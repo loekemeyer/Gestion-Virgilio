@@ -24096,3 +24096,84 @@ select np, origen, zona, es_retira from public.gv_np_prog_reparto where es_retir
 `sql/gv_np_prog_reparto_v1982.sql`. Regresión: `tests/cc-retira-web.cjs` (verificado que **falla**
 contra el código anterior). **Rollback:** `drop view public.gv_np_prog_reparto;` y volver el
 `pedUrl` a `gv_ppp_programacion_diaria`.
+
+## §3.jq — v19.83: el generador de OC contaba lo COMPROMETIDO como disponible (problema 428) — 2026-09-18
+
+**Thomas:** *"lo comprometido (separar_pedidos y a_facturar) no debería contar como stock
+disponible para la cuenta de 'lo que tenemos - lo que nos falta'"*.
+
+Salió de medir **cuánto pesaba la compensación de pedidos** después de la v19.62 (la que hizo que
+los pedidos web contaran). Midiendo eso apareció el agujero del otro lado.
+
+### El desbalance
+
+`vista_generador_oc` calcula `total = maximo + pedidos - stock`. Sus dos puntas trataban la misma
+caja de dos maneras incompatibles:
+
+| | qué hacía |
+|---|---|
+| `pend_np` (la demanda) | **EXCLUYE** las NP cuya tanda ya tiene **TP** → el pedido pickeado deja de compensar |
+| `stock` | sumaba los **8** depósitos, incluidos `separar_pedidos` y `a_facturar` → **donde el picking dejó esa misma mercadería** |
+
+O sea: la caja ya vendida contaba como disponible **y** su pedido ya no contaba como demanda. Se
+pedía de menos, sistemáticamente. La premisa de la **v7.18** (*"ya se pickeó, la góndola ya
+bajó"*) no se cumple con la definición de stock de hoy: **la caja no salió del conteo, sólo
+cambió de depósito.**
+
+Lo correcto era una de dos — contar el pedido pickeado en `pedidos` **y** su mercadería en
+`stock` (se cancelan solos), o sacarlo de los dos. Thomas eligió la segunda, que además es la que
+menos toca.
+
+### El cambio
+
+Un solo `CASE`, dos tokens: el `stock` que expone la vista sale de **`fin_dep`** en vez de
+`stock`. Las dos columnas **ya existían** en los CTE `stk` / `stk_e`:
+
+```
+fin_dep = terminado + a_guardar + racks + excedente + para_envasar + racks_ch
+stock   = fin_dep + separar_pedidos + a_facturar
+```
+
+No se agregó ni se sacó ninguna columna (siguen **22**), así que ningún consumidor se entera
+salvo por el valor.
+
+### Medido al aplicarlo (382 filas activas)
+
+| | antes | después |
+|---|---|---|
+| a pedir | 10.606 | **11.422** (+816) |
+| stock | 45.733 | **44.528** (−1.205) |
+| códigos que cambian | — | **64**, y **ninguno baja** |
+
+Peores: **505** 787→877 · **501** 944→1008 · **510** 746→807 · **583E** 197→247 · **506** 993→1031.
+
+⚠ **El 256 (Mate Madera Cerámica) queda con `stock = -1`**: tiene 2 cajas comprometidas contra 1
+de saldo total, o sea que el libro ya venía con un sobre-pickeo. **Este cambio no lo causa, lo
+destapa** — y el `greatest(0, …)` del total lo contiene (pide 5 en vez de 3). No se tocó el dato.
+
+### Lo que hay que recordar
+
+> **Las dos puntas de una resta tienen que tratar el mismo hecho igual.** Si un lado saca el
+> pedido pickeado, el otro tiene que sacar su mercadería. El bug no estaba en ninguna de las dos
+> mitades leída sola: las dos eran defendibles por separado.
+
+Y el de siempre, que esta vez mordió: **la vista la tocaron TRES sesiones el mismo día** — v19.62
+(pedidos web), v19.71 (tope de góndola), v19.80 (duales por empresa). Entre que la leí para
+diagnosticar y que fui a escribir, había crecido de ~8.000 a **18.657** caracteres y tenía CTEs
+nuevos (`dual`, `stk_e`, el `u.emp`). **Partir de la copia que uno leyó hace un rato habría
+borrado el trabajo de otra sesión.** Se aplicó por `replace()` sobre `pg_get_viewdef` de la
+definición **viva**, con guard de ancla única y `security_invoker` repuesto.
+
+### Chequeos
+
+```sql
+select * from public.gv_reglas_perdidas;   -- vacía (el centinela COALESCE\(s\.fin_dep vive acá)
+select * from public.gv_endpoints_rotos;   -- vacía
+select relname, reloptions from pg_class where oid='public.vista_generador_oc'::regclass;
+-- security_invoker=true
+```
+
+Respaldos: `zz_backups."GV_Backup_Def_GeneradorOC_20260918c"` (definición previa) y
+`zz_backups."GV_Backup_GeneradorOC_Filas_20260918c"` (las 382 filas de antes).
+Rollback exacto en `docs/ROLLBACK-PRODUCCION.md`; SQL completo en
+`sql/gv_generador_oc_stock_disponible_v1983.sql`.

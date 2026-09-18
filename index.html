@@ -5733,7 +5733,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.82"></script>
+<script type="module" src="recepcion.js?v=19.83"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.82";
+const APP_VERSION = "v19.83";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15719,10 +15719,13 @@ async function ocNuevaCrear() {
 }
 
 /* ===== GENERADOR DE OCs (v4.13): replica la lógica del Excel "Pedidos Talleristas/Prov".
-   Por artículo: A pedir = max(0, Máximo + Pedidos − Stock). Stock (vista_generador_oc, v9.65) =
-   TODO el módulo Stocks = terminado + a_guardar + racks + excedente + separar_pedidos + a_facturar
-   + para_envasar + racks_ch (NO insumos). Todo lo que hay en mano cuenta → no se re-pide; los
-   pedidos se descuentan vía la fórmula. Máximo y Proveedor salen de OC_Maximos (config del Excel);
+   Por artículo: A pedir = max(0, Máximo + Pedidos − Stock). Stock (vista_generador_oc) = el
+   DISPONIBLE: terminado + a_guardar + racks + excedente + para_envasar + racks_ch (NO insumos).
+   ⚠ v19.83 — YA NO suma separar_pedidos ni a_facturar: eso es mercadería ya pickeada y
+   comprometida con un pedido que, por estar su tanda en TP, dejó de contar como demanda. Si
+   contara de los dos lados se pedía de menos (medido: 1.205 cajas, 816 de a pedir). Problema 428.
+   Lo demás que hay en mano sí cuenta → no se re-pide; los pedidos pendientes se descuentan vía la
+   fórmula. Máximo y Proveedor salen de OC_Maximos (config del Excel);
    Pedidos (demanda) = Σ cajas por artículo en los pedidos del PPP (PPP_Programacion_Diaria) según la
    base de picking (PPP_Base_Pedidos). Agrupa por proveedor y, al confirmar, escribe las OCs en
    Ordenes_Compra (escritura: sesión de supervisor). v7.65: "Log/ Fabr" (fábrica) SÍ genera OC

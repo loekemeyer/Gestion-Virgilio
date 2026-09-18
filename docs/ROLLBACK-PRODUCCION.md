@@ -1904,3 +1904,56 @@ do $$ declare d text; begin
 end $$;
 delete from public."GV_Reglas_Centinela" where version = 'v19.66';
 ```
+
+## v19.83 — `vista_generador_oc`: el stock pasa a ser el DISPONIBLE — 2026-09-18
+
+**Qué cambió.** El `stock` que expone la vista deja de sumar **`separar_pedidos`** y
+**`a_facturar`**: pasa a salir de `fin_dep` (terminado + a_guardar + racks + excedente +
+para_envasar + racks_ch), que los CTE `stk` / `stk_e` ya calculaban. Un solo `CASE`, dos tokens;
+**no se agregó ni se sacó ninguna columna** (siguen 22).
+
+**Por qué.** `total = maximo + pedidos - stock`, y `pend_np` excluye las NP cuya tanda ya tiene
+TP. O sea que el pedido pickeado deja de compensar **mientras su mercadería seguía contando como
+disponible**, porque el picking la movió a `separar_pedidos` / `a_facturar` pero no la sacó de la
+suma. Se pedía de menos. Thomas, 18/09: *"lo comprometido no debería contar como stock disponible
+para la cuenta de lo que tenemos - lo que nos falta"*. Problema 428.
+
+**Impacto medido** (382 filas activas, al aplicarlo):
+
+| | antes | después |
+|---|---|---|
+| a pedir | 10.606 | **11.422** (+816) |
+| stock | 45.733 | **44.528** (−1.205 comprometidas) |
+| códigos que cambian | — | 64, **ninguno baja** |
+
+Peores: 505 787→877 · 501 944→1008 · 510 746→807 · 583E 197→247 · 506 993→1031.
+⚠ El **256** (Mate Madera Cerámica) queda con `stock = -1`: tiene 2 comprometidas y 1 de saldo
+total, o sea que el libro ya traía un sobre-pickeo. **No lo causa este cambio, lo destapa**; el
+`greatest(0, …)` lo contiene (pide 5 en vez de 3).
+
+**Qué de Producción lo ve.** Su `index.html` lee `vista_generador_oc` (mismo endpoint que
+Gestión) y el cron **`ocs-auto-miercoles`** (miércoles 10:00 UTC) corre
+`generar_ocs_automaticas`, que también la lee: desde ahora las dos puntas piden el disponible.
+Es la intención del cambio, no un efecto colateral.
+
+**Respaldos:** `zz_backups."GV_Backup_Def_GeneradorOC_20260918c"` (la definición previa, con sus
+reloptions) y `zz_backups."GV_Backup_GeneradorOC_Filas_20260918c"` (las 382 filas de antes, para
+comparar). Centinela nuevo en `GV_Reglas_Centinela` (`COALESCE\(s\.fin_dep`) para que no vuelva
+de contrabando.
+
+**Rollback exacto** — vuelve a contar lo comprometido como disponible:
+
+```sql
+do $rb$
+declare v_def text;
+begin
+  select def into v_def from zz_backups."GV_Backup_Def_GeneradorOC_20260918c";
+  execute 'create or replace view public.vista_generador_oc as ' || v_def;
+  execute 'alter view public.vista_generador_oc set (security_invoker = true)';
+  update public."GV_Reglas_Centinela" set activo = false where patron = 'COALESCE\(s\.fin_dep';
+end $rb$;
+-- verificar: sum(total) tiene que volver a 10.606 si no entró movimiento nuevo
+select sum(total) from public.vista_generador_oc where activo;
+```
+
+`sql/gv_generador_oc_stock_disponible_v1983.sql`.

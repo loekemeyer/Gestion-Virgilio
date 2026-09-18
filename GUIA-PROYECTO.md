@@ -1,3 +1,37 @@
+## Nota v19.83 (2026-09-18) — El generador de OC contaba lo comprometido como disponible (problema 428)
+
+Thomas: *"lo comprometido (separar_pedidos y a_facturar) no debería contar como stock disponible
+para la cuenta de 'lo que tenemos - lo que nos falta'"*.
+
+Salió de medir cuánto pesaba la compensación de pedidos web después de la v19.62. Midiendo eso
+apareció el agujero del otro lado: **las dos puntas de la resta trataban la misma caja distinto.**
+
+| | qué hacía |
+|---|---|
+| `pend_np` (demanda) | **saca** las NP cuya tanda ya tiene TP → el pedido pickeado no compensa |
+| `stock` | sumaba `separar_pedidos` y `a_facturar` → **donde ese picking dejó la mercadería** |
+
+Resultado: la caja ya vendida se contaba como disponible **y** su pedido ya no se contaba como
+demanda. Se pedía de menos, siempre para el mismo lado.
+
+**Desde la v19.83 el `stock` del generador es el DISPONIBLE** — terminado + a_guardar + racks +
+excedente + para_envasar + racks_ch. La columna Stock de la pantalla muestra eso.
+
+| | antes | después |
+|---|---|---|
+| a pedir | 10.606 | **11.422** (+816) |
+| stock | 45.733 | **44.528** (−1.205 comprometidas) |
+| códigos que cambian | — | 64, **ninguno baja** |
+
+Peores: 505 787→877 · 501 944→1008 · 510 746→807 · 583E 197→247 · 506 993→1031.
+
+⚠ **El 256 (Mate Madera Cerámica) queda en −1**: tiene 2 comprometidas contra 1 de saldo total, o
+sea un sobre-pickeo que ya estaba en el libro y que el stock total tapaba. **No lo causa este
+cambio, lo destapa**; el `greatest(0, …)` lo contiene. No se tocó el dato.
+
+Detalle, respaldos y rollback: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.jq y
+`docs/ROLLBACK-PRODUCCION.md`. SQL: `sql/gv_generador_oc_stock_disponible_v1983.sql`.
+
 ## Nota v19.78 (2026-09-18) — Generador de OCs: un artículo con dos talleristas, UNA fila (problema 419)
 
 Thomas, mirando el 505 (Pelador Plástico, repartido 50/50 entre **Garcia** y **Lucho**): *"para

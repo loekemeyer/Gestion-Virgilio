@@ -1031,6 +1031,40 @@ select count(*) filter (where llenar_gondola)                as pisan_la_proyecc
   from public.vista_generador_oc;
 ```
 
+## ⚠ Regla del dueño (2026-09-18, v19.83): lo COMPROMETIDO no es stock disponible
+
+**Thomas, 2026-09-18:** *"lo comprometido (separar_pedidos y a_facturar) no debería contar como
+stock disponible para la cuenta de 'lo que tenemos - lo que nos falta'"*.
+
+El `stock` de **`vista_generador_oc`** es el **DISPONIBLE**:
+
+```
+terminado + a_guardar + racks + excedente + para_envasar + racks_ch      ← cuenta
+separar_pedidos + a_facturar                                            ← NO cuenta
+```
+
+**Por qué, y es la parte que importa:** `total = maximo + pedidos - stock`, y el CTE `pend_np`
+**excluye** las NP cuya tanda ya tiene **TP**. O sea que el pedido pickeado deja de compensar
+como demanda — mientras su mercadería seguía sumando como disponible, porque el picking la mueve
+a `separar_pedidos` / `a_facturar` pero no la saca del depósito. **La misma caja tratada de dos
+maneras incompatibles en las dos puntas de la resta**, y siempre para el mismo lado: se pedía de
+menos. Medido al corregirlo: **1.205 cajas comprometidas, +816 de a pedir en 64 códigos**, ninguno
+a la baja. Problema 428, §3.jq.
+
+⚠ **Esto NO cambia el módulo Stocks ni ninguna otra pantalla**: lo comprometido sigue existiendo y
+se sigue viendo donde corresponde. Cambia **sólo** la cuenta del generador de OC.
+
+⚠ **Y destapó un negativo viejo**: el **256** (Mate Madera Cerámica) tiene 2 cajas comprometidas
+contra 1 de saldo total, así que su disponible da **−1** — un sobre-pickeo que ya estaba en el
+libro y que el stock total tapaba. El `greatest(0, …)` lo contiene. **No se tocó el dato.**
+
+> **La regla general, que vale para cualquier resta:** si un lado saca un hecho, el otro tiene
+> que sacarlo también. El bug no estaba en ninguna de las dos mitades leída sola — las dos eran
+> defendibles por separado.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — el centinela `COALESCE\(s\.fin_dep`
+vive ahí. `sql/gv_generador_oc_stock_disponible_v1983.sql`.
+
 ## ⚠ PROTOCOLO: Backend vs Front-end — decidir y avisar (ya NO se pregunta)
 
 **Cuando alguien pide cambiar lógica** (normalización de códigos, cálculos, filtros,
