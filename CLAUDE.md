@@ -1888,6 +1888,19 @@ select p.prosrc ~ 'gv_empresa_de_articulo' as tiene_la_regla_del_articulo
 **Chequeo de que no volvió a pasar:** `select * from public.gv_stock_empresa_fantasma;` vacía, y
 esta consulta en 0 — caza el duplicado que el índice único no ve, porque compara **sin** la empresa:
 
+⚠ **Ese centinela cambió en la v19.77 (problema 416): ahora sólo marca el split de etiqueta de
+verdad** (`fantasma = least(positivo, negativo)`). Antes disparaba con **cualquier** saldo
+negativo de una sola empresa —donde no hay ninguna caja fantasma— y por eso vivía en rojo. Los
+sobre-pickeos comunes van a **`gv_stock_negativos`**, que ya los lista con descripción.
+
+⚠ **Y hay un tercer duplicado que ninguno de los dos veía**, porque el `ref` es **otro**: el que
+deja el renombre de tanda. `select * from public.gv_stock_picking_duplicado;` — vacía = todo
+bien. El 18/09 marcó 4 tandas (D71B/E40A, E03F/E12R, E11B/E41A, E03G/E44A): **+461 cajas en
+Pickeados, −443 en góndola**. Causa: `gv_ppp_tanda_renombrar` no renombra los eventos **PKC**
+(la tanda va en el campo 1 y `gv_evento_tanda` devuelve NULL) ni los `ref` con pipe
+(`tanda|NP`, `NP|CP`), así que el cron 68 vuelve a insertar el picking con el código viejo.
+§3.jj, problemas 417, 420 y 421.
+
 ```sql
 select count(*) from (
   select 1 from public."Movimientos_Stock" where tipo in ('picking','separado','facturado')

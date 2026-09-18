@@ -23645,3 +23645,89 @@ Rollback: el `CREATE OR REPLACE` viejo está en el historial de git; para los da
  where b.id = "Registros_Produccion_Virgilio".id;`
 
 `sql/gv_evento_tanda_v1976.sql`.
+
+## §3.jj — v19.77: los dos centinelas de stock — uno gritaba de más y el otro no existía — 2026-09-18
+
+**Cómo empezó:** «6 códigos con stock fantasma (760, 764, 727E, 955E, 256, 207), todos de hoy
+09:40 y 10:20». Los 6 salían de `gv_stock_empresa_fantasma`. Ninguno era un problema de etiqueta
+de empresa — y abajo había uno bastante peor.
+
+### 1. El centinela de etiqueta disparaba con cualquier negativo (problema 416)
+
+Calculaba `fantasma = Σ greatest(saldo,0) − Σ saldo` por `(cod, deposito)`. Con **una sola**
+empresa y saldo negativo eso da `0 − (−N) = N`: la fila sale aunque no exista ninguna pila
+positiva del otro lado, o sea ninguna caja fantasma. Medido el 18/09: **5 filas, 0 con dos
+empresas**. Y la columna `riesgo` decía *"etiqueta: código no dual, una sola pila"*, que se lee
+como si el problema fuera la etiqueta.
+
+Un centinela que el `CLAUDE.md` declara *"vacía = todo bien"* y que está permanentemente rojo no
+lo mira nadie — y el día que aparezca un split real (el de D72A, problema 390) pasa de largo.
+
+Ahora `fantasma = least(positivo, negativo)`: las cajas que una etiqueta muestra en positivo
+mientras la otra las debe. Con una sola pila da 0 y la fila no sale. Los sobre-pickeos comunes ya
+los lista **`gv_stock_negativos`**, con descripción del artículo y qué hacer.
+
+**Probado rompiéndolo a propósito**, adentro de un bloque que aborta (leer la vista no prueba
+nada): dos filas del mismo código, `LK +5` y `CH −5` → 1 fila, `fantasma = 5`, `detalle = CH: -5
+LK: 5`. El bloque termina en `raise`, así que no queda nada.
+
+### 2. Lo que apareció abajo: 4 tandas con el picking contado dos veces (problema 420)
+
+Tirando del hilo de los 3 códigos CH (760, 764, 727E), que venían de la tanda `E03G`:
+
+| tanda fantasma | tanda viva | códigos | cajas | re-creada |
+|---|---|---|---|---|
+| D71B | E40A | 25 | 78 | 18/09 08:40 |
+| E03F | E12R | 50 | 184 | 18/09 09:40 |
+| E11B | E41A | 5 | 50 | 18/09 09:50 |
+| E03G | E44A | 35 | 149 | 18/09 10:20 |
+
+**+461 cajas fantasma en Pickeados y −443 en góndola**, en 345 filas de `Movimientos_Stock`
+insertadas todas hoy. Mismo cuadro que el problema 390 (+287 / −265).
+
+**La causa es el renombre de tanda, y tiene dos agujeros distintos:**
+
+- **Los eventos PKC no se renombran** (problema 421). `gv_ppp_tanda_renombrar` renombra los
+  eventos de ciclo (EP/TP/AP/TAP/PUB/AUB por el update de texto exacto; ENT/TAL por
+  `gv_evento_set_tanda`), pero el PKC lleva la tanda en el **campo 1** y
+  `gv_evento_tanda('PKC', …)` devuelve `NULL`. Entonces
+  `reconciliar_pipeline_stock_etapa1` (cron 68, cada 10 min) deriva la tanda de ese campo 1, no
+  encuentra filas con ese `ref` —el renombre las movió al código nuevo— y las **inserta de
+  nuevo**. `mov_stock_pipeline_dedup` no lo frena: el `ref` es distinto.
+- **Los `ref` con `|` tampoco se renombran.** El update es
+  `set ref = nueva where upper(btrim(ref)) = vieja`, match **exacto**: mueve el `separado`
+  (`ref = tanda`) y deja los drenajes por NP (`ref = tanda|NP`, ej. `E03G|CH 0010`) y los de CP
+  (`NP|CP`) en el código viejo. Por eso `a_facturar` quedó en **−140 en 30 códigos** bajo E03G y
+  **−72 en 20** bajo D71B, con la pila ya movida al código nuevo (problema 417).
+
+⚠ **El diagnóstico fácil era «se facturó antes de armar», y era falso.** El `ts` de una fila de
+picking es cuándo la escribió el reconciliador, no cuándo se pickeó: por eso E03G parecía
+pickeada el 18/09 y facturada el 17/09. El orden real (PKC 16/09 → TAP 17/09 13:50 → facturado
+17/09 14:56) sale de `Registros_Produccion_Virgilio`, no de `Movimientos_Stock`.
+
+### 3. El centinela nuevo: `gv_stock_picking_duplicado`
+
+```sql
+select * from public.gv_stock_picking_duplicado;   -- vacía = ningún picking contado dos veces
+```
+
+Empareja tandas con la **misma huella de picking** (`md5` de código:delta de `separar_pedidos`) y
+se queda con las que tienen la firma exacta del bug: la fantasma **tiene** los PKC, la viva no
+tiene **ninguno**, y la fantasma ya no figura en ninguna programación. Devuelve además
+`gondola_de_mas`, que es lo que hay que reponer.
+
+⚠ Sin la condición de los PKC salían dos pares viejos de más —`D19A`/`C83C` (30/07) y
+`D10F`/`C80E` (11/08)—: un solo código, una sola caja y cada tanda con su propio PKC, o sea
+coincidencia. **Un centinela con falsos positivos es un centinela apagado**, que es justamente lo
+que le pasó al de etiqueta.
+
+**Qué NO se tocó:** las 345 filas duplicadas y los negativos de `a_facturar` siguen ahí. Borrarlas
+es tocar datos reales y va con permiso explícito (protocolo). Los dos problemas de fondo —el
+renombre del PKC (421) y el del `ref` con `|` (417)— tampoco: mueven stock y hay que medirlos
+corriendo el reconciliador, no leyendo el código.
+
+**Rollback:** `sql/gv_centinelas_stock_v1977.sql` tiene el `CREATE OR REPLACE` de las dos vistas;
+para volver atrás, restaurar la definición anterior de `gv_stock_empresa_fantasma`
+(`where (positivo - total) > 0`) y `drop view public.gv_stock_picking_duplicado`. Ninguna vista
+la lee nadie (0 dependientes, 0 funciones, 0 apariciones en el front), así que el cambio no puede
+romper una pantalla.
