@@ -1,4 +1,4 @@
-## Nota v20.18 (2026-09-18) — El monitor de la TV también dice qué ya salió
+## Nota v20.19 (2026-09-18) — El monitor de la TV también dice qué ya salió
 
 Thomas, sobre `monitor/tv.html`: **sí**, que lleve SALIÓ. En la TV no hay columnas de porcentaje
 (no es la PPP), así que la pregunta se contesta donde importa en una pared: **la tabla «Tandas a
@@ -20,7 +20,7 @@ tanda facturada Y despachada (`despachadaYFacturada`). Se partió en dos piezas 
 con 🚚, con la fila marcada y con el aviso en el título. Se verificó **rompiéndolo a propósito**
 (sacando el 🚚 del render): el test cae con *"le falta el 🚚 de salió"*.
 
-## Nota v20.18 (2026-09-18) — El picking arrancaba por el excedente y rompía el recorrido
+## Nota v20.19 (2026-09-18) — El picking arrancaba por el excedente y rompía el recorrido
 
 Thomas, probando el módulo de operarios con una tanda: *"primero le dice que pickee del excedente,
 eso rompe el flujo de movimiento por las góndolas"*. Tenía razón, y el dato lo dice solo.
