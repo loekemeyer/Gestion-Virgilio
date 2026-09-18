@@ -14555,3 +14555,16 @@ distinta, empresa distinta.
 > `select np, origen, zona, es_retira from gv_np_prog_reparto where es_retira order by np;`
 > `sql/gv_np_prog_reparto_v1984.sql` · `tests/cc-retira-web.cjs` · §3.jp de
 > `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+> Nota **v19.86** — **Un RETIRA figura como retira en la programación, sea de ISIS o web**
+> (Thomas, 18/09). ISIS ya andaba (la zona viaja en la programación y el barrio `Retira` está en
+> el diccionario). Lo web decidía con `barrio ~* 'retir'`: subcadena y sobre un solo campo. Por
+> eso **Retiro** —barrio de CABA— quedaba marcado Retira y no se repartía nunca (3 direcciones por
+> `zona_expreso`, 4 por `localidad`), y al revés **no veía el retiro en fábrica que viene por el
+> expreso** (`nombre_expreso = 'Retira'`, 140 direcciones en LK: `zona_expreso` sigue trayendo el
+> barrio del cliente y gana el coalesce). Eran **5 NP** saliendo al reparto siendo retiras: LK 0011
+> y LK 0157 (BP Import), LK 0024 (Osa), LK 0143 y LK 0144 (Suppa). Ahora `gv_ppp_web_zona` matchea
+> **exacto** y mira los tres campos. ⚠ **Sólo manda hacia adelante**: esas 5 quedan con la zona
+> vieja y tres ya tienen tanda de reparto — sacarlas es decisión de armado (Marianela), no de
+> Claude. Chequeo: `select * from gv_retira_sin_etiqueta;` — vacía = todo bien.
+> `sql/gv_ppp_web_zona_retira_v1986.sql` · §3.jq de `docs/SUPABASE-GESTION-VIRGILIO.md`.
