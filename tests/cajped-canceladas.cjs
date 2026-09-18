@@ -6,6 +6,13 @@
        cancelada nunca se programa, así que el ⚠ era siempre falso.
    F2) Razón Social con fallback a PPP_Base_Pedidos.cliente cuando la NP no está en
        Programación Diaria (antes la celda quedaba vacía → "pedido sin nombre de cliente").
+   F3) v19.65 — el pop-up muestra TAMBIÉN los pedidos de la WEB. Thomas, 18/09: *"¿por qué ahí
+       dice que pide 198 pero cuando entro veo solo tres cajas? algo está mal"*. La fuente era
+       `gv_ppp_base_pedidos` (SOLO el espejo de ISIS), así que las NP de la página —que se
+       llaman "LK 0025" y viven en otra tabla— no aparecían: en el 321 mostraba 3 cajas de 2 NP
+       cuando había 13 NP web más con 194. Ahora lee `gv_demanda_pedidos` (ISIS + web) y la
+       programación sale de `gv_np_prog_info` (las dos programaciones + razón social), así que
+       una NP web tampoco queda marcada ⚠ "sin programar". Las filas van ordenadas por DÍA.
    Todo con fetch stubbeado (sin red). Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -25,17 +32,28 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.getEmpleadosNombres = async function () { return new Map(); };
     window.fetch = function (url) {
       url = String(url);
+      // v19.65: la demanda sale de gv_demanda_pedidos (ISIS + WEB), no del espejo de ISIS
+      if (url.indexOf("gv_demanda_pedidos") >= 0) return J([
+        { pedido: "44458",   cajas: 18, articulo: "719", origen: "isis" }, // CANCELADA
+        { pedido: "44593",   cajas: 6,  articulo: "719", origen: "isis" }, // sin programar (fallback de RS)
+        { pedido: "44600",   cajas: 16, articulo: "719", origen: "isis" }, // programada
+        { pedido: "44700",   cajas: 5,  articulo: "719", origen: "isis" }, // ya facturada
+        { pedido: "LK 0053", cajas: 80, articulo: "719", origen: "web"  }  // F3: la de la página
+      ]);
+      // el fallback de Razón Social sigue saliendo de la base de ISIS (no tiene las web)
       if (url.indexOf("ppp_base_pedidos") >= 0) return J([
-        { pedido: "44458", cajas: 18, cliente: "Dorinka S.R.L" },   // CANCELADA
-        { pedido: "44593", cajas: 6,  cliente: "Aguilar Maria Co" },// sin programar (fallback de RS)
-        { pedido: "44600", cajas: 16, cliente: "Dorinka S.R.L" },   // programada
-        { pedido: "44700", cajas: 5,  cliente: "Facturado SA" }     // ya facturada
+        { pedido: "44458", cliente: "Dorinka S.R.L" },
+        { pedido: "44593", cliente: "Aguilar Maria Co" },
+        { pedido: "44600", cliente: "Dorinka S.R.L" },
+        { pedido: "44700", cliente: "Facturado SA" }
       ]);
       if (url.indexOf("NP_Canceladas") >= 0) return J([{ np: "44458" }]);
       if (url.indexOf("Facturacion_NP") >= 0) return J([{ np: "44700" }]);
       if (url.indexOf("ppp_entregados_meta") >= 0) return J([]);
-      if (url.indexOf("ppp_programacion_diaria") >= 0) return J([
-        { np: "44600", tanda: "D58A", razon_social: "Dorinka S.R.L", fecha_entrega: "2026-09-03" }
+      // v19.65: las dos programaciones juntas, con la web incluida
+      if (url.indexOf("gv_np_prog_info") >= 0) return J([
+        { np: "44600",   tanda: "D58A", razon_social: "Dorinka S.R.L",   fecha_entrega: "2026-09-03" },
+        { np: "LK 0053", tanda: "E17B", razon_social: "Orfali Alfredo",  fecha_entrega: "2026-09-22" }
       ]);
       return J([]);
     };
@@ -45,10 +63,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const html = document.getElementById("stkPopBody").innerHTML;
 
     out.nps = rows.map(function (x) { return x.np; }).join(",");
-    // F1: 44458 (cancelada) y 44700 (facturada) fuera; quedan 44593 + 44600 = 22 cajas
-    out.sinCancelada = out.nps === "44593,44600";
+    /* F1 + F3: 44458 (cancelada) y 44700 (facturada) fuera; quedan 44593 + 44600 + LK 0053.
+       v19.65: ordenadas por DÍA de entrega — 44600 el 03/09, LK 0053 el 22/09, y la sin fecha
+       (44593) al final. Si alguien vuelve a ordenar por número de NP, esto falla. */
+    out.sinCancelada = out.nps === "44600,LK 0053,44593";
     out.total = rows.reduce(function (s, x) { return s + x.pidio; }, 0);
-    out.totalOk = out.total === 22;
+    out.totalOk = out.total === 102;   // 6 + 16 + 80
+    // F3: la NP web está, con su origen, su tanda y SIN el ⚠ de "sin programar"
+    var _web = rows.filter(function (x) { return x.np === "LK 0053"; })[0];
+    out.webEsta = !!_web && _web.pidio === 80 && _web.origen === "web"
+      && _web.tanda === "E17B" && _web.sinProg === false;
+    out.webEnHtml = html.indexOf("LK 0053") >= 0 && html.indexOf(">WEB<") >= 0;
     out.hintCancel = html.indexOf("1 NP canceladas (🚫 no va)") >= 0;
     out.hintFact = html.indexOf("1 NP ya facturadas/entregadas") >= 0;
     // el ⚠ "sin programar" ya no se dispara por una cancelada: sólo la 44593 queda marcada
@@ -65,7 +90,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // caso borde: si TODAS las NP están canceladas/facturadas, el pop-up lo dice y no rompe
     window.fetch = function (url) {
       url = String(url);
-      if (url.indexOf("ppp_base_pedidos") >= 0) return J([{ pedido: "44458", cajas: 18, cliente: "Dorinka S.R.L" }]);
+      if (url.indexOf("gv_demanda_pedidos") >= 0) return J([{ pedido: "44458", cajas: 18, articulo: "719", origen: "isis" }]);
+      if (url.indexOf("ppp_base_pedidos") >= 0) return J([{ pedido: "44458", cliente: "Dorinka S.R.L" }]);
       if (url.indexOf("NP_Canceladas") >= 0) return J([{ np: "44458" }]);
       return J([]);
     };
@@ -75,7 +101,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     return out;
   });
   const pass = r.sinCancelada && r.totalOk && r.hintCancel && r.hintFact && r.spOk &&
-    r.rsOk && r.rsEnHtml && r.todoCancelado && errs.length === 0;
+    r.rsOk && r.rsEnHtml && r.todoCancelado && r.webEsta && r.webEnHtml && errs.length === 0;
   console.log("cajped-canceladas:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();

@@ -23066,6 +23066,24 @@ rollback quedaron **0 filas** con `dedup_key like 'ocajena_%'` — no se mandó 
 `tests/rcp-oc-ajena.cjs` cubre el front y **se verificó rompiéndolo**: con `ajena: null` en
 `opExcesoItems` el test falla en 4 chequeos.
 
+### ✅ Resuelto el 18/09 — las dos decisiones de Thomas
+
+**(1) *"1 sí"* → se corrió `gv_oc_recompute_recibido()` sin filtros**: 85 filas, las 4.214 cajas
+fantasma a cero. El dry-run en `begin … rollback` dio **exactamente las mismas 85** que la corrida
+real, y ninguna OC viva perdió `cantidad_recibida` (75 pendiente→anulada, 8 recibida→anulada, 2
+ajustes sobre anuladas). Quedan **154 OC pendientes / 12.539 cajas**, que es lo que falta de
+verdad. Problema **401** cerrado. Backup y rollback exacto en `docs/ROLLBACK-PRODUCCION.md`.
+
+**(2) *"2 ambos"* → el 550 quedó con los dos proveedores, 50/50**: Garcia de `proveedor`, Poly de
+`proveedor2`. Medido a 6 meses: Garcia 256 cj (7 entregas, y es el que entrega hoy), Poly 203
+(hasta el 30/06), Log/Fabr 145 — el reparto real da 56/44 y se redondeó. El generador del
+miércoles parte las 144 en 72 y 72.
+⚠ **Hasta ese miércoles el 550 de Garcia sigue avisando como ajeno, y está bien**: la OC vigente
+(id 914) se emitió sólo a Poly. **No se partió a mano a propósito.**
+
+**(3)** Lo de silenciar el par Log/Fabr ← Oscar quedó **sin hacer**: `GV_OC_Entrega_Permitida`
+sigue vacía, así que ese par avisa.
+
 **Chequeo:** `select caso, count(*), sum(cajas) from public.gv_oc_entregas_ajenas
 where fecha >= current_date - 30 group by 1;`
 `sql/gv_oc_entrega_ajena_v1957.sql` · problemas **250** (abierto) y **398** (descartado).
@@ -23138,7 +23156,308 @@ Problemas **402** (LK) y **403** (Gestión).
 
 ---
 
-## §3.jg — v19.60: todo se programa solo, salvo súper (menos Carrefour) y Matiz — 2026-09-18
+## §3.jg — v19.60: la Conciliación se recalcula cuando alguien la mira, no cuando toca el reloj — 2026-09-18
+
+**Lo que hacía el cron 90 (`gv-cruce-fc-asig`, `gv_cruce_fc_asig_refrescar`):** cruza cada NP de
+`Facturacion_NP` con su factura real de ISIS y deja el resultado en el caché
+**`GV_Cruce_FC_Asig`** (hoy 905 NP: 890 con factura, 15 sin). El emparejamiento exige las cuatro:
+misma **empresa** (`gv_empresa_de_np_texto`), mismo **código de cliente** (`canon_cod`), **fecha**
+±3 días de la salida y **cajas** ±15 % con piso de 1. De los candidatos toma el más parecido y
+asigna **uno a uno** (la temp tiene `np` y `doc_id` los dos únicos), y guarda **cuántos candidatos**
+había — eso es el "hay 3 facturas posibles, elegí" de la pantalla.
+
+Lo leen `gv_conciliacion_lista`, `gv_conciliacion_comparar` y `gv_vista_cruce_facturacion`: **nadie
+recalcula el cruce en vivo**, todos leen el caché.
+
+**El problema era la frecuencia, no el cruce.** Corría **cada 10 minutos** — 144 corridas por día,
+3,09 s cada una — y en esas corridas **no cambiaba una sola fila**: las facturas entran cuando
+Facturación baja el Excel de ISIS, no cada 10 minutos.
+
+**Qué cambió (Luis, 18/09: *"cron cada 30 entonces"*):**
+
+| | antes | ahora |
+|---|---|---|
+| cron 90 | `*/10` (144 corridas/día) | **`7-59/30`** (48/día) |
+| quién refresca de verdad | sólo el cron | **la pantalla, al abrirse** |
+
+⚠ **El offset del cron no es cosmético**: en Virgilio el minuto `:00` también está cargado
+(`*/2`, `*/5`, `*/10`, `*/15` caen todos ahí). `7-59/30` lo deja en los minutos 7 y 37, lejos
+también del `:30` donde ya vive el cron 63. Misma lección que costó nueve horas en LK el 17/09.
+
+**El refresco perezoso YA EXISTÍA y nadie lo llamaba.** `gv_cruce_fc_asig_refrescar_si_viejo(p_seg)`
+estaba escrita desde antes: recalcula sólo si el caché tiene más de `p_seg` segundos, y si no
+devuelve `-1` sin tocar nada. No se usaba porque **tenía el `EXECUTE` revocado a
+`anon`/`authenticated`**. Se le dio `EXECUTE` a **`authenticated` solamente** — no a `anon`: es
+`SECURITY DEFINER` y dispara un recálculo de ~3 s, así que abrirla a la clave pública sería
+regalar un botón de carga. Conciliación es pantalla de supervisor, o sea sesión `authenticated`.
+
+`concilRefresh()` la llama con `p_seg: 180` **antes** del `Promise.all`, **en su propia llamada y
+con su propio catch**: si falla —o si la sesión no es `authenticated`— la pantalla carga igual con
+el caché como esté, que es exactamente lo que hacía antes. Es la lección de la v19.44 (*lo nuevo no
+se cuelga del `await` de lo que ya funciona*).
+
+**Resultado:** la Conciliación queda **más fresca** que antes (se recalcula cuando alguien la mira,
+no cuando toca el reloj) y la base hace **96 corridas menos por día**.
+
+**El guard de siempre sigue:** si el cruce vuelve vacío, `gv_cruce_fc_asig_refrescar` **no pisa el
+caché** (`if n = 0 then return 0`) — un caché vacío dejaría la Conciliación sin facturas y nadie se
+enteraría.
+
+**Rollback:** `select cron.alter_job(90, schedule := '*/10 * * * *');` ·
+`revoke execute on function public.gv_cruce_fc_asig_refrescar_si_viejo(integer) from authenticated;`
+· y sacar la línea del `_si_viejo` de `concilRefresh()` en `index.html`.
+
+## §3.jf — v19.62: el generador de OC IGNORABA los pedidos WEB — 2026-09-18
+
+**Thomas, mirando el 321 en la pantalla de Stocks:** *"¿Por qué 321 sacó OC de 120 si está
+así?"* — la pantalla mostraba **321 de stock y 198 cajas pedidas**, y la OC del 16/09 salió por
+**120**.
+
+La cuenta de esa OC cerraba con los datos que tenía: `445 + 6 − 331 = 120`. **El problema es que
+los datos estaban mal: contaba 6 cajas pedidas cuando había ~199.**
+
+### La causa
+
+El CTE `pend_np` de `vista_generador_oc` miraba **sólo `GV_PPP_Programacion_Diaria`**, o sea las
+NP de ISIS. Las NP web viven en **`PPP_Web_Programacion`** y se nombran con
+`gv_ppp_web_np_label()` (`LK 0001`), así que ninguna matcheaba contra `gv_demanda_pedidos.pedido`
+y **su demanda contaba CERO**.
+
+⚠ **El arreglo ya estaba escrito al lado y nadie lo trajo.** `vista_stock_procesada` tiene el CTE
+`pend_np_oc`, que hace el `UNION` con la web y además saltea `GV_Web_Cancelados`. El generador
+quedó con la versión vieja. Por eso el parche **copia ese bloque tal cual** en vez de escribir uno
+nuevo: si divergen otra vez, la pantalla y la OC vuelven a decir cosas distintas.
+
+### Lo medido antes de aplicar
+
+| | |
+|---|---|
+| códigos con demanda web ignorada | **265** |
+| cajas que el generador no veía | **4.465** |
+| códigos que pasan a pedir más | **92** |
+| **cajas de más a pedir** | **2.651** |
+
+Peores: **505** 85 → 574 · **501** 89 → 325 · **506** 630 → 833 · **321** 127 → 320 · **586**
+0 → 188 · **544** 270 → 395 · **510** 472 → 586.
+
+⚠ **Y el 321 igual queda topeado por la GÓNDOLA, no por la proyección:** la proyección pide
+366,33 × 1,5 = 550 y la capacidad es **445**, así que `maximo` = 445. Con la web contada:
+`445 + 196 − 321 = 320`. Es la respuesta completa a la pregunta de Thomas — había **dos** cosas,
+no una: la demanda web sin contar (bug) y el techo de góndola (a propósito).
+
+### Sin doble conteo, medido
+
+Las **16 NP** de `GV_PPP_Prog_Override` marcadas `oculto` —los espejos de ISIS que duplican un
+pedido web— aportan **0 cajas** de demanda, así que el `UNION` no suma nada dos veces.
+
+### Cómo se aplicó
+
+Reemplazo de texto sobre `pg_get_viewdef` de la definición **viva** (nunca sobre una copia del
+repo), con dos guards: que el ancla exista y que aparezca **una sola vez**. Respaldo de la
+definición previa y sus `reloptions` en `zz_backups."GV_Backup_Def_GeneradorOC_20260918"`, y el
+`CREATE` resultante completo en `sql/gv_generador_oc_pedidos_web_v1962.sql`.
+`security_invoker = true` repuesto después del replace, y verificado.
+
+⚠ **`vista_generador_oc` la lee también el front de Producción Virgilio** (`index.html`, `sw.js`)
+→ la nota de rollback está en `docs/ROLLBACK-PRODUCCION.md`.
+
+### El centinela, para que no se pierda otra vez
+
+```sql
+insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
+values ('vista_generador_oc','vista','PPP_Web_Programacion', '…', 'Thomas','v19.62');
+```
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` vacía · `select * from
+public.gv_endpoints_rotos;` vacía · `select codn, pedidos, total from public.vista_generador_oc
+where codn = '321';` → 196 y 320. Problema **405**.
+
+## §3.jg — v19.65: el pop-up «Cajas pedidas» tampoco veía la web — 2026-09-18
+
+**Thomas, el mismo día y sobre el mismo 321:** *"¿Por qué ahí dice que pide 198 pero cuando entro
+veo solo tres cajas? Algo está mal."* Tenía razón: **el mismo agujero de §3.jf, en otro lugar.**
+
+El pop-up leía **`gv_ppp_base_pedidos`**, que es sólo el espejo de ISIS. Las NP de la página se
+llaman `LK 0025` y viven en `PPP_Web_Base`, así que no aparecían.
+
+| Pendiente del 321 al 18/09 | NP | Cajas |
+|---|---|---|
+| ISIS — lo único que mostraba el pop-up | 2 | **3** |
+| **WEB — lo que faltaba** | **13** | **194** |
+| Total (lo que dice la columna) | 15 | **197** |
+
+Y encima, aunque hubieran aparecido, **habrían salido todas marcadas ⚠ "sin programar"**: la
+segunda consulta del pop-up iba a `gv_ppp_programacion_diaria`, que tampoco tiene las web.
+
+### Qué quedó
+
+| | |
+|---|---|
+| `gv_np_prog_info` (vista nueva) | np · origen · tanda · fecha_entrega · razón social, **de las dos programaciones**: `gv_ppp_programacion_diaria` (con los overrides ya aplicados) + `PPP_Web_Programacion`. A diferencia de `gv_np_prog`, **no exige tanda** y trae la razón social |
+| `index.html` — la demanda | `gv_ppp_base_pedidos` → **`gv_demanda_pedidos`** (ISIS + web, y trae `origen`) |
+| `index.html` — la programación | `gv_ppp_programacion_diaria` → **`gv_np_prog_info`** |
+| Badge **WEB** | cada NP de la página se ve como tal, en la tabla y en el Excel |
+| Orden | por **día de entrega** (sin fecha al final), no por número de NP — con las dos fuentes mezcladas el número no ordena nada, y la pregunta que se le hace a esta pantalla es *"¿para qué día están las que quedan?"* |
+
+⚠ **El fallback de Razón Social de la v12.22 se conservó**: `gv_demanda_pedidos` no tiene
+`cliente`, así que las NP de ISIS que no están en ninguna programación lo siguen sacando de
+`gv_ppp_base_pedidos`, ahora en una consulta aparte de dos columnas. Sin eso, esas filas volvían
+a quedar en "—" y el test `cajped-canceladas` (F2) lo caza.
+
+### Lo que confirmó que estaba bien cubierto
+
+**El test ya existía y el cambio lo puso en rojo** — `cajped-canceladas.cjs`, que stubbea la
+fuente vieja. Se actualizó el fixture (ahora sirve `gv_demanda_pedidos` con una NP web y
+`gv_np_prog_info`) y se le agregó **F3**: la NP web aparece, con su tanda, sin el ⚠, con badge, y
+el orden por día. **Verificado rompiéndolo**: con la fuente vuelta a `gv_ppp_base_pedidos` el test
+falla en 12 chequeos.
+
+⚠ **Dos tests de la suite son INESTABLES y no tienen que ver con esto**:
+`pga-enviar-a-programar` y `ppp-tanda-cambiar-dia` fallan de a uno según la corrida (timing de
+Playwright bajo carga; `ppp-tanda-cambiar-dia` falló **en main limpio** y pasó con el cambio
+aplicado). Aislados pasan los dos. A la tercera corrida la suite entera dio verde (rc=0). Queda
+anotado: si alguien los ve en rojo, que los corra solos antes de buscar la causa en su diff.
+
+**Chequeo:** abrir el 321 en Stocks → 15 NP, 197 cajas, 13 con badge WEB, ordenadas 21/9 → 29/9.
+
+---
+
+## §3.jh — v19.69: mover una tanda pickeada adentro de otra reventaba con «duplicate key» — 2026-09-18
+
+**Lo que vio Thomas** (problema 407): desde «📅 Cambiar de día», la tanda **E12A** (pickeada y
+armada) al **lunes 21/09** →
+
+```
+No se pudo mover:
+duplicate key value violates unique constraint "mov_stock_pipeline_dedup"
+```
+
+No se movió nada, y eso estuvo bien: la RPC devuelve 400 y la transacción hace rollback entero.
+
+### La causa
+
+`gv_ppp_tanda_mover` llama a **`gv_ppp_tanda_renombrar`**, que hacía
+
+```sql
+update "Movimientos_Stock" set ref = <tanda nueva> where upper(btrim(ref)) = <tanda vieja>;
+```
+
+**a ciegas**. `mov_stock_pipeline_dedup` es un índice **único** sobre
+`(upper(trim(ref)), upper(trim(cod_art)), coalesce(empresa,''), deposito, tipo)` para
+`tipo in ('picking','separado','facturado')`: es el guard que impide el doble picking, el que se
+agregó por el problema 390. Si la tanda destino ya tiene una fila del pipeline del **mismo
+artículo**, el renombre choca contra él.
+
+Medido el 18/09 con E12A: chocaba con **126** filas de E12E, **120** de E12F, **84** de E12K,
+**75** de E12J, **69** de E12G y **3** de D69H. O sea que **fusionar dos tandas ya pickeadas era
+imposible**, aunque la pantalla lo ofrezca y el estado sea compatible.
+
+### El arreglo: fusionar, no pisar
+
+Sumar los `delta` no es una licencia, es lo que va a quedar igual: ese `delta` es el **total
+pickeado de la tanda para ese artículo**, y lo escribe `reconciliar_stock_articulo_rt` con
+`do update set delta = excluded.delta` derivándolo de los eventos **PKC**. Como la misma función
+renombra también los eventos, el reconciliador va a recalcular ese total como la **suma de las
+dos tandas**. El saldo del depósito no se mueve ni una caja.
+
+⚠ **El orden importa: primero el DELETE de la fila vieja, después el UPDATE que suma.**
+`trigger_actualizar_saldo_stock` recalcula el saldo del código desde cero, pero corre
+**AFTER INSERT OR UPDATE y NO en DELETE**: sumando antes de borrar, el recálculo contaría las dos
+filas y `stocks_carga_rapida` quedaría inflado hasta el próximo movimiento de ese código.
+
+### Y el mismo pozo por el otro lado: «Tanda nueva» podía reciclar un código con stock
+
+`gv_ppp_web_codigo_tomado` decidía si un código estaba libre mirando **sólo las programaciones**
+(`GV_PPP_Programacion_Diaria`, `PPP_Web_Programacion`, `PPP_Web_Tandas`, `GV_PPP_Prog_Override`).
+Un código que ya no figura en ninguna pero **tiene stock del pipeline** —una tanda vieja ya
+entregada— se daba por libre, así que el botón «➕ Tanda nueva» lo podía reciclar y meter el stock
+de hoy adentro del de aquella: o el mismo «duplicate key», o algo peor, cajas de dos tandas de
+épocas distintas sumadas bajo un código. **Al 18/09 hay 353 códigos así** (casi todos de las
+series C y D, más **E01G**, que sí está en la serie viva). Ahora también cuenta como tomado.
+
+El `exists` sale por ese mismo índice: **0,1 ms**. Sin él eran **49 ms** de seq scan — y el
+generador lo llama hasta 400 veces en su loop, así que la forma importa: tiene que escribirse
+`upper(btrim(m.ref))`, **no** `upper(btrim(coalesce(m.ref,'')))`, que no matchea la expresión del
+índice.
+
+### Medición (todo en transacciones abortadas, contra los datos reales)
+
+| prueba | resultado |
+|---|---|
+| fusión E12A → E12E | 129 filas chocaban · E12E 213 → 288 · E12A queda en 0 · **saldos que cambian: 0** |
+| tanda nueva E12A → E12T | movidas=1 · **saldos que cambian: 0** |
+| `stocks_carga_rapida` | igual de alineado que antes (el único desalineado, 437E, ya lo estaba: es dual y su clave lleva sufijo de empresa) |
+| guards que siguen andando | `ESTADO_DISTINTO` (E12E en proceso), «la tanda ya salió», `TANDA_EMPEZADA` |
+| tests | `ppp-tanda-cambiar-dia` OK · `dead-handlers` 785/0 · `checkhtml` 0 errores |
+
+⚠ **La prueba tuvo que hacerse dos veces** porque E12A cambiaba de tamaño entre corrida y corrida:
+Thomas estaba moviendo pedidos a mano al mismo tiempo. Es el recordatorio de siempre — el estado
+vivo se mueve, la medición se repite justo antes de dar algo por bueno.
+
+### Front
+
+`pppMovErrTxt` traduce el error crudo de Postgres: si vuelve a aparecer un choque contra
+`mov_stock_pipeline_dedup`, el supervisor lee *"las dos tandas tienen el mismo artículo pickeado y
+el stock no se pudo juntar, NO se movió nada"* en vez del texto de la base. Es el paracaídas, no
+el camino normal.
+
+**Archivos:** `sql/gv_ppp_tanda_fusion_stock_v1969.sql`, rollback en
+`sql/backups/gv_ppp_tanda_renombrar_pre_v1969.sql`.
+
+### Lo que queda abierto
+
+`gv_ppp_pedido_mover` mueve **una NP** a otra tanda, pero el stock del pipeline está anotado por
+**tanda**, no por NP: al mover un pedido suelto, las cajas pickeadas siguen contadas en la tanda
+de origen. No es lo que rompió acá (esto se ve recién cuando se compara pedido contra pedido), y
+tocarlo es otra tanda de trabajo, pero queda anotado para no descubrirlo de nuevo desde cero.
+
+## §3.jh — v19.71: el MÁXIMO de la OC ya no se topea por la góndola · y Oscar silenciado — 2026-09-18
+
+### 1. Sin tope de góndola
+
+**Thomas:** *"no contemples el maximo de gondola para pedidos. Tenemos que tener la mercadería
+que hace falta, despues vemos como la guardamos"*.
+
+| | |
+|---|---|
+| antes | `Máximo = LEAST(ceil(proyección × índice), capacidad)` |
+| ahora | `Máximo = ceil(proyección × índice)` |
+
+**La capacidad sigue valiendo en las otras dos ramas del `CASE`, a propósito**: con
+`llenar_gondola = true` la capacidad es el **objetivo** del código (no un techo), y en un código
+con proveedor real pero **sin** proyección es la única referencia que queda — sin eso pediría 0.
+
+**Medido antes de aplicar:** **49** códigos suben el Máximo, **33** pasan a pedir más, **+2.178
+cajas**; el total a pedir va de **7.324 a 9.502**. Peores: 501 365→888 · 31 0→223 · 315 0→211 ·
+505 594→768 · 583E 72→203 · **321 320→425** · 207 0→101.
+
+El 321, que abrió todo el tema: proyección 366 × 1,5 = **550** (antes quedaba en 445, su
+capacidad), 321 de stock, 196 pedidas → **425 a pedir**.
+
+⚠ **Consecuencia esperada, no un bug:** comprando por encima de la góndola, el aviso de recepción
+*"no entra en góndola"* (`_opGondExceso`, factor 1.20) va a saltar más seguido y el excedente va a
+racks. Es lo que Thomas aceptó con *"después vemos cómo la guardamos"*.
+
+Centinela nuevo con el patrón `THEN ceil\(b\.proy \* b\.indice\)`: si alguien vuelve a meter el
+`LEAST`, ese patrón desaparece y `gv_reglas_perdidas` lo canta.
+`sql/gv_generador_oc_sin_tope_gondola_v1971.sql`, respaldo en
+`zz_backups."GV_Backup_Def_GeneradorOC_20260918b"`.
+
+### 2. Oscar silenciado en el aviso de entrega ajena
+
+**Thomas:** *"silencialo a oscar"*. Primera fila de `GV_OC_Entrega_Permitida`: par
+**`Log/ Fabr` ← `Oscar`**, `cod = null` (todo el par). Verificado leyendo el mismo filtro que usa
+el loop de `gv_oc_aplicar_recepcion`: los **11** códigos de Oscar (280, 500, 506, 510, 555, 557,
+654, 658, 659, 758, 764) dan **SILENCIADO** y el resto sigue avisando.
+
+⚠ **El aviso de la v19.57 ya está trabajando en producción**, y conviene tenerlo escrito porque
+casi lo leí al revés: al mirar `telegram_outbox` aparecieron **2 filas** después de una prueba con
+`rollback`, y la primera lectura fue *"el rollback no funcionó"*. **No eran de la prueba**: eran
+dos recepciones **reales** de **Pedernera** de esa mañana (09:24 el **544** y 09:25 el **560**,
+las dos con OC a nombre de Log/ Fabr), ya enviadas. La prueba propia no dejó nada.
+**Antes de declarar que una transacción no revirtió, mirar el `created_at` y el contenido de las
+filas**, no sólo el conteo.
+## §3.ji — v19.74: todo se programa solo, salvo súper (menos Carrefour) y Matiz — 2026-09-18
 
 **Regla del dueño, textual (Thomas, 18/09):** *"Todos los pedidos que llegan se programan
 automaticamente. con excepcion de supers (excepto carrefour ya que viene con la fecha desde el
@@ -23263,7 +23582,7 @@ propia aunque `hurlingham` y `constitucion` ya existan.
 Probado sobre las direcciones reales del padrón: las 13 que usaban esos 11 barrios resuelven, cada
 una en su zona. Direcciones sin zona: **40 → 27**.
 
-**SQL, backups y rollback:** `sql/gv_todo_automatico_v1960.sql`. Backups en
+**SQL, backups y rollback:** `sql/gv_todo_automatico_v1974.sql`. Backups en
 `zz_backups."GV_Backup_PPPWebConfig_20260918"` y `zz_backups."GV_Backup_ZonasBarrios_20260918"`.
 
 **Chequeos:** `gv_ppp_web_armado_salud`, `gv_ppp_tanda_camion_mezclado`, `gv_ppp_cliente_dos_dias`,

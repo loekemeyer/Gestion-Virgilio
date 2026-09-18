@@ -1729,3 +1729,178 @@ confirmado después del reemplazo:
 
 **No se tocó nada de `public.*` compartido.** El otro cambio de esta versión es la Edge Function
 `gv-ppp-web-tandas-diarias`, que no es un objeto de la base.
+
+---
+
+## v19.60 (2026-09-18) — cron 90 a cada 30 min + `EXECUTE` de `gv_cruce_fc_asig_refrescar_si_viejo`
+
+**Objetos tocados:** (1) el **schedule** del cron `gv-cruce-fc-asig` (jobid 90), de `*/10` a
+`7-59/30`; (2) un `grant execute … to authenticated` sobre
+`gv_cruce_fc_asig_refrescar_si_viejo(integer)`, que hasta hoy estaba revocada para todos los
+roles del front. **No se tocó ni una función ni una vista ni una tabla**: el cuerpo de
+`gv_cruce_fc_asig_refrescar` y `gv_cruce_fc_asignacion` quedó igual.
+
+**Impacto medido:** el cron pasa de 144 a 48 corridas por día (3,09 s cada una, 0 filas
+cambiadas entre corridas sobre 905). La frescura no se pierde porque `concilRefresh()` ahora
+llama al refresco perezoso al abrir la pantalla. `anon` **sigue sin** poder ejecutarla:
+
+```sql
+select has_function_privilege('anon','public.gv_cruce_fc_asig_refrescar_si_viejo(integer)','EXECUTE') as anon,
+       has_function_privilege('authenticated','public.gv_cruce_fc_asig_refrescar_si_viejo(integer)','EXECUTE') as auth;
+-- esperado: false | true
+```
+
+**Rollback exacto:**
+
+```sql
+select cron.alter_job(90, schedule := '*/10 * * * *');
+revoke execute on function public.gv_cruce_fc_asig_refrescar_si_viejo(integer) from authenticated;
+```
+
+y quitar de `index.html` la línea `await sb.rpc("gv_cruce_fc_asig_refrescar_si_viejo", …)` de
+`concilRefresh()`. Producción Virgilio no lee nada de esto.
+
+---
+
+## v19.61 — limpieza de las 85 OC fantasma y el 550 a dos proveedores — 2026-09-18
+
+**Toca DATOS de dos tablas que Producción Virgilio LEE**, así que va acá. Pedido de Thomas
+("1 sí", "2 ambos") sobre lo medido en la v19.57.
+
+| | |
+|---|---|
+| Tablas | `Ordenes_Compra` y `OC_Maximos` — las dos las lee el front de Producción (`recepcion.js`, `index.html`, `modulo_talleristas_edit.js`, `modulo_talleristas_arts.js`) |
+| Backups | `zz_backups."GV_Backup_OrdenesCompra_20260918"` (721 filas, PK `id`) · `zz_backups."GV_Backup_OCMaximos_20260918"` (354 filas, PK `cod`, único) — las dos con RLS y sin grants para `anon` |
+
+### 1. `gv_oc_recompute_recibido()` sin filtros — 85 filas
+
+Cierra el problema **401**: una OC reemplazada por la del miércoles siguiente sólo pasa a
+`anulada` cuando se recibe **de ese proveedor**, y si el proveedor nunca entrega queda
+`pendiente` para siempre. **Medido en `begin … rollback` ANTES de correrlo**, y el dry-run dio
+exactamente lo mismo que la corrida real (85):
+
+| estado antes | después | filas | ¿cambia `cantidad_recibida`? | cajas |
+|---|---|---|---|---|
+| pendiente | anulada | 75 | **no** | 4.186 |
+| recibida | anulada | 8 | **no** | 0 |
+| anulada | anulada | 2 | sí (ajuste) | 21 |
+
+**Ninguna OC viva perdió lo recibido.** Después quedan **154 OC pendientes / 12.539 cajas**, que
+es lo que de verdad falta entrar.
+
+### 2. El 550 pasa a Garcia + Poly, 50/50
+
+Thomas: *"ambos"*. Medido en 6 meses: **Garcia 256 cj** (7 entregas, 16/07→17/09, es el que
+entrega hoy) · **Poly 203** (11, hasta el 30/06) · Log/Fabr 145. Va Garcia de `proveedor` y Poly
+de `proveedor2`, **50 / 50** — el reparto real da 56/44, se redondeó.
+
+⚠ **Hasta el miércoles el 550 de Garcia SIGUE avisando como entrega ajena**, y está bien: la OC
+vigente hoy (id **914**, 155 cj) se emitió sólo a nombre de Poly. **La OC 914 NO se partió a
+mano a propósito** — ya salió así, y el generador del miércoles emite las dos líneas (72 y 72
+sobre las 144 que pide) y lo acomoda solo.
+
+### 3. Cron 93 `gv-oc-anular-superadas` — para que no vuelva a pasar
+
+El fix de arriba es de datos: sin nada que lo repita, en dos miércoles vuelven los fantasmas.
+Va **miércoles 10:30 UTC**, metido entre el **50** `ocs-auto-miercoles` (10:00, genera) y el
+**11** `alerta-oc-pendientes` (11:00) — así el aviso de OC pendientes sale con la lista ya
+limpia. `select public.gv_oc_recompute_recibido();`, que es idempotente.
+Para apagarlo: `select cron.unschedule('gv-oc-anular-superadas');`
+
+### Rollback
+
+```sql
+-- 1) los estados de las OC
+update public."Ordenes_Compra" o
+   set estado = b.estado, cantidad_recibida = b.cantidad_recibida,
+       fecha_entrega_real = b.fecha_entrega_real
+  from zz_backups."GV_Backup_OrdenesCompra_20260918" b
+ where b.id = o.id
+   and (o.estado, o.cantidad_recibida, o.fecha_entrega_real)
+       is distinct from (b.estado, b.cantidad_recibida, b.fecha_entrega_real);
+-- 2) el proveedor del 550
+update public."OC_Maximos" m
+   set proveedor = b.proveedor, prop_prov1 = b.prop_prov1,
+       proveedor2 = b.proveedor2, prop_prov2 = b.prop_prov2
+  from zz_backups."GV_Backup_OCMaximos_20260918" b
+ where b.cod = m.cod and public.norm_cod(m.cod) = '550';
+```
+
+⚠ **Y una limitación preexistente que conviene tener escrita:** el `recepcion.js` de Producción
+llama `oc_vigentes_por_proveedor` (que **no se tocó**) pero **no** llama
+`gv_oc_aplicar_recepcion`. O sea que una recepción cargada desde Producción **no descuenta la OC
+ni dispara el aviso de entrega ajena**. No lo rompió este cambio: nunca lo hizo.
+
+**Chequeo:** `select * from public.gv_oc_entregas_ajenas where fecha >= current_date - 30;` y
+
+```sql
+with w as (select o.id, o.estado, row_number() over (
+    partition by public.norm_cod(o.codigo), public.gv_norm_prov_key(o.proveedor)
+    order by (lower(coalesce(o.estado,'')) in ('cerrada','anulada')), o.fecha desc, o.id desc) rn
+  from public."Ordenes_Compra" o where o.fecha is not null)
+select count(*) from w where rn > 1 and lower(coalesce(estado,'')) not in ('cerrada','anulada');
+-- 0 = ninguna OC fantasma
+```
+
+---
+
+## v19.62 — `vista_generador_oc` pasa a contar los pedidos WEB — 2026-09-18
+
+**Vista que Producción Virgilio LEE** (`index.html` y `sw.js` de `produccion-virgilio`), por eso
+va acá. Es una **corrección**: la vista subcontaba la demanda, así que el cambio le mejora el dato
+a las dos apps. Problema **405**, detalle en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.jf.
+
+| | |
+|---|---|
+| Qué cambió | el CTE `pend_np` suma ahora, por `UNION`, las NP de `PPP_Web_Programacion` (salteando `GV_Web_Cancelados`) — antes miraba sólo `GV_PPP_Programacion_Diaria` |
+| Respaldo | `zz_backups."GV_Backup_Def_GeneradorOC_20260918"` (definición previa + `reloptions`), con RLS y sin grants para `anon` |
+| Impacto medido | 265 códigos / 4.465 cajas de demanda que no se veían · **92 códigos piden 2.651 cajas más** |
+| `reloptions` | `security_invoker=true` repuesto después del replace **y verificado** |
+
+⚠ **Lo que cambia en plata:** el cron 50 (miércoles 10:00) va a generar **2.651 cajas más** que
+antes. Es lo correcto —esa mercadería está pedida y no se estaba comprando— pero es un salto de
+una vez, no un goteo. Si hay que frenarlo, el rollback de abajo lo deja como estaba.
+
+### Rollback
+
+El SQL exacto (las dos variantes, por replace inverso o desde el respaldo) está al pie de
+`sql/gv_generador_oc_pedidos_web_v1962.sql`. La corta:
+
+```sql
+do $$ declare d text; begin
+  select definicion into d from zz_backups."GV_Backup_Def_GeneradorOC_20260918";
+  execute 'create or replace view public.vista_generador_oc as ' || d;
+  execute 'alter view public.vista_generador_oc set (security_invoker = true)';
+end $$;
+delete from public."GV_Reglas_Centinela" where objeto = 'vista_generador_oc';
+```
+
+---
+
+## v19.71 — `vista_generador_oc`: el Máximo ya no se topea por la góndola — 2026-09-18
+
+**Vista que Producción Virgilio LEE** (`index.html`, `sw.js`), por eso va acá. Pedido de Thomas:
+*"no contemples el maximo de gondola para pedidos"*. Detalle en §3.jh de
+`docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+| | |
+|---|---|
+| Qué cambió | en el `CASE` del Máximo, `LEAST(ceil(proy × indice), cap)` → `ceil(proy × indice)`. Las ramas `llenar_gondola` y "proveedor sin proyección" **no se tocaron**: ahí la capacidad no es un tope |
+| Respaldo | `zz_backups."GV_Backup_Def_GeneradorOC_20260918b"` (definición previa + `reloptions`), con RLS |
+| Impacto medido | 49 códigos suben el Máximo · 33 piden más · **+2.178 cajas** · total 7.324 → 9.502 |
+| `reloptions` | `security_invoker=true` repuesto y verificado |
+
+⚠ **Lo que cambia en plata:** sumado al fix de la v19.62 (contar los pedidos web), el cron 50 del
+miércoles va a pedir bastante más que antes. Las dos cosas son correctas por separado; si hay que
+frenar, cada una tiene su rollback y son independientes.
+
+### Rollback
+
+```sql
+do $$ declare d text; begin
+  select definicion into d from zz_backups."GV_Backup_Def_GeneradorOC_20260918b";
+  execute 'create or replace view public.vista_generador_oc as ' || d;
+  execute 'alter view public.vista_generador_oc set (security_invoker = true)';
+end $$;
+delete from public."GV_Reglas_Centinela" where version = 'v19.66';
+```

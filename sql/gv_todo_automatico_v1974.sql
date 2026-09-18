@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════════════════════
--- v19.60 (Thomas, 2026-09-18) — TODO SE PROGRAMA SOLO, SALVO SÚPER (MENOS CARREFOUR) Y MATIZ
+-- v19.74 (Thomas, 2026-09-18) — TODO SE PROGRAMA SOLO, SALVO SÚPER (MENOS CARREFOUR) Y MATIZ
 -- ═══════════════════════════════════════════════════════════════════════════════════════════
 --
 -- Regla del dueño, textual: *"Todos los pedidos que llegan se programan automaticamente. con
@@ -84,7 +84,7 @@ as $function$
      orders.sheets_payload->>'retiro_fecha'. Viaja de LK por el FDW cada 15 min
      (sync_pedidos_match_virgilio -> lk_pedidos_match.retiro_fecha).
 
-     v19.60 (Thomas, 2026-09-18: *"para los que vienen sin eso, se tiene el boton para
+     v19.74 (Thomas, 2026-09-18: *"para los que vienen sin eso, se tiene el boton para
      editarlo"*) — AHORA TAMBIEN MIRA EL DIA CARGADO A MANO en GV_Pedido_Horario. Sin esto el
      boton del badge no hacia que el pedido se programara solo. EL MANUAL MANDA, mismo criterio
      que ya usa el front. */
@@ -104,7 +104,7 @@ as $function$
      el FDW a lk_pedidos_match.fecha_entrega; el texto crudo con hora queda en
      fecha_entrega_txt ("29/09/2026 14:00").
 
-     v19.60 (Thomas, 2026-09-18) — mismo arreglo que gv_web_retiro_pactado: si un supervisor
+     v19.74 (Thomas, 2026-09-18) — mismo arreglo que gv_web_retiro_pactado: si un supervisor
      recoordino el turno con el super desde el badge, ese dia es el que vale y el pase (a3)
      ahora lo ve. */
   select coalesce(
