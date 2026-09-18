@@ -15,7 +15,7 @@ estar sin descripción.
 
 Se ve en Stocks, en el generador de OC y en los avisos de Telegram, porque de esa vista cuelgan
 `vista_stock_procesada`, `stocks_carga_rapida`, `vista_abastecimiento` y `gv_planimetria_celda`.
-La pantalla se realinea sola con el cron 57 (cada 5 min). Detalle y medición: §3.ke de
+La pantalla se realinea sola con el cron 57 (cada 5 min). Detalle y medición: §3.kf de
 `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 ---
