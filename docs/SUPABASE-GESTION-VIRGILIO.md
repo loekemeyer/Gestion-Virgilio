@@ -24626,3 +24626,42 @@ compararlos en la misma fila.
 
 **Prueba:** `node tests/apr-cuarentena.cjs` — la columna existe, el retenido muestra `$80.000` /
 `c/IVA $96.800`, y la tabla tiene tantos `<td>` como `<th>`.
+
+---
+
+## §3.jy — v19.95: el valor de un pedido se calculaba DOS veces — 2026-09-18
+
+**Thomas, 2026-09-18** (sobre lo que le marqué al cerrar la v19.94): *"colapsalo a una llamada
+supongo"*.
+
+`gv_clientes_nuevos_valor_lote` llamaba a **`gv_ppp_web_valor_items` dos veces por pedido**: una
+para el neto y otra, idéntica, para multiplicarla por 1,21. Se notaba poco mientras el lote eran
+los 2 o 3 clientes nuevos del día; desde la v19.94 el lote va por **todos** los retenidos, así que
+el doble de trabajo pasó a pagarse siempre.
+
+Y no es una función barata: arma 5 CTE y pega contra `precios_venta`, `precios_venta_chef`,
+`cobranzas_precios_super`, `clientes_dto` y `GV_UxB`.
+
+**Medición** (20 pedidos de 3 artículos, mitad LK y mitad Chef, un tercio con condición web):
+
+| | antes | después |
+|---|---|---|
+| tiempo | **74 ms** | **36 ms** (−51 %) |
+| montos distintos | — | **0 de 20** |
+
+⚠ **El CTE va `MATERIALIZED` a propósito.** Sin esa palabra el planner aplana el CTE, copia la
+llamada en las dos columnas de salida y **volvemos a las dos llamadas sin que nada lo avise** — el
+mismo tipo de regresión silenciosa que el `security_invoker` que se come un `CREATE OR REPLACE
+VIEW`. Por eso tiene centinela:
+
+```sql
+select * from public.gv_reglas_perdidas;   -- vacía = la regla sigue
+-- GV_Reglas_Centinela: gv_clientes_nuevos_valor_lote · funcion · patrón `as\s+materialized`
+```
+
+El candado de supervisor quedó **adentro** del CTE, en el `WHERE` (que se evalúa antes que la lista
+de selección): a un no-supervisor no se le valoriza nada, igual que antes.
+
+**Rollback:** `select def from zz_backups."GV_Backup_ValorLote_20260918";` — y los 20 montos de
+control, en `zz_backups."GV_Backup_ValorLote_Res_20260918"`.
+`sql/gv_clientes_nuevos_valor_lote_v1995.sql`.
