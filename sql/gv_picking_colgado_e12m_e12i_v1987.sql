@@ -120,3 +120,41 @@ having count(*) >= 3
    and 100.0 * count(*) / tf.cods >= 80;
 
 alter view public.gv_stock_picking_duplicado set (security_invoker = true);
+
+-- ============================================================================================
+-- ⛔ v19.88 — TODO LO DE ARRIBA SE REVIRTIÓ EL MISMO DÍA. NO VOLVER A APLICARLO.
+-- ============================================================================================
+-- La premisa era falsa. Yo di por duplicado el picking de E12M y E12I porque el patrón de los
+-- segundos (EP de una tanda / PSP de la otra, mismo legajo) probaba que era UN solo picking con
+-- dos códigos. Eso era cierto. Lo que NO se sigue de ahí, y yo asumí, es que las cajas estuvieran
+-- contadas del otro lado.
+--
+-- Thomas trajo los remitos en papel: las 7 NP (LK 0030, 0036, 0037, 0039, 0040, 0044, 0045) se
+-- armaron como E12M, que después pasó a ser E12A. Al cruzar los 11 PKC anulados de E12M contra el
+-- stock vivo de E12A:
+--
+--   art        E12M anulado   E12A tiene
+--   437E LK         2             0      ← NO estaba del otro lado
+--   583E           20             4      ← faltaban 16
+--   355             2             3
+--   501             8            11
+--
+-- O sea: 18 cajas como mínimo NO eran duplicado. Anularlas era perder picking real.
+-- E12I se revirtió también: 31 de sus 32 códigos quedaban "cubiertos" por E12E, pero ESO NO ES
+-- PRUEBA — es el mismo razonamiento que ya había fallado. Que la otra tanda tenga esa cantidad no
+-- dice que sea la MISMA caja.
+--
+-- LECCIÓN, que es la que vale para la próxima:
+--   Dos códigos para un mismo picking NO implican dos anotaciones de las mismas cajas. Antes de
+--   anular picking hay que cruzarlo artículo por artículo contra el destino y que dé COMPLETO —
+--   y aun así, el que decide es el conteo físico, no el dato. El único par donde el duplicado
+--   estaba probado (mismo set, misma cantidad, 100 % de solape) eran los 4 de la v19.80.
+--
+-- La reversión usó los backups, por `id`, con guardas que abortaban si no volvía exacto:
+--   zz_backups."GV_Backup_Eventos_E12M_E12I_20260918"   → opcion y descripcion
+--   zz_backups."GV_Backup_MovStock_E12M_E12I_20260918"  → delta
+-- Estado verificado después: E12M 40 cajas / 11 PKC, E12I 38 / 37, 0 PKCX.
+--
+-- ⚠ El fix de la v19.80 (gv_evento_tanda_campo declara PKC/PSP/FGU/SSG/RAG) NO se toca: ése sí
+-- estaba probado corriendo el cron y es el que impide que el problema se repita. Lo que se
+-- revierte es SÓLO la limpieza de datos de este archivo.

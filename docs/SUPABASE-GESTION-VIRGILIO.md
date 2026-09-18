@@ -24314,3 +24314,40 @@ centinela la dio por perdida hasta que se le puso un patrón simple (`virgilio`)
 
 `sql/gv_ppp_web_zona_retira_v1988.sql`. **Rollback:** volver al `barrio ~* 'retir'` (y con él, el
 bug de Retiro), `drop view public.gv_retira_sin_etiqueta;` y restaurar las 5 filas del backup.
+
+## §3.js — v19.89: la limpieza de E12M y E12I se REVIRTIÓ — la premisa era falsa — 2026-09-18
+
+**Revierte la limpieza de datos de la §3.jr (v19.87). El fix de la v19.80 NO se toca.**
+
+Di por duplicado el picking de E12M y E12I. El patrón de los segundos —`EP` de una tanda y `PSP`
+de la otra separados por 3 s, mismo legajo— probaba que era **un solo picking con dos códigos**, y
+eso era cierto. Lo que **no se sigue de ahí**, y asumí igual, es que las cajas estuvieran contadas
+del otro lado.
+
+Thomas trajo los remitos en papel: las 7 NP (LK 0030, 0036, 0037, 0039, 0040, 0044, 0045) se
+armaron como **E12M**, que después pasó a ser **E12A**. Al cruzar los 11 PKC anulados contra el
+stock vivo de E12A:
+
+| art | E12M anulado | E12A tiene |
+|---|---|---|
+| `437E LK` | 2 | **0** |
+| `583E` | 20 | **4** |
+| `355` | 2 | 3 |
+| `501` | 8 | 11 |
+
+**Al menos 18 cajas no eran duplicado.** Anularlas era perder picking real. E12I se revirtió
+también: 31 de sus 32 códigos quedaban "cubiertos" por E12E, pero eso **no es prueba** — es el
+mismo razonamiento que ya había fallado.
+
+> **La lección:** dos códigos para un mismo picking NO implican dos anotaciones de las mismas
+> cajas. Antes de anular picking hay que cruzarlo artículo por artículo contra el destino y que dé
+> **completo** — y aun así decide el conteo físico, no el dato. El único par donde el duplicado
+> estaba probado (mismo set, misma cantidad, 100 % de solape en los dos sentidos) eran los 4 de la
+> v19.80.
+
+La reversión fue por `id` desde los backups, con guardas que abortaban si no volvía exacto.
+Estado verificado: **E12M 40 cajas / 11 PKC, E12I 38 / 37, 0 `PKCX`**. `sql/gv_picking_colgado_e12m_e12i_v1987.sql`.
+
+⚠ **Lo que sí sigue en pie es el fix**: `gv_evento_tanda_campo` declara PKC/PSP/FGU/SSG/RAG, o sea
+que los eventos del picking viajan con el renombre. Eso se probó corriendo el cron 68 de verdad
+(fusión 78 → 78, renombre 100 → 100) y es lo que impide que el problema se repita.
