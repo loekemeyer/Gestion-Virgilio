@@ -1,3 +1,25 @@
+## Nota v20.04 (2026-09-18) — El 043 se llamaba "043": el guard que existía y no servía
+
+Thomas: *"la descripción del 043 y esos otros códigos no debería ser 043, algo se rompió ahí"*.
+
+`vista_nombres_articulos` ya traía el guard **"la descripción no puede ser el propio código"**,
+pero comparaba la descripción **cruda** contra el código **sin el cero adelante**: `'043' <> '43'`
+da verdadero, así que la basura pasaba. **18 de 616 filas** tenían el código como nombre — y las
+18 venían de `proyeccion_madre`, la fuente de más prioridad, tapando el nombre bueno que ya estaba
+en `Articulos Virgilio X Tallerista`: 043 = Abrelatas Uña 3 En 1, 052 = Cepillo Lavavajilla,
+053/054/055 = las pinzas, 097 = Afila Cuchillos, 099 = Pelapapas.
+
+Ahora el guard normaliza **las dos puntas**, y de paso un código terminado en L (el artículo de
+Loeke vendido por Chef, regla v13.71) hereda el nombre del base: 124 códigos `NNNL` dejaron de
+estar sin descripción.
+
+Se ve en Stocks, en el generador de OC y en los avisos de Telegram, porque de esa vista cuelgan
+`vista_stock_procesada`, `stocks_carga_rapida`, `vista_abastecimiento` y `gv_planimetria_celda`.
+La pantalla se realinea sola con el cron 57 (cada 5 min). Detalle y medición: §3.ke de
+`docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+---
+
 ## Nota v20.02 (2026-09-18) — Abrir una fila de Stocks decía "sin movimientos contados" teniendo stock
 
 Lo reportó Thomas con una foto: el **055** muestra 21 cajas en góndola y, al tocarlo, el detalle
