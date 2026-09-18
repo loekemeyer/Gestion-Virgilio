@@ -24876,3 +24876,74 @@ select d.tanda, e.np,
 **Queda abierto:** las 92 cajas están en `a_guardar` y **hay que subirlas a góndola** con Guardado;
 hasta entonces no cuentan como disponibles. Y por qué el drenaje del 17/09 tomó la NP equivocada
 —`a_facturar` se lleva por tanda y por artículo— no está resuelto: se registró el caso, no la causa.
+
+## §3.kd — v20.00: el picking de E12K vuelve a su tanda · las 4 tablas que faltaban · de quién es cada caja — 2026-09-18
+
+Tres cosas que pidió Thomas en la misma tanda de trabajo.
+
+### 1. El picking de E12K estaba archivado bajo E12L
+
+La tanda que Moncayo pickeó el 17/09 10:24 se llamaba **E12L** y hoy se llama **E12K**: el
+encabezado (EP/TP) viajó al nombre nuevo y los **40 escaneos se quedaron con el viejo**. Hoy `E12L`
+es otra tanda (LK 0043, El Gran Bazar). Verificado **artículo por artículo**: los 40 códigos del
+picking bajo E12L calzan **40 de 40** con las Entregas de E12K, contra **2 de 7** de LK 0043.
+
+Se corrió el plan que la otra sesión había medido, **con una línea que le faltaba**: borrar el
+candado de picking de E12L. Sin eso, LK 0043 quedaba sin poder pickearse nunca más — la app
+contesta *"ya está PICKEADA (la terminó Moncayo)"*.
+
+| | antes | después |
+|---|---|---|
+| E12K `separar_pedidos` | **−46** | **0** |
+| E12K `terminado` | +16 | −28 |
+| E12L | picking 30 · separado −30 | **sin movimientos** |
+
+El orden importa y está escrito en el SQL: **(a)** los 42 eventos (40 PKC + PSP + FGU) pasan a
+E12K **primero** —si no, el cron 68 los vuelve a leer como E12L y deshace el arreglo en 10 min—,
+**(b)** se borra el picking de E12L, **(c)** se borran los `separado` de las dos (DELETE y no
+`delta = 0`: el guard `not exists` de la etapa2 no los rehace mientras la fila exista), **(d)**
+recalculan las dos etapas y **(e)** un `UPDATE` no-op despierta a `trigger_actualizar_saldo_stock`,
+que no corre en DELETE.
+
+⚠ Ese paso (e) es seguro y conviene saber por qué: de los 10 triggers de `Movimientos_Stock`,
+`zz_normalizar_empresa`, `zzz_facturado_no_negativo` y `zzz_guardado_no_negativo` son **BEFORE
+INSERT**, así que un UPDATE no los despierta y no hay riesgo de que a una fila vieja se le
+reescriba la empresa (el problema 390).
+
+Backups: `zz_backups."GV_Backup_E12K_Movs_20260918"` (384), `…_Eventos_20260918` (42) y
+`…_Lock_20260918` (3). **Verificado después:** `gv_stock_tanda_pickeado_negativo` sólo D53A (−2, de
+agosto, ajena) · picking duplicado, reglas perdidas y empresa fantasma en cero · ningún código con
+góndola negativa · el candado huérfano de E12L desapareció.
+
+### 2. Las cuatro tablas que el renombrador no tocaba
+
+Se agregan a `gv_ppp_tanda_renombrar`: `Etiquetas_Lio` (las etiquetas de lío se **imprimen** con el
+código de la tanda), `GV_Conciliacion_Facturacion`, `GV_PPP_Prog_Override` y `Faltantes_Tareas`.
+Se suman `Faltantes_Avisados` y `Faltantes_Revisados`, que son la misma familia.
+
+⚠ **Esas dos tienen la tanda en la CLAVE PRIMARIA `(tanda, cod)`**, así que van con el mismo
+tratamiento que el candado: primero el DELETE del origen que choca, después el UPDATE. Probado
+corriéndolo con ZZ80Z/ZZ81Z.
+
+**No se tocan los libros de historia** — `GV_Desarmes`, `GV_Tanda_Anulada` y
+`GV_Stock_Drenaje_Bloqueado` anotan que algo pasó bajo **ese** nombre en **ese** momento;
+renombrarlos sería reescribir el pasado.
+
+### 3. De quién es cada caja de la pila de facturar
+
+Thomas sobre el drenaje cruzado (problema 446): *"que el sistema empiece a trackear la info por si
+hay que hacer una corrección… suficientemente infrecuente como para que no amerite ningún otro
+cambio"*. Entonces **el módulo de Facturación no se toca** y lo que se agrega es el rastro:
+
+- **`gv_fac_cajas_por_np`** — por tanda, NP y artículo: cuántas cajas puso el armado, cuántas
+  drenó el facturado **a nombre de esa NP**, cuántas quedan pendientes, si la NP está facturada, y
+  cuántas se drenaron **sin dueño** en esa tanda. Es la tabla que hay que mirar para saber a quién
+  le corresponde qué cuando haya que corregir.
+- **`gv_fac_drenaje_cruzado`** — el centinela: un drenaje sin dueño cuyos renglones calzan exacto
+  con una NP **no facturada**. Vacía = todo bien.
+
+⚠ **Probado contra el caso real:** hoy da vacía porque la v19.99 se llevó las Entregas de 98622.
+Corriendo la misma lógica con el backup de esas filas unido a `Entregas_Virgilio`, devuelve
+exactamente `D69C | 98622 | facturada = false`. Lo habría cazado.
+
+`sql/gv_tanda_renombrar_tablas_faltantes_v2000.sql`.
