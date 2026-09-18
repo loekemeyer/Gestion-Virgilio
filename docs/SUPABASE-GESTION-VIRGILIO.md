@@ -6848,6 +6848,21 @@ que se estaba pickeando en vivo). (2) Tanda falsa `ZZDEP1|207|10|10|3` (art 207,
 a excedente 27 / góndola 133. (5) Suite completa: 119 bloques, 0 fallas, con el test nuevo
 `tests/pk-deposito-pkc.cjs`.
 
+⚠ **DADO VUELTA el 2026-09-18 (v20.17): el excedente va en el ORDEN DEL RECORRIDO, no
+primero.** Thomas, después de probar el módulo de operarios con una tanda: *"primero le dice
+que pickee del excedente, eso rompe el flujo de movimiento por las góndolas"*. Medido ese día
+sobre `GV_Lugar`: la góndola de picking ocupa el `orden` **1..657** (pasillos A..Ñ), los racks
+706..717 y **el excedente se apila en la zona P, orden 718..757** — o sea después de todo el
+recorrido. Mandarlo primero era arrancar el picking por el fondo del depósito y volver.
+Ahora cada paso `art·EXC` se ordena por el `orden` del sector donde está el excedente
+(`gvFetchLugares().orden`, la misma escala que usa la góndola) y cae solo donde le toca; sin
+red o con un sector que no se reconoce, **al final** — que es además lo que la pantalla ya
+venía diciendo ("hay N en excedente P13 — al final"). El reparto `excUsed`/`gondNeeded` **no
+se tocó**. Lo que se resigna es justamente la recuperación temprana que buscaba la v15.41: si
+el excedente miente, el paso de góndola de ese artículo ya pasó — decisión de Thomas, manda el
+recorrido. Tests: `tests/pk-excedente-orden.cjs` (nuevo) y `tests/pk-deposito-pkc.cjs` (el
+candado del orden, invertido). Abajo queda la regla vieja, que es la que se dio vuelta:
+
 **Orden del recorrido: el EXCEDENTE va PRIMERO** (dueño vía Luis, 2026-09-11). Antes los
 pasos `art·EXC` se encolaban al final (`items.concat(excSteps)`); ahora al principio
 (`excSteps.concat(items)`). **No cambia de dónde se descuenta**: el reparto `excUsed` /

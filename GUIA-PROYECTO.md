@@ -20,6 +20,44 @@ tanda facturada Y despachada (`despachadaYFacturada`). Se partió en dos piezas 
 con 🚚, con la fila marcada y con el aviso en el título. Se verificó **rompiéndolo a propósito**
 (sacando el 🚚 del render): el test cae con *"le falta el 🚚 de salió"*.
 
+## Nota v20.17 (2026-09-18) — El picking arrancaba por el excedente y rompía el recorrido
+
+Thomas, probando el módulo de operarios con una tanda: *"primero le dice que pickee del excedente,
+eso rompe el flujo de movimiento por las góndolas"*. Tenía razón, y el dato lo dice solo.
+
+**Dónde está cada cosa, medido sobre `GV_Lugar` el 18/09** (`orden` = el recorrido del pickeador):
+
+| zona | `orden` |
+|---|---|
+| góndola de picking (pasillos A..Ñ) | 1 – 657 |
+| racks K/N/O | 706 – 717 |
+| **zona P, donde se apila el excedente** | **718 – 757** |
+
+O sea: el excedente está **después de toda la góndola**. La **v15.41** (pedido de Luis) había puesto
+los pasos `art·EXC` **todos al principio** para que, si el excedente miente, el operario se entere
+antes de pasar por la góndola — pero el precio es arrancar el picking por el fondo del depósito y
+después volver al pasillo A.
+
+**Qué cambió.** Cada paso de excedente se ordena por el `orden` del sector donde está el excedente
+(`gvFetchLugares()` ahora devuelve `orden` por sector, la **misma escala** que usa la góndola), así
+cae solo en el lugar del recorrido que le toca. Sin red, o con un sector que no se reconoce, va al
+**final** — que es lo que la pantalla ya venía diciendo: *"hay N en excedente P13 — al final"*.
+
+- El **reparto** no se tocó: del excedente lo que hay, de góndola el resto. Eso ya estaba decidido
+  al abrir la tanda, antes de que el operario dé un paso.
+- El excedente marcado **a mano** (`pkMarkExcedente`) sigue yendo al final, como siempre.
+- La consulta de sectores va con **corte a 5 s**: en el fondo del depósito sin señal el picking abre
+  igual, con el excedente al final.
+
+⚠ **Lo que se resigna, a propósito:** la recuperación temprana que buscaba la v15.41. Si el excedente
+miente (el saldo dice 10 y hay 6), ahora el operario se entera cuando el paso de góndola de ese
+artículo ya pasó. Choque de criterios (Thomas / Luis) resuelto por Thomas: **manda el recorrido**.
+Si alguna vez molesta, el arreglo completo no es volver atrás sino que el faltante del excedente
+**reabra** el paso de góndola de ese artículo.
+
+Tests: `tests/pk-excedente-orden.cjs` (nuevo: el primer paso no es de excedente, un excedente en
+A05 se pickea entre A01 y D18, uno en P13 queda al final, y sin mapa de sectores todos al final) y
+`tests/pk-deposito-pkc.cjs`, cuyo candado del orden quedó invertido.
 ## Nota v20.12 (2026-09-18) — SALIÓ = carga al camión registrada, y nada más
 
 Thomas, sobre las tres formas de salida que la v20.10 contaba: ***"sólo salió si se cargó a
