@@ -23135,3 +23135,56 @@ vista; para la Edge Function, revertir el bloque `preErrores` de
 `supabase/functions/gv-ppp-web-tandas-diarias/index.ts` y redeployar.
 
 Problemas **402** (LK) y **403** (Gestión).
+
+---
+
+## §3.jg — v19.60: la Conciliación se recalcula cuando alguien la mira, no cuando toca el reloj — 2026-09-18
+
+**Lo que hacía el cron 90 (`gv-cruce-fc-asig`, `gv_cruce_fc_asig_refrescar`):** cruza cada NP de
+`Facturacion_NP` con su factura real de ISIS y deja el resultado en el caché
+**`GV_Cruce_FC_Asig`** (hoy 905 NP: 890 con factura, 15 sin). El emparejamiento exige las cuatro:
+misma **empresa** (`gv_empresa_de_np_texto`), mismo **código de cliente** (`canon_cod`), **fecha**
+±3 días de la salida y **cajas** ±15 % con piso de 1. De los candidatos toma el más parecido y
+asigna **uno a uno** (la temp tiene `np` y `doc_id` los dos únicos), y guarda **cuántos candidatos**
+había — eso es el "hay 3 facturas posibles, elegí" de la pantalla.
+
+Lo leen `gv_conciliacion_lista`, `gv_conciliacion_comparar` y `gv_vista_cruce_facturacion`: **nadie
+recalcula el cruce en vivo**, todos leen el caché.
+
+**El problema era la frecuencia, no el cruce.** Corría **cada 10 minutos** — 144 corridas por día,
+3,09 s cada una — y en esas corridas **no cambiaba una sola fila**: las facturas entran cuando
+Facturación baja el Excel de ISIS, no cada 10 minutos.
+
+**Qué cambió (Luis, 18/09: *"cron cada 30 entonces"*):**
+
+| | antes | ahora |
+|---|---|---|
+| cron 90 | `*/10` (144 corridas/día) | **`7-59/30`** (48/día) |
+| quién refresca de verdad | sólo el cron | **la pantalla, al abrirse** |
+
+⚠ **El offset del cron no es cosmético**: en Virgilio el minuto `:00` también está cargado
+(`*/2`, `*/5`, `*/10`, `*/15` caen todos ahí). `7-59/30` lo deja en los minutos 7 y 37, lejos
+también del `:30` donde ya vive el cron 63. Misma lección que costó nueve horas en LK el 17/09.
+
+**El refresco perezoso YA EXISTÍA y nadie lo llamaba.** `gv_cruce_fc_asig_refrescar_si_viejo(p_seg)`
+estaba escrita desde antes: recalcula sólo si el caché tiene más de `p_seg` segundos, y si no
+devuelve `-1` sin tocar nada. No se usaba porque **tenía el `EXECUTE` revocado a
+`anon`/`authenticated`**. Se le dio `EXECUTE` a **`authenticated` solamente** — no a `anon`: es
+`SECURITY DEFINER` y dispara un recálculo de ~3 s, así que abrirla a la clave pública sería
+regalar un botón de carga. Conciliación es pantalla de supervisor, o sea sesión `authenticated`.
+
+`concilRefresh()` la llama con `p_seg: 180` **antes** del `Promise.all`, **en su propia llamada y
+con su propio catch**: si falla —o si la sesión no es `authenticated`— la pantalla carga igual con
+el caché como esté, que es exactamente lo que hacía antes. Es la lección de la v19.44 (*lo nuevo no
+se cuelga del `await` de lo que ya funciona*).
+
+**Resultado:** la Conciliación queda **más fresca** que antes (se recalcula cuando alguien la mira,
+no cuando toca el reloj) y la base hace **96 corridas menos por día**.
+
+**El guard de siempre sigue:** si el cruce vuelve vacío, `gv_cruce_fc_asig_refrescar` **no pisa el
+caché** (`if n = 0 then return 0`) — un caché vacío dejaría la Conciliación sin facturas y nadie se
+enteraría.
+
+**Rollback:** `select cron.alter_job(90, schedule := '*/10 * * * *');` ·
+`revoke execute on function public.gv_cruce_fc_asig_refrescar_si_viejo(integer) from authenticated;`
+· y sacar la línea del `_si_viejo` de `concilRefresh()` en `index.html`.

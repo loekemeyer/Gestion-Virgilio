@@ -5733,7 +5733,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.59"></script>
+<script type="module" src="recepcion.js?v=19.60"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.59";
+const APP_VERSION = "v19.60";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -53632,6 +53632,16 @@ async function concilRefresh() {
   if (_concil.cargando) return; _concil.cargando = true;
   var rb = document.getElementById("concilBtnRefr"); if (rb) { rb.disabled = true; rb.textContent = "Actualizando…"; }
   if (!_concil.rows.length) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
+  /* v19.60 — el cruce NP↔factura se recalcula CUANDO ALGUIEN MIRA, no cuando toca el reloj.
+     El caché `GV_Cruce_FC_Asig` lo llenaba sólo el cron 90, que corría cada 10 min y en 144
+     corridas por día no cambiaba UNA fila; ahora va cada 30 min como red y el que manda es
+     esto. `_si_viejo` recalcula sólo si el caché tiene más de 180 s, así que abrir la pantalla
+     dos veces seguidas no cuesta nada.
+     ⚠ VA EN SU PROPIA LLAMADA CON SU PROPIO CATCH, NO adentro del Promise.all de abajo: si
+     falla (o si la sesión no es `authenticated`, que es la única que tiene el EXECUTE), la
+     pantalla tiene que cargar igual con el caché como esté — que es exactamente lo que hacía
+     antes. Es la lección de la v19.44: lo nuevo no se cuelga del await de lo que ya funciona. */
+  try { await sb.rpc("gv_cruce_fc_asig_refrescar_si_viejo", { p_seg: 180 }); } catch (_e) { /* el caché viejo sirve */ }
   try {
     var pr = await Promise.all([
       sb.rpc("gv_conciliacion_lista", { p_limit: 300, p_offset: 0, p_q: _concil.q || null, p_empresa: _concil.empresa || null }),

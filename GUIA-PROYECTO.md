@@ -1,3 +1,20 @@
+## Nota v19.60 (2026-09-18) — La Conciliación se recalcula cuando alguien la mira
+
+El cron 90 (`gv-cruce-fc-asig`) cruzaba cada NP facturada con su factura de ISIS **cada 10
+minutos** —144 corridas por día, 3 s cada una— y en esas corridas **no cambiaba una sola fila**
+de las 905: las facturas entran cuando Facturación baja el Excel de ISIS, no cada 10 minutos.
+
+Luis: *"cron cada 30 entonces"*. Ahora corre **cada 30 min** (`7-59/30`, con offset para no caer
+en el minuto :00, que también está cargado) y el que manda es la **pantalla**: `concilRefresh()`
+llama a `gv_cruce_fc_asig_refrescar_si_viejo(180)` al abrirse, que recalcula sólo si el caché
+tiene más de 3 minutos. O sea que la Conciliación queda **más fresca** que antes, con 96 corridas
+menos por día.
+
+Esa función ya existía y nadie la llamaba porque tenía el `EXECUTE` revocado; se le dio a
+**`authenticated` solamente** (no a `anon`: dispara un recálculo de 3 s y es `SECURITY DEFINER`).
+
+§3.jg de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
 ## Nota v19.58 (2026-09-18) — El armado estuvo 5 h 40 sin correr y el log decía que todo bien
 
 **El armado automático de pedidos web no corrió entre las 18:20 del 17/09 y las 00:01 del 18/09**,

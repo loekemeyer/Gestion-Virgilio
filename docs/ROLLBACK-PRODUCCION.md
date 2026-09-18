@@ -1729,3 +1729,33 @@ confirmado después del reemplazo:
 
 **No se tocó nada de `public.*` compartido.** El otro cambio de esta versión es la Edge Function
 `gv-ppp-web-tandas-diarias`, que no es un objeto de la base.
+
+---
+
+## v19.60 (2026-09-18) — cron 90 a cada 30 min + `EXECUTE` de `gv_cruce_fc_asig_refrescar_si_viejo`
+
+**Objetos tocados:** (1) el **schedule** del cron `gv-cruce-fc-asig` (jobid 90), de `*/10` a
+`7-59/30`; (2) un `grant execute … to authenticated` sobre
+`gv_cruce_fc_asig_refrescar_si_viejo(integer)`, que hasta hoy estaba revocada para todos los
+roles del front. **No se tocó ni una función ni una vista ni una tabla**: el cuerpo de
+`gv_cruce_fc_asig_refrescar` y `gv_cruce_fc_asignacion` quedó igual.
+
+**Impacto medido:** el cron pasa de 144 a 48 corridas por día (3,09 s cada una, 0 filas
+cambiadas entre corridas sobre 905). La frescura no se pierde porque `concilRefresh()` ahora
+llama al refresco perezoso al abrir la pantalla. `anon` **sigue sin** poder ejecutarla:
+
+```sql
+select has_function_privilege('anon','public.gv_cruce_fc_asig_refrescar_si_viejo(integer)','EXECUTE') as anon,
+       has_function_privilege('authenticated','public.gv_cruce_fc_asig_refrescar_si_viejo(integer)','EXECUTE') as auth;
+-- esperado: false | true
+```
+
+**Rollback exacto:**
+
+```sql
+select cron.alter_job(90, schedule := '*/10 * * * *');
+revoke execute on function public.gv_cruce_fc_asig_refrescar_si_viejo(integer) from authenticated;
+```
+
+y quitar de `index.html` la línea `await sb.rpc("gv_cruce_fc_asig_refrescar_si_viejo", …)` de
+`concilRefresh()`. Producción Virgilio no lee nada de esto.
