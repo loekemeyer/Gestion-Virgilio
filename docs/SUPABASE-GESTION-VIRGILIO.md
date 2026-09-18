@@ -25000,3 +25000,43 @@ llamada** no sirve — la excepción de la prueba aborta también el `CREATE`, y
 existir mientras el resultado parece decir que anduvo. Van en llamadas separadas.
 
 `sql/gv_np_mover_guard_v2001.sql`.
+
+## §3.kf — v20.05: los `ref` con PIPE también viajan al renombrar (E03G y D71B) — 2026-09-18
+
+**El agujero.** El facturado no anota el movimiento con la tanda sola: lo anota **`TANDA|NP`**
+(`E03G|CH 0010`). El renombrador comparaba por igualdad exacta —`upper(btrim(ref)) = v_a`—, así que
+esas filas **nunca matcheaban** y se quedaban con el código viejo mientras el picking, el armado,
+las Entregas y la Facturación viajaban al nuevo. Estaba anotado desde el problema 421 (*"ni los
+`ref` con pipe"*) y nunca se había tapado.
+
+| tanda vieja | se quedó con | tanda nueva | quedó con | suma |
+|---|---|---|---|---|
+| E03G | facturado **−140** | E44A | +149 −9 = **+140** | **0** |
+| D71B | facturado **−72** | E40A | +78 −6 = **+72** | **0** |
+
+⚠ **Ninguna caja se pierde: la suma da cero.** El depósito estaba bien. Lo que mentía era la pila
+**por tanda**: E44A decía tener 140 cajas esperando facturarse que ya se habían facturado, y E03G
+—que hoy no tiene ni un pedido— mostraba −140. Con esas dos filas clavadas en rojo,
+`gv_stock_afacturar_tanda_negativa` dejaba de servir para el caso real, que es el mismo desgaste
+que se comió a otro centinela antes de la v19.77.
+
+**El arreglo, en el orden que pidió Thomas: primero la función, después los datos.**
+
+1. `gv_ppp_tanda_renombrar` ahora mueve también los `ref` que empiezan con `TANDA|`. Misma fusión
+   que el resto del bloque de stock —`facturado` está dentro de `mov_stock_pipeline_dedup`— y el
+   DELETE antes del UPDATE, porque el trigger del saldo no corre en DELETE.
+2. Con eso arreglado, **la corrección fue llamar a la función**, no SQL a mano: E03G y D71B ya no
+   tenían programación, Entregas ni Facturación, así que el renombre movió exactamente lo que
+   faltaba — los 20 movimientos del facturado, las **36 etiquetas de lío** de E03G y los **4
+   candados**, que también seguían colgados del código viejo.
+
+**Probado corriéndolo** (ZZ85Z → ZZ86Z, filas de descarte borradas después): el `ref` sin pipe
+sigue igual, `ZZ85Z|NPX` se renombró, y `ZZ85Z|NPY 3` + `ZZ86Z|NPY 7` **fusionaron en 10** sin
+violar el unique.
+
+**Después:** E44A y E40A con `a_facturar` en **0** · E03G y D71B sin un solo movimiento ·
+`gv_stock_afacturar_tanda_negativa` **vacía** (eran 50 filas) · picking duplicado, reglas perdidas,
+empresa fantasma, drenaje cruzado y góndola negativa en **0** · pickeado negativo sólo D53A (−2, de
+agosto, ajena) · candados huérfanos de 12 a 7.
+
+`sql/gv_tanda_renombrar_ref_pipe_v2005.sql`.
