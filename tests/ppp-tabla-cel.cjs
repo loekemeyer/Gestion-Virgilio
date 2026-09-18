@@ -36,7 +36,7 @@ const pintar = async (p) => p.evaluate(async () => {
     mk("2026-10-28", "E50A", "98660", "Andser", 19.95, "pendiente")
   ];
   _pgaTs = Date.now();
-  // v20.09: con la columna SALIÓ llena («100 %»), que es el caso ancho — con el «—» de cuando
+  // v20.10: con la columna SALIÓ llena («100 %»), que es el caso ancho — con el «—» de cuando
   // todavía no llegó En Salida la medición del ancho sería más chica de lo real.
   // (se usa `_pppLoadMs` —los CCN— y no `_pppEnSalida`, porque esa otra lista además ESCONDE de
   //  Programación lo que está en salida y acá lo que se mide es el ancho de la tabla llena)
@@ -61,7 +61,7 @@ const pintar = async (p) => p.evaluate(async () => {
   const fila = [...prev.querySelectorAll("tr.pga-d")][0];
   const visible = fila.children[0].innerText.replace(/\s+/g, " ").trim();
   const texto = fila.children[0].textContent.replace(/\s+/g, " ").trim();
-  // v20.09 (Thomas: *"el desglose … tiene que figurar por tanda también"*) — con el DÍA abierto,
+  // v20.10 (Thomas: *"el desglose … tiene que figurar por tanda también"*) — con el DÍA abierto,
   // que es cuando se miran las tandas, las 9 columnas tienen que seguir entrando.
   pgaAbrirDia("20260923"); await new Promise((s) => setTimeout(s, 150));
   const tandaTr = prev.querySelector("tr.pga-t");
@@ -100,7 +100,7 @@ const pintar = async (p) => p.evaluate(async () => {
   t(!/Viernes/.test(cel.visible), "(1) sin el nombre del día");
   t(!/18\/09/.test(cel.visible), "(1) y sin el cero del mes");
   t(/Viernes 18\/09/.test(cel.texto), "(2) el texto completo sigue en el HTML (se esconde, no se recorta)");
-  t(cel.cols === 9, "(3) las 9 columnas siguen estando (Salió incluida, v20.09) — " + cel.cols);
+  t(cel.cols === 9, "(3) las 9 columnas siguen estando (Salió incluida, v20.10) — " + cel.cols);
   t(cel.sobra >= 0, "(3) y entran en el ancho visible: la última termina dentro del marco (sobran " +
     cel.sobra + " px; tabla " + cel.tabla + " de " + cel.wrap + ")");
   t(cel.abierto.pcts === 5, "(5) con el día abierto, la fila de la tanda trae los 5 porcentajes — " + cel.abierto.pcts);

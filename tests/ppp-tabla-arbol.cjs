@@ -72,7 +72,7 @@ catch (_e) {
     // (1) la tabla es lo que se ve por defecto, con las 8 columnas
     out.esDefault = /class="pga"/.test(html) && !/pn-days/.test(html);
     // v17.79: los 4 estados van a la DERECHA, angostos, con el encabezado partido en dos y con color
-    // v20.09 (Thomas): SALIÓ se agregó a la IZQUIERDA de Facturado — 9 columnas.
+    // v20.10 (Thomas): SALIÓ se agregó a la IZQUIERDA de Facturado — 9 columnas.
     out.cols = ["Día", "m³", "Tandas", "NPs"].every((c) => new RegExp(">" + c + "<").test(html)) &&
       /pga-h sal[^>]*>Sa<br>lió</.test(html) &&
       /pga-h fac[^>]*>Factu<br>rado</.test(html) && /pga-h arm[^>]*>Ar<br>mado</.test(html) &&
@@ -94,7 +94,7 @@ catch (_e) {
         if (r > g + 40 && r > b + 40) return "rojo";
         return "otro";
       };
-      const th = [...prev.querySelectorAll("table.pga thead th")].slice(5);   // v20.09: la 1ª de las 5 es SALIÓ
+      const th = [...prev.querySelectorAll("table.pga thead th")].slice(5);   // v20.10: la 1ª de las 5 es SALIÓ
       // el martes es el único día con los 4 estados en juego (los que están en 0 % se pintan grises)
       const d15 = [...prev.querySelectorAll("tr.pga-d")].find((tr) => /15\/09/.test(tr.textContent));
       return {
@@ -118,7 +118,7 @@ catch (_e) {
     const mar = [...prev.querySelectorAll("tr.pga-d")].find((tr) => /15\/09/.test(tr.textContent));
     out.pctMartes = [...mar.querySelectorAll(".pga-pct")].slice(1).map((e) => e.textContent.trim());
     out.pctClases = [...mar.querySelectorAll(".pga-pct")].slice(1).map((e) => e.className.replace("pga-pct ", ""));
-    // v20.09: sin En Salida ni los CCN cargados, la columna SALIÓ dice «—» (un 0 % sería mentira)
+    // v20.10: sin En Salida ni los CCN cargados, la columna SALIÓ dice «—» (un 0 % sería mentira)
     out.salioSinDatos = (mar.querySelector(".pga-pct.sal") || {}).textContent;
 
     // (4) tocar el día lo expande en sus tandas, con color por estado
