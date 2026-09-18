@@ -1,3 +1,38 @@
+## Nota v20.11 (2026-09-18) — Las 5 columnas NETEAN, y cada NP lleva su porcentaje
+
+Thomas, sobre la v20.10: *"quiero que cada NP lleve el dato de los porcentajes (para determinar su
+estado) y que en el de la tanda y día se netee entre facturado y armado (ej, viernes 18 dice salió
+92 % 11, facturado 100 % 12; debería ser salió 92 % 11, facturado 100 % 1)"*.
+
+**El problema real:** la v20.10 puso SALIÓ al lado de los otros cuatro **sin descontarla**, así que
+el mismo pedido se contaba dos veces. El viernes 18: *Salió 92 % (11)* y *Facturado 100 % (12)* —
+cuando lo que de verdad queda **facturado y todavía en el depósito es 1**.
+
+**Regla nueva: las cinco columnas son excluyentes y suman 100 %.** Una NP que ya se fue en el camión
+deja de ser un pendiente de facturar o de armar: se cuenta **una sola vez**, en SALIÓ, y se descuenta
+de su estado. En el árbol, `est` sigue crudo y `estSal` anota **de qué estado salió cada una**; el
+porcentaje se arma con la resta.
+
+⚠ **El porcentaje se mueve con el conteo.** Ese día pasa a decir **Salió 92 % (11) · Facturado 8 %
+(1)**, no «100 % (1)»: con 1 de 12, el 100 % sería el número viejo pegado al conteo nuevo. Es la
+única parte del pedido que se hizo distinto de como estaba escrito, y por eso queda anotada acá.
+
+⚠ **El COLOR de la fila no netea.** `_pgaEstadoGrupo` sigue mirando `est` **crudo**: una tanda entera
+facturada y ya salida se tiene que seguir viendo facturada, no como "mezcla" (que es lo que daría
+con los conteos en cero).
+
+⚠ **Mientras no llegaron las dos fuentes** (En Salida y los CCN), SALIÓ dice «—» y los otros cuatro
+van **sin** netear: restar lo que todavía no se sabe sería peor que no restar.
+
+**Cada NP lleva su porcentaje** (`_pgaNpPctFila`): marca `100 %` en la columna que le toca y deja las
+otras vacías, con el mismo neteo — si salió, su 100 % va en SALIÓ y no en Facturado. Así la columna
+se lee de arriba abajo sin ir mirando la pastilla de cada renglón. Con la NP **abierta** esas celdas
+las ocupa el contenido (colspan 7) y el estado se sigue leyendo en la pastilla y en el chip 🚚.
+
+`tests/ppp-tabla-salio.cjs` (13 chequeos) fija las dos cosas: la fila del día queda en
+`["80 %4","20 %1","0 %0","0 %0","0 %0"]` —4 salidas de 5, la 5.ª facturada sin salir— y cada NP
+marca su 100 % en una sola columna.
+
 ## Nota v20.10 (2026-09-18) — El desglose por TANDA ya estaba: lo que no entraba era la pantalla
 
 Thomas: *"el desglose de Salió/Facturado/Armado/en proceso tiene que figurar por tanda también"*.

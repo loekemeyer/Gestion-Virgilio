@@ -5769,7 +5769,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.10"></script>
+<script type="module" src="recepcion.js?v=20.11"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9615,7 +9615,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.10";
+const APP_VERSION = "v20.11";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38364,11 +38364,11 @@ function patrColapsar() {
 function _pgaCuerpoHtml(dias, opts) {
   const esAtraso = !!(opts && opts.atraso);
   const hoy = _pppHoyKey();
-  const tot = { m3: 0, nps: 0, tandas: 0, est: _pgaEstCero(), salio: 0 };
+  const tot = { m3: 0, nps: 0, tandas: 0, est: _pgaEstCero(), estSal: _pgaEstCero(), salio: 0 };
   let h = "";
   for (const d of dias) {
     tot.m3 += d.m3; tot.nps += d.nps; tot.tandas += d.tandasArr.length;
-    for (const k of PGA_EST) tot.est[k] += d.est[k];
+    for (const k of PGA_EST) { tot.est[k] += d.est[k]; tot.estSal[k] += (d.estSal ? d.estSal[k] : 0); }
     tot.salio += d.salio || 0;
     // v18.31: buscando, los días y las tandas que quedaron abren solos — lo que se busca es
     // una NP, no un día, así que esconderla atrás de dos clics es lo mismo que no encontrarla.
@@ -38383,7 +38383,7 @@ function _pgaCuerpoHtml(dias, opts) {
                  : 'vacío · acá se mandan las tandas armadas sin fecha, con 📅 Cambiar de día') + '</span>' : '') +
         (esAtraso ? '<span class="patr-dias' + (atr >= 7 ? ' grave' : '') + '">hace ' + atr + ' día' + (atr === 1 ? '' : 's') + '</span>' : '') + '</td>' +
       '<td>' + _pppFmtM3(d.m3) + '</td><td>' + d.tandasArr.length + '</td><td>' + d.nps + '</td>' +
-      _pgaPctFila(d.est, d.nps, d.salio) + '</tr>';
+      _pgaPctFila(d.est, d.nps, d.salio, d.estSal) + '</tr>';
     if (!ab) continue;
     for (const t of d.tandasArr) {
       const tb = !!_pgaOpenT[t.key] || !!_pppSearch, te = _pgaEstadoGrupo(t.est, t.nps);
@@ -38404,7 +38404,7 @@ function _pgaCuerpoHtml(dias, opts) {
             : '') +
         '</div></td>' +
         '<td>' + _pppFmtM3(t.m3) + '</td><td></td><td>' + t.nps + '</td>' +
-        _pgaPctFila(t.est, t.nps, t.salio) + '</tr>';
+        _pgaPctFila(t.est, t.nps, t.salio, t.estSal) + '</tr>';
       if (!tb) continue;
       for (const r of t.filas) {
         const nk = t.key + "|" + r.np, nb = !!_pgaOpenN[nk];
@@ -38462,14 +38462,15 @@ function _pgaCuerpoHtml(dias, opts) {
           // `stopPropagation` en la celda: si no, tocar un código cierra la NP.
           (nb ? '<td colspan="7" class="pga-ncont" onclick="event.stopPropagation()">' +
                   _pgaItemsHtml(r.np) + '</td>'
-              : '<td></td><td></td><td></td><td></td><td></td><td></td><td></td>') +
+              // Tandas y NPs quedan vacías (una NP no es un grupo); las cinco de la derecha, v20.11.
+              : '<td></td><td></td>' + _pgaNpPctFila(est, _pgaSalio(r))) +
           '</tr>';
       }
     }
   }
   return h + '</tbody><tfoot><tr>' +
     '<td>Total</td><td>' + _pppFmtM3(tot.m3) + '</td><td>' + tot.tandas + '</td><td>' + tot.nps + '</td>' +
-    _pgaPctFila(tot.est, tot.nps, tot.salio) + '</tr></tfoot></table>';
+    _pgaPctFila(tot.est, tot.nps, tot.salio, tot.estSal) + '</tr></tfoot></table>';
 }
 
 /* v18.78 — recibe las filas por parámetro para que el submódulo "Pedidos atrasados"
@@ -38484,13 +38485,15 @@ function _pgaArbol(filas) {
     const k = String(r.fecha == null ? "" : r.fecha).replace(/-/g, ""); if (!k) continue;
     const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
     const sal = _pgaSalio(r) ? 1 : 0;   // v20.10: ya se fue en el camión
+    // v20.11 (Thomas): `est` queda CRUDO —es el que decide el color de la fila— y `estSal` anota
+    // cuántas de cada estado ya salieron, que es lo que después se NETEA en los porcentajes.
     let d = dias.get(k);
-    if (!d) { d = { key: k, m3: 0, nps: 0, est: _pgaEstCero(), salio: 0, tandas: new Map() }; dias.set(k, d); }
-    d.m3 += Number(r.m3) || 0; d.nps++; d.est[est]++; d.salio += sal;
+    if (!d) { d = { key: k, m3: 0, nps: 0, est: _pgaEstCero(), estSal: _pgaEstCero(), salio: 0, tandas: new Map() }; dias.set(k, d); }
+    d.m3 += Number(r.m3) || 0; d.nps++; d.est[est]++; d.salio += sal; if (sal) d.estSal[est]++;
     const tk = String(r.tanda || "—");
     let t = d.tandas.get(tk);
-    if (!t) { t = { tanda: tk, key: k + "|" + tk, m3: 0, nps: 0, est: _pgaEstCero(), salio: 0, filas: [] }; d.tandas.set(tk, t); }
-    t.m3 += Number(r.m3) || 0; t.nps++; t.est[est]++; t.salio += sal; t.filas.push(r);
+    if (!t) { t = { tanda: tk, key: k + "|" + tk, m3: 0, nps: 0, est: _pgaEstCero(), estSal: _pgaEstCero(), salio: 0, filas: [] }; d.tandas.set(tk, t); }
+    t.m3 += Number(r.m3) || 0; t.nps++; t.est[est]++; t.salio += sal; if (sal) t.estSal[est]++; t.filas.push(r);
   }
   const out = [...dias.values()].sort(function (a, b) { return a.key.localeCompare(b.key); });
   for (const d of out) d.tandasArr = [...d.tandas.values()].sort(function (a, b) { return a.tanda.localeCompare(b.tanda); });
@@ -38504,7 +38507,7 @@ function _pgaArbol(filas) {
    ruido. */
 function _pgaConEspera(dias) {
   if (dias.some(function (d) { return d.key === PGA_ESPERA_KEY; })) return dias;
-  dias.push({ key: PGA_ESPERA_KEY, m3: 0, nps: 0, est: _pgaEstCero(), salio: 0, tandas: new Map(), tandasArr: [] });
+  dias.push({ key: PGA_ESPERA_KEY, m3: 0, nps: 0, est: _pgaEstCero(), estSal: _pgaEstCero(), salio: 0, tandas: new Map(), tandasArr: [] });
   return dias;
 }
 function _pgaPctTd(n, tot, cls) {
@@ -38517,9 +38520,38 @@ function _pgaPctTd(n, tot, cls) {
 /* v20.10: la 1ª celda es SALIÓ y NO entra en el reparto de los otros cuatro — una NP facturada
    puede haber salido o no, así que esta columna se lee sola y la fila ya no suma 100 %.
    Si todavía no llegaron las dos fuentes (En Salida y los CCN), dice «—»: un 0 % ahí sería mentira. */
-function _pgaPctFila(e, n, salio) {
-  return _pgaSalioTd(salio, n) + _pgaPctTd(e.facturado, n, "fac") + _pgaPctTd(e.armado, n, "arm") +
-         _pgaPctTd(e.proceso, n, "pro") + _pgaPctTd(e.pendiente, n, "pen");
+/* v20.11 (Thomas: *"que en el de la tanda y día se netee entre facturado y armado"*) — LAS CINCO
+   COLUMNAS SON EXCLUYENTES Y SUMAN 100 %.
+   La v20.10 ponía SALIÓ al lado de los otros cuatro sin descontarla, y el mismo pedido se contaba
+   dos veces: el viernes 18 decía «Salió 92 % (11)» y «Facturado 100 % (12)» cuando lo que queda
+   facturado y todavía en el depósito es **1**. Una NP que ya se fue en el camión deja de ser un
+   pendiente de facturar o de armar: se cuenta UNA sola vez, en SALIÓ, y se descuenta de su estado
+   (`estSal` guarda de qué estado salió cada una).
+   ⚠ Al netear, el porcentaje se mueve con el conteo: esas 12 facturadas pasan a «8 % (1)», no a
+   «100 % (1)» — con 1 de 12, el 100 % sería el número viejo pegado al conteo nuevo.
+   ⚠ El COLOR de la fila (`_pgaEstadoGrupo`) sigue usando `est` CRUDO: una tanda entera facturada y
+   ya salida se tiene que seguir viendo facturada, no como "mezcla".
+   ⚠ Mientras no llegaron las dos fuentes (En Salida y los CCN), SALIÓ dice «—» y los otros cuatro
+   van SIN netear: es lo único honesto mientras no se sabe qué salió. */
+function _pgaPctFila(e, n, salio, eSal) {
+  const s = eSal || _pgaEstCero(), listo = _pgaSalioListo();
+  const neto = function (k) { return e[k] - (listo ? (s[k] || 0) : 0); };
+  return _pgaSalioTd(salio, n) + _pgaPctTd(neto("facturado"), n, "fac") + _pgaPctTd(neto("armado"), n, "arm") +
+         _pgaPctTd(neto("proceso"), n, "pro") + _pgaPctTd(neto("pendiente"), n, "pen");
+}
+/* v20.11 (Thomas: *"quiero que cada NP lleve el dato de los porcentajes (para determinar su
+   estado)"*) — la fila de UNA NP marca 100 % en la columna que le toca y deja las otras vacías, así
+   la columna se lee de arriba abajo sin ir mirando la pastilla de cada renglón. Con el mismo neteo:
+   si salió, su 100 % va en SALIÓ y no en Facturado.
+   ⚠ Con la NP ABIERTA estas celdas las ocupa el contenido (colspan), y ahí el estado se sigue
+   leyendo en la pastilla y en el chip 🚚 de la primera columna. */
+function _pgaNpPctFila(est, salio) {
+  const cls = { facturado: "fac", armado: "arm", proceso: "pro", pendiente: "pen" };
+  const uno = function (c, on) {
+    return '<td><span class="pga-pct ' + c + (on ? '' : ' z') + '">' +
+      (on ? '100<span class="pga-pcs"> </span>%' : '') + '</span></td>';
+  };
+  return uno("sal", !!salio) + PGA_EST.map(function (k) { return uno(cls[k], !salio && k === est); }).join("");
 }
 function _pgaSalioTd(s, n) {
   if (!_pgaSalioListo()) return '<td><span class="pga-pct sal z" title="Leyendo En Salida…">—</span></td>';
