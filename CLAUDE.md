@@ -835,7 +835,7 @@ para avisar el día, no para que el pedido saliera. `gv_web_retiro_pactado` y `g
 ahora lo miran primero — **el manual pisa** a lo que eligió el cliente y al turno de la OC, igual
 que ya hacía el front.
 
-`sql/gv_todo_automatico_v1974.sql`, §3.jg.
+`sql/gv_todo_automatico_v1974.sql`, §3.ji.
 
 ## ⚠ QUIÉN ORGANIZA LA PROGRAMACIÓN: el automático arma, **MARIANELA** organiza
 
