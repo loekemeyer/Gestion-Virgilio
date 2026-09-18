@@ -1,4 +1,4 @@
--- v19.80 — Los pedidos de CLIENTE NUEVO salían sin cliente, sin zona y sin expreso (problema 425)
+-- v19.81 — Los pedidos de CLIENTE NUEVO salían sin cliente, sin zona y sin expreso (problema 425)
 --
 -- Thomas, 18/09, despues de la v19.78: *"¿pero el pedido de esos clientes sin ficha en customers
 -- no entró desde la página?"* y *"si vinieron de la página tenemos los datos del cliente, ¿no?"*
@@ -35,7 +35,7 @@
 --
 -- MEDIDO ANTES / DESPUES (1.072 pedidos):
 --   · pedidos de cliente nuevo que recuperan cliente/localidad/provincia ...... 4 de 6
---   · pedidos que recuperan localidad (total, v19.78 + v19.80) ................ +19
+--   · pedidos que recuperan localidad (total, v19.78 + v19.81) ................ +19
 --   · pedidos que recuperan razon social ..................................... +6
 --   · regresiones (zona / localidad / razon social) ........................... 0
 --   · filas de v_pedidos_web / _np / _dif ..................... 17.782 / 1.570 / 17.782 (iguales)
@@ -50,7 +50,7 @@
 --
 -- ROLLBACK: sql/backups/v_pedidos_web_20260918_pre_v1978.sql vuelve al feed anterior a las dos
 --           versiones. Para volver solo esta, sacar el join a `expo_clientes_pendientes`, el
---           lateral `dirx` y los COALESCE que los usan (marcados "v19.80").
+--           lateral `dirx` y los COALESCE que los usan (marcados "v19.81").
 
 -- El feed, con las tres fuentes de cliente ------------------------------------------------
 create or replace view public.v_pedidos_web as
@@ -60,13 +60,13 @@ create or replace view public.v_pedidos_web as
             o.sheets_payload,
             o.enviado_a_compras_at,
             COALESCE(o.sheets_payload ->> 'cod_cliente'::text, o.sheets_payload ->> 'codCliente'::text) AS cod_cliente,
-            COALESCE(c.business_name, ep.business_name) AS razon_social,          -- v19.80
-            COALESCE(c.cuit, ep.cuit) AS cuit,                                    -- v19.80
+            COALESCE(c.business_name, ep.business_name) AS razon_social,          -- v19.81
+            COALESCE(c.cuit, ep.cuit) AS cuit,                                    -- v19.81
             COALESCE(o.sheets_payload ->> 'sucursal_entrega'::text, o.sheets_payload ->> 'sucursalEntrega'::text) AS sucursal_entrega,
-            COALESCE(dir.localidad, dirx.localidad) AS localidad,                 -- v19.80
-            COALESCE(dir.provincia, dirx.provincia) AS provincia,                 -- v19.80
+            COALESCE(dir.localidad, dirx.localidad) AS localidad,                 -- v19.81
+            COALESCE(dir.provincia, dirx.provincia) AS provincia,                 -- v19.81
             dir.zona_expreso,
-            COALESCE(dir.nombre_expreso, dirx.expreso) AS nombre_expreso,         -- v19.80
+            COALESCE(dir.nombre_expreso, dirx.expreso) AS nombre_expreso,         -- v19.81
             dir.direccion_expreso,
             dir.direccion_entrega,
             ( btrim(COALESCE(COALESCE(dir.nombre_expreso, dirx.expreso), ''::text)) <> ''::text
@@ -85,7 +85,7 @@ create or replace view public.v_pedidos_web as
              LEFT JOIN LATERAL ( SELECT COALESCE(c0.id, c1.id) AS id,
                                         COALESCE(c0.business_name, c1.business_name) AS business_name,
                                         COALESCE(c0.cuit, c1.cuit) AS cuit ) c ON true
-             -- v19.80: tercera fuente, solo si las dos anteriores fallaron
+             -- v19.81: tercera fuente, solo si las dos anteriores fallaron
              LEFT JOIN expo_clientes_pendientes ep
                     ON c.id IS NULL
                    AND ep.cod_cliente::text = COALESCE(o.sheets_payload ->> 'cod_cliente'::text, o.sheets_payload ->> 'codCliente'::text)
@@ -118,7 +118,7 @@ create or replace view public.v_pedidos_web as
                   WHERE y.sc = y.sc_min AND y.sc < 9 AND (y.sc <= 2 OR y.n_sc = 1)
                   ORDER BY y.sc, (btrim(COALESCE(y.zona_expreso, ''::text)) <> ''::text) DESC, y.slot
                  LIMIT 1) dir ON true
-             -- v19.80: la misma escalera, pero adentro del jsonb del alta de cliente nuevo
+             -- v19.81: la misma escalera, pero adentro del jsonb del alta de cliente nuevo
              LEFT JOIN LATERAL (
                  SELECT y.localidad, y.provincia, y.expreso
                    FROM ( SELECT x.*, min(x.sc) OVER () AS sc_min, count(*) OVER (PARTITION BY x.sc) AS n_sc
@@ -258,7 +258,7 @@ alter view public.gv_web_sucursal_sin_match set (security_invoker = true);
 revoke select on public.gv_web_sucursal_sin_match from anon;
 
 comment on view public.gv_web_sucursal_sin_match is
- 'v19.80 (problemas 418 y 425): pedidos web de LK cuya sucursal de entrega NO se puede cruzar, ni contra el ABM (customers + customer_delivery_addresses) ni contra el alta de cliente nuevo (expo_clientes_pendientes). Cada fila = un pedido que sale sin expreso, sin localidad y sin provincia, o sea que tampoco se le puede aplicar la regla de Tierra del Fuego. Vacia = todo bien.';
+ 'v19.81 (problemas 418 y 425): pedidos web de LK cuya sucursal de entrega NO se puede cruzar, ni contra el ABM (customers + customer_delivery_addresses) ni contra el alta de cliente nuevo (expo_clientes_pendientes). Cada fila = un pedido que sale sin expreso, sin localidad y sin provincia, o sea que tampoco se le puede aplicar la regla de Tierra del Fuego. Vacia = todo bien.';
 
 -- Chequeo:
 --   select motivo, count(*) from public.gv_web_sucursal_sin_match group by 1;

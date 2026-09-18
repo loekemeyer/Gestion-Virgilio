@@ -23881,7 +23881,91 @@ el 30/07 — pero `Racks_Planimetria` **no tiene ninguna fila del 505**, y el li
 `racks = 0`. Esa tabla está congelada desde el **10/08**: esas 729 cajas ya se bajaron y la vieja
 nunca se actualizó. Leerla hoy para saber dónde está el 505 da una respuesta que suena bien y
 está mal.
-## §3.jn — v19.80: el pedido de CLIENTE NUEVO salía sin cliente, sin zona y sin expreso (problema 425) — 2026-09-18
+
+## §3.jn — v19.80: el evento PKC lleva la tanda en el campo 1 y nadie lo renombraba — 2026-09-18
+
+**Problemas 420 y 421.** Al renombrar una tanda («📅 Cambiar de día») o fusionarla dentro de otra,
+10 minutos después el picking **reaparecía bajo el código viejo**, y la fusión se deshacía sola.
+
+### Por qué
+
+`gv_evento_tanda_campo` no declaraba **PKC**. El primer `UPDATE` de `gv_ppp_tanda_renombrar` sólo
+matchea cuando el texto ENTERO es la tanda (`TP`, `TAP`, `AP`, `EP`, `PUB`), y un PKC es
+`tanda|art|…`. El segundo, el de `gv_evento_set_tanda`, necesita que la opción esté declarada. Así
+que los PKC se quedaban con el código viejo y el **cron 68** (`reconciliar_pipeline_stock_etapa1`)
+volvía a insertar el picking con ese código. Y peor: el upsert de la etapa1 hace
+`DO UPDATE SET delta = excluded.delta`, o sea que además **pisa la suma de la fusión**.
+
+Faltaban cinco opciones, todas con la tanda en el campo 1: **PKC, PSP, FGU, SSG, RAG**.
+
+### Cómo se probó — corriendo el cron, no leyendo la función
+
+En transacción abortada, **antes** del fix:
+
+```
+fusión   E12M -> E12I : 40+38=78 -> renombrado 0/78 -> tras el cron 40/48 = 88   (+10 fantasma)
+renombre E12M -> ZZ9Z : 40       -> renombrado 0/40 -> tras el cron 40/40 = 80   (duplicado entero)
+```
+
+Y **después**, contra la función ya aplicada (no una copia redefinida adentro del bloque, que era
+lo que hacía la prueba del borrador y no prueba nada):
+
+```
+fusión   E12M -> E12I : 78  -> 78   ✅
+renombre E12J -> ZZ9Z : 100 -> 100  ✅
+```
+
+⚠ **No afecta a `gv_ppp_nps_mover_a`**, el otro llamador: filtra por campo 1 = **NP**, y esas cinco
+opciones llevan ahí la **tanda**, que nunca tiene formato de NP. Medido moviendo LK 0029 de E12A:
+66 PKC antes, 66 después, **0 migrados**.
+
+### Daño acumulado y limpieza
+
+7 pares de tandas con el picking contado dos veces: **868 cajas fantasma, 843 de menos en góndola**.
+
+| fantasma | viva | cajas | se limpió |
+|---|---|---|---|
+| E03F | E12R | 184 | ✅ |
+| E03G | E44A | 149 | ✅ |
+| D71B | E40A | 78 | ✅ |
+| E11B | E41A | 50 | ✅ |
+| E12A | E12S | 193 | ❌ abierto |
+| E12E | E37F | 114 | ❌ abierto |
+| E12J | E12G | 100 | ❌ abierto |
+
+**La firma que separa a los cuatro limpios**: el fantasma quedó **sólo con PKC y PSP** — sus
+`TP`/`TAP`/`AP`/`EP`/`PUB` sí viajaron a la tanda viva, que es exactamente lo que hace
+`gv_ppp_tanda_renombrar`. En los otros tres hay **`TP` de los dos lados**, así que no pasaron
+(sólo) por un renombre y no se tocaron. Además **E12A sigue programada**, con una NP propia viva
+(LK 0029, C.M.G. Distrib. de Tegerina, 47 cajas, 21/09) mientras E12S lleva las otras 7 NP: repartir
+ese picking entre las dos es **decisión de armado**, y el PKC no guarda la NP, así que no se puede
+deducir del dato. Eso lo decide Marianela.
+
+Backups: `zz_backups."GV_Backup_PKC_Fantasma_20260918"` (118 eventos) y
+`zz_backups."GV_Backup_MovStock_Fantasma_20260918"` (962 movimientos), las dos con RLS.
+
+⚠ El `DELETE` del picking fantasma va antes del recálculo de saldos, y el recálculo hay que
+**forzarlo**: `trigger_actualizar_saldo_stock` es `AFTER INSERT OR UPDATE` y **no corre en DELETE**,
+así que `stocks_carga_rapida` queda inflado si uno se confía. Los `facturado` con ref `tanda|NP`
+**no se tocaron**: son el problema 417, aparte (E03G ya estaba negativo desde el 17/09).
+
+### El centinela: la huella exacta se comía la mitad
+
+`gv_stock_picking_duplicado` exigía `md5(set completo art:delta)` idéntico **y** que el fantasma no
+estuviera en ninguna programación. Con eso marcaba **4 de 7**. La firma nueva es: la tanda viva no
+tiene **ningún** evento PKC (todo su picking le llegó por renombre) y el fantasma sí, con **≥ 80 %
+de solape en ambos sentidos** por (código, cantidad exacta). Calibrado: **exactamente los 7**, sin
+un falso positivo — con solape de ≥ 3 códigos a secas daban 300+, por coincidencia entre tandas
+viejas.
+
+⚠ **Y el fantasma es el MÁS NUEVO de los dos**, porque lo re-crea el cron cada 10 minutos. Copiar
+la comparación de fechas al revés deja la vista **en cero, sin avisar** — pasó al escribirla.
+
+**Chequeo:** `select * from public.gv_stock_picking_duplicado;` — al 18/09 quedan los 3 abiertos.
+`select * from public.gv_reglas_perdidas;` — vacía. `sql/gv_evento_tanda_campo_pkc_v1980.sql`.
+
+---
+## §3.jo — v19.81: el pedido de CLIENTE NUEVO salía sin cliente, sin zona y sin expreso (problema 425) — 2026-09-18
 
 **Thomas, justo después de la v19.78:** *"¿pero el pedido de esos clientes sin ficha en customers
 no entró desde la página?"* y, cuando le contesté que sí: ***"y si vinieron de la página tenemos
@@ -23922,7 +24006,7 @@ vino a arreglar del otro lado. Se toman localidad, provincia y el **nombre** del
 | | |
 |---|---|
 | pedidos de cliente nuevo que recuperan cliente / localidad / provincia | **4 de 6** |
-| pedidos que recuperan localidad (v19.78 + v19.80) | **+19** |
+| pedidos que recuperan localidad (v19.78 + v19.81) | **+19** |
 | pedidos que recuperan razón social | **+6** |
 | **regresiones** (zona, localidad, razón social) | **0** |
 | filas de `v_pedidos_web` / `_np` / `_dif` | 17.782 / 1.570 / 17.782 (iguales) |
@@ -23956,4 +24040,4 @@ select motivo, count(*) from public.gv_web_sucursal_sin_match group by 1;   -- e
 
 Al 18/09: **11** (eran 15). 9 de nombre que no coincide —la última del 07/08— y los 2 de arriba.
 
-`sql/gv_web_cliente_nuevo_expo_v1980.sql`.
+`sql/gv_web_cliente_nuevo_expo_v1981.sql`.

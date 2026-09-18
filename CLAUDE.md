@@ -1010,9 +1010,16 @@ proyección con la capacidad, incluso cuando la proyección es más alta. **Al 1
 tildado ningún artículo (0 de 238)**, y no hay que tildarlo salvo que el dueño lo pida para un
 código puntual.
 
-La flecha roja **⤓ "Topado a la capacidad de góndola"** que el generador pintaba era de la **v4.31**,
-cuando el tope sí existía; afirmaba un tope que hace rato no pasa. **Se sacó en la v19.78**
-(problema 419). Si vuelve a aparecer un cartel de tope, está mintiendo.
+⚠ **El tope existió hasta HOY a las 13:26**, y lo sacó esta misma regla: la **v19.71** cambió
+`LEAST(ceil(proy × índice), cap)` por `ceil(proy × índice)` en el CASE del Máximo (*"no contemples
+el máximo de góndola para pedidos. Tenemos que tener la mercadería que hace falta, después vemos
+cómo la guardamos"*). Midió **49 códigos que suben el Máximo, 33 que pasan a pedir más, +2.178
+cajas** (7.324 → 9.502). La flecha roja **⤓ "Topado a la capacidad de góndola"** quedó huérfana ahí
+mismo y **se sacó en la v19.78** (problema 419) — no era un resto viejo, estuvo diciendo la verdad
+hasta esa tarde. Si vuelve a aparecer un cartel de tope, está mintiendo.
+
+**Consecuencia aceptada, no un bug:** comprando por encima de la góndola, el aviso de recepción
+*"no entra en góndola"* salta más seguido y el excedente va a racks.
 
 **Chequeo:**
 
