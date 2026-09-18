@@ -1,4 +1,4 @@
-## Nota v20.04 (2026-09-18) — El 043 se llamaba "043": el guard que existía y no servía
+## Nota v20.05 (2026-09-18) — El 043 se llamaba "043": el guard que existía y no servía
 
 Thomas: *"la descripción del 043 y esos otros códigos no debería ser 043, algo se rompió ahí"*.
 
@@ -19,6 +19,54 @@ La pantalla se realinea sola con el cron 57 (cada 5 min). Detalle y medición: �
 `docs/SUPABASE-GESTION-VIRGILIO.md`.
 
 ---
+
+## Nota v20.04 (2026-09-18) — Columna «SALIÓ» en la tabla de Programación
+
+Thomas: *"agregá columna a esa visión que sea SALIÓ a la izquierda de FACTURADO que busque en el
+módulo En salida para ver si esa tanda/NP ya salió en el camión"*.
+
+**Mirar sólo «En Salida» habría mentido.** De ese módulo la NP **se va sola** cuando vuelve el
+remito (CRN) y pasa a Pedidos Entregados — y una NP entregada, obviamente, salió. Medido el 18/09
+sobre las **158 NP** del árbol (`gv_ppp_prog_arbol`, hoy → +60 días):
+
+| | NP |
+|---|---|
+| están en **En Salida** (todas con CCN) | 7 |
+| ya tienen **CRN** y siguen en el árbol | 9 |
+| en En Salida **sin** carga al camión | 0 |
+
+Con la vista sola, esas 9 dirían «no salió». Por eso la columna cruza **dos** fuentes, las dos del
+backend y las dos ya cargadas en esta pantalla (no hay una llamada de red nueva):
+
+- **`gv_ppp_en_salida`** (`_pppEnSalida`): cuenta como salida `cargada` (evento **CCN**),
+  `salida_manual` (la dio por salida un supervisor, v15.97) y `armada_sin_carga` (salida presunta:
+  armada hace +36 h y sin papel, v15.55). **No** cuenta la facturada sin cargar: ésa sigue en el
+  depósito y es justo la que Programación tiene que seguir mostrando como pendiente de salir.
+- **los CCN de los últimos 60 días** (`_pppLoadMs`, el mapa que arma `pppRefreshEntregado`), que
+  son los que ya pasaron a Entregados. Ese mapa **ya descuenta el FSS posterior**: si la mercadería
+  volvió al depósito, no salió.
+
+**Dónde se ve:** el **%** va en la fila del **día** y en la de la **tanda** (5ª columna, violeta,
+a la izquierda de Facturado); la fila de la **NP** lleva el chip **🚚 Salió** al lado de su pastilla
+de estado — ahí no va en la columna porque, al abrir la NP, el contenido ocupa esas celdas
+(`colspan` 6 → **7**).
+
+⚠ **La fila ya no suma 100 %, y está bien.** Los otros cuatro porcentajes son estados excluyentes;
+«Salió» se cruza con ellos: una NP puede estar **facturada Y salida**. Se lee sola.
+
+⚠ **Mientras las dos fuentes no llegaron, la celda dice «—», no `0 %`.** Un cero ahí sería una
+afirmación falsa («no salió ninguna») cuando lo cierto es que todavía no se sabe.
+
+**Va en el front**, no en `gv_ppp_prog_arbol`: el dato ya es del backend y agregarle una columna al
+`TABLE(...)` de esa RPC obliga a **DROP + CREATE** de una función que usan varias pantallas.
+
+**En el celular entra igual** (v20.01): con 9 columnas la tabla llena medía 379 px contra 364 de
+marco, así que el espacio de `100 %` pasó a un span propio (`pga-pcs`) que el celular esconde —
+cinco columnas de porcentaje × ~4 px — y el padding lateral bajó a 2 px. Medido: **356 px de
+mínimo**, entra en 390 con 8 px de aire. El `textContent` sigue diciendo `100 %`.
+
+`tests/ppp-tabla-salio.cjs` (10 chequeos: las tres formas de salida, la facturada-sin-cargar que
+NO sale, la entregada que sí, el % por día/tanda/total, el chip por NP y el «—» sin datos).
 
 ## Nota v20.02 (2026-09-18) — Abrir una fila de Stocks decía "sin movimientos contados" teniendo stock
 

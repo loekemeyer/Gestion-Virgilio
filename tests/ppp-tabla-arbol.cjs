@@ -72,13 +72,15 @@ catch (_e) {
     // (1) la tabla es lo que se ve por defecto, con las 8 columnas
     out.esDefault = /class="pga"/.test(html) && !/pn-days/.test(html);
     // v17.79: los 4 estados van a la DERECHA, angostos, con el encabezado partido en dos y con color
+    // v20.04 (Thomas): SALIÓ se agregó a la IZQUIERDA de Facturado — 9 columnas.
     out.cols = ["Día", "m³", "Tandas", "NPs"].every((c) => new RegExp(">" + c + "<").test(html)) &&
+      /pga-h sal[^>]*>Sa<br>lió</.test(html) &&
       /pga-h fac[^>]*>Factu<br>rado</.test(html) && /pga-h arm[^>]*>Ar<br>mado</.test(html) &&
       /pga-h pro[^>]*>En<br>proceso</.test(html) && /pga-h pen[^>]*>Pen<br>dientes</.test(html);
     out.estadosDerecha = (function () {
       const th = [...prev.querySelectorAll("table.pga thead th")].map((e) => e.className);
-      return th.length === 8 && !th[0] && !th[1] && !th[2] && !th[3] &&
-             /fac/.test(th[4]) && /arm/.test(th[5]) && /pro/.test(th[6]) && /pen/.test(th[7]);
+      return th.length === 9 && !th[0] && !th[1] && !th[2] && !th[3] && /sal/.test(th[4]) &&
+             /fac/.test(th[5]) && /arm/.test(th[6]) && /pro/.test(th[7]) && /pen/.test(th[8]);
     })();
     out.salidas = /pppPlanTabla\(false\)/.test(html) && /pppPlanClasica\(true\)/.test(html);
     // v17.79 (Luis): "Facturado azul, armado verde, en proceso amarillo, pendiente rojo"
@@ -92,12 +94,12 @@ catch (_e) {
         if (r > g + 40 && r > b + 40) return "rojo";
         return "otro";
       };
-      const th = [...prev.querySelectorAll("table.pga thead th")].slice(4);
+      const th = [...prev.querySelectorAll("table.pga thead th")].slice(5);   // v20.04: la 1ª de las 5 es SALIÓ
       // el martes es el único día con los 4 estados en juego (los que están en 0 % se pintan grises)
       const d15 = [...prev.querySelectorAll("tr.pga-d")].find((tr) => /15\/09/.test(tr.textContent));
       return {
         head: th.map((e) => fam(getComputedStyle(e).borderTopColor)),
-        num: [...d15.querySelectorAll(".pga-pct")].map((e) => fam(getComputedStyle(e).color))
+        num: [...d15.querySelectorAll(".pga-pct")].slice(1).map((e) => fam(getComputedStyle(e).color))
       };
     })();
 
@@ -114,8 +116,10 @@ catch (_e) {
 
     // (3) los 4 porcentajes del día, en números y con su color
     const mar = [...prev.querySelectorAll("tr.pga-d")].find((tr) => /15\/09/.test(tr.textContent));
-    out.pctMartes = [...mar.querySelectorAll(".pga-pct")].map((e) => e.textContent.trim());
-    out.pctClases = [...mar.querySelectorAll(".pga-pct")].map((e) => e.className.replace("pga-pct ", ""));
+    out.pctMartes = [...mar.querySelectorAll(".pga-pct")].slice(1).map((e) => e.textContent.trim());
+    out.pctClases = [...mar.querySelectorAll(".pga-pct")].slice(1).map((e) => e.className.replace("pga-pct ", ""));
+    // v20.04: sin En Salida ni los CCN cargados, la columna SALIÓ dice «—» (un 0 % sería mentira)
+    out.salioSinDatos = (mar.querySelector(".pga-pct.sal") || {}).textContent;
 
     // (4) tocar el día lo expande en sus tandas, con color por estado
     pgaAbrirDia("20260915"); await new Promise((res) => setTimeout(res, 120));
@@ -170,7 +174,7 @@ catch (_e) {
     // que fluye, para que se abra en horizontal y no hacia adentro.
     // v17.96 (Luis): el contenido ya no va en un renglón aparte — ocupa las 6 celdas que quedaban
     // vacías en la MISMA fila de la NP (de Tandas a Pendientes).
-    out.contenido = /class="pga-ncont"/.test(html) && /colspan="6"/.test(html) && /class="pga-its"/.test(html) &&
+    out.contenido = /class="pga-ncont"/.test(html) && /colspan="7"/.test(html) && /class="pga-its"/.test(html) &&
                     /pga-it-cod">505</.test(html) && /pga-it-cj">20 cj</.test(html) &&
                     /pga-it-tot">3 códigos · <b>48<\/b> cajas · <b>528<\/b> unidades/.test(html);
     // v17.96: la celda del contenido y la de la NP tienen que ser de la MISMA <tr>
@@ -179,7 +183,7 @@ catch (_e) {
       if (!td) return false;
       const tr = td.parentElement;
       return tr.classList.contains("pga-n") && !!tr.querySelector(".pga-np") &&
-             Number(td.getAttribute("colspan")) === 6;
+             Number(td.getAttribute("colspan")) === 7;
     })();
     out.contenidoAncho = (function () {
       const g = prev.querySelector(".pga-its"), td = prev.querySelector("td.pga-ncont");
@@ -209,8 +213,9 @@ catch (_e) {
   const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
   t(r.esDefault, "(1) la tabla es la vista por defecto de Programación");
-  t(r.cols, "(1) columnas Día · m³ · Tandas · NPs + los 4 estados con el encabezado partido y su color");
-  t(r.estadosDerecha, "(1) los 4 estados van últimos, bien a la derecha");
+  t(r.cols, "(1) columnas Día · m³ · Tandas · NPs · Salió + los 4 estados con el encabezado partido y su color");
+  t(r.estadosDerecha, "(1) SALIÓ 5ª y los 4 estados últimos, bien a la derecha");
+  t(r.salioSinDatos === "—", "(1) sin En Salida cargado, SALIÓ dice «—» y no 0 % — «" + r.salioSinDatos + "»");
   const _pal = ["azul", "verde", "amarillo", "rojo"];
   t(r.paleta && JSON.stringify(r.paleta.head) === JSON.stringify(_pal),
     "(1) facturado azul · armado verde · en proceso amarillo · pendiente rojo, en el encabezado — " +

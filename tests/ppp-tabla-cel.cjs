@@ -36,6 +36,11 @@ const pintar = async (p) => p.evaluate(async () => {
     mk("2026-10-28", "E50A", "98660", "Andser", 19.95, "pendiente")
   ];
   _pgaTs = Date.now();
+  // v20.04: con la columna SALIÓ llena («100 %»), que es el caso ancho — con el «—» de cuando
+  // todavía no llegó En Salida la medición del ancho sería más chica de lo real.
+  // (se usa `_pppLoadMs` —los CCN— y no `_pppEnSalida`, porque esa otra lista además ESCONDE de
+  //  Programación lo que está en salida y acá lo que se mide es el ancho de la tabla llena)
+  _pppLoadMs = new Map(_pgaRows.map((r) => [r.np, Date.now()]));
   _pppTab = "plan"; _pppPlanTabla = true; _pppPlanClasica = false; _pppPlanDay = null;
   document.getElementById("pppOverlay").classList.add("show");
   pppRenderProg(); await new Promise((s) => setTimeout(s, 250));
@@ -78,7 +83,7 @@ const pintar = async (p) => p.evaluate(async () => {
   t(!/Viernes/.test(cel.visible), "(1) sin el nombre del día");
   t(!/18\/09/.test(cel.visible), "(1) y sin el cero del mes");
   t(/Viernes 18\/09/.test(cel.texto), "(2) el texto completo sigue en el HTML (se esconde, no se recorta)");
-  t(cel.cols === 8, "(3) las 8 columnas siguen estando — " + cel.cols);
+  t(cel.cols === 9, "(3) las 9 columnas siguen estando (Salió incluida, v20.04) — " + cel.cols);
   t(cel.sobra >= 0, "(3) y entran en el ancho visible: la última termina dentro del marco (sobran " +
     cel.sobra + " px; tabla " + cel.tabla + " de " + cel.wrap + ")");
   t(/Viernes 18\/09/.test(esc.visible), "(4) en el escritorio el día se lee entero — «" + esc.visible + "»");

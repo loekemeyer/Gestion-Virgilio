@@ -25003,7 +25003,7 @@ existir mientras el resultado parece decir que anduvo. Van en llamadas separadas
 
 ---
 
-## §3.kf — v20.04: la descripción del 043 era "043" — el guard comparaba una punta cruda y la otra normalizada — 2026-09-18
+## §3.kf — v20.05: la descripción del 043 era "043" — el guard comparaba una punta cruda y la otra normalizada — 2026-09-18
 
 **Thomas, 18/09:** *"la descripción del 043 y esos otros códigos no debería ser 043, algo se rompió ahí"*.
 
@@ -25074,7 +25074,7 @@ una descripción basura, y corregir 18 filas a mano no evita la número 19.
 `gv_reglas_perdidas`, `gv_endpoints_rotos` y el barrido de vistas sin `security_invoker`: **0**.
 
 **Rollback**: la definición anterior está en el mensaje del commit v20.04 y se vuelve con un
-`create or replace` a `sql/gv_nombres_articulos_desc_es_codigo_v2004.sql` cambiando los cuatro
+`create or replace` a `sql/gv_nombres_articulos_desc_es_codigo_v2005.sql` cambiando los cuatro
 guards por la forma vieja. `stocks_carga_rapida` se realinea sola con el cron 57.
 
 **Centinelas nuevos** (`GV_Reglas_Centinela` 25 y 26): el guard normalizado y la rama `base_L`.

@@ -1,4 +1,4 @@
--- v20.04 (2026-09-18) — La descripción del 043 era "043"
+-- v20.05 (2026-09-18) — La descripción del 043 era "043"
 --
 -- Thomas, 18/09: "la descripción del 043 y esos otros códigos no debería ser 043, algo se rompió ahí".
 --
