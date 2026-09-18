@@ -24315,7 +24315,7 @@ centinela la dio por perdida hasta que se le puso un patrón simple (`virgilio`)
 `sql/gv_ppp_web_zona_retira_v1988.sql`. **Rollback:** volver al `barrio ~* 'retir'` (y con él, el
 bug de Retiro), `drop view public.gv_retira_sin_etiqueta;` y restaurar las 5 filas del backup.
 
-## §3.js — v19.89: la limpieza de E12M y E12I se REVIRTIÓ — la premisa era falsa — 2026-09-18
+## §3.js — v19.91: la limpieza de E12M y E12I se REVIRTIÓ — la premisa era falsa — 2026-09-18
 
 **Revierte la limpieza de datos de la §3.jr (v19.87). El fix de la v19.80 NO se toca.**
 
@@ -24454,3 +24454,86 @@ total del depósito no cambia — pero el comprometido de esas tres queda en neg
 corrigió: toca `a_facturar`, o sea camino de facturación.** Va con decisión aparte.
 
 `sql/gv_pkc_cadena_e12_v1991.sql`.
+---
+
+## §3.jt — v19.91: la demanda de un código DUAL se keyea CON la empresa (problema 427) — 2026-09-18
+
+**Thomas:** *"437E por ejemplo, tenemos el código de LK y el código de CH (productos que se
+consideran DIFERENTES, en diferentes lugares físicamente del depósito). En todo momento viajan en
+tablas con una columna que dice de qué empresa son."*
+
+**Es la última punta de un trabajo hecho en tramos**, no un hallazgo: los tramos 1 a 4bis están en
+`docs/PLAN-SACAR-SUFIJO-EMPRESA.md` (v16.14 → v16.51) y los problemas 92, 108, 88, 372, 390, 416 y
+430 ya están cerrados. Lo que faltaba era **la demanda**.
+
+### Qué estaba mal, en dos mitades
+
+1. **Backend.** `vista_stock_procesada` keyea el **stock** por `vista_saldos_stock.clave`, que para
+   un dual viene partida (`437E LK` / `437E CH`) desde el tramo 1. La **demanda**, en cambio, la
+   keyeaba con `gv_cod_stock(resolver_equiv(articulo))`, que **pela la empresa**: los pedidos de las
+   dos empresas caían juntos en una fila PELADA (`437E`) que la pantalla esconde
+   (`visible_en_stock = false`), y las dos mitades quedaban en **0**.
+2. **Front.** `_demOf` / `_proyOf` / `_demSPOf` hacían *fallback al código base*, así que la cifra
+   de la fila escondida se mostraba en **LAS DOS** mitades: 15 en LK y 15 en CH, **30 en pantalla
+   para una demanda real de 15**.
+
+### El arreglo
+
+Pieza nueva **`public.gv_cod_stock_dem(articulo, pedido)`** — una sola definición de "la clave de
+stock de una línea de demanda". Cuando el código es dual le vuelve a pegar la empresa; la empresa la
+da el **pedido** (`gv_empresa_de_np_texto`, la canónica, la misma que usa `vista_generador_oc`),
+salvo que el artículo venga con **"L"** (438EL → LK, regla v13.71). **Sin pedido no hay empresa:
+devuelve la clave pelada**, o sea la deja donde estaba, en vez de adivinar.
+
+**No-op demostrable:** de las **11.549** líneas de `gv_demanda_pedidos` cambian **238**, y son
+exactamente los 4 duales.
+
+En la matview se tocó **sólo `dem_raw`** (el que alimenta `cajas_pedidas`, la columna que se ve).
+`dem_oc_raw` / `dem_fam` quedaron intactos **a propósito**: alimentan `cajas_pedidas_familia`, que no
+la lee nadie (ni el front ni `refresh_stocks_carga_rapida`) y partirla exige llevar también la
+empresa de la familia. En el front se agregó **`_stkLookupEmp`**: match exacto y, si el código trae
+sufijo de empresa, **corta ahí** en vez de caer al base (para los códigos comunes el fallback sigue).
+
+### Medido (baseline refrescado en la MISMA transacción, no un snapshot de hace 10 minutos)
+
+| | |
+|---|---|
+| filas | 370 → **367** |
+| códigos NO duales con la demanda cambiada | **0** |
+| filas nuevas | **0** |
+| demanda de cada dual | **se reparte; el total por código no cambia** |
+
+`437E LK` 0 → **15** · CH 0 → 0 · `438E LK` 0 → **13** · CH 0 → **6** · `439E LK` 0 → **12** ·
+`809E CH` 0 → **14** · LK 0 → **5**.
+
+⚠ **Las 3 filas que desaparecen no son mercadería:** `437E` y `438E` son filas del catálogo de
+`Insumos` con 0 de stock, que el propio `WHERE` de la vista descarta cuando no tienen demanda — se
+mantenían vivas sólo por la demanda mal keyeada. `809E` no tiene fila pelada en `vista_saldos_stock`
+(sólo las dos mitades). `439E` pelada sigue estando, en 0 y escondida.
+
+### Cómo se aplicó (una matview NO admite `CREATE OR REPLACE`)
+
+`DROP CASCADE + CREATE` dentro de **UN `do` block**, o sea una sola transacción: **falló dos veces
+por los asserts y las dos veces se deshizo solo** (la primera por un `count(*)` fijo, la segunda
+porque comparaba contra un snapshot viejo mientras los operarios pickeaban).
+
+El pozo del CASCADE son los **dependientes transitivos**: `Stock_Saldos` y `gv_importados_stock_dep`
+(nivel 2) y **`gv_importados_ordenes` (nivel 3)**, el que dejó Importados en 404 en la v16.20 y la
+v16.33. Los tres se recrearon en la misma transacción **desde el catálogo** (`pg_get_viewdef`, no una
+copia a mano), con `security_invoker = true` y los mismos grants.
+
+Orden: apagar crons **55** (refresh cada 2 min) y **57** → backups (`GV_Backup_VistaStockProcesada_
+antes_20260918` con los datos y `GV_Backup_VSP_defs_20260918` con definición + reloptions + ACL +
+índices de los 4 objetos) → el `do` block con **guard** (el fragmento tiene que aparecer 2 veces en
+`dem_raw` y 2 en `dem_oc_raw`, si no aborta sin tocar nada) y 4 asserts → prender los crons →
+`refresh_stocks_carga_rapida()`.
+
+**Chequeos posteriores:** `gv_endpoints_rotos` vacía · `gv_reglas_perdidas` vacía · ACL **idéntica**
+a la anterior (`anon=arwdxtm`) · lectura como `anon` OK · las 3 filas huérfanas se fueron solas de
+`stocks_carga_rapida` (el DELETE de huérfanas de la v12.41) · suite de 217 tests EXIT=0.
+
+**Rollback:** la definición anterior completa está en `zz_backups."GV_Backup_VSP_defs_20260918"`.
+Alcanza con volver `dem_raw` a `gv_cod_stock(resolver_equiv(TRIM(BOTH FROM b.articulo)))` y el front
+a la v19.88. Centinela: fila en `GV_Reglas_Centinela` con el patrón `gv_cod_stock_dem`.
+`sql/gv_stock_demanda_dual_por_empresa_v1991.sql` (con el CREATE completo),
+`tests/stk-dual-demanda-empresa.cjs`.
