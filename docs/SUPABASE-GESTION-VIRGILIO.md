@@ -25354,7 +25354,7 @@ algo afuera no estaba pedido.
 Las 159 cajas ya recibidas pasaron por el 16/09 y volvieron solas a las líneas nuevas del 18/09 al
 recalcular (`gv_oc_generar_pendientes` llama al recompute al terminar). Verificado: las del 16/09
 quedaron en `recibida = 0` y las del 18/09 con su cantidad, sin duplicar.
-## §3.ki — v20.11: se cierra a mano el picking de E37F, que quedó abierto dos días — 2026-09-18
+## §3.kj — v20.11: se cierra a mano el picking de E37F, que quedó abierto dos días — 2026-09-18
 
 **Qué pasó** (historia completa en el chat de esta sesión): los 7 pedidos web de Zona 3 – CABA
 Oeste los pickeó **Jhonny Cartaya (277)** el **16/09 13:08–13:49** — 62 escaneos, **107 cajas**
