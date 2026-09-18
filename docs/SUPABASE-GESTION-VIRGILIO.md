@@ -24540,7 +24540,70 @@ a la v19.88. Centinela: fila en `GV_Reglas_Centinela` con el patrón `gv_cod_sto
 
 ---
 
-## §3.jv — v19.92: Cuarentena también muestra el MONTO del pedido — 2026-09-18
+## §3.jw — v19.93: el armado drenaba el picking del inquilino anterior — 2026-09-18
+
+**Problema 437.** Tercera y última capa del bug del PKC (problema 421). Quedó a la vista recién
+cuando la v19.91 puso cada picking en su tanda: con el picking correcto, el `separado` viejo
+quedó al descubierto.
+
+`reconciliar_pipeline_stock_etapa2` es **insert-only con guard**
+(`not exists (separado de esa tanda+articulo)`): una vez que escribió el `separado`, **no lo
+recalcula nunca**. Los armados del 18/09 drenaron lo que **había** pickeado bajo ese código en ese
+momento — el picking del inquilino anterior, no el de sus propias NP.
+
+### La fuente dura es `Entregas_Virgilio`
+
+Es lo que el operario contó al armar, por NP y tanda:
+
+| tanda | entregó | el sistema drenó | de más |
+|---|---|---|---|
+| E12E | **38** (98605:21 + 98606:16 + 98607:1) | 114 | 76 |
+| E12J | **20** (98618) | 100 | 80 |
+
+⚠ **E12K no entra, aunque parecía el tercer caso** (drenó 46 con picking 0). Es una tanda **vieja,
+entregada y facturada** (LK 0004, LK 0005, LK 0006 en `Facturacion_NP`) cuyo código se reutilizó
+después para 98618. Su drenaje de 46 es **legítimo**: 30 entregadas + 16 devueltas a góndola. Lo
+que le falta es su picking original, perdido en una capa anterior — otro problema, y no sale el
+lunes. El primer conteo dijo "192 cajas de más"; **el bueno es 156**.
+
+⚠ **Y por eso se pudo tocar:** E12E y E12J son NP de ISIS y **ninguna está facturada**. No hay
+factura emitida que contradecir. E12S y E12K sí lo están, y no se tocaron.
+
+### El arreglo no calcula nada a mano
+
+Se **borra** el `separado` viejo y `etapa2` lo rehace: con el picking ya corregido, su propia
+lógica da el número bueno. ⚠ **Acá poner el delta en 0 NO sirve** — mientras las filas existan, el
+guard `not exists` impide que las rehaga. Es la excepción a la regla de "UPDATE y no DELETE", y
+por eso hay que forzar después el recálculo del saldo, que el trigger no hace en DELETE.
+
+**Resultado, verificado corriendo `reconciliar_pipeline_stock()`:**
+
+| tanda | pickeado | armado | colgado | a_facturar | |
+|---|---|---|---|---|---|
+| E12E | 38 | −38 | **0** | 38 | ✅ |
+| E12J | 20 | −20 | **0** | 20 | ✅ |
+| E12S | 188 | −188 | **0** | 188 | ✅ intacta |
+| E12A | 40 | 0 | 40 | 0 | LK 0029, sin armar |
+| E37F | 107 | 0 | 107 | 0 | sin armar, 24/09 |
+| E12G | 93 | −93 | **0** | 92 | ✅ |
+
+Cero tandas E12 con comprometido negativo. `gv_stock_picking_duplicado`, `gv_reglas_perdidas`,
+`gv_stock_empresa_fantasma` y el dedup por empresa: **todos en cero**.
+
+### ⚠ Un centinela se movió, y NO es por esto
+
+`GV_Stock_Drenaje_Bloqueado` pasó de 0 a **32 filas**, todas de **E11D | LK 0099** — una tanda que
+no se tocó. E11D está **sana y cerrada** (picking 46, separado −46, facturado −46, todo en cero),
+con movimientos del 16/09. El guard `zzz_facturado_no_negativo` frenó un segundo intento de drenar
+92 cajas sobre una pila ya en cero: **hizo exactamente su trabajo**. Lo destapó una corrida manual
+del cron, pero el de los 10 minutos lo habría anotado igual. **Queda para mirar aparte: por qué la
+etapa3 vuelve a proponer ese drenaje.**
+
+`sql/gv_separado_e12e_e12j_v1993.sql`.
+---
+---
+
+## §3.jx — v19.94: Cuarentena también muestra el MONTO del pedido — 2026-09-18
 
 **Thomas, 2026-09-18:** *"agregale el monto del pedido ($) a los de cuarentena que no los tienen"*.
 

@@ -1,3 +1,30 @@
+## Nota v19.92 (2026-09-18) — Un armado sobre una tanda SIN pedidos dejaba al operario sin salida
+
+El legajo 8 le dio **AP a `E12M`** a las 13:23. Ese código ya no tenía pedidos: su NP —**LK 0029**,
+Tegerina— se había mudado a **`E12A`**, y `E12M` quedó sólo con los escaneos de picking viejos
+(secuela del problema 421 / 429, que resolvió la v19.91). A partir de ahí las **tres salidas estaban
+cerradas al mismo tiempo**:
+
+| salida | por qué no andaba |
+|---|---|
+| «Terminé Armado Pedido» (TAP) | la tanda no tiene Entregas → el gate de la v7.74 manda al asistente |
+| el asistente «Completar» | `showCompletarWizard` hacía `if (!nps.length) return;` — **volvía en silencio** |
+| agarrar la tanda buena (AP) | con un armado abierto, `updateCoreButtonsState` bloquea AP |
+
+Cada guard, solo, está bien. Juntos forman un **círculo cerrado**, y el único `return` mudo de los
+tres era el del asistente: el operario tocaba el botón azul y **no pasaba nada**, sin un cartel.
+
+**El arreglo** (front, `showCompletarWizard`): si la tanda no tiene pedidos en la PPP se **avisa**, y
+si el armado abierto es del que está mirando se le ofrece **soltarlo** por el mismo camino que «No la
+armo yo» (`compAnularArmado` → RPC `anular_armado_virgilio`): no marca nada como armado, no mueve
+stock, libera el lock y deja el registro en `GV_Tanda_Anulada`. Después puede agarrar la tanda que
+corresponde.
+
+⚠ `compAnularArmado` ahora acepta **tanda y legajo explícitos** (los dos opcionales). Sin eso soltaba
+`_comp.tanda` — que en este camino puede ser el wizard de **otra** tanda que quedó en memoria.
+
+Smoke `tests/comp-tanda-sin-pedidos.cjs` (incluye el caso de la tanda equivocada).
+
 ## Nota v19.91 (2026-09-18) — Las cajas pedidas de un DUAL son de UNA empresa, no de las dos
 
 El **437E CH** mostraba **15 cajas pedidas** y el detalle decía, con razón, que lo de Chef ya estaba

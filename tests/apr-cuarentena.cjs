@@ -153,7 +153,7 @@ catch (_e) {
     out.cliNuevosCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec);
     out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(cliSec);
     out.cliNuevosSinMixto = !/Cliente Nuevo Deudor/.test(cliSec);
-    // (3a-2) v19.92 (Thomas) — Cuarentena también muestra el MONTO del pedido.
+    // (3a-2) v19.94 (Thomas) — Cuarentena también muestra el MONTO del pedido.
     out.cuarMontoCol = /<th class="cuar-td-m3">Monto<\/th>/.test(cuarSec);
     out.cuarCols = (cuarSec.match(/<th[ >]/g) || []).length ===
                    ((cuarSec.match(/<tr class="cuar-tr[^"]*"[^>]*>([\s\S]*?)<\/tr>/) || ["", ""])[1].match(/<td[ >]/g) || []).length;
@@ -175,7 +175,7 @@ catch (_e) {
     const cliSecIva = htmlIva.slice(htmlIva.indexOf("🆕 Clientes nuevos"));
     const cuarSecIva = htmlIva.slice(htmlIva.indexOf("🚧 Cuarentena"), htmlIva.indexOf("🆕 Clientes nuevos"));
     out.cliMontoIva = /clin-iva[^>]*>c\/IVA \$121\.000/.test(cliSecIva);
-    // v19.92 (Thomas): el retenido por deuda muestra su monto (neto arriba, c/IVA abajo).
+    // v19.94 (Thomas): el retenido por deuda muestra su monto (neto arriba, c/IVA abajo).
     out.cuarMontoIva = /\$80\.000/.test(cuarSecIva) && /clin-iva[^>]*>c\/IVA \$96\.800/.test(cuarSecIva);
     const msg1 = clinSpeechMsg1({ order_id: 200, empresa: "chef", np: null });
     out.cliMsgTotal = /\$121\.000/.test(msg1) && /IVA incluido/.test(msg1);
@@ -483,7 +483,7 @@ catch (_e) {
     // la flechita abre el contenido del pedido en una fila aparte, a lo ancho de la tabla
     aprToggle("clk900"); await new Promise((res) => setTimeout(res, 120));
     html = document.getElementById("pppPreview").innerHTML;
-    out.tblDetalle = /cuar-tbl-det/.test(html) && /colspan="10"/.test(html);   // v19.92: +columna Monto
+    out.tblDetalle = /cuar-tbl-det/.test(html) && /colspan="10"/.test(html);   // v19.94: +columna Monto
     aprToggle("clk900"); await new Promise((res) => setTimeout(res, 100));
 
     // el 📖 de un retenido abre el MISMO log, con la clave del pedido
