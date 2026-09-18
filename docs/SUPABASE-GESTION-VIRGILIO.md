@@ -23550,3 +23550,98 @@ segundo salió de un chequeo, no de leer el código**.
 `sql/gv_viaje_vuelta_v1974.sql` (md5 del cuerpo normalizado verificado contra la definición viva).
 Rollback y chequeos, ahí mismo. `gv_endpoints_rotos` en 0 y `gv_viajes_sin_controlar` vacía
 después del cambio.
+
+## §3.jk — v19.76: mover una NP de tanda BORRABA el detalle del evento ENT (problema 413) — 2026-09-18
+
+**Thomas, mirando E29D del miércoles 23/09:** *"figuran facturadas pero no me consta que se hayan
+pickeado"*. Tirando de ese hilo apareció el bug, que no era el de las NP: era del que las movió.
+
+### El error, en una línea
+
+`gv_ppp_nps_mover_a` reescribía el evento como `campo1|campo2|tanda_nueva`, dando por sentado que
+**la tanda siempre vive en el campo 3** y que el texto no tiene más de 3 campos. De los 11 eventos
+que llevan la NP en el campo 1, **la tanda está en el campo 3 en UNO solo** (el TAL):
+
+| opcion | texto | tanda |
+|---|---|---|
+| `CCN` | `NP\|tanda\|camión\|orden` | **2** |
+| `CCR` · `CRN` · `FSS` | `NP\|tanda` | **2** |
+| `CRA` | `NP\|tanda\|razón social` | **2** |
+| `FCO` | `NP\|tanda\|cod×faltó,…\|razón social` | **2** |
+| `ENT` | `NP\|tanda\|cod:pedidas:entregadas:faltó,…\|ENT` | **2** |
+| `TAL` | `NP\|líos\|tanda[\|resumen[\|clase]]` | **3** |
+| `FAL` | `NP\|cod\|cajas\|legajo\|tanda\|MANUAL` | **5** |
+| `NPD` | `NP\|cod\|tipo\|góndola\|qty\|sale\|tanda` | **7** |
+| `CP` | `NP\|cod\|qty\|GONDOLA/AGUARDAR\|lío` | **—** (no tiene) |
+
+Mover LK 0034 / LK 0035 de `E01G` a `E29D` dejó el ENT como **`LK 0034|E01G|E29D`**: el detalle
+por renglón pisado con el código de tanda, el marcador `|ENT` comido, y la tanda **vieja** intacta
+en el campo 2. Y el ENT existe justamente para que el servidor **no tenga que adivinar** el armado
+(v17.85: reconstruirlo a mano acertaba 1.159 de 1.280 y erraba 6).
+
+**Medido el 18/09: 31 eventos rotos desde el 15/09** — 26 `ENT`, 3 `CP`, 1 `FAL`, 1 `NPD`.
+`gv_ppp_tanda_renombrar` tenía el mismo `split_part(...,3)`, con menos alcance porque filtra por
+campo 3 = tanda vieja: ahí el daño era comerle al TAL el `resumen` y la `clase`.
+
+### El arreglo
+
+Tres funciones chicas que dicen **en qué campo vive la tanda de cada evento**, y los dos
+llamadores pasan por ellas:
+
+```sql
+select public.gv_evento_tanda_campo('ENT');                                  -- 2
+select public.gv_evento_tanda('ENT', 'LK 0134|E32A|323E:1:0:1|ENT');         -- E32A
+select public.gv_evento_set_tanda('ENT','LK 0134|E32A|323E:1:0:1|ENT','Z99Z');
+-- LK 0134|Z99Z|323E:1:0:1|ENT   ← el detalle y el marcador quedan
+```
+
+`gv_evento_set_tanda` devuelve **NULL** cuando no hay nada que cambiar (el evento no lleva tanda,
+el texto es más corto que el campo que le toca, o ya dice esa tanda), y **ese NULL es el filtro**
+del `update`: así no se toca una fila de más. Probado con los 13 formatos reales y después
+**corriendo las dos funciones de verdad** contra LK 0034/LK 0035 dentro de una transacción abortada
+— leer la función no prueba nada (§ regla del `CREATE OR REPLACE` que sale limpio).
+
+**De arrastre se arreglan dos cosas más**: el TAL deja de perder `resumen` y `clase`, y
+`CCR` / `CRN` / `FSS` / `CCN` de 2 campos —que el guard viejo (`campo 3 no vacío`) nunca
+actualizaba— ahora siguen a la NP en vez de quedar apuntando a la tanda vieja.
+
+### Los 26 ENT se recuperaron
+
+`Entregas_Virgilio` guarda el mismo detalle por NP y **no lo tocó el bug**, así que el texto se
+reconstruyó de ahí (`cod:pedidas:entregadas:faltó` en orden de `id`, que es el orden en que el
+front escribe las filas). Backup previo en
+`zz_backups."GV_Backup_RegProd_ENT_rotos_20260918"` (31 filas, RLS prendida). Chequeo:
+
+```sql
+select count(*) filter (where texto like '%|ENT') sanos,
+       count(*) filter (where texto not like '%|ENT') rotos
+  from public."Registros_Produccion_Virgilio" where opcion='ENT';   -- 76 / 0
+```
+
+Los 3 `CP`, el `FAL` y el `NPD` **no se pueden reconstruir**: lo que perdieron (la cantidad del
+CP, las cajas y el legajo del FAL, el tipo/góndola/qty/sale del NPD) no está en ninguna otra
+tabla. Quedan como están, con el backup al lado.
+
+### ⚠ Lo que NO se tocó, a propósito
+
+El evento **`PKC` lleva la tanda en el campo 1** (`TANDA|cod|…`) y **hoy no lo renombra nadie**
+— medido: `gv_ppp_nps_mover_a`, `gv_ppp_tanda_renombrar`, `anular_armado_virgilio` y
+`gv_anular_picking_virgilio` son las únicas 4 funciones que escriben en
+`Registros_Produccion_Virgilio`, y ninguna lo hace. Importa porque el comentario de la **v19.69**
+(fusión de stock, problema 407) dice textual *"como los eventos también se renombran acá arriba,
+el reconciliador va a recalcularlo como la suma de las dos"*: **para el PKC eso no pasa**, así que
+`reconciliar_stock_articulo_rt` puede recalcular el delta fusionado leyendo sólo los PKC del
+destino y deshacer la suma. Eso **mueve stock**, así que va medido y aparte: **problema 421**,
+abierto.
+
+### Centinela y rollback
+
+```sql
+select * from public.gv_reglas_perdidas;   -- vacía = las dos funciones siguen usando el helper
+```
+
+Rollback: el `CREATE OR REPLACE` viejo está en el historial de git; para los datos,
+`update … set texto = b.texto from zz_backups."GV_Backup_RegProd_ENT_rotos_20260918" b
+ where b.id = "Registros_Produccion_Virgilio".id;`
+
+`sql/gv_evento_tanda_v1976.sql`.
