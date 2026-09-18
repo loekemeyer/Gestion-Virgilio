@@ -25454,11 +25454,18 @@ veces (problemas 407, 417, 420, 421: el renombre no toca los `PKC` ni los `ref` 
 `gv_ppp_tanda_dos_dias` y `gv_armado_sin_entregas` marcan **2 cada una, las dos de `D69H`**, que es
 anterior y ajena a este cambio.
 
-### ⚠ Lo que quedó a la vista y NO se tocó
+### ⚠ El 580 / 580E, y la regla que lo resolvió
 
-El pedido de la página pide **580E ×2**; en ISIS lo tipearon **580** y **eso es lo que está
-armado** en el lío `J` (`Entregas_Virgilio` quedó con la línea del pedido, `580EL`). Son dos
-artículos distintos: **hay que cambiar esas 2 cajas antes de que salga.**
+El pedido de la página pide **580E ×2**; en ISIS lo tipearon **580** y **eso es lo que se pickeó y
+se armó** (evento `PKC` `D47B|580|2|2`, lío `J` del `TAL`). Son dos artículos distintos.
+
+**Thomas, el mismo día:** *"LA NP TIENE QUE DECIR LO MISMO QUE DECÍA ANTES"* → la NP queda con
+**`580L`**. Cambiar de identidad NO es cambiar el contenido: lo que la NP pedía y lo que hay en el
+lío tienen que seguir coincidiendo, así que no hay faltante ni cajas que cambiar.
+
+⚠ Cuidado con cómo se pregunta esto: cuando se preguntó *"¿580EL o 580L?"* la respuesta fue *"tal y
+como la puso. 580EL (L por la zona…)"* — estaba contestando por **la L**, no por **la E**. La
+pregunta mezclaba dos decisiones en un solo token y se leyó al revés. **Una pregunta, una decisión.**
 
 **Rollback:** las 48 filas del backup alcanzan para volver todo; además hay que borrar las 3 filas
 de `PPP_Web_NP` / `PPP_Web_Programacion` / las 35 de `PPP_Web_Base` del `order_id` 1001228 y los 6
