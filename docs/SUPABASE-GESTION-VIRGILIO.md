@@ -24243,7 +24243,7 @@ pallet; no sale de la base.
 
 **Chequeo:** `select * from public.gv_stock_picking_duplicado;`
 `sql/gv_picking_colgado_e12m_e12i_v1987.sql`.
-## §3.jq — v19.86: un RETIRA tiene que figurar como retira en la programación (ISIS y web) — 2026-09-18
+## §3.js — v19.88: un RETIRA tiene que figurar como retira en la programación (ISIS y web) — 2026-09-18
 
 **Thomas, 18/09:** *"Los pedidos que se retiran tienen que figurar como que se retiran en la
 programación (sean ISIS o web)"*. Sale de §3.jp: ahí se arregló que Carga Camión LEYERA la zona
@@ -24277,17 +24277,26 @@ Un tercer caso, de carga: **11 direcciones con `label='Retira'` y otro `zona_exp
 
 `gv_ppp_web_zona` decide Retira **antes** del `coalesce`, con match **exacto** y mirando los tres
 campos: `ze|loc|dir ~* '^retira$'`, `dir ~* '^exp\.\s*retira'`, `dir ~* 'virgilio\s*2788'`.
-Las 9 pruebas están al pie de `sql/gv_ppp_web_zona_retira_v1986.sql`; las que importan:
+Las 9 pruebas están al pie de `sql/gv_ppp_web_zona_retira_v1988.sql`; las que importan:
 `'Retiro' → Zona 2` (antes Retira) y `Exp. Retira — … → Retira` (antes Zona 1).
 
 **Blast radius:** de las 178 filas de `PPP_Web_Programacion`, cambian **6**: esas 5 pasan a Retira,
 **0** dejan de serlo, y la 6ª (LK 0103) es artefacto de la medición (se recalculó pasando `barrio`
 como `ze`), no del cambio.
 
-⚠ **La función sólo manda hacia adelante.** Las 5 NP ya programadas **quedan con la zona vieja**:
-corregirlas es un `update` de datos y encima tres ya tienen tanda de reparto (E26D, E43A), así que
-además habría que sacarlas de esa tanda — un Retira va en **su propia tanda** (v19.52). Eso es
-decisión de armado: se reporta, lo decide Marianela. Queda anotado en el problema 433.
+⚠ **La función sólo manda hacia adelante**, así que las 5 NP ya programadas se corrigieron a mano
+(Thomas, 18/09: *"correjilas, sí"*) — backup en
+`zz_backups."GV_Backup_PPPWebProg_zona_20260918"`:
+
+```sql
+update public."PPP_Web_Programacion" set zona = 'Retira', actualizado_at = now()
+ where empresa = 'lk' and np in (11, 24, 143, 144, 157);
+```
+
+**Y la tanda no hubo que tocarla, contra lo que parecía:** E26D (LK 0143 + 0144) y E43A (LK 0157)
+resultaron ser **tandas de Retira puras** — no llevan ningún cliente de reparto, o sea que ya
+cumplen la v19.52 (*un Retira va en su propia tanda*). La única mezclada es **E01D** (LK 0003 Zona 3
++ LK 0011 Retira) y es del **08/09, ya pasada**. Nada que mover.
 
 ### Centinela
 
@@ -24298,5 +24307,10 @@ select * from public.gv_retira_sin_etiqueta order by np;   -- vacía = todo bien
 Cruza dirección contra zona en las DOS programaciones (se apoya en `gv_np_prog_reparto`, §3.jp) y
 dice `RETIRA SIN ETIQUETA` o `ETIQUETA SIN DIRECCION DE RETIRA`. Al 18/09 marca las 5 de arriba.
 
-`sql/gv_ppp_web_zona_retira_v1986.sql`. **Rollback:** volver al `barrio ~* 'retir'` (y con él, el
-bug de Retiro) y `drop view public.gv_retira_sin_etiqueta;`.
+Y las tres reglas quedaron con su fila en **`GV_Reglas_Centinela`** (ids 18, 19 y 20), así que si
+otra sesión pisa la función con una copia vieja lo canta `gv_reglas_perdidas` — que al 18/09 está
+vacía. ⚠ Al cargar el `patron`, ojo con el escape: la fila 19 entró con las barras de más y el
+centinela la dio por perdida hasta que se le puso un patrón simple (`virgilio`).
+
+`sql/gv_ppp_web_zona_retira_v1988.sql`. **Rollback:** volver al `barrio ~* 'retir'` (y con él, el
+bug de Retiro), `drop view public.gv_retira_sin_etiqueta;` y restaurar las 5 filas del backup.

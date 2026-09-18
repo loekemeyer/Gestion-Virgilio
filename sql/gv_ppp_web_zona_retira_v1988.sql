@@ -1,4 +1,4 @@
--- v19.86 — RETIRA: que un pedido que se retira FIGURE como retira en la programación.
+-- v19.88 — RETIRA: que un pedido que se retira FIGURE como retira en la programación.
 --
 -- Thomas, 2026-09-18: *"Los pedidos que se retiran tienen que figurar como que se retiran en la
 -- programación (sean ISIS o web)"*.
@@ -41,7 +41,7 @@ as $function$
     select ze, loc, dir,
            coalesce(nullif(ze, ''), nullif(loc, ''),
                     public.gv_ppp_web_barrio_de(dir)) as barrio,
-           -- v19.86 — RETIRA se decide acá, y con tres correcciones sobre el `barrio ~* 'retir'`
+           -- v19.88 — RETIRA se decide acá, y con tres correcciones sobre el `barrio ~* 'retir'`
            -- que había antes:
            --   (a) EXACTO: "Retiro" es un BARRIO de CABA (Zona 2), no un retiro en fábrica.
            --       Medido el 18/09 en LK: 3 direcciones con zona_expreso = 'Retiro' y 4 con

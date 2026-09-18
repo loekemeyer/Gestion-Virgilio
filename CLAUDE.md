@@ -940,7 +940,7 @@ marcadas como retiro en fábrica y no se repartían nunca. Y al revés: el retir
 **expreso** (`nombre_expreso = 'Retira'`, 140 direcciones en LK) no se veía, porque `zona_expreso`
 sigue trayendo el barrio del cliente y ganaba el `coalesce`. Se mira la dirección también
 (`Exp. Retira — …`, `Virgilio 2788`). Centinela: `select * from public.gv_retira_sin_etiqueta;`
-— vacía = todo bien. §3.jq.
+— vacía = todo bien. §3.js.
 
 **Chequeo:** `select empresa, order_id, retiro_fecha, retiro_franja from public.lk_pedidos_match
 where retiro_fecha is not null;` · `sql/gv_retira_dia_elegido_v1952.sql`, §3.ja.
