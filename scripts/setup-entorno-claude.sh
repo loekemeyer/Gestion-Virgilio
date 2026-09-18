@@ -16,11 +16,17 @@
 # vale para TODOS los repos, tambien en los contenedores remotos, que nacen
 # vacios. Mergea: nunca pisa lo que ya este.
 #
+# PRECEDENCIA: deny > ask > allow. Por eso "Bash" pelado en ALLOW deja correr
+# toda la terminal sin preguntar, pero git push, curl y wget siguen preguntando
+# porque estan en ASK, y rm -rf no pasa ni preguntando porque esta en DENY.
+# (Medido: con "Bash" en allow y "Bash(curl:*)" en ask, el curl queda denegado.)
+#
 # QUE SIGUE PREGUNTANDO, a proposito:
 #   - mcp__Supabase__execute_sql / apply_migration / deploy_edge_function.
 #     Es la puerta a los datos de produccion, y la regla del dueno (incidente
 #     del 26/08/2026) es que los datos no se tocan sin permiso explicito.
 #     Si algun dia se quiere que tampoco pregunte, agregarlas a ALLOW.
+#   - git push, curl y wget (lista ASK).
 #   - Todo lo que este en DENY, que ni preguntando pasa.
 #
 # El por que completo esta en CLAUDE.md, regla "por que Claude pide permiso
@@ -57,6 +63,11 @@ ALLOW = [
     "mcp__github__actions_list", "mcp__github__actions_get",
     "mcp__github__get_job_logs", "mcp__github__get_check_run",
 ]
+ASK = [
+    # esto SI pregunta, una vez por comando y por sesion: es lo que sale
+    # para afuera (push) o toca la red a mano (curl). Regla del CLAUDE.md.
+    "Bash(git push:*)", "Bash(curl:*)", "Bash(wget:*)",
+]
 DENY = [
     "Bash(rm -rf:*)", "Bash(rm -fr:*)", "Bash(sudo rm:*)",
     "Bash(git push --force:*)", "Bash(git push -f:*)",
@@ -71,9 +82,10 @@ try:
 except Exception:
     d = {}
 perm = d.setdefault("permissions", {})
-for clave, lista in (("allow", ALLOW), ("deny", DENY)):
+for clave, lista in (("allow", ALLOW), ("ask", ASK), ("deny", DENY)):
     actual = perm.setdefault(clave, [])
     actual.extend(x for x in lista if x not in actual)
 json.dump(d, open(p, "w"), indent=2)
-print("permisos de Claude:", len(perm["allow"]), "allow /", len(perm["deny"]), "deny ->", p)
+print("permisos de Claude:", len(perm["allow"]), "allow /", len(perm["ask"]),
+      "ask /", len(perm["deny"]), "deny ->", p)
 PY
