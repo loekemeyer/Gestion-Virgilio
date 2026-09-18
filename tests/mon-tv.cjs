@@ -80,7 +80,12 @@ const DATOS = {
     { tanda: "E31A", np: "98802", m3: 1.5, fecha_entrega: HOY },
     { tanda: "E32A", np: "98803", m3: 3.0, fecha_entrega: MANANA },
     { tanda: "E33A", np: "98804", m3: 4.0, fecha_entrega: HOY },
-    { tanda: "E34A", np: "98805", m3: 2.0, fecha_entrega: HOY }
+    { tanda: "E34A", np: "98805", m3: 2.0, fecha_entrega: HOY },
+    // v20.20: E36A está EN CURSO y ya tiene CCN (salió sin cerrar) → 🚚 en la tabla principal.
+    // E37A y E38A completan las 3 que disparan el cartel de "salieron sin facturar".
+    { tanda: "E36A", np: "98806", m3: 1.0, fecha_entrega: HOY },
+    { tanda: "E37A", np: "98807", m3: 1.0, fecha_entrega: HOY },
+    { tanda: "E38A", np: "98808", m3: 1.0, fecha_entrega: HOY }
   ],
   web: [
     { empresa: "lk", np: 97, tanda: "E30A", fecha_entrega: HOY, razon_social: "Casa Pepe",
@@ -98,6 +103,15 @@ const DATOS = {
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
     { tanda: "E34A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 30 * H),
       last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(Date.now() - 29 * H),
+      pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
+    { tanda: "E36A", last_pick_op: "EP", pick_legajo: 12, pick_start_ts: iso(Date.now() - 2 * H),
+      last_arm_op: null, arm_legajo: null, arm_start_ts: null,
+      pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
+    { tanda: "E37A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 32 * H),
+      last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(Date.now() - 31 * H),
+      pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
+    { tanda: "E38A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 34 * H),
+      last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(Date.now() - 33 * H),
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null }
   ],
   eventos: [
@@ -120,7 +134,10 @@ const DATOS = {
   ],
   facturadas: [{ np: "98802" }, { np: "98804" }],
   ccn: [{ opcion: "CCN", texto: "98804", ts_cliente: iso(Date.now() - 6 * H) },
-         { opcion: "CCN", texto: "98805", ts_cliente: iso(Date.now() - 5 * H) }],
+         { opcion: "CCN", texto: "98805", ts_cliente: iso(Date.now() - 5 * H) },
+         { opcion: "CCN", texto: "98806", ts_cliente: iso(Date.now() - 1 * H) },
+         { opcion: "CCN", texto: "98807", ts_cliente: iso(Date.now() - 7 * H) },
+         { opcion: "CCN", texto: "98808", ts_cliente: iso(Date.now() - 8 * H) }],
   deshechas: []
 };
 
@@ -199,12 +216,18 @@ function responder(url) {
   ok(/E31A/.test(r.fc), "E31A no aparece en 'a facturar'");
   ok(/✅/.test(r.fc), "E31A está facturada (NP 98802) y no tiene el ✅");
 
-  // 4b) v20.19 (Thomas) — la columna SALIÓ del monitor: sólo carga al camión (CCN)
+  // 4b) v20.21 (Thomas) — la columna SALIÓ del monitor: sólo carga al camión (CCN)
   ok(/Salió/.test(r.fc), "la tabla 'a facturar' no trae la columna Salió");
   ok(/E34A/.test(r.fc), "E34A (terminada y cargada al camión, sin FC) no aparece en 'a facturar'");
   ok(/🚚/.test(r.fc), "E34A tiene CCN (NP 98805): le falta el 🚚 de salió");
   ok(/salio-sinfc/.test(r.fc), "E34A salió y no está facturada: la fila tiene que quedar marcada");
-  ok(/ya salió sin FC/.test(r.fcTit), "el título no avisa cuántas se fueron sin factura: " + r.fcTit);
+  ok(/3 ya salieron sin FC/.test(r.fcTit), "el título no avisa cuántas se fueron sin factura: " + r.fcTit);
+  // v20.21 (Thomas) — el 🚚 también en la tabla principal, y el cartel a partir de 3
+  ok(/E36A/.test(r.tandas), "E36A está en curso: tiene que estar en la tabla principal");
+  ok(/🚚/.test(r.tandas), "E36A salió (CCN) sin cerrar el picking: le falta el 🚚 en la tabla principal");
+  ok(/aviso-salio/.test(r.avisos), "3 tandas salieron sin facturar: falta el cartel de arriba");
+  ok(/E34A/.test(r.avisos) && /E37A/.test(r.avisos) && /E38A/.test(r.avisos),
+    "el cartel tiene que nombrar las tres tandas: " + r.avisos);
 
   // m³ terminados hoy
   ok(/1,5/.test(r.m3Pick), "m³ pickeados hoy debería ser 1,5 (E31A) y dice: " + r.m3Pick);
@@ -221,12 +244,12 @@ function responder(url) {
   ok(/E99Z/.test(r.avisos), "no avisa la tanda trabajada que no está en la PPP");
 
   // m³ por día y camión: E30A (2,5 + 0,8 de la web) + E31A (1,5) + E34A (2,0) = 6,8 hoy
-  ok(/6,8/.test(r.tot), "el total de hoy debería ser 6,8 m³ (E30A 3,3 + E31A 1,5 + E34A 2,0)");
+  ok(/9,8/.test(r.tot), "el total de hoy debería ser 9,8 m³ (E30A 3,3 + E31A 1,5 + E34A 2,0 + E36A/E37A/E38A 1,0 c/u)");
   ok(/E30/.test(r.tot), "no agrupa por camión (E30)");
 
   // header
-  ok(/2\/4/.test(r.prog), "la barra de avance debería decir 2/4 (E31A y E34A terminadas de 4 en ventana), dice: " + r.prog);
-  ok(/1 en curso/.test(r.meta), "el header no cuenta la tanda en curso: " + r.meta);
+  ok(/4\/7/.test(r.prog), "la barra de avance debería decir 4/7 (E31A, E34A, E37A y E38A terminadas de 7 en ventana), dice: " + r.prog);
+  ok(/2 en curso/.test(r.meta), "el header no cuenta las tandas en curso (E30A y E36A): " + r.meta);
   ok(/en vivo/.test(r.estado), "el estado no quedó 'en vivo': " + r.estado);
 
   // sin scroll: la TV no tiene cómo moverse

@@ -1,3 +1,25 @@
+## Nota v20.21 (2026-09-18) — El 🚚 también en la tabla de arriba, y el cartel de lo que se fue sin papel
+
+Thomas, sobre las dos puntas que quedaban del monitor TV: **dale a las 2**.
+
+**1 · El 🚚 en la tabla principal.** Ahí están las tandas que **NO terminaron**, así que una con
+carga al camión registrada es una anomalía que conviene ver desde la pared: *salió sin cerrar el
+picking o el armado*. Va **pegado al código de tanda**, no en una columna propia — al lado de
+«Salida», que es la **fecha de entrega**, una columna «Salió» se leía como lo mismo. Si la tanda
+no está en curso, la fila se pinta violeta igual que en «a facturar».
+
+**2 · El cartel.** Cuando hay **3 o más** tandas que ya salieron y siguen sin factura
+(`AVISO_SALIO_SIN_FC`), sube un aviso violeta arriba con **todas** nombradas. Con una o dos alcanza
+el contador del título; de tres para arriba ya no es un olvido suelto — la facturación quedó atrás.
+La lista va **completa y sin «+N más»**: son las que alguien tiene que facturar hoy.
+
+⚠ Y el plural del título estaba mal armado: decía **«3 ya salióeron sin FC»** (`"ya salió" +
+(n===1?"":"eron")`). Lo cazó el test al pedirle el texto exacto — un `ok(/ya salió sin FC/)` genérico
+lo habría dejado pasar. Ahora las dos formas se escriben enteras.
+
+`tests/mon-tv.cjs`: **E36A** en curso y con CCN (el 🚚 arriba), más **E37A** y **E38A** para llegar a
+las tres del cartel.
+
 ## Nota v20.19 (2026-09-18) — El monitor de la TV también dice qué ya salió
 
 Thomas, sobre `monitor/tv.html`: **sí**, que lleve SALIÓ. En la TV no hay columnas de porcentaje
