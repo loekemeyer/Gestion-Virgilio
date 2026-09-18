@@ -23271,3 +23271,51 @@ values ('vista_generador_oc','vista','PPP_Web_Programacion', '…', 'Thomas','v1
 **Chequeo:** `select * from public.gv_reglas_perdidas;` vacía · `select * from
 public.gv_endpoints_rotos;` vacía · `select codn, pedidos, total from public.vista_generador_oc
 where codn = '321';` → 196 y 320. Problema **405**.
+
+## §3.jg — v19.65: el pop-up «Cajas pedidas» tampoco veía la web — 2026-09-18
+
+**Thomas, el mismo día y sobre el mismo 321:** *"¿Por qué ahí dice que pide 198 pero cuando entro
+veo solo tres cajas? Algo está mal."* Tenía razón: **el mismo agujero de §3.jf, en otro lugar.**
+
+El pop-up leía **`gv_ppp_base_pedidos`**, que es sólo el espejo de ISIS. Las NP de la página se
+llaman `LK 0025` y viven en `PPP_Web_Base`, así que no aparecían.
+
+| Pendiente del 321 al 18/09 | NP | Cajas |
+|---|---|---|
+| ISIS — lo único que mostraba el pop-up | 2 | **3** |
+| **WEB — lo que faltaba** | **13** | **194** |
+| Total (lo que dice la columna) | 15 | **197** |
+
+Y encima, aunque hubieran aparecido, **habrían salido todas marcadas ⚠ "sin programar"**: la
+segunda consulta del pop-up iba a `gv_ppp_programacion_diaria`, que tampoco tiene las web.
+
+### Qué quedó
+
+| | |
+|---|---|
+| `gv_np_prog_info` (vista nueva) | np · origen · tanda · fecha_entrega · razón social, **de las dos programaciones**: `gv_ppp_programacion_diaria` (con los overrides ya aplicados) + `PPP_Web_Programacion`. A diferencia de `gv_np_prog`, **no exige tanda** y trae la razón social |
+| `index.html` — la demanda | `gv_ppp_base_pedidos` → **`gv_demanda_pedidos`** (ISIS + web, y trae `origen`) |
+| `index.html` — la programación | `gv_ppp_programacion_diaria` → **`gv_np_prog_info`** |
+| Badge **WEB** | cada NP de la página se ve como tal, en la tabla y en el Excel |
+| Orden | por **día de entrega** (sin fecha al final), no por número de NP — con las dos fuentes mezcladas el número no ordena nada, y la pregunta que se le hace a esta pantalla es *"¿para qué día están las que quedan?"* |
+
+⚠ **El fallback de Razón Social de la v12.22 se conservó**: `gv_demanda_pedidos` no tiene
+`cliente`, así que las NP de ISIS que no están en ninguna programación lo siguen sacando de
+`gv_ppp_base_pedidos`, ahora en una consulta aparte de dos columnas. Sin eso, esas filas volvían
+a quedar en "—" y el test `cajped-canceladas` (F2) lo caza.
+
+### Lo que confirmó que estaba bien cubierto
+
+**El test ya existía y el cambio lo puso en rojo** — `cajped-canceladas.cjs`, que stubbea la
+fuente vieja. Se actualizó el fixture (ahora sirve `gv_demanda_pedidos` con una NP web y
+`gv_np_prog_info`) y se le agregó **F3**: la NP web aparece, con su tanda, sin el ⚠, con badge, y
+el orden por día. **Verificado rompiéndolo**: con la fuente vuelta a `gv_ppp_base_pedidos` el test
+falla en 12 chequeos.
+
+⚠ **Dos tests de la suite son INESTABLES y no tienen que ver con esto**:
+`pga-enviar-a-programar` y `ppp-tanda-cambiar-dia` fallan de a uno según la corrida (timing de
+Playwright bajo carga; `ppp-tanda-cambiar-dia` falló **en main limpio** y pasó con el cambio
+aplicado). Aislados pasan los dos. A la tercera corrida la suite entera dio verde (rc=0). Queda
+anotado: si alguien los ve en rojo, que los corra solos antes de buscar la causa en su diff.
+
+**Chequeo:** abrir el 321 en Stocks → 15 NP, 197 cajas, 13 con badge WEB, ordenadas 21/9 → 29/9.
