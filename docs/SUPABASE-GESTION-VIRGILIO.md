@@ -23135,3 +23135,136 @@ vista; para la Edge Function, revertir el bloque `preErrores` de
 `supabase/functions/gv-ppp-web-tandas-diarias/index.ts` y redeployar.
 
 Problemas **402** (LK) y **403** (Gestión).
+
+---
+
+## §3.jg — v19.60: todo se programa solo, salvo súper (menos Carrefour) y Matiz — 2026-09-18
+
+**Regla del dueño, textual (Thomas, 18/09):** *"Todos los pedidos que llegan se programan
+automaticamente. con excepcion de supers (excepto carrefour ya que viene con la fecha desde el
+pedido que mandan) y Matiz"*.
+
+Al medirlo contra lo que corría, **dos de las tres partes ya estaban**:
+
+| Parte de la regla | Estado |
+|---|---|
+| Los súper no se programan solos | ✅ ya, desde v18.28 (padrón `GV_Supers`, 19 activos) |
+| Carrefour sí, con la fecha de su OC | ✅ ya, desde v19.13 — regla `auto_super` sobre LK 1651 + pase (a3), que toma el turno de la OC y **pisa el cupo** |
+| Matiz no | ✅ ya — Matiz SA es el cod **4263 de LK** y estaba en `GV_Supers` como `super_key = 'gigot'` |
+| **Todo lo demás automático** | ❌ **no era cierto** → es el cambio |
+
+### 1. `zonas_automaticas`: de `'1,2'` a las siete
+
+Las zonas 1 y 2 iban en cascada por cupo (pase (b)); **las zonas 3 a 7 sólo se colgaban de un
+camión que ya fuera ese día** (pase (c)), y si no había camión el pedido quedaba en A Programar.
+
+⚠ **El `CLAUDE.md` decía `'1,2,3'` desde la v13.07 y la base decía `'1,2'`.** Otra vez lo mismo:
+la doc no es la fuente de verdad.
+
+Las 7 zonas son AMBA y mapean a los 4 camiones de siempre (`gv_ppp_web_camion`: 1/2/3 → Capital,
+4 → GBA Sur, 5 → GBA Oeste, 6/7 → GBA Norte), así que esto **no inventa camiones a otras
+provincias** — el interior viaja por expreso (punto 4).
+
+**Verificado con el armador corriendo, no leyendo la función.** Hoy 10:18–10:20 el `sistema` armó
+solo, para el 23/09, `E29G` (Zona 3) y `E46A`/`E46B`/`E46C` (Zona 5, un camión de GBA Oeste entero
+desde cero). Ninguna de esas dos zonas se programaba sola antes. Tiempos sin moverse: 1,3 s la
+última corrida de LK, 2,8 s el máximo del día contra un `statement_timeout` de 8 s, 0 errores.
+
+⚠ **Efecto colateral previsto:** `gv_ppp_cliente_dos_dias` pasó de 2 a 11 filas, y son dos
+clientes. **Jazquel SRL (3814)** quedó con 8 NP el 22/09 en el camión de Capital (`E26E`, Zona 2) y
+la NP `LK 0109` el 23/09 en GBA Oeste (`E46C`). **No es un bug**: es el caso que describe la regla
+de Luis (v18.87, §3.ib) con Jazquel como ejemplo textual — el día es uno por cliente pero la tanda
+se parte por camión, y cuando chocan gana la del camión: la NP no se mueve y queda a la vista para
+que lo resuelva Marianela (§ "QUIÉN ORGANIZA LA PROGRAMACIÓN" del `CLAUDE.md`).
+
+### 2. Carrefour también en Chef
+
+La regla `auto_super` estaba sólo en LK 1651. El espejo de Chef (**1087**, mismo CUIT
+30687310434) no la tenía, así que una OC suya que entrara por Chef no se programaba sola.
+Thomas: *"Aplica la regla a Chef tambien como LK para carrefour"*.
+
+### 3. ⚠ El día cargado A MANO no programaba — el botón servía para avisar, no para que saliera
+
+**Éste es el agujero que apareció al verificar, y es el que valía la pena.**
+
+El badge 🕑 de A Programar (v17.74) deja poner día y franja a mano y guarda en `GV_Pedido_Horario`
+(`gv_pedido_horario_set`). Lo lleva **todo** pedido con zona Retira y todo cliente de
+`gv_clientes_horario`, con día o sin él.
+
+Pero los dos pases del armador que miran un día pactado — **(a4) Retira** y **(a3) súper** — leían
+sólo `lk_pedidos_match` (lo que eligió el cliente en la página, o el turno que trae la OC) y
+**nunca** `GV_Pedido_Horario`. Consecuencia:
+
+- un **Retira del Cotizador o recuperado** —los que no pasan por el checkout, que es justo el caso
+  para el que existe el badge— seguía en A Programar aunque un supervisor le hubiera puesto el día;
+- y si alguien **recoordinaba el turno con un súper**, el automático seguía programando por el
+  turno viejo de la OC aunque en pantalla figurara el nuevo.
+
+**El manual manda**, que es la precedencia que el front ya tenía escrita (`aprHorBadge`: *"El
+horario cargado a mano MANDA sobre el de la OC: si un supervisor lo pisó es porque recoordinó con
+el súper"*). La clave de `GV_Pedido_Horario` es el `order_id` en texto para los pedidos de la
+página (`aprHorClave`: order_id si vino de la web, NP si es de ISIS).
+
+Probado con **escrituras de verdad**, y borradas después:
+
+| Caso | Resultado |
+|---|---|
+| A · fila manual 30/09, sin dato del cliente | **30/09** ✅ (antes null → no programaba) |
+| B · pedido 1483, sólo el día del cliente | 22/09 ✅ |
+| C · 1483 + fila manual 25/09 | **25/09** ✅ el manual pisa |
+| D · borrada la fila de prueba | vuelve a 22/09 ✅ |
+
+### 4. ⚠ El interior NO es "sin zona": viaja por EXPRESO, y el dato viene con el pedido
+
+Se planteó mal de entrada (como *"¿camión propio o expreso?"* para La Plata, Campana y Zárate) y lo
+corrigió el dueño: *"EL DATO DE ENTREGA VIAJA CON EL PEDIDO DEL CLIENTE, te estas complicando al
+pedo me parece"*.
+
+**La lógica que ya existe:** un cliente del interior lleva un **expreso**, y `zona_expreso` guarda
+el **barrio del depósito del expreso en AMBA** — no la ciudad del cliente. Por eso Salta, Tucumán,
+Río Grande, Comodoro y Bariloche terminan todos en **Zona 1 o Zona 4** (Soldati, Barracas, Pompeya,
+Parque Patricios, Avellaneda, Lugano, Mataderos) y los entrega el camión propio como a cualquier
+otro. Campana → **Bijarra** (Soldati), Zárate → **Larraz** (Pompeya), La Plata → **Caltabiano**
+(Soldati). La respuesta ya estaba en los datos.
+
+**Medido:** 945 direcciones con expreso, **944 resuelven zona**. Y sobre los pedidos, que es lo que
+importa: de **1.172 NP de LK en 120 días, 1.121 (95,6 %) traen `zona_expreso` con el pedido**. Lo
+que no resuelve son **18 pedidos en 4 meses** (21 direcciones), y en todos la sucursal existe y
+viaja — lo único que falta es el expreso cargado en esa dirección, **en el ABM de la página**
+(LK/Chef). **No hace falta override en Virgilio ni padrón de expresos.**
+
+Tres de esas 21 no son falta de expreso sino ficha mal cargada: **LK 4309** (localidad "CABA" con
+dirección Amenábar 1492, que es Belgrano), **Chef 2226** (Villa Real con dirección Virgilio 2788,
+o sea el depósito: es un Retira) y "Av. Gral. Mosconi 2305", que no trae ni localidad ni guion, así
+que `gv_ppp_web_barrio_de` no tiene de dónde sacar el barrio.
+
+### 5. Los 11 barrios de AMBA que faltaban en el mapa
+
+`GV_Zonas_Barrios` es la capa de override sobre `Zonas_Barrios` y **estaba vacía**: todo el mapa
+vivía en la original. Estas 11 filas son las primeras. La zona de cada una salió de los barrios
+**limítrofes que ya estaban cargados**, no de una opinión:
+
+| Barrio | Zona | Por qué |
+|---|---|---|
+| La Tablada · Villa Madero · Tapiales | 5 - GBA Oeste | La Matanza, pegados a Lomas del Mirador y Ciudadela |
+| Paso del Rey | 5 - GBA Oeste | Moreno; `moreno` y `merlo` ya son 5 |
+| Sáenz Peña | 5 - GBA Oeste | Tres de Febrero; Caseros, Santos Lugares, Ciudadela y Palomar ya son 5 |
+| Hurlingam | 5 - GBA Oeste | typo de Hurlingham |
+| Bernal Oeste | 4 - GBA Sur | Quilmes; `bernal` y `quilmes oeste` ya son 4 |
+| General Pacheco | 7 - GBA Norte Lejos | Tigre; Don Torcuato, Tigre y Garín ya son 7 |
+| Escobar | 7 - GBA Norte Lejos | pegado a Garín y Del Viso, misma distancia que Pilar |
+| Parque Chas | 2 - CABA Centro | rodeado por Chacarita, Villa Ortúzar y Villa Urquiza |
+| Costitucion | 1 - CABA Sur | typo de Constitución |
+
+⚠ **`_norm_barrio` no corrige errores de tipeo.** Baja a minúscula, recorta, colapsa espacios y
+saca acentos de las vocales (pero **no** la ñ). Por eso `hurlingam` y `costitucion` necesitan fila
+propia aunque `hurlingham` y `constitucion` ya existan.
+
+Probado sobre las direcciones reales del padrón: las 13 que usaban esos 11 barrios resuelven, cada
+una en su zona. Direcciones sin zona: **40 → 27**.
+
+**SQL, backups y rollback:** `sql/gv_todo_automatico_v1960.sql`. Backups en
+`zz_backups."GV_Backup_PPPWebConfig_20260918"` y `zz_backups."GV_Backup_ZonasBarrios_20260918"`.
+
+**Chequeos:** `gv_ppp_web_armado_salud`, `gv_ppp_tanda_camion_mezclado`, `gv_ppp_cliente_dos_dias`,
+`gv_ppp_super_mezclado`, `gv_ppp_tanda_dos_dias`.

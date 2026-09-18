@@ -731,6 +731,37 @@ de tocar tandas a mano. Desde v18.87 dice además si el camión se armó **AUTOM
 ISIS** (`camion_armado`, `origen`, `origen_detalle`) y deja afuera las tandas de
 `GV_Vehiculo_Propio` (la kangoo no es el camión). `sql/gv_ppp_super_mezclado_v1887.sql`, §3.ic.
 
+## ⚠ Regla del dueño (2026-09-18, v19.60): TODO se programa solo, salvo SÚPER (menos Carrefour) y MATIZ
+
+*"Todos los pedidos que llegan se programan automaticamente. con excepcion de supers (excepto
+carrefour ya que viene con la fecha desde el pedido que mandan) y Matiz"*.
+
+**Las TRES piezas, y dónde vive cada una:**
+
+| | |
+|---|---|
+| Súper afuera del automático | padrón **`GV_Supers`** (v18.28) · `gv_es_super` |
+| **Carrefour adentro**, con la fecha de su OC | regla **`auto_super`** en `GV_Clientes_Reglas` (LK **1651** y Chef **1087**) · pase (a3) de `gv_ppp_web_armar_pendientes`, que lee `gv_web_turno_pactado` y **pisa el cupo** |
+| **Matiz afuera** | ya estaba: Matiz SA es el cod **4263 de LK** dentro de `GV_Supers` (`super_key = 'gigot'`) |
+| Todo lo demás adentro | **`zonas_automaticas = '1,2,3,4,5,6,7'`** |
+
+⚠ **El interior NO es "sin zona": viaja por EXPRESO, y el dato viene con el pedido.** `zona_expreso`
+guarda el **barrio del depósito del expreso en AMBA**, no la ciudad del cliente — por eso Salta,
+Tucumán, Río Grande y Comodoro caen en **Zona 1 o 4** (Soldati, Barracas, Pompeya, Parque
+Patricios, Avellaneda) y los entrega el camión propio. Medido: 945 direcciones con expreso, **944
+resuelven zona**, y **1.121 de 1.172 NP (95,6 %) traen `zona_expreso` con el pedido**. Cuando una
+NP sale sin zona, **no falta una regla: falta el expreso cargado en esa dirección, en el ABM de la
+página** (LK/Chef). No inventar override en Virgilio ni padrón de expresos — el dueño lo frenó
+explícitamente: *"EL DATO DE ENTREGA VIAJA CON EL PEDIDO DEL CLIENTE, te estas complicando al pedo"*.
+
+⚠ **El día cargado A MANO también programa** (v19.60). El badge 🕑 de A Programar escribe en
+`GV_Pedido_Horario`, y hasta esta versión los pases (a3) y (a4) **no lo leían**: el botón servía
+para avisar el día, no para que el pedido saliera. `gv_web_retiro_pactado` y `gv_web_turno_pactado`
+ahora lo miran primero — **el manual pisa** a lo que eligió el cliente y al turno de la OC, igual
+que ya hacía el front.
+
+`sql/gv_todo_automatico_v1960.sql`, §3.jg.
+
 ## ⚠ QUIÉN ORGANIZA LA PROGRAMACIÓN: el automático arma, **MARIANELA** organiza
 
 **Definido por Luis, 2026-09-17.** Hasta ese día no estaba escrito en ningún lado, y por eso una
@@ -1036,8 +1067,8 @@ Detalle, medición y rollback en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.l y §3
   `(empresa, np)`). El pedido de la página (`order_id`) queda guardado como referencia y se muestra "web LK 1350"
   hasta que se programa (ahí se asigna la NP). Un pedido de 4 bloques = 4 NP distintas. Deshace v12.92 (NP = nº de
   pedido con sufijo `-2`); `sql/gv_np_contador_v1370.sql`, §3.aw. Se
-  programa por el job de las 00:01 para zona 1, 2 y 3 (`zonas_automaticas = '1,2,3'` desde v13.07)
-  y a mano en "A Programar" para el resto.
+  programa por el job de las 00:01 para **TODAS las zonas** (`zonas_automaticas = '1,2,3,4,5,6,7'`
+  desde v19.60; ⚠ esta línea decía `'1,2,3'` desde la v13.07 y **la base decía `'1,2'`**).
   **Desde el 2026-09-05 además hay armado INTRADÍA** (idea 7317, cron jobid 73 — **cada 5 min
   desde el 15/09**, `*/5 9-23 * * *` UTC = 06:00–20:55 ART; antes cada 15 min lun–vie
   07:00–18:45 —, Edge Function v14 con `{"intradia": true}`): cuando lo pendiente de
