@@ -24804,3 +24804,75 @@ renombre — la función es `STABLE`, usa el snapshot del statement, no ve la fi
 contesta `false` como si no anduviera.
 
 `sql/gv_tandas_codigos_no_reciclar_v1998.sql`.
+
+## §3.kc — v19.99: el facturado de dos NP se llevó las cajas de una TERCERA — D69C / 98622 — 2026-09-18
+
+**Lo que pidió Thomas:** la NP **98622** (Martinelli) quedó armada en **D69C** el 16/09 y nunca
+salió; hoy está programada en **E33A** y se volvió a pickear. Poner esa mercadería en **A guardar**
+y seguir el pedido con la tanda de hoy.
+
+**Lo que apareció al medirlo, y es más grave que "quedó armada":** el **17/09 10:41**, al facturar
+**98615 y 98616** (Arguello, la misma tanda), el drenaje de `a_facturar` se llevó **las 92 cajas de
+98622** — los **14 códigos calzan uno por uno, código y cantidad**. Y 98622 **no está en
+`Facturacion_NP`**: nunca se facturó. El libro ya las contaba como salidas del depósito y estaban
+en el piso de armado. Físicamente había **184 cajas afuera para un pedido de 92** (las de D69C más
+el picking nuevo de E33A).
+
+⚠ **El botón «Desarmar» NO servía para esto, y conviene que quede escrito:**
+`gv_ppp_np_desarmar` calcula la devolución contra la tanda que la NP tiene **hoy** (E33A), así que
+habría devuelto el picking **nuevo** en vez del armado viejo; y en sus dos variantes saca la NP de
+la programación (`gv_ppp_isis_desprogramar`, o `NP_Canceladas` + override `oculto`), que es justo
+lo que había que conservar.
+
+**Lo que se hizo** (backups `zz_backups."GV_Backup_98622_D69C_Movs_20260918"` — 161 filas — y
+`…_Entregas_20260918` — 14 —, las dos con RLS):
+
+1. Las 92 cajas vuelven a **`a_guardar`**. ⚠ Con la **reversa del facturado primero** (regla
+   v19.51): el drenaje del 17/09 ya las había descontado, así que sin reponerlas el desarme saca
+   de una pila vacía y deja `a_facturar` en −92. Quedó `a_facturar` neto **0** (28 filas, +92/−92)
+   y `a_guardar` **+92** (14 filas), todo con `tipo='desarme'`, `ref='98622'`.
+2. Se borraron las **14 filas de `Entregas_Virgilio`** de 98622 bajo D69C: si quedaban, al cerrar
+   E33A la NP tenía **dos juegos** de renglones y todo lo que suma por NP la contaba doble.
+3. Quedó el registro en `GV_Desarmes`, igual que un desarme por pantalla.
+4. **E33A no se tocó**: su armado sigue su curso y su `separado` drena su propio picking.
+
+**Verificado después:** Entregas de 98622 = 0 · la NP sigue en **E33A** en la programación ·
+`gv_stock_picking_duplicado`, `gv_reglas_perdidas` y `gv_stock_empresa_fantasma` en cero · ningún
+código con `a_guardar` negativo.
+
+### El barrido: ¿pasó más veces? — **una sola, y es ésta**
+
+El drenaje del facturado escribe `ref = 'TANDA|NP'`. Los que salen con **`ref` = la tanda sola** son
+los sospechosos. Barriendo **25 días** y buscando cuáles calzan **exacto** con los renglones de una
+NP, aparecen 9 casos y **8 son de NP efectivamente facturadas** (el `ref` sin NP es una forma vieja,
+no un error). El único que calza con una NP **no facturada** es **D69C → 98622**.
+
+El otro corte, por tanda (drenado contra lo que justifican sus NP facturadas), da 7 tandas con
+exceso — pero **seis son la familia del renombre**, no este bug: el `facturado` quedó bajo el código
+viejo mientras las Entregas y la Facturación viajaron al nuevo. Medido: **E03G** (140) y **D71B**
+(72) no tienen ni una NP en Entregas ni en Facturación — están todas en **E44A** y **E40A**; ídem
+D60E y D67B. E12R (+12) y D47C (+10) son restos chicos.
+
+```sql
+-- el chequeo, para repetirlo
+with dren as (
+  select upper(btrim(ref)) tanda, upper(btrim(cod_art)) cod, -sum(delta) cajas
+    from public."Movimientos_Stock"
+   where tipo='facturado' and ts >= now() - interval '25 days' and position('|' in btrim(ref)) = 0
+   group by 1,2),
+dtot as (select tanda, count(*) cods from dren group by 1 having count(*) >= 3),
+ent as (select upper(btrim(tanda)) tanda, regexp_replace(btrim(np),'\.0+$','') np,
+               upper(btrim(cod_art)) cod, sum(cajas_entregadas) cajas
+          from public."Entregas_Virgilio" group by 1,2,3)
+select d.tanda, e.np,
+       exists (select 1 from public."Facturacion_NP" f
+                where regexp_replace(btrim(f.np::text),'\.0+$','') = e.np) esta_facturada
+  from dren d join dtot dt on dt.tanda = d.tanda
+  join ent e on e.tanda = d.tanda and e.cod = d.cod and e.cajas = d.cajas
+ group by 1,2 having count(*) = dt.cods;
+-- toda fila con esta_facturada = false es este bug
+```
+
+**Queda abierto:** las 92 cajas están en `a_guardar` y **hay que subirlas a góndola** con Guardado;
+hasta entonces no cuentan como disponibles. Y por qué el drenaje del 17/09 tomó la NP equivocada
+—`a_facturar` se lleva por tanda y por artículo— no está resuelto: se registró el caso, no la causa.
