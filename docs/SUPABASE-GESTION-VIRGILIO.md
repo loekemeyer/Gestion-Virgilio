@@ -25240,3 +25240,84 @@ Backups: `zz_backups."GV_Backup_VistaGeneradorOC_20260918"` (la definición viej
 como `replace()` sobre `pg_get_viewdef`, así que el último `CREATE` entero guardado era el de la
 v19.84 y ya no coincidía con lo que corría. `sql/gv_generador_oc_sin_codigos_L_v2008.sql` tiene
 la definición viva **verificada por md5 contra la base** (`4cc29b4f…`, 18.573 caracteres).
+
+## §3.kj — v20.09: el generador de OC recalculaba la proyección y le daba 12 veces menos (el 706) — 2026-09-18
+
+**Thomas, 18/09:** *"706 tiene proveedor, necesita pedir stock, no generó OCs"*.
+
+### El síntoma
+
+El **706** (Abrelatas Uñas, Martin C) no aparecía en el Generador de OC. La fila estaba, con
+**`total = 0`** — la pantalla no muestra lo que no hay que pedir. Y daba 0 porque la
+**proyección** del generador era **16,75 cj/mes**, cuando el módulo **Stocks**, para el mismo
+artículo, mostraba **201**. Dos pantallas, un artículo, un factor de 12 de diferencia.
+
+### La causa: dos fuentes para el mismo número
+
+`proyeccion_madre` guarda el dato de las dos formas: `proy_uni_mes` y `proy_cajas_mes`. **Stocks
+lee `proy_cajas_mes`; el generador lo recalculaba** como `proy_uni_mes / uxb`, con el `uxb` de
+`GV_UxB`. Mientras las dos puntas coinciden da igual — pero el motor de proyección de LK, para
+los códigos que no tiene con `uxb`, **escribe las cajas en las dos columnas**:
+
+| cod | `proy_uni_mes` | `proy_cajas_mes` | uxb | `uni/uxb` |
+|---|---|---|---|---|
+| 505 | 27.854 | 2.321,17 | 12 | 2.321,17 ✔ |
+| 505L | 254 | 21,17 | 12 | 21,17 ✔ |
+| **706** | **201** | **201,00** | **12** | **16,75** ✘ |
+
+**119 de 333 códigos** discrepaban, casi todos de la línea de **Chef** (7xx / 8xx / 9xx: 706,
+713, 836, 840, 701, 824, 798E, 702E, 901, 847, 802…). Sumados: el generador proyectaba
+**20.281,85 cj/mes** contra las **22.305,87** de la tabla madre — **~2.000 cajas/mes de menos**,
+siempre para el lado de comprar de menos.
+
+### El arreglo
+
+La proyección del generador pasa a ser **`sum(proy_cajas_mes)`**, el mismo número que muestra
+Stocks y el mismo que suma la madre. El CTE `gux` —que traía el `uxb` sólo para esta cuenta— se
+va: ya no queda una segunda fuente que pueda derivar.
+
+⚠ Y `max(proy_cajas_mes)` pasó a **`sum`** en `proy_raw`, que es lo que ya hacía la columna de
+unidades: el código base y su gemelo con **"L"** son dos tajadas de la misma proyección
+(505 = 2.321,17 LK + 21,17 CH = **2.342,34**, el número que cita el CLAUDE.md). Con `max`, el
+546 se comía la tajada del 546E.
+
+> **La regla que queda:** la proyección en cajas es `proy_cajas_mes`. **Nadie la recalcula.**
+
+### Qué cambió, medido
+
+| | |
+|---|---|
+| filas | 355 → **356** |
+| códigos que suben el "a pedir" | **53** |
+| códigos que bajan | **4** |
+| total a pedir | 11.230 → **12.477** cajas (**+1.247**) |
+| proyección total de la vista | 20.281,85 → **22.278,87** cj/mes |
+
+Ahora cierra contra `proyeccion_madre` (22.305,87) salvo **27,00 cajas** de 4 filas que no son
+artículos y que el filtro `cod ~ '^[0-9]'` saca a propósito: `E` (26,67), `GASTOTRRECH`,
+`TRANSFRECH` y `ANTICIPO VTA MERCAERIA`.
+
+**El 706**: proy 16,75 → **201**; máximo `ceil(201 × 2,5)` = **503**; con 136 de stock y 14
+pedidos pasa a pedir **381 cajas**. Antes, 0.
+
+⚠ **Las 4 bajas no son un error.** Tres —**618** Espátula Repost, **631** Espumadera, **857**
+Cuchillo De Torta— estaban en la lista de *"artículos sin proyección"* del CLAUDE.md, donde manda
+la capacidad de góndola. **Estaban ahí por este mismo bug**: tienen `proy_uni_mes = 0` pero
+`proy_cajas_mes` de 0,17 / 0,33, así que la cuenta vieja los leía como 0. Ahora tienen proyección
+—mínima, pero proyección— y gana *"proyección es siempre rey"*: piden 1 caja en vez de llenar la
+góndola. **Los "sin proyección" bajan de 10 a 6.** La cuarta es el **502**, 256 → **255**:
+`proy_cajas_mes` viene redondeada a 2 decimales (520,66) y la división daba 520,6667.
+
+### Chequeos
+
+```sql
+select cod, proy, maximo, stock, pedidos, total from public.vista_generador_oc where codn = '706';
+-- proy = 201, total = 381
+select round(sum(proy),2) from public.vista_generador_oc;                     -- 22.278,87
+select round(sum(coalesce(proy_cajas_mes,0)),2) from public.proyeccion_madre; -- 22.305,87
+select * from public.gv_reglas_perdidas;   -- vacía
+select * from public.gv_endpoints_rotos;   -- vacía
+```
+
+Backups: `zz_backups."GV_Backup_VistaGeneradorOC_proy_20260918"` (definición previa) y
+`zz_backups."GV_Backup_VistaGeneradorOC_filas_proy_20260918"` (las 355 filas de antes).
