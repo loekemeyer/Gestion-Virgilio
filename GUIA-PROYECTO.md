@@ -1,4 +1,4 @@
-## Nota v20.13 (2026-09-18) — El picking arrancaba por el excedente y rompía el recorrido
+## Nota v20.17 (2026-09-18) — El picking arrancaba por el excedente y rompía el recorrido
 
 Thomas, probando el módulo de operarios con una tanda: *"primero le dice que pickee del excedente,
 eso rompe el flujo de movimiento por las góndolas"*. Tenía razón, y el dato lo dice solo.

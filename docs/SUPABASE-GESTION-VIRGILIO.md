@@ -6848,7 +6848,7 @@ que se estaba pickeando en vivo). (2) Tanda falsa `ZZDEP1|207|10|10|3` (art 207,
 a excedente 27 / góndola 133. (5) Suite completa: 119 bloques, 0 fallas, con el test nuevo
 `tests/pk-deposito-pkc.cjs`.
 
-⚠ **DADO VUELTA el 2026-09-18 (v20.13): el excedente va en el ORDEN DEL RECORRIDO, no
+⚠ **DADO VUELTA el 2026-09-18 (v20.17): el excedente va en el ORDEN DEL RECORRIDO, no
 primero.** Thomas, después de probar el módulo de operarios con una tanda: *"primero le dice
 que pickee del excedente, eso rompe el flujo de movimiento por las góndolas"*. Medido ese día
 sobre `GV_Lugar`: la góndola de picking ocupa el `orden` **1..657** (pasillos A..Ñ), los racks
