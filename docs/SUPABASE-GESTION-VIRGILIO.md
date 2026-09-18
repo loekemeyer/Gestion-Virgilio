@@ -23410,3 +23410,63 @@ el camino normal.
 **tanda**, no por NP: al mover un pedido suelto, las cajas pickeadas siguen contadas en la tanda
 de origen. No es lo que rompió acá (esto se ve recién cuando se compara pedido contra pedido), y
 tocarlo es otra tanda de trabajo, pero queda anotado para no descubrirlo de nuevo desde cero.
+
+## §3.ji — Cencosud D72B/D72C: la salida del 14/09 se cargó a mano — 2026-09-18
+
+**Thomas, 18/09:** *"el pedido de cencosud (tandas: d72b y d72c) salió el 14/09 con transportista
+Guillermo. Anotalo y sacalo de pendiente"*. No es un cambio de código: es el **dato que faltaba**
+para cerrar seis NP que estaban colgadas desde el 10/09.
+
+**Qué tenían y qué no**, medido antes de tocar nada (44612, 44613, 44614 → D72B · 44615, 44616,
+44617 → D72C, todas CENCOSUD 2444, 3,27 m³):
+
+| etapa | estaba |
+|---|---|
+| picking (EP/PKC/TP) | ✅ 09/09 |
+| armado (AP/TAL/TAP) | ✅ 10 y 11/09 |
+| facturación (`Facturacion_NP`) | ✅ 14/09, con `cierre_id` |
+| Control Remitos (CCR) | ✅ 15/09 |
+| **Carga Camión (CCN)** | ❌ **nunca** |
+| **Recepción Remitos (CRN)** | ❌ **nunca** |
+
+Sin el CCN quedaban **pendientes de cargar para siempre**: el reparto de Carga Camión es
+*facturado + cerrado + sin CCN + sin entregar*, sin ventana de tiempo (`CC_REPARTO_DESDE_ISO`,
+v9.68). Ésa era la "pendiente" que pedía sacar.
+
+⚠ **Y por eso el CCN solo no alcanzaba**: Recepción Remitos lee CCN sin CRN, con vencimiento a
+**30 h** (`crDeadline`). Cargar nada más la salida las habría movido de una lista a otra, y encima
+en rojo. Por eso van los dos eventos, con la fecha que dio Thomas.
+
+```sql
+-- lo que se escribió (12 filas en Registros_Produccion_Virgilio, ningún trigger las toca:
+-- CCN y CRN no tienen trigger, el stock no se mueve)
+--   CCN  '<np>|<tanda>|Guillermo|<orden 1..6>'   ts 2026-09-14 12:00 ART
+--   CRN  '<np>|<tanda>'                          ts 2026-09-14 17:30 ART
+-- descripcion: dice que es retroactivo y de quién salió el dato.
+-- ROLLBACK: delete from public."Registros_Produccion_Virgilio"
+--            where client_id like 'retro-cenco-20260914-%';   -- 12 filas
+```
+
+**Medición después.** `gv_ppp_en_salida` 0 · `gv_ppp_entregados_meta` las 6 (fuente `remito`) ·
+`gv_viajes_sin_controlar` vacía · `gv_ppp_super_mezclado`, `gv_reglas_perdidas`,
+`gv_ppp_tanda_dos_dias` y `gv_ppp_tanda_camion_mezclado` vacías. Las 6 filas de
+`gv_stock_empresa_fantasma` son de hoy (760, 764, 727E, 955E, 256, 207) y **no** vienen de esto.
+
+El backup del `nota` que se apendeó en `GV_PPP_Prog_Override` quedó en
+`zz_backups."GV_Backup_PPPProgOverride_cencosud_20260918"` (6 filas, RLS prendida).
+
+### ⚠ Lo que se encontró de paso: `gv_viaje` parte TODA carga en dos vueltas (problema 412)
+
+`gv_viaje_np` calcula `vuelta = 1 + sum(orden = 1) OVER (… ROWS BETWEEN UNBOUNDED PRECEDING AND
+**1 PRECEDING**)`. Como excluye la fila actual, la NP con `orden = 1` —la primera que manda el
+operario al tocar "Terminé"— **no abre su propia vuelta**: queda contada en la anterior y la
+vuelta nueva arranca recién en la segunda NP.
+
+Por eso **todos** los fleteros muestran una "vuelta 1" de exactamente 1 NP. Medido: Guillermo el
+14/09 hizo **una** selección de 9 NP a las 10:51:49 (orden 1..9) y figura como vuelta 1 (98653,
+1 NP) + vuelta 2 (8 NP). Igual Eduardo 15/09 (1 + 11), Daniel 16/09, Horacio, Nicolás, Claudio y
+Retira. Distorsiona vueltas por día, m³ por vuelta y paradas.
+
+El arreglo es contar **incluyendo** la fila actual (`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT
+ROW`, sin el `1 +`). **No se aplicó**: cambia los números históricos de la jornada de camiones,
+así que lo decide el dueño. Queda `abierto` como problema 412.
