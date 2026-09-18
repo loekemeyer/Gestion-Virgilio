@@ -23644,7 +23644,7 @@ Rollback: el `CREATE OR REPLACE` viejo está en el historial de git; para los da
 `update … set texto = b.texto from zz_backups."GV_Backup_RegProd_ENT_rotos_20260918" b
  where b.id = "Registros_Produccion_Virgilio".id;`
 
-`sql/gv_evento_tanda_v1976.sql`.
+`sql/gv_evento_tanda_v1978.sql`.
 
 ## §3.jj — v19.77: los dos centinelas de stock — uno gritaba de más y el otro no existía — 2026-09-18
 
@@ -23731,3 +23731,100 @@ para volver atrás, restaurar la definición anterior de `gv_stock_empresa_fanta
 (`where (positivo - total) > 0`) y `drop view public.gv_stock_picking_duplicado`. Ninguna vista
 la lee nadie (0 dependientes, 0 funciones, 0 apariciones en el front), así que el cambio no puede
 romper una pantalla.
+---
+
+## §3.jl — v19.78: los pedidos web de LK salían «sin expreso» (problema 418) — 2026-09-18
+
+**Thomas, 18/09, mirando el ABM de la página:** *"el dato está (fijate que abajo de Brc Onelli
+dice «Entrega: Pergamino 2820»). ¿por qué daba error?"*
+
+Tenía razón: el dato estaba cargado. Lo que estaba mal era el feed.
+
+### Lo que se ve en pantalla y lo que lee el feed son COLUMNAS DISTINTAS
+
+| | |
+|---|---|
+| El ABM muestra | `direccion_entrega` (+ `zona_expreso`) |
+| `v_pedidos_web` lee | `direccion_expreso` · **vacía en 669 de las 1.583** sucursales con zona cargada |
+
+Y donde existen las dos, **848 de 914 (92,8 %) tienen la misma calle y altura**: en un pedido con
+intermediario, `direccion_entrega` **es** la dirección del expreso. **Chef ya lo resolvía así
+desde la v13.43** (`gv_pedidos_web_np_chef`, `l_intermediario`); **LK nunca tuvo esa regla.**
+
+### Y el cruce pedido → sucursal era por TEXTO EXACTO del nombre
+
+```sql
+where d.customer_id = c.id
+  and btrim(lower(d.label)) = btrim(lower(payload->>'sucursal_entrega'))
+```
+
+Si no coincidía letra por letra volvían en NULL las tres columnas de expreso **y también la
+provincia** — que es la que decide Tierra del Fuego → ISIS de Chef (regla v13.77). O sea que un
+label mal escrito no sólo escondía el expreso: podía mandar la factura a la empresa equivocada.
+Medido: **23 pedidos / 19 sucursales** en 120 días. Los dos patrones que lo rompían:
+
+| el pedido decía | el ABM dice |
+|---|---|
+| `Multi Bazar S.R.L — Brc Onelli` | `Brc Onelli` |
+| `Onelli 653 - Bariloche` | `Brc Onelli` |
+| `Oriental Party SRL Casa Albert` | `Libertad 6310 - Chilavert` |
+
+### La escalera nueva (v19.78)
+
+| nivel | regla | ejemplo que arregla |
+|---|---|---|
+| 0 | igual exacto (lo de antes) | — |
+| 1 | igual normalizado (sin acentos ni puntuación) | `David Luque 440-B? General Paz` |
+| 2 | igual normalizado sin el prefijo `<Razón Social> ` | `Multi Bazar S.R.L — Brc Onelli` |
+| 3 | la **localidad** de la sucursal es el resto del label | `Poy Ignacio — ROJAS` |
+| 4 | el cliente tiene **una sola** sucursal cargada | `Oriental Party SRL Casa Albert` |
+
+⚠ **Los niveles 3 y 4 exigen candidato ÚNICO**: si hay dos que empatan no se elige ninguno.
+Por eso Sorpresur (*"— MORENO 2"*, con dos sucursales en Moreno) queda sin match a propósito:
+mandar la mercadería a la sucursal equivocada es peor que no resolverla. **"Retira" no entra
+al nivel 4**: no es una sucursal.
+
+### Y el cliente ahora tiene fallback por uuid
+
+Se buscaba **sólo** por `cod_cliente` de texto. `orders` ya trae `customer_id`; en 2 pedidos el
+código del payload apuntaba a un cliente inexistente mientras el uuid estaba bien. El código
+sigue ganando cuando resuelve, así que **no cambia ni un pedido de los que ya andaban**.
+
+### Medición antes / después (180 días, 1.072 pedidos)
+
+| | antes | después |
+|---|---|---|
+| sucursales del interior sin dirección de expreso | **25** (41 pedidos) | **0** |
+| pedidos que recuperan zona / localidad / provincia | — | **+15** |
+| pedidos que recuperan el cliente | — | **+2** |
+| **pedidos que cambian de sucursal teniendo match antes** | — | **0** ← la prueba de que no rompe |
+| `gv_pedidos_web_np_lk(30 días)` | 1,14 s | 1,04 s |
+
+### Chef NO necesitaba el cambio
+
+Se midió antes de tocarlo: **0 pedidos sin match en 180 días**, y su feed ya usa
+`direccion_entrega`. No se tocó.
+
+### Lo que NO se tocó
+
+La columna `direccion` (lo que dice el remito). Chef, sin intermediario, la pisa con
+`direccion_entrega`; LK sigue mostrando el label de la sucursal. Unificar eso movería la
+dirección de **todos** los pedidos locales y no es lo que se reportó.
+
+### Centinela
+
+```sql
+select motivo, count(*) from public.gv_web_sucursal_sin_match group by 1;   -- en LK
+```
+
+Vacía = todo bien. Al 18/09 quedan **15**, todas de pedidos ya entregados:
+
+- **9** *"el nombre de la sucursal no coincide con ninguna del ABM"* (la última es del 07/08):
+  Jorge Airut 700, Multi Bazar 4042 ×4, Sorpresur 2521, Satdjian 2313, Caffaro 2208, Trolli 587.
+  Se cierran **en el ABM** —renombrando la sucursal como la nombró el pedido— o no se cierran:
+  son históricas.
+- **6** *"el codigo de cliente no esta en customers"* (4317, 4312, 4302, 4299, 4292, 4286):
+  pedidos con `cliente_nuevo`, cuyo código todavía no tiene ficha en `customers`.
+
+`sql/gv_web_sucursal_match_v1978.sql` · rollback en
+`sql/backups/v_pedidos_web_20260918_pre_v1978.sql`.
