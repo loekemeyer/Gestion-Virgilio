@@ -1,4 +1,4 @@
-## Nota v20.14 (2026-09-18) — El monitor de la TV también dice qué ya salió
+## Nota v20.16 (2026-09-18) — El monitor de la TV también dice qué ya salió
 
 Thomas, sobre `monitor/tv.html`: **sí**, que lleve SALIÓ. En la TV no hay columnas de porcentaje
 (no es la PPP), así que la pregunta se contesta donde importa en una pared: **la tabla «Tandas a
