@@ -23206,3 +23206,68 @@ enteraría.
 **Rollback:** `select cron.alter_job(90, schedule := '*/10 * * * *');` ·
 `revoke execute on function public.gv_cruce_fc_asig_refrescar_si_viejo(integer) from authenticated;`
 · y sacar la línea del `_si_viejo` de `concilRefresh()` en `index.html`.
+
+## §3.jf — v19.62: el generador de OC IGNORABA los pedidos WEB — 2026-09-18
+
+**Thomas, mirando el 321 en la pantalla de Stocks:** *"¿Por qué 321 sacó OC de 120 si está
+así?"* — la pantalla mostraba **321 de stock y 198 cajas pedidas**, y la OC del 16/09 salió por
+**120**.
+
+La cuenta de esa OC cerraba con los datos que tenía: `445 + 6 − 331 = 120`. **El problema es que
+los datos estaban mal: contaba 6 cajas pedidas cuando había ~199.**
+
+### La causa
+
+El CTE `pend_np` de `vista_generador_oc` miraba **sólo `GV_PPP_Programacion_Diaria`**, o sea las
+NP de ISIS. Las NP web viven en **`PPP_Web_Programacion`** y se nombran con
+`gv_ppp_web_np_label()` (`LK 0001`), así que ninguna matcheaba contra `gv_demanda_pedidos.pedido`
+y **su demanda contaba CERO**.
+
+⚠ **El arreglo ya estaba escrito al lado y nadie lo trajo.** `vista_stock_procesada` tiene el CTE
+`pend_np_oc`, que hace el `UNION` con la web y además saltea `GV_Web_Cancelados`. El generador
+quedó con la versión vieja. Por eso el parche **copia ese bloque tal cual** en vez de escribir uno
+nuevo: si divergen otra vez, la pantalla y la OC vuelven a decir cosas distintas.
+
+### Lo medido antes de aplicar
+
+| | |
+|---|---|
+| códigos con demanda web ignorada | **265** |
+| cajas que el generador no veía | **4.465** |
+| códigos que pasan a pedir más | **92** |
+| **cajas de más a pedir** | **2.651** |
+
+Peores: **505** 85 → 574 · **501** 89 → 325 · **506** 630 → 833 · **321** 127 → 320 · **586**
+0 → 188 · **544** 270 → 395 · **510** 472 → 586.
+
+⚠ **Y el 321 igual queda topeado por la GÓNDOLA, no por la proyección:** la proyección pide
+366,33 × 1,5 = 550 y la capacidad es **445**, así que `maximo` = 445. Con la web contada:
+`445 + 196 − 321 = 320`. Es la respuesta completa a la pregunta de Thomas — había **dos** cosas,
+no una: la demanda web sin contar (bug) y el techo de góndola (a propósito).
+
+### Sin doble conteo, medido
+
+Las **16 NP** de `GV_PPP_Prog_Override` marcadas `oculto` —los espejos de ISIS que duplican un
+pedido web— aportan **0 cajas** de demanda, así que el `UNION` no suma nada dos veces.
+
+### Cómo se aplicó
+
+Reemplazo de texto sobre `pg_get_viewdef` de la definición **viva** (nunca sobre una copia del
+repo), con dos guards: que el ancla exista y que aparezca **una sola vez**. Respaldo de la
+definición previa y sus `reloptions` en `zz_backups."GV_Backup_Def_GeneradorOC_20260918"`, y el
+`CREATE` resultante completo en `sql/gv_generador_oc_pedidos_web_v1962.sql`.
+`security_invoker = true` repuesto después del replace, y verificado.
+
+⚠ **`vista_generador_oc` la lee también el front de Producción Virgilio** (`index.html`, `sw.js`)
+→ la nota de rollback está en `docs/ROLLBACK-PRODUCCION.md`.
+
+### El centinela, para que no se pierda otra vez
+
+```sql
+insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
+values ('vista_generador_oc','vista','PPP_Web_Programacion', '…', 'Thomas','v19.62');
+```
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` vacía · `select * from
+public.gv_endpoints_rotos;` vacía · `select codn, pedidos, total from public.vista_generador_oc
+where codn = '321';` → 196 y 320. Problema **405**.

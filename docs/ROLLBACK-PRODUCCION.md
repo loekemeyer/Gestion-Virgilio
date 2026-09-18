@@ -1841,3 +1841,36 @@ with w as (select o.id, o.estado, row_number() over (
 select count(*) from w where rn > 1 and lower(coalesce(estado,'')) not in ('cerrada','anulada');
 -- 0 = ninguna OC fantasma
 ```
+
+---
+
+## v19.62 — `vista_generador_oc` pasa a contar los pedidos WEB — 2026-09-18
+
+**Vista que Producción Virgilio LEE** (`index.html` y `sw.js` de `produccion-virgilio`), por eso
+va acá. Es una **corrección**: la vista subcontaba la demanda, así que el cambio le mejora el dato
+a las dos apps. Problema **405**, detalle en `docs/SUPABASE-GESTION-VIRGILIO.md` §3.jf.
+
+| | |
+|---|---|
+| Qué cambió | el CTE `pend_np` suma ahora, por `UNION`, las NP de `PPP_Web_Programacion` (salteando `GV_Web_Cancelados`) — antes miraba sólo `GV_PPP_Programacion_Diaria` |
+| Respaldo | `zz_backups."GV_Backup_Def_GeneradorOC_20260918"` (definición previa + `reloptions`), con RLS y sin grants para `anon` |
+| Impacto medido | 265 códigos / 4.465 cajas de demanda que no se veían · **92 códigos piden 2.651 cajas más** |
+| `reloptions` | `security_invoker=true` repuesto después del replace **y verificado** |
+
+⚠ **Lo que cambia en plata:** el cron 50 (miércoles 10:00) va a generar **2.651 cajas más** que
+antes. Es lo correcto —esa mercadería está pedida y no se estaba comprando— pero es un salto de
+una vez, no un goteo. Si hay que frenarlo, el rollback de abajo lo deja como estaba.
+
+### Rollback
+
+El SQL exacto (las dos variantes, por replace inverso o desde el respaldo) está al pie de
+`sql/gv_generador_oc_pedidos_web_v1962.sql`. La corta:
+
+```sql
+do $$ declare d text; begin
+  select definicion into d from zz_backups."GV_Backup_Def_GeneradorOC_20260918";
+  execute 'create or replace view public.vista_generador_oc as ' || d;
+  execute 'alter view public.vista_generador_oc set (security_invoker = true)';
+end $$;
+delete from public."GV_Reglas_Centinela" where objeto = 'vista_generador_oc';
+```
