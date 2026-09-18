@@ -1,3 +1,39 @@
+## Nota v20.04 (2026-09-18) — Los códigos con "L" NO son artículos: fuera del Generador de OC
+
+Thomas, mirando el Generador de OC: *"Todos los que tienen L no deben aparecer para OC. Son para
+Loeke y nada más"*. Eran **53 filas fantasma** — `505L`, `513L`, `584EL`, `438EL`… — todas con
+**(sin proveedor)**, sin descripción, sin proyección, sin góndola y sin stock, pidiéndole
+mercadería a nadie.
+
+La **"L"** es una marca de ruteo (regla v13.71): artículo de Loekemeyer vendido por la página de
+**Chef** (505 → 505L). **El artículo es el mismo**; no hay un 505L que comprarle a un proveedor.
+Medido: ninguna tabla del lado físico conoce un código con L (`Articulos_Cajas`, `GV_UxB`,
+`OC_Maximos`, `Capacidad_Sector`, `Movimientos_Stock`, `Equivalencias_Familia`: **0** cada una).
+
+**La causa es vieja y estaba a medio hacer.** En agosto (nota v8.17, más abajo) se peló la L en el
+CTE **`proy`** de `vista_generador_oc`, y ahí quedó: de las cinco patas del universo, cuatro la
+pelaban y **`dem_raw` —los pedidos— no**. La demanda de un pedido de Chef con artículo de Loeke
+se iba a un código propio que jamás iba a tener stock ni proveedor que lo cubriera, y **se la
+robaba al código base**, que es el que hay que comprar: `total = maximo + pedidos − stock` quedaba
+corto en el código real. Mismo tipo de error que la v19.85: un hecho que un lado de la resta
+cuenta y el otro no.
+
+**El arreglo es una línea**: `dem_raw` keyea con **`gv_cod_stock(b.articulo)`**, la función
+canónica que ya pela `([0-9E])L$`. El `CASE` de `emp` **no se toca** y sigue leyendo el artículo
+crudo (`'[0-9E]L$'` → `'LK'`), así que un `438EL` cae en la mitad **`438E LK`**, que es donde se
+pickea. ⚠ **No se esconden las filas: la demanda se muda al código base** — esconderlas habría
+borrado pedidos reales y se compraría de menos, al revés de *"proyección es siempre rey"*.
+
+Medido contra el snapshot previo: filas **408 → 355** (−53, todas las L), **0** filas nuevas,
+**35** códigos suben el "a pedir" y **0** bajan; total 11.259 → **11.230** cajas (las 81 cajas de
+las filas L se mudaron y 29 las absorbió el stock que el código base ya tenía). Los que más suben:
+505 +4, 584E +4, 502 +3, 506 +3; y `439E LK` +1, que prueba el camino del dual.
+
+**Chequeo:** `select count(*) from public.vista_generador_oc where cod ~ 'L$';` — **0**.
+§3.kf de `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/gv_generador_oc_sin_codigos_L_v2004.sql`, que
+además vuelve a dejar en el repo la **definición completa** de la vista (la v19.85 se había
+aplicado como `replace()` y el repo tenía la de la v19.84).
+
 ## Nota v20.02 (2026-09-18) — Abrir una fila de Stocks decía "sin movimientos contados" teniendo stock
 
 Lo reportó Thomas con una foto: el **055** muestra 21 cajas en góndola y, al tocarlo, el detalle

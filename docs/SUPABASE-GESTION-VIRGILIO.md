@@ -25000,3 +25000,91 @@ llamada** no sirve — la excepción de la prueba aborta también el `CREATE`, y
 existir mientras el resultado parece decir que anduvo. Van en llamadas separadas.
 
 `sql/gv_np_mover_guard_v2001.sql`.
+
+## §3.kf — v20.04: los códigos con "L" no son artículos y salen del Generador de OC — 2026-09-18
+
+**Thomas, 18/09 (video del Generador de OC):** *"Todos los que tienen L no deben aparecer para
+OC. Son para Loeke y nada más"*.
+
+### El síntoma
+
+El Generador de OC listaba **53 filas fantasma** — `505L`, `513L`, `584EL`, `438EL`… — todas con
+**(sin proveedor)**, sin descripción, `proy = 0`, `cap = 0`, `stock = 0`, `maximo = 0` y un
+`total` igual a los pedidos. Cincuenta y tres renglones pidiéndole mercadería a nadie.
+
+### Qué es una "L", y por qué no es un artículo
+
+Regla del dueño **v13.71**: un artículo de Loekemeyer vendido por la página de **Chef** viaja con
+**"L" al final** (505 → 505L, 438E → 438EL). La L es una **marca de ruteo**: dice que la caja se
+pickea de la góndola de Loeke y que la factura sale por Chef. **El artículo es el mismo.** No hay
+un 505L que comprarle a un proveedor.
+
+Medido el 18/09, y es lo que lo cierra: **ninguna** tabla del lado físico conoce un código con L.
+
+| tabla | códigos terminados en L |
+|---|---|
+| `Articulos_Cajas` | 0 |
+| `GV_UxB` | 0 |
+| `OC_Maximos` | 0 |
+| `Capacidad_Sector` | 0 |
+| `Movimientos_Stock` | 0 |
+| `Equivalencias_Familia` | 0 |
+| `proyeccion_madre` | 126 — **la vista ya los pelaba** |
+| `gv_demanda_pedidos` | 54 — **la vista NO los pelaba** ← el agujero |
+
+### La causa: cuatro de las cinco patas pelaban la L
+
+`vista_generador_oc` arma su universo con cinco CTEs. `fam` y `proy_raw` pelaban `'L$'`;
+`stk_raw` y `cap` no lo necesitan (no existe stock ni góndola con L). **`dem_raw` era la única
+que keyeaba con el código crudo.** Así, la demanda de un pedido de Chef con artículo de Loeke se
+iba a un código propio que nunca iba a tener stock ni proveedor que lo cubriera — y, peor, **se
+la robaba al código base**, que es el que de verdad hay que comprar: la resta
+`total = maximo + pedidos − stock` quedaba corta en el código real.
+
+> Es el mismo tipo de error que la **v19.85**: un hecho que un lado de la resta cuenta y el otro
+> no. Las dos mitades eran defendibles leídas por separado.
+
+### El arreglo, una línea
+
+`dem_raw` pasa a keyear con **`gv_cod_stock(b.articulo)`** — la función canónica, que ya pela
+`([0-9E])L$` además de los ceros, el sufijo de empresa y el `·…`. **No se toca el `CASE` de
+`emp`**, que sigue leyendo el artículo **crudo** (`'[0-9E]L$'` → `'LK'`): así un `438EL` cae en
+la mitad **`438E LK`**, que es donde se pickea.
+
+⚠ **No es esconder las filas.** La demanda **se muda al código base**. Esconderlas habría borrado
+pedidos reales de la cuenta y se compraría de menos — justo al revés de la regla del 18/09
+(*"proyección es siempre rey… tenemos que tener la mercadería que hace falta"*).
+
+### Qué cambió, medido contra el snapshot previo
+
+| | |
+|---|---|
+| filas | 408 → **355** (−53) |
+| filas con código terminado en L | 53 → **0** |
+| filas nuevas | **0** |
+| códigos que suben el "a pedir" | **35** |
+| códigos que bajan | **0** |
+| total a pedir | 11.259 → **11.230** cajas |
+
+Las 81 cajas de las filas L se mudaron a su código base; 29 las absorbió el stock que ese código
+ya tenía, que es exactamente lo que tenía que pasar. Los que más suben: **505** Pelador Plástico
++4 (Garcia), **584E** Aceitera 400 Ml +4 (Garcia), **502** Abrelatas Mariposa +3 (Poly), **506**
+Abrelata Uña +3 (Oscar). Y **`439E LK` +1**, que prueba el camino del dual.
+
+`vista_faltante_catalogo`, que cuelga de esta vista, quedó en 511 filas y **0** con L.
+
+### Chequeos
+
+```sql
+select count(*) from public.vista_generador_oc where cod ~ 'L$';   -- 0
+select * from public.gv_reglas_perdidas;                           -- vacía
+select * from public.gv_endpoints_rotos;                           -- vacía
+```
+
+Backups: `zz_backups."GV_Backup_VistaGeneradorOC_20260918"` (la definición vieja completa) y
+`zz_backups."GV_Backup_VistaGeneradorOC_filas_20260918"` (las 408 filas de antes).
+
+⚠ **Y de paso, el repo volvió a tener la definición completa.** La **v19.85** se había aplicado
+como `replace()` sobre `pg_get_viewdef`, así que el último `CREATE` entero guardado era el de la
+v19.84 y ya no coincidía con lo que corría. `sql/gv_generador_oc_sin_codigos_L_v2004.sql` tiene
+la definición viva **verificada por md5 contra la base** (`4cc29b4f…`, 18.573 caracteres).
