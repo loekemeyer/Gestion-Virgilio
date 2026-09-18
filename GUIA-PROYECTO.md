@@ -1,4 +1,4 @@
-## Nota v20.06 (2026-09-18) — Los códigos con "L" NO son artículos: fuera del Generador de OC
+## Nota v20.08 (2026-09-18) — Los códigos con "L" NO son artículos: fuera del Generador de OC
 
 Thomas, mirando el Generador de OC: *"Todos los que tienen L no deben aparecer para OC. Son para
 Loeke y nada más"*. Eran **53 filas fantasma** — `505L`, `513L`, `584EL`, `438EL`… — todas con
@@ -30,10 +30,26 @@ las filas L se mudaron y 29 las absorbió el stock que el código base ya tenía
 505 +4, 584E +4, 502 +3, 506 +3; y `439E LK` +1, que prueba el camino del dual.
 
 **Chequeo:** `select count(*) from public.vista_generador_oc where cod ~ 'L$';` — **0**.
-§3.kg de `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/gv_generador_oc_sin_codigos_L_v2006.sql`, que
+§3.ki de `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/gv_generador_oc_sin_codigos_L_v2008.sql`, que
 además vuelve a dejar en el repo la **definición completa** de la vista (la v19.85 se había
 aplicado como `replace()` y el repo tenía la de la v19.84).
 
+## Nota v20.06 (2026-09-18) — El 055 se llamaba "Pinza De Ensalada", igual que el 054
+
+Cola de la v20.05. `Articulos Virgilio X Tallerista` tiene **dos filas por código** (una por
+tallerista) y las de Rafael están **cruzadas**: dice Fideos donde va Ensalada (054) y Ensalada
+donde va Fideos (055). La vista desempataba **alfabéticamente** — que no significa nada — y para el
+055 elegía justo la cruzada. Ahora desempata por **`id`**, la fila más vieja, que es la que coincide
+con `OC_Maximos`.
+
+Cambian 8 nombres de los 20 códigos que tienen más de una descripción: 4 mejoran claro (055 =
+Pinza De Fideos, 564 dejó de ser "C Pizza 8 LK", 609 "Pisa Papa" → "Pisa Papas Acero Inox", 558 sin
+el "(GRJ5)" pegado), 3 son la misma palabra con otra capitalización y 1 es indistinto.
+
+**El dato cruzado no se tocó**: corregir esas filas es decisión del dueño, y esa tabla la usa la
+recepción de talleristas. §3.kg de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+---
 ## Nota v20.05 (2026-09-18) — El 043 se llamaba "043": el guard que existía y no servía
 
 Thomas: *"la descripción del 043 y esos otros códigos no debería ser 043, algo se rompió ahí"*.

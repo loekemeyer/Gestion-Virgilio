@@ -25078,7 +25078,82 @@ una descripción basura, y corregir 18 filas a mano no evita la número 19.
 guards por la forma vieja. `stocks_carga_rapida` se realinea sola con el cron 57.
 
 **Centinelas nuevos** (`GV_Reglas_Centinela` 25 y 26): el guard normalizado y la rama `base_L`.
-## §3.kg — v20.06: los códigos con "L" no son artículos y salen del Generador de OC — 2026-09-18
+
+---
+
+## §3.kg — v20.06: el 055 se llamaba "Pinza De Ensalada", igual que el 054 — 2026-09-18
+
+Cola de la §3.kf: con el guard arreglado, el **055** pasó a mostrar *"Pinza De Ensalada Mgo Pla X
+12"* — el nombre del **054**. Dos códigos distintos con el mismo nombre en la pantalla es peor que
+un código sin nombre, así que se siguió tirando del hilo.
+
+**`Articulos Virgilio X Tallerista` tiene DOS filas por código** (una por tallerista), y las de
+Rafael están **cruzadas**:
+
+| cod | Log/ Fabr (id viejo) | Rafael (id nuevo) | `OC_Maximos` |
+|---|---|---|---|
+| 053 | Pinza De Fiambre Inox Cachas Plásticas 23cm | Pinza De Fiambre Mgo Plast X 12 | Pinza De Fiambre X 12 |
+| 054 | Pinza De Ensalada Inox Cachas Plásticas 23cm | Pinza De **Fideos** Mgo Plast X 12 | Pinza De Ensaladas X 12 |
+| 055 | Pinza De Fideos Inox Cachas Plásticas 25cm | Pinza De **Ensalada** Mgo Pla X 12 | Pinza De Fideos X 12 |
+
+La CTE desempataba con `order by k, descripcion` — **alfabético, que no significa nada** — y para el
+055 eso elegía justo la fila cruzada. Ahora desempata por **`id`**: la fila más vieja, que es la que
+coincide con `OC_Maximos`.
+
+**Medido**: 20 códigos tienen más de una descripción en esa tabla y **8 cambian de nombre**. Cuatro
+mejoran claro (055 → Fideos, 564 `"C Pizza 8 LK"` → nombre de verdad, 609 `"Pisa Papa"` → `"Pisa
+Papas Acero Inox"`, 558 sin el `"(GRJ5)"` pegado al nombre), tres son la misma palabra con otra
+capitalización y uno (GRJ10, arandela/resorte) es indistinto.
+
+⚠ Las otras dos fuentes (`proyeccion_madre`, `OC_Maximos`) tienen **0** códigos con más de una
+descripción, así que su `order by` no desempata nada: se dejaron como estaban.
+
+⚠ **No se tocó el dato**: las filas cruzadas de Rafael siguen en `Articulos Virgilio X Tallerista`.
+Corregirlas es decisión del dueño — y esa tabla la usa la recepción de talleristas, no sólo esto.
+
+Después de aplicar: 729 filas, 0 con descripción == código, 0 duplicados, `security_invoker` true,
+`gv_reglas_perdidas` y `gv_endpoints_rotos` en 0.
+`sql/gv_nombres_articulos_desempate_id_v2006.sql`. Rollback: `order by 1, 2` en `norm_vxt`.
+## §3.kh — v20.07: los `ref` con PIPE también viajan al renombrar (E03G y D71B) — 2026-09-18
+
+**El agujero.** El facturado no anota el movimiento con la tanda sola: lo anota **`TANDA|NP`**
+(`E03G|CH 0010`). El renombrador comparaba por igualdad exacta —`upper(btrim(ref)) = v_a`—, así que
+esas filas **nunca matcheaban** y se quedaban con el código viejo mientras el picking, el armado,
+las Entregas y la Facturación viajaban al nuevo. Estaba anotado desde el problema 421 (*"ni los
+`ref` con pipe"*) y nunca se había tapado.
+
+| tanda vieja | se quedó con | tanda nueva | quedó con | suma |
+|---|---|---|---|---|
+| E03G | facturado **−140** | E44A | +149 −9 = **+140** | **0** |
+| D71B | facturado **−72** | E40A | +78 −6 = **+72** | **0** |
+
+⚠ **Ninguna caja se pierde: la suma da cero.** El depósito estaba bien. Lo que mentía era la pila
+**por tanda**: E44A decía tener 140 cajas esperando facturarse que ya se habían facturado, y E03G
+—que hoy no tiene ni un pedido— mostraba −140. Con esas dos filas clavadas en rojo,
+`gv_stock_afacturar_tanda_negativa` dejaba de servir para el caso real, que es el mismo desgaste
+que se comió a otro centinela antes de la v19.77.
+
+**El arreglo, en el orden que pidió Thomas: primero la función, después los datos.**
+
+1. `gv_ppp_tanda_renombrar` ahora mueve también los `ref` que empiezan con `TANDA|`. Misma fusión
+   que el resto del bloque de stock —`facturado` está dentro de `mov_stock_pipeline_dedup`— y el
+   DELETE antes del UPDATE, porque el trigger del saldo no corre en DELETE.
+2. Con eso arreglado, **la corrección fue llamar a la función**, no SQL a mano: E03G y D71B ya no
+   tenían programación, Entregas ni Facturación, así que el renombre movió exactamente lo que
+   faltaba — los 20 movimientos del facturado, las **36 etiquetas de lío** de E03G y los **4
+   candados**, que también seguían colgados del código viejo.
+
+**Probado corriéndolo** (ZZ85Z → ZZ86Z, filas de descarte borradas después): el `ref` sin pipe
+sigue igual, `ZZ85Z|NPX` se renombró, y `ZZ85Z|NPY 3` + `ZZ86Z|NPY 7` **fusionaron en 10** sin
+violar el unique.
+
+**Después:** E44A y E40A con `a_facturar` en **0** · E03G y D71B sin un solo movimiento ·
+`gv_stock_afacturar_tanda_negativa` **vacía** (eran 50 filas) · picking duplicado, reglas perdidas,
+empresa fantasma, drenaje cruzado y góndola negativa en **0** · pickeado negativo sólo D53A (−2, de
+agosto, ajena) · candados huérfanos de 12 a 7.
+
+`sql/gv_tanda_renombrar_ref_pipe_v2007.sql`.
+## §3.ki — v20.08: los códigos con "L" no son artículos y salen del Generador de OC — 2026-09-18
 
 **Thomas, 18/09 (video del Generador de OC):** *"Todos los que tienen L no deben aparecer para
 OC. Son para Loeke y nada más"*.
@@ -25163,5 +25238,5 @@ Backups: `zz_backups."GV_Backup_VistaGeneradorOC_20260918"` (la definición viej
 
 ⚠ **Y de paso, el repo volvió a tener la definición completa.** La **v19.85** se había aplicado
 como `replace()` sobre `pg_get_viewdef`, así que el último `CREATE` entero guardado era el de la
-v19.84 y ya no coincidía con lo que corría. `sql/gv_generador_oc_sin_codigos_L_v2006.sql` tiene
+v19.84 y ya no coincidía con lo que corría. `sql/gv_generador_oc_sin_codigos_L_v2008.sql` tiene
 la definición viva **verificada por md5 contra la base** (`4cc29b4f…`, 18.573 caracteres).

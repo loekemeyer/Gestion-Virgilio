@@ -1,5 +1,5 @@
 -- ============================================================================
--- v20.06 — LOS CÓDIGOS CON "L" NO SON ARTÍCULOS: NO VAN AL GENERADOR DE OC
+-- v20.08 — LOS CÓDIGOS CON "L" NO SON ARTÍCULOS: NO VAN AL GENERADOR DE OC
 --
 -- Thomas, 2026-09-18 (video del Generador de OC): *"Todos los que tienen L no deben aparecer
 -- para OC. Son para Loeke y nada más"*.
@@ -444,7 +444,7 @@ alter view public.vista_generador_oc set (security_invoker = true);   -- NUNCA o
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
 values ('vista_generador_oc','vista','gv_cod_stock\(b\.articulo\)',
  'La demanda del generador de OC se keyea con gv_cod_stock, que pela la "L": un 505L no es un articulo, es un 505 de Loeke vendido por Chef. Ningun codigo con L puede aparecer en el Generador de OC.',
- 'Thomas','v20.06')
+ 'Thomas','v20.08')
 on conflict do nothing;
 
 -- CHEQUEOS
