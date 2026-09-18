@@ -25321,3 +25321,42 @@ select * from public.gv_endpoints_rotos;   -- vacía
 
 Backups: `zz_backups."GV_Backup_VistaGeneradorOC_proy_20260918"` (definición previa) y
 `zz_backups."GV_Backup_VistaGeneradorOC_filas_proy_20260918"` (las 355 filas de antes).
+
+## §3.ki — v20.11: se cierra a mano el picking de E37F, que quedó abierto dos días — 2026-09-18
+
+**Qué pasó** (historia completa en el chat de esta sesión): los 7 pedidos web de Zona 3 – CABA
+Oeste los pickeó **Jhonny Cartaya (277)** el **16/09 13:08–13:49** — 62 escaneos, **107 cajas**
+fuera de góndola — cuando la tanda se llamaba **`E12E`**. **Nunca tocó «Fin Picking»**, y como el
+evento `PUB` (dónde quedó lo pickeado) sale junto con el TP, **la ubicación no existe**: no se
+perdió, nunca se generó. El 18/09 10:48 los 7 pedidos se movieron al código nuevo **`E37F`**.
+
+⚠ **El `client_id` de los PKC guarda el nombre original** — `pkc_277_E12E_368E_2026-09-16` — y es
+una prueba independiente de cómo se llamaba la tanda al escanearla, porque ningún renombre lo
+toca. Sirve para reconstruir cualquier caso parecido.
+
+**Por qué había que cerrarlo:** con el picking abierto la tanda queda con candado para todos, y su
+dueño no puede empezar **ningún** otro picking (guard `otra_tanda_abierta`, ventana de 3 días).
+Cartaya lo tenía así desde el martes.
+
+**Decisión de Thomas (18/09):** *"cerrá vos ese picking. Ni idea dónde está ahora, ya aparecerá y
+lo ubicamos"*.
+
+**Lo que se escribió** — dos eventos y el candado, nada de stock (las 107 cajas ya estaban
+contabilizadas desde el martes y no se movió ninguna):
+
+| | |
+|---|---|
+| `TP` | `client_id = cierre_manual_e37f_20260918` |
+| `PUB` | descripción **"SIN REGISTRAR — el picking se cerró por sistemas y nadie anotó dónde quedó"** |
+| candado | `gv_tanda_completar('E37F','picking','277')` → `completada` |
+
+⚠ **El `ts_cliente` del TP es el del ÚLTIMO ESCANEO REAL (16/09 13:49:25), no el del cierre.** Con
+`ts_inicio` en el EP, el picking mide sus **41 minutos** verdaderos. Poniéndole `now()` habrían
+quedado **dos días** cargados a Cartaya en cualquier informe de tiempos — que es exactamente el
+daño del cierre manual de E09A (problema 348, v19.07).
+
+⚠ Y el `PUB` **no inventa una ubicación**: dice que no se registró. Un dato en blanco se nota; un
+dato inventado, no.
+
+**Verificado:** el TP mide 41 min · el candado quedó `completada` · **Cartaya sin ningún picking
+bloqueado** · la tanda vuelve a aparecer como pickeada y lista para armar.
