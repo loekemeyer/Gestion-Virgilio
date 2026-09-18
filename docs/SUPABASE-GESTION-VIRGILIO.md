@@ -24351,3 +24351,36 @@ Estado verificado: **E12M 40 cajas / 11 PKC, E12I 38 / 37, 0 `PKCX`**. `sql/gv_p
 ⚠ **Lo que sí sigue en pie es el fix**: `gv_evento_tanda_campo` declara PKC/PSP/FGU/SSG/RAG, o sea
 que los eventos del picking viajan con el renombre. Eso se probó corriendo el cron 68 de verdad
 (fusión 78 → 78, renombre 100 → 100) y es lo que impide que el problema se repita.
+
+---
+
+## §3.jt — v19.90: Clientes nuevos también lleva 📖 Comentarios — 2026-09-18
+
+**Thomas, 2026-09-18:** *"agregale la funcionalidad de comentarios a clientes nuevos de la misma
+forma que a los que tienen cuarentena"*.
+
+El submódulo 🚧 Cuarentena tenía la columna **Coment.** desde la v18.01 y 🆕 Clientes nuevos no,
+aunque los dos son el mismo tipo de pedido retenido y el que atiende a un cliente nuevo por
+WhatsApp (Speech 1/2) es justamente el que tiene algo que anotar ("no contesta", "dijo que
+transfiere mañana").
+
+**Cambio (SÓLO front, `index.html`):** ninguna tabla, ninguna RPC nueva.
+
+- `clinNuevosHtml()` suma la columna `<th class="cuar-td-com">Coment.</th>` y, en cada fila,
+  `cuarComBtnHtml(p)` — el **mismo** botón 📖 de Cuarentena. El `colspan` de la fila de detalle
+  pasó de 9 a 10.
+- Es el mismo log de punta a punta: `GV_Cuarentena_Comentarios`, la misma clave
+  (`empresa` + `order_id` normalizado con `gv_cuarentena_clave`), el mismo pop-up
+  (`cuarComAbrirPed` → `cuarComAbrir` modo `log`) y la misma identidad obligatoria
+  (Vivi / Marian / Otro). Un comentario dejado acá se lee después desde 🚧 Config. Cuarentena.
+
+⚠ **El bug que venía de arriba y se arregló de paso:** el contador de cada 📖 lo pedía
+`aprColCuarentena()` con un `if` sobre **su** lista. Si el único retenido del día era un cliente
+nuevo, esa lista quedaba vacía, `cuarComLoteCargar()` no se llamaba nunca y `_apr.cuarComN` se
+quedaba en `null` — o sea que todos los 📖 se dibujaban en *"Buscando comentarios…"* para
+siempre. Ahora el disparador es **`cuarComNeed()`**, uno solo, que mira **todos** los pedidos con
+`aprEnCuarentena(p)` y lo llaman los dos submódulos.
+
+**Prueba:** `node tests/apr-cuarentena.cjs` — tres asserts nuevos (la columna existe, la fila abre
+`cuarComAbrirPed('chef','200')`, y la tabla tiene tantos `<td>` como `<th>`, que es lo que caza un
+desalineo de columnas).

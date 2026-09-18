@@ -34,7 +34,11 @@ La marca `cliente_nuevo` es la de la v17.12 (`GV_Clientes_Nuevos`, la calcula LK
   (`aprColPedidos()+aprColCuarentena()+clinNuevosHtml()`). Colapsable (`aprCliColapsar`,
   `vir_cli_colapsado`). Las dos arrancan **expandidas** por defecto.
 - Columnas: Pedido · Fecha · m³ · Cliente · Zona · **1er contacto** · **Contacto (Speech 1/2)** ·
-  **Monto** · **Acción**.
+  **Monto** · **Acción** · **Coment.** (v19.90). El 📖 es el MISMO log que Cuarentena
+  (`cuarComBtnHtml` / `cuarComAbrirPed` → `GV_Cuarentena_Comentarios`, clave empresa + order_id),
+  así lo que se escribe acá se lee después desde el log de 🚧 Config. Cuarentena. El contador de
+  cada 📖 lo pide `cuarComNeed()`, que ahora sirve a los dos submódulos (antes colgaba de la
+  lista de Cuarentena: si el único retenido era un cliente nuevo, no se pedía nunca).
 - `clinSpeech1` / `clinSpeech2`, `clinContactoBtns`, `clinAccionBtns`,
   `clinTiempoHtml` / `clinFmtElapsed` / `clinTickStart` (timer, refresco 60 s),
   `clinSpeechMsg1` / `clinSpeechMsg2` (mensajes WhatsApp), `clinAbrirWa` (usa `_avpWa`).

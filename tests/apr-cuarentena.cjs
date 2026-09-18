@@ -132,6 +132,7 @@ catch (_e) {
     // submódulo "Clientes nuevos"; uno que además tiene deuda (u otro motivo) sigue en Cuarentena.
     try { localStorage.removeItem("vir_cuar_colapsado"); localStorage.removeItem("vir_cli_colapsado"); } catch (_e) {}
     _apr.cuarContacto = {}; _apr.cliValor = {}; _apr.cliDemo = false;   // evitan los fetch (ruta REST abortada)
+    _apr.cuarComN = {};   // v19.90: el contador del 📖, servido (si no, sale a buscarlo por red)
     _apr.pedidos = [
       mk({ order_id: 200, empresa: "chef", cod: "2533", razon_social: "Cliente Nuevo SA",
            cuarentena_motivos: ["cliente_nuevo"], cuarentena_detalle: { nuevo_pedidos: 1 } }),
@@ -156,6 +157,11 @@ catch (_e) {
     out.cliCols = /1er contacto/.test(cliSec) && /Acci[oó]n/.test(cliSec);
     out.cliSpeech = /Speech 1/.test(cliSec) && /Speech 2/.test(cliSec);
     out.cliAccion = /Aprobar pedido/.test(cliSec) && /Eliminar pedido/.test(cliSec);
+    // (3b-2b) v19.90 (Thomas) — el MISMO 📖 de comentarios que Cuarentena, con su columna.
+    out.cliComCol = /<th class="cuar-td-com">Coment\.<\/th>/.test(cliSec);
+    out.cliComBtn = /cuarComAbrirPed\('chef','200'\)/.test(cliSec);
+    out.cliComCols = (cliSec.match(/<th[ >]/g) || []).length ===
+                     ((cliSec.match(/<tr class="cuar-tr[^"]*">([\s\S]*?)<\/tr>/) || ["", ""])[1].match(/<td[ >]/g) || []).length;
     // (3b-3) v19.37 (Luis) — NO hay seña del 30%: el Speech 1 pide el TOTAL con IVA, por
     // adelantado, y la columna Monto muestra ese mismo número debajo del neto.
     _apr.cliValor = { "chef:200": { valor: 100000, valorIva: 121000 } };
@@ -635,6 +641,9 @@ catch (_e) {
   chk(r.cliNuevosSinMixto, "el pedido mixto (deuda+nuevo) NO aparece en Clientes nuevos");
   chk(r.cliCols, "Clientes nuevos tiene columnas '1er contacto' y 'Acción'");
   chk(r.cliSpeech, "Contacto tiene los botones 'Speech 1' y 'Speech 2'");
+  chk(r.cliComCol, "Clientes nuevos tiene la columna 'Coment.'");
+  chk(r.cliComBtn, "cada fila abre el MISMO log de comentarios (cuarComAbrirPed)");
+  chk(r.cliComCols, "la tabla de Clientes nuevos tiene tantos <td> como <th>");
   chk(r.cliAccion, "Acción tiene 'Aprobar pedido' y 'Eliminar pedido'");
   chk(r.cliMontoIva, "Monto muestra el total con IVA debajo del neto (c/IVA $121.000)");
   chk(r.cliMsgTotal, "Speech 1 manda el TOTAL con IVA del pedido");
