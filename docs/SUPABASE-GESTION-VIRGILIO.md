@@ -25537,3 +25537,57 @@ tandas ya armadas:
 de agosto) y está facturado, así que el guard 1 lo deja afuera y queda al centinela.
 
 `sql/gv_etapa2_idempotente_v2018.sql`.
+
+
+## §3.kn — v20.22: que el renombre de tanda deje de romper — 2026-09-18
+
+Pedido de Thomas después de E12K: *"fijate que renombre deje de romper"*. Se barrieron **todos**
+los eventos de los últimos 90 días contra el regex de tanda (`^[A-Z][0-9]{2}[A-Z]$`, 4 caracteres)
+comparando campo por campo con lo que `gv_evento_tanda_campo` mapea. **Cinco agujeros**, ninguno
+visible leyendo el código:
+
+| evento | dónde va la tanda | qué pasaba |
+|---|---|---|
+| `CP` (forma de 3 campos) | campo 3 — `CH 0010\|920\|E44A` | no se renombraba |
+| `PKA` | campo 1 — `E51A\|360E\|0` | no se renombraba |
+| `PGE` | campo 2 — `505\|D11F`, 20 eventos | no se renombraba |
+| `FAL` **forma corta** | campo 3 — `LK 0035\|958E\|E29D` | mapeado al 5, que no existe → null |
+| `NPD` **forma corta** | campo 3 — igual | mapeado al 7, que no existe → null |
+
+⚠ **La lección: el mapeo por índice fijo no alcanza, porque varias opciones tienen DOS FORMATOS
+bajo el mismo código.** En la forma corta el índice largo no existe, `gv_evento_set_tanda` devolvía
+null y el evento se quedaba con el código viejo **en silencio**.
+
+**La solución** es `gv_evento_tanda_idx(opcion, texto)`, que resuelve el índice **real de ese
+texto**. Fallback **conservador** a propósito: si el campo mapeado existe se usa ése, así que no
+cambia nada de lo que hoy anda; sólo cuando el texto es más corto busca el **único** campo con
+forma de tanda, y si hay más de uno devuelve null — mejor no renombrar que renombrar mal.
+
+⚠ **`CP` no necesita distinguir sus dos formas.** La de 5 campos tiene una **cantidad** en el campo
+3, y el renombrador matchea por **valor**: una cantidad nunca tiene forma de tanda. Medido: 0 de
+224 eventos de 5 campos. Probado además con un `CP` de 5 campos de descarte: intacto.
+
+⚠ **Y EL CANDADO VIEJO.** `Tandas_Lock` —la que usan `tanda_reservar` y `tanda_liberar`, con
+movimientos del 15/09— no la tocaba el renombrador. **Un candado que se queda con el código viejo
+deja la tanda impickeable para siempre**: es lo que le pasó a LK 0043 con E12L. Mismo PK
+`(tanda, fase)` que `GV_Tandas_Lock`, mismo tratamiento: primero el DELETE del origen que choca,
+después el UPDATE.
+
+**El centinela, para no volver a barrer a mano:**
+
+```sql
+select * from public.gv_renombre_eventos_sin_mapear;   -- vacía = todo bien
+```
+
+Vale la pena decir esto: **el centinela encontró `PGE` y las formas cortas de `FAL`/`NPD` DESPUÉS
+de que el barrido a mano diera el tema por cerrado con `CP` y `PKA`**. Un barrido manual cierra
+cuando uno se cansa; el centinela, cuando no queda nada.
+
+**Probado punta a punta** (transacción abortada) con una tanda de descarte y los 10 formatos de
+evento: los 10 viajaron, los **dos** candados se movieron, no quedó nada en el código viejo y el
+`CP` de 5 campos quedó intacto.
+
+⚠ **Al probar esto, la tanda de descarte tiene que tener forma de tanda REAL (4 caracteres).** Con
+`ZZ90Z` (5) el regex no la reconoce y la prueba miente — pasó, y dio un falso negativo.
+
+`sql/gv_renombre_eventos_todos_v2022.sql`.
