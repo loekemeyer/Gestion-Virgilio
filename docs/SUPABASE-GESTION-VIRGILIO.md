@@ -24930,6 +24930,18 @@ Backups: `zz_backups."GV_Backup_E12K_Movs_20260918"` (384), `…_Eventos_2026091
 agosto, ajena) · picking duplicado, reglas perdidas y empresa fantasma en cero · ningún código con
 góndola negativa · el candado huérfano de E12L desapareció.
 
+**El centinela que se usó para verificar es nuevo y su `CREATE` vive en
+`sql/gv_stock_tanda_pickeado_negativo_v2013.sql`** (antes estaba sólo aplicado en la base, que es
+justo lo que el `CLAUDE.md` prohíbe). Mira **por tanda**, no por código, porque
+`gv_stock_negativos` agrega por código y el saldo de otra tanda tapa el agujero: el hueco de E12K
+eran 34 códigos / 46 cajas y en pantalla se veían 7, e iban apareciendo de a uno a medida que se
+armaban las tandas que hacían de colchón. Distingue *"armada sin picking propio"* (pickeado 0 y
+el armado igual drenó — la firma del renombre) de *"drenaje mayor que el picking"*.
+
+⚠ **Dos snapshots mal nombrados:** `zz_backups."GV_Backup_E12K_Recon_20260918"` y
+`…_ReconEv_20260918` se tomaron **después** del arreglo, así que NO sirven de rollback; quedan con
+`comment on table` que lo aclara. El estado previo es el de `…_Movs_/_Eventos_/_Lock_20260918`.
+
 ### 2. Las cuatro tablas que el renombrador no tocaba
 
 Se agregan a `gv_ppp_tanda_renombrar`: `Etiquetas_Lio` (las etiquetas de lío se **imprimen** con el
@@ -25407,3 +25419,69 @@ dato inventado, no.
 
 **Verificado:** el TP mide 41 min · el candado quedó `completada` · **Cartaya sin ningún picking
 bloqueado** · la tanda vuelve a aparecer como pickeada y lista para armar.
+
+## §3.kl — v20.14: el pedido web LK 1228 (Alesso, TdF) pasa a ser un pedido de CHEF, con su tanda ya armada — 2026-09-18
+
+**Thomas, 18/09:** *"Debería ser un pedido de Chef (códigos L, esa lógica ya que es para el sur)
+pero se cargó erróneamente … es cambiarle la identidad al pedido ese que ya está armado."*
+
+### Qué había pasado
+
+El pedido de la página **LK 1228** (20/08, Alesso Vilarino Liliana, sucursal *Kami 178 - Río
+Grande*) **nunca entró por el circuito web**: alguien lo tipeó a mano en ISIS como **LK 98480 /
+98481**. No fue un bug del pipeline — la regla TdF→Chef (§3.fr, v17.80) tiene piso
+`tdf_como_chef_desde = 2026-09-14` y ese piso dejó afuera al 1228 a propósito.
+
+El cliente es de Chef y sólo de Chef: **0 facturas en `isis_lk`**, **12 en `isis_ch`** (última
+2023-04-10), CUIT 27185876115 en las dos puntas. `GV_Cliente_Isis` ya lo mapeaba `(lk,1941) →
+(chef,2600)`.
+
+### Lo que se hizo (todo reversible, backup en `zz_backups."GV_Backup_1228_Alesso_a_Chef_20260918"`, 48 filas)
+
+| paso | detalle |
+|---|---|
+| NP | `gv_ppp_web_np_asignar('chef', order_id **1001228**)` → **CH 0030 / CH 0031 / CH 0032** |
+| partición | **rehecha con el tope de Chef**: `v_pedidos_web_np.cap_lineas` = 18 lk / **15 chef** → 35 líneas = 15 + 15 + 5 (la de ISIS era 18 + 17) |
+| `PPP_Web_Base` | 35 filas **con L** (`026L`, `580EL`…) |
+| `PPP_Web_Programacion` | 3 filas, cod **2600**, `Exp. Oro Negro — PEGAMINO 3751, Soldati (Kami 178- Rio Grande)`, Zona 1 - CABA Sur, **tanda `D47B`**, entrega **22/09** |
+| NP viejas | `GV_PPP_Prog_Override.oculto = true` en 98480 / 98481 (no se borra nada de la tabla compartida) |
+| facturado | se borraron las 2 filas de `Facturacion_NP` y el movimiento `facturado` de **438E** (ref `D47B`, −1): la caja **vuelve a `a_facturar`** (2 → 3) |
+| armado | `Entregas_Virgilio`: 35 filas reetiquetadas a CH 0030/31/32, cod 2600, `cod_art` **crudo con L**; eventos `TAL` y `AUB` reemitidos por NP **con su `ts_cliente` original** (27/08 13:47 y 13:49) |
+| líos | los 10 líos originales (6 + 4) se repartieron **proporcionalmente**: 5 / 4 / 1. Dos líos quedaban partidos entre bloques (`D=355,544×2` y `F=511,513,536E,540E`) |
+
+### ⚠ Por qué la tanda NO se renombró
+
+`gv_ppp_web_estado` saca `pickeado`/`armado` de los eventos **de la TANDA** (`EP/TP/AP/TAP`), no de
+la NP. Dejando `D47B` las tres NP nuevas nacen en estado **armado** sin tocar un solo evento de
+picking ni un movimiento de stock. Renombrar habría entrado justo por donde ya se rompió cuatro
+veces (problemas 407, 417, 420, 421: el renombre no toca los `PKC` ni los `ref` con pipe).
+
+### ⚠ El armador no la puede re-armar
+
+`gv_pedidos_web_excluidos` devuelve **`anterior_al_cambio`** para los dos `order_id` (1228 y
+1001228): `fecha_recep` 20/08 < `gestion_desde` 03/09. Y el feed de Chef tiene además el piso
+`tdf_como_chef_desde` del 14/09.
+
+### Centinelas después del cambio
+
+`gv_ppp_tanda_camion_mezclado`, `gv_ppp_super_mezclado`, `gv_reglas_perdidas`,
+`gv_endpoints_rotos`, `gv_stock_empresa_fantasma`, `gv_stock_picking_duplicado` → **0**.
+`gv_ppp_tanda_dos_dias` y `gv_armado_sin_entregas` marcan **2 cada una, las dos de `D69H`**, que es
+anterior y ajena a este cambio.
+
+### ⚠ El 580 / 580E, y la regla que lo resolvió
+
+El pedido de la página pide **580E ×2**; en ISIS lo tipearon **580** y **eso es lo que se pickeó y
+se armó** (evento `PKC` `D47B|580|2|2`, lío `J` del `TAL`). Son dos artículos distintos.
+
+**Thomas, el mismo día:** *"LA NP TIENE QUE DECIR LO MISMO QUE DECÍA ANTES"* → la NP queda con
+**`580L`**. Cambiar de identidad NO es cambiar el contenido: lo que la NP pedía y lo que hay en el
+lío tienen que seguir coincidiendo, así que no hay faltante ni cajas que cambiar.
+
+⚠ Cuidado con cómo se pregunta esto: cuando se preguntó *"¿580EL o 580L?"* la respuesta fue *"tal y
+como la puso. 580EL (L por la zona…)"* — estaba contestando por **la L**, no por **la E**. La
+pregunta mezclaba dos decisiones en un solo token y se leyó al revés. **Una pregunta, una decisión.**
+
+**Rollback:** las 48 filas del backup alcanzan para volver todo; además hay que borrar las 3 filas
+de `PPP_Web_NP` / `PPP_Web_Programacion` / las 35 de `PPP_Web_Base` del `order_id` 1001228 y los 6
+eventos `TAL`/`AUB` con `client_id like 'tdf1228_%'`.
