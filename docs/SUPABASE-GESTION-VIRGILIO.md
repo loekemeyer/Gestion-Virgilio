@@ -24685,3 +24685,73 @@ con ningún `EP/AP` de su tanda. Vacía = todo bien. Al 18/09 quedan **12 filas*
 recicle. La regla quedó además en `GV_Reglas_Centinela` (`gv_ppp_tanda_renombrar` ~ `GV_Tandas_Lock`).
 
 `sql/gv_tanda_lock_renombrar_v1996.sql`.
+
+## §3.ka — v19.97: el armado escrito con DOS tandas distintas — la red de seguridad quedó cosida al lado — 2026-09-18
+
+Al cerrar un armado, el asistente escribe el pedido **dos veces a propósito**: las filas de
+`Entregas_Virgilio` y, aparte, un evento **`ENT`** por NP (v17.85). El evento es la red: el 14/09 el
+POST a `Entregas_Virgilio` murió con un 42501 y el armado se salvó porque el evento igual llegó
+(`gv_entregas_reconstruir` rehace la tabla desde ahí). Las dos puntas llevan la tanda adentro y
+**tienen que decir lo mismo**.
+
+**38 eventos de 7 NP decían otra cosa**, y el desfasaje calca el mapa de la migración de la v19.91:
+
+| NP | `Entregas_Virgilio` | evento | paso del mapa |
+|---|---|---|---|
+| 98605 · 98606 · 98607 | E12E | E37F | `E12E → E37F` |
+| 98618 | E12J | E12G | `E12J → E12G` |
+| LK 0004 · 0005 · 0006 | E12K | E12J | `E12K → E12J` |
+
+**Causa.** Esa migración reconoce en su commit que *"el primer intento movió también TAL, ENT y
+compañía… se devolvieron desde el backup"*. **La devolución quedó incompleta.** Lo prueba el
+backup: `GV_Backup_Eventos_Cadena_E12_20260918` tiene 216 PKC, 7 EP, 6 AP, 6 PUB… y **cero ENT y
+cero TAL**, o sea que la restauración salió de otra copia y estos 38 quedaron afuera.
+
+**Y la app no lo pudo hacer:** `compTerminar` arma la fila y el evento desde **la misma variable**
+(`index.html`, `tanda: tanda` en las filas y `_compSendEntregasEvento(legajo, tanda, rows)`). No hay
+camino en el celular que los haga salir distintos — si difieren, los movió algo de afuera.
+
+**Qué rompía:** nada a la vista. La factura, el PDF de Facturado, los entregados y la composición a
+líos leen la **tabla**, y la tabla decía bien. Lo que se había perdido es la **red**: una
+reconstrucción desde los eventos habría puesto esas 7 NP en la tanda equivocada.
+
+**El arreglo — UN SOLO UPDATE, keyeado por la NP.** ⚠ `E12J` es **origen y destino a la vez**
+(`E12G → E12J` y `E12J → E12K`): con updates encadenados, el segundo se lleva puesto lo que acaba
+de llegar del primero. Manejado como en la v19.91: una sola sentencia, cada fila evaluada contra su
+valor VIEJO, y el destino no sale de un mapa sino de **la tanda que dice `Entregas_Virgilio` para
+esa NP** (la fuente que nadie tocó).
+
+```sql
+update public."Registros_Produccion_Virgilio" r
+   set texto = public.gv_evento_set_tanda(r.opcion, r.texto, b.tanda_correcta)
+  from zz_backups."GV_Backup_Eventos_Tanda_Desfasada_20260918" b
+ where r.id = b.id
+   and public.gv_evento_tanda(r.opcion, r.texto) is distinct from b.tanda_correcta;
+```
+
+Backup: `zz_backups."GV_Backup_Eventos_Tanda_Desfasada_20260918"` (38 filas, con RLS y el `id` de
+cada evento, así que el restore es fila por fila). Alcanzó a `ENT`, `TAL`, `FAL` y `NPD` — los
+cuatro eventos que llevan la NP en el campo 1 y la tanda más adelante (campos 2, 3, 5 y 7).
+
+**Verificación:** el desfasaje quedó en **0**, y las 38 filas quedaron 10 en E12E, 2 en E12J y 26 en
+E12K — o sea que el encadenamiento no pasó (98618 siguió en E12J, no se fue a E12K).
+
+**Chequeo, para repetirlo:**
+
+```sql
+with correcta as (
+  select btrim(np) np, min(tanda) tanda from public."Entregas_Virgilio" group by btrim(np)
+   having count(distinct upper(btrim(tanda))) = 1)
+select count(*) from public."Registros_Produccion_Virgilio" r
+  join correcta c on btrim(split_part(r.texto,'|',1)) = c.np
+ where r.opcion in ('ENT','TAL','FAL','NPD')
+   and public.gv_evento_tanda(r.opcion, r.texto) is distinct from upper(btrim(c.tanda));
+-- 0 = todo bien
+```
+
+⚠ **Lo que apareció al mirar los centinelas y NO es esto:**
+`gv_stock_afacturar_tanda_negativa` tiene **50 filas en clase `tanda`** — `E03G` (30 códigos,
+−140) y `D71B` (20, −72), con último movimiento del **17/09 14:56** y **16/09 10:31**. Son
+anteriores a este cambio y no tienen ninguna NP en común con él: son las dos tandas que
+`gv_stock_picking_duplicado` ya había marcado por el renombre (E03G/E44A y D71B/E40A). Toca
+`a_facturar`, así que queda para una decisión aparte.
