@@ -731,6 +731,42 @@ de tocar tandas a mano. Desde v18.87 dice además si el camión se armó **AUTOM
 ISIS** (`camion_armado`, `origen`, `origen_detalle`) y deja afuera las tandas de
 `GV_Vehiculo_Propio` (la kangoo no es el camión). `sql/gv_ppp_super_mezclado_v1887.sql`, §3.ic.
 
+## ⚠ QUIÉN ORGANIZA LA PROGRAMACIÓN: el automático arma, **MARIANELA** organiza
+
+**Definido por Luis, 2026-09-17.** Hasta ese día no estaba escrito en ningún lado, y por eso una
+tanda mal armada podía quedar semanas a la vista sin que fuera de nadie (pasó con D69F).
+
+**Medido sobre los últimos 30 días**, que es lo que hizo falta para definirlo:
+
+| quién deja programada una NP web | NP | de ésas, retocadas |
+|---|---|---|
+| **`sistema`** (crons 71 y 73) | **148** | 91 |
+| `loekemeyer.n8n@gmail.com` (el panel) | 21 | 19 |
+
+O sea: **el automático organiza el 88 %**. Lo que se toca a mano se toca desde una **cuenta
+compartida**, así que la base guarda la cuenta y no la persona. Luis decidió **dejarlo así** (no se
+agrega firma por legajo): la responsabilidad se define acá, no se deduce del dato.
+
+**Marianela Becker** (Planify **38**) es la responsable de lo que el automático NO resuelve:
+
+- **A Programar**: Retira sin día elegido, súper, pedidos sin zona y los que no tienen camión previsto.
+- **Los choques de regla**, que el sistema a propósito **no** resuelve solo y deja a la vista:
+  un cliente que hay que juntar en un día pero ese día no tiene camión de su etiqueta
+  (`gv_ppp_cliente_dos_dias`), y una tanda repartida en dos camiones (`gv_ppp_tanda_camion_mezclado`).
+- **Mirar esos dos centinelas**, que es justamente lo que no pasaba: D69F estaba ahí desde el 16/09
+  y se encontró recién el 17/09 barriendo a mano.
+
+```sql
+select * from public.gv_ppp_tanda_camion_mezclado;   -- vacía = todo bien
+select * from public.gv_ppp_cliente_dos_dias;        -- vacía = todo bien
+select * from public.gv_ppp_super_mezclado;          -- vacía = todo bien
+select * from public.gv_ppp_tanda_dos_dias;          -- vacía = todo bien
+```
+
+⚠ **Que una tanda salga marcada NO la arregla sola, y Claude no la toca por su cuenta**: mover una
+NP de tanda es decisión de armado. Se reporta; lo decide Marianela. Con D69F, Luis lo dijo
+explícito el 17/09: *"no toques D69F"* — la tanda sale así el lunes 21/09.
+
 ## ⚠ Regla de Luis (2026-09-16, v18.87): la tanda de un cliente se parte por CAMIÓN
 
 *"Claro que se parte en zonas distintas (si un mismo cliente pide para una sucursal que tiene en
