@@ -23881,3 +23881,79 @@ el 30/07 — pero `Racks_Planimetria` **no tiene ninguna fila del 505**, y el li
 `racks = 0`. Esa tabla está congelada desde el **10/08**: esas 729 cajas ya se bajaron y la vieja
 nunca se actualizó. Leerla hoy para saber dónde está el 505 da una respuesta que suena bien y
 está mal.
+## §3.jn — v19.80: el pedido de CLIENTE NUEVO salía sin cliente, sin zona y sin expreso (problema 425) — 2026-09-18
+
+**Thomas, justo después de la v19.78:** *"¿pero el pedido de esos clientes sin ficha en customers
+no entró desde la página?"* y, cuando le contesté que sí: ***"y si vinieron de la página tenemos
+los datos del cliente, ¿no?"***
+
+Las dos veces tenía razón, y la segunda es la que arregla esto. Lo que yo había cerrado como
+*"cliente nuevo sin ficha, no se puede hacer nada desde el feed"* **sí se podía**: el dato estaba
+cargado, en otra tabla.
+
+### Lo que se midió
+
+- Los 6 pedidos **entraron por la página**: `orders.auth_user_id` cargado, login por CUIT
+  (`<cuit>@cuit.loekemeyer`). **Cinco los hizo el usuario de Loekemeyer SRL (cod 1)** — o sea un
+  vendedor cargando por el cliente— con un `cod_cliente` distinto en cada pedido.
+- Ese código no está en `customers` ni en `orders.customer_id`, así que el feed no tenía contra
+  qué cruzar.
+- **Pero el alta de cliente nuevo lo guarda en `expo_clientes_pendientes`** (14 filas): razón
+  social, CUIT, localidad, provincia y un `direcciones_entrega` jsonb cuyo **`titulo` es
+  exactamente el `sucursal_entrega` que viaja en el pedido**, y que además trae el **expreso por
+  sucursal** (CONSACO VIARA → `logistica md`).
+- Sólo **3 de esas 14** llegaron a `customers`. Y **`estado = 'cargado_erp'` no garantiza nada**:
+  4284, 4290 y 4301 están en `cargado_erp` y **no** están en `customers`.
+
+### El cambio
+
+`expo_clientes_pendientes` pasa a ser la **tercera fuente del cliente**, detrás de las dos que ya
+estaban (`cod_cliente` → `customers`, y desde la v19.78 `orders.customer_id`). Sólo entra cuando
+las dos fallan, así que la ficha real siempre gana. La sucursal se cruza **adentro del jsonb** con
+la misma escalera de la v19.78, sobre `titulo` (y `localidad` en el nivel 3).
+
+⚠ **De esa fuente NO se toma dirección de expreso.** El `direccion` del jsonb es el domicilio
+**del cliente**, no el del expreso. Tomarlo como `direccion_expreso` mandaría el camión a
+Aguilares (Tucumán) en vez de al depósito del expreso en Capital — el mismo error que la v19.78
+vino a arreglar del otro lado. Se toman localidad, provincia y el **nombre** del expreso.
+
+### Medición (1.072 pedidos)
+
+| | |
+|---|---|
+| pedidos de cliente nuevo que recuperan cliente / localidad / provincia | **4 de 6** |
+| pedidos que recuperan localidad (v19.78 + v19.80) | **+19** |
+| pedidos que recuperan razón social | **+6** |
+| **regresiones** (zona, localidad, razón social) | **0** |
+| filas de `v_pedidos_web` / `_np` / `_dif` | 17.782 / 1.570 / 17.782 (iguales) |
+| `gv_pedidos_web_np_lk(30 días)` | 1,04 s → 1,40 s |
+
+### Los 2 que no se pudieron, y por qué no se adivinan
+
+- **4317** (15/09, *"Arribeños 2979 - Nuñez"*): no tiene fila en `expo_clientes_pendientes`. La
+  última fila de esa tabla es del **22/08**, así que esa alta no pasó por ahí.
+- **4299** (20/08, *"Montevideo 2123 - Berizo"*): el alta figura con el código **4298**
+  (Alejandro Javier De La Casa), **con esa misma dirección**. El pedido dice 4299. Uno de los dos
+  números está mal y lo decide una persona.
+
+### Lo que ahora se ve y antes estaba tapado
+
+```sql
+select order_id, cod_cliente, localidad, provincia from public.v_pedidos_web
+ where provincia is not null and lower(btrim(provincia)) not in ('buenos aires','caba')
+   and direccion_expreso is null;
+```
+
+Da **1**: el pedido 1233 de Jesús Salvador Rojas (4292), **Aguilares, Tucumán**. Ahora se sabe que
+es del interior y que **nadie le cargó expreso en el alta** — antes ni siquiera se sabía la
+provincia. Eso lo decide una persona, no el feed.
+
+### Centinela
+
+```sql
+select motivo, count(*) from public.gv_web_sucursal_sin_match group by 1;   -- en LK
+```
+
+Al 18/09: **11** (eran 15). 9 de nombre que no coincide —la última del 07/08— y los 2 de arriba.
+
+`sql/gv_web_cliente_nuevo_expo_v1980.sql`.
