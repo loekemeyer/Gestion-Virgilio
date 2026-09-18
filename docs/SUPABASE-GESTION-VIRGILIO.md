@@ -25485,3 +25485,53 @@ pregunta mezclaba dos decisiones en un solo token y se leyó al revés. **Una pr
 **Rollback:** las 48 filas del backup alcanzan para volver todo; además hay que borrar las 3 filas
 de `PPP_Web_NP` / `PPP_Web_Programacion` / las 35 de `PPP_Web_Base` del `order_id` 1001228 y los 6
 eventos `TAL`/`AUB` con `client_id like 'tdf1228_%'`.
+
+
+## §3.km — v20.18: la etapa2 se corrige sola (era insert-only) — 2026-09-18
+
+**El agujero.** `reconciliar_pipeline_stock_etapa2` era **insert-only**: escribía el `separado` de
+una (tanda, artículo) **una vez**, con guard `not exists`, y no lo revisaba nunca más. Si el
+picking de esa tanda cambiaba **después** del armado, el drenaje quedaba con el número viejo y
+**ningún centinela lo avisaba**. La etapa1 siempre fue idempotente (`on conflict do update set
+delta`); **esa asimetría entre las dos etapas era el agujero**, y es lo que hay que recordar.
+
+Caso testigo: **E12K** (§3.kd). La tanda se llamó E12L cuando se pickeó, E12J cuando se armó y
+E12K ahora. Los eventos de tanda pelada viajaron con cada renombre; los `PKC`, que la llevan en el
+campo 1, no. Quedó con picking **0** contra separado **−46** — 34 códigos, 46 cajas.
+
+**El bloque A no se tocó.** Lo nuevo es el bloque B, con tres guards:
+
+1. **La tanda no puede tener `facturado`.** Mover el `separado` mueve `a_facturar`, o sea camino de
+   facturación: contra una factura ya emitida no se escribe. Esas quedan a la vista en
+   `gv_stock_tanda_pickeado_negativo`.
+2. **Una sola grafía del artículo y a lo sumo una fila por depósito.** Con varias hace falta la
+   ventana `cum` del bloque A, y repetirla a mano es pedir un bug silencioso.
+3. Sólo (tanda, artículo) que **ya** tienen `separado`; el resto es del bloque A.
+
+⚠ **Es `UPDATE`, no una fila complementaria:** `mov_stock_pipeline_dedup` es única por
+`(ref, cod_art, empresa, depósito, tipo)`.
+
+⚠ **Y la pata que NO existe hay que INSERTARLA.** El bloque A no escribe la fila cuyo delta daba 0
+(`where x.delta <> 0`). Con sólo el UPDATE la pila quedaba balanceada y **las cajas no aterrizaban
+en ningún depósito** — una fuga silenciosa, justo lo que el bloque viene a evitar. Se vio rompiendo
+E33A/502 a propósito: pila en 0 y 5 cajas en el aire.
+
+⚠ **Performance, que acá no es un detalle: esto corre en el cron 68 cada 10 minutos.** La primera
+versión escaneaba los tres depósitos enteros con regexp por fila y tardó **más de 60 segundos**
+(timeout, con locks sobre `Movimientos_Stock` mientras los operarios pickean; se canceló y quedó
+todo revertido). La buena arranca del **conjunto chico** —los pares (tanda, artículo)
+desbalanceados, que hoy son 2— y de ahí sale a buscar. Bloque A solo **286 ms** · con el bloque B
+**542 ms**.
+
+**Probado rompiéndolo a propósito** (transacción abortada), sumándole 5 cajas al picking de dos
+tandas ya armadas:
+
+| tanda | tiene factura | resultado |
+|---|---|---|
+| E33A / 502 | no | pila neta **0** y `a_facturar 3 + terminado 5 = 8` = lo pickeado ✅ |
+| E10A / 220 | **sí** | pila neta **5**: NO se tocó ✅ (guard 1) |
+
+**Sobre los datos vivos: 0 filas tocadas.** El único par desbalanceado es D14B 952E/957E (+4 cajas,
+de agosto) y está facturado, así que el guard 1 lo deja afuera y queda al centinela.
+
+`sql/gv_etapa2_idempotente_v2018.sql`.
