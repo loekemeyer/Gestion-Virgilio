@@ -23066,6 +23066,24 @@ rollback quedaron **0 filas** con `dedup_key like 'ocajena_%'` — no se mandó 
 `tests/rcp-oc-ajena.cjs` cubre el front y **se verificó rompiéndolo**: con `ajena: null` en
 `opExcesoItems` el test falla en 4 chequeos.
 
+### ✅ Resuelto el 18/09 — las dos decisiones de Thomas
+
+**(1) *"1 sí"* → se corrió `gv_oc_recompute_recibido()` sin filtros**: 85 filas, las 4.214 cajas
+fantasma a cero. El dry-run en `begin … rollback` dio **exactamente las mismas 85** que la corrida
+real, y ninguna OC viva perdió `cantidad_recibida` (75 pendiente→anulada, 8 recibida→anulada, 2
+ajustes sobre anuladas). Quedan **154 OC pendientes / 12.539 cajas**, que es lo que falta de
+verdad. Problema **401** cerrado. Backup y rollback exacto en `docs/ROLLBACK-PRODUCCION.md`.
+
+**(2) *"2 ambos"* → el 550 quedó con los dos proveedores, 50/50**: Garcia de `proveedor`, Poly de
+`proveedor2`. Medido a 6 meses: Garcia 256 cj (7 entregas, y es el que entrega hoy), Poly 203
+(hasta el 30/06), Log/Fabr 145 — el reparto real da 56/44 y se redondeó. El generador del
+miércoles parte las 144 en 72 y 72.
+⚠ **Hasta ese miércoles el 550 de Garcia sigue avisando como ajeno, y está bien**: la OC vigente
+(id 914) se emitió sólo a Poly. **No se partió a mano a propósito.**
+
+**(3)** Lo de silenciar el par Log/Fabr ← Oscar quedó **sin hacer**: `GV_OC_Entrega_Permitida`
+sigue vacía, así que ese par avisa.
+
 **Chequeo:** `select caso, count(*), sum(cajas) from public.gv_oc_entregas_ajenas
 where fecha >= current_date - 30 group by 1;`
 `sql/gv_oc_entrega_ajena_v1957.sql` · problemas **250** (abierto) y **398** (descartado).

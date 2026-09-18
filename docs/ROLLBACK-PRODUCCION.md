@@ -1759,3 +1759,85 @@ revoke execute on function public.gv_cruce_fc_asig_refrescar_si_viejo(integer) f
 
 y quitar de `index.html` la línea `await sb.rpc("gv_cruce_fc_asig_refrescar_si_viejo", …)` de
 `concilRefresh()`. Producción Virgilio no lee nada de esto.
+
+---
+
+## v19.61 — limpieza de las 85 OC fantasma y el 550 a dos proveedores — 2026-09-18
+
+**Toca DATOS de dos tablas que Producción Virgilio LEE**, así que va acá. Pedido de Thomas
+("1 sí", "2 ambos") sobre lo medido en la v19.57.
+
+| | |
+|---|---|
+| Tablas | `Ordenes_Compra` y `OC_Maximos` — las dos las lee el front de Producción (`recepcion.js`, `index.html`, `modulo_talleristas_edit.js`, `modulo_talleristas_arts.js`) |
+| Backups | `zz_backups."GV_Backup_OrdenesCompra_20260918"` (721 filas, PK `id`) · `zz_backups."GV_Backup_OCMaximos_20260918"` (354 filas, PK `cod`, único) — las dos con RLS y sin grants para `anon` |
+
+### 1. `gv_oc_recompute_recibido()` sin filtros — 85 filas
+
+Cierra el problema **401**: una OC reemplazada por la del miércoles siguiente sólo pasa a
+`anulada` cuando se recibe **de ese proveedor**, y si el proveedor nunca entrega queda
+`pendiente` para siempre. **Medido en `begin … rollback` ANTES de correrlo**, y el dry-run dio
+exactamente lo mismo que la corrida real (85):
+
+| estado antes | después | filas | ¿cambia `cantidad_recibida`? | cajas |
+|---|---|---|---|---|
+| pendiente | anulada | 75 | **no** | 4.186 |
+| recibida | anulada | 8 | **no** | 0 |
+| anulada | anulada | 2 | sí (ajuste) | 21 |
+
+**Ninguna OC viva perdió lo recibido.** Después quedan **154 OC pendientes / 12.539 cajas**, que
+es lo que de verdad falta entrar.
+
+### 2. El 550 pasa a Garcia + Poly, 50/50
+
+Thomas: *"ambos"*. Medido en 6 meses: **Garcia 256 cj** (7 entregas, 16/07→17/09, es el que
+entrega hoy) · **Poly 203** (11, hasta el 30/06) · Log/Fabr 145. Va Garcia de `proveedor` y Poly
+de `proveedor2`, **50 / 50** — el reparto real da 56/44, se redondeó.
+
+⚠ **Hasta el miércoles el 550 de Garcia SIGUE avisando como entrega ajena**, y está bien: la OC
+vigente hoy (id **914**, 155 cj) se emitió sólo a nombre de Poly. **La OC 914 NO se partió a
+mano a propósito** — ya salió así, y el generador del miércoles emite las dos líneas (72 y 72
+sobre las 144 que pide) y lo acomoda solo.
+
+### 3. Cron 93 `gv-oc-anular-superadas` — para que no vuelva a pasar
+
+El fix de arriba es de datos: sin nada que lo repita, en dos miércoles vuelven los fantasmas.
+Va **miércoles 10:30 UTC**, metido entre el **50** `ocs-auto-miercoles` (10:00, genera) y el
+**11** `alerta-oc-pendientes` (11:00) — así el aviso de OC pendientes sale con la lista ya
+limpia. `select public.gv_oc_recompute_recibido();`, que es idempotente.
+Para apagarlo: `select cron.unschedule('gv-oc-anular-superadas');`
+
+### Rollback
+
+```sql
+-- 1) los estados de las OC
+update public."Ordenes_Compra" o
+   set estado = b.estado, cantidad_recibida = b.cantidad_recibida,
+       fecha_entrega_real = b.fecha_entrega_real
+  from zz_backups."GV_Backup_OrdenesCompra_20260918" b
+ where b.id = o.id
+   and (o.estado, o.cantidad_recibida, o.fecha_entrega_real)
+       is distinct from (b.estado, b.cantidad_recibida, b.fecha_entrega_real);
+-- 2) el proveedor del 550
+update public."OC_Maximos" m
+   set proveedor = b.proveedor, prop_prov1 = b.prop_prov1,
+       proveedor2 = b.proveedor2, prop_prov2 = b.prop_prov2
+  from zz_backups."GV_Backup_OCMaximos_20260918" b
+ where b.cod = m.cod and public.norm_cod(m.cod) = '550';
+```
+
+⚠ **Y una limitación preexistente que conviene tener escrita:** el `recepcion.js` de Producción
+llama `oc_vigentes_por_proveedor` (que **no se tocó**) pero **no** llama
+`gv_oc_aplicar_recepcion`. O sea que una recepción cargada desde Producción **no descuenta la OC
+ni dispara el aviso de entrega ajena**. No lo rompió este cambio: nunca lo hizo.
+
+**Chequeo:** `select * from public.gv_oc_entregas_ajenas where fecha >= current_date - 30;` y
+
+```sql
+with w as (select o.id, o.estado, row_number() over (
+    partition by public.norm_cod(o.codigo), public.gv_norm_prov_key(o.proveedor)
+    order by (lower(coalesce(o.estado,'')) in ('cerrada','anulada')), o.fecha desc, o.id desc) rn
+  from public."Ordenes_Compra" o where o.fecha is not null)
+select count(*) from w where rn > 1 and lower(coalesce(estado,'')) not in ('cerrada','anulada');
+-- 0 = ninguna OC fantasma
+```
