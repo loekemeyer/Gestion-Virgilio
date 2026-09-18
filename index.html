@@ -5733,7 +5733,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.76"></script>
+<script type="module" src="recepcion.js?v=19.77"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.76";
+const APP_VERSION = "v19.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -14559,7 +14559,10 @@ async function loadArtNombres() {
   if (_artNombres) return _artNombres;
   const m = {}, H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   try { const r = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_nombres_articulos", "select=cod,descripcion&order=cod.asc"); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.cod), d = String(x.descripcion || "").trim(); if (k && d) m[k] = d; }); } catch (_e) {}
-  _artNombres = m; return m;
+  /* v19.77 - si el fetch fallo el mapa queda VACIO; no cachearlo, o artNombre() devuelve el
+     fallback (la descripcion del libro) para toda la sesion y no hay forma de recuperarse. */
+  if (Object.keys(m).length) _artNombres = m;
+  return m;
 }
 function artNombre(cod, fb) { const n = _artNombres && _artNombres[_ocgNorm(cod)]; return n || fb || ""; }
 /* v11.39 — MARCA/LÍNEA (LK/CH), fuente ÚNICA: vista Supabase `vista_marca_articulo`
@@ -14799,7 +14802,13 @@ async function openStockAdmin(soloConteo) {
           r.cajas_pedidas = vr.cajas_pedidas;
           r.proy_cajas_mes = vr.proy_cajas_mes;
           r.capacidad_gondola = vr.capacidad_gondola;
-          if (vr.descripcion) r.descripcion = vr.descripcion;
+          // v19.77 - NO pisar la descripcion: stocks_carga_rapida ya la resuelve con
+          // COALESCE(vista_nombres_articulos, vista_stock_procesada, ...), o sea el NOMBRE del
+          // catalogo primero. vista_stock_procesada hace el COALESCE al reves (libro primero),
+          // asi que pisarla traia el comentario de un ajuste manual como nombre del articulo
+          // (505I quedaba "Esta en racks"; 503E "Para pedido Np 98690"; 518 "Devolucin de Nexxo").
+          // Solo se completa si la fila no traia ninguna. Problema 422.
+          if (vr.descripcion && !r.descripcion) r.descripcion = vr.descripcion;
           if (vr.linea) r.linea = vr.linea;
         }
       });
@@ -24938,7 +24947,10 @@ async function stockAjustar() {
   var ref = "ajuste manual" + (comentario ? " | " + comentario : "");
   /* v11.76: insumos — incluir la unidad dominante para que el movimiento
      caiga en el grupo correcto de la vista (mismo fix que stockFijar). */
-  var row = { cod_art: cod, descripcion: comentario || ((sd && sd.desc) || null), deposito: dep, delta: cant, tipo: "ajuste", ref: ref, legajo: "0" };
+  /* v19.77 - el comentario va SOLO en `ref`. En `descripcion` va el nombre del articulo:
+     vista_saldos_stock elige la descripcion MAS CORTA del codigo, asi que un comentario
+     corto le ganaba al nombre real y quedaba como nombre del articulo. Problema 422. */
+  var row = { cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: cant, tipo: "ajuste", ref: ref, legajo: "0" };
   if (dep === "insumos") {
     var ajUni = (sd && sd._uni) || null;
     /* v11.77: si la unidad dominante no es la base, convertir delta a base
@@ -24972,7 +24984,7 @@ async function stockFijar() {
      original (en Kg u otra) quedaba intacto → el operario reintentaba. */
   if (dep === "insumos") {
     var uniS = _stkFijarUniSaldos(cod);
-    var rows = [], desc = comentario || ((sd && sd.desc) || null);
+    var rows = [], desc = (sd && sd.desc) || null;   // v19.77: el comentario va en `ref`, no en `descripcion` (problema 422)
     var uKeys = Object.keys(uniS);
     // Ceroizar todas las unidades que tengan saldo
     uKeys.forEach(function (uk) {
@@ -24989,7 +25001,7 @@ async function stockFijar() {
     await stkInsertMov(rows, "Stock de " + cod + " (insumos) fijado en " + fijar);
     return;
   }
-  await stkInsertMov([{ cod_art: cod, descripcion: comentario || ((sd && sd.desc) || null), deposito: dep, delta: delta, tipo: "ajuste", ref: ref, legajo: "0" }], "Stock de " + cod + " (" + dep + ") fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
+  await stkInsertMov([{ cod_art: cod, descripcion: (sd && sd.desc) || null, deposito: dep, delta: delta, tipo: "ajuste", ref: ref, legajo: "0" }], "Stock de " + cod + " (" + dep + ") fijado en " + fijar + " (ajuste " + (delta > 0 ? "+" : "") + delta + ")");
 }
 /* v11.76: calcula saldos por-unidad de un cod en depósito insumos, respetando cutoff */
 function _stkFijarUniSaldos(cod) {
