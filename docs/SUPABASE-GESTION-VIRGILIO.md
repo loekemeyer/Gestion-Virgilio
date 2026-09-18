@@ -25001,7 +25001,120 @@ existir mientras el resultado parece decir que anduvo. Van en llamadas separadas
 
 `sql/gv_np_mover_guard_v2001.sql`.
 
-## §3.kf — v20.05: los `ref` con PIPE también viajan al renombrar (E03G y D71B) — 2026-09-18
+---
+
+## §3.kf — v20.05: la descripción del 043 era "043" — el guard comparaba una punta cruda y la otra normalizada — 2026-09-18
+
+**Thomas, 18/09:** *"la descripción del 043 y esos otros códigos no debería ser 043, algo se rompió ahí"*.
+
+`vista_nombres_articulos` **ya tenía** el guard "la descripción no puede ser el propio código", en
+las tres fuentes que arma por CTE (`proyeccion_madre`, `Articulos Virgilio X Tallerista`,
+`OC_Maximos`). Estaba escrito así:
+
+```sql
+upper(btrim(descripcion)) <> upper(regexp_replace(cod, '^0+(.)', '\1'))
+--        ↑ cruda                        ↑ normalizada, SIN el cero adelante
+```
+
+La descripción cruda contra el código **sin** ceros. Cuando la basura viene escrita **con** el
+cero —`"043"` en el código `043`— las dos puntas no coinciden (`'043' <> '43'`), el guard la deja
+pasar y el artículo termina llamándose como su código. **El guard existía y no servía justo para
+el caso que más aparece.**
+
+> Es la misma familia de bug que el de esta misma tanda en el detalle de Stocks (§ v20.02) y que
+> el problema 358: **una punta normalizada y la otra no**. Cuando dos lados comparan códigos,
+> los dos tienen que estar en la misma forma.
+
+### Lo que se midió (18/09)
+
+**18 de las 616 filas** de la vista tenían el código como nombre, y las 18 salían de
+`proyeccion_madre.gv_descripcion`, que es la fuente de **más prioridad** — o sea que además
+**tapaba el nombre bueno que ya estaba** en las otras dos:
+
+| cod | mostraba | lo que había en `Articulos Virgilio X Tallerista` |
+|---|---|---|
+| 043 | 043 | Abrelatas Uña 3 En 1 |
+| 052 | 052 | Cepillo Lavavajilla |
+| 053 | 053 | Pinza De Fiambre Inox Cachas Plásticas 23cm |
+| 054 | 054 | Pinza De Ensalada Inox Cachas Plásticas 23cm |
+| 055 | 055 | Pinza De Fideos Inox Cachas Plásticas 25cm |
+| 097 | 097 | Afila Cuchillos Base Blanca/Verde |
+| 099 | 099 | Pelapapas Mgo Plástico Ergonómico |
+
+Los otros 11 son códigos con L (`026L`, `031L`, `035EL`…) y un `000E`: ésos no tenían nombre en
+ninguna fuente.
+
+**Dónde se veía**: de esa vista cuelgan `vista_stock_procesada`, `stocks_carga_rapida` (vía
+`refresh_stocks_carga_rapida`, cron 57 cada 5 min), `vista_abastecimiento`, `gv_planimetria_celda`,
+`gv_stock_procesada_dup` y las tres funciones de aviso por Telegram.
+
+### Los dos cambios
+
+1. **El guard compara las dos puntas normalizadas** (sin el cero adelante), en las 4 CTE.
+2. **Fallback `base_L`**: un código terminado en L es el artículo de Loekemeyer vendido por Chef
+   (regla del dueño v13.71: 505 → 505L), así que si no tiene nombre propio hereda el del base.
+   Las claves L entran a `keys` desde una CTE propia (`keys_l`), porque el guard nuevo las saca de
+   `norm_pm` y sin eso no llegarían al fallback. **124 códigos `NNNL` quedaron con nombre**
+   (`102EL` = Abrelatas Mariposa, `220L` = Cuchara Madera 40 Cm…). El `000E` queda sin descripción,
+   que es lo correcto: antes decía "000E" y parecía un nombre.
+
+**No se tocó el dato de `proyeccion_madre`**: el guard de la vista existe exactamente para ignorar
+una descripción basura, y corregir 18 filas a mano no evita la número 19.
+
+### Medición después de aplicar
+
+| | antes | después |
+|---|---|---|
+| filas de la vista | 616 | 729 |
+| descripción == código | **18** | **0** |
+| códigos duplicados | 0 | 0 |
+| heredados por `base_L` | — | 124 |
+| `security_invoker` | true | **true** (se vuelve a poner explícito) |
+
+`gv_reglas_perdidas`, `gv_endpoints_rotos` y el barrido de vistas sin `security_invoker`: **0**.
+
+**Rollback**: la definición anterior está en el mensaje del commit v20.05 y se vuelve con un
+`create or replace` a `sql/gv_nombres_articulos_desc_es_codigo_v2005.sql` cambiando los cuatro
+guards por la forma vieja. `stocks_carga_rapida` se realinea sola con el cron 57.
+
+**Centinelas nuevos** (`GV_Reglas_Centinela` 25 y 26): el guard normalizado y la rama `base_L`.
+
+---
+
+## §3.kg — v20.06: el 055 se llamaba "Pinza De Ensalada", igual que el 054 — 2026-09-18
+
+Cola de la §3.kf: con el guard arreglado, el **055** pasó a mostrar *"Pinza De Ensalada Mgo Pla X
+12"* — el nombre del **054**. Dos códigos distintos con el mismo nombre en la pantalla es peor que
+un código sin nombre, así que se siguió tirando del hilo.
+
+**`Articulos Virgilio X Tallerista` tiene DOS filas por código** (una por tallerista), y las de
+Rafael están **cruzadas**:
+
+| cod | Log/ Fabr (id viejo) | Rafael (id nuevo) | `OC_Maximos` |
+|---|---|---|---|
+| 053 | Pinza De Fiambre Inox Cachas Plásticas 23cm | Pinza De Fiambre Mgo Plast X 12 | Pinza De Fiambre X 12 |
+| 054 | Pinza De Ensalada Inox Cachas Plásticas 23cm | Pinza De **Fideos** Mgo Plast X 12 | Pinza De Ensaladas X 12 |
+| 055 | Pinza De Fideos Inox Cachas Plásticas 25cm | Pinza De **Ensalada** Mgo Pla X 12 | Pinza De Fideos X 12 |
+
+La CTE desempataba con `order by k, descripcion` — **alfabético, que no significa nada** — y para el
+055 eso elegía justo la fila cruzada. Ahora desempata por **`id`**: la fila más vieja, que es la que
+coincide con `OC_Maximos`.
+
+**Medido**: 20 códigos tienen más de una descripción en esa tabla y **8 cambian de nombre**. Cuatro
+mejoran claro (055 → Fideos, 564 `"C Pizza 8 LK"` → nombre de verdad, 609 `"Pisa Papa"` → `"Pisa
+Papas Acero Inox"`, 558 sin el `"(GRJ5)"` pegado al nombre), tres son la misma palabra con otra
+capitalización y uno (GRJ10, arandela/resorte) es indistinto.
+
+⚠ Las otras dos fuentes (`proyeccion_madre`, `OC_Maximos`) tienen **0** códigos con más de una
+descripción, así que su `order by` no desempata nada: se dejaron como estaban.
+
+⚠ **No se tocó el dato**: las filas cruzadas de Rafael siguen en `Articulos Virgilio X Tallerista`.
+Corregirlas es decisión del dueño — y esa tabla la usa la recepción de talleristas, no sólo esto.
+
+Después de aplicar: 729 filas, 0 con descripción == código, 0 duplicados, `security_invoker` true,
+`gv_reglas_perdidas` y `gv_endpoints_rotos` en 0.
+`sql/gv_nombres_articulos_desempate_id_v2006.sql`. Rollback: `order by 1, 2` en `norm_vxt`.
+## §3.kh — v20.07: los `ref` con PIPE también viajan al renombrar (E03G y D71B) — 2026-09-18
 
 **El agujero.** El facturado no anota el movimiento con la tanda sola: lo anota **`TANDA|NP`**
 (`E03G|CH 0010`). El renombrador comparaba por igualdad exacta —`upper(btrim(ref)) = v_a`—, así que
@@ -25039,4 +25152,4 @@ violar el unique.
 empresa fantasma, drenaje cruzado y góndola negativa en **0** · pickeado negativo sólo D53A (−2, de
 agosto, ajena) · candados huérfanos de 12 a 7.
 
-`sql/gv_tanda_renombrar_ref_pipe_v2005.sql`.
+`sql/gv_tanda_renombrar_ref_pipe_v2007.sql`.

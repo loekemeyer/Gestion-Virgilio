@@ -1,3 +1,42 @@
+## Nota v20.06 (2026-09-18) — El 055 se llamaba "Pinza De Ensalada", igual que el 054
+
+Cola de la v20.05. `Articulos Virgilio X Tallerista` tiene **dos filas por código** (una por
+tallerista) y las de Rafael están **cruzadas**: dice Fideos donde va Ensalada (054) y Ensalada
+donde va Fideos (055). La vista desempataba **alfabéticamente** — que no significa nada — y para el
+055 elegía justo la cruzada. Ahora desempata por **`id`**, la fila más vieja, que es la que coincide
+con `OC_Maximos`.
+
+Cambian 8 nombres de los 20 códigos que tienen más de una descripción: 4 mejoran claro (055 =
+Pinza De Fideos, 564 dejó de ser "C Pizza 8 LK", 609 "Pisa Papa" → "Pisa Papas Acero Inox", 558 sin
+el "(GRJ5)" pegado), 3 son la misma palabra con otra capitalización y 1 es indistinto.
+
+**El dato cruzado no se tocó**: corregir esas filas es decisión del dueño, y esa tabla la usa la
+recepción de talleristas. §3.kg de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+---
+
+## Nota v20.05 (2026-09-18) — El 043 se llamaba "043": el guard que existía y no servía
+
+Thomas: *"la descripción del 043 y esos otros códigos no debería ser 043, algo se rompió ahí"*.
+
+`vista_nombres_articulos` ya traía el guard **"la descripción no puede ser el propio código"**,
+pero comparaba la descripción **cruda** contra el código **sin el cero adelante**: `'043' <> '43'`
+da verdadero, así que la basura pasaba. **18 de 616 filas** tenían el código como nombre — y las
+18 venían de `proyeccion_madre`, la fuente de más prioridad, tapando el nombre bueno que ya estaba
+en `Articulos Virgilio X Tallerista`: 043 = Abrelatas Uña 3 En 1, 052 = Cepillo Lavavajilla,
+053/054/055 = las pinzas, 097 = Afila Cuchillos, 099 = Pelapapas.
+
+Ahora el guard normaliza **las dos puntas**, y de paso un código terminado en L (el artículo de
+Loeke vendido por Chef, regla v13.71) hereda el nombre del base: 124 códigos `NNNL` dejaron de
+estar sin descripción.
+
+Se ve en Stocks, en el generador de OC y en los avisos de Telegram, porque de esa vista cuelgan
+`vista_stock_procesada`, `stocks_carga_rapida`, `vista_abastecimiento` y `gv_planimetria_celda`.
+La pantalla se realinea sola con el cron 57 (cada 5 min). Detalle y medición: §3.kf de
+`docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+---
+
 ## Nota v20.04 (2026-09-18) — Columna «SALIÓ» en la tabla de Programación
 
 Thomas: *"agregá columna a esa visión que sea SALIÓ a la izquierda de FACTURADO que busque en el

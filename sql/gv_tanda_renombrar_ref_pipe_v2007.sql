@@ -1,4 +1,4 @@
--- v20.05 (2026-09-18) — Los `ref` con PIPE también viajan al renombrar, y se corrigen E03G y D71B
+-- v20.07 (2026-09-18) — Los `ref` con PIPE también viajan al renombrar, y se corrigen E03G y D71B
 -- =============================================================================================
 -- EL AGUJERO. El facturado no anota el movimiento con la tanda sola: lo anota **`TANDA|NP`**
 -- (`E03G|CH 0010`). El renombrador comparaba por igualdad exacta —`upper(btrim(ref)) = v_a`— así
@@ -67,8 +67,8 @@
 -- así que el renombre movió exactamente lo que faltaba — los 20 movimientos del facturado, las
 -- 36 etiquetas de lío de E03G y los 4 candados, que también estaban colgados del código viejo.
 --
---   select public.gv_ppp_tanda_renombrar('E03G','E44A','v20.05: el facturado habia quedado con el codigo viejo');
---   select public.gv_ppp_tanda_renombrar('D71B','E40A','v20.05: el facturado habia quedado con el codigo viejo');
+--   select public.gv_ppp_tanda_renombrar('E03G','E44A','v20.07: el facturado habia quedado con el codigo viejo');
+--   select public.gv_ppp_tanda_renombrar('D71B','E40A','v20.07: el facturado habia quedado con el codigo viejo');
 --
 -- Backups: zz_backups."GV_Backup_E03G_D71B_Movs_20260918" (366),
 --          zz_backups."GV_Backup_E03G_D71B_Lock_20260918" (4) y "…_Lios_20260918" (36).
