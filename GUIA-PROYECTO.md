@@ -1,3 +1,56 @@
+## Nota v20.02 (2026-09-18) — Abrir una fila de Stocks decía "sin movimientos contados" teniendo stock
+
+Lo reportó Thomas con una foto: el **055** muestra 21 cajas en góndola y, al tocarlo, el detalle
+que se abre abajo dice *"sin movimientos contados"*. Los 21 salen justamente de los movimientos,
+así que el cartel se contradecía con la propia fila.
+
+### La causa: las dos puntas escriben el código distinto
+
+La fila expandida filtraba los movimientos comparando el **texto crudo**:
+
+```js
+_stk.movs.filter(mv => String(mv.cod_art) === a.cod)   // ← nunca matcheaba en esos casos
+```
+
+y el código no se escribe igual de los dos lados:
+
+| de dónde sale | cómo viene |
+|---|---|
+| la fila (`stocks_carga_rapida` / `vista_stock_procesada`) | **sin** el cero adelante: `55`, `35E` — y el dual **con** sufijo: `809E LK` |
+| el movimiento (`Movimientos_Stock`) | **con** cero: `055`, `035E` — y el dual **bare** `809E` + columna `empresa` |
+
+Medido el 18/09 contra la base: de las **367** filas de la tabla, **31 no matcheaban literal** —
+23 con cero adelante (el 031 con 830 cajas, el 066 con 306, el 099 con 248…) y los 8 duales
+partidos (809E LK con 349). Ésas eran exactamente las que se abrían vacías; las otras 336
+andaban, y por eso el bug parecía puntual.
+
+Es **el mismo bug que la v14.58 ya había arreglado en los pop-ups** (góndola, pickeados, a
+facturar, excedente, racks) creando `_stkMovMatch`. El detalle inline de la tabla quedó con la
+comparación vieja y nadie lo volvió a mirar. Ahora usa el mismo helper:
+
+```js
+const _detCodN = _stkNormCod(codBase(a.cod)), _detEmp = _stkEmpDe(a.cod);
+const det = _stk.movs.filter(mv => _stkMovMatch(mv, _detCodN, _detEmp) && …);
+```
+
+`_stkMovMatch` normaliza el cero adelante y, si la fila tiene sufijo de empresa, filtra por esa
+empresa: abrir `809E LK` muestra los movimientos de Loekemeyer y no los de Chef.
+
+### Lo que NO cambió
+
+- El **saldo** de la tabla nunca estuvo mal: sale de `stocks_carga_rapida`, no de este filtro.
+- Un código que de verdad no tiene movimientos **sigue** diciendo "sin movimientos contados".
+- Modo "a esa fecha" (`asOf`): ahí las filas se arman desde los propios movimientos, así que las
+  dos puntas ya coincidían y no se tocó.
+
+### La regresión que lo cuida
+
+`tests/stk-detalle-cero-adelante.cjs` — abre el 55 (movs "055"), el 35E (movs "035E") y los dos
+lados del dual, y exige que el 706 sin movimientos siga avisando. **Se probó rompiéndolo**: con
+el `index.html` anterior al fix los 4 casos dan rojo.
+
+---
+
 ## Nota v20.01 (2026-09-18) — En el celular, la tabla de Programación mostraba DOS columnas de ocho
 
 Thomas, desde el teléfono: *"la visual del cel se ve mal. Que desde el cel sólo diga 18/9 y después

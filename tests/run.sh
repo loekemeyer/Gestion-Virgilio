@@ -583,3 +583,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== horas-activas (v19.23: solo se cuentan horas ACTIVAS, la noche no cuenta) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/horas-activas.cjs
+
+echo "== stk-detalle-cero-adelante (v20.02: el detalle de una fila de Stocks encuentra los movimientos con cero adelante y los duales) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-detalle-cero-adelante.cjs
