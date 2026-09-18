@@ -417,76 +417,100 @@ Cuando revocar: esperar el tiempo de expiracion del access token + 15 min (1 h 1
 **Al tocar cualquier archivo con una clave de Supabase, dejarlo en el sistema nuevo. Nunca
 escribir codigo nuevo con la clave legacy.**
 
-## ⚠ REGLA: por qué Claude pide permiso para TODO — y dónde se apaga de verdad
+## ⚠ REGLA: el cartel de permiso de `execute_sql` NO se arregla desde el repo
 
-**Vale para TODOS los repos** (copiar este bloque al `CLAUDE.md` del repo nuevo, junto con el
-bloque `permissions` de `.claude/settings.json`). Thomas, 2026-09-18: *"otras sesiones están
-pidiendo muchísimos permisos para editar todo y antes no pasaba"*. Son tres cosas, en este orden.
+**Medido el 2026-09-18 (v19.74), después de que dos sesiones perdieran horas buscándolo en el
+lugar equivocado.** El síntoma: `mcp__Supabase__execute_sql` abre el cartel de permiso en cada
+llamada, aunque esté en `permissions.allow` de `.claude/settings.json` y la sesión corra en Auto.
 
-### 1. Lo que MÁS pesa es el MODO de la sesión, y no se configura por archivo
+### La causa: el CONNECTOR de claude.ai marca esa herramienta como `always_ask`
 
-En **Manual** (config value `default`) **sólo las lecturas corren solas**: todo lo demás pregunta,
-haya o no regla de `allow`. En **Auto** corre todo con chequeo en segundo plano. El modo se elige
-en el **selector de la sesión** (en la web, arriba del cuadro de mensaje) y se puede cambiar con
-la sesión andando.
+No es el settings del repo, no es el trust, no son los hooks, no es el modo. La plataforma le
+escribe a la sesión un archivo `/tmp/mcp-config-<session>.json` armado desde **la configuración
+del connector en claude.ai**, y ahí cada herramienta viene con su `permission_policy`:
 
-⚠ `permissions.defaultMode` con `"auto"` o `"bypassPermissions"` **se ignora** desde el
-`.claude/settings.json` de un repo; sólo vale desde el settings de **usuario**, que en cloud no se
-lee (punto 2). O sea: **en cloud, el modo se elige a mano y punto.** Una sesión en Manual va a
-pedir permiso para todo por más lista que haya.
-
-Cómo se reconoce: si te pide autorización hasta para un `select`, mirá el modo antes que el JSON.
-
-### 2. La lista de permisos sale del `.claude/settings.json` DEL REPO — el único que llega
-
-La doc de Claude Code lo dice sin vueltas:
-
-> *"**User and project local settings** (`~/.claude/settings.json` and `.claude/settings.local.json`):
-> **not read**. Both stay on your machine, and the local file isn't in the clone."*
-
-Escribirlo desde el setup script del entorno **no sirve** para una sesión cloud. El 18/09 se perdió
-medio día por creer lo contrario.
-
-⚠ **Y hay una condición que tumba hasta eso:** el repo manda **sólo si la sesión tiene UN
-repositorio**. Con varios adjuntos la sesión arranca **arriba** de los clones y de cada
-`.claude/settings.json` toma únicamente los plugins y marketplaces — **ni permisos, ni hooks, ni
-`env`**. Una sesión con 3 repos adjuntos pide permiso para todo y no hay archivo que lo arregle:
-ahí el modo es lo único que queda.
-
-### 3. Un `hooks` mal formado tira el archivo ENTERO, sin avisar
-
-El formato viejo —`{"matcher":"", "command":"..."}`— ya no vale. Hoy va con el array `hooks`
-adentro:
-
-```jsonc
-"hooks": { "PreToolUse": [ { "matcher": "",
-  "hooks": [ { "type": "command", "command": "echo hola" } ] } ] }
+```json
+{"name": "execute_sql",          "permission_policy": "always_ask"}
+{"name": "apply_migration",      "permission_policy": "always_ask"}
+{"name": "list_tables",          "permission_policy": "always_allow"}
+{"name": "deploy_edge_function", "permission_policy": "always_allow"}
 ```
 
-Con el formato viejo Claude Code **descarta el `.claude/settings.json` completo**, así que la
-`permissions.allow` deja de existir. No tira ningún error: simplemente no pasa nada. Así estuvo
-este repo desde el commit `542ab7e` (16/09), y de yapa el hook de caveman nunca corrió ni una vez.
+**De las 27 herramientas de Supabase, esas DOS son las únicas en `always_ask`** — hasta
+`delete_branch`, `pause_project` y `deploy_edge_function` están en `always_allow`. El CLI lo
+convierte en una regla `ask` con `source = 'mcpServerPolicy'`, y en Claude Code la precedencia es
+**deny > ask > allow**: un `ask` le gana a CUALQUIER `allow`, venga del repo, del settings de
+usuario o del flag `--allowed-tools`. Por eso agregar la herramienta a `allow` no cambia nada.
 
-### ⚠ Cómo NO probarlo: `claude --print` adentro del contenedor
+**Se confirma solo, por un segundo lado:** el proceso de Claude arranca con un
+`--allowed-tools` que enumera las herramientas de Supabase una por una y **saltea exactamente
+esas dos**.
 
-Ese `claude` es un CLI local: **sí** lee `~/.claude/settings.json` y **sí** exige el trust del
-workspace (`~/.claude.json` → `hasTrustDialogAccepted`). La sesión cloud no hace ninguna de las
-dos cosas. El 18/09 esa prueba dio verde tres veces seguidas mientras el usuario seguía
-autorizando de a uno. **Se prueba en una sesión nueva de verdad**; el cartel dice el nombre de la
-herramienta, y ése es el string que se agrega a `allow`.
+### Dónde SÍ se apaga
 
-### Lo que hay hoy en `.claude/settings.json`
+En **claude.ai → Settings → Connectors → Supabase**, poniendo `execute_sql` en *Always allow*
+(lo mismo para `apply_migration` si se quiere). O, cuando salta el cartel, eligiendo la opción
+de **"siempre permitir" en vez de la de permitir una vez** — ésa escribe la política del
+connector y vale para las sesiones siguientes.
 
-`allow`: lectura/edición, subagentes, `WebFetch`/`WebSearch`, **`Bash` entero** y el SQL de
-Supabase (`execute_sql`) más las herramientas de lectura de Supabase y GitHub.
-`ask`: `git push`, `curl`, `wget`, `apply_migration`, `deploy_edge_function`.
-`deny`: `rm -rf`, `sudo rm`, force-push, `git reset --hard`, `psql`, `supabase db`, leer `.env`.
+**Lo aprieta el dueño en su cuenta. Desde el repo no hay forma**, y no hay que volver a intentarlo.
 
-⚠ Un `ask` matchea por **prefijo del comando**: `Bash(git push:*)` **no** agarra
-`git -C /ruta push …`, que empieza con `git -C`. Medido el 18/09: por eso un push con `-C` salió
-sin preguntar. Si un comando tiene que frenar sí o sí, va en `deny`, no en `ask`.
+### Cómo se mide, para no volver a adivinar
 
-⚠ Que `execute_sql` no pregunte **no cambia la regla del 26/08**: los datos no se tocan sin
+Las dos consultas que contestan todo, desde adentro del contenedor:
+
+```bash
+# 1) la política real de cada herramienta del connector (la causa)
+python3 -c "import json;d=json.load(open([f for f in __import__('glob').glob('/tmp/mcp-config-*.json')][0]));print(d['mcpServers']['Supabase']['tools'])"
+
+# 2) si el settings del repo se leyó, y con qué reglas (el efecto)
+grep -n "Applying permission update" /tmp/claude-code.log
+```
+
+El `/tmp/claude-code.log` es el debug del CLI y dice, línea por línea, qué reglas entraron y de
+qué fuente (`userSettings`, `projectSettings`, `cliArg`, `flagSettings`). **Al 18/09 muestra las
+50 reglas de `projectSettings` con `mcp__Supabase__execute_sql` adentro**: o sea que el settings
+del repo se lee perfecto y el problema nunca estuvo ahí.
+
+⚠ **El aviso "Ignoring N permissions.allow entries: this workspace has not been trusted" ya NO
+existe** en el CLI 2.1.276 (se buscó el string en el binario: 0 apariciones). Si una doc vieja lo
+menciona como "la única señal de que el settings se lee", está desactualizada — la señal de hoy
+son las líneas `Applying permission update` del log.
+
+### Lo que SÍ sigue siendo cierto del settings del repo
+
+1. **El modo de la sesión pesa**: en **Manual** (`default`) sólo las lecturas corren solas. Se
+   elige en el selector de la sesión (Auto / Aceptar ediciones / Plan; **no hay
+   `bypassPermissions`**, Auto es el máximo). `permissions.defaultMode` desde el settings de un
+   repo se ignora.
+2. **El único settings que llega a una sesión cloud es `.claude/settings.json` DEL REPO**, y sólo
+   si la sesión tiene **un** repositorio. `~/.claude/settings.json` y `.claude/settings.local.json`
+   no se leen; escribirlos desde el setup script del entorno no sirve.
+3. **Un `hooks` mal formado tira el archivo ENTERO, sin avisar.** El formato viejo
+   —`{"matcher":"", "command":"..."}`— ya no vale; hoy va con el array `hooks` anidado:
+   ```jsonc
+   "hooks": { "SessionStart": [ { "matcher": "",
+     "hooks": [ { "type": "command", "command": "echo hola" } ] } ] }
+   ```
+   Con el formato viejo la `permissions.allow` deja de existir y no se tira ningún error. Así
+   estuvo este repo desde el commit `542ab7e` (16/09) hasta la v19.63.
+4. ⚠ **En Auto, un `allow` "peligroso" se descarta a propósito**, y el log lo dice:
+   `Ignoring dangerous permission Bash(*) from .claude/settings.json (bypasses classifier)`. Por
+   eso un `"Bash"` pelado en `allow` **no** hace que Bash deje de pasar por el clasificador.
+   Las reglas con comando concreto (`Bash(git status:*)`) sí valen.
+5. ⚠ Un `ask` matchea por **prefijo del comando**: `Bash(git push:*)` **no** agarra
+   `git -C /ruta push …` ni `cd X && git push`. Si algo tiene que frenar sí o sí, va en `deny`.
+
+### ⚠ Cómo NO probarlo
+
+- **`claude --print` adentro del contenedor**: ese CLI es local, lee el settings de usuario y
+  exige el trust; la sesión cloud no hace ninguna de las dos cosas. El 18/09 dio verde tres veces
+  seguidas mientras el usuario seguía autorizando de a uno.
+- **Preguntándole a la sesión**: Claude **no ve los carteles**, sólo sabe si la llamada corrió o
+  fue rechazada. Cualquier prueba de esto la mira el usuario en pantalla — o se lee del
+  `mcp-config`, que es la fuente y no requiere mirar nada.
+
+⚠ Que `execute_sql` pregunte o no **no cambia la regla del 26/08**: los datos no se tocan sin
 permiso explícito. Eso lo sostiene este archivo, no el diálogo de permisos.
 
 `scripts/claude-permisos.sh` y `scripts/setup-entorno-claude.sh` quedan para las sesiones
