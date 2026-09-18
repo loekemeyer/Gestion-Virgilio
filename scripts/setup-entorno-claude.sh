@@ -85,10 +85,15 @@ try:
 except Exception:
     d = {}
 perm = d.setdefault("permissions", {})
+# Modo de arranque de la sesion. "auto" = corre todo con chequeo en segundo plano,
+# que es lo que existe justamente contra la lluvia de carteles. Las reglas de ASK
+# siguen preguntando igual (a proposito). Solo vale desde ~/.claude/settings.json:
+# en el .claude/settings.json de un repo, "auto" se ignora.
+perm["defaultMode"] = "auto"
 for clave, lista in (("allow", ALLOW), ("ask", ASK), ("deny", DENY)):
     actual = perm.setdefault(clave, [])
     actual.extend(x for x in lista if x not in actual)
 json.dump(d, open(p, "w"), indent=2)
 print("permisos de Claude:", len(perm["allow"]), "allow /", len(perm["ask"]),
-      "ask /", len(perm["deny"]), "deny ->", p)
+      "ask /", len(perm["deny"]), "deny / modo", perm["defaultMode"], "->", p)
 PY
