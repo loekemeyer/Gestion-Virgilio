@@ -23319,3 +23319,94 @@ aplicado). Aislados pasan los dos. A la tercera corrida la suite entera dio verd
 anotado: si alguien los ve en rojo, que los corra solos antes de buscar la causa en su diff.
 
 **Chequeo:** abrir el 321 en Stocks → 15 NP, 197 cajas, 13 con badge WEB, ordenadas 21/9 → 29/9.
+
+---
+
+## §3.jh — v19.69: mover una tanda pickeada adentro de otra reventaba con «duplicate key» — 2026-09-18
+
+**Lo que vio Thomas** (problema 407): desde «📅 Cambiar de día», la tanda **E12A** (pickeada y
+armada) al **lunes 21/09** →
+
+```
+No se pudo mover:
+duplicate key value violates unique constraint "mov_stock_pipeline_dedup"
+```
+
+No se movió nada, y eso estuvo bien: la RPC devuelve 400 y la transacción hace rollback entero.
+
+### La causa
+
+`gv_ppp_tanda_mover` llama a **`gv_ppp_tanda_renombrar`**, que hacía
+
+```sql
+update "Movimientos_Stock" set ref = <tanda nueva> where upper(btrim(ref)) = <tanda vieja>;
+```
+
+**a ciegas**. `mov_stock_pipeline_dedup` es un índice **único** sobre
+`(upper(trim(ref)), upper(trim(cod_art)), coalesce(empresa,''), deposito, tipo)` para
+`tipo in ('picking','separado','facturado')`: es el guard que impide el doble picking, el que se
+agregó por el problema 390. Si la tanda destino ya tiene una fila del pipeline del **mismo
+artículo**, el renombre choca contra él.
+
+Medido el 18/09 con E12A: chocaba con **126** filas de E12E, **120** de E12F, **84** de E12K,
+**75** de E12J, **69** de E12G y **3** de D69H. O sea que **fusionar dos tandas ya pickeadas era
+imposible**, aunque la pantalla lo ofrezca y el estado sea compatible.
+
+### El arreglo: fusionar, no pisar
+
+Sumar los `delta` no es una licencia, es lo que va a quedar igual: ese `delta` es el **total
+pickeado de la tanda para ese artículo**, y lo escribe `reconciliar_stock_articulo_rt` con
+`do update set delta = excluded.delta` derivándolo de los eventos **PKC**. Como la misma función
+renombra también los eventos, el reconciliador va a recalcular ese total como la **suma de las
+dos tandas**. El saldo del depósito no se mueve ni una caja.
+
+⚠ **El orden importa: primero el DELETE de la fila vieja, después el UPDATE que suma.**
+`trigger_actualizar_saldo_stock` recalcula el saldo del código desde cero, pero corre
+**AFTER INSERT OR UPDATE y NO en DELETE**: sumando antes de borrar, el recálculo contaría las dos
+filas y `stocks_carga_rapida` quedaría inflado hasta el próximo movimiento de ese código.
+
+### Y el mismo pozo por el otro lado: «Tanda nueva» podía reciclar un código con stock
+
+`gv_ppp_web_codigo_tomado` decidía si un código estaba libre mirando **sólo las programaciones**
+(`GV_PPP_Programacion_Diaria`, `PPP_Web_Programacion`, `PPP_Web_Tandas`, `GV_PPP_Prog_Override`).
+Un código que ya no figura en ninguna pero **tiene stock del pipeline** —una tanda vieja ya
+entregada— se daba por libre, así que el botón «➕ Tanda nueva» lo podía reciclar y meter el stock
+de hoy adentro del de aquella: o el mismo «duplicate key», o algo peor, cajas de dos tandas de
+épocas distintas sumadas bajo un código. **Al 18/09 hay 353 códigos así** (casi todos de las
+series C y D, más **E01G**, que sí está en la serie viva). Ahora también cuenta como tomado.
+
+El `exists` sale por ese mismo índice: **0,1 ms**. Sin él eran **49 ms** de seq scan — y el
+generador lo llama hasta 400 veces en su loop, así que la forma importa: tiene que escribirse
+`upper(btrim(m.ref))`, **no** `upper(btrim(coalesce(m.ref,'')))`, que no matchea la expresión del
+índice.
+
+### Medición (todo en transacciones abortadas, contra los datos reales)
+
+| prueba | resultado |
+|---|---|
+| fusión E12A → E12E | 129 filas chocaban · E12E 213 → 288 · E12A queda en 0 · **saldos que cambian: 0** |
+| tanda nueva E12A → E12T | movidas=1 · **saldos que cambian: 0** |
+| `stocks_carga_rapida` | igual de alineado que antes (el único desalineado, 437E, ya lo estaba: es dual y su clave lleva sufijo de empresa) |
+| guards que siguen andando | `ESTADO_DISTINTO` (E12E en proceso), «la tanda ya salió», `TANDA_EMPEZADA` |
+| tests | `ppp-tanda-cambiar-dia` OK · `dead-handlers` 785/0 · `checkhtml` 0 errores |
+
+⚠ **La prueba tuvo que hacerse dos veces** porque E12A cambiaba de tamaño entre corrida y corrida:
+Thomas estaba moviendo pedidos a mano al mismo tiempo. Es el recordatorio de siempre — el estado
+vivo se mueve, la medición se repite justo antes de dar algo por bueno.
+
+### Front
+
+`pppMovErrTxt` traduce el error crudo de Postgres: si vuelve a aparecer un choque contra
+`mov_stock_pipeline_dedup`, el supervisor lee *"las dos tandas tienen el mismo artículo pickeado y
+el stock no se pudo juntar, NO se movió nada"* en vez del texto de la base. Es el paracaídas, no
+el camino normal.
+
+**Archivos:** `sql/gv_ppp_tanda_fusion_stock_v1969.sql`, rollback en
+`sql/backups/gv_ppp_tanda_renombrar_pre_v1969.sql`.
+
+### Lo que queda abierto
+
+`gv_ppp_pedido_mover` mueve **una NP** a otra tanda, pero el stock del pipeline está anotado por
+**tanda**, no por NP: al mover un pedido suelto, las cajas pickeadas siguen contadas en la tanda
+de origen. No es lo que rompió acá (esto se ve recién cuando se compara pedido contra pedido), y
+tocarlo es otra tanda de trabajo, pero queda anotado para no descubrirlo de nuevo desde cero.

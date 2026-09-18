@@ -5733,7 +5733,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.68"></script>
+<script type="module" src="recepcion.js?v=19.69"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.68";
+const APP_VERSION = "v19.69";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34561,6 +34561,18 @@ async function pppTandaFecha(id, tanda) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(inp.value); if (!m) return;
   return pppTandaMover(tanda, m[1] + "-" + m[2] + "-" + m[3]);
 }
+/* v19.69 (problema 407) — el error crudo de Postgres no lo entiende nadie. Si un movimiento choca
+   contra `mov_stock_pipeline_dedup` (el índice que impide el doble picking), se explica en castellano.
+   Desde la v19.69 el backend lo resuelve solo fusionando las filas de stock, así que esto es el
+   paracaídas, no el camino normal: si aparece, algo quedó fuera de ese arreglo y hay que mirarlo. */
+function pppMovErrTxt(msg) {
+  const s = String(msg || "");
+  if (s.indexOf("mov_stock_pipeline_dedup") >= 0)
+    return "Las dos tandas tienen el mismo art\u00edculo pickeado y el stock no se pudo juntar, as\u00ed que NO se movi\u00f3 nada "
+         + "(qued\u00f3 todo como estaba). No lo arregles a mano: avis\u00e1 para que revisen el stock de las dos tandas.\n\n("
+         + s + ")";
+  return s;
+}
 /* v14.04 — el mismo movimiento, pero recibiendo la fecha ya elegida (del pop-up de días o del
    campo de fecha viejo). Devuelve true si movió. */
 async function pppTandaMover(tanda, iso, opts) {
@@ -34612,7 +34624,7 @@ async function pppTandaMover(tanda, iso, opts) {
         return false;
       }
       pppSetStatus("⚠ No se pudo mover: " + msg, false);
-      try { alert("No se pudo mover la tanda " + t + ":\n\n" + msg); } catch (_e) {}
+      try { alert("No se pudo mover la tanda " + t + ":\n\n" + pppMovErrTxt(msg)); } catch (_e) {}
       return false;
     }
   }
@@ -34938,7 +34950,7 @@ async function pppMovDestinoElegir(tanda) {
   } catch (e) {
     const msg2 = (e && e.message) ? e.message : String(e);
     pppSetStatus("⚠ No se pudo mover: " + msg2, false);
-    try { alert("No se pudo mover:\n\n" + msg2.replace(/^.*?(ESTADO_DISTINTO|PEDIDO_SALIO):\s*/, "")); } catch (_e) {}
+    try { alert("No se pudo mover:\n\n" + pppMovErrTxt(msg2).replace(/^.*?(ESTADO_DISTINTO|PEDIDO_SALIO):\s*/, "")); } catch (_e) {}
     return false;
   }
 }

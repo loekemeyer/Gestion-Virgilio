@@ -1863,6 +1863,47 @@ select count(*) from (
   having count(*) > 1 and count(distinct coalesce(empresa,'')) > 1) z;
 ```
 
+## ⚠ REGLA: el `ref` del pipeline de stock NO se renombra a ciegas — se FUSIONA
+
+**2026-09-18, problema 407.** Mover la tanda **E12A** (pickeada y armada) al lunes 21/09 desde
+«📅 Cambiar de día» devolvía el error crudo de Postgres:
+
+```
+duplicate key value violates unique constraint "mov_stock_pipeline_dedup"
+```
+
+`gv_ppp_tanda_renombrar` hacía `update "Movimientos_Stock" set ref = <tanda nueva>` **a ciegas**, y
+ese índice es **único** por `(ref, cod_art, empresa, deposito, tipo)` para
+`picking/separado/facturado` — es el guard que impide el doble picking (problema 390). Si la tanda
+destino ya tiene el mismo artículo pickeado, choca: **fusionar dos tandas armadas era imposible**,
+aunque la pantalla lo ofrezca. Medido: E12A chocaba con 126 filas de E12E, 120 de E12F, 84 de E12K.
+
+**Lo que corresponde es sumar los `delta`, y no es una licencia:** ese `delta` es el total pickeado
+de la tanda para ese artículo y lo escribe `reconciliar_stock_articulo_rt` desde los eventos PKC;
+como los eventos también se renombran, el reconciliador va a recalcularlo como la suma de las dos.
+El saldo del depósito no se mueve ni una caja (medido: 0 saldos cambiados).
+
+⚠ **Primero el DELETE de la fila vieja, después el UPDATE que suma.**
+`trigger_actualizar_saldo_stock` recalcula el saldo del código desde cero pero corre
+**AFTER INSERT OR UPDATE y NO en DELETE**: al revés, `stocks_carga_rapida` queda inflado.
+
+⚠ **Y un código de tanda está TOMADO si tiene stock, aunque no figure en ninguna programación.**
+`gv_ppp_web_codigo_tomado` sólo miraba las programaciones, así que «➕ Tanda nueva» podía reciclar
+un código con movimientos viejos (353 al 18/09, más E01G de la serie viva). Ahora mira también
+`Movimientos_Stock` — escrito como `upper(btrim(m.ref))`, **sin `coalesce`**, o no entra por el
+índice y pasa de 0,1 ms a 49 ms de seq scan en un loop de hasta 400 vueltas.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` (las dos reglas tienen su centinela) y
+
+```sql
+select count(*) from (
+  select 1 from public."Movimientos_Stock" where tipo in ('picking','separado','facturado')
+   group by upper(btrim(ref)), upper(btrim(cod_art)), deposito, tipo
+  having count(*) > 1 and count(distinct coalesce(empresa,'')) > 1) z;   -- 0
+```
+
+`sql/gv_ppp_tanda_fusion_stock_v1969.sql`, §3.jh.
+
 ## ⚠ REGLA: una lectura ROTA no es un CERO — y un centinela que sólo mira el log del éxito es ciego
 
 **2026-09-18, problemas 402 y 403.** El armado automático de pedidos web estuvo **5 h 40 sin
