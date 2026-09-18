@@ -33,10 +33,13 @@ repartido 50/50 redondea a 273 + 273 = 546 y el renglón no cerraría por 1. El 
 ### Y se sacó la flecha ⤓ "topado a la capacidad de góndola", que mentía
 
 El generador pintaba `⤓` cuando `proy × índice > capacidad`, con el cartel *"Topado a la capacidad
-de góndola (N cajas)"*. **Hace rato que no topa nada.** `vista_generador_oc` calcula
-`maximo = ceil(proy × índice)` y sólo usa la capacidad si el artículo tiene tildado **Llenar
-góndola** (o si no tiene proyección). Medido en el 505: cap 3340, y el máximo igual salió 3514.
-Era un resto de la **v4.31**, cuando el tope sí existía. El campo `capped` se borró del ítem.
+de góndola (N cajas)"*. **Dejó de topar el mismo 18/09 a las 13:26**: la **v19.71** —otra sesión,
+pedido de Thomas: *"no contemples el máximo de góndola para pedidos"*— cambió
+`LEAST(ceil(proy × índice), cap)` por `ceil(proy × índice)`, y midió **+2.178 cajas** (49 códigos
+suben el Máximo, 33 pasan a pedir más). Desde ahí la capacidad sólo manda con **Llenar góndola**
+tildado o sin proyección. Medido en el 505 esa noche: cap 3340 y el máximo igual 3514, con la
+flecha todavía dibujada. O sea que **la flecha no era un resto viejo** —estuvo bien hasta esa
+tarde— sino que quedó huérfana 6 h antes. El campo `capped` se borró del ítem.
 
 ### De paso, de dónde sale el "A pedir" (la cuenta que no cerraba a mano)
 
