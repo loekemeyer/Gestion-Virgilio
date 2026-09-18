@@ -5733,7 +5733,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.78"></script>
+<script type="module" src="recepcion.js?v=19.79"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.78";
+const APP_VERSION = "v19.79";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21409,11 +21409,25 @@ function _stkFmtFechaNP(v) {
   var m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
   return m ? (String(parseInt(m[3], 10)) + "/" + String(parseInt(m[2], 10))) : "";
 }
+/* v19.79 (problema 425) - VARIANTES DE CERO para buscar un articulo en la base de pedidos.
+   La base guarda el codigo como lo escribio ISIS o la pagina ("071"), y la fila de Stock trae
+   el codigo SIN ceros ("71", porque vista_stock_procesada los pela). Un `articulo=in.(71)` no
+   encuentra nada y el pop-up dice "ningun pedido pidio 71" aunque la columna diga 1. Es la
+   regla del dueno del 12/09: para MOSTRAR va con cero adelante, para BUSCAR tiene que dar
+   igual. Devuelve las variantes (pelada, canonica y cruda) + cada una con la "L" de los
+   articulos de Loeke que vende Chef (438E / 438EL). Mismo criterio que stkHistBuscar. */
+function _stkArtCands(codB) {
+  var out = [], push = function (c) { c = String(c || "").toUpperCase().trim(); if (c && out.indexOf(c) < 0) out.push(c); };
+  push(codB); push(codCanon(codB)); push(_ocgNorm(codB));
+  out.slice().forEach(function (c) { push(c + "L"); });
+  return out;
+}
 async function stkOpenCajasPedidasArt(codEnc) {
   if (!_stk) return;
   const cod = decodeURIComponent(codEnc), codN = _stkNormCod(codBase(cod));
   // v8.89: desconcatenación — buscar por código base en la base de picking y filtrar por marca
-  const _codB = codBase(cod), _codDisp = codBase(cod);
+  // v19.79: para MOSTRAR, el codigo canonico (071, no 71). Problema 425.
+  const _codB = codBase(cod), _codDisp = codCanon(codBase(cod));
   const _sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
   const _empFiltro = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : "";
   _stkPopShell("🟡 Cajas pedidas — " + escapeHtml(_codDisp) + (_empFiltro ? ' <span style="font-size:14px;font-weight:800;color:' + (_empFiltro === "LK" ? "#b91c1c" : "#1e40af") + ';">' + _empFiltro + '</span>' : ''), "stkPopBody");
@@ -21425,7 +21439,7 @@ async function stkOpenCajasPedidasArt(codEnc) {
   // v12.39 — también traer la variante con "L" (ej. 438EL): es un artículo de Loeke que
   // vende Chef y su pedido cuenta en la fila LK. Se trae articulo IN (438E, 438EL) y la
   // empresa de cada pedido se decide con la L (L → LK; el resto por NP).
-  const _codBL = _codB + "L";
+  const _codCands = _stkArtCands(_codB).map(encodeURIComponent).join(",");   // v19.79: variantes de cero (problema 425)
   /* v19.65 (Thomas: "¿por qué ahí dice que pide 198 pero cuando entro veo solo tres cajas?
      algo está mal") — la fuente pasó de `gv_ppp_base_pedidos` (SOLO el espejo de ISIS) a
      `gv_demanda_pedidos`, que es ISIS + WEB. Es el MISMO agujero que tenía el generador de
@@ -21433,13 +21447,13 @@ async function stkOpenCajasPedidasArt(codEnc) {
      que ninguna matcheaba y su demanda no se mostraba.
      Medido en el 321 el 18/09: pendiente = 2 NP / 3 cajas de ISIS + **13 NP / 194 cajas de
      la web**. El pop-up mostraba las 3 y la columna decía 198. */
-  try { base = await fetch(SUPABASE_URL + "/rest/v1/gv_demanda_pedidos?articulo=in.(" + encodeURIComponent(_codB) + "," + encodeURIComponent(_codBL) + ")&select=pedido,cajas,articulo,origen&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
+  try { base = await fetch(SUPABASE_URL + "/rest/v1/gv_demanda_pedidos?articulo=in.(" + _codCands + ")&select=pedido,cajas,articulo,origen&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }); } catch (_e) {}
   const pedByNp = {}, cliByNp = {}, origenByNp = {};
   /* `gv_demanda_pedidos` no trae `cliente`, así que el fallback de Razón Social para las NP que
      NO están en ninguna programación (v12.22) se pide aparte, de la base de ISIS. Best-effort:
      si falla, esas filas quedan con "—" como antes de la v12.22. */
   try {
-    const _cli = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos?articulo=in.(" + encodeURIComponent(_codB) + "," + encodeURIComponent(_codBL) + ")&select=pedido,cliente&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    const _cli = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos?articulo=in.(" + _codCands + ")&select=pedido,cliente&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
     _cli.forEach(function (x) {
       const np = String(x.pedido || "").trim().replace(/\.0+$/, ""); if (!np || cliByNp[np]) return;
       const c = String(x.cliente || "").trim(); if (c) cliByNp[np] = c;
@@ -21627,7 +21641,9 @@ async function stkOpenMovsArt(codEnc, dep, titulo, icono) {
   // v6.32 — NP(s) que pidieron ESTE artículo en cada tanda → para las filas de picking/separado.
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const base = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos?articulo=eq." + encodeURIComponent(cod) + "&select=pedido&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    /* v19.79 - `articulo=eq.<cod>` no encontraba nada cuando la base tiene el codigo con
+       ceros y la fila trae el pelado (071 vs 71). Problema 425. */
+    const base = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos?articulo=in.(" + _stkArtCands(codBase(cod)).map(encodeURIComponent).join(",") + ")&select=pedido&limit=20000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
     const nps = [];
     base.forEach(function (x) { const np = String(x.pedido || "").trim().replace(/\.0+$/, ""); if (np && nps.indexOf(np) < 0) nps.push(np); });
     if (nps.length) {
