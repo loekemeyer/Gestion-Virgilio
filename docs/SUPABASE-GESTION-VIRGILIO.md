@@ -24627,41 +24627,61 @@ compararlos en la misma fila.
 **Prueba:** `node tests/apr-cuarentena.cjs` — la columna existe, el retenido muestra `$80.000` /
 `c/IVA $96.800`, y la tabla tiene tantos `<td>` como `<th>`.
 
----
+## §3.jy — v19.95: al renombrar una tanda, el CANDADO se quedaba con el código viejo — 2026-09-18
 
-## §3.jy — v19.95: el valor de un pedido se calculaba DOS veces — 2026-09-18
+**Síntoma (Thomas, 18/09):** el armador elige `E12A` en el módulo, toca Enviar y la app le contesta
+que **"ya la agarró Jhonny"**. La tanda está pickeada y nadie la puede arrancar.
 
-**Thomas, 2026-09-18** (sobre lo que le marqué al cerrar la v19.94): *"colapsalo a una llamada
-supongo"*.
+**Causa.** `gv_ppp_tanda_renombrar` renombraba los eventos, las Entregas, la Facturación, el stock
+del pipeline y las tablas de tandas — **todo menos `GV_Tandas_Lock`**, que no aparecía ni una vez
+en su cuerpo (`prosrc ~* 'GV_Tandas_Lock'` daba `false`). El candado se quedaba con el código
+**viejo**, o sea a nombre de la tanda que antes usaba ese código. Las dos filas que lo probaron, y
+en las dos el candado se escribió **el mismo segundo** que el evento que hoy dice otra cosa:
 
-`gv_clientes_nuevos_valor_lote` llamaba a **`gv_ppp_web_valor_items` dos veces por pedido**: una
-para el neto y otra, idéntica, para multiplicarla por 1,21. Se notaba poco mientras el lote eran
-los 2 o 3 clientes nuevos del día; desde la v19.94 el lote va por **todos** los retenidos, así que
-el doble de trabajo pasó a pagarse siempre.
-
-Y no es una función barata: arma 5 CTE y pega contra `precios_venta`, `precios_venta_chef`,
-`cobranzas_precios_super`, `clientes_dto` y `GV_UxB`.
-
-**Medición** (20 pedidos de 3 artículos, mitad LK y mitad Chef, un tercio con condición web):
-
-| | antes | después |
+| candado | evento del mismo segundo | de quién es en realidad |
 |---|---|---|
-| tiempo | **74 ms** | **36 ms** (−51 %) |
-| montos distintos | — | **0 de 20** |
+| `E12A · picking · Cartaya · completada · 16/09 10:24:49` | `EP E12S` 10:24:49 | **E12S** |
+| `E12A · picking · ts_estado 11:22:54` | `TP E12S` 11:22:54 | **E12S** |
+| `E12E · picking · Cartaya · TOMADA · 16/09 13:08:51` | `EP E37F` 13:08:51 | **E37F** |
 
-⚠ **El CTE va `MATERIALIZED` a propósito.** Sin esa palabra el planner aplana el CTE, copia la
-llamada en las dos columnas de salida y **volvemos a las dos llamadas sin que nada lo avise** — el
-mismo tipo de regresión silenciosa que el `security_invoker` que se come un `CREATE OR REPLACE
-VIEW`. Por eso tiene centinela:
+**Rompía en las dos direcciones, y la segunda es la que no se ve:**
+
+1. sobre el código **viejo**, el candado ajeno frena a quien quiera trabajarlo — *"ya está PICKEADA
+   (la terminó …)"* (`motivo = ya_completada`) o *"la está pickeando …"* (`tomada`). Y un `tomada`
+   colgado deja además **al dueño sin poder empezar ninguna otra** de esa fase, por el guard
+   `otra_tanda_abierta` (ventana de 3 días). Cartaya lo tuvo así desde el 16/09.
+2. sobre el código **nuevo** (E12S, E37F) **no quedaba candado**, así que su picking se podía
+   **reabrir** — justo el invariante que la tabla existe para sostener (v18.65, pedido de Luis).
+
+**El arreglo.** `gv_ppp_tanda_renombrar` mueve también el candado. ⚠ `GV_Tandas_Lock` es **única
+por `(tanda, fase)`**: si el destino ya tiene esa fase —el caso de juntar dos tandas— un `update`
+pelado tira el unique y la RPC entera devuelve 400, que es el mismo pozo del problema 407 con
+`Movimientos_Stock`. Entonces **primero el DELETE del origen que choca, después el UPDATE**:
 
 ```sql
-select * from public.gv_reglas_perdidas;   -- vacía = la regla sigue
--- GV_Reglas_Centinela: gv_clientes_nuevos_valor_lote · funcion · patrón `as\s+materialized`
+delete from public."GV_Tandas_Lock" l
+ where upper(btrim(l.tanda)) = v_a
+   and exists (select 1 from public."GV_Tandas_Lock" d
+                where upper(btrim(d.tanda)) = v_b and d.fase = l.fase);
+update public."GV_Tandas_Lock" l set tanda = v_b where upper(btrim(l.tanda)) = v_a;
 ```
 
-El candado de supervisor quedó **adentro** del CTE, en el `WHERE` (que se evalúa antes que la lista
-de selección): a un no-supervisor no se le valoriza nada, igual que antes.
+**Criterio en la fusión: manda el DESTINO** (es la tanda que sobrevive y su candado refleja su
+propio trabajo); la fila del origen se borra. Es el lado indulgente a propósito: nadie queda
+trabado por un candado que ya no representa a nadie, y el evento EP/AP del origen sigue estando
+para reconstruir.
 
-**Rollback:** `select def from zz_backups."GV_Backup_ValorLote_20260918";` — y los 20 montos de
-control, en `zz_backups."GV_Backup_ValorLote_Res_20260918"`.
-`sql/gv_clientes_nuevos_valor_lote_v1995.sql`.
+**Probado corriéndolo, no leyéndolo** (tandas `ZZ99Z`/`ZZ98Z`, borradas después): el `armado` del
+origen se renombró y el `picking`, que chocaba, se borró dejando el del destino intacto — sin
+violación de unique.
+
+**Datos corregidos** (backup `zz_backups."GV_Backup_TandasLock_20260918"`, con RLS):
+`E12A → E12S` y `E12E → E37F`. Con eso E12A y E12E quedaron libres.
+
+**Centinela nuevo:** `select * from public.gv_tandas_lock_huerfano;` — un candado que no coincide
+con ningún `EP/AP` de su tanda. Vacía = todo bien. Al 18/09 quedan **12 filas**, todas
+`completada` y ninguna bloquea hoy: son códigos ya renombrados cuyos candados nunca se mudaron
+(E03F, E03G, E12L, D71B, E11B, E01D, D52B, D40D, C06B). Son minas para cuando un código se
+recicle. La regla quedó además en `GV_Reglas_Centinela` (`gv_ppp_tanda_renombrar` ~ `GV_Tandas_Lock`).
+
+`sql/gv_tanda_lock_renombrar_v1996.sql`.
