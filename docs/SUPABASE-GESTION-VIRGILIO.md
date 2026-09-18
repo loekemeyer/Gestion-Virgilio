@@ -25078,3 +25078,39 @@ una descripción basura, y corregir 18 filas a mano no evita la número 19.
 guards por la forma vieja. `stocks_carga_rapida` se realinea sola con el cron 57.
 
 **Centinelas nuevos** (`GV_Reglas_Centinela` 25 y 26): el guard normalizado y la rama `base_L`.
+
+---
+
+## §3.kg — v20.06: el 055 se llamaba "Pinza De Ensalada", igual que el 054 — 2026-09-18
+
+Cola de la §3.kf: con el guard arreglado, el **055** pasó a mostrar *"Pinza De Ensalada Mgo Pla X
+12"* — el nombre del **054**. Dos códigos distintos con el mismo nombre en la pantalla es peor que
+un código sin nombre, así que se siguió tirando del hilo.
+
+**`Articulos Virgilio X Tallerista` tiene DOS filas por código** (una por tallerista), y las de
+Rafael están **cruzadas**:
+
+| cod | Log/ Fabr (id viejo) | Rafael (id nuevo) | `OC_Maximos` |
+|---|---|---|---|
+| 053 | Pinza De Fiambre Inox Cachas Plásticas 23cm | Pinza De Fiambre Mgo Plast X 12 | Pinza De Fiambre X 12 |
+| 054 | Pinza De Ensalada Inox Cachas Plásticas 23cm | Pinza De **Fideos** Mgo Plast X 12 | Pinza De Ensaladas X 12 |
+| 055 | Pinza De Fideos Inox Cachas Plásticas 25cm | Pinza De **Ensalada** Mgo Pla X 12 | Pinza De Fideos X 12 |
+
+La CTE desempataba con `order by k, descripcion` — **alfabético, que no significa nada** — y para el
+055 eso elegía justo la fila cruzada. Ahora desempata por **`id`**: la fila más vieja, que es la que
+coincide con `OC_Maximos`.
+
+**Medido**: 20 códigos tienen más de una descripción en esa tabla y **8 cambian de nombre**. Cuatro
+mejoran claro (055 → Fideos, 564 `"C Pizza 8 LK"` → nombre de verdad, 609 `"Pisa Papa"` → `"Pisa
+Papas Acero Inox"`, 558 sin el `"(GRJ5)"` pegado al nombre), tres son la misma palabra con otra
+capitalización y uno (GRJ10, arandela/resorte) es indistinto.
+
+⚠ Las otras dos fuentes (`proyeccion_madre`, `OC_Maximos`) tienen **0** códigos con más de una
+descripción, así que su `order by` no desempata nada: se dejaron como estaban.
+
+⚠ **No se tocó el dato**: las filas cruzadas de Rafael siguen en `Articulos Virgilio X Tallerista`.
+Corregirlas es decisión del dueño — y esa tabla la usa la recepción de talleristas, no sólo esto.
+
+Después de aplicar: 729 filas, 0 con descripción == código, 0 duplicados, `security_invoker` true,
+`gv_reglas_perdidas` y `gv_endpoints_rotos` en 0.
+`sql/gv_nombres_articulos_desempate_id_v2006.sql`. Rollback: `order by 1, 2` en `norm_vxt`.

@@ -1,3 +1,20 @@
+## Nota v20.06 (2026-09-18) — El 055 se llamaba "Pinza De Ensalada", igual que el 054
+
+Cola de la v20.05. `Articulos Virgilio X Tallerista` tiene **dos filas por código** (una por
+tallerista) y las de Rafael están **cruzadas**: dice Fideos donde va Ensalada (054) y Ensalada
+donde va Fideos (055). La vista desempataba **alfabéticamente** — que no significa nada — y para el
+055 elegía justo la cruzada. Ahora desempata por **`id`**, la fila más vieja, que es la que coincide
+con `OC_Maximos`.
+
+Cambian 8 nombres de los 20 códigos que tienen más de una descripción: 4 mejoran claro (055 =
+Pinza De Fideos, 564 dejó de ser "C Pizza 8 LK", 609 "Pisa Papa" → "Pisa Papas Acero Inox", 558 sin
+el "(GRJ5)" pegado), 3 son la misma palabra con otra capitalización y 1 es indistinto.
+
+**El dato cruzado no se tocó**: corregir esas filas es decisión del dueño, y esa tabla la usa la
+recepción de talleristas. §3.kg de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+---
+
 ## Nota v20.05 (2026-09-18) — El 043 se llamaba "043": el guard que existía y no servía
 
 Thomas: *"la descripción del 043 y esos otros códigos no debería ser 043, algo se rompió ahí"*.
