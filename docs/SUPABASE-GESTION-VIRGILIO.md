@@ -24947,3 +24947,56 @@ Corriendo la misma lógica con el backup de esas filas unido a `Entregas_Virgili
 exactamente `D69C | 98622 | facturada = false`. Lo habría cazado.
 
 `sql/gv_tanda_renombrar_tablas_faltantes_v2000.sql`.
+
+## §3.ke — v20.01: mover un pedido cuya tanda ya tiene trabajo hecho queda BLOQUEADO — 2026-09-18
+
+**Thomas, 18/09, con el caso Martinelli todavía caliente:** *"que el sistema avise cuando movés un
+pedido que ya tiene picking o armado hecho. **URGENTE YA y que inhabilite.** Cuando haga falta se
+ve el código en el momento."*
+
+**Por qué.** Mover una NP de una tanda a otra cambia el **papel** —programación, Entregas,
+facturación, eventos— pero **no las cajas**: el picking y el armado viven en la pila de la
+**tanda**, no del pedido. La mercadería se queda en la tanda vieja y nadie se entera. Es
+exactamente la NP 98622: armada en D69C el 16/09, movida a E33A, 92 cajas huérfanas en el piso de
+armado que después el facturado de **otra** NP se llevó como si hubieran salido.
+
+**Bloquea, no avisa.** En `gv_ppp_isis_programar` ya había un aviso de texto —*"si ya estaba
+pickeada y armada, no hay que repetirlo"*— y no alcanzó: se reprogramó igual, se volvió a pickear
+y quedaron 184 cajas afuera para un pedido de 92. La excepción se levanta a mano, caso por caso,
+mirando el stock.
+
+**Cómo está armado.** `gv_tanda_trabajo_hecho(tanda)` contesta si esa tanda tiene picking o armado,
+con dos señales por lado y las baratas primero (el stock sale por el índice del dedup; los eventos
+por el de `opcion`, que para EP/TP/AP/TAP son pocos miles de filas). **~16 ms por NP.**
+`gv_np_trabajo_hecho(np)` resuelve la tanda de hoy y delega. `gv_np_mover_guard(nps, destino)`
+levanta la excepción con la lista de las NP que frenan y por qué.
+
+**Dónde se engancha:**
+
+| función | qué hace | freno |
+|---|---|---|
+| `gv_ppp_nps_mover_a` | mueve NP a otra tanda | **sí**, apenas se arma la lista |
+| `gv_ppp_isis_programar` | reprograma desde A Programar | **sí**, sólo si el código que sale es **distinto** de `tanda_previa` |
+| `gv_ppp_web_tanda_reusar` | devuelve el pedido a **su** tanda | no: es el caso sano |
+| `gv_ppp_pedido_mover` · `gv_ppp_tanda_mover` | pasan por el renombrador | no: **sí** arrastran la mercadería |
+
+⚠ **Sólo frena cuando el destino es OTRA tanda.** Cambiarle el día a una tanda entera —que pasa
+todo el tiempo— no se toca: ahí la mercadería viaja con su tanda.
+
+⚠ **El mensaje llega al usuario tal cual**: `aprMsgErr` del front ya saca el `message` de
+PostgREST, así que no hubo que tocar nada del lado del celular.
+
+**Probado corriéndolo**, todo dentro de bloques que abortan y sin escribir una fila:
+
+- mover 98622 (E33A, pickeada y armada) a otra tanda → **frenó**;
+- mover 98622 a **su misma** tanda con otra fecha → pasó;
+- misma tanda, NP inexistente y lista vacía → pasan;
+- la rama de bloqueo de `gv_ppp_isis_programar` con D69C → *"su tanda anterior D69C ya esta
+  pickeada y armada y las 148 cajas pickeadas quedarian ahi, sin dueno"*;
+- el camino sano de `gv_ppp_isis_programar` (98617, tanda previa E12I sin trabajo) → corrió.
+
+⚠ **Y una trampa del procedimiento, para la próxima:** crear la función y probarla **en la misma
+llamada** no sirve — la excepción de la prueba aborta también el `CREATE`, y la función queda sin
+existir mientras el resultado parece decir que anduvo. Van en llamadas separadas.
+
+`sql/gv_np_mover_guard_v2001.sql`.
