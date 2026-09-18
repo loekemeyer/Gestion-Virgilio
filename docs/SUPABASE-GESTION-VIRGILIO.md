@@ -25001,7 +25001,84 @@ existir mientras el resultado parece decir que anduvo. Van en llamadas separadas
 
 `sql/gv_np_mover_guard_v2001.sql`.
 
-## §3.kf — v20.04: los códigos con "L" no son artículos y salen del Generador de OC — 2026-09-18
+---
+
+## §3.kf — v20.05: la descripción del 043 era "043" — el guard comparaba una punta cruda y la otra normalizada — 2026-09-18
+
+**Thomas, 18/09:** *"la descripción del 043 y esos otros códigos no debería ser 043, algo se rompió ahí"*.
+
+`vista_nombres_articulos` **ya tenía** el guard "la descripción no puede ser el propio código", en
+las tres fuentes que arma por CTE (`proyeccion_madre`, `Articulos Virgilio X Tallerista`,
+`OC_Maximos`). Estaba escrito así:
+
+```sql
+upper(btrim(descripcion)) <> upper(regexp_replace(cod, '^0+(.)', '\1'))
+--        ↑ cruda                        ↑ normalizada, SIN el cero adelante
+```
+
+La descripción cruda contra el código **sin** ceros. Cuando la basura viene escrita **con** el
+cero —`"043"` en el código `043`— las dos puntas no coinciden (`'043' <> '43'`), el guard la deja
+pasar y el artículo termina llamándose como su código. **El guard existía y no servía justo para
+el caso que más aparece.**
+
+> Es la misma familia de bug que el de esta misma tanda en el detalle de Stocks (§ v20.02) y que
+> el problema 358: **una punta normalizada y la otra no**. Cuando dos lados comparan códigos,
+> los dos tienen que estar en la misma forma.
+
+### Lo que se midió (18/09)
+
+**18 de las 616 filas** de la vista tenían el código como nombre, y las 18 salían de
+`proyeccion_madre.gv_descripcion`, que es la fuente de **más prioridad** — o sea que además
+**tapaba el nombre bueno que ya estaba** en las otras dos:
+
+| cod | mostraba | lo que había en `Articulos Virgilio X Tallerista` |
+|---|---|---|
+| 043 | 043 | Abrelatas Uña 3 En 1 |
+| 052 | 052 | Cepillo Lavavajilla |
+| 053 | 053 | Pinza De Fiambre Inox Cachas Plásticas 23cm |
+| 054 | 054 | Pinza De Ensalada Inox Cachas Plásticas 23cm |
+| 055 | 055 | Pinza De Fideos Inox Cachas Plásticas 25cm |
+| 097 | 097 | Afila Cuchillos Base Blanca/Verde |
+| 099 | 099 | Pelapapas Mgo Plástico Ergonómico |
+
+Los otros 11 son códigos con L (`026L`, `031L`, `035EL`…) y un `000E`: ésos no tenían nombre en
+ninguna fuente.
+
+**Dónde se veía**: de esa vista cuelgan `vista_stock_procesada`, `stocks_carga_rapida` (vía
+`refresh_stocks_carga_rapida`, cron 57 cada 5 min), `vista_abastecimiento`, `gv_planimetria_celda`,
+`gv_stock_procesada_dup` y las tres funciones de aviso por Telegram.
+
+### Los dos cambios
+
+1. **El guard compara las dos puntas normalizadas** (sin el cero adelante), en las 4 CTE.
+2. **Fallback `base_L`**: un código terminado en L es el artículo de Loekemeyer vendido por Chef
+   (regla del dueño v13.71: 505 → 505L), así que si no tiene nombre propio hereda el del base.
+   Las claves L entran a `keys` desde una CTE propia (`keys_l`), porque el guard nuevo las saca de
+   `norm_pm` y sin eso no llegarían al fallback. **124 códigos `NNNL` quedaron con nombre**
+   (`102EL` = Abrelatas Mariposa, `220L` = Cuchara Madera 40 Cm…). El `000E` queda sin descripción,
+   que es lo correcto: antes decía "000E" y parecía un nombre.
+
+**No se tocó el dato de `proyeccion_madre`**: el guard de la vista existe exactamente para ignorar
+una descripción basura, y corregir 18 filas a mano no evita la número 19.
+
+### Medición después de aplicar
+
+| | antes | después |
+|---|---|---|
+| filas de la vista | 616 | 729 |
+| descripción == código | **18** | **0** |
+| códigos duplicados | 0 | 0 |
+| heredados por `base_L` | — | 124 |
+| `security_invoker` | true | **true** (se vuelve a poner explícito) |
+
+`gv_reglas_perdidas`, `gv_endpoints_rotos` y el barrido de vistas sin `security_invoker`: **0**.
+
+**Rollback**: la definición anterior está en el mensaje del commit v20.05 y se vuelve con un
+`create or replace` a `sql/gv_nombres_articulos_desc_es_codigo_v2005.sql` cambiando los cuatro
+guards por la forma vieja. `stocks_carga_rapida` se realinea sola con el cron 57.
+
+**Centinelas nuevos** (`GV_Reglas_Centinela` 25 y 26): el guard normalizado y la rama `base_L`.
+## §3.kg — v20.06: los códigos con "L" no son artículos y salen del Generador de OC — 2026-09-18
 
 **Thomas, 18/09 (video del Generador de OC):** *"Todos los que tienen L no deben aparecer para
 OC. Son para Loeke y nada más"*.
@@ -25086,5 +25163,5 @@ Backups: `zz_backups."GV_Backup_VistaGeneradorOC_20260918"` (la definición viej
 
 ⚠ **Y de paso, el repo volvió a tener la definición completa.** La **v19.85** se había aplicado
 como `replace()` sobre `pg_get_viewdef`, así que el último `CREATE` entero guardado era el de la
-v19.84 y ya no coincidía con lo que corría. `sql/gv_generador_oc_sin_codigos_L_v2004.sql` tiene
+v19.84 y ya no coincidía con lo que corría. `sql/gv_generador_oc_sin_codigos_L_v2006.sql` tiene
 la definición viva **verificada por md5 contra la base** (`4cc29b4f…`, 18.573 caracteres).

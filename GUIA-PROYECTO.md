@@ -1,4 +1,4 @@
-## Nota v20.04 (2026-09-18) — Los códigos con "L" NO son artículos: fuera del Generador de OC
+## Nota v20.06 (2026-09-18) — Los códigos con "L" NO son artículos: fuera del Generador de OC
 
 Thomas, mirando el Generador de OC: *"Todos los que tienen L no deben aparecer para OC. Son para
 Loeke y nada más"*. Eran **53 filas fantasma** — `505L`, `513L`, `584EL`, `438EL`… — todas con
@@ -30,10 +30,79 @@ las filas L se mudaron y 29 las absorbió el stock que el código base ya tenía
 505 +4, 584E +4, 502 +3, 506 +3; y `439E LK` +1, que prueba el camino del dual.
 
 **Chequeo:** `select count(*) from public.vista_generador_oc where cod ~ 'L$';` — **0**.
-§3.kf de `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/gv_generador_oc_sin_codigos_L_v2004.sql`, que
+§3.kg de `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/gv_generador_oc_sin_codigos_L_v2006.sql`, que
 además vuelve a dejar en el repo la **definición completa** de la vista (la v19.85 se había
 aplicado como `replace()` y el repo tenía la de la v19.84).
 
+## Nota v20.05 (2026-09-18) — El 043 se llamaba "043": el guard que existía y no servía
+
+Thomas: *"la descripción del 043 y esos otros códigos no debería ser 043, algo se rompió ahí"*.
+
+`vista_nombres_articulos` ya traía el guard **"la descripción no puede ser el propio código"**,
+pero comparaba la descripción **cruda** contra el código **sin el cero adelante**: `'043' <> '43'`
+da verdadero, así que la basura pasaba. **18 de 616 filas** tenían el código como nombre — y las
+18 venían de `proyeccion_madre`, la fuente de más prioridad, tapando el nombre bueno que ya estaba
+en `Articulos Virgilio X Tallerista`: 043 = Abrelatas Uña 3 En 1, 052 = Cepillo Lavavajilla,
+053/054/055 = las pinzas, 097 = Afila Cuchillos, 099 = Pelapapas.
+
+Ahora el guard normaliza **las dos puntas**, y de paso un código terminado en L (el artículo de
+Loeke vendido por Chef, regla v13.71) hereda el nombre del base: 124 códigos `NNNL` dejaron de
+estar sin descripción.
+
+Se ve en Stocks, en el generador de OC y en los avisos de Telegram, porque de esa vista cuelgan
+`vista_stock_procesada`, `stocks_carga_rapida`, `vista_abastecimiento` y `gv_planimetria_celda`.
+La pantalla se realinea sola con el cron 57 (cada 5 min). Detalle y medición: §3.kf de
+`docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+---
+
+## Nota v20.04 (2026-09-18) — Columna «SALIÓ» en la tabla de Programación
+
+Thomas: *"agregá columna a esa visión que sea SALIÓ a la izquierda de FACTURADO que busque en el
+módulo En salida para ver si esa tanda/NP ya salió en el camión"*.
+
+**Mirar sólo «En Salida» habría mentido.** De ese módulo la NP **se va sola** cuando vuelve el
+remito (CRN) y pasa a Pedidos Entregados — y una NP entregada, obviamente, salió. Medido el 18/09
+sobre las **158 NP** del árbol (`gv_ppp_prog_arbol`, hoy → +60 días):
+
+| | NP |
+|---|---|
+| están en **En Salida** (todas con CCN) | 7 |
+| ya tienen **CRN** y siguen en el árbol | 9 |
+| en En Salida **sin** carga al camión | 0 |
+
+Con la vista sola, esas 9 dirían «no salió». Por eso la columna cruza **dos** fuentes, las dos del
+backend y las dos ya cargadas en esta pantalla (no hay una llamada de red nueva):
+
+- **`gv_ppp_en_salida`** (`_pppEnSalida`): cuenta como salida `cargada` (evento **CCN**),
+  `salida_manual` (la dio por salida un supervisor, v15.97) y `armada_sin_carga` (salida presunta:
+  armada hace +36 h y sin papel, v15.55). **No** cuenta la facturada sin cargar: ésa sigue en el
+  depósito y es justo la que Programación tiene que seguir mostrando como pendiente de salir.
+- **los CCN de los últimos 60 días** (`_pppLoadMs`, el mapa que arma `pppRefreshEntregado`), que
+  son los que ya pasaron a Entregados. Ese mapa **ya descuenta el FSS posterior**: si la mercadería
+  volvió al depósito, no salió.
+
+**Dónde se ve:** el **%** va en la fila del **día** y en la de la **tanda** (5ª columna, violeta,
+a la izquierda de Facturado); la fila de la **NP** lleva el chip **🚚 Salió** al lado de su pastilla
+de estado — ahí no va en la columna porque, al abrir la NP, el contenido ocupa esas celdas
+(`colspan` 6 → **7**).
+
+⚠ **La fila ya no suma 100 %, y está bien.** Los otros cuatro porcentajes son estados excluyentes;
+«Salió» se cruza con ellos: una NP puede estar **facturada Y salida**. Se lee sola.
+
+⚠ **Mientras las dos fuentes no llegaron, la celda dice «—», no `0 %`.** Un cero ahí sería una
+afirmación falsa («no salió ninguna») cuando lo cierto es que todavía no se sabe.
+
+**Va en el front**, no en `gv_ppp_prog_arbol`: el dato ya es del backend y agregarle una columna al
+`TABLE(...)` de esa RPC obliga a **DROP + CREATE** de una función que usan varias pantallas.
+
+**En el celular entra igual** (v20.01): con 9 columnas la tabla llena medía 379 px contra 364 de
+marco, así que el espacio de `100 %` pasó a un span propio (`pga-pcs`) que el celular esconde —
+cinco columnas de porcentaje × ~4 px — y el padding lateral bajó a 2 px. Medido: **356 px de
+mínimo**, entra en 390 con 8 px de aire. El `textContent` sigue diciendo `100 %`.
+
+`tests/ppp-tabla-salio.cjs` (10 chequeos: las tres formas de salida, la facturada-sin-cargar que
+NO sale, la entregada que sí, el % por día/tanda/total, el chip por NP y el «—» sin datos).
 ## Nota v20.02 (2026-09-18) — Abrir una fila de Stocks decía "sin movimientos contados" teniendo stock
 
 Lo reportó Thomas con una foto: el **055** muestra 21 cajas en góndola y, al tocarlo, el detalle
