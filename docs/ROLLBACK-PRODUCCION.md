@@ -1874,3 +1874,33 @@ do $$ declare d text; begin
 end $$;
 delete from public."GV_Reglas_Centinela" where objeto = 'vista_generador_oc';
 ```
+
+---
+
+## v19.71 — `vista_generador_oc`: el Máximo ya no se topea por la góndola — 2026-09-18
+
+**Vista que Producción Virgilio LEE** (`index.html`, `sw.js`), por eso va acá. Pedido de Thomas:
+*"no contemples el maximo de gondola para pedidos"*. Detalle en §3.jh de
+`docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+| | |
+|---|---|
+| Qué cambió | en el `CASE` del Máximo, `LEAST(ceil(proy × indice), cap)` → `ceil(proy × indice)`. Las ramas `llenar_gondola` y "proveedor sin proyección" **no se tocaron**: ahí la capacidad no es un tope |
+| Respaldo | `zz_backups."GV_Backup_Def_GeneradorOC_20260918b"` (definición previa + `reloptions`), con RLS |
+| Impacto medido | 49 códigos suben el Máximo · 33 piden más · **+2.178 cajas** · total 7.324 → 9.502 |
+| `reloptions` | `security_invoker=true` repuesto y verificado |
+
+⚠ **Lo que cambia en plata:** sumado al fix de la v19.62 (contar los pedidos web), el cron 50 del
+miércoles va a pedir bastante más que antes. Las dos cosas son correctas por separado; si hay que
+frenar, cada una tiene su rollback y son independientes.
+
+### Rollback
+
+```sql
+do $$ declare d text; begin
+  select definicion into d from zz_backups."GV_Backup_Def_GeneradorOC_20260918b";
+  execute 'create or replace view public.vista_generador_oc as ' || d;
+  execute 'alter view public.vista_generador_oc set (security_invoker = true)';
+end $$;
+delete from public."GV_Reglas_Centinela" where version = 'v19.66';
+```

@@ -23410,3 +23410,50 @@ el camino normal.
 **tanda**, no por NP: al mover un pedido suelto, las cajas pickeadas siguen contadas en la tanda
 de origen. No es lo que rompió acá (esto se ve recién cuando se compara pedido contra pedido), y
 tocarlo es otra tanda de trabajo, pero queda anotado para no descubrirlo de nuevo desde cero.
+
+## §3.jh — v19.71: el MÁXIMO de la OC ya no se topea por la góndola · y Oscar silenciado — 2026-09-18
+
+### 1. Sin tope de góndola
+
+**Thomas:** *"no contemples el maximo de gondola para pedidos. Tenemos que tener la mercadería
+que hace falta, despues vemos como la guardamos"*.
+
+| | |
+|---|---|
+| antes | `Máximo = LEAST(ceil(proyección × índice), capacidad)` |
+| ahora | `Máximo = ceil(proyección × índice)` |
+
+**La capacidad sigue valiendo en las otras dos ramas del `CASE`, a propósito**: con
+`llenar_gondola = true` la capacidad es el **objetivo** del código (no un techo), y en un código
+con proveedor real pero **sin** proyección es la única referencia que queda — sin eso pediría 0.
+
+**Medido antes de aplicar:** **49** códigos suben el Máximo, **33** pasan a pedir más, **+2.178
+cajas**; el total a pedir va de **7.324 a 9.502**. Peores: 501 365→888 · 31 0→223 · 315 0→211 ·
+505 594→768 · 583E 72→203 · **321 320→425** · 207 0→101.
+
+El 321, que abrió todo el tema: proyección 366 × 1,5 = **550** (antes quedaba en 445, su
+capacidad), 321 de stock, 196 pedidas → **425 a pedir**.
+
+⚠ **Consecuencia esperada, no un bug:** comprando por encima de la góndola, el aviso de recepción
+*"no entra en góndola"* (`_opGondExceso`, factor 1.20) va a saltar más seguido y el excedente va a
+racks. Es lo que Thomas aceptó con *"después vemos cómo la guardamos"*.
+
+Centinela nuevo con el patrón `THEN ceil\(b\.proy \* b\.indice\)`: si alguien vuelve a meter el
+`LEAST`, ese patrón desaparece y `gv_reglas_perdidas` lo canta.
+`sql/gv_generador_oc_sin_tope_gondola_v1971.sql`, respaldo en
+`zz_backups."GV_Backup_Def_GeneradorOC_20260918b"`.
+
+### 2. Oscar silenciado en el aviso de entrega ajena
+
+**Thomas:** *"silencialo a oscar"*. Primera fila de `GV_OC_Entrega_Permitida`: par
+**`Log/ Fabr` ← `Oscar`**, `cod = null` (todo el par). Verificado leyendo el mismo filtro que usa
+el loop de `gv_oc_aplicar_recepcion`: los **11** códigos de Oscar (280, 500, 506, 510, 555, 557,
+654, 658, 659, 758, 764) dan **SILENCIADO** y el resto sigue avisando.
+
+⚠ **El aviso de la v19.57 ya está trabajando en producción**, y conviene tenerlo escrito porque
+casi lo leí al revés: al mirar `telegram_outbox` aparecieron **2 filas** después de una prueba con
+`rollback`, y la primera lectura fue *"el rollback no funcionó"*. **No eran de la prueba**: eran
+dos recepciones **reales** de **Pedernera** de esa mañana (09:24 el **544** y 09:25 el **560**,
+las dos con OC a nombre de Log/ Fabr), ya enviadas. La prueba propia no dejó nada.
+**Antes de declarar que una transacción no revirtió, mirar el `created_at` y el contenido de las
+filas**, no sólo el conteo.
