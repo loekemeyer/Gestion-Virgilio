@@ -71,6 +71,9 @@ catch (_e) {
       return e ? getComputedStyle(e).color : "";
     })();
     out.pctDia = (dia.querySelector(".pga-pct.sal") || {}).textContent;
+    // v20.11: las 5 columnas netean y suman 100 % — 4 salieron (3 facturadas + 1 armada) y queda
+    // 1 facturada que todavía está en el depósito.
+    out.filaDia = [...dia.querySelectorAll(".pga-pct")].map((e) => e.textContent.trim());
     out.salioUno = _pgaSalio({ np: "98001" }) + "," + _pgaSalio({ np: "98002" }) + "," +
                    _pgaSalio({ np: "98003" }) + "," + _pgaSalio({ np: "98004" }) + "," +
                    _pgaSalio({ np: "98005" });
@@ -81,6 +84,13 @@ catch (_e) {
     pgaAbrirTanda("20260922|E41A"); await new Promise((s) => setTimeout(s, 120));
     out.chips = [...prev.querySelectorAll("tr.pga-n")].map((tr) =>
       (tr.querySelector(".pga-np") || {}).textContent + ":" + (tr.querySelector(".pga-salio") ? "🚚" : "—"));
+    // v20.11 (Thomas): cada NP marca su 100 % en la columna que le toca
+    out.npPct = [...prev.querySelectorAll("tr.pga-n")].map(function (tr) {
+      const np = (tr.querySelector(".pga-np") || {}).textContent;
+      const on = [...tr.querySelectorAll(".pga-pct")].filter(function (e) { return e.textContent.trim(); })
+        .map(function (e) { return e.className.replace("pga-pct ", "").trim() + "=" + e.textContent.trim(); });
+      return np + ":" + (on.join("+") || "(nada)");
+    });
     out.total = ([...prev.querySelectorAll("table.pga tfoot .pga-pct.sal")][0] || {}).textContent;
     return out;
   });
@@ -101,7 +111,14 @@ catch (_e) {
   const espera = ["98001:🚚", "98002:🚚", "98003:🚚", "98004:—", "98005:🚚"];
   t(JSON.stringify(r.chips) === JSON.stringify(espera),
     "(4) y cada NP lleva su chip 🚚 salvo la que no salió — " + JSON.stringify(r.chips));
-  t(r.sinDatos === "—", "(5) sin las dos fuentes cargadas dice «—», no 0 % — «" + r.sinDatos + "»");
+  t(JSON.stringify(r.filaDia) === JSON.stringify(["80 %4", "20 %1", "0 %0", "0 %0", "0 %0"]),
+    "(5) las 5 columnas NETEAN y suman 100 %: lo que salió no se cuenta otra vez como facturado — " +
+    JSON.stringify(r.filaDia));
+  const npEsp = ["98001:sal=100 %", "98002:sal=100 %", "98003:sal=100 %",
+                 "98004:fac=100 %", "98005:sal=100 %"];
+  t(JSON.stringify(r.npPct) === JSON.stringify(npEsp),
+    "(6) cada NP lleva su 100 % en la columna que le toca — " + JSON.stringify(r.npPct));
+  t(r.sinDatos === "—", "(7) sin las dos fuentes cargadas dice «—», no 0 % — «" + r.sinDatos + "»");
   t(errs.length === 0, "sin errores de JS" + (errs.length ? ": " + errs[0] : ""));
   console.log(ok ? "\nOK ppp-tabla-salio" : "\nFALLÓ ppp-tabla-salio");
   process.exit(ok ? 0 : 1);
