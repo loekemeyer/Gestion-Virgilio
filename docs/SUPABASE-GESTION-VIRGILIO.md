@@ -24177,3 +24177,69 @@ Respaldos: `zz_backups."GV_Backup_Def_GeneradorOC_20260918c"` (definición previ
 `zz_backups."GV_Backup_GeneradorOC_Filas_20260918c"` (las 382 filas de antes).
 Rollback exacto en `docs/ROLLBACK-PRODUCCION.md`; SQL completo en
 `sql/gv_generador_oc_stock_disponible_v1985.sql`.
+
+## §3.jo — v19.86: picking colgado de E12M y E12I, 78 cajas de vuelta a góndola — 2026-09-18
+
+**Problema 429.** Secuela del bug del PKC (problema 421, arreglado en la v19.80). Dos tandas
+quedaron con picking anotado y **cero pedidos**: sus NP se habían mudado a otra tanda y el stock
+se fue con ellas, pero los eventos PKC se quedaron con el código viejo y el cron 68 volvía a crear
+el picking cada 10 minutos. 78 cajas contadas dos veces, descontadas de góndola.
+
+### Cómo se identificó cada par — el patrón se ve en los segundos
+
+```
+E12M · PSP 17/09 11:39:33  ←→  E12A · EP 17/09 11:39:30   (3 s, mismo legajo 104)
+E12I · PKC 17/09 09:22:54  ←→  E12E · EP 17/09 09:22:28
+```
+
+El `EP` (texto = la tanda sola) viajó con el renombre; el `PSP`/`PKC` (tanda en el campo 1) se
+quedó. **Un solo operario, un solo picking, dos códigos.** Las cajas ya estaban contadas del otro
+lado: E12E las consumió al armarse el 18/09, E12A las tiene dentro de sus 193.
+
+### El mecanismo: el de `gv_anular_picking_virgilio`, no un DELETE
+
+No se usó la función tal cual porque exige un `EP` con ese legajo y ese texto, y estas dos ya no
+lo tienen —viajó con el renombre—, así que devuelve `sin_ep`. Pero su mecanismo es el correcto:
+
+1. **`PKC` → `PKCX`.** ⚠ **No se borra la fila**: el `client_id` es lo único que impide que el
+   reenvío de la cola offline del celular **resucite** el evento (hay un UNIQUE sobre esa columna
+   y el front postea con `Prefer: resolution=ignore-duplicates`). Pasó el 15/09 con E25A, borrado
+   16:56 y reinsertado 17:17. Con `PKCX` la fila conserva su `client_id`, el reenvío choca, y
+   ningún consumidor la cuenta: todos filtran por `opcion = 'PKC'`.
+2. **`delta = 0`, no `DELETE`.** `trigger_actualizar_saldo_stock` es `AFTER INSERT OR UPDATE` y
+   **no corre en DELETE**: borrando, `stocks_carga_rapida` queda inflado. Con el UPDATE el saldo
+   se recalcula solo.
+3. `gv_tanda_lock_anular` para las dos.
+
+Corrido como un bloque único con tres guardas que lo abortaban solo: 0 cajas restantes en
+E12M/E12I, la góndola subiendo **exactamente 77** y `separar_pedidos` bajando **exactamente 78**.
+Verificado corriendo `reconciliar_pipeline_stock()` de verdad después: **no vuelven**. 48 PKC
+anulados, 66 filas de stock a cero. Backups en `zz_backups."GV_Backup_Eventos_E12M_E12I_20260918"`
+(49 eventos) y `"GV_Backup_MovStock_E12M_E12I_20260918"` (144 movimientos), las dos con RLS.
+
+### El centinela marcaba dos pares ya resueltos
+
+`gv_stock_picking_duplicado` (v19.80) marcaba 3, pero **E12E/E37F y E12J/E12G ya estaban
+resueltos solos**: al armarse la tanda fantasma, su `separado` cancela el picking duplicado y
+devuelve a góndola lo que no se usó.
+
+| tanda | separar_pedidos | a_facturar | góndola | neto |
+|---|---|---|---|---|
+| E12E | −114 | +37 | +77 | **0** |
+| E12J | −100 | +19 | +81 | **0** |
+
+Y contra el evento `ENT`, el armado salió bien: **E12E armó 38 de 44 pedidas, E12J 20 de 20**
+(E12S, 188 de 199). Desde la v19.86 la vista exige **`neto_fantasma > 0`** y trae esa columna.
+Sin eso el centinela los marcaba para siempre y quedaba en rojo — el mismo defecto que tenía
+`gv_stock_empresa_fantasma` antes de la v19.77. **Un centinela que vive en rojo no lo mira nadie.**
+
+⚠ **Y no confundir con lo normal**: una tanda pickeada y todavía no armada **tiene** que mostrar
+picking colgado. E37F (107, sale el 24/09), E12G (93, el 21/09) y E41A (50, el 25/09) están en ese
+caso y están bien.
+
+**Queda 1 y es el único que espera un dato de afuera:** E12A/E12S — 193 cajas colgadas contra una
+sola NP de 47 (LK 0029, C.M.G. Distrib. de Tegerina, 21/09). Hace falta el conteo físico del
+pallet; no sale de la base.
+
+**Chequeo:** `select * from public.gv_stock_picking_duplicado;`
+`sql/gv_picking_colgado_e12m_e12i_v1986.sql`.
