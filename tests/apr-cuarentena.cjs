@@ -153,6 +153,10 @@ catch (_e) {
     out.cliNuevosCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec);
     out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(cliSec);
     out.cliNuevosSinMixto = !/Cliente Nuevo Deudor/.test(cliSec);
+    // (3a-2) v19.91 (Thomas) — Cuarentena también muestra el MONTO del pedido.
+    out.cuarMontoCol = /<th class="cuar-td-m3">Monto<\/th>/.test(cuarSec);
+    out.cuarCols = (cuarSec.match(/<th[ >]/g) || []).length ===
+                   ((cuarSec.match(/<tr class="cuar-tr[^"]*"[^>]*>([\s\S]*?)<\/tr>/) || ["", ""])[1].match(/<td[ >]/g) || []).length;
     // (3b-2) v19.05 — columnas nuevas: 1er contacto, Speech 1/2, Acción (Aprobar / Eliminar).
     out.cliCols = /1er contacto/.test(cliSec) && /Acci[oó]n/.test(cliSec);
     out.cliSpeech = /Speech 1/.test(cliSec) && /Speech 2/.test(cliSec);
@@ -164,11 +168,15 @@ catch (_e) {
                      ((cliSec.match(/<tr class="cuar-tr[^"]*">([\s\S]*?)<\/tr>/) || ["", ""])[1].match(/<td[ >]/g) || []).length;
     // (3b-3) v19.37 (Luis) — NO hay seña del 30%: el Speech 1 pide el TOTAL con IVA, por
     // adelantado, y la columna Monto muestra ese mismo número debajo del neto.
-    _apr.cliValor = { "chef:200": { valor: 100000, valorIva: 121000 } };
+    _apr.cliValor = { "chef:200": { valor: 100000, valorIva: 121000 },
+                      "lk:202": { valor: 80000, valorIva: 96800 } };
     aprRender(); await new Promise((res) => setTimeout(res, 50));
-    const cliSecIva = document.getElementById("pppPreview").innerHTML.slice(
-      document.getElementById("pppPreview").innerHTML.indexOf("🆕 Clientes nuevos"));
+    const htmlIva = document.getElementById("pppPreview").innerHTML;
+    const cliSecIva = htmlIva.slice(htmlIva.indexOf("🆕 Clientes nuevos"));
+    const cuarSecIva = htmlIva.slice(htmlIva.indexOf("🚧 Cuarentena"), htmlIva.indexOf("🆕 Clientes nuevos"));
     out.cliMontoIva = /clin-iva[^>]*>c\/IVA \$121\.000/.test(cliSecIva);
+    // v19.91 (Thomas): el retenido por deuda muestra su monto (neto arriba, c/IVA abajo).
+    out.cuarMontoIva = /\$80\.000/.test(cuarSecIva) && /clin-iva[^>]*>c\/IVA \$96\.800/.test(cuarSecIva);
     const msg1 = clinSpeechMsg1({ order_id: 200, empresa: "chef", np: null });
     out.cliMsgTotal = /\$121\.000/.test(msg1) && /IVA incluido/.test(msg1);
     out.cliMsgSinSena = !/30\s*%/.test(msg1) && !/se\u00f1a/i.test(msg1);
@@ -475,7 +483,7 @@ catch (_e) {
     // la flechita abre el contenido del pedido en una fila aparte, a lo ancho de la tabla
     aprToggle("clk900"); await new Promise((res) => setTimeout(res, 120));
     html = document.getElementById("pppPreview").innerHTML;
-    out.tblDetalle = /cuar-tbl-det/.test(html) && /colspan="9"/.test(html);
+    out.tblDetalle = /cuar-tbl-det/.test(html) && /colspan="10"/.test(html);   // v19.91: +columna Monto
     aprToggle("clk900"); await new Promise((res) => setTimeout(res, 100));
 
     // el 📖 de un retenido abre el MISMO log, con la clave del pedido
@@ -641,6 +649,9 @@ catch (_e) {
   chk(r.cliNuevosSinMixto, "el pedido mixto (deuda+nuevo) NO aparece en Clientes nuevos");
   chk(r.cliCols, "Clientes nuevos tiene columnas '1er contacto' y 'Acción'");
   chk(r.cliSpeech, "Contacto tiene los botones 'Speech 1' y 'Speech 2'");
+  chk(r.cuarMontoCol, "Cuarentena tiene la columna 'Monto'");
+  chk(r.cuarCols, "la tabla de Cuarentena tiene tantos <td> como <th>");
+  chk(r.cuarMontoIva, "el retenido muestra su monto ($80.000 y c/IVA $96.800)");
   chk(r.cliComCol, "Clientes nuevos tiene la columna 'Coment.'");
   chk(r.cliComBtn, "cada fila abre el MISMO log de comentarios (cuarComAbrirPed)");
   chk(r.cliComCols, "la tabla de Clientes nuevos tiene tantos <td> como <th>");

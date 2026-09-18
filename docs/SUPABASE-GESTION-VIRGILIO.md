@@ -24384,3 +24384,29 @@ siempre. Ahora el disparador es **`cuarComNeed()`**, uno solo, que mira **todos*
 **Prueba:** `node tests/apr-cuarentena.cjs` — tres asserts nuevos (la columna existe, la fila abre
 `cuarComAbrirPed('chef','200')`, y la tabla tiene tantos `<td>` como `<th>`, que es lo que caza un
 desalineo de columnas).
+
+---
+
+## §3.ju — v19.91: Cuarentena también muestra el MONTO del pedido — 2026-09-18
+
+**Thomas, 2026-09-18:** *"agregale el monto del pedido ($) a los de cuarentena que no los tienen"*.
+
+🆕 Clientes nuevos tenía la columna **Monto** desde la v18.95 y 🚧 Cuarentena no, que es donde más
+falta hace: el badge dice *"💰 Deuda $X"* y *"📈 Excede crédito"*, y hasta ahora no había con qué
+compararlos en la misma fila.
+
+**Cambio (SÓLO front, `index.html`):** ninguna RPC nueva.
+
+- `aprColCuarentena()` suma `<th class="cuar-td-m3">Monto</th>` después de Motivos y, en cada fila,
+  `clinNuevosValorFmt(p)` — el **mismo** formato de Clientes nuevos: el **neto por lista** arriba
+  (el que se compara con el límite de crédito) y el **total con IVA** abajo. `colspan` del detalle
+  9 → 10.
+- `clinNuevosValorCargar()` dejó de filtrar por `aprSoloClienteNuevo`: el lote va por **todos** los
+  retenidos (`aprEnCuarentena`). Sin eso un pedido de Cuarentena no entraba nunca al lote y la
+  celda se quedaba en "—". El backend es el de siempre: `gv_clientes_nuevos_valor_lote` →
+  `gv_ppp_web_valor_items`, la misma función que valoriza el control de límite de crédito, así que
+  Cuarentena y Clientes nuevos no pueden decir números distintos.
+- Una NP que entró por **ISIS** sigue en "—": el monto se valoriza sobre los ítems del pedido web.
+
+**Prueba:** `node tests/apr-cuarentena.cjs` — la columna existe, el retenido muestra `$80.000` /
+`c/IVA $96.800`, y la tabla tiene tantos `<td>` como `<th>`.
