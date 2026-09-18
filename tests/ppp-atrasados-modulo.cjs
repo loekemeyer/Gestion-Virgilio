@@ -109,9 +109,13 @@ catch (_e) {
     ];
     const h = _patrHtml();
     out.html = h;
-    out.dias = (h.match(/class="pga-d/g) || []).length;
+    // ⚠ el regex pide el cierre de la clase: desde la v20.01 la fila del día trae adentro
+    //   spans propios (`pga-sem`, `pga-m0`) y un `/class="pga-d/` suelto los contaba también.
+    out.dias = (h.match(/class="pga-d[ "]/g) || []).length;
     // v19.29: el más viejo va ARRIBA. Lo que más tiempo lleva parado es lo primero que hay que ver.
-    out.ordenAsc = h.indexOf(_pgaDiaTxt(dk(9).replace(/-/g, ""))) < h.indexOf(_pgaDiaTxt(dk(1).replace(/-/g, "")));
+    // v20.01: el día se escribe con `_pgaDiaHtml` (el nombre del día va en un span que el celular
+    //   esconde), así que el texto plano de `_pgaDiaTxt` ya no aparece literal en el HTML.
+    out.ordenAsc = h.indexOf(_pgaDiaHtml(dk(9).replace(/-/g, ""))) < h.indexOf(_pgaDiaHtml(dk(1).replace(/-/g, "")));
     out.dice4 = /<b>4<\/b> pedido/.test(h);
     out.dice3dias = /<b>3<\/b> día/.test(h);
     out.m3 = /<b>3,8<\/b> m³|<b>3,75<\/b> m³/.test(h);

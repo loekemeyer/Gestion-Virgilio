@@ -3640,9 +3640,21 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 @media (max-width:760px){
   /* v17.94: en el celular la letra baja un punto, pero SIGUE siendo la misma en los tres niveles
      — que es lo que pidió Luis; lo que se achica es todo junto, no la fila de la NP sola. */
-  .pga{ font-size:14px; } .pga th, .pga td{ padding:6px 7px; }
+  .pga{ font-size:14px; } .pga th, .pga td{ padding:6px 4px; }
   .pga-pct small{ display:none; }
-  .pga th:nth-child(n+2), .pga td:nth-child(n+2){ padding-left:9px; padding-right:9px; }
+  .pga th:nth-child(n+2), .pga td:nth-child(n+2){ padding-left:3px; padding-right:3px; }
+  /* v20.01 (Thomas) — la columna del día deja de comerse la pantalla: sólo la fecha ("18/9"),
+     sin el nombre del día, sin el cero del mes y sin el chip largo del día de espera. Y sobre
+     todo: deja de pedir `width:100%`, que era lo que le daba TODO el ancho sobrante a la única
+     columna `sticky` y dejaba los números atrás. Medido a 390 px: la tabla pasa de 428 px
+     (seis columnas invisibles) a ~360 px, o sea entra entera. */
+  .pga-sem, .pga-m0, .pga-esp{ display:none; }
+  .pga th:first-child, .pga td:first-child{ width:auto; max-width:54vw; }
+  .pga-t>td:first-child{ white-space:normal; }   /* la tanda envuelve en vez de estirar la columna */
+  .pga-d.espera>td:first-child{ white-space:normal; }   /* sólo el día de espera, que es el único con texto largo */
+  .pga th{ font-size:9px; letter-spacing:0; text-transform:none; }
+  .pga-chev{ width:11px; }
+  .pga-d.hoy>td:first-child::after{ font-size:9px; padding:1px 4px; margin-left:4px; letter-spacing:0; }
   /* ⚠ las acciones NO se anclan a la derecha acá: la columna es mucho más ancha que la pantalla,
      así que `margin-left:auto` las mandaba fuera de lo que se ve y había que scrollear para
      encontrarlas. Van pegadas al texto y la fila puede cortar. */
@@ -5733,7 +5745,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.00"></script>
+<script type="module" src="recepcion.js?v=20.01"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9591,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.00";
+const APP_VERSION = "v20.01";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38307,7 +38319,7 @@ function _pgaCuerpoHtml(dias, opts) {
     h += '<tr class="pga-d' + (ab ? ' on' : '') + (d.key === hoy ? ' hoy' : '') + (esp ? ' espera' : '') +
         '" onclick="pgaAbrirDia(\'' + d.key + '\')"' +
         (esp ? ' title="Armado y parado a propósito, sin fecha de entrega: no consume cupo, no va en ningún camión y no cuenta como atrasado. Para sacarlo de acá, «📅 Cambiar de día» en la tanda."' : '') + '>' +
-      '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + escapeHtml(_pgaDiaTxt(d.key)) +
+      '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + _pgaDiaHtml(d.key) +
         (esp ? '<span class="pga-esp">' + (d.nps ? 'sin fecha de entrega'
                  : 'vacío · acá se mandan las tandas armadas sin fecha, con 📅 Cambiar de día') + '</span>' : '') +
         (esAtraso ? '<span class="patr-dias' + (atr >= 7 ? ' grave' : '') + '">hace ' + atr + ' día' + (atr === 1 ? '' : 's') + '</span>' : '') + '</td>' +
@@ -38452,6 +38464,22 @@ function _pgaDiaTxt(k) {
   if (String(k) === PGA_ESPERA_KEY) return PGA_ESPERA_TXT;   // v19.29: no es una fecha, es el estacionamiento
   const d = _pppKeyDate(k);
   return _PN_DOW[d.getDay()] + " " + d.getDate() + "/" + String(d.getMonth() + 1).padStart(2, "0");
+}
+/* v20.01 (Thomas, 2026-09-18) — EN EL CELULAR, EL DÍA ES SÓLO LA FECHA: "18/9".
+   La columna del día es la 1ª, es `sticky` y se lleva todo el ancho sobrante (`width:100%`), así que
+   en un teléfono "Viernes 18/09" la estiraba hasta tapar seis de las ocho columnas: los m³, las
+   tandas, las NP y tres de los cuatro porcentajes quedaban atrás de la columna pegada a la
+   izquierda, y scrollear no servía justamente porque es sticky. Thomas: *"que desde el cel sólo
+   diga 18/9 y después figure lo que está a la derecha tapado"*.
+   ⚠ El nombre del día y el cero del mes SIGUEN en el HTML, envueltos en un span que el
+   `@media (max-width:760px)` esconde — no se recorta el texto. Por eso el `textContent` de la fila
+   sigue diciendo "Viernes 18/09" y todo lo que lee la fila por texto (los tests, el buscador) no
+   cambia. En el escritorio no se toca nada. */
+function _pgaDiaHtml(k) {
+  if (String(k) === PGA_ESPERA_KEY) return escapeHtml(PGA_ESPERA_TXT);
+  const d = _pppKeyDate(k), m = d.getMonth() + 1;
+  return '<span class="pga-sem">' + _PN_DOW[d.getDay()] + ' </span>' + d.getDate() + '/' +
+    (m < 10 ? '<span class="pga-m0">0</span>' : "") + m;
 }
 /* El contenido de UNA NP: la misma tabla Código/Cajas/Unidades de A Programar (v17.57). */
 function _pgaItemsHtml(np) {

@@ -1,3 +1,41 @@
+## Nota v20.01 (2026-09-18) — En el celular, la tabla de Programación mostraba DOS columnas de ocho
+
+Thomas, desde el teléfono: *"la visual del cel se ve mal. Que desde el cel sólo diga 18/9 y después
+figure lo que está a la derecha tapado"*. En pantalla se veían el **Día** y **Pendientes**, y nada
+más: m³, Tandas, NPs, Facturado, Armado y En proceso quedaban invisibles.
+
+**La causa no era falta de scroll.** La columna del día es la 1ª, es la única `sticky` (v17.94, para
+que no se pierda al scrollear a lo ancho) y pide `width:100%` (v17.79, para que todo el ancho
+sobrante sea de la info y los 4 porcentajes queden angostos a la derecha). En un escritorio eso es
+lo correcto; en 390 px, "Viernes 18/09" más el chip **HOY** estiraban esa columna hasta **164 px de
+una tabla de 428**, y como está pegada a la izquierda **tapaba** a las demás: scrollear no las
+traía, las volvía a tapar.
+
+**Qué cambió, sólo dentro de `@media (max-width:760px)`:**
+
+| | |
+|---|---|
+| el día se lee **`18/9`** | el nombre del día y el cero del mes van en `<span class="pga-sem">` / `pga-m0`, que el celular esconde |
+| la 1ª columna deja de pedir `width:100%` | `width:auto; max-width:54vw` — el ancho vuelve a repartirse entre las ocho |
+| encabezados sin VERSALITA y a 9 px, padding lateral 3 px | "PROCESO" en mayúscula medía 15 px más que "proceso" |
+| el chip largo del día de espera (`.pga-esp`) no se muestra | y la fila de tanda envuelve en vez de estirar la columna |
+
+⚠ **El texto completo sigue en el HTML**: se esconde con CSS, no se recorta. El `textContent` de la
+fila sigue diciendo `Viernes 18/09`, así que el buscador y los tests que leen la fila por texto no
+cambian. En el escritorio **no cambia nada**.
+
+**Medido con Playwright a 390 px** (el viewport del teléfono de la captura): la tabla pasa de **428 px
+con seis columnas invisibles** a **364 px, entrando entera** en el marco. A 360 px quedan ~8 px de
+scroll, y ahora ese scroll **sirve**, porque la columna pegada a la izquierda mide 78 px y no 164.
+
+`tests/ppp-tabla-cel.cjs` fija las cuatro cosas: el día dice `18/9`, no dice "Viernes", el texto
+completo sigue en el HTML y las 8 columnas terminan **dentro** del marco. En `1400 px` el día se
+sigue leyendo entero.
+
+⚠ Y una trampa que dejó el cambio: el regex `/class="pga-d/` de `tests/ppp-atrasados-modulo.cjs`
+contaba también los spans nuevos (`pga-sem` empezaba con `pga-d` cuando se llamaba `pga-dow`). Se
+renombró el span y el regex pide el cierre de la clase (`/class="pga-d[ "]/`).
+
 ## Nota v19.92 (2026-09-18) — Un armado sobre una tanda SIN pedidos dejaba al operario sin salida
 
 El legajo 8 le dio **AP a `E12M`** a las 13:23. Ese código ya no tenía pedidos: su NP —**LK 0029**,
