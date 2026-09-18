@@ -1484,16 +1484,17 @@
             </button>
           </div>
 
-          <!-- 4 grupos activos. "Clientes web" = cliente + vendedor y
-               "Clientes no pasados" = admin + sin cot: las categorías finas
-               siguen viviendo en la RPC y en la tabla de abajo, acá se muestran
-               sumadas. El % de cada grupo es sobre la SUMA de los 4.
-               Desconocido y Previo al tracking quedan aparte y NO entran. -->
+          <!-- 2 grupos activos, que son los que llevan %. "Clientes web" =
+               cliente + vendedor y "Clientes no pasados" = admin + sin cot: las
+               categorías finas siguen viviendo en la RPC y en la tabla de abajo,
+               acá se muestran sumadas. El % de cada uno es sobre la SUMA de los
+               dos. Expo, Super, Desconocido y Previo al tracking van abajo y NO
+               entran en el %. -->
           <div
             id="origenPedidosStats"
             style="
               display: grid;
-              grid-template-columns: repeat(4, minmax(0, 1fr));
+              grid-template-columns: repeat(2, minmax(0, 1fr));
               gap: 12px;
               margin-bottom: 10px;
             "
@@ -1508,26 +1509,25 @@
               <div class="stat-pct" id="origenPedidosNoPasadosPct"></div>
               <div class="stat-label" title="Pedidos que el cliente no pasó por la web y cargó un admin desde el panel: Cotizador (admin) más los cargados sin cotizador.">Clientes no pasados</div>
             </div>
-            <div class="stat-box stat-neutral">
-              <div class="stat-num" id="origenPedidosExpo">–</div>
-              <div class="stat-pct" id="origenPedidosExpoPct"></div>
-              <div class="stat-label" title="Pedidos tomados en la expo (19-22/8/2026) desde el panel. Categoría propia, aunque se carguen desde el admin.">Expo</div>
-            </div>
-            <div class="stat-box stat-neutral">
-              <div class="stat-num" id="origenPedidosSuper">–</div>
-              <div class="stat-pct" id="origenPedidosSuperPct"></div>
-              <div class="stat-label" title="OC de supermercados (Cotizador Supermercados / Krikos). Categoría propia, aunque se carguen desde el admin.">Super</div>
-            </div>
           </div>
-          <!-- Fuera del %: no son canal de venta. -->
+          <!-- Fuera del %: Expo y Super son canales propios que no se miden
+               contra la web, y los otros dos no son canal de venta. -->
           <div
             style="
               display: grid;
-              grid-template-columns: repeat(2, minmax(0, 150px));
+              grid-template-columns: repeat(4, minmax(0, 150px));
               gap: 12px;
               margin-bottom: 16px;
             "
           >
+            <div class="stat-box stat-neutral">
+              <div class="stat-num" id="origenPedidosExpo">–</div>
+              <div class="stat-label" title="Pedidos tomados en la expo (19-22/8/2026) desde el panel. Categoría propia, aunque se carguen desde el admin. NO entra en el %.">Expo</div>
+            </div>
+            <div class="stat-box stat-neutral">
+              <div class="stat-num" id="origenPedidosSuper">–</div>
+              <div class="stat-label" title="OC de supermercados (Cotizador Supermercados / Krikos). Categoría propia, aunque se carguen desde el admin. NO entra en el %.">Super</div>
+            </div>
             <div class="stat-box stat-warn">
               <div class="stat-num" id="origenPedidosDesconocido">–</div>
               <div class="stat-label" title="Pedidos posteriores al inicio del tracking que igual no registraron quién los cargó. Si este número crece, alguna vía de carga dejó de guardar el origen. NO entra en el %.">Desconocido</div>
@@ -3377,7 +3377,7 @@
     <script src="./version.js?v=23186"></script>
     <script src="excel-parser-smart.js"></script>
     <script src="argentina-map-data.js?v=23176"></script>
-    <script src="admin.js?v=23441"></script>
+    <script src="admin.js?v=23442"></script>
     <script src="admin-supercot.js?v=23377"></script>
     <script src="admin-excel-krikos.js?v=23181"></script>
     <script src="analisis-venta-cliente.js?v=23176"></script>
