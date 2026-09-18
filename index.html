@@ -5770,7 +5770,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.19"></script>
+<script type="module" src="recepcion.js?v=20.20"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9616,7 +9616,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.19";
+const APP_VERSION = "v20.20";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11791,7 +11791,9 @@ async function showPickingList(tanda, legajo, opts) {
     // final". El excedente marcado A MANO (pkMarkExcedente) sigue yendo al final.
     // ⚠ Lo que se resigna es la recuperación temprana de la v15.41: si el excedente
     // miente, el paso de góndola de ese artículo ya pasó. Decisión de Thomas: manda el
-    // recorrido. Test: tests/pk-excedente-orden.cjs.
+    // recorrido — y la regla vieja queda DEROGADA *hasta nuevo aviso* ("olvidate de esa
+    // regla de excedente primero", 18/09), así que no volver a ponerlos adelante ni como
+    // fallback. Test: tests/pk-excedente-orden.cjs.
     let _secOrden = {};
     if (excSteps.length) {
       try {

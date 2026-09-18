@@ -658,6 +658,35 @@ select np_label, articulo from public."PPP_Web_Base" where empresa='chef' and ar
 select cod_art from public."Movimientos_Stock" where cod_art ~ '[0-9E]L$';   -- vacío = todo bien
 ```
 
+## ⚠ Regla de Thomas (2026-09-18, v20.17 · asentada v20.20): el EXCEDENTE va en el ORDEN DEL RECORRIDO
+
+Probando el módulo de operarios con una tanda: *"primero le dice que pickee del excedente, eso
+rompe el flujo de movimiento por las góndolas"*. Y sobre la regla que lo había puesto adelante:
+***"olvidate de esa regla de excedente primero hasta nuevo aviso"***.
+
+**La v15.41 (pedido de Luis) queda DEROGADA hasta que Thomas diga lo contrario.** No volver a
+poner los pasos `art·EXC` al principio, ni "mientras tanto" ni como fallback: hoy se ordenan por
+el `orden` del sector donde está el excedente y, sin ese dato, van al final.
+
+Por qué, medido el 18/09 sobre `GV_Lugar` — y es el dato que la v15.41 no miró:
+
+| zona | `orden` |
+|---|---|
+| góndola de picking (pasillos A..Ñ) | 1 – 657 |
+| racks K/N/O | 706 – 717 |
+| **zona P, donde se apila el excedente** | **718 – 757** |
+
+El excedente está **después de toda la góndola**: ponerlo primero es mandar al operario al fondo
+del depósito y hacerlo volver al pasillo A.
+
+⚠ **Lo que se resigna a propósito:** si el excedente miente (el saldo dice 10 y hay 6), el paso de
+góndola de ese artículo ya pasó. Era justo lo que buscaba la v15.41 y **Thomas decidió que manda el
+recorrido**. Si algún día molesta, el arreglo NO es volver atrás: es que el faltante del excedente
+**reabra** el paso de góndola de ese artículo. Eso tampoco se hace sin que lo pida.
+
+Lo sostiene `tests/pk-excedente-orden.cjs` y el candado invertido de `tests/pk-deposito-pkc.cjs`
+(`items.concat(excSteps)` tiene que estar, `excSteps.concat(items)` no). Problema 455.
+
 ## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
 
 **Luis, 2026-09-17:** *"fijate que estés usando las tablas actualizadas de `gv_` y escribí en

@@ -6860,7 +6860,9 @@ red o con un sector que no se reconoce, **al final** — que es además lo que l
 venía diciendo ("hay N en excedente P13 — al final"). El reparto `excUsed`/`gondNeeded` **no
 se tocó**. Lo que se resigna es justamente la recuperación temprana que buscaba la v15.41: si
 el excedente miente, el paso de góndola de ese artículo ya pasó — decisión de Thomas, manda el
-recorrido. Tests: `tests/pk-excedente-orden.cjs` (nuevo) y `tests/pk-deposito-pkc.cjs` (el
+recorrido. **La regla de la v15.41 queda derogada HASTA NUEVO AVISO** (Thomas, 18/09:
+*"olvidate de esa regla de excedente primero hasta nuevo aviso"*): no se vuelve a poner el
+excedente adelante, tampoco como fallback. Tests: `tests/pk-excedente-orden.cjs` (nuevo) y `tests/pk-deposito-pkc.cjs` (el
 candado del orden, invertido). Abajo queda la regla vieja, que es la que se dio vuelta:
 
 **Orden del recorrido: el EXCEDENTE va PRIMERO** (dueño vía Luis, 2026-09-11). Antes los
