@@ -23516,3 +23516,37 @@ Retira. Distorsiona vueltas por día, m³ por vuelta y paradas.
 El arreglo es contar **incluyendo** la fila actual (`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT
 ROW`, sin el `1 +`). **No se aplicó**: cambia los números históricos de la jornada de camiones,
 así que lo decide el dueño. Queda `abierto` como problema 412.
+
+## §3.jj — v19.74: `gv_viaje` partía TODA carga en dos vueltas (problema 412) — 2026-09-18
+
+**Thomas:** *"no entiendo ese problema, ¿rompe algo el arreglo?"*. **No rompe nada**, y por eso se
+aplicó: `gv_viaje_np`, `gv_viaje` y `gv_viajes_sin_controlar` **no las lee nadie** — 0 funciones,
+0 vistas, 0 crons y 0 apariciones en `index.html` (la única mención en el front es un comentario).
+Se consultan a mano. Y `GV_Viaje_Horas`, la tabla que joinea por `(fecha, fletero, vuelta)` y es
+lo único que se despegaría al renumerar, está **vacía** (0 filas).
+
+**El error, en una línea:** la ventana contaba los `orden = 1` **sin incluir la fila actual**
+(`ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING`), así que la NP con `orden = 1` —la primera
+que manda el operario al tocar "Terminé"— **no abría su propia vuelta**: quedaba contada en la
+anterior y la vuelta nueva arrancaba recién en la segunda NP.
+
+Por eso **todos** los fleteros mostraban una "vuelta 1" de exactamente 1 NP: Eduardo 15/09 (1+11),
+Guillermo 14/09, Daniel 16/09, Horacio, Nicolás, Claudio, Retira. Ninguno hizo dos viajes; era el
+mismo viaje cortado al medio.
+
+| | antes | ahora |
+|---|---|---|
+| vueltas en toda la historia de CCN | **47** | **35** |
+| fletero-días | 32 | 32 |
+| NP (`gv_viaje_np`) | 998 | **998** (no se pierde ninguna) |
+| Guillermo 14/09 | 1 + 8 + 5 | **9 + 6** (clientes · Cencosud) |
+
+⚠ **Y el `GREATEST(…, 1)` no es cosmético.** Los CCN **anteriores a la v15.70** no traen el 4.º
+campo, así que su `orden` es NULL y ninguna fila dispara el contador: sin el `GREATEST` esas
+cargas caían en **vuelta 0** (20 fletero-días, hasta el 11/09). Se vio recién al mirar
+`min(vuelta)` después de aplicar el primer pase — **el arreglo se probó en dos tiempos y el
+segundo salió de un chequeo, no de leer el código**.
+
+`sql/gv_viaje_vuelta_v1974.sql` (md5 del cuerpo normalizado verificado contra la definición viva).
+Rollback y chequeos, ahí mismo. `gv_endpoints_rotos` en 0 y `gv_viajes_sin_controlar` vacía
+después del cambio.
