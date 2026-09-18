@@ -25345,6 +25345,7 @@ recepciones perdidas.
 | regeneradas | **149** · **11.432 cajas** · 17 talleristas |
 | el 706 | **381 cajas** (Martin C) |
 | códigos con "L" | **0** |
+| ⚠ y después **borradas otra vez** | Thomas, minutos más tarde: *"Borrá la OC del 18/9"*. El día quedó **sin ninguna OC**; backup de esas 149 en `zz_backups."GV_Backup_OrdenesCompra_dia1809_regen_20260918"`. La próxima sale sola el **miércoles 23/09 07:00 ART** (cron 50 `ocs-auto-miercoles`), ya con la vista corregida. |
 
 La regeneración se hizo con **`gv_oc_generar_pendientes`** —el mismo camino que el botón ⚙ Generar
 OCs— y **no** con `generar_ocs_automaticas`, a propósito: esa última manda un Telegram, y mandar
