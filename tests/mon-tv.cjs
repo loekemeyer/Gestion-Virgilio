@@ -74,7 +74,7 @@ const iso = (ms) => new Date(ms).toISOString();
 
 const DATOS = {
   // E30A en curso · E31A terminada y facturada · E32A mañana sin tocar · E33A facturada Y despachada
-  // E34A terminada y YA CARGADA AL CAMIÓN, pero SIN facturar (v20.16: el caso urgente)
+  // E34A terminada y YA CARGADA AL CAMIÓN, pero SIN facturar (v20.18: el caso urgente)
   prog: [
     { tanda: "E30A", np: "98801", m3: 2.5, fecha_entrega: HOY },
     { tanda: "E31A", np: "98802", m3: 1.5, fecha_entrega: HOY },
@@ -199,7 +199,7 @@ function responder(url) {
   ok(/E31A/.test(r.fc), "E31A no aparece en 'a facturar'");
   ok(/✅/.test(r.fc), "E31A está facturada (NP 98802) y no tiene el ✅");
 
-  // 4b) v20.16 (Thomas) — la columna SALIÓ del monitor: sólo carga al camión (CCN)
+  // 4b) v20.18 (Thomas) — la columna SALIÓ del monitor: sólo carga al camión (CCN)
   ok(/Salió/.test(r.fc), "la tabla 'a facturar' no trae la columna Salió");
   ok(/E34A/.test(r.fc), "E34A (terminada y cargada al camión, sin FC) no aparece en 'a facturar'");
   ok(/🚚/.test(r.fc), "E34A tiene CCN (NP 98805): le falta el 🚚 de salió");
