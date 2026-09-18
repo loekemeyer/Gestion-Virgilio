@@ -1,3 +1,38 @@
+## Nota v19.91 (2026-09-18) — Las cajas pedidas de un DUAL son de UNA empresa, no de las dos
+
+El **437E CH** mostraba **15 cajas pedidas** y el detalle decía, con razón, que lo de Chef ya estaba
+todo facturado. **Las 15 eran todas de LK.**
+
+La pantalla de Stock keyea el **stock** de un dual con la empresa (`437E LK` / `437E CH`, del tramo 1
+de `docs/PLAN-SACAR-SUFIJO-EMPRESA.md`), pero la **demanda** la keyeaba con el código pelado: los
+pedidos de las dos empresas caían juntos en una fila `437E` que la pantalla **esconde**, las dos
+mitades quedaban en 0, y el front —al no encontrar la clave exacta— hacía **fallback al código
+base** y mostraba la misma cifra en las dos. 30 en pantalla para una demanda real de 15.
+
+**Desde la v19.91 la demanda se keyea con la empresa**, con una pieza nueva:
+`gv_cod_stock_dem(articulo, pedido)`. La empresa la da el **pedido** (`gv_empresa_de_np_texto`, la
+misma que usa el generador de OC), salvo que el artículo venga con **"L"** (438EL → LK, regla
+v13.71). Sin pedido no hay empresa: la deja pelada en vez de adivinar. Y en el front,
+`_stkLookupEmp` **corta el fallback al base cuando el código trae empresa** (para los códigos
+comunes sigue igual).
+
+| | pedidas antes | ahora |
+|---|---|---|
+| 437E LK / CH | 15 / 15 (la misma, duplicada) | **15 / 0** |
+| 438E LK / CH | 19 / 19 | **13 / 6** |
+| 439E LK / CH | 12 / 12 | **12 / 0** |
+| 809E LK / CH | 19 / 19 | **5 / 14** |
+
+**Es un no-op para todo lo demás, medido:** de las 11.549 líneas de demanda cambian **238**, y son
+exactamente los 4 duales. 0 códigos no duales con la demanda cambiada, 0 filas nuevas, y el total
+pedido por código base no se mueve.
+
+⚠ Es una **matview**, así que fue `DROP CASCADE + CREATE` en una sola transacción, recreando el
+índice único, los grants y los **3 dependientes transitivos** —incluido `gv_importados_ordenes`, el
+de **nivel 3** que dejó Importados en 404 dos veces (v16.20 y v16.33)—. Detalle, medición y rollback
+en §3.jt de `docs/SUPABASE-GESTION-VIRGILIO.md` y `sql/gv_stock_demanda_dual_por_empresa_v1991.sql`.
+Problema 427.
+
 ## Nota v19.85 (2026-09-18) — El generador de OC contaba lo comprometido como disponible (problema 428)
 
 Thomas: *"lo comprometido (separar_pedidos y a_facturar) no debería contar como stock disponible

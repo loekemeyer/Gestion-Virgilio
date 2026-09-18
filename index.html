@@ -5733,7 +5733,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=19.91"></script>
+<script type="module" src="recepcion.js?v=19.92"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9579,7 +9579,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v19.91";
+const APP_VERSION = "v19.92";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15721,7 +15721,7 @@ async function ocNuevaCrear() {
 /* ===== GENERADOR DE OCs (v4.13): replica la lógica del Excel "Pedidos Talleristas/Prov".
    Por artículo: A pedir = max(0, Máximo + Pedidos − Stock). Stock (vista_generador_oc) = el
    DISPONIBLE: terminado + a_guardar + racks + excedente + para_envasar + racks_ch (NO insumos).
-   ⚠ v19.85 — YA NO suma separar_pedidos ni a_facturar: eso es mercadería ya pickeada y
+   ⚠ v19.91 — YA NO suma separar_pedidos ni a_facturar: eso es mercadería ya pickeada y
    comprometida con un pedido que, por estar su tanda en TP, dejó de contar como demanda. Si
    contara de los dos lados se pedía de menos (medido: 1.205 cajas, 816 de a pedir). Problema 428.
    Lo demás que hay en mano sí cuenta → no se re-pide; los pedidos pendientes se descuentan vía la
@@ -15748,6 +15748,20 @@ async function ocgFetchMaximos() {
 const SUPABASE_PROY_ENDPOINT = SUPABASE_URL + "/rest/v1/proyeccion_madre";
 const OCG_FACTOR_MAXIMO = 1.5;
 function _ocgNorm(c) { return String(c || "").toUpperCase().trim().replace(/^0+(?=.)/, ""); }
+/* v19.91 (problema 427) - un codigo con SUFIJO DE EMPRESA no cae nunca al codigo base.
+   Los 4 duales (437E/438E/439E/809E) son DOS productos cada uno, en dos gondolas distintas, y
+   sus mapas (demanda, proyeccion) vienen keyeados por "437E LK" / "437E CH" desde el backend.
+   El fallback al base existe para los codigos comunes, donde el saldo puede venir con sufijo y
+   el mapa sin el; para un dual, en cambio, caer al base significa mostrar la MISMA cifra en las
+   dos mitades (las 15 cajas pedidas de LK aparecian tambien en la fila de CH). */
+function _stkTieneSufijoEmp(cod) { return /\s+(LK|CH|LOKE)$/i.test(String(cod == null ? "" : cod)); }
+function _stkLookupEmp(map, cod) {
+  if (!map) return 0;
+  var k = _ocgNorm(cod);
+  if (map[k] != null) return Number(map[k]) || 0;      // match exacto (el de SU empresa)
+  if (_stkTieneSufijoEmp(cod)) return 0;                // dual: NO se cae al base
+  return Number(map[_ocgNorm(codBase(cod))]) || 0;      // comun: fallback al base, como siempre
+}
 /* v7.90 — FAMILIAS DE EQUIVALENTES (curadas a mano con el dueño). Mismo producto
    funcional, MISMA empresa: intercambiables para PLANIFICAR y FACTURAR (cambiando la
    NP en el ERP), pero DISTINTOS para el picking (el operario NO debe confundirlos).
@@ -17898,13 +17912,13 @@ function stkBodyStocks() {
   // v8.88: lookup helpers para desconcatenación — dem y capByCod pueden estar indexados
   // por código base ("437E") pero los saldos tienen sufijo ("437E LK"). Busca exacto primero,
   // fallback al base.
-  var _demOf = function (cod) { var k = _ocgNorm(cod); return Number(dem[k] || dem[_ocgNorm(codBase(cod))]) || 0; };
+  var _demOf = function (cod) { return _stkLookupEmp(dem, cod); };   // v19.91: un dual no cae al base (problema 427)
   // v9.49 — proyección caj/mes (proyeccion_madre): valor "antes del índice" que se usa en las OCs. Mismo lookup exacto→base.
   var _proyM = (_stk && _stk.proy) || {};
-  var _proyOf = function (cod) { var k = _ocgNorm(cod); return Number(_proyM[k] || _proyM[_ocgNorm(codBase(cod))]) || 0; };
+  var _proyOf = function (cod) { return _stkLookupEmp(_proyM, cod); };   // v19.91 (problema 427)
   // v8.97 — cajas pedidas que vienen de NP SIN programar (en la base pero no en PPP_Programacion_Diaria) → ⚠.
   var _demSP = (dem && dem._sinProg) || {};
-  var _demSPOf = function (cod) { var k = _ocgNorm(cod); return Number(_demSP[k] || _demSP[_ocgNorm(codBase(cod))]) || 0; };
+  var _demSPOf = function (cod) { return _stkLookupEmp(_demSP, cod); };   // v19.91 (problema 427)
   var _capOf = function (cod) {
     var k = _ocgNorm(cod);
     if (capByCod[k] != null) return Number(capByCod[k]) || 0;   // match exacto (si la celda tuviera sufijo)
@@ -22023,10 +22037,10 @@ function stkDescargarExcel() {
   const capByCod = {};
   (_stk.cap || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; capByCod[k] = (capByCod[k] || 0) + (Number(r.cajas_max) || 0); });
   // v8.88: helpers desconcatenación (mismo patrón que stkBodyStocks)
-  var _demOf = function (cod) { var k = _ocgNorm(cod); return Number(dem[k] || dem[_ocgNorm(codBase(cod))]) || 0; };
+  var _demOf = function (cod) { return _stkLookupEmp(dem, cod); };   // v19.91: un dual no cae al base (problema 427)
   // v8.97 — cajas pedidas que vienen de NP SIN programar (en la base pero no en PPP_Programacion_Diaria) → ⚠.
   var _demSP = (dem && dem._sinProg) || {};
-  var _demSPOf = function (cod) { var k = _ocgNorm(cod); return Number(_demSP[k] || _demSP[_ocgNorm(codBase(cod))]) || 0; };
+  var _demSPOf = function (cod) { return _stkLookupEmp(_demSP, cod); };   // v19.91 (problema 427)
   var _capOf = function (cod) {
     var k = _ocgNorm(cod);
     if (capByCod[k] != null) return Number(capByCod[k]) || 0;   // match exacto (si la celda tuviera sufijo)
@@ -44833,7 +44847,7 @@ function aprColCuarentena() {
   if (_apr.cuarContacto === null && !_apr.cuarContactoLoading && lista.some(function (p) { return !p._demo; })) cuarContactoCargar();
   // v18.01: cuántos comentarios tiene cada retenido (una sola vuelta de red para toda la lista)
   cuarComNeed();
-  clinNuevosValorNeed();   // v19.91 (Thomas): el monto del pedido, igual que en Clientes nuevos
+  clinNuevosValorNeed();   // v19.92 (Thomas): el monto del pedido, igual que en Clientes nuevos
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
   const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
   const _cuarCol = aprColapsado("vir_cuar_colapsado");   // v18.100 (Luis): submódulo colapsable
@@ -44878,7 +44892,7 @@ function aprColCuarentena() {
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</td>' +
       '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</td>' +
       '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') + '</td>' +
-      // v19.91 (Thomas): el MISMO monto que Clientes nuevos — precio total por lista (neto) y,
+      // v19.92 (Thomas): el MISMO monto que Clientes nuevos — precio total por lista (neto) y,
       // debajo, el total con IVA. Va al lado de los badges de deuda y de límite, que es donde sirve.
       '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
       '<td><div class="cuar-td-acc">' + cuarWppContactoBtn(p) +
@@ -45270,7 +45284,7 @@ async function cuarContactoCargar() {
    el backend con gv_ppp_web_valor_items (misma función que usa el control de límite de
    crédito), expuesto por gv_clientes_nuevos_valor_lote. Sólo web: un cliente nuevo que
    entra por ISIS ya trae su NP y se valoriza aparte, así que ahí el monto queda en "—". */
-/* v19.91 (Thomas, 2026-09-18): el monto lo muestran los DOS submódulos, así que el lote va por
+/* v19.92 (Thomas, 2026-09-18): el monto lo muestran los DOS submódulos, así que el lote va por
    TODOS los retenidos (`aprEnCuarentena`), no sólo por los clientes nuevos. Antes un pedido de
    Cuarentena no entraba nunca al lote y su celda de Monto se habría quedado en "—". */
 function clinNuevosValorNeed() { if (_apr.cliValor === null && !_apr.cliValorLoading) clinNuevosValorCargar(); }
