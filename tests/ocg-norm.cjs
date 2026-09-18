@@ -2,7 +2,9 @@
    desde stock, Máximo = proy×índice o capacidad, stock con empresa LK/CH mergeada, pedidos)
    vive en la vista Supabase vista_generador_oc; ocgEnter solo la lee y arma los ítems +
    reparto por proveedor. Este test stubea el fetch de la vista y verifica el armado:
-   - pasa stock/falta/capped tal cual,
+   - pasa stock/falta tal cual,
+   - guarda además los totales del ARTÍCULO (maxTot/demandaTot/stockTot) para la vista "Por
+     artículo", que desde v19.78 muestra una sola fila por artículo con los números enteros,
    - parte los duales por proporción (P2 = resto),
    - muestra "(sin proveedor)" con su flag (no se envía, pero se ve),
    - excluye Racks.
@@ -42,17 +44,22 @@ catch (_e) {
     const sin = items.find((i) => i.cod === "580");
     const racks = items.find((i) => i.cod === "809E");
     return {
-      A_stock: A ? A.stock : null, A_falta: A ? A.falta : null, A_capped: A ? A.capped : null,       // 60 / 90 / false
-      B_stock: B ? B.stock : null, B_capped: B ? B.capped : null, B_falta: B ? B.falta : null,       // 20 / true / 10
+      A_stock: A ? A.stock : null, A_falta: A ? A.falta : null,                                     // 60 / 90
+      B_stock: B ? B.stock : null, B_falta: B ? B.falta : null,                                     // 20 / 10
       dualN: dual.length, dualGarcia: (dual.find((i) => i.prov === "Garcia") || {}).falta, dualLucho: (dual.find((i) => i.prov === "Lucho") || {}).falta,  // 2 / 47 / 47
+      // v19.78 — el total del artículo viaja aparte del reparto (la fila agrupada lo usa tal cual)
+      dualMaxTot: (dual[0] || {}).maxTot, dualStockTot: (dual[0] || {}).stockTot, dualMax: (dual[0] || {}).max,  // 164 / 70 / 82
+      // la flecha "topado a capacidad" se sacó en v19.78: la vista NO topa (maximo = ceil(proy×índice))
+      sinCapped: items.every((i) => i.capped === undefined),
       sinProv: sin ? sin.prov : null, sinFlag: sin ? !!sin.sinProv : null,                            // "(sin proveedor)" / true
       racksExcl: !racks,                                                                              // true (Racks afuera)
       error: (_oc.gen && _oc.gen.error) || null
     };
   });
-  const pass = r.A_stock === 60 && r.A_falta === 90 && r.A_capped === false &&
-    r.B_stock === 20 && r.B_capped === true && r.B_falta === 10 &&
+  const pass = r.A_stock === 60 && r.A_falta === 90 &&
+    r.B_stock === 20 && r.B_falta === 10 &&
     r.dualN === 2 && r.dualGarcia === 47 && r.dualLucho === 47 &&
+    r.dualMaxTot === 164 && r.dualStockTot === 70 && r.dualMax === 82 && r.sinCapped === true &&
     r.sinProv === "(sin proveedor)" && r.sinFlag === true && r.racksExcl === true &&
     !r.error && errs.length === 0;
   console.log("ocg-norm:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
