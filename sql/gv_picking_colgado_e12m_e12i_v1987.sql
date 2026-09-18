@@ -1,4 +1,4 @@
--- v19.86 — Picking colgado de E12M y E12I: 78 cajas que volvieron a góndola (problema 429)
+-- v19.87 — Picking colgado de E12M y E12I: 78 cajas que volvieron a góndola (problema 429)
 -- ============================================================================================
 -- Secuela del bug del PKC (problema 421, arreglado en la v19.80). Estas dos tandas quedaron con
 -- picking anotado y CERO pedidos: sus NP se habían mudado a otra tanda y el stock se fue con
@@ -47,7 +47,7 @@ select public.gv_tanda_lock_anular('E12M','picking','104');
 select public.gv_tanda_lock_anular('E12I','picking','104');
 
 -- ============================================================================================
--- gv_stock_picking_duplicado v19.86 — un duplicado YA ARMADO no es un duplicado pendiente
+-- gv_stock_picking_duplicado v19.87 — un duplicado YA ARMADO no es un duplicado pendiente
 -- ============================================================================================
 -- El centinela que salió con la v19.80 marcaba 3 pares, pero dos de ellos (E12E/E37F y
 -- E12J/E12G) ya estaban RESUELTOS: al armarse la tanda fantasma, su `separado` cancela el
@@ -84,7 +84,7 @@ with st as (
     from public."Registros_Produccion_Virgilio" r where r.opcion = 'PKC' group by 1
 ), tot as (
   select tanda, count(*) cods, sum(q) cajas, min(primer_mov) primer_mov from st group by 1
-), neto as (   -- v19.86: picking MENOS lo que ya se armó
+), neto as (   -- v19.87: picking MENOS lo que ya se armó
   select upper(btrim(m.ref)) tanda, sum(m.delta) q
     from public."Movimientos_Stock" m
    where m.deposito = 'separar_pedidos' and m.tipo in ('picking', 'separado')

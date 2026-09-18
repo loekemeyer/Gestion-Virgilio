@@ -24178,7 +24178,7 @@ Respaldos: `zz_backups."GV_Backup_Def_GeneradorOC_20260918c"` (definición previ
 Rollback exacto en `docs/ROLLBACK-PRODUCCION.md`; SQL completo en
 `sql/gv_generador_oc_stock_disponible_v1985.sql`.
 
-## §3.jo — v19.86: picking colgado de E12M y E12I, 78 cajas de vuelta a góndola — 2026-09-18
+## §3.jr — v19.87: picking colgado de E12M y E12I, 78 cajas de vuelta a góndola — 2026-09-18
 
 **Problema 429.** Secuela del bug del PKC (problema 421, arreglado en la v19.80). Dos tandas
 quedaron con picking anotado y **cero pedidos**: sus NP se habían mudado a otra tanda y el stock
@@ -24229,7 +24229,7 @@ devuelve a góndola lo que no se usó.
 | E12J | −100 | +19 | +81 | **0** |
 
 Y contra el evento `ENT`, el armado salió bien: **E12E armó 38 de 44 pedidas, E12J 20 de 20**
-(E12S, 188 de 199). Desde la v19.86 la vista exige **`neto_fantasma > 0`** y trae esa columna.
+(E12S, 188 de 199). Desde la v19.87 la vista exige **`neto_fantasma > 0`** y trae esa columna.
 Sin eso el centinela los marcaba para siempre y quedaba en rojo — el mismo defecto que tenía
 `gv_stock_empresa_fantasma` antes de la v19.77. **Un centinela que vive en rojo no lo mira nadie.**
 
@@ -24242,4 +24242,61 @@ sola NP de 47 (LK 0029, C.M.G. Distrib. de Tegerina, 21/09). Hace falta el conte
 pallet; no sale de la base.
 
 **Chequeo:** `select * from public.gv_stock_picking_duplicado;`
-`sql/gv_picking_colgado_e12m_e12i_v1986.sql`.
+`sql/gv_picking_colgado_e12m_e12i_v1987.sql`.
+## §3.jq — v19.86: un RETIRA tiene que figurar como retira en la programación (ISIS y web) — 2026-09-18
+
+**Thomas, 18/09:** *"Los pedidos que se retiran tienen que figurar como que se retiran en la
+programación (sean ISIS o web)"*. Sale de §3.jp: ahí se arregló que Carga Camión LEYERA la zona
+de las dos programaciones; acá se arregla que la zona **DIGA** Retira cuando corresponde.
+
+### ISIS ya andaba
+
+La zona viaja en `GV_PPP_Programacion_Diaria.zona` y el barrio `Retira` está en el diccionario
+`Zonas_Barrios` (→ `Retira`; ojo que `retiro` está aparte, → Zona 2). Medido el 18/09: **0** NP de
+ISIS con dirección de retiro y otra zona. La única fila `Retira` de ese lado es la 98701, y es un
+pedido web tipeado en ISIS.
+
+### Lo web decidía por SUBCADENA, y sobre un solo campo
+
+`gv_ppp_web_zona(ze, loc, dir)` hacía `coalesce(ze, loc, barrio_de(dir))` y después
+`barrio ~* 'retir'`. Dos agujeros, los dos medidos contra el padrón de LK
+(`customer_delivery_addresses`, 1.612 direcciones):
+
+| agujero | qué pasaba | cuánto |
+|---|---|---|
+| **`'retir'` es subcadena** | **Retiro** es un BARRIO de CABA (Zona 2), no un retiro en fábrica → esas direcciones quedaban marcadas Retira y **no se repartían nunca** | 3 con `zona_expreso='Retiro'` + 4 con `localidad='Retiro'` |
+| **el EXPRESO no se miraba** | cuando el cliente pasa a buscar, LK deja `nombre_expreso='Retira'` y `zona_expreso` **sigue trayendo el barrio del cliente** (Osa: `Villa Lugano`), que gana el `coalesce`. La dirección ya venía como `Exp. Retira — Virgilio 2788, Retira (…)` y nadie la leía | 140 direcciones con `nombre_expreso='Retira'`; 140 con `direccion_entrega='Virgilio 2788'` |
+
+Un tercer caso, de carga: **11 direcciones con `label='Retira'` y otro `zona_expreso`**
+(BP Import es una) — la dirección de entrega es el depósito pero la zona dice el barrio del cliente.
+
+**Efecto medido:** **5 NP web programadas con zona numérica siendo retiras** — LK 0011 y LK 0157
+(BP Import), LK 0024 (Osa), LK 0143 y LK 0144 (Suppa). O sea, al reparto.
+
+### El arreglo
+
+`gv_ppp_web_zona` decide Retira **antes** del `coalesce`, con match **exacto** y mirando los tres
+campos: `ze|loc|dir ~* '^retira$'`, `dir ~* '^exp\.\s*retira'`, `dir ~* 'virgilio\s*2788'`.
+Las 9 pruebas están al pie de `sql/gv_ppp_web_zona_retira_v1986.sql`; las que importan:
+`'Retiro' → Zona 2` (antes Retira) y `Exp. Retira — … → Retira` (antes Zona 1).
+
+**Blast radius:** de las 178 filas de `PPP_Web_Programacion`, cambian **6**: esas 5 pasan a Retira,
+**0** dejan de serlo, y la 6ª (LK 0103) es artefacto de la medición (se recalculó pasando `barrio`
+como `ze`), no del cambio.
+
+⚠ **La función sólo manda hacia adelante.** Las 5 NP ya programadas **quedan con la zona vieja**:
+corregirlas es un `update` de datos y encima tres ya tienen tanda de reparto (E26D, E43A), así que
+además habría que sacarlas de esa tanda — un Retira va en **su propia tanda** (v19.52). Eso es
+decisión de armado: se reporta, lo decide Marianela. Queda anotado en el problema 433.
+
+### Centinela
+
+```sql
+select * from public.gv_retira_sin_etiqueta order by np;   -- vacía = todo bien
+```
+
+Cruza dirección contra zona en las DOS programaciones (se apoya en `gv_np_prog_reparto`, §3.jp) y
+dice `RETIRA SIN ETIQUETA` o `ETIQUETA SIN DIRECCION DE RETIRA`. Al 18/09 marca las 5 de arriba.
+
+`sql/gv_ppp_web_zona_retira_v1986.sql`. **Rollback:** volver al `barrio ~* 'retir'` (y con él, el
+bug de Retiro) y `drop view public.gv_retira_sin_etiqueta;`.
