@@ -11775,16 +11775,51 @@ async function showPickingList(tanda, legajo, opts) {
         excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null, emp: it.emp || "" });
       }
     });
-    // v15.41 (pedido de Luis): los pasos de EXCEDENTE van PRIMERO, no al final.
-    // No cambia de dónde se descuenta —el reparto excUsed/gondNeeded ya quedó
-    // decidido arriba, antes de que el operario dé un paso—: cambia la RECUPERACIÓN
-    // del error. Si el excedente miente (el saldo dice 10 y hay 6), yendo primero se
-    // entera al principio y levanta las 4 que faltan de góndola EN LA MISMA PASADA,
-    // porque todavía no pasó por ahí. Al final se enteraba cuando el paso de góndola
-    // ya estaba cerrado pidiendo sólo el resto, y tenía que volver.
-    // (El excedente marcado A MANO —pkMarkExcedente— sigue yendo al final: se
-    // descubre parado en la góndola, ya pasó la zona del excedente.)
-    const allItems = excSteps.concat(items);
+    // v20.12 (Thomas, 2026-09-18): los pasos de EXCEDENTE vuelven al RECORRIDO.
+    // La v15.41 los ponía a TODOS al principio (pedido de Luis: si el excedente miente,
+    // enterarse antes de pasar por la góndola). El costo era el recorrido: el operario
+    // arrancaba el picking por la zona del excedente y después volvía a la góndola.
+    // Medido el 18/09 sobre GV_Lugar: la góndola de picking ocupa el orden 1..657
+    // (pasillos A..Ñ), los racks 706..717, y el excedente se apila en la zona P, orden
+    // 718..757 — o sea DESPUÉS de todo el recorrido. Mandarlos primero era arrancar el
+    // picking por el fondo del depósito.
+    // Ahora cada paso de excedente se ordena por el `orden` del sector donde está
+    // (GV_Lugar, la MISMA escala que usa la góndola), así cae solo en el lugar del
+    // recorrido que le toca. Sin red, o si el sector no se reconoce, va al FINAL — que
+    // es además lo que la pantalla ya venía diciendo: "hay N en excedente P13 — al
+    // final". El excedente marcado A MANO (pkMarkExcedente) sigue yendo al final.
+    // ⚠ Lo que se resigna es la recuperación temprana de la v15.41: si el excedente
+    // miente, el paso de góndola de ese artículo ya pasó. Decisión de Thomas: manda el
+    // recorrido. Test: tests/pk-excedente-orden.cjs.
+    let _secOrden = {};
+    if (excSteps.length) {
+      try {
+        const _lug = await Promise.race([
+          gvFetchLugares(),
+          new Promise(function (r) { setTimeout(function () { r(null); }, 5000); })   // WiFi lento: al final y seguimos
+        ]);
+        if (_lug && _lug.orden) _secOrden = _lug.orden;
+      } catch (_e) { /* sin lugares: el excedente queda al final */ }
+    }
+    // El excedente de un artículo puede estar desparramado: se ordena por el PRIMERO del
+    // recorrido (el menor `orden`), que es al que el operario llega antes.
+    const _ordExc = function (it) {
+      let best = null;
+      String(it.excUbic || it.sector || "").split("\u00b7").forEach(function (parte) {
+        const s = pkUbicLimpia(parte);
+        const o = (s && _secOrden[s] != null) ? Number(_secOrden[s]) : null;
+        if (o != null && !isNaN(o) && (best == null || o < best)) best = o;
+      });
+      return best;
+    };
+    // Merge estable: a igual orden, primero la góndola y después el excedente.
+    const allItems = items.concat(excSteps)
+      .map(function (it, i) {
+        const o = it.isExc ? _ordExc(it) : gOrden(it.art);
+        return { it: it, i: i, o: (o == null ? Number.MAX_SAFE_INTEGER : o) };
+      })
+      .sort(function (a, b) { return (a.o - b.o) || (a.i - b.i); })
+      .map(function (x) { return x.it; });
     _pk = { tanda: tNorm, legajo: String(legajo || (typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(), items: allItems, idx: 0, results: {}, mode: "item", excOk: excOk,
             // Si el cliente le agregó algo a un pedido de esta tanda cuando ya
             // estaba en la mesa, el operario lo tiene que ver en CADA paso del
@@ -14531,12 +14566,16 @@ async function stockFetchSaldos() {
 let _gvLugares = null;
 async function gvFetchLugares() {
   if (_gvLugares) return _gvLugares;
-  const out = { lista: [], set: new Set(), libres: new Set(), emp: {} };
+  // v20.12 — `orden` (el del RECORRIDO, el mismo que usa la góndola en el picking) se
+  // guarda además del resto: lo usa showPickingList para meter los pasos de excedente en
+  // el lugar del recorrido que les toca, en vez de mandarlos a todos al principio.
+  const out = { lista: [], set: new Set(), libres: new Set(), emp: {}, orden: {} };
   try {
     const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Lugar", "select=sector,tipo,empresa,orden,uso,activo&activo=is.true&order=orden.asc");
     (rows || []).forEach(function (r) {
       const sec = String(r.sector || "").trim().toUpperCase(); if (!sec) return;
       out.lista.push(sec); out.set.add(sec); out.emp[sec] = r.empresa || "";
+      if (r.orden != null && out.orden[sec] == null) out.orden[sec] = Number(r.orden);
     });
   } catch (_e) { /* sin tabla: no se valida */ }
   _gvLugares = out; return out;

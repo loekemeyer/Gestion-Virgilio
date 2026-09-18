@@ -87,14 +87,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   });
   await b.close();
 
-  /* v15.41 (pedido de Luis): los pasos de EXCEDENTE van PRIMERO. No cambia de dónde se
-     descuenta (el reparto ya está decidido antes de caminar) — cambia que, si el excedente
-     miente, el operario lo descubre al principio y completa de góndola en la misma pasada. */
+  /* v20.12 (Thomas, 18/09) — se DIO VUELTA la regla de la v15.41: los pasos de EXCEDENTE
+     ya no van todos al principio, van en el orden del RECORRIDO (el `orden` del sector
+     donde está el excedente; sin ese dato, al final). Poner el excedente adelante hacía
+     arrancar el picking por la zona P —orden 718..757 en GV_Lugar, contra 1..657 de la
+     góndola— o sea por el fondo del depósito. El reparto góndola/excedente NO cambió, que
+     es lo que mide el resto de este test. El orden en sí lo cubre pk-excedente-orden. */
   const src = require("fs").readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-  r.excedentePrimero = src.indexOf("excSteps.concat(items)") >= 0;
-  r.noQuedoElOrdenViejo = src.indexOf("items.concat(excSteps)") < 0;
+  r.excedenteEnElRecorrido = src.indexOf("items.concat(excSteps)") >= 0;
+  r.noQuedoElOrdenViejo = src.indexOf("excSteps.concat(items)") < 0;
 
-  const ok = r.excedentePrimero && r.noQuedoElOrdenViejo && r.paso1EsTotal && r.paso2EsTotal && r.mismoClientId && r.sinExcedente &&
+  const ok = r.excedenteEnElRecorrido && r.noQuedoElOrdenViejo && r.paso1EsTotal && r.paso2EsTotal && r.mismoClientId && r.sinExcedente &&
              r.excOkFalseSinCampo && r.manualNoDuplica && r.faltanteLeeCincoCampos && !errs.length;
   console.log("pk-deposito-pkc:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join(" | ") : "none", ok ? "· ✓ OK" : "· ✗ FALLÓ");
   process.exit(ok ? 0 : 1);
