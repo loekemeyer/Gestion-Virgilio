@@ -564,6 +564,34 @@ Qué cambia en la práctica:
 
 Vale para TODOS los repos.
 
+## ⚠⚠ LA LÓGICA DE PROGRAMACIÓN, RESUMIDA POR LUIS (2026-09-19)
+
+Es el objetivo contra el que se mide cualquier cambio de armado. Textual:
+
+> 1. Hay que programar para sacar lo más rápido los pedidos posible, **como máximo 2 camiones
+>    por día**.
+> 2. Hay que programar los **m³ lo más al ras de lo que lleguen a preparar**, para que no haya
+>    ineficiencia interna ni necesidad de reprogramar para adelantar ni para retrasar, para
+>    evitar errores de programación.
+> 3. La lógica de los **km recorridos entre destinos debe ser la menor posible**.
+> 4. Los pedidos **no pueden demorar más de 10 días hábiles** en salir.
+> 5. Si hay más demora, **o se priorizan pedidos, o se trae más gente al depósito** a ayudar a
+>    armar.
+
+**Las cinco no son independientes y hay que tenerlo presente al tocar el armado:**
+
+- **(1) y (3) tiran contra (4).** Juntar pedidos para bajar km exige esperar a que se acumulen;
+  esperar demora la salida. El modelo de anclas resuelve ese compromiso con la ventana: cuanto
+  más larga, menos camiones y más demora. Toda discusión sobre la ventana es esta discusión.
+- **(2) es la que evita el retrabajo.** El cupo del día tiene que ser el que el depósito
+  realmente arma, ni más ni menos: de más obliga a reprogramar para atrás, de menos deja gente
+  ociosa y empuja pedidos hacia adelante. Hoy vive en `gv_ppp_web_cupo` (pickers × 3 m³) y, en
+  el modelo de anclas, en `ancla_cupo_m3_dia` (10 m³, el p90 medido).
+- **(5) es la válvula, y es una decisión de Luis, no del sistema.** El sistema avisa que un
+  pedido va a pasar los 10 días hábiles; quién prioriza o si se suma gente lo decide él.
+- El tope de 2 camiones por día es `jornada_camiones`; el de 6 m³ por camión, `camion_m3_tope`;
+  la jornada de 8 h, `jornada_horas_max`.
+
 ---
 
 ## ⚠ REGLA: borrar un pedido = borrarlo de TODOS lados (todos los repos/proyectos)
