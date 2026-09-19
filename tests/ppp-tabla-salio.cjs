@@ -3,7 +3,7 @@
    módulo En salida para ver si esa tanda/NP ya salió en el camión"*.
    Lo que prueba:
      (1) la columna va 5ª, a la izquierda de Facturado, y tiene su color propio;
-     (7) el cartel de arriba nombra lo que salió y NO está facturado (v20.22, umbral 1);
+     (7) el cartel de arriba nombra lo que salió y NO está facturado (v20.23, umbral 1);
      (2) cuenta como SALIDA **sólo** la NP con carga al camión registrada (CCN) — v20.12, Thomas:
          *"sólo salió si se cargó a camión"*. La dada por salida a mano (`salida_manual`) y la
          salida presunta (`armada_sin_carga`) son presunciones y NO cuentan, igual que la facturada
@@ -45,7 +45,7 @@ catch (_e) {
       mk("2026-09-22", "E41A", "98003", "armado"),      // salida presunta (+36 h sin papel): NO cuenta
       mk("2026-09-22", "E41A", "98004", "facturado"),   // facturada SIN cargar → no salió
       mk("2026-09-22", "E41A", "98005", "facturado"),   // ya volvió con el remito → salió
-      // v20.22: ésta es la que dispara el cartel — salió (CCN) y NO está facturada
+      // v20.23: ésta es la que dispara el cartel — salió (CCN) y NO está facturada
       mk("2026-09-22", "E41A", "98006", "armado")
     ];
     _pgaTs = Date.now();
@@ -97,7 +97,7 @@ catch (_e) {
       return np + ":" + (on.join("+") || "(nada)");
     });
     out.total = ([...prev.querySelectorAll("table.pga tfoot .pga-pct.sal")][0] || {}).textContent;
-    // v20.22 (Thomas): el cartel de lo que se fue sin factura, arriba de la tabla
+    // v20.23 (Thomas): el cartel de lo que se fue sin factura, arriba de la tabla
     const band = prev.querySelector(".pga-aviso-salio");
     out.banda = band ? band.textContent.replace(/\s+/g, " ").trim() : "";
     return out;

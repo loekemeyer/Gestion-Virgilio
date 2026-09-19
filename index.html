@@ -3528,7 +3528,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-pill{ display:inline-block; font-size:12px; font-weight:900; border-radius:999px; padding:1px 9px; letter-spacing:.02em; margin-left:8px; vertical-align:1px; }
 .pga-pill.e-facturado{ background:#dbeafe; color:#1e3a8a; } .pga-pill.e-armado{ background:#dcfce7; color:#14532d; }
 .pga-pill.e-proceso{ background:#fef9c3; color:#854d0e; }   .pga-pill.e-pendiente{ background:#fee2e2; color:#991b1b; }
-/* v20.22 — la banda de lo que salió y no se facturó, arriba de la tabla */
+/* v20.23 — la banda de lo que salió y no se facturó, arriba de la tabla */
 .pga-aviso-salio{ margin-top:12px; border:1.5px solid #c4b5fd; border-left:5px solid #7c3aed;
   background:#f5f3ff; border-radius:12px; padding:9px 13px; color:#4c1d95; font-size:13.5px; }
 .pga-aviso-salio > b{ font-size:15px; font-weight:900; color:#5b21b6; }
@@ -38662,7 +38662,7 @@ function _pgaItemsHtml(np) {
     '<div class="pga-it-tot">' + c.length + ' código' + (c.length === 1 ? '' : 's') +
     ' · <b>' + aprNum(cj, 0) + '</b> cajas' + (un ? ' · <b>' + aprNum(un, 0) + '</b> unidades' : '') + '</div>';
 }
-/* v20.22 (Thomas, 2026-09-18) — LO QUE YA SE FUE Y TODAVÍA NO SE FACTURÓ.
+/* v20.23 (Thomas, 2026-09-18) — LO QUE YA SE FUE Y TODAVÍA NO SE FACTURÓ.
    El mismo cartel que el monitor de la TV, acá arriba de la tabla: una NP con la carga al camión
    registrada (CCN) que no está facturada es mercadería en la calle sin papel, y es lo único de
    esta pantalla que hay que resolver HOY. Salta con **una sola** (Thomas bajó el umbral del

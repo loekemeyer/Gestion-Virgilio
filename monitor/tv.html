@@ -890,7 +890,7 @@ function pintar(d) {
   /* v20.21 (Thomas) — el cartel de lo que se fue sin papel. La lista va completa: son las que
      alguien tiene que facturar hoy, y en una pared un "+3 más" no sirve para nada. */
   if (fcSinFc.length >= AVISO_SALIO_SIN_FC) {
-    /* v20.22 (Thomas): cada tanda con sus m³, y el total adelante. En una pared el volumen es lo
+    /* v20.23 (Thomas): cada tanda con sus m³, y el total adelante. En una pared el volumen es lo
        que dice si lo que está afuera sin papel es un pedido chico o medio camión. */
     var m3SinFc = fcSinFc.reduce(function (s, x) { return s + (x.v.m3 || 0); }, 0);
     avisos += '<div class="aviso aviso-salio">🚚 ' + fcSinFc.length +

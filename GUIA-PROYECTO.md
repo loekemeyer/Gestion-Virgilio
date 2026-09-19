@@ -1,4 +1,4 @@
-## Nota vNEXT (2026-09-18) — El cartel salta con UNA, lleva los m³, y ahora también está en la PPP
+## Nota v20.23 (2026-09-18) — El cartel salta con UNA, lleva los m³, y ahora también está en la PPP
 
 Thomas, sobre las tres puntas abiertas: **dale · dale · sale**.
 
