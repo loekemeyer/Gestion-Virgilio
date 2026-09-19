@@ -1,3 +1,31 @@
+## Nota vNEXT (2026-09-18) — El cartel salta con UNA, lleva los m³, y ahora también está en la PPP
+
+Thomas, sobre las tres puntas abiertas: **dale · dale · sale**.
+
+**1 · Umbral 1.** `AVISO_SALIO_SIN_FC` pasó de 3 a **1**: una tanda en la calle sin papel ya es
+algo que alguien tiene que resolver hoy, no un umbral estadístico.
+
+**2 · Con los m³.** El cartel de la TV dice el total adelante y el volumen de cada tanda —
+*"🚚 2 TANDAS YA SALIERON Y NO ESTÁN FACTURADAS (3,4 m³): E34A **2,0** · E37A **1,4**"*. En una
+pared el volumen es lo que distingue un pedido chico de medio camión.
+⚠ **El cliente no se puede poner ahí**: el mapa de tandas del monitor se arma de
+`gv_ppp_programacion_diaria` (`tanda, np, m3, fecha_entrega`) y **no trae la razón social** — sólo
+la parte web la tiene. Agregarla sería otra consulta en la página que existe justamente para no
+hacerlas. En la PPP sí está, y ahí va.
+
+**3 · El mismo cartel en la PPP** (`_pgaSalioSinFcHtml`, arriba de la tabla de Programación): NP ·
+tanda · **cliente** · m³ de cada pedido con **CCN** que todavía no figura facturado. Mismo umbral
+(1) y mismo violeta.
+
+⚠ **Sin las dos fuentes cargadas no se muestra nada.** Un cartel en cero, cuando todavía no se sabe
+qué salió, es tan falso como uno lleno.
+
+**Medido el 18/09, y es lo que dice que esto no va a ser ruido:** de las **158 NP** del árbol, **16
+tienen CCN** y **las 16 están facturadas** — en un día sano el cartel no aparece.
+
+`tests/ppp-tabla-salio.cjs` suma la NP **98006** (armada, con CCN, sin factura): el cartel tiene que
+nombrarla a ella sola, con su tanda.
+
 ## Nota v20.21 (2026-09-18) — El 🚚 también en la tabla de arriba, y el cartel de lo que se fue sin papel
 
 Thomas, sobre las dos puntas que quedaban del monitor TV: **dale a las 2**.

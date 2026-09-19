@@ -3,6 +3,7 @@
    módulo En salida para ver si esa tanda/NP ya salió en el camión"*.
    Lo que prueba:
      (1) la columna va 5ª, a la izquierda de Facturado, y tiene su color propio;
+     (7) el cartel de arriba nombra lo que salió y NO está facturado (v20.22, umbral 1);
      (2) cuenta como SALIDA **sólo** la NP con carga al camión registrada (CCN) — v20.12, Thomas:
          *"sólo salió si se cargó a camión"*. La dada por salida a mano (`salida_manual`) y la
          salida presunta (`armada_sin_carga`) son presunciones y NO cuentan, igual que la facturada
@@ -43,7 +44,9 @@ catch (_e) {
       mk("2026-09-22", "E41A", "98002", "facturado"),   // la dio por salida un supervisor: NO cuenta
       mk("2026-09-22", "E41A", "98003", "armado"),      // salida presunta (+36 h sin papel): NO cuenta
       mk("2026-09-22", "E41A", "98004", "facturado"),   // facturada SIN cargar → no salió
-      mk("2026-09-22", "E41A", "98005", "facturado")    // ya volvió con el remito → salió
+      mk("2026-09-22", "E41A", "98005", "facturado"),   // ya volvió con el remito → salió
+      // v20.22: ésta es la que dispara el cartel — salió (CCN) y NO está facturada
+      mk("2026-09-22", "E41A", "98006", "armado")
     ];
     _pgaTs = Date.now();
     _pppTab = "plan"; _pppPlanTabla = true; _pppPlanClasica = false; _pppPlanDay = null;
@@ -62,7 +65,7 @@ catch (_e) {
       ["98003", { np: "98003", cargada: false, estado: "armada_sin_carga" }],
       ["98004", { np: "98004", cargada: false, estado: "facturada_sin_cargar" }]
     ]);
-    _pppLoadMs = new Map([["98005", Date.now()]]);   // ya entregada: salió de En Salida, pero salió
+    _pppLoadMs = new Map([["98005", Date.now()], ["98006", Date.now()]]);   // ya entregadas / cargadas
     pppRenderProg(); await new Promise((s) => setTimeout(s, 200));
 
     const dia = [...prev.querySelectorAll("tr.pga-d")].find((tr) => /22\/09/.test(tr.textContent));
@@ -94,6 +97,9 @@ catch (_e) {
       return np + ":" + (on.join("+") || "(nada)");
     });
     out.total = ([...prev.querySelectorAll("table.pga tfoot .pga-pct.sal")][0] || {}).textContent;
+    // v20.22 (Thomas): el cartel de lo que se fue sin factura, arriba de la tabla
+    const band = prev.querySelector(".pga-aviso-salio");
+    out.banda = band ? band.textContent.replace(/\s+/g, " ").trim() : "";
     return out;
   });
   await b.close();
@@ -108,20 +114,24 @@ catch (_e) {
   t(r.salioUno === "true,false,false,false,true",
     "(2)(3) SÓLO la cargada al camión y la ya entregada salieron; la dada por salida a mano, la " +
     "presunta y la facturada sin cargar NO — " + r.salioUno);
-  t(r.pctDia === "40 %2", "(4) el día dice 40 % (2 de 5) — «" + r.pctDia + "»");
-  t(r.pctTanda === "40 %2", "(4) y la tanda lo mismo — «" + r.pctTanda + "»");
-  t(r.total === "40 %2", "(4) igual que el total de abajo — «" + r.total + "»");
-  const espera = ["98001:🚚", "98002:—", "98003:—", "98004:—", "98005:🚚"];
+  t(r.pctDia === "50 %3", "(4) el día dice 50 % (3 de 6) — «" + r.pctDia + "»");
+  t(r.pctTanda === "50 %3", "(4) y la tanda lo mismo — «" + r.pctTanda + "»");
+  t(r.total === "50 %3", "(4) igual que el total de abajo — «" + r.total + "»");
+  const espera = ["98001:🚚", "98002:—", "98003:—", "98004:—", "98005:🚚", "98006:🚚"];
   t(JSON.stringify(r.chips) === JSON.stringify(espera),
     "(4) y cada NP lleva su chip 🚚 salvo la que no salió — " + JSON.stringify(r.chips));
-  t(JSON.stringify(r.filaDia) === JSON.stringify(["40 %2", "40 %2", "20 %1", "0 %0", "0 %0"]),
+  t(JSON.stringify(r.filaDia) === JSON.stringify(["50 %3", "33 %2", "17 %1", "0 %0", "0 %0"]),
     "(5) las 5 columnas NETEAN y suman 100 %: lo que salió no se cuenta otra vez como facturado — " +
     JSON.stringify(r.filaDia));
   const npEsp = ["98001:sal=100 %", "98002:fac=100 %", "98003:arm=100 %",
-                 "98004:fac=100 %", "98005:sal=100 %"];
+                 "98004:fac=100 %", "98005:sal=100 %", "98006:sal=100 %"];
   t(JSON.stringify(r.npPct) === JSON.stringify(npEsp),
     "(6) cada NP lleva su 100 % en la columna que le toca — " + JSON.stringify(r.npPct));
-  t(r.sinDatos === "—", "(7) sin las dos fuentes cargadas dice «—», no 0 % — «" + r.sinDatos + "»");
+  t(/1 pedido ya salió y no está facturado/.test(r.banda),
+    "(7) el cartel avisa el pedido que salió sin factura — «" + r.banda + "»");
+  t(/98006/.test(r.banda) && /E41A/.test(r.banda) && !/98001/.test(r.banda),
+    "(7) y nombra SÓLO esa NP, con su tanda — «" + r.banda + "»");
+  t(r.sinDatos === "—", "(8) sin las dos fuentes cargadas dice «—», no 0 % — «" + r.sinDatos + "»");
   t(errs.length === 0, "sin errores de JS" + (errs.length ? ": " + errs[0] : ""));
   console.log(ok ? "\nOK ppp-tabla-salio" : "\nFALLÓ ppp-tabla-salio");
   process.exit(ok ? 0 : 1);

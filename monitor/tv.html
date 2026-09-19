@@ -243,10 +243,10 @@ var WATCHDOG_MS     = 10 * 60 * 1000;   // ≡ index.html MON_RELOAD_MS
 var RELOAD_CADA_MS  = 6 * 60 * 60 * 1000; // higiene: reload cada 6 h de madrugada
 var VENTANA_DIAS    = 3;                // ≡ index.html targetDeliveryDates(sheetMap, 3)
 var MAX_SIN_ACT     = 6;                // ≡ index.html MAX_PLANNED_NO_ACT
-/* v20.21 (Thomas) — a partir de cuántas tandas salidas y sin factura sale el cartel. Con una o
-   dos alcanza el contador del título de "a facturar"; de tres para arriba ya no es un olvido
-   suelto, es que la facturación quedó atrás y tiene que verse desde lejos. */
-var AVISO_SALIO_SIN_FC = 3;
+/* A partir de cuántas tandas salidas y sin factura sale el cartel. Arrancó en 3 (v20.21) y
+   Thomas lo bajó a **1** el mismo día: una tanda en la calle sin papel ya es algo que alguien
+   tiene que resolver hoy, no un umbral estadístico. */
+var AVISO_SALIO_SIN_FC = 1;
 var CC_DESDE_ISO    = "2026-06-22T00:00:00-03:00";  // ≡ index.html CC_REPARTO_DESDE_ISO
 
 /* Enrolamiento, igual que el modo kiosko del monitor grande: la primera vez
@@ -890,9 +890,13 @@ function pintar(d) {
   /* v20.21 (Thomas) — el cartel de lo que se fue sin papel. La lista va completa: son las que
      alguien tiene que facturar hoy, y en una pared un "+3 más" no sirve para nada. */
   if (fcSinFc.length >= AVISO_SALIO_SIN_FC) {
+    /* v20.22 (Thomas): cada tanda con sus m³, y el total adelante. En una pared el volumen es lo
+       que dice si lo que está afuera sin papel es un pedido chico o medio camión. */
+    var m3SinFc = fcSinFc.reduce(function (s, x) { return s + (x.v.m3 || 0); }, 0);
     avisos += '<div class="aviso aviso-salio">🚚 ' + fcSinFc.length +
-      ' TANDAS YA SALIERON Y NO ESTÁN FACTURADAS: ' +
-      fcSinFc.map(function (x) { return esc(x.v.tanda); }).join(" · ") + '</div>';
+      (fcSinFc.length === 1 ? ' TANDA YA SALIÓ Y NO ESTÁ FACTURADA' : ' TANDAS YA SALIERON Y NO ESTÁN FACTURADAS') +
+      ' (' + n1(m3SinFc) + ' m³): ' +
+      fcSinFc.map(function (x) { return esc(x.v.tanda) + ' <b>' + n1(x.v.m3) + '</b>'; }).join(" · ") + '</div>';
   }
   if (d.alertas.length) {
     avisos += '<div class="aviso aviso-err">⚠ Tandas trabajadas que NO están en la PPP: ' +
