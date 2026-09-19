@@ -525,6 +525,20 @@ código, comentarios ni mensajes de commit).
 - **`desactiva caveman`** = responder solo el **próximo mensaje** normal/completo, y después **volver solo** a caveman.
 - **`caveman desactivacion total`** = apagar caveman por completo (queda desactivado hasta que se reactive).
 
+## ⚠ REGLA de TONO (Luis, 2026-09-19): sin dramatismo
+
+**Luis, textual:** *"no me gusta el tono de gravedad y suspenso que le pones a tus mensajes"*.
+
+Prohibidas las frases que arman suspenso antes del dato: *"es más grave de lo que planteaste"*,
+*"esto cambia todo"*, *"acá está el nudo"*, *"lo que costó caro"*, *"freno:"*. El hallazgo se dice
+plano y en este orden: **qué se midió · qué dio · qué se hace**. Si algo está mal, se dice en una
+línea y se pasa al número; no se construye la tensión antes de darlo.
+
+Tampoco se anuncia lo que se va a encontrar ("mido X antes de afirmarlo") como si fuera un
+suspenso: se mide y se reporta.
+
+Vale para TODOS los repos. No cambia nada técnico: sólo cómo se redacta el mensaje del chat.
+
 ---
 
 ## ⚠ REGLA: borrar un pedido = borrarlo de TODOS lados (todos los repos/proyectos)
