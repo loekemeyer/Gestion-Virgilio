@@ -25822,3 +25822,36 @@ otro cliente en la otra empresa (114 de 115 códigos compartidos son personas di
 
 ⚠ **Esto no deshace los choques que YA están programados** — el pase lleva el mismo guard
 `not exists (… tanda <> '')` que el resto. Riondini y Jazquel del 20/09 hay que moverlos a mano.
+
+### §3.ko — v20.28: la pauta de adelantar proponía días imposibles — 2026-09-20
+
+**Luis, 20/09: *"revisa"***. Las 36 recomendaciones de `gv_ppp_adelantar` apuntaban **todas al
+lunes 21** — mañana, con el día 100 % armado y nada que pickear. La vista buscaba el camión más
+cercano sin mirar si había **tiempo de preparar** el pedido ni **cupo** ese día.
+
+Arreglado con un piso por estado y el cupo del destino:
+
+| columna | qué hace |
+|---|---|
+| `piso_real` | armado o pickeado → puede salir mañana · **sin armar → 2.º día hábil** (se pickea y arma un día, sale el siguiente) |
+| `lugar_libre_destino` | el cupo que le queda al día propuesto, de la vista nueva `gv_ppp_dia_carga` |
+| `accionable` | ahora exige las tres: no armada **+** hay camión antes **+** entra en el cupo de ese día |
+
+**Lo que mostró el arreglo, y es el dato que importa: de las 35 NP TARDE, 0 se pueden
+adelantar.** 17 tienen camión a su zona antes de su fecha, pero ese día no tiene cupo de
+picking. **El cuello no son los camiones: es el depósito.**
+
+Medido: 34,09 m³ por pickear en los 10 días hábiles del horizonte (sin los dos Matiz, que son de
+octubre), contra 3,67 m³/día de un picker → **93 % de utilización**. No hay holgura para
+adelantar nada, y un día de ausencia empuja todo.
+
+Eso deja la decisión donde Luis la puso en el punto 5 de su lógica: *"o se priorizan pedidos, o
+se trae más gente al depósito"*. El sistema ya no puede resolverlo solo.
+
+**Vista nueva `gv_ppp_dia_carga`**: por día, m³ totales, m³ por pickear, lugar libre contra
+`gv_ppp_web_cupo(fecha)`, NP y camiones. Es la que hay que mirar antes de mover cualquier tanda.
+
+```sql
+select * from public.gv_ppp_dia_carga order by fecha;
+select * from public.gv_ppp_adelantar where accionable;
+```

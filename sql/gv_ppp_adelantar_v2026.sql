@@ -75,3 +75,28 @@ grant select on public.gv_ppp_adelantar to anon, authenticated, service_role;
 
 -- chequeo
 -- select estado, count(*), count(*) filter (where accionable) from public.gv_ppp_adelantar group by 1;
+
+-- ═══════════════════════════════════════════════════════════════════════════════════════
+-- v20.28 (2026-09-20) — REVISIÓN: la pauta proponía días imposibles
+--
+-- Luis, 20/09: *"3 revisa"*. El repaso encontró que **las 36 recomendaciones apuntaban al
+-- lunes 21**, o sea mañana, con el lunes ya 100 % armado y sin nada que pickear. Un pedido
+-- "sin armar" no se pickea y se arma para el día siguiente: la vista buscaba el camión más
+-- cercano sin mirar si había **tiempo de prepararlo** ni **cupo** ese día.
+--
+-- Dos columnas nuevas y un piso:
+--   piso_real           · armado o pickeado → puede salir mañana; sin armar → 2.º día hábil
+--                         (se pickea y arma un día, sale el siguiente).
+--   lugar_libre_destino · el cupo que le queda al día propuesto, de `gv_ppp_dia_carga`.
+--   accionable          · ahora exige las tres: no armada + hay camión antes + **entra en el
+--                         cupo de ese día**.
+--
+-- LO QUE MOSTRÓ EL ARREGLO, y es el dato que importa: **de las 35 NP TARDE, 0 se pueden
+-- adelantar.** 17 tienen camión a su zona antes, pero ese día no tiene cupo de picking. El
+-- cuello no son los camiones: es el depósito. Con 1 picker (3,67 m³/día medidos) y 34,09 m³
+-- por pickear en 10 días hábiles, la utilización es del **93 %**. No hay holgura para
+-- adelantar nada, y un día de ausencia empuja todo.
+--
+-- Eso pone la decisión donde Luis la puso en su punto 5: *"o se priorizan pedidos, o se trae
+-- más gente al depósito"*. El sistema ya no puede resolverlo solo.
+-- ═══════════════════════════════════════════════════════════════════════════════════════
