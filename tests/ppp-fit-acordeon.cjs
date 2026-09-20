@@ -70,7 +70,7 @@ catch (_e) {
     // (g) v17.95 (Luis) — la vista TABLA de Programación nunca se achica. Es un acordeón de tres
     // niveles y el zoom la comprimía un poco más con cada nivel abierto (medido: caía al piso de
     // 0,70 con la tanda abierta). Tiene su propio scroll.
-    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanClasica = false; _pppOpen = new Set();
+    _pppTab = "plan"; _pppPlanTabla = true; _pppOpen = new Set();
     pppFitPantalla();
     out.tabla = leer();
     _pppTab = "plan"; _pppPlanTabla = false; _pppOpen = new Set();

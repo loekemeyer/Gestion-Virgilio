@@ -87,7 +87,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // tabla día→tanda→NP, así que sin esta línea `pppRenderProg()` dibuja la tabla y este test —que
     // mide el tablero de 6 días— no encuentra nada. El tablero sigue existiendo (botón "Tablero de
     // 6 días" → `pppPlanTabla(false)`); lo que quedó viejo era el test.
-    _pppTab = "plan"; _pppPlanDay = null; _pppPlanClasica = false; _pppPlanTabla = false; pppRenderProg();
+    _pppTab = "plan"; _pppPlanDay = null; _pppPlanTabla = false; pppRenderProg();
     let html = document.getElementById("pppPreview").innerHTML;
     const kpi = (l) => { const m = new RegExp('<div class="l">' + l + '</div><div class="v">([^<]*)</div>').exec(html); return m ? m[1] : null; };
     out.kpiPed = kpi("Pedidos"); out.kpiCam = kpi("Camiones"); out.kpiVol = kpi("Volumen"); out.kpiVal = (function () { const m = /<div class="l">Valor<\/div><div class="v"><span class="full">([^<]*)<\/span><span class="short">([^<]*)<\/span>/.exec(html); return m ? m[1] + "|" + m[2] : null; })();   // v13.25: largo + corto (celular)
@@ -142,11 +142,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       // ahora sale SÓLO si N > 0 (antes se imprimía igual con 0, que era ruido). Las 2 vencidas
       // del fixture nunca se armaron → N = 0 → el cartel NO tiene que estar.
       !/pn-note/.test(html);
-    // vista clásica y vuelta
-    pppPlanClasica(true);
-    html = document.getElementById("pppPreview").innerHTML;
-    out.clasica = /ppp-sec-done/.test(html) && /Tablero de 6 días/.test(html) && !/pn-days/.test(html);
-    pppPlanClasica(false); pppPlanVolver();
+    // v20.24: la vista clásica se borró; queda la vuelta al tablero
+    pppPlanVolver();
     html = document.getElementById("pppPreview").innerHTML;
     out.vuelve = /pn-days/.test(html);
     // v13.17: "Ver hoja 2 →" pagina de a 6 hábiles; "Más Adelante SRL" (hábil 11) cae en la hoja 2 y deja de ser chip
@@ -227,7 +224,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["camión de 1 pedido: sin orden de carga (v13.13)",       r.sinOrdenNorte === true],
     ["las tandas del día siguen abajo con sus bloques",       r.bloques === true],
     ["vista de atrasados",                                    r.venc === true],
-    ["vista clásica y vuelta al tablero",                     r.clasica === true && r.vuelve === true],
+    ["vuelta al tablero",                                    r.vuelve === true],
     ["v13.17: hoja 1 con 'Ver hoja 2 →' y sin '← Hoja'",      r.hoja1Btn === true],
     ["v13.17: hoja 2 = 6 hábiles siguientes, sin 'Más adelante', KPI 1", r.hoja2 === true],
     ["v13.17: vuelta a la hoja 1",                            r.hoja1Vuelve === true],

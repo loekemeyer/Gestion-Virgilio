@@ -47,9 +47,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await pppRefreshEnSalida();
     // cargada hace 48 h, sin FSS → vencida
     _pppEntregadoCC = new Set(["98002"]); _pppLoadMs = new Map([["98002", Date.now() - 48 * 3600000]]);
-    window.crVencido = (ms) => ms > 0 && (Date.now() - ms) > 30 * 3600000;
-
-    _pppPlanClasica = true; _pppTab = "plan"; pppRenderProg();
+    window.crVencido = (ms) => ms > 0 && (Date.now() - ms) > 30 * 3600000; // v20.24: la vista clásica se borró; el render de bloques (id="ppprow_NN") vive
+    // ahora en la vista de UN DÍA. El fixture entrega el 04/09, ya pasado → vencidos.
+    _pppTab = "plan"; _pppPlanTabla = false; _pppPlanDay = "venc"; pppRenderProg();
     let html = document.body.innerHTML;
     out.plan98001 = html.indexOf('id="ppprow_98001"') >= 0;
     out.plan98002 = html.indexOf('id="ppprow_98002"') >= 0;
@@ -68,8 +68,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.entMuestra98001 = html.indexOf("98001") >= 0;
     // vista vacía → En Salida vacía, aunque haya facturados sin confirmar
     salida = []; await pppRefreshEnSalida();
-    out.vaciaSinCargados = _pppSplitDelivered().enViaje.length === 0;
-    _pppPlanClasica = true; _pppTab = "plan"; pppRenderProg();
+    out.vaciaSinCargados = _pppSplitDelivered().enViaje.length === 0; _pppTab = "plan"; _pppPlanTabla = false; _pppPlanDay = "venc"; pppRenderProg();
     out.vuelve98002 = document.body.innerHTML.indexOf('id="ppprow_98002"') >= 0;
     return out;
   });

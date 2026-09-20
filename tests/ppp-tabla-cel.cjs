@@ -41,7 +41,7 @@ const pintar = async (p) => p.evaluate(async () => {
   // (se usa `_pppLoadMs` —los CCN— y no `_pppEnSalida`, porque esa otra lista además ESCONDE de
   //  Programación lo que está en salida y acá lo que se mide es el ancho de la tabla llena)
   _pppLoadMs = new Map(_pgaRows.map((r) => [r.np, Date.now()]));
-  _pppTab = "plan"; _pppPlanTabla = true; _pppPlanClasica = false; _pppPlanDay = null;
+  _pppTab = "plan"; _pppPlanTabla = true; _pppPlanDay = null;
   document.getElementById("pppOverlay").classList.add("show");
   pppRenderProg(); await new Promise((s) => setTimeout(s, 250));
   const prev = document.getElementById("pppPreview");

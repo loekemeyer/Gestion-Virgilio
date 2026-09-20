@@ -62,7 +62,7 @@ catch (_e) {
     await pppRefreshControlado(); await pppRefreshArmado(); await pppRefreshEnSalida(); await pppRefreshValor();
 
     // Abrir la lista de atrasados en Programación
-    _pppTab = "plan"; _pppPlanDay = null; _pppPlanClasica = false; pppRenderProg();
+    _pppTab = "plan"; _pppPlanDay = null; pppRenderProg();
     pppPlanAbrir("venc");
     let h = document.getElementById("pppPreview").innerHTML;
     // (a) el botón por pedido

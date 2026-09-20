@@ -50,7 +50,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await pppRefreshControlado();
     await pppRefreshMetaEntSet();
     await pppRefreshDelivered();
-    _pppPlanClasica = true; _pppTab = "plan"; pppRenderProg();
+    // v20.24: la vista clasica se borro. El mismo render de bloques de tanda
+    // (id="ppprow_NN") vive ahora en la vista de UN DIA, asi que el test entra ahi.
+    _pppTab = "plan"; _pppPlanTabla = false;
+    _pppPlanDay = "venc"; pppRenderProg();   // 04/09 ya pasó: cae en vencidos
     let html = document.body.innerHTML;
     out.plan98001 = html.indexOf('id="ppprow_98001"') >= 0;
     out.plan98002 = html.indexOf('id="ppprow_98002"') >= 0;

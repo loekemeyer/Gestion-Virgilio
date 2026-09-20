@@ -63,7 +63,7 @@ catch (_e) {
       return { ok: true, status: 200, json: async () => [], text: async () => "[]", headers: { get: () => null } };
     };
 
-    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanClasica = false; _pppPlanDay = null;
+    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanDay = null;
     document.getElementById("pppOverlay").classList.add("show");
     pppRenderProg(); await new Promise((res) => setTimeout(res, 250));
 

@@ -49,7 +49,7 @@ catch (_e) {
       mk("2026-09-22", "E41A", "98006", "armado")
     ];
     _pgaTs = Date.now();
-    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanClasica = false; _pppPlanDay = null;
+    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanDay = null;
     document.getElementById("pppOverlay").classList.add("show");
 
     // (5) primero, SIN ninguna de las dos fuentes

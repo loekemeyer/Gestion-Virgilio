@@ -53,7 +53,7 @@ catch (_e) {
     // ⚠ `_pppPlanTabla = false` a mano: desde la v17.66 la vista por defecto de Programación es la
     // tabla día→tanda→NP, así que sin esta línea se dibuja la tabla y este test —que mide las
     // tarjetas del tablero de 6 días— no encuentra nada (y los chequeos en negativo pasan solos).
-    _pppTab = "plan"; _pppPlanDay = null; _pppPlanClasica = false; _pppPlanTabla = false; pppRenderProg();
+    _pppTab = "plan"; _pppPlanDay = null; _pppPlanTabla = false; pppRenderProg();
     const g = document.getElementById("pppPreview").innerHTML;
     // la lista larga sólo puede estar dentro del title, nunca como texto visible
     out.gridTodas = /D67A · D67B · D67C · D67D/.test(g.replace(/title="[^"]*"/g, ""));

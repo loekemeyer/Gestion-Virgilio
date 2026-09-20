@@ -107,7 +107,7 @@ catch (_e) {
       return false;
     };
 
-    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanClasica = false; _pppPlanDay = null;
+    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanDay = null;
     document.getElementById("pppOverlay").classList.add("show");
     pppRenderProg();
     await esperar(() => !!document.querySelector("#pppPreview table.pga"));

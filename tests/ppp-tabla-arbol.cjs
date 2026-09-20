@@ -63,7 +63,7 @@ catch (_e) {
       return { ok: true, status: 200, json: async () => [], text: async () => "[]", headers: { get: () => null } };
     };
 
-    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanClasica = false; _pppPlanDay = null;
+    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanDay = null;
     document.getElementById("pppOverlay").classList.add("show");
     pppRenderProg(); await new Promise((res) => setTimeout(res, 250));
     const prev = document.getElementById("pppPreview");
@@ -82,7 +82,7 @@ catch (_e) {
       return th.length === 9 && !th[0] && !th[1] && !th[2] && !th[3] && /sal/.test(th[4]) &&
              /fac/.test(th[5]) && /arm/.test(th[6]) && /pro/.test(th[7]) && /pen/.test(th[8]);
     })();
-    out.salidas = /pppPlanTabla\(false\)/.test(html) && /pppPlanClasica\(true\)/.test(html);
+    out.salidas = /pppPlanTabla\(false\)/.test(html);   // v20.24: ya no hay botón de vista clásica
     // v17.79 (Luis): "Facturado azul, armado verde, en proceso amarillo, pendiente rojo"
     out.paleta = (function () {
       const fam = function (css) {

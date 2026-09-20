@@ -33,7 +33,7 @@ catch (_e) { ({ chromium } = require("playwright")); }
     // Valores a mano: lo que se está probando es el layout, no la carga del importe.
     _pppValor = new Map([["98701",{valor:514290}],["98702",{valor:2414815}],["98703",{valor:997640}]]
       .map(([np,v]) => [_pppNpNorm(np), v]));
-    _pppTab = "plan"; _pppPlanClasica = false; pppRenderProg();
+    _pppTab = "plan"; pppRenderProg();
     pppPlanAbrir(_pppDateKey(hab[0]));
     window.fetch = origFetch;
 

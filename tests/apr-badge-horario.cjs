@@ -141,7 +141,7 @@ catch (_e) {
     window._pppPlanAgrupar = function () { return { venc: [], byDay: new Map() }; };
     window.pppPaintTabs = function () {};
     window.getTodayKey = () => "2026-09-14";
-    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanClasica = false; _pppPlanDay = null;
+    _pppTab = "plan"; _pppPlanTabla = true; _pppPlanDay = null;
     pppRenderProg(); await new Promise((res) => setTimeout(res, 200));
     pgaAbrirDia("20260918"); await new Promise((res) => setTimeout(res, 120));
     pgaAbrirTanda("20260918|E01A"); await new Promise((res) => setTimeout(res, 150));

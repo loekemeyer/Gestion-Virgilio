@@ -132,7 +132,7 @@ catch (_e) {
     _pppGeo = null; _pppGeoCod = null;
     await pppLoadProgFromSupabase();
     await pppRefreshValor(); await pppRefreshGeo();
-    _pppTab = "plan"; _pppPlanClasica = false;
+    _pppTab = "plan";
     pppPlanAbrir(_pppDateKey(hab[0]));
     const pant = document.getElementById("pppPreview").innerHTML;
     out.botones = (pant.match(/pppHojaAbrir\(/g) || []).length;   // 1 (el camión) — Retira no lleva
