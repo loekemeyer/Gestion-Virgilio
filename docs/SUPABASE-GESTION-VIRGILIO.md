@@ -25855,3 +25855,44 @@ se trae más gente al depósito"*. El sistema ya no puede resolverlo solo.
 select * from public.gv_ppp_dia_carga order by fecha;
 select * from public.gv_ppp_adelantar where accionable;
 ```
+
+### §3.kp — v20.29: el corte de las 18 hs — lo que no está facturado no sale mañana — 2026-09-20
+
+**Luis, 20/09, textual:** *"si a las 18 hs ya no hay facturado algo para que salga al próximo
+día hábil, se debe reprogramar de manera automática al siguiente día que sale esa zona. Salvo
+que sea súper. Si es súper, tiene que llegar aviso."*
+
+**Cron 96 `gv-reprog-sin-factura-18hs`**, `0 21 * * 1-5` UTC = **18:00 ART, lunes a viernes**.
+El viernes a las 18 mira el **lunes**: el objetivo es el próximo día **hábil**, no el siguiente
+día calendario.
+
+| caso | qué hace | por qué |
+|---|---|---|
+| súper | **aviso**, no se toca | pedido de Luis |
+| **retira** | **aviso**, no se toca | ⚠ no estaba en el pedido, lo agregué al probarlo |
+| tanda **mitad facturada** | **aviso**, no se toca | partirla deja la mercadería en la pila vieja (guard v20.01) |
+| el resto | **se mueve** al siguiente día con camión a esa zona | la regla |
+
+⚠ **Retira lo agregué yo y conviene que quede claro por qué.** La corrida en seco contra el
+martes 22 mostró **4 tandas de Retira que se habrían movido solas** (E26D, E35A, E60A, E62A,
+0,677 m³). Un Retira no es un camión nuestro: el cliente **eligió el día** (regla v19.52) y
+viene a buscar. Moverlo solo significa que llega y el pedido no está. Mismo criterio que el
+súper: avisa.
+
+⚠ **Trabaja por TANDA, nunca por NP.** Es el guard v20.01 de Thomas: el picking vive en la pila
+de la tanda, no del pedido. Mover una NP suelta deja las cajas donde estaban.
+
+⚠ **Si no hay otro día con camión a esa zona, va al próximo día con cupo.** Suena peor de lo que
+es: cuando varias tandas de la misma zona caen juntas, la primera funda el día y las siguientes
+**ya lo encuentran**, porque el lazo consulta `gv_ppp_web_dias_ancla` en cada vuelta y con
+`p_aplicar = true` cada movida ya está escrita. Terminan viajando juntas.
+
+Todo queda en **`GV_Reprog_Sin_Factura_Log`** y sale un Telegram por corrida, con las tres listas
+separadas. Probar sin escribir, y también correrlo a mano sobre otro día:
+
+```sql
+select * from public.gv_ppp_reprogramar_sin_factura(false, date '2026-09-22');
+select * from public."GV_Reprog_Sin_Factura_Log" order by corrida desc;
+```
+
+**Apagarlo:** `select cron.alter_job(96, active := false);` · `sql/gv_reprog_sin_factura_v2029.sql`
