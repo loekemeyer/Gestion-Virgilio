@@ -25599,10 +25599,29 @@ evento: los 10 viajaron, los **dos** candados se movieron, no quedó nada en el 
 valía **3,00 m³** y los días programados iban de 2,77 a 6,00.
 
 **De dónde salía el 3,00.** `gv_ppp_web_cupo_dias` calcula `pickers × cupo_m3_por_picker` cuando
-`cupo_por_dotacion = 1`. `gv_ppp_web_pickers_tipicos()` devuelve **1** —la mediana de legajos
-distintos por día con eventos EP/TP/PKC— aunque en 10 días haya **6 legajos** pickeando y uno solo
-llegue a 265 eventos en un día. Con 1 picker el cupo quedaba en 3,00 y dejó de frenar al armador:
-todos los días hábiles del 21/09 al 01/10 estaban por encima. Es la idea **8220**.
+`cupo_por_dotacion = 1`, y `gv_ppp_web_pickers_tipicos()` devuelve **1**. Con 1 picker el cupo
+quedaba en 3,00 y dejó de frenar al armador: todos los días hábiles del 21/09 al 01/10 estaban por
+encima.
+
+⚠ **Esa función NO está rota** —así se escribió acá primero, y es falso—: devuelve 1 porque hoy
+pickea **una sola persona**. Los 6 legajos de la idea **8220** están repartidos en 60 días, no
+juntos: Adrián Villalba (22 días) dejó de pickear el **21/08**, Kevin Latrónico (10 días) el
+**31/08**, Jhonny Cartaya llega al 16/09 y Jhonny Moncayo es el único del 17 y 18/09. El equipo
+pasó de 2-3 personas a **una**.
+
+**Y el rendimiento no escala con la gente**, medido sobre 60 días de picking cerrado:
+
+| pickers | días | m³/día | m³ por persona |
+|---|---|---|---|
+| 1 | 16 | 3,67 | 3,67 |
+| 2 | 19 | 6,41 | 3,21 |
+| 3 | 5 | 5,56 | 1,85 |
+| 4 | 2 | 5,49 | 1,37 |
+
+Con 3 personas se prepara **menos** que con 2. Va contra el punto 5 de la lógica de Luis (*"si hay
+más demora, se trae más gente al depósito"*): esa válvula puede no existir. La muestra de 3 y 4 es
+chica (5 y 2 días) y puede estar sesgada —quizá se llama gente justo los días complicados— así que
+**hay que medirlo con más días antes de apoyarse en eso**. Idea **8220**.
 
 **Lo que el depósito cierra de verdad**, medido sobre los eventos **TP** con `ts_inicio` no nulo de
 los últimos 45 días, cruzados contra `vista_tanda_m3`, sólo días hábiles:
@@ -25613,6 +25632,13 @@ los últimos 45 días, cruzados contra `vista_tanda_m3`, sólo días hábiles:
 
 Se tomó la **mediana**, que es el día típico; el promedio lo inflan dos picos (14,17 el 15/09 y
 13,55 el 09/09). Coincide con lo que programa la simulación de anclas con ventana 10 (4,34 m³/día).
+
+⚠ **Revisado el mismo día (20/09), y el 4,30 QUEDA igual por decisión de Luis** (*"por ahora que
+quede en 4.3"*). El repaso de la dotación cambió el diagnóstico pero no el número: la mediana de
+4,31 mezcla días de 1 y de 2 pickers, y **hoy pickea uno solo**, que cierra 3,67 m³/día. O sea que
+el cupo está ~17 % por encima de lo que el equipo de hoy prepara. Se deja así a propósito, no por
+error: el equipo se achicó hace dos semanas y el cupo apretado sería la referencia equivocada si
+vuelve el segundo. **No bajarlo a 3,67 sin que Luis lo pida.**
 
 **Por qué FIJO y no atado a la dotación.** Mientras `gv_ppp_web_pickers_tipicos()` mida 1 donde hay
 6, el cupo por dotación es una cuenta rota: si mañana midiera 2, el cupo saltaría a 8,60 sin que
