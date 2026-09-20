@@ -25671,3 +25671,80 @@ retroceso es `while v_i < v_off - 1`, que con `v_off = 0` no corre nunca y marca
 pedidos sin lugar, baja 22 % los km contra la ventana corta (regla 3) y deja el p90 de demora en 7
 días hábiles, con 3 de margen contra el límite de 10 (regla 4). La 13 ahorra 9 % más de km pero
 deja el p90 en 9, sin lugar para un feriado.
+
+### §3.kl — v20.26: el ANCLA DE ZONA conectada al armador — 2026-09-20
+
+**Luis, 20/09:** *"conectala"* · *"pero si ya fue programado, ya está. La lógica es para los a
+programar únicamente"* · *"yo quiero que todo se programe automático"*.
+
+Para una zona automática, el día deja de ser *"el próximo día con cupo"* y pasa a ser *"el día
+en que YA va un camión a esa zona"*, si cae dentro de la ventana de **10 días hábiles**. Recién
+si no hay camión a esa zona, cascada de cupo como hasta ahora.
+
+Fuente y medición completa: `sql/gv_ppp_web_ancla_zona_v2026.sql`. Lo que importa acá:
+
+1. **Pase nuevo `(b0)`**, justo antes de `(b)`. Recorre **todos** los días con camión a esa zona
+   dentro de la ventana, del más cercano al más lejano; si el primero no tiene cupo, prueba el
+   siguiente. Con `p_forzar_cods = '{}'`, o sea que **respeta el cupo** (punto 2 de la lógica).
+2. **Función nueva `gv_ppp_web_dias_ancla(zona, desde, ventana)`** → `date[]`. ⚠ No se pudo
+   reusar `gv_ppp_web_dia_camion` iterándola: esa función **topa el piso en mañana** a propósito
+   (v15.48), así que con cualquier `p_desde` devuelve siempre el mismo día. Se repite su consulta
+   sin el `min()` y sin el clamp. **Los filtros tienen que quedar iguales** —tanda no vacía,
+   KRIKOS afuera, `gv_es_super`/`gv_es_super_np`— y por esa duplicación lleva centinela.
+3. **Config**: `ancla_activa` (1) y `ancla_ventana_habiles` (10). En 0, todo vuelve a la cascada
+   sin tocar código. ⚠ `PPP_Web_Config` **no tiene unique sobre `clave`**: nada de `on conflict`.
+
+**Cómo se probó, que es lo que vale.** Leer la función no prueba nada — el pase nuevo sólo
+explota cuando *entra* por ahí (§3.kk.1 y el problema 400). Se corrió el armador de verdad con
+`p_filas` de prueba dentro de un `do` que termina en `raise exception`, así la transacción se
+aborta y no queda nada escrito. Resultado del 20/09:
+
+| caso | dónde quedó | por qué |
+|---|---|---|
+| Zona 4 | **01/10** | el único día con camión a esa zona |
+| Zona 6 | **02/10** | saltea 21/09 (6,00 m³) y 22/09 (4,55): los dos sin cupo |
+| Súper Matiz, zona *"Zona 5 - GBA Oeste"* | **no se programa** | regla v14.23 en pie |
+| NP ya programada (order 1377, E12R, 21/09) | **igual que antes** | el guard `not exists (… tanda <> '')` |
+
+⚠ Dos trampas del `p_filas` de prueba, que costaron dos corridas: `p_forzar` es un **array**
+(`'[]'`, no `'{}'`) y **`m3_parcial` es BOOLEAN**, no el m³ parcial.
+
+⚠ **Que el caso de zona 6 termine en 02/10 no es un defecto del ancla**: 21/09 y 22/09 están por
+encima del cupo porque se programaron con la regla vieja. De acá en adelante los días los llena
+el pase (b0) **antes** que la cascada, así que el ancla tiene la primera opción sobre el cupo
+del día.
+
+**Chequeo:**
+
+```sql
+select * from public.gv_reglas_perdidas;                              -- vacía
+select z, public.gv_ppp_web_dias_ancla(z, current_date + 1)
+  from unnest(array['Zona 1','Zona 4','Zona 5','Zona 6','Zona 7']) z; -- los días con camión
+```
+
+**Rollback:** `update public."PPP_Web_Config" set valor = 0 where clave = 'ancla_activa';`
+
+### §3.km — v20.26: `gv_ppp_adelantar`, la pauta para adelantar tandas — 2026-09-20
+
+**Luis, 20/09:** *"tendría que marcar la pauta para adelantar tandas"*. Es el punto 5 de su
+lógica (*"si hay más demora, o se priorizan pedidos, o se trae más gente"*) y la decisión es
+suya: **la vista marca, no mueve nada**.
+
+`dias_habiles` cuenta de `fecha_recep` hasta el día en que **sale** —los que va a tardar, no los
+transcurridos— así que avisa antes y no después. `estado` = TARDE (> 10) o AL LIMITE (9-10).
+`dia_ancla_antes` es el día anterior en que ya va un camión a su zona, y `dias_que_adelanta`
+cuánto gana el movimiento. **`accionable`** = todavía no está armada **y** hay camión antes.
+
+⚠ Los **súper quedan afuera** (`gv_es_super`, `gv_es_super_np` y por zona). Luis, 19/09: *"Matiz
+es como un súper que se pide con mucha anticipación y ellos definen la fecha de entrega"*. En la
+primera versión sus dos NP encabezaban la lista con 64 y 51 días hábiles, que no son demora
+nuestra. Retira y expreso, lo mismo: la fecha la pone el cliente o el transporte.
+
+⚠ `dia_ancla_antes` dice que **hay camión** ese día, no que haya **cupo**. Mover la tanda es
+decisión de armado y la toma Marianela.
+
+Medido al aplicarla: **37 NP TARDE (7,23 m³)** y **48 AL LÍMITE (11,61 m³)**; **50 accionables**.
+El peor: LK 0066 (MRG Soluciones, zona 2, 0,082 m³) sale el 29/09 con 13 días hábiles y hay
+camión a zona 2 el 21/09 — **6 días de adelanto por 82 litros**.
+
+`sql/gv_ppp_adelantar_v2026.sql`. Chequeo: `select * from public.gv_ppp_adelantar where accionable;`
