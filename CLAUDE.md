@@ -564,6 +564,21 @@ Qué cambia en la práctica:
 
 Vale para TODOS los repos.
 
+## ⚠ REGLA de UNIDADES (Luis, 2026-09-20): **no existe "litros"**
+
+**Luis, textual:** *"No existe litros"*.
+
+El volumen de un pedido se dice en **m³**, siempre, con coma decimal y tres decimales cuando hace
+falta: `0,097 m³`. **Nunca** traducirlo a litros para que suene chico ("97 litros"), ni a cm³, ni
+a ninguna otra unidad: en el depósito nadie habla así y obliga a volver a convertir mentalmente.
+
+Lo mismo con el resto del vocabulario de la operación, que ya está en la regla de ROL: **cajas**
+(no "unidades" cuando son cajas), **tanda**, **NP**, **picking**, **armado**, **camión**, **zona**,
+**góndola**, **rack**. Si un número es chico, se dice chico con su unidad —`0,097 m³`— o se lo
+compara contra algo de la operación (*"menos de una caja"*), no cambiando de unidad.
+
+Vale para TODOS los repos. Es sólo cómo se escribe el mensaje del chat: no cambia nada técnico.
+
 ## ⚠⚠ LA LÓGICA DE PROGRAMACIÓN, RESUMIDA POR LUIS (2026-09-19)
 
 Es el objetivo contra el que se mide cualquier cambio de armado. Textual:
