@@ -25774,3 +25774,51 @@ El peor: LK 0066 (MRG Soluciones, zona 2, 0,082 m³) sale el 29/09 con 13 días 
 camión a zona 2 el 21/09 — **6 días de adelanto por 82 litros**.
 
 `sql/gv_ppp_adelantar_v2026.sql`. Chequeo: `select * from public.gv_ppp_adelantar where accionable;`
+
+### §3.kn — v20.27: el ANCLA DE CLIENTE, arriba del ancla de zona — 2026-09-20
+
+**Luis, 20/09**, mostrando el cartel rojo de la PPP (*"2 cliente(s) con entregas en días
+distintos de la misma semana — tendrían que ir juntos … Movelo a mano al día que corresponda"*):
+***"esto hay que arreglarlo"***.
+
+El cartel no era un error: el armado dejaba el choque **a la vista a propósito** y esperaba a una
+persona (regla *"QUIÉN ORGANIZA LA PROGRAMACIÓN"* del `CLAUDE.md`). Con *"yo quiero que todo se
+programe automático"* eso dejó de alcanzar.
+
+**El orden de precedencia queda así, y es el orden de los pases:**
+
+| pase | qué decide el día | pisa el cupo |
+|---|---|---|
+| **(b00)** ancla de **cliente** | el día que ese cliente ya tiene | **sí** |
+| (b0) ancla de **zona** | el día en que ya va un camión a esa zona | no |
+| (b) cascada | el próximo día con cupo | no |
+
+El día del cliente pisa el cupo a propósito: **no juntarlo es un segundo viaje al mismo
+domicilio**, que cuesta más que el m³ de más en el día. Es la misma precedencia que ya tenía el
+pase (c) de zonas manuales. La **tanda** se sigue partiendo por camión (v18.87): un cliente con
+sucursales en dos zonas sale el mismo día en dos tandas — lo que no puede es salir en dos días.
+
+**Los dos casos del cartel, y por qué el guard viejo no los vio:**
+
+| cliente | choque | por qué pasó |
+|---|---|---|
+| **Riondini Federico** (LK 4105) | 98605/98606/98607 ISIS el lun 21/09 · **LK 0118** web el jue 24/09 — las 4 en Zona 3 y al camión de Capital | `gv_web_cliente_un_solo_dia` sólo mira `PPP_Web_Programacion`, así que un choque **ISIS contra web es invisible** (idea 9869) |
+| **Jazquel SRL** (LK 3814) | LK 0109 (E46C, zona 5, mié 23/09) · 8 NP (E48D, zona 2, lun 28/09) | web contra web, pero en **zonas distintas**: el armador eligió el día por la zona de cada uno |
+
+**Función nueva `gv_ppp_web_dias_cliente(empresa, cod, desde, ventana)`** → `date[]`. Mira **las
+dos** programaciones. ⚠ La clave es **`(empresa, cod)`**, nunca `cod` solo: el mismo número es
+otro cliente en la otra empresa (114 de 115 códigos compartidos son personas distintas).
+
+**Probado corriendo el armador**, en transacción abortada:
+
+| fila de prueba | dónde cayó | |
+|---|---|---|
+| Jazquel, zona 6 (no tiene camión ese día) | **23/09** | día que Jazquel ya tiene — no fundó uno nuevo |
+| Riondini, zona 3 | **24/09** | día que Riondini ya tiene |
+| cliente sin historia, zona 6 | ancla de zona | el pase (b0) sigue mandando cuando no hay día de cliente |
+
+**Chequeo:** `select * from public.gv_ppp_cliente_dos_dias;` — vacía = todo bien.
+`sql/gv_ppp_web_ancla_cliente_v2027.sql`. Interruptor: el mismo `ancla_activa = 0`.
+
+⚠ **Esto no deshace los choques que YA están programados** — el pase lleva el mismo guard
+`not exists (… tanda <> '')` que el resto. Riondini y Jazquel del 20/09 hay que moverlos a mano.
