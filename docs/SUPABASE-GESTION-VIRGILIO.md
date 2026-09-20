@@ -25591,3 +25591,83 @@ evento: los 10 viajaron, los **dos** candados se movieron, no quedó nada en el 
 `ZZ90Z` (5) el regex no la reconoce y la prueba miente — pasó, y dio un falso negativo.
 
 `sql/gv_renombre_eventos_todos_v2022.sql`.
+
+### §3.kk — v20.25: el cupo del día pasa a ser fijo en 4,30 m³ — 2026-09-20
+
+**Luis, 20/09**, al ordenar la programación contra sus cinco reglas. El punto 2 de esa lógica
+("programar los m³ lo más al ras de lo que lleguen a preparar") no se estaba cumpliendo: el cupo
+valía **3,00 m³** y los días programados iban de 2,77 a 6,00.
+
+**De dónde salía el 3,00.** `gv_ppp_web_cupo_dias` calcula `pickers × cupo_m3_por_picker` cuando
+`cupo_por_dotacion = 1`. `gv_ppp_web_pickers_tipicos()` devuelve **1** —la mediana de legajos
+distintos por día con eventos EP/TP/PKC— aunque en 10 días haya **6 legajos** pickeando y uno solo
+llegue a 265 eventos en un día. Con 1 picker el cupo quedaba en 3,00 y dejó de frenar al armador:
+todos los días hábiles del 21/09 al 01/10 estaban por encima. Es la idea **8220**.
+
+**Lo que el depósito cierra de verdad**, medido sobre los eventos **TP** con `ts_inicio` no nulo de
+los últimos 45 días, cruzados contra `vista_tanda_m3`, sólo días hábiles:
+
+| días hábiles con picking | promedio | **mediana** | p90 | máximo |
+|---|---|---|---|---|
+| 31 | 4,93 | **4,31** | 8,98 | 14,17 |
+
+Se tomó la **mediana**, que es el día típico; el promedio lo inflan dos picos (14,17 el 15/09 y
+13,55 el 09/09). Coincide con lo que programa la simulación de anclas con ventana 10 (4,34 m³/día).
+
+**Por qué FIJO y no atado a la dotación.** Mientras `gv_ppp_web_pickers_tipicos()` mida 1 donde hay
+6, el cupo por dotación es una cuenta rota: si mañana midiera 2, el cupo saltaría a 8,60 sin que
+cambie nada en el depósito. Queda fijo hasta que se arregle la medición (idea **8220**); ahí se
+vuelve a evaluar.
+
+```sql
+update public."PPP_Web_Config" set valor = 0    where clave = 'cupo_por_dotacion';
+update public."PPP_Web_Config" set valor = 4.30 where clave = 'm3_max_dia';
+```
+
+**Efecto en cadena.** Lo leen seis funciones: `ppp_web_armar_tandas`,
+`gv_ppp_web_proximo_dia_con_cupo`, `gv_ppp_web_calendario`, `gv_ppp_tanda_mover`,
+`gv_ppp_web_tanda_programar` y `gv_ppp_isis_programar`. Cada día acepta 4,30 m³ en vez de 3,00
+(+43 %), así que lo nuevo se concentra antes y cascadea menos. **No reprograma nada de lo ya
+programado**: sólo cambia las corridas siguientes de los crons 71 y 73.
+
+**Chequeo:**
+
+```sql
+select dia, cupo from public.gv_ppp_web_cupo_dias(current_date, current_date + 6);  -- 4.30 todos
+```
+
+**Rollback:** `valor = 1` en `cupo_por_dotacion` y `valor = 5.00` en `m3_max_dia`.
+Backup: `zz_backups."GV_Backup_PPPWebConfig_cupo_20260920"` (RLS prendida, sin grants a anon).
+
+⚠ **Lo que NO cambia esto.** El cupo decide *cuánto* entra en un día, no *a qué zona va el camión
+de ese día*. El desorden de zonas —zona 5 con 4 días para 3,45 m³, zona 6 con 3 días para 3,31—
+sale de `zonas_automaticas = '1,2,3,4,5,6,7'`, que manda todo a la cascada de "próximo día con
+cupo". Eso lo resuelve conectar el modelo de anclas al armador, que hoy **sólo simula**
+(`gv_ancla_simular` / `gv_ancla_comparar`; el que arma sigue siendo `gv_ppp_web_armar_pendientes`).
+
+### §3.kk.1 — La medición de la ventana del ancla: ojo con el `offset`
+
+`gv_ancla_demora_resumen(desde, hasta, ventana, offset, cupo)` devuelve un resultado **degenerado**
+si se la llama con `offset = 0`: paradas por camión exactamente 1,00, idéntico para toda ventana, y
+332 de 410 anclas marcadas `sin_lugar`. No es un bug de la función, es la llamada.
+
+La razón: el lazo que busca compañía mira los días `fs + 1 .. fs + ventana`, mientras que el ancla
+nueva se funda en `gv_ancla_habil_atras(fs + offset)`. Con `offset = 0` las anclas quedan en `fs` y
+la búsqueda nunca mira ese día, así que **cada pedido funda su propio camión**. Además el lazo de
+retroceso es `while v_i < v_off - 1`, que con `v_off = 0` no corre nunca y marca todo `sin_lugar`.
+
+**Se llama siempre con `offset = ventana`.** Así medido sobre los 60 días reales anteriores al
+20/09 (410 pedidos, 164,97 m³, cupo 10):
+
+| ventana | camiones/día | máx/día | paradas/camión | km | demora p50 | p90 | máx | +10 días hábiles |
+|---|---|---|---|---|---|---|---|---|
+| real | 2,69 | 4 | 3,63 | — | — | — | — | 41 vivos |
+| 5 | 2,64 | 9 | 3,69 | 4.629 | 2 | 3 | 4 | 0 |
+| 8 | 2,11 | 5 | 5,13 | 3.858 | 3 | 6 | 6 | 0 |
+| **10** | **1,87** | **2** | **5,77** | **3.600** | 4 | 7 | 8 | 0 |
+| 13 | 1,68 | 2 | 7,19 | 3.275 | 5 | 9 | 9 | 0 |
+
+**La ventana 10 es la primera que cumple el tope de 2 camiones por día** (regla 1 de Luis) con 0
+pedidos sin lugar, baja 22 % los km contra la ventana corta (regla 3) y deja el p90 de demora en 7
+días hábiles, con 3 de margen contra el límite de 10 (regla 4). La 13 ahorra 9 % más de km pero
+deja el p90 en 9, sin lugar para un feriado.
