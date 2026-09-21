@@ -25896,3 +25896,64 @@ select * from public."GV_Reprog_Sin_Factura_Log" order by corrida desc;
 ```
 
 **Apagarlo:** `select cron.alter_job(96, active := false);` · `sql/gv_reprog_sin_factura_v2029.sql`
+
+### §3.kq — v20.30: el guard del pedido suelto bloqueaba mover la TANDA ENTERA — 2026-09-21
+
+**Pedido de Luis:** *"verificá que mover pedidos y tandas en la programación no rompa los pedidos
+(que el sistema haga bien el cambio de código de tanda, que si está pickeado no pierda la info)"*.
+Problema **458**.
+
+El movimiento no perdía nada. Lo que estaba roto es que **no dejaba mover**.
+
+`gv_np_mover_guard` (v20.01, caso Martinelli) frena mover **una NP** cuya tanda ya tiene picking o
+armado: las cajas viven en la pila de la TANDA, así que la mercadería quedaría en la tanda vieja.
+Eso sigue igual. Pero el mismo guard se disparaba desde `gv_ppp_tanda_mover`, o sea cuando viaja
+la **tanda completa** a un código nuevo o se fusiona con otra — donde no hay orfandad posible,
+porque después del pase de NP la propia función llama a `gv_ppp_tanda_renombrar`, que se lleva el
+stock, los eventos, las entregas y los candados al código nuevo.
+
+**Alcance antes del fix: 10 de las 12 tandas vivas** (D47B, E12S, E12R, E12A, E44A, E12K, E37F,
+E28A, E41A, D69H). Entre ellas **D69H**, la que `gv_ppp_tanda_camion_mezclado` marca para que
+Marianela la separe: no se podía tocar desde la app. Y "Cambiar de día" **sin** tocar el código sí
+andaba, por eso el bloqueo no saltaba siempre.
+
+**El fix:** `p_tanda_entera` viaja de `gv_ppp_tanda_mover` → `gv_ppp_nps_mover_a` → el guard, que
+exime **sólo las NP que vienen de esa tanda**. Si el array trajera una NP de otra tanda pickeada,
+la frena igual. Las firmas viejas (`gv_np_mover_guard(text[],text)` y
+`gv_ppp_nps_mover_a(text[],text,date,text)`) se dropearon: si quedan, un llamador viejo resuelve
+a la vieja en silencio.
+
+**Medido el 21/09, cada prueba dentro de una transacción abortada:**
+
+| prueba | resultado |
+|---|---|
+| E37F → código nuevo (pickeada, 7 NP) | pasa · 186 movimientos y 107 cajas viajan · **0 saldos del depósito cambiados** · 0 rastro del código viejo |
+| E12R → E12S (las dos pickeadas, **183 filas del mismo artículo en las dos**) | pasa · 654 movimientos quedan en 471 · 372 cajas · **0 saldos cambiados** · `gv_stock_picking_duplicado` y `gv_stock_empresa_fantasma` en 0 |
+| E12E (ISIS) → código nuevo | pasa · override de 3 NP, la vista toma tanda y fecha nuevas, la madre compartida no se toca · 309 movimientos, 38 cajas |
+| **LK 0050 suelta, de E37F pickeada** | **sigue bloqueada** — la regla de Thomas intacta |
+
+**Y dos tablas que el renombre se salteaba**, encontradas barriendo las 22 columnas `tanda` de
+`public` contra lo que la función tocaba: **`GV_Vehiculo_Propio`** (dice que la tanda va en la
+kangoo y no en el camión: con el código viejo, la tanda renombrada vuelve a contar como camión) y
+**`Comprobantes_ARCA`**. Las dos viajan desde la v20.30. `GV_Vehiculo_Propio` tiene la tanda de
+**PK**, así que va el mismo tratamiento que el candado: DELETE del origen que choca, después el
+UPDATE.
+
+**Lo que se verificó y estaba bien** (no se tocó): el renombre arrastra los eventos de operario
+—los 6 cuyo texto *es* la tanda (TP/TAP/AP/EP/PUB/AUB/APX/EPX/CC) y los 87 que la llevan en un
+campo (PKC, TAL, CCN, FAL…)—, los `ref` de stock `TANDA` y `TANDA|NP`, Entregas, Etiquetas de
+Lío, Facturación, Conciliación, override y los dos candados. Los libros de historia
+(`GV_Desarmes`, `GV_Tanda_Anulada`, `GV_Stock_Drenaje_Bloqueado`) **no** se reescriben, a
+propósito.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — los 4 centinelas de la v20.30 viven ahí.
+`sql/gv_mover_tanda_entera_v2030.sql` (lleva el CREATE completo de las 4 funciones, byte a byte
+igual a lo vivo, y el rollback).
+
+**Y de paso, dos tests que estaban en rojo en `main` desde el 19/09 y no eran míos:**
+`tests/ppp-tanda-cambiar-dia.cjs` y `tests/ppp-pedido-cambiar-dia.cjs` tenían las fechas **fijas**
+(2026-09-16/17/18). El front filtra los días del pop-up contra la fecha **real** del sistema
+(`new Date()` en `_pppMovPintar`), no contra `getTodayKey()`, que el test sí mockea: pasado el 18
+no quedaba ningún día para tocar y fallaban 15 de 24 chequeos en cadena. Ahora las fechas son
+**relativas a hoy** y el día destino se busca por el ISO del `onclick`, no por el número del día.
+No había ningún bug de UI: el botón, el pop-up y las dos llamadas estaban bien.

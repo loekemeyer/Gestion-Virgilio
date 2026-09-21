@@ -41,6 +41,13 @@ catch (_e) {
   catch (_e2) { console.log("ppp-pedido-cambiar-dia: estático ✓ OK (sin Playwright)"); process.exit(0); }
 }
 
+const _d = (n) => { const d = new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate() + n);
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
+/* v20.30 — fechas RELATIVAS A HOY, por lo mismo que en tests/ppp-tanda-cambiar-dia.cjs: el front
+   filtra los dias del pop-up contra la fecha REAL del sistema, no contra `getTodayKey()`. Con las
+   fechas fijas de 2026-09-17/18 el test se cayo solo el 19/09. */
+const F = { hoy: _d(0), d1: _d(1), d2: _d(2) };
+F.d1C = F.d1.replace(/-/g, "");
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1400, height: 1000 } });
@@ -48,12 +55,12 @@ catch (_e) {
   await p.route("**/rest/v1/**", (r) => r.abort());
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
 
-  const r = await p.evaluate(async () => {
+  const r = await p.evaluate(async (F) => {
     const out = {}, rpc = [], confirms = [];
     window.__isSupervisor = true;
     window.confirm = function (t) { confirms.push(String(t || "")); return true; };
     window.alert = function () {};
-    window.getTodayKey = () => "2026-09-16";
+    window.getTodayKey = () => F.hoy;
     window.pppSetStatus = function () {};
     window.pppLoadProgFromSupabase = async function () {};
     window._faltMiLegajo = () => "52";
@@ -62,7 +69,7 @@ catch (_e) {
     window.pgaRecargar = function () { recargas++; };
     window._pppPlanAgrupar = function () { return { venc: [], byDay: new Map() }; };
     window.pppPaintTabs = function () {};
-    _pppParsed = { prog: [{ np: "98630", tanda: "D99Z", fecha_entrega: "2026-09-20", m3: 1.8,
+    _pppParsed = { prog: [{ np: "98630", tanda: "D99Z", fecha_entrega: F.d2, m3: 1.8,
                             cod: "1", razon_social: "Otra", zona: "Zona 2", programmed: true }] };
 
     window.aprRpc = async function (fn, args) {
@@ -73,8 +80,8 @@ catch (_e) {
                               { np_label: "LK 0010", tanda: "E01B", m3: 0.108, estado: "armado" }] };
       }
       if (fn === "gv_ppp_web_calendario") {
-        return [{ dia: "2026-09-17", m3: 1, cupo: 6, habil: true, tandas: 1 },
-                { dia: "2026-09-18", m3: 0, cupo: 6, habil: true, tandas: 0 }];
+        return [{ dia: F.d1, m3: 1, cupo: 6, habil: true, tandas: 1 },
+                { dia: F.d2, m3: 0, cupo: 6, habil: true, tandas: 0 }];
       }
       if (fn === "gv_ppp_tandas_del_dia") {
         return [{ tanda: "E20A", m3: 1.1, nps: 3, clientes: 2, estado: "armado", orden: 3,
@@ -96,9 +103,9 @@ catch (_e) {
       cod: "2118", razon_social: "Emilio Martinez", localidad: "CABA", zona: "Zona 2",
       zona_corta: "Zona 2", empresa: "LK", origen: "web", m3: m3, estado: est, estado_orden: 3,
       barrio: "Villa Crespo", fecha_pedido: "2026-09-11", clave: "1345" });
-    _pgaRows = [mk("2026-09-17", "E01B", "LK 0009", "armado", 0.1),
-                mk("2026-09-17", "E01B", "LK 0010", "armado", 0.108),
-                mk("2026-09-17", "E01B", "LK 0012", "armado", 0.13)];
+    _pgaRows = [mk(F.d1, "E01B", "LK 0009", "armado", 0.1),
+                mk(F.d1, "E01B", "LK 0010", "armado", 0.108),
+                mk(F.d1, "E01B", "LK 0012", "armado", 0.13)];
     _pgaTs = Date.now(); _patrRows = []; _patrTs = Date.now();
 
     const esperar = async function (fn, ms) {
@@ -111,7 +118,7 @@ catch (_e) {
     document.getElementById("pppOverlay").classList.add("show");
     pppRenderProg();
     await esperar(() => !!document.querySelector("#pppPreview table.pga"));
-    pgaAbrirDia("20260917"); pgaAbrirTanda("20260917|E01B");
+    pgaAbrirDia(F.d1C); pgaAbrirTanda(F.d1C + "|E01B");
     out.hayNp = await esperar(() => [...document.querySelectorAll("#pppPreview tr.pga-n")]
       .some((x) => x.textContent.indexOf("LK 0009") >= 0));
 
@@ -135,7 +142,9 @@ catch (_e) {
 
     // (c) elegir el día abre el paso 2 y NO mueve nada
     rpc.length = 0; confirms.length = 0;
-    const d18 = [...document.querySelectorAll("#pppMovBody .mv-d")].find((x) => x.textContent.indexOf("18") >= 0);
+    // por el ISO del onclick, no por el numero del dia (ver el comentario de F, arriba)
+    const d18 = [...document.querySelectorAll("#pppMovBody .mv-d")]
+      .find((x) => String(x.getAttribute("onclick") || "").indexOf(F.d2) >= 0);
     d18.click();
     await esperar(() => !!document.querySelector("#pppMovBody .mv-esp-b.nueva"));
     out.paso2 = !!document.querySelector("#pppMovBody .mv-esp-b.nueva");
@@ -157,7 +166,7 @@ catch (_e) {
     out.recargo = await esperar(() => recargas > 0);
     out.cerro = !document.getElementById("pppMovOverlay").classList.contains("show");
     return out;
-  });
+  }, F);
 
   const mal = [];
   const t = (c, m) => { if (!c) mal.push(m); };
@@ -175,7 +184,7 @@ catch (_e) {
   t(r.destOk, "la tanda compatible no se puede elegir");
   t(r.destNo, "la tanda incompatible se puede elegir igual (la regla de estados no se ve)");
   t(r.avisoRojo, "no se ve el aviso de súper / camión distinto");
-  t(r.arg === JSON.stringify({ np: "LK 0009", f: "2026-09-18", t: "E20A" }),
+  t(r.arg === JSON.stringify({ np: "LK 0009", f: F.d2, t: "E20A" }),
     "no llamó a gv_ppp_pedido_mover con el pedido, el día y la tanda — " + r.arg);
   t(r.confirmDiceJuntas, "el confirm no avisa que se mueven todas las NP del pedido juntas");
   t(r.confirmAvisaFuerte, "el aviso de mezcla no aparece en el confirm");

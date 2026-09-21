@@ -2205,6 +2205,30 @@ select count(*) from (
 
 `sql/gv_ppp_tanda_fusion_stock_v1969.sql`, §3.jh.
 
+## ⚠ REGLA: el guard del PEDIDO SUELTO no se le aplica a la TANDA ENTERA
+
+**Luis, 2026-09-21 (v20.30, problema 458).** Son dos movimientos distintos y el sistema tiene que
+tratarlos distinto:
+
+| qué se mueve | ¿se puede si está pickeada? | por qué |
+|---|---|---|
+| **una NP sola**, a otra tanda | **NO** — `gv_np_mover_guard` la frena | las cajas viven en la pila de la TANDA: quedarían huérfanas (caso Martinelli, v20.01) |
+| **la tanda entera**, a otro código o fusionada | **SÍ** | `gv_ppp_tanda_renombrar` se lleva el stock con ella y lo fusiona |
+
+Hasta la v20.30 el guard se disparaba en los dos casos, así que **"📅 Cambiar de día" con código
+nuevo o fusión estaba bloqueado en 10 de las 12 tandas vivas** —incluida D69H, la que el centinela
+de camión mezclado marcaba para que la arreglara Marianela— con el cartel *"avisá a sistemas"*.
+Cambiar el día **sin** tocar el código sí andaba, y por eso no saltaba siempre.
+
+Lo resuelve `p_tanda_entera`, que viaja `gv_ppp_tanda_mover` → `gv_ppp_nps_mover_a` → el guard y
+exime **sólo las NP de esa tanda**: una NP de otra tanda pickeada se sigue frenando.
+
+⚠ **No es un `p_forzar` ni un "saltear el guard".** Si aparece la tentación de agregar un booleano
+que lo apague, es la señal de que se está por reabrir el pozo de las 92 cajas huérfanas.
+
+**Chequeo** (las cuatro reglas tienen centinela): `select * from public.gv_reglas_perdidas;` —
+vacía = todo bien. `sql/gv_mover_tanda_entera_v2030.sql`, §3.kq.
+
 ## ⚠ REGLA: una lectura ROTA no es un CERO — y un centinela que sólo mira el log del éxito es ciego
 
 **2026-09-18, problemas 402 y 403.** El armado automático de pedidos web estuvo **5 h 40 sin

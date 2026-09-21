@@ -20,6 +20,15 @@ catch (_e) {
   try { ({ chromium } = require("playwright")); }
   catch (_e2) { console.error("Playwright no encontrado."); process.exit(2); }
 }
+const _d = (n) => { const d = new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate() + n);
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
+/* v20.30 — las fechas del test son RELATIVAS A HOY. Estaban fijas (2026-09-16/17/18) y el test
+   se cayo solo el 19/09, porque el front filtra los dias del pop-up contra la fecha REAL del
+   sistema (`new Date()` en `_pppMovPintar`), no contra `getTodayKey()`, que el test si mockea:
+   pasado el 18 no quedaba ningun dia para tocar y (c), (d) y (e) fallaban en cadena. Un test con
+   fecha de vencimiento deja main en rojo sin que nadie sepa por que. */
+const F = { hoy: _d(0), d1: _d(1), d2: _d(2), atr: _d(-5) };
+F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.replace(/-/g, ""); F.atrC = F.atr.replace(/-/g, "");
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1400, height: 1000 } });
@@ -27,12 +36,12 @@ catch (_e) {
   await p.route("**/rest/v1/**", (r) => r.abort());
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
 
-  const r = await p.evaluate(async () => {
+  const r = await p.evaluate(async (F) => {
     const out = {}, rpc = [], confirms = [];
     window.__isSupervisor = true;
     window.confirm = function (t) { confirms.push(String(t || "")); return true; };
     window.alert = function () {};
-    window.getTodayKey = () => "2026-09-16";
+    window.getTodayKey = () => F.hoy;
     window.pppSetStatus = function () {};
     window.pppLoadProgFromSupabase = async function () {};
     window._faltMiLegajo = () => "52";
@@ -45,16 +54,16 @@ catch (_e) {
     // la vista clásica NO tiene NINGUNA de las dos tandas del test (E01A ni D72B): si el pop-up
     // leyera de acá —como hace `pppMoverAbrir`, el botón de la vista clásica— diría "0 pedidos · 0 m³".
     // La fila que va es sólo para que la pantalla no muestre el cartel de "Importá el Formato PPP".
-    _pppParsed = { prog: [{ np: "98630", tanda: "D99Z", fecha_entrega: "2026-09-20", m3: 1.8,
+    _pppParsed = { prog: [{ np: "98630", tanda: "D99Z", fecha_entrega: F.d2, m3: 1.8,
                             cod: "1", razon_social: "Otra", zona: "Zona 2", programmed: true }] };
 
     window.__falla = "";
     window.aprRpc = async function (fn, args) {
       rpc.push({ fn: fn, args: args });
       if (fn === "gv_ppp_web_calendario") {
-        return [{ dia: "2026-09-16", m3: 2, cupo: 6, habil: true, tandas: 2 },
-                { dia: "2026-09-17", m3: 1, cupo: 6, habil: true, tandas: 1 },
-                { dia: "2026-09-18", m3: 0, cupo: 6, habil: true, tandas: 0 }];
+        return [{ dia: F.hoy, m3: 2, cupo: 6, habil: true, tandas: 2 },
+                { dia: F.d1, m3: 1, cupo: 6, habil: true, tandas: 1 },
+                { dia: F.d2, m3: 0, cupo: 6, habil: true, tandas: 0 }];
       }
       if (fn === "gv_ppp_web_camion_nuevo") return [];
       // v19.32: el paso 2 del pop-up pregunta qué tandas hay ese día, ya juzgadas por el backend.
@@ -81,10 +90,10 @@ catch (_e) {
       cod: "2118", razon_social: "Ricci Gabriel", localidad: "CABA", zona: "Zona 2",
       zona_corta: "Zona 2", empresa: "LK", origen: "web", m3: m3, estado: est, estado_orden: 3,
       barrio: "Villa Crespo", fecha_pedido: "2026-09-11" });
-    _pgaRows = [mk("2026-09-17", "E01A", "LK 0058", "armado", 1.2),
-                mk("2026-09-17", "E01A", "LK 0059", "armado", 0.3)];
+    _pgaRows = [mk(F.d1, "E01A", "LK 0058", "armado", 1.2),
+                mk(F.d1, "E01A", "LK 0059", "armado", 0.3)];
     _pgaTs = Date.now();
-    _patrRows = [mk("2026-09-14", "D72B", "44612", "facturado", 0.8)];
+    _patrRows = [mk(F.atr, "D72B", "44612", "facturado", 0.8)];
     _patrTs = Date.now();
 
     const esperar = async function (fn, ms) {
@@ -101,7 +110,7 @@ catch (_e) {
     document.getElementById("pppOverlay").classList.add("show");
     pppRenderProg();
     await esperar(() => !!document.querySelector("#pppPreview table.pga"));
-    pgaAbrirDia("20260917");
+    pgaAbrirDia(F.d1C);
     out.hayFilaTanda = await esperar(() => !!filaTanda("E01A"));
 
     // (a) el botón está en la fila de la tanda y no abre la tanda
@@ -126,8 +135,12 @@ catch (_e) {
 
     // (c) elegir un día → mueve con p_forzar (la tanda está armada) y recarga el árbol
     rpc.length = 0; confirms.length = 0;
-    const dia18 = [...document.querySelectorAll("#pppMovBody .mv-d")].find((x) => x.textContent.indexOf("18") >= 0);
-    dia18.click();
+    // se busca por el ISO del onclick, no por el numero del dia: con fechas relativas el numero
+    // puede coincidir con un m3 o un cupo del mismo boton.
+    const diaD2 = [...document.querySelectorAll("#pppMovBody .mv-d")]
+      .find((x) => String(x.getAttribute("onclick") || "").indexOf(F.d2) >= 0);
+    if (!diaD2) { out.__diasOfrecidos = [...document.querySelectorAll("#pppMovBody .mv-d")].map((x) => x.getAttribute("onclick")); return out; }
+    diaD2.click();
     // v19.32: el dia ya no mueve nada — abre el PASO 2, «en que tanda?».
     await esperar(() => !!document.querySelector("#pppMovBody .mv-esp-b.nueva"));
     out.paso2 = !!document.querySelector("#pppMovBody .mv-esp-b.nueva");
@@ -149,7 +162,7 @@ catch (_e) {
 
     // (d) el backend contesta TANDA_EMPEZADA → pregunta y reintenta con p_forzar
     rpc.length = 0; confirms.length = 0; window.__falla = "1";
-    await pppTandaMover("E01A", "2026-09-18", { filas: _pgaRows, empezada: false, desdeArbol: true });
+    await pppTandaMover("E01A", F.d2, { filas: _pgaRows, empezada: false, desdeArbol: true });
     const mov = rpc.filter((x) => x.fn === "gv_ppp_tanda_mover");
     out.reintentos = mov.length;
     out.forzoAlReintentar = mov.length === 2 && mov[0].args.p_forzar === false && mov[1].args.p_forzar === true;
@@ -159,7 +172,7 @@ catch (_e) {
     try { localStorage.setItem("vir_patr_colapsado", "0"); } catch (_e) {}
     pppRenderProg();
     await esperar(() => !!document.querySelector("#pppPreview table.patr-tbl"));
-    pgaAbrirDia("20260914");
+    pgaAbrirDia(F.atrC);
     out.hayFilaAtrasada = await esperar(() => !!filaTanda("D72B"));
     const fa = filaTanda("D72B");
     const bta = fa && fa.querySelector(".pga-acc-b.dia");
@@ -174,7 +187,7 @@ catch (_e) {
 
     out.errs = [];
     return out;
-  });
+  }, F);
 
   const fallas = [];
   const ok = (c, txt, extra) => { console.log((c ? "ok  " : "FALLA") + " " + txt + (extra ? " — " + extra : "")); if (!c) fallas.push(txt); };
@@ -194,7 +207,7 @@ catch (_e) {
   ok(r.destOk, "(c) la tanda compatible se puede elegir");
   ok(r.destNo && r.destMotivo, "(c) la incompatible queda apagada y dice por qué (la regla de estados de Luis)");
   ok(r.destAviso, "(c) y el aviso de súper / camión distinto se ve, sin bloquear");
-  ok(r.argMover === JSON.stringify({ t: "E01A", f: "2026-09-18", forzar: true, dest: "" }),
+  ok(r.argMover === JSON.stringify({ t: "E01A", f: F.d2, forzar: true, dest: "" }),
      "(c) elegir «tanda nueva» mueve la tanda al día tocado, forzando porque está armada", r.argMover);
   ok(r.confirmDiceArmada && r.confirmDiceNoRepickear, "(c) y el confirm avisa que está armada y que no hay que volver a pickear");
   ok(r.recargoElArbol, "(c) recarga el árbol y los atrasados (tienen caché propio)");
