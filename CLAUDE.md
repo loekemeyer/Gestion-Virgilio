@@ -2043,6 +2043,21 @@ borró). Layout:
   2. **`entero/Inicio/index.html`**: el botón "Cerrar sesión" pasó a **"← Volver a Gestión"**
      (`../../../`) — hacía `signOut` + borraba las claves `sb-*`, o sea te echaba de todo.
   3. **`gp2/GP2_MODULOS.html`**: link **"← Volver a Gestión"** en el header (`../../`).
+  4. **La fecha de carga lleva el AÑO: `dd/mm/aa`, nunca `dd/mm`** (v20.53, pedido de Elías,
+     2026-09-21). `getDiaMesHoy()` y `getFechaDiaMes()` de `Talleristas/Envios/EnviosTall.js` y
+     `getDiaMesHoy()` + los dos `split("-")` de `Prov Serv/Envios/EnviosPS.js`, en las **dos**
+     copias, escribían el día y el mes y **tiraban el año** — incluso cuando el operario elegía
+     la fecha en el `<input type=date>`, que lo trae. Medido ese día: **154 filas de `Envios a
+     Talleristas` y 41 de `Envios a PS` sin año**, todas de agosto y septiembre de 2026, o sea
+     que la carga de hoy lo estaba perdiendo. Hoy no molesta porque el año se adivina; el 1.º de
+     enero esas filas dejan de poder ubicarse (`StockFlejes/cajas.js` las fecha con
+     `hoy.getFullYear()`). El formato elegido es el que ya tenían las otras **2.446** filas, y
+     ningún lector se rompe: los parsers (`mmDe` / `ddDe` de `EnviosPS.js`, los `split('/')`)
+     ya toleran `dd/mm`, `dd-mm`, `dd/mm/aa`, `dd/mm/aaaa` e ISO, y **no hay un solo filtro por
+     igualdad** sobre `Dia-mes`. ⚠ Al tocar cualquier pantalla de carga, mirar que la fecha que
+     se guarda tenga año. **`Entregas PS` y `Entregas Prov AT` escriben ISO (`arDateISO()`) y se
+     dejaron como están**: tienen el año, y cambiarlas movería un formato que los lectores ya
+     soportan a propósito. Las 236 filas viejas sin año **no se tocaron**.
 - **`.nojekyll` en la raíz**: sin eso, Pages corre Jekyll y **no publica** lo que empieza con
   `_` — y las copias traen varios (`_backup_relevamiento_*`, `_export`, `_archivo`).
 - El botón **🏭 Admin Cervantes (GP2)** del panel supervisor abre **esa misma pantalla**

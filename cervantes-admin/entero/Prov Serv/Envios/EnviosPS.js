@@ -107,7 +107,8 @@ function getDiaMesHoy() {
   const hoy = new Date();
   const dia = String(hoy.getDate()).padStart(2, "0");
   const mes = String(hoy.getMonth() + 1).padStart(2, "0");
-  return `${dia}/${mes}`;
+  const anio = String(hoy.getFullYear()).slice(-2);
+  return `${dia}/${mes}/${anio}`;
 }
 
 function normalizarTexto(value) {
@@ -1642,7 +1643,7 @@ function renderGruposCodigo() {
   acciones.querySelector("#btnEnviarGrupos").addEventListener("click", async (e) => {
     const btnE = e.currentTarget;
     let diaMes = getDiaMesHoy();
-    if (fInput && fInput.value) { const [y, m, d] = fInput.value.split("-"); diaMes = `${d}/${m}`; }
+    if (fInput && fInput.value) { const [y, m, d] = fInput.value.split("-"); diaMes = `${d}/${m}/${String(y).slice(-2)}`; }
     btnE.disabled = true; const t = btnE.textContent; btnE.textContent = "Enviando...";
     try {
       const codigo = await ejecutarEnvioPS(diaMes);
@@ -1827,7 +1828,7 @@ btnEnviar.addEventListener("click", async () => {
   let diaMes = getDiaMesHoy();
   if (fechaInput && fechaInput.value) {
     const [y, m, d] = fechaInput.value.split("-");
-    diaMes = `${d}/${m}`;
+    diaMes = `${d}/${m}/${String(y).slice(-2)}`;
   }
 
   btnEnviar.disabled = true;

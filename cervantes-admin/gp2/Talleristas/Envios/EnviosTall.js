@@ -1257,7 +1257,8 @@ function getDiaMesHoy(){
   const hoy = new Date();
   const dia = String(hoy.getDate()).padStart(2, "0");
   const mes = String(hoy.getMonth() + 1).padStart(2, "0");
-  return `${dia}/${mes}`;
+  const anio = String(hoy.getFullYear()).slice(-2);
+  return `${dia}/${mes}/${anio}`;
 }
 
 const fechaEnvioInput = document.getElementById("fechaEnvio");
@@ -1274,8 +1275,8 @@ const fechaEnvioInput = document.getElementById("fechaEnvio");
 function getFechaDiaMes(){
   const val = fechaEnvioInput ? fechaEnvioInput.value : "";
   if (val) {
-    const [, mes, dia] = val.split("-");
-    return `${dia}/${mes}`;
+    const [anio, mes, dia] = val.split("-");
+    return `${dia}/${mes}/${String(anio).slice(-2)}`;
   }
   return getDiaMesHoy();
 }
