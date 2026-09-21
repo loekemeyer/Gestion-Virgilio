@@ -1184,6 +1184,48 @@ valen para cualquier cambio, no sólo para esto:**
 **Chequeo:** `select * from public.gv_cuarentena_repo_hoy where exento;`
 `sql/gv_cuarentena_repo_chica_v1944.sql`, §3.iy.
 
+## ⚠ REGLA (Luis, 2026-09-21, v20.64): DÍA SIN REPARTO ≠ día no hábil
+
+**Luis:** *"hace que la programacion automatica vea que el martes no se programa nada"*.
+
+Un día puede tener el depósito **armando normal** y **ningún camión saliendo**. Son dos preguntas
+distintas y hay que tenerlas separadas:
+
+| pregunta | función | tabla |
+|---|---|---|
+| ¿se trabaja en el depósito? | `gv_es_dia_habil(d)` | `GV_Dias_No_Habiles` |
+| ¿además sale el camión? | **`gv_es_dia_con_reparto(d)`** | + **`GV_Dias_Sin_Reparto`** |
+
+⚠ **Nunca cargar un día sin reparto en `GV_Dias_No_Habiles`.** Eso dice "no se trabaja" y mueve el
+conteo de días hábiles de **toda** la operación: la espera de cada pedido, los 10 días hábiles del
+tope y la anticipación mínima de 4.
+
+**Cerrar un día es un `insert`, no un deploy:**
+
+```sql
+insert into public."GV_Dias_Sin_Reparto" (fecha, motivo, creado_por)
+values (date '2026-12-24', 'Nochebuena: no sale camion', 'Luis');
+```
+
+⚠ **Vaciar el día a mano NO alcanza: hay que cerrarlo.** El 21/09 una sesión movió las 12 tandas
+del martes 22 a las 12:27 y **a las 12:45 el armador creó E12F para ese mismo día**. La puerta es
+`gv_ppp_web_dia_camion`, que devuelve el primer día que ya tiene camión a esa zona y **a propósito
+no mira el día mínimo** (v15.48). Correr el piso no sirve: hay que decir que ese día no hay camión.
+
+**Al tocar el armado, los cuatro que eligen fecha** (los 11 pases de `gv_ppp_web_armar_pendientes`
+no usan ningún otro): `gv_ppp_web_dia_camion`, `gv_ppp_web_proximo_dia_con_cupo`,
+`gv_ppp_web_dia_minimo` y `gv_web_retiro_pactado`. `ppp_web_armar_tandas` **no elige** —escribe la
+fecha que le pasó el llamador— y por eso no lleva el salto: se lo comería el día que el cliente
+pactó para su Retira.
+
+**RETIRA (Luis, textual): *"Solo los que ya estan programados, no se programan retiros nuevos"*.**
+Lo viene a buscar el cliente al depósito, no usa camión: el Retira ya programado **sale igual** y
+no se mueve. Lo que se frena es programar uno nuevo ahí.
+
+**Chequeo:** `select * from public.gv_dia_sin_reparto_ocupado;` — vacía = no quedó nada de reparto
+en un día cerrado. Mira **web e ISIS** y saca lo que ya salió por CCN/CRN.
+`sql/gv_dia_sin_reparto_v2064.sql`, `tests/ppp-dia-sin-reparto.cjs`, §3.ll.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.56): un pedido retenido NO vuelve a una tanda que avanzó sin él
 
 **Luis, textual:** *"esto me preocupa. estaban armados? qué interacción tienen si vuelven a

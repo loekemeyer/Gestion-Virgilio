@@ -27200,3 +27200,95 @@ backup, está comentado en el archivo). Y que los pedidos de Chef de 7 dígitos 
 del lado de Chef/LK, no de este repo.
 
 `sql/gv_fecha_recep_armador_v2063.sql`, `tests/ppp-fecha-recep.cjs`.
+---
+
+### §3.ll — v20.64 · Día sin reparto: el depósito arma, el camión no sale — 2026-09-21
+
+**Luis:** *"hace que la programacion automatica vea que el martes no se programa nada"* · y sobre
+lo ya programado: *"reprograma automaticamente todos los otros pedidos para otros días de la
+semana siguiendo la logica de programacion"*.
+
+**Qué se midió.** Otra sesión vació el martes 22/09 a las **12:27** moviendo 12 tandas. A las
+**12:45 el armador automático creó la tanda E12F para el 22/09** (Okabe, 0,094 m³). Redistribuir
+a mano no alcanza: el armador vuelve a llenar el día cada 5 minutos.
+
+**Por dónde entraba, que es lo que define el arreglo.** `gv_ppp_web_dia_camion` devuelve el primer
+día que **ya tiene camión a esa zona** y **no mira el día mínimo a propósito** (v15.48, dueño:
+*"si ya hay programado algo para x día para esa zona, hay que agregarlo ahí"*). El 22 tenía D47B y
+E12E, así que era "un día con camión". Correr el piso no sirve: hay que decir que ese día **no hay
+camión**.
+
+⚠ **No se usa `GV_Dias_No_Habiles`.** Eso significa *"no se trabaja"*, y acá el armado sigue
+normal. Si el 22 fuera no hábil se movería el conteo de días hábiles de **toda** la operación: la
+espera de cada pedido, los 10 días hábiles del tope y la anticipación mínima de 4. Son dos
+preguntas distintas y ahora son dos tablas distintas:
+
+| pregunta | función | tabla |
+|---|---|---|
+| ¿se trabaja en el depósito? | `gv_es_dia_habil(d)` | `GV_Dias_No_Habiles` |
+| ¿además sale el camión? | `gv_es_dia_con_reparto(d)` | + **`GV_Dias_Sin_Reparto`** |
+
+**Dónde se enchufó.** Medido sobre `gv_ppp_web_armar_pendientes`: los 11 pases sólo llaman a
+**cuatro** funciones para decidir una fecha. `ppp_web_armar_tandas` no elige — escribe la que le
+pasó el llamador (`dias_hasta_entrega = 0`)— y por eso **no se toca**: si se le pusiera el salto
+adentro, pisaría el día que el cliente pactó para su Retira.
+
+| función | cambio |
+|---|---|
+| `gv_ppp_web_dia_camion` | un día sin reparto **no cuenta como camión** a ninguna zona (las dos mitades, web e ISIS) |
+| `gv_ppp_web_proximo_dia_con_cupo` | la cascada usa `gv_es_dia_con_reparto` en vez de `gv_es_dia_habil` |
+| `gv_ppp_web_dia_minimo` | el **conteo** de hábiles no cambia; lo que no puede es **terminar** en un día sin reparto |
+| `gv_web_retiro_pactado` | un Retira **nuevo** no se programa solo ahí: queda en A Programar |
+
+**La regla de Retira (Luis, textual):** *"Solo los que ya estan programados, no se programan
+retiros nuevos"*. Un Retira lo viene a buscar el cliente al depósito: no usa camión, así que el
+que ya quedó programado **sale igual**. El pase (a4) sólo mira pedidos sin tanda, así que
+devolver `null` no mueve a nadie.
+
+**Lo que se reprogramó** (backup en `zz_backups."GV_Backup_ProgWeb_pre_sinreparto_20260921"`,
+211 filas, con RLS y sin escritura para `anon`):
+
+| qué | de | a | por qué |
+|---|---|---|---|
+| E26D, E35A, E60A, E62A (Retira) | 23/09 | **22/09** | estaban programados el 22 y la otra sesión los había movido. **E35A es Tau Daniela, que eligió el martes 9:00 a 12:00** |
+| E12F (Okabe, sin empezar) | 22/09 | 23/09 | lo puso el armador a las 12:45 |
+| D47B — sólo las 3 NP de Alesso | 22/09 | 23/09 | armadas, sin salir |
+| E12E (Riondini) | — | **no se tocó** | facturada, ya salió: esa fecha es historia |
+
+⚠ **D47B NO se movió con `gv_ppp_tanda_mover`.** Ese código está **reciclado**: la tanda tiene
+además 5 NP del 28/08 y 2 del 01/09, todas facturadas hace tres semanas. `gv_ppp_tanda_mover`
+junta las NP de web + ISIS + `Facturacion_NP`, así que con `p_forzar` les habría cambiado la fecha
+histórica a las 7 viejas. Se actualizó `fecha_entrega` **sólo de las 3 filas web**, que es
+literalmente lo que pidió Luis: *"mover lo que no salió al miércoles"*.
+
+**Cómo queda la semana:**
+
+| día | NP Retira | NP reparto | m³ reparto |
+|---|---|---|---|
+| mar 22 | 5 | 3 (ya salieron) | 0,239 |
+| mié 23 | 0 | 31 | 5,120 |
+| jue 24 | 5 | 21 | 7,734 |
+| vie 25 | 0 | 3 | 5,869 |
+
+**En pantalla:** el día sin reparto va **gris rayado** con el chip `🚫 sin reparto` y el motivo en
+el `title`. Gris y no naranja a propósito: no es una alerta, es un día cerrado por decisión.
+
+**Chequeo:**
+
+```sql
+select * from public.gv_dia_sin_reparto_ocupado;   -- vacía = nada de reparto quedó en un día cerrado
+select public.gv_es_dia_habil('2026-09-22')       as trabaja,      -- true
+       public.gv_es_dia_con_reparto('2026-09-22') as sale_camion;  -- false
+select * from public.gv_reglas_perdidas;           -- vacía (4 centinelas nuevos)
+```
+
+⚠ El centinela mira **las dos mitades** (web e ISIS) y saca lo que ya salió por CCN/CRN — si
+mirara sólo la web sería ciego justo a la mitad por la que el día se vuelve a llenar. Para cerrar
+otro día es un `insert`, no un deploy:
+
+```sql
+insert into public."GV_Dias_Sin_Reparto" (fecha, motivo, creado_por)
+values (date '2026-12-24', 'Nochebuena: no sale camion', 'Luis');
+```
+
+`sql/gv_dia_sin_reparto_v2064.sql`, `tests/ppp-dia-sin-reparto.cjs`.
