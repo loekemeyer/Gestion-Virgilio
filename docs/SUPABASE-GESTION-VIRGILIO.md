@@ -27564,3 +27564,64 @@ pasó de 4 filas a **0**.
 public.gv_reglas_perdidas;` · `sql/gv_cliente_dos_dias_salidos_v2067.sql`,
 `tests/ppp-cliente-dos-dias-salidos.cjs`.
 >>>>>>> Stashed changes
+
+---
+
+### §3.lp — v20.70 · D69H figuraba armada con los pedidos de otro adentro · el centinela — 2026-09-21
+
+**Luis:** *"1) nunca se pickeo pero figura como armado? como, por que?"* · y al entenderlo:
+*"Que quede registrada en el sistema como su estado real (si no esta armada, que no figure
+armada) y ponela en programacion como corresponde (para que la armen hoy) — D69H. Agrega el
+centinela"*.
+
+**Por qué pasa, y es estructural.** `EP`, `TP`, `AP` y `TAP` son eventos de la **TANDA**, no del
+pedido: `texto = 'D69H'`, sin NP. Una vez que la tanda tiene TAP queda armada **para siempre**,
+sin importar qué pedidos tenga adentro después. El único registro por NP es `Entregas_Virgilio`.
+Nada relaciona una cosa con la otra.
+
+**La historia de D69H, medida:**
+
+| cuándo | qué pasó |
+|---|---|
+| 10/09 10:03 | nace desde el panel **con LK 0058** (Arguello, Villa Ballester, Zona 6) |
+| 11/09 12:15 | se le suma **LK 0070** (Valimar, Villa Lynch, Zona 6) |
+| 14/09 16:54 | se le suma **LK 0083** (Lin Chuang, **Núñez, Zona 2**) ← acá se mezcla el camión |
+| 15/09 13:00 | se le suman 3 NP de Silvano (San Miguel) |
+| 15/09 14:03 | las 3 de Silvano salen a A Programar — *"D69H mezclaba Zona 2 con Zona 6"* |
+| **16/09 13:07→13:08** | **picking: 41 segundos, un solo PKC** → `D69H\|550\|10` |
+| **16/09 14:24→14:26** | **armado: 1 sola fila** → LK 0058, 10 pedidas, **0 entregadas, 10 faltó** |
+| después | LK 0058 sale de la tanda (hoy en A Programar, sin fecha) |
+
+Las 10 cajas del 550 son **exactamente el pedido entero de LK 0058**. Resultado: D69H decía
+"armada" y adentro tenía **62 cajas sin pickear** —LK 0070 (22 cajas, 9 líneas) y LK 0083 (40
+cajas, 6 líneas)— y salía el miércoles 23.
+
+**No es un patrón: era el único caso.** De todas las tandas futuras marcadas como armadas, D69H
+era la única cuyos pedidos actuales no tenían ninguna línea de armado propia.
+
+**Qué se hizo con D69H.** Sus eventos se anularon con el patrón del repo —`TAP→TAPX`, `AP→APX`,
+`TP→TPX`, `EP→EPX`, `PKC→PKCX`— más las dos filas en `GV_Tanda_Anulada`. Quedó **pendiente**, con
+sus 2 NP y su fecha del 23/09 (el martes no hay reparto), para pickearla y armarla entera.
+
+⚠ **No se borró ni una fila.** Borrar libera el `client_id` y la cola offline del celular
+**resucita** el evento — es la lección de la v18.71/72 (E25A, borrado 16:56 y reinsertado 17:17).
+Con la X la fila sigue ocupando su `client_id` y ningún consumidor la cuenta, porque todos filtran
+por igualdad exacta.
+
+⚠ **No hubo stock que tocar:** los 3 movimientos de D69H ya estaban en `delta = 0`. Backups:
+`zz_backups."GV_Backup_Eventos_D69H_20260921"` y `"GV_Backup_MovStock_D69H_20260921"`.
+
+⚠ La fila de `Entregas_Virgilio` de LK 0058 **se dejó**: dice 0 entregadas / 10 faltó, o sea que
+no factura nada, y es la historia de ese día.
+
+**El centinela.** `gv_tanda_armada_sin_armado`: una fila por (tanda, NP) programada a futuro
+donde la tanda tiene **TAP vivo** (no TAPX) y esa NP **no tiene una sola línea** en
+`Entregas_Virgilio`. Saca lo que ya salió por CCN/CRN — su armado es historia.
+
+**Y se probó rompiéndolo**, en transacción abortada: devolviéndole el TAP a D69H, el centinela
+caza sus 2 NP **y `anon` ve las 2 filas**. Ese segundo chequeo no es decorativo: es la trampa de
+la v20.45 —una vista `security_invoker` sobre una tabla con RLS devuelve **menos filas** en vez de
+dar error— y sin medirlo el centinela podría estar mudo en pantalla y ruidoso desde el MCP.
+
+**Chequeo:** `select * from public.gv_tanda_armada_sin_armado;` — vacía = todo bien.
+`sql/gv_tanda_armada_sin_armado_v2070.sql`, `tests/ppp-tanda-armada-sin-armado.cjs`.

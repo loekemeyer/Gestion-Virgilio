@@ -1037,6 +1037,40 @@ de tocar tandas a mano. Desde v18.87 dice además si el camión se armó **AUTOM
 ISIS** (`camion_armado`, `origen`, `origen_detalle`) y deja afuera las tandas de
 `GV_Vehiculo_Propio` (la kangoo no es el camión). `sql/gv_ppp_super_mezclado_v1887.sql`, §3.ic.
 
+## ⚠ REGLA (Luis, 2026-09-21, v20.70): el ARMADO es de la TANDA — el pedido de adentro puede ser otro
+
+**Luis, al ver que D69H figuraba armada:** *"nunca se pickeo pero figura como armado? como, por
+qué?"*.
+
+`EP`, `TP`, `AP` y `TAP` son eventos de la **TANDA**: `texto = 'D69H'`, sin NP. Una vez que una
+tanda tiene TAP **queda armada para siempre**, aunque después le saquen y le pongan pedidos
+adentro. El único registro por NP es **`Entregas_Virgilio`** (np, artículo, pedidas / entregadas /
+faltó), y nada relaciona una cosa con la otra.
+
+**Caso D69H (21/09):** su TAP del 16/09 era de **LK 0058**, un pedido que ya no estaba en la
+tanda; los dos que sí estaban —LK 0070 y LK 0083, **62 cajas, 15 líneas**— no tenían ni picking ni
+armado, y la tanda salía el miércoles marcada como armada.
+
+**Chequeo:** `select * from public.gv_tanda_armada_sin_armado;` — vacía = todo bien. Marca la NP
+programada a futuro que está en una tanda con TAP vivo sin una sola línea propia en
+`Entregas_Virgilio`.
+
+⚠ **Para deshacer un evento NO se borra la fila: se le cambia la opción** (`TAP→TAPX`, `AP→APX`,
+`TP→TPX`, `EP→EPX`, `PKC→PKCX`), más su fila en `GV_Tanda_Anulada`. Borrarla libera el
+`client_id` y **la cola offline del celular resucita el evento** (v18.71/72, caso E25A: borrado
+16:56, reinsertado 17:17). Con la X la fila sigue ocupando su `client_id` y ningún consumidor la
+cuenta, porque todos filtran por igualdad exacta. Ya existen `anular_armado_virgilio` y
+`gv_anular_picking_virgilio`, pero **sólo sirven dentro de las 72 h / 3 días y para el mismo
+legajo**: más viejo que eso se hace a mano con ese mismo patrón y con backup.
+
+⚠ **Y el armado NO mide lo que hay: resta.** `cajas_entregadas = cajas_pedidas − faltante
+declarado`, con `cajas_pedidas` saliendo de `PPP_Web_Base`. Nunca mira cuántas cajas se
+pickearon, así que con el pallet vacío escribe *"entregadas = pedidas"* si nadie declara el
+faltante. **Pendiente de Luis (21/09):** *"cuando se arma el pedido, debería definirse (tenés que
+saber qué carajo estás armando en base a lo que tenés y quedar anotado para cada NP, así es como
+funca la facturación actualmente)"*. `sql/gv_tanda_armada_sin_armado_v2070.sql`,
+`tests/ppp-tanda-armada-sin-armado.cjs`, §3.lp.
+
 ## ⚠ QUIÉN ORGANIZA LA PROGRAMACIÓN: el automático arma, **MARIANELA** organiza
 
 **Definido por Luis, 2026-09-17.** Hasta ese día no estaba escrito en ningún lado, y por eso una

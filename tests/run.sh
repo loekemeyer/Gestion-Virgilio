@@ -622,3 +622,6 @@ node tests/pipe-clientes-nuevos.cjs
 
 echo "== ppp-cliente-dos-dias-salidos (v20.67: lo que ya salio no parte al cliente en dos dias) =="
 node tests/ppp-cliente-dos-dias-salidos.cjs
+
+echo "== ppp-tanda-armada-sin-armado (v20.70: tanda con TAP cuyos pedidos de hoy no tienen armado propio) =="
+node tests/ppp-tanda-armada-sin-armado.cjs
