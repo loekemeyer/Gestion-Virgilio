@@ -27078,7 +27078,7 @@ legítimas**: la fecha cambia cuando se reprograma, y la tanda **no es de un sol
 **Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien (las tres reglas
 tienen su fila). `sql/gv_retenido_codigo_reservado_v2060.sql`, `tests/apr-codigo-reservado.cjs`.
 
-### §3.lj — v20.61 · El destino de una NP de ISIS, y la etiqueta con paréntesis — 2026-09-21
+### §3.lj — v20.62 · El destino de una NP de ISIS, y la etiqueta con paréntesis — 2026-09-21
 
 **Thomas, sobre el aviso de Misiones de la §3.kz:** *"¿pero los nuevos pedidos que lleguen ya van
 con el banner?"*. Y sobre las NP de ISIS de un cliente con sucursales en varias provincias:
@@ -27115,8 +27115,8 @@ veces por par costaba 10× (4.338 pares, 3 corridas cada uno):
 | variante | ms |
 |---|---|
 | v20.45, sin normalizar | 321 |
-| v20.61 llamando a `gv_txt_norm` | **3.590** |
-| v20.61 con la normalización adentro | **870** |
+| v20.62 llamando a `gv_txt_norm` | **3.590** |
+| v20.62 con la normalización adentro | **870** |
 
 La vista entera mide **875 ms** y la RPC la llama de a lotes de 500 NP, así que la primera
 versión —la linda— no podía quedar.
@@ -27146,4 +27146,4 @@ select como, count(*) from public.gv_np_destino where programada group by 1;   -
 select * from public.gv_destino_sin_provincia order by fecha desc;             -- con motivo
 ```
 
-`sql/gv_destino_isis_v2061.sql`, `tests/ppp-misiones.cjs`.
+`sql/gv_destino_isis_v2062.sql`, `tests/ppp-misiones.cjs`.

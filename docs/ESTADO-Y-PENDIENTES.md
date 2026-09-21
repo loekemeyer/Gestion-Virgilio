@@ -1,6 +1,6 @@
-# Estado y pendientes — al 2026-09-21 (última actualización: v20.61)
+# Estado y pendientes — al 2026-09-21 (última actualización: v20.62)
 
-> **2026-09-21, tanda de Thomas (v20.61, §3.lj) — el destino de las NP de ISIS ya resuelve, y lo
+> **2026-09-21, tanda de Thomas (v20.62, §3.lj) — el destino de las NP de ISIS ya resuelve, y lo
 > que queda NO es código: es dato que falta en el padrón.** El aviso de provincia de la v20.45
 > resolvía 307 de las 315 NP programadas desde el 01/09; hoy resuelve 311 y **`ambiguo` bajó a 0**
 > (la NP de ISIS no trae expreso —0 de 120 filas—, así que desambigua por el barrio; y la etiqueta

@@ -1270,11 +1270,11 @@ En la Programación: la NP marcada va naranja con el badge de la provincia, y el
 de la NP al día y a la tanda; no se calcula aparte.
 
 **Chequeo:** `select * from public.gv_destino_sin_provincia;` — pedido programado cuyo destino no
-se pudo resolver, con el `motivo` (v20.61). Al 21/09 son **24**: 20 direcciones del padrón sin
+se pudo resolver, con el `motivo` (v20.62). Al 21/09 son **24**: 20 direcciones del padrón sin
 provincia cargada (9 de Cencosud) y 4 de dos clientes que no están en el padrón. **Ninguna
 `ambiguo`.** `sql/gv_destino_misiones_v2045.sql`, `tests/ppp-misiones.cjs`, §3.kz.
 
-### ⚠ Y una NP de ISIS **no trae expreso**: lo que desambigua es el BARRIO (v20.61, Thomas)
+### ⚠ Y una NP de ISIS **no trae expreso**: lo que desambigua es el BARRIO (v20.62, Thomas)
 
 Medido el 21/09: **0 de las 120 filas** de `gv_ppp_programacion_diaria` traen `Exp.`. El
 `Exp. <expreso> — <dir> (<etiqueta>)` lo arma la **página**; la NP de ISIS trae `direccion` y
@@ -1289,7 +1289,7 @@ no `ambiguo`: no hay expreso que entregue nada.
 ⚠ **Y la normalización va ADENTRO de `gv_destino_score`, repetida, no llamando a un helper.**
 Una función SQL con `SET search_path` **no se inlinea**: llamarla 20 veces por par costaba
 **3.590 ms contra 870** (4.338 pares, 3 corridas). Es feo a propósito y está comentado ahí.
-`sql/gv_destino_isis_v2061.sql`, §3.lj.
+`sql/gv_destino_isis_v2062.sql`, §3.lj.
 
 ⚠⚠ **Y la trampa que se comió la v20.45 entera, que vale para CUALQUIER vista nueva:** una vista
 con `security_invoker = true` sobre una tabla con RLS **no da error cuando el lector no tiene

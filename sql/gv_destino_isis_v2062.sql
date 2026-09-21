@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════════════════
--- v20.61 (Thomas, 2026-09-21) — EL DESTINO DE UNA NP DE ISIS, Y LA ETIQUETA CON PARÉNTESIS
+-- v20.62 (Thomas, 2026-09-21) — EL DESTINO DE UNA NP DE ISIS, Y LA ETIQUETA CON PARÉNTESIS
 -- ════════════════════════════════════════════════════════════════════════════════════════
 -- Pregunta de Thomas: *"pero los nuevos pedidos que lleguen ya van con el banner?"*, sobre el
 -- aviso de Misiones de la v20.45. Y sobre las NP de ISIS de un cliente con sucursales en
@@ -57,8 +57,8 @@
 --   | variante                              | ms  |
 --   |---------------------------------------|-----|
 --   | v20.45 (sin normalizar)               | 321 |
---   | v20.61 llamando a un helper gv_txt_norm | 3.590 |
---   | v20.61 con la normalización adentro   | 870 |
+--   | v20.62 llamando a un helper gv_txt_norm | 3.590 |
+--   | v20.62 con la normalización adentro   | 870 |
 --
 -- Es feo a propósito. La vista entera mide 875 ms y la RPC la llama de a lotes de 500 NP.
 create or replace function public.gv_destino_score(p_etiqueta text, p_direccion text, p_dir_key text, p_nombre_expreso text, p_dir_expreso text, p_localidad text, p_dir text, p_bar text, p_x_exp text, p_x_dirx text, p_x_lab text)
@@ -120,7 +120,7 @@ with _nd_todo as (
    order by t.np, t.pri, t.direccion
 ), _q as (
   select n.*,
-         -- ⚠ v20.61: la etiqueta puede tener PARENTESIS ADENTRO ("Rio Gall (25 de mayo)").
+         -- ⚠ v20.62: la etiqueta puede tener PARENTESIS ADENTRO ("Rio Gall (25 de mayo)").
          -- Con `\(([^()]*)\)$` esa NP no matcheaba ninguna sucursal y salia 'ambiguo'
          -- (LK 0178 y LK 0179, Santa Cruz, programadas para el 02/10).
          (regexp_match(coalesce(n.direccion, ''), '^Exp\.\s*(.+?)\s+—\s'))[1] as x_exp,
@@ -196,13 +196,13 @@ insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pi
 select * from (values
  ('gv_destino_score','funcion','n\.loc = n\.bar',
   'La NP de ISIS no trae etiqueta ni expreso (medido 21/09: 0 de 120 filas con "Exp."): lo que desambigua la sucursal es su BARRIO contra la localidad del padron. Sin esta regla un pedido al interior de un cliente con sucursales en varias provincias sale ambiguo y no se pinta.',
-  'Thomas','v20.61'),
+  'Thomas','v20.62'),
  ('gv_np_destino','vista','\(\?:',
   'La etiqueta de la sucursal puede tener parentesis adentro ("Rio Gall (25 de mayo)"): el parentesis final se lee con un grupo que tolera un nivel de anidado. Con \(([^()]*)\)$ esas NP no matcheaban ninguna sucursal y salian ambiguo (LK 0178 y LK 0179, Santa Cruz).',
-  'Thomas','v20.61'),
+  'Thomas','v20.62'),
  ('gv_np_destino','vista','es_retira',
   'Un Retira que no resuelve provincia sale como "retira", no como "ambiguo": no hay expreso que entregue nada y el centinela gv_destino_sin_provincia tiene que quedar con lo que de verdad falta.',
-  'Thomas','v20.61')
+  'Thomas','v20.62')
 ) as v(objeto, clase, patron, regla, quien_pidio, version)
  where not exists (select 1 from public."GV_Reglas_Centinela" c
                     where c.objeto = v.objeto and c.patron = v.patron);
@@ -235,5 +235,5 @@ select * from (values
 -- ROLLBACK: `sql/gv_destino_misiones_v2045.sql` tiene el `gv_destino_score` y el
 -- `gv_np_destino` anteriores. Volverlos a aplicar los dos juntos (el score viejo con la
 -- vista nueva anda, pero deja de resolver las de ISIS) + borrar las 3 filas de
--- `GV_Reglas_Centinela` con version = 'v20.61'.
+-- `GV_Reglas_Centinela` con version = 'v20.62'.
 -- ════════════════════════════════════════════════════════════════════════════════════════

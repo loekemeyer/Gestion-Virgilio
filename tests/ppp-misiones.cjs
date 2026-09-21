@@ -176,12 +176,12 @@ catch (_e) {
   if (!/aprDestinoChip\(p\) \+ aprMisBadge\(p\)/.test(html)) fallos.push("la tarjeta de A Programar no pinta los chips");
   if (!/aprEsProvMarcada\(p\) \? ' mis' : ''/.test(html)) fallos.push("la tarjeta de A Programar no se pinta de naranja");
 
-  // ── v20.61: el backend que resuelve el destino (candados sobre el SQL del repo) ────────
+  // ── v20.62: el backend que resuelve el destino (candados sobre el SQL del repo) ────────
   // Son reglas que ya se perdieron una vez por un CREATE OR REPLACE de otra sesión, así que
   // además de la fila en GV_Reglas_Centinela quedan acá.
-  const sqlDest = path.join(root, "sql", "gv_destino_isis_v2061.sql");
+  const sqlDest = path.join(root, "sql", "gv_destino_isis_v2062.sql");
   if (!fs.existsSync(sqlDest)) {
-    fallos.push("falta sql/gv_destino_isis_v2061.sql: el destino de las NP de ISIS vive ahí");
+    fallos.push("falta sql/gv_destino_isis_v2062.sql: el destino de las NP de ISIS vive ahí");
   } else {
     const s = fs.readFileSync(sqlDest, "utf8");
     // la NP de ISIS no trae etiqueta ni expreso: desambigua el BARRIO contra la localidad
