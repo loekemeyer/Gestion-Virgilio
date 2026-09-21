@@ -8,6 +8,32 @@ lo que la tabla NO cuenta: **qué decidió el dueño y no hay que revisitar**, *
 destrabar él** (redeploy de Vercel, rotar las credenciales de Meta y OpenAI) y **qué quedó a
 medias**. Mantenerlo al día al cerrar cada tanda de trabajo.
 
+## 🟥🟥🟥 LA "L" = EL MISMO NÚMERO, PERO DE LOEKEMEYER. NADA MÁS.
+
+> ## `702EL` es el `702E` **de LK**.
+> ## `026L` es el `026` **de LK**.
+> ## La L se saca y queda el código; la empresa que agrega es **LK**.
+
+**Luis, 2026-09-21, después de explicarlo varias veces:** *"la L solo indica que son códigos de
+LK pero sin la L (702EL = 702E de LK), ¿se entiende?"*
+
+### Las tres conclusiones FALSAS que hay que no volver a sacar
+
+| lo que alguien piensa | por qué está MAL |
+|---|---|
+| *"7xx y 8xx son de Chef, así que esa L está mal puesta"* | **El número NO dice la empresa.** El mismo número existe de los dos lados. `702E` de LK y `702E` de Chef son **dos artículos distintos**, como los duales. La L es justamente lo que los separa. |
+| *"este código no está en la lista de precios de LK, entonces la L es un error del pedido"* | Que a LK le falte ese número **en una tabla** no convierte la L en un error. Es un dato incompleto de esa tabla, y se reporta como tal. |
+| *"le saco la L para que matchee"* | Sacarla manda el picking a la góndola equivocada y la factura sale con el artículo equivocado. **Nunca** se saca de `PPP_Web_Base`. |
+
+### Qué se hace cuando un código con L no resuelve (precio, m³, góndola)
+
+Se reporta que **falta el dato de ese código en LK**, con el número pelado y la tabla donde falta.
+No se toca el pedido, no se saca la L, y no se dice que el pedido esté mal cargado.
+
+El detalle de dónde viaja la L y dónde no (picking sin L, factura con L cruda, `pkResolveArt`)
+está más abajo, en **"LA «L» NO ES UN CÓDIGO — ES UNA DENOTACIÓN"**. Lo sostiene
+`tests/regla-L.cjs`.
+
 ## ⚠⚠⚠ REGLA: TRAER SIEMPRE LA DEFINICIÓN VIVA, Y USAR SIEMPRE LA TABLA VIGENTE
 
 **Luis, 2026-09-17, después de que esto costara 4 tandas con el picking duplicado:**
