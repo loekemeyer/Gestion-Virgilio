@@ -176,6 +176,35 @@ catch (_e) {
   if (!/aprDestinoChip\(p\) \+ aprMisBadge\(p\)/.test(html)) fallos.push("la tarjeta de A Programar no pinta los chips");
   if (!/aprEsProvMarcada\(p\) \? ' mis' : ''/.test(html)) fallos.push("la tarjeta de A Programar no se pinta de naranja");
 
+  // ── v20.61: el backend que resuelve el destino (candados sobre el SQL del repo) ────────
+  // Son reglas que ya se perdieron una vez por un CREATE OR REPLACE de otra sesión, así que
+  // además de la fila en GV_Reglas_Centinela quedan acá.
+  const sqlDest = path.join(root, "sql", "gv_destino_isis_v2061.sql");
+  if (!fs.existsSync(sqlDest)) {
+    fallos.push("falta sql/gv_destino_isis_v2061.sql: el destino de las NP de ISIS vive ahí");
+  } else {
+    const s = fs.readFileSync(sqlDest, "utf8");
+    // la NP de ISIS no trae etiqueta ni expreso: desambigua el BARRIO contra la localidad
+    if (!/n\.loc = n\.bar/.test(s))
+      fallos.push("gv_destino_score dejó de mirar el barrio: las NP de ISIS de un cliente multi-provincia vuelven a salir 'ambiguo'");
+    // la etiqueta puede tener paréntesis adentro ("Río Gall (25 de mayo)"): el grupo del
+    // final tolera un nivel de anidado. Se busca como texto, no como regex de regex.
+    if (!s.includes("(?:[^()]|\\([^()]*\\))"))
+      fallos.push("el regex del label volvió a no tolerar paréntesis anidados: LK 0178/0179 (Santa Cruz) quedan sin provincia");
+    // candado invertido: el regex viejo NO puede volver
+    if (s.includes("'\\(([^()]*)\\)\\s*$'"))
+      fallos.push("volvió el regex viejo del label, el que no matchea una etiqueta con paréntesis adentro");
+    // y no puede normalizar llamando a un helper: costaba 10x (3.590 ms contra 870)
+    if (/gv_txt_norm\s*\(/.test(s))
+      fallos.push("gv_destino_score normaliza llamando a un helper: una función SQL con SET search_path no se inlinea y cuesta 10x");
+    // una vista sin security_invoker saltea la RLS del padrón
+    if ((s.match(/security_invoker = true/g) || []).length < 2)
+      fallos.push("falta el `alter view ... set (security_invoker = true)` de alguna de las dos vistas");
+    // el Retira no es un agujero del centinela
+    if (!/when es_retira\s+then 'retira'/.test(s))
+      fallos.push("el Retira volvió a contar como 'ambiguo' en el centinela de destinos");
+  }
+
   if (fallos.length) { console.error("ppp-misiones FALLA:\n - " + fallos.join("\n - ")); process.exit(1); }
   console.log("ppp-misiones OK — Programación y A Programar en naranja, badge y destino por dato.");
 })();

@@ -1,4 +1,17 @@
-# Estado y pendientes — al 2026-09-16 (última actualización: v18.94)
+# Estado y pendientes — al 2026-09-21 (última actualización: v20.61)
+
+> **2026-09-21, tanda de Thomas (v20.61, §3.lj) — el destino de las NP de ISIS ya resuelve, y lo
+> que queda NO es código: es dato que falta en el padrón.** El aviso de provincia de la v20.45
+> resolvía 307 de las 315 NP programadas desde el 01/09; hoy resuelve 311 y **`ambiguo` bajó a 0**
+> (la NP de ISIS no trae expreso —0 de 120 filas—, así que desambigua por el barrio; y la etiqueta
+> puede tener paréntesis adentro). Se pintaron LK 0178/0179 (Santa Cruz) y 98620.
+>
+> **Sólo lo puede destrabar el dueño / la carga del padrón — `gv_destino_sin_provincia`, 24 NP:**
+> (a) **20** direcciones del padrón **sin provincia cargada** en la página, 9 de ellas de Cencosud;
+> (b) **4** NP de dos clientes que **no están en el padrón**: **Matiz SA (LK 4263)** y
+> **Chaverim SA (LK 4317)**, cero filas en `GV_Clientes_Direcciones`. Ese dato no existe en
+> ningún lado, así que no se inventa: mientras falte, esas NP no pueden decir a qué provincia van
+> (ninguna parece del interior, pero el sistema no lo puede afirmar).
 
 > **2026-09-16, tanda de Thomas (v18.88, §3.id) — Conciliación abría el detalle con timeout.**
 > `🔍 Comparar` moría con *"canceling statement due to statement timeout"*. Tres capas: (1)

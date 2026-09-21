@@ -27077,3 +27077,73 @@ legítimas**: la fecha cambia cuando se reprograma, y la tanda **no es de un sol
 
 **Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien (las tres reglas
 tienen su fila). `sql/gv_retenido_codigo_reservado_v2060.sql`, `tests/apr-codigo-reservado.cjs`.
+
+### §3.lj — v20.61 · El destino de una NP de ISIS, y la etiqueta con paréntesis — 2026-09-21
+
+**Thomas, sobre el aviso de Misiones de la §3.kz:** *"¿pero los nuevos pedidos que lleguen ya van
+con el banner?"*. Y sobre las NP de ISIS de un cliente con sucursales en varias provincias:
+*"¿se resuelve el destino por el expreso que trae la NP, o se deja en null? Hoy queda ciego"* →
+**Sí, resolverlo.**
+
+⚠ **Lo primero que se midió tira abajo la premisa: la NP de ISIS NO TRAE EXPRESO.**
+
+```sql
+select count(*) filas, count(*) filter (where direccion ~* '^\s*exp') con_prefijo_exp
+  from public.gv_ppp_programacion_diaria;   -- 120 filas, 0 con "Exp."
+```
+
+El `Exp. <nombre> — <dir> (<etiqueta>)` lo arma la **página**; la NP de ISIS trae `direccion` y
+`barrio` pelados. Y el expreso, aunque viajara, no alcanzaría solo: de los **98** clientes con
+sucursales en más de una provincia, 63 tienen expreso cargado, y de sus 73 combinaciones
+(cliente, expreso) sólo **41 pintan una sola provincia** — en las otras 32 el mismo expreso
+entrega a dos provincias del mismo cliente. **Lo que sí trae y desambigua es el BARRIO**, que es
+la localidad de la sucursal.
+
+**Estado antes del cambio, sobre las 315 NP programadas desde el 01/09:** 307 resolvían (97,5 %),
+**4 salían `ambiguo`** y 4 `sin padrón`. Las 4 ambiguas, una por una:
+
+| NP | cliente | qué pasaba |
+|---|---|---|
+| **LK 0178 · LK 0179** | Multi Bazar (02/10) | dirección `Exp.  — Juan B. Justo 7594 (Río Gall (25 de mayo))`: la etiqueta **tiene paréntesis adentro** y el regex era `\(([^()]*)\)\s*$`, así que no matcheaba ninguna sucursal. Van a **Río Gallegos, Santa Cruz**, y en pantalla se leía *"Zona 3 - CABA Oeste"* |
+| **98620** | La Patagonia (NP de ISIS) | sus 11 sucursales están en 8 provincias y **todas con la misma dirección y el mismo `dir_key`** (el galpón del expreso en Ituzaingó): la dirección no distingue nada. El barrio `Campo de Mayo` sí — es la localidad de una sola |
+| **LK 0097** | Bazar Y Cia | es un **Retira**: no hay expreso que entregue, así que no hay provincia destino. Sale `como = 'retira'` y deja de contar como agujero |
+
+⚠ **La normalización (minúsculas, sin acentos) va ADENTRO de `gv_destino_score`, repetida, y NO
+llamando a un helper.** Una función SQL con `SET search_path` **no se inlinea**, y llamarla 20
+veces por par costaba 10× (4.338 pares, 3 corridas cada uno):
+
+| variante | ms |
+|---|---|
+| v20.45, sin normalizar | 321 |
+| v20.61 llamando a `gv_txt_norm` | **3.590** |
+| v20.61 con la normalización adentro | **870** |
+
+La vista entera mide **875 ms** y la RPC la llama de a lotes de 500 NP, así que la primera
+versión —la linda— no podía quedar.
+
+**Impacto medido (1.493 NP): se recreó la vista v20.45 al lado y se comparó fila por fila.**
+**13 NP cambian, 3 ganan provincia, ninguna cambia de una provincia a otra:**
+
+| antes | ahora | provincia | NP |
+|---|---|---|---|
+| `unica` | `match` | CABA → CABA | 5 |
+| `unica` | `match` | Buenos Aires → Buenos Aires | 4 |
+| `ambiguo` | `match` | null → **Santa Cruz** | 2 (LK 0178, LK 0179) |
+| `ambiguo` | `match` | null → Buenos Aires | 1 (98620) |
+| `ambiguo` | `retira` | null → null | 1 (LK 0097) |
+
+`ambiguo` en la PPP viva pasó de **4 a 0**. El centinela bajó de 28 a **24 filas** y ahora dice
+por qué con la columna `motivo`: **20** son direcciones del padrón **sin provincia cargada** (9
+de Cencosud) y **4** son dos clientes que **no están en el padrón** (Matiz SA 4263, Chaverim SA
+4317: cero filas en `GV_Clientes_Direcciones`, que corrió hoy 10:46). Ese dato no existe en
+ningún lado y **no se inventa** — misma regla que la §3.kz.
+
+**Chequeo:**
+
+```sql
+select * from public.gv_reglas_perdidas;                                       -- vacía
+select como, count(*) from public.gv_np_destino where programada group by 1;   -- 0 ambiguos
+select * from public.gv_destino_sin_provincia order by fecha desc;             -- con motivo
+```
+
+`sql/gv_destino_isis_v2061.sql`, `tests/ppp-misiones.cjs`.
