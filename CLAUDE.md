@@ -1149,6 +1149,17 @@ sigue trayendo el barrio del cliente y ganaba el `coalesce`. Se mira la direcci�
 (`Exp. Retira — …`, `Virgilio 2788`). Centinela: `select * from public.gv_retira_sin_etiqueta;`
 — vacía = todo bien. §3.js.
 
+⚠⚠ **Y el error va también para el otro lado: un pedido que se REPARTE puede decir Retira**
+(v20.66, Thomas 21/09, problema 470). El `nombre_expreso` de la ficha queda en `Retira` cuando un
+cliente pasa de retirar a que se le entregue — nadie borra ese campo al cargarle la dirección — y
+`gv_np_destino` lo publica como destino: Iro Iro (4223) figuraba **Retira** mientras iba en camión
+a Longchamps, ya facturado. **Antes de sacarle la etiqueta de retiro a un pedido, mirar la zona de
+la programación, no el `nombre_expreso`.** Y la señal de que el `Retira` de una ficha es resto y no
+condición: **ese cliente tiene ADEMÁS su fila de retiro de verdad aparte** (`Virgilio 2788`, en
+otro slot). Centinela: `select * from public.gv_retira_contradictorio;` — vacía = todo bien;
+**sólo `service_role`**, porque cuelga de `gv_np_destino` y leída por `anon` contestaría vacía por
+RLS, o sea que mentiría. §3.ln.
+
 **Chequeo:** `select empresa, order_id, retiro_fecha, retiro_franja from public.lk_pedidos_match
 where retiro_fecha is not null;` · `sql/gv_retira_dia_elegido_v1952.sql`, §3.ja.
 
@@ -1430,7 +1441,7 @@ el cruce. Luis lo frenó el mismo día: *"la idea del remito no sirve… cruzás
 - **Chequeo:** `select estado_cadena, count(*) from public.gv_cuarentena_deuda_sucursal group by 1;`
   — `ok` es lo que llega a la dirección; `sin factura parseada` tiene que dar 0.
 
-## ⚠ REGLA (Luis, 2026-09-21, v20.65): el PIPELINE de clientes nuevos convive — y el VIEJO manda
+## ⚠ REGLA (Luis, 2026-09-21, v20.66): el PIPELINE de clientes nuevos convive — y el VIEJO manda
 
 **Luis, textual:** *"De momento convive y el viejo sigue siendo el principal que se usa. Cuando
 verifiquemos que el nuevo va, cambiamos."*
@@ -1515,7 +1526,7 @@ sale limpio).
 **Chequeo:** `select * from public.gv_clin_vencidos;` — lo que espera hace demasiado (es el badge
 rojo de la pestaña; el pedido **no se cancela solo**, Luis 21/09). Y
 `select * from public.gv_clin_prioritarios;` — lo aprobado que tiene que salir en 2 días hábiles,
-fundando camión si en su zona no hay. `sql/gv_clin_pipeline_v2065.sql`, §3.lm.
+fundando camión si en su zona no hay. `sql/gv_clin_pipeline_v2066.sql`, §3.ln.
 
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
 

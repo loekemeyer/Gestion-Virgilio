@@ -1,4 +1,4 @@
-/* v20.65 — PIPELINE DE CLIENTES NUEVOS (pestaña propia del módulo PPP).
+/* v20.66 — PIPELINE DE CLIENTES NUEVOS (pestaña propia del módulo PPP).
 
    Luis, 2026-09-21: el cliente nuevo tiene un CAMINO, no un botón. Análisis crediticio en
    Equifax → la dirección lo define Referenciado / Válido / No válido → el Válido paga por
@@ -29,7 +29,7 @@ const path = require("path");
 
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "index.html"), "latin1");
-const sql  = fs.readFileSync(path.join(root, "sql", "gv_clin_pipeline_v2065.sql"), "utf8");
+const sql  = fs.readFileSync(path.join(root, "sql", "gv_clin_pipeline_v2066.sql"), "utf8");
 const fallos = [];
 
 /* ── 1. aprobar es el MISMO camino que el submódulo viejo ─────────────────────────────── */

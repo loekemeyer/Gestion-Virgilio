@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════════════════
--- PIPELINE DE CLIENTES NUEVOS · v20.65 (2026-09-21, pedido de Luis)
+-- PIPELINE DE CLIENTES NUEVOS · v20.66 (2026-09-21, pedido de Luis)
 --
 -- ⚠ Este archivo es la definición VIVA, volcada de la base con pg_get_functiondef /
 --   pg_get_viewdef después de aplicarla y probarla. No es "lo que se quiso escribir".
@@ -546,13 +546,13 @@ insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pi
 select * from (values
   ('gv_clin_evento', 'funcion', 'GV_Clientes_Nuevos_Contacto',
    'El Speech 1 del pipeline sella tambien el timer del submodulo viejo: mientras convivan, los dos cuentan lo mismo.',
-   'Luis', 'v20.65'),
+   'Luis', 'v20.66'),
   ('gv_clin_vincular', 'funcion', 'gv_excepcion_cuarentena',
    'El vinculo opera escribiendo la excepcion de cuarentena; sin eso el pop-up es decorativo y el proximo pedido vuelve a caer.',
-   'Luis', 'v20.65'),
+   'Luis', 'v20.66'),
   ('gv_clin_vincular', 'funcion', 'GV_Clientes_Nuevos',
    'No se puede vincular a otro cliente nuevo: heredar de alguien sin antiguedad es heredar cero.',
-   'Luis', 'v20.65')
+   'Luis', 'v20.66')
 ) v(objeto, clase, patron, regla, quien_pidio, version)
 where not exists (select 1 from public."GV_Reglas_Centinela" c
                    where c.objeto = v.objeto and c.patron = v.patron);
