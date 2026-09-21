@@ -1293,6 +1293,38 @@ no se mueve. Lo que se frena es programar uno nuevo ahí.
 en un día cerrado. Mira **web e ISIS** y saca lo que ya salió por CCN/CRN.
 `sql/gv_dia_sin_reparto_v2064.sql`, `tests/ppp-dia-sin-reparto.cjs`, §3.ll.
 
+## ⚠ REGLA (Thomas, 2026-09-21, v20.86): lo ARMADO SIN DÍA tiene que verse en el badge
+
+**Thomas, textual:** *"debería aparecer discriminado en el badge del icono de PPP en la página
+principal del admin (un número rojo con los pendientes)"*.
+
+**`GV_PPP_Armados_Espera` es un agujero por diseño si nadie lo mira.** Toda NP que esté ahí
+pierde la `fecha_entrega` en `gv_ppp_programacion_diaria` —es el sentido del módulo: armado a
+propósito sin día— así que **desaparece de todos los días de la Programación** y no puede figurar
+como "Salió".
+
+**Caso Iro Iro (21/09):** NP 98626/98627, 0,483 m³, pickeadas el 14/09, armadas el 15/09,
+**facturadas el 16/09** y metidas ahí el 18/09. Tres días en el pallet, con la factura hecha,
+sin aparecer en ninguna pantalla. **Lo encontró Thomas mirando, no el sistema.**
+
+Desde la v20.86 es el tipo `armado_espera` de `gv_ppp_avisos` (orden 4, antes que los retenidos y
+que las alertas web) y tiene su renglón en `gv_ppp_avisos_detalle` con las NP, la tanda, los m³,
+la zona, los días que lleva y **si ya se facturó**, que es lo que apura.
+
+⚠ **Cuenta PEDIDOS, no filas** (Iro Iro son 2 NP de un pedido = 1), igual que el resto del badge.
+
+⚠ **`por` y `motivo` de esa tabla vienen NULL** en las dos filas que existen: el detalle dice
+*"no quedó registrado quién ni por qué"* en vez de inventarlo. Si algún día se escribe quién lo
+dejó ahí, el detalle ya lo muestra solo.
+
+**El front no se tocó**: `pppFetchAvisos` y `pppAvisosAbrir` leen las dos vistas genéricamente,
+así que un tipo nuevo aparece sin tocar `index.html`. **Al agregar otro aviso, se agrega en el
+SQL y listo** — y con su fila en `GV_Reglas_Centinela`.
+
+**Chequeo:** `select * from public.gv_ppp_armado_espera;` — lo armado sin día, con los días que
+lleva y si está facturado. `sql/gv_ppp_armado_espera_v2086.sql`,
+`tests/ppp-armado-espera-badge.cjs`, §3.lw.
+
 ## ⚠ REGLA (Thomas, 2026-09-21, v20.80): un pedido programado NO vuelve a «A Programar»
 
 **Thomas, textual:** *"sacá del módulo programación la opción de mandar pedidos a «A programar».
@@ -1523,7 +1555,7 @@ el cruce. Luis lo frenó el mismo día: *"la idea del remito no sirve… cruzás
 - **Chequeo:** `select estado_cadena, count(*) from public.gv_cuarentena_deuda_sucursal group by 1;`
   — `ok` es lo que llega a la dirección; `sin factura parseada` tiene que dar 0.
 
-## ⚠ REGLA (Luis, 2026-09-21, v20.86): el PIPELINE **reemplazó** al submódulo de clientes nuevos
+## ⚠ REGLA (Luis, 2026-09-21, v20.87): el PIPELINE **reemplazó** al submódulo de clientes nuevos
 
 **Luis, textual:** *"implementá esta nueva versión de clientes nuevos en «A programar»
 reemplazando la vieja"*. El submódulo 🆕 Clientes nuevos **ya no se dibuja**: en su lugar, dentro
@@ -1699,7 +1731,7 @@ excepción. **Si se suma una escritura nueva a `gv_clin_evento`, va con `and not
 
 **Chequeo:** `select * from public.gv_clin_vencidos;` — lo que espera hace demasiado (el pedido
 **no se cancela solo**). Y `select * from public.gv_clin_prioritarios;` — lo aprobado que tiene
-que salir en 2 días hábiles. `sql/gv_clin_dos_estados_v2086.sql` (vigente) y
+que salir en 2 días hábiles. `sql/gv_clin_dos_estados_v2086.sql` (vigente; se aplicó como v20.87 — la v20.86 se la llevó otra sesión) y
 `sql/gv_clin_pipeline_v2066.sql` (tablas, config, vínculo y vistas), §3.ln.
 
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
