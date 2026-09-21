@@ -1,4 +1,4 @@
--- v20.63 — Centinela: el destino dice RETIRA y el pedido va en camion (o al reves)
+-- v20.65 — Centinela: el destino dice RETIRA y el pedido va en camion (o al reves)
 -- Problema 470. Pedido de Thomas, 2026-09-21.
 --
 -- QUE PASO
@@ -50,13 +50,13 @@ alter view public.gv_retira_contradictorio set (security_invoker = true);
 revoke all on public.gv_retira_contradictorio from anon, authenticated;
 
 comment on view public.gv_retira_contradictorio is
-  'Centinela (v20.63): NP programada cuyo destino y cuya zona se contradicen sobre el retiro. Vacia = todo bien. Nace del problema 470 (Iro Iro 4223 y Osa 2533 mostraban Retira mientras iban en camion). Solo service_role: cuelga de gv_np_destino, que anon no puede leer.';
+  'Centinela (v20.65): NP programada cuyo destino y cuya zona se contradicen sobre el retiro. Vacia = todo bien. Nace del problema 470 (Iro Iro 4223 y Osa 2533 mostraban Retira mientras iban en camion). Solo service_role: cuelga de gv_np_destino, que anon no puede leer.';
 
 -- que no le saquen el corazon en un CREATE OR REPLACE
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
 values ('gv_retira_contradictorio','vista','es_retira',
         'El centinela compara el destino que se MUESTRA (gv_np_destino.expreso) contra como se esta REPARTIENDO de verdad (gv_np_prog_reparto.es_retira). Si se le saca ese cruce deja de ver el caso del problema 470: un pedido que va en camion con el badge Retira por nombre_expreso viejo en el padron.',
-        'Thomas','v20.63')
+        'Thomas','v20.65')
 on conflict do nothing;
 
 -- ── CHEQUEO ────────────────────────────────────────────────────────────────────

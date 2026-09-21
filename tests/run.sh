@@ -613,3 +613,6 @@ node tests/recepcion-fecha-anio.cjs
 
 echo "== apr-codigo-reservado (v20.60: el codigo de un pedido retenido queda reservado y no vuelve a la bolsa) =="
 node tests/apr-codigo-reservado.cjs
+
+echo "== ppp-dia-sin-reparto (v20.64: el dia sin reparto no recibe programacion y se ve marcado) =="
+node tests/ppp-dia-sin-reparto.cjs
