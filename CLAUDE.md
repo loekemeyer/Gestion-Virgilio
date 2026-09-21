@@ -1496,6 +1496,20 @@ Por eso el pipeline **no tiene camino propio para nada que ya existiera**, y est
 Lo sostiene `tests/pipe-clientes-nuevos.cjs` con el **candado invertido**: si alguien le escribe
 al pipeline su propio «aprobar», el test se pone en rojo.
 
+⚠⚠ **«Todavía no llegaron los pedidos» NO es «no hay dato»** (v20.70, lo vio Luis: *"¿cómo
+carajo no tiene cuit? imposible"*). Los cuatro lotes de A Programar / Clientes nuevos —CUIT,
+monto, teléfono y primer contacto— hacían `if (!lista.length) { _apr.X = {}; return; }`. La app
+**abre en A Programar y dibuja mientras `_apr.pedidos` todavía está vacío**: ahí la lista sale
+vacía, se guardaba `{}` y, como el `*Need()` sólo pide cuando el estado es `null`, **el dato no
+se volvía a pedir en toda la sesión**. Medido con LK 4282: el CUIT está en el padrón, la RPC lo
+devuelve, y el front la llamaba **0 veces** mientras la celda mostraba el guion de *"este cliente
+no tiene CUIT"* — o sea, justo lo contrario de lo que pasaba.
+
+Lo resuelven dos líneas, `clinSinPedidos()` / `clinVacio(campo)`: sin pedidos cargados el estado
+queda en `null` y se vuelve a pedir; con los pedidos cargados y sin retenidos, `{}` legítimo.
+**Al agregar un lote nuevo de este tipo, usar `clinVacio`.** Es el mismo pozo de §*"una lectura
+ROTA no es un CERO"*. Problema 474.
+
 **El CLIENTE DE PRUEBA** (botón «👁 Ver cliente de prueba») avanza por las etapas **de verdad**
 —si no, no se prueba nada— pero su clave es `__DEMO__` y el backend lo aísla: no escribe el log
 de Cuarentena, ni comentarios, ni el timer del submódulo viejo, ni ninguna excepción; Aprobar y

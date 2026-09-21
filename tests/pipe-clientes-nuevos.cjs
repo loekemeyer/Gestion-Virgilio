@@ -99,6 +99,27 @@ if (!/create or replace view public\.gv_clin_vencidos/.test(sql))
 if (/cron\.schedule[\s\S]{0,200}gv_clin/.test(sql))
   fallos.push("hay un cron tocando el pipeline: el pedido NO se cancela solo (Luis, 21/09)");
 
+/* ── 10. el CUIT: "todavia no llegaron los pedidos" NO es "no hay CUIT" ──────────────── */
+// v20.70 — bug real que vio Luis: LK 4282 mostraba «—» con el CUIT cargado en el padron y la
+// RPC devolviendolo. A Programar dibujaba con _apr.pedidos vacio, el lote guardaba {} y el
+// *Need() no volvia a pedir NUNCA (medido: 0 llamadas en toda la sesion). Afecta a los cuatro
+// lotes, no solo al CUIT.
+if (!/function clinSinPedidos\(\)[\s\S]{0,200}function clinVacio\(campo\)/.test(html))
+  fallos.push("falta el guard clinSinPedidos/clinVacio: una lista vacia por no haber cargado se guardaria como «no hay»");
+["cliCuit", "cliValor", "cliContacto", "cliWpp", "pipe"].forEach(function (c) {
+  if (new RegExp("if \\(!lista\\.length\\) \\{ _apr\\." + c + " = \\{\\}").test(html))
+    fallos.push("el lote de " + c + " sigue guardando {} cuando la lista esta vacia: el dato no se pide nunca mas");
+});
+
+/* ── 11. el EJEMPLO tiene que responder a los botones ────────────────────────────────── */
+// pipeBuscar mira `pedidosTodos`, donde el ejemplo no esta: sin esta linea pipeAnalisis salia
+// por su `if (!p) return` y el boton no hacia nada (lo reporto Luis).
+if (!/if \(String\(orderId\) === "__DEMO__"\) return pipeDemoPedido\(\);/.test(html))
+  fallos.push("pipeBuscar no conoce al ejemplo: sus botones no hacen nada");
+// y Equifax abre con el CUIT por el mismo camino que la columna
+if (!/const cuit = String\(pipeCuitTxt\(p\) \|\| ""\)/.test(html))
+  fallos.push("la URL de Equifax no usa pipeCuitTxt: al ejemplo le quedaria el {cuit} vacio");
+
 /* ── y lo de siempre: toda vista nueva con security_invoker ───────────────────────────── */
 ["gv_clin_prioritarios", "gv_clin_vencidos"].forEach(function (v) {
   if (!new RegExp("alter view public\\." + v + "\\s+set \\(security_invoker = true\\)", "i").test(sql))

@@ -46593,11 +46593,16 @@ async function cuarContactoCargar() {
    en Config. Cuarentena (2.045 de 2.047 filas lo traen).
    Va en SU PROPIA llamada con SU PROPIO catch: si falla, el monto -que es lo que sostiene el
    Speech 1- no se cae con el (leccion de la v19.44). */
+/* ⚠ "Todavia no llegaron los pedidos" NO es "no hay a quien preguntarle". Si se guarda {} en
+   ese momento, el *Need() no vuelve a pedir nunca y el dato falta el resto de la sesion.
+   Estas dos lineas son las que lo distinguen; van en los CUATRO lotes. */
+function clinSinPedidos() { return !_apr.listo || !(_apr.pedidos && _apr.pedidos.length); }
+function clinVacio(campo) { _apr[campo] = clinSinPedidos() ? null : {}; }
 function clinCuitNeed() { if (_apr.cliCuit === null && !_apr.cliCuitLoading) clinCuitCargar(); }
 async function clinCuitCargar() {
   if (_apr.cliCuitLoading) return;
   const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p); });
-  if (!lista.length) { _apr.cliCuit = {}; return; }
+  if (!lista.length) { clinVacio("cliCuit"); return; }
   _apr.cliCuitLoading = true;
   try {
     const res = await aprRpc("gv_cuarentena_cuit_lote", {
@@ -46631,7 +46636,7 @@ async function clinNuevosValorCargar() {
   const lista = (_apr.pedidos || []).filter(function (p) {
     return !p._demo && !p._isis && aprEnCuarentena(p);
   });
-  if (!lista.length) { _apr.cliValor = {}; return; }
+  if (!lista.length) { clinVacio("cliValor"); return; }
   _apr.cliValorLoading = true;
   try {
     const res = await aprRpc("gv_clientes_nuevos_valor_lote", {
@@ -46658,7 +46663,7 @@ function clinContactoNeed() { if (_apr.cliContacto === null && !_apr.cliContacto
 async function clinContactoCargar() {
   if (_apr.cliContactoLoading) return;
   const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
-  if (!lista.length) { _apr.cliContacto = {}; return; }
+  if (!lista.length) { clinVacio("cliContacto"); return; }
   _apr.cliContactoLoading = true;
   try {
     const res = await aprRpc("gv_cliente_nuevo_contacto_lote", {
@@ -46675,7 +46680,7 @@ function clinWppNeed() { if (_apr.cliWpp === null && !_apr.cliWppLoading) clinWp
 async function clinWppCargar() {
   if (_apr.cliWppLoading) return;
   const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
-  if (!lista.length) { _apr.cliWpp = {}; return; }
+  if (!lista.length) { clinVacio("cliWpp"); return; }
   _apr.cliWppLoading = true;
   try {
     const res = await aprRpc("gv_cliente_nuevo_wpp_lote", {
@@ -46961,7 +46966,7 @@ function pipeNeed() { if (_apr.pipe === null && !_apr.pipeLoading) pipeCargar();
 async function pipeCargar() {
   if (_apr.pipeLoading) return;
   const lista = pipeLista();
-  if (!lista.length) { _apr.pipe = {}; return; }
+  if (!lista.length) { clinVacio("pipe"); return; }
   _apr.pipeLoading = true;
   try {
     const res = await aprRpc("gv_clin_pipeline_lote", {
@@ -47070,8 +47075,9 @@ async function pipeCfgCargar() {
 function pipeEquifaxUrl(p) {
   let base = "https://www.equifax.com.ar/";
   try { const c = (_apr.pipeCfg || {}).clin_equifax_url; if (c) base = String(c); } catch (_e) {}
-  const cuit = String(((_apr.cliCuit || {})[String(p.empresa || "lk") + ":" + String(p.cod || "").trim()]) || "")
-                 .replace(/\D/g, "");
+  // el CUIT sale por el MISMO camino que la columna (pipeCuitTxt), asi que el ejemplo tambien
+  // abre Equifax con un CUIT y no con el {cuit} vacio
+  const cuit = String(pipeCuitTxt(p) || "").replace(/\D/g, "");
   return base.indexOf("{cuit}") >= 0 ? base.replace("{cuit}", cuit) : base;
 }
 async function pipeAnalisis(empresa, orderId) {
@@ -47081,6 +47087,9 @@ async function pipeAnalisis(empresa, orderId) {
   await pipeEvento(empresa, orderId, "analisis", null, null);
 }
 function pipeBuscar(empresa, orderId) {
+  // ⚠ el pedido de EJEMPLO no vive en `pedidosTodos` (no es un pedido real), asi que sin esta
+  // linea `pipeAnalisis` salia por su `if (!p) return` y el boton no hacia nada.
+  if (String(orderId) === "__DEMO__") return pipeDemoPedido();
   const k = String(empresa) + ":" + String(orderId);
   return (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === k; });
 }
