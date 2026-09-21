@@ -360,7 +360,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pweb-pendiente (v12.89: A Programar sólo muestra pedidos pendientes según gv_pedidos_web_excluidos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-pendiente.cjs
 
-echo "== pedidos-lectura-1vuelta (v20.71: la toma de datos de pedidos va en UNA vuelta, sin count=exact) =="
+echo "== pedidos-lectura-1vuelta (v20.76: la toma de datos de pedidos va en UNA vuelta, sin count=exact) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedidos-lectura-1vuelta.cjs
 
 echo "== gv-espejo-corte (v12.90: Gestión lee las vistas gv_ppp_* y no las tablas crudas del espejo de ISIS) =="

@@ -27780,3 +27780,91 @@ Y lo de siempre: `create or replace view` sin `WITH` borra las `reloptions`, as�
 chequea `security_invoker` **antes** (si no lo tiene, frena) y lo repone **después**.
 
 `sql/gv_destino_badge_del_pedido_v2074.sql`, `tests/ppp-misiones.cjs`.
+
+### §3.ls — v20.76 · La toma de datos de pedidos: una vuelta en vez de diez — 2026-09-21
+
+**Luis, 21/09, con la captura del `canceling statement due to statement timeout` en A
+Programar:** *"primero, banda de timeouts, fijate de optimizar la toma de datos de pedidos"*.
+
+Se midió primero, como manda la regla del `pg_stat_statements` (§3.iz). Ventana de 22.553 s:
+
+| consulta | llamadas | total | media | máximo |
+|---|---:|---:|---:|---:|
+| `gv_ppp_base_pedidos` (`select=pedido,articulo,cajas`) | 1.121 | 815 s | 727 ms | 5.675 ms |
+| `gv_ppp_base_pedidos` (`select=articulo`) | 1.203 | 855 s | 711 ms | 3.681 ms |
+| `gv_pedidos_web_excluidos` | 270 | 566 s | 2.484 ms | **7.958 ms** |
+
+Los tres problemas son distintos y los tres se arreglan solos una vez que se ven.
+
+#### 1. La RPC que se moría por 42 ms
+
+`gv_pedidos_web_excluidos` es la que contesta A Programar. Su peor llamada tardaba
+**7.958 ms** contra un `statement_timeout` de **8 s**: no fallaba por un pico raro, fallaba
+porque estaba pegada al techo. Tres causas, ninguna cambia la lógica (medido: **0 filas de
+diferencia** sobre los 217 pedidos de hoy):
+
+1. `np_prod` barría las **cuatro** tablas enteras (16.143 filas) y recién después comparaba
+   el código de cliente. Ahora filtra por los códigos que vienen en el payload.
+2. `np_fecha` hacía un `group by` sobre `GV_PPP_Base_Pedidos` **completa** (9.782 filas).
+   Ahora sobre las 17 fechas del payload.
+3. `gv_espejo_np_pasa` se llamaba **una vez por fila**, 16.143 veces.
+
+**2.465 ms → 530 ms** (517 ms corriendo como `authenticated`, que es el rol que tiene el
+timeout de 8 s). `sql/gv_pedidos_web_excluidos_v2076.sql`.
+
+#### 2. La función que no se inlinea, otra vez
+
+El punto 3 de arriba es el mismo pozo que `gv_destino_score` en la v20.62, y estaba también
+adentro de `gv_ppp_base_pedidos`: **una función SQL con `SET search_path` NO se inlinea**, así
+que Postgres la ejecuta una vez por fila. Y con la canilla del espejo **abierta** —corte `lk`
+y `chef` en `null`, como está desde el 06/09— `gv_espejo_np_pasa` devuelve `true` siempre: las
+tres ramas de su `CASE` terminan en `p_lk is null` / `p_chef is null`. O sea que esas 9.618
+llamadas por lectura no decidían nada.
+
+Con el short-circuit adelante, la vista pasa de **153 ms a 33 ms**, con 0 filas de diferencia
+en las dos direcciones del `EXCEPT ALL`:
+
+```sql
+WHERE ((c.lk is null and c.chef is null) or gv_espejo_np_pasa(b.pedido, c.lk, c.chef))
+```
+
+#### 3. Diez páginas, y cada página recalculaba la vista entera
+
+El front leía `gv_ppp_base_pedidos` **entera** desde dos lugares, y son 9.618 filas contra el
+corte de 1.000 de PostgREST: **diez vueltas**, y cada vuelta vuelve a calcular la vista
+completa. Lo que el front usa de verdad es mucho menos, así que se agrega del lado del
+servidor y las dos lecturas entran en **una sola página**:
+
+| lectura | antes | ahora | filas |
+|---|---|---|---:|
+| base de picking (`fetchPickingBaseFromSupabase`) | `gv_ppp_base_pedidos` | **`gv_ppp_base_pedidos_items`** (pedido → items) | 816 |
+| panel de Despiece | `gv_ppp_base_pedidos` | **`gv_ppp_base_articulos`** (códigos distintos) | 321 |
+
+Medido después: `items` 35 ms, `articulos` 36 ms. Contra **1.530 ms** (10 × 153) por lectura.
+
+⚠ Los items van en el mismo **orden de `id`** que traía el `select` crudo (`jsonb_agg(… order
+by p.id)`): el picking los muestra en ese orden.
+
+#### 4. Y el `Prefer: count=exact` que nadie usaba
+
+`supaFetchAll` mandaba `Prefer: "count=exact"` en **cada página**, o sea que PostgREST contaba
+la relación entera por vuelta (`pgrst_source_count`) para devolver un total que **ningún
+llamador lee**: la función sólo devuelve las filas. Se sacó, y el corte pasa a ser la página
+corta, igual que en `gvRestTodo` y en el envoltorio de `supabase-config.js` (§3.le).
+
+⚠ **El `else` tiene que colgar del NaN, no de la barra.** Sin `count=exact` el header viene
+`0-999/*`: `cr.indexOf("/")` sigue dando ≥ 0, así que con el código viejo el total quedaba en
+`Infinity` y se pedía una página vacía de más en cada lectura paginada de la app.
+
+```js
+const t = (slash >= 0) ? parseInt(cr.slice(slash + 1), 10) : NaN;
+if (!isNaN(t)) total = t;
+else if (got < 1000) { total = from + got; }
+```
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — las dos reglas nuevas tienen su fila
+(el short-circuit del espejo y el `jsonb_agg` de la vista de items). Y el test
+`tests/pedidos-lectura-1vuelta.cjs`, que **muerde**: con el `Prefer` repuesto se pone en rojo
+por dos lados (el literal en el código y el header que sale de verdad en la request).
+
+`sql/gv_base_pedidos_lectura_v2076.sql`, `sql/gv_pedidos_web_excluidos_v2076.sql`.

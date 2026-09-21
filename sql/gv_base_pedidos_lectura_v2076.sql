@@ -1,4 +1,4 @@
--- v20.71 — La toma de datos de pedidos: 1 vuelta en vez de 10, y sin la funcion por fila.
+-- v20.76 — La toma de datos de pedidos: 1 vuelta en vez de 10, y sin la funcion por fila.
 --
 -- Que se midio (21/09, ventana de 22.553 s de pg_stat_statements):
 --   gv_ppp_base_pedidos (select=articulo)            1.203 calls · 855 s · 711 ms de media
@@ -34,7 +34,7 @@ create or replace view public.gv_ppp_base_pedidos as
             upper(btrim(b.articulo)) AS art_n
            FROM "GV_PPP_Base_Pedidos" b
              CROSS JOIN gv_espejo_corte() c(lk, chef)
-          -- v20.71: el short-circuit. Con el corte abierto la funcion siempre da true,
+          -- v20.76: el short-circuit. Con el corte abierto la funcion siempre da true,
           -- y asi no se la llama una vez por fila.
           WHERE ((c.lk is null and c.chef is null) or gv_espejo_np_pasa(b.pedido, c.lk, c.chef))
             AND NOT (EXISTS ( SELECT 1 FROM "GV_PPP_Prog_Override" o
