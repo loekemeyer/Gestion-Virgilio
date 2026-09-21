@@ -28091,7 +28091,85 @@ exigía un **tercer** botón en la fila de la NP —el `↩ Enviar a programar`�
 Thomas mandó sacar. Ahora verifica lo contrario: que quede el 📅 y que **no vuelva** una puerta a
 «A Programar».
 
-### §3.lx — v20.88 · El pipeline reemplaza al submódulo de clientes nuevos — 2026-09-21
+### §3.lw — v20.88 · Manda el pallet: E12L → E03F, y la tabla que el renombre se salteaba — 2026-09-21
+
+**Luis, 21/09:** *"Te estoy diciendo que el pedido está armado y se armó otra vez. Si registrás
+algo diferente estás yendo contra la realidad física del depósito. Actualmente está allá con un
+papel impreso que dice que pertenece a la tanda E03F."*
+
+Es la regla de fondo del caso: **cuando el registro y el pallet no coinciden, manda el pallet.**
+
+#### Lo que había pasado
+
+El pedido **LK 0043 (El Gran Bazar, cod 2375)** se armó el **17/09 16:07** — `TAL` + `ENT`, 7
+líneas, 15 cajas — y el papel del pallet salió con el código **E03F**. En el sistema la tanda
+figuraba como **E12L**: el código se había renombrado y el papel quedó con el nombre viejo.
+
+El **21/09** el pedido volvió a pickearse (Fabi, legajo 104, 13:04-13:10) y a las 15:38 Juan
+(legajo 8) intentó armarlo y lo frenó el candado anti doble-armado. O sea: **el mismo pedido,
+armado dos veces**.
+
+Qué se hizo, con la realidad física como criterio:
+
+| | |
+|---|---|
+| programación | `E12L` → **`E03F`**, 23/09 |
+| armado del 17/09 | **repuesto**: 7 líneas en `Entregas_Virgilio`, 15 cajas, tanda E03F, y los `TALX`/`ENTX` volvieron a `TAL`/`ENT` |
+| lo pickeado el 21/09 (2.º armado) | **a `a_guardar`**, 15 cajas |
+| `separar_pedidos` / `a_facturar` | 0 / 0 |
+| el `AP` de Juan | soltado (`APX`) |
+| el `TAP` que nunca se había dado | cargado a mano con la fecha y el legajo del armado real (17/09 16:07, legajo 8) |
+
+Sin ese `TAP` la tanda seguía apareciendo en la lista de Armado con el picking cerrado, y al que
+la agarrara lo frenaba el candado: es exactamente lo que le pasó a Juan.
+
+#### Un mismo código, dos usos: `GV_Tanda_Codigo_Historia`
+
+**Luis:** *"que encuentre las dos, pero que quede marcado que son diferentes y no me mezcles los
+contenidos"*.
+
+`E03F` ya se había usado antes: se renombró a **`E12R`** (Maravillas de Concepción, Flores,
+Pérez Zarate y Bazar Mandarín — 184 cajas, salió el 21/09). Cuando una tanda se renombra, **el
+rastro se va con el nombre nuevo y el código viejo queda vacío**: de E03F sólo quedaba el `lock`
+en `GV_Tandas_Codigos_Usados`. Por eso buscar E03F no devolvía nada.
+
+La tabla **`GV_Tanda_Codigo_Historia`** anota cada **uso** por separado (código, nro de uso,
+desde/hasta, a qué se renombró, qué tenía adentro y una nota), y la vista
+**`gv_tanda_codigo_vidas`** los devuelve juntos pero **sin mezclar**:
+
+```sql
+select codigo, uso, estado, renombrada_a, clientes_hoy, sale_hoy from public.gv_tanda_codigo_vidas;
+-- E03F · 1 · renombrada a E12R · (otros 4 clientes, 184 cajas)
+-- E03F · 2 · EN USO · El Gran Bazar S.R.L · 2026-09-23
+```
+
+#### Y el agujero que apareció al renombrar
+
+`gv_ppp_tanda_renombrar` contestó **4 objetos tocados** y la PPP siguió diciendo E12L. Renombra
+**18 tablas** —eventos (PKC y `ref` con pipe incluidos), Entregas, Facturación, stock con fusión
+de deltas, los dos candados, Etiquetas_Lío, Faltantes, la conciliación, el override de ISIS, la
+kangoo, Comprobantes ARCA, los armados en espera y `PPP_Web_Tandas`— y **se salteaba
+`PPP_Web_Programacion`**, la tabla madre de los pedidos de la página.
+
+Con eso, la tanda queda **partida en dos nombres según desde dónde se la mire**: el stock, el
+picking, el armado y la factura en el código nuevo; la PPP, que es lo que ve quien programa, en
+el viejo.
+
+Medido antes de aplicar: **0 tandas web habían quedado desincronizadas** por esto. El agujero
+mordía en el próximo renombre de una tanda web.
+
+⚠ Es el mismo tipo de error que el `ref` compuesto (§3.lq) y los pases que eligen fecha (§3.lv):
+una lista de lugares donde hay que replicar algo, y uno que falta. **Al agregar una tabla con
+columna `tanda`, agregarla también al renombre.**
+
+**Probado corriéndolo, no leyéndolo:** `gv_ppp_tanda_renombrar('D69H','ZZ9Z')` en una transacción
+abortada devuelve **5** objetos en vez de 4 y deja la programación en ZZ9Z.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — el centinela de
+`gv_ppp_tanda_renombrar` / `PPP_Web_Programacion` vive ahí.
+`sql/gv_ppp_tanda_renombrar_prog_web_v2088.sql`, `tests/ppp-renombrar-prog-web.cjs`.
+
+### §3.ly — v20.89 · El pipeline reemplaza al submódulo de clientes nuevos — 2026-09-21
 
 **Pedido de Luis**, en cuatro tandas de definiciones. La última: *"Después del análisis solo hay
 2 estados que un cliente puede tener: Referenciado y No referenciado."*

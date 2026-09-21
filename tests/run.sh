@@ -360,6 +360,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pweb-pendiente (v12.89: A Programar sólo muestra pedidos pendientes según gv_pedidos_web_excluidos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-pendiente.cjs
 
+echo "== ppp-renombrar-prog-web (v20.88: renombrar una tanda mueve tambien la programacion web) =="
+node tests/ppp-renombrar-prog-web.cjs
+
 echo "== pedidos-lectura-1vuelta (v20.78: la toma de datos de pedidos va en UNA vuelta, sin count=exact) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedidos-lectura-1vuelta.cjs
 

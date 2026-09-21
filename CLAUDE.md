@@ -1555,7 +1555,7 @@ el cruce. Luis lo frenó el mismo día: *"la idea del remito no sirve… cruzás
 - **Chequeo:** `select estado_cadena, count(*) from public.gv_cuarentena_deuda_sucursal group by 1;`
   — `ok` es lo que llega a la dirección; `sin factura parseada` tiene que dar 0.
 
-## ⚠ REGLA (Luis, 2026-09-21, v20.88): el PIPELINE **reemplazó** al submódulo de clientes nuevos
+## ⚠ REGLA (Luis, 2026-09-21, v20.89): el PIPELINE **reemplazó** al submódulo de clientes nuevos
 
 **Luis, textual:** *"implementá esta nueva versión de clientes nuevos en «A programar»
 reemplazando la vieja"*. El submódulo 🆕 Clientes nuevos **ya no se dibuja**: en su lugar, dentro
@@ -1731,7 +1731,7 @@ excepción. **Si se suma una escritura nueva a `gv_clin_evento`, va con `and not
 
 **Chequeo:** `select * from public.gv_clin_vencidos;` — lo que espera hace demasiado (el pedido
 **no se cancela solo**). Y `select * from public.gv_clin_prioritarios;` — lo aprobado que tiene
-que salir en 2 días hábiles. `sql/gv_clin_dos_estados_v2086.sql` (vigente; se aplicó como v20.88 — la v20.86 y la v20.87 se las llevaron otras sesiones) y
+que salir en 2 días hábiles. `sql/gv_clin_dos_estados_v2086.sql` (vigente; se aplicó como v20.89 — la v20.86, la v20.87 y la v20.88 se las llevaron otras sesiones) y
 `sql/gv_clin_pipeline_v2066.sql` (tablas, config, vínculo y vistas), §3.ln.
 
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
@@ -3029,3 +3029,52 @@ la app**.
 perdió. Y `tests/pedidos-lectura-1vuelta.cjs`, que muerde por los dos lados (el literal en el
 código y el header que sale de verdad en la request).
 `sql/gv_base_pedidos_lectura_v2078.sql`, `sql/gv_pedidos_web_excluidos_v2078.sql`, §3.ls.
+
+## ⚠ REGLA (Luis, 2026-09-21, v20.88): cuando el registro y el PALLET no coinciden, manda el PALLET
+
+**Luis, textual:** *"Te estoy diciendo que el pedido está armado y se armó otra vez. Si registrás
+algo diferente estás yendo contra la realidad física del depósito. Actualmente está allá con un
+papel impreso que dice que pertenece a la tanda E03F."*
+
+El caso: **LK 0043 (El Gran Bazar)** se armó el 17/09 y su papel salió con el código **E03F**; en
+el sistema la tanda figuraba como **E12L**, porque se había renombrado y el papel quedó con el
+nombre viejo. El 21/09 el pedido **se pickeó de nuevo** y el candado anti doble-armado frenó al
+operario que iba a armarlo por segunda vez.
+
+**Lo que NO se hace:** "corregir" el papel del depósito desde la base. Se renombra la tanda al
+código del papel y se repone lo que el registro había perdido.
+
+- La tanda se renombró `E12L` → **`E03F`** y el armado del 17/09 se repuso tal cual.
+- **El segundo picking va a `a_guardar`**, nunca de vuelta a góndola: esas cajas están en un
+  pallet, no en el sector.
+- El **`TAP` que nunca se dio** se carga con la fecha y el legajo del armado REAL. Sin él, la
+  tanda sigue apareciendo en la lista de Armado con el picking cerrado y traba al próximo.
+
+### Un mismo código puede tener DOS usos, y no se mezclan
+
+Al renombrar una tanda **el rastro se va con el nombre nuevo y el viejo queda vacío** (de E03F
+sólo quedaba el `lock` en `GV_Tandas_Codigos_Usados`), así que el generador lo puede volver a
+entregar. `E03F` ya había sido lo que hoy es `E12R`.
+
+Cada uso se anota por separado en **`GV_Tanda_Codigo_Historia`** y se lee junto, sin mezclar, en
+**`gv_tanda_codigo_vidas`**. **Al reusar a mano un código que ya tuvo otra vida, agregarle su
+fila** — es un `insert`, no código.
+
+```sql
+select codigo, uso, estado, renombrada_a, clientes_hoy from public.gv_tanda_codigo_vidas;
+```
+
+### Y el renombre se salteaba la programación web
+
+`gv_ppp_tanda_renombrar` renombra **18 tablas** y no tocaba **`PPP_Web_Programacion`**, la tabla
+madre de los pedidos de la página: la tanda quedaba **partida en dos nombres según desde dónde se
+la mirara** (stock, picking, armado y factura en el nuevo; la PPP en el viejo). Medido: 0 tandas
+web desincronizadas de antes.
+
+⚠ Mismo tipo de agujero que el `ref` compuesto y los pases que eligen fecha: **una lista de
+lugares donde hay que replicar algo, y uno que falta. Al agregar una tabla con columna `tanda`,
+agregarla también al renombre.** Y se prueba **corriéndolo**: `gv_ppp_tanda_renombrar` tiene que
+devolver **5** objetos, no 4.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
+`sql/gv_ppp_tanda_renombrar_prog_web_v2088.sql`, `tests/ppp-renombrar-prog-web.cjs`, §3.lw.
