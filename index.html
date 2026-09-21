@@ -9892,7 +9892,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.85";
+const APP_VERSION = "v20.86";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -19634,15 +19634,37 @@ function stkNpFaltanExport() {
    LISTA y no ajusta solo. Lee `vista_faltantes_sin_completar` (backend). Un caso desaparece de la
    lista cuando se le hace el CP, o cuando se ajusta a mano con ref '<tanda>|FIX...'. */
 // ===== Reporte diario Virgilio (modal in-panel). Invoca la edge gv-reporte-diario-virgilio
-// en modo solo_pdf (la publishable key pasa verify_jwt) y muestra el PDF firmado en un iframe.
-// NO manda WhatsApp: es solo consulta. El envio diario a Juan lo hace el cron 18hs, aparte. =====
+// en modo solo_pdf (la publishable key pasa verify_jwt) y arma un CUADRO SINÓPTICO en HTML con
+// las mismas 16 columnas del PDF (los valores ya vienen formateados desde la edge: `celda`/
+// `celdaHs`, con coma decimal y "-" en los ceros — no se reformatea acá). NO manda WhatsApp:
+// es solo consulta. El envío diario a Juan lo hace el cron 18hs, aparte. El pdfUrl firmado
+// queda como link de descarga por si alguien quiere la versión imprimible. =====
+// Orden EXACTO de COLS en la edge (index.ts): cambiar acá si cambia allá.
+const RV_COLS = [
+  { k: "nombre", h: "Operario", name: true },
+  { k: "pkH", h: "Prom. Picking<br>M3 x Hs" },
+  { k: "pkD", h: "Prom. Picking<br>M3 x Día" },
+  { k: "arH", h: "Prom. Arm<br>M3 x Hs" },
+  { k: "arD", h: "Prom. Arm<br>M3 x Día" },
+  { k: "totDia", h: "Total<br>Hs Día" },
+  { k: "hsProd", h: "Hs<br>Prod" },
+  { k: "pick", h: "Picking" },
+  { k: "arm", h: "Armado" },
+  { k: "cc", h: "Carga de<br>Camión" },
+  { k: "noProd", h: "Hs No<br>Productivas" },
+  { k: "rt", h: "Recp de<br>Merc" },
+  { k: "mg", h: "Guardado<br>de Merc" },
+  { k: "limp", h: "Limpieza" },
+  { k: "pb", h: "Baño" },
+  { k: "sinReg", h: "Hs<br>S/Reg" },
+];
 function openReporteVirgilio() {
   _stkPopShell("📈 Reporte diario Virgilio", "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
   const _iso = function (d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
   const hoy = new Date(), ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
   body.innerHTML =
-    '<div class="stkpop-hint">Elegí un día y generá el reporte. Se arma en el momento; <b>no manda WhatsApp</b> (el envío diario a Juan es aparte).</div>' +
+    '<div class="stkpop-hint">Elegí un día y generá el reporte. Se arma en el momento como cuadro; <b>no manda WhatsApp</b> (el envío diario a Juan es aparte).</div>' +
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
     '<label style="font-weight:700;font-size:14px">Día:</label>' +
     '<input type="date" id="rvFecha" value="' + _iso(ayer) + '" max="' + _iso(hoy) + '" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">' +
@@ -19650,16 +19672,73 @@ function openReporteVirgilio() {
     '<a id="rvDesc" download target="_blank" rel="noopener" style="display:none;color:#1e6bd6;font-weight:700;font-size:13.5px">Descargar PDF ↓</a>' +
     '</div>' +
     '<div id="rvEstado" style="min-height:20px;color:#64748b;font-weight:600;font-size:13.5px;margin:2px 0 6px"></div>' +
-    '<div id="rvVisor" style="display:none"><iframe id="rvPdf" title="Reporte PDF" style="width:100%;height:64vh;border:1px solid #e2e8f0;border-radius:8px;background:#fff"></iframe></div>';
+    '<div id="rvVisor"></div>';
+}
+// Un bloque = una tabla. Con un solo día viene un bloque "(unico)" (sin subtítulo); con rango,
+// un bloque por día + "Total del período". table-layout:auto → cada columna toma el ancho de su
+// contenido (no se estira a toda la pantalla); la de Operario queda pegada a la izquierda.
+function _rvBloqueHtml(b) {
+  const filas = (b && b.filas) || [];
+  if (!filas.length) return "";
+  const sub = (b.subtitulo && b.subtitulo !== "(unico)") ? b.subtitulo : "";
+  let h = "";
+  if (sub) h += '<div style="font-size:16px;font-weight:800;color:#0f172a;margin:12px 0 6px">' + escapeHtml(sub) + '</div>';
+  h += '<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:6px">' +
+    '<table style="border-collapse:collapse;table-layout:auto;font-size:12.5px;background:#fff">';
+  h += '<thead><tr>' + RV_COLS.map(function (c) {
+    const al = c.name ? "left" : "right";
+    const sticky = c.name ? "position:sticky;left:0;z-index:3;background:#f1f5f9;" : "";
+    return '<th style="' + sticky + 'padding:6px 9px;text-align:' + al + ';background:#f1f5f9;color:#475569;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;line-height:1.25;border-bottom:2px solid #cbd5e1;white-space:nowrap;position:sticky;top:0;">' + c.h + '</th>';
+  }).join("") + '</tr></thead><tbody>';
+  h += filas.map(function (f) {
+    return '<tr>' + RV_COLS.map(function (c) {
+      const v = (f[c.k] != null && f[c.k] !== "") ? String(f[c.k]) : "-";
+      if (c.name) {
+        return '<td style="position:sticky;left:0;z-index:1;background:#fff;padding:6px 10px;text-align:left;font-weight:700;color:#0f172a;white-space:nowrap;border-bottom:1px solid #eef2f6;box-shadow:1px 0 0 #e2e8f0;">' + escapeHtml(v) + '</td>';
+      }
+      const dim = (v === "-") ? "color:#cbd5e1;" : "color:#0f172a;";
+      return '<td style="padding:6px 9px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:1px solid #eef2f6;' + dim + '">' + escapeHtml(v) + '</td>';
+    }).join("") + '</tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  return h;
+}
+// Pendientes al cierre — espejo exacto de lo que el PDF dibuja en la edge (index.ts ~483).
+function _rvPendHtml(p) {
+  if (!p) return "";
+  const coma = function (s) { return String(s).replace(".", ","); };
+  const m3 = coma(Number(p.m3pend || 0).toFixed(2));
+  const dias = coma(Number(p.dias || 0).toFixed(1));
+  let gDisp;
+  if (Number(p.guardHoras) < 1) {
+    const min = (p.guardRatio && isFinite(p.guardCajas / p.guardRatio)) ? Math.round((p.guardCajas / p.guardRatio) * 60) : null;
+    gDisp = (min == null) ? "—" : (min + " min");
+  } else {
+    gDisp = coma(String(Math.round(Number(p.guardHoras) * 10) / 10)) + " h";
+  }
+  const filas = [
+    ["M3 Pend", m3 + " m3", "(" + dias + " días)"],
+    ["Hs Guard Pend", gDisp, "(" + (p.guardCajas != null ? p.guardCajas : "—") + " cajas)"],
+  ];
+  let h = '<div style="font-size:16px;font-weight:800;color:#0f172a;margin:14px 0 6px">Pendientes (al cierre del día)</div>';
+  h += '<div style="display:inline-block;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">' +
+    '<table style="border-collapse:collapse;font-size:14px;background:#fff">';
+  h += filas.map(function (r) {
+    return '<tr><td style="padding:7px 12px;color:#475569;border-bottom:1px solid #eef2f6;white-space:nowrap">' + escapeHtml(r[0]) + '</td>' +
+      '<td style="padding:7px 12px;text-align:right;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;border-bottom:1px solid #eef2f6;border-left:1px solid #eef2f6;white-space:nowrap">' + escapeHtml(r[1]) + '</td>' +
+      '<td style="padding:7px 12px;color:#94a3b8;font-size:12.5px;border-bottom:1px solid #eef2f6;white-space:nowrap">' + escapeHtml(r[2]) + '</td></tr>';
+  }).join("");
+  h += '</table></div>';
+  return h;
 }
 async function rvGenerar() {
   const f = (document.getElementById("rvFecha") || {}).value;
   const est = document.getElementById("rvEstado"), vis = document.getElementById("rvVisor"),
-        pdf = document.getElementById("rvPdf"), desc = document.getElementById("rvDesc");
+        desc = document.getElementById("rvDesc");
   if (!est) return;
   if (!f) { est.textContent = "Elegí una fecha."; return; }
   const dd = f.split("-").reverse().join("/");
-  est.innerHTML = "Generando el reporte del " + dd + "…"; vis.style.display = "none"; desc.style.display = "none";
+  est.innerHTML = "Generando el reporte del " + dd + "…"; if (vis) vis.innerHTML = ""; desc.style.display = "none";
   try {
     const r = await fetch(SUPABASE_URL + "/functions/v1/gv-reporte-diario-virgilio", {
       method: "POST",
@@ -19667,7 +19746,7 @@ async function rvGenerar() {
       body: JSON.stringify({ solo_pdf: true, fecha: f })
     });
     const j = await r.json().catch(function () { return null; });
-    if (!r.ok || !j || !j.pdfUrl) {
+    if (!r.ok || !j) {
       est.textContent = "No se pudo generar: " + ((j && (j.error || j.message)) || ("HTTP " + r.status));
       return;
     }
@@ -19675,8 +19754,16 @@ async function rvGenerar() {
     est.textContent = (j.operarios === 0)
       ? ("El " + dd + " no tiene datos de operarios cargados.")
       : ("Listo — " + dd + " · " + ops + " operario" + (ops === 1 ? "" : "s") + ".");
-    pdf.src = j.pdfUrl; vis.style.display = "block";
-    desc.href = j.pdfUrl; desc.setAttribute("download", "Virgilio-" + f + ".pdf"); desc.style.display = "inline";
+    const bloques = (j.bloques || []);
+    let h = "";
+    if (j.titulo) h += '<div style="font-size:16px;font-weight:800;color:#0f172a;margin:2px 0 8px">' + escapeHtml(j.titulo) + '</div>';
+    const cuerpo = bloques.map(_rvBloqueHtml).join("");
+    h += cuerpo || '<div class="stkpop-empty">Sin registros de producción para la fecha.</div>';
+    h += _rvPendHtml(j.pendientes);
+    if (vis) vis.innerHTML = h;
+    if (j.pdfUrl) {
+      desc.href = j.pdfUrl; desc.setAttribute("download", "Virgilio-" + f + ".pdf"); desc.style.display = "inline";
+    }
   } catch (e) { est.textContent = "Error de red: " + ((e && e.message) || e); }
 }
 async function stkOpenFaltFact() {
