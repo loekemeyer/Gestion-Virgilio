@@ -26359,3 +26359,139 @@ $508.200 descontados — los mismos números que antes del cambio.
 stock de ese momento. No reserva nada.
 
 `sql/gv_importado_escaso_reparto_v2044.sql`.
+
+---
+
+### §3.kz — v20.45 · El DESTINO del expreso, y el aviso de pedido a Misiones (Luis, 2026-09-21)
+
+**Pedido textual:** *"Tenemos que traer el dato de las dos paginas, tiene que viajar con los
+pedidos. Esta bueno que muestre la zona así para los expresos (expreso y provincia destino).
+Pero particularmente para los pedido de misiones necesito que la fila del día que tenga
+programado un pedido de misiones se ponga naranja y aparezca una medalla que diga (Hay pedido
+misiones). Lo mismo para tandas. Que las NPs de ese tipo de pedidos tambien se coloreen de
+naranja y tengan el badge «MISIONES»."*
+
+#### Qué se midió primero, porque cambia dónde va el arreglo
+
+Arrancó con una pregunta de Luis sobre **LK 0027 · Albalandia S.R.L. (M)**, cliente de Misiones:
+*"¿desde el pedido de ese cliente tenemos el dato de que es de Misiones el lugar donde entrega el
+expreso?"*
+
+| | |
+|---|---|
+| El dato en la página (LK, `customer_delivery_addresses`) | `provincia = Misiones`, `localidad = Puerto Rico`, `nombre_expreso = Snaider`, `zona_expreso = Soldati` |
+| La vista que Gestión lee (`v_pedidos_web_np` de LK) | expone `provincia` |
+| Lo que el front pedía | `localidad, zona_expreso, nombre_expreso, direccion_expreso` — **`provincia` no estaba en ningún `select=`** |
+| Lo que quedaba en la PPP | `Zona 1 · Soldati`, el barrio del galpón del **expreso**, en CABA |
+| De Misiones sobrevivía | nada estructurado: sólo el texto del paréntesis de `direccion`, que es la **etiqueta que el cliente le puso a su sucursal** |
+
+Y `gv_ppp_web_zona` hace `coalesce(zona_expreso, localidad, barrio_de(direccion))`: como
+`zona_expreso` nunca viene vacío, **"Puerto Rico" nunca se miraba**. Es la misma trampa del
+`coalesce` que ya había mordido con Retira (v19.86).
+
+**Tamaño:** de los últimos 60 días de pedidos web de LK, **143 de 390 van al interior (37 %)**, y
+**141 de ellos con zona de CABA/GBA**. En el padrón: 943 direcciones con expreso, **576 apuntan al
+interior** (Córdoba 130, Santa Fe 116, Tucumán 54… Misiones 4).
+
+#### Dónde se resolvió, y por qué NO en `PPP_Web_Programacion`
+
+Esa tabla tiene **cinco caminos de escritura** (`gv_ppp_web_armar_pendientes`,
+`gv_ppp_web_tanda_programar`, `ppp_web_armar_tandas`, `ppp_web_resync` y el upsert del front).
+Persistir la provincia obliga a tocar los cinco y a acordarse del sexto que aparezca — el mismo
+agujero que ya mordió tres veces con `'super|retira|expo'`. Resolviéndolo **al leer** hay un solo
+lugar, sirve igual para las NP de **ISIS** (que nunca pasaron por la página) y para lo viejo, y si
+el cliente corrige su provincia la PPP se corrige sola en la próxima corrida del padrón.
+
+El padrón ya estaba: **`GV_Clientes_Direcciones`** (2.321 filas, las dos empresas, 2.248 con
+provincia) la llena todos los días `gv-sync-padron-direcciones`.
+
+#### La etiqueta de la sucursal es la que desambigua
+
+**119 clientes** (85 de LK + 34 de Chef) tienen direcciones en **más de una provincia**: cruzar por
+`(empresa, cod)` solo se equivoca. La dirección que la PPP guarda lleva la etiqueta entre
+paréntesis —`Exp. Snaider — PERGAMINO 3751, Soldati (San Martin 1801- Puerto Rico)`— y esa
+etiqueta es el `label` de la dirección en la página. Por eso la v20.45 le agrega **`etiqueta`** a
+`GV_Clientes_Direcciones` y la Edge Function la trae (las dos páginas la tienen: 2.312 de 2.321
+filas quedaron con etiqueta, `avisos: []`).
+
+Puntaje del match, en **una sola definición** (`gv_destino_score`, la usan la función por pedido y
+la vista en bloque):
+
+| puntos | señal |
+|---|---|
+| 9 | la etiqueta coincide con la del paréntesis ← la que desambigua |
+| 7 | la etiqueta coincide con la dirección entera |
+| 6 | la dirección de entrega coincide pelada (pedido sin expreso) |
+| 5 | mismo `dir_key` |
+| 4 | mismo expreso |
+| 3 | la etiqueta del pedido contiene la localidad |
+| 2 | misma dirección de expreso |
+
+⚠ **Sin señal que desambigüe NO se inventa**: `provincia` queda en null y `como = 'ambiguo'`.
+Mismo criterio que la reposición chica (*sin datos, retener*).
+
+#### Qué se creó
+
+| objeto | qué hace |
+|---|---|
+| `GV_Clientes_Direcciones.etiqueta` | la etiqueta de la sucursal (`label` de la página) |
+| `PPP_Web_Config.provincias_alerta` | qué provincias se marcan. Hoy `Misiones`. **No está en el código** |
+| `gv_provincia_alerta(provincia)` | lee ese config |
+| `gv_destino_score(...)` | el puntaje, en un solo lugar |
+| `gv_destino_de(empresa, cod, direccion, barrio)` | resuelve UN pedido (para probar a mano) |
+| `gv_np_destino` | una fila por NP: `provincia`, `localidad_destino`, `expreso`, `como`, `alerta`, `destino_txt` |
+| `gv_destino_sin_provincia` | centinela: pedido **programado** cuyo destino no se pudo resolver |
+
+⚠ **La vista va EN BLOQUE, no llamando a `gv_destino_de` por fila.** Medido sobre las 1.482 NP:
+**por fila 3.219 ms · en bloque 407 ms**. La pantalla la pide en cada refresco.
+
+#### Cuánto resuelve
+
+| | todas las NP (1.482) | las del árbol de Programación (162) |
+|---|---|---|
+| `match` (desambiguada por señal) | 281 | 145 |
+| `unica` (el cliente tiene una sola provincia) | 993 | 14 |
+| `ambiguo` | 202 | 0 |
+| `sin padron` | 6 | 3 |
+
+**LK 0027 → `Misiones · Puerto Rico · Snaider`, `como = match`.** Al 21/09 las dos únicas NP
+marcadas son las dos de Albalandia (LK 0027 y la vieja 97792).
+
+El centinela `gv_destino_sin_provincia` marca **23 NP programadas** sin destino resoluble — la
+mayoría de **Cencosud (Chef 2444)**, cuyas direcciones no tienen provincia cargada en la página.
+Eso no se arregla acá: se arregla cargándola.
+
+#### En pantalla
+
+- La fila de la **NP** con destino por expreso muestra `🚚 Snaider · Misiones` al lado de la zona.
+  Sólo cuando hay expreso: en un reparto propio la provincia es la de la zona que ya se lee al
+  lado, y repetirla en cada fila de CABA es ruido.
+- Si el destino es una provincia marcada, la NP va en **naranja** con el badge **`MISIONES`**, y
+  el **día** y la **tanda** que la contienen van en naranja con la medalla **`⚠ Hay pedido
+  Misiones`** (`Hay 2 pedidos …` si son varios).
+- El naranja de la tanda **pisa** su color de estado (`!important`): el destino es más urgente de
+  ver, y el estado se sigue leyendo en la pastilla.
+- La marca **sube** de la NP al día y a la tanda (`_pgaArbol`), no se calcula aparte: las partes
+  tienen que sumar el todo, igual que los m³ y los estados.
+- El buscador encuentra `misiones` y el nombre del expreso.
+
+⚠ **La provincia NO está en el front.** Para marcar otra:
+
+```sql
+update public."PPP_Web_Config" set valor_texto = 'Misiones,Tierra del Fuego'
+ where clave = 'provincias_alerta';
+```
+
+No hay que tocar código ni redeployar. `tests/ppp-misiones.cjs` lo prueba cambiando la provincia
+marcada y verificando que el front reacciona.
+
+#### Chequeo
+
+```sql
+select * from public.gv_np_destino where alerta;              -- los pedidos a Misiones
+select como, count(*) from public.gv_np_destino group by 1;   -- cuánto resuelve
+select * from public.gv_destino_sin_provincia;                -- lo que quedó sin destino
+select * from public.gv_reglas_perdidas;                      -- vacía = todo bien
+```
+
+`sql/gv_destino_misiones_v2045.sql`, `tests/ppp-misiones.cjs`.

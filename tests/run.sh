@@ -429,6 +429,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== supers-una-lista (v17.72: UNA sola lista de clientes super, en la base y por empresa+codigo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/supers-una-lista.cjs
 
+echo "== ppp-misiones (regresión: destino del expreso y el aviso de Misiones en la Programación) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-misiones.cjs
+
 echo "== ppp-tanda-cambiar-dia (v19.11: el botón 📅 Cambiar de día en cada tanda, en Programación y en Pedidos atrasados) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-tanda-cambiar-dia.cjs
 

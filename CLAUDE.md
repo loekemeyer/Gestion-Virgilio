@@ -1158,6 +1158,48 @@ valen para cualquier cambio, no sólo para esto:**
 **Chequeo:** `select * from public.gv_cuarentena_repo_hoy where exento;`
 `sql/gv_cuarentena_repo_chica_v1944.sql`, §3.iy.
 
+## ⚠ Regla de Luis (2026-09-21, v20.45): la ZONA es dónde va el camión; el DESTINO es otra cosa
+
+**Luis, textual:** *"es especialmente importante poder identificar si el expreso tiene que
+entregar a Misiones"*.
+
+Un pedido por expreso tiene **dos lugares**, y la PPP sólo mostraba uno:
+
+| | qué es | dónde se lee |
+|---|---|---|
+| **zona / barrio** | dónde lo deja el camión: el galpón del expreso, **en CABA** | `zona_expreso` |
+| **destino** | dónde termina la mercadería: la provincia del cliente | `provincia` + `localidad` |
+
+Medido el 21/09: **143 de 390** pedidos web de LK de 60 días van al interior (37 %), **141 con
+zona de CABA/GBA**. LK 0027 (Albalandia, Puerto Rico, Misiones) se leía *"Zona 1 · Soldati"*.
+
+**El dato SIEMPRE existió en las dos páginas** (`customer_delivery_addresses.provincia`) y ya
+viajaba a Gestión en `GV_Clientes_Direcciones`. Lo que faltaba era **atarlo a la NP y mostrarlo**.
+
+- Lo resuelve **`gv_np_destino`** (una fila por NP: provincia, localidad, expreso, `alerta`).
+- Se resuelve **al LEER, no al escribir**: `PPP_Web_Programacion` tiene **cinco** caminos de
+  escritura y persistirlo obliga a tocar los cinco. Al leer hay un solo lugar, sirve para las NP
+  de ISIS y para lo viejo, y se corrige solo cuando el cliente corrige su dirección.
+- Lo que desambigua es la **`etiqueta`** de la sucursal (el `label` de la página): **119 clientes
+  tienen direcciones en más de una provincia**, así que cruzar por `(empresa, cod)` solo se
+  equivoca. Sin señal, `provincia` queda **null** — no se inventa.
+
+⚠ **Qué provincias se marcan NO está en el código.** Sale de `PPP_Web_Config.provincias_alerta`
+(hoy `Misiones`). Para agregar otra es un `update`, no un deploy:
+
+```sql
+update public."PPP_Web_Config" set valor_texto = 'Misiones,Tierra del Fuego'
+ where clave = 'provincias_alerta';
+```
+
+En la Programación: la NP marcada va naranja con el badge de la provincia, y el **día** y la
+**tanda** que la contienen van naranja con la medalla *"Hay pedido Misiones"*. La marca **sube**
+de la NP al día y a la tanda; no se calcula aparte.
+
+**Chequeo:** `select * from public.gv_destino_sin_provincia;` — pedido programado cuyo destino no
+se pudo resolver (al 21/09 son 23, casi todas de Cencosud, que no tiene provincia cargada en la
+página). `sql/gv_destino_misiones_v2045.sql`, `tests/ppp-misiones.cjs`, §3.kz.
+
 ## ⚠ Regla de Luis (2026-09-21): la CUARENTENA se mide por SUCURSAL, y Retira nunca exime
 
 *"Para clientes que tienen múltiples sucursales, se debería llevar registro por el «a qué sucursal
