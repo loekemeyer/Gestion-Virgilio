@@ -1134,6 +1134,48 @@ valen para cualquier cambio, no sólo para esto:**
 **Chequeo:** `select * from public.gv_cuarentena_repo_hoy where exento;`
 `sql/gv_cuarentena_repo_chica_v1944.sql`, §3.iy.
 
+## ⚠ Regla de Luis (2026-09-21): la CUARENTENA se mide por SUCURSAL, y Retira nunca exime
+
+*"Para clientes que tienen múltiples sucursales, se debería llevar registro por el «a qué sucursal
+se corresponde la deuda»… si un cliente tiene direcciones de entrega A y B, hace hoy un pedido
+para A, se le arma, se le factura y se le envía (generándole deuda) y en ese momento, antes de
+pagar, quiere hacer un pedido para sucursal B, este debería pasar sin ser retenido."*
+
+**Las dos decisiones que cierran la regla, textuales del 21/09: «retiene, y toda la deuda viva».**
+
+1. **Deuda que NO se pueda atribuir a una sucursal → RETIENE.** Sin atribución no hay excepción:
+   es el mismo criterio que la reposición chica (*"sin datos, retener"*).
+2. **La ventana es TODA la deuda viva**, no los últimos N días.
+3. **Retira nunca exime.** Un cliente con una sola dirección real no convierte su Retira en
+   "otra sucursal"; y al multi-sucursal, con cualquier deuda, el Retira lo retiene igual.
+4. La clave de la sucursal es **`dir_key`** (`gv_dir_key(direccion, barrio)`), **no** la etiqueta
+   `sucursal_entrega`: Chef trae la dirección en el 100 % de sus pedidos web y la etiqueta casi
+   nunca (48 de 56 pedidos de 60 días sin ella). Por eso la regla vale para **LK y Chef**.
+
+**La cadena, y por dónde NO va:**
+
+```
+comprobante del Excel de deuda -> factura de ISIS (gv_comprobante_key)
+  -> GV_Cruce_FC_Asig  -> NP -> GV_NP_Sucursal -> dir_key
+```
+
+⚠ **No va por el remito.** Se probó (`GV_NP_Remito`) y rinde **101** NP contra **923** del cruce
+NP↔FC, y no aporta una sola NP propia: de las 114 que tienen remito cargado, las 114 ya están en
+el cruce. Luis lo frenó el mismo día: *"la idea del remito no sirve… cruzás NP con FC"*.
+
+**Lo que hay que saber antes de tocar esto:**
+
+- **El Excel de deuda SÍ trae el detalle por comprobante** (Crystal agrupado: col E = comprobante,
+  col L = pendiente). Hasta la v20.35 el front lo leía y lo tiraba: mandaba sólo el total por
+  cliente. Ahora se guarda en **`GV_Cuarentena_Deuda_Detalle`**, y desde la v20.37 **el archivo
+  crudo queda en el bucket `cuarentena`** (antes no se subía a ningún lado y había que volver a
+  pedírselo a quien lo bajó del ERP).
+- **La dirección de una NP de ISIS vive un día.** `GV_PPP_Programacion_Diaria` tiene sólo lo
+  programado (133 filas al 21/09) y después se borra: por eso existe **`GV_NP_Sucursal`**, que la
+  captura cada hora (cron 97). Lo viejo no se recupera — el registro empieza el 21/09.
+- **Chequeo:** `select estado_cadena, count(*) from public.gv_cuarentena_deuda_sucursal group by 1;`
+  — `ok` es lo que llega a la dirección; `sin factura parseada` tiene que dar 0.
+
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
 
 Al revisar por qué llegaban los WhatsApps de *"SIN OC generada"* aparecieron 14 códigos —casi

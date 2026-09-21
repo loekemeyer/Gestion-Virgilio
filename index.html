@@ -5778,7 +5778,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.36"></script>
+<script type="module" src="recepcion.js?v=20.37"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9623,7 +9623,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.36";
+const APP_VERSION = "v20.37";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -46617,6 +46617,9 @@ function cuarImportOtro() { _cuarImp.headers = []; _cuarImp.dataRows = []; _cuar
 function cuarImportSetMap(key, val) { _cuarImp.map[key] = (val === "") ? "" : parseInt(val, 10); cuarImportRender(); }
 async function cuarImportFile(input) {
   const f = input && input.files && input.files[0]; if (!f) return;
+  // v20.37 - el archivo se guarda para poder volver a mirarlo: hasta hoy se parseaba aca y
+  // a la base llegaba solo lo mapeado, asi que habia que pedirselo de nuevo a quien lo bajo.
+  _cuarImp.file = f;
   _cuarImp.err = ""; _cuarImp.fname = f.name; _cuarImp.loading = true; cuarImportRender();
   try {
     const XLSX = await pppLoadXlsx();
@@ -46781,6 +46784,15 @@ async function cuarImportGuardar() {
         try { await aprRpc("gv_cuarentena_deuda_detalle_cargar", { p_empresa: s.empresa, p_rows: det }); }
         catch (eDet) { console.warn("Cuarentena: el detalle por comprobante no se cargo:", eDet); }
       }
+    }
+    // v20.37 - y el archivo crudo al bucket, en su propia llamada con su propio catch.
+    if (s.file) {
+      try {
+        const ext = (s.fname.match(/\.[A-Za-z0-9]+$/) || [".xls"])[0];
+        const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
+        await sb.storage.from("cuarentena")
+          .upload(s.empresa + "/" + s.tipo + "/" + stamp + ext, s.file, { upsert: false });
+      } catch (eUp) { console.warn("Cuarentena: el archivo no se guardo:", eUp); }
     }
     s.saving = false; cuarImportCerrar();
     _apr.msg = "Cuarentena: cargué " + n + " filas de " + cuarFuenteLabel(s.empresa, s.tipo) + "."; _apr.msgErr = false;

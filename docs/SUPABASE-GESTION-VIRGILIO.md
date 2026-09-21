@@ -26144,3 +26144,25 @@ sacar columnas de una vista. Sin dependientes (medido con el recursivo de `pg_de
 `security_invoker` se repuso después del CREATE.
 
 `sql/gv_cuarentena_deuda_detalle_v2036.sql`.
+
+### §3.kv — v20.37: el Excel de deuda queda guardado, y las dos decisiones de Luis — 2026-09-21
+
+**Luis:** *"¿no tenés los últimos archivos subidos de deuda?"*. No: **el archivo nunca se subió a
+ningún lado**. Se parsea en el navegador con SheetJS y a la base llega sólo lo mapeado. Medido:
+no hay bucket de cuarentena, y en los 13 buckets del proyecto el único `.xls*` es
+`planify_bot-assets/prueba-excel-3.xlsx` (17/07). Lo último cargado son los totales del **17/09
+17:43 (LK, 180 clientes)** y **17:42 (Chef, 44)**, los dos desde `loekemeyer.n8n@gmail.com`.
+
+**Desde la v20.37 el archivo crudo se guarda**: bucket privado **`cuarentena`**, ruta
+`<empresa>/<tipo>/<YYYYMMDDHHMMSS>.<ext>`, lectura y escritura sólo para supervisor
+(`es_supervisor_virgilio()`). La subida va **después** del guardado y con su propio `catch`: si
+falla, la carga de la deuda no se cae con ella. Así no hay que volver a pedir el archivo.
+
+**Las dos decisiones que cierran la regla de sucursal** (textual: *"retiene, y toda la deuda
+viva"*) quedaron escritas en `CLAUDE.md`, en el bloque nuevo *"la CUARENTENA se mide por
+SUCURSAL"*. **No se cargó nada en `PPP_Web_Config`**: sin la regla escrita esas claves no harían
+nada, y los datos no se tocan sin que Luis lo pida en el momento.
+
+**Lo que falta para escribir la regla**: subir el Excel de LK y el de Chef una vez. Hasta que el
+detalle exista, la rama que exime no se puede hacer entrar — y una rama que no se hizo entrar no
+está probada (v19.56).
