@@ -626,5 +626,5 @@ node tests/ppp-cliente-dos-dias-salidos.cjs
 echo "== ppp-tanda-armada-sin-armado (v20.70: tanda con TAP cuyos pedidos de hoy no tienen armado propio) =="
 node tests/ppp-tanda-armada-sin-armado.cjs
 
-echo "== ppp-arbol-centrado (v20.76: el arbol de Programacion va centrado, no pegado a la izquierda) =="
+echo "== ppp-arbol-centrado (v20.77: el arbol de Programacion va centrado, no pegado a la izquierda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-arbol-centrado.cjs

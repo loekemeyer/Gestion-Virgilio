@@ -3395,7 +3395,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    bloque es el del hijo más ancho —la tabla— y el encabezado se estira a ESE ancho, así que los
    botones quedan pegados al borde derecho de la tabla y se mueven con ella al abrir o cerrar un
    día. Sin JS: no hay que recalcular nada en cada render. */
-/* v20.76 (Luis: "mucho espacio vacio a la derecha; centra mas la tabla"). El bloque mide lo que
+/* v20.77 (Luis: "mucho espacio vacio a la derecha; centra mas la tabla"). El bloque mide lo que
    mide la tabla (`fit-content`, para que los botones queden pegados a su borde derecho), y un
    bloque angosto adentro de un contenedor ancho queda pegado a la IZQUIERDA: de ahí el hueco.
    `margin-inline:auto` lo centra sin estirarlo — estirarlo dejaría columnas vacías, que es el
@@ -6002,7 +6002,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.76"></script>
+<script type="module" src="recepcion.js?v=20.77"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9880,7 +9880,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.76";
+const APP_VERSION = "v20.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción

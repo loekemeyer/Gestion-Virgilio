@@ -1,4 +1,4 @@
-/* v20.76 — EL ARBOL DE PROGRAMACION VA CENTRADO, NO PEGADO A LA IZQUIERDA.
+/* v20.77 — EL ARBOL DE PROGRAMACION VA CENTRADO, NO PEGADO A LA IZQUIERDA.
 
    Luis, 2026-09-21, sobre la pantalla de Programacion: *"mucho espacio vacio a la derecha en
    esa pantalla. centra mas la tabla en la pantalla"*.
