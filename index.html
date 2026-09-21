@@ -17942,12 +17942,13 @@ function prodRender() {
 
   if (!_prod) { body.innerHTML = sel + '<div class="prod-empty">Sin datos.</div>'; return; }
   const POCO = 5;
+  const MIN_TM3_MS = 5 * 60000;   // piso: con <5 min de tiempo efectivo con m3, el ritmo m3/h es basura (division por ~0). Se deja en 0 -> showVal muestra "—". Evita el "Farias picking 307" (tenia 73s de picking con m3).
 
   // serie semanal de m³/h de UNA actividad (arm | pick) — para tendencia y sparkline
   const mkSerie = function (leg, which) {
     return _prod.weekly.map(function (wk, i) {
       const a = wk[leg]; let v = null;
-      if (a) { const m3 = which === "arm" ? a.armM3 : a.pickM3, tm = which === "arm" ? a.armTimeM3 : a.pickTimeM3; if (tm > 0) v = m3 / hrs(tm); }
+      if (a) { const m3 = which === "arm" ? a.armM3 : a.pickM3, tm = which === "arm" ? a.armTimeM3 : a.pickTimeM3; if (tm >= MIN_TM3_MS) v = m3 / hrs(tm); }
       return { v: v, lbl: wkLbl(i) };
     });
   };
@@ -17958,8 +17959,8 @@ function prodRender() {
     if ((t.armTandas + t.pickTandas) === 0) return;
     const role = t.armTime >= t.pickTime ? "arm" : "pick";   // rol primario = lo que más hace (para agrupar/ordenar)
     const measurable = Math.max(0, t.jornada - t.excluded);
-    const armM3h = t.armTimeM3 > 0 ? t.armM3 / hrs(t.armTimeM3) : 0;
-    const pickM3h = t.pickTimeM3 > 0 ? t.pickM3 / hrs(t.pickTimeM3) : 0;
+    const armM3h = t.armTimeM3 >= MIN_TM3_MS ? t.armM3 / hrs(t.armTimeM3) : 0;
+    const pickM3h = t.pickTimeM3 >= MIN_TM3_MS ? t.pickM3 / hrs(t.pickTimeM3) : 0;
     ops.push({
       leg: leg, role: role, t: t, measurable: measurable,
       armM3h: armM3h, pickM3h: pickM3h,
