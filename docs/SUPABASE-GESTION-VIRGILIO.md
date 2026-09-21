@@ -28022,3 +28022,71 @@ después (`gv_ppp_tanda_camion_mezclado`, `gv_ppp_tanda_dos_dias`, `gv_ppp_clien
 viene a buscar el cliente.
 
 `sql/gv_dia_sin_reparto_quinta_puerta_v2083.sql`, `tests/ppp-dia-sin-reparto.cjs`.
+
+## §3.lw — v20.86: el armado que espera camión entra al badge de la PPP
+
+**Thomas, 2026-09-21, textual:** *"debería aparecer discriminado en el badge del icono de PPP en
+la página principal del admin (un número rojo con los pendientes)"*.
+
+### Qué pasó
+
+**Iro Iro (4223), NP 98626/98627, tandas E39A/E40A, 0,483 m³.** Medido el 21/09:
+
+| paso | cuándo |
+|---|---|
+| Picking (TP) | 14/09 16:31 |
+| Armado (TAP) | 15/09 08:42 |
+| **Facturado** | **16/09 10:30** |
+| a `GV_PPP_Armados_Espera` | 18/09 09:35 y 10:15 |
+| Control Remitos · Carga Camión · Recepción Remitos | **ninguno** |
+
+`gv_ppp_programacion_diaria` le **vacía la `fecha_entrega`** a toda NP que esté en
+`GV_PPP_Armados_Espera` — es el sentido del módulo: armado a propósito sin día. Consecuencia: las
+dos NP desaparecieron de **todos** los días de la Programación, así que no podían figurar como
+"Salió" ni aparecer en ninguna pantalla. Tres días facturadas, en el pallet, invisibles.
+
+⚠ **No es un bug del módulo: hace lo que dice.** El agujero era que **no había forma de
+enterarse**. Lo encontró Thomas mirando la pantalla, no el sistema. Es el mismo criterio de la
+regla de Elías (§v20.58): *el tapón va en el mismo commit que la forma nueva de enterarse*; y el
+mismo caso que Albalandia (§3.lq), otro bulto armado que no aparecía en ninguna pantalla.
+
+### Qué se hizo
+
+- **`gv_ppp_armado_espera`** — vista nueva que resuelve cliente, zona y m³ contra las **dos**
+  programaciones (ISIS y web), más los días que lleva esperando y si **ya se facturó**.
+- **`gv_ppp_avisos`** — tipo nuevo `armado_espera` en **orden 4** (un pedido facturado sin salir
+  pesa más que una alerta web sin revisar); `retenido_sin_fecha` pasó a 5 y `alerta_web` a 6.
+- **`gv_ppp_avisos_detalle`** — su renglón, con las NP, la tanda, los m³, la zona, los días y el
+  aviso de facturado.
+
+**El front no se tocó**: ya lee las dos vistas genéricamente, así que el tipo nuevo aparece solo.
+El badge pasó de **2 a 3**.
+
+⚠ **Cuenta PEDIDOS, no filas**, igual que el resto de `gv_ppp_avisos`: Iro Iro son 2 NP de un
+pedido y cuenta **1**.
+
+⚠ **La fila no guarda quién ni por qué** (`por` y `motivo` vienen NULL en las dos que hay), así
+que el detalle lo dice —*"no quedó registrado quién ni por qué"*— en vez de inventarlo.
+
+### Cómo se verificó
+
+- **Como `anon`**, que es quien la lee desde el navegador (la trampa de §3.kz: una vista con
+  `security_invoker` sobre una tabla con RLS no da error, devuelve menos filas):
+  `armado_espera` 2 filas · badge `n=1` · detalle 3 filas, con el texto completo. Idéntico a
+  `postgres`.
+- **`security_invoker` repuesto** en las tres, y el barrido de vistas sueltas legibles por `anon`
+  da vacío.
+- **Rompiéndolo a propósito**, en transacción abortada: sacando el tipo de `gv_ppp_avisos`, el
+  centinela `gv_reglas_perdidas` marca 1 fila. Con el rollback vuelve a 0.
+- `tests/ppp-armado-espera-badge.cjs`, probado también al revés (sin el tipo en el conteo, el
+  test sale en rojo: *"el badge dice 2 y tiene que decir 3"*).
+
+**Chequeo:** `select * from public.gv_ppp_armado_espera;` — lo que está armado sin día, con los
+días que lleva. Y `select * from public.gv_ppp_avisos where tipo = 'armado_espera';`
+
+`sql/gv_ppp_armado_espera_v2086.sql`.
+
+⚠ **Y de paso se corrigió `tests/ppp-cancelar-pedido.cjs`**, que estaba en rojo desde la v20.80:
+exigía un **tercer** botón en la fila de la NP —el `↩ Enviar a programar`— que es justo el que
+Thomas mandó sacar. Ahora verifica lo contrario: que quede el 📅 y que **no vuelva** una puerta a
+«A Programar».
