@@ -25957,3 +25957,65 @@ igual a lo vivo, y el rollback).
 no quedaba ningún día para tocar y fallaban 15 de 24 chequeos en cadena. Ahora las fechas son
 **relativas a hoy** y el día destino se busca por el ISO del `onclick`, no por el número del día.
 No había ningún bug de UI: el botón, el pop-up y las dos llamadas estaban bien.
+
+### §3.kr — v20.31: `GV_NP_Sucursal`, el registro de a qué sucursal fue cada NP — 2026-09-21
+
+**Pedido de Luis:** la cuarentena tiene que poder distinguir la deuda **por sucursal** — un cliente
+con sucursales A y B, que debe por A, tendría que poder pedir para B. Y *"Retira"* nunca exime.
+
+**Lo que se midió antes de tocar nada**, que es lo que define qué se puede y qué no:
+
+| qué | número |
+|---|---|
+| Fuente de deuda (`GV_Cuarentena_Fuente`, tipo `deuda`) | 180 filas LK + 44 CH, y el `raw` tiene **3 claves**: `cod`, `deuda`, `razon_social`. Un total por cliente, sin comprobantes |
+| Facturas LK parseadas, 365 días | 3.522. Mencionan "domicilio de entrega": **0**. `datos` con campo de entrega: **0** |
+| `contraparte_direccion` de esas facturas | es el **domicilio fiscal**: en 365 días **1 solo** cliente tiene dos valores distintos |
+| Facturas con `remito_ref` | **3.476 de 3.522** |
+| Remitos de `GV_NP_Remito` que cruzan contra su factura | **101 de 101** (LK). Arranca el 04/09 |
+| Recibos / cobranzas parseadas | **ninguna**: las familias son `factura_venta`, `nc_venta`, `nd_venta`; `comprobantes_aplicados` tiene 19 filas en LK y 0 en Chef |
+| Clientes con 2+ sucursales reales **y** deuda | **17** (16 LK, 1 CH) — contando `dir_key` distintos, no slots |
+
+O sea: **la factura no dice la sucursal, el remito sí la implica**, y la cadena
+`comprobante → remito → NP` ya existe. Lo que faltaba es el último eslabón, `NP → sucursal`: la
+dirección de una NP de ISIS vive en `GV_PPP_Programacion_Diaria` **mientras está programada**
+(133 filas al 21/09) y después desaparece. Sin snapshot no hay historia que atribuir.
+
+**Lo que se creó** (`sql/gv_np_sucursal_v2031.sql`):
+
+- **`GV_NP_Sucursal`** — PK `(empresa, np)`, con `cod`, `direccion`, `barrio`, `zona`, `dir_key`
+  (de `gv_dir_key`), `sucursal_entrega`, **`es_retira`**, `fecha_entrega` y `origen`. RLS prendida,
+  `select` para `anon`/`authenticated`, escritura revocada.
+- **`gv_np_sucursal_snapshot()`** — `security definer`, cada hora (**cron 97**, `17 * * * *`).
+  Toma la web (`PPP_Web_Programacion` + `lk_pedidos_match.sucursal_entrega`) y lo de ISIS
+  (`gv_ppp_programacion_diaria`, que ya aplica los override) **antes de que se borre**.
+  ⚠ El `coalesce` del `on conflict` va con **`excluded` primero**: al revés —como estuvo
+  `wa_np_snapshot` hasta la v16.60, problema 76— el dato no se actualiza nunca más y la fila
+  parece fresca con el contenido del primer día.
+- **`gv_np_sucursal_cobertura`** — centinela: cuánta facturación de 180 días quedó sin sucursal.
+
+**Corrida real** (no leída): 315 filas en el primer llamado, más 145 del backfill de
+`wa_np_snapshot` → **460 NP**. ⚠ `wa_np_snapshot` **no estaba muerta**: corre cada hora (cron 64) y
+se actualizó hoy a las 08:00; lo que se congeló el 08/09 es el alta de NP **nuevas** de ISIS,
+porque desde entonces programa Gestión.
+
+Cobertura al aplicarlo:
+
+| empresa · clase | NP facturadas 180 d | con sucursal |
+|---|---|---|
+| lk · isis | 1.086 | 196 |
+| lk · web | 55 | **55** |
+| chef · isis | 192 | 32 |
+| chef · web | 13 | **13** |
+
+Lo web queda al 100 %; lo de ISIS viejo no se recupera — se llena de acá en adelante.
+
+⚠ **Chef no puede usar la regla todavía**: 48 de 56 pedidos de 60 días vienen **sin
+`sucursal_entrega`** en el feed de la página.
+
+**Falta para que la regla exista** (no se implementó nada de cuarentena todavía): cargar el Excel
+de deuda **con el detalle por comprobante** — hoy el importador (`gv_cuarentena_cargar`) acepta 7
+campos y ninguno es comprobante, fecha o saldo, así que los pagos parciales que el Excel trae no
+entraron nunca a la base.
+
+**Rollback:** `select cron.unschedule('gv-np-sucursal-snapshot'); drop view public.gv_np_sucursal_cobertura;
+drop function public.gv_np_sucursal_snapshot(); drop table public."GV_NP_Sucursal";`
