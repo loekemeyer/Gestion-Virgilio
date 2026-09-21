@@ -60,7 +60,9 @@ catch (e) { try { ({ chromium } = require("playwright")); }
   await b.close();
   const ok = r.trasRenderSinMotivos === "null" && r.vecesQuePidio === 1 &&
              r.cuitEnPantalla && !errs.length;
-  if (!ok) console.error("FALLA: con la lista de retenidos vacía se guardó una respuesta, " +
-                         "y el dato no se vuelve a pedir en toda la sesión.");
+  if (ok) console.log("apr-lotes-reintentan OK — con la lista vacía no se guarda respuesta: " +
+                      "cuando llegan los motivos, el CUIT se pide y se ve.");
+  else console.error("FALLA: con la lista de retenidos vacía se guardó una respuesta, " +
+                     "y el dato no se vuelve a pedir en toda la sesión.");
   process.exit(ok ? 0 : 1);
 })();
