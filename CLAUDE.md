@@ -2756,6 +2756,23 @@ tratarlos distinto:
 |---|---|---|
 | **una NP sola**, a otra tanda | **NO** — `gv_np_mover_guard` la frena | las cajas viven en la pila de la TANDA: quedarían huérfanas (caso Martinelli, v20.01) |
 | **la tanda entera**, a otro código o fusionada | **SÍ** | `gv_ppp_tanda_renombrar` se lleva el stock con ella y lo fusiona |
+| **una NP sola cuya tanda YA SALIÓ SIN ELLA** y cuya pila cierra en cero | **SÍ** (v20.72) | no hay una sola caja que pueda quedar huérfana: lo pickeado ya drenó al facturarse y lo que queda es un bulto esperando el camión |
+
+⚠⚠ **El tercer caso cierra un callejón que dejó un pedido 3 días parado** (v20.72, Thomas 21/09,
+problema 472): `gv_ppp_tanda_mover` frena la tanda que salió en parte y **manda a mover la NP sola**,
+y el guard frenaba exactamente eso con *"avisá a sistemas"*. Caso **LK 0027 (Albalandia)**: E03C
+salió el 17/09 con 4 de sus 5 NP y el quinto quedó sin CCR, sin CCN y sin CRN. Lo resuelve
+**`gv_np_mover_exento_salida(np, tanda)`**, con **tres** condiciones necesarias: la tanda ya salió ·
+esta NP no · la pila cierra en cero. **Con saldo vivo sigue frenando** — ahí el motivo de la v20.01
+vale igual.
+
+⚠ **Al medir la pila de una tanda, contar los `ref` COMPUESTOS.** El drenaje del facturado se anota
+como `<tanda>|<NP>` (`E03C|LK 0027`): filtrando `ref = 'E03C'` a secas da **+182** y parece que hay
+stock vivo cuando cierra en cero. Van los tres: `= <tanda>`, `<tanda>|%` y `%|<tanda>`.
+
+**Y el caso se ve solo**, que es lo que faltaba — Albalandia no aparecía en ninguna pantalla:
+`select * from public.gv_pedido_quedo_sin_salir;` — vacía = ningún bulto quedó atrás; dice hace
+cuántos días salió el resto y si se puede reprogramar sin tocar el stock. §3.lq.
 
 Hasta la v20.30 el guard se disparaba en los dos casos, así que **"📅 Cambiar de día" con código
 nuevo o fusión estaba bloqueado en 10 de las 12 tandas vivas** —incluida D69H, la que el centinela

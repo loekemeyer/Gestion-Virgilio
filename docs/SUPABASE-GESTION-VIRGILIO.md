@@ -27374,7 +27374,6 @@ padrón de Gestión **136 = 140 − 4**; `gv_retira_sin_etiqueta` vacía; `gv_re
 
 `sql/gv_retira_contradictorio_v2065.sql`, problema 470.
 
-<<<<<<< Updated upstream
 
 ### §3.ln — v20.66 · Pipeline de clientes nuevos: una pestaña propia para el camino entero — 2026-09-21
 
@@ -27522,8 +27521,6 @@ y se escribe en UTF-8 o en bytes, nunca re-codificando lo que ya estaba.** Corre
 con un barrido del archivo entero: no quedó ninguna otra secuencia de doble encoding.
 
 `sql/gv_clin_pipeline_v2066.sql`, `tests/pipe-clientes-nuevos.cjs`.
-
-=======
 ---
 
 ### §3.lo — v20.67 · Lo que ya salió no parte al cliente en dos días — 2026-09-21
@@ -27563,7 +27560,6 @@ pasó de 4 filas a **0**.
 **Chequeo:** `select * from public.gv_ppp_cliente_dos_dias;` · `select * from
 public.gv_reglas_perdidas;` · `sql/gv_cliente_dos_dias_salidos_v2067.sql`,
 `tests/ppp-cliente-dos-dias-salidos.cjs`.
->>>>>>> Stashed changes
 
 ---
 
@@ -27625,3 +27621,91 @@ dar error— y sin medirlo el centinela podría estar mudo en pantalla y ruidoso
 
 **Chequeo:** `select * from public.gv_tanda_armada_sin_armado;` — vacía = todo bien.
 `sql/gv_tanda_armada_sin_armado_v2070.sql`, `tests/ppp-tanda-armada-sin-armado.cjs`.
+### §3.lq — v20.72 · Un pedido de una tanda que salió sin él no tenía cómo reprogramarse — 2026-09-21
+
+**Thomas:** *"reprogramame el pedido atrasado de albalandia S.R.L. (M). Por qué no se habia
+reprogramado"* → y después, con el callejón medido: ***"cerrá el callejón"***.
+
+**La respuesta a la pregunta: la app no lo dejaba.** Dos funciones con razón por separado y, juntas,
+ninguna salida:
+
+| | qué dice |
+|---|---|
+| `gv_ppp_tanda_mover` | *"La tanda X ya salió en parte… **Reprogramá el pedido que falta desde su fila** (📅 Cambiar de día de la NP): sale en una tanda nueva, sin volver a pickear."* |
+| `gv_np_mover_guard` (v20.01) | `23514` *"Esa tanda YA tiene el trabajo hecho… **avisá a sistemas**."* |
+
+La primera manda a la segunda y la segunda frena. Y la pantalla ofrece el botón igual.
+
+**El caso.** LK 0027, **Albalandia S.R.L. (M)** (cod 958, 0,709 m³, Misiones por el expreso
+Snaider). Su tanda **E03C** tenía 5 NP, se facturaron las 5 el 16/09 con salida 18/09 y salió con 4:
+
+| NP | ENT (armado) | CCR | CCN | CRN |
+|---|---|---|---|---|
+| LK 0026 · 0031 · 0033 · 0048 | sí | sí | 17/09 | 18/09 |
+| **LK 0027** | **sí** | **no** | **no** | **no** |
+
+Se armó, se facturó y nadie le controló el remito ni lo cargó. Estuvo **3 días** en Pedidos
+atrasados, y era el único de los 22 atrasados con zona real: los otros 21 son arrastre histórico
+de 24 a 56 días, todos «Sin zona».
+
+**Por qué se puede eximir, y por qué no es aflojar la v20.01.** El motivo del guard es que las cajas
+viven en la **pila de la tanda**: mover el papel sin mover el stock deja mercadería huérfana (caso
+Martinelli, 92 cajas). Ese motivo **no aplica cuando la pila ya cerró**: lo pickeado drenó al
+facturarse y lo que queda es un bulto identificado esperando el camión. Medido en E03C:
+
+| depósito | movimientos | saldo |
+|---|---|---|
+| `separar_pedidos` | picking +183, separado −183, ajuste 0 | **0** |
+| `a_facturar` | separado +183, facturado −1 −22 −**106** −50 −2 −2 | **0** |
+
+Las **106 cajas de LK 0027** ya se facturaron el 16/09.
+
+⚠⚠ **La trampa de la medición, que casi frenó el arreglo: el drenaje se anota con el `ref`
+COMPUESTO** (`E03C|LK 0027`). Filtrando `ref = 'E03C'` a secas la pila da **+182** y parece que hay
+saldo vivo. Cualquier cuenta sobre la pila de una tanda tiene que sumar `ref = <tanda>`,
+`<tanda>|%` y `%|<tanda>`.
+
+**Lo que se hizo.** La exención vive en **`gv_np_mover_exento_salida(np, tanda)`** y pide **tres
+condiciones, las tres necesarias**: (1) alguna NP de la tanda ya salió; (2) **esta NP no**; (3) la
+pila de la tanda cierra en **cero**. Con saldo vivo **sigue frenando**.
+
+⚠ **No es un `p_forzar`.** No hay booleano que lo apague: la decide el estado medido. Por eso va en
+su propia función — se prueba sola con cualquier `(np, tanda)`, que es lo que permitió testearla sin
+un caso vivo.
+
+**Se probó haciendo ENTRAR la rama**, no leyéndola: se devolvió LK 0027 a E03C dentro de un
+`do $$ … raise exception` que **aborta todo** (verificado después: sigue en E29A). Las cinco ramas:
+
+| prueba | resultado |
+|---|---|
+| LK 0027 en E03C — salió sin él, pila 0 | **PASA** (la exención) |
+| LK 0026, que ya salió, misma tanda | FRENA |
+| LK 0100, en E29C con **176 cajas vivas** | FRENA — Martinelli intacto |
+| LK 0100 con `p_tanda_entera = 'E29C'` | PASA — la v20.30 sigue |
+| `gv_ppp_pedido_mover('LK 0027', …)` completo | ANDA |
+
+La condición (3) se midió además **en su insumo**, porque hoy no existe un caso que combine salida
+parcial con stock vivo: la pila de E03C, E12R, E44A y E12S da 0; la de E29C, 176; la de E51A, 50.
+
+**Y la exención no pasa en silencio**, en las dos direcciones:
+
+- `gv_ppp_pedido_mover` suma al aviso de pantalla *"La tanda X ya había salido sin este pedido y su
+  pila de stock cierra en cero: sale en tanda nueva y NO hay que volver a pickear"*.
+- **`gv_pedido_quedo_sin_salir`** es el centinela que faltaba: pedido cuya tanda ya salió sin él, con
+  cuántos días hace, si se puede reprogramar solo y qué hacer si no.
+
+```sql
+select * from public.gv_pedido_quedo_sin_salir;   -- vacía = ningún bulto quedó atrás
+```
+
+Probado cazando: con LK 0027 de vuelta en E03C (transacción abortada) devuelve
+*"LK 0027 · E03C · Albalandia S.R.L. (M) · 0,709 m³ · salió el resto el 2026-09-18 (hace 3 días) ·
+reprogramable = t"*. Hoy da vacía.
+
+**Cómo se reprogramó Albalandia**, antes de que existiera esto: la excepción a mano que el propio
+guard prevé (*"la excepción se levanta a mano, caso por caso, mirando el stock"*), a la tanda
+**E29A del miércoles 23/09** — el próximo día con camión a **Zona 1 - CABA Sur**, porque el martes
+22 sólo tiene Retira y una tanda de Zona 3. Quedó en `GV_PPP_NP_Estado` como `facturado` para que
+nadie lo vuelva a pickear.
+
+`sql/gv_mover_tanda_salio_sin_el_v2072.sql`, problema 472.
