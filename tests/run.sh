@@ -619,3 +619,6 @@ node tests/ppp-dia-sin-reparto.cjs
 
 echo "== pipe-clientes-nuevos (v20.66: el pipeline convive con el submodulo viejo sin tener verdad propia) =="
 node tests/pipe-clientes-nuevos.cjs
+
+echo "== ppp-cliente-dos-dias-salidos (v20.67: lo que ya salio no parte al cliente en dos dias) =="
+node tests/ppp-cliente-dos-dias-salidos.cjs

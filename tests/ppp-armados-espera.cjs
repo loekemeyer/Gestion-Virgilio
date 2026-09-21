@@ -94,7 +94,17 @@ catch (_e) {
     out.esperaUltimo = out.ultimo === PGA_ESPERA_KEY;   // el estacionamiento va al final, no en el medio
     const h = _pgaCuerpoHtml(dias, {});
     out.diceNombre = h.indexOf(PGA_ESPERA_TXT) >= 0;
+    /* v20.67 — el chip se acorto a proposito en la v20.59: el texto largo ("sin fecha de entrega"
+       / "vacio · aca se mandan las tandas armadas sin fecha, con Cambiar de dia") medía 626 px y,
+       como toda la tabla va `nowrap`, UN renglon le fijaba el ancho a la columna del dia entera
+       (636 px contra los 165 que piden las filas de dia). Thomas: *"no puede quedar tanto espacio
+       en blanco entre Dia y m3, compacta la visual"*. El test ya NO exige ese texto: acepta las dos
+       redacciones —eso lo resolvio otra sesion en la v20.66— y ademas chequea que la explicacion no
+       se haya perdido, que es lo que el chip largo hacia y ahora vive en el `title` de la fila.
+       Las dos mitades hacen falta: sin la segunda, acortar el chip hasta dejarlo mudo pasa el test. */
     out.chip = /class="pga-esp">sin fecha( de entrega)?</.test(h);
+    out.chipExplica = /title="[^"]*sin fecha de entrega[^"]*"/.test(h)
+                   && /title="[^"]*no consume cupo[^"]*"/.test(h);
     out.clase = /class="pga-d[^"]* espera"/.test(h);
     out.noDiceHace = !/hace \d+ día/.test(h);   // no es un atraso: no lleva el chip de días
 
@@ -141,7 +151,8 @@ catch (_e) {
   ok(r.nDias === 2, "debería armar 2 días (uno real + el de espera) y armó " + r.nDias);
   ok(r.esperaUltimo, "el día de espera tiene que quedar ÚLTIMO y quedó «" + r.ultimo + "»");
   ok(r.diceNombre, "la tabla no muestra «⏸ Armados en espera»");
-  ok(r.chip, "falta el chip «sin fecha de entrega»: es lo que explica por qué ese día no es un día");
+  ok(r.chip, "falta el chip «sin fecha» en la fila del día de espera");
+  ok(r.chipExplica, "el chip se acortó pero la explicación no quedó en el title de la fila: ese día dejó de decir por qué no es un día");
   ok(r.clase, "la fila del día de espera no lleva la clase que la pinta distinto");
   ok(r.noDiceHace, "el día de espera se está marcando como atrasado");
   ok(r.abreTanda, "abrir el día de espera no muestra su tanda");
