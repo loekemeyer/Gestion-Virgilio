@@ -26495,3 +26495,60 @@ select * from public.gv_reglas_perdidas;                      -- vacía = todo b
 ```
 
 `sql/gv_destino_misiones_v2045.sql`, `tests/ppp-misiones.cjs`.
+
+---
+
+### §3.la — v20.46: el monto volvía «—» porque la RPC tardaba 11,8 s contra un timeout de 8 s — 2026-09-21
+
+**Síntoma (Luis, 21/09):** *"no veo montos ahora"*. En Cuarentena y en Clientes Nuevos la columna
+Monto mostraba `—` en **todas** las filas, en los dos módulos a la vez.
+
+**Qué se midió.** `explain (analyze)` de `gv_clientes_nuevos_valor_lote` con el lote real de 8
+pedidos: **Execution Time 11.864 ms**. El rol `authenticated` tiene `statement_timeout = 8 s`, así
+que PostgREST cortaba, el `catch` del front se comía el error y dejaba el guion. Desde el MCP no se
+reproducía: entra como `postgres`, que **no tiene** ese timeout.
+
+**Causa.** La v20.44 resolvía el reparto del importado escaso llamando a `gv_art_libre(art, empresa)`
+**una vez por cada (código, empresa)**, y cada llamada evaluaba entera la vista
+`gv_demanda_programada_pendiente` (que recorre la programación viva). Con 8 pedidos y ~17 ítems cada
+uno eran decenas de pasadas por la misma vista.
+
+**Cambio.** La demanda programada se calcula **una sola vez**, en un CTE `materialized`, y el libre
+sale de ahí:
+
+```sql
+_vl_prog as materialized (
+  select d.codn, d.emp, sum(d.cajas) as cajas
+    from public.gv_demanda_programada_pendiente d group by d.codn, d.emp
+),
+_vl_libre as (
+  select distinct it.codn, it.emp, it.art, it.empresa,
+         greatest(0, public.gv_art_disponible(it.art, it.empresa)
+                   - coalesce((select p.cajas from _vl_prog p
+                                where p.codn = it.codn and p.emp = it.emp), 0)) as libre
+    from _vl_it it where it.imp and it.art is not null
+),
+```
+
+`gv_art_libre` queda sin llamadores dentro de la RPC (se deja porque la usa el chequeo manual).
+
+**Medición, mismo lote de 8 pedidos con ítems reales:**
+
+| | Execution Time |
+|---|---|
+| v20.44 | 11.864 ms |
+| **v20.46** | **503 ms** |
+
+**El reparto no cambió** (era el punto): 5 pedidos de 10 cajas de **437E** de Chef con **14 libres**
+siguen dando **0 · 6 · 10 · 10 · 10** faltantes, con $656.409,60 descontados en el segundo — idéntico
+a lo medido en la v20.44.
+
+**La regla general, que ya mordió antes:** una función escalar dentro de un `select` por fila no
+cuesta lo que cuesta ella, cuesta lo que cuesta **por la cantidad de filas**. Si adentro hay una
+vista que recorre la operación entera, se saca a un CTE `materialized` y se junta con un join.
+
+⚠ **Y el corte por timeout no deja rastro**: un statement cortado **no** queda en
+`pg_stat_statements`, y del lado del front es un `catch` que pinta un guion. La única forma de verlo
+es medir la RPC con `explain (analyze)` y compararla contra los 8 s del rol `authenticated`.
+
+`sql/gv_valor_lote_una_sola_pasada_v2046.sql`.
