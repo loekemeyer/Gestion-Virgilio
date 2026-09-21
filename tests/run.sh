@@ -635,5 +635,5 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pipe-vinculo-en-el-cuadro (v20.79: el vinculo va dentro del cuadro de la decision, y antes que ella) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-vinculo-en-el-cuadro.cjs
 
-echo "== cuar-badge-nro-pedido (v20.80: el numero de pedido va dentro del badge de Cliente nuevo) =="
+echo "== cuar-badge-nro-pedido (v20.81: el numero de pedido va dentro del badge de Cliente nuevo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cuar-badge-nro-pedido.cjs

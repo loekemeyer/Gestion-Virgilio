@@ -1,4 +1,4 @@
-/* v20.80 — EL NUMERO DE PEDIDO VA DENTRO DEL BADGE DE «CLIENTE NUEVO».
+/* v20.81 — EL NUMERO DE PEDIDO VA DENTRO DEL BADGE DE «CLIENTE NUEVO».
 
    Luis lo pidio asi desde el principio: *"un badge que indica, ADEMAS de su condicion de ser
    clientes nuevos, el pedido por el que van (1er pedido, 2do pedido, 3er pedido)"*, y estaba

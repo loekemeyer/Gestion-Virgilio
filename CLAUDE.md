@@ -1582,6 +1582,19 @@ queda en `null` y se vuelve a pedir; con los pedidos cargados y sin retenidos, `
 **Al agregar un lote nuevo de este tipo, usar `clinVacio`.** Es el mismo pozo de §*"una lectura
 ROTA no es un CERO"*. Problema 474.
 
+### El número de pedido va DENTRO del badge de «Cliente nuevo» (v20.81, Luis)
+
+Fue el pedido textual desde el principio: *"un badge que indica, además de su condición de ser
+clientes nuevos, el pedido por el que van (1er pedido, 2do pedido, 3er pedido)"*. Estaba como
+badge aparte al lado de la NP — dos pastillas donde iba una. Ahora el badge dice
+**«🆕 Cliente nuevo · 2.º pedido»**.
+
+Es el **mismo badge** de A Programar, Clientes nuevos y Cuarentena, así que el dato aparece en
+las tres pantallas.
+
+⚠ `nuevo_pedidos` son los pedidos **FACTURADOS** de toda su historia: el que está en la pantalla
+es el **siguiente**, o sea +1. Sin el dato no se inventa un número.
+
 ### El VÍNCULO va dentro del cuadro de la decisión (v20.79, Luis)
 
 *"no figura la opcion de vincularlo con otras razones sociales u otros clientes"*, mirando el
