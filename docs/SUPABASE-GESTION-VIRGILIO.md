@@ -26019,3 +26019,49 @@ entraron nunca a la base.
 
 **Rollback:** `select cron.unschedule('gv-np-sucursal-snapshot'); drop view public.gv_np_sucursal_cobertura;
 drop function public.gv_np_sucursal_snapshot(); drop table public."GV_NP_Sucursal";`
+
+### §3.kr — v20.32: el centinela contaba el ajuste que descuenta y no el que lo revierte — 2026-09-21
+
+**Luis: *"mirá lo del D53A"***. La tanda figuraba en `gv_stock_tanda_pickeado_negativo` con el
+código 839 en rojo. **En el depósito no faltaba nada**: el descuadre ya lo había corregido alguien
+el 01/09. Problema **459**.
+
+**Qué pasó de verdad en D53A:**
+
+| cuándo | qué |
+|---|---|
+| 31/08 09:30–10:00 | se pickea la tanda: 28 códigos, 102 cajas. **El 839 no está** — no hay ni un PKC suyo |
+| 31/08 11:18 | entra un **ajuste de −2** en `separar_pedidos` con `ref = 'D53A'` |
+| 01/09 10:38 | lo corrigen a mano, con el motivo escrito en el propio `ref`: **+2**, *"Revierte ajuste D53A: se cargó −2 en separar_pedidos pero el picking D53A nunca se registró"*, y **−4 en terminado**, *"Operario dijo 6, había 4 y se llevaron todo"* |
+
+Saldo del 839 hoy: **0 en `separar_pedidos`, 2 en terminado**.
+
+**El bug:** la vista agrupaba filtrando `ref ~ '^[A-Z][0-9]{2}[A-Z]$'`, o sea el código de tanda
+**pelado**. El −2 lo tiene; el +2 que lo anula no, porque su `ref` es texto libre. **Contaba media
+pareja.**
+
+**Y fallaba en las dos direcciones.** Hay **47 movimientos en 8 tandas** con `ref` de texto libre
+que la vista ignoraba, entre ellos los ajustes negativos que dejaron a **D20E en −2** (366E,
+`FIX_STOCK_ZERO_366E_D20E`) y a **E10A en −1** (221, *"la caja se cargó 3 veces"*) — descuadres
+reales que no aparecían en ningún lado.
+
+**Efecto medido:** D53A sale (queda en 0), entran D20E y E10A. Los 8 códigos que el regex saca del
+texto libre son tandas reales: **0 falsos positivos**. El motivo nuevo *"el picking cierra: lo
+negativo lo dejó un ajuste manual"* los distingue del picking duplicado, que es otra cosa.
+
+**Probado de verdad, en transacción abortada:** un +2 de reversión con `ref` de texto libre saca a
+D20E del centinela, y un ajuste contra la tanda inventada `Z98Z` **no genera ninguna fila** — la
+validación contra `GV_Tandas_Codigos_Usados` hace su trabajo.
+
+⚠ **Rendimiento:** 128 ms. La primera versión cruzaba además contra los `ref` pelados de
+`Movimientos_Stock` para cubrir una tanda de menos de 10 minutos de vida; costaba **334 ms** por un
+caso que no existe, y se sacó.
+
+⚠ **Lo que sigue afuera a propósito:** los **143 ajustes** de `separar_pedidos` que no nombran
+ninguna tanda (suma −54). No hay dato para atribuirlos; ésos van por `gv_stock_negativos`.
+
+⚠ `reconciliar_pipeline_stock_etapa2()` (cron 68) **nombra la vista en un comentario, no la
+consulta**: el cambio no toca nada ejecutable.
+
+**Chequeo:** `select * from public.gv_stock_tanda_pickeado_negativo;` — al 21/09 quedan D20E (−2) y
+E10A (−1), los dos por ajuste manual. `sql/gv_stock_tanda_pickeado_negativo_v2032.sql`.
