@@ -27292,3 +27292,114 @@ values (date '2026-12-24', 'Nochebuena: no sale camion', 'Luis');
 ```
 
 `sql/gv_dia_sin_reparto_v2064.sql`, `tests/ppp-dia-sin-reparto.cjs`.
+
+### §3.lm — v20.65 · Pipeline de clientes nuevos: una pestaña propia para el camino entero — 2026-09-21
+
+**Pedido de Luis, textual:** *"Una persona/empresa se contacta con nosotros y nos dice que quiere
+ser cliente … Entra el pedido, entra en la PPP y queda con el flag de cliente nuevo … se le tiene
+que hacer un analisis crediticio … el analisis se le presenta a la direccion y define que se hace
+con el cliente"*.
+
+Hasta ahora el cliente nuevo tenía un submódulo con dos botones (aprobar / eliminar) y los dos
+Speech. Lo que faltaba era el **camino**: quién lo analizó, qué decidió la dirección, cuánto hace
+que está esperando y qué sigue. Eso es esta pestaña.
+
+```
+ingresado → [🔎 Análisis Cred.] abre Equifax y arranca el reloj
+  → analisis → la dirección define:
+      · Referenciado → cuenta como habitual, se le da crédito → Aprobar y programar
+      · Válido       → Speech 1 (paga por adelantado) → Speech 2 (24 h) → Pagó → Aprobar
+      · No válido    → se descarta el pedido
+```
+
+**Las cuatro definiciones que dio Luis el 21/09** (las otras siete las resolvió Claude con
+criterio y quedaron avisadas en el chat):
+
+| | |
+|---|---|
+| convivencia | pestaña nueva; **el submódulo viejo sigue siendo el principal** hasta verificar |
+| prioridad | el aprobado sale en 2 días hábiles y **se le funda camión** si en su zona no hay |
+| vencimiento | Speech 2 a **24 h** (no 48), y el pedido **no se cancela solo**: sale un badge |
+| vínculo | se guarda **en Gestión**, y aparte se le pide a LK que lo absorba |
+
+#### Lo único que puede salir mal callado es la convivencia
+
+Dos módulos sobre los mismos pedidos: si cada uno tiene su verdad, alguien aprueba de un lado y
+el otro lo sigue mostrando. Por eso el pipeline **no tiene camino propio para nada que ya
+existiera**:
+
+- aprobar llama a **`gv_cuarentena_liberar`**, la misma del submódulo viejo;
+- el Speech 1 sella **`GV_Clientes_Nuevos_Contacto`**, que es de donde el viejo saca su timer;
+- los eventos y comentarios van al **mismo log** (`GV_Cuarentena_Log`, prefijo `pipeline_`), así
+  Config. Cuarentena sigue siendo el único lugar donde se lee la historia de un pedido.
+
+Lo sostiene `tests/pipe-clientes-nuevos.cjs`, con el candado invertido: si alguien le escribe al
+pipeline su propio «aprobar», el test se pone en rojo (probado rompiéndolo).
+
+#### La etapa no se guarda: se deriva
+
+`GV_Cliente_Nuevo_Pipeline` guarda **hechos** (`analisis_at`, `decision`, `speech1_at`,
+`speech2_at`, `pagado_at`, `cerrado_at`) y `gv_clin_etapa` los lee. Una columna `etapa` escrita a
+mano se desincroniza el día que una escritura falla a la mitad, y después no se sabe cuál de las
+dos miente.
+
+#### El vínculo no tocó ninguna función viva
+
+`gv_cuarentena_marcar_calc` ya filtra **todos** los motivos con `gv_cuarentena_exento` —
+`cliente_nuevo` incluido —, así que alcanzó con que `gv_clin_vincular` inserte la excepción en
+`gv_excepcion_cuarentena`. Cero `CREATE OR REPLACE` sobre la marcación.
+
+**Probado sobre un cliente real** (LK 4281 Biaggio Valentin → LK 45 Distribuidora Cuyana),
+midiendo `gv_cuarentena_marcar_calc` en los tres momentos y revirtiendo todo en el mismo paso:
+
+| momento | motivos | filas |
+|---|---|---|
+| antes | `{cliente_nuevo}` | 1 |
+| **vinculado** | — | **0** ← deja de retener |
+| desvinculado | `{cliente_nuevo}` | 1 |
+
+⚠ **El vínculo NO destraba el pedido en curso, a propósito.** Cambia la antigüedad del cliente
+hacia adelante; el pedido que está en pantalla sigue su camino hasta que una persona lo apruebe.
+El pop-up aparece cuando ya se decidió Referenciado/Válido, así que destrabarlo ahí sería
+aprobarlo dos veces.
+
+⚠ **Y lo que queda pendiente del lado de LK:** `gv_clientes_nuevos_calc` cuenta la antigüedad con
+`customer_grupos` + `clientes_lk_ch_links`, que viven allá. Mientras el vínculo no llegue a esas
+tablas, LK va a seguir empujando al cliente en `GV_Clientes_Nuevos`; lo que lo mantiene fuera del
+retén es la excepción local.
+
+#### Tres cosas que salieron limpias del `CREATE` y explotaron al ejecutarse
+
+1. **`make_interval(hours => numeric)` no existe.** `PPP_Web_Config.valor` es numeric: los
+   coalesce de config van con `::int` o la función entera falla en la primera llamada.
+2. **`gv_excepcion_cuarentena.origen` tenía un CHECK** con sólo `super` y `manual`. Se le
+   **agregó** `vinculo` (las 25 filas que había siguen válidas; backup en
+   `zz_backups."GV_Backup_excepcion_cuarentena_20260921"`). Sin marca propia, desvincular
+   pisaría las excepciones que puso una persona a mano.
+3. **`array_length` de un array vacío es NULL, no 0**: sin el `coalesce`, sacarle el último
+   motivo a una excepción dejaba `activo` en null en vez de false.
+
+#### Lo que NO probó la prueba de `anon`
+
+Se intentó verificar el guard con `set local role anon` desde el MCP y **no prueba nada**:
+`gv_es_supervisor_o_servicio()` mira `session_user`, que no cambia con `set role` y desde el MCP
+sigue siendo `postgres`. El guard es **el mismo** que usa `gv_cuarentena_liberar` en producción,
+así que se hereda un mecanismo ya validado — pero conviene no volver a "probarlo" así.
+
+#### Config: los relojes y la URL de Equifax se cambian con un `update`
+
+```sql
+update public."PPP_Web_Config" set valor = 48 where clave = 'clin_speech_horas';
+update public."PPP_Web_Config" set valor_texto = '<url>' where clave = 'clin_equifax_url';
+-- si la URL trae {cuit}, se le pega el CUIT del cliente
+```
+
+**Chequeos:**
+
+```sql
+select * from public.gv_clin_vencidos;      -- lo que espera hace demasiado (el badge rojo)
+select * from public.gv_clin_prioritarios;  -- lo aprobado que tiene que salir en 2 días hábiles
+select * from public.gv_reglas_perdidas;    -- vacía = ninguna regla se perdió
+```
+
+`sql/gv_clin_pipeline_v2065.sql`, `tests/pipe-clientes-nuevos.cjs`.

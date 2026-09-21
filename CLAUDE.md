@@ -1430,6 +1430,93 @@ el cruce. Luis lo frenó el mismo día: *"la idea del remito no sirve… cruzás
 - **Chequeo:** `select estado_cadena, count(*) from public.gv_cuarentena_deuda_sucursal group by 1;`
   — `ok` es lo que llega a la dirección; `sin factura parseada` tiene que dar 0.
 
+## ⚠ REGLA (Luis, 2026-09-21, v20.65): el PIPELINE de clientes nuevos convive — y el VIEJO manda
+
+**Luis, textual:** *"De momento convive y el viejo sigue siendo el principal que se usa. Cuando
+verifiquemos que el nuevo va, cambiamos."*
+
+La pestaña **🧭 Pipeline clientes** del módulo PPP lleva al cliente nuevo por su camino entero:
+
+```
+ingresado → [🔎 Análisis Cred.] abre Equifax y arranca el reloj
+  → analisis → la dirección define:
+      · Referenciado → cuenta como habitual, se le da crédito → Aprobar y programar
+      · Válido       → Speech 1 (paga por adelantado) → Speech 2 (24 h) → Pagó → Aprobar
+      · No válido    → se descarta el pedido
+```
+
+### Qué es «Referenciado», con las palabras de Thomas (21/09)
+
+*"Clientes que no requerimos ni para el primer pedido, ni para el segundo, ni para el tercero,
+que paguen de manera anticipada. Por ejemplo, un cliente muy grande o un amigo de la empresa que
+es cliente nuevo. También pueden ser clientes referenciados los clientes que están comprando por
+una nueva razón social … Hirohiro es un cliente ya activo que compartía dueños con otra razón
+social de un cliente que ya era activo. Entonces no tiene tratamiento de cliente nuevo, sino que
+tiene tratamiento de cliente habitual."*
+
+⚠ **Por eso Referenciado exime al CLIENTE, no a este pedido.** `gv_clin_evento` escribe la
+excepción en `gv_excepcion_cuarentena` con `origen = 'referenciado'`, así el 2.º y el 3.º pedido
+tampoco caen. Medido el 21/09 sobre LK 4281: referenciado → **otro pedido distinto del mismo
+cliente también da 0 filas**; «↩ Reabrir» le saca la excepción y vuelve a retener.
+
+### Y qué paga el que NO es referenciado (Thomas, 21/09)
+
+*"Tiene que pagar la totalidad del pedido de manera anticipada antes de la programación. Tiene
+que pagar el pedido considerando el IVA y el descuento que ya se le otorgó, considerando todos
+los artículos nacionales y los importados que sabemos que tienen stock. Si no tiene stock del
+importado, que es algo que no puede recuperar, eso no se le factura, no se le pasa dentro del
+importe a pagar."*
+
+Es exactamente lo que ya calcula `gv_clientes_nuevos_valor_lote` desde la **v20.41**:
+`valor_con_iva` = neto × 1,21, el neto ya trae el 2 % web y el `dto_vol` del cliente, y los
+importados sin stock salen del monto (se muestran al lado como *"− $X import. en falta"* para
+que se vea de cuánto era el pedido entero). **No hay nada que cambiar ahí.**
+
+⚠⚠ **Lo único que puede salir mal callado es la convivencia.** Dos módulos sobre los mismos
+pedidos: si cada uno tiene su verdad, alguien aprueba de un lado y el otro lo sigue mostrando.
+Por eso el pipeline **no tiene camino propio para nada que ya existiera**, y esto no se toca:
+
+| | el pipeline usa… |
+|---|---|
+| aprobar | **`gv_cuarentena_liberar`**, la MISMA función del submódulo viejo |
+| el timer | sella **`GV_Clientes_Nuevos_Contacto`**, de donde el viejo saca el suyo |
+| el log | **`GV_Cuarentena_Log`** con prefijo `pipeline_` — Config. Cuarentena sigue siendo el único lugar donde se lee la historia de un pedido |
+
+Lo sostiene `tests/pipe-clientes-nuevos.cjs` con el **candado invertido**: si alguien le escribe
+al pipeline su propio «aprobar», el test se pone en rojo.
+
+**La etapa NO se guarda: se deriva** de los timestamps (`gv_clin_etapa`). Una columna `etapa`
+escrita a mano se desincroniza el día que una escritura falla a la mitad, y después nadie sabe
+cuál de las dos miente.
+
+**El vínculo NO tocó ninguna función viva**: `gv_cuarentena_marcar_calc` ya filtra todos los
+motivos con `gv_cuarentena_exento`, así que alcanza con que `gv_clin_vincular` inserte la
+excepción en `gv_excepcion_cuarentena`. Probado sobre LK 4281: retenido → vinculado (0 filas) →
+desvinculado (vuelve a retener), y revertido en el mismo paso.
+
+⚠ **El vínculo no destraba el pedido en curso, a propósito**: cambia la antigüedad del cliente
+hacia adelante. El pedido en pantalla sigue su camino hasta que una persona lo apruebe.
+
+⚠ **Y falta que LK lo absorba**: `gv_clientes_nuevos_calc` cuenta la antigüedad con
+`customer_grupos` + `clientes_lk_ch_links`, que viven allá. Mientras tanto LK lo sigue empujando
+en `GV_Clientes_Nuevos` y lo que lo mantiene afuera del retén es la excepción local.
+
+**Los relojes y la URL de Equifax se cambian con un `update`, no con un deploy:**
+
+```sql
+update public."PPP_Web_Config" set valor = 48 where clave = 'clin_speech_horas';
+update public."PPP_Web_Config" set valor_texto = '<url>' where clave = 'clin_equifax_url';
+```
+
+⚠ `PPP_Web_Config.valor` es **numeric** y `make_interval(hours => numeric)` **no existe**: los
+coalesce de esa config van con `::int` o la función explota en la primera llamada (el `CREATE`
+sale limpio).
+
+**Chequeo:** `select * from public.gv_clin_vencidos;` — lo que espera hace demasiado (es el badge
+rojo de la pestaña; el pedido **no se cancela solo**, Luis 21/09). Y
+`select * from public.gv_clin_prioritarios;` — lo aprobado que tiene que salir en 2 días hábiles,
+fundando camión si en su zona no hay. `sql/gv_clin_pipeline_v2065.sql`, §3.lm.
+
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
 
 Al revisar por qué llegaban los WhatsApps de *"SIN OC generada"* aparecieron 14 códigos —casi

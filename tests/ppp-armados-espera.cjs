@@ -94,7 +94,7 @@ catch (_e) {
     out.esperaUltimo = out.ultimo === PGA_ESPERA_KEY;   // el estacionamiento va al final, no en el medio
     const h = _pgaCuerpoHtml(dias, {});
     out.diceNombre = h.indexOf(PGA_ESPERA_TXT) >= 0;
-    out.chip = /class="pga-esp">sin fecha de entrega</.test(h);
+    out.chip = /class="pga-esp">sin fecha( de entrega)?</.test(h);
     out.clase = /class="pga-d[^"]* espera"/.test(h);
     out.noDiceHace = !/hace \d+ día/.test(h);   // no es un atraso: no lleva el chip de días
 

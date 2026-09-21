@@ -616,3 +616,6 @@ node tests/apr-codigo-reservado.cjs
 
 echo "== ppp-dia-sin-reparto (v20.64: el dia sin reparto no recibe programacion y se ve marcado) =="
 node tests/ppp-dia-sin-reparto.cjs
+
+echo "== pipe-clientes-nuevos (v20.65: el pipeline convive con el submodulo viejo sin tener verdad propia) =="
+node tests/pipe-clientes-nuevos.cjs

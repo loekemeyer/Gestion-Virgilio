@@ -5989,7 +5989,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.64"></script>
+<script type="module" src="recepcion.js?v=20.65"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9867,7 +9867,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.64";
+const APP_VERSION = "v20.65";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -41125,7 +41125,7 @@ function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
     b("ent",     "✅ Pedidos Entregados (" + n(cEnt) + ")") +
     b("ocup",    "📦 Ocupación") +
     b("modif",   "✏️ Modificar Pedidos") +          // v18.14 (Luis): entre Ocupación y Config. Cuarentena
-    b("clin",    "🧭 Pipeline clientes") +   // v20.63 (Luis): convive con el submódulo de A Programar
+    b("clin",    "🧭 Pipeline clientes") +   // v20.65 (Luis): convive con el submódulo de A Programar
     b("cuarcfg", "ð§ Config. Cuarentena") +
   '</div>';
 }
@@ -41179,7 +41179,7 @@ function pppRenderProg() {
   // v14.88 — Config. Cuarentena: pantalla propia (a la derecha de Ocupación) con los 4
   // botones de importación de reportes .xls + la última vez que se actualizó cada uno.
   // No depende de que se haya importado una PPP, así que se intercepta acá arriba.
-  // v20.63 (Luis) — 🧭 Pipeline de clientes nuevos. Pantalla propia, interceptada acá arriba
+  // v20.65 (Luis) — 🧭 Pipeline de clientes nuevos. Pantalla propia, interceptada acá arriba
   // por lo mismo que Config. Cuarentena: no depende de que se haya importado una PPP.
   if (_pppTab === "clin") {
     pppPaintTabs();
@@ -44478,7 +44478,7 @@ let _apr = {
   // v19.05 — CLIENTES NUEVOS: primer contacto (Speech 1) y teléfono del cliente
   cliContacto: null, cliContactoLoading: false,   // empresa:order_id → ISO del primer contacto
   cliWpp: null, cliWppLoading: false,              // empresa:cod → teléfono del cliente
-  // v20.63 (Luis) — PIPELINE DE CLIENTES NUEVOS (pestaña propia): estado por pedido
+  // v20.65 (Luis) — PIPELINE DE CLIENTES NUEVOS (pestaña propia): estado por pedido
   // (empresa:order_id → {etapa, reloj_desde, vencido, decision…}) y la config de sus timers.
   pipe: null, pipeLoading: false, pipeRetry: false,
   pipeCfg: null, pipeCfgLoading: false,
@@ -47265,8 +47265,10 @@ function pipeAccionesHtml(p) {
 
   if (et === "analisis")
     return B("pipe-b-ref", "pipeFirmaAbrir('" + emp + "','" + oid + "','referenciado','Marcar REFERENCIADO'," +
-             "'Pasa a contar como cliente habitual: se le da crédito y el pedido se programa con prioridad.')",
-             "🤝 Referenciado", "Cliente de confianza: cuenta como habitual y se le da crédito") +
+             "'Cliente que NO paga por adelantado en sus primeros pedidos: un cliente muy grande, un amigo de la " +
+             "empresa, o el que compra por una razon social nueva de un cliente ya activo. Exime al CLIENTE, " +
+             "no solo a este pedido (Thomas, 21/09), y el pedido se programa con prioridad.')",
+             "🤝 Referenciado", "Cuenta como habitual: no paga por adelantado, ni este pedido ni los próximos") +
            B("pipe-b-val", "pipeFirmaAbrir('" + emp + "','" + oid + "','valido','Marcar VÁLIDO'," +
              "'Se lo contacta para que pague por adelantado. El pedido no se programa hasta que pague.')",
              "✔ Válido", "Paga por adelantado antes de armarle el pedido") +
