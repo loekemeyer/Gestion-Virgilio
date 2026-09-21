@@ -1269,9 +1269,19 @@ del martes 22 a las 12:27 y **a las 12:45 el armador creó E12F para ese mismo d
 `gv_ppp_web_dia_camion`, que devuelve el primer día que ya tiene camión a esa zona y **a propósito
 no mira el día mínimo** (v15.48). Correr el piso no sirve: hay que decir que ese día no hay camión.
 
-**Al tocar el armado, los cuatro que eligen fecha** (los 11 pases de `gv_ppp_web_armar_pendientes`
+**Al tocar el armado, los CINCO que eligen fecha** (los 11 pases de `gv_ppp_web_armar_pendientes`
 no usan ningún otro): `gv_ppp_web_dia_camion`, `gv_ppp_web_proximo_dia_con_cupo`,
-`gv_ppp_web_dia_minimo` y `gv_web_retiro_pactado`. `ppp_web_armar_tandas` **no elige** —escribe la
+`gv_ppp_web_dia_minimo`, `gv_web_retiro_pactado` y —**el que se escapó, v20.83**—
+`gv_ppp_web_dia_cliente`.
+
+⚠ **El quinto no CALCULA el día: lo COPIA.** Por eso no aparece buscando `proximo_dia` ni
+`dia_camion`, y la v20.64 lo dejó afuera: el martes 22 se cerró a las **13:38:37** y la corrida
+del armador de las **14:30:13** igual creó `E12H` (LK 0193, Pezzali, Zona 3) para ese día, por
+los pases **(a1)** y **(a2)**, que son los únicos que eligen la fecha ahí. La forma de
+encontrarlos a todos no es grepear nombres: es mirar **quién le pasa una fecha a
+`ppp_web_armar_tandas`**.
+
+`ppp_web_armar_tandas` **no elige** —escribe la
 fecha que le pasó el llamador— y por eso no lleva el salto: se lo comería el día que el cliente
 pactó para su Retira.
 

@@ -27958,3 +27958,67 @@ se escriben con sus bytes UTF-8 escapados (`\xf0\x9f\x93\x85`), porque el archiv
 escribe en latin1 por el byte NUL que tiene adentro.
 
 `tests/ppp-sin-a-programar.cjs`.
+
+
+### §3.lv — v20.83 · El quinto que elige fecha, y el armado anulado que seguía mandando — 2026-09-21
+
+**Luis:** *"despues parti la D69H si no es ningun riesgo, queda programado para armado y entrega
+(martes no)"*. Partirla destapó dos cosas, y las dos son lo mismo: un dato viejo que sigue
+decidiendo.
+
+#### 1. La v20.64 tapó cuatro puertas y había cinco
+
+Medido: el martes 22 se cerró en `GV_Dias_Sin_Reparto` a las **13:38:37**, y la corrida del
+armador de las **14:30:13** igual creó **`E12H` (LK 0193, Distribuidora Pezzali, Zona 3)** para
+ese día. No era un resto: la fila se creó después del cierre.
+
+La puerta es **`gv_ppp_web_dia_cliente`**, que usan los pases **(a1)** y **(a2)** de
+`gv_ppp_web_armar_pendientes`. Los cuatro de la v20.64 **calculan** el día; éste **no calcula:
+copia** el día que el cliente ya tiene programado. Por eso no aparecía buscando `proximo_dia` ni
+`dia_camion`.
+
+> **La forma de encontrarlos a todos no es grepear nombres: es mirar quién le pasa una fecha a
+> `ppp_web_armar_tandas`.**
+
+El arreglo es una línea al final de la función, sobre el `min()`:
+
+```sql
+  ) d
+  where public.gv_es_dia_con_reparto(dia);   -- v20.83
+```
+
+Verificado: `gv_ppp_web_dia_cliente('lk','888', …)` devolvía `2026-09-22` y ahora devuelve
+`null`.
+
+#### 2. Un armado ANULADO seguía diciendo "esta tanda tiene el trabajo hecho"
+
+`gv_np_mover_guard` frenaba la partición de D69H con el cartel *"avisá a sistemas"* — y la pila
+de esa tanda está en **cero**. La razón: `gv_tanda_trabajo_hecho` daba `tiene_armado = true` por
+la **sola existencia** de una fila en `Entregas_Virgilio`. Los eventos `AP`/`TAP` anulados ya no
+contaban (se renombran a `APX`/`TAPX`), pero la fila de Entregas quedaba para siempre.
+
+La fila de D69H (id 13028) es de **LK 0058**, un pedido que ya no está en la tanda, y su `TAP` se
+anuló en la v20.70. O sea: la misma causa raíz del §3.lp, del otro lado.
+
+⚠ **El criterio es la FECHA, no un interruptor.** La fila cuenta si es **posterior** a la última
+anulación del armado de esa tanda; si mañana se vuelve a armar, la fila nueva es posterior y
+vuelve a contar sola. Medido sobre las tandas con filas de Entregas: **cambia UNA**, D69H, que es
+justo la que se anuló.
+
+#### 3. Lo que se movió
+
+Backup en `zz_backups."GV_Backup_PPPWebProg_D69H_E12H_20260921"` (3 filas).
+
+| tanda | NP | cliente | zona / camión | antes | ahora |
+|---|---|---|---|---|---|
+| **E12H** | LK 0193 | Distribuidora Pezzali | Zona 3 · CABA Oeste | mar 22 | **mié 23** |
+| **E70A** | LK 0070 | Distribuidora Valimar | Zona 6 · GBA Norte | D69H | **tanda nueva, mié 23** |
+| **D69H** | LK 0083 | Lin Chuang Shun Chu | Zona 2 · CABA Centro | D69H | **queda, mié 23** |
+
+**Ningún movimiento de stock**: las dos tandas tenían la pila en cero. Los seis centinelas en 0
+después (`gv_ppp_tanda_camion_mezclado`, `gv_ppp_tanda_dos_dias`, `gv_ppp_cliente_dos_dias`,
+`gv_ppp_super_mezclado`, `gv_tanda_armada_sin_armado`, `gv_dia_sin_reparto_ocupado`), y el martes
+22 queda **sólo con los cuatro Retira** que ya estaban programados, que salen igual porque los
+viene a buscar el cliente.
+
+`sql/gv_dia_sin_reparto_quinta_puerta_v2083.sql`, `tests/ppp-dia-sin-reparto.cjs`.

@@ -88,5 +88,25 @@ if (!/\.pga-d\.sinrep>td\{/.test(html)) fallos.push("falta el CSS del dia sin re
 if (!/class="pga-sinrep"/.test(html)) fallos.push("falta el chip 'sin reparto' en la fila del dia");
 if (!/sinRep !== null \? ' sinrep' : ''/.test(html)) fallos.push("la fila del dia no recibe la clase sinrep");
 
+// 9) v20.83 — EL QUINTO QUE ELIGE FECHA. La v20.64 tapo los cuatro que CALCULAN el dia y dejo
+//    afuera gv_ppp_web_dia_cliente, que no calcula: COPIA el dia que el cliente ya tiene. Con el
+//    martes 22 cerrado a las 13:38, el armador de las 14:30 igual creo E12H (LK 0193, Pezzali)
+//    para ese dia, por los pases (a1) y (a2), que son los unicos que eligen la fecha por ahi.
+const f79 = path.join(root, "sql", "gv_dia_sin_reparto_quinta_puerta_v2083.sql");
+if (!fs.existsSync(f79)) fallos.push("FALTA " + f79);
+else {
+  const q = fs.readFileSync(f79, "utf8");
+  const qv = q.split("\n").map((l) => l.replace(/--.*$/, "")).join("\n");
+  const dc = (qv.match(/create or replace function public\.gv_ppp_web_dia_cliente[\s\S]*?\$function\$;/i) || [""])[0];
+  if (!dc) fallos.push("falta gv_ppp_web_dia_cliente en el archivo de la v20.83");
+  else if (!/gv_es_dia_con_reparto/.test(dc))
+    fallos.push("gv_ppp_web_dia_cliente volvio a copiar el dia sin mirar si sale el camion (el quinto que elige fecha)");
+  // y el armado anulado: la fila de Entregas cuenta solo si es POSTERIOR a la anulacion
+  const tth = (qv.match(/create or replace function public\.gv_tanda_trabajo_hecho[\s\S]*?\$function\$;/i) || [""])[0];
+  if (!tth) fallos.push("falta gv_tanda_trabajo_hecho en el archivo de la v20.83");
+  else if (!/GV_Tanda_Anulada/.test(tth) || !/anulado_en/.test(tth))
+    fallos.push("un armado ANULADO vuelve a contar como armado: el guard frena una tanda con la pila en cero");
+}
+
 if (fallos.length) { console.error("FALLAS:\n - " + fallos.join("\n - ")); process.exit(1); }
-console.log("OK ppp-dia-sin-reparto: el dia cerrado no recibe reparto y se ve marcado");
+console.log("OK ppp-dia-sin-reparto: el dia cerrado no recibe reparto (los CINCO que eligen fecha) y se ve marcado");
