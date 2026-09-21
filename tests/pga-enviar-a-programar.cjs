@@ -160,7 +160,13 @@ catch (_e) {
       direccion: "x", m3: 1.2, m3_parcial: false, lineas: 2, cajas: 3, np_total: 1,
       bloques: [{ np_idx: 1, items: [] }],
       tanda_previa: "E01A", ya_pickeada: true, ya_armada: true };
-    _apr.pedidos = [ped]; _apr.pedidosTodos = [ped];
+    // v20.71 — el chip rojo lo saca AHORA el estado VIVO de la tanda (v20.56), no los flags
+    // ya_pickeada/ya_armada, que son la foto de cuando se sacó el pedido. Van dos pedidos:
+    // el de arriba, cuya tanda sigue sin empezar (vuelve a ESA tanda, chequeo (f)), y éste,
+    // cuya tanda ya se armó sin él (va a tanda nueva, chequeo (e)).
+    const pedArmada = Object.assign({}, ped, { order_id: 1402, tanda_previa: "E01A",
+      tanda_estado: "armada", razon_social: "Ricci Gabriel 2" });
+    _apr.pedidos = [ped, pedArmada]; _apr.pedidosTodos = [ped, pedArmada];
     _pppTab = "prog";
     aprRender(); await new Promise((res) => setTimeout(res, 250));
     const chip = document.getElementById("pppPreview").querySelector(".apr-chip-hecho");
@@ -199,7 +205,7 @@ catch (_e) {
   if (r._botones) console.log("     (botones en la fila: " + JSON.stringify(r._botones) + ")");
   t(r.unSoloBoton, "(g) en la fila quedan los tres botones sanos: 📅 Cambiar de día, ↩ Enviar a programar y ✕ Cancelar pedido — " + JSON.stringify(r._botones));
   t(r.yaHecho, "(e) el pedido web retenido cuenta como «ya hecho»");
-  t(/ya pickeada y armada · E01A/.test(r.chip), "(e) y sale con su chip rojo en A Programar — " + JSON.stringify(r.chip));
+  t(/E01A ya est. armada · va a tanda nueva/.test(r.chip), "(e) y sale con su chip rojo en A Programar — " + JSON.stringify(r.chip));
   t(/gv_ppp_web_tanda_reusar/.test(r.rpcProg) && !/gv_ppp_web_tanda_nueva/.test(r.rpcProg),
     "(f) programarlo lo devuelve a SU tanda, sin crear una nueva — " + r.rpcProg);
   t(/"p_order_id":1401/.test(r.argProg) && /"p_fecha":"2026-09-22"/.test(r.argProg),
