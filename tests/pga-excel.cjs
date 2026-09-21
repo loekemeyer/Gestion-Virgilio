@@ -169,9 +169,9 @@ catch (_e) {
       "(cols → sheetData → autoFilter → mergeCells)");
   chk(r.grupos.filter((x) => x).join("|") === "ENTREGA|TANDA|PEDIDO|DESTINO|TOTALES|ESTADO",
       "DOBLE fila de encabezados: arriba los grupos, " + JSON.stringify(r.grupos.filter((x) => x)));
-  chk(r.merges.some((m) => /^A1:/.test(m)) && r.merges.some((m) => /^E3:H3$/.test(m)),
+  chk(r.merges.some((m) => /^A1:/.test(m)) && r.merges.some((m) => /^E3:I3$/.test(m)),
       "con las celdas de grupo combinadas: " + JSON.stringify(r.merges.slice(0, 4)));
-  chk(r.congelar === 4 && r.filtro === "A4:Q4",
+  chk(r.congelar === 4 && r.filtro === "A4:R4",
       "panel inmovilizado bajo el encabezado y autofiltro en la fila de columnas: " +
       r.congelar + " / " + r.filtro);
   chk(r.cols.length === r.enc.length && r.cols.every((w) => w >= 6 && w <= 42),
@@ -194,6 +194,9 @@ catch (_e) {
   chk(!!f58 && cel(f58, "Estado").v === "Facturado", "y el estado en castellano");
   chk(!!f58 && cel(f58, "Fecha").n === true && cel(f58, "Fecha").v === 46280,
       "la fecha es una FECHA de verdad (serial de Excel), no texto: " + cel(f58 || [], "Fecha").v);
+  // v20.59 (Thomas): la fecha de la nota de pedido, también como fecha
+  chk(!!f58 && cel(f58, "F. pedido").n === true && cel(f58, "F. pedido").v === 46276,
+      "y la fecha del pedido va en su columna: " + cel(f58 || [], "F. pedido").v);
   chk(!!f58 && cel(f58, "m³").n === true && cel(f58, "m³").v === 1.2,
       "los m³ son número, no texto: " + JSON.stringify(cel(f58 || [], "m³").v));
   chk(!!f58 && cel(f58, "Monto $ (lista)").n === true && cel(f58, "Monto $ (lista)").v === 1234567,
@@ -209,8 +212,8 @@ catch (_e) {
   chk(r.filas.filter((f) => cel(f, "Provincia destino").v).length === 1,
       "sin provincia resuelta la celda queda vacía — no se inventa");
 
-  chk(r.total[0] === "TOTAL" && r.total[12] === 6.35 && r.total[13] === 4350567,
-      "la hoja cierra con su total de m³ y de plata: " + JSON.stringify([r.total[12], r.total[13]]));
+  chk(r.total[0] === "TOTAL" && r.total[13] === 6.35 && r.total[14] === 4350567,
+      "la hoja cierra con su total de m³ y de plata: " + JSON.stringify([r.total[13], r.total[14]]));
   const tTot = r.tandas[r.tandas.length - 1].map((c) => (c ? c.v : ""));
   chk(r.tandas.length === 5 && tTot[0] === "TOTAL" && tTot[6] === 4350567,
       "la hoja Tandas trae una fila por tanda (3) y su total: " + JSON.stringify(tTot));

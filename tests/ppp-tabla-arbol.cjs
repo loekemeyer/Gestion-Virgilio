@@ -113,6 +113,17 @@ catch (_e) {
     out.esperaUltima = /Armados en espera/.test(([...prev.querySelectorAll("tr.pga-d")].pop() || {}).textContent || "");
     out.hoy = !!prev.querySelector("tr.pga-d.hoy");
     out.sinTandasCerrado = prev.querySelectorAll("tr.pga-t").length === 0;
+    /* v20.59 (Thomas): *"no puede quedar tanto espacio en blanco entre Día y m³, compactá la
+       visual, que si se expande para ver las tandas y las NPs se vaya expandiendo también"*.
+       Se mide la tabla CERRADA acá y ABIERTA más abajo: tiene que medir lo que mide su contenido
+       —no el ancho del contenedor— y crecer al abrir. */
+    const _mid = function () {
+      const tb = prev.querySelector("table.pga");
+      return tb ? { tabla: Math.round(tb.getBoundingClientRect().width),
+                    cont: Math.round((tb.parentElement || tb).getBoundingClientRect().width),
+                    col1: Math.round(tb.querySelector("thead th").getBoundingClientRect().width) } : null;
+    };
+    out.midCerrada = _mid();
 
     // (3) los 4 porcentajes del día, en números y con su color
     const mar = [...prev.querySelectorAll("tr.pga-d")].find((tr) => /15\/09/.test(tr.textContent));
@@ -196,6 +207,7 @@ catch (_e) {
     out.cacheItems = pedidos.length === antes;
 
     // (7) el total de abajo suma todos los días
+    out.midAbierta = _mid();
     out.total = filaDe("table.pga > tfoot > tr")[0];
 
     // (8) volver al tablero de 6 días y a la tabla
@@ -259,6 +271,15 @@ catch (_e) {
   t(_p.dia > 0 && _p.dia === _p.tanda && _p.tanda === _p.np,
     "(9) y los tres arrancan en la MISMA posición: no se abre hacia adentro — " + JSON.stringify(_p));
   t(r.zoom === "1", "(9) pppFitPantalla no achica esta vista (antes caía a 0,70) — zoom " + r.zoom);
+  // (10) v20.59 — la tabla mide lo que mide su contenido, y crece al abrirla
+  const _mc = r.midCerrada || {}, _ma = r.midAbierta || {};
+  t(_mc.tabla > 0 && _mc.tabla <= _mc.cont + 1,
+    "(10) cerrada, la tabla NO se estira al contenedor — " + _mc.tabla + " px");
+  t(_mc.col1 > 0 && _mc.col1 / _mc.tabla < 0.45,
+    "(10) y la columna del día no se come el ancho: " + Math.round(100 * _mc.col1 / _mc.tabla) +
+    " % de la tabla (antes 58 %)");
+  t(_ma.tabla > _mc.tabla,
+    "(10) al abrir día y tanda la tabla CRECE con el contenido — " + _mc.tabla + " → " + _ma.tabla + " px");
   t(eq(r.total.slice(0, 4), ["Total", "11,3", "5", "8"]), "(7) el total suma todos los días — " + JSON.stringify(r.total.slice(0, 4)));
   t(r.tablero, "(8) se puede volver al tablero de 6 días");
   t(r.vuelve, "(8) y volver a la tabla");

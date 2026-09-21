@@ -3378,7 +3378,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    Mismas cuatro columnas de cabecera que la PPP del operario (Día · m³ · Tandas · NPs) más los
    cuatro porcentajes de avance, y todo se abre hacia adentro en la misma tabla: no hay que salir
    de la pantalla para ver una tanda ni una NP. */
-.pga-wrap{ margin-top:12px; border:1px solid #e2e8f0; border-radius:14px; background:#fff; overflow:auto; }
+/* v20.59: el marco sigue a la tabla. Con la tabla en `width:auto` y el marco al 100 %, la
+   tarjeta quedaba medio vacía a la derecha — el mismo espacio muerto, corrido de lugar. El
+   `max-width` deja intacto el scroll horizontal de siempre cuando la tabla no entra. */
+.pga-wrap{ margin-top:12px; border:1px solid #e2e8f0; border-radius:14px; background:#fff; overflow:auto;
+  width:fit-content; max-width:100%; }
 
 /* ── Pedidos atrasados (v18.78, Luis) ──────────────────────────────────────────
    Submódulo propio arriba de la programación. Va en rojo y arriba de todo porque
@@ -3415,7 +3419,14 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    mantenga el tamaño al expandirse (que no se abra para adentro, sino en horizontal con todas las
    filas manteniendo el tamaño)"*. Ahora los tres niveles miden lo mismo y la jerarquía la marcan
    el color y la barra de la izquierda, no el tamaño. */
-.pga{ width:100%; border-collapse:collapse; font-size:16px; color:#0f172a; }
+/* v20.59 (Thomas): *"no puede quedar tanto espacio en blanco entre Día y m³, compactá la
+   visual, que si se expande para ver las tandas y las NPs dentro de la tanda se vaya expandiendo
+   también"*. La tabla ya NO se estira al ancho del contenedor: mide lo que miden sus columnas.
+   Cerrada, la primera columna sólo tiene «▸ Lunes 21/09» y la tabla entra en ~820 px en vez de
+   1.474; al abrir un día o una tanda, el contenido de esa columna crece y la tabla crece con él.
+   Es exactamente el mismo mecanismo de siempre (`width:1%` en todas), sacándole el `100%` a la
+   primera — que era lo que le regalaba TODO el sobrante aunque no lo necesitara. */
+.pga{ width:auto; border-collapse:collapse; font-size:16px; color:#0f172a; }
 .pga th{ position:sticky; top:0; z-index:2; background:#f8fafc; text-align:right; font-size:11.5px; font-weight:800;
   letter-spacing:.04em; text-transform:uppercase; color:#64748b; padding:9px 10px; border-bottom:2px solid #cbd5e1; white-space:nowrap; }
 .pga td{ text-align:right; padding:8px 10px; border-bottom:1px solid #eef2f7; white-space:nowrap; font-variant-numeric:tabular-nums; }
@@ -3424,14 +3435,17 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    todo el ancho que sobra, que es la que tiene la info que se lee.
    ⚠ La v17.76 las había puesto PRIMERAS; la v17.79 las mandó a la DERECHA (Luis: "mandalos a la
    derecha"). Este comentario decía lo viejo hasta la v17.81. */
-/* El truco para que se encojan: TODAS las columnas a `width:1%`, y la 1ª a `width:100%` — así el
-   reparto del ancho sobrante se lo lleva entera la columna de la info (día / tanda / NP). */
-.pga th, .pga td{ width:1%; }
+/* ⚠ Hasta la v20.59 acá iba `width:1%` en todas y `100%` en la 1ª, para que el ancho sobrante se
+   lo llevara entera la columna de la info. Con la tabla en `width:auto` **no hay sobrante**: cada
+   columna mide lo que mide su contenido (que va `nowrap`), así que el `1%` dejó de hacer falta —
+   y de hecho estiraba la tabla al contenedor aunque el contenido pidiera la mitad (medido:
+   873 px de contenido dentro de una tabla de 1.474). */
+.pga th, .pga td{ width:auto; }
 /* v17.95: los números dejan de apiñarse contra el borde. La columna del día se llevaba ~740 px
    casi vacíos y las 7 columnas de datos se amontonaban en 360; con más aire el ancho se reparte. */
 .pga th:nth-child(n+2), .pga td:nth-child(n+2){ padding-left:16px; padding-right:16px; }
 .pga th:nth-child(n+5), .pga td:nth-child(n+5){ text-align:right; }
-.pga th:first-child, .pga td:first-child{ text-align:left; width:100%; }
+.pga th:first-child, .pga td:first-child{ text-align:left; width:auto; }
 .pga-h{ text-align:right !important; line-height:1.15; padding-top:7px !important; padding-bottom:7px !important;
   border-top:3px solid transparent; letter-spacing:.02em; }
 .pga-h.sal{ border-top-color:#7c3aed; color:#6d28d9; }   /* v20.10: SALIÓ — violeta, para que no se confunda con los 4 estados */
@@ -5861,7 +5875,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.58"></script>
+<script type="module" src="recepcion.js?v=20.59"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9739,7 +9753,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.58";
+const APP_VERSION = "v20.59";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38629,12 +38643,15 @@ function _pgaCuerpoHtml(dias, opts) {
     h += '<tr class="pga-d' + (ab ? ' on' : '') + (d.key === hoy ? ' hoy' : '') + (esp ? ' espera' : '') +
         (d.mis ? ' mis' : '') +
         '" onclick="pgaAbrirDia(\'' + d.key + '\')"' +
-        (esp ? ' title="Armado y parado a propósito, sin fecha de entrega: no consume cupo, no va en ningún camión y no cuenta como atrasado. Para sacarlo de acá, «📅 Cambiar de día» en la tanda."' : '') + '>' +
+        (esp ? ' title="Armado y parado a propósito, sin fecha de entrega: no consume cupo, no va en ningún camión y no cuenta como atrasado. Acá se mandan las tandas armadas sin fecha; para sacar una de acá, «📅 Cambiar de día» en la tanda."' : '') + '>' +
       '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + _pgaDiaHtml(d.key) +
         (d.mis ? '<span class="pga-mis" title="Este día lleva un pedido a una provincia marcada. El camión va al expreso en CABA, pero la mercadería termina en otra provincia: mirar que salga con el expreso que corresponde.">⚠ ' +
           escapeHtml(_pgaMisTxt(d.mis, d.misProv)) + '</span>' : '') +
-        (esp ? '<span class="pga-esp">' + (d.nps ? 'sin fecha de entrega'
-                 : 'vacío · acá se mandan las tandas armadas sin fecha, con 📅 Cambiar de día') + '</span>' : '') +
+        /* ⚠ v20.59: acá había un texto de 626 px ("vacío · acá se mandan las tandas armadas sin
+           fecha, con 📅 Cambiar de día"). Como toda la tabla va `nowrap`, ESE renglón —uno— le
+           fijaba el ancho a la columna del día ENTERA: 636 px cuando las filas de día piden 165.
+           La explicación vive en el `title` de la fila; acá va el chip corto. */
+        (esp ? '<span class="pga-esp">' + (d.nps ? 'sin fecha' : 'vacío') + '</span>' : '') +
         (esAtraso ? '<span class="patr-dias' + (atr >= 7 ? ' grave' : '') + '">hace ' + atr + ' día' + (atr === 1 ? '' : 's') + '</span>' : '') + '</td>' +
       '<td>' + _pppFmtM3(d.m3) + '</td><td>' + d.tandasArr.length + '</td><td>' + d.nps + '</td>' +
       _pgaPctFila(d.est, d.nps, d.salio, d.estSal) + '</tr>';
@@ -39300,6 +39317,13 @@ function _pgaValorDia(d) {
 }
 /* En la hoja el monto va SIN el signo (está en el encabezado) y sin centavos: son 11 caracteres
    contra 13, y en una columna que se repite en 150 renglones eso es ancho de papel. */
+/* v20.59 (Thomas: *"sumale fecha de nota de pedido"*). Va con el AÑO —`dd/mm/aa`— aunque en
+   pantalla sea `dd/mm`: la hoja se archiva y una fecha sin año deja de poder ubicarse. */
+function _pgpFechaPedido(f) {
+  const t = String(f || "");
+  if (t.length < 10) return "";
+  return t.slice(8, 10) + "/" + t.slice(5, 7) + "/" + t.slice(2, 4);
+}
 function _pgpMonto(n) {
   if (n == null) return "—";
   return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -39320,21 +39344,26 @@ function pgaImprimirHtml(dias) {
   }
   /* Una sola pasada arma las filas de todos los días y va juntando el texto para medir: los anchos
      tienen que ser LOS MISMOS en los 5 días, si no las columnas no alinean de hoja en hoja. */
-  const mNp = [{ t: "Total del día" }], mCli = [], mLug = [], mM3 = [], mVal = [], mEst = [];
+  const mNp = [], mPed = [], mCli = [], mLug = [], mM3 = [], mVal = [], mEst = [];
   const porDia = [];
   for (const d of dias) {
     const fil = [];
     for (const t of d.tandasArr) {
       const te = _pgaEstadoGrupo(t.est, t.nps), z = _pgaZonaTanda(t);
-      const estTxt = t.nps + " NP · " + PGA_EST_TXT[te];
+      /* v20.59: el «N NP» de la tanda vivía en la columna ESTADO y era su texto más largo
+         ("7 NP · En proceso"), o sea que le fijaba el ancho a las 150 filas. Va con el código de
+         la tanda, que es de quien habla, y ESTADO queda del ancho de la palabra sola: 206 → 131 px.
+         ⚠ El del DÍA se queda en ESTADO ("35 NP" es corto): pegado a «Total del día» estiraba la
+         primera columna de 150 a 201. */
+      const tandaTxt = t.tanda + " · " + t.nps + " NP";
       const vt = _pgaValorTanda(t), vtTxt = _pgpMonto(vt ? vt.valor : null) + (vt && vt.sinPrecio ? " *" : "");
-      mNp.push({ t: t.tanda }); mLug.push({ t: z }); mM3.push({ t: _pppFmtM3(t.m3) });
-      mVal.push({ t: vtTxt }); mEst.push({ t: estTxt });
-      fil.push('<tr class="pgp-t"><td>' + escapeHtml(t.tanda) + '</td><td></td>' +
+      mNp.push({ t: tandaTxt }); mLug.push({ t: z }); mM3.push({ t: _pppFmtM3(t.m3) });
+      mVal.push({ t: vtTxt }); mEst.push({ t: PGA_EST_TXT[te] });
+      fil.push('<tr class="pgp-t"><td>' + escapeHtml(tandaTxt) + '</td><td></td><td></td>' +
         '<td>' + escapeHtml(z) + '</td>' +
         '<td class="n">' + _pppFmtM3(t.m3) + '</td>' +
         '<td class="n">' + escapeHtml(vtTxt) + '</td>' +
-        '<td class="c">' + escapeHtml(estTxt) + '</td></tr>');
+        '<td class="c">' + escapeHtml(PGA_EST_TXT[te]) + '</td></tr>');
       for (const r of t.filas) {
         const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
         /* La zona ya la dice el renglón de la tanda: si la NP está en esa misma zona sólo va el
@@ -39346,12 +39375,14 @@ function pgaImprimirHtml(dias) {
         const cod = r.cod ? "(" + String(r.empresa || "LK").toUpperCase() + " " + r.cod + ")" : "";
         const hor = r.pide_horario ? aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja }) : "";
         const vn = _pgaValorNp(r.np), vnTxt = _pgpMonto(vn ? vn.valor : null) + (vn && vn.sinPrecio ? " *" : "");
-        mNp.push({ t: String(r.np) });
+        const fped = _pgpFechaPedido(r.fecha_pedido);
+        mNp.push({ t: String(r.np) }); mPed.push({ t: fped });
         mCli.push({ p: [[r.razon_social || "—", 1], [cod ? " " + cod : "", PGP_COD_EM]] });
         mLug.push({ t: lug });
         mM3.push({ t: _pppFmtM3(r.m3) }); mVal.push({ t: vnTxt }); mEst.push({ t: PGA_EST_TXT[est] });
         if (hor) mCli.push({ t: "⏱ " + hor, em: 0.82 });
         fil.push('<tr class="pgp-np"><td><b>' + escapeHtml(String(r.np)) + '</b></td>' +
+          '<td class="c">' + escapeHtml(fped) + '</td>' +
           '<td class="pgp-cli">' + escapeHtml(r.razon_social || "—") +
             (cod ? ' <span class="pgp-cod">' + escapeHtml(cod) + '</span>' : '') +
             (hor ? '<span class="pgp-hor">⏱ ' + escapeHtml(hor) + '</span>' : '') + '</td>' +
@@ -39362,24 +39393,30 @@ function pgaImprimirHtml(dias) {
       }
     }
     const vd = _pgaValorDia(d), vdTxt = _pgpMonto(vd ? vd.valor : null) + (vd && vd.sinPrecio ? " *" : "");
-    fil.push('<tr class="pgp-tot"><td>Total del día</td><td></td><td></td>' +
+    fil.push('<tr class="pgp-tot"><td>Total del día</td><td></td><td></td><td></td>' +
       '<td class="n">' + _pppFmtM3(d.m3) + '</td>' +
       '<td class="n">' + escapeHtml(vdTxt) + '</td>' +
       '<td class="c">' + d.nps + ' NP</td></tr>');
     porDia.push(fil.join(""));
+    mNp.push({ t: "Total del día" });
     mM3.push({ t: _pppFmtM3(d.m3) }); mVal.push({ t: vdTxt }); mEst.push({ t: d.nps + " NP" });
   }
   const lay = _pgpLayout([
     { head: "Tanda / NP", textos: mNp },
+    { head: "F. pedido", textos: mPed },
     { head: "Cliente (cód)", textos: mCli, flex: true, pct: 0.75 },
-    { head: "Zona · barrio", textos: mLug, pct: 0.92 },
+    /* ⚠ `Zona · barrio` va al p75 (Thomas: *"no puede haber tanto espacio entre zona/barrio y
+       m³"*): la estiraban 3 barrios largos («Arribeños 2979 - Nuñez») contra 150 cortos
+       («Flores», «Moron»). Con p75 esos tres parten en dos renglones —la celda ya tiene
+       `white-space:normal`— y la columna queda del ancho de lo que se lee siempre. */
+    { head: "Zona · barrio", textos: mLug, pct: 0.75 },
     { head: "m³", textos: mM3 },
     { head: "Monto $", textos: mVal },
     { head: "Estado", textos: mEst, padEm: 0.5 }   // la píldora `.pgp-est` tiene padding propio
   ]);
   const cg = '<colgroup>' + lay.anchos.map(function (x) { return '<col style="width:' + x + 'px">'; }).join("") + '</colgroup>';
-  const th = '<thead><tr><th>Tanda / NP</th><th>Cliente (cód)</th><th>Zona · barrio</th>' +
-    '<th>m³</th><th>Monto $</th><th>Estado</th></tr></thead>';
+  const th = '<thead><tr><th>Tanda / NP</th><th>F. pedido</th><th>Cliente (cód)</th>' +
+    '<th>Zona · barrio</th><th>m³</th><th>Monto $</th><th>Estado</th></tr></thead>';
   const estilo = ' style="font-size:' + lay.pt + 'pt;width:' + lay.total + 'px"';
   /* El `@page` de la hoja se escribe acá, no en el CSS fijo: la orientación la decide la medición.
      Un `<style>` aplica al documento entero aunque su contenedor esté en `display:none`. */
@@ -39590,13 +39627,13 @@ function _pgxAnchos(filas, desde, min) {
 }
 
 /* Los grupos de la primera fila de encabezados: [título, cuántas columnas ocupa]. */
-const PGX_GRUPOS = [["ENTREGA", 2], ["TANDA", 2], ["PEDIDO", 4], ["DESTINO", 4],
+const PGX_GRUPOS = [["ENTREGA", 2], ["TANDA", 2], ["PEDIDO", 5], ["DESTINO", 4],
                     ["TOTALES", 3], ["ESTADO", 2]];
-const PGX_COLS = ["Fecha", "Día", "Tanda", "Zona de la tanda", "NP", "Cliente", "Emp",
-  "Cód cliente", "Zona · barrio", "Provincia destino", "Expreso", "Horario",
+const PGX_COLS = ["Fecha", "Día", "Tanda", "Zona de la tanda", "NP", "F. pedido", "Cliente",
+  "Emp", "Cód cliente", "Zona · barrio", "Provincia destino", "Expreso", "Horario",
   "m³", "Monto $ (lista)", "Art. s/precio", "Estado", "Salió"];
 function _pgaXlsHojaDetalle(dias) {
-  const S = PGX_S, filas = [], merges = [], anchoMin = [11, 11, 8, 12, 10, 18, 6, 8, 14, 12, 10, 12, 8, 14, 8, 11, 7];
+  const S = PGX_S, filas = [], merges = [], anchoMin = [11, 11, 8, 12, 10, 11, 18, 6, 8, 14, 12, 10, 12, 8, 14, 8, 11, 7];
   const ncol = PGX_COLS.length, ultima = _facColLetra(ncol - 1);
   const rango = dias.length === 1 ? _pgaDiaTxt(dias[0].key)
     : (_pgaDiaTxt(dias[0].key) + " a " + _pgaDiaTxt(dias[dias.length - 1].key));
@@ -39636,7 +39673,9 @@ function _pgaXlsHojaDetalle(dias) {
         filas.push([
           { v: ser, s: S.fecha, n: true }, { v: dTxt, s: S.txt },
           { v: t.tanda, s: S.cen }, { v: zt, s: S.txt },
-          { v: String(r.np), s: S.txt }, { v: r.razon_social || "", s: S.txt },
+          { v: String(r.np), s: S.txt },
+          { v: _pgxSerialFecha(String(r.fecha_pedido || "").replace(/-/g, "")), s: S.fecha, n: !!r.fecha_pedido },
+          { v: r.razon_social || "", s: S.txt },
           { v: String(r.empresa || "").toUpperCase(), s: S.cen },
           { v: r.cod ? String(r.cod) : "", s: S.cen },
           { v: lug, s: S.txt }, { v: dst.provincia || "", s: S.txt },
@@ -39653,10 +39692,10 @@ function _pgaXlsHojaDetalle(dias) {
   // el cierre: una sola fila de totales, para que el número no haya que sacarlo a mano
   f = vacia(S.totTxt);
   f[0] = { v: "TOTAL", s: S.totTxt };
-  f[12] = { v: Math.round(m3 * 1000) / 1000, s: S.totM3, n: true };
-  f[13] = { v: plata, s: S.totMoney, n: true };
-  f[14] = { v: sinP || "", s: S.totEnt, n: !!sinP };
-  f[15] = { v: nps + " NP", s: S.totEnt };
+  f[13] = { v: Math.round(m3 * 1000) / 1000, s: S.totM3, n: true };
+  f[14] = { v: plata, s: S.totMoney, n: true };
+  f[15] = { v: sinP || "", s: S.totEnt, n: !!sinP };
+  f[16] = { v: nps + " NP", s: S.totEnt };
   filas.push(f);
   return { nombre: "Programación", filas: filas, merges: merges, congelar: 4,
     filtro: "A4:" + ultima + "4", altos: { 0: 26 },

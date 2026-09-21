@@ -141,7 +141,8 @@ catch (_e) {
     out.sinContenido = !/pga-its|pga-it\b|apr-det/.test(hh) && !pedidosItems.length;
     // v18.02 (Luis): el cód va DENTRO de la celda del cliente, entre paréntesis — no en la de la NP
     out.codEnCliente = [...hoja.querySelectorAll("tr.pgp-np")].map((tr) => ({
-      np: tr.children[0].textContent.trim(), cli: tr.children[1].textContent.trim() }));
+      np: tr.children[0].textContent.trim(), ped: tr.children[1].textContent.trim(),
+      cli: tr.children[2].textContent.trim() }));
     out.tieneCodCliente = /\(LK 2118\)/.test(hh) && /\(CH 2533\)/.test(hh);
     // ojo: la NP web ES "LK 0058", eso no es el cód. Lo que no tiene que estar es el cód entre
     // paréntesis, y la NP de ISIS tiene que quedar pelada ("98701", antes "98701 LK 1974").
@@ -155,23 +156,24 @@ catch (_e) {
     out.sinColHorario = [...hoja.querySelectorAll("table.pgp-tab thead th")]
       .every((e) => !/horario/i.test(e.textContent));
     // la zona no se repite: el renglón de la tanda ya la dice, la NP deja sólo el barrio
-    out.lugares = [...hoja.querySelectorAll("tr.pgp-np td:nth-child(3)")].map((e) => e.textContent.trim());
+    out.lugares = [...hoja.querySelectorAll("tr.pgp-np td:nth-child(4)")].map((e) => e.textContent.trim());
     out.tieneEstado = [...hoja.querySelectorAll(".pgp-est")].map((e) => e.textContent.trim());
     out.tieneTotal = [...hoja.querySelectorAll("tr.pgp-tot")].length === 2;
     out.tieneEncabezado = /Programación de entregas/.test(hh) && /impreso el /.test(hh);
     // las columnas alinean entre días: cada tabla trae el mismo colgroup de 6
     out.colgroups = [...hoja.querySelectorAll("table.pgp-tab")].map((t) => t.querySelectorAll("col").length);
     // v20.57 — monto, encabezados centrados y la orientación elegida por la medición
-    out.thTxt = [...hoja.querySelectorAll("table.pgp-tab thead th")].slice(0, 6).map((e) => e.textContent.trim());
+    out.thTxt = [...hoja.querySelectorAll("table.pgp-tab thead th")].slice(0, 7).map((e) => e.textContent.trim());
     out.pageCss = (document.getElementById("pgpPageCss") || {}).textContent || "";
     out.fontPt = ((hoja.querySelector("table.pgp-tab").getAttribute("style") || "")
       .match(/font-size:(\d+)pt/) || [])[1];
     out.anchoDeclarado = +(((hoja.querySelector("table.pgp-tab").getAttribute("style") || "")
       .match(/width:(\d+)px/) || [])[1] || 0);
-    out.montos = [...hoja.querySelectorAll("tr.pgp-np td:nth-child(5)")].map((e) => e.textContent.trim());
-    out.montoTanda = [...hoja.querySelectorAll("tr.pgp-t td:nth-child(5)")].map((e) => e.textContent.trim());
-    out.montoDia = [...hoja.querySelectorAll("tr.pgp-tot td:nth-child(5)")].map((e) => e.textContent.trim());
+    out.montos = [...hoja.querySelectorAll("tr.pgp-np td:nth-child(6)")].map((e) => e.textContent.trim());
+    out.montoTanda = [...hoja.querySelectorAll("tr.pgp-t td:nth-child(6)")].map((e) => e.textContent.trim());
+    out.montoDia = [...hoja.querySelectorAll("tr.pgp-tot td:nth-child(6)")].map((e) => e.textContent.trim());
     out.notaValor = /valor de lista/.test(hh);
+    out.estTanda = [...hoja.querySelectorAll("tr.pgp-t td:nth-child(7)")].map((e) => e.textContent.trim());
     // los anchos salen del dato, pero tienen que ser LOS MISMOS en todos los días (si no, no alinean)
     out.anchos = [...hoja.querySelectorAll("table.pgp-tab")].map((t) =>
       [...t.querySelectorAll("col")].map((c) => c.style.width).join("|"));
@@ -197,7 +199,7 @@ catch (_e) {
     const hoja = document.getElementById("pgaPrint");
     const otros = [...document.body.children].filter((e) =>
       e.id !== "pgaPrint" && getComputedStyle(e).display !== "none").map((e) => e.id || e.tagName);
-    const cli = hoja.querySelector("tr.pgp-np td:nth-child(2)");
+    const cli = hoja.querySelector("tr.pgp-np td:nth-child(3)");
     // nada truncado: con los anchos salidos del dato, ninguna celda puede desbordar su columna
     const cortadas = [...hoja.querySelectorAll("table.pgp-tab td")]
       .filter((td) => td.scrollWidth > td.clientWidth + 1)
@@ -261,7 +263,7 @@ catch (_e) {
   chk(r.llamoPrint === 1, "llama a window.print() una sola vez");
   chk(r.hayHoja, "arma la hoja en #pgaPrint");
   chk(r.soloTildados, "sólo entran los días tildados (2 de 3): " + JSON.stringify(r.diasEnHoja));
-  chk(r.tandasEnHoja.join(",") === "E10A,E10B,E11A",
+  chk(r.tandasEnHoja.length === 3 && /^E10A/.test(r.tandasEnHoja[0]),
       "la hoja sale ABIERTA a nivel tanda: " + JSON.stringify(r.tandasEnHoja));
   chk(r.npsEnHoja.length === 5, "y abierta a nivel NP (5): " + JSON.stringify(r.npsEnHoja));
   chk(r.sinContenido, "pero SIN el contenido de cada NP (ni se pide gv_ppp_np_items)");
@@ -280,8 +282,8 @@ catch (_e) {
       r.tieneEstado.indexOf("Armado") >= 0, "cada NP lleva su estado: " + JSON.stringify(r.tieneEstado));
   chk(r.tieneTotal, "cada día cierra con su total");
   chk(r.tieneEncabezado, "la hoja tiene título con el rango y la fecha de impresión");
-  chk(r.colgroups.length === 2 && r.colgroups.every((n) => n === 6),
-      "cada día trae el colgroup de 6 columnas: " + JSON.stringify(r.colgroups));
+  chk(r.colgroups.length === 2 && r.colgroups.every((n) => n === 7),
+      "cada día trae el colgroup de 7 columnas: " + JSON.stringify(r.colgroups));
   chk(r.anchosIguales, "y los anchos son idénticos entre días → alinean de hoja en hoja");
   chk(r.anchosEnPx, "los anchos salen en px del dato real, no en % del papel: " +
       JSON.stringify(r.anchos[0]));
@@ -317,8 +319,8 @@ catch (_e) {
       "y la tabla tampoco se estira: sigue midiendo " + Math.round(ancho.anchoTabla) + " px");
 
   // ── v20.57: monto, encabezados centrados y columnas separadas ─────────────
-  chk(r.thTxt.join("|") === "Tanda / NP|Cliente (cód)|Zona · barrio|m³|Monto $|Estado",
-      "la hoja suma la columna de monto: " + JSON.stringify(r.thTxt));
+  chk(r.thTxt.join("|") === "Tanda / NP|F. pedido|Cliente (cód)|Zona · barrio|m³|Monto $|Estado",
+      "las 7 columnas, con monto y fecha de pedido: " + JSON.stringify(r.thTxt));
   chk(r.montos.length === 5 && r.montos[0] === "1.234.567",
       "cada NP lleva su monto, sin centavos y con punto de miles: " + JSON.stringify(r.montos));
   chk(r.montos.some((x) => /\*$/.test(x)),
@@ -329,6 +331,15 @@ catch (_e) {
       "y el día con la suma de sus tandas: " + JSON.stringify(r.montoDia));
   chk(r.notaValor, "la hoja aclara que el monto es valor de lista, sin IVA ni descuentos");
   chk(imp.thCentrado, "los encabezados van centrados: " + imp.thCentrado);
+  // v20.59 (Thomas): *"sumale fecha de nota de pedido"* · *"no puede haber tanto espacio entre
+  // zona/barrio y m³"* · el «N NP» se mudó de ESTADO al cajón de la tanda.
+  chk(r.codEnCliente.every((x) => /^\d{2}\/\d{2}\/\d{2}$/.test(x.ped)),
+      "cada NP lleva la fecha en que entró el pedido, con año: " +
+      JSON.stringify(r.codEnCliente.map((x) => x.ped)));
+  chk(r.tandasEnHoja.join(",") === "E10A · 2 NP,E10B · 1 NP,E11A · 2 NP",
+      "el «N NP» de la tanda va con su código, no en ESTADO: " + JSON.stringify(r.tandasEnHoja));
+  chk(r.estTanda.length === 3 && r.estTanda.every((x) => !/NP/.test(x)),
+      "así ESTADO queda del ancho de la palabra sola: " + JSON.stringify(r.estTanda));
   chk(imp.tdConBorde, "y cada columna va separada por su filete: " + imp.tdConBorde);
   chk(errs.length === 0, "sin errores de JS: " + JSON.stringify(errs));
 

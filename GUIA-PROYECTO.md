@@ -1,3 +1,63 @@
+## Nota v20.59 (2026-09-21) — Fecha del pedido en la hoja, y la tabla deja de tener aire
+
+Dos pedidos de Thomas sobre lo mismo: que no sobre ancho.
+
+### La hoja impresa: columna «F. pedido» y tres recortes
+
+*"Sumale fecha de nota de pedido"* · *"no puede haber tanto espacio entre zona/barrio y m³"*.
+
+La fecha del pedido sale en **columna propia**, con el **año** (`dd/mm/aa`) aunque en pantalla se
+vea `dd/mm`: la hoja se archiva y una fecha sin año deja de poder ubicarse.
+
+Para que esa columna entrara sin sacrificar nada, tres recortes que además son mejoras por su
+cuenta:
+
+| qué | antes | ahora |
+|---|---|---|
+| **Zona · barrio** | p92 — la estiraban 3 barrios largos («Arribeños 2979 - Nuñez») contra 150 cortos | **p75**: esos 3 parten en dos renglones y la columna queda del ancho de lo que se lee siempre |
+| **Estado** | el renglón de la tanda decía *"7 NP · En proceso"*, el texto más largo de la columna | el **«N NP» se mudó al cajón de la tanda** (`E12S · 7 NP`) y ESTADO queda del ancho de la palabra: **206 → 131 px** |
+| **Total del día** | — | el «N NP» de la fila de total **se queda en ESTADO**: pegado a «Total del día» estiraba la primera columna de 150 a 201 px |
+
+Resultado medido con la programación del 21/09: **7 columnas, A4 apaisada, 15 pt, 1.046 px de
+1.047**, ninguna celda cortada y cada columna usando el 98-100 % de su ancho. A 16 pt las siete
+piden 1.115 px, así que la escalera baja un punto — sigue dentro de lo que se pidió (Arial 15-16).
+
+### La tabla de la pantalla: la columna del día se comía el 58 %
+
+*"No puede quedar tanto espacio en blanco entre Día y m³, compactá la visual, que si se expande
+para ver las tandas y las NPs dentro de la tanda se vaya expandiendo también"*.
+
+**Eran dos cosas distintas, y la segunda es la que importa:**
+
+1. La tabla estaba en `width:100%` con la 1.ª columna en `width:100%` y el resto en `width:1%` —
+   el truco de la v17.76 para que todo el ancho sobrante se lo llevara la columna de la info. Hoy
+   la tabla va en **`width:auto`**: mide lo que miden sus columnas y crece al abrir un día o una
+   tanda. Medido: **1.474 → 873 px cerrada**, 1.331 abierta con un día y una tanda; la columna del
+   día pasa del **58 % al 30 %** de la tabla.
+2. ⚠ **Pero achicarla sola no alcanzaba**, y esto es lo que hay que recordar: el chip de
+   «⏸ Armados en espera» decía *"vacío · acá se mandan las tandas armadas sin fecha, con 📅 Cambiar
+   de día"*. **Toda la tabla va `white-space:nowrap`**, así que ESE renglón —uno solo, y encima el
+   de un día que casi siempre está vacío— le fijaba a la columna del día un mínimo de **626 px**
+   mientras las filas de día piden 165. La explicación se mudó al `title` de la fila y el chip
+   quedó en «vacío».
+
+> **En una tabla `nowrap`, la columna la fija la celda más larga — aunque sea una sola y aunque
+> sea un cartel.** Antes de tocar anchos, buscar cuál es esa celda.
+
+El marco (`.pga-wrap`) sigue a la tabla con `width:fit-content; max-width:100%`, si no la tarjeta
+quedaba medio vacía a la derecha: el mismo espacio muerto, corrido de lugar. El `max-width` deja
+intacto el scroll horizontal de siempre cuando la tabla no entra.
+
+El Excel también sumó la columna «F. pedido» (grupo PEDIDO, como fecha de verdad).
+
+### Chequeo
+
+```bash
+node tests/pga-imprimir.cjs     # 62 chequeos
+node tests/pga-excel.cjs        # 40
+node tests/ppp-tabla-arbol.cjs  # + los 3 del ancho: cerrada no se estira, columna 1 < 45 %, abierta crece
+```
+
 ## Nota v20.57 (2026-09-21) — La hoja se mide en PUNTOS, y le entra el MONTO
 
 Thomas, sobre la impresión: *"columnas bien definidas, tamaño de fuente grande (equivalente a
