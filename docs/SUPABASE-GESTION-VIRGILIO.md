@@ -28091,7 +28091,7 @@ exigía un **tercer** botón en la fila de la NP —el `↩ Enviar a programar`�
 Thomas mandó sacar. Ahora verifica lo contrario: que quede el 📅 y que **no vuelva** una puerta a
 «A Programar».
 
-### §3.lx — v20.87 · El pipeline reemplaza al submódulo de clientes nuevos — 2026-09-21
+### §3.lx — v20.88 · El pipeline reemplaza al submódulo de clientes nuevos — 2026-09-21
 
 **Pedido de Luis**, en cuatro tandas de definiciones. La última: *"Después del análisis solo hay
 2 estados que un cliente puede tener: Referenciado y No referenciado."*
