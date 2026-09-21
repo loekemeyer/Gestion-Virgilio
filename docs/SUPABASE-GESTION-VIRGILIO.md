@@ -27780,3 +27780,36 @@ Y lo de siempre: `create or replace view` sin `WITH` borra las `reloptions`, as�
 chequea `security_invoker` **antes** (si no lo tiene, frena) y lo repone **después**.
 
 `sql/gv_destino_badge_del_pedido_v2074.sql`, `tests/ppp-misiones.cjs`.
+
+### §3.ls — v20.76 · Dar por cerrada una NP atrasada, sin tocar la facturación — 2026-09-21
+
+**Thomas:** *"borrá los 21 atrasados viejos"* → y con la medición: ***"marcá los 21 como cerrados"***.
+
+**Primero la corrección: la pantalla no los mostraba.** `gv_ppp_atrasados` tiene un piso
+configurable —`PPP_Web_Config.atrasados_desde = 2026-09-01`— y los 21 son **todos** anteriores. El
+front pide la función **sin argumento** y recibe **0**; los 21 aparecían sólo en un barrido con
+`p_desde` hacia atrás, que es como los encontré. Lo que se reportó como *"21 renglones que nadie
+mira en el submódulo rojo"* era la consulta, no la app.
+
+**Qué son**, medido: NP de julio y agosto **facturadas**, con fecha de salida vencida, **sin carga
+de camión (CCN) y sin recepción de remito (CRN)**; 14 de las 21 sí tienen **control de remito
+(CCR)**. Salieron y nadie registró el cierre. 8,645 m³, del 27/07 al 28/08.
+
+⚠ **No se borran de `Facturacion_NP`.** Ahí vive la facturación, que alimenta el reporte diario de
+LK por Telegram (`ppp_np_feed` → `gv_lk_np_feed` → `rep_despacho_diario`), `vista_tanda_m3` y el
+cruce NP↔factura: borrar 21 filas para limpiar una pantalla habría movido la plata facturada de
+julio y agosto en los reportes.
+
+⚠ **Y tampoco se inventan eventos.** La otra tentación era insertarles un CCN/CRN para que
+"cierren solos" — eso es escribir en el registro de producción de los operarios un evento que
+nadie hizo, con un legajo que no existe. El cierre administrativo es otra cosa y por eso se llama
+distinto.
+
+**Lo que se hizo:** la tabla **`GV_PPP_Atrasado_Cerrado`** (np, empresa, tanda, fecha, m³, cliente,
+**motivo**, quién, cuándo) y un `not exists` en el `WHERE` de `gv_ppp_atrasados`. Reversible con un
+`delete`, y el motivo queda escrito fila por fila (dice si tenía control de remito o no).
+
+**Verificación:** barrido de 60 días **21 → 0**, pantalla 0, `Facturacion_NP` **1.351 filas,
+intacta**.
+
+`sql/gv_atrasado_cerrado_v2076.sql`.
