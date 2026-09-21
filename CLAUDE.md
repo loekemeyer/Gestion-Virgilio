@@ -1263,6 +1263,24 @@ pero todas crecen y el día que pasen las 1.000 no va a avisar nadie.
 > **Un `limit=` alto no es una garantía, es una expresión de deseo.** Si la consulta lee el
 > universo entero de algo que crece: o `gvRestTodo`, o declarada como chica. §3.ld.
 
+⚠⚠ **Y desde la v20.53 está tapado para TODA la app, sin tocar la configuración del proyecto**
+(Luis: *"quiero que esto quede cubierto sin el cambio global al proyecto"*). **No se sube
+`db-max-rows`**: es del PROYECTO, y contra esta base pegan también Producción Virgilio y los admin
+de Cervantes — una consulta sin `limit` sobre `Movimientos_Stock` pasaría de traer 1.000 a traer
+63 mil. En su lugar **`supabase-config.js` envuelve `fetch` una sola vez** (es el único archivo que
+cargan todas las páginas *y* el service worker): si una respuesta de `/rest/v1/` llega justo con
+1.000 filas, pide el resto con `offset` y devuelve todo junto.
+
+| la URL trae… | qué hace |
+|---|---|
+| nada, o `limit=` **mayor** a 1.000 | **completa** |
+| `limit=` **menor o igual** a 1.000 | **no toca nada** (el que llamó pidió esa cantidad) |
+
+Esa segunda fila es la que hace imposible la recursión con `gvRestTodo`, que pagina con
+`limit=1000`. Se da cuenta por el header **`Content-Range`**, que el navegador puede leer (medido:
+`Access-Control-Expose-Headers` lo incluye), así que cuando no hay corte **el body no se toca**.
+`offset` anda igual en tablas, vistas y `rpc` POST. §3.le.
+
 ## ⚠ Regla de Luis (2026-09-21): la CUARENTENA se mide por SUCURSAL, y Retira nunca exime
 
 *"Para clientes que tienen múltiples sucursales, se debería llevar registro por el «a qué sucursal

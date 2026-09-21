@@ -26741,3 +26741,72 @@ bien que pise el color de estado"*).
 
 `tests/ppp-misiones.cjs` cubre las dos pantallas y verifica, cambiando la provincia marcada, que el
 front sigue la config y no tiene nada hardcodeado.
+
+---
+
+### §3.le — v20.53 · El tope de 1.000 filas, tapado para toda la app sin tocar el proyecto · La pastilla que decía «Facturado» sobre algo que ya salió
+
+Luis, 2026-09-21: *"quiero que esto quede cubierto sin el cambio global al proyecto"* y, con la
+pantalla al lado: *"fijate que el color-coding no coincide y el badge tampoco (esta 'Salio' pero
+figura 'Facturado')"*.
+
+#### 1. El tope, tapado en un solo lugar
+
+**Por qué no se sube `db-max-rows`:** es configuración del **proyecto**, y contra esta misma base
+pegan también Producción Virgilio y los dos admin de Cervantes. Subirlo haría que una consulta sin
+`limit` sobre `Movimientos_Stock` (63 mil filas) pase de traer 1.000 a traer todo. El riesgo no es
+de esta app y el arreglo sí puede serlo.
+
+**Lo que se hizo:** `supabase-config.js` —el único archivo que cargan **todas** las páginas
+(`index.html`, `monitor/tv.html`, `fichada.html`, `fichadas-monitor.html`, `productividad.html`) y
+también el **service worker**— envuelve `fetch` una sola vez. Si una respuesta de `/rest/v1/` llega
+justo con 1.000 filas, pide las que faltan con `offset` y devuelve una `Response` con todo junto.
+El que llamó no se entera.
+
+**La regla, que es lo que evita romper a quien sí quería un tope:**
+
+| la URL trae… | qué hace |
+|---|---|
+| nada, o `limit=` **mayor** a 1.000 | **completa** — ese número era el techo que el autor *creyó* estar pidiendo |
+| `limit=` menor o igual a 1.000 | **no toca nada** — el que llamó pidió esa cantidad y la recibió |
+
+Esa segunda fila es también lo que hace **imposible la recursión**: `gvRestTodo` pagina con
+`limit=1000`, así que sus páginas nunca entran al envoltorio.
+
+**Cómo se da cuenta, y por qué es barato.** Por el header `Content-Range` (`0-999/*`). Medido el
+21/09 con un `Origin` real: `Access-Control-Expose-Headers` incluye `Content-Range`, o sea que el
+navegador **puede leerlo**. Cuando la respuesta no llegó al tope —que es siempre— el costo es leer
+un header: **el body no se toca**. Y `offset` anda igual en una tabla, en una vista y en un `rpc`
+POST (medido: `rpc/gv_np_destino_lista?offset=500` → `Content-Range: 500-899/*`, 400 filas).
+
+Si algo sale mal adentro del envoltorio devuelve la respuesta original sin tocarla: nunca puede
+dejar una pantalla sin datos por su culpa. Si la red se corta a mitad del paginado, devuelve lo que
+juntó.
+
+⚠ De paso se le sacó el `limit 900` interno a `gv_np_destino_lista`: era **otro tope silencioso**,
+del mismo tipo que el que se estaba tapando.
+
+`tests/rest-tope-wrapper.cjs` lo prueba con red simulada, incluidos los casos en los que **no** se
+tiene que meter: 2.137 filas en 3 pedidos sin `limit` y con `limit=20000`; un solo pedido con
+`limit=1000` y con `limit=300`; una respuesta de 999 filas sin tocar el body; una URL que no es de
+`/rest/v1/`; un `rpc` por POST que conserva el método en las páginas siguientes; y la red cayéndose
+a mitad.
+
+#### 2. La pastilla decía «Facturado» sobre una tanda que ya salió
+
+Desde la **v20.11** los porcentajes **netean** lo que ya se cargó al camión: la tanda E12E mostraba
+**SALIÓ 100 %** y **FACTURADO 0 %**. Pero la pastilla y el color de la fila usaban `est` crudo, así
+que decían **Facturado** en azul. Dos lecturas distintas de la misma fila.
+
+Ahora hay un quinto estado **sólo de presentación**, `salio`, con el mismo violeta (`#7c3aed`) de
+su columna:
+
+- una **NP** que ya salió lleva pastilla **Salió**, y el estado de abajo queda en el `title`
+  (*"Antes de salir estaba: Facturado"*);
+- una **tanda** con **todas** sus NP salidas lleva pastilla Salió y la fila en violeta;
+- con **algunas sí y otras no** manda el estado de abajo, como antes.
+
+⚠ **`salio` NO entra en `PGA_EST`**: esa lista son las **cuatro columnas** de estado, y SALIÓ ya
+tiene la suya. Y **`est` sigue crudo** — es sobre eso que los porcentajes netean, y eso no cambió.
+
+`tests/pga-salio-badge.cjs` lo sostiene, incluido el guard de que `est` no dejó de estar crudo.

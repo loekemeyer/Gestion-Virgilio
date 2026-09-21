@@ -3436,6 +3436,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-t.e-armado>td{    background:#f4fdf7; } .pga-t.e-armado>td:first-child{    box-shadow:inset 4px 0 0 #15803d; color:#14532d; }
 .pga-t.e-proceso>td{   background:#fffdf0; } .pga-t.e-proceso>td:first-child{   box-shadow:inset 4px 0 0 #ca8a04; color:#854d0e; }
 .pga-t.e-pendiente>td{ background:#fff6f6; } .pga-t.e-pendiente>td:first-child{ box-shadow:inset 4px 0 0 #dc2626; color:#991b1b; }
+.pga-t.e-salio>td{     background:#faf8ff; } .pga-t.e-salio>td:first-child{     box-shadow:inset 4px 0 0 #7c3aed; color:#5b21b6; }
 .pga-sub{ font-weight:600; color:#94a3b8; font-size:13px; margin-left:8px; }
 /* fila de NP — acá va lo que se lee: NP, estado, horario, código de cliente, cliente, zona ·
    barrio y la fecha en que entró el pedido (v17.76, pedido de Luis) */
@@ -3564,6 +3565,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-pill{ display:inline-block; font-size:12px; font-weight:900; border-radius:999px; padding:1px 9px; letter-spacing:.02em; margin-left:8px; vertical-align:1px; }
 .pga-pill.e-facturado{ background:#dbeafe; color:#1e3a8a; } .pga-pill.e-armado{ background:#dcfce7; color:#14532d; }
 .pga-pill.e-proceso{ background:#fef9c3; color:#854d0e; }   .pga-pill.e-pendiente{ background:#fee2e2; color:#991b1b; }
+/* v20.53 (Luis) — SALIÓ: el mismo violeta de su columna (#7c3aed), para que la pastilla y la
+   columna digan lo mismo y no se confunda con los cuatro estados. */
+.pga-pill.e-salio{ background:#ede9fe; color:#5b21b6; }
 /* v20.23 — la banda de lo que salió y no se facturó, arriba de la tabla */
 .pga-aviso-salio{ margin-top:12px; border:1.5px solid #c4b5fd; border-left:5px solid #7c3aed;
   background:#f5f3ff; border-radius:12px; padding:9px 13px; color:#4c1d95; font-size:13.5px; }
@@ -5817,7 +5821,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.52"></script>
+<script type="module" src="recepcion.js?v=20.53"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6362,7 +6366,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 
 <!-- Modal: Planilla Conteo Cajas -->
 
-<script src="supabase-config.js?v=1201"></script>
+<script src="supabase-config.js?v=1202"></script>
 <script>
 /* v18.67 — el botón «Entrar con legajo» está arriba en el HTML y la función de verdad se define en el último
    <script> (44k líneas después): en un celular lento el tap llega antes y tiraba
@@ -9694,7 +9698,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.52";
+const APP_VERSION = "v20.53";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38278,8 +38282,17 @@ const PGA_ESPERA_ISO = "9999-12-31";
 const PGA_ESPERA_KEY = "99991231";
 const PGA_ESPERA_TXT = "⏸ Armados en espera";
 const PGA_EST    = ["facturado", "armado", "proceso", "pendiente"];
-const PGA_EST_TXT = { facturado: "Facturado", armado: "Armado", proceso: "En proceso", pendiente: "Pendiente" };
-const PGA_EST_CLS = { facturado: "fac", armado: "arm", proceso: "pro", pendiente: "pen" };
+const PGA_EST_TXT = { facturado: "Facturado", armado: "Armado", proceso: "En proceso", pendiente: "Pendiente",
+                      salio: "Salió" };
+const PGA_EST_CLS = { facturado: "fac", armado: "arm", proceso: "pro", pendiente: "pen", salio: "sal" };
+/* ⚠ v20.53 (Luis, 2026-09-21) — `salio` NO está en `PGA_EST` a propósito: esa lista son las
+   CUATRO columnas de estado, y SALIÓ ya tiene la suya. Acá entra sólo para la pastilla y el
+   color de la fila.
+   Luis, con la pantalla al lado: *"fijate que el color-coding no coincide y el badge tampoco
+   (esta 'Salio' pero figura 'Facturado')"*. La tanda E12E mostraba SALIÓ 100 % y FACTURADO 0 %
+   en las columnas, y la pastilla decía *Facturado* con la fila azul. Las columnas **netean** lo
+   que salió (v20.11) y la pastilla no lo hacía: dos lecturas distintas de la misma fila.
+   El dato de abajo (`est`) sigue CRUDO — es lo que las columnas netean, y eso no cambia. */
 let _pgaRows = null, _pgaTs = 0, _pgaBusy = false, _pgaErr = "";
 /* ═══ v20.45 (Luis, 2026-09-21) — EL DESTINO REAL DEL PEDIDO ════════════════════════
    Lo que la PPP mostraba de un pedido por expreso era "Zona 1 · Soldati": el barrio del galón del
@@ -38401,8 +38414,11 @@ async function pgaItemsCargar(np) {
 }
 /* Estado de un grupo (día o tanda) a partir de sus NP: todo facturado, todo armado o mejor,
    nada empezado, o mezcla = en proceso. Es lo que pinta la fila. */
-function _pgaEstadoGrupo(e, n) {
+function _pgaEstadoGrupo(e, n, salio) {
   if (!n) return "pendiente";
+  // v20.53: si TODAS sus NP ya salieron en el camión, la fila dice Salió — que es lo mismo que
+  // dice su columna. Con algunas sí y otras no sigue mandando el estado de abajo.
+  if (_pgaSalioListo() && Number(salio) === n) return "salio";
   if (e.facturado === n) return "facturado";
   if (e.facturado + e.armado === n) return "armado";
   if (e.pendiente === n) return "pendiente";
@@ -38583,7 +38599,7 @@ function _pgaCuerpoHtml(dias, opts) {
       _pgaPctFila(d.est, d.nps, d.salio, d.estSal) + '</tr>';
     if (!ab) continue;
     for (const t of d.tandasArr) {
-      const tb = !!_pgaOpenT[t.key] || !!_pppSearch, te = _pgaEstadoGrupo(t.est, t.nps);
+      const tb = !!_pgaOpenT[t.key] || !!_pppSearch, te = _pgaEstadoGrupo(t.est, t.nps, t.salio);
       h += '<tr class="pga-t e-' + te + (t.mis ? ' mis' : '') + '" onclick="pgaAbrirTanda(\'' + escapeHtml(t.key) + '\')">' +
         '<td><div class="pga-trow"><span class="pga-ninfo">' +
           '<span class="pga-chev">' + (tb ? "▾" : "▸") + '</span>' + escapeHtml(t.tanda) +
@@ -38617,12 +38633,17 @@ function _pgaCuerpoHtml(dias, opts) {
         // Se muestra sólo cuando hay EXPRESO: en un reparto propio la provincia es la de la zona
         // que ya se está leyendo al lado, y repetirla en cada fila de CABA es ruido.
         const _dst = _pgaDestDe(r), _mis = !!(_dst && _dst.alerta);
+        // v20.53 (Luis): la pastilla NETEA igual que las columnas — si la NP ya salió en el
+        // camión dice Salió, no Facturado. El estado de abajo queda en el `title`.
+        const _sal = _pgaSalio(r), estVis = _sal ? "salio" : est;
         h += '<tr class="pga-n' + (nb ? " on" : "") + (_mis ? " mis" : "") + '" onclick="pgaAbrirNp(\'' + escapeHtml(nk) + '\',\'' + escapeHtml(r.np) + '\')">' +
           '<td>' +
             '<div class="pga-nrow"><span class="pga-ninfo">' +
           '<span class="pga-chev">' + (nb ? "▾" : "▸") + '</span>' +
             '<span class="pga-np">' + escapeHtml(r.np) + '</span>' + _npSrcChip(r.np) +
-            '<span class="pga-pill e-' + est + '">' + PGA_EST_TXT[est] + '</span>' +
+            '<span class="pga-pill e-' + estVis + '"' +
+              (_sal ? ' title="Ya salió en el camión (CCN). Antes de salir estaba: ' + PGA_EST_TXT[est] + '"' : '') +
+              '>' + PGA_EST_TXT[estVis] + '</span>' +
             // v20.10: el «salió» de UNA NP va acá y no en la columna, que en esta fila la tapa el
             // contenido cuando se abre. La columna SALIÓ es el % del día y de la tanda.
             // v20.12 (Thomas: *"que sea finito"*) — el chip queda en el ícono solo: la palabra la
