@@ -26552,3 +26552,48 @@ vista que recorre la operación entera, se saca a un CTE `materialized` y se jun
 es medir la RPC con `explain (analyze)` y compararla contra los 8 s del rol `authenticated`.
 
 `sql/gv_valor_lote_una_sola_pasada_v2046.sql`.
+
+---
+
+### §3.lb — v20.47 · La v20.45 no pintaba nada: la vista contestaba 200 y vacío a la clave pública
+
+Luis, con la pantalla al lado: *"tiene que quedar pintada en la tabla y con el badge como te dije"*.
+
+**Qué pasaba.** `GV_Clientes_Direcciones` tiene RLS y **ninguna policy**: `anon` no ve **ni una
+fila**. Como `gv_np_destino` corre con `security_invoker = true`, leída desde el navegador el
+`left join` contra el padrón no traía nada y las **1.482 NP** salían con `como = 'sin padron'` y
+`provincia = null`. Medido por la REST con la clave publishable:
+
+```
+GET /rest/v1/gv_np_destino?select=...&alerta=is.true   →  HTTP 200   []
+```
+
+Desde el MCP —que entra como `postgres`— la misma vista daba las 2 filas de Albalandia. **Eso es
+lo que hizo que la v20.45 pasara los tests y no pintara nada**: no fallaba, contestaba bien con
+datos vacíos.
+
+> **La regla, que vale para cualquier vista nueva:** una vista con `security_invoker` sobre una
+> tabla con RLS **no devuelve error cuando el lector no tiene acceso: devuelve menos filas**.
+> Probarla desde el MCP no prueba nada — hay que probarla **con el rol que la va a leer**:
+>
+> ```sql
+> do $$ declare n int; begin
+>   set local role anon; select count(*) into n from public.<la vista>; reset role;
+>   raise notice 'anon ve %', n; end $$;
+> ```
+
+**Qué NO se hizo:** darle un policy de SELECT a `anon` sobre `GV_Clientes_Direcciones`. Esa tabla
+es el padrón entero de direcciones **y CUIT** de los 1.849 clientes de las dos empresas; abrirla a
+la clave pública es exactamente la filtración que costó caro el 2026-09-04.
+
+**Qué se hizo:** `gv_np_destino_lista()`, **SECURITY DEFINER**, que devuelve **sólo lo que la
+pantalla usa** — `np, provincia, expreso, alerta, destino_txt`. Ni dirección, ni CUIT, ni razón
+social, ni el padrón. Y las dos vistas dejaron de ser legibles por `anon`/`authenticated`: leídas
+desde el navegador **mienten**, y una vista que miente es peor que una que no está. Quedan para
+consultarlas por el MCP.
+
+El front pasó de `GET /rest/v1/gv_np_destino?select=…` a `POST /rest/v1/rpc/gv_np_destino_lista`.
+Medido con la clave publishable: **HTTP 200, 1.482 filas, 2 con `alerta`** (las dos de Albalandia).
+
+`tests/ppp-misiones.cjs` tiene el guard estático de los dos lados: exige la llamada a la RPC y
+**falla si alguien vuelve a leer la vista** desde `index.html`.

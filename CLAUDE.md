@@ -1200,6 +1200,23 @@ de la NP al día y a la tanda; no se calcula aparte.
 se pudo resolver (al 21/09 son 23, casi todas de Cencosud, que no tiene provincia cargada en la
 página). `sql/gv_destino_misiones_v2045.sql`, `tests/ppp-misiones.cjs`, §3.kz.
 
+⚠⚠ **Y la trampa que se comió la v20.45 entera, que vale para CUALQUIER vista nueva:** una vista
+con `security_invoker = true` sobre una tabla con RLS **no da error cuando el lector no tiene
+acceso — devuelve menos filas**. `GV_Clientes_Direcciones` tiene RLS sin policy, así que `anon`
+no ve ni una fila y `gv_np_destino` le contestaba **HTTP 200 con `sin padron` para las 1.482 NP**.
+Probarla desde el MCP no prueba nada: el MCP entra como `postgres`.
+
+```sql
+do $$ declare n int; begin
+  set local role anon; select count(*) into n from public.<la vista>; reset role;
+  raise notice 'anon ve %', n; end $$;
+```
+
+El arreglo **no** es abrirle la tabla a `anon` (es el padrón de direcciones y CUIT de 1.849
+clientes): es una RPC **SECURITY DEFINER** que devuelva sólo lo que la pantalla usa
+(`gv_np_destino_lista()` → np, provincia, expreso, alerta, texto) y **revocarle el SELECT de la
+vista a `anon`**, porque leída desde el navegador miente. §3.lb.
+
 ## ⚠ Regla de Luis (2026-09-21): la CUARENTENA se mide por SUCURSAL, y Retira nunca exime
 
 *"Para clientes que tienen múltiples sucursales, se debería llevar registro por el «a qué sucursal

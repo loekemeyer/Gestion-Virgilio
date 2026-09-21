@@ -5805,7 +5805,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.46"></script>
+<script type="module" src="recepcion.js?v=20.47"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9650,7 +9650,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.46";
+const APP_VERSION = "v20.47";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38253,8 +38253,18 @@ let _pgaRows = null, _pgaTs = 0, _pgaBusy = false, _pgaErr = "";
 let _pgaDest = null;
 function pgaDestNeed(force) {
   if (_pgaDest && !force) return;
-  fetch(SUPABASE_URL + "/rest/v1/gv_np_destino?select=np,provincia,expreso,alerta,destino_txt&limit=5000",
-    { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" })
+  // ⚠ v20.47 — POR RPC, NO POR LA VISTA. `GV_Clientes_Direcciones` tiene RLS y la clave
+  // pública no ve NINGUNA de sus filas (es el padrón entero de direcciones y CUIT: darle un
+  // policy de SELECT a `anon` sería la filtración que el protocolo prohibe). Como
+  // `gv_np_destino` corre con `security_invoker`, leída desde el navegador devolvía
+  // `sin padron` para las 1.482 NP y la Programación no pintaba NADA — sin error, sin 403,
+  // con HTTP 200 y datos vacíos, que es la peor forma de fallar.
+  // `gv_np_destino_lista()` es SECURITY DEFINER y devuelve SÓLO lo que esta pantalla usa:
+  // NP, provincia, expreso, el flag y el texto. Ni dirección, ni CUIT, ni razón social.
+  fetch(SUPABASE_URL + "/rest/v1/rpc/gv_np_destino_lista", {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: "{}", cache: "no-store" })
     .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function (rows) {
       const m = new Map();

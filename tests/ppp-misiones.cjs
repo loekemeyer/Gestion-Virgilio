@@ -34,8 +34,13 @@ catch (_e) {
   const html = fs.readFileSync(path.join(root, "index.html"), "latin1");
   if (!/select=[a-z_,0-9]*localidad,provincia,zona_expreso/.test(html))
     fallos.push("el feed de LK no pide `provincia`: el destino no viaja desde la página");
-  if (!/gv_np_destino\?select=np,provincia,expreso,alerta,destino_txt/.test(html))
-    fallos.push("no se lee gv_np_destino");
+  // v20.47: por RPC, NO por la vista. `GV_Clientes_Direcciones` tiene RLS y anon no ve una
+  // sola fila, asi que la vista leida desde el navegador devolvia "sin padron" para TODO:
+  // HTTP 200, sin error, y la Programacion sin pintar nada.
+  if (!/rest\/v1\/rpc\/gv_np_destino_lista/.test(html))
+    fallos.push("no se llama la RPC gv_np_destino_lista");
+  if (/rest\/v1\/gv_np_destino\?select=/.test(html))
+    fallos.push("se lee la VISTA gv_np_destino desde el front: anon no ve el padron y devuelve 'sin padron' para todo");
   // la provincia no se decide en el front
   if (/["']Misiones["']/.test(html.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")))
     fallos.push("aparece 'Misiones' hardcodeado fuera de los comentarios: tiene que salir de PPP_Web_Config.provincias_alerta");

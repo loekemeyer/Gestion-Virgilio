@@ -259,3 +259,51 @@ on conflict do nothing;
 -- select como, count(*) from public.gv_np_destino group by 1;   -- cuanto resuelve
 -- select * from public.gv_destino_sin_provincia;                -- lo que quedo sin destino
 -- select * from public.gv_reglas_perdidas;                      -- vacia = todo bien
+
+-- ════════════════════════════════════════════════════════════════════════════════════════
+-- v20.47 — LA PANTALLA LEE EL DESTINO POR UNA RPC, NO POR LA VISTA
+-- ════════════════════════════════════════════════════════════════════════════════════════
+-- ⚠ El bug que dejó la v20.45 sin pintar nada, y que hay que tener presente cada vez que se
+-- arma una vista con `security_invoker = true` sobre una tabla con RLS:
+--
+--   `GV_Clientes_Direcciones` tiene RLS y NINGUNA policy, o sea que `anon` no ve ni una fila
+--   (es el padrón entero de direcciones + CUIT: darle SELECT a la clave pública sería la
+--   filtración que el protocolo del repo prohibe). Como `gv_np_destino` corre con
+--   `security_invoker`, leída desde el navegador devolvía `como = 'sin padron'` y
+--   `provincia = null` para las 1.482 NP.
+--
+--   **Y no falló: contestó HTTP 200 con datos válidos y vacíos.** Medido por la REST con la
+--   clave publishable: `gv_np_destino?alerta=is.true` → `[]`. Desde el MCP (que entra como
+--   `postgres`) la misma vista daba las 2 filas de Albalandia. Es la peor forma de fallar:
+--   sin error, sin 403, sin nada en la consola.
+--
+-- La RPC es SECURITY DEFINER y expone SÓLO lo que la pantalla usa: NP, provincia, expreso, el
+-- flag y el texto. Ni dirección, ni CUIT, ni razón social, ni el padrón.
+create or replace function public.gv_np_destino_lista()
+returns table (np text, provincia text, expreso text, alerta boolean, destino_txt text)
+language sql
+stable
+security definer
+set search_path to 'public', 'pg_temp'
+as $function$
+  select d.np, d.provincia, d.expreso, d.alerta, d.destino_txt from public.gv_np_destino d;
+$function$;
+
+revoke all on function public.gv_np_destino_lista() from public;
+grant execute on function public.gv_np_destino_lista() to anon, authenticated;
+
+-- y las dos vistas dejan de ser legibles por la clave pública: leídas por anon MIENTEN
+-- ("sin padron" para todo), y una vista que miente es peor que una que no está. Quedan para
+-- consultarlas por el MCP, que entra como postgres.
+revoke select on public.gv_np_destino            from anon, authenticated;
+revoke select on public.gv_destino_sin_provincia from anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ── chequeo (el que hay que correr, no el de postgres) ──────────────────────────────────
+-- do $$ declare n int; a int; begin
+--   set local role anon;
+--   select count(*) into n from public.gv_np_destino_lista();
+--   select count(*) into a from public.gv_np_destino_lista() where alerta;
+--   reset role; raise notice 'anon: filas=% alerta=%', n, a;   -- 1.482 y 2 al 21/09
+-- end $$;
