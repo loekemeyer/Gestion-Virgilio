@@ -38,6 +38,9 @@ const vistas = html.match(/\/rest\/v1\/gv_ppp_(programacion_diaria|base_pedidos|
     window.fetch = async (url) => {
       const u = String(url); out.urls.push(u);
       if (u.indexOf("gv_ppp_programacion_diaria") >= 0) return json([{ np: "98694", tanda: "D52B", cod: "4109", razon_social: "Di Leo", m3: 0.5, fecha_entrega: "2026-09-08 00:00:00", zona: "Zona 1" }]);
+      // v20.78: el picking lee la vista agregada (pedido -> items). El chequeo sigue siendo
+      // el mismo: que la base salga de una vista gv_ppp_*, no de la tabla cruda del espejo.
+      if (u.indexOf("gv_ppp_base_pedidos_items") >= 0) return json([{ pedido: "98694", items: [{ a: "035E", c: 2 }] }]);
       if (u.indexOf("gv_ppp_base_pedidos") >= 0) return json([{ pedido: "98694", articulo: "035E", cajas: 2 }]);
       if (u.indexOf("gv_ppp_entregados_meta") >= 0) return json([{ np: "98000" }]);
       return json([]);
@@ -50,13 +53,13 @@ const vistas = html.match(/\/rest\/v1\/gv_ppp_(programacion_diaria|base_pedidos|
   });
 
   const aTabla = r.urls.filter((u) => /\/rest\/v1\/PPP_(Programacion_Diaria|Base_Pedidos|Entregados_Meta)\b/.test(u));
-  const aVista = r.urls.filter((u) => /\/rest\/v1\/gv_ppp_(programacion_diaria|base_pedidos|entregados_meta)\b/.test(u));
+  const aVista = r.urls.filter((u) => /\/rest\/v1\/gv_ppp_(programacion_diaria|base_pedidos(_items)?|entregados_meta)\b/.test(u));
   const checks = [
     ["index.html no lee más las tres tablas crudas por REST",          crudas.length === 0],
     ["y sí lee las vistas gv_ppp_* (>= 20 lugares)",                    vistas.length >= 20],
     ["los tres endpoints constantes apuntan a las vistas",              r.endpoints.every((e) => /\/gv_ppp_(programacion_diaria|base_pedidos|entregados_meta)$/.test(e))],
     ["la PPP carga desde gv_ppp_programacion_diaria",                    r.progNp.indexOf("98694") >= 0],
-    ["la base de picking carga desde gv_ppp_base_pedidos",              r.baseNp === "98694"],
+    ["la base de picking carga desde gv_ppp_base_pedidos(_items)",      r.baseNp === "98694"],
     ["los entregados cargan desde gv_ppp_entregados_meta",              r.metaTiene98000 === true],
     ["ningún fetch fue a una tabla cruda",                              aTabla.length === 0 && aVista.length >= 3],
     ["sin errores de página",                                           errs.length === 0]

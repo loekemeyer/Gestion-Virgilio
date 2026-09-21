@@ -1,0 +1,44 @@
+-- v20.78 — A Programar dejaba de contestar: la RPC llegaba al statement_timeout de 8 s.
+--
+-- Luis, 21/09, con la captura del "canceling statement due to statement timeout":
+-- "banda de timeouts, fijate de optimizar la toma de datos de pedidos".
+--
+-- Medido en pg_stat_statements (ventana de 22.553 s): 270 llamadas, 566 s de base,
+-- 2.484 ms de media y **7.958 ms de maximo** contra un statement_timeout de 8 s. O sea
+-- que la peor llamada no llegaba por 42 ms: cualquier pico de carga la cortaba.
+--
+-- Tres causas, ninguna cambia la logica (medido: 0 filas de diferencia sobre los 217
+-- pedidos que manda A Programar hoy):
+--
+--   1. `np_prod` barria las CUATRO tablas enteras (16.143 filas) y recien despues comparaba
+--      el codigo de cliente. Ahora filtra por los codigos que vienen en el payload.
+--   2. `np_fecha` hacia un `group by` sobre `GV_PPP_Base_Pedidos` COMPLETA (9.782 filas).
+--      Ahora sobre las 17 fechas del payload.
+--   3. `gv_espejo_np_pasa` se llamaba una vez POR FILA, 16.143 veces. Tiene `SET search_path`,
+--      asi que **NO se inlinea** — el mismo pozo que `gv_destino_score` en la v20.62. Y con
+--      la canilla del espejo ABIERTA (corte lk y chef en null, como esta desde el 06/09)
+--      devuelve `true` siempre: esas 16.143 llamadas no decidian nada.
+--
+-- Resultado: 2.465 ms -> 530 ms como postgres, 517 ms corriendo como `authenticated`
+-- (que es el que tiene el timeout de 8 s).
+--
+-- Rollback: sacar las dos CTE `_ex_cods` / `_ex_fechas`, los dos `in (select ...)` y el
+-- `or` del short-circuit. Vuelve a andar igual, mas lento.
+--
+-- La definicion viva esta aplicada en la base. Para traerla:
+--   select pg_get_functiondef('public.gv_pedidos_web_excluidos(jsonb)'::regprocedure);
+--
+-- Lo que cambio, en tres pedazos (el resto del cuerpo quedo igual):
+
+--   (a) las dos listas que salen del payload, nuevas:
+--       _ex_cods   as (select distinct cod   from ped where nullif(cod,'') is not null),
+--       _ex_fechas as (select distinct fecha from ped where fecha is not null),
+
+--   (b) np_prod: el filtro por cliente ADENTRO, y el short-circuit del espejo
+--         where x.np is not null and nullif(btrim(x.cod),'') is not null
+--           and btrim(x.cod) in (select cod from _ex_cods)
+--           and ((c.lk is null and c.chef is null) or public.gv_espejo_np_pasa(x.np, c.lk, c.chef))
+
+--   (c) np_fecha: por las fechas del payload, no por la tabla entera
+--         where fecha::date in (select fecha from _ex_fechas)
+--         group by 1
