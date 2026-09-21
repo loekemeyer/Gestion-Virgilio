@@ -27374,6 +27374,7 @@ padrón de Gestión **136 = 140 − 4**; `gv_retira_sin_etiqueta` vacía; `gv_re
 
 `sql/gv_retira_contradictorio_v2065.sql`, problema 470.
 
+<<<<<<< Updated upstream
 
 ### §3.ln — v20.66 · Pipeline de clientes nuevos: una pestaña propia para el camino entero — 2026-09-21
 
@@ -27486,3 +27487,44 @@ select * from public.gv_reglas_perdidas;    -- vacía = ninguna regla se perdió
 
 `sql/gv_clin_pipeline_v2066.sql`, `tests/pipe-clientes-nuevos.cjs`.
 
+=======
+---
+
+### §3.lo — v20.67 · Lo que ya salió no parte al cliente en dos días — 2026-09-21
+
+**Luis, sobre Riondini figurando en `gv_ppp_cliente_dos_dias`:** *"ya salio así que la macana ya
+esta hecha"*.
+
+**Qué se midió.** El centinela compara las fechas de entrega de un mismo cliente y marca si caen
+en días distintos. Una NP con **carga de camión (CCN) o remito controlado (CRN)** ya se entregó:
+su `fecha_entrega` es la que tenía programada, no una entrega pendiente. Al 21/09, de las **179 NP
+programadas a futuro, 34 ya habían salido** — el centinela las contaba a todas como pendientes.
+
+**El caso, que además contesta cómo se partió Riondini:**
+
+| pedido | NP | origen | recepción | m³ | tanda |
+|---|---|---|---|---|---|
+| viejo | 98605 · 98606 · 98607 | ISIS, tipo COT (Cotizador) | 26/08 | 0,239 | E12E |
+| nuevo | LK 0118 | web | 16/09 | **0,007** (1 código, 2 cajas) | E37F |
+
+No es un pedido partido ni un agregado (`es_agregado = false`): son dos pedidos con **21 días** de
+diferencia. Y **estaban los dos el 22/09** — el cliente estaba junto, en dos tandas del mismo día
+y el mismo camión (Zona 3 → Capital), separadas por origen (regla v14.12, web y ISIS no se
+mezclan).
+
+Lo que los partió fue la secuencia del 21/09: E12E se cargó al camión a las **10:18** (chofer
+Guillermo, remitos 17, 18 y 19) y a las **12:27** la redistribución del día sin reparto movió al
+23/09 lo que no había salido. E12E se quedó con su fecha porque el guard la frenó —correcto— y
+LK 0118 se fue al 23.
+
+⚠ Dato aparte: **E12E salió el lunes 21 con fecha de entrega martes 22**, o sea un día antes, y
+eso hoy no lo avisa nadie.
+
+**Qué se hizo.** Un CTE `salidos` (CCN/CRN, sin los legajos de prueba — el mismo criterio de
+`gv_ppp_tanda_mover` y `gv_dia_sin_reparto_ocupado`) y un `NOT EXISTS` en `limpia`. El centinela
+pasó de 4 filas a **0**.
+
+**Chequeo:** `select * from public.gv_ppp_cliente_dos_dias;` · `select * from
+public.gv_reglas_perdidas;` · `sql/gv_cliente_dos_dias_salidos_v2067.sql`,
+`tests/ppp-cliente-dos-dias-salidos.cjs`.
+>>>>>>> Stashed changes
