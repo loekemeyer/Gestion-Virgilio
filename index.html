@@ -3063,6 +3063,35 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 /* v19.14 — el badge de PPP pasa a `dp-badge`, el mismo de Facturacion / Stock / RR (supSetBadge).
    Queda arriba a la DERECHA, igual que los demas (v19.18: Luis lo pidio a la izquierda y despues
    lo corrigio a la derecha; `dp-badge` ya es `right:2px`, asi que no lleva estilo propio). */
+/* v20.55 (Luis) — el desglose del badge de la PPP. Tocar el número rojo abre esto. */
+.pav-ov{ display:none; position:fixed; inset:0; z-index:1320; background:rgba(2,6,23,.66);
+  padding:16px; overflow:auto; }
+.pav-ov.show{ display:flex; align-items:flex-start; justify-content:center; }
+.pav-card{ background:#fff; border-radius:14px; width:min(720px,100%); margin-top:6vh;
+  box-shadow:0 18px 50px rgba(2,6,23,.35); overflow:hidden; }
+.pav-head{ display:flex; align-items:center; gap:10px; padding:12px 16px;
+  border-bottom:1px solid #e2e8f0; background:#f8fafc; }
+.pav-title{ font-weight:900; color:#0f172a; font-size:16px; flex:1 1 auto; }
+.pav-x{ border:none; background:#e2e8f0; color:#334155; font-weight:900; font-size:14px;
+  border-radius:8px; padding:4px 10px; cursor:pointer; }
+.pav-body{ padding:12px 16px 16px; }
+.pav-cargando, .pav-vacio{ color:#64748b; font-weight:700; padding:14px 2px; }
+.pav-grupo{ border:1px solid #e2e8f0; border-radius:11px; padding:9px 12px 10px; margin-bottom:10px; }
+.pav-g-head{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.pav-g-n{ background:#dc2626; color:#fff; font-weight:900; font-size:12px; border-radius:999px;
+  padding:1px 9px; }
+.pav-g-t{ font-weight:900; color:#0f172a; font-size:14px; }
+.pav-fila{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; padding:3px 0 3px 2px;
+  border-top:1px dashed #eef2f7; }
+.pav-grupo .pav-fila:first-of-type{ border-top:none; }
+.pav-fecha{ color:#1e6bd6; font-weight:800; font-size:12.5px; font-variant-numeric:tabular-nums;
+  flex:0 0 auto; }
+.pav-que{ font-weight:800; color:#0f172a; font-size:13.5px; flex:0 0 auto; }
+.pav-det{ color:#475569; font-size:13px; flex:1 1 220px; }
+/* qué hacer con eso: es lo único accionable de la tarjeta, va abajo y distinto */
+.pav-accion{ margin-top:7px; padding-top:6px; border-top:1px solid #e2e8f0; color:#166534;
+  background:#f0fdf4; border-radius:7px; padding:6px 9px; font-size:12.5px; font-weight:700; }
+@media (max-width:560px){ .pav-card{ margin-top:2vh; } .pav-det{ flex-basis:100%; } }
 .ppp-alert-banner{ display:none; width:100%; }
 .ppp-alert-banner.on{ display:block; }
 /* v9.05 — tarjetas de alerta del PPP compactas (~1/4 del tamaño): todo en una fila, botones chicos */
@@ -5821,7 +5850,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.54"></script>
+<script type="module" src="recepcion.js?v=20.55"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -5914,7 +5943,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- GRANDES: uso diario (orden definido por el usuario). "Stock y Compras" = Stocks + OC en un solo botón. -->
     <div class="sup-actions sup-primary">
       <button class="sup-action-btn" onclick="openFacturacion()" style="position:relative;"><span class="sup-ico">📋</span><span>Facturación</span><span id="facBadge" class="dp-badge" style="display:none;" title="Pedidos listos para facturar (picking + separado terminados, todavía sin facturar)"></span></button>
-      <button class="sup-action-btn" onclick="openPPP()" style="position:relative;"><span class="sup-ico">🗓️</span><span>PPP</span><span id="pppAlertBadge" class="dp-badge" style="display:none;" title="Cosas para mirar en la PPP"></span></button>
+      <button class="sup-action-btn" onclick="openPPP()" style="position:relative;"><span class="sup-ico">🗓️</span><span>PPP</span><span id="pppAlertBadge" class="dp-badge" style="display:none;cursor:pointer;" title="Tocá para ver qué son" onclick="event.stopPropagation();pppAvisosAbrir()"></span></button>
       <button class="sup-action-btn" onclick="openRecepcionAdmin()" style="position:relative;"><span class="sup-ico">🏭</span><span>Carga Recepción Mercadería</span><span id="recepBadge" class="dp-badge" style="display:none;min-width:26px;height:26px;line-height:26px;font-size:15px;padding:0 6px;border-radius:13px;" title="Pendiente en Recepción: remitos por cargar + bajadas de racks por aprobar"></span></button>
       <button class="sup-action-btn" onclick="showFaltAvisar()" style="position:relative;"><span class="sup-ico">📦➕</span><span>Completar Pedido</span><span id="cpBadge" class="dp-badge" style="display:none;" title="Pedidos con faltante que tiene stock para completarse"></span></button>
       <button class="sup-action-btn" onclick="openStockAdmin()" style="position:relative;"><span class="sup-ico">📦</span><span>Stock y Compras</span><span id="stkBadge" class="dp-badge" style="display:none;" title="Códigos con stock negativo"></span><span id="stkOkBadge" style="display:none;position:absolute;top:2px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#16a34a;color:#fff;font-size:10px;font-weight:800;line-height:18px;text-align:center;pointer-events:none;">✓</span></button>
@@ -9698,7 +9727,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.54";
+const APP_VERSION = "v20.55";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -41037,6 +41066,82 @@ function pppAlertBadgeUpdate() {
   badge.title = total
     ? _pppAvisos.map(function (x) { return x.n + " · " + (x.titulo || x.tipo); }).join("\n")
     : "Sin avisos en la PPP";
+}
+
+/* ═══ v20.55 (Luis, 2026-09-21) — EL BADGE DE LA PPP DICE QUÉ SON ════════════════
+   Pedido: *"el �4� del badge qué significa? Debería tener más info"*.
+
+   El desglose ya existía, pero **sólo en el `title`**: un tooltip que en la práctica no se ve
+   — en el monitor táctil directamente no existe, y en la compu hay que adivinar que está ahí.
+   Un número rojo que no dice de qué es no se mira: se ignora.
+
+   Ahora el badge se toca y abre el desglose, con **la cosa concreta** — qué tanda, qué pedido,
+   qué día— y qué hacer con ella. El `4` del 21/09 eran dos cosas distintas: **1 tanda con
+   paradas de dos recorridos** (D69H, Capital + GBA Norte, mar 22/09) y **3 pedidos sacados a mano
+   esperando fecha** (LK 1448, LK 1358, CH 218).
+
+   El detalle sale de `gv_ppp_avisos_detalle`, que es la MISMA fuente que cuenta el badge
+   (`gv_ppp_avisos`): una fila por cosa, no por fila de la vista de origen — una tanda mezclada
+   cuenta 1 aunque tenga 4 pedidos adentro, igual que en el número. */
+function pppAvisosCerrar() {
+  const ov = document.getElementById("pppAvisosPop");
+  if (ov) ov.classList.remove("show");
+}
+async function pppAvisosAbrir() {
+  let ov = document.getElementById("pppAvisosPop");
+  if (!ov) {
+    ov = document.createElement("div");
+    ov.id = "pppAvisosPop";
+    ov.className = "pav-ov";
+    ov.onclick = function (e) { if (e.target === ov) pppAvisosCerrar(); };
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div class="pav-card"><div class="pav-head">' +
+      '<span class="pav-title">🗓️ Cosas para mirar en la PPP</span>' +
+      '<button class="pav-x" onclick="pppAvisosCerrar()">✕</button></div>' +
+      '<div class="pav-body"><div class="pav-cargando">Leyendo…</div></div></div>';
+  ov.classList.add("show");
+  let filas = [];
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/gv_ppp_avisos_detalle" +
+      "?select=tipo,orden,titulo,fecha,que,detalle,accion&order=orden,fecha,que",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    filas = await r.json() || [];
+  } catch (_e) {
+    const b = ov.querySelector(".pav-body");
+    if (b) b.innerHTML = '<div class="pav-vacio">No se pudo leer el detalle. Revisá la conexión.</div>';
+    return;
+  }
+  const body = ov.querySelector(".pav-body");
+  if (!body) return;
+  if (!filas.length) {
+    body.innerHTML = '<div class="pav-vacio">✓ Sin avisos. La programación no tiene nada marcado.</div>';
+    return;
+  }
+  const grupos = [];
+  for (const f of filas) {
+    let g = grupos.find(function (x) { return x.tipo === f.tipo; });
+    if (!g) { g = { tipo: f.tipo, titulo: f.titulo, accion: f.accion, filas: [] }; grupos.push(g); }
+    g.filas.push(f);
+  }
+  const dia = function (d) {
+    const t = String(d || ""); return t.length >= 10 ? t.slice(8, 10) + "/" + t.slice(5, 7) : "";
+  };
+  body.innerHTML = grupos.map(function (g) {
+    return '<div class="pav-grupo">' +
+      '<div class="pav-g-head"><span class="pav-g-n">' + g.filas.length + '</span>' +
+        '<span class="pav-g-t">' + escapeHtml(g.titulo || g.tipo) + '</span></div>' +
+      g.filas.map(function (f) {
+        return '<div class="pav-fila">' +
+          (f.fecha ? '<span class="pav-fecha">' + escapeHtml(dia(f.fecha)) + '</span>' : '') +
+          '<span class="pav-que">' + escapeHtml(f.que || "—") + '</span>' +
+          '<span class="pav-det">' + escapeHtml(f.detalle || "") + '</span>' +
+        '</div>';
+      }).join("") +
+      (g.accion ? '<div class="pav-accion">↳ ' + escapeHtml(g.accion) + '</div>' : '') +
+    '</div>';
+  }).join("");
 }
 
 function pppAlertBannerRender(alertas) {

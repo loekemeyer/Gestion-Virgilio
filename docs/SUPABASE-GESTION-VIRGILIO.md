@@ -26810,3 +26810,45 @@ su columna:
 tiene la suya. Y **`est` sigue crudo** — es sobre eso que los porcentajes netean, y eso no cambió.
 
 `tests/pga-salio-badge.cjs` lo sostiene, incluido el guard de que `est` no dejó de estar crudo.
+
+---
+
+### §3.lf — v20.55 · El badge de la PPP dice QUÉ son esos avisos
+
+Luis, 2026-09-21, con el panel a la vista: *"el «4» del badge qué significa? Debería tener más
+info"*.
+
+**Qué pasaba.** El badge contaba `gv_ppp_avisos` (una fila por tipo con su conteo) y el desglose
+vivía **sólo en el `title` del `<span>`**: un tooltip que en el monitor táctil no existe y en la
+compu hay que adivinar que está ahí. Un número rojo que no dice de qué es no se mira, se ignora.
+
+**Qué era el 4**, y es la mejor prueba de por qué hacía falta — eran **dos cosas distintas**:
+
+| | |
+|---|---|
+| 1 tanda con paradas de dos recorridos | **D69H**, Capital + GBA Norte, martes 22/09 |
+| 3 pedidos sacados a mano esperando fecha | **LK 1448** (3 NP, de D69H y E52A), **LK 1358** (de E50A), **CH 218** (de E26B) |
+
+**Qué se hizo.** `gv_ppp_avisos_detalle`: **una fila por cosa**, con el dato concreto (qué tanda,
+qué pedido, qué día), el detalle y **qué hacer con eso**. El badge se toca y abre el desglose
+agrupado por tipo.
+
+⚠ **El conteo tiene que dar exactamente el del badge**, o el pop-up desmiente al número que lo
+abrió. Por eso agrupa igual que `gv_ppp_avisos`: por `(día, camión)` el súper mezclado, por tanda
+las dos de tanda, por `(empresa, order_id)` los retenidos — una tanda mezclada cuenta **1** aunque
+tenga 4 pedidos adentro. Medido el 21/09: `tanda_dos_camiones` 1 = 1, `retenido_sin_fecha` 3 = 3,
+total **4 = 4**.
+
+```sql
+with a as (select tipo, n from public.gv_ppp_avisos where n > 0),
+     d as (select tipo, count(*)::int n from public.gv_ppp_avisos_detalle group by 1)
+select coalesce(a.tipo, d.tipo) tipo, a.n badge, d.n detalle,
+       case when coalesce(a.n,0) = coalesce(d.n,0) then 'ok' else 'NO COINCIDE' end
+  from a full join d using (tipo);
+```
+
+Detalles de la pantalla: el clic del badge **no** abre la PPP (`event.stopPropagation()`), la
+acción va **una vez por grupo** y no repetida en cada fila, sin avisos dice que no hay en vez de
+quedarse en *"Leyendo…"*, y si la consulta falla lo dice.
+
+`sql/gv_ppp_avisos_detalle_v2055.sql`, `tests/ppp-avisos-detalle.cjs`.
