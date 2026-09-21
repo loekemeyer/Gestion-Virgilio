@@ -6635,6 +6635,10 @@ const SUPABASE_PPP_PROG_ENDPOINT       = SUPABASE_URL + "/rest/v1/gv_ppp_program
    Se unificó para poder sacar esa hoja del Apps Script y borrar la tabla chica. */
 const SUPABASE_PPP_ENTREGADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/gv_ppp_entregados_meta";
 const SUPABASE_PPP_BASE_ENDPOINT       = SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos";
+/* v20.71 - las dos lecturas agregadas: lo que el front usa de verdad de esa vista, del
+   lado del servidor. Las dos entran en una sola pagina de PostgREST. */
+const SUPABASE_PPP_BASE_ITEMS_ENDPOINT = SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos_items";
+const SUPABASE_PPP_BASE_ARTS_ENDPOINT  = SUPABASE_URL + "/rest/v1/gv_ppp_base_articulos";
 /* v18.58 — tandas que se DESHICIERON a propósito (desarme de sus NPs o anulación de
    picking/armado). El monitor las saltea en el cartel "Tandas trabajadas que NO están en
    PPP — alguien se equivocó": si la sacamos nosotros de la programación, nadie se equivocó.
@@ -11542,8 +11546,11 @@ async function _supaFetchAllRaw(endpoint, query) {
           apikey: SUPABASE_KEY,
           Authorization: "Bearer " + SUPABASE_KEY,
           "Range-Unit": "items",
-          Range: from + "-" + (from + 999),
-          Prefer: "count=exact"
+          /* v20.71 - SIN `Prefer: count=exact`. Ese header hacia que PostgREST contara la
+             vista ENTERA en CADA pagina (`pgrst_source_count`), y nadie usa ese total: la
+             paginacion corta igual por pagina corta. Sobre `gv_ppp_base_pedidos` eran 10
+             recuentos de 9.618 filas por lectura, 2.324 lecturas en 6 h. */
+          Range: from + "-" + (from + 999)
         }
       }), _corte]);
       if (!r.ok && r.status !== 206) throw new Error("Supabase " + endpoint + " HTTP " + r.status);
@@ -11563,7 +11570,12 @@ async function _supaFetchAllRaw(endpoint, query) {
     // paginación entera; sin esto tira TypeError y el llamador se queda sin datos.
     const cr = ((r.headers && typeof r.headers.get === "function") ? r.headers.get("content-range") : "") || "";
     const slash = cr.indexOf("/");
-    if (slash >= 0) { const t = parseInt(cr.slice(slash + 1), 10); if (!isNaN(t)) total = t; }
+    /* v20.71 - sin `count=exact` PostgREST manda `0-999/*`, asi que el total viene NaN. El
+       corte pasa a ser la pagina corta, igual que en `gvRestTodo` y en el envoltorio de
+       `supabase-config.js`. Ojo: el `else` tiene que colgar del NaN, no del `/`, o con el
+       `*` el total queda en Infinity y se pide una pagina vacia de mas. */
+    const t = (slash >= 0) ? parseInt(cr.slice(slash + 1), 10) : NaN;
+    if (!isNaN(t)) total = t;
     else if (got < 1000) { total = from + got; }   // sin header → heurística
     if (!got) break;
     from += got;
@@ -11595,16 +11607,23 @@ async function fetchPickingBase() {
    pre-agrega (pedido,artículo) sumando cajas; el picking suma por código igual,
    así el resultado es idéntico al de Sheets. cajas es numérico en la DB. v2.80. */
 async function fetchPickingBaseFromSupabase() {
-  const rows = await supaFetchAll(SUPABASE_PPP_BASE_ENDPOINT, "select=pedido,articulo,cajas&order=id.asc");
+  /* v20.71 - se lee `gv_ppp_base_pedidos_items` (una fila por pedido, con sus items ya
+     agrupados en el orden de id) en vez de la vista cruda. Son 816 filas contra 9.618, o
+     sea UNA pagina contra diez, y cada pagina recalculaba la vista entera: 68 ms contra
+     1.530 ms de base por lectura. El contenido es el mismo. */
+  const rows = await supaFetchAll(SUPABASE_PPP_BASE_ITEMS_ENDPOINT, "select=pedido,items");
   const map = new Map();
   await mergePickingBasePppWeb(map);      // v12.64 — los artículos de los pedidos web
   for (let i = 0; i < rows.length; i++) {
     const ped = pickNormNp(rows[i].pedido);
     if (!ped) continue;
-    const art = (rows[i].articulo == null ? "" : String(rows[i].articulo)).trim();
-    if (!art) continue;
-    if (!map.has(ped)) map.set(ped, []);
-    map.get(ped).push({ art: art, cajas: Number(rows[i].cajas) || 0 });
+    const items = Array.isArray(rows[i].items) ? rows[i].items : [];
+    for (let j = 0; j < items.length; j++) {
+      const art = (items[j] && items[j].a != null) ? String(items[j].a).trim() : "";
+      if (!art) continue;
+      if (!map.has(ped)) map.set(ped, []);
+      map.get(ped).push({ art: art, cajas: Number(items[j].c) || 0 });
+    }
   }
   return map;
 }
@@ -42168,7 +42187,8 @@ async function dpLoad(force) {
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_volumen_articulo_resuelto", "select=codigo,m3"),
         supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,empresa,sector,cajas_max"),
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,isis,nombre,categoria"),
-        supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos", "select=articulo&order=id.asc"),
+        // v20.71 - los codigos distintos (321 filas) en vez de la vista entera (9.618).
+        supaFetchAllSafe(SUPABASE_PPP_BASE_ARTS_ENDPOINT, "select=articulo"),
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos_Discontinuados", "select=cod")   // v9.08: discontinuos → no se muestran
       ]);
       var pppRows = res[0], cajasRows = res[1], volRows = res[2], capRows = res[3], insRows = res[4], pedRows = res[5];
