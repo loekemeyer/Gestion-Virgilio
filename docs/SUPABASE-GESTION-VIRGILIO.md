@@ -26217,3 +26217,11 @@ el stock es el **disponible** (usa `fin_dep`, sin lo comprometido); **0 de 241**
 809E ← 809: +1,33).
 
 **Chequeo:** `select public.watchdog_frescura_datos();` · `sql/gv_proyeccion_sync_diario_v2038.sql`
+
+⚠ **Lo que NO era un hallazgo, y conviene que quede escrito porque los números invitan a
+equivocarse:** al revisar el generador aparecieron los 4 duales pidiendo **357 cajas** para el lado
+de Chef con **767** del mismo código del lado LK (437E: 286, de las cuales 189 en racks). Leído
+como un solo artículo eso parece un traslado de góndola disfrazado de compra. **Luis lo corrigió el
+mismo día: *"No son el mismo artículo por más que tengan el mismo código. Cambia el packaging, por
+eso está dividido así."*** El generador está haciendo lo correcto al pedir por separado, y no hay
+que volver a proponer el traslado.

@@ -876,6 +876,30 @@ select cod, public.gv_empresa_de_articulo(cod) from public.codigos_duales;
 -- las 4 tienen que dar NULL
 ```
 
+### ⚠ Y un DUAL **no es el mismo artículo de los dos lados: cambia el PACKAGING**
+
+**Luis, 2026-09-21:** *"No son el mismo artículo por más que tengan el mismo código. Cambia el
+packaging, por eso está dividido así."*
+
+Es la pregunta que se hace sola al mirar el generador de OC, porque los números invitan a
+equivocarse. Medido ese día:
+
+| código | stock lado LK | stock lado CH | se pide (CH) |
+|---|---|---|---|
+| 437E | 286 (189 en racks) | 14 | 145 |
+| 809E | 349 | 113 | 126 |
+| 438E | 117 | 3 | 86 |
+| 439E | 15 | 8 | 10 |
+
+Leído como si fuera un solo artículo, eso parece **357 cajas que se compran teniendo 767 del otro
+lado**, o sea un traslado de góndola disfrazado de compra. **No lo es.** Son dos productos
+distintos con el mismo número: la caja de Loekemeyer no sirve para un pedido de Chef.
+
+**Entonces:** el generador está haciendo lo correcto al pedir por separado, y **nunca hay que
+proponer "trasladar de la góndola LK a la de Chef" para ahorrarse la compra**. La única
+consecuencia del código compartido es la de siempre: la empresa la da de qué pila salió la caja
+(el pedido), no el artículo.
+
 ## ⚠ REGLA: el CÓDIGO DE CLIENTE es por EMPRESA — nunca cruzar por código solo
 
 **Thomas, 2026-09-16:** *"¿contemplaste que los códigos de clientes de LK y CH son diferentes?
