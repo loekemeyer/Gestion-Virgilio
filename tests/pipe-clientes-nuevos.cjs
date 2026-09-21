@@ -69,10 +69,16 @@ if (/^\s*etapa\s+text/mi.test(sql.split(/gv_clin_etapa/i)[0]))
 if (!/create or replace function public\.gv_clin_etapa/i.test(sql))
   fallos.push("falta gv_clin_etapa: la etapa tiene que derivarse de los timestamps");
 
-/* ── 6. el badge del pedido es pedidos + 1 ────────────────────────────────────────────── */
+/* ── 6. el numero de pedido va DENTRO del badge de Cliente nuevo ─────────────────────── */
+// Luis lo pidio asi desde el principio: "un badge que indica, ADEMAS de su condicion de ser
+// clientes nuevos, el pedido por el que van". Estaba como badge aparte al lado de la NP.
 // `nuevo_pedidos` son los FACTURADOS de toda su historia: el de la pantalla es el siguiente.
-if (!/function pipeNroPedidoHtml[\s\S]{0,400}const i = n \+ 1;/.test(html))
-  fallos.push("el badge 1er/2do/3er pedido no suma 1: nuevo_pedidos son los facturados ANTERIORES");
+if (!/const cual = isFinite\(n\) \? \(n \+ 1\) : null;/.test(html))
+  fallos.push("el badge no suma 1: nuevo_pedidos son los facturados ANTERIORES a este");
+if (!/cuar-badge-nro">.{1,2} ' \+ cual \+ '.{1,2}. pedido/.test(html))
+  fallos.push("el numero de pedido no esta dentro del badge de Cliente nuevo");
+if (/function pipeNroPedidoHtml/.test(html))
+  fallos.push("quedo pipeNroPedidoHtml sin llamadores: el numero ya vive en el badge");
 
 /* ── 7. el vinculo ────────────────────────────────────────────────────────────────────── */
 if (!/insert into public\.gv_excepcion_cuarentena[\s\S]{0,400}'vinculo'/.test(sql))
@@ -162,6 +168,26 @@ if (!/data-fmt="dhm"/.test(html))
   fallos.push("el timer del pipeline no marca su formato: el tick lo pisaria con el viejo");
 if (!/n\.getAttribute\("data-fmt"\) === "dhm" \? pipeFmtEspera/.test(html))
   fallos.push("clinTickStart no respeta el formato del pipeline");
+
+/* ── 14. el vinculo va DENTRO del cuadro de la decision ──────────────────────────────── */
+// v20.79 (Luis: "no figura la opcion de vincularlo con otras razones sociales u otros
+// clientes"). Estaba en un pop-up SEPARADO que se abria DESPUES de confirmar: habia que
+// decidir a ciegas. Y el propio cuadro habla de "una razon social nueva de un cliente ya
+// activo" — es ahi donde se esta pensando en el vinculo.
+if (!/function pipeFirmaVincHtml/.test(html))
+  fallos.push("el cuadro de la decision no trae la seccion de vinculo");
+if (!/pipeFirmaAbrir\([^)]*'referenciado'[\s\S]{0,400}',true\)/.test(html))
+  fallos.push("el boton Referenciado no abre el cuadro con la seccion de vinculo");
+if (!/pipeFirmaAbrir\([^)]*'valido'[\s\S]{0,300}',true\)/.test(html))
+  fallos.push("el boton Valido no abre el cuadro con la seccion de vinculo");
+// ⚠ el ORDEN (vinculo antes que la decision) lo mide tests/pipe-vinculo-en-el-cuadro.cjs
+//   corriendolo de verdad: un regex sobre el codigo no lo caza — se probo, y con la condicion
+//   del vinculo desactivada el texto seguia estando y el candado daba verde.
+if (!/if \(s\.velegido && !s\.demo\) \{/.test(html))
+  fallos.push("el vinculo del cuadro no esta condicionado a que se haya elegido un cliente");
+// y no puede volver el pop-up separado que se abria solo despues de confirmar
+if (/if \(ev === "referenciado" \|\| ev === "valido"\) pipeVincAbrir/.test(html))
+  fallos.push("volvio el pop-up de vinculo que se abria DESPUES de confirmar");
 
 /* ── y lo de siempre: toda vista nueva con security_invoker ───────────────────────────── */
 ["gv_clin_prioritarios", "gv_clin_vencidos"].forEach(function (v) {

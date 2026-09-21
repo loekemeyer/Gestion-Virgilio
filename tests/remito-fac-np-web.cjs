@@ -1,4 +1,4 @@
-/* Regresión v20.79 — el remito FACTURADO (el que se auto-imprime al tildar Facturación)
+/* Regresión v20.82 — el remito FACTURADO (el que se auto-imprime al tildar Facturación)
    tiene que traer CLIENTE y FECHA DE ENTREGA también cuando la NP es de la página.
 
    Es el mismo agujero de la v15.46, en el único camino que había quedado afuera:

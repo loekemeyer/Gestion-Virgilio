@@ -468,8 +468,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-tabla-arbol (v17.66: Programación como tabla día → tanda → NP → contenido, con los 4 % de avance) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-tabla-arbol.cjs
 
-echo "== pga-enviar-a-programar (v17.85: el botón ↩ Enviar a programar de la fila de la NP, con memoria de la tanda) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pga-enviar-a-programar.cjs
+echo "== ppp-sin-a-programar (candado v20.77: desde Programación sólo se reprograma o se cancela) =="
+node tests/ppp-sin-a-programar.cjs
 
 echo "== ppp-fit-acordeon (v13.95: con un acordeón abierto la PPP scrollea en vez de achicarse y cortar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fit-acordeon.cjs
@@ -631,3 +631,9 @@ node tests/ppp-tanda-armada-sin-armado.cjs
 
 echo "== ppp-arbol-centrado (v20.77: el arbol de Programacion va centrado, no pegado a la izquierda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-arbol-centrado.cjs
+
+echo "== pipe-vinculo-en-el-cuadro (v20.79: el vinculo va dentro del cuadro de la decision, y antes que ella) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-vinculo-en-el-cuadro.cjs
+
+echo "== cuar-badge-nro-pedido (v20.81: el numero de pedido va dentro del badge de Cliente nuevo) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cuar-badge-nro-pedido.cjs

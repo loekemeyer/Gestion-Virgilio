@@ -1283,6 +1283,32 @@ no se mueve. Lo que se frena es programar uno nuevo ahí.
 en un día cerrado. Mira **web e ISIS** y saca lo que ya salió por CCN/CRN.
 `sql/gv_dia_sin_reparto_v2064.sql`, `tests/ppp-dia-sin-reparto.cjs`, §3.ll.
 
+## ⚠ REGLA (Thomas, 2026-09-21, v20.80): un pedido programado NO vuelve a «A Programar»
+
+**Thomas, textual:** *"sacá del módulo programación la opción de mandar pedidos a «A programar».
+Una vez programados o se eliminan o se reprograman para otra fecha"*.
+
+| qué se quiere hacer | el único camino |
+|---|---|
+| que salga otro día | **📅 Cambiar de día** (`pgaNpMoverAbrir`): elige día y después tanda nueva o una existente |
+| que no salga | **✕ Cancelar pedido** (`pppVencCancelar`): sale de la PPP y lo armado vuelve a «A guardar» |
+
+⚠ **Las puertas eran TRES y en dos módulos distintos** —la fila de la NP en el árbol
+(`pgaEnviarAProgramar`), y los dos paneles de la NP: pedido sin empezar (`pppVencVolver`) y vencido
+(`pppVencSinProgramar`)—, más una **cuarta automática**: al corregir la dirección y cambiar la
+zona, preguntaba si devolverlo a A Programar; ahora abre el pop-up de Cambiar de día. Las
+funciones siguen en el archivo (como `gv_ppp_np_desarmar` en la v18.77): lo que no puede volver es
+la **puerta**.
+
+**Chequeo:** `node tests/ppp-sin-a-programar.cjs` — candado **estático** sobre `index.html`, porque
+un test de pantalla prueba una puerta y deja pasar las otras dos. ⚠ No escribirlo con un regex
+`[^"']*`: el `onclick` vive dentro de un string de JS con las comillas escapadas, así que ese regex
+no matchea nunca y el test da **falso verde** (pasó en el primer intento, con las tres puertas
+puestas). §3.lu.
+
+⚠ **`GV_PPP_Web_Retenido` deja de recibir filas nuevas**, pero las que hay siguen vivas y su regla
+—la de abajo— sigue valiendo: al programarlas vuelven a su tanda sólo si está sana.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.56): un pedido retenido NO vuelve a una tanda que avanzó sin él
 
 **Luis, textual:** *"esto me preocupa. estaban armados? qué interacción tienen si vuelven a
@@ -1555,6 +1581,38 @@ Lo resuelven dos líneas, `clinSinPedidos()` / `clinVacio(campo)`: sin pedidos c
 queda en `null` y se vuelve a pedir; con los pedidos cargados y sin retenidos, `{}` legítimo.
 **Al agregar un lote nuevo de este tipo, usar `clinVacio`.** Es el mismo pozo de §*"una lectura
 ROTA no es un CERO"*. Problema 474.
+
+### El número de pedido va DENTRO del badge de «Cliente nuevo» (v20.81, Luis)
+
+Fue el pedido textual desde el principio: *"un badge que indica, además de su condición de ser
+clientes nuevos, el pedido por el que van (1er pedido, 2do pedido, 3er pedido)"*. Estaba como
+badge aparte al lado de la NP — dos pastillas donde iba una. Ahora el badge dice
+**«🆕 Cliente nuevo · 2.º pedido»**.
+
+Es el **mismo badge** de A Programar, Clientes nuevos y Cuarentena, así que el dato aparece en
+las tres pantallas.
+
+⚠ `nuevo_pedidos` son los pedidos **FACTURADOS** de toda su historia: el que está en la pantalla
+es el **siguiente**, o sea +1. Sin el dato no se inventa un número.
+
+### El VÍNCULO va dentro del cuadro de la decisión (v20.79, Luis)
+
+*"no figura la opcion de vincularlo con otras razones sociales u otros clientes"*, mirando el
+cuadro de «Marcar REFERENCIADO».
+
+Estaba en un pop-up **separado que se abría DESPUÉS de confirmar**: había que decidir a ciegas y
+recién ahí aparecía la pregunta. Y el propio cuadro habla de *"el que compra por una razón social
+nueva de un cliente ya activo"* — es ahí donde se está pensando en el vínculo. Ahora es una
+sección opcional del mismo cuadro, en Referenciado y en Válido.
+
+⚠ **El vínculo se ejecuta ANTES que la decisión.** Si falla, el cuadro queda abierto con el error
+y la decisión no se toma: al revés quedaría el pedido decidido y el cliente sin vincular.
+
+⚠⚠ **Y eso se verifica corriéndolo, no con un regex.** El primer candado que se escribió miraba
+el orden de las dos llamadas **en el código** y **no cazó el bug** cuando se desactivó la
+condición del vínculo: el texto seguía estando. Por eso existe `tests/pipe-vinculo-en-el-cuadro.cjs`,
+que abre el cuadro de verdad y mira el orden real de las RPC. **Un candado de texto no puede
+verificar semántica** — cuando lo que importa es el orden o la condición, el test se corre.
 
 ### La espera va en «Qué sigue», en día · hora · minuto (v20.75, Luis)
 

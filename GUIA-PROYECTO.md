@@ -1,4 +1,4 @@
-## Nota v20.79 (2026-09-21) — El remito FACTURADO ya trae el cliente de una NP web
+## Nota v20.82 (2026-09-21) — El remito FACTURADO ya trae el cliente de una NP web
 
 Lo vio Thomas sobre **LK 0145** (tanda E35A, impresa el 21/09 a las 14:51): la hoja salía con
 **`Cliente —`** y **`Fecha Entrega —`**, con el dato cargado y a la vista en la base
