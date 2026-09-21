@@ -5778,7 +5778,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.39"></script>
+<script type="module" src="recepcion.js?v=20.40"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9623,7 +9623,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.39";
+const APP_VERSION = "v20.40";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -46674,7 +46674,11 @@ function cuarParseDeudaCrystal(aoa) {
       // saber a que sucursal corresponde la deuda (comprobante -> remito -> NP -> sucursal).
       const pend = cuarNumRaw(L);
       cur.deuda += pend; cur.docs++;
-      cur.items.push({ comprobante: et, pendiente: pend, fila: row });
+      // v20.40 - la col E trae el TIPO (FCA, RC, NCA, FCE, AjP...); el NUMERO formateado
+      // ("0006-00005511") esta en la col G. Con el tipo solo no hay nada que cruzar contra
+      // la factura de ISIS: las 135 lineas de Chef quedaron en "sin factura parseada".
+      const nroComp = (row[6] == null ? "" : String(row[6]).trim());
+      cur.items.push({ comprobante: (nroComp ? et + " " + nroComp : et), pendiente: pend, fila: row });
     }
   }
   if (cur) cli.push(cur);
