@@ -26613,3 +26613,62 @@ histórico. Medido con la clave publishable sobre el árbol real: **268 filas, 1
 
 `tests/ppp-misiones.cjs` tiene el guard estático de los tres lados: exige la llamada a la RPC,
 exige que vaya con `p_nps`, y **falla si alguien vuelve a leer la vista** desde `index.html`.
+
+---
+
+### §3.lc — v20.50: un código con L cae a la lista de Chef cuando LK no lo tiene — 2026-09-21
+
+**Luis, 21/09:** *"pone esa regla de que se busque en la lista de chef si no esta en LK"*.
+
+**Qué pasaba.** Los pedidos web de Chef **215** y **229** mostraban Monto **$0,00** en Clientes
+Nuevos. Sus artículos van con L (702EL, 769L, 798EL, 838L, 840L, 847L, 865EL…), y
+`gv_ppp_web_valor_items` pela la L y busca el precio en la lista de **LK** — que no tiene esos
+números. El join a `precios_venta_chef` llevaba `and not v.es_l`, así que el código con L **no
+tenía a dónde caer** y la línea valía 0.
+
+⚠ **Esto NO significa que la L estuviera mal puesta.** La L dice que el código es el mismo número
+pero de Loekemeyer (`702EL` = `702E` de LK); el número **no** dice la empresa. Lo que falta es el
+precio de ese número del lado de LK. Ver el bloque de la L arriba de todo en `CLAUDE.md`.
+
+**Qué se midió antes de tocar nada:**
+
+| | |
+|---|---|
+| códigos con L en las listas de precios | **0** de 336 (LK 235 + Chef 101) — las listas guardan el número pelado |
+| los 11 números del caso, en la lista de **Chef** | 10 de 11 (falta sólo el **838**) |
+| los mismos, en la lista de **LK** | **0** |
+| líneas con L facturadas en el ISIS de Chef | **6.308**, de 187 códigos (025L, 026L, 102EL, 207L…) |
+| …de esos 187, los 11 del caso | **0 líneas**: nunca se facturaron |
+
+**El cambio, una condición:**
+
+```sql
+-- antes
+left join precios_venta_chef pc on lower(p_empresa) = 'chef' and not v.es_l and canon_cod(pc.cod) = v.cod_precio
+-- ahora
+left join precios_venta_chef pc on lower(p_empresa) = 'chef' and canon_cod(pc.cod) = v.cod_precio
+```
+
+El `coalesce` ya estaba en el orden correcto —`super → LK → Chef`— así que un código con L sigue
+tomando **la lista de LK** cuando LK lo tiene, y sólo cae a la de Chef cuando no.
+
+**Impacto medido sobre los pedidos web de Chef: 2 pedidos, 13 líneas, $15.138.480** que pasan de
+no valorizarse a valorizarse.
+
+| pedido | antes | ahora |
+|---|---|---|
+| chef 215 | 0,00 | **14.364.390,00** |
+| chef 229 | 0,00 | **1.471.020,00** |
+| chef 227 | 900.768,00 | 900.768,00 |
+| chef 228 | 649.809,60 | 649.809,60 |
+
+Y `505L` —un código con L que **sí** está en LK— sigue valiendo lo de LK (19.080,00), que es el
+control de que el respaldo no le gana a la lista que manda.
+
+**Centinela.** `GV_Reglas_Centinela` tiene la fila de `gv_ppp_web_valor_items`: si alguien repone
+el `and not v.es_l`, el patrón deja de matchear y aparece en `select * from public.gv_reglas_perdidas;`.
+
+**Lo que queda sin precio en ninguna de las dos listas: el 838.** Es un dato a cargar, no un
+problema de la regla.
+
+`sql/gv_valor_items_L_fallback_chef_v2050.sql`.
