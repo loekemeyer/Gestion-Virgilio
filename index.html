@@ -3288,6 +3288,22 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .ppp-pencil-btn:hover{ background:#fef3c7; }
 /* ===== v13.03 — Programación nueva (tablero de 6 días) · prefijo pn- ===== */
 .pn-wrap{ color:#0f172a; }
+/* v20.61 (Thomas): *"los botones de Actualizar, Imprimir y Tablero se quedan trabados, quiero
+   que viajen con la tabla (que dinámicamente se muevan si la tabla se expande/contrae)"*.
+   Desde la v20.59 la tabla mide lo que mide su contenido, así que el encabezado —que iba al
+   ancho del contenedor— dejaba los tres botones flotando a la derecha, lejos del borde de la
+   tabla. `pga-blk` envuelve encabezado + banda + tabla con `width:fit-content`: el ancho del
+   bloque es el del hijo más ancho —la tabla— y el encabezado se estira a ESE ancho, así que los
+   botones quedan pegados al borde derecho de la tabla y se mueven con ella al abrir o cerrar un
+   día. Sin JS: no hay que recalcular nada en cada render. */
+.pga-blk{ width:fit-content; max-width:100%; }
+/* ⚠ `width:0` + `min-width:100%` es lo que hace que el ancho lo fije SIEMPRE la tabla. Un hijo
+   con `width:0` no participa del `fit-content` del padre —así el encabezado no lo estira cuando
+   su texto es más largo que la tabla, que es lo que pasaba con pocos días— y el `min-width:100%`
+   lo devuelve al ancho ya resuelto del bloque. Sin esto la botonera se iba 11 px de más. */
+.pga-blk > .pn-head{ width:0; min-width:100%; }
+.pga-blk > .pn-head > div:first-child{ min-width:0; }   /* el título puede envolver, no empujar */
+.pga-blk > .pn-head .pn-tools{ flex:0 0 auto; }
 .pn-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:2px 0 12px; }
 .pn-h1{ font-size:24px; font-weight:900; letter-spacing:-.3px; }
 .pn-h2{ color:#64748b; font-size:13px; font-weight:600; margin-top:2px; }
@@ -5875,7 +5891,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.60"></script>
+<script type="module" src="recepcion.js?v=20.61"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9753,7 +9769,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.60";
+const APP_VERSION = "v20.61";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38941,6 +38957,9 @@ function _pppArbolHtml(programados) {
   // lista →", que contaba con otro criterio (no miraba el FSS) y mandaba a otra
   // pantalla; dejar las dos era mostrar dos números distintos de lo mismo.
   let h = _patrHtml();
+  // ⚠ `pga-blk` abre acá y CIERRA EN LAS CUATRO SALIDAS de esta función (las tres tempranas y
+  // la final). Si se agrega una salida nueva, el `</div>` va también ahí.
+  h += '<div class="pga-blk">';
   h += '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div>' +
     '<div class="pn-h2">Tocá un día para ver sus tandas · una tanda para ver sus NP · una NP para ver qué lleva</div></div>' +
     '<div class="pn-tools">' +
@@ -38952,14 +38971,14 @@ function _pppArbolHtml(programados) {
   h += _pgaSalioSinFcHtml();
   const dias = _pgaArbol();
   h += '<div class="pga-wrap">';
-  if (!_pgaRows) { return h + '<div class="pga-msg">Leyendo la programación…</div></div>'; }
+  if (!_pgaRows) { return h + '<div class="pga-msg">Leyendo la programación…</div></div></div>'; }
   if (_pgaErr && !dias.length) {
     return h + '<div class="pga-msg pga-err">No se pudo leer la programación (' + escapeHtml(_pgaErr) +
-      '). <button class="pn-lnk" onclick="pgaRecargar()">Reintentar</button></div></div>';
+      '). <button class="pn-lnk" onclick="pgaRecargar()">Reintentar</button></div></div></div>';
   }
   if (!dias.length) return h + '<div class="pga-msg">' + (_pppSearch
     ? 'Sin coincidencias para «' + escapeHtml(_pppSearch) + '» en lo programado de hoy en adelante.'
-    : 'No hay nada programado de hoy en adelante.') + '</div></div>';
+    : 'No hay nada programado de hoy en adelante.') + '</div></div></div>';
   // v19.32: el día de espera está siempre, aunque hoy no haya nada parado (con el buscador
   // puesto no, que ahí la tabla muestra coincidencias y un día vacío sería una falsa).
   if (!_pppSearch) _pgaConEspera(dias);
@@ -38977,7 +38996,7 @@ function _pppArbolHtml(programados) {
     '</tr></thead><tbody>';
   // v18.78: el cuerpo dia -> tanda -> NP lo arma _pgaCuerpoHtml, que comparten
   // esta tabla y el submodulo de atrasados. Una sola copia = no pueden divergir.
-  h += _pgaCuerpoHtml(dias, {}) + '</div>';
+  h += _pgaCuerpoHtml(dias, {}) + '</div></div>';
   return h;
 }
 
