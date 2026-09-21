@@ -882,6 +882,97 @@ button {
 .clin-speech, .clin-accion{ display:flex; flex-direction:column; gap:4px; align-items:stretch; }
 .clin-tiempo{ font-weight:800; white-space:nowrap; color:#9a3412; }
 .clin-iva{ display:block; font-size:11px; font-weight:800; color:#166534; white-space:nowrap; }
+
+/* v20.61 (Luis): 🧭 Pipeline de clientes nuevos — pestaña propia del módulo PPP.
+   Reusa las clases de Cuarentena (`cuar-tbl`, `cuar-td-*`) y agrega sólo lo suyo. */
+.pipe-col{ margin:0; }
+.pipe-tbl th.pipe-th-acc{ min-width:210px; }
+.pipe-td-acc{ white-space:normal; }
+.pipe-td-et{ white-space:nowrap; }
+/* la fila se tiñe apenas según la etapa: el ojo encuentra en qué está cada pedido sin leer */
+.pipe-tr-referenciado{ background:#f0fdf4; }
+.pipe-tr-valido,.pipe-tr-speech1,.pipe-tr-speech2{ background:#fffbeb; }
+.pipe-tr-pagado{ background:#ecfdf5; }
+.pipe-tr-no_valido,.pipe-tr-cancelado{ background:#fef2f2; }
+.pipe-tr-aprobado{ background:#f8fafc; color:#64748b; }
+
+.pipe-etapa{ display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }
+.pipe-etapa.e-ing{ background:#e2e8f0; color:#334155; }
+.pipe-etapa.e-ana{ background:#dbeafe; color:#1e40af; }
+.pipe-etapa.e-ref{ background:#dcfce7; color:#166534; }
+.pipe-etapa.e-val{ background:#fef3c7; color:#92400e; }
+.pipe-etapa.e-sp1{ background:#fed7aa; color:#9a3412; }
+.pipe-etapa.e-sp2{ background:#fecaca; color:#991b1b; }
+.pipe-etapa.e-pag{ background:#a7f3d0; color:#065f46; }
+.pipe-etapa.e-nov{ background:#fecdd3; color:#9f1239; }
+.pipe-etapa.e-apr{ background:#cbd5e1; color:#1e293b; }
+.pipe-etapa.e-can{ background:#e5e7eb; color:#6b7280; text-decoration:line-through; }
+
+/* el número de pedido del cliente (1.º / 2.º / 3.º), al lado de la NP */
+.pipe-nro{ display:inline-block; margin-left:6px; padding:2px 7px; border-radius:6px;
+  background:#eef2ff; color:#3730a3; font-size:11px; font-weight:700; white-space:nowrap; }
+.pipe-vinc{ display:block; margin-top:3px; font-size:11px; color:#0f766e; font-weight:700; }
+.pipe-vencido{ color:#b91c1c !important; font-weight:800; }
+.pipe-badge-venc{ margin-left:10px; padding:3px 9px; border-radius:999px; background:#fee2e2;
+  color:#991b1b; font-size:12px; font-weight:800; }
+.pipe-cerrado{ font-size:12px; color:#166534; font-weight:700; }
+.pipe-cerrado-no{ color:#9f1239; }
+
+/* los botones de cada etapa: mismo alto, van uno al lado del otro y bajan si no entran */
+.pipe-b{ display:inline-block; margin:2px 3px 2px 0; padding:6px 10px; border-radius:8px;
+  border:1px solid transparent; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.pipe-b-eq { background:#1e6bd6; color:#fff; }
+.pipe-b-ref{ background:#16a34a; color:#fff; }
+.pipe-b-val{ background:#d97706; color:#fff; }
+.pipe-b-no { background:#dc2626; color:#fff; }
+.pipe-b-ok2{ background:#15803d; color:#fff; }
+.pipe-b-wa { background:#25d366; color:#0b3d20; }
+.pipe-b-lnk{ background:#e0f2fe; color:#075985; border-color:#bae6fd; }
+.pipe-b-sec2{ background:#f1f5f9; color:#334155; border-color:#cbd5e1; }
+.pipe-b-off{ opacity:.45; cursor:not-allowed; }
+
+/* pop-ups (firma y vínculo) */
+.pipe-modal-off{ display:none; }
+.pipe-modal{ position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:9000;
+  display:flex; align-items:center; justify-content:center; padding:16px; }
+.pipe-modal-in{ background:#fff; border-radius:14px; padding:18px; width:min(460px,100%);
+  max-height:88vh; overflow:auto; box-shadow:0 18px 50px rgba(0,0,0,.28); }
+.pipe-modal-ancha{ width:min(620px,100%); }
+.pipe-modal-t{ font-size:17px; font-weight:800; color:#0f172a; margin-bottom:6px; }
+.pipe-modal-ayuda{ font-size:13px; color:#475569; line-height:1.45; margin-bottom:12px; }
+.pipe-modal-lbl{ font-size:12px; font-weight:800; color:#334155; margin:10px 0 6px; text-transform:uppercase; letter-spacing:.4px; }
+.pipe-quien{ display:flex; gap:6px; flex-wrap:wrap; }
+.pipe-quien-b{ padding:7px 13px; border-radius:8px; border:1px solid #cbd5e1; background:#f8fafc;
+  color:#334155; font-size:13px; font-weight:700; cursor:pointer; }
+.pipe-quien-b.on{ background:#1e6bd6; color:#fff; border-color:#1e6bd6; }
+.pipe-modal-inp{ width:100%; margin-top:8px; padding:9px 11px; border:1px solid #cbd5e1;
+  border-radius:8px; font-size:14px; box-sizing:border-box; }
+.pipe-modal-ta{ width:100%; margin-top:10px; min-height:64px; padding:9px 11px; border:1px solid #cbd5e1;
+  border-radius:8px; font-size:14px; font-family:inherit; box-sizing:border-box; resize:vertical; }
+.pipe-modal-err{ margin-top:10px; padding:8px 10px; border-radius:8px; background:#fee2e2; color:#991b1b;
+  font-size:13px; font-weight:700; }
+.pipe-modal-btns{ display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+.pipe-b-ok{ padding:9px 18px; border:0; border-radius:9px; background:#15803d; color:#fff;
+  font-size:14px; font-weight:800; cursor:pointer; }
+.pipe-b-sec{ padding:9px 16px; border:1px solid #cbd5e1; border-radius:9px; background:#f8fafc;
+  color:#334155; font-size:14px; font-weight:700; cursor:pointer; }
+.pipe-b-ok:disabled{ opacity:.6; cursor:wait; }
+
+/* la lista de candidatos del vínculo */
+.pipe-vinc-hint{ margin-top:10px; font-size:13px; color:#64748b; }
+.pipe-vinc-lista{ margin-top:10px; max-height:250px; overflow:auto; border:1px solid #e2e8f0; border-radius:10px; }
+.pipe-vinc-it{ display:block; width:100%; text-align:left; padding:8px 11px; border:0;
+  border-bottom:1px solid #f1f5f9; background:#fff; font-size:13px; color:#0f172a; cursor:pointer; }
+.pipe-vinc-it:hover{ background:#f8fafc; }
+.pipe-vinc-it.on{ background:#dbeafe; font-weight:700; }
+.pipe-vinc-it.nuevo{ opacity:.6; }
+.pipe-vinc-cod{ display:inline-block; min-width:64px; margin-right:8px; padding:1px 6px; border-radius:5px;
+  background:#e2e8f0; color:#334155; font-size:11px; font-weight:800; }
+.pipe-vinc-cuit{ margin-left:8px; font-size:11px; color:#64748b; }
+.pipe-vinc-tag{ margin-left:8px; padding:1px 6px; border-radius:5px; background:#fee2e2; color:#991b1b;
+  font-size:10px; font-weight:800; }
+.pipe-vinc-ok{ margin-top:10px; padding:8px 11px; border-radius:8px; background:#ecfdf5; color:#065f46; font-size:13px; }
+
 .clin-cuit{ display:block; font-weight:600; font-size:11px; color:#64748b; letter-spacing:.2px; }
 .clin-imp{ display:block; font-weight:700; font-size:11px; color:#b45309; }
 .clin-td-tiempo{ white-space:nowrap; }
@@ -41004,7 +41095,8 @@ function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
     b("ent",     "✅ Pedidos Entregados (" + n(cEnt) + ")") +
     b("ocup",    "📦 Ocupación") +
     b("modif",   "✏️ Modificar Pedidos") +          // v18.14 (Luis): entre Ocupación y Config. Cuarentena
-    b("cuarcfg", "🚧 Config. Cuarentena") +
+    b("clin",    "🧭 Pipeline clientes") +   // v20.63 (Luis): convive con el submódulo de A Programar
+    b("cuarcfg", "ð§ Config. Cuarentena") +
   '</div>';
 }
 /* v14.29 — contadores de las solapas calculados aparte, para que A Programar también
@@ -41056,6 +41148,14 @@ function pppRenderProg() {
   // v14.88 — Config. Cuarentena: pantalla propia (a la derecha de Ocupación) con los 4
   // botones de importación de reportes .xls + la última vez que se actualizó cada uno.
   // No depende de que se haya importado una PPP, así que se intercepta acá arriba.
+  // v20.63 (Luis) — 🧭 Pipeline de clientes nuevos. Pantalla propia, interceptada acá arriba
+  // por lo mismo que Config. Cuarentena: no depende de que se haya importado una PPP.
+  if (_pppTab === "clin") {
+    pppPaintTabs();
+    if (!_apr.listo && !_apr.cargando) { try { aprCargar(); } catch (_e) {} }
+    _renderKeepFocus(box, pipeHtml());
+    return;
+  }
   if (_pppTab === "cuarcfg") {
     pppPaintTabs();
     if (_apr.cuarResumen === null && !_apr.cuarResumenLoading) cuarResumenCargar();
@@ -44347,6 +44447,11 @@ let _apr = {
   // v19.05 — CLIENTES NUEVOS: primer contacto (Speech 1) y teléfono del cliente
   cliContacto: null, cliContactoLoading: false,   // empresa:order_id → ISO del primer contacto
   cliWpp: null, cliWppLoading: false,              // empresa:cod → teléfono del cliente
+  // v20.63 (Luis) — PIPELINE DE CLIENTES NUEVOS (pestaña propia): estado por pedido
+  // (empresa:order_id → {etapa, reloj_desde, vencido, decision…}) y la config de sus timers.
+  pipe: null, pipeLoading: false, pipeRetry: false,
+  pipeCfg: null, pipeCfgLoading: false,
+  pipeFirma: null, pipeVinc: null,
   // v19.44 — REPOSICIÓN CHICA: pedidos que NO caen en cuarentena porque al cliente se le facturó
   // hace poco y pidió un solo código (empresa:order_id → {items, dias, fecha}). Se pide APARTE,
   // nunca junto con la marcación: ver cuarRepoCargar.
@@ -46752,6 +46857,490 @@ function clinDemoRowHtml() {
     (_apr.cliDemo ? "✕ Quitar ejemplo" : "👁 Ver ejemplo") + '</button></div>';
 }
 function clinDemoToggle() { _apr.cliDemo = !_apr.cliDemo; pppRenderProg(); }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════
+   🧭 PIPELINE CLIENTES NUEVOS — pestaña propia del módulo PPP (v20.61, pedido de Luis)
+
+   Luis, 21/09: el cliente nuevo tiene un CAMINO, no un botón. Entra el pedido → se le hace
+   el análisis crediticio (Equifax) → la dirección lo define Referenciado / Válido / No
+   válido → el Válido paga por adelantado (Speech 1, y Speech 2 si no contesta) → recién ahí
+   se programa, y con prioridad.
+
+   ⚠ CONVIVE con el submódulo 🆕 Clientes nuevos de «A Programar», y ÉSE SIGUE SIENDO EL
+     PRINCIPAL hasta que Luis diga lo contrario. Por eso los dos comparten todo lo que se
+     puede compartir y ninguno tiene una verdad propia:
+       · aprobar llama a `gv_cuarentena_liberar`, la MISMA función del viejo;
+       · el Speech 1 sella `GV_Clientes_Nuevos_Contacto`, que es el timer del viejo;
+       · los comentarios y los eventos van al MISMO log (Config. Cuarentena).
+     La etapa la DERIVA el backend de los timestamps: acá no se decide nada, se dibuja.
+
+   ⚠ Muestra TAMBIÉN los clientes nuevos que además tienen deuda o están suspendidos (los
+     que el submódulo viejo deja en Cuarentena). El análisis crediticio es justamente para
+     ésos; el candado no cambia: siguen retenidos hasta que alguien los apruebe.
+   ══════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ¿este pedido es de cliente nuevo? (con o sin otros motivos encima) */
+function pipeEsClienteNuevo(p) {
+  return aprCuarentenaMotivos(p).indexOf("cliente_nuevo") >= 0;
+}
+function pipeLista() {
+  return (_apr.pedidos || []).filter(function (p) {
+    return !p._demo && aprEnCuarentena(p) && pipeEsClienteNuevo(p);
+  });
+}
+
+/* ── estado del pipeline, por lote (una sola vuelta de red para toda la pantalla) ────── */
+function pipeNeed() { if (_apr.pipe === null && !_apr.pipeLoading) pipeCargar(); }
+async function pipeCargar() {
+  if (_apr.pipeLoading) return;
+  const lista = pipeLista();
+  if (!lista.length) { _apr.pipe = {}; return; }
+  _apr.pipeLoading = true;
+  try {
+    const res = await aprRpc("gv_clin_pipeline_lote", {
+      p_pedidos: lista.map(function (p) {
+        return { empresa: p.empresa || "lk", order_id: String(p.order_id), cod: String(p.cod || "").trim() };
+      })
+    });
+    const m = {};
+    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.order_id)] = r; });
+    _apr.pipe = m;
+  } catch (_e) {
+    // v20.42: la PRIMERA llamada a una RPC recién creada puede dar 404 (PostgREST todavía no
+    // la tiene en su caché de esquema). Se reintenta una vez; después se deja vacío.
+    if (!_apr.pipeRetry) { _apr.pipeRetry = true; _apr.pipe = null; }
+    else { _apr.pipe = _apr.pipe || {}; }
+  }
+  _apr.pipeLoading = false;
+  if (_pppTab === "clin") pppRenderProg();
+}
+/* El order_id del pedido y la clave del backend son el mismo string salvo el prefijo `np`,
+   que gv_cuarentena_clave saca. Se replica acá para poder buscar en el mapa. */
+function pipeClave(oid) { return String(oid || "").replace(/^np/i, ""); }
+function pipeEst(p) {
+  if (!p) return null;
+  const m = _apr.pipe || {};
+  return m[String(p.empresa || "lk") + ":" + pipeClave(p.order_id)] || null;
+}
+function pipeEtapa(p) { const e = pipeEst(p); return (e && e.etapa) || "ingresado"; }
+
+const PIPE_ETAPAS = {
+  ingresado:    { t: "Sin analizar",      c: "e-ing"  },
+  analisis:     { t: "Análisis pedido",   c: "e-ana"  },
+  referenciado: { t: "Referenciado",      c: "e-ref"  },
+  valido:       { t: "Válido",            c: "e-val"  },
+  speech1:      { t: "Esperando pago",    c: "e-sp1"  },
+  speech2:      { t: "2.º aviso",         c: "e-sp2"  },
+  pagado:       { t: "Pagó",              c: "e-pag"  },
+  no_valido:    { t: "No válido",         c: "e-nov"  },
+  aprobado:     { t: "Aprobado",          c: "e-apr"  },
+  cancelado:    { t: "Cancelado",         c: "e-can"  },
+};
+function pipeEtapaHtml(p) {
+  const e = pipeEst(p), et = pipeEtapa(p), d = PIPE_ETAPAS[et] || PIPE_ETAPAS.ingresado;
+  const firma = e && e.decision_persona ? ' title="Definido por ' + escapeHtml(String(e.decision_persona)) + '"' : "";
+  return '<span class="pipe-etapa ' + d.c + '"' + firma + '>' + escapeHtml(d.t) + '</span>' +
+         (e && e.vinc_cod
+           ? '<span class="pipe-vinc" title="Vinculado a ' + escapeHtml(String(e.vinc_razon_social || "")) +
+             ' — toma su antigüedad">🔗 ' + escapeHtml(cuarEmpCod(e.vinc_empresa) + " " + e.vinc_cod) + '</span>'
+           : "");
+}
+/* El reloj de la etapa. Rojo cuando el backend lo marca vencido (el tope sale de
+   PPP_Web_Config: clin_speech_horas / clin_analisis_horas, hoy 24 h). */
+function pipeRelojHtml(p) {
+  const e = pipeEst(p);
+  if (!e || !e.reloj_desde) return '<span class="cuar-yp-sin">—</span>';
+  return '<span class="clin-tiempo' + (e.vencido ? " pipe-vencido" : "") + '" data-since="' +
+    escapeHtml(String(e.reloj_desde)) + '" title="' +
+    (e.vencido ? "Pasó el tope de espera de esta etapa" : "Desde que arrancó esta etapa") + '">' +
+    clinFmtElapsed(e.reloj_desde) + '</span>';
+}
+/* 1.º / 2.º / 3.º pedido. `nuevo_pedidos` son los pedidos FACTURADOS de toda su historia
+   (lo calcula LK): el que está en pantalla es el siguiente, así que va +1. */
+function pipeNroPedidoHtml(p) {
+  const d = (p && p.cuarentena_detalle) || {};
+  const n = Number(d.nuevo_pedidos);
+  if (!isFinite(n)) return "";
+  const i = n + 1;
+  return '<span class="pipe-nro" title="' + (n === 0 ? "Sin ninguna compra facturada" :
+      n + " pedido" + (n === 1 ? "" : "s") + " facturado" + (n === 1 ? "" : "s") + " en toda su historia") +
+    ' — éste sería el ' + i + '.º">' + (i <= 3 ? i + ".º pedido" : i + ".º") + '</span>';
+}
+
+/* ── Análisis crediticio: abre Equifax y arranca el timer ───────────────────────────── */
+/* La URL sale de PPP_Web_Config (clave `clin_equifax_url`), no del codigo: cambiarla es un
+   update, no un deploy. Si trae {cuit} se le pega el CUIT del cliente. */
+function pipeCfgNeed() { if (_apr.pipeCfg === null && !_apr.pipeCfgLoading) pipeCfgCargar(); }
+async function pipeCfgCargar() {
+  if (_apr.pipeCfgLoading) return;
+  _apr.pipeCfgLoading = true;
+  try {
+    const r = await gvRestTodo("PPP_Web_Config?select=clave,valor,valor_texto&clave=like.clin_*");
+    const m = {};
+    (r || []).forEach(function (x) { m[String(x.clave)] = x.valor_texto != null ? x.valor_texto : x.valor; });
+    _apr.pipeCfg = m;
+  } catch (_e) { _apr.pipeCfg = _apr.pipeCfg || {}; }
+  _apr.pipeCfgLoading = false;
+  if (_pppTab === "clin") pppRenderProg();
+}
+function pipeEquifaxUrl(p) {
+  let base = "https://www.equifax.com.ar/";
+  try { const c = (_apr.pipeCfg || {}).clin_equifax_url; if (c) base = String(c); } catch (_e) {}
+  const cuit = String(((_apr.cliCuit || {})[String(p.empresa || "lk") + ":" + String(p.cod || "").trim()]) || "")
+                 .replace(/\D/g, "");
+  return base.indexOf("{cuit}") >= 0 ? base.replace("{cuit}", cuit) : base;
+}
+async function pipeAnalisis(empresa, orderId) {
+  const p = pipeBuscar(empresa, orderId); if (!p) return;
+  // 1) abrir Equifax PRIMERO: si el sello falla, la persona igual tiene que poder trabajar
+  try { window.open(pipeEquifaxUrl(p), "_blank", "noopener"); } catch (_e) {}
+  await pipeEvento(empresa, orderId, "analisis", null, null);
+}
+function pipeBuscar(empresa, orderId) {
+  const k = String(empresa) + ":" + String(orderId);
+  return (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === k; });
+}
+
+/* ── Una sola puerta para todos los eventos ──────────────────────────────────────────── */
+async function pipeEvento(empresa, orderId, evento, persona, comentario) {
+  const p = pipeBuscar(empresa, orderId);
+  try {
+    const r = await aprRpc("gv_clin_evento", {
+      p_empresa: empresa, p_order_id: String(orderId), p_evento: evento,
+      p_persona: persona || null, p_por: await aprQuien(), p_comentario: comentario || null,
+      p_np: p ? aprPedLabel(p) : null, p_cod: p ? String(p.cod || "") : null,
+      p_razon_social: p ? String(p.razon_social || "") : null
+    });
+    const fila = Array.isArray(r) ? r[0] : r;
+    _apr.pipe = _apr.pipe || {};
+    const k = String(empresa) + ":" + pipeClave(orderId);
+    _apr.pipe[k] = Object.assign({}, _apr.pipe[k] || {}, {
+      empresa: empresa, order_id: pipeClave(orderId),
+      etapa: (fila && fila.etapa) || evento,
+      reloj_desde: fila ? fila.reloj_desde : null, vencido: false
+    });
+    // el estado completo (incluye `vencido` y la decisión) lo recalcula el backend
+    _apr.pipe = _apr.pipe; _apr.pipeRetry = false;
+    pipeRecargar();
+    return true;
+  } catch (e) {
+    _apr.msg = "No se pudo registrar el paso: " + String((e && e.message) || e);
+    _apr.msgErr = true; pppRenderProg();
+    return false;
+  }
+}
+function pipeRecargar() { _apr.pipe = null; _apr.pipeLoading = false; pipeNeed(); pppRenderProg(); }
+
+/* ── Pop-up de firma: los pasos que decide una persona llevan su nombre ──────────────── */
+/* Mismo criterio que el pop-up de Cuarentena (Vivi / Marian / Otro): lo que se mira después
+   no es el mail de la sesión (que es una cuenta compartida) sino quién lo autorizó. */
+const PIPE_PERSONAS = ["Luis", "Thomas", "Marian", "Vivi"];
+function pipeFirmaAbrir(empresa, orderId, evento, titulo, ayuda) {
+  _apr.pipeFirma = { empresa: empresa, orderId: String(orderId), evento: evento,
+                     titulo: titulo, ayuda: ayuda || "", persona: "", otro: "", txt: "", err: "", saving: false };
+  pppRenderProg();
+}
+function pipeFirmaCerrar() { _apr.pipeFirma = null; pppRenderProg(); }
+function pipeFirmaPersona(v) { const s = _apr.pipeFirma; if (!s) return; s.persona = v; s.err = ""; pipeFirmaRender(); }
+function pipeFirmaRender() {
+  const box = document.getElementById("pipeFirmaBox"); if (!box) return;
+  const ta = document.getElementById("pipeFirmaTexto"); if (ta) { const s = _apr.pipeFirma; if (s) s.txt = ta.value; }
+  box.outerHTML = pipeFirmaHtml();
+}
+function pipeFirmaValor(s) {
+  if (!s) return "";
+  return String(s.persona === "__otro" ? (s.otro || "") : (s.persona || "")).trim();
+}
+async function pipeFirmaConfirmar() {
+  const s = _apr.pipeFirma; if (!s || s.saving) return;
+  const ta = document.getElementById("pipeFirmaTexto"); if (ta) s.txt = ta.value;
+  const otro = document.getElementById("pipeFirmaOtro"); if (otro) s.otro = otro.value;
+  const quien = pipeFirmaValor(s);
+  if (!quien) { s.err = "Decinos quién lo define."; pipeFirmaRender(); return; }
+  s.saving = true; s.err = ""; pipeFirmaRender();
+  const ok = await pipeEvento(s.empresa, s.orderId, s.evento, quien, s.txt);
+  if (!ok) { s.saving = false; s.err = _apr.msg || "No se pudo guardar."; pipeFirmaRender(); return; }
+  const ev = s.evento, emp = s.empresa, oid = s.orderId;
+  _apr.pipeFirma = null;
+  // Referenciado y Válido son los dos momentos en que Luis quiere preguntar por el vínculo
+  if (ev === "referenciado" || ev === "valido") pipeVincAbrir(emp, oid);
+  else pppRenderProg();
+}
+function pipeFirmaHtml() {
+  const s = _apr.pipeFirma;
+  if (!s) return '<div id="pipeFirmaBox" class="pipe-modal-off"></div>';
+  let h = '<div id="pipeFirmaBox" class="pipe-modal"><div class="pipe-modal-in">' +
+    '<div class="pipe-modal-t">' + escapeHtml(s.titulo || "Confirmar") + '</div>';
+  if (s.ayuda) h += '<div class="pipe-modal-ayuda">' + escapeHtml(s.ayuda) + '</div>';
+  h += '<div class="pipe-modal-lbl">¿Quién lo define?</div><div class="pipe-quien">';
+  PIPE_PERSONAS.forEach(function (n) {
+    h += '<button class="pipe-quien-b' + (s.persona === n ? " on" : "") +
+         '" onclick="pipeFirmaPersona(\'' + n + '\')">' + n + '</button>';
+  });
+  h += '<button class="pipe-quien-b' + (s.persona === "__otro" ? " on" : "") +
+       '" onclick="pipeFirmaPersona(\'__otro\')">Otro</button></div>';
+  if (s.persona === "__otro")
+    h += '<input id="pipeFirmaOtro" class="pipe-modal-inp" placeholder="Nombre" value="' +
+         escapeHtml(String(s.otro || "")) + '" oninput="_apr.pipeFirma.otro=this.value">';
+  h += '<textarea id="pipeFirmaTexto" class="pipe-modal-ta" placeholder="Comentario (opcional) — queda en el log del pedido">' +
+       escapeHtml(String(s.txt || "")) + '</textarea>';
+  if (s.err) h += '<div class="pipe-modal-err">' + escapeHtml(s.err) + '</div>';
+  h += '<div class="pipe-modal-btns">' +
+    '<button class="pipe-b-sec" onclick="pipeFirmaCerrar()">Cancelar</button>' +
+    '<button class="pipe-b-ok" onclick="pipeFirmaConfirmar()"' + (s.saving ? " disabled" : "") + '>' +
+      (s.saving ? "Guardando…" : "Confirmar") + '</button>' +
+    '</div></div></div>';
+  return h;
+}
+
+/* ── Pop-up del VÍNCULO: "¿ya es cliente?" ───────────────────────────────────────────── */
+/* Luis: al marcar Referenciado o Válido hay que preguntar si ya es cliente con otra razón
+   social. Si lo es, hereda su antigüedad y sus PRÓXIMOS pedidos dejan de caer acá.
+   ⚠ NO destraba el pedido en curso: ese sigue su camino hasta que alguien lo apruebe. */
+function pipeVincAbrir(empresa, orderId) {
+  const p = pipeBuscar(empresa, orderId);
+  _apr.pipeVinc = { empresa: empresa, orderId: String(orderId),
+                    cod: p ? String(p.cod || "") : "", rs: p ? String(p.razon_social || "") : "",
+                    q: "", res: null, buscando: false, elegido: null,
+                    persona: "", otro: "", err: "", saving: false };
+  pppRenderProg();
+}
+function pipeVincCerrar() { _apr.pipeVinc = null; pppRenderProg(); }
+function pipeVincRender() {
+  const box = document.getElementById("pipeVincBox"); if (!box) return;
+  box.outerHTML = pipeVincHtml();
+  const i = document.getElementById("pipeVincQ");
+  if (i) { try { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } catch (_e) {} }
+}
+let _pipeVincT = null;
+function pipeVincInput(v) {
+  const s = _apr.pipeVinc; if (!s) return;
+  s.q = String(v || "");
+  if (_pipeVincT) clearTimeout(_pipeVincT);
+  _pipeVincT = setTimeout(pipeVincBuscar, 300);
+}
+async function pipeVincBuscar() {
+  const s = _apr.pipeVinc; if (!s) return;
+  const q = String(s.q || "").trim();
+  if (q.length < 3) { s.res = null; pipeVincRender(); return; }
+  s.buscando = true; pipeVincRender();
+  try { s.res = (await aprRpc("gv_clin_vinculo_buscar", { p_q: q, p_limit: 20 })) || []; }
+  catch (_e) { s.res = []; s.err = "No se pudo buscar."; }
+  s.buscando = false; pipeVincRender();
+}
+function pipeVincElegir(emp, cod, rs, esNuevo) {
+  const s = _apr.pipeVinc; if (!s) return;
+  if (esNuevo === "1") {
+    s.err = "Ese cliente también figura como cliente nuevo: vincularlo no le daría antigüedad.";
+    pipeVincRender(); return;
+  }
+  s.elegido = { empresa: emp, cod: cod, rs: rs }; s.err = ""; pipeVincRender();
+}
+function pipeVincPersona(v) { const s = _apr.pipeVinc; if (!s) return; s.persona = v; s.err = ""; pipeVincRender(); }
+async function pipeVincGuardar() {
+  const s = _apr.pipeVinc; if (!s || s.saving) return;
+  const otro = document.getElementById("pipeVincOtro"); if (otro) s.otro = otro.value;
+  if (!s.elegido) { s.err = "Elegí a qué cliente se lo vincula."; pipeVincRender(); return; }
+  const quien = String(s.persona === "__otro" ? (s.otro || "") : (s.persona || "")).trim();
+  if (!quien) { s.err = "Decinos quién vincula."; pipeVincRender(); return; }
+  s.saving = true; s.err = ""; pipeVincRender();
+  try {
+    await aprRpc("gv_clin_vincular", {
+      p_empresa: s.empresa, p_cod: s.cod,
+      p_vinc_empresa: s.elegido.empresa, p_vinc_cod: s.elegido.cod,
+      p_persona: quien, p_por: await aprQuien(), p_order_id: String(s.orderId), p_nota: null
+    });
+    _apr.pipeVinc = null;
+    _apr.msg = "Vinculado a " + cuarEmpCod(s.elegido.empresa) + " " + s.elegido.cod +
+               ". Sus próximos pedidos ya no entran al pipeline; éste sigue su camino.";
+    _apr.msgErr = false;
+    pipeRecargar();
+  } catch (e) {
+    s.saving = false; s.err = String((e && e.message) || e); pipeVincRender();
+  }
+}
+function pipeVincHtml() {
+  const s = _apr.pipeVinc;
+  if (!s) return '<div id="pipeVincBox" class="pipe-modal-off"></div>';
+  let h = '<div id="pipeVincBox" class="pipe-modal"><div class="pipe-modal-in pipe-modal-ancha">' +
+    '<div class="pipe-modal-t">¿' + escapeHtml(s.rs || ("cliente " + s.cod)) + ' ya es cliente nuestro?</div>' +
+    '<div class="pipe-modal-ayuda">Si ya compra con otra razón social (de Loekemeyer o de Chef), ' +
+      'vinculalo: toma su antigüedad y sus próximos pedidos dejan de entrar acá. ' +
+      'Este pedido sigue su camino igual.</div>' +
+    '<input id="pipeVincQ" class="pipe-modal-inp" placeholder="Razón social, CUIT o código…" value="' +
+      escapeHtml(String(s.q || "")) + '" oninput="pipeVincInput(this.value)">';
+  if (s.buscando) h += '<div class="pipe-vinc-hint">Buscando…</div>';
+  else if (s.res && !s.res.length) h += '<div class="pipe-vinc-hint">Sin resultados.</div>';
+  else if (s.res && s.res.length) {
+    h += '<div class="pipe-vinc-lista">';
+    s.res.forEach(function (r) {
+      const sel = s.elegido && s.elegido.empresa === r.empresa && s.elegido.cod === r.cod;
+      h += '<button class="pipe-vinc-it' + (sel ? " on" : "") + (r.es_nuevo ? " nuevo" : "") +
+        '" onclick="pipeVincElegir(\'' + r.empresa + '\',\'' + escapeHtml(String(r.cod)) + '\',\'' +
+        escapeHtml(String(r.razon_social || "").replace(/'/g, "\\'")) + '\',\'' + (r.es_nuevo ? "1" : "0") + '\')">' +
+        '<span class="pipe-vinc-cod">' + cuarEmpCod(r.empresa) + " " + escapeHtml(String(r.cod)) + '</span>' +
+        escapeHtml(String(r.razon_social || "")) +
+        (r.cuit ? '<span class="pipe-vinc-cuit">' + escapeHtml(String(r.cuit)) + '</span>' : "") +
+        (r.es_nuevo ? '<span class="pipe-vinc-tag">también nuevo</span>' : "") +
+        '</button>';
+    });
+    h += '</div>';
+  }
+  if (s.elegido)
+    h += '<div class="pipe-vinc-ok">Se vincula a <b>' + cuarEmpCod(s.elegido.empresa) + " " +
+         escapeHtml(String(s.elegido.cod)) + '</b> — ' + escapeHtml(String(s.elegido.rs || "")) + '</div>';
+  h += '<div class="pipe-modal-lbl">¿Quién vincula?</div><div class="pipe-quien">';
+  PIPE_PERSONAS.forEach(function (n) {
+    h += '<button class="pipe-quien-b' + (s.persona === n ? " on" : "") +
+         '" onclick="pipeVincPersona(\'' + n + '\')">' + n + '</button>';
+  });
+  h += '<button class="pipe-quien-b' + (s.persona === "__otro" ? " on" : "") +
+       '" onclick="pipeVincPersona(\'__otro\')">Otro</button></div>';
+  if (s.persona === "__otro")
+    h += '<input id="pipeVincOtro" class="pipe-modal-inp" placeholder="Nombre" value="' +
+         escapeHtml(String(s.otro || "")) + '" oninput="_apr.pipeVinc.otro=this.value">';
+  if (s.err) h += '<div class="pipe-modal-err">' + escapeHtml(s.err) + '</div>';
+  h += '<div class="pipe-modal-btns">' +
+    '<button class="pipe-b-sec" onclick="pipeVincCerrar()">No es cliente / más tarde</button>' +
+    '<button class="pipe-b-ok" onclick="pipeVincGuardar()"' + (s.saving ? " disabled" : "") + '>' +
+      (s.saving ? "Guardando…" : "Vincular") + '</button>' +
+    '</div></div></div>';
+  return h;
+}
+
+/* ── Los Speech: mismo texto y mismo teléfono que el submódulo viejo ─────────────────── */
+async function pipeSpeech(empresa, orderId, n) {
+  const p = pipeBuscar(empresa, orderId); if (!p) return;
+  await pipeEvento(empresa, orderId, n === 2 ? "speech2" : "speech1", null, null);
+  clinAbrirWa(p, n === 2 ? clinSpeechMsg2(p) : clinSpeechMsg1(p));
+}
+
+/* ── Los botones de cada etapa ───────────────────────────────────────────────────────── */
+function pipeAccionesHtml(p) {
+  const emp = (p.empresa || "lk"), oid = escapeHtml(String(p.order_id));
+  const et = pipeEtapa(p), sinTel = !clinWppTel(p);
+  const B = function (cls, onclick, txt, title, off) {
+    return '<button class="pipe-b ' + cls + (off ? " pipe-b-off" : "") + '"' + (off ? " disabled" : "") +
+      ' onclick="' + onclick + '" title="' + escapeHtml(title) + '">' + txt + '</button>';
+  };
+  if (et === "aprobado")
+    return '<span class="pipe-cerrado">✅ Aprobado — ya está en «Pedidos a programar»</span>';
+  if (et === "cancelado")
+    return '<span class="pipe-cerrado pipe-cerrado-no">🗑 Cancelado</span>';
+
+  if (et === "ingresado")
+    return B("pipe-b-eq", "pipeAnalisis('" + emp + "','" + oid + "')", "🔎 Análisis Cred.",
+             "Abre Equifax y arranca el reloj del análisis");
+
+  if (et === "analisis")
+    return B("pipe-b-ref", "pipeFirmaAbrir('" + emp + "','" + oid + "','referenciado','Marcar REFERENCIADO'," +
+             "'Pasa a contar como cliente habitual: se le da crédito y el pedido se programa con prioridad.')",
+             "🤝 Referenciado", "Cliente de confianza: cuenta como habitual y se le da crédito") +
+           B("pipe-b-val", "pipeFirmaAbrir('" + emp + "','" + oid + "','valido','Marcar VÁLIDO'," +
+             "'Se lo contacta para que pague por adelantado. El pedido no se programa hasta que pague.')",
+             "✔ Válido", "Paga por adelantado antes de armarle el pedido") +
+           B("pipe-b-no", "pipeFirmaAbrir('" + emp + "','" + oid + "','no_valido','Marcar NO VÁLIDO'," +
+             "'El pedido se descarta.')", "✖ No válido", "No se le vende: el pedido se descarta");
+
+  if (et === "referenciado")
+    return B("pipe-b-ok2", "cuarLiberar('" + emp + "','" + oid + "')", "✅ Aprobar y programar",
+             "Lo manda a «Pedidos a programar». Tiene que salir dentro de los 2 días hábiles.") +
+           B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
+             "Vincularlo a una razón social que ya es cliente");
+
+  if (et === "valido")
+    return B("pipe-b-wa", "pipeSpeech('" + emp + "','" + oid + "',1)", "💬 Contacto Speech 1",
+             sinTel ? "No hay teléfono cargado — igual marca el contacto" : "Le pide el pago por adelantado del total") +
+           B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
+             "Vincularlo a una razón social que ya es cliente");
+
+  if (et === "speech1")
+    return B("pipe-b-ok2", "pipeFirmaAbrir('" + emp + "','" + oid + "','pagado','Confirmar el PAGO'," +
+             "'Con esto queda listo para programar, con prioridad.')", "💵 Pagó",
+             "El cliente pagó: queda listo para aprobar y programar") +
+           B("pipe-b-wa", "pipeSpeech('" + emp + "','" + oid + "',2)", "💬 Contacto Speech 2",
+             sinTel ? "No hay teléfono cargado" : "Le pregunta si paga en 24 h; si no, se da de baja", sinTel);
+
+  if (et === "speech2")
+    return B("pipe-b-ok2", "pipeFirmaAbrir('" + emp + "','" + oid + "','pagado','Confirmar el PAGO'," +
+             "'Con esto queda listo para programar, con prioridad.')", "💵 Pagó",
+             "El cliente pagó: queda listo para aprobar y programar") +
+           B("pipe-b-no", "pipeFirmaAbrir('" + emp + "','" + oid + "','cancelado','CANCELAR el pedido'," +
+             "'No pagó en las 24 h. El pedido queda cancelado en el pipeline y hay que eliminarlo de la PPP.')",
+             "🗑 Cancelar pedido", "No pagó: se da de baja");
+
+  if (et === "pagado")
+    return B("pipe-b-ok2", "cuarLiberar('" + emp + "','" + oid + "')", "✅ Aprobar y programar",
+             "Ya pagó. Lo manda a «Pedidos a programar»; tiene que salir dentro de los 2 días hábiles.");
+
+  if (et === "no_valido")
+    return B("pipe-b-no", "aprAnularAbrir('" + emp + "','" + oid + "')", "🗑 Eliminar pedido",
+             "No válido: se saca de la PPP y queda en el log de anulados") +
+           B("pipe-b-sec2", "pipeEvento('" + emp + "','" + oid + "','reabrir',null,null)", "↩ Reabrir",
+             "Vuelve el pedido al principio del pipeline");
+  return "";
+}
+
+/* ── La pantalla ─────────────────────────────────────────────────────────────────────── */
+function pipeVencidos() {
+  const m = _apr.pipe || {};
+  return pipeLista().filter(function (p) { const e = pipeEst(p); return e && e.vencido; }).length;
+}
+function pipeHtml() {
+  const cargando = !_apr.listo || aprCargandoAlgo();
+  let h = '<div class="apr-col apr-col-cuar pipe-col' + (cargando ? ' apr-col-cargando' : '') + '">' +
+    '<div class="apr-col-t">🧭 Pipeline de clientes nuevos <b>(' + (cargando ? '…' : pipeLista().length) + ')</b>' +
+    '<span class="apr-cuar-help" title="El camino completo de un cliente nuevo: análisis crediticio en Equifax, ' +
+      'decisión de la dirección (Referenciado / Válido / No válido), cobro por adelantado al Válido y recién ahí ' +
+      'la programación, con prioridad. Convive con el submódulo 🆕 Clientes nuevos de A Programar, que sigue siendo ' +
+      'el principal: los dos comparten el mismo candado, el mismo timer y el mismo log.">ⓘ</span>';
+  const venc = cargando ? 0 : pipeVencidos();
+  if (venc) h += '<span class="pipe-badge-venc" title="Pedidos que pasaron el tope de espera de su etapa. ' +
+    'NO se cancelan solos: hay que mirarlos.">⏰ ' + venc + ' sin respuesta</span>';
+  h += '</div>';
+
+  if (!_apr.listo) return h + '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Cargando…</b></div></div>' + pipeFirmaHtml() + pipeVincHtml();
+
+  const lista = pipeLista();
+  pipeNeed(); pipeCfgNeed(); clinNuevosValorNeed(); clinCuitNeed(); clinWppNeed(); cuarComNeed(); clinTickStart();
+
+  if (!lista.length)
+    return h + '<div class="apr-vacio">No hay pedidos de clientes nuevos esperando. Acá cae <b>todo</b> ' +
+      'pedido de un cliente nuevo —incluidos los que además tienen deuda o están suspendidos, que en ' +
+      '«A Programar» quedan en Cuarentena— y se lo lleva por el camino completo hasta que se programa ' +
+      'o se descarta.</div></div>' + pipeFirmaHtml() + pipeVincHtml();
+
+  h += '<div class="cuar-tblwrap"><table class="cuar-tbl pipe-tbl"><thead><tr>' +
+    '<th>Pedido</th><th>Fecha</th><th class="cuar-td-m3">m³</th><th>Cliente</th>' +
+    '<th>Etapa</th><th>Espera</th><th class="cuar-td-m3">Monto</th><th class="pipe-th-acc">Qué sigue</th>' +
+    '<th class="cuar-td-com">Coment.</th></tr></thead><tbody>';
+  for (const p of lista) {
+    const cid = "pipe" + p.empresa + p.order_id, cab = !!_apr.exp[cid];
+    const et = pipeEtapa(p);
+    const nblo = Number(p.np_total) || ((p.bloques && p.bloques.length) || 1);
+    h += '<tr class="cuar-tr pipe-tr pipe-tr-' + et + (cab ? ' cuar-tr-open' : '') + '">' +
+      '<td class="cuar-td-np" onclick="aprToggle(\'' + cid + '\')" title="Ver qué pidió (códigos y cajas)">' +
+        '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
+        '<span class="cuar-card-np">' + escapeHtml(aprPedLabel(p)) + '</span>' +
+        pipeNroPedidoHtml(p) +
+        (nblo > 1 ? '<span class="cuar-demo-tag" title="Este pedido se parte en ' + nblo + ' NP">' + nblo + ' NP</span>' : '') +
+      '</td>' +
+      '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
+      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
+      '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) +
+        clinCuitFmt(p) + aprCuarBadgesHtml(p) + '</td>' +
+      '<td class="pipe-td-et">' + pipeEtapaHtml(p) + '</td>' +
+      '<td class="clin-td-tiempo">' + pipeRelojHtml(p) + '</td>' +
+      '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
+      '<td class="pipe-td-acc">' + pipeAccionesHtml(p) + '</td>' +
+      '<td class="cuar-td-com">' + cuarComBtnHtml(p) + '</td>' +
+      '</tr>';
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="9"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
+  }
+  h += '</tbody></table></div></div>';
+  return h + pipeFirmaHtml() + pipeVincHtml();
+}
+
 /* v16.57 (problema 14) — "YA PROGRAMADOS con el cliente en cuarentena".
    La Cuarentena sólo mira lo que TODAVÍA NO tiene tanda: gv_cuarentena_marcar corre adentro del
    armado, sobre los pendientes. Si el reporte de deuda entra DESPUÉS de que el pedido ya recibió
