@@ -26852,3 +26852,86 @@ acción va **una vez por grupo** y no repetida en cada fila, sin avisos dice que
 quedarse en *"Leyendo…"*, y si la consulta falla lo dice.
 
 `sql/gv_ppp_avisos_detalle_v2055.sql`, `tests/ppp-avisos-detalle.cjs`.
+
+---
+
+### §3.lg — v20.56 · Un pedido retenido NO vuelve a una tanda que avanzó sin él
+
+Luis, 2026-09-21, mirando el desglose del badge: *"esto me preocupa. estaban armados? qué
+interacción tienen si vuelven a programación a su tanda y su tanda está armada/facturada/
+entregada cuando estos no?"*.
+
+**La pregunta era correcta y el sistema estaba mal.**
+
+#### Lo que se midió
+
+`GV_PPP_Web_Retenido.ya_pickeada` / `ya_armada` son la **foto del momento en que se sacó el
+pedido**, y la tanda sigue avanzando después. **D69H decía `ya_armada = false`** (del 15/09) y el
+21/09 **ya tenía TAP**. El chip de A Programar leía esos flags, así que le decía al supervisor lo
+contrario de la realidad justo cuando más importaba.
+
+Probado en transacción abortada con el caso real — LK 1448 devuelto a D69H para el 25/09:
+
+```
+movidas=3 · arbol=[{"np":"LK 0070","fecha":"2026-09-22","estado":"armado"},
+                   {"np":"LK 0083","fecha":"2026-09-22","estado":"armado"},
+                   {"np":"LK 0094","fecha":"2026-09-25","estado":"armado"},   ← nunca se pickeó
+                   {"np":"LK 0095","fecha":"2026-09-25","estado":"armado"},   ← nunca se pickeó
+                   {"np":"LK 0096","fecha":"2026-09-25","estado":"armado"}]   ← nunca se pickeó
+```
+
+**Tres consecuencias, ninguna teórica:**
+
+1. Las 3 NP salían del árbol como **ARMADAS sin haberse pickeado nunca** — su mercadería no está
+   en ese pallet, porque se sacaron **antes** del picking. El operario no las ve para armar, y al
+   camión se le cargan cajas que no existen.
+2. La tanda quedaba en **dos días** (22/09 y 25/09) → problema 338, dos camiones.
+3. **LK 0096 venía de E52A, no de D69H**: la función tomaba **una sola** `tanda_previa`
+   (`limit 1`) y se la aplicaba a **todas** las NP del pedido.
+
+#### Qué se hizo
+
+| | |
+|---|---|
+| `gv_ppp_web_retenido` | `ya_pickeada` / `ya_armada` pasan a calcularse **en vivo**, y se agregan `tanda_estado`, `tanda_viva`, `tanda_fecha`, `tanda_nps` |
+| `gv_ppp_web_tanda_reusar` | **frena** si la tanda está `pickeada / armada / facturada / salio`, si su código lo tomó otra cosa, o si sale otro día que el elegido; y cada NP vuelve a **su** tanda |
+| A Programar | el pedido que no puede volver **cae al camino de tanda nueva** en vez de fallar, con un chip que dice por qué |
+| `gv_ppp_avisos_detalle` | el aviso del badge lee la vista, o sea el estado de **hoy** |
+
+`tanda_estado` es: `salio` > `facturada` > `armada` > `pickeada` > `sin empezar` > `codigo tomado`
+> `no existe`. Vuelve sólo con **`sin empezar`** o **`no existe`**.
+
+**Probado haciéndolo entrar**, con los tres casos reales en transacción abortada:
+
+```
+1) LK 1448 a D69H: FRENO -> La tanda D69H ya esta armada: la mercaderia de este pedido
+                            NO esta en ese pallet (se saco antes). Programalo en una tanda NUEVA.
+2) LK 1358 a E50A: OK -> 1 NP a E50A
+3) CH 218  a E26B: OK -> 1 NP a E26B
+```
+
+Y el caso de los dos días, fabricado porque hoy no existe:
+
+```
+a) otro dia: FRENO -> La tanda E50A sale el 22/09 y vos elegiste el 25/09. Una tanda no puede
+                      salir en dos dias: programalo el 22/09 o mandalo a una tanda NUEVA.
+b) el dia de la tanda: OK -> 1 NP a E50A
+```
+
+Se verificó que la transacción abortada no dejó nada: `0` filas de prueba en
+`PPP_Web_Programacion`.
+
+⚠ **No se tocó ningún dato**: los tres pedidos retenidos quedan como están. Esto es el guard.
+
+⚠ **Y el estado de los tres, hoy**: LK 1448 → D69H **armada** (no vuelve ahí); LK 1358 → E50A y
+CH 218 → E26B, **tandas que ya no existen** (vuelven sin problema, el código está libre).
+
+**Chequeo:**
+
+```sql
+select np_label, tanda_previa, ya_pickeada, ya_armada, tanda_estado, tanda_fecha
+  from public.gv_ppp_web_retenido order by tanda_previa, np_label;
+select * from public.gv_reglas_perdidas;   -- las 4 reglas nuevas tienen centinela
+```
+
+`sql/gv_retenido_tanda_viva_v2056.sql`, `tests/apr-retenido-tanda.cjs`.

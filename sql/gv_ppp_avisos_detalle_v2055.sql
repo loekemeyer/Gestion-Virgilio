@@ -52,16 +52,24 @@ select 'tanda_dos_dias', 3, 'Tanda con el mismo código en dos días',
  group by d.tanda
 union all
 -- 4 · pedidos que un supervisor sacó a mano de su tanda y todavía no tienen fecha nueva
+-- ⚠ v20.56 — lee la VISTA `gv_ppp_web_retenido`, no la tabla: el estado de la tanda es el de HOY.
+-- Con los flags de la tabla (la foto de cuando se sacó el pedido) este aviso decía que D69H no
+-- estaba armada, seis días después de que se armara.
 select 'retenido_sin_fecha', 4, 'Pedidos sacados a mano, esperando fecha',
        min(r.fecha_previa),
        (upper(case when r.empresa = 'chef' then 'CH' else 'LK' end) || ' pedido ' || r.order_id),
        (count(*) || ' NP · salió de la tanda ' || string_agg(distinct r.tanda_previa, ', ') ||
-        case when bool_or(r.ya_armada) then ' (YA ARMADA: no hay que volver a armarla)'
-             when bool_or(r.ya_pickeada) then ' (YA PICKEADA: no hay que volver a pickearla)'
-             else '' end ||
+        case when bool_or(r.tanda_estado in ('pickeada','armada','facturada','salio'))
+             then ' · ⚠ esa tanda ' ||
+                  string_agg(distinct r.tanda_estado, ', ') filter
+                    (where r.tanda_estado in ('pickeada','armada','facturada','salio')) ||
+                  ' SIN este pedido: NO vuelve ahí, va a una tanda nueva'
+             when bool_or(r.tanda_viva) then ' · esa tanda sale el ' ||
+                  to_char(min(r.tanda_fecha), 'DD/MM') || ' y no se empezó: vuelve ahí'
+             else ' · esa tanda ya no existe: el código queda libre' end ||
         ' · lo sacó ' || string_agg(distinct r.por, ', ')),
-       'Está en A Programar esperando día. Al programarlo vuelve a su tanda anterior.'
-  from public."GV_PPP_Web_Retenido" r
+       'Está en A Programar esperando día. Si su tanda ya avanzó, va a una tanda nueva y se pickea normal.'
+  from public.gv_ppp_web_retenido r
  group by r.empresa, r.order_id
 union all
 -- 5 · pedido web que se salió de lo que ese cliente compra siempre

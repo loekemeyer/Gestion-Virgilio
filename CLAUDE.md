@@ -1184,6 +1184,33 @@ valen para cualquier cambio, no sólo para esto:**
 **Chequeo:** `select * from public.gv_cuarentena_repo_hoy where exento;`
 `sql/gv_cuarentena_repo_chica_v1944.sql`, §3.iy.
 
+## ⚠ REGLA (Luis, 2026-09-21, v20.56): un pedido retenido NO vuelve a una tanda que avanzó sin él
+
+**Luis, textual:** *"esto me preocupa. estaban armados? qué interacción tienen si vuelven a
+programación a su tanda y su tanda está armada/facturada/entregada cuando estos no?"*.
+
+Cuando un supervisor saca un pedido de su tanda con «↳ Enviar a programar», `GV_PPP_Web_Retenido`
+recuerda de qué tanda venía para devolverlo ahí. **Pero esa tanda sigue avanzando sin él.**
+
+⚠ **Los flags `ya_pickeada` / `ya_armada` de la TABLA son la FOTO del momento en que se sacó el
+pedido.** D69H decía `false` (del 15/09) y el 21/09 ya tenía TAP: el chip le decía al supervisor
+lo contrario de la realidad. **Nunca leer esos flags de la tabla — leer la vista
+`gv_ppp_web_retenido`, que los calcula en vivo.**
+
+Probado en transacción abortada (LK 1448 → D69H): las 3 NP salían del árbol como **ARMADAS sin
+haberse pickeado nunca** —su mercadería no está en ese pallet— y dejaban la tanda en **dos días**
+(problema 338). Y una de ellas venía de **otra** tanda: la función tomaba una sola `tanda_previa`
+con `limit 1` para todo el pedido.
+
+**La regla:** vuelve a su tanda **sólo** si esa tanda está `sin empezar` o `no existe`. Con
+`pickeada`, `armada`, `facturada`, `salio` o el código tomado, **va a una tanda NUEVA y se pickea
+como cualquier otro**. Y si la tanda sale otro día que el elegido, se frena: una tanda en dos días
+cae en dos camiones.
+
+**Chequeo:** `select np_label, tanda_previa, tanda_estado, tanda_fecha from
+public.gv_ppp_web_retenido;` · `sql/gv_retenido_tanda_viva_v2056.sql`,
+`tests/apr-retenido-tanda.cjs`, §3.lg.
+
 ## ⚠ Regla de Luis (2026-09-21, v20.45): la ZONA es dónde va el camión; el DESTINO es otra cosa
 
 **Luis, textual:** *"es especialmente importante poder identificar si el expreso tiene que

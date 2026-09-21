@@ -1271,6 +1271,9 @@ button {
 /* v16.03 — el pedido ya se pickeó y se armó en una tanda anterior: rojo, para que nadie lo mande
    a pickear de nuevo. Al programarlo vuelve a ESA tanda, no a una nueva. */
 .apr-chip-hecho{ background:#fee2e2; color:#991b1b; font-weight:800; border:1px solid #fca5a5; }
+/* v20.56 — salió de una tanda que TODAVÍA no se empezó: al programarlo vuelve ahí. Verde,
+   porque no hay nada que mirar; el rojo queda para el que ya no puede volver. */
+.apr-chip-vuelve{ background:#dcfce7; color:#14532d; font-weight:800; border:1px solid #bbf7d0; }
 /* v19.44 (Luis): el pedido que NO cayó en cuarentena por ser una reposición chica. */
 .apr-chip-repo{ background:#ecfeff; color:#155e75; font-weight:800; border:1px solid #a5f3fc; }
 .apr-chip-z{ background:#e0edff; color:#1e40af; }
@@ -5850,7 +5853,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.55"></script>
+<script type="module" src="recepcion.js?v=20.56"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9728,7 +9731,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.55";
+const APP_VERSION = "v20.56";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -44261,13 +44264,22 @@ async function aprTraerPedidos(e) {
   // Si la consulta falla, el pedido se muestra igual: sin memoria, no roto.
   const _ret = new Map();
   try {
-    const rr = await aprGet("gv_ppp_web_retenido?select=empresa,order_id,tanda_previa,ya_pickeada,ya_armada&limit=2000");
+    // v20.56 — se trae `tanda_estado`, que es el estado VIVO de la tanda a la que volvería.
+    // `ya_pickeada` / `ya_armada` también son en vivo desde esta versión: hasta acá eran la FOTO
+    // del momento en que se sacó el pedido y la tanda siguió avanzando después.
+    const rr = await aprGet("gv_ppp_web_retenido?select=empresa,order_id,tanda_previa,ya_pickeada,ya_armada,tanda_estado,tanda_fecha&limit=2000");
     for (const x of (rr || [])) {
       const k = String(x.empresa) + ":" + String(x.order_id);
-      const v = _ret.get(k) || { tanda_previa: "", ya_pickeada: false, ya_armada: false };
+      const v = _ret.get(k) || { tanda_previa: "", ya_pickeada: false, ya_armada: false, tanda_estado: "", tanda_fecha: "" };
       if (!v.tanda_previa && x.tanda_previa) v.tanda_previa = String(x.tanda_previa);
       v.ya_pickeada = v.ya_pickeada || !!x.ya_pickeada;
       v.ya_armada   = v.ya_armada   || !!x.ya_armada;
+      // de varias NP con tandas distintas se queda con el estado MÁS avanzado: si una sola no
+      // puede volver, el pedido entero no puede.
+      if (APR_TANDA_ORDEN.indexOf(x.tanda_estado) > APR_TANDA_ORDEN.indexOf(v.tanda_estado)) {
+        v.tanda_estado = String(x.tanda_estado || "");
+        v.tanda_fecha  = x.tanda_fecha ? String(x.tanda_fecha).slice(0, 10) : "";
+      }
       _ret.set(k, v);
     }
   } catch (_e) {}
@@ -44281,6 +44293,8 @@ async function aprTraerPedidos(e) {
     p.tanda_previa = (_r && _r.tanda_previa) || "";
     p.ya_pickeada  = !!(_r && _r.ya_pickeada);
     p.ya_armada    = !!(_r && _r.ya_armada);
+    p.tanda_estado = (_r && _r.tanda_estado) || "";
+    p.tanda_fecha  = (_r && _r.tanda_fecha) || "";
     out.push(p);
   }
   out.sort(function (a, b) {
@@ -44324,6 +44338,35 @@ async function aprTraerIsis() {
 function aprPedLabel(p) { return p && p._isis ? ("NP " + p.np) : pwebPedidoLabel(p.empresa, p.order_id); }
 /* v16.03 — ¿este pedido ya tiene el trabajo hecho (picking/armado) en una tanda anterior? */
 function _aprYaHecho(p) { return !!(p && p.tanda_previa && (p.ya_pickeada || p.ya_armada)); }
+/* ═══ v20.56 (Luis, 2026-09-21) — ¿PUEDE VOLVER A SU TANDA? ════════════════════
+   Luis: *"estaban armados? qué interacción tienen si vuelven a programación a su tanda y su
+   tanda está armada/facturada/entregada cuando estos no?"*.
+
+   Un pedido sacado a mano vuelve a SU tanda anterior — pero esa tanda siguió avanzando sin él.
+   Probado el 21/09 en transacción abortada con el caso real (LK 1448 → D69H, que se armó el
+   día después de que lo sacaran): las 3 NP entraban a la tanda y salían del árbol como
+   **ARMADAS sin haberse pickeado nunca** — su mercadería no está en ese pallet — y además
+   dejaban la tanda en dos días (22/09 y 25/09), que es el problema 338.
+
+   El estado sale del backend (`gv_ppp_web_retenido.tanda_estado`), en vivo. Acá sólo se decide
+   qué camino ofrecer; el guard de verdad está en `gv_ppp_web_tanda_reusar`, que frena igual si
+   la tanda avanza entre que se pinta la pantalla y se toca el botón. */
+const APR_TANDA_ORDEN = ["", "no existe", "sin empezar", "codigo tomado", "pickeada", "armada", "facturada", "salio"];
+const APR_TANDA_OK    = ["no existe", "sin empezar"];
+function _aprPuedeVolver(p) {
+  if (!p || !p.tanda_previa) return false;
+  if (!p.tanda_estado) return true;   // sin dato: lo decide el backend
+  return APR_TANDA_OK.indexOf(p.tanda_estado) >= 0;
+}
+function _aprTandaEstadoTxt(p) {
+  const e = p && p.tanda_estado;
+  return e === "salio" ? "ya salió en el camión"
+       : e === "facturada" ? "ya está facturada"
+       : e === "armada" ? "ya está armada"
+       : e === "pickeada" ? "ya se pickeó"
+       : e === "codigo tomado" ? "tiene el código ocupado por otra cosa"
+       : "";
+}
 
 /* v13.84 — el m³ mínimo deseable de una tanda lo dice el backend (PPP_Web_Config.tanda_m3_min, 0,60): el front
    sólo pregunta. Si no se puede leer, se usa 0,60. */
@@ -44727,13 +44770,25 @@ async function aprGenerarTanda(fecha, keys, opts) {
   // que no estaba armado": si vuelve a la misma tanda, el estado (pickeado / armado / facturado)
   // vuelve con ella, porque el estado sale de los eventos de esa tanda. Espejo de lo que ya hacía
   // `gv_ppp_isis_programar` con `tanda_previa`.
-  const _reten = peds.filter(function (p) { return p.tanda_previa; });
+  // v20.56: sólo los que PUEDEN volver. Si la tanda anterior ya se pickeó, se armó, se facturó
+  // o salió, este pedido NO va ahí — su mercadería no está en ese pallet — y cae al camino
+  // normal de tanda nueva, unas líneas más abajo.
+  const _reten = peds.filter(_aprPuedeVolver);
+  const _noVuelven = peds.filter(function (p) { return p.tanda_previa && !_aprPuedeVolver(p); });
+  if (_reten.length && _noVuelven.length) {
+    _apr.msg = "Estos no pueden volver a su tanda (" + _noVuelven.map(function (p) {
+      return p.tanda_previa + " " + _aprTandaEstadoTxt(p); }).join(", ") +
+      "): programalos por separado, en una tanda nueva.";
+    _apr.msgErr = true; aprRender(); return;
+  }
   if (_reten.length) {
     if (_reten.length !== peds.length) { _apr.msg = "Hay pedidos que ya tenían tanda y otros que no: programalos por separado."; _apr.msgErr = true; aprRender(); return; }
     const _ts = [...new Set(_reten.map(function (p) { return p.tanda_previa; }))];
     if (_ts.length > 1) { _apr.msg = "Estos pedidos venían de tandas distintas (" + _ts.join(", ") + "): programalos de a uno."; _apr.msgErr = true; aprRender(); return; }
     if (!(opts && opts.sinConfirm) &&
-        !confirm("¿Devolver " + labels + " a su tanda " + _ts[0] + ", para el " + aprDiaCorto(fecha) + "?\n\nVuelve a la MISMA tanda de antes: no se arma una nueva y no se pickea ni se arma de nuevo lo que ya estaba hecho.")) return;
+        !confirm("¿Devolver " + labels + " a su tanda " + _ts[0] + ", para el " + aprDiaCorto(fecha) + "?\n\n" +
+          "Vuelve a la MISMA tanda de antes, que todavía no se empezó: no se arma una nueva.\n" +
+          "Se pickea y se arma junto con el resto de esa tanda.")) return;
     _apr.ocupado = true; aprRender();
     try {
       const por = await aprQuien();
@@ -45386,7 +45441,20 @@ function aprColPedidos() {
         // v16.03 — el pedido estuvo en una tanda y esa tanda YA se pickeó y se armó (la mercadería
         // está en un pallet). Va acá en rojo para que nadie lo mande a pickear de nuevo: al
         // programarlo vuelve a ESA tanda (gv_ppp_isis_programar reusa tanda_previa), no a una nueva.
-        (_aprYaHecho(p) ? '<span class="apr-chip apr-chip-hecho" title="Ya se pickeó y se armó en la tanda ' + escapeHtml(p.tanda_previa) + '. Al programarla vuelve a esa misma tanda: NO se pickea de nuevo.">⚠ ya ' + (p.ya_pickeada ? 'pickeada' : '') + (p.ya_pickeada && p.ya_armada ? ' y ' : '') + (p.ya_armada ? 'armada' : '') + ' · ' + escapeHtml(p.tanda_previa) + '</span>' : '') +
+        // v20.56 (Luis) — el chip decía *"al programarla vuelve a esa misma tanda: NO se pickea
+        // de nuevo"*, y eso era falso justo en el caso que marcaba: la tanda avanzó SIN este
+        // pedido, así que su mercadería no está en ese pallet y hay que pickearla igual.
+        // Los flags ahora son del estado VIVO de la tanda, no la foto de cuando se sacó.
+        ((p.tanda_previa && !_aprPuedeVolver(p))
+          ? '<span class="apr-chip apr-chip-hecho" title="La tanda ' + escapeHtml(p.tanda_previa) + ' ' +
+              escapeHtml(_aprTandaEstadoTxt(p)) + ' y avanzó SIN este pedido: su mercadería no está en ese pallet. ' +
+              'Va a una tanda NUEVA y se pickea y se arma como cualquier otro.">⚠ ' +
+              escapeHtml(p.tanda_previa) + ' ' + escapeHtml(_aprTandaEstadoTxt(p)) + ' · va a tanda nueva</span>'
+          : (p.tanda_previa
+            ? '<span class="apr-chip apr-chip-vuelve" title="Salió de la tanda ' + escapeHtml(p.tanda_previa) +
+                ', que todavía no se empezó. Al programarlo vuelve a esa misma tanda.">↶ vuelve a ' +
+                escapeHtml(p.tanda_previa) + '</span>'
+            : '')) +
         // v13.21 (dueño): qué día va a poder salir, no la fecha en que llegó (queda en el title)
         aprRepoChip(p) +     // v19.44 (Luis): no cayó en cuarentena por ser reposición chica
         aprSalidaChip(p) +

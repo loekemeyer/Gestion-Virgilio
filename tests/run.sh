@@ -429,6 +429,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== supers-una-lista (v17.72: UNA sola lista de clientes super, en la base y por empresa+codigo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/supers-una-lista.cjs
 
+echo "== apr-retenido-tanda (regresión: no vuelve a una tanda que avanzó sin él) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-retenido-tanda.cjs
+
 echo "== ppp-avisos-detalle (regresión: el badge de la PPP dice QUÉ son esos avisos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-avisos-detalle.cjs
 
