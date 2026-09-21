@@ -110,7 +110,7 @@ if (/cron\.schedule[\s\S]{0,200}gv_clin/.test(sql))
 // RPC devolviendolo. A Programar dibujaba con _apr.pedidos vacio, el lote guardaba {} y el
 // *Need() no volvia a pedir NUNCA (medido: 0 llamadas en toda la sesion). Afecta a los cuatro
 // lotes, no solo al CUIT.
-// v20.82: el guard de la v20.71 miraba si habia PEDIDOS y NO alcanzaba — la lista que importa
+// v20.84: el guard de la v20.71 miraba si habia PEDIDOS y NO alcanzaba — la lista que importa
 // es la de RETENIDOS, que llega en otra llamada. Una lista vacia NUNCA se guarda como respuesta.
 if (!/function clinVacio\(campo\) \{ _apr\[campo\] = null; \}/.test(html))
   fallos.push("clinVacio guarda algo distinto de null: el dato no se vuelve a pedir en toda la sesion");

@@ -1,4 +1,4 @@
-/* v20.82 — UNA LISTA VACIA NO SE GUARDA COMO RESPUESTA.
+/* v20.84 — UNA LISTA VACIA NO SE GUARDA COMO RESPUESTA.
 
    Luis, dos veces: *"¿cómo carajo no tiene cuit? imposible"* y después *"volvio a no aparecer
    el cuit de silvano, por que?"* — sobre LK 4282, que tiene el CUIT cargado en el padrón y la
