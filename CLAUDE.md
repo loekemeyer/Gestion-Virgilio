@@ -1149,6 +1149,17 @@ sigue trayendo el barrio del cliente y ganaba el `coalesce`. Se mira la direcci�
 (`Exp. Retira — …`, `Virgilio 2788`). Centinela: `select * from public.gv_retira_sin_etiqueta;`
 — vacía = todo bien. §3.js.
 
+⚠⚠ **Y el error va también para el otro lado: un pedido que se REPARTE puede decir Retira**
+(v20.63, Thomas 21/09, problema 470). El `nombre_expreso` de la ficha queda en `Retira` cuando un
+cliente pasa de retirar a que se le entregue — nadie borra ese campo al cargarle la dirección — y
+`gv_np_destino` lo publica como destino: Iro Iro (4223) figuraba **Retira** mientras iba en camión
+a Longchamps, ya facturado. **Antes de sacarle la etiqueta de retiro a un pedido, mirar la zona de
+la programación, no el `nombre_expreso`.** Y la señal de que el `Retira` de una ficha es resto y no
+condición: **ese cliente tiene ADEMÁS su fila de retiro de verdad aparte** (`Virgilio 2788`, en
+otro slot). Centinela: `select * from public.gv_retira_contradictorio;` — vacía = todo bien;
+**sólo `service_role`**, porque cuelga de `gv_np_destino` y leída por `anon` contestaría vacía por
+RLS, o sea que mentiría. §3.lk.
+
 **Chequeo:** `select empresa, order_id, retiro_fecha, retiro_franja from public.lk_pedidos_match
 where retiro_fecha is not null;` · `sql/gv_retira_dia_elegido_v1952.sql`, §3.ja.
 

@@ -27147,3 +27147,84 @@ select * from public.gv_destino_sin_provincia order by fecha desc;             -
 ```
 
 `sql/gv_destino_isis_v2062.sql`, `tests/ppp-misiones.cjs`.
+
+### §3.lk — v20.63 · Un pedido que va en camión decía RETIRA — 2026-09-21
+
+**Thomas:** *"el pedido de Iro Iro SRL (NP 98626, 98627) figura como RETIRA. ¿Es su condición
+real? Me dicen que se puso a entregar en Longchamps"*.
+
+No era su condición. **La ficha de entrega se contradecía sola, en la misma fila**:
+
+| campo de la única dirección del 4223 (LK) | valor |
+|---|---|
+| `etiqueta` / `direccion_entrega` / `zona_expreso` | Burgwardt 903 · Longchamps |
+| `nombre_expreso` / `direccion_expreso` | **Retira** · `Virgilio 2788, Retira` |
+
+`gv_np_destino` publica `nombre_expreso` como `expreso`, así que el badge decía *"Retira · CABA"*
+para dos NP que la operación ya estaba repartiendo: **98626 → E39A y 98627 → E40A, Zona 4 - GBA
+Sur**, pickeadas el 14/09, armadas el 15, facturadas el 16 y con salida el 17/09. El pedido web
+que las originó (1303, del 28/08) eligió la sucursal *"Burgwardt 903 - Longchamps"*: el cliente
+nunca pidió retirar.
+
+**Lo que decide que el `Retira` era resto y no condición**, y es el dato que conviene mirar
+primero la próxima vez: **los otros tres clientes con la misma contradicción tienen ADEMÁS su
+fila de retiro legítimo aparte** (`Virgilio 2788`, `zona_expreso = 'Retira'`, otro slot). O sea
+que la fila con barrio real no es "el retiro de ese cliente": es la dirección de reparto con el
+modo de envío viejo pegado.
+
+| se limpió (`nombre_expreso`, `direccion_expreso` → null) | dirección que queda | zona |
+|---|---|---|
+| 4223 Iro Iro · slot 2 | Burgwardt 903, Longchamps | Zona 4 - GBA Sur |
+| 2533 Osa · slot 2 | Zuviria 5352, Villa Lugano | Zona 1 - CABA Sur |
+| 1435 · slot 3 | Av. Alcorta 1811, Moreno | Moreno |
+| 4111 · slot 2 | Solis 1405, Constitución | Constitución |
+
+En la del 4223, además, `provincia` CABA → **Buenos Aires** y `localidad` → **Longchamps**
+(Longchamps es Almirante Brown). Backup previo en
+`public."GV_Backup_dirs_retira_arrastre_20260921"` **del proyecto LK** (4 filas, RLS prendida y
+DML revocado a `anon`).
+
+**Alcance, medido el 21/09:** de las **140** direcciones de LK con `nombre_expreso = 'Retira'`,
+**128** tienen también `zona_expreso = 'Retira'` (retiro real) y **12** traen barrio. De esas 12,
+**8 tienen `label = 'Retira'`** —ahí el barrio es el domicilio del cliente, que es exactamente lo
+que describe la §3.js— y **4 tienen la etiqueta con la dirección real**: las que se limpiaron. De
+las NP programadas, las 4 que mostraban el badge Retira iban las 4 en camión, o sea **cero
+retiros reales marcados**.
+
+⚠ **Limpiar el dato sin centinela habría cambiado un error que se ve por uno que no se ve.** Por
+eso va **`gv_retira_contradictorio`**, que cruza lo que se MUESTRA contra lo que se REPARTE:
+
+```sql
+select * from public.gv_retira_contradictorio;   -- vacía = todo bien
+```
+
+| fuente | qué aporta |
+|---|---|
+| `gv_np_prog_reparto.es_retira` | cómo se está repartiendo de verdad (la zona de la programación) |
+| `gv_np_destino.expreso` | lo que se muestra como destino (el `nombre_expreso` del padrón) |
+
+Marca las dos direcciones del error: `DESTINO RETIRA EN ZONA DE REPARTO` (el caso de hoy) y
+`PROGRAMADA RETIRA PERO LA FICHA MANDA POR EXPRESO`. **Se probó rompiéndolo**, no leyéndolo: se
+inyectó el dato sucio en `GV_Clientes_Direcciones` —el padrón **derivado**, que el sync de LK
+reescribe, nunca la madre— y se revirtió; la rama A cazó 98626/98627 y la B, `LK 0024`.
+
+⚠ **Sólo `service_role`, calcado de `gv_destino_sin_provincia`.** Cuelga de `gv_np_destino`, que
+`anon` no puede leer: con el SELECT abierto contestaría **vacía por RLS**, o sea que diría que
+todo está bien justo cuando no puede ver nada. Es la trampa de la §3.lb, del lado del centinela.
+
+⚠ **No marca un tercer caso a propósito:** NP con zona Retira cuyo destino no resuelve **ningún**
+expreso (al 21/09 son 7: `LK 0011`, `0024`, `0067`, `0097`, `0143`, `0144`, `0157`). La zona ya
+dice Retira, así que no falta ningún dato operativo — y un centinela que nace en rojo no lo mira
+nadie.
+
+**Para que se viera el mismo día** se corrió a mano la Edge Function `gv-sync-padron-direcciones`
+(200, 2.312 direcciones, 0 avisos): el **cron 79 la refresca una sola vez por día**, a las 05:40
+ART, así que sin eso la corrección del padrón de LK no llegaba a Gestión hasta la mañana
+siguiente.
+
+**Verificación:** 98626/98627 pasan de *"Retira · CABA"* a **Buenos Aires · Longchamps** y
+98650/98667 a CABA · Villa Lugano; NP programadas con destino Retira **= 0**; retiros de LK en el
+padrón de Gestión **136 = 140 − 4**; `gv_retira_sin_etiqueta` vacía; `gv_reglas_perdidas` vacía;
+`gv_destino_sin_provincia` sin ninguna fila de estos 4 clientes.
+
+`sql/gv_retira_contradictorio_v2063.sql`, problema 470.
