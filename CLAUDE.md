@@ -1577,10 +1577,15 @@ se volvía a pedir en toda la sesión**. Medido con LK 4282: el CUIT está en el
 devuelve, y el front la llamaba **0 veces** mientras la celda mostraba el guion de *"este cliente
 no tiene CUIT"* — o sea, justo lo contrario de lo que pasaba.
 
-Lo resuelven dos líneas, `clinSinPedidos()` / `clinVacio(campo)`: sin pedidos cargados el estado
-queda en `null` y se vuelve a pedir; con los pedidos cargados y sin retenidos, `{}` legítimo.
-**Al agregar un lote nuevo de este tipo, usar `clinVacio`.** Es el mismo pozo de §*"una lectura
-ROTA no es un CERO"*. Problema 474.
+**Una lista vacía NUNCA se guarda como respuesta** (`clinVacio` deja `null`): con la lista
+vacía no se hace ninguna llamada de red, así que reintentar en el próximo render es gratis.
+
+⚠⚠ **El primer arreglo (v20.71) miraba si ya había PEDIDOS, y NO alcanzó.** Luis lo volvió a ver
+el mismo día: *"volvio a no aparecer el cuit de silvano, por que?"*. La lista que importa no es
+la de pedidos sino la de **RETENIDOS**, y ésa la arma `cuarMarcarPedidos` en **otra llamada,
+después**: con los pedidos ya cargados y los motivos todavía en camino, la lista salía vacía
+igual y el `{}` se guardaba lo mismo. Lo reproduce `tests/apr-lotes-reintentan.cjs`, que simula
+esa secuencia y mide las llamadas: con el guard viejo, **0**. Problema 474.
 
 ### El número de pedido va DENTRO del badge de «Cliente nuevo» (v20.81, Luis)
 

@@ -46640,11 +46640,15 @@ async function cuarContactoCargar() {
    en Config. Cuarentena (2.045 de 2.047 filas lo traen).
    Va en SU PROPIA llamada con SU PROPIO catch: si falla, el monto -que es lo que sostiene el
    Speech 1- no se cae con el (leccion de la v19.44). */
-/* ⚠ "Todavia no llegaron los pedidos" NO es "no hay a quien preguntarle". Si se guarda {} en
-   ese momento, el *Need() no vuelve a pedir nunca y el dato falta el resto de la sesion.
-   Estas dos lineas son las que lo distinguen; van en los CUATRO lotes. */
-function clinSinPedidos() { return !_apr.listo || !(_apr.pedidos && _apr.pedidos.length); }
-function clinVacio(campo) { _apr[campo] = clinSinPedidos() ? null : {}; }
+/* ⚠ UNA LISTA VACIA NUNCA SE GUARDA COMO RESPUESTA. El *Need() sólo vuelve a pedir cuando el
+   estado es `null`, así que guardar {} apaga la carga para el resto de la sesión.
+   La v20.71 intentó distinguirlo mirando si ya había PEDIDOS — y no alcanzó, porque la lista
+   que importa es la de RETENIDOS, que la arma `cuarMarcarPedidos` en OTRA llamada, después:
+   con los pedidos ya cargados y los motivos todavía en camino, la lista sale vacía igual y el
+   CUIT quedaba sin pedirse (lo volvió a ver Luis con LK 4282).
+   No hay nada que optimizar acá: con la lista vacía no se hace ninguna llamada de red, así que
+   reintentar en el próximo render es gratis. */
+function clinVacio(campo) { _apr[campo] = null; }
 function clinCuitNeed() { if (_apr.cliCuit === null && !_apr.cliCuitLoading) clinCuitCargar(); }
 async function clinCuitCargar() {
   if (_apr.cliCuitLoading) return;
