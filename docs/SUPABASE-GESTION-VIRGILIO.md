@@ -27147,3 +27147,56 @@ select * from public.gv_destino_sin_provincia order by fecha desc;             -
 ```
 
 `sql/gv_destino_isis_v2062.sql`, `tests/ppp-misiones.cjs`.
+
+### §3.lk — v20.63 · La fecha de recepción la tiene el armador y la tiraba — 2026-09-21
+
+**Thomas:** *"los pedidos de chef del nuevo formato no tienen fecha de recepcion"*.
+
+⚠ **Es más que el formato nuevo de Chef.** Medido el 21/09 sobre `PPP_Web_Programacion`:
+
+| quién | NP sin fecha de recepción |
+|---|---|
+| Chef con `order_id` de 7 dígitos (1001430+) | 5 (CH 0020-0024) |
+| **LK, pedidos normales del 18 al 21/09** | **9** (LK 0160 … LK 0185) |
+
+Las 9 de LK las programó el automático y **sí** están en el feed: el problema no es de Chef.
+
+**La causa: el armador tiene la fecha y no la escribe.** Viaja desde la página
+(`gv_pedidos_web_np_lk` / `_chef` la devuelven como `fecha_recep`), la Edge Function la mete en
+`p_filas` —*"La antigüedad es con lo que se ordena la cola cuando no entra todo"*—,
+`ppp_web_armar_tandas` la parsea y **ordena la cola FIFO con ella**, y después su
+`insert into "PPP_Web_Programacion"` **no incluye la columna**. Quedaba a merced del trigger
+`gv_ppp_web_fecha_recep`, que la busca en el **cache** `lk_pedidos_match`:
+
+- un pedido de LK programado **2 a 4 minutos** después de entrar todavía no está en el cache
+  (lo llena un sync cada 15 min) → NULL para siempre. Las 9 de LK se programaron entre 0 y 4
+  minutos de entrar el pedido; **ninguna** de las que tienen fecha, después;
+- los de Chef con `order_id` de 7 dígitos **no están en el cache ni van a estar**: 0 filas con
+  id ≥ 1.000.000 en `lk_pedidos_match`, y `chef_orders_cache` de LK tiene los ids 145..231.
+  Ése es el caso que vio Thomas.
+
+Ninguna de las 14 pasó por `PPP_Web_Tanda_Items` (el camino manual, que sí escribía la columna).
+
+⚠ **Y no se persiste la fecha con fallback.** En `_sin_tanda` ahora hay dos: `fecha_recep`
+(`coalesce(<la del pedido>, current_date)`, sólo para **ordenar** — nula rompe el FIFO) y
+**`fecha_recep_real`**, la del pedido pelada, que es la que se guarda. Si el pedido no la trajo
+queda NULL, el trigger prueba el cache, y si tampoco, NULL y al centinela. Escribir
+`current_date` sería anotar el día en que se programó como si fuera el día en que entró.
+
+**Probado corriendo el armador**, no leyéndolo, en transacción abortada:
+
+| pedido de prueba | resultado |
+|---|---|
+| trae `2026-09-10` | `fecha_recep = 2026-09-10` ✅ |
+| no trae nada | `NULL` ✅ (hoy era 2026-09-21) |
+
+⚠ Con m³ chicos el armador **no programa nada** (acumula hasta 0,80 m³, v13.67): la prueba va
+con 1,1 / 1,2 m³ y los códigos en `p_forzar_cods`, o da 0 filas y parece que el cambio falló.
+
+**Chequeo:** `select * from public.gv_ppp_sin_fecha_recep;` — al 21/09 quedan **14**: 9 con
+`motivo = 'se puede completar: el feed ya tiene el pedido'` y 5 de Chef formato nuevo sin
+fuente. **El UPDATE de esas 14 no se ejecutó**: es dato, va con el sí del dueño (el SQL, con su
+backup, está comentado en el archivo). Y que los pedidos de Chef de 7 dígitos entren al feed es
+del lado de Chef/LK, no de este repo.
+
+`sql/gv_fecha_recep_armador_v2063.sql`, `tests/ppp-fecha-recep.cjs`.
