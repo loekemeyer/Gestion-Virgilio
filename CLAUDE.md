@@ -2148,14 +2148,22 @@ Pickeados, −443 en góndola**. Causa: `gv_ppp_tanda_renombrar` no renombra los
 ⚠ **Y un CUARTO, que es el que ve el agujero en vez del duplicado:**
 `select * from public.gv_stock_tanda_pickeado_negativo;` — vacía = todo bien. Marca la tanda
 cuyo **Pickeados quedó negativo**, con el motivo: *"armada sin picking propio"* (pickeado 0 y el
-armado igual drenó — la firma del renombre) o *"drenaje mayor que el picking"*.
+armado igual drenó — la firma del renombre), *"drenaje mayor que el picking"*, o —desde la
+v20.32— *"el picking cierra: lo negativo lo dejó un ajuste manual"*.
+
+⚠ **Y cuenta los ajustes que nombran la tanda en TEXTO LIBRE, no sólo los que traen el código
+pelado de `ref`** (v20.32, problema 459). Un ajuste manual se anota con `ref = 'D53A'`, pero su
+**reversión** se anota con texto (`ajuste manual | Revierte ajuste D53A: …`): contando uno y no el
+otro, D53A vivía en rojo con el depósito sano, y los negativos de D20E y E10A no los veía nadie.
+El código que sale del texto libre **se valida contra `GV_Tandas_Codigos_Usados`**, o el regex
+inventa tandas.
 
 **Va POR TANDA a propósito.** `gv_stock_negativos` agrega por código sin mirar la tanda, así que
 el saldo positivo de otra tanda **tapa el agujero**: el 18/09 el hueco de E12K eran **34 códigos
 / 46 cajas** y en pantalla se veían **7**. Y a medida que se armaban otras tandas se consumía ese
 colchón y aparecían códigos nuevos en rojo sin que se hubiera roto nada — el cartel prendía y
 apagaba solo. Por tanda el número es estable y dice **dónde**.
-`sql/gv_stock_tanda_pickeado_negativo_v2013.sql`, §3.kd.
+`sql/gv_stock_tanda_pickeado_negativo_v2032.sql`, §3.kd y §3.kr.
 
 ```sql
 select count(*) from (
