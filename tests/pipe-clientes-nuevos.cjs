@@ -163,6 +163,26 @@ if (!/data-fmt="dhm"/.test(html))
 if (!/n\.getAttribute\("data-fmt"\) === "dhm" \? pipeFmtEspera/.test(html))
   fallos.push("clinTickStart no respeta el formato del pipeline");
 
+/* ── 14. el vinculo va DENTRO del cuadro de la decision ──────────────────────────────── */
+// v20.78 (Luis: "no figura la opcion de vincularlo con otras razones sociales u otros
+// clientes"). Estaba en un pop-up SEPARADO que se abria DESPUES de confirmar: habia que
+// decidir a ciegas. Y el propio cuadro habla de "una razon social nueva de un cliente ya
+// activo" — es ahi donde se esta pensando en el vinculo.
+if (!/function pipeFirmaVincHtml/.test(html))
+  fallos.push("el cuadro de la decision no trae la seccion de vinculo");
+if (!/pipeFirmaAbrir\([^)]*'referenciado'[\s\S]{0,400}',true\)/.test(html))
+  fallos.push("el boton Referenciado no abre el cuadro con la seccion de vinculo");
+if (!/pipeFirmaAbrir\([^)]*'valido'[\s\S]{0,300}',true\)/.test(html))
+  fallos.push("el boton Valido no abre el cuadro con la seccion de vinculo");
+// ⚠ el ORDEN (vinculo antes que la decision) lo mide tests/pipe-vinculo-en-el-cuadro.cjs
+//   corriendolo de verdad: un regex sobre el codigo no lo caza — se probo, y con la condicion
+//   del vinculo desactivada el texto seguia estando y el candado daba verde.
+if (!/if \(s\.velegido && !s\.demo\) \{/.test(html))
+  fallos.push("el vinculo del cuadro no esta condicionado a que se haya elegido un cliente");
+// y no puede volver el pop-up separado que se abria solo despues de confirmar
+if (/if \(ev === "referenciado" \|\| ev === "valido"\) pipeVincAbrir/.test(html))
+  fallos.push("volvio el pop-up de vinculo que se abria DESPUES de confirmar");
+
 /* ── y lo de siempre: toda vista nueva con security_invoker ───────────────────────────── */
 ["gv_clin_prioritarios", "gv_clin_vencidos"].forEach(function (v) {
   if (!new RegExp("alter view public\\." + v + "\\s+set \\(security_invoker = true\\)", "i").test(sql))

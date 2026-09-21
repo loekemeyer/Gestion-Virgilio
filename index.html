@@ -967,6 +967,12 @@ button {
 .pipe-b-ok:disabled{ opacity:.6; cursor:wait; }
 
 /* la lista de candidatos del vínculo */
+/* v20.78: el vínculo, adentro del cuadro de la decisión */
+.pipe-vinc-caja{ margin-top:12px; padding:10px 12px; border:1px dashed #cbd5e1; border-radius:10px; background:#f8fafc; }
+.pipe-vinc-caja .pipe-modal-lbl{ margin-top:0; }
+.pipe-opt{ font-weight:600; text-transform:none; letter-spacing:0; color:#94a3b8; }
+.pipe-vinc-ayuda{ font-size:12px; color:#64748b; line-height:1.4; margin-bottom:8px; }
+.pipe-vinc-x{ margin-left:8px; border:0; background:transparent; color:#991b1b; font-weight:800; cursor:pointer; }
 .pipe-vinc-hint{ margin-top:10px; font-size:13px; color:#64748b; }
 .pipe-vinc-lista{ margin-top:10px; max-height:250px; overflow:auto; border:1px solid #e2e8f0; border-radius:10px; }
 .pipe-vinc-it{ display:block; width:100%; text-align:left; padding:8px 11px; border:0;
@@ -47187,17 +47193,60 @@ function pipeRecargar() {
 /* Mismo criterio que el pop-up de Cuarentena (Vivi / Marian / Otro): lo que se mira después
    no es el mail de la sesión (que es una cuenta compartida) sino quién lo autorizó. */
 const PIPE_PERSONAS = ["Luis", "Thomas", "Marian", "Vivi"];
-function pipeFirmaAbrir(empresa, orderId, evento, titulo, ayuda) {
+/* v20.78 (Luis: "no figura la opcion de vincularlo con otras razones sociales u otros
+   clientes"). El vínculo vivía en un pop-up SEPARADO que se abría DESPUÉS de confirmar, o sea
+   que había que decidir a ciegas y recién ahí aparecía la pregunta. Y el propio cuadro habla de
+   "el que compra por una razón social nueva de un cliente ya activo": es ahí donde se está
+   pensando en el vínculo. Ahora va adentro, como parte opcional de la misma decisión. */
+function pipeFirmaAbrir(empresa, orderId, evento, titulo, ayuda, conVinculo) {
+  const p = pipeBuscar(empresa, orderId) || {};
   _apr.pipeFirma = { empresa: empresa, orderId: String(orderId), evento: evento,
-                     titulo: titulo, ayuda: ayuda || "", persona: "", otro: "", txt: "", err: "", saving: false };
+                     titulo: titulo, ayuda: ayuda || "", persona: "", otro: "", txt: "", err: "", saving: false,
+                     conVinculo: !!conVinculo, demo: !!p._demo,
+                     cod: String(p.cod || ""), rs: String(p.razon_social || ""),
+                     vq: "", vres: null, vbuscando: false, velegido: null };
   pppRenderProg();
 }
+/* el buscador de razones sociales, adentro del cuadro de la decisión */
+let _pipeFirmaVincT = null;
+function pipeFirmaVincInput(v) {
+  const s = _apr.pipeFirma; if (!s) return;
+  s.vq = String(v || "");
+  if (_pipeFirmaVincT) clearTimeout(_pipeFirmaVincT);
+  _pipeFirmaVincT = setTimeout(pipeFirmaVincBuscar, 300);
+}
+async function pipeFirmaVincBuscar() {
+  const s = _apr.pipeFirma; if (!s) return;
+  const q = String(s.vq || "").trim();
+  if (q.length < 3) { s.vres = null; pipeFirmaRender(); return; }
+  s.vbuscando = true; pipeFirmaRender();
+  try { s.vres = (await aprRpc("gv_clin_vinculo_buscar", { p_q: q, p_limit: 20 })) || []; }
+  catch (_e) { s.vres = []; s.err = "No se pudo buscar."; }
+  s.vbuscando = false; pipeFirmaRender();
+}
+function pipeFirmaVincElegir(emp, cod, rs, esNuevo) {
+  const s = _apr.pipeFirma; if (!s) return;
+  if (esNuevo === "1") {
+    s.err = "Ese cliente también figura como cliente nuevo: vincularlo no le daría antigüedad.";
+    pipeFirmaRender(); return;
+  }
+  s.velegido = { empresa: emp, cod: cod, rs: rs }; s.err = ""; pipeFirmaRender();
+}
+function pipeFirmaVincQuitar() { const s = _apr.pipeFirma; if (!s) return; s.velegido = null; pipeFirmaRender(); }
 function pipeFirmaCerrar() { _apr.pipeFirma = null; pppRenderProg(); }
 function pipeFirmaPersona(v) { const s = _apr.pipeFirma; if (!s) return; s.persona = v; s.err = ""; pipeFirmaRender(); }
 function pipeFirmaRender() {
   const box = document.getElementById("pipeFirmaBox"); if (!box) return;
-  const ta = document.getElementById("pipeFirmaTexto"); if (ta) { const s = _apr.pipeFirma; if (s) s.txt = ta.value; }
+  const s = _apr.pipeFirma;
+  const ta = document.getElementById("pipeFirmaTexto"); if (ta && s) s.txt = ta.value;
+  const vq = document.getElementById("pipeFirmaVincQ"); if (vq && s) s.vq = vq.value;
+  const foco = document.activeElement && document.activeElement.id;
   box.outerHTML = pipeFirmaHtml();
+  // el buscador se redibuja en cada tecla: sin esto se pierde el foco y el cursor
+  if (foco === "pipeFirmaVincQ") {
+    const n = document.getElementById("pipeFirmaVincQ");
+    if (n) { try { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } catch (_e) {} }
+  }
 }
 function pipeFirmaValor(s) {
   if (!s) return "";
@@ -47210,13 +47259,59 @@ async function pipeFirmaConfirmar() {
   const quien = pipeFirmaValor(s);
   if (!quien) { s.err = "Decinos quién lo define."; pipeFirmaRender(); return; }
   s.saving = true; s.err = ""; pipeFirmaRender();
+  // 1) el vínculo PRIMERO: si falla, la decisión no se toma y el cuadro queda abierto con el
+  //    error a la vista. Al revés quedaría el pedido decidido y el cliente sin vincular.
+  if (s.velegido && !s.demo) {
+    try {
+      await aprRpc("gv_clin_vincular", {
+        p_empresa: s.empresa, p_cod: s.cod,
+        p_vinc_empresa: s.velegido.empresa, p_vinc_cod: s.velegido.cod,
+        p_persona: quien, p_por: await aprQuien(), p_order_id: String(s.orderId), p_nota: null });
+    } catch (e) {
+      s.saving = false; s.err = String((e && e.message) || e); pipeFirmaRender(); return;
+    }
+  }
+  // 2) y recién ahora la decisión
   const ok = await pipeEvento(s.empresa, s.orderId, s.evento, quien, s.txt);
   if (!ok) { s.saving = false; s.err = _apr.msg || "No se pudo guardar."; pipeFirmaRender(); return; }
-  const ev = s.evento, emp = s.empresa, oid = s.orderId;
+  if (s.velegido) {
+    _apr.msg = (s.demo ? "Ejemplo: " : "") + "Vinculado a " + cuarEmpCod(s.velegido.empresa) + " " +
+      s.velegido.cod + ". Sus próximos pedidos ya no entran al pipeline; éste sigue su camino.";
+    _apr.msgErr = false;
+  }
   _apr.pipeFirma = null;
-  // Referenciado y Válido son los dos momentos en que Luis quiere preguntar por el vínculo
-  if (ev === "referenciado" || ev === "valido") pipeVincAbrir(emp, oid);
-  else pppRenderProg();
+  pppRenderProg();
+}
+function pipeFirmaVincHtml(s) {
+  let h = '<div class="pipe-vinc-caja">' +
+    '<div class="pipe-modal-lbl">¿Ya es cliente con otra razón social? <span class="pipe-opt">(opcional)</span></div>' +
+    '<div class="pipe-vinc-ayuda">Si ' + escapeHtml(s.rs || ("el cliente " + s.cod)) + ' ya compra con otro ' +
+      'código —de Loekemeyer o de Chef—, vinculalo: toma su antigüedad y sus próximos pedidos dejan de entrar acá.</div>';
+  if (s.velegido) {
+    h += '<div class="pipe-vinc-ok">Se vincula a <b>' + cuarEmpCod(s.velegido.empresa) + ' ' +
+      escapeHtml(String(s.velegido.cod)) + '</b> — ' + escapeHtml(String(s.velegido.rs || "")) +
+      ' <button class="pipe-vinc-x" onclick="pipeFirmaVincQuitar()" title="No vincularlo">✕</button></div>';
+    return h + '</div>';
+  }
+  h += '<input id="pipeFirmaVincQ" class="pipe-modal-inp" placeholder="Razón social, CUIT o código…" value="' +
+    escapeHtml(String(s.vq || "")) + '" oninput="pipeFirmaVincInput(this.value)">';
+  if (s.vbuscando) h += '<div class="pipe-vinc-hint">Buscando…</div>';
+  else if (s.vres && !s.vres.length) h += '<div class="pipe-vinc-hint">Sin resultados.</div>';
+  else if (s.vres && s.vres.length) {
+    h += '<div class="pipe-vinc-lista">';
+    s.vres.forEach(function (r) {
+      h += '<button class="pipe-vinc-it' + (r.es_nuevo ? " nuevo" : "") +
+        '" onclick="pipeFirmaVincElegir(\'' + r.empresa + '\',\'' + escapeHtml(String(r.cod)) + '\',\'' +
+        escapeHtml(String(r.razon_social || "").replace(/'/g, "\\'")) + '\',\'' + (r.es_nuevo ? "1" : "0") + '\')">' +
+        '<span class="pipe-vinc-cod">' + cuarEmpCod(r.empresa) + " " + escapeHtml(String(r.cod)) + '</span>' +
+        escapeHtml(String(r.razon_social || "")) +
+        (r.cuit ? '<span class="pipe-vinc-cuit">' + escapeHtml(String(r.cuit)) + '</span>' : "") +
+        (r.es_nuevo ? '<span class="pipe-vinc-tag">también nuevo</span>' : "") +
+        '</button>';
+    });
+    h += '</div>';
+  }
+  return h + '</div>';
 }
 function pipeFirmaHtml() {
   const s = _apr.pipeFirma;
@@ -47234,6 +47329,7 @@ function pipeFirmaHtml() {
   if (s.persona === "__otro")
     h += '<input id="pipeFirmaOtro" class="pipe-modal-inp" placeholder="Nombre" value="' +
          escapeHtml(String(s.otro || "")) + '" oninput="_apr.pipeFirma.otro=this.value">';
+  if (s.conVinculo) h += pipeFirmaVincHtml(s);
   h += '<textarea id="pipeFirmaTexto" class="pipe-modal-ta" placeholder="Comentario (opcional) — queda en el log del pedido">' +
        escapeHtml(String(s.txt || "")) + '</textarea>';
   if (s.err) h += '<div class="pipe-modal-err">' + escapeHtml(s.err) + '</div>';
@@ -47423,10 +47519,10 @@ function pipeAccionesBtns(p) {
            B("pipe-b-ref", "pipeFirmaAbrir('" + emp + "','" + oid + "','referenciado','Marcar REFERENCIADO'," +
              "'Cliente que NO paga por adelantado en sus primeros pedidos: un cliente muy grande, un amigo de la " +
              "empresa, o el que compra por una razon social nueva de un cliente ya activo. Exime al CLIENTE, " +
-             "no solo a este pedido (Thomas, 21/09), y el pedido se programa con prioridad.')",
+             "no solo a este pedido (Thomas, 21/09), y el pedido se programa con prioridad.',true)",
              "🤝 Referenciado", "Cuenta como habitual: no paga por adelantado, ni este pedido ni los próximos") +
            B("pipe-b-val", "pipeFirmaAbrir('" + emp + "','" + oid + "','valido','Marcar VÁLIDO'," +
-             "'Se lo contacta para que pague por adelantado. El pedido no se programa hasta que pague.')",
+             "'Se lo contacta para que pague por adelantado. El pedido no se programa hasta que pague.',true)",
              "✔ Válido", "Paga por adelantado antes de armarle el pedido") +
            B("pipe-b-no", "pipeFirmaAbrir('" + emp + "','" + oid + "','no_valido','Marcar NO VÁLIDO'," +
              "'El pedido se descarta.')", "✖ No válido", "No se le vende: el pedido se descarta");

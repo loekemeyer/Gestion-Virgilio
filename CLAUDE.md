@@ -1556,6 +1556,25 @@ queda en `null` y se vuelve a pedir; con los pedidos cargados y sin retenidos, `
 **Al agregar un lote nuevo de este tipo, usar `clinVacio`.** Es el mismo pozo de §*"una lectura
 ROTA no es un CERO"*. Problema 474.
 
+### El VÍNCULO va dentro del cuadro de la decisión (v20.78, Luis)
+
+*"no figura la opcion de vincularlo con otras razones sociales u otros clientes"*, mirando el
+cuadro de «Marcar REFERENCIADO».
+
+Estaba en un pop-up **separado que se abría DESPUÉS de confirmar**: había que decidir a ciegas y
+recién ahí aparecía la pregunta. Y el propio cuadro habla de *"el que compra por una razón social
+nueva de un cliente ya activo"* — es ahí donde se está pensando en el vínculo. Ahora es una
+sección opcional del mismo cuadro, en Referenciado y en Válido.
+
+⚠ **El vínculo se ejecuta ANTES que la decisión.** Si falla, el cuadro queda abierto con el error
+y la decisión no se toma: al revés quedaría el pedido decidido y el cliente sin vincular.
+
+⚠⚠ **Y eso se verifica corriéndolo, no con un regex.** El primer candado que se escribió miraba
+el orden de las dos llamadas **en el código** y **no cazó el bug** cuando se desactivó la
+condición del vínculo: el texto seguía estando. Por eso existe ,
+que abre el cuadro de verdad y mira el orden real de las RPC. **Un candado de texto no puede
+verificar semántica** — cuando lo que importa es el orden o la condición, el test se corre.
+
 ### La espera va en «Qué sigue», en día · hora · minuto (v20.75, Luis)
 
 *"la espera debería estar incluida en el «Que sigue» y debería ser en formato de dia, hora,
