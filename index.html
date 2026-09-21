@@ -917,6 +917,8 @@ button {
 .pipe-etapa.e-can{ background:#e5e7eb; color:#6b7280; text-decoration:line-through; }
 
 /* el número de pedido del cliente (1.º / 2.º / 3.º), al lado de la NP */
+/* v20.80 (Luis): el número de pedido va DENTRO del badge de Cliente nuevo, no al lado. */
+.cuar-badge-nro{ margin-left:5px; font-weight:800; opacity:.92; }
 .pipe-nro{ display:inline-block; margin-left:6px; padding:2px 7px; border-radius:6px;
   background:#eef2ff; color:#3730a3; font-size:11px; font-weight:700; white-space:nowrap; }
 .pipe-vinc{ display:block; margin-top:3px; font-size:11px; color:#0f766e; font-weight:700; }
@@ -46134,9 +46136,12 @@ function aprCuarBadgesHtml(p) {
   // social agrupada, vínculo LK↔CH). Lo calcula LK y lo espeja GV_Clientes_Nuevos.
   if (has("cliente_nuevo")) {
     const n = Number(d.nuevo_pedidos);
+    const cual = isFinite(n) ? (n + 1) : null;   // el de la pantalla es el SIGUIENTE al último facturado
     h += '<span class="cuar-badge b-nuevo" title="Cliente nuevo: código alto y ' +
       (isFinite(n) ? (n === 0 ? "ninguna compra facturada" : n + " pedido" + (n === 1 ? "" : "s") + " facturado" + (n === 1 ? "" : "s")) : "menos de 3 pedidos facturados") +
-      ' en toda su historia (se cuentan también sus otros códigos y la otra empresa).">🆕 Cliente nuevo</span>';
+      ' en toda su historia (se cuentan también sus otros códigos y la otra empresa)' +
+      (cual ? '. Éste sería su ' + cual + '.º pedido' : '') + '.">🆕 Cliente nuevo' +
+      (cual ? '<b class="cuar-badge-nro">· ' + cual + '.º pedido</b>' : '') + '</span>';
   }
   return h + '</div>';
 }
@@ -46980,7 +46985,7 @@ function pipeDemoPedido() {
            zona: "Zona 1 - CABA Sur", localidad: "Barracas", direccion: "Av. de Ejemplo 1234",
            m3: 0.30, lineas: 2, cajas: 6, np_total: 1, fecha_recep: hoy,
            bloques: [{ np_idx: 1, m3: 0.30, lineas: 2, cajas: 6, items: items }],
-           cuarentena_motivos: ["cliente_nuevo"], cuarentena_detalle: { nuevo_pedidos: 1 },
+           cuarentena_motivos: ["cliente_nuevo"], cuarentena_detalle: { nuevo_pedidos: 0 },
            _demo: true, _cuit: "30712345678" };
 }
 function pipeDemoToggle() {
@@ -47121,17 +47126,6 @@ function pipeRelojHtml(p) {
     escapeHtml(String(e.reloj_desde)) + '" data-fmt="dhm" title="' +
     (e.vencido ? "Pasó el tope de espera de esta etapa — hay que mirarlo" : "Hace cuánto que este pedido está esperando en esta etapa") + '">' +
     '⏱ ' + pipeFmtEspera(e.reloj_desde) + '</span>';
-}
-/* 1.º / 2.º / 3.º pedido. `nuevo_pedidos` son los pedidos FACTURADOS de toda su historia
-   (lo calcula LK): el que está en pantalla es el siguiente, así que va +1. */
-function pipeNroPedidoHtml(p) {
-  const d = (p && p.cuarentena_detalle) || {};
-  const n = Number(d.nuevo_pedidos);
-  if (!isFinite(n)) return "";
-  const i = n + 1;
-  return '<span class="pipe-nro" title="' + (n === 0 ? "Sin ninguna compra facturada" :
-      n + " pedido" + (n === 1 ? "" : "s") + " facturado" + (n === 1 ? "" : "s") + " en toda su historia") +
-    ' — éste sería el ' + i + '.º">' + (i <= 3 ? i + ".º pedido" : i + ".º") + '</span>';
 }
 
 /* ── Análisis crediticio: abre Equifax y arranca el timer ───────────────────────────── */
@@ -47628,7 +47622,6 @@ function pipeHtml() {
       '<td class="cuar-td-np" onclick="aprToggle(\'' + cid + '\')" title="Ver qué pidió (códigos y cajas)">' +
         '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
         '<span class="cuar-card-np">' + escapeHtml(p._demo ? "web LK 9999" : aprPedLabel(p)) + '</span>' +
-        pipeNroPedidoHtml(p) +
         (nblo > 1 ? '<span class="cuar-demo-tag" title="Este pedido se parte en ' + nblo + ' NP">' + nblo + ' NP</span>' : '') +
       '</td>' +
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
