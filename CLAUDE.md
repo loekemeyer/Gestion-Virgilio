@@ -1231,6 +1231,21 @@ hasta esa tarde. Si vuelve a aparecer un cartel de tope, está mintiendo.
 **Consecuencia aceptada, no un bug:** comprando por encima de la góndola, el aviso de recepción
 *"no entra en góndola"* salta más seguido y el excedente va a racks.
 
+⚠ **Y la proyección sale de `proyeccion_madre`, que la empuja LK — no se calcula acá.** El cron
+`sync-proyeccion-madre-virgilio` (jobid **25 en LK**) era **semanal** y su única corrida del 16/09
+cayó adentro de los cuatro días en que la base de LK estuvo ahogada (15–18/09, hasta 2.130 corridas
+fallidas por día): se perdieron 7 días de dato y el watchdog, con umbral de 9 días, no dijo nada.
+Desde la **v20.38** el cron es **diario** (`'20 9 * * *'` = 06:20 ART) y el umbral de
+`watchdog_frescura_datos()` es de **40 h**. Antes de mirar un número del generador:
+
+```sql
+select public.watchdog_frescura_datos();   -- avisos=0 y cuántas horas tiene la proyección
+```
+
+⚠ **El sync tarda ~70 s y el MCP corta a los 60**, así que llamarlo desde una sesión hace ROLLBACK
+y no escribe nada (el delete+insert está adentro de la función). Se corre con un job de pg_cron de
+una sola vez y después se borra con `cron.unschedule`. §3.ks.
+
 **Chequeo:**
 
 ```sql

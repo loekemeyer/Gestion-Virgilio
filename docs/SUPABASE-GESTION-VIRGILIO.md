@@ -26166,3 +26166,54 @@ nada, y los datos no se tocan sin que Luis lo pida en el momento.
 **Lo que falta para escribir la regla**: subir el Excel de LK y el de Chef una vez. Hasta que el
 detalle exista, la rama que exime no se puede hacer entrar — y una rama que no se hizo entrar no
 está probada (v19.56).
+
+### §3.ks — v20.38: la proyección que fija el Máximo de las OC se había congelado — 2026-09-21
+
+**Luis: *"revisá que la generación de OCs esté funcionando bien"***. La cuenta del generador está
+bien; lo que estaba mal es de dónde venía el número.
+
+`proyeccion_madre` tenía una sola fecha de escritura: **15/09 12:21**, o sea 141 h. El Máximo de
+las **241 OC activas** sale de ahí.
+
+**Por qué falló** (medido en `cron.job_run_details` de LK):
+
+- El sync corre en **LK** (`sync-proyeccion-madre-virgilio`, jobid 25) y era **semanal**:
+  `'20 9 * * 3'`, miércoles 06:20 ART.
+- La corrida del miércoles **16/09 falló con `job startup timeout`**.
+- **No fue ella**: en esa misma ventana (16/09, 08:00–11:00 UTC) fallaron **22 jobs distintos** con
+  el mismo mensaje. La base de LK estuvo ahogada cuatro días — 15/09: **1.233** corridas fallidas,
+  16/09: **1.768**, 17/09: **2.130**, 18/09: **1.559** — y desde el 19/09 está en **0**. Es el mismo
+  episodio del problema 402.
+- Última corrida **exitosa: 9/09**. La escritura del 15/09 fue a mano (martes, fuera de horario).
+
+> **El problema de fondo no es el timeout: es que un cron semanal no tiene red.** Su única corrida
+> cayó adentro de la ventana mala y se perdieron 7 días. El watchdog avisaba a los 9.
+
+**Qué se hizo**
+
+1. **Se corrió el sync**: 70 s, ok, 461 filas, `actualizado = 2026-09-21 09:47`.
+   ⚠ **Tarda más de los 60 s que aguanta el MCP**, así que por ahí se corta y hace ROLLBACK (el
+   delete+insert está adentro de la función). Se dispara con un job de pg_cron de una sola vez y
+   después se borra con `cron.unschedule`. Backup previo en
+   `zz_backups."GV_Backup_proyeccion_madre_20260921"`.
+   ⚠ El `statement_timeout` de la función es **120 s** y tardó **70**: si LK se vuelve a ahogar
+   puede pasarse. Ahí el guard hace lo correcto — aborta sin tocar Virgilio.
+2. **El cron 25 de LK pasó a diario**: `select cron.alter_job(25, schedule := '20 9 * * *');`
+3. **El umbral del watchdog pasó de 216 h a 40 h.** Con el cron diario la antigüedad normal máxima
+   es ~24 h: una corrida perdida no molesta, dos seguidas avisan. Probado en transacción abortada
+   y con las dos funciones de Telegram en no-op para no mandar nada: con `actualizado - 50 hours`
+   contesta `avisos=1 · proyeccion_madre=50h`.
+
+**Lo que la semana perdida costó en el número: nada.** Comparado el backup del 15/09 contra lo
+recién sincronizado: **461 códigos, 0 nuevos, 0 desaparecidos, 0 con valores distintos**
+(22.305,87 cajas/mes; LK 18.358,55; CH 3.947,32). El motor calcula sobre meses cerrados, así que
+dentro del mismo mes da igual — pero el día que cambie de mes con el cron caído, no.
+
+**Lo que se verificó del generador y está bien** (no se tocó): 224 códigos simples con stock,
+proyección, Máximo y a-pedir recalculados desde las fuentes → **0 diferencias**;
+`vista_saldos_stock` contra el libro de movimientos, 487 códigos × 5 depósitos → **0 diferencias**;
+el stock es el **disponible** (usa `fin_dep`, sin lo comprometido); **0 de 241** con
+`llenar_gondola`; las familias suman al principal (437E ← 29: +13,67 · 438E ← 30: +0,50 ·
+809E ← 809: +1,33).
+
+**Chequeo:** `select public.watchdog_frescura_datos();` · `sql/gv_proyeccion_sync_diario_v2038.sql`

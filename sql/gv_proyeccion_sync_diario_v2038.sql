@@ -1,0 +1,58 @@
+-- v20.38 (Luis, 2026-09-21) — LA PROYECCION QUE FIJA EL MAXIMO DE LAS OC SE HABIA CONGELADO.
+--
+-- Sintoma: `proyeccion_madre` tenia una sola fecha de escritura, 2026-09-15 12:21 (141 h / 5,9
+-- dias), y el Maximo de las 241 OC activas sale de ahi.
+--
+-- POR QUE FALLO, medido en cron.job_run_details de LK:
+--   · el sync corre en LK (`sync-proyeccion-madre-virgilio`, jobid 25) y era SEMANAL: '20 9 * * 3',
+--     miercoles 06:20 ART;
+--   · la corrida del miercoles 16/09 09:20 UTC fallo con `job startup timeout`;
+--   · no fue ella: en esa MISMA ventana (16/09 08:00-11:00 UTC) fallaron 22 jobs distintos con el
+--     mismo mensaje. La base de LK estuvo ahogada cuatro dias seguidos —15/09: 1.233 corridas
+--     fallidas, 16/09: 1.768, 17/09: 2.130, 18/09: 1.559— y desde el 19/09 esta en 0. Es el mismo
+--     episodio del problema 402 (el feed de LK devolvia 57014).
+--   · ultima corrida EXITOSA del sync: 9/09. La escritura del 15/09 fue a mano (martes).
+--
+-- El problema de fondo no es el timeout: es que **un cron semanal no tiene red**. Su unica
+-- corrida cayo adentro de la ventana mala y se perdieron 7 dias; el watchdog avisaba a los 9.
+--
+-- QUE SE HIZO
+--   1. Se corrio el sync a mano: 70 s, ok, 461 filas. `actualizado` = 2026-09-21 09:47.
+--      ⚠ Tarda mas de los 60 s que aguanta el MCP, asi que por ahi se corta y hace ROLLBACK
+--      (el delete+insert esta adentro de la funcion). Se dispara con un job de pg_cron de una
+--      sola vez y despues se borra con `cron.unschedule`. Backup previo en
+--      zz_backups."GV_Backup_proyeccion_madre_20260921".
+--      ⚠ El `statement_timeout` de la funcion es 120 s y tardo 70: si LK se vuelve a ahogar,
+--      puede pasarse. Ahi el guard hace lo correcto (aborta sin tocar Virgilio).
+--   2. El cron 25 de LK paso a DIARIO:
+--        select cron.alter_job(25, schedule := '20 9 * * *');   -- 06:20 ART, en el proyecto LK
+--   3. El umbral del watchdog paso de 216 h a 40 h (abajo). Con el cron diario la antiguedad
+--      normal maxima es ~24 h: una corrida perdida no molesta, dos seguidas avisan.
+--
+-- LO QUE LA SEMANA PERDIDA COSTO EN EL NUMERO: nada. Comparado el backup del 15/09 contra lo
+-- recien sincronizado: 461 codigos, 0 nuevos, 0 desaparecidos, **0 con valores distintos**
+-- (22.305,87 cajas/mes; LK 18.358,55; CH 3.947,32). El motor calcula sobre meses cerrados, asi
+-- que dentro del mismo mes da igual. No se compro mal por esto — pero el dia que cambie de mes
+-- con el cron caido, si.
+
+-- ── el umbral del watchdog ────────────────────────────────────────────────────────────────────
+-- Aplicado con replace() sobre la definicion viva (el resto de la funcion no se toco):
+--   216  ->  40        en la fila ('proyeccion_madre', 'la proyeccion que fija el Maximo…', N)
+--   y el texto del aviso pasa a decir que el cron es diario 06:20 ART.
+--
+-- Probado de verdad, en transaccion abortada y con tg_enqueue/tg_outbox_flush reemplazadas por
+-- no-op para que no saliera ningun Telegram: con `actualizado - 50 hours` el watchdog contesta
+--   watchdog frescura ok · avisos=1 · proyeccion_madre=50h
+-- y con el dato fresco, `avisos=0 · proyeccion_madre=0h`.
+
+-- ROLLBACK
+--   select cron.alter_job(25, schedule := '20 9 * * 3');   -- en LK, volver a semanal
+--   -- y en Virgilio, poner 216 de vuelta en watchdog_frescura_datos()
+--   -- restaurar la proyeccion:
+--   --   delete from public.proyeccion_madre where cod is not null;
+--   --   insert into public.proyeccion_madre select * from zz_backups."GV_Backup_proyeccion_madre_20260921";
+
+-- CHEQUEO
+--   select public.watchdog_frescura_datos();      -- avisos=0 y las horas de antiguedad
+--   select count(*), max(actualizado) from public.proyeccion_madre;
+--   select jobid, schedule, active from cron.job where jobid = 25;   -- en LK: '20 9 * * *'
