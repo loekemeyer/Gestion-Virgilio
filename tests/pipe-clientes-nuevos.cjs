@@ -29,7 +29,9 @@ const path = require("path");
 
 const root = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "index.html"), "latin1");
-const sql  = fs.readFileSync(path.join(root, "sql", "gv_clin_pipeline_v2066.sql"), "utf8");
+const sql  = fs.readFileSync(path.join(root, "sql", "gv_clin_pipeline_v2066.sql"), "utf8") +
+             "\n" +
+             fs.readFileSync(path.join(root, "sql", "gv_clin_dos_estados_v2086.sql"), "utf8");
 const fallos = [];
 
 /* ── 1. aprobar es el MISMO camino que el submódulo viejo ─────────────────────────────── */
@@ -58,10 +60,70 @@ if (!/insert into public\."GV_Cuarentena_Log"/.test(sql))
 if (!/'pipeline_' \|\| v_ev/.test(sql))
   fallos.push("los eventos del pipeline no se distinguen en el log (prefijo pipeline_)");
 
-/* ── 4. la pestaña ────────────────────────────────────────────────────────────────────── */
-if (!/b\("clin",/.test(html))      fallos.push("falta la pestana `clin` en pppTabsHtml");
-if (!/_pppTab === "clin"[\s\S]{0,200}pipeHtml\(\)/.test(html))
-  fallos.push("falta el intercept de la pestana `clin` en pppRenderProg");
+/* ── 4. v20.86: el pipeline REEMPLAZA al submodulo viejo DENTRO de «A Programar» ───────── */
+// Luis, 21/09: "implementalo... remplazando la vieja". El mismo modulo en dos lugares es
+// justo el problema de convivencia que se queria evitar, asi que la pestaña propia se fue.
+if (!/aprColPedidos\(\) \+ aprColCuarentena\(\) \+ pipeHtml\(\)/.test(html))
+  fallos.push("el pipeline no ocupa el lugar del submodulo viejo en A Programar");
+if (/aprColCuarentena\(\) \+ clinNuevosHtml\(\)/.test(html))
+  fallos.push("volvio el submodulo viejo a A Programar: los dos modulos no pueden convivir ahi");
+if (/b\("clin",/.test(html))
+  fallos.push("quedo la pestaña `clin`: el pipeline se ve en A Programar, no en una pestaña propia");
+// ⚠ y el navegador que quedo parado en la pestaña vieja (se guarda en localStorage) tiene que
+// caer solo en A Programar — y el fallback va ANTES del `return` de "prog", o no se ejecuta
+if (!/if \(_pppTab === "clin"\) _pppTab = "prog";[\s\S]{0,200}if \(_pppTab === "prog"\) \{ aprRender\(\); return; \}/.test(html))
+  fallos.push("la pestaña vieja no cae en A Programar, o el fallback quedo DESPUES del return");
+
+/* ── 4b. DOS ESTADOS (Luis, 21/09) ────────────────────────────────────────────────────── */
+if (!/no_referenciado/.test(html) || !/no_referenciado/.test(sql))
+  fallos.push("falta el estado `no_referenciado`");
+if (/'no_valido'|"no_valido"/.test(html))
+  fallos.push("quedo `no_valido` en el front: despues del analisis solo hay DOS estados");
+if (/p_decision = 'no_valido'/.test(sql))
+  fallos.push("gv_clin_etapa sigue teniendo la etapa `no_valido`");
+if (!/not in \('analisis','referenciado','no_referenciado','speech1','speech2','pagado','cancelado','reabrir'\)/.test(sql))
+  fallos.push("gv_clin_evento sigue aceptando los eventos viejos (valido / no_valido)");
+// al que no se le quiere vender se le ELIMINA el pedido: ese boton tiene que estar en analisis
+if (!/B\("pipe-b-no", _eliminar, "[^"]*Eliminar pedido"/.test(html))
+  fallos.push("sin `No valido` hay que poder eliminar el pedido desde el analisis, y no se puede");
+
+/* ── 4c. CUARENTENA PRIMERO ───────────────────────────────────────────────────────────── */
+if (!/function pipeEsClienteNuevo\(p\) \{ return aprSoloClienteNuevo\(p\); \}/.test(html))
+  fallos.push("el pipeline no toma el mismo conjunto que el submodulo viejo: se duplica con Cuarentena");
+// el boton de Cuarentena libera SUS motivos, nunca cliente_nuevo (si no, nunca llega al pipeline)
+if (!/\.filter\(function \(m\) \{ return m !== "cliente_nuevo"; \}\)/.test(html))
+  fallos.push("liberar desde Cuarentena tambien libera `cliente_nuevo`: el pedido nunca pasa por el pipeline");
+if (!/motivos_vivos/.test(sql))
+  fallos.push("gv_cuarentena_marcar_calc no resta los motivos ya liberados");
+// ⚠ una liberacion vieja con motivos NULL o ARRAY VACIO libera TODO (el pedido 1368 tiene '{}')
+if (!/coalesce\(array_length\(lb\.motivos,1\),0\) = 0/.test(sql))
+  fallos.push("falta el guard del array vacio: los liberados viejos volverian al reten");
+
+/* ── 4d. la ZONA, y el submodulo COLAPSABLE ───────────────────────────────────────────── */
+if (!/<th>Zona<\/th>/.test(html.slice(html.indexOf("function pipeHtml"))))
+  fallos.push("falta la columna Zona en el pipeline (Luis: `agregale zona`)");
+if (!/onclick="aprCliColapsar\(\)"[\s\S]{0,300}Clientes nuevos/.test(html))
+  fallos.push("el pipeline no es colapsable como lo era el submodulo viejo");
+
+/* ── 4e. la DECISION se hereda (Luis: "la verificacion no se vuelve a hacer") ──────────── */
+if (!/coalesce\(h\.decision, h\.cli_decision\)/.test(sql))
+  fallos.push("la decision no se hereda: el 2do pedido volveria a pedir el analisis");
+if (!/decision_heredada/.test(sql) || !/decision_heredada/.test(html))
+  fallos.push("no se marca que la decision viene heredada");
+
+/* ── 4f. el LOG es del CLIENTE (Luis: "deberia traer todo el log anterior") ────────────── */
+if (!/function public\.gv_clin_comentarios_cliente/i.test(sql))
+  fallos.push("falta gv_clin_comentarios_cliente: el log no es del cliente");
+if (!/gv_clin_comentarios_cliente/.test(html))
+  fallos.push("el pop-up de comentarios no trae el historial del cliente");
+if (!/add column if not exists cod text/.test(sql))
+  fallos.push("GV_Cuarentena_Comentarios no guarda el cod: el log no se puede agrupar por cliente");
+
+/* ── 4g. el TELEFONO, por (empresa, cod) ──────────────────────────────────────────────── */
+if (!/GV_Clientes_Whatsapp/.test(sql))
+  fallos.push("el telefono no sale del padron con empresa: 13 codigos son otro cliente en cada empresa");
+if (!/lower\(x\.empresa\) = case when i\.empresa='chef' then 'ch' else 'lk' end/.test(sql))
+  fallos.push("el telefono no filtra por empresa");
 
 /* ── 5. la etapa se DERIVA, no se guarda ──────────────────────────────────────────────── */
 if (/^\s*etapa\s+text/mi.test(sql.split(/gv_clin_etapa/i)[0]))
@@ -137,9 +199,12 @@ if (!/analisis_heredado/.test(sql) || !/cli_analisis_at/.test(sql))
   fallos.push("la RPC no trae la memoria del cliente: el 2do pedido volveria a arrancar de cero");
 if (!/coalesce\(h\.analisis_at, h\.cli_analisis_at\) as analisis_ef/.test(sql))
   fallos.push("la etapa no usa el analisis EFECTIVO (propio o heredado)");
-// la decision NO se hereda: Referenciado ya exime al cliente y el Valido paga pedido por pedido
-if (/coalesce\([a-z]\.decision, [a-z]\.cli_decision\)/.test(sql))
-  fallos.push("la decision se esta heredando: el pago por adelantado es pedido por pedido");
+// ⚠ v20.86: la regla DIO VUELTA. Hasta el 21/09 la decision NO se heredaba; ese dia Luis lo
+// cambio: "la verificacion no se vuelve a hacer... lo unico que queda definir es el contacto
+// por speech". Lo que sigue sin heredarse son los TIMESTAMPS: el pedido nuevo arranca con su
+// Speech 1 pendiente y paga por adelantado igual (sus 3 primeros pedidos).
+if (!/speech1_at,\s*\n?\s*e\.speech2_at/.test(sql) && !/e\.speech1_at, e\.speech2_at/.test(sql))
+  fallos.push("el lote no usa los speech PROPIOS del pedido: heredarlos saltearia el cobro");
 if (!/function pipeMemoriaHtml/.test(html))
   fallos.push("la memoria del cliente no se muestra en la fila");
 // y un analisis heredado no puede correr el reloj de este pedido
@@ -182,15 +247,15 @@ if (!/function pipeFirmaVincHtml/.test(html))
   fallos.push("el cuadro de la decision no trae la seccion de vinculo");
 if (!/pipeFirmaAbrir\([^)]*'referenciado'[\s\S]{0,400}',true\)/.test(html))
   fallos.push("el boton Referenciado no abre el cuadro con la seccion de vinculo");
-if (!/pipeFirmaAbrir\([^)]*'valido'[\s\S]{0,300}',true\)/.test(html))
-  fallos.push("el boton Valido no abre el cuadro con la seccion de vinculo");
+if (!/pipeFirmaAbrir\([^)]*'no_referenciado'[\s\S]{0,400}',true\)/.test(html))
+  fallos.push("el boton No referenciado no abre el cuadro con la seccion de vinculo");
 // ⚠ el ORDEN (vinculo antes que la decision) lo mide tests/pipe-vinculo-en-el-cuadro.cjs
 //   corriendolo de verdad: un regex sobre el codigo no lo caza — se probo, y con la condicion
 //   del vinculo desactivada el texto seguia estando y el candado daba verde.
 if (!/if \(s\.velegido && !s\.demo\) \{/.test(html))
   fallos.push("el vinculo del cuadro no esta condicionado a que se haya elegido un cliente");
 // y no puede volver el pop-up separado que se abria solo despues de confirmar
-if (/if \(ev === "referenciado" \|\| ev === "valido"\) pipeVincAbrir/.test(html))
+if (/if \(ev === "referenciado" \|\| ev === "(valido|no_referenciado)"\) pipeVincAbrir/.test(html))
   fallos.push("volvio el pop-up de vinculo que se abria DESPUES de confirmar");
 
 /* ── y lo de siempre: toda vista nueva con security_invoker ───────────────────────────── */
@@ -204,4 +269,4 @@ if (fallos.length) {
   fallos.forEach(function (f) { console.error("  - " + f); });
   process.exit(1);
 }
-console.log("pipe-clientes-nuevos: OK — convive con el submodulo viejo (mismo aprobar, mismo timer, mismo log).");
+console.log("pipe-clientes-nuevos: OK — reemplaza al submodulo viejo en A Programar, con el mismo aprobar, el mismo timer y el mismo log.");

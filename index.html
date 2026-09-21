@@ -1163,6 +1163,12 @@ button {
 /* v17.15 — log de comentarios (modal) */
 .cuar-log{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; max-height:40vh; overflow:auto; }
 .cuar-log-it{ border-left:3px solid #cbd5e1; padding:1px 0 1px 9px; }
+/* v20.86 (Luis): el log de las veces ANTERIORES del mismo cliente, aparte del hilo de este
+   pedido. Apagado a proposito: es contexto, no lo que se esta discutiendo ahora. */
+.cuar-log-hist{ margin-top:10px; border-top:1px dashed #cbd5e1; padding-top:8px; }
+.cuar-log-hist-t{ font-size:12px; font-weight:700; color:#64748b; margin-bottom:6px; }
+.cuar-log-it-prev{ border-left-color:#e2e8f0; opacity:.82; }
+.cuar-log-it-prev .cuar-log-txt{ color:#475569; }
 .cuar-log-meta{ font-size:11px; color:#64748b; }
 .cuar-log-txt{ font-size:13px; color:#0f172a; white-space:pre-wrap; overflow-wrap:anywhere; }
 .cuar-log-vacio{ font-size:12.5px; color:#64748b; font-style:italic; margin-bottom:10px; }
@@ -41216,7 +41222,6 @@ function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
     b("ent",     "✅ Pedidos Entregados (" + n(cEnt) + ")") +
     b("ocup",    "📦 Ocupación") +
     b("modif",   "✏️ Modificar Pedidos") +          // v18.14 (Luis): entre Ocupación y Config. Cuarentena
-    b("clin",    "🧭 Pipeline clientes") +   // v20.66 (Luis): convive con el submódulo de A Programar
     b("cuarcfg", "🚧 Config. Cuarentena") +
   '</div>';
 }
@@ -41265,19 +41270,16 @@ function pppRenderProg() {
   //   LK y Chef, así que no puede depender de que se haya importado una PPP —
   //   más abajo hay un `if (!all.length) return` que lo dejaría afuera para
   //   siempre. Ver docs/SUPABASE-GESTION-VIRGILIO.md §3.j.
+  // ⚠ v20.86 (Luis, 21/09): el pipeline REEMPLAZA al submódulo viejo DENTRO de «A Programar»,
+  // así que su pestaña propia se fue: el mismo módulo en dos lugares es justo el problema de
+  // convivencia que se quería evitar. Un navegador que quedó parado en la pestaña vieja
+  // (se guarda en localStorage) cae solo en A Programar, que es donde está ahora.
+  if (_pppTab === "clin") _pppTab = "prog";
   pgaSinRepNeed();          // v20.63: los dias sin reparto, para pintarlos en el arbol
   if (_pppTab === "prog") { aprRender(); return; }
   // v14.88 — Config. Cuarentena: pantalla propia (a la derecha de Ocupación) con los 4
   // botones de importación de reportes .xls + la última vez que se actualizó cada uno.
   // No depende de que se haya importado una PPP, así que se intercepta acá arriba.
-  // v20.66 (Luis) — 🧭 Pipeline de clientes nuevos. Pantalla propia, interceptada acá arriba
-  // por lo mismo que Config. Cuarentena: no depende de que se haya importado una PPP.
-  if (_pppTab === "clin") {
-    pppPaintTabs();
-    if (!_apr.listo && !_apr.cargando) { try { aprCargar(); } catch (_e) {} }
-    _renderKeepFocus(box, pipeHtml());
-    return;
-  }
   if (_pppTab === "cuarcfg") {
     pppPaintTabs();
     if (_apr.cuarResumen === null && !_apr.cuarResumenLoading) cuarResumenCargar();
@@ -45643,7 +45645,7 @@ function aprRender() {
   // existe mientras haya pedidos tildados. Al programar se vacía la selección, así que vuelve solo al paso 1.
   if (_apr.paso === 2 && !aprSelKeys().length) { _apr.paso = 1; _apr.diaSel = null; }
   if (_apr.paso === 2) h += '<div class="apr-wrap apr-2col">' + aprPaso2Html() + '</div>';
-  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + aprColCuarentena() + clinNuevosHtml() + (conTandas ? aprColTandas() : '') + '</div>';
+  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + aprColCuarentena() + pipeHtml() + (conTandas ? aprColTandas() : '') + '</div>';
   h += aprFootHtml();
 
   // Cada acción re-dibuja las tres columnas. Sin esto, sacar un pedido de una
@@ -46390,6 +46392,7 @@ function cuarComAbrirPed(empresa, orderId) {
   cuarComAbrir({ modo: "log", empresa: empresa || "lk", clave: String(orderId),
                  np: p ? aprPedLabel(p) : String(orderId),
                  cli: (p && (p.razon_social || p.cod)) || "",
+                 cod: (p && String(p.cod || "").trim()) || "",   // v20.86: para el log del CLIENTE
                  motivos: (p && aprCuarentenaMotivos(p)) || null });
 }
 async function cuarComLoteCargar() {
@@ -46616,8 +46619,14 @@ async function cuarLiberarConfirmar() {
   try {
     // los motivos salen del pedido si está a la vista, y si no de la fila de la tabla (un pedido
     // YA programado no está en `pedidosTodos`: se fue de A Programar cuando recibió tanda)
+    // ⚠ v20.86 (Luis, 21/09): este botón libera los motivos DE CUARENTENA — nunca `cliente_nuevo`.
+    // "un cliente nuevo con deuda pasa primero por la cuarentena y despues, cuando es liberado,
+    // va al modulo de clientes nuevos": si acá se liberara también ese motivo, el pedido se iría
+    // derecho a programar y nunca pasaría por el pipeline. Quien lo levanta es el ✅ del pipeline.
+    const _mot = ((p && aprCuarentenaMotivos(p)) || s.motivos || [])
+      .filter(function (m) { return m !== "cliente_nuevo"; });
     await aprRpc("gv_cuarentena_liberar", { p_empresa: empresa, p_order_id: String(orderId),
-      p_motivos: (p && aprCuarentenaMotivos(p)) || s.motivos || null,
+      p_motivos: _mot.length ? _mot : null,
       p_comentario: txt || null, p_por: await aprQuien(), p_persona: quien, p_np: s.np || null });
     s.saving = false; cuarComCerrar(); cuarYaProgRecargar();
     _apr.msg = "Pedido enviado a Pedidos a programar (aprobado por " + quien + ")" + (txt ? ", con tu comentario." : "."); _apr.msgErr = false;
@@ -46777,7 +46786,9 @@ async function clinContactoCargar() {
 function clinWppNeed() { if (_apr.cliWpp === null && !_apr.cliWppLoading) clinWppCargar(); }
 async function clinWppCargar() {
   if (_apr.cliWppLoading) return;
-  const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p) && aprSoloClienteNuevo(p); });
+  // v20.86: TODO retenido, no solo el cliente nuevo puro — un pedido que esta en Cuarentena hoy
+  // puede caer manana en el pipeline (se le libera la deuda) y ahi ya tiene que tener el telefono.
+  const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p); });
   if (!lista.length) { clinVacio("cliWpp"); return; }
   _apr.cliWppLoading = true;
   try {
@@ -46785,6 +46796,9 @@ async function clinWppCargar() {
       p_pedidos: lista.map(function (p) { return { empresa: p.empresa || "lk", cod: String(p.cod || "").trim() }; })
     });
     const m = {};
+    // `origen` dice de donde salio: `padron_empresa` (el Excel del dueno, que tiene empresa y es
+    // el unico que distingue LK de CH), `historico` (whatsapp_clientes, sin empresa, solo si el
+    // codigo no es ambiguo) o `ambiguo_sin_dato` (el codigo es de dos clientes distintos).
     (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.cod)] = r.telefono; });
     _apr.cliWpp = m;
   } catch (_e) { _apr.cliWpp = _apr.cliWpp || {}; }
@@ -47020,9 +47034,13 @@ function clinDemoToggle() { _apr.cliDemo = !_apr.cliDemo; pppRenderProg(); }
    ══════════════════════════════════════════════════════════════════════════════════════ */
 
 /* ¿este pedido es de cliente nuevo? (con o sin otros motivos encima) */
-function pipeEsClienteNuevo(p) {
-  return aprCuarentenaMotivos(p).indexOf("cliente_nuevo") >= 0;
-}
+/* ⚠ v20.86 (Luis, 21/09): "cuarentena toma prioridad sobre cliente nuevo — un cliente nuevo con
+   deuda pasa primero por la cuarentena y despues, cuando es liberado, va al modulo de clientes
+   nuevos". Por eso el pipeline toma el mismo conjunto que tomaba el submodulo viejo: el pedido
+   cuyo UNICO motivo vivo es `cliente_nuevo`. El que ademas tiene deuda o esta suspendido sigue
+   en Cuarentena, y cae acá recién cuando el supervisor le libera ESE otro motivo — la resta la
+   hace `gv_cuarentena_marcar_calc` contra `GV_Cuarentena_Liberados.motivos`. */
+function pipeEsClienteNuevo(p) { return aprSoloClienteNuevo(p); }
 function pipeLista() {
   const l = (_apr.pedidos || []).filter(function (p) {
     return !p._demo && aprEnCuarentena(p) && pipeEsClienteNuevo(p);
@@ -47085,7 +47103,7 @@ async function pipeCargar() {
     else { _apr.pipe = _apr.pipe || {}; }
   }
   _apr.pipeLoading = false;
-  if (_pppTab === "clin") pppRenderProg();
+  if (_pppTab === "prog") aprRender();
 }
 /* El order_id del pedido y la clave del backend son el mismo string salvo el prefijo `np`,
    que gv_cuarentena_clave saca. Se replica acá para poder buscar en el mapa. */
@@ -47117,12 +47135,11 @@ function pipeCuitHtml(p) {
 const PIPE_ETAPAS = {
   ingresado:    { t: "Sin analizar",      c: "e-ing"  },
   analisis:     { t: "Análisis pedido",   c: "e-ana"  },
-  referenciado: { t: "Referenciado",      c: "e-ref"  },
-  valido:       { t: "Válido",            c: "e-val"  },
+  referenciado:    { t: "Referenciado",    c: "e-ref"  },
+  no_referenciado: { t: "No referenciado", c: "e-val"  },
   speech1:      { t: "Esperando pago",    c: "e-sp1"  },
   speech2:      { t: "2.º aviso",         c: "e-sp2"  },
   pagado:       { t: "Pagó",              c: "e-pag"  },
-  no_valido:    { t: "No válido",         c: "e-nov"  },
   aprobado:     { t: "Aprobado",          c: "e-apr"  },
   cancelado:    { t: "Cancelado",         c: "e-can"  },
 };
@@ -47135,13 +47152,14 @@ function pipeMemoriaHtml(p) {
       'el ' + escapeHtml(cuarFechaHora(e.cli_analisis_at)) +
       (e.cli_analisis_np ? ' en ' + escapeHtml(String(e.cli_analisis_np)) : '') +
       '. No hace falta volver a Equifax.">🧠 ya analizado</span>';
-  if (e.cli_decision) {
-    const T = { referenciado: "Referenciado", valido: "Válido", no_valido: "No válido" };
-    h += '<span class="pipe-mem pipe-mem-dec" title="Lo que se decidió con este cliente la vez anterior' +
-      (e.cli_decision_np ? ' (' + escapeHtml(String(e.cli_decision_np)) + ')' : '') +
-      '. La decisión NO se hereda: el pago por adelantado es pedido por pedido.">antes: ' +
-      escapeHtml(T[e.cli_decision] || e.cli_decision) +
-      (e.cli_decision_persona ? ' · ' + escapeHtml(String(e.cli_decision_persona)) : '') + '</span>';
+  // v20.86 (Luis): la DECISION ES DEL CLIENTE y SE HEREDA — "la verificacion no se vuelve a
+  // hacer... lo unico que queda definir es el contacto por speech". Lo que NO se hereda son los
+  // timestamps: el pedido nuevo arranca con su Speech 1 pendiente y paga por adelantado igual.
+  if (e.decision_heredada && e.cli_decision) {
+    h += '<span class="pipe-mem pipe-mem-dec" title="Ya se definió con este cliente' +
+      (e.cli_decision_np ? ' en ' + escapeHtml(String(e.cli_decision_np)) : '') +
+      (e.cli_decision_persona ? ', por ' + escapeHtml(String(e.cli_decision_persona)) : '') +
+      '. No se vuelve a analizar: este pedido sigue desde donde corresponde.">🧠 ya definido</span>';
   }
   return h;
 }
@@ -47197,7 +47215,7 @@ async function pipeCfgCargar() {
     _apr.pipeCfg = m;
   } catch (_e) { _apr.pipeCfg = _apr.pipeCfg || {}; }
   _apr.pipeCfgLoading = false;
-  if (_pppTab === "clin") pppRenderProg();
+  if (_pppTab === "prog") aprRender();
 }
 function pipeEquifaxUrl(p) {
   let base = "https://www.equifax.com.ar/";
@@ -47576,11 +47594,18 @@ function pipeAccionesBtns(p) {
   if (et === "cancelado")
     return '<span class="pipe-cerrado pipe-cerrado-no">🗑 Cancelado</span>';
 
+  // v20.86: el 🗑 esta desde el minuto cero — un pedido que entro MAL no hay que analizarlo
+  // para poder sacarlo, y desde que "No valido" no existe es la unica via de descarte.
   if (et === "ingresado")
     return B("pipe-b-eq", "pipeAnalisis('" + emp + "','" + oid + "')", "🔎 Análisis Cred.",
-             "Abre Equifax y arranca el reloj del análisis");
+             "Abre Equifax y arranca el reloj del análisis") +
+           B("pipe-b-no", _eliminar, "🗑 Eliminar pedido",
+             "Lo saca de la PPP y queda en el log de anulados");
 
   const _her = !!(pipeEst(p) || {}).analisis_heredado;
+  // ⚠ v20.86 (Luis, 21/09): DESPUES DEL ANALISIS SOLO HAY DOS ESTADOS. "No válido" ya no existe:
+  // al cliente al que no se le quiere vender se le elimina el pedido (🗑, que está en todas las
+  // etapas) y queda en el log de anulados, que ahora es del CLIENTE y no sólo del pedido.
   if (et === "analisis")
     return (_her ? B("pipe-b-sec2", "pipeAnalisis('" + emp + "','" + oid + "')", "🔎 Re-analizar",
                      "Al cliente ya se le hizo el análisis en un pedido anterior. Esto vuelve a abrir Equifax " +
@@ -47590,11 +47615,12 @@ function pipeAccionesBtns(p) {
              "empresa, o el que compra por una razon social nueva de un cliente ya activo. Exime al CLIENTE, " +
              "no solo a este pedido (Thomas, 21/09), y el pedido se programa con prioridad.',true)",
              "🤝 Referenciado", "Cuenta como habitual: no paga por adelantado, ni este pedido ni los próximos") +
-           B("pipe-b-val", "pipeFirmaAbrir('" + emp + "','" + oid + "','valido','Marcar VÁLIDO'," +
-             "'Se lo contacta para que pague por adelantado. El pedido no se programa hasta que pague.',true)",
-             "✔ Válido", "Paga por adelantado antes de armarle el pedido") +
-           B("pipe-b-no", "pipeFirmaAbrir('" + emp + "','" + oid + "','no_valido','Marcar NO VÁLIDO'," +
-             "'El pedido se descarta.')", "✖ No válido", "No se le vende: el pedido se descarta");
+           B("pipe-b-val", "pipeFirmaAbrir('" + emp + "','" + oid + "','no_referenciado','Marcar NO REFERENCIADO'," +
+             "'Paga por adelantado sus 3 primeros pedidos. Se lo contacta por Speech 1; el pedido no se " +
+             "programa hasta que pague. Vale para el CLIENTE: sus proximos pedidos arrancan en el Speech.',true)",
+             "💳 No referenciado", "Paga por adelantado sus primeros 3 pedidos") +
+           B("pipe-b-no", _eliminar, "🗑 Eliminar pedido",
+             "No se le vende: se saca de la PPP y queda en el log de anulados");
 
   if (et === "referenciado")
     return B("pipe-b-ok2", _aprobar, "✅ Aprobar y programar",
@@ -47602,7 +47628,7 @@ function pipeAccionesBtns(p) {
            B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
              "Vincularlo a una razón social que ya es cliente");
 
-  if (et === "valido")
+  if (et === "no_referenciado")
     return B("pipe-b-wa", "pipeSpeech('" + emp + "','" + oid + "',1)", "💬 Contacto Speech 1",
              sinTel ? "No hay teléfono cargado — igual marca el contacto" : "Le pide el pago por adelantado del total") +
            B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
@@ -47627,11 +47653,6 @@ function pipeAccionesBtns(p) {
     return B("pipe-b-ok2", _aprobar, "✅ Aprobar y programar",
              "Ya pagó. Lo manda a «Pedidos a programar»; tiene que salir dentro de los 2 días hábiles.");
 
-  if (et === "no_valido")
-    return B("pipe-b-no", _eliminar, "🗑 Eliminar pedido",
-             "No válido: se saca de la PPP y queda en el log de anulados") +
-           B("pipe-b-sec2", "pipeEvento('" + emp + "','" + oid + "','reabrir',null,null)", "↩ Reabrir",
-             "Vuelve el pedido al principio del pipeline");
   return "";
 }
 
@@ -47642,16 +47663,25 @@ function pipeVencidos() {
 }
 function pipeHtml() {
   const cargando = !_apr.listo || aprCargandoAlgo();
-  let h = '<div class="apr-col apr-col-cuar pipe-col' + (cargando ? ' apr-col-cargando' : '') + '">' +
-    '<div class="apr-col-t">🧭 Pipeline de clientes nuevos <b>(' + (cargando ? '…' : pipeLista().length) + ')</b>' +
-    '<span class="apr-cuar-help" title="El camino completo de un cliente nuevo: análisis crediticio en Equifax, ' +
-      'decisión de la dirección (Referenciado / Válido / No válido), cobro por adelantado al Válido y recién ahí ' +
-      'la programación, con prioridad. Convive con el submódulo 🆕 Clientes nuevos de A Programar, que sigue siendo ' +
-      'el principal: los dos comparten el mismo candado, el mismo timer y el mismo log.">ⓘ</span>';
+  // v20.86: el submodulo es COLAPSABLE y guarda la preferencia por navegador, igual que el
+  // viejo — y con la MISMA clave, para que el operario no pierda como lo habia dejado.
+  const _cliCol = aprColapsado("vir_cli_colapsado");
+  let h = '<div class="apr-col apr-col-cuar pipe-col' + (cargando ? ' apr-col-cargando' : '') +
+    (_cliCol ? ' apr-col-colapsado' : '') + '">' +
+    '<div class="apr-col-t apr-col-t-clic" onclick="aprCliColapsar()" title="' +
+      (_cliCol ? "Mostrar" : "Ocultar") + ' el pipeline de clientes nuevos">' +
+    '<span class="apr-col-caret">' + (_cliCol ? "▸" : "▾") + '</span> ' +
+    '🧭 Clientes nuevos <b>(' + (cargando ? '…' : pipeLista().length) + ')</b>' +
+    '<span class="apr-cuar-help" title="El camino completo de un cliente nuevo: análisis crediticio en Equifax y ' +
+      'después UNO DE DOS estados — Referenciado (no paga por adelantado, como un cliente habitual) o No ' +
+      'referenciado (paga por adelantado sus 3 primeros pedidos: Speech 1, Speech 2 a las 24 h, y recién con el ' +
+      'pago se programa). Acá cae el pedido cuyo único motivo de retención es ser cliente nuevo: si además ' +
+      'tiene deuda o está suspendido, primero pasa por Cuarentena.">ⓘ</span>';
   const venc = cargando ? 0 : pipeVencidos();
   if (venc) h += '<span class="pipe-badge-venc" title="Pedidos que pasaron el tope de espera de su etapa. ' +
     'NO se cancelan solos: hay que mirarlos.">⏰ ' + venc + ' sin respuesta</span>';
   h += '</div>';
+  if (_cliCol) return h + '</div>' + pipeFirmaHtml() + pipeVincHtml();
 
   if (!_apr.listo) return h + '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Cargando…</b></div></div>' + pipeFirmaHtml() + pipeVincHtml();
 
@@ -47659,15 +47689,16 @@ function pipeHtml() {
   pipeNeed(); pipeCfgNeed(); clinNuevosValorNeed(); clinCuitNeed(); clinWppNeed(); cuarComNeed(); clinTickStart();
 
   if (!lista.length)
-    return h + '<div class="apr-vacio">No hay pedidos de clientes nuevos esperando. Acá cae <b>todo</b> ' +
-      'pedido de un cliente nuevo —incluidos los que además tienen deuda o están suspendidos, que en ' +
-      '«A Programar» quedan en Cuarentena— y se lo lleva por el camino completo hasta que se programa ' +
-      'o se descarta.</div>' + pipeDemoRowHtml() + '</div>' + pipeFirmaHtml() + pipeVincHtml();
+    return h + '<div class="apr-vacio">Sin pedidos de clientes nuevos. Acá caen los pedidos de ' +
+      '<b>clientes nuevos</b> sin ningún otro problema; si tienen <b>deuda</b>, están <b>suspendidos</b> o ' +
+      '<b>superan su límite</b>, primero pasan por <b>Cuarentena</b> y vuelven acá cuando se les libera ' +
+      'ese motivo. Tocá <b>👁 Ver cliente de prueba</b> para probar los botones sin tocar nada.</div>' +
+      pipeDemoRowHtml() + '</div>' + pipeFirmaHtml() + pipeVincHtml();
 
   h += pipeDemoRowHtml();
   h += '<div class="cuar-tblwrap"><table class="cuar-tbl pipe-tbl"><thead><tr>' +
     '<th>Pedido</th><th>Fecha</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>CUIT</th>' +
-    '<th>Etapa</th><th class="cuar-td-m3">Monto</th><th class="pipe-th-acc">Qué sigue</th>' +
+    '<th>Zona</th><th>Etapa</th><th class="cuar-td-m3">Monto</th><th class="pipe-th-acc">Qué sigue</th>' +
     '<th class="cuar-td-com">Coment.</th></tr></thead><tbody>';
   for (const p of lista) {
     const cid = "pipe" + p.empresa + p.order_id, cab = !!_apr.exp[cid];
@@ -47684,12 +47715,14 @@ function pipeHtml() {
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) +
         (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') + aprCuarBadgesHtml(p) + '</td>' +
       '<td class="pipe-td-cuit">' + pipeCuitHtml(p) + '</td>' +
+      // v20.86 (Luis): la zona, con su badge de horario — es lo que se mira para programarlo
+      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</td>' +
       '<td class="pipe-td-et">' + pipeEtapaHtml(p) + '</td>' +
       '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
       '<td class="pipe-td-acc">' + pipeAccionesHtml(p) + '</td>' +
       '<td class="cuar-td-com">' + (p._demo ? '<span class="cuar-yp-sin">—</span>' : cuarComBtnHtml(p)) + '</td>' +
       '</tr>';
-    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="9"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
   }
   h += '</tbody></table></div></div>';
   return h + pipeFirmaHtml() + pipeVincHtml();
@@ -47833,6 +47866,17 @@ async function cuarComAbrir(o) {
       if (_apr.cuarCom) _apr.cuarCom.lib = (Array.isArray(r) ? r[0] : r) || null;
     } catch (_e) { if (_apr.cuarCom) _apr.cuarCom.lib = null; }   // sin la ficha, igual se ve el hilo
   }
+  // ⚠ v20.86 (Luis, 21/09): "si un cliente vuelve a entrar en el modulo de clientes nuevos,
+  // deberia traer todo el log anterior de veces anteriores que estuvo". El historial es del
+  // CLIENTE: trae los comentarios de TODOS sus pedidos, marcando cual es el de ahora. Va en su
+  // propia llamada con su propio catch — si falla, el hilo del pedido se ve igual.
+  if (_apr.cuarCom && _apr.cuarCom.cod) {
+    try {
+      _apr.cuarCom.hist = (await aprRpc("gv_clin_comentarios_cliente", {
+        p_empresa: _apr.cuarCom.empresa, p_cod: String(_apr.cuarCom.cod),
+        p_order_id: String(_apr.cuarCom.clave) })) || [];
+    } catch (_e) { if (_apr.cuarCom) _apr.cuarCom.hist = []; }
+  }
   if (_apr.cuarCom) { _apr.cuarCom.cargando = false; cuarComRender(); }
 }
 function cuarComRender() {
@@ -47859,6 +47903,19 @@ function cuarComRender() {
         (c.por ? ' · ' + escapeHtml(String(c.por)) : '') + '</div>' +
         '<div class="cuar-log-txt">' + escapeHtml(String(c.texto || "")) + '</div></div>';
     }).join("") + '</div>';
+  }
+  // v20.86: lo que se escribio en OTROS pedidos del mismo cliente. Aparte del hilo de este
+  // pedido, y solo si hay algo: es contexto, no ruido.
+  const prev = (s.hist || []).filter(function (c) { return !c.es_este_pedido; });
+  if (prev.length) {
+    log += '<div class="cuar-log-hist"><div class="cuar-log-hist-t">🕘 Antes, con este cliente ' +
+      '<b>(' + prev.length + ')</b></div><div class="cuar-log">' + prev.map(function (c) {
+        return '<div class="cuar-log-it cuar-log-it-prev"><div class="cuar-log-meta">' +
+          escapeHtml(cuarFechaHora(c.creado_at)) +
+          (c.np ? ' · <i>' + escapeHtml(String(c.np)) + '</i>' : '') +
+          (c.persona ? ' · <b>' + escapeHtml(String(c.persona)) + '</b>' : '') + '</div>' +
+          '<div class="cuar-log-txt">' + escapeHtml(String(c.texto || "")) + '</div></div>';
+      }).join("") + '</div></div>';
   }
   el.innerHTML =
     '<div class="cuar-m-back" onclick="cuarComCerrar()"></div>' +

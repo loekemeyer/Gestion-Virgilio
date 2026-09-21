@@ -620,8 +620,10 @@ node tests/apr-codigo-reservado.cjs
 echo "== ppp-dia-sin-reparto (v20.64: el dia sin reparto no recibe programacion y se ve marcado) =="
 node tests/ppp-dia-sin-reparto.cjs
 
-echo "== pipe-clientes-nuevos (v20.66: el pipeline convive con el submodulo viejo sin tener verdad propia) =="
+echo "== pipe-clientes-nuevos (v20.86: el pipeline reemplazo al submodulo viejo, con el mismo aprobar y el mismo log) =="
 node tests/pipe-clientes-nuevos.cjs
+echo "== pipe-en-a-programar (v20.86: cuarentena primero, zona, dos estados y colapsable — corrido, no leido) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-en-a-programar.cjs
 
 echo "== ppp-cliente-dos-dias-salidos (v20.67: lo que ya salio no parte al cliente en dos dias) =="
 node tests/ppp-cliente-dos-dias-salidos.cjs

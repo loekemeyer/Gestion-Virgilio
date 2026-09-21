@@ -1523,181 +1523,165 @@ el cruce. Luis lo frenó el mismo día: *"la idea del remito no sirve… cruzás
 - **Chequeo:** `select estado_cadena, count(*) from public.gv_cuarentena_deuda_sucursal group by 1;`
   — `ok` es lo que llega a la dirección; `sin factura parseada` tiene que dar 0.
 
-## ⚠ REGLA (Luis, 2026-09-21, v20.66): el PIPELINE de clientes nuevos convive — y el VIEJO manda
+## ⚠ REGLA (Luis, 2026-09-21, v20.86): el PIPELINE **reemplazó** al submódulo de clientes nuevos
 
-**Luis, textual:** *"De momento convive y el viejo sigue siendo el principal que se usa. Cuando
-verifiquemos que el nuevo va, cambiamos."*
-
-La pestaña **🧭 Pipeline clientes** del módulo PPP lleva al cliente nuevo por su camino entero:
+**Luis, textual:** *"implementá esta nueva versión de clientes nuevos en «A programar»
+reemplazando la vieja"*. El submódulo 🆕 Clientes nuevos **ya no se dibuja**: en su lugar, dentro
+de «A Programar», está el pipeline. Su pestaña propia se fue — el mismo módulo en dos lugares era
+justo el problema de convivencia que se quería evitar. `clinNuevosHtml` y sus 9 funciones siguen
+en el archivo (como `gv_ppp_np_desarmar` en la v18.77): lo que no puede volver es la **puerta**.
 
 ```
 ingresado → [🔎 Análisis Cred.] abre Equifax y arranca el reloj
-  → analisis → la dirección define:
-      · Referenciado → cuenta como habitual, se le da crédito → Aprobar y programar
-      · Válido       → Speech 1 (paga por adelantado) → Speech 2 (24 h) → Pagó → Aprobar
-      · No válido    → se descarta el pedido
+  → analisis → la dirección define UNO DE DOS:
+      · 🤝 Referenciado    → ✅ Aprobar y programar
+      · 💳 No referenciado → Speech 1 → Speech 2 (24 h) → 💵 Pagó → ✅ Aprobar
+                                                        └→ 🗑 Cancelar pedido
 ```
 
-### Qué es «Referenciado», con las palabras de Thomas (21/09)
+### Los estados son DOS, y son del CLIENTE
 
-*"Clientes que no requerimos ni para el primer pedido, ni para el segundo, ni para el tercero,
-que paguen de manera anticipada. Por ejemplo, un cliente muy grande o un amigo de la empresa que
-es cliente nuevo. También pueden ser clientes referenciados los clientes que están comprando por
-una nueva razón social … Hirohiro es un cliente ya activo que compartía dueños con otra razón
-social de un cliente que ya era activo. Entonces no tiene tratamiento de cliente nuevo, sino que
-tiene tratamiento de cliente habitual."*
+**Luis, 21/09:** *"Después del análisis solo hay 2 estados que un cliente puede tener:
+Referenciado y No referenciado. No referenciado se le requiere que pague los primeros 3 pedidos
+por adelantado y el pipeline contempla todos los casos ahí (comunicaciones, aceptación,
+cancelación)."*
 
-⚠ **Por eso Referenciado exime al CLIENTE, no a este pedido.** `gv_clin_evento` escribe la
-excepción en `gv_excepcion_cuarentena` con `origen = 'referenciado'`, así el 2.º y el 3.º pedido
-tampoco caen. Medido el 21/09 sobre LK 4281: referenciado → **otro pedido distinto del mismo
-cliente también da 0 filas**; «↩ Reabrir» le saca la excepción y vuelve a retener.
+⚠ **«No válido» ya NO existe.** Al cliente al que no se le quiere vender **se le elimina el
+pedido** (🗑, disponible desde `ingresado`, sin tener que analizarlo), que lo saca de la PPP y lo
+deja en el log de anulados. Eso descarta *ese* pedido: si vuelve a pedir, entra de nuevo — y el
+log del cliente, que ahora es histórico, muestra que ya pasó antes.
 
-### Y qué paga el que NO es referenciado (Thomas, 21/09)
+⚠⚠ **Y la DECISIÓN AHORA SE HEREDA** (Luis: *"la verificación no se vuelve a hacer… lo único que
+queda definir es el contacto por speech"*). **Esto dio vuelta la regla de la v20.73**, que decía
+lo contrario. El 2.º pedido de un No referenciado arranca en «No referenciado» —o sea, pidiendo
+el Speech 1— sin volver a Equifax, con el chip **🧠 ya definido**.
 
-*"Tiene que pagar la totalidad del pedido de manera anticipada antes de la programación. Tiene
-que pagar el pedido considerando el IVA y el descuento que ya se le otorgó, considerando todos
-los artículos nacionales y los importados que sabemos que tienen stock. Si no tiene stock del
-importado, que es algo que no puede recuperar, eso no se le factura, no se le pasa dentro del
-importe a pagar."*
+**Lo que NO se hereda son los timestamps**: el pedido nuevo tiene su `speech1_at` en null, así que
+paga por adelantado igual. Si se heredaran, el 2.º pedido saldría como «ya pagado». Lo resuelve
+`decision_ef = coalesce(propia, del cliente)` en `gv_clin_pipeline_lote`, y lo marca
+`decision_heredada`.
 
-Es exactamente lo que ya calcula `gv_clientes_nuevos_valor_lote` desde la **v20.41**:
-`valor_con_iva` = neto × 1,21, el neto ya trae el 2 % web y el `dto_vol` del cliente, y los
-importados sin stock salen del monto (se muestran al lado como *"− $X import. en falta"* para
-que se vea de cuánto era el pedido entero). **No hay nada que cambiar ahí.**
+### Los 3 pedidos NO se cuentan acá: ya los corta LK
 
-⚠⚠ **Lo único que puede salir mal callado es la convivencia.** Dos módulos sobre los mismos
-pedidos: si cada uno tiene su verdad, alguien aprueba de un lado y el otro lo sigue mostrando.
-Por eso el pipeline **no tiene camino propio para nada que ya existiera**, y esto no se toca:
+*"Después de que pasan 3 pedidos bien pagando por adelantado ya se considera un cliente normal."*
+Eso **ya estaba hecho y no se tocó**: `GV_Clientes_Nuevos` sólo trae clientes con **1 o 2**
+pedidos facturados (medido al 21/09: 269 con 1, 80 con 2, **ninguno con 3**). Al tercero el
+cliente desaparece de la tabla y deja de caer en el retén. Y como un pedido cancelado por no
+pagar nunca se factura, no suma — el contador hace exactamente lo que pide la regla.
+
+### ⚠ CUARENTENA PRIMERO — y liberar ya no levanta el candado entero
+
+**Luis:** *"cuarentena toma prioridad sobre cliente nuevo (ej, un cliente nuevo con deuda pasa
+primero por la cuarentena y después cuando es liberado con «Enviar a Pedidos a programar» va al
+módulo de clientes nuevos"*.
+
+Medido el 21/09 sobre 45 pedidos retenidos: **25** sin cliente nuevo, **13** cliente nuevo puro,
+**7** cliente nuevo + deuda. Sin esta regla esos 7 (el **35 %** de los clientes nuevos) habrían
+quedado en las **dos** columnas a la vez.
+
+| el pedido está… | dónde cae |
+|---|---|
+| retenido por deuda / suspendido / límite (con o sin cliente nuevo) | **Cuarentena** |
+| retenido **sólo** por cliente nuevo | **el pipeline** |
+| liberado de la deuda, pero sigue siendo cliente nuevo | **el pipeline** |
+| liberado de todo | Pedidos a programar |
+
+Son **dos cambios que van juntos**, y uno sin el otro no hace nada:
+
+1. **`gv_cuarentena_marcar_calc` resta** de los motivos vivos los que esa liberación resolvió
+   (`GV_Cuarentena_Liberados.motivos`, que ya se guardaba y **nadie leía**). Antes el liberado
+   quedaba excluido entero.
+2. **El botón de Cuarentena nunca libera `cliente_nuevo`** (`cuarLiberarConfirmar` lo filtra). Si
+   lo liberara, el pedido se iría derecho a programar y no pasaría nunca por el pipeline. Quien
+   levanta ese motivo es el **✅ del pipeline**.
+
+⚠ **Una liberación vieja con `motivos` en NULL *o en array vacío* libera TODO.** Los dos casos
+significan lo mismo —"no se registró el detalle"— y sin el segundo guard el pedido **1368**, que
+tiene `'{}'`, volvía al retén. Medido: de los 38 ya liberados, vuelven **2** (98585 y 98586, que
+se liberaron sólo por deuda y siguen siendo cliente nuevo), y **los dos ya están programados**, o
+sea que no están en la lista de pendientes: cero impacto visible.
+
+### ⚠ El TELÉFONO se busca por `(empresa, cod)`, nunca por código solo
+
+El Excel del dueño del 08/09 **ya está dentro de `whatsapp_clientes`**: de los 332 códigos
+compartidos, **0** tienen teléfono distinto, y las dos cargas se escribieron con 12 segundos de
+diferencia. No hay dos verdades — pero **26 filas del dueño nunca llegaron**:
+
+| | |
+|---|---:|
+| filas del dueño que no están en `whatsapp_clientes` | **26** |
+| …que son el mismo código en LK **y** en CH | 13 códigos |
+| …de esos 13, con **otro teléfono** en cada empresa | **13** |
+| …de esos 13, con **otra razón social** | **13** |
+
+`whatsapp_clientes` no tiene columna empresa, así que esos códigos no entraban y **se descartaron
+los dos lados**. Por eso `GV_Clientes_Whatsapp` (358, con empresa) **manda**, y `whatsapp_clientes`
+(942, sin empresa) es el respaldo **sólo si el código no existe en las dos empresas** — son **257**
+según el padrón de direcciones. La RPC devuelve además `origen`: `padron_empresa`, `historico`,
+`ambiguo_sin_dato` o `sin_dato`.
+
+**Chequeo** (tienen que salir dos teléfonos distintos):
+```sql
+select * from public.gv_cliente_nuevo_wpp_lote(
+  '[{"empresa":"lk","cod":"94"},{"empresa":"chef","cod":"94"}]'::jsonb);
+```
+
+⚠ **Lo que sigue faltando, y no es un bug del código:** de los 12 clientes nuevos de hoy, **6 no
+tienen teléfono en ninguna tabla** — y **11 de 12 tienen mail**. La página les pide mail, no
+WhatsApp. Eso se arregla en la página, no acá. (Otros 2 están sólo en `customers.whatsapp` de LK
+y necesitan que LK los empuje por el FDW, como `sync_cliente_isis_virgilio`.)
+
+### El LOG es del CLIENTE, no sólo del pedido
+
+**Luis:** *"deberían quedar registrados los «Coment.» a modo de log histórico. Si un cliente
+vuelve a entrar en el módulo de clientes nuevos, debería traer todo el log anterior de veces
+anteriores que estuvo."*
+
+`GV_Cuarentena_Comentarios` tiene ahora **`cod`** (nullable, sin default que reescriba). El
+backfill lo recuperó cruzando con `GV_Cuarentena_Log`: **70 de 71**. El 📖 muestra el hilo de
+**este** pedido y debajo, apagado, **🕘 Antes, con este cliente** —los comentarios de sus otros
+pedidos— vía `gv_clin_comentarios_cliente`, en su propia llamada con su propio catch.
+
+### Lo que no cambió, y no se toca
 
 | | el pipeline usa… |
 |---|---|
-| aprobar | **`gv_cuarentena_liberar`**, la MISMA función del submódulo viejo |
-| el timer | sella **`GV_Clientes_Nuevos_Contacto`**, de donde el viejo saca el suyo |
-| el log | **`GV_Cuarentena_Log`** con prefijo `pipeline_` — Config. Cuarentena sigue siendo el único lugar donde se lee la historia de un pedido |
+| aprobar | **`gv_cuarentena_liberar`**, la MISMA función de siempre |
+| el timer | sella **`GV_Clientes_Nuevos_Contacto`** |
+| el log | **`GV_Cuarentena_Log`** con prefijo `pipeline_` |
 
 Lo sostiene `tests/pipe-clientes-nuevos.cjs` con el **candado invertido**: si alguien le escribe
 al pipeline su propio «aprobar», el test se pone en rojo.
 
-⚠⚠ **«Todavía no llegaron los pedidos» NO es «no hay dato»** (v20.71, lo vio Luis: *"¿cómo
-carajo no tiene cuit? imposible"*). Los cuatro lotes de A Programar / Clientes nuevos —CUIT,
-monto, teléfono y primer contacto— hacían `if (!lista.length) { _apr.X = {}; return; }`. La app
-**abre en A Programar y dibuja mientras `_apr.pedidos` todavía está vacío**: ahí la lista sale
-vacía, se guardaba `{}` y, como el `*Need()` sólo pide cuando el estado es `null`, **el dato no
-se volvía a pedir en toda la sesión**. Medido con LK 4282: el CUIT está en el padrón, la RPC lo
-devuelve, y el front la llamaba **0 veces** mientras la celda mostraba el guion de *"este cliente
-no tiene CUIT"* — o sea, justo lo contrario de lo que pasaba.
+### ⚠⚠ Esta función LA TOCAN VARIAS SESIONES — y lo pisó una, en el medio
 
-**Una lista vacía NUNCA se guarda como respuesta** (`clinVacio` deja `null`): con la lista
-vacía no se hace ninguna llamada de red, así que reintentar en el próximo render es gratis.
+Mientras se escribía esto, otra sesión hizo `CREATE OR REPLACE` de
+**`gv_cuarentena_marcar_calc`** partiendo de su propia copia y **borró este cambio** (se notó
+porque apareció su CTE `mismo`, de la v20.52, que antes no estaba). Se reaplicó sobre la
+definición viva, conservando lo de la otra sesión.
 
-⚠⚠ **El primer arreglo (v20.71) miraba si ya había PEDIDOS, y NO alcanzó.** Luis lo volvió a ver
-el mismo día: *"volvio a no aparecer el cuit de silvano, por que?"*. La lista que importa no es
-la de pedidos sino la de **RETENIDOS**, y ésa la arma `cuarMarcarPedidos` en **otra llamada,
-después**: con los pedidos ya cargados y los motivos todavía en camino, la lista salía vacía
-igual y el `{}` se guardaba lo mismo. Lo reproduce `tests/apr-lotes-reintentan.cjs`, que simula
-esa secuencia y mide las llamadas: con el guard viejo, **0**. Problema 474.
+Por eso el bloque de `sql/gv_clin_dos_estados_v2086.sql` **se aplica sobre `pg_get_functiondef`,
+es idempotente** (si ya tiene la regla, no hace nada) y **falla con un `raise` si el texto no
+matchea**, en vez de escribir una versión vieja encima. Y las cinco reglas tienen su fila en
+`GV_Reglas_Centinela`:
 
-### El número de pedido va DENTRO del badge de «Cliente nuevo» (v20.81, Luis)
+```sql
+select * from public.gv_reglas_perdidas;   -- vacía = ninguna regla se perdió
+```
 
-Fue el pedido textual desde el principio: *"un badge que indica, además de su condición de ser
-clientes nuevos, el pedido por el que van (1er pedido, 2do pedido, 3er pedido)"*. Estaba como
-badge aparte al lado de la NP — dos pastillas donde iba una. Ahora el badge dice
-**«🆕 Cliente nuevo · 2.º pedido»**.
+### Qué se prueba, y cómo
 
-Es el **mismo badge** de A Programar, Clientes nuevos y Cuarentena, así que el dato aparece en
-las tres pantallas.
+- **`tests/pipe-en-a-programar.cjs`** dibuja A Programar de verdad y mira **qué columna se lleva
+  cada pedido**: es lo único que prueba que no se duplican. Ahí están también la zona, el
+  colapsable, los dos estados y el fallback de la pestaña vieja.
+- **`tests/pipe-clientes-nuevos.cjs`** son los candados estáticos (el aprobar compartido, el
+  guard del array vacío, la herencia, el log por cliente, el teléfono por empresa).
+- **`tests/pipe-vinculo-en-el-cuadro.cjs`** corre el cuadro y mira el **orden real** de las RPC.
+  ⚠ Un candado de texto no puede verificar semántica: cuando importa el orden o la condición, el
+  test se corre.
 
-⚠ `nuevo_pedidos` son los pedidos **FACTURADOS** de toda su historia: el que está en la pantalla
-es el **siguiente**, o sea +1. Sin el dato no se inventa un número.
-
-### El VÍNCULO va dentro del cuadro de la decisión (v20.79, Luis)
-
-*"no figura la opcion de vincularlo con otras razones sociales u otros clientes"*, mirando el
-cuadro de «Marcar REFERENCIADO».
-
-Estaba en un pop-up **separado que se abría DESPUÉS de confirmar**: había que decidir a ciegas y
-recién ahí aparecía la pregunta. Y el propio cuadro habla de *"el que compra por una razón social
-nueva de un cliente ya activo"* — es ahí donde se está pensando en el vínculo. Ahora es una
-sección opcional del mismo cuadro, en Referenciado y en Válido.
-
-⚠ **El vínculo se ejecuta ANTES que la decisión.** Si falla, el cuadro queda abierto con el error
-y la decisión no se toma: al revés quedaría el pedido decidido y el cliente sin vincular.
-
-⚠⚠ **Y eso se verifica corriéndolo, no con un regex.** El primer candado que se escribió miraba
-el orden de las dos llamadas **en el código** y **no cazó el bug** cuando se desactivó la
-condición del vínculo: el texto seguía estando. Por eso existe `tests/pipe-vinculo-en-el-cuadro.cjs`,
-que abre el cuadro de verdad y mira el orden real de las RPC. **Un candado de texto no puede
-verificar semántica** — cuando lo que importa es el orden o la condición, el test se corre.
-
-### La espera va en «Qué sigue», en día · hora · minuto (v20.75, Luis)
-
-*"la espera debería estar incluida en el «Que sigue» y debería ser en formato de dia, hora,
-minuto"*. No es sólo cosmético: el formato viejo (`6d 3h`) **escondía los minutos justo cuando
-se está por vencer el plazo**, y la espera es lo que decide si hay que apurarse — o sea que es
-parte de qué sigue, no un dato suelto en otra columna.
-
-⚠ **El timer del pipeline lleva `data-fmt="dhm"`.** `clinTickStart` reescribe el texto de
-todos los `.clin-tiempo` cada 60 s: sin esa marca, al minuto de dibujarlo lo pisaba con el
-formato del submódulo viejo. Lo verifica el test.
-
-### La MEMORIA es del CLIENTE, no del pedido (v20.73, Luis)
-
-*"tiene que haber memoria del estado de proceso por el que va el cliente"*, sobre LK 4282, que
-decía **«2.º pedido»** y arrancaba en **«Sin analizar»**.
-
-**El análisis crediticio es del cliente.** Si ya se lo hicieron en un pedido anterior, el nuevo
-arranca en «Análisis pedido» con el chip **🧠 ya analizado** y el botón pasa a **«🔎 Re-analizar»**:
-no hay que volver a Equifax. La RPC lo resuelve con `analisis_ef = coalesce(propio, del cliente)`
-y lo marca con `analisis_heredado`.
-
-⚠ **La DECISIÓN no se hereda, y no es un olvido:** «Referenciado» ya exime al cliente por su
-cuenta (excepción de cuarentena) y el «Válido» **paga pedido por pedido**. Lo que se hereda es
-el trabajo que no hay que repetir, no la decisión comercial. Lo anterior se ve igual, como chip
-morado (*"antes: Válido · Luis"*), para que quien decide lo tenga a la vista.
-
-⚠ **Un análisis heredado NO vence**: el reloj mide lo que espera *este* pedido, y este pedido
-todavía no pidió nada.
-
-⚠ **Cambiar las columnas de salida de `gv_clin_pipeline_lote` exige `DROP`** (*"cannot change
-return type of existing function"*), así que el archivo del repo la trae con su `drop … ; create`.
-
-### Un botón que no hace nada es peor que uno que falla (v20.73)
-
-Luis apretó «Análisis Cred.» en LK 4282 y no pasó nada. `pipeBuscar` miraba sólo
-`_apr.pedidosTodos` —que `aprCargar` llena aparte y puede no tener lo que la pantalla ya
-muestra— y `pipeAnalisis` salía por un `if (!p) return` **mudo**. Ahora `pipeBuscar` mira
-también `_apr.pedidos`, y **el evento se manda aunque el pedido no aparezca**: sus datos son
-para enriquecer el log, no para que el paso funcione. Si falla, se ve en pantalla.
-
-⚠ Y `pipeRecargar` **ya no borra el mapa**: `pipeEvento` deja la etapa y el reloj nuevos al
-toque, y ponerlo en `null` hacía desaparecer el timer hasta que volviera la RPC. Se fuerza la
-relectura con `pipeStale`.
-
-**El CLIENTE DE PRUEBA** (botón «👁 Ver cliente de prueba») avanza por las etapas **de verdad**
-—si no, no se prueba nada— pero su clave es `__DEMO__` y el backend lo aísla: no escribe el log
-de Cuarentena, ni comentarios, ni el timer del submódulo viejo, ni ninguna excepción; Aprobar y
-Eliminar avisan qué pasaría en vez de tocar un pedido real, y los Speech muestran el texto sin
-abrir WhatsApp. Medido: 8 etapas seguidas → **0 filas** en las cuatro tablas. «↺ Reiniciar
-ejemplo» lo deja como recién llegado.
-
-⚠ **Si alguna vez hay que sumar una escritura nueva a `gv_clin_evento`, va con `and not v_demo`**,
-o el ejemplo empieza a dejar basura en una tabla de verdad sin que nadie lo note.
-
-**La etapa NO se guarda: se deriva** de los timestamps (`gv_clin_etapa`). Una columna `etapa`
-escrita a mano se desincroniza el día que una escritura falla a la mitad, y después nadie sabe
-cuál de las dos miente.
-
-**El vínculo NO tocó ninguna función viva**: `gv_cuarentena_marcar_calc` ya filtra todos los
-motivos con `gv_cuarentena_exento`, así que alcanza con que `gv_clin_vincular` inserte la
-excepción en `gv_excepcion_cuarentena`. Probado sobre LK 4281: retenido → vinculado (0 filas) →
-desvinculado (vuelve a retener), y revertido en el mismo paso.
-
-⚠ **El vínculo no destraba el pedido en curso, a propósito**: cambia la antigüedad del cliente
-hacia adelante. El pedido en pantalla sigue su camino hasta que una persona lo apruebe.
-
-⚠ **Y falta que LK lo absorba**: `gv_clientes_nuevos_calc` cuenta la antigüedad con
-`customer_grupos` + `clientes_lk_ch_links`, que viven allá. Mientras tanto LK lo sigue empujando
-en `GV_Clientes_Nuevos` y lo que lo mantiene afuera del retén es la excepción local.
+⚠ **El fallback de la pestaña vieja va ANTES del `return` de `"prog"`** en `pppRenderProg`, o no
+se ejecuta nunca. Lo verifica el test — el primer intento lo puso después y quedaba muerto.
 
 **Los relojes y la URL de Equifax se cambian con un `update`, no con un deploy:**
 
@@ -1706,14 +1690,17 @@ update public."PPP_Web_Config" set valor = 48 where clave = 'clin_speech_horas';
 update public."PPP_Web_Config" set valor_texto = '<url>' where clave = 'clin_equifax_url';
 ```
 
-⚠ `PPP_Web_Config.valor` es **numeric** y `make_interval(hours => numeric)` **no existe**: los
-coalesce de esa config van con `::int` o la función explota en la primera llamada (el `CREATE`
-sale limpio).
+⚠ `PPP_Web_Config.valor` es **numeric** y `make_interval(hours => numeric)` **no existe**: esos
+coalesce van con `::int` o la función explota en la primera llamada (el `CREATE` sale limpio).
 
-**Chequeo:** `select * from public.gv_clin_vencidos;` — lo que espera hace demasiado (es el badge
-rojo de la pestaña; el pedido **no se cancela solo**, Luis 21/09). Y
-`select * from public.gv_clin_prioritarios;` — lo aprobado que tiene que salir en 2 días hábiles,
-fundando camión si en su zona no hay. `sql/gv_clin_pipeline_v2066.sql`, §3.ln.
+**El CLIENTE DE PRUEBA** (botón «👁 Ver cliente de prueba») avanza por las etapas de verdad, pero
+su clave es `__DEMO__` y el backend lo aísla: no escribe el log, ni el timer, ni ninguna
+excepción. **Si se suma una escritura nueva a `gv_clin_evento`, va con `and not v_demo`.**
+
+**Chequeo:** `select * from public.gv_clin_vencidos;` — lo que espera hace demasiado (el pedido
+**no se cancela solo**). Y `select * from public.gv_clin_prioritarios;` — lo aprobado que tiene
+que salir en 2 días hábiles. `sql/gv_clin_dos_estados_v2086.sql` (vigente) y
+`sql/gv_clin_pipeline_v2066.sql` (tablas, config, vínculo y vistas), §3.ln.
 
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
 

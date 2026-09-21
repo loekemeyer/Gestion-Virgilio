@@ -28022,3 +28022,93 @@ después (`gv_ppp_tanda_camion_mezclado`, `gv_ppp_tanda_dos_dias`, `gv_ppp_clien
 viene a buscar el cliente.
 
 `sql/gv_dia_sin_reparto_quinta_puerta_v2083.sql`, `tests/ppp-dia-sin-reparto.cjs`.
+
+### §3.lw — v20.86 · El pipeline reemplaza al submódulo de clientes nuevos — 2026-09-21
+
+**Pedido de Luis**, en cuatro tandas de definiciones. La última: *"Después del análisis solo hay
+2 estados que un cliente puede tener: Referenciado y No referenciado."*
+
+#### Lo que se midió antes de tocar nada
+
+| | |
+|---|---:|
+| filas en `GV_Cliente_Nuevo_Pipeline` | **1**, y es el cliente de prueba (`__DEMO__`) |
+| pedidos retenidos (60 días) sin cliente nuevo | 25 |
+| …cliente nuevo **puro** | 13 |
+| …cliente nuevo **+ deuda** | **7** ← se habrían duplicado en dos columnas |
+| liberados hoy | 38, **0** con `motivos` en NULL |
+
+Cero pedidos reales decididos, así que el cambio de estados **no migró un solo dato**.
+
+#### Backend
+
+| objeto | qué cambió |
+|---|---|
+| `GV_Cliente_Nuevo_Pipeline` | CHECK `gv_clin_decision_valida` → `referenciado \| no_referenciado` |
+| `gv_clin_etapa` | sale `no_valido`; `valido` → `no_referenciado` |
+| `gv_clin_evento` | los eventos nuevos; `no_referenciado` **saca** la excepción de cuarentena si la tenía; el comentario lleva `cod` |
+| `gv_clin_pipeline_lote` | `decision_ef = coalesce(propia, del cliente)` + `decision_heredada` (DROP: cambia el retorno) |
+| `gv_cliente_nuevo_wpp_lote` | por `(empresa, cod)` + `origen` (DROP: cambia el retorno) |
+| `gv_clin_comentarios_cliente` | **nueva**: el log de todos los pedidos del cliente |
+| `GV_Cuarentena_Comentarios` | columna `cod` + backfill (70 de 71) |
+| `gv_cuarentena_marcar_calc` | resta los motivos que la liberación resolvió |
+
+Backups: `zz_backups."GV_Backup_ClienteNuevoPipeline_20260921"` y
+`zz_backups."GV_Backup_CuarentenaComentarios_20260921"`, las dos con RLS.
+
+#### Las tres pruebas que se corrieron (no se leyó el código)
+
+**a) La herencia**, en transacción abortada: se insertó un pedido anterior del mismo cliente ya
+decidido `no_referenciado` y pagado, y el pedido nuevo salió en etapa **`no_referenciado`** con
+`decision_heredada = true`, `analisis_heredado = true` y `vencido = false`. O sea: pide el
+Speech 1, no vuelve a Equifax, y no arrastra el pago del anterior.
+
+**b) Cuarentena primero**, con el cliente 4173 (nuevo + deuda de $496.128):
+
+| | resultado |
+|---|---|
+| sin liberar | retenido `{cliente_nuevo, deuda}` |
+| liberado **sólo por deuda** | retenido **`{cliente_nuevo}`** → cae en el pipeline |
+| liberado por los dos | **sale del retén** (0 filas) |
+
+**c) No-regresión** sobre los 38 ya liberados: vuelven **2** (98585 y 98586), que se liberaron
+sólo por deuda y siguen siendo cliente nuevo. **Los dos ya están programados**, así que no están
+en la lista de pendientes de A Programar: cero impacto visible.
+
+#### ⚠ Otra sesión pisó `gv_cuarentena_marcar_calc` en el medio
+
+A mitad del trabajo, la definición viva apareció **sin este cambio** y **con un CTE `mismo`** (la
+v20.52) que antes no estaba: otra sesión hizo `CREATE OR REPLACE` desde su propia copia. Se
+reaplicó sobre la viva, conservando lo de la otra sesión. Por eso el bloque del repo:
+
+- parte de `pg_get_functiondef`, nunca de una copia;
+- es **idempotente** (si ya tiene la regla, `raise notice` y sale);
+- **falla con `raise exception`** si el texto no matchea, en vez de escribir algo viejo encima.
+
+Y las **cinco** reglas tienen su fila en `GV_Reglas_Centinela` (`motivos_vivos`, el guard del
+array vacío, `no_referenciado`, `GV_Clientes_Whatsapp`, `decision_ef`).
+
+#### Front
+
+- `aprRender`: `clinNuevosHtml()` → `pipeHtml()`. El submódulo viejo deja de dibujarse; sus
+  funciones quedan en el archivo.
+- La pestaña `clin` se fue, y un navegador parado en ella cae solo en A Programar — el fallback
+  va **antes** del `return` de `"prog"` en `pppRenderProg`, o no se ejecuta.
+- `pipeEsClienteNuevo` → `aprSoloClienteNuevo`.
+- `cuarLiberarConfirmar` filtra `cliente_nuevo` de los motivos que libera.
+- Columna **Zona** con su badge de horario, y el submódulo **colapsable** con la misma clave de
+  `localStorage` que tenía el viejo (`vir_cli_colapsado`).
+- El 🗑 está desde `ingresado`: sin «No válido», es la única vía de descarte.
+- El 📖 muestra el hilo del pedido y debajo **🕘 Antes, con este cliente**.
+
+#### Rollback
+
+```sql
+-- los estados viejos (la tabla no tiene datos reales)
+alter table public."GV_Cliente_Nuevo_Pipeline" drop constraint gv_clin_decision_valida;
+alter table public."GV_Cliente_Nuevo_Pipeline" add constraint gv_clin_decision_valida
+  check (decision is null or decision = any (array['referenciado','valido','no_valido']));
+-- y la cuarentena, volviendo al filtro entero: en gv_cuarentena_marcar_calc, reemplazar
+-- `motivos_vivos` por `motivos_ok` y sacar el guard `cliente_nuevo = any (lb.motivos)`.
+```
+El front vuelve con `git revert` del commit.
