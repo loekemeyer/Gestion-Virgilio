@@ -1,4 +1,4 @@
-/* v20.78 — EL VINCULO VA DENTRO DEL CUADRO DE LA DECISION, Y ANTES QUE ELLA.
+/* v20.79 — EL VINCULO VA DENTRO DEL CUADRO DE LA DECISION, Y ANTES QUE ELLA.
 
    Luis, 2026-09-21, mirando el cuadro de «Marcar REFERENCIADO»: *"no figura la opcion de
    vincularlo con otras razones sociales u otros clientes"*.

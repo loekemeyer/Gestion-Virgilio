@@ -1556,7 +1556,7 @@ queda en `null` y se vuelve a pedir; con los pedidos cargados y sin retenidos, `
 **Al agregar un lote nuevo de este tipo, usar `clinVacio`.** Es el mismo pozo de §*"una lectura
 ROTA no es un CERO"*. Problema 474.
 
-### El VÍNCULO va dentro del cuadro de la decisión (v20.78, Luis)
+### El VÍNCULO va dentro del cuadro de la decisión (v20.79, Luis)
 
 *"no figura la opcion de vincularlo con otras razones sociales u otros clientes"*, mirando el
 cuadro de «Marcar REFERENCIADO».
@@ -1571,7 +1571,7 @@ y la decisión no se toma: al revés quedaría el pedido decidido y el cliente s
 
 ⚠⚠ **Y eso se verifica corriéndolo, no con un regex.** El primer candado que se escribió miraba
 el orden de las dos llamadas **en el código** y **no cazó el bug** cuando se desactivó la
-condición del vínculo: el texto seguía estando. Por eso existe ,
+condición del vínculo: el texto seguía estando. Por eso existe `tests/pipe-vinculo-en-el-cuadro.cjs`,
 que abre el cuadro de verdad y mira el orden real de las RPC. **Un candado de texto no puede
 verificar semántica** — cuando lo que importa es el orden o la condición, el test se corre.
 

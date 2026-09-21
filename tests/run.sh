@@ -632,5 +632,5 @@ node tests/ppp-tanda-armada-sin-armado.cjs
 echo "== ppp-arbol-centrado (v20.77: el arbol de Programacion va centrado, no pegado a la izquierda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-arbol-centrado.cjs
 
-echo "== pipe-vinculo-en-el-cuadro (v20.78: el vinculo va dentro del cuadro de la decision, y antes que ella) =="
+echo "== pipe-vinculo-en-el-cuadro (v20.79: el vinculo va dentro del cuadro de la decision, y antes que ella) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-vinculo-en-el-cuadro.cjs

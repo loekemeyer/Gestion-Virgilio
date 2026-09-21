@@ -164,7 +164,7 @@ if (!/n\.getAttribute\("data-fmt"\) === "dhm" \? pipeFmtEspera/.test(html))
   fallos.push("clinTickStart no respeta el formato del pipeline");
 
 /* ── 14. el vinculo va DENTRO del cuadro de la decision ──────────────────────────────── */
-// v20.78 (Luis: "no figura la opcion de vincularlo con otras razones sociales u otros
+// v20.79 (Luis: "no figura la opcion de vincularlo con otras razones sociales u otros
 // clientes"). Estaba en un pop-up SEPARADO que se abria DESPUES de confirmar: habia que
 // decidir a ciegas. Y el propio cuadro habla de "una razon social nueva de un cliente ya
 // activo" — es ahi donde se esta pensando en el vinculo.
