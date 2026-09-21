@@ -27011,3 +27011,69 @@ con `Dia` nulo) en vez de un error, y el centinela la caza. Las dos vistas conse
 236 con su valor original) y `..."GV_Backup_SPKg_pre_fechas_20260921"` — `Envios a Talleristas`
 tiene un trigger que recalcula el stock por sector, así que se comparó antes y después:
 **0 de 155 sectores cambió**.
+
+---
+
+### §3.li — v20.60 · El código de un pedido retenido queda reservado — 2026-09-21
+
+**Luis, mirando la respuesta de §3.lg:** *"el problema si vuelve con el codigo viejo es si se pisa
+con algun pedido que haya quedado dentro de la tanda con ese codigo y haya quilombo (como ya hubo).
+Verifica que no pase."*
+
+**Qué se midió · qué dio.** `GV_PPP_Web_Retenido.tanda_previa` **no estaba** entre las 11 fuentes
+de `gv_tandas_codigos_usados_sync()`, la memoria que desde la v19.98 impide que un código de tanda
+se recicle. Al sacar el **último** pedido de una tanda, su código desaparece de todas las tablas
+vivas y vuelve a la bolsa de códigos libres — aunque haya un pedido esperando para volver ahí:
+
+| código | en la memoria | prog. web | prog. ISIS | stock | eventos |
+|---|---|---|---|---|---|
+| D69H | sí | 2 | 0 | 3 | 6 |
+| E50A | **no** | 0 | 0 | 0 | 0 |
+| E26B | **no** | 0 | 0 | 0 | 0 |
+| E52A | **no** | 0 | 0 | 0 | 0 |
+
+Las tres se vaciaron el 18/09 13:14–13:18 y desde ahí estaban sueltas. O sea: «➕ Tanda nueva» o el
+armador automático podían darle `E50A` a un pedido cualquiera, y después el retenido volvía a
+`E50A` y se metía **adentro de esa tanda ajena**. El guard de la v20.56 no lo tapaba: con el código
+ocupado por otra tanda, `tanda_estado` da `'sin empezar'`, que es uno de los dos estados que dejan
+volver.
+
+**Qué se hizo.** Son **dos preguntas distintas** y ahora hay una función para cada una:
+
+| pregunta | función | la usa |
+|---|---|---|
+| *¿este código se usó alguna vez?* | `gv_ppp_web_codigo_tomado(cod)` | el generador de códigos nuevos |
+| *¿hay algo VIVO adentro que no sea mío?* | `gv_ppp_web_codigo_vivo(cod, empresa, order_id)` | el retorno del retenido |
+
+1. **`gv_ppp_web_codigo_tomado`** suma la **reserva viva** (`exists` sobre `GV_PPP_Web_Retenido`).
+   Cierra el agujero al instante, sin esperar los 10 min del cron.
+2. **`gv_tandas_codigos_usados_sync`** suma la 12.ª fuente, `'retenido'`. Así el código queda
+   **quemado** aunque después el pedido se vaya a una tanda nueva y su reserva se borre.
+3. **La vista `gv_ppp_web_retenido`** pasa a preguntar por `gv_ppp_web_codigo_vivo`. Si le
+   preguntara a la memoria, el código que la propia reserva acaba de quemar **bloquearía a su
+   dueño** y el pedido no podría volver nunca a su tanda.
+
+**Medición después** (21/09):
+
+```
+np_label | tanda | tanda_estado | tomado_generador | vivo_ajeno
+CH 0004  | E26B  | no existe    | true             | false
+LK 0028  | E50A  | no existe    | true             | false
+LK 0096  | E52A  | no existe    | true             | false
+LK 0094  | D69H  | armada       | true             | true
+```
+
+El sync metió **3 códigos nuevos** en la memoria (los tres con `fuente = 'retenido'`).
+
+Y la reserva sola alcanza, probado en transacción abortada borrando la memoria a propósito:
+`E50A = t`, `E26B = t`, y un código nunca usado (`Z98Q`) sigue dando `f`.
+
+⚠ **Lo que queda afuera a propósito.** Si una tanda ajena llegara igual a ocupar el código —hoy
+sólo escribiendo la tabla a mano: el generador, `gv_ppp_tanda_renombrar` y `ppp_web_armar_tandas`
+pasan todos por `gv_ppp_web_codigo_tomado`— la vista diría `'sin empezar'` y el pedido volvería
+adentro. No se cerró porque los dos chequeos posibles dan **falsos positivos sobre tandas
+legítimas**: la fecha cambia cuando se reprograma, y la tanda **no es de un solo cliente**
+(medido el 21/09: **20 de 77** tandas web tienen más de uno).
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien (las tres reglas
+tienen su fila). `sql/gv_retenido_codigo_reservado_v2060.sql`, `tests/apr-codigo-reservado.cjs`.

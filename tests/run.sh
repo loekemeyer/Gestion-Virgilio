@@ -610,3 +610,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== recepcion-fecha-anio (v20.58: la fecha que graba Recepcion lleva anio y sin fecha no se graba) =="
 node tests/recepcion-fecha-anio.cjs
+
+echo "== apr-codigo-reservado (v20.60: el codigo de un pedido retenido queda reservado y no vuelve a la bolsa) =="
+node tests/apr-codigo-reservado.cjs

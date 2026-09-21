@@ -1211,6 +1211,26 @@ cae en dos camiones.
 public.gv_ppp_web_retenido;` · `sql/gv_retenido_tanda_viva_v2056.sql`,
 `tests/apr-retenido-tanda.cjs`, §3.lg.
 
+⚠⚠ **Y el CÓDIGO de esa tanda queda RESERVADO mientras el pedido espera** (v20.60, Luis: *"el
+problema si vuelve con el codigo viejo es si se pisa con algun pedido que haya quedado dentro de la
+tanda con ese codigo y haya quilombo (como ya hubo)"*). Al sacar el **último** pedido de una tanda,
+su código desaparece de todas las tablas vivas: `GV_PPP_Web_Retenido.tanda_previa` **no estaba**
+entre las fuentes de `gv_tandas_codigos_usados_sync()`, así que volvía a la bolsa de códigos libres
+y otra tanda se lo llevaba — y después el retenido caía **adentro de esa tanda ajena**. E50A, E26B
+y E52A estaban las tres sueltas al 21/09.
+
+**Son dos preguntas distintas y no hay que confundirlas:**
+
+| pregunta | función | la usa |
+|---|---|---|
+| *¿este código se usó alguna vez?* | `gv_ppp_web_codigo_tomado(cod)` | el generador de códigos nuevos |
+| *¿hay algo VIVO adentro que no sea mío?* | `gv_ppp_web_codigo_vivo(cod, empresa, order_id)` | el retorno del retenido |
+
+La reserva es **viva** y la memoria la absorbe después (`fuente = 'retenido'`). **La vista nunca
+puede preguntarle a la memoria**: el código que la propia reserva quemó bloquearía a su dueño y el
+pedido no podría volver nunca. `sql/gv_retenido_codigo_reservado_v2060.sql`,
+`tests/apr-codigo-reservado.cjs`, §3.li.
+
 ## ⚠ Regla de Luis (2026-09-21, v20.45): la ZONA es dónde va el camión; el DESTINO es otra cosa
 
 **Luis, textual:** *"es especialmente importante poder identificar si el expreso tiene que
