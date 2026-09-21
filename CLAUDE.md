@@ -1283,6 +1283,32 @@ no se mueve. Lo que se frena es programar uno nuevo ahí.
 en un día cerrado. Mira **web e ISIS** y saca lo que ya salió por CCN/CRN.
 `sql/gv_dia_sin_reparto_v2064.sql`, `tests/ppp-dia-sin-reparto.cjs`, §3.ll.
 
+## ⚠ REGLA (Thomas, 2026-09-21, v20.80): un pedido programado NO vuelve a «A Programar»
+
+**Thomas, textual:** *"sacá del módulo programación la opción de mandar pedidos a «A programar».
+Una vez programados o se eliminan o se reprograman para otra fecha"*.
+
+| qué se quiere hacer | el único camino |
+|---|---|
+| que salga otro día | **📅 Cambiar de día** (`pgaNpMoverAbrir`): elige día y después tanda nueva o una existente |
+| que no salga | **✕ Cancelar pedido** (`pppVencCancelar`): sale de la PPP y lo armado vuelve a «A guardar» |
+
+⚠ **Las puertas eran TRES y en dos módulos distintos** —la fila de la NP en el árbol
+(`pgaEnviarAProgramar`), y los dos paneles de la NP: pedido sin empezar (`pppVencVolver`) y vencido
+(`pppVencSinProgramar`)—, más una **cuarta automática**: al corregir la dirección y cambiar la
+zona, preguntaba si devolverlo a A Programar; ahora abre el pop-up de Cambiar de día. Las
+funciones siguen en el archivo (como `gv_ppp_np_desarmar` en la v18.77): lo que no puede volver es
+la **puerta**.
+
+**Chequeo:** `node tests/ppp-sin-a-programar.cjs` — candado **estático** sobre `index.html`, porque
+un test de pantalla prueba una puerta y deja pasar las otras dos. ⚠ No escribirlo con un regex
+`[^"']*`: el `onclick` vive dentro de un string de JS con las comillas escapadas, así que ese regex
+no matchea nunca y el test da **falso verde** (pasó en el primer intento, con las tres puertas
+puestas). §3.lu.
+
+⚠ **`GV_PPP_Web_Retenido` deja de recibir filas nuevas**, pero las que hay siguen vivas y su regla
+—la de abajo— sigue valiendo: al programarlas vuelven a su tanda sólo si está sana.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.56): un pedido retenido NO vuelve a una tanda que avanzó sin él
 
 **Luis, textual:** *"esto me preocupa. estaban armados? qué interacción tienen si vuelven a

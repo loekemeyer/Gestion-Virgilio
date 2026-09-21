@@ -27901,3 +27901,60 @@ else if (got < 1000) { total = from + got; }
 por dos lados (el literal en el código y el header que sale de verdad en la request).
 
 `sql/gv_base_pedidos_lectura_v2078.sql`, `sql/gv_pedidos_web_excluidos_v2078.sql`.
+### §3.lu — v20.80 · Un pedido programado ya no vuelve a «A Programar» — 2026-09-21
+
+**Thomas:** *"sacá del módulo programación la opción de mandar pedidos a «A programar». Una vez
+programados o se eliminan o se reprograman para otra fecha"*.
+
+Un pedido ya programado tiene **dos** salidas y ninguna más:
+
+| | |
+|---|---|
+| se **reprograma** | 📅 **Cambiar de día** (`pgaNpMoverAbrir`) — elige día y después tanda nueva o una que ya exista |
+| se **elimina** | ✕ **Cancelar pedido** (`pppVencCancelar`) — sale de la PPP y lo armado vuelve a «A guardar» |
+
+⚠ **Las puertas a «A Programar» eran TRES, en dos módulos distintos**, y por eso esto no se
+resolvía sacando un botón:
+
+1. la fila de la NP en el árbol de Programación → `pgaEnviarAProgramar` (el botón `↩`);
+2. el panel de la NP, pedido **sin empezar** → `↩ A Programar` (`pppVencVolver`);
+3. el panel de la NP, pedido **vencido** → `↩ Sin programar` (`pppVencSinProgramar`).
+
+Las tres pasaron a **📅 Reprogramar**, que abre el mismo pop-up de días. En el panel, la NP de
+ISIS ya tenía su `📅 Reprogramar` (`pppReprogAbrir`) y la web no tenía ninguno: ahora las dos usan
+**`pgaNpMoverAbrir`**, que resuelve el pedido por backend y sirve para las dos.
+
+**Y había una cuarta, automática:** cuando se corrige la dirección de un pedido y **cambia la
+zona**, la tanda dejó de cerrar por cercanía y el sistema preguntaba *"¿lo devuelvo a A Programar?"*.
+Ahora abre el **pop-up de Cambiar de día**: el supervisor elige ahí mismo dónde va.
+
+**Las funciones siguen en el archivo a propósito** —igual que `gv_ppp_np_desarmar` cuando se sacó
+el botón de Desarmar en la v18.77—: lo que no puede volver es la **puerta**. Medido después del
+cambio: `pgaEnviarAProgramar` **0 llamadas**, y las de `pppVencVolver` / `pppVencSinProgramar` que
+quedan son internas (una llama a la otra).
+
+⚠ **El candado es ESTÁTICO (`tests/ppp-sin-a-programar.cjs`), y eso no es pereza:** un test de
+pantalla prueba la puerta que ese caso renderiza y deja pasar las otras dos, que viven en otro
+módulo. Éste barre el archivo entero y falla si vuelve a aparecer un `onclick` que llame a
+cualquiera de las tres, o si desaparece alguno de los dos caminos que sí tienen que estar.
+**Probado rompiéndolo:** se repuso una puerta a propósito y el test salió en rojo.
+
+⚠ **Y el candado no puede escribirse con un regex `[^"']*`**: el `onclick` vive **dentro de un
+string de JS**, con las comillas escapadas (`onclick="event.stopPropagation();fn(\'…`), así que un
+regex así no matchea nunca y el test pasa siempre — falso verde. El primer intento fue exactamente
+eso y daba OK con las tres puertas puestas. Se busca la subcadena `stopPropagation();<fn>(`.
+
+**Se retiró `tests/pga-enviar-a-programar.cjs`**: probaba el botón que ya no existe (y estaba en
+rojo desde antes, por el chip que reescribió la v20.56 — problema 471). Lo que ese test cubría del
+retenido sigue vivo en `apr-retenido-tanda.cjs` y `apr-codigo-reservado.cjs`, los dos en verde.
+
+⚠⚠ **Y el incidente de la v15.44, otra vez, esta misma tarde.** Al editar `index.html` por script,
+el primer intento escribió con `io.open(p,'w')` y el `write` **falló a mitad** por un carácter que
+no entra en latin1: el archivo quedó en **0 bytes**. Se recuperó con `git checkout --` (no estaba
+commiteado, nunca llegó a `main`). La disciplina que ya estaba escrita y que hay que cumplir:
+**leer a variable, hacer los reemplazos, verificar el largo del resultado, escribir a un `.tmp`,
+verificar el tamaño del `.tmp` y recién ahí `os.replace`.** Y el texto nuevo, en ASCII: los emojis
+se escriben con sus bytes UTF-8 escapados (`\xf0\x9f\x93\x85`), porque el archivo se lee y se
+escribe en latin1 por el byte NUL que tiene adentro.
+
+`tests/ppp-sin-a-programar.cjs`.

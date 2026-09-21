@@ -6010,7 +6010,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.79"></script>
+<script type="module" src="recepcion.js?v=20.80"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9892,7 +9892,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.79";
+const APP_VERSION = "v20.80";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38910,8 +38910,10 @@ function _pgaCuerpoHtml(dias, opts) {
                 + ' Se elige el día y después si va en una tanda NUEVA o dentro de una que ya existe ese día.'
                 + ' El contenido no cambia: no hay que volver a pickear."'
                 + ' onclick="event.stopPropagation();pgaNpMoverAbrir(\'' + escapeHtml(r.np) + '\')">📅</button>'
-                + '<button class="pga-acc-b" title="Enviar a programar — lo saca de esta tanda y lo manda a 📥 A Programar para darle otra fecha. Queda anotado en qué tanda estaba: al reprogramarlo vuelve a ESA tanda, así no se pickea ni se arma dos veces. El automático no lo toca."'
-                + ' onclick="event.stopPropagation();pgaEnviarAProgramar(\'' + escapeHtml(r.np) + '\')">↩</button>'
+                // v20.77 (Thomas, 21/09): "saca del modulo programacion la opcion de mandar
+                // pedidos a 'A programar'. una vez programados o se eliminan o se reprograman
+                // para otra fecha". Aca estaba el boton "Enviar a programar". Quedan los dos
+                // caminos que valen: Cambiar de dia (reprogramar) y Cancelar pedido (eliminar).
                 // v19.34 (Luis): cancelar el pedido, en cualquier estado. Sale de la PPP y lo que
                 // se había armado vuelve a «A guardar». El pop-up avisa QUÉ vuelve antes de tocar nada.
                 + '<button class="pga-acc-b cancel" title="Cancelar pedido — el pedido no se entrega: sale de la PPP, no se factura, y lo que ya estaba armado vuelve a «A guardar» para que un operario lo baje.'
@@ -40080,7 +40082,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
           const npS = escapeHtml(String(p.np));
           const btn = _puedeReprog
             ? (_pppEsNpWeb(p.np)
-                ? ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppVencVolver(\'' + npS + '\')" title="Sacarlo de esta tanda y devolverlo a A Programar (pendiente)">↩ A Programar</button>'
+                ? ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pgaNpMoverAbrir(\'' + npS + '\')" title="Reprogramar este pedido a otro dia. v20.77: ya no se manda a A Programar, se le cambia el dia o se cancela.">📅 Reprogramar</button>'
                 : ' <button class="pn-reprog-btn" onclick="event.stopPropagation();pppReprogAbrir(\'' + npS + '\')" title="Reprogramar este pedido a un día nuevo">📅 Reprogramar</button>') +
               ' <button class="pn-reprog-btn pn-cancel-btn" onclick="event.stopPropagation();pppVencCancelar(\'' + npS + '\')" title="El pedido NO va: sale de la PPP y no vuelve a entrar">🚫 Cancelar</button>'
             : '';
@@ -40178,12 +40180,12 @@ function _pppPlanDiaHtml(programados, key, opts) {
         // reprogramarlo, así que no se genera una tanda nueva ni se pickea de nuevo.
         ? '<div class="pn-acc">' +
             '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencDarPorSalido(\'' + _npS + '\')" title="Salió igual, pero nadie registró la Carga Camión: dalo por salido con su fecha y pasa a En Salida">🚚 Ya salió</button>' +
-            '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencSinProgramar(\'' + _npS + '\')" title="Sacalo de la programación y revisalo en A Programar. Queda marcado como ya pickeado y armado, y al programarlo vuelve a su misma tanda (no se pickea de nuevo)">↩ Sin programar</button>' +
+            '<button class="pn-acc-b" onclick="event.stopPropagation();pgaNpMoverAbrir(\'' + _npS + '\')" title="Reprogramar este pedido a otro dia. Esta armado: el contenido no cambia y no hay que volver a pickear. v20.77: ya no se manda a A Programar.">📅 Reprogramar</button>' +
           '</div>'
         : (!esVenc && e === "sin")
         ? '<div class="pn-acc">' +
             (_pppEsNpWeb(np)
-              ? '<button class="pn-acc-b" onclick="event.stopPropagation();pppVencVolver(\'' + _npS + '\')" title="Sacarlo de esta tanda y devolverlo a A Programar (pendiente)">↩ A Programar</button>'
+              ? '<button class="pn-acc-b" onclick="event.stopPropagation();pgaNpMoverAbrir(\'' + _npS + '\')" title="Reprogramar este pedido a otro dia. v20.77: ya no se manda a A Programar, se le cambia el dia o se cancela.">📅 Reprogramar</button>'
               : '') +
             '<button class="pn-acc-b pn-cancel-btn" onclick="event.stopPropagation();pppVencCancelar(\'' + _npS + '\')" title="El pedido NO va: sale de la PPP y no vuelve a entrar. Pide confirmar dos veces.">🚫 Cancelar</button>' +
           '</div>'
@@ -41137,13 +41139,15 @@ async function pmodZonaCambio(p, antes, despues) {
   if (!zd || za === zd) return;
   const txt = "La zona de entrega pasó de «" + (za || "sin zona") + "» a «" + zd + "».\n\n" +
     "La tanda " + (p.tandas.join(" + ") || "") + " se armó por cercanía, así que con la zona nueva ya no cierra.\n\n" +
-    "¿Lo devuelvo a 📥 A Programar para que se arme donde corresponde?";
+    "¿Le cambiamos el dia para que se arme donde corresponde?";   // v20.77: ya no se manda a A Programar
   if (!confirm(txt)) {
     pppSetStatus("La zona cambió a " + zd + " y el pedido quedó en su tanda: revisalo a mano.", false);
     return;
   }
-  await pppVencVolver(p.nps[0], { sinConfirm: true });
-  pppRenderProg();
+  // v20.77 (Thomas, 21/09): un pedido ya programado no vuelve a A Programar. Se le cambia el
+  // dia (y ahi se elige tanda nueva o una que ya exista) o se cancela. Este era el ultimo
+  // camino que quedaba hacia A Programar, y estaba detras de un confirm.
+  pgaNpMoverAbrir(p.nps[0]);
 }
 function _pmodFecha(iso, conDia) {
   if (String(iso || "").slice(0, 10) === PGA_ESPERA_ISO) return "⏸ En espera";   // v19.29

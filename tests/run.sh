@@ -468,8 +468,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-tabla-arbol (v17.66: Programación como tabla día → tanda → NP → contenido, con los 4 % de avance) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-tabla-arbol.cjs
 
-echo "== pga-enviar-a-programar (v17.85: el botón ↩ Enviar a programar de la fila de la NP, con memoria de la tanda) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pga-enviar-a-programar.cjs
+echo "== ppp-sin-a-programar (candado v20.77: desde Programación sólo se reprograma o se cancela) =="
+node tests/ppp-sin-a-programar.cjs
 
 echo "== ppp-fit-acordeon (v13.95: con un acordeón abierto la PPP scrollea en vez de achicarse y cortar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fit-acordeon.cjs
