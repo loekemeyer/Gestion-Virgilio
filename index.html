@@ -6010,7 +6010,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.81"></script>
+<script type="module" src="recepcion.js?v=20.83"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9892,7 +9892,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.81";
+const APP_VERSION = "v20.83";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17942,12 +17942,13 @@ function prodRender() {
 
   if (!_prod) { body.innerHTML = sel + '<div class="prod-empty">Sin datos.</div>'; return; }
   const POCO = 5;
+  const MIN_TM3_MS = 5 * 60000;   // piso: con <5 min de tiempo efectivo con m3, el ritmo m3/h es basura (division por ~0). Se deja en 0 -> showVal muestra "—". Evita el "Farias picking 307" (tenia 73s de picking con m3).
 
   // serie semanal de m³/h de UNA actividad (arm | pick) — para tendencia y sparkline
   const mkSerie = function (leg, which) {
     return _prod.weekly.map(function (wk, i) {
       const a = wk[leg]; let v = null;
-      if (a) { const m3 = which === "arm" ? a.armM3 : a.pickM3, tm = which === "arm" ? a.armTimeM3 : a.pickTimeM3; if (tm > 0) v = m3 / hrs(tm); }
+      if (a) { const m3 = which === "arm" ? a.armM3 : a.pickM3, tm = which === "arm" ? a.armTimeM3 : a.pickTimeM3; if (tm >= MIN_TM3_MS) v = m3 / hrs(tm); }
       return { v: v, lbl: wkLbl(i) };
     });
   };
@@ -17958,8 +17959,8 @@ function prodRender() {
     if ((t.armTandas + t.pickTandas) === 0) return;
     const role = t.armTime >= t.pickTime ? "arm" : "pick";   // rol primario = lo que más hace (para agrupar/ordenar)
     const measurable = Math.max(0, t.jornada - t.excluded);
-    const armM3h = t.armTimeM3 > 0 ? t.armM3 / hrs(t.armTimeM3) : 0;
-    const pickM3h = t.pickTimeM3 > 0 ? t.pickM3 / hrs(t.pickTimeM3) : 0;
+    const armM3h = t.armTimeM3 >= MIN_TM3_MS ? t.armM3 / hrs(t.armTimeM3) : 0;
+    const pickM3h = t.pickTimeM3 >= MIN_TM3_MS ? t.pickM3 / hrs(t.pickTimeM3) : 0;
     ops.push({
       leg: leg, role: role, t: t, measurable: measurable,
       armM3h: armM3h, pickM3h: pickM3h,
@@ -51174,7 +51175,14 @@ async function facPrintFacturado(np, tanda){
     const parts = await Promise.all([
       fetch(talUrl, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
       fetch(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&np=eq." + npE + "&limit=1", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
-      fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cod_art,cajas_falto&np=eq." + npE + "&cajas_falto=gt.0&limit=2000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })
+      fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cod_art,cajas_falto&np=eq." + npE + "&cajas_falto=gt.0&limit=2000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
+      // v20.82 — la NP de la página ("LK 0145") NO vive en gv_ppp_programacion_diaria, que es
+      // el espejo de ISIS: por eso el remito FACTURADO salía con "Cliente —" y "Fecha Entrega —".
+      // Sale de gv_ppp_web_estado, la misma fuente que ya usan Composición a líos (v14.36),
+      // Recepción Remitos (v15.42) y el remito de ARMADO (v15.46) — este camino, el auto-print
+      // al tildar Facturación, había quedado afuera. El np_label va ENTRECOMILLADO porque lleva
+      // un espacio: sin comillas PostgREST no lo resuelve (lección de la v12.67).
+      fetch(SUPABASE_URL + "/rest/v1/gv_ppp_web_estado?select=np_label,cod_cliente,razon_social,fecha_entrega,tanda&np_label=eq." + encodeURIComponent('"' + String(np).replace(/"/g, "") + '"') + "&limit=1", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })
     ]);
     const tal = (parts[0] || [])[0] || {};
     const seg = String(tal.texto || "").split("|");
@@ -51186,7 +51194,11 @@ async function facPrintFacturado(np, tanda){
       const tp = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TP&texto=eq." + encodeURIComponent(tandaU) + "&select=legajo&order=ts_cliente.desc&limit=1", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; });
       pickerLeg = (tp[0] && tp[0].legajo) || "";
     }
-    const pp = (parts[1] || [])[0] || {};
+    // ISIS primero (fuente histórica); si la NP no está ahí, es una NP de la página.
+    const ppIsis = (parts[1] || [])[0] || {};
+    const ppWeb0 = (parts[3] || [])[0] || {};
+    const pp = ppIsis.np ? ppIsis
+             : (ppWeb0.np_label ? { cod: ppWeb0.cod_cliente, razon_social: ppWeb0.razon_social, fecha_entrega: ppWeb0.fecha_entrega, tanda: ppWeb0.tanda } : {});
     const row = {
       np: np, tanda: tandaU,
       cod: String(pp.cod || "").trim(), rs: String(pp.razon_social || "").trim(),
