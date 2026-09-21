@@ -899,6 +899,10 @@ button {
 .pipe-td-cuit{ white-space:nowrap; }
 .pipe-mem{ display:block; margin-top:3px; font-size:11px; color:#0f766e; font-weight:700; }
 .pipe-mem-dec{ color:#7c3aed; }
+/* la espera, arriba de los botones de «Qué sigue» */
+.pipe-esp-linea{ margin:0 0 5px; }
+.pipe-espera{ font-size:12px; font-weight:800; color:#475569; white-space:nowrap; }
+.pipe-espera.pipe-vencido{ color:#b91c1c; }
 .pipe-cuit{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; color:#334155; }
 .pipe-etapa{ display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }
 .pipe-etapa.e-ing{ background:#e2e8f0; color:#334155; }
@@ -5993,7 +5997,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.73"></script>
+<script type="module" src="recepcion.js?v=20.74"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9871,7 +9875,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.73";
+const APP_VERSION = "v20.74";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -46728,7 +46732,10 @@ function clinTickStart() {
   _clinTick = setInterval(function () {
     try {
       const nodos = document.querySelectorAll(".clin-tiempo[data-since]");
-      nodos.forEach(function (n) { n.textContent = clinFmtElapsed(n.getAttribute("data-since")); });
+      nodos.forEach(function (n) {
+        const d = n.getAttribute("data-since");
+        n.textContent = n.getAttribute("data-fmt") === "dhm" ? pipeFmtEspera(d) : clinFmtElapsed(d);
+      });
     } catch (_e) {}
   }, 60000);
 }
@@ -47057,6 +47064,20 @@ function pipeEtapaHtml(p) {
              ' — toma su antigüedad">🔗 ' + escapeHtml(cuarEmpCod(e.vinc_empresa) + " " + e.vinc_cod) + '</span>'
            : "");
 }
+/* v20.74 (Luis): la espera va en «Qué sigue» y en formato día · hora · minuto — no "6d 3h",
+   que esconde los minutos justo cuando se está por vencer el plazo. */
+function pipeFmtEspera(sinceIso) {
+  const t = Date.parse(sinceIso); if (!isFinite(t)) return "";
+  let s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600);  s -= h * 3600;
+  const m = Math.floor(s / 60);
+  const out = [];
+  if (d > 0) out.push(d + " d");
+  if (d > 0 || h > 0) out.push(h + " h");
+  out.push(m + " min");
+  return out.join(" ");
+}
 /* El reloj de la etapa. Rojo cuando el backend lo marca vencido (el tope sale de
    PPP_Web_Config: clin_speech_horas / clin_analisis_horas, hoy 24 h). */
 function pipeRelojHtml(p) {
@@ -47065,10 +47086,10 @@ function pipeRelojHtml(p) {
   // un análisis HEREDADO no es una espera de este pedido: no corre el reloj ni se pone rojo
   if (e.analisis_heredado && pipeEtapa(p) === "analisis")
     return '<span class="cuar-yp-sin" title="El análisis ya estaba hecho: este pedido no está esperando nada">—</span>';
-  return '<span class="clin-tiempo' + (e.vencido ? " pipe-vencido" : "") + '" data-since="' +
-    escapeHtml(String(e.reloj_desde)) + '" title="' +
-    (e.vencido ? "Pasó el tope de espera de esta etapa" : "Desde que arrancó esta etapa") + '">' +
-    clinFmtElapsed(e.reloj_desde) + '</span>';
+  return '<span class="clin-tiempo pipe-espera' + (e.vencido ? " pipe-vencido" : "") + '" data-since="' +
+    escapeHtml(String(e.reloj_desde)) + '" data-fmt="dhm" title="' +
+    (e.vencido ? "Pasó el tope de espera de esta etapa — hay que mirarlo" : "Hace cuánto que este pedido está esperando en esta etapa") + '">' +
+    '⏱ ' + pipeFmtEspera(e.reloj_desde) + '</span>';
 }
 /* 1.º / 2.º / 3.º pedido. `nuevo_pedidos` son los pedidos FACTURADOS de toda su historia
    (lo calcula LK): el que está en pantalla es el siguiente, así que va +1. */
@@ -47363,6 +47384,13 @@ function pipeDemoEliminar() {
 
 /* ── Los botones de cada etapa ───────────────────────────────────────────────────────── */
 function pipeAccionesHtml(p) {
+  // v20.74 (Luis): la espera va ACA, arriba de los botones — es parte de «qué sigue», no un
+  // dato suelto: lo que decide si hay que apurarse es cuánto hace que está esperando.
+  const _reloj = pipeRelojHtml(p);
+  const _esp = /cuar-yp-sin/.test(_reloj) ? "" : '<div class="pipe-esp-linea">' + _reloj + '</div>';
+  return _esp + pipeAccionesBtns(p);
+}
+function pipeAccionesBtns(p) {
   const emp = (p.empresa || "lk"), oid = escapeHtml(String(p.order_id));
   const et = pipeEtapa(p), esDemo = !!p._demo;
   // en el ejemplo los Speech no se deshabilitan por falta de teléfono: la idea es poder tocarlos
@@ -47469,7 +47497,7 @@ function pipeHtml() {
   h += pipeDemoRowHtml();
   h += '<div class="cuar-tblwrap"><table class="cuar-tbl pipe-tbl"><thead><tr>' +
     '<th>Pedido</th><th>Fecha</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>CUIT</th>' +
-    '<th>Etapa</th><th>Espera</th><th class="cuar-td-m3">Monto</th><th class="pipe-th-acc">Qué sigue</th>' +
+    '<th>Etapa</th><th class="cuar-td-m3">Monto</th><th class="pipe-th-acc">Qué sigue</th>' +
     '<th class="cuar-td-com">Coment.</th></tr></thead><tbody>';
   for (const p of lista) {
     const cid = "pipe" + p.empresa + p.order_id, cab = !!_apr.exp[cid];
@@ -47488,12 +47516,11 @@ function pipeHtml() {
         (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') + aprCuarBadgesHtml(p) + '</td>' +
       '<td class="pipe-td-cuit">' + pipeCuitHtml(p) + '</td>' +
       '<td class="pipe-td-et">' + pipeEtapaHtml(p) + '</td>' +
-      '<td class="clin-td-tiempo">' + pipeRelojHtml(p) + '</td>' +
       '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
       '<td class="pipe-td-acc">' + pipeAccionesHtml(p) + '</td>' +
       '<td class="cuar-td-com">' + (p._demo ? '<span class="cuar-yp-sin">—</span>' : cuarComBtnHtml(p)) + '</td>' +
       '</tr>';
-    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="9"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
   }
   h += '</tbody></table></div></div>';
   return h + pipeFirmaHtml() + pipeVincHtml();

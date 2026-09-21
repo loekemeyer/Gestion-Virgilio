@@ -147,6 +147,22 @@ if (!/\(_apr\.pedidosTodos \|\| \[\]\)\.find\(f\) \|\| \(_apr\.pedidos \|\| \[\]
 if (/function pipeRecargar\(\) \{ _apr\.pipe = null;/.test(html))
   fallos.push("pipeRecargar borra el mapa: el timer desaparece hasta que vuelve la RPC");
 
+/* ── 13. la espera va en «Qué sigue» y en día · hora · minuto ────────────────────────── */
+// v20.74 (Luis): "la espera debería estar incluida en el «Que sigue» y debería ser en formato
+// de dia, hora, minuto". El formato viejo ("6d 3h") escondía los minutos justo cuando se está
+// por vencer el plazo.
+if (/<th>Espera<\/th>/.test(html))
+  fallos.push("la espera sigue siendo una columna propia: va dentro de «Qué sigue»");
+if (!/function pipeFmtEspera/.test(html))
+  fallos.push("falta pipeFmtEspera: el formato dia · hora · minuto");
+if (!/const _esp = [^\n]*pipe-esp-linea/.test(html))
+  fallos.push("la espera no se dibuja dentro de la celda de acciones");
+// ⚠ el tick de cada minuto reescribe el texto: sin data-fmt lo pisa con el formato viejo
+if (!/data-fmt="dhm"/.test(html))
+  fallos.push("el timer del pipeline no marca su formato: el tick lo pisaria con el viejo");
+if (!/n\.getAttribute\("data-fmt"\) === "dhm" \? pipeFmtEspera/.test(html))
+  fallos.push("clinTickStart no respeta el formato del pipeline");
+
 /* ── y lo de siempre: toda vista nueva con security_invoker ───────────────────────────── */
 ["gv_clin_prioritarios", "gv_clin_vencidos"].forEach(function (v) {
   if (!new RegExp("alter view public\\." + v + "\\s+set \\(security_invoker = true\\)", "i").test(sql))

@@ -1544,6 +1544,17 @@ queda en `null` y se vuelve a pedir; con los pedidos cargados y sin retenidos, `
 **Al agregar un lote nuevo de este tipo, usar `clinVacio`.** Es el mismo pozo de §*"una lectura
 ROTA no es un CERO"*. Problema 474.
 
+### La espera va en «Qué sigue», en día · hora · minuto (v20.74, Luis)
+
+*"la espera debería estar incluida en el «Que sigue» y debería ser en formato de dia, hora,
+minuto"*. No es sólo cosmético: el formato viejo (`6d 3h`) **escondía los minutos justo cuando
+se está por vencer el plazo**, y la espera es lo que decide si hay que apurarse — o sea que es
+parte de qué sigue, no un dato suelto en otra columna.
+
+⚠ **El timer del pipeline lleva `data-fmt="dhm"`.** `clinTickStart` reescribe el texto de
+todos los `.clin-tiempo` cada 60 s: sin esa marca, al minuto de dibujarlo lo pisaba con el
+formato del submódulo viejo. Lo verifica el test.
+
 ### La MEMORIA es del CLIENTE, no del pedido (v20.73, Luis)
 
 *"tiene que haber memoria del estado de proceso por el que va el cliente"*, sobre LK 4282, que
