@@ -1,3 +1,102 @@
+## Nota v20.57 (2026-09-21) — La hoja se mide en PUNTOS, y le entra el MONTO
+
+Thomas, sobre la impresión: *"columnas bien definidas, tamaño de fuente grande (equivalente a
+arial 15-16 en word), encabezados centrados, columnas separadas, ancho de celda (dato) mínimo
+posible"* · *"fijate si al habilitar eso para una hoja A4 hay algún otro dato que se le pueda
+sumar a la info, como el monto de cada NP y de la tanda en general"*.
+
+### Lo que se midió, que es lo que contesta la pregunta
+
+**La hoja sale ahora en A4 APAISADA, a 16 pt.** Y la que la saca de la A4 vertical es la letra,
+no la columna nueva. Medido sobre la programación real del 21/09 (167 NP, 63 tandas, 11 días):
+
+| | ancho que piden las columnas | entra en A4 vertical (718 px) |
+|---|---|---|
+| las 5 columnas viejas, a 16 pt | **890 px** | no |
+| las 6 columnas, con Monto, a 16 pt | **1.024 px** | no — pero sí en apaisada (1.047 px) |
+
+O sea: **el monto entra gratis en el ancho que libera la apaisada.** Antes la hoja salía a ~11,8 pt
+porque el font se elegía para que la tabla llenara el papel; ahora el font manda y el papel se
+elige para que entre.
+
+### Cómo se decide, y qué derogó
+
+Esto **deroga la regla de la v18.03** (*"nada de adivinar el ancho del papel"*). El ancho útil
+vuelve, pero ya no es una suposición: sale del `@page` que fija el mismo `index.html`
+(`margin:12mm 10mm`), y en CSS de impresión 1 px = 1/96", así que la cuenta es exacta —
+A4 vertical 190 mm = 718 px, apaisada 277 mm = 1.047 px.
+
+`_pgpLayout()` prueba, y gana la primera que entra: **vertical 16 pt · vertical 15 pt ·
+apaisada 16 pt · apaisada 15 pt**. Si ninguna entra, la columna del cliente se achica hasta que
+entre (parte en dos renglones, que es lo que ya hacía) y **nunca se baja de 15 pt**: el pedido es
+la letra. La orientación elegida se escribe en un `<style>@page{size:A4 …}</style>` dentro de la
+hoja — un `@page` vale para el documento entero aunque su contenedor esté en `display:none`.
+
+El resto del pedido: encabezados **centrados**, **grilla completa** (cada columna con su filete),
+padding de `.45em` a `.24em` por lado, y la tabla con `width:auto` + el ancho exacto que suman sus
+columnas — **ya no se estira al papel**. Cada columna de dato queda pegada a lo suyo; lo que sobra
+va **todo a la columna del cliente**, que es la única que parte en renglones, y sólo hasta lo que
+ella pide entera. Medido: cada columna usa el **98-100 %** de su ancho y **no se corta ninguna
+celda**.
+
+⚠ Dos detalles que hacen la diferencia en el papel y no se ven en el código: el **código del
+cliente se mide a .86em** (va más chico que el nombre) y lleva `white-space:nowrap`, así
+«(LK 2543)» baja entero al renglón de abajo en vez de partirse en «(LK» + «2543)». Con eso, de
+las 35 NP del lunes 21/09 parten en dos renglones **3**, no 12.
+
+### El monto: de dónde sale y qué NO es
+
+De **`gv_ppp_np_valor`**, la vista que ya cacheaba `pppRefreshValor()` para el tablero de 6 días.
+No se recalcula nada. Cubre **167 de 167 NP** del árbol (medido el 21/09); 2 tienen algún
+artículo sin precio cargado y esas van con un **`*`** al lado del número.
+
+⚠ **Es valor de LISTA: sin IVA y sin descuentos.** La hoja lo dice en el subtítulo y el pop-up
+también. No es lo que se va a facturar, y no hay que presentarlo como tal.
+
+Va en tres niveles, y el de arriba es la suma del de abajo: **NP → tanda → día**, más el total de
+la hoja en el encabezado.
+
+### El Excel
+
+Mismo pedido: *"misma idea, tabla optimizada, fuente grande, mínimo espacio entre columnas
+(doble fila de encabezados, etc)"*. La v20.52 lo bajaba con `_facXlsxBlob`, el armador de
+Facturación: un ZIP con los XML mínimos y **sin `styles.xml`**, o sea sin fuente, sin bordes, sin
+anchos y sin formato de número.
+
+**`_facXlsxBlob` no se tocó** —lo que baja va a ISIS y su formato es contrato— y al lado va un
+armador propio (`_pgxBlob`) que agrega lo que esta hoja necesita:
+
+- **Arial 14** en todo, 18 en el título. El ancho de columna de Excel se cuenta en caracteres de
+  la fuente normal del libro, así que con la 14 declarada como fuente 0 los anchos calculados acá
+  valen tal cual.
+- **Doble fila de encabezados**: grupos combinados (ENTREGA · TANDA · PEDIDO · DESTINO · TOTALES ·
+  ESTADO) y abajo las 17 columnas.
+- **Ancho por dato** (p95 + 1,2 caracteres) en vez del 8,43 de fábrica.
+- **Panel inmovilizado** bajo el encabezado y **autofiltro** en la fila de columnas.
+- **Formato de número**: m³ `#,##0.000`, monto `#,##0`, y la **fecha como fecha de verdad**
+  (serial + `dd/mm/yyyy`), así Excel ordena y filtra por fecha y no por texto.
+- Tres hojas: **Programación** (una fila por NP, plana), **Tandas** y **Resumen** (por día), las
+  tres cerrando con su TOTAL.
+
+⚠ **El orden de los elementos adentro de `<worksheet>` lo fija el esquema**: `cols` → `sheetData`
+→ `autoFilter` → `mergeCells`. Cambiarlo hace que Excel diga que el archivo está dañado; el test
+lo verifica.
+
+**Comprobado abriendo el archivo de verdad** (167 NP, 172 filas): carga sin reparaciones, las tres
+hojas, Arial 14, panel en A5, filtro `A4:Q4`, y los totales cierran contra el árbol
+(53,026 m³ · $ 259.858.979).
+
+### Chequeo
+
+```bash
+node tests/pga-imprimir.cjs   # 59 chequeos: font en pt, 15 mínimo, nada cortado, @page
+node tests/pga-excel.cjs      # 39 chequeos: styles.xml, doble encabezado, números y totales
+```
+
+⚠ Y un detalle del camino: `index.html` llegó de `main` con dos bytes latin1 (`«»`) adentro de un
+comentario de la v20.55 — en un archivo UTF-8 eso no es UTF-8 válido y rompe cualquier script que
+lo lea como texto. Se repusieron como « » de verdad.
+
 ## Nota v20.52 (2026-09-21) — El botón de Imprimir de la Programación también baja Excel
 
 Thomas: *"dentro del botón de imprimir. dejame imprimir o descargar excel"*.

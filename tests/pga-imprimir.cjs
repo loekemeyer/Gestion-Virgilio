@@ -14,6 +14,11 @@
      · al imprimir se cierra el pop-up ANTES de llamar a print(), si no sale en el papel;
      · en `media print` lo único visible es la hoja: el resto de la app se esconde;
      · la hoja imprime en NEGRO (heredaba el azul de la app y en papel salía gris).
+
+   v20.57 (Thomas): la hoja pasó a medirse en PUNTOS —16 pt, 15 si no entra— con las columnas
+   pegadas al dato y encabezados centrados, y le entró la columna de MONTO. Lo que este test fija
+   de eso: el font sale en `pt` y nunca baja de 15; la tabla NO se estira al ancho del papel; la
+   orientación la elige la medición y queda escrita en un `@page`; ninguna celda se corta.
    Estado inyectado; no pega contra la red. */
 const path = require("path");
 let chromium;
@@ -55,6 +60,12 @@ catch (_e) {
       mk("2026-09-17", "E12A", "98700", "Andser Quimica", 1.3, "pendiente", { cod: "1000" })
     ];
     _pgaTs = Date.now();
+    // v20.57: el monto sale de `gv_ppp_np_valor`, que la pantalla ya cachea en `_pppValor`
+    _pppValor = new Map([["LK 0058", { valor: 1234567, sinPrecio: 0 }],
+                         ["98701", { valor: 89000, sinPrecio: 2 }],
+                         ["LK 0060", { valor: 2500000, sinPrecio: 0 }],
+                         ["LK 0061", { valor: 450000, sinPrecio: 0 }],
+                         ["CH 0019", { valor: 77000, sinPrecio: 0 }]]);
     // el contenido de la NP NO tiene que pedirse ni salir en la hoja: si se pide, se ve acá
     const pedidosItems = [];
     window.fetch = async function (url) {
@@ -150,15 +161,24 @@ catch (_e) {
     out.tieneEncabezado = /Programación de entregas/.test(hh) && /impreso el /.test(hh);
     // las columnas alinean entre días: cada tabla trae el mismo colgroup de 6
     out.colgroups = [...hoja.querySelectorAll("table.pgp-tab")].map((t) => t.querySelectorAll("col").length);
+    // v20.57 — monto, encabezados centrados y la orientación elegida por la medición
+    out.thTxt = [...hoja.querySelectorAll("table.pgp-tab thead th")].slice(0, 6).map((e) => e.textContent.trim());
+    out.pageCss = (document.getElementById("pgpPageCss") || {}).textContent || "";
+    out.fontPt = ((hoja.querySelector("table.pgp-tab").getAttribute("style") || "")
+      .match(/font-size:(\d+)pt/) || [])[1];
+    out.anchoDeclarado = +(((hoja.querySelector("table.pgp-tab").getAttribute("style") || "")
+      .match(/width:(\d+)px/) || [])[1] || 0);
+    out.montos = [...hoja.querySelectorAll("tr.pgp-np td:nth-child(5)")].map((e) => e.textContent.trim());
+    out.montoTanda = [...hoja.querySelectorAll("tr.pgp-t td:nth-child(5)")].map((e) => e.textContent.trim());
+    out.montoDia = [...hoja.querySelectorAll("tr.pgp-tot td:nth-child(5)")].map((e) => e.textContent.trim());
+    out.notaValor = /valor de lista/.test(hh);
     // los anchos salen del dato, pero tienen que ser LOS MISMOS en todos los días (si no, no alinean)
     out.anchos = [...hoja.querySelectorAll("table.pgp-tab")].map((t) =>
       [...t.querySelectorAll("col")].map((c) => c.style.width).join("|"));
     out.anchosIguales = out.anchos.length === 2 && out.anchos[0] === out.anchos[1];
-    // ojo: buscar "7%" con regex daba falso positivo dentro de "5.57%". Se compara el juego entero.
-    out.anchosDelDato = (out.anchos[0] || "") !== "17%|28%|22%|14%|7%|12%" &&
-      (out.anchos[0] || "").split("|").every((x) => /^\d+(\.\d+)?%$/.test(x));
-    out.anchosSuman100 = Math.abs((out.anchos[0] || "").split("|")
-      .reduce((a, x) => a + parseFloat(x || 0), 0) - 100) < 0.5;
+    // v20.57: los anchos salen en px (el ancho exacto del dato), no en % del papel
+    out.anchosEnPx = (out.anchos[0] || "").split("|").every((x) => /^\d+px$/.test(x));
+    out.anchosSuman = (out.anchos[0] || "").split("|").reduce((a, x) => a + parseFloat(x || 0), 0);
     out.thRepetido = [...hoja.querySelectorAll("table.pgp-tab thead")].length === 2;
 
     // ── (6) en pantalla la hoja no se ve ───────────────────────────────────
@@ -167,9 +187,11 @@ catch (_e) {
   });
 
   // ── (7) en `media print`: sólo la hoja, y en negro ────────────────────────
-  // El viewport se lleva al ancho ÚTIL de una A4 con los márgenes de @page (190 mm ≈ 718 px): es el
-  // único ancho en el que tiene sentido preguntar si algo se corta.
-  await p.setViewportSize({ width: 718, height: 1100 });
+  // El viewport se lleva al ancho ÚTIL del papel que ELIGIÓ la medición, con los márgenes del
+  // @page (12mm 10mm): A4 vertical = 190 mm ≈ 718 px, apaisada = 277 mm ≈ 1047 px. Es el único
+  // ancho en el que tiene sentido preguntar si algo se corta.
+  const utilPx = Math.round((/landscape/.test(r.pageCss) ? 277 : 190) / 25.4 * 96);
+  await p.setViewportSize({ width: utilPx, height: 1100 });
   await p.emulateMedia({ media: "print" });
   const imp = await p.evaluate(() => {
     const hoja = document.getElementById("pgaPrint");
@@ -187,7 +209,11 @@ catch (_e) {
       const need = Math.max(...tds.map((td) => td.scrollWidth));
       return Math.round(100 * need / th.getBoundingClientRect().width);
     });
+    const th0 = tab.querySelector("thead th");
+    const td0 = tab.querySelector("tbody td");
     return {
+      thCentrado: getComputedStyle(th0).textAlign,
+      tdConBorde: getComputedStyle(td0).borderLeftWidth,
       cortadas: cortadas,
       uso: uso,
       fontPx: parseFloat(getComputedStyle(tab).fontSize),
@@ -200,14 +226,13 @@ catch (_e) {
       colorHoja: getComputedStyle(hoja).color
     };
   });
-  // (8) y el mismo papel, más ancho: la letra tiene que CRECER con él. La v18.02 la elegía en px
-  // contra un ancho supuesto (718), así que en una hoja más ancha quedaba chica y sobraba aire.
-  await p.setViewportSize({ width: 1000, height: 1100 });
+  // (8) v20.57 — y en un papel más ancho la letra NO cambia: 16 pt es 16 pt. Es justo lo
+  // contrario de lo que fijaba la v18.03 (font en `vw`), y es el pedido de Thomas.
+  await p.setViewportSize({ width: 1400, height: 1100 });
   const ancho = await p.evaluate(() => {
     const tab = document.querySelector("#pgaPrint table.pgp-tab");
     return { fontPx: parseFloat(getComputedStyle(tab).fontSize),
-      llena: tab.getBoundingClientRect().width /
-             document.getElementById("pgaPrint").getBoundingClientRect().width };
+      anchoTabla: tab.getBoundingClientRect().width };
   });
   await p.emulateMedia({ media: "screen" });
   await b.close();
@@ -255,12 +280,14 @@ catch (_e) {
       r.tieneEstado.indexOf("Armado") >= 0, "cada NP lleva su estado: " + JSON.stringify(r.tieneEstado));
   chk(r.tieneTotal, "cada día cierra con su total");
   chk(r.tieneEncabezado, "la hoja tiene título con el rango y la fecha de impresión");
-  chk(r.colgroups.length === 2 && r.colgroups.every((n) => n === 5),
-      "cada día trae el colgroup de 5 columnas: " + JSON.stringify(r.colgroups));
+  chk(r.colgroups.length === 2 && r.colgroups.every((n) => n === 6),
+      "cada día trae el colgroup de 6 columnas: " + JSON.stringify(r.colgroups));
   chk(r.anchosIguales, "y los anchos son idénticos entre días → alinean de hoja en hoja");
-  chk(r.anchosDelDato, "los anchos los calcula _pgpAnchos() del dato real, no son los % fijos viejos: " +
+  chk(r.anchosEnPx, "los anchos salen en px del dato real, no en % del papel: " +
       JSON.stringify(r.anchos[0]));
-  chk(r.anchosSuman100, "y suman 100 % → no queda papel muerto a la derecha");
+  chk(Math.abs(r.anchosSuman - r.anchoDeclarado) <= 2,
+      "y la tabla declara justo la suma de sus columnas (" + r.anchoDeclarado +
+      " px) → queda compacta, no estirada");
   chk(r.thRepetido, "cada tabla tiene su thead (se repite al cortar de hoja)");
   chk(r.hojaEscondidaEnPantalla, "en pantalla la hoja no se ve");
   chk(imp.hojaVisible, "en `media print` la hoja SÍ se ve");
@@ -270,20 +297,39 @@ catch (_e) {
       "la hoja imprime en negro, no hereda el azul de la app: " + imp.colorCliente);
   chk(imp.cortadas.length === 0,
       "al ancho de una A4 no se corta NINGUNA celda: " + JSON.stringify(imp.cortadas));
-  chk(/vw/.test(imp.fontInline),
-      "la letra va en `vw`, no en px contra un ancho supuesto: " + JSON.stringify(imp.fontInline));
-  chk(imp.fontPx >= 14, "a 718 px (una A4) la letra da " + imp.fontPx.toFixed(1) +
-      " px — la v18.02 daba 11,5 fijos");
-  chk(imp.anchoTabla / imp.anchoCont > 0.97,
-      "la tabla llena el ancho del papel: " +
-      Math.round(100 * imp.anchoTabla / imp.anchoCont) + " %");
+  chk(/pt/.test(imp.fontInline) && (r.fontPt === "16" || r.fontPt === "15"),
+      "la letra va en PUNTOS y es la que pidió Thomas (15-16, Arial de Word): " +
+      JSON.stringify(imp.fontInline));
+  chk(imp.fontPx >= 20, "o sea " + imp.fontPx.toFixed(1) +
+      " px de cuerpo — la v18.03 daba 15,8 en una A4");
+  chk(/@page\{ size:A4 (portrait|landscape); margin:12mm 10mm; \}/.test(r.pageCss),
+      "la orientación la decide la medición y queda escrita en un @page: " + JSON.stringify(r.pageCss));
+  chk(imp.anchoTabla <= imp.anchoCont + 1,
+      "la tabla entra en el papel que eligió: " + Math.round(imp.anchoTabla) + " de " +
+      Math.round(imp.anchoCont) + " px");
   chk(imp.uso.every((x) => x >= 90),
       "y CADA columna la usa entera — nada de aire entre columnas: " +
       JSON.stringify(imp.uso.map((x) => x + " %")));
-  chk(ancho.fontPx > imp.fontPx * 1.2,
-      "en un papel más ancho la letra CRECE con él: 718 px → " + imp.fontPx.toFixed(1) +
-      " px, 1000 px → " + ancho.fontPx.toFixed(1) + " px");
-  chk(ancho.llena > 0.97, "y ahí también llena el ancho: " + Math.round(100 * ancho.llena) + " %");
+  chk(Math.abs(ancho.fontPx - imp.fontPx) < 0.5,
+      "en un papel más ancho la letra NO cambia (16 pt es 16 pt): " + imp.fontPx.toFixed(1) +
+      " px → " + ancho.fontPx.toFixed(1) + " px");
+  chk(Math.abs(ancho.anchoTabla - imp.anchoTabla) < 2,
+      "y la tabla tampoco se estira: sigue midiendo " + Math.round(ancho.anchoTabla) + " px");
+
+  // ── v20.57: monto, encabezados centrados y columnas separadas ─────────────
+  chk(r.thTxt.join("|") === "Tanda / NP|Cliente (cód)|Zona · barrio|m³|Monto $|Estado",
+      "la hoja suma la columna de monto: " + JSON.stringify(r.thTxt));
+  chk(r.montos.length === 5 && r.montos[0] === "1.234.567",
+      "cada NP lleva su monto, sin centavos y con punto de miles: " + JSON.stringify(r.montos));
+  chk(r.montos.some((x) => /\*$/.test(x)),
+      "y un * marca la NP con algún artículo sin precio cargado: " + JSON.stringify(r.montos));
+  chk(r.montoTanda.length === 3 && r.montoTanda[0] === "1.323.567 *",
+      "la tanda cierra con la suma de sus NP: " + JSON.stringify(r.montoTanda));
+  chk(r.montoDia.length === 2 && r.montoDia[0] === "3.823.567 *",
+      "y el día con la suma de sus tandas: " + JSON.stringify(r.montoDia));
+  chk(r.notaValor, "la hoja aclara que el monto es valor de lista, sin IVA ni descuentos");
+  chk(imp.thCentrado, "los encabezados van centrados: " + imp.thCentrado);
+  chk(imp.tdConBorde, "y cada columna va separada por su filete: " + imp.tdConBorde);
   chk(errs.length === 0, "sin errores de JS: " + JSON.stringify(errs));
 
   let malas = 0;

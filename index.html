@@ -3597,7 +3597,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-pill{ display:inline-block; font-size:12px; font-weight:900; border-radius:999px; padding:1px 9px; letter-spacing:.02em; margin-left:8px; vertical-align:1px; }
 .pga-pill.e-facturado{ background:#dbeafe; color:#1e3a8a; } .pga-pill.e-armado{ background:#dcfce7; color:#14532d; }
 .pga-pill.e-proceso{ background:#fef9c3; color:#854d0e; }   .pga-pill.e-pendiente{ background:#fee2e2; color:#991b1b; }
-/* v20.53 (Luis) — SALIÓ: el mismo violeta de su columna (#7c3aed), para que la pastilla y la
+/* v20.56 (Luis) — SALIÓ: el mismo violeta de su columna (#7c3aed), para que la pastilla y la
    columna digan lo mismo y no se confunda con los cuatro estados. */
 .pga-pill.e-salio{ background:#ede9fe; color:#5b21b6; }
 /* v20.23 — la banda de lo que salió y no se facturó, arriba de la tabla */
@@ -3686,42 +3686,50 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 #pgaPrint, #pgaPrint *{ color:#000; }
 #pgaPrint .pgp-h2, #pgaPrint .pgp-dia > h3 small{ color:#444; }
 .pgp-h1{ font-size:19px; font-weight:900; margin:0; }
-.pgp-h2{ font-size:12px; margin:2px 0 12px; }
+.pgp-h2{ font-size:12px; margin:2px 0 10px; line-height:1.3; }
 /* ⚠ el día NO lleva `break-inside:avoid`: un día de 40 NP no entra en una hoja y el navegador lo
    empujaba entero a la siguiente, dejando media hoja en blanco. Corta donde tenga que cortar, pero
    NUNCA por el medio de un renglón, y el encabezado de la tabla se repite en cada hoja. */
 .pgp-dia{ margin:0 0 14px; }
 .pgp-tab thead{ display:table-header-group; }
 .pgp-tab tr{ break-inside:avoid; page-break-inside:avoid; }
-.pgp-dia > h3{ font-size:15px; font-weight:900; margin:0 0 4px; padding:4px 6px;
+.pgp-dia > h3{ font-size:15px; font-weight:900; margin:0 0 4px; padding:3px 6px;
   background:#eef2f7; border-left:4px solid #333; break-after:avoid; page-break-after:avoid; }
 .pgp-dia > h3 small{ font-weight:700; font-size:12px; margin-left:8px; }
-/* v18.04 — ANCHOS AJUSTADOS AL DATO, no a porcentajes a ojo. Sigue siendo `table-layout:fixed`
-   con un `<colgroup>` —si cada día dimensiona su tabla sola las columnas no alinean entre días—
-   pero los anchos los calcula `_pgpAnchos()` midiendo el texto real de TODA la hoja, una sola vez.
-   Antes eran 17/28/22/14/7/12 fijos y sobraba medio ancho de papel sin usar. */
-.pgp-tab{ width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed; }
+/* v20.57 (Thomas: *"columnas bien definidas … columnas separadas … ancho de celda mínimo"*).
+   Tres cambios sobre la v18.04, y el primero es el que manda:
+     · `width:auto` — la tabla ya NO se estira al ancho del papel. El JS le pone el ancho exacto
+       que suman sus columnas, así que cada una queda pegada a su dato y lo que sobra a la
+       derecha queda en blanco. Antes era `width:100%` y el aire se repartía adentro de las celdas.
+     · grilla completa (`border:1px solid`) en vez de una línea abajo: "columnas bien definidas".
+     · encabezados CENTRADOS, y padding de .45em a .30em por lado.
+   Sigue siendo `table-layout:fixed` con `<colgroup>`: si cada día dimensiona su tabla sola, las
+   columnas no alinean entre días y la hoja se lee como seis tablas distintas. */
+.pgp-tab{ width:auto; border-collapse:collapse; font-size:13px; table-layout:fixed; }
 .pgp-tab td{ overflow:hidden; }
-/* ⚠ Paddings y tamaños en `em`, NO en px: el font de la tabla lo pone el JS en `vw`, así que si
-   todo escala junto los anchos en % que calculó siguen valiendo en cualquier papel. Con paddings
-   fijos, en una hoja más ancha que la supuesta sobraba aire adentro de cada celda. */
-.pgp-tab th{ text-align:left; font-size:.78em; text-transform:uppercase; letter-spacing:.04em;
-  color:#444; border-bottom:1.5px solid #333; padding:.25em .45em; }
-.pgp-tab td{ padding:.3em .45em; border-bottom:1px solid #ddd; vertical-align:top;
+/* ⚠ Paddings y tamaños en `em`, NO en px: el font de la tabla lo pone el JS en `pt`, y los anchos
+   que calculó salen de medir a ESE tamaño con este mismo padding. Con paddings fijos, cambiar el
+   cuerpo de 16 a 15 pt dejaría los anchos mal. */
+.pgp-tab th{ text-align:center; font-size:.80em; text-transform:uppercase; letter-spacing:.04em;
+  color:#000; background:#e8ecf1; border:1px solid #333; padding:.26em .24em; }
+.pgp-tab td{ padding:.18em .24em; border:1px solid #999; vertical-align:top;
   white-space:nowrap; text-overflow:ellipsis; }
 .pgp-tab th.n, .pgp-tab td.n{ text-align:right; white-space:nowrap; }
-/* El cliente es la única que PARTE en dos renglones en vez de cortar con "…": en una hoja de
-   reparto un nombre cortado es peor que una fila un poco más alta. */
-.pgp-cli{ white-space:normal !important; line-height:1.25; }
-.pgp-cod{ font-weight:700; }
+.pgp-tab th.c, .pgp-tab td.c{ text-align:center; }
+/* El cliente y el lugar PARTEN en dos renglones en vez de cortar con "…": en una hoja de reparto
+   un nombre o un barrio cortado es peor que una fila un poco más alta. */
+.pgp-cli, .pgp-lug{ white-space:normal !important; line-height:1.2; }
+/* el código va entero al renglón de abajo o no va: partir «(LK 2543)» en «(LK» + «2543)» es
+   ilegible. Por eso `nowrap` acá y `normal` en la celda. */
+.pgp-cod{ font-weight:700; font-size:.86em; white-space:nowrap; }
 /* El horario iba en una COLUMNA propia que estaba vacía en casi todas las filas (14 % del papel
    muerto). Ahora es un segundo renglón bajo el cliente, y sólo aparece cuando hay horario. */
 .pgp-hor{ display:block; font-size:.82em; font-weight:700; margin-top:.1em; }
-.pgp-t > td{ background:#f4f6f8; font-weight:900; border-top:1px solid #999; }
-.pgp-np td:first-child{ padding-left:16px; }
-.pgp-est{ display:inline-block; border:1px solid #666; border-radius:8px; padding:0 .4em;
-  font-size:.74em; font-weight:900; white-space:nowrap; }
-.pgp-tot > td{ border-top:1.5px solid #333; border-bottom:none; font-weight:900; background:#f4f6f8; }
+.pgp-t > td{ background:#dfe5ec; font-weight:900; border-top:2px solid #333; }
+.pgp-np td:first-child{ padding-left:1em; }
+.pgp-est{ display:inline-block; border:1px solid #666; border-radius:8px; padding:0 .25em;
+  font-size:.78em; font-weight:900; white-space:nowrap; }
+.pgp-tot > td{ border-top:2px solid #333; font-weight:900; background:#dfe5ec; }
 .pgp-sin{ font-size:13px; color:#444; }
 
 /* En el celular la tabla no entra a lo ancho: scrollea adentro de su caja, y la columna del
@@ -5853,7 +5861,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.56"></script>
+<script type="module" src="recepcion.js?v=20.57"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9731,7 +9739,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.56";
+const APP_VERSION = "v20.57";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38318,7 +38326,7 @@ const PGA_EST    = ["facturado", "armado", "proceso", "pendiente"];
 const PGA_EST_TXT = { facturado: "Facturado", armado: "Armado", proceso: "En proceso", pendiente: "Pendiente",
                       salio: "Salió" };
 const PGA_EST_CLS = { facturado: "fac", armado: "arm", proceso: "pro", pendiente: "pen", salio: "sal" };
-/* ⚠ v20.53 (Luis, 2026-09-21) — `salio` NO está en `PGA_EST` a propósito: esa lista son las
+/* ⚠ v20.56 (Luis, 2026-09-21) — `salio` NO está en `PGA_EST` a propósito: esa lista son las
    CUATRO columnas de estado, y SALIÓ ya tiene la suya. Acá entra sólo para la pastilla y el
    color de la fila.
    Luis, con la pantalla al lado: *"fijate que el color-coding no coincide y el badge tampoco
@@ -38449,7 +38457,7 @@ async function pgaItemsCargar(np) {
    nada empezado, o mezcla = en proceso. Es lo que pinta la fila. */
 function _pgaEstadoGrupo(e, n, salio) {
   if (!n) return "pendiente";
-  // v20.53: si TODAS sus NP ya salieron en el camión, la fila dice Salió — que es lo mismo que
+  // v20.56: si TODAS sus NP ya salieron en el camión, la fila dice Salió — que es lo mismo que
   // dice su columna. Con algunas sí y otras no sigue mandando el estado de abajo.
   if (_pgaSalioListo() && Number(salio) === n) return "salio";
   if (e.facturado === n) return "facturado";
@@ -38666,7 +38674,7 @@ function _pgaCuerpoHtml(dias, opts) {
         // Se muestra sólo cuando hay EXPRESO: en un reparto propio la provincia es la de la zona
         // que ya se está leyendo al lado, y repetirla en cada fila de CABA es ruido.
         const _dst = _pgaDestDe(r), _mis = !!(_dst && _dst.alerta);
-        // v20.53 (Luis): la pastilla NETEA igual que las columnas — si la NP ya salió en el
+        // v20.56 (Luis): la pastilla NETEA igual que las columnas — si la NP ya salió en el
         // camión dice Salió, no Facturado. El estado de abajo queda en el `title`.
         const _sal = _pgaSalio(r), estVis = _sal ? "salio" : est;
         h += '<tr class="pga-n' + (nb ? " on" : "") + (_mis ? " mis" : "") + '" onclick="pgaAbrirNp(\'' + escapeHtml(nk) + '\',\'' + escapeHtml(r.np) + '\')">' +
@@ -39103,6 +39111,14 @@ function pgaImprimirAbrir() {
   _pgi = { dias: arbol, sel: {} };
   for (const d of arbol) _pgi.sel[d.key] = true;
   pgaImprimirRender();
+  /* v20.57: el monto sale de `gv_ppp_np_valor`, que ya carga el tablero de 6 días. Si todavía no
+     está —se entró directo a la tabla—, se pide acá y el pop-up se vuelve a dibujar. La hoja NO
+     se bloquea esperándolo: sin el dato la columna dice "—" y el resto sale igual. */
+  if (_pppValor == null && typeof pppRefreshValor === "function") {
+    try {
+      Promise.resolve(pppRefreshValor()).then(function () { if (_pgi) pgaImprimirRender(); });
+    } catch (_e) {}
+  }
 }
 function pgaImprimirCerrar() {
   const m = document.getElementById("pgiModal");
@@ -39120,11 +39136,13 @@ function pgaImprimirRender() {
       ' onchange="pgaImprimirTildar(\'' + d.key + '\', this.checked)">' +
       '<b>' + escapeHtml(_pgaDiaTxt(d.key)) + '</b>' +
       '<span>' + _pppFmtM3(d.m3) + ' m³ · ' + d.tandasArr.length + ' tanda' +
-        (d.tandasArr.length === 1 ? '' : 's') + ' · ' + d.nps + ' NP</span></label>';
+        (d.tandasArr.length === 1 ? '' : 's') + ' · ' + d.nps + ' NP' +
+        (_pgaValorDia(d) ? ' · $ ' + _pgpMonto(_pgaValorDia(d).valor) : '') + '</span></label>';
   }).join("");
   m.innerHTML = '<div class="pgi-card">' +
     '<div class="pgi-top"><h3>🖨 Imprimir la programación</h3>' +
-      '<p>Elegí los días. Sale abierta hasta la NP, sin el detalle de códigos.</p></div>' +
+      '<p>Elegí los días. Sale abierta hasta la NP, sin el detalle de códigos. El monto es el ' +
+      'valor de lista, sin IVA ni descuentos.</p></div>' +
     '<div class="pgi-body">' +
       '<div class="pgi-rango">Rango: desde ' +
         '<select id="pgiD1">' + opts + '</select> hasta ' +
@@ -39165,54 +39183,128 @@ function pgaImprimirRango() {
   for (const d of _pgi.dias) _pgi.sel[d.key] = (d.key >= lo && d.key <= hi);
   pgaImprimirRender();
 }
-/* v18.03 — NADA DE ADIVINAR EL ANCHO DEL PAPEL.
-   La v18.04 medía contra un `PGP_ANCHO_PAPEL = 718` (190 mm a 96 dpi, el útil de una A4) y con eso
-   elegía un font en px. Si el útil real es más ancho —y lo es— la letra queda chica y sobra aire
-   adentro de cada columna: exactamente lo que se veía en la primera hoja de verdad.
+/* ═══ v20.57 (Thomas) — LA HOJA SE MIDE EN PUNTOS, NO EN vw ═══════════════════════════════
+   Pedido: *"columnas bien definidas, tamaño de fuente grande (equivalente a arial 15-16 en
+   word), encabezados centrados, columnas separadas, ancho de celda (dato) mínimo posible"* ·
+   *"fijate si al habilitar eso para una hoja A4 hay algún otro dato que se le pueda sumar a
+   la info, como el monto de cada NP y de la tanda en general"*.
 
-   Ahora no hay ningún ancho supuesto. Se mide el texto a un tamaño de referencia, se le suma el
-   padding EN ESE MISMO tamaño (el CSS lo tiene en `em`, así que escala igual), y el resultado sale
-   en unidades relativas:
-     · cada columna en **%** de la tabla  → Ti / ΣT, que suma 100 % exacto;
-     · el font de la tabla en **vw**      → REF × 100 / ΣT, o sea "que ΣT entre justo en el ancho".
-   Como todo escala junto, la hoja llena el papel y las columnas quedan pegadas al dato, sea A4,
-   oficio o carta. El `clamp` sólo pone un piso y un techo de legibilidad. */
-const PGP_REF = 13;          // tamaño de referencia para medir; el real sale en vw
-const PGP_PAD = 0.9;         // los dos paddings de la celda, en em (CSS: .45em por lado)
-const PGP_SEG = 0.96;        // colchón: el viewport de impresión no es exactamente el área útil
-function _pgpAnchos(cols) {
-  const ff = (typeof getComputedStyle === "function" &&
-              getComputedStyle(document.body).fontFamily) || "sans-serif";
-  const ctx = document.createElement("canvas").getContext("2d");
-  const ancho = function (txt, px) {
-    ctx.font = "700 " + px + "px " + ff;             // ⚠ siempre en negrita: medir de menos CORTA
+   Esto DEROGA la regla de la v18.03 ("nada de adivinar el ancho del papel"), a propósito: esa
+   versión elegía el font para que la tabla LLENARA el papel, o sea que la letra salía de lo que
+   sobraba (15,8 px ≈ 11,8 pt en una A4). Ahora manda el font —16 pt, 15 si no entra— y cada
+   columna queda del ancho de su dato; lo que sobra a la derecha queda en blanco.
+
+   Para poder contestar "¿entra?" hay que saber cuánto mide el papel. El ancho útil NO es una
+   suposición: sale del `@page` que fija este mismo archivo (`margin:12mm 10mm`), y en CSS de
+   impresión 1 px = 1/96", así que la cuenta es exacta:
+     A4 vertical  = 210 − 20 = 190 mm = 718 px      A4 apaisada = 297 − 20 = 277 mm = 1047 px
+
+   MEDIDO con la programación real del 21/09: a 16 pt las columnas piden ~1.000 px. En vertical
+   no entran ni sacando el monto (las 5 columnas viejas ya piden ~980 px), o sea que **lo que
+   saca la hoja de la A4 vertical es la letra grande, no la columna nueva**. Por eso la hoja
+   sale APAISADA y el monto entra gratis en el ancho que eso libera.
+
+   El orden en que se prueba, y gana la primera que entra:
+     1. A4 vertical 16 pt · 2. A4 vertical 15 pt · 3. A4 apaisada 16 pt · 4. A4 apaisada 15 pt
+   Si ninguna entra, la columna del cliente se achica hasta que entre —parte en dos renglones,
+   que es lo que ya hacía— y NUNCA se baja de 15 pt: el pedido es la letra. */
+const PGP_PTS   = [16, 15];                       // Arial 15-16 de Word, en puntos
+const PGP_PX_PT = 96 / 72;                        // 1 pt = 1/72" · 1 px CSS = 1/96"
+const PGP_UTIL  = { vert: (210 - 20) / 25.4 * 96, apa: (297 - 20) / 25.4 * 96 };
+const PGP_PAD   = 0.48;      // los dos paddings de la celda, en em (CSS: .24em por lado)
+const PGP_BORDE = 2;         // el filete que separa una columna de la otra
+const PGP_FLEX_MIN_EM = 10;  // la columna del cliente no baja de ~10 caracteres
+const PGP_COD_EM = 0.86;     // el código del cliente va más chico que el nombre (CSS: .pgp-cod)
+/* Percentil por columna: el cliente y el lugar se dimensionan por el p75/p90 y el 10-25 % largo
+   parte en dos renglones. Un solo "Coto C.I.C.S.A. Sucursal Lanus Centro (LK 801)" en 100 NP le
+   comía el ancho a la columna —y, cuando el font salía de ahí, a toda la hoja. */
+function _pgpMedirCol(c, px, ctx, ff) {
+  const ancho = function (txt, s) {
+    ctx.font = "700 " + s + "px " + ff;            // ⚠ siempre negrita: medir de menos CORTA
     return ctx.measureText(String(txt == null ? "" : txt)).width;
   };
-  /* ⚠ Medir de menos corta datos; medir de más sólo deja aire. Por eso: el encabezado se mide en
-     MAYÚSCULA y con su `letter-spacing` (el CSS los aplica, el canvas no), todo se mide en negrita
-     (el código de cliente lo va), y la píldora del estado suma su borde y su padding propios. */
-  const w = cols.map(function (c) {
-    const hp = PGP_REF * 0.78, hTxt = String(c.head).toUpperCase();
-    const enc = ancho(hTxt, hp) + hTxt.length * hp * 0.04;
-    const aa = (c.textos || []).map(function (t) {
-      return ancho(t.t, t.em ? PGP_REF * t.em : PGP_REF);
-    }).sort(function (x, y) { return x - y; });
-    /* La columna del cliente se dimensiona por el PERCENTIL 90, no por el máximo. Un solo
-       "Coto C.I.C.S.A. Sucursal Lanus Centro (LK 801)" en 102 NP le comía el ancho a la columna y,
-       como el font sale de ahí, achicaba la letra de TODA la hoja por una fila. Ese 10 % largo
-       parte en dos renglones — que es para lo que la celda tiene `white-space:normal`. El resto de
-       las columnas (NP, zona, m³, estado) van por el máximo: son cortas y no se parten. */
-    const i = aa.length ? (c.flex ? Math.floor((aa.length - 1) * 0.90) : aa.length - 1) : -1;
-    const mx = Math.max(enc, i >= 0 ? aa[i] : 0);
-    return mx + PGP_REF * (PGP_PAD + (c.padEm || 0)) + 3;   // +3: borde y redondeo del layout
-  });
-  const tot = w.reduce(function (a, b) { return a + b; }, 0);
-  return {
-    // "que ΣT entre justo en el ancho de la página", con piso y techo de legibilidad
-    font: "clamp(10px, " + (PGP_REF * 100 * PGP_SEG / tot).toFixed(3) + "vw, 26px)",
-    anchos: w.map(function (x) { return (100 * x / tot).toFixed(3) + "%"; })
-  };
+  const hp = px * 0.80, hTxt = String(c.head).toUpperCase();
+  const enc = ancho(hTxt, hp) + hTxt.length * hp * 0.06;      // el CSS le pone letter-spacing
+  /* `t.p` = el texto partido en pedazos con tamaños distintos, que van en el MISMO renglón
+     (el nombre del cliente a 1em + su código a .86em). Medirlo todo junto al tamaño grande
+     inflaba la columna y hacía que un tercio de los nombres partiera en dos renglones. */
+  const aa = (c.textos || []).map(function (t) {
+    if (t.p) return t.p.reduce(function (a, q) { return a + ancho(q[0], px * q[1]); }, 0);
+    return ancho(t.t, t.em ? px * t.em : px);
+  }).sort(function (x, y) { return x - y; });
+  const pc = c.pct || 1;
+  const i = aa.length ? Math.floor((aa.length - 1) * pc) : -1;
+  const mx = Math.max(enc, i >= 0 ? aa[i] : 0);
+  return Math.ceil(mx + px * (PGP_PAD + (c.padEm || 0)) + PGP_BORDE);
 }
+function _pgpLayout(cols) {
+  const ff = (typeof getComputedStyle === "function" &&
+              getComputedStyle(document.body).fontFamily) || "Arial, sans-serif";
+  const ctx = document.createElement("canvas").getContext("2d");
+  let iFlex = -1;
+  cols.forEach(function (c, i) { if (c.flex && iFlex < 0) iFlex = i; });
+  let ultimo = null;
+  for (const orient of ["vert", "apa"]) {
+    for (const pt of PGP_PTS) {
+      const px = pt * PGP_PX_PT, util = PGP_UTIL[orient];
+      const w = cols.map(function (c) { return _pgpMedirCol(c, px, ctx, ff); });
+      const nat = w.reduce(function (a, b) { return a + b; }, 0);
+      ultimo = { pt: pt, px: px, apaisado: orient === "apa", anchos: w, natural: nat,
+                 total: nat, util: util, achicado: false };
+      if (nat > util) continue;
+      /* Lo que sobra va TODO a la columna del cliente, y sólo hasta lo que ella pide entera
+         (p100). No es estirar la tabla: es la única columna que parte en renglones, así que
+         cada px que se le da es un nombre que deja de partirse. Las demás siguen pegadas a su
+         dato, que es lo que pidió Thomas. */
+      if (iFlex >= 0 && nat < util) {
+        const lleno = _pgpMedirCol(Object.assign({}, cols[iFlex], { pct: 1 }), px, ctx, ff);
+        const da = Math.floor(Math.min(util - nat, Math.max(0, lleno - w[iFlex])));
+        if (da > 0) { w[iFlex] += da; ultimo.total = nat + da; }
+      }
+      return ultimo;
+    }
+  }
+  // Ni la apaisada a 15 pt: la columna del cliente absorbe lo que sobra (parte en renglones)
+  if (iFlex >= 0) {
+    const w = ultimo.anchos.slice();
+    const resto = ultimo.natural - w[iFlex];
+    const hueco = ultimo.util - resto;
+    w[iFlex] = Math.max(Math.round(ultimo.px * PGP_FLEX_MIN_EM), hueco);
+    ultimo = Object.assign({}, ultimo, { anchos: w, achicado: true,
+      total: w.reduce(function (a, b) { return a + b; }, 0) });
+  }
+  return ultimo;
+}
+/* El monto de una NP sale de `gv_ppp_np_valor` (valor A LISTA, sin IVA ni descuentos), que ya
+   carga `pppRefreshValor()` para el tablero de 6 días. No se recalcula acá. */
+function _pgaValorNp(np) {
+  if (!_pppValor) return null;
+  const v = _pppValor.get(_pppNpNorm(np));
+  return v ? v : null;
+}
+function _pgaValorTanda(t) {
+  let val = 0, sin = 0, hay = false;
+  for (const r of t.filas) {
+    const v = _pgaValorNp(r.np);
+    if (v) { hay = true; val += v.valor || 0; sin += v.sinPrecio || 0; }
+  }
+  return hay ? { valor: val, sinPrecio: sin } : null;
+}
+function _pgaValorDia(d) {
+  let val = 0, sin = 0, hay = false;
+  for (const t of d.tandasArr) {
+    const v = _pgaValorTanda(t);
+    if (v) { hay = true; val += v.valor; sin += v.sinPrecio; }
+  }
+  return hay ? { valor: val, sinPrecio: sin } : null;
+}
+/* En la hoja el monto va SIN el signo (está en el encabezado) y sin centavos: son 11 caracteres
+   contra 13, y en una columna que se repite en 150 renglones eso es ancho de papel. */
+function _pgpMonto(n) {
+  if (n == null) return "—";
+  return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
 /* La hoja. Todo desplegado: día → tanda → NP, sin el contenido de cada NP. */
 function pgaImprimirHtml(dias) {
   const hoy = new Date();
@@ -39220,26 +39312,29 @@ function pgaImprimirHtml(dias) {
     "/" + hoy.getFullYear() + " " + String(hoy.getHours()).padStart(2, "0") + ":" + String(hoy.getMinutes()).padStart(2, "0");
   const rango = dias.length === 1 ? _pgaDiaTxt(dias[0].key)
     : (_pgaDiaTxt(dias[0].key) + " a " + _pgaDiaTxt(dias[dias.length - 1].key));
-  let m3 = 0, nps = 0, tn = 0;
-  for (const d of dias) { m3 += d.m3; nps += d.nps; tn += d.tandasArr.length; }
-  let h = '<div class="pgp-h1">Programación de entregas — ' + escapeHtml(rango) + '</div>' +
-    '<div class="pgp-h2">' + _pppFmtM3(m3) + ' m³ · ' + tn + ' tanda' + (tn === 1 ? '' : 's') +
-    ' · ' + nps + ' NP · impreso el ' + cuando + '</div>';
+  let m3 = 0, nps = 0, tn = 0, plata = 0, hayPlata = false, sinPrecio = 0;
+  for (const d of dias) {
+    m3 += d.m3; nps += d.nps; tn += d.tandasArr.length;
+    const v = _pgaValorDia(d);
+    if (v) { hayPlata = true; plata += v.valor; sinPrecio += v.sinPrecio; }
+  }
   /* Una sola pasada arma las filas de todos los días y va juntando el texto para medir: los anchos
      tienen que ser LOS MISMOS en los 5 días, si no las columnas no alinean de hoja en hoja. */
-  const mNp = [{ t: "Total del día", b: true }], mCli = [], mLug = [], mM3 = [], mEst = [];
+  const mNp = [{ t: "Total del día" }], mCli = [], mLug = [], mM3 = [], mVal = [], mEst = [];
   const porDia = [];
   for (const d of dias) {
     const fil = [];
     for (const t of d.tandasArr) {
       const te = _pgaEstadoGrupo(t.est, t.nps), z = _pgaZonaTanda(t);
       const estTxt = t.nps + " NP · " + PGA_EST_TXT[te];
-      mNp.push({ t: t.tanda, b: true }); mLug.push({ t: z }); mM3.push({ t: _pppFmtM3(t.m3), b: true });
-      mEst.push({ t: estTxt, b: true });
+      const vt = _pgaValorTanda(t), vtTxt = _pgpMonto(vt ? vt.valor : null) + (vt && vt.sinPrecio ? " *" : "");
+      mNp.push({ t: t.tanda }); mLug.push({ t: z }); mM3.push({ t: _pppFmtM3(t.m3) });
+      mVal.push({ t: vtTxt }); mEst.push({ t: estTxt });
       fil.push('<tr class="pgp-t"><td>' + escapeHtml(t.tanda) + '</td><td></td>' +
         '<td>' + escapeHtml(z) + '</td>' +
         '<td class="n">' + _pppFmtM3(t.m3) + '</td>' +
-        '<td>' + escapeHtml(estTxt) + '</td></tr>');
+        '<td class="n">' + escapeHtml(vtTxt) + '</td>' +
+        '<td class="c">' + escapeHtml(estTxt) + '</td></tr>');
       for (const r of t.filas) {
         const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
         /* La zona ya la dice el renglón de la tanda: si la NP está en esa misma zona sólo va el
@@ -39249,118 +39344,65 @@ function pgaImprimirHtml(dias) {
           .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
         // Pedido de Luis: el código de cliente al lado del nombre, entre paréntesis.
         const cod = r.cod ? "(" + String(r.empresa || "LK").toUpperCase() + " " + r.cod + ")" : "";
-        const cli = (r.razon_social || "—") + (cod ? " " + cod : "");
         const hor = r.pide_horario ? aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja }) : "";
-        mNp.push({ t: String(r.np), b: true }); mCli.push({ t: cli }); mLug.push({ t: lug });
-        mM3.push({ t: _pppFmtM3(r.m3) }); mEst.push({ t: PGA_EST_TXT[est] });
+        const vn = _pgaValorNp(r.np), vnTxt = _pgpMonto(vn ? vn.valor : null) + (vn && vn.sinPrecio ? " *" : "");
+        mNp.push({ t: String(r.np) });
+        mCli.push({ p: [[r.razon_social || "—", 1], [cod ? " " + cod : "", PGP_COD_EM]] });
+        mLug.push({ t: lug });
+        mM3.push({ t: _pppFmtM3(r.m3) }); mVal.push({ t: vnTxt }); mEst.push({ t: PGA_EST_TXT[est] });
         if (hor) mCli.push({ t: "⏱ " + hor, em: 0.82 });
         fil.push('<tr class="pgp-np"><td><b>' + escapeHtml(String(r.np)) + '</b></td>' +
           '<td class="pgp-cli">' + escapeHtml(r.razon_social || "—") +
             (cod ? ' <span class="pgp-cod">' + escapeHtml(cod) + '</span>' : '') +
             (hor ? '<span class="pgp-hor">⏱ ' + escapeHtml(hor) + '</span>' : '') + '</td>' +
-          '<td>' + escapeHtml(lug) + '</td>' +
+          '<td class="pgp-lug">' + escapeHtml(lug) + '</td>' +
           '<td class="n">' + _pppFmtM3(r.m3) + '</td>' +
-          '<td><span class="pgp-est">' + PGA_EST_TXT[est] + '</span></td></tr>');
+          '<td class="n">' + escapeHtml(vnTxt) + '</td>' +
+          '<td class="c"><span class="pgp-est">' + PGA_EST_TXT[est] + '</span></td></tr>');
       }
     }
+    const vd = _pgaValorDia(d), vdTxt = _pgpMonto(vd ? vd.valor : null) + (vd && vd.sinPrecio ? " *" : "");
     fil.push('<tr class="pgp-tot"><td>Total del día</td><td></td><td></td>' +
-      '<td class="n">' + _pppFmtM3(d.m3) + '</td><td>' + d.nps + ' NP</td></tr>');
+      '<td class="n">' + _pppFmtM3(d.m3) + '</td>' +
+      '<td class="n">' + escapeHtml(vdTxt) + '</td>' +
+      '<td class="c">' + d.nps + ' NP</td></tr>');
     porDia.push(fil.join(""));
-    mM3.push({ t: _pppFmtM3(d.m3), b: true }); mEst.push({ t: d.nps + " NP", b: true });
+    mM3.push({ t: _pppFmtM3(d.m3) }); mVal.push({ t: vdTxt }); mEst.push({ t: d.nps + " NP" });
   }
-  const med = _pgpAnchos([
+  const lay = _pgpLayout([
     { head: "Tanda / NP", textos: mNp },
-    { head: "Cliente (cód)", textos: mCli, flex: true, min: 150 },
-    { head: "Zona · barrio", textos: mLug },
+    { head: "Cliente (cód)", textos: mCli, flex: true, pct: 0.75 },
+    { head: "Zona · barrio", textos: mLug, pct: 0.92 },
     { head: "m³", textos: mM3 },
-    { head: "Estado", textos: mEst, padEm: 0.8 }   // la píldora `.pgp-est` tiene borde y padding propios
+    { head: "Monto $", textos: mVal },
+    { head: "Estado", textos: mEst, padEm: 0.5 }   // la píldora `.pgp-est` tiene padding propio
   ]);
-  const an = med.anchos, estilo = ' style="font-size:' + med.font + '"';
-  const cg = '<colgroup>' + an.map(function (x) { return '<col style="width:' + x + '">'; }).join("") + '</colgroup>';
+  const cg = '<colgroup>' + lay.anchos.map(function (x) { return '<col style="width:' + x + 'px">'; }).join("") + '</colgroup>';
   const th = '<thead><tr><th>Tanda / NP</th><th>Cliente (cód)</th><th>Zona · barrio</th>' +
-    '<th class="n">m³</th><th>Estado</th></tr></thead>';
+    '<th>m³</th><th>Monto $</th><th>Estado</th></tr></thead>';
+  const estilo = ' style="font-size:' + lay.pt + 'pt;width:' + lay.total + 'px"';
+  /* El `@page` de la hoja se escribe acá, no en el CSS fijo: la orientación la decide la medición.
+     Un `<style>` aplica al documento entero aunque su contenedor esté en `display:none`. */
+  let h = '<style id="pgpPageCss">@page{ size:A4 ' + (lay.apaisado ? "landscape" : "portrait") +
+    '; margin:12mm 10mm; }</style>';
+  h += '<div class="pgp-h1" style="font-size:' + (lay.pt + 3) + 'pt">Programación de entregas — ' +
+    escapeHtml(rango) + '</div>' +
+    '<div class="pgp-h2" style="font-size:' + (lay.pt - 4) + 'pt">' + _pppFmtM3(m3) + ' m³ · ' +
+    tn + ' tanda' + (tn === 1 ? '' : 's') + ' · ' + nps + ' NP' +
+    (hayPlata ? ' · $ ' + _pgpMonto(plata) : '') + ' · impreso el ' + cuando +
+    (hayPlata ? '<br>Monto = valor de lista, sin IVA ni descuentos' +
+      (sinPrecio ? '. Un * marca el pedido que tiene algún artículo sin precio cargado.' : '.') : '') +
+    '</div>';
   dias.forEach(function (d, i) {
-    h += '<div class="pgp-dia"><h3>' + escapeHtml(_pgaDiaTxt(d.key)) +
-      '<small>' + _pppFmtM3(d.m3) + ' m³ · ' + d.tandasArr.length + ' tanda' +
-      (d.tandasArr.length === 1 ? '' : 's') + ' · ' + d.nps + ' NP</small></h3>' +
+    const vd = _pgaValorDia(d);
+    h += '<div class="pgp-dia"><h3 style="font-size:' + (lay.pt + 1) + 'pt">' + escapeHtml(_pgaDiaTxt(d.key)) +
+      '<small style="font-size:' + (lay.pt - 3) + 'pt">' + _pppFmtM3(d.m3) + ' m³ · ' + d.tandasArr.length + ' tanda' +
+      (d.tandasArr.length === 1 ? '' : 's') + ' · ' + d.nps + ' NP' +
+      (vd ? ' · $ ' + _pgpMonto(vd.valor) : '') + '</small></h3>' +
       '<table class="pgp-tab"' + estilo + '>' + cg + th + '<tbody>' + porDia[i] + '</tbody></table></div>';
   });
   return h;
 }
-/* ═══ v20.52 (Thomas) — EL MISMO POP-UP BAJA EXCEL ══════════════════════════
-   Pedido: *"dentro del botón de imprimir, dejame imprimir o descargar excel"*. Los días se
-   eligen una sola vez y de ahí salen las dos cosas.
-
-   El papel va en árbol (día → tanda → NP) porque se lee de arriba a abajo; el Excel va
-   PLANO, una fila por NP con el día y la tanda repetidos en cada fila. Un árbol en Excel no se
-   filtra ni se ordena, que es para lo único que sirve bajarlo.
-
-   Se arma con `_facXlsxBlob`, el mismo .xlsx a mano (ZIP + XML, sin librería) que ya usa
-   Facturación: `vendor/xlsx.full.min.js` NO está en el repo, así que SheetJS no es opción.
-   ⚠ Los m³ van con PUNTO decimal a propósito: así Excel los toma como número y los suma
-   (`_facHojaXml` manda a texto todo lo que no matchee `^-?\d+(\.\d+)?$`). La coma la pone
-   Excel al mostrarlos, según el idioma de la máquina. */
-function _pgaXlsFilas(dias) {
-  const enc = ["Fecha", "Día", "Tanda", "Zona de la tanda", "NP", "Cliente", "Empresa",
-    "Cód cliente", "Zona · barrio", "Provincia destino", "Expreso", "Horario", "m³",
-    "Estado", "Salió"];
-  const filas = [enc];
-  for (const d of dias) {
-    const dTxt = _pgaDiaTxt(d.key);
-    const fec = d.key.slice(6, 8) + "/" + d.key.slice(4, 6) + "/" + d.key.slice(0, 4);
-    for (const t of d.tandasArr) {
-      const zt = _pgaZonaTanda(t);
-      for (const r of t.filas) {
-        const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
-        const zn = String(r.zona_corta || r.localidad || "").trim();
-        const lug = [zn, r.barrio || ""]
-          .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
-        const dst = _pgaDestDe(r) || {};
-        filas.push([fec, dTxt, t.tanda, zt, String(r.np),
-          r.razon_social || "", String(r.empresa || "").toUpperCase(), r.cod ? String(r.cod) : "",
-          lug, dst.provincia || "", dst.expreso || "",
-          r.pide_horario ? aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja }) : "",
-          (Number(r.m3) || 0).toFixed(3), PGA_EST_TXT[est], _pgaSalio(r) ? "Sí" : ""]);
-      }
-    }
-  }
-  return filas;
-}
-function _pgaXlsResumen(dias) {
-  const filas = [["Día", "Fecha", "m³", "Tandas", "NP"]];
-  let m3 = 0, tn = 0, nps = 0;
-  for (const d of dias) {
-    m3 += d.m3; tn += d.tandasArr.length; nps += d.nps;
-    filas.push([_pgaDiaTxt(d.key),
-      d.key.slice(6, 8) + "/" + d.key.slice(4, 6) + "/" + d.key.slice(0, 4),
-      (Number(d.m3) || 0).toFixed(3), String(d.tandasArr.length), String(d.nps)]);
-  }
-  filas.push(["TOTAL", "", m3.toFixed(3), String(tn), String(nps)]);
-  return filas;
-}
-function pgaImprimirExcel() {
-  if (!_pgi) return;
-  const dias = _pgi.dias.filter(function (d) { return _pgi.sel[d.key]; });
-  if (!dias.length) return;
-  const nom = "Programacion_" + dias[0].key +
-    (dias.length > 1 ? "_a_" + dias[dias.length - 1].key : "") + ".xlsx";
-  try {
-    const blob = _facXlsxBlob([
-      { nombre: "Programación", filas: _pgaXlsFilas(dias) },
-      { nombre: "Resumen", filas: _pgaXlsResumen(dias) }
-    ]);
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = nom;
-    document.body.appendChild(a); a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-  } catch (e) {
-    alert("No se pudo armar el Excel: " + (e && e.message ? e.message : e));
-    return;
-  }
-  pgaImprimirCerrar();
-}
-
 function pgaImprimirHacer() {
   if (!_pgi) return;
   const dias = _pgi.dias.filter(function (d) { return _pgi.sel[d.key]; });
@@ -39371,6 +39413,316 @@ function pgaImprimirHacer() {
   pgaImprimirCerrar();
   // el pop-up se cierra ANTES de imprimir; si no, sale en la hoja
   setTimeout(function () { try { window.print(); } catch (_e) {} }, 60);
+}
+
+/* ═══ v20.57 (Thomas) — EL EXCEL CON FORMATO, NO UNA GRILLA PELADA ═══════════════════════
+   Pedido: *"misma idea, tabla optimizada, fuente grande, mínimo espacio entre columnas
+   (doble fila de encabezados, etc)"*.
+
+   La v20.52 bajaba el .xlsx con `_facXlsxBlob`, el armador de Facturación: un ZIP con los XML
+   mínimos y **sin `styles.xml`**, o sea sin fuente, sin bordes, sin anchos y sin formato de
+   número. `_facXlsxBlob` NO se toca —lo que baja va a ISIS y su formato es contrato—: acá va
+   un armador propio que agrega lo que esta hoja necesita.
+
+   Lo que trae de más, y por qué cada cosa:
+     · **Arial 14** en todo (18 en el título): es la "fuente grande" del pedido. El ancho de
+       columna de Excel se cuenta en caracteres DE LA FUENTE NORMAL del libro, así que con la
+       14 declarada como fuente 0 los anchos calculados acá valen tal cual.
+     · **Doble fila de encabezados**: una de grupo (ENTREGA · TANDA · PEDIDO · DESTINO ·
+       TOTALES · ESTADO) con celdas combinadas, y abajo la de columnas.
+     · **Ancho por dato** (p95 + 1,2 caracteres), no el default de 8,43: "mínimo espacio entre
+       columnas".
+     · **Panel inmovilizado** bajo el encabezado y **autofiltro** en la fila de columnas: sin
+       eso una tabla de 150 NP se lee igual de mal que en papel.
+     · **Formato de número**: m³ con 3 decimales, monto con separador de miles, fecha como
+       FECHA de verdad (serial) — así Excel ordena y filtra por fecha, no por texto.
+   ⚠ El orden de los elementos adentro de `<worksheet>` lo fija el esquema: cols → sheetData →
+   autoFilter → mergeCells. Cambiarlo hace que Excel diga que el archivo está dañado. */
+const PGX_FUENTE = 14;                 // pt del cuerpo (Arial). El título va a 18.
+/* Los estilos son un juego fijo; el índice es el `s` de cada celda. */
+const PGX_S = { base: 0, titulo: 1, sub: 2, grupo: 3, enc: 4, txt: 5, cen: 6, m3: 7, money: 8,
+                ent: 9, fecha: 10, totTxt: 11, totM3: 12, totMoney: 13, totEnt: 14, tanda: 15 };
+function _pgxStyles() {
+  const f = function (b, sz, color) {
+    return "<font>" + (b ? "<b/>" : "") + '<sz val="' + sz + '"/>' +
+      (color ? '<color rgb="' + color + '"/>' : "") + '<name val="Arial"/><family val="2"/></font>';
+  };
+  const fill = function (rgb) {
+    return '<fill><patternFill patternType="solid"><fgColor rgb="' + rgb +
+      '"/><bgColor indexed="64"/></patternFill></fill>';
+  };
+  // xf(numFmt, font, fill, borde, alineación)
+  const xf = function (n, fo, fi, bo, al) {
+    return '<xf numFmtId="' + n + '" fontId="' + fo + '" fillId="' + fi + '" borderId="' + bo +
+      '" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">' +
+      '<alignment ' + al + '/></xf>';
+  };
+  const V = 'vertical="center"';
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<numFmts count="3">' +
+      '<numFmt numFmtId="164" formatCode="#,##0.000"/>' +
+      '<numFmt numFmtId="165" formatCode="#,##0"/>' +
+      '<numFmt numFmtId="166" formatCode="dd/mm/yyyy"/>' +
+    '</numFmts>' +
+    '<fonts count="5">' + f(false, PGX_FUENTE) + f(true, PGX_FUENTE) +
+      f(true, PGX_FUENTE, "FFFFFFFF") + f(true, 18) + f(false, 11, "FF555555") + '</fonts>' +
+    '<fills count="5"><fill><patternFill patternType="none"/></fill>' +
+      '<fill><patternFill patternType="gray125"/></fill>' +
+      fill("FF1E40AF") + fill("FFE2E8F0") + fill("FFF1F5F9") + '</fills>' +
+    '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+      '<border><left style="thin"><color rgb="FF94A3B8"/></left>' +
+      '<right style="thin"><color rgb="FF94A3B8"/></right>' +
+      '<top style="thin"><color rgb="FF94A3B8"/></top>' +
+      '<bottom style="thin"><color rgb="FF94A3B8"/></bottom><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="16">' +
+      xf(0, 0, 0, 0, V) +                                      // 0 base
+      xf(0, 3, 0, 0, 'horizontal="left" ' + V) +               // 1 título
+      xf(0, 4, 0, 0, 'horizontal="left" ' + V) +               // 2 subtítulo
+      xf(0, 2, 2, 1, 'horizontal="center" ' + V) +             // 3 encabezado de grupo
+      xf(0, 1, 3, 1, 'horizontal="center" ' + V + ' wrapText="1"') +  // 4 encabezado de columna
+      xf(0, 0, 0, 1, 'horizontal="left" ' + V) +               // 5 texto
+      xf(0, 0, 0, 1, 'horizontal="center" ' + V) +             // 6 centrado
+      xf(164, 0, 0, 1, 'horizontal="right" ' + V) +            // 7 m³
+      xf(165, 0, 0, 1, 'horizontal="right" ' + V) +            // 8 monto
+      xf(0, 0, 0, 1, 'horizontal="center" ' + V) +             // 9 entero/centrado
+      xf(166, 0, 0, 1, 'horizontal="center" ' + V) +           // 10 fecha
+      xf(0, 1, 4, 1, 'horizontal="left" ' + V) +               // 11 total texto
+      xf(164, 1, 4, 1, 'horizontal="right" ' + V) +            // 12 total m³
+      xf(165, 1, 4, 1, 'horizontal="right" ' + V) +            // 13 total monto
+      xf(0, 1, 4, 1, 'horizontal="center" ' + V) +             // 14 total entero
+      xf(0, 1, 0, 1, 'horizontal="left" ' + V) +               // 15 renglón de tanda (negrita)
+    '</cellXfs>' +
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+    '</styleSheet>';
+}
+function _pgxEsc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+/* Excel cuenta los días desde el 1899-12-30 (el bug del año bisiesto de Lotus incluido). */
+function _pgxSerialFecha(k) {
+  const y = +String(k).slice(0, 4), m = +String(k).slice(4, 6), d = +String(k).slice(6, 8);
+  if (!y || !m || !d) return null;
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000);
+}
+/* hoja = { nombre, cols:[ancho], filas:[[celda…]], merges:[], congelar:n, filtro:"A4:Q4" }
+   celda = null | { v, s, n:true si es número } */
+function _pgxHojaXml(h) {
+  const filas = h.filas.map(function (f, ri) {
+    const celdas = f.map(function (c, ci) {
+      if (c == null) return "";
+      const ref = _facColLetra(ci) + (ri + 1);
+      const s = ' s="' + (c.s == null ? 0 : c.s) + '"';
+      if (c.n) return '<c r="' + ref + '"' + s + '><v>' + (Number(c.v) || 0) + "</v></c>";
+      if (c.v === "" || c.v == null) return '<c r="' + ref + '"' + s + "/>";
+      return '<c r="' + ref + '"' + s + ' t="inlineStr"><is><t xml:space="preserve">' +
+        _pgxEsc(c.v) + "</t></is></c>";
+    }).join("");
+    return '<row r="' + (ri + 1) + '"' + (h.altos && h.altos[ri] ?
+      ' ht="' + h.altos[ri] + '" customHeight="1"' : "") + ">" + celdas + "</row>";
+  }).join("");
+  const cols = (h.cols || []).map(function (w, i) {
+    return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w.toFixed(2) +
+      '" customWidth="1"/>';
+  }).join("");
+  const cong = h.congelar ? '<pane ySplit="' + h.congelar + '" topLeftCell="A' + (h.congelar + 1) +
+    '" activePane="bottomLeft" state="frozen"/>' +
+    '<selection pane="bottomLeft" activeCell="A' + (h.congelar + 1) + '" sqref="A' + (h.congelar + 1) + '"/>' : "";
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<sheetViews><sheetView workbookViewId="0">' + cong + "</sheetView></sheetViews>" +
+    '<sheetFormatPr defaultRowHeight="19"/>' +
+    (cols ? "<cols>" + cols + "</cols>" : "") +
+    "<sheetData>" + filas + "</sheetData>" +
+    (h.filtro ? '<autoFilter ref="' + h.filtro + '"/>' : "") +
+    ((h.merges && h.merges.length) ? '<mergeCells count="' + h.merges.length + '">' +
+      h.merges.map(function (m) { return '<mergeCell ref="' + m + '"/>'; }).join("") + "</mergeCells>" : "") +
+    '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>' +
+    "</worksheet>";
+}
+function _pgxBlob(hojas) {
+  const arch = [
+    { nombre: "[Content_Types].xml", texto: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+      hojas.map(function (h, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") +
+      "</Types>" },
+    { nombre: "_rels/.rels", texto: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+      "</Relationships>" },
+    { nombre: "xl/workbook.xml", texto: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+      hojas.map(function (h, i) { return '<sheet name="' + _pgxEsc(h.nombre) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") +
+      "</sheets></workbook>" },
+    { nombre: "xl/_rels/workbook.xml.rels", texto: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      hojas.map(function (h, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+      '<Relationship Id="rId' + (hojas.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+      "</Relationships>" },
+    { nombre: "xl/styles.xml", texto: _pgxStyles() }
+  ];
+  hojas.forEach(function (h, i) { arch.push({ nombre: "xl/worksheets/sheet" + (i + 1) + ".xml", texto: _pgxHojaXml(h) }); });
+  return new Blob([_facZip(arch)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+/* El ancho de columna = el dato más largo (p95, para que un outlier no estire la columna),
+   más 1,2 caracteres de aire. En unidades de Excel, que son caracteres de la fuente normal. */
+function _pgxAnchos(filas, desde, min) {
+  const n = filas.reduce(function (a, f) { return Math.max(a, f.length); }, 0);
+  const out = [];
+  for (let c = 0; c < n; c++) {
+    const largos = [];
+    for (let r = desde; r < filas.length; r++) {
+      const cel = filas[r][c];
+      const v = cel == null ? "" : cel.v;
+      largos.push(String(v == null ? "" : (cel.n && cel.s === PGX_S.money
+        ? _pgpMonto(v) : v)).length);
+    }
+    largos.sort(function (a, b) { return a - b; });
+    const p95 = largos.length ? largos[Math.floor((largos.length - 1) * 0.95)] : 0;
+    out.push(Math.max(min[c] || 6, Math.min(p95 + 1.2, 42)));
+  }
+  return out;
+}
+
+/* Los grupos de la primera fila de encabezados: [título, cuántas columnas ocupa]. */
+const PGX_GRUPOS = [["ENTREGA", 2], ["TANDA", 2], ["PEDIDO", 4], ["DESTINO", 4],
+                    ["TOTALES", 3], ["ESTADO", 2]];
+const PGX_COLS = ["Fecha", "Día", "Tanda", "Zona de la tanda", "NP", "Cliente", "Emp",
+  "Cód cliente", "Zona · barrio", "Provincia destino", "Expreso", "Horario",
+  "m³", "Monto $ (lista)", "Art. s/precio", "Estado", "Salió"];
+function _pgaXlsHojaDetalle(dias) {
+  const S = PGX_S, filas = [], merges = [], anchoMin = [11, 11, 8, 12, 10, 18, 6, 8, 14, 12, 10, 12, 8, 14, 8, 11, 7];
+  const ncol = PGX_COLS.length, ultima = _facColLetra(ncol - 1);
+  const rango = dias.length === 1 ? _pgaDiaTxt(dias[0].key)
+    : (_pgaDiaTxt(dias[0].key) + " a " + _pgaDiaTxt(dias[dias.length - 1].key));
+  let m3 = 0, nps = 0, tn = 0, plata = 0, sinP = 0;
+  for (const d of dias) {
+    m3 += d.m3; nps += d.nps; tn += d.tandasArr.length;
+    const v = _pgaValorDia(d); if (v) { plata += v.valor; sinP += v.sinPrecio; }
+  }
+  const vacia = function (s) { const f = []; for (let i = 0; i < ncol; i++) f.push({ v: "", s: s }); return f; };
+  // 1 · título   2 · subtítulo   3 · grupos   4 · columnas
+  let f = vacia(S.titulo); f[0] = { v: "Programación de entregas — " + rango, s: S.titulo };
+  filas.push(f); merges.push("A1:" + ultima + "1");
+  f = vacia(S.sub);
+  f[0] = { v: _pppFmtM3(m3) + " m³ · " + tn + " tanda" + (tn === 1 ? "" : "s") + " · " + nps +
+    " NP · $ " + _pgpMonto(plata) + " a valor de lista (sin IVA ni descuentos)" +
+    (sinP ? " · hay artículos sin precio cargado, ver «Art. s/precio»" : ""), s: S.sub };
+  filas.push(f); merges.push("A2:" + ultima + "2");
+  f = []; let c0 = 0;
+  for (const g of PGX_GRUPOS) {
+    f.push({ v: g[0], s: S.grupo });
+    for (let i = 1; i < g[1]; i++) f.push({ v: "", s: S.grupo });
+    if (g[1] > 1) merges.push(_facColLetra(c0) + "3:" + _facColLetra(c0 + g[1] - 1) + "3");
+    c0 += g[1];
+  }
+  filas.push(f);
+  filas.push(PGX_COLS.map(function (t) { return { v: t, s: S.enc }; }));
+  for (const d of dias) {
+    const dTxt = _pgaDiaTxt(d.key), ser = _pgxSerialFecha(d.key);
+    for (const t of d.tandasArr) {
+      const zt = _pgaZonaTanda(t);
+      for (const r of t.filas) {
+        const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
+        const zn = String(r.zona_corta || r.localidad || "").trim();
+        const lug = [zn, r.barrio || ""]
+          .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
+        const dst = _pgaDestDe(r) || {}, vn = _pgaValorNp(r.np);
+        filas.push([
+          { v: ser, s: S.fecha, n: true }, { v: dTxt, s: S.txt },
+          { v: t.tanda, s: S.cen }, { v: zt, s: S.txt },
+          { v: String(r.np), s: S.txt }, { v: r.razon_social || "", s: S.txt },
+          { v: String(r.empresa || "").toUpperCase(), s: S.cen },
+          { v: r.cod ? String(r.cod) : "", s: S.cen },
+          { v: lug, s: S.txt }, { v: dst.provincia || "", s: S.txt },
+          { v: dst.expreso || "", s: S.txt },
+          { v: r.pide_horario ? aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja }) : "", s: S.txt },
+          { v: Math.round((Number(r.m3) || 0) * 1000) / 1000, s: S.m3, n: true },
+          vn ? { v: vn.valor, s: S.money, n: true } : { v: "", s: S.money },
+          { v: vn && vn.sinPrecio ? vn.sinPrecio : "", s: S.ent, n: !!(vn && vn.sinPrecio) },
+          { v: PGA_EST_TXT[est], s: S.cen }, { v: _pgaSalio(r) ? "Sí" : "", s: S.cen }
+        ]);
+      }
+    }
+  }
+  // el cierre: una sola fila de totales, para que el número no haya que sacarlo a mano
+  f = vacia(S.totTxt);
+  f[0] = { v: "TOTAL", s: S.totTxt };
+  f[12] = { v: Math.round(m3 * 1000) / 1000, s: S.totM3, n: true };
+  f[13] = { v: plata, s: S.totMoney, n: true };
+  f[14] = { v: sinP || "", s: S.totEnt, n: !!sinP };
+  f[15] = { v: nps + " NP", s: S.totEnt };
+  filas.push(f);
+  return { nombre: "Programación", filas: filas, merges: merges, congelar: 4,
+    filtro: "A4:" + ultima + "4", altos: { 0: 26 },
+    cols: _pgxAnchos(filas, 3, anchoMin) };
+}
+function _pgaXlsHojaTandas(dias) {
+  const S = PGX_S;
+  const enc = ["Fecha", "Día", "Tanda", "Zona", "NP", "m³", "Monto $ (lista)", "Estado"];
+  const filas = [enc.map(function (t) { return { v: t, s: S.enc }; })];
+  let m3 = 0, nps = 0, plata = 0, tn = 0;
+  for (const d of dias) {
+    const dTxt = _pgaDiaTxt(d.key), ser = _pgxSerialFecha(d.key);
+    for (const t of d.tandasArr) {
+      const v = _pgaValorTanda(t), te = _pgaEstadoGrupo(t.est, t.nps);
+      m3 += t.m3; nps += t.nps; tn++; if (v) plata += v.valor;
+      filas.push([{ v: ser, s: S.fecha, n: true }, { v: dTxt, s: S.txt },
+        { v: t.tanda, s: S.cen }, { v: _pgaZonaTanda(t), s: S.txt },
+        { v: t.nps, s: S.ent, n: true }, { v: Math.round((Number(t.m3) || 0) * 1000) / 1000, s: S.m3, n: true },
+        v ? { v: v.valor, s: S.money, n: true } : { v: "", s: S.money },
+        { v: PGA_EST_TXT[te], s: S.cen }]);
+    }
+  }
+  filas.push([{ v: "TOTAL", s: S.totTxt }, { v: "", s: S.totTxt },
+    { v: tn + " tandas", s: S.totEnt }, { v: "", s: S.totTxt },
+    { v: nps, s: S.totEnt, n: true }, { v: Math.round(m3 * 1000) / 1000, s: S.totM3, n: true },
+    { v: plata, s: S.totMoney, n: true }, { v: "", s: S.totTxt }]);
+  return { nombre: "Tandas", filas: filas, congelar: 1, filtro: "A1:H1",
+    cols: _pgxAnchos(filas, 0, [11, 11, 8, 12, 6, 8, 14, 11]) };
+}
+function _pgaXlsHojaDias(dias) {
+  const S = PGX_S;
+  const enc = ["Fecha", "Día", "Tandas", "NP", "m³", "Monto $ (lista)"];
+  const filas = [enc.map(function (t) { return { v: t, s: S.enc }; })];
+  let m3 = 0, nps = 0, plata = 0, tn = 0;
+  for (const d of dias) {
+    const v = _pgaValorDia(d);
+    m3 += d.m3; nps += d.nps; tn += d.tandasArr.length; if (v) plata += v.valor;
+    filas.push([{ v: _pgxSerialFecha(d.key), s: S.fecha, n: true }, { v: _pgaDiaTxt(d.key), s: S.txt },
+      { v: d.tandasArr.length, s: S.ent, n: true }, { v: d.nps, s: S.ent, n: true },
+      { v: Math.round((Number(d.m3) || 0) * 1000) / 1000, s: S.m3, n: true },
+      v ? { v: v.valor, s: S.money, n: true } : { v: "", s: S.money }]);
+  }
+  filas.push([{ v: "TOTAL", s: S.totTxt }, { v: "", s: S.totTxt }, { v: tn, s: S.totEnt, n: true },
+    { v: nps, s: S.totEnt, n: true }, { v: Math.round(m3 * 1000) / 1000, s: S.totM3, n: true },
+    { v: plata, s: S.totMoney, n: true }]);
+  return { nombre: "Resumen", filas: filas, congelar: 1,
+    cols: _pgxAnchos(filas, 0, [11, 11, 8, 6, 8, 14]) };
+}
+function pgaImprimirExcel() {
+  if (!_pgi) return;
+  const dias = _pgi.dias.filter(function (d) { return _pgi.sel[d.key]; });
+  if (!dias.length) return;
+  const nom = "Programacion_" + dias[0].key +
+    (dias.length > 1 ? "_a_" + dias[dias.length - 1].key : "") + ".xlsx";
+  try {
+    const blob = _pgxBlob([_pgaXlsHojaDetalle(dias), _pgaXlsHojaTandas(dias), _pgaXlsHojaDias(dias)]);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = nom;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  } catch (e) {
+    alert("No se pudo armar el Excel: " + (e && e.message ? e.message : e));
+    return;
+  }
+  pgaImprimirCerrar();
 }
 
 function _pppPlanGridHtml(programados) {
@@ -41073,7 +41425,7 @@ function pppAlertBadgeUpdate() {
 }
 
 /* ═══ v20.55 (Luis, 2026-09-21) — EL BADGE DE LA PPP DICE QUÉ SON ════════════════
-   Pedido: *"el �4� del badge qué significa? Debería tener más info"*.
+   Pedido: *"el «4» del badge qué significa? Debería tener más info"*.
 
    El desglose ya existía, pero **sólo en el `title`**: un tooltip que en la práctica no se ve
    — en el monitor táctil directamente no existe, y en la compu hay que adivinar que está ahí.
