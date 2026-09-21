@@ -1556,7 +1556,7 @@ queda en `null` y se vuelve a pedir; con los pedidos cargados y sin retenidos, `
 **Al agregar un lote nuevo de este tipo, usar `clinVacio`.** Es el mismo pozo de §*"una lectura
 ROTA no es un CERO"*. Problema 474.
 
-### La espera va en «Qué sigue», en día · hora · minuto (v20.74, Luis)
+### La espera va en «Qué sigue», en día · hora · minuto (v20.75, Luis)
 
 *"la espera debería estar incluida en el «Que sigue» y debería ser en formato de dia, hora,
 minuto"*. No es sólo cosmético: el formato viejo (`6d 3h`) **escondía los minutos justo cuando

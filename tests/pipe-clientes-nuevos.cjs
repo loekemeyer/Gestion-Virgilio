@@ -148,7 +148,7 @@ if (/function pipeRecargar\(\) \{ _apr\.pipe = null;/.test(html))
   fallos.push("pipeRecargar borra el mapa: el timer desaparece hasta que vuelve la RPC");
 
 /* ── 13. la espera va en «Qué sigue» y en día · hora · minuto ────────────────────────── */
-// v20.74 (Luis): "la espera debería estar incluida en el «Que sigue» y debería ser en formato
+// v20.75 (Luis): "la espera debería estar incluida en el «Que sigue» y debería ser en formato
 // de dia, hora, minuto". El formato viejo ("6d 3h") escondía los minutos justo cuando se está
 // por vencer el plazo.
 if (/<th>Espera<\/th>/.test(html))
