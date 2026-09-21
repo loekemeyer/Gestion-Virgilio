@@ -26107,3 +26107,40 @@ ahora dice *"N clientes / M comprobantes"* — si M es 0, el archivo no es el Cr
 **Rollback:** `drop view public.gv_cuarentena_deuda_sucursal;
 drop function public.gv_cuarentena_deuda_detalle_cargar(text,jsonb,text);
 drop table public."GV_Cuarentena_Deuda_Detalle";` (y revertir el commit del front).
+
+### §3.ku — v20.36: la deuda por sucursal se cruza por NP↔FC, no por el remito — 2026-09-21
+
+**Luis, sobre la cadena de la v20.35:** *"la idea del remito no sirve. Tenemos los datos de las
+direcciones de los pedidos de acá en adelante… cruzás NP con FC, de ahí sacás dirección, de ahí
+sacás deuda por sucursal"*. Tiene razón, y el cruce ya estaba hecho.
+
+| camino | NP que resuelve |
+|---|---|
+| **`GV_Cruce_FC_Asig`** (el que usa `gv_vista_cruce_facturacion`) | **923** |
+| `GV_NP_Remito` (el de la v20.35) | 101 |
+
+Y el remito **no aporta ni una NP propia**: de las 114 que lo tienen cargado, las **114** están
+también en el cruce. Se saca de la cadena.
+
+**Cadena nueva:** `comprobante del Excel → factura de ISIS (comp_key) → GV_Cruce_FC_Asig → NP →
+GV_NP_Sucursal`.
+
+**Probada de verdad** (563 facturas LK de 45 días cargadas como detalle de prueba, lote
+`__PRUEBA__`, y borradas después):
+
+| estado_cadena | filas |
+|---|---|
+| **ok** (llega a la dirección) | **244** |
+| NP sin sucursal registrada | 223 |
+| factura sin NP asignada | 96 |
+| **sin factura parseada** | **0** |
+
+Ese 0 es lo que valida el normalizador `gv_comprobante_key`: el comprobante cruza contra la
+factura el 100 % de las veces. Los otros dos escalones se llenan solos — `GV_NP_Sucursal` arrancó
+hoy y el cruce FC se asigna al facturar.
+
+⚠ **DROP + CREATE, no `create or replace`**: se va la columna `remito_ref` y Postgres no deja
+sacar columnas de una vista. Sin dependientes (medido con el recursivo de `pg_depend`), y el
+`security_invoker` se repuso después del CREATE.
+
+`sql/gv_cuarentena_deuda_detalle_v2036.sql`.
