@@ -1,3 +1,41 @@
+## Nota v20.52 (2026-09-21) — El botón de Imprimir de la Programación también baja Excel
+
+Thomas: *"dentro del botón de imprimir. dejame imprimir o descargar excel"*.
+
+**Dónde:** el mismo pop-up de `🖨 Imprimir` (`#pgiModal`, v17.98). Se eligen los días **una sola
+vez** —los mismos checkboxes, el mismo rango Desde/Hasta, el mismo `Todos` / `Ninguno`— y de ahí
+salen las dos cosas: `⬇ Excel` (verde) y `🖨 Imprimir N días` (azul). Con cero días tildados quedan
+deshabilitados **los dos**.
+
+**El Excel NO es la hoja de papel en otro envase: va PLANO.** El papel sale en árbol (día → tanda
+→ NP) porque se lee de arriba a abajo; el Excel lleva **una fila por NP**, con el día y la tanda
+repetidos en cada fila. Un árbol en Excel no se filtra ni se ordena, que es para lo único que
+sirve bajarlo.
+
+**Columnas** (hoja `Programación`): Fecha · Día · Tanda · Zona de la tanda · NP · Cliente ·
+Empresa · Cód cliente · Zona · barrio · **Provincia destino** · Expreso · Horario · m³ · Estado ·
+Salió. Segunda hoja `Resumen`: un renglón por día (m³ / tandas / NP) y el TOTAL.
+
+Tres decisiones que no son obvias:
+
+- **El cód de cliente va en su propia columna, con la empresa al lado.** En papel va pegado al
+  nombre entre paréntesis porque ahí se lee; en Excel, separado, se filtra. Y va con la empresa
+  porque la clave de un cliente es **`(empresa, cod)`** — el mismo número es de dos clientes
+  distintos el 99 % de las veces que coincide entre LK y Chef.
+- **La provincia de destino sale como columna propia** (v20.45: la zona es dónde va el camión, el
+  destino es otra cosa). Si no se pudo resolver queda **vacía**, no se inventa.
+- **Los m³ van con PUNTO decimal.** `_facHojaXml` manda a texto todo lo que no matchee
+  `^-?\d+(\.\d+)?$`, así que con coma Excel los tomaría como texto y no los sumaría. La coma la
+  pone Excel al mostrarlos, según el idioma de la máquina.
+
+**Con qué se arma:** `_facXlsxBlob`, el mismo .xlsx a mano (ZIP + XMLs, método *stored*, sin
+deflate) que ya usa Facturación para ISIS. **SheetJS no es opción**: `pppLoadXlsx` busca
+`vendor/xlsx.full.min.js` y ese archivo NO está en el repo.
+
+Funciones nuevas: `pgaImprimirExcel`, `_pgaXlsFilas`, `_pgaXlsResumen`. Lo sostiene
+`tests/pga-excel.cjs` (29 chequeos, incluido que el archivo bajado empiece con `PK\x03\x04`);
+`tests/pga-imprimir.cjs` sigue verde y fija que el papel no cambió.
+
 ## Nota v20.23 (2026-09-18) — El cartel salta con UNA, lleva los m³, y ahora también está en la PPP
 
 Thomas, sobre las tres puntas abiertas: **dale · dale · sale**.

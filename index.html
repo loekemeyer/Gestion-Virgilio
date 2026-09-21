@@ -3630,6 +3630,9 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pgi-no{ background:#eef2f7; color:#0f172a; }
 .pgi-si{ background:#1e6bd6; color:#fff; }
 .pgi-si:disabled{ background:#e5e7eb; color:#9ca3af; cursor:not-allowed; }
+/* v20.52 (Thomas): el mismo pop-up baja Excel. Verde = "se descarga", azul = "sale por papel". */
+.pgi-xls{ background:#dcfce7; color:#166534; }
+.pgi-xls:disabled{ background:#e5e7eb; color:#9ca3af; cursor:not-allowed; }
 
 /* la hoja: vive escondida en la pantalla y es LO ÚNICO que se ve al imprimir */
 #pgaPrint{ display:none; }
@@ -5814,7 +5817,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.51"></script>
+<script type="module" src="recepcion.js?v=20.52"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9691,7 +9694,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.51";
+const APP_VERSION = "v20.52";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38864,7 +38867,7 @@ function _pppArbolHtml(programados) {
     '<div class="pn-tools">' +
       '<button class="pn-lnk" onclick="pgaRecargar()" title="Volver a leer la programación">🔄 Actualizar</button>' +
       // v17.97 (Luis): "al lado del botón de Actualizar quiero que haya un botón de Imprimir"
-      '<button class="pn-lnk" onclick="pgaImprimirAbrir()" title="Elegís qué días y sale la programación abierta hasta la NP, para papel">🖨 Imprimir</button>' +
+      '<button class="pn-lnk" onclick="pgaImprimirAbrir()" title="Elegís qué días y sale la programación abierta hasta la NP: por papel o en Excel">🖨 Imprimir</button>' +
       '<button class="pn-lnk" onclick="pppPlanTabla(false)" title="El tablero de 6 días con los camiones">Tablero de 6 días</button>' +
     '</div></div>';
   h += _pgaSalioSinFcHtml();
@@ -39079,6 +39082,10 @@ function pgaImprimirRender() {
     '</div>' +
     '<div class="pgi-btns">' +
       '<button class="pgi-no" onclick="pgaImprimirCerrar()">Cancelar</button>' +
+      // v20.52 (Thomas): "dejame imprimir o descargar excel". Los mismos días tildados salen
+      // por los dos lados; el Excel lleva UNA FILA POR NP (plano, filtrable) en vez del árbol.
+      '<button class="pgi-xls" id="pgiXls" ' + (n ? '' : 'disabled') +
+        ' onclick="pgaImprimirExcel()">⬇ Excel</button>' +
       '<button class="pgi-si" id="pgiOk" ' + (n ? '' : 'disabled') +
         ' onclick="pgaImprimirHacer()">🖨 Imprimir ' + n + ' día' + (n === 1 ? '' : 's') + '</button>' +
     '</div></div>';
@@ -39226,6 +39233,80 @@ function pgaImprimirHtml(dias) {
   });
   return h;
 }
+/* ═══ v20.52 (Thomas) — EL MISMO POP-UP BAJA EXCEL ══════════════════════════
+   Pedido: *"dentro del botón de imprimir, dejame imprimir o descargar excel"*. Los días se
+   eligen una sola vez y de ahí salen las dos cosas.
+
+   El papel va en árbol (día → tanda → NP) porque se lee de arriba a abajo; el Excel va
+   PLANO, una fila por NP con el día y la tanda repetidos en cada fila. Un árbol en Excel no se
+   filtra ni se ordena, que es para lo único que sirve bajarlo.
+
+   Se arma con `_facXlsxBlob`, el mismo .xlsx a mano (ZIP + XML, sin librería) que ya usa
+   Facturación: `vendor/xlsx.full.min.js` NO está en el repo, así que SheetJS no es opción.
+   ⚠ Los m³ van con PUNTO decimal a propósito: así Excel los toma como número y los suma
+   (`_facHojaXml` manda a texto todo lo que no matchee `^-?\d+(\.\d+)?$`). La coma la pone
+   Excel al mostrarlos, según el idioma de la máquina. */
+function _pgaXlsFilas(dias) {
+  const enc = ["Fecha", "Día", "Tanda", "Zona de la tanda", "NP", "Cliente", "Empresa",
+    "Cód cliente", "Zona · barrio", "Provincia destino", "Expreso", "Horario", "m³",
+    "Estado", "Salió"];
+  const filas = [enc];
+  for (const d of dias) {
+    const dTxt = _pgaDiaTxt(d.key);
+    const fec = d.key.slice(6, 8) + "/" + d.key.slice(4, 6) + "/" + d.key.slice(0, 4);
+    for (const t of d.tandasArr) {
+      const zt = _pgaZonaTanda(t);
+      for (const r of t.filas) {
+        const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
+        const zn = String(r.zona_corta || r.localidad || "").trim();
+        const lug = [zn, r.barrio || ""]
+          .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
+        const dst = _pgaDestDe(r) || {};
+        filas.push([fec, dTxt, t.tanda, zt, String(r.np),
+          r.razon_social || "", String(r.empresa || "").toUpperCase(), r.cod ? String(r.cod) : "",
+          lug, dst.provincia || "", dst.expreso || "",
+          r.pide_horario ? aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja }) : "",
+          (Number(r.m3) || 0).toFixed(3), PGA_EST_TXT[est], _pgaSalio(r) ? "Sí" : ""]);
+      }
+    }
+  }
+  return filas;
+}
+function _pgaXlsResumen(dias) {
+  const filas = [["Día", "Fecha", "m³", "Tandas", "NP"]];
+  let m3 = 0, tn = 0, nps = 0;
+  for (const d of dias) {
+    m3 += d.m3; tn += d.tandasArr.length; nps += d.nps;
+    filas.push([_pgaDiaTxt(d.key),
+      d.key.slice(6, 8) + "/" + d.key.slice(4, 6) + "/" + d.key.slice(0, 4),
+      (Number(d.m3) || 0).toFixed(3), String(d.tandasArr.length), String(d.nps)]);
+  }
+  filas.push(["TOTAL", "", m3.toFixed(3), String(tn), String(nps)]);
+  return filas;
+}
+function pgaImprimirExcel() {
+  if (!_pgi) return;
+  const dias = _pgi.dias.filter(function (d) { return _pgi.sel[d.key]; });
+  if (!dias.length) return;
+  const nom = "Programacion_" + dias[0].key +
+    (dias.length > 1 ? "_a_" + dias[dias.length - 1].key : "") + ".xlsx";
+  try {
+    const blob = _facXlsxBlob([
+      { nombre: "Programación", filas: _pgaXlsFilas(dias) },
+      { nombre: "Resumen", filas: _pgaXlsResumen(dias) }
+    ]);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = nom;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  } catch (e) {
+    alert("No se pudo armar el Excel: " + (e && e.message ? e.message : e));
+    return;
+  }
+  pgaImprimirCerrar();
+}
+
 function pgaImprimirHacer() {
   if (!_pgi) return;
   const dias = _pgi.dias.filter(function (d) { return _pgi.sel[d.key]; });
