@@ -26020,7 +26020,7 @@ entraron nunca a la base.
 **Rollback:** `select cron.unschedule('gv-np-sucursal-snapshot'); drop view public.gv_np_sucursal_cobertura;
 drop function public.gv_np_sucursal_snapshot(); drop table public."GV_NP_Sucursal";`
 
-### §3.kr — v20.32: el centinela contaba el ajuste que descuenta y no el que lo revierte — 2026-09-21
+### §3.ks — v20.32: el centinela contaba el ajuste que descuenta y no el que lo revierte — 2026-09-21
 
 **Luis: *"mirá lo del D53A"***. La tanda figuraba en `gv_stock_tanda_pickeado_negativo` con el
 código 839 en rojo. **En el depósito no faltaba nada**: el descuadre ya lo había corregido alguien
@@ -26065,3 +26065,45 @@ consulta**: el cambio no toca nada ejecutable.
 
 **Chequeo:** `select * from public.gv_stock_tanda_pickeado_negativo;` — al 21/09 quedan D20E (−2) y
 E10A (−1), los dos por ajuste manual. `sql/gv_stock_tanda_pickeado_negativo_v2032.sql`.
+### §3.kt — v20.35: el DETALLE del Excel de deuda deja de tirarse — 2026-09-21
+
+**Luis:** *"el excel es el que se sube en configuración de cuarentena, como que no lo tenés?"*.
+Tenía razón: el Excel **sí** trae el detalle por comprobante. El que lo tiraba era el front.
+
+`cuarParseDeudaCrystal` (index.html) ya recorre el Crystal renglón por renglón —**col E =
+comprobante, col L = pendiente**— y hasta cuenta los comprobantes en `cur.docs`. Pero
+`cuarImportGuardar` mandaba a la base `{cod, razon_social, deuda}` y nada más: el detalle **moría
+en el navegador**. Por eso las 180 filas LK y 44 CH de `GV_Cuarentena_Fuente` tienen 3 claves en
+`raw` y la deuda es un número suelto.
+
+**Lo que se creó** (`sql/gv_cuarentena_deuda_detalle_v2035.sql`):
+
+- **`GV_Cuarentena_Deuda_Detalle`** — una fila por comprobante: `empresa`, `cod`, `comprobante`,
+  `comp_key`, `pendiente` y **`fila` (el renglón crudo del Excel)**. Se guarda el renglón entero a
+  propósito: hoy se mapean 2 columnas, y si mañana hace falta la fecha de vencimiento o el importe
+  original ya están, sin volver a pedir el archivo. RLS: sólo supervisor.
+- **`gv_cuarentena_deuda_detalle_cargar(empresa, rows, lote)`** — **no aditiva** (borra y recarga
+  su empresa), igual que `gv_cuarentena_cargar`.
+- **`gv_comprobante_key(texto)`** — prefijo (`FCA`, `NCA`, `FCCOMP`…) + los dígitos de punto de
+  venta y número. Se arma igual del lado del Excel y del de `isis_lk`/`isis_ch.documentos`.
+- **`gv_cuarentena_deuda_sucursal`** — la cadena entera, con `estado_cadena` diciendo dónde se
+  corta: `sin factura parseada` · `factura sin remito` · `remito sin NP` · `NP sin sucursal
+  registrada` · `ok`.
+
+⚠ **La llamada nueva del front va SOLA, con su propio `catch`** (lección de la v19.44): si el
+detalle falla, la carga de la deuda —que es la que hoy sostiene la cuarentena— no se cae con él.
+
+**La cadena, probada con datos reales** (no leída): de **345 facturas LK de 30 días**, 26 no
+tienen remito y **101 llegan hasta la sucursal**. El dato que importa: de las 101 que resuelven
+NP, **las 101 tienen sucursal** — la conversión NP → sucursal es del 100 %. El cuello es el
+puente remito (`GV_NP_Remito` arrancó el 04/09), no el registro nuevo.
+
+**Chef entra igual que LK**, porque la clave real es **`dir_key`**, no la etiqueta de sucursal: las
+29 NP web de Chef tienen dirección (100 %) aunque sólo 2 traigan `sucursal_entrega` en el feed.
+
+**Para que empiece a juntar**: volver a subir el mismo Excel desde ⚙ Config. Cuarentena. El preview
+ahora dice *"N clientes / M comprobantes"* — si M es 0, el archivo no es el Crystal con detalle.
+
+**Rollback:** `drop view public.gv_cuarentena_deuda_sucursal;
+drop function public.gv_cuarentena_deuda_detalle_cargar(text,jsonb,text);
+drop table public."GV_Cuarentena_Deuda_Detalle";` (y revertir el commit del front).

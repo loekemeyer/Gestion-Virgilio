@@ -5778,7 +5778,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.34"></script>
+<script type="module" src="recepcion.js?v=20.35"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9623,7 +9623,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.34";
+const APP_VERSION = "v20.35";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -46665,8 +46665,14 @@ function cuarParseDeudaCrystal(aoa) {
     const et = (E == null ? "" : String(E).trim());
     const isHeader = /^\d+$/.test(cod) && bt !== "" && et === "";
     const isDetail = et !== "" && et.toUpperCase() !== "COMPROBANTE";
-    if (isHeader) { if (cur) cli.push(cur); cur = { cod: cod, razon_social: bt, deuda: 0, docs: 0 }; }
-    else if (cur && isDetail) { cur.deuda += cuarNumRaw(L); cur.docs++; }
+    if (isHeader) { if (cur) cli.push(cur); cur = { cod: cod, razon_social: bt, deuda: 0, docs: 0, items: [] }; }
+    else if (cur && isDetail) {
+      // v20.35 - el DETALLE se guarda, no solo el total: sin el comprobante no hay forma de
+      // saber a que sucursal corresponde la deuda (comprobante -> remito -> NP -> sucursal).
+      const pend = cuarNumRaw(L);
+      cur.deuda += pend; cur.docs++;
+      cur.items.push({ comprobante: et, pendiente: pend, fila: row });
+    }
   }
   if (cur) cli.push(cur);
   return cli;
@@ -46674,7 +46680,8 @@ function cuarParseDeudaCrystal(aoa) {
 function cuarDeudaPreviewHtml() {
   const s = _cuarImp, cli = s.deuda || [];
   const may = cli.filter(function (c) { return c.deuda > 1000; }).length;
-  let h = '<div class="cuar-file-ok">📄 ' + escapeHtml(s.fname) + ' · ' + cli.length + ' clientes · <b>' + may + '</b> con deuda &gt; $1.000 → cuarentena</div>' +
+  const docs = cli.reduce(function (a, c) { return a + (c.docs || 0); }, 0);
+  let h = '<div class="cuar-file-ok">📄 ' + escapeHtml(s.fname) + ' · ' + cli.length + ' clientes / ' + docs + ' comprobantes · <b>' + may + '</b> con deuda &gt; $1.000 → cuarentena</div>' +
     '<div class="cuar-prev"><table><thead><tr><th>Código</th><th>Razón social</th><th>Deuda</th><th>Cuarent.</th></tr></thead><tbody>';
   const top = cli.slice().sort(function (a, b) { return b.deuda - a.deuda; }).slice(0, 8);
   for (const c of top) {
@@ -46762,6 +46769,19 @@ async function cuarImportGuardar() {
   s.saving = true; s.err = ""; cuarImportRender();
   try {
     const n = await aprRpc("gv_cuarentena_cargar", { p_empresa: s.empresa, p_tipo: s.tipo, p_rows: rows });
+    // v20.35 - el detalle por comprobante va en SU PROPIA llamada, con su propio catch: si
+    // falla, la carga de la deuda (que ya funciona) no se cae con el. Leccion de la v19.44.
+    if (s.tipo === "deuda") {
+      const det = [];
+      for (const c of (s.deuda || [])) for (const it of (c.items || [])) {
+        det.push({ cod: c.cod, razon_social: c.razon_social || null,
+                   comprobante: it.comprobante, pendiente: it.pendiente, fila: it.fila });
+      }
+      if (det.length) {
+        try { await aprRpc("gv_cuarentena_deuda_detalle_cargar", { p_empresa: s.empresa, p_rows: det }); }
+        catch (eDet) { console.warn("Cuarentena: el detalle por comprobante no se cargo:", eDet); }
+      }
+    }
     s.saving = false; cuarImportCerrar();
     _apr.msg = "Cuarentena: cargué " + n + " filas de " + cuarFuenteLabel(s.empresa, s.tipo) + "."; _apr.msgErr = false;
     cuarResumenCargar(); aprRender();
