@@ -1,3 +1,38 @@
+## Nota v20.61 (2026-09-21) — Los botones de la Programación viajan con la tabla
+
+Thomas: *"los botones de Actualizar, Imprimir y Tablero se quedan trabados, quiero que viajen con
+la tabla (que dinámicamente se muevan si la tabla se expande/contrae)"*.
+
+**Es la contra de la v20.59.** Al dejar la tabla en `width:auto` —mide lo que mide su contenido—
+el encabezado siguió yendo al ancho del contenedor, así que los tres botones quedaron flotando
+lejos del borde derecho de la tabla. Se ve solo con la tabla cerrada, que es cuando más se achica.
+
+**Se resuelve con CSS, sin JS**: un `div.pga-blk` envuelve encabezado + banda + tabla y va en
+`width:fit-content` — el ancho del bloque es el del hijo más ancho (la tabla) y el encabezado se
+estira a ESE ancho.
+
+⚠ **Y hace falta un segundo paso, que es el que no se ve venir:**
+
+```css
+.pga-blk > .pn-head{ width:0; min-width:100%; }
+```
+
+Sin eso, el encabezado **también participa** del `fit-content` del padre: cuando su texto es más
+largo que la tabla —pasa con pocos días programados— es él el que fija el ancho del bloque y la
+botonera se va de más (medido: 11 px con el fixture del test). Con `width:0` el encabezado no
+cuenta para esa cuenta, y el `min-width:100%` lo devuelve al ancho ya resuelto por la tabla.
+
+**Medido**, tabla cerrada / con un día y una tanda abiertos: el borde derecho de la botonera cae
+a **1 px** del borde de la tabla en los dos estados (el filete de `.pga-wrap`), y se mueve de
+887 a 1.345 px al abrir.
+
+⚠ `pga-blk` abre antes del encabezado y **cierra en las CUATRO salidas** de `_pppArbolHtml` —las
+tres tempranas («Leyendo la programación…», el error de lectura y «no hay nada programado») y la
+final. Si se agrega una salida nueva, el `</div>` va también ahí.
+
+**Chequeo:** `node tests/ppp-tabla-arbol.cjs` — dos chequeos nuevos comparan el borde derecho de
+la botonera contra el de la tabla, cerrada y abierta.
+
 ## Nota v20.59 (2026-09-21) — Fecha del pedido en la hoja, y la tabla deja de tener aire
 
 Dos pedidos de Thomas sobre lo mismo: que no sobre ancho.

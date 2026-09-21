@@ -119,9 +119,15 @@ catch (_e) {
        —no el ancho del contenedor— y crecer al abrir. */
     const _mid = function () {
       const tb = prev.querySelector("table.pga");
+      /* v20.61 (Thomas): *"los botones de Actualizar, Imprimir y Tablero se quedan trabados,
+         quiero que viajen con la tabla"*. Se compara el borde DERECHO de la botonera contra el
+         de la tabla: tienen que coincidir en los dos estados. */
+      const tl = prev.querySelector(".pga-blk .pn-tools");
       return tb ? { tabla: Math.round(tb.getBoundingClientRect().width),
                     cont: Math.round((tb.parentElement || tb).getBoundingClientRect().width),
-                    col1: Math.round(tb.querySelector("thead th").getBoundingClientRect().width) } : null;
+                    col1: Math.round(tb.querySelector("thead th").getBoundingClientRect().width),
+                    derTabla: Math.round(tb.getBoundingClientRect().right),
+                    derTools: tl ? Math.round(tl.getBoundingClientRect().right) : -1 } : null;
     };
     out.midCerrada = _mid();
 
@@ -280,6 +286,11 @@ catch (_e) {
     " % de la tabla (antes 58 %)");
   t(_ma.tabla > _mc.tabla,
     "(10) al abrir día y tanda la tabla CRECE con el contenido — " + _mc.tabla + " → " + _ma.tabla + " px");
+  t(_mc.derTools > 0 && Math.abs(_mc.derTools - _mc.derTabla) <= 4,
+    "(10) los botones terminan donde termina la tabla, cerrada — botones " + _mc.derTools +
+    " / tabla " + _mc.derTabla + " px");
+  t(_ma.derTools > 0 && Math.abs(_ma.derTools - _ma.derTabla) <= 4 && _ma.derTools > _mc.derTools,
+    "(10) y VIAJAN con ella al abrirla — " + _mc.derTools + " → " + _ma.derTools + " px");
   t(eq(r.total.slice(0, 4), ["Total", "11,3", "5", "8"]), "(7) el total suma todos los días — " + JSON.stringify(r.total.slice(0, 4)));
   t(r.tablero, "(8) se puede volver al tablero de 6 días");
   t(r.vuelve, "(8) y volver a la tabla");
