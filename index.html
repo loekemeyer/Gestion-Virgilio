@@ -5805,7 +5805,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.48"></script>
+<script type="module" src="recepcion.js?v=20.49"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9650,7 +9650,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.48";
+const APP_VERSION = "v20.49";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38250,28 +38250,50 @@ let _pgaRows = null, _pgaTs = 0, _pgaBusy = false, _pgaErr = "";
    columna SALIÓ (v20.10): agregarle una columna al TABLE de esa RPC obliga a DROP + CREATE de una
    función que usan varias pantallas.
    ⚠ Y con su propio catch: si esto falla, la Programación se tiene que seguir viendo. */
-let _pgaDest = null;
-function pgaDestNeed(force) {
-  if (_pgaDest && !force) return;
-  // ⚠ v20.47 — POR RPC, NO POR LA VISTA. `GV_Clientes_Direcciones` tiene RLS y la clave
-  // pública no ve NINGUNA de sus filas (es el padrón entero de direcciones y CUIT: darle un
-  // policy de SELECT a `anon` sería la filtración que el protocolo prohibe). Como
-  // `gv_np_destino` corre con `security_invoker`, leída desde el navegador devolvía
-  // `sin padron` para las 1.482 NP y la Programación no pintaba NADA — sin error, sin 403,
-  // con HTTP 200 y datos vacíos, que es la peor forma de fallar.
-  // `gv_np_destino_lista()` es SECURITY DEFINER y devuelve SÓLO lo que esta pantalla usa:
-  // NP, provincia, expreso, el flag y el texto. Ni dirección, ni CUIT, ni razón social.
-  fetch(SUPABASE_URL + "/rest/v1/rpc/gv_np_destino_lista", {
-    method: "POST",
-    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-    body: "{}", cache: "no-store" })
-    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(function (rows) {
-      const m = new Map();
-      for (const x of (rows || [])) { const k = _pppNpNorm(x.np); if (k) m.set(k, x); }
-      _pgaDest = m; pppRenderProg();
-    })
-    .catch(function (_e) { if (!_pgaDest) _pgaDest = new Map(); });
+let _pgaDest = null, _pgaDestPide = new Set();
+/* ⚠ POR RPC, NO POR LA VISTA. `GV_Clientes_Direcciones` tiene RLS y la clave pública no ve
+   NINGUNA de sus filas (es el padrón entero de direcciones y CUIT: darle un policy de SELECT a
+   `anon` sería la filtración que el protocolo prohibe). Como `gv_np_destino` corre con
+   `security_invoker`, leída desde el navegador devolvía `sin padron` para las 1.482 NP y la
+   Programación no pintaba NADA — sin error, sin 403, con HTTP 200 y datos vacíos.
+   `gv_np_destino_lista()` es SECURITY DEFINER y devuelve SÓLO lo que esta pantalla usa: NP,
+   provincia, expreso, el flag y el texto. Ni dirección, ni CUIT, ni razón social.
+
+   ⚠ Y SE PIDE POR LISTA, no el universo entero. PostgREST corta en 1.000 filas
+   (`db-max-rows`) y `limit=5000` NO lo levanta: contesta 200 con las primeras 1.000 y nada dice
+   que falten. Con 1.482 NP "LK 0027" quedaba afuera del corte —ordenado por np, los numéricos
+   van antes que "LK …"— así que el pedido de Misiones seguía sin pintarse aunque la RPC
+   estuviera bien. Pidiendo las NP que la pantalla está mostrando (hoy 162, de a 500) el tope
+   no se puede alcanzar por más que crezca el histórico. */
+let _pgaDestNoPidas = false;
+function pgaDestNeed(nps) {
+  if (!_pgaDest) _pgaDest = new Map();
+  const falta = [];
+  for (const np of (nps || [])) {
+    const k = _pppNpNorm(np);
+    if (k && !_pgaDest.has(k) && !_pgaDestPide.has(k)) { falta.push(k); _pgaDestPide.add(k); }
+  }
+  if (!falta.length || _pgaDestNoPidas) return;
+  for (let i = 0; i < falta.length; i += 500) {
+    const lote = falta.slice(i, i + 500);
+    fetch(SUPABASE_URL + "/rest/v1/rpc/gv_np_destino_lista", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_nps: lote }), cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (rows) {
+        // las que vuelven, con su dato; las que no volvieron quedan marcadas como "sin destino"
+        // para no volver a pedirlas en cada refresco.
+        for (const x of (rows || [])) { const k = _pppNpNorm(x.np); if (k) _pgaDest.set(k, x); }
+        for (const k of lote) if (!_pgaDest.has(k)) _pgaDest.set(k, null);
+        pppRenderProg();
+      })
+      .catch(function (_e) { for (const k of lote) _pgaDestPide.delete(k); });
+  }
+}
+/* Las NP que hay que pedir: las del árbol de Programación y las de Pedidos atrasados. */
+function pgaDestDeFilas(filas) {
+  pgaDestNeed((filas || []).map(function (r) { return r && r.np; }).filter(Boolean));
 }
 function _pgaDestDe(r) {
   if (!_pgaDest) return null;
@@ -38297,20 +38319,21 @@ function pgaNeed(force) {
   // — y si algún día alguien programa a 6 meses, ahora se ve en vez de esconderse.
   const hasta = PGA_ESPERA_ISO;
   if (!desde) { _pgaBusy = false; return; }
-  pgaDestNeed(force);
   fetch(SUPABASE_URL + "/rest/v1/rpc/gv_ppp_prog_arbol", {
     method: "POST",
     headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({ p_desde: desde, p_hasta: hasta })
   }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(function (rows) { _pgaRows = rows || []; _pgaTs = Date.now(); _pgaErr = ""; _pgaBusy = false; pppRenderProg(); })
+    .then(function (rows) { _pgaRows = rows || []; _pgaTs = Date.now(); _pgaErr = ""; _pgaBusy = false;
+      pgaDestDeFilas(_pgaRows); pppRenderProg(); })
     .catch(function (e) {
       _pgaBusy = false; _pgaErr = String((e && e.message) || e);
       if (!_pgaRows) _pgaRows = [];
       pppRenderProg();
     });
 }
-function pgaRecargar() { _pgaTs = 0; _pgaItems = {}; _patrTs = 0; pgaNeed(true); patrNeed(true); pgaDestNeed(true); pppRenderProg(); }
+function pgaRecargar() { _pgaTs = 0; _pgaItems = {}; _patrTs = 0; _pgaDest = null; _pgaDestPide = new Set();
+  pgaNeed(true); patrNeed(true); pppRenderProg(); }
 function pgaAbrirDia(k)   { _pgaOpenD[k] = !_pgaOpenD[k]; pppRenderProg(); }
 function pgaAbrirTanda(k) { _pgaOpenT[k] = !_pgaOpenT[k]; pppRenderProg(); }
 function pgaAbrirNp(k, np) {
@@ -38415,7 +38438,10 @@ function patrNeed(force) {
     headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({})
   }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(function (rows) { _patrRows = rows || []; _patrTs = Date.now(); _patrErr = ""; _patrBusy = false; pppRenderProg(); })
+    .then(function (rows) { _patrRows = rows || []; _patrTs = Date.now(); _patrErr = ""; _patrBusy = false;
+      // v20.49: Pedidos atrasados comparte el cuerpo de la tabla, así que también necesita el
+      // destino de SUS NP — son de días que ya pasaron, o sea que no están en el árbol.
+      pgaDestDeFilas(_patrRows); pppRenderProg(); })
     .catch(function (e) {
       _patrBusy = false; _patrErr = String((e && e.message) || e);
       if (!_patrRows) _patrRows = [];

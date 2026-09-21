@@ -39,6 +39,10 @@ catch (_e) {
   // HTTP 200, sin error, y la Programacion sin pintar nada.
   if (!/rest\/v1\/rpc\/gv_np_destino_lista/.test(html))
     fallos.push("no se llama la RPC gv_np_destino_lista");
+  // v20.49: se pide POR LISTA DE NP. PostgREST corta en 1.000 filas y contesta 200 sin avisar:
+  // con el universo entero (1.482 NP) "LK 0027" quedaba afuera del corte y no se pintaba.
+  if (!/p_nps: lote/.test(html))
+    fallos.push("la RPC se llama sin p_nps: con mas de 1.000 NP PostgREST corta en silencio");
   if (/rest\/v1\/gv_np_destino\?select=/.test(html))
     fallos.push("se lee la VISTA gv_np_destino desde el front: anon no ve el padron y devuelve 'sin padron' para todo");
   // la provincia no se decide en el front

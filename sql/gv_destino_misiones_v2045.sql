@@ -162,18 +162,20 @@ with _nd_todo as (
   select public.gv_ppp_web_np_label(w.empresa, w.np, w.np_idx) as np,
          lower(btrim(coalesce(w.empresa, '')))                 as empresa,
          btrim(coalesce(w.cod_cliente, ''))                    as cod,
-         w.direccion, w.barrio, 1 as pri, true as programada
+         w.direccion, w.barrio, w.fecha_entrega as fecha, 1 as pri, true as programada
     from public."PPP_Web_Programacion" w
   union all
   select regexp_replace(btrim(g.np), '\.0+$', ''),
          public.gv_emp_de_np(g.np), btrim(coalesce(g.cod, '')),
-         g.direccion, g.barrio, 2, true
+         g.direccion, g.barrio,
+         case when left(btrim(coalesce(g.fecha_entrega, '')), 10) ~ '^\d{4}-\d{2}-\d{2}$'
+              then left(btrim(g.fecha_entrega), 10)::date end, 2, true
     from public.gv_ppp_programacion_diaria g
   union all
   -- las que ya sólo figuran facturadas: sin dirección, se resuelve por cliente
   select regexp_replace(upper(btrim(f.np)), '\.0+$', ''),
          public.gv_emp_de_np(f.np), btrim(coalesce(f.cod_cliente, '')),
-         null::text, null::text, 3, false
+         null::text, null::text, f.fecha_salida, 3, false
     from public."Facturacion_NP" f
 ), _nd as (
   select distinct on (t.np) t.*
@@ -189,7 +191,7 @@ with _nd_todo as (
 ), _c as (
   -- LEFT JOIN a propósito: la NP de un cliente que no está en el padrón tiene que seguir
   -- apareciendo, con `como = 'sin padron'`. Si no, el centinela no la ve.
-  select q.np, q.empresa, q.cod, q.programada, d.slot, d.provincia, d.localidad, d.nombre_expreso,
+  select q.np, q.empresa, q.cod, q.programada, q.fecha, d.slot, d.provincia, d.localidad, d.nombre_expreso,
          public.gv_destino_score(d.etiqueta, d.direccion, d.dir_key, d.nombre_expreso,
                                  d.dir_expreso, d.localidad,
                                  q.direccion, q.barrio, q.x_exp, q.x_dirx, q.x_lab) as score
@@ -206,12 +208,12 @@ with _nd_todo as (
 ), _p as (
   select distinct on (c.np) c.* from _c c order by c.np, c.score desc nulls last, c.slot
 ), _r as (
-  select p.np, p.empresa, p.cod, p.programada, a.mx, a.cands, a.prov_todas, t.prov_top,
+  select p.np, p.empresa, p.cod, p.programada, p.fecha, a.mx, a.cands, a.prov_todas, t.prov_top,
          p.provincia, p.localidad, p.nombre_expreso,
          (a.cands > 0 and ((a.mx > 0 and t.prov_top = 1) or a.prov_todas = 1)) as ok
     from _p p join _a a using (np) left join _t t using (np)
 )
-select r.np, r.empresa, r.cod, r.programada,
+select r.np, r.empresa, r.cod, r.programada, r.fecha,
        case when r.ok then r.provincia end                                          as provincia,
        case when r.ok then r.localidad end                                          as localidad_destino,
        case when r.ok then r.nombre_expreso end                                     as expreso,
@@ -228,7 +230,7 @@ select r.np, r.empresa, r.cod, r.programada,
 -- ── 5. el centinela: pedido programado cuyo destino no se pudo resolver ─────────────────
 create view public.gv_destino_sin_provincia
 with (security_invoker = true) as
-select d.np, d.empresa, d.cod, d.como
+select d.np, d.empresa, d.cod, d.como, d.fecha
   from public.gv_np_destino d
  where d.provincia is null and d.programada;
 
@@ -237,8 +239,9 @@ select d.np, d.empresa, d.cod, d.como
 alter view public.gv_np_destino            set (security_invoker = true);
 alter view public.gv_destino_sin_provincia set (security_invoker = true);
 
-grant select on public.gv_np_destino            to anon, authenticated;
-grant select on public.gv_destino_sin_provincia to anon, authenticated;
+-- ⚠ NO se le da SELECT a anon: ver el bloque v20.47 al final del archivo.
+revoke select on public.gv_np_destino            from anon, authenticated;
+revoke select on public.gv_destino_sin_provincia from anon, authenticated;
 
 -- ── 6. centinelas de regla ──────────────────────────────────────────────────────────────
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
@@ -261,7 +264,7 @@ on conflict do nothing;
 -- select * from public.gv_reglas_perdidas;                      -- vacia = todo bien
 
 -- ════════════════════════════════════════════════════════════════════════════════════════
--- v20.47 — LA PANTALLA LEE EL DESTINO POR UNA RPC, NO POR LA VISTA
+-- v20.47-49 — LA PANTALLA LEE EL DESTINO POR UNA RPC, Y PIDIENDO LAS NP QUE MUESTRA, NO POR LA VISTA
 -- ════════════════════════════════════════════════════════════════════════════════════════
 -- ⚠ El bug que dejó la v20.45 sin pintar nada, y que hay que tener presente cada vez que se
 -- arma una vista con `security_invoker = true` sobre una tabla con RLS:
@@ -279,18 +282,32 @@ on conflict do nothing;
 --
 -- La RPC es SECURITY DEFINER y expone SÓLO lo que la pantalla usa: NP, provincia, expreso, el
 -- flag y el texto. Ni dirección, ni CUIT, ni razón social, ni el padrón.
-create or replace function public.gv_np_destino_lista()
+-- ⚠ Y RECIBE LA LISTA DE NP, no devuelve el universo. PostgREST corta en 1.000 filas
+-- (`db-max-rows`) y `limit=5000` NO lo levanta: contesta 200 con las primeras 1.000 y nada dice
+-- que falten. Con 1.482 NP, "LK 0027" quedaba afuera del corte —ordenado por np, los numéricos
+-- van antes que "LK …"— así que el pedido de Misiones seguía sin pintarse aunque la RPC
+-- estuviera bien. El front pide de a 500 las NP que está mostrando (hoy 162): con ese diseño el
+-- tope no se alcanza por más que crezca el histórico.
+create or replace function public.gv_np_destino_lista(
+  p_nps   text[] default null,
+  p_desde date   default null)
 returns table (np text, provincia text, expreso text, alerta boolean, destino_txt text)
 language sql
 stable
 security definer
 set search_path to 'public', 'pg_temp'
 as $function$
-  select d.np, d.provincia, d.expreso, d.alerta, d.destino_txt from public.gv_np_destino d;
+  select d.np, d.provincia, d.expreso, d.alerta, d.destino_txt
+    from public.gv_np_destino d
+   where (p_nps is null or d.np = any (
+           select regexp_replace(btrim(x), '\.0+$', '') from unnest(p_nps) x))
+     and (p_desde is null or d.fecha is null or d.fecha >= p_desde)
+   limit 900;
 $function$;
 
-revoke all on function public.gv_np_destino_lista() from public;
-grant execute on function public.gv_np_destino_lista() to anon, authenticated;
+revoke all on function public.gv_np_destino_lista(text[], date) from public;
+grant execute on function public.gv_np_destino_lista(text[], date) to anon, authenticated;
+drop function if exists public.gv_np_destino_lista();
 
 -- y las dos vistas dejan de ser legibles por la clave pública: leídas por anon MIENTEN
 -- ("sin padron" para todo), y una vista que miente es peor que una que no está. Quedan para
@@ -303,7 +320,7 @@ notify pgrst, 'reload schema';
 -- ── chequeo (el que hay que correr, no el de postgres) ──────────────────────────────────
 -- do $$ declare n int; a int; begin
 --   set local role anon;
---   select count(*) into n from public.gv_np_destino_lista();
---   select count(*) into a from public.gv_np_destino_lista() where alerta;
---   reset role; raise notice 'anon: filas=% alerta=%', n, a;   -- 1.482 y 2 al 21/09
+--   select count(*) into n from public.gv_np_destino_lista(array['LK 0027','97792']);
+--   select count(*) into a from public.gv_np_destino_lista(array['LK 0027','97792']) where alerta;
+--   reset role; raise notice 'anon: filas=% alerta=%', n, a;   -- 2 y 2 al 21/09
 -- end $$;

@@ -26595,5 +26595,21 @@ consultarlas por el MCP.
 El front pasó de `GET /rest/v1/gv_np_destino?select=…` a `POST /rest/v1/rpc/gv_np_destino_lista`.
 Medido con la clave publishable: **HTTP 200, 1.482 filas, 2 con `alerta`** (las dos de Albalandia).
 
-`tests/ppp-misiones.cjs` tiene el guard estático de los dos lados: exige la llamada a la RPC y
-**falla si alguien vuelve a leer la vista** desde `index.html`.
+**Y faltaba una segunda mitad, del mismo tipo.** Con la RPC arreglada el pedido de Misiones
+*seguía* sin pintarse: **PostgREST corta en 1.000 filas** (`db-max-rows`) y **`limit=5000` no lo
+levanta** — contesta `200` con las primeras 1.000 y nada dice que falten. Con **1.482 NP** y el
+orden por `np` (los numéricos van antes que `LK …`), **`LK 0027` quedaba afuera del corte**.
+Medido: `rpc/gv_np_destino_lista` con la clave publishable devolvía **1.000 filas** y la única
+marcada era `97792`, no `LK 0027`.
+
+Arreglo: la RPC pasa a recibir **`p_nps text[]`** y el front le pide, de a 500, **las NP que está
+mostrando** — el árbol de Programación y las de Pedidos atrasados, que son de días que ya pasaron
+y no están en el árbol. Hoy son 162; con ese diseño el tope no se alcanza por más que crezca el
+histórico. Medido con la clave publishable sobre el árbol real: **268 filas, 1 marcada,
+`LK 0027 → Snaider · Misiones`**.
+
+> Las dos mitades fallaron igual: **HTTP 200, datos válidos, incompletos, sin una sola señal**.
+> Un endpoint que devuelve exactamente 1.000 filas nunca es una casualidad.
+
+`tests/ppp-misiones.cjs` tiene el guard estático de los tres lados: exige la llamada a la RPC,
+exige que vaya con `p_nps`, y **falla si alguien vuelve a leer la vista** desde `index.html`.

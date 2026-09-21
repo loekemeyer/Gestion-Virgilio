@@ -1241,7 +1241,14 @@ do $$ declare n int; begin
 El arreglo **no** es abrirle la tabla a `anon` (es el padrón de direcciones y CUIT de 1.849
 clientes): es una RPC **SECURITY DEFINER** que devuelva sólo lo que la pantalla usa
 (`gv_np_destino_lista()` → np, provincia, expreso, alerta, texto) y **revocarle el SELECT de la
-vista a `anon`**, porque leída desde el navegador miente. §3.lb.
+vista a `anon`**, porque leída desde el navegador miente.
+
+⚠⚠ **Y la segunda mitad, del mismo tipo: PostgREST corta en 1.000 filas** (`db-max-rows`), y
+**`limit=5000` NO lo levanta**: contesta `200` con las primeras 1.000 y **nada dice que falten**.
+Con 1.482 NP, `LK 0027` quedaba afuera del corte y el pedido de Misiones seguía sin pintarse con
+la RPC ya arreglada. **Un endpoint que devuelve exactamente 1.000 filas nunca es una casualidad.**
+El arreglo es pedir **por lista** (`p_nps text[]`, de a 500) lo que la pantalla está mostrando, no
+el universo. §3.lb.
 
 ## ⚠ Regla de Luis (2026-09-21): la CUARENTENA se mide por SUCURSAL, y Retira nunca exime
 
