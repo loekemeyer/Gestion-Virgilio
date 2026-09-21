@@ -26319,3 +26319,43 @@ Corrida real: 2.312 direcciones, **2.023 clientes** de CUIT (LK 1.258, Chef 760)
 nuevos con CUIT: 345 de 349** (eran 312).
 
 `sql/gv_monto_sin_importados_en_falta_v2042.sql`, `sql/gv_cliente_cuit_v2043.sql`.
+
+### §3.ky — v20.44: el importado escaso se REPARTE por prioridad — 2026-09-21
+
+**Luis:** *"tiene que haber un orden, ya que si 5 pedidos tienen 10 cajas de un código del que
+sólo tenemos 3 cajas, no tienen que figurar todos con 7 faltantes… prioridad por orden de
+programa/llegada"*.
+
+**El orden, tal cual:**
+
+1. **Lo ya PROGRAMADO se lo lleva primero** — día de entrega más próximo y, dentro del mismo día,
+   la tanda por orden alfabético. Una NP programada tiene la mercadería reservada aunque todavía
+   no se haya pickeado. Vive en **`gv_demanda_programada_pendiente`** (mismo criterio que el
+   `pend_np` del generador de OC: programada, sin factura y sin TP; **si se cambia allá, cambiar
+   acá**). Al 21/09: **110 NP y 7.320 cajas** reservadas.
+2. **Lo que sobra se reparte por orden de llegada** entre los retenidos: fecha del pedido, después
+   la hora, y a igualdad el `order_id`.
+3. **Un pedido del lote que ya está programado no vuelve a competir**: sus cajas ya se contaron en
+   el paso 1, y contarlas dos veces le inventaría un faltante propio.
+
+`gv_art_libre(cod, empresa)` = disponible − reservado. Medido: 505 pasa de 3.668 disponibles a
+**3.169 libres**; 437E de LK de 286 a **273**; `438EL` de Chef de 117 a **104**.
+
+**Probado con la rama nueva, haciéndola entrar** (v19.56: una rama que no se hizo entrar no está
+probada) — 5 pedidos de 10 cajas de 437E de Chef, con 14 libres:
+
+| pedido | faltantes | monto | descontado |
+|---|---|---|---|
+| P1 | 0 | $1.094.016 | — |
+| P2 | 6 | $437.606,40 | $656.409,60 |
+| P3 · P4 · P5 | 10 c/u | $0 | $1.094.016 c/u |
+
+**Sin el reparto los cinco mostraban 0 faltantes**, porque cada uno veía las 14 cajas enteras.
+
+**Regresión sobre pedidos reales**: chef 227 y 228 sin descuento, chef 229 con 1 ítem en falta y
+$508.200 descontados — los mismos números que antes del cambio.
+
+⚠ El reparto es **una foto**: se calcula cada vez que la pantalla pide los montos, contra el
+stock de ese momento. No reserva nada.
+
+`sql/gv_importado_escaso_reparto_v2044.sql`.
