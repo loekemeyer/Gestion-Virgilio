@@ -110,8 +110,12 @@ if (/cron\.schedule[\s\S]{0,200}gv_clin/.test(sql))
 // RPC devolviendolo. A Programar dibujaba con _apr.pedidos vacio, el lote guardaba {} y el
 // *Need() no volvia a pedir NUNCA (medido: 0 llamadas en toda la sesion). Afecta a los cuatro
 // lotes, no solo al CUIT.
-if (!/function clinSinPedidos\(\)[\s\S]{0,200}function clinVacio\(campo\)/.test(html))
-  fallos.push("falta el guard clinSinPedidos/clinVacio: una lista vacia por no haber cargado se guardaria como «no hay»");
+// v20.84: el guard de la v20.71 miraba si habia PEDIDOS y NO alcanzaba — la lista que importa
+// es la de RETENIDOS, que llega en otra llamada. Una lista vacia NUNCA se guarda como respuesta.
+if (!/function clinVacio\(campo\) \{ _apr\[campo\] = null; \}/.test(html))
+  fallos.push("clinVacio guarda algo distinto de null: el dato no se vuelve a pedir en toda la sesion");
+if (/function clinSinPedidos/.test(html))
+  fallos.push("volvio clinSinPedidos: mirar si hay pedidos no alcanza, los motivos llegan despues");
 ["cliCuit", "cliValor", "cliContacto", "cliWpp", "pipe"].forEach(function (c) {
   if (new RegExp("if \\(!lista\\.length\\) \\{ _apr\\." + c + " = \\{\\}").test(html))
     fallos.push("el lote de " + c + " sigue guardando {} cuando la lista esta vacia: el dato no se pide nunca mas");

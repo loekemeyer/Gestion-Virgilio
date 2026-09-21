@@ -6010,7 +6010,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.83"></script>
+<script type="module" src="recepcion.js?v=20.87"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6130,7 +6130,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
       <button class="sup-action-btn" onclick="openAdminCervantes()"><span class="sup-ico">🏭</span><span>Admin Cervantes (GP2)</span></button>
       <button class="sup-action-btn" onclick="openOperarioView()"><span class="sup-ico">👁️</span><span>Ver módulo operarios</span></button>
-      <button class="sup-action-btn" onclick="window.open('reporte-virgilio.html','_blank')"><span class="sup-ico">📈</span><span>Reporte diario Virgilio</span></button>
+      <button class="sup-action-btn" onclick="openReporteVirgilio()"><span class="sup-ico">📈</span><span>Reporte diario Virgilio</span></button>
     </div>
     <style id="ssgSwCss">
       .sup-cfg{max-width:520px;margin:14px auto 0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 14px;}
@@ -9892,7 +9892,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.83";
+const APP_VERSION = "v20.87";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17942,12 +17942,13 @@ function prodRender() {
 
   if (!_prod) { body.innerHTML = sel + '<div class="prod-empty">Sin datos.</div>'; return; }
   const POCO = 5;
+  const MIN_TM3_MS = 5 * 60000;   // piso: con <5 min de tiempo efectivo con m3, el ritmo m3/h es basura (division por ~0). Se deja en 0 -> showVal muestra "—". Evita el "Farias picking 307" (tenia 73s de picking con m3).
 
   // serie semanal de m³/h de UNA actividad (arm | pick) — para tendencia y sparkline
   const mkSerie = function (leg, which) {
     return _prod.weekly.map(function (wk, i) {
       const a = wk[leg]; let v = null;
-      if (a) { const m3 = which === "arm" ? a.armM3 : a.pickM3, tm = which === "arm" ? a.armTimeM3 : a.pickTimeM3; if (tm > 0) v = m3 / hrs(tm); }
+      if (a) { const m3 = which === "arm" ? a.armM3 : a.pickM3, tm = which === "arm" ? a.armTimeM3 : a.pickTimeM3; if (tm >= MIN_TM3_MS) v = m3 / hrs(tm); }
       return { v: v, lbl: wkLbl(i) };
     });
   };
@@ -17958,8 +17959,8 @@ function prodRender() {
     if ((t.armTandas + t.pickTandas) === 0) return;
     const role = t.armTime >= t.pickTime ? "arm" : "pick";   // rol primario = lo que más hace (para agrupar/ordenar)
     const measurable = Math.max(0, t.jornada - t.excluded);
-    const armM3h = t.armTimeM3 > 0 ? t.armM3 / hrs(t.armTimeM3) : 0;
-    const pickM3h = t.pickTimeM3 > 0 ? t.pickM3 / hrs(t.pickTimeM3) : 0;
+    const armM3h = t.armTimeM3 >= MIN_TM3_MS ? t.armM3 / hrs(t.armTimeM3) : 0;
+    const pickM3h = t.pickTimeM3 >= MIN_TM3_MS ? t.pickM3 / hrs(t.pickTimeM3) : 0;
     ops.push({
       leg: leg, role: role, t: t, measurable: measurable,
       armM3h: armM3h, pickM3h: pickM3h,
@@ -19632,6 +19633,139 @@ function stkNpFaltanExport() {
    que salió y el stock está bien. Hay que cotejar contra la factura del ERP — por eso el módulo
    LISTA y no ajusta solo. Lee `vista_faltantes_sin_completar` (backend). Un caso desaparece de la
    lista cuando se le hace el CP, o cuando se ajusta a mano con ref '<tanda>|FIX...'. */
+// ===== Reporte diario Virgilio (modal in-panel). Invoca la edge gv-reporte-diario-virgilio
+// en modo solo_pdf (la publishable key pasa verify_jwt) y arma un CUADRO SINÓPTICO en HTML con
+// las mismas 16 columnas del PDF (los valores ya vienen formateados desde la edge: `celda`/
+// `celdaHs`, con coma decimal y "-" en los ceros — no se reformatea acá). NO manda WhatsApp:
+// es solo consulta. El envío diario a Juan lo hace el cron 18hs, aparte. El pdfUrl firmado
+// queda como link de descarga por si alguien quiere la versión imprimible. =====
+// Orden EXACTO de COLS en la edge (index.ts): cambiar acá si cambia allá.
+const RV_COLS = [
+  { k: "nombre", h: "Operario", name: true },
+  { k: "pkH", h: "Prom. Picking<br>M3 x Hs" },
+  { k: "pkD", h: "Prom. Picking<br>M3 x Día" },
+  { k: "arH", h: "Prom. Arm<br>M3 x Hs" },
+  { k: "arD", h: "Prom. Arm<br>M3 x Día" },
+  { k: "totDia", h: "Total<br>Hs Día" },
+  { k: "hsProd", h: "Hs<br>Prod" },
+  { k: "pick", h: "Picking" },
+  { k: "arm", h: "Armado" },
+  { k: "cc", h: "Carga de<br>Camión" },
+  { k: "noProd", h: "Hs No<br>Productivas" },
+  { k: "rt", h: "Recp de<br>Merc" },
+  { k: "mg", h: "Guardado<br>de Merc" },
+  { k: "limp", h: "Limpieza" },
+  { k: "pb", h: "Baño" },
+  { k: "sinReg", h: "Hs<br>S/Reg" },
+];
+function openReporteVirgilio() {
+  _stkPopShell("📈 Reporte diario Virgilio", "stkPopBody");
+  const body = document.getElementById("stkPopBody"); if (!body) return;
+  const _iso = function (d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  const hoy = new Date(), ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
+  body.innerHTML =
+    '<div class="stkpop-hint">Elegí un día y generá el reporte. Se arma en el momento como cuadro; <b>no manda WhatsApp</b> (el envío diario a Juan es aparte).</div>' +
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
+    '<label style="font-weight:700;font-size:14px">Día:</label>' +
+    '<input type="date" id="rvFecha" value="' + _iso(ayer) + '" max="' + _iso(hoy) + '" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">' +
+    '<button class="mva-clear" style="background:#1e6bd6;color:#fff;border-color:#1e6bd6" onclick="rvGenerar()">Generar</button>' +
+    '<a id="rvDesc" download target="_blank" rel="noopener" style="display:none;color:#1e6bd6;font-weight:700;font-size:13.5px">Descargar PDF ↓</a>' +
+    '</div>' +
+    '<div id="rvEstado" style="min-height:20px;color:#64748b;font-weight:600;font-size:13.5px;margin:2px 0 6px"></div>' +
+    '<div id="rvVisor"></div>';
+}
+// Un bloque = una tabla. Con un solo día viene un bloque "(unico)" (sin subtítulo); con rango,
+// un bloque por día + "Total del período". table-layout:auto → cada columna toma el ancho de su
+// contenido (no se estira a toda la pantalla); la de Operario queda pegada a la izquierda.
+function _rvBloqueHtml(b) {
+  const filas = (b && b.filas) || [];
+  if (!filas.length) return "";
+  const sub = (b.subtitulo && b.subtitulo !== "(unico)") ? b.subtitulo : "";
+  let h = "";
+  if (sub) h += '<div style="font-size:16px;font-weight:800;color:#0f172a;margin:12px 0 6px">' + escapeHtml(sub) + '</div>';
+  h += '<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:6px">' +
+    '<table style="border-collapse:collapse;table-layout:auto;font-size:12.5px;background:#fff">';
+  h += '<thead><tr>' + RV_COLS.map(function (c) {
+    const al = c.name ? "left" : "right";
+    const sticky = c.name ? "position:sticky;left:0;z-index:3;background:#f1f5f9;" : "";
+    return '<th style="' + sticky + 'padding:6px 9px;text-align:' + al + ';background:#f1f5f9;color:#475569;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;line-height:1.25;border-bottom:2px solid #cbd5e1;white-space:nowrap;position:sticky;top:0;">' + c.h + '</th>';
+  }).join("") + '</tr></thead><tbody>';
+  h += filas.map(function (f) {
+    return '<tr>' + RV_COLS.map(function (c) {
+      const v = (f[c.k] != null && f[c.k] !== "") ? String(f[c.k]) : "-";
+      if (c.name) {
+        return '<td style="position:sticky;left:0;z-index:1;background:#fff;padding:6px 10px;text-align:left;font-weight:700;color:#0f172a;white-space:nowrap;border-bottom:1px solid #eef2f6;box-shadow:1px 0 0 #e2e8f0;">' + escapeHtml(v) + '</td>';
+      }
+      const dim = (v === "-") ? "color:#cbd5e1;" : "color:#0f172a;";
+      return '<td style="padding:6px 9px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:1px solid #eef2f6;' + dim + '">' + escapeHtml(v) + '</td>';
+    }).join("") + '</tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  return h;
+}
+// Pendientes al cierre — espejo exacto de lo que el PDF dibuja en la edge (index.ts ~483).
+function _rvPendHtml(p) {
+  if (!p) return "";
+  const coma = function (s) { return String(s).replace(".", ","); };
+  const m3 = coma(Number(p.m3pend || 0).toFixed(2));
+  const dias = coma(Number(p.dias || 0).toFixed(1));
+  let gDisp;
+  if (Number(p.guardHoras) < 1) {
+    const min = (p.guardRatio && isFinite(p.guardCajas / p.guardRatio)) ? Math.round((p.guardCajas / p.guardRatio) * 60) : null;
+    gDisp = (min == null) ? "—" : (min + " min");
+  } else {
+    gDisp = coma(String(Math.round(Number(p.guardHoras) * 10) / 10)) + " h";
+  }
+  const filas = [
+    ["M3 Pend", m3 + " m3", "(" + dias + " días)"],
+    ["Hs Guard Pend", gDisp, "(" + (p.guardCajas != null ? p.guardCajas : "—") + " cajas)"],
+  ];
+  let h = '<div style="font-size:16px;font-weight:800;color:#0f172a;margin:14px 0 6px">Pendientes (al cierre del día)</div>';
+  h += '<div style="display:inline-block;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">' +
+    '<table style="border-collapse:collapse;font-size:14px;background:#fff">';
+  h += filas.map(function (r) {
+    return '<tr><td style="padding:7px 12px;color:#475569;border-bottom:1px solid #eef2f6;white-space:nowrap">' + escapeHtml(r[0]) + '</td>' +
+      '<td style="padding:7px 12px;text-align:right;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;border-bottom:1px solid #eef2f6;border-left:1px solid #eef2f6;white-space:nowrap">' + escapeHtml(r[1]) + '</td>' +
+      '<td style="padding:7px 12px;color:#94a3b8;font-size:12.5px;border-bottom:1px solid #eef2f6;white-space:nowrap">' + escapeHtml(r[2]) + '</td></tr>';
+  }).join("");
+  h += '</table></div>';
+  return h;
+}
+async function rvGenerar() {
+  const f = (document.getElementById("rvFecha") || {}).value;
+  const est = document.getElementById("rvEstado"), vis = document.getElementById("rvVisor"),
+        desc = document.getElementById("rvDesc");
+  if (!est) return;
+  if (!f) { est.textContent = "Elegí una fecha."; return; }
+  const dd = f.split("-").reverse().join("/");
+  est.innerHTML = "Generando el reporte del " + dd + "…"; if (vis) vis.innerHTML = ""; desc.style.display = "none";
+  try {
+    const r = await fetch(SUPABASE_URL + "/functions/v1/gv-reporte-diario-virgilio", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ solo_pdf: true, fecha: f })
+    });
+    const j = await r.json().catch(function () { return null; });
+    if (!r.ok || !j) {
+      est.textContent = "No se pudo generar: " + ((j && (j.error || j.message)) || ("HTTP " + r.status));
+      return;
+    }
+    const ops = (j.operarios != null) ? j.operarios : "?";
+    est.textContent = (j.operarios === 0)
+      ? ("El " + dd + " no tiene datos de operarios cargados.")
+      : ("Listo — " + dd + " · " + ops + " operario" + (ops === 1 ? "" : "s") + ".");
+    const bloques = (j.bloques || []);
+    let h = "";
+    if (j.titulo) h += '<div style="font-size:16px;font-weight:800;color:#0f172a;margin:2px 0 8px">' + escapeHtml(j.titulo) + '</div>';
+    const cuerpo = bloques.map(_rvBloqueHtml).join("");
+    h += cuerpo || '<div class="stkpop-empty">Sin registros de producción para la fecha.</div>';
+    h += _rvPendHtml(j.pendientes);
+    if (vis) vis.innerHTML = h;
+    if (j.pdfUrl) {
+      desc.href = j.pdfUrl; desc.setAttribute("download", "Virgilio-" + f + ".pdf"); desc.style.display = "inline";
+    }
+  } catch (e) { est.textContent = "Error de red: " + ((e && e.message) || e); }
+}
 async function stkOpenFaltFact() {
   _stkPopShell("📉 Faltantes facturados sin completar", "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
@@ -46640,11 +46774,15 @@ async function cuarContactoCargar() {
    en Config. Cuarentena (2.045 de 2.047 filas lo traen).
    Va en SU PROPIA llamada con SU PROPIO catch: si falla, el monto -que es lo que sostiene el
    Speech 1- no se cae con el (leccion de la v19.44). */
-/* ⚠ "Todavia no llegaron los pedidos" NO es "no hay a quien preguntarle". Si se guarda {} en
-   ese momento, el *Need() no vuelve a pedir nunca y el dato falta el resto de la sesion.
-   Estas dos lineas son las que lo distinguen; van en los CUATRO lotes. */
-function clinSinPedidos() { return !_apr.listo || !(_apr.pedidos && _apr.pedidos.length); }
-function clinVacio(campo) { _apr[campo] = clinSinPedidos() ? null : {}; }
+/* ⚠ UNA LISTA VACIA NUNCA SE GUARDA COMO RESPUESTA. El *Need() sólo vuelve a pedir cuando el
+   estado es `null`, así que guardar {} apaga la carga para el resto de la sesión.
+   La v20.71 intentó distinguirlo mirando si ya había PEDIDOS — y no alcanzó, porque la lista
+   que importa es la de RETENIDOS, que la arma `cuarMarcarPedidos` en OTRA llamada, después:
+   con los pedidos ya cargados y los motivos todavía en camino, la lista sale vacía igual y el
+   CUIT quedaba sin pedirse (lo volvió a ver Luis con LK 4282).
+   No hay nada que optimizar acá: con la lista vacía no se hace ninguna llamada de red, así que
+   reintentar en el próximo render es gratis. */
+function clinVacio(campo) { _apr[campo] = null; }
 function clinCuitNeed() { if (_apr.cliCuit === null && !_apr.cliCuitLoading) clinCuitCargar(); }
 async function clinCuitCargar() {
   if (_apr.cliCuitLoading) return;
@@ -51171,7 +51309,7 @@ async function facPrintFacturado(np, tanda){
       fetch(talUrl, { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
       fetch(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&np=eq." + npE + "&limit=1", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
       fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cod_art,cajas_falto&np=eq." + npE + "&cajas_falto=gt.0&limit=2000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
-      // v20.82 — la NP de la página ("LK 0145") NO vive en gv_ppp_programacion_diaria, que es
+      // v20.84 — la NP de la página ("LK 0145") NO vive en gv_ppp_programacion_diaria, que es
       // el espejo de ISIS: por eso el remito FACTURADO salía con "Cliente —" y "Fecha Entrega —".
       // Sale de gv_ppp_web_estado, la misma fuente que ya usan Composición a líos (v14.36),
       // Recepción Remitos (v15.42) y el remito de ARMADO (v15.46) — este camino, el auto-print

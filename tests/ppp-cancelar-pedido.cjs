@@ -8,7 +8,8 @@
    tiene que preguntar si se quieren cancelar todas las NPs de ese pedido o solo esa."*
 
    Lo que se cuida acá:
-     · El botón está en la fila de la NP, al lado del 📅 y del ↩, y no se los come.
+     · El botón está en la fila de la NP, al lado del 📅, y no se lo come. (v20.80: el ↩
+       «Enviar a programar» ya no existe ahí, así que se verifica que NO vuelva.)
      · Antes de tocar nada le pregunta al backend QUÉ se lleva puesto
        (`gv_ppp_np_cancelar_previo`): nunca se cancela a ciegas.
      · Con un pedido de varias NP, lo PRIMERO que pregunta es el alcance. Y si se elige «sólo
@@ -128,8 +129,11 @@ catch (_e) {
     out.texto = bt ? bt.textContent.trim() : "";
     out.tooltip = bt ? (bt.getAttribute("title") || "") : "";
     out.tooltipDiceAGuardar = /A guardar/.test(out.tooltip);
-    out.siguenLosOtros = !!(fila && fila.querySelector(".pga-acc-b.dia") &&
-                            fila.querySelector(".pga-acc-b:not(.dia):not(.cancel)"));
+    // v20.86 — en la v20.80 Thomas sacó el «↩ Enviar a programar» de la fila: los únicos
+    // caminos son 📅 Cambiar de día y ✕ Cancelar. Antes esto exigía un TERCER botón, que era
+    // justo el que se mandó sacar, así que el test quedó en rojo pidiendo la puerta cerrada.
+    out.sigueElDia = !!(fila && fila.querySelector(".pga-acc-b.dia"));
+    out.sinAProgramar = !!(fila && !fila.querySelector(".pga-acc-b:not(.dia):not(.cancel)"));
     if (!bt) return out;
 
     // (b) abrirlo pide el previo y arranca preguntando EL ALCANCE (son 2 NP)
@@ -263,7 +267,8 @@ catch (_e) {
   t(r.hayBoton, "la fila de la NP no tiene el botón ✕ de cancelar");
   t(r.texto === "✕", "el botón no es sólo el ícono — «" + r.texto + "»");
   t(r.tooltipDiceAGuardar, "el tooltip no dice que la mercadería vuelve a «A guardar»");
-  t(r.siguenLosOtros, "se comió el 📅 o el ↩ de la fila");
+  t(r.sigueElDia, "se comió el 📅 Cambiar de día de la fila");
+  t(r.sinAProgramar, "volvió a aparecer una puerta a «A Programar» en la fila (v20.80: no puede)");
   t(r.abrio, "no abre el pop-up");
   t(r.pidioPrevio, "no le pregunta al backend qué se lleva puesto (gv_ppp_np_cancelar_previo)");
   t(r.noCancelóTodavia, "canceló con sólo tocar el botón, sin confirmar");

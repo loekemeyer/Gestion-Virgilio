@@ -1293,6 +1293,38 @@ no se mueve. Lo que se frena es programar uno nuevo ahí.
 en un día cerrado. Mira **web e ISIS** y saca lo que ya salió por CCN/CRN.
 `sql/gv_dia_sin_reparto_v2064.sql`, `tests/ppp-dia-sin-reparto.cjs`, §3.ll.
 
+## ⚠ REGLA (Thomas, 2026-09-21, v20.86): lo ARMADO SIN DÍA tiene que verse en el badge
+
+**Thomas, textual:** *"debería aparecer discriminado en el badge del icono de PPP en la página
+principal del admin (un número rojo con los pendientes)"*.
+
+**`GV_PPP_Armados_Espera` es un agujero por diseño si nadie lo mira.** Toda NP que esté ahí
+pierde la `fecha_entrega` en `gv_ppp_programacion_diaria` —es el sentido del módulo: armado a
+propósito sin día— así que **desaparece de todos los días de la Programación** y no puede figurar
+como "Salió".
+
+**Caso Iro Iro (21/09):** NP 98626/98627, 0,483 m³, pickeadas el 14/09, armadas el 15/09,
+**facturadas el 16/09** y metidas ahí el 18/09. Tres días en el pallet, con la factura hecha,
+sin aparecer en ninguna pantalla. **Lo encontró Thomas mirando, no el sistema.**
+
+Desde la v20.86 es el tipo `armado_espera` de `gv_ppp_avisos` (orden 4, antes que los retenidos y
+que las alertas web) y tiene su renglón en `gv_ppp_avisos_detalle` con las NP, la tanda, los m³,
+la zona, los días que lleva y **si ya se facturó**, que es lo que apura.
+
+⚠ **Cuenta PEDIDOS, no filas** (Iro Iro son 2 NP de un pedido = 1), igual que el resto del badge.
+
+⚠ **`por` y `motivo` de esa tabla vienen NULL** en las dos filas que existen: el detalle dice
+*"no quedó registrado quién ni por qué"* en vez de inventarlo. Si algún día se escribe quién lo
+dejó ahí, el detalle ya lo muestra solo.
+
+**El front no se tocó**: `pppFetchAvisos` y `pppAvisosAbrir` leen las dos vistas genéricamente,
+así que un tipo nuevo aparece sin tocar `index.html`. **Al agregar otro aviso, se agrega en el
+SQL y listo** — y con su fila en `GV_Reglas_Centinela`.
+
+**Chequeo:** `select * from public.gv_ppp_armado_espera;` — lo armado sin día, con los días que
+lleva y si está facturado. `sql/gv_ppp_armado_espera_v2086.sql`,
+`tests/ppp-armado-espera-badge.cjs`, §3.lw.
+
 ## ⚠ REGLA (Thomas, 2026-09-21, v20.80): un pedido programado NO vuelve a «A Programar»
 
 **Thomas, textual:** *"sacá del módulo programación la opción de mandar pedidos a «A programar».
@@ -1587,10 +1619,15 @@ se volvía a pedir en toda la sesión**. Medido con LK 4282: el CUIT está en el
 devuelve, y el front la llamaba **0 veces** mientras la celda mostraba el guion de *"este cliente
 no tiene CUIT"* — o sea, justo lo contrario de lo que pasaba.
 
-Lo resuelven dos líneas, `clinSinPedidos()` / `clinVacio(campo)`: sin pedidos cargados el estado
-queda en `null` y se vuelve a pedir; con los pedidos cargados y sin retenidos, `{}` legítimo.
-**Al agregar un lote nuevo de este tipo, usar `clinVacio`.** Es el mismo pozo de §*"una lectura
-ROTA no es un CERO"*. Problema 474.
+**Una lista vacía NUNCA se guarda como respuesta** (`clinVacio` deja `null`): con la lista
+vacía no se hace ninguna llamada de red, así que reintentar en el próximo render es gratis.
+
+⚠⚠ **El primer arreglo (v20.71) miraba si ya había PEDIDOS, y NO alcanzó.** Luis lo volvió a ver
+el mismo día: *"volvio a no aparecer el cuit de silvano, por que?"*. La lista que importa no es
+la de pedidos sino la de **RETENIDOS**, y ésa la arma `cuarMarcarPedidos` en **otra llamada,
+después**: con los pedidos ya cargados y los motivos todavía en camino, la lista salía vacía
+igual y el `{}` se guardaba lo mismo. Lo reproduce `tests/apr-lotes-reintentan.cjs`, que simula
+esa secuencia y mide las llamadas: con el guard viejo, **0**. Problema 474.
 
 ### El número de pedido va DENTRO del badge de «Cliente nuevo» (v20.81, Luis)
 
