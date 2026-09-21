@@ -26268,3 +26268,54 @@ propio catch**: si falla, el monto —que sostiene el Speech 1— no se cae con 
 esos 37 tiene factura (lógico, nunca se le facturó). Aparecen sin CUIT hasta el próximo padrón.
 
 `sql/gv_cuarentena_monto_sin_importados_v2041.sql`.
+
+### §3.kx — v20.42 / v20.43: la regla de la E, el faltante de stock y el CUIT de la página — 2026-09-21
+
+**Tres correcciones de Luis sobre la v20.41.**
+
+**1. "Poné la regla de la E como te dije."** `gv_art_es_importado` vuelve a ser **el código con
+E, y nada más**. La unión con la tabla `Importados` que había agregado la v20.41 se saca.
+
+**2. "Sólo monto sin importados que tengamos en falta del stock."** No se descuenta todo lo
+importado: se descuenta **lo que hoy no se puede entregar, caja por caja**. Si el pedido pide 10
+cajas de un importado y hay 6 disponibles, se descuentan 4.
+
+El disponible sale de `stocks_carga_rapida` con el criterio del generador de OC (v19.85): lo
+comprometido (`separar_pedidos`, `a_facturar`) **no cuenta**, ya tiene dueño.
+
+⚠ **Un dual son DOS pilas** (`437E LK` / `437E CH`) y la elige la **L** del código —siempre LK,
+regla de Thomas— o, si no la tiene, la empresa del pedido. Sumar las dos daría stock que a ese
+pedido no se le puede dar. Medido: 437E da **14** para Chef y **286** para LK; `438EL` pedido de
+Chef da **117** (la L manda a la pila de LK); 198E y 323E dan 0.
+
+**Probado con pedidos reales, antes y después:**
+
+| pedido | ítems | con E | en falta | monto | descontado |
+|---|---|---|---|---|---|
+| chef 229 | 6 | 2 | **1** | $1.922.940 | $508.200 |
+| chef 228 | 8 | 2 | 0 | $649.809,60 | — |
+| chef 227 | 19 | 1 | 0 | $900.768 | — |
+
+La v20.41 descontaba en el 229 los **dos** ítems ($1.613.520), aunque uno tuviera stock.
+
+**3. El CUIT no se veía, y no era el dato.** La RPC devolvía bien: la primera llamada a una **RPC
+recién creada** vuelve **404** porque PostgREST todavía no la tiene en su cache de esquema, y el
+`catch` del front la dejaba vacía para siempre. Se recargó el cache (`notify pgrst, 'reload
+schema'`) y el front **reintenta una vez** antes de darse por vencido. Es la contracara de la
+lección de la v19.44: el catch que salva la pantalla también esconde el error.
+
+> Al crear una RPC nueva, el `notify pgrst, 'reload schema'` va en la misma migración.
+
+**Y el CUIT de los clientes nuevos sale de la página** (Luis: *"esos clientes nuevos se subieron
+a la página, de ahí tenemos que tener el dato"*). La Edge Function `gv-sync-padron-direcciones`
+(cron 79, 08:40) ya leía `customers` de LK y Chef todos los días: ahora pide también el `cuit`.
+
+⚠ Va a **dos** lugares y no es redundancia: `GV_Clientes_Direcciones.cuit` tiene una fila por
+**dirección**, y un cliente recién dado de alta puede no haber cargado ninguna — medido, llenar
+sólo esa tabla recuperaba **2 de los 35** que faltaban. Por eso además va a **`GV_Cliente_Cuit`**,
+una fila por **cliente**.
+
+Corrida real: 2.312 direcciones, **2.023 clientes** de CUIT (LK 1.258, Chef 760). **Clientes
+nuevos con CUIT: 345 de 349** (eran 312).
+
+`sql/gv_monto_sin_importados_en_falta_v2042.sql`, `sql/gv_cliente_cuit_v2043.sql`.
