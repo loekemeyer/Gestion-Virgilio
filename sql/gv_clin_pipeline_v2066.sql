@@ -246,6 +246,7 @@ declare
   v_ev    text := nullif(btrim(lower(p_evento)), '');
   v_cod   text := regexp_replace(btrim(coalesce(p_cod,'')), '\.0+$', '');
   v_apro  boolean;
+  v_demo  boolean;
   r       public."GV_Cliente_Nuevo_Pipeline"%rowtype;
 begin
   if not (es_supervisor_virgilio() or gv_es_supervisor_o_servicio()) then
@@ -258,6 +259,13 @@ begin
   if v_ev in ('referenciado','valido','no_valido','pagado','cancelado') and v_pers is null then
     raise exception 'Falta indicar quién lo decide.' using errcode='22023';
   end if;
+
+  -- ⚠ EL PEDIDO DE EJEMPLO (clave `__DEMO__`) avanza por las etapas como cualquiera — si no, no
+  -- se prueba nada — pero NO puede dejar rastro en lo que se mira despues: ni una linea en el log
+  -- de Cuarentena, ni un comentario, ni el timer del submodulo viejo, ni una excepcion que le
+  -- saque la cuarentena a un cliente de verdad. Pedido de Luis, 21/09: *"un cliente de ejemplo
+  -- con el que pueda probar los botones y no romper nada"*.
+  v_demo := v_clave like '\_\_DEMO%';
 
   insert into public."GV_Cliente_Nuevo_Pipeline" (empresa, order_id, np, cod, razon_social)
   values (v_emp, v_clave, nullif(btrim(p_np),''), nullif(v_cod,''), nullif(btrim(p_razon_social),''))
@@ -291,7 +299,7 @@ begin
   -- tercero, que paguen de manera anticipada"*. Asi que se exime al CLIENTE, no solo al pedido
   -- que esta en pantalla: sus proximos pedidos tampoco caen en el pipeline. Mismo mecanismo que
   -- el vinculo, con `origen` propio para poder revertir uno sin tocar el otro.
-  if v_ev = 'referenciado' and nullif(v_cod,'') is not null then
+  if v_ev = 'referenciado' and nullif(v_cod,'') is not null and not v_demo then
     insert into public.gv_excepcion_cuarentena (empresa, cod, nombre, motivos, origen, activo, nota, actualizado_por)
     values (v_emp, v_cod, coalesce(nullif(btrim(p_razon_social),''), r.razon_social),
             array['cliente_nuevo'], 'referenciado', true,
@@ -302,7 +310,7 @@ begin
            activo = true, nota = excluded.nota, actualizado_por = excluded.actualizado_por, actualizado_at = now();
   end if;
   -- y al reabrir se saca, o el cliente quedaria referenciado para siempre por un click deshecho
-  if v_ev = 'reabrir' and nullif(v_cod,'') is not null then
+  if v_ev = 'reabrir' and nullif(v_cod,'') is not null and not v_demo then
     update public.gv_excepcion_cuarentena
        set motivos = array_remove(motivos, 'cliente_nuevo'),
            activo = (coalesce(array_length(array_remove(motivos, 'cliente_nuevo'), 1), 0) >= 1),
@@ -310,22 +318,24 @@ begin
      where empresa = v_emp and cod = v_cod and origen = 'referenciado';
   end if;
 
-  if v_ev = 'speech1' then
+  if v_ev = 'speech1' and not v_demo then
     insert into public."GV_Clientes_Nuevos_Contacto" (empresa, order_id, por)
     values (v_emp, v_clave, v_quien) on conflict (empresa, order_id) do nothing;
   end if;
 
-  if coalesce(btrim(p_comentario),'') <> '' and v_ev <> 'cancelado' then
+  if coalesce(btrim(p_comentario),'') <> '' and v_ev <> 'cancelado' and not v_demo then
     insert into public."GV_Cuarentena_Comentarios" (empresa, order_id, np, texto, por, persona)
     values (v_emp, v_clave, nullif(btrim(p_np),''), btrim(p_comentario), v_quien, v_pers);
   end if;
 
-  insert into public."GV_Cuarentena_Log" (empresa, clave, np, cod, razon_social, evento, motivos, persona, por, comentario)
-  values (v_emp, v_clave, coalesce(nullif(btrim(p_np),''), r.np), coalesce(nullif(v_cod,''), r.cod),
-          coalesce(nullif(btrim(p_razon_social),''), r.razon_social),
-          'pipeline_' || v_ev, array['cliente_nuevo'], v_pers, v_quien, nullif(btrim(p_comentario),''));
+  if not v_demo then
+    insert into public."GV_Cuarentena_Log" (empresa, clave, np, cod, razon_social, evento, motivos, persona, por, comentario)
+    values (v_emp, v_clave, coalesce(nullif(btrim(p_np),''), r.np), coalesce(nullif(v_cod,''), r.cod),
+            coalesce(nullif(btrim(p_razon_social),''), r.razon_social),
+            'pipeline_' || v_ev, array['cliente_nuevo'], v_pers, v_quien, nullif(btrim(p_comentario),''));
+  end if;
 
-  v_apro := exists (select 1 from public."GV_Cuarentena_Liberados" lb
+  v_apro := (not v_demo) and exists (select 1 from public."GV_Cuarentena_Liberados" lb
                      where lb.empresa = v_emp and public.gv_cuarentena_clave(lb.order_id) = v_clave);
   etapa := public.gv_clin_etapa(r.analisis_at, r.decision, r.speech1_at, r.speech2_at, r.pagado_at, r.cerrado_at, v_apro);
   reloj_desde := public.gv_clin_reloj(etapa, r.analisis_at, r.speech1_at, r.speech2_at);

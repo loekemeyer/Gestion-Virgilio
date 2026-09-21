@@ -1496,6 +1496,16 @@ Por eso el pipeline **no tiene camino propio para nada que ya existiera**, y est
 Lo sostiene `tests/pipe-clientes-nuevos.cjs` con el **candado invertido**: si alguien le escribe
 al pipeline su propio «aprobar», el test se pone en rojo.
 
+**El CLIENTE DE PRUEBA** (botón «👁 Ver cliente de prueba») avanza por las etapas **de verdad**
+—si no, no se prueba nada— pero su clave es `__DEMO__` y el backend lo aísla: no escribe el log
+de Cuarentena, ni comentarios, ni el timer del submódulo viejo, ni ninguna excepción; Aprobar y
+Eliminar avisan qué pasaría en vez de tocar un pedido real, y los Speech muestran el texto sin
+abrir WhatsApp. Medido: 8 etapas seguidas → **0 filas** en las cuatro tablas. «↺ Reiniciar
+ejemplo» lo deja como recién llegado.
+
+⚠ **Si alguna vez hay que sumar una escritura nueva a `gv_clin_evento`, va con `and not v_demo`**,
+o el ejemplo empieza a dejar basura en una tabla de verdad sin que nadie lo note.
+
 **La etapa NO se guarda: se deriva** de los timestamps (`gv_clin_etapa`). Una columna `etapa`
 escrita a mano se desincroniza el día que una escritura falla a la mitad, y después nadie sabe
 cuál de las dos miente.

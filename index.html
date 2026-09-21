@@ -896,6 +896,8 @@ button {
 .pipe-tr-no_valido,.pipe-tr-cancelado{ background:#fef2f2; }
 .pipe-tr-aprobado{ background:#f8fafc; color:#64748b; }
 
+.pipe-td-cuit{ white-space:nowrap; }
+.pipe-cuit{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; color:#334155; }
 .pipe-etapa{ display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }
 .pipe-etapa.e-ing{ background:#e2e8f0; color:#334155; }
 .pipe-etapa.e-ana{ background:#dbeafe; color:#1e40af; }
@@ -41126,7 +41128,7 @@ function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
     b("ocup",    "📦 Ocupación") +
     b("modif",   "✏️ Modificar Pedidos") +          // v18.14 (Luis): entre Ocupación y Config. Cuarentena
     b("clin",    "🧭 Pipeline clientes") +   // v20.66 (Luis): convive con el submódulo de A Programar
-    b("cuarcfg", "ð§ Config. Cuarentena") +
+    b("cuarcfg", "🚧 Config. Cuarentena") +
   '</div>';
 }
 /* v14.29 — contadores de las solapas calculados aparte, para que A Programar también
@@ -44483,6 +44485,7 @@ let _apr = {
   pipe: null, pipeLoading: false, pipeRetry: false,
   pipeCfg: null, pipeCfgLoading: false,
   pipeFirma: null, pipeVinc: null,
+  pipeDemo: false,   // v20.67 (Luis): el cliente de prueba de la pestaña
   // v19.44 — REPOSICIÓN CHICA: pedidos que NO caen en cuarentena porque al cliente se le facturó
   // hace poco y pidió un solo código (empresa:order_id → {items, dias, fecha}). Se pide APARTE,
   // nunca junto con la marcación: ver cuarRepoCargar.
@@ -46915,9 +46918,42 @@ function pipeEsClienteNuevo(p) {
   return aprCuarentenaMotivos(p).indexOf("cliente_nuevo") >= 0;
 }
 function pipeLista() {
-  return (_apr.pedidos || []).filter(function (p) {
+  const l = (_apr.pedidos || []).filter(function (p) {
     return !p._demo && aprEnCuarentena(p) && pipeEsClienteNuevo(p);
   });
+  // v20.67 (Luis): el pedido de EJEMPLO va primero, para poder probar los botones sin tocar
+  // nada real. Avanza por las etapas de verdad (si no, no se prueba nada), pero su clave es
+  // `__DEMO__` y el backend no le escribe ni el log, ni el timer viejo, ni ninguna excepcion.
+  return _apr.pipeDemo ? [pipeDemoPedido()].concat(l) : l;
+}
+/* El cliente de prueba. No es un pedido real y no existe en ninguna otra pantalla. */
+function pipeDemoPedido() {
+  const items = [{ art: "505", uni: 24, uxb: 12, cajas: 2 }, { art: "221", uni: 48, uxb: 12, cajas: 4 }];
+  let hoy = ""; try { hoy = new Date().toISOString().slice(0, 10); } catch (_e) {}
+  return { order_id: "__DEMO__", empresa: "lk", cod: "4999", razon_social: "CLIENTE DE PRUEBA S.R.L.",
+           zona: "Zona 1 - CABA Sur", localidad: "Barracas", direccion: "Av. de Ejemplo 1234",
+           m3: 0.30, lineas: 2, cajas: 6, np_total: 1, fecha_recep: hoy,
+           bloques: [{ np_idx: 1, m3: 0.30, lineas: 2, cajas: 6, items: items }],
+           cuarentena_motivos: ["cliente_nuevo"], cuarentena_detalle: { nuevo_pedidos: 1 },
+           _demo: true, _cuit: "30712345678" };
+}
+function pipeDemoToggle() {
+  _apr.pipeDemo = !_apr.pipeDemo;
+  if (_apr.pipeDemo) pipeRecargar(); else pppRenderProg();
+}
+/* Lo deja como recien llegado, para volver a probar desde el principio. */
+async function pipeDemoReiniciar() {
+  await pipeEvento("lk", "__DEMO__", "reabrir", null, null);
+}
+function pipeDemoRowHtml() {
+  return '<div class="cuar-demo-row">' +
+    '<span class="cuar-demo-hint">Cliente de prueba: los botones funcionan de verdad y las etapas avanzan, ' +
+      'pero no toca ningún pedido real, no deja nada en el log y no abre WhatsApp.</span>' +
+    (_apr.pipeDemo
+      ? '<button class="cuar-demo-btn" onclick="pipeDemoReiniciar()" title="Lo deja como recién llegado">↺ Reiniciar ejemplo</button>'
+      : '') +
+    '<button class="cuar-demo-btn" onclick="pipeDemoToggle()">' +
+      (_apr.pipeDemo ? "✕ Quitar ejemplo" : "👁 Ver cliente de prueba") + '</button></div>';
 }
 
 /* ── estado del pipeline, por lote (una sola vuelta de red para toda la pantalla) ────── */
@@ -46954,6 +46990,23 @@ function pipeEst(p) {
   return m[String(p.empresa || "lk") + ":" + pipeClave(p.order_id)] || null;
 }
 function pipeEtapa(p) { const e = pipeEst(p); return (e && e.etapa) || "ingresado"; }
+/* v20.67 (Luis: "que figure el cuit en la tabla"). Sale del padron que se importa en
+   Config. Cuarentena, el mismo que usa el submodulo viejo. Columna propia y no un chip
+   debajo del nombre: es el dato que se copia para buscar al cliente en Equifax. */
+function pipeCuitTxt(p) {
+  if (!p) return "";
+  const c = p._demo ? p._cuit
+    : (_apr.cliCuit || {})[String(p.empresa || "lk") + ":" + String(p.cod || "").trim()];
+  if (!c) return (_apr.cliCuit === null) ? "…" : "";
+  const d = String(c).replace(/\D/g, "");
+  return d.length === 11 ? d.slice(0, 2) + "-" + d.slice(2, 10) + "-" + d.slice(10) : d;
+}
+function pipeCuitHtml(p) {
+  const t = pipeCuitTxt(p);
+  if (!t) return '<span class="cuar-yp-sin" title="Este cliente no tiene CUIT en el padrón de Config. Cuarentena">—</span>';
+  if (t === "…") return '<span class="cuar-yp-sin">…</span>';
+  return '<span class="pipe-cuit" title="CUIT del cliente — es el que se busca en Equifax">' + escapeHtml(t) + '</span>';
+}
 
 const PIPE_ETAPAS = {
   ingresado:    { t: "Sin analizar",      c: "e-ing"  },
@@ -47241,15 +47294,39 @@ function pipeVincHtml() {
 
 /* ── Los Speech: mismo texto y mismo teléfono que el submódulo viejo ─────────────────── */
 async function pipeSpeech(empresa, orderId, n) {
-  const p = pipeBuscar(empresa, orderId); if (!p) return;
+  const esDemo = String(orderId) === "__DEMO__";
+  const p = esDemo ? pipeDemoPedido() : pipeBuscar(empresa, orderId);
+  if (!p) return;
   await pipeEvento(empresa, orderId, n === 2 ? "speech2" : "speech1", null, null);
+  if (esDemo) {
+    // el telefono del ejemplo es inventado: se muestra el texto que se mandaria, no se manda
+    _apr.msg = "Ejemplo: el reloj arrancó y la etapa avanzó, pero no se abre WhatsApp. " +
+               "El mensaje que iría es: «" + (n === 2 ? clinSpeechMsg2(p) : clinSpeechMsg1(p)) + "»";
+    _apr.msgErr = false; pppRenderProg(); return;
+  }
   clinAbrirWa(p, n === 2 ? clinSpeechMsg2(p) : clinSpeechMsg1(p));
+}
+/* Aprobar y Eliminar del EJEMPLO: no llaman a cuarLiberar ni a aprAnularAbrir, que tocan
+   pedidos de verdad. El ejemplo se cierra solo y avisa qué habría pasado. */
+function pipeDemoAprobar() {
+  _apr.msg = "Ejemplo: acá el pedido pasaría a «Pedidos a programar» con prioridad — " +
+             "tiene que salir dentro de los 2 días hábiles. En el ejemplo no se programa nada.";
+  _apr.msgErr = false; pppRenderProg();
+}
+function pipeDemoEliminar() {
+  _apr.msg = "Ejemplo: acá el pedido saldría de la PPP y quedaría en el log de anulados. " +
+             "En el ejemplo no se borra nada. Tocá «↺ Reiniciar ejemplo» para volver a empezar.";
+  _apr.msgErr = false; pppRenderProg();
 }
 
 /* ── Los botones de cada etapa ───────────────────────────────────────────────────────── */
 function pipeAccionesHtml(p) {
   const emp = (p.empresa || "lk"), oid = escapeHtml(String(p.order_id));
-  const et = pipeEtapa(p), sinTel = !clinWppTel(p);
+  const et = pipeEtapa(p), esDemo = !!p._demo;
+  // en el ejemplo los Speech no se deshabilitan por falta de teléfono: la idea es poder tocarlos
+  const sinTel = !esDemo && !clinWppTel(p);
+  const _aprobar = esDemo ? "pipeDemoAprobar()" : "cuarLiberar('" + emp + "','" + oid + "')";
+  const _eliminar = esDemo ? "pipeDemoEliminar()" : "aprAnularAbrir('" + emp + "','" + oid + "')";
   const B = function (cls, onclick, txt, title, off) {
     return '<button class="pipe-b ' + cls + (off ? " pipe-b-off" : "") + '"' + (off ? " disabled" : "") +
       ' onclick="' + onclick + '" title="' + escapeHtml(title) + '">' + txt + '</button>';
@@ -47276,7 +47353,7 @@ function pipeAccionesHtml(p) {
              "'El pedido se descarta.')", "✖ No válido", "No se le vende: el pedido se descarta");
 
   if (et === "referenciado")
-    return B("pipe-b-ok2", "cuarLiberar('" + emp + "','" + oid + "')", "✅ Aprobar y programar",
+    return B("pipe-b-ok2", _aprobar, "✅ Aprobar y programar",
              "Lo manda a «Pedidos a programar». Tiene que salir dentro de los 2 días hábiles.") +
            B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
              "Vincularlo a una razón social que ya es cliente");
@@ -47303,11 +47380,11 @@ function pipeAccionesHtml(p) {
              "🗑 Cancelar pedido", "No pagó: se da de baja");
 
   if (et === "pagado")
-    return B("pipe-b-ok2", "cuarLiberar('" + emp + "','" + oid + "')", "✅ Aprobar y programar",
+    return B("pipe-b-ok2", _aprobar, "✅ Aprobar y programar",
              "Ya pagó. Lo manda a «Pedidos a programar»; tiene que salir dentro de los 2 días hábiles.");
 
   if (et === "no_valido")
-    return B("pipe-b-no", "aprAnularAbrir('" + emp + "','" + oid + "')", "🗑 Eliminar pedido",
+    return B("pipe-b-no", _eliminar, "🗑 Eliminar pedido",
              "No válido: se saca de la PPP y queda en el log de anulados") +
            B("pipe-b-sec2", "pipeEvento('" + emp + "','" + oid + "','reabrir',null,null)", "↩ Reabrir",
              "Vuelve el pedido al principio del pipeline");
@@ -47341,10 +47418,11 @@ function pipeHtml() {
     return h + '<div class="apr-vacio">No hay pedidos de clientes nuevos esperando. Acá cae <b>todo</b> ' +
       'pedido de un cliente nuevo —incluidos los que además tienen deuda o están suspendidos, que en ' +
       '«A Programar» quedan en Cuarentena— y se lo lleva por el camino completo hasta que se programa ' +
-      'o se descarta.</div></div>' + pipeFirmaHtml() + pipeVincHtml();
+      'o se descarta.</div>' + pipeDemoRowHtml() + '</div>' + pipeFirmaHtml() + pipeVincHtml();
 
+  h += pipeDemoRowHtml();
   h += '<div class="cuar-tblwrap"><table class="cuar-tbl pipe-tbl"><thead><tr>' +
-    '<th>Pedido</th><th>Fecha</th><th class="cuar-td-m3">m³</th><th>Cliente</th>' +
+    '<th>Pedido</th><th>Fecha</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>CUIT</th>' +
     '<th>Etapa</th><th>Espera</th><th class="cuar-td-m3">Monto</th><th class="pipe-th-acc">Qué sigue</th>' +
     '<th class="cuar-td-com">Coment.</th></tr></thead><tbody>';
   for (const p of lista) {
@@ -47354,21 +47432,22 @@ function pipeHtml() {
     h += '<tr class="cuar-tr pipe-tr pipe-tr-' + et + (cab ? ' cuar-tr-open' : '') + '">' +
       '<td class="cuar-td-np" onclick="aprToggle(\'' + cid + '\')" title="Ver qué pidió (códigos y cajas)">' +
         '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
-        '<span class="cuar-card-np">' + escapeHtml(aprPedLabel(p)) + '</span>' +
+        '<span class="cuar-card-np">' + escapeHtml(p._demo ? "web LK 9999" : aprPedLabel(p)) + '</span>' +
         pipeNroPedidoHtml(p) +
         (nblo > 1 ? '<span class="cuar-demo-tag" title="Este pedido se parte en ' + nblo + ' NP">' + nblo + ' NP</span>' : '') +
       '</td>' +
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
       '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) +
-        clinCuitFmt(p) + aprCuarBadgesHtml(p) + '</td>' +
+        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') + aprCuarBadgesHtml(p) + '</td>' +
+      '<td class="pipe-td-cuit">' + pipeCuitHtml(p) + '</td>' +
       '<td class="pipe-td-et">' + pipeEtapaHtml(p) + '</td>' +
       '<td class="clin-td-tiempo">' + pipeRelojHtml(p) + '</td>' +
       '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
       '<td class="pipe-td-acc">' + pipeAccionesHtml(p) + '</td>' +
-      '<td class="cuar-td-com">' + cuarComBtnHtml(p) + '</td>' +
+      '<td class="cuar-td-com">' + (p._demo ? '<span class="cuar-yp-sin">—</span>' : cuarComBtnHtml(p)) + '</td>' +
       '</tr>';
-    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="9"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
   }
   h += '</tbody></table></div></div>';
   return h + pipeFirmaHtml() + pipeVincHtml();

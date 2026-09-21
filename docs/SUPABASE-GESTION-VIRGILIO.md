@@ -27484,5 +27484,41 @@ select * from public.gv_clin_prioritarios;  -- lo aprobado que tiene que salir e
 select * from public.gv_reglas_perdidas;    -- vacía = ninguna regla se perdió
 ```
 
+#### El cliente de prueba (v20.67, pedido de Luis)
+
+*"creame un cliente de prueba en el pipeline de clientes (uno de ejemplo con el que pueda probar
+los botones y no romper nada)"*.
+
+El botón **👁 Ver cliente de prueba** agrega una fila (`CLIENTE DE PRUEBA S.R.L.`, LK 4999, CUIT
+30-71234567-8) que **avanza por las etapas de verdad** — si los botones no hicieran nada, no se
+probaría nada — pero está aislada por la clave `__DEMO__`:
+
+| toca… | el ejemplo |
+|---|---|
+| `GV_Cuarentena_Log` · comentarios · `GV_Clientes_Nuevos_Contacto` · excepciones | **no** (guard `v_demo` en `gv_clin_evento`) |
+| Aprobar y programar · Eliminar pedido | avisan qué pasaría; no llaman a `gv_cuarentena_liberar` ni a `aprAnularAbrir` |
+| Speech 1 / Speech 2 | marcan la etapa y muestran el texto; **no abren WhatsApp** |
+
+Medido el 21/09 corriendo las 8 etapas seguidas (`analisis → referenciado → reabrir → analisis →
+valido → speech1 → speech2 → pagado`): las etapas salen en orden y las cuatro tablas quedan en
+**0 filas**. «↺ Reiniciar ejemplo» manda `reabrir` y lo deja como recién llegado.
+
+⚠ **Toda escritura nueva que se le agregue a `gv_clin_evento` va con `and not v_demo`**, o el
+ejemplo empieza a ensuciar una tabla real en silencio. Lo verifica el test.
+
+#### Y el CUIT, en columna propia
+
+Luis: *"y que figure el cuit en la tabla"*. Sale del mismo padrón que importa Config. Cuarentena.
+Va como **columna**, no como chip debajo del nombre, porque es el dato que se copia para buscar al
+cliente en Equifax. Sin CUIT en el padrón muestra `—`, no se inventa.
+
+#### De paso: el emoji de Config. Cuarentena
+
+La v20.66 lo dejó como `ð🚧§`. Causa: el script que insertó la pestaña nueva concatenó la línea
+vieja con la nueva y le pasó **`.encode('utf-8')` a las dos**, así que el 🚧 —que ya estaba en
+UTF-8— quedó codificado dos veces (`C3 B0 C2 9F…` en vez de `F0 9F 9A A7`). **`index.html` se lee
+y se escribe en UTF-8 o en bytes, nunca re-codificando lo que ya estaba.** Corregido en la v20.67,
+con un barrido del archivo entero: no quedó ninguna otra secuencia de doble encoding.
+
 `sql/gv_clin_pipeline_v2066.sql`, `tests/pipe-clientes-nuevos.cjs`.
 

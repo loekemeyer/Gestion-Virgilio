@@ -34,13 +34,22 @@ const fallos = [];
 
 /* ── 1. aprobar es el MISMO camino que el submódulo viejo ─────────────────────────────── */
 // el candado invertido: si alguien le escribe al pipeline su propio "aprobar", esto lo caza.
-if (!/pipe-b-ok2", "cuarLiberar\('/.test(html))
+// v20.67: el boton de un pedido REAL sigue aprobando con cuarLiberar; solo el de EJEMPLO
+// (clave __DEMO__) va a otro lado, y ese no toca nada.
+if (!/const _aprobar = esDemo \? "pipeDemoAprobar\(\)" : "cuarLiberar\('/.test(html))
   fallos.push("el pipeline no aprueba con cuarLiberar: si tiene camino propio, el submodulo viejo no se entera");
+// y el ejemplo no puede aprobar ni anular de verdad
+if (!/const _eliminar = esDemo \? "pipeDemoEliminar\(\)" : "aprAnularAbrir\('/.test(html))
+  fallos.push("el ejemplo puede eliminar un pedido de verdad");
+if (!/v_demo := v_clave like/.test(sql))
+  fallos.push("el backend no aisla el pedido de EJEMPLO: dejaria basura en el log de Cuarentena");
+if (!/if not v_demo then\s*\n\s*insert into public\."GV_Cuarentena_Log"/.test(sql))
+  fallos.push("el ejemplo escribe en el log de Cuarentena");
 if (/function pipeLiberar|function pipeAprobar/.test(html))
   fallos.push("aparecio un aprobar propio del pipeline (pipeLiberar/pipeAprobar): tiene que ser cuarLiberar");
 
 /* ── 2. el Speech 1 sella el timer del submodulo viejo ────────────────────────────────── */
-if (!/if v_ev = 'speech1' then[\s\S]{0,260}GV_Clientes_Nuevos_Contacto/.test(sql))
+if (!/if v_ev = 'speech1'[^\n]*then[\s\S]{0,260}GV_Clientes_Nuevos_Contacto/.test(sql))
   fallos.push("gv_clin_evento no sella GV_Clientes_Nuevos_Contacto en speech1: los dos modulos contarian distinto");
 
 /* ── 3. un solo log ───────────────────────────────────────────────────────────────────── */
