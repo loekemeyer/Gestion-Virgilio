@@ -2070,7 +2070,7 @@ borró). Layout:
   2. **`entero/Inicio/index.html`**: el botón "Cerrar sesión" pasó a **"← Volver a Gestión"**
      (`../../../`) — hacía `signOut` + borraba las claves `sb-*`, o sea te echaba de todo.
   3. **`gp2/GP2_MODULOS.html`**: link **"← Volver a Gestión"** en el header (`../../`).
-  4. **La fecha de carga lleva el AÑO: `dd/mm/aa`, nunca `dd/mm`** (v20.53, pedido de Elías,
+  4. **La fecha de carga lleva el AÑO: `dd/mm/aa`, nunca `dd/mm`** (v20.54, pedido de Elías,
      2026-09-21). `getDiaMesHoy()` y `getFechaDiaMes()` de `Talleristas/Envios/EnviosTall.js` y
      `getDiaMesHoy()` + los dos `split("-")` de `Prov Serv/Envios/EnviosPS.js`, en las **dos**
      copias, escribían el día y el mes y **tiraban el año** — incluso cuando el operario elegía
@@ -2082,9 +2082,8 @@ borró). Layout:
      ningún lector se rompe: los parsers (`mmDe` / `ddDe` de `EnviosPS.js`, los `split('/')`)
      ya toleran `dd/mm`, `dd-mm`, `dd/mm/aa`, `dd/mm/aaaa` e ISO, y **no hay un solo filtro por
      igualdad** sobre `Dia-mes`. ⚠ Al tocar cualquier pantalla de carga, mirar que la fecha que
-     se guarda tenga año. **`Entregas PS` y `Entregas Prov AT` escriben ISO (`arDateISO()`) y se
-     dejaron como están**: tienen el año, y cambiarlas movería un formato que los lectores ya
-     soportan a propósito. Las 236 filas viejas sin año **no se tocaron**.
+     se guarda tenga año. **`Entregas PS` escribe ISO (`arDateISO()`) y se dejó como está**:
+     tiene el año, y cambiarla movería un formato que los lectores ya soportan a propósito.
 - **`.nojekyll` en la raíz**: sin eso, Pages corre Jekyll y **no publica** lo que empieza con
   `_` — y las copias traen varios (`_backup_relevamiento_*`, `_export`, `_archivo`).
 - El botón **🏭 Admin Cervantes (GP2)** del panel supervisor abre **esa misma pantalla**
@@ -2102,6 +2101,59 @@ borró). Layout:
   accedan, por ahora prefiero que esté suelto"*). O sea que ese botón hoy entra **sin
   pedir nada**. Para volver a prenderlo hay que tocar el OTRO repo: `true` ahí y bumpear
   el `?v=` de `auth-guard.js` en sus HTML.
+
+## ⚠ REGLA (Elías, 2026-09-21, v20.58): la fecha se guarda ENTERA — y el blindaje va con centinela
+
+Dos cosas que salieron del mismo tirón y no se separan.
+
+### 1. Una fecha sin año es un dato que se pudre solo
+
+`opEnviar` de **`recepcion.js`** —la pantalla de Recepción, la que usan los operarios— armaba
+el `Dia_mes` de **`Entregas Prov AT`** tirando el año: `partes[2] + "-" + partes[1]` → `18-09`.
+**El 100 % de esa tabla nacía sin año**; las 121 filas que hoy lo tienen se lo puso alguien a
+mano entre el 25 y el 31/08. El mismo renglón, con la fecha vacía, escribía `Dia_mes = ""` y la
+entrega entraba sin fecha sin que nada avisara.
+
+Mirá el `else` de esa misma función: para `Entregas Tallerista Virgilio` guarda
+`Fecha: opState.fecha` **entera**. Mismo archivo, dos ramas, dos criterios — por eso una tabla
+tiene año y la otra no.
+
+Lo que costó: de las 41 filas sin datar, **37 se recuperaron leyendo `Fecha_RTO` /
+`Fecha_Factura` de la misma fila** (coinciden día y mes en las 37) y **4 hubo que
+preguntárselas a Elías** (Pintos, remito 0438, `17-09`). Y lo primero que se intentó fue
+deducir el año por la secuencia de `id`: Elías lo frenó —*"si no tienen forma no les inventes;
+intentá buscar registros, logs"*— y tenía razón, porque el registro existía y estaba en la
+propia fila. **Antes de deducir un dato, mirar si la fila no lo trae al lado.**
+
+Hoy: `dd/mm/aa`, y sin fecha no se graba. Lo sostiene `tests/recepcion-fecha-anio.cjs`.
+
+⚠ **`Entregas Prov AT` ya tiene `created_at`** (default `now()`, v20.58). Las 162 filas viejas
+quedan en **NULL a propósito**: no se les inventa una fecha de carga.
+
+### 2. Blindar sin centinela es cambiar un error ruidoso por uno mudo
+
+**Elías, textual:** *"pero cómo nos daríamos cuenta que entró una vacía?"*
+
+`Entregas_Tallerista_Excel` castea `"Fecha"::date`, así que **una** fila con `'|||'` hacía que
+la vista entera devolviera `22007` y se viera vacía: 1.409 filas invisibles por culpa de una,
+durante cinco meses. Ponerle un `CASE` para que no explote es correcto, **pero solo eso deja el
+dato sucio entrando en silencio**. Por eso el blindaje se aplicó junto con:
+
+```sql
+select * from public.gv_fechas_carga_invalidas;   -- vacía = todo bien
+```
+
+Barre las 6 tablas de entregas y envíos y dice `fecha VACIA`, `sin año` o `no es una fecha`, con
+tabla, id y valor. Al 21/09 marca 4 filas: las de Pintos 0438 que faltan datar.
+
+**La regla general:** cuando se tape un error que hoy se ve (una pantalla que se rompe, un
+proceso que corta), el tapón va **en el mismo commit** que la forma nueva de enterarse. Si no,
+lo único que se logró es dejar de ver el problema. Es el mismo criterio de §"una lectura ROTA no
+es un CERO": el centinela tiene que mirar dónde queda huella **cuando falla**, no cuando anda.
+
+**Y se prueba rompiéndolo:** se insertó una fila con `Fecha = '__PRUEBA__'`, se comprobó que la
+vista sigue devolviendo todo (1.410 filas, esa con `Dia` nulo) y que el centinela la caza, y se
+borró. `sql/gv_fechas_carga_v2058.sql`.
 
 ## Panel Web LK bajo `/admin/`
 

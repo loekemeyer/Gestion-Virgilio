@@ -26935,3 +26935,79 @@ select * from public.gv_reglas_perdidas;   -- las 4 reglas nuevas tienen centine
 ```
 
 `sql/gv_retenido_tanda_viva_v2056.sql`, `tests/apr-retenido-tanda.cjs`.
+
+---
+### §3.lh — v20.58 · La fecha que grababa Recepción no tenía año · Una vista vacía por una sola fila — 2026-09-21
+
+Pedido de Elías. Empezó mirando el Table Editor: la vista **`Entregas_Tallerista_Excel`** se veía
+vacía.
+
+#### 1. Una fila tiraba la vista entera
+
+La vista castea `"Fecha"::date` para calcular `Dia` y `Mes`. La fila **id 876** (Lucho 3806, cod
+186, 39 cajas, cargada el 21/04/2026) tenía `Fecha = '|||'`, así que cualquier `select` de sus
+columnas devolvía **`22007 invalid input syntax for type date`** y no se veía **ninguna** de las
+1.409 filas. Cinco meses así. `Entregas_Tall_Todas` no castea: por eso las 14 pantallas del admin
+de Cervantes que la leen nunca se enteraron.
+
+⚠ **`count(*)` no lo detecta**: el planner no evalúa la lista de selección, así que la vista
+«contaba» 1.409 filas sin errores. Hay que pedir las columnas.
+
+El valor correcto salió de las dos filas hermanas del mismo `insert` (mismo `created_at` al
+microsegundo, ids 877 y 878, las dos `2026-01-12`). Backup en
+`zz_backups."GV_Backup_EntregasTallVirgilio_20260921"`.
+
+#### 2. El año que se tiraba en cada carga
+
+Medido ese día: **236 filas sin año** en las tablas de entregas y envíos. El origen resultó ser
+**dos lugares distintos**, y eso es lo que costó encontrar:
+
+| Tabla | Filas sin año | Quién las escribe |
+|---|---|---|
+| Envios a Talleristas | 154 | `EnviosTall.js` del admin (`getDiaMesHoy`, `getFechaDiaMes`) |
+| Envios a PS | 41 | `EnviosPS.js` del admin (`getDiaMesHoy` + los dos `split("-")`) |
+| Entregas Prov AT | 41 | **`recepcion.js` de ESTE repo**, `opEnviar` |
+
+Las del admin se corrigieron con el **`created_at` real** de cada fila (cargadas entre el 25/08 y
+el 21/09 de 2026; cero casos de diciembre cargado en enero, cero fechas posteriores a su propia
+carga). Las de Prov AT no tenían `created_at`.
+
+**El primer intento fue deducir el año por la secuencia de `id` y Elías lo frenó**: *"si no
+tienen forma no les inventes; intentá buscar registros, logs"*. Se revirtieron las 41 y se
+buscó. Lo que apareció:
+
+- `track_commit_timestamp` está en **off**, así que Postgres no guarda fecha de commit por fila;
+- **`GP2.entrega_prov_at`** es una foto de esa tabla del **31/08/2026 22:08:53** (las 125 filas
+  con el mismo `creado_en`): prueba que los remitos 01739 y 01740 ya existían ese día;
+- las **series de remito** de los cinco proveedores continúan sin saltos a través de esas filas
+  (Carriero 1735 → 01739 → 1745, Maspoli 4017 → 4056, The Plast 3564 → 3579…);
+- y sobre todo: **la fecha completa estaba en la propia fila**, en `Fecha_RTO` (27 filas) o
+  `Fecha_Factura` (10). Día y mes coinciden en las 37, todas 2026.
+
+Quedaron **4 filas** sin ninguna de las dos —Pintos, remito 0438, `17-09`— que las dató Elías.
+
+> **Antes de deducir un dato, mirar si la fila no lo trae al lado.** Se estuvo a punto de
+> inventar 41 fechas teniendo 37 escritas en la misma tabla, dos columnas más a la derecha.
+
+#### 3. Lo que quedó
+
+- **`recepcion.js`**: `Dia_mes` con año (`dd/mm/aa`) y **sin fecha no se graba** — antes, con
+  `opState.fecha` vacío, entraba `Dia_mes = ""`. `tests/recepcion-fecha-anio.cjs`.
+- **`EnviosTall.js` / `EnviosPS.js`** de las dos copias del admin (v20.54), con el `?v=` de sus
+  cuatro HTML bumpeado.
+- **`Entregas Prov AT` tiene `created_at`** (default `now()`); las 162 viejas en NULL a propósito.
+- **La vista blindada con un `CASE`** y —porque blindar solo cambia un error ruidoso por uno
+  mudo— el centinela:
+
+```sql
+select * from public.gv_fechas_carga_invalidas;   -- vacía = todo bien
+```
+
+Probado rompiéndolo: con una fila `'__PRUEBA__'` adentro, la vista devuelve **1.410** filas (esa
+con `Dia` nulo) en vez de un error, y el centinela la caza. Las dos vistas conservan
+`security_invoker = true`.
+
+`sql/gv_fechas_carga_v2058.sql`. Backups: `zz_backups."GV_Backup_Fechas_SinAnio_20260921"` (las
+236 con su valor original) y `..."GV_Backup_SPKg_pre_fechas_20260921"` — `Envios a Talleristas`
+tiene un trigger que recalcula el stock por sector, así que se comparó antes y después:
+**0 de 155 sectores cambió**.

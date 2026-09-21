@@ -607,3 +607,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== cuar-com-limpia (v20.34: el cuadro de comentarios queda vacio al mandar, al cerrar y al reabrir) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cuar-com-limpia.cjs
+
+echo "== recepcion-fecha-anio (v20.58: la fecha que graba Recepcion lleva anio y sin fecha no se graba) =="
+node tests/recepcion-fecha-anio.cjs

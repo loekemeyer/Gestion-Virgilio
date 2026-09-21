@@ -2265,6 +2265,13 @@ async function opEnviar() {
     .map(([cod, n]) => ({ cod, cajas: n, desc: descPorCod[cod] || "" }));
   if (items.length === 0) { alert("Cargá al menos un código con cajas."); return; }
 
+  // v20.58 - sin fecha no se graba. Antes, con opState.fecha vacio, Dia_mes entraba como ""
+  // y la entrega quedaba sin fecha sin que nada avisara. Centinela: gv_fechas_carga_invalidas.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(opState.fecha || ""))) {
+    alert("Falta la fecha de la recepci\u00f3n. Elegila antes de confirmar.");
+    return;
+  }
+
   const totalCajas = items.reduce((s, i) => s + i.cajas, 0);
 
   const btn = document.getElementById("opConfirmar");
@@ -2282,8 +2289,14 @@ async function opEnviar() {
   let tabla, rows;
   if (opState.tipo === 'prov_at') {
     tabla = "Entregas Prov AT";
+    // v20.58 - la fecha va con ANIO (dd/mm/aa). Hasta aca se guardaba "18-09": el anio se
+    // tiraba SIEMPRE, y a las 41 filas que quedaron asi hubo que datarlas despues mirando
+    // Fecha_RTO / Fecha_Factura, con 4 que no se pudieron. Comparar con la rama de abajo,
+    // que para "Entregas Tallerista Virgilio" siempre guardo la fecha entera.
     const partes = (opState.fecha || "").split("-");
-    const diaMes = (partes.length === 3) ? (partes[2] + "-" + partes[1]) : "";
+    const diaMes = (partes.length === 3)
+      ? (partes[2] + "/" + partes[1] + "/" + partes[0].slice(-2))
+      : "";
     rows = items.map(i => ({
       Dia_mes: diaMes,
       Proveedor: opState.tallNombre,
