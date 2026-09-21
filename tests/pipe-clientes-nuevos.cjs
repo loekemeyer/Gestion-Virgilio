@@ -120,6 +120,33 @@ if (!/if \(String\(orderId\) === "__DEMO__"\) return pipeDemoPedido\(\);/.test(h
 if (!/const cuit = String\(pipeCuitTxt\(p\) \|\| ""\)/.test(html))
   fallos.push("la URL de Equifax no usa pipeCuitTxt: al ejemplo le quedaria el {cuit} vacio");
 
+/* ── 12. la MEMORIA del cliente, y el boton que no puede fallar mudo ─────────────────── */
+// v20.73 (Luis): "tiene que haber memoria del estado de proceso por el que va el cliente".
+// El analisis es del CLIENTE: su 2do pedido no arranca en «Sin analizar» ni vuelve a Equifax.
+if (!/analisis_heredado/.test(sql) || !/cli_analisis_at/.test(sql))
+  fallos.push("la RPC no trae la memoria del cliente: el 2do pedido volveria a arrancar de cero");
+if (!/coalesce\(h\.analisis_at, h\.cli_analisis_at\) as analisis_ef/.test(sql))
+  fallos.push("la etapa no usa el analisis EFECTIVO (propio o heredado)");
+// la decision NO se hereda: Referenciado ya exime al cliente y el Valido paga pedido por pedido
+if (/coalesce\([a-z]\.decision, [a-z]\.cli_decision\)/.test(sql))
+  fallos.push("la decision se esta heredando: el pago por adelantado es pedido por pedido");
+if (!/function pipeMemoriaHtml/.test(html))
+  fallos.push("la memoria del cliente no se muestra en la fila");
+// y un analisis heredado no puede correr el reloj de este pedido
+if (!/e\.heredado and e\.etapa = 'analisis' then false/.test(sql))
+  fallos.push("un analisis heredado vence: el reloj mide lo que espera ESTE pedido");
+
+// Luis apreto «Análisis Cred.» en LK 4282 y no paso nada: pipeBuscar miraba solo
+// `pedidosTodos` y la funcion salia por un `return` mudo. Un boton que no hace nada y no
+// avisa es peor que uno que falla.
+if (/const p = pipeBuscar\(empresa, orderId\); if \(!p\) return;/.test(html))
+  fallos.push("pipeAnalisis vuelve a fallar en silencio si no encuentra el pedido");
+if (!/\(_apr\.pedidosTodos \|\| \[\]\)\.find\(f\) \|\| \(_apr\.pedidos \|\| \[\]\)\.find\(f\)/.test(html))
+  fallos.push("pipeBuscar no mira _apr.pedidos: lo que la pantalla muestra puede no estar en pedidosTodos");
+// y la recarga no puede borrar el reloj que se acaba de poner
+if (/function pipeRecargar\(\) \{ _apr\.pipe = null;/.test(html))
+  fallos.push("pipeRecargar borra el mapa: el timer desaparece hasta que vuelve la RPC");
+
 /* ── y lo de siempre: toda vista nueva con security_invoker ───────────────────────────── */
 ["gv_clin_prioritarios", "gv_clin_vencidos"].forEach(function (v) {
   if (!new RegExp("alter view public\\." + v + "\\s+set \\(security_invoker = true\\)", "i").test(sql))

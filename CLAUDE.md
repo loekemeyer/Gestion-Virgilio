@@ -1544,6 +1544,39 @@ queda en `null` y se vuelve a pedir; con los pedidos cargados y sin retenidos, `
 **Al agregar un lote nuevo de este tipo, usar `clinVacio`.** Es el mismo pozo de §*"una lectura
 ROTA no es un CERO"*. Problema 474.
 
+### La MEMORIA es del CLIENTE, no del pedido (v20.73, Luis)
+
+*"tiene que haber memoria del estado de proceso por el que va el cliente"*, sobre LK 4282, que
+decía **«2.º pedido»** y arrancaba en **«Sin analizar»**.
+
+**El análisis crediticio es del cliente.** Si ya se lo hicieron en un pedido anterior, el nuevo
+arranca en «Análisis pedido» con el chip **🧠 ya analizado** y el botón pasa a **«🔎 Re-analizar»**:
+no hay que volver a Equifax. La RPC lo resuelve con `analisis_ef = coalesce(propio, del cliente)`
+y lo marca con `analisis_heredado`.
+
+⚠ **La DECISIÓN no se hereda, y no es un olvido:** «Referenciado» ya exime al cliente por su
+cuenta (excepción de cuarentena) y el «Válido» **paga pedido por pedido**. Lo que se hereda es
+el trabajo que no hay que repetir, no la decisión comercial. Lo anterior se ve igual, como chip
+morado (*"antes: Válido · Luis"*), para que quien decide lo tenga a la vista.
+
+⚠ **Un análisis heredado NO vence**: el reloj mide lo que espera *este* pedido, y este pedido
+todavía no pidió nada.
+
+⚠ **Cambiar las columnas de salida de `gv_clin_pipeline_lote` exige `DROP`** (*"cannot change
+return type of existing function"*), así que el archivo del repo la trae con su `drop … ; create`.
+
+### Un botón que no hace nada es peor que uno que falla (v20.73)
+
+Luis apretó «Análisis Cred.» en LK 4282 y no pasó nada. `pipeBuscar` miraba sólo
+`_apr.pedidosTodos` —que `aprCargar` llena aparte y puede no tener lo que la pantalla ya
+muestra— y `pipeAnalisis` salía por un `if (!p) return` **mudo**. Ahora `pipeBuscar` mira
+también `_apr.pedidos`, y **el evento se manda aunque el pedido no aparezca**: sus datos son
+para enriquecer el log, no para que el paso funcione. Si falla, se ve en pantalla.
+
+⚠ Y `pipeRecargar` **ya no borra el mapa**: `pipeEvento` deja la etapa y el reloj nuevos al
+toque, y ponerlo en `null` hacía desaparecer el timer hasta que volviera la RPC. Se fuerza la
+relectura con `pipeStale`.
+
 **El CLIENTE DE PRUEBA** (botón «👁 Ver cliente de prueba») avanza por las etapas **de verdad**
 —si no, no se prueba nada— pero su clave es `__DEMO__` y el backend lo aísla: no escribe el log
 de Cuarentena, ni comentarios, ni el timer del submódulo viejo, ni ninguna excepción; Aprobar y

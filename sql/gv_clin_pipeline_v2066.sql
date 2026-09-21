@@ -185,19 +185,39 @@ $function$;
 -- Un pedido sin fila devuelve 'ingresado' igual: el pipeline los muestra a todos.
 -- ⚠ Los coalesce de config van casteados a ::int — `PPP_Web_Config.valor` es numeric y
 --   `make_interval(hours => numeric)` NO existe. El CREATE sale limpio y explota al ejecutarse.
-CREATE OR REPLACE FUNCTION public.gv_clin_pipeline_lote(p_pedidos jsonb)
- RETURNS TABLE(empresa text, order_id text, etapa text, reloj_desde timestamp with time zone, vencido boolean, decision text, decision_persona text, decision_at timestamp with time zone, analisis_at timestamp with time zone, speech1_at timestamp with time zone, speech2_at timestamp with time zone, pagado_at timestamp with time zone, cerrado_at timestamp with time zone, cerrado_motivo text, aprobado boolean, vinc_empresa text, vinc_cod text, vinc_razon_social text)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
+-- ⚠ LA MEMORIA POR CLIENTE (v20.73, Luis: *"tiene que haber memoria del estado de proceso por
+--   el que va el cliente"*). El analisis crediticio es del CLIENTE, no del pedido: si al 4282 ya
+--   se lo hicieron en su 1er pedido, el 2do NO arranca en «Sin analizar» ni vuelve a Equifax.
+--   La RPC devuelve la historia del cliente (`cli_*`, de su pedido mas reciente en el pipeline
+--   que no sea este) y la etapa se calcula con el analisis EFECTIVO = el propio, o el heredado.
+-- ⚠ LA DECISION NO SE HEREDA, y no es un olvido: «Referenciado» ya exime al cliente por su
+--   cuenta (excepcion de cuarentena, Thomas 21/09) y el «Valido» paga pedido por pedido. Lo que
+--   se hereda es el TRABAJO que no hay que repetir, no la decision comercial.
+-- ⚠ Un analisis heredado NO vence: el reloj mide lo que espera ESTE pedido, y este pedido
+--   todavia no pidio nada.
+-- ⚠ `::int` en los coalesce de config: PPP_Web_Config.valor es numeric y
+--   make_interval(hours => numeric) NO existe (el CREATE sale limpio y explota al ejecutarse).
+-- ⚠ Cambiar las columnas de salida exige DROP: «cannot change return type of existing function».
+drop function if exists public.gv_clin_pipeline_lote(jsonb);
+create function public.gv_clin_pipeline_lote(p_pedidos jsonb)
+returns table(empresa text, order_id text, etapa text, reloj_desde timestamptz,
+              vencido boolean, decision text, decision_persona text, decision_at timestamptz,
+              analisis_at timestamptz, speech1_at timestamptz, speech2_at timestamptz,
+              pagado_at timestamptz, cerrado_at timestamptz, cerrado_motivo text,
+              aprobado boolean, vinc_empresa text, vinc_cod text, vinc_razon_social text,
+              cli_analisis_at timestamptz, cli_analisis_np text,
+              cli_decision text, cli_decision_at timestamptz, cli_decision_persona text,
+              cli_decision_np text, analisis_heredado boolean)
+language sql stable security definer
+set search_path to 'public','pg_temp'
+as $function$
   with cfg as (
     select coalesce((select valor from public."PPP_Web_Config" where clave='clin_speech_horas'), 24)::int   as h_speech,
            coalesce((select valor from public."PPP_Web_Config" where clave='clin_analisis_horas'), 24)::int as h_analisis),
   ped as (
     select lower(coalesce(e->>'empresa','lk')) as empresa,
            public.gv_cuarentena_clave(nullif(btrim(e->>'order_id'),'')) as order_id,
-           nullif(btrim(e->>'cod'),'') as cod
+           regexp_replace(btrim(coalesce(e->>'cod','')), '\.0+$', '') as cod
       from jsonb_array_elements(coalesce(p_pedidos,'[]'::jsonb)) e
      where nullif(btrim(e->>'order_id'),'') is not null),
   fila as (
@@ -211,22 +231,48 @@ AS $function$
                x.speech1_at, x.speech2_at, x.pagado_at, x.cerrado_at, x.cerrado_motivo
           from public."GV_Cliente_Nuevo_Pipeline" x
          where x.empresa = p.empresa and x.order_id = p.order_id) t on true),
+  hist as (
+    select f.*,
+           ha.analisis_at as cli_analisis_at, ha.np as cli_analisis_np,
+           hd.decision as cli_decision, hd.decision_at as cli_decision_at,
+           hd.decision_persona as cli_decision_persona, hd.np as cli_decision_np
+      from fila f
+      left join lateral (
+        select y.analisis_at, y.np from public."GV_Cliente_Nuevo_Pipeline" y
+         where y.empresa = f.empresa
+           and regexp_replace(btrim(coalesce(y.cod,'')), '\.0+$','') = f.cod
+           and y.order_id <> f.order_id and y.analisis_at is not null
+         order by y.analisis_at desc limit 1) ha on true
+      left join lateral (
+        select y.decision, y.decision_at, y.decision_persona, y.np
+          from public."GV_Cliente_Nuevo_Pipeline" y
+         where y.empresa = f.empresa
+           and regexp_replace(btrim(coalesce(y.cod,'')), '\.0+$','') = f.cod
+           and y.order_id <> f.order_id and y.decision is not null
+         order by y.decision_at desc limit 1) hd on true),
   eta as (
-    select f.*, public.gv_clin_etapa(f.analisis_at, f.decision, f.speech1_at,
-                                     f.speech2_at, f.pagado_at, f.cerrado_at, f.aprobado) as etapa
-      from fila f)
+    select h.*, coalesce(h.analisis_at, h.cli_analisis_at) as analisis_ef,
+           (h.analisis_at is null and h.cli_analisis_at is not null) as heredado
+      from hist h),
+  eta2 as (
+    select e.*, public.gv_clin_etapa(e.analisis_ef, e.decision, e.speech1_at,
+                                     e.speech2_at, e.pagado_at, e.cerrado_at, e.aprobado) as etapa
+      from eta e)
   select e.empresa, e.order_id, e.etapa,
-         public.gv_clin_reloj(e.etapa, e.analisis_at, e.speech1_at, e.speech2_at),
-         case when public.gv_clin_reloj(e.etapa, e.analisis_at, e.speech1_at, e.speech2_at) is null then false
-              else now() - public.gv_clin_reloj(e.etapa, e.analisis_at, e.speech1_at, e.speech2_at)
+         public.gv_clin_reloj(e.etapa, e.analisis_ef, e.speech1_at, e.speech2_at),
+         case when public.gv_clin_reloj(e.etapa, e.analisis_ef, e.speech1_at, e.speech2_at) is null then false
+              when e.heredado and e.etapa = 'analisis' then false
+              else now() - public.gv_clin_reloj(e.etapa, e.analisis_ef, e.speech1_at, e.speech2_at)
                    > make_interval(hours => case when e.etapa='analisis' then c.h_analisis else c.h_speech end) end,
          e.decision, e.decision_persona, e.decision_at,
-         e.analisis_at, e.speech1_at, e.speech2_at, e.pagado_at, e.cerrado_at, e.cerrado_motivo,
-         e.aprobado, v.vinc_empresa, v.vinc_cod, v.vinc_razon_social
-    from eta e cross join cfg c
+         e.analisis_ef, e.speech1_at, e.speech2_at, e.pagado_at, e.cerrado_at, e.cerrado_motivo,
+         e.aprobado, v.vinc_empresa, v.vinc_cod, v.vinc_razon_social,
+         e.cli_analisis_at, e.cli_analisis_np,
+         e.cli_decision, e.cli_decision_at, e.cli_decision_persona, e.cli_decision_np,
+         e.heredado
+    from eta2 e cross join cfg c
     left join public."GV_Cliente_Vinculo" v
-      on v.activo and v.empresa = e.empresa
-     and v.cod = regexp_replace(btrim(coalesce(e.cod,'')), '\.0+$', '');
+      on v.activo and v.empresa = e.empresa and v.cod = e.cod;
 $function$;
 
 -- ── 6. Escritura: UNA sola puerta para todos los pasos ─────────────────────────────────

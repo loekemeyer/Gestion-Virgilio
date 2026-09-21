@@ -897,6 +897,8 @@ button {
 .pipe-tr-aprobado{ background:#f8fafc; color:#64748b; }
 
 .pipe-td-cuit{ white-space:nowrap; }
+.pipe-mem{ display:block; margin-top:3px; font-size:11px; color:#0f766e; font-weight:700; }
+.pipe-mem-dec{ color:#7c3aed; }
 .pipe-cuit{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; color:#334155; }
 .pipe-etapa{ display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }
 .pipe-etapa.e-ing{ background:#e2e8f0; color:#334155; }
@@ -44486,6 +44488,7 @@ let _apr = {
   pipeCfg: null, pipeCfgLoading: false,
   pipeFirma: null, pipeVinc: null,
   pipeDemo: false,   // v20.69 (Luis): el cliente de prueba de la pestaña
+  pipeStale: false,  // v20.72: hay que releer el pipeline (sin borrar lo que ya se sabe)
   // v19.44 — REPOSICIÓN CHICA: pedidos que NO caen en cuarentena porque al cliente se le facturó
   // hace poco y pidió un solo código (empresa:order_id → {items, dias, fecha}). Se pide APARTE,
   // nunca junto con la marcación: ver cuarRepoCargar.
@@ -46962,12 +46965,12 @@ function pipeDemoRowHtml() {
 }
 
 /* ── estado del pipeline, por lote (una sola vuelta de red para toda la pantalla) ────── */
-function pipeNeed() { if (_apr.pipe === null && !_apr.pipeLoading) pipeCargar(); }
+function pipeNeed() { if ((_apr.pipe === null || _apr.pipeStale) && !_apr.pipeLoading) pipeCargar(); }
 async function pipeCargar() {
   if (_apr.pipeLoading) return;
   const lista = pipeLista();
-  if (!lista.length) { clinVacio("pipe"); return; }
-  _apr.pipeLoading = true;
+  if (!lista.length) { clinVacio("pipe"); _apr.pipeStale = false; return; }
+  _apr.pipeLoading = true; _apr.pipeStale = false;
   try {
     const res = await aprRpc("gv_clin_pipeline_lote", {
       p_pedidos: lista.map(function (p) {
@@ -47025,10 +47028,30 @@ const PIPE_ETAPAS = {
   aprobado:     { t: "Aprobado",          c: "e-apr"  },
   cancelado:    { t: "Cancelado",         c: "e-can"  },
 };
+/* Lo que ya se sabe de ESTE CLIENTE de sus pedidos anteriores. */
+function pipeMemoriaHtml(p) {
+  const e = pipeEst(p); if (!e) return "";
+  let h = "";
+  if (e.analisis_heredado && e.cli_analisis_at)
+    h += '<span class="pipe-mem" title="El análisis crediticio es del CLIENTE, no del pedido: ya se le hizo ' +
+      'el ' + escapeHtml(cuarFechaHora(e.cli_analisis_at)) +
+      (e.cli_analisis_np ? ' en ' + escapeHtml(String(e.cli_analisis_np)) : '') +
+      '. No hace falta volver a Equifax.">🧠 ya analizado</span>';
+  if (e.cli_decision) {
+    const T = { referenciado: "Referenciado", valido: "Válido", no_valido: "No válido" };
+    h += '<span class="pipe-mem pipe-mem-dec" title="Lo que se decidió con este cliente la vez anterior' +
+      (e.cli_decision_np ? ' (' + escapeHtml(String(e.cli_decision_np)) + ')' : '') +
+      '. La decisión NO se hereda: el pago por adelantado es pedido por pedido.">antes: ' +
+      escapeHtml(T[e.cli_decision] || e.cli_decision) +
+      (e.cli_decision_persona ? ' · ' + escapeHtml(String(e.cli_decision_persona)) : '') + '</span>';
+  }
+  return h;
+}
 function pipeEtapaHtml(p) {
   const e = pipeEst(p), et = pipeEtapa(p), d = PIPE_ETAPAS[et] || PIPE_ETAPAS.ingresado;
   const firma = e && e.decision_persona ? ' title="Definido por ' + escapeHtml(String(e.decision_persona)) + '"' : "";
   return '<span class="pipe-etapa ' + d.c + '"' + firma + '>' + escapeHtml(d.t) + '</span>' +
+         pipeMemoriaHtml(p) +
          (e && e.vinc_cod
            ? '<span class="pipe-vinc" title="Vinculado a ' + escapeHtml(String(e.vinc_razon_social || "")) +
              ' — toma su antigüedad">🔗 ' + escapeHtml(cuarEmpCod(e.vinc_empresa) + " " + e.vinc_cod) + '</span>'
@@ -47039,6 +47062,9 @@ function pipeEtapaHtml(p) {
 function pipeRelojHtml(p) {
   const e = pipeEst(p);
   if (!e || !e.reloj_desde) return '<span class="cuar-yp-sin">—</span>';
+  // un análisis HEREDADO no es una espera de este pedido: no corre el reloj ni se pone rojo
+  if (e.analisis_heredado && pipeEtapa(p) === "analisis")
+    return '<span class="cuar-yp-sin" title="El análisis ya estaba hecho: este pedido no está esperando nada">—</span>';
   return '<span class="clin-tiempo' + (e.vencido ? " pipe-vencido" : "") + '" data-since="' +
     escapeHtml(String(e.reloj_desde)) + '" title="' +
     (e.vencido ? "Pasó el tope de espera de esta etapa" : "Desde que arrancó esta etapa") + '">' +
@@ -47081,9 +47107,11 @@ function pipeEquifaxUrl(p) {
   return base.indexOf("{cuit}") >= 0 ? base.replace("{cuit}", cuit) : base;
 }
 async function pipeAnalisis(empresa, orderId) {
-  const p = pipeBuscar(empresa, orderId); if (!p) return;
+  const p = pipeBuscar(empresa, orderId) || { empresa: empresa, order_id: orderId };
   // 1) abrir Equifax PRIMERO: si el sello falla, la persona igual tiene que poder trabajar
   try { window.open(pipeEquifaxUrl(p), "_blank", "noopener"); } catch (_e) {}
+  // 2) y el sello SIEMPRE se intenta. Si falla, pipeEvento lo dice en pantalla: un boton que
+  //    no hace nada y no avisa es peor que uno que falla.
   await pipeEvento(empresa, orderId, "analisis", null, null);
 }
 function pipeBuscar(empresa, orderId) {
@@ -47091,7 +47119,8 @@ function pipeBuscar(empresa, orderId) {
   // linea `pipeAnalisis` salia por su `if (!p) return` y el boton no hacia nada.
   if (String(orderId) === "__DEMO__") return pipeDemoPedido();
   const k = String(empresa) + ":" + String(orderId);
-  return (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === k; });
+  const f = function (x) { return aprKey(x.empresa, x.order_id) === k; };
+  return (_apr.pedidosTodos || []).find(f) || (_apr.pedidos || []).find(f);
 }
 
 /* ── Una sola puerta para todos los eventos ──────────────────────────────────────────── */
@@ -47122,7 +47151,11 @@ async function pipeEvento(empresa, orderId, evento, persona, comentario) {
     return false;
   }
 }
-function pipeRecargar() { _apr.pipe = null; _apr.pipeLoading = false; pipeNeed(); pppRenderProg(); }
+function pipeRecargar() {
+  // ⚠ NO se borra el mapa: `pipeEvento` ya dejo la etapa y el reloj nuevos, y ponerlo en null
+  //   haria desaparecer el timer hasta que volviera la RPC. Se fuerza la relectura con un flag.
+  _apr.pipeLoading = false; _apr.pipeStale = true; pipeNeed(); pppRenderProg();
+}
 
 /* ── Pop-up de firma: los pasos que decide una persona llevan su nombre ──────────────── */
 /* Mismo criterio que el pop-up de Cuarentena (Vivi / Marian / Otro): lo que se mira después
@@ -47304,8 +47337,8 @@ function pipeVincHtml() {
 /* ── Los Speech: mismo texto y mismo teléfono que el submódulo viejo ─────────────────── */
 async function pipeSpeech(empresa, orderId, n) {
   const esDemo = String(orderId) === "__DEMO__";
-  const p = esDemo ? pipeDemoPedido() : pipeBuscar(empresa, orderId);
-  if (!p) return;
+  const p = (esDemo ? pipeDemoPedido() : pipeBuscar(empresa, orderId))
+            || { empresa: empresa, order_id: orderId };
   await pipeEvento(empresa, orderId, n === 2 ? "speech2" : "speech1", null, null);
   if (esDemo) {
     // el telefono del ejemplo es inventado: se muestra el texto que se mandaria, no se manda
@@ -47349,8 +47382,12 @@ function pipeAccionesHtml(p) {
     return B("pipe-b-eq", "pipeAnalisis('" + emp + "','" + oid + "')", "🔎 Análisis Cred.",
              "Abre Equifax y arranca el reloj del análisis");
 
+  const _her = !!(pipeEst(p) || {}).analisis_heredado;
   if (et === "analisis")
-    return B("pipe-b-ref", "pipeFirmaAbrir('" + emp + "','" + oid + "','referenciado','Marcar REFERENCIADO'," +
+    return (_her ? B("pipe-b-sec2", "pipeAnalisis('" + emp + "','" + oid + "')", "🔎 Re-analizar",
+                     "Al cliente ya se le hizo el análisis en un pedido anterior. Esto vuelve a abrir Equifax " +
+                     "y arranca el reloj de nuevo, sólo si hace falta rever el caso.") : "") +
+           B("pipe-b-ref", "pipeFirmaAbrir('" + emp + "','" + oid + "','referenciado','Marcar REFERENCIADO'," +
              "'Cliente que NO paga por adelantado en sus primeros pedidos: un cliente muy grande, un amigo de la " +
              "empresa, o el que compra por una razon social nueva de un cliente ya activo. Exime al CLIENTE, " +
              "no solo a este pedido (Thomas, 21/09), y el pedido se programa con prioridad.')",
