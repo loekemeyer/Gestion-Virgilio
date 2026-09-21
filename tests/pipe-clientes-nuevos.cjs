@@ -100,7 +100,7 @@ if (/cron\.schedule[\s\S]{0,200}gv_clin/.test(sql))
   fallos.push("hay un cron tocando el pipeline: el pedido NO se cancela solo (Luis, 21/09)");
 
 /* ── 10. el CUIT: "todavia no llegaron los pedidos" NO es "no hay CUIT" ──────────────── */
-// v20.70 — bug real que vio Luis: LK 4282 mostraba «—» con el CUIT cargado en el padron y la
+// v20.71 — bug real que vio Luis: LK 4282 mostraba «—» con el CUIT cargado en el padron y la
 // RPC devolviendolo. A Programar dibujaba con _apr.pedidos vacio, el lote guardaba {} y el
 // *Need() no volvia a pedir NUNCA (medido: 0 llamadas en toda la sesion). Afecta a los cuatro
 // lotes, no solo al CUIT.

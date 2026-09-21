@@ -1530,7 +1530,7 @@ Por eso el pipeline **no tiene camino propio para nada que ya existiera**, y est
 Lo sostiene `tests/pipe-clientes-nuevos.cjs` con el **candado invertido**: si alguien le escribe
 al pipeline su propio «aprobar», el test se pone en rojo.
 
-⚠⚠ **«Todavía no llegaron los pedidos» NO es «no hay dato»** (v20.70, lo vio Luis: *"¿cómo
+⚠⚠ **«Todavía no llegaron los pedidos» NO es «no hay dato»** (v20.71, lo vio Luis: *"¿cómo
 carajo no tiene cuit? imposible"*). Los cuatro lotes de A Programar / Clientes nuevos —CUIT,
 monto, teléfono y primer contacto— hacían `if (!lista.length) { _apr.X = {}; return; }`. La app
 **abre en A Programar y dibuja mientras `_apr.pedidos` todavía está vacío**: ahí la lista sale
