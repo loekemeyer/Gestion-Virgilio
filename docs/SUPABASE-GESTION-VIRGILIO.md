@@ -26225,3 +26225,46 @@ como un solo artículo eso parece un traslado de góndola disfrazado de compra. 
 mismo día: *"No son el mismo artículo por más que tengan el mismo código. Cambia el packaging, por
 eso está dividido así."*** El generador está haciendo lo correcto al pedir por separado, y no hay
 que volver a proponer el traslado.
+
+### §3.kw — v20.41: en Cuarentena y Clientes Nuevos, el monto sin importados y el CUIT — 2026-09-21
+
+**Luis:** *"para la sección de clientes Nuevos y clientes en cuarentena, quiero que el monto del
+pedido se descuenten los artículos importados (los códigos que tienen E) que sabemos no hay en
+stock. En la columna de cliente tiene que figurar el CUIT."*
+
+**Qué se entiende por importado.** Medido sobre los 329 artículos que aparecen en pedidos web:
+
+| | |
+|---|---|
+| con **E** | 115 |
+| …de ésos, **no** figuran en `Importados` activo | 1 |
+| importados activos **sin** E | 5 (026, 027, 110, 111, 112, 113, 505C, 523C, 587C, 824, 825 en la tabla) |
+
+Por eso el criterio es la **unión**: `gv_art_es_importado(cod)` da true si el código tiene **E**
+**o** está en `Importados` (activo). Con uno solo se escapa lo del otro lado, y lo que se busca es
+"lo que no hay en stock". Pela la **L** de ruteo antes de mirar la tabla.
+
+**Dónde se descuenta.** En `gv_clientes_nuevos_valor_lote`, que parte los ítems del pedido en dos
+y valoriza cada lado: `valor` (lo que se cobra) y `valor_importados` + `items_importados` (lo
+descontado, que la pantalla muestra en chico debajo del monto).
+
+⚠ **`gv_ppp_web_valor_items` NO se tocó**: la usa también el control de **límite de crédito**, y
+ahí el pedido vale lo que vale. El descuento es de estas dos pantallas, no del crédito.
+
+**Probado con pedidos reales** (no leído):
+
+| pedido | ítems | importados | monto que se muestra | descontado |
+|---|---|---|---|---|
+| chef 229 | 6 | 2 | $817.620 | $1.613.520 |
+| chef 228 | 8 | 2 | $499.171,20 | $150.638,40 |
+| chef 227 | 19 | 3 | $679.113,60 | $221.654,40 |
+
+**El CUIT** sale del padrón que se importa en ⚙ Config. Cuarentena (`GV_Cuarentena_Fuente` tipo
+`busqueda`: **2.045 de 2.047** filas lo traen), vía `gv_cuarentena_cuit_lote`, que resuelve la
+identidad con `gv_cuarentena_ident` (respeta Tierra del Fuego). Va en **su propia llamada con su
+propio catch**: si falla, el monto —que sostiene el Speech 1— no se cae con ella (v19.44).
+
+⚠ **37 de los 349 clientes nuevos no tienen CUIT**, y no hay de dónde sacarlo: medido, **0** de
+esos 37 tiene factura (lógico, nunca se le facturó). Aparecen sin CUIT hasta el próximo padrón.
+
+`sql/gv_cuarentena_monto_sin_importados_v2041.sql`.

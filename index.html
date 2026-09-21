@@ -882,6 +882,8 @@ button {
 .clin-speech, .clin-accion{ display:flex; flex-direction:column; gap:4px; align-items:stretch; }
 .clin-tiempo{ font-weight:800; white-space:nowrap; color:#9a3412; }
 .clin-iva{ display:block; font-size:11px; font-weight:800; color:#166534; white-space:nowrap; }
+.clin-cuit{ display:block; font-weight:600; font-size:11px; color:#64748b; letter-spacing:.2px; }
+.clin-imp{ display:block; font-weight:700; font-size:11px; color:#b45309; }
 .clin-td-tiempo{ white-space:nowrap; }
 .clin-7dias{ display:inline-block; margin-top:4px; font-size:11px; font-weight:800; color:#9a3412; background:#ffedd5; border:1px solid #fdba74; border-radius:6px; padding:2px 7px; }
 .apr-col-nps .apr-scroll{ display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:7px; align-items:start; }
@@ -5778,7 +5780,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.40"></script>
+<script type="module" src="recepcion.js?v=20.41"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9623,7 +9625,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.40";
+const APP_VERSION = "v20.41";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -43561,6 +43563,7 @@ let _apr = {
   cuarComN: null, cuarComNLoading: false,
   // v18.95 — CLIENTES NUEVOS: monto por lista de cada pedido (empresa:order_id → {valor, valorIva})
   cliValor: null, cliValorLoading: false,
+  cliCuit: null, cliCuitLoading: false,      // v20.41 (Luis): el CUIT en la columna de cliente
   // v19.05 — CLIENTES NUEVOS: primer contacto (Speech 1) y teléfono del cliente
   cliContacto: null, cliContactoLoading: false,   // empresa:order_id → ISO del primer contacto
   cliWpp: null, cliWppLoading: false,              // empresa:cod → teléfono del cliente
@@ -45095,6 +45098,7 @@ function aprColCuarentena() {
   // v18.01: cuántos comentarios tiene cada retenido (una sola vuelta de red para toda la lista)
   cuarComNeed();
   clinNuevosValorNeed();   // v19.94 (Thomas): el monto del pedido, igual que en Clientes nuevos
+  clinCuitNeed();          // v20.41 (Luis): el CUIT en la columna de cliente
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
   const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
   const _cuarCol = aprColapsado("vir_cuar_colapsado");   // v18.100 (Luis): submódulo colapsable
@@ -45136,7 +45140,7 @@ function aprColCuarentena() {
       '</td>' +
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
       '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
-      '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</td>' +
+      '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) + '</td>' +
       '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</td>' +
       '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') + '</td>' +
       // v19.94 (Thomas): el MISMO monto que Clientes nuevos — precio total por lista (neto) y,
@@ -45534,6 +45538,37 @@ async function cuarContactoCargar() {
 /* v19.94 (Thomas, 2026-09-18): el monto lo muestran los DOS submódulos, así que el lote va por
    TODOS los retenidos (`aprEnCuarentena`), no sólo por los clientes nuevos. Antes un pedido de
    Cuarentena no entraba nunca al lote y su celda de Monto se habría quedado en "—". */
+/* v20.41 (Luis, 2026-09-21): el CUIT en la columna de cliente. Sale del padron que se importa
+   en Config. Cuarentena (2.045 de 2.047 filas lo traen).
+   Va en SU PROPIA llamada con SU PROPIO catch: si falla, el monto -que es lo que sostiene el
+   Speech 1- no se cae con el (leccion de la v19.44). */
+function clinCuitNeed() { if (_apr.cliCuit === null && !_apr.cliCuitLoading) clinCuitCargar(); }
+async function clinCuitCargar() {
+  if (_apr.cliCuitLoading) return;
+  const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo && aprEnCuarentena(p); });
+  if (!lista.length) { _apr.cliCuit = {}; return; }
+  _apr.cliCuitLoading = true;
+  try {
+    const res = await aprRpc("gv_cuarentena_cuit_lote", {
+      p_clientes: lista.map(function (p) {
+        return { empresa: p.empresa || "lk", cod: String(p.cod || "").trim() };
+      })
+    });
+    const m = {};
+    (res || []).forEach(function (r) { if (r && r.cuit) m[String(r.empresa) + ":" + String(r.cod)] = String(r.cuit); });
+    _apr.cliCuit = m;
+  } catch (_e) { _apr.cliCuit = _apr.cliCuit || {}; }
+  _apr.cliCuitLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+function clinCuitFmt(p) {
+  if (!p || p._demo) return '<span class="clin-cuit">CUIT 30-71234567-8</span>';
+  const c = (_apr.cliCuit || {})[String(p.empresa || "lk") + ":" + String(p.cod || "").trim()];
+  if (!c) return "";
+  const d = String(c).replace(/\D/g, "");
+  const lindo = d.length === 11 ? d.slice(0, 2) + "-" + d.slice(2, 10) + "-" + d.slice(10) : d;
+  return '<span class="clin-cuit" title="CUIT del cliente (padron de Config. Cuarentena)">CUIT ' + escapeHtml(lindo) + '</span>';
+}
 function clinNuevosValorNeed() { if (_apr.cliValor === null && !_apr.cliValorLoading) clinNuevosValorCargar(); }
 async function clinNuevosValorCargar() {
   if (_apr.cliValorLoading) return;
@@ -45550,7 +45585,13 @@ async function clinNuevosValorCargar() {
       })
     });
     const m = {};
-    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.order_id)] = { valor: Number(r.valor), valorIva: Number(r.valor_con_iva) }; });
+    (res || []).forEach(function (r) {
+      m[String(r.empresa) + ":" + String(r.order_id)] = {
+        valor: Number(r.valor), valorIva: Number(r.valor_con_iva),
+        // v20.41 (Luis): lo importado se descuenta del monto, pero se muestra al lado para que
+        // se vea de cuanto era el pedido entero.
+        valorImp: Number(r.valor_importados), itemsImp: Number(r.items_importados) };
+    });
     _apr.cliValor = m;
   } catch (_e) { _apr.cliValor = _apr.cliValor || {}; }
   _apr.cliValorLoading = false;
@@ -45711,6 +45752,10 @@ function clinNuevosValorFmt(p) {
   return '<b title="Precio total del pedido según lo pedido y la lista de precios (neto, sin IVA)">' + cuarPlata(v.valor) + '</b>' +
     (isFinite(v.valorIva) && v.valorIva > 0
       ? '<span class="clin-iva" title="Total con IVA — es el monto que pide el Speech 1 y que el cliente nuevo tiene que pagar ANTES del armado y la entrega">c/IVA ' + cuarPlata(v.valorIva) + '</span>'
+      : '') +
+    // v20.41 (Luis): el importado no entra en el monto - no hay stock, no se cobra por adelantado.
+    (isFinite(v.valorImp) && v.valorImp > 0
+      ? '<span class="clin-imp" title="' + (v.itemsImp || 0) + ' articulo(s) importado(s), descontados del monto: no hay stock">- ' + cuarPlata(v.valorImp) + ' import.</span>'
       : '');
 }
 function clinNuevosHtml() {
@@ -45725,6 +45770,7 @@ function clinNuevosHtml() {
     '</div>';
   if (_cliCol) return h + '</div>';   // colapsado: sólo el título con el contador
   clinNuevosValorNeed();
+  clinCuitNeed();          // v20.41 (Luis): el CUIT en la columna de cliente
   clinContactoNeed();   // v19.05: timer "primer contacto"
   clinWppNeed();        // v19.05: teléfono del cliente para los Speech
   clinTickStart();      // v19.05: refresca los timers cada 60 s
@@ -45755,7 +45801,7 @@ function clinNuevosHtml() {
       '</td>' +
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
       '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
-      '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</td>' +
+      '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) + '</td>' +
       '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</td>' +
       '<td class="clin-td-tiempo">' + clinTiempoHtml(p) + '</td>' +
       '<td>' + clinContactoBtns(p) + '</td>' +
