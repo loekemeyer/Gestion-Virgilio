@@ -26672,3 +26672,72 @@ el `and not v.es_l`, el patrón deja de matchear y aparece en `select * from pub
 problema de la regla.
 
 `sql/gv_valor_items_L_fallback_chef_v2050.sql`.
+
+---
+
+### §3.ld — v20.51 · El tope de 1.000 filas de PostgREST, barrido y paginado · Misiones en A Programar
+
+Luis, 2026-09-21: *"fijate que el corte de postgress no nos joda a futuro. si no hay que paginar o
+algo"* · *"lo de A programar debería pintarlo de naranja y poner badge de misiones si corresponde
+(saca el dato por el otro camino que mencionaste)"* · *"esta bien que pise el color de estado"*.
+
+#### El barrido: qué está cortado hoy
+
+Se midieron las **115 lecturas REST** de `index.html` contra el conteo real de cada objeto.
+
+**Resultado: hoy ninguna está cortada.** Dos falsos positivos del primer barrido hay que dejarlos
+anotados, porque son el tipo de error que hace perder una hora:
+
+- El regex arrancaba **después** del `?`, así que toda consulta cuyo **primer** parámetro es el
+  filtro (`?articulo=in.(…)`) se contaba como "sin filtro". Daba **cuatro** lecturas supuestamente
+  cortadas —`gv_demanda_pedidos` (11.751), `gv_np_items` (11.751), `gv_venta_mensual_cliente`
+  (9.779), `gv_ppp_base_pedidos` (9.618)— y las cuatro están acotadas por clave.
+- `PPP_Web_Base` (2.133) y `whatsapp_clientes` (942) no son lecturas: son **upserts**
+  (`on_conflict=`).
+
+Lo que queda, y es real: **32 lecturas leen el universo entero de algo**. La más grande hoy es
+`vista_uxb_articulo` con **527** filas; `vista_recepcion_mensual` 469, `GV_Clientes_Nuevos` 349,
+`vista_abastecimiento` 321, `PPP_Geo` 262. Todas crecen, ninguna tiene filtro de fecha, y varias
+llevan un `limit=20000` o `limit=50000` **que nunca hizo nada**.
+
+#### `gvRestTodo(path)` — el paginador
+
+```js
+const REST_PAGINA = 1000;
+async function gvRestTodo(path, headers) { … }   // pide de a 1.000 con offset hasta página corta
+```
+
+Le **saca** el `limit=`/`offset=` que traiga el path: ese número era, en todos los casos, el techo
+que el autor **creyó** estar pidiendo. Probado con red simulada: 3 páginas, 2.137 filas, y el
+`limit=20000` viejo no viaja en ninguna URL.
+
+Se convirtieron las **8** lecturas enteras de objetos que crecen: `vista_uxb_articulo`,
+`vista_abastecimiento`, `PPP_Geo` (×2), `GV_Clientes_Nuevos`, `PPP_Web_Programacion` (×2),
+`gv_ppp_web_estado`, `vista_fc_sin_salida`, `Zonas_Barrios`.
+
+#### El guard, que es lo que evita que vuelva
+
+`tests/rest-tope-1000.cjs` rehace el barrido en cada corrida y **falla** si aparece una lectura
+sin filtro que no vaya por `gvRestTodo` ni esté declarada en `CHICAS` con su conteo medido.
+Probado rompiéndolo a propósito: volver `Zonas_Barrios` a un `fetch` pelado lo pone en rojo.
+
+> **La regla:** un `limit=` alto no es una garantía, es una expresión de deseo. Si la consulta lee
+> el universo entero de algo que crece, o va por `gvRestTodo`, o está declarada como chica.
+
+#### Misiones en A Programar
+
+Ahí el pedido **todavía no tiene NP**, así que no entra en `gv_np_destino`. El dato sale por el
+otro camino: la **provincia que viaja con el pedido** desde la página (el feed de LK la trae desde
+la v20.45; la RPC de Chef ya la devolvía y el front la tiraba). Un pedido de **ISIS** no pasó por
+la página y no trae provincia — pero sí tiene NP, así que se resuelve con el mismo
+`gv_np_destino_lista`.
+
+Qué provincias se marcan sigue saliendo de **`PPP_Web_Config.provincias_alerta`**, leída por el
+front de esa misma fila: una sola fuente con `gv_provincia_alerta` del backend.
+
+La tarjeta marcada va en **naranja** con el badge de la provincia, y el chip `🚚 Snaider · Misiones`
+sale siempre que haya expreso. **El naranja pisa el fondo de la tarjeta a propósito** (Luis: *"esta
+bien que pise el color de estado"*).
+
+`tests/ppp-misiones.cjs` cubre las dos pantallas y verifica, cambiando la provincia marcada, que el
+front sigue la config y no tiene nada hardcodeado.

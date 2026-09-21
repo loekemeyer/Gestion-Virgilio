@@ -1250,6 +1250,19 @@ la RPC ya arreglada. **Un endpoint que devuelve exactamente 1.000 filas nunca es
 El arreglo es pedir **por lista** (`p_nps text[]`, de a 500) lo que la pantalla está mostrando, no
 el universo. §3.lb.
 
+⚠⚠ **Y vale para TODA la app, no para esa pantalla.** Se barrieron las 115 lecturas REST de
+`index.html`: **32 leen el universo entero de algo**, varias con un `limit=20000` o `limit=50000`
+**que nunca hizo nada**. Hoy ninguna está cortada (la mayor es `vista_uxb_articulo` con 527 filas),
+pero todas crecen y el día que pasen las 1.000 no va a avisar nadie.
+
+- **`gvRestTodo(path)`** pagina con `offset` hasta que vuelve una página corta, y le saca el
+  `limit=` viejo al path. Las 8 lecturas enteras de objetos que crecen ya van por ahí.
+- **`tests/rest-tope-1000.cjs`** rehace el barrido en cada corrida y **falla** si aparece una
+  lectura sin filtro que no use `gvRestTodo` ni esté declarada en `CHICAS` con su conteo medido.
+
+> **Un `limit=` alto no es una garantía, es una expresión de deseo.** Si la consulta lee el
+> universo entero de algo que crece: o `gvRestTodo`, o declarada como chica. §3.ld.
+
 ## ⚠ Regla de Luis (2026-09-21): la CUARENTENA se mide por SUCURSAL, y Retira nunca exime
 
 *"Para clientes que tienen múltiples sucursales, se debería llevar registro por el «a qué sucursal

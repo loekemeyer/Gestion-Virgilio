@@ -429,6 +429,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== supers-una-lista (v17.72: UNA sola lista de clientes super, en la base y por empresa+codigo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/supers-una-lista.cjs
 
+echo "== rest-tope-1000 (guard: el corte de 1.000 filas de PostgREST no avisa) =="
+node tests/rest-tope-1000.cjs
+
 echo "== ppp-misiones (regresión: destino del expreso y el aviso de Misiones en la Programación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-misiones.cjs
 

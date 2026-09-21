@@ -130,6 +130,52 @@ catch (_e) {
   if (/pga-dest[^<]*>🚚 CABA</.test(h)) fallos.push("un pedido SIN expreso no tiene que mostrar chip de destino");
   if (!r.chubut) fallos.push("con otra provincia marcada el front no reacciona: la provincia está hardcodeada");
 
+  // ── A Programar (v20.51) ──────────────────────────────────────────────────────────────
+  const b2 = await chromium.launch();
+  const p2 = await b2.newPage();
+  const errs2 = [];
+  p2.on("pageerror", (e) => errs2.push(e.message));
+  await p2.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
+  const a = await p2.evaluate(() => {
+    const out = {};
+    _aprProvAlerta = new Set(["misiones"]);
+    const web  = { order_id: 1357, empresa: "lk", cod: "958", razon_social: "Albalandia S.R.L. (M)",
+                   zona: "Zona 1 - CABA Sur", localidad: "Soldati", provincia: "Misiones", expreso: "Snaider" };
+    const web2 = { order_id: 1358, empresa: "lk", cod: "2394", razon_social: "Clapera",
+                   zona: "Zona 1 - CABA Sur", localidad: "Soldati", provincia: "Santa Fe", expreso: "Avellaneda" };
+    const caba = { order_id: 1359, empresa: "lk", cod: "3797", razon_social: "Oranhogar",
+                   zona: "Zona 6 - GBA Norte", localidad: "Villa Urquiza", provincia: "CABA", expreso: "" };
+    // un pedido de ISIS: no trae provincia, la saca del mapa de gv_np_destino_lista
+    const isis = { order_id: 0, np: "98615", _isis: true, empresa: "lk", cod: "958",
+                   razon_social: "Albalandia S.R.L. (M)", zona: "Zona 1 - CABA Sur", provincia: "", expreso: "" };
+    _pgaDest = new Map([["98615", { np: "98615", provincia: "Misiones", expreso: "Snaider", alerta: true,
+                                    destino_txt: "Snaider · Misiones" }]]);
+    out.web   = { marcada: aprEsProvMarcada(web),  chip: aprDestinoChip(web),  badge: aprMisBadge(web) };
+    out.web2  = { marcada: aprEsProvMarcada(web2), chip: aprDestinoChip(web2), badge: aprMisBadge(web2) };
+    out.caba  = { marcada: aprEsProvMarcada(caba), chip: aprDestinoChip(caba) };
+    out.isis  = { marcada: aprEsProvMarcada(isis), chip: aprDestinoChip(isis), badge: aprMisBadge(isis) };
+    // y con la provincia marcada cambiada, el front tiene que seguir a la config
+    _aprProvAlerta = new Set(["santa fe"]);
+    out.cambia = { web: aprEsProvMarcada(web), web2: aprEsProvMarcada(web2) };
+    return out;
+  });
+  await b2.close();
+  if (errs2.length) fallos.push("errores de página (A Programar): " + errs2.join(" | "));
+
+  if (!a.web.marcada) fallos.push("A Programar: el pedido web a Misiones no queda marcado");
+  if (!/apr-chip-mis[^>]*>MISIONES</.test(a.web.badge)) fallos.push("A Programar: falta el badge MISIONES");
+  if (!/Snaider · Misiones/.test(a.web.chip)) fallos.push("A Programar: falta el destino del expreso");
+  if (a.web2.marcada) fallos.push("A Programar: Santa Fe no está marcada y se pintó igual");
+  if (!/Avellaneda · Santa Fe/.test(a.web2.chip)) fallos.push("A Programar: el chip de destino tiene que salir siempre que haya expreso");
+  if (a.caba.chip) fallos.push("A Programar: un pedido sin expreso no lleva chip de destino");
+  if (!a.isis.marcada) fallos.push("A Programar: la NP de ISIS no resuelve su destino por gv_np_destino_lista");
+  if (!/apr-chip-mis[^>]*>MISIONES</.test(a.isis.badge)) fallos.push("A Programar: falta el badge en la NP de ISIS");
+  if (a.cambia.web || !a.cambia.web2) fallos.push("A Programar: la provincia marcada está hardcodeada, no sigue la config");
+  // el naranja en la tarjeta y que el chip esté enganchado al render
+  if (!/apr-card\.mis\{/.test(html)) fallos.push("falta el CSS .apr-card.mis");
+  if (!/aprDestinoChip\(p\) \+ aprMisBadge\(p\)/.test(html)) fallos.push("la tarjeta de A Programar no pinta los chips");
+  if (!/aprEsProvMarcada\(p\) \? ' mis' : ''/.test(html)) fallos.push("la tarjeta de A Programar no se pinta de naranja");
+
   if (fallos.length) { console.error("ppp-misiones FALLA:\n - " + fallos.join("\n - ")); process.exit(1); }
-  console.log("ppp-misiones OK — día/tanda/NP en naranja, badge y medalla por dato, destino del expreso a la vista.");
+  console.log("ppp-misiones OK — Programación y A Programar en naranja, badge y destino por dato.");
 })();

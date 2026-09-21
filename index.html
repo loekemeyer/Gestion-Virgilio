@@ -1274,6 +1274,15 @@ button {
 /* v19.44 (Luis): el pedido que NO cayó en cuarentena por ser una reposición chica. */
 .apr-chip-repo{ background:#ecfeff; color:#155e75; font-weight:800; border:1px solid #a5f3fc; }
 .apr-chip-z{ background:#e0edff; color:#1e40af; }
+/* v20.51 (Luis) — destino del expreso y provincia marcada, con el mismo naranja que la
+   Programación. El naranja pisa el fondo de la tarjeta a propósito (Luis: *"esta bien que pise
+   el color de estado"*): el destino es lo que hay que ver de lejos, y lo demás se sigue leyendo
+   en los chips. */
+.apr-chip-dest{ background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; }
+.apr-chip-mis{ background:#ea580c; color:#fff; font-weight:900; letter-spacing:.04em; }
+.apr-card.mis{ background:#fff7ed !important; border-color:#fdba74 !important;
+  box-shadow:inset 4px 0 0 #ea580c; }
+.apr-card.mis .apr-card-cli{ color:#9a3412; }
 /* idea 2048: última corrida del armado automático */
 .apr-log{ margin:0 0 8px; padding:7px 12px; border-radius:10px; font-size:12.5px; font-weight:700; background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
 .apr-log.gris{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
@@ -5805,7 +5814,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.50"></script>
+<script type="module" src="recepcion.js?v=20.51"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6368,6 +6377,38 @@ const SUPABASE_URL  = window.VIR_SUPABASE_URL;
 const SUPABASE_KEY  = window.VIR_SUPABASE_KEY;
 const SUPABASE_TABLE_ENDPOINT =
   SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio";
+/* ═══ v20.51 — EL TOPE DE 1.000 FILAS DE PostgREST ═══════════════════════════
+   PostgREST corta toda respuesta en **1.000 filas** (`db-max-rows` del proyecto) y el `limit=`
+   de la URL **NO lo levanta**: un `limit=20000` contesta `200` con las primeras 1.000 y **nada
+   dice que falten**. No hay error, no hay 403, no hay header que mirar — la pantalla muestra
+   menos datos y nadie se entera. Es lo que se comió la v20.45: `LK 0027` quedaba afuera del
+   corte y el pedido a Misiones no se pintaba.
+
+   `gvRestTodo(path)` pide de a 1.000 con `offset` hasta que vuelve una página corta, así que
+   el tope deja de existir para quien lo use. Le saca el `limit=`/`offset=` que traiga el path:
+   ese número era, en todos los casos, el techo que el autor CREYÓ estar pidiendo.
+
+   ⚠ Va SIEMPRE que la consulta lea el universo entero de algo que puede crecer. Si la
+   consulta está acotada por una clave (`?np=eq.`, `?cod=in.(…)`), no hace falta.
+   `tests/rest-tope-1000.cjs` marca las lecturas sin filtro que no lo usan. */
+const REST_PAGINA = 1000;
+async function gvRestTodo(path, headers) {
+  const H = headers || { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+  let base = String(path || "").replace(/([?&])(limit|offset)=\d+/g, "$1");
+  base = base.replace(/&&+/g, "&").replace(/\?&/, "?").replace(/[?&]$/, "");
+  const sep = base.indexOf("?") >= 0 ? "&" : "?";
+  const out = [];
+  for (let off = 0; off < 500000; off += REST_PAGINA) {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/" + base + sep + "limit=" + REST_PAGINA + "&offset=" + off,
+      { headers: H, cache: "no-store" });
+    if (!r.ok) { if (!off) throw new Error("HTTP " + r.status); break; }
+    const pag = await r.json();
+    if (!Array.isArray(pag)) return pag;
+    for (const x of pag) out.push(x);
+    if (pag.length < REST_PAGINA) break;
+  }
+  return out;
+}
 /* Fichadas de ingreso vienen del QR (fichada.html → Supabase). El monitor
    las cruza con PC/FJ de Registros_Produccion_Virgilio para calcular
    jornada. Empleados se usa para resolver email→legajo cuando el QR no
@@ -9650,7 +9691,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.50";
+const APP_VERSION = "v20.51";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -14738,7 +14779,7 @@ let _artUxbs = null;
 async function loadArtUxb() {
   if (_artUxbs) return _artUxbs;
   const m = {}, H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  try { const r = await fetch(SUPABASE_URL + "/rest/v1/vista_uxb_articulo?select=cod,uxb&limit=20000", { headers: H, cache: "no-store" }); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.cod), u = Number(x.uxb); if (k && u > 0) m[k] = u; }); } catch (_e) {}
+  try { (await gvRestTodo("vista_uxb_articulo?select=cod,uxb", H)).forEach(function (x) { const k = _ocgNorm(x.cod), u = Number(x.uxb); if (k && u > 0) m[k] = u; }); } catch (_e) {}
   _artUxbs = m; return m;
 }
 function artUxb(cod, fb) { const u = _artUxbs && _artUxbs[_ocgNorm(cod)]; return (u && u > 0) ? u : (fb != null ? fb : null); }
@@ -16935,7 +16976,7 @@ async function stkFcsFetch() {
   /* v10.10 — reemplaza 6 fetches client-side por 1 fetch de vista_fc_sin_salida (server-side).
      La vista ya resuelve CCN/FSS/Facturacion_NP/Entregas y agrupa por artículo con detalle NP. */
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  const rows = await fetch(SUPABASE_URL + "/rest/v1/vista_fc_sin_salida?select=cod,cajas,cant_nps,detalle_nps&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+  const rows = await gvRestTodo("vista_fc_sin_salida?select=cod,cajas,cant_nps,detalle_nps", H).catch(function () { return []; });
   const porArt = {}, pend = {};
   (rows || []).forEach(function (r) {
     var nps = r.detalle_nps || [];
@@ -17428,7 +17469,7 @@ async function openAbastecimiento() {
        mes-a-mes (drill-down al expandir un artículo) se carga lazy on-demand. */
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const res = await Promise.all([
-      fetch(SUPABASE_URL + "/rest/v1/vista_abastecimiento?select=cod,descripcion,rec_avg,rec_ult,ven_avg,ven_ult,bal_avg,bal_ult,n_prov,stock,pedidos,nps_ped,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,falta,cap_falla,stk_falla,provs_ult_detalle,mes_ultimo,es_importado&limit=50000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }),
+      gvRestTodo("vista_abastecimiento?select=cod,descripcion,rec_avg,rec_ult,ven_avg,ven_ult,bal_avg,bal_ult,n_prov,stock,pedidos,nps_ped,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,racks_ch,para_envasar,falta,cap_falla,stk_falla,provs_ult_detalle,mes_ultimo,es_importado", H).catch(function () { return []; }),
       loadArtNombres()
     ]);
     var viewRows = res[0] || [];
@@ -34641,9 +34682,7 @@ function pppSaveZonaOvr() { try { localStorage.setItem(PPP_ZONA_OVR_KEY, JSON.st
 let _pppZonaSupa = {};
 async function loadZonasBarriosRemote() {
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/Zonas_Barrios?select=barrio_norm,zona&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    if (!r.ok) return;
-    const rows = await r.json();
+    const rows = await gvRestTodo("Zonas_Barrios?select=barrio_norm,zona");
     const m = {};
     rows.forEach(function (x) { const k = String(x.barrio_norm == null ? "" : x.barrio_norm).trim(); if (k && x.zona) m[k] = String(x.zona); });
     _pppZonaSupa = m;
@@ -36974,7 +37013,7 @@ async function _zgFetchAddrs() {
   const pedir = function (u) { return fetch(SUPABASE_URL + "/rest/v1/" + u, { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); };
   const [isis, web] = await Promise.all([
     pedir("gv_ppp_programacion_diaria?select=np,razon_social,direccion,barrio,zona&limit=20000"),
-    pedir("PPP_Web_Programacion?select=np,razon_social,direccion,barrio,zona&limit=20000")
+    gvRestTodo("PPP_Web_Programacion?select=np,razon_social,direccion,barrio,zona").catch(function () { return []; })
   ]);
   const rows = isis.concat(web);
   const seen = {}, out = [];
@@ -37011,8 +37050,8 @@ async function _rtEnsureDepot(cache) {
 async function _zgCacheAll() {
   const out = {};
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo?select=dir_key,lat,lng,comp&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    if (r.ok) { const d = await r.json(); for (const row of d) out[row.dir_key] = { lat: +row.lat, lng: +row.lng, comp: row.comp || null }; }
+    const d = await gvRestTodo("PPP_Geo?select=dir_key,lat,lng,comp");
+    for (const row of d) out[row.dir_key] = { lat: +row.lat, lng: +row.lng, comp: row.comp || null };
   } catch (e) { }
   return out;
 }
@@ -37125,8 +37164,8 @@ async function zgGeocodeFaltantes() {
 async function _rtCacheAll() {
   const out = {};
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/PPP_Geo?select=dir_key,lat,lng&limit=20000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    if (r.ok) { const d = await r.json(); for (const row of d) out[row.dir_key] = { lat: +row.lat, lng: +row.lng }; }
+    const d = await gvRestTodo("PPP_Geo?select=dir_key,lat,lng");
+    for (const row of d) out[row.dir_key] = { lat: +row.lat, lng: +row.lng };
   } catch (e) { }
   return out;
 }
@@ -43984,6 +44023,11 @@ async function aprTraerPedidos(e) {
       cod: n.cod || "", razon_social: n.razon_social || "",
       fecha_recep: n.fecha_recep || "", zona: pwebZonaSugerida(n),
       localidad: pwebLocalidad(n), direccion: pwebDireccion(n),
+      // v20.51 (Luis) — el DESTINO del expreso. La zona de al lado es dónde lo deja el
+      // camión (el galón del expreso, en CABA); esto es dónde termina la mercadería. Viene
+      // con el pedido: `provincia` del feed de LK y de la RPC de Chef, que ya la devolvía.
+      provincia: String(n.provincia || "").trim(),
+      expreso: String(n.nombre_expreso || "").trim(),
       cond: (n.condicion_pago_code == null ? "" : String(n.condicion_pago_code)),  // v14.85: condición de pago (2% web condicional)
       // v19.10 — EL TURNO QUE PIDE LA OC. Es del PEDIDO, no del bloque: todos los bloques
       // de un pedido comparten la misma fecha y hora de entrega pactada.
@@ -44757,6 +44801,58 @@ function aprPorQueHtml(lista) {
      · el que programa, tocando el badge → `GV_Pedido_Horario` (RPC `gv_pedido_horario_set`).
    Como Virgilio no tiene FDW contra LK, el merge de las dos fuentes se hace acá; lo que se EDITA va
    siempre a la tabla de Virgilio, que es la que después lee `gv_ppp_prog_arbol` para Programación. */
+/* ═══ v20.51 (Luis) — MISIONES TAMBIÉN EN A PROGRAMAR ═════════════════════════
+   *"lo de A programar debería pintarlo de naranja y poner badge de misiones si corresponde"*.
+   Acá el pedido todavía NO tiene NP, así que no entra en `gv_np_destino`. El dato sale por el
+   otro camino: la **provincia que viaja con el pedido** desde la página (el feed de LK la trae
+   desde la v20.45; la RPC de Chef ya la devolvía y el front la tiraba).
+   Un pedido de ISIS no pasó por la página y no tiene provincia en el feed — ése sí tiene NP,
+   así que se resuelve con el mismo `gv_np_destino_lista` que usa Programación.
+   ⚠ Qué provincias se marcan NO está en el código: sale de `PPP_Web_Config.provincias_alerta`,
+   la misma fila que lee `gv_provincia_alerta` del backend. Una sola fuente. */
+let _aprProvAlerta = null;
+function aprProvAlertaNeed() {
+  if (_aprProvAlerta) return;
+  _aprProvAlerta = new Set();   // hasta que conteste, nadie está marcado
+  fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Config?select=valor_texto&clave=eq.provincias_alerta&limit=1",
+    { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (rows) {
+      const txt = String(((rows || [])[0] || {}).valor_texto || "");
+      const st = new Set();
+      for (const x of txt.split(",")) { const v = x.trim().toLowerCase(); if (v) st.add(v); }
+      _aprProvAlerta = st;
+      if (_pppTab === "prog") aprRender();
+    })
+    .catch(function (_e) {});
+}
+/* El destino de un pedido de A Programar: de la página si vino de ahí, del backend si es de ISIS. */
+function aprDestino(p) {
+  if (!p) return null;
+  if (p.provincia || p.expreso) return { provincia: p.provincia || "", expreso: p.expreso || "" };
+  const np = (typeof aprIsisNp === "function") ? aprIsisNp(p) : "";
+  const d = np ? _pgaDestDe({ np: np }) : null;
+  return d ? { provincia: d.provincia || "", expreso: d.expreso || "" } : null;
+}
+function aprEsProvMarcada(p) {
+  const d = aprDestino(p);
+  return !!(d && d.provincia && _aprProvAlerta && _aprProvAlerta.has(d.provincia.trim().toLowerCase()));
+}
+/* El chip del destino: sólo cuando hay EXPRESO. En un reparto propio la provincia es la de la
+   zona que ya se lee al lado, y repetirla en cada tarjeta de CABA es ruido. */
+function aprDestinoChip(p) {
+  const d = aprDestino(p);
+  if (!d || !d.expreso) return "";
+  const txt = [d.expreso, d.provincia].filter(Boolean).join(" · ");
+  return '<span class="apr-chip apr-chip-dest" title="Destino del expreso. La zona de al lado es dónde lo deja el camión (el galón del expreso, en CABA); esto es dónde termina la mercadería.">🚚 ' +
+    escapeHtml(txt) + '</span>';
+}
+function aprMisBadge(p) {
+  if (!aprEsProvMarcada(p)) return "";
+  const d = aprDestino(p);
+  return '<span class="apr-chip apr-chip-mis" title="Pedido a una provincia marcada (PPP_Web_Config.provincias_alerta).">' +
+    escapeHtml(String(d.provincia || "").toUpperCase()) + '</span>';
+}
 const APR_HORARIO_TTL_MS = 5 * 60 * 1000;
 /* Las franjas de siempre, como atajo; el que programa igual puede escribir cualquier cosa. */
 const APR_FRANJAS = ["08:00 a 12:00", "12:00 a 16:00", "16:00 a 20:00", "Mañana", "Tarde", "Todo el día"];
@@ -45016,9 +45112,16 @@ function aprContenidoHtml(p) {
 function aprColPedidos() {
   const q = _apr.q;
   cuarRepoNeed();   // v19.44: los exentos por reposición chica, para el chip (llamada aparte)
+  aprProvAlertaNeed();   // v20.51: qué provincias se marcan (del backend, no del código)
   // v14.81: los pedidos en cuarentena (deuda / suspendido / supera crédito) salen de la lista
   // normal y van a su propio sector (aprColCuarentena). No se pueden tildar ni programar.
   let lista = (_apr.pedidos || []).filter(function (p) { return !aprEnCuarentena(p); });
+  // v20.51: un pedido de ISIS no pasó por la página y no trae provincia — pero SÍ tiene NP,
+  // así que su destino sale del mismo `gv_np_destino_lista` que usa Programación. Pide sólo las
+  // que faltan, así que no pega a la red en cada render.
+  if (typeof pgaDestNeed === "function" && typeof aprIsisNp === "function")
+    pgaDestNeed(lista.filter(function (p) { return p && p._isis; })
+                     .map(function (p) { return aprIsisNp(p); }).filter(Boolean));
   if (q) lista = lista.filter(function (p) {
     return (p.razon_social + " " + p.cod + " " + p.zona + " " + p.localidad + " " + p.order_id).toLowerCase().indexOf(q) >= 0;
   });
@@ -45051,7 +45154,8 @@ function aprColPedidos() {
     const id = "p" + p.order_id, ab = !!_apr.exp[id];
     const key = aprKey(p.empresa, p.order_id), on = !!(_apr.sel && _apr.sel[key]);
     // v13.81: la tarjeta se TILDA (paso 1); el nombre abre el detalle. El arrastre queda como atajo en compu.
-    h += '<div class="apr-card' + (on ? ' apr-card-sel' : '') + '" draggable="true" ondragstart="aprDragPedido(event,\'' + key + '\')"' +
+    h += '<div class="apr-card' + (on ? ' apr-card-sel' : '') + (aprEsProvMarcada(p) ? ' mis' : '') +
+      '" draggable="true" ondragstart="aprDragPedido(event,\'' + key + '\')"' +
       ' ondragend="aprDndFin()">' +
       // v17.57 (Luis): arriba el NÚMERO, el m³ y la flechita — igual que las fichas de Cuarentena.
       '<div class="apr-card-h">' +
@@ -45069,6 +45173,8 @@ function aprColPedidos() {
         aprEsperaChip(p) +   // v13.85: hace cuánto llegó
         aprDiferidoChip(p) + // v15.67: espera un reingreso
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
+        // v20.51 (Luis): el destino del expreso, y el badge si la provincia está marcada.
+        aprDestinoChip(p) + aprMisBadge(p) +
         // v16.03 — el pedido estuvo en una tanda y esa tanda YA se pickeó y se armó (la mercadería
         // está en un pallet). Va acá en rojo para que nadie lo mande a pickear de nuevo: al
         // programarlo vuelve a ESA tanda (gv_ppp_isis_programar reusa tanda_previa), no a una nueva.
@@ -48918,7 +49024,7 @@ async function npcLoad(force){
         // gv_ppp_programacion_diaria— son el espejo de ISIS y NO contienen las NP de la página
         // ("LK 0011", "CH 0003"): por eso salían sin razón social. Las web viven en
         // PPP_Web_Programacion, y gv_ppp_web_estado ya las expone con su etiqueta (np_label).
-        fetch(SUPABASE_URL + "/rest/v1/gv_ppp_web_estado?select=np_label,cod_cliente,razon_social,tanda,fecha_entrega&limit=20000", { headers: H, cache: "no-store" }).then(function(r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })
+        gvRestTodo("gv_ppp_web_estado?select=np_label,cod_cliente,razon_social,tanda,fecha_entrega", H).catch(function(){ return []; })
       ]);
       const ent = par[0], meta = par[1], pp = par[2], pk = par[3] || [];
       // v6.33 — CP con origen "a guardar": qué código(s) de cada NP salieron de a_guardar
@@ -50098,7 +50204,7 @@ async function _facXlsArmar(nps) {
     // La fecha de una NP de ISIS sale de PPP_Base_Pedidos; una NP web NO está ahí,
     // así que su fecha de recepción se guarda al programar y se lee de acá. Sin
     // esto el Excel salía con la fecha vacía para todo lo que viene de la página.
-    fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?select=np,np_idx,empresa,order_id,fecha_recep&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+    gvRestTodo("PPP_Web_Programacion?select=np,np_idx,empresa,order_id,fecha_recep", H).catch(function () { return []; })
   ]);
 
   const uxbBy = {}; (uxb || []).forEach(function (x) { const k = String(x.cod || "").replace(/^0+/, ""); if (k) uxbBy[k] = Number(x.uxb) || null; });
@@ -50777,11 +50883,9 @@ async function facNuevosCargar() {
   if (_facNuevosInflight) return _facNuevosInflight;
   _facNuevosInflight = (async function () {
     try {
-      const r = await fetch(SUPABASE_URL + "/rest/v1/GV_Clientes_Nuevos?select=empresa,cod,pedidos&limit=2000",
-        { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-      if (r.ok) {
+      {
         const m = new Map();
-        for (const x of (await r.json())) {
+        for (const x of (await gvRestTodo("GV_Clientes_Nuevos?select=empresa,cod,pedidos"))) {
           const c = String(x.cod == null ? "" : x.cod).trim();
           if (c) m.set(pppEmpNorm(x.empresa) + "|" + c, Number(x.pedidos));
         }
