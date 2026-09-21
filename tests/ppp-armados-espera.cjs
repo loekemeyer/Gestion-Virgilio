@@ -94,14 +94,15 @@ catch (_e) {
     out.esperaUltimo = out.ultimo === PGA_ESPERA_KEY;   // el estacionamiento va al final, no en el medio
     const h = _pgaCuerpoHtml(dias, {});
     out.diceNombre = h.indexOf(PGA_ESPERA_TXT) >= 0;
-    /* v20.65 — el chip se acorto a proposito en la v20.59: el texto largo ("sin fecha de entrega"
+    /* v20.67 — el chip se acorto a proposito en la v20.59: el texto largo ("sin fecha de entrega"
        / "vacio · aca se mandan las tandas armadas sin fecha, con Cambiar de dia") medía 626 px y,
        como toda la tabla va `nowrap`, UN renglon le fijaba el ancho a la columna del dia entera
        (636 px contra los 165 que piden las filas de dia). Thomas: *"no puede quedar tanto espacio
-       en blanco entre Dia y m3, compacta la visual"*. Asi que el test ya NO exige ese texto: exige
-       lo que el chip tiene que seguir cumpliendo —estar, y decir que ese dia no tiene fecha— y que
-       la explicacion completa no se haya perdido, que ahora vive en el `title` de la fila. */
-    out.chip = /class="pga-esp">sin fecha</.test(h);
+       en blanco entre Dia y m3, compacta la visual"*. El test ya NO exige ese texto: acepta las dos
+       redacciones —eso lo resolvio otra sesion en la v20.66— y ademas chequea que la explicacion no
+       se haya perdido, que es lo que el chip largo hacia y ahora vive en el `title` de la fila.
+       Las dos mitades hacen falta: sin la segunda, acortar el chip hasta dejarlo mudo pasa el test. */
+    out.chip = /class="pga-esp">sin fecha( de entrega)?</.test(h);
     out.chipExplica = /title="[^"]*sin fecha de entrega[^"]*"/.test(h)
                    && /title="[^"]*no consume cupo[^"]*"/.test(h);
     out.clase = /class="pga-d[^"]* espera"/.test(h);
