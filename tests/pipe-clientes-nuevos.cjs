@@ -34,7 +34,7 @@ const fallos = [];
 
 /* ── 1. aprobar es el MISMO camino que el submódulo viejo ─────────────────────────────── */
 // el candado invertido: si alguien le escribe al pipeline su propio "aprobar", esto lo caza.
-// v20.67: el boton de un pedido REAL sigue aprobando con cuarLiberar; solo el de EJEMPLO
+// v20.69: el boton de un pedido REAL sigue aprobando con cuarLiberar; solo el de EJEMPLO
 // (clave __DEMO__) va a otro lado, y ese no toca nada.
 if (!/const _aprobar = esDemo \? "pipeDemoAprobar\(\)" : "cuarLiberar\('/.test(html))
   fallos.push("el pipeline no aprueba con cuarLiberar: si tiene camino propio, el submodulo viejo no se entera");

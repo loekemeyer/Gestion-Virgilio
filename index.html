@@ -5991,7 +5991,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.68"></script>
+<script type="module" src="recepcion.js?v=20.69"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9869,7 +9869,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.68";
+const APP_VERSION = "v20.69";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -44485,7 +44485,7 @@ let _apr = {
   pipe: null, pipeLoading: false, pipeRetry: false,
   pipeCfg: null, pipeCfgLoading: false,
   pipeFirma: null, pipeVinc: null,
-  pipeDemo: false,   // v20.67 (Luis): el cliente de prueba de la pestaña
+  pipeDemo: false,   // v20.69 (Luis): el cliente de prueba de la pestaña
   // v19.44 — REPOSICIÓN CHICA: pedidos que NO caen en cuarentena porque al cliente se le facturó
   // hace poco y pidió un solo código (empresa:order_id → {items, dias, fecha}). Se pide APARTE,
   // nunca junto con la marcación: ver cuarRepoCargar.
@@ -46921,7 +46921,7 @@ function pipeLista() {
   const l = (_apr.pedidos || []).filter(function (p) {
     return !p._demo && aprEnCuarentena(p) && pipeEsClienteNuevo(p);
   });
-  // v20.67 (Luis): el pedido de EJEMPLO va primero, para poder probar los botones sin tocar
+  // v20.69 (Luis): el pedido de EJEMPLO va primero, para poder probar los botones sin tocar
   // nada real. Avanza por las etapas de verdad (si no, no se prueba nada), pero su clave es
   // `__DEMO__` y el backend no le escribe ni el log, ni el timer viejo, ni ninguna excepcion.
   return _apr.pipeDemo ? [pipeDemoPedido()].concat(l) : l;

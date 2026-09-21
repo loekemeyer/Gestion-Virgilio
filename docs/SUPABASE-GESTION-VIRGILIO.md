@@ -27485,7 +27485,7 @@ select * from public.gv_clin_prioritarios;  -- lo aprobado que tiene que salir e
 select * from public.gv_reglas_perdidas;    -- vacía = ninguna regla se perdió
 ```
 
-#### El cliente de prueba (v20.67, pedido de Luis)
+#### El cliente de prueba (v20.69, pedido de Luis)
 
 *"creame un cliente de prueba en el pipeline de clientes (uno de ejemplo con el que pueda probar
 los botones y no romper nada)"*.
@@ -27518,7 +27518,7 @@ cliente en Equifax. Sin CUIT en el padrón muestra `—`, no se inventa.
 La v20.66 lo dejó como `ð🚧§`. Causa: el script que insertó la pestaña nueva concatenó la línea
 vieja con la nueva y le pasó **`.encode('utf-8')` a las dos**, así que el 🚧 —que ya estaba en
 UTF-8— quedó codificado dos veces (`C3 B0 C2 9F…` en vez de `F0 9F 9A A7`). **`index.html` se lee
-y se escribe en UTF-8 o en bytes, nunca re-codificando lo que ya estaba.** Corregido en la v20.67,
+y se escribe en UTF-8 o en bytes, nunca re-codificando lo que ya estaba.** Corregido en la v20.69,
 con un barrido del archivo entero: no quedó ninguna otra secuencia de doble encoding.
 
 `sql/gv_clin_pipeline_v2066.sql`, `tests/pipe-clientes-nuevos.cjs`.
