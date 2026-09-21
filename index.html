@@ -3395,7 +3395,12 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    bloque es el del hijo más ancho —la tabla— y el encabezado se estira a ESE ancho, así que los
    botones quedan pegados al borde derecho de la tabla y se mueven con ella al abrir o cerrar un
    día. Sin JS: no hay que recalcular nada en cada render. */
-.pga-blk{ width:fit-content; max-width:100%; }
+/* v20.76 (Luis: "mucho espacio vacio a la derecha; centra mas la tabla"). El bloque mide lo que
+   mide la tabla (`fit-content`, para que los botones queden pegados a su borde derecho), y un
+   bloque angosto adentro de un contenedor ancho queda pegado a la IZQUIERDA: de ahí el hueco.
+   `margin-inline:auto` lo centra sin estirarlo — estirarlo dejaría columnas vacías, que es el
+   problema que la v13.65 ya había arreglado del otro lado. */
+.pga-blk{ width:fit-content; max-width:100%; margin-inline:auto; }
 /* ⚠ `width:0` + `min-width:100%` es lo que hace que el ancho lo fije SIEMPRE la tabla. Un hijo
    con `width:0` no participa del `fit-content` del padre —así el encabezado no lo estira cuando
    su texto es más largo que la tabla, que es lo que pasaba con pocos días— y el `min-width:100%`
