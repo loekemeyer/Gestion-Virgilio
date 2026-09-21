@@ -586,3 +586,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== stk-detalle-cero-adelante (v20.02: el detalle de una fila de Stocks encuentra los movimientos con cero adelante y los duales) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-detalle-cero-adelante.cjs
+
+echo "== cuar-com-limpia (v20.34: el cuadro de comentarios queda vacio al mandar, al cerrar y al reabrir) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cuar-com-limpia.cjs
