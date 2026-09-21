@@ -1,3 +1,32 @@
+## Nota v20.79 (2026-09-21) — El remito FACTURADO ya trae el cliente de una NP web
+
+Lo vio Thomas sobre **LK 0145** (tanda E35A, impresa el 21/09 a las 14:51): la hoja salía con
+**`Cliente —`** y **`Fecha Entrega —`**, con el dato cargado y a la vista en la base
+(`1802 · Tau Daniela Leonor · 22/09`).
+
+**No faltaba el dato: faltaba la fuente.** `facPrintFacturado` —el auto-print que dispara el tilde
+de Facturación— arma su propio `row` y resolvía la cabecera **sólo** contra
+`gv_ppp_programacion_diaria`, que es el espejo de ISIS y **no tiene las NP de la página**
+(`LK 0145`, `CH 0005`). Sin fila, `cod` y `rs` quedaban vacíos y el remito imprimía el guion.
+
+Es el **cuarto** lugar con el mismo agujero, y el único que faltaba: lo taparon la **v14.36**
+(Composición a líos), la **v15.42** (Recepción Remitos y la lista de la Cola de impresión) y la
+**v15.46** (el remito de ARMADO, en `_armadoRemitoDataForItems`). Aquella vez el caso testigo fue
+CH 0005 el 11/09 — mismo síntoma, otra función.
+
+Ahora `facPrintFacturado` pide también `gv_ppp_web_estado` y usa ISIS primero, web si la NP no está
+ahí. El `np_label` va **entrecomillado** porque lleva un espacio (lección de la v12.67).
+
+**Alcance de lo que salió mal impreso:** 72 NP web facturadas desde el 08/09, 68 de ellas en los
+últimos 7 días. El remito de **armado** salía bien desde la v15.46; el que se imprime al facturar,
+que es el que va con el camión y lleva el recuadro «Controlado / Legajo», no.
+
+⚠ **Al tocar cualquier cabecera de remito, pantalla o export que muestre cliente o fecha de
+entrega, preguntarse si la NP web está contemplada.** La señal es siempre la misma:
+`SUPABASE_PPP_PROG_ENDPOINT` usado solo, sin `gv_ppp_web_estado` al lado. Lo sostienen
+`tests/remito-fac-np-web.cjs` (nuevo, con candado invertido: se rompió a propósito y se puso en
+rojo) y `tests/remito-np-web.cjs`.
+
 ## Nota v20.61 (2026-09-21) — Los botones de la Programación viajan con la tabla
 
 Thomas: *"los botones de Actualizar, Imprimir y Tablero se quedan trabados, quiero que viajen con
