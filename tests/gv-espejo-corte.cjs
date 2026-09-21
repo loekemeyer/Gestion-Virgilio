@@ -38,7 +38,7 @@ const vistas = html.match(/\/rest\/v1\/gv_ppp_(programacion_diaria|base_pedidos|
     window.fetch = async (url) => {
       const u = String(url); out.urls.push(u);
       if (u.indexOf("gv_ppp_programacion_diaria") >= 0) return json([{ np: "98694", tanda: "D52B", cod: "4109", razon_social: "Di Leo", m3: 0.5, fecha_entrega: "2026-09-08 00:00:00", zona: "Zona 1" }]);
-      // v20.71: el picking lee la vista agregada (pedido -> items). El chequeo sigue siendo
+      // v20.78: el picking lee la vista agregada (pedido -> items). El chequeo sigue siendo
       // el mismo: que la base salga de una vista gv_ppp_*, no de la tabla cruda del espejo.
       if (u.indexOf("gv_ppp_base_pedidos_items") >= 0) return json([{ pedido: "98694", items: [{ a: "035E", c: 2 }] }]);
       if (u.indexOf("gv_ppp_base_pedidos") >= 0) return json([{ pedido: "98694", articulo: "035E", cajas: 2 }]);

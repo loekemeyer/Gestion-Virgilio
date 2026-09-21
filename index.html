@@ -6002,7 +6002,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.77"></script>
+<script type="module" src="recepcion.js?v=20.78"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6640,7 +6640,7 @@ const SUPABASE_PPP_PROG_ENDPOINT       = SUPABASE_URL + "/rest/v1/gv_ppp_program
    Se unificó para poder sacar esa hoja del Apps Script y borrar la tabla chica. */
 const SUPABASE_PPP_ENTREGADOS_ENDPOINT = SUPABASE_URL + "/rest/v1/gv_ppp_entregados_meta";
 const SUPABASE_PPP_BASE_ENDPOINT       = SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos";
-/* v20.71 - las dos lecturas agregadas: lo que el front usa de verdad de esa vista, del
+/* v20.78 - las dos lecturas agregadas: lo que el front usa de verdad de esa vista, del
    lado del servidor. Las dos entran en una sola pagina de PostgREST. */
 const SUPABASE_PPP_BASE_ITEMS_ENDPOINT = SUPABASE_URL + "/rest/v1/gv_ppp_base_pedidos_items";
 const SUPABASE_PPP_BASE_ARTS_ENDPOINT  = SUPABASE_URL + "/rest/v1/gv_ppp_base_articulos";
@@ -9884,7 +9884,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.77";
+const APP_VERSION = "v20.78";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11551,7 +11551,7 @@ async function _supaFetchAllRaw(endpoint, query) {
           apikey: SUPABASE_KEY,
           Authorization: "Bearer " + SUPABASE_KEY,
           "Range-Unit": "items",
-          /* v20.71 - SIN `Prefer: count=exact`. Ese header hacia que PostgREST contara la
+          /* v20.78 - SIN `Prefer: count=exact`. Ese header hacia que PostgREST contara la
              vista ENTERA en CADA pagina (`pgrst_source_count`), y nadie usa ese total: la
              paginacion corta igual por pagina corta. Sobre `gv_ppp_base_pedidos` eran 10
              recuentos de 9.618 filas por lectura, 2.324 lecturas en 6 h. */
@@ -11575,7 +11575,7 @@ async function _supaFetchAllRaw(endpoint, query) {
     // paginación entera; sin esto tira TypeError y el llamador se queda sin datos.
     const cr = ((r.headers && typeof r.headers.get === "function") ? r.headers.get("content-range") : "") || "";
     const slash = cr.indexOf("/");
-    /* v20.71 - sin `count=exact` PostgREST manda `0-999/*`, asi que el total viene NaN. El
+    /* v20.78 - sin `count=exact` PostgREST manda `0-999/*`, asi que el total viene NaN. El
        corte pasa a ser la pagina corta, igual que en `gvRestTodo` y en el envoltorio de
        `supabase-config.js`. Ojo: el `else` tiene que colgar del NaN, no del `/`, o con el
        `*` el total queda en Infinity y se pide una pagina vacia de mas. */
@@ -11612,7 +11612,7 @@ async function fetchPickingBase() {
    pre-agrega (pedido,artículo) sumando cajas; el picking suma por código igual,
    así el resultado es idéntico al de Sheets. cajas es numérico en la DB. v2.80. */
 async function fetchPickingBaseFromSupabase() {
-  /* v20.71 - se lee `gv_ppp_base_pedidos_items` (una fila por pedido, con sus items ya
+  /* v20.78 - se lee `gv_ppp_base_pedidos_items` (una fila por pedido, con sus items ya
      agrupados en el orden de id) en vez de la vista cruda. Son 816 filas contra 9.618, o
      sea UNA pagina contra diez, y cada pagina recalculaba la vista entera: 68 ms contra
      1.530 ms de base por lectura. El contenido es el mismo. */
@@ -42192,7 +42192,7 @@ async function dpLoad(force) {
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_volumen_articulo_resuelto", "select=codigo,m3"),
         supaFetchAllSafe(SUPABASE_CAPACIDAD_ENDPOINT, "select=cod,empresa,sector,cajas_max"),
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Insumos", "select=cod,isis,nombre,categoria"),
-        // v20.71 - los codigos distintos (321 filas) en vez de la vista entera (9.618).
+        // v20.78 - los codigos distintos (321 filas) en vez de la vista entera (9.618).
         supaFetchAllSafe(SUPABASE_PPP_BASE_ARTS_ENDPOINT, "select=articulo"),
         supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos_Discontinuados", "select=cod")   // v9.08: discontinuos → no se muestran
       ]);

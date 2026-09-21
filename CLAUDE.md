@@ -2883,3 +2883,57 @@ Dos detalles de implementación que costaron y conviene no repetir:
 **Chequeo:** `select * from public.gv_ppp_web_armado_salud;` — `FEED CAIDO` / `SIN CORRER` son
 para mirar; `sin nada que armar` y `fuera de horario` son sanos. §3.jf,
 `sql/gv_armado_salud_feed_v1958.sql`.
+
+## ⚠ REGLA (Luis, 2026-09-21, v20.78): antes de optimizar, medir — y leer lo que se usa, no el universo
+
+**Luis, con la captura del `canceling statement due to statement timeout` en A Programar:**
+*"banda de timeouts, fijate de optimizar la toma de datos de pedidos"*.
+
+El orden sigue siendo el de §"si algo tira «canceling statement», mirar `pg_stat_statements`
+ANTES de tocar la función". Lo que apareció al mirarlo son tres cosas que se repiten en toda
+la app, y por eso quedan escritas acá:
+
+### 1. Una función SQL con `SET search_path` NO se inlinea — buscarla en los `WHERE`
+
+Es el mismo pozo de `gv_destino_score` (v20.62), y estaba en otros dos lugares:
+`gv_espejo_np_pasa` se llamaba **una vez por fila** dentro de `gv_ppp_base_pedidos` (9.618) y
+de `gv_pedidos_web_excluidos` (16.143). Y con la canilla del espejo **abierta** —corte `lk` y
+`chef` en `null`, como está desde el 06/09— **devuelve `true` siempre**: ninguna de esas
+llamadas decidía nada.
+
+```sql
+-- el short-circuit, que es todo el arreglo:
+where ((c.lk is null and c.chef is null) or gv_espejo_np_pasa(b.pedido, c.lk, c.chef))
+```
+
+`gv_ppp_base_pedidos`: 153 ms → **33 ms**. `gv_pedidos_web_excluidos`: 2.465 ms → **517 ms**
+(y su peor llamada era de 7.958 ms contra un timeout de 8 s). Las dos con **0 filas de
+diferencia**, medido con `EXCEPT ALL` en las dos direcciones.
+
+### 2. Si el front usa un pedacito, el pedacito se arma en el servidor
+
+`gv_ppp_base_pedidos` son 9.618 filas y PostgREST corta en 1.000: **diez vueltas, y cada
+vuelta recalcula la vista entera**. De esas 9.618 filas el picking quiere `pedido → items` y
+el panel de Despiece quiere los códigos. Las dos vistas nuevas entran en **una página**:
+
+| lectura | vista | filas |
+|---|---|---:|
+| base de picking | **`gv_ppp_base_pedidos_items`** (`jsonb_agg` en orden de `id`) | 816 |
+| panel de Despiece | **`gv_ppp_base_articulos`** | 321 |
+
+**1.530 ms → 35 ms por lectura**, y son 2.324 lecturas cada 6 h.
+
+### 3. `Prefer: count=exact` cuesta un recuento entero por página, y nadie lo usa
+
+`supaFetchAll` lo mandaba en **cada** página: PostgREST contaba la relación completa por
+vuelta (`pgrst_source_count`) para devolver un total que la función ni mira. Se sacó.
+
+⚠ **Sin `count=exact` el header viene `0-999/*`**, así que el `else` del corte tiene que
+colgar del **NaN**, no de la barra: con el código viejo `cr.indexOf("/")` seguía dando ≥ 0, el
+total quedaba en `Infinity` y se pedía **una página vacía de más en cada lectura paginada de
+la app**.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = ninguna de las dos reglas se
+perdió. Y `tests/pedidos-lectura-1vuelta.cjs`, que muerde por los dos lados (el literal en el
+código y el header que sale de verdad en la request).
+`sql/gv_base_pedidos_lectura_v2078.sql`, `sql/gv_pedidos_web_excluidos_v2078.sql`, §3.ls.

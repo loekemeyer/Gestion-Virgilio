@@ -1,4 +1,4 @@
--- v20.71 — A Programar dejaba de contestar: la RPC llegaba al statement_timeout de 8 s.
+-- v20.78 — A Programar dejaba de contestar: la RPC llegaba al statement_timeout de 8 s.
 --
 -- Luis, 21/09, con la captura del "canceling statement due to statement timeout":
 -- "banda de timeouts, fijate de optimizar la toma de datos de pedidos".

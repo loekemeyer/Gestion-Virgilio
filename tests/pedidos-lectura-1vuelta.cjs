@@ -1,4 +1,4 @@
-/* Regresión (v20.71): LA TOMA DE DATOS DE PEDIDOS VA EN UNA VUELTA, NO EN DIEZ.
+/* Regresión (v20.78): LA TOMA DE DATOS DE PEDIDOS VA EN UNA VUELTA, NO EN DIEZ.
 
    Luis, 21/09, con la captura del "canceling statement due to statement timeout" en
    A Programar: "banda de timeouts, fijate de optimizar la toma de datos de pedidos".
