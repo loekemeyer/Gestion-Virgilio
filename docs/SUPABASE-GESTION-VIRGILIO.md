@@ -27709,3 +27709,74 @@ guard prevé (*"la excepción se levanta a mano, caso por caso, mirando el stock
 nadie lo vuelva a pickear.
 
 `sql/gv_mover_tanda_salio_sin_el_v2072.sql`, problema 472.
+
+### §3.lr — v20.74 · El badge de destino dice lo que dice el PEDIDO, no la ficha — 2026-09-21
+
+**Thomas:** *"¿qué puso el cliente? ¿que retira o que se lo entreguemos en algún lado? eso es lo que
+tiene que decir el badge, y así es como lo tiene que tomar el sistema a menos que se cambie de
+alguna forma"* · y ante la reticencia: ***"el badge debería reflejar la realidad, ¿por qué lo que
+eligió el cliente no sería la realidad?"***.
+
+**Tiene razón, y la precisión es una sola: lo que eligió el cliente es una SUCURSAL, y lo que
+define el modo es su DIRECCIÓN, no su nombre.**
+
+| el cliente eligió… | dirección de esa sucursal | qué es |
+|---|---|---|
+| *"Convenir en Av. Panamericana"* (Muller y Muller) | **Virgilio 2788** | **retira**, aunque el nombre no lo diga |
+| *"Burgwardt 903 - Longchamps"* (Iro Iro) | Burgwardt 903 | entrega ahí |
+
+Eso ya lo resolvía **`es_retira`** de `gv_np_destino`, que mira la dirección y el barrio que viajan
+con la NP (`^retira$`, `Exp. Retira — …`, `virgilio\s*2788`). Lo que faltaba era **usarlo para el
+badge**: el badge salía de `nombre_expreso` **del padrón**, que es otro campo, lo mantiene otra
+gente y no dice nada de este pedido.
+
+**El cambio es una sola expresión**, la columna `expreso`:
+
+```
+antes:  CASE WHEN ok THEN nombre_expreso ELSE NULL END
+ahora:  CASE WHEN es_retira THEN 'Retira'
+             WHEN ok AND nombre_expreso NO ES 'Retira' THEN nombre_expreso
+             ELSE NULL END
+```
+
+**Las dos mitades hacen falta:**
+
+1. el pedido dice retira → el badge dice **Retira**, aunque el padrón calle (eran **9** NP mudas);
+2. el pedido dice que se entrega → el badge **nunca** dice Retira, aunque el padrón lo diga.
+
+La (2) es el **problema 470 resuelto de raíz**. Ahí el `Retira` arrastrado se limpió a mano en 4
+fichas y quedaban **8 con el mismo arrastre** esperando su turno: ahora el dato del padrón no puede
+mentirle al badge, porque manda el pedido.
+
+⚠ **El padrón sigue sirviendo para lo que es:** `nombre_expreso` dice **por qué medio** viaja
+(Snaider, Arias, Tim Car…) y eso se sigue mostrando. Lo único que ya no puede hacer es decidir si
+retira.
+
+**Medición, sobre las 337 NP programadas (web + ISIS):**
+
+| | antes | ahora |
+|---|---|---|
+| badge «Retira» | 17 | **24** |
+| zona Retira **sin** badge | 9 | **0** |
+| se reparte y el badge decía Retira | 0 | 0 |
+| con expreso real (Snaider, Arias…) | 118 | 118 |
+| `gv_destino_sin_provincia` | 24 | 24 |
+
+O sea: **24 con badge Retira y 24 con zona Retira**, alineados.
+
+⚠⚠ **El paso en falso al aplicarlo, que conviene no repetir.** Se parcheó la vista con
+`pg_get_viewdef` → `replace` → `create or replace`. El primer intento usó un **regexp con `\s+` y
+`'g'`** creyendo que agarraba las dos apariciones del `CASE` (la columna `expreso` y la de
+`destino_txt`): agarró la de `destino_txt` y **no** la de la columna, así que la vista quedó a
+medias y las 6 NP de Retira seguían mudas — y el chequeo de `'es_retira THEN'` en la definición
+daba **true**, o sea que *parecía* aplicado. Lo cantó la prueba (consultar la RPC), no la lectura.
+El segundo intento usó `replace()` **literal** contra el texto exacto terminado en `END AS
+expreso,`.
+
+> **Al parchear una vista por texto, la verificación es CONSULTAR la vista. Un «reemplazos: N» y un
+> `position()` en la definición no prueban que el cambio esté donde tenía que estar.**
+
+Y lo de siempre: `create or replace view` sin `WITH` borra las `reloptions`, así que el bloque
+chequea `security_invoker` **antes** (si no lo tiene, frena) y lo repone **después**.
+
+`sql/gv_destino_badge_del_pedido_v2074.sql`, `tests/ppp-misiones.cjs`.

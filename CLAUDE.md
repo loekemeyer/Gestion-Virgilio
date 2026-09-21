@@ -1183,6 +1183,18 @@ sigue trayendo el barrio del cliente y ganaba el `coalesce`. Se mira la direcci�
 (`Exp. Retira — …`, `Virgilio 2788`). Centinela: `select * from public.gv_retira_sin_etiqueta;`
 — vacía = todo bien. §3.js.
 
+⚠⚠⚠ **Y desde la v20.74 el badge lo decide EL PEDIDO, no la ficha** (Thomas, 21/09: *"¿qué puso el
+cliente? ¿que retira o que se lo entreguemos en algún lado? eso es lo que tiene que decir el badge…
+a menos que se cambie de alguna forma"*). La columna `expreso` de `gv_np_destino` sale de
+`es_retira` —la dirección y el barrio que viajan con la NP— y **no** de `nombre_expreso` del padrón:
+si el pedido dice retira, el badge dice **Retira** aunque el padrón calle (eran 9 NP mudas); si el
+pedido dice que se entrega, el badge **nunca** dice Retira aunque el padrón lo diga. `nombre_expreso`
+sigue diciendo **por qué medio** viaja (Snaider, Arias…), que es para lo que sirve.
+
+⚠ **Lo que eligió el cliente es una SUCURSAL: lo que define el modo es su DIRECCIÓN, no su nombre.**
+*"Convenir en Av. Panamericana"* tiene dirección `Virgilio 2788` → retira. Medido al 21/09: 24 NP con
+badge Retira y 24 con zona Retira, y **0** que se reparten diciendo Retira. §3.lr.
+
 ⚠⚠ **Y el error va también para el otro lado: un pedido que se REPARTE puede decir Retira**
 (v20.66, Thomas 21/09, problema 470). El `nombre_expreso` de la ficha queda en `Retira` cuando un
 cliente pasa de retirar a que se le entregue — nadie borra ese campo al cargarle la dirección — y
