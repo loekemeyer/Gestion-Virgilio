@@ -1293,6 +1293,57 @@ no se mueve. Lo que se frena es programar uno nuevo ahí.
 en un día cerrado. Mira **web e ISIS** y saca lo que ya salió por CCN/CRN.
 `sql/gv_dia_sin_reparto_v2064.sql`, `tests/ppp-dia-sin-reparto.cjs`, §3.ll.
 
+## ⚠ REGLA (Luis, 2026-09-21, v20.90): el armado NO puede entregar más de lo que se pickeó
+
+`Entregas_Virgilio` escribe `cajas_entregadas = cajas_pedidas − faltante`, y ese faltante sale del
+reparto del Paso 2 del asistente, que vive detrás de un booleano **global**:
+
+```js
+const hayFalt = arts.some(a => a.nps.length);
+```
+
+`arts` sólo tiene los artículos que se pudieron cruzar contra `pickBase`. Si ese cruce falla
+—un código que no matchea, un pedido que no está en la base— `hayFalt` queda en `false`,
+`faltMap` sale **vacío** y se pierden **todos** los faltantes de la tanda: cada línea se escribe
+*"entregadas = pedidas"* con el pallet a medio llenar.
+
+**Medido sobre 90 días: 119 líneas, 554 cajas, 80 tandas** con el picking diciendo `real = 0` y el
+remito diciendo entregado. Todas **dentro de la ventana de 5 días** — el dato estaba y se perdía
+en el cruce, no por llegar tarde.
+
+Desde la v20.90 hay un **TOPE que no depende del reparto**: el picking (PKC) dice cuántas cajas se
+levantaron de cada código y la suma de lo entregado no puede pasarse de ahí. Lo que sobra se
+recorta —por la NP que más entregó— y va a `cajas_falto`, que es lo que el remito tiene que decir.
+
+⚠ **La clave del tope es ESTRICTA**: `codBase(pkStripL(cod))`. **No** colapsa la `E` final como
+`_compMatchArt`: `809` y `809E` son artículos distintos y acá un match de más **recorta cajas que
+sí están en el pallet**. Y **suma**, no toma el mínimo: `faltantesDeTanda` dedupea por el código
+crudo, así que un dual entra dos veces (`438E LK` y `438E CH`) y las dos son cajas de verdad.
+
+### ⚠ Y un armado ANTERIOR al picking no traba el armado de verdad
+
+El candado anti doble-armado (v5.72) miraba sólo si la tanda tenía filas en `Entregas_Virgilio`.
+**Caso E12L / LK 0043:** el 17/09 quedó registrado un armado **sin picking** (7 líneas, 15 cajas,
+cero movimientos de stock ese día); el 21/09 Fabi pickeó de verdad y a las 15:38 Juan dio AP y se
+comió *"La tanda ya fue armada"* — cuatro días después y con la mercadería en la mano.
+
+**La regla:** un armado anterior al último `TP`/`PKC` de la tanda es de otro ciclo y no traba. Dos
+armados del **mismo** ciclo son posteriores al picking y el candado sigue frenando igual (NP 98114).
+⚠ **Ante cualquier duda, traba**: sin picking medible, sin fecha de armado o con el endpoint caído,
+devuelve `true`.
+
+### ⚠ Y «A Programar» no ofrece un pedido que ya salió
+
+**Luis:** *"no me tires el histórico, fijate en lo que hay programado ahora che. de ahora en
+adelante"*. Los guards de `gv_ppp_isis_sin_tanda` (facturada, entregada, cancelada) colgaban de un
+`or o.desprogramada`, así que una NP marcada desprogramada volvía a ofrecerse aunque ya estuviera
+facturada y entregada. Y faltaba el guard de **CCN / CRN**: un pedido puede haber salido en el
+camión sin estar todavía en `Facturacion_NP`. Impacto medido: **0 NP** salen de la lista hoy — el
+cambio cierra la puerta para adelante, no le saca nada al supervisor.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` · `node tests/comp-tope-pickeado.cjs` ·
+`node tests/comp-armado-viejo-no-traba.cjs`. `sql/gv_isis_sin_tanda_freno_v2090.sql`, §3.lz.
+
 ## ⚠ REGLA (Thomas, 2026-09-21, v20.86): lo ARMADO SIN DÍA tiene que verse en el badge
 
 **Thomas, textual:** *"debería aparecer discriminado en el badge del icono de PPP en la página

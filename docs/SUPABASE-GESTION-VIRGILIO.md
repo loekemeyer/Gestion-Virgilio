@@ -28258,3 +28258,102 @@ alter table public."GV_Cliente_Nuevo_Pipeline" add constraint gv_clin_decision_v
 -- `motivos_vivos` por `motivos_ok` y sacar el guard `cliente_nuevo = any (lb.motivos)`.
 ```
 El front vuelve con `git revert` del commit.
+
+---
+
+### §3.lz — v20.90 · El armado no puede entregar más de lo que se pickeó — 2026-09-21
+
+Tres agujeros del mismo día, los tres en el borde entre **lo que hay en el pallet** y **lo que
+dice el registro**. Salieron de dos pedidos de Luis: *"a uno de los armadores le figura la E51A
+como duplicada"* y *"les aparecía la opción de armar la tanda E12L (a Juan) y cuando apretó le
+aparece un error de que la tanda ya fue armada"*.
+
+#### 1. El faltante del picking se perdía entero si el cruce fallaba
+
+`Entregas_Virgilio` escribe `cajas_entregadas = cajas_pedidas − faltante`, y ese faltante sale
+del reparto del Paso 2 del asistente de armado. El reparto vive detrás de un booleano **global**:
+
+```js
+const hayFalt = arts.some(a => a.nps.length);
+```
+
+`arts` sólo tiene los artículos del faltante que se pudieron cruzar contra `pickBase`. Si ese
+cruce falla —un código que no matchea, un pedido que no está en la base—, `hayFalt` queda en
+`false`, `faltMap` sale **vacío** y se pierden **todos** los faltantes de la tanda: cada línea se
+escribe *"entregadas = pedidas"* con el pallet a medio llenar.
+
+**Medido sobre 90 días: 119 líneas, 554 cajas, 80 tandas** donde el picking dice `real = 0` y
+`Entregas_Virgilio` dice entregado con `cajas_falto = 0`. Todas **dentro de la ventana de 5 días**
+de `faltantesDeTanda`, o sea que el dato estaba disponible y se perdía en el cruce — no por llegar
+tarde.
+
+**El arreglo es un TOPE que no depende del reparto.** El picking (PKC) dice cuántas cajas se
+levantaron de cada código; la suma de lo entregado en la tanda no puede pasarse de ahí. Si se
+pasa, se recorta —empezando por la NP que más entregó— y la diferencia va a `cajas_falto`, que es
+lo que el remito tiene que decir. El operario ve el recorte en el cartel de cierre.
+
+⚠ **La clave del tope es ESTRICTA**: `codBase(pkStripL(cod))` — sufijo de empresa fuera y la «L»
+del pedido pelada, la misma transformación que ya usa el picking. **No** se colapsa la «E» final
+como hace `_compMatchArt`: `809` y `809E` son artículos distintos, y acá un match de más
+**recorta cajas que sí están en el pallet**. Un código que no matchea exacto se queda sin tope,
+que es el comportamiento de siempre.
+
+⚠ **Y suma, no toma el mínimo.** `faltantesDeTanda` dedupea por el código **crudo**, así que un
+dual puede entrar dos veces (`438E LK` y `438E CH`) y las dos son cajas de verdad.
+
+#### 2. Un armado viejo trababa el armado de verdad
+
+El candado anti doble-armado (v5.72) miraba **sólo** si la tanda tenía filas en
+`Entregas_Virgilio`. Con eso alcanzaba para frenar a un operario con el pallet delante.
+
+**Caso E12L / LK 0043 (El Gran Bazar):** el 17/09 quedó registrado un armado **sin picking** —7
+líneas, 15 cajas, cero movimientos de stock ese día—. El 21/09 Fabi pickeó de verdad y a las 15:38
+Juan dio AP y se comió *"La tanda ya fue armada"*: cuatro días después, con la mercadería en la
+mano y sin ninguna salida.
+
+**La regla:** un armado **anterior** al último `TP`/`PKC` de la tanda es de otro ciclo y **no
+traba**. Si alguien arma dos veces en el mismo ciclo, sus Entregas son **posteriores** al picking
+y el candado sigue frenando igual — que es para lo que existe (NP 98114: 2 armados, 546×120).
+
+⚠ **Ante cualquier duda, traba.** Sin picking medible, sin fecha de armado o con el endpoint de
+eventos caído, `_compTandaYaArmada` devuelve `true`: el candado es lo conservador.
+
+Medido sobre 90 días: **3 tandas** tienen el último armado anterior a su último picking.
+
+#### 3. «A Programar» ofrecía pedidos que ya habían salido
+
+**Luis:** *"no me tires el histórico, fijate en lo que hay programado ahora che. de ahora en
+adelante"* · *"sacamos eso de «desprogramada», no?"*.
+
+`gv_ppp_isis_sin_tanda` tenía sus guards (facturada, entregada, cancelada) colgando de un
+`or o.desprogramada`: marcada la NP como desprogramada en `GV_PPP_Prog_Override`, los guards se
+apagaban y el pedido volvía a ofrecerse aunque ya estuviera facturado y entregado. Desde la v20.80
+no hay puerta que devuelva un pedido a A Programar, así que `desprogramada` ya no recibe filas
+nuevas — pero las viejas seguían apagando los guards.
+
+Y **faltaba un guard: CCN / CRN.** Un pedido puede haber salido en el camión o tener el remito
+controlado sin que su NP esté todavía en `Facturacion_NP` ni en `GV_PPP_Entregados_Historico`.
+Ése es justamente el caso "de ahora en adelante".
+
+`desprogramada` y `tanda_previa` se siguen leyendo para lo que sí sirven (el retorno del retenido
+a su tanda); lo que se saca es que apaguen los guards.
+
+**Impacto medido: 0 NP** salen de la lista hoy — el cambio no le quita nada al supervisor, cierra
+la puerta para adelante.
+
+#### Chequeos
+
+```sql
+select * from public.gv_reglas_perdidas;    -- vacía = el guard de CCN/CRN sigue puesto
+select * from public.gv_endpoints_rotos;    -- vacía = la vista se lee desde el front
+```
+
+```bash
+node tests/comp-tope-pickeado.cjs            # el armado no entrega mas de lo pickeado
+node tests/comp-armado-viejo-no-traba.cjs    # un armado de otro ciclo no traba
+```
+
+Los dos tests **muerden**: sin el bloque del tope, el caso de la fuga escribe 30 cajas de 12
+pickeadas; sin el chequeo de fecha, el armado del 17 vuelve a trabar el del 21.
+
+`sql/gv_isis_sin_tanda_freno_v2090.sql`.

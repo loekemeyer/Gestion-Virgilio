@@ -6016,7 +6016,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.89"></script>
+<script type="module" src="recepcion.js?v=20.90"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9898,7 +9898,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.89";
+const APP_VERSION = "v20.90";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13537,7 +13537,17 @@ async function showCompletarWizard(legajo, codigo) {
       }
     }
     const hayFalt = arts.some(a => a.nps.length);
-    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, step: 2, pickUbic: _pickUbic, dirByNp: _dirByNp, sucByNp: _sucByNp, _difMovs: [] };   // v8.75 (idea 9849): step=2 desde el arranque (Paso 1 borrado). v11.09: _difMovs acumula ajustes picking_difiere para flush síncrono antes de Entregas
+    /* v20.90 (Luis, 21/09) - EL FALTANTE DEL PICKING SE GUARDA CRUDO, aparte del reparto.
+       `hayFalt` es un booleano GLOBAL: se arma con `arts.some(a => a.nps.length)`, y `arts`
+       solo tiene los articulos del faltante que se pudieron cruzar contra `pickBase`. Si ese
+       cruce falla (un codigo que no matchea, un pedido que no esta en la base), `hayFalt`
+       queda en false y `faltMap` sale VACIO: se pierden TODOS los faltantes de la tanda y
+       cada linea se escribe "entregadas = pedidas" con el pallet a medio llenar.
+       Medido el 21/09 sobre 90 dias: 119 lineas / 554 cajas en 80 tandas, con el picking
+       diciendo real = 0 y el remito diciendo entregado, TODAS dentro de la ventana de 5 dias
+       del faltante - o sea que el dato estaba y se perdia en el cruce, no por llegar tarde.
+       `faltRaw` lo conserva tal cual lo dijo el operario al pickear, y se usa de TOPE. */
+    _comp = { legajo: String(legajo || "").trim(), tanda: tanda, fecha: fecha, nps: nps, arts: arts, pedidoFull: pedidoFull, hayFalt: hayFalt, faltRaw: falt, step: 2, pickUbic: _pickUbic, dirByNp: _dirByNp, sucByNp: _sucByNp, _difMovs: [] };   // v8.75 (idea 9849): step=2 desde el arranque (Paso 1 borrado). v11.09: _difMovs acumula ajustes picking_difiere para flush síncrono antes de Entregas
     try { etlLoadGlobal(); } catch (_e) {}   // idea 5290: traer el ajuste GLOBAL de etiquetas de lío para este armado
     const t = document.getElementById("compTanda"); if (t) t.textContent = "Tanda " + tanda + (nps[0] && nps[0].rs ? " · " + nps[0].rs : "");
     const d2 = document.getElementById("compD2"), ln = document.getElementById("compLine");
@@ -14268,11 +14278,36 @@ async function _compTandaYaArmada(tanda) {
   const t = String(tanda == null ? "" : tanda).trim().toUpperCase();
   if (!t) return false;
   try {
-    const url = SUPABASE_ENTREGAS_ENDPOINT + "?select=id&tanda=eq." + encodeURIComponent(t) + "&limit=1";
+    const url = SUPABASE_ENTREGAS_ENDPOINT + "?select=creado&tanda=eq." + encodeURIComponent(t) +
+                "&order=creado.desc&limit=1";
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     if (!r.ok) return false;
     const rows = await r.json();
-    return Array.isArray(rows) && rows.length > 0;
+    if (!Array.isArray(rows) || !rows.length) return false;
+    /* v20.90 (Luis, 21/09) - EL ARMADO VIEJO NO TRABA EL ARMADO DE VERDAD.
+       El candado miraba SOLO si la tanda tiene filas en Entregas_Virgilio, y con eso alcanzaba
+       para frenar a un operario con el pallet delante. Caso E12L / LK 0043: el 17/09 se
+       registro un armado SIN picking (7 lineas, 15 cajas, cero movimientos de stock ese dia);
+       el 21/09 Fabi pickeo de verdad y a las 15:38 Juan dio AP y se comio
+       "La tanda ya fue armada", cuatro dias despues y con la mercaderia en la mano.
+       La regla: un armado ANTERIOR al picking es de otro ciclo y no traba. Si alguien arma dos
+       veces en el mismo ciclo, sus Entregas son POSTERIORES al picking y el candado sigue
+       frenando igual - que es para lo que existe (NP 98114: 2 armados, 546x120).
+       Si no se puede medir el picking, se traba: el candado es lo conservador. */
+    const _arm = rows[0] && rows[0].creado ? Date.parse(rows[0].creado) : NaN;
+    if (isNaN(_arm)) return true;
+    try {
+      const up = SUPABASE_TABLE_ENDPOINT + "?opcion=in.(TP,PKC)&texto=like." +
+                 encodeURIComponent(t + "*") + "&select=ts_cliente&order=ts_cliente.desc&limit=1";
+      const rp = await fetch(up, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+      if (!rp.ok) return true;
+      const ev = await rp.json();
+      if (!Array.isArray(ev) || !ev.length) return true;        // sin picking: el armado manda
+      const _pk = ev[0] && ev[0].ts_cliente ? Date.parse(ev[0].ts_cliente) : NaN;
+      if (isNaN(_pk)) return true;
+      if (_arm < _pk) return false;                              // armado de un ciclo anterior
+    } catch (_e2) { return true; }
+    return true;
   } catch (_e) { return false; }
 }
 /* v15.92 — candado anti doble-armado POR NP (el de arriba es por TANDA y no alcanza).
@@ -14328,6 +14363,7 @@ async function compTerminar() {
     if (!_okPend) { _comp.liosNpIdx = _comp.nps.indexOf(pendLios[0]); _compGo(2); return; }
   }
   const legajo = _comp.legajo, tanda = _comp.tanda, fecha = _comp.fecha || "";
+  const _faltRawTanda = (_comp.faltRaw || []).slice();   // v20.90: el tope de abajo lo usa despues de soltar _comp
   // v5.72: candado anti doble-armado. Si esta tanda ya fue armada antes (ya tiene
   // Entregas), NO la volvemos a armar → evita duplicar el pedido. Guardo contra
   // doble-click con _terminando y contra re-apertura con el chequeo en Supabase.
@@ -14379,6 +14415,51 @@ async function compTerminar() {
       rows.push({ fecha_salida: fecha, cod_cliente: p.cod, np: p.np, cod_art: it.art, cajas_pedidas: it.cajas, cajas_falto: falto, cajas_entregadas: Math.max(it.cajas - falto, 0), tanda: tanda });
     });
   });
+  /* v20.90 - TOPE CONTRA LO PICKEADO. Lo de arriba depende de que el reparto del Paso 2 haya
+     podido cruzar cada articulo contra el pedido; esto NO depende de nada: el picking dijo
+     cuantas cajas se levantaron de cada codigo, y la suma de lo entregado en la tanda no puede
+     pasarse de ahi. Si se pasa, se recorta (empezando por la NP que mas pidio) y la diferencia
+     va a `cajas_falto`, que es lo que el remito tiene que decir.
+     No mira `hayFalt` a proposito: es el piso que queda cuando el reparto falla. */
+  var _topeAvisos = [];
+  try {
+    /* La clave es ESTRICTA: sufijo de empresa fuera (codBase) y la "L" del pedido pelada
+       (pkStripL) - la misma transformacion que ya usa el picking. NO se colapsa la "E"
+       final como hace _compMatchArt: 809 y 809E son articulos DISTINTOS, y ac� un match
+       de mas RECORTA cajas que si estan en el pallet. Si un codigo no matchea exacto, se
+       queda sin tope, que es el comportamiento de siempre. */
+    var _k = function (c) { return codBase(pkStripL(c)); };
+    var _pick = {};
+    (_faltRawTanda || []).forEach(function (f) {
+      var k = _k(f.art); if (!k) return;
+      var rv = Number(f.real); if (isNaN(rv) || rv < 0) return;
+      /* SUMA, no minimo: faltantesDeTanda dedupea por el codigo CRUDO, asi que un dual
+         puede entrar dos veces ("438E LK" y "438E CH") y las dos son cajas de verdad. */
+      _pick[k] = (_pick[k] || 0) + rv;
+    });
+    var _porArt = {};
+    rows.forEach(function (r) {
+      var k = _k(r.cod_art); if (!k || _pick[k] == null) return;
+      (_porArt[k] = _porArt[k] || []).push(r);
+    });
+    Object.keys(_porArt).forEach(function (k) {
+      var lista = _porArt[k];
+      var total = lista.reduce(function (a, r) { return a + (Number(r.cajas_entregadas) || 0); }, 0);
+      var tope = _pick[k];
+      if (!(total > tope)) return;
+      var sobra = total - tope;
+      lista.sort(function (a, b) { return (Number(b.cajas_entregadas) || 0) - (Number(a.cajas_entregadas) || 0); });
+      for (var i = 0; i < lista.length && sobra > 0; i++) {
+        var rr = lista[i], ent = Number(rr.cajas_entregadas) || 0;
+        var quita = Math.min(ent, sobra);
+        if (quita <= 0) continue;
+        rr.cajas_entregadas = ent - quita;
+        rr.cajas_falto = (Number(rr.cajas_falto) || 0) + quita;
+        sobra -= quita;
+      }
+      _topeAvisos.push(k + " (se pickearon " + tope + ")");
+    });
+  } catch (_e) { /* el tope es defensivo: si falla, se escribe lo que decidio el reparto */ }
   const nFalt = Object.keys(faltMap).length;
   // v11.09: flush síncrono de ajustes picking_difiere ANTES de Entregas (para que el
   // trigger trg_entregas_reconciliar_stock vea separar_pedidos ya reducido).
@@ -14394,7 +14475,8 @@ async function compTerminar() {
   // Va ANTES del POST: si el POST falla, el evento ya salió.
   if (rows.length) { try { _compSendEntregasEvento(legajo, tanda, rows); } catch (_e) {} }
   if (rows.length) { _compSaveEntregas(rows); try { _armadoRegistrado.add(String(tanda).trim().toUpperCase()); } catch (_e) {} }   // v7.74: marca la tanda como armado registrado
-  try { alert("✓ Completado: líos guardados" + (nFalt ? " · " + nFalt + " artículo(s) con faltante" : "") + ". Entregas registradas: " + rows.length + "."); } catch (_e) {}
+  try { alert("✓ Completado: líos guardados" + (nFalt ? " · " + nFalt + " artículo(s) con faltante" : "") + ". Entregas registradas: " + rows.length + "." +
+        (_topeAvisos.length ? "\n\n\u26a0 Se recort\u00f3 lo entregado contra lo pickeado en: " + _topeAvisos.join(", ") + ".\nEsas cajas salen como FALTANTE en el remito." : "")); } catch (_e) {}
 
   // v7.75: Emitir TAP event + mover stock (antes estaba suelto, ahora unificado con "Terminar" del asistente).
   // Captura ts_inicio del armado para el cierre, marca como inactivo, y emite el evento.
