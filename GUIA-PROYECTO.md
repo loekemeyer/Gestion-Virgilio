@@ -1,3 +1,292 @@
+## Nota v21.27 (2026-09-22) — Las dos pantallas dan el mismo número, y el test lo sostiene
+
+⚠ Salió como **v21.27** y no v21.21: mientras esto se escribía, otras sesiones pusearon a `main`
+la v21.21, la v21.25 y la v21.26. Se mergeó todo y se renumeró éste tres veces — el número de
+versión es lo que el dueño mira en el badge para saber qué llegó, así que no puede haber dos
+iguales. **Al pushear a `main` en este repo conviene hacer `git fetch origin main` justo antes:
+hay varias sesiones trabajando a la vez.**
+
+Las tres respuestas de Thomas al comparador.
+
+### 1. Gana la regla del MONITOR GRANDE para un cierre que cruza la medianoche
+
+La vista arrancaba en el primer evento de hoy; el monitor cuenta además el tramo del **día de
+apertura** (de la apertura al `FJ` real de ese día, o a la hora de salida) y una jornada completa
+por cada día hábil del medio. **Se replicó `computeClosureDur` en la función**, feriados incluidos.
+
+⚠ Y con eso desapareció el recorte por «arranque», que era invención de la v21.17 y **se comía el
+primer MG del día**: un `MG` no tiene fila de apertura (desde la v7.68 emite una sola fila con la
+duración adentro), así que el recorte le cortaba el pedazo anterior al primer evento. Ésa era la
+diferencia del legajo 94 — 2,63 contra 2,33.
+
+⚠ **Los feriados son la copia de `FERIADOS_AR` de `index.html`, NO `GV_Dias_No_Habiles`**: esa
+tabla tiene los días que el dueño cierra el depósito (al 22/09, uno solo) y mueve el conteo de días
+hábiles de toda la operación.
+
+### 2. Las dos chicas: las dos eran de la vista
+
+| qué se veía | causa |
+|---|---|
+| legajo 94, movimiento 2,63 vs 2,33 | el recorte por «arranque» (punto 1) |
+| legajo 277, picking 0,46 vs 0,45 | **un `PB` adentro de un `Limp`**: la vista lo restaba dos veces |
+
+El segundo es el que vale recordar: los tiempos muertos **se mergean antes de restar**, que es lo
+que hace `deadByLeg` en `index.html` desde la v19.07. Sin el merge, `Limp 15:07→15:26` con
+`PB 15:18→15:21` adentro descuenta 3 minutos de más.
+
+**Resultado, día 15/09: 5 operarios × 6 números, coinciden TODOS.**
+
+### 3. El comparador es un test de la suite
+
+`tests/mon-vs-vista.cjs` corre el monitor grande de verdad y lo compara contra la salida de la
+vista **congelada** en `tests/tools/vista-15.json`. Las sesiones no pueden pegarle a Supabase (el
+proxy bloquea supabase.co), así que congelar esa mitad es la única forma de tener las dos en un
+test.
+
+⚠ **Caza los cambios del lado JS.** Los del lado SQL los caza `gv_reglas_perdidas`, con 8
+centinelas sobre la función y la vista. Si se cambia una regla a propósito: los dos lados **y**
+volver a congelar el JSON (cómo, está adentro del propio JSON).
+
+⚠ **Verificado rompiéndolo**: sacándole el merge a los tiempos muertos, el test se pone rojo con
+*"legajo 277 · hs_pick: vista 6.37 · monitor 6.32"*. Y una honesta: el 15/09 no tiene tiempo muerto
+adentro de ningún MG/RT, así que ese día **no** prueba la regla de la v21.20 — ésa la prueba
+`muerto-neteado.cjs`, caso (C).
+
+`sql/gv_monitor_horas_operario_v2117.sql`, §3.ml.
+
+## Nota v21.20 (2026-09-22) — Al movimiento también se le resta el tiempo muerto, y el comparador vuelve a servir
+
+### 1. El baño adentro de una recepción ya no cuenta como movimiento
+
+Es la regla de Luis del 16/09 (v19.07), que hasta ahora sólo se aplicaba a picking y armado.
+**`PB` y `PC` están en `ALWAYS_ALLOWED_CODES`**, así que se pueden abrir con un `RT`/`RI`/`EI` en
+curso: la media hora de comida entraba entera como movimiento de mercadería.
+
+**Medido antes de tocar, sobre 30 días: 4 cierres de 352, 1,36 h de 65,75 (2,1 %).** Chico, pero
+es la misma regla. Va en los dos lados —`index.html` y la vista— y el popup de desglose ahora
+dice, abajo de cada duración, cuánto se descontó.
+
+⚠ **A las no productivas NO se les resta**: se restarían a sí mismas.
+
+### 2. El cálculo pasó a una FUNCIÓN con día, y la vista quedó de envoltorio
+
+`gv_monitor_horas_operario_dia(p_dia)` hace la cuenta; `gv_monitor_horas_operario` es
+`select * from esa función con el día de hoy`. **Sin eso, `tests/tools/monitor-vs-vista.cjs` no
+podía comparar nada**: sus fixtures son del 15/09 y la vista sólo sabía de hoy.
+
+### 3. El comparador quedó arreglado — y lo primero que muestra es que NO coinciden
+
+`tests/tools/monitor-vs-vista.cjs` ahora imprime los números del monitor grande **en el
+vocabulario de la vista** y el `SELECT` para traer la otra mitad. El fixture `ev-15.json` se
+rehízo completo (estaba filtrado: sólo TP/TAP/muertos, sin un solo MG/RT, así que `hs_mov` daba
+0 en los dos lados y parecía que coincidían).
+
+Medición del 22/09 sobre el 15/09:
+
+| qué | resultado |
+|---|---|
+| `hs_noprod` | coincide en los **5** operarios |
+| `hs_mov` | coincide en **4 de 5** (legajo 94: 2,63 monitor vs 2,33 vista) |
+| `prom_hs_arm` | **difiere** en los 2 legajos con un cierre que cruzó la medianoche: 237 → 0,49 vs 0,41 · 8 → 2,47 vs 2,23 |
+| `prom_hs_pick` | 277 → 0,46 vs 0,45, sin explicar todavía |
+
+⚠ **La causa de la grande está identificada y NO es un bug de uno de los dos:** el monitor grande
+cuenta además el tramo del **día de apertura** (de la apertura al fin de esa jornada,
+`businessDurBetweenMs`); la vista arranca en el **primer evento de hoy**. Son dos reglas
+defendibles para un cierre que cruza la medianoche, y **hay que elegir una** — no tocar ninguna
+para que el número cierre.
+
+### 4. Y la fila «No prod.» del monitor grande
+
+Viene de la v21.19: como la tabla «Mts3 x Hora» **sí se dibuja**, sacarle el baño y la limpieza a
+*Movim.* dejaba esas horas sin aparecer en ningún lado. Ahora hay una fila más, con su gemela en
+«Parcial» y «Ayer» — que se alinean **por posición, no por nombre**.
+
+`sql/gv_monitor_horas_operario_v2117.sql`, §3.ml.
+
+## Nota v21.19 (2026-09-22) — La tabla «Mts3 x Hora» SÍ se dibuja: corrección de la v21.18
+
+### 1. Me equivoqué, y vale la pena que quede escrito por qué
+
+La nota v21.18 decía que la tabla «Mts3 x Hora» del monitor grande **ya no se dibujaba** y que
+`fetchMonitorDayStats` sólo lo llamaban los tests. **Es falso.** `renderMonitor` existe, la dibuja,
+escribe `_monitorLiveStats` y llama a `fetchMonitorDayStats`; `showOperarioActivityDetail` está
+bindeada en un `onclick` de esa tabla.
+
+⚠⚠ **El error salió de contar con `grep`.** `index.html` tiene un **byte NUL** adentro (el
+separador de claves de `_pppGeoCod`), así que `grep` lo trata como **binario**: no imprime las
+líneas, imprime *"Binary file matches"*. Los conteos daban 1, 2, 5 — números inventados, y encima
+verosímiles. **Para buscar o contar algo en `index.html`: `grep -a`, o Python.** Ya estaba escrito
+en el `CLAUDE.md` ("por eso `grep` lo trata como binario") y caí igual.
+
+**Lo cazó un test, no la lectura:** `tests/dead-handlers.cjs` —el que busca botones que llaman a
+funciones inexistentes— se puso en rojo con `muertos=1 [showOperarioActivityDetail]` apenas se
+borró la función. Sin ese test, el monitor grande se quedaba con una tabla que al tocarla no hacía
+nada. Se revirtió el borrado entero.
+
+### 2. Y la separación de la v21.18 SÍ se ve — así que el monitor grande tenía un agujero
+
+Como la tabla está viva, sacarle el baño y la limpieza a **Movim.** dejaba esas horas sin aparecer
+en ninguna parte. Ahora hay una fila más:
+
+| fila | qué suma |
+|---|---|
+| Picking · Pedido · CC | m³/h (o min/m³) |
+| **Movim. (h)** | MG · RT · RI · EI |
+| **No prod. (h)** ← nueva | AT · PB · Limp · PC · CT · Perm |
+
+La celda es clickeable como las otras y abre el mismo popup de desglose, ahora con `"noprod"`.
+
+⚠ **Las tarjetas «Parcial» y «Ayer» se alinean por POSICIÓN con la de al lado, no por nombre** (el
+comentario del código lo dice). Si se agrega una fila de un lado, va también del otro — si no, los
+números quedan corridos una fila y nadie lo nota.
+
+### 3. La zona va en sigla: `Z3 CO`
+
+*"acorta"* (Thomas). `Z3 CABA Oe…` se cortaba por un carácter en la columna de la TV. Ahora la
+ciudad va en su inicial y el punto cardinal en la suya: **`Z3 CO`** = Zona 3, CABA Oeste ·
+**`Z6 GN`** = Zona 6, GBA Norte. El número de zona, que es lo que se busca, queda entero y
+adelante. **`Retira` y los expresos no se tocan.** Una zona nueva que no esté en las tablas se
+abrevia igual, por iniciales.
+
+### 4. El legajo 600 ya tiene nombre
+
+Es el que se usa para **entrevistas**. Se le cargó la fila en `Empleados` (`Legajo 600`,
+`Empleado 'Entrevista'`, `Activo NO`, Sede V), con backup previo en
+`zz_backups."GV_Backup_Empleados_20260922"`. **`hora_entrada` queda en NULL a propósito**: con hora
+cargada, ese legajo empezaría a generar eventos de **Llegada Tarde** todos los días.
+
+⚠ Y `nombreCorto` de la TV ahora **saltea los pedazos sin letras**: `"Entrevista / Prueba"` salía
+`"Entrevista /."` — la inicial era la barra. Por eso el nombre quedó en una sola palabra.
+
+## Nota v21.18 (2026-09-22) — Las tres respuestas de Thomas sobre el monitor
+
+### 1. «Días» pasó a ser **fecha de programación − fecha de pedido**
+
+Textual: *"fecha programacion - fecha pedido"*. La v21.17 lo contaba **hasta hoy** (antigüedad del
+pedido); ahora es la demora **con la que sale**: días hábiles entre `fecha_recep` y
+`fecha_entrega`, tomando el pedido más viejo de la tanda. Los umbrales no cambian (ámbar 7, rojo
+10 — regla 4 de Luis).
+
+⚠ **El número ya no crece mientras la tanda espera.** Si la fecha de entrega pasó y el pedido
+sigue ahí, «Días» dice **lo que se prometió**, no lo que se está tardando. Es lo que se pidió; si
+algún día hace falta ver el atraso real, es otra columna, no ésta.
+
+### 2. «Unificar el monitor grande» — y lo que apareció al abrirlo
+
+⚠⚠ **LO QUE DICE ESTE PÁRRAFO ESTABA MAL — ver la nota v21.19.** Acá se afirmó que la tabla
+«Mts3 x Hora» del monitor grande ya no se dibujaba y que `fetchMonitorDayStats` sólo lo llamaban
+los tests. **Es falso**: `renderMonitor` la dibuja. El conteo se había hecho con `grep`, que trata
+a `index.html` como binario por el byte NUL y devuelve números inventados.
+
+**Consecuencia real:** la separación de abajo **sí se ve** en el monitor grande, y por eso la
+v21.19 le agregó la fila **No prod.** — si no, esas horas desaparecían de la pantalla.
+
+Los códigos quedaron así:
+
+| | antes | ahora |
+|---|---|---|
+| `MOV_TOGGLE_CODES` | MG · RI · EI · RT · **AT · PB · Limp** | MG · RI · EI · RT |
+| `NOPROD_TOGGLE_CODES` | — | AT · PB · Limp · PC · CT · Perm |
+
+Y **la vista aprendió la regla de Luis del 16/09** (v19.07, problema 349): *"si arma 1 h, va al
+baño 10 min y arma 50 min más, debería ser 1 h 50 de armado y 10 de baño, cada uno contado
+individual"*. Sin eso las dos pantallas daban números distintos para el mismo día. **Medido con el
+ejemplo de Luis, en una transacción abortada: armado 169,8 min · no productivas 10,2 min** — los
+mismos 170 y 10 que `tests/muerto-neteado.cjs` le exige al monitor grande.
+
+⚠ El descuento va **sólo en las productivas**: a los toggles de movimiento no se les resta (los de
+tiempo muerto los bloquean, así que no pueden solaparse) y a los de tiempo muerto tampoco, o se
+restarían a sí mismos.
+
+### 3. El legajo 600 es el de entrevistas
+
+Hoy sale en la tabla como **«Leg 600»** porque no tiene fila en `Empleados`, y figura trabajando
+(3,13 h de picking el 22/09). **No se tocó**: darle nombre es un `insert` en `Empleados`, que es la
+tabla del login por legajo — el SQL y sus efectos están en el chat, esperando el «sí».
+
+`sql/gv_monitor_horas_operario_v2117.sql`, §3.ml.
+
+## Nota v21.17 (2026-09-22) — Monitor TV: la tabla de tandas que pidió Damián, y las horas por operario
+
+Pedido de **Damián**, que lo pasó Marianela por WhatsApp con un boceto de las dos tablas.
+
+### 1. La tabla de tandas: una fila por TANDA, con cliente, demora, zona y semáforo
+
+| antes | ahora |
+|---|---|
+| Tanda · M³ · Salida · Picking · Pedido separado | Tanda · **N° Pedido** · **Cliente** · M³ · **Días** · **Zona** · **Progreso** |
+
+- **Una fila por tanda aunque lleve varios pedidos** (textual: *"si hay varias NP que aparezca en
+  una sola fila y con el nombre resumido"*). Las NP se listan juntas (`98801 · LK 0097 +2`) y el
+  cliente va resumido: se le saca la forma societaria —hay 30 "S.R.L.", no distingue a nadie— y,
+  si la tanda lleva pedidos de más de un cliente, sale el primero + **`+N`**. E12R tenía 6 NP de 4
+  clientes el 22/09.
+- **Días** = días **hábiles** desde que entró el pedido (`fecha_recep`) hasta hoy, tomando el
+  pedido **más viejo** de la tanda: la demora de una tanda es la del que más esperó. Es el número
+  de la **regla 4 de Luis** (*"los pedidos no pueden demorar más de 10 días hábiles en salir"*):
+  ámbar a los 7, rojo a los 10.
+- **Zona** acortada (`Zona 3 - CABA Oeste` → `Z3 CABA Oeste`). **`Retira` queda tal cual**: no es
+  un número de zona y el nombre ES el dato.
+- **Progreso** = semáforo de **dos luces**, picking y armado (textual: *"lo quiere ver como
+  semáforo"*): 🔴 sin empezar · 🟡 en curso · 🟢 terminado · 🟣 abandonada. Al lado siguen las
+  iniciales de quién la tiene y hace cuánto, que es lo que se acciona.
+  ⚠ Son círculos dibujados con **CSS, no emoji**: los emoji los pinta la fuente del televisor y
+  cambian de un modelo a otro (mismo criterio que el `■` de la fase abandonada, v18.71).
+
+⚠ **La columna «Salida» salió de la tabla** — 7 columnas ya son muchas — y en su lugar cada
+bloque de días lleva su **encabezado** (`MIÉ 23/09`), que es como lo dibujó Damián. Sin eso, lo de
+hoy y lo de mañana se mezclaban sin que se notara.
+
+### 2. Horas por operario — y la mezcla que venía de antes
+
+La TV **no tenía nada por operario**: la tabla "Mts3 x Hora" del monitor grande se había dejado
+afuera a propósito porque depende de `computeClosureDur`, la parte más pesada del cálculo. Damián
+pidió el otro corte: **cuánto tardó en promedio cada tanda, y en qué se fue el resto del día.**
+
+| Operario | Prom hs picking | Prom hs armado | Hs prod | Hs mov | Hs no prod | Total hs |
+|---|---|---|---|---|---|---|
+
+⚠⚠ **La clasificación vive en el BACKEND**, en la vista **`gv_monitor_horas_operario`** — es una
+regla de negocio (qué cuenta como hora productiva), así que la TV no la calcula: la lee resuelta.
+Si cambia, el monitor grande la hereda.
+
+⚠ **Y corrige una mezcla que ya estaba en `index.html`:** `MOV_TOGGLE_CODES` es
+`{MG, RI, EI, RT, AT, PB, Limp}`, o sea que **"Paré Baño" y "Limpieza" contaban como movimiento de
+mercadería**. Separado:
+
+| balde | códigos |
+|---|---|
+| **Productivas** | `TP` `TAP` `CC` `CR` `RR` — picking, armado, carga camión, remitos |
+| **Movimiento** | `MG` `RT` `RI` `EI` — guardado a góndola, recepción de mercadería e insumos |
+| **No productivas** | `AT` `PB` `Limp` `PC` `CT` `Perm` |
+
+Un código sin duración (`PKC`, `CCN`, `TAL`…) no suma a ningún balde. El tiempo se acredita **una
+vez por tanda** (≡ v12.97) y **`LT` no cuenta** (es tiempo no trabajado). Legajos 0 y 1 afuera, y
+cada duración se **recorta contra el primer evento del día**: un `TP` que cierra el `EP` del
+viernes no le mete el fin de semana al lunes.
+
+**Total hs** = del primer evento del día al `FJ`; sin `FJ` la jornada sigue abierta —esos van sin
+el ✓ al lado del nombre— pero topeada en la **hora de salida** del empleado (fallback 17:00), para
+que un `FJ` que nadie apretó no haga crecer el número hasta medianoche.
+
+⚠⚠ **La suma de los tres baldes PUEDE pasarse del Total, y no está mal.** `CR` y `RR` quedan
+abiertos mientras el operario hace otra cosa: el 22/09 el legajo 104 tenía `RR` de 08:42 a 11:43
+en paralelo con un `RT`, un `AT` y dos `MG` → **8,62 h de baldes contra 6,03 h de jornada**. Por
+eso el **«% productivas» del título va sobre el tiempo MEDIDO** (prod + mov + no prod), no sobre
+la jornada: contra la jornada daría más de 100 %.
+
+### 3. El tablero pasó a TRES columnas
+
+Con la tabla de operarios adentro, las dos de antes dejaban «Total por día» en 4 filas y el
+desglose por camión se colapsaba solo. En una TV 16:9 **sobra ancho y falta alto**, así que el
+panel que no entraba a lo alto se movió a lo ancho: tandas + "en este momento" · operarios +
+avisos · a facturar + total por día. Abajo de 1500 px vuelve a dos columnas.
+
+**Chequeos:** `select * from public.gv_reglas_perdidas;` (vacía) ·
+`select * from public.gv_monitor_horas_operario;` · `node tests/mon-tv.cjs`.
+`sql/gv_monitor_horas_operario_v2117.sql`, §3.ml.
+
 ## Nota v21.05 (2026-09-22) — El barrido del pozo de RR: el chooser de CC, y 5 bytes fuera de UTF-8
 
 Dos cosas que salieron de preguntar *"¿qué otro submódulo tiene el problema de RR?"*.
@@ -13710,6 +13999,10 @@ avance, reloj y estado de la conexión.
 - **La tabla "Mts3 x Hora" por operario**, que depende de `computeClosureDur` (la
   parte más pesada y más delicada del cálculo). En su lugar van los m³ de picking y
   de armado terminados hoy, que es el número que se lee de lejos.
+  ⚠ **Desde la v21.17 SÍ hay una tabla por operario**, pero es otra cosa y no repite
+  ese cálculo: son las **horas del día clasificadas** (promedio por tanda pickeada y
+  armada, productivas, movimiento, no productivas y total), y vienen **resueltas del
+  backend** por `gv_monitor_horas_operario`. Pedido de Damián — ver la nota v21.17.
 
 **Al tocarla:** los puntos donde repite una regla del monitor grande están marcados en
 el código con `≡ index.html` (ventana de fechas, qué tanda sale del tablero, duración

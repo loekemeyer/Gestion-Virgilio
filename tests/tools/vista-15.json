@@ -1,0 +1,19 @@
+{
+  "_comentario": [
+    "Salida de public.gv_monitor_horas_operario_dia(date '2026-09-15'), congelada el 2026-09-22.",
+    "Es la mitad SQL de la comparación: tests/mon-vs-vista.cjs corre el monitor grande con los",
+    "fixtures de ese día y exige que dé lo mismo. Las sesiones no pueden pegarle a Supabase (el",
+    "proxy de egress bloquea supabase.co), así que la única forma de tener las dos mitades en un",
+    "test es congelar ésta.",
+    "SI SE CAMBIA UNA REGLA DE HORAS A PROPÓSITO: se vuelve a correr ese SELECT con el MCP y se",
+    "pega el resultado acá. Si se cambia sin querer, el test se pone rojo, que es el punto."
+  ],
+  "dia": "2026-09-15",
+  "operarios": [
+    { "legajo": "8",   "tandas_pick": 1,  "prom_hs_pick": 0.01, "tandas_arm": 3,  "prom_hs_arm": 2.47, "hs_pick": 0.01, "hs_arm": 7.40, "hs_mov": 0.00, "hs_noprod": 0.89 },
+    { "legajo": "94",  "tandas_pick": 0,  "prom_hs_pick": 0,    "tandas_arm": 0,  "prom_hs_arm": 0,    "hs_pick": 0.00, "hs_arm": 0.00, "hs_mov": 2.63, "hs_noprod": 0.00 },
+    { "legajo": "104", "tandas_pick": 0,  "prom_hs_pick": 0,    "tandas_arm": 0,  "prom_hs_arm": 0,    "hs_pick": 0.00, "hs_arm": 0.00, "hs_mov": 1.08, "hs_noprod": 0.57 },
+    { "legajo": "237", "tandas_pick": 0,  "prom_hs_pick": 0,    "tandas_arm": 12, "prom_hs_arm": 0.49, "hs_pick": 0.00, "hs_arm": 5.91, "hs_mov": 0.00, "hs_noprod": 2.40 },
+    { "legajo": "277", "tandas_pick": 14, "prom_hs_pick": 0.46, "tandas_arm": 0,  "prom_hs_arm": 0,    "hs_pick": 6.37, "hs_arm": 0.00, "hs_mov": 0.96, "hs_noprod": 1.70 }
+  ]
+}

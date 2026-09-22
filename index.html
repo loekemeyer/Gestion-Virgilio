@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.16"></script>
+<script type="module" src="recepcion.js?v=21.27"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.16";
+const APP_VERSION = "v21.27";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -14422,18 +14422,39 @@ async function _compTandaYaArmada(tanda) {
    (D47C → D54C) y 98583 (D50C → D50D): 57 cajas contadas por dos.
    Devuelve la lista de NP que YA tienen Entregas, sea en la tanda que sea.
    Ante error de red devuelve [] (no trabar el laburo por una caída puntual). */
+/* v21.21 (Luis, 2026-09-22) — UN ARMADO ANULADO NO ES UN ARMADO.
+   Para deshacer un armado NO se borra la fila de Entregas_Virgilio: se le pega `-X` a la
+   `tanda` (E29D -> E29D-X) y queda su fila en GV_Tanda_Anulada. Es el mismo criterio que
+   los eventos (TAP->TAPX): borrar la fila libera el client_id y la cola offline del celular
+   resucita el armado. La `-X` la ve cualquiera que lea la fila, y por eso la convencion
+   vive ACA, en una sola funcion, y no repetida en cada lector. */
+function _entregaAnulada(row) {
+  return /-X\d*$/i.test(String(row && row.tanda != null ? row.tanda : "").trim());
+}
 async function _compNpsYaArmadas(nps) {
   const lista = (nps || []).map(function (n) { return String(n == null ? "" : n).trim(); }).filter(Boolean);
   if (!lista.length) return [];
   try {
     const inList = "(" + lista.map(function (n) { return '"' + n.replace(/"/g, "") + '"'; }).join(",") + ")";
-    const url = SUPABASE_ENTREGAS_ENDPOINT + "?select=np&np=in." + encodeURIComponent(inList) + "&limit=2000";
+    const url = SUPABASE_ENTREGAS_ENDPOINT + "?select=np,tanda&np=in." + encodeURIComponent(inList) + "&limit=2000";
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     if (!r.ok) return [];
     const rows = await r.json();
     if (!Array.isArray(rows)) return [];
     const set = new Set();
-    rows.forEach(function (x) { const v = String(x.np == null ? "" : x.np).trim(); if (v) set.add(v); });
+    /* v21.21 — se leia por NP SIN mirar la tanda, asi que una fila ANULADA trababa el
+       armado igual que una viva, y para siempre. Caso E29D (22/09): LK 0034 se DESARMO
+       el 15/09 (17 cajas volvieron a gondola) y se anulo el TAP; el 22/09 el operario,
+       con el pallet a medio preparar, se comia "Ya esta armado el pedido NP LK 0034,
+       LK 0035 (en otra tanda)". Y el propio cartel le dice "avisa para darlo de baja a
+       mano primero", que era EXACTAMENTE lo que ya se habia hecho: el candado ignoraba
+       su propia salida. Al 22/09 son 20 filas en 2 tandas (E29D-X, D69H-X).
+       `_compTandaYaArmada` no tiene el problema: filtra `tanda=eq.<T>` y `E29D-X` no
+       matchea — por eso el sintoma aparecia solo en el candado POR NP. */
+    rows.forEach(function (x) {
+      if (_entregaAnulada(x)) return;
+      const v = String(x.np == null ? "" : x.np).trim(); if (v) set.add(v);
+    });
     return lista.filter(function (n) { return set.has(n); });
   } catch (_e) { return []; }
 }
@@ -17092,6 +17113,7 @@ const OC_AUTO_CSS = "#ocAutoOv{display:none;position:fixed;inset:0;z-index:1300;
   + "#ocAutoOv .oca-fecha{display:flex;gap:8px;align-items:center;flex-wrap:wrap}"
   + "#ocAutoOv input[type=date]{width:auto;margin:0;padding:8px 10px;font-size:15px;border:1px solid #cbd5e1;border-radius:8px}"
   + "#ocAutoOv .oca-hoy{font-size:12.5px;color:#64748b}"
+  + "#ocAutoOv .oca-ya{font-size:13.5px;font-weight:700;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:9px;padding:9px 11px}"
   + "#ocAutoOv .oca-msg{font-size:13px;color:#b91c1c;font-weight:700}"
   + "#ocAutoOv .oca-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:12px 16px;border-top:1px solid #e2e8f0}"
   + "#ocAutoOv .oca-btn{width:auto;margin:0;padding:9px 16px;border-radius:9px;font-size:14.5px;font-weight:700;border:1px solid #cbd5e1;background:#f1f5f9;color:#0f172a;cursor:pointer}"
@@ -17106,6 +17128,13 @@ function ocAutoAbrir(nLineas) {
   if (!ov) { ov = document.createElement("div"); ov.id = "ocAutoOv"; document.body.appendChild(ov); }
   ov.classList.add("show");
   _ocAutoRender();
+}
+/* v21.25 — ¿el ancla está tan cerca que "dejarlo como está" vuelve a generar enseguida?
+   Hoy o mañana: la corrida de las 07:00 no mira lo que se generó AYER (su único guard propio es
+   "ya hay OC de HOY"), así que saldría el juego completo de nuevo. */
+function _ocAutoAnclaPegada() {
+  if (!_ocAuto || !_ocgAuto || !_ocgAuto.proxima) return false;
+  return _ocgAuto.proxima <= _ocgSumarDias(_ocAuto.hoy, 1);
 }
 function ocAutoCerrar() { const ov = document.getElementById("ocAutoOv"); if (ov) ov.classList.remove("show"); _ocAuto = null; }
 function ocAutoSetFecha(v) { if (!_ocAuto) return; _ocAuto.fecha = String(v || "").slice(0, 10); _ocAuto.msg = ""; _ocAutoRender(); }
@@ -17122,6 +17151,12 @@ function _ocAutoRender() {
   let h = '<div class="oca-box"><div class="oca-head">✓ Generadas ' + _ocAuto.n + ' línea(s) de OC</div><div class="oca-body">';
   h += '<div>Las acabás de generar <b>a mano</b>. ¿Cuándo querés que vuelva a generarse <b>sola</b>?</div>';
   if (ancla) h += '<div class="oca-hoy">Hoy el ciclo la tiene para el <b>' + escapeHtml(ancla) + '</b>' + (_ocgAuto && _ocgAuto.motivo ? ' (' + escapeHtml(String(_ocgAuto.motivo)) + ')' : '') + '.</div>';
+  // v21.25 — el aviso que faltaba: si el ancla es HOY o MAÑANA, no elegir nada es volver a generar
+  // enseguida (justo lo que la v21.14 vino a evitar). El diálogo lo dice, no lo decide por él.
+  if (_ocAutoAnclaPegada()) {
+    h += '<div class="oca-ya">⚠ Si no elegís un día, la automática vuelve a generar TODO el ' +
+         escapeHtml(_ocgFechaTxt(_ocgAuto.proxima)) + ' a las 07:00 — o sea, de nuevo lo que acabás de generar.</div>';
+  }
   h += '<div class="oca-chips">';
   _ocAutoOpciones().forEach(function (o) {
     h += '<button class="oca-chip' + (_ocAuto.fecha === o.f ? " on" : "") + '" onclick="ocAutoSetFecha(' + JSON.stringify(o.f).replace(/"/g, "&quot;") + ')">' + escapeHtml(o.t) + ' · ' + escapeHtml(_ocgFechaTxt(o.f)) + '</button>';
@@ -17131,7 +17166,9 @@ function _ocAutoRender() {
   h += '<div class="oca-hoy">Se genera a las <b>07:00</b> de ese día. Puede ser cualquier día, no sólo miércoles.</div>';
   if (_ocAuto.msg) h += '<div class="oca-msg">' + escapeHtml(_ocAuto.msg) + '</div>';
   h += '</div><div class="oca-foot">';
-  h += '<button class="oca-btn" onclick="ocAutoCerrar()"' + (_ocAuto.guardando ? " disabled" : "") + '>Dejarlo como está</button>';
+  const anclaTxt = (_ocgAuto && _ocgAuto.proxima) ? _ocgFechaTxt(_ocgAuto.proxima) : "";
+  h += '<button class="oca-btn" onclick="ocAutoCerrar()"' + (_ocAuto.guardando ? " disabled" : "") + '>Dejarlo como está' +
+       (anclaTxt ? ' <span style="font-weight:600;opacity:.75">(se genera sola el ' + escapeHtml(anclaTxt) + ')</span>' : '') + '</button>';
   h += '<button class="oca-btn ok" onclick="ocAutoGuardar()"' + (_ocAuto.guardando ? " disabled" : "") + '>' + (_ocAuto.guardando ? "Guardando…" : "✓ Retomar ese día") + '</button>';
   h += '</div></div>';
   ov.innerHTML = h;
@@ -29431,8 +29468,8 @@ async function cpCerrarTareaSiCompleta(np) {
   try {
     const n = String(np).trim().replace(/\.0+$/, "");
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const r = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cajas_falto&np=eq." + encodeURIComponent(n), { headers: H, cache: "no-store" });
-    let rest = 1; if (r.ok) { const rows = await r.json(); rest = 0; rows.forEach(function (x) { rest += Number(x.cajas_falto) || 0; }); }
+    const r = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cajas_falto,tanda&np=eq." + encodeURIComponent(n), { headers: H, cache: "no-store" });
+    let rest = 1; if (r.ok) { const rows = await r.json(); rest = 0; rows.forEach(function (x) { if (_entregaAnulada(x)) return; /* v21.21: lo anulado no falta */ rest += Number(x.cajas_falto) || 0; }); }
     if (rest > 0) return;   // todavía falta algo → no cerrar
     const rt = await fetch(SUPABASE_FALTAREAS_ENDPOINT + "?select=id&np=eq." + encodeURIComponent(n) + "&estado=in.(pendiente,asignado)", { headers: H, cache: "no-store" });
     const tareas = rt.ok ? await rt.json() : [];
@@ -29769,8 +29806,8 @@ async function faltMaybeCompletar(np) {
   if (!_faltTareaMia || _faltNpNorm(_faltTareaMia.np) !== _faltNpNorm(np)) return;
   let rest = 1;
   try {
-    const r = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cajas_falto&np=eq." + encodeURIComponent(_faltNpNorm(np)), { headers: _faltH(), cache: "no-store" });
-    if (r.ok) { const rows = await r.json(); rest = 0; rows.forEach(function (x) { rest += Number(x.cajas_falto) || 0; }); }
+    const r = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cajas_falto,tanda&np=eq." + encodeURIComponent(_faltNpNorm(np)), { headers: _faltH(), cache: "no-store" });
+    if (r.ok) { const rows = await r.json(); rest = 0; rows.forEach(function (x) { if (_entregaAnulada(x)) return; /* v21.21: lo anulado no falta */ rest += Number(x.cajas_falto) || 0; }); }
   } catch (_e) { return; }   // ante error, NO autocerramos
   if (rest <= 0) {
     const id = _faltTareaMia.id;
@@ -31533,7 +31570,8 @@ function showOperarioActivityDetail(legajo, activity) {
   const dayKey = _monitorLiveStats.todayKey;
   const op = (stats.perOperario || []).find(o => o.legajo === String(legajo));
   if (!op) return;
-  const label = { pick:"Picking", arm:"Pedido", cc:"Carga Camión", mov:"Movimientos" }[activity];
+  const label = { pick:"Picking", arm:"Pedido", cc:"Carga Camión",
+                  mov:"Movimientos", noprod:"No productivas" }[activity];
   const m = document.getElementById("tandaModal");
   m.querySelector(".tanda-modal-title").textContent =
     `${op.nombre} — ${label} (${dayKey.slice(8,10)}/${dayKey.slice(5,7)})`;
@@ -31554,16 +31592,20 @@ function showOperarioActivityDetail(legajo, activity) {
     return h > 0 ? `${h}h ${m2}min` : `${m2}min`;
   };
 
-  if (activity === "mov") {
+  if (activity === "mov" || activity === "noprod") {
     // Detalle por toggle: apertura, cierre y cuánto tardó (minutos).
-    const totalH = (op.movMin || 0) / 60;
-    const totalMin = Math.round(op.movMin || 0);
-    const movArr = op.movDetail || [];
+    // v21.18: el mismo popup sirve para los dos baldes (movimiento y no
+    // productivas), que antes venían mezclados en uno solo.
+    const esMovPop = activity === "mov";
+    const totalH = ((esMovPop ? op.movMin : op.noprodMin) || 0) / 60;
+    const totalMin = Math.round((esMovPop ? op.movMin : op.noprodMin) || 0);
+    const movArr = (esMovPop ? op.movDetail : op.noprodDetail) || [];
     const movLabel = {
       MG: "Guardado a Góndola", RI: "Recepción Insumos",
       EI: "Entrega Insumos",    RT: "Recepción Mercadería",
       AT: "Atendí Timbre",      PB: "Paré Baño",
-      Limp: "Limpieza"
+      Limp: "Limpieza",         PC: "Paré Comida",
+      CT: "Conteo",             Perm: "Permiso de Salida"
     };
     const fmtMin = (ms) => `${Math.round(ms / 60000)} min`;
     if (!movArr.length) {
@@ -31579,7 +31621,10 @@ function showOperarioActivityDetail(legajo, activity) {
         <td><b>${escapeHtml(d.opcion)}</b> <span style="color:#666;font-size:11px">${escapeHtml(movLabel[d.opcion] || "")}</span>${d.texto ? ` <span style="color:#1e6bd6;font-size:11px">${escapeHtml(d.texto)}</span>` : ''}</td>
         <td>${fmtTime(d.ts_inicio)}</td>
         <td>${fmtTime(d.ts_cliente)}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${fmtMin(d.durMs)}</b></td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${fmtMin(d.durMs)}</b>${
+          d.muertoMs > 0
+            ? `<div style="font-size:11px;color:#b45309;font-weight:700">−${fmtMin(d.muertoMs)} de tiempo muerto</div>`
+            : ""}</td>
       </tr>`).join("");
     m.querySelector(".tanda-modal-body").innerHTML = `
       <div style="font-size:14px; margin-bottom:10px;">
@@ -32273,10 +32318,26 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     if (!prev || ts < prev) ingresoByLegajo.set(leg, ts);
   }
 
-  // Códigos que contamos como "movimientos" en la tabla Mts3xHora:
-  // toggles internos cuyo TIEMPO (sumatoria de duraciones cerradas) interesa
-  // saber por operario. Cuentan PB y Limp también (decisión del supervisor).
-  const MOV_TOGGLE_CODES = new Set(["MG", "RI", "EI", "RT", "AT", "PB", "Limp"]);
+  /* Toggles internos cuyo TIEMPO (sumatoria de duraciones cerradas) interesa
+     saber por operario.
+
+     ⚠ v21.18 (Damián, via Marianela) — ANTES ERA UN SOLO BALDE con PB y Limp
+     adentro ("decisión del supervisor"), o sea que **ir al baño contaba como
+     movimiento de mercadería**. Damián pidió las dos cosas separadas, así que
+     acá quedan separadas y con los mismos códigos que usa la vista
+     `gv_monitor_horas_operario`, que es la que ve la TV: si algún día se
+     vuelven a mostrar estos números, los dos lados dicen lo mismo.
+
+     ⚠ CORRECCIÓN v21.19 — el comentario que estaba acá decía que la tabla
+     "Mts3 x Hora" ya no se dibujaba. ERA FALSO: `renderMonitor` existe y la
+     dibuja, escribe `_monitorLiveStats` y llama a `fetchMonitorDayStats`. El
+     error salió de contar las apariciones con `grep`, que trata a este archivo
+     como BINARIO (tiene un NUL adentro, el separador de `_pppGeoCod`) y en vez
+     de las líneas imprime "Binary file matches" — o sea que los conteos daban
+     cualquier cosa. **Para contar algo en `index.html`: `grep -a`, o Python.**
+     Lo cazó `tests/dead-handlers.cjs`. */
+  const MOV_TOGGLE_CODES    = new Set(["MG", "RI", "EI", "RT"]);
+  const NOPROD_TOGGLE_CODES = new Set(["AT", "PB", "Limp", "PC", "CT", "Perm"]);
 
   // Lookup m3 por tanda: sheetMap actual primero (más fresco), después la
   // histórica del Sheet. ANTES del loop de eventos porque el detail necesita
@@ -32452,7 +32513,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       pickedTandas: new Set(), pickedDetail: [], pickMs: 0,
       armedTandas:  new Set(), armedDetail:  [], armMs:  0,
       ccTandas:     new Set(), ccDetail:     [], ccMs:   0,
-      comidaMs: 0, movMs: 0, movDetail: [], fjTs: null
+      comidaMs: 0, movMs: 0, movDetail: [], noprodMs: 0, noprodDetail: [], fjTs: null
     });
     const p = perLegajo.get(leg);
     p.lastTs = ev.ts_cliente;
@@ -32476,17 +32537,33 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     }
     // Toggles de movimiento: sumar duración cuando se cierra (ts_inicio set)
     // y guardar el evento en movDetail para el popup.
-    if (MOV_TOGGLE_CODES.has(ev.opcion) && ev.ts_inicio) {
-      const dur = new Date(ev.ts_cliente) - new Date(ev.ts_inicio);
-      if (dur > 0 && dur < 8 * 3600 * 1000) {
-        p.movMs += dur;
-        p.movDetail.push({
+    if ((MOV_TOGGLE_CODES.has(ev.opcion) || NOPROD_TOGGLE_CODES.has(ev.opcion)) && ev.ts_inicio) {
+      const iniMs = new Date(ev.ts_inicio).getTime();
+      const finMs = new Date(ev.ts_cliente).getTime();
+      const bruto = finMs - iniMs;
+      if (bruto > 0 && bruto < 8 * 3600 * 1000) {
+        const esMov = MOV_TOGGLE_CODES.has(ev.opcion);
+        /* v21.20 (Thomas) — al MOVIMIENTO también se le resta el tiempo muerto
+           que quedó adentro, igual que a picking y armado desde la v19.07.
+           `PB` y `PC` están en ALWAYS_ALLOWED_CODES, así que se pueden abrir con
+           un RT/RI/EI en curso: la media hora de comida entraba entera como
+           movimiento de mercadería. Medido sobre 30 días: 4 cierres de 352, 1,36 h
+           de 65,75 (2,1 %) — chico, pero es la misma regla.
+           ⚠ A las NO PRODUCTIVAS no se les resta: se restarían a sí mismas. */
+        const muerto = esMov ? Math.min(bruto, deadOverlapMs(leg, iniMs, finMs)) : 0;
+        const dur = bruto - muerto;
+        if (dur <= 0) continue;
+        const fila = {
           opcion: ev.opcion,
           texto: ev.texto || "",
           ts_inicio: ev.ts_inicio,
           ts_cliente: ev.ts_cliente,
-          durMs: dur
-        });
+          durMs: dur,
+          brutoMs: bruto,
+          muertoMs: muerto
+        };
+        if (esMov) { p.movMs += dur; p.movDetail.push(fila); }
+        else       { p.noprodMs += dur; p.noprodDetail.push(fila); }
       }
     }
     if (ev.opcion === "FJ") p.fjTs = ev.ts_cliente;
@@ -32514,37 +32591,41 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const m3hArm  = (armH  > 0 && m3Arm  > 0) ? m3Arm  / armH  : 0;
     const m3hCC   = (ccH   > 0 && m3CC   > 0) ? m3CC   / ccH   : 0;
     const movMin  = p.movMs / 60000;
+    const noprodMin = p.noprodMs / 60000;
     perOperario.push({
       legajo: leg,
       nombre: nombres.get(leg) || ("Leg " + leg),
       m3Pick, m3Arm, m3CC,
       pickH, armH, ccH,
-      m3hPick, m3hArm, m3hCC, movMin,
+      m3hPick, m3hArm, m3hCC, movMin, noprodMin,
       pickedDetail: p.pickedDetail,
       armedDetail:  p.armedDetail,
       ccDetail:     p.ccDetail,
       movDetail:    p.movDetail,
+      noprodDetail: p.noprodDetail,
       didPick: p.pickedTandas.size > 0,
       didArm:  p.armedTandas.size  > 0,
       didCC:   p.ccTandas.size     > 0,
-      didMov:  p.movMs > 0
+      didMov:  p.movMs > 0,
+      didNoprod: p.noprodMs > 0
     });
   }
   // Totales: sumamos m3 y horas REALES por actividad (no por operario completo)
   // así el total m3/h refleja la productividad real de la actividad ese día.
   let pickM3 = 0, pickHsum = 0, sepM3 = 0, sepHsum = 0;
-  let ccM3 = 0, ccHsum = 0, movMinTot = 0;
+  let ccM3 = 0, ccHsum = 0, movMinTot = 0, noprodMinTot = 0;
   for (const o of perOperario) {
     pickM3 += o.m3Pick; pickHsum += o.pickH;
     sepM3  += o.m3Arm;  sepHsum  += o.armH;
     ccM3   += o.m3CC;   ccHsum   += o.ccH;
     movMinTot += o.movMin;
+    noprodMinTot += (o.noprodMin || 0);
   }
   const totals = {
     pickM3, pickHsum, pickM3h: pickHsum > 0 ? pickM3 / pickHsum : 0,
     sepM3,  sepHsum,  sepM3h:  sepHsum  > 0 ? sepM3  / sepHsum  : 0,
     ccM3,   ccHsum,   ccM3h:   ccHsum   > 0 ? ccM3   / ccHsum   : 0,
-    movMin: movMinTot
+    movMin: movMinTot, noprodMin: noprodMinTot
   };
   perOperario.sort((a, b) => (b.m3Pick + b.m3Arm + b.m3CC) - (a.m3Pick + a.m3Arm + a.m3CC));
   const data = { perOperario, totals };
@@ -50691,7 +50772,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // Cache para los popups (al hacer click en una celda de Mts3xHora).
   _monitorLiveStats = { todayKey, today: todayStats, yesterdayKey, yesterday: yesterdayStats };
   const operariosHoy = (todayStats && todayStats.perOperario) || [];
-  const emptyTot = { pickM3:0, pickM3h:0, sepM3:0, sepM3h:0, ccM3:0, ccM3h:0, movMin:0 };
+  const emptyTot = { pickM3:0, pickM3h:0, sepM3:0, sepM3h:0, ccM3:0, ccM3h:0, movMin:0, noprodMin:0 };
   const totHoy  = (todayStats     && todayStats.totals)     || emptyTot;
   const totAyer = (yesterdayStats && yesterdayStats.totals) || emptyTot;
   // Cada celda clickeable abre el popup con el desglose por tanda. El
@@ -50705,9 +50786,11 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     if (did)     return `<td class="num stats-nodata" title="${msg}" ${_clk(leg, act)}>·</td>`;
     return `<td class="num">—</td>`;
   };
-  const cellMin = (val, did, leg) => {
-    if (val > 0) return `<td class="num" ${_clk(leg, "mov")}>${fmt1(val / 60)}</td>`;
-    if (did)     return `<td class="num stats-nodata" ${_clk(leg, "mov")}>·</td>`;
+  /* v21.19 — `act` es "mov" o "noprod": son DOS filas desde que se separaron
+     (antes el baño y la limpieza se sumaban adentro de Movim.). */
+  const cellMin = (val, did, leg, act) => {
+    if (val > 0) return `<td class="num" ${_clk(leg, act)}>${fmt1(val / 60)}</td>`;
+    if (did)     return `<td class="num stats-nodata" ${_clk(leg, act)}>·</td>`;
     return `<td class="num">—</td>`;
   };
 
@@ -50736,7 +50819,11 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
           </tr>
           <tr>
             <th class="row-label">Movim.<br><span class="row-unit">(h)</span></th>
-            ${operariosHoy.map(o => cellMin(o.movMin, o.didMov, o.legajo)).join("")}
+            ${operariosHoy.map(o => cellMin(o.movMin, o.didMov, o.legajo, "mov")).join("")}
+          </tr>
+          <tr>
+            <th class="row-label" title="Timbre, baño, limpieza, comida, conteo y permiso de salida. Hasta la v21.17 se sumaban adentro de Movim.">No prod.<br><span class="row-unit">(h)</span></th>
+            ${operariosHoy.map(o => cellMin(o.noprodMin, o.didNoprod, o.legajo, "noprod")).join("")}
           </tr>
         </tbody>
       </table>
@@ -50751,9 +50838,12 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
         </tbody>
       </table>
     </div>`;
-  // Los labels Picking/Pedido/CC/Movim NO van acá — quedan implícitos por la
-  // tabla Mts3 x Hora de al lado (orden: Picking, Pedido, CC, Movim). La fila
-  // Movim. muestra TOTAL HORAS (no es un m³/h) en una celda con colspan=2.
+  // Los labels Picking/Pedido/CC/Movim/No prod. NO van acá — quedan implícitos
+  // por la tabla Mts3 x Hora de al lado (orden: Picking, Pedido, CC, Movim,
+  // No prod.). Las dos últimas muestran TOTAL HORAS (no es un m³/h) en una
+  // celda con colspan=2.
+  // ⚠ Si se agrega una fila de un lado, VA TAMBIÉN del otro: se alinean por
+  //   POSICIÓN, no por nombre.
   const renderParcial = (title, t) => `
     <div class="monitor-stats-card">
       <table class="monitor-stats-table monitor-stats-parcial">
@@ -50769,6 +50859,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
           <tr><td class="num">${fmt1(t.sepM3)}</td><td class="num">${prodVal(t.sepM3h)}</td></tr>
           <tr><td class="num">${fmt1(t.ccM3)}</td><td class="num">${prodVal(t.ccM3h)}</td></tr>
           <tr><td class="num" colspan="2">${fmt1((t.movMin || 0) / 60)} h</td></tr>
+          <tr><td class="num" colspan="2">${fmt1((t.noprodMin || 0) / 60)} h</td></tr>
         </tbody>
       </table>
     </div>`;

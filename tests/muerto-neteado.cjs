@@ -1,6 +1,6 @@
 /* v19.07 — dos reglas que pidió Luis el 16/09 y una que verificó.
 
-   (A) TIEMPO MUERTO NETEADO. "Si arma 1 h, va al baño 10 min y arma 50 min más, debería ser
+   (A) TIEMPO MUERTO NETEADO (y (C), el mismo neteo adentro de un movimiento, v21.20). "Si arma 1 h, va al baño 10 min y arma 50 min más, debería ser
        1 h 50 de armado y 10 de baño, cada uno contado individual." Hasta la v19.02 NO se
        restaba en ningún lado: `DEAD_TIME_CODES` sólo bloqueaba botones y `computeClosureDur`
        partía el cruce de día sin descontar nada. Problema 349.
@@ -27,7 +27,14 @@ const EVENTOS = [
   { opcion: "TAP", texto: "Z01A", legajo: "700", ts_cliente: iso("11:00:00"), ts_inicio: iso("09:00:00") },
   // control: otro armado del mismo día SIN nada adentro → no se le toca un minuto
   { opcion: "AP",  texto: "Z01B", legajo: "700", ts_cliente: iso("11:05:00"), ts_inicio: null },
-  { opcion: "TAP", texto: "Z01B", legajo: "700", ts_cliente: iso("12:05:00"), ts_inicio: iso("11:05:00") }
+  { opcion: "TAP", texto: "Z01B", legajo: "700", ts_cliente: iso("12:05:00"), ts_inicio: iso("11:05:00") },
+  /* (C) v21.20 — el mismo caso pero contra un MOVIMIENTO, en otro legajo para que
+     el tiempo muerto no se cruce con el armado de arriba. Una recepción de 2 h con
+     un baño de 10 min adentro: `PB` está en ALWAYS_ALLOWED_CODES, así que se puede
+     abrir con el RT en curso. Tiene que dar 110 de movimiento y 10 de no productivas. */
+  { opcion: "RT",  texto: "",     legajo: "701", ts_cliente: iso("09:00:00"), ts_inicio: null },
+  { opcion: "PB",  texto: "",     legajo: "701", ts_cliente: iso("10:10:00"), ts_inicio: iso("10:00:00") },
+  { opcion: "RT",  texto: "66",   legajo: "701", ts_cliente: iso("11:00:00"), ts_inicio: iso("09:00:00") }
 ];
 
 (async () => {
@@ -70,10 +77,29 @@ const EVENTOS = [
       out.A_Z01A_muerto_10 = !!(a && a.breakdown && Math.round(a.breakdown.muertoMs / 60000) === 10);
       out.A_Z01B_intacta   = !!(bb && Math.round(bb.durMs / 60000) === 60
                               && bb.breakdown && Math.round(bb.breakdown.muertoMs / 60000) === 0);
-      // el baño sigue contándose aparte (MOV_TOGGLE_CODES lo suma en movMin): 10 min.
-      // Eso es el "cada uno contado individual" del pedido: se resta del armado Y se
-      // suma en su propio casillero, no desaparece.
-      out.A_bano_aparte = Math.round(op.movMin || 0) === 10;
+      /* El baño sigue contándose aparte: 10 min. Eso es el "cada uno contado
+         individual" del pedido de Luis — se resta del armado Y se suma en su
+         propio casillero, no desaparece.
+         ⚠ v21.18 (Damián): ese casillero ya NO es `movMin`. Hasta la v21.17 el
+         baño, el timbre y la limpieza se sumaban junto con el guardado a góndola
+         y la recepción, o sea que "movimiento de mercadería" incluía ir al baño.
+         Ahora son dos baldes y el baño va en `noprodMin`; `movMin` tiene que
+         quedar en CERO, que es lo que prueba que la separación existe de verdad
+         y no es sólo un renombre. */
+      out.A_bano_aparte     = Math.round(op.noprodMin || 0) === 10;
+      out.A_bano_no_es_mov  = Math.round(op.movMin || 0) === 0;
+    }
+    /* (C) el mismo neteo, pero adentro de un MOVIMIENTO (v21.20, Thomas). */
+    const opMov = (stats && stats.perOperario || []).filter(x => String(x.legajo) === "701")[0] || null;
+    out.C_encontro_operario = !!opMov;
+    if (opMov) {
+      out.C_mov_110      = Math.round(opMov.movMin || 0) === 110;
+      out.C_no_es_120    = Math.round(opMov.movMin || 0) !== 120;   // 120 = el número viejo, sin netear
+      out.C_bano_aparte  = Math.round(opMov.noprodMin || 0) === 10;
+      /* y el popup tiene que poder decir cuánto se descontó */
+      const dmov = (opMov.movDetail || [])[0] || {};
+      out.C_detalle_dice_cuanto = Math.round((dmov.brutoMs || 0) / 60000) === 120
+                               && Math.round((dmov.muertoMs || 0) / 60000) === 10;
     }
 
     /* ============ (B) no volver a cerrar lo que el server ya cerró ============ */

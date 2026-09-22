@@ -1,0 +1,166 @@
+-- v21.23 — 544 y 560 pasan a Pedernera en OC_Maximos (Luis, 2026-09-22)
+--
+-- Luis, textual: "si, corregí 544 y 560 a Pedernera".
+--
+-- Contexto: `OC_Maximos.proveedor` dice QUIEN FABRICA (regla del dueno del 15/09,
+-- caso Oscar: "dejalo ahi"). Para los tres fabricantes de `GV_OC_Fabrica_Para`
+-- la OC se EMITE a `Log/ Fabr` — eso ya lo resuelve `gv_oc_emite_a()` (v21.22),
+-- no el campo `proveedor`.
+--
+-- Lo que estaba mezclado: de los 7 codigos que fabrica Pedernera, la config decia
+-- `Pedernera` en 5 (115, 561, 800, 801, 802) y `Log/ Fabr` en 2 (544, 560).
+-- Medido el 22/09 sobre entregas desde el 01/06: Pedernera entrego 115, 544, 560
+-- y 802 — o sea que los dos que decian `Log/ Fabr` son suyos igual.
+--
+-- Backup: zz_backups."GV_Backup_OCMaximos_20260922"  (clave: cod, unica — 360/360)
+--
+--   create table zz_backups."GV_Backup_OCMaximos_20260922" as
+--     select * from public."OC_Maximos";
+--   alter table zz_backups."GV_Backup_OCMaximos_20260922" enable row level security;
+--   revoke insert, update, delete, truncate
+--     on zz_backups."GV_Backup_OCMaximos_20260922" from anon, authenticated;
+
+update public."OC_Maximos" set proveedor = 'Pedernera'
+ where regexp_replace(upper(btrim(cod)), '^0+(.)', '\1') in ('544', '560');
+-- 2 filas
+
+-- verificacion: los 7 codigos de Pedernera dicen Pedernera en la config,
+-- y la OC de los 7 se emite igual a Log/ Fabr.
+select m.cod, m.proveedor, public.gv_oc_emite_a(m.proveedor) emite_a
+  from public."OC_Maximos" m
+ where regexp_replace(upper(btrim(m.cod)), '^0+(.)', '\1')
+       in ('115','544','560','561','800','801','802')
+ order by 1;
+-- 7 filas: proveedor = Pedernera, emite_a = Log/ Fabr
+
+-- rollback:
+--   update public."OC_Maximos" m set proveedor = b.proveedor
+--     from zz_backups."GV_Backup_OCMaximos_20260922" b
+--    where b.cod = m.cod and m.cod in ('544','560');
+
+------------------------------------------------------------------------------
+-- El BARRIDO limpio: que OTROS pares (OC a uno, entrega otro) quedan sin imputar
+------------------------------------------------------------------------------
+-- Luis: "2 cuales son? Que tiene que ver basconia???"
+--
+-- ⚠ El barrido anterior ("25 pares") estaba CONTAMINADO: cruzaba por NUMERO de
+-- codigo, y Basconia compra ACERO EN KILOS (rubro Flejes, unidad Kg) con codigos
+-- que chocan con los de articulo terminado — su `0635` es "Arandela Gde/Chica
+-- Afila (77 x 1,25)", no el articulo 635. Basconia tiene UNA sola tanda, del
+-- 13/07, 10 lineas, 7.650 Kg, y CERO entregas en `Entregas Tallerista Virgilio`:
+-- no entra en esto por ningun lado.
+--
+-- El barrido que vale filtra rubro = 'Art Term' y unidad = 'Cajas', y deja afuera
+-- los alias que `gv_prov_match` ya resuelve (Martin C = Martin, Carlos E = Carlos,
+-- Pettofrezza = Rafael) y los tres fabricantes de `GV_OC_Fabrica_Para`.
+--
+-- Resultado al 22/09: **22 pares, 19 codigos, 4.654 cajas de OC sin imputar**.
+-- Luis: "2 no necesariamente, tengo que ver caso x caso" → NO se toca ninguno.
+
+with oc as (
+  select public.gv_norm_prov_key(o.proveedor) pk_oc, o.proveedor prov_oc,
+         regexp_replace(upper(btrim(o.codigo)),'^0+(.)','\1') cod,
+         sum(o.cantidad) cajas_oc, count(*) n_oc, max(o.fecha::date) ult_oc
+    from public."Ordenes_Compra" o
+   where o.rubro = 'Art Term' and o.unidad = 'Cajas'
+     and coalesce(o.cantidad_recibida,0) = 0
+     and o.fecha >= date '2026-07-01'
+   group by 1,2,3),
+ent as (
+  select public.gv_norm_prov_key(e."Nombre_Tall") pk_ent, e."Nombre_Tall" prov_ent,
+         regexp_replace(upper(btrim(e."Cod")),'^0+(.)','\1') cod,
+         sum(e."Cajas") cajas_ent, max(e."Fecha"::date) ult_ent
+    from public."Entregas Tallerista Virgilio" e
+   where e."Fecha" >= '2026-07-01'
+   group by 1,2,3),
+cfg as (
+  select regexp_replace(upper(btrim(m.cod)),'^0+(.)','\1') cod, m.proveedor prov_cfg
+    from public."OC_Maximos" m)
+select oc.cod, oc.prov_oc oc_a, ent.prov_ent entrega, cfg.prov_cfg config,
+       oc.cajas_oc, oc.n_oc, oc.ult_oc, ent.cajas_ent, ent.ult_ent,
+       case when public.gv_norm_prov_key(coalesce(cfg.prov_cfg,'')) = ent.pk_ent
+              then 'config = el que ENTREGA'
+            when public.gv_norm_prov_key(coalesce(cfg.prov_cfg,'')) = oc.pk_oc
+              then 'config = el de la OC'
+            else 'config = ninguno de los dos' end situacion
+  from oc
+  join ent on ent.cod = oc.cod and ent.pk_ent <> oc.pk_oc
+  left join cfg on cfg.cod = oc.cod
+ where oc.pk_oc  not in (select public.gv_norm_prov_key(f.fabricante) from public."GV_OC_Fabrica_Para" f)
+   and ent.pk_ent not in (select public.gv_norm_prov_key(f.fabricante) from public."GV_OC_Fabrica_Para" f)
+   and not public.gv_prov_match(public.gv_norm_prov_keys(oc.prov_oc),
+                                public.gv_norm_prov_keys(ent.prov_ent))
+ order by oc.cajas_oc desc;
+
+------------------------------------------------------------------------------
+-- v21.24 — LA LISTA DE TRABAJO de Luis (22/09): que configurar de esos codigos
+------------------------------------------------------------------------------
+-- Luis: "No siempre es la norma general de que le entrega a otro. En los unicos que la
+-- orden sale en nombre de uno y le entrega a otro son los casos de Pedernera, Blistpack
+-- y Oscar." + "lo configuro yo, los 22 articulos que me pasaste, y lo damos por cerrado".
+--
+-- ⚠ La medicion va contra `vista_generador_oc` (lo que se VA A EMITIR), no contra las OC
+-- ya emitidas: el 550 salia a Poly hasta el 16/09 y hoy la config ya dice Garcia. Mirando
+-- las OC viejas, un codigo ya arreglado figura como problema para siempre.
+--
+-- Al 22/09: 5 OK · 1 SIN PROVEEDOR (583E) · 13 REVISAR.
+
+with cods as (select unnest(array['510','550','583E','505','584E','103','922','911','224','223',
+                                  '123','609','591','580','760','234','519','719','355']) cod),
+ent as (select e."Cod" cod,
+               string_agg(e."Nombre_Tall"||' ('||e.cj||')', ' · ' order by e.cj desc) entrega,
+               (array_agg(e."Nombre_Tall" order by e.cj desc))[1] principal
+          from (select "Cod","Nombre_Tall",sum("Cajas") cj
+                  from public."Entregas Tallerista Virgilio"
+                 where "Fecha" >= '2026-07-01' group by 1,2) e
+         group by 1),
+ocs as (select o.codigo cod, string_agg(distinct o.proveedor,' + ') oc_a,
+               sum(o.cantidad) filter (where coalesce(o.cantidad_recibida,0)=0) sin_imputar
+          from public."Ordenes_Compra" o
+         where o.rubro='Art Term' and o.unidad='Cajas' and o.fecha >= date '2026-07-01'
+         group by 1)
+select c.cod, g.descripcion, g.proveedor as emitiria_hoy, ocs.oc_a as oc_viejas_a,
+       ocs.sin_imputar, ent.entrega, ent.principal,
+       case when g.proveedor is null      then 'sin fila en el generador'
+            when not g.tiene_prov_real    then 'SIN PROVEEDOR configurado'
+            when public.gv_prov_match(public.gv_norm_prov_keys(g.proveedor),
+                                      public.gv_norm_prov_keys(ent.principal)) then 'OK'
+            else 'REVISAR' end estado
+  from cods c
+  left join public.vista_generador_oc g on g.cod = c.cod
+  left join ent on ent.cod = c.cod
+  left join ocs on ocs.cod = c.cod
+ order by ocs.sin_imputar desc nulls last;
+
+------------------------------------------------------------------------------
+-- v21.25 — 591 Despolvillador de Yerba: DISCONTINUADO (Luis, 22/09)
+------------------------------------------------------------------------------
+-- Luis: "591 marcalo como discontinuo" + "No se va a recibir mas ni va a salir en OC".
+--
+-- De donde salia la demanda (por si se revisa): total 41 = maximo 50 + pedidos 4 - stock 13.
+-- El maximo 50 = ceil(proyeccion 33,17 x indice 1,5), y esos 33,17 caj/mes son el promedio
+-- de los 6 meses CERRADOS (mar-ago: 69+15+53+9+20+33 = 199/6), que empuja LK todos los dias
+-- a las 06:20. Marzo (69) y mayo (53) son el 61% de ese total. Septiembre (21 cajas, 10
+-- clientes) todavia no entra. O sea: la demanda era real, no un fantasma de configuracion.
+--
+-- Backup: zz_backups."GV_Backup_OCMaximos_591_20260922" (1 fila, RLS on, writes revocados).
+
+update public."OC_Maximos"
+   set activo = false, proveedor = null,
+       descripcion = 'Despolvillador de Yerba - discontinuado: no se compra ni se recibe mas (Luis, 22/09/2026)'
+ where cod = '591';
+
+-- verificacion COMO ANON (la identidad del celular; desde el MCP se entra como postgres y
+-- no prueba nada — trampa de la v20.45). Los tres tienen que dar 0:
+set local role anon;
+select (select count(*) from public.oc_vigentes_por_proveedor('Tierra Nativa') where cod='591')
+         as boton_tierra_nativa,
+       (select count(*) from public."OC_Maximos" where cod='591' and activo)
+         as buscador_de_activos_de_recepcion,
+       (select count(*) from public.vista_generador_oc where cod='591' and activo and tiene_prov_real)
+         as lista_de_compra;
+
+-- rollback:
+--   update public."OC_Maximos" m set activo = b.activo, proveedor = b.proveedor,
+--          descripcion = b.descripcion
+--     from zz_backups."GV_Backup_OCMaximos_591_20260922" b where b.cod = m.cod;

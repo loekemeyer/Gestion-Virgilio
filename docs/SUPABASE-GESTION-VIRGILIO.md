@@ -29088,3 +29088,112 @@ para cualquier otro día, y **"Dejarlo como está"**, que no escribe nada.
 select cron.alter_job(50, schedule := '0 10 * * 3',
                           command  := 'select public.generar_ocs_automaticas()');
 ```
+
+### §3.ml — v21.17: horas por operario del día, clasificadas (`gv_monitor_horas_operario`) — 2026-09-22
+
+**Pedido de Damián** (lo pasó Marianela, 22/09) para el monitor de la TV: además de las tandas,
+ver por operario **cuánto tardó en promedio cada tanda y en qué se fue el resto del día**.
+
+**Objetos nuevos:** función `public.gv_monitor_horas_operario_dia(p_dia date)` (el cálculo) y
+vista `public.gv_monitor_horas_operario` (`security_invoker = true`), que es sólo
+`select * from` esa función con el día de hoy — es lo que lee `monitor/tv.html`. EXECUTE y SELECT
+para `anon` y `authenticated`. Una fila por legajo con actividad ese día (hora AR):
+
+⚠ **La función con `p_dia` existe para poder COMPARAR** contra el monitor grande cualquier día
+(`tests/tools/monitor-vs-vista.cjs`). Con la vista atada a "hoy" la comparación era imposible: sus
+fixtures son del 15/09. Si alguien le vuelve a meter el cálculo adentro de la vista, quedan dos
+implementaciones otra vez — tiene su centinela.
+
+| columna | qué es |
+|---|---|
+| `tandas_pick` · `hs_pick` · `prom_hs_pick` | tandas cerradas con `TP`, horas y promedio por tanda |
+| `tandas_arm` · `hs_arm` · `prom_hs_arm` | ídem con `TAP` |
+| `hs_prod` | `TP` + `TAP` + `CC` + `CR` + `RR` |
+| `hs_mov` | `MG` + `RT` + `RI` + `EI` |
+| `hs_noprod` | `AT` + `PB` + `Limp` + `PC` + `CT` + `Perm` |
+| `hs_total` | del primer evento del día al `FJ`; sin `FJ`, hasta ahora |
+| `en_jornada` | `true` mientras no haya `FJ` |
+
+**Por qué va al backend y no al front:** qué cuenta como hora productiva es una **regla de
+negocio**, y la miran dos pantallas (la TV y, cuando se enganche, el monitor grande). Protocolo
+del repo. Cuatro filas en `GV_Reglas_Centinela` la sostienen.
+
+⚠ **Corrige una mezcla que ya estaba en `index.html`:** `MOV_TOGGLE_CODES` era
+`{MG, RI, EI, RT, AT, PB, Limp}` — *"Paré Baño"* y *"Limpieza"* contaban como **movimiento de
+mercadería**. Acá van separados, y en la **v21.18 `index.html` se alineó**: su
+`MOV_TOGGLE_CODES` quedó en `{MG, RI, EI, RT}` y apareció `NOPROD_TOGGLE_CODES`, con su propio
+`noprodMin` / `noprodDetail`.
+
+⚠⚠ **CORRECCIÓN v21.19 — acá decía que la tabla «Mts3 x Hora» del monitor grande ya no se
+dibujaba, y era FALSO.** `renderMonitor` la dibuja, escribe `_monitorLiveStats` y llama a
+`fetchMonitorDayStats`. El conteo se había hecho con `grep`, que trata a `index.html` como
+**binario** (tiene un byte NUL) y en vez de las líneas imprime *"Binary file matches"*: los
+números eran inventados. **Para contar algo ahí: `grep -a` o Python.** Se intentó borrar esos
+~520 renglones y lo frenó `tests/dead-handlers.cjs`, que se puso en rojo con
+`muertos=1 [showOperarioActivityDetail]`. Revertido.
+
+⚠ **Por eso la v21.19 le agregó al monitor grande la fila «No prod.»**: como la tabla SÍ se ve,
+sacarle el baño y la limpieza a *Movim.* dejaba esas horas sin aparecer en ningún lado.
+
+⚠ **v21.18 — el TIEMPO MUERTO se resta**, que es la regla de Luis del 16/09 (v19.07, problema
+349): *"si arma 1 h, va al baño 10 min y arma 50 min más, debería ser 1 h 50 de armado y 10 de
+baño, cada uno contado individual"*. El descuento va **sólo en las productivas**: a los toggles de
+movimiento no se les resta (los de tiempo muerto los bloquean, no pueden solaparse) y a los de
+tiempo muerto tampoco (se restarían a sí mismos). **Medido con el ejemplo de Luis, en una
+transacción abortada: armado 169,8 min · no productivas 10,2 min** — los mismos 170 y 10 que
+`tests/muerto-neteado.cjs` le exige a `fetchMonitorDayStats`. El bloque para repetirlo está
+comentado al final de `sql/gv_monitor_horas_operario_v2117.sql`.
+
+⚠ **El tiempo se acredita UNA vez por tanda** (`group by legajo, tanda` en los CTE `pick` y
+`arm`): una tanda cerrada dos veces por error no puede contar las horas dos veces. Es la misma
+corrección que la v12.97 del monitor grande.
+
+⚠ **`LT` no entra**, y los legajos `0` y `1` tampoco. Las duraciones fuera de `(0, 24 h)` se
+descartan: un toggle que quedó abierto de un día para otro y lo cerró el autocierre no es trabajo.
+
+⚠ **v21.21 — un cierre que CRUZA LA MEDIANOCHE se calcula con la regla del MONITOR GRANDE**
+(`computeClosureDur`, decisión de Thomas el 22/09 para que las dos pantallas den lo mismo): tramo
+del día de apertura (de la apertura al `FJ` real de ese día, o a la hora de salida del empleado) +
+una jornada completa por cada día hábil del medio + tramo del día de cierre (desde la fichada real,
+o la hora de entrada). Los feriados son la **copia de `FERIADOS_AR` de `index.html`**, no
+`GV_Dias_No_Habiles`.
+
+⚠ **Y desapareció el recorte por «arranque»** que traía la v21.17: además de perder ese tramo, se
+comía el primer `MG` del día — un MG **no tiene fila de apertura** (desde la v7.68 emite una sola
+fila con la duración adentro), así que el recorte le cortaba lo anterior al primer evento. Era la
+diferencia del legajo 94: 2,63 contra 2,33.
+
+⚠ **Los tiempos muertos se MERGEAN antes de restar.** Un `PB` adentro de un `Limp` se restaba dos
+veces: medido el 15/09 con el legajo 277, 3 minutos. Es lo que hace `deadByLeg` en `index.html`.
+
+✅ **Verificado: día 15/09, 5 operarios × 6 números, coinciden todos** — `tests/mon-vs-vista.cjs`,
+que corre en la suite y compara el monitor grande contra esta función congelada en
+`tests/tools/vista-15.json`.
+
+⚠⚠ **Los baldes PUEDEN SOLAPARSE y su suma pasarse de `hs_total`, y no es un error.** `CR` y `RR`
+son `SURVIVING_TOGGLES`: quedan abiertos mientras el operario hace otra cosa. Medido el 22/09 con
+el legajo **104** — `RR` de 08:42 a 11:43 corriendo en paralelo con un `RT`, un `AT` y dos `MG` —:
+**8,62 h de baldes contra 6,03 h de jornada.** Por eso el front saca el **«% productivas» sobre el
+tiempo MEDIDO** (`prod + mov + no prod`) y **no sobre la jornada**, que daría más de 100 % y nadie
+le creería.
+
+⚠ **Medido con `set local role anon`** antes de darla por buena: anon ve **las mismas 3 filas**
+que `postgres`. Es la trampa de la v20.45 — una vista con `security_invoker` sobre una tabla con
+RLS **no da error cuando el lector no tiene acceso: devuelve menos filas**.
+
+⚠ **Los patrones de los centinelas van como los NORMALIZA `pg_get_viewdef`**, no como se tipearon:
+un `in ('MG','RT',…)` se guarda como `= ANY (ARRAY['MG'::text, …])`. Escritos "como uno los
+escribió", los 3 centinelas arrancaron **en rojo el día que se crearon** — pasó, y se corrigió
+mirando el `viewdef` real.
+
+**Chequeo:**
+
+```sql
+select * from public.gv_reglas_perdidas;            -- vacía = todo bien
+select * from public.gv_monitor_horas_operario;     -- las horas de hoy
+```
+
+**Rollback:** `drop view public.gv_monitor_horas_operario;` +
+`delete from public."GV_Reglas_Centinela" where objeto = 'gv_monitor_horas_operario';`
+(el front de la TV lo lee con `.catch()`: sin la vista, el panel queda vacío y el resto del
+tablero se dibuja igual). `sql/gv_monitor_horas_operario_v2117.sql`.
