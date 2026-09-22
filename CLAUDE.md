@@ -2060,6 +2060,62 @@ libro y que el stock total tapaba. El `greatest(0, …)` lo contiene. **No se to
 **Chequeo:** `select * from public.gv_reglas_perdidas;` — el centinela `COALESCE\(s\.fin_dep`
 vive ahí. `sql/gv_generador_oc_stock_disponible_v1985.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-22, v21.13): la góndola es de 4 filas — **A y P son las únicas de 5**
+
+**Luis, textual:** *"solo las góndolas A y P son de 5 filas, el resto está organizado en filas de
+a 4… que por ejemplo ahí las H las muestre de a 4 filas y no 5"*.
+
+El Mapa de góndolas dibujaba **todas** con módulos de 5 (`PMAP_ALTO = 5`), así que la H salía en
+**12 columnas de 5** cuando en el depósito son **15 de 4**: la celda que el operario veía arriba a
+la izquierda no era la que tiene enfrente.
+
+Hoy la altura la da `pmapAlto(g)`: **`PMAP_ALTO_X = { A: 5, P: 5 }`**, default **4**. Al agregar
+una góndola de 5 filas va ahí, no se toca el default.
+
+**Y la numeración cierra con eso** (medido el 22/09 sobre `gv_planimetria_celda`): cada góndola
+tiene su `celda` corrida de 1 a N sin huecos y **N es divisible por SU altura** —
+`A = 85 = 17×5`, `P = 40 = 8×5`, `B/D/F/H/J/L/M/Ñ = 60 = 15×4`, `C/E/G/I = 20 = 5×4` —, así que
+el corte cae siempre donde tiene que caer. `Y` y `Z` tienen **una celda suelta cada una** (Y29,
+Z07) y van por el default.
+
+**Chequeo:** `node tests/pmap-gondolas.cjs` — verifica que A corta en `1–5` y F en `1–4`, y que
+F13 queda **abajo de la 4.ª columna**, no arriba de la 3.ª. Verificado que falla con el 5 fijo.
+
+## ⚠ REGLA (Luis, 2026-09-22, v21.13): generar las OC a mano MUEVE el ciclo automático
+
+**Luis, textual:** *"OCs. Generación manual. Si se generan manualmente, que consulte cuándo
+retomar el ciclo de generación automática en ese momento."*
+
+El cron **50** generaba todos los miércoles y su único guard era *"¿ya hay OC de HOY?"*: una
+corrida manual del lunes **no frenaba la del miércoles**, que salía dos días después.
+
+Ahora el ciclo tiene un **ancla**, `GV_OC_Auto.proxima_auto`, y el cron corre **todos los días**
+llamando a **`gv_oc_auto_corrida()`**:
+
+| situación | qué hace |
+|---|---|
+| `hoy < ancla` | `pospuesta_hasta:<fecha>` — no genera |
+| `hoy >= ancla` | genera y adelanta el ancla a `hoy + cadencia_dias` (7) |
+| ancla en **NULL** | ciclo histórico: **sólo miércoles** (es el fallback, del backend y del contador) |
+
+Al generar a mano, la pantalla pregunta y escribe el ancla con **`gv_oc_auto_programar(fecha,
+motivo)`** (supervisor adentro de la RPC). **La fecha puede ser cualquier día**, no sólo
+miércoles: el `schedule` ya no decide nada, decide el ancla.
+
+⚠ **`generar_ocs_automaticas(boolean)` NO SE TOCÓ**: el ciclo vive en el envoltorio, así que otra
+sesión puede seguir editando esa función sin pisar la regla.
+
+⚠ **El ancla avanza también con `sin_items` y `ya_hay_del_dia`** (el turno de la semana ya se
+consumió) y **no avanza con `error:`**, para que una caída se reintente sola al día siguiente.
+
+⚠ **El jobname sigue diciendo `ocs-auto-miercoles` y ya no es cierto**: `update cron.job` da
+`permission denied for table job` y `cron.alter_job` no tiene `job_name`.
+
+**Chequeo:** `select * from public."GV_OC_Auto";` · `select * from public.gv_reglas_perdidas;` ·
+`node tests/oc-auto-ciclo.cjs`. `sql/gv_oc_auto_ciclo_v2113.sql`, §3.mk.
+**Rollback, una línea:**
+`select cron.alter_job(50, schedule := '0 10 * * 3', command := 'select public.generar_ocs_automaticas()');`
+
 ## ⚠ PROTOCOLO: Backend vs Front-end — decidir y avisar (ya NO se pregunta)
 
 **Cuando alguien pide cambiar lógica** (normalización de códigos, cálculos, filtros,

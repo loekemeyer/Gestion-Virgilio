@@ -3,7 +3,8 @@
 
    Lo que se verifica, que es lo que el dibujo tiene que respetar sí o sí:
    (a) la celda de ARRIBA de cada columna es la de número más alto (a5 … a1) y las
-       columnas cortan de a 5, que es como está armado el módulo de góndola;
+       columnas cortan a la altura del módulo — **5 en A y P, 4 en todas las demás**
+       (Luis, 2026-09-22; antes eran 5 para todas y la H salía de a 5);
    (b) cada celda muestra el código y su capacidad en cajas;
    (c) una celda sin nadie dice "libre" y una sin capacidad cargada avisa (s/cap);
    (d) buscar un código NO filtra: resalta, y salta a la góndola que lo tiene;
@@ -62,6 +63,17 @@ const FILAS = [
     o.col2sec = [...cols[1].querySelectorAll(".pmap-cell")].filter((c) => c.style.visibility !== "hidden")
       .map((c) => (c.querySelector(".pmap-sec") || {}).textContent);
     o.head = document.querySelector("#pmapGrid .pmap-head").textContent;
+
+    // v21.13 — la altura del módulo NO es la misma en todas: A y P van de a 5, el resto de a 4.
+    o.aPie1 = (document.querySelector("#pmapGrid .pmap-colft") || {}).textContent;
+    pmapGo("F");
+    const fcols = [...document.querySelectorAll("#pmapGrid .pmap-col")];
+    o.fCols = fcols.length;
+    o.fPies = fcols.map((c) => (c.querySelector(".pmap-colft") || {}).textContent);
+    o.fSecs = fcols.map((c) => [...c.querySelectorAll(".pmap-cell")]
+      .filter((x) => x.style.visibility !== "hidden")
+      .map((x) => (x.querySelector(".pmap-sec") || {}).textContent).join("+"));
+    pmapGo("A");
 
     // buscar salta de góndola y resalta, sin filtrar
     pmapBuscar("438E");
@@ -138,6 +150,12 @@ const FILAS = [
   // (a) la de arriba es la 5 y la de abajo la 1
   eq(out.col1.map((c) => c.sec).join(","), "A05,A04,A03,A02,A01", "orden de la columna (arriba la 5)");
   eq(out.col2sec.join(","), "A06", "segunda columna arranca en la 6");
+
+  // (a2) v21.13 — A es de 5 filas; F (como todas menos A y P) es de 4
+  eq(out.aPie1, "1\u20135", "la góndola A corta de a 5");
+  eq(out.fPies[0], "1\u20134", "la góndola F corta de a 4");
+  eq(out.fCols, 4, "F con celdas hasta la 13 son 4 columnas de a 4 (no 3 de a 5)");
+  eq(out.fSecs.join(","), ",,F12,F13", "F12 arriba de la 3ª columna (9–12) y F13 abajo de la 4ª (13–16)");
 
   // (b) código + capacidad
   const a05 = out.col1[0], a01 = out.col1[4];
