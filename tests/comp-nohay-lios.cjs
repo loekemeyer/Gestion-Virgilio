@@ -1,4 +1,4 @@
-/* v20.97 (Luis, 2026-09-22) — «No hay más» desde la pantalla de LÍOS.
+/* v21.00 (Luis, 2026-09-22) — «No hay más» desde la pantalla de LÍOS.
 
    Hasta hoy el armador contaba caja por caja en Líos pero sólo podía contar HASTA CERO: la
    única salida para "hay menos de lo que dice el picking" estaba en Separar, una pantalla
