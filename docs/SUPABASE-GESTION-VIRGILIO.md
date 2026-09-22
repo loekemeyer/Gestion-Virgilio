@@ -28448,3 +28448,74 @@ Los dos tests **muerden**: sin el bloque del tope, el caso de la fuga escribe 30
 pickeadas; sin el chequeo de fecha, el armado del 17 vuelve a trabar el del 21.
 
 `sql/gv_isis_sin_tanda_freno_v2091.sql`.
+## §3.lx — v20.92: el retenido no vuelve a una tanda de OTRO CAMIÓN
+
+**Problema 489**, detectado el 22/09 mirando por qué el badge de la PPP seguía en 2.
+
+`gv_ppp_web_retenido` decidía si un pedido retenido vuelve a su tanda previa mirando **sólo el
+ESTADO** de esa tanda (v20.56: pickeada / armada / facturada / salió) y el código reservado
+(v20.60). **No miraba la zona.**
+
+| | zona | camión |
+|---|---|---|
+| LK 1448 (Silvano, 4282) — NP LK 0094/0095 | Zona 6 - GBA Norte | **GBA Norte** |
+| su tanda previa **D69H** | Zona 2 - CABA Centro | **Capital** |
+
+El chip del badge decía textual *"esa tanda sale el 23/09 y no se empezó: **vuelve ahí**"*. El
+supervisor que siguiera ese consejo partía la tanda en dos camiones y ponía
+`gv_ppp_tanda_camion_mezclado` en rojo — la regla de Luis de la v18.87 (*la tanda de un cliente
+se parte por camión*). **Es el mismo hueco que la v20.56 tapó para el estado y dejó abierto para
+la zona.**
+
+### Qué se hizo
+
+- **`gv_ppp_web_retenido`**: estado nuevo **`otro camion`**, más dos columnas al final
+  (`camion_np`, `camion_tanda`). El corte va **después** de los estados que ya frenan y **antes**
+  de `sin empezar`: si la tanda ya está armada no vuelve por ese motivo y el camión no agrega nada.
+- **`gv_ppp_avisos_detalle`**: el chip lo dice y nombra los dos camiones —
+  *"⚠ esa tanda va en el camión Capital y este pedido en el de GBA Norte: NO vuelve ahí, va a una
+  tanda nueva"*.
+
+⚠ **Una tanda YA MEZCLADA también sale `otro camion`**, porque `camion_tanda` queda
+`Capital + GBA Norte` y nunca coincide. Es lo correcto: no se le suma nada a una tanda que ya
+está mal. Mismo criterio que `gv_ppp_web_tanda_abierta_cliente` (v18.87).
+
+⚠ **El corte es la ETIQUETA de `gv_ppp_web_camion`**, no el número de zona: una tanda de CABA
+mezcla Zona 1+2 a propósito y va en el mismo camión.
+
+⚠ **La firma es `gv_ppp_web_camion(text, text)`, no `(text, date)`.** El primer intento falló con
+`42883`; el segundo argumento es texto.
+
+### Cómo se verificó
+
+- Como `anon`: 4 filas de retenido, 2 de detalle, el texto completo. Idéntico a `postgres`.
+- Rompiéndolo en transacción abortada: sin la rama del camión, `gv_reglas_perdidas` marca 3 filas;
+  con el rollback vuelve a 0.
+- `tests/apr-retenido-camion.cjs`, probado al revés (con el consejo viejo en el mock, falla por
+  los cuatro asserts).
+
+**Chequeo:** `select np_label, camion_np, camion_tanda, tanda_estado from
+public.gv_ppp_web_retenido;` · `sql/gv_retenido_camion_v2092.sql`.
+
+### Lo operativo del mismo día (22/09)
+
+Thomas: *"dale a todas"*. Se programó, con backup en
+`zz_backups."GV_Backup_prog_22sep_v2092"` y `..."GV_Backup_retenido_22sep_v2092"`:
+
+| pedido | qué se hizo | tanda | día | camión |
+|---|---|---|---|---|
+| **CH 218** Ierakuin | tanda nueva (E26B ya no existía) | **E71A** | lun 28/09 | Capital |
+| **LK 1448** Silvano | tanda nueva (D69H es de otro camión) | **E72A** | lun 28/09 | GBA Norte |
+| **LK 1487** Olímpico + **LK 1489** Max Lim | el camión GBA Sur se corrió del 01/10 al 29/09 | E59A / E59B | mar 29/09 | GBA Sur |
+
+`GV_PPP_Web_Retenido` quedó **vacía** y los once centinelas en cero.
+
+⚠⚠ **Dos consecuencias aceptadas, no bugs — las dos son la válvula (5) de Luis:**
+
+1. **El lunes 28 quedó con TRES camiones** (Capital, GBA Norte, GBA Oeste) contra el tope de 2.
+   Lo empujó Silvano al fundar GBA Norte. Se lo puso ahí porque el 28 es **el día que respeta el
+   tope de 10 días hábiles** (pedido el 15/09): las reglas (1) y (4) chocan y ganó la (4). El
+   miércoles 23 ya tenía 3 camiones de antes, no es de este cambio.
+2. **El 28 queda en 5,414 m³ y el 29 en 7,657 m³**, contra un cupo de 4,30. Adelantar Olímpico y
+   Max Lim al 29 fue decisión de Thomas sabiendo el número: **hace falta sumar gente al depósito
+   esos dos días**, o alguno se reprograma para atrás.
