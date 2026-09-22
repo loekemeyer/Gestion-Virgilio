@@ -75,12 +75,18 @@ header{display:flex;align-items:center;gap:1.4vw;flex:0 0 auto}
 .prog-txt{font-size:1.8vh;font-weight:900;color:#e2e8f0;white-space:nowrap;font-variant-numeric:tabular-nums}
 
 /* ── Grilla principal ─────────────────────────────────────────────────── */
-main{flex:1;display:grid;grid-template-columns:1.55fr 1fr;gap:1vw;min-height:0}
+/* v21.17 — TRES columnas. Con la tabla de operarios adentro, las dos de antes
+   dejaban "Total por día" en 4 filas y el desglose por camión se colapsaba: en
+   una TV 16:9 sobra ancho y falta alto, así que el panel que no entraba a lo
+   alto se mueve a lo ancho. Abajo de 1500 px vuelve a dos columnas (la tercera
+   se apila bajo la segunda): en una pantalla angosta tres tablas no se leen. */
+main{flex:1;display:grid;grid-template-columns:1.85fr 1.05fr .72fr;gap:.8vw;min-height:0}
+main.angosto{grid-template-columns:1.55fr 1fr}
 .col{display:flex;flex-direction:column;gap:1vh;min-height:0;min-width:0}
 .card{background:#111c2f;border:1px solid #1e293b;border-radius:1vh;
   padding:.9vh 1vw;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .card-t{font-size:1.7vh;font-weight:900;color:#93c5fd;letter-spacing:.04em;
-  margin-bottom:.7vh;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  margin-bottom:.7vh;flex:0 0 auto;overflow:hidden;line-height:1.2}
 .card-t small{color:#64748b;font-weight:700}
 .grow{flex:1;min-height:0;overflow:hidden}
 
@@ -100,8 +106,16 @@ tr.salio-sinfc td{background:#2a1f45}
 .st-salio{font-size:2.1vh}
 .fc-salio{color:#c4b5fd}
 
+/* Separador de día. Reemplaza a la columna «Salida», que salió de la tabla
+   cuando entraron cliente, zona y demora: el boceto de Damián encabeza la
+   tabla con el día ("Miercoles 23/09") y la ventana son 2-3 días, así que cada
+   bloque lleva el suyo. */
+tr.dia td{background:#0e1830;color:#93c5fd;font-size:1.5vh;font-weight:900;
+  letter-spacing:.07em;text-transform:uppercase;padding:.35vh .5vw;
+  border-bottom:.2vh solid #1e293b}
+
 /* Tabla de tandas: el código de tanda es lo que se busca de lejos. */
-.t-tanda{font-weight:900;font-size:2.3vh;color:#f8fafc;letter-spacing:.03em}
+.t-tanda{font-weight:900;font-size:2.3vh;color:#f8fafc;letter-spacing:.03em;white-space:nowrap}
 .t-fe{color:#94a3b8;font-weight:800}
 /* Celda de estado: ✅ terminado · ◍ girando en curso · vacío sin actividad. */
 .st{display:inline-flex;align-items:center;gap:.35vw;justify-content:center;white-space:nowrap}
@@ -116,6 +130,46 @@ tr.salio-sinfc td{background:#2a1f45}
 .ini{background:#1e293b;color:#cbd5e1;border-radius:.5vh;padding:.1vh .5vh;
   font-size:1.5vh;font-weight:900;letter-spacing:.03em}
 .dur{font-size:1.4vh;font-weight:800;white-space:nowrap}
+
+/* ── Tabla de tandas: cliente, zona, demora y semáforo (v21.17, Damián) ──
+   El ancho se fija por columna: el nombre del cliente es lo único elástico, y
+   sin `table-layout:fixed` una razón social larga empuja el semáforo fuera de
+   la pantalla. */
+table.tandas{table-layout:fixed}
+.t-np{font-size:1.5vh;font-weight:800;color:#93c5fd;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.t-cli{font-size:1.75vh;font-weight:800;color:#e2e8f0;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.t-cli b{color:#64748b;font-weight:900;font-size:1.4vh}
+.t-zona{font-size:1.3vh;font-weight:800;color:#94a3b8;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.t-dias{font-weight:900;font-size:2vh}
+/* Semáforo: dos luces, picking y armado. Rojo = no empezó · ámbar = en curso ·
+   verde = terminado · violeta = abandonado (fichó salida sin cerrar). Son
+   círculos dibujados con CSS, NO emoji: los emoji los pinta la fuente del
+   televisor y cambian de un modelo a otro. */
+.sem{display:inline-flex;gap:.4vw;align-items:center;justify-content:center;white-space:nowrap}
+.sem i{width:1.7vh;height:1.7vh;border-radius:50%;display:inline-block;font-style:normal;flex:0 0 auto}
+.sem .s-no{background:#7f1d1d;box-shadow:inset 0 0 0 .2vh #dc2626}
+.sem .s-curso{background:#f59e0b;animation:pulso 1.4s ease-in-out infinite}
+.sem .s-ok{background:#16a34a}
+.sem .s-aband{background:#6d28d9;box-shadow:inset 0 0 0 .2vh #a78bfa}
+@keyframes pulso{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── Horas por operario (v21.17, Damián) ─────────────────────────────────
+   Las columnas salen de `gv_monitor_horas_operario`: la clasificación de qué
+   hora es productiva vive en el BACKEND, no acá. */
+table.ops th{font-size:1.25vh;letter-spacing:0;padding:.3vh .3vw;line-height:1.15;
+  white-space:normal;text-align:right}
+table.ops th:first-child{text-align:left}
+table.ops td{font-size:1.75vh;padding:.45vh .3vw;text-align:right}
+table.ops td:first-child{text-align:left;font-weight:900;color:#f8fafc;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.op-prod{color:#4ade80}
+.op-mov{color:#93c5fd}
+.op-no{color:#fbbf24}
+.op-tot{color:#f8fafc;font-weight:900}
+tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
 
 /* ── Panel "En este momento" ──────────────────────────────────────────── */
 .act{display:flex;align-items:center;gap:.7vw;padding:.55vh .2vw;
@@ -141,7 +195,7 @@ tr.salio-sinfc td{background:#2a1f45}
 .aviso-err{background:#450a0a;color:#fecaca;border:1px solid #991b1b}
 /* v20.20 — salió y sin factura: violeta, el mismo color que la columna Salió */
 .aviso-salio{background:#2e1065;color:#ddd6fe;border:1px solid #6d28d9}
-.t-salio{font-size:1.9vh}
+.t-salio{font-size:1.5vh;margin-left:.2vw}
 .vacio{color:#475569;font-size:1.9vh;font-weight:700;padding:1.5vh .5vw;text-align:center}
 .mas{color:#64748b;font-size:1.5vh;font-weight:800;padding:.5vh;text-align:center}
 
@@ -192,7 +246,7 @@ tr.salio-sinfc td{background:#2a1f45}
       </div>
     </div>
 
-    <div class="col">
+    <div class="col" id="col2">
       <div class="m3row">
         <div class="m3box">
           <div class="m3lab">Pickeado hoy</div>
@@ -203,15 +257,26 @@ tr.salio-sinfc td{background:#2a1f45}
           <div class="m3val" id="m3Arm">—<small> m³</small></div>
         </div>
       </div>
+      <!-- Horas por operario (v21.17, pedido de Damián via Marianela). La TV
+           NO tenía nada por operario: la tabla "Mts3 x Hora" del monitor grande
+           se había dejado afuera porque dependía de `computeClosureDur`. Ésta
+           no repite ese cálculo: lo lee ya resuelto del backend. -->
       <div class="card grow">
-        <div class="card-t" id="fcTit">Tandas a facturar</div>
+        <div class="card-t" id="opsTit">Operarios · horas de hoy</div>
+        <div class="grow" id="opsBox"></div>
+      </div>
+      <div class="avisos" id="avisos"></div>
+    </div>
+
+    <div class="col" id="col3">
+      <div class="card grow">
+        <div class="card-t" id="fcTit">A facturar</div>
         <div class="grow" id="fcBox"></div>
       </div>
       <div class="card grow">
         <div class="card-t">Total por día</div>
         <div class="grow" id="totBox"></div>
       </div>
-      <div class="avisos" id="avisos"></div>
     </div>
   </main>
 </div>
@@ -238,6 +303,7 @@ var PROG_TTL        = 60 * 1000;        // la programación no cambia cada 15 s
 var FAC_TTL         = 30 * 1000;
 var DESPACHO_TTL    = 120 * 1000;       // la consulta más cara de todas
 var DESHECHAS_TTL   = 60 * 1000;
+var HORAS_TTL       = 60 * 1000;        // horas por operario: se mueven de a cierres
 var FETCH_TIMEOUT   = 20000;            // ≡ index.html SUPA_FETCH_TIMEOUT_MS
 var WATCHDOG_MS     = 10 * 60 * 1000;   // ≡ index.html MON_RELOAD_MS
 var RELOAD_CADA_MS  = 6 * 60 * 60 * 1000; // higiene: reload cada 6 h de madrugada
@@ -287,6 +353,25 @@ function esc(s) {
 }
 function el(id) { return document.getElementById(id); }
 function n1(x) { return (Math.round((Number(x) || 0) * 10) / 10).toFixed(1).replace(".", ","); }
+/* Horas con UNA decimal y coma, como el resto de los números de la casa. El 0
+   se escribe "—": en una pared un cero y un "no hizo nada" se leen igual, y el
+   guion no se confunde con un dato. */
+function nH(x) {
+  var v = Number(x) || 0;
+  return v > 0.049 ? n1(v) : "—";
+}
+/* Nombre para la tabla de operarios: nombre de pila + inicial del apellido.
+   "Farias Juan Hilario" → "Farias J." — el apellido va primero porque así
+   están cargados en `Empleados`. */
+function nombreCorto(nombre, legajo) {
+  /* Se saltean los pedazos sin letras: un nombre como "Entrevista / Prueba"
+     salía "Entrevista /." — la inicial era la barra. */
+  var p = String(nombre || "").trim().split(/\s+/)
+            .filter(function (x) { return /[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(x); });
+  if (!p.length) return "Leg " + legajo;
+  if (p.length === 1) return p[0];
+  return p[0] + " " + p[1].charAt(0).toUpperCase() + ".";
+}
 
 /* Día YYYY-MM-DD en hora de Buenos Aires, salga de donde salga el reloj de la
    TV. ≡ index.html isoToDayKey. Argentina no usa horario de verano: UTC-3 fijo. */
@@ -439,9 +524,9 @@ function cache(ttl, cargar) {
 var cargarProgramacion = cache(PROG_TTL, function () {
   return Promise.all([
     getAll("gv_ppp_programacion_diaria",
-      "select=tanda,np,m3,fecha_entrega&order=tanda.asc,np.asc"),
+      "select=tanda,np,m3,fecha_entrega,razon_social,zona,fecha_recep&order=tanda.asc,np.asc"),
     getAll("PPP_Web_Programacion",
-      "select=empresa,np,tanda,fecha_entrega,razon_social,m3,es_agregado,agregado_a_np" +
+      "select=empresa,np,tanda,fecha_entrega,razon_social,zona,fecha_recep,m3,es_agregado,agregado_a_np" +
       "&tanda=not.is.null&order=tanda.asc,np.asc").catch(function (e) {
         /* Aditivo: si la PPP web falla, las tandas de ISIS se muestran igual.
            ≡ index.html, que envuelve mergeMonitorPppWeb en try/catch. */
@@ -462,11 +547,11 @@ var cargarProgramacion = cache(PROG_TTL, function () {
       if (tanda) { display = tanda; key = tanda.toUpperCase(); }
       else if (feRaw) { display = "S/Tanda"; key = "S/TANDA__" + feRaw; }
       else continue;
-      if (!acc.has(key)) acc.set(key, { tanda: display, key: key, m3: 0,
-        fecha: fmtFecha(fe), fechaRaw: feRaw, nps: [], agregados: [] });
+      if (!acc.has(key)) acc.set(key, nuevaTanda(display, key, fe));
       var e1 = acc.get(key);
       e1.m3 += Number(r.m3) || 0;
       e1.nps.push(np);
+      sumarDestino(e1, r.razon_social, r.zona, r.fecha_recep);
     }
 
     for (var j = 0; j < web.length; j++) {
@@ -475,11 +560,11 @@ var cargarProgramacion = cache(PROG_TTL, function () {
       if (!t || !x.np) continue;
       var k2 = t.toUpperCase();
       var fe2 = String(x.fecha_entrega || "").trim();
-      if (!acc.has(k2)) acc.set(k2, { tanda: t, key: k2, m3: 0,
-        fecha: fmtFecha(fe2), fechaRaw: rawFecha(fe2), nps: [], agregados: [] });
+      if (!acc.has(k2)) acc.set(k2, nuevaTanda(t, k2, fe2));
       var e2 = acc.get(k2);
       e2.m3 += Number(x.m3) || 0;
       e2.nps.push(npLabel(x.empresa, x.np));
+      sumarDestino(e2, x.razon_social, x.zona, x.fecha_recep);
       /* Un AGREGADO es un pedido que el cliente sumó cuando su tanda ya estaba
          en la mesa. Si nadie lo ve, el camión sale sin eso: por eso se canta
          fuerte. ≡ index.html pwebAgregadoAviso. */
@@ -492,6 +577,122 @@ var cargarProgramacion = cache(PROG_TTL, function () {
     return acc;
   });
 });
+
+/* Una tanda del tablero. `clientes` y `zonas` son listas SIN repetidos: una
+   tanda puede llevar varios pedidos de varios clientes (E12R tenía 6 NP de 4
+   clientes el 22/09) y en la pared va UNA fila — pedido de Damián: "si hay
+   varias NP que aparezca en una sola fila y con el nombre resumido".
+   `recep` es la fecha del pedido MÁS VIEJO de la tanda: la demora de una tanda
+   es la del pedido que más esperó, no el promedio. */
+function nuevaTanda(display, key, fe) {
+  return { tanda: display, key: key, m3: 0, fecha: fmtFecha(fe), fechaRaw: rawFecha(fe),
+           nps: [], agregados: [], clientes: [], zonas: [], recep: "" };
+}
+function sumarDestino(e, rs, zona, recep) {
+  var c = String(rs == null ? "" : rs).trim();
+  if (c && e.clientes.indexOf(c) < 0) e.clientes.push(c);
+  var z = String(zona == null ? "" : zona).trim();
+  if (z && e.zonas.indexOf(z) < 0) e.zonas.push(z);
+  var r = rawFecha(recep);
+  if (r && (!e.recep || r < e.recep)) e.recep = r;
+}
+
+/* Nombre de cliente para una pared: se le sacan las formas societarias, que
+   ocupan lugar y no distinguen a nadie (hay 30 "S.R.L."), y se corta largo.
+   NO se abrevia el apellido: es lo único por lo que el supervisor lo busca. */
+function resumirCliente(nombre) {
+  var s = String(nombre || "").trim()
+    .replace(/\s*\((?:[^()]*)\)\s*$/, "")
+    .replace(/[\s,.-]*\b(S\.?\s?R\.?\s?L\.?|S\.?\s?A\.?\s?S?\.?|SACIFI?A?|SRL|SA)\b\.?\s*$/i, "")
+    .replace(/\s{2,}/g, " ").trim();
+  if (!s) return "";
+  return s.length > 20 ? s.slice(0, 19).trim() + "…" : s;
+}
+/* "Zona 3 - CABA Oeste" → "Z3 CO". La etiqueta larga no entraba en la columna
+   —"Z3 CABA Oe…" se cortaba por un carácter— y en una pared un texto cortado se
+   lee peor que uno corto. Thomas, 22/09: *"acorta"*.
+   La ciudad queda en la inicial (CABA → C, GBA → G) y el punto cardinal en la
+   suya: **Z3 CO** = Zona 3, CABA Oeste · **Z6 GN** = Zona 6, GBA Norte. El
+   número de zona, que es lo que se busca, queda entero y adelante.
+   "Retira" y los expresos NO se tocan: no son número de zona y el nombre ES el
+   dato. */
+var ZONA_CIUDAD = { CABA: "C", GBA: "G", CAPITAL: "C" };
+var ZONA_PUNTO  = { NORTE: "N", SUR: "S", ESTE: "E", OESTE: "O", CENTRO: "C" };
+function zonaCorta(zona) {
+  var s = String(zona || "").trim();
+  if (!s) return "";
+  var m = /^\s*Zona\s*(\d+)\s*(?:-\s*(.*))?$/i.exec(s);
+  if (!m) return s.length > 16 ? s.slice(0, 15).trim() + "…" : s;
+  var resto = (m[2] || "").trim();
+  if (!resto) return "Z" + m[1];
+  var partes = resto.toUpperCase().split(/\s+/).filter(Boolean);
+  var sigla = "";
+  for (var i = 0; i < partes.length; i++) {
+    /* Lo que no está en ninguna de las dos tablas se abrevia por su inicial:
+       una zona nueva se ve corta igual, no se cae al texto largo. */
+    sigla += ZONA_CIUDAD[partes[i]] || ZONA_PUNTO[partes[i]] || partes[i].charAt(0);
+  }
+  return "Z" + m[1] + " " + sigla;
+}
+
+/* Días HÁBILES entre la fecha del PEDIDO (`fecha_recep`) y la fecha en que
+   quedó PROGRAMADO (`fecha_entrega`) — Thomas, 22/09: *"fecha programacion -
+   fecha pedido"*. Es la demora con la que sale, no la que lleva acumulada: el
+   número no se mueve mientras la tanda espera. Se toma el pedido MÁS VIEJO de
+   la tanda, que es el que más esperó.
+   Es el número de la regla 4 de Luis: «los pedidos no pueden demorar más de 10
+   días hábiles en salir». Sábados, domingos y feriados no cuentan — ≡
+   index.html / durLaboralMs.
+   ⚠ Si la fecha de entrega ya pasó y la tanda sigue ahí, este número NO crece:
+   dice lo que se prometió, no lo que se está tardando. */
+function diasDemora(recepRaw, entregaRaw) {
+  if (!recepRaw || !entregaRaw) return null;
+  var ini = new Date(recepRaw + "T00:00:00-03:00").getTime();
+  var fin = new Date(entregaRaw + "T00:00:00-03:00").getTime();
+  if (!(fin > ini)) return 0;
+  /* Cada `t` cae a las 00:00 de Argentina, que en UTC son las 03:00 del MISMO
+     día (no hay horario de verano), así que `getUTCDay` da el día correcto sin
+     volver a pasar por `toLocaleString` — que es caro y esto corre por fila,
+     cada 15 s, en el SoC de un televisor. */
+  var n = 0, t;
+  for (t = ini + 86400000; t <= fin; t += 86400000) {
+    var d = new Date(t), wd = d.getUTCDay();
+    if (wd === 0 || wd === 6) continue;
+    if (FERIADOS[d.toISOString().slice(0, 10)]) continue;
+    n++;
+    if (n > 99) break;          // un pedido de hace medio año ya dice todo con 99
+  }
+  return n;
+}
+/* Tope de la regla de Luis. Se pone en ámbar antes de romperlo, no cuando ya
+   se rompió: a los 10 días ya es tarde para priorizarlo. */
+var DEMORA_TOPE = 10, DEMORA_AVISO = 7;
+function colorDemora(d) {
+  if (d == null) return "#475569";
+  if (d >= DEMORA_TOPE) return "#f87171";
+  if (d >= DEMORA_AVISO) return "#fbbf24";
+  return "#94a3b8";
+}
+
+/* Semáforo de la tanda: dos luces, picking y armado. Pedido de Damián: "lo
+   quiere ver como semáforo". No reemplaza el detalle — al lado siguen las
+   iniciales de quién la tiene y hace cuánto, que es lo que se acciona. */
+function luz(estado, aband) {
+  if (aband) return '<i class="s-aband" title="Abandonada"></i>';
+  if (estado === "done")  return '<i class="s-ok" title="Terminado"></i>';
+  if (estado === "curso") return '<i class="s-curso" title="En curso"></i>';
+  return '<i class="s-no" title="Sin empezar"></i>';
+}
+function semaforo(ev, nombres, horarios) {
+  var s = '<span class="sem">' +
+    luz(ev.picking, ev.pickAband) + luz(ev.armado, ev.armAband) + '</span>';
+  /* El detalle es de la fase que está EN CURSO; si las dos están quietas no
+     hay nada que agregar. El armado va primero: es la fase más tardía. */
+  var det = "";
+  if (ev.armado === "curso")       det = celdaEstado("curso", ev.armLegajo,  ev.armStart,  ev.armAband,  ev.armFj,  nombres, horarios);
+  else if (ev.picking === "curso") det = celdaEstado("curso", ev.pickLegajo, ev.pickStart, ev.pickAband, ev.pickFj, nombres, horarios);
+  return s + (det ? " " + det : "");
+}
 
 /* Estado de cada tanda. `gv_tanda_status` ya resuelve en el backend el último
    EP/TP y AP/TAP, el legajo, el arranque y si la fase quedó ABANDONADA (el
@@ -574,6 +775,18 @@ var cargarDeshechas = cache(DESHECHAS_TTL, function () {
     });
     return s;
   }).catch(function (e) { console.warn("[tv] deshechas:", e.message); return new Set(); });
+});
+
+/* Horas de hoy por operario, ya clasificadas por el backend
+   (`gv_monitor_horas_operario`, v21.17 — pedido de Damián). ⚠ La regla de qué
+   hora es productiva NO se duplica acá: si cambia, cambia en la vista y esta
+   pantalla y el monitor grande la heredan juntos. Best-effort: si falla, el
+   resto del tablero se dibuja igual. */
+var cargarHoras = cache(HORAS_TTL, function () {
+  return getAll("gv_monitor_horas_operario",
+    "select=legajo,nombre,tandas_pick,prom_hs_pick,tandas_arm,prom_hs_arm," +
+    "hs_prod,hs_mov,hs_noprod,hs_total,en_jornada")
+    .catch(function (e) { console.warn("[tv] horas:", e.message); return []; });
 });
 
 /* NP facturadas (con o sin cierre): el ✅ del panel de facturación. */
@@ -789,7 +1002,7 @@ function pintar(d) {
 
   var m3Pick = 0, m3Arm = 0;
   var fc = [], porDia = new Map(), agregados = [];
-  var filas = [], sinAct = 0, enVentana = 0, terminadas = 0;
+  var filas = [], sinAct = 0, enVentana = 0, terminadas = 0, diaEnCurso = "";
 
   tandas.forEach(function (t) {
     var v = t.v, ev = t.ev;
@@ -828,13 +1041,34 @@ function pintar(d) {
        picking o el armado. Va pegado al código y no en una columna propia para no confundirse con
        «Salida», que es la fecha de entrega. */
     var salioT = tandaSalio(v, d.despachadas);
+    /* Una fila por TANDA aunque lleve varios pedidos (Damián, 22/09). Las NP
+       se listan juntas y el cliente va resumido; si son de más de un cliente,
+       el primero + "+N" — el detalle completo no entra ni se lee de lejos. */
+    var npTxt = v.nps.length <= 2 ? v.nps.join(" · ")
+      : (v.nps.slice(0, 2).join(" · ") + " +" + (v.nps.length - 2));
+    var cliTxt = v.clientes.length
+      ? esc(resumirCliente(v.clientes[0])) +
+        (v.clientes.length > 1 ? ' <b>+' + (v.clientes.length - 1) + '</b>' : "")
+      : '<span style="color:#475569">—</span>';
+    var dias = diasDemora(v.recep, v.fechaRaw);
+    /* Encabezado del día. Las tandas vienen ordenadas por fecha de entrega, así
+       que alcanza con mirar cuándo cambia. */
+    if (v.fechaRaw !== diaEnCurso) {
+      diaEnCurso = v.fechaRaw;
+      filas.push('<tr class="dia"><td colspan="7">' +
+        esc(diaEtiqueta(v.fechaRaw) || "Sin fecha") + '</td></tr>');
+    }
     filas.push('<tr' + (enCurso ? ' class="curso"' : (salioT ? ' class="salio-sinfc"' : '')) + '>' +
       '<td class="t-tanda">' + esc(v.tanda) +
         (salioT ? ' <span class="t-salio" title="Ya se registró la carga al camión (CCN)">🚚</span>' : '') + '</td>' +
+      '<td class="t-np">' + esc(npTxt) + '</td>' +
+      '<td class="t-cli">' + cliTxt + '</td>' +
       '<td class="num">' + n1(v.m3) + '</td>' +
-      '<td class="cen t-fe">' + esc(v.fecha) + '</td>' +
-      '<td class="cen">' + celdaEstado(ev.picking, ev.pickLegajo, ev.pickStart, ev.pickAband, ev.pickFj, nombres, horarios) + '</td>' +
-      '<td class="cen">' + celdaEstado(ev.armado,  ev.armLegajo,  ev.armStart,  ev.armAband,  ev.armFj,  nombres, horarios) + '</td>' +
+      '<td class="cen t-dias" style="color:' + colorDemora(dias) + '">' +
+        (dias == null ? "—" : dias) + '</td>' +
+      '<td class="t-zona">' + esc(zonaCorta(v.zonas[0] || "")) +
+        (v.zonas.length > 1 ? ' <b style="color:#64748b">+' + (v.zonas.length - 1) + '</b>' : "") + '</td>' +
+      '<td class="cen">' + semaforo(ev, nombres, horarios) + '</td>' +
       '</tr>');
   });
 
@@ -855,12 +1089,19 @@ function pintar(d) {
   });
 
   // ── Tabla de tandas
-  var etiqueta = d.fechas.map(function (f) { return f.slice(8, 10) + "/" + f.slice(5, 7); }).join(", ") || "—";
+  /* Con el día de la semana escrito (Damián, 22/09: el boceto dice "Miercoles
+     23/09"). En una pared "Mié 23/09" se ubica de un vistazo; "23/09" obliga a
+     pensar qué día es hoy. */
+  var etiqueta = d.fechas.map(diaEtiqueta).join(" · ") || "—";
   el("tandasTit").innerHTML = "Tandas <small>· entrega " + esc(etiqueta) + "</small>";
   var topeT = cabenFilas("tandasBox", true);
   el("tandasBox").innerHTML = filas.length
-    ? '<table><thead><tr><th>Tanda</th><th class="num">M³</th><th class="cen">Salida</th>' +
-      '<th class="cen">Picking</th><th class="cen">Pedido separado</th></tr></thead><tbody>' +
+    ? '<table class="tandas"><colgroup><col style="width:12.5%"><col style="width:12.5%">' +
+      '<col><col style="width:6.5%"><col style="width:6%"><col style="width:15%">' +
+      '<col style="width:16.5%"></colgroup>' +
+      '<thead><tr><th>Tanda</th><th>N° Pedido</th><th>Cliente</th>' +
+      '<th class="num">M³</th><th class="cen" title="Días hábiles entre la fecha del pedido y la fecha para la que quedó programado">Días</th>' +
+      '<th>Zona</th><th class="cen">Progreso</th></tr></thead><tbody>' +
       filas.slice(0, topeT).join("") + '</tbody></table>' +
       (filas.length > topeT ? '<div class="mas">+ ' + (filas.length - topeT) + ' más</div>' : "")
     : '<div class="vacio">' + (tandas.length
@@ -906,7 +1147,7 @@ function pintar(d) {
 
   // ── A facturar
   var totFc = fc.reduce(function (s, x) { return s + (x.v.m3 || 0); }, 0);
-  el("fcTit").innerHTML = "Tandas a facturar <small>· " + n1(totFc) + " m³" +
+  el("fcTit").innerHTML = "A facturar <small>· " + n1(totFc) + " m³" +
     (fcSalidas ? " · <b class=\"fc-salio\">" + fcSalidas + (fcSalidas === 1 ? " ya salió" : " ya salieron") +
       " sin FC</b>" : "") + "</small>";
   if (fc.length) {
@@ -973,6 +1214,9 @@ function pintar(d) {
     el("totBox").innerHTML = '<div class="vacio">—</div>';
   }
 
+  // ── Operarios · horas de hoy (v21.17, Damián)
+  pintarHoras(d.horas);
+
   // ── En este momento
   var MAX_ACT = cabenFilas("actBox", false);
   var trabajando = d.actividad.filter(function (r) { return !r.idle; }).length;
@@ -1011,6 +1255,69 @@ function pintar(d) {
   el("meta").textContent = d.prog.size + " programadas · " + enCursoN + " en curso · " + fc.length + " a FC";
 }
 
+/* "2026-09-23" → "Mié 23/09". Los nombres van a mano y no por `toLocaleDateString`:
+   el televisor puede no tener el locale es-AR y devolver "Wed". */
+var DIA_NOMBRE = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+function diaEtiqueta(raw) {
+  if (!raw) return "";
+  var wd = new Date(raw + "T00:00:00-03:00").getUTCDay();
+  return DIA_NOMBRE[wd] + " " + raw.slice(8, 10) + "/" + raw.slice(5, 7);
+}
+
+/* Horas de hoy por operario. Las cuatro columnas de la derecha son la pregunta
+   de Damián: cuánto tardó en promedio cada tanda, y en qué se fue el resto del
+   día. El criterio de qué es productivo está en `gv_monitor_horas_operario`. */
+function pintarHoras(filas) {
+  filas = filas || [];
+  if (!filas.length) {
+    el("opsTit").innerHTML = "Operarios · horas de hoy";
+    el("opsBox").innerHTML = '<div class="vacio">Todavía nadie cerró una tarea</div>';
+    return;
+  }
+  var tope = cabenFilas("opsBox", true);
+  /* La fila de totales ocupa lugar: se le descuenta al tope para no cortar un
+     operario por mostrarla. */
+  var maxOp = Math.max(1, tope - 1);
+  var tProd = 0, tMov = 0, tNo = 0, tTot = 0;
+  filas.forEach(function (o) {
+    tProd += Number(o.hs_prod) || 0;  tMov += Number(o.hs_mov) || 0;
+    tNo   += Number(o.hs_noprod) || 0; tTot += Number(o.hs_total) || 0;
+  });
+  var cuerpo = filas.slice(0, maxOp).map(function (o) {
+    return '<tr><td title="' + esc(o.nombre) + '">' +
+      esc(nombreCorto(o.nombre, o.legajo)) +
+      (o.en_jornada ? "" : ' <span style="color:#475569;font-weight:800">✓</span>') + '</td>' +
+      '<td>' + nH(o.prom_hs_pick) + '</td>' +
+      '<td>' + nH(o.prom_hs_arm) + '</td>' +
+      '<td class="op-prod">' + nH(o.hs_prod) + '</td>' +
+      '<td class="op-mov">' + nH(o.hs_mov) + '</td>' +
+      '<td class="op-no">' + nH(o.hs_noprod) + '</td>' +
+      '<td class="op-tot">' + nH(o.hs_total) + '</td></tr>';
+  }).join("");
+  var total = '<tr class="op-tot-row"><td>Total</td><td></td><td></td>' +
+    '<td class="op-prod">' + nH(tProd) + '</td>' +
+    '<td class="op-mov">' + nH(tMov) + '</td>' +
+    '<td class="op-no">' + nH(tNo) + '</td>' +
+    '<td class="op-tot">' + nH(tTot) + '</td></tr>';
+  /* ⚠ El % se saca sobre el tiempo MEDIDO (prod + mov + no prod), NO sobre la
+     jornada: `CR` y `RR` son toggles que quedan abiertos mientras el operario
+     hace otra cosa, así que la suma de los baldes puede pasarse del total de
+     horas del día (medido: 8,62 contra 6,03 en un caso real del 22/09). Contra
+     la jornada el número daría más de 100 % y nadie le creería. */
+  var medido = tProd + tMov + tNo;
+  var pct = medido > 0 ? Math.round(tProd * 100 / medido) : 0;
+  el("opsTit").innerHTML = "Operarios · horas de hoy <small>· " + filas.length +
+    " · " + pct + "% productivas</small>";
+  el("opsBox").innerHTML = '<table class="ops"><thead><tr><th>Operario</th>' +
+    '<th title="Promedio de horas por tanda pickeada">Prom hs<br>picking</th>' +
+    '<th title="Promedio de horas por tanda armada">Prom hs<br>armado</th>' +
+    '<th title="Picking + armado + carga camión + remitos">Hs<br>prod</th>' +
+    '<th title="Guardado a góndola, recepción de mercadería e insumos">Hs<br>mov</th>' +
+    '<th title="Timbre, baño, limpieza, comida, conteo, permiso">Hs no<br>prod</th>' +
+    '<th>Total<br>hs</th></tr></thead><tbody>' + cuerpo + total + '</tbody></table>' +
+    (filas.length > maxOp ? '<div class="mas">+ ' + (filas.length - maxOp) + ' más</div>' : "");
+}
+
 /* v20.21 (Thomas) — ¿esta tanda YA SALIÓ? Es la misma pregunta que contesta la
    columna SALIÓ de la PPP (≡ index.html _pgaSalio) y la misma respuesta:
    **sólo cuenta la carga al camión registrada** (evento CCN, ya descontado el
@@ -1045,10 +1352,11 @@ var ultimoOk = 0, fallos = 0, arrancado = false;
 function ciclo() {
   return Promise.all([
     cargarProgramacion(), cargarEventosHoy(), cargarEmpleados(),
-    cargarFichadasHoy(), cargarDeshechas(), cargarFacturadas(), cargarDespachadas()
+    cargarFichadasHoy(), cargarDeshechas(), cargarFacturadas(), cargarDespachadas(),
+    cargarHoras()
   ]).then(function (r) {
     var prog = r[0], eventos = r[1], empleados = r[2], fichadas = r[3],
-        deshechas = r[4], facturadas = r[5], despachadas = r[6];
+        deshechas = r[4], facturadas = r[5], despachadas = r[6], horas = r[7];
     var hoy = hoyKey();
     var fechas = fechasVentana(prog, VENTANA_DIAS);
 
@@ -1088,7 +1396,8 @@ function ciclo() {
         prog: prog, status: status, fechas: fechas,
         actividad: actividadActual(eventos, hoy, fjHoy, fichados),
         alertas: Array.from(alertas).sort(),
-        empleados: empleados, facturadas: facturadas, despachadas: despachadas
+        empleados: empleados, facturadas: facturadas, despachadas: despachadas,
+        horas: horas
       });
 
       ultimoOk = Date.now(); fallos = 0;
@@ -1171,6 +1480,20 @@ function reloj() {
      los paneles arrancan en `display:none` miden 0 de alto y `cabenFilas`
      concluye que entra una sola fila. */
   el("app").classList.remove("hide");
+
+  /* Pantalla angosta (un box de 1280 o el de 979 px): tres tablas no se leen,
+     así que se vuelve a DOS columnas y las dos tarjetas de la tercera se mudan
+     abajo de la de operarios. Se MUEVEN, no se esconden: «a facturar» y «total
+     por día» no pueden desaparecer por el ancho del televisor. Se hace una sola
+     vez, al arrancar: una TV no cambia de tamaño. */
+  if (window.innerWidth < 1500) {
+    var main = document.querySelector("main"), c3 = el("col3"), c2 = el("col2");
+    if (main && c3 && c2) {
+      while (c3.firstElementChild) c2.appendChild(c3.firstElementChild);
+      c3.parentNode.removeChild(c3);
+      main.classList.add("angosto");
+    }
+  }
   reloj();
   setInterval(reloj, 10000);
   ciclo();
