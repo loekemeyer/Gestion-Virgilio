@@ -3603,9 +3603,10 @@ que aborta todo (verificado: la fila encolada desapareció al revertir).
 `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
 `sql/gv_equivalencia_facturar_web_v2115.sql`.
 
-## ⚠ REGLA (Luis, 2026-09-22, v21.19): la OC va a LOG/ FABR y la mercadería la entrega PEDERNERA
+## ⚠⚠ REGLA (Luis, 2026-09-22, v21.20): a BLISTPACK, OSCAR y PEDERNERA **no se les manda OC**
 
-**Luis, textual:** *"544, 560, 800 son pedernera 100%, pero no se le manda la OC a pedernera, solo
+**Luis, textual:** *"a blistpack/oscar/pedernera no se le manda OC, porque ellos fabrican acorde
+a lo que le mandamos desde log/fabr"*. Y antes, sobre esos tres códigos: *"544, 560, 800 son pedernera 100%, pero no se le manda la OC a pedernera, solo
 se le manda a log. Pero la recepción de mercadería es mercadería de Pedernera"*.
 
 **Es el caso Oscar exactamente al revés**, y las dos puntas están bien: la orden se le emite a
@@ -3630,12 +3631,35 @@ que más pesa es el de Oscar (506: OC a **Oscar** por 2.178 cajas, recepción **
 2.449). También 510, 280, 557, 555, 758, 500, 654, 658 (Oscar → Log/ Fabr), 550 (Poly → Garcia),
 519 y 719 (Log/ Fabr → Lucho), 355 (Pettofrezza → Rafael / German).
 
-> **El arreglo NO es cambiar el proveedor de un lado ni del otro**, y menos el de `OC_Maximos`:
-> los dos datos son ciertos y describen cosas distintas — **a quién se le ordena** y **quién
-> entrega**. Falta la tercera pieza: un **alias de equivalencia** `(código, proveedor de la OC)
-> → quién la entrega`, que lea `gv_oc_recompute_recibido`. Con eso la OC se cierra sola, el aviso
-> de *"SIN OC generada"* deja de saltar y ninguna de las dos pantallas miente.
-> **PENDIENTE del dueño** (es dato real, no código): confirmar los 25 pares antes de cargarlos.
+> **Son dos datos distintos y los dos son ciertos:** quién **fabrica y entrega** (así se carga en
+> Recepción, y está bien) y a quién se le **emite la orden** (siempre `Log/ Fabr`, que es el que
+> les manda el material). **Ninguno se "corrige" con el otro** — y en particular `OC_Maximos` NO
+> se toca: su `proveedor` sigue diciendo quién fabrica, que es lo que el dueño pidió conservar el
+> 15/09 (*"dejalo ahí"*). Lo que faltaba es la pieza que los relaciona.
+
+**La pieza es `GV_OC_Fabrica_Para`** (fabricante → quién recibe la OC), con las tres filas que
+dictó Luis. Al 22/09 **el dato y el centinela están aplicados; las dos mitades del arreglo NO**
+— son dato real y las autoriza el dueño. Están escritas, con su medición, en
+`sql/gv_oc_fabrica_para_v2120.sql`:
+
+1. **que la OC salga a nombre de quién la recibe** — un solo lugar, `gv_oc_generar_pendientes`,
+   por donde escriben el generador manual **y** el automático (cron 50).
+2. **que la recepción del fabricante impute contra la OC de `Log/ Fabr`** — el mecanismo **ya
+   existe**: `gv_norm_prov_keys` devuelve un **array** de claves y `gv_prov_match` las compara
+   todas contra todas (así está resuelto hoy `pettofrezza → rafael`, hardcodeado adentro de dos
+   funciones). Se le suma esta tabla como fuente y ese alias se migra ahí.
+   ⚠ **Fusiona los dos nombres a efectos de imputación.** Riesgo medido: sólo **3 códigos** tienen
+   entregas de los dos por separado desde el 01/06 — 506 (Log/ Fabr 3.439 vs Blistpack 203), 659
+   (42 vs 8) y 764 (49 vs 8). ⚠ Y recalcula `cantidad_recibida` y `estado`: va con backup.
+
+⚠ **Hoy conviven las DOS configuraciones para el mismo fabricante**, y ése es el desorden de fondo:
+**544 y 560** tienen la OC a `Log/ Fabr` (bien) y **no imputan**; **115, 561, 800, 801 y 802** la
+tienen a `Pedernera` (mal) y **sí imputan**, por casualidad de nombres.
+
+**Chequeo:** `select * from public.gv_oc_proveedor_no_recibe_oc;` — vacía = todo emitido a quién
+corresponde. Al 22/09 marca **225 cajas en 12 líneas** por salir mal en la próxima corrida:
+Blistpack **177** (10 códigos, casi todos bombillas, más Manga Repostera) y Pedernera **48**
+(561 Pinza Larga y 801 Pinza Grande Alambre).
 
 ### ⚠ Lo que NO va: la excepción de la doble OC (v21.14, aplicada y revertida el mismo día)
 
