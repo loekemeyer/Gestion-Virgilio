@@ -3127,6 +3127,25 @@ perdió. Y `tests/pedidos-lectura-1vuelta.cjs`, que muerde por los dos lados (el
 código y el header que sale de verdad en la request).
 `sql/gv_base_pedidos_lectura_v2078.sql`, `sql/gv_pedidos_web_excluidos_v2078.sql`, §3.ls.
 
+## ⚠ REGLA (Luis, 2026-09-22, v20.95): un código BUSCADO se muestra aunque esté en 0
+
+**Luis, textual:** *"838E NO APARECE en la vista de stocks"*.
+
+La tabla de Stock esconde a propósito las filas que están en 0 en **todos** los sectores y sin
+pedidos — son ruido al mirar la tabla entera. Pero ese filtro (`_stkHasAny`) se aplicaba
+**también al buscar**, así que tipear el código entero no traía nada. Eran **46 códigos**, **21
+con proyección viva** (838E: capacidad 35, proyección 34,17 caj/mes, comprado por Log/ Fabr).
+
+> **Una fila que no sale no se distingue de un código que no existe.** El 0 es la respuesta
+> —*"no hay"*—, no un motivo para callarse.
+
+⚠ El comentario de arriba del filtro **ya decía** *"con búsqueda sí se muestran (para poder
+encontrarlos)"* y el código hacía lo contrario. Un comentario que contradice a su propio bloque
+es una señal, no un adorno: el que se equivocó casi siempre es el código.
+
+⚠ **Sin buscar el filtro SIGUE valiendo**, o vuelve el ruido de las filas todo-cero.
+`tests/stk-buscar-cero.cjs` muerde por los dos lados.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.88): cuando el registro y el PALLET no coinciden, manda el PALLET
 
 **Luis, textual:** *"Te estoy diciendo que el pedido está armado y se armó otra vez. Si registrás
