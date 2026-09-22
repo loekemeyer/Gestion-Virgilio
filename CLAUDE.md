@@ -3661,6 +3661,39 @@ corresponde. Al 22/09 marca **225 cajas en 12 líneas** por salir mal en la pró
 Blistpack **177** (10 códigos, casi todos bombillas, más Manga Repostera) y Pedernera **48**
 (561 Pinza Larga y 801 Pinza Grande Alambre).
 
+### ⚠⚠ Y EN LA PANTALLA DEL OPERARIO la OC va bajo el FABRICANTE, no bajo Log/ Fabr
+
+**Luis, textual:** *"en Virgilio los operarios deben aparecer la OC dentro de sus botones de
+prov/tall, no en log/fabr"*. Es la tercera capa, y es la que usan todos los días:
+
+| capa | quién va | dónde vive |
+|---|---|---|
+| **emisión** de la orden | `Log/ Fabr` | `Ordenes_Compra.proveedor` |
+| **entrega** física | el fabricante | `Entregas Tallerista Virgilio.Nombre_Tall` |
+| **botón de Recepción** (lo que ve el operario) | **el fabricante** | `oc_vigentes_por_proveedor(nombre)` |
+
+Medido el 22/09 llamando la RPC con cada nombre: **`Pedernera` devuelve CERO códigos** — el
+operario toca el botón del que le está entregando las cajas y no ve ninguna OC — mientras el
+**560**, que trae Pedernera, aparece bajo **`Log/ Fabr`**. `Blistpack` también da cero, y `Oscar`
+muestra 510 y 555, que en Recepción se cargan como Log/ Fabr (regla del 15/09). **Sin OC a la
+vista se pierde el control de cantidad**: `opState.ocOk` queda en false y el margen del +20 % no
+se exige.
+
+⚠⚠ **Y el arreglo NO puede derivarse de `OC_Maximos.proveedor`, porque ese campo está MEZCLADO.**
+De los 4 códigos que Pedernera entregó desde el 01/06 (115, 544, 560, 802 · 2.355 cajas), la
+config dice **Pedernera en 2 y `Log/ Fabr` en los otros 2** — o sea que a veces guarda al
+fabricante y a veces a quién se le emite. Una regla automática sobre ese campo mueve de botón
+**11 líneas de OC**, y la mayoría son config vieja y no esta regla: 515/615/635 (OC a Basconia,
+config Carlos E, 1.800 cajas), 222 y 910 (Maspoli → Pintos), 234 (Tierra Nativa → Log/ Fabr),
+618 (Paternal Goma / The Plast → Log/ Fabr), 725 (Basconia → Lucho).
+
+**Por eso la RPC NO se tocó**: primero hay que desempatar el dato. Lo que entregó cada uno desde
+el 01/06 es el único dato limpio — Pedernera 115/544/560/802, Blistpack 506, Oscar 659/763/764 —
+y contra eso, lo que falta es **corregir `OC_Maximos.proveedor` de 544 y 560 a `Pedernera`**. Con
+eso la regla queda sin listas: **el campo pasa a significar siempre "quién fabrica", el botón sale
+de ahí, y `GV_OC_Fabrica_Para` dice a nombre de quién se emite.** Es un `update` de dos filas y
+lo autoriza el dueño.
+
 ### ⚠ Lo que NO va: la excepción de la doble OC (v21.14, aplicada y revertida el mismo día)
 
 Una lectura anterior del pedido —*"deberían generar OCs por el total (100%) para fab y para
