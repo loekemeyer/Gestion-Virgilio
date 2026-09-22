@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.27"></script>
+<script type="module" src="recepcion.js?v=21.28"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.27";
+const APP_VERSION = "v21.28";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20106,16 +20106,20 @@ const RV_COLS = [
   { k: "sinReg", h: "Hs<br>S/Reg" },
 ];
 function openReporteVirgilio() {
-  _stkPopShell("📈 Reporte diario Virgilio", "stkPopBody");
+  // v21.28 — tarjeta ANCHA (1760): con 760 las 16 columnas quedaban cortadas y el cuadro
+  // se leía a medias, con scroll horizontal. El cuadro tiene que entrar entero.
+  _stkPopShell("📈 Reporte diario Virgilio", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   const _iso = function (d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  // v21.28 — arranca en HOY, no en ayer (pedido de Luis). El reporte de hoy es el que se
+  // mira mientras el deposito trabaja; ayer se elige a mano si hace falta.
   const hoy = new Date(), ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
   body.innerHTML =
     '<div class="stkpop-hint">Elegí un día y generá el reporte. Se arma en el momento como cuadro; <b>no manda WhatsApp</b> (el envío diario a Juan es aparte).<br>'
     + 'Las horas son opcionales: vacías miden la jornada entera (08:00 a 17:00); cargadas miden <b>sólo ese lapso</b> (ej. 13:00 a 16:30).</div>' +
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
     '<label style="font-weight:700;font-size:14px">Día:</label>' +
-    '<input type="date" id="rvFecha" value="' + _iso(ayer) + '" max="' + _iso(hoy) + '" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">' +
+    '<input type="date" id="rvFecha" value="' + _iso(hoy) + '" max="' + _iso(hoy) + '" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">' +
     '<label style="font-weight:700;font-size:14px">Desde:</label>' +
     '<input type="time" id="rvDesde" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px">' +
     '<label style="font-weight:700;font-size:14px">Hasta:</label>' +
@@ -20135,21 +20139,24 @@ function _rvBloqueHtml(b) {
   const sub = (b.subtitulo && b.subtitulo !== "(unico)") ? b.subtitulo : "";
   let h = "";
   if (sub) h += '<div style="font-size:16px;font-weight:800;color:#0f172a;margin:12px 0 6px">' + escapeHtml(sub) + '</div>';
+  // v21.28 — el cuadro entra entero: ancho por dato (table-layout:auto, sin width:100% que
+  // estire), padding mínimo y tipografía compacta. El overflow-x queda sólo de red para el
+  // celular; en el monitor no tiene que hacer falta tocarlo.
   h += '<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:6px">' +
-    '<table style="border-collapse:collapse;table-layout:auto;font-size:12.5px;background:#fff">';
+    '<table style="border-collapse:collapse;table-layout:auto;font-size:12px;background:#fff">';
   h += '<thead><tr>' + RV_COLS.map(function (c) {
     const al = c.name ? "left" : "right";
     const sticky = c.name ? "position:sticky;left:0;z-index:3;background:#f1f5f9;" : "";
-    return '<th style="' + sticky + 'padding:6px 9px;text-align:' + al + ';background:#f1f5f9;color:#475569;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;line-height:1.25;border-bottom:2px solid #cbd5e1;white-space:nowrap;position:sticky;top:0;">' + c.h + '</th>';
+    return '<th style="' + sticky + 'padding:4px 6px;text-align:' + al + ';background:#f1f5f9;color:#475569;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;line-height:1.25;border-bottom:2px solid #cbd5e1;white-space:nowrap;position:sticky;top:0;">' + c.h + '</th>';
   }).join("") + '</tr></thead><tbody>';
   h += filas.map(function (f) {
     return '<tr>' + RV_COLS.map(function (c) {
       const v = (f[c.k] != null && f[c.k] !== "") ? String(f[c.k]) : "-";
       if (c.name) {
-        return '<td style="position:sticky;left:0;z-index:1;background:#fff;padding:6px 10px;text-align:left;font-weight:700;color:#0f172a;white-space:nowrap;border-bottom:1px solid #eef2f6;box-shadow:1px 0 0 #e2e8f0;">' + escapeHtml(v) + '</td>';
+        return '<td style="position:sticky;left:0;z-index:1;background:#fff;padding:4px 8px;text-align:left;font-weight:700;color:#0f172a;white-space:nowrap;border-bottom:1px solid #eef2f6;box-shadow:1px 0 0 #e2e8f0;">' + escapeHtml(v) + '</td>';
       }
       const dim = (v === "-") ? "color:#cbd5e1;" : "color:#0f172a;";
-      return '<td style="padding:6px 9px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:1px solid #eef2f6;' + dim + '">' + escapeHtml(v) + '</td>';
+      return '<td style="padding:4px 6px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:1px solid #eef2f6;' + dim + '">' + escapeHtml(v) + '</td>';
     }).join("") + '</tr>';
   }).join("");
   h += '</tbody></table></div>';
