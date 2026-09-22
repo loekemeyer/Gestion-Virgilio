@@ -33,6 +33,8 @@ const ANCLA = mas(hoyArt, 3);
 
   const out = await p.evaluate(async (ancla) => {
     const o = {};
+    const hoyArtJs = () => new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 10);
+    const mas = (iso, n) => { const d = new Date(iso + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
     // (b) primero SIN ancla: tiene que hablar de un miércoles
     _ocgAuto = null;
     const sin = _ocgNextAuto();
@@ -86,6 +88,17 @@ const ANCLA = mas(hoyArt, 3);
     o.rpcBody = (rpc[rpc.length - 1] || {}).body || null;
     o.cierraAlGuardar = !document.getElementById("ocAutoOv").classList.contains("show");
 
+    // (e2) v21.15 — con el ancla PEGADA (hoy/mañana) el diálogo avisa que dejarlo así re-genera
+    _ocgAuto = { proxima: mas(hoyArtJs(), 1), cadencia: 7, motivo: "x", por: "y" };
+    ocAutoAbrir(5);
+    o.avisaPegada = /vuelve a generar TODO/i.test(document.getElementById("ocAutoOv").textContent);
+    o.escapeDiceElDia = /Dejarlo como est[áa][^]*se genera sola el/i.test(document.getElementById("ocAutoOv").textContent);
+    ocAutoCerrar();
+    _ocgAuto = { proxima: mas(hoyArtJs(), 30), cadencia: 7, motivo: "x", por: "y" };
+    ocAutoAbrir(5);
+    o.sinAvisoLejos = !/vuelve a generar TODO/i.test(document.getElementById("ocAutoOv").textContent);
+    ocAutoCerrar();
+
     // (e) "Dejarlo como está" no escribe
     const antes = rpc.length;
     ocAutoAbrir(3); ocAutoCerrar();
@@ -121,6 +134,9 @@ const ANCLA = mas(hoyArt, 3);
   eq(out.rpcBody && out.rpcBody.p_fecha, ANCLA, "manda la fecha elegida");
   if (!out.cierraAlGuardar) fail.push("el diálogo no se cierra al guardar");
   if (!out.dejarNoEscribe) fail.push('"Dejarlo como está" escribió igual');
+  if (!out.avisaPegada) fail.push("con el ancla en mañana, el diálogo NO avisa que igual se re-genera");
+  if (!out.escapeDiceElDia) fail.push('el botón de escape no dice qué día se genera sola si no se elige nada');
+  if (!out.sinAvisoLejos) fail.push("el aviso de ancla pegada sale con el ancla a 30 días (falso positivo)");
   if (!out.sinSesionNoEscribe) fail.push("sin sesión de Google escribe igual (o no avisa)");
 
   if (errs.length) fail.push("errores de página: " + errs.join(" | "));

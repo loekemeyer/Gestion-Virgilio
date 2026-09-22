@@ -2131,6 +2131,15 @@ consumió) y **no avanza con `error:`**, para que una caída se reintente sola a
 ⚠ **El jobname sigue diciendo `ocs-auto-miercoles` y ya no es cierto**: `update cron.job` da
 `permission denied for table job` y `cron.alter_job` no tiene `job_name`.
 
+⚠⚠ **Generar a mano NO mueve el ancla solo: la mueve el DIÁLOGO** (v21.15). El backend no puede
+adivinar cuándo se retoma, así que si el supervisor cierra con «Dejarlo como está», el ancla queda
+donde estaba — y si estaba en hoy o mañana, la corrida de las 07:00 **vuelve a generar todo**,
+porque el único guard propio de `generar_ocs_automaticas` es *"ya hay OC de HOY"* y lo de ayer no
+lo mira. Medido en transacción abortada: con OC del día anterior y el ancla en hoy, genera **150
+líneas**. Por eso el diálogo avisa en amarillo cuando el ancla está a un día o menos, y el botón
+de escape dice qué día sale si no se elige nada. **La decisión es del supervisor; lo que no puede
+es ser invisible.**
+
 **Chequeo:** `select * from public."GV_OC_Auto";` · `select * from public.gv_reglas_perdidas;` ·
 `node tests/oc-auto-ciclo.cjs`. `sql/gv_oc_auto_ciclo_v2114.sql`, §3.mk.
 **Rollback, una línea:**

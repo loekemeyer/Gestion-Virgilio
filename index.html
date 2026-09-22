@@ -17092,6 +17092,7 @@ const OC_AUTO_CSS = "#ocAutoOv{display:none;position:fixed;inset:0;z-index:1300;
   + "#ocAutoOv .oca-fecha{display:flex;gap:8px;align-items:center;flex-wrap:wrap}"
   + "#ocAutoOv input[type=date]{width:auto;margin:0;padding:8px 10px;font-size:15px;border:1px solid #cbd5e1;border-radius:8px}"
   + "#ocAutoOv .oca-hoy{font-size:12.5px;color:#64748b}"
+  + "#ocAutoOv .oca-ya{font-size:13.5px;font-weight:700;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:9px;padding:9px 11px}"
   + "#ocAutoOv .oca-msg{font-size:13px;color:#b91c1c;font-weight:700}"
   + "#ocAutoOv .oca-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:12px 16px;border-top:1px solid #e2e8f0}"
   + "#ocAutoOv .oca-btn{width:auto;margin:0;padding:9px 16px;border-radius:9px;font-size:14.5px;font-weight:700;border:1px solid #cbd5e1;background:#f1f5f9;color:#0f172a;cursor:pointer}"
@@ -17106,6 +17107,13 @@ function ocAutoAbrir(nLineas) {
   if (!ov) { ov = document.createElement("div"); ov.id = "ocAutoOv"; document.body.appendChild(ov); }
   ov.classList.add("show");
   _ocAutoRender();
+}
+/* v21.15 — ¿el ancla está tan cerca que "dejarlo como está" vuelve a generar enseguida?
+   Hoy o mañana: la corrida de las 07:00 no mira lo que se generó AYER (su único guard propio es
+   "ya hay OC de HOY"), así que saldría el juego completo de nuevo. */
+function _ocAutoAnclaPegada() {
+  if (!_ocAuto || !_ocgAuto || !_ocgAuto.proxima) return false;
+  return _ocgAuto.proxima <= _ocgSumarDias(_ocAuto.hoy, 1);
 }
 function ocAutoCerrar() { const ov = document.getElementById("ocAutoOv"); if (ov) ov.classList.remove("show"); _ocAuto = null; }
 function ocAutoSetFecha(v) { if (!_ocAuto) return; _ocAuto.fecha = String(v || "").slice(0, 10); _ocAuto.msg = ""; _ocAutoRender(); }
@@ -17122,6 +17130,12 @@ function _ocAutoRender() {
   let h = '<div class="oca-box"><div class="oca-head">✓ Generadas ' + _ocAuto.n + ' línea(s) de OC</div><div class="oca-body">';
   h += '<div>Las acabás de generar <b>a mano</b>. ¿Cuándo querés que vuelva a generarse <b>sola</b>?</div>';
   if (ancla) h += '<div class="oca-hoy">Hoy el ciclo la tiene para el <b>' + escapeHtml(ancla) + '</b>' + (_ocgAuto && _ocgAuto.motivo ? ' (' + escapeHtml(String(_ocgAuto.motivo)) + ')' : '') + '.</div>';
+  // v21.15 — el aviso que faltaba: si el ancla es HOY o MAÑANA, no elegir nada es volver a generar
+  // enseguida (justo lo que la v21.14 vino a evitar). El diálogo lo dice, no lo decide por él.
+  if (_ocAutoAnclaPegada()) {
+    h += '<div class="oca-ya">⚠ Si no elegís un día, la automática vuelve a generar TODO el ' +
+         escapeHtml(_ocgFechaTxt(_ocgAuto.proxima)) + ' a las 07:00 — o sea, de nuevo lo que acabás de generar.</div>';
+  }
   h += '<div class="oca-chips">';
   _ocAutoOpciones().forEach(function (o) {
     h += '<button class="oca-chip' + (_ocAuto.fecha === o.f ? " on" : "") + '" onclick="ocAutoSetFecha(' + JSON.stringify(o.f).replace(/"/g, "&quot;") + ')">' + escapeHtml(o.t) + ' · ' + escapeHtml(_ocgFechaTxt(o.f)) + '</button>';
@@ -17131,7 +17145,9 @@ function _ocAutoRender() {
   h += '<div class="oca-hoy">Se genera a las <b>07:00</b> de ese día. Puede ser cualquier día, no sólo miércoles.</div>';
   if (_ocAuto.msg) h += '<div class="oca-msg">' + escapeHtml(_ocAuto.msg) + '</div>';
   h += '</div><div class="oca-foot">';
-  h += '<button class="oca-btn" onclick="ocAutoCerrar()"' + (_ocAuto.guardando ? " disabled" : "") + '>Dejarlo como está</button>';
+  const anclaTxt = (_ocgAuto && _ocgAuto.proxima) ? _ocgFechaTxt(_ocgAuto.proxima) : "";
+  h += '<button class="oca-btn" onclick="ocAutoCerrar()"' + (_ocAuto.guardando ? " disabled" : "") + '>Dejarlo como está' +
+       (anclaTxt ? ' <span style="font-weight:600;opacity:.75">(se genera sola el ' + escapeHtml(anclaTxt) + ')</span>' : '') + '</button>';
   h += '<button class="oca-btn ok" onclick="ocAutoGuardar()"' + (_ocAuto.guardando ? " disabled" : "") + '>' + (_ocAuto.guardando ? "Guardando…" : "✓ Retomar ese día") + '</button>';
   h += '</div></div>';
   ov.innerHTML = h;
