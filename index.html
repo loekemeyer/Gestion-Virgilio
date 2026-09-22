@@ -15140,7 +15140,7 @@ function _stkSaldosFromView(rows) {
     // lo resuelve el backend; acá se respeta. El filtro exige además saldo y
     // demanda en 0 para no esconder nunca algo con stock o pedidos reales.
     if (r.visible_en_stock === false && !(Number(r.stock_total) || 0) && !(Number(r.cajas_pedidas) || 0)) return;
-    m[k] = { cod: k, desc: r.descripcion || "", linea: r.linea || "", terminado: Number(r.terminado) || 0, excedente: Number(r.excedente) || 0, separar_pedidos: Number(r.separar_pedidos) || 0, a_facturar: Number(r.a_facturar) || 0, a_guardar: Number(r.a_guardar) || 0, racks: Number(r.racks) || 0, racks_ch: Number(r.racks_ch) || 0, para_envasar: Number(r.para_envasar) || 0, insumos: Number(r.insumos_dep) || 0, _uni: "", _ubi: "" };
+    m[k] = { cod: k, desc: r.descripcion || "", linea: r.linea || "", terminado: Number(r.terminado) || 0, excedente: Number(r.excedente) || 0, separar_pedidos: Number(r.separar_pedidos) || 0, a_facturar: Number(r.a_facturar) || 0, a_guardar: Number(r.a_guardar) || 0, racks: Number(r.racks) || 0, racks_ch: Number(r.racks_ch) || 0, para_envasar: Number(r.para_envasar) || 0, insumos: Number(r.insumos_dep) || 0, fc_sin_salida: Number(r.fc_sin_salida) || 0, _uni: "", _ubi: "" };
   });
   return m;
 }
@@ -17427,15 +17427,27 @@ function agExportPdf() {
    Antes alimentaba una solapa aparte; ahora alimenta la COLUMNA "FC s/Salida" de la
    tabla de Stock (a la derecha de Racks) — pedido del usuario. Se carga junto con el
    stock (openStockAdmin). Devuelve { pend: {np->…}, porArt: {codN->{cod,cajas,nps}} }. */
+/* v21.12 — la clave de FC s/Salida es el ARTÍCULO + su EMPRESA, nunca un string
+   concatenado. `cod` puede llegar con el sufijo heredado de stocks_carga_rapida
+   ("438E LK"); `codBase` lo pela y el sufijo, si estaba, manda sobre la línea. */
+function _fcsClave(cod, linea) {
+  const c = String(cod == null ? "" : cod).trim().toUpperCase();
+  const m = /\s+(LK|CH|LOKE)$/.exec(c);
+  const emp = m ? (m[1] === "LOKE" ? "LK" : m[1]) : String(linea || "").trim().toUpperCase();
+  return _ocgNorm(codBase(c)) + "|" + emp;
+}
 async function stkFcsFetch() {
   /* v10.10 — reemplaza 6 fetches client-side por 1 fetch de vista_fc_sin_salida (server-side).
      La vista ya resuelve CCN/FSS/Facturacion_NP/Entregas y agrupa por artículo con detalle NP. */
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  const rows = await gvRestTodo("vista_fc_sin_salida?select=cod,cajas,cant_nps,detalle_nps", H).catch(function () { return []; });
+  /* v21.12 (Luis, 22/09) — el código viene PELADO y la empresa en su propia columna.
+     "438E LK" no es un código: es el artículo 438E de la empresa LK. La clave de este
+     mapa es `<cod>|<empresa>`, y se busca con `_fcsClave(cod, linea)`. */
+  const rows = await gvRestTodo("vista_fc_sin_salida?select=cod,empresa,cajas,cant_nps,detalle_nps", H).catch(function () { return []; });
   const porArt = {}, pend = {};
   (rows || []).forEach(function (r) {
     var nps = r.detalle_nps || [];
-    porArt[r.cod] = { cod: r.cod, cajas: r.cajas, nps: nps };
+    porArt[_fcsClave(r.cod, r.empresa)] = { cod: r.cod, empresa: r.empresa || "", cajas: r.cajas, nps: nps };
     nps.forEach(function (d) {
       if (!pend[d.np]) pend[d.np] = { np: d.np, tanda: d.tanda || "—", rs: d.rs || "", fecha: String(d.fecha || ""), cajas: 0 };
       pend[d.np].cajas += Number(d.cajas) || 0;
@@ -17452,7 +17464,10 @@ function stkOpenFcsArt(codEnc) {
   const _codBfc = codBase(cod), _kB = _ocgNorm(_codBfc);
   _stkPopShell("🧾 FC s/Salida — " + escapeHtml(_codBfc), "stkPopBody");
   const body = document.getElementById("stkPopBody"); if (!body) return;
-  const a = (_stk.fcs && _stk.fcs.porArt) ? (_stk.fcs.porArt[k] || _stk.fcs.porArt[_kB]) : null;
+  /* v21.12 — por artículo + empresa. `codEnc` trae el cod de la fila, que puede llevar
+     el sufijo heredado ("438E LK"); _fcsClave lo separa en sus dos datos. */
+  const _pa = (_stk.fcs && _stk.fcs.porArt) || {};
+  const a = _pa[_fcsClave(cod)] || _pa[_fcsClave(cod, "LK")] || _pa[_fcsClave(cod, "CH")] || null;
   if (!a || !a.nps || !a.nps.length) { body.innerHTML = '<div class="stkpop-empty">No hay facturado sin salida de <b>' + escapeHtml(_codBfc) + '</b> ahora.</div>'; return; }
   const pend = (_stk.fcs && _stk.fcs.pend) || {};
   const nps = a.nps.slice().sort(function (x, y) { return y.cajas - x.cajas || String(x.np).localeCompare(String(y.np), undefined, { numeric: true }); });
@@ -18595,8 +18610,22 @@ function stkBodyStocks() {
   Object.keys(dem).forEach(function (k) { if (!_seenN[k] && (Number(dem[k]) || 0) > 0) arts.push({ cod: k, desc: artNombre(k, ""), terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0 }); });
   // v6.70: FC s/Salida por artículo (facturado sin cargar al camión) → columna a la derecha de Racks.
   const _fcArt = (_stk.fcs && _stk.fcs.porArt) || {};
-  const _fcArtCajas = function (cod) { return Number((_fcArt[_ocgNorm(cod)] || _fcArt[_ocgNorm(codBase(cod))] || {}).cajas) || 0; };
-  Object.keys(_fcArt).forEach(function (k) { if (!_seenN[k] && (Number((_fcArt[k] || {}).cajas) || 0) > 0) { arts.push({ cod: _fcArt[k].cod || k, desc: artNombre(k, ""), terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0 }); _seenN[k] = true; } });
+  /* v21.12 — el número sale de la PROPIA FILA (`fc_sin_salida`, que el backend ya
+     resolvió por artículo + empresa), no de cruzar el código contra un mapa. Antes el
+     cruce caía en `codBase` y le daba las mismas cajas a las DOS filas de un dual. */
+  const _fcArtCajas = function (a) {
+    if (a && a.fc_sin_salida != null) return Number(a.fc_sin_salida) || 0;
+    return Number((_fcArt[_fcsClave(a && a.cod, a && a.linea)] || {}).cajas) || 0;
+  };
+  /* Red de seguridad: un código que está en la vista y no en el universo de stock. Al
+     22/09 son 0 — y la fila fantasma "026L" salía justo de acá, porque la vista devolvía
+     el código con la L pegada. Hoy viene pelado y con su empresa al lado. */
+  Object.keys(_fcArt).forEach(function (k) {
+    const e = _fcArt[k]; if (!e || !(Number(e.cajas) || 0)) return;
+    const kb = _ocgNorm(e.cod); if (_seenN[kb] || _seenN[k]) return;
+    arts.push({ cod: e.cod, desc: artNombre(kb, ""), linea: e.empresa || "", fc_sin_salida: Number(e.cajas) || 0, terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0 });
+    _seenN[k] = true;
+  });
   // v7.90 — los equivalentes van ALEDAÑOS pero cada uno en su fila (NO se fusionan): se
   // ordenan por la posición del PRINCIPAL de su familia y, dentro, el principal primero.
   arts.sort(function (a, b) {
@@ -18633,7 +18662,7 @@ function stkBodyStocks() {
   const _pinSet = new Set((_stk.pins || []).map(function (c) { return String(c).trim().toUpperCase(); }));
   const _terms = f.split(/[\s,]+/).filter(Boolean);
   // v9.34: helper — ¿tiene stock en algún depósito de producto, o demanda, o FC pendiente?
-  const _stkHasAny = function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || _fcArtCajas(a.cod) > 0; };
+  const _stkHasAny = function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || _fcArtCajas(a) > 0; };
   let shown = _stk.soloPin
     ? arts.filter(function (a) { return _pinSet.has(String(a.cod).trim().toUpperCase()); })
     : (_terms.length
@@ -18663,7 +18692,7 @@ function stkBodyStocks() {
   const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
   shown = shown.filter(function (a) {
     if (!_insCodsSet.has(String(a.cod || "").trim().toUpperCase())) return true;
-    return (Number(a.terminado) || 0) !== 0 || (Number(a.excedente) || 0) !== 0 || (Number(a.separar_pedidos) || 0) !== 0 || (Number(a.a_facturar) || 0) !== 0 || (Number(a.a_guardar) || 0) !== 0 || (Number(a.racks) || 0) !== 0 || (Number(a.para_envasar) || 0) !== 0 || (Number(a.racks_ch) || 0) !== 0 || _demOf(a.cod) > 0 || _fcArtCajas(a.cod) > 0;
+    return (Number(a.terminado) || 0) !== 0 || (Number(a.excedente) || 0) !== 0 || (Number(a.separar_pedidos) || 0) !== 0 || (Number(a.a_facturar) || 0) !== 0 || (Number(a.a_guardar) || 0) !== 0 || (Number(a.racks) || 0) !== 0 || (Number(a.para_envasar) || 0) !== 0 || (Number(a.racks_ch) || 0) !== 0 || _demOf(a.cod) > 0 || _fcArtCajas(a) > 0;
   });
   // v10.50 — chip "🚫 Ocultar discontinuos": saca los códigos discontinuados (OC_Maximos.activo=false
   // o marcados a mano). Off por defecto → se ven. La cuenta es sobre lo que quedó visible.
@@ -18701,7 +18730,7 @@ function stkBodyStocks() {
       else if (_fcK === "_proy") v = _proyOf(a.cod);
       else if (_fcK === "_ped") v = _demOf(a.cod);
       else if (_fcK === "_cap") v = _capOf(a.cod);
-      else if (_fcK === "_fc") v = _fcArtCajas(a.cod);
+      else if (_fcK === "_fc") v = _fcArtCajas(a);
       else if (_fcK === "racks") v = (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
       else v = Number(a[_fcK]) || 0;
       return v > 0.05;
@@ -18882,7 +18911,7 @@ function stkBodyStocks() {
         tds += '<td class="num ' + (v < 0 ? "stk-neg" : "") + '">' + (c.key === "terminado" ? '<b>' + fmtCajas(v) + '</b>' : fmtCajas(v)) + '</td>';
       }
     });
-    const _fcV = _fcArtCajas(a.cod);   // v6.70: FC s/Salida por artículo
+    const _fcV = _fcArtCajas(a);   // v6.70: FC s/Salida por artículo (v21.12: de la fila)
     if (_fcV > 0.05) {
       tds += '<td class="num stk-pick-cell" style="background:#eef2ff;color:#1e3a8a" onclick="event.stopPropagation();stkOpenFcsArt(\'' + encodeURIComponent(a.cod) + '\')" title="Facturado sin salida — tocá para ver las NP"><b>' + fmtCajas(_fcV) + '</b></td>';
     } else {
@@ -22859,7 +22888,7 @@ function stkDescargarExcel() {
   const _xlTerms = f.split(/[\s,]+/).filter(Boolean);   // v21.02 — el mismo prefijo que la pantalla
   let shown = _xlTerms.length
     ? arts.filter(function (a) { const s = (a.cod + " " + a.desc).toLowerCase(); return _xlTerms.some(function (t) { return stkMatchBusq(t, a.cod, s, false); }); })
-    : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || (Number((_fcArt[_ocgNorm(a.cod)] || _fcArt[_ocgNorm(codBase(a.cod))] || {}).cajas) || 0) > 0; });
+    : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || (Number(a.fc_sin_salida) || 0) > 0; });
   shown = shown.filter(function (a) {
     if (!_insCodsSet.has(String(a.cod || "").trim().toUpperCase())) return true;
     return (Number(a.terminado) || 0) !== 0 || (Number(a.excedente) || 0) !== 0 || (Number(a.separar_pedidos) || 0) !== 0 || (Number(a.a_facturar) || 0) !== 0 || (Number(a.a_guardar) || 0) !== 0 || (Number(a.racks) || 0) !== 0 || (Number(a.para_envasar) || 0) !== 0 || (Number(a.racks_ch) || 0) !== 0;
@@ -22875,7 +22904,7 @@ function stkDescargarExcel() {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);
     const _ped = _demOf(a.cod);
     const _cap = _capOf(a.cod);
-    const _fcV = Number((_fcArt[_ocgNorm(a.cod)] || _fcArt[_ocgNorm(codBase(a.cod))] || {}).cajas) || 0;
+    const _fcV = Number(a.fc_sin_salida) || 0;   // v21.12: de la propia fila
     aoa.push([
       String(codBase(a.cod) || ""),
       String(artNombre(a.cod, a.desc) || ""),
