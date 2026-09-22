@@ -28023,7 +28023,7 @@ viene a buscar el cliente.
 
 `sql/gv_dia_sin_reparto_quinta_puerta_v2083.sql`, `tests/ppp-dia-sin-reparto.cjs`.
 
-## §3.lw — v20.86: el armado que espera camión entra al badge de la PPP
+## §3.lx — v20.86: el armado que espera camión entra al badge de la PPP
 
 **Thomas, 2026-09-21, textual:** *"debería aparecer discriminado en el badge del icono de PPP en
 la página principal del admin (un número rojo con los pendientes)"*.
@@ -28448,7 +28448,95 @@ Los dos tests **muerden**: sin el bloque del tope, el caso de la fuga escribe 30
 pickeadas; sin el chequeo de fecha, el armado del 17 vuelve a trabar el del 21.
 
 `sql/gv_isis_sin_tanda_freno_v2091.sql`.
-## §3.lx — v20.92: el retenido no vuelve a una tanda de OTRO CAMIÓN
+### §3.mb — v20.92 · `main` en rojo: 12 chequeos que miraban un submódulo que ya no existe — 2026-09-22
+
+**Qué se midió.** `node tests/apr-cuarentena.cjs` fallaba **12 de 60** chequeos en `main`, desde la
+v20.89 (el pipeline reemplazó al submódulo 🆕 Clientes nuevos de «A Programar»). Los otros dos tests
+del pipeline —`pipe-en-a-programar.cjs` y `pipe-clientes-nuevos.cjs`— daban verde, o sea que la
+pantalla andaba: lo que había quedado viejo eran las expectativas.
+
+**Por dónde entraba, y es la parte que sirve para la próxima.** El test parte el HTML de A Programar
+en dos por los títulos de los submódulos:
+
+```js
+const iCuar = html.indexOf("🚧 Cuarentena"), iCli = html.indexOf("🆕 Clientes nuevos");
+const cuarSec = html.slice(iCuar, iCli), cliSec = html.slice(iCli);
+```
+
+El pipeline se titula **`🧭 Clientes nuevos`**, así que `iCli` pasó a valer **−1**: `cliSec` quedó en
+**un carácter** (todo lo que lo mirara falla) y `cuarSec` se comió el resto de la pantalla (por eso
+caía hasta `cuarCols`, que cuenta `<th>` contra `<td>` y no tiene nada que ver con clientes nuevos).
+
+> **Un `indexOf` que no encuentra no rompe: devuelve −1, y `slice` lo toma como "desde el final".**
+> Un corte de HTML por un título tiene que fallar ruidoso cuando el título no está, no seguir con un
+> pedazo de un carácter. De los 12 en rojo, **8 eran colaterales de ese −1**: sólo 4 chequeaban de
+> verdad algo que el pipeline hace distinto.
+
+**Qué se cambió en el test** (`tests/apr-cuarentena.cjs`): el corte y los conteos van por
+`🧭 Clientes nuevos`; el ejemplo se prende con `_apr.pipeDemo` (antes `_apr.cliDemo`); y los dos
+chequeos que describían columnas y botones del submódulo viejo pasaron a los del pipeline
+—`Etapa` / `Qué sigue` / `CUIT`, y «Análisis Cred.» + «Eliminar pedido»—. Lo demás quedó igual.
+
+**Y uno de los 12 era una regresión de verdad, no una expectativa vieja.** El badge del pipeline
+contaba `pipeLista().length`, que **incluye el cliente de prueba**: con el ejemplo prendido decía
+`(2)` habiendo **1** pedido real. El submódulo viejo lo excluía a propósito (v18.99). Se repuso:
+
+```js
+'🧭 Clientes nuevos <b>(' + (cargando ? '…' : pipeLista().filter(function (p) { return !p._demo; }).length) + ')</b>'
+```
+
+El ejemplo sigue apareciendo en la tabla y sus botones siguen funcionando: lo único que cambia es
+que no infla el contador.
+
+**Chequeo:** `node tests/apr-cuarentena.cjs` (60 ok), `node tests/pipe-en-a-programar.cjs` y
+`node tests/pipe-clientes-nuevos.cjs`.
+### §3.mc — v20.93 · `gv_ppp_prog_arbol`: la fecha del pedido se resuelve en cascada — 2026-09-22
+
+**Qué se midió.** Rango hoy..+30: 183 NP programadas, **14 con `fecha_pedido` en NULL**. Las 14
+son web y las 14 tienen `PPP_Web_Programacion.fecha_recep` en NULL. Salían con «—» en la hoja de
+la Programación y vacías en el Excel (columna **F. pedido**, v20.59).
+
+**Qué se hizo.** La rama `web` de `gv_ppp_prog_arbol(date,date)` resuelve ahora en cascada:
+
+1. `PPP_Web_Programacion.fecha_recep` — el que ya se usaba;
+2. `lk_pedidos_match.fecha_pedido` — la fecha real del pedido de la página (tabla local, cron de
+   LK cada 15 min), cruzada por `(empresa, order_id)`;
+3. `(PPP_Web_NP.creado_at at time zone 'America/Argentina/Buenos_Aires')::date` — el día en que se
+   asignó la NP, cruzado por `(empresa, np, np_idx)`.
+
+**Resultado:** 183 de 183 con fecha. `anon` las ve las 183 (`set local role anon`). Ningún valor
+previo cambia: es un `coalesce`, sólo rellena NULL. Costo medido: 371 ms para 179 filas como
+`anon`, 1.310 ms para 943 filas en una ventana de 120 días como `authenticated` (tope 8 s).
+
+**⚠ No reemplaza a la v20.63** (§ del armador, `sql/gv_fecha_recep_armador_v2063.sql`), que es el
+arreglo de raíz: allá la fecha se **persiste** al programar. Esto es el lado de la **lectura** y
+cubre dos cosas que aquél no alcanza: las filas que ya estaban sin fecha (su `UPDATE` de 9 filas
+sigue esperando el «sí» del dueño) y los otros **cuatro** caminos de escritura de
+`PPP_Web_Programacion`. El centinela `gv_ppp_sin_fecha_recep` sigue mirando la **tabla**, así que
+una fila nueva sin fecha se ve igual: esto no la tapa.
+
+**⚠ El paso (3) es una aproximación**, no la fecha del pedido: es cuándo se numeró. Para las 9 NP
+de LK coincide exactamente con el (2). Las 5 de Chef de formato nuevo (order_id 1001430/31/32) no
+están en `lk_pedidos_match` —su feed no las trae, es del lado de Chef— así que el (3) es lo único
+que hay y da 2026-09-14 para las tres. La v20.63 las había dado por irrecuperables.
+
+**Lo que queda sin fecha a propósito:** las NP de ISIS ya facturadas o entregadas cuya fila
+desapareció del espejo (origen `fact` / `hist`). En 120 días son **622**, todas de numeración
+ISIS: `gv_ppp_programacion_diaria` guarda sólo lo programado y después se borra. Son días
+pasados; la impresión mira días por venir.
+
+**Chequeo.**
+
+```sql
+select count(*) filter (where fecha_pedido is null)
+  from public.gv_ppp_prog_arbol(current_date, current_date + 30);   -- 0
+select * from public.gv_ppp_sin_fecha_recep;                        -- la verdad de la TABLA
+```
+
+**Rollback:** volver a poner `w.fecha_recep::date,` en lugar del `coalesce` de la rama `web`.
+`sql/gv_ppp_prog_arbol_fecha_pedido_v2093.sql`, `tests/ppp-fecha-pedido-cascada.cjs`.
+
+### §3.md — v20.94 · El retenido no vuelve a una tanda de OTRO CAMIÓN — 2026-09-22
 
 **Problema 489**, detectado el 22/09 mirando por qué el badge de la PPP seguía en 2.
 

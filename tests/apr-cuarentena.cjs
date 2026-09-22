@@ -134,7 +134,7 @@ catch (_e) {
     // Cuarentena, y las dos colapsables. Un pedido cuyo ÚNICO motivo es cliente_nuevo va al
     // submódulo "Clientes nuevos"; uno que además tiene deuda (u otro motivo) sigue en Cuarentena.
     try { localStorage.removeItem("vir_cuar_colapsado"); localStorage.removeItem("vir_cli_colapsado"); } catch (_e) {}
-    _apr.cuarContacto = {}; _apr.cliValor = {}; _apr.cliDemo = false;   // evitan los fetch (ruta REST abortada)
+    _apr.cuarContacto = {}; _apr.cliValor = {}; _apr.pipeDemo = false;   // evitan los fetch (ruta REST abortada)
     _apr.cuarComN = {};   // v19.90: el contador del 📖, servido (si no, sale a buscarlo por red)
     _apr.pedidos = [
       mk({ order_id: 200, empresa: "chef", cod: "2533", razon_social: "Cliente Nuevo SA",
@@ -146,14 +146,14 @@ catch (_e) {
     _pppTab = "prog"; aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
     // Los dos submódulos conviven en el mismo render; se parte el HTML por sus títulos.
-    const iCuar = html.indexOf("🚧 Cuarentena"), iCli = html.indexOf("🆕 Clientes nuevos");
+    const iCuar = html.indexOf("🚧 Cuarentena"), iCli = html.indexOf("🧭 Clientes nuevos");
     const cuarSec = html.slice(iCuar, iCli), cliSec = html.slice(iCli);
     // (3a) Cuarentena: sólo el mixto (deuda+nuevo), con badge; el puro NO.
     out.nuevoFueraDeCuar = /🚧 Cuarentena <b>\(1\)<\/b>/.test(cuarSec);
     out.nuevoBadge = /cuar-badge b-nuevo[^>]*>🆕 Cliente nuevo</.test(cuarSec);
     out.nuevoMotivo = /Cliente nuevo \(1 pedido facturado en toda su historia\)\./.test(cuarSec);
     // (3b) Clientes nuevos: el puro está (chip CH 2533); el mixto NO.
-    out.cliNuevosCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec);
+    out.cliNuevosCuenta = /🧭 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec);
     out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(cliSec);
     out.cliNuevosSinMixto = !/Cliente Nuevo Deudor/.test(cliSec);
     // (3a-2) v19.94 (Thomas) — Cuarentena también muestra el MONTO del pedido.
@@ -161,9 +161,9 @@ catch (_e) {
     out.cuarCols = (cuarSec.match(/<th[ >]/g) || []).length ===
                    ((cuarSec.match(/<tr class="cuar-tr[^"]*"[^>]*>([\s\S]*?)<\/tr>/) || ["", ""])[1].match(/<td[ >]/g) || []).length;
     // (3b-2) v19.05 — columnas nuevas: 1er contacto, Speech 1/2, Acción (Aprobar / Eliminar).
-    out.cliCols = /1er contacto/.test(cliSec) && /Acci[oó]n/.test(cliSec);
+    out.cliCols = /<th>Etapa<\/th>/.test(cliSec) && /Qu[eé] sigue/.test(cliSec) && /<th>CUIT<\/th>/.test(cliSec);
     out.cliSpeech = /Speech 1/.test(cliSec) && /Speech 2/.test(cliSec);
-    out.cliAccion = /Aprobar pedido/.test(cliSec) && /Eliminar pedido/.test(cliSec);
+    out.cliAccion = /An[aá]lisis Cred\./.test(cliSec) && /Eliminar pedido/.test(cliSec);
     // (3b-2b) v19.90 (Thomas) — el MISMO 📖 de comentarios que Cuarentena, con su columna.
     out.cliComCol = /<th class="cuar-td-com">Coment\.<\/th>/.test(cliSec);
     out.cliComBtn = /cuarComAbrirPed\('chef','200'\)/.test(cliSec);
@@ -175,8 +175,8 @@ catch (_e) {
                       "lk:202": { valor: 80000, valorIva: 96800 } };
     aprRender(); await new Promise((res) => setTimeout(res, 50));
     const htmlIva = document.getElementById("pppPreview").innerHTML;
-    const cliSecIva = htmlIva.slice(htmlIva.indexOf("🆕 Clientes nuevos"));
-    const cuarSecIva = htmlIva.slice(htmlIva.indexOf("🚧 Cuarentena"), htmlIva.indexOf("🆕 Clientes nuevos"));
+    const cliSecIva = htmlIva.slice(htmlIva.indexOf("🧭 Clientes nuevos"));
+    const cuarSecIva = htmlIva.slice(htmlIva.indexOf("🚧 Cuarentena"), htmlIva.indexOf("🧭 Clientes nuevos"));
     out.cliMontoIva = /clin-iva[^>]*>c\/IVA \$121\.000/.test(cliSecIva);
     // v19.94 (Thomas): el retenido por deuda muestra su monto (neto arriba, c/IVA abajo).
     out.cuarMontoIva = /\$80\.000/.test(cuarSecIva) && /clin-iva[^>]*>c\/IVA \$96\.800/.test(cuarSecIva);
@@ -187,18 +187,18 @@ catch (_e) {
     _apr.cliValor = {}; aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
     // (3c) el botón "👁 Ver ejemplo" agrega una fila EJEMPLO con su monto, sin sumar al badge.
-    _apr.cliDemo = true; aprRender(); await new Promise((res) => setTimeout(res, 50));
+    _apr.pipeDemo = true; aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
-    const cliSec2 = html.slice(html.indexOf("🆕 Clientes nuevos"));
+    const cliSec2 = html.slice(html.indexOf("🧭 Clientes nuevos"));
     out.cliDemoFila = /cuar-demo-tag">EJEMPLO</.test(cliSec2) && /\$120\.480/.test(cliSec2);
-    out.cliDemoNoCuenta = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec2);
-    _apr.cliDemo = false;
+    out.cliDemoNoCuenta = /🧭 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec2);
+    _apr.pipeDemo = false;
     // (3d) v18.100 — colapsar: el título queda, la tabla se esconde.
     try { localStorage.setItem("vir_cli_colapsado", "1"); } catch (_e) {}
     aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
-    const cliSec3 = html.slice(html.indexOf("🆕 Clientes nuevos"), html.indexOf("🆕 Clientes nuevos") + 400);
-    out.cliColapsaTitulo = /🆕 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec3);   // el título con contador sigue
+    const cliSec3 = html.slice(html.indexOf("🧭 Clientes nuevos"), html.indexOf("🧭 Clientes nuevos") + 400);
+    out.cliColapsaTitulo = /🧭 Clientes nuevos <b>\(1\)<\/b>/.test(cliSec3);   // el título con contador sigue
     out.cliColapsaSinTabla = !/CH 2533/.test(html);   // la tabla (chip del cliente) desaparece
     try { localStorage.removeItem("vir_cli_colapsado"); } catch (_e) {}
     _pppTab = "prog";
@@ -650,7 +650,7 @@ catch (_e) {
   chk(r.cliNuevosCuenta, "pestaña 'Clientes nuevos': muestra el pedido puro (1)");
   chk(r.nuevoCodChip, "cliente nuevo de Chef: el chip dice CH 2533 (en Clientes nuevos)");
   chk(r.cliNuevosSinMixto, "el pedido mixto (deuda+nuevo) NO aparece en Clientes nuevos");
-  chk(r.cliCols, "Clientes nuevos tiene columnas '1er contacto' y 'Acción'");
+  chk(r.cliCols, "el pipeline tiene las columnas Etapa / Qué sigue / CUIT");
   chk(r.cliSpeech, "Contacto tiene los botones 'Speech 1' y 'Speech 2'");
   chk(r.cuarMontoCol, "Cuarentena tiene la columna 'Monto'");
   chk(r.cuarCols, "la tabla de Cuarentena tiene tantos <td> como <th>");
@@ -658,7 +658,7 @@ catch (_e) {
   chk(r.cliComCol, "Clientes nuevos tiene la columna 'Coment.'");
   chk(r.cliComBtn, "cada fila abre el MISMO log de comentarios (cuarComAbrirPed)");
   chk(r.cliComCols, "la tabla de Clientes nuevos tiene tantos <td> como <th>");
-  chk(r.cliAccion, "Acción tiene 'Aprobar pedido' y 'Eliminar pedido'");
+  chk(r.cliAccion, "«Qué sigue» arranca con Análisis Cred. y deja Eliminar pedido");
   chk(r.cliMontoIva, "Monto muestra el total con IVA debajo del neto (c/IVA $121.000)");
   chk(r.cliMsgTotal, "Speech 1 manda el TOTAL con IVA del pedido");
   chk(r.cliMsgSinSena, "Speech 1 ya NO pide seña del 30%");

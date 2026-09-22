@@ -1374,7 +1374,7 @@ SQL y listo** — y con su fila en `GV_Reglas_Centinela`.
 
 **Chequeo:** `select * from public.gv_ppp_armado_espera;` — lo armado sin día, con los días que
 lleva y si está facturado. `sql/gv_ppp_armado_espera_v2086.sql`,
-`tests/ppp-armado-espera-badge.cjs`, §3.lw.
+`tests/ppp-armado-espera-badge.cjs`, §3.lx.
 
 ## ⚠ REGLA (Thomas, 2026-09-21, v20.80): un pedido programado NO vuelve a «A Programar»
 
@@ -1429,7 +1429,7 @@ cae en dos camiones.
 public.gv_ppp_web_retenido;` · `sql/gv_retenido_tanda_viva_v2056.sql`,
 `tests/apr-retenido-tanda.cjs`, §3.lg.
 
-⚠⚠ **Y TAMPOCO vuelve si esa tanda es de OTRO CAMIÓN** (v20.92, problema 489). La v20.56 tapó
+⚠⚠ **Y TAMPOCO vuelve si esa tanda es de OTRO CAMIÓN** (v20.94, problema 489). La v20.56 tapó
 el ESTADO de la tanda y dejó abierta la ZONA: **LK 1448** (Silvano, Zona 6 - **GBA Norte**) tenía
 como tanda previa **D69H** (Zona 2 - CABA Centro, camión **Capital**), y el chip decía *"esa tanda
 sale el 23/09 y no se empezó: vuelve ahí"*. Seguir ese consejo parte la tanda en dos camiones y
@@ -1441,7 +1441,7 @@ y nunca coincide): no se le suma nada a una tanda que ya está mal. Y el corte e
 `gv_ppp_web_camion`, no el número de zona — una tanda de CABA mezcla Zona 1+2 a propósito.
 
 ⚠ La firma es **`gv_ppp_web_camion(text, text)`**, no `(text, date)`.
-`sql/gv_retenido_camion_v2092.sql`, `tests/apr-retenido-camion.cjs`, §3.lx.
+`sql/gv_retenido_camion_v2092.sql`, `tests/apr-retenido-camion.cjs`, §3.md.
 
 ⚠⚠ **Y el CÓDIGO de esa tanda queda RESERVADO mientras el pedido espera** (v20.60, Luis: *"el
 problema si vuelve con el codigo viejo es si se pisa con algun pedido que haya quedado dentro de la
