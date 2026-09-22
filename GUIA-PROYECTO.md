@@ -1,3 +1,53 @@
+## Nota v21.21 (2026-09-22) — Las dos pantallas dan el mismo número, y el test lo sostiene
+
+Las tres respuestas de Thomas al comparador.
+
+### 1. Gana la regla del MONITOR GRANDE para un cierre que cruza la medianoche
+
+La vista arrancaba en el primer evento de hoy; el monitor cuenta además el tramo del **día de
+apertura** (de la apertura al `FJ` real de ese día, o a la hora de salida) y una jornada completa
+por cada día hábil del medio. **Se replicó `computeClosureDur` en la función**, feriados incluidos.
+
+⚠ Y con eso desapareció el recorte por «arranque», que era invención de la v21.17 y **se comía el
+primer MG del día**: un `MG` no tiene fila de apertura (desde la v7.68 emite una sola fila con la
+duración adentro), así que el recorte le cortaba el pedazo anterior al primer evento. Ésa era la
+diferencia del legajo 94 — 2,63 contra 2,33.
+
+⚠ **Los feriados son la copia de `FERIADOS_AR` de `index.html`, NO `GV_Dias_No_Habiles`**: esa
+tabla tiene los días que el dueño cierra el depósito (al 22/09, uno solo) y mueve el conteo de días
+hábiles de toda la operación.
+
+### 2. Las dos chicas: las dos eran de la vista
+
+| qué se veía | causa |
+|---|---|
+| legajo 94, movimiento 2,63 vs 2,33 | el recorte por «arranque» (punto 1) |
+| legajo 277, picking 0,46 vs 0,45 | **un `PB` adentro de un `Limp`**: la vista lo restaba dos veces |
+
+El segundo es el que vale recordar: los tiempos muertos **se mergean antes de restar**, que es lo
+que hace `deadByLeg` en `index.html` desde la v19.07. Sin el merge, `Limp 15:07→15:26` con
+`PB 15:18→15:21` adentro descuenta 3 minutos de más.
+
+**Resultado, día 15/09: 5 operarios × 6 números, coinciden TODOS.**
+
+### 3. El comparador es un test de la suite
+
+`tests/mon-vs-vista.cjs` corre el monitor grande de verdad y lo compara contra la salida de la
+vista **congelada** en `tests/tools/vista-15.json`. Las sesiones no pueden pegarle a Supabase (el
+proxy bloquea supabase.co), así que congelar esa mitad es la única forma de tener las dos en un
+test.
+
+⚠ **Caza los cambios del lado JS.** Los del lado SQL los caza `gv_reglas_perdidas`, con 8
+centinelas sobre la función y la vista. Si se cambia una regla a propósito: los dos lados **y**
+volver a congelar el JSON (cómo, está adentro del propio JSON).
+
+⚠ **Verificado rompiéndolo**: sacándole el merge a los tiempos muertos, el test se pone rojo con
+*"legajo 277 · hs_pick: vista 6.37 · monitor 6.32"*. Y una honesta: el 15/09 no tiene tiempo muerto
+adentro de ningún MG/RT, así que ese día **no** prueba la regla de la v21.20 — ésa la prueba
+`muerto-neteado.cjs`, caso (C).
+
+`sql/gv_monitor_horas_operario_v2117.sql`, §3.ml.
+
 ## Nota v21.20 (2026-09-22) — Al movimiento también se le resta el tiempo muerto, y el comparador vuelve a servir
 
 ### 1. El baño adentro de una recepción ya no cuenta como movimiento

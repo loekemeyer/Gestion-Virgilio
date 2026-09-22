@@ -596,6 +596,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== hora-24h-renglon (v19.02: reloj de 24h en pantalla + un renglon por tarea + cierre de RI/EI) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/hora-24h-renglon.cjs
 
+echo "== mon-vs-vista (v21.20: el monitor grande y la vista de la TV dan el MISMO numero) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-vs-vista.cjs
+
 echo "== muerto-neteado (v19.07: el tiempo muerto se resta del picking/armado + no cerrar dos veces) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/muerto-neteado.cjs
 

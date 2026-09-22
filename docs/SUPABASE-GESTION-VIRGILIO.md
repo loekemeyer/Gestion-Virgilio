@@ -29151,9 +29151,24 @@ corrección que la v12.97 del monitor grande.
 ⚠ **`LT` no entra**, y los legajos `0` y `1` tampoco. Las duraciones fuera de `(0, 24 h)` se
 descartan: un toggle que quedó abierto de un día para otro y lo cerró el autocierre no es trabajo.
 
-⚠ **Cada duración se recorta contra el ARRANQUE del operario** (su primer evento del día). Un `TP`
-que cierra el `EP` del viernes le metía el fin de semana entero al lunes. Con el recorte, la tarea
-que quedó abierta ayer aporta sólo las horas de hoy.
+⚠ **v21.21 — un cierre que CRUZA LA MEDIANOCHE se calcula con la regla del MONITOR GRANDE**
+(`computeClosureDur`, decisión de Thomas el 22/09 para que las dos pantallas den lo mismo): tramo
+del día de apertura (de la apertura al `FJ` real de ese día, o a la hora de salida del empleado) +
+una jornada completa por cada día hábil del medio + tramo del día de cierre (desde la fichada real,
+o la hora de entrada). Los feriados son la **copia de `FERIADOS_AR` de `index.html`**, no
+`GV_Dias_No_Habiles`.
+
+⚠ **Y desapareció el recorte por «arranque»** que traía la v21.17: además de perder ese tramo, se
+comía el primer `MG` del día — un MG **no tiene fila de apertura** (desde la v7.68 emite una sola
+fila con la duración adentro), así que el recorte le cortaba lo anterior al primer evento. Era la
+diferencia del legajo 94: 2,63 contra 2,33.
+
+⚠ **Los tiempos muertos se MERGEAN antes de restar.** Un `PB` adentro de un `Limp` se restaba dos
+veces: medido el 15/09 con el legajo 277, 3 minutos. Es lo que hace `deadByLeg` en `index.html`.
+
+✅ **Verificado: día 15/09, 5 operarios × 6 números, coinciden todos** — `tests/mon-vs-vista.cjs`,
+que corre en la suite y compara el monitor grande contra esta función congelada en
+`tests/tools/vista-15.json`.
 
 ⚠⚠ **Los baldes PUEDEN SOLAPARSE y su suma pasarse de `hs_total`, y no es un error.** `CR` y `RR`
 son `SURVIVING_TOGGLES`: quedan abiertos mientras el operario hace otra cosa. Medido el 22/09 con
