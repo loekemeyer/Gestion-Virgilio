@@ -28821,3 +28821,65 @@ Dos palancas, medidas y sin tocar la lógica del stock:
    cambia la frescura más allá del refresh.
 
 `sql/gv_chip_salida_cuarentena_v2097.sql`.
+
+### §3.mh — v20.98 · Los pedidos de CHEF llegaban tarde y nadie los volvía a controlar — 2026-09-22
+
+**Thomas:** *"Ierakuin sigue saliendo en la vista de «A programar» y no en la sección de
+Cuarentena. POR QUÉ?"*
+
+**El backend lo marcaba bien; la pantalla nunca se lo preguntó.** `aprCargarPedidos` carga en dos
+tiempos: primero LK + ISIS, y **ahí llama a `cuarMarcarPedidos()` y a `aprCargarSalida()`**;
+después, en un segundo `await`, llegan los de Chef y se agregan a la lista — **sin volver a
+controlarlos**.
+
+Como el único pedido de Chef pendiente era **CH 0004 (Ierakuin Srl, deuda $2.062.528,58)**, era el
+único que fallaba, y por eso parecía un problema del pedido y no de la secuencia.
+
+La cuenta cierra exacta:
+
+| | |
+|---|---:|
+| retenidos que devuelve `gv_cuarentena_marcar` para los 9 pendientes | **7** |
+| menos el cliente nuevo puro (LK 0094, va al pipeline) | 6 |
+| menos Ierakuin, que nunca pasó por el control | **5** ← lo que mostraba la pantalla |
+
+**Cómo se descartó el render**, que era la sospecha obvia: se dibujó A Programar en headless con un
+pedido de Chef **con la marca puesta** y cae en Cuarentena sin problema (`cuarTieneChef: true`,
+`pedidosTieneChef: false`). O sea el problema no era dónde se dibuja: era que la marca no llegaba.
+
+Desde la v20.98, al llegar Chef se vuelven a correr las dos cosas. `tests/cuar-control-caido.cjs`
+lo verifica.
+
+> ⚠ **Carga en dos tiempos = control en dos tiempos.** Cada vez que una lista se completa con un
+> segundo `await`, todo lo que se calculó sobre la primera mitad hay que volver a calcularlo.
+
+#### Stock: cómo tenerlo al día SIN el costo de hoy
+
+**Thomas:** *"La vista del stock en ese módulo tiene que ser lo más actualizada posible, eso no se
+discute. Cómo hacerlo sin timeout y más optimizado, fijate y recomendá"*.
+
+Medido: **el 94,5 % de los refrescos recalculan algo que no cambió.**
+
+| | |
+|---|---:|
+| bloques de 2 min en 7 días | 5.040 |
+| bloques **con algún movimiento de stock** | **277 (5,5 %)** |
+
+El cron 55 corre `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada` **cada 2 minutos,
+mire o no si pasó algo**: 1.770 s en 26,4 h, el **7,4 %** de toda la base, con picos de 33,8 s. Y
+`vista_saldos_stock` —de la que cuelga— escanea **`Movimientos_Stock` entero (67.046 filas)** y le
+aplica un `regexp_replace` a cada `cod_art` para armar la clave, sin filtro ni índice posible.
+
+Tres pasos, del más barato al más profundo, **ninguno resigna frescura**:
+
+1. **Refrescar por MOVIMIENTO, no por reloj.** El cron mira si hubo movimientos desde el último
+   refresh y, si no, no hace nada. Saca ~94 % de las corridas sin cambiar un segundo la frescura.
+   Con eso sobra margen para bajarlo a **cada minuto** y que igual cueste la mitad que hoy: el
+   stock quedaría **más** actualizado que ahora.
+2. **Que el módulo lea la matview, no `vista_saldos_stock`.** Hoy se hacen las dos cosas: se
+   materializa y después se consulta igual la vista cara **1.373 veces** (1.707 s, otro 7,2 %).
+   La matview son 367 filas y 216 kB: la lectura pasa a ser instantánea.
+3. **Materializar la clave normalizada** (`ckey`) como columna generada con índice en
+   `Movimientos_Stock`. Hoy ese `regexp_replace` corre sobre las 67.046 filas en **cada** lectura.
+   Es el cambio de mayor impacto sobre el cálculo en sí, y no cambia ningún resultado. ⚠ Agregar
+   una columna generada reescribe la tabla: va con backup y en un momento sin operación.

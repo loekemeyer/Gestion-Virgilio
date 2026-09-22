@@ -6024,7 +6024,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.97"></script>
+<script type="module" src="recepcion.js?v=20.98"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9906,7 +9906,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.97";
+const APP_VERSION = "v20.98";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -45448,6 +45448,20 @@ async function aprCargar() {
       const pedsChef = await pChef;
       _apr.pedidosTodos = ordenar(_apr.pedidosTodos.concat(pedsChef));
       _apr.pedidos = _apr.pedidosTodos.filter(function (p) { return !fuera.has(aprKey(p.empresa, p.order_id)); });
+      /* ⚠ v20.98 (Thomas, 2026-09-22: *"Ierakuin sigue saliendo en la vista de «A programar» y no
+         en la sección de Cuarentena"*) — LOS PEDIDOS DE CHEF LLEGAN TARDE Y NADIE LOS VOLVÍA A
+         CONTROLAR. Arriba, `cuarMarcarPedidos()` y `aprCargarSalida()` corren con los de LK + ISIS
+         y ahí termina todo: Chef se agrega a la lista DESPUÉS, con este await, y nunca pasaba por
+         el control. Resultado: el único pedido de Chef pendiente —CH 0004, Ierakuin Srl, deuda
+         $2.062.528,58— se dibujaba en la lista normal, sin badge, y el chip decía "sin camión
+         previsto" en vez de "retenido en cuarentena". Medido: el backend devolvía 7 retenidos y la
+         pantalla mostraba 5 (los 7 menos el cliente nuevo puro, que va al pipeline, menos éste).
+         Por eso el control se vuelve a correr acá, con la lista ya completa. */
+      if (_pppTab === "prog") {
+        aprRender();
+        aprCargarSalida().then(function () { if (_pppTab === "prog") aprRender(); });
+        cuarMarcarPedidos();
+      }
     } catch (e) {
       _apr.aviso = "Chef no respondió (" + ((e && e.message) || e) + "): se ven sólo los pedidos de LK.";
     }

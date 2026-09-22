@@ -44,6 +44,17 @@ ok(/\(_apr\.cuarErr \? '' : '<div class="apr-vacio">Sin pedidos retenidos/.test(
    'con el control caído NO se escribe "Sin pedidos retenidos"');
 ok(/\.apr-cuar-err\{/.test(src), "el aviso tiene su estilo");
 
+/* v20.98 — los pedidos de CHEF llegan DESPUÉS (segundo await) y nadie los volvía a controlar:
+   cuarMarcarPedidos corría con los de LK + ISIS y ahí terminaba. CH 0004 (Ierakuin Srl, deuda
+   $2.062.528,58) se dibujaba en la lista normal, sin badge. */
+const k = src.indexOf("const pedsChef = await pChef;");
+const bloqueChef = k >= 0 ? src.slice(k, src.indexOf("} catch (e) {", k)) : "";
+ok(bloqueChef.length > 0, "encuentro el bloque que agrega los pedidos de Chef");
+ok(/cuarMarcarPedidos\(\)/.test(bloqueChef),
+   "al llegar Chef se vuelve a controlar la cuarentena");
+ok(/aprCargarSalida\(\)/.test(bloqueChef),
+   "y se recalcula el chip de salida, que tampoco conocía a los de Chef");
+
 // el estado CANCELADO del log
 ok(/\["cancelado", "🗑 Cancelados"\]/.test(src) || /\[\"cancelado\"/.test(src),
    "el log tiene el chip de Cancelados");
