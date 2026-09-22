@@ -3603,37 +3603,53 @@ que aborta todo (verificado: la fila encolada desapareció al revertir).
 `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
 `sql/gv_equivalencia_facturar_web_v2115.sql`.
 
-## ⚠ REGLA (Luis, 2026-09-22, v21.14): los códigos 544, 560 y 800 NO se reparten — cada uno lleva el TOTAL
+## ⚠ REGLA (Luis, 2026-09-22, v21.19): la OC va a LOG/ FABR y la mercadería la entrega PEDERNERA
 
-**Luis, textual:** *"excepción para 3 códigos. 544, 560 y 800 deberían generar OCs por el total
-(100%) para fab y para carlos / de momento ponemos esto como hardcode"*.
+**Luis, textual:** *"544, 560, 800 son pedernera 100%, pero no se le manda la OC a pedernera, solo
+se le manda a log. Pero la recepción de mercadería es mercadería de Pedernera"*.
 
-El generador reparte un artículo entre dos talleristas por porcentaje (`pr1` / `pr2` de
-`OC_Maximos`): 50/50 da media OC a cada uno. Estos tres van al revés: **`Log/ Fabr` y
-`Carlos E` reciben cada uno una OC por las cajas enteras.**
+**Es el caso Oscar exactamente al revés**, y las dos puntas están bien: la orden se le emite a
+**`Log/ Fabr`** y el que trae las cajas es **`Pedernera`**. Ninguna de las dos se "corrige".
 
-| cód | descripción | línea | proveedor que tenía | a pedir al 22/09 |
-|---|---|---|---|--:|
-| 544 | Batidor Pera | LK | Log/ Fabr 100% | **382** |
-| 560 | Pinza Chica | LK | Log/ Fabr 100% | 0 |
-| 800 | Pinza Chica Display | CH | **Pedernera** 100% | 0 |
+Medido el 22/09:
 
-⚠ **La excepción le saca el 800 a Pedernera**, que es el que lo tenía configurado. Es
-consecuencia de la regla, no un descuido.
+| | 544 Batidor Pera | 560 Pinza Chica | 800 Pinza Chica Display |
+|---|---|---|---|
+| OC emitidas | **Log/ Fabr** · 6 · 2.022 cajas | **Log/ Fabr** · 4 · 168 | **0** |
+| recepción | **Pedernera** · 22 · 1.866 | **Pedernera** · 7 · 259 | **0** |
+| `OC_Maximos.proveedor` | Log/ Fabr | Log/ Fabr | **Pedernera** ← el único que no cierra |
 
-⚠ **Los nombres van EXACTOS como están en `OC_Maximos`** — `Log/ Fabr` (60 códigos) y
-`Carlos E` (30) —: la OC se agrupa por ese texto y un nombre distinto abre un proveedor nuevo.
+⚠ **La consecuencia medible: `cantidad_recibida = 0` en las DIEZ OC.** 2.190 cajas ordenadas,
+2.125 recibidas, **0 imputadas** — nueve quedaron `anulada` y una `pendiente`.
+**`gv_oc_recompute_recibido(proveedor, codigo)` cruza por el par `(proveedor, código)`**, así que
+con nombres distintos en las dos puntas la OC **no se cierra nunca sola**.
 
-⚠ **Y rompe el supuesto de la vista «Por artículo», que SUMA los subs** para sacar el "a pedir"
-del artículo. Sumando, las 382 del 544 se verían como **764** en la fila y en el encabezado; se
-toma el mayor, que es ese mismo total. Lo que se genera sí son dos líneas de 382.
+⚠⚠ **Y NO son estos tres: es un patrón de toda la tabla.** Barrido del 22/09 sobre las OC con
+`cantidad_recibida = 0` cuyo código se recibió de otro nombre desde el 01/07 — **25 pares**, y el
+que más pesa es el de Oscar (506: OC a **Oscar** por 2.178 cajas, recepción **Log/ Fabr** por
+2.449). También 510, 280, 557, 555, 758, 500, 654, 658 (Oscar → Log/ Fabr), 550 (Poly → Garcia),
+519 y 719 (Log/ Fabr → Lucho), 355 (Pettofrezza → Rafael / German).
 
-**Es hardcode a propósito** (`OCG_DOBLE_100` en `index.html`, al lado de `OCG_FACTOR_MAXIMO`),
-porque Luis lo pidió así por ahora. Si aparece un cuarto código, la fila se agrega ahí; si se
-vuelven muchos, el lugar es una columna de `OC_Maximos`, no una lista más larga.
+> **El arreglo NO es cambiar el proveedor de un lado ni del otro**, y menos el de `OC_Maximos`:
+> los dos datos son ciertos y describen cosas distintas — **a quién se le ordena** y **quién
+> entrega**. Falta la tercera pieza: un **alias de equivalencia** `(código, proveedor de la OC)
+> → quién la entrega`, que lea `gv_oc_recompute_recibido`. Con eso la OC se cierra sola, el aviso
+> de *"SIN OC generada"* deja de saltar y ninguna de las dos pantallas miente.
+> **PENDIENTE del dueño** (es dato real, no código): confirmar los 25 pares antes de cargarlos.
 
-**Chequeo:** `node tests/oc-doble-100.cjs` — mira las dos mitades (dos OCs por el total · la
-fila y el encabezado sin duplicar) y verificado que falla contra el código anterior.
+### ⚠ Lo que NO va: la excepción de la doble OC (v21.14, aplicada y revertida el mismo día)
+
+Una lectura anterior del pedido —*"deberían generar OCs por el total (100%) para fab y para
+carlos"*— se implementó como `OCG_DOBLE_100`: dos OC por código, una a `Log/ Fabr` y otra a
+`Carlos E`. **El dato la desmintió**: en toda la historia de `Ordenes_Compra` esos códigos tienen
+**cero OC a `Carlos E`** y cero a Pedernera. El único rastro de un Carlos son **3 filas de
+recepción de mayo-junio a nombre de `AGUIRRE CARLOS RODOLFO`** (260 cajas de 544), muertas desde
+el **04/06**, justo antes de que empezara Pedernera el 10/06. `Carlos E` y `Carlos` son entidades
+distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
+
+**Se revirtió entero** (la constante, el armado de subs, la marca `dupProv`, el `Math.max` de la
+vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
+códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
 ## ⚠ REGLA (Luis, 2026-09-22, v20.95): un código BUSCADO se muestra aunque esté en 0
 
