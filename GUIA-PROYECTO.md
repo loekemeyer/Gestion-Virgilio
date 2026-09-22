@@ -1,3 +1,46 @@
+## Nota v21.05 (2026-09-22) — El barrido del pozo de RR: el chooser de CC, y 5 bytes fuera de UTF-8
+
+Dos cosas que salieron de preguntar *"¿qué otro submódulo tiene el problema de RR?"*.
+
+### 1. Son TRES módulos, y el que faltaba era el chooser de Carga Camión
+
+El pozo no es de cualquier toggle: es de los que, **estando abiertos, RE-ABREN su popup en vez de
+cerrarse**. Ésos no se pueden cerrar desde la botonera, así que la única salida está adentro del
+modal. Medido sobre `selectOption`, son exactamente tres — `CC`, `RR` y `CR`. En todos los demás
+(`RT`, `RI`, `EI`, `AT`, `PB`, `Limp`, `PC`, `Perm`, `CT`) tocar el botón de nuevo **cierra**, así
+que no hay forma de quedar trabado.
+
+De esos tres, RR ya se arregló (v21.03) y CR estaba entero. En **CC quedaba una pantalla suelta:
+el chooser** —*"¿qué vas a cargar? 🚛 Camión / 🚶 Retira"*—, que se dibuja **antes** de consultar
+nada y cuyo único «Cerrar» era `ccClose()`, o sea minimizar. El escape (`ccEndWithoutLoading`)
+aparecía recién después de elegir Camión o Retira y que la lista viniera vacía.
+
+⚠ **No era un callejón cerrado como el de RR** —había salida, a dos clics de más— pero el botón
+decía «Cerrar» y no cerraba: el mismo malentendido que reportó Luis. Ahora el chooser ofrece los
+dos: **«✓ Cerrar Carga Camión (sin cargar por app)»** y **«Cerrar (sigo después)»**. Van los dos y
+no uno solo como en RR vacío, porque acá todavía **no se sabe si hay reparto**: si lo hay, el
+operario puede querer minimizar de verdad.
+
+### 2. `index.html` tenía 5 bytes en latin1 — y 2 se veían en pantalla
+
+El archivo es UTF-8 (`<meta charset="UTF-8">`) y tenía 5 bytes sueltos en latin1/cp1252, dejados
+por sesiones que lo editaron con herramientas distintas. Tres eran de comentario y no molestaban.
+**Los otros dos estaban en un string de JS que va al `innerHTML`**: el chip «Mismo pedido» de
+A Programar (`aprMismoPedidoChip`), donde el separador `·` salía como `U+FFFD`:
+
+> 🧾 Mismo pedido **�** LK 0001 **�** $836.909
+
+⚠ **Y encima rompe las herramientas, que es lo que lo hace crecer.** Con un byte inválido cualquier
+script que abra el archivo como texto UTF-8 explota; abrirlo como latin1 para esquivarlo convierte
+**todos** los acentos buenos en mojibake y los reescribe así. Un byte malo se multiplica.
+
+Costó 5 reemplazos. El candado que impide que vuelva es **`node tests/encoding-utf8.cjs`**
+(index.html, sw.js, recepcion.js, planimetria.js, supabase-config.js), verificado rompiéndolo a
+propósito. ⚠ El **NUL** de `_pppGeoCod` es legítimo y está contemplado: es UTF-8 válido y lo único
+que hace es que `grep` trate al archivo como binario.
+
+**Chequeo:** `node tests/rr-sin-remitos-cierra.cjs` (cubre los tres módulos) · `node tests/encoding-utf8.cjs`.
+
 ## Nota v21.03 (2026-09-22) — RR sin remitos dejaba el toggle abierto y trababa picking/armado
 
 Luis, con la captura de la botonera: *"si uno aprieta recepción de remitos ahora, figura que no
