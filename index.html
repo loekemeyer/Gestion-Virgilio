@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.17"></script>
+<script type="module" src="recepcion.js?v=21.18"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.17";
+const APP_VERSION = "v21.18";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31521,7 +31521,8 @@ function showOperarioActivityDetail(legajo, activity) {
   const dayKey = _monitorLiveStats.todayKey;
   const op = (stats.perOperario || []).find(o => o.legajo === String(legajo));
   if (!op) return;
-  const label = { pick:"Picking", arm:"Pedido", cc:"Carga Camión", mov:"Movimientos" }[activity];
+  const label = { pick:"Picking", arm:"Pedido", cc:"Carga Camión",
+                  mov:"Movimientos", noprod:"No productivas" }[activity];
   const m = document.getElementById("tandaModal");
   m.querySelector(".tanda-modal-title").textContent =
     `${op.nombre} — ${label} (${dayKey.slice(8,10)}/${dayKey.slice(5,7)})`;
@@ -31542,16 +31543,20 @@ function showOperarioActivityDetail(legajo, activity) {
     return h > 0 ? `${h}h ${m2}min` : `${m2}min`;
   };
 
-  if (activity === "mov") {
+  if (activity === "mov" || activity === "noprod") {
     // Detalle por toggle: apertura, cierre y cuánto tardó (minutos).
-    const totalH = (op.movMin || 0) / 60;
-    const totalMin = Math.round(op.movMin || 0);
-    const movArr = op.movDetail || [];
+    // v21.18: el mismo popup sirve para los dos baldes (movimiento y no
+    // productivas), que antes venían mezclados en uno solo.
+    const esMovPop = activity === "mov";
+    const totalH = ((esMovPop ? op.movMin : op.noprodMin) || 0) / 60;
+    const totalMin = Math.round((esMovPop ? op.movMin : op.noprodMin) || 0);
+    const movArr = (esMovPop ? op.movDetail : op.noprodDetail) || [];
     const movLabel = {
       MG: "Guardado a Góndola", RI: "Recepción Insumos",
       EI: "Entrega Insumos",    RT: "Recepción Mercadería",
       AT: "Atendí Timbre",      PB: "Paré Baño",
-      Limp: "Limpieza"
+      Limp: "Limpieza",         PC: "Paré Comida",
+      CT: "Conteo",             Perm: "Permiso de Salida"
     };
     const fmtMin = (ms) => `${Math.round(ms / 60000)} min`;
     if (!movArr.length) {
@@ -32261,10 +32266,23 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     if (!prev || ts < prev) ingresoByLegajo.set(leg, ts);
   }
 
-  // Códigos que contamos como "movimientos" en la tabla Mts3xHora:
-  // toggles internos cuyo TIEMPO (sumatoria de duraciones cerradas) interesa
-  // saber por operario. Cuentan PB y Limp también (decisión del supervisor).
-  const MOV_TOGGLE_CODES = new Set(["MG", "RI", "EI", "RT", "AT", "PB", "Limp"]);
+  /* Toggles internos cuyo TIEMPO (sumatoria de duraciones cerradas) interesa
+     saber por operario.
+
+     ⚠ v21.18 (Damián, via Marianela) — ANTES ERA UN SOLO BALDE con PB y Limp
+     adentro ("decisión del supervisor"), o sea que **ir al baño contaba como
+     movimiento de mercadería**. Damián pidió las dos cosas separadas, así que
+     acá quedan separadas y con los mismos códigos que usa la vista
+     `gv_monitor_horas_operario`, que es la que ve la TV: si algún día se
+     vuelven a mostrar estos números, los dos lados dicen lo mismo.
+
+     ⚠ Y OJO CON ESTO: la tabla "Mts3 x Hora" YA NO SE DIBUJA. `renderMonitor`
+     no existe, `_monitorLiveStats` no lo escribe nadie y `fetchMonitorDayStats`
+     sólo lo llaman los tests. O sea que HOY este cálculo no se ve en ninguna
+     pantalla: el número vivo es el de la vista. Se deja alineado para que el
+     día que se lo reviva no arranque mintiendo. */
+  const MOV_TOGGLE_CODES    = new Set(["MG", "RI", "EI", "RT"]);
+  const NOPROD_TOGGLE_CODES = new Set(["AT", "PB", "Limp", "PC", "CT", "Perm"]);
 
   // Lookup m3 por tanda: sheetMap actual primero (más fresco), después la
   // histórica del Sheet. ANTES del loop de eventos porque el detail necesita
@@ -32440,7 +32458,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       pickedTandas: new Set(), pickedDetail: [], pickMs: 0,
       armedTandas:  new Set(), armedDetail:  [], armMs:  0,
       ccTandas:     new Set(), ccDetail:     [], ccMs:   0,
-      comidaMs: 0, movMs: 0, movDetail: [], fjTs: null
+      comidaMs: 0, movMs: 0, movDetail: [], noprodMs: 0, noprodDetail: [], fjTs: null
     });
     const p = perLegajo.get(leg);
     p.lastTs = ev.ts_cliente;
@@ -32464,17 +32482,19 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     }
     // Toggles de movimiento: sumar duración cuando se cierra (ts_inicio set)
     // y guardar el evento en movDetail para el popup.
-    if (MOV_TOGGLE_CODES.has(ev.opcion) && ev.ts_inicio) {
+    if ((MOV_TOGGLE_CODES.has(ev.opcion) || NOPROD_TOGGLE_CODES.has(ev.opcion)) && ev.ts_inicio) {
       const dur = new Date(ev.ts_cliente) - new Date(ev.ts_inicio);
       if (dur > 0 && dur < 8 * 3600 * 1000) {
-        p.movMs += dur;
-        p.movDetail.push({
+        const esMov = MOV_TOGGLE_CODES.has(ev.opcion);
+        const fila = {
           opcion: ev.opcion,
           texto: ev.texto || "",
           ts_inicio: ev.ts_inicio,
           ts_cliente: ev.ts_cliente,
           durMs: dur
-        });
+        };
+        if (esMov) { p.movMs += dur; p.movDetail.push(fila); }
+        else       { p.noprodMs += dur; p.noprodDetail.push(fila); }
       }
     }
     if (ev.opcion === "FJ") p.fjTs = ev.ts_cliente;
@@ -32502,37 +32522,41 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const m3hArm  = (armH  > 0 && m3Arm  > 0) ? m3Arm  / armH  : 0;
     const m3hCC   = (ccH   > 0 && m3CC   > 0) ? m3CC   / ccH   : 0;
     const movMin  = p.movMs / 60000;
+    const noprodMin = p.noprodMs / 60000;
     perOperario.push({
       legajo: leg,
       nombre: nombres.get(leg) || ("Leg " + leg),
       m3Pick, m3Arm, m3CC,
       pickH, armH, ccH,
-      m3hPick, m3hArm, m3hCC, movMin,
+      m3hPick, m3hArm, m3hCC, movMin, noprodMin,
       pickedDetail: p.pickedDetail,
       armedDetail:  p.armedDetail,
       ccDetail:     p.ccDetail,
       movDetail:    p.movDetail,
+      noprodDetail: p.noprodDetail,
       didPick: p.pickedTandas.size > 0,
       didArm:  p.armedTandas.size  > 0,
       didCC:   p.ccTandas.size     > 0,
-      didMov:  p.movMs > 0
+      didMov:  p.movMs > 0,
+      didNoprod: p.noprodMs > 0
     });
   }
   // Totales: sumamos m3 y horas REALES por actividad (no por operario completo)
   // así el total m3/h refleja la productividad real de la actividad ese día.
   let pickM3 = 0, pickHsum = 0, sepM3 = 0, sepHsum = 0;
-  let ccM3 = 0, ccHsum = 0, movMinTot = 0;
+  let ccM3 = 0, ccHsum = 0, movMinTot = 0, noprodMinTot = 0;
   for (const o of perOperario) {
     pickM3 += o.m3Pick; pickHsum += o.pickH;
     sepM3  += o.m3Arm;  sepHsum  += o.armH;
     ccM3   += o.m3CC;   ccHsum   += o.ccH;
     movMinTot += o.movMin;
+    noprodMinTot += (o.noprodMin || 0);
   }
   const totals = {
     pickM3, pickHsum, pickM3h: pickHsum > 0 ? pickM3 / pickHsum : 0,
     sepM3,  sepHsum,  sepM3h:  sepHsum  > 0 ? sepM3  / sepHsum  : 0,
     ccM3,   ccHsum,   ccM3h:   ccHsum   > 0 ? ccM3   / ccHsum   : 0,
-    movMin: movMinTot
+    movMin: movMinTot, noprodMin: noprodMinTot
   };
   perOperario.sort((a, b) => (b.m3Pick + b.m3Arm + b.m3CC) - (a.m3Pick + a.m3Arm + a.m3CC));
   const data = { perOperario, totals };

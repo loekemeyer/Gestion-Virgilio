@@ -71,9 +71,10 @@ const HOY = key(Date.now());
 const MANANA = key(Date.now() + 86400000);
 const H = 3600 * 1000;
 const iso = (ms) => new Date(ms).toISOString();
-/* Fecha de entrada del pedido, para la columna «Días» (v21.17). 28 días
-   corridos son siempre más de 10 hábiles, caiga donde caiga el fin de semana:
-   así el caso ROJO no depende de qué día se corra el test. */
+/* Fecha de entrada del pedido, para la columna «Días» (v21.18: entrega − pedido).
+   28 días corridos antes de HOY son siempre más de 10 hábiles contra una entrega
+   de hoy, caiga donde caiga el fin de semana: así el caso ROJO no depende de qué
+   día se corra el test. */
 const RECEP_VIEJA = key(Date.now() - 28 * 86400000);
 
 const DATOS = {
@@ -92,7 +93,11 @@ const DATOS = {
       razon_social: "Nexxo S.R.L.", zona: "Zona 1 - CABA Sur", fecha_recep: HOY },
     // v20.20: E36A está EN CURSO y ya tiene CCN (salió sin cerrar) → 🚚 en la tabla principal.
     // E37A y E38A completan las 3 que disparan el cartel de "salieron sin facturar".
-    { tanda: "E36A", np: "98806", m3: 1.0, fecha_entrega: HOY },
+    /* E36A entró HOY y sale HOY → «Días» = 0. Es el control del caso sano:
+       sin él, en la tabla sólo quedan E30A (28 días) y E32A (1), porque las
+       terminadas se van al panel «a facturar». */
+    { tanda: "E36A", np: "98806", m3: 1.0, fecha_entrega: HOY,
+      razon_social: "Valher SRL", zona: "Zona 1 - CABA Sur", fecha_recep: HOY },
     { tanda: "E37A", np: "98807", m3: 1.0, fecha_entrega: HOY },
     { tanda: "E38A", np: "98808", m3: 1.0, fecha_entrega: HOY }
   ],
@@ -291,14 +296,18 @@ function responder(url) {
      la columna de progreso. */
   ok(/s-curso/.test(r.tandas), "el semáforo no marca lo que está EN CURSO");
   ok(/s-no/.test(r.tandas), "el semáforo no marca lo que NO se empezó");
-  /* Días de demora: el pedido de hace 28 días corridos tiene que salir en rojo
-     (más de 10 hábiles, regla 4 de Luis); el de hoy, en 0 y sin alarma. */
+  /* Días = hábiles entre la fecha del pedido y la de programación (Thomas, 22/09).
+     E30A entró hace 28 días y se entrega HOY → más de 10 hábiles, rojo. E31A entró
+     hoy y sale hoy → 0. ⚠ E32A entró hoy y sale MAÑANA: si el número se calculara
+     "hasta hoy" daría 0 y este test no lo distinguiría — por eso se mira E32A = 1. */
   /* Se mira la celda de Días, no el color suelto: #f87171 ya lo usa el reloj de
      una fase que lleva más de 2 h, así que un `/#f87171/` pelado da verde solo. */
   ok(/class="cen t-dias" style="color:#f87171"/.test(r.tandas),
      "un pedido de hace 28 días no se marca como demorado en la columna Días");
   ok(/class="cen t-dias" style="color:#94a3b8">0</.test(r.tandas),
-     "un pedido que entró hoy tiene que decir 0 y no marcar demora");
+     "un pedido que entró hoy y sale hoy tiene que decir 0 y no marcar demora");
+  ok(/class="cen t-dias" style="color:#94a3b8">1</.test(r.tandas),
+     "un pedido que entró hoy y sale MAÑANA tiene que decir 1 (entrega − pedido, no 'hasta hoy')");
   ok(/Mié|Lun|Mar|Jue|Vie|Sáb|Dom/.test(r.tandasTit), "el título no dice el día de la semana: " + r.tandasTit);
   /* La columna «Salida» salió de la tabla: el día tiene que quedar igual a la
      vista, como separador, o hoy y mañana se mezclan sin que se note. */

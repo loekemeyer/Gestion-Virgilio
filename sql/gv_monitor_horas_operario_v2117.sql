@@ -1,5 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- v21.17 — Horas por operario del día, clasificadas (pedido de Damián, 22/09)
+-- v21.17 / v21.18 — Horas por operario del día, clasificadas
+--                   (pedido de Damián, 22/09, via Marianela)
 --
 -- El monitor de la TV mostraba m³ pickeados y armados del día, pero NADA por
 -- operario: la tabla "Mts3 x Hora" se había dejado afuera a propósito porque
@@ -8,11 +9,11 @@
 --
 -- ⚠ LA CLASIFICACIÓN VIVE ACÁ, NO EN EL FRONT. Es una regla de negocio (qué
 --   cuenta como hora productiva), así que va al backend — protocolo del repo.
---   El monitor grande y la TV leen el mismo número.
 --
--- ⚠ Y CORRIGE UNA MEZCLA QUE YA ESTABA: `MOV_TOGGLE_CODES` de index.html es
+-- ⚠ Y CORRIGE UNA MEZCLA QUE YA ESTABA: `MOV_TOGGLE_CODES` de index.html era
 --   {MG, RI, EI, RT, AT, PB, Limp} — o sea que "Paré Baño" y "Limpieza"
---   contaban como MOVIMIENTO de mercadería. Acá van separados:
+--   contaban como MOVIMIENTO de mercadería. Acá van separados, y en la v21.18
+--   `index.html` se alineó con esto mismo:
 --
 --     PRODUCTIVAS  TP  TAP  CC  CR  RR       picking, armado, carga camión, remitos
 --     MOVIMIENTO   MG  RT   RI  EI           guardado a góndola, recepción, insumos
@@ -20,6 +21,15 @@
 --
 --   Un código que no esté en ninguna de las tres NO suma a ningún balde
 --   (PKC, CCN, TAL… no tienen duración).
+--
+-- ⚠ v21.18 — EL TIEMPO MUERTO SE RESTA de la tarea que lo contiene, que es la
+--   regla de Luis del 16/09 (v19.07, problema 349): *"si arma 1 h, va al baño
+--   10 min y arma 50 min más, debería ser 1 h 50 de armado y 10 de baño, cada
+--   uno contado individual"*. Sin esto la TV y el monitor grande daban números
+--   distintos para el mismo día. Medido con el ejemplo de Luis, en una
+--   transacción abortada: **armado 169,8 min · no productivas 10,2 min**, o sea
+--   los mismos 170 y 10 que verifica `tests/muerto-neteado.cjs` sobre
+--   `fetchMonitorDayStats`.
 --
 -- ⚠ El tiempo se acredita UNA vez por tanda (≡ index.html v12.97): si una
 --   tanda se cerró dos veces por error, las horas no se cuentan dos veces.
@@ -29,10 +39,9 @@
 -- ⚠⚠ LOS BALDES PUEDEN SOLAPARSE Y SU SUMA PASARSE DE `hs_total`. `CR` y `RR`
 --    son toggles que sobreviven abiertos mientras el operario hace otra cosa
 --    (SURVIVING_TOGGLES). Medido el 22/09 con el legajo 104: RR 08:42→11:43
---    corriendo en paralelo con RT, AT y dos MG → 8,62 h de baldes contra 6,03 h
---    de jornada. NO es un error de la vista: es lo que pasó. Por eso el front
---    saca el "% productivas" sobre el tiempo MEDIDO (prod+mov+noprod) y no
---    sobre la jornada, que daría más de 100 %.
+--    corriendo en paralelo con RT, AT y dos MG. NO es un error de la vista: es
+--    lo que pasó. Por eso el front saca el "% productivas" sobre el tiempo
+--    MEDIDO (prod+mov+noprod) y no sobre la jornada, que daría más de 100 %.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 create or replace view public.gv_monitor_horas_operario as
@@ -54,12 +63,34 @@ base as (
    aporta las horas de HOY. Sin ese recorte, un TP que cierra el EP del viernes
    le metía el fin de semana entero al lunes. */
 inicio as (select legajo, min(ts_cliente) as arranque from base group by legajo),
+ev0 as (select b.*, i.arranque from base b join inicio i on i.legajo = b.legajo),
+/* Los ratos de tiempo muerto del día, por operario. `DEAD_TIME_CODES` de
+   index.html: mientras están abiertos BLOQUEAN todo, así que no se pisan entre
+   sí y sumar los solapes no cuenta nada dos veces. */
+muerto as (
+  select legajo, greatest(ts_inicio, arranque) as ini, ts_cliente as fin
+    from ev0
+   where opcion in ('AT','PB','Limp','PC','CT')
+     and ts_inicio is not null
+     and ts_cliente > greatest(ts_inicio, arranque)
+),
 ev as (
-  select b.*, i.arranque,
-         case when b.ts_inicio is null then null
-              else greatest(0, extract(epoch from
-                   (b.ts_cliente - greatest(b.ts_inicio, i.arranque)))) end as dur_s
-    from base b join inicio i on i.legajo = b.legajo
+  select e.*,
+         case when e.ts_inicio is null then null else greatest(0,
+           extract(epoch from (e.ts_cliente - greatest(e.ts_inicio, e.arranque)))
+           /* El descuento va SÓLO en las productivas: el baño que pasó adentro
+              de un armado no es armado. A los toggles de movimiento no se les
+              resta nada — los de tiempo muerto los bloquean, así que no pueden
+              solaparse. Y a los de tiempo muerto tampoco, o se restarían a sí
+              mismos. */
+           - case when e.opcion in ('TP','TAP','CC','CR','RR') then coalesce((
+               select sum(extract(epoch from (least(e.ts_cliente, m.fin)
+                        - greatest(greatest(e.ts_inicio, e.arranque), m.ini))))
+                 from muerto m
+                where m.legajo = e.legajo
+                  and m.fin > greatest(e.ts_inicio, e.arranque)
+                  and m.ini < e.ts_cliente), 0) else 0 end) end as dur_s
+    from ev0 e
 ),
 /* Un cierre sin `ts_inicio` no es un cierre. El tope de 24 h saca los arrastres
    absurdos (un toggle que quedó abierto y lo cerró el autocierre). */
@@ -146,13 +177,36 @@ values
   'Damian (via Marianela)','v21.17'),
  ('gv_monitor_horas_operario','vista','opcion <> ''LT''',
   'La llegada tarde (LT) es tiempo NO trabajado y no entra en ningun balde de horas (= index.html fetchMonitorDayStats).',
-  'Damian (via Marianela)','v21.17');
+  'Damian (via Marianela)','v21.17'),
+ ('gv_monitor_horas_operario','vista','muerto',
+  'El tiempo muerto (AT/PB/Limp/PC/CT) se RESTA de las horas productivas que lo contienen: si arma 1 h, va al bano 10 min y arma 50 min mas, son 1 h 50 de armado y 10 de bano, cada uno contado individual (regla de Luis, v19.07 = computeClosureDur de index.html).',
+  'Luis (v19.07) / Damian','v21.18');
 
--- Chequeos
+-- ── Chequeos ────────────────────────────────────────────────────────────────
 --   select * from public.gv_reglas_perdidas;             -- vacia = todo bien
 --   select * from public.gv_monitor_horas_operario;      -- las horas de hoy
 --   -- y que la anon la vea IGUAL que postgres (trampa de la v20.45):
 --   set local role anon; select count(*) from public.gv_monitor_horas_operario;
+--
+-- El ejemplo de Luis, PROBADO de verdad y sin dejar nada: el `raise` aborta la
+-- transaccion, asi que los eventos de prueba NO quedan. Tiene que dar
+-- armado 169,8 min (110 + 60) y no productivas 10,2 min.
+--
+-- do $$
+-- declare d date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
+--         v_arm numeric; v_no numeric; v_mov numeric;
+-- begin
+--   insert into public."Registros_Produccion_Virgilio"(legajo,opcion,descripcion,texto,ts_cliente,ts_inicio,client_id) values
+--    ('999','AP','prueba','Z01A',(d+time '09:00') at time zone 'America/Argentina/Buenos_Aires',null,'__PRUEBA_HS_1__'),
+--    ('999','PB','prueba','',    (d+time '10:10') at time zone 'America/Argentina/Buenos_Aires',(d+time '10:00') at time zone 'America/Argentina/Buenos_Aires','__PRUEBA_HS_2__'),
+--    ('999','TAP','prueba','Z01A',(d+time '11:00') at time zone 'America/Argentina/Buenos_Aires',(d+time '09:00') at time zone 'America/Argentina/Buenos_Aires','__PRUEBA_HS_3__'),
+--    ('999','AP','prueba','Z01B',(d+time '11:05') at time zone 'America/Argentina/Buenos_Aires',null,'__PRUEBA_HS_4__'),
+--    ('999','TAP','prueba','Z01B',(d+time '12:05') at time zone 'America/Argentina/Buenos_Aires',(d+time '11:05') at time zone 'America/Argentina/Buenos_Aires','__PRUEBA_HS_5__');
+--   select hs_arm, hs_noprod, hs_mov into v_arm, v_no, v_mov
+--     from public.gv_monitor_horas_operario where legajo = '999';
+--   raise exception 'PRUEBA-> armado_min=% noprod_min=% mov_min=%',
+--     round(v_arm*60,1), round(v_no*60,1), round(v_mov*60,1);
+-- end $$;
 
 -- Rollback: drop view public.gv_monitor_horas_operario;
 --           delete from public."GV_Reglas_Centinela" where objeto = 'gv_monitor_horas_operario';

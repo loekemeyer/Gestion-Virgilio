@@ -70,10 +70,17 @@ const EVENTOS = [
       out.A_Z01A_muerto_10 = !!(a && a.breakdown && Math.round(a.breakdown.muertoMs / 60000) === 10);
       out.A_Z01B_intacta   = !!(bb && Math.round(bb.durMs / 60000) === 60
                               && bb.breakdown && Math.round(bb.breakdown.muertoMs / 60000) === 0);
-      // el baño sigue contándose aparte (MOV_TOGGLE_CODES lo suma en movMin): 10 min.
-      // Eso es el "cada uno contado individual" del pedido: se resta del armado Y se
-      // suma en su propio casillero, no desaparece.
-      out.A_bano_aparte = Math.round(op.movMin || 0) === 10;
+      /* El baño sigue contándose aparte: 10 min. Eso es el "cada uno contado
+         individual" del pedido de Luis — se resta del armado Y se suma en su
+         propio casillero, no desaparece.
+         ⚠ v21.18 (Damián): ese casillero ya NO es `movMin`. Hasta la v21.17 el
+         baño, el timbre y la limpieza se sumaban junto con el guardado a góndola
+         y la recepción, o sea que "movimiento de mercadería" incluía ir al baño.
+         Ahora son dos baldes y el baño va en `noprodMin`; `movMin` tiene que
+         quedar en CERO, que es lo que prueba que la separación existe de verdad
+         y no es sólo un renombre. */
+      out.A_bano_aparte     = Math.round(op.noprodMin || 0) === 10;
+      out.A_bano_no_es_mov  = Math.round(op.movMin || 0) === 0;
     }
 
     /* ============ (B) no volver a cerrar lo que el server ya cerró ============ */

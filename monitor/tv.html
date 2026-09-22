@@ -141,7 +141,7 @@ table.tandas{table-layout:fixed}
 .t-cli{font-size:1.75vh;font-weight:800;color:#e2e8f0;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 .t-cli b{color:#64748b;font-weight:900;font-size:1.4vh}
-.t-zona{font-size:1.4vh;font-weight:800;color:#94a3b8;white-space:nowrap;
+.t-zona{font-size:1.3vh;font-weight:800;color:#94a3b8;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 .t-dias{font-weight:900;font-size:2vh}
 /* Semáforo: dos luces, picking y armado. Rojo = no empezó · ámbar = en curso ·
@@ -615,14 +615,20 @@ function zonaCorta(zona) {
   return s.length > 16 ? s.slice(0, 15).trim() + "…" : s;
 }
 
-/* Días HÁBILES que lleva esperando el pedido más viejo de la tanda, contados
-   desde que entró (`fecha_recep`) hasta hoy. Es el número de la regla 4 de
-   Luis: «los pedidos no pueden demorar más de 10 días hábiles en salir».
-   Sábados, domingos y feriados no cuentan — ≡ index.html / durLaboralMs. */
-function diasDemora(recepRaw) {
-  if (!recepRaw) return null;
+/* Días HÁBILES entre la fecha del PEDIDO (`fecha_recep`) y la fecha en que
+   quedó PROGRAMADO (`fecha_entrega`) — Thomas, 22/09: *"fecha programacion -
+   fecha pedido"*. Es la demora con la que sale, no la que lleva acumulada: el
+   número no se mueve mientras la tanda espera. Se toma el pedido MÁS VIEJO de
+   la tanda, que es el que más esperó.
+   Es el número de la regla 4 de Luis: «los pedidos no pueden demorar más de 10
+   días hábiles en salir». Sábados, domingos y feriados no cuentan — ≡
+   index.html / durLaboralMs.
+   ⚠ Si la fecha de entrega ya pasó y la tanda sigue ahí, este número NO crece:
+   dice lo que se prometió, no lo que se está tardando. */
+function diasDemora(recepRaw, entregaRaw) {
+  if (!recepRaw || !entregaRaw) return null;
   var ini = new Date(recepRaw + "T00:00:00-03:00").getTime();
-  var fin = new Date(hoyKey() + "T00:00:00-03:00").getTime();
+  var fin = new Date(entregaRaw + "T00:00:00-03:00").getTime();
   if (!(fin > ini)) return 0;
   /* Cada `t` cae a las 00:00 de Argentina, que en UTC son las 03:00 del MISMO
      día (no hay horario de verano), así que `getUTCDay` da el día correcto sin
@@ -1024,7 +1030,7 @@ function pintar(d) {
       ? esc(resumirCliente(v.clientes[0])) +
         (v.clientes.length > 1 ? ' <b>+' + (v.clientes.length - 1) + '</b>' : "")
       : '<span style="color:#475569">—</span>';
-    var dias = diasDemora(v.recep);
+    var dias = diasDemora(v.recep, v.fechaRaw);
     /* Encabezado del día. Las tandas vienen ordenadas por fecha de entrega, así
        que alcanza con mirar cuándo cambia. */
     if (v.fechaRaw !== diaEnCurso) {
@@ -1070,11 +1076,11 @@ function pintar(d) {
   el("tandasTit").innerHTML = "Tandas <small>· entrega " + esc(etiqueta) + "</small>";
   var topeT = cabenFilas("tandasBox", true);
   el("tandasBox").innerHTML = filas.length
-    ? '<table class="tandas"><colgroup><col style="width:12.5%"><col style="width:13.5%">' +
-      '<col><col style="width:6.5%"><col style="width:6%"><col style="width:14%">' +
+    ? '<table class="tandas"><colgroup><col style="width:12.5%"><col style="width:12.5%">' +
+      '<col><col style="width:6.5%"><col style="width:6%"><col style="width:15%">' +
       '<col style="width:16.5%"></colgroup>' +
       '<thead><tr><th>Tanda</th><th>N° Pedido</th><th>Cliente</th>' +
-      '<th class="num">M³</th><th class="cen" title="Días hábiles desde que entró el pedido">Días</th>' +
+      '<th class="num">M³</th><th class="cen" title="Días hábiles entre la fecha del pedido y la fecha para la que quedó programado">Días</th>' +
       '<th>Zona</th><th class="cen">Progreso</th></tr></thead><tbody>' +
       filas.slice(0, topeT).join("") + '</tbody></table>' +
       (filas.length > topeT ? '<div class="mas">+ ' + (filas.length - topeT) + ' más</div>' : "")

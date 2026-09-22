@@ -1,3 +1,49 @@
+## Nota v21.18 (2026-09-22) — Las tres respuestas de Thomas sobre el monitor
+
+### 1. «Días» pasó a ser **fecha de programación − fecha de pedido**
+
+Textual: *"fecha programacion - fecha pedido"*. La v21.17 lo contaba **hasta hoy** (antigüedad del
+pedido); ahora es la demora **con la que sale**: días hábiles entre `fecha_recep` y
+`fecha_entrega`, tomando el pedido más viejo de la tanda. Los umbrales no cambian (ámbar 7, rojo
+10 — regla 4 de Luis).
+
+⚠ **El número ya no crece mientras la tanda espera.** Si la fecha de entrega pasó y el pedido
+sigue ahí, «Días» dice **lo que se prometió**, no lo que se está tardando. Es lo que se pidió; si
+algún día hace falta ver el atraso real, es otra columna, no ésta.
+
+### 2. «Unificar el monitor grande» — y lo que apareció al abrirlo
+
+**La tabla «Mts3 x Hora» del monitor grande YA NO SE DIBUJA.** Medido sobre `index.html`:
+`renderMonitor` **no existe** (queda nombrado en tres comentarios), `_monitorLiveStats` se declara
+y se lee pero **no lo escribe nadie**, y `fetchMonitorDayStats` **sólo lo llaman los tests**. O sea
+que la mezcla vieja —baño y limpieza contando como movimiento de mercadería— **no llegaba a
+ninguna pantalla**, y los dos números nunca podían contradecirse delante de nadie.
+
+Se alineó igual, porque son ~350 renglones que alguien va a revivir:
+
+| | antes | ahora |
+|---|---|---|
+| `MOV_TOGGLE_CODES` | MG · RI · EI · RT · **AT · PB · Limp** | MG · RI · EI · RT |
+| `NOPROD_TOGGLE_CODES` | — | AT · PB · Limp · PC · CT · Perm |
+
+Y **la vista aprendió la regla de Luis del 16/09** (v19.07, problema 349): *"si arma 1 h, va al
+baño 10 min y arma 50 min más, debería ser 1 h 50 de armado y 10 de baño, cada uno contado
+individual"*. Sin eso las dos pantallas daban números distintos para el mismo día. **Medido con el
+ejemplo de Luis, en una transacción abortada: armado 169,8 min · no productivas 10,2 min** — los
+mismos 170 y 10 que `tests/muerto-neteado.cjs` le exige al monitor grande.
+
+⚠ El descuento va **sólo en las productivas**: a los toggles de movimiento no se les resta (los de
+tiempo muerto los bloquean, así que no pueden solaparse) y a los de tiempo muerto tampoco, o se
+restarían a sí mismos.
+
+### 3. El legajo 600 es el de entrevistas
+
+Hoy sale en la tabla como **«Leg 600»** porque no tiene fila en `Empleados`, y figura trabajando
+(3,13 h de picking el 22/09). **No se tocó**: darle nombre es un `insert` en `Empleados`, que es la
+tabla del login por legajo — el SQL y sus efectos están en el chat, esperando el «sí».
+
+`sql/gv_monitor_horas_operario_v2117.sql`, §3.ml.
+
 ## Nota v21.17 (2026-09-22) — Monitor TV: la tabla de tandas que pidió Damián, y las horas por operario
 
 Pedido de **Damián**, que lo pasó Marianela por WhatsApp con un boceto de las dos tablas.

@@ -29111,10 +29111,28 @@ ver por operario **cuánto tardó en promedio cada tanda y en qué se fue el res
 negocio**, y la miran dos pantallas (la TV y, cuando se enganche, el monitor grande). Protocolo
 del repo. Cuatro filas en `GV_Reglas_Centinela` la sostienen.
 
-⚠ **Corrige una mezcla que ya estaba en `index.html`:** `MOV_TOGGLE_CODES` es
+⚠ **Corrige una mezcla que ya estaba en `index.html`:** `MOV_TOGGLE_CODES` era
 `{MG, RI, EI, RT, AT, PB, Limp}` — *"Paré Baño"* y *"Limpieza"* contaban como **movimiento de
-mercadería**. Acá van separados. El front de `index.html` **no se tocó**: sigue con su
-`movMin` de siempre, así que si alguna vez se cruzan los dos números, el bueno es el de la vista.
+mercadería**. Acá van separados, y en la **v21.18 `index.html` se alineó**: su
+`MOV_TOGGLE_CODES` quedó en `{MG, RI, EI, RT}` y apareció `NOPROD_TOGGLE_CODES`, con su propio
+`noprodMin` / `noprodDetail`.
+
+⚠⚠ **Y ojo con lo que se "unificó": la tabla «Mts3 x Hora» del monitor grande YA NO SE DIBUJA.**
+Medido el 22/09 sobre `index.html`: `renderMonitor` **no existe** (sólo se lo nombra en tres
+comentarios), `_monitorLiveStats` se declara y se lee pero **no lo escribe nadie**, y
+`fetchMonitorDayStats` **sólo lo llaman los tests** (`muerto-neteado`, `mejoras-v1297`,
+`tools/monitor-vs-vista`). O sea que la mezcla vieja **no llegaba a ninguna pantalla** y los dos
+números nunca podían contradecirse a la vista de nadie. Se alineó igual, para que el día que se
+revivan esos ~350 renglones no arranquen mintiendo.
+
+⚠ **v21.18 — el TIEMPO MUERTO se resta**, que es la regla de Luis del 16/09 (v19.07, problema
+349): *"si arma 1 h, va al baño 10 min y arma 50 min más, debería ser 1 h 50 de armado y 10 de
+baño, cada uno contado individual"*. El descuento va **sólo en las productivas**: a los toggles de
+movimiento no se les resta (los de tiempo muerto los bloquean, no pueden solaparse) y a los de
+tiempo muerto tampoco (se restarían a sí mismos). **Medido con el ejemplo de Luis, en una
+transacción abortada: armado 169,8 min · no productivas 10,2 min** — los mismos 170 y 10 que
+`tests/muerto-neteado.cjs` le exige a `fetchMonitorDayStats`. El bloque para repetirlo está
+comentado al final de `sql/gv_monitor_horas_operario_v2117.sql`.
 
 ⚠ **El tiempo se acredita UNA vez por tanda** (`group by legajo, tanda` en los CTE `pick` y
 `arm`): una tanda cerrada dos veces por error no puede contar las horas dos veces. Es la misma
