@@ -752,6 +752,45 @@ las manda directo al portal de **Chef** (`precios_super.cadena`: `cencosud` → 
 Su caso propio —NP de Chef con artículos de Loeke **sin** L— ya lo cubre `gv_fac_ajustes_isis` (v13.79): es el caso
 **inverso** al de Tierra del Fuego. `sql/gv_cliente_isis_v1775.sql`, §3.fp.
 
+## ⚠ REGLA (Luis, 2026-09-22, v21.09): la L es de CENCOSUD y de TIERRA DEL FUEGO — de nadie más
+
+**Luis, textual:** *"lo de la L debería aplicar únicamente a CENCOSUD y a pedidos que van a
+TIERRA DEL FUEGO"*.
+
+La regla v13.71 de más abajo (*"lo que entra por Chef ES de Chef; artículo LK → L al final"*)
+se leyó como *"todo pedido de Chef lleva L"*, y **no es eso**:
+
+> **La L no la decide quién FACTURA: la decide de quién son los ARTÍCULOS.**
+
+| súper | factura por | sus artículos son de | ¿L? |
+|---|---|---|:--:|
+| **Cencosud** | Chef | **LK** (matchea contra LK + `loke_products`) | **SÍ** |
+| **Dorinka** (Chango Más) | Chef | **Chef** (`usa_productos_chef`) | **NO** |
+| el resto (Coto, INC, Día, Diarco…) | LK | LK | NO |
+
+El criterio ya estaba en el código y en la config: `isChefSuper(k) && !usesChefProducts(k)`,
+que sale de `precios_super.cadena` de LK. Medido: `empresa='chef' and usa_productos_chef=false`
+devuelve **una sola cadena, Cencosud**.
+
+**Lo que estaba roto** (en `pagina-LK-copia/admin-supercot.js` y su espejo `admin/` de acá):
+`addLSuffix = isChef` en el submit y `cencosud || dorinka` en el PDF. El admin de **Chef**
+(`paginach`) siempre estuvo bien, con el comentario *"Dorinka NO lleva L (son art. de Chef);
+solo Cencosud"*.
+
+**Lo que costó, medido:** el pedido 229 de Dorinka (NP **CH 0025**) salió con los 5 códigos con
+L — `769L`, `840L`, `838L`, `865EL`, `798EL` — y del lado de LK **no hay una sola caja** de
+ninguno: 769 → 0, 798E → 0, 840 → 0, 865E → 0. Todo el stock está en Chef (40, 74, 85 y 9).
+
+⚠ **Esto NO contradice la regla de abajo: la L sigue sin sacarse nunca de un pedido.** Lo que
+cambia es **quién se la pone al armarlo**. Si un pedido ya tiene la L, viaja y rutea como
+siempre; lo que no puede es nacer con una L que no le corresponde.
+
+⚠ **Y Tierra del Fuego va por otro camino** (v13.77): ahí la L no la pone el cotizador de
+súper sino el pedido de la página de LK con sucursal de entrega en TdF. Son dos orígenes
+distintos de la misma marca.
+
+`sql/gv_secundarios_web_y_regla_L_v2109.sql`.
+
 ## ⚠⚠⚠ REGLA: LA "L" NO ES UN CÓDIGO — ES UNA DENOTACIÓN
 
 **Thomas, 2026-09-18, textual:** *"la L no existe. `026L` no es un código válido. Existe sólo para
