@@ -3533,6 +3533,38 @@ son **16** (7 con pedidos, 82 cajas), con el `motivo` que dice cuál duele: *ped
 *pedido sin OC*, *stock sin OC* o *resto* (código viejo o mal tipeado: `438E-`, `501B`, `587C`).
 `sql/gv_oc_codigos_sin_config_v2101.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-22, v21.15): pelar la L de LOS DOS LADOS es no matchear nunca
+
+Tercera pieza del agujero de la v21.12. **`reporte_agentes_equivalencia_facturar()`** —el aviso de
+Telegram *"al facturar cambíá el código"*, cron 14, 08:00 / 12:00 / 16:00 ART— no usaba
+`vista_pedidos_equivalencia`: **rehacía el join por su cuenta contra `GV_PPP_Base_Pedidos`**, o sea
+que los pedidos de la página no existían para él.
+
+Y al taparlo apareció el error que duele, que estaba también en la vista:
+
+> **`Equivalencias_Codigos` tiene dos `cod_pedido` que TERMINAN EN L** — `438EL` → `438E` y
+> `439EL` → `439E`. Pelando la L del pedido, `438EL` se compara como `438E` contra un `cod_pedido`
+> que es `438EL`: **no matchea nunca**. El pelado hacía invisibles justo a las dos equivalencias
+> que existen para códigos con L.
+
+Medido: **CH 0022 (438EL) y CH 0024 (439EL)**, las dos programadas y sin facturar, no salían en
+ningún lado. Hoy se compara el código **crudo Y el pelado**: cualquiera que matchee, avisa. Sobrar
+un aviso no cuesta nada (dice *"mirá el código al facturar"*); faltar uno cuesta una factura mal.
+
+⚠ **Esto NO vale para `Equivalencias_Familia`** (`vista_pedidos_secundarios`): ahí `cod_secundario`
+no tiene **ni una** fila terminada en L, así que pelar es lo correcto y se deja como está. La
+diferencia no se adivina — se mide: `where upper(btrim(<col>)) ~ '[0-9E]L$'`.
+
+⚠ **La consulta del aviso salió de la función y es una VISTA**
+(`gv_equivalencia_facturar_pendiente`), para poder probarla sin mandar el Telegram: `tg_enqueue`
+escribe en `telegram_outbox` y el cron 28 lo vacía **cada minuto**, así que llamar a la función
+"para ver qué da" manda el mensaje de verdad. La prueba va dentro de un `do $$ … raise exception $$`
+que aborta todo (verificado: la fila encolada desapareció al revertir).
+
+**Chequeo:** `select * from public.gv_equivalencia_facturar_pendiente;` ·
+`select * from public.gv_reglas_perdidas;` — vacía = todo bien.
+`sql/gv_equivalencia_facturar_web_v2115.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-22, v21.14): los códigos 544, 560 y 800 NO se reparten — cada uno lleva el TOTAL
 
 **Luis, textual:** *"excepción para 3 códigos. 544, 560 y 800 deberían generar OCs por el total
