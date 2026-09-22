@@ -29117,13 +29117,16 @@ mercadería**. Acá van separados, y en la **v21.18 `index.html` se alineó**: s
 `MOV_TOGGLE_CODES` quedó en `{MG, RI, EI, RT}` y apareció `NOPROD_TOGGLE_CODES`, con su propio
 `noprodMin` / `noprodDetail`.
 
-⚠⚠ **Y ojo con lo que se "unificó": la tabla «Mts3 x Hora» del monitor grande YA NO SE DIBUJA.**
-Medido el 22/09 sobre `index.html`: `renderMonitor` **no existe** (sólo se lo nombra en tres
-comentarios), `_monitorLiveStats` se declara y se lee pero **no lo escribe nadie**, y
-`fetchMonitorDayStats` **sólo lo llaman los tests** (`muerto-neteado`, `mejoras-v1297`,
-`tools/monitor-vs-vista`). O sea que la mezcla vieja **no llegaba a ninguna pantalla** y los dos
-números nunca podían contradecirse a la vista de nadie. Se alineó igual, para que el día que se
-revivan esos ~350 renglones no arranquen mintiendo.
+⚠⚠ **CORRECCIÓN v21.19 — acá decía que la tabla «Mts3 x Hora» del monitor grande ya no se
+dibujaba, y era FALSO.** `renderMonitor` la dibuja, escribe `_monitorLiveStats` y llama a
+`fetchMonitorDayStats`. El conteo se había hecho con `grep`, que trata a `index.html` como
+**binario** (tiene un byte NUL) y en vez de las líneas imprime *"Binary file matches"*: los
+números eran inventados. **Para contar algo ahí: `grep -a` o Python.** Se intentó borrar esos
+~520 renglones y lo frenó `tests/dead-handlers.cjs`, que se puso en rojo con
+`muertos=1 [showOperarioActivityDetail]`. Revertido.
+
+⚠ **Por eso la v21.19 le agregó al monitor grande la fila «No prod.»**: como la tabla SÍ se ve,
+sacarle el baño y la limpieza a *Movim.* dejaba esas horas sin aparecer en ningún lado.
 
 ⚠ **v21.18 — el TIEMPO MUERTO se resta**, que es la regla de Luis del 16/09 (v19.07, problema
 349): *"si arma 1 h, va al baño 10 min y arma 50 min más, debería ser 1 h 50 de armado y 10 de

@@ -290,7 +290,11 @@ function responder(url) {
   ok(!/S\.R\.L/.test(r.tandas), "no le saca la forma societaria al cliente (ocupa lugar y no distingue)");
   ok(/\+1<\/b>/.test(r.tandas), "una tanda con dos clientes tiene que decir «+1», no repetir la fila");
   ok((r.tandas.match(/E30A/g) || []).length === 1, "E30A aparece más de una vez: la tanda va en UNA fila");
-  ok(/Z3 CABA Oeste/.test(r.tandas), "no acorta la zona (Zona 3 - CABA Oeste → Z3 CABA Oeste)");
+  /* v21.19 (Thomas: "acorta"): la etiqueta larga no entraba en la columna y se
+     cortaba por un carácter. Ahora ciudad y punto cardinal van en sigla. */
+  ok(/Z3 CO/.test(r.tandas), "no acorta la zona (Zona 3 - CABA Oeste → Z3 CO)");
+  ok(/Z1 CS/.test(r.tandas), "no acorta la zona (Zona 1 - CABA Sur → Z1 CS)");
+  ok(!/CABA/.test(r.tandas), "la zona sigue escribiendo CABA entero: no se acortó");
   ok(/Retira/.test(r.tandas), "Retira NO es un número de zona y tiene que verse tal cual");
   /* Semáforo: E30A pickeando (ámbar + rojo), E36A igual; ningún ✅ suelto en
      la columna de progreso. */

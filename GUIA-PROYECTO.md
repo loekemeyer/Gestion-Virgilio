@@ -1,3 +1,58 @@
+## Nota v21.19 (2026-09-22) — La tabla «Mts3 x Hora» SÍ se dibuja: corrección de la v21.18
+
+### 1. Me equivoqué, y vale la pena que quede escrito por qué
+
+La nota v21.18 decía que la tabla «Mts3 x Hora» del monitor grande **ya no se dibujaba** y que
+`fetchMonitorDayStats` sólo lo llamaban los tests. **Es falso.** `renderMonitor` existe, la dibuja,
+escribe `_monitorLiveStats` y llama a `fetchMonitorDayStats`; `showOperarioActivityDetail` está
+bindeada en un `onclick` de esa tabla.
+
+⚠⚠ **El error salió de contar con `grep`.** `index.html` tiene un **byte NUL** adentro (el
+separador de claves de `_pppGeoCod`), así que `grep` lo trata como **binario**: no imprime las
+líneas, imprime *"Binary file matches"*. Los conteos daban 1, 2, 5 — números inventados, y encima
+verosímiles. **Para buscar o contar algo en `index.html`: `grep -a`, o Python.** Ya estaba escrito
+en el `CLAUDE.md` ("por eso `grep` lo trata como binario") y caí igual.
+
+**Lo cazó un test, no la lectura:** `tests/dead-handlers.cjs` —el que busca botones que llaman a
+funciones inexistentes— se puso en rojo con `muertos=1 [showOperarioActivityDetail]` apenas se
+borró la función. Sin ese test, el monitor grande se quedaba con una tabla que al tocarla no hacía
+nada. Se revirtió el borrado entero.
+
+### 2. Y la separación de la v21.18 SÍ se ve — así que el monitor grande tenía un agujero
+
+Como la tabla está viva, sacarle el baño y la limpieza a **Movim.** dejaba esas horas sin aparecer
+en ninguna parte. Ahora hay una fila más:
+
+| fila | qué suma |
+|---|---|
+| Picking · Pedido · CC | m³/h (o min/m³) |
+| **Movim. (h)** | MG · RT · RI · EI |
+| **No prod. (h)** ← nueva | AT · PB · Limp · PC · CT · Perm |
+
+La celda es clickeable como las otras y abre el mismo popup de desglose, ahora con `"noprod"`.
+
+⚠ **Las tarjetas «Parcial» y «Ayer» se alinean por POSICIÓN con la de al lado, no por nombre** (el
+comentario del código lo dice). Si se agrega una fila de un lado, va también del otro — si no, los
+números quedan corridos una fila y nadie lo nota.
+
+### 3. La zona va en sigla: `Z3 CO`
+
+*"acorta"* (Thomas). `Z3 CABA Oe…` se cortaba por un carácter en la columna de la TV. Ahora la
+ciudad va en su inicial y el punto cardinal en la suya: **`Z3 CO`** = Zona 3, CABA Oeste ·
+**`Z6 GN`** = Zona 6, GBA Norte. El número de zona, que es lo que se busca, queda entero y
+adelante. **`Retira` y los expresos no se tocan.** Una zona nueva que no esté en las tablas se
+abrevia igual, por iniciales.
+
+### 4. El legajo 600 ya tiene nombre
+
+Es el que se usa para **entrevistas**. Se le cargó la fila en `Empleados` (`Legajo 600`,
+`Empleado 'Entrevista'`, `Activo NO`, Sede V), con backup previo en
+`zz_backups."GV_Backup_Empleados_20260922"`. **`hora_entrada` queda en NULL a propósito**: con hora
+cargada, ese legajo empezaría a generar eventos de **Llegada Tarde** todos los días.
+
+⚠ Y `nombreCorto` de la TV ahora **saltea los pedazos sin letras**: `"Entrevista / Prueba"` salía
+`"Entrevista /."` — la inicial era la barra. Por eso el nombre quedó en una sola palabra.
+
 ## Nota v21.18 (2026-09-22) — Las tres respuestas de Thomas sobre el monitor
 
 ### 1. «Días» pasó a ser **fecha de programación − fecha de pedido**
@@ -13,13 +68,15 @@ algún día hace falta ver el atraso real, es otra columna, no ésta.
 
 ### 2. «Unificar el monitor grande» — y lo que apareció al abrirlo
 
-**La tabla «Mts3 x Hora» del monitor grande YA NO SE DIBUJA.** Medido sobre `index.html`:
-`renderMonitor` **no existe** (queda nombrado en tres comentarios), `_monitorLiveStats` se declara
-y se lee pero **no lo escribe nadie**, y `fetchMonitorDayStats` **sólo lo llaman los tests**. O sea
-que la mezcla vieja —baño y limpieza contando como movimiento de mercadería— **no llegaba a
-ninguna pantalla**, y los dos números nunca podían contradecirse delante de nadie.
+⚠⚠ **LO QUE DICE ESTE PÁRRAFO ESTABA MAL — ver la nota v21.19.** Acá se afirmó que la tabla
+«Mts3 x Hora» del monitor grande ya no se dibujaba y que `fetchMonitorDayStats` sólo lo llamaban
+los tests. **Es falso**: `renderMonitor` la dibuja. El conteo se había hecho con `grep`, que trata
+a `index.html` como binario por el byte NUL y devuelve números inventados.
 
-Se alineó igual, porque son ~350 renglones que alguien va a revivir:
+**Consecuencia real:** la separación de abajo **sí se ve** en el monitor grande, y por eso la
+v21.19 le agregó la fila **No prod.** — si no, esas horas desaparecían de la pantalla.
+
+Los códigos quedaron así:
 
 | | antes | ahora |
 |---|---|---|

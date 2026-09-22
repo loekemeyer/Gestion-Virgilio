@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.18"></script>
+<script type="module" src="recepcion.js?v=21.19"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.18";
+const APP_VERSION = "v21.19";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -32276,11 +32276,14 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
      `gv_monitor_horas_operario`, que es la que ve la TV: si algún día se
      vuelven a mostrar estos números, los dos lados dicen lo mismo.
 
-     ⚠ Y OJO CON ESTO: la tabla "Mts3 x Hora" YA NO SE DIBUJA. `renderMonitor`
-     no existe, `_monitorLiveStats` no lo escribe nadie y `fetchMonitorDayStats`
-     sólo lo llaman los tests. O sea que HOY este cálculo no se ve en ninguna
-     pantalla: el número vivo es el de la vista. Se deja alineado para que el
-     día que se lo reviva no arranque mintiendo. */
+     ⚠ CORRECCIÓN v21.19 — el comentario que estaba acá decía que la tabla
+     "Mts3 x Hora" ya no se dibujaba. ERA FALSO: `renderMonitor` existe y la
+     dibuja, escribe `_monitorLiveStats` y llama a `fetchMonitorDayStats`. El
+     error salió de contar las apariciones con `grep`, que trata a este archivo
+     como BINARIO (tiene un NUL adentro, el separador de `_pppGeoCod`) y en vez
+     de las líneas imprime "Binary file matches" — o sea que los conteos daban
+     cualquier cosa. **Para contar algo en `index.html`: `grep -a`, o Python.**
+     Lo cazó `tests/dead-handlers.cjs`. */
   const MOV_TOGGLE_CODES    = new Set(["MG", "RI", "EI", "RT"]);
   const NOPROD_TOGGLE_CODES = new Set(["AT", "PB", "Limp", "PC", "CT", "Perm"]);
 
@@ -50703,7 +50706,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // Cache para los popups (al hacer click en una celda de Mts3xHora).
   _monitorLiveStats = { todayKey, today: todayStats, yesterdayKey, yesterday: yesterdayStats };
   const operariosHoy = (todayStats && todayStats.perOperario) || [];
-  const emptyTot = { pickM3:0, pickM3h:0, sepM3:0, sepM3h:0, ccM3:0, ccM3h:0, movMin:0 };
+  const emptyTot = { pickM3:0, pickM3h:0, sepM3:0, sepM3h:0, ccM3:0, ccM3h:0, movMin:0, noprodMin:0 };
   const totHoy  = (todayStats     && todayStats.totals)     || emptyTot;
   const totAyer = (yesterdayStats && yesterdayStats.totals) || emptyTot;
   // Cada celda clickeable abre el popup con el desglose por tanda. El
@@ -50717,9 +50720,11 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
     if (did)     return `<td class="num stats-nodata" title="${msg}" ${_clk(leg, act)}>·</td>`;
     return `<td class="num">—</td>`;
   };
-  const cellMin = (val, did, leg) => {
-    if (val > 0) return `<td class="num" ${_clk(leg, "mov")}>${fmt1(val / 60)}</td>`;
-    if (did)     return `<td class="num stats-nodata" ${_clk(leg, "mov")}>·</td>`;
+  /* v21.19 — `act` es "mov" o "noprod": son DOS filas desde que se separaron
+     (antes el baño y la limpieza se sumaban adentro de Movim.). */
+  const cellMin = (val, did, leg, act) => {
+    if (val > 0) return `<td class="num" ${_clk(leg, act)}>${fmt1(val / 60)}</td>`;
+    if (did)     return `<td class="num stats-nodata" ${_clk(leg, act)}>·</td>`;
     return `<td class="num">—</td>`;
   };
 
@@ -50748,7 +50753,11 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
           </tr>
           <tr>
             <th class="row-label">Movim.<br><span class="row-unit">(h)</span></th>
-            ${operariosHoy.map(o => cellMin(o.movMin, o.didMov, o.legajo)).join("")}
+            ${operariosHoy.map(o => cellMin(o.movMin, o.didMov, o.legajo, "mov")).join("")}
+          </tr>
+          <tr>
+            <th class="row-label" title="Timbre, baño, limpieza, comida, conteo y permiso de salida. Hasta la v21.17 se sumaban adentro de Movim.">No prod.<br><span class="row-unit">(h)</span></th>
+            ${operariosHoy.map(o => cellMin(o.noprodMin, o.didNoprod, o.legajo, "noprod")).join("")}
           </tr>
         </tbody>
       </table>
@@ -50763,9 +50772,12 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
         </tbody>
       </table>
     </div>`;
-  // Los labels Picking/Pedido/CC/Movim NO van acá — quedan implícitos por la
-  // tabla Mts3 x Hora de al lado (orden: Picking, Pedido, CC, Movim). La fila
-  // Movim. muestra TOTAL HORAS (no es un m³/h) en una celda con colspan=2.
+  // Los labels Picking/Pedido/CC/Movim/No prod. NO van acá — quedan implícitos
+  // por la tabla Mts3 x Hora de al lado (orden: Picking, Pedido, CC, Movim,
+  // No prod.). Las dos últimas muestran TOTAL HORAS (no es un m³/h) en una
+  // celda con colspan=2.
+  // ⚠ Si se agrega una fila de un lado, VA TAMBIÉN del otro: se alinean por
+  //   POSICIÓN, no por nombre.
   const renderParcial = (title, t) => `
     <div class="monitor-stats-card">
       <table class="monitor-stats-table monitor-stats-parcial">
@@ -50781,6 +50793,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
           <tr><td class="num">${fmt1(t.sepM3)}</td><td class="num">${prodVal(t.sepM3h)}</td></tr>
           <tr><td class="num">${fmt1(t.ccM3)}</td><td class="num">${prodVal(t.ccM3h)}</td></tr>
           <tr><td class="num" colspan="2">${fmt1((t.movMin || 0) / 60)} h</td></tr>
+          <tr><td class="num" colspan="2">${fmt1((t.noprodMin || 0) / 60)} h</td></tr>
         </tbody>
       </table>
     </div>`;

@@ -364,7 +364,10 @@ function nH(x) {
    "Farias Juan Hilario" → "Farias J." — el apellido va primero porque así
    están cargados en `Empleados`. */
 function nombreCorto(nombre, legajo) {
-  var p = String(nombre || "").trim().split(/\s+/).filter(Boolean);
+  /* Se saltean los pedazos sin letras: un nombre como "Entrevista / Prueba"
+     salía "Entrevista /." — la inicial era la barra. */
+  var p = String(nombre || "").trim().split(/\s+/)
+            .filter(function (x) { return /[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(x); });
   if (!p.length) return "Leg " + legajo;
   if (p.length === 1) return p[0];
   return p[0] + " " + p[1].charAt(0).toUpperCase() + ".";
@@ -605,14 +608,31 @@ function resumirCliente(nombre) {
   if (!s) return "";
   return s.length > 20 ? s.slice(0, 19).trim() + "…" : s;
 }
-/* "Zona 3 - CABA Oeste" → "Z3 CABA Oeste". "Retira" y los expresos quedan como
-   están: no son número de zona y el nombre ES el dato. */
+/* "Zona 3 - CABA Oeste" → "Z3 CO". La etiqueta larga no entraba en la columna
+   —"Z3 CABA Oe…" se cortaba por un carácter— y en una pared un texto cortado se
+   lee peor que uno corto. Thomas, 22/09: *"acorta"*.
+   La ciudad queda en la inicial (CABA → C, GBA → G) y el punto cardinal en la
+   suya: **Z3 CO** = Zona 3, CABA Oeste · **Z6 GN** = Zona 6, GBA Norte. El
+   número de zona, que es lo que se busca, queda entero y adelante.
+   "Retira" y los expresos NO se tocan: no son número de zona y el nombre ES el
+   dato. */
+var ZONA_CIUDAD = { CABA: "C", GBA: "G", CAPITAL: "C" };
+var ZONA_PUNTO  = { NORTE: "N", SUR: "S", ESTE: "E", OESTE: "O", CENTRO: "C" };
 function zonaCorta(zona) {
   var s = String(zona || "").trim();
   if (!s) return "";
   var m = /^\s*Zona\s*(\d+)\s*(?:-\s*(.*))?$/i.exec(s);
-  if (m) return "Z" + m[1] + (m[2] ? " " + m[2].trim() : "");
-  return s.length > 16 ? s.slice(0, 15).trim() + "…" : s;
+  if (!m) return s.length > 16 ? s.slice(0, 15).trim() + "…" : s;
+  var resto = (m[2] || "").trim();
+  if (!resto) return "Z" + m[1];
+  var partes = resto.toUpperCase().split(/\s+/).filter(Boolean);
+  var sigla = "";
+  for (var i = 0; i < partes.length; i++) {
+    /* Lo que no está en ninguna de las dos tablas se abrevia por su inicial:
+       una zona nueva se ve corta igual, no se cae al texto largo. */
+    sigla += ZONA_CIUDAD[partes[i]] || ZONA_PUNTO[partes[i]] || partes[i].charAt(0);
+  }
+  return "Z" + m[1] + " " + sigla;
 }
 
 /* Días HÁBILES entre la fecha del PEDIDO (`fecha_recep`) y la fecha en que
