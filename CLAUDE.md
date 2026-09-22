@@ -3183,7 +3183,7 @@ perdió. Y `tests/pedidos-lectura-1vuelta.cjs`, que muerde por los dos lados (el
 código y el header que sale de verdad en la request).
 `sql/gv_base_pedidos_lectura_v2078.sql`, `sql/gv_pedidos_web_excluidos_v2078.sql`, §3.ls.
 
-## ⚠ REGLA (Luis, 2026-09-22, v20.100): en el generador de OC, **`activo` NO es una decisión**
+## ⚠ REGLA (Luis, 2026-09-22, v21.01): en el generador de OC, **`activo` NO es una decisión**
 
 **Luis, al ver el 838 en OCs:** *"quiero entender por qué figura el 838 en OCs y la lógica
 subyacente para encontrar otros códigos que estén errados"*.
@@ -3218,7 +3218,7 @@ comparando el código crudo salen **8 duales sanos** como si estuvieran sin conf
 **Chequeo:** `select * from public.gv_oc_codigos_sin_config order by pedidos desc;` — al 22/09
 son **16** (7 con pedidos, 82 cajas), con el `motivo` que dice cuál duele: *pedido sin góndola*,
 *pedido sin OC*, *stock sin OC* o *resto* (código viejo o mal tipeado: `438E-`, `501B`, `587C`).
-`sql/gv_oc_codigos_sin_config_v20100.sql`.
+`sql/gv_oc_codigos_sin_config_v2101.sql`.
 
 ## ⚠ REGLA (Luis, 2026-09-22, v20.95): un código BUSCADO se muestra aunque esté en 0
 

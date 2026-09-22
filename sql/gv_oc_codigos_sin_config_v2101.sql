@@ -1,4 +1,4 @@
--- v20.100 (Luis, 2026-09-22) — "quiero entender por que figura el 838 en OCs y la logica
+-- v21.01 (Luis, 2026-09-22) — "quiero entender por que figura el 838 en OCs y la logica
 -- subyacente para encontrar otros codigos que esten errados".
 --
 -- LA LOGICA, que es lo que hay que entender antes de mirar la lista:
@@ -87,4 +87,4 @@ alter view public.gv_oc_codigos_sin_config set (security_invoker = true);
 --   begin; set local role anon; select count(*) from public.gv_oc_codigos_sin_config; commit;
 
 comment on view public.gv_oc_codigos_sin_config is
- 'v20.100 (Luis, 22/09) - codigos que ENTRAN a vista_generador_oc sin tener fila en OC_Maximos. El universo del generador es la UNION de stock+proyeccion+demanda+capacidad+OC_Maximos, y activo sale de COALESCE(OC_Maximos.activo, true): sin fila, el codigo nace ACTIVO sin que nadie lo haya decidido. Caso testigo: 838 (Filtro Mate/Cafe), 80 cajas de Dorinka por la web de Chef, sin gondola ni proveedor.';
+ 'v21.01 (Luis, 22/09) - codigos que ENTRAN a vista_generador_oc sin tener fila en OC_Maximos. El universo del generador es la UNION de stock+proyeccion+demanda+capacidad+OC_Maximos, y activo sale de COALESCE(OC_Maximos.activo, true): sin fila, el codigo nace ACTIVO sin que nadie lo haya decidido. Caso testigo: 838 (Filtro Mate/Cafe), 80 cajas de Dorinka por la web de Chef, sin gondola ni proveedor.';
