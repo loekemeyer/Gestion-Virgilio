@@ -29023,3 +29023,68 @@ la empresa de la **NP** en vez de la que dice la L. Medido en D47B: el picking y
 `438E` fueron **LK** y el facturado quedó **CH**, así que la pila de `a_facturar` cerró en
 **LK +1 / CH −1**. `gv_stock_empresa_fantasma` no lo ve porque agrega por código sin mirar la tanda.
 Es 1 caja, y está en el Planify de Luis.
+
+---
+
+### §3.mk — v21.14: generar las OC a mano ahora mueve el ciclo automático (cron 50) — 2026-09-22
+
+**Luis, textual:** *"OCs. Generación manual. Si se generan manualmente, que consulte cuándo
+retomar el ciclo de generación automática en ese momento."*
+
+**Qué se midió.** El cron **50** (`ocs-auto-miercoles`, `0 10 * * 3` = miércoles 07:00 ART)
+llamaba a `generar_ocs_automaticas()`, cuyo único guard es **"¿ya hay OC con `fecha` = HOY?"**.
+O sea que una corrida manual del lunes **no frenaba nada**: el miércoles volvía a generar, dos
+días después. Al 22/09 la corrida completa da **153 líneas**.
+
+**Qué se hizo.** El ciclo pasó a tener un **ancla**, `GV_OC_Auto.proxima_auto`:
+
+| | |
+|---|---|
+| `GV_OC_Auto` | una fila (`id = 1`): `proxima_auto`, `cadencia_dias` (7), `motivo`, `fijado_por`, `fijado_en`. RLS con policy de **SELECT** para `anon`/`authenticated`; la escritura sólo por las dos funciones. |
+| `gv_oc_auto_corrida()` | el envoltorio que corre el cron. `hoy < ancla` → `pospuesta_hasta:<fecha>` y no genera. `hoy >= ancla` → genera y adelanta el ancla a `hoy + cadencia`. **Ancla en NULL → ciclo histórico: sólo miércoles.** |
+| `gv_oc_auto_programar(fecha, motivo)` | la RPC que llama la pantalla. `SECURITY DEFINER` con `es_supervisor_virgilio() or gv_es_supervisor_o_servicio()` adentro, `EXECUTE` revocado a `anon`. Valida que la fecha no esté en el pasado ni a más de 180 días. |
+| cron 50 | pasa a **`0 10 * * *`** (diario) y llama al envoltorio. Es lo que permite que la fecha elegida sea **cualquier día**, no sólo miércoles: el que decide es el ancla, no el `schedule`. |
+
+⚠ **`generar_ocs_automaticas(boolean)` NO SE TOCÓ.** El ciclo vive en el envoltorio: otra sesión
+puede seguir editando esa función sin pisar esta regla, y el rollback es una línea.
+
+⚠ **El ancla avanza también cuando la corrida devuelve `sin_items` o `ya_hay_del_dia`** — el
+turno de la semana ya se consumió. **No avanza con `error:`**, así que una caída se reintenta
+sola al día siguiente en vez de perder la semana.
+
+⚠ **El jobname sigue diciendo `ocs-auto-miercoles` y ya no es cierto.** No se pudo renombrar:
+`update cron.job` da `permission denied for table job` y `cron.alter_job` no tiene `job_name`.
+
+**Cómo se probó** (correrlo, no leerlo):
+
+```sql
+-- 1) hoy martes, ancla el miércoles -> no genera
+select public.gv_oc_auto_corrida();            -- pospuesta_hasta:2026-09-23
+-- 2) la rama que SÍ genera, en transacción abortada
+do $$ declare v text; n2 int; v_prox date; v_hoy date := (now() at time zone 'America/Argentina/Buenos_Aires')::date;
+begin
+  update public."GV_OC_Auto" set proxima_auto = v_hoy where id = 1;
+  v := public.gv_oc_auto_corrida();
+  select count(*) into n2 from public."Ordenes_Compra" where fecha = v_hoy;
+  select a.proxima_auto into v_prox from public."GV_OC_Auto" a where a.id = 1;
+  raise exception 'PRUEBA res=% lineas=% ancla=%', v, n2, v_prox;
+end $$;
+-- res=ok:153 | lineas_generadas=153 | ancla_nueva=2026-09-29, y todo rollback
+```
+
+**El front** (`index.html`): el contador del botón *"Generar las OCs"* deja de calcular el
+miércoles y lee el ancla (`ocgCargarAuto`, `_ocgNextAuto`) — ahora dice *"se genera sola el
+mié 23/09 · en 0D18H9M"*. Al terminar una generación manual se abre el diálogo
+`ocAutoAbrir` con atajos (en 7 días / en 14 / el próximo miércoles), un `<input type=date>`
+para cualquier otro día, y **"Dejarlo como está"**, que no escribe nada.
+
+**Chequeo:** `select * from public.gv_oc_auto_corrida();` (o mirar `GV_OC_Auto`) ·
+`select * from public.gv_reglas_perdidas;` — vacía = todo bien ·
+`node tests/oc-auto-ciclo.cjs`. `sql/gv_oc_auto_ciclo_v2114.sql`.
+
+**Rollback (deja todo como antes; la tabla puede quedar, nadie más la lee):**
+
+```sql
+select cron.alter_job(50, schedule := '0 10 * * 3',
+                          command  := 'select public.generar_ocs_automaticas()');
+```

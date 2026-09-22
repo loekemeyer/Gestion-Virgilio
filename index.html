@@ -16667,18 +16667,73 @@ async function ocgDemanda(porEmpresa, soloNoPickeadas) {
   Object.defineProperty(dem, "_sinProg", { value: sinProg, enumerable: false });
   return dem;
 }
-/* v7.33 — COUNTDOWN a la generación AUTOMÁTICA. El cron corre '0 10 * * 3' (miércoles
-   10:00 UTC = 07:00 AR, UTC-3 fijo). Se calcula en UTC directo para no depender de la
-   zona del navegador. El generador manual (esta misma pantalla) sigue disponible siempre. */
+/* v7.33 — COUNTDOWN a la generación AUTOMÁTICA. El cron 50 corre 10:00 UTC = 07:00 AR (UTC-3
+   fijo). Se calcula en UTC directo para no depender de la zona del navegador. El generador
+   manual (esta misma pantalla) sigue disponible siempre.
+
+   ⚠ v21.14 (Luis, 2026-09-22) — el día ya NO es "el miércoles que viene": lo dice el ANCLA
+   `GV_OC_Auto.proxima_auto`, que la pantalla mueve cuando alguien genera las OC a mano. El cron
+   pasó a correr TODOS los días y quien decide si genera es el ancla (`gv_oc_auto_corrida`), así
+   que el día elegido puede ser cualquiera. Sin ancla (o si la lectura falla) se cae al cálculo
+   histórico del miércoles, que es lo que hace el backend en ese mismo caso.
+   Backend: `sql/gv_oc_auto_ciclo_v2114.sql`. */
+const SUPABASE_OCAUTO_ENDPOINT = SUPABASE_URL + "/rest/v1/GV_OC_Auto";
+let _ocgAuto = null;   // { proxima:"YYYY-MM-DD", cadencia, motivo, por } · null = no se pudo leer
+async function ocgCargarAuto() {
+  try {
+    const r = await supaFetchAllSafe(SUPABASE_OCAUTO_ENDPOINT, "select=proxima_auto,cadencia_dias,motivo,fijado_por&id=eq.1");
+    const f = (r || [])[0];
+    _ocgAuto = f ? { proxima: String(f.proxima_auto || "").slice(0, 10), cadencia: Number(f.cadencia_dias) || 7,
+                     motivo: f.motivo || "", por: f.fijado_por || "" } : null;
+  } catch (_e) { _ocgAuto = null; }
+}
+// hoy en ART, como "YYYY-MM-DD" (UTC-3 fijo, igual que el resto de la app)
+function _ocgHoyArt() { return new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 10); }
+function _ocgSumarDias(iso, n) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  if (!m) return "";
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  d.setUTCDate(d.getUTCDate() + (Number(n) || 0));
+  return d.toISOString().slice(0, 10);
+}
+// el próximo miércoles ESTRICTAMENTE posterior a iso (el ciclo histórico)
+function _ocgProxMiercoles(iso) {
+  let f = _ocgSumarDias(iso, 1);
+  for (let i = 0; i < 8; i++) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(f);
+    if (m && new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay() === 3) return f;
+    f = _ocgSumarDias(f, 1);
+  }
+  return _ocgSumarDias(iso, 7);
+}
+// "mié 23/09" a partir de una fecha ART "YYYY-MM-DD"
+function _ocgFechaTxt(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  if (!m) return "";
+  const dias = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  return dias[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()] + " " + m[3] + "/" + m[2];
+}
 function _ocgNextAuto() {
   const now = new Date();
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 10, 0, 0));
-  while (d.getUTCDay() !== 3 || d.getTime() <= now.getTime()) d.setUTCDate(d.getUTCDate() + 1);
-  const ms = d.getTime() - now.getTime();
-  return { date: d, ms: ms, days: Math.floor(ms / 864e5), hours: Math.floor(ms % 864e5 / 36e5), mins: Math.floor(ms % 36e5 / 6e4) };
+  let d = null, iso = (_ocgAuto && _ocgAuto.proxima) ? _ocgAuto.proxima : "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (m) {
+    d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 10, 0, 0));   // el cron corre 10:00 UTC = 07:00 ART
+  } else {
+    d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 10, 0, 0));
+    while (d.getUTCDay() !== 3 || d.getTime() <= now.getTime()) d.setUTCDate(d.getUTCDate() + 1);
+    iso = new Date(d.getTime() - 3 * 36e5).toISOString().slice(0, 10);
+  }
+  const ms = d.getTime() - now.getTime(), msp = Math.max(0, ms);
+  return { date: d, iso: iso, ms: ms, vencida: ms <= 0,
+           days: Math.floor(msp / 864e5), hours: Math.floor(msp % 864e5 / 36e5), mins: Math.floor(msp % 36e5 / 6e4) };
 }
 /* v7.67 — texto del contador que va DENTRO del botón "Generar las OCs". */
-function _ocgAutoEnTxt() { const n = _ocgNextAuto(); return "se genera automáticamente en " + n.days + "D" + n.hours + "H" + n.mins + "M"; }
+function _ocgAutoEnTxt() {
+  const n = _ocgNextAuto();
+  if (n.vencida) return "se genera sola en la próxima corrida (07:00)";
+  return "se genera sola el " + _ocgFechaTxt(n.iso) + " · en " + n.days + "D" + n.hours + "H" + n.mins + "M";
+}
 let _ocgCdTimer = null;
 function ocgStartCountdown() { if (_ocgCdTimer) return; _ocgCdTimer = setInterval(function () { const el = document.getElementById("ocgCountdown"); if (!el) { clearInterval(_ocgCdTimer); _ocgCdTimer = null; return; } el.textContent = _ocgAutoEnTxt(); }, 30000); }
 /* v9.12 — OC de IMPORTADOS (circuito propio, aparte del generador nacional). Lee la vista
@@ -16849,6 +16904,9 @@ async function ocgEnter() {
     const items = itemsAll.filter(function (it) { return it.falta > 0; });
     _oc.gen = { items: items, itemsAll: itemsAll, fecha: new Date().toISOString().slice(0, 10) };
     ocRender();
+    // v21.14 — el ancla del ciclo automático; el contador la usa. En su propia llamada con su
+    // propio catch: si falla, el contador se cae al miércoles y el generador sigue andando.
+    ocgCargarAuto().then(function () { const el = document.getElementById("ocgCountdown"); if (el) el.textContent = _ocgAutoEnTxt(); });
     ocgStartCountdown();   // v7.67: contador vivo dentro del botón "Generar las OCs"
     // v9.12 — sección de importados (circuito propio). No rompe el generador nacional si falla.
     try { const imp = await ocgFetchImportados(); if (_oc && _oc.gen) { _oc.gen.imp = imp; ocRender(); } } catch (_e) {}
@@ -17031,8 +17089,96 @@ async function ocgGenerar() {
     if (!r.ok) throw new Error("HTTP " + r.status);
     _oc.rows = await ocFetchRows(); _oc.recepByRow = ocBuildRecep();
     _oc.view = "list"; ocRender();
-    alert("✓ Generadas " + rows.length + " línea(s) de OC. Las ves en la lista, agrupadas por proveedor.");
+    // v21.14 (Luis, 22/09) — generar a mano NO mueve solo el ciclo automático: se pregunta.
+    // Sin esto el cron volvía a generar en su día como si nada (el único guard que tenía era
+    // "ya hay OCs de HOY", así que una corrida del lunes no frenaba la del miércoles).
+    ocAutoAbrir(rows.length);
   } catch (e) { alert("Error generando OCs: " + (e.message || e)); }
+}
+
+/* ═══ v21.14 — ¿CUÁNDO RETOMA LA GENERACIÓN AUTOMÁTICA? ═══════════════════════
+   Se abre sola después de generar las OC a mano. Lo que elija el supervisor se escribe en
+   `GV_OC_Auto.proxima_auto` por la RPC `gv_oc_auto_programar` (SECURITY DEFINER, con chequeo
+   de supervisor adentro: el front no decide nada). "Dejar como está" no escribe.
+   ⚠ La fecha puede ser CUALQUIER día, no sólo miércoles: el cron corre todos los días y el que
+   decide es el ancla. Backend y rollback en `sql/gv_oc_auto_ciclo_v2114.sql`. */
+const OC_AUTO_CSS = "#ocAutoOv{display:none;position:fixed;inset:0;z-index:1300;background:rgba(2,6,23,.55);align-items:center;justify-content:center;padding:16px}"
+  + "#ocAutoOv.show{display:flex}"
+  + "#ocAutoOv .oca-box{background:#fff;border-radius:14px;width:min(520px,100%);max-height:88vh;overflow:auto;box-shadow:0 20px 50px rgba(2,6,23,.35)}"
+  + "#ocAutoOv .oca-head{padding:14px 16px;border-bottom:1px solid #e2e8f0;font-size:18px;font-weight:800;color:#0f172a}"
+  + "#ocAutoOv .oca-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px;font-size:14px;color:#334155}"
+  + "#ocAutoOv .oca-chips{display:flex;gap:8px;flex-wrap:wrap}"
+  + "#ocAutoOv .oca-chip{width:auto;margin:0;padding:8px 12px;border-radius:999px;border:1px solid #cbd5e1;background:#f8fafc;font-size:13.5px;font-weight:700;color:#0f172a;cursor:pointer}"
+  + "#ocAutoOv .oca-chip.on{background:#0f172a;color:#fff;border-color:#0f172a}"
+  + "#ocAutoOv .oca-fecha{display:flex;gap:8px;align-items:center;flex-wrap:wrap}"
+  + "#ocAutoOv input[type=date]{width:auto;margin:0;padding:8px 10px;font-size:15px;border:1px solid #cbd5e1;border-radius:8px}"
+  + "#ocAutoOv .oca-hoy{font-size:12.5px;color:#64748b}"
+  + "#ocAutoOv .oca-msg{font-size:13px;color:#b91c1c;font-weight:700}"
+  + "#ocAutoOv .oca-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:12px 16px;border-top:1px solid #e2e8f0}"
+  + "#ocAutoOv .oca-btn{width:auto;margin:0;padding:9px 16px;border-radius:9px;font-size:14.5px;font-weight:700;border:1px solid #cbd5e1;background:#f1f5f9;color:#0f172a;cursor:pointer}"
+  + "#ocAutoOv .oca-btn.ok{background:#047857;border-color:#047857;color:#fff}"
+  + "#ocAutoOv .oca-btn[disabled]{opacity:.55;cursor:default}";
+let _ocAuto = null;
+function ocAutoAbrir(nLineas) {
+  const hoy = _ocgHoyArt();
+  _ocAuto = { n: Number(nLineas) || 0, hoy: hoy, fecha: _ocgSumarDias(hoy, 7), guardando: false, msg: "" };
+  if (!document.getElementById("ocAutoCss")) { const st = document.createElement("style"); st.id = "ocAutoCss"; st.textContent = OC_AUTO_CSS; document.head.appendChild(st); }
+  let ov = document.getElementById("ocAutoOv");
+  if (!ov) { ov = document.createElement("div"); ov.id = "ocAutoOv"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  _ocAutoRender();
+}
+function ocAutoCerrar() { const ov = document.getElementById("ocAutoOv"); if (ov) ov.classList.remove("show"); _ocAuto = null; }
+function ocAutoSetFecha(v) { if (!_ocAuto) return; _ocAuto.fecha = String(v || "").slice(0, 10); _ocAuto.msg = ""; _ocAutoRender(); }
+function _ocAutoOpciones() {
+  const h = _ocAuto.hoy;
+  const o = [{ f: _ocgSumarDias(h, 7), t: "En 7 días" }, { f: _ocgSumarDias(h, 14), t: "En 14 días" }];
+  const mi = _ocgProxMiercoles(h);
+  if (!o.some(function (x) { return x.f === mi; })) o.push({ f: mi, t: "El próximo miércoles" });
+  return o;
+}
+function _ocAutoRender() {
+  const ov = document.getElementById("ocAutoOv"); if (!ov || !_ocAuto) return;
+  const ancla = (_ocgAuto && _ocgAuto.proxima) ? _ocgFechaTxt(_ocgAuto.proxima) : "";
+  let h = '<div class="oca-box"><div class="oca-head">✓ Generadas ' + _ocAuto.n + ' línea(s) de OC</div><div class="oca-body">';
+  h += '<div>Las acabás de generar <b>a mano</b>. ¿Cuándo querés que vuelva a generarse <b>sola</b>?</div>';
+  if (ancla) h += '<div class="oca-hoy">Hoy el ciclo la tiene para el <b>' + escapeHtml(ancla) + '</b>' + (_ocgAuto && _ocgAuto.motivo ? ' (' + escapeHtml(String(_ocgAuto.motivo)) + ')' : '') + '.</div>';
+  h += '<div class="oca-chips">';
+  _ocAutoOpciones().forEach(function (o) {
+    h += '<button class="oca-chip' + (_ocAuto.fecha === o.f ? " on" : "") + '" onclick="ocAutoSetFecha(' + JSON.stringify(o.f).replace(/"/g, "&quot;") + ')">' + escapeHtml(o.t) + ' · ' + escapeHtml(_ocgFechaTxt(o.f)) + '</button>';
+  });
+  h += '</div>';
+  h += '<div class="oca-fecha"><span>O el día que quieras:</span><input type="date" min="' + escapeHtml(_ocAuto.hoy) + '" value="' + escapeHtml(_ocAuto.fecha || "") + '" onchange="ocAutoSetFecha(this.value)"></div>';
+  h += '<div class="oca-hoy">Se genera a las <b>07:00</b> de ese día. Puede ser cualquier día, no sólo miércoles.</div>';
+  if (_ocAuto.msg) h += '<div class="oca-msg">' + escapeHtml(_ocAuto.msg) + '</div>';
+  h += '</div><div class="oca-foot">';
+  h += '<button class="oca-btn" onclick="ocAutoCerrar()"' + (_ocAuto.guardando ? " disabled" : "") + '>Dejarlo como está</button>';
+  h += '<button class="oca-btn ok" onclick="ocAutoGuardar()"' + (_ocAuto.guardando ? " disabled" : "") + '>' + (_ocAuto.guardando ? "Guardando…" : "✓ Retomar ese día") + '</button>';
+  h += '</div></div>';
+  ov.innerHTML = h;
+}
+async function ocAutoGuardar() {
+  if (!_ocAuto || _ocAuto.guardando) return;
+  const f = String(_ocAuto.fecha || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) { _ocAuto.msg = "Elegí la fecha desde la que retoma."; _ocAutoRender(); return; }
+  if (f < _ocAuto.hoy) { _ocAuto.msg = "Esa fecha ya pasó."; _ocAutoRender(); return; }
+  _ocAuto.guardando = true; _ocAuto.msg = ""; _ocAutoRender();
+  const headers = await facAuthWriteHeaders({ "Content-Type": "application/json" });
+  if (!headers) {
+    _ocAuto.guardando = false;
+    _ocAuto.msg = authNoSesionMsg("Para mover el ciclo automático necesitás iniciar sesión con Google (supervisor).");
+    _ocAutoRender(); return;
+  }
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_oc_auto_programar", {
+      method: "POST", headers: headers, body: JSON.stringify({ p_fecha: f, p_motivo: "se generaron a mano" }) });
+    if (!r.ok) { let t = ""; try { t = await r.text(); } catch (_e) {} throw new Error(t || ("HTTP " + r.status)); }
+    await ocgCargarAuto();
+    ocAutoCerrar();
+    const el = document.getElementById("ocgCountdown"); if (el) el.textContent = _ocgAutoEnTxt();
+  } catch (e) {
+    _ocAuto.guardando = false; _ocAuto.msg = "No se pudo guardar: " + (e.message || e); _ocAutoRender();
+  }
 }
 
 /* v7.51 — CONFIG de compras (OC_Maximos) EDITABLE desde la app → el Excel deja de ser
@@ -43887,11 +44033,19 @@ async function lugDelItem(sector, cod, clase) {
    quedó a medias, problema 84), y la vista resuelve ese empate y avisa en qué
    celdas los dos no coinciden — que es justo lo que este dibujo deja ver de una.
 
-   Las celdas se agrupan de a PMAP_ALTO porque así está armada la góndola: A01..A05
-   son un módulo, A06..A10 el siguiente. Todas las letras tienen la numeración
-   corrida de 1 a N sin huecos (A=85, B/D/F/H/J/L/M/Ñ=60, C/E/G/I=20, P=40), así
-   que el corte de a 5 cae siempre donde tiene que caer. */
-const PMAP_ALTO = 5;
+   Las celdas se agrupan por MÓDULO: A01..A05 son un módulo, A06..A10 el siguiente.
+   ⚠ La altura NO es la misma en todas las góndolas (Luis, 2026-09-22): **sólo A y P
+   son de 5 filas; el resto está armado de a 4**. Con el 5 fijo para todas, la H se
+   dibujaba en 12 columnas de 5 cuando en el depósito son 15 de 4, así que la celda
+   que el operario veía arriba a la izquierda no era la que tiene enfrente.
+
+   La numeración corre de 1 a N sin huecos (A=85, B/D/F/H/J/L/M/Ñ=60, C/E/G/I=20,
+   P=40) y N es divisible por la altura de SU góndola en todas, así que el corte cae
+   siempre donde tiene que caer: 85 = 17×5, 40 = 8×5, 60 = 15×4, 20 = 5×4.
+   Al agregar una góndola de 5 filas va acá, en PMAP_ALTO_X; el default es 4. */
+const PMAP_ALTO_DEF = 4;
+const PMAP_ALTO_X = { "A": 5, "P": 5 };
+function pmapAlto(g) { return PMAP_ALTO_X[String(g || "").toUpperCase()] || PMAP_ALTO_DEF; }
 const PMAP_SELECT = "select=sector,gondola,celda,empresa,orden,cod,descripcion,cajas_max,max_fuente,estado" +
                     "&order=gondola.asc,celda.asc";
 let _pmap = null, _pmapG = "", _pmapQ = "";
@@ -44051,11 +44205,12 @@ function pmapGondolaHtml(g) {
           'capacidad <b>' + pmapNum(capTot) + '</b> cajas' +
           (Object.keys(emps).length ? ' · ' + escapeHtml(Object.keys(emps).sort().join("/")) : "") + '</div>';
   h += '<div class="pmap-wrap"><div class="pmap-cols">';
-  const cols = Math.ceil(maxN / PMAP_ALTO) || 1;
+  const alto = pmapAlto(g);
+  const cols = Math.ceil(maxN / alto) || 1;
   for (let c = 0; c < cols; c++) {
     h += '<div class="pmap-col">';
-    for (let lvl = PMAP_ALTO; lvl >= 1; lvl--) h += pmapCellHtml(g, c * PMAP_ALTO + lvl, porCelda);
-    h += '<div class="pmap-colft">' + (c * PMAP_ALTO + 1) + '–' + (c * PMAP_ALTO + PMAP_ALTO) + '</div>';
+    for (let lvl = alto; lvl >= 1; lvl--) h += pmapCellHtml(g, c * alto + lvl, porCelda);
+    h += '<div class="pmap-colft">' + (c * alto + 1) + '–' + (c * alto + alto) + '</div>';
     h += '</div>';
   }
   return h + '</div></div>';
