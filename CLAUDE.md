@@ -1492,6 +1492,43 @@ conservador — mismo criterio que la v20.91 (*"ante cualquier duda, traba"*).
 **Chequeo:** `select tanda, count(*) from public."Entregas_Virgilio" where tanda ~ '-X$' group by 1;`
 · `node tests/comp-armado-anulado.cjs` (verificado que falla contra el código anterior).
 
+#### ⚠⚠ Y la otra mitad es BACKEND: el DEDUP también toma la anulada como antecedente (v21.31)
+
+**Luis, textual:** *"fijate que no vaya a pasar con ningún otro pedido. si fuese a pasar fijate
+de hacer la corrección de antemano"*. Barriendo las NP programadas apareció el gemelo del bug,
+del lado del servidor, y **ya había mordido**.
+
+`entregas_virgilio_dedup` —trigger BEFORE INSERT de `Entregas_Virgilio`— descarta la fila cuando
+ya existe **misma NP + mismo código + las tres cantidades iguales**, y **a propósito NO mira la
+tanda** (v15.92: un pedido reprogramado y rearmado quedaba duplicado). Con una fila anulada
+delante, ese mismo criterio **descarta la fila del rearmado**.
+
+**Caso E29D / LK 0034 (22/09):** el armado del 15/09 se anuló; el 22/09 a las 15:31 el operario
+rearmó y de las **19 líneas entraron 3** — sólo las que habían cambiado de cantidad. Las otras
+16 se descartaron contra `E29D-X`: **38 cajas fuera del remito y de la factura**.
+
+⚠ **Y no avisa nada**: el `INSERT` devuelve 201 igual, el evento `ENT` de la cola sí lleva los
+18 códigos, y el operario ve *"Entregas registradas: 19"*. La diferencia sólo se ve mirando la
+tabla.
+
+> **Las dos mitades del mismo agujero**: el front (`_compNpsYaArmadas`) y el backend
+> (`entregas_virgilio_dedup`) leen `Entregas_Virgilio` **por NP ignorando la tanda** — que es
+> justo la columna donde viaja la marca de anulación. Arreglar una sola deja la otra viva.
+
+⚠ **El dedup de verdad NO se toca**: dos armados iguales del mismo ciclo siguen descartándose,
+porque esas filas están vivas. Probado con las dos mitades — una fila igual a una **anulada**
+entra (1), una fila igual a una **viva** se descarta (0).
+
+⚠ **Se aplica sobre `pg_get_functiondef`, es idempotente y falla con un `raise` si el texto no
+matchea** (varias sesiones tocan estos objetos). El marcador adentro de la función dice `v21.22`,
+que es la versión con la que se aplicó: **no cambiarlo**, es la llave que evita reaplicar.
+
+**Chequeo:** `select * from public.gv_entregas_perdidas_por_anulacion;` — vacía = ningún remito
+quedó incompleto por una anulación. Dice la NP, la tanda anulada, la viva, cuántos códigos y
+cuántas cajas. **Sólo marca la NP que SE REARMÓ**: una anulación sin rearmado no perdió nada,
+está esperando que alguien arme (por eso `LK 0058` / `D69H-X` no figura).
+Y `select * from public.gv_reglas_perdidas;`. `sql/gv_entregas_dedup_anulada_v2131.sql`.
+
 ## ⚠ REGLA (Thomas, 2026-09-21, v20.86): lo ARMADO SIN DÍA tiene que verse en el badge
 
 **Thomas, textual:** *"debería aparecer discriminado en el badge del icono de PPP en la página
