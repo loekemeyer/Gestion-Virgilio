@@ -605,6 +605,38 @@ compara contra algo de la operación (*"menos de una caja"*), no cambiando de un
 
 Vale para TODOS los repos. Es sólo cómo se escribe el mensaje del chat: no cambia nada técnico.
 
+## 🟩🟩🟩 PRINCIPIO RECTOR DE LA PROGRAMACIÓN (Luis, 2026-09-22)
+
+> ## Agrupar pedidos existe para **ENTREGAR LA MAYOR CANTIDAD DE MERCADERÍA EN LA MENOR CANTIDAD DE CAMIONES.**
+
+**Es el para qué de la tanda.** Toda regla de armado, de movimiento y de reprogramación se mide
+contra esto: si una decisión hace salir más camiones para la misma mercadería, está mal, por más
+que respete todas las demás reglas.
+
+### La consecuencia que se saca mal todo el tiempo: se agrupa POR PEDIDO, NUNCA por cliente
+
+**Luis, textual:** *"Un cliente puede tener sucursales en lugares diferentes (uno que tenga en
+Zona 1 y zona 5 por ejemplo, no van a salir juntas en un mismo camión, van a ir en camiones que
+vayan a esas zonas)."*
+
+La unidad de agrupamiento y de movimiento es el **PEDIDO** (todas las NP de ese `order_id` juntas),
+**no el cliente**. Juntar por cliente parece prolijo y es lo contrario del principio: manda mercadería
+a un camión que no va a esa zona, o parte un camión en dos.
+
+⚠ **Al mover un pedido, NO se arrastran los otros pedidos del mismo cliente.** Medido el 22/09:
+hay 5 tandas vivas con 2+ pedidos distintos del mismo cliente (E48D tiene **8** de Jazquel). Moverlos
+juntos "porque son del mismo cliente" es justamente lo que esta regla prohíbe.
+
+**Cómo convive con las otras dos reglas de cliente, que siguen valiendo:**
+
+| regla | qué dice | por qué no choca |
+|---|---|---|
+| Thomas: *"nunca +1 pedido de un cliente va separado en la PPP"* | el **DÍA** es uno solo por cliente | habla del día, no del camión |
+| Luis v18.87: *"la tanda de un cliente se parte por CAMIÓN"* | mismo día, distinta tanda si la zona manda a otro camión | es esta misma regla aplicada al armado |
+
+O sea: **mismo día para el cliente · tanda por camión · agrupamiento por pedido.** Las tres dicen lo
+mismo desde tres lados, y el principio rector es el que las ordena cuando parecen chocar.
+
 ## ⚠⚠ LA LÓGICA DE PROGRAMACIÓN, RESUMIDA POR LUIS (2026-09-19)
 
 Es el objetivo contra el que se mide cualquier cambio de armado. Textual:
