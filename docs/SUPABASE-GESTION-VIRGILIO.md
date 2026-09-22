@@ -29094,8 +29094,15 @@ select cron.alter_job(50, schedule := '0 10 * * 3',
 **Pedido de Damián** (lo pasó Marianela, 22/09) para el monitor de la TV: además de las tandas,
 ver por operario **cuánto tardó en promedio cada tanda y en qué se fue el resto del día**.
 
-**Objeto nuevo:** vista `public.gv_monitor_horas_operario` (`security_invoker = true`, SELECT para
-`anon` y `authenticated`). Una fila por legajo con actividad **hoy** (hora AR):
+**Objetos nuevos:** función `public.gv_monitor_horas_operario_dia(p_dia date)` (el cálculo) y
+vista `public.gv_monitor_horas_operario` (`security_invoker = true`), que es sólo
+`select * from` esa función con el día de hoy — es lo que lee `monitor/tv.html`. EXECUTE y SELECT
+para `anon` y `authenticated`. Una fila por legajo con actividad ese día (hora AR):
+
+⚠ **La función con `p_dia` existe para poder COMPARAR** contra el monitor grande cualquier día
+(`tests/tools/monitor-vs-vista.cjs`). Con la vista atada a "hoy" la comparación era imposible: sus
+fixtures son del 15/09. Si alguien le vuelve a meter el cálculo adentro de la vista, quedan dos
+implementaciones otra vez — tiene su centinela.
 
 | columna | qué es |
 |---|---|

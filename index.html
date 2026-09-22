@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.19"></script>
+<script type="module" src="recepcion.js?v=21.20"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.19";
+const APP_VERSION = "v21.20";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31572,7 +31572,10 @@ function showOperarioActivityDetail(legajo, activity) {
         <td><b>${escapeHtml(d.opcion)}</b> <span style="color:#666;font-size:11px">${escapeHtml(movLabel[d.opcion] || "")}</span>${d.texto ? ` <span style="color:#1e6bd6;font-size:11px">${escapeHtml(d.texto)}</span>` : ''}</td>
         <td>${fmtTime(d.ts_inicio)}</td>
         <td>${fmtTime(d.ts_cliente)}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${fmtMin(d.durMs)}</b></td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${fmtMin(d.durMs)}</b>${
+          d.muertoMs > 0
+            ? `<div style="font-size:11px;color:#b45309;font-weight:700">−${fmtMin(d.muertoMs)} de tiempo muerto</div>`
+            : ""}</td>
       </tr>`).join("");
     m.querySelector(".tanda-modal-body").innerHTML = `
       <div style="font-size:14px; margin-bottom:10px;">
@@ -32486,15 +32489,29 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     // Toggles de movimiento: sumar duración cuando se cierra (ts_inicio set)
     // y guardar el evento en movDetail para el popup.
     if ((MOV_TOGGLE_CODES.has(ev.opcion) || NOPROD_TOGGLE_CODES.has(ev.opcion)) && ev.ts_inicio) {
-      const dur = new Date(ev.ts_cliente) - new Date(ev.ts_inicio);
-      if (dur > 0 && dur < 8 * 3600 * 1000) {
+      const iniMs = new Date(ev.ts_inicio).getTime();
+      const finMs = new Date(ev.ts_cliente).getTime();
+      const bruto = finMs - iniMs;
+      if (bruto > 0 && bruto < 8 * 3600 * 1000) {
         const esMov = MOV_TOGGLE_CODES.has(ev.opcion);
+        /* v21.20 (Thomas) — al MOVIMIENTO también se le resta el tiempo muerto
+           que quedó adentro, igual que a picking y armado desde la v19.07.
+           `PB` y `PC` están en ALWAYS_ALLOWED_CODES, así que se pueden abrir con
+           un RT/RI/EI en curso: la media hora de comida entraba entera como
+           movimiento de mercadería. Medido sobre 30 días: 4 cierres de 352, 1,36 h
+           de 65,75 (2,1 %) — chico, pero es la misma regla.
+           ⚠ A las NO PRODUCTIVAS no se les resta: se restarían a sí mismas. */
+        const muerto = esMov ? Math.min(bruto, deadOverlapMs(leg, iniMs, finMs)) : 0;
+        const dur = bruto - muerto;
+        if (dur <= 0) continue;
         const fila = {
           opcion: ev.opcion,
           texto: ev.texto || "",
           ts_inicio: ev.ts_inicio,
           ts_cliente: ev.ts_cliente,
-          durMs: dur
+          durMs: dur,
+          brutoMs: bruto,
+          muertoMs: muerto
         };
         if (esMov) { p.movMs += dur; p.movDetail.push(fila); }
         else       { p.noprodMs += dur; p.noprodDetail.push(fila); }

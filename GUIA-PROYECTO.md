@@ -1,3 +1,53 @@
+## Nota v21.20 (2026-09-22) — Al movimiento también se le resta el tiempo muerto, y el comparador vuelve a servir
+
+### 1. El baño adentro de una recepción ya no cuenta como movimiento
+
+Es la regla de Luis del 16/09 (v19.07), que hasta ahora sólo se aplicaba a picking y armado.
+**`PB` y `PC` están en `ALWAYS_ALLOWED_CODES`**, así que se pueden abrir con un `RT`/`RI`/`EI` en
+curso: la media hora de comida entraba entera como movimiento de mercadería.
+
+**Medido antes de tocar, sobre 30 días: 4 cierres de 352, 1,36 h de 65,75 (2,1 %).** Chico, pero
+es la misma regla. Va en los dos lados —`index.html` y la vista— y el popup de desglose ahora
+dice, abajo de cada duración, cuánto se descontó.
+
+⚠ **A las no productivas NO se les resta**: se restarían a sí mismas.
+
+### 2. El cálculo pasó a una FUNCIÓN con día, y la vista quedó de envoltorio
+
+`gv_monitor_horas_operario_dia(p_dia)` hace la cuenta; `gv_monitor_horas_operario` es
+`select * from esa función con el día de hoy`. **Sin eso, `tests/tools/monitor-vs-vista.cjs` no
+podía comparar nada**: sus fixtures son del 15/09 y la vista sólo sabía de hoy.
+
+### 3. El comparador quedó arreglado — y lo primero que muestra es que NO coinciden
+
+`tests/tools/monitor-vs-vista.cjs` ahora imprime los números del monitor grande **en el
+vocabulario de la vista** y el `SELECT` para traer la otra mitad. El fixture `ev-15.json` se
+rehízo completo (estaba filtrado: sólo TP/TAP/muertos, sin un solo MG/RT, así que `hs_mov` daba
+0 en los dos lados y parecía que coincidían).
+
+Medición del 22/09 sobre el 15/09:
+
+| qué | resultado |
+|---|---|
+| `hs_noprod` | coincide en los **5** operarios |
+| `hs_mov` | coincide en **4 de 5** (legajo 94: 2,63 monitor vs 2,33 vista) |
+| `prom_hs_arm` | **difiere** en los 2 legajos con un cierre que cruzó la medianoche: 237 → 0,49 vs 0,41 · 8 → 2,47 vs 2,23 |
+| `prom_hs_pick` | 277 → 0,46 vs 0,45, sin explicar todavía |
+
+⚠ **La causa de la grande está identificada y NO es un bug de uno de los dos:** el monitor grande
+cuenta además el tramo del **día de apertura** (de la apertura al fin de esa jornada,
+`businessDurBetweenMs`); la vista arranca en el **primer evento de hoy**. Son dos reglas
+defendibles para un cierre que cruza la medianoche, y **hay que elegir una** — no tocar ninguna
+para que el número cierre.
+
+### 4. Y la fila «No prod.» del monitor grande
+
+Viene de la v21.19: como la tabla «Mts3 x Hora» **sí se dibuja**, sacarle el baño y la limpieza a
+*Movim.* dejaba esas horas sin aparecer en ningún lado. Ahora hay una fila más, con su gemela en
+«Parcial» y «Ayer» — que se alinean **por posición, no por nombre**.
+
+`sql/gv_monitor_horas_operario_v2117.sql`, §3.ml.
+
 ## Nota v21.19 (2026-09-22) — La tabla «Mts3 x Hora» SÍ se dibuja: corrección de la v21.18
 
 ### 1. Me equivoqué, y vale la pena que quede escrito por qué
