@@ -3276,8 +3276,46 @@ Lo cazó la prueba, no la lectura.
 El pallet tiene el papel de E29C y ahora es E75A. Cambiarle el rótulo ANTES de cargarlo. NO hay que
 volver a pickearlo ni armarlo: el picking y el armado ya viajaron."*
 
+### ⚠ De dónde heredó el registro una tanda: `gv_tanda_registro_heredado` (v21.16, Luis)
+
+**Luis, al leer que los PKC no viajan:** *"tiene que quedar el registro de que se pickeó (que se
+levantó de la góndola ya), correcto?"*. Sí, y es el **TP**, con la fecha y el legajo reales del
+picking original — no se inventa que se pickeó hoy. El candado anti doble-armado
+(`opcion in (TP,PKC)`), el monitor y la lista de picking lo ven, así que **nadie la vuelve a
+mandar a pickear**: es lo que falló con E29A y sus 88 cajas.
+
+Lo que queda en la tanda vieja es el **detalle por artículo** (los PKC: *"501 · esperadas 7 ·
+reales 7"*). Ése es el renglón del libro de góndola, y las cajas salieron una sola vez, de ahí.
+
+El rastro del traspaso siempre se escribió —en el `client_id` de los eventos copiados
+(`mv_<nueva>_<TP|TAP>_<vieja>`) y en el `ref` de los ajustes (`<nueva>|MOV-<vieja>`)— pero
+**enterrado**: ninguna pantalla lo mostraba. La vista lo saca a la superficie, una fila por
+(tanda que recibió, tanda de origen):
+
+```sql
+select tanda, vino_de, np_lista, cajas_movidas, pickeado_el, pickeado_por,
+       pkc_propios, pkc_en_origen, donde_esta_el_detalle
+  from public.gv_tanda_registro_heredado;
+```
+
+Medido sobre el movimiento de prueba LK 0101/0102 · E29C → E75A: **72 cajas · 17 códigos ·
+pickeado el 21/09 14:12 por el legajo 104 · pkc_propios 0 · pkc_en_origen 60**, y la columna que
+contesta la pregunta: *"el detalle del picking (60 códigos) está en E29C — acá NO se volvió a
+levantar de la góndola"*.
+
+⚠ **No persiste nada**: se calcula al leer, de los rastros que el movimiento ya escribe. Si
+cambia el formato del `client_id` o del `ref`, cambia acá y en ningún otro lado.
+
+⚠ **`full outer join` entre los eventos y el stock a propósito**: puede haber eventos sin cajas
+(un pedido con 0 entregadas) y cajas sin eventos (la tanda nueva ya tenía TP/TAP propios y el
+`not exists` de la función no los volvió a copiar).
+
+⚠ Medido con `set local role anon` y `authenticated`: las tres identidades ven la fila (es la
+trampa de la v20.45 — una vista con `security_invoker` sobre una tabla con RLS **no da error, da
+menos filas**). Su fila de centinela vigila el patrón `pkc_en_origen`.
+
 **Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
-`sql/gv_pedido_mover_registro_v2105.sql`.
+`sql/gv_pedido_mover_registro_v2105.sql`, `sql/gv_tanda_registro_heredado_v2116.sql`.
 
 ⚠ **EL FRENO GENERAL SIGUE PUESTO hasta que Luis lo diga**
 (`PPP_Web_Config.np_mover_frenado = 1`). Se levanta con un `update`, no con un deploy:
