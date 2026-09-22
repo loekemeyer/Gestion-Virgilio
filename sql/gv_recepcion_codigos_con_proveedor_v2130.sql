@@ -3,7 +3,8 @@
 -- Pedido de Luis (2026-09-22): "fijate de todos los productos que tengan un proveedor
 -- y que no figuren en el modulo de operarios para recibirlos. ajustalos a todos."
 --
--- ⚠ NO SE EJECUTA SOLO. Se corre a mano, con el "sí" de Luis (protocolo de datos).
+-- ✅ APLICADO el 2026-09-22 con el OK de Luis. Backup: zz_backups."GV_Backup_ArtXTall_20260922"
+--    (335 filas). Resultado real: INSERT 40 · 335 -> 375. Verificado como `anon`.
 --
 -- MEDICIÓN (22/09). El universo son los 238 códigos activos de OC_Maximos con
 -- proveedor. Lo que el operario ve al elegir a ese proveedor sale de DOS lugares:
@@ -24,7 +25,17 @@
 --         la fila CH de Blist-Pack, así que el operario no tiene código que elegir.
 --         Falta ese dato -> lo define Luis (758, 762, 763, 764, 769).
 --   ·  1  era 581T (Martin, LK): no tenia Uni_x_Caja en ninguna tabla y la columna es
---         NOT NULL. Luis lo dicto el 22/09: **18**. Entra con los demas -> son 43.
+--         NOT NULL. Luis lo dicto (18), pero despues dijo que es DISCONTINUO -> no entra.
+--
+-- ⚠ LAS TRES CORRECCIONES DE LUIS (22/09), que son lo que baja 43 a 40:
+--   · 231, 232, 233 (palos de amasar) -> "los hace log fabr", NO Tierra Nativa. Van bajo
+--     Log/ Fabr. El dato no lo desmiente: esos 3 codigos tienen CERO entregas registradas,
+--     asi que nunca se recibieron a nombre de nadie. (El 55215, Palo de Amasar 40, SI es de
+--     Tierra Nativa: 208 cajas el 26/08. Son cosas distintas.)
+--   · 582E y 119 -> "no se fabrica, se importa listo para la venta (descuenta de racks)".
+--     Un importado no se recibe por el modulo de talleristas: NO entran.
+--   · 581T -> "es discontinuo realmente, si no genera OC no me jode". Medido: `total = 0`
+--     en vista_generador_oc, asi que hoy NO genera OC. NO entra.
 --   ·  1  es 193 (Kuffo, prov_at) -> bloque B, es otra cosa.
 -- ============================================================================
 
@@ -38,12 +49,11 @@ revoke insert, update, delete, truncate on zz_backups."GV_Backup_ArtXTall_202609
   from anon, authenticated;
 
 -- ----------------------------------------------------------------------------
--- A) ALTA de los 43. Es ADITIVO: sólo INSERT, ningún update ni delete.
+-- A) ALTA de los 40. Es ADITIVO: sólo INSERT, ningún update ni delete.
 --    El SELECT se recalcula al correr, así que no puede desfasarse de la medición.
 --    Desc  <- la que ya tenga ese código en la tabla, si no OC_Maximos.descripcion,
 --             si no stocks_carga_rapida.descripcion, si no el código pelado.
 --    UxB   <- la que ya tenga ese código en la tabla, si no vista_uxb_articulo, si no
---             `uxb_manual` (lo que dicto Luis para el codigo que no lo tiene en ningun lado).
 --             Sin UxB no se inserta: la columna es NOT NULL.
 -- ----------------------------------------------------------------------------
 insert into public."Articulos Virgilio X Tallerista"
@@ -63,8 +73,9 @@ yaesta as (
   select distinct btrim("Cod_Art") cod, btrim("Cod_Tallerista") tcod,
          upper(btrim(coalesce("Linea",''))) linea
     from public."Articulos Virgilio X Tallerista"),
--- Uni_x_Caja que NO existe en ninguna tabla y dicto Luis (22/09). Al agregar otro, va aca.
-uxb_manual(cod, uxb) as (values ('581T', 18))
+-- Correcciones dictadas por Luis (22/09). Al agregar otra, va aca y en ningun otro lado.
+excluir(cod) as (values ('582E'), ('119'), ('581T')),   -- importados y discontinuo
+prov_override(cod, prov) as (values ('231','Log/ Fabr'), ('232','Log/ Fabr'), ('233','Log/ Fabr'))
 select o.linea, o.cod,
        coalesce(
          nullif((select max(x."Desc") from public."Articulos Virgilio X Tallerista" x
@@ -78,20 +89,26 @@ select o.linea, o.cod,
           (select max(x."Uni_x_Caja") from public."Articulos Virgilio X Tallerista" x
             where btrim(x."Cod_Art") = o.cod),
           (select round(u.uxb)::int from public.vista_uxb_articulo u
-            where btrim(u.cod) = o.cod),
-          (select m.uxb from uxb_manual m where m.cod = o.cod))) as "Uni_x_Caja",
+            where btrim(u.cod) = o.cod))) as "Uni_x_Caja",
        c.codigo
   from ocm o
-  join ct c on public.gv_prov_match(o.k, c.k) and c.linea = o.linea
- where not exists (select 1 from yaesta a
+  join ct c on c.linea = o.linea and (
+        case when exists (select 1 from prov_override v where v.cod = o.cod)
+             then public.gv_prov_match(
+                    public.gv_norm_prov_keys((select v.prov from prov_override v where v.cod = o.cod)),
+                    c.k)
+             else public.gv_prov_match(o.k, c.k) end)
+ where not exists (select 1 from excluir e where e.cod = o.cod)
+   and not exists (select 1 from yaesta a
                     where a.cod = o.cod and a.tcod = c.codigo and a.linea = o.linea)
    and coalesce(
          (select max(x."Uni_x_Caja") from public."Articulos Virgilio X Tallerista" x
            where btrim(x."Cod_Art") = o.cod),
          (select round(u.uxb)::int from public.vista_uxb_articulo u
-           where btrim(u.cod) = o.cod),
-         (select m.uxb from uxb_manual m where m.cod = o.cod)) is not null;
--- esperado: INSERT 0 43
+           where btrim(u.cod) = o.cod)) is not null;
+-- APLICADO: INSERT 0 40 (Log/ Fabr LK 20 · Log/ Fabr CH 11 · Blist-Pack 5 · Martin 2 ·
+--            Garcia CH 1 · Pedernera 1). Verificado como anon: el boton de Log/ Fabr LK
+--            muestra 207, 229, 231, 232, 233, 234.
 
 -- ----------------------------------------------------------------------------
 -- B) 193 (Tostador Enlozado, Kuffo) — NO es un alta: es la LÍNEA de la vista.
@@ -161,7 +178,21 @@ select o.cod, o.linea, o.prov
                           and a.tcod = (case when o.linea='CH' then e.cod_ch else e.cod_lk end)
                           and a.linea = o.linea) end))
  order by 3, 2, 1;
--- esperado después de correr A y B: 5 filas
+-- DESPUES DE APLICAR: 11 filas, y las 11 estan explicadas.
+--   · 758 762 763 764 769  CH  Blistpack   -> falta el codigo CH de Blist-Pack (abierto)
+--   · 582E · 119                           -> importados, no se reciben por talleristas
+--   · 581T                                 -> discontinuo
+--   · 231 · 232 · 233                      -> ⚠ el operario YA los ve bien (botón Log/ Fabr).
+--     Salen listados porque `OC_Maximos.proveedor` todavia dice **Tierra Nativa** y el
+--     barrido compara contra la config. El arreglo es la config, y es OTRA escritura:
+--     hoy esos 3 generan OC a Tierra Nativa por 5 + 7 + 5 = 17 cajas (todo por pedidos;
+--     proy 0, cap 0, stock 0). SQL propuesto, pendiente del "si" de Luis:
+--
+--       create table zz_backups."GV_Backup_OCMaximos_palos_20260922" as
+--         select * from public."OC_Maximos" where btrim(cod) in ('231','232','233');
+--       alter table zz_backups."GV_Backup_OCMaximos_palos_20260922" enable row level security;
+--       update public."OC_Maximos" set proveedor = 'Log/ Fabr'
+--        where btrim(cod) in ('231','232','233');
 --   758 / 762 / 763 / 764 / 769  CH  Blistpack  -> falta el código CH de Blist-Pack.
 --   Luis, 22/09: "nose". Y el dato tampoco esta en la operacion: de las 21 entregas de
 --   Blist-Pack (03/02 al 21/09) NINGUNA es de la linea CH -- son 500, 506, 510, 557 y 558,

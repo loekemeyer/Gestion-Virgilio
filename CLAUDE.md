@@ -3962,8 +3962,30 @@ no pueden aparecer aunque se los dé de alta — falta ese dato, lo define el du
 tiene nada que ver con un prov AT. Un código que no esté ahí sale con `linea = ''` y el
 `.eq("linea","LK")` del celular no lo encuentra nunca. Al 22/09 era **1 de 87** (el 193, Kuffo).
 
-**Chequeo y alta:** `sql/gv_recepcion_codigos_con_proveedor_v2130.sql` (la consulta de barrido
-está al final y tiene que dar vacío).
+**✅ APLICADO el 22/09 con el OK de Luis: 40 filas nuevas** (backup
+`zz_backups."GV_Backup_ArtXTall_20260922"`, 335 → 375), verificado como `anon`. Y la vista
+`vista_articulos_prov_at` ya cae a `OC_Maximos.linea` cuando la tabla de talleristas no tiene el
+código, así que el 193 sale `LK` y **ninguno de los 87 queda sin línea**.
+
+⚠ **Las tres correcciones que dictó Luis y bajaron el alta de 43 a 40:**
+
+| qué dijo | qué se hizo |
+|---|---|
+| *"231, 232, 233 los hace log fabr"* | van bajo **Log/ Fabr**, no Tierra Nativa. El dato no lo desmiente: esos 3 tienen **cero entregas** registradas. ⚠ El **55215** (Palo de Amasar 40) **sí** es de Tierra Nativa — 208 cajas el 26/08. Son cosas distintas |
+| *"582E y 119 no se fabrica, se importa listo para la venta"* | **no entran**: un importado no se recibe por el módulo de talleristas |
+| *"581T es discontinuo… si no genera OC no me jode"* | **no entra**. Medido: `total = 0` en `vista_generador_oc` (proy 0, stock 73 = capacidad), así que hoy no genera OC. ⚠ Pero apenas se venda una caja el `total` sube y **sí** la genera: si es discontinuo de verdad, va `activo = false` como el 591 |
+
+⚠ **Y quedan DOS cosas de config, que son de Luis y NO se tocaron:**
+
+1. **231/232/233 siguen diciendo `Tierra Nativa` en `OC_Maximos`**, así que generan **17 cajas**
+   de OC a ese proveedor (5 + 7 + 5, todo por pedidos). El operario ya los ve bien; lo que falta
+   es la config. SQL propuesto al final de `sql/gv_recepcion_codigos_con_proveedor_v2130.sql`.
+2. **119 genera 19 cajas a Lucho y 582E genera 18 a Garcia** — si se importan, esas dos OC están
+   mal emitidas.
+
+**Chequeo:** la consulta de barrido está al final de
+`sql/gv_recepcion_codigos_con_proveedor_v2130.sql`. Al 22/09 devuelve **11 filas y las 11 están
+explicadas** ahí mismo (5 de Blist-Pack CH, 3 que Luis sacó y los 3 palos, que esperan la config).
 
 ## ⚠ REGLA (Luis, 2026-09-22, v20.95): un código BUSCADO se muestra aunque esté en 0
 
