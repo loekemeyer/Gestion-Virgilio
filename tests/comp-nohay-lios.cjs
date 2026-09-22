@@ -14,7 +14,7 @@
    - Cancelar el confirm no toca absolutamente nada.
    - NO duplica lógica: pasa por _compDifResolve (candado estático).
    - REGRESIÓN: la llamada de 2 argumentos (Separar) sigue leyendo el input del diálogo.
-   v21.01 (Luis):
+   v21.04 (Luis):
    - "Sí, agarro de góndola" NO registra faltante y deja el pedido entero (antes lo anotaba
      igual: el armador completaba de góndola y el remito decía que faltó — 3 eventos / 14
      cajas en 90 días). El aviso al picking sigue saliendo; el stock no se toca, porque la
@@ -39,9 +39,9 @@ const est = {
   // candado invertido: _compSinMas NO puede registrar el faltante por su cuenta
   sinmas_usa_difresolve: /function _compSinMas\([\s\S]{0,2600}?_compDifResolve\("menos", "no", real\)/.test(SRC),
   sinmas_no_llama_falt: !(/function _compSinMas\([\s\S]{0,2600}?_compAddFaltManual\(/.test(SRC)),
-  // v21.01: "Sí, agarro de góndola" no registra faltante
+  // v21.04: "Sí, agarro de góndola" no registra faltante
   si_no_es_faltante: /if \(tipo === "menos" && gond !== "si" && qty > 0\) \{/.test(SRC),
-  // v21.01: súper/retira también tienen la salida, y la lista no filtra por c.sep
+  // v21.04: súper/retira también tienen la salida, y la lista no filtra por c.sep
   etiqueta_tiene_boton: /hh \+= '<button class="cmpl-nomas" onclick="_compViewNoMas\(\)"/.test(SRC),
   grid_no_filtra_sep: /function _compNoMasGrid\(n\) \{\n  const pend = \(n\.codes \|\| \[\]\)\.filter\(function \(c\) \{ return \(\(c\.rest \|\| 0\) \+ \(c\.cur \|\| 0\)\) > 0; \}\);/.test(SRC),
 };
@@ -125,7 +125,7 @@ const est = {
     await wait(40);
     out.c5_lee_input = _comp.nps[0].codes[0].sale === 5 && _comp.arts[0].nps[0].asig === 1;   // qty = 6 - 5
 
-    // ---- CASO 6 (v21.01): "Sí, agarro de góndola" NO registra faltante ni achica el pedido ----
+    // ---- CASO 6 (v21.04): "Sí, agarro de góndola" NO registra faltante ni achica el pedido ----
     setup(6, 0, "501", "501");
     _comp.sepDif = { mode: "dialog", npIdx: 0, ci: 0, tipo: "menos" };
     inp.value = "4";                       // el picking dijo 6, en la mesa hay 4, las 2 las trae de góndola
@@ -138,7 +138,7 @@ const est = {
     out.c6_sin_stock = movs.length === 0;   // la góndola ya la debitó el picking por `real`
     inp.remove();
 
-    // ---- CASO 7 (v21.01): súper/retira puede decir "no hay más" y NO traba el Terminar ----
+    // ---- CASO 7 (v21.04): súper/retira puede decir "no hay más" y NO traba el Terminar ----
     window.confirm = function () { return true; };
     const c7c = setup(3, 0, "501", "501");
     _comp.nps[0].clase = "etiqueta"; _comp.nps[0].liosArr = []; _comp.nps[0].liosDone = true;

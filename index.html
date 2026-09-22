@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.03"></script>
+<script type="module" src="recepcion.js?v=21.04"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.03";
+const APP_VERSION = "v21.04";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13635,7 +13635,7 @@ function _compViewSueltas() { if (_comp) { _comp.liosView = "sueltas"; _compRend
    la trae y sigue contando — la rama "sí" del diálogo de Separar registra el faltante igual,
    y desde acá eso sería un faltante inventado. */
 function _compViewNoMas() { if (_comp) { _comp.liosView = "nomas"; _compRenderLios(); } }
-/* v21.01 — la lista de «No hay más». Una sola función porque la usan las DOS pantallas de
+/* v21.04 — la lista de «No hay más». Una sola función porque la usan las DOS pantallas de
    Líos: la de la NP de cliente (que arma líos) y la de súper/retira (que no arma ninguno).
    ⚠ NO filtra por `c.sep`: "¿hay o no hay en la mesa?" no depende de que haya tocado la
    tarjeta en Separar, y súper/retira ni siquiera pasan por ese marcado. */
@@ -13668,7 +13668,7 @@ function _compSinMas(ci) {
   c.rest = pend; c.cur = 0;                                  // el lío a medio armar vuelve a "sin poner"
   _comp.sepDif = { mode: "dialog", npIdx: idx, ci: ci, tipo: "menos", desde: "lios" };
   try { _compDifResolve("menos", "no", real); } catch (_e) {}
-  /* v21.01 — súper/retira NO arman líos: su `liosDone` lo pone el gate de clasificación, no
+  /* v21.04 — súper/retira NO arman líos: su `liosDone` lo pone el gate de clasificación, no
      el conteo. `_compDifResolve` llama a `_compLioMark`, que lo recalcula como
      codes.every(rest===0 && cur===0) — con cajas pendientes eso lo pondría en FALSE y
      trabaría el botón Terminar de toda la tanda. Se lo devuelve como estaba. */
@@ -13889,7 +13889,7 @@ function _compRenderLios() {
     const _lbl = n.clase === "etiqueta" ? "🏷 Etiqueta (súper)" : "🚶 Retira";
     let hh = '<div class="cmpl-nphead"><div class="cmpl-npinfo"><span class="cmpl-np">NP ' + escapeHtml(n.np) + '</span> <span class="cmpl-cli">' + escapeHtml(n.rs || "") + '</span></div><span class="cmpl-npidx">' + (idx + 1) + " / " + _comp.nps.length + '</span></div>';
     if (_comp.pickUbic) hh += '<div class="cmpl-ubic">📦 Pedido separado / dejado en: <b>' + escapeHtml(_comp.pickUbic) + '</b></div>';   // v10.12
-    /* v21.01 (Luis, 2026-09-22): *"¿qué impide que se registre lo que tienen las NPs de esos
+    /* v21.04 (Luis, 2026-09-22): *"¿qué impide que se registre lo que tienen las NPs de esos
        pedidos?"*. Nada. Súper y retira no arman LÍOS — eso es EMBALAJE — pero contar si están
        todas es otra cosa, y el gate las dejaba en liosDone=true sin que nadie mirara: el armado
        escribía "entregadas = pedidas" a ciegas (12 NP en 45 días). Acá tienen la MISMA salida
@@ -14249,7 +14249,7 @@ function _compDifResolve(tipo, gond, realOpt) {
   // armado (líos) Y de Entregas_Virgilio (no se factura). Antes solo emitía el aviso NPD y
   // seguía entero → el operario tenía que armar/facturar cajas que no estaban. Ahora se
   // reduce el código en los líos y se registra el faltante para el cruce de facturación.
-  /* v21.01 (Luis, 2026-09-22): *"'Si, agarro de gondola' si funciona para agregar al pedido
+  /* v21.04 (Luis, 2026-09-22): *"'Si, agarro de gondola' si funciona para agregar al pedido
      debería descontar de gondola y el sistema NO debería decir que falto"*.
      El faltante estaba FUERA del `if` del `gond`, así que la respuesta "Sí" lo registraba
      igual: el armador completaba el pedido de góndola y el remito decía que faltó. Medido a
