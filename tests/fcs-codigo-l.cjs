@@ -1,4 +1,4 @@
-/* Regresión v21.12 — "438E LK" NO ES UN CÓDIGO: el artículo va pelado y la empresa al lado.
+/* Regresión v21.13 — "438E LK" NO ES UN CÓDIGO: el artículo va pelado y la empresa al lado.
 
    Luis, 2026-09-22: *"COMO QUE «438E LK»… NO EXISTE ESE CÓDIGO. Debería ser en todos lados
    «438E» de la empresa «LK» o de la empresa «CH» como dato en una columna aparte que viaje
@@ -8,7 +8,7 @@
    FACTURA. Para mirar stock hay que partirlo en sus DOS datos:
        gv_cod_stock_de_entrega  -> el ARTÍCULO   (026L -> 026, 438EL -> 438E)
        gv_empresa_de_entrega    -> la EMPRESA    (LK / CH)
-   y nunca volver a pegarlos. Ver sql/gv_fc_sin_salida_codigo_l_v2112.sql.
+   y nunca volver a pegarlos. Ver sql/gv_fc_sin_salida_codigo_l_v2113.sql.
 
    Este test corre `pkResolveArt` / `pkStripL` / `pkEmpresaArt` DE VERDAD —extraídos de
    index.html— y verifica que el front y la base separen el código de la empresa igual. Si
@@ -118,9 +118,9 @@ if (/_fcArt\[_ocgNorm\(codBase\(/.test(src)) {
 }
 
 /* ── 6. El SQL del repo tiene que seguir teniendo las piezas ───────────────── */
-const sqlPath = path.join(__dirname, "..", "sql", "gv_fc_sin_salida_codigo_l_v2112.sql");
+const sqlPath = path.join(__dirname, "..", "sql", "gv_fc_sin_salida_codigo_l_v2113.sql");
 if (!fs.existsSync(sqlPath)) {
-  fallos.push("falta sql/gv_fc_sin_salida_codigo_l_v2112.sql");
+  fallos.push("falta sql/gv_fc_sin_salida_codigo_l_v2113.sql");
 } else {
   /* ⚠ Sacar los comentarios ANTES de buscar, mismo criterio que gv_reglas_perdidas: el
      archivo NOMBRA el bug en la nota de rollback, y sin esto los candados invertidos se

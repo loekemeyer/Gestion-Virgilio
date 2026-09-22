@@ -1,5 +1,5 @@
 /* ============================================================================
-   v21.12 — "438E LK" NO ES UN CODIGO: el articulo va pelado y la empresa al lado
+   v21.13 — "438E LK" NO ES UN CODIGO: el articulo va pelado y la empresa al lado
 
    Luis, 2026-09-22:
      "ahi figura que se facturo un 026L. Ahora, para el stock, se deberia descontar
@@ -173,7 +173,7 @@ with (security_invoker = true) as
                    FROM cargados))
           ORDER BY np_clean.np_n, np_clean.facturado_at DESC
         ), entregas_pend AS (
-         -- v21.12 (Luis, 22/09): EL CODIGO VA PELADO Y LA EMPRESA VIAJA AL LADO.
+         -- v21.13 (Luis, 22/09): EL CODIGO VA PELADO Y LA EMPRESA VIAJA AL LADO.
          -- Entregas_Virgilio guarda el codigo CRUDO con L (026L, 438EL) porque es el
          -- que va a la FACTURA. Aca se parte en sus dos datos: `cod` (026, 438E — el
          -- articulo, que es lo unico que existe) y `empresa` (LK/CH — de que gondola
@@ -218,7 +218,7 @@ begin
   FROM public.vista_fc_sin_salida fc
   WHERE scr.cod = fc.cod;';
 
-  v_nuevo := '  -- v21.12 (Luis, 22/09) — EL CRUCE VA POR (CODIGO, EMPRESA), nunca por un string
+  v_nuevo := '  -- v21.13 (Luis, 22/09) — EL CRUCE VA POR (CODIGO, EMPRESA), nunca por un string
   -- concatenado. `stocks_carga_rapida` ya tiene los dos datos separados: `cod_base`
   -- (438E) y `linea` (LK/CH); el `cod` con sufijo ("438E LK") es una clave heredada
   -- de vista_stock_procesada y NO se usa para esto. Antes se cruzaba `scr.cod = fc.cod`
@@ -254,16 +254,16 @@ insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pi
 values
  ('vista_fc_sin_salida','vista','gv_empresa_de_entrega\s*\(',
   'La vista FC s/Salida publica el codigo y la empresa en DOS columnas separadas, nunca concatenados. Sin gv_empresa_de_entrega el dual no se puede desambiguar y el badge queda en 0 de los dos lados.',
-  'Luis','v21.12'),
+  'Luis','v21.13'),
  ('gv_cod_stock_de_entrega','funcion','LK\|CH\|LOKE',
   'gv_cod_stock_de_entrega devuelve SOLO el codigo (026L -> 026, 438EL -> 438E) y ADEMAS pela cualquier sufijo de empresa que le llegue pegado. "438E LK" NO es un codigo: la empresa viaja aparte, en gv_empresa_de_entrega. (Luis, 22/09)',
-  'Luis','v21.12'),
+  'Luis','v21.13'),
  ('gv_empresa_de_entrega','funcion','''LK''',
   'La empresa de un codigo con L es LOEKEMEYER: la da la L, NUNCA la NP. Y en un codigo NO dual la da el ARTICULO (gv_empresa_de_articulo), no el pedido (regla v19.26).',
-  'Luis','v21.12'),
+  'Luis','v21.13'),
  ('refresh_stocks_carga_rapida','funcion','norm_cod\(scr\.cod_base\)',
   'El badge FC s/Salida se cruza por (cod_base, linea) — las dos columnas que la tabla YA tiene separadas — nunca por el string concatenado scr.cod = fc.cod. Con igualdad exacta los 4 duales quedaban en 0 y un codigo con L no matcheaba nada.',
-  'Luis','v21.12')
+  'Luis','v21.13')
 on conflict do nothing;
 
 select public.refresh_stocks_carga_rapida();

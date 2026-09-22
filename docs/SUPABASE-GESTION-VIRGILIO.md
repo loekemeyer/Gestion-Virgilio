@@ -28944,60 +28944,82 @@ select cron.alter_job(55, command := 'REFRESH MATERIALIZED VIEW CONCURRENTLY vis
 
 `sql/gv_refresh_stock_si_cambio_v2105.sql`, `tests/stock-refresh-si-cambio.cjs`.
 
-### §3.mj — v21.11: FC s/Salida partía el artículo en dos — el código de la FACTURA no es el de la GÓNDOLA
+### §3.mj — v21.13: «438E LK» no es un código — el artículo va pelado y la empresa al lado
 
 **Luis, 2026-09-22**, con la captura del módulo Stocks: *"ahí figura que se facturó un 026L. Ahora,
-para el stock, se debería descontar el 026 (regla de códigos L)... ¿Por qué figura ahí?"* Y después:
-*"si hay 11 que salen los 11 deberían aparecer como 026 y ninguno como 026L para fc s/salida, es
-rarísimo eso. Aplicá esa lógica a todos esos códigos."*
+para el stock, se debería descontar el 026 (regla de códigos L)... ¿Por qué figura ahí?"* · *"si hay
+11 que salen los 11 deberían aparecer como 026 y ninguno como 026L"* · y, al ver el primer arreglo:
+***"COMO QUE «438E LK»… NO EXISTE ESE CÓDIGO. Debería ser en todos lados «438E» de la empresa «LK» o
+de la empresa «CH» como dato en una columna aparte que viaje con el código a todos lados."***
 
-**El stock estaba BIEN.** Medido primero, porque era la duda de fondo: **0 movimientos de
-`Movimientos_Stock` terminan en L**, y el 026 de ese pedido se descontó como corresponde —
-picking 26/08 (excedente −1, separar_pedidos +1) · separado 27/08 · facturado 21/09 (`ref =
-D47B|CH 0030`, **empresa LK**, delta −1). `pkResolveArt` hace su trabajo.
+**El stock estaba BIEN**, que era la duda de fondo: **0 movimientos de `Movimientos_Stock` terminan
+en L**, y de las 34 líneas con L facturadas **31 drenaron contra el código pelado y la góndola que
+corresponde**. El 026 de ese pedido: picking 26/08 (excedente −1, separar_pedidos +1) · separado
+27/08 · facturado 21/09 (`ref = D47B|CH 0030`, **empresa LK**, delta −1).
 
-**Lo que estaba mal es el badge.** `vista_fc_sin_salida` agrupaba por
-`norm_cod(Entregas_Virgilio.cod_art)`, y **`norm_cod()` sólo saca ceros a la izquierda y pone
-mayúsculas: no pela la L**. Y `Entregas_Virgilio` lleva la L **cruda a propósito** — es el código
-que va a la factura y al Excel de ISIS (regla *"LA L NO ES UN CÓDIGO — ES UNA DENOTACIÓN"*).
-Después `index.html` (~18579) **fabrica una fila nueva** por cada código de esa vista que no exista
-en el universo de stock: de ahí la fila fantasma `026L`, sin empresa, sin descripción, stock 0.
+**El modelo que Luis pide ya existe, y es el del libro de stock:**
+
+| | código | empresa |
+|---|---|---|
+| `Movimientos_Stock` | `438E` | columna **`empresa`** ✅ |
+| `GV_Lugar_Item` | `438E` | la dice el sector ✅ |
+| `stocks_carga_rapida` | `438E LK` ← clave heredada | …pero ya tiene **`cod_base` + `linea`** |
+
+El string concatenado vive en **un solo lugar: 8 filas de 367** (los 4 duales × 2 empresas), y es una
+clave heredada de `vista_stock_procesada`. **Nada nuevo se escribe así.**
+
+**La causa del síntoma:** `vista_fc_sin_salida` agrupaba por `norm_cod(Entregas_Virgilio.cod_art)`, y
+**`norm_cod()` sólo saca ceros a la izquierda: no pela la L**. Y `Entregas_Virgilio` lleva la L
+**cruda a propósito** — es el código que va a la factura (regla *"LA L NO ES UN CÓDIGO"*). Después
+`index.html` **fabrica una fila** por cada código de esa vista que no exista en el universo de stock:
+de ahí la fila fantasma `026L`, sin empresa, sin descripción, stock 0.
 
 | | antes | después |
 |---|---|---|
 | códigos con L en la vista | **32** | 0 |
+| códigos con sufijo pegado | — | 0 |
 | badge del 026 | 10 | **11** |
-| badge de `438E LK` | 0 | **4** |
-| cajas totales de la vista | 2.084 | **2.084** |
+| badge del 438E · LK | 0 | **4** |
+| cajas totales | 2.084 | **2.084** |
 
-El total no se movió: el cambio es de **agrupación**, no de filtro (verificado contra la fuente
-cruda, 2.084 = 2.084). Los 32 códigos eran todos del mismo pedido — Alesso Vilarino Liliana, NP
-CH 0030/0031/0032, tanda D47B, fact. 21/09: pedido de Chef con artículos de Loeke, el caso de la
-regla. Histórico en `Entregas_Virgilio`: 38 filas / 36 códigos / 6 NP desde el 07/07.
+El total no se movió: el cambio es de **agrupación**, no de filtro. Los 32 códigos eran todos del
+mismo pedido — Alesso Vilarino Liliana, NP CH 0030/0031/0032, tanda D47B, fact. 21/09.
 
-⚠ **En los DUALES el badge no funcionaba ni con L ni sin L.** La vista devolvía `438EL` y `438E`,
-y el universo de stock los tiene como **`438E LK` / `438E CH`**; `refresh_stocks_carga_rapida`
-cruza con `scr.cod = fc.cod` (igualdad **exacta**), así que los dos quedaban en 0. Y el fallback
-`codBase` del front le asignaba las mismas cajas a las **dos** filas del dual.
+⚠ **En los DUALES el badge no funcionaba ni con L ni sin L.** La vista devolvía `438EL` y `438E`, el
+universo los tiene como `438E LK` / `438E CH`, y el cruce era `scr.cod = fc.cod` (igualdad **exacta**):
+los dos quedaban en **0**. Y el fallback `codBase` del front le daba las mismas cajas a las **dos**
+filas del dual.
 
-**El arreglo es una sola resolución**, `gv_cod_stock_de_entrega`, que es `pkResolveArt` en SQL:
-`026L → 026`, `438EL → 438E LK`, `438E` + NP de Chef `→ 438E CH`, `505 → 505`. Arregla las **dos
-puntas** —el popup lee la vista, `stocks_carga_rapida.fc_sin_salida` también— **sin tocar el front**.
+**El arreglo son dos datos, dos funciones, dos columnas** — y nunca se vuelven a pegar:
 
-⚠ **La empresa la da la L, NUNCA la NP**, y ése es el orden del `CASE`: un `438EL` de una NP de
-Chef resuelto por NP daría `438E CH` y el badge miraría la góndola equivocada.
+```
+gv_cod_stock_de_entrega  -> el ARTICULO   026L -> 26 · 438EL -> 438E
+gv_empresa_de_entrega    -> la EMPRESA    LK / CH
+```
 
-⚠ **`stocks_carga_rapida` no hizo falta tocarla**: el cron 57 (`*/5`) la refresca solo, así que
-el badge se corrigió sin escribir un dato.
+La vista los publica en **columnas separadas** (`cod`, `empresa`) y `refresh_stocks_carga_rapida`
+cruza por **`(cod_base, linea)`**, las dos que la tabla ya tenía. **El front tampoco cruza por código:
+el número sale de `fc_sin_salida` de la propia fila**, que el backend ya resolvió.
 
-**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien ·
-`select count(*) from public.vista_fc_sin_salida where cod ~ '[0-9E]L$';` — 0 ·
-`node tests/fcs-codigo-l.cjs` (corre `pkResolveArt` de verdad y lo compara contra la función de
-la base: si el front cambia la regla de la L, se pone en rojo).
-`sql/gv_fc_sin_salida_codigo_l_v2111.sql`.
+⚠ **La empresa de un código con L es LK: la da la L, NUNCA la NP.** Y en un código **no dual** la da
+el **artículo** (`gv_empresa_de_articulo`), no el pedido — regla v19.26.
 
-**PENDIENTE, del mismo barrido (no se tocó):** en un **dual con L**, el drenaje del `facturado`
-toma la empresa de la **NP** en vez de la que dice la L. Medido en D47B: el picking y el separado
-del `438E` fueron **LK** y el facturado quedó **CH**, así que la pila de `a_facturar` cerró en
-**LK +1 / CH −1**. `gv_stock_empresa_fantasma` no lo ve porque agrega por código sin mirar la
-tanda. Es 1 caja hoy, y está en el Planify de Luis.
+⚠ **Un dato preexistente que apareció al cruzar por `cod_base`:** el **439E** tiene **tres** filas en
+`stocks_carga_rapida` — `439E` (pelada, stock 0, residual de antes del desdoble), `439E LK` (15) y
+`439E CH` (8). Sin el segundo filtro del `WHERE` el badge se contaba **dos veces** del lado LK. La
+fila residual **no se tocó** (es un dato, no código); queda reportada.
+
+⚠ **No se escribió ningún dato**: `stocks_carga_rapida` la refresca el cron 57 (`*/5`).
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía ·
+`select count(*) from public.vista_fc_sin_salida where cod ~ '[0-9E]L$' or cod ~ ' (LK|CH)$';` — 0 ·
+`select sum(fc_sin_salida) from public.stocks_carga_rapida;` — igual a `sum(cajas)` de la vista ·
+`node tests/fcs-codigo-l.cjs` (corre `pkResolveArt` de verdad y verifica que el front y la base
+separen artículo y empresa igual; verificado rompiéndolo por los dos lados).
+`sql/gv_fc_sin_salida_codigo_l_v2113.sql`.
+
+**PENDIENTE, del mismo barrido (no se tocó):** en un **dual con L**, el drenaje del `facturado` toma
+la empresa de la **NP** en vez de la que dice la L. Medido en D47B: el picking y el separado del
+`438E` fueron **LK** y el facturado quedó **CH**, así que la pila de `a_facturar` cerró en
+**LK +1 / CH −1**. `gv_stock_empresa_fantasma` no lo ve porque agrega por código sin mirar la tanda.
+Es 1 caja, y está en el Planify de Luis.

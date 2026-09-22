@@ -810,7 +810,7 @@ ruteo** que viaja pegada al código del PEDIDO y significa exactamente dos cosas
 | Pedido | `PPP_Web_Base.articulo`, `gv_ppp_np_items` | **SÍ** (`026L`) | lo trae el feed de la página |
 | Picking (pantalla y stock) | lista de picking, `Movimientos_Stock.cod_art` | **NO** (`026`, o `438E LK` si es dual) | **`pkResolveArt`** = `pkStripL` + `pkEmpresaArt` |
 | Armado / factura | `Entregas_Virgilio.cod_art`, Excel ISIS | **SÍ**, crudo (`438EL`) | `_facXlsArmar` lo toma tal cual de `Entregas_Virgilio` |
-| Badge **FC s/Salida** (Stocks) | `vista_fc_sin_salida`, `stocks_carga_rapida.fc_sin_salida` | **NO** | **`gv_cod_stock_de_entrega`** = `pkResolveArt` en SQL (v21.11) |
+| Badge **FC s/Salida** (Stocks) | `vista_fc_sin_salida`, `stocks_carga_rapida.fc_sin_salida` | **NO** | **`gv_cod_stock_de_entrega`** (artículo) + **`gv_empresa_de_entrega`** (empresa), en columnas separadas (v21.13) |
 
 ```js
 // index.html, v12.39 — el comentario que lo dice todo:
@@ -830,23 +830,43 @@ repuso dentro de la misma tanda de trabajo; queda escrito para que no se repita.
 (`admin-supercot.js`, `addLSuffix = isChef`). Gestión la **respeta y la rutea**, no la genera.
 
 ⚠⚠ **Y todo lo que MUESTRA stock a partir de un código de FACTURA tiene que resolverlo primero**
-(v21.11, Luis 22/09). `Entregas_Virgilio` guarda `026L` porque ése es el código de la factura; el
-badge **FC s/Salida** lo agrupaba con `norm_cod()`, que **sólo saca ceros a la izquierda y pone
-mayúsculas — no pela la L**, así que el 026 salía partido en dos filas (026 = 10, **026L** = 1) y
-el front fabricaba una fila fantasma sin empresa ni descripción. Eran **32 códigos**, todos del
-mismo pedido de Chef con artículos de Loeke. Lo resuelve **`gv_cod_stock_de_entrega(cod, np, emp)`**,
-que es `pkResolveArt` en SQL.
+(v21.13, Luis 22/09). `Entregas_Virgilio` guarda `026L` porque ése es el código de la factura; el
+badge **FC s/Salida** lo agrupaba con `norm_cod()`, que **sólo saca ceros a la izquierda — no pela la
+L**, así que el 026 salía partido en dos filas (026 = 10, **026L** = 1) y el front fabricaba una fila
+fantasma sin empresa ni descripción. Eran **32 códigos**, todos del mismo pedido de Chef con
+artículos de Loeke.
 
-⚠ **En los DUALES no alcanza con pelar la L**: el universo de stock los tiene como `438E LK` /
-`438E CH`, y el cruce es por **igualdad exacta**, así que `438EL` tiene que resolver a **`438E LK`**
-— la L manda LK aunque la NP sea de Chef. Sin el sufijo, el badge del dual quedaba en **0 de los
-dos lados**, y el fallback `codBase` del front le asignaba las mismas cajas a las dos filas.
+> ## **«438E LK» NO ES UN CÓDIGO.** Es el artículo `438E` **de la empresa `LK`**, y son **dos datos**.
+
+**Luis, 22/09, textual:** *"Debería ser en todos lados «438E» de la empresa «LK» o de la empresa «CH»
+como dato en una columna aparte que viaje con el código a todos lados."* Y el modelo correcto **ya es
+el del libro de stock**: `Movimientos_Stock` guarda `cod_art = '438E'` + columna `empresa`, y
+`GV_Lugar_Item` lo mismo — **0 filas con sufijo pegado en las dos**. El string concatenado vive en un
+solo lugar, **8 filas de 367 de `stocks_carga_rapida`** (los 4 duales × 2 empresas), como **clave
+heredada** de `vista_stock_procesada`; esa tabla **ya tiene los dos datos separados al lado**
+(`cod_base` + `linea`). **Nada nuevo se escribe concatenado.**
+
+Los dos datos salen de dos funciones, y no se vuelven a pegar:
+
+| función | devuelve | ejemplo |
+|---|---|---|
+| **`gv_cod_stock_de_entrega(cod, np, emp)`** | el **artículo** | `026L` → `26` · `438EL` → `438E` |
+| **`gv_empresa_de_entrega(cod, np, emp)`** | la **empresa** | `438EL` → `LK` · `438E` en NP de Chef → `CH` |
+
+⚠ **La empresa de un código con L es LK: la da la L, NUNCA la NP.** En un código **no dual** la da el
+**artículo** (`gv_empresa_de_articulo`), no el pedido — regla v19.26.
+
+⚠ **En los duales, cruzar por el código solo cuenta doble o cuenta cero.** El universo de stock los
+tiene desdoblados y el cruce es por **igualdad exacta**: con `438EL` y `438E` a secas los dos
+quedaban en **0**, y el fallback `codBase` del front le daba las mismas cajas a las dos filas. El
+cruce va por **`(cod_base, linea)`** y el front lee el número de **su propia fila**, no de un mapa.
 
 **Al escribir una vista o una pantalla que cruce un código de `Entregas_Virgilio` / factura contra
-stock o góndola, pasarlo por `gv_cod_stock_de_entrega`, nunca por `norm_cod` a secas.** Lo sostienen
-`tests/fcs-codigo-l.cjs` —que corre `pkResolveArt` de verdad y lo compara contra la función de la
-base, así que avisa si el front y el SQL se desfasan— y dos filas en `GV_Reglas_Centinela`.
-`sql/gv_fc_sin_salida_codigo_l_v2111.sql`, §3.mj.
+stock o góndola: el artículo por `gv_cod_stock_de_entrega`, la empresa por `gv_empresa_de_entrega`,
+en columnas separadas — nunca `norm_cod` a secas y nunca concatenados.** Lo sostienen
+`tests/fcs-codigo-l.cjs` —que corre `pkResolveArt` de verdad y compara contra la base, así que avisa
+si el front y el SQL se desfasan— y cuatro filas en `GV_Reglas_Centinela`.
+`sql/gv_fc_sin_salida_codigo_l_v2113.sql`, §3.mj.
 
 **Chequeo** (el operario tiene que ver el código pelado y la góndola LK):
 
