@@ -14422,18 +14422,39 @@ async function _compTandaYaArmada(tanda) {
    (D47C → D54C) y 98583 (D50C → D50D): 57 cajas contadas por dos.
    Devuelve la lista de NP que YA tienen Entregas, sea en la tanda que sea.
    Ante error de red devuelve [] (no trabar el laburo por una caída puntual). */
+/* v21.21 (Luis, 2026-09-22) — UN ARMADO ANULADO NO ES UN ARMADO.
+   Para deshacer un armado NO se borra la fila de Entregas_Virgilio: se le pega `-X` a la
+   `tanda` (E29D -> E29D-X) y queda su fila en GV_Tanda_Anulada. Es el mismo criterio que
+   los eventos (TAP->TAPX): borrar la fila libera el client_id y la cola offline del celular
+   resucita el armado. La `-X` la ve cualquiera que lea la fila, y por eso la convencion
+   vive ACA, en una sola funcion, y no repetida en cada lector. */
+function _entregaAnulada(row) {
+  return /-X\d*$/i.test(String(row && row.tanda != null ? row.tanda : "").trim());
+}
 async function _compNpsYaArmadas(nps) {
   const lista = (nps || []).map(function (n) { return String(n == null ? "" : n).trim(); }).filter(Boolean);
   if (!lista.length) return [];
   try {
     const inList = "(" + lista.map(function (n) { return '"' + n.replace(/"/g, "") + '"'; }).join(",") + ")";
-    const url = SUPABASE_ENTREGAS_ENDPOINT + "?select=np&np=in." + encodeURIComponent(inList) + "&limit=2000";
+    const url = SUPABASE_ENTREGAS_ENDPOINT + "?select=np,tanda&np=in." + encodeURIComponent(inList) + "&limit=2000";
     const r = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
     if (!r.ok) return [];
     const rows = await r.json();
     if (!Array.isArray(rows)) return [];
     const set = new Set();
-    rows.forEach(function (x) { const v = String(x.np == null ? "" : x.np).trim(); if (v) set.add(v); });
+    /* v21.21 — se leia por NP SIN mirar la tanda, asi que una fila ANULADA trababa el
+       armado igual que una viva, y para siempre. Caso E29D (22/09): LK 0034 se DESARMO
+       el 15/09 (17 cajas volvieron a gondola) y se anulo el TAP; el 22/09 el operario,
+       con el pallet a medio preparar, se comia "Ya esta armado el pedido NP LK 0034,
+       LK 0035 (en otra tanda)". Y el propio cartel le dice "avisa para darlo de baja a
+       mano primero", que era EXACTAMENTE lo que ya se habia hecho: el candado ignoraba
+       su propia salida. Al 22/09 son 20 filas en 2 tandas (E29D-X, D69H-X).
+       `_compTandaYaArmada` no tiene el problema: filtra `tanda=eq.<T>` y `E29D-X` no
+       matchea — por eso el sintoma aparecia solo en el candado POR NP. */
+    rows.forEach(function (x) {
+      if (_entregaAnulada(x)) return;
+      const v = String(x.np == null ? "" : x.np).trim(); if (v) set.add(v);
+    });
     return lista.filter(function (n) { return set.has(n); });
   } catch (_e) { return []; }
 }
@@ -29419,8 +29440,8 @@ async function cpCerrarTareaSiCompleta(np) {
   try {
     const n = String(np).trim().replace(/\.0+$/, "");
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const r = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cajas_falto&np=eq." + encodeURIComponent(n), { headers: H, cache: "no-store" });
-    let rest = 1; if (r.ok) { const rows = await r.json(); rest = 0; rows.forEach(function (x) { rest += Number(x.cajas_falto) || 0; }); }
+    const r = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cajas_falto,tanda&np=eq." + encodeURIComponent(n), { headers: H, cache: "no-store" });
+    let rest = 1; if (r.ok) { const rows = await r.json(); rest = 0; rows.forEach(function (x) { if (_entregaAnulada(x)) return; /* v21.21: lo anulado no falta */ rest += Number(x.cajas_falto) || 0; }); }
     if (rest > 0) return;   // todavía falta algo → no cerrar
     const rt = await fetch(SUPABASE_FALTAREAS_ENDPOINT + "?select=id&np=eq." + encodeURIComponent(n) + "&estado=in.(pendiente,asignado)", { headers: H, cache: "no-store" });
     const tareas = rt.ok ? await rt.json() : [];
@@ -29757,8 +29778,8 @@ async function faltMaybeCompletar(np) {
   if (!_faltTareaMia || _faltNpNorm(_faltTareaMia.np) !== _faltNpNorm(np)) return;
   let rest = 1;
   try {
-    const r = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cajas_falto&np=eq." + encodeURIComponent(_faltNpNorm(np)), { headers: _faltH(), cache: "no-store" });
-    if (r.ok) { const rows = await r.json(); rest = 0; rows.forEach(function (x) { rest += Number(x.cajas_falto) || 0; }); }
+    const r = await fetch(SUPABASE_ENTREGAS_ENDPOINT + "?select=cajas_falto,tanda&np=eq." + encodeURIComponent(_faltNpNorm(np)), { headers: _faltH(), cache: "no-store" });
+    if (r.ok) { const rows = await r.json(); rest = 0; rows.forEach(function (x) { if (_entregaAnulada(x)) return; /* v21.21: lo anulado no falta */ rest += Number(x.cajas_falto) || 0; }); }
   } catch (_e) { return; }   // ante error, NO autocerramos
   if (rest <= 0) {
     const id = _faltTareaMia.id;
