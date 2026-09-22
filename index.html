@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.28"></script>
+<script type="module" src="recepcion.js?v=21.29"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.28";
+const APP_VERSION = "v21.29";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20087,35 +20087,44 @@ function stkNpFaltanExport() {
 // es solo consulta. El envío diario a Juan lo hace el cron 18hs, aparte. El pdfUrl firmado
 // queda como link de descarga por si alguien quiere la versión imprimible. =====
 // Orden EXACTO de COLS en la edge (index.ts): cambiar acá si cambia allá.
+// v21.29 — encabezado de CUADRO SINÓPTICO: 2 líneas, abreviado y CON LA UNIDAD (m³/h,
+// m³/día, hs). El ancho lo tiene que dar el DATO, no el título: "Prom. Picking M3 x Hs"
+// medía más que "0,70" y estiraba la columna al pedo. Y las dos columnas que decían
+// "Picking" (una en m³/h y otra en horas) ahora se distinguen solas.
 const RV_COLS = [
   { k: "nombre", h: "Operario", name: true },
-  { k: "pkH", h: "Prom. Picking<br>M3 x Hs" },
-  { k: "pkD", h: "Prom. Picking<br>M3 x Día" },
-  { k: "arH", h: "Prom. Arm<br>M3 x Hs" },
-  { k: "arD", h: "Prom. Arm<br>M3 x Día" },
-  { k: "totDia", h: "Total<br>Hs Día" },
-  { k: "hsProd", h: "Hs<br>Prod" },
-  { k: "pick", h: "Picking" },
-  { k: "arm", h: "Armado" },
-  { k: "cc", h: "Carga de<br>Camión" },
-  { k: "noProd", h: "Hs No<br>Productivas" },
-  { k: "rt", h: "Recp de<br>Merc" },
-  { k: "mg", h: "Guardado<br>de Merc" },
+  { k: "pkH", h: "Picking<br>m³/h" },
+  { k: "pkD", h: "Picking<br>m³/día" },
+  { k: "arH", h: "Armado<br>m³/h" },
+  { k: "arD", h: "Armado<br>m³/día" },
+  { k: "totDia", h: "Total<br>hs día" },
+  { k: "hsProd", h: "Hs<br>prod" },
+  { k: "pick", h: "Picking<br>hs" },
+  { k: "arm", h: "Armado<br>hs" },
+  { k: "cc", h: "Carga<br>camión" },
+  { k: "noProd", h: "Hs no<br>prod." },
+  { k: "rt", h: "Recep.<br>merc." },
+  { k: "mg", h: "Guard.<br>merc." },
   { k: "limp", h: "Limpieza" },
   { k: "pb", h: "Baño" },
-  { k: "sinReg", h: "Hs<br>S/Reg" },
+  { k: "sinReg", h: "Hs<br>s/reg" },
 ];
 function openReporteVirgilio() {
   // v21.28 — tarjeta ANCHA (1760): con 760 las 16 columnas quedaban cortadas y el cuadro
   // se leía a medias, con scroll horizontal. El cuadro tiene que entrar entero.
   _stkPopShell("📈 Reporte diario Virgilio", "stkPopBody", true);
+  // v21.29 — la tarjeta se ajusta AL CUADRO (width:max-content): con el ancho fijo de la
+  // clase .wide sobraban ~450px de vacío a la derecha. El texto de arriba se limita aparte,
+  // si no es ÉL el que decide el ancho de la tarjeta.
+  const _card = document.querySelector(".stkpop-card");
+  if (_card) { _card.style.width = "max-content"; _card.style.maxWidth = "98vw"; }
   const body = document.getElementById("stkPopBody"); if (!body) return;
   const _iso = function (d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
   // v21.28 — arranca en HOY, no en ayer (pedido de Luis). El reporte de hoy es el que se
   // mira mientras el deposito trabaja; ayer se elige a mano si hace falta.
   const hoy = new Date(), ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
   body.innerHTML =
-    '<div class="stkpop-hint">Elegí un día y generá el reporte. Se arma en el momento como cuadro; <b>no manda WhatsApp</b> (el envío diario a Juan es aparte).<br>'
+    '<div class="stkpop-hint" style="max-width:900px;white-space:normal">Elegí un día y generá el reporte. Se arma en el momento como cuadro; <b>no manda WhatsApp</b> (el envío diario a Juan es aparte).<br>'
     + 'Las horas son opcionales: vacías miden la jornada entera (08:00 a 17:00); cargadas miden <b>sólo ese lapso</b> (ej. 13:00 a 16:30).</div>' +
     '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
     '<label style="font-weight:700;font-size:14px">Día:</label>' +
@@ -20143,20 +20152,20 @@ function _rvBloqueHtml(b) {
   // estire), padding mínimo y tipografía compacta. El overflow-x queda sólo de red para el
   // celular; en el monitor no tiene que hacer falta tocarlo.
   h += '<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:6px">' +
-    '<table style="border-collapse:collapse;table-layout:auto;font-size:12px;background:#fff">';
+    '<table style="border-collapse:collapse;table-layout:auto;font-size:14px;background:#fff">';
   h += '<thead><tr>' + RV_COLS.map(function (c) {
     const al = c.name ? "left" : "right";
-    const sticky = c.name ? "position:sticky;left:0;z-index:3;background:#f1f5f9;" : "";
-    return '<th style="' + sticky + 'padding:4px 6px;text-align:' + al + ';background:#f1f5f9;color:#475569;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;line-height:1.25;border-bottom:2px solid #cbd5e1;white-space:nowrap;position:sticky;top:0;">' + c.h + '</th>';
+    const sticky = c.name ? "position:sticky;left:0;z-index:3;background:#fff;" : "";
+    return '<th style="' + sticky + 'padding:6px 10px;text-align:' + al + ';vertical-align:middle;background:#fff;color:#0f172a;font-size:16px;font-weight:800;line-height:1.2;border-bottom:2px solid #cbd5e1;white-space:nowrap;position:sticky;top:0;">' + c.h + '</th>';
   }).join("") + '</tr></thead><tbody>';
   h += filas.map(function (f) {
     return '<tr>' + RV_COLS.map(function (c) {
       const v = (f[c.k] != null && f[c.k] !== "") ? String(f[c.k]) : "-";
       if (c.name) {
-        return '<td style="position:sticky;left:0;z-index:1;background:#fff;padding:4px 8px;text-align:left;font-weight:700;color:#0f172a;white-space:nowrap;border-bottom:1px solid #eef2f6;box-shadow:1px 0 0 #e2e8f0;">' + escapeHtml(v) + '</td>';
+        return '<td style="position:sticky;left:0;z-index:1;background:#fff;padding:6px 10px;text-align:left;vertical-align:middle;font-size:14px;font-weight:700;color:#0f172a;white-space:nowrap;border-bottom:1px solid #eef2f6;box-shadow:1px 0 0 #e2e8f0;">' + escapeHtml(v) + '</td>';
       }
       const dim = (v === "-") ? "color:#cbd5e1;" : "color:#0f172a;";
-      return '<td style="padding:4px 6px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:1px solid #eef2f6;' + dim + '">' + escapeHtml(v) + '</td>';
+      return '<td style="padding:6px 10px;text-align:center;vertical-align:middle;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:1px solid #eef2f6;' + dim + '">' + escapeHtml(v) + '</td>';
     }).join("") + '</tr>';
   }).join("");
   h += '</tbody></table></div>';
@@ -20175,19 +20184,20 @@ function _rvPendHtml(p) {
   } else {
     gDisp = coma(String(Math.round(Number(p.guardHoras) * 10) / 10)) + " h";
   }
-  const filas = [
-    ["M3 Pend", m3 + " m3", "(" + dias + " días)"],
-    ["Hs Guard Pend", gDisp, "(" + (p.guardCajas != null ? p.guardCajas : "—") + " cajas)"],
+  // v21.29 — Pendientes son DOS datos, no un cuadro: con menos de 3 filas comparables va
+  // LISTA, y no se parte una oración en dos columnas. Cajas con punto de miles (1.720) y el
+  // volumen en m³, que es la unidad del depósito.
+  const miles = function (n) {
+    if (n == null || !isFinite(Number(n))) return "—";
+    return String(Math.round(Number(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+  const items = [
+    "<b>" + m3 + " m³</b> por entregar — " + dias + " días de armado",
+    "<b>" + gDisp + "</b> de guardado — " + miles(p.guardCajas) + " cajas",
   ];
-  let h = '<div style="font-size:16px;font-weight:800;color:#0f172a;margin:14px 0 6px">Pendientes (al cierre del día)</div>';
-  h += '<div style="display:inline-block;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">' +
-    '<table style="border-collapse:collapse;font-size:14px;background:#fff">';
-  h += filas.map(function (r) {
-    return '<tr><td style="padding:7px 12px;color:#475569;border-bottom:1px solid #eef2f6;white-space:nowrap">' + escapeHtml(r[0]) + '</td>' +
-      '<td style="padding:7px 12px;text-align:right;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums;border-bottom:1px solid #eef2f6;border-left:1px solid #eef2f6;white-space:nowrap">' + escapeHtml(r[1]) + '</td>' +
-      '<td style="padding:7px 12px;color:#94a3b8;font-size:12.5px;border-bottom:1px solid #eef2f6;white-space:nowrap">' + escapeHtml(r[2]) + '</td></tr>';
-  }).join("");
-  h += '</table></div>';
+  let h = '<div style="font-size:16px;font-weight:800;color:#0f172a;margin:14px 0 4px">Pendientes (al cierre del día)</div>';
+  h += '<ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.7;color:#0f172a">' +
+    items.map(function (t) { return '<li>' + t + '</li>'; }).join("") + '</ul>';
   return h;
 }
 async function rvGenerar() {
