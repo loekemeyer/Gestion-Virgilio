@@ -1,8 +1,10 @@
-## Nota v21.22 (2026-09-22) — Las dos pantallas dan el mismo número, y el test lo sostiene
+## Nota v21.27 (2026-09-22) — Las dos pantallas dan el mismo número, y el test lo sostiene
 
-⚠ Salió como **v21.22** y no v21.21: otra sesión pusheó su v21.21 a `main` mientras esto se
-escribía (*"un armado ANULADO no traba el armado de verdad"*). Se mergeó su trabajo y se renumeró
-éste — el número de versión es lo que el dueño mira en el badge, no puede haber dos.
+⚠ Salió como **v21.27** y no v21.21: mientras esto se escribía, otras sesiones pusearon a `main`
+la v21.21, la v21.25 y la v21.26. Se mergeó todo y se renumeró éste tres veces — el número de
+versión es lo que el dueño mira en el badge para saber qué llegó, así que no puede haber dos
+iguales. **Al pushear a `main` en este repo conviene hacer `git fetch origin main` justo antes:
+hay varias sesiones trabajando a la vez.**
 
 Las tres respuestas de Thomas al comparador.
 
