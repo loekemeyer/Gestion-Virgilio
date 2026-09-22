@@ -1,4 +1,4 @@
--- v21.15 (Luis, 2026-09-22) - DE DONDE VIENE EL REGISTRO DE UNA TANDA QUE LO HEREDO
+-- v21.16 (Luis, 2026-09-22) - DE DONDE VIENE EL REGISTRO DE UNA TANDA QUE LO HEREDO
 --
 -- Al mover un pedido ARMADO a otra tanda (gv_ppp_pedido_llevar_registro, v21.10) viajan el
 -- TP y el TAP, las filas de Entregas_Virgilio y la porcion de cajas de a_facturar. Lo que NO
@@ -116,7 +116,7 @@ select p.tanda,
  order by p.movido_el desc nulls last, p.tanda;
 
 comment on view public.gv_tanda_registro_heredado is
-  'v21.15 - Tandas que recibieron el registro de un pedido ya armado (v21.10). Una fila por '
+  'v21.16 - Tandas que recibieron el registro de un pedido ya armado (v21.10). Una fila por '
   '(tanda que recibio, tanda de origen), con las cajas que viajaron y DONDE quedo el detalle '
   'por articulo del picking: los PKC NO se copian porque copiarlos re-pickea.';
 
@@ -127,5 +127,5 @@ insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pi
 values ('gv_tanda_registro_heredado', 'vista', 'pkc_en_origen',
         'La vista que dice de que tanda heredo el registro un pedido movido ya armado, y '
         'donde quedo el detalle del picking (los PKC no viajan: copiarlos re-pickea).',
-        'Luis', 'v21.15')
+        'Luis', 'v21.16')
 on conflict do nothing;
