@@ -3625,7 +3625,31 @@ Medido el 22/09:
 **`gv_oc_recompute_recibido(proveedor, codigo)` cruza por el par `(proveedor, código)`**, así que
 con nombres distintos en las dos puntas la OC **no se cierra nunca sola**.
 
-⚠⚠ **Y NO son estos tres: es un patrón de toda la tabla — pero el número es 22, no 25.**
+### ⚠⚠ Y son EXACTAMENTE estos tres: NO es un patrón de toda la tabla
+
+**Luis, 2026-09-22, textual:** *"No siempre es la norma general de que le entrega a otro. En los
+únicos que la orden sale en nombre de uno y le entrega a otro son los casos de Pedernera,
+Blistpack y Oscar."*
+
+O sea: **«la OC sale a uno y entrega otro» es una REGLA de negocio sólo para los tres fabricantes
+de `GV_OC_Fabrica_Para`.** Cualquier otro código donde eso pase **es configuración mal puesta**, y
+se arregla poniendo en `OC_Maximos.proveedor` al que de verdad entrega. **No se agrandan las
+excepciones**: si aparece un caso nuevo, primero se mira la config, y sólo Luis decide si ese
+fabricante entra a la tabla.
+
+**Los 19 códigos que quedaban los revisa y los configura Luis, uno por uno** (22/09: *"lo
+configuro yo, los 22 artículos que me pasaste, y lo damos por cerrado con eso"*). **Claude no los
+toca.** Medido ese día contra `vista_generador_oc` —que es lo que se va a emitir, no lo que se
+emitió—: **5 ya están bien** (550, 584E, 234, 609, 580: la config ya dice el que entrega y las OC
+viejas a otro nombre son restos que se limpian solos), **1 no tiene proveedor** (583E, que por eso
+no se puede comprar) y **13 hay que mirarlos**.
+
+⚠ **La medición se hace contra `vista_generador_oc`, NO contra `OC_Maximos` a secas ni contra las
+OC ya emitidas.** El 550 es el ejemplo: sus OC salieron a **Poly** hasta el 16/09 y hoy la config
+dice **Garcia**, o sea que ya está corregido y lo que se ve es historia. Mirando sólo las OC
+emitidas, un código ya arreglado sigue apareciendo como problema para siempre.
+
+**El número era 22, no 25.**
 
 > **Se retira el "25 pares" del barrido anterior: estaba CONTAMINADO.** Cruzaba por **número de
 > código** y **Basconia compra ACERO EN KILOS** (rubro `Flejes`, unidad `Kg`), con códigos que
@@ -3657,9 +3681,9 @@ OC sin imputar**. Los que pesan:
 | 519 · 719 | Log/ Fabr | Lucho | 39 | el de la OC |
 | 355 | German ↔ Pettofrezza | Rafael / German | 31 | Pettofrezza |
 
-**Ninguno se tocó.** Luis, 22/09: ***"2 no necesariamente, tengo que ver caso x caso"*** — el
-arreglo se aplicó **sólo** a los tres fabricantes de `GV_OC_Fabrica_Para`. El barrido, para
-volver a correrlo, está en `sql/gv_oc_maximos_544_560_v2123.sql`.
+**Ninguno se tocó**, y quedaron para Luis. El barrido, para volver a correrlo, y la consulta que
+arma la lista de trabajo (código · qué emitiría hoy · quién viene entregando · estado) están en
+`sql/gv_oc_maximos_544_560_v2123.sql`.
 
 > **Son dos datos distintos y los dos son ciertos:** quién **fabrica y entrega** (así se carga en
 > Recepción, y está bien) y a quién se le **emite la orden** (siempre `Log/ Fabr`, que es el que

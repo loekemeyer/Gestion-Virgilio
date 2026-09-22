@@ -91,3 +91,43 @@ select oc.cod, oc.prov_oc oc_a, ent.prov_ent entrega, cfg.prov_cfg config,
    and not public.gv_prov_match(public.gv_norm_prov_keys(oc.prov_oc),
                                 public.gv_norm_prov_keys(ent.prov_ent))
  order by oc.cajas_oc desc;
+
+------------------------------------------------------------------------------
+-- v21.24 — LA LISTA DE TRABAJO de Luis (22/09): que configurar de esos codigos
+------------------------------------------------------------------------------
+-- Luis: "No siempre es la norma general de que le entrega a otro. En los unicos que la
+-- orden sale en nombre de uno y le entrega a otro son los casos de Pedernera, Blistpack
+-- y Oscar." + "lo configuro yo, los 22 articulos que me pasaste, y lo damos por cerrado".
+--
+-- ⚠ La medicion va contra `vista_generador_oc` (lo que se VA A EMITIR), no contra las OC
+-- ya emitidas: el 550 salia a Poly hasta el 16/09 y hoy la config ya dice Garcia. Mirando
+-- las OC viejas, un codigo ya arreglado figura como problema para siempre.
+--
+-- Al 22/09: 5 OK · 1 SIN PROVEEDOR (583E) · 13 REVISAR.
+
+with cods as (select unnest(array['510','550','583E','505','584E','103','922','911','224','223',
+                                  '123','609','591','580','760','234','519','719','355']) cod),
+ent as (select e."Cod" cod,
+               string_agg(e."Nombre_Tall"||' ('||e.cj||')', ' · ' order by e.cj desc) entrega,
+               (array_agg(e."Nombre_Tall" order by e.cj desc))[1] principal
+          from (select "Cod","Nombre_Tall",sum("Cajas") cj
+                  from public."Entregas Tallerista Virgilio"
+                 where "Fecha" >= '2026-07-01' group by 1,2) e
+         group by 1),
+ocs as (select o.codigo cod, string_agg(distinct o.proveedor,' + ') oc_a,
+               sum(o.cantidad) filter (where coalesce(o.cantidad_recibida,0)=0) sin_imputar
+          from public."Ordenes_Compra" o
+         where o.rubro='Art Term' and o.unidad='Cajas' and o.fecha >= date '2026-07-01'
+         group by 1)
+select c.cod, g.descripcion, g.proveedor as emitiria_hoy, ocs.oc_a as oc_viejas_a,
+       ocs.sin_imputar, ent.entrega, ent.principal,
+       case when g.proveedor is null      then 'sin fila en el generador'
+            when not g.tiene_prov_real    then 'SIN PROVEEDOR configurado'
+            when public.gv_prov_match(public.gv_norm_prov_keys(g.proveedor),
+                                      public.gv_norm_prov_keys(ent.principal)) then 'OK'
+            else 'REVISAR' end estado
+  from cods c
+  left join public.vista_generador_oc g on g.cod = c.cod
+  left join ent on ent.cod = c.cod
+  left join ocs on ocs.cod = c.cod
+ order by ocs.sin_imputar desc nulls last;
