@@ -28607,3 +28607,83 @@ Thomas: *"dale a todas"*. Se programó, con backup en
 2. **El 28 queda en 5,414 m³ y el 29 en 7,657 m³**, contra un cupo de 4,30. Adelantar Olímpico y
    Max Lim al 29 fue decisión de Thomas sabiendo el número: **hace falta sumar gente al depósito
    esos dos días**, o alguno se reprograma para atrás.
+
+### §3.me — v20.95 · El armado automático no programa cuarentena ni cliente nuevo sin aprobación humana — 2026-09-22
+
+**Thomas, textual:** *"armado automatico no debería programar automaticamente clientes nuevos ni
+clientes en cuarentena que no hayan sido aprobados por un humano, nunca. Si ya fueron aprobados y
+se atrasa la entrega o algo asi, si se puede reprogramar automaticamente, pero primero aprobado
+por humano."*
+
+**Qué se midió.** Barrido sobre `pg_proc`: **ninguna** pieza del armado nombra la palabra
+cuarentena.
+
+| objeto | ¿mira la cuarentena? |
+|---|---|
+| `gv_ppp_web_armar_pendientes` | no |
+| `ppp_web_armar_tandas` | no |
+| `gv_ppp_web_juntar_clientes` | no |
+| `gv_pedidos_web_excluidos` | no |
+
+La retención vivía **sólo en el front**, en el chip de A Programar. El armador saltea lo diferido
+(a0), lo retenido a mano en `GV_PPP_Web_Retenido` (a0b) y lo cancelado (a0c): alcanzaba con que el
+pedido no tuviera fila en esa tabla para que el cron lo programara igual.
+
+**Los dos casos que lo destaparon**, los dos sin una sola fila en `GV_Cuarentena_Liberados`:
+
+| NP | cliente | motivo | quedó en |
+|---|---|---|---|
+| LK 0094/95/96 (order 1448) | Silvano Lucas Martin (4282) | **cliente nuevo**, pipeline en `ingresado` | E72A · 28/09 |
+| CH 0004 (order 218) | Ierakuin Srl (1665) | **deuda $2.062.528,58** | E71A · 28/09 |
+
+A los dos los había devuelto Vivi a mano (18/09, *"No pago"* y *"No pago todavia"*) y los dos
+volvieron solos. Se desprogramaron con `gv_cuarentena_devolver`.
+
+**Qué se hizo.** Pase **(a0d)** en `gv_ppp_web_armar_pendientes`, apoyado en la función nueva
+`gv_cuarentena_retiene_lote(p_empresa, p_filas)`.
+
+- **Aprobado por humano = fila en `GV_Cuarentena_Liberados`** que levante ESE motivo, que es lo que
+  escriben el botón de Cuarentena y el ✅ del pipeline de Clientes nuevos (los dos vía
+  `gv_cuarentena_liberar`). Aprobado, el pedido vuelve a los pases normales y se reprograma solo:
+  es la segunda mitad de la regla y está probada.
+- ⚠ **El criterio de QUÉ retiene no se duplica**: lo da `gv_cuarentena_marcar_calc`, la misma que
+  usa la pantalla, con sus excepciones vivas (`gv_excepcion_cuarentena`, reposición chica v19.44,
+  mismo pedido v20.52, resta de motivos liberados v20.86). Si cambia una regla de cuarentena, el
+  armado la hereda sola. Medido: **Suppa (1482, deuda $836.909) NO retiene**, porque su deuda es la
+  factura de otra NP del **mismo** pedido — y eso es lo correcto.
+- ⚠ **`gv_cuarentena_ya_programado()` no aplica esas excepciones**, así que marca de más: lista a
+  Suppa como retenido-y-programado cuando la Cuarentena no lo retiene. Es un centinela con falsos
+  positivos, no una fuente.
+
+⚠ **FAIL-CLOSED, al revés del patrón de la v19.44.** Si la cuarentena no se puede evaluar (sin
+permiso, o la marcación explota), `gv_cuarentena_retiene_lote` devuelve **todo el lote** y no se
+programa nada. Un armado que no corre se ve (`GV_PPP_Web_Armado_Log`, `gv_ppp_web_armado_salud`);
+un pedido con deuda que sale en el camión, no. Ojo con el guard de `gv_cuarentena_marcar_calc`: su
+`WHERE` termina en `(es_supervisor_virgilio() or gv_es_supervisor_o_servicio())`, así que **sin
+permiso devuelve CERO FILAS** — leído como *"no hay retenidos"* sería el mismo bug al revés. Por eso
+el chequeo de identidad se hace **antes y afuera**.
+
+⚠ **El pase va DESPUÉS del tope (a00)**, no antes: así evalúa a lo sumo `armado_tope_pedidos` (120)
+y no los 172 que entran. **Y no costó tiempo: lo bajó.** El guard cuesta 1.041 ms sobre 218 pedidos
+(766 de ellos son `gv_cuarentena_mismo_pedido_seguro`), pero el armado cuesta ~43 ms por pedido y
+los retenidos dejaron de procesarse. LK, mismas ~170 filas de entrada:
+
+| corrida | ms |
+|---|---|
+| 09:40 / 09:45 / 09:50 (sin guard) | 4.515 / 5.499 / 4.951 |
+| 10:00 / 10:05 (con guard) | **4.327 / 4.306** |
+
+⚠ **El alias es `_cq_r`, no `r`.** `gv_ppp_web_armar_pendientes` declara `r record`: un alias `r`
+la vuelve ambigua y la función explota **en ejecución** con `42702`, no al crearse. Es el pozo de
+la v19.56 (problema 400) y **volvió a morder en el primer intento**; lo cazó la prueba, no la
+lectura.
+
+**Cómo se probó: corriendo el armador**, en una transacción que se revierte con un `raise` final.
+
+| escenario | resultado medido |
+|---|---|
+| cliente nuevo **sin** aprobar + cliente sano | `2026-09-29 E74A np=1 cods={1402}` · 1448 **SIN TANDA** |
+| el mismo, **con** fila en Liberados | `2026-10-02 E61E np=1` · 1448 quedó en **E61E** |
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = las dos reglas siguen.
+`sql/gv_armado_cuarentena_v2095.sql`.
