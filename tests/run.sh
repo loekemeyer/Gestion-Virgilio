@@ -654,3 +654,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== comp-armado-viejo-no-traba (v20.91: un armado anterior al picking no traba el armado de verdad) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-armado-viejo-no-traba.cjs
+
+echo "== rv-cuadro-entero (v21.29: el Reporte diario entra entero, arranca en hoy y mide lapsos) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rv-cuadro-entero.cjs

@@ -29197,3 +29197,58 @@ select * from public.gv_monitor_horas_operario;     -- las horas de hoy
 `delete from public."GV_Reglas_Centinela" where objeto = 'gv_monitor_horas_operario';`
 (el front de la TV lo lee con `.catch()`: sin la vista, el panel queda vacío y el resto del
 tablero se dibuja igual). `sql/gv_monitor_horas_operario_v2117.sql`.
+
+## §3.mm — v21.28: el Reporte diario muestra el LEGAJO 600 (entrevistas) y mide LAPSOS de horas
+
+**Luis, 2026-09-22:** *"añadi para medir lapsos de horas por ejemplo desde la 1pm a 4:30 pm"* ·
+*"tiene que mostrar todo el cuadro sinoptico"* · *"que siempre muestre el dia de hoy 1ro"*.
+
+El reporte no lo arma el front: lo arma la Edge Function **`gv-reporte-diario-virgilio`**
+(`openReporteVirgilio` → `solo_pdf`). Su fuente ahora vive en el repo, en
+`supabase/functions/gv-reporte-diario-virgilio/` — antes sólo existía desplegada.
+
+### 1. El 600 no era "de prueba": es el legajo de ENTREVISTAS
+
+`calculo.js` lo tiraba junto con el 0/999/9999 (`legajosTest`), así que la producción del
+candidato no se veía. Pero el 600 **persiste eventos y descuenta stock** (v14.62): es trabajo real.
+
+⚠ **En un mismo día pasan VARIOS candidatos por ese legajo.** Medido el 22/09: javier Romero
+(08:31–11:47) y Juan Segundo Landaberry (13:09–13:48). Una sola fila "600" los sumaba en un
+operario inexistente. Por eso `index.ts` **reescribe el legajo** a `600·<gv_nombre_prueba>` al
+traer los datos: todo lo que agrupa por legajo aguas abajo (`porPersona`, `sreg`, `det`) se parte
+por candidato solo, sin tocar `calculo.js`. Sale como *"javier Romero (entrevista)"*.
+
+⚠ **Sin nombre NO se le atribuye a nadie por cercanía de reloj**: queda `600` pelado y sale como
+*"Entrevista (s/nombre)"*. Al 22/09 son 3 eventos (`EP` y dos `PKA`): **el front no sella
+`gv_nombre_prueba` en esas opciones** — eso se arregla en la app, no acá.
+
+### 2. El lapso: no hace falta un filtro nuevo, ya existe la jornada
+
+`splitParPorJornada` **ya recorta cada par contra la jornada**. Alcanza con pisarla con el lapso
+pedido y todo lo que mide horas queda recortado solo. Los minutos van aparte de la hora porque
+16:30 no entra en un entero (`jornadaInicioMin` / `jornadaFinMin`, nuevos).
+
+```
+{ "solo_pdf": true, "fecha": "2026-09-22", "desde_hora": "13:00", "hasta_hora": "16:30" }
+```
+
+Acepta `13:00`, `13`, `1300`, `13.00`, `1pm` y `4:30 pm`. Vacías = jornada de siempre (08:00–17:00).
+
+⚠ **Un valor cargado que no se entiende NO cae en silencio al horario de siempre**: se ignora el
+lapso entero. Un default inventado se lee como un dato real.
+
+⚠ **`aplicarVentana` pisa `CONFIG`, que es de módulo.** Se llama **sin `await` de por medio**
+antes de `procesar()` y `calcExtra()`, que son sincrónicos: así dos pedidos con lapsos distintos
+no se pisan.
+
+**Medido el 22/09** (día entero → 13:00-16:30): Farias 8:36 → 3:29 · Jhonny 8:02 → 2:50 ·
+Landaberry 2:39 → 2:39 (su prueba entra entera) · javier Romero desaparece (fue a la mañana).
+
+### 3. El cuadro entra entero
+
+El pop-up usaba la tarjeta de 760 px y las 16 columnas quedaban cortadas con scroll horizontal.
+Ahora va la **ancha** (1760) y la tabla es compacta: ancho por dato, padding mínimo, sin
+`width:100%` que estire. Y el selector de día **arranca en HOY**, no en ayer.
+
+**Chequeo:** `node tests/rv-cuadro-entero.cjs` — mide el render (`scrollWidth <= clientWidth`),
+no el texto del código. Verificado que falla contra la versión anterior.
