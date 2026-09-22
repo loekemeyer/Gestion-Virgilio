@@ -131,3 +131,36 @@ select c.cod, g.descripcion, g.proveedor as emitiria_hoy, ocs.oc_a as oc_viejas_
   left join ent on ent.cod = c.cod
   left join ocs on ocs.cod = c.cod
  order by ocs.sin_imputar desc nulls last;
+
+------------------------------------------------------------------------------
+-- v21.25 — 591 Despolvillador de Yerba: DISCONTINUADO (Luis, 22/09)
+------------------------------------------------------------------------------
+-- Luis: "591 marcalo como discontinuo" + "No se va a recibir mas ni va a salir en OC".
+--
+-- De donde salia la demanda (por si se revisa): total 41 = maximo 50 + pedidos 4 - stock 13.
+-- El maximo 50 = ceil(proyeccion 33,17 x indice 1,5), y esos 33,17 caj/mes son el promedio
+-- de los 6 meses CERRADOS (mar-ago: 69+15+53+9+20+33 = 199/6), que empuja LK todos los dias
+-- a las 06:20. Marzo (69) y mayo (53) son el 61% de ese total. Septiembre (21 cajas, 10
+-- clientes) todavia no entra. O sea: la demanda era real, no un fantasma de configuracion.
+--
+-- Backup: zz_backups."GV_Backup_OCMaximos_591_20260922" (1 fila, RLS on, writes revocados).
+
+update public."OC_Maximos"
+   set activo = false, proveedor = null,
+       descripcion = 'Despolvillador de Yerba - discontinuado: no se compra ni se recibe mas (Luis, 22/09/2026)'
+ where cod = '591';
+
+-- verificacion COMO ANON (la identidad del celular; desde el MCP se entra como postgres y
+-- no prueba nada — trampa de la v20.45). Los tres tienen que dar 0:
+set local role anon;
+select (select count(*) from public.oc_vigentes_por_proveedor('Tierra Nativa') where cod='591')
+         as boton_tierra_nativa,
+       (select count(*) from public."OC_Maximos" where cod='591' and activo)
+         as buscador_de_activos_de_recepcion,
+       (select count(*) from public.vista_generador_oc where cod='591' and activo and tiene_prov_real)
+         as lista_de_compra;
+
+-- rollback:
+--   update public."OC_Maximos" m set activo = b.activo, proveedor = b.proveedor,
+--          descripcion = b.descripcion
+--     from zz_backups."GV_Backup_OCMaximos_591_20260922" b where b.cod = m.cod;

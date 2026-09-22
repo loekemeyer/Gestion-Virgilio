@@ -3690,6 +3690,19 @@ emitió—: **5 ya están bien** (550, 584E, 234, 609, 580: la config ya dice el
 viejas a otro nombre son restos que se limpian solos), **1 no tiene proveedor** (583E, que por eso
 no se puede comprar) y **13 hay que mirarlos**.
 
+**El 591 (Despolvillador de Yerba) ya está cerrado: DISCONTINUADO** (Luis, 22/09: *"no se va a
+recibir más ni va a salir en OC"*). `activo = false`, `proveedor = null` y el motivo en la
+descripción; backup en `zz_backups."GV_Backup_OCMaximos_591_20260922"`. Verificado **como `anon`**,
+que es la identidad del celular: sale de la lista de compra, del buscador de códigos activos de
+Recepción (el «+» de Log/ Fabr lee `OC_Maximos where activo`) y del botón de Tierra Nativa — los
+tres en **0**. Sus 6 OC (119 cajas, del 12/08 al 16/09) ya estaban **todas `anulada` con 0
+recibido**, así que no quedó ninguna viva que cancelar.
+
+⚠ **Discontinuar acá NO lo saca de la página.** En LK `products.active` sigue en `true` y sin
+badge: el cliente lo sigue pidiendo. Al 22/09 hay **7 NP programadas** con 591 (22/09 al 02/10)
+contra **13 cajas de stock** — salen con lo que hay. Si además hay que dejar de venderlo, es otro
+cambio, en el proyecto de LK.
+
 ⚠ **La medición se hace contra `vista_generador_oc`, NO contra `OC_Maximos` a secas ni contra las
 OC ya emitidas.** El 550 es el ejemplo: sus OC salieron a **Poly** hasta el 16/09 y hoy la config
 dice **Garcia**, o sea que ya está corregido y lo que se ve es historia. Mirando sólo las OC
