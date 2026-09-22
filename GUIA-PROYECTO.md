@@ -1,3 +1,49 @@
+## Nota v20.92 (2026-09-22) — «F. pedido» de la Programación: la cascada del lado de la lectura
+
+Thomas preguntó si la hoja trae la fecha en que recibimos la NP. La trae —es la columna
+**F. pedido** de la impresión y del Excel, que sale de `gv_ppp_prog_arbol.fecha_pedido`— pero al
+22/09 **14 de 183 NP programadas salían con «—»**. Las 14 son web y las 14 tenían
+`PPP_Web_Programacion.fecha_recep` en NULL.
+
+**El arreglo de raíz ya existía y es de otra tanda: la v20.63**
+(`sql/gv_fecha_recep_armador_v2063.sql`), que hace que el armador **persista** la fecha en la
+tabla. Esto es otra cosa y no lo reemplaza: es el lado de la **lectura**, y cubre lo que aquél no
+puede alcanzar —las filas que **ya** estaban programadas sin fecha (su `UPDATE` de 9 filas sigue
+esperando el «sí» del dueño) y los otros **cuatro** caminos de escritura de
+`PPP_Web_Programacion`, porque la v20.63 arregló el del armador, que es uno solo.
+
+La rama `web` resuelve ahora en cascada:
+
+| | de dónde sale | qué es |
+|---|---|---|
+| 1 | `PPP_Web_Programacion.fecha_recep` | el que ya se usaba |
+| 2 | `lk_pedidos_match.fecha_pedido` | la fecha real del pedido de la página (tabla local, la empuja el cron de LK cada 15 min) |
+| 3 | `PPP_Web_NP.creado_at` a hora AR | el día en que se le asignó la NP |
+
+⚠ **El (3) es una aproximación, no la fecha del pedido.** Se midió: para las **9** NP de LK
+coincide exactamente con el (2). Las **5** de Chef de formato nuevo (order_id 1001430/31/32) no
+están en `lk_pedidos_match` —su feed no las trae, y eso es del lado de Chef— así que el (3) es lo
+único que hay: da 2026-09-14 para las tres. La v20.63 las daba por irrecuperables; el día en que se
+numeró la NP sí estaba guardado.
+
+**Medido después:** 183 de 183 con fecha, y `anon` las ve las 183 (probado con `set local role`).
+Ningún valor previo cambia: es un `coalesce`, sólo rellena los NULL.
+
+⚠ **Esto no tapa nada.** El centinela de la v20.63 sigue mirando la **tabla**, no el árbol:
+
+```sql
+select * from public.gv_ppp_sin_fecha_recep;   -- al 22/09: las mismas 14 filas
+select count(*) filter (where fecha_pedido is null)
+  from public.gv_ppp_prog_arbol(current_date, current_date + 30);   -- 0
+```
+
+**Lo que sigue sin fecha, a propósito:** las NP de **ISIS ya facturadas o entregadas** cuya fila
+desapareció del espejo (origen `fact`/`hist`). En una ventana de 120 días son **622** y las 622 son
+de numeración ISIS: `gv_ppp_programacion_diaria` guarda sólo lo programado y después se borra, así
+que su `fecha_recep` no está en ningún lado. Son días pasados; la impresión mira días por venir.
+
+`sql/gv_ppp_prog_arbol_fecha_pedido_v2092.sql`, `tests/ppp-fecha-pedido-cascada.cjs`.
+
 ## Nota v20.82 (2026-09-21) — El remito FACTURADO ya trae el cliente de una NP web
 
 Lo vio Thomas sobre **LK 0145** (tanda E35A, impresa el 21/09 a las 14:51): la hoja salía con
