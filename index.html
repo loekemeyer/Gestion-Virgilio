@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.02"></script>
+<script type="module" src="recepcion.js?v=21.03"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.02";
+const APP_VERSION = "v21.03";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30832,7 +30832,13 @@ async function showControlRemitos(legajo, isAdmin) {
     items.sort((a, b) => (b.venc ? 1 : 0) - (a.venc ? 1 : 0) || String(a.tanda).localeCompare(String(b.tanda)) || a.np.localeCompare(b.np));
     if (!items.length) {
       _cr = null; crReleaseWakeLock();
-      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay pedidos cargados al camión pendientes de control.</div><button class="pk-btn pk-cancel" onclick="crClose()">Cerrar</button>`;
+      // v21.03 (Luis) — sin remitos NO se minimiza: el toggle RR tiene que quedar CERRADO.
+      // Antes el único botón era crClose(), que sólo esconde el modal y deja RR abierto (rojo)
+      // bloqueando EP/AP. Mismo escape que ya tenían CC (ccEndWithoutLoading) y CR (ccrEndWithout).
+      // El admin (openRemitosAdmin, legajo "0") no tiene botonera ni toggle: sólo cierra el modal.
+      m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay pedidos cargados al camión pendientes de control.</div>` +
+        (isAdmin ? `<button class="pk-btn pk-cancel" onclick="crClose()">Cerrar</button>`
+                 : `<button class="pk-btn pk-ok" onclick="crEndWithout('${leg}')">✓ Cerrar Recepción Remitos (no hay remitos)</button>`);
       return;
     }
     const saved = crLoadChecked(leg);
@@ -30840,7 +30846,11 @@ async function showControlRemitos(legajo, isAdmin) {
     crRender();
   } catch (e) {
     _cr = null; crReleaseWakeLock();
-    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div><button class="pk-btn pk-cancel" onclick="crClose()">Cerrar</button>`;
+    // v21.03 — ídem: si la lista no carga, el operario tiene que poder CERRAR el toggle RR
+    // (si no queda rojo y traba picking/armado). "Cerrar (sigo después)" sigue minimizando.
+    m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No se pudo cargar (¿sin conexión?).<br><small>${escapeHtml(e.message || "")}</small></div>` +
+      (isAdmin ? `<button class="pk-btn pk-cancel" onclick="crClose()">Cerrar</button>`
+               : `<button class="pk-btn pk-ok" onclick="crEndWithout('${leg}')">✓ Cerrar Recepción Remitos (sin controlar por app)</button><button class="pk-btn pk-cancel" onclick="crClose()">Cerrar (sigo después)</button>`);
   }
 }
 
@@ -30909,6 +30919,21 @@ function crToggle(npClean) {
   crRender();
 }
 function crClose() { crReleaseWakeLock(); _cr = null; closeTandaModal(); }   // minimiza (RR sigue abierto, re-abrís tocando RR)
+/* v21.03 (Luis, 2026-09-22) — Cierra/termina RR SIN registrar ningún CRN. Es el escape para
+   cuando NO hay remitos pendientes o la lista no carga: sin esto el único botón era crClose(),
+   que minimiza y deja el toggle RR abierto (rojo) trabando EP/AP. Copia de ccrEndWithout (CR)
+   y ccEndWithoutLoading (CC), que ya lo tenían. NO emite el evento RR si el toggle no está
+   abierto (el admin usa legajo "0" y no tiene toggle): así no quedan RR huérfanos en el log. */
+function crEndWithout(legajo) {
+  const leg = String(legajo || (_cr && _cr.legajo) || "").trim();
+  const st = leg ? getLegajoState(leg) : null;
+  const abierto = !!(st && st.toggles && st.toggles.RR);
+  if (abierto) { try { crSendClose(leg); } catch (_e) {} }
+  try { crClearChecked(leg); } catch (_e) {}
+  _cr = null; crReleaseWakeLock(); closeTandaModal();
+  try { alert(abierto ? "📋 Recepción Remitos cerrada (no se controló ninguna NP por la app)."
+                      : "📋 Recepción Remitos cerrada."); } catch (_e) {}
+}
 function crFinish() {
   if (!_cr) return;
   const legajo = _cr.legajo;
@@ -30967,7 +30992,11 @@ function crMarkSinSalida(npClean) {
   _cr.items = _cr.items.filter(x => x !== it);
   try { crSaveChecked(_cr.legajo, _cr.checked); } catch (_e) {}
   if (!_cr.items.length) {
+    // v21.03 — al sacar el ÚLTIMO remito por FSS no queda nada que controlar: se cierra el
+    // toggle RR igual que en el caso "no hay remitos". Antes quedaba abierto (rojo) y trababa EP/AP.
+    const _leg = _cr.legajo, _adm = !!_cr.admin;
     try { alert("✓ NP " + it.np + " marcada FACTURADO SIN SALIDA.\nNo quedan remitos pendientes."); } catch (_e) {}
+    if (!_adm) { crEndWithout(_leg); return; }
     _cr = null; crReleaseWakeLock(); closeTandaModal(); return;
   }
   try { alert("✓ NP " + it.np + " marcada FACTURADO SIN SALIDA → «FC s/Salida»."); } catch (_e) {}

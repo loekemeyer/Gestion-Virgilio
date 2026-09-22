@@ -1,3 +1,45 @@
+## Nota v21.03 (2026-09-22) — RR sin remitos dejaba el toggle abierto y trababa picking/armado
+
+Luis, con la captura de la botonera: *"si uno aprieta recepción de remitos ahora, figura que no
+hay remitos para recepcionar (correcto) pero después aprieta cerrar y queda marcado en rojo el
+módulo RR y no deja comenzar picking/armado"*.
+
+**Lo que pasaba, en tres pasos.** El toggle RR se abre en el **primer toque del botón**
+(`selectOption` → evento RR con `ts_inicio_iso = null`), y recién **después** se abre el modal
+(`showControlRemitos`). Si la lista venía vacía, el único botón era **`crClose()`**, que
+**minimiza a propósito** —el comentario lo dice: *"RR sigue abierto, re-abrís tocando RR"*—, así
+que el toggle quedaba abierto. Y con cualquier toggle abierto `updateCoreButtonsState` deshabilita
+los `CORE_CODES`: **EP y AP quedan trabados**. Para el operario no había salida dentro de la app.
+
+**No era un caso nuevo: era el único de los tres que no lo tenía.** Los hermanos ya lo resolvían:
+
+| módulo | botón de escape | desde |
+|---|---|---|
+| CC · Carga Camión | `ccEndWithoutLoading` — *"✓ Terminar Carga Camión (sin cargar por app)"* | ya estaba |
+| CR · Control Remitos | `ccrEndWithout` — *"✓ Terminar Control Remitos (sin controlar por app)"* | ya estaba |
+| **RR · Recepción Remitos** | **`crEndWithout`** | **v21.03** |
+
+Qué cambia, y sólo eso:
+
+1. **Sin remitos** el botón pasa a ser **«✓ Cerrar Recepción Remitos (no hay remitos)»** y cierra
+   el toggle de verdad. No hay «sigo después»: no tiene sentido dejar abierto un módulo vacío —
+   si después entra un remito, se vuelve a tocar RR y la lista se re-consulta igual.
+2. **Si la lista no carga** (sin conexión, HTTP 500) van los dos: el escape que cierra y
+   «Cerrar (sigo después)», que sigue minimizando — ahí sí puede haber remitos y conviene reintentar.
+3. **El último remito marcado «↩ s/salida»** (`crMarkSinSalida`) también cierra el toggle: dejaba
+   la lista vacía y caía en el mismo pozo.
+4. **`crEndWithout` NO manda ningún `CRN`** —no se controló nada— y **no emite el evento RR si el
+   toggle no está abierto**. Eso último es por el admin: `openRemitosAdmin` abre la MISMA lista con
+   legajo `"0"` y sin botonera, así que un `RR` ahí sería un evento huérfano.
+
+⚠ **Con remitos NO se toca nada**: sigue haciendo falta tildar y tocar «Terminé» (`crFinish`), que
+es lo que emite los CRN. El escape es sólo para cuando no hay nada que controlar.
+
+**Chequeo:** `node tests/rr-sin-remitos-cierra.cjs` — corre la pantalla de verdad con la lista
+vacía, con error y con remitos, y mira si el toggle quedó abierto. Verificado que **falla contra el
+código anterior** (6 fallas) y pasa con éste. Un candado de texto no servía: lo que hay que ver es
+el estado del toggle, no qué dice el botón.
+
 ## Nota v20.93 (2026-09-22) — «F. pedido» de la Programación: la cascada del lado de la lectura
 
 Thomas preguntó si la hoja trae la fecha en que recibimos la NP. La trae —es la columna

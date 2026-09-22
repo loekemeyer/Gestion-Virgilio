@@ -3129,6 +3129,38 @@ Dos detalles de implementación que costaron y conviene no repetir:
 para mirar; `sin nada que armar` y `fuera de horario` son sanos. §3.jf,
 `sql/gv_armado_salud_feed_v1958.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-22, v21.03): un módulo que ABRE TOGGLE tiene que poder CERRARSE desde el caso VACÍO
+
+**Luis, textual:** *"si uno aprieta recepción de remitos ahora, figura que no hay remitos para
+recepcionar (correcto) pero después aprieta cerrar y queda marcado en rojo el módulo RR y no deja
+comenzar picking/armado"*.
+
+El toggle se abre en el **primer toque del botón**, y recién después se consulta la lista. Si la
+lista viene vacía y el único botón del modal **minimiza** (`crClose` / `ccClose` / `ccrClose`: *"sigue
+abierto, re-abrís tocando el botón"*), el toggle queda abierto — y con **cualquier** toggle abierto
+`updateCoreButtonsState` deshabilita los `CORE_CODES`: **EP y AP trabados, sin salida dentro de la app.**
+
+| módulo | el botón que cierra de verdad |
+|---|---|
+| CC · Carga Camión | `ccEndWithoutLoading` |
+| CR · Control Remitos | `ccrEndWithout` |
+| RR · Recepción Remitos | **`crEndWithout`** (faltaba hasta la v21.03) |
+
+⚠ **Minimizar y cerrar son cosas distintas, y el caso vacío es siempre CERRAR.** No tiene sentido
+dejar abierto un módulo sin nada adentro: si después entra trabajo, se vuelve a tocar el botón y la
+lista se re-consulta igual. «Sigo después» sólo va en el caso de **error de carga**, donde sí puede
+haber items y conviene reintentar.
+
+⚠ **Y el escape NO emite el evento del toggle si el toggle no está abierto.** La misma lista la abre
+el supervisor (`openRemitosAdmin`) con legajo **`"0"`** y **sin botonera**: ahí el evento sería huérfano.
+
+⚠ **Vale para cada camino que puede DEJAR la lista vacía, no sólo para el fetch inicial.** En RR el
+otro era `crMarkSinSalida`: al marcar «↩ s/salida» el último remito caía en el mismo pozo.
+
+**Y no se prueba leyendo el botón.** Lo que hay que mirar es si el **toggle quedó abierto**, o sea
+correr la pantalla: `node tests/rr-sin-remitos-cierra.cjs` (verificado que falla contra el código
+anterior). Al agregar un módulo con toggle + lista, agregarle su caso vacío a ese test.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.78): antes de optimizar, medir — y leer lo que se usa, no el universo
 
 **Luis, con la captura del `canceling statement due to statement timeout` en A Programar:**
