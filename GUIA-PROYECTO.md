@@ -1,4 +1,8 @@
-## Nota v21.21 (2026-09-22) — Las dos pantallas dan el mismo número, y el test lo sostiene
+## Nota v21.22 (2026-09-22) — Las dos pantallas dan el mismo número, y el test lo sostiene
+
+⚠ Salió como **v21.22** y no v21.21: otra sesión pusheó su v21.21 a `main` mientras esto se
+escribía (*"un armado ANULADO no traba el armado de verdad"*). Se mergeó su trabajo y se renumeró
+éste — el número de versión es lo que el dueño mira en el badge, no puede haber dos.
 
 Las tres respuestas de Thomas al comparador.
 
