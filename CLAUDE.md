@@ -771,6 +771,7 @@ ruteo** que viaja pegada al código del PEDIDO y significa exactamente dos cosas
 | Pedido | `PPP_Web_Base.articulo`, `gv_ppp_np_items` | **SÍ** (`026L`) | lo trae el feed de la página |
 | Picking (pantalla y stock) | lista de picking, `Movimientos_Stock.cod_art` | **NO** (`026`, o `438E LK` si es dual) | **`pkResolveArt`** = `pkStripL` + `pkEmpresaArt` |
 | Armado / factura | `Entregas_Virgilio.cod_art`, Excel ISIS | **SÍ**, crudo (`438EL`) | `_facXlsArmar` lo toma tal cual de `Entregas_Virgilio` |
+| Badge **FC s/Salida** (Stocks) | `vista_fc_sin_salida`, `stocks_carga_rapida.fc_sin_salida` | **NO** | **`gv_cod_stock_de_entrega`** = `pkResolveArt` en SQL (v21.11) |
 
 ```js
 // index.html, v12.39 — el comentario que lo dice todo:
@@ -788,6 +789,25 @@ repuso dentro de la misma tanda de trabajo; queda escrito para que no se repita.
 
 ⚠ **Y la L tampoco se agrega a mano en Gestión.** La pone la página al armar el pedido
 (`admin-supercot.js`, `addLSuffix = isChef`). Gestión la **respeta y la rutea**, no la genera.
+
+⚠⚠ **Y todo lo que MUESTRA stock a partir de un código de FACTURA tiene que resolverlo primero**
+(v21.11, Luis 22/09). `Entregas_Virgilio` guarda `026L` porque ése es el código de la factura; el
+badge **FC s/Salida** lo agrupaba con `norm_cod()`, que **sólo saca ceros a la izquierda y pone
+mayúsculas — no pela la L**, así que el 026 salía partido en dos filas (026 = 10, **026L** = 1) y
+el front fabricaba una fila fantasma sin empresa ni descripción. Eran **32 códigos**, todos del
+mismo pedido de Chef con artículos de Loeke. Lo resuelve **`gv_cod_stock_de_entrega(cod, np, emp)`**,
+que es `pkResolveArt` en SQL.
+
+⚠ **En los DUALES no alcanza con pelar la L**: el universo de stock los tiene como `438E LK` /
+`438E CH`, y el cruce es por **igualdad exacta**, así que `438EL` tiene que resolver a **`438E LK`**
+— la L manda LK aunque la NP sea de Chef. Sin el sufijo, el badge del dual quedaba en **0 de los
+dos lados**, y el fallback `codBase` del front le asignaba las mismas cajas a las dos filas.
+
+**Al escribir una vista o una pantalla que cruce un código de `Entregas_Virgilio` / factura contra
+stock o góndola, pasarlo por `gv_cod_stock_de_entrega`, nunca por `norm_cod` a secas.** Lo sostienen
+`tests/fcs-codigo-l.cjs` —que corre `pkResolveArt` de verdad y lo compara contra la función de la
+base, así que avisa si el front y el SQL se desfasan— y dos filas en `GV_Reglas_Centinela`.
+`sql/gv_fc_sin_salida_codigo_l_v2111.sql`, §3.mj.
 
 **Chequeo** (el operario tiene que ver el código pelado y la góndola LK):
 
