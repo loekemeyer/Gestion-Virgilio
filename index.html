@@ -4621,6 +4621,7 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
 .cmpl-repminus{ flex:0 0 auto; width:56px; margin:0; padding:0; border:2px solid #cbd5e1; border-radius:11px; background:#fff; color:#475569; font-size:26px; font-weight:800; line-height:1; cursor:pointer; }
 .cmpl-cerrar{ display:block; width:100%; margin-top:11px; padding:13px; border:none; border-radius:12px; background:#16a34a; color:#fff; font-size:16px; font-weight:800; cursor:pointer; }
 .cmpl-cerrar:disabled{ background:#cbd5e1; color:#64748b; cursor:not-allowed; }
+.cmpl-nomas{ display:block; width:100%; margin-top:9px; padding:10px; border:1.5px dashed #fca5a5; border-radius:11px; background:#fef2f2; color:#b42318; font-size:13px; font-weight:800; cursor:pointer; }
 .cmpl-back{ width:auto; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:9px; padding:7px 14px; font-size:13px; font-weight:800; cursor:pointer; margin-bottom:10px; }
 .cmpl-eh{ font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px; }
 .cmpl-eg{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:10px 11px 11px; margin-bottom:8px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
@@ -13581,7 +13582,11 @@ function _compBuildLiosData() {
       // góndola (438EL → 438E LK; duales por NP). El pedido crudo (438EL) queda en
       // pedidoFull → Entregas_Virgilio/factura. `_stkGondolaSaldoVivo(c.cod)` necesita el
       // código de góndola resuelto, no el crudo, para leer el saldo correcto.
-      if (sale > 0) codes.push({ cod: pkResolveArt(it.art, npKey), sale: sale, rest: sale, cur: 0, sep: false });
+      // v20.97 — `raw` = el código CRUDO del pedido (438EL / 026L); `cod` es el de GÓNDOLA
+      //          (438E LK). El faltante MANUAL tiene que guardarse con el CRUDO: la clave de
+      //          `faltMap` se arma con `it.art` crudo (acá arriba y en compTerminar), así que un
+      //          faltante anotado con el resuelto NO matchea nunca y se pierde en Entregas_Virgilio.
+      if (sale > 0) codes.push({ cod: pkResolveArt(it.art, npKey), raw: String(it.art), sale: sale, rest: sale, cur: 0, sep: false });
     });
     codes.sort(function (a, b) { return parseInt(a.cod, 10) - parseInt(b.cod, 10); });
     n.codes = codes; n.liosArr = []; n.lios = 0; n.liosDone = (codes.length === 0);
@@ -13607,6 +13612,46 @@ function _compLioAuto(ci) {
 }
 function _compViewArmar() { if (_comp) { _comp.liosView = "armar"; _compRenderLios(); } }
 function _compViewSueltas() { if (_comp) { _comp.liosView = "sueltas"; _compRenderLios(); } }
+/* v20.97 (Luis, 2026-09-22) — «NO HAY MÁS» DESDE LA PANTALLA DE LÍOS.
+   El armador cuenta caja por caja ACÁ, pero hasta hoy sólo podía contar HASTA CERO: la única
+   salida para decir "hay menos de lo que dice el picking" estaba en Separar — una pantalla
+   antes, con el botón «Hay un artículo diferente a la mesa», redactado como aviso al
+   pickeador ("No es tu error — lo bajó el picking"). Medido el 22/09: 24 eventos FAL en 47
+   días contra 764 TAL, el 3%. Por eso `cajas_entregadas` salía "entregadas = pedidas" con el
+   pallet a medio llenar (437 pares / 2.200 cajas antes del tope de la v20.91).
+   NO duplica lógica: arma el mismo `sepDif` y llama al MISMO `_compDifResolve` con tipo
+   "menos", que ya emite el NPD, descuenta separar_pedidos y registra el faltante.
+   ⚠ `real` = lo que YA quedó en líos CERRADOS (`sale - pendiente`), nunca 0: si se dejara
+   leer el input inexistente del diálogo, `real` sería 0 y marcaría como faltante hasta las
+   cajas que ya están en un lío armado.
+   ⚠ Sólo usa la rama gond="no" (no hay en góndola). Si hay para completar, el armador va,
+   la trae y sigue contando — la rama "sí" del diálogo de Separar registra el faltante igual,
+   y desde acá eso sería un faltante inventado. */
+function _compViewNoMas() { if (_comp) { _comp.liosView = "nomas"; _compRenderLios(); } }
+function _compSinMas(ci) {
+  if (!_comp) return;
+  const idx = _comp.liosNpIdx, n = _comp.nps[idx];
+  if (!n || !n.codes) return;
+  const c = n.codes[ci];
+  if (!c) return;
+  const pend = (Number(c.rest) || 0) + (Number(c.cur) || 0);
+  if (pend <= 0) return;
+  let ok = false;
+  try {
+    ok = confirm("¿No hay más " + c.cod + " en la mesa?\n\n" +
+                 "Quedan " + pend + " caja(s) sin poner en la NP " + n.np + ".\n\n" +
+                 "Si HAY en góndola: cancelá, traélas y seguí contando.\n" +
+                 "Si NO hay: se marcan como FALTANTE de esta NP y se avisa al picking.");
+  } catch (_e) { ok = false; }
+  if (!ok) return;
+  const real = Math.max(0, (Number(c.sale) || 0) - pend);   // lo que ya quedó en líos cerrados
+  c.rest = pend; c.cur = 0;                                  // el lío a medio armar vuelve a "sin poner"
+  _comp.sepDif = { mode: "dialog", npIdx: idx, ci: ci, tipo: "menos", desde: "lios" };
+  try { _compDifResolve("menos", "no", real); } catch (_e) {}
+  _comp.liosView = "armar";
+  try { _compRenderLios(); } catch (_e) {}
+  try { _compRecalc(); } catch (_e) {}
+}
 function _compSueltaUndo() { const n = _compLioNow(); if (!n) return; for (let k = n.liosArr.length - 1; k >= 0; k--) { if (n.liosArr[k].suelta) { _compLioDel(k); return; } } }
 function _compLioDel(k) { const n = _compLioNow(); if (!n) return; const l = n.liosArr[k]; if (!l) return; l.items.forEach(function (it) { const c = n.codes.find(function (x) { return x.cod === it.cod; }); if (c) c.rest += it.qty; }); n.liosArr.splice(k, 1); _compLioMark(n); _compRenderLios(); _compRecalc(); }
 function _compLioNp(d) { if (!_comp) return; const ni = _comp.liosNpIdx + d; if (ni < 0 || ni >= _comp.nps.length) return; _comp.liosNpIdx = ni; _compRenderLios(); _compPersist(); }
@@ -13825,7 +13870,7 @@ function _compRenderLios() {
     const _fab = document.getElementById("compFab"); if (_fab) _fab.classList.add("hidden");
     return;
   }
-  const view = (_comp.liosView === "sueltas" || _comp.liosView === "editar") ? _comp.liosView : "armar";
+  const view = (_comp.liosView === "sueltas" || _comp.liosView === "editar" || _comp.liosView === "nomas") ? _comp.liosView : "armar";
   const TOTAL = n.codes.reduce(function (s, c) { return s + c.sale; }, 0);
   const curCajas = n.codes.reduce(function (s, c) { return s + c.cur; }, 0);
   const enLios = n.liosArr.reduce(function (s, l) { return s + l.cajas; }, 0);
@@ -13859,6 +13904,15 @@ function _compRenderLios() {
     if (n.liosArr.some(function (l) { return l.suelta; })) h += '<button class="cmpl-sundo" onclick="_compSueltaUndo()">↶ Deshacer última suelta</button>';
     if (!restCods.length) h += '<div class="cmpl-empty">No quedan cajas sin asignar 👍</div>';
     else h += '<div class="cmpl-sgrid">' + restCods.map(function (c) { const sci = n.codes.indexOf(c); return '<button class="cmpl-sitem" onclick="_compLioSuelta(' + sci + ')"><span class="cmpl-sicod">' + escapeHtml(c.cod) + '</span><span class="cmpl-sirest">quedan ' + c.rest + '</span><span class="cmpl-siadd">📦 marcar</span></button>'; }).join("") + '</div>';
+  } else if (view === "nomas") {
+    /* v20.97 — «NO HAY MÁS». Mismo dibujo que Sueltas (reusa .cmpl-sgrid/.cmpl-sitem). Lista
+       los códigos que todavía tienen cajas SIN PONER en esta NP; lo que ya se cerró en un lío
+       no aparece y no se toca. */
+    const pendCods = n.codes.filter(function (c) { return c.sep && ((c.rest || 0) + (c.cur || 0)) > 0; });
+    h += '<button class="cmpl-back" onclick="_compViewArmar()">← Volver</button>';
+    h += '<div class="cmpl-shint">Tocá el código del que <b>no hay más en la mesa</b>. Las cajas que falten quedan como <b>faltante de esta NP</b> y se avisa al picking. Si hay en góndola, andá a buscarlas y seguí contando.</div>';
+    if (!pendCods.length) h += '<div class="cmpl-empty">No queda ninguna caja sin poner \uD83D\uDC4D</div>';
+    else h += '<div class="cmpl-sgrid">' + pendCods.map(function (c) { const sci = n.codes.indexOf(c); return '<button class="cmpl-sitem" onclick="_compSinMas(' + sci + ')"><span class="cmpl-sicod">' + escapeHtml(c.cod) + '</span><span class="cmpl-sirest">sin poner ' + ((c.rest || 0) + (c.cur || 0)) + '</span><span class="cmpl-siadd">\uD83D\uDEAB no hay más</span></button>'; }).join("") + '</div>';
   } else {
     h += '<div class="cmpl-ctrlrow">' +
       '<div class="cmpl-ctrl cmpl-ctrl-lio">🔨 Armando<br>Lío ' + curLetter + (curCajas ? ' (' + curCajas + ')' : '') + '</div>' +
@@ -13889,6 +13943,9 @@ function _compRenderLios() {
     }).join("") + "</div>";
     const _noSep = n.codes.filter(function (c) { return !c.sep && c.rest > 0; });
     if (_noSep.length) h += '<button class="csep-tosep" onclick="_compGo(2)">↩ Volver a separar · faltan ' + _noSep.reduce(function (s, c) { return s + c.rest; }, 0) + ' cajas</button>';
+    // v20.97 — la salida para «acá no hay más», en la pantalla donde el armador cuenta.
+    const _pendNoMas = n.codes.reduce(function (c1, c) { return c1 + (c.sep ? ((c.rest || 0) + (c.cur || 0)) : 0); }, 0);
+    if (_pendNoMas > 0) h += '<button class="cmpl-nomas" onclick="_compViewNoMas()">\uD83D\uDEAB No hay más de algún código</button>';
     h += '<button class="cmpl-cerrar" onclick="_compLioSiguiente()"' + (curCajas === 0 ? " disabled" : "") + '>✓ Cerrar Lío ' + curLetter + (curCajas ? ' (' + curCajas + ')' : '') + '</button>';
   }
   h += '<div class="cmpl-npbtns"><button class="cmpl-npbtn" onclick="_compLioNp(-1)"' + (idx <= 0 ? " disabled" : "") + '>← NP anterior</button><button class="cmpl-npbtn pri" onclick="_compLioNp(1)"' + (idx >= _comp.nps.length - 1 ? " disabled" : "") + '>NP siguiente →</button></div>';
@@ -14095,11 +14152,15 @@ function _compDifStart() { if (_comp) { _comp.sepDif = { mode: "pick", npIdx: (_
 function _compDifPick(ci) { if (_comp && _comp.sepDif) { _comp.sepDif.ci = ci; _comp.sepDif.mode = "dialog"; _comp.sepDif.tipo = null; _compRenderSep(); } }
 function _compDifTipo(t) { if (_comp && _comp.sepDif) { _comp.sepDif.tipo = t; _compRenderSep(); } }
 function _compDifBack() { if (!_comp || !_comp.sepDif) return; if (_comp.sepDif.mode === "dialog") { _comp.sepDif.mode = "pick"; _comp.sepDif.tipo = null; } else { _comp.sepDif = null; } _compRenderSep(); }
-function _compDifResolve(tipo, gond) {
+function _compDifResolve(tipo, gond, realOpt) {
   if (!_comp || !_comp.sepDif) return;
   const d = _comp.sepDif, n = _comp.nps[d.npIdx], c = n.codes[d.ci];
   if (!c) { _comp.sepDif = null; _compRenderSep(); return; }
-  let real = 0; try { const ri = document.getElementById("csep-difreal"); real = Math.max(0, parseInt(ri && ri.value, 10) || 0); } catch (_e) {}
+  // v20.97 — `realOpt` lo pasa «No hay más» desde la pantalla de Líos, donde no existe el
+  // input del diálogo. Sin él (las dos llamadas de Separar) se lee el input, igual que siempre.
+  let real = 0;
+  if (realOpt != null && !isNaN(Number(realOpt))) real = Math.max(0, Math.round(Number(realOpt)));
+  else { try { const ri = document.getElementById("csep-difreal"); real = Math.max(0, parseInt(ri && ri.value, 10) || 0); } catch (_e) {} }
   const qty = (tipo === "menos") ? (c.sale - real) : (real - c.sale);
   if (qty < 1) { try { alert("Revisá: 'Levantadas real' tiene que ser " + (tipo === "menos" ? "menor" : "mayor") + " que el picking (" + c.sale + ")."); } catch (_e) {} return; }
   try {
@@ -14161,7 +14222,7 @@ function _compDifResolve(tipo, gond) {
     c.sale = Math.max(0, (Number(c.sale) || 0) - qty);
     c.rest = Math.max(0, (Number(c.rest) || 0) - qty);
     if (c.sale === 0) c.sep = true;                              // nada que separar → queda marcado
-    _compAddFaltManual(n.np, c.cod, qty, n.cod, n.rs);           // faltante → Entregas_Virgilio (no factura)
+    _compAddFaltManual(n.np, c.raw || c.cod, qty, n.cod, n.rs);  // v20.97: CRUDO (438EL), que es la clave de faltMap → Entregas_Virgilio (no factura)
     try { _compLioMark(n); } catch (_e) {}
   }
   _comp.sepDif = null; _compRenderSep();
