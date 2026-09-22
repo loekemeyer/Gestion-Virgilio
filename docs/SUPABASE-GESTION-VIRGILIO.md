@@ -28607,3 +28607,279 @@ Thomas: *"dale a todas"*. Se programó, con backup en
 2. **El 28 queda en 5,414 m³ y el 29 en 7,657 m³**, contra un cupo de 4,30. Adelantar Olímpico y
    Max Lim al 29 fue decisión de Thomas sabiendo el número: **hace falta sumar gente al depósito
    esos dos días**, o alguno se reprograma para atrás.
+
+### §3.me — v20.95 · El armado automático no programa cuarentena ni cliente nuevo sin aprobación humana — 2026-09-22
+
+**Thomas, textual:** *"armado automatico no debería programar automaticamente clientes nuevos ni
+clientes en cuarentena que no hayan sido aprobados por un humano, nunca. Si ya fueron aprobados y
+se atrasa la entrega o algo asi, si se puede reprogramar automaticamente, pero primero aprobado
+por humano."*
+
+**Qué se midió.** Barrido sobre `pg_proc`: **ninguna** pieza del armado nombra la palabra
+cuarentena.
+
+| objeto | ¿mira la cuarentena? |
+|---|---|
+| `gv_ppp_web_armar_pendientes` | no |
+| `ppp_web_armar_tandas` | no |
+| `gv_ppp_web_juntar_clientes` | no |
+| `gv_pedidos_web_excluidos` | no |
+
+La retención vivía **sólo en el front**, en el chip de A Programar. El armador saltea lo diferido
+(a0), lo retenido a mano en `GV_PPP_Web_Retenido` (a0b) y lo cancelado (a0c): alcanzaba con que el
+pedido no tuviera fila en esa tabla para que el cron lo programara igual.
+
+**Los dos casos que lo destaparon**, los dos sin una sola fila en `GV_Cuarentena_Liberados`:
+
+| NP | cliente | motivo | quedó en |
+|---|---|---|---|
+| LK 0094/95/96 (order 1448) | Silvano Lucas Martin (4282) | **cliente nuevo**, pipeline en `ingresado` | E72A · 28/09 |
+| CH 0004 (order 218) | Ierakuin Srl (1665) | **deuda $2.062.528,58** | E71A · 28/09 |
+
+A los dos los había devuelto Vivi a mano (18/09, *"No pago"* y *"No pago todavia"*) y los dos
+volvieron solos. Se desprogramaron con `gv_cuarentena_devolver`.
+
+**Qué se hizo.** Pase **(a0d)** en `gv_ppp_web_armar_pendientes`, apoyado en la función nueva
+`gv_cuarentena_retiene_lote(p_empresa, p_filas)`.
+
+- **Aprobado por humano = fila en `GV_Cuarentena_Liberados`** que levante ESE motivo, que es lo que
+  escriben el botón de Cuarentena y el ✅ del pipeline de Clientes nuevos (los dos vía
+  `gv_cuarentena_liberar`). Aprobado, el pedido vuelve a los pases normales y se reprograma solo:
+  es la segunda mitad de la regla y está probada.
+- ⚠ **El criterio de QUÉ retiene no se duplica**: lo da `gv_cuarentena_marcar_calc`, la misma que
+  usa la pantalla, con sus excepciones vivas (`gv_excepcion_cuarentena`, reposición chica v19.44,
+  mismo pedido v20.52, resta de motivos liberados v20.86). Si cambia una regla de cuarentena, el
+  armado la hereda sola. Medido: **Suppa (1482, deuda $836.909) NO retiene**, porque su deuda es la
+  factura de otra NP del **mismo** pedido — y eso es lo correcto.
+- ⚠ **`gv_cuarentena_ya_programado()` no aplica esas excepciones**, así que marca de más: lista a
+  Suppa como retenido-y-programado cuando la Cuarentena no lo retiene. Es un centinela con falsos
+  positivos, no una fuente.
+
+⚠ **FAIL-CLOSED, al revés del patrón de la v19.44.** Si la cuarentena no se puede evaluar (sin
+permiso, o la marcación explota), `gv_cuarentena_retiene_lote` devuelve **todo el lote** y no se
+programa nada. Un armado que no corre se ve (`GV_PPP_Web_Armado_Log`, `gv_ppp_web_armado_salud`);
+un pedido con deuda que sale en el camión, no. Ojo con el guard de `gv_cuarentena_marcar_calc`: su
+`WHERE` termina en `(es_supervisor_virgilio() or gv_es_supervisor_o_servicio())`, así que **sin
+permiso devuelve CERO FILAS** — leído como *"no hay retenidos"* sería el mismo bug al revés. Por eso
+el chequeo de identidad se hace **antes y afuera**.
+
+⚠ **El pase va DESPUÉS del tope (a00)**, no antes: así evalúa a lo sumo `armado_tope_pedidos` (120)
+y no los 172 que entran. **Y no costó tiempo: lo bajó.** El guard cuesta 1.041 ms sobre 218 pedidos
+(766 de ellos son `gv_cuarentena_mismo_pedido_seguro`), pero el armado cuesta ~43 ms por pedido y
+los retenidos dejaron de procesarse. LK, mismas ~170 filas de entrada:
+
+| corrida | ms |
+|---|---|
+| 09:40 / 09:45 / 09:50 (sin guard) | 4.515 / 5.499 / 4.951 |
+| 10:00 / 10:05 (con guard) | **4.327 / 4.306** |
+
+⚠ **El alias es `_cq_r`, no `r`.** `gv_ppp_web_armar_pendientes` declara `r record`: un alias `r`
+la vuelve ambigua y la función explota **en ejecución** con `42702`, no al crearse. Es el pozo de
+la v19.56 (problema 400) y **volvió a morder en el primer intento**; lo cazó la prueba, no la
+lectura.
+
+**Cómo se probó: corriendo el armador**, en una transacción que se revierte con un `raise` final.
+
+| escenario | resultado medido |
+|---|---|
+| cliente nuevo **sin** aprobar + cliente sano | `2026-09-29 E74A np=1 cods={1402}` · 1448 **SIN TANDA** |
+| el mismo, **con** fila en Liberados | `2026-10-02 E61E np=1` · 1448 quedó en **E61E** |
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = las dos reglas siguen.
+`sql/gv_armado_cuarentena_v2095.sql`.
+
+### §3.mf — v20.96 · El control de cuarentena se caía en silencio, y el cancelado no se veía — 2026-09-22
+
+Dos cosas del mismo tipo, las dos encontradas mirando la pantalla, no el sistema.
+
+#### 1. «Cuarentena (0)» cuando el control no pudo correr
+
+**Thomas:** *"espera, hay algo roto. el de Ierakuin sigue saliendo automáticamente de cuarentena?"*
+
+`cuarMarcarPedidos` llamaba a las tres RPC dentro de **un solo `Promise.all`**. Si una fallaba, el
+`await` tiraba, el `catch (_e) { /* no marca; no rompe la pantalla */ }` se lo comía y **ningún
+pedido quedaba marcado**: el sector dibujaba *"🚧 Cuarentena (0) · Sin pedidos retenidos"* mientras
+los retenidos de verdad se dibujaban en la lista normal, sin su cartel y con el chip verde
+*"se arma solo"*.
+
+Medido en `edge_logs` el 22/09, entre las 10:28 y las 10:36 ART:
+
+| RPC | respuestas 500 |
+|---|---|
+| `gv_cuarentena_marcar` | 4 |
+| `gv_cuarentena_limite` | 1 |
+
+Todas con `canceling statement due to statement timeout` en `postgres_logs`. **No es un bug de la
+cuarentena ni del cambio de la v20.95**: los timeouts arrancan a las 09:00 ART (8 esa hora, 10 la
+siguiente) y el 21/09 hubo 28 en una hora. `pg_stat_statements` dice quién ocupa la base, y no es
+la cuarentena:
+
+| consulta | llamadas | total | media | peor |
+|---|---:|---:|---:|---:|
+| replicación / WAL | 73.150 | 1.937 s | 26 ms | 10,4 s |
+| `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada` | 785 | 1.757 s | 2.239 ms | **33,8 s** |
+| `vista_saldos_stock` | 887 | 1.707 s | 1.925 ms | 7,9 s |
+
+**Qué se hizo** (v20.96): `Promise.allSettled` — cada RPC falla por su cuenta —, `marcar` en su
+propio helper `cuarRpcMarcar` con **un reintento** (el timeout deshace la transacción entera, así
+que reintentar es seguro), `_apr.cuarErr` con el motivo, y el sector avisa en rojo en vez de decir
+*"sin pedidos retenidos"*. Si la marcación no se pudo hacer, **se conservan las marcas de la vuelta
+anterior**: no se borran.
+
+> Es la lección de la v19.44 —*"lo nuevo no puede ir adentro del `Promise.all` de lo que ya
+> funciona"*— que entonces se aplicó sólo a la RPC de reposición chica.
+
+⚠ **Lo que NO estaba roto:** ningún pedido salió. Con el guard de la v20.95, el armado automático
+no toca un retenido aunque la pantalla no lo pinte. Medido: CH 0004 y LK 0094/95/96 siguen sin
+tanda y en `GV_PPP_Web_Retenido`; Romagessi (LK 0201, $2.216.125) y Bazar Monica (LK 0018,
+$1.080.583) los frena el guard. De los 5 que el log listaba como retenidos, el único realmente
+programado es **LK 0144 (Suppa, E26D del 22/09)** — y está bien: su deuda es la factura de la NP
+hermana del mismo pedido, así que la Cuarentena no lo retiene.
+
+`tests/cuar-control-caido.cjs` (candados estáticos: un test de pantalla necesitaría reproducir el
+timeout, y lo que hay que impedir es que alguien vuelva a juntar las llamadas o a tapar el error).
+
+#### 2. El pedido cancelado decía «retenido» para siempre
+
+**Thomas:** *"fijate que en «estado» aparezca cuando le cancelan/anulan un pedido"*.
+
+El estado salía del último **evento** de `GV_Cuarentena_Log`. El caso `anulado` estaba en el CASE
+desde siempre, pero ese evento **nunca se escribió**:
+
+| | |
+|---|---:|
+| eventos `anulado` en `GV_Cuarentena_Log` | **0** |
+| filas en `GV_Pedidos_Anulados` | 1 |
+| filas en `GV_Web_Cancelados` | 7 |
+
+Ocho cancelaciones registradas, ninguna en el log. Desde la v20.96 el estado se lee del **hecho**,
+uniendo las tres tablas de cancelación (`GV_Web_Cancelados`, `GV_PPP_Web_NP_Cancelada`,
+`GV_Pedidos_Anulados`) por la clave normalizada de `gv_cuarentena_clave`. Impacto medido a 60 días:
+`retenido` 17 → **15**, `cancelado` 0 → **2** (`web LK 1503` Clapera, cancelado el 21/09, y
+`web LK 1375` Andser Química, el 15/09 — los dos con deuda y figurando retenidos desde entonces).
+
+> Mismo criterio que §"el log del paso que falló no está donde está el log del paso que anduvo":
+> se mira la fila que EXISTE cuando el hecho ocurre, no la que alguien tendría que haber copiado.
+
+Front: chip de filtro **🗑 Cancelados** y su color. `sql/gv_cuarentena_log_cancelado_v2096.sql`.
+
+### §3.mg — v20.97 · El chip «se arma solo» mira la cuarentena, y qué ahoga la base — 2026-09-22
+
+**Thomas, textual:** *"QUE el chip «se arma solo» mire la cuarentena y clientes nuevos por el amor
+de dios"*.
+
+**Sexta puerta del mismo bug.** `gv_ppp_web_dia_salida` ya miraba el retenido a mano (v18.77) y el
+súper del padrón (v19.12); la cuarentena, no. Los que el chip mandaba a armarse solos el jueves
+1/10, medido el 22/09:
+
+| NP | cliente | por qué está retenido |
+|---|---|---|
+| CH 0004 | Ierakuin Srl (1665) | deuda **$2.062.528,58** |
+| LK 0201 | Romagessi Antonio (2191) | deuda **$2.216.125** |
+| LK 0018 | Bazar Monica (4045) | deuda **$1.080.583** |
+| LK 1465 | Ramirez Santiago Roman (4123) | **suspendido** ← apareció al probarlo |
+
+Desde la v20.95 el armador no los toca, así que el chip decía lo contrario de lo que iba a pasar,
+y con fecha.
+
+⚠ **Se resolvió en el BACKEND**, no marcando el chip desde el front, por dos razones: una sola
+fuente (`gv_cuarentena_retiene_lote`, la misma del armado, así que el chip no puede decir una cosa
+y el armador hacer otra), y porque así **sigue diciendo la verdad aunque la marcación del front se
+caiga por timeout** — que es justo cuando más mentía (§3.mf).
+
+⚠ **Una llamada POR EMPRESA, no una por fila**: la función no se inlinea (`SET search_path`). El
+costo es **fijo**, no crece con el lote: **1.789 ms con 5 pedidos y 1.683 ms con 40**, contra el
+`statement_timeout` de 8 s.
+
+⚠ **El pozo del primer intento:** `(array_agg(c.motivos))[1]` sobre un array **de arrays** devuelve
+un `text`, no un `text[]` — el subíndice entra al array aplanado. El `CREATE` sale limpio y explota
+**al ejecutarse** con `42883 array_to_string(text, unknown)`. Otra vez lo cazó la prueba, no la
+lectura. Se desarma con `unnest` y se vuelve a armar.
+
+`pend_auto` además deja de sumar los m³ de lo retenido: el umbral del intradía no puede contar m³
+que el automático no va a armar.
+
+#### Qué ahoga la base (lo que pidió mirar Thomas)
+
+Ventana de `pg_stat_statements`: **26,4 h**, 23.827 s de ejecución total.
+
+| consulta | llamadas | total | % del total | media | peor |
+|---|---:|---:|---:|---:|---:|
+| `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada` (cron 55) | 785 | **1.770 s** | **7,4 %** | 2.239 ms | **33,8 s** |
+| lectura de `vista_saldos_stock` desde el front | 887 | **1.707 s** | **7,2 %** | 1.925 ms | 7,9 s |
+
+**Son el mismo cálculo, hecho dos veces.** La matview tiene **367 filas y 216 kB**: lo caro no es
+escribirla, es la consulta que la define, que cuelga de `vista_saldos_stock`. Y el cron la refresca
+**cada 2 minutos** — 720 corridas por día para 367 filas.
+
+Dos palancas, medidas y sin tocar la lógica del stock:
+
+1. **Bajar el cron 55 de `*/2` a `*/10`**: 720 → 144 corridas/día, ~1.400 s/día menos. Se paga con
+   frescura: el saldo pasa de 2 a 10 minutos de atraso. **Es decisión operativa, no técnica.**
+2. **Que el front lea la matview en vez de `vista_saldos_stock`**: hoy hace las dos cosas —
+   se materializa y después igual se consulta la vista cara 1.373 veces. Es lo que más rinde y no
+   cambia la frescura más allá del refresh.
+
+`sql/gv_chip_salida_cuarentena_v2097.sql`.
+
+### §3.mh — v20.98 · Los pedidos de CHEF llegaban tarde y nadie los volvía a controlar — 2026-09-22
+
+**Thomas:** *"Ierakuin sigue saliendo en la vista de «A programar» y no en la sección de
+Cuarentena. POR QUÉ?"*
+
+**El backend lo marcaba bien; la pantalla nunca se lo preguntó.** `aprCargarPedidos` carga en dos
+tiempos: primero LK + ISIS, y **ahí llama a `cuarMarcarPedidos()` y a `aprCargarSalida()`**;
+después, en un segundo `await`, llegan los de Chef y se agregan a la lista — **sin volver a
+controlarlos**.
+
+Como el único pedido de Chef pendiente era **CH 0004 (Ierakuin Srl, deuda $2.062.528,58)**, era el
+único que fallaba, y por eso parecía un problema del pedido y no de la secuencia.
+
+La cuenta cierra exacta:
+
+| | |
+|---|---:|
+| retenidos que devuelve `gv_cuarentena_marcar` para los 9 pendientes | **7** |
+| menos el cliente nuevo puro (LK 0094, va al pipeline) | 6 |
+| menos Ierakuin, que nunca pasó por el control | **5** ← lo que mostraba la pantalla |
+
+**Cómo se descartó el render**, que era la sospecha obvia: se dibujó A Programar en headless con un
+pedido de Chef **con la marca puesta** y cae en Cuarentena sin problema (`cuarTieneChef: true`,
+`pedidosTieneChef: false`). O sea el problema no era dónde se dibuja: era que la marca no llegaba.
+
+Desde la v20.98, al llegar Chef se vuelven a correr las dos cosas. `tests/cuar-control-caido.cjs`
+lo verifica.
+
+> ⚠ **Carga en dos tiempos = control en dos tiempos.** Cada vez que una lista se completa con un
+> segundo `await`, todo lo que se calculó sobre la primera mitad hay que volver a calcularlo.
+
+#### Stock: cómo tenerlo al día SIN el costo de hoy
+
+**Thomas:** *"La vista del stock en ese módulo tiene que ser lo más actualizada posible, eso no se
+discute. Cómo hacerlo sin timeout y más optimizado, fijate y recomendá"*.
+
+Medido: **el 94,5 % de los refrescos recalculan algo que no cambió.**
+
+| | |
+|---|---:|
+| bloques de 2 min en 7 días | 5.040 |
+| bloques **con algún movimiento de stock** | **277 (5,5 %)** |
+
+El cron 55 corre `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada` **cada 2 minutos,
+mire o no si pasó algo**: 1.770 s en 26,4 h, el **7,4 %** de toda la base, con picos de 33,8 s. Y
+`vista_saldos_stock` —de la que cuelga— escanea **`Movimientos_Stock` entero (67.046 filas)** y le
+aplica un `regexp_replace` a cada `cod_art` para armar la clave, sin filtro ni índice posible.
+
+Tres pasos, del más barato al más profundo, **ninguno resigna frescura**:
+
+1. **Refrescar por MOVIMIENTO, no por reloj.** El cron mira si hubo movimientos desde el último
+   refresh y, si no, no hace nada. Saca ~94 % de las corridas sin cambiar un segundo la frescura.
+   Con eso sobra margen para bajarlo a **cada minuto** y que igual cueste la mitad que hoy: el
+   stock quedaría **más** actualizado que ahora.
+2. **Que el módulo lea la matview, no `vista_saldos_stock`.** Hoy se hacen las dos cosas: se
+   materializa y después se consulta igual la vista cara **1.373 veces** (1.707 s, otro 7,2 %).
+   La matview son 367 filas y 216 kB: la lectura pasa a ser instantánea.
+3. **Materializar la clave normalizada** (`ckey`) como columna generada con índice en
+   `Movimientos_Stock`. Hoy ese `regexp_replace` corre sobre las 67.046 filas en **cada** lectura.
+   Es el cambio de mayor impacto sobre el cálculo en sí, y no cambia ningún resultado. ⚠ Agregar
+   una columna generada reescribe la tabla: va con backup y en un momento sin operación.

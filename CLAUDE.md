@@ -1652,6 +1652,62 @@ el cruce. Luis lo frenó el mismo día: *"la idea del remito no sirve… cruzás
 - **Chequeo:** `select estado_cadena, count(*) from public.gv_cuarentena_deuda_sucursal group by 1;`
   — `ok` es lo que llega a la dirección; `sin factura parseada` tiene que dar 0.
 
+## ⚠⚠ REGLA (Thomas, 2026-09-22, v20.95): el ARMADO AUTOMÁTICO no programa CUARENTENA ni CLIENTE NUEVO sin aprobación humana
+
+**Thomas, textual:** *"armado automatico no debería programar automaticamente clientes nuevos ni
+clientes en cuarentena que no hayan sido aprobados por un humano, nunca. Si ya fueron aprobados y
+se atrasa la entrega o algo asi, si se puede reprogramar automaticamente, pero primero aprobado
+por humano."*
+
+**Hasta el 22/09 la retención vivía SÓLO en el front.** Medido sobre `pg_proc`: ni
+`gv_ppp_web_armar_pendientes`, ni `ppp_web_armar_tandas`, ni `gv_ppp_web_juntar_clientes`, ni
+`gv_pedidos_web_excluidos` nombraban la palabra cuarentena. El armador sólo saltea lo diferido
+(a0), lo retenido **a mano** en `GV_PPP_Web_Retenido` (a0b) y lo cancelado (a0c): alcanzaba con
+que el pedido no tuviera fila ahí para que el cron lo programara igual.
+
+| NP | cliente | motivo | quedó en |
+|---|---|---|---|
+| LK 0094/95/96 (1448) | Silvano Lucas Martin (4282) | **cliente nuevo**, pipeline en `ingresado` | E72A · 28/09 |
+| CH 0004 (218) | Ierakuin Srl (1665) | **deuda $2.062.528,58** | E71A · 28/09 |
+
+A los dos los había devuelto Vivi a mano el 18/09 (*"No pago"*) y los dos volvieron solos, sin una
+fila en `GV_Cuarentena_Liberados`.
+
+**APROBADO POR HUMANO = fila en `GV_Cuarentena_Liberados`** que levante ESE motivo. La escriben el
+botón de Cuarentena y el ✅ del pipeline de Clientes nuevos (los dos vía `gv_cuarentena_liberar`).
+Aprobado, el pedido vuelve a los pases normales y se reprograma solo como cualquier otro.
+
+⚠ **El criterio de QUÉ retiene no se duplica en el armado**: lo da `gv_cuarentena_marcar_calc`, la
+misma que usa la pantalla, con sus excepciones vivas (`gv_excepcion_cuarentena`, reposición chica
+v19.44, mismo pedido v20.52, resta de motivos liberados v20.86). Si cambia una regla de cuarentena,
+el armado la hereda sola. Medido: **Suppa (1482, deuda $836.909) NO retiene**, porque su deuda es
+la factura de otra NP del **mismo** pedido.
+
+⚠ **`gv_cuarentena_ya_programado()` marca DE MÁS**: no aplica esas excepciones, así que lista a
+Suppa como retenido-y-programado cuando la Cuarentena no lo retiene. Es un centinela con falsos
+positivos, no una fuente.
+
+⚠⚠ **`gv_cuarentena_retiene_lote` es FAIL-CLOSED, al revés del patrón de la v19.44**: si no se
+puede evaluar, devuelve **todo el lote** y no se programa nada. Un armado que no corre se ve
+(`GV_PPP_Web_Armado_Log`, `gv_ppp_web_armado_salud`); un pedido con deuda que sale en el camión, no.
+Y ojo: el `WHERE` de `gv_cuarentena_marcar_calc` termina en `(es_supervisor_virgilio() or
+gv_es_supervisor_o_servicio())`, o sea que **sin permiso devuelve CERO FILAS** — leído como *"no hay
+retenidos"* sería el mismo bug al revés. Por eso el chequeo de identidad se hace **antes y afuera**.
+
+⚠ **No costó tiempo: lo bajó.** El pase va **después** del tope (a00), así evalúa a lo sumo
+`armado_tope_pedidos` (120). El guard cuesta 1.041 ms sobre 218 pedidos (766 son
+`gv_cuarentena_mismo_pedido_seguro`), pero el armado cuesta ~43 ms por pedido y los retenidos
+dejaron de procesarse: LK con ~170 de entrada pasó de 4.515 / 5.499 / 4.951 ms a **4.327 / 4.306**.
+
+⚠ **El alias del subselect es `_cq_r`, no `r`** — la función declara `r record` y un alias `r` la
+vuelve ambigua: explota **en ejecución** con `42702`, no al crearse (pozo de la v19.56). Volvió a
+morder en el primer intento y **lo cazó la prueba, no la lectura**: se corre el armador con un
+retenido y un cliente sano dentro de una transacción abortada, y se prueban **las dos mitades** de
+la regla (sin aprobar → sin tanda; con fila en Liberados → se programa).
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
+`sql/gv_armado_cuarentena_v2095.sql`, §3.me.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.89): el PIPELINE **reemplazó** al submódulo de clientes nuevos
 
 **Luis, textual:** *"implementá esta nueva versión de clientes nuevos en «A programar»
@@ -3126,6 +3182,43 @@ la app**.
 perdió. Y `tests/pedidos-lectura-1vuelta.cjs`, que muerde por los dos lados (el literal en el
 código y el header que sale de verdad en la request).
 `sql/gv_base_pedidos_lectura_v2078.sql`, `sql/gv_pedidos_web_excluidos_v2078.sql`, §3.ls.
+
+## ⚠ REGLA (Luis, 2026-09-22, v21.01): en el generador de OC, **`activo` NO es una decisión**
+
+**Luis, al ver el 838 en OCs:** *"quiero entender por qué figura el 838 en OCs y la lógica
+subyacente para encontrar otros códigos que estén errados"*.
+
+`vista_generador_oc` arma su universo con la **UNIÓN de CINCO fuentes** — stock
+(`vista_saldos_stock`), proyección (`proyeccion_madre`), **demanda** (pedidos pendientes),
+capacidad (`Capacidad_Sector`) y configuración (`OC_Maximos`) — y después resuelve:
+
+```sql
+COALESCE("OC_Maximos".activo, true) AS activo
+```
+
+> **Un código sin fila en `OC_Maximos` entra igual y nace ACTIVO.** "Activo" no dice *"alguien
+> decidió que esto se compra"*: dice *"nadie dijo lo contrario"*. Lo único que lo saca de la
+> lista de compra es `tiene_prov_real` (`proveedor IS NOT NULL`).
+
+**Caso testigo:** el **838** (Filtro para Mate y Café) no está en `OC_Maximos`; lo arrastró la
+**demanda** — dos pedidos web de Chef de **Dorinka** (CH 0025 · 48 cajas, CH 0027 · 32), entrega
+25/09. Sin góndola, sin capacidad, sin proyección y sin proveedor: **no se puede pickear ni
+comprar**. Y no es teórico — la tanda **E41A** se pickeó el 15/09 y las tres filas del 838 en
+`Movimientos_Stock` quedaron en **delta 0**. El **838E** (Rallador Cilíndrico Mini), que es el
+que está vivo, sí tiene las cuatro cosas.
+
+⚠ **Lo que NO es un error y por eso el centinela no lo lista:** 73 códigos tienen fila activa
+**sin proveedor**, y **72 terminan en E** — son **importados**, no tienen proveedor local y está
+bien que no lo tengan. Filtrar por *"activo sin proveedor"* da 73 falsos positivos.
+
+⚠ **Y la comparación pela el sufijo de empresa antes que los ceros.** Un dual entra al
+generador como `438E LK` / `438E CH` (`universo_e`) pero en `OC_Maximos` vive como `438E`:
+comparando el código crudo salen **8 duales sanos** como si estuvieran sin configurar.
+
+**Chequeo:** `select * from public.gv_oc_codigos_sin_config order by pedidos desc;` — al 22/09
+son **16** (7 con pedidos, 82 cajas), con el `motivo` que dice cuál duele: *pedido sin góndola*,
+*pedido sin OC*, *stock sin OC* o *resto* (código viejo o mal tipeado: `438E-`, `501B`, `587C`).
+`sql/gv_oc_codigos_sin_config_v2101.sql`.
 
 ## ⚠ REGLA (Luis, 2026-09-22, v20.95): un código BUSCADO se muestra aunque esté en 0
 
