@@ -6018,7 +6018,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.94"></script>
+<script type="module" src="recepcion.js?v=20.95"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9900,7 +9900,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.94";
+const APP_VERSION = "v20.95";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18549,7 +18549,13 @@ function stkBodyStocks() {
     ? arts.filter(function (a) { return _pinSet.has(String(a.cod).trim().toUpperCase()); })
     : (_terms.length
       ? arts.filter(function (a) {
-          if (!_stkHasAny(a)) return false;
+          // v20.95 (Luis, 22/09) - BUSCANDO no se esconde nada. El comentario de arriba
+          // siempre dijo "con busqueda si se muestran (para poder encontrarlos)" y el codigo
+          // hacia lo contrario: exigia _stkHasAny tambien aca, asi que un codigo en 0 en TODOS
+          // los sectores y sin pedidos no aparecia ni tipeandolo entero. Eran 46 codigos, 21
+          // de ellos con proyeccion viva (838E: capacidad 35, proy 34,17 caj/mes). Una fila que
+          // no sale no se distingue de un codigo que no existe: eso es lo que confundio. El 0
+          // es la respuesta -"no hay"-, no un motivo para callarse.
           const s = (a.cod + " " + a.desc).toLowerCase();
           // v18.20 — la tabla muestra el código rellenado a 3 dígitos (031) pero en la base vive
           // normalizado (31), así que tipear "031" no encontraba nada: la pantalla enseñaba un
