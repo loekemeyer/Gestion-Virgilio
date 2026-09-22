@@ -1,0 +1,44 @@
+-- ═══════════════════════════════════════════════════════════════════════════════════════════
+-- v20.90 (2026-09-21) — EL ANULADO QUEDA EN EL LOG DE CUARENTENA
+--
+-- Luis: *"en el log figuran retenidos que fueron eliminados de la cuarentena (no liberados,
+-- directamente removidos y pedidos anulados). Deberían figurar (estado «anulado» y quién lo
+-- cerró). Si hay que pedir confirmación en la anulación, comentario y autoría, dale con eso."*
+--
+-- QUÉ PASABA: `gv_pedido_anular` escribía en NP_Canceladas / GV_Web_Cancelados /
+-- GV_Pedidos_Anulados y borraba la fila de GV_PPP_Web_Retenido, pero NO tocaba
+-- GV_Cuarentena_Log. El retenido desaparecía del log sin dejar rastro: el log sólo tenía
+-- los eventos `entro` (65), `aprobado` (38) y `devuelto` (6).
+--
+-- LA CONFIRMACIÓN, EL COMENTARIO Y LA AUTORÍA YA SE PEDÍAN: `gv_pedido_anular` exige
+-- p_motivo y p_persona (tira excepción si faltan) y el front ya abre el confirm con el motivo
+-- y quién anula. Lo único que faltaba era dejarlo escrito en el log.
+--
+-- DOS ASIENTOS, no uno:
+--   1. GV_Cuarentena_Log con evento 'anulado', heredando motivos y deuda del último asiento
+--      (el estado con el que se lo anuló), más persona / por / comentario.
+--   2. GV_Cuarentena_Comentarios con "Anulado: <motivo>" — la columna «Coment.» del log lee
+--      de ahí desde la v17.40, no del campo del evento: sin esto se veía quién anuló pero no
+--      por qué.
+-- Los dos van sólo si el pedido tuvo historia en cuarentena, para no ensuciar el log con
+-- anulaciones de pedidos que nunca estuvieron retenidos.
+--
+-- Y `gv_cuarentena_log(integer)` pasa a devolver estado 'anulado' con su cerrado_at / persona
+-- / por: los 5 `in ('aprobado','devuelto')` del cierre ahora incluyen 'anulado'.
+--
+-- PROBADO de verdad, con rollback (perform + raise exception):
+--   anulado · cerrado=21/09 18:06 · quien=Vivi · com="Anulado: entro mal, cliente lo cancelo"
+--   · com_persona=Vivi     → y 0 filas quedaron después del rollback.
+--
+-- Las tres migraciones se aplicaron con pg_get_functiondef + replace() en un DO block, con
+-- ancla y guard de idempotencia, para no transcribir a mano una función de 7.200 caracteres:
+--   gv_pedido_anular_log_cuarentena_v2053   (el asiento en el log)
+--   gv_pedido_anular_comentario_v2053b      (el motivo como comentario)
+--   gv_cuarentena_log_estado_anulado_v2053  (el estado en la lectura del log)
+--
+-- Rollback: volver a aplicar las funciones sin esos bloques (el DO block es idempotente: si
+-- encuentra 'GV_Cuarentena_Log' / 'GV_Cuarentena_Comentarios' / 'anulado' no toca nada).
+--
+-- Chequeo:  select evento, count(*) from public."GV_Cuarentena_Log" group by 1;
+--           select estado, count(*) from public.gv_cuarentena_log(60) group by 1;
+-- ═══════════════════════════════════════════════════════════════════════════════════════════
