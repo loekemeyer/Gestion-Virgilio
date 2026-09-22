@@ -3183,6 +3183,43 @@ perdió. Y `tests/pedidos-lectura-1vuelta.cjs`, que muerde por los dos lados (el
 código y el header que sale de verdad en la request).
 `sql/gv_base_pedidos_lectura_v2078.sql`, `sql/gv_pedidos_web_excluidos_v2078.sql`, §3.ls.
 
+## ⚠ REGLA (Luis, 2026-09-22, v20.100): en el generador de OC, **`activo` NO es una decisión**
+
+**Luis, al ver el 838 en OCs:** *"quiero entender por qué figura el 838 en OCs y la lógica
+subyacente para encontrar otros códigos que estén errados"*.
+
+`vista_generador_oc` arma su universo con la **UNIÓN de CINCO fuentes** — stock
+(`vista_saldos_stock`), proyección (`proyeccion_madre`), **demanda** (pedidos pendientes),
+capacidad (`Capacidad_Sector`) y configuración (`OC_Maximos`) — y después resuelve:
+
+```sql
+COALESCE("OC_Maximos".activo, true) AS activo
+```
+
+> **Un código sin fila en `OC_Maximos` entra igual y nace ACTIVO.** "Activo" no dice *"alguien
+> decidió que esto se compra"*: dice *"nadie dijo lo contrario"*. Lo único que lo saca de la
+> lista de compra es `tiene_prov_real` (`proveedor IS NOT NULL`).
+
+**Caso testigo:** el **838** (Filtro para Mate y Café) no está en `OC_Maximos`; lo arrastró la
+**demanda** — dos pedidos web de Chef de **Dorinka** (CH 0025 · 48 cajas, CH 0027 · 32), entrega
+25/09. Sin góndola, sin capacidad, sin proyección y sin proveedor: **no se puede pickear ni
+comprar**. Y no es teórico — la tanda **E41A** se pickeó el 15/09 y las tres filas del 838 en
+`Movimientos_Stock` quedaron en **delta 0**. El **838E** (Rallador Cilíndrico Mini), que es el
+que está vivo, sí tiene las cuatro cosas.
+
+⚠ **Lo que NO es un error y por eso el centinela no lo lista:** 73 códigos tienen fila activa
+**sin proveedor**, y **72 terminan en E** — son **importados**, no tienen proveedor local y está
+bien que no lo tengan. Filtrar por *"activo sin proveedor"* da 73 falsos positivos.
+
+⚠ **Y la comparación pela el sufijo de empresa antes que los ceros.** Un dual entra al
+generador como `438E LK` / `438E CH` (`universo_e`) pero en `OC_Maximos` vive como `438E`:
+comparando el código crudo salen **8 duales sanos** como si estuvieran sin configurar.
+
+**Chequeo:** `select * from public.gv_oc_codigos_sin_config order by pedidos desc;` — al 22/09
+son **16** (7 con pedidos, 82 cajas), con el `motivo` que dice cuál duele: *pedido sin góndola*,
+*pedido sin OC*, *stock sin OC* o *resto* (código viejo o mal tipeado: `438E-`, `501B`, `587C`).
+`sql/gv_oc_codigos_sin_config_v20100.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-22, v20.95): un código BUSCADO se muestra aunque esté en 0
 
 **Luis, textual:** *"838E NO APARECE en la vista de stocks"*.
