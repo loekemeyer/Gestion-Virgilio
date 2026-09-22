@@ -646,8 +646,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== apr-lotes-reintentan (v20.84: una lista vacia no se guarda como respuesta) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-lotes-reintentan.cjs
 
-echo "== comp-tope-pickeado (v20.90: el armado no entrega mas de lo que se pickeo) =="
+echo "== comp-tope-pickeado (v20.91: el armado no entrega mas de lo que se pickeo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-tope-pickeado.cjs
 
-echo "== comp-armado-viejo-no-traba (v20.90: un armado anterior al picking no traba el armado de verdad) =="
+echo "== comp-armado-viejo-no-traba (v20.91: un armado anterior al picking no traba el armado de verdad) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-armado-viejo-no-traba.cjs

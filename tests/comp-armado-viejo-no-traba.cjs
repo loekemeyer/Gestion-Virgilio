@@ -1,4 +1,4 @@
-/* Regresión v20.90 — UN ARMADO ANTERIOR AL PICKING NO TRABA EL ARMADO DE VERDAD.
+/* Regresión v20.91 — UN ARMADO ANTERIOR AL PICKING NO TRABA EL ARMADO DE VERDAD.
 
    POR QUÉ. El candado anti doble-armado (v5.72) miraba SOLO si la tanda tenía filas en
    `Entregas_Virgilio`, y con eso alcanzaba para frenar a un operario con el pallet delante.

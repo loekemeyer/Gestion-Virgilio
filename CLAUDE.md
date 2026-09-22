@@ -1293,7 +1293,7 @@ no se mueve. Lo que se frena es programar uno nuevo ahí.
 en un día cerrado. Mira **web e ISIS** y saca lo que ya salió por CCN/CRN.
 `sql/gv_dia_sin_reparto_v2064.sql`, `tests/ppp-dia-sin-reparto.cjs`, §3.ll.
 
-## ⚠ REGLA (Luis, 2026-09-21, v20.90): el armado NO puede entregar más de lo que se pickeó
+## ⚠ REGLA (Luis, 2026-09-21, v20.91): el armado NO puede entregar más de lo que se pickeó
 
 `Entregas_Virgilio` escribe `cajas_entregadas = cajas_pedidas − faltante`, y ese faltante sale del
 reparto del Paso 2 del asistente, que vive detrás de un booleano **global**:
@@ -1311,7 +1311,7 @@ const hayFalt = arts.some(a => a.nps.length);
 remito diciendo entregado. Todas **dentro de la ventana de 5 días** — el dato estaba y se perdía
 en el cruce, no por llegar tarde.
 
-Desde la v20.90 hay un **TOPE que no depende del reparto**: el picking (PKC) dice cuántas cajas se
+Desde la v20.91 hay un **TOPE que no depende del reparto**: el picking (PKC) dice cuántas cajas se
 levantaron de cada código y la suma de lo entregado no puede pasarse de ahí. Lo que sobra se
 recorta —por la NP que más entregó— y va a `cajas_falto`, que es lo que el remito tiene que decir.
 
@@ -1342,7 +1342,7 @@ camión sin estar todavía en `Facturacion_NP`. Impacto medido: **0 NP** salen d
 cambio cierra la puerta para adelante, no le saca nada al supervisor.
 
 **Chequeo:** `select * from public.gv_reglas_perdidas;` · `node tests/comp-tope-pickeado.cjs` ·
-`node tests/comp-armado-viejo-no-traba.cjs`. `sql/gv_isis_sin_tanda_freno_v2090.sql`, §3.lz.
+`node tests/comp-armado-viejo-no-traba.cjs`. `sql/gv_isis_sin_tanda_freno_v2091.sql`, §3.lz.
 
 ## ⚠ REGLA (Thomas, 2026-09-21, v20.86): lo ARMADO SIN DÍA tiene que verse en el badge
 

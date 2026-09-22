@@ -1,4 +1,4 @@
--- v20.90 — «A Programar» NO ofrece un pedido que ya salió, ya se facturó o ya se canceló.
+-- v20.91 — «A Programar» NO ofrece un pedido que ya salió, ya se facturó o ya se canceló.
 --
 -- Luis, 2026-09-21: «no me tires el historico, fijate en lo que hay programado ahora che.
 -- de ahora en adelante» · «sacamos eso de "desprogramada", no? osea, no hay pedidos que
@@ -73,12 +73,12 @@ select d.np, d.cod, d.razon_social, d.tipo, d.fecha_recep, d.fecha_entrega,
               coalesce(sum(coalesce(bp.cajas, 0::numeric)), 0::numeric) as cajas
          from public."GV_PPP_Base_Pedidos" bp
         where regexp_replace(btrim(bp.pedido), '\.0+$', '') = d.np) b on true
- -- v20.90: los cuatro guards YA NO cuelgan de `desprogramada`.
+ -- v20.91: los cuatro guards YA NO cuelgan de `desprogramada`.
  where not exists (select 1 from public."Facturacion_NP" f
                     where regexp_replace(btrim(coalesce(f.np, '')), '\.0+$', '') = d.np)
    and not exists (select 1 from public."GV_PPP_Entregados_Historico" e
                     where regexp_replace(btrim(coalesce(e.np, '')), '\.0+$', '') = d.np)
-   -- v20.90: guard nuevo. Ya salió en el camión (CCN) o el remito está controlado (CRN).
+   -- v20.91: guard nuevo. Ya salió en el camión (CCN) o el remito está controlado (CRN).
    and not exists (select 1 from public."Registros_Produccion_Virgilio" r2
                     where r2.opcion = any (array['CCN','CRN'])
                       and not public.es_legajo_test(r2.legajo)
@@ -93,7 +93,7 @@ insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pi
 values ('public.gv_ppp_isis_sin_tanda', 'vista',
         'CCN',
         'A Programar no ofrece una NP que ya salio (CCN/CRN); el guard no cuelga de desprogramada',
-        'Luis', 'v20.90')
+        'Luis', 'v20.91')
 on conflict do nothing;
 
 -- CHEQUEOS

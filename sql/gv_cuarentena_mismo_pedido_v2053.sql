@@ -1,0 +1,50 @@
+-- ═══════════════════════════════════════════════════════════════════════════════════════════
+-- v20.90 (2026-09-21) — LA DEUDA DEL MISMO PEDIDO NO LO RETIENE
+--
+-- Luis: *"si tiene deuda, tiene que haber un paso de chequeo de si hay una factura vinculada
+-- con otra NP de la misma order_id. Y si la hay, exceptuarlo del aviso."*
+--
+-- CASO TESTIGO: LK 0144 (order 1482, tanda E26D, sale el 22/09) quedó retenido por
+-- $836.909,11 que son la FC A 0004-00035973 de **LK 0143** — la otra mitad de su propio
+-- pedido, partido en dos NP por tener 19 ítems. El pedido se retenía a sí mismo.
+--   14:38 se facturó LK 0143 · 14:51 entró la factura · 15:47 se subió el Excel de deuda
+--   de LK (182 filas) · y la pantalla marcó LK 0144 por la deuda de su propia factura.
+--
+-- LA PALABRA QUE MANDA ES **OTRA**, y define los dos guards:
+--   1. la deuda se descuenta sólo si viene de una NP HERMANA **ya facturada**, y
+--   2. tiene que quedar al menos una NP del pedido **sin facturar** — la que está por salir.
+-- Si todas las NP del pedido ya se facturaron, el pedido salió entero y su deuda es deuda de
+-- verdad: retiene. Sin el guard 2 se eximía a cualquier pedido de UNA sola NP por su propia
+-- factura: medido, 36 exentos, entre ellos LK 0038, LK 0003 y LK 0145, ya entregados.
+--
+-- MEDICIÓN (21/09, sobre los 139 pedidos con tanda):
+--   sin_deuda 77 · el_pedido_ya_salio_entero 43 · ninguna_NP_facturada 15 · EXENTOS 4
+--   Los 4: order 1474 (Spillare, 5 NP, 4 facturadas) · 1347 (Guerreiro, 3 NP, 2)
+--          · 1343 (Chen Li Yu, 3 NP, 2) · 1482 (Suppa, 2 NP, 1) ← el caso de hoy.
+--   marcar_calc: 39 retenidos con la excepción ROTA → 35 con la excepción sana.
+--   Un pedido partido en varias NP es el 36,6 % de los programados (53 de 145): no es raro.
+--
+-- ⚠ Se llama por el envoltorio _SEGURO, nunca al _lote directo: si esto falla devuelve vacío,
+-- nadie queda exento y la Cuarentena sigue marcando. Probado rompiéndolo a propósito.
+--
+-- Rollback: quitar los CTE `mismo` y su condición de gv_cuarentena_marcar_calc, o poner
+-- PPP_Web_Config.cuar_mismo_pedido_activo = 0 (la función queda, deja de eximir).
+-- ═══════════════════════════════════════════════════════════════════════════════════════════
+-- Las dos funciones vivas están en la base; para traerlas:
+--   select pg_get_functiondef('public.gv_cuarentena_mismo_pedido_lote(jsonb)'::regprocedure);
+--   select pg_get_functiondef('public.gv_cuarentena_mismo_pedido_seguro(jsonb)'::regprocedure);
+--   select pg_get_functiondef('public.gv_cuarentena_marcar_calc(jsonb)'::regprocedure);
+-- Migraciones aplicadas, en orden:
+--   gv_cuarentena_mismo_pedido_v2052            (las dos funciones)
+--   gv_cuarentena_marcar_calc_mismo_pedido_v2052(el enganche en marcar_calc)
+--   gv_cuarentena_mismo_pedido_guard_cliente_v2052b (el comprobante tiene que ser del MISMO cliente)
+--   gv_cuarentena_mismo_pedido_solo_hermanas_v2052c (los dos guards de "OTRA" NP)
+--   gv_cuarentena_mismo_pedido_restaurar_v2052d (restaurar tras el test de romperla)
+--
+-- Chequeo:
+--   select motivo, count(*), count(*) filter (where exento) from (
+--     select * from public.gv_cuarentena_mismo_pedido_lote(
+--       (select jsonb_agg(distinct jsonb_build_object('order_id', w.order_id::text,
+--                                                     'empresa', w.empresa, 'cod', w.cod_cliente))
+--          from public."PPP_Web_Programacion" w where coalesce(btrim(w.tanda),'') <> ''))) z
+--    group by 1 order by 2 desc;

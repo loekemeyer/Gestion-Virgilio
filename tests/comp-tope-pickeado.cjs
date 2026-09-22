@@ -1,4 +1,4 @@
-/* Regresión v20.90 — EL ARMADO NO PUEDE ENTREGAR MÁS DE LO QUE SE PICKEÓ.
+/* Regresión v20.91 — EL ARMADO NO PUEDE ENTREGAR MÁS DE LO QUE SE PICKEÓ.
 
    POR QUÉ. `Entregas_Virgilio` escribe `cajas_entregadas = cajas_pedidas − faltante`, y ese
    faltante sale del reparto del Paso 2, que vive detrás de un booleano GLOBAL:

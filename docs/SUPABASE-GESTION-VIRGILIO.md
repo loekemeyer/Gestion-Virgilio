@@ -28261,7 +28261,98 @@ El front vuelve con `git revert` del commit.
 
 ---
 
-### §3.lz — v20.90 · El armado no puede entregar más de lo que se pickeó — 2026-09-21
+### §3.ld — v20.90: la deuda del MISMO pedido no lo retiene, y el anulado queda en el log — 2026-09-21
+
+Dos pedidos de Luis que salieron del mismo caso: **LK 0144** apareció en *"Ya programados y el
+cliente está en cuarentena"* por **$836.909,11**… que son la factura de **LK 0143**, la otra
+mitad de su propio pedido.
+
+#### 1. El pedido se retenía a sí mismo
+
+La secuencia del día, medida:
+
+| hora | qué pasó |
+|---|---|
+| 14:38 | se facturó **LK 0143** (order 1482, tanda E26D, sale el 22/09) |
+| 14:51 | entró al sistema la **FC A 0004-00035973**, $876.850,73 |
+| 15:47 | se subió el Excel de deuda de LK (lote `20260921T154751`, 182 filas) |
+| ~16:05 | la pantalla marcó **LK 0144** por esa deuda |
+
+El pedido 1482 tiene **19 ítems**, así que la página lo partió en dos NP. La cuenta cierra
+exacto: $876.850,73 − $39.941,62 (NC A 0004-00010950 del 28/08) = **$836.909,11**.
+
+**La regla, textual:** *"si tiene deuda, tiene que haber un paso de chequeo de si hay una
+factura vinculada con otra NP de la misma order_id. Y si la hay, exceptuarlo del aviso."*
+
+⚠ **La palabra que manda es OTRA**, y son dos guards, no uno:
+
+1. la deuda se descuenta sólo si viene de una NP **hermana ya facturada**, y
+2. tiene que quedar al menos una NP del pedido **sin facturar** — la que está por salir.
+
+**Sin el guard 2 se eximía a cualquier pedido de UNA sola NP por su propia factura.** Medido en
+el primer intento: **36 exentos**, entre ellos LK 0038, LK 0003 y LK 0145 — pedidos de una NP,
+ya entregados, cuya deuda es deuda de verdad. Con los dos guards quedan **4**:
+
+| pedido | cliente | NP | facturadas | deuda del cliente | de su propio pedido |
+|---|---|---|---|---|---|
+| 1474 | Spillare | 5 | 4 | 4.353.351,86 | 6.294.833,55 |
+| 1347 | Guerreiro | 3 | 2 | 1.137.051,77 | 1.137.051,77 |
+| 1343 | Chen Li Yu | 3 | 2 | 967.637,70 | 967.637,70 |
+| 1482 | Suppa | 2 | 1 | 836.909,11 | 876.850,73 |
+
+**Un pedido partido en varias NP es el 36,6 % de los programados** (53 de 145, hasta 5 NP): no
+es un caso de borde.
+
+La cadena ya existía: **`gv_cuarentena_deuda_sucursal`** cruza el comprobante del Excel con la
+factura de ISIS y da la NP (§3.ku). Lo nuevo es sumarla por `order_id`.
+
+⚠ **Se llama por `gv_cuarentena_mismo_pedido_SEGURO`, nunca al `_lote` directo** — la lección de
+la v19.41. Probado rompiéndolo a propósito: con la función reemplazada por un `1/0`,
+`marcar_calc` devuelve **39 retenidos**; con la función sana, **35**. La marcación nunca depende
+de la excepción.
+
+En la pantalla, el chip **🧾 Mismo pedido · LK 0143 · $876.850** explica por qué esa deuda no
+retuvo; sin él, el pedido aparece en la lista normal sin ninguna marca.
+
+#### 2. El anulado desaparecía del log
+
+`gv_pedido_anular` escribía en `NP_Canceladas` / `GV_Web_Cancelados` / `GV_Pedidos_Anulados` y
+borraba la fila de `GV_PPP_Web_Retenido`, pero **no tocaba `GV_Cuarentena_Log`**: el log sólo
+tenía `entro` (65), `aprobado` (38) y `devuelto` (6), y el retenido anulado se esfumaba.
+
+La confirmación, el motivo y la autoría **ya se pedían** (`p_motivo` y `p_persona` son
+obligatorios y la función tira excepción si faltan). Lo que faltaba era dejarlo escrito. Ahora
+la anulación deja **dos** asientos:
+
+1. `GV_Cuarentena_Log` con evento **`anulado`**, heredando motivos y deuda del último asiento.
+2. `GV_Cuarentena_Comentarios` con *"Anulado: &lt;motivo&gt;"* — la columna «Coment.» del log lee
+   de ahí desde la v17.40, así que sin esto se veía **quién** anuló pero no **por qué**.
+
+Los dos van sólo si el pedido tuvo historia en cuarentena. Y `gv_cuarentena_log(integer)`
+devuelve el estado `anulado` con su `cerrado_at` / `persona` / `por`.
+
+**Probado con rollback** (`perform` + `raise exception`):
+`anulado · cerrado=21/09 18:06 · quien=Vivi · com="Anulado: entro mal, cliente lo cancelo"`,
+y 0 filas después del rollback.
+
+⚠ Las tres funciones se editaron con `pg_get_functiondef` + `replace()` en un `DO` block con
+ancla y guard de idempotencia: `gv_pedido_anular` tiene 7.200 caracteres y transcribirla a mano
+es el pozo del problema 390.
+
+#### 3. El botón Imprimir del sector Cuarentena
+
+Sale el **"Ver ejemplo"** (la ayuda de la primera semana) y entra **🖨 Imprimir**, que baja
+`reporte de cuarentena dd-mm-aa.xlsx` con los retenidos: razón social, motivo, fecha del pedido,
+días desde el pedido, monto de deuda y vendedor, ordenado por deuda. Se arma en el **front** a
+propósito: no hay regla de negocio, son los mismos pedidos que ya marcó `gv_cuarentena_marcar_calc`
+y los mismos datos que pinta la tabla. SheetJS se carga bajo demanda, igual que el Excel de Stock.
+`cuarDemoToggle` y `cuarDemoPedido` siguen vivos para explicar la pantalla desde la consola.
+
+`sql/gv_cuarentena_mismo_pedido_v2053.sql`, `sql/gv_cuarentena_anulado_log_v2053.sql`.
+
+---
+
+### §3.ma — v20.91 · El armado no puede entregar más de lo que se pickeó — 2026-09-21
 
 Tres agujeros del mismo día, los tres en el borde entre **lo que hay en el pallet** y **lo que
 dice el registro**. Salieron de dos pedidos de Luis: *"a uno de los armadores le figura la E51A
@@ -28356,4 +28447,4 @@ node tests/comp-armado-viejo-no-traba.cjs    # un armado de otro ciclo no traba
 Los dos tests **muerden**: sin el bloque del tope, el caso de la fuga escribe 30 cajas de 12
 pickeadas; sin el chequeo de fecha, el armado del 17 vuelve a trabar el del 21.
 
-`sql/gv_isis_sin_tanda_freno_v2090.sql`.
+`sql/gv_isis_sin_tanda_freno_v2091.sql`.

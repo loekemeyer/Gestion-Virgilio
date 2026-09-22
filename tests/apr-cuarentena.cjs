@@ -99,11 +99,14 @@ catch (_e) {
     // v14.88: la ficha muestra 3 badges separados, no el texto unido
     out.demoMotivo = /cuar-badge b-deuda/.test(html) && /cuar-badge b-limite/.test(html);
     out.demoCuenta = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);
-    out.demoBtnQuitar = /Quitar ejemplo/.test(html);
+    // v20.53 (Luis): el boton "Ver ejemplo" se cambio por "Imprimir". El pedido de ejemplo
+    // sigue existiendo (se prende desde la consola), pero ya no tiene boton propio.
+    out.demoBtnImprimir = /cuarExportarExcel\(\)/.test(html) && /Imprimir/.test(html);
     _apr.cuarDemo = false;
     aprRender(); await new Promise((res) => setTimeout(res, 40));
     html = document.getElementById("pppPreview").innerHTML;
-    out.demoOff = !/EJEMPLO/.test(html) && /👁 Ver ejemplo/.test(html);
+    // el 'Ver ejemplo' de Clientes nuevos sigue existiendo; el del sector Cuarentena no.
+    out.demoOff = !/EJEMPLO/.test(html) && !/cuarDemoToggle\(\)/.test(html);
 
     // (2) un pedido marcado por deuda + supera crédito: sale de la lista y cae en cuarentena
     _apr.pedidos = [
@@ -754,8 +757,8 @@ catch (_e) {
   // pedido de ejemplo
   chk(r.demoTag && r.demoCli && r.demoMotivo, "el ejemplo muestra tag EJEMPLO + cliente + motivo");
   chk(r.demoCuenta, "el ejemplo cuenta en Cuarentena (1)");
-  chk(r.demoBtnQuitar, "con ejemplo activo el botón dice 'Quitar ejemplo'");
-  chk(r.demoOff, "al quitar el ejemplo desaparece y el botón vuelve a 'Ver ejemplo'");
+  chk(r.demoBtnImprimir, "el sector Cuarentena tiene el botón Imprimir (v20.53)");
+  chk(r.demoOff, "al quitar el ejemplo desaparece y el sector ya no tiene botón de ejemplo");
   chk(r.itemsFlat.length === 2 && r.itemsFlat[0].art === "027" && r.itemsFlat[1].art === "505", "cuarItemsDe aplana los items de todos los bloques del pedido");
   // v18.01 — los retenidos como lista/tabla
   chk(r.tblEs, "los retenidos son una TABLA con NP / Pedido / Motivos / Coment.");

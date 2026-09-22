@@ -1108,6 +1108,7 @@ button {
 .cuar-log-chip.on.c-retenido{ background:#b45309; border-color:#b45309; }
 .cuar-log-chip.on.c-aprobado{ background:#166534; border-color:#166534; }
 .cuar-log-chip.on.c-devuelto{ background:#9f1239; border-color:#9f1239; }
+.cuar-log-chip.on.c-anulado{ background:#475569; border-color:#475569; }
 /* v18.06 (Luis, 2026-09-15: *"no puede estar así el submódulo, se tiene que ver la tabla sin
    scrollear en el submódulo, scrolleando en la página en sí si hace falta"*) — el log tenía su
    PROPIO scroll (`max-height: calc(100vh - 430px)` + `overflow:auto`) adentro de una pestaña que
@@ -6016,7 +6017,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.90"></script>
+<script type="module" src="recepcion.js?v=20.91"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9898,7 +9899,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.90";
+const APP_VERSION = "v20.91";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13537,7 +13538,7 @@ async function showCompletarWizard(legajo, codigo) {
       }
     }
     const hayFalt = arts.some(a => a.nps.length);
-    /* v20.90 (Luis, 21/09) - EL FALTANTE DEL PICKING SE GUARDA CRUDO, aparte del reparto.
+    /* v20.91 (Luis, 21/09) - EL FALTANTE DEL PICKING SE GUARDA CRUDO, aparte del reparto.
        `hayFalt` es un booleano GLOBAL: se arma con `arts.some(a => a.nps.length)`, y `arts`
        solo tiene los articulos del faltante que se pudieron cruzar contra `pickBase`. Si ese
        cruce falla (un codigo que no matchea, un pedido que no esta en la base), `hayFalt`
@@ -14284,7 +14285,7 @@ async function _compTandaYaArmada(tanda) {
     if (!r.ok) return false;
     const rows = await r.json();
     if (!Array.isArray(rows) || !rows.length) return false;
-    /* v20.90 (Luis, 21/09) - EL ARMADO VIEJO NO TRABA EL ARMADO DE VERDAD.
+    /* v20.91 (Luis, 21/09) - EL ARMADO VIEJO NO TRABA EL ARMADO DE VERDAD.
        El candado miraba SOLO si la tanda tiene filas en Entregas_Virgilio, y con eso alcanzaba
        para frenar a un operario con el pallet delante. Caso E12L / LK 0043: el 17/09 se
        registro un armado SIN picking (7 lineas, 15 cajas, cero movimientos de stock ese dia);
@@ -14363,7 +14364,7 @@ async function compTerminar() {
     if (!_okPend) { _comp.liosNpIdx = _comp.nps.indexOf(pendLios[0]); _compGo(2); return; }
   }
   const legajo = _comp.legajo, tanda = _comp.tanda, fecha = _comp.fecha || "";
-  const _faltRawTanda = (_comp.faltRaw || []).slice();   // v20.90: el tope de abajo lo usa despues de soltar _comp
+  const _faltRawTanda = (_comp.faltRaw || []).slice();   // v20.91: el tope de abajo lo usa despues de soltar _comp
   // v5.72: candado anti doble-armado. Si esta tanda ya fue armada antes (ya tiene
   // Entregas), NO la volvemos a armar → evita duplicar el pedido. Guardo contra
   // doble-click con _terminando y contra re-apertura con el chequeo en Supabase.
@@ -14415,7 +14416,7 @@ async function compTerminar() {
       rows.push({ fecha_salida: fecha, cod_cliente: p.cod, np: p.np, cod_art: it.art, cajas_pedidas: it.cajas, cajas_falto: falto, cajas_entregadas: Math.max(it.cajas - falto, 0), tanda: tanda });
     });
   });
-  /* v20.90 - TOPE CONTRA LO PICKEADO. Lo de arriba depende de que el reparto del Paso 2 haya
+  /* v20.91 - TOPE CONTRA LO PICKEADO. Lo de arriba depende de que el reparto del Paso 2 haya
      podido cruzar cada articulo contra el pedido; esto NO depende de nada: el picking dijo
      cuantas cajas se levantaron de cada codigo, y la suma de lo entregado en la tanda no puede
      pasarse de ahi. Si se pasa, se recorta (empezando por la NP que mas pidio) y la diferencia
@@ -44752,6 +44753,8 @@ let _apr = {
   // hace poco y pidió un solo código (empresa:order_id → {items, dias, fecha}). Se pide APARTE,
   // nunca junto con la marcación: ver cuarRepoCargar.
   cuarRepo: null, cuarRepoLoading: false,
+  // v20.53 (Luis): la deuda que viene de OTRA NP del mismo pedido no retiene (chip).
+  cuarMismo: null, cuarMismoLoading: false,
   // v18.04 — log de pedidos ANULADOS (undefined = todavía no se pidió)
   anulados: undefined, anuladosLoading: false, anuModal: false
 };
@@ -46268,6 +46271,7 @@ function aprColPedidos() {
             : '')) +
         // v13.21 (dueño): qué día va a poder salir, no la fecha en que llegó (queda en el title)
         aprRepoChip(p) +     // v19.44 (Luis): no cayó en cuarentena por ser reposición chica
+        aprMismoPedidoChip(p) +   // v20.53 (Luis): la deuda es de otra NP del mismo pedido
         aprSalidaChip(p) +
         // v17.57: el m³ se mudó arriba, al lado del número (como en Cuarentena)
         (p.np_total > 1 ? '<span class="apr-chip apr-chip-np">sale en ' + p.np_total + ' NP</span>' : '') +
@@ -46415,6 +46419,7 @@ function aprColCuarentena() {
   cuarComNeed();
   clinNuevosValorNeed();   // v19.94 (Thomas): el monto del pedido, igual que en Clientes nuevos
   clinCuitNeed();          // v20.41 (Luis): el CUIT en la columna de cliente
+  cuarMismoNeed();         // v20.53 (Luis): chip "la deuda es de otra NP del mismo pedido"
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
   const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
   const _cuarCol = aprColapsado("vir_cuar_colapsado");   // v18.100 (Luis): submódulo colapsable
@@ -46613,6 +46618,49 @@ async function cuarRepoCargar() {
   } catch (_e) { _apr.cuarRepo = {}; }   // sin chip; la marcación NO depende de esto
   _apr.cuarRepoLoading = false;
   if (_pppTab === "prog") aprRender();
+}
+/* ── v20.53 (Luis, 2026-09-21) — LA DEUDA DEL MISMO PEDIDO NO RETIENE ──
+   "si tiene deuda, tiene que haber un paso de chequeo de si hay una factura vinculada con otra
+   NP de la misma order_id. Y si la hay, exceptuarlo del aviso". La decision la toma el BACKEND
+   (gv_cuarentena_mismo_pedido_seguro, adentro de gv_cuarentena_marcar_calc); esto es SOLO el
+   chip que lo explica — si no, el pedido aparece en la lista normal sin ninguna marca y nadie
+   sabe por que la deuda no lo retuvo.
+
+   ⚠ Mismo recaudo que la reposicion chica: llamada propia, catch propio, y NUNCA adentro del
+   Promise.all de la marcacion (v19.41: por eso la Cuarentena quedo una vez en 0). */
+function cuarMismoNeed() { if (_apr.cuarMismo === null && !_apr.cuarMismoLoading) cuarMismoCargar(); }
+async function cuarMismoCargar() {
+  if (_apr.cuarMismoLoading) return;
+  const lista = (_apr.pedidos || []).filter(function (p) { return !p._demo; });
+  if (!lista.length) { _apr.cuarMismo = {}; return; }
+  _apr.cuarMismoLoading = true;
+  try {
+    const res = await aprRpc("gv_cuarentena_mismo_pedido_lote", {
+      p_pedidos: lista.map(function (p) {
+        return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim() };
+      })
+    });
+    const m = {};
+    (res || []).forEach(function (r) {
+      if (!r || !r.exento) return;
+      m[String(r.empresa) + ":" + String(r.order_id)] =
+        { deuda: Number(r.deuda_propia), nps: r.nps_facturadas || [] };
+    });
+    _apr.cuarMismo = m;
+  } catch (_e) { _apr.cuarMismo = {}; }   // sin chip; la marcacion NO depende de esto
+  _apr.cuarMismoLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+function aprMismoPedidoChip(p) {
+  if (!p || p._demo) return "";
+  const r = (_apr.cuarMismo || {})[aprKey(p.empresa, p.order_id)];
+  if (!r) return "";
+  const nps = (r.nps || []).join(", ");
+  return '<span class="apr-chip apr-chip-repo" title="No cae en Cuarentena: la deuda es la factura de ' +
+    'otra NP de ESTE MISMO pedido' + (nps ? " (" + escapeHtml(nps) + ")" : "") + '. El pedido se partio en ' +
+    'varias NP, ya se facturo una parte y todavia falta salir la otra: no se retiene a si mismo.">' +
+    '\u{1F9FE} Mismo pedido' + (nps ? ' � ' + escapeHtml(nps) : '') +
+    (isFinite(r.deuda) ? ' � ' + cuarPlata(r.deuda) : '') + '</span>';
 }
 function aprRepoChip(p) {
   if (!p || p._demo) return "";
@@ -48379,7 +48427,7 @@ function cuarLogHtml() {
   h += '<div class="cuar-log-chips">' +
     '<button class="cuar-log-chip' + (filtro ? "" : " on") + '" onclick="cuarLogFiltro(null)" ' +
       'title="Ver todos">Todos <b>' + todos.length + '</b></button>' +
-    [["retenido", "🚧 Retenidos"], ["aprobado", "✅ Aprobados"], ["devuelto", "↩ Devueltos"]].map(function (e) {
+    [["retenido", "🚧 Retenidos"], ["aprobado", "✅ Aprobados"], ["devuelto", "↩ Devueltos"], ["anulado", "✕ Anulados"]].map(function (e) {
       return '<button class="cuar-log-chip c-' + e[0] + (filtro === e[0] ? " on" : "") + '" ' +
         'onclick="cuarLogFiltro(\'' + e[0] + '\')">' + e[1] + ' <b>' + cuenta(e[0]) + '</b></button>';
     }).join("") +
@@ -48446,13 +48494,76 @@ function cuarLogComentarios(i) {
   cuarComAbrir({ modo: "log", empresa: r.empresa || "lk", clave: String(r.clave || ""),
                  np: String(r.np || r.clave || ""), cli: String(r.razon_social || r.cod || "") });
 }
-/* Fila "Ver ejemplo" — vive en el sector Cuarentena (no en Config). */
+/* Fila del sector Cuarentena (no en Config): la ayuda y el boton Imprimir. */
 function cuarDemoRowHtml() {
-  // v15.02: la ayuda primero (izquierda) y el botón al final (derecha), en una sola línea.
+  // v20.53 (Luis, 2026-09-21: *"saca el �ver ejemplo� y pone ahi en ese lugar un boton de
+  // imprimir"*) - el ejemplo era la ayuda de la primera semana; el reporte se usa todos los
+  // dias. cuarDemoToggle y cuarDemoPedido siguen vivos: el pedido de ejemplo se puede volver
+  // a prender desde la consola si alguna vez hace falta explicar la pantalla.
   return '<div class="cuar-demo-row">' +
-    '<span class="cuar-demo-hint">Los reportes se importan en <b>🚧 Config. Cuarentena</b>.</span>' +
-    '<button class="cuar-demo-btn" onclick="cuarDemoToggle()">' +
-    (_apr.cuarDemo ? "✕ Quitar ejemplo" : "👁 Ver ejemplo") + '</button></div>';
+    '<span class="cuar-demo-hint">Los reportes se importan en <b>\u{1F527} Config. Cuarentena</b>.</span>' +
+    '<button class="cuar-demo-btn" onclick="cuarExportarExcel()" ' +
+    'title="Bajar el listado de los retenidos en Excel">\u{1F5A8} Imprimir</button></div>';
+}
+/* El Excel del sector: lo que se ve en pantalla, en una planilla. Se arma en el FRONT a
+   proposito - no hay ninguna regla de negocio aca: son los mismos pedidos que ya marco
+   gv_cuarentena_marcar_calc y los mismos datos que pinta la tabla. SheetJS se carga bajo
+   demanda (vendor/xlsx.full.min.js), igual que el Excel de Stock. */
+function _cuarFechaPedido(p) {
+  const f = String((p && (p.fecha_recep || p.fecha_pedido || p.fecha || '')) || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(f) ? f : '';
+}
+function _cuarDiasDesde(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00-03:00');
+  if (isNaN(d)) return '';
+  return Math.max(0, Math.round((Date.now() - d.getTime()) / 86400000));
+}
+function _cuarMotivoTxt(p) {
+  const M = { deuda: 'Deuda', suspendido: 'Suspendido', sin_cta_cte: 'Sin cta. cte.',
+              limite_credito: 'Excede el limite', cliente_nuevo: 'Cliente nuevo' };
+  return (aprCuarentenaMotivos(p) || []).map(function (x) { return M[x] || String(x); }).join(' + ');
+}
+function _cuarVendedorTxt(p) {
+  try {
+    const c = cuarContactoDe(p);
+    if (c && c.tipo === 'vendedor' && c.nombre) return cuarTituloCase(c.nombre);
+  } catch (_e) {}
+  return '';
+}
+async function cuarExportarExcel() {
+  const lista = (_apr.pedidos || []).filter(function (p) {
+    return aprEnCuarentena(p) && !aprSoloClienteNuevo(p) && !p._demo;
+  });
+  if (!lista.length) { try { alert('No hay pedidos en cuarentena para exportar.'); } catch (_e) {} return; }
+  let XLSX;
+  try { XLSX = await pppLoadXlsx(); }
+  catch (e) { try { alert('No pude cargar el generador de Excel: ' + ((e && e.message) || e)); } catch (_e) {} return; }
+
+  const filas = lista.map(function (p) {
+    const f = _cuarFechaPedido(p);
+    const d = (p.cuarentena_detalle || {});
+    const deuda = Number(d.deuda != null ? d.deuda : p.cuarentena_deuda);
+    return {
+      'Razon social': String(p.razon_social || p.cod || ''),
+      'Motivo': _cuarMotivoTxt(p),
+      'Fecha del pedido': f ? f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4) : '',
+      'Dias desde el pedido': _cuarDiasDesde(f),
+      'Monto de deuda': isFinite(deuda) ? Math.round(deuda) : '',
+      'Vendedor': _cuarVendedorTxt(p)
+    };
+  }).sort(function (a, b) {
+    return (Number(b['Monto de deuda']) || 0) - (Number(a['Monto de deuda']) || 0) ||
+           String(a['Razon social']).localeCompare(String(b['Razon social']));
+  });
+
+  const hoy = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+  const dmy = hoy.slice(8, 10) + '-' + hoy.slice(5, 7) + '-' + hoy.slice(2, 4);
+  const ws = XLSX.utils.json_to_sheet(filas);
+  ws['!cols'] = [{ wch: 34 }, { wch: 22 }, { wch: 15 }, { wch: 19 }, { wch: 16 }, { wch: 20 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Cuarentena');
+  XLSX.writeFile(wb, 'reporte de cuarentena ' + dmy + '.xlsx');
 }
 /* v15.48 (dueño, 2026-09-11: *"porque está programado Orfali para 2 días diferentes. no podría
    pasar y tendría que salir como alerta"*) — mismo cliente con entregas en dos días separados por
