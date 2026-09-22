@@ -1455,6 +1455,43 @@ cambio cierra la puerta para adelante, no le saca nada al supervisor.
 **Chequeo:** `select * from public.gv_reglas_perdidas;` · `node tests/comp-tope-pickeado.cjs` ·
 `node tests/comp-armado-viejo-no-traba.cjs`. `sql/gv_isis_sin_tanda_freno_v2091.sql`, §3.lz.
 
+### ⚠ Y un armado ANULADO tampoco traba: la `-X` es la salida, no un armado (v21.21, Luis 22/09)
+
+**Luis, con la captura del operario:** *"le sale al operador pero me dicen que no la prepararon
+todavía (la estaban preparando recién)"*.
+
+Para deshacer un armado **no se borra la fila de `Entregas_Virgilio`: se le pega `-X` a la
+`tanda`** (`E29D` → `E29D-X`) y queda su fila en `GV_Tanda_Anulada`. Es el mismo criterio que los
+eventos (`TAP`→`TAPX`) y por el mismo motivo: borrarla libera el `client_id` y **la cola offline
+del celular resucita el armado**.
+
+`_compNpsYaArmadas` —el candado anti doble-armado **por NP**, v15.92— leía
+`?select=np&np=in.(…)` **sin mirar la tanda**, así que una fila anulada trababa igual que una
+viva, **y para siempre**.
+
+**Caso E29D (22/09):** `LK 0034` se desarmó el 15/09 —17 cajas volvieron, 13 a góndola y 4 a
+excedente— y se anuló el TAP (`GV_Tanda_Anulada` id 19). El 22/09 el operario, con el pallet a
+medio preparar, se comía *"Ya está armado el pedido NP LK 0034, LK 0035 (en otra tanda)"*.
+
+⚠ **Y el propio cartel le decía *"avisá para darlo de baja a mano primero"*, que era
+exactamente lo que ya se había hecho: el candado ignoraba su propia salida.** Medido al 22/09:
+**20 filas en 2 tandas** (`E29D-X` con 19 de LK 0034/0035, `D69H-X` con 1 de LK 0058).
+
+⚠ **`_compTandaYaArmada` (el candado por TANDA) NO tenía el problema**, y por eso el síntoma
+aparecía en uno solo de los dos: filtra `tanda=eq.<T>` y `E29D-X` no matchea. Que un candado
+esté sano no dice nada del otro.
+
+⚠ **La convención vive en UNA función, `_entregaAnulada(row)`**, no repetida en cada lector — la
+usan también los dos lectores de `cajas_falto` (`cpCerrarTareaSiCompleta`, `faltMaybeCompletar`),
+que sumaban las cajas de un armado anulado y dejaban la tarea de faltante abierta para siempre.
+**Al leer `Entregas_Virgilio` por NP, pedir también `tanda` y pasarla por ahí.**
+
+⚠ **Una fila SIN tanda (null o vacía) NO se toma por anulada: traba.** El candado es lo
+conservador — mismo criterio que la v20.91 (*"ante cualquier duda, traba"*).
+
+**Chequeo:** `select tanda, count(*) from public."Entregas_Virgilio" where tanda ~ '-X$' group by 1;`
+· `node tests/comp-armado-anulado.cjs` (verificado que falla contra el código anterior).
+
 ## ⚠ REGLA (Thomas, 2026-09-21, v20.86): lo ARMADO SIN DÍA tiene que verse en el badge
 
 **Thomas, textual:** *"debería aparecer discriminado en el badge del icono de PPP en la página
