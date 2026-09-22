@@ -1,0 +1,27 @@
+-- v21.35 (Thomas, 22/09/2026): comentarios de vendedores sobre clientes que dejaron de comprar.
+-- El vendedor marca cada cliente en su perfil de la página LK. Estados (el primero es el default):
+--   pendiente_revision · lo_contacto_yo · otra_razon_social   → quedan en LK
+--   cerro · contactenlo_ustedes · otro                         → viajan a Gestión + tarea a Luis (52)
+--
+-- ===== GESTIÓN (hrxfctzncixxqmpfhskv) — aplicado =====
+--   public."GV_Vendedor_Avisos" (id_lk PK = id de la nota en LK) — RLS: select authenticated,
+--     all para lk_ppp_reader (el rol del FDW de LK). Sin acceso anon.
+--   gv_vendedor_aviso_planify()  trigger AFTER INSERT → planify.tasks a employee 52 (Luis),
+--     system_generated = true; guarda planify_task_id.
+--   gv_vendedor_aviso_resolver(p_id bigint, p_resolucion text) → resuelto_at/por + cierra la
+--     tarea (done = true). EXECUTE: authenticated, service_role.
+--   Pantalla: A Programar → 📣 Avisos de vendedores (aprColAvisosVend), lee con la sesión.
+--
+-- ===== LK (kwkclwhmoygunqmlegrg) — aplicado =====
+--   public.vendedor_inactivo_notas (historial; RLS sin policies, sólo por RPC)
+--   vinact_marcar(p_cod, p_estado, p_texto, p_fecha, p_cod_rel) — sólo un vendedor, sólo su cartera
+--   get_mis_clientes_inactivos(p_meses) + nota_* (última nota POSTERIOR a la última compra).
+--     Salida anterior verificada idéntica (Andrés: 96 filas, mismo md5). Backup:
+--     zz_backups."LK_Backup_funcdef_vinact_20260922".
+--   virgilio.gv_vendedor_avisos (foreign table, SIN recibido_at: postgres_fdw manda NULL y pisa
+--     el default) + sync_vendedor_avisos_virgilio() (nunca propaga error; corre al marcar y en
+--     el cron 24 junto con sync_pedidos_match_virgilio).
+--
+-- Probado de punta a punta el 22/09 (y deshecho): Andrés marcó 565 Kohn Felipe Edgardo como
+-- "Contáctenlo ustedes" → llegó el aviso con localidad y última compra → tarea en Planify →
+-- un cliente ajeno rebota con "Ese cliente no es de tu cartera".

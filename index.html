@@ -1023,6 +1023,20 @@ button {
 /* v14.81 — SUBMÓDULO CUARENTENA (idea usuario 8877): pedidos retenidos (deuda / suspendido /
    supera límite de crédito). No se programan solos; van a este sector con badge. */
 .apr-col-cuar{ background:#fff7ed; border-color:#fed7aa; }
+.apr-col-avvend{ background:#eff6ff; border-color:#bfdbfe; }                                   /* v21.35 */
+.avv-lista{ display:flex; flex-direction:column; gap:6px; }
+.avv-fila{ background:#fff; border:1px solid #dbeafe; border-radius:8px; padding:7px 9px; font-size:13px; }
+.avv-fila.avv-ok{ opacity:.6; }
+.avv-top{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.avv-cod{ color:#64748b; font-size:12px; }
+.avv-fecha{ margin-left:auto; color:#64748b; font-size:12px; }
+.avv-chip{ font-size:11px; font-weight:800; border-radius:999px; padding:1px 8px; background:#e2e8f0; color:#334155; }
+.avv-chip.avv-cerro{ background:#fee2e2; color:#991b1b; }
+.avv-chip.avv-contactenlo_ustedes{ background:#dbeafe; color:#1e3a8a; }
+.avv-sub{ color:#475569; font-size:12px; margin-top:2px; }
+.avv-txt{ margin-top:3px; color:#334155; font-style:italic; white-space:pre-wrap; }
+.avv-res{ margin-top:3px; color:#15803d; font-size:12px; font-weight:700; }
+.avv-btn{ margin-top:5px !important; padding:3px 10px !important; border:1px solid #86efac; background:#f0fdf4; color:#166534; border-radius:999px; font-weight:800; font-size:12px; cursor:pointer; }
 /* v16.57 (problema 14) — aviso de los pedidos que YA tienen tanda y el cliente está en cuarentena.
    Rojo, no naranja: no es "retenido a tiempo", es "se escapó y hay que mirarlo". */
 .cuar-yaprog{ background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:8px 10px; margin:0 0 8px; }
@@ -6029,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.34"></script>
+<script type="module" src="recepcion.js?v=21.35"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9911,7 +9925,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.34";
+const APP_VERSION = "v21.35";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -46348,7 +46362,7 @@ function aprRender() {
   // existe mientras haya pedidos tildados. Al programar se vacía la selección, así que vuelve solo al paso 1.
   if (_apr.paso === 2 && !aprSelKeys().length) { _apr.paso = 1; _apr.diaSel = null; }
   if (_apr.paso === 2) h += '<div class="apr-wrap apr-2col">' + aprPaso2Html() + '</div>';
-  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + aprColCuarentena() + pipeHtml() + (conTandas ? aprColTandas() : '') + '</div>';
+  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + aprColCuarentena() + pipeHtml() + aprColAvisosVend() + (conTandas ? aprColTandas() : '') + '</div>';
   h += aprFootHtml();
 
   // Cada acción re-dibuja las tres columnas. Sin esto, sacar un pedido de una
@@ -46874,6 +46888,96 @@ function aprSoloClienteNuevo(p) {
 function aprColapsado(key) { try { return localStorage.getItem(key) === "1"; } catch (_e) { return false; } }
 function aprSetColapsado(key, v) { try { localStorage.setItem(key, v ? "1" : "0"); } catch (_e) {} }
 function aprCuarColapsar() { aprSetColapsado("vir_cuar_colapsado", !aprColapsado("vir_cuar_colapsado")); aprRender(); }
+/* =====================================================================================
+   v21.35 (Thomas, 22/09/2026) — 📣 AVISOS DE VENDEDORES. En la página de LK el vendedor ve
+   "Clientes que no están comprando" y marca cada uno. Tres de esas marcas son para la
+   oficina — Cerró / Contáctenlo ustedes / Otro — y LK las empuja a `GV_Vendedor_Avisos`
+   (sync_vendedor_avisos_virgilio, al momento y por el cron 24). Cada aviso abre solo una
+   tarea en Planify a Luis (trigger gv_vendedor_aviso_planify); "✓ Resuelto" la cierra
+   (gv_vendedor_aviso_resolver). Se lee CON LA SESIÓN, no con la anon: la tabla trae datos del
+   cliente y su RLS sólo deja leer a authenticated. Muestra lo abierto + lo resuelto en 7 días.
+   ===================================================================================== */
+const AVV_LBL = { cerro: "Cerró", contactenlo_ustedes: "Contáctenlo ustedes", otro: "Otro" };
+function avVendNeed() {
+  if (_apr.avVend == null && !_apr.avVendLoading) avVendCargar();
+}
+async function avVendCargar() {
+  _apr.avVendLoading = true;
+  try {
+    const h = await facAuthWriteHeaders();
+    if (!h) { _apr.avVend = []; _apr.avVendErr = authNoSesionMsg("Iniciá sesión para ver los avisos de vendedores."); return; }
+    const desde = new Date(Date.now() - 7 * 86400000).toISOString();
+    const r = await fetch(SUPABASE_URL + "/rest/v1/GV_Vendedor_Avisos?select=*" +
+      "&or=(resuelto_at.is.null,resuelto_at.gte." + encodeURIComponent(desde) + ")" +
+      "&order=creado_at.desc&limit=300", { headers: h, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    _apr.avVend = await r.json();
+    _apr.avVendErr = null;
+  } catch (e) {
+    _apr.avVend = [];
+    _apr.avVendErr = "No se pudieron leer los avisos (" + String((e && e.message) || e).slice(0, 120) + ")";
+  } finally {
+    _apr.avVendLoading = false;
+    if (_pppTab === "prog") aprRender();
+  }
+}
+function avVendColapsar() { aprSetColapsado("vir_avvend_colapsado", !aprColapsado("vir_avvend_colapsado")); aprRender(); }
+function _avvFecha(ts) {
+  const d = new Date(ts);
+  if (isNaN(d)) return "";
+  return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + " " +
+         String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+function avVendFila(a) {
+  const wpp = String(a.whatsapp || "").replace(/\D/g, "");
+  const ult = a.ultima_compra ? String(a.ultima_compra).slice(8, 10) + "/" + String(a.ultima_compra).slice(5, 7) + "/" + String(a.ultima_compra).slice(0, 4) : "";
+  let h = '<div class="avv-fila' + (a.resuelto_at ? " avv-ok" : "") + '">' +
+    '<div class="avv-top"><span class="avv-chip avv-' + escapeHtml(a.estado) + '">' + escapeHtml(AVV_LBL[a.estado] || a.estado) + '</span>' +
+    '<b>' + escapeHtml(a.razon_social || "(sin razón social)") + '</b> <span class="avv-cod">' + escapeHtml(a.cod_cliente || "") + '</span>' +
+    '<span class="avv-fecha">' + escapeHtml(_avvFecha(a.creado_at)) + '</span></div>' +
+    '<div class="avv-sub">Vendedor: ' + escapeHtml(a.vendedor || "?") +
+    (ult ? ' · última compra ' + ult : '') +
+    (a.localidad ? ' · ' + escapeHtml(a.localidad) : '') +
+    (wpp ? ' · <a target="_blank" rel="noopener" href="https://wa.me/' + (wpp.length <= 11 ? "54" + wpp.replace(/^54/, "") : wpp) + '">WhatsApp</a>' : '') +
+    '</div>' +
+    (a.texto ? '<div class="avv-txt">“' + escapeHtml(a.texto) + '”</div>' : '');
+  if (a.resuelto_at) {
+    h += '<div class="avv-res">✓ Resuelto ' + escapeHtml(_avvFecha(a.resuelto_at)) + ' por ' + escapeHtml(a.resuelto_por || "?") +
+         (a.resolucion ? ' — ' + escapeHtml(a.resolucion) : '') + '</div>';
+  } else {
+    h += '<button class="avv-btn" onclick="avVendResolver(' + Number(a.id_lk) + ')" title="Marcarlo resuelto: cierra la tarea de Planify">✓ Resuelto</button>';
+  }
+  return h + '</div>';
+}
+async function avVendResolver(id) {
+  const res = prompt("¿Qué se hizo con este aviso? (opcional — queda en la tarea de Planify)");
+  if (res === null) return;
+  const h = await facAuthWriteHeaders();
+  if (!h) { alert(authNoSesionMsg("Iniciá sesión para resolver avisos.")); return; }
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_vendedor_aviso_resolver", {
+    method: "POST", headers: h, body: JSON.stringify({ p_id: id, p_resolucion: res || null })
+  });
+  if (!r.ok) { alert("No se pudo marcar como resuelto: " + (await r.text()).slice(0, 200)); return; }
+  _apr.avVend = null;
+  avVendCargar();
+}
+function aprColAvisosVend() {
+  avVendNeed();
+  const todos = _apr.avVend || [];
+  const abiertos = todos.filter(function (a) { return !a.resuelto_at; });
+  const col = aprColapsado("vir_avvend_colapsado");
+  let h = '<div class="apr-col apr-col-avvend' + (col ? ' apr-col-colapsado' : '') + '">' +
+    '<div class="apr-col-t apr-col-t-clic" onclick="avVendColapsar()" title="' + (col ? "Mostrar" : "Ocultar") + ' los avisos de vendedores">' +
+    '<span class="apr-col-caret">' + (col ? "▸" : "▾") + '</span> 📣 Avisos de vendedores <b>(' + (_apr.avVend == null ? '…' : abiertos.length) + ')</b>' +
+    '<span class="apr-cuar-help" title="Clientes que dejaron de comprar y que un vendedor marcó desde su perfil en la página de LK como Cerró, Contáctenlo ustedes u Otro. Cada uno le abre una tarea en Planify a Luis; ✓ Resuelto la cierra.">ⓘ</span>' +
+    '</div>';
+  if (col) return h + '</div>';
+  if (_apr.avVendErr) h += '<div class="apr-vacio">⚠ ' + escapeHtml(_apr.avVendErr) + '</div>';
+  if (_apr.avVend == null) h += '<div class="apr-vacio">Cargando…</div>';
+  else if (!todos.length) h += '<div class="apr-vacio">Sin avisos. Acá caen los clientes que un vendedor marcó como <b>Cerró</b>, <b>Contáctenlo ustedes</b> u <b>Otro</b> desde su perfil en la página.</div>';
+  else h += '<div class="avv-lista">' + abiertos.concat(todos.filter(function (a) { return a.resuelto_at; })).map(avVendFila).join('') + '</div>';
+  return h + '</div>';
+}
 function aprCliColapsar() { aprSetColapsado("vir_cli_colapsado", !aprColapsado("vir_cli_colapsado")); aprRender(); }
 /* 3 badges separados (suspendido/deuda/límite), sólo los que aplican. */
 /* v15.04 (dueño: "que diga ahí el motivo de la cuarentena: ej deuda $10000") — los
@@ -49374,6 +49478,7 @@ async function cuarMarcarPedidos() {
   _apr.cuarErr = null;
   _apr.cuarContacto = null;   // v14.90: cambió el set de retenidos → recargar contactos WhatsApp
   _apr.cuarComN = null;       // v18.01: ídem el contador de comentarios de cada 📖
+  _apr.avVend = null;         // v21.35: los avisos de vendedores se releen con cada refresco
   _apr.cliValor = null;       // v18.95: cambió el set → recargar el monto de los clientes nuevos
   _apr.cliContacto = null;    // v19.05: ídem el timer de primer contacto
   _apr.cliWpp = null;         // v19.05: ídem el teléfono del cliente
