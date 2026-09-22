@@ -810,6 +810,7 @@ ruteo** que viaja pegada al código del PEDIDO y significa exactamente dos cosas
 | Pedido | `PPP_Web_Base.articulo`, `gv_ppp_np_items` | **SÍ** (`026L`) | lo trae el feed de la página |
 | Picking (pantalla y stock) | lista de picking, `Movimientos_Stock.cod_art` | **NO** (`026`, o `438E LK` si es dual) | **`pkResolveArt`** = `pkStripL` + `pkEmpresaArt` |
 | Armado / factura | `Entregas_Virgilio.cod_art`, Excel ISIS | **SÍ**, crudo (`438EL`) | `_facXlsArmar` lo toma tal cual de `Entregas_Virgilio` |
+| Badge **FC s/Salida** (Stocks) | `vista_fc_sin_salida`, `stocks_carga_rapida.fc_sin_salida` | **NO** | **`gv_cod_stock_de_entrega`** = `pkResolveArt` en SQL (v21.11) |
 
 ```js
 // index.html, v12.39 — el comentario que lo dice todo:
@@ -827,6 +828,25 @@ repuso dentro de la misma tanda de trabajo; queda escrito para que no se repita.
 
 ⚠ **Y la L tampoco se agrega a mano en Gestión.** La pone la página al armar el pedido
 (`admin-supercot.js`, `addLSuffix = isChef`). Gestión la **respeta y la rutea**, no la genera.
+
+⚠⚠ **Y todo lo que MUESTRA stock a partir de un código de FACTURA tiene que resolverlo primero**
+(v21.11, Luis 22/09). `Entregas_Virgilio` guarda `026L` porque ése es el código de la factura; el
+badge **FC s/Salida** lo agrupaba con `norm_cod()`, que **sólo saca ceros a la izquierda y pone
+mayúsculas — no pela la L**, así que el 026 salía partido en dos filas (026 = 10, **026L** = 1) y
+el front fabricaba una fila fantasma sin empresa ni descripción. Eran **32 códigos**, todos del
+mismo pedido de Chef con artículos de Loeke. Lo resuelve **`gv_cod_stock_de_entrega(cod, np, emp)`**,
+que es `pkResolveArt` en SQL.
+
+⚠ **En los DUALES no alcanza con pelar la L**: el universo de stock los tiene como `438E LK` /
+`438E CH`, y el cruce es por **igualdad exacta**, así que `438EL` tiene que resolver a **`438E LK`**
+— la L manda LK aunque la NP sea de Chef. Sin el sufijo, el badge del dual quedaba en **0 de los
+dos lados**, y el fallback `codBase` del front le asignaba las mismas cajas a las dos filas.
+
+**Al escribir una vista o una pantalla que cruce un código de `Entregas_Virgilio` / factura contra
+stock o góndola, pasarlo por `gv_cod_stock_de_entrega`, nunca por `norm_cod` a secas.** Lo sostienen
+`tests/fcs-codigo-l.cjs` —que corre `pkResolveArt` de verdad y lo compara contra la función de la
+base, así que avisa si el front y el SQL se desfasan— y dos filas en `GV_Reglas_Centinela`.
+`sql/gv_fc_sin_salida_codigo_l_v2111.sql`, §3.mj.
 
 **Chequeo** (el operario tiene que ver el código pelado y la góndola LK):
 
@@ -3128,6 +3148,123 @@ que lo apague, es la señal de que se está por reabrir el pozo de las 92 cajas 
 **Chequeo** (las cuatro reglas tienen centinela): `select * from public.gv_reglas_perdidas;` —
 vacía = todo bien. `sql/gv_mover_tanda_entera_v2030.sql`, §3.kq.
 
+## ⚠⚠ REGLA (Luis, 2026-09-22, v21.10): el REGISTRO DEL ARMADO viaja con el pedido
+
+**Luis, textual:** *"Pedido ARMADO tiene que tener el dato. Pedido que todavía no armaron, no
+importa. Pedido en proceso ponemos que no se pueda mover hasta que terminen de armarlo o lo
+cancelen y listo"*.
+
+`TP` y `TAP` son eventos de la **TANDA** (`texto = 'E29A'`, sin NP) y la pila de stock va toda
+con `ref = <tanda>`: medido sobre E29A, sus seis filas (picking / separado / facturado) van con
+`ref = tanda` y **ninguna tiene NP**. Renombrar no es opción — la tanda vieja sigue viva con los
+otros pedidos adentro. Por eso la tanda nueva nacía **sin registro de producción y sin cajas**: el
+monitor la mostraba pendiente y el depósito re-pickeaba mercadería que ya estaba en un pallet
+(E29A, 88 cajas el 21/09).
+
+| estado del pedido | qué hace al moverlo |
+|---|---|
+| **sin empezar** | tanda nueva y listo: no hay nada que llevar |
+| **en proceso** (pickeado, sin terminar de armar) | **NO SE MUEVE.** Sus cajas están en la pila de la tanda **sin separar por pedido** — eso recién pasa en el armado. Se termina de armar o se cancela |
+| **armado** | se mueve **con su registro**: `TP` + `TAP` copiados, sus filas de `Entregas_Virgilio`, y su porción de `a_facturar` |
+
+**Medido en transacción abortada sobre E29C** (6 NP, 176 cajas): LK 0101 → E75A ·
+`a_facturar` 176 → 104 + 72 en la nueva = **176** · **el total global no se movió** (615 → 615) ·
+2 eventos en la nueva · `gv_stock_tanda_pickeado_negativo` = 0.
+
+⚠ **Después del armado `separar_pedidos` cierra en CERO**: las cajas están en **`a_facturar`**.
+Ahí es donde vive la porción que viaja, no en la pila de picking.
+
+⚠ **NO se copian los PKC.** Medido: copiarlos dispara `reconciliar_stock_articulo_rt` y
+**re-pickea** (góndola −85 → −194, `separar_pedidos` 0 → +106). Por lo mismo, la porción viaja
+como **`ajuste`**: las filas `picking` las reescribe la etapa 1 desde los PKC y las `separado` las
+reescribe la etapa 2, así que un split ahí **se deshace solo**.
+
+⚠ **La etapa 2 se silencia durante el movimiento** (`gv.sin_reconciliar`, local a la
+transacción). El trigger corre AFTER STATEMENT, o sea que ve los estados intermedios, y
+`reconciliar_pipeline_stock_etapa2` reparte contra `Entregas_Virgilio`: moviendo las Entregas
+antes del stock manda la diferencia a **`terminado`** (cajas fantasma en góndola), y moviendo el
+stock antes de las Entregas manda **todo** a góndola. Se hacen las tres cosas y se reconcilia
+**una** vez al final.
+
+⚠ **El guard de la v20.01 deja pasar el armado sólo cuando el llamador declara que el registro
+viaja** (`gv.pedido_lleva_registro`). Llamado directo, sin esa señal, sigue frenando — verificado.
+Y las copias van con `ts_inicio = ts_cliente`, **duración cero**: el trabajo ya se contó en la
+tanda vieja.
+
+⚠ **Al parchear una función por texto, los saltos de línea van con `chr(10)`.** El guard del
+EN PROCESO se aplicó la primera vez con `\n` dentro de comillas simples —barra-n literal— así que
+**quedó comentado entero** en una sola línea. El `CREATE` salió limpio y la función corrió igual.
+Lo cazó la prueba, no la lectura.
+
+**El supervisor ve el AVISO**: *"⚠⚠ ROTULAR: este pedido ya estaba armado y sale con CÓDIGO NUEVO.
+El pallet tiene el papel de E29C y ahora es E75A. Cambiarle el rótulo ANTES de cargarlo. NO hay que
+volver a pickearlo ni armarlo: el picking y el armado ya viajaron."*
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
+`sql/gv_pedido_mover_registro_v2105.sql`.
+
+⚠ **EL FRENO GENERAL SIGUE PUESTO hasta que Luis lo diga**
+(`PPP_Web_Config.np_mover_frenado = 1`). Se levanta con un `update`, no con un deploy:
+`update public."PPP_Web_Config" set valor = 0 where clave = 'np_mover_frenado';`
+## ⚠ REGLA (Thomas, 2026-09-22, v21.06): el refresco del stock se hace SOLO si algo cambió
+
+Cron 55 refrescaba `vista_stock_procesada` **cada 2 minutos, siempre**: **1.770 s sobre una
+ventana de 26,4 h = 7,4 % del tiempo total de la base**, para una matview de **367 filas /
+216 kB**. Y sobre 7 días, sólo **277 de los 5.040 bloques** de 2 minutos tuvieron movimiento de
+stock: el **94,5 % de los refrescos no cambiaba una sola fila**. Esa contención es la que daba
+los `canceling statement due to statement timeout` de la Cuarentena (problema 492).
+
+Hoy el cron llama a **`gv_refresh_stock_si_cambio()`**. Medido en vivo: **refresco 1.813 ms ·
+chequeo que salta 12 ms (150×)**.
+
+⚠ **La frescura NO empeora.** El chequeo sigue corriendo cada 2 minutos: apenas se escribe un
+movimiento, el refresco sale en la corrida siguiente. Lo único que se saca es el refresco que
+no cambiaba nada.
+
+⚠ **El árbol de dependencias se camina EN VIVO, no es una lista a mano.** La matview cuelga de
+**23 tablas y 5 vistas**; se resuelve con `pg_rewrite`/`pg_depend`, así que una tabla nueva entra
+sola (verificado 23 de 23, 11 ms). Una lista escrita a mano es el mismo pozo de los pases que
+eligen fecha (v20.83), el `ref` compuesto (v20.72) y las 18 tablas del renombre (v20.88):
+**siempre falta una**.
+
+⚠ **La matview se excluye de su propia huella**, o su refresco cambiaría la huella y se
+refrescaría para siempre. Y la comparación que manda es el **jsonb entero**, no clave por clave:
+así una tabla que entra o sale del árbol también cuenta.
+
+⚠ **FAIL-OPEN, al revés del guard de cuarentena (v20.95):** sin huella, se refresca. Un refresco
+de más cuesta 2 s; una vista de stock vieja la mira un operario y le miente. Más el **piso de
+frescura** (60 min).
+
+⚠ **La huella cuenta ESCRITURAS, no contenido** (`pg_stat_user_tables`). Un `delete`+`insert`
+con contenido idéntico dispara un refresco al pedo, y un reset de estadísticas fuerza uno: las
+dos fallan hacia refrescar de más, nunca de menos.
+
+⚠⚠ **Y lo que el stock gasta de verdad NO es esto.** Medido el 22/09: `vista_saldos_stock` se
+lee **directo desde la app en 5 lugares** de `index.html` — **1.759 llamadas, 2.850 s**, contra
+los **1.808 s** del refresco. Pedir **un solo código** (`clave=eq.438E`) cuesta lo mismo que
+pedir todos (**769 ms**): `clave` es una expresión calculada, así que no hay índice que valga y
+recorre las 67.242 filas y las ordena para devolver 0 (`Rows Removed by Filter: 496`). El
+arreglo es la columna de clave normalizada + índice en `Movimientos_Stock`, **pendiente del
+dueño** (necesita ventana sin operarios pickeando).
+
+⚠ **`work_mem` NO es el arreglo, se midió y se descartó.** Con 4 MB el orden se cae a disco
+(`external merge Disk: 3.304 kB`); con 32 MB entra en memoria y el I/O temporal se va a 0 — pero
+la consulta pasa de **769 ms a 751 ms**. Los 750 ms son el recorrido y el regex por fila, no el
+orden. No volver a proponerlo para esto.
+
+**Chequeo:**
+```sql
+select * from public.gv_stock_refresh_salud;              -- estado='ok' y pct_ahorrado
+select * from public.gv_refresh_stock_si_cambio(60,true); -- qué HARÍA, sin refrescar
+```
+
+**Rollback, una línea:**
+```sql
+select cron.alter_job(55, command := 'REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada');
+```
+
+`sql/gv_refresh_stock_si_cambio_v2105.sql`, `tests/stock-refresh-si-cambio.cjs`, §3.mi.
+
 ## ⚠ REGLA: una lectura ROTA no es un CERO — y un centinela que sólo mira el log del éxito es ciego
 
 **2026-09-18, problemas 402 y 403.** El armado automático de pedidos web estuvo **5 h 40 sin
@@ -3168,7 +3305,7 @@ Dos detalles de implementación que costaron y conviene no repetir:
 para mirar; `sin nada que armar` y `fuera de horario` son sanos. §3.jf,
 `sql/gv_armado_salud_feed_v1958.sql`.
 
-## ⚠ REGLA (v21.05): `index.html` es UTF-8 — un byte en latin1 se multiplica solo
+## ⚠ REGLA (v21.10): `index.html` es UTF-8 — un byte en latin1 se multiplica solo
 
 El archivo declara `<meta charset="UTF-8">`. El 22/09 tenía **5 bytes sueltos en latin1/cp1252**,
 dejados por sesiones que lo editaron con herramientas distintas. Tres eran de comentario; **los
@@ -3210,7 +3347,7 @@ salida está adentro del modal. En `RT`, `RI`, `EI`, `AT`, `PB`, `Limp`, `PC`, `
 el botón de nuevo **cierra** — no hay forma de quedar trabado. Al agregar un módulo con popup, la
 pregunta es ésa: *¿su botón re-abre o cierra?* Si re-abre, necesita su `…EndWithout`.
 
-⚠ **Y en TODA pantalla del módulo, no sólo en la de la lista** (v21.05). El chooser de CC
+⚠ **Y en TODA pantalla del módulo, no sólo en la de la lista** (v21.10). El chooser de CC
 (*"¿qué vas a cargar? Camión / Retira"*) se dibuja **antes** de consultar nada y su único «Cerrar»
 minimizaba: el escape aparecía recién después de elegir y que la lista viniera vacía.
 
