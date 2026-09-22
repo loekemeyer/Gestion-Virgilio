@@ -14,6 +14,13 @@
    - Cancelar el confirm no toca absolutamente nada.
    - NO duplica lógica: pasa por _compDifResolve (candado estático).
    - REGRESIÓN: la llamada de 2 argumentos (Separar) sigue leyendo el input del diálogo.
+   v21.01 (Luis):
+   - "Sí, agarro de góndola" NO registra faltante y deja el pedido entero (antes lo anotaba
+     igual: el armador completaba de góndola y el remito decía que faltó — 3 eventos / 14
+     cajas en 90 días). El aviso al picking sigue saliendo; el stock no se toca, porque la
+     góndola ya la debitó el picking por su `real`.
+   - Súper y retira (clase etiqueta/nada) también pueden decir "no hay más", y hacerlo NO
+     les recalcula liosDone (los trabaría el Terminar de toda la tanda).
    Sale 1 si falla. */
 const path = require("path");
 const fs = require("fs");
@@ -32,6 +39,11 @@ const est = {
   // candado invertido: _compSinMas NO puede registrar el faltante por su cuenta
   sinmas_usa_difresolve: /function _compSinMas\([\s\S]{0,2600}?_compDifResolve\("menos", "no", real\)/.test(SRC),
   sinmas_no_llama_falt: !(/function _compSinMas\([\s\S]{0,2600}?_compAddFaltManual\(/.test(SRC)),
+  // v21.01: "Sí, agarro de góndola" no registra faltante
+  si_no_es_faltante: /if \(tipo === "menos" && gond !== "si" && qty > 0\) \{/.test(SRC),
+  // v21.01: súper/retira también tienen la salida, y la lista no filtra por c.sep
+  etiqueta_tiene_boton: /hh \+= '<button class="cmpl-nomas" onclick="_compViewNoMas\(\)"/.test(SRC),
+  grid_no_filtra_sep: /function _compNoMasGrid\(n\) \{\n  const pend = \(n\.codes \|\| \[\]\)\.filter\(function \(c\) \{ return \(\(c\.rest \|\| 0\) \+ \(c\.cur \|\| 0\)\) > 0; \}\);/.test(SRC),
 };
 
 (async () => {
@@ -112,7 +124,34 @@ const est = {
     _compDifResolve("menos", "no");        // sin 3er argumento
     await wait(40);
     out.c5_lee_input = _comp.nps[0].codes[0].sale === 5 && _comp.arts[0].nps[0].asig === 1;   // qty = 6 - 5
+
+    // ---- CASO 6 (v21.01): "Sí, agarro de góndola" NO registra faltante ni achica el pedido ----
+    setup(6, 0, "501", "501");
+    _comp.sepDif = { mode: "dialog", npIdx: 0, ci: 0, tipo: "menos" };
+    inp.value = "4";                       // el picking dijo 6, en la mesa hay 4, las 2 las trae de góndola
+    _compDifResolve("menos", "si");
+    await wait(40);
+    const c6 = _comp.nps[0].codes[0];
+    out.c6_pedido_entero = c6.sale === 6 && c6.rest === 6;
+    out.c6_sin_faltante = _comp.arts.length === 0 && _comp.hayFalt === false;
+    out.c6_avisa_igual = evs.filter((e) => e.opcion === "NPD").length === 1;
+    out.c6_sin_stock = movs.length === 0;   // la góndola ya la debitó el picking por `real`
     inp.remove();
+
+    // ---- CASO 7 (v21.01): súper/retira puede decir "no hay más" y NO traba el Terminar ----
+    window.confirm = function () { return true; };
+    const c7c = setup(3, 0, "501", "501");
+    _comp.nps[0].clase = "etiqueta"; _comp.nps[0].liosArr = []; _comp.nps[0].liosDone = true;
+    c7c.sale = 3;
+    _compSinMas(0);
+    await wait(40);
+    out.c7_falt = _comp.arts.length === 1 && _comp.arts[0].nps[0].asig === 3;
+    out.c7_sale = c7c.sale === 0;
+    out.c7_no_traba = _comp.nps[0].liosDone === true;
+
+    // ---- CASO 8: la lista NO filtra por c.sep (súper/retira no pasan por ese marcado) ----
+    const n8 = { np: "LK 0001", codes: [{ cod: "777", raw: "777", sale: 2, rest: 2, cur: 0, sep: false }] };
+    out.c8_lista_sin_sep = _compNoMasGrid(n8).indexOf("_compSinMas(0)") >= 0;
     return out;
   });
   const dyn = Object.keys(r).every((k) => r[k] === true);
