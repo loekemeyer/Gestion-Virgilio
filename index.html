@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.30"></script>
+<script type="module" src="recepcion.js?v=21.31"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.30";
+const APP_VERSION = "v21.31";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11617,6 +11617,30 @@ async function _supaFetchAllRaw(endpoint, query) {
    (degradan a lista vacía), pero paginando con Range → trae TODO. Necesario en las
    lecturas catálogo-completo (Capacidad_Sector, OC_Maximos) que crecen hacia el corte
    de 1000 filas de PostgREST (limit=N no lo evita; ya mordió en v5.41/v5.42). */
+/* v21.07 — saldos de UNOS POCOS codigos, por la RPC indexada.
+   `vista_saldos_stock.clave` es una expresion de AGREGACION, asi que filtrarla
+   desde la vista NO se puede empujar: pedir UN codigo recorria las 67.945 filas
+   de Movimientos_Stock y las ordenaba (medido: 687 ms, devolviendo 1 fila).
+   `gv_saldos_por_clave` filtra la base por el ckey INDEXADO (mov_stock_ckey_idx)
+   y despues agrupa: 687 ms -> 7 ms. Devuelve EXACTAMENTE las mismas filas
+   (verificado con EXCEPT ALL en las dos direcciones sobre las 496 claves).
+   ⚠ El match final es `clave = any(p_claves)`, igual que el `clave=in.(...)`
+   que reemplaza: hay que pasarle las claves tal cual las escribe la vista
+   (un dual va como '438E LK'). */
+async function gvSaldosDeClaves(claves, opts) {
+  const arr = (claves || []).map(function (c) { return String(c).trim(); }).filter(Boolean);
+  if (!arr.length) return [];
+  const o = opts || {};
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_saldos_por_clave" + (o.select ? "?select=" + o.select : ""), {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_claves: arr }),
+    cache: "no-store",
+    signal: o.signal
+  });
+  if (!r.ok) throw new Error("gv_saldos_por_clave " + r.status);
+  return await r.json();
+}
 async function supaFetchAllSafe(endpoint, query) {
   try { return await supaFetchAll(endpoint, query); }
   catch (_e) { return []; }
@@ -12652,7 +12676,7 @@ async function _pkCeldasPorCod() {
    del código exacto = lo que suma el trigger. Devuelve null si no se pudo. */
 async function _pkConteoSistema(art) {
   try {
-    const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock", "select=clave,terminado&clave=eq." + encodeURIComponent(String(art).trim()));
+    const rows = await gvSaldosDeClaves([String(art).trim()], { select: "clave,terminado" });
     let s = 0; (rows || []).forEach(function (r) { s += Number(r.terminado) || 0; });
     return Math.round(s);
   } catch (_e) { return null; }
@@ -14896,10 +14920,7 @@ function stockMove(rows) {
    no se pudo leer (→ el llamador NO toca el stock). */
 async function _stkGondolaSaldoVivo(cod) {
   try {
-    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const r = await fetch(SUPABASE_URL + "/rest/v1/vista_saldos_stock?clave=eq." + encodeURIComponent(cod) + "&select=terminado", { headers: H, cache: "no-store" });
-    if (!r.ok) return null;
-    const a = await r.json();
+    const a = await gvSaldosDeClaves([String(cod).trim()], { select: "terminado" });
     if (!a || !a.length) return 0;   // sin fila = sin saldo = 0
     // v15.71 — SUMAR: la vista agrupa por (código, empresa), así que un código pelado
     // puede volver en varias filas. `a[0]` era una de ellas, no el saldo.

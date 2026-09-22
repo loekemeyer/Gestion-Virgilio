@@ -29252,3 +29252,79 @@ Ahora va la **ancha** (1760) y la tabla es compacta: ancho por dato, padding mí
 
 **Chequeo:** `node tests/rv-cuadro-entero.cjs` — mide el render (`scrollWidth <= clientWidth`),
 no el texto del código. Verificado que falla contra la versión anterior.
+
+### §3.mj — v21.31: la huella del refresco no ahorraba, y el índice que sí hace barato pedir un código
+
+**A. El refresco condicional (v21.06) estaba dando 1,2 % de ahorro, no 94,5 %.**
+Medido el 22/09 a la tarde: **166 refrescos contra 2 saltos**. La huella contaba
+**escrituras** (`pg_stat_user_tables`) y hay crons que reescriben tablas enteras sin cambiar
+nada de lo que ve la matview:
+
+| tabla | inserts | updates | quién |
+|---|---:|---:|---|
+| `PPP_Web_Base` | 372 | **582.748** | el sync la reescribe entera |
+| `GV_UxB` | 0 | **34.036** | ídem |
+| `Movimientos_Stock` | 2.847 | 7.223 | **cron 81 `gv-reconciliar-aguardar`, cada 2 min** |
+| `Registros_Produccion_Virgilio` | 1.048 | 5.471 | |
+| `proyeccion_madre` | 1.383 | 922 | delete+insert diario desde LK |
+
+El cron 81 corre en **el mismo minuto** que el 55 (17:18:00,23 contra 17:18:00,19), así que
+cada chequeo encontraba escrituras frescas.
+
+⚠ **Esto estaba escrito como riesgo en la v21.06 y se lo trató como caso raro. Es el caso
+NORMAL de esta base**, y la medición de 5 minutos que lo dio por bueno cayó justo entre dos
+corridas del cron. **Una medición corta sobre un proceso periódico no mide nada.**
+
+Arreglo: las tablas ruidosas pasan a **firma de CONTENIDO**, y cuál es ruidosa vive en
+**`GV_Stock_Huella_Expr`** — un `insert`, no un deploy. El resto sigue con el contador barato.
+Huella completa: **60-74 ms**. Resultado: **0 refrescos / 3 saltos = 100 % ahorrado** con el
+cron 81 corriendo en el medio.
+
+⚠ El armador de motivos casteaba a `bigint`: con una firma de texto explota **en ejecución**
+con `22P02` (el pozo de la v19.44, ya escrito). Hoy compara como texto y sólo resta cuando los
+dos lados son números. **Falló ruidoso y deshizo la transacción**, que es lo correcto.
+
+**B. Pedir UN código costaba lo mismo que pedir TODOS.**
+`vista_saldos_stock.clave` es una expresión de **agregación**, así que `clave=eq.438E` no se
+puede empujar: recorre las 67.945 filas, las ordena y filtra después (`Rows Removed by Filter:
+496`) — **687 ms para devolver 1 fila**. Se lee así desde 5 lugares de `index.html`: **1.759
+llamadas, 2.850 s**, más que el refresco de la matview (1.808 s).
+
+⚠ **Ningún índice sobre `clave` arregla eso: `clave` no existe en la tabla.** Lo indexable es
+**`ckey`**, función pura de `cod_art` con funciones inmutables → **índice de EXPRESIÓN**
+(`mov_stock_ckey_idx`, **496 kB**): sin columna, sin trigger, sin backfill, **sin reescribir una
+sola fila del libro de stock**. Eso saca de encima el riesgo que tenía el plan original.
+
+Y como un índice sólo sirve si alguien filtra por esa expresión, va con
+**`gv_saldos_por_clave(text[])`**:
+
+| | ms |
+|---|---:|
+| vista, 1 código | 687 |
+| RPC, 1 código | **7** |
+| RPC, 10 códigos | 69 |
+
+Verificado idéntico: **496 = 496 filas, `EXCEPT ALL` 0 en las dos direcciones**.
+
+⚠ **El filtro va con `= any(v_ck)` y la expresión escrita IGUAL que en el índice.** La primera
+versión usaba `in (select k from <cte>)` y el planner **no usaba el índice**: 232 ms en vez de 7.
+
+⚠⚠ **El picking se reapuntó a la RPC y se REVIRTIÓ.** `tests/pk-excedente-vista.cjs` se puso en
+rojo (su mock intercepta por la URL de la vista, no ve el POST a la RPC). Se revirtió en vez de
+adaptar el test: **el picking es el camino caliente de los operarios**. Lo sostiene el candado
+invertido de `tests/stock-clave-indexada.cjs`. Quedaron reapuntados los dos llamados de código
+puntual (`_pkConteoSistema` y `_stkGondolaSaldoVivo`).
+
+⚠ **Las 2 lecturas del universo entero (`select=*`) siguen contra la vista**: 887 + 526
+llamadas, ~2.221 s. El índice no las ayuda — necesitan las 496 filas igual. **Eso es lo que
+queda pendiente.**
+
+**Rollback, nada toca datos:**
+```sql
+drop index if exists public.mov_stock_ckey_idx;
+drop function if exists public.gv_saldos_por_clave(text[]);
+delete from public."GV_Stock_Huella_Expr";
+select cron.alter_job(55, command := 'REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada');
+```
+
+`sql/gv_stock_indice_clave_v2131.sql`, `tests/stock-clave-indexada.cjs`.

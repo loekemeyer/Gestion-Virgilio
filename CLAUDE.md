@@ -3377,6 +3377,16 @@ los `canceling statement due to statement timeout` de la Cuarentena (problema 49
 Hoy el cron llama a **`gv_refresh_stock_si_cambio()`**. Medido en vivo: **refresco 1.813 ms ·
 chequeo que salta 12 ms (150×)**.
 
+⚠⚠ **Y con esa primera versión el ahorro fue del 1,2 %, no del 94,5 % (v21.31).** La huella
+contaba **escrituras**, y hay crons que reescriben tablas enteras sin cambiar nada: el **cron 81
+`gv-reconciliar-aguardar` corre cada 2 minutos** —el mismo minuto que el 55— y toca
+`Movimientos_Stock`. Medido: `PPP_Web_Base` 582.748 updates contra 372 inserts, `GV_UxB` 34.036
+contra 0. El riesgo estaba escrito acá mismo como caso raro; **es el caso normal de esta base**,
+y la medición de 5 minutos que lo dio por bueno cayó justo entre dos corridas del cron. Hoy las
+5 tablas ruidosas llevan **firma de CONTENIDO** (`GV_Stock_Huella_Expr`, que es un `insert`, no
+código): 60-74 ms de huella y **0 refrescos / 3 saltos = 100 % ahorrado** con el cron 81
+corriendo en el medio. §3.mj.
+
 ⚠ **La frescura NO empeora.** El chequeo sigue corriendo cada 2 minutos: apenas se escribe un
 movimiento, el refresco sale en la corrida siguiente. Lo único que se saca es el refresco que
 no cambiaba nada.
@@ -3404,8 +3414,12 @@ lee **directo desde la app en 5 lugares** de `index.html` — **1.759 llamadas, 
 los **1.808 s** del refresco. Pedir **un solo código** (`clave=eq.438E`) cuesta lo mismo que
 pedir todos (**769 ms**): `clave` es una expresión calculada, así que no hay índice que valga y
 recorre las 67.242 filas y las ordena para devolver 0 (`Rows Removed by Filter: 496`). El
-arreglo es la columna de clave normalizada + índice en `Movimientos_Stock`, **pendiente del
-dueño** (necesita ventana sin operarios pickeando).
+arreglo **NO es una columna nueva**: `clave` no existe en la tabla, pero `ckey` —la
+normalización del código— es función pura de `cod_art` con funciones inmutables, así que alcanza
+un **índice de EXPRESIÓN** (`mov_stock_ckey_idx`, 496 kB): sin columna, sin trigger, sin backfill
+y sin reescribir una fila. Y como el índice sólo sirve si alguien filtra por esa expresión, va con
+**`gv_saldos_por_clave(text[])`**: **687 ms → 7 ms** para un código, 69 ms para diez, con salida
+verificada idéntica (496 = 496 filas, `EXCEPT ALL` 0 en las dos direcciones). v21.31, §3.mj.
 
 ⚠ **`work_mem` NO es el arreglo, se midió y se descartó.** Con 4 MB el orden se cae a disco
 (`external merge Disk: 3.304 kB`); con 32 MB entra en memoria y el I/O temporal se va a 0 — pero
