@@ -3,10 +3,10 @@
 
    Buscar un CÓDIGO en el módulo Stock es buscar por el PRINCIPIO. Dos cosas que el test cuida:
 
-   1. El PREFIJO se compara contra las DOS grafías del mismo código: la que se MUESTRA (031,
-      con el cero adelante — regla del dueño del 12/09) y la PELADA (31, como vive en la base).
-      Sin las dos, o "03" no encuentra nada (lo que pasaba hasta la v20.94) o "31" deja de
-      encontrar el 031.
+   1. El PREFIJO se mide sobre la grafía que se MUESTRA (031, con el cero adelante — regla del
+      dueño del 12/09), que es la que el operario tiene delante. Nunca sobre la pelada de la
+      base: la v21.02 probaba las dos y Luis lo frenó el mismo día — "si busco 30 en la tabla
+      aparece el 030 y es un error". 030 empieza con 0, no con 30.
    2. Un término que arranca con dígito NO mira la descripción: "031" no puede traer un
       artículo porque su texto diga "031 cm". Un término de texto sí busca por pedazo.
 
@@ -23,11 +23,13 @@ const PREFIJO = [
   ["30", "03", true], ["31", "03", true], ["35E", "03", true], ["031", "03", true], ["036E", "03", true],
   // y no los que lo tienen en el medio
   ["231", "03", false], ["130", "03", false], ["703", "03", false], ["007", "03", false],
+  // ⚠ y TAMPOCO por la grafía pelada: "30" no puede traer el 030 (Luis, 22/09: "es un error").
+  // El código se muestra con el cero adelante, así que el prefijo se mide sobre esa forma.
+  ["030", "30", false], ["31", "31", false], ["031", "31", false], ["026", "26", false],
+  ["307", "30", true], ["311", "31", true], ["260E", "26", true],
   // la regla del 18/09 sigue en pie: 031 es el 031 y sus variantes de letra, nada más
   ["031", "031", true], ["31", "031", true], ["031E", "031", true], ["031 LK", "031", true],
   ["231", "031", false], ["311", "031", false], ["312", "031", false], ["931E", "031", false],
-  // tipear sin el cero tiene que seguir encontrando
-  ["031", "31", true], ["035E", "35E", true], ["026", "26", true],
   // 3 dígitos: el prefijo vale igual (50 → 505, 506)
   ["505", "50", true], ["506", "50", true], ["605", "50", false],
   // sufijo de empresa: el código es el mismo artículo

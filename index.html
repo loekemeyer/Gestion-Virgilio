@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.08"></script>
+<script type="module" src="recepcion.js?v=21.10"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.08";
+const APP_VERSION = "v21.10";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15235,21 +15235,27 @@ function _padCod(cod) {
   const m = s.match(/^([0-9]+)(.*)$/);
   return m ? m[1].padStart(3, "0") + m[2] : s;
 }
-/* v21.02 — BUSCAR UN CÓDIGO ES BUSCAR POR EL PRINCIPIO, NO POR EL MEDIO. Luis, 22/09/2026:
-   "cuando se escribe 03 debería mostrar todos los códigos que empiecen con 03, no que lo
-   tengan en alguna parte del código". Se compara contra las DOS grafías del MISMO código:
-   la que se MUESTRA (031, con el cero adelante — regla del dueño del 12/09) y la PELADA
-   (31, como vive en la base). Así "03" trae 030/031/035E, "50" trae 505/506, y "31" sigue
-   trayendo el 031 como hasta hoy. Nunca por pedazo: "031" no trae 231, 312 ni 931E.
-   ⚠ El cero lo manda quien escribe: si lo tipea, el prefijo lo respeta. */
+/* v21.02 / v21.9 — BUSCAR UN CÓDIGO ES BUSCAR POR EL PRINCIPIO, NO POR EL MEDIO. Luis,
+   22/09/2026: "cuando se escribe 03 debería mostrar todos los códigos que empiecen con 03,
+   no que lo tengan en alguna parte del código".
+
+   Se compara contra UNA sola grafía: la que se MUESTRA (031, con el cero adelante — regla
+   del dueño del 12/09), que es la que el operario tiene delante en la tabla. Así "03" trae
+   030/031/035E y "50" trae 505/506.
+
+   ⚠ La v21.02 probaba ADEMÁS contra la grafía pelada de la base (31), para que tipear sin el
+   cero siguiera encontrando. Luis lo frenó el mismo día: "si busco 30 en la tabla aparece el
+   030 y es un error" — y tiene razón, 030 empieza con 0, no con 30. O sea que el precio de
+   esa tolerancia era romper el prefijo justo donde más se nota. Se busca lo que se ve: "30"
+   trae el 307, no el 030, y para llegar al 030 se escribe "03" o "030".
+
+   Nunca por pedazo: "031" no trae 231, 312 ni 931E. */
 function codEmpiezaCon(cod, term) {
   var t = String(term == null ? "" : term).toUpperCase().replace(/\s+/g, "");
   if (!t) return true;
   var c = String(cod == null ? "" : cod).toUpperCase().trim();
   if (!c) return false;
-  var pad = _padCod(c).replace(/\s+/g, "");                  // 031E · 438ELK
-  var pel = c.replace(/^0+(?=.)/, "").replace(/\s+/g, "");   // 31E
-  return pad.indexOf(t) === 0 || pel.indexOf(t) === 0;
+  return _padCod(c).replace(/\s+/g, "").indexOf(t) === 0;    // 031E · 438ELK · GRJ10
 }
 /* Un término del buscador del módulo Stock. Si arranca con DÍGITO es un CÓDIGO y va por
    prefijo (arriba); si no, es texto libre y busca por pedazo en `libre` (descripción,
@@ -16865,7 +16871,11 @@ function ocBodyGen() {
 // NO cambia: ocgGenerar sigue armando una línea de OC por tallerista desde gen.items. Problema 419.
 function ocBodyGenArt() {
   const gen = _oc.gen;
-  const items = (gen && gen.items) || [];
+  // v21.08 (Luis, 22/09): "quiero que la vision ahi muestre los que estan en 0 demanda para
+  // generacion de OCs tambien". La lista sale de itemsAll (TODO el universo activo), no de
+  // items (solo a pedir > 0). Lo que se GENERA no cambia: ocgGenerar arma las OC desde
+  // ocgGroups(), que lee gen.items. Los de a pedir 0 caen solos al final por el sort.
+  const items = (gen && gen.itemsAll) || [];
   const gf = (_oc.genFiltro || "").toLowerCase().trim();
   const byCod = {}; const orden = [];
   items.forEach(function (it) {
@@ -16879,13 +16889,23 @@ function ocBodyGenArt() {
     .filter(function (g) { return !gf || (codCanon(g.cod) + " " + (g.desc || "") + " " + g.subs.map(function (s) { return s.prov; }).join(" ")).toLowerCase().indexOf(gf) !== -1; })
     .sort(function (a, b) { return b.falta - a.falta; });
   if (!fgrupos.length) return '<div class="oc-empty">' + (gf ? "Nada coincide con la búsqueda." : "No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small>") + '</div>' + ocBodyGenImportados();
-  const totCajas = fgrupos.reduce(function (s, g) { return s + g.falta; }, 0);
-  const sinN = fgrupos.filter(function (g) { return g.subs.some(function (x) { return x.sinProv; }); }).length;
-  let h = '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + fgrupos.length + '</b> artículo(s) a pedir · <b>' + totCajas + '</b> cajas' + (sinN ? ' · <b style="color:#b45309">' + sinN + ' sin proveedor</b>' : '') + '.</div>';
+  const conPedido = fgrupos.filter(function (g) { return g.falta > 0; });
+  const enCero = fgrupos.length - conPedido.length;
+  const totCajas = conPedido.reduce(function (s, g) { return s + g.falta; }, 0);
+  const sinN = conPedido.filter(function (g) { return g.subs.some(function (x) { return x.sinProv; }); }).length;
+  let h = '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + conPedido.length + '</b> artículo(s) a pedir · <b>' + totCajas + '</b> cajas'
+    + (sinN ? ' · <b style="color:#b45309">' + sinN + '</b> sin proveedor' : '')
+    + (enCero ? ' · <b style="color:#64748b" title="Están en o sobre el máximo: hoy no se piden. Se muestran al final.">' + enCero + '</b> en 0' : '') + '.</div>';
   h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Tallerista</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
   fgrupos.forEach(function (g) {
     const proyTxt = (g.fuente === "proy") ? (Math.round(g.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
-    h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(g.cod)) + '</td><td>' + escapeHtml(artNombre(g.cod, g.desc)) + '</td><td>' + _ocgProvCell(g.subs) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + g.indice + '</td><td class="num">' + g.max + '</td><td class="num">' + g.demanda + '</td><td class="num">' + g.stock + '</td><td class="num oc-falt">' + g.falta + '</td></tr>';
+    // v21.08 - el que queda en 0 se ve atenuado y al final: esta para mirarlo, no se pide.
+    const cero = !(g.falta > 0);
+    const trAttr = cero ? ' style="opacity:.55" title="En o sobre el maximo: hoy no se pide"' : '';
+    // la celda Tallerista de un articulo que SI se pide sigue mostrando solo a los que reciben
+    // cajas (como antes de la v21.08); el que queda en 0 muestra a todos los que lo hacen.
+    const subsV = cero ? g.subs : g.subs.filter(function (s) { return s.falta > 0; });
+    h += '<tr' + trAttr + '><td class="oc-cod">' + escapeHtml(codCanon(g.cod)) + '</td><td>' + escapeHtml(artNombre(g.cod, g.desc)) + '</td><td>' + _ocgProvCell(subsV) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + g.indice + '</td><td class="num">' + g.max + '</td><td class="num">' + g.demanda + '</td><td class="num">' + g.stock + '</td><td class="num' + (cero ? '" style="color:#94a3b8;font-weight:700' : ' oc-falt') + '">' + g.falta + '</td></tr>';
   });
   h += '</tbody></table></div>';
   return h + ocBodyGenImportados();

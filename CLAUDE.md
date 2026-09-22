@@ -3089,7 +3089,7 @@ que lo apague, es la señal de que se está por reabrir el pozo de las 92 cajas 
 **Chequeo** (las cuatro reglas tienen centinela): `select * from public.gv_reglas_perdidas;` —
 vacía = todo bien. `sql/gv_mover_tanda_entera_v2030.sql`, §3.kq.
 
-## ⚠⚠ REGLA (Luis, 2026-09-22, v21.05): el REGISTRO DEL ARMADO viaja con el pedido
+## ⚠⚠ REGLA (Luis, 2026-09-22, v21.10): el REGISTRO DEL ARMADO viaja con el pedido
 
 **Luis, textual:** *"Pedido ARMADO tiene que tener el dato. Pedido que todavía no armaron, no
 importa. Pedido en proceso ponemos que no se pueda mover hasta que terminen de armarlo o lo
@@ -3188,7 +3188,7 @@ Dos detalles de implementación que costaron y conviene no repetir:
 para mirar; `sin nada que armar` y `fuera de horario` son sanos. §3.jf,
 `sql/gv_armado_salud_feed_v1958.sql`.
 
-## ⚠ REGLA (v21.05): `index.html` es UTF-8 — un byte en latin1 se multiplica solo
+## ⚠ REGLA (v21.10): `index.html` es UTF-8 — un byte en latin1 se multiplica solo
 
 El archivo declara `<meta charset="UTF-8">`. El 22/09 tenía **5 bytes sueltos en latin1/cp1252**,
 dejados por sesiones que lo editaron con herramientas distintas. Tres eran de comentario; **los
@@ -3230,7 +3230,7 @@ salida está adentro del modal. En `RT`, `RI`, `EI`, `AT`, `PB`, `Limp`, `PC`, `
 el botón de nuevo **cierra** — no hay forma de quedar trabado. Al agregar un módulo con popup, la
 pregunta es ésa: *¿su botón re-abre o cierra?* Si re-abre, necesita su `…EndWithout`.
 
-⚠ **Y en TODA pantalla del módulo, no sólo en la de la lista** (v21.05). El chooser de CC
+⚠ **Y en TODA pantalla del módulo, no sólo en la de la lista** (v21.10). El chooser de CC
 (*"¿qué vas a cargar? Camión / Retira"*) se dibuja **antes** de consultar nada y su único «Cerrar»
 minimizaba: el escape aparecía recién después de elegir y que la lista viniera vacía.
 

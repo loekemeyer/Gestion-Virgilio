@@ -1,5 +1,5 @@
 -- ============================================================================
--- v21.05 (Luis, 2026-09-22) — EL REGISTRO DEL ARMADO VIAJA CON EL PEDIDO
+-- v21.10 (Luis, 2026-09-22) — EL REGISTRO DEL ARMADO VIAJA CON EL PEDIDO
 --
 -- Luis, textual: "Pedido ARMADO tiene que tener el dato. Pedido que todavia no
 -- armaron, no importa. Pedido en proceso ponemos que no se pueda mover hasta que
@@ -61,7 +61,7 @@ security definer
 set search_path to 'public'
 as $function$
 begin
-  -- v21.05: `gv.sin_reconciliar` lo prende (LOCAL a la transaccion) el movimiento de un
+  -- v21.10: `gv.sin_reconciliar` lo prende (LOCAL a la transaccion) el movimiento de un
   -- pedido armado, que reconcilia una sola vez al final. Cualquier otro camino no lo
   -- setea nunca y entra por el mismo lugar de siempre.
   if coalesce(current_setting('gv.sin_reconciliar', true), '') = '1' then
@@ -194,7 +194,7 @@ begin
     a := '     and (x.tiene_picking or x.tiene_armado)';
     if position(a in src) = 0 then raise exception 'gv_np_mover_guard: no matchea el ancla'; end if;
     nue := replace(src, a,
-      '     -- v21.05 (Luis, 22/09) - el ARMADO ya no queda huerfano: gv_ppp_pedido_mover le COPIA' || nl ||
+      '     -- v21.10 (Luis, 22/09) - el ARMADO ya no queda huerfano: gv_ppp_pedido_mover le COPIA' || nl ||
       '     -- el TP/TAP a la tanda nueva, le pasa su porcion de a_facturar y avisa POR PANTALLA que' || nl ||
       '     -- hay que re-rotular el pallet. Prende `gv.pedido_lleva_registro` (LOCAL a la' || nl ||
       '     -- transaccion) justo antes de mover, y si llevar_registro explota se cae todo junto:' || nl ||
@@ -220,13 +220,13 @@ end $$;
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
 values
  ('gv_ppp_pedido_mover','funcion','gv_ppp_pedido_llevar_registro',
-  'Al mover un pedido ARMADO a una tanda nueva, el registro del armado (TP/TAP + Entregas + su porcion de la pila) viaja con el. Sin esto la tanda nueva nace pendiente y el deposito la re-pickea (caso E29A, 88 cajas).','Luis','v21.05'),
+  'Al mover un pedido ARMADO a una tanda nueva, el registro del armado (TP/TAP + Entregas + su porcion de la pila) viaja con el. Sin esto la tanda nueva nace pendiente y el deposito la re-pickea (caso E29A, 88 cajas).','Luis','v21.10'),
  ('gv_ppp_pedido_mover','funcion','EN_PROCESO',
-  'Un pedido empezado y sin terminar de armar NO se mueve: sus cajas estan en la pila de la tanda sin separar por pedido. Se termina de armar o se cancela (Luis, 22/09).','Luis','v21.05'),
+  'Un pedido empezado y sin terminar de armar NO se mueve: sus cajas estan en la pila de la tanda sin separar por pedido. Se termina de armar o se cancela (Luis, 22/09).','Luis','v21.10'),
  ('gv_np_mover_guard','funcion','gv\.pedido_lleva_registro',
-  'El guard deja pasar el ARMADO solo cuando el llamador declaro que el registro viaja. El PICKEADO SIN ARMAR sigue frenado siempre.','Luis','v21.05'),
+  'El guard deja pasar el ARMADO solo cuando el llamador declaro que el registro viaja. El PICKEADO SIN ARMAR sigue frenado siempre.','Luis','v21.10'),
  ('trg_entregas_reconciliar','funcion','sin_reconciliar',
-  'La etapa 2 se puede silenciar dentro de la transaccion: el movimiento de un pedido armado toca eventos, Entregas y stock, y reconciliar en un estado intermedio manda cajas a gondola.','Luis','v21.05')
+  'La etapa 2 se puede silenciar dentro de la transaccion: el movimiento de un pedido armado toca eventos, Entregas y stock, y reconciliar en un estado intermedio manda cajas a gondola.','Luis','v21.10')
 on conflict do nothing;
 
 -- Chequeo:  select * from public.gv_reglas_perdidas;   -- vacia = todo bien
