@@ -3147,6 +3147,64 @@ volver a pickearlo ni armarlo: el picking y el armado ya viajaron."*
 ⚠ **EL FRENO GENERAL SIGUE PUESTO hasta que Luis lo diga**
 (`PPP_Web_Config.np_mover_frenado = 1`). Se levanta con un `update`, no con un deploy:
 `update public."PPP_Web_Config" set valor = 0 where clave = 'np_mover_frenado';`
+## ⚠ REGLA (Thomas, 2026-09-22, v21.06): el refresco del stock se hace SOLO si algo cambió
+
+Cron 55 refrescaba `vista_stock_procesada` **cada 2 minutos, siempre**: **1.770 s sobre una
+ventana de 26,4 h = 7,4 % del tiempo total de la base**, para una matview de **367 filas /
+216 kB**. Y sobre 7 días, sólo **277 de los 5.040 bloques** de 2 minutos tuvieron movimiento de
+stock: el **94,5 % de los refrescos no cambiaba una sola fila**. Esa contención es la que daba
+los `canceling statement due to statement timeout` de la Cuarentena (problema 492).
+
+Hoy el cron llama a **`gv_refresh_stock_si_cambio()`**. Medido en vivo: **refresco 1.813 ms ·
+chequeo que salta 12 ms (150×)**.
+
+⚠ **La frescura NO empeora.** El chequeo sigue corriendo cada 2 minutos: apenas se escribe un
+movimiento, el refresco sale en la corrida siguiente. Lo único que se saca es el refresco que
+no cambiaba nada.
+
+⚠ **El árbol de dependencias se camina EN VIVO, no es una lista a mano.** La matview cuelga de
+**23 tablas y 5 vistas**; se resuelve con `pg_rewrite`/`pg_depend`, así que una tabla nueva entra
+sola (verificado 23 de 23, 11 ms). Una lista escrita a mano es el mismo pozo de los pases que
+eligen fecha (v20.83), el `ref` compuesto (v20.72) y las 18 tablas del renombre (v20.88):
+**siempre falta una**.
+
+⚠ **La matview se excluye de su propia huella**, o su refresco cambiaría la huella y se
+refrescaría para siempre. Y la comparación que manda es el **jsonb entero**, no clave por clave:
+así una tabla que entra o sale del árbol también cuenta.
+
+⚠ **FAIL-OPEN, al revés del guard de cuarentena (v20.95):** sin huella, se refresca. Un refresco
+de más cuesta 2 s; una vista de stock vieja la mira un operario y le miente. Más el **piso de
+frescura** (60 min).
+
+⚠ **La huella cuenta ESCRITURAS, no contenido** (`pg_stat_user_tables`). Un `delete`+`insert`
+con contenido idéntico dispara un refresco al pedo, y un reset de estadísticas fuerza uno: las
+dos fallan hacia refrescar de más, nunca de menos.
+
+⚠⚠ **Y lo que el stock gasta de verdad NO es esto.** Medido el 22/09: `vista_saldos_stock` se
+lee **directo desde la app en 5 lugares** de `index.html` — **1.759 llamadas, 2.850 s**, contra
+los **1.808 s** del refresco. Pedir **un solo código** (`clave=eq.438E`) cuesta lo mismo que
+pedir todos (**769 ms**): `clave` es una expresión calculada, así que no hay índice que valga y
+recorre las 67.242 filas y las ordena para devolver 0 (`Rows Removed by Filter: 496`). El
+arreglo es la columna de clave normalizada + índice en `Movimientos_Stock`, **pendiente del
+dueño** (necesita ventana sin operarios pickeando).
+
+⚠ **`work_mem` NO es el arreglo, se midió y se descartó.** Con 4 MB el orden se cae a disco
+(`external merge Disk: 3.304 kB`); con 32 MB entra en memoria y el I/O temporal se va a 0 — pero
+la consulta pasa de **769 ms a 751 ms**. Los 750 ms son el recorrido y el regex por fila, no el
+orden. No volver a proponerlo para esto.
+
+**Chequeo:**
+```sql
+select * from public.gv_stock_refresh_salud;              -- estado='ok' y pct_ahorrado
+select * from public.gv_refresh_stock_si_cambio(60,true); -- qué HARÍA, sin refrescar
+```
+
+**Rollback, una línea:**
+```sql
+select cron.alter_job(55, command := 'REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada');
+```
+
+`sql/gv_refresh_stock_si_cambio_v2105.sql`, `tests/stock-refresh-si-cambio.cjs`, §3.mi.
 
 ## ⚠ REGLA: una lectura ROTA no es un CERO — y un centinela que sólo mira el log del éxito es ciego
 
