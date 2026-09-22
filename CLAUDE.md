@@ -3661,38 +3661,60 @@ corresponde. Al 22/09 marca **225 cajas en 12 líneas** por salir mal en la pró
 Blistpack **177** (10 códigos, casi todos bombillas, más Manga Repostera) y Pedernera **48**
 (561 Pinza Larga y 801 Pinza Grande Alambre).
 
-### ⚠⚠ Y EN LA PANTALLA DEL OPERARIO la OC va bajo el FABRICANTE, no bajo Log/ Fabr
+### ⚠⚠ LAS TRES CAPAS, y la del medio es la que usa el operario todos los días
 
-**Luis, textual:** *"en Virgilio los operarios deben aparecer la OC dentro de sus botones de
-prov/tall, no en log/fabr"*. Es la tercera capa, y es la que usan todos los días:
+**Luis, textual:** *"Cuando pedernera entrega, el operario de GV debe poner pedernera y anotar ahí
+lo que reciben. En el celular del operario de GV debe figurar la OC de las cajas a entregar"*.
 
-| capa | quién va | dónde vive |
+| capa | a nombre de quién | dónde |
 |---|---|---|
-| **emisión** de la orden | `Log/ Fabr` | `Ordenes_Compra.proveedor` |
-| **entrega** física | el fabricante | `Entregas Tallerista Virgilio.Nombre_Tall` |
-| **botón de Recepción** (lo que ve el operario) | **el fabricante** | `oc_vigentes_por_proveedor(nombre)` |
+| se **emite** la OC | `Log/ Fabr` | `gv_oc_generar_pendientes` |
+| se **entrega** | el fabricante | `Entregas Tallerista Virgilio` |
+| el **botón del celular** | **el fabricante** | `oc_vigentes_por_proveedor` |
 
-Medido el 22/09 llamando la RPC con cada nombre: **`Pedernera` devuelve CERO códigos** — el
-operario toca el botón del que le está entregando las cajas y no ve ninguna OC — mientras el
-**560**, que trae Pedernera, aparece bajo **`Log/ Fabr`**. `Blistpack` también da cero, y `Oscar`
-muestra 510 y 555, que en Recepción se cargan como Log/ Fabr (regla del 15/09). **Sin OC a la
-vista se pierde el control de cantidad**: `opState.ocOk` queda en false y el margen del +20 % no
-se exige.
+**Antes (medido llamando la RPC con cada nombre): `Pedernera` devolvía CERO** — el operario tocaba
+el botón del que le estaba entregando y no veía ninguna OC — mientras el **560**, que trae
+Pedernera, aparecía bajo **`Log/ Fabr`**. Y sin OC a la vista se pierde el control de cantidad:
+`opState.ocOk` queda en false y el margen del +20 % no se exige.
 
-⚠⚠ **Y el arreglo NO puede derivarse de `OC_Maximos.proveedor`, porque ese campo está MEZCLADO.**
-De los 4 códigos que Pedernera entregó desde el 01/06 (115, 544, 560, 802 · 2.355 cajas), la
-config dice **Pedernera en 2 y `Log/ Fabr` en los otros 2** — o sea que a veces guarda al
-fabricante y a veces a quién se le emite. Una regla automática sobre ese campo mueve de botón
-**11 líneas de OC**, y la mayoría son config vieja y no esta regla: 515/615/635 (OC a Basconia,
-config Carlos E, 1.800 cajas), 222 y 910 (Maspoli → Pintos), 234 (Tierra Nativa → Log/ Fabr),
-618 (Paternal Goma / The Plast → Log/ Fabr), 725 (Basconia → Lucho).
+**Las tres mitades aplicadas en la v21.22**, acotadas a `GV_OC_Fabrica_Para` (Luis: *"2 no
+necesariamente, tengo que ver caso x caso"* — el resto de la tabla **no** se tocó):
 
-**Por eso la RPC NO se tocó**: primero hay que desempatar el dato. Lo que entregó cada uno desde
-el 01/06 es el único dato limpio — Pedernera 115/544/560/802, Blistpack 506, Oscar 659/763/764 —
-y contra eso, lo que falta es **corregir `OC_Maximos.proveedor` de 544 y 560 a `Pedernera`**. Con
-eso la regla queda sin listas: **el campo pasa a significar siempre "quién fabrica", el botón sale
-de ahí, y `GV_OC_Fabrica_Para` dice a nombre de quién se emite.** Es un `update` de dos filas y
-lo autoriza el dueño.
+1. **Al emitir**: `gv_oc_emite_a()` dentro de `gv_oc_generar_pendientes`, el **único** lugar por
+   donde escriben el generador manual y el cron 50.
+2. **Al imputar**: `gv_oc_recompute_recibido` suma las claves de los fabricantes a `pkeys`. El
+   mecanismo **ya existía** (es un array, y `gv_prov_match` compara todas contra todas: así estaba
+   resuelto `pettofrezza → rafael`). Impacto medido: **6 filas, todas 544 y 560** — 776 cajas del
+   544 imputadas en 5 OC anuladas y el 560 completo (57/57) pasando a **recibida**. Ninguna OC de
+   otro proveedor se movió. Backup: `zz_backups."GV_Backup_OrdenesCompra_20260922"`.
+3. **El botón**: `gv_oc_codigo_del_fabricante` dice qué códigos entrega cada uno, y
+   `oc_vigentes_por_proveedor` se lo suma al fabricante y se lo saca al que recibe la orden.
+
+⚠⚠ **Y el botón NO puede derivarse de `OC_Maximos.proveedor` a secas, porque ese campo está
+MEZCLADO.** De los 4 códigos que Pedernera entregó desde el 01/06 (115, 544, 560, 802 · 2.355
+cajas) la config dice **Pedernera en 2 y `Log/ Fabr` en los otros 2**. Derivarlo sólo de ahí mueve
+**11 líneas de OC** que son config vieja y no esta regla: 515/615/635 (Basconia → Carlos E, 1.800
+cajas), 222 y 910 (Maspoli → Pintos), 234, 618, 725. Por eso la vista une **config ∪ lo que viene
+entregando**, y sólo para los tres fabricantes de la tabla.
+
+⚠⚠⚠ **Y mordió la trampa de la v20.45.** `GV_OC_Fabrica_Para` nació con RLS sin policy y
+`oc_vigentes_por_proveedor` es **INVOKER**: medido, **postgres veía 1 código y el operario 0**.
+No da error — da menos filas, y probarlo desde el MCP no prueba nada porque el MCP entra como
+`postgres`. Se le puso policy de **SELECT** (es config de proveedores: 3 filas con nombres); la
+escritura sigue revocada. **Toda RPC nueva que el celular llame se prueba con
+`set local role anon`, no desde el MCP.**
+
+**La prueba que vale, corrida como `anon`** (OC del 561 emitida, transacción abortada):
+
+```
+boton PEDERNERA: 561 (pend 41)          <- la OC donde el operario la necesita
+boton LOG/ FABR: 255                    <- sigue con lo suyo, sin el 561
+Garcia (control): 113, 323, 439E, 839   <- sin cambios
+```
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien ·
+`select * from public.gv_oc_codigo_del_fabricante order by 2,3;`
+`sql/gv_oc_fabrica_para_v2122.sql`.
 
 ### ⚠ Lo que NO va: la excepción de la doble OC (v21.14, aplicada y revertida el mismo día)
 
