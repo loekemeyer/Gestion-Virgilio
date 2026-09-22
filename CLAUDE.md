@@ -3618,18 +3618,48 @@ Medido el 22/09:
 |---|---|---|---|
 | OC emitidas | **Log/ Fabr** · 6 · 2.022 cajas | **Log/ Fabr** · 4 · 168 | **0** |
 | recepción | **Pedernera** · 22 · 1.866 | **Pedernera** · 7 · 259 | **0** |
-| `OC_Maximos.proveedor` | Log/ Fabr | Log/ Fabr | **Pedernera** ← el único que no cierra |
+| `OC_Maximos.proveedor` (quién FABRICA) | **Pedernera** (v21.23) | **Pedernera** (v21.23) | Pedernera |
 
 ⚠ **La consecuencia medible: `cantidad_recibida = 0` en las DIEZ OC.** 2.190 cajas ordenadas,
 2.125 recibidas, **0 imputadas** — nueve quedaron `anulada` y una `pendiente`.
 **`gv_oc_recompute_recibido(proveedor, codigo)` cruza por el par `(proveedor, código)`**, así que
 con nombres distintos en las dos puntas la OC **no se cierra nunca sola**.
 
-⚠⚠ **Y NO son estos tres: es un patrón de toda la tabla.** Barrido del 22/09 sobre las OC con
-`cantidad_recibida = 0` cuyo código se recibió de otro nombre desde el 01/07 — **25 pares**, y el
-que más pesa es el de Oscar (506: OC a **Oscar** por 2.178 cajas, recepción **Log/ Fabr** por
-2.449). También 510, 280, 557, 555, 758, 500, 654, 658 (Oscar → Log/ Fabr), 550 (Poly → Garcia),
-519 y 719 (Log/ Fabr → Lucho), 355 (Pettofrezza → Rafael / German).
+⚠⚠ **Y NO son estos tres: es un patrón de toda la tabla — pero el número es 22, no 25.**
+
+> **Se retira el "25 pares" del barrido anterior: estaba CONTAMINADO.** Cruzaba por **número de
+> código** y **Basconia compra ACERO EN KILOS** (rubro `Flejes`, unidad `Kg`), con códigos que
+> chocan con los de artículo terminado: su `0635` es *"Arandela Gde/Chica Afila (77 x 1,25)"*, no
+> el artículo 635. Basconia tiene **una sola tanda, del 13/07, 10 líneas, 7.650 Kg**, y **cero
+> entregas** en `Entregas Tallerista Virgilio`: **no entra en esto por ningún lado**, ni tiene
+> nada que ver con 544/560/800.
+
+El barrido que vale filtra **`rubro = 'Art Term'` y `unidad = 'Cajas'`**, y deja afuera los alias
+que `gv_prov_match` ya resuelve (`Martin C` = Martin, `Carlos E` = Carlos, `Pettofrezza` = Rafael)
+y los tres fabricantes de `GV_OC_Fabrica_Para`. Al 22/09: **22 pares · 19 códigos · 4.654 cajas de
+OC sin imputar**. Los que pesan:
+
+| código | OC a | entrega | cajas OC | qué dice la config |
+|---|---|---|---:|---|
+| 510 | Carlos E | Log/ Fabr | 1.250 | el de la OC |
+| 550 | **Poly** | Garcia (256) · Log/ Fabr (21) | 1.007 | **Garcia — ninguno de los dos** |
+| 583E | Garcia | Log/ Fabr | 599 | el de la OC |
+| 505 | Garcia | **Lucho (3.221)** · Log/ Fabr (98) | 274 | el de la OC |
+| 584E | Garcia | Log/ Fabr | 222 | el de la OC |
+| 103 | Martin C | Log/ Fabr | 186 | el de la OC |
+| 922 · 911 · 224 · 223 | Pintos | Log/ Fabr | 275 | el de la OC |
+| 123 | Lucho ↔ Garcia (los dos sentidos) | Garcia / Lucho | 179 | Garcia |
+| 609 | German | Rafael | 151 | el de la OC |
+| 591 | Tierra Nativa | Log/ Fabr | 119 | el de la OC |
+| 580 | Carlos E | Log/ Fabr | 119 | el de la OC |
+| 760 | Poly | Garcia | 99 | el de la OC |
+| 234 | Tierra Nativa | Log/ Fabr | 94 | **el que entrega** |
+| 519 · 719 | Log/ Fabr | Lucho | 39 | el de la OC |
+| 355 | German ↔ Pettofrezza | Rafael / German | 31 | Pettofrezza |
+
+**Ninguno se tocó.** Luis, 22/09: ***"2 no necesariamente, tengo que ver caso x caso"*** — el
+arreglo se aplicó **sólo** a los tres fabricantes de `GV_OC_Fabrica_Para`. El barrido, para
+volver a correrlo, está en `sql/gv_oc_maximos_544_560_v2123.sql`.
 
 > **Son dos datos distintos y los dos son ciertos:** quién **fabrica y entrega** (así se carga en
 > Recepción, y está bien) y a quién se le **emite la orden** (siempre `Log/ Fabr`, que es el que
@@ -3652,9 +3682,19 @@ dictó Luis. Al 22/09 **el dato y el centinela están aplicados; las dos mitades
    entregas de los dos por separado desde el 01/06 — 506 (Log/ Fabr 3.439 vs Blistpack 203), 659
    (42 vs 8) y 764 (49 vs 8). ⚠ Y recalcula `cantidad_recibida` y `estado`: va con backup.
 
-⚠ **Hoy conviven las DOS configuraciones para el mismo fabricante**, y ése es el desorden de fondo:
-**544 y 560** tienen la OC a `Log/ Fabr` (bien) y **no imputan**; **115, 561, 800, 801 y 802** la
-tienen a `Pedernera` (mal) y **sí imputan**, por casualidad de nombres.
+### ✅ v21.23: `OC_Maximos` de 544 y 560 → Pedernera (Luis: *"si, corregí 544 y 560 a Pedernera"*)
+
+Hasta la v21.22 convivían **las dos configuraciones para el mismo fabricante**: de los 7 códigos
+que fabrica Pedernera, la config decía `Pedernera` en 5 (115, 561, 800, 801, 802) y `Log/ Fabr`
+en 2 (**544 y 560**). Medido sobre las entregas desde el 01/06, Pedernera entregó 115, 544, 560 y
+802 — o sea que los dos que decían `Log/ Fabr` son suyos igual.
+
+**Esto NO cambia a quién se le emite la OC**: `OC_Maximos.proveedor` dice **quién FABRICA** (regla
+del dueño del 15/09, caso Oscar: *"dejalo ahí"*) y la emisión la resuelve `gv_oc_emite_a()`.
+Verificado: los 7 códigos dicen `Pedernera` en la config y los 7 siguen emitiendo a `Log/ Fabr`.
+
+Backup `zz_backups."GV_Backup_OCMaximos_20260922"` (clave `cod`, única: 360/360).
+`sql/gv_oc_maximos_544_560_v2123.sql`.
 
 **Chequeo:** `select * from public.gv_oc_proveedor_no_recibe_oc;` — vacía = todo emitido a quién
 corresponde. Al 22/09 marca **225 cajas en 12 líneas** por salir mal en la próxima corrida:
