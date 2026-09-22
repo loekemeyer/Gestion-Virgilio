@@ -3089,6 +3089,65 @@ que lo apague, es la señal de que se está por reabrir el pozo de las 92 cajas 
 **Chequeo** (las cuatro reglas tienen centinela): `select * from public.gv_reglas_perdidas;` —
 vacía = todo bien. `sql/gv_mover_tanda_entera_v2030.sql`, §3.kq.
 
+## ⚠⚠ REGLA (Luis, 2026-09-22, v21.05): el REGISTRO DEL ARMADO viaja con el pedido
+
+**Luis, textual:** *"Pedido ARMADO tiene que tener el dato. Pedido que todavía no armaron, no
+importa. Pedido en proceso ponemos que no se pueda mover hasta que terminen de armarlo o lo
+cancelen y listo"*.
+
+`TP` y `TAP` son eventos de la **TANDA** (`texto = 'E29A'`, sin NP) y la pila de stock va toda
+con `ref = <tanda>`: medido sobre E29A, sus seis filas (picking / separado / facturado) van con
+`ref = tanda` y **ninguna tiene NP**. Renombrar no es opción — la tanda vieja sigue viva con los
+otros pedidos adentro. Por eso la tanda nueva nacía **sin registro de producción y sin cajas**: el
+monitor la mostraba pendiente y el depósito re-pickeaba mercadería que ya estaba en un pallet
+(E29A, 88 cajas el 21/09).
+
+| estado del pedido | qué hace al moverlo |
+|---|---|
+| **sin empezar** | tanda nueva y listo: no hay nada que llevar |
+| **en proceso** (pickeado, sin terminar de armar) | **NO SE MUEVE.** Sus cajas están en la pila de la tanda **sin separar por pedido** — eso recién pasa en el armado. Se termina de armar o se cancela |
+| **armado** | se mueve **con su registro**: `TP` + `TAP` copiados, sus filas de `Entregas_Virgilio`, y su porción de `a_facturar` |
+
+**Medido en transacción abortada sobre E29C** (6 NP, 176 cajas): LK 0101 → E75A ·
+`a_facturar` 176 → 104 + 72 en la nueva = **176** · **el total global no se movió** (615 → 615) ·
+2 eventos en la nueva · `gv_stock_tanda_pickeado_negativo` = 0.
+
+⚠ **Después del armado `separar_pedidos` cierra en CERO**: las cajas están en **`a_facturar`**.
+Ahí es donde vive la porción que viaja, no en la pila de picking.
+
+⚠ **NO se copian los PKC.** Medido: copiarlos dispara `reconciliar_stock_articulo_rt` y
+**re-pickea** (góndola −85 → −194, `separar_pedidos` 0 → +106). Por lo mismo, la porción viaja
+como **`ajuste`**: las filas `picking` las reescribe la etapa 1 desde los PKC y las `separado` las
+reescribe la etapa 2, así que un split ahí **se deshace solo**.
+
+⚠ **La etapa 2 se silencia durante el movimiento** (`gv.sin_reconciliar`, local a la
+transacción). El trigger corre AFTER STATEMENT, o sea que ve los estados intermedios, y
+`reconciliar_pipeline_stock_etapa2` reparte contra `Entregas_Virgilio`: moviendo las Entregas
+antes del stock manda la diferencia a **`terminado`** (cajas fantasma en góndola), y moviendo el
+stock antes de las Entregas manda **todo** a góndola. Se hacen las tres cosas y se reconcilia
+**una** vez al final.
+
+⚠ **El guard de la v20.01 deja pasar el armado sólo cuando el llamador declara que el registro
+viaja** (`gv.pedido_lleva_registro`). Llamado directo, sin esa señal, sigue frenando — verificado.
+Y las copias van con `ts_inicio = ts_cliente`, **duración cero**: el trabajo ya se contó en la
+tanda vieja.
+
+⚠ **Al parchear una función por texto, los saltos de línea van con `chr(10)`.** El guard del
+EN PROCESO se aplicó la primera vez con `\n` dentro de comillas simples —barra-n literal— así que
+**quedó comentado entero** en una sola línea. El `CREATE` salió limpio y la función corrió igual.
+Lo cazó la prueba, no la lectura.
+
+**El supervisor ve el AVISO**: *"⚠⚠ ROTULAR: este pedido ya estaba armado y sale con CÓDIGO NUEVO.
+El pallet tiene el papel de E29C y ahora es E75A. Cambiarle el rótulo ANTES de cargarlo. NO hay que
+volver a pickearlo ni armarlo: el picking y el armado ya viajaron."*
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
+`sql/gv_pedido_mover_registro_v2105.sql`.
+
+⚠ **EL FRENO GENERAL SIGUE PUESTO hasta que Luis lo diga**
+(`PPP_Web_Config.np_mover_frenado = 1`). Se levanta con un `update`, no con un deploy:
+`update public."PPP_Web_Config" set valor = 0 where clave = 'np_mover_frenado';`
+
 ## ⚠ REGLA: una lectura ROTA no es un CERO — y un centinela que sólo mira el log del éxito es ciego
 
 **2026-09-18, problemas 402 y 403.** El armado automático de pedidos web estuvo **5 h 40 sin
