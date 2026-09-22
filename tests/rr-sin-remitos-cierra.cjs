@@ -14,7 +14,10 @@
      1. lista vacía  → el botón cierra el toggle RR y NO manda ningún CRN;
      2. lista vacía como ADMIN (openRemitosAdmin, legajo "0", sin botonera) → NO emite RR;
      3. error de carga → el operario también puede cerrar el toggle;
-     4. con remitos → sigue mandando CRN y cerrando por «Terminé» (no se rompió lo que andaba).
+     4. con remitos → sigue mandando CRN y cerrando por «Terminé» (no se rompió lo que andaba);
+     5. el CHOOSER de Carga Camión (v21.05) → mismo pozo: era la otra pantalla que abría el
+        toggle y sólo ofrecía minimizar. Son los TRES módulos cuyo botón RE-ABRE el popup en vez
+        de cerrar el toggle (CC, RR, CR); en el resto, tocar el botón de nuevo lo cierra.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -67,9 +70,15 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.vacioAdmin = await correr("vacio", true);
     out.error      = await correr("error", false);
 
-    // 4) con remitos: se tilda la NP y se toca «Terminé» (crFinish), el camino que ya andaba
+    // 4) con remitos: sigue haciendo falta «Terminé» (crFinish), el camino que ya andaba
     const st4 = await correr("conRemitos", false);
     out.conRemitosHtml = st4.html;
+
+    // 5) el chooser de Carga Camión (la 1ª pantalla de CC, antes de saber si hay reparto)
+    window.closeTandaModal = function () {};
+    window.ccRenderChooser("12");
+    const bodyCC = document.querySelector("#tandaModal .tanda-modal-body");
+    out.chooserCC = bodyCC ? bodyCC.innerHTML : "";
     return out;
   });
 
@@ -95,7 +104,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   if (!/crFinish\(\)/.test(r.conRemitosHtml)) fail.push("4) con remitos: se perdió el botón «Terminé» (crFinish)");
   if (/crEndWithout/.test(r.conRemitosHtml)) fail.push("4) con remitos: NO va el escape — hay que controlar o minimizar");
 
+  // 5) el chooser de CC tiene que ofrecer el cierre de verdad, no sólo minimizar
+  if (!/ccEndWithoutLoading/.test(r.chooserCC))
+    fail.push("5) el chooser de Carga Camión sólo minimiza: CC queda abierto y traba EP/AP");
+  if (!/ccClose\(\)/.test(r.chooserCC))
+    fail.push("5) el chooser de Carga Camión perdió el «Cerrar (sigo después)»");
+
   await b.close();
   if (fail.length) { console.error("RR sin remitos — FALLA:\n - " + fail.join("\n - ")); process.exit(1); }
-  console.log("rr-sin-remitos-cierra: OK (vacío cierra el toggle · admin no emite RR · error cierra · con remitos sigue pidiendo «Terminé»)");
+  console.log("rr-sin-remitos-cierra: OK (vacío cierra el toggle · admin no emite RR · error cierra · con remitos sigue pidiendo «Terminé» · chooser de CC con escape)");
 })();

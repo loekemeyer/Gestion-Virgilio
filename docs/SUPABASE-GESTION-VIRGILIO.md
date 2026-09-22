@@ -28883,3 +28883,63 @@ Tres pasos, del más barato al más profundo, **ninguno resigna frescura**:
    `Movimientos_Stock`. Hoy ese `regexp_replace` corre sobre las 67.046 filas en **cada** lectura.
    Es el cambio de mayor impacto sobre el cálculo en sí, y no cambia ningún resultado. ⚠ Agregar
    una columna generada reescribe la tabla: va con backup y en un momento sin operación.
+
+### §3.mi — v21.05: el refresco del stock se hace SOLO si algo cambió (cron 55)
+
+**Qué se midió.** Cron 55 (`REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada`,
+`*/2 * * * *`) sobre una ventana de 26,4 h: **1.770 s de ejecución = 7,4 % del tiempo total de
+la base**, media 2.239 ms, máximo 33.795 ms. La matview son **367 filas / 216 kB**. Y sobre 7
+días: sólo **277 de los 5.040 bloques de 2 minutos** tuvieron movimiento de stock, o sea que el
+**94,5 % de los refrescos no cambiaba una sola fila**.
+
+Ese 7,4 % es la contención que hacía que la Cuarentena diera `canceling statement due to
+statement timeout` (problema 492).
+
+**Qué se hizo.** El cron pasa a llamar a **`gv_refresh_stock_si_cambio()`**, que compara una
+**huella** de lo que alimenta a la matview contra la anterior y refresca sólo si se movió.
+Medido en vivo: **refresco 1.813 ms · chequeo que salta 12 ms (150×)**.
+
+⚠ **La frescura NO empeora.** El chequeo sigue corriendo cada 2 minutos: apenas se escribe un
+movimiento, el refresco sale en la corrida siguiente, igual que antes. Lo único que se saca es
+el refresco que no cambiaba nada.
+
+#### El árbol de dependencias se camina EN VIVO, no es una lista a mano
+
+`vista_stock_procesada` cuelga de **23 tablas y 5 vistas**. Una lista escrita a mano es
+exactamente el pozo que este repo ya pisó varias veces —los pases que eligen fecha (v20.83), el
+`ref` compuesto (v20.72), las 18 tablas del renombre (v20.88)—: **siempre falta una**. Se
+resuelve con `pg_rewrite`/`pg_depend`, así que una tabla nueva entra sola. Verificado: **23 de
+23 cubiertas**, y el cálculo cuesta **11 ms**.
+
+⚠ **La matview se excluye de su propia huella.** Si contara, su propio refresco cambiaría la
+huella y se refrescaría para siempre.
+
+⚠ **La comparación que manda es el jsonb entero, no clave por clave**: así una tabla que
+**entra o sale** del árbol de dependencias también cuenta.
+
+⚠ **FAIL-OPEN, al revés del guard de cuarentena (v20.95):** si la huella no se puede calcular,
+**se refresca**. Un refresco de más cuesta 2 s; una vista de stock vieja la mira un operario y
+le miente. Más el **piso de frescura** (60 min): aunque nada se mueva, se refresca una vez por
+hora. Es el seguro contra una dependencia que el árbol no vea — hoy no hay ninguna (se midió:
+ni una vista ni una función de la cadena usa `now()` / `current_date`).
+
+#### La huella cuenta ESCRITURAS, no contenido
+
+Sale de `pg_stat_user_tables` (`n_tup_ins + n_tup_upd + n_tup_del`), que es instantáneo. Tiene
+dos consecuencias conocidas y aceptadas: un `delete`+`insert` con contenido idéntico dispara un
+refresco al pedo (medido: en 5 minutos de jornada sólo se movió `Movimientos_Stock`, los 420.994
+de `PPP_Web_Base` son historia acumulada, no escritura continua), y un reset de estadísticas
+cambia la huella y fuerza **un** refresco — las dos fallan hacia refrescar de más, nunca de menos.
+
+**Chequeo:**
+```sql
+select * from public.gv_stock_refresh_salud;              -- estado='ok' y pct_ahorrado
+select * from public.gv_refresh_stock_si_cambio(60,true); -- qué HARÍA, sin refrescar
+```
+
+**Rollback, una línea:**
+```sql
+select cron.alter_job(55, command := 'REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada');
+```
+
+`sql/gv_refresh_stock_si_cambio_v2105.sql`, `tests/stock-refresh-si-cambio.cjs`.

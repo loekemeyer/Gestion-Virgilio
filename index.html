@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.04"></script>
+<script type="module" src="recepcion.js?v=21.07"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.04";
+const APP_VERSION = "v21.07";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -14529,7 +14529,7 @@ async function compTerminar() {
   try {
     /* La clave es ESTRICTA: sufijo de empresa fuera (codBase) y la "L" del pedido pelada
        (pkStripL) - la misma transformacion que ya usa el picking. NO se colapsa la "E"
-       final como hace _compMatchArt: 809 y 809E son articulos DISTINTOS, y ac� un match
+       final como hace _compMatchArt: 809 y 809E son articulos DISTINTOS, y acá un match
        de mas RECORTA cajas que si estan en el pallet. Si un codigo no matchea exacto, se
        queda sin tope, que es el comportamiento de siempre. */
     var _k = function (c) { return codBase(pkStripL(c)); };
@@ -30482,7 +30482,11 @@ function ccRenderChooser(leg) {
     `<div class="cc-sub" style="margin-bottom:14px;">¿Qué vas a cargar?</div>` +
     `<button class="pk-btn pk-ok" style="font-size:19px;padding:18px;" onclick="showCargaCamion('${leg}','camion')">🚛 Camión <small style="font-weight:700;opacity:.85;display:block;font-size:12px;margin-top:3px;">Todos los pedidos, salvo los retira. Pedís el camionero.</small></button>` +
     `<button class="pk-btn pk-ok" style="font-size:19px;padding:18px;background:#475569;" onclick="showCargaCamion('${leg}','retira')">🚶 Retira <small style="font-weight:700;opacity:.85;display:block;font-size:12px;margin-top:3px;">Solo los retira, contados en cajas.</small></button>` +
-    `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar</button>`;
+    // v21.05 — mismo pozo que RR (v21.03): el toggle CC ya se abrió en el primer toque del
+    // botón, así que un "Cerrar" que sólo MINIMIZA deja CC en rojo trabando EP/AP. Acá todavía
+    // no se sabe si hay reparto, así que van los dos: el que cierra de verdad y el que minimiza.
+    `<button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Cerrar Carga Camión (sin cargar por app)</button>` +
+    `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
 }
 
 function ccRender() {
@@ -46849,8 +46853,8 @@ function aprMismoPedidoChip(p) {
   return '<span class="apr-chip apr-chip-repo" title="No cae en Cuarentena: la deuda es la factura de ' +
     'otra NP de ESTE MISMO pedido' + (nps ? " (" + escapeHtml(nps) + ")" : "") + '. El pedido se partio en ' +
     'varias NP, ya se facturo una parte y todavia falta salir la otra: no se retiene a si mismo.">' +
-    '\u{1F9FE} Mismo pedido' + (nps ? ' � ' + escapeHtml(nps) : '') +
-    (isFinite(r.deuda) ? ' � ' + cuarPlata(r.deuda) : '') + '</span>';
+    '\u{1F9FE} Mismo pedido' + (nps ? ' · ' + escapeHtml(nps) : '') +
+    (isFinite(r.deuda) ? ' · ' + cuarPlata(r.deuda) : '') + '</span>';
 }
 function aprRepoChip(p) {
   if (!p || p._demo) return "";
@@ -48686,7 +48690,7 @@ function cuarLogComentarios(i) {
 }
 /* Fila del sector Cuarentena (no en Config): la ayuda y el boton Imprimir. */
 function cuarDemoRowHtml() {
-  // v20.53 (Luis, 2026-09-21: *"saca el �ver ejemplo� y pone ahi en ese lugar un boton de
+  // v20.53 (Luis, 2026-09-21: *"saca el «ver ejemplo» y pone ahi en ese lugar un boton de
   // imprimir"*) - el ejemplo era la ayuda de la primera semana; el reporte se usa todos los
   // dias. cuarDemoToggle y cuarDemoPedido siguen vivos: el pedido de ejemplo se puede volver
   // a prender desde la consola si alguna vez hace falta explicar la pantalla.

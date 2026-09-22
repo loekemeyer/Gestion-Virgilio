@@ -3188,6 +3188,25 @@ Dos detalles de implementación que costaron y conviene no repetir:
 para mirar; `sin nada que armar` y `fuera de horario` son sanos. §3.jf,
 `sql/gv_armado_salud_feed_v1958.sql`.
 
+## ⚠ REGLA (v21.05): `index.html` es UTF-8 — un byte en latin1 se multiplica solo
+
+El archivo declara `<meta charset="UTF-8">`. El 22/09 tenía **5 bytes sueltos en latin1/cp1252**,
+dejados por sesiones que lo editaron con herramientas distintas. Tres eran de comentario; **los
+otros dos estaban en un string de JS que va al `innerHTML`** —el chip «Mismo pedido» de A Programar—
+y el operario veía **`🧾 Mismo pedido � LK 0001 � $836.909`** en vez del separador `·`.
+
+⚠ **Lo que lo hace crecer es que rompe las herramientas.** Con un byte inválido, cualquier script
+que abra el archivo como texto UTF-8 explota (`UnicodeDecodeError`); abrirlo como **latin1** para
+esquivarlo convierte **todos** los acentos buenos en mojibake y los reescribe así. O sea: el atajo
+obvio para editar el archivo es justo lo que multiplica el problema.
+
+**Al editar `index.html` por script**: leerlo y escribirlo en **UTF-8** o **en bytes** (`"rb"`/`"wb"`
+con los patrones en `.encode("utf-8")`), **nunca** en latin1. Y sigue valiendo lo del **NUL** de
+`_pppGeoCod`: es UTF-8 válido y legítimo, sólo hace que `grep` trate al archivo como binario.
+
+**Chequeo:** `node tests/encoding-utf8.cjs` — index.html, sw.js, recepcion.js, planimetria.js y
+supabase-config.js; falla nombrando archivo, línea y contexto. Verificado rompiéndolo a propósito.
+
 ## ⚠ REGLA (Luis, 2026-09-22, v21.03): un módulo que ABRE TOGGLE tiene que poder CERRARSE desde el caso VACÍO
 
 **Luis, textual:** *"si uno aprieta recepción de remitos ahora, figura que no hay remitos para
@@ -3204,6 +3223,16 @@ abierto, re-abrís tocando el botón"*), el toggle queda abierto — y con **cua
 | CC · Carga Camión | `ccEndWithoutLoading` |
 | CR · Control Remitos | `ccrEndWithout` |
 | RR · Recepción Remitos | **`crEndWithout`** (faltaba hasta la v21.03) |
+
+**Y son EXACTAMENTE esos tres** (medido el 22/09 sobre `selectOption`): el pozo no es de cualquier
+toggle, es de los que **estando abiertos RE-ABREN su popup en vez de cerrarse**, así que la única
+salida está adentro del modal. En `RT`, `RI`, `EI`, `AT`, `PB`, `Limp`, `PC`, `Perm` y `CT`, tocar
+el botón de nuevo **cierra** — no hay forma de quedar trabado. Al agregar un módulo con popup, la
+pregunta es ésa: *¿su botón re-abre o cierra?* Si re-abre, necesita su `…EndWithout`.
+
+⚠ **Y en TODA pantalla del módulo, no sólo en la de la lista** (v21.05). El chooser de CC
+(*"¿qué vas a cargar? Camión / Retira"*) se dibuja **antes** de consultar nada y su único «Cerrar»
+minimizaba: el escape aparecía recién después de elegir y que la lista viniera vacía.
 
 ⚠ **Minimizar y cerrar son cosas distintas, y el caso vacío es siempre CERRAR.** No tiene sentido
 dejar abierto un módulo sin nada adentro: si después entra trabajo, se vuelve a tocar el botón y la
