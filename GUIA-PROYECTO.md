@@ -1,4 +1,4 @@
-## Nota v20.92 (2026-09-22) — «F. pedido» de la Programación: la cascada del lado de la lectura
+## Nota v20.93 (2026-09-22) — «F. pedido» de la Programación: la cascada del lado de la lectura
 
 Thomas preguntó si la hoja trae la fecha en que recibimos la NP. La trae —es la columna
 **F. pedido** de la impresión y del Excel, que sale de `gv_ppp_prog_arbol.fecha_pedido`— pero al
@@ -42,7 +42,7 @@ desapareció del espejo (origen `fact`/`hist`). En una ventana de 120 días son 
 de numeración ISIS: `gv_ppp_programacion_diaria` guarda sólo lo programado y después se borra, así
 que su `fecha_recep` no está en ningún lado. Son días pasados; la impresión mira días por venir.
 
-`sql/gv_ppp_prog_arbol_fecha_pedido_v2092.sql`, `tests/ppp-fecha-pedido-cascada.cjs`.
+`sql/gv_ppp_prog_arbol_fecha_pedido_v2093.sql`, `tests/ppp-fecha-pedido-cascada.cjs`.
 
 ## Nota v20.82 (2026-09-21) — El remito FACTURADO ya trae el cliente de una NP web
 

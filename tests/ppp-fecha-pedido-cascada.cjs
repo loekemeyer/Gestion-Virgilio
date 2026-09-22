@@ -1,4 +1,4 @@
-/* Regresión v20.92 — «F. pedido» DE LA PROGRAMACIÓN: LA CASCADA DEL LADO DE LA LECTURA.
+/* Regresión v20.93 — «F. pedido» DE LA PROGRAMACIÓN: LA CASCADA DEL LADO DE LA LECTURA.
 
    Thomas, 2026-09-22: *"¿Tiene la fecha que recibimos la NP?"*. La tenía, pero 14 de 183 NP
    programadas salían con «—» en la hoja y vacías en el Excel, porque
@@ -11,15 +11,15 @@
      2. lk_pedidos_match.fecha_pedido      (la fecha real del pedido de la página)
      3. PPP_Web_NP.creado_at a hora AR     (aproximación: el día en que se numeró la NP)
 
-   Candados sobre `sql/gv_ppp_prog_arbol_fecha_pedido_v2092.sql`. Sale 1 si falla. */
+   Candados sobre `sql/gv_ppp_prog_arbol_fecha_pedido_v2093.sql`. Sale 1 si falla. */
 const fs = require("fs");
 const path = require("path");
 
-const f = path.join(__dirname, "..", "sql", "gv_ppp_prog_arbol_fecha_pedido_v2092.sql");
+const f = path.join(__dirname, "..", "sql", "gv_ppp_prog_arbol_fecha_pedido_v2093.sql");
 const fallos = [];
 
 if (!fs.existsSync(f)) {
-  fallos.push("falta sql/gv_ppp_prog_arbol_fecha_pedido_v2092.sql");
+  fallos.push("falta sql/gv_ppp_prog_arbol_fecha_pedido_v2093.sql");
 } else {
   const s = fs.readFileSync(f, "utf8");
 

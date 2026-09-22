@@ -1,4 +1,4 @@
--- v20.92 — «F. pedido» de la Programación: que no quede ninguna NP sin fecha de entrada.
+-- v20.93 — «F. pedido» de la Programación: que no quede ninguna NP sin fecha de entrada.
 --
 -- Qué se midió (2026-09-22, rango hoy..+30): 183 NP programadas, 14 sin `fecha_pedido`.
 -- Las 14 son web y las 14 tienen `PPP_Web_Programacion.fecha_recep` en NULL. Salían con «—»
@@ -77,7 +77,7 @@ fuentes as (
          coalesce(btrim(w.zona), ''),
          w.order_id::text,
          nullif(btrim(coalesce(w.barrio, '')), ''),
-         -- v20.92: fecha de entrada del pedido en cascada. `fecha_recep` queda NULL cuando la
+         -- v20.93: fecha de entrada del pedido en cascada. `fecha_recep` queda NULL cuando la
          -- fila la escribe un camino que no lo carga; el dato igual existe en el espejo del
          -- pedido web y, en último lugar, en el día en que se asignó la NP.
          coalesce(w.fecha_recep::date,
@@ -214,4 +214,4 @@ $function$;
 --         'La rama web de gv_ppp_prog_arbol resuelve fecha_pedido en cascada: fecha_recep, '
 --         'lk_pedidos_match.fecha_pedido y PPP_Web_NP.creado_at. Sin la cascada, 14 de 179 NP '
 --         'programadas salen sin fecha de pedido en la hoja y en el Excel.',
---         'Thomas', 'v20.92');
+--         'Thomas', 'v20.93');

@@ -47888,7 +47888,7 @@ function pipeHtml() {
     '<div class="apr-col-t apr-col-t-clic" onclick="aprCliColapsar()" title="' +
       (_cliCol ? "Mostrar" : "Ocultar") + ' el pipeline de clientes nuevos">' +
     '<span class="apr-col-caret">' + (_cliCol ? "▸" : "▾") + '</span> ' +
-    '🧭 Clientes nuevos <b>(' + (cargando ? '…' : pipeLista().length) + ')</b>' +
+    '🧭 Clientes nuevos <b>(' + (cargando ? '…' : pipeLista().filter(function (p) { return !p._demo; }).length) + ')</b>' +
     '<span class="apr-cuar-help" title="El camino completo de un cliente nuevo: análisis crediticio en Equifax y ' +
       'después UNO DE DOS estados — Referenciado (no paga por adelantado, como un cliente habitual) o No ' +
       'referenciado (paga por adelantado sus 3 primeros pedidos: Speech 1, Speech 2 a las 24 h, y recién con el ' +

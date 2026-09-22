@@ -28448,7 +28448,49 @@ Los dos tests **muerden**: sin el bloque del tope, el caso de la fuga escribe 30
 pickeadas; sin el chequeo de fecha, el armado del 17 vuelve a trabar el del 21.
 
 `sql/gv_isis_sin_tanda_freno_v2091.sql`.
-### §3.mb — v20.92 · `gv_ppp_prog_arbol`: la fecha del pedido se resuelve en cascada — 2026-09-22
+### §3.mb — v20.92 · `main` en rojo: 12 chequeos que miraban un submódulo que ya no existe — 2026-09-22
+
+**Qué se midió.** `node tests/apr-cuarentena.cjs` fallaba **12 de 60** chequeos en `main`, desde la
+v20.89 (el pipeline reemplazó al submódulo 🆕 Clientes nuevos de «A Programar»). Los otros dos tests
+del pipeline —`pipe-en-a-programar.cjs` y `pipe-clientes-nuevos.cjs`— daban verde, o sea que la
+pantalla andaba: lo que había quedado viejo eran las expectativas.
+
+**Por dónde entraba, y es la parte que sirve para la próxima.** El test parte el HTML de A Programar
+en dos por los títulos de los submódulos:
+
+```js
+const iCuar = html.indexOf("🚧 Cuarentena"), iCli = html.indexOf("🆕 Clientes nuevos");
+const cuarSec = html.slice(iCuar, iCli), cliSec = html.slice(iCli);
+```
+
+El pipeline se titula **`🧭 Clientes nuevos`**, así que `iCli` pasó a valer **−1**: `cliSec` quedó en
+**un carácter** (todo lo que lo mirara falla) y `cuarSec` se comió el resto de la pantalla (por eso
+caía hasta `cuarCols`, que cuenta `<th>` contra `<td>` y no tiene nada que ver con clientes nuevos).
+
+> **Un `indexOf` que no encuentra no rompe: devuelve −1, y `slice` lo toma como "desde el final".**
+> Un corte de HTML por un título tiene que fallar ruidoso cuando el título no está, no seguir con un
+> pedazo de un carácter. De los 12 en rojo, **8 eran colaterales de ese −1**: sólo 4 chequeaban de
+> verdad algo que el pipeline hace distinto.
+
+**Qué se cambió en el test** (`tests/apr-cuarentena.cjs`): el corte y los conteos van por
+`🧭 Clientes nuevos`; el ejemplo se prende con `_apr.pipeDemo` (antes `_apr.cliDemo`); y los dos
+chequeos que describían columnas y botones del submódulo viejo pasaron a los del pipeline
+—`Etapa` / `Qué sigue` / `CUIT`, y «Análisis Cred.» + «Eliminar pedido»—. Lo demás quedó igual.
+
+**Y uno de los 12 era una regresión de verdad, no una expectativa vieja.** El badge del pipeline
+contaba `pipeLista().length`, que **incluye el cliente de prueba**: con el ejemplo prendido decía
+`(2)` habiendo **1** pedido real. El submódulo viejo lo excluía a propósito (v18.99). Se repuso:
+
+```js
+'🧭 Clientes nuevos <b>(' + (cargando ? '…' : pipeLista().filter(function (p) { return !p._demo; }).length) + ')</b>'
+```
+
+El ejemplo sigue apareciendo en la tabla y sus botones siguen funcionando: lo único que cambia es
+que no infla el contador.
+
+**Chequeo:** `node tests/apr-cuarentena.cjs` (60 ok), `node tests/pipe-en-a-programar.cjs` y
+`node tests/pipe-clientes-nuevos.cjs`.
+### §3.mc — v20.93 · `gv_ppp_prog_arbol`: la fecha del pedido se resuelve en cascada — 2026-09-22
 
 **Qué se midió.** Rango hoy..+30: 183 NP programadas, **14 con `fecha_pedido` en NULL**. Las 14
 son web y las 14 tienen `PPP_Web_Programacion.fecha_recep` en NULL. Salían con «—» en la hoja de
@@ -28492,4 +28534,4 @@ select * from public.gv_ppp_sin_fecha_recep;                        -- la verdad
 ```
 
 **Rollback:** volver a poner `w.fecha_recep::date,` en lugar del `coalesce` de la rama `web`.
-`sql/gv_ppp_prog_arbol_fecha_pedido_v2092.sql`, `tests/ppp-fecha-pedido-cascada.cjs`.
+`sql/gv_ppp_prog_arbol_fecha_pedido_v2093.sql`, `tests/ppp-fecha-pedido-cascada.cjs`.
