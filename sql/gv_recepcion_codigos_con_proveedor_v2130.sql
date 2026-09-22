@@ -1,5 +1,5 @@
 -- ============================================================================
--- v21.28 — RECEPCIÓN: que todo código con proveedor figure en el módulo de operarios
+-- v21.30 — RECEPCIÓN: que todo código con proveedor figure en el módulo de operarios
 -- Pedido de Luis (2026-09-22): "fijate de todos los productos que tengan un proveedor
 -- y que no figuren en el modulo de operarios para recibirlos. ajustalos a todos."
 --
@@ -109,7 +109,7 @@ create or replace view public.vista_articulos_prov_at as
         a."Cod_Art"     as cod_art,
         a."Descripcion" as descripcion,
         coalesce(nullif(t."Linea", ''),
-                 nullif(upper(btrim(m.linea)), ''),      -- v21.28: fallback
+                 nullif(upper(btrim(m.linea)), ''),      -- v21.30: fallback
                  '')::character varying as linea
    from "Articulos x Prov AT" a
    left join lateral (

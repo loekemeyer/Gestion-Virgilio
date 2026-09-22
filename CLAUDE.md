@@ -3853,7 +3853,7 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
-## ⚠ REGLA (Luis, 2026-09-22, v21.28): el operario puede recibir un código que NO es del proveedor
+## ⚠ REGLA (Luis, 2026-09-22, v21.30): el operario puede recibir un código que NO es del proveedor
 
 **Luis, textual:** *"cuando se elige al tallerista deberían aparecer los códigos asignados a el
 como proveedor y un botón más grande que diga «Introducir Código diferente» … Una vez envíe el
@@ -3881,7 +3881,7 @@ se corrigió en la v19.57 para el caso de la OC ajena.
 | qué pasó | qué dice |
 |---|---|
 | el código está en la OC de **otro** proveedor (`ajena`, v19.57) | *"la OC es de Poly (155 pendientes)"* |
-| el código **no está asignado** a este proveedor (`noAsig`, v21.28) | *"NO está asignado a Lucho ni tiene OC suya"* |
+| el código **no está asignado** a este proveedor (`noAsig`, v21.30) | *"NO está asignado a Lucho ni tiene OC suya"* |
 | es suyo pero no hay OC (`sinOc`, v17.99) | *"SIN OC generada (OC = 0)"* |
 
 **Chequeo:** `node tests/rcp-codigo-diferente.cjs` — corre la pantalla de verdad y mira las dos
@@ -3911,7 +3911,7 @@ no pueden aparecer aunque se los dé de alta — falta ese dato, lo define el du
 tiene nada que ver con un prov AT. Un código que no esté ahí sale con `linea = ''` y el
 `.eq("linea","LK")` del celular no lo encuentra nunca. Al 22/09 era **1 de 87** (el 193, Kuffo).
 
-**Chequeo y alta:** `sql/gv_recepcion_codigos_con_proveedor_v2128.sql` (la consulta de barrido
+**Chequeo y alta:** `sql/gv_recepcion_codigos_con_proveedor_v2130.sql` (la consulta de barrido
 está al final y tiene que dar vacío).
 
 ## ⚠ REGLA (Luis, 2026-09-22, v20.95): un código BUSCADO se muestra aunque esté en 0

@@ -1,4 +1,4 @@
-/* Test de regresión (v21.28) — RECEPCIÓN: "Introducir código diferente" para TODOS.
+/* Test de regresión (v21.30) — RECEPCIÓN: "Introducir código diferente" para TODOS.
 
    Pedido de Luis (2026-09-22): *"en el módulo de recepción de tallerista, cuando se elige
    al tallerista deberían aparecer los códigos asignados a el como proveedor y un botón más
