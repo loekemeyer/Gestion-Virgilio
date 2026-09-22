@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.13"></script>
+<script type="module" src="recepcion.js?v=21.14"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.13";
+const APP_VERSION = "v21.14";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16379,6 +16379,16 @@ async function ocgFetchMaximos() {
 const SUPABASE_PROY_ENDPOINT = SUPABASE_URL + "/rest/v1/proyeccion_madre";
 const OCG_FACTOR_MAXIMO = 1.5;
 function _ocgNorm(c) { return String(c || "").toUpperCase().trim().replace(/^0+(?=.)/, ""); }
+/* v21.14 (Luis, 22/09) - EXCEPCION HARDCODEADA: estos codigos NO se reparten entre talleristas.
+   Cada proveedor de la lista recibe una OC por el TOTAL (100% cada uno), no una mitad. Textual:
+   "excepcion para 3 codigos. 544, 560 y 800 deberian generar OCs por el total (100%) para fab y
+   para carlos / de momento ponemos esto como hardcode".
+   ⚠ Los nombres van EXACTOS como estan en OC_Maximos / Talleristas_Contacto ("Log/ Fabr",
+   "Carlos E"): la OC se agrupa por ese texto y un nombre distinto abre un proveedor nuevo.
+   ⚠ Pisa lo que diga OC_Maximos para esos codigos. El 800 figuraba con Pedernera al 100%:
+   esta excepcion se lo saca.
+   ⚠ La clave es el codigo NORMALIZADO (_ocgNorm: mayusculas, sin ceros a la izquierda). */
+const OCG_DOBLE_100 = { "544": ["Log/ Fabr", "Carlos E"], "560": ["Log/ Fabr", "Carlos E"], "800": ["Log/ Fabr", "Carlos E"] };
 /* v19.91 (problema 427) - un codigo con SUFIJO DE EMPRESA no cae nunca al codigo base.
    Los 4 duales (437E/438E/439E/809E) son DOS productos cada uno, en dos gondolas distintas, y
    sus mapas (demanda, proyeccion) vienen keyeados por "437E LK" / "437E CH" desde el backend.
@@ -16818,9 +16828,13 @@ async function ocgEnter() {
       // "(sin proveedor)" se muestra pero no se envía; Racks queda excluido (por sub).
       const p1 = String(r.proveedor || "").trim(), p2 = String(r.proveedor2 || "").trim();
       const pr1 = (r.pr1 == null ? 100 : Number(r.pr1)), pr2 = (r.pr2 == null ? 0 : Number(r.pr2));
-      const subs = (p2 && pr2 > 0)
-        ? [{ prov: p1 || "(sin proveedor)", prop: pr1, resto: false }, { prov: p2, prop: pr2, resto: true }]
-        : [{ prov: p1 || "(sin proveedor)", prop: 100, resto: false }];
+      // v21.14 - los 3 codigos de OCG_DOBLE_100 no se reparten: cada tallerista lleva el total.
+      const doble = OCG_DOBLE_100[_ocgNorm(cod)];
+      const subs = doble
+        ? doble.map(function (nom) { return { prov: nom, prop: 100, resto: false, dup: true }; })
+        : (p2 && pr2 > 0)
+          ? [{ prov: p1 || "(sin proveedor)", prop: pr1, resto: false }, { prov: p2, prop: pr2, resto: true }]
+          : [{ prov: p1 || "(sin proveedor)", prop: 100, resto: false }];
       let acc = 0;
       subs.forEach(function (sub) {
         const faltaSub = sub.resto ? (totalFalta - acc) : Math.round(totalFalta * sub.prop / 100);
@@ -16829,7 +16843,7 @@ async function ocgEnter() {
         const k = sub.prop / 100;
         // v11.67 — se incluyen también los de falta 0 (para la vista Por tallerista). El armado
         // de `items` (a pedir > 0) filtra después, así lo que se genera/manda queda idéntico.
-        itemsAll.push({ cod: cod, desc: r.descripcion || "", prov: sub.prov, max: Math.round(maxCajas * k), fuente: fuente, indice: indice, proy: (pc > 0 ? pc : null), demanda: Math.round(demanda * k), stock: Math.round(stock * k), falta: Math.max(0, faltaSub), cap: (cap > 0 ? cap : null), maxTot: maxCajas, demandaTot: demanda, stockTot: stock, uni: Number(r.uni_x_caja) || 0, ncaja: (r.n_caja != null ? r.n_caja : null), prop: sub.prop, sinProv: (sub.prov === "(sin proveedor)") });
+        itemsAll.push({ cod: cod, desc: r.descripcion || "", prov: sub.prov, max: Math.round(maxCajas * k), fuente: fuente, indice: indice, proy: (pc > 0 ? pc : null), demanda: Math.round(demanda * k), stock: Math.round(stock * k), falta: Math.max(0, faltaSub), cap: (cap > 0 ? cap : null), maxTot: maxCajas, demandaTot: demanda, stockTot: stock, uni: Number(r.uni_x_caja) || 0, ncaja: (r.n_caja != null ? r.n_caja : null), prop: sub.prop, sinProv: (sub.prov === "(sin proveedor)"), dupProv: !!sub.dup });
       });
     });
     const items = itemsAll.filter(function (it) { return it.falta > 0; });
@@ -16883,7 +16897,12 @@ function ocBodyGenArt() {
     // máx/pedidos/stock salen de los totales del ARTÍCULO (maxTot/demandaTot/stockTot), no de la
     // suma de las mitades: 545 repartido 50/50 redondea a 273+273 = 546 y el renglón no cerraría.
     if (!byCod[k]) { byCod[k] = { cod: it.cod, desc: it.desc, fuente: it.fuente, indice: it.indice, proy: it.proy, max: it.maxTot, demanda: it.demandaTot, stock: it.stockTot, falta: 0, subs: [] }; orden.push(k); }
-    byCod[k].subs.push(it); byCod[k].falta += it.falta;   // a pedir = lo que realmente se va a ordenar
+    byCod[k].subs.push(it);
+    // a pedir = lo que realmente se va a ordenar. v21.14: en un codigo de OCG_DOBLE_100 los subs
+    // llevan TODOS el total (cada uno su OC entera), asi que sumarlos contaria las cajas dos
+    // veces en la fila y en el encabezado. Se toma el mayor, que es ese mismo total.
+    if (it.dupProv) byCod[k].falta = Math.max(byCod[k].falta, it.falta);
+    else byCod[k].falta += it.falta;
   });
   const fgrupos = orden.map(function (k) { return byCod[k]; })
     .filter(function (g) { return !gf || (codCanon(g.cod) + " " + (g.desc || "") + " " + g.subs.map(function (s) { return s.prov; }).join(" ")).toLowerCase().indexOf(gf) !== -1; })
@@ -16916,7 +16935,9 @@ function _ocgProvNom(s) { return s.sinProv ? '<span style="color:#b45309;font-we
 function _ocgProvCell(subs) {
   if (!subs || !subs.length) return "";
   if (subs.length === 1) return _ocgProvNom(subs[0]);
-  return '<b title="El total de la fila se reparte entre estos talleristas">' + subs.length + ' talleristas</b>' + subs.map(function (s) {
+  // v21.14 - un codigo de OCG_DOBLE_100 no se reparte: cada uno recibe una OC por el total.
+  const dup = subs.some(function (s) { return s.dupProv; });
+  return '<b title="' + (dup ? 'No se reparte: cada tallerista recibe una OC por el TOTAL' : 'El total de la fila se reparte entre estos talleristas') + '">' + subs.length + ' talleristas' + (dup ? ' \u00b7 c/u el total' : '') + '</b>' + subs.map(function (s) {
     return '<div style="font-size:11px;color:#64748b;white-space:nowrap">' + _ocgProvNom(s) + ' ' + Math.round(s.prop) + '% → <b style="color:#334155">' + s.falta + '</b></div>';
   }).join("");
 }

@@ -3477,6 +3477,38 @@ son **16** (7 con pedidos, 82 cajas), con el `motivo` que dice cuál duele: *ped
 *pedido sin OC*, *stock sin OC* o *resto* (código viejo o mal tipeado: `438E-`, `501B`, `587C`).
 `sql/gv_oc_codigos_sin_config_v2101.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-22, v21.14): los códigos 544, 560 y 800 NO se reparten — cada uno lleva el TOTAL
+
+**Luis, textual:** *"excepción para 3 códigos. 544, 560 y 800 deberían generar OCs por el total
+(100%) para fab y para carlos / de momento ponemos esto como hardcode"*.
+
+El generador reparte un artículo entre dos talleristas por porcentaje (`pr1` / `pr2` de
+`OC_Maximos`): 50/50 da media OC a cada uno. Estos tres van al revés: **`Log/ Fabr` y
+`Carlos E` reciben cada uno una OC por las cajas enteras.**
+
+| cód | descripción | línea | proveedor que tenía | a pedir al 22/09 |
+|---|---|---|---|--:|
+| 544 | Batidor Pera | LK | Log/ Fabr 100% | **382** |
+| 560 | Pinza Chica | LK | Log/ Fabr 100% | 0 |
+| 800 | Pinza Chica Display | CH | **Pedernera** 100% | 0 |
+
+⚠ **La excepción le saca el 800 a Pedernera**, que es el que lo tenía configurado. Es
+consecuencia de la regla, no un descuido.
+
+⚠ **Los nombres van EXACTOS como están en `OC_Maximos`** — `Log/ Fabr` (60 códigos) y
+`Carlos E` (30) —: la OC se agrupa por ese texto y un nombre distinto abre un proveedor nuevo.
+
+⚠ **Y rompe el supuesto de la vista «Por artículo», que SUMA los subs** para sacar el "a pedir"
+del artículo. Sumando, las 382 del 544 se verían como **764** en la fila y en el encabezado; se
+toma el mayor, que es ese mismo total. Lo que se genera sí son dos líneas de 382.
+
+**Es hardcode a propósito** (`OCG_DOBLE_100` en `index.html`, al lado de `OCG_FACTOR_MAXIMO`),
+porque Luis lo pidió así por ahora. Si aparece un cuarto código, la fila se agrega ahí; si se
+vuelven muchos, el lugar es una columna de `OC_Maximos`, no una lista más larga.
+
+**Chequeo:** `node tests/oc-doble-100.cjs` — mira las dos mitades (dos OCs por el total · la
+fila y el encabezado sin duplicar) y verificado que falla contra el código anterior.
+
 ## ⚠ REGLA (Luis, 2026-09-22, v20.95): un código BUSCADO se muestra aunque esté en 0
 
 **Luis, textual:** *"838E NO APARECE en la vista de stocks"*.
