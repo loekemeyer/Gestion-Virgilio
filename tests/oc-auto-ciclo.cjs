@@ -88,7 +88,7 @@ const ANCLA = mas(hoyArt, 3);
     o.rpcBody = (rpc[rpc.length - 1] || {}).body || null;
     o.cierraAlGuardar = !document.getElementById("ocAutoOv").classList.contains("show");
 
-    // (e2) v21.15 — con el ancla PEGADA (hoy/mañana) el diálogo avisa que dejarlo así re-genera
+    // (e2) v21.25 — con el ancla PEGADA (hoy/mañana) el diálogo avisa que dejarlo así re-genera
     _ocgAuto = { proxima: mas(hoyArtJs(), 1), cadencia: 7, motivo: "x", por: "y" };
     ocAutoAbrir(5);
     o.avisaPegada = /vuelve a generar TODO/i.test(document.getElementById("ocAutoOv").textContent);

@@ -2168,7 +2168,7 @@ consumió) y **no avanza con `error:`**, para que una caída se reintente sola a
 ⚠ **El jobname sigue diciendo `ocs-auto-miercoles` y ya no es cierto**: `update cron.job` da
 `permission denied for table job` y `cron.alter_job` no tiene `job_name`.
 
-⚠⚠ **Generar a mano NO mueve el ancla solo: la mueve el DIÁLOGO** (v21.15). El backend no puede
+⚠⚠ **Generar a mano NO mueve el ancla solo: la mueve el DIÁLOGO** (v21.25). El backend no puede
 adivinar cuándo se retoma, así que si el supervisor cierra con «Dejarlo como está», el ancla queda
 donde estaba — y si estaba en hoy o mañana, la corrida de las 07:00 **vuelve a generar todo**,
 porque el único guard propio de `generar_ocs_automaticas` es *"ya hay OC de HOY"* y lo de ayer no
