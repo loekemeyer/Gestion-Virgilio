@@ -6025,7 +6025,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.00"></script>
+<script type="module" src="recepcion.js?v=21.02"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9907,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.00";
+const APP_VERSION = "v21.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15235,6 +15235,33 @@ function _padCod(cod) {
   const m = s.match(/^([0-9]+)(.*)$/);
   return m ? m[1].padStart(3, "0") + m[2] : s;
 }
+/* v21.02 — BUSCAR UN CÓDIGO ES BUSCAR POR EL PRINCIPIO, NO POR EL MEDIO. Luis, 22/09/2026:
+   "cuando se escribe 03 debería mostrar todos los códigos que empiecen con 03, no que lo
+   tengan en alguna parte del código". Se compara contra las DOS grafías del MISMO código:
+   la que se MUESTRA (031, con el cero adelante — regla del dueño del 12/09) y la PELADA
+   (31, como vive en la base). Así "03" trae 030/031/035E, "50" trae 505/506, y "31" sigue
+   trayendo el 031 como hasta hoy. Nunca por pedazo: "031" no trae 231, 312 ni 931E.
+   ⚠ El cero lo manda quien escribe: si lo tipea, el prefijo lo respeta. */
+function codEmpiezaCon(cod, term) {
+  var t = String(term == null ? "" : term).toUpperCase().replace(/\s+/g, "");
+  if (!t) return true;
+  var c = String(cod == null ? "" : cod).toUpperCase().trim();
+  if (!c) return false;
+  var pad = _padCod(c).replace(/\s+/g, "");                  // 031E · 438ELK
+  var pel = c.replace(/^0+(?=.)/, "").replace(/\s+/g, "");   // 31E
+  return pad.indexOf(t) === 0 || pel.indexOf(t) === 0;
+}
+/* Un término del buscador del módulo Stock. Si arranca con DÍGITO es un CÓDIGO y va por
+   prefijo (arriba); si no, es texto libre y busca por pedazo en `libre` (descripción,
+   proveedor, sector, ubicación…). `numLibre` habilita además buscar un número por pedazo
+   en el texto libre: sólo para las pantallas donde el número puede ser otra cosa que un
+   código — un remito, por ejemplo. */
+function stkMatchBusq(term, cod, libre, numLibre) {
+  var t = String(term == null ? "" : term).trim().toLowerCase();
+  if (!t) return true;
+  if (/^\d/.test(t)) return codEmpiezaCon(cod, t) || (numLibre ? String(libre || "").toLowerCase().indexOf(t) >= 0 : false);
+  return String(libre || "").toLowerCase().indexOf(t) >= 0 || codEmpiezaCon(cod, t);
+}
 async function loadCodCanon() {
   if (_codCanon) return _codCanon;
   const m = {};
@@ -18599,23 +18626,13 @@ function stkBodyStocks() {
           // no sale no se distingue de un codigo que no existe: eso es lo que confundio. El 0
           // es la respuesta -"no hay"-, no un motivo para callarse.
           const s = (a.cod + " " + a.desc).toLowerCase();
-          // v18.20 — la tabla muestra el código rellenado a 3 dígitos (031) pero en la base vive
-          // normalizado (31), así que tipear "031" no encontraba nada: la pantalla enseñaba un
-          // código que después ella misma no hallaba. Se compara sin los ceros de adelante, de
-          // los dos lados, con el mismo _ocgNorm que usa el resto del módulo.
-          // v18.25 — y un término que es un CÓDIGO ya no busca por pedazo: el dueño pidió que
-          // "031" traiga el 031 y nada más, no los ocho que lo contienen (231, 311, 312, 315,
-          // 531, 631, 731, 931E). Matchea el código entero y sus variantes de letra — 031 trae
-          // también 031E y "031 LK", porque son el mismo artículo — pero no los que siguen con
-          // otro dígito. Un término que NO arranca con dígito sigue siendo texto libre y busca
-          // por pedazo en el código y en la descripción ("café" tiene que seguir andando).
-          const cn = _ocgNorm(a.cod).toLowerCase();
-          return _terms.some(function (t) {
-            if (!/^0*\d/.test(t)) return s.indexOf(t) >= 0;
-            const tn = _ocgNorm(t).toLowerCase();
-            if (!tn || cn.indexOf(tn) !== 0) return false;
-            return !/\d/.test(cn.charAt(tn.length));      // lo que sigue no puede ser otro dígito
-          });
+          // v18.20 / v18.25 / v21.02 — un término que es un CÓDIGO busca por el PRINCIPIO, no
+          // por el medio: "03" trae 030/031/035E y "031" trae el 031 y sus variantes de letra,
+          // nunca los que lo contienen (231, 312, 931E). Lo resuelve codEmpiezaCon, que compara
+          // contra las dos grafías del código (la mostrada con el cero y la pelada de la base),
+          // así "31" sigue encontrando el 031. Un término que NO arranca con dígito sigue siendo
+          // texto libre y busca por pedazo en el código y en la descripción ("café" sigue andando).
+          return _terms.some(function (t) { return stkMatchBusq(t, a.cod, s, false); });
         })
       : arts.filter(_stkHasAny));
   // v7.73→v8.71: excluir códigos que están en la tabla Insumos, SALVO que tengan
@@ -22819,8 +22836,9 @@ function stkDescargarExcel() {
   const _stkStockKeys = SECTKEYS.concat(["racks_ch"]);
   // v8.71: mismo filtro dinámico que stkBodyStocks — oculta insumos SALVO que tengan stock de producto
   const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
-  let shown = f
-    ? arts.filter(function (a) { return (a.cod + " " + a.desc).toLowerCase().indexOf(f) >= 0; })
+  const _xlTerms = f.split(/[\s,]+/).filter(Boolean);   // v21.02 — el mismo prefijo que la pantalla
+  let shown = _xlTerms.length
+    ? arts.filter(function (a) { const s = (a.cod + " " + a.desc).toLowerCase(); return _xlTerms.some(function (t) { return stkMatchBusq(t, a.cod, s, false); }); })
     : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || (Number((_fcArt[_ocgNorm(a.cod)] || _fcArt[_ocgNorm(codBase(a.cod))] || {}).cajas) || 0) > 0; });
   shown = shown.filter(function (a) {
     if (!_insCodsSet.has(String(a.cod || "").trim().toUpperCase())) return true;
@@ -23317,10 +23335,8 @@ function stkBodyFaltante() {
   // Filtrar por búsqueda
   var sq = String(F.search || "").trim().toLowerCase();
   if (sq) {
-    arts = arts.filter(function (a) {
-      return codCanon(a.cod).toLowerCase().indexOf(sq) >= 0 ||
-             a.desc.toLowerCase().indexOf(sq) >= 0 ||
-             a.prov.toLowerCase().indexOf(sq) >= 0;
+    arts = arts.filter(function (a) {   // v21.02 — el codigo, por prefijo; el texto, por pedazo
+      return stkMatchBusq(sq, a.cod, a.desc + " " + a.prov, false);
     });
   }
 
@@ -23980,7 +23996,7 @@ function stkBodyCapacidad() {
   h += '<div class="stk-ini-btns"><button class="stk-btn ok" onclick="stkCapImport()">📥 Importar</button>' + (cap.length ? ' <button class="stk-btn danger" onclick="stkCapBorrar()">Borrar todo</button>' : '') + '</div>';
   if (!arts.length) return h + '<div class="stk-empty" style="margin-top:12px">Todavía no hay capacidad cargada. Pegá la tabla arriba.</div>';
   const f = (_stk.filtro || "").toLowerCase();
-  const shown = f ? arts.filter(function (r) { return (r.cod + " " + r.desc + " " + r.sectores.join(" ")).toLowerCase().indexOf(f) >= 0; }) : arts;
+  const shown = f ? arts.filter(function (r) { return stkMatchBusq(f, r.cod, r.desc + " " + r.sectores.join(" "), false); }) : arts;   // v21.02
   const totCap = arts.reduce(function (s, r) { return s + r.capacidad; }, 0);
   const conMax = arts.filter(function (r) { return r.max != null; });
   const bajos = conMax.filter(function (r) { return r.dif > 0; }).length;     // capacidad > máximo → máximo podría estar bajo
@@ -24502,7 +24518,7 @@ function stkBodyConteo() {
 function stkBodyIngresos() {
   const ing = _stk.movs.filter(function (mv) { return mv.tipo === "recepcion"; });
   const f = (_stk.filtro || "").toLowerCase();
-  const shown = f ? ing.filter(function (mv) { return ((mv.cod_art || "") + " " + (mv.descripcion || "") + " " + (mv.ref || "")).toLowerCase().indexOf(f) >= 0; }) : ing;
+  const shown = f ? ing.filter(function (mv) { return stkMatchBusq(f, mv.cod_art, (mv.descripcion || "") + " " + (mv.ref || ""), true); }) : ing;   // v21.02 — numLibre: el numero puede ser un remito
   let h = '<div class="stk-seg"><button class="stk-segb' + (_stk.ingMode === "remito" ? " on" : "") + '" onclick="if(_stk){_stk.ingMode=\'remito\';stkRender();}">Por remito</button><button class="stk-segb' + (_stk.ingMode === "codigo" ? " on" : "") + '" onclick="if(_stk){_stk.ingMode=\'codigo\';stkRender();}">Por código</button></div>';
   h += '<input class="stk-filtro" type="search" placeholder="🔎 Buscar remito / código / descripción" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
   if (!shown.length) return h + '<div class="stk-empty">Sin ingresos.</div>';
@@ -24524,7 +24540,7 @@ function stkBodySalidas() {
   // a separar (esa se ve en la solapa "A Separar").
   const sal = _stk.movs.filter(function (mv) { return (mv.tipo === "picking" && mv.deposito === "terminado") || mv.tipo === "salida_cervantes"; }).sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
   const f = (_stk.filtro || "").toLowerCase();
-  const shown = f ? sal.filter(function (mv) { return ((mv.cod_art || "") + " " + (mv.ref || "") + " " + (mv.tipo || "")).toLowerCase().indexOf(f) >= 0; }) : sal;
+  const shown = f ? sal.filter(function (mv) { return stkMatchBusq(f, mv.cod_art, (mv.ref || "") + " " + (mv.tipo || ""), true); }) : sal;   // v21.02 — numLibre: el numero puede ser una NP
   let h = '<input class="stk-filtro" type="search" placeholder="🔎 Buscar código / tanda / destino" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">';
   h += '<table class="stk-tbl"><thead><tr><th>Día/hora</th><th>Código</th><th>Descripción</th><th class="num">Salió</th><th>Destino</th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="5" class="stk-empty">Sin salidas.</td></tr>';
@@ -24911,7 +24927,7 @@ function _stkInsListado(k, items) {
     if (!_stkInsConStock(it)) return false;   // en 0 = no se lista acá (queda en «Todos los insumos»)
     const c = insCatDef(it.cat) ? it.cat : "";
     if (k === "?" ? c !== "" : c !== k) return false;
-    return !f || (it.cod + " " + it.nombre + " " + _stkInsUbicStr(it)).toLowerCase().indexOf(f) >= 0;
+    return !f || stkMatchBusq(f, it.cod, it.nombre + " " + _stkInsUbicStr(it), true);   // v21.02
   });
   let h = '<div class="stk-catlist">';
   h += '<input class="stk-inp" style="width:100%;box-sizing:border-box;margin-bottom:7px;" placeholder="🔎 Buscar código / nombre / ubicación" value="' + escapeHtml(_stkIns.filtro) + '" oninput="if(_stkIns){_stkIns.filtro=this.value;stkRender();}">';
@@ -25651,7 +25667,7 @@ function stkBodyHistAjustes() {
   h += '</div>';
   // Filtrar movimientos tipo ajuste
   var ajustes = _stk.movs.filter(function(mv) { return mv.tipo === 'ajuste'; });
-  if (fCod) ajustes = ajustes.filter(function(mv) { return String(mv.cod_art || '').toUpperCase().indexOf(fCod) >= 0; });
+  if (fCod) ajustes = ajustes.filter(function(mv) { return codEmpiezaCon(mv.cod_art, fCod); });   // v21.02 — por prefijo
   if (fDep) ajustes = ajustes.filter(function(mv) { return mv.deposito === fDep; });
   if (fDesde) { var dD = new Date(fDesde + 'T00:00:00-03:00').getTime(); ajustes = ajustes.filter(function(mv) { return new Date(mv.ts).getTime() >= dD; }); }
   if (fHasta) { var dH = new Date(fHasta + 'T23:59:59-03:00').getTime(); ajustes = ajustes.filter(function(mv) { return new Date(mv.ts).getTime() <= dH; }); }

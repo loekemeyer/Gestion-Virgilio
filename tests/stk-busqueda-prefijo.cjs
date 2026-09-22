@@ -1,0 +1,86 @@
+/* Regresión — Luis, 22/09/2026: "cuando se escribe 03 debería mostrar todos los códigos que
+   empiecen con 03, no que lo tengan en alguna parte del código".
+
+   Buscar un CÓDIGO en el módulo Stock es buscar por el PRINCIPIO. Dos cosas que el test cuida:
+
+   1. El PREFIJO se compara contra las DOS grafías del mismo código: la que se MUESTRA (031,
+      con el cero adelante — regla del dueño del 12/09) y la PELADA (31, como vive en la base).
+      Sin las dos, o "03" no encuentra nada (lo que pasaba hasta la v20.94) o "31" deja de
+      encontrar el 031.
+   2. Un término que arranca con dígito NO mira la descripción: "031" no puede traer un
+      artículo porque su texto diga "031 cm". Un término de texto sí busca por pedazo.
+
+   Y el candado: el filtro de la pestaña Stocks tiene que pasar por stkMatchBusq. Si alguien
+   vuelve a escribirle su propio indexOf, la búsqueda por pedazo vuelve sin que nadie lo note. */
+const path = require("path");
+let chromium;
+try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
+catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { console.error("Playwright no encontrado."); process.exit(2); } }
+
+// [código, término, ¿matchea?]
+const PREFIJO = [
+  // lo que pidió Luis: 03 trae los 03x
+  ["30", "03", true], ["31", "03", true], ["35E", "03", true], ["031", "03", true], ["036E", "03", true],
+  // y no los que lo tienen en el medio
+  ["231", "03", false], ["130", "03", false], ["703", "03", false], ["007", "03", false],
+  // la regla del 18/09 sigue en pie: 031 es el 031 y sus variantes de letra, nada más
+  ["031", "031", true], ["31", "031", true], ["031E", "031", true], ["031 LK", "031", true],
+  ["231", "031", false], ["311", "031", false], ["312", "031", false], ["931E", "031", false],
+  // tipear sin el cero tiene que seguir encontrando
+  ["031", "31", true], ["035E", "35E", true], ["026", "26", true],
+  // 3 dígitos: el prefijo vale igual (50 → 505, 506)
+  ["505", "50", true], ["506", "50", true], ["605", "50", false],
+  // sufijo de empresa: el código es el mismo artículo
+  ["438E LK", "438", true], ["438E LK", "438E", true], ["809E CH", "809", true], ["809E CH", "708", false],
+  // códigos que no arrancan con número
+  ["GRJ10", "GRJ", true], ["GRJ10", "RJ", false],
+];
+
+// [término, cod, texto libre, numLibre, ¿matchea?]
+const LIBRE = [
+  ["031", "231", "colador 031 cm", false, false],   // un número NO busca en la descripción
+  ["031", "231", "colador 031 cm", true, true],     // …salvo donde puede ser un remito
+  ["cafe", "120", "filtro de cafe", false, true],   // texto: por pedazo
+  ["cafe", "120", "colador", false, false],
+  ["", "505", "", false, true],                     // sin término, pasa todo
+];
+
+(async () => {
+  const b = await chromium.launch();
+  const p = await b.newPage();
+  const errs = [];
+  p.on("pageerror", (e) => errs.push(e.message));
+  await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
+
+  const r = await p.evaluate(({ PREFIJO, LIBRE }) => {
+    const fallas = [];
+    if (typeof codEmpiezaCon !== "function") fallas.push("no existe codEmpiezaCon");
+    else PREFIJO.forEach(([cod, term, esp]) => {
+      const dio = !!codEmpiezaCon(cod, term);
+      if (dio !== esp) fallas.push("codEmpiezaCon(" + cod + ", " + term + ") = " + dio + ", esperaba " + esp);
+    });
+
+    if (typeof stkMatchBusq !== "function") fallas.push("no existe stkMatchBusq");
+    else LIBRE.forEach(([term, cod, libre, num, esp]) => {
+      const dio = !!stkMatchBusq(term, cod, libre, num);
+      if (dio !== esp) fallas.push("stkMatchBusq(" + JSON.stringify(term) + ", " + cod + ", " + JSON.stringify(libre) + ", " + num + ") = " + dio + ", esperaba " + esp);
+    });
+
+    // candado: los buscadores de código del módulo pasan por el helper, no por su propio indexOf
+    ["stkBodyStocks", "stkDescargarExcel", "stkBodyIngresos", "stkBodySalidas", "stkBodyHistAjustes"].forEach((fn) => {
+      if (typeof window[fn] !== "function") { fallas.push("no existe " + fn); return; }
+      const src = String(window[fn]);
+      if (!/stkMatchBusq|codEmpiezaCon/.test(src)) fallas.push(fn + " no usa el helper de búsqueda por prefijo");
+    });
+    // y la regla vieja (matchear el código entero y frenar si sigue un dígito) no puede volver
+    if (/charAt\(tn\.length\)/.test(String(window.stkBodyStocks || ""))) fallas.push("stkBodyStocks volvió al match exacto: 03 no encontraría nada");
+    return fallas;
+  }, { PREFIJO, LIBRE });
+
+  const ok = r.length === 0 && errs.length === 0;
+  console.log("stk-busqueda-prefijo: prefijo=" + PREFIJO.length + " · libre=" + LIBRE.length +
+    (r.length ? " · FALLAS: " + r.join(" | ") : "") + " · pageerrors:", errs.length ? errs.join("|") : "none",
+    "·", ok ? "✓ OK" : "✗ FAIL");
+  await b.close();
+  process.exit(ok ? 0 : 1);
+})();
