@@ -3853,6 +3853,67 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
+## ⚠ REGLA (Luis, 2026-09-22, v21.28): el operario puede recibir un código que NO es del proveedor
+
+**Luis, textual:** *"cuando se elige al tallerista deberían aparecer los códigos asignados a el
+como proveedor y un botón más grande que diga «Introducir Código diferente» … Una vez envíe el
+dato de la recepción, debería aparecer un botón para notificar a Thomy por WhatsApp (como si
+hubiesen recibido mercadería > a las OCs establecidas) que no impida la recepción"*.
+
+El buscador de códigos activos ya existía desde la **v15.76**, pero era el `+` de **Log/Fabr** y
+**de nadie más**: si Pedernera entregaba un código que no estaba en su lista, el operario no tenía
+forma de cargarlo. Y con la lista vacía la pantalla cortaba con un `return` que dejaba sólo el
+cartel *"No hay códigos"*. Hoy el botón grande **«🔍 Introducir código diferente»** está en todos
+los proveedores, con lista vacía también.
+
+⚠ **El código agregado así NO se asigna al proveedor** — sólo en Log/Fabr, que es como venía. Si
+se guardara en `Articulos Virgilio X Tallerista`, la próxima entrega del mismo código entraría en
+silencio y el aviso a Thomas no saldría nunca más. Es exactamente lo que se quiere evitar.
+
+⚠ **El aviso es el del exceso de OC, no uno nuevo.** Un código que no es del proveedor no tiene OC
+suya → `ocRef = 0` → ya entraba por `opExcesoItems` y el botón de WhatsApp ya aparecía. Lo que
+faltaba era **decirlo por su nombre**: `noAsig` hace que el mensaje diga *"un proveedor entregó un
+código que no está asignado a él"* en vez de *"SIN OC generada (OC = 0)"*, que es lo mismo que ya
+se corrigió en la v19.57 para el caso de la OC ajena.
+
+**Los tres casos del mensaje, y no se pisan:**
+
+| qué pasó | qué dice |
+|---|---|
+| el código está en la OC de **otro** proveedor (`ajena`, v19.57) | *"la OC es de Poly (155 pendientes)"* |
+| el código **no está asignado** a este proveedor (`noAsig`, v21.28) | *"NO está asignado a Lucho ni tiene OC suya"* |
+| es suyo pero no hay OC (`sinOc`, v17.99) | *"SIN OC generada (OC = 0)"* |
+
+**Chequeo:** `node tests/rcp-codigo-diferente.cjs` — corre la pantalla de verdad y mira las dos
+mitades (que el botón esté para un tallerista común **y** que Log/Fabr siga guardando fijo).
+Verificado que falla contra el código anterior.
+
+### ⚠ Y un código con proveedor puede NO figurar en el módulo de operarios
+
+Lo que el operario ve al elegir a un proveedor sale de **dos tablas distintas**, y ninguna es
+`OC_Maximos`:
+
+| tipo de entidad | de dónde salen sus códigos |
+|---|---|
+| `tallerista` | **`Articulos Virgilio X Tallerista`** por `Cod_Tallerista` + `Linea` |
+| `prov_at` | **`vista_articulos_prov_at`** por `proveedor` + `linea` |
+
+⚠ **El barrido se hace con `gv_prov_match`, NUNCA por nombre crudo.** `OC_Maximos` dice
+`Martin C` / `Carlos E` / `Pettofrezza` / `Blistpack` donde la entidad se llama `Martin` /
+`Carlos` / `Rafael` / `Blist-Pack`: comparando el texto pelado salen **91 códigos "a nombre de
+otro"** que están perfectos. Con el matcher, de los 238 activos con proveedor faltan **49**.
+
+⚠ **Y el `Cod_Tallerista` es POR LÍNEA**: `Codigos X Tallerista` tiene una fila por (nombre,
+línea). **Blist-Pack no tiene fila CH**, así que sus 5 códigos de Chef (758, 762, 763, 764, 769)
+no pueden aparecer aunque se los dé de alta — falta ese dato, lo define el dueño.
+
+⚠ **`vista_articulos_prov_at.linea` sale de un LATERAL contra la tabla de TALLERISTAS**, que no
+tiene nada que ver con un prov AT. Un código que no esté ahí sale con `linea = ''` y el
+`.eq("linea","LK")` del celular no lo encuentra nunca. Al 22/09 era **1 de 87** (el 193, Kuffo).
+
+**Chequeo y alta:** `sql/gv_recepcion_codigos_con_proveedor_v2128.sql` (la consulta de barrido
+está al final y tiene que dar vacío).
+
 ## ⚠ REGLA (Luis, 2026-09-22, v20.95): un código BUSCADO se muestra aunque esté en 0
 
 **Luis, textual:** *"838E NO APARECE en la vista de stocks"*.

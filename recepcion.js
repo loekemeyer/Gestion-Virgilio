@@ -88,7 +88,8 @@ function rcpDraftSave() {
       tallCods: opState.tallCods, articulosManual: opState.articulosManual,
       linea: opState.linea, fecha: opState.fecha, remito: opState.remito,
       articulos: opState.articulos, cargas: cargas,
-      altaNuevos: opState.altaNuevos || {}
+      altaNuevos: opState.altaNuevos || {},
+      artExtra: opState.artExtra || {}
     }));
   } catch (_e) { /* localStorage lleno / modo privado: no rompe la carga */ }
   rcpDraftNotify();
@@ -177,6 +178,10 @@ const RCP_CSS = `
 #rcpRoot .opCodeBtn.exceso .cnt{ color:var(--danger); }
 #rcpRoot .opCodeBtn.opCodeAdd{ border:2px dashed var(--ok); color:var(--ok); background:#f6fff8; }
 #rcpRoot .opCodeAddPlus{ font-size:34px; line-height:1; font-weight:900; }
+/* v21.28 — "Introducir codigo diferente": va para TODOS los proveedores, no solo Log/Fabr. */
+#rcpRoot .opCodeOtro{ width:100%; margin-top:14px; padding:18px; font-size:18px; font-weight:900;
+  border:2px dashed var(--ok); border-radius:14px; background:#f6fff8; color:var(--ok); cursor:pointer; }
+#rcpRoot .opCodeOtroHint{ margin-top:6px; text-align:center; font-size:13px; color:#6b7280; }
 #rcpRoot .opLineRow{ display:flex; gap:14px; margin-top:14px; }
 #rcpRoot .opLineBtn{ flex:1; height:90px; font-size:24px; font-weight:900; border-radius:14px; border:2px solid var(--border); background:#fff; cursor:pointer; }
 #rcpRoot .opLineBtn.active{ background:#111; color:#fff; border-color:#111; }
@@ -431,7 +436,9 @@ const opState = {
   listaTipo: null,
   ocPorCod: null,    // v7.07: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
   ocOk: false,       // v17.99: true sólo si la RPC de OCs contestó (sin eso no se exige el aviso)
-  ocAjena: null      // v19.57: códigos que NO están en SU OC pero sí en la de otro { codNorm: {otros,pend,...} }
+  ocAjena: null,     // v19.57: códigos que NO están en SU OC pero sí en la de otro { codNorm: {otros,pend,...} }
+  artExtra: null     // v21.28: { codNorm: true } de los códigos que el operario agregó a mano
+                     //          con "Introducir código diferente" (NO estaban asignados a este proveedor)
 };
 
 /* v3.81-fix: usar TZ Argentina (igual que getTodayKey() en index.html) en
@@ -496,6 +503,7 @@ function opResetState() {
   opState.linea = null; opState.fecha = opTodayStr();
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
   opState.altaNuevos = {};      // v15.36: altas del "+" esperando el OK de Thomas
+  opState.artExtra = {};        // v21.28: códigos agregados a mano en esta recepción
   opState.ocPorCod = null; opState.ocOk = false; opState.ocAjena = null;   // v19.57
   opState.excesoAvisado = null; opState.excesoGond = null; opState.excesoGondFirma = null;   // v18.02
   opState.fotoFile = null;
@@ -532,6 +540,7 @@ window.reanudarRecepcionOp = function (legajo, dayKey) {
   opState.articulos = d.articulos || null;
   opState.cargas = d.cargas || {};
   opState.altaNuevos = d.altaNuevos || {};   // v15.36: altas pendientes de OK
+  opState.artExtra = d.artExtra || {};       // v21.28: códigos agregados a mano
   if (Object.keys(opState.altaNuevos).some(function (c) { return opState.altaNuevos[c].estado === "pendiente"; })) altaPollStart();
   opPage.classList.remove("pendWide");
   opPage.classList.add("open");
@@ -1274,9 +1283,15 @@ function drawArticulosGrid() {
       if (opState.step === "articulos") drawArticulosGrid();
     });
   }
-  // Sin códigos: aviso normal, salvo en Log/Fabr (ahí igual mostramos el "+").
-  if (!hayArts && !arEsLogFabr()) {
-    opBody.innerHTML = '<div class="opEmpty">No hay códigos para la línea ' + opState.linea + '.</div>';
+  // v21.28 — sin códigos ya NO se corta acá: el aviso va arriba y abajo queda el botón
+  // "Introducir código diferente", que ahora existe para TODOS los proveedores. Antes el
+  // return dejaba al operario sin ninguna salida salvo en Log/Fabr.
+  if (!hayArts) {
+    const vac = document.createElement("div");
+    vac.className = "opEmpty";
+    vac.textContent = "No hay códigos asignados a este proveedor para la línea " + opState.linea + ".";
+    opBody.appendChild(vac);
+    opBody.appendChild(_arBotonOtro());
     opActions.innerHTML = "";
     return;
   }
@@ -1319,17 +1334,9 @@ function drawArticulosGrid() {
     b.onclick = () => openCajas(a.Cod_Art);
     grid.appendChild(b);
   });
-  // Log/Fabr: botón "+" para agregar un artículo nuevo (queda fijo).
-  if (arEsLogFabr()) {
-    const addBtn = document.createElement("button");
-    addBtn.type = "button";
-    addBtn.className = "opCodeBtn opCodeAdd";
-    addBtn.innerHTML = '<span class="opCodeAddPlus">+</span>';
-    addBtn.title = "Agregar artículo a Log/Fabr";
-    addBtn.onclick = arAddCode;
-    grid.appendChild(addBtn);
-  }
   opBody.appendChild(grid);
+  // v21.28 — el "+" de Log/Fabr pasó a ser un botón grande y vale para TODOS los proveedores.
+  opBody.appendChild(_arBotonOtro());
 
   const total = Object.values(opState.cargas).filter(n => n > 0).length;
   opActions.innerHTML = "";
@@ -1349,6 +1356,37 @@ function drawArticulosGrid() {
 function arEsLogFabr() {
   return opState.tipo === 'tallerista' && claveTall(opState.tallNombre || "") === claveTall("Log/Fabr");
 }
+/* ====== v21.28 — "Introducir código diferente", para TODOS los proveedores ==========
+   Pedido de Luis (2026-09-22): *"cuando se elige al tallerista deberían aparecer los
+   códigos asignados a el como proveedor y un botón más grande que diga «Introducir
+   Código diferente» que le permita al operario escribir un código (pero solo elegir de
+   una lista de sugerencias que consiste en los códigos existentes)"*.
+
+   La lista de sugerencias YA existe: es el buscador de `arAddCode` (v15.76), que filtra
+   los activos de `OC_Maximos` y sólo deja escribir libre por la puerta de escape
+   "Cargar igual", que dispara el WhatsApp a Thomas. Lo único que cambia es que ese
+   buscador dejó de ser exclusivo de Log/Fabr.
+
+   ⚠ Y el código agregado así NO se guarda fijo en el padrón, salvo en Log/Fabr — ver
+   `arSaveCodeRemote`. Si se guardara, la próxima entrega entraría en silencio y nadie
+   se enteraría: es justo el aviso que Luis pide. */
+function _arBotonOtro() {
+  const wrap = document.createElement("div");
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "opCodeOtro";
+  b.id = "opCodeOtro";
+  b.textContent = "🔍 Introducir código diferente";
+  b.onclick = arAddCode;
+  wrap.appendChild(b);
+  const h = document.createElement("div");
+  h.className = "opCodeOtroHint";
+  h.textContent = arEsLogFabr()
+    ? "Buscá el código en la lista de activos."
+    : "Buscá el código en la lista de activos. Si no es de este proveedor, le avisamos a Thomy y seguís igual.";
+  wrap.appendChild(h);
+  return wrap;
+}
 /* Guarda el código en "Articulos Virgilio X Tallerista" (best-effort).
    MAESTRO: busca una fila existente del MISMO código (cualquier tallerista) y
    COPIA todas sus columnas (Desc, UxB y cualquier otro dato del artículo);
@@ -1357,6 +1395,11 @@ function arEsLogFabr() {
    por cada línea de Log/Fabr (LK y CH) → aparece en ambas y en cualquier device.
    Si el código no existe en ningún lado, cae a un alta mínima (Desc: ""). */
 async function arSaveCodeRemote(cod) {
+  // v21.28 — el alta FIJA en el padrón sigue siendo sólo de Log/Fabr. Para el resto de
+  // los proveedores el código agregado a mano vale para ESTA recepción y nada más: si
+  // quedara asignado, la próxima entrega del mismo código entraría sin que nadie se
+  // entere, y el aviso a Thomas que pidió Luis dejaría de salir.
+  if (!arEsLogFabr()) return;
   let base = null;
   try {
     const res = await supabase.from("Articulos Virgilio X Tallerista")
@@ -1701,8 +1744,13 @@ async function arAddCodeAplicar(cod, fueraDeLista) {
   if (!opState.articulos) opState.articulos = [];
   const existe = opState.articulos.some(a => _ocgNorm(a.Cod_Art) === cod);
   if (!existe) {
+    // v21.28 — queda marcado como "no asignado a este proveedor" para que el WhatsApp
+    // del resumen lo diga con todas las letras (no es "se pasó de la OC": no es de él).
+    if (!opState.artExtra) opState.artExtra = {};
+    opState.artExtra[cod] = true;
     opState.articulos.push({ Cod_Art: cod, Desc: "" });   // mostrar al instante
-    arSaveCodeRemote(cod);                                  // guardar fijo (compartido)
+    arSaveCodeRemote(cod);                                  // Log/Fabr: guardar fijo
+    rcpDraftSave();
   }
   drawArticulosGrid();
   openCajas(cod);                                // que le cargue las cajas ya mismo
@@ -1934,8 +1982,13 @@ function opExcesoItems() {
     .map(function (e) {
       const cod = e[0], cajas = e[1], oc = ocDeCod(cod), ref = ocRef(oc);
       // v19.57 — `ajena` = el código no está en SU OC pero sí en la de otro proveedor.
+      // v21.28 — `noAsig` = lo agregó el operario con "Introducir código diferente", o sea
+      // que ese código NO está asignado a este proveedor. Es el caso que pidió Luis y por
+      // eso el aviso a Thomas es el mismo que el del exceso de OC (sin OC propia, ref = 0,
+      // así que ya entraba por acá: lo que faltaba era decirlo por su nombre).
       return { cod: cod, cajas: cajas, oc: oc, ref: ref, exced: cajas - ref, sinOc: !oc,
-               ajena: ocAjenaDe(cod) };
+               ajena: ocAjenaDe(cod),
+               noAsig: !!(opState.artExtra || {})[_ocgNorm(cod)] };
     })
     .filter(function (i) { return i.cajas > i.ref; });
 }
@@ -2044,9 +2097,13 @@ function opWhatsExceso(exc) {
   // v19.57 — si hay alguna ajena, el título lo dice: no es "se pasó de la OC", es "esto no es
   // de él". El backend además manda su propio aviso por Telegram, que no depende de este botón.
   const hayAjena = (exc || []).some(function (i) { return !!i.ajena; });
+  // v21.28 — y el caso de Luis: un código que NO está asignado a este proveedor.
+  const hayNoAsig = (exc || []).some(function (i) { return !!i.noAsig && !i.ajena; });
   const L = [
     hayAjena
       ? "Hola Thomas, un proveedor entregó mercadería que no está en su orden de compra:"
+      : hayNoAsig
+      ? "Hola Thomas, un proveedor entregó un código que no está asignado a él:"
       : "Hola Thomas, entró mercadería que la OC no habilita:",
     "Proveedor: " + (opState.tallNombre || "?"),
     "RTO/FC: " + (opState.remito || "s/remito") + " · " + (opState.linea || "") + " · " + fechaCorta(opState.fecha),
@@ -2066,6 +2123,9 @@ function opWhatsExceso(exc) {
       ? ("• " + i.cod + ": recibo " + i.cajas + ", NO está en la OC de " +
          (opState.tallNombre || "?") + " → la OC es de " + i.ajena.otros +
          (i.ajena.pend > 0 ? " (" + i.ajena.pend + " pendientes)" : "") + " · " + entra)
+      : i.noAsig
+      ? ("• " + i.cod + ": recibo " + i.cajas + ", NO está asignado a " +
+         (opState.tallNombre || "?") + " ni tiene OC suya · " + entra)
       : i.sinOc
       ? ("• " + i.cod + ": recibo " + i.cajas + ", SIN OC generada (OC = 0) → las " + i.exced +
          " son de más · " + entra)
