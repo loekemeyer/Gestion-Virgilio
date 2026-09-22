@@ -23,8 +23,8 @@
 --   ·  5  son de Blist-Pack línea CH y NO se pueden: "Codigos X Tallerista" no tiene
 --         la fila CH de Blist-Pack, así que el operario no tiene código que elegir.
 --         Falta ese dato -> lo define Luis (758, 762, 763, 764, 769).
---   ·  1  es 581T (Martin, LK): no tiene Uni_x_Caja en ninguna tabla y la columna es
---         NOT NULL -> falta el dato.
+--   ·  1  era 581T (Martin, LK): no tenia Uni_x_Caja en ninguna tabla y la columna es
+--         NOT NULL. Luis lo dicto el 22/09: **18**. Entra con los demas -> son 43.
 --   ·  1  es 193 (Kuffo, prov_at) -> bloque B, es otra cosa.
 -- ============================================================================
 
@@ -38,12 +38,13 @@ revoke insert, update, delete, truncate on zz_backups."GV_Backup_ArtXTall_202609
   from anon, authenticated;
 
 -- ----------------------------------------------------------------------------
--- A) ALTA de los 42. Es ADITIVO: sólo INSERT, ningún update ni delete.
+-- A) ALTA de los 43. Es ADITIVO: sólo INSERT, ningún update ni delete.
 --    El SELECT se recalcula al correr, así que no puede desfasarse de la medición.
 --    Desc  <- la que ya tenga ese código en la tabla, si no OC_Maximos.descripcion,
 --             si no stocks_carga_rapida.descripcion, si no el código pelado.
---    UxB   <- la que ya tenga ese código en la tabla, si no vista_uxb_articulo.
---             Sin UxB no se inserta (la columna es NOT NULL): ése es el 581T.
+--    UxB   <- la que ya tenga ese código en la tabla, si no vista_uxb_articulo, si no
+--             `uxb_manual` (lo que dicto Luis para el codigo que no lo tiene en ningun lado).
+--             Sin UxB no se inserta: la columna es NOT NULL.
 -- ----------------------------------------------------------------------------
 insert into public."Articulos Virgilio X Tallerista"
        ("Linea", "Cod_Art", "Desc", "Tallerista", "Uni_x_Caja", "Cod_Tallerista")
@@ -61,7 +62,9 @@ ct as (
 yaesta as (
   select distinct btrim("Cod_Art") cod, btrim("Cod_Tallerista") tcod,
          upper(btrim(coalesce("Linea",''))) linea
-    from public."Articulos Virgilio X Tallerista")
+    from public."Articulos Virgilio X Tallerista"),
+-- Uni_x_Caja que NO existe en ninguna tabla y dicto Luis (22/09). Al agregar otro, va aca.
+uxb_manual(cod, uxb) as (values ('581T', 18))
 select o.linea, o.cod,
        coalesce(
          nullif((select max(x."Desc") from public."Articulos Virgilio X Tallerista" x
@@ -75,7 +78,8 @@ select o.linea, o.cod,
           (select max(x."Uni_x_Caja") from public."Articulos Virgilio X Tallerista" x
             where btrim(x."Cod_Art") = o.cod),
           (select round(u.uxb)::int from public.vista_uxb_articulo u
-            where btrim(u.cod) = o.cod))) as "Uni_x_Caja",
+            where btrim(u.cod) = o.cod),
+          (select m.uxb from uxb_manual m where m.cod = o.cod))) as "Uni_x_Caja",
        c.codigo
   from ocm o
   join ct c on public.gv_prov_match(o.k, c.k) and c.linea = o.linea
@@ -85,8 +89,9 @@ select o.linea, o.cod,
          (select max(x."Uni_x_Caja") from public."Articulos Virgilio X Tallerista" x
            where btrim(x."Cod_Art") = o.cod),
          (select round(u.uxb)::int from public.vista_uxb_articulo u
-           where btrim(u.cod) = o.cod)) is not null;
--- esperado: INSERT 0 42
+           where btrim(u.cod) = o.cod),
+         (select m.uxb from uxb_manual m where m.cod = o.cod)) is not null;
+-- esperado: INSERT 0 43
 
 -- ----------------------------------------------------------------------------
 -- B) 193 (Tostador Enlozado, Kuffo) — NO es un alta: es la LÍNEA de la vista.
@@ -156,9 +161,12 @@ select o.cod, o.linea, o.prov
                           and a.tcod = (case when o.linea='CH' then e.cod_ch else e.cod_lk end)
                           and a.linea = o.linea) end))
  order by 3, 2, 1;
--- esperado después de correr A y B: 6 filas
---   758 / 762 / 763 / 764 / 769  CH  Blistpack  -> falta el código CH de Blist-Pack
---   581T                         LK  Martin C   -> falta Uni_x_Caja
+-- esperado después de correr A y B: 5 filas
+--   758 / 762 / 763 / 764 / 769  CH  Blistpack  -> falta el código CH de Blist-Pack.
+--   Luis, 22/09: "nose". Y el dato tampoco esta en la operacion: de las 21 entregas de
+--   Blist-Pack (03/02 al 21/09) NINGUNA es de la linea CH -- son 500, 506, 510, 557 y 558,
+--   todos LK. O sea que esos 5 codigos de bombillas nunca se recibieron a su nombre.
+--   NO se inventa un codigo: queda abierto hasta que el dueño lo diga.
 
 -- ----------------------------------------------------------------------------
 -- ROLLBACK
