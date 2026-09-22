@@ -1441,6 +1441,10 @@ button {
 .apr-hor{ font-size:11.5px; font-weight:800; border-radius:999px; padding:2px 9px; cursor:pointer;
   background:#e0f2fe; color:#075985; border:1px solid #bae6fd; white-space:nowrap; }
 .apr-hor:hover{ background:#bae6fd; }
+.apr-card-obs{ margin:4px 0 2px; padding:4px 8px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px;
+  color:#78350f; font-size:12.5px; font-weight:600; white-space:pre-wrap; word-break:break-word; }   /* v21.34 */
+.apr-obs{ font-size:11.5px; font-weight:700; color:#78350f; background:#fffbeb; border:1px solid #fde68a;
+  border-radius:999px; padding:1px 8px; margin-left:4px; white-space:nowrap; }                     /* v21.34 */
 .apr-hor.vacio{ background:#fff; color:#94a3b8; border:1px dashed #cbd5e1; font-weight:700; }
 .apr-hor.vacio:hover{ background:#f8fafc; color:#475569; }
 .apr-hor.cli{ background:#dcfce7; color:#14532d; border-color:#86efac; }   /* lo eligió el cliente */
@@ -6025,7 +6029,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.33"></script>
+<script type="module" src="recepcion.js?v=21.34"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9907,7 +9911,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.33";
+const APP_VERSION = "v21.34";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -33345,7 +33349,7 @@ async function pwebResync(nps, empresa) {
 async function pppTraerWebProgramados() {
   const rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion",
     "select=empresa,order_id,np_idx,np,cod_cliente,razon_social,direccion,barrio,zona," +
-    "tanda,fecha_entrega,fecha_recep,m3,m3_parcial,lineas,cajas&tanda=not.is.null");
+    "tanda,fecha_entrega,fecha_recep,m3,m3_parcial,lineas,cajas,observaciones&tanda=not.is.null");
   return (rows || []).map(function (r) {
     return {
       // v12.92 — la NP es el número de pedido de la página: si `np` viniera vacío se
@@ -33357,6 +33361,9 @@ async function pppTraerWebProgramados() {
       localidad: r.barrio || "",
       fecha_entrega: _pppSupaFecha(r.fecha_entrega),
       zona: r.zona || "",
+      // v21.34 (Thomas, 22/09): la observación que el cliente/vendedor escribió en el carrito.
+      // La completa un trigger desde lk_pedidos_match; va a la hoja de ruta como la de ISIS.
+      observaciones: r.observaciones || "",
       programmed: true,
       _web: true, _wEmp: r.empresa, _wOrder: r.order_id, _wIdx: r.np_idx,
       _wNum: r.np, _wItems: [], _wLineas: r.lineas, _wCajas: r.cajas,
@@ -45461,7 +45468,7 @@ async function aprTraerPedidos(e) {
   // los pedidos de Tierra del Fuego, que viven en la página de LK y son de Chef.
   const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
   const rLk = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-    + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,provincia,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de,isis_empresa,cod_isis,fecha_entrega_pactada,hora_entrega_pactada,fecha_entrega_txt"
+    + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,provincia,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de,isis_empresa,cod_isis,fecha_entrega_pactada,hora_entrega_pactada,fecha_entrega_txt,observaciones"
     + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
     { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
   if (!rLk.ok) throw new Error("LK respondió " + rLk.status);
@@ -45552,6 +45559,8 @@ async function aprTraerPedidos(e) {
       turno_fecha: (n.fecha_entrega_pactada ? String(n.fecha_entrega_pactada).slice(0, 10) : ""),
       turno_hora: n.hora_entrega_pactada || "",
       turno_txt: n.fecha_entrega_txt || "",
+      // v21.34 (Thomas, 22/09): "tendría que figurar sí o sí". Es del PEDIDO, no del bloque.
+      obs_pedido: String(n.observaciones || "").trim(),
       m3: 0, m3_parcial: false, lineas: 0, cajas: 0, bloques: []
     });
     const p = by.get(k);
@@ -46525,6 +46534,21 @@ function aprTurnoOc(p) {
   if (!f && !hh) return null;
   return { fecha: f, franja: hh, origen: "oc", txt: String(p.turno_txt || "").trim() };
 }
+/* v21.34 (Thomas, 22/09/2026) — LA OBSERVACIÓN DEL PEDIDO WEB. Lo que el cliente o el vendedor
+   escribe en el carrito ("Urgente", "retira en moto", "otro expreso") no llegaba a ninguna
+   pantalla de Gestión: 51 de 435 pedidos en 60 días la tenían. Viene de `v_pedidos_web_np`
+   (LK) y, al programar, un trigger la copia a `PPP_Web_Programacion.observaciones`, que es la
+   columna que ya imprime la hoja de ruta. */
+function aprObsLinea(p) {
+  const o = String((p && p.obs_pedido) || "").trim();
+  if (!o) return "";
+  return '<div class="apr-card-obs" title="Observación del pedido (la escribió el cliente o el vendedor)">💬 ' + escapeHtml(o) + '</div>';
+}
+function aprObsBadge(p) {
+  const o = String((p && p.obs_pedido) || "").trim();
+  if (!o) return "";
+  return ' <span class="apr-obs" title="' + escapeHtml("Observación del pedido: " + o) + '">💬 ' + escapeHtml(o.length > 40 ? o.slice(0, 40) + "…" : o) + '</span>';
+}
 function aprHorBadge(p) {
   const oc = aprTurnoOc(p);
   if (!aprPideHorario(p) && !oc) return "";
@@ -46767,6 +46791,7 @@ function aprColPedidos() {
         '<span class="apr-card-chev" onclick="aprToggle(\'' + id + '\')" title="Ver qué pidieron (códigos y cajas)">' + (ab ? "▾" : "▸") + '</span>' +
       '</div>' +
       '<div class="apr-card-cli" onclick="aprToggle(\'' + id + '\')">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + '</div>' +
+      aprObsLinea(p) +       // v21.34: observación del pedido
       '<div class="apr-card-d">' +
         aprHorBadge(p) +     // v17.74 (Luis): el cliente coordina horario — tocalo para editarlo
         aprEsperaChip(p) +   // v13.85: hace cuánto llegó
@@ -46991,7 +47016,7 @@ function aprColCuarentena() {
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
       '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) + '</td>' +
-      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</td>' +
+      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
       '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') + '</td>' +
       // v19.94 (Thomas): el MISMO monto que Clientes nuevos — precio total por lista (neto) y,
       // debajo, el total con IVA. Va al lado de los badges de deuda y de límite, que es donde sirve.
@@ -47724,7 +47749,7 @@ function clinNuevosHtml() {
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
       '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) + '</td>' +
-      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</td>' +
+      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
       '<td class="clin-td-tiempo">' + clinTiempoHtml(p) + '</td>' +
       '<td>' + clinContactoBtns(p) + '</td>' +
       '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
@@ -48462,7 +48487,7 @@ function pipeHtml() {
         (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') + aprCuarBadgesHtml(p) + '</td>' +
       '<td class="pipe-td-cuit">' + pipeCuitHtml(p) + '</td>' +
       // v20.86 (Luis): la zona, con su badge de horario — es lo que se mira para programarlo
-      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + '</td>' +
+      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
       '<td class="pipe-td-et">' + pipeEtapaHtml(p) + '</td>' +
       '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
       '<td class="pipe-td-acc">' + pipeAccionesHtml(p) + '</td>' +
