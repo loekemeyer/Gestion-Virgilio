@@ -28687,3 +28687,78 @@ lectura.
 
 **Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = las dos reglas siguen.
 `sql/gv_armado_cuarentena_v2095.sql`.
+
+### §3.mf — v20.96 · El control de cuarentena se caía en silencio, y el cancelado no se veía — 2026-09-22
+
+Dos cosas del mismo tipo, las dos encontradas mirando la pantalla, no el sistema.
+
+#### 1. «Cuarentena (0)» cuando el control no pudo correr
+
+**Thomas:** *"espera, hay algo roto. el de Ierakuin sigue saliendo automáticamente de cuarentena?"*
+
+`cuarMarcarPedidos` llamaba a las tres RPC dentro de **un solo `Promise.all`**. Si una fallaba, el
+`await` tiraba, el `catch (_e) { /* no marca; no rompe la pantalla */ }` se lo comía y **ningún
+pedido quedaba marcado**: el sector dibujaba *"🚧 Cuarentena (0) · Sin pedidos retenidos"* mientras
+los retenidos de verdad se dibujaban en la lista normal, sin su cartel y con el chip verde
+*"se arma solo"*.
+
+Medido en `edge_logs` el 22/09, entre las 10:28 y las 10:36 ART:
+
+| RPC | respuestas 500 |
+|---|---|
+| `gv_cuarentena_marcar` | 4 |
+| `gv_cuarentena_limite` | 1 |
+
+Todas con `canceling statement due to statement timeout` en `postgres_logs`. **No es un bug de la
+cuarentena ni del cambio de la v20.95**: los timeouts arrancan a las 09:00 ART (8 esa hora, 10 la
+siguiente) y el 21/09 hubo 28 en una hora. `pg_stat_statements` dice quién ocupa la base, y no es
+la cuarentena:
+
+| consulta | llamadas | total | media | peor |
+|---|---:|---:|---:|---:|
+| replicación / WAL | 73.150 | 1.937 s | 26 ms | 10,4 s |
+| `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada` | 785 | 1.757 s | 2.239 ms | **33,8 s** |
+| `vista_saldos_stock` | 887 | 1.707 s | 1.925 ms | 7,9 s |
+
+**Qué se hizo** (v20.96): `Promise.allSettled` — cada RPC falla por su cuenta —, `marcar` en su
+propio helper `cuarRpcMarcar` con **un reintento** (el timeout deshace la transacción entera, así
+que reintentar es seguro), `_apr.cuarErr` con el motivo, y el sector avisa en rojo en vez de decir
+*"sin pedidos retenidos"*. Si la marcación no se pudo hacer, **se conservan las marcas de la vuelta
+anterior**: no se borran.
+
+> Es la lección de la v19.44 —*"lo nuevo no puede ir adentro del `Promise.all` de lo que ya
+> funciona"*— que entonces se aplicó sólo a la RPC de reposición chica.
+
+⚠ **Lo que NO estaba roto:** ningún pedido salió. Con el guard de la v20.95, el armado automático
+no toca un retenido aunque la pantalla no lo pinte. Medido: CH 0004 y LK 0094/95/96 siguen sin
+tanda y en `GV_PPP_Web_Retenido`; Romagessi (LK 0201, $2.216.125) y Bazar Monica (LK 0018,
+$1.080.583) los frena el guard. De los 5 que el log listaba como retenidos, el único realmente
+programado es **LK 0144 (Suppa, E26D del 22/09)** — y está bien: su deuda es la factura de la NP
+hermana del mismo pedido, así que la Cuarentena no lo retiene.
+
+`tests/cuar-control-caido.cjs` (candados estáticos: un test de pantalla necesitaría reproducir el
+timeout, y lo que hay que impedir es que alguien vuelva a juntar las llamadas o a tapar el error).
+
+#### 2. El pedido cancelado decía «retenido» para siempre
+
+**Thomas:** *"fijate que en «estado» aparezca cuando le cancelan/anulan un pedido"*.
+
+El estado salía del último **evento** de `GV_Cuarentena_Log`. El caso `anulado` estaba en el CASE
+desde siempre, pero ese evento **nunca se escribió**:
+
+| | |
+|---|---:|
+| eventos `anulado` en `GV_Cuarentena_Log` | **0** |
+| filas en `GV_Pedidos_Anulados` | 1 |
+| filas en `GV_Web_Cancelados` | 7 |
+
+Ocho cancelaciones registradas, ninguna en el log. Desde la v20.96 el estado se lee del **hecho**,
+uniendo las tres tablas de cancelación (`GV_Web_Cancelados`, `GV_PPP_Web_NP_Cancelada`,
+`GV_Pedidos_Anulados`) por la clave normalizada de `gv_cuarentena_clave`. Impacto medido a 60 días:
+`retenido` 17 → **15**, `cancelado` 0 → **2** (`web LK 1503` Clapera, cancelado el 21/09, y
+`web LK 1375` Andser Química, el 15/09 — los dos con deuda y figurando retenidos desde entonces).
+
+> Mismo criterio que §"el log del paso que falló no está donde está el log del paso que anduvo":
+> se mira la fila que EXISTE cuando el hecho ocurre, no la que alguien tendría que haber copiado.
+
+Front: chip de filtro **🗑 Cancelados** y su color. `sql/gv_cuarentena_log_cancelado_v2096.sql`.

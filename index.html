@@ -1109,6 +1109,7 @@ button {
 .cuar-log-chip.on.c-aprobado{ background:#166534; border-color:#166534; }
 .cuar-log-chip.on.c-devuelto{ background:#9f1239; border-color:#9f1239; }
 .cuar-log-chip.on.c-anulado{ background:#475569; border-color:#475569; }
+.cuar-log-chip.on.c-cancelado{ background:#7f1d1d; border-color:#7f1d1d; }   /* v20.96 */
 /* v18.06 (Luis, 2026-09-15: *"no puede estar así el submódulo, se tiene que ver la tabla sin
    scrollear en el submódulo, scrolleando en la página en sí si hace falta"*) — el log tenía su
    PROPIO scroll (`max-height: calc(100vh - 430px)` + `overflow:auto`) adentro de una pestaña que
@@ -1145,6 +1146,9 @@ button {
 .cuar-log-est.e-retenido{ background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
 .cuar-log-est.e-aprobado{ background:#dcfce7; color:#166534; border:1px solid #86efac; }
 .cuar-log-est.e-devuelto{ background:#ffe4e6; color:#9f1239; border:1px solid #fda4af; }
+/* v20.96 (Thomas): el pedido CANCELADO deja de decir "retenido" para siempre. El hecho sale
+   de las tablas de cancelados, no de un evento que nadie escribia (0 filas al 22/09). */
+.cuar-log-est.e-cancelado{ background:#fee2e2; color:#7f1d1d; border:1px solid #fca5a5; }
 .cuar-log-quien{ font-weight:800; overflow-wrap:anywhere; }
 .cuar-log-cuando{ font-size:13px; color:#475569; white-space:nowrap; }
 .cuar-log-mail{ display:block; font-size:12px; color:#64748b; max-width:170px; overflow:hidden;
@@ -1179,6 +1183,9 @@ button {
 .apr-col-cuar .apr-col-t{ color:#9a3412; }
 .apr-cuar-help{ font-weight:800; color:#c2410c; cursor:help; margin-left:5px; }
 .apr-col-cuar .apr-vacio{ color:#b45309; }
+/* v20.96 — el control de cuarentena se cayo (timeout): se avisa en vez de decir "no hay". */
+.apr-cuar-err{ color:#7f1d1d !important; background:#fef2f2; border-left:4px solid #b91c1c;
+  border-radius:6px; text-align:left; line-height:1.45; padding:10px 12px; margin:6px 0; }
 .apr-col-cuar .apr-vacio b{ color:#9a3412; }
 /* v18.01 — las FICHAS de Cuarentena (`.apr-card-cuar`, `.cuar-info`, `.cuar-card-top/-cli/-zona`,
    `.cuar-acciones`, la grilla de 340px de `.apr-col-cuar .apr-scroll` y `.apr-card-demo`) se
@@ -6017,7 +6024,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.95"></script>
+<script type="module" src="recepcion.js?v=20.96"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9899,7 +9906,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.95";
+const APP_VERSION = "v20.96";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -46431,10 +46438,17 @@ function aprColCuarentena() {
   if (_cuarCol) return h + '</div>';   // colapsado: sólo el título con el contador
   h += cuarDemoRowHtml();   // v14.88: los 4 botones de importación se movieron a "Config. Cuarentena"
   h += cuarYaProgHtml();   // v16.57 — aviso de los que YA tienen tanda (problema 14)
+  // v20.96 — el control se cayó: el sector NO puede decir "sin pedidos retenidos".
+  if (_apr.cuarErr) {
+    h += '<div class="apr-vacio apr-cuar-err">⚠ <b>No se pudo controlar la cuarentena</b> (' +
+      escapeHtml(String(_apr.cuarErr)) + '). Lo que ves puede estar incompleto: puede haber pedidos ' +
+      'con deuda, suspendidos o de clientes nuevos en la lista de la izquierda <b>sin su cartel</b>. ' +
+      'Refrescá antes de programar nada — el armado automático igual no los toca.</div>';
+  }
   if (!lista.length) {
     h += _cuarCargando
       ? '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Todavía controlando…</b></div>'
-      : '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b>, que <b>superan su límite de crédito</b> o que son <b>clientes nuevos</b>: no se programan solos.</div>';
+      : (_apr.cuarErr ? '' : '<div class="apr-vacio">Sin pedidos retenidos. Acá caen los de clientes con <b>deuda</b>, <b>suspendidos</b>, que <b>superan su límite de crédito</b> o que son <b>clientes nuevos</b>: no se programan solos.</div>');
     return h + '</div>';
   }
   // v18.01 (Luis): LISTA/TABLA, no fichas — las mismas columnas que la de "Ya programados"
@@ -48427,7 +48441,7 @@ function cuarLogHtml() {
   h += '<div class="cuar-log-chips">' +
     '<button class="cuar-log-chip' + (filtro ? "" : " on") + '" onclick="cuarLogFiltro(null)" ' +
       'title="Ver todos">Todos <b>' + todos.length + '</b></button>' +
-    [["retenido", "🚧 Retenidos"], ["aprobado", "✅ Aprobados"], ["devuelto", "↩ Devueltos"], ["anulado", "✕ Anulados"]].map(function (e) {
+    [["retenido", "🚧 Retenidos"], ["aprobado", "✅ Aprobados"], ["devuelto", "↩ Devueltos"], ["cancelado", "🗑 Cancelados"], ["anulado", "✕ Anulados"]].map(function (e) {
       return '<button class="cuar-log-chip c-' + e[0] + (filtro === e[0] ? " on" : "") + '" ' +
         'onclick="cuarLogFiltro(\'' + e[0] + '\')">' + e[1] + ' <b>' + cuenta(e[0]) + '</b></button>';
     }).join("") +
@@ -48735,20 +48749,36 @@ function cuarItemsDe(p) {
   (p.bloques || []).forEach(function (b) { (b.items || []).forEach(function (it) { a.push({ art: it.art, cajas: it.cajas }); }); });
   return a;
 }
+/* v20.96 — la RPC que decide QUIÉN está retenido, con UN reintento. El `statement timeout`
+   deshace la transacción entera, así que reintentar no duplica nada (§"canceling statement").
+   Va aparte para que el reintento no arrastre a las otras dos llamadas del allSettled. */
+async function cuarRpcMarcar(peds) {
+  const payload = { p_pedidos: peds.map(function (p) {
+    // v17.23: np y razón social viajan para que el LOG de Cuarentena se lea sin joins
+    return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim(),
+             np: aprPedLabel(p), razon_social: p.razon_social || null };
+  }) };
+  try { return await aprRpc("gv_cuarentena_marcar", payload); }
+  catch (_e) { return await aprRpc("gv_cuarentena_marcar", payload); }
+}
 async function cuarMarcarPedidos() {
   const peds = _apr.pedidos || [];
   if (!peds.length) { if (_pppTab === "prog") aprRender(); return; }
   try {
     // (1) Estado + Deuda (por empresa+cod) y (2) Límite (valoriza + greedy, sólo web) — en paralelo.
     const webPend = peds.filter(function (p) { return !p._demo && !p._isis; });
-    const [res, lim, libs] = await Promise.all([
-      aprRpc("gv_cuarentena_marcar", {
-        // v17.23: np y razón social viajan para que el LOG de Cuarentena se lea sin joins
-        p_pedidos: peds.map(function (p) {
-          return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim(),
-                   np: aprPedLabel(p), razon_social: p.razon_social || null };
-        })
-      }),
+    /* v20.96 (Thomas, 2026-09-22) — LAS TRES VAN POR SEPARADO, Y EL FALLO SE VE.
+       Estaban en un Promise.all: si UNA se caía, el await tiraba, el catch de abajo se lo comía
+       y NINGÚN pedido quedaba marcado — la pantalla dibujaba "🚧 Cuarentena (0) · Sin pedidos
+       retenidos" mientras los pedidos retenidos de verdad se dibujaban en la lista normal, sin
+       su cartel y con el chip verde "se arma solo". Medido el 22/09: 5 respuestas 500 en ocho
+       minutos, todas `canceling statement due to statement timeout` (la base ocupada por el
+       refresh de vista_stock_procesada, 2,2 s de media y hasta 33,8 s).
+       Es la misma lección de la v19.44, aplicada entonces sólo a la RPC de reposición chica.
+       allSettled: cada una falla por su cuenta. Y `marcar` —la que decide quién está retenido—
+       se reintenta UNA vez: el timeout deshace la transacción entera, así que es seguro. */
+    const _st = await Promise.allSettled([
+      cuarRpcMarcar(peds),
       webPend.length ? aprRpc("gv_cuarentena_limite", {
         p_pendientes: webPend.map(function (p) {
           return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim(),
@@ -48757,6 +48787,16 @@ async function cuarMarcarPedidos() {
       }) : Promise.resolve([]),
       aprRpc("gv_cuarentena_liberados")   // v14.88: los liberados van a la lista normal, con badge
     ]);
+    const res  = _st[0].status === "fulfilled" ? _st[0].value : null;
+    const lim  = _st[1].status === "fulfilled" ? _st[1].value : null;
+    const libs = _st[2].status === "fulfilled" ? _st[2].value : null;
+    _apr.cuarErr = (_st[0].status === "rejected")
+      ? (String((_st[0].reason && _st[0].reason.message) || _st[0].reason || "").slice(0, 160) || "no se pudo consultar")
+      : (_st[1].status === "rejected" ? "no se pudo calcular el límite de crédito" : null);
+    /* ⚠ Si la marcación no se pudo hacer, la pantalla NO puede decir "no hay retenidos": se
+       CONSERVA la marca de la vuelta anterior y se avisa arriba del sector. Un cero que en
+       realidad es "no pude preguntar" es el pozo de §"una lectura ROTA no es un CERO". */
+    if (res === null) { if (_pppTab === "prog") aprRender(); return; }
     const byKey = {};   // retenidos (no liberados) → sector
     const detKey = {};  // v15.04: montos del motivo (deuda / exceso de crédito / estado)
     (res || []).forEach(function (r) {
@@ -48785,7 +48825,13 @@ async function cuarMarcarPedidos() {
       else if (byKey[k] && byKey[k].length) { p.cuarentena_motivos = byKey[k]; p._cuarLiberado = false; }
       else { if (p.cuarentena_motivos) delete p.cuarentena_motivos; if (p._cuarLiberado) delete p._cuarLiberado; }
     });
-  } catch (_e) { /* si falla, no marca; no rompe la pantalla */ }
+  } catch (_e) {
+    // v20.96: no rompe la pantalla, pero tampoco miente: queda el aviso y las marcas de antes.
+    _apr.cuarErr = String((_e && _e.message) || _e || "").slice(0, 160) || "no se pudo consultar";
+    if (_pppTab === "prog") aprRender();
+    return;
+  }
+  _apr.cuarErr = null;
   _apr.cuarContacto = null;   // v14.90: cambió el set de retenidos → recargar contactos WhatsApp
   _apr.cuarComN = null;       // v18.01: ídem el contador de comentarios de cada 📖
   _apr.cliValor = null;       // v18.95: cambió el set → recargar el monto de los clientes nuevos
