@@ -71,16 +71,25 @@ const HOY = key(Date.now());
 const MANANA = key(Date.now() + 86400000);
 const H = 3600 * 1000;
 const iso = (ms) => new Date(ms).toISOString();
+/* Fecha de entrada del pedido, para la columna «Días» (v21.17). 28 días
+   corridos son siempre más de 10 hábiles, caiga donde caiga el fin de semana:
+   así el caso ROJO no depende de qué día se corra el test. */
+const RECEP_VIEJA = key(Date.now() - 28 * 86400000);
 
 const DATOS = {
   // E30A en curso · E31A terminada y facturada · E32A mañana sin tocar · E33A facturada Y despachada
   // E34A terminada y YA CARGADA AL CAMIÓN, pero SIN facturar (v20.19: el caso urgente)
   prog: [
-    { tanda: "E30A", np: "98801", m3: 2.5, fecha_entrega: HOY },
-    { tanda: "E31A", np: "98802", m3: 1.5, fecha_entrega: HOY },
-    { tanda: "E32A", np: "98803", m3: 3.0, fecha_entrega: MANANA },
-    { tanda: "E33A", np: "98804", m3: 4.0, fecha_entrega: HOY },
-    { tanda: "E34A", np: "98805", m3: 2.0, fecha_entrega: HOY },
+    { tanda: "E30A", np: "98801", m3: 2.5, fecha_entrega: HOY,
+      razon_social: "Bazar Mandarin S.R.L.", zona: "Zona 3 - CABA Oeste", fecha_recep: RECEP_VIEJA },
+    { tanda: "E31A", np: "98802", m3: 1.5, fecha_entrega: HOY,
+      razon_social: "Perez Zarate S.R.L.", zona: "Zona 1 - CABA Sur", fecha_recep: HOY },
+    { tanda: "E32A", np: "98803", m3: 3.0, fecha_entrega: MANANA,
+      razon_social: "Simon Zeitune E Hijo S.A", zona: "Retira", fecha_recep: HOY },
+    { tanda: "E33A", np: "98804", m3: 4.0, fecha_entrega: HOY,
+      razon_social: "Gifel S.R.L.", zona: "Zona 6 - GBA Norte", fecha_recep: HOY },
+    { tanda: "E34A", np: "98805", m3: 2.0, fecha_entrega: HOY,
+      razon_social: "Nexxo S.R.L.", zona: "Zona 1 - CABA Sur", fecha_recep: HOY },
     // v20.20: E36A está EN CURSO y ya tiene CCN (salió sin cerrar) → 🚚 en la tabla principal.
     // E37A y E38A completan las 3 que disparan el cartel de "salieron sin facturar".
     { tanda: "E36A", np: "98806", m3: 1.0, fecha_entrega: HOY },
@@ -89,6 +98,7 @@ const DATOS = {
   ],
   web: [
     { empresa: "lk", np: 97, tanda: "E30A", fecha_entrega: HOY, razon_social: "Casa Pepe",
+      zona: "Zona 3 - CABA Oeste", fecha_recep: HOY,
       m3: 0.8, es_agregado: true, agregado_a_np: 95 }
   ],
   status: [
@@ -138,7 +148,17 @@ const DATOS = {
          { opcion: "CCN", texto: "98806", ts_cliente: iso(Date.now() - 1 * H) },
          { opcion: "CCN", texto: "98807", ts_cliente: iso(Date.now() - 7 * H) },
          { opcion: "CCN", texto: "98808", ts_cliente: iso(Date.now() - 8 * H) }],
-  deshechas: []
+  deshechas: [],
+  /* v21.17 — horas por operario, ya clasificadas por `gv_monitor_horas_operario`.
+     La TV NO recalcula nada de esto: si la vista cambia, cambia acá. */
+  horas: [
+    { legajo: "8", nombre: "Farias Juan Hilario", tandas_pick: 3, prom_hs_pick: 0.84,
+      tandas_arm: 1, prom_hs_arm: 1.95, hs_prod: 4.5, hs_mov: 0.8, hs_noprod: 0.6,
+      hs_total: 6.2, en_jornada: true },
+    { legajo: "12", nombre: "Ortiz Franco", tandas_pick: 0, prom_hs_pick: 0,
+      tandas_arm: 2, prom_hs_arm: 1.2, hs_prod: 2.4, hs_mov: 2.1, hs_noprod: 0.5,
+      hs_total: 5.4, en_jornada: false }
+  ]
 };
 
 /* Qué devolver según la URL que pida la página. */
@@ -148,6 +168,7 @@ function responder(url) {
   if (q.includes("/PPP_Web_Programacion"))       return DATOS.web;
   if (q.includes("/gv_tanda_status"))            return DATOS.status.filter(s => q.includes(s.tanda));
   if (q.includes("/gv_tandas_deshechas"))        return DATOS.deshechas;
+  if (q.includes("/gv_monitor_horas_operario"))  return DATOS.horas;
   if (q.includes("/Facturacion_NP"))             return DATOS.facturadas;
   if (q.includes("/Fichadas_Virgilio"))          return DATOS.fichadas;
   if (q.includes("/Empleados"))                  return DATOS.empleados;
@@ -184,6 +205,7 @@ function responder(url) {
     return {
       arranco: document.getElementById("splash").classList.contains("hide"),
       tandas: t("tandasBox"), fc: t("fcBox"), fcTit: t("fcTit"), tot: t("totBox"),
+      ops: t("opsBox"), opsTit: t("opsTit"), tandasTit: t("tandasTit"),
       act: t("actBox"), avisos: t("avisos"),
       m3Pick: (document.getElementById("m3Pick") || {}).textContent || "",
       m3Arm: (document.getElementById("m3Arm") || {}).textContent || "",
@@ -250,6 +272,52 @@ function responder(url) {
   // header
   ok(/4\/7/.test(r.prog), "la barra de avance debería decir 4/7 (E31A, E34A, E37A y E38A terminadas de 7 en ventana), dice: " + r.prog);
   ok(/2 en curso/.test(r.meta), "el header no cuenta las tandas en curso (E30A y E36A): " + r.meta);
+
+  /* ── v21.17 · lo que pidió Damián (via Marianela, 22/09) ───────────────────
+     UNA fila por tanda con el N° de pedido, el cliente resumido, los días que
+     lleva esperando, la zona y el progreso como semáforo. */
+  ok(/N° Pedido/.test(r.tandas) && /Cliente/.test(r.tandas) && /Zona/.test(r.tandas)
+     && /Progreso/.test(r.tandas), "faltan las columnas nuevas de la tabla de tandas");
+  ok(/98801/.test(r.tandas), "la tabla no muestra el N° de pedido");
+  /* E30A lleva la NP de ISIS (Bazar Mandarin) y la web (Casa Pepe): UNA fila,
+     el primer cliente + «+1». Si esto se rompe, volvió la fila por NP. */
+  ok(/Bazar Mandarin/.test(r.tandas), "no resume el cliente de la tanda");
+  ok(!/S\.R\.L/.test(r.tandas), "no le saca la forma societaria al cliente (ocupa lugar y no distingue)");
+  ok(/\+1<\/b>/.test(r.tandas), "una tanda con dos clientes tiene que decir «+1», no repetir la fila");
+  ok((r.tandas.match(/E30A/g) || []).length === 1, "E30A aparece más de una vez: la tanda va en UNA fila");
+  ok(/Z3 CABA Oeste/.test(r.tandas), "no acorta la zona (Zona 3 - CABA Oeste → Z3 CABA Oeste)");
+  ok(/Retira/.test(r.tandas), "Retira NO es un número de zona y tiene que verse tal cual");
+  /* Semáforo: E30A pickeando (ámbar + rojo), E36A igual; ningún ✅ suelto en
+     la columna de progreso. */
+  ok(/s-curso/.test(r.tandas), "el semáforo no marca lo que está EN CURSO");
+  ok(/s-no/.test(r.tandas), "el semáforo no marca lo que NO se empezó");
+  /* Días de demora: el pedido de hace 28 días corridos tiene que salir en rojo
+     (más de 10 hábiles, regla 4 de Luis); el de hoy, en 0 y sin alarma. */
+  /* Se mira la celda de Días, no el color suelto: #f87171 ya lo usa el reloj de
+     una fase que lleva más de 2 h, así que un `/#f87171/` pelado da verde solo. */
+  ok(/class="cen t-dias" style="color:#f87171"/.test(r.tandas),
+     "un pedido de hace 28 días no se marca como demorado en la columna Días");
+  ok(/class="cen t-dias" style="color:#94a3b8">0</.test(r.tandas),
+     "un pedido que entró hoy tiene que decir 0 y no marcar demora");
+  ok(/Mié|Lun|Mar|Jue|Vie|Sáb|Dom/.test(r.tandasTit), "el título no dice el día de la semana: " + r.tandasTit);
+  /* La columna «Salida» salió de la tabla: el día tiene que quedar igual a la
+     vista, como separador, o hoy y mañana se mezclan sin que se note. */
+  ok(/<tr class="dia"><td colspan="7">/.test(r.tandas), "falta el separador de día en la tabla de tandas");
+  ok((r.tandas.match(/<tr class="dia">/g) || []).length === 2,
+     "tiene que haber UN separador por día de entrega (hoy y mañana)");
+
+  // ── v21.17 · tabla de horas por operario
+  ok(/Farias J\./.test(r.ops), "la tabla de operarios no muestra el nombre corto");
+  ok(/Ortiz F\./.test(r.ops), "falta un operario de la tabla de horas");
+  ok(/Prom hs/.test(r.ops) && /Hs no/.test(r.ops), "faltan las columnas de horas pedidas");
+  ok(/0,8/.test(r.ops), "no muestra el promedio de horas por tanda pickeada");
+  ok(/6,9/.test(r.ops) && /11,6/.test(r.ops),
+     "la fila de Total no suma bien (prod 4,5+2,4=6,9 · total 6,2+5,4=11,6): " + r.ops.replace(/<[^>]*>/g, " "));
+  /* El % va sobre el tiempo MEDIDO (prod + mov + no prod), no sobre la jornada:
+     CR y RR quedan abiertos mientras el operario hace otra cosa, así que los
+     baldes pueden sumar más que el total de horas del día. */
+  ok(/63% productivas/.test(r.opsTit),
+     "el título no dice el % de horas productivas (6,9 de 6,9+2,9+1,1 = 63%): " + r.opsTit);
   ok(/en vivo/.test(r.estado), "el estado no quedó 'en vivo': " + r.estado);
 
   // sin scroll: la TV no tiene cómo moverse

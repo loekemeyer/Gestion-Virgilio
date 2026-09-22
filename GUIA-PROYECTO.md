@@ -1,3 +1,83 @@
+## Nota v21.17 (2026-09-22) — Monitor TV: la tabla de tandas que pidió Damián, y las horas por operario
+
+Pedido de **Damián**, que lo pasó Marianela por WhatsApp con un boceto de las dos tablas.
+
+### 1. La tabla de tandas: una fila por TANDA, con cliente, demora, zona y semáforo
+
+| antes | ahora |
+|---|---|
+| Tanda · M³ · Salida · Picking · Pedido separado | Tanda · **N° Pedido** · **Cliente** · M³ · **Días** · **Zona** · **Progreso** |
+
+- **Una fila por tanda aunque lleve varios pedidos** (textual: *"si hay varias NP que aparezca en
+  una sola fila y con el nombre resumido"*). Las NP se listan juntas (`98801 · LK 0097 +2`) y el
+  cliente va resumido: se le saca la forma societaria —hay 30 "S.R.L.", no distingue a nadie— y,
+  si la tanda lleva pedidos de más de un cliente, sale el primero + **`+N`**. E12R tenía 6 NP de 4
+  clientes el 22/09.
+- **Días** = días **hábiles** desde que entró el pedido (`fecha_recep`) hasta hoy, tomando el
+  pedido **más viejo** de la tanda: la demora de una tanda es la del que más esperó. Es el número
+  de la **regla 4 de Luis** (*"los pedidos no pueden demorar más de 10 días hábiles en salir"*):
+  ámbar a los 7, rojo a los 10.
+- **Zona** acortada (`Zona 3 - CABA Oeste` → `Z3 CABA Oeste`). **`Retira` queda tal cual**: no es
+  un número de zona y el nombre ES el dato.
+- **Progreso** = semáforo de **dos luces**, picking y armado (textual: *"lo quiere ver como
+  semáforo"*): 🔴 sin empezar · 🟡 en curso · 🟢 terminado · 🟣 abandonada. Al lado siguen las
+  iniciales de quién la tiene y hace cuánto, que es lo que se acciona.
+  ⚠ Son círculos dibujados con **CSS, no emoji**: los emoji los pinta la fuente del televisor y
+  cambian de un modelo a otro (mismo criterio que el `■` de la fase abandonada, v18.71).
+
+⚠ **La columna «Salida» salió de la tabla** — 7 columnas ya son muchas — y en su lugar cada
+bloque de días lleva su **encabezado** (`MIÉ 23/09`), que es como lo dibujó Damián. Sin eso, lo de
+hoy y lo de mañana se mezclaban sin que se notara.
+
+### 2. Horas por operario — y la mezcla que venía de antes
+
+La TV **no tenía nada por operario**: la tabla "Mts3 x Hora" del monitor grande se había dejado
+afuera a propósito porque depende de `computeClosureDur`, la parte más pesada del cálculo. Damián
+pidió el otro corte: **cuánto tardó en promedio cada tanda, y en qué se fue el resto del día.**
+
+| Operario | Prom hs picking | Prom hs armado | Hs prod | Hs mov | Hs no prod | Total hs |
+|---|---|---|---|---|---|---|
+
+⚠⚠ **La clasificación vive en el BACKEND**, en la vista **`gv_monitor_horas_operario`** — es una
+regla de negocio (qué cuenta como hora productiva), así que la TV no la calcula: la lee resuelta.
+Si cambia, el monitor grande la hereda.
+
+⚠ **Y corrige una mezcla que ya estaba en `index.html`:** `MOV_TOGGLE_CODES` es
+`{MG, RI, EI, RT, AT, PB, Limp}`, o sea que **"Paré Baño" y "Limpieza" contaban como movimiento de
+mercadería**. Separado:
+
+| balde | códigos |
+|---|---|
+| **Productivas** | `TP` `TAP` `CC` `CR` `RR` — picking, armado, carga camión, remitos |
+| **Movimiento** | `MG` `RT` `RI` `EI` — guardado a góndola, recepción de mercadería e insumos |
+| **No productivas** | `AT` `PB` `Limp` `PC` `CT` `Perm` |
+
+Un código sin duración (`PKC`, `CCN`, `TAL`…) no suma a ningún balde. El tiempo se acredita **una
+vez por tanda** (≡ v12.97) y **`LT` no cuenta** (es tiempo no trabajado). Legajos 0 y 1 afuera, y
+cada duración se **recorta contra el primer evento del día**: un `TP` que cierra el `EP` del
+viernes no le mete el fin de semana al lunes.
+
+**Total hs** = del primer evento del día al `FJ`; sin `FJ` la jornada sigue abierta —esos van sin
+el ✓ al lado del nombre— pero topeada en la **hora de salida** del empleado (fallback 17:00), para
+que un `FJ` que nadie apretó no haga crecer el número hasta medianoche.
+
+⚠⚠ **La suma de los tres baldes PUEDE pasarse del Total, y no está mal.** `CR` y `RR` quedan
+abiertos mientras el operario hace otra cosa: el 22/09 el legajo 104 tenía `RR` de 08:42 a 11:43
+en paralelo con un `RT`, un `AT` y dos `MG` → **8,62 h de baldes contra 6,03 h de jornada**. Por
+eso el **«% productivas» del título va sobre el tiempo MEDIDO** (prod + mov + no prod), no sobre
+la jornada: contra la jornada daría más de 100 %.
+
+### 3. El tablero pasó a TRES columnas
+
+Con la tabla de operarios adentro, las dos de antes dejaban «Total por día» en 4 filas y el
+desglose por camión se colapsaba solo. En una TV 16:9 **sobra ancho y falta alto**, así que el
+panel que no entraba a lo alto se movió a lo ancho: tandas + "en este momento" · operarios +
+avisos · a facturar + total por día. Abajo de 1500 px vuelve a dos columnas.
+
+**Chequeos:** `select * from public.gv_reglas_perdidas;` (vacía) ·
+`select * from public.gv_monitor_horas_operario;` · `node tests/mon-tv.cjs`.
+`sql/gv_monitor_horas_operario_v2117.sql`, §3.ml.
+
 ## Nota v21.05 (2026-09-22) — El barrido del pozo de RR: el chooser de CC, y 5 bytes fuera de UTF-8
 
 Dos cosas que salieron de preguntar *"¿qué otro submódulo tiene el problema de RR?"*.
@@ -13710,6 +13790,10 @@ avance, reloj y estado de la conexión.
 - **La tabla "Mts3 x Hora" por operario**, que depende de `computeClosureDur` (la
   parte más pesada y más delicada del cálculo). En su lugar van los m³ de picking y
   de armado terminados hoy, que es el número que se lee de lejos.
+  ⚠ **Desde la v21.17 SÍ hay una tabla por operario**, pero es otra cosa y no repite
+  ese cálculo: son las **horas del día clasificadas** (promedio por tanda pickeada y
+  armada, productivas, movimiento, no productivas y total), y vienen **resueltas del
+  backend** por `gv_monitor_horas_operario`. Pedido de Damián — ver la nota v21.17.
 
 **Al tocarla:** los puntos donde repite una regla del monitor grande están marcados en
 el código con `≡ index.html` (ventana de fechas, qué tanda sale del tablero, duración

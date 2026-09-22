@@ -29088,3 +29088,69 @@ para cualquier otro día, y **"Dejarlo como está"**, que no escribe nada.
 select cron.alter_job(50, schedule := '0 10 * * 3',
                           command  := 'select public.generar_ocs_automaticas()');
 ```
+
+### §3.ml — v21.17: horas por operario del día, clasificadas (`gv_monitor_horas_operario`) — 2026-09-22
+
+**Pedido de Damián** (lo pasó Marianela, 22/09) para el monitor de la TV: además de las tandas,
+ver por operario **cuánto tardó en promedio cada tanda y en qué se fue el resto del día**.
+
+**Objeto nuevo:** vista `public.gv_monitor_horas_operario` (`security_invoker = true`, SELECT para
+`anon` y `authenticated`). Una fila por legajo con actividad **hoy** (hora AR):
+
+| columna | qué es |
+|---|---|
+| `tandas_pick` · `hs_pick` · `prom_hs_pick` | tandas cerradas con `TP`, horas y promedio por tanda |
+| `tandas_arm` · `hs_arm` · `prom_hs_arm` | ídem con `TAP` |
+| `hs_prod` | `TP` + `TAP` + `CC` + `CR` + `RR` |
+| `hs_mov` | `MG` + `RT` + `RI` + `EI` |
+| `hs_noprod` | `AT` + `PB` + `Limp` + `PC` + `CT` + `Perm` |
+| `hs_total` | del primer evento del día al `FJ`; sin `FJ`, hasta ahora |
+| `en_jornada` | `true` mientras no haya `FJ` |
+
+**Por qué va al backend y no al front:** qué cuenta como hora productiva es una **regla de
+negocio**, y la miran dos pantallas (la TV y, cuando se enganche, el monitor grande). Protocolo
+del repo. Cuatro filas en `GV_Reglas_Centinela` la sostienen.
+
+⚠ **Corrige una mezcla que ya estaba en `index.html`:** `MOV_TOGGLE_CODES` es
+`{MG, RI, EI, RT, AT, PB, Limp}` — *"Paré Baño"* y *"Limpieza"* contaban como **movimiento de
+mercadería**. Acá van separados. El front de `index.html` **no se tocó**: sigue con su
+`movMin` de siempre, así que si alguna vez se cruzan los dos números, el bueno es el de la vista.
+
+⚠ **El tiempo se acredita UNA vez por tanda** (`group by legajo, tanda` en los CTE `pick` y
+`arm`): una tanda cerrada dos veces por error no puede contar las horas dos veces. Es la misma
+corrección que la v12.97 del monitor grande.
+
+⚠ **`LT` no entra**, y los legajos `0` y `1` tampoco. Las duraciones fuera de `(0, 24 h)` se
+descartan: un toggle que quedó abierto de un día para otro y lo cerró el autocierre no es trabajo.
+
+⚠ **Cada duración se recorta contra el ARRANQUE del operario** (su primer evento del día). Un `TP`
+que cierra el `EP` del viernes le metía el fin de semana entero al lunes. Con el recorte, la tarea
+que quedó abierta ayer aporta sólo las horas de hoy.
+
+⚠⚠ **Los baldes PUEDEN SOLAPARSE y su suma pasarse de `hs_total`, y no es un error.** `CR` y `RR`
+son `SURVIVING_TOGGLES`: quedan abiertos mientras el operario hace otra cosa. Medido el 22/09 con
+el legajo **104** — `RR` de 08:42 a 11:43 corriendo en paralelo con un `RT`, un `AT` y dos `MG` —:
+**8,62 h de baldes contra 6,03 h de jornada.** Por eso el front saca el **«% productivas» sobre el
+tiempo MEDIDO** (`prod + mov + no prod`) y **no sobre la jornada**, que daría más de 100 % y nadie
+le creería.
+
+⚠ **Medido con `set local role anon`** antes de darla por buena: anon ve **las mismas 3 filas**
+que `postgres`. Es la trampa de la v20.45 — una vista con `security_invoker` sobre una tabla con
+RLS **no da error cuando el lector no tiene acceso: devuelve menos filas**.
+
+⚠ **Los patrones de los centinelas van como los NORMALIZA `pg_get_viewdef`**, no como se tipearon:
+un `in ('MG','RT',…)` se guarda como `= ANY (ARRAY['MG'::text, …])`. Escritos "como uno los
+escribió", los 3 centinelas arrancaron **en rojo el día que se crearon** — pasó, y se corrigió
+mirando el `viewdef` real.
+
+**Chequeo:**
+
+```sql
+select * from public.gv_reglas_perdidas;            -- vacía = todo bien
+select * from public.gv_monitor_horas_operario;     -- las horas de hoy
+```
+
+**Rollback:** `drop view public.gv_monitor_horas_operario;` +
+`delete from public."GV_Reglas_Centinela" where objeto = 'gv_monitor_horas_operario';`
+(el front de la TV lo lee con `.catch()`: sin la vista, el panel queda vacío y el resto del
+tablero se dibuja igual). `sql/gv_monitor_horas_operario_v2117.sql`.
