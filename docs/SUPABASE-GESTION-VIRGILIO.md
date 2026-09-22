@@ -28762,3 +28762,62 @@ uniendo las tres tablas de cancelación (`GV_Web_Cancelados`, `GV_PPP_Web_NP_Can
 > se mira la fila que EXISTE cuando el hecho ocurre, no la que alguien tendría que haber copiado.
 
 Front: chip de filtro **🗑 Cancelados** y su color. `sql/gv_cuarentena_log_cancelado_v2096.sql`.
+
+### §3.mg — v20.97 · El chip «se arma solo» mira la cuarentena, y qué ahoga la base — 2026-09-22
+
+**Thomas, textual:** *"QUE el chip «se arma solo» mire la cuarentena y clientes nuevos por el amor
+de dios"*.
+
+**Sexta puerta del mismo bug.** `gv_ppp_web_dia_salida` ya miraba el retenido a mano (v18.77) y el
+súper del padrón (v19.12); la cuarentena, no. Los que el chip mandaba a armarse solos el jueves
+1/10, medido el 22/09:
+
+| NP | cliente | por qué está retenido |
+|---|---|---|
+| CH 0004 | Ierakuin Srl (1665) | deuda **$2.062.528,58** |
+| LK 0201 | Romagessi Antonio (2191) | deuda **$2.216.125** |
+| LK 0018 | Bazar Monica (4045) | deuda **$1.080.583** |
+| LK 1465 | Ramirez Santiago Roman (4123) | **suspendido** ← apareció al probarlo |
+
+Desde la v20.95 el armador no los toca, así que el chip decía lo contrario de lo que iba a pasar,
+y con fecha.
+
+⚠ **Se resolvió en el BACKEND**, no marcando el chip desde el front, por dos razones: una sola
+fuente (`gv_cuarentena_retiene_lote`, la misma del armado, así que el chip no puede decir una cosa
+y el armador hacer otra), y porque así **sigue diciendo la verdad aunque la marcación del front se
+caiga por timeout** — que es justo cuando más mentía (§3.mf).
+
+⚠ **Una llamada POR EMPRESA, no una por fila**: la función no se inlinea (`SET search_path`). El
+costo es **fijo**, no crece con el lote: **1.789 ms con 5 pedidos y 1.683 ms con 40**, contra el
+`statement_timeout` de 8 s.
+
+⚠ **El pozo del primer intento:** `(array_agg(c.motivos))[1]` sobre un array **de arrays** devuelve
+un `text`, no un `text[]` — el subíndice entra al array aplanado. El `CREATE` sale limpio y explota
+**al ejecutarse** con `42883 array_to_string(text, unknown)`. Otra vez lo cazó la prueba, no la
+lectura. Se desarma con `unnest` y se vuelve a armar.
+
+`pend_auto` además deja de sumar los m³ de lo retenido: el umbral del intradía no puede contar m³
+que el automático no va a armar.
+
+#### Qué ahoga la base (lo que pidió mirar Thomas)
+
+Ventana de `pg_stat_statements`: **26,4 h**, 23.827 s de ejecución total.
+
+| consulta | llamadas | total | % del total | media | peor |
+|---|---:|---:|---:|---:|---:|
+| `REFRESH MATERIALIZED VIEW CONCURRENTLY vista_stock_procesada` (cron 55) | 785 | **1.770 s** | **7,4 %** | 2.239 ms | **33,8 s** |
+| lectura de `vista_saldos_stock` desde el front | 887 | **1.707 s** | **7,2 %** | 1.925 ms | 7,9 s |
+
+**Son el mismo cálculo, hecho dos veces.** La matview tiene **367 filas y 216 kB**: lo caro no es
+escribirla, es la consulta que la define, que cuelga de `vista_saldos_stock`. Y el cron la refresca
+**cada 2 minutos** — 720 corridas por día para 367 filas.
+
+Dos palancas, medidas y sin tocar la lógica del stock:
+
+1. **Bajar el cron 55 de `*/2` a `*/10`**: 720 → 144 corridas/día, ~1.400 s/día menos. Se paga con
+   frescura: el saldo pasa de 2 a 10 minutos de atraso. **Es decisión operativa, no técnica.**
+2. **Que el front lea la matview en vez de `vista_saldos_stock`**: hoy hace las dos cosas —
+   se materializa y después igual se consulta la vista cara 1.373 veces. Es lo que más rinde y no
+   cambia la frescura más allá del refresh.
+
+`sql/gv_chip_salida_cuarentena_v2097.sql`.

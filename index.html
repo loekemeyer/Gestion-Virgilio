@@ -6024,7 +6024,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=20.96"></script>
+<script type="module" src="recepcion.js?v=20.97"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9906,7 +9906,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v20.96";
+const APP_VERSION = "v20.97";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -45277,6 +45277,21 @@ function aprSalidaChip(p) {
   if (s.motivo === "retenido") {
     return '<span class="apr-chip apr-chip-sal no" title="' + escapeHtml(recep + s.detalle) +
       '">🔒 no lo toca el automático · ponele día</span>';
+  }
+  /* v20.97 (Thomas, 2026-09-22: *"QUE el chip «se arma solo» mire la cuarentena y clientes nuevos
+     por el amor de dios"*) — SEXTA puerta del mismo bug, después del retenido a mano (v18.77) y
+     del súper del padrón (v19.12). Ierakuin Srl (deuda $2.062.528,58) y Romagessi Antonio
+     ($2.216.125) salían con "🤖 se arma solo → jue 1/10 · en minutos" mientras el armador, desde
+     la v20.95, no los toca. Lo resuelve el BACKEND (gv_ppp_web_dia_salida pregunta a la misma
+     gv_cuarentena_retiene_lote que usa el armado), así que el chip dice la verdad aunque la
+     marcación del front se haya caído por timeout — que es justo cuando más mentía. */
+  if (s.motivo === "cuarentena") {
+    return '<span class="apr-chip apr-chip-sal no" title="' + escapeHtml(recep + s.detalle) +
+      '">🚧 retenido en cuarentena · no se arma solo</span>';
+  }
+  if (s.motivo === "cliente_nuevo") {
+    return '<span class="apr-chip apr-chip-sal no" title="' + escapeHtml(recep + s.detalle) +
+      '">🆕 cliente nuevo sin aprobar · no se arma solo</span>';
   }
   if (s.dia) {
     const d = new Date(+s.dia.slice(0, 4), +s.dia.slice(5, 7) - 1, +s.dia.slice(8, 10));
