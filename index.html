@@ -989,6 +989,39 @@ button {
   font-size:10px; font-weight:800; }
 .pipe-vinc-ok{ margin-top:10px; padding:8px 11px; border-radius:8px; background:#ecfdf5; color:#065f46; font-size:13px; }
 
+/* v21.82 — la COMPOSICION del pedido: lo que se le reclama al cliente nuevo que pague */
+.clin-comp-b{ display:block; width:100%; margin-top:5px; padding:4px 8px; border:1px solid #cbd5e1;
+  border-radius:7px; background:#f8fafc; color:#334155; font-size:11px; font-weight:800; cursor:pointer;
+  white-space:nowrap; }
+.clin-comp-b:hover{ background:#eef2f7; }
+.clin-comp-b:disabled{ opacity:.5; cursor:default; }
+.pipe-comp-tblwrap{ margin-top:10px; overflow:auto; border:1px solid #e2e8f0; border-radius:9px; }
+.pipe-comp-tbl{ border-collapse:collapse; font-size:12px; }
+.pipe-comp-tbl th{ padding:5px 8px; background:#f1f5f9; color:#334155; font-weight:800; text-align:left;
+  white-space:nowrap; border-bottom:1px solid #e2e8f0; }
+.pipe-comp-tbl td{ padding:4px 8px; border-bottom:1px solid #f1f5f9; color:#0f172a; white-space:nowrap; }
+.pipe-comp-tbl td.num, .pipe-comp-tbl th.num{ text-align:right; }
+.pipe-comp-tbl tr.sinstock td{ color:#94a3b8; text-decoration:line-through; }
+.pipe-comp-e{ display:inline-block; margin-left:5px; padding:0 5px; border-radius:5px; background:#fef3c7;
+  color:#92400e; font-size:10px; font-weight:800; text-decoration:none; }
+.pipe-comp-sp{ display:inline-block; margin-left:5px; padding:0 5px; border-radius:5px; background:#fee2e2;
+  color:#991b1b; font-size:10px; font-weight:800; }
+.pipe-comp-tot{ margin-top:12px; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; }
+.pipe-comp-tot div{ display:flex; justify-content:space-between; gap:18px; padding:5px 11px; font-size:13px;
+  color:#334155; border-bottom:1px solid #f1f5f9; }
+.pipe-comp-tot div:last-child{ border-bottom:0; }
+.pipe-comp-tot div b{ color:#0f172a; }
+.pipe-comp-tot .dto b{ color:#b45309; }
+.pipe-comp-tot .neto{ background:#f8fafc; font-weight:700; }
+.pipe-comp-tot .cobrar{ background:#ecfdf5; padding:9px 11px; font-size:15px; font-weight:800; color:#065f46; }
+.pipe-comp-tot .cobrar b{ color:#065f46; font-size:18px; }
+.pipe-comp-iva{ margin-top:6px; padding:7px 10px; border-radius:8px; background:#ecfdf5; border:1px solid #a7f3d0;
+  color:#065f46; font-size:12px; font-weight:700; line-height:1.4; }
+.pipe-comp-nota{ margin-top:8px; font-size:12px; color:#475569; line-height:1.45; }
+.pipe-comp-nota b{ color:#0f172a; }
+.pipe-comp-falta{ margin-top:8px; padding:7px 10px; border-radius:8px; background:#fff7ed; border:1px solid #fdba74;
+  color:#9a3412; font-size:12px; line-height:1.4; }
+
 .clin-cuit{ display:block; font-weight:600; font-size:11px; color:#64748b; letter-spacing:.2px; }
 .clin-imp{ display:block; font-weight:700; font-size:11px; color:#b45309; }
 .clin-td-tiempo{ white-space:nowrap; }
@@ -48402,7 +48435,8 @@ function clinAccionBtns(p) {
 function clinNuevosValorFmt(p) {
   if (p && p._demo)
     return '<b title="Ejemplo — precio total por lista (neto, sin IVA)">' + cuarPlata(120480) + '</b>' +
-      '<span class="clin-iva" title="Ejemplo — total con IVA: es lo que se le pide pagar por adelantado">c/IVA ' + cuarPlata(145781) + '</span>';
+      '<span class="clin-iva" title="Ejemplo — total con IVA: es lo que se le pide pagar por adelantado">c/IVA ' + cuarPlata(145781) + '</span>' +
+      pipeCompBtn(p);
   if (p && p._isis) return '<span class="cuar-yp-sin" title="El monto por lista se valoriza sobre los pedidos de la página; este entró por ISIS con NP propia">—</span>';
   if (_apr.cliValor === null) return '<span class="cuar-yp-sin">…</span>';
   const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
@@ -48415,7 +48449,10 @@ function clinNuevosValorFmt(p) {
     // v20.41 (Luis): el importado no entra en el monto - no hay stock, no se cobra por adelantado.
     (isFinite(v.valorImp) && v.valorImp > 0
       ? '<span class="clin-imp" title="' + (v.itemsImp || 0) + ' importado(s) sin stock para cubrir lo pedido: esas cajas no entran en el monto">- ' + cuarPlata(v.valorImp) + ' import. en falta</span>'
-      : '');
+      : '') +
+    // v21.82: el 🧾 abre la composición — qué códigos, a qué precio, los descuentos y el
+    // TOTAL CON IVA, que es el único número que se le reclama al cliente.
+    pipeCompBtn(p);
 }
 function clinNuevosHtml() {
   const cargando = !_apr.listo || aprCargandoAlgo();
@@ -49060,6 +49097,170 @@ function pipeVincHtml() {
   return h;
 }
 
+/* ── 🧾 LA COMPOSICIÓN DEL PEDIDO ── v21.82 ─────────────────────────────
+   Pedido del chat: "un boton donde se pueda ver la composicion del pedido con el monto total de
+   los articulos importados (E) que tienen stock, con el dto por volumen aplicado, el dto del 2%
+   por web y el 25% por volumen". Y sobre el total, textual: "que aclare que incluye IVA porque
+   es lo que tengo que reclamar al cliente que pague".
+
+   ⚠ Acá NO se valoriza nada: el detalle lo calcula `gv_clin_composicion` con la MISMA cuenta que
+     `gv_ppp_web_valor_items` (cajas × uxb × precio × (1 − dto_vol) × factor_web). El front suma y
+     formatea.
+
+   ⚠ La RPC recibe el LOTE ENTERO, no este pedido solo: cuántas cajas de un importado escaso le
+     tocan depende de lo que se llevaron los pedidos anteriores (reparto greedy por fecha/hora).
+     Es el mismo array que arma `clinNuevosValorCargar` para el monto de la celda.
+
+   ⚠ Y la SUMA de las líneas se compara contra el `valor` que ya está en pantalla. Si no coincide,
+     el pop-up lo dice en rojo: son dos copias de la misma cuenta y así se ve si se desfasaron. */
+function pipeCompItemsLote() {
+  return (_apr.pedidos || [])
+    .filter(function (p) { return !p._demo && !p._isis && aprEnCuarentena(p); })
+    .map(function (p) {
+      return { order_id: String(p.order_id), empresa: p.empresa || "lk",
+               cod: String(p.cod || "").trim(), cond: p.cond || "", items: cuarItemsDe(p) };
+    });
+}
+function pipeCompAbrir(empresa, orderId) {
+  const p = pipeBuscar(empresa, orderId);
+  _apr.pipeComp = { empresa: empresa, orderId: String(orderId),
+                    np: p ? aprPedLabel(p) : "", cod: p ? String(p.cod || "") : "",
+                    rs: p ? String(p.razon_social || "") : "",
+                    filas: null, err: "", cargando: true };
+  pppRenderProg();
+  pipeCompCargar();
+}
+function pipeCompCerrar() { _apr.pipeComp = null; pppRenderProg(); }
+async function pipeCompCargar() {
+  const s = _apr.pipeComp; if (!s) return;
+  try {
+    const r = await aprRpc("gv_clin_composicion",
+      { p_pedidos: pipeCompItemsLote(), p_empresa: s.empresa, p_order_id: String(s.orderId) });
+    const f = r || [];
+    /* ⚠ CERO FILAS NO ES UN PEDIDO DE $0. La RPC lleva el mismo guard de supervisor que la
+       función canónica, así que sin permiso devuelve vacío; y una RPC recién creada puede dar
+       404 hasta que PostgREST refresca su cache. Las dos cosas son un error, no un monto. */
+    if (!f.length) { s.filas = []; s.err = "No se pudo traer la composición de este pedido."; }
+    else { s.filas = f; s.err = ""; }
+  } catch (e) { s.filas = []; s.err = String((e && e.message) || e); }
+  s.cargando = false;
+  if (_apr.pipeComp === s) pppRenderProg();
+}
+function pipeCompPct(x) {
+  const n = Number(x) * 100;
+  if (!isFinite(n) || n <= 0) return "";
+  return n.toLocaleString("es-AR", { maximumFractionDigits: 2 }) + " %";
+}
+function pipeCompNum(x, d) {
+  const n = Number(x);
+  if (!isFinite(n)) return "—";
+  return n.toLocaleString("es-AR", { maximumFractionDigits: d == null ? 0 : d });
+}
+function pipeCompBtn(p) {
+  if (p && p._demo)
+    return '<button class="clin-comp-b" disabled title="En el ejemplo no hay pedido real que componer">' +
+           '🧾 Ver composición</button>';
+  if (p && p._isis) return "";
+  const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
+  if (!v || !isFinite(v.valor) || v.valor <= 0) return "";
+  return '<button class="clin-comp-b" onclick="pipeCompAbrir(\'' + (p.empresa || "lk") + '\',\'' +
+    escapeHtml(String(p.order_id)) + '\')" title="Ver qué códigos entran, a qué precio, los descuentos ' +
+    'aplicados y el TOTAL CON IVA — que es el número que hay que reclamarle al cliente">' +
+    '🧾 Ver composición</button>';
+}
+function pipeCompHtml() {
+  const s = _apr.pipeComp;
+  if (!s) return '<div id="pipeCompBox" class="pipe-modal-off"></div>';
+  const tit = escapeHtml((s.np || ("pedido " + s.orderId)) + " · " + (s.rs || ("cliente " + s.cod)));
+  let h = '<div id="pipeCompBox" class="pipe-modal"><div class="pipe-modal-in pipe-modal-ancha">' +
+    '<div class="pipe-modal-t">🧾 Composición — ' + tit + '</div>';
+
+  if (s.cargando) h += '<div class="pipe-vinc-hint">Calculando la composición…</div>';
+  else if (s.err) h += '<div class="pipe-modal-err">' + escapeHtml(s.err) + '</div>';
+  else {
+    const fs = s.filas || [];
+    const num = function (x) { return Number(x) || 0; };
+    let bruto = 0, vol = 0, web = 0, neto = 0, impOk = 0, impOkN = 0, faltaN = 0, faltaCaj = 0, sinPx = 0;
+    fs.forEach(function (f) {
+      bruto += num(f.bruto);
+      vol   += num(f.bruto) * num(f.dto_vol);
+      web   += num(f.bruto) * (1 - num(f.dto_vol)) * num(f.dto_web);
+      neto  += num(f.importe);
+      if (f.importado && num(f.cajas_ok) > 0) { impOk += num(f.importe); impOkN++; }
+      if (num(f.cajas_falta) > 0) { faltaN++; faltaCaj += num(f.cajas_falta); }
+      if (f.sin_precio && num(f.cajas_ok) > 0) sinPx++;
+    });
+    const pVol = fs.length ? num(fs[0].dto_vol) : 0;
+    const pWeb = fs.length ? num(fs[0].dto_web) : 0;
+    const iva = neto * 0.21, total = neto * 1.21;
+
+    h += '<div class="pipe-comp-tblwrap"><table class="pipe-comp-tbl"><thead><tr>' +
+      '<th>Código</th><th class="num">Cajas</th><th class="num">U×B</th>' +
+      '<th class="num">$ u. lista</th><th class="num">Bruto</th><th class="num">Importe</th>' +
+      '</tr></thead><tbody>';
+    fs.forEach(function (f) {
+      const fuera = num(f.cajas_ok) <= 0;
+      h += '<tr' + (fuera ? ' class="sinstock"' : '') + '>' +
+        '<td>' + escapeHtml(String(f.art || "")) +
+          (f.importado ? '<span class="pipe-comp-e" title="Artículo importado">E</span>' : '') +
+          (f.sin_precio && !fuera ? '<span class="pipe-comp-sp" title="Sin precio de lista: no suma al monto">sin precio</span>' : '') +
+        '</td>' +
+        '<td class="num">' + pipeCompNum(f.cajas_ok) +
+          (num(f.cajas_falta) > 0 ? ' <span class="pipe-comp-sp" title="Cajas que no se pueden cubrir con el stock de hoy: quedan afuera del monto">−' +
+            pipeCompNum(f.cajas_falta) + '</span>' : '') + '</td>' +
+        '<td class="num">' + pipeCompNum(f.uxb) + '</td>' +
+        '<td class="num">' + cuarPlata(f.precio_unit) + '</td>' +
+        '<td class="num">' + cuarPlata(f.bruto) + '</td>' +
+        '<td class="num"><b>' + cuarPlata(f.importe) + '</b></td>' +
+        '</tr>';
+    });
+    h += '</tbody></table></div>';
+
+    h += '<div class="pipe-comp-tot">' +
+      '<div><span>Subtotal por lista (sin descuentos)</span><b>' + cuarPlata(bruto) + '</b></div>' +
+      (vol > 0 ? '<div class="dto"><span>− Descuento por volumen (' + pipeCompPct(pVol) + ')</span><b>− ' + cuarPlata(vol) + '</b></div>' : '') +
+      (web > 0 ? '<div class="dto"><span>− Descuento web (' + pipeCompPct(pWeb) + ')</span><b>− ' + cuarPlata(web) + '</b></div>' : '') +
+      '<div class="neto"><span>Neto (sin IVA)</span><b>' + cuarPlata(neto) + '</b></div>' +
+      '<div><span>+ IVA 21 %</span><b>' + cuarPlata(iva) + '</b></div>' +
+      '<div class="cobrar"><span>TOTAL A COBRAR — IVA INCLUIDO</span><b>' + cuarPlata(total) + '</b></div>' +
+      '</div>';
+
+    /* Thomas / Luis (23/09): "que aclare que incluye IVA porque es lo que tengo que reclamar al
+       cliente que pague" — el número de abajo es el único que se le pide al cliente. */
+    h += '<div class="pipe-comp-iva">💰 <b>' + cuarPlata(total) + ' IVA incluido</b> es lo que hay que ' +
+      'reclamarle al cliente que pague. Es el mismo número que manda el Speech 1 y el que tiene que ' +
+      'estar pago ANTES de armar y entregar.</div>';
+
+    if (impOkN > 0)
+      h += '<div class="pipe-comp-nota">De ese total, los <b>importados (E) que tienen stock</b> son ' +
+        '<b>' + impOkN + '</b> código' + (impOkN === 1 ? '' : 's') + ' por <b>' + cuarPlata(impOk) + '</b> ' +
+        'netos (' + cuarPlata(impOk * 1.21) + ' con IVA) — ya con el descuento por volumen y el de web aplicados.</div>';
+
+    if (faltaN > 0)
+      h += '<div class="pipe-comp-falta">⚠ <b>' + faltaN + '</b> línea' + (faltaN === 1 ? '' : 's') +
+        ' importada' + (faltaN === 1 ? '' : 's') + ' (<b>' + pipeCompNum(faltaCaj) + '</b> cajas) <b>NO tienen ' +
+        'stock</b> para cubrir lo pedido: quedan afuera del monto y no se cobran. Van tachadas arriba.</div>';
+
+    if (sinPx > 0)
+      h += '<div class="pipe-comp-falta">⚠ <b>' + sinPx + '</b> código' + (sinPx === 1 ? '' : 's') +
+        ' sin precio de lista: suma' + (sinPx === 1 ? '' : 'n') + ' $0. El total de abajo está incompleto ' +
+        'hasta que se les cargue el precio.</div>';
+
+    /* El control de que las dos copias de la cuenta no se hayan desfasado: la suma de las líneas
+       tiene que dar el mismo neto que ya muestra la celda Monto (gv_clientes_nuevos_valor_lote). */
+    const v = (_apr.cliValor || {})[aprKey(s.empresa, s.orderId)];
+    if (v && isFinite(v.valor) && Math.abs(neto - Number(v.valor)) > 1)
+      h += '<div class="pipe-modal-err">⚠ La suma de las líneas (' + cuarPlata(neto) + ') no coincide con el ' +
+        'monto de la pantalla (' + cuarPlata(v.valor) + '). Avisá a sistemas antes de reclamarle este número ' +
+        'al cliente: alguien cambió una de las dos cuentas y no la otra.</div>';
+  }
+
+  h += '<div class="pipe-modal-btns">' +
+    '<button class="pipe-b-sec" onclick="pipeCompCerrar()">Cerrar</button></div>' +
+    '</div></div>';
+  return h;
+}
+
 /* ── Los Speech: mismo texto y mismo teléfono que el submódulo viejo ─────────────────── */
 async function pipeSpeech(empresa, orderId, n) {
   const esDemo = String(orderId) === "__DEMO__";
@@ -49221,7 +49422,7 @@ function pipeHtml() {
       '<b>clientes nuevos</b> sin ningún otro problema; si tienen <b>deuda</b>, están <b>suspendidos</b> o ' +
       '<b>superan su límite</b>, primero pasan por <b>Cuarentena</b> y vuelven acá cuando se les libera ' +
       'ese motivo. Tocá <b>👁 Ver cliente de prueba</b> para probar los botones sin tocar nada.</div>' +
-      pipeDemoRowHtml() + '</div>' + pipeFirmaHtml() + pipeVincHtml();
+      pipeDemoRowHtml() + '</div>' + pipeFirmaHtml() + pipeVincHtml() + pipeCompHtml();
 
   h += pipeDemoRowHtml();
   h += '<div class="cuar-tblwrap"><table class="cuar-tbl pipe-tbl"><thead><tr>' +
@@ -49253,7 +49454,7 @@ function pipeHtml() {
     if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
   }
   h += '</tbody></table></div></div>';
-  return h + pipeFirmaHtml() + pipeVincHtml();
+  return h + pipeFirmaHtml() + pipeVincHtml() + pipeCompHtml();
 }
 
 /* v16.57 (problema 14) — "YA PROGRAMADOS con el cliente en cuarentena".
