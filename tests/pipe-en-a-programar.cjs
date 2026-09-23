@@ -32,7 +32,9 @@ catch (e) { try { ({ chromium } = require("playwright")); }
                    cuarentena_motivos: ["deuda", "cliente_nuevo"],
                    cuarentena_detalle: { nuevo_pedidos: 2, deuda: 500000 } };
     _apr.listo = true; _apr.pedidos = [puro, conDeuda]; _apr.pedidosTodos = _apr.pedidos;
-    _apr.pipe = {}; _apr.cliValor = {}; _apr.cliWpp = {}; _apr.cuarComN = {};
+    // v22.11: sin fila del backend el pedido sale «Cargando…», no «Sin analizar"; por eso el
+    // mock le da su etapa explícita (y abajo se mira el caso sin dato).
+    _apr.pipe = { "lk:9001": { empresa: "lk", order_id: "9001", etapa: "ingresado" } }; _apr.cliValor = {}; _apr.cliWpp = {}; _apr.cuarComN = {};
     _apr.cliCuit = {}; _apr.pipeDemo = false; _apr.pipeCfg = {}; _apr.pipeStale = false;
     try { localStorage.setItem("vir_cli_colapsado", "0"); } catch (_e) {}
 
@@ -53,6 +55,11 @@ catch (e) { try { ({ chromium } = require("playwright")); }
     out.botonReferenciado   = /Referenciado/.test(pipe);
     out.botonNoValido       = /No v[aá]lido/i.test(pipe);               // tiene que ser FALSE
     out.puedeEliminar       = /Eliminar pedido/.test(pipe);
+    // (c2) v22.11: sin el estado del backend NO se ofrece «Análisis Cred.» como si estuviera sin analizar
+    const _bak = _apr.pipe; _apr.pipe = {};
+    const pipeSin = pipeHtml(); _apr.pipe = _bak;
+    out.sinDatoCargando  = /Cargando…/.test(pipeSin);
+    out.sinDatoSinAnalis = !/An[aá]lisis Cred/.test(pipeSin);
 
     // (d) colapsable, y la preferencia queda guardada
     out.tieneColapsar = /aprCliColapsar\(\)/.test(pipe);
@@ -83,6 +90,8 @@ catch (e) { try { ({ chromium } = require("playwright")); }
   ok(r.botonNoReferenciado, "falta el boton `No referenciado`");
   ok(r.botonReferenciado,   "falta el boton `Referenciado`");
   ok(!r.botonNoValido,      "quedo `No valido`: despues del analisis hay DOS estados");
+  ok(r.sinDatoCargando,     "sin estado del backend el pedido tiene que decir «Cargando…»");
+  ok(r.sinDatoSinAnalis,    "sin estado del backend NO se puede ofrecer «Análisis Cred.»");
   ok(r.puedeEliminar,       "sin `No valido` hay que poder eliminar el pedido, y no se puede");
   ok(r.tieneColapsar,       "el pipeline no es colapsable");
   ok(r.colapsadoGuardado,   "colapsar no guarda la preferencia");

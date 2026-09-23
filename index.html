@@ -6118,7 +6118,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.10"></script>
+<script type="module" src="recepcion.js?v=22.11"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10070,7 +10070,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.10";
+const APP_VERSION = "v22.11";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -48519,6 +48519,17 @@ async function cuarLiberar(empresa, orderId) {
                  np: p ? aprPedLabel(p) : String(orderId),
                  cli: (p && (p.razon_social || p.cod)) || "" });
 }
+/* v22.11 (Luis, 23/09): «Enviar a programar» del pipeline abre el MISMO cuadro de aprobar,
+   pero el mensaje de log es OBLIGATORIO: se saca al pedido del reten de cliente nuevo sin haber
+   terminado el pipeline, y tiene que quedar escrito por qué. */
+function pipeEnviarProgramar(empresa, orderId) {
+  const key = String(empresa) + ":" + String(orderId);
+  const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === key; });
+  cuarComAbrir({ modo: "aprobar", clinEnviar: true, empresa: empresa || "lk", clave: String(orderId),
+                 np: p ? aprPedLabel(p) : String(orderId),
+                 cod: p ? String(p.cod || "").trim() : null,
+                 cli: (p && (p.razon_social || p.cod)) || "" });
+}
 async function cuarLiberarConfirmar() {
   const s = _apr.cuarCom; if (!s) return;
   const empresa = s.empresa, orderId = s.clave;
@@ -48526,6 +48537,10 @@ async function cuarLiberarConfirmar() {
   const txt = ((ta && ta.value) || "").trim();
   const quien = cuarQuienValor(s);
   if (!quien) { s.err = "Decinos quién aprueba el pedido (Vivi, Marian u Otro)."; cuarComRender(); return; }
+  if (s.clinEnviar && !txt) {
+    s.err = "Escribí por qué se manda a programar sin terminar el pipeline de cliente nuevo: queda en el log.";
+    cuarComRender(); return;
+  }
   const key = String(empresa) + ":" + String(orderId);
   const p = (_apr.pedidosTodos || []).find(function (x) { return aprKey(x.empresa, x.order_id) === key; });
   s.saving = true; s.err = ""; cuarComRender();
@@ -49078,7 +49093,7 @@ async function pipeCargar() {
     });
     const m = {};
     (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.order_id)] = r; });
-    _apr.pipe = m;
+    _apr.pipe = m; _apr.pipeErr = false;
     // v21.59 (Luis): los OTROS codigos del cliente real (tabla canonica clientes_vinculados de LK,
     // espejada en GV_Clientes_Vinculados). Llamada propia con su propio catch: si falla, el
     // pipeline se dibuja igual, sin el chip.
@@ -49087,7 +49102,7 @@ async function pipeCargar() {
     // v20.42: la PRIMERA llamada a una RPC recién creada puede dar 404 (PostgREST todavía no
     // la tiene en su caché de esquema). Se reintenta una vez; después se deja vacío.
     if (!_apr.pipeRetry) { _apr.pipeRetry = true; _apr.pipe = null; }
-    else { _apr.pipe = _apr.pipe || {}; }
+    else { _apr.pipe = _apr.pipe || {}; _apr.pipeErr = true; }
   }
   _apr.pipeLoading = false;
   if (_pppTab === "prog") aprRender();
@@ -49124,7 +49139,15 @@ function pipeEst(p) {
   const m = _apr.pipe || {};
   return m[String(p.empresa || "lk") + ":" + pipeClave(p.order_id)] || null;
 }
-function pipeEtapa(p) { const e = pipeEst(p); return (e && e.etapa) || "ingresado"; }
+// v22.11 (Luis, 23/09): sin el estado del backend NO se asume "ingresado". Mientras la RPC no
+// contestaba, LK 1448 (en «Esperando pago») se dibujaba «Sin analizar» con el botón de Análisis
+// Cred. — como si el análisis se hubiera perdido. Sin dato: «Cargando…» y sin botones.
+function pipeEtapa(p) {
+  const e = pipeEst(p);
+  if (e && e.etapa) return e.etapa;
+  if (p && p._demo) return "ingresado";
+  return _apr.pipeErr ? "sin_dato" : "cargando";
+}
 /* v20.67 (Luis: "que figure el cuit en la tabla"). Sale del padron que se importa en
    Config. Cuarentena, el mismo que usa el submodulo viejo. Columna propia y no un chip
    debajo del nombre: es el dato que se copia para buscar al cliente en Equifax. */
@@ -49144,6 +49167,8 @@ function pipeCuitHtml(p) {
 }
 
 const PIPE_ETAPAS = {
+  cargando:     { t: "Cargando…",         c: "e-ing"  },
+  sin_dato:     { t: "No se pudo leer",   c: "e-can"  },
   ingresado:    { t: "Sin analizar",      c: "e-ing"  },
   analisis:     { t: "Análisis pedido",   c: "e-ana"  },
   referenciado:    { t: "Referenciado",    c: "e-ref"  },
@@ -49798,7 +49823,9 @@ function pipeAccionesBtns(p) {
   // pedido, no marca al cliente). El cliente sigue siendo nuevo: su proximo pedido vuelve a
   // entrar al pipeline, y este, al facturarse, le suma al contador de GV_Clientes_Nuevos.
   const _enviarBtn = function () {
-    return B("pipe-b-ok2 pipe-b-enviar", _aprobar, "➡ Enviar a programar",
+    return B("pipe-b-ok2 pipe-b-enviar",
+             esDemo ? "pipeDemoAprobar()" : "pipeEnviarProgramar('" + emp + "','" + oid + "')",
+             "➡ Enviar a programar",
              "Saca SÓLO este pedido de la retención de cliente nuevo y lo manda a «Pedidos a programar». " +
              "El cliente sigue siendo nuevo: su próximo pedido vuelve a pasar por acá.");
   };
@@ -50161,7 +50188,8 @@ function cuarComRender() {
       '<div class="cuar-m-body">' +
         '<p class="cuar-com-sub"><b>' + escapeHtml(String(s.np || "")) + '</b>' +
           (s.cli ? ' · ' + escapeHtml(String(s.cli)) : '') +
-          (aprobar ? '<br>Dejá un comentario de por qué se aprueba (cobranzas lo autorizó, ya pagó, lo pidió el dueño…). Queda en el log con tu usuario, la fecha y la hora.'
+          (aprobar && s.clinEnviar ? '<br><b>Cliente nuevo:</b> sale <b>sólo este pedido</b> de la retención; el cliente sigue siendo nuevo y su próximo pedido vuelve a pasar por el pipeline. <b>El mensaje es obligatorio</b> y queda en el log del cliente.'
+                   : aprobar ? '<br>Dejá un comentario de por qué se aprueba (cobranzas lo autorizó, ya pagó, lo pidió el dueño…). Queda en el log con tu usuario, la fecha y la hora.'
                    : devolver ? '<br>Vuelve a Cuarentena: se lo <b>saca de la programación</b> (pierde tanda y fecha) y reaparece en <b>A Programar</b>, retenido. Contá por qué, queda en el log.'
                    : anular ? ('<br>Sale de <b>A Programar</b> y el armado automático <b>no lo toma más</b>. Es para un pedido que entró <b>mal</b>. El pedido de la página <b>no se borra</b>, y esto <b>no se deshace</b> desde la pantalla.'
                        + (s.m3 != null ? ' Son <b>' + aprNum(s.m3) + ' m³</b>.' : ''))
@@ -50172,7 +50200,7 @@ function cuarComRender() {
           (s.picking ? ' ⚠ Esa tanda <b>ya se empezó a trabajar</b>: lo más probable es que el servidor no deje sacarlo — primero hay que resolverlo con el depósito.' : '') +
           '</div>' : '') +
         log +
-        (ver ? '' : '<textarea id="cuarComTexto" class="cuar-com-ta" placeholder="' + (aprobar ? 'Comentario de la aprobación (opcional)' : devolver ? 'Por qué vuelve a Cuarentena (opcional)' : anular ? 'Por qué se anula — OBLIGATORIO (ej: lo cargó mal el cliente, pedido duplicado…)' : 'Escribí un comentario…') + '">' + escapeHtml(String(s.texto || "")) + '</textarea>') +
+        (ver ? '' : '<textarea id="cuarComTexto" class="cuar-com-ta" placeholder="' + (aprobar && s.clinEnviar ? 'Por qué se manda a programar — OBLIGATORIO (ej: pagó por transferencia, lo autorizó Luis…)' : aprobar ? 'Comentario de la aprobación (opcional)' : devolver ? 'Por qué vuelve a Cuarentena (opcional)' : anular ? 'Por qué se anula — OBLIGATORIO (ej: lo cargó mal el cliente, pedido duplicado…)' : 'Escribí un comentario…') + '">' + escapeHtml(String(s.texto || "")) + '</textarea>') +
         (s.err ? '<div class="cuar-m-err">⚠ ' + escapeHtml(s.err) + '</div>' : '') +
       '</div>' +
       '<div class="cuar-m-foot">' +
