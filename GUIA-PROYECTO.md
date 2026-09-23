@@ -1,3 +1,41 @@
+## Nota v22.09 (2026-09-23) — Buscador por CÓDIGO en «📦 Pedidos Importación»
+
+El módulo listaba una tarjeta por proveedor chino con todos sus ítems y **no tenía forma de ir a
+un código**: para mirar el 035E había que saber de qué chino era, tocar su ficha y bajar.
+
+Ahora arriba de «Solo Pedido / Ver Todo» hay un buscador. Usa **el mismo matcher que el módulo
+Stock** (`stkMatchBusq`), así que se comporta igual y no hay dos criterios:
+
+| lo que se tipea | qué trae |
+|---|---|
+| arranca con **dígito** → es un CÓDIGO | por **prefijo de la grafía que se muestra** (regla v21.09): `03` trae 030/035E · `30` trae el 307, **no** el 030 · `031` nunca trae 231 ni 312 |
+| no arranca con dígito → **texto libre** | por pedazo en la descripción y en el proveedor (`cernidor`, `colador`) |
+| **varios** separados por espacio o coma | `026 031 508` (OR, igual que en Stock) |
+
+> ⚠ **Buscando NO se esconde nada.** El término **gana sobre «Solo Pedido» y sobre el filtro de
+> proveedor**, y barre los ítems de **todos** los chinos, pidan o no. Es la regla v20.95: *una
+> fila que no sale no se distingue de un código que no existe*, y el 0 es la respuesta —"no hay
+> que pedir"—, no un motivo para callarse. Si buscando se aplicara «Solo Pedido», tipear el
+> código entero de un artículo que está sobre el objetivo no traería nada.
+
+- El botón de proveedor **queda marcado** mientras se busca (no se pierde la selección): al
+  limpiar la búsqueda se vuelve a esa ficha sola. El chip lo aclara.
+- Las dos cajas de totales (FOB y volumen) dicen **· filtrado** cuando hay búsqueda, para que
+  nadie lea el subtotal de lo que encontró como el total del pedido.
+- **El Excel baja lo que se está viendo** (respeta el término). El **PDF por proveedor NO**: ése
+  es la orden que se le manda al chino y sale entero, con todos sus MC > 0.
+- El vacío dice **por qué** está vacío (*"Ningún importado coincide con X. Se buscó en los N
+  importados, de todos los proveedores"*), no «no hay importados para pedir».
+
+⚠ `_pedImpRender` pasó a pintar con **`_renderKeepFocus`** en vez de `body.innerHTML = h`: el
+buscador re-renderiza en cada tecla y sin eso se perdía el foco (y en Android se reseteaba el
+teclado). El input lleva la clase **`pedimp-q`** justamente para que ese helper lo encuentre entre
+render y render — si se le saca la clase, el foco se va a la primera tecla.
+
+**Chequeo:** `node tests/pedimp-buscador.cjs` — corre la pantalla de verdad y mide las cuatro
+cosas (el que no pide sigue oculto sin buscar · buscándolo aparece aunque esté en otro proveedor ·
+el prefijo de la v21.09 · el texto libre). Verificado que **falla contra el index.html anterior**.
+
 ## Nota v21.80 (2026-09-23) — La observación del pedido AHORA SE PUEDE LEER, en la PPP
 
 **Tomás González:** *"¿hay forma de agregar en la sección de PPP un botón que deje ver las

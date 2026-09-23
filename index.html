@@ -6118,7 +6118,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.08"></script>
+<script type="module" src="recepcion.js?v=22.09"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10070,7 +10070,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.08";
+const APP_VERSION = "v22.09";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20692,6 +20692,22 @@ function pedImpSetFiltro(solo) { if (!_stkPop || _stkPop.kind !== "pedImp") retu
 /* Filtro por PROVEEDOR: "" = todas las tarjetas (un box por proveedor), o el nombre de un proveedor = solo ese box. */
 function pedImpSetProv(provEnc) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.provFiltro = decodeURIComponent(provEnc || ""); _pedImpRender(); }
 function pedImpToggle() { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.soloPedir = !_stkPop.soloPedir; _pedImpRender(); }
+/* v22.09 — BUSCADOR POR CÓDIGO. Reusa el matcher del módulo Stock (`stkMatchBusq`), así que
+   vale la misma regla: un término que arranca con DÍGITO es un CÓDIGO y va por PREFIJO de la
+   grafía que se MUESTRA (v21.09: "30" trae el 307, no el 030); si no arranca con dígito es
+   texto libre y busca por pedazo en la descripción y en el proveedor. Varios términos,
+   separados por espacio o coma (026 031 508).
+   ⚠ BUSCANDO NO SE ESCONDE NADA: el término gana sobre "Solo Pedido" y sobre el filtro de
+   proveedor, y barre TODOS los ítems, pidan o no. Es la regla v20.95: una fila que no sale no
+   se distingue de un código que no existe, y el 0 es la respuesta, no un motivo para callarse. */
+function pedImpSetQ(v) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.q = String(v == null ? "" : v); _pedImpRender(); }
+function pedImpQTerms() { return String((_stkPop && _stkPop.q) || "").trim().split(/[\s,]+/).filter(Boolean); }
+function pedImpMatch(it, terms) {
+  if (!terms || !terms.length) return true;
+  var cod = codCanon(it.cod);
+  var libre = (cod + " " + (artNombre(it.cod, it.desc) || "") + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase();
+  return terms.some(function (t) { return stkMatchBusq(t, cod, libre, false); });
+}
 /* v14.78 — "Cargar pedido ya hecho" (pedido emitido por fuera, plataforma externa) en UN solo
    pop-up, en vez de la cadena de prompt() de la v14.77. El pop-up pide:
      1) PROVEEDOR chino  ·  2) FECHA estimada de entrega
@@ -21017,17 +21033,20 @@ function _pedImpRender() {
   if (!_stkPop.mcOverride) _stkPop.mcOverride = {};
   const soloPedir = _stkPop.soloPedir !== false;   // default: Solo Pedido
   const allItems = (data.items || []);
+  const _pedQ = pedImpQTerms(), _buscando = _pedQ.length > 0, _qRaw = String(_stkPop.q || "");
   // v14.99 — las fichas de proveedor salen de TODOS los ítems (no sólo de los que generan
   // pedido), así un chino sin nada a pedir sigue apareciendo y se puede elegir.
   const provAll = [];
   allItems.forEach(function (it) { const p = it.prov || "(sin proveedor)"; if (provAll.indexOf(p) < 0) provAll.push(p); });
   provAll.sort(function (a, b) { const ia = _IMPORTADOR_DE[a] || "zz", ib = _IMPORTADOR_DE[b] || "zz"; return String(ia).localeCompare(String(ib)) || String(a).localeCompare(String(b)); });
-  const provFiltro = (_stkPop.provFiltro && provAll.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
+  const provSel = (_stkPop.provFiltro && provAll.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
+  const provFiltro = _buscando ? "" : provSel;   // buscando se barre TODO (ver pedImpSetQ)
   let items = allItems;
   // v14.99 — parado en UN proveedor se ven todos sus ítems aunque no generen pedido
   // (dueño: "si me paro en un solo prov, mostrame todos los items"). "Solo Pedido"
   // filtra únicamente en la vista Todos.
-  if (soloPedir && !provFiltro) items = items.filter(function (it) { return _pedImpMcOf(it) > 0; });
+  if (_buscando) items = allItems.filter(function (it) { return pedImpMatch(it, _pedQ); });
+  else if (soloPedir && !provFiltro) items = items.filter(function (it) { return _pedImpMcOf(it) > 0; });
   // ventanas POR PROVEEDOR (cada proveedor = una tarjeta con su tabla, subtotal y botón PDF).
   const byProv = {}, provOrder = [];
   items.forEach(function (it) { const prov = it.prov || "(sin proveedor)"; if (!byProv[prov]) { byProv[prov] = []; provOrder.push(prov); } byProv[prov].push(it); });
@@ -21043,6 +21062,13 @@ function _pedImpRender() {
     '</div>';
   // filtro Solo Pedido / Ver Todo + Excel
   const _fbtn = function (on) { return 'width:auto;flex:0 0 auto;padding:8px 14px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:13px;font-weight:800;cursor:pointer'; };
+  // v22.09 — buscador por código (ver pedImpSetQ). Clase `pedimp-q` para que _renderKeepFocus
+  // lo encuentre entre re-render y re-render y no se pierda el foco a cada tecla.
+  h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+    '<input class="pedimp-q" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 Buscar código (varios: 026 031 508) o descripción" value="' + escapeHtml(_qRaw) + '" oninput="pedImpSetQ(this.value)" style="width:auto;margin:0;flex:1 1 280px;min-width:200px;max-width:440px;height:38px;border:1.5px solid ' + (_buscando ? '#0f766e' : '#cbd5e1') + ';border-radius:9px;padding:0 11px;font-size:14px;box-sizing:border-box;background:#fff">' +
+    (_buscando ? '<button class="mva-clear" onclick="pedImpSetQ(\'\')" title="Limpiar la búsqueda">✕ Limpiar</button>' +
+       '<span style="font-size:12px;color:#0f766e;font-weight:700">' + items.length + ' ítem(s) · se busca en <b>todos</b> los proveedores, pidan o no</span>' : '') +
+    '</div>';
   h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">' +
     '<button style="' + _fbtn(soloPedir) + '" onclick="pedImpSetFiltro(true)">Solo Pedido</button>' +
     '<button style="' + _fbtn(!soloPedir) + '" onclick="pedImpSetFiltro(false)">Ver Todo</button>' +
@@ -21053,9 +21079,9 @@ function _pedImpRender() {
   if (provAll.length > 1) {
     h += '<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
       '<span style="font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.4px">🏭 Proveedor:</span>' +
-      '<button style="' + _fbtn(!provFiltro) + '" onclick="pedImpSetProv(\'\')">Todos</button>' +
-      provAll.map(function (p) { return '<button style="' + _fbtn(provFiltro === p) + '" onclick="pedImpSetProv(\'' + encodeURIComponent(p) + '\')">' + escapeHtml(p) + '</button>'; }).join('') +
-      (provFiltro ? '<span style="font-size:11.5px;color:#64748b">· se muestran <b>todos</b> los artículos de ' + escapeHtml(provFiltro) + ', pidan o no</span>' : '') +
+      '<button style="' + _fbtn(!provSel) + '" onclick="pedImpSetProv(\'\')">Todos</button>' +
+      provAll.map(function (p) { return '<button style="' + _fbtn(provSel === p) + '" onclick="pedImpSetProv(\'' + encodeURIComponent(p) + '\')">' + escapeHtml(p) + '</button>'; }).join('') +
+      (_buscando && provSel ? '<span style="font-size:11.5px;color:#0f766e;font-weight:700">· mientras buscás se miran <b>todos</b> los proveedores</span>' : (provSel ? '<span style="font-size:11.5px;color:#64748b">· se muestran <b>todos</b> los artículos de ' + escapeHtml(provSel) + ', pidan o no</span>' : '')) +
       '</div>';
   }
   // totales (respetan el MC editado y el proveedor elegido)
@@ -21065,8 +21091,8 @@ function _pedImpRender() {
   const _nSinFob = itemsView.filter(function (it) { return _pedImpMcOf(it) > 0 && !(it.fobUni > 0); }).length;
   const _nSinVol = itemsView.filter(function (it) { return _pedImpMcOf(it) > 0 && !(it.m3Master > 0); }).length;
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">' +
-    '<div style="flex:1;min-width:150px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Total pedido (FOB)</div><div style="font-size:22px;font-weight:800;color:#065f46">u$s ' + Math.round(_gUsd).toLocaleString("es-AR") + '</div>' + (_nSinFob ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinFob + ' ítem(s) sin FOB cargado</div>' : '') + '</div>' +
-    '<div style="flex:1;min-width:150px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Volumen total</div><div style="font-size:22px;font-weight:800;color:#1e3a8a">' + (Math.round(_gM3 * 100) / 100).toLocaleString("es-AR") + ' m³</div>' + (_nSinVol ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinVol + ' ítem(s) sin volumen cargado</div>' : '') + '</div>' +
+    '<div style="flex:1;min-width:150px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Total pedido (FOB)' + (_buscando ? ' <span style="color:#0f766e">· filtrado</span>' : '') + '</div><div style="font-size:22px;font-weight:800;color:#065f46">u$s ' + Math.round(_gUsd).toLocaleString("es-AR") + '</div>' + (_nSinFob ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinFob + ' ítem(s) sin FOB cargado</div>' : '') + '</div>' +
+    '<div style="flex:1;min-width:150px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Volumen total' + (_buscando ? ' <span style="color:#0f766e">· filtrado</span>' : '') + '</div><div style="font-size:22px;font-weight:800;color:#1e3a8a">' + (Math.round(_gM3 * 100) / 100).toLocaleString("es-AR") + ' m³</div>' + (_nSinVol ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinVol + ' ítem(s) sin volumen cargado</div>' : '') + '</div>' +
     '</div>';
   let algo = false;
   provOrder.forEach(function (prov) {
@@ -21138,8 +21164,10 @@ function _pedImpRender() {
     });
     h += '</tbody></table></div></div>';
   });
-  if (!algo) h += '<div class="stkpop-empty">No hay importados ' + (soloPedir ? 'para pedir (todo en o sobre el objetivo)' : 'cargados') + '.</div>';
-  body.innerHTML = h;
+  if (!algo) h += '<div class="stkpop-empty">' + (_buscando
+    ? ('Ningún importado coincide con <b>' + escapeHtml(_qRaw) + '</b>. Se buscó en los ' + allItems.length + ' importados, de todos los proveedores.')
+    : ('No hay importados ' + (soloPedir ? 'para pedir (todo en o sobre el objetivo)' : 'cargados') + '.')) + '</div>';
+  _renderKeepFocus(body, h);   // v22.09 — el buscador re-renderiza en cada tecla: sin esto se pierde el foco
 }
 /* v10.38 — PDF del pedido de UN proveedor: solo Código · Master Cajas · Unidades (SIN FOB),
    para mandarle al proveedor chino a cotizar. Respeta el MC editado (0 = no va). */
@@ -21170,7 +21198,11 @@ function pedImpExportExcel() {
   if (!_stkPop || _stkPop.kind !== "pedImp") return;
   var data = _stkPop.data || { items: [] };
   var items = (data.items || []).slice();
-  if (_stkPop.soloPedir) items = items.filter(function (it) { return it.aPedirUni > 0; });
+  // v22.09 — con el buscador puesto, el Excel baja lo que se está viendo (y el término gana
+  // sobre "Solo Pedido", igual que en pantalla).
+  var _q = pedImpQTerms();
+  if (_q.length) items = items.filter(function (it) { return pedImpMatch(it, _q); });
+  else if (_stkPop.soloPedir) items = items.filter(function (it) { return it.aPedirUni > 0; });
   if (!items.length) { try { alert("No hay ítems para exportar."); } catch (_e) {} return; }
   var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
   var fecha = (function () { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return "hoy"; } })();
@@ -21182,7 +21214,7 @@ function pedImpExportExcel() {
     return (b.aPedirUni || 0) - (a.aPedirUni || 0);
   });
   var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#166534;color:#fff;text-align:left;}</style></head><body>';
-  html += '<h3>Pedidos Importación — Producción Virgilio (' + esc(fecha) + ', índice ' + (data.meses || 10) + ' meses)</h3>';
+  html += '<h3>Pedidos Importación — Producción Virgilio (' + esc(fecha) + ', índice ' + (data.meses || 10) + ' meses)' + (_q.length ? ' — búsqueda: ' + esc(_q.join(" ")) : '') + '</h3>';
   html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>En curso</th><th>A pedir u</th><th>Master cjs</th><th>FOB u$s/u</th><th>u$s pedido</th><th>m3/master</th><th>m3 pedido</th></tr>';
   var _totM3 = 0, _totUsd = 0;
   items.forEach(function (it) {
