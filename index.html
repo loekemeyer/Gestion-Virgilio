@@ -4195,6 +4195,15 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppres-tbl td.np.npc{ cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px; }
 .pppres-tbl td.np.npc:hover{ background:#ecfeff; }
 .pppres-tbl tfoot td{ font-weight:800; background:#f8fafc; }
+/* v21.72 — el pop-up de camiones por demora: una fila de cabecera por camión. */
+.pppres-tbl tr.camh td{ background:#0f172a; color:#fff; font-weight:800; font-size:12.5px; padding:6px 12px; }
+.pppres-tbl tr.camh td.dem.hot{ color:#fca5a5; }
+.pppres-nocam{ font-weight:600; opacity:.75; }
+.pppres-loc{ display:block; color:#64748b; font-size:11.5px; }
+.pppres-tbl td.dem{ font-weight:800; }
+.pppres-tbl td.dem.hot{ color:#b91c1c; }
+.ppp-restbl td.dem.hot, .ppp-restbl tr.totrow td.hot{ color:#dc2626; font-weight:800; }
+.ppp-restbl tr.totrow td.hot{ color:#fca5a5; }
 /* Chequeo de góndola (v7.16): modal del botón 📦 de cada pedido / tanda. Reusa
    .pppres-ov/.pppres-card; la tabla es propia porque tiene que entrar en el celu. */
 .pppchk-msg{ padding:26px 16px; text-align:center; color:#475569; font-size:14px; font-weight:700; }
@@ -37819,13 +37828,49 @@ function _pppBlock(key, name, cls, meta, pedidos, headerExtra, editTanda) {
 }
 /* ===== Fase 3: Resumen de camiones por día de ENTREGA (réplica de 'Resumen Prog').
    Agrupa los pedidos por Fecha de Entrega; suma m³ por zona (los súper cuentan en
-   "Súper", no en su zona geográfica); arma camiones por RUTA fija:
-   Ruta Sur/Centro/Oeste = Z1+Z2+Z3+Z4 · Ruta Norte = Z5+Z6+Z7 · Súper (uno
-   por cliente) · Retira (sin camión). Cada camión hasta la capacidad (6 m³/día →
-   ceil(m³/cap) camiones por ruta). Demora prom = promedio (Fecha Entrega − Fecha Recep). */
+   "Súper", no en su zona geográfica) y cuenta los camiones del día por GRUPO DE ZONAS
+   (regla v21.56) — ver `PPP_RES_CAMIONES`. Demora = la MAYOR del día (v21.72), no el
+   promedio: el promedio de un día con un pedido de 3 días y otro de 34 daba 18, un número
+   que no le pasa a ningún pedido y que esconde justo al que está parado hace más. */
 /* v6.57/v6.58 — composición de cada celda del Resumen: click en un número
    (zona/Retira/Súper/Total de un día) abre un POP-UP con la tabla de NPs que lo componen. */
 let _pppResDet = {};
+/* v21.72 (23/09) — LOS CAMIONES DEL RESUMEN. Dos cosas que cambiaron el mismo día:
+
+   1. **Un camión = UN GRUPO DE ZONAS**, la regla v21.56 de Thomas, y no las dos rutas viejas
+      (Sur/Centro/Oeste = Z1+Z2+Z3+Z4 · Norte = Z5+Z6+Z7). Con las viejas, un día con
+      Z2+Z3+Z4+Z6 contaba 2 camiones cuando salen 3, así que pasarse del tope de 2 por día
+      no se veía en la única pantalla que mira el conjunto.
+
+   2. **No hay tope de m³ por camión.** Textual: *"no hay límite para arriba en la cantidad de
+      metros cúbicos por camión, puedo tener hasta 40 m³ en un camión"*. El Resumen hacía
+      `ceil(m³ / 6)` por ruta, así que el 28/10 —Matiz sola, 12,33 m³, UN cliente, una sola
+      entrega— decía **3 camiones** cuando sale **1**.
+      ⚠ Los 6 m³ de `PPP_Web_Config.camion_m3_tope` NO son lo que entra en el camión: son el
+      tope de lo que el armador MEZCLA en una tanda (`gv_ppp_web_agrupar_geo`). Confundir las
+      dos cosas es lo que infló esta cuenta. El tope físico es otro número y vive aparte.
+
+   El único tope que queda es el físico: `PPP_Web_Config.jornada_camion_m3_cap` (40 m³). Entra
+   por el mismo fetch `clave=like.jornada*` de `pppRefreshJornadaCfg`, o sea sin llamada nueva,
+   y si la fila no existe manda el default de `_pppJorCfg`. */
+const PPP_RES_CAMIONES = [
+  ["Capital Sur",          ["Zona 1 - CABA Sur"]],
+  ["Capital Centro-Oeste", ["Zona 2 - CABA Centro", "Zona 3 - CABA Oeste"]],
+  ["GBA Sur",              ["Zona 4 - GBA Sur"]],
+  ["GBA Oeste",            ["Zona 5 - GBA Oeste"]],
+  ["GBA Norte",            ["Zona 6 - GBA Norte", "Zona 7 - GBA Norte Lejos"]]
+];
+/* Capacidad FÍSICA del camión, en m³. `_pppJorCfg` se declara más abajo en el archivo (`let`),
+   así que la lectura va adentro de un try: ante cualquier error, el default. */
+function _pppCamionM3() {
+  try { const v = _pppJorCfg && _pppJorCfg.camionM3; if (isFinite(v) && v > 0) return v; } catch (_e) {}
+  return 40;
+}
+let _pppResCam = {};   // v21.72: los camiones de cada día, para el pop-up de demora
+/* Punto 4 de la lógica de programación de Luis: *"los pedidos no pueden demorar más de 10 días
+   hábiles en salir"*. La columna cuenta días CORRIDOS (es la cuenta que ya hacía), y 10 hábiles
+   son 14 corridos: a partir de ahí el número va en rojo. No frena nada, sólo se ve. */
+const PPP_DEM_ALERTA = 14;
 function pppResPopClose() { const ov = document.getElementById("pppResPopOv"); if (ov) ov.classList.remove("show"); }
 /* v6.59/v6.60: NPs del mismo cliente en UNA fila, compactas — la 1ª completa y las
    siguientes solo los dígitos que cambian (mínimo 2): 44506+44507 → "44506/07";
@@ -37896,6 +37941,59 @@ function pppResTgl(dk, zkeyEnc) {
     '<tfoot><tr><td colspan="4">Total</td><td class="num">' + f2(tot) + '</td></tr></tfoot></table></div></div>';
   ov.classList.add("show");
 }
+/* v21.72 (23/09) — LOS CAMIONES DE UN DÍA, ORDENADOS POR LA MAYOR DEMORA. Textual:
+   *"que pueda tocar y ver por camión cuál es, ordenado por mayor demora, la demora real de
+   cada uno"*. Lo abren las dos celdas del día: la de Cam. y la de Mayor demora.
+   ⚠ Adentro de cada camión las NP se juntan por CLIENTE **y demora**: dos pedidos del mismo
+   cliente pedidos en días distintos tienen demoras distintas y son dos renglones, porque el
+   número que se mira es justamente ése. Reusa el overlay y el CSS de `pppResTgl`. */
+function pppResCamTgl(dk) {
+  const d = _pppResCam[dk];
+  if (!d) return;
+  const f2 = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
+  let ov = document.getElementById("pppResPopOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "pppResPopOv"; ov.className = "pppres-ov";
+    ov.addEventListener("click", function (e) { if (e.target === ov) pppResPopClose(); });
+    document.body.appendChild(ov);
+  }
+  let filas = "", nPed = 0;
+  d.cams.forEach(function (c) {
+    nPed += c.peds.length;
+    const grp = {}, orden = [];
+    c.peds.forEach(function (i) {
+      const k = (i.rs || ("np:" + i.np)) + "|" + (i.dem == null ? "-" : i.dem);
+      if (!grp[k]) { grp[k] = { nps: [], tandas: [], locs: [], rs: i.rs, m3: 0, dem: i.dem }; orden.push(k); }
+      grp[k].nps.push(String(i.np));
+      if (i.tanda && grp[k].tandas.indexOf(i.tanda) < 0) grp[k].tandas.push(i.tanda);
+      if (i.loc && grp[k].locs.indexOf(i.loc) < 0) grp[k].locs.push(i.loc);
+      grp[k].m3 += i.m3;
+    });
+    const filasC = orden.map(function (k) { return grp[k]; })
+      .sort(function (a, b) { return (b.dem == null ? -1 : b.dem) - (a.dem == null ? -1 : a.dem) || b.m3 - a.m3; });
+    filasC.forEach(function (r) { r.nps.sort(function (a, b) { return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0); }); });
+    const cuantos = c.n === 0 ? '<span class="pppres-nocam">' + escapeHtml(c.sinCam || "sin camión") + '</span>'
+      : (c.n === 1 ? '1 camión' : '<b>' + c.n + ' camiones</b> (no entra en uno)');
+    filas += '<tr class="camh"><td colspan="3">🚚 ' + escapeHtml(c.nombre) + ' · ' + cuantos + '</td>' +
+      '<td class="num">' + f2(c.m3) + '</td>' +
+      '<td class="num dem' + (c.demMax != null && c.demMax >= PPP_DEM_ALERTA ? ' hot' : '') + '">' + (c.demMax != null ? c.demMax + " d" : "·") + '</td></tr>';
+    filasC.forEach(function (r) {
+      const npCsv = r.nps.map(function (x) { return String(x).replace(/"/g, ""); }).filter(Boolean).join(",");
+      filas += '<tr><td class="np npc" onclick="pppChequeoNp(\'' + _pppArg(npCsv) + '\',\'' + _pppArg(r.rs || "") + '\',\'' + _pppArg(r.tandas[0] || "") + '\')" title="Ver qué contiene (código y cajas)">' + escapeHtml(_pppNpsCompact(r.nps)) + '</td>' +
+        '<td>' + escapeHtml(r.tandas.join("/") || "—") + '</td>' +
+        '<td>' + escapeHtml(r.rs || "—") + '<span class="pppres-loc">' + escapeHtml(r.locs.join(" / ")) + '</span></td>' +
+        '<td class="num">' + f2(r.m3) + '</td>' +
+        '<td class="num dem' + (r.dem != null && r.dem >= PPP_DEM_ALERTA ? ' hot' : '') + '">' + (r.dem != null ? r.dem : "·") + '</td></tr>';
+    });
+  });
+  if (!filas) filas = '<tr><td colspan="5" style="text-align:center;color:#94a3b8">— sin pedidos —</td></tr>';
+  ov.innerHTML = '<div class="pppres-card">' +
+    '<div class="pppres-head"><span class="pppres-title">🚚 Camiones del ' + escapeHtml(d.fecha || "") + '</span><button class="pppres-x" onclick="pppResPopClose()">✕</button></div>' +
+    '<div class="pppres-sum"><b>' + d.nCam + '</b> camión(es) · <b>' + nPed + '</b> NP(s) · <b>' + f2(d.m3) + ' m³</b> · mayor demora <b>' + (d.demMax != null ? d.demMax + " día(s)" : "—") + '</b> ' +
+    '<span style="opacity:.75">— ordenado por la demora más grande de cada camión</span></div>' +
+    '<div class="pppres-wrap"><table class="pppres-tbl"><thead><tr><th>NP</th><th>Tanda</th><th>Cliente</th><th class="num">m³</th><th class="num">Demora</th></tr></thead><tbody>' + filas + '</tbody></table></div></div>';
+  ov.classList.add("show");
+}
 function pppResumenHtml(prog) {
   const conF = prog.filter(function (p) { return (p.fecha_entrega || "").trim(); });
   // v9.80 — Retira NO lleva fecha de entrega (el cliente retira del depósito, sin camión):
@@ -37923,42 +38021,70 @@ function pppResumenHtml(prog) {
   }
   if (sinF) head += '<div class="ppp-res-note">⏳ ' + sinF + ' pedido(s) sin Fecha de Entrega — no entran al resumen. <span style="opacity:.7">(Retira no cuenta)</span></div>';
   if (!conF.length) return head + '<div class="planim-empty">Sin pedidos con Fecha de Entrega todavía.</div>';
-  const CAP = pppGetCfg().dayCap > 0 ? pppGetCfg().dayCap : 6;
+  const CAMM3 = _pppCamionM3();
   const byD = {};
   for (const p of conF) { const k = _pppFechaKey(p.fecha_entrega); if (!byD[k]) byD[k] = { fecha: p.fecha_entrega, ped: [] }; byD[k].ped.push(p); }
   const dias = Object.keys(byD).sort();
-  const ceilT = function (m) { return m > 0 ? Math.ceil((m - 1e-9) / CAP) : 0; };
+  // Cuántos camiones hace falta para m³: UNO, salvo que no entren (40 m³). v21.72.
+  const nCamDe = function (m) { return m > 0.0001 ? Math.max(1, Math.ceil((m - 1e-9) / CAMM3)) : 0; };
   const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
   const f2 = function (n) { return (Math.round(n * 100) / 100).toFixed(2); };
   // columnas de zona (clave, clase de color)
   const Zc = [["Zona 1 - CABA Sur", "z1"], ["Zona 2 - CABA Centro", "z2"], ["Zona 3 - CABA Oeste", "z3"], ["Zona 4 - GBA Sur", "z4"], ["Zona 5 - GBA Oeste", "z5"], ["Zona 6 - GBA Norte", "z6"], ["Zona 7 - GBA Norte Lejos", "z7"], ["Retira", "zret"], ["Super", "zsup"]];
   const tcell = function (m) { return '<td class="num">' + (m > 0.0001 ? f2(m) : '·') + '</td>'; };
-  const T = {}; Zc.forEach(function (z) { T[z[0]] = 0; }); let Ttot = 0, Tcam = 0, Tdem = 0, TdemN = 0;
+  const T = {}; Zc.forEach(function (z) { T[z[0]] = 0; }); let Ttot = 0, Tcam = 0, TdemMax = null;
   _pppResDet = {};   // v6.57: composición por celda (fecha × zona) para el detalle clickeable
+  _pppResCam = {};   // v21.72: los camiones de cada día, para el pop-up de la demora
   let rows = "";
   for (const dk of dias) {
     const d = byD[dk], ped = d.ped;
     const Z = {}; Zc.forEach(function (z) { Z[z[0]] = 0; });
     const det = { __tot__: [] }; Zc.forEach(function (z) { det[z[0]] = []; });
-    const supCli = {};
+    const supCli = {}, supNom = {}, supPeds = {};
     for (const p of ped) {
       const m3 = Number(p.m3) || 0;
-      const item = { np: String(p.np || "—"), tanda: String(p.tanda || "").trim(), rs: String(p.razon_social || "").trim(), loc: String(p.localidad || "").trim(), m3: m3 };
+      // Demora del pedido, en días CORRIDOS: es la misma cuenta que hacía el promedio.
+      const _fa = _pppFechaDate(p.fecha), _fb = _pppFechaDate(p.fecha_entrega);
+      const dem = (_fa && _fb) ? Math.round((_fb - _fa) / 86400000) : null;
+      const item = { np: String(p.np || "—"), tanda: String(p.tanda || "").trim(), rs: String(p.razon_social || "").trim(), loc: String(p.localidad || "").trim(), m3: m3, dem: dem };
       det.__tot__.push(item);
-      if (pppEsSuper(p)) { Z["Super"] += m3; det["Super"].push(item); const k = String(p.cod || p.razon_social || "?"); supCli[k] = (supCli[k] || 0) + m3; }
+      if (pppEsSuper(p)) { Z["Super"] += m3; det["Super"].push(item); const k = String(p.cod || p.razon_social || "?"); supCli[k] = (supCli[k] || 0) + m3; if (!supNom[k]) supNom[k] = String(p.razon_social || "").trim() || k; (supPeds[k] = supPeds[k] || []).push(item); }
       else { const z = pppZonaDeBarrio(p.localidad); if (Z[z] != null) { Z[z] += m3; det[z].push(item); } }
     }
     det.__fecha__ = d.fecha;
     _pppResDet[dk] = det;
     const total = ped.reduce(function (s, p) { return s + (Number(p.m3) || 0); }, 0);
-    const surOeste = Z["Zona 1 - CABA Sur"] + Z["Zona 2 - CABA Centro"] + Z["Zona 3 - CABA Oeste"] + Z["Zona 4 - GBA Sur"];
-    const norte = Z["Zona 5 - GBA Oeste"] + Z["Zona 6 - GBA Norte"] + Z["Zona 7 - GBA Norte Lejos"];
-    let nSup = 0; for (const k in supCli) nSup += Math.max(1, ceilT(supCli[k]));
-    const nCam = ceilT(surOeste) + ceilT(norte) + nSup;
-    let dem = 0, dn = 0; for (const p of ped) { const a = _pppFechaDate(p.fecha), b = _pppFechaDate(p.fecha_entrega); if (a && b) { dem += (b - a) / 86400000; dn++; } }
-    const demP = dn ? dem / dn : null;
+    // v21.72 — los camiones del día: un grupo de zonas = un camión (regla v21.56), un súper
+    // por cliente (regla v14.23: el súper no comparte camión) y Retira sin camión.
+    const _demMaxDe = function (arr) { let x = null; for (const i of arr) if (i.dem != null && (x == null || i.dem > x)) x = i.dem; return x; };
+    const cams = [], puestos = new Set();
+    PPP_RES_CAMIONES.forEach(function (C) {
+      let m3 = 0; const peds = [];
+      C[1].forEach(function (z) { m3 += Z[z] || 0; (det[z] || []).forEach(function (i) { peds.push(i); puestos.add(i); }); });
+      if (!peds.length && m3 <= 0.0001) return;
+      cams.push({ nombre: C[0], m3: m3, peds: peds, n: nCamDe(m3), demMax: _demMaxDe(peds) });
+    });
+    for (const k in supCli) {
+      const peds = supPeds[k] || [];
+      peds.forEach(function (i) { puestos.add(i); });
+      cams.push({ nombre: "Súper · " + supNom[k], m3: supCli[k], peds: peds, n: nCamDe(supCli[k]), demMax: _demMaxDe(peds) });
+    }
+    if ((det["Retira"] || []).length) {
+      det["Retira"].forEach(function (i) { puestos.add(i); });
+      cams.push({ nombre: "Retira", m3: Z["Retira"] || 0, peds: det["Retira"], n: 0, sinCam: "lo pasa a buscar el cliente", demMax: _demMaxDe(det["Retira"]) });
+    }
+    // Un pedido cuyo barrio no resuelve a ninguna zona no cae en ningún camión: se muestra
+    // igual y se dice que no se contó, en vez de desaparecer del pop-up sin explicación.
+    const _sinZ = det.__tot__.filter(function (i) { return !puestos.has(i); });
+    if (_sinZ.length) cams.push({ nombre: "Sin zona", m3: _sinZ.reduce(function (s, i) { return s + i.m3; }, 0), peds: _sinZ, n: 0, sinCam: "sin zona: no se sabe en qué camión va", demMax: _demMaxDe(_sinZ) });
+    cams.sort(function (a, b) { return (b.demMax == null ? -1 : b.demMax) - (a.demMax == null ? -1 : a.demMax) || b.m3 - a.m3; });
+    const nCam = cams.reduce(function (s, c) { return s + c.n; }, 0);
+    const demP = _demMaxDe(det.__tot__);
+    _pppResCam[dk] = { fecha: d.fecha, cams: cams, nCam: nCam, demMax: demP, m3: 0 };
     const dt = _pppFechaDate(d.fecha), dia = dt ? DOW[dt.getDay()] : "";
-    Zc.forEach(function (z) { T[z[0]] += Z[z[0]]; }); Ttot += total; Tcam += nCam; Tdem += dem; TdemN += dn;
+    Zc.forEach(function (z) { T[z[0]] += Z[z[0]]; }); Ttot += total; Tcam += nCam;
+    if (demP != null && (TdemMax == null || demP > TdemMax)) TdemMax = demP;
+    _pppResCam[dk].m3 = total;
     // v15.54 (dueño): el TOTAL del día va pegado al Día y ANTES del desglose por zona —
     // primero el número que se mira, después de qué se compone.
     // v15.57 (dueño): en esta tabla la fecha va "dd/mm", sin el año, pegada al día.
@@ -37969,16 +38095,19 @@ function pppResumenHtml(prog) {
         if (m > 0.0001) return '<td class="num zc ' + z[1] + '" onclick="pppResTgl(\'' + dk + '\',\'' + encodeURIComponent(z[0]) + '\')" title="Ver de qué NPs se compone">' + f2(m) + '</td>';
         return '<td class="num z0 ' + z[1] + '">·</td>';
       }).join("") +
-      '<td class="num cam">' + nCam + '</td><td class="num">' + (demP != null ? (Math.round(demP * 10) / 10) : "·") + '</td></tr>';
+      '<td class="num cam zc" onclick="pppResCamTgl(\'' + dk + '\')" title="Ver los camiones del día, ordenados por la mayor demora">' + nCam + '</td>' +
+      '<td class="num zc dem' + (demP != null && demP >= PPP_DEM_ALERTA ? ' hot' : '') + '" onclick="pppResCamTgl(\'' + dk + '\')" title="La demora del pedido que más esperó. Tocá para ver la de cada camión.">' + (demP != null ? demP : "·") + '</td></tr>';
   }
-  const demT = TdemN ? (Math.round(Tdem / TdemN * 10) / 10) : null;
+  const demT = TdemMax;   // v21.72: la PEOR de todas, no el promedio de promedios
   const totRow = '<tr class="totrow"><td class="f">TOTAL</td><td></td>' +
     '<td class="num tot">' + f2(Ttot) + '</td>' + Zc.map(function (z) { return tcell(T[z[0]]); }).join("") +
-    '<td class="num">' + Tcam + '</td><td class="num">' + (demT != null ? demT : "·") + '</td></tr>';
+    '<td class="num">' + Tcam + '</td><td class="num' + (demT != null && demT >= PPP_DEM_ALERTA ? ' hot' : '') + '">' + (demT != null ? demT : "·") + '</td></tr>';
   return head +
-    '<div class="ppp-res-leg">🚚 Camiones por ruta: <b>Z1·Z2·Z3·Z4</b> Sur/Centro/Oeste · <b>Z5·Z6·Z7</b> Norte · Súper (1 por cliente) · Retira sin camión. Tope <b>' + CAP + ' m³/día</b>.</div>' +
+    '<div class="ppp-res-leg" title="Un camión = un grupo de zonas (regla del 23/09): Capital Sur = Z1 · Capital Centro-Oeste = Z2+Z3 · GBA Sur = Z4 · GBA Oeste = Z5 · GBA Norte = Z6+Z7. Cada grupo sale UNA vez: no se parte por m³ hasta los ' + CAMM3 + ' m³ que entran físicamente en el camión. La demora se cuenta en días corridos entre la fecha del pedido y la de entrega.">' +
+      '🚚 <b>1 camión = 1 grupo de zonas</b>: Z1 · Z2+Z3 · Z4 · Z5 · Z6+Z7 · Súper 1 x cliente · Retira sin camión. Sin partir hasta <b>' + CAMM3 + ' m³</b>. ' +
+      '⏱ <b>Demora</b> = la del pedido que más esperó — tocala.</div>' +
     '<div class="ppp-restbl-wrap"><table class="ppp-restbl"><thead><tr>' +
-      '<th>Fecha</th><th>Día</th><th class="tot">Total<br>m³</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Cam.</th><th>Demora<br>(d)</th>' +
+      '<th>Fecha</th><th>Día</th><th class="tot">Total<br>m³</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Cam.</th><th>Mayor<br>demora</th>' +
     '</tr></thead><tbody>' + rows + totRow + '</tbody></table></div>';
 }
 
@@ -38703,7 +38832,7 @@ async function pppRefreshValor() {
    Los dos últimos son una estimación: se recalibran con las horas reales de la hoja de ruta
    (`GV_Viaje_Horas`, §3.bx) cuando empiecen a cargarse. Acá quedan los defaults por si la
    config no cargó (sin red la PPP tiene que seguir andando). */
-let _pppJorCfg = { horasMax: 8, minParada: 15, kmH: 28, factor: 1.35, camiones: 2 };
+let _pppJorCfg = { horasMax: 8, minParada: 15, kmH: 28, factor: 1.35, camiones: 2, camionM3: 40 };
 let _pppJorCfgOk = false;
 /* v16.72 — TANDAS QUE SALEN EN VEHÍCULO PROPIO (la kangoo). Caso real: E11A (Extralimp, Luján, 16/09)
    salió en kangoo aparte y no en el camión del fletero, pero `_pppComputeErrors` la sumaba a las
@@ -38769,7 +38898,10 @@ async function pppRefreshJornadaCfg() {
       minParada: n(map.jornada_min_parada,  _pppJorCfg.minParada),
       kmH:       n(map.jornada_km_h,        _pppJorCfg.kmH),
       factor:    n(map.jornada_factor_ruta, _pppJorCfg.factor),
-      camiones:  n(map.jornada_camiones,    _pppJorCfg.camiones)
+      camiones:  n(map.jornada_camiones,    _pppJorCfg.camiones),
+      /* v21.72 — los m³ que entran FÍSICAMENTE en el camión (40). No confundir con
+         `camion_m3_tope` (6), que es lo que el armador mezcla en una tanda. */
+      camionM3:  n(map.jornada_camion_m3_cap, _pppJorCfg.camionM3)
     };
     _pppJorCfgOk = true;
   } catch (_e) {}
