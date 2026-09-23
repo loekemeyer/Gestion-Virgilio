@@ -29489,3 +29489,9 @@ Probado: 12.673 → 3.413 ms. `sql/gv_fusion_tope_corrida_v2189.sql` (marcador `
 para esas dos. Se retira `Capital Centro-Oeste` (v21.43). Impacta armado por grupo, fusión y
 centinelas de camión. Front: `PPP_RES_CAMIONES`. Test `ppp-res-demora-camion` actualizado (23/09 =
 4 camiones) y verificado que falla contra el index anterior. `sql/gv_camion_z2_z3_separadas_v2192.sql`.
+
+## §3.mv — v21.94: Z6 y Z7 son camiones distintos (Luis, 2026-09-23)
+
+`gv_ppp_web_camion`: Z6 → `GBA Norte`, Z7 → `GBA Norte Lejos`, la zona manda sobre el sector (N y P
+eran los dos GBA Norte). Front: `PPP_RES_CAMIONES` separa las dos filas. Medido: `gv_ppp_tanda_camion_mezclado`
+1 → 1. Rollback: sacar `when '6' … when '7' …` del primer `case`. `sql/gv_camion_z6_z7_separadas_v2194.sql`.

@@ -748,7 +748,7 @@ el "mismo día para el cliente" del principio rector, el ancla de cliente v20.27
 |---|---|
 | plazo | entrada del pedido + **14 días corridos**; por **expreso + 13**. Hacia atrás al día con reparto |
 | fecha mínima | la de siempre: `gv_ppp_web_dia_minimo` (4 hábiles, calculado al mediodía) |
-| 1 | si su **grupo** (Capital Sur Z1 · Capital Centro Z2 · Capital Oeste Z3 · GBA Sur · GBA Oeste · GBA Norte Z6+Z7) ya sale un día del plazo → **ese**, sin mirar el cupo (el 4,30 m³ es promedio, no techo) |
+| 1 | si su **grupo** (Capital Sur Z1 · Capital Centro Z2 · Capital Oeste Z3 · GBA Sur · GBA Oeste · GBA Norte Z6 · GBA Norte Lejos Z7) ya sale un día del plazo → **ese**, sin mirar el cupo (el 4,30 m³ es promedio, no techo) |
 | 2 | si no, el **último día LIBRE** del plazo (sin ningún grupo de reparto), para que los pedidos del grupo que entren después se sumen |
 | 3 | si todos los días del plazo tienen otro grupo → **gana el cliente**: el día con menos grupos (segundo camión / flete) |
 | 4 | ya vencido → lo antes posible, aunque mezcle grupos: el rezagado no se traba |
@@ -4573,14 +4573,15 @@ desastre"* · *"No puedo ir tantas veces a zona 3 y 4 y 5 y 6"*.
 | **Capital Oeste** | Z3 | (la zona manda, no el sector) |
 | GBA Sur | Z4 | J, K, L |
 | GBA Oeste | Z5 | M |
-| GBA Norte | Z6 + Z7 | N, P |
+| GBA Norte | Z6 | N |
+| GBA Norte Lejos | Z7 | P |
 | súper | cada uno el suyo | — |
 
 ⚠⚠ **Z2 y Z3 son camiones DISTINTOS (Luis, 23/09, v21.91)** — *"¿cuál sería la lógica de tener
 separadas las zonas Z2 y Z3 si son lo mismo?"*. Se retira el "Capital Centro-Oeste = Z2 + Z3" de la
 v21.43. En `gv_ppp_web_camion` la ZONA manda sobre el sector para Z2 y Z3 (los sectores C..H siguen
 armando la tanda por cercanía, no deciden el camión). Centinela `Capital Oeste` en `GV_Reglas_Centinela`.
-**Z6 + Z7 sigue siendo un solo camión** (GBA Norte) hasta que alguien diga lo contrario.
+**Z6 y Z7 también son camiones distintos (Luis, 23/09, v21.94: *"sí, separalas también"*)**: GBA Norte (Z6) y GBA Norte Lejos (Z7); la zona manda sobre el sector. Centinela `GBA Norte Lejos`.
 
 Hasta la v21.57 `gv_ppp_web_camion` devolvía **"Capital" para Z1, Z2 y Z3**, así que un día con Z1+Z2+Z3
 contaba como un solo camión y nada lo marcaba. Máximo **2 camiones por día**, cada uno a **un** grupo, y
