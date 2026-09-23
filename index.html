@@ -1022,6 +1022,8 @@ button {
 .pipe-comp-falta{ margin-top:8px; padding:7px 10px; border-radius:8px; background:#fff7ed; border:1px solid #fdba74;
   color:#9a3412; font-size:12px; line-height:1.4; }
 
+.clin-dtopago{ display:block; font-size:11px; font-weight:800; color:#166534; margin-top:1px; }
+.clin-dtopago-sin{ color:#b45309; }
 .clin-cuit{ display:block; font-weight:600; font-size:11px; color:#64748b; letter-spacing:.2px; }
 .clin-imp{ display:block; font-weight:700; font-size:11px; color:#b45309; }
 .clin-td-tiempo{ white-space:nowrap; }
@@ -45875,6 +45877,10 @@ let _apr = {
   cuarComN: null, cuarComNLoading: false,
   // v18.95 — CLIENTES NUEVOS: monto por lista de cada pedido (empresa:order_id → {valor, valorIva})
   cliValor: null, cliValorLoading: false,
+  /* v21.98 (Vivi) — DESCUENTO POR PLAZO DE PAGO (empresa:order_id → {dto, label, metodo}).
+     Va APARTE del monto a propósito: si esta lectura falla, la celda sigue mostrando el neto de
+     siempre y lo dice. Sin dato NO se asume 25 % (una lectura ROTA no es un CERO). */
+  cliDtoPago: null, cliDtoPagoLoading: false,
   cliCuit: null, cliCuitLoading: false, cliCuitRetry: false,   // v20.41 (Luis): el CUIT en la columna de cliente
   // v19.05 — CLIENTES NUEVOS: primer contacto (Speech 1) y teléfono del cliente
   cliContacto: null, cliContactoLoading: false,   // empresa:order_id → ISO del primer contacto
@@ -47721,6 +47727,7 @@ function aprColCuarentena() {
   // v18.01: cuántos comentarios tiene cada retenido (una sola vuelta de red para toda la lista)
   cuarComNeed();
   clinNuevosValorNeed();   // v19.94 (Thomas): el monto del pedido, igual que en Clientes nuevos
+  clinDtoPagoNeed();       // v21.98 (Vivi): el descuento por plazo de pago, para saber qué cobrar
   clinCuitNeed();          // v20.41 (Luis): el CUIT en la columna de cliente
   cuarMismoNeed();         // v20.53 (Luis): chip "la deuda es de otra NP del mismo pedido"
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
@@ -48292,6 +48299,50 @@ async function clinNuevosValorCargar() {
   _apr.cliValorLoading = false;
   if (_pppTab === "prog") aprRender();
 }
+
+/* ── v21.98 (Vivi, 2026-09-23) — el 25 % POR PAGO ADELANTADO ────────────────────────────────
+   Medido sobre LK 1448: la celda decía `c/IVA $2.052.219` y el pedido, del lado de LK, guarda
+   `subtotal 1.696.048,96 · payment_discount 0,25 · total 1.272.036,72`. O sea que el número que
+   se le reclamaba al cliente estaba 25 % ARRIBA de lo que tiene que pagar.
+   El descuento lo da el PLAZO DE PAGO del pedido (Contado = 0-14 días = 25 %), no el volumen. */
+function clinDtoPagoNeed() { if (_apr.cliDtoPago === null && !_apr.cliDtoPagoLoading) clinDtoPagoCargar(); }
+async function clinDtoPagoCargar() {
+  if (_apr.cliDtoPagoLoading) return;
+  const lista = (_apr.pedidos || []).filter(function (p) {
+    return !p._demo && !p._isis && aprEnCuarentena(p);
+  });
+  if (!lista.length) { clinVacio("cliDtoPago"); return; }
+  _apr.cliDtoPagoLoading = true;
+  try {
+    const res = await aprRpc("gv_clin_dto_pago_lote", {
+      p_pedidos: lista.map(function (p) {
+        return { order_id: String(p.order_id), empresa: p.empresa || "lk" };
+      })
+    });
+    const m = {};
+    (res || []).forEach(function (r) {
+      m[String(r.empresa) + ":" + String(r.order_id)] =
+        { dto: Number(r.dto) || 0, label: r.escalon_label || "", metodo: r.metodo_pago || "" };
+    });
+    _apr.cliDtoPago = m;
+  } catch (_e) { _apr.cliDtoPago = _apr.cliDtoPago || {}; }
+  _apr.cliDtoPagoLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+/* Lo que hay que COBRARLE. Devuelve null si todavía no hay monto; `dto` en null significa
+   "no se pudo leer el plazo de pago" y ahí el a-cobrar ES el neto, sin inventar descuento. */
+function clinACobrar(p) {
+  const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
+  if (!v || !isFinite(v.valor) || v.valor <= 0) return null;
+  const d = (_apr.cliDtoPago || {})[aprKey(p.empresa, p.order_id)];
+  const pct = d && isFinite(d.dto) ? Number(d.dto) : null;
+  const neto = Number(v.valor);
+  const aCobrar = neto * (1 - (pct || 0));
+  return { neto: neto, netoIva: Number(v.valorIva) || neto * 1.21,
+           pct: pct, label: (d && d.label) || "", metodo: (d && d.metodo) || "",
+           aCobrar: aCobrar, aCobrarIva: aCobrar * 1.21,
+           leido: !!d };
+}
 /* ── v19.05 (Luis) — Clientes nuevos: primer contacto (timer), teléfono del cliente, Speech 1/2 ── */
 function clinContactoNeed() { if (_apr.cliContacto === null && !_apr.cliContactoLoading) clinContactoCargar(); }
 async function clinContactoCargar() {
@@ -48378,9 +48429,13 @@ function clinBrand(p) { return String((p && p.empresa) || "lk") === "chef" ? "Ch
    gv_clientes_nuevos_valor_lote (valor_con_iva = neto × 1,21; el neto ya trae el 2 % web). */
 function clinSpeechMsg1(p) {
   const np = aprPedLabel(p || {});
+  /* v21.98 (Vivi): el monto del Speech es el que hay que COBRAR — el neto con el descuento por
+     pago adelantado y después el IVA. Sin el dato del plazo de pago cae al total por lista, que
+     es lo que decía antes: nunca se inventa el descuento. */
+  const ac = clinACobrar(p);
   const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
-  const iva = v && isFinite(v.valorIva) && v.valorIva > 0 ? v.valorIva : null;
-  const plata = function (n) { return "$" + Number(n).toLocaleString("es-AR"); };
+  const iva = ac ? ac.aCobrarIva : (v && isFinite(v.valorIva) && v.valorIva > 0 ? v.valorIva : null);
+  const plata = function (n) { return "$" + Number(n).toLocaleString("es-AR", { maximumFractionDigits: 0 }); };
   let m = "Hola, le escribimos de " + clinBrand(p) + " por su pedido " + np + ". ";
   if (iva != null) m += "El total del pedido es " + plata(iva) + " (IVA incluido). ";
   // Por ser cliente nuevo se cobra por adelantado: se arma y se entrega recién cuando está pago.
@@ -48453,10 +48508,12 @@ function clinNuevosValorFmt(p) {
   const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
   if (!v || !isFinite(v.valor) || v.valor <= 0)
     return '<span class="cuar-yp-sin" title="Sin precio de lista para los artículos de este pedido">—</span>';
-  return '<b title="Precio total del pedido según lo pedido y la lista de precios (neto, sin IVA)">' + cuarPlata(v.valor) + '</b>' +
-    (isFinite(v.valorIva) && v.valorIva > 0
-      ? '<span class="clin-iva" title="Total con IVA — es el monto que pide el Speech 1 y que el cliente nuevo tiene que pagar ANTES del armado y la entrega">c/IVA ' + cuarPlata(v.valorIva) + '</span>'
-      : '') +
+  /* v21.98 (Vivi): el número GRANDE es lo que hay que COBRAR — el neto ya con el descuento por
+     pago adelantado — y abajo el mismo con IVA, que es el que se le reclama al cliente.
+     ⚠ Si la lectura del plazo de pago falla, `ac.pct` viene null y se muestra lo de siempre:
+     NO se asume 25 % (regla: una lectura ROTA no es un CERO). */
+  const ac = clinACobrar(p);
+  const cola =
     // v20.41 (Luis): el importado no entra en el monto - no hay stock, no se cobra por adelantado.
     (isFinite(v.valorImp) && v.valorImp > 0
       ? '<span class="clin-imp" title="' + (v.itemsImp || 0) + ' importado(s) sin stock para cubrir lo pedido: esas cajas no entran en el monto">- ' + cuarPlata(v.valorImp) + ' import. en falta</span>'
@@ -48464,6 +48521,21 @@ function clinNuevosValorFmt(p) {
     // v21.83: el 🧾 abre la composición — qué códigos, a qué precio, los descuentos y el
     // TOTAL CON IVA, que es el único número que se le reclama al cliente.
     pipeCompBtn(p);
+  if (ac && ac.pct > 0)
+    return '<b title="A COBRAR, neto: precio por lista ' + cuarPlata(ac.neto) + ' menos el ' +
+        pipeCompPct(ac.pct) + ' por ' + escapeHtml(ac.label || "pago adelantado") + '">' + cuarPlata(ac.aCobrar) + '</b>' +
+      '<span class="clin-iva" title="TOTAL A COBRAR, IVA INCLUIDO — es el número que hay que reclamarle al cliente que pague">c/IVA ' + cuarPlata(ac.aCobrarIva) + '</span>' +
+      '<span class="clin-dtopago" title="Descuento por plazo de pago (' + escapeHtml(ac.metodo || "—") + '). Por lista era ' +
+        cuarPlata(ac.netoIva) + ' c/IVA">− ' + pipeCompPct(ac.pct) + ' ' + escapeHtml(ac.label || "pago adelantado") + '</span>' +
+      cola;
+  return '<b title="Precio total del pedido según lo pedido y la lista de precios (neto, sin IVA)">' + cuarPlata(v.valor) + '</b>' +
+    (isFinite(v.valorIva) && v.valorIva > 0
+      ? '<span class="clin-iva" title="Total con IVA — es el monto que pide el Speech 1 y que el cliente nuevo tiene que pagar ANTES del armado y la entrega">c/IVA ' + cuarPlata(v.valorIva) + '</span>'
+      : '') +
+    (ac && !ac.leido
+      ? '<span class="clin-dtopago clin-dtopago-sin" title="No se pudo leer el plazo de pago de este pedido: si le corresponde el descuento por pago adelantado, este total está de más.">⚠ sin plazo de pago</span>'
+      : '') +
+    cola;
 }
 function clinNuevosHtml() {
   const cargando = !_apr.listo || aprCargandoAlgo();
@@ -48477,6 +48549,7 @@ function clinNuevosHtml() {
     '</div>';
   if (_cliCol) return h + '</div>';   // colapsado: sólo el título con el contador
   clinNuevosValorNeed();
+  clinDtoPagoNeed();
   clinCuitNeed();          // v20.41 (Luis): el CUIT en la columna de cliente
   clinContactoNeed();   // v19.05: timer "primer contacto"
   clinWppNeed();        // v19.05: teléfono del cliente para los Speech
@@ -49449,7 +49522,7 @@ function pipeHtml() {
   if (!_apr.listo) return h + '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Cargando…</b></div></div>' + pipeFirmaHtml() + pipeVincHtml();
 
   const lista = pipeLista();
-  pipeNeed(); pipeCfgNeed(); clinNuevosValorNeed(); clinCuitNeed(); clinWppNeed(); cuarComNeed(); clinTickStart();
+  pipeNeed(); pipeCfgNeed(); clinNuevosValorNeed(); clinDtoPagoNeed(); clinCuitNeed(); clinWppNeed(); cuarComNeed(); clinTickStart();
 
   if (!lista.length)
     return h + '<div class="apr-vacio">Sin pedidos de clientes nuevos. Acá caen los pedidos de ' +
@@ -50379,6 +50452,7 @@ async function cuarMarcarPedidos() {
   _apr.cuarComN = null;       // v18.01: ídem el contador de comentarios de cada 📖
   _apr.avVend = null;         // v21.35: los avisos de vendedores se releen con cada refresco
   _apr.cliValor = null;       // v18.95: cambió el set → recargar el monto de los clientes nuevos
+  _apr.cliDtoPago = null;     // v21.98: y el descuento por plazo de pago, que va con el monto
   _apr.cliContacto = null;    // v19.05: ídem el timer de primer contacto
   _apr.cliWpp = null;         // v19.05: ídem el teléfono del cliente
   _apr.cuarRepo = null;       // v19.44: ídem los exentos por reposición chica

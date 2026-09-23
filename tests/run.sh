@@ -793,6 +793,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pipe-composicion (v21.83: el boton de composicion, con el TOTAL CON IVA que se le reclama al cliente) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-composicion.cjs
+node tests/pipe-monto-cobrar.cjs
 echo "== pipe-recurrente (v21.48 — CLIENTE NUEVO RECURRENTE (Luis, 23/09)) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-recurrente.cjs
 
