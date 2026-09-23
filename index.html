@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.62"></script>
+<script type="module" src="recepcion.js?v=21.63"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -8960,7 +8960,7 @@ const ACTIVITY_LOOKBACK_DAYS  = 180;
    36 tandas sin ver). Ahora todos los modos las traen todas; lo que acota la lista
    son los topes que ya existían: la ventana de fechas y MAX_PLANNED_NO_ACT.
    El flag se sigue parseando por si alguna vez se quiere volver a usar. */
-/* v21.62 (Luis, 23/09) — CLIENTES DE PRUEBA (tabla GV_Clientes_Prueba, hoy LK 99862
+/* v21.63 (Luis, 23/09) — CLIENTES DE PRUEBA (tabla GV_Clientes_Prueba, hoy LK 99862
    "Luiggy y Luiggy (PRUEBA)"). Sus pedidos entran a la PPP con las reglas de siempre, pero van
    en tanda propia con código PRUEBAn y el OPERARIO no los ve: ni en las listas de picking/armado,
    ni en el monitor, ni en Carga Camión / Control Remitos / Recepción Remitos, ni en el Excel ISIS.
@@ -9007,7 +9007,7 @@ async function getPppTandasForOperator() {
     return _pppOperatorCache;
   }
   try {
-    const sheetMap = await gvSinPrueba(await fetchMonitorSheet());   // v21.62
+    const sheetMap = await gvSinPrueba(await fetchMonitorSheet());   // v21.63
     const items = [];
     for (const v of sheetMap.values()) {
       if (!v.tanda || v.tanda === "S/Tanda") continue;
@@ -9994,7 +9994,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.62";
+const APP_VERSION = "v21.63";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13521,7 +13521,7 @@ async function showCompletarWizard(legajo, codigo) {
   const modal = document.getElementById("completarModal"); if (!modal) return;
   try {
     let enr = null; try { enr = await faltGetEnrich(); } catch (_e) {}
-    const sheetMap = (enr && enr.sheetMap) || await gvSinPrueba(await fetchMonitorSheet());   // v21.62
+    const sheetMap = (enr && enr.sheetMap) || await gvSinPrueba(await fetchMonitorSheet());   // v21.63
     let pickBase = (enr && enr.pickBase) || null;
     if (!pickBase) { try { pickBase = await fetchPickingBase(); } catch (_e) { pickBase = new Map(); } }
     let tanda = code, entry = sheetMap.get(tanda);
@@ -30700,7 +30700,7 @@ async function fetchCCData() {
     fetchSinSalidaMap(desdeIso),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_entregados_meta", "select=np&order=np.asc")
   ]);
-  const repR = (_par[0] || []).filter(function (r) { return !gvEsTandaPrueba(r.tanda); }), ccnR = _par[1], talR = _par[2], fssMap = _par[3], entrR = _par[4];   // v21.62 sin tandas PRUEBA
+  const repR = (_par[0] || []).filter(function (r) { return !gvEsTandaPrueba(r.tanda); }), ccnR = _par[1], talR = _par[2], fssMap = _par[3], entrR = _par[4];   // v21.63 sin tandas PRUEBA
   // v9.68 — set de NP ya ENTREGADAS. Si el fetch falla queda vacío → NO filtramos por entrega
   // (degradación segura: mejor mostrar de más que ocultar un reparto real).
   const entregadas = new Set((entrR || []).map(function (p) { return String(p.np || "").trim().replace(/\.0+$/, ""); }));
@@ -31160,7 +31160,7 @@ async function rrLoadBadge() {
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const rows = await fetch(SUPABASE_URL + "/rest/v1/gv_vista_control_remitos?select=vencido,tanda&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
-      .then(function (rs) { return (rs || []).filter(function (r) { return !gvEsTandaPrueba(r.tanda); }); });   // v21.62
+      .then(function (rs) { return (rs || []).filter(function (r) { return !gvEsTandaPrueba(r.tanda); }); });   // v21.63
     const n = (rows || []).length;
     const venc = (rows || []).filter(function (r) { return r.vencido; }).length;
     supSetBadge("rrBadge", n);
@@ -31181,7 +31181,7 @@ async function fetchCRData() {
     headers: H, cache: "no-store"
   });
   if (!res.ok) throw new Error("HTTP " + res.status);
-  const rows = (await res.json()).filter(function (r) { return !gvEsTandaPrueba(r.tanda); });   // v21.62
+  const rows = (await res.json()).filter(function (r) { return !gvEsTandaPrueba(r.tanda); });   // v21.63
   return rows.map(r => ({
     np: r.np, tanda: r.tanda || "—", cod: r.cod_cliente || "", rs: r.rs || "",
     remito: (r.remito || "").trim(),
@@ -31431,7 +31431,7 @@ async function fetchCCRData() {
     supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, ccrQ),
     supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, talQ)
   ]);
-  const repR = (_par[0] || []).filter(function (r) { return !gvEsTandaPrueba(r.tanda); }), ccrR = _par[1], talR = _par[2];   // v21.62 sin tandas PRUEBA
+  const repR = (_par[0] || []).filter(function (r) { return !gvEsTandaPrueba(r.tanda); }), ccrR = _par[1], talR = _par[2];   // v21.63 sin tandas PRUEBA
   const controlados = new Set();
   for (const ev of ccrR) {
     const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, "");
@@ -36898,7 +36898,7 @@ function pgaTandaMoverAbrir(key) {
 }
 window.pgaTandaMoverAbrir = pgaTandaMoverAbrir;
 
-/* v21.62 (Luis, 23/09) — «Eliminar» de una tanda PRUEBAn. No es un borrado nuevo: por cada NP llama
+/* v21.63 (Luis, 23/09) — «Eliminar» de una tanda PRUEBAn. No es un borrado nuevo: por cada NP llama
    a `gv_ppp_pedido_cancelar` con alcance TODO EL PEDIDO, o sea exactamente lo que hace «Cancelar
    pedido» (sale de la PPP, no vuelve a entrar, lo armado va a «A guardar», el pedido queda en la
    base). Sólo se ofrece en tandas PRUEBA, y por eso alcanza con una confirmación. */
@@ -39782,7 +39782,7 @@ function _pgaCuerpoHtml(dias, opts) {
               + ' y arriba el botón para dejarla en ⏸ Armados en espera (armada, sin fecha de entrega).'
               + ' El contenido no cambia: no hay que volver a pickear. Se guarda en el servidor, lo ven todos."'
               + ' onclick="event.stopPropagation();pgaTandaMoverAbrir(\'' + escapeHtml(t.key) + '\')">📅<span class="pga-acc-t"> Cambiar de día</span></button>'
-              // v21.62 (Luis): una tanda de CLIENTE DE PRUEBA se elimina de un toque — cancela sus pedidos
+              // v21.63 (Luis): una tanda de CLIENTE DE PRUEBA se elimina de un toque — cancela sus pedidos
               // con el mismo backend que «Cancelar pedido» (gv_ppp_pedido_cancelar, alcance: todo el pedido).
               + (gvEsTandaPrueba(t.tanda)
                 ? '<button class="pga-acc-b" title="Tanda de PRUEBA: cancela todos sus pedidos (salen de la PPP y no vuelven). Es el mismo «Cancelar pedido», sin la doble confirmación."'
@@ -51416,7 +51416,7 @@ async function refreshMonitor() {
       _pppCache = sheetMap;
       _pppCacheTs = Date.now();
     }
-    sheetMap = await gvSinPrueba(sheetMap);   // v21.62 — el monitor es de los operarios: sin pedidos de prueba
+    sheetMap = await gvSinPrueba(sheetMap);   // v21.63 — el monitor es de los operarios: sin pedidos de prueba
     // Fetcheamos siempre la ventana ANCHA (7 días futuros + pasados) así
     // tenemos eventos para todas las tandas que potencialmente se muestran.
     const wideTargetDates = targetDeliveryDates(sheetMap, 7);
@@ -53165,7 +53165,7 @@ async function _facXlsArmar(nps) {
     // esto el Excel salía con la fecha vacía para todo lo que viene de la página.
     gvRestTodo("PPP_Web_Programacion?select=np,np_idx,empresa,order_id,fecha_recep,cod_cliente,tanda", H).catch(function () { return []; })
   ]);
-  // v21.62 — un pedido de CLIENTE DE PRUEBA no va a ISIS nunca: se saca del Excel acá, antes de armar filas.
+  // v21.63 — un pedido de CLIENTE DE PRUEBA no va a ISIS nunca: se saca del Excel acá, antes de armar filas.
   const _prSet = await gvPruebaClientes();
   const _prNps = new Set();
   (web || []).forEach(function (x) {

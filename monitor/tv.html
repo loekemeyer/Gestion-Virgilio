@@ -536,7 +536,7 @@ var cargarProgramacion = cache(PROG_TTL, function () {
            ≡ index.html, que envuelve mergeMonitorPppWeb en try/catch. */
         console.warn("[tv] PPP web:", e.message); return [];
       }),
-    /* v21.62 — clientes de PRUEBA: la tele es de los operarios y no los muestra.
+    /* v21.63 — clientes de PRUEBA: la tele es de los operarios y no los muestra.
        ≡ index.html gvSinPrueba (tanda PRUEBAn o cliente de GV_Clientes_Prueba). */
     getAll("GV_Clientes_Prueba", "select=empresa,cod&order=cod.asc").catch(function () { return []; })
   ]).then(function (par) {
@@ -551,7 +551,7 @@ var cargarProgramacion = cache(PROG_TTL, function () {
       var np = (r.np == null ? "" : String(r.np)).trim();
       if (!/\d/.test(np)) continue;                 // sólo filas con N° de NP real
       var tanda = (r.tanda == null ? "" : String(r.tanda)).trim();
-      if (esTandaPrueba(tanda)) continue;            // v21.62
+      if (esTandaPrueba(tanda)) continue;            // v21.63
       var fe = (r.fecha_entrega == null ? "" : String(r.fecha_entrega)).trim();
       var feRaw = rawFecha(fe);
       var display, key;
@@ -569,7 +569,7 @@ var cargarProgramacion = cache(PROG_TTL, function () {
       var x = web[j];
       var t = String(x.tanda || "").trim();
       if (!t || !x.np) continue;
-      if (esTandaPrueba(t) || prueba[String(x.empresa || "").toLowerCase() + "|" + String(x.cod_cliente || "").trim()]) continue;   // v21.62
+      if (esTandaPrueba(t) || prueba[String(x.empresa || "").toLowerCase() + "|" + String(x.cod_cliente || "").trim()]) continue;   // v21.63
       var k2 = t.toUpperCase();
       var fe2 = String(x.fecha_entrega || "").trim();
       if (!acc.has(k2)) acc.set(k2, nuevaTanda(t, k2, fe2));

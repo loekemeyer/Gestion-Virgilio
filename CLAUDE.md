@@ -4309,7 +4309,7 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
-## ⚠ REGLA (Luis, 2026-09-23, v21.62): CLIENTES DE PRUEBA — van a la PPP, el operario no los ve
+## ⚠ REGLA (Luis, 2026-09-23, v21.63): CLIENTES DE PRUEBA — van a la PPP, el operario no los ve
 
 **Luis:** *"que sus pedidos solo se puedan programar como tanda única (código PruebaX) · si se
 programa automáticamente, con las reglas que ya hay · que no se considere cliente nuevo · que NO le
@@ -4330,7 +4330,7 @@ página LK — usuario `prueba123`. La lista vive en **`GV_Clientes_Prueba`** (a
 ⚠ **El filtro del front NO toca el mapa cacheado** (`_pppCache`): el supervisor sigue viendo las
 tandas PRUEBA en la PPP. **Centinela:** `select * from public.gv_prueba_mezclada;` — vacía = ningún
 pedido de prueba quedó adentro de una tanda con pedidos reales (esa no se renombra).
-`sql/gv_clientes_prueba_v2162.sql`, `tests/prueba-oculta-operario.cjs`.
+`sql/gv_clientes_prueba_v2163.sql`, `tests/prueba-oculta-operario.cjs`.
 
 ## ⚠ REGLA (Marianela, 2026-09-23, v21.58): una tanda EMPEZADA no cambia de CÓDIGO al moverla de día
 

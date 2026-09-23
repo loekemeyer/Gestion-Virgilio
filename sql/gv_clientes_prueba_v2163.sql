@@ -1,4 +1,4 @@
--- v21.62 (Luis, 2026-09-23) — CLIENTES DE PRUEBA
+-- v21.63 (Luis, 2026-09-23) — CLIENTES DE PRUEBA
 --
 -- Luis: "que sus pedidos solo se puedan programar como tanda unica (con un codigo especial
 -- PruebaX donde X va aumentando) · si se programa automaticamente, con las reglas que ya hay
@@ -127,12 +127,12 @@ values ('lk', '99862', 'Luiggy y Luiggy (PRUEBA)', 'Copia de Muller y Muller (LK
 on conflict do nothing;
 
 insert into public."GV_Clientes_Reglas" (cod_cliente, empresa, regla, nombre, nota)
-values ('99862', 'lk', 'solo', 'Luiggy y Luiggy (PRUEBA)', 'v21.62 cliente de prueba: tanda propia (PRUEBAn), nunca mezclado')
+values ('99862', 'lk', 'solo', 'Luiggy y Luiggy (PRUEBA)', 'v21.63 cliente de prueba: tanda propia (PRUEBAn), nunca mezclado')
 on conflict do nothing;
 
 insert into public.gv_excepcion_cuarentena (empresa, cod, nombre, motivos, origen, activo, nota, actualizado_por)
 select 'lk', '99862', 'Luiggy y Luiggy (PRUEBA)', m.motivos, 'manual', true,
-       'v21.62 cliente de prueba de Luis: copia la excepcion de Muller y Muller (862), no es cliente nuevo.', 'luis'
+       'v21.63 cliente de prueba de Luis: copia la excepcion de Muller y Muller (862), no es cliente nuevo.', 'luis'
   from public.gv_excepcion_cuarentena m
  where m.empresa = 'lk' and m.cod = '862'
 on conflict do nothing;
