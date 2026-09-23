@@ -36,7 +36,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       // (A) 28/10 — UN cliente, 12,33 m³, todo en GBA Sur: un camión. Demoras 35 y 76.
       ped("98426", "Matiz SA", "Burzaco", 6.167, "13/08/2026", "28/10/2026", "D63A"),
       ped("LK 0190", "Matiz SA", "Burzaco", 6.160, "23/09/2026", "28/10/2026", "E85A"),
-      // (B) 23/09 — cuatro zonas en CUATRO camiones (v21.91, Luis: Z2 y Z3 son camiones distintos)
+      // (B) 23/09 — cuatro zonas en TRES camiones: Z2 y Z3 van juntas porque cada una < 1 m³ (v21.95, Luis)
       ped("98618", "Simon Zeitune", "Balvanera",  0.103, "26/08/2026", "23/09/2026", "E12J"),
       ped("98664", "Guini Jorge",   "Flores",     0.100, "31/08/2026", "23/09/2026", "E12G"),
       ped("98626", "Iro Iro",       "Burzaco",    0.365, "28/08/2026", "23/09/2026", "E39A"),
@@ -44,7 +44,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       // (C) 29/09 — 45 m³ en un solo grupo (no entran en un camión) + un súper + un retira
       ped("99001", "Mayorista Gde", "Barracas",  45.0, "25/09/2026", "29/09/2026", "E90A"),
       ped("99002", "Coto C.I.C.S.A.", "Esteban Echeverria", 2.2, "27/09/2026", "29/09/2026", "E91A"),
-      ped("99003", "Retiro Propio", "Retira",     0.4, "28/09/2026", "29/09/2026", "E92A")
+      ped("99003", "Retiro Propio", "Retira",     0.4, "28/09/2026", "29/09/2026", "E92A"),
+      // (D) 30/09 — Z3 llega a 1 m³ -> Z2 y Z3 van SOLAS; Z6 + Z7 juntas (v21.95) = 3 camiones
+      ped("99004", "Cli Z2", "Balvanera",   0.30, "25/09/2026", "30/09/2026", "E93A"),
+      ped("99005", "Cli Z3", "Flores",      1.20, "25/09/2026", "30/09/2026", "E94A"),
+      ped("99006", "Cli Z6", "Bella Vista", 0.20, "25/09/2026", "30/09/2026", "E95A"),
+      ped("99007", "Cli Z7", "Pilar",       0.20, "25/09/2026", "30/09/2026", "E96A")
     ];
     const host = document.createElement("div");
     host.style.cssText = "position:absolute;left:0;top:0;width:1360px;";
@@ -108,9 +113,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
   // (2) camiones sin tope de m³, por grupo de zonas
   eq("28/10 camiones (1 cliente, 12,33 m³)", d["28/10"] && d["28/10"].cam, "1");
-  eq("23/09 camiones (Z2 · Z3 · Z4 · Z6)", d["23/09"] && d["23/09"].cam, "4");
+  eq("23/09 camiones (Z2+Z3 juntas · Z4 · Z6)", d["23/09"] && d["23/09"].cam, "3");
+  eq("30/09 camiones (Z2 sola · Z3 >= 1 m3 sola · Z6+Z7)", d["30/09"] && d["30/09"].cam, "3");
   eq("29/09 camiones (45 m³ = 2 + súper, retira no cuenta)", d["29/09"] && d["29/09"].cam, "3");
-  eq("TOTAL camiones", r.tot.cam, String(1 + 4 + 3));
+  eq("TOTAL camiones", r.tot.cam, String(1 + 3 + 3 + 3));
 
   // (3) las dos celdas abren el pop-up
   if (!(d["23/09"] && d["23/09"].demClick && d["23/09"].camClick)) fallas.push("las celdas de Cam./Demora no son clickeables");
@@ -120,9 +126,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   else {
     const noms = r.camsPop.map(function (c) { return c.nombre; }).join(" | ");
     const dems = r.camsPop.map(function (c) { return c.dem; });
-    if (r.camsPop.length !== 4) fallas.push("el pop-up trae " + r.camsPop.length + " camiones, no 4: " + noms);
+    if (r.camsPop.length !== 3) fallas.push("el pop-up trae " + r.camsPop.length + " camiones, no 3: " + noms);
     for (let i = 1; i < dems.length; i++) if (dems[i] > dems[i - 1]) fallas.push("los camiones NO están ordenados por mayor demora: " + dems.join(","));
-    if (!/^\S* ?Capital Centro ·/.test(noms)) fallas.push("el primer camión no es el de mayor demora: " + noms);
+    if (!/^\S* ?Capital Centro-Oeste ·/.test(noms)) fallas.push("el primer camión no es el de mayor demora: " + noms);
     if (dems[0] !== 28) fallas.push("la demora del primer camión no es la real (28): " + dems[0]);
     const pedRows = (r.demPop || []).filter(function (x) { return !/^CAM:/.test(x); });
     if (!pedRows.some(function (x) { return /=28$/.test(x); }) || !pedRows.some(function (x) { return /=23$/.test(x); }))
