@@ -17125,9 +17125,13 @@ function ocBodyGenTall() {
       .sort(function (a, b) { return (b.falta - a.falta) || codCanon(a.cod).localeCompare(codCanon(b.cod)); });
     if (!fitems.length) return;   // ocultar tallerista entero si nada matchea el filtro
     shown++;
-    const fTotal = fitems.reduce(function (s, it) { return s + it.falta; }, 0);
+    // v21.67 (Marianela): los artículos que se manejan en UNIDADES (uni×caja = 1: 55215, 55219,
+    // 55289) no se suman con las cajas: el total del tallerista los muestra aparte, en unidades.
+    const _ocU = function (it) { return typeof artUxb === "function" && Number(artUxb(it.cod)) === 1; };
+    const fTotal = fitems.reduce(function (s, it) { return s + (_ocU(it) ? 0 : it.falta); }, 0);
+    const fTotU = fitems.reduce(function (s, it) { return s + (_ocU(it) ? it.falta : 0); }, 0);
     const nPedir = fitems.filter(function (it) { return it.falta > 0; }).length;
-    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + fitems.length + ' artículo(s) · <b>' + nPedir + '</b> a pedir · ' + fTotal + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones</span>' : '') + '</div>';
+    h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + fitems.length + ' artículo(s) · <b>' + nPedir + '</b> a pedir · ' + fTotal + ' cajas' + (fTotU ? ' + ' + fTotU.toLocaleString("es-AR") + ' u' : '') + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones</span>' : '') + '</div>';
     h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
     fitems.forEach(function (it) {
       const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0)">0</span>';
