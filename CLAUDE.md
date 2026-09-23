@@ -3643,9 +3643,12 @@ menos filas**). Su fila de centinela vigila el patrón `pkc_en_origen`.
 **Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
 `sql/gv_pedido_mover_registro_v2105.sql`, `sql/gv_tanda_registro_heredado_v2116.sql`.
 
-⚠ **EL FRENO GENERAL SIGUE PUESTO hasta que Luis lo diga**
-(`PPP_Web_Config.np_mover_frenado = 1`). Se levanta con un `update`, no con un deploy:
-`update public."PPP_Web_Config" set valor = 0 where clave = 'np_mover_frenado';`
+⚠ **EL FRENO GENERAL SIGUE PUESTO** (`PPP_Web_Config.np_mover_frenado = 1`), **pero desde la
+v21.60 frena SÓLO la NP cuya tanda tiene picking o armado** (Luis, 23/09: *"sacá la traba de mover
+NPs individuales sólo para las que están pendientes sin nada armado"*). Una NP **pendiente** se
+mueve sola con «📅 Cambiar de día» → tanda nueva o existente. Primer caso: LK 0156 (Matiz) E74A →
+E78A. Se levanta del todo con `update public."PPP_Web_Config" set valor = 0 where clave =
+'np_mover_frenado';`. Centinela en `GV_Reglas_Centinela`. `sql/gv_np_mover_pendiente_v2160.sql`.
 ## ⚠ REGLA (Thomas, 2026-09-22, v21.06): el refresco del stock se hace SOLO si algo cambió
 
 Cron 55 refrescaba `vista_stock_procesada` **cada 2 minutos, siempre**: **1.770 s sobre una
