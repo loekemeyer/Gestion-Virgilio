@@ -2476,6 +2476,44 @@
               </div>
             </div>
           </div>
+          <!-- 5. Cliente real: la tabla CANONICA clientes_vinculados (23/09) -->
+          <div class="card" style="margin-bottom: 18px">
+            <div class="est-card-head collapsed" onclick="toggleEstCard('cvBody', this)">
+              <span class="est-card-caret">▸</span>
+              <h2 style="margin: 0; font-size: 21px">
+                Cliente real: todos sus códigos
+                <span id="cvCount" style="margin-left: 6px; background: #0f766e; color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700;">0</span>
+                <span class="est-help"
+                      onclick="event.stopPropagation()"
+                      data-tip="Tabla canónica clientes_vinculados: junta la lista de Ventas (razón social nueva/anterior y LK↔Chef), el mismo CUIT, los grupos armados y los vínculos a mano. Un cliente puede tener muchos códigos. Es la que usa Gestión para decidir quién es cliente nuevo. Se recalcula sola cada hora.">?</span>
+              </h2>
+              <span style="color: #666; font-size: 13px">
+                Cada fila es un cliente real con todos los códigos que tuvo, en Loekemeyer y en Chef
+              </span>
+            </div>
+            <div class="est-card-body" id="cvBody" style="display: none">
+              <div id="cvStatus" class="cliente-lookup-status"></div>
+              <div class="rank-buscar" style="margin: 0 0 10px">
+                <input type="text" id="cvBuscar" class="rank-buscar-input"
+                       placeholder="Buscar razón social, código o CUIT…" autocomplete="off"
+                       oninput="onInputBuscarCv(this)">
+              </div>
+              <div class="est-table-wrap" style="max-width: 1180px">
+                <table class="est-table" id="cvTable">
+                  <thead>
+                    <tr>
+                      <th>Cliente (código vigente)</th>
+                      <th>Códigos LK</th>
+                      <th>Códigos Chef</th>
+                      <th>Cómo se vinculó</th>
+                      <th>Última compra</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </section>
 
         <!-- PAGE: GERENTE DE VENTAS -->
@@ -3352,7 +3390,7 @@
     <script src="./version.js?v=23186"></script>
     <script src="excel-parser-smart.js"></script>
     <script src="argentina-map-data.js?v=23176"></script>
-    <script src="admin.js?v=23443"></script>
+    <script src="admin.js?v=23444"></script>
     <script src="admin-supercot.js?v=23378"></script>
     <script src="admin-excel-krikos.js?v=23181"></script>
     <script src="analisis-venta-cliente.js?v=23176"></script>
