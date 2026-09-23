@@ -4389,6 +4389,40 @@ El 22/09 21:54 una reprogramación a mano niveló los días a 4,30 m³ sin mirar
 **Chequeo:** `select * from public.gv_ppp_tanda_camion_mezclado;` · `select * from public.gv_reglas_perdidas;`
 `sql/gv_camion_un_grupo_zonas_v2156.sql`.
 
+### ⚠⚠ Y NO HAY TOPE DE m³ POR CAMIÓN (v21.75, 23/09): `camion_m3_tope` NO es la capacidad
+
+**Textual:** *"no hay límite para arriba en la cantidad de metros cúbicos por camión. Puedo tener
+hasta 40 metros cúbicos en un camión."*
+
+> **`PPP_Web_Config.camion_m3_tope` = 6 es lo que el armador MEZCLA en una TANDA, no lo que entra
+> en el camión.** Lo lee `gv_ppp_web_agrupar_geo` / `gv_ancla_simular`, y ahí está bien. Usarlo
+> como capacidad del camión es lo que partía un pedido en tres.
+
+**Lo que costó, medido:** el Resumen de la PPP contaba `ceil(m³ / 6)` por ruta, así que el
+**28/10** —**12,33 m³ de Matiz sola**, un cliente, una entrega— decía **3 camiones**. Y contaba con
+las **dos rutas viejas** (Z1+Z2+Z3+Z4 = un camión), o sea que un día con Z2+Z3+Z4+Z6 decía **2**
+cuando salen **3** y el exceso sobre el tope de 2 camiones por día no se veía en la única pantalla
+que mira el conjunto.
+
+Hoy el Resumen cuenta **un camión por grupo de zonas** (la tabla de arriba) + **uno por cliente
+súper** + **Retira sin camión**, y un grupo **no se parte** hasta los **40 m³** que entran
+físicamente, que viven en **`PPP_Web_Config.jornada_camion_m3_cap`** — entra por el fetch
+`clave=like.jornada*` que el front ya hacía, y sin la fila usa 40 de default.
+
+⚠ **El armado NO se tocó**: sigue con `camion_m3_tope` y sus reglas. Esto es la cuenta que
+**muestra** el Resumen.
+
+⚠ **Y la DEMORA de esa tabla es la MAYOR del día, no el promedio** (mismo pedido): *"en lugar de
+figurar los días de demora promedio, el día de mayor demora… y que pueda tocar y ver por camión,
+ordenado por mayor demora, la demora real de cada uno"*. El promedio de un día con un pedido de 35
+días y otro de 76 daba **55,5**, un número que no le pasa a ninguno de los dos y que escondía al que
+estaba parado hace 76. La celda abre el pop-up de camiones ordenado por demora; a partir de **14
+días corridos** (los 10 hábiles del punto 4 de la lógica de programación) va en rojo.
+
+**Chequeo:** `node tests/ppp-res-demora-camion.cjs` — corre la pantalla y clickea la celda.
+Verificado que falla contra el código anterior con los números del reclamo (3 camiones, 55,5 días).
+`sql/gv_resumen_camion_m3_v2175.sql` (la fila de config, **pendiente del sí del dueño**).
+
 ## ⚠ REGLA (Luis, 2026-09-22, v21.39): las tandas son de 0,80 m³ — y el armado las FUSIONA
 
 **Luis, textual:** *"¿Por qué las tandas son tan chicas? Tienen que ser de 0,8 en promedio.

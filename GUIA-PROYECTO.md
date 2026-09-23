@@ -1,3 +1,60 @@
+## Nota v21.75 (2026-09-23) — El Resumen de la PPP: la MAYOR demora, y un camión por grupo de zonas
+
+Dos pedidos del mismo mensaje, sobre la única pantalla que mira el conjunto.
+
+### 1. La demora promedio no le pasa a ningún pedido
+
+*"En lugar de figurar los días de demora promedio, que figure el día de mayor demora"*, y que la
+celda se pueda tocar para ver, **por camión, ordenado por mayor demora, la demora real de cada uno**.
+
+El promedio tapaba justo lo que se busca. El **28/10** son dos NP de Matiz con **35 y 76** días de
+espera: el promedio decía **55,5**, un número que no le pasa a ninguna de las dos, y el pedido
+parado hace 76 días no se veía en ningún lado.
+
+Hoy la columna dice **76** y se toca: abre los camiones del día, ordenados por su demora más
+grande, y adentro de cada uno las NP con la suya. A partir de **14 días corridos** el número va en
+rojo — son los 10 días hábiles del punto 4 de la lógica de programación.
+
+⚠ Adentro de un camión las NP se juntan por **cliente Y demora**: dos pedidos del mismo cliente
+hechos en días distintos esperaron distinto, y el número que se mira es justamente ése.
+
+⚠ Son días **corridos**, igual que cuando era un promedio: no cambió la cuenta, cambió cuál de los
+valores se muestra.
+
+### 2. Un camión = un grupo de zonas, y no se parte por m³
+
+*"Veo que en el último día hay 12 m³ programados y me decís que van tres camiones. Es solo un
+cliente y no hay límite para arriba en la cantidad de m³ por camión: puedo tener hasta 40 m³.
+Voy a entregar todo ese pedido en un solo camión."*
+
+El Resumen hacía `ceil(m³ / 6)` por ruta. Medido sobre el caso: el 28/10 son **12,33 m³ de Matiz
+sola**, un cliente, una entrega — y la pantalla decía **3 camiones**.
+
+⚠ **Los 6 m³ de `camion_m3_tope` no son lo que entra en el camión**: son el tope de lo que el
+armador MEZCLA en una tanda (`gv_ppp_web_agrupar_geo`). Tomar uno por el otro es todo el bug. La
+capacidad física es otro número, 40 m³, y vive aparte en `PPP_Web_Config.jornada_camion_m3_cap`
+(entra por el fetch `clave=like.jornada*` que ya existía; sin la fila, el front usa 40 de default).
+
+Y de paso se corrigió la otra mitad, que venía del mismo lugar: el Resumen seguía contando con las
+**dos rutas viejas** (Sur/Centro/Oeste = Z1+Z2+Z3+Z4 · Norte = Z5+Z6+Z7) cuando la regla del 23/09
+dice **un camión = un grupo de zonas**. Con las viejas, un día con Z2+Z3+Z4+Z6 contaba **2** y salen
+**3**, así que pasarse del tope de 2 camiones por día no se veía.
+
+| | Z1 | Z2+Z3 | Z4 | Z5 | Z6+Z7 |
+|---|---|---|---|---|---|
+| camión | Capital Sur | Capital Centro-Oeste | GBA Sur | GBA Oeste | GBA Norte |
+
+Más **un camión por cliente súper** (regla v14.23: el súper no comparte camión) y **Retira sin
+camión**. Un pedido cuyo barrio no resuelve a ninguna zona sale en el pop-up como **«Sin zona»** y
+se dice que no se contó, en vez de desaparecer sin explicación.
+
+⚠ Lo que **no** se tocó: el armador, que sigue con sus propias reglas y su `camion_m3_tope`. Esto
+es la cuenta que muestra el Resumen.
+
+**Qué se prueba, y corriéndolo:** `node tests/ppp-res-demora-camion.cjs` dibuja el Resumen de
+verdad, clickea la celda y lee el pop-up. Verificado que contra el código anterior falla con los
+números exactos del reclamo: **28/10 = 3 camiones y demora 55,5**.
+
 ## Nota v21.47 (2026-09-23) — CC/CR/RR entran al balde productivo · `GV_Feriados` es la canónica · centinela de huella
 
 Los tres pendientes que habían quedado anotados al cerrar la v21.27, contestados por Thomas.
