@@ -29510,7 +29510,7 @@ de la llamada en el armador.
 
 ## §3.mx
 
-**v21.98 (Thomas, 2026-09-23) — AGREGAR EXPRESO ISIS: el expreso lo elige el cliente en la página.**
+**v21.99 (Thomas, 2026-09-23) — AGREGAR EXPRESO ISIS: el expreso lo elige el cliente en la página.**
 
 **Lo que se midió antes de tocar nada** (padrón de LK, 23/09): el dato del expreso **ya existía**
 — `customer_delivery_addresses.nombre_expreso` en **941 de 1.615** sucursales y
@@ -29557,7 +29557,7 @@ se cargan en ISIS con lo que ya está.
 crece sola si nadie la vacía. Lo cazó `tests/rest-tope-1000.cjs` en la primera corrida.
 
 **Chequeo:** `select * from public.gv_expreso_pendiente;` · `node tests/exp-isis-modulo.cjs`.
-`sql/gv_expreso_pendiente_v2198.sql`; el lado LK en `pagina-LK-copia/sql/expreso_cambio_cliente.sql`.
+`sql/gv_expreso_pendiente_v2199.sql`; el lado LK en `pagina-LK-copia/sql/expreso_cambio_cliente.sql`.
 
 ⚠ **Chef quedó a medias a propósito**: el front está puesto y degrada solo (si el SQL no se corrió,
 el select cae a su fallback corto y la línea no se dibuja), pero el SQL hay que correrlo a mano en

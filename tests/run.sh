@@ -908,7 +908,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== stk-buscar-cero-adelante (v21.09: el prefijo se mide contra la grafia MOSTRADA) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-buscar-cero-adelante.cjs
 
-echo "== exp-isis-modulo (v21.98: Agregar Expreso ISIS — el expreso que eligio el cliente en la pagina) =="
+echo "== exp-isis-modulo (v21.99: Agregar Expreso ISIS — el expreso que eligio el cliente en la pagina) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/exp-isis-modulo.cjs
 
 _resumen
