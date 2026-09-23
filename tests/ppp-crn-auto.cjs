@@ -39,6 +39,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         { np: "98001", tanda: "D01A", tipo: "", fecha_recep: "2026-09-01", cod: "1111", razon_social: "Uno SA", m3: 0.4, direccion: "Calle 1", barrio: "Mataderos", fecha_entrega: "2026-09-04", zona: "Zona 1" },
         { np: "98002", tanda: "D01A", tipo: "", fecha_recep: "2026-09-01", cod: "2222", razon_social: "Dos SA", m3: 0.3, direccion: "Calle 2", barrio: "Mataderos", fecha_entrega: "2026-09-04", zona: "Zona 1" }
       ]);
+      // v21.44 — desde la v21.37 "atrasado" lo dice el BACKEND (gv_ppp_atrasados), no la
+      // fecha pelada: sin esta respuesta el mock devolvía [] y la solapa de vencidos se
+      // vaciaba entera, así que el test decía que la NP sin controlar tampoco se mostraba.
+      // 98002 no tiene CRN, o sea que el backend la marca atrasada; 98001 salió y no.
+      if (u.indexOf("gv_ppp_atrasados") >= 0) return J([{ np: "98002" }]);
       if (u.indexOf("ppp_entregados_meta") >= 0) return J([]);
       if (u.indexOf("gv_ppp_entregados") >= 0) return J([
         { np: "98001", empresa: "lk", es_web: false, tanda: "D01A", cod_cliente: "1111", razon_social: "Uno SA", m3: 0.4, fecha_entrega: "2026-09-04", fecha_carga: "2026-09-04", controlado_at: "2026-09-04T15:00:00Z", n_crn: 1, cajas_entregadas: 3, cajas_falto: 0, facturada: false }
