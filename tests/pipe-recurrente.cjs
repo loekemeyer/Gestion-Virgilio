@@ -26,9 +26,9 @@ function fn(name) {
 }
 const ctx = { _apr: { pipe: {} }, escapeHtml: s => String(s), clinWppTel: () => "1",
   cuarFechaHora: s => s, pipeClave: o => String(o).replace(/^np/i, ""),
-  pipeRelojHtml: () => "" };
+  pipeRelojHtml: () => "", cuarEmpCod: e => e === "chef" ? "CH" : "LK" };
 vm.createContext(ctx);
-["pipeEst", "pipeEtapa", "pipeMemoriaHtml", "pipeAccionesBtns"].forEach(n => vm.runInContext(fn(n), ctx));
+["pipeEst", "pipeEtapa", "pipeVincOtrosHtml", "pipeMemoriaHtml", "pipeAccionesBtns"].forEach(n => vm.runInContext(fn(n), ctx));
 const p = { empresa: "lk", order_id: "1448", cod: "4282" };
 function btns(etapa, extra) { ctx._apr.pipe = { "lk:1448": Object.assign({ etapa }, extra || {}) }; return ctx.pipeAccionesBtns(p); }
 

@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.58"></script>
+<script type="module" src="recepcion.js?v=21.59"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9953,7 +9953,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.58";
+const APP_VERSION = "v21.59";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -48112,6 +48112,10 @@ async function pipeCargar() {
     const m = {};
     (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.order_id)] = r; });
     _apr.pipe = m;
+    // v21.60 (Luis): los OTROS codigos del cliente real (tabla canonica clientes_vinculados de LK,
+    // espejada en GV_Clientes_Vinculados). Llamada propia con su propio catch: si falla, el
+    // pipeline se dibuja igual, sin el chip.
+    pipeVincCargar(lista);
   } catch (_e) {
     // v20.42: la PRIMERA llamada a una RPC recién creada puede dar 404 (PostgREST todavía no
     // la tiene en su caché de esquema). Se reintenta una vez; después se deja vacío.
@@ -48120,6 +48124,30 @@ async function pipeCargar() {
   }
   _apr.pipeLoading = false;
   if (_pppTab === "prog") aprRender();
+}
+async function pipeVincCargar(lista) {
+  try {
+    const res = await aprRpc("gv_clientes_vinculados_lote", {
+      p_clientes: (lista || []).map(function (p) { return { empresa: p.empresa || "lk", cod: String(p.cod || "").trim() }; })
+    });
+    const m = {};
+    (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.cod)] = r; });
+    _apr.cliVinc = m;
+    if (_pppTab === "prog") aprRender();
+  } catch (_e) { _apr.cliVinc = _apr.cliVinc || {}; }
+}
+/* v21.60 (Luis, 23/09): "que se vea para el chequeo de clientes nuevos". Chip con los otros
+   codigos del mismo cliente real (razon social anterior, la otra empresa). */
+function pipeVincOtrosHtml(p) {
+  const k = String(p.empresa || "lk") + ":" + String(p.cod || "").trim().replace(/^0+(?=.)/, "");
+  const v = (_apr.cliVinc || {})[k];
+  if (!v || !Array.isArray(v.otros) || !v.otros.length) return "";
+  const txt = v.otros.map(function (o) {
+    return cuarEmpCod(o.empresa) + " " + o.cod + " " + (o.razon_social || "(baja)") +
+      (o.ultima_compra ? " · última compra " + o.ultima_compra : "");
+  }).join("\n");
+  return '<span class="pipe-mem" title="Mismo cliente real (tabla de clientes vinculados):\n' + escapeHtml(txt) +
+    '">🔗 ' + v.otros.length + ' código' + (v.otros.length === 1 ? '' : 's') + ' más</span>';
 }
 /* El order_id del pedido y la clave del backend son el mismo string salvo el prefijo `np`,
    que gv_cuarentena_clave saca. Se replica acá para poder buscar en el mapa. */
@@ -48161,8 +48189,8 @@ const PIPE_ETAPAS = {
 };
 /* Lo que ya se sabe de ESTE CLIENTE de sus pedidos anteriores. */
 function pipeMemoriaHtml(p) {
-  const e = pipeEst(p); if (!e) return "";
-  let h = "";
+  const e = pipeEst(p); if (!e) return pipeVincOtrosHtml(p);
+  let h = pipeVincOtrosHtml(p);
   if (e.analisis_heredado && e.cli_analisis_at)
     h += '<span class="pipe-mem" title="El análisis crediticio es del CLIENTE, no del pedido: ya se le hizo ' +
       'el ' + escapeHtml(cuarFechaHora(e.cli_analisis_at)) +
