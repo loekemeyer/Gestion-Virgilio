@@ -72,7 +72,9 @@ as $function$
     left join _rf_dem d on d.cod = i.cod
   )
   select cod, reingreso_est, (disponible <= 0 or pedidos >= disponible) as sin_stock
-  from _rf_disp;
+  from _rf_disp
+  -- Luis 23/09: codigos sin cartel ni pedido partido (tabla editable, sql/gv_reingreso_excluido.sql)
+  where not exists (select 1 from public."GV_Reingreso_Excluido" x where x.cod = _rf_disp.cod);
 $function$;
 revoke all on function public.gv_reingresos_feed(text) from public, anon, authenticated;
 
