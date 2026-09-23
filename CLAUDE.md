@@ -723,7 +723,7 @@ compara contra algo de la operación (*"menos de una caja"*), no cambiando de un
 
 Vale para TODOS los repos. Es sólo cómo se escribe el mensaje del chat: no cambia nada técnico.
 
-## 🟥🟥🟥 REGLA (Luis, 2026-09-23, v21.86): UN GRUPO DE ZONAS POR DÍA — y "mismo cliente, mismo día" NO EXISTE MÁS
+## 🟥🟥🟥 REGLA (Luis, 2026-09-23, v21.87): UN GRUPO DE ZONAS POR DÍA — y "mismo cliente, mismo día" NO EXISTE MÁS
 
 > ## **DEROGADA: "nunca +1 pedido de un cliente va separado en la PPP".** No se junta al cliente en un día.
 > ## Un cliente con sucursales en dos zonas va en **dos días**, cada pedido con el camión de SU zona.
@@ -734,7 +734,7 @@ la seguís refiriendo y no va."* Toda mención de esa regla más abajo en este a
 el "mismo día para el cliente" del principio rector, el ancla de cliente v20.27, la alarma
 `gv_ppp_cliente_dos_dias`) queda **sin efecto**. No citarla, no proponerla, no "respetarla".
 
-**Cómo elige el día el armado desde la v21.86** (`gv_ppp_web_dia_grupo`, pase **(g)** de
+**Cómo elige el día el armado desde la v21.87** (`gv_ppp_web_dia_grupo`, pase **(g)** de
 `gv_ppp_web_armar_pendientes`; forward-facing: lo ya programado no se toca):
 
 | paso | qué hace |
@@ -751,7 +751,7 @@ el "mismo día para el cliente" del principio rector, el ancla de cliente v20.27
 - Apagados en modo grupo: (a1), (a2), (b00) ancla de cliente, (b0) ancla por número de zona,
   (b) cascada por cupo, (c) zonas manuales, (d) juntar clientes. El INC (auto_super) sigue con su cascada.
 - **Interruptor**: `PPP_Web_Config.grupo_dia_activo` — sin fila = prendido; con `valor = 0` vuelve
-  la lógica anterior sin redeploy. `sql/gv_programacion_grupo_dia_v2186.sql` (el marcador interno
+  la lógica anterior sin redeploy. `sql/gv_programacion_grupo_dia_v2187.sql` (el marcador interno
   dice `v21.80-grupo`: es la llave de idempotencia, no cambiarlo).
 
 **Probado corriendo el armador** en transacción abortada (23/09): Z3 → 30/09 con Centro-Oeste
@@ -784,7 +784,7 @@ juntos "porque son del mismo cliente" es justamente lo que esta regla prohíbe.
 
 | regla | qué dice | por qué no choca |
 |---|---|---|
-| ~~Thomas: *"nunca +1 pedido de un cliente va separado en la PPP"*~~ | **DEROGADA (Luis, 23/09, v21.86)** | ver "UN GRUPO DE ZONAS POR DÍA" |
+| ~~Thomas: *"nunca +1 pedido de un cliente va separado en la PPP"*~~ | **DEROGADA (Luis, 23/09, v21.87)** | ver "UN GRUPO DE ZONAS POR DÍA" |
 | Luis v18.87: *"la tanda de un cliente se parte por CAMIÓN"* | mismo día, distinta tanda si la zona manda a otro camión | es esta misma regla aplicada al armado |
 
 O sea: **mismo día para el cliente · tanda por camión · agrupamiento por pedido.**

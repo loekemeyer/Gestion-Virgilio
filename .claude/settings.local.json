@@ -3,7 +3,11 @@
     "allow": [
       "Bash(cat)",
       "Bash(break)",
-      "Bash(git rebase *)"
+      "Bash(git rebase *)",
+      "Bash(git mv *)",
+      "Bash(sed -i '1s/v21.86/v21.87/' sql/gv_programacion_grupo_dia_v2187.sql)",
+      "Bash(python3 -)",
+      "Bash(node scripts/bump-version.cjs 21.87)"
     ]
   }
 }

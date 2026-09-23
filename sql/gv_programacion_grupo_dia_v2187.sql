@@ -1,4 +1,4 @@
--- v21.86 (Luis, 2026-09-23) — PROGRAMACION AUTOMATICA POR GRUPO DE ZONAS
+-- v21.87 (Luis, 2026-09-23) — PROGRAMACION AUTOMATICA POR GRUPO DE ZONAS
 -- (el marcador dentro de la funcion dice "v21.80-grupo": es la llave de idempotencia, NO cambiarlo)
 --
 -- Reglas que definio Luis (forward-facing: lo ya programado no se toca):

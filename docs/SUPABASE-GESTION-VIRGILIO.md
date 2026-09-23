@@ -29456,13 +29456,13 @@ Centinela en `GV_Reglas_Centinela` (patrón `(a000) v21.61`, el marcador con que
 Chequeo: `select * from public.gv_ppp_web_armado_salud;`. Rollback: sacar el bloque `(a000)`.
 `sql/gv_armado_descarta_programadas_v2166.sql`.
 
-## §3.ms — v21.86: el armado elige el día por GRUPO DE ZONAS, con plazo de 14/13 días (Luis, 2026-09-23)
+## §3.ms — v21.87: el armado elige el día por GRUPO DE ZONAS, con plazo de 14/13 días (Luis, 2026-09-23)
 
 **Qué cambió.** Función nueva `gv_ppp_web_dia_grupo(zona, entrada, expreso, dia_min)` y pase **(g)**
 en `gv_ppp_web_armar_pendientes` (parche idempotente sobre la definición viva, marcador
 `v21.80-grupo`). En modo grupo se apagan (a1), (a2), (b00), (b0), (b), (c) y (d); el INC
 (auto_super sin turno) conserva la cascada. Detalle de la regla en `CLAUDE.md`, "UN GRUPO DE
-ZONAS POR DÍA". `sql/gv_programacion_grupo_dia_v2186.sql`.
+ZONAS POR DÍA". `sql/gv_programacion_grupo_dia_v2187.sql`.
 
 **Probado** en transacción abortada con 4 pedidos de prueba (ver CLAUDE.md). Primer intento
 falló por `42803` (subconsulta con columna sin agrupar) — lo cazó la corrida, no la lectura.
