@@ -216,9 +216,16 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
 
     // (e) el mismo botón en «Pedidos atrasados», con los pedidos de ESE día
     try { localStorage.setItem("vir_patr_colapsado", "0"); } catch (_e) {}
-    pppRenderProg();
-    await esperar(() => !!document.querySelector("#pppPreview table.patr-tbl"));
-    pgaAbrirDia(F.atrC);
+    // v21.85 — en la suite completa (2 de 2 corridas) la FILA de D72B aparecia y el BOTON no,
+    // aun esperando 15 s: algo vuelve a dibujar la tabla entre medio. Corrido solo o en paralelo
+    // pasa 13 de 13. Si el boton no aparece, se redibuja y se vuelve a abrir el dia (hasta 3).
+    const _btnAtr = () => { const fx = filaTanda("D72B"); return !!(fx && fx.querySelector(".pga-acc-b.dia")); };
+    for (let k = 0; k < 3; k++) {
+      pppRenderProg();
+      await esperar(() => !!document.querySelector("#pppPreview table.patr-tbl"));
+      pgaAbrirDia(F.atrC);
+      if (await esperar(_btnAtr, 6000)) break;
+    }
     // v21.61 — se esperaba la FILA y se clickeaba el BOTON: la fila puede estar dibujada y el
     // boton no, asi que bajo carga `bta` venia null y el test moria sin decir que fallo.
     const btAtr = function () { const fx = filaTanda("D72B"); return fx && fx.querySelector(".pga-acc-b.dia"); };
@@ -227,6 +234,7 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
     const fa = filaTanda("D72B");
     const bta = btAtr();
     out.botonEnAtrasados = !!bta;
+    if (!bta) out.dumpAtr = fa ? fa.outerHTML.slice(0, 600) : "(sin fila)";
     out.enTablaAtrasados = !!(fa && fa.closest("table.patr-tbl"));
     rpc.length = 0;
     if (!bta) return out;
@@ -271,7 +279,7 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
   ok(r.destNo && r.destMotivo, "(f) la incompatible queda apagada y dice por qué (la regla de estados de Luis)");
   ok(r.destAviso, "(f) y el aviso de súper / camión distinto se ve, sin bloquear");
   ok(r.hayFilaAtrasada && r.enTablaAtrasados, "(e) Pedidos atrasados dibuja su fila de tanda");
-  ok(r.botonEnAtrasados, "(e) y tiene el MISMO botón");
+  ok(r.botonEnAtrasados, "(e) y tiene el MISMO botón", r.dumpAtr);
   ok(/D72B/.test(r.tituloAtr), "(e) que abre el pop-up de esa tanda", JSON.stringify(r.tituloAtr));
   ok(/0,8|0\.8/.test(r.subAtr), "(e) con los m³ del día que ya pasó (los de _patrRows)", JSON.stringify(r.subAtr));
   ok(errs.length === 0, "sin errores de página", errs.join(" | "));
