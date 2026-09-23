@@ -161,7 +161,7 @@ catch (_e) {
     r.pidioEntregas && r.fichaProy && r.dosFichas && r.sinPromedio && r.conRitmo &&
     r.sinFacturado && r.sinEntregado && r.sinArriba && r.asterisco && r.puntoHueco &&
     r.sinBarras && r.hits === 12 && r.filasMes === 7 && r.mesCursoMarcado && r.numerosAbren &&
-    r.tablaAntesDelGrafico && r.tituloEstadMadre && r.columnas === "mes|vtas|entrega" &&
+    r.tablaAntesDelGrafico && r.tituloEstadMadre && r.columnas === "mes|vtas|entrega|delta" &&
     r.abrioDet && r.detTieneCliente && r.detTieneRemito && r.detMarcado && r.cierraDet &&
     r.sinColEnt &&
     errs.length === 0;

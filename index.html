@@ -6068,7 +6068,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.80"></script>
+<script type="module" src="recepcion.js?v=21.81"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10019,7 +10019,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.80";
+const APP_VERSION = "v21.81";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -19518,6 +19518,11 @@ var STK_POP_CSS =
   ".proyv-tab td.v.bajo{color:#b91c1c;}" +
   ".proyv-tab td.e{font-size:21px;font-weight:900;color:#047857;}" +
   ".proyv-tab td.e.sd{font-size:14px;font-weight:700;color:#cbd5e1;}" +
+  ".proyv-tab td.d{font-size:17px;font-weight:800;color:#64748b;}" +
+  ".proyv-tab td.d.pos{color:#b45309;}" +
+  ".proyv-tab td.d.neg{color:#1d4ed8;}" +
+  ".proyv-tab td.d.sd{font-size:14px;font-weight:700;color:#cbd5e1;}" +
+  "@media(max-width:400px){.proyv-tab th,.proyv-tab td{padding-left:7px;padding-right:7px;}.proyv-tab th:first-child,.proyv-tab td:first-child{padding-left:0;padding-right:10px;}.proyv-tab td.v,.proyv-tab td.e{font-size:19px;}.proyv-tab td.d{font-size:16px;}}" +
   ".proyv-tab tr.curso td:first-child{color:#b45309;}" +
   ".proyv-tab tr.curso td.v{color:#b45309;}" +
   ".proyv-tab tr.on td{background:#f5f3ff;}" +
@@ -19947,7 +19952,7 @@ function _stkProyMesesHtml() {
   var lista = S.win.slice();
   if (S.parcial) lista = lista.concat([S.parcial]);
   var h = '<div class="stkpop-grp"><div style="font-size:16px;font-weight:900;color:#334155;margin-bottom:6px;">📊 Estad. Madre</div>' +
-          '<table class="proyv-tab"><tr><th>mes</th><th>vtas</th>' + (S.hayEnt ? '<th>entrega</th>' : '') + '</tr>';
+          '<table class="proyv-tab"><tr><th>mes</th><th>vtas</th>' + (S.hayEnt ? '<th>entrega</th><th title="vtas − entrega">delta</th>' : '') + '</tr>';
   lista.forEach(function (x) {
     var curso = S.parcial && x.mes === S.parcial.mes;
     var bajo = !curso && S.proyN > 0.05 && x.cajas < S.proyN;
@@ -19961,6 +19966,15 @@ function _stkProyMesesHtml() {
             ? '<td class="e"><button type="button" class="proyv-lnk" onclick="stkProyMes(&quot;' + x.mes + '&quot;)"' +
               ' title="Ver el detalle del mes">' + fc(e.cajas) + '</button></td>'
             : '<td class="e sd" title="Ese mes las entregas todavía no se registraban en la app — no es un cero">s/d</td>') : '') +
+         // v21.72: delta = vtas − entrega. Sin entregas registradas ese mes, s/d (no es un cero).
+         (S.hayEnt ? (e && e.cub
+            ? (function () {
+                var d = (Number(x.cajas) || 0) - (Number(e.cajas) || 0), t = fc(Math.abs(d)), z = (t === "0");
+                return '<td class="d' + (z ? '' : (d > 0 ? ' pos' : ' neg')) + '" title="' +
+                  (z ? 'Se entregó lo mismo que se facturó' : d > 0 ? 'Se facturó más de lo que se entregó' : 'Se entregó más de lo que se facturó') +
+                  '">' + (z ? '0' : (d > 0 ? '+' : '−') + t) + '</td>';
+              })()
+            : '<td class="d sd">s/d</td>') : '') +
          '</tr>';
   });
   h += '</table>';
