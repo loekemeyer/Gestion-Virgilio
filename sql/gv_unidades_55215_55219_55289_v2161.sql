@@ -1,0 +1,12 @@
+-- 2026-09-23 (Marianela): 55215, 55219 y 55289 pasan a manejarse en UNIDADES en todos lados
+-- (uxb = 1). Aplicado con su "sí" en la sesión. Backups en zz_backups."GV_Backup_Unidades55_*_20260923"
+-- y en LK public."zz_bkp_item_precios_55215_20260923".
+--   GV_UxB (6 filas) y OC_Maximos.uni_x_caja (3) -> 1 · LK item_precios 55215 uxb 24 -> 1
+--   Stock 55219: 126 cajas -> ajuste +630 (756 u) y conteo de Marianela +246 = 1.002 u en góndola
+--   PPP_Web_Base: LK 0098 55219 1.000 u / 55289 2.000 u · LK 0156 55219 1.002 u
+--   GV_PPP_Base_Pedidos (ISIS, tabla compartida): 97964 55289 4.000 u · 98426 55219 2.000 u
+--   Ordenes_Compra pendientes 1616/1617/1618: 1.272 / 3.246 / 6.000 u, unidad 'Uni'
+--   GV_Volumen_Articulos 55219: 0,0185 -> 0,00308 m3 por unidad
+-- 97889 y 98109 ya estaban facturados: fuera de la demanda sin tocar nada.
+-- ROLLBACK: restaurar cada tabla desde su backup (update ... from zz_backups.<tabla> using clave)
+-- y dos ajustes de stock en contra: -630 y -246 sobre 55219 terminado LK.
