@@ -2014,6 +2014,20 @@ paga por adelantado igual. Si se heredaran, el 2.º pedido saldría como «ya pa
 `decision_ef = coalesce(propia, del cliente)` en `gv_clin_pipeline_lote`, y lo marca
 `decision_heredada`.
 
+### ⚠ El cliente nuevo RECURRENTE no se vuelve a analizar (Luis, 23/09, v21.48)
+
+**Luis:** *"para clientes nuevos recurrentes (que todavía no tienen 3 pedidos completados) debería
+directamente abrir el «qué sigue» en speech 1, speech 2 y agregar la opción de marcarlo como
+referido"*. Caso: **LK 1448 · Silvano (LK 4282)**, 2.º pedido, figuraba «Sin analizar» porque su
+1.er pedido es anterior al pipeline y no había decisión que heredar.
+
+Si el pedido no tiene decisión propia ni heredada y `GV_Clientes_Nuevos.pedidos >= 1`,
+`gv_clin_pipeline_lote` devuelve `decision = no_referenciado` (columnas nuevas `recurrente`,
+`pedidos_previos`) → arranca en **💬 Speech 1**, con el chip **🔁 recurrente**. En
+`no_referenciado`, `speech1` y `speech2` está el botón **🤝 Referenciado** (`gv_clin_etapa` ya le
+da prioridad sobre los speech). No se escribe ninguna fila: se deriva al leer.
+`sql/gv_clin_recurrente_v2148.sql`, `tests/pipe-recurrente.cjs`.
+
 ### Los 3 pedidos NO se cuentan acá: ya los corta LK
 
 *"Después de que pasan 3 pedidos bien pagando por adelantado ya se considera un cliente normal."*

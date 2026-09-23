@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.47"></script>
+<script type="module" src="recepcion.js?v=21.48"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9953,7 +9953,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.47";
+const APP_VERSION = "v21.48";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -48163,6 +48163,12 @@ function pipeMemoriaHtml(p) {
   // v20.86 (Luis): la DECISION ES DEL CLIENTE y SE HEREDA — "la verificacion no se vuelve a
   // hacer... lo unico que queda definir es el contacto por speech". Lo que NO se hereda son los
   // timestamps: el pedido nuevo arranca con su Speech 1 pendiente y paga por adelantado igual.
+  // v21.48 (Luis): cliente nuevo RECURRENTE (ya tiene 1 o 2 pedidos facturados) sin decision
+  // previa: no se vuelve a analizar, arranca en el Speech. Se puede marcar Referenciado igual.
+  if (e.recurrente && !e.decision_heredada && !e.analisis_at)
+    h += '<span class="pipe-mem pipe-mem-dec" title="Cliente nuevo recurrente: ya tiene ' +
+      escapeHtml(String(e.pedidos_previos || 1)) + ' pedido(s) facturado(s). No se vuelve a hacer el ' +
+      'análisis crediticio: sigue por el Speech (paga por adelantado) o se marca Referenciado.">🔁 recurrente</span>';
   if (e.decision_heredada && e.cli_decision) {
     h += '<span class="pipe-mem pipe-mem-dec" title="Ya se definió con este cliente' +
       (e.cli_decision_np ? ' en ' + escapeHtml(String(e.cli_decision_np)) : '') +
@@ -48611,6 +48617,14 @@ function pipeAccionesBtns(p) {
              "Lo saca de la PPP y queda en el log de anulados");
 
   const _her = !!(pipeEst(p) || {}).analisis_heredado;
+  // v21.48 (Luis): "agregar la opcion de marcarlo como referido" en las etapas del Speech —
+  // el recurrente arranca ahi sin pasar por el analisis. gv_clin_etapa ya le da prioridad a
+  // 'referenciado' sobre speech1/speech2, asi que marcarlo corta el cobro por adelantado.
+  const _ref = B("pipe-b-ref", "pipeFirmaAbrir('" + emp + "','" + oid + "','referenciado','Marcar REFERENCIADO'," +
+             "'Cliente que NO paga por adelantado en sus primeros pedidos: un cliente muy grande, un amigo de la " +
+             "empresa, o el que compra por una razon social nueva de un cliente ya activo. Exime al CLIENTE, " +
+             "no solo a este pedido (Thomas, 21/09), y el pedido se programa con prioridad.',true)",
+             "🤝 Referenciado", "Cuenta como habitual: no paga por adelantado, ni este pedido ni los próximos");
   // ⚠ v20.86 (Luis, 21/09): DESPUES DEL ANALISIS SOLO HAY DOS ESTADOS. "No válido" ya no existe:
   // al cliente al que no se le quiere vender se le elimina el pedido (🗑, que está en todas las
   // etapas) y queda en el log de anulados, que ahora es del CLIENTE y no sólo del pedido.
@@ -48639,6 +48653,7 @@ function pipeAccionesBtns(p) {
   if (et === "no_referenciado")
     return B("pipe-b-wa", "pipeSpeech('" + emp + "','" + oid + "',1)", "💬 Contacto Speech 1",
              sinTel ? "No hay teléfono cargado — igual marca el contacto" : "Le pide el pago por adelantado del total") +
+           _ref +
            B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
              "Vincularlo a una razón social que ya es cliente");
 
@@ -48647,7 +48662,8 @@ function pipeAccionesBtns(p) {
              "'Con esto queda listo para programar, con prioridad.')", "💵 Pagó",
              "El cliente pagó: queda listo para aprobar y programar") +
            B("pipe-b-wa", "pipeSpeech('" + emp + "','" + oid + "',2)", "💬 Contacto Speech 2",
-             sinTel ? "No hay teléfono cargado" : "Le pregunta si paga en 24 h; si no, se da de baja", sinTel);
+             sinTel ? "No hay teléfono cargado" : "Le pregunta si paga en 24 h; si no, se da de baja", sinTel) +
+           _ref;
 
   if (et === "speech2")
     return B("pipe-b-ok2", "pipeFirmaAbrir('" + emp + "','" + oid + "','pagado','Confirmar el PAGO'," +
@@ -48655,7 +48671,8 @@ function pipeAccionesBtns(p) {
              "El cliente pagó: queda listo para aprobar y programar") +
            B("pipe-b-no", "pipeFirmaAbrir('" + emp + "','" + oid + "','cancelado','CANCELAR el pedido'," +
              "'No pagó en las 24 h. El pedido queda cancelado en el pipeline y hay que eliminarlo de la PPP.')",
-             "🗑 Cancelar pedido", "No pagó: se da de baja");
+             "🗑 Cancelar pedido", "No pagó: se da de baja") +
+           _ref;
 
   if (et === "pagado")
     return B("pipe-b-ok2", _aprobar, "✅ Aprobar y programar",
