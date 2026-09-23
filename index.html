@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.42"></script>
+<script type="module" src="recepcion.js?v=21.43"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9925,7 +9925,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.42";
+const APP_VERSION = "v21.43";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15778,7 +15778,7 @@ function ocBodyEntregas() {
       nProv: a ? a.nProv : 0, recAvg: a ? a.recAvg : 0, venAvg: a ? a.venAvg : 0, balAvg: a ? a.balAvg : 0,
       stock: a ? a.stock : 0, pedidos: a ? a.pedidos : 0, npsPed: a ? a.npsPed : 0, falta: a ? a.falta : 0 };
   });
-  if (f) arr = arr.filter(function (x) { return (x.cod + " " + x.desc + " " + x.prov).toLowerCase().indexOf(f) >= 0; });
+  if (f) arr = arr.filter(function (x) { return stkMatchBusq(f, x.cod, x.desc + " " + x.prov, false); });   // v21.43 — el codigo por prefijo
   arr.sort(function (a, b) { return (b.falta - a.falta) || (pct(a.ent, a.ped) - pct(b.ent, b.ped)) || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); });
   const conFalta = arr.filter(function (x) { return x.falta > 0.05; });
   const totFalta = conFalta.reduce(function (s, x) { return s + x.falta; }, 0);
@@ -15980,7 +15980,7 @@ function ocBodyGeneral() {
     });
   });
   const f = (_oc.filtro || "").trim().toLowerCase();
-  if (f) items = items.filter(function (it) { return (it.prov + " " + it.cod + " " + it.desc).toLowerCase().indexOf(f) >= 0; });
+  if (f) items = items.filter(function (it) { return stkMatchBusq(f, it.cod, it.prov + " " + it.desc, false); });   // v21.43
   // Orden: proveedor, y dentro por falta desc
   items.sort(function (a, b) { return (a.prov || "").localeCompare(b.prov || "") || (b.falt - a.falt); });
   let tPed = 0, tRec = 0;
@@ -17004,7 +17004,7 @@ function ocBodyGenArt() {
     byCod[k].subs.push(it); byCod[k].falta += it.falta;   // a pedir = lo que realmente se va a ordenar
   });
   const fgrupos = orden.map(function (k) { return byCod[k]; })
-    .filter(function (g) { return !gf || (codCanon(g.cod) + " " + (g.desc || "") + " " + g.subs.map(function (s) { return s.prov; }).join(" ")).toLowerCase().indexOf(gf) !== -1; })
+    .filter(function (g) { return !gf || stkMatchBusq(gf, g.cod, (g.desc || "") + " " + g.subs.map(function (s) { return s.prov; }).join(" "), false); })   // v21.43
     .sort(function (a, b) { return b.falta - a.falta; });
   if (!fgrupos.length) return '<div class="oc-empty">' + (gf ? "Nada coincide con la búsqueda." : "No hay nada para pedir (todo está en o sobre el máximo).<br><small>Con el stock en 0, va a dar todo para pedir cuando lo cargues.</small>") + '</div>' + ocBodyGenImportados();
   const conPedido = fgrupos.filter(function (g) { return g.falta > 0; });
@@ -17052,7 +17052,7 @@ function ocBodyGenTall() {
   keys.forEach(function (k) {
     const x = g[k];
     const sinP = (k === "(sin proveedor)");
-    const fitems = (gf ? x.items.filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : x.items.slice())
+    const fitems = (gf ? x.items.filter(function (it) { return stkMatchBusq(gf, it.cod, (it.desc || "") + " " + (it.prov || ""), false); }) : x.items.slice())   // v21.43
       .sort(function (a, b) { return (b.falta - a.falta) || codCanon(a.cod).localeCompare(codCanon(b.cod)); });
     if (!fitems.length) return;   // ocultar tallerista entero si nada matchea el filtro
     shown++;
@@ -17088,7 +17088,7 @@ function ocBodyGenImportados() {
   keys.forEach(function (k) {
     const sinP = (k === "(sin proveedor)");
     // v9.34: filtro compartido con la sección principal
-    const arr = gf ? g[k].filter(function (it) { return (codCanon(it.cod) + " " + (it.desc || "") + " " + (it.prov || "")).toLowerCase().indexOf(gf) !== -1; }) : g[k];
+    const arr = gf ? g[k].filter(function (it) { return stkMatchBusq(gf, it.cod, (it.desc || "") + " " + (it.prov || ""), false); }) : g[k];   // v21.43
     if (gf && !arr.length) return;
     const totCaj = arr.reduce(function (s, it) { return s + (it.aPedirCajas || 0); }, 0);
     h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + arr.length + ' ítem(s) · ' + totCaj + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en 🏭 Proveedor de importación</span>' : '') + '</div>';
@@ -17302,7 +17302,7 @@ function ocBodyCfg() {
   h += '<input class="oc-filtro" type="search" placeholder="🔎 código / descripción / proveedor" value="' + escapeHtml(_oc.cfg.filtro || "") + '" oninput="if(_oc&&_oc.cfg){_oc.cfg.filtro=this.value;ocRender();}"></div>';
   const provs = _oc.cfg.provs || [];
   const f = (_oc.cfg.filtro || "").toLowerCase().trim();
-  const shown = f ? _oc.cfg.rows.filter(function (a) { return (a.cod + " " + a.descripcion + " " + a.proveedor + " " + a.proveedor2).toLowerCase().indexOf(f) >= 0; }) : _oc.cfg.rows;
+  const shown = f ? _oc.cfg.rows.filter(function (a) { return stkMatchBusq(f, a.cod, a.descripcion + " " + a.proveedor + " " + a.proveedor2, false); }) : _oc.cfg.rows;   // v21.43
   h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor 1</th><th class="num">% P1</th><th>Proveedor 2</th><th class="num">% P2</th><th class="num">Uni×Caja</th><th class="num" title="Capacidad de góndola (Capacidad_Sector)">Cap gónd.</th><th class="num" title="Si está tildado, el máximo = capacidad de góndola (llena la góndola), ignora proyección×índice">Llenar<br>góndola</th><th class="num">Índice</th><th>Activo</th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="11" class="oc-empty">Sin resultados.</td></tr>';
   shown.forEach(function (a) {
@@ -18204,7 +18204,7 @@ function abastRender() {
   // Si tenés stock de sobra, que entreguen menos es a propósito (lo pediste vos) → no es problema.
   const capReal = function (r) { return capFalla(r) && stkFalla(r); };
   let rows = _abast.rows.slice().filter(function (r) { return (r.recUlt || r.venUlt || r.recAvg || r.venAvg || r.stock || r.pedidos); });
-  if (f) rows = rows.filter(function (r) { return (_abastCodDisp(r.cod) + " " + r.cod + " " + r.desc).toLowerCase().indexOf(f) >= 0; });
+  if (f) rows = rows.filter(function (r) { return stkMatchBusq(f, r.cod, r.desc, false); });   // v21.43
   // Peores primero: primero lo urgente (falta stock para pedidos), después lo estructural (capacidad real).
   rows.sort(function (a, b) { return (b.falta - a.falta) || ((capReal(b) ? 1 : 0) - (capReal(a) ? 1 : 0)) || (a.balAvg - b.balAvg) || String(a.cod).localeCompare(String(b.cod), undefined, { numeric: true }); });
   const conStk = _abast.rows.filter(stkFalla), totFalta = conStk.reduce(function (s, r) { return s + r.falta; }, 0);
@@ -20447,7 +20447,7 @@ function _provImpRender() {
   const conProv = all.filter(function (r) { return r.proveedor; }).length;
   let rows = all;
   if (_stkPop.soloSin) rows = rows.filter(function (r) { return !r.proveedor; });
-  if (q) rows = rows.filter(function (r) { return String(r.cod).toUpperCase().indexOf(q) >= 0 || String(r.descripcion || "").toUpperCase().indexOf(q) >= 0; });
+  if (q) rows = rows.filter(function (r) { return stkMatchBusq(q, r.cod, r.descripcion, false); });   // v21.43
   let h = _impTabsHtml('prov');
   h += '<div class="stkpop-hint"><b>' + all.length + '</b> artículos importados (' + conProv + ' con proveedor). Tocá el desplegable para <b>corregir el proveedor chino</b> de cada uno (se guarda al instante en el maestro <code>Importados</code>, que alimenta la OC de importados). <small style="color:#94a3b8">García no está: reenvasa lo de insumos, no importa.</small></div>';
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">';
@@ -20732,7 +20732,7 @@ function _pedHechoRenderCuerpo(soloTabla) {
   if (!st.prov) { el.innerHTML = '<div class="phc-hint">Elegí primero el <b>proveedor</b> para ver sus artículos. (O usá la pestaña <b>2</b> y escribí los códigos.)</div>'; return; }
   var q = _pedHechoNorm(st.q).raw;
   var items = (data.items || []).filter(function (it) { return (it.prov || "(sin proveedor)") === st.prov; });
-  if (q) items = items.filter(function (it) { return _pedHechoNorm(it.cod).raw.indexOf(q) >= 0 || String(it.desc || "").toUpperCase().indexOf(String(st.q).toUpperCase()) >= 0; });
+  if (q) items = items.filter(function (it) { return stkMatchBusq(st.q, it.cod, it.desc, false); });   // v21.43
   items.sort(function (a, b) { return String(a.cod).localeCompare(String(b.cod), "es", { numeric: true }); });
   // v15.00 — un artículo con dos marcas (LK y CH) sale como DOS renglones, uno por marca.
   var rows = [];
@@ -24209,7 +24209,7 @@ function stkGondRender() {
     if (f === "gp") return _stkEsGuardado(mv) || mv.tipo === "picking";
     return true;
   });
-  if (sq) list = list.filter(function (mv) { return (String(mv.cod_art) + " " + String(mv.ref || "")).toLowerCase().indexOf(sq) >= 0; });
+  if (sq) list = list.filter(function (mv) { return stkMatchBusq(sq, mv.cod_art, mv.ref, true); });   // v21.43 — numLibre: el ref puede ser una NP
   list.sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); });
   const MAX = 300, shown = list.slice(0, MAX);
   const fmt1 = function (n) { return Math.round(n * 10) / 10; };
@@ -27280,7 +27280,7 @@ function insRender() {
     const base = f
       ? (cat ? _ins.items.filter(function (it) { return insCatOf(it) === (cat === "?" ? "" : cat); }) : _ins.items)
       : _ins.items.filter(function (it) { const k = insCatOf(it); return cat === "?" ? k === "" : k === cat; });
-    const shown = (f ? base.filter(function (it) { return (it.cod + " " + (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || "")).toLowerCase().indexOf(f) >= 0; }) : base)
+    const shown = (f ? base.filter(function (it) { return stkMatchBusq(f, it.cod, (it.nombre || "") + " " + (it.sector || "") + " " + (it.ubic || ""), true); }) : base)   // v21.43
       .slice().sort(_insSortCat(cat));
     h += '<div class="ins-bar"><button class="ins-back" onclick="insBack()">‹ Atrás</button>' +
       '<span class="ins-bar-t">' + escapeHtml(cat ? insCatLbl(cat === "?" ? "" : cat) : "🔎 Buscar") + '</span></div>';
@@ -27704,7 +27704,7 @@ function scRender() {
   if (!_sc) return; const body = document.getElementById("scBody"); if (!body) return;
   if (!_sc.items.length) { body.innerHTML = '<div class="sc-empty">No hay artículo terminado en góndola para mandar.</div>'; return; }
   const f = (_sc.filtro || "").toLowerCase().trim();
-  const shown = f ? _sc.items.filter(function (it) { return (it.cod + " " + (it.desc || "")).toLowerCase().indexOf(f) >= 0; }) : _sc.items;
+  const shown = f ? _sc.items.filter(function (it) { return stkMatchBusq(f, it.cod, it.desc, false); }) : _sc.items;   // v21.43
   let h = '<div class="sc-hint">Marcá cuántas <b>cajas</b> mandás a Cervantes. Sale de la góndola (Artículo Terminado).</div>';
   h += '<input class="sc-mot" type="text" placeholder="Remito / motivo (opcional)" value="' + escapeHtml(_sc.motivo || "") + '" oninput="if(_sc)_sc.motivo=this.value;">';
   h += '<input class="sc-search" type="search" placeholder="🔎 Buscar código / descripción" value="' + escapeHtml(_sc.filtro) + '" oninput="if(_sc){_sc.filtro=this.value;scRender();}">';
@@ -27878,8 +27878,8 @@ function mgRender() {
   }
   h += '<div class="mg-hint">Ordenado por <b>prioridad</b>: primero lo que tiene la <b>góndola más vacía</b> (stock ÷ capacidad). Marcá cuántas cajas van a <b>Góndola</b>; si está <b>llena</b>, tocá <b>“¿Hay Excedente?”</b> (avisa al supervisor).</div>';
   h += '<input id="mgSearch" class="mg-search" type="search" inputmode="numeric" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_mg.filtro || "") + '" oninput="mgSearchInput(this.value)">';
-  const fq = String(_mg.filtro || "").trim(), fLo = fq.toLowerCase(), fUp = fq.toUpperCase();
-  const shown = fq ? _mg.items.filter(function (it) { return String(it.cod).toLowerCase().indexOf(fLo) >= 0; }) : _mg.items;
+  const fq = String(_mg.filtro || "").trim(), fUp = fq.toUpperCase();
+  const shown = fq ? _mg.items.filter(function (it) { return codEmpiezaCon(it.cod, fq); }) : _mg.items;   // v21.43 — por prefijo
   const exact = _mg.items.some(function (it) { return String(it.cod).toUpperCase() === fUp; });
   // Código buscado que NO está en "a guardar" → se puede guardar igual (avisa Telegram).
   if (fq && !exact) {
@@ -28155,8 +28155,8 @@ function excRender() {
   if (!_exc) return; const body = document.getElementById("excBody"); if (!body) return;
   let h = '<div class="exc-hint">El <b>excedente</b> son cajas que no entraron cuando la góndola estaba llena (guardadas arriba). Ahora que hay lugar, bajalas: elegí cuántas por código y tocá <b>Bajar</b>. Van directo a <b>góndola</b>.</div>';
   h += '<input id="excSearch" class="exc-search" type="search" inputmode="numeric" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_exc.filtro || "") + '" oninput="excSearchInput(this.value)">';
-  const fq = String(_exc.filtro || "").trim(), fLo = fq.toLowerCase();
-  const shown = fq ? _exc.items.filter(function (it) { return String(it.cod).toLowerCase().indexOf(fLo) >= 0; }) : _exc.items;
+  const fq = String(_exc.filtro || "").trim();
+  const shown = fq ? _exc.items.filter(function (it) { return codEmpiezaCon(it.cod, fq); }) : _exc.items;   // v21.43
   if (!_exc.items.length) h += '<div class="exc-empty">No hay nada en excedente 👍</div>';
   else if (!shown.length) h += '<div class="exc-empty">Sin resultados.</div>';
   h += shown.map(function (it) {
@@ -28453,8 +28453,8 @@ function rkbRender() {
   if (!_rkb) return; const body = document.getElementById("rkbBody"); if (!body) return;
   let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por código</b>. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). Al registrar, <b>el stock pasa a góndola al instante</b> (no espera aprobación).</div>';
   h += '<input id="rkbSearch" class="rkb-search" type="search" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_rkb.filtro || "") + '" oninput="rkbSearchInput(this.value)">';
-  const fq = String(_rkb.filtro || "").trim(), fLo = fq.toLowerCase(), fUp = fq.toUpperCase();
-  const shown = fq ? _rkb.items.filter(function (it) { return String(it.cod).toLowerCase().indexOf(fLo) >= 0; }) : _rkb.items;
+  const fq = String(_rkb.filtro || "").trim(), fUp = fq.toUpperCase();
+  const shown = fq ? _rkb.items.filter(function (it) { return codEmpiezaCon(it.cod, fq); }) : _rkb.items;   // v21.43
   const exact = _rkb.items.some(function (it) { return String(it.cod).toUpperCase() === fUp; });
   if (fq && !exact) {
     const enCat = !!_rkb.saldosN[_cpNorm(fq)];
@@ -28609,7 +28609,7 @@ function mvRender() {
   const orig = _mv.plani.filter(function (r) { return r.estado === "ocupado" && _mvEsReal(r.cod_art) && (Number(r.innercajas) || 0) > 0; })
     .sort(function (a, b) { return String(a.sector).localeCompare(String(b.sector), undefined, { numeric: true }); });
   const f = _mv.filtroO.trim().toLowerCase();
-  const shown = f ? orig.filter(function (r) { return (String(r.sector) + " " + String(r.cod_art)).toLowerCase().indexOf(f) >= 0; }) : orig;
+  const shown = f ? orig.filter(function (r) { return stkMatchBusq(f, r.cod_art, r.sector, false); }) : orig;   // v21.43
   let h = '<div class="mv-hint">Elegí <b>de dónde</b> movés (la ubicación que tiene la mercadería). Después elegís a dónde y cuántas cajas. Solo cambia el <b>mapa de racks</b>, no el stock total.</div>';
   h += '<input class="mv-search" type="search" autocomplete="off" placeholder="🔎 Buscar código / ubicación…" value="' + escapeHtml(_mv.filtroO) + '" oninput="if(_mv){_mv.filtroO=this.value;mvRender();}">';
   if (!shown.length) h += '<div class="mv-empty">' + (f ? "Sin resultados." : "No hay mercadería en racks para mover.") + '</div>';
@@ -42873,7 +42873,7 @@ function tallArtsRender(filter) {
   const list = document.getElementById("tallArtsList"); if (!list) return;
   let rows = _tallArts.rows || [];
   const f = String(filter || "").trim().toLowerCase();
-  if (f) rows = rows.filter(function (a) { return (String(a.Cod_Art) + " " + String(a.Desc || "")).toLowerCase().indexOf(f) >= 0; });
+  if (f) rows = rows.filter(function (a) { return stkMatchBusq(f, a.Cod_Art, a.Desc, false); });   // v21.43
   if (!rows.length) { list.innerHTML = '<div class="planim-empty">' + (f ? "Nada coincide." : "Sin artículos en esta línea. Agregá uno arriba.") + "</div>"; return; }
   const numKey = function (c) { const m = String(c).match(/^(\d+)/); return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER; };
   rows = rows.slice().sort(function (a, b) { return numKey(a.Cod_Art) - numKey(b.Cod_Art) || (String(a.Cod_Art) < String(b.Cod_Art) ? -1 : 1); });
@@ -43836,7 +43836,7 @@ function dpRender(filter) {
   if (!_dpCache) { list.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
   var rows = _dpCache.missing;
   var f = String(filter || "").trim().toLowerCase();
-  if (f) rows = rows.filter(function (r) { return (r.cod + " " + r.desc).toLowerCase().indexOf(f) >= 0; });
+  if (f) rows = rows.filter(function (r) { return stkMatchBusq(f, r.cod, r.desc, false); });   // v21.43
 
   if (!rows.length) {
     list.innerHTML = '<div class="planim-empty">' + (f ? "Nada coincide." : "✅ ¡Todos los productos tienen datos completos!") + "</div>";
@@ -44142,7 +44142,7 @@ function lugRenderCod(filter) {
   if (!f) { list.innerHTML = '<div class="planim-empty">Escribí un código.</div>'; return; }
   const empDe = {};
   _lug.lugares.forEach(function (l) { empDe[String(l.sector).toUpperCase()] = l; });
-  const hits = _lug.items.filter(function (i) { return String(i.cod).toUpperCase().indexOf(f) >= 0; });
+  const hits = _lug.items.filter(function (i) { return codEmpiezaCon(i.cod, f); });   // v21.43 — por prefijo
   if (!hits.length) { list.innerHTML = '<div class="planim-empty">Ningún lugar tiene "' + escapeHtml(filter) + '".</div>'; return; }
   const porCod = {};
   hits.forEach(function (i) { (porCod[String(i.cod).toUpperCase()] || (porCod[String(i.cod).toUpperCase()] = [])).push(i); });
@@ -44280,7 +44280,8 @@ function pmapGondolas() {
 }
 function pmapMatch(r, q) {
   if (!q) return false;
-  return String(r.cod || "").toUpperCase().indexOf(q) >= 0 ||
+  // v21.43 — el CODIGO va por prefijo (codEmpiezaCon); el sector y la descripcion siguen por pedazo
+  return codEmpiezaCon(r.cod, q) ||
          String(r.sector || "").toUpperCase().indexOf(q) >= 0 ||
          String(r.descripcion || "").toUpperCase().indexOf(q) >= 0;
 }

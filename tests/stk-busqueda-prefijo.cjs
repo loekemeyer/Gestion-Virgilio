@@ -68,11 +68,32 @@ const LIBRE = [
       if (dio !== esp) fallas.push("stkMatchBusq(" + JSON.stringify(term) + ", " + cod + ", " + JSON.stringify(libre) + ", " + num + ") = " + dio + ", esperaba " + esp);
     });
 
-    // candado: los buscadores de código del módulo pasan por el helper, no por su propio indexOf
-    ["stkBodyStocks", "stkDescargarExcel", "stkBodyIngresos", "stkBodySalidas", "stkBodyHistAjustes"].forEach((fn) => {
+    // candado: TODO buscador de código de la app pasa por el helper, no por su propio indexOf.
+    // v21.43 — se sumaron los 17 que quedaban afuera (Stock del operario, Compras/OC, planimetría),
+    // para que no haya dos criterios de búsqueda según la pantalla.
+    [
+      // Stock y Compras (admin)
+      "stkBodyStocks", "stkDescargarExcel", "stkBodyIngresos", "stkBodySalidas", "stkBodyHistAjustes",
+      "stkGondRender", "abastRender", "dpRender", "tallArtsRender",
+      // Compras / OC
+      "ocBodyEntregas", "ocBodyGeneral", "ocBodyCfg",
+      "ocBodyGenArt", "ocBodyGenTall", "ocBodyGenImportados",   // el generador filtra en las TRES vistas, no en ocBodyGen
+      // operario
+      "mgRender", "excRender", "rkbRender", "scRender", "insRender", "mvRender",
+      // planimetría / mapa de góndolas
+      "lugRenderCod", "pmapMatch",
+      // otros popups de código
+      "_provImpRender", "_pedHechoRenderCuerpo",
+    ].forEach((fn) => {
       if (typeof window[fn] !== "function") { fallas.push("no existe " + fn); return; }
       const src = String(window[fn]);
       if (!/stkMatchBusq|codEmpiezaCon/.test(src)) fallas.push(fn + " no usa el helper de búsqueda por prefijo");
+    });
+    // ⚠ los que NO van por prefijo, a propósito: ahí un número es una NP, un cliente, un remito
+    // o una fecha, no un artículo. Si alguien les mete el helper, la búsqueda deja de encontrar.
+    ["ocBodyList", "_pppEntFilter"].forEach((fn) => {
+      if (typeof window[fn] !== "function") { fallas.push("no existe " + fn); return; }
+      if (/stkMatchBusq|codEmpiezaCon/.test(String(window[fn]))) fallas.push(fn + ": ahí el número NO es un código de artículo (NP/cliente/fecha) — no va por prefijo");
     });
     // y la regla vieja (matchear el código entero y frenar si sigue un dígito) no puede volver
     if (/charAt\(tn\.length\)/.test(String(window.stkBodyStocks || ""))) fallas.push("stkBodyStocks volvió al match exacto: 03 no encontraría nada");
