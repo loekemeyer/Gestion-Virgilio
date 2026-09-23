@@ -4422,6 +4422,39 @@ select * from public.gv_reglas_perdidas;                   -- vacía = el pase s
 
 `sql/gv_ppp_web_fusionar_tandas_v2139.sql`.
 
+## ⚠ REGLA (v21.60): un test VIEJO deja main en rojo igual que uno ROTO — y la clase del botón se comparte
+
+El 23/09 la v21.58 agregó el **candado de código** (una tanda empezada conserva su nombre) con su
+test propio `ppp-tanda-candado-codigo.cjs`, y dejó **`ppp-tanda-cambiar-dia.cjs` sin tocar**. Ese
+test medía justo lo contrario —que una tanda ARMADA puede ir a «tanda nueva» o fusionarse— así que
+main quedó en rojo (issue del CI) hasta la v21.60. Es el caso que la regla de la v21.53 ya nombra:
+**al cambiar una pantalla, `grep` su nombre en `tests/` antes de dar el cambio por terminado.**
+
+⚠⚠ **Y el botón nuevo se llama IGUAL que el viejo.** «🔒 Mismo código» salió con la clase
+`mv-esp-b nueva` —la misma de «➕ Tanda nueva»— y **dibujado primero**, así que
+`querySelector("#pppMovBody .mv-esp-b.nueva")` pasó a agarrar otro botón sin que nada avisara: el
+test clickeaba el candado creyendo que clickeaba tanda nueva, y el `p_tanda_destino` salía `null`
+en vez de `""`. **Un selector que ya usa alguien no se reutiliza para un botón distinto.**
+
+Qué mide hoy `ppp-tanda-cambiar-dia.cjs`, que son **dos casos y no uno**:
+
+| tanda | estado | qué ofrece el paso 2 |
+|---|---|---|
+| **E01A** (c) | armada | **sólo** «🔒 Mismo código» → `p_tanda_destino = null`. Ni tanda nueva ni fusión |
+| **E02A** (f) | pendiente | «➕ Tanda nueva» **y** los destinos, con su compatible / incompatible / aviso |
+
+⚠ **E02A NO se agrega como tercera fila del árbol**: probado, eso rompe el render de «Pedidos
+atrasados» y tira (e) abajo. El pop-up se arma igual que `pgaTandaMoverAbrir`, cambiando lo único
+que separa los dos casos: `empezada`.
+
+⚠ **Y había una carrera aparte, real**: dos `.click()` sin guard (el de «tanda nueva» y el del
+botón de atrasados, que esperaba la FILA y clickeaba el BOTÓN) morían con *"Cannot read properties
+of null"* bajo carga — 1 de cada 4 corriendo en paralelo. Ahora reintentan, como el click del día
+en la v21.49. Medido después: **8 de 8 en paralelo**.
+
+**Chequeo:** `node tests/ppp-tanda-cambiar-dia.cjs` — verificado que **falla (4) contra el
+`index.html` anterior al candado**, o sea que no tapa nada.
+
 ## ⚠ REGLA (Luis, 2026-09-23, v21.42): el SUPERVISOR no firma con legajo 0 — 0 y 1 son PRUEBA en todo el sistema
 
 **Luis, con Ocupación abierta en el 18/09:** *"Sigo sin entender esos 2. En prog dice que está todo

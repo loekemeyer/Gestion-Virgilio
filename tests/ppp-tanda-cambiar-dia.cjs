@@ -155,13 +155,22 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
     }
     out.paso2 = !!document.querySelector("#pppMovBody .mv-esp-b.nueva");
     out.pidioTandas = rpc.some((x) => x.fn === "gv_ppp_tandas_del_dia");
-    const dests = [...document.querySelectorAll("#pppMovBody .mv-dest")];
-    out.destOk = dests.some((b) => /E18A/.test(b.textContent) && !b.disabled);
-    out.destNo = dests.some((b) => /E30A/.test(b.textContent) && b.disabled);
-    out.destMotivo = /mismo estado/.test((dests.find((b) => /E30A/.test(b.textContent)) || {}).textContent || "");
-    out.destAviso = !!document.querySelector("#pppMovBody .mv-dest-av");
-    document.querySelector("#pppMovBody .mv-esp-b.nueva").click();
-    await esperar(() => rpc.some((x) => x.fn === "gv_ppp_tanda_mover"));
+    // v21.60 — E01A esta ARMADA, asi que desde la v21.58 el paso 2 le ofrece SOLO «Mismo codigo»:
+    // ni tanda nueva ni fusion. Hasta la v21.58 este bloque media lo contrario y quedo viejo.
+    const cuerpo2 = (document.getElementById("pppMovBody") || {}).textContent || "";
+    out.candadoBoton = /Mismo c.digo/.test((document.querySelector("#pppMovBody .mv-esp-b.nueva") || {}).textContent || "");
+    out.sinTandaNueva = ![...document.querySelectorAll("#pppMovBody .mv-esp-b")].some((b) => /Tanda nueva/.test(b.textContent));
+    out.sinDestinos = document.querySelectorAll("#pppMovBody .mv-dest").length === 0;
+    out.candadoExplica = /picking o armado/.test(cuerpo2) && /no se le puede cambiar el c.digo/.test(cuerpo2);
+    // v21.60 — el mismo reintento que el click del dia, y por lo mismo: bajo carga el click se
+    // pierde y el querySelector daba null, o sea que el test moria con "Cannot read properties
+    // of null" en vez de decir que fallo. Si de verdad no se dibuja, `out.paso2` ya lo canta.
+    for (let i = 0; i < 3; i++) {
+      const bn = document.querySelector("#pppMovBody .mv-esp-b.nueva");
+      if (!bn) break;
+      bn.click();
+      if (await esperar(() => rpc.some((x) => x.fn === "gv_ppp_tanda_mover"), 8000)) break;
+    }
     const arg = (rpc.find((x) => x.fn === "gv_ppp_tanda_mover") || {}).args || {};
     out.argMover = JSON.stringify({ t: arg.p_tanda, f: arg.p_fecha, forzar: arg.p_forzar, dest: arg.p_tanda_destino });
     out.confirmDiceArmada = confirms.join(" ").indexOf("pickeada o armada") >= 0;
@@ -178,19 +187,51 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
     out.forzoAlReintentar = mov.length === 2 && mov[0].args.p_forzar === false && mov[1].args.p_forzar === true;
     out.pregunto = confirms.filter((c) => c.indexOf("TANDA_EMPEZADA") < 0 && c.indexOf("La movemos igual") >= 0).length === 1;
 
+    // (f) v21.60 — una tanda NO empezada SI puede cambiar de codigo: ahi viven los destinos.
+    // Se arma el pop-up igual que `pgaTandaMoverAbrir`, cambiando lo unico que separa los dos
+    // casos: `empezada`. Agregar una tercera fila al arbol rompia el render de «atrasados».
+    rpc.length = 0; confirms.length = 0;
+    const ovShow = () => { const o = document.getElementById("pppMovOverlay"); return !!o && o.classList.contains("show"); };
+    _pppMov = { tanda: "E02A", np: 1, m3: 0.5, dias: 21, cal: [], cargando: true,
+                actual: F.d1, actualTxt: "", arbolFilas: [mk(F.d1, "E02A", "LK 0060", "pendiente", 0.5)],
+                empezada: false, desdeArbol: true };
+    pppMovOverlay("📅 Cambiar de día — tanda E02A");
+    pppMovCargar();
+    out.popupPendiente = await esperar(ovShow);
+    await esperar(() => (document.querySelectorAll("#pppMovBody .mv-d") || []).length > 0);
+    const diaP = [...document.querySelectorAll("#pppMovBody .mv-d")]
+      .find((x) => String(x.getAttribute("onclick") || "").indexOf(F.d2) >= 0);
+    if (diaP) for (let i = 0; i < 3; i++) {
+      diaP.click();
+      if (await esperar(() => document.querySelectorAll("#pppMovBody .mv-dest").length > 0, 8000)) break;
+    }
+    const dests = [...document.querySelectorAll("#pppMovBody .mv-dest")];
+    out.destOk = dests.some((b) => /E18A/.test(b.textContent) && !b.disabled);
+    out.destNo = dests.some((b) => /E30A/.test(b.textContent) && b.disabled);
+    out.destMotivo = /mismo estado/.test((dests.find((b) => /E30A/.test(b.textContent)) || {}).textContent || "");
+    out.destAviso = !!document.querySelector("#pppMovBody .mv-dest-av");
+    out.pendTandaNueva = [...document.querySelectorAll("#pppMovBody .mv-esp-b")].some((b) => /Tanda nueva/.test(b.textContent));
+    try { pppMovCerrar(); } catch (_e) {}
+    await esperar(() => !ovShow());
+
     // (e) el mismo botón en «Pedidos atrasados», con los pedidos de ESE día
     try { localStorage.setItem("vir_patr_colapsado", "0"); } catch (_e) {}
     pppRenderProg();
     await esperar(() => !!document.querySelector("#pppPreview table.patr-tbl"));
     pgaAbrirDia(F.atrC);
+    // v21.60 — se esperaba la FILA y se clickeaba el BOTON: la fila puede estar dibujada y el
+    // boton no, asi que bajo carga `bta` venia null y el test moria sin decir que fallo.
+    const btAtr = function () { const fx = filaTanda("D72B"); return fx && fx.querySelector(".pga-acc-b.dia"); };
     out.hayFilaAtrasada = await esperar(() => !!filaTanda("D72B"));
+    await esperar(() => !!btAtr());
     const fa = filaTanda("D72B");
-    const bta = fa && fa.querySelector(".pga-acc-b.dia");
+    const bta = btAtr();
     out.botonEnAtrasados = !!bta;
     out.enTablaAtrasados = !!(fa && fa.closest("table.patr-tbl"));
     rpc.length = 0;
-    bta.click();
-    await esperar(() => document.getElementById("pppMovOverlay").classList.contains("show"));
+    if (!bta) return out;
+    const ovAbierto = () => { const o = document.getElementById("pppMovOverlay"); return !!o && o.classList.contains("show"); };
+    for (let i = 0; i < 3; i++) { bta.click(); if (await esperar(ovAbierto, 8000)) break; }
     out.tituloAtr = (document.getElementById("pppMovTitle") || {}).textContent || "";
     await esperar(() => (document.querySelector("#pppMovBody .mv-sub") || {}).textContent);
     out.subAtr = (document.querySelector("#pppMovBody .mv-sub") || {}).textContent || "";
@@ -214,16 +255,21 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
   ok(r.pidioCalendario, "(b) pide el calendario con los m³ y el cupo de cada día");
   ok(r.paso2, "(c) elegir el día abre el paso 2 («¿en qué tanda?») y todavía no mueve nada");
   ok(r.pidioTandas, "(c) y le pregunta al backend qué tandas hay ese día (gv_ppp_tandas_del_dia)");
-  ok(r.destOk, "(c) la tanda compatible se puede elegir");
-  ok(r.destNo && r.destMotivo, "(c) la incompatible queda apagada y dice por qué (la regla de estados de Luis)");
-  ok(r.destAviso, "(c) y el aviso de súper / camión distinto se ve, sin bloquear");
-  ok(r.argMover === JSON.stringify({ t: "E01A", f: F.d2, forzar: true, dest: "" }),
-     "(c) elegir «tanda nueva» mueve la tanda al día tocado, forzando porque está armada", r.argMover);
+  ok(r.candadoBoton, "(c) la tanda ARMADA sólo puede conservar su código: «🔒 Mismo código» (v21.58)");
+  ok(r.sinTandaNueva && r.sinDestinos, "(c) y NO se le ofrece tanda nueva ni fusión");
+  ok(r.candadoExplica, "(c) con el motivo escrito: los operarios la buscan por ese nombre");
+  ok(r.argMover === JSON.stringify({ t: "E01A", f: F.d2, forzar: true, dest: null }),
+     "(c) mueve la tanda al día tocado con p_tanda_destino null (mantiene el código)", r.argMover);
   ok(r.confirmDiceArmada && r.confirmDiceNoRepickear, "(c) y el confirm avisa que está armada y que no hay que volver a pickear");
   ok(r.recargoElArbol, "(c) recarga el árbol y los atrasados (tienen caché propio)");
   ok(r.popupCerrado, "(c) y cierra el pop-up");
   ok(r.reintentos === 2 && r.forzoAlReintentar, "(d) si el backend dice TANDA_EMPEZADA, reintenta una vez con p_forzar", "intentos " + r.reintentos);
   ok(r.pregunto, "(d) preguntando antes, con el motivo del backend");
+  ok(r.popupPendiente, "(f) el pop-up de una tanda PENDIENTE");
+  ok(r.pendTandaNueva, "(f) y a ella sí se le ofrece «➕ Tanda nueva»");
+  ok(r.destOk, "(f) la tanda compatible se puede elegir");
+  ok(r.destNo && r.destMotivo, "(f) la incompatible queda apagada y dice por qué (la regla de estados de Luis)");
+  ok(r.destAviso, "(f) y el aviso de súper / camión distinto se ve, sin bloquear");
   ok(r.hayFilaAtrasada && r.enTablaAtrasados, "(e) Pedidos atrasados dibuja su fila de tanda");
   ok(r.botonEnAtrasados, "(e) y tiene el MISMO botón");
   ok(/D72B/.test(r.tituloAtr), "(e) que abre el pop-up de esa tanda", JSON.stringify(r.tituloAtr));
