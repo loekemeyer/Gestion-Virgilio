@@ -74,7 +74,7 @@ catch (_e) {
     const fake = { preventDefault() {}, stopPropagation() {}, currentTarget: document.createElement("div") };
     aprDropDia(fake, "2026-09-15");
     await new Promise((res) => setTimeout(res, 300));
-    out.drop = { fns: tandaFns(), fecha: (calls.find((c) => c.fn === "gv_ppp_web_tanda_programar") || { body: {} }).body.p_fecha, cod: (calls.find((c) => c.fn === "gv_ppp_web_tanda_programar") || { body: {} }).body.p_codigo, emp: (calls[0] || { body: {} }).body.p_empresa, msg: _apr.msg, err: _apr.msgErr, items: JSON.stringify((calls.find((c) => c.fn === "gv_ppp_web_tanda_programar") || { body: {} }).body.p_items) };
+    out.drop = { fns: tandaFns(), fecha: (calls.find((c) => c.fn === "gv_ppp_web_tanda_programar") || { body: {} }).body.p_fecha, cod: (calls.find((c) => c.fn === "gv_ppp_web_tanda_programar") || { body: {} }).body.p_codigo, emp: (calls.find((c) => c.fn === "gv_ppp_web_tanda_nueva") || { body: {} }).body.p_empresa, msg: _apr.msg, err: _apr.msgErr, items: JSON.stringify((calls.find((c) => c.fn === "gv_ppp_web_tanda_programar") || { body: {} }).body.p_items) };
 
     // falla al programar → descartar
     reset(); calls.length = 0; window.__falla = true;
