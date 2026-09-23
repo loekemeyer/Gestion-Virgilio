@@ -723,6 +723,41 @@ compara contra algo de la operación (*"menos de una caja"*), no cambiando de un
 
 Vale para TODOS los repos. Es sólo cómo se escribe el mensaje del chat: no cambia nada técnico.
 
+## 🟥🟥🟥 REGLA (Luis, 2026-09-23, v21.86): UN GRUPO DE ZONAS POR DÍA — y "mismo cliente, mismo día" NO EXISTE MÁS
+
+> ## **DEROGADA: "nunca +1 pedido de un cliente va separado en la PPP".** No se junta al cliente en un día.
+> ## Un cliente con sucursales en dos zonas va en **dos días**, cada pedido con el camión de SU zona.
+
+**Luis, textual:** *"Saca esa regla de que se junta al cliente. Un cliente puede tener sucursales en
+2 zonas diferentes y lo más importante es eso. En serio saca esa regla porque por más que lo explico
+la seguís refiriendo y no va."* Toda mención de esa regla más abajo en este archivo (Thomas v15.52,
+el "mismo día para el cliente" del principio rector, el ancla de cliente v20.27, la alarma
+`gv_ppp_cliente_dos_dias`) queda **sin efecto**. No citarla, no proponerla, no "respetarla".
+
+**Cómo elige el día el armado desde la v21.86** (`gv_ppp_web_dia_grupo`, pase **(g)** de
+`gv_ppp_web_armar_pendientes`; forward-facing: lo ya programado no se toca):
+
+| paso | qué hace |
+|---|---|
+| plazo | entrada del pedido + **14 días corridos**; por **expreso + 13**. Hacia atrás al día con reparto |
+| fecha mínima | la de siempre: `gv_ppp_web_dia_minimo` (4 hábiles, calculado al mediodía) |
+| 1 | si su **grupo** (Capital Sur · Centro-Oeste Z2+Z3 · GBA Sur · GBA Oeste · GBA Norte Z6+Z7) ya sale un día del plazo → **ese**, sin mirar el cupo (el 4,30 m³ es promedio, no techo) |
+| 2 | si no, el **último día LIBRE** del plazo (sin ningún grupo de reparto), para que los pedidos del grupo que entren después se sumen |
+| 3 | si todos los días del plazo tienen otro grupo → **gana el cliente**: el día con menos grupos (segundo camión / flete) |
+| 4 | ya vencido → lo antes posible, aunque mezcle grupos: el rezagado no se traba |
+
+- Súper y Retira no son "grupo de reparto" (camión propio / no usan camión) y no ocupan el día.
+- Súper con turno, Retira con día elegido, cliente nuevo aprobado (48 h) y diferidos: **sin cambios**.
+- Apagados en modo grupo: (a1), (a2), (b00) ancla de cliente, (b0) ancla por número de zona,
+  (b) cascada por cupo, (c) zonas manuales, (d) juntar clientes. El INC (auto_super) sigue con su cascada.
+- **Interruptor**: `PPP_Web_Config.grupo_dia_activo` — sin fila = prendido; con `valor = 0` vuelve
+  la lógica anterior sin redeploy. `sql/gv_programacion_grupo_dia_v2186.sql` (el marcador interno
+  dice `v21.80-grupo`: es la llave de idempotencia, no cambiarlo).
+
+**Probado corriendo el armador** en transacción abortada (23/09): Z3 → 30/09 con Centro-Oeste
+(E48G), Z4 → 05/10 con GBA Sur (E73A), Z6 sin camión en el plazo → 07/10 (último día libre), un
+expreso vencido Z1 → 01/10 con Capital Sur, y el **mismo cliente** en Z3 y Z6 → **dos días**.
+
 ## 🟩🟩🟩 PRINCIPIO RECTOR DE LA PROGRAMACIÓN (Luis, 2026-09-22)
 
 > ## Agrupar pedidos existe para **ENTREGAR LA MAYOR CANTIDAD DE MERCADERÍA EN LA MENOR CANTIDAD DE CAMIONES.**
@@ -749,7 +784,7 @@ juntos "porque son del mismo cliente" es justamente lo que esta regla prohíbe.
 
 | regla | qué dice | por qué no choca |
 |---|---|---|
-| Thomas: *"nunca +1 pedido de un cliente va separado en la PPP"* | el **DÍA** es uno solo por cliente | habla del día, no del camión |
+| ~~Thomas: *"nunca +1 pedido de un cliente va separado en la PPP"*~~ | **DEROGADA (Luis, 23/09, v21.86)** | ver "UN GRUPO DE ZONAS POR DÍA" |
 | Luis v18.87: *"la tanda de un cliente se parte por CAMIÓN"* | mismo día, distinta tanda si la zona manda a otro camión | es esta misma regla aplicada al armado |
 
 O sea: **mismo día para el cliente · tanda por camión · agrupamiento por pedido.**
