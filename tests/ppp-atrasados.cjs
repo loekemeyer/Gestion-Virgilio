@@ -53,8 +53,13 @@ catch (_e) {
       mk("98804", "E92A", "1004", "Al Día Uno", 1.10, "Pompeya", "Sáenz 1100", hab[0], "Zona 1 - CABA Sur"),
       mk("98805", "E92A", "1005", "Al Día Dos", 0.90, "Lugano", "Cafayate 4000", hab[0], "Zona 1 - CABA Sur")
     ];
+    // v21.37 — quien decide que esta atrasado es `gv_ppp_atrasados` (backend), no la fecha
+    // pelada: el cartel de Resumen y la banda del Tablero leen lo mismo que el submodulo.
+    // Por eso el stub tiene que devolver los 4 vencidos tambien por esa RPC.
+    const ATR = ["98801", "98802", "98803", "98806"];
     window.fetch = (url) => {
       const u = String(url);
+      if (u.indexOf("gv_ppp_atrasados") >= 0) return J(rows.filter((x) => ATR.indexOf(x.np) >= 0));
       if (u.indexOf("gv_ppp_programacion_diaria") >= 0) return J(rows);
       return J([]);
     };

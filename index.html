@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.36"></script>
+<script type="module" src="recepcion.js?v=21.37"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9925,7 +9925,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.36";
+const APP_VERSION = "v21.37";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37732,11 +37732,11 @@ function pppResumenHtml(prog) {
   let head = '';
   // v13.33 (dueño: "los atrasados son un dato para que lo revise alguien de gerencia"): salieron de la
   // solapa Programación y viven acá, en Resumen, que es la solapa de mirar el conjunto.
-  const _nVenc = _pppPlanAgrupar(prog).venc.length;
+  const _nVenc = _pppPlanAgrupar(prog).atr.length;   // v21.37: el backend, no la fecha pelada
   if (_nVenc) {
     // v13.46 (dueño): los que NO salieron (tanda sin armar) van como alerta — hay que reprogramarlos;
     // los que salieron con la tanda armada sólo tienen el remito sin marcar.
-    const _venc = _pppPlanAgrupar(prog).venc;
+    const _venc = _pppPlanAgrupar(prog).atr;
     const _rep = _venc.filter(function (p) { return _pppEstadoPed(p) !== "armado"; }).length;
     head += '<div class="ppp-res-note' + (_rep ? ' rep' : '') + '">⏰ <b>' + _nVenc + '</b> pedido(s) con fecha de entrega vencida: ' +
       (_rep ? '<b>' + _rep + ' sin salir → hay que reprogramar</b>' + (_nVenc - _rep ? ' · ' : '') : '') +
@@ -38725,16 +38725,43 @@ function _pppEstadoPed(p) {
   return "sin";
 }
 const _PN_EST = { armado: { txt: "Armado ✓", cls: "arm" }, armando: { txt: "Armando", cls: "cur" }, picking: { txt: "Picking ✓ · falta armar", cls: "cur" }, pickeando: { txt: "En picking", cls: "cur" }, sin: { txt: "Sin empezar", cls: "sin" } };
+/* v21.37 (Luis, 22/09, con las dos capturas: *"en Programación dice que no hay pedidos
+   atrasados, pero en Resumen dice 18/9"*) — QUIÉN ESTÁ ATRASADO LO DICE EL BACKEND, UNA
+   SOLA VEZ, PARA LAS TRES PANTALLAS QUE LO MUESTRAN.
+   El submódulo de Pedidos atrasados (v18.78) pregunta `gv_ppp_atrasados`, que mira el CCN
+   Y EL FSS POSTERIOR y normaliza la NP. El cartel de Resumen y la banda del Tablero de 6
+   días contaban por su cuenta: TODO pedido con `fecha_entrega` anterior a hoy, saliera o
+   no. Por eso el mismo día decían "✅ sin atrasados" y "⏰ 6 con fecha vencida".
+   El CLAUDE.md ya avisaba en la v18.78 que dejar los dos criterios era mostrar dos números
+   distintos de lo mismo; lo que quedó vivo fue esta copia.
+   ⚠ `venc` NO cambia: es "lo que tiene fecha anterior a hoy" y de eso dependen los KPI de
+   lo que queda por programar. Lo que se agrega es `atr`, que es el subconjunto que el
+   backend marca atrasado — y es lo único que se muestra como atrasado.
+   ⚠ Sin respuesta todavía, o con el fetch caído, `atr` = `venc`: ante la duda se avisa.
+   Un falso "no hay atrasados" esconde un pedido parado; un falso atrasado sólo molesta. */
+function _pppAtrasadoSet() {
+  // ⚠ todo adentro del try: `_patrRows` se declara MÁS ABAJO en el archivo (`let`), así que
+  // una llamada durante la evaluación del script daría ReferenceError por la TDZ. Ante
+  // cualquier error, null = manda el criterio viejo.
+  try {
+    patrNeed();
+    if (!_patrRows || _patrErr) return null;
+    const s = new Set();
+    for (const r of _patrRows) s.add(_pppNpNorm(r && r.np));
+    return s;
+  } catch (_e) { return null; }
+}
 function _pppPlanAgrupar(programados) {
   const hoy = _pppHoyKey();
-  const byDay = new Map(); const venc = [];
+  const atr0 = _pppAtrasadoSet();
+  const byDay = new Map(); const venc = []; const atr = [];
   for (const p of programados) {
     const k = _pppFechaKey(p.fecha_entrega || "");
-    if (k < hoy) { venc.push(p); continue; }
+    if (k < hoy) { venc.push(p); if (!atr0 || atr0.has(_pppNpNorm(p.np))) atr.push(p); continue; }
     if (!byDay.has(k)) byDay.set(k, { key: k, fecha: p.fecha_entrega || "—", ped: [] });
     byDay.get(k).ped.push(p);
   }
-  return { byDay: byDay, venc: venc };
+  return { byDay: byDay, venc: venc, atr: atr };
 }
 /* Camiones de un día. v13.07 (idea 7317): un camión = un NÚMERO de tanda (E01A + E01B = camión 01,
    igual que el cuadro "Total por día" y que Producción). Antes era un camión por zona, pero con los
@@ -39461,6 +39488,12 @@ function patrNeed(force) {
     .catch(function (e) {
       _patrBusy = false; _patrErr = String((e && e.message) || e);
       if (!_patrRows) _patrRows = [];
+      // v21.37 — el TTL también se sella cuando FALLA. Antes sólo se sellaba en el éxito, así
+      // que con el endpoint caído cada render volvía a pedir; desde que `_pppPlanAgrupar`
+      // llama a `patrNeed`, el `pppRenderProg()` de acá abajo realimentaba ese pedido y la
+      // pantalla entraba en un loop cerrado (se colgó el test antes de llegar al navegador).
+      // Con el sello, un backend caído se reintenta cada 60 s y no en cada dibujo.
+      _patrTs = Date.now();
       pppRenderProg();
     });
 }
@@ -40692,14 +40725,15 @@ function _pppPlanGridHtml(programados) {
   for (const d of dias) { const dd = g.byDay.get(d.key); if (!dd) continue; tot += dd.ped.length; totM3 += _pppM3Sum(dd.ped); const v = _pppPlanValor(dd.ped); totVal += v.valor; totSinVal += v.sin; camiones += _pppCamiones(dd.ped).filter(function (c) { return c.ruta !== "ret"; }).length; }
   let sinCtrl = 0;
   if (_pppEnSalida) _pppEnSalida.forEach(function (r, np) { try { if (_pppCargaVencida({ np: np })) sinCtrl++; } catch (_e) {} });
-  const nVenc = g.venc.length;
+  const nVenc = g.atr.length;          // v21.37: la banda "N atrasados" = lo que dice el backend
+  const nFueraDeFecha = g.venc.length; // el KPI de abajo: todo lo que tiene fecha anterior a hoy
   let h = '<div class="pn-head"><div><div class="pn-h1">Programación de entregas</div><div class="pn-h2">' + (hoja ? 'Hoja ' + (hoja + 1) + ' · ' + escapeHtml(rangoTxt) : 'Próximos 6 días hábiles') + ' · tocá un día para ver sus camiones y pedidos</div></div>' +
     '<div class="pn-tools"><button class="pn-lnk" onclick="pppPlanTabla(true)" title="La tabla día → tanda → NP">↩ Tabla</button>' +
     '</div></div>';
   // v13.33 (dueño: "los 48 atrasados no deben aparecer en Programación… es un dato para que lo revise
   // alguien de gerencia"): esta solapa es la de programar, así que cuenta SÓLO lo que todavía tiene
   // fecha por delante. Los vencidos se miran desde Resumen.
-  const nProg = Math.max(0, programados.length - nVenc);
+  const nProg = Math.max(0, programados.length - nFueraDeFecha);
   h += '<div class="pn-kpis">' +
     '<div class="pn-kpi"><div class="ico">📦</div><div><div class="l">Pedidos</div><div class="v">' + nProg + '</div><div class="s">' + tot + ' en ' + (hoja ? 'la hoja ' + (hoja + 1) : 'estos 6 días') + ' · ' + Math.max(0, nProg - tot) + ' después</div></div></div>' +
     '<div class="pn-kpi"><div class="ico">🚚</div><div><div class="l">Camiones</div><div class="v">' + camiones + '</div><div class="s">por n° de tanda y día</div></div></div>' +
@@ -40717,7 +40751,7 @@ function _pppPlanGridHtml(programados) {
   // van juntas en una fila (`.pn-avisos`), repartiéndose el ancho.
   let _avisos = "";
   if (nVenc) {
-    const _rep = g.venc.filter(function (p) { return _pppEstadoPed(p) !== "armado"; }).length;
+    const _rep = g.atr.filter(function (p) { return _pppEstadoPed(p) !== "armado"; }).length;
     _avisos += '<div class="pn-venc-band' + (_rep ? ' rep' : '') + '" onclick="pppPlanAbrir(\'venc\')" title="Ver la lista de atrasados">' +
       '<b>⏰ ' + nVenc + ' atrasado' + (nVenc === 1 ? '' : 's') + '</b>' +
       (_rep ? '<span class="r">' + _rep + ' sin salir → reprogramar</span>' : '') +
@@ -40777,7 +40811,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
   // v13.94: `inline` = la lista se está dibujando DENTRO de Resumen, no en Programación. Cambia
   // sólo la barra de arriba: ahí no hay "los 6 días" a los que volver, hay que cerrarla y punto.
   const inline = !!(opts && opts.inline);
-  const ped = esVenc ? g.venc : ((g.byDay.get(key) || {}).ped || []);
+  const ped = esVenc ? g.atr : ((g.byDay.get(key) || {}).ped || []);   // v21.37
   const hoy = _pppHoyKey();
   const dt = esVenc ? null : _pppKeyDate(key);
   const titulo = esVenc ? "Atrasados — la fecha de entrega ya pasó" : (dt.getDate() + " de " + _PN_MESL[dt.getMonth()]);
