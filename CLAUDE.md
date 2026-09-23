@@ -680,7 +680,13 @@ juntos "porque son del mismo cliente" es justamente lo que esta regla prohíbe.
 | Thomas: *"nunca +1 pedido de un cliente va separado en la PPP"* | el **DÍA** es uno solo por cliente | habla del día, no del camión |
 | Luis v18.87: *"la tanda de un cliente se parte por CAMIÓN"* | mismo día, distinta tanda si la zona manda a otro camión | es esta misma regla aplicada al armado |
 
-O sea: **mismo día para el cliente · tanda por camión · agrupamiento por pedido.** Las tres dicen lo
+O sea: **mismo día para el cliente · tanda por camión · agrupamiento por pedido.**
+
+⚠ **Y la alarma de "cliente en días distintos" (`gv_ppp_cliente_dos_dias`) salta SÓLO si esos pedidos
+podrían ir en el MISMO camión** (Luis, 23/09, v21.70). Caso Multi Bazar (LK 4042): 4 pedidos a Río
+Negro y Santa Cruz por expreso y a San Martín por reparto propio, en 3 camiones distintos — juntarlos
+en un día no ahorra un viaje y el 2/10 ya salían los 2 camiones de Capital. El corte es la etiqueta de
+`gv_ppp_web_camion` (Capital Sur / Capital Centro-Oeste / GBA Sur / GBA Oeste / GBA Norte). Las tres dicen lo
 mismo desde tres lados, y el principio rector es el que las ordena cuando parecen chocar.
 
 ## ⚠⚠ LA LÓGICA DE PROGRAMACIÓN, RESUMIDA POR LUIS (2026-09-19)

@@ -1,0 +1,11 @@
+-- v21.69 (Luis, 2026-09-23) — aplicado en Gestión el 23/09.
+-- La alarma "cliente con entregas en días distintos" (gv_ppp_cliente_dos_dias) sólo salta si esos
+-- pedidos podrían ir en el MISMO camión (etiqueta de gv_ppp_web_camion). Principio rector: agrupar
+-- existe para llevar más mercadería en menos camiones; juntar en un día pedidos que van en camiones
+-- distintos no ahorra nada. Caso Multi Bazar (LK 4042): salía con 6 NP en 3 camiones; ahora 0.
+-- Probado en transacción abortada: Zona 2 + Zona 3 del mismo cliente en días distintos → marca
+-- (Capital Centro-Oeste); Zona 6 del mismo cliente → no.
+-- Aplicado sobre pg_get_viewdef (conserva security_invoker): columna `camion` en `limpia` y al final,
+-- `choque` por (k, camion, dia), join final por camion. Centinela en GV_Reglas_Centinela (v21.69).
+-- Rollback: volver a crear la vista sin la columna camion (la definición anterior está en el git log de
+-- este archivo: choque por (k, dia) y join final `c.k = l.k AND c.dia = l.dia`).

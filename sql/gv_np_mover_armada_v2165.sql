@@ -1,0 +1,11 @@
+-- v21.65 (Luis, 23/09) — cierra los pendientes (1) y (3) de la tarea de mover NP armadas.
+-- Antes de armar se midió: gv_armado_sin_entregas y gv_tanda_armada_sin_armado miran lo INVERSO
+-- (TAP sin armado por NP); ninguna vista marcaba una NP armada en una tanda sin TAP.
+-- (1) gv_np_mover_exento_salida: la exencion "la tanda ya salio sin el" ya no aplica a una NP con
+--     Entregas_Virgilio viva: una NP armada se muda con su registro (gv_ppp_pedido_mover). Aplicado
+--     sobre pg_get_functiondef, idempotente (marca v21.65). LK 0027/E03C: antes true, ahora false.
+-- (3) centinela gv_np_armada_tanda_sin_tap — vacia = todo bien (al 23/09: 0 de 216 NP armadas).
+--     Probado rompiendolo en transaccion abortada: NP 98617 con una Entregas falsa -> la marca.
+-- (4) freno np_mover_frenado sigue en 1: levantarlo es un UPDATE de config, lo decide Luis:
+--     update public."PPP_Web_Config" set valor = 0 where clave = 'np_mover_frenado';
+-- Chequeo: select * from public.gv_np_armada_tanda_sin_tap; select * from public.gv_reglas_perdidas;
