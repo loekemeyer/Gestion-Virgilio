@@ -3463,6 +3463,53 @@ verificada idéntica (496 = 496 filas, `EXCEPT ALL` 0 en las dos direcciones). v
 la consulta pasa de **769 ms a 751 ms**. Los 750 ms son el recorrido y el regex por fila, no el
 orden. No volver a proponerlo para esto.
 
+### ⚠⚠ Y `vista_stock_procesada` NO puede reemplazar a `vista_saldos_stock` (medido 23/09)
+
+La tentación es obvia — la matview ya está calculada y las lecturas del universo entero de
+`vista_saldos_stock` son hoy el mayor consumidor del stock: **cuatro formas de consulta, 3.524 s
+sobre una ventana de 47,9 h = 2,0 % del tiempo de la base** (`stockFetchSaldos` 1.902 llamadas,
+`_pppChkFetchSaldos` 254). **No se puede, y el número lo cierra:**
+
+| | |
+|---|---:|
+| filas de `vista_saldos_stock` | 496 |
+| filas de `vista_stock_procesada` | 367 |
+| códigos que la matview NO tiene | **152** |
+| …de esos, **con stock real** | **119** |
+| …de esos, **insumos** | **101** |
+| cajas de `terminado` que se perderían | **2.266** |
+
+En las 344 filas comunes los números coinciden (**0 difieren**), así que la matview *parece*
+equivalente mirando cualquier código de góndola. Y los módulos que llaman a `stockFetchSaldos`
+son justamente MG, bajar racks, **insumos** y salida Cervantes. Sería el pozo de la v20.95:
+**una fila que no sale no se distingue de un código que no existe.**
+
+⚠ Lo que SÍ serviría, si algún día molesta, es una matview **propia de `vista_saldos_stock`**
+(las 496 filas) colgada del guard que ya existe — no la de OC. El costo es frescura: hasta
+2 min. `_pppChkFetchSaldos` (el Chequeo de góndola, que compara contra lo que el operario cuenta)
+se quedaría en la vista viva; sólo `stockFetchSaldos` iría a la matview. **No está hecho.**
+
+⚠ **El picking NO se repunta a `gv_saldos_por_clave`**, y no es olvido: son **44 llamadas y 35 s
+sobre esos 3.524 s (1 %)**, contra tocar el camino caliente del operario. Lo sostiene el candado
+invertido de `tests/stock-clave-indexada.cjs`.
+
+⚠ **El `count=exact` que todavía aparece en `pg_stat_statements`** (887 llamadas pagando el doble:
+1.925 ms contra 1.021 ms de la misma consulta sin él) **no está en el código**: lo sacó la v20.78.
+Son celulares con el `index.html` viejo cacheado. Se muere solo; no hay nada que arreglar.
+
+### ⚠ Cron 81 `gv-reconciliar-aguardar`: reescribe lo mismo cada 2 minutos, y se deja así
+
+Su `on conflict … do update set delta = excluded.delta, legajo = excluded.legajo` **no tiene
+`where`**, así que reescribe sus 10 filas cada corrida cambie o no el valor: 1.438 corridas /
+278 s / 194 ms de media (peor 13.271 ms), y `Movimientos_Stock` con **10.719 updates contra 2.853
+inserts, 11.847 tuplas muertas y `last_autovacuum` en null**.
+
+**Era la causa de que la primera huella (por escrituras) ahorrara 1,2 % en vez de 94,5 %.** Con la
+huella por CONTENIDO eso ya no importa, y **Thomas decidió el 23/09 dejar el cron 55 y el 81 como
+están**. Lo que queda es el churn del libro de stock, que no molesta a nadie hoy. Si algún día se
+toca, el arreglo es una línea (`where … is distinct from …`) — y toca una función que escribe en
+`Movimientos_Stock`, o sea que lo autoriza el dueño.
+
 **Chequeo:**
 ```sql
 select * from public.gv_stock_refresh_salud;              -- estado='ok' y pct_ahorrado
