@@ -102,6 +102,46 @@ values ('<objeto>','funcion','<regex que tiene que estar>','<la regla en castell
 ⚠ El centinela **saca los comentarios antes de buscar**: si no, un `-- NO usar X` contaba como
 uso de X.
 
+⚠⚠ **Y esa regla la había perdido el propio centinela** (v21.82, 23/09). `gv_reglas_perdidas`
+comparaba `cuerpo !~ patron` a secas: el vigilante estaba en la misma falla que vigila. Ya había
+dejado pasar una — la regla **(a000) v21.61** del armador tenía como patrón `\(a000\) v21\.61`,
+que en esa función **sólo existe dentro del comentario**: borrando el código y dejando el
+comentario, el centinela seguía en verde. Medido: **1 de 124**. Hoy la limpieza vive en
+**`gv_regla_presente(cuerpo, patron)`**, que usan la vista y el barrido, así que no puede haber
+dos criterios.
+
+> **Al registrar una regla, el patrón se elige del CÓDIGO, nunca del comentario que lo explica.**
+> Un patrón como `(a000) v21.61` o `-- REGLA DE LUIS` vigila el rótulo, no la regla.
+
+**El botón de prueba de la base** — el equivalente de `tests/tools/mutar.cjs` para lo que vive
+en Supabase:
+
+```sql
+select * from public.gv_centinelas_flojos;   -- ningún 'VIGILA UN COMENTARIO' = todo bien
+```
+
+Al 23/09: **0** que vigilan un comentario, **0** perdidas, 26 con patrón genérico — eso último
+es señal **débil**, no un error: el centinela vigila que alguien pise el objeto con una copia
+vieja, y para eso alcanza con que el patrón esté una vez.
+
+Y la prueba de verdad, que es romper la regla y ver si avisa, **revirtiendo siempre** (el bloque
+completo está en `sql/gv_centinelas_boton_de_prueba_v2182.sql`):
+
+```sql
+do $prueba$ … execute <la funcion SIN la regla>; …
+  raise exception 'RESULTADO -> antes: % · con la regla borrada: % · la nombra: %', …;
+end $prueba$;
+```
+
+⚠ **El resultado va en el mensaje del `raise`, no en un `notice`**: desde el MCP los `notice` no
+se ven, y el `raise` es además lo que aborta la transacción y deja la función como estaba.
+Medido con `refresh_stocks_carga_rapida`: *antes 0 perdidas · con la regla borrada 1 · la nombra
+sí*, y después la función intacta.
+
+⚠ **Lo que se probó y se descartó, para no rehacerlo:** una vista que borraba la **primera**
+aparición del patrón y miraba si el centinela avisaba. Marcaba **41 de 124** y era ruido — el
+caso real es el reemplazo del objeto entero, donde desaparecen todas. Se borró el mismo día.
+
 **Y un tercero, del lado del stock** (v19.49, después del doble drenaje de D66D):
 
 ```sql
