@@ -29433,3 +29433,25 @@ select def from zz_backups."GV_Backup_funcdef_20260923"
 ```
 
 `sql/gv_stock_carga_rapida_encadenada_v2148.sql`, `tests/stock-carga-rapida-encadenada.cjs`.
+
+## §3.mr — v21.66: el armador automático descarta al entrar lo ya programado (Luis, 2026-09-23, problema 514)
+
+**Síntoma:** desde las 10:20 la corrida de LK de `gv_ppp_web_armar_pendientes` se cortaba por
+`statement_timeout` (57014) en 3 de 4 vueltas y no programaba nada. LK 1529 (Tegerina) figuraba
+«se arma solo → lun 5/10» y recién lo tomó la vuelta de las 10:40.
+
+**Causa:** el feed manda todas las NP vivas (LK ~185, Chef ~25), casi todas ya con tanda, y cada
+pase las descartaba recién al final, después de calcularles zona, sector, día del cliente, ancla y
+cuarentena.
+
+**Cambio:** bloque `(a000)` al principio de la función, con el mismo `not exists … tanda <> ''` que
+usan todos los pases. El tope pasa a contar sólo pendientes.
+
+| entrada (transacción abortada) | actual | nueva | resultado |
+|---|---:|---:|---|
+| LK, 118 NP (3 pendientes) | 6.156 ms | 2.520 ms | idéntico (md5 de la programación) |
+| Chef, 31 NP (2 pendientes) | 1.691 ms | 1.103 ms | idéntico |
+
+Centinela en `GV_Reglas_Centinela` (patrón `(a000) v21.61`, el marcador con que se aplicó).
+Chequeo: `select * from public.gv_ppp_web_armado_salud;`. Rollback: sacar el bloque `(a000)`.
+`sql/gv_armado_descarta_programadas_v2166.sql`.
