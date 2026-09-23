@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.66"></script>
+<script type="module" src="recepcion.js?v=21.67"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9994,7 +9994,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.66";
+const APP_VERSION = "v21.67";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39852,10 +39852,16 @@ function _pgaCuerpoHtml(dias, opts) {
             // v20.12 (Thomas: *"que sea finito"*) — el chip queda en el ícono solo: la palabra la
             // dice la columna SALIÓ, que está en la misma fila. El `title` cuenta el resto.
             (_pgaSalio(r) ? '<span class="pga-salio" title="Ya salió: se registró la carga al camión (CCN)">🚚</span>' : '') +
-            // v17.74 (Luis): el horario viaja con el pedido — acá se ve, no se edita
-            (r.pide_horario ? '<span class="apr-hor' + ((r.horario_fecha || r.horario_franja) ? (r.horario_origen === "cliente" ? " cli" : "") : " vacio") + '" style="cursor:default"' +
-              ' title="' + ((r.horario_fecha || r.horario_franja) ? "Horario coordinado con el cliente. Se edita en A Programar."
-                                                                  : "Este cliente coordina horario y no hay ninguno cargado. Se carga en A Programar.") + '">🕑 ' +
+            // v17.74 (Luis): el horario viaja con el pedido. v21.67 (Luis, 23/09): y SE EDITA ACÁ también —
+            // mismo pop-up y misma RPC que A Programar (gv_pedido_horario_set). Lo manual manda; si no hay
+            // manual se ve lo que eligió el cliente.
+            (r.pide_horario ? '<span class="apr-hor' + ((r.horario_fecha || r.horario_franja) ? (r.horario_origen === "cliente" ? " cli" : "") : " vacio") + '" style="cursor:pointer"' +
+              ' onclick="event.stopPropagation();pgaHorAbrir(' + escapeHtml(JSON.stringify({ e: r.empresa || "LK", c: r.clave || r.np, np: r.np,
+                  cli: r.razon_social || r.cod || "", f: r.horario_fecha || "", fr: r.horario_franja || "", o: r.horario_origen || "" })) + ')"' +
+              ' title="' + ((r.horario_fecha || r.horario_franja)
+                  ? (r.horario_origen === "cliente" ? "Día y franja que eligió el cliente en el pedido. Tocá para cambiarlos."
+                                                    : "Día y franja cargados a mano. Tocá para cambiarlos.")
+                  : "Este cliente coordina horario y no hay ninguno cargado. Tocá para ponerlo.") + '">🕑 ' +
               escapeHtml(aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja })) + '</span>' : '') +
             // v21.65 (Luis): el comentario del pedido viaja con la NP — el badge avisa, el texto va en el title
             (_pgaObsDe(r) ? '<span class="pga-obs" title="Comentario del pedido: ' + escapeHtml(_pgaObsDe(r)) + '"'
@@ -46864,6 +46870,16 @@ function aprHorAbrir(k) {
                   origen: h.origen || "", err: "", saving: false };
   aprHorRender();
 }
+/* v21.67 (Luis): el mismo pop-up, abierto desde la fila de la NP en Programación. `desde` hace que al
+   guardar se recargue Programación (la que lee gv_ppp_prog_arbol) y no sólo A Programar. */
+function pgaHorAbrir(x) {
+  if (!x) return;
+  const k = aprHorKey(pppEmpNorm(x.e), x.c);
+  _aprHorEdit = { k: k, cli: x.cli || "", np: x.np || "", fecha: String(x.f || "").slice(0, 10), franja: x.fr || "",
+                  origen: x.o || "", err: "", saving: false, desde: "prog" };
+  aprHorRender();
+}
+window.pgaHorAbrir = pgaHorAbrir;
 function aprHorCerrar() { _aprHorEdit = null; aprHorRender(); }
 function aprHorSet(campo, v) { if (_aprHorEdit) { _aprHorEdit[campo] = v; _aprHorEdit.err = ""; aprHorRender(); } }
 function aprHorRender() {
@@ -46905,11 +46921,13 @@ async function aprHorGuardar(vaciar) {
   try {
     const p = aprHorPedidoDe(s.k);
     await aprRpc("gv_pedido_horario_set", { p_empresa: emp, p_clave: clave, p_fecha: fecha, p_franja: franja,
-      p_np: p ? aprPedLabel(p) : null, p_origen: "manual", p_por: await aprQuien() });
+      p_np: p ? aprPedLabel(p) : (s.np || null), p_origen: "manual", p_por: await aprQuien() });
     _aprHor = _aprHor || {};
     if (!fecha && !franja) delete _aprHor[s.k];
     else _aprHor[s.k] = { fecha: fecha || "", franja: franja || "", origen: "manual" };
+    const _deProg = s.desde === "prog";
     _aprHorEdit = null; aprHorRender(); aprRender();
+    if (_deProg && typeof pgaRecargar === "function") pgaRecargar();
   } catch (e) { s.saving = false; s.err = String((e && e.message) || e); aprHorRender(); }
 }
 

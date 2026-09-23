@@ -146,7 +146,8 @@ catch (_e) {
     pgaAbrirDia("20260918"); await new Promise((res) => setTimeout(res, 120));
     pgaAbrirTanda("20260918|E01A"); await new Promise((res) => setTimeout(res, 150));
     const ph = document.getElementById("pppPreview").innerHTML;
-    out.enProgramacion = /apr-hor[^"]*" style="cursor:default"[^>]*>🕑 18\/09 08:00 a 12:00</.test(ph);
+    // v21.67 (Luis): en Programación el reloj también se EDITA (mismo pop-up que A Programar).
+    out.enProgramacion = /apr-hor[^"]*" style="cursor:pointer" onclick="event\.stopPropagation\(\);pgaHorAbrir\([^>]*>🕑 18\/09 08:00 a 12:00</.test(ph);
     return out;
   });
 
@@ -176,7 +177,7 @@ catch (_e) {
   t(r.claveIsis, "(d) en una NP de ISIS la clave es la NP, no el order_id falso");
   t(r.vacia, "(e) 'Sacar el horario' manda los dos campos en null");
   t(r.vaciaEnPantalla, "(e) y el badge vuelve a ----");
-  t(r.enProgramacion, "(f) el horario viaja y se ve en la tabla de Programación, sin editarse ahí");
+  t(r.enProgramacion, "(f) el horario viaja, se ve en la tabla de Programación y se puede tocar para editarlo (v21.67)");
   t(errs.length === 0, "sin errores de JS" + (errs.length ? ": " + errs[0] : ""));
 
   await b.close();

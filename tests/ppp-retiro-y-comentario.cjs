@@ -12,6 +12,7 @@ exige(/retiro_fecha: n\.retiro_fecha \?/, "el pedido de A Programar no guarda re
 exige(/if \(p && \(p\.retiro_fecha \|\| p\.retiro_franja\)\) return \{/, "aprHorDe no usa el retiro que trae el pedido");
 exige(/rpc\/gv_np_obs_lista/, "Programación no pide los comentarios (gv_np_obs_lista)");
 exige(/💬 comentario/, "falta el badge de comentario en la NP");
+exige(/pgaHorAbrir\(' \+ escapeHtml\(JSON\.stringify/, "el reloj de Programación no se puede editar (v21.67)");
 if (fallas.length) { console.log("ppp-retiro-y-comentario: ✗ FAIL\n  - " + fallas.join("\n  - ")); process.exit(1); }
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -30,7 +31,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _aprHor = {};
     const nada = aprHorDe({ order_id: 1, empresa: "lk" });
     _pgaObs = new Map([["LK 0100", "Horario 8.30 a 12.30"]]);
-    return { soloPedido, manual, nada, obs: _pgaObsDe({ np: "LK 0100" }), sinObs: _pgaObsDe({ np: "LK 0101" }) };
+    pgaHorAbrir({ e: "LK", c: "1530", np: "LK 0213", cli: "X", f: "2026-10-07", fr: "13:00 a 16:30", o: "cliente" });
+    const ed = _aprHorEdit ? { k: _aprHorEdit.k, desde: _aprHorEdit.desde, fecha: _aprHorEdit.fecha } : null;
+    const modal = !!document.getElementById("aprHorFecha");
+    aprHorCerrar();
+    return { soloPedido, manual, nada, obs: _pgaObsDe({ np: "LK 0100" }), sinObs: _pgaObsDe({ np: "LK 0101" }), ed, modal };
   });
   await b.close();
   const mal = [];
@@ -38,6 +43,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   if (!r.manual || r.manual.fecha !== "2026-10-08") mal.push("lo manual no manda: " + JSON.stringify(r.manual));
   if (r.nada !== null) mal.push("pedido sin retiro devolvió algo");
   if (r.obs !== "Horario 8.30 a 12.30" || r.sinObs !== "") mal.push("_pgaObsDe: " + r.obs + " / " + r.sinObs);
+  if (!r.ed || r.ed.k !== "lk:1530" || r.ed.desde !== "prog" || r.ed.fecha !== "2026-10-07" || !r.modal) mal.push("pgaHorAbrir: " + JSON.stringify(r.ed) + " modal=" + r.modal);
   if (mal.length) { console.log("ppp-retiro-y-comentario: ✗ FAIL\n  - " + mal.join("\n  - ")); process.exit(1); }
   console.log("ppp-retiro-y-comentario: ✓ OK");
 })().catch((e) => { console.log("ppp-retiro-y-comentario: ✗ FAIL " + e.message); process.exit(1); });

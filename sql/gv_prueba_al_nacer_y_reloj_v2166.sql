@@ -34,3 +34,9 @@ create constraint trigger zz_gv_prueba_tanda_al_nacer
 --     `h.fecha, h.franja, h.origen,` + left join lk_pedidos_match cm por empresa y order_id, sólo
 --     para origen 'web'). Medido: 520 filas antes y después. Centinela en GV_Reglas_Centinela.
 --     ⚠ A Programar sigue con la precedencia de la v19.60 (el manual pisa al cliente).
+
+-- v21.67 (Luis, 23/09): CORRIGE lo de arriba. "Lo manual siempre primero y lo del cliente después,
+-- como fallback si no hay nada manual" — lo manual sólo existe porque (A) el cliente no lo puso o
+-- (B) hubo que cambiarlo. gv_ppp_prog_arbol quedó: case when h.fecha/h.franja (manual) then manual
+-- else cm.retiro_* (cliente). Mismo orden que el armado (gv_web_retiro_pactado) y A Programar.
+-- Y el reloj de Programación ahora se EDITA (pgaHorAbrir → mismo pop-up y RPC gv_pedido_horario_set).
