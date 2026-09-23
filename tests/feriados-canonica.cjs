@@ -1,4 +1,4 @@
-/* v21.46 — LOS FERIADOS SALEN DE UNA SOLA TABLA.
+/* v21.47 — LOS FERIADOS SALEN DE UNA SOLA TABLA.
 
    La lista estaba escrita TRES veces a mano (`FERIADOS_AR` en index.html, `FERIADOS` en
    monitor/tv.html y un CTE adentro de `gv_monitor_horas_operario_dia`) y las tres terminaban el

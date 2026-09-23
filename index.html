@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.46"></script>
+<script type="module" src="recepcion.js?v=21.47"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6771,7 +6771,7 @@ const FERIADOS_AR = new Set([
   "2026-12-08",               // Inmaculada Concepción
   "2026-12-25"                // Navidad
 ]);
-/* ⚠ v21.46 — LA LISTA DE ARRIBA ES EL FALLBACK, NO LA FUENTE.
+/* ⚠ v21.47 — LA LISTA DE ARRIBA ES EL FALLBACK, NO LA FUENTE.
    La CANÓNICA es la tabla `public."GV_Feriados"` de Supabase. Estaba escrita a mano
    TRES veces —acá, en `monitor/tv.html` y adentro de `gv_monitor_horas_operario_dia`—
    y las tres terminaban el 25/12/2026: desde el 1.º de enero ninguna conocía un solo
@@ -9953,7 +9953,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.46";
+const APP_VERSION = "v21.47";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31681,7 +31681,7 @@ function showOperarioActivityDetail(legajo, activity) {
     // Detalle por toggle: apertura, cierre y cuánto tardó (minutos).
     // v21.18: el mismo popup sirve para los dos baldes (movimiento y no
     // productivas), que antes venían mezclados en uno solo.
-    /* v21.46: el mismo popup sirve para los TRES baldes por duración. */
+    /* v21.47: el mismo popup sirve para los TRES baldes por duración. */
     const _min = activity === "mov" ? op.movMin
                : activity === "noprod" ? op.noprodMin
                : (op.otrosProdH || 0) * 60;
@@ -32353,7 +32353,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   const cached = _monitorDayStatsCache.get(dayKey);
   if (cached && (Date.now() - cached.ts) < MONITOR_DAY_STATS_TTL_MS && cached.hadSheet) return cached.data;
 
-  // v21.46: los feriados salen de la canónica GV_Feriados. Best-effort — si el fetch
+  // v21.47: los feriados salen de la canónica GV_Feriados. Best-effort — si el fetch
   // falla, `FERIADOS_AR` se queda con su lista de fallback y la cuenta no cambia.
   await ensureFeriadosAR();
 
@@ -32434,7 +32434,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
      Lo cazó `tests/dead-handlers.cjs`. */
   const MOV_TOGGLE_CODES    = new Set(["MG", "RI", "EI", "RT"]);
   const NOPROD_TOGGLE_CODES = new Set(["AT", "PB", "Limp", "PC", "CT", "Perm"]);
-  /* v21.46 (Thomas) — TRABAJO PRODUCTIVO QUE NO TIENE m³: Carga Camión, Control
+  /* v21.47 (Thomas) — TRABAJO PRODUCTIVO QUE NO TIENE m³: Carga Camión, Control
      Remitos y Recepción Remitos. Hasta acá el monitor grande **no medía ninguno**:
      los tres colgaban de `tanda && ev.ts_inicio`, y el `texto` de esos eventos dejó
      de venir — CC lo perdió en julio (63 cierres, 1 con texto; 0 de agosto en
@@ -32641,7 +32641,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       if (ev.opcion === "TAP" && durOK) { if (!p.armedTandas.has(tanda))  p.armMs  += dur; p.armedTandas.add(tanda);  p.armedDetail.push(detail);  }
       if (ev.opcion === "CC"  && durOK) { if (!p.ccTandas.has(tanda))     p.ccMs   += dur; p.ccTandas.add(tanda);     p.ccDetail.push(detail);     }
     }
-    /* v21.46 — CC + CR + RR por duración, con el MISMO `computeClosureDur` que
+    /* v21.47 — CC + CR + RR por duración, con el MISMO `computeClosureDur` que
        picking y armado: cruce de medianoche y tiempo muerto neteado. */
     if (PROD_OTROS_CODES.has(ev.opcion) && ev.ts_inicio) {
       const _brO = {};
@@ -51129,7 +51129,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
             ${operariosHoy.map(o => cellM3h(o.m3hCC, o.didCC, "Cargó camión pero falta m³ en el sheet", o.legajo, "cc")).join("")}
           </tr>
           <tr>
-            <th class="row-label" title="Carga Camión, Control Remitos y Recepción Remitos: trabajo productivo que no tiene m³. Hasta la v21.45 no se medía ninguno de los tres.">CC+CR+RR<br><span class="row-unit">(h)</span></th>
+            <th class="row-label" title="Carga Camión, Control Remitos y Recepción Remitos: trabajo productivo que no tiene m³. Hasta la v21.46 no se medía ninguno de los tres.">CC+CR+RR<br><span class="row-unit">(h)</span></th>
             ${operariosHoy.map(o => cellMin((o.otrosProdH || 0) * 60, o.didOtrosProd, o.legajo, "prodotros")).join("")}
           </tr>
           <tr>

@@ -1,4 +1,4 @@
--- v21.46 · `gv_monitor_horas_operario_dia` deja de tener la lista de feriados adentro
+-- v21.47 · `gv_monitor_horas_operario_dia` deja de tener la lista de feriados adentro
 --
 -- ⚠ SE PARTE DE LA DEFINICIÓN VIVA, NUNCA DE UNA COPIA. Varias sesiones tocan esta
 -- función; un `CREATE OR REPLACE` desde un archivo del repo le borra a otro su cambio
@@ -25,7 +25,7 @@ begin
   def := replace(def, viejo, nuevo);
   def := replace(def,
     'Espejo de FERIADOS_AR de index.html.',
-    'v21.46: lee la CANONICA public."GV_Feriados" (antes era un espejo a mano de FERIADOS_AR de index.html, y las dos listas terminaban el 25/12/2026).');
+    'v21.47: lee la CANONICA public."GV_Feriados" (antes era un espejo a mano de FERIADOS_AR de index.html, y las dos listas terminaban el 25/12/2026).');
 
   execute def;
   raise notice 'OK: la funcion lee GV_Feriados';
@@ -35,10 +35,10 @@ end $mig$;
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version) values
  ('gv_monitor_horas_operario_dia','funcion','GV_Feriados',
   'Los feriados salen de la CANONICA public."GV_Feriados", no de una lista escrita a mano adentro de la funcion. Las tres copias que habia terminaban el 25/12/2026.',
-  'Thomas','v21.46'),
+  'Thomas','v21.47'),
  ('gv_monitor_horas_operario_dia','funcion','prod_otros_s',
   'hs_prod = picking + armado + CC/CR/RR. Los tres se miden por DURACION, sin pedir texto y sin deduplicar por tanda. El monitor grande (index.html, PROD_OTROS_CODES) hace lo mismo y tests/mon-vs-vista.cjs compara los dos.',
-  'Thomas','v21.46')
+  'Thomas','v21.47')
 on conflict do nothing;
 
 -- Medido: la función devuelve los MISMOS números para el 15/09 leyendo la tabla

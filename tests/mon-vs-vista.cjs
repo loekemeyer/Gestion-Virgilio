@@ -24,11 +24,11 @@
      · `select * from public.gv_reglas_perdidas;`    → ¿el PATRÓN sigue en el cuerpo? (10 filas
        sobre la función y la vista). No ve un cambio de CUENTA con el patrón puesto.
      · `select * from public.gv_huellas_cambiadas;`  → ¿el cuerpo es EXACTAMENTE el mismo que
-       cuando se congeló este JSON? (v21.46). Ése es el que avisa que hay que re-congelarlo.
+       cuando se congeló este JSON? (v21.47). Ése es el que avisa que hay que re-congelarlo.
    Si se cambia una regla de horas A PROPÓSITO hay que tocar los dos lados, volver a congelar el
    JSON (cómo, adentro del propio JSON) y actualizar el md5 en `GV_Huella_Objeto`.
 
-   ⚠ `hs_prod` SÍ se compara desde la v21.46. Antes no se podía: la vista le sumaba CC+CR+RR
+   ⚠ `hs_prod` SÍ se compara desde la v21.47. Antes no se podía: la vista le sumaba CC+CR+RR
    y el monitor grande **no medía ninguno de los tres** — colgaban de `tanda && ts_inicio` y el
    `texto` de esos eventos dejó de venir (CC en julio, CR en marzo, RR nunca lo tuvo). Eran
    79,10 h en 30 días que no se le atribuían a nadie. `hs_total` sigue afuera: sólo existe en

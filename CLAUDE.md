@@ -906,7 +906,7 @@ recorrido**. Si algún día molesta, el arreglo NO es volver atrás: es que el f
 Lo sostiene `tests/pk-excedente-orden.cjs` y el candado invertido de `tests/pk-deposito-pkc.cjs`
 (`items.concat(excSteps)` tiene que estar, `excSteps.concat(items)` no). Problema 455.
 
-## ⚠⚠ REGLA (Thomas, 2026-09-23, v21.46): los FERIADOS tienen UNA tabla canónica — `GV_Feriados`
+## ⚠⚠ REGLA (Thomas, 2026-09-23, v21.47): los FERIADOS tienen UNA tabla canónica — `GV_Feriados`
 
 **Thomas, textual:** *"que quede bien definido que es la canónica así cualquier implementación que
 requiera ver feriados la podés encontrar a futuro y dejar de duplicarla"*.
@@ -947,9 +947,9 @@ lista vieja de 2026 sigue puesta — mejor ésa que ninguna. Por eso `ensureFeri
 va sólo con los feriados de la ley.
 
 **Chequeo:** `select tipo, count(*) from public."GV_Feriados" group by 1;` — al 23/09, 32 feriados
-(16 de 2026 + 16 de 2027) y 3 no laborables. `sql/gv_feriados_v2146.sql`.
+(16 de 2026 + 16 de 2027) y 3 no laborables. `sql/gv_feriados_v2147.sql`.
 
-## ⚠ REGLA (Thomas, 2026-09-23, v21.46): un centinela de PATRÓN no ve un cambio de CUENTA — para eso está la HUELLA
+## ⚠ REGLA (Thomas, 2026-09-23, v21.47): un centinela de PATRÓN no ve un cambio de CUENTA — para eso está la HUELLA
 
 `gv_reglas_perdidas` contesta *"¿el patrón sigue en el cuerpo?"*. Es lo que hace falta cuando el
 riesgo es que otra sesión pise el objeto con una copia vieja. **No sirve** cuando el riesgo es que
@@ -976,7 +976,7 @@ cuesta releer el fixture; un falso negativo cuesta un test que miente. Verificad
 propósito (un comentario metido en el cuerpo, en transacción abortada: la vista devolvió su fila).
 
 **Al espejar el cuerpo de un objeto afuera de la base, agregarle su fila** — es un `insert`, no
-código. `sql/gv_huella_objeto_v2146.sql`.
+código. `sql/gv_huella_objeto_v2147.sql`.
 
 ## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
 
@@ -1933,7 +1933,7 @@ la regla (sin aprobar → sin tanda; con fila en Liberados → se programa).
 **Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
 `sql/gv_armado_cuarentena_v2095.sql`, §3.me.
 
-## ⚠ REGLA (Luis, 2026-09-23, v21.46): una RESPUESTA no opina sobre lo que no PREGUNTÓ
+## ⚠ REGLA (Luis, 2026-09-23, v21.47): una RESPUESTA no opina sobre lo que no PREGUNTÓ
 
 **Luis, textual:** *"primero revisá por qué Ierakuin no está en el submódulo de cuarentena. Se
 sigue escapando y seguís sin poder arreglarlo"*.

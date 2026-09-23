@@ -1,4 +1,4 @@
-## Nota v21.46 (2026-09-23) — CC/CR/RR entran al balde productivo · `GV_Feriados` es la canónica · centinela de huella
+## Nota v21.47 (2026-09-23) — CC/CR/RR entran al balde productivo · `GV_Feriados` es la canónica · centinela de huella
 
 Los tres pendientes que habían quedado anotados al cerrar la v21.27, contestados por Thomas.
 
@@ -72,9 +72,9 @@ diferencia del legajo 94 — 2,63 contra 2,33.
 ⚠ **Los feriados NO son `GV_Dias_No_Habiles`**: esa tabla tiene los días que el dueño cierra el
 depósito (al 22/09, uno solo) y mueve el conteo de días hábiles de toda la operación.
 
-⚠ **Corrección v21.46:** acá decía que los feriados eran *"la copia de `FERIADOS_AR` de
-`index.html`"*. **Ya no hay copia**: desde la v21.46 la canónica es la tabla `public."GV_Feriados"`
-y la leen los tres lados (la función, `index.html` y `monitor/tv.html`). Ver la nota de la v21.46.
+⚠ **Corrección v21.47:** acá decía que los feriados eran *"la copia de `FERIADOS_AR` de
+`index.html`"*. **Ya no hay copia**: desde la v21.47 la canónica es la tabla `public."GV_Feriados"`
+y la leen los tres lados (la función, `index.html` y `monitor/tv.html`). Ver la nota de la v21.47.
 
 ### 2. Las dos chicas: las dos eran de la vista
 

@@ -1,4 +1,4 @@
--- v21.46 · CENTINELA DE HUELLA — `GV_Huella_Objeto` + `gv_huellas_cambiadas`
+-- v21.47 · CENTINELA DE HUELLA — `GV_Huella_Objeto` + `gv_huellas_cambiadas`
 --
 -- Thomas, 2026-09-23, sobre el hueco que dejaba `tests/mon-vs-vista.cjs`: *"si al
 -- centinela"*.
@@ -77,7 +77,7 @@ insert into public."GV_Huella_Objeto" (objeto, clase, md5_esperado, por_que, qui
 select 'gv_monitor_horas_operario_dia', 'funcion', md5(p.prosrc),
        'tests/tools/vista-15.json es una FOTO de esta funcion. Si el cuerpo cambia y el JSON no, '
        'tests/mon-vs-vista.cjs queda verde y miente: hay que re-congelarlo.',
-       'Thomas', 'v21.46'
+       'Thomas', 'v21.47'
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public' and p.proname = 'gv_monitor_horas_operario_dia'
 on conflict (objeto, clase) do update

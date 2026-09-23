@@ -1,4 +1,4 @@
--- v21.46 · LA TABLA CANÓNICA DE FERIADOS — `public."GV_Feriados"`
+-- v21.47 · LA TABLA CANÓNICA DE FERIADOS — `public."GV_Feriados"`
 --
 -- Thomas, 2026-09-23: *"que quede bien definido que es la canónica así cualquier
 -- implementación que requiera ver feriados la podés encontrar a futuro y dejar de

@@ -29331,7 +29331,7 @@ select cron.alter_job(55, command := 'REFRESH MATERIALIZED VIEW CONCURRENTLY vis
 
 ---
 
-### §3.mn — v21.46: CC/CR/RR entran al balde productivo, `GV_Feriados` es la canónica, y el centinela de huella — 2026-09-23
+### §3.mn — v21.47: CC/CR/RR entran al balde productivo, `GV_Feriados` es la canónica, y el centinela de huella — 2026-09-23
 
 Tres cosas que salieron del mismo pedido de Thomas (los tres pendientes que habían quedado
 anotados al cerrar la v21.27).
@@ -29351,7 +29351,7 @@ O sea: la fila **CC** del cuadro «Mts3 x Hora» venía en `—` desde agosto, y
 —el 15 % de las horas productivas del depósito— no se le atribuían a nadie. La vista de la TV sí
 las contaba (`prod_otros_s`), y por eso `hs_prod` no se podía comparar entre las dos pantallas.
 
-Desde la v21.46 hay un balde nuevo, `PROD_OTROS_CODES = {CC, CR, RR}`, medido **por duración**, sin
+Desde la v21.47 hay un balde nuevo, `PROD_OTROS_CODES = {CC, CR, RR}`, medido **por duración**, sin
 pedir `texto` y **sin deduplicar por tanda** — exactamente lo que hace la vista. Pasa por el mismo
 `computeClosureDur`, así que se le netea el tiempo muerto y se le parte el cruce de medianoche.
 
@@ -29370,7 +29370,7 @@ Verificado rompiéndolo (`PROD_OTROS_CODES` vacío): `legajo 8 · hs_prod: vista
 
 La lista estaba escrita **tres** veces (`index.html`, `monitor/tv.html`, el CTE de
 `gv_monitor_horas_operario_dia`), con las mismas 16 fechas — y las tres terminaban el **2026-12-25**.
-Detalle, y por qué no es `GV_Dias_No_Habiles`, en el bloque de `CLAUDE.md`. `sql/gv_feriados_v2146.sql`.
+Detalle, y por qué no es `GV_Dias_No_Habiles`, en el bloque de `CLAUDE.md`. `sql/gv_feriados_v2147.sql`.
 
 Medido: la función devuelve **exactamente los mismos números** para el 15/09 leyendo la tabla
 (5 operarios × 7 columnas), así que el JSON congelado siguió valiendo.
@@ -29382,4 +29382,4 @@ Medido: la función devuelve **exactamente los mismos números** para el 15/09 l
 `tests/mon-vs-vista.cjs` congela la mitad SQL, así que un cambio del lado de la función lo dejaba
 verde y mintiendo. `GV_Huella_Objeto` guarda el `md5(prosrc)` esperado y la vista avisa cuando el
 cuerpo vivo dejó de coincidir. Complementa a `gv_reglas_perdidas`, que mira patrones y no cuentas.
-`sql/gv_huella_objeto_v2146.sql`.
+`sql/gv_huella_objeto_v2147.sql`.
