@@ -530,21 +530,28 @@ var cargarProgramacion = cache(PROG_TTL, function () {
     getAll("gv_ppp_programacion_diaria",
       "select=tanda,np,m3,fecha_entrega,razon_social,zona,fecha_recep&order=tanda.asc,np.asc"),
     getAll("PPP_Web_Programacion",
-      "select=empresa,np,tanda,fecha_entrega,razon_social,zona,fecha_recep,m3,es_agregado,agregado_a_np" +
+      "select=empresa,np,tanda,fecha_entrega,razon_social,zona,fecha_recep,m3,es_agregado,agregado_a_np,cod_cliente" +
       "&tanda=not.is.null&order=tanda.asc,np.asc").catch(function (e) {
         /* Aditivo: si la PPP web falla, las tandas de ISIS se muestran igual.
            ≡ index.html, que envuelve mergeMonitorPppWeb en try/catch. */
         console.warn("[tv] PPP web:", e.message); return [];
-      })
+      }),
+    /* v21.62 — clientes de PRUEBA: la tele es de los operarios y no los muestra.
+       ≡ index.html gvSinPrueba (tanda PRUEBAn o cliente de GV_Clientes_Prueba). */
+    getAll("GV_Clientes_Prueba", "select=empresa,cod&order=cod.asc").catch(function () { return []; })
   ]).then(function (par) {
     var acc = new Map();
     var isis = par[0] || [], web = par[1] || [];
+    var prueba = {};
+    (par[2] || []).forEach(function (c) { prueba[String(c.empresa || "").toLowerCase() + "|" + String(c.cod || "").trim()] = 1; });
+    var esTandaPrueba = function (t) { return /^PRUEBA\d+$/i.test(String(t == null ? "" : t).trim()); };
 
     for (var i = 0; i < isis.length; i++) {
       var r = isis[i];
       var np = (r.np == null ? "" : String(r.np)).trim();
       if (!/\d/.test(np)) continue;                 // sólo filas con N° de NP real
       var tanda = (r.tanda == null ? "" : String(r.tanda)).trim();
+      if (esTandaPrueba(tanda)) continue;            // v21.62
       var fe = (r.fecha_entrega == null ? "" : String(r.fecha_entrega)).trim();
       var feRaw = rawFecha(fe);
       var display, key;
@@ -562,6 +569,7 @@ var cargarProgramacion = cache(PROG_TTL, function () {
       var x = web[j];
       var t = String(x.tanda || "").trim();
       if (!t || !x.np) continue;
+      if (esTandaPrueba(t) || prueba[String(x.empresa || "").toLowerCase() + "|" + String(x.cod_cliente || "").trim()]) continue;   // v21.62
       var k2 = t.toUpperCase();
       var fe2 = String(x.fecha_entrega || "").trim();
       if (!acc.has(k2)) acc.set(k2, nuevaTanda(t, k2, fe2));
