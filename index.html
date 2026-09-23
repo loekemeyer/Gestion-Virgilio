@@ -6101,7 +6101,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.91"></script>
+<script type="module" src="recepcion.js?v=21.92"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10052,7 +10052,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.91";
+const APP_VERSION = "v21.92";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49126,7 +49126,7 @@ function pipeCompAbrir(empresa, orderId) {
   _apr.pipeComp = { empresa: empresa, orderId: String(orderId),
                     np: p ? aprPedLabel(p) : "", cod: p ? String(p.cod || "") : "",
                     rs: p ? String(p.razon_social || "") : "",
-                    filas: null, err: "", cargando: true };
+                    filas: null, pago: null, err: "", cargando: true };
   pppRenderProg();
   pipeCompCargar();
 }
@@ -49143,6 +49143,13 @@ async function pipeCompCargar() {
     if (!f.length) { s.filas = []; s.err = "No se pudo traer la composición de este pedido."; }
     else { s.filas = f; s.err = ""; }
   } catch (e) { s.filas = []; s.err = String((e && e.message) || e); }
+  /* v21.92 (Vivi): el descuento por PLAZO DE PAGO. Va en SU PROPIA llamada con SU PROPIO catch
+     — si falla, la composición (que es lo que sostiene el número) no se cae con él.
+     ⚠ Sin dato NO se asume 25 %: se muestra el neto sin descuento y se dice por qué. */
+  try {
+    const d = await aprRpc("gv_dto_pago_pedido", { p_empresa: s.empresa, p_order_id: String(s.orderId) });
+    s.pago = (Array.isArray(d) ? d[0] : d) || null;
+  } catch (_e) { s.pago = null; }
   s.cargando = false;
   if (_apr.pipeComp === s) pppRenderProg();
 }
@@ -49192,7 +49199,13 @@ function pipeCompHtml() {
     });
     const pVol = fs.length ? num(fs[0].dto_vol) : 0;
     const pWeb = fs.length ? num(fs[0].dto_web) : 0;
-    const iva = neto * 0.21, total = neto * 1.21;
+    /* v21.92 (Vivi, 23/09): "el 25% corresponde por pago, como es cliente nuevo y tiene que pagar
+       anticipado le corresponde". Sale de cobranzas_escalones según el método de pago del pedido
+       (contado 0-14 días = 25 %) y va ENCADENADO sobre el neto, como los otros dos. */
+    const pPago   = s.pago ? num(s.pago.dto) : 0;
+    const dtoPago = neto * pPago;
+    const aCobrar = neto - dtoPago;
+    const iva = aCobrar * 0.21, total = aCobrar * 1.21;
 
     h += '<div class="pipe-comp-tblwrap"><table class="pipe-comp-tbl"><thead><tr>' +
       '<th>Código</th><th class="num">Cajas</th><th class="num">U×B</th>' +
@@ -49220,7 +49233,12 @@ function pipeCompHtml() {
       '<div><span>Subtotal por lista (sin descuentos)</span><b>' + cuarPlata(bruto) + '</b></div>' +
       (vol > 0 ? '<div class="dto"><span>− Descuento por volumen (' + pipeCompPct(pVol) + ')</span><b>− ' + cuarPlata(vol) + '</b></div>' : '') +
       (web > 0 ? '<div class="dto"><span>− Descuento web (' + pipeCompPct(pWeb) + ')</span><b>− ' + cuarPlata(web) + '</b></div>' : '') +
-      '<div class="neto"><span>Neto (sin IVA)</span><b>' + cuarPlata(neto) + '</b></div>' +
+      (pPago > 0
+        ? '<div class="neto"><span>Subtotal</span><b>' + cuarPlata(neto) + '</b></div>' +
+          '<div class="dto"><span>− Pago por adelantado — ' + escapeHtml(String((s.pago && s.pago.escalon_label) || '')) +
+            '</span><b>− ' + cuarPlata(dtoPago) + '</b></div>'
+        : '') +
+      '<div class="neto"><span>Neto (sin IVA)</span><b>' + cuarPlata(aCobrar) + '</b></div>' +
       '<div><span>+ IVA 21 %</span><b>' + cuarPlata(iva) + '</b></div>' +
       '<div class="cobrar"><span>TOTAL A COBRAR — IVA INCLUIDO</span><b>' + cuarPlata(total) + '</b></div>' +
       '</div>';
@@ -49231,10 +49249,15 @@ function pipeCompHtml() {
       'reclamarle al cliente que pague. Es el mismo número que manda el Speech 1 y el que tiene que ' +
       'estar pago ANTES de armar y entregar.</div>';
 
+    if (!pPago)
+      h += '<div class="pipe-comp-falta">⚠ Sin descuento por adelantado: ' +
+        escapeHtml(String((s.pago && s.pago.escalon_label) || 'no se pudo leer la condición de pago del pedido')) +
+        '. Si al cliente le corresponde, el total de arriba está <b>de más</b>.</div>';
+
     if (impOkN > 0)
       h += '<div class="pipe-comp-nota">De ese total, los <b>importados (E) que tienen stock</b> son ' +
         '<b>' + impOkN + '</b> código' + (impOkN === 1 ? '' : 's') + ' por <b>' + cuarPlata(impOk) + '</b> ' +
-        'netos (' + cuarPlata(impOk * 1.21) + ' con IVA) — ya con el descuento por volumen y el de web aplicados.</div>';
+        'netos (' + cuarPlata(impOk * (1 - pPago) * 1.21) + ' con IVA) — ya con todos los descuentos aplicados.</div>';
 
     if (faltaN > 0)
       h += '<div class="pipe-comp-falta">⚠ <b>' + faltaN + '</b> línea' + (faltaN === 1 ? '' : 's') +

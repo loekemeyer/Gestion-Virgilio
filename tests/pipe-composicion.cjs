@@ -28,10 +28,16 @@ catch (e) { try { ({ chromium } = require("playwright")); }
       { art: "865E", cajas: 4,  cajas_ok: 0,  cajas_falta: 4, importado: true,  uxb: 6,  unidades: 0,
         precio_unit: 800,  bruto: 0,     dto_vol: 0.25, dto_web: 0.02, importe: 0,     sin_precio: false }
     ];
-    const NETO = 66150, TOTAL = Math.round(NETO * 1.21);   // 80.042 — el numero que se le reclama
-    let ultimoBody = null, respuesta = FILAS;
+    // v21.92 (Vivi): cliente nuevo que paga por adelantado -> escalon contado, 25 %
+    const PAGO = { metodo_pago: "Contado", dias: 14, escalon: "contado",
+                   escalon_label: "Contado (0-14 dias)", dto: 0.25 };
+    const NETO = 66150;                                   // suma de las lineas, sin dto de pago
+    const A_COBRAR = NETO * 0.75;                         // 49.612,50 con el 25 % de contado
+    const TOTAL = Math.round(A_COBRAR * 1.21);            // 60.031 — el numero que se le reclama
+    let ultimoBody = null, respuesta = FILAS, pago = PAGO;
     window.aprRpc = async function (fn, body) {
       if (fn === "gv_clin_composicion") { ultimoBody = body; return respuesta; }
+      if (fn === "gv_dto_pago_pedido") return pago ? [pago] : [];
       return [];
     };
     window.pppRenderProg = function () {};   // el pop-up se lee de pipeCompHtml(), sin DOM
@@ -71,6 +77,9 @@ catch (e) { try { ({ chromium } = require("playwright")); }
     out.dtoVol      = /volumen \(25 %\)/.test(m) && m.indexOf("$22.500") >= 0;
     out.dtoWeb      = /web \(2 %\)/.test(m)     && m.indexOf("$1.350") >= 0;
     out.neto        = m.indexOf("$66.150") >= 0;
+    // (c2) el 25 % por pagar por adelantado, encadenado sobre el neto
+    out.dtoPago     = /Pago por adelantado/.test(m) && m.indexOf("$16.538") >= 0;
+    out.aCobrar     = m.indexOf("$49.613") >= 0;
 
     // (d) EL TOTAL DICE IVA INCLUIDO — es lo que se le reclama al cliente
     out.totalConIva = m.indexOf("TOTAL A COBRAR — IVA INCLUIDO") >= 0;
@@ -84,6 +93,15 @@ catch (e) { try { ({ chromium } = require("playwright")); }
     out.impSinStock = /NO tienen <b>?stock/.test(m) || /NO tienen ?<b>stock<\/b>/.test(m) ||
                       m.indexOf("stock</b> para cubrir lo pedido") >= 0;
     out.sinAviso    = m.indexOf("no coincide con el") >= 0;          // tiene que ser FALSE
+
+    // (f2) sin condicion de pago legible NO se asume el 25 %: se dice que falta
+    pago = null; pipeCompAbrir("lk", "9001");
+    await new Promise(function (r) { setTimeout(r, 60); });
+    const mSin = pipeCompHtml();
+    out.sinPagoAvisa   = /Sin descuento por adelantado/.test(mSin);
+    out.sinPagoNoAsume = mSin.indexOf("Pago por adelantado") < 0 && mSin.indexOf("$66.150") >= 0;
+    pago = PAGO; pipeCompAbrir("lk", "9001");
+    await new Promise(function (r) { setTimeout(r, 60); });
 
     // (f) si la suma no da el monto de la pantalla, el pop-up lo grita
     _apr.cliValor["lk:9001"].valor = 99999;
@@ -117,7 +135,11 @@ catch (e) { try { ({ chromium } = require("playwright")); }
   ok(r.bruto,         "no esta el subtotal por lista (bruto)");
   ok(r.dtoVol,        "no esta el descuento por volumen (25 %) con su importe");
   ok(r.dtoWeb,        "no esta el descuento web (2 %) con su importe");
-  ok(r.neto,          "no esta el neto sin IVA");
+  ok(r.neto,          "no esta el subtotal antes del dto de pago");
+  ok(r.dtoPago,       "no esta el 25 % por pagar por adelantado (escalon contado)");
+  ok(r.aCobrar,       "el neto a cobrar no descuenta el pago por adelantado");
+  ok(r.sinPagoAvisa,  "sin condicion de pago legible no avisa que falta el descuento");
+  ok(r.sinPagoNoAsume,"sin condicion de pago ASUME un descuento: tiene que mostrar el neto pelado");
   ok(r.totalConIva,   "el total NO aclara que incluye IVA");
   ok(r.numeroTotal,   "el total con IVA no da el numero esperado");
   ok(r.diceReclamar,  "no dice que ese numero es el que hay que reclamarle al cliente");
