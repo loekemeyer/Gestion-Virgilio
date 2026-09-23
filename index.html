@@ -5624,6 +5624,21 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   border-radius:6px; font-size:11px; font-weight:700; color:#3b82f6; cursor:pointer; }
 .falt-sim-bar button:hover { background:#dbeafe; }
 .falt-foot { margin-top:6px; font-size:11px; color:#94a3b8; }
+
+/* v21.97 pop-up de dia ocupado */
+#aprDoOv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:16px}
+#aprDoOv.show{display:flex}
+#aprDoOv .ado-box{background:var(--card,#fff);color:inherit;border-radius:10px;padding:14px;max-width:980px;width:100%;max-height:90vh;overflow:auto}
+#aprDoOv .ado-h{font-weight:700;margin-bottom:10px}
+#aprDoOv .ado-ops{display:flex;gap:10px;flex-wrap:wrap}
+#aprDoOv .ado-op{flex:1 1 260px;border:1px solid #ccc;border-radius:8px;padding:10px;font-size:13px}
+#aprDoOv .ado-op.dis{opacity:.5}
+#aprDoOv .ado-s{margin-top:6px;font-weight:600}
+#aprDoOv .ado-w{color:#b45309}
+#aprDoOv .ado-ok{margin-top:6px;color:#15803d;font-weight:600}
+#aprDoOv ul{margin:2px 0 0 16px;padding:0}
+#aprDoOv .ado-b{margin-top:8px;padding:6px 12px;cursor:pointer}
+#aprDoOv .ado-x{margin-top:10px;padding:6px 12px;cursor:pointer}
 </style>
 
 <!-- jsPDF + autotable para generar PDF de cierre de facturación (Marianela).
@@ -6103,7 +6118,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.99"></script>
+<script type="module" src="recepcion.js?v=22.02"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6212,6 +6227,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
       <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadgeGreen" class="dp-badge" style="left:2px;right:auto;background:#16a34a;display:none;" title="Se pueden corregir pero NO es obligatorio (hay stock del secundario)"></span><span id="corrBadge" class="dp-badge" style="display:none;" title="Hay que corregir SÍ o SÍ (el secundario no tiene stock)"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
+      <button class="sup-action-btn" onclick="openExpresoIsis()" style="position:relative;"><span class="sup-ico">🚚</span><span>Agregar Expreso ISIS</span><span id="expIsisBadge" class="dp-badge" style="display:none;" title="Expresos que el cliente eligió desde la página y falta cargar en ISIS. NO frena ningún pedido."></span></button>
       <button class="sup-action-btn" onclick="openPasajePapeles()" style="position:relative;"><span class="sup-ico">📄</span><span>Pasaje de Papeles</span><span id="ppBadge" class="dp-badge" style="display:none;" title="Documentos pendientes de enviar a Cervantes"></span></button>
       <button class="sup-action-btn" onclick="openColaImpresion()" style="position:relative;"><span class="sup-ico">🖨️</span><span>Cola de impresión NP</span><span id="colaImpBadge" class="dp-badge" style="display:none;" title="Notas de pedido armadas pendientes de imprimir (rojo = alguna hace +24 h)"></span></button>
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
@@ -10054,7 +10070,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.99";
+const APP_VERSION = "v22.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37353,6 +37369,170 @@ async function pppPrintTanda(npsCsv) {
    y sale de la cola; las que no tienen PDF quedan. ALARMA (badge rojo) si alguna quedó +24 h sin
    imprimir. Reusa la infra de PDF ISIS (pppGetPdfDirs / _pppIndexDirs / _pppPrintPdf). */
 var _colaImp = null;
+/* ============================================================================
+   AGREGAR EXPRESO ISIS  (Thomas, 2026-09-23)
+   ============================================================================
+   La cola administrativa de los expresos que el CLIENTE eligió o cambió desde
+   la página. Lo empuja LK cada 15 min (`sync_expreso_pendiente_virgilio`, cron
+   56, minuto 1-59/15) a `GV_Expreso_Pendiente`.
+
+   ⚠ ESTO NO FRENA NADA, y es lo que hay que tener claro antes de mirarlo: el
+     pedido YA SALIÓ con el expreso nuevo. La ficha de LK quedó con el valor que
+     puso el cliente, así que la PPP, el remito y el camión ya van al galpón
+     correcto. Lo único que falta es que el dato quede igual en ISIS, para que
+     la próxima factura salga bien. Si esta pantalla queda sin mirar una semana
+     no se traba ningún pedido — se desincroniza ISIS, que es otra cosa.
+
+   ⚠ La fila en ROJO es la única que necesita llamar al cliente: un expreso que
+     no está en nuestro padrón Y que vino sin dirección. La dirección es OPCIONAL
+     a propósito (decisión de Thomas: "la prioridad es que el cliente termine de
+     mandar el pedido, sin ninguna limitación administrativa").
+*/
+var _expIsis = null;
+
+function expIsisModal() {
+  var ov = document.getElementById("expIsisOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "expIsisOv";
+    ov.style.cssText = "display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.72);overflow:auto;padding:14px;";
+    ov.addEventListener("click", function (e) { if (e.target === ov) expIsisClose(); });
+    ov.innerHTML = '<div style="background:#f8fafc;max-width:1080px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e3a8a,#1e40af);color:#fff;">' +
+      '<span style="font-size:18px;font-weight:800;">🚚 Agregar Expreso ISIS</span>' +
+      '<button onclick="expIsisClose()" style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;">Cerrar</button></div>' +
+      '<div id="expIsisBody" style="padding:14px 16px;max-height:calc(100vh - 120px);overflow:auto;"></div></div>';
+    document.body.appendChild(ov);
+  }
+  return ov;
+}
+function expIsisClose() {
+  var ov = document.getElementById("expIsisOv"); if (ov) ov.style.display = "none";
+  try { expIsisLoadBadge(); } catch (_e) {}
+}
+
+async function openExpresoIsis() {
+  var ov = expIsisModal(); ov.style.display = "block";
+  var body = document.getElementById("expIsisBody");
+  if (body) body.innerHTML = '<div style="padding:24px;text-align:center;color:#64748b;">Cargando…</div>';
+  try {
+    // Paginado a proposito: es una COLA, y una cola crece sola si nadie la
+    // vacia. Un limit alto no es una garantia, es una expresion de deseo.
+    var rows = await gvRestTodo("gv_expreso_pendiente?select=*&order=falta_direccion.desc,creado_at.asc");
+    _expIsis = { items: rows || [] };
+    expIsisRender();
+  } catch (e) {
+    if (body) body.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + escapeHtml(e.message || String(e)) + '</div>';
+  }
+}
+
+function expIsisRender() {
+  var body = document.getElementById("expIsisBody"); if (!body || !_expIsis) return;
+  var items = _expIsis.items || [];
+  var faltan = items.filter(function (x) { return x.falta_direccion; }).length;
+  var altas  = items.filter(function (x) { return !x.del_padron; }).length;
+
+  var h = '';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">' +
+    '<button onclick="openExpresoIsis()" style="background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:9px 13px;font-weight:800;cursor:pointer;width:auto;">↻ Actualizar</button></div>';
+  h += '<div style="font-size:12.5px;color:#475569;margin-bottom:10px;line-height:1.45;">' +
+    'Expresos que el cliente eligió o cambió desde la página. <b>El pedido ya salió con el expreso nuevo</b> ' +
+    '(la PPP, el remito y el camión ya lo tienen): lo que falta es dejarlo igual en ISIS para que la próxima ' +
+    'factura salga bien.</div>';
+  if (faltan) {
+    h += '<div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:9px;padding:9px 12px;font-weight:800;margin-bottom:10px;">' +
+      '⚠ ' + faltan + ' expreso(s) sin dirección: hay que preguntársela al cliente antes de darlo de alta.</div>';
+  }
+  if (!items.length) {
+    body.innerHTML = h + '<div style="padding:20px;text-align:center;color:#94a3b8;">No hay expresos pendientes de cargar en ISIS. 👍</div>';
+    return;
+  }
+  h += '<div style="font-size:12.5px;color:#64748b;margin-bottom:8px;">' + items.length + ' pendiente(s) · ' +
+       altas + ' son ALTA de un expreso que no tenemos en el padrón.</div>';
+
+  var thc = 'text-align:left;padding:7px 9px;background:#f1f5f9;color:#475569;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;';
+  var td  = 'padding:8px 9px;border-bottom:1px solid #eef2f7;vertical-align:top;';
+  h += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>' +
+    '<th style="' + thc + '">Cliente</th><th style="' + thc + '">Sucursal</th>' +
+    '<th style="' + thc + '">Expreso</th><th style="' + thc + '">Dónde entregamos</th>' +
+    '<th style="' + thc + '">Qué hacer</th><th style="' + thc + 'text-align:right;">Días</th>' +
+    '<th style="' + thc + '"></th></tr></thead><tbody>';
+
+  items.forEach(function (x) {
+    var rojo = !!x.falta_direccion;
+    var dir = [x.direccion_nueva, x.localidad_nueva, x.provincia_nueva].filter(Boolean).join(", ");
+    h += '<tr' + (rojo ? ' style="background:#fef2f2;"' : '') + '>' +
+      '<td style="' + td + '"><b>' + escapeHtml(x.razon_social || "—") + '</b>' +
+        '<div style="font-size:11.5px;color:#64748b;font-family:Consolas,Menlo,monospace;">' +
+        escapeHtml(String(x.empresa || "lk").toUpperCase()) + ' ' + escapeHtml(x.cod_cliente || "—") + '</div></td>' +
+      '<td style="' + td + '">' + escapeHtml(x.sucursal_label || "—") + '</td>' +
+      '<td style="' + td + '">' +
+        (x.expreso_anterior
+          ? '<span style="color:#94a3b8;text-decoration:line-through;">' + escapeHtml(x.expreso_anterior) + '</span><br>'
+          : '<span style="color:#94a3b8;font-size:11.5px;">(no tenía)</span><br>') +
+        '<b style="color:#0f172a;">' + escapeHtml(x.expreso_nuevo || "—") + '</b>' +
+        (x.del_padron ? '' : ' <span style="background:#fef3c7;color:#92400e;border-radius:5px;padding:1px 6px;font-size:10.5px;font-weight:800;">NUEVO</span>') +
+      '</td>' +
+      '<td style="' + td + '">' + (dir ? escapeHtml(dir) :
+        '<span style="color:#b91c1c;font-weight:800;">sin dirección</span>') + '</td>' +
+      '<td style="' + td + 'font-size:12.5px;color:' + (rojo ? '#b91c1c' : '#334155') + ';">' + escapeHtml(x.que_hacer || "") + '</td>' +
+      '<td style="' + td + 'text-align:right;font-weight:800;color:' + (Number(x.dias) >= 3 ? '#b91c1c' : '#64748b') + ';">' + escapeHtml(String(x.dias == null ? "—" : x.dias)) + '</td>' +
+      '<td style="' + td + 'white-space:nowrap;">' +
+        '<button onclick="expIsisCopiar(' + Number(x.id) + ')" title="Copiar los datos para pegarlos en ISIS" style="background:#fff;border:1px solid #cbd5e1;border-radius:7px;padding:5px 9px;font-weight:700;cursor:pointer;width:auto;margin-right:5px;">📋</button>' +
+        '<button onclick="expIsisMarcar(' + Number(x.id) + ',\'cargado_isis\')" style="background:#16a34a;color:#fff;border:none;border-radius:7px;padding:5px 10px;font-weight:800;cursor:pointer;width:auto;margin-right:5px;">✔ Cargado</button>' +
+        '<button onclick="expIsisMarcar(' + Number(x.id) + ',\'descartado\')" title="No corresponde cargarlo" style="background:#fff;border:1px solid #cbd5e1;color:#64748b;border-radius:7px;padding:5px 9px;font-weight:700;cursor:pointer;width:auto;">✕</button>' +
+      '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  body.innerHTML = h;
+}
+
+/* Los datos en una línea, para pegarlos en ISIS sin volver a tipearlos. */
+function expIsisCopiar(id) {
+  var x = ((_expIsis && _expIsis.items) || []).filter(function (r) { return Number(r.id) === Number(id); })[0];
+  if (!x) return;
+  var txt = [
+    "Expreso: " + (x.expreso_nuevo || ""),
+    "Direccion: " + [x.direccion_nueva, x.localidad_nueva, x.provincia_nueva].filter(Boolean).join(", "),
+    "Cliente: " + String(x.empresa || "lk").toUpperCase() + " " + (x.cod_cliente || "") + " - " + (x.razon_social || ""),
+    "Sucursal: " + (x.sucursal_label || ""),
+  ].join("\n");
+  try {
+    navigator.clipboard.writeText(txt);
+    alert("Copiado:\n\n" + txt);
+  } catch (_e) { alert(txt); }
+}
+
+async function expIsisMarcar(id, estado) {
+  var x = ((_expIsis && _expIsis.items) || []).filter(function (r) { return Number(r.id) === Number(id); })[0];
+  var quien = x ? (x.expreso_nuevo || "") : "";
+  if (estado === "descartado" && !confirm("¿Descartar el pedido de alta de «" + quien + "»?\n\nOjo: la ficha del cliente en la página YA quedó con ese expreso — descartarlo acá sólo saca el renglón de esta lista, no lo revierte.")) return;
+  if (estado === "cargado_isis" && !confirm("¿Confirmás que «" + quien + "» ya quedó cargado en ISIS?")) return;
+  try {
+    await aprRpc("gv_expreso_marcar", { p_id: Number(id), p_estado: estado, p_por: (window.__identity && window.__identity.email) || null });
+    await openExpresoIsis();
+    expIsisLoadBadge();
+  } catch (e) {
+    alert("No se pudo marcar: " + (e.message || e));
+  }
+}
+
+async function expIsisLoadBadge() {
+  try {
+    var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    var rows = await gvRestTodo("gv_expreso_pendiente?select=id,falta_direccion,dias", H);
+    var n = (rows || []).length;
+    var faltan = (rows || []).filter(function (r) { return r.falta_direccion; }).length;
+    var viejos = (rows || []).filter(function (r) { return Number(r.dias) >= 3; }).length;
+    var b = document.getElementById("expIsisBadge"); if (!b) return;
+    if (!n) { b.style.display = "none"; return; }
+    b.style.display = ""; b.className = "dp-badge"; b.textContent = (faltan ? "⚠ " : "") + n;
+    b.style.background = (faltan || viejos) ? "#b91c1c" : "#2563eb";
+    b.title = faltan
+      ? (faltan + " expreso(s) sin dirección: hay que preguntársela al cliente")
+      : (n + " expreso(s) para cargar en ISIS. El pedido ya salió con el expreso nuevo; esto es para que ISIS quede igual.");
+  } catch (_e) {}
+}
+
 async function colaImpLoadBadge() {
   try {
     var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
@@ -46928,7 +47108,125 @@ function aprDropDia(ev, fecha) {
   aprDndFin();
   if (cod) aprProgramar(cod, fecha);
   // v13.65: un pedido soltado en un día = tanda nueva (código automático) ya programada ese día
-  else if (ped) aprGenerarTanda(fecha, [aprKey(ped.empresa, ped.order_id)]);
+  // v21.97 (Luis): si el día YA tiene programación, pop-up con las 3 opciones (aprDiaOcupadoAbrir)
+  else if (ped) aprDiaOcupadoAbrir(fecha, ped);
+}
+
+/* v21.97 (Luis, 23/09) — POP-UP DE DÍA OCUPADO. Al soltar un pedido a mano en un día que ya tiene
+   programación:
+     1) sumarlo al día · 2) programarlo y reprogramar lo PENDIENTE del día con la lógica automática ·
+     3) programarlo y CORRER toda la programación desde ese día, 1 día con reparto.
+   Cada opción muestra antes los problemas que deja (m³ del día, camiones, pedidos que pasan a vencer).
+   Las opciones 2 y 3 las resuelve el backend (gv_ppp_dia_reprogramar), que NO mueve súper, retira fijos,
+   lo que ya salió ni una tanda EN PROCESO (pickeo/armado sin terminar); lo armado se mueve con su
+   mismo código. Si la simulación falla, se sigue como antes (tanda nueva con su confirm). */
+const APR_DO_CUPO = 4.3;
+function _adoGrupo(z) {
+  z = String(z || "");
+  if (/super/i.test(z)) return "SUPER";
+  if (/retira/i.test(z)) return null;
+  const m = z.match(/Zona\s*(\d+)/i); if (!m) return "?";
+  return ({ "1": "Z1", "2": "Z2", "3": "Z3", "4": "Z4", "5": "Z5", "6": "Z6+Z7", "7": "Z6+Z7" })[m[1]] || ("Z" + m[1]);
+}
+function _adoCamiones(rows) {
+  const g = {}; let sup = 0;
+  rows.forEach(function (r) {
+    const k = _adoGrupo(r.zona); if (!k) return;
+    if (k === "SUPER") { sup++; return; }
+    g[k] = (g[k] || 0) + (Number(r.m3) || 0);
+  });
+  let n = Object.keys(g).length + sup;
+  if (g.Z2 != null && g.Z3 != null && g.Z2 < 1 && g.Z3 < 1) n--;   // Z2+Z3 juntas si cada una < 1 m³
+  return n;
+}
+function _adoProblemasDia(fecha, rows) {
+  const out = [];
+  const m3 = rows.reduce(function (s, r) { return s + (Number(r.m3) || 0); }, 0);
+  const cam = _adoCamiones(rows);
+  if (m3 > APR_DO_CUPO) out.push(aprDiaCorto(fecha) + ": " + aprNum(m3, 2) + " m³ (más que el promedio de " + aprNum(APR_DO_CUPO, 2) + ")");
+  if (cam > 2) out.push(aprDiaCorto(fecha) + ": " + cam + " camiones (más de 2)");
+  return out;
+}
+function _adoReporte(fecha, rows, nuevo, modo) {
+  // estado DESPUÉS: cada tanda en su día final, más el pedido nuevo en `fecha`
+  const porDia = {};
+  const add = function (d, r) { (porDia[d] = porDia[d] || []).push(r); };
+  rows.forEach(function (r) { add(r.accion === "mueve" ? r.fecha_nueva : r.fecha_actual, r); });
+  add(fecha, nuevo);
+  let probs = [];
+  Object.keys(porDia).sort().forEach(function (d) {
+    if (modo === "sumar" && d !== fecha) return;
+    probs = probs.concat(_adoProblemasDia(d, porDia[d]));
+  });
+  const mov = rows.filter(function (r) { return r.accion === "mueve" && r.fecha_nueva !== r.fecha_actual; });
+  const fijos = rows.filter(function (r) { return r.accion === "fijo" && r.fecha_actual === fecha; });
+  const vencen = mov.filter(function (r) { return r.vence && !r.vencia; });
+  return { probs: probs, mov: mov, fijos: fijos, vencen: vencen };
+}
+async function aprDiaOcupadoAbrir(fecha, ped) {
+  const keys = [aprKey(ped.empresa, ped.order_id)];
+  let corr = null, auto = null;
+  try { corr = await aprRpc("gv_ppp_dia_reprogramar", { p_fecha: fecha, p_modo: "correr", p_simular: true }); }
+  catch (_e) { return aprGenerarTanda(fecha, keys); }
+  const delDia = (corr || []).filter(function (r) { return r.fecha_actual === fecha; });
+  if (!delDia.length) return aprGenerarTanda(fecha, keys);   // día vacío: como siempre
+  try { auto = await aprRpc("gv_ppp_dia_reprogramar", { p_fecha: fecha, p_modo: "automatico", p_simular: true }); }
+  catch (_e) { auto = null; }
+  const nuevo = { tanda: "(nuevo)", zona: ped.zona || "", m3: Number(ped.m3) || 0, accion: "nuevo", fecha_actual: fecha };
+  const rep = {
+    sumar: _adoReporte(fecha, delDia.map(function (r) { return Object.assign({}, r, { accion: "fijo" }); }), nuevo, "sumar"),
+    automatico: auto ? _adoReporte(fecha, auto, nuevo, "automatico") : null,
+    correr: _adoReporte(fecha, corr || [], nuevo, "correr")
+  };
+  _apr.doCtx = { fecha: fecha, keys: keys, ped: ped };
+  const lista = function (arr, fmt, max) {
+    if (!arr.length) return "";
+    const n = max || 6;
+    return "<ul>" + arr.slice(0, n).map(function (x) { return "<li>" + fmt(x) + "</li>"; }).join("") +
+      (arr.length > n ? "<li>… y " + (arr.length - n) + " más</li>" : "") + "</ul>";
+  };
+  const card = function (op, tit, desc, r) {
+    if (!r) return '<div class="ado-op dis"><b>' + tit + '</b><div>' + desc + '</div><div class="ado-p">No se pudo simular.</div></div>';
+    const ok = !r.probs.length && !r.vencen.length;
+    return '<div class="ado-op"><b>' + tit + '</b><div class="ado-d">' + desc + '</div>' +
+      (r.mov.length ? '<div class="ado-s">Se mueven ' + r.mov.length + ' tanda(s):</div>' +
+        lista(r.mov, function (x) { return escapeHtml(x.tanda) + " " + aprDiaCorto(x.fecha_actual) + " → " + aprDiaCorto(x.fecha_nueva) + (x.motivo && /armada/.test(x.motivo) ? " (armada, mismo código)" : ""); }) : "") +
+      (r.fijos.length ? '<div class="ado-s">Quedan fijas en el ' + aprDiaCorto(fecha) + ':</div>' +
+        lista(r.fijos, function (x) { return escapeHtml(x.tanda) + " — " + escapeHtml(x.motivo || ""); }) : "") +
+      (r.probs.length ? '<div class="ado-s ado-w">⚠ Problemas:</div>' + lista(r.probs, function (x) { return escapeHtml(x); }, 10) : "") +
+      (r.vencen.length ? '<div class="ado-s ado-w">⚠ Pasan a vencer (más de 14 días):</div>' +
+        lista(r.vencen, function (x) { return escapeHtml(x.tanda) + " → " + aprDiaCorto(x.fecha_nueva); }) : "") +
+      (ok ? '<div class="ado-ok">✓ Sin problemas</div>' : "") +
+      '<button class="ado-b" onclick="aprDiaOcupadoElegir(\'' + op + '\')">Elegir</button></div>';
+  };
+  let ov = document.getElementById("aprDoOv");
+  if (!ov) { ov = document.createElement("div"); ov.id = "aprDoOv"; document.body.appendChild(ov); }
+  ov.innerHTML = '<div class="ado-box"><div class="ado-h">El ' + aprDiaCorto(fecha) + ' ya tiene programación (' + delDia.length +
+    ' tanda/s). ¿Qué hacemos con ' + escapeHtml(aprPedLabel(ped)) + ' · ' + aprNum(nuevo.m3) + ' m³?</div><div class="ado-ops">' +
+    card("sumar", "1) Sumarlo", "Va a este día y no se mueve nada más.", rep.sumar) +
+    card("automatico", "2) Reprogramar el resto", "Va a este día y lo PENDIENTE del día se reprograma con la lógica automática.", rep.automatico) +
+    card("correr", "3) Correr la programación", "Va a este día y todo lo programado desde acá se corre 1 día con reparto.", rep.correr) +
+    '</div><button class="ado-x" onclick="aprDiaOcupadoCerrar()">Cancelar</button></div>';
+  ov.classList.add("show");
+}
+function aprDiaOcupadoCerrar() {
+  const ov = document.getElementById("aprDoOv"); if (ov) ov.classList.remove("show");
+}
+async function aprDiaOcupadoElegir(op) {
+  const c = _apr.doCtx; aprDiaOcupadoCerrar();
+  if (!c) return;
+  if (op !== "sumar") {
+    _apr.ocupado = true; aprRender();
+    try {
+      await aprRpc("gv_ppp_dia_reprogramar", { p_fecha: c.fecha, p_modo: op, p_simular: false, p_por: await aprQuien() });
+    } catch (e) {
+      _apr.ocupado = false;
+      _apr.msg = "⚠ No se reprogramó nada: " + (e && e.message ? e.message : String(e)); _apr.msgErr = true;
+      aprRender(); return;
+    }
+    _apr.ocupado = false;
+  }
+  await aprGenerarTanda(c.fecha, c.keys, { sinConfirm: true });
 }
 
 /* ── Dibujo ────────────────────────────────────────────────────────────── */
@@ -57092,6 +57390,7 @@ function showSupervisor(email) {
   try { initStkBadge(); } catch (_e) {}   // v10.41: badge Stock y Compras (negativos)
   try { ppLoadBadge(); } catch (_e) {}   // v10.48: badge Pasaje de Papeles (pendientes de enviar)
   try { colaImpLoadBadge(); } catch (_e) {}   // v11.60: badge Cola de impresión NP (armadas sin imprimir; rojo si +24h)
+  try { expIsisLoadBadge(); } catch (_e) {}   // badge Agregar Expreso ISIS (expresos que eligió el cliente en la página)
   try { if (typeof pppAlertPollStart === "function") pppAlertPollStart(); } catch (_e) {}
 }
 

@@ -765,6 +765,23 @@ el "mismo día para el cliente" del principio rector, el ancla de cliente v20.27
 (E48G), Z4 → 05/10 con GBA Sur (E73A), Z6 sin camión en el plazo → 07/10 (último día libre), un
 expreso vencido Z1 → 01/10 con Capital Sur, y el **mismo cliente** en Z3 y Z6 → **dos días**.
 
+## ⚠ REGLA (Luis, 2026-09-23, v21.97): POP-UP de DÍA OCUPADO al programar a mano
+
+Al soltar un pedido en A Programar sobre un día que YA tiene programación, sale un pop-up (`aprDiaOcupadoAbrir`)
+con 3 opciones, cada una con su reporte previo (m³ del día contra el promedio 4,30, más de 2 camiones, pedidos
+que pasan a vencer): **1) sumarlo** · **2) reprogramar lo PENDIENTE del día con la lógica automática** ·
+**3) correr toda la programación desde ese día, 1 día con reparto**. Día vacío → como siempre, sin pop-up.
+
+Lo resuelve **`gv_ppp_dia_reprogramar(fecha, 'correr'|'automatico', simular, por)`** (`simular = true` no escribe;
+ejecutando es atómico). **NO se mueven** (Luis): **súper**, **retira fijos**, lo que **ya salió** y una tanda
+**EN PROCESO** (pickeo o armado empezado sin TAP). Armada, facturada o pendiente **se mueve con su MISMO código**
+(el papel del pallet sigue valiendo). La tanda nueva se arma DESPUÉS de mover, o se correría también.
+
+⚠ **El trigger `gv_web_cliente_un_solo_dia` quedó APAGADO** (23/09): aplicaba la regla derogada "mismo cliente,
+mismo día" — frenaba los movimientos y movía solos los otros pedidos del cliente a su día. Rollback:
+`alter table public."PPP_Web_Programacion" enable trigger gv_web_cliente_un_solo_dia;`
+`sql/gv_ppp_dia_reprogramar_v2197.sql`, `tests/apr-dia-ocupado.cjs`.
+
 ## ⚠⚠ NO REPORTAR (Luis, 23/09): "entran N pedidos y no se programan" en el log del armado
 
 `GV_PPP_Web_Armado_Log` / `GV_Tandas_Auto_Log` muestran en CADA corrida pedidos que entran y no arman tanda.
@@ -2506,6 +2523,39 @@ Z07) y van por el default.
 
 **Chequeo:** `node tests/pmap-gondolas.cjs` — verifica que A corta en `1–5` y F en `1–4`, y que
 F13 queda **abajo de la 4.ª columna**, no arriba de la 3.ª. Verificado que falla con el 5 fijo.
+
+## ⚠ REGLA (Thomas, 2026-09-23, v21.99): AGREGAR EXPRESO ISIS — la cola NO frena ningún pedido
+
+El cliente ahora ve con qué expreso le entregamos y lo puede cambiar desde el checkout de la
+página. Cada cambio cae en el módulo **🚚 Agregar Expreso ISIS** para cargarlo a mano en ISIS.
+
+> ## **Cuando llega acá, el pedido YA SALIÓ con el expreso nuevo.**
+> LK escribe la ficha (`customer_delivery_addresses`) en el acto y `v_pedidos_web` la lee **en
+> vivo**, así que la PPP, el remito y el camión ya van al galpón correcto. Lo único que falta es
+> dejarlo igual en ISIS para que la próxima factura salga bien.
+
+**Por eso esta pantalla sin mirar una semana NO traba nada** — desincroniza ISIS, que es otra cosa.
+Leerlo como un freno es el error a no cometer: la regla de Thomas es *"la prioridad es que el
+cliente termine de mandar el pedido, sin ninguna limitación administrativa"*.
+
+⚠ **La fila ROJA es la única que necesita llamar al cliente**: un expreso que no está en nuestro
+padrón **y** que vino sin dirección (`falta_direccion`). La dirección es **opcional** del lado del
+cliente a propósito. Las demás se cargan con lo que ya está.
+
+⚠ **La clave de `GV_Expreso_Pendiente` es `(empresa, id)`.** El `id` es el de la tabla de LK; el
+día que entre Chef sus ids son de su propio `bigserial` y pisarían filas de LK en silencio.
+
+⚠ **Marcar "Cargado en ISIS" es de SUPERVISOR** y va por `gv_expreso_marcar`, no por un UPDATE
+suelto: la tabla no tiene escritura para `anon`.
+
+⚠ **Descartar NO revierte nada**: la ficha del cliente en la página ya quedó con ese expreso.
+Sólo saca el renglón de la cola. El cartel del botón lo dice.
+
+⚠ **La cola se lee PAGINADA** (`gvRestTodo`, y está en `DEBEN_PAGINAR`): es una cola, y una cola
+crece sola si nadie la vacía. Un `limit=1000` ahí sería una expresión de deseo.
+
+**Chequeo:** `select * from public.gv_expreso_pendiente;` — vacía = nada pendiente de ISIS ·
+`node tests/exp-isis-modulo.cjs`. `sql/gv_expreso_pendiente_v2199.sql`, §3.mx.
 
 ## ⚠ REGLA (Luis, 2026-09-22, v21.14): generar las OC a mano MUEVE el ciclo automático
 

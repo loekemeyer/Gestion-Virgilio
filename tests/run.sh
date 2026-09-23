@@ -25,6 +25,7 @@ node() {
 
 echo "== ppp-res-demora-camion (v21.72: Resumen = MAYOR demora por camion, y camiones sin tope de m3) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-demora-camion.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-dia-ocupado.cjs
 
 echo "== ppp-tanda-candado-codigo (v21.76: una tanda empezada conserva su codigo al cambiar de dia) =="
 node tests/ppp-tanda-candado-codigo.cjs
@@ -908,5 +909,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== stk-buscar-cero-adelante (v21.09: el prefijo se mide contra la grafia MOSTRADA) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-buscar-cero-adelante.cjs
+
+echo "== exp-isis-modulo (v21.99: Agregar Expreso ISIS — el expreso que eligio el cliente en la pagina) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/exp-isis-modulo.cjs
 
 _resumen
