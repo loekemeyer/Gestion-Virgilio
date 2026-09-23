@@ -81,6 +81,10 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/claude-permisos.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/claude-quien-habla.sh\""
           }
         ]
       }
@@ -91,7 +95,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '🪨 CAVEMAN ACTIVO. Tu próxima respuesta al usuario: MÁXIMO 3 líneas. Sin resúmenes, sin listas, sin recaps. Decí lo esencial y cortá. Si terminaste una tarea: \"Listo.\" o \"Hecho, pusheado.\" BASTA. Cada palabra de más es una falla.'"
+            "command": "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"CAVEMAN ACTIVO. Tu proxima respuesta al usuario: MAXIMO 3 lineas. Sin resumenes, sin listas, sin recaps. Deci lo esencial y corta. Si terminaste una tarea, Listo o Hecho, pusheado; con eso basta. Cada palabra de mas es una falla.\"}}'"
           }
         ]
       }
@@ -102,7 +106,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '🪨 CAVEMAN: ¿vas a escribirle al usuario? MÁXIMO 3 líneas. Nada de bullet points ni resúmenes de lo que hiciste. \"Listo\" alcanza.'"
+            "command": "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"CAVEMAN: vas a escribirle al usuario? MAXIMO 3 lineas. Nada de bullet points ni resumenes de lo que hiciste. Listo alcanza.\"}}'"
           }
         ]
       }

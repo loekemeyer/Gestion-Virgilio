@@ -137,6 +137,21 @@ hacer sin figurar en la agenda de alguien.
 
 1. **Al empezar la sesión, preguntar quién está hablando** (antes de hacer nada):
    *"¿Quién sos? (Thomas, Marianela, Luis, Gastón, …)"*. Si el mensaje ya lo dice, no repreguntar.
+
+   ⚠⚠ **EL MAIL DE LA CUENTA NO CUENTA COMO "ya lo dice"** (Thomas, 23/09: *"no está funcionando
+   el tema de que preguntes quién es el que te escribe"*). En las sesiones cloud el harness inyecta
+   `thomasloke1@gmail.com` y eso disparaba el escape de arriba SIEMPRE: el modelo leía *"ya se sabe,
+   es Thomas"* y no preguntaba nunca. **Es el mail de la CUENTA, no de la persona.** Medido sobre
+   las 425 tareas que cargó Claude: **202 las pidió Thomas y 123 Luis**, más Marianela, Elías,
+   Yanina, Melany, Angely y Vivi. El mail acierta menos de la mitad de las veces.
+
+   ⚠ **Y no choca con la regla de «NO preguntar — razonar primero»**: ahí la excepción (c) es el
+   dato que sólo el usuario tiene. Quién está del otro lado es exactamente eso — no se averigua
+   leyendo código ni consultando la base.
+
+   ⚠ **Lo sostiene un hook, no esta prosa**: `scripts/claude-quien-habla.sh`, colgado del
+   `SessionStart` de `.claude/settings.json`, sólo en `startup`. La regla estaba escrita **sólo acá**
+   —línea ~220 de un archivo de 1.400— y no se cumplía.
 2. **Cada pedido de trabajo se registra como tarea en el Planify de esa persona**, apenas se
    empieza, con nombre MUY resumido (≤ 60 caracteres). Queda `done=false` hasta que se cierre
    (punto 4). Si la sesión termina sin cerrar, la tarea queda en la agenda: ése es el objetivo.
@@ -512,7 +527,22 @@ son las líneas `Applying permission update` del log.
 2. **El único settings que llega a una sesión cloud es `.claude/settings.json` DEL REPO**, y sólo
    si la sesión tiene **un** repositorio. `~/.claude/settings.json` y `.claude/settings.local.json`
    no se leen; escribirlos desde el setup script del entorno no sirve.
-3. **Un `hooks` mal formado tira el archivo ENTERO, sin avisar.** El formato viejo
+3. ⚠⚠ **La salida de un hook `PreToolUse` / `PostToolUse` en TEXTO PLANO NO LE LLEGA AL MODELO.**
+   El CLI la corre, la anota en el log como `success` y **la descarta**; la línea del log lo dice:
+   `Hook output does not start with {, treating as plain text`. Para que llegue tiene que ser
+   **JSON**: `{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"…"}}`.
+   **La de `SessionStart` sí llega en texto plano** (por eso la línea de `claude-permisos.sh` se ve
+   en cada arranque), y por eso la regla de "quién habla" cuelga de ahí.
+
+   Medido el 23/09: los dos hooks de **caveman** —puestos en la v20.58, el 21/09— estuvieron
+   **muertos desde que se escribieron**, 431 corridas de `PreToolUse` y 412 de `PostToolUse` sin que
+   una sola llegara. Por eso caveman "no se respetaba". Se probó cambiando uno a JSON y viendo el
+   texto aparecer en el resultado de la herramienta siguiente — **no se prueba leyendo el settings**.
+
+   ⚠ `UserPromptSubmit` **no está configurado** (0 corridas): es el hook pensado para inyectar
+   contexto en cada mensaje del usuario, por si algún día hace falta algo más fuerte que el arranque.
+
+4. **Un `hooks` mal formado tira el archivo ENTERO, sin avisar.** El formato viejo
    —`{"matcher":"", "command":"..."}`— ya no vale; hoy va con el array `hooks` anidado:
    ```jsonc
    "hooks": { "SessionStart": [ { "matcher": "",
@@ -520,11 +550,11 @@ son las líneas `Applying permission update` del log.
    ```
    Con el formato viejo la `permissions.allow` deja de existir y no se tira ningún error. Así
    estuvo este repo desde el commit `542ab7e` (16/09) hasta la v19.63.
-4. ⚠ **En Auto, un `allow` "peligroso" se descarta a propósito**, y el log lo dice:
+5. ⚠ **En Auto, un `allow` "peligroso" se descarta a propósito**, y el log lo dice:
    `Ignoring dangerous permission Bash(*) from .claude/settings.json (bypasses classifier)`. Por
    eso un `"Bash"` pelado en `allow` **no** hace que Bash deje de pasar por el clasificador.
    Las reglas con comando concreto (`Bash(git status:*)`) sí valen.
-5. ⚠ Un `ask` matchea por **prefijo del comando**: `Bash(git push:*)` **no** agarra
+6. ⚠ Un `ask` matchea por **prefijo del comando**: `Bash(git push:*)` **no** agarra
    `git -C /ruta push …` ni `cd X && git push`. Si algo tiene que frenar sí o sí, va en `deny`.
 
 ### ⚠ Cómo NO probarlo
