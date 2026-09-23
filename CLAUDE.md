@@ -2014,6 +2014,20 @@ paga por adelantado igual. Si se heredaran, el 2.º pedido saldría como «ya pa
 `decision_ef = coalesce(propia, del cliente)` en `gv_clin_pipeline_lote`, y lo marca
 `decision_heredada`.
 
+### ⚠ El cliente nuevo RECURRENTE no se vuelve a analizar (Luis, 23/09, v21.48)
+
+**Luis:** *"para clientes nuevos recurrentes (que todavía no tienen 3 pedidos completados) debería
+directamente abrir el «qué sigue» en speech 1, speech 2 y agregar la opción de marcarlo como
+referido"*. Caso: **LK 1448 · Silvano (LK 4282)**, 2.º pedido, figuraba «Sin analizar» porque su
+1.er pedido es anterior al pipeline y no había decisión que heredar.
+
+Si el pedido no tiene decisión propia ni heredada y `GV_Clientes_Nuevos.pedidos >= 1`,
+`gv_clin_pipeline_lote` devuelve `decision = no_referenciado` (columnas nuevas `recurrente`,
+`pedidos_previos`) → arranca en **💬 Speech 1**, con el chip **🔁 recurrente**. En
+`no_referenciado`, `speech1` y `speech2` está el botón **🤝 Referenciado** (`gv_clin_etapa` ya le
+da prioridad sobre los speech). No se escribe ninguna fila: se deriva al leer.
+`sql/gv_clin_recurrente_v2148.sql`, `tests/pipe-recurrente.cjs`.
+
 ### Los 3 pedidos NO se cuentan acá: ya los corta LK
 
 *"Después de que pasan 3 pedidos bien pagando por adelantado ya se considera un cliente normal."*
@@ -3599,10 +3613,12 @@ equivalente mirando cualquier código de góndola. Y los módulos que llaman a `
 son justamente MG, bajar racks, **insumos** y salida Cervantes. Sería el pozo de la v20.95:
 **una fila que no sale no se distingue de un código que no existe.**
 
-⚠ Lo que SÍ serviría, si algún día molesta, es una matview **propia de `vista_saldos_stock`**
-(las 496 filas) colgada del guard que ya existe — no la de OC. El costo es frescura: hasta
-2 min. `_pppChkFetchSaldos` (el Chequeo de góndola, que compara contra lo que el operario cuenta)
-se quedaría en la vista viva; sólo `stockFetchSaldos` iría a la matview. **No está hecho.**
+⚠⚠ **Y TAMPOCO se cachea `vista_saldos_stock` en una matview propia. RETIRADO**: lo propuse
+el 23/09 y Thomas lo bajo el mismo dia — ***"todo el stock tiene que verse lo mas en vivo posible
+siempre"***. Esa vista se recalcula en cada lectura a proposito (765 ms, 67.945 movimientos), y
+`gv_saldos_por_clave` tampoco cachea nada: el indice acelera el recorrido, no lo evita. **El stock
+no se cachea.** Si el 2,0 % molesta algún día, el camino es bajar CUÁNTO recorre (la idea de los
+últimos 2 meses con el histórico por código a demanda), no congelarlo.
 
 ⚠ **El picking NO se repunta a `gv_saldos_por_clave`**, y no es olvido: son **44 llamadas y 35 s
 sobre esos 3.524 s (1 %)**, contra tocar el camino caliente del operario. Lo sostiene el candado
@@ -3624,6 +3640,49 @@ huella por CONTENIDO eso ya no importa, y **Thomas decidió el 23/09 dejar el cr
 están**. Lo que queda es el churn del libro de stock, que no molesta a nadie hoy. Si algún día se
 toca, el arreglo es una línea (`where … is distinct from …`) — y toca una función que escribe en
 `Movimientos_Stock`, o sea que lo autoriza el dueño.
+
+### ⚠⚠ REGLA (Thomas, 2026-09-23, v21.48): la pantalla de Stocks NO lee la matview — lee `stocks_carga_rapida`
+
+**Thomas, textual:** *"todo el stock tiene que verse lo mas en vivo posible siempre"*.
+
+Al medirlo apareció que esa regla **no se estaba cumpliendo, y no por el cron 55**. El dato llega
+a la pantalla por **tres saltos**, no uno:
+
+| salto | quién | cada |
+|---|---|---|
+| `Movimientos_Stock` | el libro | **en vivo** |
+| → `vista_stock_procesada` | cron 55 | 2 min, y sólo si cambió |
+| → **`stocks_carga_rapida`** | **cron 57** | **5 min, siempre** |
+| → pantalla Stocks | `supaFetchAllSafe` | al abrir |
+
+**Atraso máximo: 7 minutos**, y los dos crons no están sincronizados — si el 57 corre justo antes
+de que el 55 refresque, se pagan los 7 completos. Los 2 min del 55 eran el salto chico.
+
+Desde la v21.48 **`gv_refresh_stock_si_cambio` reescribe `stocks_carga_rapida` en la MISMA corrida
+en que refresca la matview**: la frescura baja a **2 min** y de paso el cron 57 deja de reescribirla
+cuando no cambió nada (eran 580 corridas / 324 s / 559 ms por ventana de 47,9 h, con el mismo
+94,5 % de corridas inútiles que ya se le había sacado al 55).
+
+⚠ **El lock va con `pg_try_advisory_xact_lock`, NUNCA con el bloqueante.** El advisory **5768** lo
+comparten el cron 57 y el **68** (`reconciliar-pipeline-stock`, `*/10`): esperarlo ocuparía uno de
+los **SEIS** worker slots de la instancia. Si no se consigue, no pasa nada — lo reescribe el 57.
+
+⚠ **FAIL-OPEN, y con el fallo A LA VISTA.** Si la derivada explota, la matview se refresca igual y
+el motivo lo dice. **Probado rompiéndola a propósito** (`perform 1/0`) en transacción abortada:
+`refrescada=true | motivo=piso de frescura (60 min) (carga_rapida fallo: division by zero)`.
+Un tapón sin forma de enterarse es cambiar un error ruidoso por uno mudo (regla de Elías, v20.58).
+
+⚠ **El cron 57 NO se apaga**: es la red del lock ocupado y del fallo. Bajarlo a `*/10` sería un
+segundo paso y **no está hecho**.
+
+⚠ **Lo que NO arregla:** si querés el stock *realmente* en vivo en esa pantalla, hay que sacarle a
+`stocks_carga_rapida` la dependencia de la matview, y eso se paga con latencia al abrir (~765 ms
+contra los 55 ms de hoy). Es otra conversación.
+
+**Verificado corriéndolo** (23/09): `solo_medir` → no encadena · piso de frescura en 0 →
+`"... + carga_rapida"`, 3.260 ms · `stocks_carga_rapida` **idéntica antes y después**
+(367 filas, md5 `3000430e5cfbde71e8b995819a3ce21e`): el encadenado adelanta el dato, no lo cambia.
+`sql/gv_stock_carga_rapida_encadenada_v2148.sql`, `tests/stock-carga-rapida-encadenada.cjs`, §3.mo.
 
 **Chequeo:**
 ```sql
