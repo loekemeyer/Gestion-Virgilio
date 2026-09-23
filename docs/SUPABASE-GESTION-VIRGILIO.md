@@ -29474,3 +29474,11 @@ falló por `42803` (subconsulta con columna sin agrupar) — lo cazó la corrida
 insert into public."PPP_Web_Config"(clave, valor) values ('grupo_dia_activo', 0)
 on conflict (clave) do update set valor = 0;
 ```
+
+## §3.mt — v21.90: el armado de LK cortaba por tiempo por la FUSIÓN de tandas (Luis, 2026-09-23)
+
+LK sin programar desde las 12:20: cada corrida daba 57014. Medido: 4 fusiones pendientes, cada
+`gv_ppp_tanda_renombrar` ~3,5 s, fusión real 14.289 ms, armado 12.673 ms contra 8 s. El timeout
+deshacía también las fusiones y la corrida siguiente repetía lo mismo. Arreglo: a lo sumo 1 fusión
+por corrida (`tanda_fusion_max_corrida`, sin fila = 1) y la fusión sólo si el armado lleva < 3 s.
+Probado: 12.673 → 3.413 ms. `sql/gv_fusion_tope_corrida_v2189.sql` (marcador `v21.89-tope`).
