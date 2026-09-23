@@ -19,14 +19,20 @@
    `gv_monitor_horas_operario_dia('2026-09-15')` el 22/09. La mitad JS se corre de verdad, con
    los eventos de ese día inyectados por interceptación de red.
 
-   ⚠ Entonces este test caza los cambios del lado JS. Los del lado SQL los caza
-   `select * from public.gv_reglas_perdidas;` (6 centinelas sobre la función y la vista).
-   Si se cambia una regla de horas A PROPÓSITO hay que tocar los dos lados Y volver a congelar
-   el JSON — cómo, está escrito adentro del propio JSON.
+   ⚠ Entonces este test caza los cambios del lado JS. Del lado SQL hay DOS centinelas, y hacen
+   cosas distintas:
+     · `select * from public.gv_reglas_perdidas;`    → ¿el PATRÓN sigue en el cuerpo? (10 filas
+       sobre la función y la vista). No ve un cambio de CUENTA con el patrón puesto.
+     · `select * from public.gv_huellas_cambiadas;`  → ¿el cuerpo es EXACTAMENTE el mismo que
+       cuando se congeló este JSON? (v21.46). Ése es el que avisa que hay que re-congelarlo.
+   Si se cambia una regla de horas A PROPÓSITO hay que tocar los dos lados, volver a congelar el
+   JSON (cómo, adentro del propio JSON) y actualizar el md5 en `GV_Huella_Objeto`.
 
-   ⚠ NO se comparan `hs_prod` ni `hs_total`: la vista le suma CR y RR al primero (el monitor
-   grande no los mide) y el segundo sólo existe en la vista. Es una diferencia de alcance, no
-   de cuenta.
+   ⚠ `hs_prod` SÍ se compara desde la v21.46. Antes no se podía: la vista le sumaba CC+CR+RR
+   y el monitor grande **no medía ninguno de los tres** — colgaban de `tanda && ts_inicio` y el
+   `texto` de esos eventos dejó de venir (CC en julio, CR en marzo, RR nunca lo tuvo). Eran
+   79,10 h en 30 días que no se le atribuían a nadie. `hs_total` sigue afuera: sólo existe en
+   la vista, el monitor grande no calcula la jornada por operario.
 
    ⚠ Y una honesta: el 15/09 NO tiene ningún tiempo muerto adentro de un MG/RT/RI/EI, así que
    este test pasa igual con o sin esa regla (v21.20). La que la prueba es
@@ -86,6 +92,7 @@ const TOL = 0.011;
         hs_pick: o.pickH || 0, hs_arm: o.armH || 0,
         prom_hs_pick: nP ? (o.pickH || 0) / nP : 0,
         prom_hs_arm:  nA ? (o.armH  || 0) / nA : 0,
+        hs_prod: o.prodH || 0,
         hs_mov: (o.movMin || 0) / 60,
         hs_noprod: (o.noprodMin || 0) / 60
       };
@@ -96,7 +103,8 @@ const TOL = 0.011;
   const mal = [];
   if (errs.length) mal.push("errores de página: " + errs.join(" | "));
 
-  const CAMPOS = ["prom_hs_pick", "prom_hs_arm", "hs_pick", "hs_arm", "hs_mov", "hs_noprod"];
+  const CAMPOS = ["prom_hs_pick", "prom_hs_arm", "hs_pick", "hs_arm",
+                  "hs_prod", "hs_mov", "hs_noprod"];
   const ENTEROS = ["tandas_pick", "tandas_arm"];
   const n2 = (x) => (Math.round((Number(x) || 0) * 100) / 100).toFixed(2);
 

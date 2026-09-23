@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.45"></script>
+<script type="module" src="recepcion.js?v=21.46"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6771,6 +6771,34 @@ const FERIADOS_AR = new Set([
   "2026-12-08",               // Inmaculada Concepción
   "2026-12-25"                // Navidad
 ]);
+/* ⚠ v21.46 — LA LISTA DE ARRIBA ES EL FALLBACK, NO LA FUENTE.
+   La CANÓNICA es la tabla `public."GV_Feriados"` de Supabase. Estaba escrita a mano
+   TRES veces —acá, en `monitor/tv.html` y adentro de `gv_monitor_horas_operario_dia`—
+   y las tres terminaban el 25/12/2026: desde el 1.º de enero ninguna conocía un solo
+   feriado. Ahora las tres leen la tabla, que ya tiene 2027.
+   ⚠ `GV_Feriados` NO es `GV_Dias_No_Habiles` (ésa dice que el dueño CIERRA el depósito
+   y mueve los días hábiles de toda la operación) ni `GV_Dias_Sin_Reparto`. Los puentes
+   turísticos van con `tipo='no_laborable'` y NO cuentan: se trabaja.
+   ⚠ Si el fetch falla o vuelve vacío NO se pisa la lista de arriba: mejor la de 2026
+   que ninguna. Por eso el hardcodeo se deja puesto en vez de borrarlo. */
+let _feriadosFetch = null;
+function ensureFeriadosAR() {
+  if (_feriadosFetch) return _feriadosFetch;
+  _feriadosFetch = (async () => {
+    try {
+      const r = await fetch(SUPABASE_URL +
+        "/rest/v1/GV_Feriados?select=fecha&tipo=eq.feriado&order=fecha.asc&limit=2000",
+        { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } });
+      if (!r.ok) return false;
+      const rows = await r.json();
+      if (!Array.isArray(rows) || !rows.length) return false;
+      FERIADOS_AR.clear();
+      for (const f of rows) if (f && f.fecha) FERIADOS_AR.add(String(f.fecha).slice(0, 10));
+      return true;
+    } catch (_e) { return false; }
+  })();
+  return _feriadosFetch;
+}
 
 /* Toggles que al cerrarse manualmente piden una cantidad/dato en el texto.
    En Terminar Día, los abiertos de este grupo abren un input en el modal y
@@ -9925,7 +9953,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.45";
+const APP_VERSION = "v21.46";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31627,6 +31655,7 @@ function showOperarioActivityDetail(legajo, activity) {
   const op = (stats.perOperario || []).find(o => o.legajo === String(legajo));
   if (!op) return;
   const label = { pick:"Picking", arm:"Pedido", cc:"Carga Camión",
+                  prodotros:"CC + Control Remitos + Recepción Remitos",
                   mov:"Movimientos", noprod:"No productivas" }[activity];
   const m = document.getElementById("tandaModal");
   m.querySelector(".tanda-modal-title").textContent =
@@ -31648,17 +31677,24 @@ function showOperarioActivityDetail(legajo, activity) {
     return h > 0 ? `${h}h ${m2}min` : `${m2}min`;
   };
 
-  if (activity === "mov" || activity === "noprod") {
+  if (activity === "mov" || activity === "noprod" || activity === "prodotros") {
     // Detalle por toggle: apertura, cierre y cuánto tardó (minutos).
     // v21.18: el mismo popup sirve para los dos baldes (movimiento y no
     // productivas), que antes venían mezclados en uno solo.
-    const esMovPop = activity === "mov";
-    const totalH = ((esMovPop ? op.movMin : op.noprodMin) || 0) / 60;
-    const totalMin = Math.round((esMovPop ? op.movMin : op.noprodMin) || 0);
-    const movArr = (esMovPop ? op.movDetail : op.noprodDetail) || [];
+    /* v21.46: el mismo popup sirve para los TRES baldes por duración. */
+    const _min = activity === "mov" ? op.movMin
+               : activity === "noprod" ? op.noprodMin
+               : (op.otrosProdH || 0) * 60;
+    const totalH = (_min || 0) / 60;
+    const totalMin = Math.round(_min || 0);
+    const movArr = (activity === "mov" ? op.movDetail
+                  : activity === "noprod" ? op.noprodDetail
+                  : op.otrosProdDetail) || [];
     const movLabel = {
       MG: "Guardado a Góndola", RI: "Recepción Insumos",
       EI: "Entrega Insumos",    RT: "Recepción Mercadería",
+      CC: "Carga Camión",       CR: "Control Remitos",
+      RR: "Recepción Remitos",
       AT: "Atendí Timbre",      PB: "Paré Baño",
       Limp: "Limpieza",         PC: "Paré Comida",
       CT: "Conteo",             Perm: "Permiso de Salida"
@@ -31688,7 +31724,7 @@ function showOperarioActivityDetail(legajo, activity) {
       </div>
       <table class="tanda-modal-table">
         <thead><tr>
-          <th>Movimiento</th>
+          <th>${activity === "prodotros" ? "Tarea" : "Movimiento"}</th>
           <th>Apertura</th>
           <th>Cierre</th>
           <th style="text-align:right">Tardó</th>
@@ -32317,6 +32353,10 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   const cached = _monitorDayStatsCache.get(dayKey);
   if (cached && (Date.now() - cached.ts) < MONITOR_DAY_STATS_TTL_MS && cached.hadSheet) return cached.data;
 
+  // v21.46: los feriados salen de la canónica GV_Feriados. Best-effort — si el fetch
+  // falla, `FERIADOS_AR` se queda con su lista de fallback y la cuenta no cambia.
+  await ensureFeriadosAR();
+
   const dayStartIso = new Date(`${dayKey}T00:00:00-03:00`).toISOString();
   const dayEndIso   = new Date(`${dayKey}T23:59:59-03:00`).toISOString();
   // Para cierres cross-day, queremos el FJ REAL del día de la apertura
@@ -32394,6 +32434,19 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
      Lo cazó `tests/dead-handlers.cjs`. */
   const MOV_TOGGLE_CODES    = new Set(["MG", "RI", "EI", "RT"]);
   const NOPROD_TOGGLE_CODES = new Set(["AT", "PB", "Limp", "PC", "CT", "Perm"]);
+  /* v21.46 (Thomas) — TRABAJO PRODUCTIVO QUE NO TIENE m³: Carga Camión, Control
+     Remitos y Recepción Remitos. Hasta acá el monitor grande **no medía ninguno**:
+     los tres colgaban de `tanda && ev.ts_inicio`, y el `texto` de esos eventos dejó
+     de venir — CC lo perdió en julio (63 cierres, 1 con texto; 0 de agosto en
+     adelante), CR en marzo y RR nunca lo tuvo. O sea que la columna CC venía en "—"
+     desde agosto y las horas de remitos no se le atribuían a nadie.
+     Medido sobre 30 días: CC 25,46 h · CR 32,13 h · RR 21,51 h = 79,10 h, el 15 %
+     de las horas productivas del depósito.
+     ⚠ Se mide por DURACIÓN, sin pedir `texto` y sin deduplicar por tanda — que es
+     exactamente lo que hace `prod_otros_s` de `gv_monitor_horas_operario_dia`. La
+     columna CC de arriba sigue saliendo de `ccTandas` porque ésa es un m³/h y
+     necesita la tanda: son dos cuentas distintas, no una repetida. */
+  const PROD_OTROS_CODES = new Set(["CC", "CR", "RR"]);
 
   // Lookup m3 por tanda: sheetMap actual primero (más fresco), después la
   // histórica del Sheet. ANTES del loop de eventos porque el detail necesita
@@ -32569,7 +32622,8 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       pickedTandas: new Set(), pickedDetail: [], pickMs: 0,
       armedTandas:  new Set(), armedDetail:  [], armMs:  0,
       ccTandas:     new Set(), ccDetail:     [], ccMs:   0,
-      comidaMs: 0, movMs: 0, movDetail: [], noprodMs: 0, noprodDetail: [], fjTs: null
+      comidaMs: 0, movMs: 0, movDetail: [], noprodMs: 0, noprodDetail: [],
+      otrosProdMs: 0, otrosProdDetail: [], fjTs: null
     });
     const p = perLegajo.get(leg);
     p.lastTs = ev.ts_cliente;
@@ -32586,6 +32640,21 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       if (ev.opcion === "TP"  && durOK) { if (!p.pickedTandas.has(tanda)) p.pickMs += dur; p.pickedTandas.add(tanda); p.pickedDetail.push(detail); }
       if (ev.opcion === "TAP" && durOK) { if (!p.armedTandas.has(tanda))  p.armMs  += dur; p.armedTandas.add(tanda);  p.armedDetail.push(detail);  }
       if (ev.opcion === "CC"  && durOK) { if (!p.ccTandas.has(tanda))     p.ccMs   += dur; p.ccTandas.add(tanda);     p.ccDetail.push(detail);     }
+    }
+    /* v21.46 — CC + CR + RR por duración, con el MISMO `computeClosureDur` que
+       picking y armado: cruce de medianoche y tiempo muerto neteado. */
+    if (PROD_OTROS_CODES.has(ev.opcion) && ev.ts_inicio) {
+      const _brO = {};
+      const durO = computeClosureDur(leg, new Date(ev.ts_inicio).getTime(),
+                                     new Date(ev.ts_cliente).getTime(), _brO);
+      if (durO > 0 && durO < 24 * 3600 * 1000) {
+        p.otrosProdMs += durO;
+        p.otrosProdDetail.push({
+          opcion: ev.opcion, texto: ev.texto || "",
+          ts_inicio: ev.ts_inicio, ts_cliente: ev.ts_cliente,
+          durMs: durO, brutoMs: _brO.brutoMs || durO, muertoMs: _brO.muertoMs || 0
+        });
+      }
     }
     if (ev.opcion === "PC" && ev.ts_inicio) {
       const dur = new Date(ev.ts_cliente) - new Date(ev.ts_inicio);
@@ -32632,7 +32701,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     // CC con tanda, ni movimientos). Si tocaron pero no tenemos m³ cargado en
     // el sheet (típico en tandas C-prefix nuevas), igual aparecen.
     if (p.pickedTandas.size === 0 && p.armedTandas.size === 0
-        && p.ccTandas.size === 0 && p.movMs === 0) continue;
+        && p.ccTandas.size === 0 && p.movMs === 0 && p.otrosProdMs === 0) continue;
     const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t), 0);
     const m3Arm  = [...p.armedTandas ].reduce((s, t) => s + tandaM3(t), 0);
     const m3CC   = [...p.ccTandas    ].reduce((s, t) => s + tandaM3(t), 0);
@@ -32648,40 +32717,47 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const m3hCC   = (ccH   > 0 && m3CC   > 0) ? m3CC   / ccH   : 0;
     const movMin  = p.movMs / 60000;
     const noprodMin = p.noprodMs / 60000;
+    const otrosProdH = p.otrosProdMs / 3600000;
+    /* ≡ `hs_prod` de `gv_monitor_horas_operario_dia`: picking + armado + CC/CR/RR.
+       Lo compara `tests/mon-vs-vista.cjs`. */
+    const prodH = pickH + armH + otrosProdH;
     perOperario.push({
       legajo: leg,
       nombre: nombres.get(leg) || ("Leg " + leg),
       m3Pick, m3Arm, m3CC,
       pickH, armH, ccH,
-      m3hPick, m3hArm, m3hCC, movMin, noprodMin,
+      m3hPick, m3hArm, m3hCC, movMin, noprodMin, otrosProdH, prodH,
       pickedDetail: p.pickedDetail,
       armedDetail:  p.armedDetail,
       ccDetail:     p.ccDetail,
       movDetail:    p.movDetail,
       noprodDetail: p.noprodDetail,
+      otrosProdDetail: p.otrosProdDetail,
       didPick: p.pickedTandas.size > 0,
       didArm:  p.armedTandas.size  > 0,
       didCC:   p.ccTandas.size     > 0,
       didMov:  p.movMs > 0,
-      didNoprod: p.noprodMs > 0
+      didNoprod: p.noprodMs > 0,
+      didOtrosProd: p.otrosProdMs > 0
     });
   }
   // Totales: sumamos m3 y horas REALES por actividad (no por operario completo)
   // así el total m3/h refleja la productividad real de la actividad ese día.
   let pickM3 = 0, pickHsum = 0, sepM3 = 0, sepHsum = 0;
-  let ccM3 = 0, ccHsum = 0, movMinTot = 0, noprodMinTot = 0;
+  let ccM3 = 0, ccHsum = 0, movMinTot = 0, noprodMinTot = 0, otrosProdMinTot = 0;
   for (const o of perOperario) {
     pickM3 += o.m3Pick; pickHsum += o.pickH;
     sepM3  += o.m3Arm;  sepHsum  += o.armH;
     ccM3   += o.m3CC;   ccHsum   += o.ccH;
     movMinTot += o.movMin;
     noprodMinTot += (o.noprodMin || 0);
+    otrosProdMinTot += (o.otrosProdH || 0) * 60;
   }
   const totals = {
     pickM3, pickHsum, pickM3h: pickHsum > 0 ? pickM3 / pickHsum : 0,
     sepM3,  sepHsum,  sepM3h:  sepHsum  > 0 ? sepM3  / sepHsum  : 0,
     ccM3,   ccHsum,   ccM3h:   ccHsum   > 0 ? ccM3   / ccHsum   : 0,
-    movMin: movMinTot, noprodMin: noprodMinTot
+    movMin: movMinTot, noprodMin: noprodMinTot, otrosProdMin: otrosProdMinTot
   };
   perOperario.sort((a, b) => (b.m3Pick + b.m3Arm + b.m3CC) - (a.m3Pick + a.m3Arm + a.m3CC));
   const data = { perOperario, totals };
@@ -33112,7 +33188,7 @@ function openRecepcionAdmin() {
    Controlado. Al «Terminé» emite CRN por NP (igual que el operario) pero NO cierra
    ningún toggle RR (el admin no tiene botonera). Usa legajo "0" (sistema, excluido de
    reportes de operario, igual que CRA). v3.75. */
-/* v21.42 (Luis, 23/09: *"Sigo sin entender esos 2. En prog dice que está todo ok pero allá dicen
+/* v21.45 (Luis, 23/09: *"Sigo sin entender esos 2. En prog dice que está todo ok pero allá dicen
    esos 2"*) — el supervisor que abre Recepción Remitos desde el panel firmaba el CRN con legajo
    "0", y TODO el sistema toma 0 y 1 como legajos de PRUEBA (`es_legajo_test`, "excluir de
    reportes"): ese CRN no contaba, el pedido nunca pasaba a Entregado y seguía en Ocupación con su
@@ -50997,7 +51073,8 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // Cache para los popups (al hacer click en una celda de Mts3xHora).
   _monitorLiveStats = { todayKey, today: todayStats, yesterdayKey, yesterday: yesterdayStats };
   const operariosHoy = (todayStats && todayStats.perOperario) || [];
-  const emptyTot = { pickM3:0, pickM3h:0, sepM3:0, sepM3h:0, ccM3:0, ccM3h:0, movMin:0, noprodMin:0 };
+  const emptyTot = { pickM3:0, pickM3h:0, sepM3:0, sepM3h:0, ccM3:0, ccM3h:0,
+                     otrosProdMin:0, movMin:0, noprodMin:0 };
   const totHoy  = (todayStats     && todayStats.totals)     || emptyTot;
   const totAyer = (yesterdayStats && yesterdayStats.totals) || emptyTot;
   // Cada celda clickeable abre el popup con el desglose por tanda. El
@@ -51043,6 +51120,10 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
             ${operariosHoy.map(o => cellM3h(o.m3hCC, o.didCC, "Cargó camión pero falta m³ en el sheet", o.legajo, "cc")).join("")}
           </tr>
           <tr>
+            <th class="row-label" title="Carga Camión, Control Remitos y Recepción Remitos: trabajo productivo que no tiene m³. Hasta la v21.45 no se medía ninguno de los tres.">CC+CR+RR<br><span class="row-unit">(h)</span></th>
+            ${operariosHoy.map(o => cellMin((o.otrosProdH || 0) * 60, o.didOtrosProd, o.legajo, "prodotros")).join("")}
+          </tr>
+          <tr>
             <th class="row-label">Movim.<br><span class="row-unit">(h)</span></th>
             ${operariosHoy.map(o => cellMin(o.movMin, o.didMov, o.legajo, "mov")).join("")}
           </tr>
@@ -51063,10 +51144,10 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
         </tbody>
       </table>
     </div>`;
-  // Los labels Picking/Pedido/CC/Movim/No prod. NO van acá — quedan implícitos
-  // por la tabla Mts3 x Hora de al lado (orden: Picking, Pedido, CC, Movim,
-  // No prod.). Las dos últimas muestran TOTAL HORAS (no es un m³/h) en una
-  // celda con colspan=2.
+  // Los labels Picking/Pedido/CC/CC+CR+RR/Movim/No prod. NO van acá — quedan
+  // implícitos por la tabla Mts3 x Hora de al lado (orden: Picking, Pedido, CC,
+  // CC+CR+RR, Movim, No prod.). Las tres últimas muestran TOTAL HORAS (no es un
+  // m³/h) en una celda con colspan=2.
   // ⚠ Si se agrega una fila de un lado, VA TAMBIÉN del otro: se alinean por
   //   POSICIÓN, no por nombre.
   const renderParcial = (title, t) => `
@@ -51083,6 +51164,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
           <tr><td class="num">${fmt1(t.pickM3)}</td><td class="num">${prodVal(t.pickM3h)}</td></tr>
           <tr><td class="num">${fmt1(t.sepM3)}</td><td class="num">${prodVal(t.sepM3h)}</td></tr>
           <tr><td class="num">${fmt1(t.ccM3)}</td><td class="num">${prodVal(t.ccM3h)}</td></tr>
+          <tr><td class="num" colspan="2">${fmt1((t.otrosProdMin || 0) / 60)} h</td></tr>
           <tr><td class="num" colspan="2">${fmt1((t.movMin || 0) / 60)} h</td></tr>
           <tr><td class="num" colspan="2">${fmt1((t.noprodMin || 0) / 60)} h</td></tr>
         </tbody>

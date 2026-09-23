@@ -10,10 +10,65 @@
   ],
   "dia": "2026-09-15",
   "operarios": [
-    { "legajo": "8",   "tandas_pick": 1,  "prom_hs_pick": 0.01, "tandas_arm": 3,  "prom_hs_arm": 2.47, "hs_pick": 0.01, "hs_arm": 7.40, "hs_mov": 0.00, "hs_noprod": 0.89 },
-    { "legajo": "94",  "tandas_pick": 0,  "prom_hs_pick": 0,    "tandas_arm": 0,  "prom_hs_arm": 0,    "hs_pick": 0.00, "hs_arm": 0.00, "hs_mov": 2.63, "hs_noprod": 0.00 },
-    { "legajo": "104", "tandas_pick": 0,  "prom_hs_pick": 0,    "tandas_arm": 0,  "prom_hs_arm": 0,    "hs_pick": 0.00, "hs_arm": 0.00, "hs_mov": 1.08, "hs_noprod": 0.57 },
-    { "legajo": "237", "tandas_pick": 0,  "prom_hs_pick": 0,    "tandas_arm": 12, "prom_hs_arm": 0.49, "hs_pick": 0.00, "hs_arm": 5.91, "hs_mov": 0.00, "hs_noprod": 2.40 },
-    { "legajo": "277", "tandas_pick": 14, "prom_hs_pick": 0.46, "tandas_arm": 0,  "prom_hs_arm": 0,    "hs_pick": 6.37, "hs_arm": 0.00, "hs_mov": 0.96, "hs_noprod": 1.70 }
+    {
+      "legajo": "8",
+      "tandas_pick": 1,
+      "prom_hs_pick": 0.01,
+      "tandas_arm": 3,
+      "prom_hs_arm": 2.47,
+      "hs_pick": 0.01,
+      "hs_arm": 7.4,
+      "hs_mov": 0.0,
+      "hs_noprod": 0.89,
+      "hs_prod": 10.73
+    },
+    {
+      "legajo": "94",
+      "tandas_pick": 0,
+      "prom_hs_pick": 0,
+      "tandas_arm": 0,
+      "prom_hs_arm": 0,
+      "hs_pick": 0.0,
+      "hs_arm": 0.0,
+      "hs_mov": 2.63,
+      "hs_noprod": 0.0,
+      "hs_prod": 0.0
+    },
+    {
+      "legajo": "104",
+      "tandas_pick": 0,
+      "prom_hs_pick": 0,
+      "tandas_arm": 0,
+      "prom_hs_arm": 0,
+      "hs_pick": 0.0,
+      "hs_arm": 0.0,
+      "hs_mov": 1.08,
+      "hs_noprod": 0.57,
+      "hs_prod": 0.36
+    },
+    {
+      "legajo": "237",
+      "tandas_pick": 0,
+      "prom_hs_pick": 0,
+      "tandas_arm": 12,
+      "prom_hs_arm": 0.49,
+      "hs_pick": 0.0,
+      "hs_arm": 5.91,
+      "hs_mov": 0.0,
+      "hs_noprod": 2.4,
+      "hs_prod": 5.91
+    },
+    {
+      "legajo": "277",
+      "tandas_pick": 14,
+      "prom_hs_pick": 0.46,
+      "tandas_arm": 0,
+      "prom_hs_arm": 0,
+      "hs_pick": 6.37,
+      "hs_arm": 0.0,
+      "hs_mov": 0.96,
+      "hs_noprod": 1.7,
+      "hs_prod": 6.37
+    }
   ]
 }

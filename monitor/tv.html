@@ -321,8 +321,12 @@ var CC_DESDE_ISO    = "2026-06-22T00:00:00-03:00";  // ≡ index.html CC_REPARTO
 var TV_KEY = "tv";
 var KIOSK_FLAG = "vir_tv_kiosk";
 
-/* ≡ index.html FERIADOS_AR — para no contar como trabajadas las horas de un
-   feriado cuando una tanda quedó abierta de un día para otro. */
+/* Feriados: para no contar como trabajadas las horas de un feriado cuando una
+   tanda quedó abierta de un día para otro.
+   ⚠ v21.46 — ESTO ES EL FALLBACK. La CANÓNICA es `public."GV_Feriados"`, y la baja
+   `cargarFeriados()` en cada ciclo. Estaba escrita a mano acá, en `index.html` y
+   adentro de `gv_monitor_horas_operario_dia`, y las tres terminaban el 25/12/2026.
+   No borrar la lista: si el fetch falla, el tablero prefiere la de 2026 a ninguna. */
 var FERIADOS = { "2026-01-01":1,"2026-02-16":1,"2026-02-17":1,"2026-03-24":1,
   "2026-04-02":1,"2026-04-03":1,"2026-05-01":1,"2026-05-25":1,"2026-06-15":1,
   "2026-06-20":1,"2026-07-09":1,"2026-08-17":1,"2026-10-12":1,"2026-11-23":1,
@@ -738,6 +742,21 @@ function cargarEventosHoy() {
     "ts_cliente=gte." + encodeURIComponent(desde) +
     "&select=legajo,opcion,texto,ts_cliente,ts_inicio&order=ts_cliente.asc");
 }
+
+/* La canónica de feriados. Pisa el fallback de arriba SOLO si vino algo: una
+   respuesta vacía dejaría al tablero sin ningún feriado, que es peor. ≡ index.html
+   `ensureFeriadosAR`. */
+var cargarFeriados = cache(EMPLEADOS_TTL, function () {
+  return get("GV_Feriados", "select=fecha&tipo=eq.feriado&order=fecha.asc&limit=2000")
+    .then(function (filas) {
+      if (!filas || !filas.length) return FERIADOS;
+      var m = {};
+      filas.forEach(function (f) { if (f && f.fecha) m[String(f.fecha).slice(0, 10)] = 1; });
+      FERIADOS = m;
+      return m;
+    })
+    .catch(function () { return FERIADOS; });
+});
 
 /* Fichadas de ingreso de hoy: los que marcaron pero todavía no tocaron ningún
    botón salen como "fichó · sin arrancar". Best-effort. */
@@ -1353,7 +1372,7 @@ function ciclo() {
   return Promise.all([
     cargarProgramacion(), cargarEventosHoy(), cargarEmpleados(),
     cargarFichadasHoy(), cargarDeshechas(), cargarFacturadas(), cargarDespachadas(),
-    cargarHoras()
+    cargarHoras(), cargarFeriados()
   ]).then(function (r) {
     var prog = r[0], eventos = r[1], empleados = r[2], fichadas = r[3],
         deshechas = r[4], facturadas = r[5], despachadas = r[6], horas = r[7];

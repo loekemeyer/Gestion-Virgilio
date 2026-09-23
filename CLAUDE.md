@@ -906,6 +906,78 @@ recorrido**. Si algún día molesta, el arreglo NO es volver atrás: es que el f
 Lo sostiene `tests/pk-excedente-orden.cjs` y el candado invertido de `tests/pk-deposito-pkc.cjs`
 (`items.concat(excSteps)` tiene que estar, `excSteps.concat(items)` no). Problema 455.
 
+## ⚠⚠ REGLA (Thomas, 2026-09-23, v21.46): los FERIADOS tienen UNA tabla canónica — `GV_Feriados`
+
+**Thomas, textual:** *"que quede bien definido que es la canónica así cualquier implementación que
+requiera ver feriados la podés encontrar a futuro y dejar de duplicarla"*.
+
+> ## Si algo necesita saber si un día es feriado, lo pregunta a **`public."GV_Feriados"`**. No se escribe la lista de nuevo.
+
+**Estaba escrita TRES veces, a mano:** `FERIADOS_AR` en `index.html`, `FERIADOS` en
+`monitor/tv.html` y el CTE `feriados` adentro de `gv_monitor_horas_operario_dia`. Medido el
+23/09: las tres tenían **las mismas 16 fechas** — pero las tres **terminaban el 2026-12-25**, así
+que desde el 1.º de enero ninguna conocía un solo feriado. Ahora las tres leen la tabla, que ya
+tiene 2027 (16 feriados, con los trasladables en su fecha observada).
+
+⚠⚠ **Son TRES tablas distintas y no hay que mezclarlas.** La que se elige mal es siempre la misma:
+
+| pregunta | tabla | qué mueve si se carga ahí |
+|---|---|---|
+| ¿es feriado nacional? | **`GV_Feriados`** · `gv_es_feriado(d)` | el conteo de horas de un cierre que cruza la medianoche |
+| ¿se trabaja en el depósito? | `GV_Dias_No_Habiles` · `gv_es_dia_habil(d)` | los días hábiles de **toda** la operación: la espera de cada pedido, el tope de 10 y la anticipación mínima de 4 |
+| ¿sale el camión? | `GV_Dias_Sin_Reparto` · `gv_es_dia_con_reparto(d)` | la programación del reparto |
+
+⚠ Los **puentes turísticos** van con `tipo = 'no_laborable'` y **NO son feriado**: en el depósito se
+trabaja. `gv_es_feriado` los devuelve `false`. Están cargados a propósito, para que nadie los vuelva
+a agregar como feriado "porque faltaban".
+
+**Agregar un año es un `insert`, no un deploy** (fuente: Ley 27.399 + decretos; los trasladables van
+con su fecha OBSERVADA y el original en `trasladado_de`):
+
+```sql
+insert into public."GV_Feriados" (fecha, nombre, tipo, trasladado_de)
+values (date '2028-01-01', 'Año Nuevo', 'feriado', null) on conflict (fecha) do nothing;
+```
+
+⚠ **El hardcodeo del front NO se borró: quedó de FALLBACK.** Si el fetch falla o vuelve vacío, la
+lista vieja de 2026 sigue puesta — mejor ésa que ninguna. Por eso `ensureFeriadosAR` (index.html) y
+`cargarFeriados` (tv.html) sólo pisan la lista **si vino algo**.
+
+⚠ Los puentes de **2027** los fija el PEN por decreto y al 23/09/2026 no estaban publicados: ese año
+va sólo con los feriados de la ley.
+
+**Chequeo:** `select tipo, count(*) from public."GV_Feriados" group by 1;` — al 23/09, 32 feriados
+(16 de 2026 + 16 de 2027) y 3 no laborables. `sql/gv_feriados_v2146.sql`.
+
+## ⚠ REGLA (Thomas, 2026-09-23, v21.46): un centinela de PATRÓN no ve un cambio de CUENTA — para eso está la HUELLA
+
+`gv_reglas_perdidas` contesta *"¿el patrón sigue en el cuerpo?"*. Es lo que hace falta cuando el
+riesgo es que otra sesión pise el objeto con una copia vieja. **No sirve** cuando el riesgo es que
+alguien deje el patrón puesto y le cambie la cuenta.
+
+Eso pasa cuando el cuerpo de un objeto está **espejado afuera de la base**. El caso concreto:
+`tests/mon-vs-vista.cjs` corre el monitor grande de verdad y lo compara contra
+`tests/tools/vista-15.json`, que es una **foto** de `gv_monitor_horas_operario_dia('2026-09-15')`
+—las sesiones no le pueden pegar a Supabase, así que esa mitad va congelada—. Si alguien le cambia
+una regla a la función y el JSON no se mueve, **el test queda verde y miente**.
+
+```sql
+select * from public.gv_huellas_cambiadas;   -- vacía = todo bien
+```
+
+**Al cambiar a propósito un objeto con huella, son dos pasos y el segundo lo dicta la vista:**
+
+1. volver a congelar lo que lo espeja (cómo, está adentro del propio fixture);
+2. `update public."GV_Huella_Objeto" set md5_esperado = '<el md5_actual que imprime la vista>',
+   version = '<vNN.NN>', actualizado_en = now() where objeto = '<el objeto>';`
+
+⚠ **Salta también por un comentario, y está bien:** es un md5 del cuerpo entero. Un falso positivo
+cuesta releer el fixture; un falso negativo cuesta un test que miente. Verificado rompiéndolo a
+propósito (un comentario metido en el cuerpo, en transacción abortada: la vista devolvió su fila).
+
+**Al espejar el cuerpo de un objeto afuera de la base, agregarle su fila** — es un `insert`, no
+código. `sql/gv_huella_objeto_v2146.sql`.
+
 ## ⚠ REGLA: LAS TABLAS QUE VALEN — góndola, racks y empresa del artículo
 
 **Luis, 2026-09-17:** *"fijate que estés usando las tablas actualizadas de `gv_` y escribí en

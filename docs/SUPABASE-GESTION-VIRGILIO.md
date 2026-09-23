@@ -29328,3 +29328,58 @@ select cron.alter_job(55, command := 'REFRESH MATERIALIZED VIEW CONCURRENTLY vis
 ```
 
 `sql/gv_stock_indice_clave_v2131.sql`, `tests/stock-clave-indexada.cjs`.
+
+---
+
+### §3.mn — v21.46: CC/CR/RR entran al balde productivo, `GV_Feriados` es la canónica, y el centinela de huella — 2026-09-23
+
+Tres cosas que salieron del mismo pedido de Thomas (los tres pendientes que habían quedado
+anotados al cerrar la v21.27).
+
+#### 1. El monitor grande no medía **ninguna** de las tres tareas sin m³
+
+`fetchMonitorDayStats` acreditaba `CC` sólo adentro de `if (tanda && ev.ts_inicio)`, y `CR` y `RR`
+no aparecían en ningún balde. El `texto` de esos eventos **dejó de venir**:
+
+| código | qué es | último mes con `texto` | cierres 30 d | horas 30 d |
+|---|---|---|---:|---:|
+| CR | Control Remitos | **feb-2026** (9 de 58) | 68 | 32,13 |
+| CC | Carga Camión | **jul-2026** (1 de 63) | 73 | 25,46 |
+| RR | Recepción Remitos | **nunca** | 44 | 21,51 |
+
+O sea: la fila **CC** del cuadro «Mts3 x Hora» venía en `—` desde agosto, y **79,10 h en 30 días**
+—el 15 % de las horas productivas del depósito— no se le atribuían a nadie. La vista de la TV sí
+las contaba (`prod_otros_s`), y por eso `hs_prod` no se podía comparar entre las dos pantallas.
+
+Desde la v21.46 hay un balde nuevo, `PROD_OTROS_CODES = {CC, CR, RR}`, medido **por duración**, sin
+pedir `texto` y **sin deduplicar por tanda** — exactamente lo que hace la vista. Pasa por el mismo
+`computeClosureDur`, así que se le netea el tiempo muerto y se le parte el cruce de medianoche.
+
+⚠ **La fila CC de arriba NO se tocó**: ésa es un **m³/h** y necesita la tanda. Son dos cuentas
+distintas, no una repetida. El balde nuevo tiene su propia fila, **CC+CR+RR (h)**, y su gemela en
+Parcial/Ayer — se alinean **por posición, no por nombre**.
+
+⚠ **Y el filtro de "no tocó nada" lo tenía que contemplar**, o un operario que sólo hizo remitos
+quedaba afuera de la tabla mientras la vista lo listaba: eso es una diferencia de criterio, no un
+detalle, y el test la caza.
+
+**`hs_prod` ya se compara** en `tests/mon-vs-vista.cjs` — son 7 números por operario, no 6.
+Verificado rompiéndolo (`PROD_OTROS_CODES` vacío): `legajo 8 · hs_prod: vista 10.73 · monitor 7.40`.
+
+#### 2. `GV_Feriados`, la canónica
+
+La lista estaba escrita **tres** veces (`index.html`, `monitor/tv.html`, el CTE de
+`gv_monitor_horas_operario_dia`), con las mismas 16 fechas — y las tres terminaban el **2026-12-25**.
+Detalle, y por qué no es `GV_Dias_No_Habiles`, en el bloque de `CLAUDE.md`. `sql/gv_feriados_v2146.sql`.
+
+Medido: la función devuelve **exactamente los mismos números** para el 15/09 leyendo la tabla
+(5 operarios × 7 columnas), así que el JSON congelado siguió valiendo.
+
+⚠ El hardcodeo del front **quedó de fallback**: si el fetch falla o vuelve vacío, no se pisa.
+
+#### 3. `gv_huellas_cambiadas`
+
+`tests/mon-vs-vista.cjs` congela la mitad SQL, así que un cambio del lado de la función lo dejaba
+verde y mintiendo. `GV_Huella_Objeto` guarda el `md5(prosrc)` esperado y la vista avisa cuando el
+cuerpo vivo dejó de coincidir. Complementa a `gv_reglas_perdidas`, que mira patrones y no cuentas.
+`sql/gv_huella_objeto_v2146.sql`.

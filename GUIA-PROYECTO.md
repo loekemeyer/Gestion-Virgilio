@@ -1,3 +1,53 @@
+## Nota v21.46 (2026-09-23) — CC/CR/RR entran al balde productivo · `GV_Feriados` es la canónica · centinela de huella
+
+Los tres pendientes que habían quedado anotados al cerrar la v21.27, contestados por Thomas.
+
+### 1. El monitor grande no medía NINGUNA de las tres tareas sin m³
+
+`CC`, `CR` y `RR` colgaban de `if (tanda && ev.ts_inicio)` y **el `texto` de esos eventos dejó de
+venir**: CC lo perdió en julio (1 de 63 cierres), CR en marzo, RR nunca lo tuvo. Consecuencia
+medida sobre 30 días:
+
+| código | qué es | cierres | horas |
+|---|---|---:|---:|
+| CR | Control Remitos | 68 | 32,13 |
+| CC | Carga Camión | 73 | 25,46 |
+| RR | Recepción Remitos | 44 | 21,51 |
+
+**79,10 h, el 15 % de las horas productivas**, que el cuadro «Mts3 x Hora» no le atribuía a nadie —
+y la fila **CC** venía en `—` desde agosto. La vista de la TV sí las contaba, así que `hs_prod` era
+el único número que las dos pantallas no podían comparar.
+
+Hoy hay un balde nuevo (`PROD_OTROS_CODES`), medido **por duración**, sin pedir `texto` y sin
+deduplicar por tanda — lo mismo que `prod_otros_s` de la vista. Pasa por `computeClosureDur`, o sea
+que se le netea el tiempo muerto y se le parte el cruce de medianoche.
+
+⚠ **La fila CC de arriba no se tocó**: ésa es un m³/h y necesita la tanda. El balde nuevo tiene su
+propia fila, **CC+CR+RR (h)**, con su gemela en Parcial/Ayer — **se alinean por posición, no por
+nombre**.
+
+⚠ Y el filtro de *"no tocó nada"* lo tenía que contemplar, o un operario que sólo hizo remitos
+quedaba afuera de la tabla mientras la vista lo listaba.
+
+`tests/mon-vs-vista.cjs` ahora compara **7 números** por operario. Verificado rompiéndolo:
+`legajo 8 · hs_prod: vista 10.73 · monitor 7.40`.
+
+### 2. Los feriados: una tabla, `GV_Feriados`
+
+Estaban escritos **tres veces a mano** —`index.html`, `monitor/tv.html` y el CTE de
+`gv_monitor_horas_operario_dia`—, con las mismas 16 fechas y las tres terminando el **25/12/2026**.
+La regla completa (y por qué no es `GV_Dias_No_Habiles` ni `GV_Dias_Sin_Reparto`) está en
+`CLAUDE.md`. Ya tiene 2027.
+
+⚠ El hardcodeo **quedó de fallback**: si el fetch falla o vuelve vacío, no se pisa. Mejor la lista
+de 2026 que ninguna.
+
+### 3. `gv_huellas_cambiadas`
+
+El test congela la mitad SQL (`tests/tools/vista-15.json`), así que un cambio de la función lo
+dejaba **verde y mintiendo**. `GV_Huella_Objeto` guarda el `md5` del cuerpo y la vista avisa cuando
+dejó de coincidir. `gv_reglas_perdidas` mira **patrones**; ésta mira **la cuenta**.
+
 ## Nota v21.27 (2026-09-22) — Las dos pantallas dan el mismo número, y el test lo sostiene
 
 ⚠ Salió como **v21.27** y no v21.21: mientras esto se escribía, otras sesiones pusearon a `main`
@@ -19,9 +69,12 @@ primer MG del día**: un `MG` no tiene fila de apertura (desde la v7.68 emite un
 duración adentro), así que el recorte le cortaba el pedazo anterior al primer evento. Ésa era la
 diferencia del legajo 94 — 2,63 contra 2,33.
 
-⚠ **Los feriados son la copia de `FERIADOS_AR` de `index.html`, NO `GV_Dias_No_Habiles`**: esa
-tabla tiene los días que el dueño cierra el depósito (al 22/09, uno solo) y mueve el conteo de días
-hábiles de toda la operación.
+⚠ **Los feriados NO son `GV_Dias_No_Habiles`**: esa tabla tiene los días que el dueño cierra el
+depósito (al 22/09, uno solo) y mueve el conteo de días hábiles de toda la operación.
+
+⚠ **Corrección v21.46:** acá decía que los feriados eran *"la copia de `FERIADOS_AR` de
+`index.html`"*. **Ya no hay copia**: desde la v21.46 la canónica es la tabla `public."GV_Feriados"`
+y la leen los tres lados (la función, `index.html` y `monitor/tv.html`). Ver la nota de la v21.46.
 
 ### 2. Las dos chicas: las dos eran de la vista
 
