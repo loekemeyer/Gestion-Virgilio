@@ -1,3 +1,51 @@
+## Nota v21.80 (2026-09-23) — La observación del pedido AHORA SE PUEDE LEER, en la PPP
+
+**Tomás González:** *"¿hay forma de agregar en la sección de PPP un botón que deje ver las
+observaciones que pone el cliente en la web al momento de cargar pedido?"*
+
+**Hay, y el dato ya estaba adentro: lo que faltaba era poder leerlo.** Las dos mitades anteriores
+ya existían —la v21.34 (Thomas) hizo viajar la observación desde `orders.sheets_payload` de LK
+hasta `PPP_Web_Programacion.observaciones`, y la v21.65 (Luis) le puso el badge **💬 comentario**
+a la NP en Programación—, pero **el texto vivía sólo en el `title`**: un tooltip.
+
+> **Un tooltip no existe en una tablet.** El badge anunciaba que había un comentario y, en el
+> dispositivo donde se mira la PPP, no había forma de abrirlo. En A Programar era medio tooltip:
+> el badge corta a 40 caracteres y el resto también quedaba atrás del hover.
+
+Tres formas de leerlo, todas sobre el MISMO dato (no se agregó ninguna columna ni ninguna RPC):
+
+| dónde | qué hace |
+|---|---|
+| badge de la **NP** (Programación) | es un botón → pop-up con el texto completo |
+| **al abrir la NP** | el comentario se ve arriba de los códigos, sin tocar nada más |
+| badge del **día** y de la **tanda** | dice cuántos comentarios lleva adentro (**💬 2**) → pop-up con todos, para no abrir NP por NP |
+| badge de **A Programar** | el mismo pop-up, con la clave empresa+pedido (ahí el pedido todavía no tiene NP) |
+
+⚠ **Es SÓLO LECTURA.** Lo escribe quien carga el pedido en la página (el cliente o el vendedor);
+acá no se edita ni se borra. El pop-up lo dice.
+
+⚠ **El día suma lo de sus tandas** (`_pgaObsDeDia`), no lo cuenta por su cuenta: la suma de las
+partes ES el todo, igual que los m³, los estados y la marca de Misiones (v20.45). Si el día lo
+contara aparte podría decir algo distinto de las tandas que muestra al abrirlo.
+
+⚠ **El badge del grupo se calcula de las filas del árbol**, así que anda igual en Programación y en
+**Pedidos atrasados**, que comparten `_pgaCuerpoHtml`.
+
+⚠⚠ **EL TEXTO NUNCA VIAJA EN EL `onclick`.** Un comentario trae comillas dobles, apóstrofes y
+saltos de línea (`Urgente: retira en moto el "Pato", av. O'Higgins 123.`): metido en el atributo
+rompe el handler. Viaja la **NP** —o empresa+pedido—, y el pop-up busca el texto en `_pgaObs`, el
+mismo mapa que alimenta el badge, que es la única fuente. El `title` sigue llevando el texto
+porque en el escritorio el hover es más rápido que un click, y ahí `escapeHtml` alcanza.
+
+⚠ Tocar el badge **no abre ni cierra** el día, la tanda ni la NP (`event.stopPropagation()`): eran
+filas clickeables y el badge vive adentro.
+
+**Chequeo:** `node tests/ppp-obs-boton.cjs` — corre la Programación de verdad, con un comentario
+que trae comillas y apóstrofes a propósito. Verificado que **falla con 14 errores contra el
+`index.html` anterior**, o sea que no tapa nada. Está en `tests/run.sh`.
+
+---
+
 ## Nota v21.75 (2026-09-23) — El Resumen de la PPP: la MAYOR demora, y un camión por grupo de zonas
 
 Dos pedidos del mismo mensaje, sobre la única pantalla que mira el conjunto.

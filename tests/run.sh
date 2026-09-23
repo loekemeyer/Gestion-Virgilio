@@ -501,6 +501,9 @@ node tests/rest-tope-1000.cjs
 echo "== ppp-misiones (regresión: destino del expreso y el aviso de Misiones en la Programación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-misiones.cjs
 
+echo "== ppp-obs-boton (v21.80: la observación del pedido se LEE — badge clickeable en NP, tanda y día, y dentro de la NP abierta) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-obs-boton.cjs
+
 echo "== ppp-tanda-cambiar-dia (v19.11: el botón 📅 Cambiar de día en cada tanda, en Programación y en Pedidos atrasados) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-tanda-cambiar-dia.cjs
 
@@ -882,7 +885,7 @@ echo "== pipe-vinculados (v21.59 (Luis, 23/09) — 'que se vea para el chequeo d
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-vinculados.cjs
 
 
-# ── v21.78 — los 3 que la v21.77 dejó afuera por fallar. Ninguno era un bug de la app:
+# ── v21.80 — los 3 que la v21.77 dejó afuera por fallar. Ninguno era un bug de la app:
 #    oc-auto-ciclo fallaba SÓLO los miércoles (el diálogo muestra 2 atajos y no 3 porque
 #    hoy+7 ya ES el próximo miércoles), ppp-reprog-boton le faltaba el mock de
 #    gv_ppp_atrasados desde la v21.37, y stk-buscar-cero-adelante medía la regla de

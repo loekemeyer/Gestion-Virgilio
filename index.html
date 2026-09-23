@@ -1459,6 +1459,22 @@ button {
   color:#78350f; font-size:12.5px; font-weight:600; white-space:pre-wrap; word-break:break-word; }   /* v21.34 */
 .apr-obs{ font-size:11.5px; font-weight:700; color:#78350f; background:#fffbeb; border:1px solid #fde68a;
   border-radius:999px; padding:1px 8px; margin-left:4px; white-space:nowrap; }                     /* v21.34 */
+/* v21.80 (Tomás González, 23/09): el badge de la observación se TOCA. El texto vivía sólo en el
+   `title` y en la tablet no hay hover, así que lo que el badge anunciaba no se podía leer. */
+.apr-obs.clic{ cursor:pointer; }
+.apr-obs.clic:hover{ background:#fef3c7; border-color:#fcd34d; }
+.pga-obs{ font-size:11px; font-weight:800; background:#fef3c7; color:#92400e; border:1px solid #fcd34d;
+  border-radius:999px; padding:0 6px; margin-left:4px; cursor:pointer; white-space:nowrap; }       /* v21.80 */
+.pga-obs:hover{ background:#fde68a; }
+.pga-nobs{ margin:0 0 6px; padding:6px 9px; background:#fffbeb; border:1px solid #fde68a;
+  border-left:4px solid #f59e0b; border-radius:8px; color:#78350f; font-size:12.5px; font-weight:600;
+  white-space:pre-wrap; word-break:break-word; }                                                  /* v21.80 */
+.gv-obs-i{ margin:0 0 8px; }
+.gv-obs-np{ font-size:12px; font-weight:800; color:#0f172a; }
+.gv-obs-cli{ font-size:12px; font-weight:600; color:#475569; }
+.gv-obs-txt{ margin-top:3px; padding:9px 11px; background:#fffbeb; border:1px solid #fde68a;
+  border-radius:8px; color:#78350f; font-size:14px; font-weight:600; line-height:1.45;
+  white-space:pre-wrap; word-break:break-word; }                                                  /* v21.80 */
 .apr-hor.vacio{ background:#fff; color:#94a3b8; border:1px dashed #cbd5e1; font-weight:700; }
 .apr-hor.vacio:hover{ background:#f8fafc; color:#475569; }
 .apr-hor.cli{ background:#dcfce7; color:#14532d; border-color:#86efac; }   /* lo eligió el cliente */
@@ -6052,7 +6068,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.79"></script>
+<script type="module" src="recepcion.js?v=21.80"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10003,7 +10019,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.79";
+const APP_VERSION = "v21.80";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39715,6 +39731,109 @@ function pgaObsNeed(nps) {
   }
 }
 function _pgaObsDe(r) { return (_pgaObs && r && r.np) ? (_pgaObs.get(String(r.np).trim()) || "") : ""; }
+/* v21.80 (Tomás González, 2026-09-23): *"un botón que deje ver las observaciones que pone el
+   cliente en la web al momento de cargar pedido"*.
+   El dato ya viajaba (v21.34, Thomas) y el badge ya avisaba (v21.65, Luis), pero el TEXTO vivia
+   SOLO en el `title`: en la tablet y en el celular no hay hover, asi que el comentario que el
+   badge anunciaba no se podia leer. Desde aca son tres formas de leerlo, sin cambiar el dato:
+     1. el badge de la NP es un BOTON -> pop-up con el texto completo;
+     2. al abrir la NP, el comentario se ve arriba de los codigos, sin tocar nada;
+     3. el dia y la tanda llevan un badge con CUANTOS comentarios tienen adentro -> pop-up con
+        todos, para no abrir NP por NP.
+   ES SOLO LECTURA. Lo escribe quien carga el pedido en la pagina; aca no se edita ni se borra.
+   ⚠ El TEXTO nunca viaja en el atributo `onclick` — un comentario trae comillas, apostrofes y
+   saltos de linea. Viaja la NP (o empresa+pedido) y el pop-up lo busca en el mismo mapa que
+   alimenta el badge, que es la unica fuente. */
+let _pgaCliNp = new Map();   // NP -> razon social, para titular el pop-up de un grupo
+function _pgaObsNps(filas) {
+  const out = [];
+  for (const r of (filas || [])) {
+    if (!r || !r.np) continue;
+    const np = String(r.np).trim();
+    _pgaCliNp.set(np, String(r.razon_social || ""));
+    if (_pgaObsDe(r)) out.push(np);
+  }
+  return out;
+}
+/* El dia suma lo de sus tandas: la suma de las partes ES el todo, igual que los m3 y los estados
+   (v20.45). Si el dia lo contara por su cuenta podria decir algo distinto de las tandas que muestra. */
+function _pgaObsDeDia(d) {
+  let out = [];
+  for (const t of ((d && d.tandasArr) || [])) out = out.concat(_pgaObsNps(t.filas));
+  return out;
+}
+/* El badge del dia y de la tanda. Las NP van en el atributo separadas por `|`: son cortas y no
+   traen comillas (`LK 0043`), al contrario del comentario. Sin comentarios adentro no dibuja nada. */
+function _pgaObsGrupoBadge(nps, titulo) {
+  if (!nps || !nps.length) return "";
+  const n = nps.length;
+  return '<span class="pga-obs" onclick="event.stopPropagation();pgaObsGrupoAbrir(\'' +
+    escapeHtml(titulo) + '\',\'' + escapeHtml(nps.join("|")) + '\')"' +
+    ' title="' + n + (n === 1 ? ' pedido trae' : ' pedidos traen') +
+    ' un comentario de quien lo cargo en la pagina. Toca para leerlos todos.">💬 ' + n + '</span>';
+}
+/* ── El pop-up. Una lista de {np, cli, txt}, con uno o con veinte. ─────────────────────── */
+let _gvObs = null;
+function gvObsMostrar(titulo, lista) {
+  _gvObs = { titulo: String(titulo || ""), lista: (lista || []).filter(function (x) { return x && x.txt; }) };
+  gvObsRender();
+}
+function gvObsCerrar() { _gvObs = null; gvObsRender(); }
+function pgaObsAbrir(np) {
+  const k = String(np || "").trim(); if (!k) return;
+  gvObsMostrar(k, [{ np: "", cli: _pgaCliNp.get(k) || "", txt: _pgaObsDe({ np: k }) }]);
+}
+function pgaObsGrupoAbrir(titulo, nps) {
+  const l = String(nps || "").split("|").map(function (np) {
+    const k = String(np || "").trim();
+    return { np: k, cli: _pgaCliNp.get(k) || "", txt: _pgaObsDe({ np: k }) };
+  });
+  gvObsMostrar(titulo, l);
+}
+/* A Programar: ahi el pedido todavia no tiene NP, asi que la clave es empresa+pedido y el texto
+   sale de `obs_pedido`, que es como lo trae el feed (v21.34). */
+function aprObsAbrir(empresa, orderId) {
+  const k = aprKey(empresa, orderId);
+  const p = ((_apr && (_apr.pedidosTodos || _apr.pedidos)) || []).find(function (x) {
+    return aprKey(x.empresa, x.order_id) === k; });
+  if (!p) return;
+  gvObsMostrar("web " + aprEmpNombre(p.empresa) + " " + String(p.order_id),
+               [{ np: "", cli: String(p.razon_social || ""), txt: String(p.obs_pedido || "").trim() }]);
+}
+function gvObsRender() {
+  let ov = document.getElementById("gvObsModal");
+  if (!_gvObs) { if (ov) ov.hidden = true; return; }
+  if (!ov) { ov = document.createElement("div"); ov.id = "gvObsModal"; ov.className = "cuar-modal"; document.body.appendChild(ov); }
+  ov.hidden = false;
+  const s = _gvObs, n = s.lista.length;
+  ov.innerHTML = '<div class="cuar-m-back" onclick="gvObsCerrar()"></div>' +
+    '<div class="cuar-m-card">' +
+      '<div class="cuar-m-head"><span>💬 Observación del pedido · ' + escapeHtml(s.titulo) + '</span>' +
+        '<button class="cuar-m-x" onclick="gvObsCerrar()">✕</button></div>' +
+      '<div class="cuar-m-body">' +
+        (n ? s.lista.map(function (x) {
+              return '<div class="gv-obs-i">' +
+                (x.np ? '<span class="gv-obs-np">' + escapeHtml(x.np) + '</span> ' : '') +
+                (x.cli ? '<span class="gv-obs-cli">' + escapeHtml(x.cli) + '</span>' : '') +
+                '<div class="gv-obs-txt">' + escapeHtml(x.txt) + '</div></div>';
+            }).join("")
+          : '<p class="cuar-m-sub">No trae observación.</p>') +
+        '<p class="cuar-m-sub">La escribió quien cargó el pedido en la página (el cliente o el vendedor).' +
+        ' Es sólo lectura: acá no se edita.</p>' +
+      '</div>' +
+      '<div class="cuar-m-foot"><button class="cuar-save" onclick="gvObsCerrar()">Cerrar</button></div>' +
+    '</div>';
+}
+window.pgaObsAbrir = pgaObsAbrir; window.pgaObsGrupoAbrir = pgaObsGrupoAbrir;
+window.aprObsAbrir = aprObsAbrir; window.gvObsCerrar = gvObsCerrar;
+/* El comentario COMPLETO dentro de la NP abierta, arriba de los códigos: es la forma de leerlo
+   sin hover y sin un click más. Va en el mismo hueco que la v17.96 (Luis) destinó a la nota. */
+function _pgaObsHtml(np) {
+  const o = _pgaObsDe({ np: np });
+  if (!o) return "";
+  return '<div class="pga-nobs" title="Observación del pedido (la escribió quien lo cargó en la página)">💬 ' +
+    escapeHtml(o) + '</div>';
+}
 function _pgaDestDe(r) {
   if (!_pgaDest) return null;
   const np = _pppNpNorm(r && r.np); if (!np) return null;
@@ -39964,6 +40083,9 @@ function _pgaCuerpoHtml(dias, opts) {
       '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + _pgaDiaHtml(d.key) +
         (d.mis ? '<span class="pga-mis" title="Este día lleva un pedido a una provincia marcada. El camión va al expreso en CABA, pero la mercadería termina en otra provincia: mirar que salga con el expreso que corresponde.">⚠ ' +
           escapeHtml(_pgaMisTxt(d.mis, d.misProv)) + '</span>' : '') +
+        // v21.80 (Tomás González): cuántos comentarios lleva el día adentro. Se calcula acá, de
+        // las filas que ya tiene el árbol, para que ande igual en Programación y en Atrasados.
+        _pgaObsGrupoBadge(_pgaObsDeDia(d), "día " + _pgaDiaTxt(d.key)) +
         /* ⚠ v20.59: acá había un texto de 626 px ("vacío · acá se mandan las tandas armadas sin
            fecha, con 📅 Cambiar de día"). Como toda la tabla va `nowrap`, ESE renglón —uno— le
            fijaba el ancho a la columna del día ENTERA: 636 px cuando las filas de día piden 165.
@@ -39982,6 +40104,7 @@ function _pgaCuerpoHtml(dias, opts) {
           '<span class="pga-pill e-' + te + '">' + PGA_EST_TXT[te] + '</span>' +
           (t.mis ? '<span class="pga-mis" title="Esta tanda lleva un pedido a una provincia marcada.">⚠ ' +
             escapeHtml(_pgaMisTxt(t.mis, t.misProv)) + '</span>' : '') +
+          _pgaObsGrupoBadge(_pgaObsNps(t.filas), "tanda " + t.tanda) +   // v21.80
           '<span class="pga-sub">' + escapeHtml(_pgaZonaTanda(t)) + '</span></span>' +
           // v19.11 (Thomas): "agregá un botón a cada tanda que sea Cambiar de día y que te permita
           // asignarla en un día diferente". Va en la fila de la TANDA y acá lo heredan las dos tablas
@@ -40042,9 +40165,11 @@ function _pgaCuerpoHtml(dias, opts) {
                                                     : "Día y franja cargados a mano. Tocá para cambiarlos.")
                   : "Este cliente coordina horario y no hay ninguno cargado. Tocá para ponerlo.") + '">🕑 ' +
               escapeHtml(aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja })) + '</span>' : '') +
-            // v21.65 (Luis): el comentario del pedido viaja con la NP — el badge avisa, el texto va en el title
-            (_pgaObsDe(r) ? '<span class="pga-obs" title="Comentario del pedido: ' + escapeHtml(_pgaObsDe(r)) + '"'
-              + ' style="font-size:11px;font-weight:800;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:999px;padding:0 6px;margin-left:4px;cursor:help">💬 comentario</span>' : '') +
+            // v21.65 (Luis): el comentario del pedido viaja con la NP — el badge avisa.
+            // v21.80 (Tomás González): y el badge SE TOCA. El `title` sigue estando para el monitor,
+              // pero el texto completo lo da el pop-up, que es lo único que se puede leer en la tablet.
+            (_pgaObsDe(r) ? '<span class="pga-obs" onclick="event.stopPropagation();pgaObsAbrir(\'' + escapeHtml(r.np) + '\')"'
+              + ' title="Comentario del pedido (tocá para leerlo completo): ' + escapeHtml(_pgaObsDe(r)) + '">💬 comentario</span>' : '') +
             (r.cod ? '<span class="pga-cod" title="Número de cliente en ' + (r.empresa === "CH" ? "Chef" : "Loekemeyer") + '">' +
               escapeHtml(r.empresa || "LK") + " " + escapeHtml(r.cod) + '</span>' : '') +
             '<span class="pga-cli" title="' + escapeHtml(r.razon_social || "") + '">' + escapeHtml(r.razon_social || "—") + '</span>' +
@@ -40086,6 +40211,7 @@ function _pgaCuerpoHtml(dias, opts) {
           // va ahí, en la misma fila, en vez de en un renglón aparte debajo.
           // `stopPropagation` en la celda: si no, tocar un código cierra la NP.
           (nb ? '<td colspan="7" class="pga-ncont" onclick="event.stopPropagation()">' +
+                  _pgaObsHtml(r.np) +   // v21.80: el comentario del cliente, completo y sin hover
                   _pgaItemsHtml(r.np) + '</td>'
               // Tandas y NPs quedan vacías (una NP no es un grupo); las cinco de la derecha, v20.11.
               : '<td></td><td></td>' + _pgaNpPctFila(est, _pgaSalio(r))) +
@@ -47012,7 +47138,12 @@ function aprObsLinea(p) {
 function aprObsBadge(p) {
   const o = String((p && p.obs_pedido) || "").trim();
   if (!o) return "";
-  return ' <span class="apr-obs" title="' + escapeHtml("Observación del pedido: " + o) + '">💬 ' + escapeHtml(o.length > 40 ? o.slice(0, 40) + "…" : o) + '</span>';
+  // v21.80 (Tomás González): clickeable. Este badge corta a 40 caracteres, así que sin el
+  // pop-up un comentario largo quedaba ilegible salvo con el mouse encima.
+  return ' <span class="apr-obs clic" onclick="event.stopPropagation();aprObsAbrir(\'' +
+    escapeHtml(String(p.empresa || "lk")) + '\',\'' + escapeHtml(String(p.order_id)) + '\')"' +
+    ' title="' + escapeHtml("Observación del pedido (tocá para leerla completa): " + o) + '">💬 ' +
+    escapeHtml(o.length > 40 ? o.slice(0, 40) + "…" : o) + '</span>';
 }
 function aprHorBadge(p) {
   const oc = aprTurnoOc(p);

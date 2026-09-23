@@ -53,6 +53,13 @@ const CATALOGO = [
     rompe: ["pk-excedente-orden"] },
   { n: "codigo-inexistente", de: "r.visible_en_stock === false &&",
     a: "false && r.visible_en_stock === false &&", rompe: ["stk-codigo-inexistente"] },
+  // v21.80: el comentario del pedido, que hasta esa version se veia SOLO con el mouse encima.
+  { n: "obs-en-la-np", de: "function _pgaObsHtml(",
+    a: "function _pgaObsHtml(){return '';} function _pgaObsHtmlMut(",
+    rompe: ["ppp-obs-boton"] },
+  { n: "obs-badge-grupo", de: "function _pgaObsGrupoBadge(",
+    a: "function _pgaObsGrupoBadge(){return '';} function _pgaObsGrupoBadgeMut(",
+    rompe: ["ppp-obs-boton"] },
 ];
 
 const filtro = process.argv[2] || "";

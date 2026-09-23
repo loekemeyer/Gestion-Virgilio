@@ -1,4 +1,19 @@
-# Estado y pendientes — al 2026-09-21 (última actualización: v20.62)
+# Estado y pendientes — al 2026-09-23 (última actualización: v21.80)
+
+> **2026-09-23, pedido de Tomás González (v21.80) — la observación del pedido ya se puede LEER en
+> la PPP, y lo que falta NO es código: es que la página de CHEF la pida.** El badge 💬 de la v21.65
+> ahora es un botón (pop-up con el texto completo), el comentario se ve al abrir la NP, y el día y
+> la tanda dicen cuántos llevan adentro. **Pero el portal de Chef no manda observaciones**: medido
+> al aplicar la v21.34, **0 de 86 pedidos** de Chef traían una, contra 51 de 435 de LK. O sea que
+> en un pedido `CH ...` el badge **no va a aparecer nunca**, y no es una falla de Gestión: el campo
+> no existe en ese checkout. **Sólo lo destraba el dueño**, agregándolo en el repo `paginach` (LK
+> ya lo tiene, en `orders.sheets_payload`).
+>
+> ⚠ Esa sesión **no tuvo acceso a Supabase** (sin MCP y con el proxy de red cerrado), así que **no
+> se midió cuántas NP programadas traen comentario hoy** ni se cargó la tarea de Planify de Tomás
+> González (employee_id 16). Las dos cosas quedan pendientes para la próxima sesión que sí lo tenga:
+> `select count(*) from public."PPP_Web_Programacion" where btrim(coalesce(observaciones,'')) <> '';`
+
 
 > **2026-09-21, tanda de Thomas (v20.62, §3.lj) — el destino de las NP de ISIS ya resuelve, y lo
 > que queda NO es código: es dato que falta en el padrón.** El aviso de provincia de la v20.45
