@@ -1933,6 +1933,49 @@ la regla (sin aprobar → sin tanda; con fila en Liberados → se programa).
 **Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
 `sql/gv_armado_cuarentena_v2095.sql`, §3.me.
 
+## ⚠ REGLA (Luis, 2026-09-23, v21.46): una RESPUESTA no opina sobre lo que no PREGUNTÓ
+
+**Luis, textual:** *"primero revisá por qué Ierakuin no está en el submódulo de cuarentena. Se
+sigue escapando y seguís sin poder arreglarlo"*.
+
+Síntoma: **`web CH 218 · Ierakuin Srl (CH 1665)`** se dibujaba en la lista normal de «Pedidos a
+programar» **con el chip 🚧 «retenido en cuarentena · no se arma solo»** —que lo pinta el
+backend— mientras el submódulo Cuarentena no lo tenía. Los dos lados decían cosas distintas del
+mismo pedido.
+
+**Medido:** `gv_cuarentena_marcar` devuelve ese pedido con `motivos ["deuda"]` y
+**$2.062.528,58**. El backend nunca se equivocó; lo que fallaba es cómo el front aplica la
+respuesta.
+
+**La causa.** Los pedidos de **Chef llegan tarde** (otra vuelta de red: `gv_pedidos_web_np_chef_admin`
+por FDW), así que `cuarMarcarPedidos` corre **dos veces por carga** (v20.98): la primera con
+LK+ISIS y la segunda, cuando Chef ya está, con la lista completa. Las dos terminaban recorriendo
+`_apr.pedidosTodos` —que para entonces **ya incluye a Chef**— y **borrando la marca de todo
+pedido que su respuesta no nombrara**:
+
+```js
+else { if (p.cuarentena_motivos) delete p.cuarentena_motivos; … }
+```
+
+La corrida de LK **no preguntó por Chef**, así que si contesta última le borra la cuarentena al
+único pedido de Chef. Es una carrera —por eso aparece y desaparece, y por eso la v20.98 parecía
+haberlo arreglado—: alcanza con que la llamada de LK se reintente una vez (v20.96, los timeouts
+son frecuentes) para que llegue después.
+
+> **La regla:** una marcación toca **sólo los pedidos de su propio lote**. Lo que no preguntó no
+> lo sabe, y no saber no es "no retiene".
+
+⚠ **Lo que SÍ se sigue limpiando:** un pedido que estaba en el lote y ya no retiene pierde la
+marca, o un liberado quedaría retenido para siempre. El test muerde por los dos lados.
+
+⚠ **Es el mismo pozo de §"una lectura ROTA no es un CERO", un paso más adelante:** ahí el cero
+venía de un feed caído; acá viene de *"no pregunté"*. En los dos casos el front lo leyó como
+*"no hay"*.
+
+**Chequeo:** `node tests/apr-cuar-chef-tarde.cjs` — corre las dos marcaciones de verdad, con la
+de LK contestando última. Verificado que falla contra el código anterior (*"el pedido de Chef
+perdió su cuarentena"*).
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.89): el PIPELINE **reemplazó** al submódulo de clientes nuevos
 
 **Luis, textual:** *"implementá esta nueva versión de clientes nuevos en «A programar»
