@@ -49678,6 +49678,10 @@ async function pipeSpeech(empresa, orderId, n) {
                "El mensaje que iría es: «" + (n === 2 ? clinSpeechMsg2(p) : clinSpeechMsg1(p)) + "»";
     _apr.msgErr = false; pppRenderProg(); return;
   }
+  if (!clinWppTel(p)) {
+    _apr.msg = "Speech " + n + " marcado. El cliente no tiene teléfono cargado: no se abrió WhatsApp.";
+    _apr.msgErr = false; pppRenderProg(); return;
+  }
   clinAbrirWa(p, n === 2 ? clinSpeechMsg2(p) : clinSpeechMsg1(p));
 }
 /* Aprobar y Eliminar del EJEMPLO: no llaman a cuarLiberar ni a aprAnularAbrir, que tocan
@@ -49760,8 +49764,13 @@ function pipeAccionesBtns(p) {
              "Vincularlo a una razón social que ya es cliente");
 
   if (et === "no_referenciado")
-    return B("pipe-b-wa", "pipeSpeech('" + emp + "','" + oid + "',1)", "💬 Contacto Speech 1",
-             sinTel ? "No hay teléfono cargado — igual marca el contacto" : "Le pide el pago por adelantado del total") +
+    // v22.03 (23/09): sin telefono el boton dice "Sin telefono" — sigue marcando el
+    // Speech 1 (si no, un cliente sin telefono nunca llega a «Pagó»), pero no promete WhatsApp.
+    return B("pipe-b-wa", "pipeSpeech('" + emp + "','" + oid + "',1)",
+             sinTel ? "📵 Sin teléfono" : "💬 Contacto Speech 1",
+             sinTel ? "No hay teléfono del cliente en ninguna tabla: tocalo para marcar el Speech 1 " +
+                      "(contacto hecho por otro medio). No abre WhatsApp."
+                    : "Le pide el pago por adelantado del total") +
            _ref +
            B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
              "Vincularlo a una razón social que ya es cliente");
@@ -49770,8 +49779,9 @@ function pipeAccionesBtns(p) {
     return B("pipe-b-ok2", "pipeFirmaAbrir('" + emp + "','" + oid + "','pagado','Confirmar el PAGO'," +
              "'Con esto queda listo para programar, con prioridad.')", "💵 Pagó",
              "El cliente pagó: queda listo para aprobar y programar") +
-           B("pipe-b-wa", "pipeSpeech('" + emp + "','" + oid + "',2)", "💬 Contacto Speech 2",
-             sinTel ? "No hay teléfono cargado" : "Le pregunta si paga en 24 h; si no, se da de baja", sinTel) +
+           B("pipe-b-wa", "pipeSpeech('" + emp + "','" + oid + "',2)", sinTel ? "📵 Sin teléfono" : "💬 Contacto Speech 2",
+             sinTel ? "No hay teléfono del cliente en ninguna tabla: no se puede mandar el Speech 2"
+                    : "Le pregunta si paga en 24 h; si no, se da de baja", sinTel) +
            _ref;
 
   if (et === "speech2")
