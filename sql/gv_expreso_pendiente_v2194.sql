@@ -52,6 +52,14 @@ create policy "GV_Expreso_Pendiente_writer" on public."GV_Expreso_Pendiente"
   for all to lk_ppp_reader using (true) with check (true);
 grant select on public."GV_Expreso_Pendiente" to anon, authenticated;
 grant select, insert, update, delete on public."GV_Expreso_Pendiente" to lk_ppp_reader;
+-- ⚠ Los grants por defecto del schema le dan INSERT/UPDATE/DELETE a `anon`
+--   igual (medido: venia con los tres). La RLS ya lo frenaba —no hay policy de
+--   escritura para anon— pero el grant sobra y queda a una policy de distancia
+--   de ser un agujero. Es el mismo criterio que la regla de los backups.
+--   Verificado como anon: antes "violates row-level security policy", despues
+--   "permission denied". El modulo sigue andando porque escribe por
+--   gv_expreso_marcar, que es SECURITY DEFINER.
+revoke insert, update, delete, truncate on public."GV_Expreso_Pendiente" from anon, authenticated;
 
 -- Lo que ve el modulo. security_invoker = true (regla del repo: sin eso corre
 -- como postgres y saltea la RLS).
