@@ -58,15 +58,15 @@ catch (_e) {
       _patrRows = null; _patrTs = 0; _patrErr = "";
       patrNeed(true);
       await new Promise((ok) => setTimeout(ok, 120));
-      // ⚠ el submódulo de Pedidos atrasados (el árbol, `_pppPlanTabla = true`) ya lo cubre
-      //   `ppp-atrasados.cjs`; acá no se dibuja a propósito, porque `pgaNeed()` sale a
-      //   buscar la programación entera por su cuenta y el test se queda colgado.
+      // v21.38 — la grilla de 6 dias (y con ella su banda ⏰) se saco. La unica vista de
+      //   Programacion es el arbol, con el submodulo de Pedidos atrasados arriba.
       const o = {};
-      _pppTab = "plan"; _pppPlanDay = null; _pppPlanTabla = false; pppRenderProg();
-      const grid = document.getElementById("pppPreview").innerHTML;
-      o.banda = /pn-venc-band/.test(grid);
-      o.bandaN = (/<b>⏰ (\d+) atrasado/.exec(grid) || [])[1] || "0";
-      o.kpiPedidos = (/<div class="l">Pedidos<\/div><div class="v">(\d+)<\/div>/.exec(grid) || [])[1] || "?";
+      _pppTab = "plan"; _pppPlanDay = null; _pppPlanTabla = true; pppRenderProg();
+      const arbol = document.getElementById("pppPreview").innerHTML;
+      o.grilla = /pn-venc-band/.test(arbol);                       // tiene que ser false SIEMPRE
+      // ⚠ sólo el caso vacío: el detalle del submódulo cuelga de `pgaNeed()`, que acá no trae
+      //   filas, y ya lo cubre `ppp-atrasados-modulo.cjs`. Lo que se prueba acá es Resumen.
+      o.vacio = /Sin pedidos atrasados/.test(arbol);
       _pppTab = "resumen"; _pppVencInline = false; pppRenderProg();
       const res = document.getElementById("pppPreview").innerHTML;
       o.cartel = /pedido\(s\) con fecha de entrega vencida/.test(res);
@@ -98,15 +98,12 @@ catch (_e) {
   const chk = (c, m) => { console.log((c ? "ok   " : "MAL  ") + m); if (!c) fails.push(m); };
 
   chk(!r.vacio.cartel, "backend sin atrasados → Resumen NO saca el cartel de fecha vencida (era el bug: decía " + r.vacio.cartelN + ")");
-  chk(!r.vacio.banda, "…y el Tablero de 6 días no saca la banda ⏰ (decía " + r.vacio.bandaN + ")");
-  chk(r.vacio.kpiPedidos === "1", "…y el KPI de Pedidos sigue contando sólo lo futuro (1): " + r.vacio.kpiPedidos);
+  chk(r.vacio.vacio, "…y el submódulo de Programación dice «Sin pedidos atrasados»");
 
   chk(r.uno.cartel && r.uno.cartelN === "1", "backend con 1 atrasado → Resumen dice 1: " + r.uno.cartelN);
-  chk(r.uno.banda && r.uno.bandaN === "1", "…el Tablero dice 1: " + r.uno.bandaN);
-  chk(r.uno.kpiPedidos === "1", "…y el KPI de Pedidos no se movió (1): " + r.uno.kpiPedidos);
 
   chk(r.caido.cartel && r.caido.cartelN === "2", "backend caído → ante la duda se avisa, con el criterio viejo (2): " + r.caido.cartelN);
-  chk(r.caido.banda && r.caido.bandaN === "2", "…y la banda también (2): " + r.caido.bandaN);
+  chk(!r.vacio.grilla && !r.uno.grilla && !r.caido.grilla, "v21.38: la grilla de 6 días no se dibuja nunca");
 
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));
   if (fails.length) { console.error("\nFALLARON " + fails.length + ":\n· " + fails.join("\n· ")); process.exit(1); }

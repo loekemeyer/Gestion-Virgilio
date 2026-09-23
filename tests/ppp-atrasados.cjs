@@ -69,13 +69,14 @@ catch (_e) {
     await pppLoadProgFromSupabase();
     await pppRefreshControlado(); await pppRefreshArmado(); await pppRefreshEnSalida(); await pppRefreshValor();
 
-    // (a)+(b)+(e) la grilla de Programación
-    _pppTab = "plan"; _pppPlanDay = null; _pppPlanTabla = false; pppRenderProg();
+    // (a)+(b)+(e) la vista de Programación
+    // v21.38 (Luis): la grilla de 6 días se sacó, y con ella su banda ⏰ y su KPI de Pedidos.
+    //   El submódulo de Pedidos atrasados del árbol ocupa ese lugar y lo cubre
+    //   `ppp-atrasados-modulo.cjs`. Acá queda lo que sigue siendo de esta pantalla.
+    _pppTab = "plan"; _pppPlanDay = null; _pppPlanTabla = true; pppRenderProg();
     let h = document.getElementById("pppPreview").innerHTML;
-    out.banda = /class="pn-venc-band rep"[^>]*onclick="pppPlanAbrir\('venc'\)"/.test(h);
-    out.bandaDice = /<b>⏰ 4 atrasados<\/b>/.test(h) && /3 sin salir → reprogramar/.test(h) && /1 salieron · falta el remito/.test(h);
     out.sinTarjetaGrande = !/pn-alert/.test(h);
-    out.kpiSoloFuturo = /<div class="l">Pedidos<\/div><div class="v">2<\/div>/.test(h);   // v13.33: los 3 vencidos no cuentan
+    out.sinGrilla = !/pn-venc-band/.test(h);
 
     // abre la lista en la MISMA solapa
     pppPlanAbrir("venc");
@@ -115,18 +116,16 @@ catch (_e) {
 
     // (b) sin atrasados no hay banda
     _pppParsed.prog = _pppParsed.prog.filter((x) => ["E92A"].indexOf(x.tanda) >= 0);   // deja sólo los del día
-    _pppTab = "plan"; _pppPlanDay = null; _pppPlanTabla = false; pppRenderProg();
-    out.sinAtrasados = !/pn-venc-band/.test(document.getElementById("pppPreview").innerHTML);
+    _pppTab = "plan"; _pppPlanDay = null; _pppPlanTabla = true; pppRenderProg();
+    out.sinAtrasados = /Sin pedidos atrasados|patr/.test(document.getElementById("pppPreview").innerHTML);
     return out;
   });
   await b.close();
 
   const fails = [];
   const chk = (c, m) => { console.log((c ? "ok   " : "MAL  ") + m); if (!c) fails.push(m); };
-  chk(r.banda, "Programación tiene la banda de atrasados y abre la lista ahí mismo");
-  chk(r.bandaDice, "y dice cuántos son, partidos en sin salir / falta el remito");
   chk(r.sinTarjetaGrande, "sin la tarjeta grande que se sacó en la v13.33");
-  chk(r.kpiSoloFuturo, "el KPI de Pedidos sigue contando sólo lo que tiene fecha por delante (2)");
+  chk(r.sinGrilla, "v21.38: la grilla de 6 días (y su banda ⏰) ya no se dibuja");
   chk(r.listaEnPlan, "la lista abre en la misma solapa Programación");
   chk(r.volverALaGrilla, "y ahí el botón vuelve a la grilla de 6 días");
   chk(r.cartel, "Resumen sigue con su cartel de vencidos");
@@ -141,7 +140,7 @@ catch (_e) {
   chk(r.sinTandaSeVe, "un atrasado SIN TANDA (el caso Cencosud) también se ve en la lista");
   chk(r.diaSinFechaPorFila, "en la vista de un día NO se repite la fecha en cada fila (ya está en el encabezado)");
   chk(r.cierra, "cerrarla la saca de la pantalla");
-  chk(r.sinAtrasados, "sin atrasados no se dibuja ninguna banda");
+  chk(r.sinAtrasados, "sin atrasados el submódulo sigue en su lugar diciendo que no hay");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));
   if (fails.length) { console.error("\nFALLARON " + fails.length + ":\n· " + fails.join("\n· ")); process.exit(1); }
   console.log("\nppp-atrasados OK");

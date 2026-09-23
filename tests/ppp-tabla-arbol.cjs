@@ -82,7 +82,8 @@ catch (_e) {
       return th.length === 9 && !th[0] && !th[1] && !th[2] && !th[3] && /sal/.test(th[4]) &&
              /fac/.test(th[5]) && /arm/.test(th[6]) && /pro/.test(th[7]) && /pen/.test(th[8]);
     })();
-    out.salidas = /pppPlanTabla\(false\)/.test(html);   // v20.24: ya no hay botón de vista clásica
+    // v21.38 (Luis): tampoco hay botón al tablero de 6 días — esa vista se sacó.
+    out.salidas = !/pppPlanTabla\(false\)/.test(html) && !/Tablero de 6 d/.test(html);
     // v17.79 (Luis): "Facturado azul, armado verde, en proceso amarillo, pendiente rojo"
     out.paleta = (function () {
       const fam = function (css) {
@@ -216,9 +217,9 @@ catch (_e) {
     out.midAbierta = _mid();
     out.total = filaDe("table.pga > tfoot > tr")[0];
 
-    // (8) volver al tablero de 6 días y a la tabla
+    // (8) v21.38 — la grilla de 6 días ya no existe: llamar a pppPlanTabla(false) deja la tabla.
     pppPlanTabla(false); await new Promise((res) => setTimeout(res, 150));
-    out.tablero = /pn-days/.test(prev.innerHTML) && !/class="pga"/.test(prev.innerHTML);
+    out.tablero = !/pn-days/.test(prev.innerHTML) && /class="pga"/.test(prev.innerHTML);
     pppPlanTabla(true); await new Promise((res) => setTimeout(res, 150));
     out.vuelve = /class="pga"/.test(prev.innerHTML);
 
@@ -240,7 +241,7 @@ catch (_e) {
     JSON.stringify(r.paleta && r.paleta.head));
   t(r.paleta && JSON.stringify(r.paleta.num) === JSON.stringify(_pal),
     "(1) y el número de cada uno con el mismo color — " + JSON.stringify(r.paleta && r.paleta.num));
-  t(r.salidas, "(1) botones para el tablero de 6 días y la vista clásica");
+  t(r.salidas, "(1) v21.38: ya no hay botón al tablero de 6 días");
   t(r.dias.length === 2, "(2) una fila por día con programación (2)");
   t(r.esperaFija, "(2) el día «⏸ Armados en espera» está siempre, aunque esté vacío (v19.32, Luis)");
   t(r.esperaUltima, "(2) y va al final, después de los días con fecha");
@@ -292,8 +293,8 @@ catch (_e) {
   t(_ma.derTools > 0 && Math.abs(_ma.derTools - _ma.derTabla) <= 4 && _ma.derTools > _mc.derTools,
     "(10) y VIAJAN con ella al abrirla — " + _mc.derTools + " → " + _ma.derTools + " px");
   t(eq(r.total.slice(0, 4), ["Total", "11,3", "5", "8"]), "(7) el total suma todos los días — " + JSON.stringify(r.total.slice(0, 4)));
-  t(r.tablero, "(8) se puede volver al tablero de 6 días");
-  t(r.vuelve, "(8) y volver a la tabla");
+  t(r.tablero, "(8) pppPlanTabla(false) deja la tabla, no abre la grilla");
+  t(r.vuelve, "(8) y la tabla sigue en su lugar");
   t(errs.length === 0, "sin errores de JS" + (errs.length ? ": " + errs[0] : ""));
 
   await b.close();

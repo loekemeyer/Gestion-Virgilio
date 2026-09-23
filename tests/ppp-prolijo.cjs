@@ -49,18 +49,14 @@ catch (_e) {
     await pppLoadProgFromSupabase();
     await pppRefreshControlado(); await pppRefreshArmado(); await pppRefreshEnSalida(); await pppRefreshValor(); await pppRefreshGeo();
 
-    // ---- la GRILLA de 6 días ----
-    // ⚠ `_pppPlanTabla = false` a mano: desde la v17.66 la vista por defecto de Programación es la
-    // tabla día→tanda→NP, así que sin esta línea se dibuja la tabla y este test —que mide las
-    // tarjetas del tablero de 6 días— no encuentra nada (y los chequeos en negativo pasan solos).
+    // ---- la vista de Programación ----
+    // v21.38 (Luis: "Tablero de 6 días, eliminá esa visual") — la grilla de tarjetas ya no se
+    // dibuja, así que sus tres chequeos (3 tandas + "+8", el globito, el súper entero) se fueron
+    // con ella. Lo que sí sigue vivo es el recorte de la lista ADENTRO del día, que es el mismo
+    // criterio y está abajo.
     _pppTab = "plan"; _pppPlanDay = null; _pppPlanTabla = false; pppRenderProg();
     const g = document.getElementById("pppPreview").innerHTML;
-    // la lista larga sólo puede estar dentro del title, nunca como texto visible
-    out.gridTodas = /D67A · D67B · D67C · D67D/.test(g.replace(/title="[^"]*"/g, ""));
-    out.gridCorto = /D67A · D67B · D67C <b class="pn-mas">\+8<\/b>/.test(g);
-    out.gridTitle = /title="D67A · D67B · D67C · D67D · D67E · D67F · D67G · D67H · D67I · D67J · D67K"/.test(g);
-    // el súper, con una sola tanda, se sigue escribiendo entero y sin "+N"
-    out.gridSuper = /D62A<\/div>|D62A ·/.test(g) && !/D62A <b class="pn-mas">/.test(g);
+    out.sinGrilla = !/pn-days/.test(g) && !/pn-card/.test(g);
 
     // ---- ADENTRO del día ----
     pppPlanAbrir(_pppDateKey(hab[0]));
@@ -81,10 +77,7 @@ catch (_e) {
 
   const fails = [];
   const chk = (c, m) => { console.log((c ? "ok   " : "MAL  ") + m); if (!c) fails.push(m); };
-  chk(!r.gridTodas, "la tarjeta de la grilla ya no escribe las 11 tandas (fuera del globito)");
-  chk(r.gridCorto, "muestra 3 y +8");
-  chk(r.gridTitle, "y la lista entera queda en el globito");
-  chk(r.gridSuper, "un camión de una sola tanda se sigue escribiendo entero");
+  chk(r.sinGrilla, "v21.38: la grilla de 6 días no se dibuja; queda la tabla día → tanda → NP");
   chk(r.diaCorto, "adentro del día muestra 4 y '+7 más'");
   chk(r.diaTitle, "y también deja la lista entera en el globito");
   chk(r.theads === 2 && r.theadsConUlt === 0, "los dos camiones sin orden de carga usan la tabla de 6 columnas (" + r.theads + ")");

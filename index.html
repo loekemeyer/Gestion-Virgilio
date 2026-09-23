@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.37"></script>
+<script type="module" src="recepcion.js?v=21.38"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9925,7 +9925,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.37";
+const APP_VERSION = "v21.38";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38673,7 +38673,9 @@ function pppVencInline(v) {
 function pppPlanHoja(n) { _pppPlanHoja = Math.max(0, Number(n) || 0); _pppPlanDay = null; pppRenderProg(); try { const el = document.getElementById("pppPreview"); if (el) el.scrollIntoView({ block: "start" }); } catch (_e) {} }
 /* v17.66 (Luis) - la TABLA dia -> tanda -> NP es la vista por defecto de Programacion; el
    tablero de 6 dias queda detras de su boton. La lista clasica se borro en la v20.24. */
-function pppPlanTabla(v) { _pppPlanTabla = !!v; _pppPlanDay = null; pppRenderProg(); }
+/* v21.38 — quedó sin llamadores vivos: el tablero de 6 días se sacó. Si alguien la llama,
+   siempre deja la tabla (no hay otra vista a la que ir). */
+function pppPlanTabla(_v) { _pppPlanTabla = true; _pppPlanDay = null; pppRenderProg(); }
 function _pppFmtPesos(n) { n = Math.round(Number(n) || 0); const s = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "."); return (n < 0 ? "-$ " : "$ ") + s; }
 function _pppFmtPesosCorto(n) { n = Number(n) || 0; if (Math.abs(n) >= 1e6) return "$" + (n / 1e6).toFixed(1).replace(".", ",") + " M"; if (Math.abs(n) >= 1e3) return "$" + Math.round(n / 1e3) + " mil"; return _pppFmtPesos(n); }
 // v13.16: 1 decimal, salvo volúmenes chicos (0,04 mostraba "0,0" como si el pedido no tuviera nada)
@@ -39893,7 +39895,6 @@ function _pppArbolHtml(programados) {
       '<button class="pn-lnk" onclick="pgaRecargar()" title="Volver a leer la programación">🔄 Actualizar</button>' +
       // v17.97 (Luis): "al lado del botón de Actualizar quiero que haya un botón de Imprimir"
       '<button class="pn-lnk" onclick="pgaImprimirAbrir()" title="Elegís qué días y sale la programación abierta hasta la NP: por papel o en Excel">🖨 Imprimir</button>' +
-      '<button class="pn-lnk" onclick="pppPlanTabla(false)" title="El tablero de 6 días con los camiones">Tablero de 6 días</button>' +
     '</div></div>';
   h += _pgaSalioSinFcHtml();
   const dias = _pgaArbol();
@@ -40820,7 +40821,7 @@ function _pppPlanDiaHtml(programados, key, opts) {
   const nCam = cams.filter(function (c) { return c.ruta !== "ret"; }).length;
   let h = inline
     ? '<div class="pn-topbar"><button class="pn-back" onclick="pppVencInline(false)">✕ Cerrar la lista</button></div>'
-    : '<div class="pn-topbar"><button class="pn-back" onclick="pppPlanVolver()">← Volver a ' + (_pppPlanTabla ? 'la tabla' : 'los 6 días') + '</button></div>';
+    : '<div class="pn-topbar"><button class="pn-back" onclick="pppPlanVolver()">← Volver a la tabla</button></div>';   // v21.38: ya no hay grilla de 6 días
   h += '<div class="pn-dayhead' + (esVenc ? ' venc' : '') + '"><div><div class="d1">' + escapeHtml(sub) + '</div><div class="d2">' + escapeHtml(titulo) + '</div></div>' +
     '<div class="kp"><div class="k"><i>📦</i><div><div class="l">Pedidos</div><div class="v">' + ped.length + '</div></div></div><div class="k"><i>🚚</i><div><div class="l">Camiones</div><div class="v">' + nCam + '</div></div></div><div class="k"><i>🧊</i><div><div class="l">Volumen</div><div class="v">' + _pppFmtM3(_pppM3Sum(ped)) + ' m³</div></div></div><div class="k"><i>💰</i><div><div class="l">Valor estimado</div><div class="v g">' + (_pppValor ? _pppFmtPesos(val.valor) : '…') + '</div></div></div></div>' +
     '<div class="barw">' + _pppPlanBarraHtml(est, ped.length, esVenc ? null : key, true) + '</div></div>';
@@ -42114,8 +42115,13 @@ function pppRenderProg() {
       if (_pppNoHabiles == null) { try { pppRefreshNoHabiles(); } catch (_e) {} }   // v13.25
       // v17.66 (Luis): la tabla día → tanda → NP es lo primero que se ve. Adentro de UN día
       // (o de las vencidas) sigue mandando la pantalla de siempre, con sus camiones y acciones.
+      // v21.38 (Luis, 22/09: "Tablero de 6 días. Eliminá esa visual"): la grilla de 6 días ya
+      // no se dibuja. El árbol día → tanda → NP es la única vista de Programación, y es la que
+      // ya venía por defecto desde la v17.66. `_pppPlanGridHtml` y `pppPlanTabla` siguen en el
+      // archivo (mismo criterio que `gv_ppp_np_desarmar` en la v18.77): lo que no puede volver
+      // es la PUERTA.
       html += '<div class="pn-wrap">' + (_pppPlanDay ? _pppPlanDiaHtml(programados, _pppPlanDay)
-              : (_pppPlanTabla ? _pppArbolHtml(programados) : _pppPlanGridHtml(programados))) + '</div>';
+              : _pppArbolHtml(programados)) + '</div>';
       _renderKeepFocus(box, html); return;
     }
   }
