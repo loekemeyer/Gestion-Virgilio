@@ -3305,6 +3305,24 @@ para descubrir que los rojos eran cuatro.
 bash tests/run.sh          # al final: "SUITE VERDE — 219 corridas, 0 rojos" o la lista
 ```
 
+⚠⚠ **Y un test que no está en `run.sh` no lo corre NADIE** (v21.77). Al medirlo el 23/09, la
+suite listaba **218 de los 274 archivos** de `tests/`: el **20 % nunca se ejecutaba**, y entre
+ellos había centinelas —`encoding-utf8`, `regla-L`, `fcs-codigo-l`, `rr-sin-remitos-cierra`,
+`comp-armado-anulado`, `stock-refresh-si-cambio`—. Se corrieron los 56 uno por uno y **53
+pasaban**: entraron todos. Hoy `run.sh` lista **271 de 274**.
+
+> **Escribir el test no alcanza: hay que agregarlo a `run.sh`.** No se descubren solos, y el
+> archivo suelto en `tests/` da la sensación de estar cubierto sin estarlo.
+
+⚠ **Los 3 que NO entraron es porque fallan**, y quedan acá para que no se pierdan de vista:
+`oc-auto-ciclo.cjs`, `ppp-reprog-boton.cjs`, `stk-buscar-cero-adelante.cjs`. No se agregan
+hasta arreglarlos — meterlos rojos sería volver a lo de siempre.
+
+⚠ **Al editar `run.sh` por script, ojo con `\n_resumen`:** matchea la **definición** de la
+función además del llamado del final. El primer intento insertó el bloque dos veces y el
+archivo quedó con 53 tests duplicados. Va con `rindex`, y después se cuenta:
+`grep -oE "node tests/[A-Za-z0-9._-]+\.cjs" tests/run.sh | sort | uniq -d` tiene que dar vacío.
+
 ⚠ **El veredicto que vale es el de CI, no el local.** El runner de GitHub es más lento y ahí
 aparecen las carreras que la máquina de desarrollo no muestra. Después de pushear, mirar el run:
 `mcp__github__actions_list` con `ci.yml`, o Actions → *CI — smoke tests*.

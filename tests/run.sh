@@ -715,4 +715,170 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ins-envio-tipo (v21.74: Entregar insumos → Envío a inyectores / Envío a otros) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-envio-tipo.cjs
 
+
+# ── v21.77 — los 53 que estaban en tests/ y NO los corria nadie. La suite listaba 218
+#    de 274 archivos: el 20 % nunca se ejecutaba, centinelas incluidos (encoding-utf8,
+#    regla-L, fcs-codigo-l, rr-sin-remitos-cierra). Medidos uno por uno antes de
+#    sumarlos: estos pasan. Los 3 que fallan NO se agregan hasta arreglarlos, y
+#    estan anotados en el CLAUDE.md para que no se pierdan.
+
+echo "== abast-clientes (Regresión v15) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/abast-clientes.cjs
+
+echo "== apr-cuar-chef-tarde (Regresión v21) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-chef-tarde.cjs
+
+echo "== apr-retenido-camion (Regresión v20) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-retenido-camion.cjs
+
+echo "== ar-pack-lios (Test de arPackLios (idea 4535)) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ar-pack-lios.cjs
+
+echo "== cc-retira-web (Regresión v19) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cc-retira-web.cjs
+
+echo "== comp-armado-anulado (Regresión v21) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-armado-anulado.cjs
+
+echo "== comp-nohay-lios (v21.00 (Luis, 2026-09-22) — «No hay más» desde la pantalla de LÍOS) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-nohay-lios.cjs
+
+echo "== comp-tanda-sin-pedidos (Regresión v19) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-tanda-sin-pedidos.cjs
+
+echo "== cp-recordatorio (Regresión v14) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cp-recordatorio.cjs
+
+echo "== cp-resumen-roundtrip (Test de cpParseResumen / cpBuildResumen (idea 1752)) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cp-resumen-roundtrip.cjs
+
+echo "== cuar-control-caido (v20.96 (Thomas, 2026-09-22) — CANDADOS del control de cuarentena) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cuar-control-caido.cjs
+
+echo "== encoding-utf8 (Candado de ENCODING — index) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/encoding-utf8.cjs
+
+echo "== enviar-a-programar-deshace (Regresión v18) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/enviar-a-programar-deshace.cjs
+
+echo "== falt-fact (Smoke de 'Faltantes facturados sin completar' (v10) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/falt-fact.cjs
+
+echo "== fcs-codigo-l (Regresión v21) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fcs-codigo-l.cjs
+
+echo "== mg-buscar-prefijo (v21.43 — el buscador de «Mover a góndola» (pantalla del operario, teclado numérico) filtra) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-buscar-prefijo.cjs
+
+echo "== mon-fc =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-fc.cjs
+
+echo "== monitor-red-tolerante (Tolerancia de red del monitor de TV (v10) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/monitor-red-tolerante.cjs
+
+echo "== oc-muestra-los-en-cero (Regresion v21) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/oc-muestra-los-en-cero.cjs
+
+echo "== ocg-dual-empresa (Regresión v19) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ocg-dual-empresa.cjs
+
+echo "== pga-excel (v20.52/v20) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pga-excel.cjs
+
+echo "== pipe-recurrente (v21.48 — CLIENTE NUEVO RECURRENTE (Luis, 23/09)) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-recurrente.cjs
+
+echo "== pk-excedente-orden (Regresión v20) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-excedente-orden.cjs
+
+echo "== pk-offline (Regresión v5) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-offline.cjs
+
+echo "== pk-resume-server (Regresión v5) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-resume-server.cjs
+
+echo "== ppp-armado-espera-badge (Regresión v20) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-armado-espera-badge.cjs
+
+echo "== ppp-atrasados-un-criterio (v21.37 — UN SOLO CRITERIO DE 'ATRASADO' EN LAS TRES PANTALLAS QUE LO MUESTRAN) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-atrasados-un-criterio.cjs
+
+echo "== ppp-ensalida-estado (Regresión v13) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-ensalida-estado.cjs
+
+echo "== ppp-fecha-pedido-cascada (Regresión v20) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fecha-pedido-cascada.cjs
+
+echo "== ppp-fecha-recep (Regresión v20) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fecha-recep.cjs
+
+echo "== ppp-tabla-cel (v20.01 (Thomas, 2026-09-18) — LA TABLA DE PROGRAMACIÓN EN EL CELULAR) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-tabla-cel.cjs
+
+echo "== ppp-tabla-salio (v20.10 (Thomas, 2026-09-18) — COLUMNA «SALIÓ» en la tabla de Programación) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-tabla-salio.cjs
+
+echo "== rcp-buscar-cero-adelante (Regresión v18) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-buscar-cero-adelante.cjs
+
+echo "== rcp-codigo-diferente (Test de regresión (v21) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-codigo-diferente.cjs
+
+echo "== rcp-codigo-parecido (Regresión v18) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-codigo-parecido.cjs
+
+echo "== regla-L =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/regla-L.cjs
+
+echo "== remito-fac-np-web (Regresión v20) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-fac-np-web.cjs
+
+echo "== resumen-multidispositivo (Test: Resumen de hoy sincroniza reportes de múltiples dispositivos (v9) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/resumen-multidispositivo.cjs
+
+echo "== rr-sin-remitos-cierra (Regresión v21) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rr-sin-remitos-cierra.cjs
+
+echo "== rr-supervisor-legajo (v21.42 (Luis, 2026-09-23) — la Recepción de Remitos que abre el SUPERVISOR desde el panel no) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rr-supervisor-legajo.cjs
+
+echo "== sin-op-si (El 'Op=SI' del Excel dejó de ser requisito para mostrar tandas (v10) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/sin-op-si.cjs
+
+echo "== stk-art-cands-cero (Regresión v19) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-art-cands-cero.cjs
+
+echo "== stk-buscar-cero (Regresion v20) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-buscar-cero.cjs
+
+echo "== stk-busqueda-prefijo (Regresión — Luis, 22/09/2026: 'cuando se escribe 03 debería mostrar todos los códigos que) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-busqueda-prefijo.cjs
+
+echo "== stk-desc-no-comentario (Regresión v19) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-desc-no-comentario.cjs
+
+echo "== stk-dual-demanda-empresa (Regresión v19) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-dual-demanda-empresa.cjs
+
+echo "== stock-carga-rapida-encadenada =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stock-carga-rapida-encadenada.cjs
+
+echo "== stock-clave-indexada =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stock-clave-indexada.cjs
+
+echo "== stock-refresh-si-cambio =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stock-refresh-si-cambio.cjs
+
+echo "== tanda-una-por-operario (Regresión v18) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-una-por-operario.cjs
+
+echo "== tap-sin-completar (Regresión v7) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tap-sin-completar.cjs
+
+echo "== vendor-sin-cdn (Las librerías se sirven desde el repo, no de CDNs de terceros (v10) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/vendor-sin-cdn.cjs
+
+echo "== pipe-vinculados (v21.59 (Luis, 23/09) — 'que se vea para el chequeo de clientes nuevos en la PPP') =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-vinculados.cjs
+
 _resumen
