@@ -4346,7 +4346,7 @@ tandas PRUEBA en la PPP. **Centinela:** `select * from public.gv_prueba_mezclada
 pedido de prueba quedó adentro de una tanda con pedidos reales (esa no se renombra).
 `sql/gv_clientes_prueba_v2163.sql`, `tests/prueba-oculta-operario.cjs`.
 
-## ⚠ REGLA (Marianela, 2026-09-23, v21.58): una tanda EMPEZADA no cambia de CÓDIGO al moverla de día
+## ⚠ REGLA (Marianela, 2026-09-23, v21.76): una tanda EMPEZADA no cambia de CÓDIGO al moverla de día
 
 **Marianela:** *"cuando tengamos una tanda en proceso de picking o armado y la cambio para otro día
 … no deje cambiar el nombre porque los operarios trabajan por nombre de tanda, luego no la encuentran"*.
@@ -4358,7 +4358,7 @@ cambio de código con **`TANDA_CANDADO`**. Juntar OTRA tanda adentro de la empez
 la empezada no cambia de nombre.
 
 **Chequeo:** `select * from public.gv_reglas_perdidas;` · `node tests/ppp-tanda-candado-codigo.cjs`.
-`sql/gv_tanda_candado_codigo_v2158.sql`.
+`sql/gv_tanda_candado_codigo_v2176.sql`.
 
 ## ⚠ REGLA (Thomas, 2026-09-23, v21.56): UN CAMIÓN = UN GRUPO DE ZONAS — Capital son DOS camiones
 
@@ -4498,7 +4498,7 @@ select * from public.gv_reglas_perdidas;                   -- vacía = el pase s
 
 ## ⚠ REGLA (v21.61): un test VIEJO deja main en rojo igual que uno ROTO — y la clase del botón se comparte
 
-El 23/09 la v21.58 agregó el **candado de código** (una tanda empezada conserva su nombre) con su
+El 23/09 la v21.76 agregó el **candado de código** (una tanda empezada conserva su nombre) con su
 test propio `ppp-tanda-candado-codigo.cjs`, y dejó **`ppp-tanda-cambiar-dia.cjs` sin tocar**. Ese
 test medía justo lo contrario —que una tanda ARMADA puede ir a «tanda nueva» o fusionarse— así que
 main quedó en rojo (issue del CI) hasta la v21.61. Es el caso que la regla de la v21.53 ya nombra:
@@ -4671,6 +4671,46 @@ es una señal, no un adorno: el que se equivocó casi siempre es el código.
 
 ⚠ **Sin buscar el filtro SIGUE valiendo**, o vuelve el ruido de las filas todo-cero.
 `tests/stk-buscar-cero.cjs` muerde por los dos lados.
+
+### ⚠⚠ Y la otra mitad, que es la contraria: un código que NO EXISTE no se dibuja (v21.76)
+
+**Luis, 23/09:** *"si busco 865 me muestra el 865 pelado (que no existe), ¿se puede poner un
+filtro para que no muestre esos?"*.
+
+> **No es lo mismo un 0 que un fantasma.** La v20.95 dice que un código que EXISTE y está en
+> cero **se muestra**, porque el 0 es la respuesta. Acá no hay respuesta que dar: el código no
+> es una cosa.
+
+**De dónde salía el 865, medido:** de **dos filas de `Movimientos_Stock`** — un ajuste manual
+del 18/08 a las 10:32 (−1) y su reversión a las 10:57 (+1). Alguien tipeó `865` en vez de
+`865E` y lo corrigió 25 minutos después. Pero **el universo de stock se arma desde los
+MOVIMIENTOS, no desde un maestro de artículos**, así que el código quedó vivo en la pantalla
+para siempre: cada error de tipeo en un ajuste deja un fantasma permanente. Eran **19** al
+23/09, entre ellos `VASTIDOR`, `H201 PART`, `N° 74` y `FLEJES LOEKEMEYER·0.80 X 64`.
+
+El criterio **no mira el saldo para decidir**: mira si el código existe
+(`gv_stock_cod_conocido`, que consulta **siete** maestros). El saldo entra sólo como guard,
+para no esconder nunca algo con una caja, un pedido, proyección, capacidad o FC pendiente.
+
+⚠ **Los siete maestros hacen falta los siete.** Con `vista_nombres_articulos` sola se escondían
+también **991E, 993E, 996E, 997E y 998E** — que no están ahí pero sí en `vista_uxb_articulo`, y
+que se pickean de verdad (el 998E el 22/09). Esconderlos habría sido el pozo de la v20.95.
+
+⚠ **El front NO se tocó**: `_stkSaldosFromView` ya respetaba `visible_en_stock === false` con su
+propio guard de saldo y pedidos en cero. El mecanismo estaba; faltaba que alguien marcara estos
+códigos. Se marca en **`refresh_stocks_carga_rapida()`**, no en `vista_stock_procesada`: ésa es
+una matview y cambiarla obliga a DROP + CASCADE, que ya se llevó puesta `gv_importados_ordenes`
+dos veces (v16.20 y v16.33).
+
+**Chequeo:** `select * from public.gv_stock_codigos_fantasma;` — dice cada uno con sus
+movimientos y el motivo (*"ajuste mal tipeado que ya se revirtió"*). Al 23/09: **19 filas, 0
+con saldo**. `node tests/stk-codigo-inexistente.cjs` (verificado que falla si el flag vuelve a
+`true`). `sql/gv_stock_codigos_fantasma_v2176.sql`.
+
+⚠ **Hallazgo aparte, NO es de este cambio:** el **439E** (Colador Pasta) ya venía oculto por la
+regla vieja del dual partido —base pelada con stock 0— y tiene **proyección 27 caj/mes y
+capacidad 66**. El guard del front sólo exige stock y pedidos en cero, así que hoy no se ve.
+Queda reportado; no se tocó.
 
 ## ⚠ REGLA (Luis, 2026-09-21, v20.88): cuando el registro y el PALLET no coinciden, manda el PALLET
 

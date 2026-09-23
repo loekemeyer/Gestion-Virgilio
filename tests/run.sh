@@ -26,7 +26,7 @@ node() {
 echo "== ppp-res-demora-camion (v21.72: Resumen = MAYOR demora por camion, y camiones sin tope de m3) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-demora-camion.cjs
 
-echo "== ppp-tanda-candado-codigo (v21.58: una tanda empezada conserva su codigo al cambiar de dia) =="
+echo "== ppp-tanda-candado-codigo (v21.76: una tanda empezada conserva su codigo al cambiar de dia) =="
 node tests/ppp-tanda-candado-codigo.cjs
 
 echo "== ppp-retiro-y-comentario (v21.65: el retiro viaja con el pedido; badge de comentario en la NP) =="
@@ -705,6 +705,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== comp-armado-viejo-no-traba (v20.91: un armado anterior al picking no traba el armado de verdad) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-armado-viejo-no-traba.cjs
+
+echo "== stk-codigo-inexistente (v21.76: un codigo que NO existe no se dibuja en Stocks, ni buscandolo) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-codigo-inexistente.cjs
 
 echo "== rv-cuadro-entero (v21.29: el Reporte diario entra entero, arranca en hoy y mide lapsos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rv-cuadro-entero.cjs
