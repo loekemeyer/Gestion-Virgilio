@@ -36,7 +36,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       // (A) 28/10 — UN cliente, 12,33 m³, todo en GBA Sur: un camión. Demoras 35 y 76.
       ped("98426", "Matiz SA", "Burzaco", 6.167, "13/08/2026", "28/10/2026", "D63A"),
       ped("LK 0190", "Matiz SA", "Burzaco", 6.160, "23/09/2026", "28/10/2026", "E85A"),
-      // (B) 23/09 — cuatro zonas en TRES camiones (Z2+Z3 van juntas, Z6 aparte, Z4 aparte)
+      // (B) 23/09 — cuatro zonas en CUATRO camiones (v21.91, Luis: Z2 y Z3 son camiones distintos)
       ped("98618", "Simon Zeitune", "Balvanera",  0.103, "26/08/2026", "23/09/2026", "E12J"),
       ped("98664", "Guini Jorge",   "Flores",     0.100, "31/08/2026", "23/09/2026", "E12G"),
       ped("98626", "Iro Iro",       "Burzaco",    0.365, "28/08/2026", "23/09/2026", "E39A"),
@@ -108,9 +108,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
   // (2) camiones sin tope de m³, por grupo de zonas
   eq("28/10 camiones (1 cliente, 12,33 m³)", d["28/10"] && d["28/10"].cam, "1");
-  eq("23/09 camiones (Z2+Z3 · Z4 · Z6)", d["23/09"] && d["23/09"].cam, "3");
+  eq("23/09 camiones (Z2 · Z3 · Z4 · Z6)", d["23/09"] && d["23/09"].cam, "4");
   eq("29/09 camiones (45 m³ = 2 + súper, retira no cuenta)", d["29/09"] && d["29/09"].cam, "3");
-  eq("TOTAL camiones", r.tot.cam, String(1 + 3 + 3));
+  eq("TOTAL camiones", r.tot.cam, String(1 + 4 + 3));
 
   // (3) las dos celdas abren el pop-up
   if (!(d["23/09"] && d["23/09"].demClick && d["23/09"].camClick)) fallas.push("las celdas de Cam./Demora no son clickeables");
@@ -120,9 +120,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   else {
     const noms = r.camsPop.map(function (c) { return c.nombre; }).join(" | ");
     const dems = r.camsPop.map(function (c) { return c.dem; });
-    if (r.camsPop.length !== 3) fallas.push("el pop-up trae " + r.camsPop.length + " camiones, no 3: " + noms);
+    if (r.camsPop.length !== 4) fallas.push("el pop-up trae " + r.camsPop.length + " camiones, no 4: " + noms);
     for (let i = 1; i < dems.length; i++) if (dems[i] > dems[i - 1]) fallas.push("los camiones NO están ordenados por mayor demora: " + dems.join(","));
-    if (!/Capital Centro-Oeste/.test(noms[0] ? noms : "")) fallas.push("el primer camión no es el de mayor demora: " + noms);
+    if (!/^\S* ?Capital Centro ·/.test(noms)) fallas.push("el primer camión no es el de mayor demora: " + noms);
     if (dems[0] !== 28) fallas.push("la demora del primer camión no es la real (28): " + dems[0]);
     const pedRows = (r.demPop || []).filter(function (x) { return !/^CAM:/.test(x); });
     if (!pedRows.some(function (x) { return /=28$/.test(x); }) || !pedRows.some(function (x) { return /=23$/.test(x); }))

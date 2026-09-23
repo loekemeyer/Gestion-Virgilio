@@ -29482,3 +29482,10 @@ LK sin programar desde las 12:20: cada corrida daba 57014. Medido: 4 fusiones pe
 deshacía también las fusiones y la corrida siguiente repetía lo mismo. Arreglo: a lo sumo 1 fusión
 por corrida (`tanda_fusion_max_corrida`, sin fila = 1) y la fusión sólo si el armado lleva < 3 s.
 Probado: 12.673 → 3.413 ms. `sql/gv_fusion_tope_corrida_v2189.sql` (marcador `v21.89-tope`).
+
+## §3.mu — v21.92: Z2 y Z3 son camiones distintos (Luis, 2026-09-23)
+
+`gv_ppp_web_camion`: Z2 → `Capital Centro`, Z3 → `Capital Oeste`; la zona manda sobre el sector
+para esas dos. Se retira `Capital Centro-Oeste` (v21.43). Impacta armado por grupo, fusión y
+centinelas de camión. Front: `PPP_RES_CAMIONES`. Test `ppp-res-demora-camion` actualizado (23/09 =
+4 camiones) y verificado que falla contra el index anterior. `sql/gv_camion_z2_z3_separadas_v2192.sql`.
