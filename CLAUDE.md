@@ -3300,6 +3300,19 @@ commit y los tests que fallaron, y lo **cierra solo** cuando vuelve a verde. No 
 configurar nada (usa el `GITHUB_TOKEN` del propio workflow). Si el issue está abierto, la suite
 está rota **ahora**; no hay que entrar a Actions a mirar.
 
+⚠⚠ **Y en `main` los runs NO se cancelan entre sí** (v21.57). La v16.25 había puesto
+`cancel-in-progress: true` para que un push nuevo matara al viejo, y con la suite corriendo
+entera —8 a 12 min— contra sesiones que pushean cada 3 a 5, eso dejaba a **todos** los runs
+muertos antes de terminar: el 23/09 los runs 1147 a 1150 se cancelaron uno atrás del otro y
+**ninguno dio veredicto**. Un CI que nunca termina no avisa nada. El motivo original —"corridas
+peleando por el runner"— no aplica: el repo es **público**, o sea Actions gratis y 20 jobs
+concurrentes. En los PR se sigue cancelando.
+
+⚠ **Sin cancelación los runs terminan DESORDENADOS**, y un run viejo que cierra el issue que
+abrió uno nuevo diría "está verde" con `main` en rojo. Por eso el paso del aviso **compara su
+`context.sha` contra el head de `main`** y, si main ya avanzó, no toca el issue: ese run habla
+de un commit que ya no es el estado de hoy.
+
 ## Git
 
 - **Trabajar SIEMPRE directo en `main`**: commitear y pushear ahí sin preguntar.

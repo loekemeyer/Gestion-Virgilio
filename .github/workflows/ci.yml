@@ -21,11 +21,17 @@ permissions:
   contents: read
   issues: write
 
-# v16.25 — un push nuevo cancela el run viejo del mismo branch. Sin esto se apilaban
-# corridas de commits ya superados peleando por el runner.
+# v21.57 — EN `main` LOS RUNS NO SE CANCELAN. La v16.25 lo puso al revés ("un push nuevo
+# cancela el viejo") y con la suite corriendo entera (v21.53, 8-12 min) contra sesiones que
+# pushean cada 3-5 min, eso significa que NINGÚN run llega a terminar: medido el 23/09, los
+# runs 1147 a 1150 murieron cancelados uno atrás del otro. Un CI que nunca da veredicto no
+# avisa nada, que es justo lo que se venía arreglando.
+# El motivo original —"corridas peleando por el runner"— no aplica: el repo es PÚBLICO, así
+# que Actions es gratis y hay 20 jobs concurrentes. Se apilan 3 o 4 y terminan todos.
+# En los PR sí se cancela: ahí el commit viejo no le importa a nadie.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   smoke:
@@ -69,6 +75,17 @@ jobs:
           script: |
             const fs = require("fs");
             const roja = process.env.ROJA === "true";
+
+            // v21.57 — sin cancelación conviven varios runs, y pueden terminar DESORDENADOS:
+            // uno viejo que cierra el issue que abrió uno nuevo diría "está verde" con main en
+            // rojo. Si main ya avanzó, este run no opina sobre el estado de HOY.
+            if (context.eventName === "push" && context.ref === "refs/heads/main") {
+              const b = await github.rest.repos.getBranch({ ...context.repo, branch: "main" });
+              if (b.data.commit.sha !== context.sha) {
+                core.info(`main ya está en ${b.data.commit.sha.slice(0,7)}; este run es de ${context.sha.slice(0,7)}: no toco el issue.`);
+                return;
+              }
+            }
             const LABEL = "suite-en-rojo";
             const sha = context.sha.slice(0, 7);
             const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
