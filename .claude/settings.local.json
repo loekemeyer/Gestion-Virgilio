@@ -13,7 +13,9 @@
       "Bash(git stash *)",
       "Bash(sed -i 's/^-- v21.97 — OC/-- v21.98 — OC/; s/v21.97: con código/v21.98: con código/; s/v21.97: entrega EXTERNA/v21.98: entrega EXTERNA/' sql/gv_oc_recibido_externo_v2198.sql)",
       "Bash(node scripts/bump-version.cjs 21.98)",
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Bash(node tests/encoding-utf8.cjs)",
+      "Bash(node tests/pipe-composicion.cjs)"
     ]
   }
 }

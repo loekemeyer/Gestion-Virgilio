@@ -4988,6 +4988,59 @@ regla vieja del dual partido —base pelada con stock 0— y tiene **proyección
 capacidad 66**. El guard del front sólo exige stock y pedidos en cero, así que hoy no se ve.
 Queda reportado; no se tocó.
 
+## ⚠⚠ REGLA (Vivi, 2026-09-23, v22.03): estar PROGRAMADO no garantiza la caja — si no hay stock, no se cobra
+
+**Vivi, textual:** *"si ya no hay stock del 323E, no debo cobrarselo. esa logica no la tenes ya
+explicada?"*. La tenía (regla v20.41: el importado sin stock no entra en el monto) y **no estaba
+corriendo**.
+
+`gv_clientes_nuevos_valor_lote` y `gv_clin_composicion` reparten los importados escasos con un
+greedy por `(fecha_pedido, hora, order_id)`, y le hacían un **atajo** al pedido que ya figura en
+`gv_demanda_programada_pendiente`: *"sus cajas ya se contaron en `_prog`, no compite"* → `falta = 0`.
+
+> **El atajo supone que lo PROGRAMADO entra en lo DISPONIBLE. Cuando no entra, la reserva es
+> ficticia y el sistema dice "tiene stock" con la góndola vacía.**
+
+**Medido el 23/09 sobre `web LK 1448`** (Silvano, LK 4282, cliente nuevo en cuarentena): sus 3 NP
+están en la vista con `tanda = ''` y `fecha_entrega` **NULL** — o sea **desprogramadas** — y aún así
+disparaban el atajo. Los **17** importados salían con `cajas_falta = 0` y `valor_importados = 0,00`,
+y **7 estaban sobrevendidos**:
+
+| código | disponible | programado |
+|---|---:|---:|
+| 035E · 323E · 970E · 971E | **0** | 8 · 10 · 3 · 4 |
+| 590E | 3 | 64 |
+| 583E | 5 | 17 |
+| 584E | 15 | 28 |
+
+**Cómo queda:** si de un código hay menos disponible que programado, se reparte lo que hay entre
+**toda** la demanda programada por su `prioridad` — que ordena por fecha de entrega, y **la NP sin
+fecha va ÚLTIMA**, que es justo el caso del cliente nuevo retenido — y cada pedido se queda con su
+parte. Lo que no cubre es `cajas_falta`, sale con `importe = 0,00` y **no se cobra**.
+
+⚠ **Cuando lo programado SÍ entra en lo disponible, `cubiertas = cajas` y el resultado es
+idéntico al de hoy**: el cambio muerde sólo en el sobreventa. Verificado con 529E y 812E del mismo
+pedido, que siguen en `falta 0`.
+
+⚠ **`cubiertas` queda NULL, no 0, cuando ese código del pedido no tiene fila en la vista** (una NP
+ya facturada mientras otra sigue viva). Ahí **no se asume faltante**: cae al greedy normal contra
+`libre`. Un `coalesce(..., 0)` habría dicho *"no hay"* sin haber medido nada.
+
+⚠ **El valor_lote llevaba además el doble conteo que la v21.96 ya le había sacado a la
+composición.** `order_items` de LK trae **dos filas** para 323E (2+1) y dos para 590E (3+3), y sin
+agregar por código antes del greedy cada mitad mide a su hermana como `tomado_antes` — o sea el
+pedido peleando contra sí mismo. Ahora las dos funciones tienen su `_itg`.
+
+**Impacto medido**, sobre los 7 pedidos web desprogramados de hoy: **$2.218.883** que dejan de
+cobrarse por adelantado (1451 455.881 · 1343 445.041 · 1347 440.940 · 1474 397.637 · 1448 343.730 ·
+1482 71.705 · 1349 63.949). Costo como `authenticated`: composición **297 ms**, valor_lote **279 ms**
+(el timeout de ese rol es 8 s).
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien (3 centinelas:
+`_vl_progalloc`, `_cp_progalloc`, `_vl_itg`). Probado rompiéndolo a propósito en transacción
+abortada: *antes 0 perdidas · con la regla borrada 1 · la nombra sí*.
+`sql/gv_clin_falta_programado_sobrevendido_v2203.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.88): cuando el registro y el PALLET no coinciden, manda el PALLET
 
 **Luis, textual:** *"Te estoy diciendo que el pedido está armado y se armó otra vez. Si registrás

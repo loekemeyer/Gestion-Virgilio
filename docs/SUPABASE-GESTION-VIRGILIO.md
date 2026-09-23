@@ -29571,3 +29571,65 @@ retira, lo salido ni lo EN PROCESO; mueve con `gv_ppp_tanda_mover(t, f, por, tru
 Trigger `gv_web_cliente_un_solo_dia` DESHABILITADO (regla derogada v21.87). Medido en transacción abortada
 sobre el 30/09: 21 movidas / 5 fijas, centinelas sin cambios. Rollback: `drop function
 gv_ppp_dia_reprogramar(date,text,boolean,text)` y `enable trigger gv_web_cliente_un_solo_dia`.
+
+### §3.mq — v22.03: estar programado no garantiza la caja (importados sobrevendidos) — 2026-09-23
+
+**Pedido de Vivi**, textual: *"si ya no hay stock del 323E, no debo cobrarselo. esa logica no la
+tenes ya explicada?"*. La regla v20.41 existía y no corría.
+
+**Objetos tocados** (los dos con `CREATE OR REPLACE` sobre `pg_get_functiondef`, idempotente y con
+`raise` si el texto no matchea, porque varias sesiones los editan):
+
+| función | qué se le agregó |
+|---|---|
+| `gv_clientes_nuevos_valor_lote(jsonb)` | `_vl_itg` (agregación por código, la que la v21.96 le puso a la composición) + `_vl_disp` / `_vl_progalloc` / `_vl_npped` / `_vl_progped` + el nuevo `case` de `_vl_falta` |
+| `gv_clin_composicion(jsonb,text,text)` | `_cp_disp` / `_cp_progalloc` / `_cp_npped` / `_cp_progped` + el nuevo `case` de `_cp_falta` |
+
+**La causa.** Las dos reparten los importados escasos con un greedy por `(fecha_pedido, hora,
+order_id)` y le hacían un atajo al pedido que ya figura en `gv_demanda_programada_pendiente`
+(*"sus cajas ya se contaron en `_prog`"*) → `falta = 0`. Ese atajo supone `programado <= disponible`.
+Cuando no se cumple, la reserva es ficticia.
+
+**Caso `web LK 1448`** (Silvano, LK 4282, cliente nuevo en cuarentena): sus 3 NP (LK 0094/0095/0096)
+están en la vista con `tanda = ''` y `fecha_entrega` NULL —desprogramadas— y disparaban el atajo
+igual. Los 17 importados salían con `cajas_falta = 0` y `valor_importados = 0,00`; **7 estaban
+sobrevendidos** y 4 con cero cajas (035E 0/8, 323E 0/10, 970E 0/3, 971E 0/4, 590E 3/64, 583E 5/17,
+584E 15/28 — disponible/programado).
+
+**Cómo quedó.** `_progalloc` reparte lo disponible entre TODA la demanda programada por
+`d.prioridad` (que es el `row_number()` de la vista ordenado por `coalesce(fecha_entrega,
+'9999-12-31'), tanda, np`, o sea que **la NP sin fecha va última**) y `_progped` suma lo que le
+tocó a las NP de ese pedido. `_falta` pasó a:
+
+```sql
+case when not g.imp or g.art is null then 0
+     when g.ya_prog and g.cubiertas is not null
+          then greatest(0, g.cajas - g.cubiertas)
+     else greatest(0, g.cajas - greatest(0, g.libre - coalesce(g.tomado_antes, 0)))
+end as falta
+```
+
+⚠ `cubiertas` queda **NULL, no 0**, cuando ese código del pedido no tiene fila en la vista (una NP
+facturada mientras otra sigue viva): ahí cae al greedy normal contra `libre` en vez de asumir
+faltante. Un `coalesce(...,0)` habría dicho *"no hay"* sin medir nada.
+
+**Medición (como rol `authenticated`).** LK 1448: los 7 códigos pasan a `cajas_ok = 0` con
+`importe = 0,00`, así que el total del pop-up ya los deja afuera; `valor` 1.730.662 → **1.386.932**,
+`valor_importados` **343.730**, `items_importados` **7**. Control: 529E y 812E (con stock) siguen en
+`falta 0`. Costo: composición **297 ms**, valor_lote **279 ms** (timeout de ese rol: 8 s).
+
+**Impacto**, sobre los 7 pedidos web desprogramados de hoy: **$2.218.883** que dejan de cobrarse por
+adelantado — 1451 455.881 · 1343 445.041 · 1347 440.940 · 1474 397.637 · 1448 343.730 · 1482 71.705 ·
+1349 63.949.
+
+**El front no se tocó**: el pop-up ya pinta la fila con `cajas_ok <= 0` como `sinstock`, muestra el
+`−N` con el título *"Cajas que no se pueden cubrir con el stock de hoy"*, y la celda Monto lee
+`valor` (que ya viene neto). Lo cubre `tests/pipe-composicion.cjs` (fila 865E con `cajas_ok 0`).
+
+**Centinelas** (`GV_Reglas_Centinela` 139, 140, 141): `_vl_progalloc`, `_cp_progalloc`, `_vl_itg`.
+Probado rompiéndolo en transacción abortada: *antes 0 perdidas · con la regla borrada 1 · la nombra
+sí*. Chequeo: `select * from public.gv_reglas_perdidas;`.
+
+**Rollback:** volver el `case` de cada `_falta` a `case when not g.imp or g.ya_prog or g.art is null
+then 0 …` (las CTE nuevas quedan sin uso y no molestan) y borrar las 3 filas de centinela.
+`sql/gv_clin_falta_programado_sobrevendido_v2203.sql`.
