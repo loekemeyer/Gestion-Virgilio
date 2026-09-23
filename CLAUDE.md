@@ -3904,6 +3904,68 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
+## ⚠ REGLA (Luis, 2026-09-22, v21.39): las tandas son de 0,80 m³ — y el armado las FUSIONA
+
+**Luis, textual:** *"¿Por qué las tandas son tan chicas? Tienen que ser de 0,8 en promedio.
+Mínimo 0,6, máximo 1. Salvo pedidos más grandes. ¿No tenés esa lógica?"* Y sobre la fusión:
+*"tiene que ser 0,80"*.
+
+**Media lógica estaba, media no.** `tanda_m3_max_mezcla` (1,00) sí se usa: es el techo hasta el
+que una tanda abierta sigue recibiendo clientes. **`tanda_m3_min` (0,60) NO lo lee ninguna
+función** —medido: 0 apariciones en `pg_proc`—; es sólo un cartel del front de A Programar.
+
+**Medido el 22/09** (tandas de los últimos 7 días + futuras), separando lo que no es camión:
+
+| clase | tandas | promedio | < 0,6 | de 1 solo cliente |
+|---|---:|---:|---:|---:|
+| **Reparto** | 62 | **0,631 m³** | 35 | 41 |
+| Retira | 17 | 0,301 | 15 | 17 |
+| Súper | 7 | 3,070 | 1 | 7 |
+
+Retira no usa camión (cada uno viene a buscar el suyo) y el súper va solo por regla. El número
+que importa es el de reparto.
+
+### La causa: la tanda nace con lo que hay en ese momento y nadie la vuelve a juntar
+
+`ppp_web_armar_tandas` acumula clientes **nuevos** en una tanda abierta del mismo día y camión
+(`_open`, v13.67), pero **nunca fusiona dos tandas que ya existen**. Caso testigo, 28/09 GBA
+Oeste: **5 tandas para 0,846 m³**, tres del mismo sector M (Ciudadela) — E46A nació el 08/09,
+E46B/E46C el 16/09, E49A el 14/09, E50A el 08/09, cada una para OTRO día. Cuando se
+reprogramaron todas al 28/09 quedaron 5 tandas en el mismo camión y ninguna regla las miró.
+
+### El pase de fusión: `gv_ppp_web_fusionar_tandas(empresa, desde, simular, por)`
+
+Corre **al final de cada corrida del armador** (pase (e) de `gv_ppp_web_armar_pendientes`) y
+junta, por (fecha, camión), las tandas que se pueden juntar, de la más grande a la más chica,
+hasta el **objetivo `tanda_m3_fusion` = 0,80** sin pasar nunca el **máximo
+`tanda_m3_max_mezcla` = 1,00**. Sólo absorbe una tanda cuyas paradas sean **todas** compatibles
+con las de la que recibe (`gv_ppp_web_compat`: mismo camión, sectores vecinos o pares del
+dueño). La fusión la hace `gv_ppp_tanda_renombrar`, que ya sabe mover programación, eventos y
+stock (v19.69 / v20.88).
+
+**Lo que NO toca, a propósito:** tandas con cualquier evento de operario (PK/PKC/EP/TP/TAP/AP/
+CC/CCN, legajo real) o con stock movido —un pallet con papel no se renombra solo, regla
+v20.88—, súper, retira, cliente `solo`, tanda de dos camiones, tanda en dos días (problema 338)
+y día sin reparto.
+
+⚠ **El interruptor es `PPP_Web_Config.tanda_fusion_activa`** (0 = apagado). Prenderlo es un
+`update`, no un deploy. Al 22/09 quedó en **0** esperando el sí de Luis.
+
+**Probado corriendo el armador**, no leyéndolo (regla v19.56): en transacción abortada, con el
+interruptor en 1, `gv_ppp_web_armar_pendientes('lk', …)` entró al pase y fusionó E70A→E64A,
+E18A→E48C y E46C→E49A: **51 → 48 tandas**, los tres códigos viejos sin una sola fila. Y lo que
+**no** fusionó lo explica la cercanía, no un bug: E37C (San Cristóbal, A) con E29G (Villa Luro,
+C) no son vecinos; E48A (Pompeya, B) no es vecino de H ni F; E61A + E61E = 1,031 > 1,00.
+
+`p_simular = true` (default) no escribe: devuelve lo que HARÍA. Es la forma de mirarlo:
+
+```sql
+select * from public.gv_ppp_web_fusionar_tandas('lk');    -- qué juntaría hoy, sin tocar nada
+select * from public.gv_reglas_perdidas;                   -- vacía = el pase sigue en el armador
+```
+
+`sql/gv_ppp_web_fusionar_tandas_v2139.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-22, v21.30): el operario puede recibir un código que NO es del proveedor
 
 **Luis, textual:** *"cuando se elige al tallerista deberían aparecer los códigos asignados a el
