@@ -4242,6 +4242,35 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
+## ⚠ REGLA (Thomas, 2026-09-23, v21.56): UN CAMIÓN = UN GRUPO DE ZONAS — Capital son DOS camiones
+
+**Thomas, textual:** *"no podés programar para un solo día zona 1, zona 2, zona 3, zona 6, zona 7. Es un
+desastre"* · *"No puedo ir tantas veces a zona 3 y 4 y 5 y 6"*.
+
+| camión | zonas | sectores |
+|---|---|---|
+| **Capital Sur** | Z1 | A, B |
+| **Capital Centro-Oeste** | Z2 + Z3 | C, D, E, F, G, H |
+| GBA Sur | Z4 | J, K, L |
+| GBA Oeste | Z5 | M |
+| GBA Norte | Z6 + Z7 | N, P |
+| súper | cada uno el suyo | — |
+
+Hasta la v21.55 `gv_ppp_web_camion` devolvía **"Capital" para Z1, Z2 y Z3**, así que un día con Z1+Z2+Z3
+contaba como un solo camión y nada lo marcaba. Máximo **2 camiones por día**, cada uno a **un** grupo, y
+**cada grupo sale una sola vez** mientras entre en un camión (Z4 4,03 m³ → una salida, no cuatro).
+
+⚠ **El súper NO se junta en un día** (*"Matiz es súper, no se juntan"*): `gv_ppp_cliente_dos_dias` no lo marca.
+
+⚠ **Norma de salida (Thomas, 23/09):** *"hoy tiene que facturarse para mañana lo que se armó ayer. Y nada
+más que eso"* — armado día 1, factura día 2, sale día 3. Vale también para el súper en el armado.
+
+El 22/09 21:54 una reprogramación a mano niveló los días a 4,30 m³ sin mirar el camión y dejó GBA Sur en
+4 salidas, Oeste en 3 y Norte en 3. Se rehizo el 23/09 (25 tandas).
+
+**Chequeo:** `select * from public.gv_ppp_tanda_camion_mezclado;` · `select * from public.gv_reglas_perdidas;`
+`sql/gv_camion_un_grupo_zonas_v2156.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-22, v21.39): las tandas son de 0,80 m³ — y el armado las FUSIONA
 
 **Luis, textual:** *"¿Por qué las tandas son tan chicas? Tienen que ser de 0,8 en promedio.
