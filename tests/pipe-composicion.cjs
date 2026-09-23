@@ -1,4 +1,4 @@
-/* v21.82 — EL BOTON DE COMPOSICION DEL PEDIDO, en la celda Monto del pipeline.
+/* v21.83 — EL BOTON DE COMPOSICION DEL PEDIDO, en la celda Monto del pipeline.
 
    Pedido del chat (23/09): "un boton donde se pueda ver la composicion del pedido con el monto
    total de los articulos importados (E) que tienen stock, con el dto por volumen aplicado, el

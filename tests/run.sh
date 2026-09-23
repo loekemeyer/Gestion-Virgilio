@@ -788,7 +788,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pga-excel (v20.52/v20) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pga-excel.cjs
 
-echo "== pipe-composicion (v21.82: el boton de composicion, con el TOTAL CON IVA que se le reclama al cliente) =="
+echo "== pipe-composicion (v21.83: el boton de composicion, con el TOTAL CON IVA que se le reclama al cliente) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-composicion.cjs
 echo "== pipe-recurrente (v21.48 — CLIENTE NUEVO RECURRENTE (Luis, 23/09)) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-recurrente.cjs

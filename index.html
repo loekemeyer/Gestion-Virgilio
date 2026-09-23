@@ -989,7 +989,7 @@ button {
   font-size:10px; font-weight:800; }
 .pipe-vinc-ok{ margin-top:10px; padding:8px 11px; border-radius:8px; background:#ecfdf5; color:#065f46; font-size:13px; }
 
-/* v21.82 — la COMPOSICION del pedido: lo que se le reclama al cliente nuevo que pague */
+/* v21.83 — la COMPOSICION del pedido: lo que se le reclama al cliente nuevo que pague */
 .clin-comp-b{ display:block; width:100%; margin-top:5px; padding:4px 8px; border:1px solid #cbd5e1;
   border-radius:7px; background:#f8fafc; color:#334155; font-size:11px; font-weight:800; cursor:pointer;
   white-space:nowrap; }
@@ -6101,7 +6101,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.82"></script>
+<script type="module" src="recepcion.js?v=21.83"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10052,7 +10052,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.82";
+const APP_VERSION = "v21.83";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -48450,7 +48450,7 @@ function clinNuevosValorFmt(p) {
     (isFinite(v.valorImp) && v.valorImp > 0
       ? '<span class="clin-imp" title="' + (v.itemsImp || 0) + ' importado(s) sin stock para cubrir lo pedido: esas cajas no entran en el monto">- ' + cuarPlata(v.valorImp) + ' import. en falta</span>'
       : '') +
-    // v21.82: el 🧾 abre la composición — qué códigos, a qué precio, los descuentos y el
+    // v21.83: el 🧾 abre la composición — qué códigos, a qué precio, los descuentos y el
     // TOTAL CON IVA, que es el único número que se le reclama al cliente.
     pipeCompBtn(p);
 }
@@ -49097,7 +49097,7 @@ function pipeVincHtml() {
   return h;
 }
 
-/* ── 🧾 LA COMPOSICIÓN DEL PEDIDO ── v21.82 ─────────────────────────────
+/* ── 🧾 LA COMPOSICIÓN DEL PEDIDO ── v21.83 ─────────────────────────────
    Pedido del chat: "un boton donde se pueda ver la composicion del pedido con el monto total de
    los articulos importados (E) que tienen stock, con el dto por volumen aplicado, el dto del 2%
    por web y el 25% por volumen". Y sobre el total, textual: "que aclare que incluye IVA porque

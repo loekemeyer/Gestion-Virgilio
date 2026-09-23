@@ -1,4 +1,4 @@
--- v21.82 (2026-09-23) — "un boton donde se pueda ver la composicion del pedido ... y que aclare
+-- v21.83 (2026-09-23) — "un boton donde se pueda ver la composicion del pedido ... y que aclare
 -- que incluye IVA porque es lo que tengo que reclamar al cliente que pague".
 --
 -- QUE FALTABA. La celda Monto del pipeline muestra DOS numeros (neto y c/IVA) y nada mas. Para
@@ -189,7 +189,7 @@ insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pi
 values ('gv_clin_composicion','funcion',
         'x\.cajas_ok \* x\.uxb::numeric \* x\.precio \* \(1 - x\.dto_vol\) \* x\.factor_web',
         'La composicion del pedido se valoriza con la MISMA cuenta que gv_ppp_web_valor_items (cajas x uxb x precio x (1-dto_vol) x factor_web). Si una de las dos cambia y la otra no, el pop-up muestra un total distinto del que se le reclama al cliente.',
-        'pedido del chat','v21.82')
+        'pedido del chat','v21.83')
 on conflict do nothing;
 
 notify pgrst, 'reload schema';
