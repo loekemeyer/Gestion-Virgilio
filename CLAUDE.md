@@ -149,9 +149,25 @@ hacer sin figurar en la agenda de alguien.
    dato que sólo el usuario tiene. Quién está del otro lado es exactamente eso — no se averigua
    leyendo código ni consultando la base.
 
-   ⚠ **Lo sostiene un hook, no esta prosa**: `scripts/claude-quien-habla.sh`, colgado del
-   `SessionStart` de `.claude/settings.json`, sólo en `startup`. La regla estaba escrita **sólo acá**
-   —línea ~220 de un archivo de 1.400— y no se cumplía.
+   ⚠ **Lo sostienen DOS hooks, no esta prosa.** La regla estaba escrita **sólo acá** —línea ~220 de
+   un archivo de 1.400— y no se cumplía.
+
+   | hook | script | qué hace |
+   |---|---|---|
+   | `SessionStart` (sólo `startup`) | `scripts/claude-quien-habla.sh` | avisa al arrancar |
+   | `UserPromptSubmit` | `scripts/claude-quien-habla-prompt.sh` | **insiste en CADA mensaje** hasta que haya confirmación |
+
+   ⚠⚠ **NO se frena el trabajo, y la pregunta va en el CIERRE** (Thomas, 23/09: *"andá trabajando en
+   lo que te piden pero agregá a pendientes o definiciones que te confirme quién es antes de
+   cerrar"*). Se hace lo que se pidió; la confirmación se pide **en las decisiones pendientes del
+   final**, en todas las respuestas, hasta que llegue. Lo único que espera es la **atribución**: no
+   se carga una tarea de Planify ni se registra un problema a nombre de alguien adivinado.
+
+   ⚠ **La confirmación la detecta el HOOK, no el modelo.** Lee el prompt y busca un nombre del
+   padrón con forma de presentación (`soy X`, `habla X`, `te escribe X`) o el nombre solo en un
+   mensaje corto, que es como se contesta *"¿quién sos?"*. Deja una marca en
+   `/tmp/claude-quien-habla-<session_id>` y a partir de ahí se calla. **Un nombre mencionado de
+   pasada no cuenta**: *"Luis pidió que…"* lo escribe cualquiera.
 2. **Cada pedido de trabajo se registra como tarea en el Planify de esa persona**, apenas se
    empieza, con nombre MUY resumido (≤ 60 caracteres). Queda `done=false` hasta que se cierre
    (punto 4). Si la sesión termina sin cerrar, la tarea queda en la agenda: ése es el objetivo.

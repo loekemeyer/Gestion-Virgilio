@@ -38,10 +38,11 @@ cat <<'TXT'
 QUIÉN ESTÁ ESCRIBIENDO: todavía NO se sabe. El mail de la cuenta es de la CUENTA,
 no de la persona: por ese mismo mail escriben Thomas, Luis, Marianela, Elías y
 otros (medido: de 425 tareas cargadas por Claude, 202 las pidió Thomas y 123 Luis).
-Antes de cargar cualquier tarea en Planify o de registrar un problema, preguntar
-"¿Quién sos?" — salvo que el propio mensaje lo diga. Esto NO choca con la regla de
-"no preguntar, razonar primero": ahí la excepción es el dato que sólo el usuario
-tiene, y quién está del otro lado es exactamente eso.
+NO se frena el trabajo por esto (Thomas, 23/09: *"andá trabajando en lo que te piden
+pero agregá a pendientes o definiciones que te confirme quién es antes de cerrar"*):
+se hace lo que se pidió, y la confirmación se pide EN LAS DECISIONES PENDIENTES del
+cierre, hasta que llegue. Lo que sí espera es la ATRIBUCIÓN: no se carga una tarea
+de Planify ni se registra un problema a nombre de alguien adivinado.
 Ruteo, para no equivocarse: Thomas -> employee_id 20 (Tomás Beviglia) con el
 nombre antepuesto por "Th ". Cualquier otro -> su propio employee_id, sin prefijo.
 TXT
