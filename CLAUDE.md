@@ -120,9 +120,31 @@ en Supabase:
 select * from public.gv_centinelas_flojos;   -- ningún 'VIGILA UN COMENTARIO' = todo bien
 ```
 
-Al 23/09: **0** que vigilan un comentario, **0** perdidas, 26 con patrón genérico — eso último
-es señal **débil**, no un error: el centinela vigila que alguien pise el objeto con una copia
-vieja, y para eso alcanza con que el patrón esté una vez.
+Al 23/09: **0** que vigilan un comentario, **0** perdidas, 26 con patrón genérico.
+
+⚠ **«Genérico» NO se mide por cuántos OBJETOS nombran la palabra: se mide por cuántas veces
+aparece el patrón EN SU PROPIO cuerpo** (v21.84). El centinela sólo mira su objeto, así que un
+patrón que aparece **una sola vez** ES la regla: borrarla la borra, y no importa que otros 25
+objetos digan `PPP_Web_Programacion`. **19 de los 26 están así y están bien.** Los otros 7
+aparecen 2+ veces, y ahí sí hay que mirar si la segunda aparición no es la regla:
+
+| centinela | veces | por qué queda flojo |
+|---|---:|---|
+| `gv_np_destino` · `es_retira` | 6 | la regla es *un Retira sale `retira`, no `ambiguo`* y vive en UNA línea; las otras 5 son la columna y su arrastre |
+| `gv_retira_contradictorio` · `es_retira` | 5 | la regla es el `WHERE` de doble dirección, no la columna |
+| `gv_tanda_armada_sin_armado` · `Entregas_Virgilio` | 2 | **una de las dos es el texto del `motivo`**: borrando el `FROM` real el centinela queda verde contra un string |
+| `gv_empresa_de_entrega` · `'LK'` | 2 | una es la rama de la **L** y la otra la de la **NP**: borrar la L deja el patrón puesto |
+
+Las otras 3 (`gv_ppp_web_dias_ancla`, `gv_ppp_web_retenido`, `gv_clin_vincular`) repiten porque
+**las dos apariciones son la misma regla**: quedan como están.
+
+> **Al elegir el patrón, la pregunta no es "¿esta palabra está?": es "¿si borro la regla, esta
+> palabra se va?".** Si queda, el centinela vigila el vecindario, no la regla.
+
+```sql
+-- las veces que el patrón aparece en el cuerpo de SU objeto (1 = es la regla)
+select id, objeto, patron from public.gv_centinelas_flojos;
+```
 
 Y la prueba de verdad, que es romper la regla y ver si avisa, **revirtiendo siempre** (el bloque
 completo está en `sql/gv_centinelas_boton_de_prueba_v2182.sql`):
@@ -882,6 +904,18 @@ súper sino el pedido de la página de LK con sucursal de entrega en TdF. Son do
 distintos de la misma marca.
 
 `sql/gv_secundarios_web_y_regla_L_v2109.sql`.
+
+**Chequeo (v21.84):** `node tests/regla-L-super.cjs` — candado **estático** sobre
+`admin/admin-supercot.js`: las dos asignaciones de `addLSuffix` (el submit y el PDF) tienen que
+llevar `&& !usesChefProducts(...)`. Verificado que falla con `addLSuffix = isChefSuper(k)` a
+secas, que es como estuvo hasta la v21.09. Se corre **sin comentarios**: el comentario que
+explica la regla nombra `usesChefProducts` igual, y un candado que vigila su propio comentario
+no vigila nada (v21.82).
+
+⚠ Esta regla **no tiene centinela en la base y no puede tenerlo**: no vive en Supabase, vive en
+el JS de las páginas. Gestión tiene la copia que se sirve por Pages; el fuente está en
+`pagina-LK-copia` y `paginach`, y ahí **no hay test que lo sostenga** — al tocar ese archivo en
+cualquiera de los dos repos, mirar esto.
 
 ## ⚠⚠⚠ REGLA: LA "L" NO ES UN CÓDIGO — ES UNA DENOTACIÓN
 
@@ -3380,8 +3414,20 @@ archivo quedó con 53 tests duplicados. Va con `rindex`, y después se cuenta:
 
 **Luis, 23/09: *"revisá otros tests"*.** Un test verde dice que hoy no se rompió, no que
 muerda. La única forma de saberlo es **romper el código a propósito y ver si se entera**:
-`node tests/tools/mutar.cjs` (catálogo de 8 mutaciones, cada una con los tests que TIENEN que
-ponerse rojos). **No va en `run.sh`**: muta `index.html` y tarda.
+`node tests/tools/mutar.cjs` (catálogo de **11** mutaciones al 23/09, cada una con los tests que
+TIENEN que ponerse rojos; las 11 las caza su test). **No va en `run.sh`**: muta archivos y tarda.
+
+⚠ **Desde la v21.84 una mutación puede vivir en OTRO archivo**, no sólo en `index.html`: la
+entrada lleva `archivo: "admin/admin-supercot.js"` y el `finally` restaura **todos** los que
+tocó. Hacía falta porque la regla de la **L** (v21.09) no está en el index: vive en el espejo
+del panel de LK, que se sirve por Pages igual que todo lo demás.
+
+⚠⚠ **Mientras `mutar.cjs` corre NO se toca el árbol de git.** Restaura desde la copia que leyó
+al arrancar, así que un `git stash` / `git pull` en el medio le deja **la mutación escrita
+encima** de lo que acabás de traer — y el script igual dice *"restaurado ✓"*, porque para él
+quedó como lo encontró. Pasó el 23/09: quedó `_pgaObsGrupoBadge(){return '';}` en `index.html`.
+La señal es un `git status` con el index modificado sin que lo hayas editado; se arregla con
+`git checkout -- index.html`.
 
 **Lo que dio el barrido del 23/09 sobre los 274 tests:**
 

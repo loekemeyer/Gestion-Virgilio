@@ -57,6 +57,12 @@ const CATALOGO = [
   { n: "obs-en-la-np", de: "function _pgaObsHtml(",
     a: "function _pgaObsHtml(){return '';} function _pgaObsHtmlMut(",
     rompe: ["ppp-obs-boton"] },
+  // v21.84: la L es de Cencosud y de Tierra del Fuego, de nadie mas (regla v21.09).
+  // Esta NO vive en index.html: el espejo del panel de LK se sirve igual por Pages.
+  { n: "regla-L-super", archivo: "admin/admin-supercot.js",
+    de: "isChefSuper(state.superKey) && !usesChefProducts(state.superKey);",
+    a: "isChefSuper(state.superKey);",
+    rompe: ["regla-L-super"] },
   { n: "obs-badge-grupo", de: "function _pgaObsGrupoBadge(",
     a: "function _pgaObsGrupoBadge(){return '';} function _pgaObsGrupoBadgeMut(",
     rompe: ["ppp-obs-boton"] },
@@ -68,19 +74,28 @@ if (!lista.length) { console.error("nada matchea '" + filtro + "'"); process.exi
 
 const orig = fs.readFileSync(IDX);
 fs.writeFileSync(BAK, orig);
+// v21.84 — una mutacion puede vivir en otro archivo (el espejo del panel de LK).
+// Se guarda el original de cada uno y se restauran TODOS en el finally.
+const ORIGINALES = new Map([[IDX, orig]]);
+function destinoDe(m) {
+  const f = m.archivo ? path.join(RAIZ, m.archivo) : IDX;
+  if (!ORIGINALES.has(f)) ORIGINALES.set(f, fs.readFileSync(f));
+  return f;
+}
 const env = Object.assign({}, process.env,
   { PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers" });
 const fallas = [];
 
-function restaurar() { fs.writeFileSync(IDX, orig); }
+function restaurar() { for (const [f, b] of ORIGINALES) fs.writeFileSync(f, b); }
 process.on("SIGINT", () => { restaurar(); process.exit(130); });
 
 try {
   for (const m of lista) {
-    const txt = orig.toString("latin1");          // ⚠ latin1 = byte a byte, no rompe el NUL
+    const dest = destinoDe(m);
+    const txt = ORIGINALES.get(dest).toString("latin1");  // ⚠ latin1 = byte a byte, no rompe el NUL
     const n = txt.split(m.de).length - 1;
     if (n !== 1) { console.log("SALTEADA (" + n + " coincidencias): " + m.n); fallas.push(m.n + ": el patrón ya no existe"); continue; }
-    fs.writeFileSync(IDX, Buffer.from(txt.replace(m.de, m.a), "latin1"));
+    fs.writeFileSync(dest, Buffer.from(txt.replace(m.de, m.a), "latin1"));
     console.log("== " + m.n);
     for (const t of m.rompe) {
       const f = path.join(RAIZ, "tests", t + ".cjs");
@@ -95,8 +110,10 @@ try {
   }
 } finally { restaurar(); }
 
-if (fs.readFileSync(IDX).equals(orig)) console.log("\nindex.html restaurado ✓");
-else { console.error("\n⚠⚠ index.html NO quedó igual: restaurar desde " + BAK); process.exit(1); }
+let _rest = [];
+for (const [f, b] of ORIGINALES) if (!fs.readFileSync(f).equals(b)) _rest.push(f);
+if (!_rest.length) console.log("\narchivos restaurados ✓ (" + ORIGINALES.size + ")");
+else { console.error("\n⚠⚠ NO quedaron iguales: " + _rest.join(", ") + " — index.html se restaura desde " + BAK); process.exit(1); }
 
 if (fallas.length) { console.error("\nFALLAN " + fallas.length + ":\n· " + fallas.join("\n· ")); process.exit(1); }
 console.log("mutar: las " + lista.length + " mutaciones las caza su test ✓");
