@@ -29495,3 +29495,15 @@ centinelas de camión. Front: `PPP_RES_CAMIONES`. Test `ppp-res-demora-camion` a
 `gv_ppp_web_camion`: Z6 → `GBA Norte`, Z7 → `GBA Norte Lejos`, la zona manda sobre el sector (N y P
 eran los dos GBA Norte). Front: `PPP_RES_CAMIONES` separa las dos filas. Medido: `gv_ppp_tanda_camion_mezclado`
 1 → 1. Rollback: sacar `when '6' … when '7' …` del primer `case`. `sql/gv_camion_z6_z7_separadas_v2194.sql`.
+
+## §3.mw — v21.95: Z2+Z3 juntas si cada una < 1 m³; Z6+Z7 siempre juntas (Luis, 2026-09-23)
+
+Retira lo de §3.mv como regla de camión. `gv_ppp_web_dia_grupo(zona, entrada, expreso, min, m3)` (firma
+nueva, 5.º arg con default; la de 4 se dropeó): Z7 se trata como GBA Norte; un pedido Z2/Z3 se suma al día de
+la otra zona si las dos quedan < 1 m³ con él adentro; la cuenta de camiones del día descuenta 1 si Z2 y Z3 están
+las dos < 1. El armador (pase g) le pasa el m³ del pedido (marcador `v21.95-m3`). `gv_ppp_web_camion` NO cambió:
+las tandas siguen por zona. Front: Resumen PPP junta Z2+Z3 < 1 m³ y Z6+Z7.
+Probado en transacción abortada: Z3 0,2 → día de Z2 0,7 (06/10) en tanda propia E91A; Z3 1,2 → no se suma;
+Z7 → día de Z6; programación existente idéntica (md5); `gv_reglas_perdidas` 0.
+Rollback: recrear la versión de 4 args de `sql/gv_programacion_grupo_dia_v2187.sql` y quitar el 5.º argumento
+de la llamada en el armador.
