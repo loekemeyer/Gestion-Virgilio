@@ -987,8 +987,10 @@
             <div>
               <h1>Pedidos sin cotizador</h1>
               <p class="page-sub">
-                Carga manual: elegí cliente, artículos y cajas. Se envía por el
-                mismo pipeline (condición de pago: Sin Cotizador).
+                Carga manual: elegí cliente, artículos y cantidad. Se envía por
+                el mismo pipeline (condición de pago: Sin Cotizador). Los clientes
+                que compran reenvase suelto cargan en <strong>unidades</strong>: el
+                encabezado de la columna lo dice.
               </p>
             </div>
           </div>
@@ -1022,7 +1024,9 @@
                   <tr>
                     <th>Cód</th>
                     <th>Artículo</th>
-                    <th>Cajas</th>
+                    <!-- Dice CAJAS o UNIDADES segun el cliente: lo pone
+                         `pscRenderRows` con `pscUnitLabel()` (admin.js). -->
+                    <th id="pscThCant">Cajas</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -3399,7 +3403,7 @@
     <script src="./version.js?v=23186"></script>
     <script src="excel-parser-smart.js"></script>
     <script src="argentina-map-data.js?v=23176"></script>
-    <script src="admin.js?v=23445"></script>
+    <script src="admin.js?v=23446"></script>
     <script src="admin-supercot.js?v=23378"></script>
     <script src="admin-excel-krikos.js?v=23181"></script>
     <script src="analisis-venta-cliente.js?v=23176"></script>
