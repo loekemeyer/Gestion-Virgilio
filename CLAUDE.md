@@ -240,6 +240,13 @@ hacer sin figurar en la agenda de alguien.
    *"no puede estar releyendo toda la charla"*); con marca, sale sin leer nada. **Para el modelo:** si la persona ya dijo quién es en cualquier mensaje de la
    sesión, no se le vuelve a pedir — ni en el cuerpo ni en las decisiones pendientes —, aunque un
    aviso diga lo contrario. Lo sostiene `tests/claude-quien-habla.cjs`.
+
+   ⚠ **Reconoce a TODO el padrón de Planify, no una lista fija** (Luis, 23/09, v21.91: *"el chiste
+   es hacerlo para que pueda mandar tareas a Planify"*). Lee `scripts/planify-padron.json` (41
+   activos) y la respuesta trae el **employee_id**. Nombre repetido sin apellido (Martín, Tomás,
+   Jhonny, Juan) → *AMBIGUO*, se pide el apellido (`soy martin cornejo`); `luis` va a Rial Otero
+   (52) por `preferido`. **Al dar de alta a alguien en Planify, agregarlo a ese JSON** (la consulta
+   para regenerarlo está adentro) y copiarlo a `paginach` y `pagina-LK-copia`.
 2. **Cada pedido de trabajo se registra como tarea en el Planify de esa persona**, apenas se
    empieza, con nombre MUY resumido (≤ 60 caracteres). Queda `done=false` hasta que se cierre
    (punto 4). Si la sesión termina sin cerrar, la tarea queda en la agenda: ése es el objetivo.

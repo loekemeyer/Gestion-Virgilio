@@ -17,18 +17,28 @@ function t(sid, prompt, transcript = "") {
   const out = execFileSync("bash", [HOOK], { input: JSON.stringify({ session_id: sid, prompt, transcript_path: transcript }), env }).toString();
   if (!out.trim()) return "silencio";
   const c = JSON.parse(out).hookSpecificOutput.additionalContext;
-  const m = c.match(/CONFIRMADA: \*\*(\w+)\*\*/);
-  return m ? m[1] : "pregunta";
+  let m = c.match(/CONFIRMADA: \*\*([^*]+)\*\*.*employee_id (\d+)/);
+  if (m) return m[1] + "#" + m[2];
+  if (/AMBIGUO/.test(c)) return "ambiguo";
+  return "pregunta";
 }
+// v21.91 (Luis: "que acepte otros nombres, el chiste es mandar tareas a Planify"): el padrón
+// sale de scripts/planify-padron.json y la respuesta trae el employee_id.
 const casos = [
-  ["a", "luis\nhabia puesto una traba para mover NPs", "", "luis"],
+  ["a", "luis\nhabia puesto una traba para mover NPs", "", "Luis Ignacio Rial Otero#52"],
   ["a", "otra cosa sin nombre", "", "silencio"],          // ya contestó: se calla
   ["b", "Luis pidió que muevas la tanda E74A", "", "pregunta"], // de pasada no cuenta
-  ["c", "soy marianela, fijate la tanda", "", "marianela"],
-  ["d", "Thomas: mirá esto", "", "thomas"],
+  ["c", "soy marianela, fijate la tanda", "", "Becker Marianela#38"],
+  ["d", "Thomas: mirá esto", "", "Thomas#20"],
   ["e", "hola, necesito mover una tanda de martin", "", "pregunta"],
   ["f", "dale seguí", tr, "pregunta"],                   // la charla NO se relee
-  ["g", "martin", "", "martin"],
+  ["g", "martin", "", "ambiguo"],                        // Cornejo y Pregelj
+  ["g", "soy martin cornejo", "", "Cornejo Martin#34"],  // el apellido lo resuelve
+  ["h", "Giuliana\nnecesito un reporte", "", "Giuliana De La Vega#63"],
+  ["i", "vivi", "", "Gauna Viviana#4"],
+  ["j", "tomas", "", "ambiguo"],                         // Beviglia y Gonzalez
+  ["k", "Juan Cruz: mirá esto", "", "Juan Cruz Karaygan#51"],
+  ["l", "hola elías", "", "Elias Irace#1"],
 ];
 let mal = 0;
 for (const [sid, pr, trp, esp] of casos) {
