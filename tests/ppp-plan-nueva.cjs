@@ -201,7 +201,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     return out;
   });
 
-  // ⚠ v21.48 — la v21.38 saco el TABLERO DE 6 DIAS (Luis: "elimina esa visual") y actualizo
+  // ⚠ v21.49 — la v21.38 saco el TABLERO DE 6 DIAS (Luis: "elimina esa visual") y actualizo
   // cuatro tests, pero no este: sus 18 chequeos del tablero (los KPI, las tarjetas de dia, las
   // hojas 1 y 2, la banda de atrasados y la vuelta al tablero) median algo que ya no se dibuja,
   // asi que CI quedo en rojo desde entonces. Se van con el tablero; el que sigue vivo es el

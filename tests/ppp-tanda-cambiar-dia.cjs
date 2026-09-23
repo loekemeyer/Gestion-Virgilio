@@ -98,7 +98,7 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
 
     const esperar = async function (fn, ms) {
       const t0 = Date.now();
-      // v21.48 — 4 s alcanzaban en una máquina libre y NO en un runner de CI ni con otros
+      // v21.49 — 4 s alcanzaban en una máquina libre y NO en un runner de CI ni con otros
       // chromium corriendo al lado: el paso 2 no llegaba a dibujarse, querySelector daba null
       // y el test moría con "Cannot read properties of null". No es un test roto, es una
       // carrera: corriendo solo pasa 5 de 5. El que espera es el test, así que espera más.

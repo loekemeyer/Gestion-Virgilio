@@ -32,7 +32,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.fetch = (url) => {
       const u = String(url);
       if (u.indexOf("gv_ppp_programacion_diaria") >= 0) return J([mk("98001", "Uno SA"), mk("98002", "Dos SA"), mk("98003", "Tres SA")]);
-      // v21.48 — desde la v21.37 la solapa de vencidos muestra lo que dice el BACKEND
+      // v21.49 — desde la v21.37 la solapa de vencidos muestra lo que dice el BACKEND
       // (gv_ppp_atrasados), no lo que tiene fecha anterior a hoy; sin esta respuesta el mock
       // contestaba [] y la solapa salía vacía, o sea que el test no podía ver ninguna NP.
       // Atrasado = vencido y NO salió: la 98003 siempre (no tiene nada), y la 98002 sólo
