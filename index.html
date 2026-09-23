@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.39"></script>
+<script type="module" src="recepcion.js?v=21.40"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9925,7 +9925,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.39";
+const APP_VERSION = "v21.40";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35889,6 +35889,12 @@ function _pppMovCss() {
     // v19.29 — el destino «Armados en espera», arriba de la grilla de días: no es un día, así que
     // no puede ser un botón más de la grilla.
     ".mv-esp{margin-bottom:11px;}" +
+    // v21.40 — el casillero «Armados en espera» dentro de la grilla: gris y punteado, para que no se lea como fecha.
+    ".mv-d.espera{background:#f8fafc;border:1px dashed #94a3b8;}" +
+    ".mv-d.espera .mv-d-num{color:#475569;font-size:14px;}" +
+    ".mv-d.espera .mv-d-m3{color:#64748b;}" +
+    ".mv-d.espera:hover{border-color:#475569;}" +
+    ".mv-d.espera.actual{border-style:solid;border-color:#1e6bd6;background:#eff6ff;}" +
     ".mv-esp-b{display:block;width:100%;text-align:left;background:#fff;border:1px dashed #94a3b8;border-radius:11px;" +
       "padding:10px 13px;cursor:pointer;font:inherit;}" +
     ".mv-esp-b:hover{border-color:#475569;background:#f8fafc;}" +
@@ -35942,21 +35948,25 @@ function pppMovRender() {
   // lados que lo pidió — la tabla de Programación de entregas y el submódulo de Pedidos atrasados—,
   // que abren este mismo pop-up. No aparece al reprogramar una NP suelta de A Programar
   // (`reprogNps`): ahí todavía no hay tanda que parar.
-  if (M.tanda && !M.reprogNps) {
-    const yaEsp = M.actual === PGA_ESPERA_ISO;
-    h += '<div class="mv-esp">' +
-      '<button class="mv-esp-b"' + (yaEsp ? ' disabled' : ' onclick="pppMovEsperaElegir()"') + '>' +
-        '<b>' + (yaEsp ? '⏸ Ya está en Armados en espera' : '⏸ Mandar a «Armados en espera»') + '</b>' +
-        '<span>' + (yaEsp
-          ? 'Para sacarla de ahí, elegí un día de abajo.'
-          : 'Se arma y queda parada SIN fecha de entrega: no consume cupo, no va en ningún camión y no cuenta como atrasada. Se le pone día cuando se sepa, desde acá mismo.') +
-        '</span></button></div>';
-  }
   if (M.cargando && !(M.cal || []).length) { body.innerHTML = h + '<div class="mv-cargando">Cargando los días…</div>'; return; }
   if (!(M.cal || []).length) { body.innerHTML = h + '<div class="mv-cargando">No pude leer el calendario. Probá de nuevo.</div>'; return; }
   const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"], MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   const hoyISO = (function () { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); })();
   h += '<div class="mv-grid">';
+  // v21.40 (Luis: *"Armado en espera que no sea más un botón"*): «Armados en espera» es un casillero
+  // más de la grilla, el primero, dibujado como un día más (gris, borde punteado: no es una fecha).
+  // Hasta la v21.39 era un botón ancho aparte, arriba de los días. No aparece al reprogramar una NP
+  // suelta de A Programar (`reprogNps`): ahí todavía no hay tanda que parar.
+  if (M.tanda && !M.reprogNps) {
+    const yaEsp = M.actual === PGA_ESPERA_ISO;
+    h += '<button class="mv-d espera' + (yaEsp ? ' actual' : '') + '"' +
+      (yaEsp ? ' disabled' : ' onclick="pppMovEsperaElegir()"') +
+      ' title="' + (yaEsp ? 'Ya está en Armados en espera. Para sacarla de ahí, elegí un día.'
+                          : 'Queda armada SIN fecha de entrega: no consume cupo, no va en ningún camión y no cuenta como atrasada.') + '">' +
+      (yaEsp ? '<span class="mv-tag aca">está acá</span>' : '') +
+      '<span class="mv-d-dow">Sin fecha</span><span class="mv-d-num">⏸ Armados en espera</span>' +
+      '<span class="mv-d-m3">no ocupa cupo</span><span class="mv-d-q">' + (yaEsp ? 'para sacarla, elegí un día' : 'no va en ningún camión') + '</span></button>';
+  }
   for (const d of M.cal) {
     const dISO = String(d.dia).slice(0, 10);
     if (dISO < hoyISO) continue;

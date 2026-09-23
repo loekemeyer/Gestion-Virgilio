@@ -122,13 +122,15 @@ catch (_e) {
                 actual: dk(1), actualTxt: "x", arbolFilas: [], empezada: true, desdeArbol: true };
     pppMovRender();
     const b1 = document.getElementById("pppMovBody").innerHTML;
-    out.ofrece = /Mandar a «Armados en espera»/.test(b1) && /pppMovEsperaElegir\(\)/.test(b1);
+    // v21.40 (Luis: "que no sea más un botón"): es un casillero de la grilla (.mv-d), no un .mv-esp-b aparte
+    out.ofrece = /Armados en espera/.test(b1) && /pppMovEsperaElegir\(\)/.test(b1)
+              && /class="mv-d espera"/.test(b1) && !/class="mv-esp-b"/.test(b1) && !/mv-esp"/.test(b1);
 
     // ya parada: el botón lo dice y no se puede volver a apretar
     _pppMov.actual = PGA_ESPERA_ISO;
     pppMovRender();
     const b2 = document.getElementById("pppMovBody").innerHTML;
-    out.yaEsta = /Ya está en Armados en espera/.test(b2) && /mv-esp-b disabled|mv-esp-b" disabled/.test(b2);
+    out.yaEsta = /class="mv-d espera actual" disabled/.test(b2) && /está acá/.test(b2) && !/pppMovEsperaElegir\(\)/.test(b2);
 
     // reprogramar una NP suelta de A Programar: todavía no hay tanda que parar
     _pppMov = { reprogNps: ["98001"], reprogLabel: "98001", np: 1, m3: 0.2, dias: 21, cal: cal,
