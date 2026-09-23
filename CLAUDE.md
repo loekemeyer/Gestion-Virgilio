@@ -3897,6 +3897,22 @@ son **16** (7 con pedidos, 82 cajas), con el `motivo` que dice cuál duele: *ped
 *pedido sin OC*, *stock sin OC* o *resto* (código viejo o mal tipeado: `438E-`, `501B`, `587C`).
 `sql/gv_oc_codigos_sin_config_v2101.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-23, v21.52): al facturar un DUAL, la caja sale de la pila donde ESTÁ
+
+Caso **438E de Chef con «a facturar» en −1**: tanda D47B, pedido CH 0030. El armado anotó
+`438E` **sin la L**, así que al facturar `stockSalidaFacturadoNP` tomó la empresa del pedido (CH)
+y descontó de la pila de Chef, con la caja en la de LK. El guard `zzz_facturado_no_negativo`
+no lo frenó porque mide la pila **sin empresa** (a propósito, v19.49) y LK tenía saldo.
+
+Hoy ese mismo guard, en un código de `codigos_duales`, **cambia la empresa del descuento a la
+otra** si la que viene no tiene saldo en esa tanda y la otra sí. No se tocó
+`trg_normalizar_empresa_stock`. Centinela `v_otra` en `GV_Reglas_Centinela`.
+`sql/gv_facturado_dual_pila_v2152.sql`.
+
+⚠ Al corregir a mano la empresa de un movimiento, el caché `stocks_carga_rapida` se recalcula
+**sólo para la empresa nueva**: la vieja hay que refrescarla aparte (un `update` sin cambios sobre
+otro movimiento de esa empresa).
+
 ## ⚠ REGLA (Luis, 2026-09-22, v21.15): pelar la L de LOS DOS LADOS es no matchear nunca
 
 Tercera pieza del agujero de la v21.12. **`reporte_agentes_equivalencia_facturar()`** —el aviso de
