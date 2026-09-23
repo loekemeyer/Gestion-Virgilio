@@ -23,6 +23,9 @@ node() {
   return 0
 }
 
+echo "== ppp-tanda-candado-codigo (v21.58: una tanda empezada conserva su codigo al cambiar de dia) =="
+node tests/ppp-tanda-candado-codigo.cjs
+
 _resumen() {
   echo ""
   echo "======================================================================"

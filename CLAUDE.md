@@ -4306,6 +4306,20 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
+## ⚠ REGLA (Marianela, 2026-09-23, v21.58): una tanda EMPEZADA no cambia de CÓDIGO al moverla de día
+
+**Marianela:** *"cuando tengamos una tanda en proceso de picking o armado y la cambio para otro día
+… no deje cambiar el nombre porque los operarios trabajan por nombre de tanda, luego no la encuentran"*.
+
+El paso 2 de «📅 Cambiar de día» sólo ofrecía **➕ Tanda nueva** o **meterla en otra**: las dos le
+cambiaban el código. Ahora hay **🔒 Mismo código** (`p_tanda_destino = null`, modo `mantiene`) y,
+si la tanda tiene eventos de operario reales (legajo ≠ 0/1), `gv_ppp_tanda_mover` frena cualquier
+cambio de código con **`TANDA_CANDADO`**. Juntar OTRA tanda adentro de la empezada sigue valiendo:
+la empezada no cambia de nombre.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` · `node tests/ppp-tanda-candado-codigo.cjs`.
+`sql/gv_tanda_candado_codigo_v2158.sql`.
+
 ## ⚠ REGLA (Thomas, 2026-09-23, v21.56): UN CAMIÓN = UN GRUPO DE ZONAS — Capital son DOS camiones
 
 **Thomas, textual:** *"no podés programar para un solo día zona 1, zona 2, zona 3, zona 6, zona 7. Es un
