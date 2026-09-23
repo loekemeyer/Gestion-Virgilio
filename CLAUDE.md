@@ -3949,7 +3949,18 @@ v20.88—, súper, retira, cliente `solo`, tanda de dos camiones, tanda en dos d
 y día sin reparto.
 
 ⚠ **El interruptor es `PPP_Web_Config.tanda_fusion_activa`** (0 = apagado). Prenderlo es un
-`update`, no un deploy. Al 22/09 quedó en **0** esperando el sí de Luis.
+`update`, no un deploy. **Prendido el 22/09 con el sí de Luis** (*"prendé la fusión"*): la
+primera corrida real hizo E70A→E64A, E18A→E48C y E46C→E49A.
+
+### ⚠ Al reprogramar a mano, el CLIENTE se junta por `cliente_key`, no por `(empresa, cod)`
+
+El 22/09 se reprogramaron 21 tandas a mano para dejar cada día en el cupo (4,30 m³). El plan
+agrupó los pedidos de un mismo cliente por **código dentro de cada empresa**, y **Clapera Alicia
+Raquel** es **2447 en Chef y 2394 en LK** —misma persona, misma dirección (Rabanal 2866, expreso
+a Rosario)—: E65A (LK) fue al 05/10 y E26C/E53B (Chef) quedaron el 30/09. Lo cazó
+`gv_ppp_cliente_dos_dias` (5 filas). La regla de Thomas (*"nunca +1 pedido de un cliente va
+separado en la PPP"*) cruza empresas: **la clave del cliente para el día es `cliente_key`**, la
+misma que usa ese centinela. Y se mira **antes y después** de cualquier movida de tandas.
 
 **Probado corriendo el armador**, no leyéndolo (regla v19.56): en transacción abortada, con el
 interruptor en 1, `gv_ppp_web_armar_pendientes('lk', …)` entró al pase y fusionó E70A→E64A,
