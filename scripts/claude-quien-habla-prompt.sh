@@ -19,8 +19,9 @@
 # Ahora:
 #   · acepta el nombre en la primera línea ("luis", "luis, …", "Luis:") además de
 #     "soy X" / "habla X" / "te escribe X";
-#   · si el mensaje actual no lo dice, RELEE LA CHARLA ENTERA (transcript_path) y
-#     busca la respuesta en cualquier mensaje anterior del usuario;
+#   · mira SÓLO el mensaje que acaba de entrar — la charla no se relee (Luis:
+#     "no puede estar releyendo toda la charla"). Detectado una vez, deja la marca
+#     y desde ahí sale en la primera línea sin leer nada;
 #   · guarda la marca en ~/.claude/quien-habla/ (y lee también la de /tmp).
 #
 # ⚠ NO BLOQUEA: el trabajo sigue. Lo que espera es la ATRIBUCIÓN (Planify,
@@ -75,32 +76,7 @@ def detectar(txt):
             return m.group(1)
     return None
 
-def textos_usuario(path):
-    try:
-        with open(path, encoding="utf-8", errors="replace") as f:
-            for linea in f:
-                try:
-                    o = json.loads(linea)
-                except Exception:
-                    continue
-                if o.get("type") != "user" or o.get("isMeta"):
-                    continue
-                c = (o.get("message") or {}).get("content")
-                if isinstance(c, str):
-                    yield c
-                elif isinstance(c, list):
-                    for b in c:
-                        if isinstance(b, dict) and b.get("type") == "text":
-                            yield b.get("text", "")
-    except Exception:
-        return
-
-quien = detectar(p.get("prompt"))
-if not quien and p.get("transcript_path"):
-    for t in textos_usuario(p["transcript_path"]):
-        quien = detectar(t)
-        if quien:
-            break
+quien = detectar(p.get("prompt"))    # SOLO el mensaje actual: la charla no se relee
 
 def emit(msg):
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",

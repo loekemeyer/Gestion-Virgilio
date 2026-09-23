@@ -235,9 +235,9 @@ hacer sin figurar en la agenda de alguien.
    incluso después de que te contestan"*). Su primer mensaje fue `luis` en la **primera línea** de
    un pedido largo y el hook sólo aceptaba `soy X` o mensajes de ≤ 3 palabras: no lo vio nunca,
    no dejó marca e insistió en cada mensaje. Hoy el hook acepta el nombre en la primera línea
-   (`luis`, `Luis:`, `luis, …`), **relee la charla entera** (`transcript_path`) si el mensaje
-   actual no lo dice, y guarda la marca en `~/.claude/` (la de `/tmp` no sobrevivía a un
-   contenedor nuevo). **Para el modelo:** si la persona ya dijo quién es en cualquier mensaje de la
+   (`luis`, `Luis:`, `luis, …`) y guarda la marca en `~/.claude/` (la de `/tmp` no sobrevivía a un
+   contenedor nuevo). **Mira sólo el mensaje que entra: la charla NO se relee** (Luis, mismo día:
+   *"no puede estar releyendo toda la charla"*); con marca, sale sin leer nada. **Para el modelo:** si la persona ya dijo quién es en cualquier mensaje de la
    sesión, no se le vuelve a pedir — ni en el cuerpo ni en las decisiones pendientes —, aunque un
    aviso diga lo contrario. Lo sostiene `tests/claude-quien-habla.cjs`.
 2. **Cada pedido de trabajo se registra como tarea en el Planify de esa persona**, apenas se

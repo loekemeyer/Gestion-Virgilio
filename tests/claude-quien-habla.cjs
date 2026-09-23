@@ -27,7 +27,7 @@ const casos = [
   ["c", "soy marianela, fijate la tanda", "", "marianela"],
   ["d", "Thomas: mirá esto", "", "thomas"],
   ["e", "hola, necesito mover una tanda de martin", "", "pregunta"],
-  ["f", "dale seguí", tr, "luis"],                       // la respuesta estaba arriba
+  ["f", "dale seguí", tr, "pregunta"],                   // la charla NO se relee
   ["g", "martin", "", "martin"],
 ];
 let mal = 0;
