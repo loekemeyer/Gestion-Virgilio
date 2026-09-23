@@ -6052,7 +6052,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.72"></script>
+<script type="module" src="recepcion.js?v=21.74"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10003,7 +10003,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.72";
+const APP_VERSION = "v21.74";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -12559,6 +12559,12 @@ function pkEmitAGuardar(art, n) {
 
 function pkCount() { return _pk ? Object.keys(_pk.results).length : 0; }
 
+// v21.73: artículo que se pickea en UNIDADES (uxb 1): 55215/55219/55289 o lo que diga GV_UxB.
+function pkEsUnidad(cod) {
+  const c = String(codBase(pkStripL(String(cod || "")))).replace(/\D/g, "");
+  if (["55215", "55219", "55289"].indexOf(c) >= 0) return true;
+  return typeof artUxb === "function" && Number(artUxb(codBase(pkStripL(String(cod || ""))))) === 1;
+}
 function pkRender() {
   const m = document.getElementById("tandaModal");
   if (!m || !_pk) return;
@@ -12666,11 +12672,14 @@ function pkRender() {
   const _pkEsDec = _PK_CODS_DEC.indexOf(String(rec).replace(/\D/g,"")) >= 0;
   const _pkIM = _pkEsDec ? "decimal" : "numeric";
   const _pkStep = _pkEsDec ? ' step="any"' : '';
+  // v21.73 (Marianela 23/09): 55215/55219/55289 van en UNIDADES en todo el sistema (uxb 1).
+  const _pkUni = pkEsUnidad(rec);
+  const _pkUd = _pkUni ? "unidades" : "cajas";
   if (_pk.mode === "fInput") {
     body.innerHTML = `<div class="pk-flow">${nav}
       ${bigRow}
       ${dualTag}
-      <div class="pk-fq-q" style="text-align:center">¿Cuántas pusiste? <span class="pk-fq-esp">(pedidas: ${pkFmt(it.esp)})</span></div>
+      <div class="pk-fq-q" style="text-align:center">¿Cuántas pusiste? <span class="pk-fq-esp">(pedidas: ${pkFmt(it.esp)}${_pkUni ? " u" : ""})</span></div>
       <div class="pk-fq2">
         <div class="pk-fq-col puse"><div class="pk-fq-lbl">PUSE</div><input id="pkFqty" class="pk-fq-input2" type="number" inputmode="${_pkIM}"${_pkStep} min="0" value="${pkFmt(confirmed != null ? confirmed : it.esp)}" oninput="pkFaltanCalc(${it.esp})"></div>
         <div class="pk-fq-col falt"><div class="pk-fq-lbl faltan">FALTAN</div><div id="pkFaltan" class="pk-fq-faltan${(it.esp - (confirmed != null ? confirmed : it.esp)) > 0 ? "" : " ok"}">${Math.max(0, Math.round((it.esp - (confirmed != null ? confirmed : it.esp)) * 10) / 10)}</div></div>
@@ -12687,7 +12696,7 @@ function pkRender() {
   body.innerHTML = `<div class="pk-flow">${nav}
     ${bigRow}
     ${dualTag}
-    <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> cajas${it.isExc ? " <span class='pk-cajas-exc'>(en el excedente)</span>" : (it.excHint ? ` <span class='pk-cajas-exc'>(hay ${pkFmt(it.excHint)} en excedente ${escapeHtml(String(it.excUbic || "").replace(/-/g, ""))} — al final)</span>` : (it.hasManualExc ? ` <span class='pk-cajas-exc'>(+ excedente @ ${escapeHtml(it.manualExcUbic || "")}, al final)</span>` : ""))}</div>
+    <div class="pk-cajas">Levantá <b>${pkFmt(it.esp)}</b> ${_pkUd}${it.isExc ? " <span class='pk-cajas-exc'>(en el excedente)</span>" : (it.excHint ? ` <span class='pk-cajas-exc'>(hay ${pkFmt(it.excHint)} en excedente ${escapeHtml(String(it.excUbic || "").replace(/-/g, ""))} — al final)</span>` : (it.hasManualExc ? ` <span class='pk-cajas-exc'>(+ excedente @ ${escapeHtml(it.manualExcUbic || "")}, al final)</span>` : ""))}</div>
     ${it.forcedGond ? `<div class="pk-forced-note">🟢 Estás retirando de <b>góndola</b> (había excedente) — se avisó al supervisor</div>` : ``}
     ${it.orig ? (it.orig.mixed
       ? `<div class="pk-orig mix">⚠ <b>Mezcla Loeke/Chef</b> — <b>Loeke ×${pkFmt(it.orig.nL)}</b> en ${escapeHtml(it.orig.loekeRango)} · <b>Chef ×${pkFmt(it.orig.nC)}</b> en ${escapeHtml(it.orig.chefRango)}</div>`
@@ -12923,7 +12932,7 @@ function pkNextHtml() {
     const nCod = codBase(x.art);
     const nm = /\s+(LK|CH|LOKE)$/.exec(String(x.art).toUpperCase());
     const nEmp = nm ? (nm[1] === "LOKE" ? "LK" : nm[1]) : ((x.emp === "LK" || x.emp === "CH") ? x.emp : "");
-    h += '<div class="pk-next-row"><span class="pk-next-sec' + (x.isExc ? " exc" : "") + '">' + escapeHtml(sec) + '</span><span class="pk-next-cod">' + escapeHtml(nCod) + (nEmp ? ' <span class="pk-cod-emp pk-cod-emp-' + nEmp.toLowerCase() + '">' + nEmp + '</span>' : "") + (x.isExc ? ' <span class="pk-next-tag">excedente</span>' : "") + '</span><span class="pk-next-q">' + pkFmt(x.esp) + ' caj</span></div>';
+    h += '<div class="pk-next-row"><span class="pk-next-sec' + (x.isExc ? " exc" : "") + '">' + escapeHtml(sec) + '</span><span class="pk-next-cod">' + escapeHtml(nCod) + (nEmp ? ' <span class="pk-cod-emp pk-cod-emp-' + nEmp.toLowerCase() + '">' + nEmp + '</span>' : "") + (x.isExc ? ' <span class="pk-next-tag">excedente</span>' : "") + '</span><span class="pk-next-q">' + pkFmt(x.esp) + (pkEsUnidad(x.art) ? ' u' : ' caj') + '</span></div>';
   });
   return h + "</div>";
 }
@@ -26846,16 +26855,41 @@ function insChooserGo(which) {
   closeInsumoChooser();
   if (which === "SC") {
     showCervantesModal(String(legajoInput.value || ""));
-  } else if (which === "RI" || which === "EI") {
+  } else if (which === "EI") {
+    // v21.74: primero el tipo de envío (inyectores / otros), después el destino
+    insEnvioTipo();
+  } else if (which === "RI") {
     // v9.15: Pedir ubicación ANTES de abrir el modal de insumos
     askInsUbicacion(which);
   }
 }
+/* v21.74 — Entregar insumos: DOS botones antes del destino.
+   "Envío a inyectores" → sólo la lista de inyectores de GP2 (bolsas plásticas).
+   "Envío a otros"      → sólo el destino en texto libre. */
+function insEnvioTipo() {
+  let ov = document.getElementById("insChooserModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "insChooserModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);display:flex;align-items:center;justify-content:center;padding:16px;"; document.body.appendChild(ov); }
+  const btn = "width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;color:#fff;font-size:16px;font-weight:800;cursor:pointer;text-align:left;";
+  ov.innerHTML = '<div style="background:#f8fafc;max-width:380px;width:100%;border-radius:16px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+    '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">📤 Entregar insumos</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">¿Qué envío es?</div>' +
+    '<button onclick="insEnvioTipoGo(\'iny\')" style="' + btn + 'background:#0d9488;">🏭 Envío a inyectores</button>' +
+    '<button onclick="insEnvioTipoGo(\'otros\')" style="' + btn + 'background:#0f766e;">📦 Envío a otros</button>' +
+    '<button onclick="closeInsumoChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>' +
+    '</div>';
+  ov.style.display = "flex";
+}
+function insEnvioTipoGo(sub) {
+  closeInsumoChooser();
+  askInsUbicacion("EI", sub === "iny" ? "iny" : "otros");
+}
 
 /* v9.15: Modal para preguntár DÓNDE se envía/recibe antes de abrir el modal de insumos.
    Esto es obligatorio al inicio del proceso RI/EI. */
-function askInsUbicacion(mode) {
+function askInsUbicacion(mode, sub) {
   const isIn = mode === "RI";
+  const soloIny = !isIn && sub === "iny";     // v21.74: sólo inyectores
+  const soloOtros = !isIn && sub === "otros"; // v21.74: sólo texto libre
   const titulo = isIn ? "¿De dónde recibís?" : "¿A dónde lo envías?";
   const hint = isIn ? "Origen/Proveedor" : "Destino/Ubicación";
 
@@ -26864,20 +26898,22 @@ function askInsUbicacion(mode) {
 
   ov.innerHTML = '<div style="background:#f8fafc;max-width:420px;width:100%;border-radius:16px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
     '<div style="font-size:18px;font-weight:800;margin-bottom:3px;">' + (isIn ? "📥 Recepción" : "📤 Entrega") + '</div>' +
-    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + titulo + '</div>' +
+    '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (soloIny ? "¿A qué inyector lo envías?" : titulo) + '</div>' +
     // v14.95 — bolsas plásticas: los inyectores (EI) / las OC de material de GP2 (RI) como botones,
     // arriba del texto libre. Se llenan async; si GP2 no responde queda el texto libre de siempre.
-    '<div id="insUbicGp2"></div>' +
+    '<div id="insUbicGp2">' + (soloIny ? '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">Cargando inyectores…</div>' : '') + '</div>' +
+    '<div id="insUbicLibre"' + (soloIny ? ' style="display:none;"' : '') + '>' +
     '<input type="text" id="insUbicInput" placeholder="' + hint + ' (ej: Cervantes, Centro, Proveedor X)" ' +
       'style="width:100%;box-sizing:border-box;height:48px;border:2px solid #cbd5e1;border-radius:12px;padding:0 12px;font-size:16px;margin-bottom:12px;" />' +
+    '</div>' +
     '<div style="display:flex;gap:10px;">' +
       '<button onclick="insUbicCancel()" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;font-size:16px;">Cancelar</button>' +
-      '<button onclick="insUbicOk(\'' + mode + '\')" style="flex:1;padding:14px;border:none;border-radius:10px;background:' + (isIn ? '#4f46e5' : '#0d9488') + ';color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
+      '<button id="insUbicContinuar" onclick="insUbicOk(\'' + mode + '\')" style="' + (soloIny ? 'display:none;' : '') + 'flex:1;padding:14px;border:none;border-radius:10px;background:' + (isIn ? '#4f46e5' : '#0d9488') + ';color:#fff;font-weight:700;cursor:pointer;font-size:16px;">Continuar</button>' +
     '</div>' +
     '</div>';
   ov.style.display = "flex";
   window._insGp2 = null;
-  _insGp2Opciones(mode);
+  if (!soloOtros) _insGp2Opciones(mode, soloIny);
 
   // Auto-focus en el input
   setTimeout(() => {
@@ -27026,7 +27062,7 @@ async function insGp2Rpc(name, args) {
   return j;
 }
 /* Llena #insUbicGp2 con los botones de GP2: inyectores (EI) u OC de material pendientes (RI). */
-async function _insGp2Opciones(mode) {
+async function _insGp2Opciones(mode, soloIny) {
   const box = document.getElementById("insUbicGp2");
   if (!box) return;
   const isIn = mode === "RI";
@@ -27047,8 +27083,8 @@ async function _insGp2Opciones(mode) {
     } else {
       const mv = await insGp2Rpc("material_virgilio_bundle", {});
       window._insGp2Cache = { mv: mv || null };
-      if (!mv || !mv.inyectores || !mv.inyectores.length) return;
-      box.innerHTML = '<div style="font-size:12.5px;font-weight:800;color:#115e59;margin-bottom:6px;">🧪 Bolsas plásticas — ¿van a un inyector?</div>' +
+      if (!mv || !mv.inyectores || !mv.inyectores.length) { if (soloIny) _insUbicSinIny(box); return; }
+      box.innerHTML = (soloIny ? '' : '<div style="font-size:12.5px;font-weight:800;color:#115e59;margin-bottom:6px;">🧪 Bolsas plásticas — ¿van a un inyector?</div>') +
         mv.inyectores.map(function (nom, i) {
           const falta = (mv.materiales || []).map(function (m) {
             const x = (m.inyectores || []).filter(function (y) { return y.proveedor === nom; })[0];
@@ -27057,9 +27093,15 @@ async function _insGp2Opciones(mode) {
           return '<button onclick="insUbicGp2Ok(\'EI\',' + i + ')" style="' + btn + '">🏭 ' + escapeHtml(nom) +
             '<span style="' + sub + '">' + (falta ? "le faltan: " + escapeHtml(falta) : "al día con sus OC") + '</span></button>';
         }).join("") +
-        '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o escribí a dónde lo enviás (otro destino) —</div>';
+        (soloIny ? '' : '<div style="font-size:12px;color:#64748b;margin:2px 0 10px;">— o escribí a dónde lo enviás (otro destino) —</div>');
     }
-  } catch (_e) { /* sin GP2: queda el texto libre */ }
+  } catch (_e) { /* sin GP2: queda el texto libre */ if (soloIny) _insUbicSinIny(box); }
+}
+/* v21.74: "Envío a inyectores" sin respuesta de GP2 → se avisa y se abre el texto libre. */
+function _insUbicSinIny(box) {
+  if (box) box.innerHTML = '<div style="font-size:13px;color:#b45309;font-weight:700;margin-bottom:10px;">No se pudo cargar la lista de inyectores. Escribí a cuál lo enviás.</div>';
+  const lib = document.getElementById("insUbicLibre"); if (lib) lib.style.display = "";
+  const bt = document.getElementById("insUbicContinuar"); if (bt) bt.style.display = "";
 }
 function insUbicGp2Ok(mode, i) {
   const c = window._insGp2Cache || {};
