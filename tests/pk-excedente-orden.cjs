@@ -87,6 +87,29 @@ catch (_e) {
     out.B_orden = kB.join(",") === "502,505,809,502·EXC,505·EXC";
     out.B_primeroNoEsExcedente = !!kB.length && kB[0].indexOf("·EXC") < 0;
 
+    // ===== (D) a IGUAL orden, primero la góndola y después su excedente =====
+    // v21.79 — el hueco que destapó la prueba de mutación del 23/09: invertir el
+    // `items.concat(excSteps)` del merge NO rompía este test, porque con órdenes
+    // distintos manda el sector y la concatenación sólo decide el DESEMPATE. El
+    // comentario del código fija esa regla ("Merge estable: a igual orden, primero
+    // la góndola y después el excedente") y hasta hoy sólo la sostenía un candado
+    // de texto en pk-deposito-pkc. Acá se prueba corriendo: el excedente del 505
+    // vive en su MISMA celda de góndola (D18), así que los dos empatan en 281.
+    window.gvFetchLugares = async function () {
+      return { lista: [], set: new Set(), libres: new Set(), emp: {},
+               orden: { "A01": 1, "D18": 281, "M16": 462 } };
+    };
+    window.pkFetchExcedente = async function () {
+      return { "505": { cajas: 3, ubics: ["D18"] } };
+    };
+    localStorage.removeItem("vir_pk_" + leg);
+    await showPickingList("E99A", leg);
+    await new Promise(function (res) { setTimeout(res, 60); });
+    const kD = claves();
+    out.D_empate_gondolaPrimero = kD.indexOf("505") >= 0 && kD.indexOf("505·EXC") >= 0 &&
+                                  kD.indexOf("505") < kD.indexOf("505·EXC");
+    out.D_orden = kD.join(",") === "502,505,505·EXC,809";
+
     // ===== (C) gvFetchLugares de verdad expone `orden` (de ahí sale el recorrido) =====
     const srcReal = _gvFetchLugaresReal.toString();
     out.C_exponeOrden = /orden\s*:\s*\{\}/.test(srcReal) && /out\.orden\[sec\]/.test(srcReal);

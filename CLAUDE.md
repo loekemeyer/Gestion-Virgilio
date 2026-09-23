@@ -3336,6 +3336,38 @@ función además del llamado del final. El primer intento insertó el bloque dos
 archivo quedó con 53 tests duplicados. Va con `rindex`, y después se cuenta:
 `grep -oE "node tests/[A-Za-z0-9._-]+\.cjs" tests/run.sh | sort | uniq -d` tiene que dar vacío.
 
+### ⚠ Un test verde no dice que el test SIRVA — para eso está la prueba de MUTACIÓN
+
+**Luis, 23/09: *"revisá otros tests"*.** Un test verde dice que hoy no se rompió, no que
+muerda. La única forma de saberlo es **romper el código a propósito y ver si se entera**:
+`node tests/tools/mutar.cjs` (catálogo de 8 mutaciones, cada una con los tests que TIENEN que
+ponerse rojos). **No va en `run.sh`**: muta `index.html` y tarda.
+
+**Lo que dio el barrido del 23/09 sobre los 274 tests:**
+
+| se buscó | resultado |
+|---|---|
+| mocks de RPC inalcanzables (el pozo de la v21.78) | **0** · los 3 candidatos eran vistas o aserciones |
+| tests sin un solo assert | **0** · los 40 marcados salen con `process.exit(cond ? 1 : 0)` |
+| el regex `[^"']*` sobre un `onclick` (pozo v20.80) | **0** |
+| 8 mutaciones dirigidas | **las 8 las caza su test** |
+
+⚠ **Una mutación que no rompe a nadie NO siempre es un test flojo: puede ser INOCUA.** Pasó
+con `items.concat(excSteps)` del picking — el orden lo da el **sector**, y la concatenación
+sólo decide el **desempate a igual orden**, así que `pk-excedente-orden` tenía razón en no
+moverse. **Antes de acusar a un test, mirar si la mutación cambia algo de verdad.** Ese caso
+igual sirvió: el desempate no se probaba corriendo (sólo un candado de texto en
+`pk-deposito-pkc`) y se le agregó el chequeo **D** a `pk-excedente-orden`.
+
+⚠ **Y dos que siguen verdes con razón, para no volver a marcarlos:** `stk-buscar-cero` mide
+el filtro de ceros, no el prefijo; y **`regla-L.cjs` no mira el código** — es un candado sobre
+el `CLAUDE.md`, para que el bloque de la L no se borre. La regla **en el código** la sostiene
+`fcs-codigo-l`, que sí se entera.
+
+⚠ **La heurística estática sola no alcanza**, y quedó medido: buscar "claves que nadie lee"
+marcó **114 tests** y eran casi todos ruido (leen el objeto entero con
+`Object.values(r).every(Boolean)` o destructuring). Mutar mide; grepear supone.
+
 ⚠ **El veredicto que vale es el de CI, no el local.** El runner de GitHub es más lento y ahí
 aparecen las carreras que la máquina de desarrollo no muestra. Después de pushear, mirar el run:
 `mcp__github__actions_list` con `ci.yml`, o Actions → *CI — smoke tests*.
