@@ -1957,3 +1957,8 @@ select sum(total) from public.vista_generador_oc where activo;
 ```
 
 `sql/gv_generador_oc_stock_disponible_v1985.sql`.
+
+## 2026-09-23 · v21.61 · 55215/55219/55289 en unidades (Marianela)
+- `GV_PPP_Base_Pedidos` ids 4583293 (97964/55289 333,33 → 4000) y 4588489 (98426/55219 333,33 → 2000).
+  Rollback: `update public."GV_PPP_Base_Pedidos" g set cajas=b.cajas from zz_backups."GV_Backup_Unidades55_BaseISIS_20260923" b where g.id=b.id;`
+- `OC_Maximos.uni_x_caja` = 1 para los 3 códigos. Rollback desde `zz_backups."GV_Backup_Unidades55_OCMax_20260923"`.
