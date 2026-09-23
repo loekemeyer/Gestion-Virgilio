@@ -1,64 +1,128 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# HOOK UserPromptSubmit — INSISTE con "¿quién sos?" en CADA mensaje, hasta que
-# haya una confirmación POSITIVA del usuario.
+# HOOK UserPromptSubmit — pregunta "¿quién sos?" hasta que haya una respuesta, y
+# DESPUÉS SE CALLA.
 #
 # Thomas, 2026-09-23: *"que hasta que no tengas confirmación positiva del usuario
 # preguntes quién es"*.
+# Luis, 2026-09-23 (v21.87): *"seguís preguntando incluso después de que te
+# contestan"*.
 #
-# El `SessionStart` (scripts/claude-quien-habla.sh) avisa UNA vez y se puede pasar
-# por alto sin que nada lo note. Éste corre en cada mensaje y no se calla hasta que
-# alguien conteste.
+# ⚠ POR QUÉ SEGUÍA PREGUNTANDO (medido en la sesión de Luis del 23/09):
+#   1) El primer mensaje fue "luis\nhabia puesto una traba…": el nombre en la
+#      PRIMERA LÍNEA de un mensaje largo. La versión anterior sólo aceptaba
+#      "soy X" o un mensaje de ≤ 3 palabras, así que no lo vio nunca.
+#   2) Sin detección no hay marca, y sin marca insistía en CADA mensaje, aunque
+#      la respuesta ya estuviera arriba en la charla.
+#   3) La marca vivía en /tmp, que no sobrevive a un contenedor nuevo.
 #
-# ⚠ NO BLOQUEA (Thomas dijo que no): el trabajo sigue. Lo que espera es la
-# ATRIBUCIÓN — no se carga una tarea de Planify ni se registra un problema a nombre
-# de alguien adivinado.
+# Ahora:
+#   · acepta el nombre en la primera línea ("luis", "luis, …", "Luis:") además de
+#     "soy X" / "habla X" / "te escribe X";
+#   · si el mensaje actual no lo dice, RELEE LA CHARLA ENTERA (transcript_path) y
+#     busca la respuesta en cualquier mensaje anterior del usuario;
+#   · guarda la marca en ~/.claude/quien-habla/ (y lee también la de /tmp).
 #
-# ⚠ La confirmación la detecta el HOOK, no el modelo: lee el prompt y busca un
-# nombre del padrón con una forma de presentación ("soy X", "habla X", "te escribe
-# X", o el nombre solo, que es como se contesta "¿quién sos?"). Así no depende de
-# que el modelo se acuerde de anotar nada.
+# ⚠ NO BLOQUEA: el trabajo sigue. Lo que espera es la ATRIBUCIÓN (Planify,
+# auditoría). Un nombre mencionado de pasada NO cuenta ("Luis pidió que…").
 #
-# ⚠ Un nombre mencionado de pasada NO cuenta: "Luis pidió que…" lo escribe
-# cualquiera. Por eso se exige la forma de presentación o el mensaje corto.
-#
-# ⚠ La salida va en JSON. Medido el 23/09: la salida de un hook en TEXTO PLANO la
-# corre el CLI, la anota como `success` y LA DESCARTA ("Hook output does not start
-# with {, treating as plain text"). Los dos hooks de caveman estuvieron muertos
-# dos días por eso.
+# ⚠ La salida va en JSON: en texto plano el CLI la descarta.
 # ---------------------------------------------------------------------------
 set -uo pipefail
 
 payload="$(cat 2>/dev/null || true)"
-sid="$(printf '%s' "$payload" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-[ -z "$sid" ] && sid="sin-sesion"
-marca="${TMPDIR:-/tmp}/claude-quien-habla-${sid}"
+command -v python3 >/dev/null 2>&1 || exit 0
 
-[ -f "$marca" ] && exit 0          # ya contestó: no se pregunta más
+QH_PAYLOAD="$payload" python3 - <<'PY'
+import json, os, re, sys
 
-prompt="$(printf '%s' "$payload" \
-  | sed -n 's/.*"prompt"[[:space:]]*:[[:space:]]*"\(.*\)","session_id".*/\1/p')"
-[ -z "$prompt" ] && prompt="$(printf '%s' "$payload" | sed -n 's/.*"prompt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-low="$(printf '%s' "$prompt" | tr '[:upper:]' '[:lower:]' | tr -d '\r')"
+try:
+    p = json.loads(os.environ.get("QH_PAYLOAD") or "{}")
+except Exception:
+    p = {}
+sid = p.get("session_id") or "sin-sesion"
+home_dir = os.path.join(os.path.expanduser("~"), ".claude", "quien-habla")
+marcas = [os.path.join(home_dir, sid),
+          os.path.join(os.environ.get("TMPDIR", "/tmp"), "claude-quien-habla-" + sid)]
+if any(os.path.isfile(m) for m in marcas):
+    sys.exit(0)                     # ya contestó: no se pregunta más
 
-# Padrón de Planify (nombre reconocible -> employee_id). Thomas es la excepción:
-# no usa Planify, sus pedidos van al 20 con el prefijo "Th ".
-nombres="thomas|tomas|tomás|luis|marianela|mariane|gaston|gastón|elias|elías|nazareno|angely|viviana|vivi|alan|diego|nora|juan cruz|pablo|martin|martín|romina|ivan|iván|jhonny|yanina|melany|franco|damian|damián"
+NOMBRES = ["juan cruz", "thomas", "tomás", "tomas", "luis", "marianela", "mariane",
+           "gastón", "gaston", "elías", "elias", "nazareno", "angely", "viviana", "vivi",
+           "alan", "diego", "nora", "pablo", "martín", "martin", "romina", "iván", "ivan",
+           "jhonny", "yanina", "melany", "franco", "damián", "damian"]
+N = "|".join(re.escape(n) for n in NOMBRES)
+L = "a-záéíóúñü"
+RE_PRES = re.compile(rf"(?:^|[^{L}])(?:soy|habla|te escribe|escribe|ac[aá]|aqu[ií])\s+({N})(?![{L}])")
+RE_INICIO = re.compile(rf"^\s*(?:hola[\s,!]+)?({N})(?![{L}])\s*(?:[,:;.!\-—]|$)")
 
-quien=""
-if printf '%s' "$low" | grep -Eq "(^|[^a-záéíóúñ])(soy|habla|te escribe|escribe|aca|acá|aquí|aqui) +($nombres)([^a-záéíóúñ]|$)"; then
-  quien="$(printf '%s' "$low" | grep -Eo "(soy|habla|te escribe|escribe|aca|acá|aquí|aqui) +($nombres)" | head -1 | awk '{print $NF}')"
-elif [ "$(printf '%s' "$low" | wc -w)" -le 3 ] && printf '%s' "$low" | grep -Eq "(^|[^a-záéíóúñ])($nombres)([^a-záéíóúñ]|$)"; then
-  # respuesta corta a "¿quién sos?": "luis", "soy yo, marianela", "thomas"
-  quien="$(printf '%s' "$low" | grep -Eo "($nombres)" | head -1)"
-fi
+def detectar(txt):
+    if not isinstance(txt, str) or not txt.strip():
+        return None
+    low = txt.lower()
+    if low.lstrip().startswith("<"):          # system-reminder, tool output, etc.
+        return None
+    m = RE_PRES.search(low)
+    if m:
+        return m.group(1)
+    primera = next((l for l in low.splitlines() if l.strip()), "")
+    m = RE_INICIO.match(primera)              # "luis", "luis, …", "Luis:", "hola luis"
+    if m:
+        return m.group(1)
+    if len(low.split()) <= 3:                 # respuesta corta: "soy yo, marianela"
+        m = re.search(rf"(?:^|[^{L}])({N})(?![{L}])", low)
+        if m:
+            return m.group(1)
+    return None
 
-emit() { printf '%s' "{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"$1\"}}"; }
+def textos_usuario(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for linea in f:
+                try:
+                    o = json.loads(linea)
+                except Exception:
+                    continue
+                if o.get("type") != "user" or o.get("isMeta"):
+                    continue
+                c = (o.get("message") or {}).get("content")
+                if isinstance(c, str):
+                    yield c
+                elif isinstance(c, list):
+                    for b in c:
+                        if isinstance(b, dict) and b.get("type") == "text":
+                            yield b.get("text", "")
+    except Exception:
+        return
 
-if [ -n "$quien" ]; then
-  printf '%s\n' "$quien" > "$marca"
-  emit "IDENTIDAD CONFIRMADA en este mensaje: **$quien**. No volver a preguntar en esta sesion. Ruteo de Planify: si es Thomas -> employee_id 20 (Tomas Beviglia) con el nombre antepuesto por 'Th '; cualquier otro -> su propio employee_id, sin prefijo."
-  exit 0
-fi
+quien = detectar(p.get("prompt"))
+if not quien and p.get("transcript_path"):
+    for t in textos_usuario(p["transcript_path"]):
+        quien = detectar(t)
+        if quien:
+            break
 
-emit "TODAVIA NO SABES QUIEN ESCRIBE, y el mail de la cuenta NO cuenta como respuesta: es de la CUENTA, no de la persona (por ese mail escriben Thomas, Luis, Marianela, Elias y otros). NO frenes ni interrumpas el trabajo con la pregunta: hace lo que te pidieron. Lo unico que espera es la ATRIBUCION -- no cargues una tarea de Planify ni registres un problema a nombre de nadie adivinado. Y ANTES DE CERRAR la respuesta, sumalo a las decisiones pendientes del final, textual: 'Confirmame quien sos (Thomas, Luis, Marianela, Gaston, Elias...) para dejar la tarea en la agenda correcta'. Este aviso se repite en cada mensaje hasta que haya confirmacion."
+def emit(msg):
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
+                                             "additionalContext": msg}}, ensure_ascii=False))
+
+if quien:
+    try:
+        os.makedirs(home_dir, exist_ok=True)
+        with open(marcas[0], "w") as f:
+            f.write(quien + "\n")
+    except Exception:
+        pass
+    emit(f"IDENTIDAD CONFIRMADA: **{quien}**. NO volver a preguntar ni pedir confirmacion en esta sesion "
+         "(tampoco en las decisiones pendientes). Ruteo de Planify: si es Thomas -> employee_id 20 "
+         "(Tomas Beviglia) con el nombre antepuesto por 'Th '; cualquier otro -> su propio employee_id, sin prefijo.")
+    sys.exit(0)
+
+emit("TODAVIA NO SABES QUIEN ESCRIBE, y el mail de la cuenta NO cuenta como respuesta: es de la CUENTA, "
+     "no de la persona. NO frenes el trabajo con la pregunta: hace lo que te pidieron. Lo unico que espera es "
+     "la ATRIBUCION -- no cargues una tarea de Planify ni registres un problema a nombre de nadie adivinado. "
+     "ANTES DE CERRAR, sumalo a las decisiones pendientes: 'Confirmame quien sos (Thomas, Luis, Marianela, "
+     "Gaston, Elias...) para dejar la tarea en la agenda correcta'. Si el usuario YA lo dijo en algun mensaje "
+     "de esta charla y este aviso igual aparece, NO repreguntes: usa esa respuesta.")
+PY
+exit 0

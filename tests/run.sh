@@ -758,6 +758,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== cuar-control-caido (v20.96 (Thomas, 2026-09-22) — CANDADOS del control de cuarentena) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cuar-control-caido.cjs
 
+echo "== claude-quien-habla (v21.87 — el hook detecta la respuesta y se calla) =="
+node tests/claude-quien-habla.cjs
+
 echo "== encoding-utf8 (Candado de ENCODING — index) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/encoding-utf8.cjs
 

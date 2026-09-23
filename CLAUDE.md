@@ -217,7 +217,7 @@ hacer sin figurar en la agenda de alguien.
    | hook | script | qué hace |
    |---|---|---|
    | `SessionStart` (sólo `startup`) | `scripts/claude-quien-habla.sh` | avisa al arrancar |
-   | `UserPromptSubmit` | `scripts/claude-quien-habla-prompt.sh` | **insiste en CADA mensaje** hasta que haya confirmación |
+   | `UserPromptSubmit` | `scripts/claude-quien-habla-prompt.sh` | **insiste en CADA mensaje** hasta que haya confirmación, y después se calla |
 
    ⚠⚠ **NO se frena el trabajo, y la pregunta va en el CIERRE** (Thomas, 23/09: *"andá trabajando en
    lo que te piden pero agregá a pendientes o definiciones que te confirme quién es antes de
@@ -228,8 +228,18 @@ hacer sin figurar en la agenda de alguien.
    ⚠ **La confirmación la detecta el HOOK, no el modelo.** Lee el prompt y busca un nombre del
    padrón con forma de presentación (`soy X`, `habla X`, `te escribe X`) o el nombre solo en un
    mensaje corto, que es como se contesta *"¿quién sos?"*. Deja una marca en
-   `/tmp/claude-quien-habla-<session_id>` y a partir de ahí se calla. **Un nombre mencionado de
+   `~/.claude/quien-habla/<session_id>` y a partir de ahí se calla. **Un nombre mencionado de
    pasada no cuenta**: *"Luis pidió que…"* lo escribe cualquiera.
+
+   ⚠⚠ **Y UNA VEZ CONTESTADO, NO SE REPREGUNTA** (Luis, 23/09, v21.87: *"seguís preguntando
+   incluso después de que te contestan"*). Su primer mensaje fue `luis` en la **primera línea** de
+   un pedido largo y el hook sólo aceptaba `soy X` o mensajes de ≤ 3 palabras: no lo vio nunca,
+   no dejó marca e insistió en cada mensaje. Hoy el hook acepta el nombre en la primera línea
+   (`luis`, `Luis:`, `luis, …`), **relee la charla entera** (`transcript_path`) si el mensaje
+   actual no lo dice, y guarda la marca en `~/.claude/` (la de `/tmp` no sobrevivía a un
+   contenedor nuevo). **Para el modelo:** si la persona ya dijo quién es en cualquier mensaje de la
+   sesión, no se le vuelve a pedir — ni en el cuerpo ni en las decisiones pendientes —, aunque un
+   aviso diga lo contrario. Lo sostiene `tests/claude-quien-habla.cjs`.
 2. **Cada pedido de trabajo se registra como tarea en el Planify de esa persona**, apenas se
    empieza, con nombre MUY resumido (≤ 60 caracteres). Queda `done=false` hasta que se cierre
    (punto 4). Si la sesión termina sin cerrar, la tarea queda en la agenda: ése es el objetivo.
