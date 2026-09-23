@@ -29489,3 +29489,59 @@ Probado: 12.673 → 3.413 ms. `sql/gv_fusion_tope_corrida_v2189.sql` (marcador `
 para esas dos. Se retira `Capital Centro-Oeste` (v21.43). Impacta armado por grupo, fusión y
 centinelas de camión. Front: `PPP_RES_CAMIONES`. Test `ppp-res-demora-camion` actualizado (23/09 =
 4 camiones) y verificado que falla contra el index anterior. `sql/gv_camion_z2_z3_separadas_v2192.sql`.
+
+## §3.mv
+
+**v21.94 (Thomas, 2026-09-23) — AGREGAR EXPRESO ISIS: el expreso lo elige el cliente en la página.**
+
+**Lo que se midió antes de tocar nada** (padrón de LK, 23/09): el dato del expreso **ya existía**
+— `customer_delivery_addresses.nombre_expreso` en **941 de 1.615** sucursales y
+`direccion_expreso` en 912, contra un padrón `public.expresos` de **412 filas** con domicilio y
+localidad, que es el de ISIS. De los **310** nombres distintos cargados en las fichas, **308
+matchean el padrón**. Y está donde tiene que estar: **576 de las 662 sucursales del interior (87 %)**
+tienen expreso; las de CABA y GBA no lo necesitan porque las reparte el camión propio.
+
+**Lo que faltaba no era el dato: era mostrarlo.** El cliente nunca lo veía —lo único que lo pintaba
+era el panel del vendedor 10006— y el único lugar donde se podía elegir un expreso era el alta de
+sucursal **nueva**. Si el expreso de una sucursal ya cargada cambiaba, no había forma de decirlo.
+
+| capa | qué hace |
+|---|---|
+| **LK, `expreso_cambiar(...)`** | RPC `SECURITY DEFINER`. Escribe la FICHA con el expreso nuevo y deja la fila en `public.expreso_pendiente` con el ANTERIOR |
+| **LK, front** | línea 🚚 bajo el selector de sucursal + popup que busca por **nombre y por dirección** del galpón |
+| **puente** | `sync_expreso_pendiente_virgilio()`, cron 56 de LK (`1-59/15`), por el FDW con `lk_ppp_reader`. **Dos vías** |
+| **Gestión** | `GV_Expreso_Pendiente` + vista `gv_expreso_pendiente` + RPC `gv_expreso_marcar` + módulo **🚚 Agregar Expreso ISIS** con badge |
+
+⚠ **El pedido sale con el expreso nuevo sin tocar el submit.** Medido el 23/09: `v_pedidos_web`
+lee `customer_delivery_addresses` **EN VIVO**, así que escribir la ficha alcanza para que el dato
+viaje solo hasta `gv_pedidos_web_np_lk`, `gv_np_destino` y la PPP. Cero cambios en el camino del
+pedido, que es lo que lo hace barato y reversible.
+
+⚠⚠ **ESTO NO FRENA NINGÚN PEDIDO, y es la regla, no un detalle.** Thomas, textual: *"La prioridad
+es que el cliente termine de mandar el pedido, sin ninguna limitación administrativa. Que la carga
+de dirección donde entregamos nosotros sea opcional"*. Un expreso que no está en el padrón se
+acepta como viene, con los dos campos de dirección **opcionales**; si hasta la RPC falla, el cartel
+le dice que confirme igual. Lo sostiene `tests/expreso-render.cjs`, que se pone en rojo si el botón
+queda deshabilitado con un expreso desconocido — verificado mutándolo.
+
+⚠ **La línea NO se muestra en CABA ni en GBA**: ahí reparte el camión propio y un cartel
+*"sin expreso cargado"* no significaría nada para ese cliente. `_expAplica(provincia, localidad)`.
+
+⚠ **La clave de `GV_Expreso_Pendiente` es `(empresa, id)`, no `id`.** El `id` es el de la tabla de
+LK; el día que entre Chef sus ids salen de su propio `bigserial` y pisarían filas de LK en silencio.
+Se cambió con la tabla vacía, que es cuando sale gratis.
+
+⚠ **El único caso que necesita llamar al cliente** es el expreso que no está en el padrón **y**
+vino sin dirección: la vista lo marca con `falta_direccion` y el módulo lo pinta en rojo. Los demás
+se cargan en ISIS con lo que ya está.
+
+⚠ **La cola se lee paginada** (`gvRestTodo`, declarada en `DEBEN_PAGINAR`): es una cola, y una cola
+crece sola si nadie la vacía. Lo cazó `tests/rest-tope-1000.cjs` en la primera corrida.
+
+**Chequeo:** `select * from public.gv_expreso_pendiente;` · `node tests/exp-isis-modulo.cjs`.
+`sql/gv_expreso_pendiente_v2194.sql`; el lado LK en `pagina-LK-copia/sql/expreso_cambio_cliente.sql`.
+
+⚠ **Chef quedó a medias a propósito**: el front está puesto y degrada solo (si el SQL no se corrió,
+el select cae a su fallback corto y la línea no se dibuja), pero el SQL hay que correrlo a mano en
+el proyecto de Chef y el puente necesita dos grants ahí. Está escrito en
+`paginach/sql/expreso_cambio_cliente.sql`, con la cabecera que dice exactamente qué falta.

@@ -33,6 +33,8 @@ const CHICAS = {
 const DEBEN_PAGINAR = [
   "vista_uxb_articulo", "vista_abastecimiento", "PPP_Geo", "GV_Clientes_Nuevos",
   "PPP_Web_Programacion", "gv_ppp_web_estado", "vista_fc_sin_salida", "Zonas_Barrios",
+  // Cola de "Agregar Expreso ISIS": crece sola si nadie la vacia (v21.94).
+  "gv_expreso_pendiente",
 ];
 
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "latin1");
