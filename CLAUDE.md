@@ -3765,8 +3765,59 @@ cuando no cambió nada (eran 580 corridas / 324 s / 559 ms por ventana de 47,9 h
 94,5 % de corridas inútiles que ya se le había sacado al 55).
 
 ⚠ **El lock va con `pg_try_advisory_xact_lock`, NUNCA con el bloqueante.** El advisory **5768** lo
-comparten el cron 57 y el **68** (`reconciliar-pipeline-stock`, `*/10`): esperarlo ocuparía uno de
-los **SEIS** worker slots de la instancia. Si no se consigue, no pasa nada — lo reescribe el 57.
+toman **TRES** jobs — el **57**, el **68** (`reconciliar-pipeline-stock`) y el **92**
+(`gv-refrescar-articulo-empresa`, `*/15`) —: esperarlo ocuparía uno de los **SEIS** worker slots de
+la instancia (`max_worker_processes = 6`, medido). Si no se consigue, no pasa nada — lo reescribe
+el 57.
+
+### ⚠⚠ Y ahí había una CARRERA: el 57 le ganaba el lock al 55 y leía la matview VIEJA (v21.57)
+
+**Thomas, textual:** *"fijate que el 57 no lo este pisando"*. No lo estaba pisando siempre, pero
+podía — y el registro lo muestra. Los tres arrancaban **en el mismo segundo**:
+
+| minuto | cron 55 | cron 57 | cron 68 |
+|---|---|---|---|
+| **08:50** | 00.327 · **4.156 ms** | 00.343 · 1.175 ms | 00.389 · **6.529 ms** |
+| 08:30 | 00.620 · 4.264 ms | 00.628 · 1.216 ms | 00.748 |
+| 08:00 | 00.929 · 1.187 ms | 00.870 · **2.625 ms** | 01.102 |
+
+`*/2` y `*/5` coinciden en los múltiplos de 10: **seis veces por hora**. En la corrida de las
+**08:50** el 68 se quedó el lock 6,5 s y el 55 terminó su refresco a los 4,1 s: **no pudo
+encadenar**. Cuando gana el 57, además, escribe `stocks_carga_rapida` desde la matview **vieja**.
+
+⚠ **Y no es teórico:** `cron.job_run_details` tiene un **`job startup timeout` del propio cron 68**
+el 22/09 a las 10:30 — uno de los dos minutos más cargados. El pozo de los seis worker slots ya
+estaba mordiendo acá, no sólo en LK.
+
+**El arreglo no toca la función: los desfasa.** El 55 corre **sólo en minutos PARES**, así que los
+otros van a **IMPARES** y la carrera desaparece (el 55 dura 4,3 s en su peor caso: no cruza el
+minuto).
+
+| job | antes | ahora | minutos |
+|---|---|---|---|
+| 57 `refresh_stocks_carga_rapida` | `*/5` | **`3-59/6`** | 3,9,15,21,27,33,39,45,51,57 |
+| 68 `reconciliar-pipeline-stock` | `*/10` | **`1-59/10`** | 1,11,21,31,41,51 |
+
+> ⚠ **Cada 6 y cada 10, NO cada 5 ni cada 15.** La paridad se conserva sólo si el paso es PAR:
+> `*/5` y `*/15` alternan par/impar por construcción, así que **un cron cada 5 o cada 15 minutos
+> no puede quedar siempre impar**. Por eso el 57 pasó de 5 a 6 minutos, y por eso **el 92 no se
+> movió**: sigue pisando al 55 en :00 y :30.
+
+**Medido**, minutos por hora en que el 55 se encuentra el lock ocupado: **6 → 2**
+(55 vs 57: **0** · 55 vs 68: **0** · 55 vs 92: 2). Y el pico por minuto bajó: **:00 de 19 a 17
+jobs**, :30 de 17 a 15.
+
+⚠ El 57 y el 68 **siguen chocando entre sí** 2 veces por hora (:21 y :51) y es **inevitable**
+(paso 6 y paso 10, mcm 30). No molesta: el lock los serializa y ninguno lee una matview a medio
+refrescar, porque el 55 no corre en impares.
+
+⚠ **Costo aceptado:** `fc_sin_salida` y las descripciones pasan de 5 a **6 min**.
+
+**Rollback, dos líneas:**
+```sql
+select cron.alter_job(57, schedule := '*/5 * * * *');
+select cron.alter_job(68, schedule := '*/10 * * * *');
+```
 
 ⚠ **FAIL-OPEN, y con el fallo A LA VISTA.** Si la derivada explota, la matview se refresca igual y
 el motivo lo dice. **Probado rompiéndola a propósito** (`perform 1/0`) en transacción abortada:
@@ -4256,7 +4307,7 @@ desastre"* · *"No puedo ir tantas veces a zona 3 y 4 y 5 y 6"*.
 | GBA Norte | Z6 + Z7 | N, P |
 | súper | cada uno el suyo | — |
 
-Hasta la v21.55 `gv_ppp_web_camion` devolvía **"Capital" para Z1, Z2 y Z3**, así que un día con Z1+Z2+Z3
+Hasta la v21.57 `gv_ppp_web_camion` devolvía **"Capital" para Z1, Z2 y Z3**, así que un día con Z1+Z2+Z3
 contaba como un solo camión y nada lo marcaba. Máximo **2 camiones por día**, cada uno a **un** grupo, y
 **cada grupo sale una sola vez** mientras entre en un camión (Z4 4,03 m³ → una salida, no cuatro).
 

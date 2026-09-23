@@ -96,3 +96,67 @@ on conflict do nothing;
 -- select * from public.gv_reglas_perdidas;        -- vacia = todo bien
 -- select * from public.gv_stock_refresh_salud;    -- ultimo_motivo tiene que decir '+ carga_rapida'
 --                                                 -- cuando refresco; 'sin cambios' cuando salto.
+
+-- ===========================================================================
+-- v21.57 (Thomas, 23/09: "fijate que el 57 no lo este pisando") — EL DESFASE
+-- ===========================================================================
+--
+-- LA CARRERA, MEDIDA (cron.job_run_details, 6 h):
+-- Los tres arrancaban EN EL MISMO SEGUNDO, con decimas de diferencia:
+--
+--   minuto   cron 55            cron 57            cron 68
+--   08:40    00.627 ·   417 ms  00.510 · 1.273 ms  00.773
+--   08:30    00.620 · 4.264 ms  00.628 · 1.216 ms  00.748
+--   08:10    00.308 · 3.799 ms  00.304 · 1.131 ms  00.475
+--   08:00    00.929 · 1.187 ms  00.870 · 2.625 ms  01.102
+--   07:00    00.523 · 1.178 ms  00.550 · 2.845 ms  00.891
+--
+-- `*/2` y `*/5` coinciden en los multiplos de 10: SEIS veces por hora.
+--
+-- Por que HOY solia ganar el dato bueno: el 57 termina en ~1,2 s y el refresco
+-- del 55 tarda ~3,8 s, asi que el 57 libera el lock y el 55 encadena DESPUES,
+-- con la matview ya nueva. Pero en 07:00 y 08:00 el 57 tardo 2,8 s y el 55
+-- termino antes: ahi el 57 toma el lock primero, lee la matview VIEJA y el 55
+-- se encuentra el lock ocupado y no corrige. `stocks_carga_rapida` queda con el
+-- saldo viejo hasta la corrida siguiente.
+--
+-- ⚠ Y NO ES UN CASO TEORICO: `cron.job_run_details` tiene un
+-- `job startup timeout` del PROPIO cron 68 el 22/09 a las 10:30 - uno de los mas
+-- cargados. Esta instancia tiene `max_worker_processes = 6` (igual que LK), y
+-- el minuto :00 junta 17 jobs.
+--
+-- EL ARREGLO: desfasarlos, sin tocar la funcion.
+-- El 55 corre SOLO en minutos PARES (`*/2`). Mandando a los otros a IMPARES la
+-- carrera desaparece, y el 55 dura 4,3 s en su peor caso: no cruza el minuto.
+--
+--   57: `*/5`  ->  `3-59/6`    (3,9,15,21,27,33,39,45,51,57)  cada 6 min
+--   68: `*/10` ->  `1-59/10`   (1,11,21,31,41,51)
+--
+-- ⚠ CADA 6 Y CADA 10, NO CADA 5 NI CADA 15. La paridad se conserva solo si el
+-- paso es PAR: `*/5` y `*/15` alternan par/impar por construccion, asi que un
+-- cron cada 5 o cada 15 minutos NO PUEDE quedar siempre impar. Es la razon por
+-- la que el 57 pasa de 5 a 6 minutos, y la razon por la que el 92 no se movio.
+--
+-- ⚠ EL LOCK 5768 LO TOMAN TRES JOBS, NO DOS: 57, 68 y **92**
+-- (`gv-refrescar-articulo-empresa`, `*/15`). El 92 queda como esta —es cada 15,
+-- no puede ser siempre impar— asi que sigue pisando al 55 en :00 y :30.
+--
+-- IMPACTO MEDIDO (minutos en que el 55 se encuentra el lock ocupado):
+--   antes:   6 por hora  (57 y 68 en los multiplos de 10, + 92 en :00 y :30)
+--   despues: 2 por hora  (solo el 92)
+--   55 vs 57: 0     55 vs 68: 0     55 vs 92: 2  [:00, :30]
+--
+-- ⚠ El 57 y el 68 SIGUEN chocando entre si 2 veces por hora (:21 y :51), y es
+-- inevitable: con paso 6 y paso 10 el mcm es 30. No molesta — el lock los
+-- serializa y ninguno de los dos lee una matview a medio refrescar, porque el
+-- 55 no corre en impares.
+--
+-- Y el pico por minuto BAJO: :00 paso de 19 jobs a 17, :30 de 17 a 15.
+--
+-- COSTO ACEPTADO: `fc_sin_salida` y las descripciones (que NO cuelgan de la
+-- matview: salen de `vista_fc_sin_salida` y `vista_nombres_articulos`, vivas)
+-- pasan de refrescarse cada 5 min a cada 6.
+--
+-- ROLLBACK, dos lineas:
+--   select cron.alter_job(57, schedule := '*/5 * * * *');
+--   select cron.alter_job(68, schedule := '*/10 * * * *');
