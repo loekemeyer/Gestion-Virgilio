@@ -1,4 +1,4 @@
-/* v21.60 (Luis, 23/09) — "que se vea para el chequeo de clientes nuevos en la PPP".
+/* v21.59 (Luis, 23/09) — "que se vea para el chequeo de clientes nuevos en la PPP".
    El pipeline de clientes nuevos muestra los OTROS codigos del cliente real (tabla canonica
    clientes_vinculados de LK, espejada en GV_Clientes_Vinculados), por la RPC
    gv_clientes_vinculados_lote. Se corre el chip de verdad. Sale 1 si falla. */

@@ -1,4 +1,4 @@
--- v21.60 (Luis, 23/09): GV_Clientes_Vinculados = espejo de la tabla CANONICA clientes_vinculados
+-- v21.59 (Luis, 23/09): GV_Clientes_Vinculados = espejo de la tabla CANONICA clientes_vinculados
 -- de LK (cliente real con todos sus codigos: Excel de Ventas + CUIT + grupos + vinculos a mano).
 -- La escribe LK cada hora (cron LK 55: recalcular_clientes_vinculados + sync_clientes_vinculados_virgilio)
 -- por el FDW con el rol lk_ppp_reader. La lee la PPP (pipeline de clientes nuevos) por

@@ -48112,7 +48112,7 @@ async function pipeCargar() {
     const m = {};
     (res || []).forEach(function (r) { m[String(r.empresa) + ":" + String(r.order_id)] = r; });
     _apr.pipe = m;
-    // v21.60 (Luis): los OTROS codigos del cliente real (tabla canonica clientes_vinculados de LK,
+    // v21.59 (Luis): los OTROS codigos del cliente real (tabla canonica clientes_vinculados de LK,
     // espejada en GV_Clientes_Vinculados). Llamada propia con su propio catch: si falla, el
     // pipeline se dibuja igual, sin el chip.
     pipeVincCargar(lista);
@@ -48136,7 +48136,7 @@ async function pipeVincCargar(lista) {
     if (_pppTab === "prog") aprRender();
   } catch (_e) { _apr.cliVinc = _apr.cliVinc || {}; }
 }
-/* v21.60 (Luis, 23/09): "que se vea para el chequeo de clientes nuevos". Chip con los otros
+/* v21.59 (Luis, 23/09): "que se vea para el chequeo de clientes nuevos". Chip con los otros
    codigos del mismo cliente real (razon social anterior, la otra empresa). */
 function pipeVincOtrosHtml(p) {
   const k = String(p.empresa || "lk") + ":" + String(p.cod || "").trim().replace(/^0+(?=.)/, "");
