@@ -748,7 +748,7 @@ el "mismo día para el cliente" del principio rector, el ancla de cliente v20.27
 |---|---|
 | plazo | entrada del pedido + **14 días corridos**; por **expreso + 13**. Hacia atrás al día con reparto |
 | fecha mínima | la de siempre: `gv_ppp_web_dia_minimo` (4 hábiles, calculado al mediodía) |
-| 1 | si su **grupo** (Capital Sur Z1 · Capital Centro Z2 · Capital Oeste Z3 · GBA Sur · GBA Oeste · GBA Norte Z6 · GBA Norte Lejos Z7) ya sale un día del plazo → **ese**, sin mirar el cupo (el 4,30 m³ es promedio, no techo) |
+| 1 | si su **grupo** (Capital Sur Z1 · Capital Centro Z2 · Capital Oeste Z3, juntas si cada una < 1 m³ · GBA Sur · GBA Oeste · GBA Norte Z6+Z7) ya sale un día del plazo → **ese**, sin mirar el cupo (el 4,30 m³ es promedio, no techo) |
 | 2 | si no, el **último día LIBRE** del plazo (sin ningún grupo de reparto), para que los pedidos del grupo que entren después se sumen |
 | 3 | si todos los días del plazo tienen otro grupo → **gana el cliente**: el día con menos grupos (segundo camión / flete) |
 | 4 | ya vencido → lo antes posible, aunque mezcle grupos: el rezagado no se traba |
@@ -2498,7 +2498,7 @@ Z07) y van por el default.
 **Chequeo:** `node tests/pmap-gondolas.cjs` — verifica que A corta en `1–5` y F en `1–4`, y que
 F13 queda **abajo de la 4.ª columna**, no arriba de la 3.ª. Verificado que falla con el 5 fijo.
 
-## ⚠ REGLA (Thomas, 2026-09-23, v21.96): AGREGAR EXPRESO ISIS — la cola NO frena ningún pedido
+## ⚠ REGLA (Thomas, 2026-09-23, v21.97): AGREGAR EXPRESO ISIS — la cola NO frena ningún pedido
 
 El cliente ahora ve con qué expreso le entregamos y lo puede cambiar desde el checkout de la
 página. Cada cambio cae en el módulo **🚚 Agregar Expreso ISIS** para cargarlo a mano en ISIS.
@@ -2529,7 +2529,7 @@ Sólo saca el renglón de la cola. El cartel del botón lo dice.
 crece sola si nadie la vacía. Un `limit=1000` ahí sería una expresión de deseo.
 
 **Chequeo:** `select * from public.gv_expreso_pendiente;` — vacía = nada pendiente de ISIS ·
-`node tests/exp-isis-modulo.cjs`. `sql/gv_expreso_pendiente_v2196.sql`, §3.mw.
+`node tests/exp-isis-modulo.cjs`. `sql/gv_expreso_pendiente_v2197.sql`, §3.mx.
 
 ## ⚠ REGLA (Luis, 2026-09-22, v21.14): generar las OC a mano MUEVE el ciclo automático
 
@@ -4606,15 +4606,23 @@ desastre"* · *"No puedo ir tantas veces a zona 3 y 4 y 5 y 6"*.
 | **Capital Oeste** | Z3 | (la zona manda, no el sector) |
 | GBA Sur | Z4 | J, K, L |
 | GBA Oeste | Z5 | M |
-| GBA Norte | Z6 | N |
-| GBA Norte Lejos | Z7 | P |
+| GBA Norte | Z6 + Z7 | N, P |
 | súper | cada uno el suyo | — |
 
 ⚠⚠ **Z2 y Z3 son camiones DISTINTOS (Luis, 23/09, v21.91)** — *"¿cuál sería la lógica de tener
 separadas las zonas Z2 y Z3 si son lo mismo?"*. Se retira el "Capital Centro-Oeste = Z2 + Z3" de la
 v21.43. En `gv_ppp_web_camion` la ZONA manda sobre el sector para Z2 y Z3 (los sectores C..H siguen
 armando la tanda por cercanía, no deciden el camión). Centinela `Capital Oeste` en `GV_Reglas_Centinela`.
-**Z6 y Z7 también son camiones distintos (Luis, 23/09, v21.94: *"sí, separalas también"*)**: GBA Norte (Z6) y GBA Norte Lejos (Z7); la zona manda sobre el sector. Centinela `GBA Norte Lejos`.
+⚠⚠⚠ **REGLA VIGENTE (Luis, 23/09, v21.95) — se retiran la v21.91 y la v21.94 como "camiones distintos siempre":**
+- **Z2 y Z3 van en el MISMO camión si cada una suma < 1 m³ ese día** (web + ISIS; Retira no cuenta). Apenas una
+  llega a 1 m³, esa va sola. Sirve para compensar zonas de poco volumen.
+- **Z6 y Z7 van SIEMPRE juntas** (un camión, GBA Norte). Z7 sale sola sólo si en su plazo no hay día con Z6.
+- **Prioridad: máxima entrega con la menor cantidad de camiones.**
+- **Las TANDAS no se tocan** (Luis: *"no rompas la lógica de tandas"*): `gv_ppp_web_camion` sigue dando una
+  etiqueta por zona (Capital Centro / Capital Oeste / GBA Norte / GBA Norte Lejos) y una tanda no mezcla esas
+  zonas. La unión es del CAMIÓN: la aplican `gv_ppp_web_dia_grupo` (el armado, al elegir el día) y el Resumen de
+  la PPP (al contar camiones). Si una zona pasa de 1 m³ después, cambia la cuenta y ningún pallet se toca.
+  `sql/gv_programacion_camion_z2z3_z6z7_v2195.sql`.
 
 Hasta la v21.57 `gv_ppp_web_camion` devolvía **"Capital" para Z1, Z2 y Z3**, así que un día con Z1+Z2+Z3
 contaba como un solo camión y nada lo marcaba. Máximo **2 camiones por día**, cada uno a **un** grupo, y

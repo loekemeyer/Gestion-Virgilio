@@ -6101,7 +6101,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.95"></script>
+<script type="module" src="recepcion.js?v=21.96"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10053,7 +10053,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.95";
+const APP_VERSION = "v21.96";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38129,8 +38129,7 @@ const PPP_RES_CAMIONES = [
   ["Capital Oeste",        ["Zona 3 - CABA Oeste"]],   // v21.91 (Luis): Z2 y Z3 son camiones distintos
   ["GBA Sur",              ["Zona 4 - GBA Sur"]],
   ["GBA Oeste",            ["Zona 5 - GBA Oeste"]],
-  ["GBA Norte",            ["Zona 6 - GBA Norte"]],
-  ["GBA Norte Lejos",      ["Zona 7 - GBA Norte Lejos"]]   // v21.94 (Luis): Z6 y Z7 son camiones distintos
+  ["GBA Norte",            ["Zona 6 - GBA Norte", "Zona 7 - GBA Norte Lejos"]]   // v21.95 (Luis): Z6 y Z7 van juntas
 ];
 /* Capacidad FÍSICA del camión, en m³. `_pppJorCfg` se declara más abajo en el archivo (`let`),
    así que la lectura va adentro de un try: ante cualquier error, el default. */
@@ -38336,6 +38335,16 @@ function pppResumenHtml(prog) {
       if (!peds.length && m3 <= 0.0001) return;
       cams.push({ nombre: C[0], m3: m3, peds: peds, n: nCamDe(m3), demMax: _demMaxDe(peds) });
     });
+    // v21.95 (Luis): Z2 y Z3 van en UN camión si cada una suma < 1 m³ ese día; si una llega a
+    // 1 m³, va sola. Es la misma regla que usa el armado (gv_ppp_web_dia_grupo).
+    (function () {
+      const iC = cams.findIndex(function (c) { return c.nombre === "Capital Centro"; });
+      const iO = cams.findIndex(function (c) { return c.nombre === "Capital Oeste"; });
+      if (iC < 0 || iO < 0 || cams[iC].m3 >= 1 || cams[iO].m3 >= 1) return;
+      const a = cams[iC], o = cams[iO], m = a.m3 + o.m3, pp = a.peds.concat(o.peds);
+      cams.splice(Math.max(iC, iO), 1);
+      cams[Math.min(iC, iO)] = { nombre: "Capital Centro-Oeste", m3: m, peds: pp, n: nCamDe(m), demMax: _demMaxDe(pp) };
+    })();
     for (const k in supCli) {
       const peds = supPeds[k] || [];
       peds.forEach(function (i) { puestos.add(i); });
@@ -38375,8 +38384,8 @@ function pppResumenHtml(prog) {
     '<td class="num tot">' + f2(Ttot) + '</td>' + Zc.map(function (z) { return tcell(T[z[0]]); }).join("") +
     '<td class="num">' + Tcam + '</td><td class="num' + (demT != null && demT >= PPP_DEM_ALERTA ? ' hot' : '') + '">' + (demT != null ? demT : "·") + '</td></tr>';
   return head +
-    '<div class="ppp-res-leg" title="Un camión = un grupo de zonas (regla del 23/09): Capital Sur = Z1 · Capital Centro = Z2 · Capital Oeste = Z3 · GBA Sur = Z4 · GBA Oeste = Z5 · GBA Norte = Z6 · GBA Norte Lejos = Z7. Cada grupo sale UNA vez: no se parte por m³ hasta los ' + CAMM3 + ' m³ que entran físicamente en el camión. La demora se cuenta en días corridos entre la fecha del pedido y la de entrega.">' +
-      '🚚 <b>1 camión = 1 grupo de zonas</b>: Z1 · Z2+Z3 · Z4 · Z5 · Z6+Z7 · Súper 1 x cliente · Retira sin camión. Sin partir hasta <b>' + CAMM3 + ' m³</b>. ' +
+    '<div class="ppp-res-leg" title="Un camión = un grupo de zonas (regla del 23/09): Capital Sur = Z1 · Capital Centro = Z2 · Capital Oeste = Z3 (juntas si cada una < 1 m³) · GBA Sur = Z4 · GBA Oeste = Z5 · GBA Norte = Z6+Z7. Cada grupo sale UNA vez: no se parte por m³ hasta los ' + CAMM3 + ' m³ que entran físicamente en el camión. La demora se cuenta en días corridos entre la fecha del pedido y la de entrega.">' +
+      '🚚 <b>1 camión = 1 grupo de zonas</b>: Z1 · Z2 · Z3 (Z2+Z3 juntas si cada una &lt; 1 m³) · Z4 · Z5 · Z6+Z7 · Súper 1 x cliente · Retira sin camión. Sin partir hasta <b>' + CAMM3 + ' m³</b>. ' +
       '⏱ <b>Demora</b> = la del pedido que más esperó — tocala.</div>' +
     '<div class="ppp-restbl-wrap"><table class="ppp-restbl"><thead><tr>' +
       '<th>Fecha</th><th>Día</th><th class="tot">Total<br>m³</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Cam.</th><th>Mayor<br>demora</th>' +
