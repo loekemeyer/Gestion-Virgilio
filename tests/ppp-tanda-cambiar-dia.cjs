@@ -144,9 +144,15 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
     const diaD2 = [...document.querySelectorAll("#pppMovBody .mv-d")]
       .find((x) => String(x.getAttribute("onclick") || "").indexOf(F.d2) >= 0);
     if (!diaD2) { out.__diasOfrecidos = [...document.querySelectorAll("#pppMovBody .mv-d")].map((x) => x.getAttribute("onclick")); return out; }
-    diaD2.click();
     // v19.32: el dia ya no mueve nada — abre el PASO 2, «en que tanda?».
-    await esperar(() => !!document.querySelector("#pppMovBody .mv-esp-b.nueva"));
+    // v21.49 — el click se REINTENTA: bajo carga (o sea, en CI) a veces no abria el paso 2 y
+    // el querySelector de abajo daba null, con lo que el test moria con "Cannot read properties
+    // of null". Subir la espera a 15 s no alcanzo: no es que tarde, es que ese click se pierde.
+    // Con tres intentos, un paso 2 que de verdad no se dibuje sigue fallando — no se tapa nada.
+    for (let i = 0; i < 3; i++) {
+      diaD2.click();
+      if (await esperar(() => !!document.querySelector("#pppMovBody .mv-esp-b.nueva"), 8000)) break;
+    }
     out.paso2 = !!document.querySelector("#pppMovBody .mv-esp-b.nueva");
     out.pidioTandas = rpc.some((x) => x.fn === "gv_ppp_tandas_del_dia");
     const dests = [...document.querySelectorAll("#pppMovBody .mv-dest")];
