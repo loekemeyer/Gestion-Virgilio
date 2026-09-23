@@ -6118,7 +6118,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.07"></script>
+<script type="module" src="recepcion.js?v=22.08"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10070,7 +10070,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.07";
+const APP_VERSION = "v22.08";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21011,6 +21011,7 @@ function _pedImpUniOf(it) { const mc = _pedImpMcOf(it); return (it.uniMaster > 0
 function _pedImpUsdOf(it) { return (it.fobUni > 0) ? _pedImpUniOf(it) * it.fobUni : 0; }
 function _pedImpM3Of(it) { return (it.m3Master > 0) ? _pedImpMcOf(it) * it.m3Master : 0; }
 function _pedImpRender() {
+  if (_reingExcl === null && !_reingExclCargando) _reingExclCargar();
   const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "pedImp") return;
   const data = _stkPop.data || { items: [], meses: 10 };
   if (!_stkPop.mcOverride) _stkPop.mcOverride = {};
@@ -21133,7 +21134,7 @@ function _pedImpRender() {
       const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _rg = it.reingresoEst ? String(it.reingresoEst).slice(0, 10) : "";
       const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _codEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
-      h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td class="num">' + rgInput + '</td><td>' + actHtml + '</td></tr>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod) + '</td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -21275,6 +21276,54 @@ async function pedImpEditFob(codEnc) {
     });
     await pedImpReload();
   } catch (e) { try { alert("No se pudo guardar el FOB: " + (e.message || e)); } catch (_e) {} }
+}
+// v22.07 (Luis, 23/09) — switch "Cartel web" por importado: prende/apaga el badge de
+// reingreso de las páginas y el partido del pedido. OFF = fila en GV_Reingreso_Excluido
+// (la lee gv_reingresos_feed). Lectura anon (gv_reingreso_excluidos), escritura supervisor
+// (gv_reingreso_web_set). Mientras no se cargó la lista, el switch no se dibuja: un ON
+// supuesto sería mentir.
+var _reingExcl = null, _reingExclCargando = false;
+function _reingNorm(cod) {   // ≡ gv_cod_stock
+  var s = String(cod == null ? "" : cod).toUpperCase().trim();
+  s = s.replace(/\s*·.*$/, "").replace(/\s+(LK|CH|LOKE)$/, "").replace(/^0+(?=.)/, "").replace(/([0-9E])L$/, "$1");
+  return s.trim();
+}
+async function _reingExclCargar() {
+  _reingExclCargando = true;
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_reingreso_excluidos", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: "{}"
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    var rows = await r.json();
+    _reingExcl = new Set((rows || []).map(function (x) { return _reingNorm(x.cod); }));
+  } catch (_e) { _reingExclCargando = false; return; }
+  _reingExclCargando = false;
+  try { if (_stkPop && _stkPop.kind === "pedImp") _pedImpRender(); } catch (_e) {}
+}
+function _reingWebSwitchHtml(cod) {
+  if (!_reingExcl) return "";
+  var on = !_reingExcl.has(_reingNorm(cod));
+  var enc = encodeURIComponent(String(cod));
+  return '<label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:4px;margin-top:3px;font-size:11px;white-space:nowrap;cursor:pointer;color:' + (on ? '#065f46' : '#94a3b8') + '" title="Cartel web de reingreso: ON = las páginas LK/CH muestran &quot;Sin stock hasta&quot; y parten el pedido. OFF = ni cartel ni partido.">'
+    + '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="pedImpReingresoWeb(\'' + enc + '\',this.checked)"> Cartel web ' + (on ? 'ON' : 'OFF') + '</label>';
+}
+async function pedImpReingresoWeb(codEnc, on) {
+  var cod = decodeURIComponent(codEnc);
+  var headers = await facAuthWriteHeaders({ "Content-Type": "application/json" });
+  if (!headers) { alert(authNoSesionMsg("Para prender o apagar el cartel web necesitás iniciar sesión con Google (supervisor).")); _pedImpRender(); return; }
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_reingreso_web_set", {
+      method: "POST", headers: headers, body: JSON.stringify({ p_cod: cod, p_activo: !!on })
+    });
+    if (!r.ok) throw new Error((await r.text()) || ("HTTP " + r.status));
+    if (!_reingExcl) _reingExcl = new Set();
+    var k = _reingNorm(cod);
+    if (on) _reingExcl.delete(k); else _reingExcl.add(k);
+  } catch (e) { alert("No se pudo cambiar el cartel web: " + (e.message || e)); }
+  _pedImpRender();
 }
 // Fecha de REINGRESO estimado del artículo importado (Importados.reingreso_est).
 // La lee LK (vista v_lk_reingresos → portal) para mostrar "Reingreso Est dd/mm"

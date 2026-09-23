@@ -576,6 +576,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pedimp-hecho (v15.72: Cargar pedido ya hecho — un bache por línea, con PI y fecha de embarque) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-hecho.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-reingreso-switch.cjs
 
 echo "== imp-encurso (v15.72: solapa 🚢 En curso — un renglón por pedido, embarque + llegada, días que faltan) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-encurso.cjs
