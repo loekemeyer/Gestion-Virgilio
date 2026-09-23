@@ -2498,7 +2498,7 @@ Z07) y van por el default.
 **Chequeo:** `node tests/pmap-gondolas.cjs` — verifica que A corta en `1–5` y F en `1–4`, y que
 F13 queda **abajo de la 4.ª columna**, no arriba de la 3.ª. Verificado que falla con el 5 fijo.
 
-## ⚠ REGLA (Thomas, 2026-09-23, v21.97): AGREGAR EXPRESO ISIS — la cola NO frena ningún pedido
+## ⚠ REGLA (Thomas, 2026-09-23, v21.98): AGREGAR EXPRESO ISIS — la cola NO frena ningún pedido
 
 El cliente ahora ve con qué expreso le entregamos y lo puede cambiar desde el checkout de la
 página. Cada cambio cae en el módulo **🚚 Agregar Expreso ISIS** para cargarlo a mano en ISIS.
@@ -2529,7 +2529,7 @@ Sólo saca el renglón de la cola. El cartel del botón lo dice.
 crece sola si nadie la vacía. Un `limit=1000` ahí sería una expresión de deseo.
 
 **Chequeo:** `select * from public.gv_expreso_pendiente;` — vacía = nada pendiente de ISIS ·
-`node tests/exp-isis-modulo.cjs`. `sql/gv_expreso_pendiente_v2197.sql`, §3.mx.
+`node tests/exp-isis-modulo.cjs`. `sql/gv_expreso_pendiente_v2198.sql`, §3.mx.
 
 ## ⚠ REGLA (Luis, 2026-09-22, v21.14): generar las OC a mano MUEVE el ciclo automático
 
