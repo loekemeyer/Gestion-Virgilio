@@ -182,8 +182,11 @@ AS $function$
    order by x.art;
 $function$;
 
+-- ⚠ Los grants son EXACTAMENTE los de gv_clientes_nuevos_valor_lote: authenticated y service_role,
+--   NO anon. Son precios de lista; el supervisor entra autenticado con su sesion de Google.
+--   Medido: las dos funciones quedan con el mismo ACL.
 revoke all on function public.gv_clin_composicion(jsonb, text, text) from public;
-grant execute on function public.gv_clin_composicion(jsonb, text, text) to anon, authenticated, service_role;
+grant execute on function public.gv_clin_composicion(jsonb, text, text) to authenticated, service_role;
 
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
 values ('gv_clin_composicion','funcion',
@@ -193,3 +196,29 @@ values ('gv_clin_composicion','funcion',
 on conflict do nothing;
 
 notify pgrst, 'reload schema';
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────
+-- APLICADO Y MEDIDO el 2026-09-23. La prueba que vale NO es leer la funcion: es correrla contra
+-- el pedido real y comparar su SUMA contra la funcion canonica, con el MISMO payload.
+--
+--   LK 1448 · Silvano Lucas Martin (LK 4282) · 38 lineas
+--   suma de gv_clin_composicion  = 1.730.662,20
+--   gv_clientes_nuevos_valor_lote= 1.730.662,20   <- identicas al centavo (cond vacio)
+--
+-- Y con el `cond` del pedido (8 -> 2 % web), el desglose da exactamente los dos numeros que
+-- la pantalla ya mostraba en la celda Monto:
+--
+--   subtotal por lista           1.841.130,00
+--   - dto por volumen (6 %)       -110.467,80
+--   - dto web (2 %)                -34.613,24
+--   = neto                       1.696.048,97   <- la captura decia $1.696.049
+--   + IVA 21 %                     356.170,28
+--   = TOTAL CON IVA              2.052.219,25   <- la captura decia $2.052.219
+--   de eso, importados (E) con stock: 17 codigos por 895.434,04 netos
+--
+-- ⚠ El descuento por volumen de ESTE cliente es 6 %, no 25 %. El 25 % existe en clientes_dto
+--   pero lo tiene UN solo cliente de 2.044. El pop-up muestra el porcentaje REAL de cada uno
+--   (sale de clientes_dto), no un numero fijo.
+--
+-- Definiciones vivas traidas ANTES de escribir (regla "traer siempre la definicion viva"):
+-- gv_ppp_web_valor_items y gv_clientes_nuevos_valor_lote estaban IDENTICAS a la copia del repo.
