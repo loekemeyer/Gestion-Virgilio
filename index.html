@@ -8960,13 +8960,54 @@ const ACTIVITY_LOOKBACK_DAYS  = 180;
    36 tandas sin ver). Ahora todos los modos las traen todas; lo que acota la lista
    son los topes que ya existían: la ventana de fechas y MAX_PLANNED_NO_ACT.
    El flag se sigue parseando por si alguna vez se quiere volver a usar. */
+/* v21.62 (Luis, 23/09) — CLIENTES DE PRUEBA (tabla GV_Clientes_Prueba, hoy LK 99862
+   "Luiggy y Luiggy (PRUEBA)"). Sus pedidos entran a la PPP con las reglas de siempre, pero van
+   en tanda propia con código PRUEBAn y el OPERARIO no los ve: ni en las listas de picking/armado,
+   ni en el monitor, ni en Carga Camión / Control Remitos / Recepción Remitos, ni en el Excel ISIS.
+   Se reconoce por la TANDA (PRUEBAn) o por el CLIENTE (por si un pedido de prueba cae en una
+   tanda común antes de que el cron lo renombre). El supervisor los sigue viendo en la PPP.
+   Si la tabla no se puede leer, el set queda vacío y sólo filtra por tanda (falla hacia mostrar). */
+let _gvPruebaSet = null, _gvPruebaTs = 0;
+async function gvPruebaClientes() {
+  if (_gvPruebaSet && (Date.now() - _gvPruebaTs) < 600000) return _gvPruebaSet;
+  const rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Clientes_Prueba", "select=empresa,cod&order=cod.asc");
+  _gvPruebaSet = new Set((rows || []).map(function (r) {
+    return String(r.empresa || "").toLowerCase() + "|" + String(r.cod || "").trim();
+  }));
+  _gvPruebaTs = Date.now();
+  return _gvPruebaSet;
+}
+function gvEsTandaPrueba(t) { return /^PRUEBA\d+$/i.test(String(t == null ? "" : t).trim()); }
+function gvEsPedidoPrueba(set, np, cod) {
+  if (!set || !set.size) return false;
+  const emp = empresaDeNp(np) === "CH" ? "chef" : "lk";
+  return set.has(emp + "|" + String(cod == null ? "" : cod).trim());
+}
+/* Copia del mapa de tandas SIN lo de prueba. No toca el mapa original: el mismo objeto lo
+   cachean pantallas de supervisor (_pppCache), que sí tienen que ver esos pedidos. */
+async function gvSinPrueba(map) {
+  if (!map || typeof map.forEach !== "function") return map;
+  const set = await gvPruebaClientes();
+  const out = new Map();
+  for (const [k, v] of map) {
+    if (gvEsTandaPrueba(v && v.tanda)) continue;
+    const peds = (v && v.pedidos) || [];
+    if (!peds.some(function (p) { return gvEsPedidoPrueba(set, p.np, p.cod); })) { out.set(k, v); continue; }
+    const quedan = peds.filter(function (p) { return !gvEsPedidoPrueba(set, p.np, p.cod); });
+    if (!quedan.length) continue;
+    const m3 = quedan.reduce(function (a, p) { return a + (Number(p.m3) || 0); }, 0);
+    out.set(k, Object.assign({}, v, { pedidos: quedan, m3: m3 }));
+  }
+  return out;
+}
+
 async function getPppTandasForOperator() {
   const now = Date.now();
   if (_pppOperatorCache && (now - _pppOperatorTs) < PPP_OPERATOR_TTL_MS) {
     return _pppOperatorCache;
   }
   try {
-    const sheetMap = await fetchMonitorSheet();
+    const sheetMap = await gvSinPrueba(await fetchMonitorSheet());   // v21.62
     const items = [];
     for (const v of sheetMap.values()) {
       if (!v.tanda || v.tanda === "S/Tanda") continue;
@@ -11980,7 +12021,7 @@ async function showPickingList(tanda, legajo, opts) {
   m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">Cargando artículos…</div>`;
   m.classList.add("show");
   try {
-    const [sheetMap, pickBase, corrMap] = await Promise.all([fetchMonitorSheet(), fetchPickingBase(), fetchCorrecciones()]);
+    const [sheetMap, pickBase, corrMap] = await Promise.all([fetchMonitorSheet().then(gvSinPrueba), fetchPickingBase(), fetchCorrecciones()]);
     const entry = sheetMap.get(tNorm);
     const nps = [];
     if (entry && entry.pedidos) {
@@ -13480,7 +13521,7 @@ async function showCompletarWizard(legajo, codigo) {
   const modal = document.getElementById("completarModal"); if (!modal) return;
   try {
     let enr = null; try { enr = await faltGetEnrich(); } catch (_e) {}
-    const sheetMap = (enr && enr.sheetMap) || await fetchMonitorSheet();
+    const sheetMap = (enr && enr.sheetMap) || await gvSinPrueba(await fetchMonitorSheet());   // v21.62
     let pickBase = (enr && enr.pickBase) || null;
     if (!pickBase) { try { pickBase = await fetchPickingBase(); } catch (_e) { pickBase = new Map(); } }
     let tanda = code, entry = sheetMap.get(tanda);
@@ -30659,7 +30700,7 @@ async function fetchCCData() {
     fetchSinSalidaMap(desdeIso),
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_ppp_entregados_meta", "select=np&order=np.asc")
   ]);
-  const repR = _par[0], ccnR = _par[1], talR = _par[2], fssMap = _par[3], entrR = _par[4];
+  const repR = (_par[0] || []).filter(function (r) { return !gvEsTandaPrueba(r.tanda); }), ccnR = _par[1], talR = _par[2], fssMap = _par[3], entrR = _par[4];   // v21.62 sin tandas PRUEBA
   // v9.68 — set de NP ya ENTREGADAS. Si el fetch falla queda vacío → NO filtramos por entrega
   // (degradación segura: mejor mostrar de más que ocultar un reparto real).
   const entregadas = new Set((entrR || []).map(function (p) { return String(p.np || "").trim().replace(/\.0+$/, ""); }));
@@ -31118,7 +31159,8 @@ async function fetchSinSalidaMap(sinceISO) {
 async function rrLoadBadge() {
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    const rows = await fetch(SUPABASE_URL + "/rest/v1/gv_vista_control_remitos?select=vencido&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    const rows = await fetch(SUPABASE_URL + "/rest/v1/gv_vista_control_remitos?select=vencido,tanda&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (rs) { return (rs || []).filter(function (r) { return !gvEsTandaPrueba(r.tanda); }); });   // v21.62
     const n = (rows || []).length;
     const venc = (rows || []).filter(function (r) { return r.vencido; }).length;
     supSetBadge("rrBadge", n);
@@ -31139,7 +31181,7 @@ async function fetchCRData() {
     headers: H, cache: "no-store"
   });
   if (!res.ok) throw new Error("HTTP " + res.status);
-  const rows = await res.json();
+  const rows = (await res.json()).filter(function (r) { return !gvEsTandaPrueba(r.tanda); });   // v21.62
   return rows.map(r => ({
     np: r.np, tanda: r.tanda || "—", cod: r.cod_cliente || "", rs: r.rs || "",
     remito: (r.remito || "").trim(),
@@ -31389,7 +31431,7 @@ async function fetchCCRData() {
     supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, ccrQ),
     supaFetchAllSafe(SUPABASE_TABLE_ENDPOINT, talQ)
   ]);
-  const repR = _par[0], ccrR = _par[1], talR = _par[2];
+  const repR = (_par[0] || []).filter(function (r) { return !gvEsTandaPrueba(r.tanda); }), ccrR = _par[1], talR = _par[2];   // v21.62 sin tandas PRUEBA
   const controlados = new Set();
   for (const ev of ccrR) {
     const np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, "");
@@ -36855,6 +36897,37 @@ function pgaTandaMoverAbrir(key) {
   pppMovCargar();
 }
 window.pgaTandaMoverAbrir = pgaTandaMoverAbrir;
+
+/* v21.62 (Luis, 23/09) — «Eliminar» de una tanda PRUEBAn. No es un borrado nuevo: por cada NP llama
+   a `gv_ppp_pedido_cancelar` con alcance TODO EL PEDIDO, o sea exactamente lo que hace «Cancelar
+   pedido» (sale de la PPP, no vuelve a entrar, lo armado va a «A guardar», el pedido queda en la
+   base). Sólo se ofrece en tandas PRUEBA, y por eso alcanza con una confirmación. */
+async function pgaPruebaEliminar(key) {
+  const t = _pgaTandaDe(key);
+  if (!t || !gvEsTandaPrueba(t.tanda)) { pppSetStatus("Sólo se puede eliminar así una tanda PRUEBA.", false); return; }
+  const nps = Array.from(new Set((t.filas || []).map(function (r) { return String(r.np || "").trim(); }).filter(Boolean)));
+  if (!nps.length) return;
+  if (!confirm("¿Eliminar la tanda de prueba " + t.tanda + "?\n\nSe cancelan " + nps.length + " NP (" + nps.join(", ")
+      + ").\nSalen de la PPP y no vuelven a entrar.")) return;
+  pppSetStatus("Eliminando " + t.tanda + "…", true);
+  const por = await aprQuien();
+  let ok = 0; const errs = [];
+  for (const np of nps) {
+    try {
+      const r = await aprRpc("gv_ppp_pedido_cancelar", { p_np: np, p_motivo: "Tanda de prueba " + t.tanda + " eliminada (cliente de PRUEBA)",
+        p_por: por, p_todas: true, p_forzar: true });
+      ok += (r || []).length;
+    } catch (e) {
+      const m = (e && e.message) ? e.message : String(e);
+      if (!/No encuentro la NP/i.test(m)) errs.push(np + ": " + m);   // ya cayó con otra NP del mismo pedido
+    }
+  }
+  pppSetStatus(errs.length ? ("⚠ " + t.tanda + ": " + ok + " NP canceladas, " + errs.length + " con error — " + errs.join(" · "))
+                           : ("🗑 " + t.tanda + " eliminada · " + ok + " NP canceladas"), !errs.length);
+  await pppLoadProgFromSupabase();
+  pgaRecargar();
+}
+window.pgaPruebaEliminar = pgaPruebaEliminar;
 async function pppReprogElegir(iso) {
   if (!_pppMov || !_pppMov.reprogNps) return;
   const nps = _pppMov.reprogNps.slice();
@@ -39708,7 +39781,13 @@ function _pgaCuerpoHtml(dias, opts) {
               + escapeHtml(t.tanda) + ' a otra fecha. Se abre el calendario con los m³ que ya tiene cada día y el cupo,'
               + ' y arriba el botón para dejarla en ⏸ Armados en espera (armada, sin fecha de entrega).'
               + ' El contenido no cambia: no hay que volver a pickear. Se guarda en el servidor, lo ven todos."'
-              + ' onclick="event.stopPropagation();pgaTandaMoverAbrir(\'' + escapeHtml(t.key) + '\')">📅<span class="pga-acc-t"> Cambiar de día</span></button></span>'
+              + ' onclick="event.stopPropagation();pgaTandaMoverAbrir(\'' + escapeHtml(t.key) + '\')">📅<span class="pga-acc-t"> Cambiar de día</span></button>'
+              // v21.62 (Luis): una tanda de CLIENTE DE PRUEBA se elimina de un toque — cancela sus pedidos
+              // con el mismo backend que «Cancelar pedido» (gv_ppp_pedido_cancelar, alcance: todo el pedido).
+              + (gvEsTandaPrueba(t.tanda)
+                ? '<button class="pga-acc-b" title="Tanda de PRUEBA: cancela todos sus pedidos (salen de la PPP y no vuelven). Es el mismo «Cancelar pedido», sin la doble confirmación."'
+                  + ' onclick="event.stopPropagation();pgaPruebaEliminar(\'' + escapeHtml(t.key) + '\')">🗑<span class="pga-acc-t"> Eliminar</span></button>'
+                : '') + '</span>'
             : '') +
         '</div></td>' +
         '<td>' + _pppFmtM3(t.m3) + '</td><td></td><td>' + t.nps + '</td>' +
@@ -44792,7 +44871,7 @@ let _faltEnrich = null, _faltEnrichTs = 0;
 async function faltGetEnrich() {
   const now = Date.now();
   if (_faltEnrich && (now - _faltEnrichTs) < 120000) return _faltEnrich;
-  const [sheetMap, pickBase] = await Promise.all([fetchMonitorSheet(), fetchPickingBase()]);
+  const [sheetMap, pickBase] = await Promise.all([fetchMonitorSheet().then(gvSinPrueba), fetchPickingBase()]);
   _faltEnrich = { sheetMap, pickBase }; _faltEnrichTs = now;
   return _faltEnrich;
 }
@@ -51337,6 +51416,7 @@ async function refreshMonitor() {
       _pppCache = sheetMap;
       _pppCacheTs = Date.now();
     }
+    sheetMap = await gvSinPrueba(sheetMap);   // v21.62 — el monitor es de los operarios: sin pedidos de prueba
     // Fetcheamos siempre la ventana ANCHA (7 días futuros + pasados) así
     // tenemos eventos para todas las tandas que potencialmente se muestran.
     const wideTargetDates = targetDeliveryDates(sheetMap, 7);
@@ -53083,8 +53163,20 @@ async function _facXlsArmar(nps) {
     // La fecha de una NP de ISIS sale de PPP_Base_Pedidos; una NP web NO está ahí,
     // así que su fecha de recepción se guarda al programar y se lee de acá. Sin
     // esto el Excel salía con la fecha vacía para todo lo que viene de la página.
-    gvRestTodo("PPP_Web_Programacion?select=np,np_idx,empresa,order_id,fecha_recep", H).catch(function () { return []; })
+    gvRestTodo("PPP_Web_Programacion?select=np,np_idx,empresa,order_id,fecha_recep,cod_cliente,tanda", H).catch(function () { return []; })
   ]);
+  // v21.62 — un pedido de CLIENTE DE PRUEBA no va a ISIS nunca: se saca del Excel acá, antes de armar filas.
+  const _prSet = await gvPruebaClientes();
+  const _prNps = new Set();
+  (web || []).forEach(function (x) {
+    if (!x.np) return;
+    const lab = pwebNpLabel(x.empresa, x.np, x.np_idx);
+    if (gvEsTandaPrueba(x.tanda) || gvEsPedidoPrueba(_prSet, lab, x.cod_cliente)) _prNps.add(lab);
+  });
+  if (_prNps.size) {
+    for (let i = ent.length - 1; i >= 0; i--) { if (_prNps.has(String(ent[i].np || "").trim())) ent.splice(i, 1); }
+    try { facShowToast("🧪 " + _prNps.size + " NP de cliente de PRUEBA quedaron afuera del Excel ISIS."); } catch (_e) {}
+  }
 
   const uxbBy = {}; (uxb || []).forEach(function (x) { const k = String(x.cod || "").replace(/^0+/, ""); if (k) uxbBy[k] = Number(x.uxb) || null; });
   const vendBy = {}; (vend || []).forEach(function (x) { vendBy[String(x.cod_cliente)] = String(x.vend || ""); });

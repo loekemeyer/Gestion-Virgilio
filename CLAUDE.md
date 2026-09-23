@@ -4309,6 +4309,29 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
+## ⚠ REGLA (Luis, 2026-09-23, v21.62): CLIENTES DE PRUEBA — van a la PPP, el operario no los ve
+
+**Luis:** *"que sus pedidos solo se puedan programar como tanda única (código PruebaX) · si se
+programa automáticamente, con las reglas que ya hay · que no se considere cliente nuevo · que NO le
+figuren a los operarios (no son pedidos reales, no quiero que rompan la operación)"*.
+
+Primer cliente: **LK 99862 «Luiggy y Luiggy (PRUEBA)»**, copia de Muller y Muller (LK 862) en la
+página LK — usuario `prueba123`. La lista vive en **`GV_Clientes_Prueba`** (agregar otro = un `insert`).
+
+| qué | cómo |
+|---|---|
+| tanda única | `GV_Clientes_Reglas` regla `solo` (ya existía) |
+| código `PRUEBAn` | `gv_prueba_tandas_normalizar()`, cron `gv-prueba-tandas` c/5 min, renombra con `gv_ppp_tanda_renombrar`. En MAYÚSCULAS: todo compara con `upper(btrim())` |
+| no es cliente nuevo | copia de la excepción de Muller en `gv_excepcion_cuarentena` |
+| oculto al operario | front: `gvSinPrueba` (listas de picking/armado, picking, armado, faltantes, monitor), `gvEsTandaPrueba` (Carga Camión, Control Remitos, Recepción Remitos), `monitor/tv.html`, y el **Excel ISIS los saca** |
+| eliminar | botón **🗑 Eliminar** en la fila de una tanda PRUEBA = «Cancelar pedido» (`gv_ppp_pedido_cancelar`, todo el pedido) |
+| cupo y camión | cuentan como cualquier pedido (*"con las reglas que ya hay"*) |
+
+⚠ **El filtro del front NO toca el mapa cacheado** (`_pppCache`): el supervisor sigue viendo las
+tandas PRUEBA en la PPP. **Centinela:** `select * from public.gv_prueba_mezclada;` — vacía = ningún
+pedido de prueba quedó adentro de una tanda con pedidos reales (esa no se renombra).
+`sql/gv_clientes_prueba_v2162.sql`, `tests/prueba-oculta-operario.cjs`.
+
 ## ⚠ REGLA (Marianela, 2026-09-23, v21.58): una tanda EMPEZADA no cambia de CÓDIGO al moverla de día
 
 **Marianela:** *"cuando tengamos una tanda en proceso de picking o armado y la cambio para otro día
