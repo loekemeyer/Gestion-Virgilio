@@ -4,6 +4,8 @@
 -- recibir a cada OC (método de restos mayores): 3 cajas con 50/50 → 2 y 1; 10 con 70/30 → 7 y 3.
 -- Además: con p_cod, se recalculan TODAS las OC del código (no sólo las del proveedor que
 -- entregó), porque la entrega de un externo mueve la OC de otro.
+-- FORWARD-FACING (pedido 23/09): sólo cuentan entregas externas con fecha >= 2026-09-23;
+-- las OC viejas no se completan con entregas viejas.
 -- Base: pg_get_functiondef viva del 23/09 (incluye GV_OC_Fabrica_Para, v21.22).
 CREATE OR REPLACE FUNCTION public.gv_oc_recompute_recibido(p_nombre text DEFAULT NULL::text, p_cod text DEFAULT NULL::text)
  RETURNS integer
@@ -78,6 +80,7 @@ begin
   ext as (
     select e.* from entregas e
     where e.f is not null and e.caj > 0
+      and e.f >= date '2026-09-23'   -- FORWARD-FACING: sólo entregas desde el 23/09; lo viejo no completa OC
       and (cod_filtro is null or e.cod = cod_filtro)
       and not exists (select 1 from oc_win w
                        where w.cod_n = e.cod and e.f >= w.fecha and e.f < w.tope
