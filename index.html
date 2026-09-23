@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.45"></script>
+<script type="module" src="recepcion.js?v=21.46"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9925,7 +9925,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.45";
+const APP_VERSION = "v21.46";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49465,6 +49465,14 @@ async function cuarRpcMarcar(peds) {
 async function cuarMarcarPedidos() {
   const peds = _apr.pedidos || [];
   if (!peds.length) { if (_pppTab === "prog") aprRender(); return; }
+  /* v21.32 (Luis, 2026-09-23: "Ierakuin no está en el submódulo de cuarentena") — DE QUÉ
+     PEDIDOS OPINA ESTA RESPUESTA. Esta función se llama DOS veces por carga (v20.98): una con
+     LK+ISIS y otra, cuando Chef llega tarde, con la lista completa. Las dos terminaban borrando
+     la marca de TODO pedido que su respuesta no nombrara — o sea que la corrida de LK, si
+     contestaba último, le borraba la cuarentena al único pedido de Chef. Una respuesta no puede
+     opinar sobre un pedido que nunca preguntó. */
+  const askKey = {};
+  peds.forEach(function (p) { if (!p._demo) askKey[aprKey(p.empresa, p.order_id)] = 1; });
   try {
     // (1) Estado + Deuda (por empresa+cod) y (2) Límite (valoriza + greedy, sólo web) — en paralelo.
     const webPend = peds.filter(function (p) { return !p._demo && !p._isis; });
@@ -49521,6 +49529,7 @@ async function cuarMarcarPedidos() {
     (_apr.pedidosTodos || []).forEach(function (p) {
       if (p._demo) return;
       const k = aprKey(p.empresa, p.order_id);
+      if (!askKey[k]) return;   // v21.32: no estaba en el lote de esta llamada → no se toca
       if (detKey[k]) p.cuarentena_detalle = detKey[k]; else if (p.cuarentena_detalle) delete p.cuarentena_detalle;
       if (libKey[k]) { p.cuarentena_motivos = libKey[k]; p._cuarLiberado = true; }
       else if (byKey[k] && byKey[k].length) { p.cuarentena_motivos = byKey[k]; p._cuarLiberado = false; }
