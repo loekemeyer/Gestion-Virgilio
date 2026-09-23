@@ -1,7 +1,7 @@
--- v21.96 — OC: la mercadería que entrega un EXTERNO (proveedor sin OC de ese código
+-- v21.97 — OC: la mercadería que entrega un EXTERNO (proveedor sin OC de ese código
 -- en esa ventana) descuenta de la OC del/los ASIGNADO(S) — los que tienen la OC vigente.
--- Si hay varios asignados, se reparte en cajas ENTERAS, proporcional a lo que le falta
--- recibir a cada OC (método de restos mayores): 3 cajas con 50/50 → 2 y 1; 10 con 70/30 → 7 y 3.
+-- Si hay varios asignados, se reparte en cajas ENTERAS, proporcional al SPLIT asignado a cada
+-- proveedor (OC_Maximos.prop_prov1/2), método de restos mayores: 3 cajas 50/50 → 2 y 1; 10 con 70/30 → 7 y 3.
 -- Además: con p_cod, se recalculan TODAS las OC del código (no sólo las del proveedor que
 -- entregó), porque la entrega de un externo mueve la OC de otro.
 -- FORWARD-FACING (pedido 23/09): sólo cuentan entregas externas con fecha >= 2026-09-23;
@@ -19,7 +19,7 @@ declare
   cod_filtro text;
 begin
   cod_filtro := case when p_cod is not null then norm_cod(p_cod) end;
-  -- v21.96: con código, todas las OC del código (la entrega externa mueve la OC del asignado)
+  -- v21.97: con código, todas las OC del código (la entrega externa mueve la OC del asignado)
   k_filtro   := case when p_nombre is not null and cod_filtro is null then gv_norm_prov_keys(p_nombre) end;
 
   with entregas as (
@@ -76,7 +76,7 @@ begin
            ),0) as rec_propio
     from oc_win w
   ),
-  -- v21.96: entrega EXTERNA = ninguna OC de ese código, en esa fecha, es de quien entregó
+  -- v21.97: entrega EXTERNA = ninguna OC de ese código, en esa fecha, es de quien entregó
   ext as (
     select e.* from entregas e
     where e.f is not null and e.caj > 0
@@ -89,15 +89,21 @@ begin
   -- los ASIGNADOS: OC vigente del código cuya ventana cubre la fecha de la entrega
   cand as (
     select x.eid, x.caj, p.id,
-           greatest(p.cantidad - p.rec_propio, 0) as falta,
-           p.cantidad
+           greatest(p.cantidad - p.rec_propio, 0) as falta, p.cantidad,
+           -- el SPLIT asignado en ⚙ Configuraciones (OC_Maximos: prop_prov1 / prop_prov2)
+           (select case when gv_prov_match(p.pkeys, gv_norm_prov_keys(m.proveedor))  then m.prop_prov1
+                        when gv_prov_match(p.pkeys, gv_norm_prov_keys(m.proveedor2)) then m.prop_prov2 end
+              from "OC_Maximos" m where norm_cod(m.cod) = p.cod_n limit 1)::numeric as pct
     from ext x
     join propio p on p.cod_n = x.cod and p.es_ultima and x.f >= p.fecha and x.f < p.tope
   ),
-  -- reparto proporcional a lo que le falta a cada OC, en cajas enteras (restos mayores)
+  -- peso = el split del proveedor. Si a algún asignado no se le encuentra el split (o suman 0),
+  -- se reparte por lo que le falta recibir a cada OC; y si eso también es 0, por la cantidad de la OC.
   peso as (
     select c.*,
-           case when sum(c.falta) over (partition by c.eid) > 0 then c.falta
+           case when bool_and(c.pct is not null) over (partition by c.eid)
+                 and sum(c.pct) over (partition by c.eid) > 0 then c.pct
+                when sum(c.falta) over (partition by c.eid) > 0 then c.falta
                 else c.cantidad end::numeric as w
     from cand c
   ),
@@ -150,3 +156,11 @@ begin
   return n_updated;
 end;
 $function$;
+
+-- APLICADO 23/09 (Luis). Nota: en la base el cuerpo dice "v21.96" en los comentarios (mismo código).
+-- Backups: zz_backups."GV_Backup_fn_oc_recompute_20260923" (def anterior) y
+--          zz_backups."GV_Backup_OrdenesCompra_20260923" (872 filas).
+-- Verificado: recompute total cambia 0 OC · split 70/30 con 10 caj → 7/3, +3 caj → 9/4 ·
+-- entrega propia sigue imputando · botón del celular (anon) muestra el pendiente descontado.
+-- Rollback: execute (select def from zz_backups."GV_Backup_fn_oc_recompute_20260923");
+-- Centinela: GV_Reglas_Centinela (gv_oc_recompute_recibido, patrón prop_prov2).
