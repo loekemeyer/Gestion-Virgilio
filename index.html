@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.41"></script>
+<script type="module" src="recepcion.js?v=21.42"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9925,7 +9925,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.41";
+const APP_VERSION = "v21.42";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31139,7 +31139,7 @@ async function showControlRemitos(legajo, isAdmin) {
       // v21.03 (Luis) — sin remitos NO se minimiza: el toggle RR tiene que quedar CERRADO.
       // Antes el único botón era crClose(), que sólo esconde el modal y deja RR abierto (rojo)
       // bloqueando EP/AP. Mismo escape que ya tenían CC (ccEndWithoutLoading) y CR (ccrEndWithout).
-      // El admin (openRemitosAdmin, legajo "0") no tiene botonera ni toggle: sólo cierra el modal.
+      // El admin (openRemitosAdmin, legajo "sup:<mail>" desde v21.42) no tiene botonera ni toggle: sólo cierra el modal.
       m.querySelector(".tanda-modal-body").innerHTML = `<div class="history-empty">No hay pedidos cargados al camión pendientes de control.</div>` +
         (isAdmin ? `<button class="pk-btn pk-cancel" onclick="crClose()">Cerrar</button>`
                  : `<button class="pk-btn pk-ok" onclick="crEndWithout('${leg}')">✓ Cerrar Recepción Remitos (no hay remitos)</button>`);
@@ -33112,9 +33112,21 @@ function openRecepcionAdmin() {
    Controlado. Al «Terminé» emite CRN por NP (igual que el operario) pero NO cierra
    ningún toggle RR (el admin no tiene botonera). Usa legajo "0" (sistema, excluido de
    reportes de operario, igual que CRA). v3.75. */
+/* v21.42 (Luis, 23/09: *"Sigo sin entender esos 2. En prog dice que está todo ok pero allá dicen
+   esos 2"*) — el supervisor que abre Recepción Remitos desde el panel firmaba el CRN con legajo
+   "0", y TODO el sistema toma 0 y 1 como legajos de PRUEBA (`es_legajo_test`, "excluir de
+   reportes"): ese CRN no contaba, el pedido nunca pasaba a Entregado y seguía en Ocupación con su
+   fecha vieja (E12C el 18/09, E44A el 21/09) mientras Programación —que da por salido con el CCN—
+   ya no lo mostraba. Medido: 8 NP desde el 10/09 con el CRN sólo de legajo 0. Firma con el mail. */
+function gvLegajoSupervisor() {
+  let em = "";
+  try { em = window.__authEmail || (typeof __identity !== "undefined" && __identity && (__identity.email || __identity.nombre)) || ""; } catch (_e) {}
+  em = String(em || "").trim().toLowerCase();
+  return em ? ("sup:" + em) : "sup:gestion";
+}
 function openRemitosAdmin() {
   if (!requireSupervisor()) return;
-  showControlRemitos("0", true);
+  showControlRemitos(gvLegajoSupervisor(), true);
 }
 
 /* ===== Panel Web LK — copia del admin del sitio de mayoristas (loekemeyer.com)

@@ -3977,6 +3977,26 @@ select * from public.gv_reglas_perdidas;                   -- vacía = el pase s
 
 `sql/gv_ppp_web_fusionar_tandas_v2139.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-23, v21.42): el SUPERVISOR no firma con legajo 0 — 0 y 1 son PRUEBA en todo el sistema
+
+**Luis, con Ocupación abierta en el 18/09:** *"Sigo sin entender esos 2. En prog dice que está todo
+ok pero allá dicen esos 2"*.
+
+Los 2 (LK 0038 y LK 0055, E12C) salieron el 18/09 con Carga Camión de Eduardo y el supervisor les
+hizo Recepción Remitos el 21/09 **desde el panel** (`openRemitosAdmin`), que firmaba el CRN con
+**legajo `"0"`**. Y `es_legajo_test` dice que 0 y 1 son legajos de prueba: `gv_ppp_entregados`
+descarta ese CRN, el pedido nunca pasa a Entregado y el front lo deja en `programados` → **Ocupación
+lo muestra en su día viejo**. Programación no lo muestra porque arranca en hoy y `gv_ppp_atrasados`
+da por salido con el **CCN** (legajo real). Dos pantallas, dos criterios, y las dos "tenían razón".
+
+Medido: **8 NP desde el 10/09** con el CRN sólo de legajo 0 (LK 0011, 98502, LK 0038, LK 0055,
+CH 0010, CH 0012, CH 0013, CH 0016); en julio/agosto hay ~230 más de Producción (`gv_app` null).
+
+Hoy el supervisor firma **`sup:<mail>`** (`gvLegajoSupervisor()`), nunca 0. Lo sostiene
+`tests/rr-supervisor-legajo.cjs`. ⚠ Los otros `legajo: "0"` del archivo (ajustes de stock, CRA
+"carga sin control", PPE "errores en PPP") son eventos del **sistema**, no de una persona, y quedan
+como están.
+
 ## ⚠ REGLA (Luis, 2026-09-23, v21.41): el día «⏸ Armados en espera» NO EXISTE MÁS
 
 **Luis, con la captura de la Programación:** *"No tiene que existir «Armados en espera»"*.
