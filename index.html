@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.64"></script>
+<script type="module" src="recepcion.js?v=21.65"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9994,7 +9994,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.64";
+const APP_VERSION = "v21.65";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39503,8 +39503,39 @@ function pgaDestNeed(nps) {
 }
 /* Las NP que hay que pedir: las del árbol de Programación y las de Pedidos atrasados. */
 function pgaDestDeFilas(filas) {
-  pgaDestNeed((filas || []).map(function (r) { return r && r.np; }).filter(Boolean));
+  const nps = (filas || []).map(function (r) { return r && r.np; }).filter(Boolean);
+  pgaDestNeed(nps);
+  pgaObsNeed(nps);
 }
+/* v21.65 (Luis, 23/09): "un badge de que el cliente puso un comentario que viaje con las NPs en
+   las que termine programado ese pedido". El comentario de la NP, o el del pedido si la NP se
+   programó antes de que llegara la copia de LK: `gv_np_obs_lista` lo resuelve al leer.
+   Mismo patrón que `pgaDestNeed`: por lista (de a 500, nunca el universo) y con su propio catch
+   — si falla, la Programación se ve igual, sin el badge. */
+let _pgaObs = null, _pgaObsPide = new Set();
+function pgaObsNeed(nps) {
+  if (!_pgaObs) _pgaObs = new Map();
+  const falta = [];
+  for (const np of (nps || [])) {
+    const k = String(np || "").trim();
+    if (k && !_pgaObs.has(k) && !_pgaObsPide.has(k)) { falta.push(k); _pgaObsPide.add(k); }
+  }
+  for (let i = 0; i < falta.length; i += 500) {
+    const lote = falta.slice(i, i + 500);
+    fetch(SUPABASE_URL + "/rest/v1/rpc/gv_np_obs_lista", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_nps: lote }), cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (rows) {
+        for (const x of (rows || [])) if (x && x.np) _pgaObs.set(String(x.np).trim(), String(x.obs || ""));
+        for (const k of lote) if (!_pgaObs.has(k)) _pgaObs.set(k, "");
+        pppRenderProg();
+      })
+      .catch(function (_e) { for (const k of lote) _pgaObsPide.delete(k); });
+  }
+}
+function _pgaObsDe(r) { return (_pgaObs && r && r.np) ? (_pgaObs.get(String(r.np).trim()) || "") : ""; }
 function _pgaDestDe(r) {
   if (!_pgaDest) return null;
   const np = _pppNpNorm(r && r.np); if (!np) return null;
@@ -39542,7 +39573,7 @@ function pgaNeed(force) {
       pppRenderProg();
     });
 }
-function pgaRecargar() { _pgaTs = 0; _pgaItems = {}; _patrTs = 0; _pgaDest = null; _pgaDestPide = new Set();
+function pgaRecargar() { _pgaTs = 0; _pgaItems = {}; _patrTs = 0; _pgaDest = null; _pgaDestPide = new Set(); _pgaObs = null; _pgaObsPide = new Set();
   pgaNeed(true); patrNeed(true); pppRenderProg(); }
 function pgaAbrirDia(k)   { _pgaOpenD[k] = !_pgaOpenD[k]; pppRenderProg(); }
 function pgaAbrirTanda(k) { _pgaOpenT[k] = !_pgaOpenT[k]; pppRenderProg(); }
@@ -39826,6 +39857,9 @@ function _pgaCuerpoHtml(dias, opts) {
               ' title="' + ((r.horario_fecha || r.horario_franja) ? "Horario coordinado con el cliente. Se edita en A Programar."
                                                                   : "Este cliente coordina horario y no hay ninguno cargado. Se carga en A Programar.") + '">🕑 ' +
               escapeHtml(aprHorTxt({ fecha: r.horario_fecha, franja: r.horario_franja })) + '</span>' : '') +
+            // v21.65 (Luis): el comentario del pedido viaja con la NP — el badge avisa, el texto va en el title
+            (_pgaObsDe(r) ? '<span class="pga-obs" title="Comentario del pedido: ' + escapeHtml(_pgaObsDe(r)) + '"'
+              + ' style="font-size:11px;font-weight:800;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:999px;padding:0 6px;margin-left:4px;cursor:help">💬 comentario</span>' : '') +
             (r.cod ? '<span class="pga-cod" title="Número de cliente en ' + (r.empresa === "CH" ? "Chef" : "Loekemeyer") + '">' +
               escapeHtml(r.empresa || "LK") + " " + escapeHtml(r.cod) + '</span>' : '') +
             '<span class="pga-cli" title="' + escapeHtml(r.razon_social || "") + '">' + escapeHtml(r.razon_social || "—") + '</span>' +
@@ -45795,7 +45829,7 @@ async function aprTraerPedidos(e) {
       turno_txt: n.fecha_entrega_txt || "",
       // v21.34 (Thomas, 22/09): "tendría que figurar sí o sí". Es del PEDIDO, no del bloque.
       obs_pedido: String(n.observaciones || "").trim(),
-      // v21.64 (Luis, 23/09: "¿por qué no puede viajar con el pedido?") — el día y la franja que
+      // v21.65 (Luis, 23/09: "¿por qué no puede viajar con el pedido?") — el día y la franja que
       // eligió el cliente al retirar vienen EN LA FILA del pedido (v_pedidos_web_np de LK), así el
       // badge los muestra apenas entra. lk_pedidos_match (sync c/15 min) sigue siendo lo que usa el
       // armado automático; esto es sólo el respaldo de la pantalla mientras esa copia no llegó.
@@ -46754,7 +46788,7 @@ function aprPideHorario(p) {
 function aprHorDe(p) {
   const h = (_aprHor || {})[aprHorKey(pppEmpDePedido(p), aprHorClave(p))];
   if (h) return h;
-  // v21.64 — la copia de lk_pedidos_match todavía no llegó: se muestra lo que trae el pedido.
+  // v21.65 — la copia de lk_pedidos_match todavía no llegó: se muestra lo que trae el pedido.
   if (p && (p.retiro_fecha || p.retiro_franja)) return { fecha: p.retiro_fecha || "", franja: p.retiro_franja || "", origen: "cliente" };
   return null;
 }

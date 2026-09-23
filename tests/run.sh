@@ -26,6 +26,9 @@ node() {
 echo "== ppp-tanda-candado-codigo (v21.58: una tanda empezada conserva su codigo al cambiar de dia) =="
 node tests/ppp-tanda-candado-codigo.cjs
 
+echo "== ppp-retiro-y-comentario (v21.65: el retiro viaja con el pedido; badge de comentario en la NP) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-retiro-y-comentario.cjs
+
 echo "== prueba-oculta-operario (v21.63: los pedidos de clientes de PRUEBA no le figuran al operario) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/prueba-oculta-operario.cjs
 
