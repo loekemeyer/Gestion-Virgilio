@@ -51,5 +51,15 @@ ok(/GV_Reglas_Centinela/.test(s) && /refresh_stocks_carga_rapida'/.test(s)
    && /pg_try_advisory_xact_lock'/.test(s),
    "las dos reglas tienen que tener su fila en GV_Reglas_Centinela");
 
+// 8. v21.57 - el desfase de los crons: el 55 corre en PARES, los otros en IMPARES
+ok(/3-59\/6/.test(s) && /1-59\/10/.test(s),
+   "tienen que quedar escritos los schedules nuevos del 57 (3-59/6) y del 68 (1-59/10)");
+ok(/paso (?:es |sea )?PAR|CADA 6 Y CADA 10/.test(s),
+   "tiene que estar la razon: la paridad se conserva solo con paso PAR, por eso NO cada 5 ni cada 15");
+ok(/TRES jobs|TOMAN TRES/.test(s) && /\b92\b/.test(s),
+   "el lock 5768 lo toman TRES jobs (57, 68 y 92), no dos: el 92 es cada 15 y no se pudo mover");
+ok(/job startup timeout/.test(s),
+   "tiene que quedar el sintoma medido: el propio cron 68 se quedo sin worker el 22/09 10:30");
+
 if (malos) { console.error("stock-carga-rapida-encadenada: " + malos + " candados ROTOS"); process.exit(1); }
-console.log("stock-carga-rapida-encadenada: 12 candados OK");
+console.log("stock-carga-rapida-encadenada: 16 candados OK");
