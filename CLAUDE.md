@@ -949,6 +949,14 @@ va sólo con los feriados de la ley.
 **Chequeo:** `select tipo, count(*) from public."GV_Feriados" group by 1;` — al 23/09, 32 feriados
 (16 de 2026 + 16 de 2027) y 3 no laborables. `sql/gv_feriados_v2147.sql`.
 
+⚠⚠ **NO se automatiza: Thomas decidió (23/09) que se ajusta A MANO en enero.** Textual: *"no, queda
+para que se ajuste manual en enero"*. **No volver a proponer el cron.** Se midió antes de decidir:
+API oficial del Estado no hay (`datos.gob.ar` da 502), y las dos comunitarias son complementarias y
+ninguna alcanza sola — **Nager.Date** trae los trasladables ya movidos pero **no trae los puentes**,
+y **ArgentinaDatos** marca los puentes pero devuelve los trasladables **sin mover** para los años sin
+decreto (Güemes 2027 el 17/06, cuando por ley cae el 21/06). El detalle y lo que falta cargar en
+enero están en `docs/ESTADO-Y-PENDIENTES.md` §2.
+
 ## ⚠ REGLA (Thomas, 2026-09-23, v21.47): un centinela de PATRÓN no ve un cambio de CUENTA — para eso está la HUELLA
 
 `gv_reglas_perdidas` contesta *"¿el patrón sigue en el cuerpo?"*. Es lo que hace falta cuando el

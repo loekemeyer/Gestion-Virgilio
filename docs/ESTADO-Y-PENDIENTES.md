@@ -210,6 +210,28 @@
   15/09**, con ~10 armados por día. Arreglado en la v18.00 (`compTerminar` pregunta él mismo) con
   regresión en `tests/comp-terminar-unificado.cjs`. Si vuelve a aparecer en 0, mirar ahí primero.
 
+- **2026-09-23 — los feriados NO se automatizan: se ajustan a mano en enero.** Textual:
+  *"no, queda para que se ajuste manual en enero"*. **No volver a proponer el cron.** Se midió
+  antes de decidir, y el resultado sirve para que enero sea barato:
+
+  | fuente | trasladables | puentes | años futuros |
+  |---|---|---|---|
+  | **Nager.Date** (`date.nager.at/api/v3/PublicHolidays/<año>/AR`) | **ya movidos** | no los trae | sí (2028 OK) |
+  | **ArgentinaDatos** (`api.argentinadatos.com/v1/feriados/<año>`) | **sin mover** | los marca `puente` | 404 hasta el decreto |
+
+  **API oficial del Estado NO hay**: `datos.gob.ar` contesta **502** y `argentina.gob.ar/interior/feriados`
+  es HTML. Y desde una sesión de Claude **no se puede pegar a ninguna** (el proxy de egress da 403);
+  desde la base sí, con la extensión `http`.
+
+  **Lo que falta en enero de 2027 es CHICO**: los 16 feriados de 2027 ya están cargados y validados
+  contra Nager (16 de 16, trasladables incluidos: 21/06, 16/08, 11/10 y 20/11, que cae sábado y no
+  se mueve). Falta **sólo los puentes**, que los fija el PEN por decreto y en 2026 fueron tres. Es
+  un `insert` en `public."GV_Feriados"` con `tipo = 'no_laborable'`.
+
+  ⚠ **La trampa, si alguien igual copia de una API a mano:** ArgentinaDatos devuelve Güemes 2027 el
+  **17/06** y por Ley 27.399 cae el **21/06**. Y un puente cargado como `feriado` le regala ~8 h a
+  cualquier cierre que lo cruce, porque en el depósito **ese día se trabaja**.
+
 ## 3. Lo que quedó a medias (deuda que dejé yo, no está en la tabla)
 
 1. **4 de las 5 Edge Functions de LK del problema 21 no están versionadas.** Sólo existen
