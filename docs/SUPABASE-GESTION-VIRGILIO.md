@@ -29383,3 +29383,53 @@ Medido: la función devuelve **exactamente los mismos números** para el 15/09 l
 verde y mintiendo. `GV_Huella_Objeto` guarda el `md5(prosrc)` esperado y la vista avisa cuando el
 cuerpo vivo dejó de coincidir. Complementa a `gv_reglas_perdidas`, que mira patrones y no cuentas.
 `sql/gv_huella_objeto_v2147.sql`.
+
+## §3.mo — v21.48: el refresco del stock encadena `stocks_carga_rapida` (Thomas, 2026-09-23)
+
+**Thomas:** *"todo el stock tiene que verse lo mas en vivo posible siempre"*.
+
+**Lo medido.** La pantalla de Stocks no lee `vista_saldos_stock` ni la matview: lee la tabla
+`stocks_carga_rapida`. La cadena tenía TRES saltos —libro → `vista_stock_procesada` (cron 55,
+`*/2`, condicional desde v21.06/v21.31) → `stocks_carga_rapida` (cron 57, `*/5`, **siempre**) →
+pantalla— o sea **hasta 7 minutos de atraso**, con los dos crons sin sincronizar. El cron 57
+reescribía la tabla 580 veces por ventana de 47,9 h (324 s, 559 ms de media) sin mirar si algo
+había cambiado: el mismo 94,5 % de corridas inútiles que ya se le había sacado al 55.
+
+**El cambio.** `gv_refresh_stock_si_cambio` reescribe `stocks_carga_rapida` **en la misma corrida
+en que refresca la matview**. Frescura de la pantalla: **7 min → 2 min**. Y el 57 deja de
+reescribirla cuando no cambió nada.
+
+**Las tres decisiones que no son obvias:**
+
+1. **`pg_try_advisory_xact_lock(5768)`, no el bloqueante.** Ese advisory lo comparten el cron 57 y
+   el 68 (`reconciliar-pipeline-stock`, `*/10`). Esperarlo ocuparía uno de los **seis** worker
+   slots de la instancia — el pozo del apagón del 17/09 en LK. Si no se consigue, lo reescribe el 57.
+2. **Fail-open con el fallo a la vista.** Si la derivada explota, la matview se refresca igual y el
+   motivo lo dice. Probado rompiendo `refresh_stocks_carga_rapida` a propósito (`perform 1/0`) en
+   transacción abortada: `refrescada=true | motivo=piso de frescura (60 min) (carga_rapida fallo:
+   division by zero)`.
+3. **El cron 57 no se apaga**: es la red del lock ocupado y del fallo. Bajarlo a `*/10` sería un
+   segundo paso y no está hecho.
+
+**Verificación** (corrida de verdad, 23/09):
+
+| prueba | resultado |
+|---|---|
+| `gv_refresh_stock_si_cambio(60, true)` (solo medir) | `refrescada=false`, `'sin cambios'` — **no encadena** |
+| `gv_refresh_stock_si_cambio(0, false)` | `refrescada=true`, `'… + carga_rapida'`, 3.260 ms |
+| `stocks_carga_rapida` antes y después | **idéntica**: 367 filas, md5 `3000430e5cfbde71e8b995819a3ce21e` |
+| `gv_reglas_perdidas` | vacía (2 centinelas nuevos) |
+
+**Lo que se RETIRA de la §3.mj:** la propuesta de una matview propia de `vista_saldos_stock`. El
+stock no se cachea. Si el 2,0 % que se llevan esas lecturas molesta algún día, el camino es bajar
+cuánto recorre la vista (los últimos 2 meses, con el histórico por código a demanda), no congelarla.
+
+**Rollback**, una línea — la definición anterior está guardada:
+
+```sql
+select def from zz_backups."GV_Backup_funcdef_20260923"
+ where objeto = 'gv_refresh_stock_si_cambio(int,boolean)';
+-- y se ejecuta ese texto tal cual.
+```
+
+`sql/gv_stock_carga_rapida_encadenada_v2148.sql`, `tests/stock-carga-rapida-encadenada.cjs`.
