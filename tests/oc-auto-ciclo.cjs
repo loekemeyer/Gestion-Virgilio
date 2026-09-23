@@ -127,7 +127,21 @@ const ANCLA = mas(hoyArt, 3);
   if (!out.generarAbreDialogo) fail.push("generar a mano NO abre el diálogo de cuándo retoma: el cron vuelve a generar igual");
   if (!out.abre) fail.push("ocAutoAbrir no muestra el diálogo");
   if (!/vuelva a generarse/i.test(out.dice)) fail.push("el diálogo no pregunta cuándo retoma: " + out.dice.slice(0, 120));
-  if (out.chips.length < 3) fail.push("faltan atajos de fecha en el diálogo: " + JSON.stringify(out.chips));
+  // v21.78 — los atajos FIJOS son dos, "En 7 días" y "En 14 días". El tercero, "El próximo
+  // miércoles", `_ocAutoOpciones` lo agrega SÓLO si no cae en la misma fecha que alguno de
+  // esos dos — y un MIÉRCOLES cae: hoy + 7 ES el próximo miércoles, así que ese día el
+  // diálogo muestra 2 chips y no 3. Exigir 3 hacía que el test fallara 1 de cada 7 días, y
+  // un intermitente entrena a todos a ignorar el rojo (regla v21.53). Se mide la regla, no
+  // la cantidad: los dos fijos siempre, y el del miércoles sólo cuando aporta una fecha nueva.
+  const _siete = mas(hoyArt, 7), _catorce = mas(hoyArt, 14), _mie = out.chips.length;
+  if (!out.chips.some((c) => /En 7 días/.test(c))) fail.push("falta el atajo 'En 7 días': " + JSON.stringify(out.chips));
+  if (!out.chips.some((c) => /En 14 días/.test(c))) fail.push("falta el atajo 'En 14 días': " + JSON.stringify(out.chips));
+  const _hoyEsMie = new Date(hoyArt + "T12:00:00Z").getUTCDay() === 3;
+  const _esperado = _hoyEsMie ? 2 : 3;
+  if (_mie !== _esperado) fail.push("hoy " + (_hoyEsMie ? "ES" : "no es") + " miércoles: esperaba " +
+    _esperado + " atajos y hay " + _mie + " — " + JSON.stringify(out.chips));
+  if (!_hoyEsMie && !out.chips.some((c) => /próximo miércoles/i.test(c)))
+    fail.push("falta el atajo 'El próximo miércoles': " + JSON.stringify(out.chips));
   eq(out.fechaPre, mas(hoyArt, 7), "viene pre-elegido en 7 días");
 
   if (out.rpcUrl.indexOf("/rpc/gv_oc_auto_programar") < 0) fail.push("no pega contra la RPC gv_oc_auto_programar: " + out.rpcUrl);

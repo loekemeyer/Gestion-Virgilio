@@ -51,6 +51,14 @@ catch (_e) {
           if (window.__falla) return { ok: false, status: 400, json: async () => ({ message: "Un súper no se junta con clientes." }), text: async () => '{"message":"x"}', headers: { get: () => null } };
           return ok([{ codigo: "E13A", np_programadas: 1, m3: 0.6, aviso: null }]);
         }
+        // v21.78 — desde la v21.37 "atrasado" lo dice el BACKEND (gv_ppp_atrasados), no la
+        // fecha de entrega: la solapa de vencidos muestra lo que devuelve esa RPC. El mock
+        // contestaba ok([]) a todo lo que no contemplaba, o sea un Set VACIO —y no null, que
+        // es el caso "no se pudo medir"—, asi que el cartel salia con "0 pedidos" y los dos
+        // chequeos del boton daban false. El codigo hace lo que pidio Luis; viejo era el test.
+        // ⚠ Va ACA ADENTRO: toda /rpc/ entra por este if (m) y sale por su ok([]) final, asi
+        // que una condicion puesta mas abajo no se alcanza nunca (primer intento, 23/09).
+        if (m[1] === "gv_ppp_atrasados") return ok([{ np: "44609" }]);
         if (m[1] === "gv_ppp_web_calendario") return ok([{ dia: "2026-09-14", habil: true, m3: 1, tandas: 1, np: 1, cupo: 6, resta: 5 }]);
         return ok([]);
       }

@@ -1,4 +1,18 @@
-/* Regresión v18.20 — el buscador de Stocks tiene que encontrar aunque se tipee el código CON
+/* v21.78 — ESTE TEST MEDÍA UNA REGLA QUE LUIS DEROGÓ. Se actualiza, no se "arregla" el código.
+
+   La v18.20/v18.25 pedía que "31" y "0031" encontraran al 031: el código vive normalizado en
+   la base ("31") y la tabla lo muestra con el cero ("031"), así que se buscaba contra las dos
+   grafías. La v21.09 lo dio vuelta, textual de Luis: "si busco 30 en la tabla aparece el 030 y
+   es un error". Hoy el prefijo se mide SÓLO contra la grafía MOSTRADA.
+
+   Lo que cambia, y es el costo que Luis aceptó: para el 031 se escribe "031" o "0", no "31".
+   A cambio, "31" ya no arrastra al 031 cuando uno busca los 31x.
+
+   Lo que NO cambió y sigue verificándose: "031" encuentra al 031 (el bug original de la
+   v18.20, que era no encontrar lo que la propia pantalla muestra), no arrastra a los que sólo
+   CONTIENEN esos dígitos, y la búsqueda por descripción sigue siendo por pedazo.
+
+   Regresión v18.20 — el buscador de Stocks tiene que encontrar aunque se tipee el código CON
    el cero adelante. La tabla muestra el código canónico ("031"), pero en la base vive
    normalizado ("31"), y el filtro comparaba el texto tipeado contra el valor crudo: tipear
    "031" no devolvía nada y tipear "31" sí. O sea, la pantalla enseñaba un código que después
@@ -54,23 +68,26 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const ve = function (html, cod) { return html.indexOf('data-stk-cod="' + cod + '"') >= 0; };
     const out = {};
     const h031 = conFiltro("031"), h31 = conFiltro("31"), h0031 = conFiltro("0031");
-    out.busca031 = ve(h031, "31");            // ← el bug de la v18.20: esto daba false
-    out.busca31 = ve(h31, "31");
-    out.busca0031 = ve(h0031, "31");
-    // v18.25 — y ninguno de los tres trae a los que sólo CONTIENEN esos dígitos
-    out.sinVecinos = ["231", "311", "931E"].every(function (c) {
-      return !ve(h031, c) && !ve(h31, c) && !ve(h0031, c);
-    });
-    // la variante de letra sí es el mismo artículo
-    out.traeVariante = ve(h031, "31E") && ve(h31, "31E");
-    out.busca31E = ve(conFiltro("31E"), "31E") && !ve(conFiltro("31E"), "931E");
-    out.buscaDesc = ve(conFiltro("café"), "31");
+    // el bug original de la v18.20: la pantalla muestra "031" y no lo encontraba. Sigue vivo.
+    out.busca031 = ve(h031, "31");
+    // v21.09 (Luis): "31" NO trae el 031 — el prefijo se mide contra la grafía MOSTRADA
+    out.el31NoTraeEl031 = !ve(h31, "31");
+    out.el0031NoTraeNada = !ve(h0031, "31");
+    // …pero "31" SÍ trae al 311, que EMPIEZA con 31. Eso es la regla, no un efecto colateral.
+    out.el31TraeEl311 = ve(h31, "311");
+    // "031" no arrastra a los que sólo CONTIENEN esos dígitos (v18.25, sigue valiendo)
+    out.sinVecinos = ["231", "311", "931E"].every(function (c) { return !ve(h031, c); });
+    // la variante de letra es el mismo artículo y entra por el prefijo de la grafía mostrada
+    out.traeVariante = ve(h031, "31E");
+    // y "31E" tampoco alcanza al 031E: se tipea como se muestra
+    out.el31ENoTrae = !ve(conFiltro("31E"), "31E") && !ve(conFiltro("31E"), "931E");
+    out.buscaDesc = ve(conFiltro("café"), "31");     // texto libre: sigue por pedazo
     const hNada = conFiltro("099999");
     out.nadaNoTrae = !ve(hNada, "31") && !ve(hNada, "231") && !ve(hNada, "706");
     return out;
   });
-  const pass = r.busca031 && r.busca31 && r.busca0031 && r.sinVecinos && r.traeVariante &&
-    r.busca31E && r.buscaDesc && r.nadaNoTrae && errs.length === 0;
+  const pass = r.busca031 && r.el31NoTraeEl031 && r.el0031NoTraeNada && r.el31TraeEl311 &&
+    r.sinVecinos && r.traeVariante && r.el31ENoTrae && r.buscaDesc && r.nadaNoTrae && errs.length === 0;
   console.log("stk-buscar-cero-adelante:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();

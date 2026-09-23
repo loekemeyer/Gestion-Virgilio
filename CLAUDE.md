@@ -3314,9 +3314,22 @@ pasaban**: entraron todos. Hoy `run.sh` lista **271 de 274**.
 > **Escribir el test no alcanza: hay que agregarlo a `run.sh`.** No se descubren solos, y el
 > archivo suelto en `tests/` da la sensación de estar cubierto sin estarlo.
 
-⚠ **Los 3 que NO entraron es porque fallan**, y quedan acá para que no se pierdan de vista:
-`oc-auto-ciclo.cjs`, `ppp-reprog-boton.cjs`, `stk-buscar-cero-adelante.cjs`. No se agregan
-hasta arreglarlos — meterlos rojos sería volver a lo de siempre.
+✅ **Los 3 que faltaban ya entraron (v21.78)**, y ninguno era un bug de la app — los tres
+medían algo que dejó de ser cierto:
+
+| test | por qué fallaba |
+|---|---|
+| `oc-auto-ciclo` | exigía **3 atajos** de fecha en el diálogo y los **miércoles son 2**: `_ocAutoOpciones` agrega "El próximo miércoles" **sólo si no cae en la misma fecha** que "En 7 días", y un miércoles cae. Fallaba **1 de cada 7 días** |
+| `ppp-reprog-boton` | le faltaba el mock de **`gv_ppp_atrasados`** desde la v21.37: la solapa de vencidos salía con "0 pedidos" y el cartel rojo nunca se dibujaba |
+| `stk-buscar-cero-adelante` | medía la regla de la v18.20/18.25 (*"31" encuentra el 031*), que **la v21.09 derogó** (*"si busco 30 aparece el 030 y es un error"*) |
+
+⚠ **Un test que falla un día de la semana es peor que uno roto**: pasa 6 de 7 y entrena a todos
+a ignorar el rojo. Se arregla midiendo **la regla** (están los dos atajos fijos; el del miércoles
+sólo cuando aporta una fecha nueva), no la cantidad.
+
+⚠ **Y el mock nuevo va ADENTRO del `if (m)` que resuelve las `/rpc/`**, no debajo: toda RPC
+entra por ahí y sale por su `ok([])`, así que una condición puesta más abajo no se alcanza
+nunca. Pasó en el primer intento y el test siguió en rojo sin decir por qué.
 
 ⚠ **Al editar `run.sh` por script, ojo con `\n_resumen`:** matchea la **definición** de la
 función además del llamado del final. El primer intento insertó el bloque dos veces y el

@@ -881,4 +881,20 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pipe-vinculados (v21.59 (Luis, 23/09) — 'que se vea para el chequeo de clientes nuevos en la PPP') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-vinculados.cjs
 
+
+# ── v21.78 — los 3 que la v21.77 dejó afuera por fallar. Ninguno era un bug de la app:
+#    oc-auto-ciclo fallaba SÓLO los miércoles (el diálogo muestra 2 atajos y no 3 porque
+#    hoy+7 ya ES el próximo miércoles), ppp-reprog-boton le faltaba el mock de
+#    gv_ppp_atrasados desde la v21.37, y stk-buscar-cero-adelante medía la regla de
+#    búsqueda que la v21.09 derogó ("31" ya no trae el 031).
+
+echo "== oc-auto-ciclo (v21.14: generar OC a mano mueve el ancla del ciclo automatico) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/oc-auto-ciclo.cjs
+
+echo "== ppp-reprog-boton (el cartel rojo de atrasados tiene su boton por pedido) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-reprog-boton.cjs
+
+echo "== stk-buscar-cero-adelante (v21.09: el prefijo se mide contra la grafia MOSTRADA) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-buscar-cero-adelante.cjs
+
 _resumen
