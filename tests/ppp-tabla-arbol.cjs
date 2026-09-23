@@ -110,8 +110,8 @@ catch (_e) {
     // v19.32: el día «⏸ Armados en espera» está SIEMPRE (aunque vacío), así que se cuenta aparte:
     // lo que este test mide son los días con programación real.
     out.dias = filaDe("tr.pga-d").filter((c) => !/Armados en espera/.test(c[0] || ""));
-    out.esperaFija = [...prev.querySelectorAll("tr.pga-d")].some((tr) => /Armados en espera/.test(tr.textContent));
-    out.esperaUltima = /Armados en espera/.test(([...prev.querySelectorAll("tr.pga-d")].pop() || {}).textContent || "");
+    // v21.41 (Luis): el día «Armados en espera» NO existe más en la tabla (antes, v19.32, estaba siempre)
+    out.esperaNo = ![...prev.querySelectorAll("tr.pga-d")].some((tr) => /Armados en espera/.test(tr.textContent));
     out.hoy = !!prev.querySelector("tr.pga-d.hoy");
     out.sinTandasCerrado = prev.querySelectorAll("tr.pga-t").length === 0;
     /* v20.59 (Thomas): *"no puede quedar tanto espacio en blanco entre Día y m³, compactá la
@@ -243,8 +243,7 @@ catch (_e) {
     "(1) y el número de cada uno con el mismo color — " + JSON.stringify(r.paleta && r.paleta.num));
   t(r.salidas, "(1) v21.38: ya no hay botón al tablero de 6 días");
   t(r.dias.length === 2, "(2) una fila por día con programación (2)");
-  t(r.esperaFija, "(2) el día «⏸ Armados en espera» está siempre, aunque esté vacío (v19.32, Luis)");
-  t(r.esperaUltima, "(2) y va al final, después de los días con fecha");
+  t(r.esperaNo, "(2) v21.41: el día «⏸ Armados en espera» no existe más en la tabla (Luis, 23/09)");
   t(eq(r.dias[0].slice(0, 4), ["▸Lunes 14/09", "5,2", "2", "3"]), "(2) el día trae m³, tandas y NPs — " + JSON.stringify(r.dias[0].slice(0, 4)));
   t(r.hoy, "(2) el día de hoy está marcado");
   t(r.sinTandasCerrado, "(2) arranca cerrado: no se ven tandas");

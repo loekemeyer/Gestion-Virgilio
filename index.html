@@ -6043,7 +6043,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=21.40"></script>
+<script type="module" src="recepcion.js?v=21.41"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9925,7 +9925,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v21.40";
+const APP_VERSION = "v21.41";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35953,20 +35953,9 @@ function pppMovRender() {
   const DOW = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"], MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   const hoyISO = (function () { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); })();
   h += '<div class="mv-grid">';
-  // v21.40 (Luis: *"Armado en espera que no sea más un botón"*): «Armados en espera» es un casillero
-  // más de la grilla, el primero, dibujado como un día más (gris, borde punteado: no es una fecha).
-  // Hasta la v21.39 era un botón ancho aparte, arriba de los días. No aparece al reprogramar una NP
-  // suelta de A Programar (`reprogNps`): ahí todavía no hay tanda que parar.
-  if (M.tanda && !M.reprogNps) {
-    const yaEsp = M.actual === PGA_ESPERA_ISO;
-    h += '<button class="mv-d espera' + (yaEsp ? ' actual' : '') + '"' +
-      (yaEsp ? ' disabled' : ' onclick="pppMovEsperaElegir()"') +
-      ' title="' + (yaEsp ? 'Ya está en Armados en espera. Para sacarla de ahí, elegí un día.'
-                          : 'Queda armada SIN fecha de entrega: no consume cupo, no va en ningún camión y no cuenta como atrasada.') + '">' +
-      (yaEsp ? '<span class="mv-tag aca">está acá</span>' : '') +
-      '<span class="mv-d-dow">Sin fecha</span><span class="mv-d-num">⏸ Armados en espera</span>' +
-      '<span class="mv-d-m3">no ocupa cupo</span><span class="mv-d-q">' + (yaEsp ? 'para sacarla, elegí un día' : 'no va en ningún camión') + '</span></button>';
-  }
+  // v21.41 (Luis, 23/09: *"No tiene que existir «Armados en espera»"*): el destino «Armados en espera»
+  // ya no se ofrece (fue botón en v19.29 y casillero de la grilla en v21.40). `pppTandaEspera` y
+  // `pppMovEsperaElegir` quedan en el archivo sin puerta, como `gv_ppp_np_desarmar` (v18.77).
   for (const d of M.cal) {
     const dISO = String(d.dia).slice(0, 10);
     if (dISO < hoyISO) continue;
@@ -39919,7 +39908,9 @@ function _pppArbolHtml(programados) {
     : 'No hay nada programado de hoy en adelante.') + '</div></div></div>';
   // v19.32: el día de espera está siempre, aunque hoy no haya nada parado (con el buscador
   // puesto no, que ahí la tabla muestra coincidencias y un día vacío sería una falsa).
-  if (!_pppSearch) _pgaConEspera(dias);
+  // v21.41 (Luis, 23/09: *"No tiene que existir «Armados en espera»"*): la fila vacía del día de
+  // espera (v19.32) ya NO se agrega. `_pgaConEspera` queda en el archivo, sin llamador. Si el backend
+  // devolviera una tanda parada (fecha centinela), se sigue mostrando: lo que existe no se esconde.
   // v17.79 (Luis): los 4 estados van a la DERECHA del todo, angostos y con su color en el
   // encabezado; todo el ancho que sobra es para la info de cada NP.
   h += '<table class="pga"><thead><tr>' +

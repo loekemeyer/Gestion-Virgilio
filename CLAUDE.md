@@ -3977,6 +3977,27 @@ select * from public.gv_reglas_perdidas;                   -- vacía = el pase s
 
 `sql/gv_ppp_web_fusionar_tandas_v2139.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-23, v21.41): el día «⏸ Armados en espera» NO EXISTE MÁS
+
+**Luis, con la captura de la Programación:** *"No tiene que existir «Armados en espera»"*.
+
+Historia corta, para no volver a ponerlo: nació en la v19.29 (pedido de Luis: un «día» sin fecha
+para tandas armadas a propósito), en la v19.32 pasó a estar **siempre** en la tabla aunque vacío,
+en la v21.40 el botón del pop-up pasó a ser un casillero de la grilla, y en la v21.41 Luis lo sacó
+entero: **ni la fila en la tabla de Programación ni el destino en «📅 Cambiar de día»**.
+
+- Lo que se sacó son las **puertas**: la fila vacía (`_pgaConEspera` sigue en el archivo sin
+  llamador) y el destino del pop-up (`pppTandaEspera` / `pppMovEsperaElegir` siguen sin puerta,
+  como `gv_ppp_np_desarmar` en la v18.77). La RPC `gv_ppp_tanda_espera` y la tabla
+  `GV_PPP_Armados_Espera` no se tocaron.
+- **Lo parado viejo no se esconde.** Si el backend devuelve una tanda con la fecha centinela
+  (`9999-12-31`), la tabla la sigue mostrando con su nombre, no como fecha; y el badge
+  `armado_espera` de `gv_ppp_avisos` (Thomas, v20.86) sigue vigilando la tabla. Al 23/09 había
+  **0** tandas ahí, así que nada quedó a oscuras.
+
+**Chequeo:** `node tests/ppp-armados-espera.cjs` — es el candado invertido: se pone en rojo si
+vuelve la fila vacía o el destino del pop-up, y si una tanda parada dejara de verse.
+
 ## ⚠ REGLA (Luis, 2026-09-22, v21.30): el operario puede recibir un código que NO es del proveedor
 
 **Luis, textual:** *"cuando se elige al tallerista deberían aparecer los códigos asignados a el
