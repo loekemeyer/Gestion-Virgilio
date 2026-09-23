@@ -29563,3 +29563,11 @@ crece sola si nadie la vacía. Lo cazó `tests/rest-tope-1000.cjs` en la primera
 el select cae a su fallback corto y la línea no se dibuja), pero el SQL hay que correrlo a mano en
 el proyecto de Chef y el puente necesita dos grants ahí. Está escrito en
 `paginach/sql/expreso_cambio_cliente.sql`, con la cabecera que dice exactamente qué falta.
+## §3.mx — v21.97: pop-up de día ocupado + trigger `gv_web_cliente_un_solo_dia` apagado (Luis, 2026-09-23)
+
+`gv_ppp_dia_reprogramar(p_fecha, p_modo, p_simular, p_por)`: 'correr' = todo desde p_fecha +1 día con reparto;
+'automatico' = lo pendiente de p_fecha con `gv_ppp_web_dia_grupo` desde el día siguiente. No mueve súper,
+retira, lo salido ni lo EN PROCESO; mueve con `gv_ppp_tanda_mover(t, f, por, true, null)` (mismo código).
+Trigger `gv_web_cliente_un_solo_dia` DESHABILITADO (regla derogada v21.87). Medido en transacción abortada
+sobre el 30/09: 21 movidas / 5 fijas, centinelas sin cambios. Rollback: `drop function
+gv_ppp_dia_reprogramar(date,text,boolean,text)` y `enable trigger gv_web_cliente_un_solo_dia`.

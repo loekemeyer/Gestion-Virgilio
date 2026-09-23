@@ -765,6 +765,23 @@ el "mismo día para el cliente" del principio rector, el ancla de cliente v20.27
 (E48G), Z4 → 05/10 con GBA Sur (E73A), Z6 sin camión en el plazo → 07/10 (último día libre), un
 expreso vencido Z1 → 01/10 con Capital Sur, y el **mismo cliente** en Z3 y Z6 → **dos días**.
 
+## ⚠ REGLA (Luis, 2026-09-23, v21.97): POP-UP de DÍA OCUPADO al programar a mano
+
+Al soltar un pedido en A Programar sobre un día que YA tiene programación, sale un pop-up (`aprDiaOcupadoAbrir`)
+con 3 opciones, cada una con su reporte previo (m³ del día contra el promedio 4,30, más de 2 camiones, pedidos
+que pasan a vencer): **1) sumarlo** · **2) reprogramar lo PENDIENTE del día con la lógica automática** ·
+**3) correr toda la programación desde ese día, 1 día con reparto**. Día vacío → como siempre, sin pop-up.
+
+Lo resuelve **`gv_ppp_dia_reprogramar(fecha, 'correr'|'automatico', simular, por)`** (`simular = true` no escribe;
+ejecutando es atómico). **NO se mueven** (Luis): **súper**, **retira fijos**, lo que **ya salió** y una tanda
+**EN PROCESO** (pickeo o armado empezado sin TAP). Armada, facturada o pendiente **se mueve con su MISMO código**
+(el papel del pallet sigue valiendo). La tanda nueva se arma DESPUÉS de mover, o se correría también.
+
+⚠ **El trigger `gv_web_cliente_un_solo_dia` quedó APAGADO** (23/09): aplicaba la regla derogada "mismo cliente,
+mismo día" — frenaba los movimientos y movía solos los otros pedidos del cliente a su día. Rollback:
+`alter table public."PPP_Web_Programacion" enable trigger gv_web_cliente_un_solo_dia;`
+`sql/gv_ppp_dia_reprogramar_v2197.sql`, `tests/apr-dia-ocupado.cjs`.
+
 ## ⚠⚠ NO REPORTAR (Luis, 23/09): "entran N pedidos y no se programan" en el log del armado
 
 `GV_PPP_Web_Armado_Log` / `GV_Tandas_Auto_Log` muestran en CADA corrida pedidos que entran y no arman tanda.
