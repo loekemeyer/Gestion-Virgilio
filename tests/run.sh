@@ -1,7 +1,43 @@
 #!/usr/bin/env bash
 # Suite de smoke-tests. Correr antes de pushear cambios a index.html / sw.js.
-set -e
+#
+# v21.53 (Luis, 23/09: "hace que corra todo y liste rojos al final") — ANTES ESTO ERA
+# `set -e`, o sea que CORTABA EN EL PRIMER ROJO. Con eso nadie sabia cuantos tests estaban
+# rotos: cada arreglo destapaba el siguiente. El 23/09, local cortaba en el test 124 de 217
+# y CI —con ese ya arreglado— cortaba en el siguiente; hicieron falta cuatro vueltas para
+# descubrir que los rojos eran cuatro. Ahora corren TODOS y el resumen va al final.
+#
+# No se toca ninguna de las 331 invocaciones: se envuelve `node`. Una funcion con el nombre
+# del comando lo intercepta, y `VAR=x node ...` la llama igual, con VAR en su entorno.
 cd "$(dirname "$0")/.."
+
+_ROJOS=()
+_N=0
+node() {
+  _N=$((_N + 1))
+  command node "$@"
+  local rc=$?
+  # ⚠ `return 0` SIEMPRE: si devolviera el codigo real, con `set -e` (o con un `&&` de quien
+  # llame) volveriamos a cortar en el primero, que es justo lo que se saco.
+  if [ $rc -ne 0 ]; then _ROJOS+=("$*"); echo "  ^^^ ROJO: $* (exit $rc)"; fi
+  return 0
+}
+
+_resumen() {
+  echo ""
+  echo "======================================================================"
+  if [ ${#_ROJOS[@]} -eq 0 ]; then
+    echo "SUITE VERDE — $_N corridas, 0 rojos."
+    echo "======================================================================"
+    exit 0
+  fi
+  echo "SUITE EN ROJO — ${#_ROJOS[@]} de $_N:"
+  for r in "${_ROJOS[@]}"; do echo "  · $r"; done
+  echo "======================================================================"
+  exit 1
+}
+# el resumen sale tambien si alguien corta la corrida con Ctrl+C
+trap _resumen INT TERM
 
 echo "== node --check sw.js =="
 node --check sw.js
@@ -660,3 +696,5 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== rv-cuadro-entero (v21.29: el Reporte diario entra entero, arranca en hoy y mide lapsos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rv-cuadro-entero.cjs
+
+_resumen

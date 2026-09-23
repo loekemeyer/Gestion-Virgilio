@@ -16,7 +16,10 @@ let chromium; try { ({ chromium } = require("/opt/node22/lib/node_modules/playwr
 catch (e) { ({ chromium } = require("playwright")); }
 (async () => {
   const b = await chromium.launch(); const pg = await b.newPage({ viewport: { width: 1900, height: 900 } });
-  await pg.goto("file:///home/user/Gestion-Virgilio/index.html");
+  // v21.51 — la ruta estaba ABSOLUTA a /home/user/…: existe en el contenedor de una
+  // sesión de Claude y NO en el runner de CI, así que este test fallaba SIEMPRE allá
+  // con ERR_FILE_NOT_FOUND mientras acá pasaba. Era uno de "los 4 que ya fallaban antes".
+  await pg.goto("file://" + path.join(__dirname, "..", "index.html"));
   await pg.waitForTimeout(900);
   const r = await pg.evaluate(() => {
     // se arma el mismo anidado real: .planim-body > #pppPreview > .pga-blk > tabla

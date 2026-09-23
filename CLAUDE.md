@@ -3207,6 +3207,53 @@ en el checklist, por cada código aceptado **mergealo a `main` directamente**:
 El merge a `main` es **directo, sin mostrar diff** (así lo pidió el usuario), salvo
 que en el momento pida verlo.
 
+## ⚠⚠ REGLA (Luis, 2026-09-23, v21.53): LA SUITE NO SE DEJA EN ROJO — el que rompe, arregla
+
+**Luis:** *"que la suite en rojo avise sola"*. Lo primero que apareció al medirlo es que el
+aviso **ya existía** —`.github/workflows/ci.yml` corre la suite entera en cada push a `main`—
+y que no decía nada porque **los últimos 20 runs de `main` estaban en rojo**. El rojo dejó de
+significar algo, que es exactamente lo que el propio `ci.yml` cuenta que ya había pasado una
+vez: *"fallaba siempre… main quedaba en rojo permanente"*.
+
+**Cómo se llegó ahí, y no fue nadie en particular:** varias sesiones pushearon diciendo, en el
+mensaje del commit, *"Tests: fallan los 4 que ya fallaban antes"* o *"los que fallan… fallan
+igual sin este cambio"*. Cada una tenía razón por separado; el resultado fue dos semanas de CI
+inútil.
+
+### Las tres cosas que ahora valen
+
+1. **No se pushea a `main` con la suite en rojo.** Si un test se pone rojo por un cambio tuyo,
+   se arregla en el mismo commit. Si ya estaba rojo, **se arregla igual o se dice por qué no**:
+   el número del test, la causa y qué falta. *"Ya fallaba antes"* no es una razón para dejarlo.
+2. **Un test viejo NO es un test roto, y se actualiza en el commit que lo deja viejo.** El 23/09
+   había cuatro rojos y **ninguno era un bug de la app**: dos median cosas que el dueño mandó
+   sacar (el Tablero de 6 días de la v21.38, el criterio de atrasado de la v21.37) y nadie los
+   volvió a mirar. Al sacar una pantalla, `grep` por su nombre en `tests/`.
+3. **Un test que falla 1 de cada 3 es tan malo como uno roto.** Los otros dos rojos eran
+   **carreras**: pasaban 5 de 5 en una máquina libre y fallaban con otro Chromium al lado — o
+   sea, fallaban en CI, que es más lento. Un intermitente entrena a todos a ignorar el rojo.
+   Se arreglan como los demás: esperar al `load`, reintentar el click, subir el timeout.
+
+### Cómo se mira, ahora que `run.sh` no corta
+
+**`tests/run.sh` corre TODO y lista los rojos al final** (v21.53). Antes tenía `set -e` y
+cortaba en el primero: por eso nadie sabía el tamaño del problema — local cortaba en el test
+124 de 217 y CI, con ése ya arreglado, cortaba en el siguiente. Hicieron falta cuatro vueltas
+para descubrir que los rojos eran cuatro.
+
+```bash
+bash tests/run.sh          # al final: "SUITE VERDE — 219 corridas, 0 rojos" o la lista
+```
+
+⚠ **El veredicto que vale es el de CI, no el local.** El runner de GitHub es más lento y ahí
+aparecen las carreras que la máquina de desarrollo no muestra. Después de pushear, mirar el run:
+`mcp__github__actions_list` con `ci.yml`, o Actions → *CI — smoke tests*.
+
+⚠ **Y CI avisa solo desde la v21.53**: cuando la suite se pone roja **abre un issue** con el
+commit y los tests que fallaron, y lo **cierra solo** cuando vuelve a verde. No hace falta
+configurar nada (usa el `GITHUB_TOKEN` del propio workflow). Si el issue está abierto, la suite
+está rota **ahora**; no hay que entrar a Actions a mirar.
+
 ## Git
 
 - **Trabajar SIEMPRE directo en `main`**: commitear y pushear ahí sin preguntar.
