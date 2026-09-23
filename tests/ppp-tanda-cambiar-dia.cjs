@@ -38,7 +38,11 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
 
   const r = await p.evaluate(async (F) => {
     const out = {}, rpc = [], confirms = [];
-    window.__isSupervisor = true;
+    // v21.93 — la CAUSA de la (e) intermitente: el arranque de la pagina (chequeo de sesion ->
+    // showLoggedOut / showSelector) pone __isSupervisor = false DESPUES de domcontentloaded. En CI,
+    // mas lento, eso cae en el medio del test y la fila de la tanda se redibuja SIN el boton
+    // (la condicion es __isSupervisor || !PPP_READONLY). Se fija en true para todo el test.
+    Object.defineProperty(window, "__isSupervisor", { get: () => true, set: () => {}, configurable: true });
     window.confirm = function (t) { confirms.push(String(t || "")); return true; };
     window.alert = function () {};
     window.getTodayKey = () => F.hoy;
