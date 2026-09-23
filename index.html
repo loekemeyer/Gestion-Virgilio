@@ -45702,7 +45702,7 @@ async function aprTraerPedidos(e) {
   // los pedidos de Tierra del Fuego, que viven en la página de LK y son de Chef.
   const desde = new Date(Date.now() - PWEB_VENTANA_DIAS * 86400000).toISOString().slice(0, 10);
   const rLk = await fetch(PWEB_LK_URL + "/rest/v1/v_pedidos_web_np"
-    + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,provincia,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de,isis_empresa,cod_isis,fecha_entrega_pactada,hora_entrega_pactada,fecha_entrega_txt,observaciones"
+    + "?select=empresa,order_id,np_idx,cod,razon_social,fecha_recep,direccion,lineas,cajas,items,m3,m3_parcial,localidad,provincia,zona_expreso,nombre_expreso,direccion_expreso,enviado_a_compras,condicion_pago_code,diferido,no_antes_de,isis_empresa,cod_isis,fecha_entrega_pactada,hora_entrega_pactada,fecha_entrega_txt,observaciones,retiro_fecha,retiro_franja"
     + "&fecha_recep=gte." + desde + "&order=order_id.asc,np_idx.asc&limit=5000",
     { headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + tok } });
   if (!rLk.ok) throw new Error("LK respondió " + rLk.status);
@@ -45795,6 +45795,12 @@ async function aprTraerPedidos(e) {
       turno_txt: n.fecha_entrega_txt || "",
       // v21.34 (Thomas, 22/09): "tendría que figurar sí o sí". Es del PEDIDO, no del bloque.
       obs_pedido: String(n.observaciones || "").trim(),
+      // v21.64 (Luis, 23/09: "¿por qué no puede viajar con el pedido?") — el día y la franja que
+      // eligió el cliente al retirar vienen EN LA FILA del pedido (v_pedidos_web_np de LK), así el
+      // badge los muestra apenas entra. lk_pedidos_match (sync c/15 min) sigue siendo lo que usa el
+      // armado automático; esto es sólo el respaldo de la pantalla mientras esa copia no llegó.
+      retiro_fecha: n.retiro_fecha ? String(n.retiro_fecha).slice(0, 10) : "",
+      retiro_franja: String(n.retiro_franja || "").trim(),
       m3: 0, m3_parcial: false, lineas: 0, cajas: 0, bloques: []
     });
     const p = by.get(k);
@@ -46745,7 +46751,13 @@ function aprPideHorario(p) {
   if (!cod || !_aprHorLista) return false;
   return _aprHorLista[pppEmpDePedido(p) + ":" + cod] !== undefined;
 }
-function aprHorDe(p) { return (_aprHor || {})[aprHorKey(pppEmpDePedido(p), aprHorClave(p))] || null; }
+function aprHorDe(p) {
+  const h = (_aprHor || {})[aprHorKey(pppEmpDePedido(p), aprHorClave(p))];
+  if (h) return h;
+  // v21.64 — la copia de lk_pedidos_match todavía no llegó: se muestra lo que trae el pedido.
+  if (p && (p.retiro_fecha || p.retiro_franja)) return { fecha: p.retiro_fecha || "", franja: p.retiro_franja || "", origen: "cliente" };
+  return null;
+}
 function aprHorTxt(h) {
   if (!h || (!h.fecha && !h.franja)) return "----";
   const f = h.fecha ? String(h.fecha).slice(8, 10) + "/" + String(h.fecha).slice(5, 7) : "";
