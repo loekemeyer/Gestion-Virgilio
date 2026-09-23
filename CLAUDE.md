@@ -765,6 +765,15 @@ el "mismo día para el cliente" del principio rector, el ancla de cliente v20.27
 (E48G), Z4 → 05/10 con GBA Sur (E73A), Z6 sin camión en el plazo → 07/10 (último día libre), un
 expreso vencido Z1 → 01/10 con Capital Sur, y el **mismo cliente** en Z3 y Z6 → **dos días**.
 
+## ⚠⚠ NO REPORTAR (Luis, 23/09): "entran N pedidos y no se programan" en el log del armado
+
+`GV_PPP_Web_Armado_Log` / `GV_Tandas_Auto_Log` muestran en CADA corrida pedidos que entran y no arman tanda.
+**Es lo esperado y NO es un bug** cuando son: **súper sin turno** (ej. LK 1504 La Anónima, 2 NP, Zona 5),
+**cliente nuevo sin aprobar** o **cuarentena**. Luis ya lo revisó 3 veces el 23/09: *"ESTA BIEN que no se
+programen automáticamente"*. Antes de mencionarlo, mirar si el pedido es súper (`gv_es_super`), cliente nuevo
+o cuarentena; si es eso, **no se dice nada**. Sólo se reporta un pedido común (no súper, no retenido) que no
+se programa.
+
 ## 🟩🟩🟩 PRINCIPIO RECTOR DE LA PROGRAMACIÓN (Luis, 2026-09-22)
 
 > ## Agrupar pedidos existe para **ENTREGAR LA MAYOR CANTIDAD DE MERCADERÍA EN LA MENOR CANTIDAD DE CAMIONES.**
