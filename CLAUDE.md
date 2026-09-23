@@ -2088,6 +2088,14 @@ Si el pedido no tiene decisión propia ni heredada y `GV_Clientes_Nuevos.pedidos
 da prioridad sobre los speech). No se escribe ninguna fila: se deriva al leer.
 `sql/gv_clin_recurrente_v2148.sql`, `tests/pipe-recurrente.cjs`.
 
+### ⚠ El cliente nuevo APROBADO sale en 48 h (Luis, 23/09, v21.67)
+
+Aprobado (fila en `GV_Cuarentena_Liberados` con `cliente_nuevo`) → el pase **(a0e)** del armador lo
+programa **forzado** en uno de los **2 días con reparto** siguientes a la aprobación
+(`gv_clin_dia_aprobado`): primero el que ya tiene camión a su grupo de zonas, después el que tiene
+cupo. Si no encaja por zona sale igual. El botón de Equifax abre la landing
+(`https://www.equifax.com.ar/`), decidido por Luis. `sql/gv_clin_aprobado_48h_v2167.sql`.
+
 ### Los 3 pedidos NO se cuentan acá: ya los corta LK
 
 *"Después de que pasan 3 pedidos bien pagando por adelantado ya se considera un cliente normal."*

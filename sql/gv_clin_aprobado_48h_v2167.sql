@@ -1,0 +1,14 @@
+-- v21.67 (Luis, 23/09): CLIENTE NUEVO APROBADO SALE EN 48 H.
+-- "la programacion automatica lo tiene que programar en los proximos 2 dias (48hs desde que se
+-- aprueba) como maximo. Si por reglas de zona no encaja bien en ninguno de los 2 dias, se lo
+-- programa igual para uno de esos dias (tratando de cumplir la regla de m3 limite por dia)".
+-- 1) gv_clin_dia_aprobado(zona, aprobado_at): los 2 dias con reparto siguientes a la aprobacion
+--    (o a hoy, si ya paso); elige el que ya tiene camion a su grupo de zonas, despues el que
+--    tiene cupo, despues el de mas cupo libre.
+-- 2) pase (a0e) en gv_ppp_web_armar_pendientes, antes de (a): aprobado = fila en
+--    GV_Cuarentena_Liberados con 'cliente_nuevo'; va FORZADO (pisa cupo, anticipacion y zona manual).
+--    Parche sobre pg_get_functiondef, idempotente (marca "(a0e) v21.67"), centinela en
+--    GV_Reglas_Centinela (patron gv_clin_dia_aprobado).
+-- Probado corriendo el armador en transaccion abortada (pedido falso 999991, Zona 5):
+--   aprobado hoy -> 24/09 E86A · sin aprobacion -> 06/10 (flujo normal).
+-- Equifax: clin_equifax_url queda en https://www.equifax.com.ar/ (la landing), decidido por Luis.
