@@ -21,9 +21,26 @@ catch (_e) {
   const p = await b.newPage({ viewport: { width: 430, height: 930 } });
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
   await p.route("**/rest/v1/**", (r) => r.abort());
-  await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
+  // v21.48 — con las llamadas REST abortadas, la app puede decidir recargarse sola (tiene 4
+  // location.reload()), y si eso cae en medio del page.evaluate el test muere con "Execution
+  // context was destroyed". No fallaba en una máquina libre y sí bajo carga —o sea, en CI—:
+  // 1 de cada 3 corridas con otro chromium al lado. Se neutraliza la recarga, que en este test
+  // no aporta nada: lo que mide son los pasos de A Programar, no el arranque de la app.
+  await p.addInitScript(() => {
+    try {
+      const nop = () => {};
+      Object.defineProperty(window.location, "reload", { configurable: true, value: nop });
+      Object.defineProperty(window.location, "assign", { configurable: true, value: nop });
+    } catch (_e) {}
+  });
+  const URL_APP = "file://" + path.join(__dirname, "..", "index.html");
+  // v21.48 — "load" y no "domcontentloaded": con las REST abortadas la app puede redirigir
+  // sola en el arranque (location.href, 5 en index.html), y si eso cae en medio del evaluate
+  // el test muere con "Execution context was destroyed". Esperar al load deja que esa
+  // decisión ya esté tomada. Y si aun así pasa, se reintenta: es una carrera, no una falla.
+  await p.goto(URL_APP, { waitUntil: "load" });
 
-  const r = await p.evaluate(async () => {
+  const medir = async () => await p.evaluate(async () => {
     const out = {};
     const calls = [];
     const ok = (o) => ({ ok: true, status: 200, json: async () => o, text: async () => JSON.stringify(o), headers: { get: () => "0-0/0" } });
@@ -57,7 +74,9 @@ catch (_e) {
 
     // (d) carga progresiva: LK aparece antes de que Chef conteste
     // la solapa dispara su propia carga al abrirse (con la red cortada): esperar a que termine antes de la nuestra
-    for (let i = 0; i < 40 && _apr.cargando; i++) await new Promise((res) => setTimeout(res, 100));
+    // v21.48 — 4 s de espera se quedaban cortos bajo carga (falló en el barrido de la suite y
+    // pasa 1 de 1 corriendo solo). 15 s: el que espera es el test.
+    for (let i = 0; i < 150 && _apr.cargando; i++) await new Promise((res) => setTimeout(res, 100));
     _apr.cargando = false; _apr.listo = false; _apr.err = "";
     const pCarga = aprCargar();
     await new Promise((res) => setTimeout(res, 700));
@@ -160,6 +179,17 @@ catch (_e) {
     _apr.q = "";
     return out;
   });
+
+  let r = null;
+  for (let intento = 1; intento <= 3; intento++) {
+    try { r = await medir(); break; }
+    catch (e) {
+      const navego = /Execution context was destroyed|frame was detached/i.test(String(e && e.message));
+      if (!navego || intento === 3) throw e;
+      errs.length = 0;
+      await p.goto(URL_APP, { waitUntil: "load" });
+    }
+  }
   await b.close();
   if (process.env.APR_DEBUG) console.log(JSON.stringify(r, null, 1));
 

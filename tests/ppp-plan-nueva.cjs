@@ -1,4 +1,5 @@
-/* Regresión v13.03 — PROGRAMACIÓN NUEVA: tablero de 6 días hábiles (mockup v2) + orden de carga LIFO (idea 5920).
+/* Regresión v13.03 — vista de UN DÍA de Programación + orden de carga LIFO (idea 5920).
+   ⚠ El tablero de 6 días que media este test se ELIMINO en la v21.38 (Luis): ver la nota de abajo.
    Fixture: 2 vencidas, 5 pedidos el 1er día hábil (2 zonas), 2 el 2º (una Retira), 1 el 4º, 1 el 5º, 1 más adelante.
    PPP_Geo con el depósito y 4 direcciones del camión 1 → recorrido Mataderos → Lugano → Pompeya → Barracas
    (nearest-neighbor + 2-opt) → carga 1º Barracas … 4º Mataderos. E01A armada (TAP), E01B en picking (EP). */
@@ -200,22 +201,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     return out;
   });
 
+  // ⚠ v21.48 — la v21.38 saco el TABLERO DE 6 DIAS (Luis: "elimina esa visual") y actualizo
+  // cuatro tests, pero no este: sus 18 chequeos del tablero (los KPI, las tarjetas de dia, las
+  // hojas 1 y 2, la banda de atrasados y la vuelta al tablero) median algo que ya no se dibuja,
+  // asi que CI quedo en rojo desde entonces. Se van con el tablero; el que sigue vivo es el
+  // orden de carga LIFO y la vista de UN DIA, que es lo que mide de aca en adelante.
+  // Lo que se saco y donde quedo cubierto: la banda de atrasados y el cartel de Resumen, en
+  // ppp-atrasados y ppp-atrasados-un-criterio (v21.37); la vista de vencidos, en ppp-crn-auto.
   const checks = [
-    ["v13.33/v13.53: KPI pedidos 11 (10 ISIS + 1 web) = programados sin los vencidos, igual que la solapa", r.kpiPed === "11" && r.kpiPedSub === "10 en estos 6 días · 1 después" && r.tabPlanN === true],
-    ["KPI camiones 6 (por n° de tanda y día; Retira no cuenta; +1 web)", r.kpiCam === "6"],
-    ["KPI volumen 20,7 m³ (20,4 ISIS + 0,3 web)",             r.kpiVol === "20,7 m³"],
-    ["KPI valor $ 20.400.000 (corto: $20,4 M en celular)",  r.kpiVal === "$ 20.400.000|$20,4 M"],
-    ["v14.06: la banda de Atrasados vive en Programación y abre la lista ahí mismo (sin tarjeta-KPI)", r.kpiAt === null && r.bandaVenc === true],
-    ["6 tarjetas de día, 1 vacía (v13.53: la web llena el día 3)", r.dias === 6 && r.vacios === 1],
     ["v13.53: la tanda web con fecha ISO se ve en su día (Tanda E09A · LK 1360)", r.webDia3 === true],
     ["sin los carteles grandes de la v13.05/v13.25 (pn-alert / pn-flags)", r.alerta === true],
-    ["Resumen sigue avisando de los vencidos", r.resumenVenc === true],
-    ["HOY sólo si hoy es hábil",                              r.hoyBadge === true],
-    ["día 1: dos camiones por zona con $",                    r.dia1 === true],
-    ["día 2: Retira en fábrica aparte",                       r.retira === true],
-    ["más adelante: chip con el pedido fuera de los 6 días",  r.masAdelante === true],
-    ["barra de estado del día 1",                             r.barra === true],
-    ["adentro: botón volver",                                 r.volver === true],
     ["adentro: cabecera con fecha y $ del día",               r.head === true],
     ["v13.36: orden de carga por CÓD de cliente (1º cód 1008), sin línea de recorrido", r.orden === true],
     ["1º armado → CARGAR AHORA",                              r.cargarAhora === true],
@@ -223,19 +218,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["2º en picking → falta armar",                           r.faltaArmar === true],
     ["camión de 1 pedido: sin orden de carga (v13.13)",       r.sinOrdenNorte === true],
     ["las tandas del día siguen abajo con sus bloques",       r.bloques === true],
-    ["vista de atrasados",                                    r.venc === true],
-    ["vuelta al tablero",                                    r.vuelve === true],
-    ["v13.17: hoja 1 con 'Ver hoja 2 →' y sin '← Hoja'",      r.hoja1Btn === true],
-    ["v13.17: hoja 2 = 6 hábiles siguientes, sin 'Más adelante', KPI 1", r.hoja2 === true],
-    ["v13.17: vuelta a la hoja 1",                            r.hoja1Vuelve === true],
     ["día 2: Retira sin orden de carga ni camión",            r.dia2 === true],
     ["v13.07/v13.35: camión = n° de tanda, zonas mezcladas, y el súper con el NOMBRE del cliente",
-      r.porTanda === "Camión 1 · Zona 1 + Zona 2 + Zona 3|E01A+E01B|3 ; Camión 2 · Zona 1 - CABA Sur|F01A|1 ; Sin tanda · Zona 4 - GBA Sur||1 ; Camión 3 · Zona 6 - GBA Norte|E02A|1 ; Camión 4 · Coto|D59A|1 ; Camión 5 · Carrefour|D61A|1 ; Camión 6 · Súper|D63A|1 ; Retira en fábrica|E01C|1"],
-    // problema 203: la v17.72 mudó el fallback "fila vieja de ISIS sin cód" al campo `nota` de
-    // gv_supers, pero el select no lo pedía → nunca matcheaba y el camión salía con la razón social
-    // cruda ("Inc Sociedad Anonima" en vez de "Carrefour"). Las 19 filas activas tienen nota.
+     r.porTanda === "Camión 1 · Zona 1 + Zona 2 + Zona 3|E01A+E01B|3 ; Camión 2 · Zona 1 - CABA Sur|F01A|1 ; Sin tanda · Zona 4 - GBA Sur||1 ; Camión 3 · Zona 6 - GBA Norte|E02A|1 ; Camión 4 · Coto|D59A|1 ; Camión 5 · Carrefour|D61A|1 ; Camión 6 · Súper|D63A|1 ; Retira en fábrica|E01C|1"],
     ["problema 203: el padrón de súper pide `nota` (si no, el fallback por razón social es letra muerta)",
-      !!r.urlSupers && /[?&]select=[^&]*\bnota\b/.test(r.urlSupers)],
+     typeof r.urlSupers === "string" && /[?&]select=[^&]*\bnota\b/.test(r.urlSupers)],
     ["problema 203: y `nota` llega a la lista en memoria, no se pierde en el .map()", r.notaViaja === true],
     ["sin errores de página",                                 errs.length === 0]
   ];

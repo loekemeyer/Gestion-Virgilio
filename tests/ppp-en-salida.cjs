@@ -32,6 +32,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.fetch = (url) => {
       const u = String(url);
       if (u.indexOf("gv_ppp_programacion_diaria") >= 0) return J([mk("98001", "Uno SA"), mk("98002", "Dos SA"), mk("98003", "Tres SA")]);
+      // v21.48 — desde la v21.37 la solapa de vencidos muestra lo que dice el BACKEND
+      // (gv_ppp_atrasados), no lo que tiene fecha anterior a hoy; sin esta respuesta el mock
+      // contestaba [] y la solapa salía vacía, o sea que el test no podía ver ninguna NP.
+      // Atrasado = vencido y NO salió: la 98003 siempre (no tiene nada), y la 98002 sólo
+      // cuando deja de estar en la vista de En Salida — que es justo el último chequeo.
+      if (u.indexOf("gv_ppp_atrasados") >= 0) {
+        return J(salida.length ? [{ np: "98003" }] : [{ np: "98002" }, { np: "98003" }]);
+      }
       if (u.indexOf("ppp_entregados_meta") >= 0) return J([]);
       if (u.indexOf("gv_ppp_en_salida") >= 0) return J(salida);
       if (u.indexOf("gv_ppp_entregados") >= 0) return J([
@@ -68,6 +76,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.entMuestra98001 = html.indexOf("98001") >= 0;
     // vista vacía → En Salida vacía, aunque haya facturados sin confirmar
     salida = []; await pppRefreshEnSalida();
+    // ⚠ la lista de atrasados se cachea 60 s (patrNeed / PATR_TTL_MS): sin forzarla, el render
+    // de abajo sigue leyendo la respuesta vieja —la de cuando la 98002 todavía estaba en la
+    // vista de En Salida— y la NP no vuelve a verse nunca. Es lo mismo que pasaría en la app:
+    // la vuelta tarda lo que tarde el TTL.
+    patrNeed(true); await new Promise((ok) => setTimeout(ok, 120));
     out.vaciaSinCargados = _pppSplitDelivered().enViaje.length === 0; _pppTab = "plan"; _pppPlanTabla = false; _pppPlanDay = "venc"; pppRenderProg();
     out.vuelve98002 = document.body.innerHTML.indexOf('id="ppprow_98002"') >= 0;
     return out;
