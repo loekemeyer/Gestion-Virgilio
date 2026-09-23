@@ -1,4 +1,4 @@
--- v21.97 — OC: la mercadería que entrega un EXTERNO (proveedor sin OC de ese código
+-- v21.98 — OC: la mercadería que entrega un EXTERNO (proveedor sin OC de ese código
 -- en esa ventana) descuenta de la OC del/los ASIGNADO(S) — los que tienen la OC vigente.
 -- Si hay varios asignados, se reparte en cajas ENTERAS, proporcional al SPLIT asignado a cada
 -- proveedor (OC_Maximos.prop_prov1/2), método de restos mayores: 3 cajas 50/50 → 2 y 1; 10 con 70/30 → 7 y 3.
@@ -19,7 +19,7 @@ declare
   cod_filtro text;
 begin
   cod_filtro := case when p_cod is not null then norm_cod(p_cod) end;
-  -- v21.97: con código, todas las OC del código (la entrega externa mueve la OC del asignado)
+  -- v21.98: con código, todas las OC del código (la entrega externa mueve la OC del asignado)
   k_filtro   := case when p_nombre is not null and cod_filtro is null then gv_norm_prov_keys(p_nombre) end;
 
   with entregas as (
@@ -76,7 +76,7 @@ begin
            ),0) as rec_propio
     from oc_win w
   ),
-  -- v21.97: entrega EXTERNA = ninguna OC de ese código, en esa fecha, es de quien entregó
+  -- v21.98: entrega EXTERNA = ninguna OC de ese código, en esa fecha, es de quien entregó
   ext as (
     select e.* from entregas e
     where e.f is not null and e.caj > 0
