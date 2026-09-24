@@ -29686,3 +29686,16 @@ Quedan 12, todas reales: armado ≠ facturado (98667, 98645, 98644, 98662, 98673
 44609), CH 0010 (727E armado / 727EN facturado + 438E armado sin L), CH 0006 (factura de otro
 pedido), LK 0097 (web «Contado» y ISIS la facturó «Sin Cotizador» sin 2 %), Matiz 97889 (UxC del
 55219 a definir). `sql/gv_facturacion_neto_items_v2222.sql`.
+
+## §3.na — v22.23: cruce NP ↔ factura, desempate por artículos (Luis, 2026-09-24)
+
+CH 0006 tenía la factura de CH 0007: mismo cliente (Chef 2469), misma tanda E12B, 25 cajas cada
+una, y el greedy desempataba sólo por cajas y fecha. No fue por faltantes (727E y 865E están bien
+fuera de la factura). La correcta, FC-A-0006-00005558 del 15/09, quedaba además fuera de la
+ventana de ±3 días (salida 11/09).
+
+`gv_cruce_fc_asignacion`: desempate por **códigos entregados que no están en la factura** (`mism`,
+la L pelada de los dos lados) y ventana hasta `facturado_at + 3`. Asignadas 958 → 980; los 22
+cambios mejoran la coincidencia (7 pares de ISIS intercambiados, 8 NP de Chef 44612-44619 que no
+tenían factura). Conciliación 204 de 215 iguales. Refresco 1,3 s.
+`sql/gv_cruce_fc_asignacion_v2223.sql`.

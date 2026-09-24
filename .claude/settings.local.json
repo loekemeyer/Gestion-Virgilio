@@ -23,7 +23,8 @@
       "Bash(node scripts/bump-version.cjs 22.19)",
       "Bash(node tests/apr-cuar-isis-confirm.cjs)",
       "Bash(node scripts/bump-version.cjs 22.21)",
-      "Bash(node scripts/bump-version.cjs 22.22)"
+      "Bash(node scripts/bump-version.cjs 22.22)",
+      "Bash(node scripts/bump-version.cjs 22.23)"
     ]
   }
 }
