@@ -27,6 +27,8 @@ echo "== ppp-res-demora-camion (v21.72: Resumen = MAYOR demora por camion, y cam
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-demora-camion.cjs
 echo "== ppp-res-demora-ancla (v22.16: importado diferido / retiro o turno pactado no cuentan como demora) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-demora-ancla.cjs
+echo "== apr-cuar-isis-confirm (v22.20: NP de ISIS retenida y sumar a tanda respetan la cuarentena) =="
+node tests/apr-cuar-isis-confirm.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-dia-ocupado.cjs
 
 echo "== ppp-tanda-candado-codigo (v21.76: una tanda empezada conserva su codigo al cambiar de dia) =="

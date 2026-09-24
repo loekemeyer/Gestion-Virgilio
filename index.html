@@ -1198,6 +1198,9 @@ button {
 /* v20.96 (Thomas): el pedido CANCELADO deja de decir "retenido" para siempre. El hecho sale
    de las tablas de cancelados, no de un evento que nadie escribia (0 filas al 22/09). */
 .cuar-log-est.e-cancelado{ background:#fee2e2; color:#7f1d1d; border:1px solid #fca5a5; }
+/* v22.20 (Luis): estados calculados al leer — salió sin aprobación / se liberó solo */
+.cuar-log-est.e-salio{ background:#e0e7ff; color:#3730a3; border:1px solid #a5b4fc; }
+.cuar-log-est.e-liberado_solo{ background:#ecfdf5; color:#065f46; border:1px solid #6ee7b7; }
 .cuar-log-quien{ font-weight:800; overflow-wrap:anywhere; }
 .cuar-log-cuando{ font-size:13px; color:#475569; white-space:nowrap; }
 .cuar-log-mail{ display:block; font-size:12px; color:#64748b; max-width:170px; overflow:hidden;
@@ -6135,7 +6138,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.20"></script>
+<script type="module" src="recepcion.js?v=22.21"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10087,7 +10090,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.20";
+const APP_VERSION = "v22.21";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -47003,6 +47006,14 @@ async function aprSoltarPedido(codigo, ped) {
                " es de " + aprEmpNombre(pe) + ": armá una tanda de " + aprEmpNombre(pe) + " (＋ Nueva tanda " + aprEmpNombre(pe) + ").";
     _apr.msgErr = true; aprRender(); return;
   }
+  // v22.20 (Luis, 24/09): sumar a mano a una tanda existente tampoco puede saltear la cuarentena.
+  if (!p._demo && aprEnCuarentena(p)) {
+    if (!p._isis) {
+      _apr.msg = "⚠ " + aprPedLabel(p) + " está en cuarentena y nadie lo aprobó: liberalo desde Cuarentena antes de programarlo.";
+      _apr.msgErr = true; aprRender(); return;
+    }
+    if (!confirm("⚠ " + aprPedLabel(p) + " está en CUARENTENA y nadie lo aprobó.\n\n¿Sumarlo igual a " + codigo + "? Lo correcto es liberarlo antes desde Cuarentena.")) return;
+  }
   const filas = aprFilasAgregar(p);
   _apr.ocupado = true;
   try {
@@ -47095,6 +47106,11 @@ async function aprGenerarTanda(fecha, keys, opts) {
   const _isisSel = peds.filter(function (p) { return p._isis; });
   if (_isisSel.length) {
     if (_isisSel.length !== peds.length) { _apr.msg = "No se pueden juntar una NP de ISIS y un pedido de la página en la misma tanda: hacé dos."; _apr.msgErr = true; aprRender(); return; }
+    /* v22.20 (Luis, 24/09): una NP de ISIS en cuarentena sin aprobar se programaba a mano sin aviso
+       (Lin Liqin 98585/86 el 14/09, Iro Iro 98626/27). No se frena —muchas ya vienen armadas desde
+       ISIS—, pero se pregunta. */
+    const _isisRet = _isisSel.filter(function (p) { return aprEnCuarentena(p); });
+    if (_isisRet.length && !confirm("⚠ " + _isisRet.map(aprPedLabel).join(", ") + " está en CUARENTENA y nadie lo aprobó.\n\n¿Programarlo igual? Lo correcto es liberarlo antes desde Cuarentena.")) return;
     if (!(opts && opts.sinConfirm) &&
         !confirm("¿Programar " + labels + " · " + aprNum(m3) + " m³ para el " + aprDiaCorto(fecha) + "?\n\nSe programan con su número de ISIS. El código de tanda lo pone el sistema.")) return;
     _apr.ocupado = true; aprRender();
@@ -50572,7 +50588,7 @@ function cuarLogHtml() {
   h += '<div class="cuar-log-chips">' +
     '<button class="cuar-log-chip' + (filtro ? "" : " on") + '" onclick="cuarLogFiltro(null)" ' +
       'title="Ver todos">Todos <b>' + todos.length + '</b></button>' +
-    [["retenido", "🚧 Retenidos"], ["aprobado", "✅ Aprobados"], ["devuelto", "↩ Devueltos"], ["cancelado", "🗑 Cancelados"], ["anulado", "✕ Anulados"]].map(function (e) {
+    [["retenido", "🚧 Retenidos"], ["aprobado", "✅ Aprobados"], ["liberado_solo", "🔓 Se liberó solo"], ["salio", "🚚 Salió sin aprobar"], ["devuelto", "↩ Devueltos"], ["cancelado", "🗑 Cancelados"], ["anulado", "✕ Anulados"]].map(function (e) {
       return '<button class="cuar-log-chip c-' + e[0] + (filtro === e[0] ? " on" : "") + '" ' +
         'onclick="cuarLogFiltro(\'' + e[0] + '\')">' + e[1] + ' <b>' + cuenta(e[0]) + '</b></button>';
     }).join("") +
@@ -50607,12 +50623,13 @@ function cuarLogHtml() {
           + '</div></td>'
         + '<td>' + (badges || '<span class="cuar-log-sin">—</span>') + '</td>'
         + '<td class="cuar-log-fh">' + escapeHtml(cuarFechaHora(r.entro_at)) + '</td>'
-        + '<td><span class="cuar-log-est e-' + escapeHtml(est) + '">' + escapeHtml(est) + '</span></td>'
+        + '<td><span class="cuar-log-est e-' + escapeHtml(est) + '">' + escapeHtml(est === "salio" ? "salió" : est === "liberado_solo" ? "se liberó solo" : est) + '</span></td>'
         + '<td>' + (r.cerrado_at
             ? '<div class="cuar-log-quien">' + escapeHtml(String(r.persona || "—")) + '</div>'
               + '<div class="cuar-log-cuando">' + escapeHtml(cuarFechaHora(r.cerrado_at)) + '</div>'
               + (r.por ? '<span class="cuar-log-mail" title="' + escapeHtml(String(r.por)) + '">' + escapeHtml(String(r.por)) + '</span>' : '')
-            : '<span class="cuar-log-sin">— sigue retenido</span>') + '</td>'
+            : '<span class="cuar-log-sin">' + (est === "salio" ? "— salió sin que nadie lo apruebe"
+                : est === "liberado_solo" ? "— ya no retiene (pagó o entró una excepción)" : "— sigue retenido") + '</span>') + '</td>'
         + '<td><div class="cuar-log-comcell"><div class="cuar-log-combox">'
           + (txt
               ? (comQuien || r.com_at
