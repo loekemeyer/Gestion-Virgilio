@@ -1683,6 +1683,7 @@ body.apr-dnd-tanda .apr-col-nps, body.apr-dnd-tanda .apr-dia-cerrado{ opacity:.4
    con el reloj pulsando. Se ve mientras controla LK + Chef (o arma) y desaparece al terminar. */
 .apr-cargando{ background:#fef3c7; border:1.5px dashed #f59e0b; color:#78350f; border-radius:12px; padding:18px 16px; text-align:center; font-size:17px; }
 .apr-cargando b{ color:#b45309; }
+.apr-clasificando{ margin:4px 0 6px; padding:6px 8px; border-radius:6px; background:#fff7e0; border:1px solid #f0c95a; color:#7a5a00; font-size:12px; animation:aprPulse 1.6s ease-in-out infinite; }
 .apr-cargando-ic{ display:block; font-size:26px; line-height:1; margin-bottom:6px; animation:aprPulse 1.2s ease-in-out infinite; }
 .apr-cargando-sub{ font-size:12.5px; color:#92400e; margin-top:6px; font-weight:400; line-height:1.4; }
 .apr-cargando-cuar{ font-size:14px; padding:12px 10px; }
@@ -6138,7 +6139,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.28"></script>
+<script type="module" src="recepcion.js?v=22.29"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10090,7 +10091,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.28";
+const APP_VERSION = "v22.29";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -46938,8 +46939,33 @@ function aprLogHtml() {
   return '<div class="apr-log ' + cls + '" title="' + escapeHtml("Corre a las 00:01 (lun–vie) y cada 15 min de 06:00 a 20:45, todos los días. Fuente: GV_Tandas_Auto_Log.") + '">' + escapeHtml(txt) + '</div>';
 }
 
+/* v22.29 (Luis, 2026-09-24: "que no se muestren hasta que estén en su lugar asignado") — un
+   pedido recién leído no sabe todavía si es cuarentena, cliente nuevo o normal: eso lo dice
+   cuarMarcarPedidos, segundos después. Al RECARGAR, el pedido que ya se había clasificado hereda
+   su clasificación anterior (la nueva la pisa al llegar), así la lista no parpadea en cada
+   refresco. Sólo el pedido NUEVO espera sin mostrarse (aprColPedidos lo cuenta en el cartel ⏳). */
+function aprHeredarCuar(nuevos, viejos) {
+  const prev = {};
+  (viejos || []).forEach(function (p) { if (p && p._cuarOk) prev[aprKey(p.empresa, p.order_id)] = p; });
+  (nuevos || []).forEach(function (p) {
+    const o = p && prev[aprKey(p.empresa, p.order_id)];
+    if (!o) return;
+    p._cuarOk = true;
+    if (o.cuarentena_motivos) p.cuarentena_motivos = o.cuarentena_motivos;
+    if (o._cuarLiberado) p._cuarLiberado = true;
+    if (o.cuarentena_detalle) p.cuarentena_detalle = o.cuarentena_detalle;
+  });
+  return nuevos;
+}
+function aprSinClasificar(p) {
+  // ⚠ Si la marcación FALLÓ (cuarErr) no se esconde nada: el cartel de error ya avisa, y un
+  // pedido que desaparece para siempre es peor que uno sin clasificar.
+  // Y sólo mientras hay una marcación EN CURSO (cuarN): terminada, lo que no tenga marca se ve.
+  return !!(p && !p._demo && !p._cuarOk && !_apr.cuarErr && (_apr.cuarN || 0) > 0);
+}
 async function aprCargar() {
   if (_apr.cargando) return;
+  _apr._cuarPrevChef = (_apr.pedidosTodos || []).filter(function (p) { return p && p.empresa === "chef"; });
   _apr.cargando = true; _apr.err = ""; aprRender();
   // v17.61: los detalles de NP de ISIS que NO se pudieron leer se reintentan en esta vuelta;
   // los que se leyeron bien quedan cacheados (la base del PPP no cambia sola).
@@ -46972,7 +46998,7 @@ async function aprCargar() {
     // `pedidosTodos` guarda TODOS, incluidos los que ya están en un borrador: al
     // programar hacen falta sus artículos, y ésos ya no están en la lista de la
     // izquierda.
-    _apr.pedidosTodos = ordenar(pedsLk.concat(isis || []));   // v14.35: web + NP de ISIS sin tanda
+    _apr.pedidosTodos = aprHeredarCuar(ordenar(pedsLk.concat(isis || [])), _apr.pedidosTodos);   // v14.35: web + NP de ISIS sin tanda
     _apr.pedidos = _apr.pedidosTodos.filter(function (p) { return !fuera.has(aprKey(p.empresa, p.order_id)); });
 
     _apr.tandas = tandas;
@@ -46982,12 +47008,12 @@ async function aprCargar() {
     _apr.cargando = false;
     _apr.cargandoChef = true;
     _apr.aviso = "";
-    if (_pppTab === "prog") { aprRender(); aprCargarSalida().then(function () { if (_pppTab === "prog") aprRender(); }); cuarMarcarPedidos(); }
+    if (_pppTab === "prog") { cuarMarcarPedidos(); aprRender(); aprCargarSalida().then(function () { if (_pppTab === "prog") aprRender(); }); }
 
     // ── Chef, cuando llegue ──
     try {
       const pedsChef = await pChef;
-      _apr.pedidosTodos = ordenar(_apr.pedidosTodos.concat(pedsChef));
+      _apr.pedidosTodos = ordenar(_apr.pedidosTodos.concat(aprHeredarCuar(pedsChef, _apr._cuarPrevChef)));
       _apr.pedidos = _apr.pedidosTodos.filter(function (p) { return !fuera.has(aprKey(p.empresa, p.order_id)); });
       /* ⚠ v20.98 (Thomas, 2026-09-22: *"Ierakuin sigue saliendo en la vista de «A programar» y no
          en la sección de Cuarentena"*) — LOS PEDIDOS DE CHEF LLEGAN TARDE Y NADIE LOS VOLVÍA A
@@ -46999,9 +47025,9 @@ async function aprCargar() {
          pantalla mostraba 5 (los 7 menos el cliente nuevo puro, que va al pipeline, menos éste).
          Por eso el control se vuelve a correr acá, con la lista ya completa. */
       if (_pppTab === "prog") {
+        cuarMarcarPedidos();   // v22.29: antes del render, así Chef nuevo no se asoma sin clasificar
         aprRender();
         aprCargarSalida().then(function () { if (_pppTab === "prog") aprRender(); });
-        cuarMarcarPedidos();
       }
     } catch (e) {
       _apr.aviso = "Chef no respondió (" + ((e && e.message) || e) + "): se ven sólo los pedidos de LK.";
@@ -47956,6 +47982,9 @@ function aprColPedidos() {
   // v14.81: los pedidos en cuarentena (deuda / suspendido / supera crédito) salen de la lista
   // normal y van a su propio sector (aprColCuarentena). No se pueden tildar ni programar.
   let lista = (_apr.pedidos || []).filter(function (p) { return !aprEnCuarentena(p); });
+  // v22.29: el que todavía no se clasificó (cuarentena / cliente nuevo / normal) no se dibuja.
+  const _sinClas = lista.filter(aprSinClasificar).length;
+  if (_sinClas) lista = lista.filter(function (p) { return !aprSinClasificar(p); });
   // v20.51: un pedido de ISIS no pasó por la página y no trae provincia — pero SÍ tiene NP,
   // así que su destino sale del mismo `gv_np_destino_lista` que usa Programación. Pide sólo las
   // que faltan, así que no pega a la red en cada render.
@@ -47977,10 +48006,11 @@ function aprColPedidos() {
       (viejo !== null && viejo >= 2 ? ' <span class="apr-chip apr-chip-esp' + (viejo >= 4 ? ' viejo' : ' medio') + '" title="El pedido más viejo de la lista">⏱ el más viejo, hace ' + viejo + ' días</span>' : '') +
       aprAnuladosChip() +   // v18.04: el log de los que se anularon, a un toque
     '</div>' +
+    (_sinClas ? '<div class="apr-clasificando">⏳ <b>' + _sinClas + ' pedido' + (_sinClas === 1 ? '' : 's') + ' clasificándose</b> (cuarentena / cliente nuevo) — aparecen en su lugar apenas termine.</div>' : '') +
     aprPorQueHtml(lista) +
     '<input class="apr-q" type="search" placeholder="🔎 cliente, zona, localidad…" value="' + escapeHtml(_apr.q) + '" oninput="aprBuscar(this.value)">' +
     '<div class="apr-scroll">';
-  if (!lista.length) {
+  if (!lista.length && !_sinClas) {
     // v13.88 (dueño: "tendría que ponerme un listo o algo"): terminado se dice fuerte, no en gris chiquito.
     // Mientras siga chequeando alguna base (LK o Chef), NO decir "Listo" todavía: podría estar
     // por caer un pedido nuevo de la base que falta. El relojito de arriba ya avisa que controla.
@@ -50968,7 +50998,14 @@ async function cuarRpcMarcar(peds) {
   try { return await aprRpc("gv_cuarentena_marcar", payload); }
   catch (_e) { return await aprRpc("gv_cuarentena_marcar", payload); }
 }
+// v22.29: cuenta las marcaciones en curso (aprSinClasificar esconde sólo mientras haya alguna).
+// El incremento corre en la parte SINCRÓNICA, así el render que sigue a la llamada ya lo ve.
 async function cuarMarcarPedidos() {
+  _apr.cuarN = (_apr.cuarN || 0) + 1;
+  try { return await _cuarMarcarPedidos0(); }
+  finally { _apr.cuarN = Math.max(0, (_apr.cuarN || 1) - 1); if (!_apr.cuarN && _pppTab === "prog") aprRender(); }
+}
+async function _cuarMarcarPedidos0() {
   const peds = _apr.pedidos || [];
   if (!peds.length) { if (_pppTab === "prog") aprRender(); return; }
   /* v21.32 (Luis, 2026-09-23: "Ierakuin no está en el submódulo de cuarentena") — DE QUÉ
