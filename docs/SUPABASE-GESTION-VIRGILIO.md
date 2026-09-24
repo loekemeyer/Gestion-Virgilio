@@ -29746,3 +29746,12 @@ guarda el código pelado y no tenía empresa: `gv_oc_recompute_recibido` nunca i
 - La OC vieja `439E` sin empresa (3 cj, 16/09) queda como está (Luis: "si es viejo y no jode, dejalo").
 - Backup: `zz_backups."GV_Backup_OrdenesCompra_20260924b"` y definiciones en `zz_backups."GV_Backup_Funciones_20260924"`.
 - `sql/gv_oc_dual_empresa_v2237.sql`, `tests/rcp-empresa-dual.cjs`. Centinelas en `GV_Reglas_Centinela`.
+
+## §3.ne — v22.38: una NP ARMADA se mueve sola a otro día con tanda nueva + la cancelada no vuelve a Atrasados (Luis, 2026-09-24)
+
+- `gv_np_mover_guard`: el freno de la v21.59 frenaba también la NP armada. Ahora deja pasar la ARMADA
+  cuando `gv_ppp_pedido_mover` lleva su registro (TP/TAP copiados + porción de `a_facturar`, v21.05).
+  Pickeado sin armar sigue frenado. Probado: LK 0100 → E18F con TP/TAP, stock total igual.
+- `gv_ppp_prog_arbol`: excluye `GV_PPP_Web_NP_Cancelada`. LK 0035 (cancelada 24/09) salía en Pedidos
+  atrasados el 17/09 por `Facturacion_NP`. Atrasados 1 → 0.
+- `sql/gv_mover_armado_y_cancelada_v2238.sql`. Centinela v21.59 del guard actualizado al patrón nuevo.
