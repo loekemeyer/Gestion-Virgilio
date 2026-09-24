@@ -4255,6 +4255,8 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppres-tbl td.dem.hot{ color:#b91c1c; }
 .ppp-restbl td.dem.hot, .ppp-restbl tr.totrow td.hot{ color:#dc2626; font-weight:800; }
 .ppp-restbl tr.totrow td.hot{ color:#fca5a5; }
+.ppp-restbl .dem-anc{ font-size:.8em; margin-left:3px; cursor:help; }   /* v22.16 */
+.pppres-tbl td.dem .pppres-anc{ font-weight:600; color:#475569; white-space:normal; text-align:right; max-width:220px; margin-left:auto; }
 /* Chequeo de góndola (v7.16): modal del botón 📦 de cada pedido / tanda. Reusa
    .pppres-ov/.pppres-card; la tabla es propia porque tiene que entrar en el celu. */
 .pppchk-msg{ padding:26px 16px; text-align:center; color:#475569; font-size:14px; font-weight:700; }
@@ -6133,7 +6135,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.15"></script>
+<script type="module" src="recepcion.js?v=22.16"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10085,7 +10087,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.15";
+const APP_VERSION = "v22.16";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38347,7 +38349,8 @@ function pppResCamTgl(dk) {
     const grp = {}, orden = [];
     c.peds.forEach(function (i) {
       const k = (i.rs || ("np:" + i.np)) + "|" + (i.dem == null ? "-" : i.dem);
-      if (!grp[k]) { grp[k] = { nps: [], tandas: [], locs: [], rs: i.rs, m3: 0, dem: i.dem }; orden.push(k); }
+      if (!grp[k]) { grp[k] = { nps: [], tandas: [], locs: [], rs: i.rs, m3: 0, dem: i.dem, ancs: [] }; orden.push(k); }
+      if (i.anc) grp[k].ancs.push(_pppDemAnclaTxt(i.np, i.anc));
       grp[k].nps.push(String(i.np));
       if (i.tanda && grp[k].tandas.indexOf(i.tanda) < 0) grp[k].tandas.push(i.tanda);
       if (i.loc && grp[k].locs.indexOf(i.loc) < 0) grp[k].locs.push(i.loc);
@@ -38367,7 +38370,8 @@ function pppResCamTgl(dk) {
         '<td>' + escapeHtml(r.tandas.join("/") || "—") + '</td>' +
         '<td>' + escapeHtml(r.rs || "—") + '<span class="pppres-loc">' + escapeHtml(r.locs.join(" / ")) + '</span></td>' +
         '<td class="num">' + f2(r.m3) + '</td>' +
-        '<td class="num dem' + (r.dem != null && r.dem >= PPP_DEM_ALERTA ? ' hot' : '') + '">' + (r.dem != null ? r.dem : "·") + '</td></tr>';
+        '<td class="num dem' + (r.dem != null && r.dem >= PPP_DEM_ALERTA ? ' hot' : '') + '">' + (r.dem != null ? r.dem : "·") +
+        (r.ancs.length ? '<span class="pppres-loc pppres-anc">' + escapeHtml((r.ancs.some(function (t) { return /importado/.test(t); }) ? "📦 " : "📅 ") + r.ancs.join(" · ")) + '</span>' : '') + '</td></tr>';
     });
   });
   if (!filas) filas = '<tr><td colspan="5" style="text-align:center;color:#94a3b8">— sin pedidos —</td></tr>';
@@ -38378,7 +38382,46 @@ function pppResCamTgl(dk) {
     '<div class="pppres-wrap"><table class="pppres-tbl"><thead><tr><th>NP</th><th>Tanda</th><th>Cliente</th><th class="num">m³</th><th class="num">Demora</th></tr></thead><tbody>' + filas + '</tbody></table></div></div>';
   ov.classList.add("show");
 }
+/* v22.16 (Luis, 24/09): "un pedido partido por un importado que entra en diciembre no es una demora
+   real; lo mismo para clientes que programan entrega/retiro para el futuro". El BACKEND dice desde
+   que fecha se cuenta la espera de cada NP (gv_ppp_demora_ancla: importado diferido, retiro con dia
+   elegido, turno pactado del super) y el Resumen cuenta la demora desde ahi, marcandola con el icono.
+   Sin respuesta del backend, la demora se cuenta como siempre (desde el pedido). */
+const PPP_DEM_ANCLA_TTL_MS = 60 * 1000;
+let _pppDemAncla = null, _pppDemAnclaTs = 0, _pppDemAnclaBusy = false;
+const PPP_DEM_ANCLA_TXT = {
+  importado: ["📦", "espera un importado que llega el"],
+  retiro_pactado: ["📅", "el cliente eligió retirar el"],
+  turno_pactado: ["📅", "turno pactado del súper para el"]
+};
+function _pppNpKey(np) { return String(np || "").toUpperCase().replace(/\s+/g, " ").trim(); }
+function pppDemAnclaNeed() {
+  if (_pppDemAnclaBusy) return;
+  if (_pppDemAncla && (Date.now() - _pppDemAnclaTs) < PPP_DEM_ANCLA_TTL_MS) return;
+  _pppDemAnclaBusy = true;
+  fetch(SUPABASE_URL + "/rest/v1/rpc/gv_ppp_demora_ancla", {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: "{}"
+  }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (rows) {
+      const m = {};
+      (rows || []).forEach(function (r) { m[_pppNpKey(r.np)] = { motivo: r.motivo, ancla: r.ancla }; });
+      _pppDemAncla = m; _pppDemAnclaTs = Date.now(); _pppDemAnclaBusy = false;
+      if (typeof _pppTab !== "undefined" && _pppTab === "resumen") pppRenderProg();
+    })
+    .catch(function () {
+      // el TTL se sella tambien al fallar: un backend caido no se re-pide en cada dibujo (pozo v21.37)
+      _pppDemAnclaBusy = false; _pppDemAnclaTs = Date.now(); if (!_pppDemAncla) _pppDemAncla = {};
+    });
+}
+function _pppDemAnclaDe(np) { return _pppDemAncla ? (_pppDemAncla[_pppNpKey(np)] || null) : null; }
+function _pppDemAnclaTxt(np, anc) {
+  const t = PPP_DEM_ANCLA_TXT[anc.motivo] || ["📅", "fecha pactada:"];
+  return np + " " + t[1] + " " + anc.fecha + (anc.bruta != null ? " (" + anc.bruta + " d desde el pedido)" : "");
+}
 function pppResumenHtml(prog) {
+  pppDemAnclaNeed();
   const conF = prog.filter(function (p) { return (p.fecha_entrega || "").trim(); });
   // v9.80 — Retira NO lleva fecha de entrega (el cliente retira del depósito, sin camión):
   // no es un error, así que NO cuenta como "sin Fecha de Entrega" (antes inflaba el aviso).
@@ -38429,8 +38472,20 @@ function pppResumenHtml(prog) {
       const m3 = Number(p.m3) || 0;
       // Demora del pedido, en días CORRIDOS: es la misma cuenta que hacía el promedio.
       const _fa = _pppFechaDate(p.fecha), _fb = _pppFechaDate(p.fecha_entrega);
-      const dem = (_fa && _fb) ? Math.round((_fb - _fa) / 86400000) : null;
-      const item = { np: String(p.np || "—"), tanda: String(p.tanda || "").trim(), rs: String(p.razon_social || "").trim(), loc: String(p.localidad || "").trim(), m3: m3, dem: dem };
+      const demBruta = (_fa && _fb) ? Math.round((_fb - _fa) / 86400000) : null;
+      // v22.16: si el backend dice que la espera arranca despues del pedido (importado que no
+      // llego, retiro o turno elegido por el cliente), la demora se cuenta desde esa fecha.
+      let dem = demBruta, anc = null;
+      const _an = _pppDemAnclaDe(p.np);
+      if (_an && _fb) {
+        const _s = String(_an.ancla || "").slice(0, 10).split("-");
+        const _fc = _s.length === 3 ? new Date(+_s[0], +_s[1] - 1, +_s[2]) : null;
+        if (_fc && !isNaN(_fc) && (!_fa || _fc > _fa)) {
+          dem = Math.max(0, Math.round((_fb - _fc) / 86400000));
+          anc = { motivo: _an.motivo, fecha: _s[2] + "/" + _s[1], bruta: demBruta };
+        }
+      }
+      const item = { np: String(p.np || "—"), tanda: String(p.tanda || "").trim(), rs: String(p.razon_social || "").trim(), loc: String(p.localidad || "").trim(), m3: m3, dem: dem, anc: anc };
       det.__tot__.push(item);
       if (pppEsSuper(p)) { Z["Super"] += m3; det["Super"].push(item); const k = String(p.cod || p.razon_social || "?"); supCli[k] = (supCli[k] || 0) + m3; if (!supNom[k]) supNom[k] = String(p.razon_social || "").trim() || k; (supPeds[k] = supPeds[k] || []).push(item); }
       else { const z = pppZonaDeBarrio(p.localidad); if (Z[z] != null) { Z[z] += m3; det[z].push(item); } }
@@ -38474,6 +38529,12 @@ function pppResumenHtml(prog) {
     cams.sort(function (a, b) { return (b.demMax == null ? -1 : b.demMax) - (a.demMax == null ? -1 : a.demMax) || b.m3 - a.m3; });
     const nCam = cams.reduce(function (s, c) { return s + c.n; }, 0);
     const demP = _demMaxDe(det.__tot__);
+    // v22.16: el icono avisa que ese dia hay pedidos cuya espera NO es demora (y cuanto darian)
+    const _ancs = det.__tot__.filter(function (i) { return i.anc && i.anc.bruta != null && i.anc.bruta > (demP == null ? -1 : demP); });
+    const _ancIco = _ancs.length
+      ? ' <span class="dem-anc" title="' + escapeHtml("No cuenta como demora: " + _ancs.map(function (i) { return _pppDemAnclaTxt(i.np, i.anc); }).join(" · ")) + '">' +
+        (_ancs.some(function (i) { return i.anc.motivo === "importado"; }) ? "📦" : "📅") + '</span>'
+      : '';
     _pppResCam[dk] = { fecha: d.fecha, cams: cams, nCam: nCam, demMax: demP, m3: 0 };
     const dt = _pppFechaDate(d.fecha), dia = dt ? DOW[dt.getDay()] : "";
     Zc.forEach(function (z) { T[z[0]] += Z[z[0]]; }); Ttot += total; Tcam += nCam;
@@ -38490,7 +38551,7 @@ function pppResumenHtml(prog) {
         return '<td class="num z0 ' + z[1] + '">·</td>';
       }).join("") +
       '<td class="num cam zc" onclick="pppResCamTgl(\'' + dk + '\')" title="Ver los camiones del día, ordenados por la mayor demora">' + nCam + '</td>' +
-      '<td class="num zc dem' + (demP != null && demP >= PPP_DEM_ALERTA ? ' hot' : '') + '" onclick="pppResCamTgl(\'' + dk + '\')" title="La demora del pedido que más esperó. Tocá para ver la de cada camión.">' + (demP != null ? demP : "·") + '</td></tr>';
+      '<td class="num zc dem' + (demP != null && demP >= PPP_DEM_ALERTA ? ' hot' : '') + '" onclick="pppResCamTgl(\'' + dk + '\')" title="La demora del pedido que más esperó. Tocá para ver la de cada camión.">' + (demP != null ? demP : "·") + _ancIco + '</td></tr>';
   }
   const demT = TdemMax;   // v21.72: la PEOR de todas, no el promedio de promedios
   const totRow = '<tr class="totrow"><td class="f">TOTAL</td><td></td>' +
@@ -38499,7 +38560,7 @@ function pppResumenHtml(prog) {
   return head +
     '<div class="ppp-res-leg" title="Un camión = un grupo de zonas (regla del 23/09): Capital Sur = Z1 · Capital Centro = Z2 · Capital Oeste = Z3 (juntas si cada una < 1 m³) · GBA Sur = Z4 · GBA Oeste = Z5 · GBA Norte = Z6+Z7. Cada grupo sale UNA vez: no se parte por m³ hasta los ' + CAMM3 + ' m³ que entran físicamente en el camión. La demora se cuenta en días corridos entre la fecha del pedido y la de entrega.">' +
       '🚚 <b>1 camión = 1 grupo de zonas</b>: Z1 · Z2 · Z3 (Z2+Z3 juntas si cada una &lt; 1 m³) · Z4 · Z5 · Z6+Z7 · Súper 1 x cliente · Retira sin camión. Sin partir hasta <b>' + CAMM3 + ' m³</b>. ' +
-      '⏱ <b>Demora</b> = la del pedido que más esperó — tocala.</div>' +
+      '⏱ <b>Demora</b> = la del pedido que más esperó — tocala.<br>📦 / 📅 = no es demora: importado que todavía no llegó, o retiro / turno que eligió el cliente. Se cuenta desde esa fecha.</div>' +
     '<div class="ppp-restbl-wrap"><table class="ppp-restbl"><thead><tr>' +
       '<th>Fecha</th><th>Día</th><th class="tot">Total<br>m³</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Cam.</th><th>Mayor<br>demora</th>' +
     '</tr></thead><tbody>' + rows + totRow + '</tbody></table></div>';

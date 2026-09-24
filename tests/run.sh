@@ -25,6 +25,8 @@ node() {
 
 echo "== ppp-res-demora-camion (v21.72: Resumen = MAYOR demora por camion, y camiones sin tope de m3) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-demora-camion.cjs
+echo "== ppp-res-demora-ancla (v22.16: importado diferido / retiro o turno pactado no cuentan como demora) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-demora-ancla.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-dia-ocupado.cjs
 
 echo "== ppp-tanda-candado-codigo (v21.76: una tanda empezada conserva su codigo al cambiar de dia) =="
