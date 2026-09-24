@@ -29714,3 +29714,18 @@ en true y el botón en «Actualizando…» para siempre. Ahora cada llamada tien
 20 s la lista), el estado se libera en un `finally`, el botón fuerza recalcular el cruce
 (`p_seg 0`) y una búsqueda tipeada mientras carga se re-corre. `tests/fac-conciliacion.cjs`
 (verificado que falla contra el código anterior).
+
+## §3.nc — v22.35: plan B aplicado — Cuarentena rápida + filtros del armado antes del tope (Luis, 2026-09-24)
+
+Aplicado ~13:35 ART con el depósito trabajando (Luis: *"metele"*), adelantado de las 17 h.
+
+| objeto | cambio | medido |
+|---|---|---|
+| `gv_cuarentena_mismo_pedido_lote` | los pedidos relacionados (`pedido_origen`, los dos lados) se calculan una vez por pedido (`rel`) y el label de cada NP una vez (`wl`); sin el `OR exists` por par | 17,0 s → **1,1 s** en vivo · 165 pedidos · 3 exentos, igual que antes |
+| `gv_ppp_web_armar_pendientes` | diferido / retenido / cancelado (a0, a0b, a0c) salen **antes** del tope de 120 pedidos | misma salida, 4,0 → 3,2 s en la prueba |
+
+- Backup de las dos definiciones: `zz_backups."GV_Backup_Funciones_20260924"` (RLS on, sin escritura para anon).
+- Rollback: `do $$ begin execute (select def from zz_backups."GV_Backup_Funciones_20260924" where objeto = '<firma>'); end $$;`
+- Centinelas: `oid_rel` y `"GV_PPP_Web_NP_Cancelada"[\s\S]*armado_tope_pedidos`. El de la v22.09 (`_mp_m\.pedido_origen`) nombraba el alias viejo: se pasó a `m\.pedido_origen::text = p\.order_id` (la regla sigue, cambió el alias). `gv_reglas_perdidas` = 0.
+- `service_role statement_timeout = 25s` (opción A, mismo día) sigue puesto.
+- SQL: `sql/gv_cuar_mismo_pedido_rapido_v2217.sql`, `sql/gv_armado_filtros_antes_tope_v2217.sql`.
