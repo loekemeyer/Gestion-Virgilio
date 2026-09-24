@@ -851,6 +851,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== rcp-codigo-diferente (Test de regresión (v21) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-codigo-diferente.cjs
+node tests/rcp-oc-reintento.cjs
 
 echo "== rcp-codigo-parecido (Regresión v18) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rcp-codigo-parecido.cjs

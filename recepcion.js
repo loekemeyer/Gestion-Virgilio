@@ -2483,11 +2483,25 @@ async function opEnviar() {
   // en cascada, sin negativos). Así las cantidades a recibir BAJAN y la OC deja de figurar/
   // imprimirse cuando se completa — antes cantidad_recibida no se tocaba nunca. Best-effort:
   // si falla, no bloquea la recepción; la OC simplemente no se descuenta esta vez.
+  // v22.40 (Luis, 24/09): supabase.rpc NO rechaza con un 500 — resuelve con {error}. Antes el
+  // error se tiraba sin mirar y el 764 de Blist-Pack quedó sin descontar (timeout de la base a
+  // las 11:49). Ahora reintenta hasta 2 veces; y si igual falla, lo levanta la red del backend
+  // (cron gv-oc-recepcion-red, cada 30 min recalcula lo recibido en las últimas 36 h).
   try {
-    supabase.rpc("gv_oc_aplicar_recepcion", {
+    const _ocArgs = {
       nombre_ent: opState.tallNombre,
       items: items.map(function (i) { return { cod: i.cod, cajas: i.cajas }; })
-    }).then(function () {}, function () {});
+    };
+    const _ocAplicar = function (intento) {
+      let p;
+      try { p = supabase.rpc("gv_oc_aplicar_recepcion", _ocArgs); } catch (_e) { p = Promise.reject(_e); }
+      Promise.resolve(p).then(function (r) {
+        if (r && r.error && intento < 2) setTimeout(function () { _ocAplicar(intento + 1); }, 4000 * (intento + 1));
+      }, function () {
+        if (intento < 2) setTimeout(function () { _ocAplicar(intento + 1); }, 4000 * (intento + 1));
+      });
+    };
+    _ocAplicar(0);
   } catch (_e) {}
   // v11.98: cierra el toggle RT automáticamente (el operario ya no tiene que volver
   // a la botonera para terminar el inicio→fin de Recepción Mercadería).
