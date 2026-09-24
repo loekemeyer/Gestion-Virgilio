@@ -6101,7 +6101,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.38"></script>
+<script type="module" src="recepcion.js?v=22.39"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10052,7 +10052,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.38";
+const APP_VERSION = "v22.39";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20662,6 +20662,125 @@ async function provImpSet(codEnc, prov) {
    Solo lectura por ahora (la emisión/curso se afina aparte). */
 const _IMPORTADOR_DE = { "Ownland": "Chef", "Kangli": "Chef", "Fujian": "Chef", "Frontier": "Chef",
                          "Becky": "Tierra Nativa", "Hugo Wong": "Tierra Nativa", "Zhixin": "Tierra Nativa" };
+/* v22.37 — Proveedores que NO nos facturan directo: le facturan a NTL y NTL nos factura a
+   nosotros. Por ese servicio NTL cobra un 5% (la línea "NTL" del Excel de nacionalización,
+   0,05×FOB). Ownland, Becky y Hugo Wong NO usan ese servicio → no llevan el 5%. */
+const _NTL_PROVEEDORES = { "Frontier": true, "Fujian": true, "Kangli": true, "Zhixin": true };
+function _esProvNtl(prov) { return !!_NTL_PROVEEDORES[String(prov || "").trim()]; }
+/* v22.37 — mínimo por proveedor para poder emitir un pedido de importación (config editable
+   Stock_Config['impo_pedido_min_usd']; default 25.000 USD FOB). */
+const _IMPO_MIN_USD_DEFAULT = 25000;
+/* v22.37 — parámetros de nacionalización del embarque (los pocos que cambian por pedido).
+   El resto de las tasas están fijas dentro de _pedImpNacionalizar, iguales al Excel. */
+const _NAC_DEFAULTS = { modo: "consolidada", valorM3: 110, fleteFull: 2000, tn: 0 };
+function _nacNum(v, d) { var n = Number(v); return (isFinite(n) && n >= 0) ? n : (d || 0); }
+/* Costo de nacionalización (traer de China a Argentina), portado del Excel
+   "Calculo_Nacionalizacion". Devuelve el costo NO RECUPERABLE (lo que queda pegado al costo
+   del artículo) y el factor sobre FOB. Modos: consolidada (marítimo LCL), full (contenedor
+   propio FCL) y avion (FEDEX). El 5% de NTL (línea "NTL" del Excel, 0,05×FOB) va SÓLO si
+   opts.ntl. Los costos fijos de flete son POR EMBARQUE: acá cada proveedor = su propio pedido.
+   ⚠ La logística de este cálculo vive también en sql/… — no; vive sólo acá (el módulo es front).
+   Lo sostiene tests/impo-nacionalizacion.cjs. */
+function _pedImpNacionalizar(fob, m3, opts) {
+  opts = opts || {};
+  fob = _nacNum(fob, 0); m3 = _nacNum(m3, 0);
+  var ntl = !!opts.ntl;
+  var modo = opts.modo || "consolidada";
+  var valorM3 = _nacNum(opts.valorM3, _NAC_DEFAULTS.valorM3);
+  var tn = _nacNum(opts.tn, 0);   // peso (toneladas); impacto menor salvo en avión. 0 = no cargado.
+  if (!(fob > 0)) return { modo: modo, ok: false, noRecup: 0, ntl: 0, factor: 0, landed: 0, detalle: [] };
+  var det = [];
+  if (modo === "full") {
+    var seguroF = 0.005 * fob;
+    var fleteF = _nacNum(opts.fleteFull, _NAC_DEFAULTS.fleteFull);
+    var cifF = fleteF + seguroF + fob;
+    var derechosF = 0.18 * cifF;
+    var estadF = 0.03 * cifF;
+    var ntl5F = ntl ? 0.05 * fob : 0;
+    var tasasF = 10 + 180;                                   // Sim + Tasa Est.
+    var despachF = Math.max(300, fob * 0.01) + 150 + 100 + 30;
+    var gastosF = 150 + 40;                                  // flete depósito + bancarios
+    var fleteDepF = 2000 + 750 + 800;                        // container + marítima + terminal
+    var noRecupF = fleteDepF + seguroF + derechosF + estadF + tasasF + gastosF + despachF + ntl5F;
+    det = [["Flete + terminal", fleteDepF], ["Seguro (0,5% FOB)", seguroF], ["Derechos (18% CIF)", derechosF],
+      ["Estadística (3% CIF)", estadF], ["Tasas (Sim + est.)", tasasF], ["Gastos varios", gastosF],
+      ["Despachante", despachF]];
+    if (ntl) det.push(["NTL (5% FOB)", ntl5F]);
+    return { modo: modo, ok: true, ntl: ntl5F, noRecup: noRecupF, factor: noRecupF / fob, landed: fob + noRecupF, detalle: det };
+  }
+  if (modo === "avion") {
+    var kg = tn * 1000;
+    var fleteA = kg * 13.5;
+    var certA = fleteA * 0.2;
+    var seguroA = (fob + certA) * 0.01;
+    var cifA = fob + seguroA + certA;
+    var derechosA = 0.18 * cifA;
+    var estadA = 0.03 * cifA;
+    var ivaImpA = (derechosA + cifA) * 0.21;
+    var tasaDesA = 50, gestionA = 85;
+    var noRecupA = seguroA + derechosA + tasaDesA + gestionA + fleteA + estadA + ivaImpA;
+    det = [["Flete FEDEX", fleteA], ["Certif. FEDEX", certA], ["Seguro (1%)", seguroA], ["Derechos (18%)", derechosA],
+      ["Estadística (3%)", estadA], ["IVA importación", ivaImpA], ["Tasa desembolso", tasaDesA], ["Gestión Comex", gestionA]];
+    return { modo: modo, ok: (kg > 0), noRecup: noRecupA, ntl: 0, factor: noRecupA / fob, landed: fob + noRecupA, detalle: det, sinPeso: !(kg > 0) };
+  }
+  // consolidada (default) — marítimo LCL
+  var fleteTot = 1080 + 35 + 90 + (tn < 1 ? 4 : tn * 4) + (valorM3 + 25) * m3;   // Costo Flete total (D10)
+  var fleteCif = valorM3 * m3;                       // parte marítima que entra al CIF (D41)
+  var seguro = 0.005 * fob;                          // D13
+  var cif = fleteCif + seguro + fob;                 // D14
+  var derechos = 0.35 * cif;                         // D16
+  var ntl5 = ntl ? 0.05 * fob : 0;                   // D17 (línea "NTL")
+  var estad = 0.03 * cif;                            // D18
+  var tasaFija = 180;                                // D19
+  var sim = 10;                                      // D38
+  var libreCirc = 0.005 * fob;                       // D33
+  var gastosVarios = 30 + 40;                        // F20 (flete depósito + bancarios)
+  var despach = Math.max(300, fob * 0.01) + 120 + 0 + 30;   // F26 (honorarios 1% + gtos + digital.)
+  var noRecup = fleteTot + derechos + estad + sim + gastosVarios + despach + tasaFija + ntl5 + libreCirc;
+  det = [["Flete + dep. fiscal", fleteTot], ["Derechos (35% CIF)", derechos], ["Estadística (3% CIF)", estad],
+    ["Libre circulación (0,5%)", libreCirc], ["Tasas (Sim + est.)", sim + tasaFija],
+    ["Gastos varios", gastosVarios], ["Despachante", despach]];
+  if (ntl) det.push(["NTL (5% FOB)", ntl5]);
+  return { modo: modo, ok: true, ntl: ntl5, noRecup: noRecup, factor: noRecup / fob, landed: fob + noRecup, detalle: det };
+}
+/* v22.37 — proyección del corte de min USD por proveedor: dado lo que hoy hay a pedir en FOB,
+   el consumo mensual en FOB (proy×fob) y el techo (objetivo lleno en FOB), dice cuándo se llega
+   al mínimo. Si el techo no alcanza el mínimo, el proveedor NUNCA llega solo (se consolida). */
+function _pedImpProy25k(fobHoy, burnMes, techo, minUsd) {
+  fobHoy = _nacNum(fobHoy, 0); burnMes = _nacNum(burnMes, 0); techo = _nacNum(techo, 0);
+  minUsd = _nacNum(minUsd, _IMPO_MIN_USD_DEFAULT);
+  var comun = { fobHoy: fobHoy, burn: burnMes, techo: techo, min: minUsd };
+  if (fobHoy >= minUsd) return Object.assign({ estado: "ya", meses: 0, fechaIso: "" }, comun);
+  if (techo < minUsd) return Object.assign({ estado: "nunca", meses: null, fechaIso: "" }, comun);
+  if (!(burnMes > 0)) return Object.assign({ estado: "sinburn", meses: null, fechaIso: "" }, comun);
+  var meses = (minUsd - fobHoy) / burnMes;
+  var d = new Date(Date.now() - 3 * 3600000);
+  d.setDate(d.getDate() + Math.ceil(meses * 30));
+  return Object.assign({ estado: "falta", meses: meses, fechaIso: d.toISOString().slice(0, 10) }, comun);
+}
+/* v22.37 — texto lindo de "cuánto falta" (días si < 1 mes, si no meses con 1 decimal). */
+function _pedImpMesesTxt(meses) {
+  if (!(meses > 0)) return "ya";
+  if (meses < 1) { var dias = Math.max(1, Math.ceil(meses * 30)); return "~" + dias + (dias === 1 ? " día" : " días"); }
+  return "~" + (Math.round(meses * 10) / 10).toLocaleString("es-AR") + (meses < 2 ? " mes" : " meses");
+}
+function _usd0(n) { return "u$s " + Math.round(_nacNum(n, 0)).toLocaleString("es-AR"); }
+/* Banda por proveedor: proyección al mínimo (izq) + costo de nacionalización del pedido (der). */
+function _pedImpBandaHtml(proy, nac, minUsd, totUsd) {
+  var chip = function (bg, bd, col, html) { return '<div style="flex:1 1 300px;min-width:250px;background:' + bg + ';border:1px solid ' + bd + ';border-radius:9px;padding:8px 11px;font-size:12.5px;color:' + col + ';line-height:1.4">' + html + '</div>'; };
+  var izq;
+  if (proy.estado === "ya") izq = chip("#ecfdf5", "#a7f3d0", "#065f46", '✅ <b>Ya se puede pedir</b> — hay ' + _usd0(proy.fobHoy) + ' de demanda, sobre el mínimo de <b>' + _usd0(minUsd) + '</b>.');
+  else if (proy.estado === "nunca") izq = chip("#fef2f2", "#fecaca", "#991b1b", '⚠ <b>No llega a ' + _usd0(minUsd) + ' solo</b> — ni con el stock en 0 (techo ' + _usd0(proy.techo) + ' en 10 meses). <span style="color:#b91c1c">Se consolida con otro proveedor.</span>');
+  else if (proy.estado === "sinburn") izq = chip("#f1f5f9", "#e2e8f0", "#475569", '📉 Sin proyección de consumo cargada: no se puede estimar cuándo llega a ' + _usd0(minUsd) + '.');
+  else izq = chip("#fffbeb", "#fde68a", "#92400e", '⏳ <b>Llega a ' + _usd0(minUsd) + ' en ' + _pedImpMesesTxt(proy.meses) + '</b>' + (proy.fechaIso ? ' (≈ ' + _isoToDdMmAa(proy.fechaIso) + ')' : '') + '. <span style="color:#b45309">Consumo ' + _usd0(_nacNum(proy.burn, 0)) + '/mes.</span>');
+  // el chip de proyección necesita fobHoy/burn; se los pasa el llamador vía proy (los adjunto abajo)
+  var der;
+  var modoTxt = { consolidada: "Consolidada", full: "Contenedor", avion: "Avión" }[nac.modo] || nac.modo;
+  if (!(totUsd > 0)) der = chip("#f1f5f9", "#e2e8f0", "#475569", '🚢 Poné el pedido (columna <b>MC</b>) para ver el costo <b>puesto en Argentina</b>.');
+  else if (nac.sinPeso) der = chip("#fef2f2", "#fecaca", "#991b1b", '✈️ <b>Avión:</b> cargá el <b>peso (TN)</b> arriba para calcular el flete FEDEX.');
+  else der = chip("#eef2ff", "#c7d2fe", "#3730a3", '🚢 <b>Puesto en Arg: ' + _usd0(nac.landed) + '</b> <span style="color:#4338ca">(' + modoTxt + ')</span><br>FOB ' + _usd0(totUsd) + ' + ' + _usd0(nac.noRecup) + ' no recuperable <b>(+' + Math.round(nac.factor * 100) + '%)</b>' + (nac.ntl > 0 ? ' · incl. NTL ' + _usd0(nac.ntl) : ''));
+  return '<div style="display:flex;gap:10px;flex-wrap:wrap;padding:10px 13px;background:#fff;border-bottom:1px solid #f1f5f9">' + izq + der + '</div>';
+}
 async function openPedidosImportacion() {
   _stkPopShell("📦 Pedidos Importación", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
@@ -20669,13 +20788,37 @@ async function openPedidosImportacion() {
   let data = { items: [], meses: 10 };
   try { data = await ocgFetchImportados(); } catch (_e) {}
   // Fecha estimada de entrega global (Stock_Config) — la muestra el carrito de LK.
+  // v22.37 — y en la misma tirada: el mínimo por proveedor (25k default) y los parámetros
+  // de nacionalización guardados (modo / valor m³ flete), todos con default si no hay fila.
   try {
-    const cfg = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Config", "select=valor&clave=eq.entrega_estimada_global");
-    data.entregaGlobal = (cfg && cfg[0] && cfg[0].valor) ? String(cfg[0].valor).slice(0, 10) : "";
-  } catch (_e) { data.entregaGlobal = ""; }
+    const cfg = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Config", "select=clave,valor&clave=in.(entrega_estimada_global,impo_pedido_min_usd,impo_nac_modo,impo_nac_valor_m3)");
+    const _cfgMap = {}; (cfg || []).forEach(function (r) { _cfgMap[r.clave] = r.valor; });
+    data.entregaGlobal = _cfgMap.entrega_estimada_global ? String(_cfgMap.entrega_estimada_global).slice(0, 10) : "";
+    data.minUsd = _nacNum(_cfgMap.impo_pedido_min_usd, _IMPO_MIN_USD_DEFAULT);
+    data.nac = { modo: (_cfgMap.impo_nac_modo || _NAC_DEFAULTS.modo), valorM3: _nacNum(_cfgMap.impo_nac_valor_m3, _NAC_DEFAULTS.valorM3), tn: 0 };
+  } catch (_e) { data.entregaGlobal = ""; data.minUsd = _IMPO_MIN_USD_DEFAULT; data.nac = { modo: _NAC_DEFAULTS.modo, valorM3: _NAC_DEFAULTS.valorM3, tn: 0 }; }
   _stkPop = { kind: "pedImp", data: data, soloPedir: true };
   _pedImpRender();
 }
+/* v22.37 — guarda un parámetro de nacionalización / el mínimo en Stock_Config y re-renderiza.
+   clave: 'impo_pedido_min_usd' | 'impo_nac_modo' | 'impo_nac_valor_m3'. */
+async function pedImpSetNacCfg(clave, valor) {
+  if (!_stkPop || _stkPop.kind !== "pedImp") return;
+  var v = String(valor == null ? "" : valor).trim();
+  // reflejo inmediato en memoria (no esperamos al backend para pintar)
+  if (clave === "impo_pedido_min_usd") _stkPop.data.minUsd = _nacNum(v, _IMPO_MIN_USD_DEFAULT);
+  else if (clave === "impo_nac_modo") _stkPop.data.nac.modo = v || _NAC_DEFAULTS.modo;
+  else if (clave === "impo_nac_valor_m3") _stkPop.data.nac.valorM3 = _nacNum(v, _NAC_DEFAULTS.valorM3);
+  _pedImpRender();
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ clave: clave, valor: v })
+    });
+  } catch (_e) {}
+}
+function pedImpSetNacTn(v) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.data.nac.tn = _nacNum(v, 0); _pedImpRender(); }
 /* v10.38 — filtro Solo Pedido / Ver Todo. */
 function pedImpSetFiltro(solo) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.soloPedir = !!solo; _pedImpRender(); }
 /* Filtro por PROVEEDOR: "" = todas las tarjetas (un box por proveedor), o el nombre de un proveedor = solo ese box. */
@@ -21083,6 +21226,23 @@ function _pedImpRender() {
     '<div style="flex:1;min-width:150px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Total pedido (FOB)' + (_buscando ? ' <span style="color:#0f766e">· filtrado</span>' : '') + '</div><div style="font-size:22px;font-weight:800;color:#065f46">u$s ' + Math.round(_gUsd).toLocaleString("es-AR") + '</div>' + (_nSinFob ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinFob + ' ítem(s) sin FOB cargado</div>' : '') + '</div>' +
     '<div style="flex:1;min-width:150px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Volumen total' + (_buscando ? ' <span style="color:#0f766e">· filtrado</span>' : '') + '</div><div style="font-size:22px;font-weight:800;color:#1e3a8a">' + (Math.round(_gM3 * 100) / 100).toLocaleString("es-AR") + ' m³</div>' + (_nSinVol ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinVol + ' ítem(s) sin volumen cargado</div>' : '') + '</div>' +
     '</div>';
+  // v22.37 — barra de nacionalización + mínimo del pedido. El modo (marítimo consolidado /
+  // contenedor propio / avión) y el valor m³ flete se guardan en Stock_Config; la proyección
+  // usa el mínimo por proveedor (25k default). El costo de traer de China lo calcula
+  // _pedImpNacionalizar (portado del Excel). Cada proveedor = su propio embarque.
+  const _nac = (data.nac || { modo: "consolidada", valorM3: 110, tn: 0 });
+  const _minUsd = _nacNum(data.minUsd, _IMPO_MIN_USD_DEFAULT);
+  const _modoBtn = function (m, txt) { const on = _nac.modo === m; return '<button style="width:auto;flex:0 0 auto;padding:6px 12px;border-radius:999px;border:1px solid ' + (on ? '#7c3aed' : '#cbd5e1') + ';background:' + (on ? '#7c3aed' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer" onclick="pedImpSetNacCfg(\'impo_nac_modo\',\'' + m + '\')">' + txt + '</button>'; };
+  h += '<div style="display:flex;gap:10px 14px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:10px 14px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px">' +
+    '<span style="font-size:12px;font-weight:800;color:#6b21a8;text-transform:uppercase;letter-spacing:.4px">🚢 Nacionalización</span>' +
+    _modoBtn("consolidada", "Consolidada (marítimo)") + _modoBtn("full", "Contenedor propio") + _modoBtn("avion", "Avión") +
+    '<span style="width:1px;height:22px;background:#e9d5ff"></span>' +
+    (_nac.modo === "consolidada" ? '<label style="font-size:12px;color:#6b21a8;font-weight:700;display:flex;align-items:center;gap:5px">Valor m³ flete u$s <input type="number" inputmode="decimal" min="0" value="' + _nac.valorM3 + '" onchange="pedImpSetNacCfg(\'impo_nac_valor_m3\',this.value)" style="width:64px;height:30px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>' : '') +
+    (_nac.modo === "avion" ? '<label style="font-size:12px;color:#6b21a8;font-weight:700;display:flex;align-items:center;gap:5px" title="Peso total del embarque en toneladas (avión cobra por kg)">Peso (TN) <input type="number" inputmode="decimal" min="0" value="' + (_nac.tn || "") + '" onchange="pedImpSetNacTn(this.value)" placeholder="0" style="width:60px;height:30px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>' : '') +
+    '<span style="width:1px;height:22px;background:#e9d5ff"></span>' +
+    '<label style="font-size:12px;color:#6b21a8;font-weight:700;display:flex;align-items:center;gap:5px" title="Mínimo por proveedor para emitir un pedido. La proyección dice cuándo se llega a este monto.">Mínimo pedido u$s <input type="number" inputmode="numeric" min="0" step="1000" value="' + _minUsd + '" onchange="pedImpSetNacCfg(\'impo_pedido_min_usd\',this.value)" style="width:82px;height:30px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>' +
+    '<span style="font-size:11px;color:#7c3aed;flex-basis:100%">El costo NO recuperable (derechos, flete, tasas, despachante' + (Object.keys(_NTL_PROVEEDORES).length ? ' y 5% NTL en Frontier/Fujian/Kangli/Zhixin' : '') + ') queda pegado al costo del artículo. Cada proveedor se calcula como su propio embarque.</span>' +
+    '</div>';
   let algo = false;
   provOrder.forEach(function (prov) {
     if (provFiltro && prov !== provFiltro) return;   // ver solo el chino elegido
@@ -21094,11 +21254,22 @@ function _pedImpRender() {
     const totM3 = arr.reduce(function (s, it) { return s + _pedImpM3Of(it); }, 0);
     const totUsd = arr.reduce(function (s, it) { return s + _pedImpUsdOf(it); }, 0);
     const provEnc = encodeURIComponent(prov);
+    // v22.37 — proyección al mínimo (usa la demanda NATURAL, no el MC editado): FOB a pedir
+    // hoy, consumo mensual (proy×fob) y techo (objetivo lleno×fob).
+    const _isNtl = _esProvNtl(prov);
+    const _fobHoyN = arr.reduce(function (s, it) { return s + (it.aPedirUni > 0 && it.fobUni > 0 ? it.aPedirUni * it.fobUni : 0); }, 0);
+    const _burnN = arr.reduce(function (s, it) { return s + (it.proyUni > 0 && it.fobUni > 0 ? it.proyUni * it.fobUni : 0); }, 0);
+    const _techoN = arr.reduce(function (s, it) { return s + (it.objetivoUni > 0 && it.fobUni > 0 ? it.objetivoUni * it.fobUni : 0); }, 0);
+    const _proy = _pedImpProy25k(_fobHoyN, _burnN, _techoN, _minUsd);
+    // costo de nacionalización SOBRE EL PEDIDO ACTUAL (respeta el MC editado)
+    const _nacR = _pedImpNacionalizar(totUsd, totM3, { modo: _nac.modo, valorM3: _nac.valorM3, tn: _nac.tn, ntl: _isNtl });
     h += '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0">' +
-      '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span><div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div></div>' +
+      '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div></div>' +
       '<button class="mva-clear" style="background:#1e6bd6;color:#fff;border-color:#1e6bd6;flex:0 0 auto" onclick="pedImpPdfProv(\'' + provEnc + '\')" title="PDF del pedido de este proveedor: solo Código, Master Cajas y Unidades (sin FOB)">🖨 PDF pedido</button>' +
       '</div>';
+    // v22.37 — banda de proyección al mínimo + costo de nacionalización estimado.
+    h += _pedImpBandaHtml(_proy, _nacR, _minUsd, totUsd);
     // v11.70 — anchos explícitos por <colgroup> (suman los 1180px del min-width): sin esto
     // las 14 columnas se pisaban entre sí. Bloque diagnóstico (proy→a pedir) | bloque pedido (MC→m³).
     h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide">' +
