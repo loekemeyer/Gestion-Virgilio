@@ -113,8 +113,14 @@ catch (_e) {
       mk({ order_id: 100, razon_social: "Cliente Deudor", cuarentena_motivos: ["deuda", "limite_credito"] }),
       mk({ order_id: 101, razon_social: "Cliente Dos" })
     ];
+    // v22.40 (Thomas): el monto del pedido actual SÓLO corre para clientes nuevos. Este retenido es
+    // un cliente ACTIVO (deuda + límite, sin cliente_nuevo): aunque tenga precio de lista, la columna
+    // Monto muestra "—", no el valor. Lo que importa de un activo es la DEUDA (badge de Motivos).
+    _apr.cliValor = { "lk:100": { valor: 55000, valorIva: 66550 } };
     aprRender(); await new Promise((res) => setTimeout(res, 200));
     html = document.getElementById("pppPreview").innerHTML;
+    out.cuarActivoSinMonto = !/\$55\.000/.test(html) && !/\$66\.550/.test(html) && !/c\/IVA/.test(html);
+    _apr.cliValor = {};
     out.cuentaCuar1 = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);
     out.listaNormal1 = /📋 Pedidos a programar <b>\(1\)<\/b>/.test(html);
     // v14.88: badges separados (b-deuda + b-limite) + botón "Enviar a Pedidos a programar"
@@ -181,7 +187,8 @@ catch (_e) {
     const cliSecIva = htmlIva.slice(htmlIva.indexOf("🧭 Clientes nuevos"));
     const cuarSecIva = htmlIva.slice(htmlIva.indexOf("🚧 Cuarentena"), htmlIva.indexOf("🧭 Clientes nuevos"));
     out.cliMontoIva = /clin-iva[^>]*>c\/IVA \$121\.000/.test(cliSecIva);
-    // v19.94 (Thomas): el retenido por deuda muestra su monto (neto arriba, c/IVA abajo).
+    // v22.40 (Thomas): la fila nuevo-CON-deuda (motivo cliente_nuevo entre los suyos) SÍ muestra su
+    // monto — es cliente nuevo. El activo puro no (se chequea en el bloque 2, cuarActivoSinMonto).
     out.cuarMontoIva = /\$80\.000/.test(cuarSecIva) && /clin-iva[^>]*>c\/IVA \$96\.800/.test(cuarSecIva);
     const msg1 = clinSpeechMsg1({ order_id: 200, empresa: "chef", np: null });
     out.cliMsgTotal = /\$121\.000/.test(msg1) && /IVA incluido/.test(msg1);
@@ -640,6 +647,7 @@ catch (_e) {
   chk(r.textoVacio, "sin retenidos: explica deuda/suspendido/crédito");
   chk(r.listaNormal2, "sin retenidos: los 2 pedidos van a la lista normal");
   chk(r.cuentaCuar1, "con 1 retenido: Cuarentena (1)");
+  chk(r.cuarActivoSinMonto, "el retenido ACTIVO (deuda/límite, sin cliente_nuevo) NO muestra el monto del pedido — sólo los clientes nuevos");
   chk(r.listaNormal1, "el retenido sale de la lista normal (queda 1)");
   chk(r.badge, "el retenido lleva 3 badges separados (deuda + límite)");
   chk(r.enviarBtn, "la ficha tiene el botón 'Enviar a Pedidos a programar'");
