@@ -6138,7 +6138,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.27"></script>
+<script type="module" src="recepcion.js?v=22.28"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10090,7 +10090,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.27";
+const APP_VERSION = "v22.28";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -58652,7 +58652,17 @@ async function _concilRefreshInner(cont, forzar) {
      falla (o si la sesión no es `authenticated`, que es la única que tiene el EXECUTE), la
      pantalla tiene que cargar igual con el caché como esté — que es exactamente lo que hacía
      antes. Es la lección de la v19.44: lo nuevo no se cuelga del await de lo que ya funciona. */
-  try { await _concilConTope(sb.rpc("gv_cruce_fc_asig_refrescar_si_viejo", { p_seg: forzar ? 0 : 180 }), 12000); } catch (_e) { /* el caché viejo sirve */ }
+  /* v22.28 (Luis, 24/09) — el recálculo del cruce YA NO se espera antes de la lista: tardaba
+     2,5 s y con la base cargada sumaba hasta el corte. Corre en paralelo; la lista sale con el
+     caché como esté y, si el recálculo cambió alguna factura (devuelve > 0), se vuelve a pedir
+     sola. -1 = estaba fresco · -2 = otro recálculo en curso · 0 = no cambió nada. */
+  if (!_concil.recalcEnCurso) {
+    _concil.recalcEnCurso = true;
+    _concilConTope(sb.rpc("gv_cruce_fc_asig_refrescar_si_viejo", { p_seg: forzar ? 0 : 180 }), 30000)
+      .then(function (res) { if (res && !res.error && Number(res.data) > 0) concilRefresh(); })
+      .catch(function () { /* el caché viejo sirve */ })
+      .then(function () { _concil.recalcEnCurso = false; });
+  }
   try {
     var pr = await _concilConTope(Promise.all([
       sb.rpc("gv_conciliacion_lista", { p_limit: 300, p_offset: 0, p_q: _concil.q || null, p_empresa: _concil.empresa || null }),
