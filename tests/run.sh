@@ -934,4 +934,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== impo-nacionalizacion (v22.37: costo de traer de China + proyeccion al minimo de 25k por proveedor) =="
 node tests/impo-nacionalizacion.cjs
 
+echo "== ppp-retira-badge (v22.40: un RETIRA no se lee como reparto 'Zona 6 · 🚚 CABA') =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-retira-badge.cjs
+
 _resumen

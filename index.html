@@ -3761,6 +3761,11 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-dest{ display:inline-block; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa;
   border-radius:6px; padding:0 7px; font-size:12.5px; font-weight:800; margin-left:8px;
   vertical-align:1px; white-space:nowrap; }
+/* v22.40 — RETIRA: lo viene a buscar el cliente al depósito, NO va en camión. Chip propio, y
+   se esconden la zona de reparto y el 🚚 del expreso (que hacían leer "Zona 6 · 🚚 CABA"). */
+.pga-ret{ display:inline-block; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1;
+  border-radius:6px; padding:0 7px; font-size:12.5px; font-weight:800; margin-left:8px;
+  vertical-align:1px; white-space:nowrap; }
 .pga-ped{ color:#94a3b8; font-size:13px; margin-left:8px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 /* v17.85 (Luis): las acciones de la fila de la NP.
    v17.94: van ANCLADAS A LA DERECHA de la columna, no colgando detrás del texto. Quedan siempre en
@@ -6101,7 +6106,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.39"></script>
+<script type="module" src="recepcion.js?v=22.40"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10052,7 +10057,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.39";
+const APP_VERSION = "v22.40";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -40708,13 +40713,21 @@ function _pgaCuerpoHtml(dias, opts) {
         const est = PGA_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
         // v17.76 (Luis): "que ahí aparezca el código de cliente (si es pedido de LK el código LK,
         // si es de CH, CH), barrio al lado de zona y fecha de pedido".
-        const _lug = [r.zona_corta || r.localidad || "", r.barrio || ""]
-          .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
         // v20.45 (Luis): el destino REAL. `_lug` sigue diciendo la zona del camión (el galón del
         // expreso, en CABA) y al lado va a dónde termina la mercadería: "Snaider · Misiones".
         // Se muestra sólo cuando hay EXPRESO: en un reparto propio la provincia es la de la zona
         // que ya se está leyendo al lado, y repetirla en cada fila de CABA es ruido.
         const _dst = _pgaDestDe(r), _mis = !!(_dst && _dst.alerta);
+        // v22.40 — RETIRA lo viene a buscar el cliente al depósito: NO va en camión. La zona que
+        // trae ("Zona 6 - GBA Norte") es la del cliente en el padrón, no un reparto, así que
+        // mostrarla con el 🚚 del expreso ("Zona 6 · Retira 🚚 CABA") se lee como si saliera a
+        // GBA Norte. Cuando es Retira se esconde esa zona/expreso y se muestra un chip claro.
+        // Lo decide el PEDIDO (regla v20.74): el destino de gv_np_destino o el barrio/zona.
+        const _esRet = (_dst && String(_dst.expreso || "").trim().toLowerCase() === "retira")
+          || String(r.barrio || "").trim().toLowerCase() === "retira"
+          || String(r.zona_corta || r.zona || "").trim().toLowerCase() === "retira";
+        const _lug = _esRet ? "" : [r.zona_corta || r.localidad || "", r.barrio || ""]
+          .filter(function (x, i, a) { return x && a.indexOf(x) === i; }).join(" · ");
         // v20.56 (Luis): la pastilla NETEA igual que las columnas — si la NP ya salió en el
         // camión dice Salió, no Facturado. El estado de abajo queda en el `title`.
         const _sal = _pgaSalio(r), estVis = _sal ? "salio" : est;
@@ -40751,7 +40764,8 @@ function _pgaCuerpoHtml(dias, opts) {
               escapeHtml(r.empresa || "LK") + " " + escapeHtml(r.cod) + '</span>' : '') +
             '<span class="pga-cli" title="' + escapeHtml(r.razon_social || "") + '">' + escapeHtml(r.razon_social || "—") + '</span>' +
             (_lug ? '<span class="pga-loc">' + escapeHtml(_lug) + '</span>' : '') +
-            ((_dst && _dst.expreso && _dst.destino_txt)
+            (_esRet ? '<span class="pga-ret" title="Lo retira el cliente en el depósito (Virgilio 2788). NO va en camión: la zona del cliente no cuenta para el reparto.">🏭 Retira</span>' : '') +
+            ((_dst && _dst.expreso && _dst.destino_txt && !_esRet)
               ? '<span class="pga-dest" title="Destino del expreso. La zona de al lado es dónde lo deja el camión (el galón del expreso, en CABA); esto es dónde termina la mercadería.">🚚 ' +
                 escapeHtml(_dst.destino_txt) + '</span>' : '') +
             (_mis ? '<span class="pga-mis" title="Pedido a una provincia marcada (PPP_Web_Config.provincias_alerta).">' +
@@ -47852,6 +47866,9 @@ function aprEsProvMarcada(p) {
 function aprDestinoChip(p) {
   const d = aprDestino(p);
   if (!d || !d.expreso) return "";
+  // v22.40 — un RETIRA no va en camión: no lleva el chip de destino del expreso (lo marca su
+  // zona "Retira"). Sin esto se leía "🚚 Retira · CABA", como si saliera a reparto.
+  if (String(d.expreso || "").trim().toLowerCase() === "retira") return "";
   const txt = [d.expreso, d.provincia].filter(Boolean).join(" · ");
   return '<span class="apr-chip apr-chip-dest" title="Destino del expreso. La zona de al lado es dónde lo deja el camión (el galón del expreso, en CABA); esto es dónde termina la mercadería.">🚚 ' +
     escapeHtml(txt) + '</span>';
