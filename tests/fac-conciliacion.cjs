@@ -160,7 +160,16 @@ catch (_e) {
   if (!/FC-A-0005-00000908/.test(r.html)) fails.push("falta el nº de comprobante");
   if (!/Sin factura aún/.test(r.html) || !/OK/.test(r.html) || !/Diferencia/.test(r.html)) fails.push("faltan estados (OK / Sin factura / Diferencia)");
   if (!/2 s\/precio/.test(r.html)) fails.push("no marca artículos sin precio");
-  if (!/1 OK/.test(r.resumen) || !/1 con diferencia/.test(r.resumen) || !/1 sin factura/.test(r.resumen)) fails.push("resumen no usa los totales: " + r.resumen);
+  // v22.25: el resumen cuenta la diferencia de HOY (factura − cálculo actual), no la del snapshot.
+  if (!/1 igual a ISIS/.test(r.resumen) || !/1 con diferencia/.test(r.resumen) || !/1 sin factura/.test(r.resumen)) fails.push("resumen no cuenta la diferencia de hoy: " + r.resumen);
+  if (!/791\.011/.test(r.html)) fails.push("la columna Diferencia no muestra la de HOY (factura − cálculo actual = $ 791.011)");
+  if (!/⚠ Diferencia/.test(r.html)) fails.push("la NP con diferencia no queda marcada (⚠ Diferencia)");
+  {
+    const src = require("fs").readFileSync(require("path").join(__dirname, "..", "index.html"), "utf8");
+    if (!/onclick="concilRefresh\(true\)"/.test(src)) fails.push("el botón ↻ Refrescar no fuerza el recálculo del cruce");
+    if (!/_concilConTope\(sb\.rpc\("gv_cruce_fc_asig_refrescar_si_viejo"/.test(src)) fails.push("el refresco del cruce no tiene tope de tiempo (el botón queda en 'Actualizando…')");
+    if (!/finally \{\s*_concil\.cargando = false;/.test(src)) fails.push("concilRefresh no libera el estado en un finally");
+  }
   if (!r.motivoCol) fails.push("falta la columna '¿Por qué?'");
   if (!r.motivoTxt) fails.push("la columna motivo no muestra la causa (809E)");
   if (!r.detTwoPane) fails.push("el modal no tiene el panel del PDF embebido al lado de la comparación (#concilDetPdf)");

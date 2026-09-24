@@ -24,7 +24,9 @@
       "Bash(node tests/apr-cuar-isis-confirm.cjs)",
       "Bash(node scripts/bump-version.cjs 22.21)",
       "Bash(node scripts/bump-version.cjs 22.22)",
-      "Bash(node scripts/bump-version.cjs 22.23)"
+      "Bash(node scripts/bump-version.cjs 22.23)",
+      "Bash(node scripts/bump-version.cjs 22.25)",
+      "Bash(timeout 180 node tests/fac-conciliacion.cjs)"
     ]
   }
 }

@@ -5976,7 +5976,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <select id="concilEmp" class="fac-concil-inp" onchange="_concil.empresa=this.value||null;concilRefresh();">
         <option value="">Todas las empresas</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option>
       </select>
-      <button id="concilBtnRefr" class="fac-concil-btn" onclick="concilRefresh()">↻ Refrescar</button>
+      <button id="concilBtnRefr" class="fac-concil-btn" onclick="concilRefresh(true)">↻ Refrescar</button>
       <button id="concilBtnSoloDiff" class="fac-concil-toggle" onclick="concilToggleSoloDiff()" title="Mostrar sólo las NP con diferencia (o que la tuvieron y ya se corrigieron)">Sólo diferencias: <b>OFF</b></button>
     </div>
     <div id="concilResumen" class="fac-concil-res">Cargando…</div>
@@ -6138,7 +6138,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.24"></script>
+<script type="module" src="recepcion.js?v=22.25"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10090,7 +10090,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.24";
+const APP_VERSION = "v22.25";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -58589,11 +58589,40 @@ function concilToggleSoloDiff() {
   concilRender();
 }
 window.concilToggleSoloDiff = concilToggleSoloDiff;
-function _concilEsDiff(r) { return r.estado === "diff" || r.corregido; }
+/* v22.25 (Luis) — la diferencia que se muestra es la de HOY: factura de ISIS − cálculo actual de
+   Gestión (lo armado × precio). La del momento de mandar a facturar queda en el tooltip. Una NP
+   sigue en rojo mientras la factura no coincida con lo armado: para eso está la Conciliación. */
+function _concilDiffHoy(r) {
+  if (r.factura_neto == null) return null;
+  var base = (r.neto_actual != null) ? r.neto_actual : r.neto_gestion;
+  if (base == null) return null;
+  return Math.round((Number(r.factura_neto) - Number(base)) * 100) / 100;
+}
+function _concilEsDiff(r) { var d = _concilDiffHoy(r); return d != null && Math.abs(d) > 100; }
 
-async function concilRefresh() {
+/* v22.25 (Luis: "el botón de actualizar me parece que está roto") — dos cosas:
+   1) sb.rpc no tiene tope: si una llamada no contestaba, `_concil.cargando` quedaba en true, el
+      botón en "Actualizando…" para siempre y todo clic siguiente salía por el `return`. Ahora cada
+      llamada tiene tope y el estado se libera SIEMPRE.
+   2) el botón fuerza recalcular el cruce NP↔factura (p_seg 0); abrir la pestaña o buscar usa el
+      caché si tiene menos de 3 min. Una búsqueda tipeada mientras carga no se pierde: se re-corre. */
+function _concilConTope(pr, ms) {
+  return Promise.race([pr, new Promise(function (_, rej) {
+    setTimeout(function () { rej(new Error("la base tardó más de " + Math.round(ms / 1000) + " s. No se perdió nada: probá de nuevo.")); }, ms);
+  })]);
+}
+async function concilRefresh(forzar) {
   var cont = document.getElementById("concilTabla"); if (!cont) return;
-  if (_concil.cargando) return; _concil.cargando = true;
+  if (_concil.cargando) { _concil.pendiente = true; return; }
+  _concil.cargando = true; _concil.pendiente = false;
+  try { await _concilRefreshInner(cont, forzar === true); }
+  finally {
+    _concil.cargando = false;
+    var rb2 = document.getElementById("concilBtnRefr"); if (rb2) { rb2.disabled = false; rb2.textContent = "↻ Refrescar"; }
+    if (_concil.pendiente) { _concil.pendiente = false; setTimeout(function () { concilRefresh(); }, 0); }
+  }
+}
+async function _concilRefreshInner(cont, forzar) {
   var rb = document.getElementById("concilBtnRefr"); if (rb) { rb.disabled = true; rb.textContent = "Actualizando…"; }
   if (!_concil.rows.length) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
   /* v19.60 — el cruce NP↔factura se recalcula CUANDO ALGUIEN MIRA, no cuando toca el reloj.
@@ -58605,22 +58634,20 @@ async function concilRefresh() {
      falla (o si la sesión no es `authenticated`, que es la única que tiene el EXECUTE), la
      pantalla tiene que cargar igual con el caché como esté — que es exactamente lo que hacía
      antes. Es la lección de la v19.44: lo nuevo no se cuelga del await de lo que ya funciona. */
-  try { await sb.rpc("gv_cruce_fc_asig_refrescar_si_viejo", { p_seg: 180 }); } catch (_e) { /* el caché viejo sirve */ }
+  try { await _concilConTope(sb.rpc("gv_cruce_fc_asig_refrescar_si_viejo", { p_seg: forzar ? 0 : 180 }), 12000); } catch (_e) { /* el caché viejo sirve */ }
   try {
-    var pr = await Promise.all([
+    var pr = await _concilConTope(Promise.all([
       sb.rpc("gv_conciliacion_lista", { p_limit: 300, p_offset: 0, p_q: _concil.q || null, p_empresa: _concil.empresa || null }),
       sb.rpc("gv_conciliacion_totales", { p_empresa: _concil.empresa || null })
-    ]);
+    ]), 20000);
     if (pr[0].error) throw pr[0].error;
     _concil.rows = pr[0].data || [];
     var tot = {}; (pr[1].data || []).forEach(function (r) { tot[r.estado] = { n: Number(r.n) || 0, suma: Number(r.suma_diff) || 0 }; });
     _concil.tot = tot;
   } catch (e) {
     cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">No se pudo cargar la conciliación: ' + escapeHtml((e && e.message) || String(e)) + '</div>';
-    _concil.cargando = false; if (rb) { rb.disabled = false; rb.textContent = "↻ Refrescar"; } return;
+    return;
   }
-  _concil.cargando = false;
-  if (rb) { rb.disabled = false; rb.textContent = "↻ Refrescar"; }
   concilRender();
 }
 window.concilRefresh = concilRefresh;
@@ -58669,40 +58696,44 @@ function concilRender() {
   if (!cont) return;
   var rows = _concil.rows, tot = _concil.tot || {};
   function _n(k) { return tot[k] ? tot[k].n : 0; }
-  var nTot = Object.keys(tot).reduce(function (a, k) { return a + tot[k].n; }, 0) || rows.length;
-  var nCorr = rows.filter(function (r) { return r.corregido; }).length;
+  var nTot = rows.length;
+  var realD = rows.filter(_concilEsDiff);
+  var sumD = realD.reduce(function (a, r) { return a + _concilDiffHoy(r); }, 0);
+  var nOk = rows.filter(function (r) { var d = _concilDiffHoy(r); return d != null && Math.abs(d) <= 100; }).length;
+  var nCorr = rows.filter(function (r) { return r.estado === "diff" && _concilDiffHoy(r) != null && !_concilEsDiff(r); }).length;
+  var nSinF = rows.filter(function (r) { return r.factura_neto == null; }).length;
   var shown = _concil.soloDiff ? rows.filter(_concilEsDiff) : rows;
   if (res) res.innerHTML =
     '<b>' + nTot + '</b> NP mandadas a facturar · ' +
-    '<span style="color:#059669;">' + _n("ok") + ' OK</span> · ' +
-    '<span style="color:#dc2626;">' + _n("diff") + ' con diferencia' + (tot.diff ? ' (' + _fmtPlata(tot.diff.suma) + ')' : '') + '</span> · ' +
-    (nCorr ? '<span style="color:#047857;">' + nCorr + ' ya corregidas</span> · ' : '') +
-    '<span style="color:#64748b;">' + _n("sin_factura") + ' sin factura aún</span> · ' +
-    '<span style="color:#94a3b8;">' + _n("sin_neto") + ' sin neto</span>' +
+    '<span style="color:#059669;">' + nOk + ' igual a ISIS</span> · ' +
+    '<span style="color:#dc2626;font-weight:800;">' + realD.length + ' con diferencia (' + _fmtPlata(sumD) + ')</span> · ' +
+    (nCorr ? '<span style="color:#047857;">' + nCorr + ' corregidas en el cálculo</span> · ' : '') +
+    '<span style="color:#64748b;">' + nSinF + ' sin factura aún</span>' +
     (_concil.soloDiff ? ' · <b style="color:#b91c1c;">mostrando sólo diferencias</b>' : '') +
-    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">Snapshot: <b>Gestión</b> = lo que se mandó a facturar (cajas entregadas × lista × descuento, congelado al facturar). <b>ISIS</b> = neto de la factura parseada (match por cliente + fecha ±3 días + cajas; se completa cuando ISIS la sube). <b>✔ Corregido</b> = tenía diferencia pero el cálculo actual ya coincide con ISIS. Los súper (🛒) no están bien modelados en el cálculo — su diferencia es esperada.</div>';
+    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;"><b>Diferencia hoy</b> = factura de ISIS − lo armado valorizado hoy (cajas entregadas × precio × descuento; súper al precio de su última factura). En rojo = la factura no coincide con lo armado: el <b>¿Por qué?</b> dice qué artículo o qué cantidad. <b>✔ Corregido</b> = se mandó con diferencia de cálculo y hoy ya coincide. <b>ISIS</b> = factura parseada (cruce por cliente, fecha, cajas y artículos; se completa cuando ISIS la sube).</div>';
   if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Todavía no se mandó nada a facturar. Cada NP que factures (Excel ISIS o tilde ✓) aparece acá.</div>'; return; }
   if (!shown.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">No hay NP con diferencia. 🎉 (Sacá "Sólo diferencias" para ver todas.)</div>'; return; }
   var h = '<div style="overflow-x:auto;"><table class="fac-concil-tbl"><thead><tr>' +
     '<th>NP</th><th>Cliente</th><th>Facturado</th><th style="text-align:right;">Cajas ges/isis</th>' +
     '<th style="text-align:right;">Gestión (mandado)</th><th style="text-align:right;">ISIS (facturado)</th>' +
-    '<th style="text-align:right;">Diferencia</th><th>Estado</th><th>¿Por qué?</th><th>Comparar</th></tr></thead><tbody>';
+    '<th style="text-align:right;">Diferencia hoy</th><th>Estado</th><th>¿Por qué?</th><th>Comparar</th></tr></thead><tbody>';
   h += shown.map(function (r, i) {
     var est = CONCIL_EST[r.estado] || ["#334155", r.estado];
     var sp = r.storage_path ? String(r.storage_path).replace(/\\/g, "\\\\").replace(/'/g, "\\'") : "";
-    var curDiff = (r.neto_actual != null && r.factura_neto != null) ? (Number(r.factura_neto) - Number(r.neto_actual)) : null;
-    var estCell = r.corregido
-      ? '<span style="color:#047857;font-weight:800;" title="Se mandó a facturar con una diferencia de ' + (r.diff != null ? _fmtPlata(r.diff) : "") + ', pero el cálculo actual de Gestión ya da IGUAL que ISIS. Tocá 🔍 Comparar.">✔ Corregido</span>'
-      : '<span style="color:' + est[0] + '">' + est[1] + '</span>';
-    // Diferencia: en las corregidas mostramos el estado ACTUAL (≈$0, verde); en el resto, el diff del snapshot.
-    var diffCell = r.corregido
-      ? '<span style="color:#047857;font-weight:bold;" title="Se mandó con ' + (r.diff != null ? _fmtPlata(r.diff) + (r.diff_pct != null ? " (" + r.diff_pct + "%)" : "") : "—") + '">✔ igual hoy</span>'
-      : (r.diff != null ? '<span style="color:' + (r.diff > 0 ? "#dc2626" : (r.diff < 0 ? "#b45309" : "#334155")) + ';">' + _fmtPlata(r.diff) + (r.diff_pct != null ? ' (' + (r.diff_pct > 0 ? "+" : "") + r.diff_pct + '%)' : '') + '</span>' : "—");
-    // v14.42 — el motivo NO viene en el listado (evita el timeout): se pide on-demand por NP
-    // (concilCargarMotivos), sólo para las filas con diferencia no corregidas.
-    var needMot = (r.estado === "diff" && !r.corregido && r.factura_neto != null);
+    var dHoy = _concilDiffHoy(r), esD = _concilEsDiff(r);
+    var snapTxt = r.diff != null ? "Al mandar a facturar: " + _fmtPlata(r.diff) + (r.diff_pct != null ? " (" + r.diff_pct + "%)" : "") : "";
+    var estCell = esD
+      ? '<span style="color:#dc2626;font-weight:800;" title="La factura de ISIS no coincide con lo armado. Mirá ¿Por qué? y 🔍 Comparar.">⚠ Diferencia</span>'
+      : ((r.estado === "diff" && dHoy != null)
+          ? '<span style="color:#047857;font-weight:800;" title="' + escapeHtml(snapTxt) + ' · el cálculo actual de Gestión ya da igual que ISIS.">✔ Corregido</span>'
+          : '<span style="color:' + est[0] + '">' + est[1] + '</span>');
+    // v22.25: la diferencia de HOY (factura − cálculo actual); la del snapshot va en el tooltip.
+    var diffCell = (dHoy == null) ? "—"
+      : (esD ? '<span style="color:' + (dHoy > 0 ? "#dc2626" : "#b45309") + ';" title="' + escapeHtml(snapTxt) + '">' + _fmtPlata(dHoy) + '</span>'
+             : '<span style="color:#047857;" title="' + escapeHtml(snapTxt) + '">✔ igual</span>');
+    var needMot = esD;
     var motivoCell = r.motivo ? escapeHtml(r.motivo) : (needMot ? '<span style="color:#94a3b8;">…</span>' : "");
-    return '<tr>' +
+    return '<tr' + (esD ? ' style="background:#fef2f2;"' : '') + '>' +
       '<td><b>' + escapeHtml(r.np || "") + '</b> ' + _npSrcChip(r.np) + '</td>' +
       '<td>' + escapeHtml((r.cod_cliente || "") + " " + (r.razon_social || "—")) + (r.es_super ? " 🛒" : "") + '</td>' +
       '<td style="font-size:12px;color:#64748b;white-space:nowrap;">' + _concilFecha(r.registrado_at) + (r.tanda ? ' <span style="color:#94a3b8;">' + escapeHtml(r.tanda) + '</span>' : '') + '</td>' +
@@ -58733,7 +58764,7 @@ function concilCargarMotivos(shown) {
   var cola = [];
   (shown || []).forEach(function (r, i) {
     if (r.motivo) return; // ya vino (por si un día se precalcula)
-    if (!(r.estado === "diff" && !r.corregido && r.factura_neto != null)) return;
+    if (!_concilEsDiff(r)) return;
     cola.push({ r: r, i: i });
   });
   var next = 0;

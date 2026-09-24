@@ -29699,3 +29699,18 @@ la L pelada de los dos lados) y ventana hasta `facturado_at + 3`. Asignadas 958 
 cambios mejoran la coincidencia (7 pares de ISIS intercambiados, 8 NP de Chef 44612-44619 que no
 tenían factura). Conciliación 204 de 215 iguales. Refresco 1,3 s.
 `sql/gv_cruce_fc_asignacion_v2223.sql`.
+
+## §3.nb — v22.25: Conciliación marca la diferencia de HOY + botón Refrescar (Luis, 2026-09-24)
+
+Luis: *"la conciliación sirve para agarrar justamente esas diferencias, debería quedar marcada"*.
+La columna mostraba la diferencia del snapshot (lo que se mandó a facturar), así que una NP con el
+cálculo viejo roto (LK 0007: −$496.117) escondía la diferencia real (−$25.585, 323E no facturado).
+Ahora (sólo front, los datos ya venían): **Diferencia hoy** = factura ISIS − `neto_actual`; la fila
+va en rojo con **⚠ Diferencia** y su **¿Por qué?**; el snapshot queda en el tooltip. El resumen
+cuenta desde las filas: igual a ISIS · con diferencia ($) · corregidas en el cálculo · sin factura.
+
+**Botón ↻ Refrescar:** `sb.rpc` no tiene tope; si una llamada no volvía, `_concil.cargando` quedaba
+en true y el botón en «Actualizando…» para siempre. Ahora cada llamada tiene tope (12 s el cruce,
+20 s la lista), el estado se libera en un `finally`, el botón fuerza recalcular el cruce
+(`p_seg 0`) y una búsqueda tipeada mientras carga se re-corre. `tests/fac-conciliacion.cjs`
+(verificado que falla contra el código anterior).
