@@ -723,6 +723,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== comp-tope-pickeado (v20.91: el armado no entrega mas de lo que se pickeo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-tope-pickeado.cjs
+echo "== comp-falt-ventana (v22.45: el armado ve los faltantes de un picking de hace dias) =="
+node tests/comp-falt-ventana.cjs
 
 echo "== comp-armado-viejo-no-traba (v20.91: un armado anterior al picking no traba el armado de verdad) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/comp-armado-viejo-no-traba.cjs

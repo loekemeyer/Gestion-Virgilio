@@ -6106,7 +6106,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.44"></script>
+<script type="module" src="recepcion.js?v=22.45"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10057,7 +10057,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.44";
+const APP_VERSION = "v22.45";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13493,7 +13493,13 @@ async function faltantesDeTanda(tanda) {
   const t = String(tanda || "").trim().toUpperCase();
   if (!t) return [];
   try {
-    const since = encodeURIComponent(new Date(Date.now() - 5 * 86400000).toISOString());
+    /* v22.45 (Luis, 24/09) - ventana de 45 dias, no 5. Con 5, una tanda pickeada y armada
+       mas tarde (E41A: pickeada 15/09, armada 24/09) perdia sus faltantes: el armado creia
+       que se habia levantado TODO (865E 16 en vez de 1), el tope v20.91 tampoco lo veia, y el
+       "de menos / sin gondola" resto 15 de un Pickeados en 0. El filtro es por el prefijo de
+       la tanda y los codigos no se reciclan (gv_ppp_web_codigo_tomado), asi que el rango
+       largo no mezcla tandas. */
+    const since = encodeURIComponent(new Date(Date.now() - 45 * 86400000).toISOString());
     const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.PKC&texto=ilike." +
       encodeURIComponent(t + "|") + "*&ts_cliente=gte." + since +
       "&select=texto&order=ts_cliente.desc&limit=4000";
