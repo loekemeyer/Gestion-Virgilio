@@ -29661,3 +29661,28 @@ iguales hoy. `gv_conciliacion_lista` 1.033 ms.
 - CH 0006: la factura asignada tiene otros artículos → el cruce NP↔FC eligió otra factura.
 
 `sql/gv_conciliacion_empresa_np_web_v2219.sql`. Rollback en el archivo.
+
+## §3.mz — v22.22: Conciliación — timeout, 2 % web por condición, precio súper de la última factura (Luis, 2026-09-24)
+
+**Timeout ("Actualizando…" colgado):** el front refresca `GV_Cruce_FC_Asig` y después
+`gv_conciliacion_lista` lo **volvía a refrescar adentro**; con el `statement_timeout` de 8 s del
+rol `authenticator` se cortaba (logs: `canceling statement` 10:52 ART en lista, totales, motivos y
+el refresco). Se sacó el refresco de la lista. Medido: lista 1.795 ms, vista neto 1.307 ms.
+A esa misma hora también cortaron `gv_cuarentena_marcar` y `gv_ppp_web_dia_salida`: la base
+estaba cargada en general (ninguna consulta sola pasa el 2,8 % del tiempo).
+
+**`vista_facturacion_neto_items`, LK y Chef:**
+- **2 % web** (regla §3.bl): no súper **y** condición de cotizador. «Sin Cotizador» → sin 2 %.
+  Condición: del pedido si es web (`lk_pedidos_match.metodo_pago`), de la factura de ISIS si la NP
+  se tipeó en ISIS. Las 6 NP que ISIS facturó sin 2 % eran todas «Sin Cotizador».
+- **Súper:** precio canónico = última factura de ISIS a ese cliente/código
+  (`GV_Precio_Facturado_Cache`, precio_bruto + dto_pct). Cencosud 44610/44611 quedan iguales.
+
+**Motivo:** `gv_conciliacion_motivo` nombra la diferencia real: *armado ≠ facturado: 583E 20 vs 10*,
+*armado y no facturado*, *facturado y no armado*, *precio*, *Gestión/la factura aplicó 2 % web*.
+
+**Resultado:** iguales hoy 188 → **195 de 207** facturadas; ninguna que daba igual se rompió.
+Quedan 12, todas reales: armado ≠ facturado (98667, 98645, 98644, 98662, 98673, 98690, LK 0007,
+44609), CH 0010 (727E armado / 727EN facturado + 438E armado sin L), CH 0006 (factura de otro
+pedido), LK 0097 (web «Contado» y ISIS la facturó «Sin Cotizador» sin 2 %), Matiz 97889 (UxC del
+55219 a definir). `sql/gv_facturacion_neto_items_v2222.sql`.
