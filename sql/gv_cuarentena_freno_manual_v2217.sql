@@ -119,3 +119,34 @@ select * from (values
    'al liberar de cuarentena el pedido se reevalua: no vuelve solo a su tanda previa','Luis','v22.17')
 ) v(objeto, clase, patron, regla, quien_pidio, version)
 where not exists (select 1 from public."GV_Reglas_Centinela" c where c.objeto = v.objeto and c.patron = v.patron);
+
+-- v22.18 (Luis, 24/09: "fijate que eso no rompa la tanda o el pedido, que no queden datos del
+-- picking o del armado que después distorsionen cosas"). Al liberar, la memoria de la tanda se
+-- borra SÓLO si ese pedido no llegó a pickearse ni armarse ahí (flags de GV_PPP_Web_Retenido,
+-- que son la foto del pedido al sacarlo) y no tiene Entregas_Virgilio vivas (sin -X). Si tiene,
+-- la memoria queda: el armador lo sigue salteando (a0b) y A Programar muestra el aviso rojo de la
+-- tanda avanzada, para que decida una persona. Probado en transacción abortada:
+-- limpio → borrado (0) · ya_armada → queda (1) · con Entregas_Virgilio → queda (1).
+do $apply$
+declare d text; n text;
+begin
+  d := pg_get_functiondef('public.gv_cuarentena_liberar(text,text,text[],text,text,text,text)'::regprocedure);
+  if position('v22.18-cuar' in d) > 0 then return; end if;
+  n := replace(d,
+    '    delete from public."GV_PPP_Web_Retenido" t' || chr(10) ||
+    '     where t.empresa = lower(p_empresa) and t.order_id = v_clave::bigint;',
+    '    -- v22.18-cuar (Luis, 24/09: "que no queden datos del picking o del armado que distorsionen"):' || chr(10) ||
+    '    -- sólo se olvida la tanda si ESTE pedido no llegó a pickearse ni armarse ahí. Si ya tenía' || chr(10) ||
+    '    -- picking/armado, la memoria QUEDA: el armador lo sigue salteando (a0b) y A Programar muestra' || chr(10) ||
+    '    -- el aviso rojo de la tanda avanzada, para que una persona decida con eso a la vista.' || chr(10) ||
+    '    delete from public."GV_PPP_Web_Retenido" t' || chr(10) ||
+    '     where t.empresa = lower(p_empresa) and t.order_id = v_clave::bigint' || chr(10) ||
+    '       and not exists (select 1 from public."GV_PPP_Web_Retenido" x' || chr(10) ||
+    '                        where x.empresa = t.empresa and x.order_id = t.order_id' || chr(10) ||
+    '                          and (x.ya_pickeada or x.ya_armada))' || chr(10) ||
+    '       and not exists (select 1 from public."Entregas_Virgilio" e' || chr(10) ||
+    '                        where upper(btrim(e.np)) = upper(public.gv_ppp_web_np_label(t.empresa, t.np, t.np_idx))' || chr(10) ||
+    '                          and coalesce(e.tanda, '''') !~ ''-X$'');');
+  if n = d then raise exception 'liberar: el texto vivo no matchea, no se aplicó'; end if;
+  execute n;
+end $apply$;

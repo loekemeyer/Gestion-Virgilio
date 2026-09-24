@@ -2200,7 +2200,13 @@ sano y a las 10:03:38 se programó a mano (terminó en E92A). Nadie lo aprobó. 
 | **front** | `aprGenerarTanda` no programa un pedido web cuya cuarentena no se pudo VERIFICAR (`p._cuarOk`, lo pone la marcación sólo en los pedidos de su lote). Sin marca no hay "no retiene": hay "no sé" |
 | **liberar** | `gv_cuarentena_liberar` borra la fila de `GV_PPP_Web_Retenido`: aprobado, el pedido **olvida la tanda de la que lo sacaron** y el armador lo reprograma con la lógica normal. En cuarentena el chip dice *"↻ al aprobarlo se reprograma"*, no *"vuelve a E92A"* |
 
-⚠ **Las NP de ISIS no tienen el freno del servidor** (el armador tampoco las evalúa): sólo web.
+⚠ **Olvidar la tanda es SÓLO para el pedido limpio** (v22.18, Luis: *"que no queden datos del picking
+o del armado que después distorsionen"*): si al sacarlo ya estaba pickeado o armado
+(`ya_pickeada`/`ya_armada` de la tabla, que acá SÍ es la foto correcta: la del pedido) o tiene
+`Entregas_Virgilio` vivas, la memoria **queda**, el armador lo sigue salteando y decide una persona.
+
+⚠ **Las NP de ISIS no tienen el freno del servidor** (el armador tampoco las evalúa): sólo web. No
+entran más NP de ISIS nuevas (Luis, 24/09), así que no se extiende.
 **Chequeo:** `select * from public.gv_reglas_perdidas;` · `node tests/apr-cuar-freno-manual.cjs` ·
 `node tests/apr-fit.cjs`. `sql/gv_cuarentena_freno_manual_v2217.sql`.
 

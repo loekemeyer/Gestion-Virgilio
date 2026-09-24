@@ -17,7 +17,8 @@
       "Bash(node tests/encoding-utf8.cjs)",
       "Bash(node tests/pipe-composicion.cjs)",
       "Bash(node scripts/bump-version.cjs 22.15)",
-      "Bash(node scripts/bump-version.cjs 22.16)"
+      "Bash(node scripts/bump-version.cjs 22.16)",
+      "Bash(node scripts/bump-version.cjs 22.18)"
     ]
   }
 }
