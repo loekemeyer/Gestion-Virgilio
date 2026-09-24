@@ -22,7 +22,8 @@
       "Bash(sed -i 's/v22\\\\.17 \\(Luis, 24\\\\/09\\)/v22.19 \\(Luis, 24\\\\/09\\)/' sql/gv_armado_filtros_antes_tope_v2217.sql)",
       "Bash(node scripts/bump-version.cjs 22.19)",
       "Bash(node tests/apr-cuar-isis-confirm.cjs)",
-      "Bash(node scripts/bump-version.cjs 22.21)"
+      "Bash(node scripts/bump-version.cjs 22.21)",
+      "Bash(node scripts/bump-version.cjs 22.22)"
     ]
   }
 }
