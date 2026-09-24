@@ -15391,13 +15391,19 @@ let _artNombres = null;
 async function loadArtNombres() {
   if (_artNombres) return _artNombres;
   const m = {}, H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  try { const r = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_nombres_articulos", "select=cod,descripcion&order=cod.asc"); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.cod), d = String(x.descripcion || "").trim(); if (k && d) m[k] = d; }); } catch (_e) {}
+  /* v22.32 (Luis, 24/09: "862 sin descripción") — supaFetchAllSafe devuelve el ARRAY de filas, no
+     un Response: el `if (r.ok)` de antes daba siempre false, el mapa quedaba VACÍO y artNombre()
+     caía al texto del libro de stock en TODA la app (862 salía "862", 763 vacío). */
+  try { const r = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_nombres_articulos", "select=cod,descripcion&order=cod.asc"); (Array.isArray(r) ? r : []).forEach(function (x) { const k = _ocgNorm(x.cod), d = String(x.descripcion || "").trim(); if (k && d) m[k] = d; }); } catch (_e) {}
   /* v19.77 - si el fetch fallo el mapa queda VACIO; no cachearlo, o artNombre() devuelve el
      fallback (la descripcion del libro) para toda la sesion y no hay forma de recuperarse. */
   if (Object.keys(m).length) _artNombres = m;
   return m;
 }
 function artNombre(cod, fb) { const n = _artNombres && _artNombres[_ocgNorm(cod)]; return n || fb || ""; }
+// v22.32: el padrón se precarga al abrir la app, así toda pantalla que dibuja una descripción
+// (artNombre) la saca del mismo lado aunque no haya llamado a loadArtNombres antes.
+setTimeout(function () { try { loadArtNombres(); } catch (_e) {} }, 1500);
 /* v11.39 — MARCA/LÍNEA (LK/CH), fuente ÚNICA: vista Supabase `vista_marca_articulo`
    (prioridad OC_Maximos.linea → Articulos_Cajas.Marca). El sufijo del propio código
    (" LK"/" CH"/" LOKE") manda por encima (código dual empresa-split). Reemplaza las
@@ -15406,8 +15412,9 @@ let _artMarcas = null;
 async function loadArtMarcas() {
   if (_artMarcas) return _artMarcas;
   const m = {}, H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-  try { const r = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_marca_articulo", "select=cod,marca&order=cod.asc"); if (r.ok) (await r.json()).forEach(function (x) { const k = _ocgNorm(x.cod), v = String(x.marca || "").toUpperCase().trim(); if (k && v) m[k] = v; }); } catch (_e) {}
-  _artMarcas = m; return m;
+  try { const r = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_marca_articulo", "select=cod,marca&order=cod.asc"); (Array.isArray(r) ? r : []).forEach(function (x) { const k = _ocgNorm(x.cod), v = String(x.marca || "").toUpperCase().trim(); if (k && v) m[k] = v; }); } catch (_e) {}
+  if (Object.keys(m).length) _artMarcas = m;   // v22.32: vacío (fetch caído) no se cachea
+  return m;
 }
 function artMarca(cod) {
   const s = String(cod == null ? "" : cod).match(/\s+(LK|CH|LOKE)$/i);
@@ -15982,7 +15989,7 @@ function ocBodyEntregas() {
     if (x.hasOc && x.ped > 0) { const p = pct(x.ent, x.ped); chips.push('<span class="oc-chip ' + (p >= 100 ? "ok" : (p >= 80 ? "warn" : "bad")) + '">🚚 OC ' + p + '%</span>'); }
     if (!chips.length) chips.push(x.recAvg > 0 ? '<span class="oc-chip ok">✓ OK</span>' : '<span class="oc-chip mut">—</span>');
     const ocP = pct(x.ent, x.ped), ocCol = ocP >= 100 ? "#166534" : (ocP >= 80 ? "#b45309" : "#b91c1c");
-    h += '<tr><td class="oc-cod">' + escapeHtml(x.cod) + '</td><td>' + escapeHtml(x.desc || "—") + '</td>' +
+    h += '<tr><td class="oc-cod">' + escapeHtml(x.cod) + '</td><td>' + escapeHtml(artNombre(x.cod, x.desc) || "—") + '</td>' +
       (x.hasAb ?
         '<td class="num">' + x.nProv + '</td><td class="num">' + _n(x.recAvg) + '</td><td class="num">' + _n(x.venAvg) + '</td>' +
         '<td class="num ' + (x.balAvg < -0.05 ? "oc-neg" : "oc-pos") + '">' + (x.balAvg >= 0 ? "+" : "") + _n(x.balAvg) + '</td>' +
@@ -17778,7 +17785,7 @@ function stkBodyAuditGon() {
     var pcls = p < 0 ? "ag-neg" : (p < 10 ? "ag-lo" : "ag-mid");
     h += '<tr>' +
       '<td class="ag-cod">' + escapeHtml(codCanon(it.cod)) + '</td>' +
-      '<td class="ag-desc">' + escapeHtml(it.desc) + '</td>' +
+      '<td class="ag-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td>' +
       '<td class="num ' + pcls + '">' + p + '%</td>' +
       '<td class="num">' + (Math.round(it.stock * 10) / 10) + '</td>' +
       '<td class="num">' + (Math.round(it.proy * 10) / 10) + '</td>' +
@@ -18411,7 +18418,7 @@ function abastRender() {
     if (!chips.length) chips.push(r.recAvg > 0 ? '<span class="abast-chip ok">✓ OK</span>' : '<span class="abast-chip warn">sin recepción</span>');
     h += '<tr class="abast-row' + (idx % 2 ? " odd" : "") + (open ? " open" : "") + '" onclick="abastToggle(\'' + encodeURIComponent(r.cod) + '\')">' +
       '<td class="l"><span class="abast-cod">' + escapeHtml(_abastCodDisp(r.cod)) + '</span>' + (open ? ' <span class="abast-chev">▾</span>' : '') + '</td>' +
-      '<td class="l abast-desc">' + escapeHtml(r.desc || "—") + '</td>' +
+      '<td class="l abast-desc">' + escapeHtml(artNombre(r.cod, r.desc) || "—") + '</td>' +
       '<td>' + r.nProv + '</td>' +
       '<td>' + _abastN(r.recAvg) + '</td><td>' + _abastN(r.venAvg) + '</td>' +
       '<td class="' + (r.balAvg < -0.05 ? "abast-neg" : "abast-pos") + '">' + (r.balAvg >= 0 ? "+" : "") + _abastN(r.balAvg) + '</td>' +
@@ -20661,7 +20668,7 @@ function _provImpRender() {
     if (cur && provs.indexOf(cur) < 0) opts += '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + '</option>';
     const sel = '<select onchange="provImpSet(\'' + encodeURIComponent(cod) + '\',this.value)" style="padding:5px 8px;border:1px solid ' + (cur ? '#16a34a' : '#f59e0b') + ';border-radius:8px;font-size:12.5px;background:' + (cur ? '#f0fdf4' : '#fffbeb') + ';font-weight:700;color:#0f172a;max-width:160px">' + opts + '</select>';
     const mk = r.marca ? ' <span style="color:#94a3b8;font-size:10.5px;font-weight:700">' + escapeHtml(String(r.marca)) + '</span>' : '';
-    return '<tr' + (cur ? '' : ' style="background:#fffbeb"') + '><td><b>' + escapeHtml(cod) + '</b>' + mk + '</td><td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(r.descripcion || "") + '">' + escapeHtml(r.descripcion || "—") + '</td><td>' + sel + '</td></tr>';
+    return '<tr' + (cur ? '' : ' style="background:#fffbeb"') + '><td><b>' + escapeHtml(cod) + '</b>' + mk + '</td><td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(artNombre(cod, r.descripcion) || "") + '">' + escapeHtml(artNombre(cod, r.descripcion) || "—") + '</td><td>' + sel + '</td></tr>';
   }).join("") + '</tbody></table></div>';
   body.innerHTML = h;
   if (_stkPop._focusQ) { const qi = document.getElementById("provImpQ"); if (qi) { qi.focus(); try { qi.setSelectionRange(qi.value.length, qi.value.length); } catch (_e) {} } }
@@ -20958,7 +20965,7 @@ function _pedHechoRenderCuerpo(soloTabla) {
     var mBadge = r.marca ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:' + (r.marca === "CH" ? "#b45309" : "#1e6bd6") + ';border-radius:999px;padding:1px 7px" title="Este artículo se compra por LK o por CH: cargá las unidades en la fila de la marca que pediste">' + escapeHtml(r.marca) + '</span>' : '';
     return '<tr id="phTr' + i + '"' + (uni > 0 ? ' class="on"' : '') + '>' +
       '<td class="phc-cod">' + escapeHtml(it.cod) + mBadge + '</td>' +
-      '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(it.desc || "").slice(0, 34)) + '</td>' +
+      '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(artNombre(it.cod, it.desc) || "").slice(0, 34)) + '</td>' +
       '<td class="num" style="color:#64748b">' + (it.uniMaster > 0 ? _pedHechoFmt(it.uniMaster) : (it.uxc > 0 ? _pedHechoFmt(it.uxc) + '*' : '—')) + '</td>' +
       '<td class="num"><input class="phc-uni" inputmode="numeric" value="' + (uni > 0 ? uni : "") + '" oninput="pedHechoSetUni(\'' + keyEnc + '\',this.value,' + i + ')" placeholder="0"></td>' +
       '<td class="num" id="phCj' + i + '">' + _pedHechoDiv(uni, it.uxc) + '</td>' +
@@ -20983,7 +20990,7 @@ function _pedHechoPreview() {
       var alerta = (_pedHecho.prov && (l.it.prov || "(sin proveedor)") !== _pedHecho.prov) ? ' <span class="phc-warn" title="Este código es de ' + escapeHtml(l.it.prov || "") + '">⚠ otro proveedor</span>' : '';
       var mTxt = (l.marca && _pedHechoMarcas(l.it).length > 1) ? ' <b style="color:' + (l.marca === "CH" ? "#b45309" : "#1e6bd6") + '">' + escapeHtml(l.marca) + '</b>' : '';
       return '<tr' + (l.uni > 0 ? ' class="on"' : '') + '><td class="phc-cod">' + escapeHtml(l.it.cod) + mTxt + '</td>' +
-        '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(l.it.desc || "").slice(0, 30)) + alerta + '</td>' +
+        '<td class="phc-desc" style="color:#475569">' + escapeHtml(String(artNombre(l.it.cod, l.it.desc) || "").slice(0, 30)) + alerta + '</td>' +
         '<td class="num">' + (l.uni > 0 ? _pedHechoFmt(l.uni) : '<span class="phc-bad">0</span>') + '</td>' +
         '<td class="num">' + _pedHechoDiv(l.uni, l.it.uxc) + '</td>' +
         '<td class="num">' + _pedHechoDiv(l.uni, l.it.uniMaster) + '</td></tr>';
@@ -22486,7 +22493,7 @@ function _impCursoLineasHtml(ls) {
   return '<table><thead><tr><th style="text-align:left">Código</th><th style="text-align:left">Descripción</th><th style="text-align:right">Unidades</th><th style="text-align:right">u$s</th><th style="text-align:right">m³</th><th style="text-align:left">Llegada</th></tr></thead><tbody>' +
     ls.map(function (l) {
       return '<tr><td style="font-weight:800;font-family:Consolas,Menlo,monospace">' + escapeHtml(codCanon(l.cod_art)) + (l.marca ? ' <span style="font-size:10px;color:#64748b">' + escapeHtml(l.marca) + '</span>' : '') + '</td>' +
-        '<td style="color:#475569">' + escapeHtml(String(l.descripcion || "").slice(0, 40)) + '</td>' +
+        '<td style="color:#475569">' + escapeHtml(String(artNombre(l.cod_art, l.descripcion) || "").slice(0, 40)) + '</td>' +
         '<td style="text-align:right;font-variant-numeric:tabular-nums">' + _impCursoNum(l.pendiente) + '</td>' +
         '<td style="text-align:right;color:#065f46">' + (Number(l.usd) > 0 ? _impCursoNum(Math.round(l.usd)) : '—') + '</td>' +
         '<td style="text-align:right;color:#0369a1">' + (Number(l.m3) > 0 ? (Math.round(l.m3 * 100) / 100).toLocaleString("es-AR") : '—') + '</td>' +
@@ -24102,7 +24109,7 @@ function stkBodyFaltante() {
     // v9.46 — el badge "faltó al armar" del código se sacó: el realFalt ahora se ve en la columna
     // que corresponde (S1/S2/Resto/Sin fecha) y en la celda del día de su salida.
     h += '<tr data-fkey="' + escapeHtml(a.key) + '"><td class="falt-cod">' + codCell + '</td>' +
-      '<td class="falt-desc" title="' + escapeHtml(a.desc) + '">' + escapeHtml(a.desc) + '</td>' +
+      '<td class="falt-desc" title="' + escapeHtml(artNombre(a.cod, a.desc)) + '">' + escapeHtml(artNombre(a.cod, a.desc)) + '</td>' +
       '<td class="falt-fab" title="' + escapeHtml(a.prov) + '">' + escapeHtml(a.prov || "—") + '</td>' +
       '<td class="num" style="font-weight:700" title="Stock TOTAL (todos los depósitos, igual que la solapa Stocks).">' + a.stockGross + '</td>' +
       (a.totalDemGross > 0
@@ -25160,7 +25167,7 @@ function stkBodyIngresos() {
     const g = groups[k]; const tot = g.reduce(function (s, mv) { return s + Number(mv.delta || 0); }, 0);
     h += '<div class="stk-grp"><div class="stk-grp-h">' + (_stk.ingMode === "remito" ? "Remito " : "Código ") + escapeHtml(k) + ' <span class="stk-grp-tot">' + tot + " caja(s)</span></div>";
     h += g.sort(function (a, b) { return new Date(b.ts) - new Date(a.ts); }).map(function (mv) {
-      return '<div class="stk-ing"><span class="stk-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stk-ing-cod">' + escapeHtml(codCanonSuf(mv.cod_art)) + '</span><span class="stk-ing-desc">' + escapeHtml(mv.descripcion || "") + '</span>' + (_stk.ingMode === "codigo" ? '<span class="stk-ing-rto">rto ' + escapeHtml(mv.ref || "—") + "</span>" : "") + '<span class="stk-mv-d pos">+' + mv.delta + "</span></div>";
+      return '<div class="stk-ing"><span class="stk-mv-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</span><span class="stk-ing-cod">' + escapeHtml(codCanonSuf(mv.cod_art)) + '</span><span class="stk-ing-desc">' + escapeHtml(artNombre(mv.cod_art, mv.descripcion) || "") + '</span>' + (_stk.ingMode === "codigo" ? '<span class="stk-ing-rto">rto ' + escapeHtml(mv.ref || "—") + "</span>" : "") + '<span class="stk-mv-d pos">+' + mv.delta + "</span></div>";
     }).join("") + "</div>";
   });
   return h;
@@ -25178,7 +25185,7 @@ function stkBodySalidas() {
   if (!shown.length) h += '<tr><td colspan="5" class="stk-empty">Sin salidas.</td></tr>';
   shown.forEach(function (mv) {
     const dest = mv.tipo === "salida_cervantes" ? ("🚚 Cervantes" + (mv.ref ? " · " + escapeHtml(mv.ref) : "")) : ("tanda " + escapeHtml(mv.ref || "—"));
-    h += '<tr><td>' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="stk-cod">' + escapeHtml(codCanonSuf(mv.cod_art)) + '</td><td class="stk-desc">' + escapeHtml(mv.descripcion || "—") + '</td><td class="num stk-neg">' + mv.delta + '</td><td>' + dest + "</td></tr>";
+    h += '<tr><td>' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="stk-cod">' + escapeHtml(codCanonSuf(mv.cod_art)) + '</td><td class="stk-desc">' + escapeHtml(artNombre(mv.cod_art, mv.descripcion) || "—") + '</td><td class="num stk-neg">' + mv.delta + '</td><td>' + dest + "</td></tr>";
   });
   return h + "</tbody></table>";
 }
@@ -26324,7 +26331,7 @@ function stkBodyHistAjustes() {
     var quien = nom ? escapeHtml(nom) + ' <span style="color:#94a3b8">(L' + escapeHtml(leg) + ')</span>' : (leg ? 'L' + escapeHtml(leg) : '—');
     h += '<tr><td style="white-space:nowrap;font-size:0.85em;">' + dd + ' ' + hh + '</td>' +
       '<td><b>' + escapeHtml(codCanonSuf(mv.cod_art || '')) + '</b></td>' +
-      '<td style="font-size:0.85em;color:#475569;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(mv.descripcion || '') + '</td>' +
+      '<td style="font-size:0.85em;color:#475569;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(artNombre(mv.cod_art, mv.descripcion) || '') + '</td>' +
       '<td style="font-size:0.85em;">' + escapeHtml(mv.deposito || '') + '</td>' +
       '<td class="num" style="color:' + col + ';font-weight:800">' + (delta > 0 ? '+' : '') + delta + '</td>' +
       '<td style="font-size:0.85em;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(mv.ref || '') + '</td>' +
@@ -26540,7 +26547,7 @@ const SUPABASE_RACKS_BAJ_ENDPOINT = SUPABASE_URL + "/rest/v1/Racks_Bajadas";
 async function stockFetchArtFactors() {
   try {
     const r = await supaFetchAllSafe(SUPABASE_ART_ENDPOINT, "select=Cod_Art,Cajas_x_Master,Uni_x_Caja&order=Cod_Art.asc");
-    const rows = r.ok ? await r.json() : [];
+    const rows = Array.isArray(r) ? r : [];   // v22.32: es un array, no un Response
     const m = {};
     rows.forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (!k) return; if (!m[k]) m[k] = { cajasXMaster: Number(x.Cajas_x_Master) || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; else { if (!m[k].cajasXMaster && x.Cajas_x_Master) m[k].cajasXMaster = Number(x.Cajas_x_Master); if (!m[k].uniXCaja && x.Uni_x_Caja) m[k].uniXCaja = Number(x.Uni_x_Caja); } });
     return m;
@@ -26911,7 +26918,7 @@ function brRender() {
   let h = '<div class="br-hint">Marcá cuántas <b>cajas</b> bajás de cada artículo. El stock se descuenta <b>al registrar</b>.</div>';
   h += _br.items.map(function (it, i) {
     const u = stkUnits(it.bajar, it.cod, _br.factors), ud = stkUnits(it.disponible, it.cod, _br.factors);
-    return '<div class="br-row"><div class="br-r1"><div class="br-info"><span class="br-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="br-desc">' + escapeHtml(it.desc || "") + '</span><div class="br-disp">en racks: ' + it.disponible + " cajas" + (ud ? " · " + ud : "") + '</div></div><div class="br-stp"><button class="br-sb" onclick="brChg(' + i + ',-1)">–</button><input class="br-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.bajar + '" oninput="brSet(' + i + ',this.value)"><button class="br-sb" onclick="brChg(' + i + ',1)">+</button></div></div>' + (it.bajar > 0 && u ? '<div class="br-conv">bajás: ' + it.bajar + " cajas · " + u + "</div>" : "") + "</div>";
+    return '<div class="br-row"><div class="br-r1"><div class="br-info"><span class="br-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="br-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span><div class="br-disp">en racks: ' + it.disponible + " cajas" + (ud ? " · " + ud : "") + '</div></div><div class="br-stp"><button class="br-sb" onclick="brChg(' + i + ',-1)">–</button><input class="br-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.bajar + '" oninput="brSet(' + i + ',this.value)"><button class="br-sb" onclick="brChg(' + i + ',1)">+</button></div></div>' + (it.bajar > 0 && u ? '<div class="br-conv">bajás: ' + it.bajar + " cajas · " + u + "</div>" : "") + "</div>";
   }).join("");
   const tot = _br.items.reduce(function (s, it) { return s + it.bajar; }, 0);
   h += '<button class="br-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="brConfirmar()">✓ Registrar bajada de ' + tot + " caja(s)</button>";
@@ -28076,7 +28083,7 @@ function scRender() {
   if (!shown.length) h += '<div class="sc-empty">No hay artículos que coincidan.</div>';
   else h += shown.map(function (it) {
     const i = _sc.items.indexOf(it);
-    return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="sc-desc">' + escapeHtml(it.desc || "") + '</span><div class="sc-disp">en góndola: ' + it.disponible + ' cajas</div></div><div class="sc-stp"><button class="sc-sb" onclick="scChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.sacar + '" oninput="scSet(' + i + ',this.value)"><button class="sc-sb" onclick="scChg(' + i + ',1)">+</button></div></div>';
+    return '<div class="sc-row"><div class="sc-info"><span class="sc-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="sc-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span><div class="sc-disp">en góndola: ' + it.disponible + ' cajas</div></div><div class="sc-stp"><button class="sc-sb" onclick="scChg(' + i + ',-1)">–</button><input class="sc-inp" type="number" min="0" max="' + it.disponible + '" inputmode="numeric" value="' + it.sacar + '" oninput="scSet(' + i + ',this.value)"><button class="sc-sb" onclick="scChg(' + i + ',1)">+</button></div></div>';
   }).join("");
   const tot = _sc.items.reduce(function (s, it) { return s + it.sacar; }, 0);
   h += '<button class="sc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="scConfirmar()">✓ Mandar ' + tot + ' caja(s) a Cervantes</button>';
@@ -28533,7 +28540,7 @@ function excRender() {
     const rest = it.disponible - it.bajar;
     const restTxt = '<span class="exc-rest' + (rest <= 0 ? ' ok' : '') + '">' + (rest <= 0 ? '✓ Todo' : 'Quedan ' + rest) + '</span>';
     return '<div class="exc-row">' +
-      '<div class="exc-headline"><div class="exc-info"><span class="exc-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="exc-desc">' + escapeHtml(it.desc || "") + '</span>' + ubicHtml + '</div><span class="exc-av">excedente <b>' + it.disponible + '</b></span></div>' +
+      '<div class="exc-headline"><div class="exc-info"><span class="exc-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="exc-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span>' + ubicHtml + '</div><span class="exc-av">excedente <b>' + it.disponible + '</b></span></div>' +
       '<div class="exc-foot"><div class="exc-stp"><button class="exc-sb" onclick="excChg(' + i + ',-1)">–</button><input class="exc-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.bajar + '" oninput="excSet(' + i + ',this.value)"><button class="exc-sb" onclick="excChg(' + i + ',1)">+</button></div>' + restTxt + '</div>' +
       '</div>';
   }).join("");
@@ -28719,7 +28726,7 @@ function renderGuardarOrden() {
     const bajarTxt = x.cajas > 0 ? ('<span style="font-weight:900;color:#0f172a;">' + x.cajas + '</span>' + mcTxt) : '<span style="color:#94a3b8;font-weight:700;">0 · góndola llena</span>';
     return '<tr style="border-bottom:1px solid #f1f5f9;' + (urg ? 'background:#fef2f2;' : '') + '">' +
       '<td style="padding:6px;font-weight:800;font-family:Consolas,Menlo,monospace;">' + (urg ? '🆘 ' : '') + escapeHtml(codCanonSuf(it.cod)) + '</td>' +
-      '<td style="padding:6px;color:#475569;">' + escapeHtml(it.desc || "") + '</td>' +
+      '<td style="padding:6px;color:#475569;">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</td>' +
       '<td style="padding:6px;text-align:right;font-weight:800;color:#15803d;">' + x.disp + '</td>' +
       '<td style="padding:6px;text-align:right;">' + bajarTxt + '</td>' +
       '<td style="padding:6px;text-align:right;color:' + pc + ';font-weight:800;">' + it.gond + ' <span style="color:#94a3b8;font-weight:600;">(' + pct + '%)</span></td>' +
@@ -28741,7 +28748,7 @@ function gordenPrint() {
   const totDisp = rows.reduce(function (s, x) { return s + x.disp; }, 0);
   t += '<h1>Orden de guardado — ' + lblF + '</h1><div class="sub">' + escapeHtml(fecha) + ' · góndola más vacía primero · ' + rows.length + ' códigos · <b>hay para guardar: ' + totDisp + ' · entran ahora: ' + totCajas + ' cajas</b></div>';
   t += '<table><thead><tr><th>Cód</th><th>Descripción</th><th class="n">Hay p/ guardar</th><th class="n">Cajas a bajar</th><th class="n">Góndola</th><th class="n">Máximo</th></tr></thead><tbody>';
-  t += rows.map(function (x) { const it = x.it; const extra = x.mc > 0 ? (' (' + x.mc + ' MC)') : (x.rk > 0 && it.cxm <= 0 ? ' (s/master)' : ''); return '<tr><td>' + escapeHtml(codCanonSuf(it.cod)) + '</td><td>' + escapeHtml(it.desc || "") + '</td><td class="n">' + x.disp + '</td><td class="n">' + x.cajas + extra + '</td><td class="n">' + it.gond + '</td><td class="n">' + it.cap + '</td></tr>'; }).join("");
+  t += rows.map(function (x) { const it = x.it; const extra = x.mc > 0 ? (' (' + x.mc + ' MC)') : (x.rk > 0 && it.cxm <= 0 ? ' (s/master)' : ''); return '<tr><td>' + escapeHtml(codCanonSuf(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</td><td class="n">' + x.disp + '</td><td class="n">' + x.cajas + extra + '</td><td class="n">' + it.gond + '</td><td class="n">' + it.cap + '</td></tr>'; }).join("");
   t += '</tbody><tfoot><tr><th colspan="2" style="text-align:left;">TOTAL (' + rows.length + ')</th><th class="n">' + totDisp + '</th><th class="n">' + totCajas + '</th><th colspan="2"></th></tr></tfoot></table></body></html>';
   const w = window.open("", "_blank");
   if (!w) { alert("Habilitá las ventanas emergentes para poder imprimir."); return; }
@@ -28851,7 +28858,7 @@ function rkbRender() {
         return '<span class="rkb-loc' + on + '" onclick="rkbSetSec(' + i + ',\'' + escapeHtml(L.sector) + '\')">' + escapeHtml(L.sector) + " · " + q + "</span>";
       }).join("") + "</div>";
     }
-    return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="rkb-desc">' + escapeHtml(it.desc || "") + '</span><div>' + head + '</div>' + locsHtml + '</div>' +
+    return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="rkb-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span><div>' + head + '</div>' + locsHtml + '</div>' +
       '<div class="rkb-stpcol"><span class="rkb-u">' + (usaMaster ? "master" : "cajas") + '</span><div class="rkb-stp"><button class="rkb-sb" onclick="rkbChg(' + i + ',-1)">–</button><input class="rkb-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.baja + '" oninput="rkbSet(' + i + ',this.value)"><button class="rkb-sb" onclick="rkbChg(' + i + ',1)">+</button></div></div></div>';
   }).join("");
   const tot = _rkb.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
@@ -29009,7 +29016,7 @@ function mvRenderStep2(body) {
   const fd = _mv.filtroD.trim().toLowerCase();
   const dShown = fd ? dests.filter(function (r) { return String(r.sector).toLowerCase().indexOf(fd) >= 0; }) : dests;
   let h = '<button class="mv-back" onclick="mvBack()">← Volver</button>';
-  h += '<div class="mv-sel"><div class="mv-r1"><span class="mv-sec">' + escapeHtml(o.sector) + '</span> · <span class="mv-cod">' + escapeHtml(codCanonSuf(o.cod)) + '</span> <span class="mv-desc">' + escapeHtml(o.desc) + '</span></div><div class="mv-av">tiene ' + o.inner + ' cajas' + (o.master ? ' · ' + o.master + ' master' : '') + '</div></div>';
+  h += '<div class="mv-sel"><div class="mv-r1"><span class="mv-sec">' + escapeHtml(o.sector) + '</span> · <span class="mv-cod">' + escapeHtml(codCanonSuf(o.cod)) + '</span> <span class="mv-desc">' + escapeHtml(artNombre(o.cod, o.desc)) + '</span></div><div class="mv-av">tiene ' + o.inner + ' cajas' + (o.master ? ' · ' + o.master + ' master' : '') + '</div></div>';
   h += '<div class="mv-fld"><div class="mv-lbl">¿Cuántas cajas movés?</div><div class="mv-stp"><button class="mv-sb" onclick="mvChg(-1)">–</button><input class="mv-inp" type="number" min="1" max="' + o.inner + '" inputmode="numeric" value="' + _mv.mover + '" oninput="mvSet(this.value)"><button class="mv-sb" onclick="mvChg(1)">+</button></div></div>';
   h += '<div class="mv-fld"><div class="mv-lbl">¿A qué ubicación?</div>';
   h += '<input class="mv-search" type="search" autocomplete="off" placeholder="🔎 Buscar ubicación…" value="' + escapeHtml(_mv.filtroD) + '" oninput="if(_mv){_mv.filtroD=this.value;mvRender();}">';
@@ -29113,7 +29120,7 @@ function eaRender() {
       ? ubs.map(function (u) { return '<span class="ea-loc-chip" onclick="eaEditUbic(\'' + escapeHtml(it.cod) + '\',' + u.id + ')">' + escapeHtml(u.sector) + (u.inner ? ' · ' + u.inner : '') + '</span>'; }).join("")
       : '<span class="ea-loc-none">sin ubicación</span> ';
     loc += '<button class="ea-loc-add" onclick="eaEditUbic(\'' + escapeHtml(it.cod) + '\',0)">+ ubicación</button></div>';
-    return '<div class="ea-row"><div class="ea-info"><span class="ea-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="ea-desc">' + escapeHtml(it.desc || "") + '</span><div class="ea-av">para envasar: <b>' + it.saldo + '</b> cajas</div>' + loc + '</div>' +
+    return '<div class="ea-row"><div class="ea-info"><span class="ea-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="ea-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span><div class="ea-av">para envasar: <b>' + it.saldo + '</b> cajas</div>' + loc + '</div>' +
       '<div class="ea-stpcol"><span class="ea-u">cajas</span><div class="ea-stp"><button class="ea-sb" onclick="eaChg(' + i + ',-1)">–</button><input class="ea-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.baja + '" oninput="eaSet(' + i + ',this.value)"><button class="ea-sb" onclick="eaChg(' + i + ',1)">+</button></div></div></div>';
   }).join("");
   const tot = _ea.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
@@ -29245,7 +29252,7 @@ async function irFetchCxM(plani) {
   const cx = {};
   try {
     const r = await supaFetchAllSafe(SUPABASE_ART_ENDPOINT, "select=Cod_Art,Cajas_x_Master&order=Cod_Art.asc");
-    if (r.ok) (await r.json()).forEach(function (x) { const k = _irNorm(x.Cod_Art), v = Number(x.Cajas_x_Master) || 0; if (k && v > 0 && !cx[k]) cx[k] = v; });
+    (Array.isArray(r) ? r : []).forEach(function (x) { const k = _irNorm(x.Cod_Art), v = Number(x.Cajas_x_Master) || 0; if (k && v > 0 && !cx[k]) cx[k] = v; });
   } catch (_e) {}
   const agg = {};
   (plani || []).forEach(function (rr) {
@@ -29763,7 +29770,7 @@ function cpRender() {
     let stockTxt = ag > 0 ? ("a guardar: " + ag) : (e._guardadoHoy ? ("guardado hoy" + (go > 0 ? " · góndola: " + go : "")) : "");
     const racksWarning = racks > 0 ? " ⚠️ RACKS: " + racks : "";
     return '<button class="cp-frow" onclick="cpPickFalt(' + i + ')" style="' + (racks > 0 ? "background:#fef3c7;border-color:#fca5a5;" : "") + '">' +
-      '<div class="cp-frow-top"><span class="cp-cod">' + escapeHtml(codCanonSuf(String(e.cod_art))) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span><span style="margin-left:auto;font-size:11.5px;font-weight:800;color:' + (racks > 0 ? "#dc2626" : "#0e7490") + ';white-space:nowrap;">' + escapeHtml(stockTxt + racksWarning) + '</span></div>' +
+      '<div class="cp-frow-top"><span class="cp-cod">' + escapeHtml(codCanonSuf(String(e.cod_art))) + '</span> <span class="cp-fdesc">' + escapeHtml(artNombre(e.cod_art, e.desc) || "") + '</span><span style="margin-left:auto;font-size:11.5px;font-weight:800;color:' + (racks > 0 ? "#dc2626" : "#0e7490") + ';white-space:nowrap;">' + escapeHtml(stockTxt + racksWarning) + '</span></div>' +
       '<div class="cp-frow-bot"><span class="cp-np">NP ' + escapeHtml(String(e.np)) + (cli ? ' · ' + escapeHtml(cli) : '') + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + '</span><span class="cp-faltan">faltan ' + Math.round(Number(e.cajas_falto) || 0) + '</span></div>' +
       '</button>';
   }).join("");
@@ -29796,7 +29803,7 @@ function cpRenderStep2(body) {
   const sal = e._saldo || {}; const agu = Math.round(Number(sal.a_guardar) || 0), gon = Math.round(Number(sal.terminado) || 0);
   const maxQ = Math.max(1, Math.round(Number(e.cajas_falto) || 1));
   let h = '<button class="cp-back" onclick="cpBack()">← Volver</button>';
-  h += '<div class="cp-sel"><span class="cp-cod">' + escapeHtml(codCanonSuf(String(e.cod_art))) + '</span> <span class="cp-fdesc">' + escapeHtml(e.desc || "") + '</span><div class="cp-selnp">NP ' + escapeHtml(String(e.np)) + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + ' · faltan ' + maxQ + '</div></div>';
+  h += '<div class="cp-sel"><span class="cp-cod">' + escapeHtml(codCanonSuf(String(e.cod_art))) + '</span> <span class="cp-fdesc">' + escapeHtml(artNombre(e.cod_art, e.desc) || "") + '</span><div class="cp-selnp">NP ' + escapeHtml(String(e.np)) + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + ' · faltan ' + maxQ + '</div></div>';
   h += '<div class="cp-fld"><div class="cp-lbl">¿Cuántas cajas llegaron?</div><div class="cp-stp"><button class="cp-sb" onclick="cpQty(-1)">–</button><input class="cp-inp" type="number" min="1" max="' + maxQ + '" inputmode="numeric" value="' + _cp.qty + '" oninput="cpQtySet(this.value)"><button class="cp-sb" onclick="cpQty(1)">+</button></div></div>';
   h += '<div class="cp-fld"><div class="cp-lbl">¿De dónde salen?</div><div class="cp-seg">' +
     '<button class="cp-opt' + (_cp.origen === "a_guardar" ? " on" : "") + '" onclick="cpOrigen(\'a_guardar\')">Tránsito<small>a guardar · ' + agu + '</small></button>' +
@@ -38129,7 +38136,7 @@ function _pppChkBody(filas, nps, pend, pickAviso, nLineas) {
         ? '<span class="pppchk-d">pedido como ' + escapeHtml(f.ped) + '</span>' : '';
       tr += '<tr' + (cls ? ' class="' + cls + '"' : '') + '>' +
         '<td><span class="pppchk-cod">' + escapeHtml(f.cod) + '</span>' +
-          (f.desc ? '<span class="pppchk-d">' + escapeHtml(f.desc) + '</span>' : '') + codDist +
+          (artNombre(f.cod, f.desc) ? '<span class="pppchk-d">' + escapeHtml(artNombre(f.cod, f.desc)) + '</span>' : '') + codDist +
           (f.sector ? '<span class="pppchk-sect">📍 ' + escapeHtml(f.sector) + '</span>' : '') + '</td>' +
         '<td class="num">' + _pppChkNum(f.need) + '</td>' +
         '<td class="num">' + _pppChkNum(f.gond) + '</td>' +
@@ -42545,7 +42552,7 @@ function _pmodContenidoHtml(E) {
     const cambiada = !it.fuera && it.cajas !== it.cajas0;
     h += '<tr class="' + (it.fuera ? "pme-fila-fuera" : (it.nueva ? "pme-nueva" : "")) + '">' +
       '<td class="cod">' + escapeHtml(it.cod) + (sinStock.has(it.cod) ? ' <span title="Hoy figura sin stock: si entra al pedido, el pedido queda marcado como diferido">🕒</span>' : '') + '</td>' +
-      '<td class="de">' + escapeHtml(it.desc || "—") + '</td>' +
+      '<td class="de">' + escapeHtml(artNombre(it.cod, it.desc) || "—") + '</td>' +
       '<td class="n">' + (it.uxb || "—") + '</td>' +
       '<td class="n"><input class="pme-cj' + (cambiada ? " tocado" : "") + '" type="number" min="0" step="1" value="' + it.cajas + '"' +
         (it.fuera ? " disabled" : "") + ' oninput="pmodCajas(' + i + ', this.value)"></td>' +
@@ -44835,7 +44842,7 @@ function _dpRenderCard(r) {
   return '<div class="dp-card" id="dpC_' + cn + '">' +
     '<div class="dp-card-head" onclick="dpToggle(\'' + cn + '\')">' +
       '<span class="dp-cod">' + escapeHtml(r.cod) + '</span>' +
-      '<span class="dp-desc">' + escapeHtml(r.desc || "(sin nombre)") + '</span>' +
+      '<span class="dp-desc">' + escapeHtml(artNombre(r.cod, r.desc) || "(sin nombre)") + '</span>' +
       '<span class="dp-dots">' +
         '<span class="dp-dot-g" title="Cajas (empaque)"><span class="dp-dot ' + (r.cajas ? "ok" : "miss") + '"></span><span class="dp-dot-label">Cj</span></span>' +
         '<span class="dp-dot-g" title="Volumen m³"><span class="dp-dot ' + (r.vol ? "ok" : "miss") + '"></span><span class="dp-dot-label">m³</span></span>' +
@@ -55286,7 +55293,7 @@ function facRenderNc(){
     return '<tr>'
       + '<td style="font-weight:800;">' + escapeHtml(x.np) + '</td>'
       + '<td>' + escapeHtml(x.cod) + '</td>'
-      + '<td style="color:#475569;">' + escapeHtml(x.desc) + '</td>'
+      + '<td style="color:#475569;">' + escapeHtml(artNombre(x.cod, x.desc)) + '</td>'
       + '<td class="center">' + (x.cajas || "") + '</td>'
       + '<td style="color:#475569;">' + escapeHtml(rs) + '</td>'
       + '<td class="center"><button class="nc-btn" data-nc=\'' + args + '\' onclick="facNcConfirm(this)">✓ NC hecha</button></td>'
