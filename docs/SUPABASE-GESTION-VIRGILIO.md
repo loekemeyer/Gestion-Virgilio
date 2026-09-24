@@ -29729,3 +29729,20 @@ Aplicado ~13:35 ART con el depósito trabajando (Luis: *"metele"*), adelantado d
 - Centinelas: `oid_rel` y `"GV_PPP_Web_NP_Cancelada"[\s\S]*armado_tope_pedidos`. El de la v22.09 (`_mp_m\.pedido_origen`) nombraba el alias viejo: se pasó a `m\.pedido_origen::text = p\.order_id` (la regla sigue, cambió el alias). `gv_reglas_perdidas` = 0.
 - `service_role statement_timeout = 25s` (opción A, mismo día) sigue puesto.
 - SQL: `sql/gv_cuar_mismo_pedido_rapido_v2217.sql`, `sql/gv_armado_filtros_antes_tope_v2217.sql`.
+
+## §3.nd — v22.37: la OC de un código DUAL se cierra sola con la recepción (Luis, 2026-09-24)
+
+Desde la v19.84 la OC de un dual sale con la empresa (`437E CH`), pero `Entregas Tallerista Virgilio`
+guarda el código pelado y no tenía empresa: `gv_oc_recompute_recibido` nunca imputaba esas OC y
+`gv_oc_entrega_ajena` avisaba "SIN OC" de más.
+
+- `Entregas Tallerista Virgilio.gv_empresa` (nullable, nueva). La escribe `recepcion.js` con `opState.linea`.
+- `gv_oc_recompute_recibido`: cruza por código BASE; si la OC trae empresa exige la misma en la entrega.
+  Las ventanas siguen por código completo (la OC CH y la LK no se anulan entre sí). OC sin empresa = igual que antes.
+- `gv_oc_entrega_ajena`: por código base.
+- Medido en transacción abortada: **0 OC cambian** con la función nueva sobre los datos de hoy. Con una
+  entrega simulada de García (437E CH 40 cj, 439E LK 7 cj): 437E CH 40/145 pendiente, 439E LK 7/7 recibida,
+  439E CH sin tocar. Ajena de García para 437E/438E: antes "sin OC", ahora no avisa.
+- La OC vieja `439E` sin empresa (3 cj, 16/09) queda como está (Luis: "si es viejo y no jode, dejalo").
+- Backup: `zz_backups."GV_Backup_OrdenesCompra_20260924b"` y definiciones en `zz_backups."GV_Backup_Funciones_20260924"`.
+- `sql/gv_oc_dual_empresa_v2237.sql`, `tests/rcp-empresa-dual.cjs`. Centinelas en `GV_Reglas_Centinela`.

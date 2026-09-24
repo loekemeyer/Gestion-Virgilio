@@ -2385,6 +2385,9 @@ async function opEnviar() {
       Nombre_Tall: opState.tallNombre,
       Cod: i.cod,
       Cajas: i.cajas,
+      // v22.37: la empresa (línea elegida) viaja con la entrega, así la OC de un dual
+      // ("437E CH") se imputa sola con gv_oc_recompute_recibido.
+      gv_empresa: opState.linea || null,
       Remito: opState.remito,
       Tipo_Entrega: opState.tipoDoc || null,
       Fecha_RTO: opState.fechaRemito || null,
