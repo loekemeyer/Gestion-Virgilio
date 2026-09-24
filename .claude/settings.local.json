@@ -27,7 +27,8 @@
       "Bash(node scripts/bump-version.cjs 22.23)",
       "Bash(node scripts/bump-version.cjs 22.25)",
       "Bash(timeout 180 node tests/fac-conciliacion.cjs)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(node scripts/bump-version.cjs 22.41)"
     ]
   }
 }
