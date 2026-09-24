@@ -2483,26 +2483,12 @@ async function opEnviar() {
   // en cascada, sin negativos). Así las cantidades a recibir BAJAN y la OC deja de figurar/
   // imprimirse cuando se completa — antes cantidad_recibida no se tocaba nunca. Best-effort:
   // si falla, no bloquea la recepción; la OC simplemente no se descuenta esta vez.
-  // v22.40 (Luis, 24/09): supabase.rpc NO rechaza con un 500 — resuelve con {error}. Antes el
-  // error se tiraba sin mirar y el 764 de Blist-Pack quedó sin descontar (timeout de la base a
-  // las 11:49). Ahora reintenta hasta 2 veces; y si igual falla, lo levanta la red del backend
-  // (cron gv-oc-recepcion-red, cada 30 min recalcula lo recibido en las últimas 36 h).
-  try {
-    const _ocArgs = {
-      nombre_ent: opState.tallNombre,
-      items: items.map(function (i) { return { cod: i.cod, cajas: i.cajas }; })
-    };
-    const _ocAplicar = function (intento) {
-      let p;
-      try { p = supabase.rpc("gv_oc_aplicar_recepcion", _ocArgs); } catch (_e) { p = Promise.reject(_e); }
-      Promise.resolve(p).then(function (r) {
-        if (r && r.error && intento < 2) setTimeout(function () { _ocAplicar(intento + 1); }, 4000 * (intento + 1));
-      }, function () {
-        if (intento < 2) setTimeout(function () { _ocAplicar(intento + 1); }, 4000 * (intento + 1));
-      });
-    };
-    _ocAplicar(0);
-  } catch (_e) {}
+  // v22.41 (Luis, 24/09: "tiene que reintentar hasta que esté"). La imputación va a una COLA
+  // persistente (localStorage) y se reintenta hasta que la base la acepte, aunque se cierre la
+  // app: rcpOcDrain corre también al cargar y al volver la conexión. Normalmente entra a la
+  // primera (0,16 s); el 24/09 11:49 falló porque la base estaba saturada. Red extra en el
+  // backend: cron gv-oc-recepcion-red recalcula lo recibido en las últimas 36 h.
+  try { rcpOcEncolar(opState.tallNombre, items.map(function (i) { return { cod: i.cod, cajas: i.cajas }; })); } catch (_e) {}
   // v11.98: cierra el toggle RT automáticamente (el operario ya no tiene que volver
   // a la botonera para terminar el inicio→fin de Recepción Mercadería).
   try { if (typeof window.autoCloseRT === "function") window.autoCloseRT(RECP.legajo); } catch (_e) {}
@@ -3555,3 +3541,57 @@ window.recepcionAbrirPendientes = async function (remito) {
   opPage.classList.add("open");
   await renderPendientes();
 };
+
+/* ── v22.41: cola persistente de imputación a OC (gv_oc_aplicar_recepcion) ───────────────
+   supabase.rpc NO rechaza con un 500: resuelve con {error}. Cada envío queda en la cola hasta
+   que vuelve sin error; los reintentos se espacian (5 s → 15 s → 30 s → 1 min → tope 2 min).
+   Recalcular dos veces no duplica nada: gv_oc_recompute_recibido recalcula desde cero. */
+var RCP_OC_KEY = "rcp_oc_pend_v1";
+var _rcpOcTimer = null, _rcpOcCorriendo = false;
+function rcpOcLeer() {
+  try { var a = JSON.parse(localStorage.getItem(RCP_OC_KEY) || "[]"); return Array.isArray(a) ? a : []; }
+  catch (_e) { return []; }
+}
+function rcpOcGuardar(a) { try { localStorage.setItem(RCP_OC_KEY, JSON.stringify(a)); } catch (_e) {} }
+function rcpOcEncolar(nombre, items) {
+  if (!nombre || !items || !items.length) return;
+  var a = rcpOcLeer();
+  a.push({ id: Date.now() + "_" + Math.random().toString(36).slice(2, 8), nombre: nombre, items: items, intentos: 0, ts: Date.now() });
+  rcpOcGuardar(a);
+  rcpOcDrain();
+}
+function rcpOcProgramar(intentos) {
+  var pasos = [5000, 15000, 30000, 60000, 120000];
+  var ms = pasos[Math.min(intentos, pasos.length - 1)];
+  if (_rcpOcTimer) clearTimeout(_rcpOcTimer);
+  _rcpOcTimer = setTimeout(function () { _rcpOcTimer = null; rcpOcDrain(); }, ms);
+}
+async function rcpOcDrain() {
+  if (_rcpOcCorriendo) return;
+  var cola = rcpOcLeer();
+  if (!cola.length) return;
+  if (typeof supabase === "undefined" || !supabase || typeof supabase.rpc !== "function") { rcpOcProgramar(0); return; }
+  _rcpOcCorriendo = true;
+  var maxIntentos = 0;
+  try {
+    for (var k = 0; k < cola.length; k++) {
+      var e = cola[k], ok = false;
+      try {
+        var r = await supabase.rpc("gv_oc_aplicar_recepcion", { nombre_ent: e.nombre, items: e.items });
+        ok = !!r && !r.error;
+      } catch (_e) { ok = false; }
+      var a = rcpOcLeer();   // releer: pudo entrar otra recepción mientras tanto
+      if (ok) a = a.filter(function (x) { return x.id !== e.id; });
+      else a.forEach(function (x) { if (x.id === e.id) { x.intentos = (x.intentos || 0) + 1; maxIntentos = Math.max(maxIntentos, x.intentos); } });
+      rcpOcGuardar(a);
+      if (!ok) break;   // la base está mal: no seguir martillando, esperar el próximo turno
+    }
+  } finally { _rcpOcCorriendo = false; }
+  if (rcpOcLeer().length) rcpOcProgramar(maxIntentos);
+}
+try {
+  if (typeof window !== "undefined") {
+    window.addEventListener("online", function () { rcpOcDrain(); });
+    setTimeout(function () { rcpOcDrain(); }, 3000);
+  }
+} catch (_e) {}

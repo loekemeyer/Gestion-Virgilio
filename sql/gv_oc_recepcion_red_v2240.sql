@@ -30,8 +30,8 @@ end $function$;
 
 revoke all on function public.gv_oc_recompute_recepciones_recientes(int) from public, anon, authenticated;
 
--- minutos 13 y 43: impares y fuera de 57 (3-59/6) y 68 (1-59/10), para no pelear el lock con el 55.
-select cron.schedule('gv-oc-recepcion-red', '13,43 * * * *',
+-- v22.41: cada ~12 min, minutos impares fuera del 57 (3-59/6) y el 68 (1-59/10)
+select cron.schedule('gv-oc-recepcion-red', '7,19,29,43,55 * * * *',
   'select * from public.gv_oc_recompute_recepciones_recientes(36)');
 
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)

@@ -4613,8 +4613,13 @@ la llamaba sin mirar el resultado, y **`supabase.rpc` no rechaza con un 500: res
 
 | capa | qué hace |
 |---|---|
-| celular | reintenta hasta 2 veces si viene `error` (4 s y 8 s) |
-| backend | cron **`gv-oc-recepcion-red`** (`13,43 * * * *`) → `gv_oc_recompute_recepciones_recientes(36)`: recalcula las OC de todo código recibido en las últimas 36 h. Idempotente: si cuadra no escribe (22 códigos, 1,4 s) |
+| celular | **cola persistente** (`rcp_oc_pend_v1` en localStorage, v22.41): cada recepción queda ahí **hasta que la base la acepta** — reintenta a los 5 s, 15 s, 30 s, 1 min y después cada 2 min, y también al abrir la app y al volver la conexión. Sobrevive al cierre de la app |
+| backend | cron **`gv-oc-recepcion-red`** (`7,19,29,43,55 * * * *`, minutos impares fuera del 57 y el 68) → `gv_oc_recompute_recepciones_recientes(36)`: recalcula las OC de todo código recibido en las últimas 36 h. Idempotente: si cuadra no escribe (22 códigos, 1,4 s) |
+
+**Por qué falló, medido:** la función tarda **0,16 s** normalmente. A las 11:49:08 le tocó la cola de
+**8 consultas pesadas en el mismo segundo** (A Programar: `gv_cuarentena_marcar` ×3 y
+`gv_ppp_web_dia_salida` ×3; Facturación: `facturacion_neto_lote` ×2), todas cortadas a los 8 s:
+esperó 15,4 s y cayó por `57014`. No es la recepción la que pesa; es la saturación de un momento.
 
 ⚠ **El cron 93 (miércoles) NO se toca**: es del circuito de OCs automáticas (Luis: *"lo del
 miércoles es que se manden las OCs"*). Probado rompiéndolo en transacción abortada: OC 1668 puesta
