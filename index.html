@@ -6101,7 +6101,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.39"></script>
+<script type="module" src="recepcion.js?v=22.40"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10052,7 +10052,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.39";
+const APP_VERSION = "v22.40";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -48371,9 +48371,14 @@ function aprColCuarentena() {
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) + '</td>' +
       '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
       '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') + '</td>' +
-      // v19.94 (Thomas): el MISMO monto que Clientes nuevos — precio total por lista (neto) y,
-      // debajo, el total con IVA. Va al lado de los badges de deuda y de límite, que es donde sirve.
-      '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
+      // v22.40 (Thomas): el monto del pedido ACTUAL (lo que se cobra por adelantado) SÓLO corre
+      // para CLIENTES NUEVOS. Para el activo retenido por deuda / límite / mal pago no aplica: lo
+      // que importa es la DEUDA (badge de Motivos), no el valor de este pedido. Deroga la v19.94,
+      // que mostraba el mismo monto para todos. La fila nuevo-con-deuda (motivo cliente_nuevo entre
+      // los suyos) sí lo sigue mostrando: es cliente nuevo.
+      '<td class="cuar-td-m3">' + (aprCuarentenaMotivos(p).indexOf("cliente_nuevo") >= 0
+        ? clinNuevosValorFmt(p)
+        : '<span class="cuar-yp-sin" title="El monto del pedido actual sólo aplica a clientes nuevos (pagan el pedido por adelantado). Para un cliente activo lo que importa es la deuda, que está en Motivos.">—</span>') + '</td>' +
       '<td><div class="cuar-td-acc">' + cuarWppContactoBtn(p) +
         '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + emp + '\',\'' + oid + '\')" title="Escribir a Vivi (cobranzas) por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas (Vivi)</button>' +
       '</div></td>' +
