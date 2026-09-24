@@ -34,6 +34,10 @@
    8) con E11A marcada el aviso del 16/09 desaparece (entra en las 8 h) y, forzando el tope a 1 h para
       verlo, el día queda con 3 tandas y menos horas; con `null` o `{}` vuelve a las 4 de antes; una
       marca sobre una tanda que no está ese día no cambia nada.
+   v22.44 — "no puede ser 313 km": el día se medía con una vuelta al depósito POR TANDA
+   (`_pppCamiones`). Ahora es una por CAMIÓN REAL (`_pppCamionesJornada`, criterio del Resumen):
+   9 tandas de una zona = 1 camión y los km son los de UN recorrido (6); el día se reparte entre
+   los fleteros (7); la kangoo sigue sin contar (8).
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -121,58 +125,60 @@ catch (_e) {
     out.avisaHoras = /<b>\d+,\d h<\/b> \(viaje \d+,\d h \+ 13 paradas × 15′\)/.test(html);
     out.avisaLejos = /lo estira <b>Luj[áa]n<\/b> \(a \d+ km\)/.test(html);   // pppLocDisp le pone el tilde
 
-    // --- (6) el DÍA no entra, aunque ninguna tanda sola se pase ---
-    // 6 tandas del 16/09 con los mismos destinos reales: cada una corta, el día entero no.
-    const dia = [];
-    const TANDAS = [
-      { t: "D69A", cods: ["4188", "2715", "3927", "2543", "3861", "4221", "4024", "2328", "4045"] },
-      { t: "E11A", cods: ["4114"] },
-      { t: "E17A", cods: ["4281", "4198"] },
-      { t: "E15A", cods: ["3927", "4189"] }
-    ];
-    let k = 0;
-    for (const g of TANDAS) for (const c of g.cods) dia.push(mk(String(++k + 100), c, "Cli " + c, "Loc " + c, g.t, "16/09/2026"));
+    // --- (6) v22.44: una vuelta por CAMIÓN REAL, no por tanda ("no puede ser 313 km") ---
+    // 9 tandas de la misma zona son UN camión: los km del día son los de UN recorrido.
+    const nueve = [];
+    ["4024", "2328", "4045", "4221", "2543", "3927", "3861", "4189", "2715"].forEach(function (c, i) {
+      nueve.push(mk(String(200 + i), c, "Cli " + c, "Loc " + c, "E" + (60 + i) + "A", "30/09/2026"));
+    });
+    const hmOrig = _pppJorCfg.horasMax; _pppJorCfg.horasMax = 0.01;   // forzar el aviso para leerlo
+    const d9 = (_pppComputeErrors(nueve).jornadaDia || [])[0] || {};
+    _pppJorCfg.horasMax = hmOrig;
+    const unaVuelta = _pppJornadaCam({ ped: nueve });
+    out.nueveCam = d9.camiones;                                   // 1 camión
+    out.nueveTandas = d9.tandas;                                  // 9 tandas
+    out.nueveKmOk = Math.abs((d9.km || 0) - unaVuelta.km) < 1e-6; // UNA vuelta, no nueve
+    let kmPorTanda = 0; nueve.forEach(function (x) { kmPorTanda += _pppJornadaCam({ ped: [x] }).km; });
+    out.nueveNoInfla = kmPorTanda > 2.5 * unaVuelta.km;           // lo que sumaba antes
+
+    // --- (7) el DÍA no entra repartido entre los fleteros: Oeste + Norte = 2 camiones ---
+    window.pppZonaDeBarrio = function (bo) {
+      return /lujan|pilar/i.test(String(bo)) ? "Zona 7 - GBA Norte Lejos"
+           : /martinez|san martin|ballester|lynch/i.test(String(bo)) ? "Zona 6 - GBA Norte" : "Zona 5 - GBA Oeste";
+    };
+    const dia = camPed.map(function (x, i) { const y = Object.assign({}, x, { _err: [] }); y.tanda = i < 6 ? "D69A" : (x.cod === "4114" ? "E11A" : "E17A"); return y; });
+    _pppJorCfg.horasMax = 0.01;
+    const d0 = (_pppComputeErrors(dia).jornadaDia || [])[0] || {};
+    out.diaCamiones = d0.camiones;                                // Oeste + Norte (Z6+Z7 juntas)
+    out.diaFleteros = d0.fleteros;
+    out.diaRepartoOk = Math.abs((d0.hCada || 0) * d0.fleteros - (d0.horas || 0)) < 1e-9;
+    // el tope justo entre repartir en 2 y en 8 fleteros: avisa con 2, no con 8
+    _pppJorCfg.horasMax = (d0.horas || 0) / 2 - 0.01;
     const eD = _pppComputeErrors(dia);
-    const d0 = (eD.jornadaDia || [])[0] || {};
-    out.diaAvisa   = (eD.jornadaDia || []).length === 1 && d0.fecha === "16/09/2026";
-    out.diaTandas  = d0.tandas;
-    out.diaCamiones = d0.camiones;                       // el default de _pppJorCfg
-    out.diaHoras   = Math.round((d0.horas || 0) * 10) / 10;
-    out.diaCada    = Math.round((d0.hCada || 0) * 10) / 10;
-    out.diaRepartoOk = Math.abs((d0.hCada || 0) * d0.camiones - (d0.horas || 0)) < 1e-9;
-    out.ningunaSola = (eD.jornada || []).length === 0;   // ← esto es lo que la v15.86 no veía
+    out.diaAvisa = (eD.jornadaDia || []).length === 1;
     const htmlD = pppErroresHtml(eD);
     out.htmlD = htmlD;
     out.diaTexto = /🚚 <b>Día que no entra en la jornada \(1\)/.test(htmlD) &&
-                   htmlD.indexOf("<b>16/09</b>") >= 0 &&
-                   /4 tandas → <b>\d+,\d h<\/b> de camión/.test(htmlD) &&
-                   /con 2 camión\(es\) son <b>\d+,\d h<\/b> cada uno/.test(htmlD);
-
-    // --- (8) v16.72: la tanda marcada como vehículo propio no ocupa camión de fletero ---
-    _pppVehPropio = { E11A: "kangoo" };
-    // con Luján en la kangoo el 16/09 entra en la jornada: el aviso del día DESAPARECE (8,5 h → menos de 8)
-    out.vehSinAviso = (_pppComputeErrors(dia).jornadaDia || []).length === 0;
-    // y para ver que fue por descontar la tanda (no por otra cosa) se fuerza el aviso con un tope de 1 h
-    const maxOrig = _pppJorCfg.horasMax; _pppJorCfg.horasMax = 1;
-    const eV = _pppComputeErrors(dia);
-    const dV = (eV.jornadaDia || [])[0] || {};
-    _pppJorCfg.horasMax = maxOrig;
-    out.vehTandas   = dV.tandas;                                       // 3, no 4
-    out.vehBaja     = (dV.horas || 0) < (d0.horas || 0) - 1;            // la kangoo se lleva las horas de Luján
-    out.vehHorasDia = Math.round((dV.horas || 0) * 10) / 10;
-    _pppVehPropio = { E99Z: "kangoo" };                                 // marca de otra tanda: no cambia nada
-    out.vehOtraIgual = ((_pppComputeErrors(dia).jornadaDia || [])[0] || {}).tandas === 4;
-    _pppVehPropio = {};
-    out.vehVacioIgual = ((_pppComputeErrors(dia).jornadaDia || [])[0] || {}).tandas === 4;
-    _pppVehPropio = null;                                               // como cuando la tabla no existe
-    out.vehNullIgual = ((_pppComputeErrors(dia).jornadaDia || [])[0] || {}).tandas === 4;
-    out.vehFnExiste = typeof pppRefreshVehPropio === "function" && typeof _pppCamEsVehPropio === "function";
-
-    // --- (7) con más camiones el mismo día deja de avisar ---
-    const camOrig = _pppJorCfg.camiones;
-    _pppJorCfg.camiones = 8;
+                   /<b>16\/09<\/b> · 2 camión\(es\), 3 tandas → <b>\d+,\d h<\/b> de camión/.test(htmlD) &&
+                   /con 2 fletero\(s\) son <b>\d+,\d h<\/b> cada uno/.test(htmlD);
+    const camOrig = _pppJorCfg.camiones; _pppJorCfg.camiones = 8;
     out.masCamionesSinAviso = (_pppComputeErrors(dia).jornadaDia || []).length === 0;
     _pppJorCfg.camiones = camOrig;
+
+    // --- (8) v16.72: la tanda en vehículo propio no ocupa camión de fletero ---
+    _pppJorCfg.horasMax = 0.01;
+    _pppVehPropio = { E11A: "kangoo" };
+    const dV = (_pppComputeErrors(dia).jornadaDia || [])[0] || {};
+    out.vehTandas = dV.tandas;                                    // 2, no 3
+    out.vehBaja = (dV.horas || 0) < (d0.horas || 0) - 1;          // la kangoo se lleva Luján
+    _pppVehPropio = { E99Z: "kangoo" };
+    out.vehOtraIgual = ((_pppComputeErrors(dia).jornadaDia || [])[0] || {}).tandas === 3;
+    _pppVehPropio = {};
+    out.vehVacioIgual = ((_pppComputeErrors(dia).jornadaDia || [])[0] || {}).tandas === 3;
+    _pppVehPropio = null;
+    out.vehNullIgual = ((_pppComputeErrors(dia).jornadaDia || [])[0] || {}).tandas === 3;
+    out.vehFnExiste = typeof pppRefreshVehPropio === "function" && typeof _pppCamionesJornada === "function";
+    _pppJorCfg.horasMax = hmOrig;
 
     // --- (4) camión corto: no avisa ---
     const corto = [mk("8", "4024", "G. Pellegrini", "Ciudadela", "D69H", "17/09/2026")];
@@ -194,9 +200,9 @@ catch (_e) {
     r.sinLujanBaja && r.sinLujanHoras < r.horas &&
     r.enJornada && r.avisaDia && r.avisaHoras && r.avisaLejos &&
     r.cortoSinAviso && r.retiraSinAviso &&
-    r.diaAvisa && r.diaTandas === 4 && r.diaCamiones === 2 && r.diaHoras > 0 &&
-    r.diaCada > 8 && r.diaRepartoOk && r.ningunaSola && r.diaTexto && r.masCamionesSinAviso &&
-    r.vehSinAviso && r.vehTandas === 3 && r.vehBaja && r.vehOtraIgual && r.vehVacioIgual && r.vehNullIgual && r.vehFnExiste &&
+    r.nueveCam === 1 && r.nueveTandas === 9 && r.nueveKmOk && r.nueveNoInfla &&
+    r.diaAvisa && r.diaCamiones === 2 && r.diaFleteros === 2 && r.diaRepartoOk && r.diaTexto && r.masCamionesSinAviso &&
+    r.vehTandas === 2 && r.vehBaja && r.vehOtraIgual && r.vehVacioIgual && r.vehNullIgual && r.vehFnExiste &&
     errs.length === 0;
   const { html, htmlD, ...vis } = r;
   console.log("ppp-jornada-camion:", JSON.stringify(vis), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");

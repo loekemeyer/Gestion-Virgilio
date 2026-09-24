@@ -6101,7 +6101,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.43"></script>
+<script type="module" src="recepcion.js?v=22.44"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10052,7 +10052,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.43";
+const APP_VERSION = "v22.44";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39129,20 +39129,25 @@ function _pppComputeErrors(peds, entSet) {
       // mayor daba 5,7 h y el aviso no salía nunca. Pero los fleteros son DOS y casi nunca hacen
       // dos vueltas (Thomas, 11/09), así que lo que importa es cuánto trabajo tiene el día
       // entero repartido entre los vehículos que hay (`jornada_camiones`). Retira no viaja.
-      let hDia = 0, kmDia = 0, parDia = 0, tandas = 0, peor = null;
-      for (const cam of _pppCamiones(porDia[fe])) {
-        if (cam.ruta === "ret") continue;
-        if (_pppCamEsVehPropio(cam)) continue;   // v16.72: salió en la kangoo, no ocupa camión de fletero
+      // v22.44 ("no puede ser 313 km") — un recorrido por CAMIÓN REAL, no por tanda. Antes
+      // cada tanda era una vuelta al depósito: el 30/09 eran 9 tandas en 3 camiones (Z2, Z5 y
+      // el súper) y el aviso sumaba 9 viajes ida y vuelta = 313 km. Los camiones salen de
+      // `_pppCamionesJornada`, con el MISMO criterio que la columna Cam. del Resumen.
+      let hDia = 0, kmDia = 0, parDia = 0, peor = null;
+      const cams = _pppCamionesJornada(porDia[fe]);
+      const tandasDia = [];
+      for (const cam of cams) {
         const j = _pppJornadaCam(cam);
-        hDia += j.horas; kmDia += j.km; parDia += j.paradas; tandas++;
+        hDia += j.horas; kmDia += j.km; parDia += j.paradas;
+        for (const t of cam.tandas) if (tandasDia.indexOf(t) < 0) tandasDia.push(t);
         if (!peor || j.horas > peor.j.horas) peor = { cam: cam, j: j };
         if (j.excede) jornada.push({ fecha: fe, cam: cam, j: j });
       }
-      const nCam = Math.max(1, _pppJorCfg.camiones || 1);
-      const hCada = hDia / nCam;
-      if (tandas > 0 && hCada > _pppJorCfg.horasMax) {
-        dias.push({ fecha: fe, tandas: tandas, camiones: nCam, horas: hDia, hCada: hCada,
-                    km: kmDia, paradas: parDia, peor: peor });
+      const nFlet = Math.max(1, _pppJorCfg.camiones || 1);   // los fleteros que hay por día
+      const hCada = hDia / nFlet;
+      if (cams.length > 0 && hCada > _pppJorCfg.horasMax) {
+        dias.push({ fecha: fe, tandas: tandasDia.length, camiones: cams.length, fleteros: nFlet,
+                    horas: hDia, hCada: hCada, km: kmDia, paradas: parDia, peor: peor });
       }
     }
     jornada.sort(function (a, b) { return b.j.horas - a.j.horas; });
@@ -39169,10 +39174,10 @@ function pppErroresHtml(e) {
     h += '<div class="ppp-ei bad">🚚 <b>Día que no entra en la jornada (' + e.jornadaDia.length + '):</b><div class="ppp-ei-det">' +
       e.jornadaDia.map(function (d) {
         const pe = d.peor && d.peor.cam;
-        const lejos = pe ? (' · la más larga es <b>' + escapeHtml(pe.zona || (pe.tandas || []).join("+") || "?") + '</b> (' + h1(d.peor.j.horas) + ' h)') : "";
+        const lejos = pe ? (' · el más largo es <b>' + escapeHtml(pe.zona || (pe.tandas || []).join("+") || "?") + '</b> (' + h1(d.peor.j.horas) + ' h)') : "";
         return '<div><b>' + escapeHtml(String(d.fecha).replace(/\/\d{4}$/, "")) + '</b> · ' +
-               d.tandas + ' tandas → <b>' + h1(d.horas) + ' h</b> de camión (' + d.paradas + ' paradas · ' +
-               Math.round(d.km) + ' km) · con ' + d.camiones + ' camión(es) son <b>' + h1(d.hCada) +
+               d.camiones + ' camión(es), ' + d.tandas + ' tandas → <b>' + h1(d.horas) + ' h</b> de camión (' + d.paradas + ' paradas · ' +
+               Math.round(d.km) + ' km) · con ' + d.fleteros + ' fletero(s) son <b>' + h1(d.hCada) +
                ' h</b> cada uno, ' + h1(d.hCada - _pppJorCfg.horasMax) + ' h de más' + lejos + '</div>';
       }).join("") + '</div></div>';
   }
@@ -39401,6 +39406,41 @@ function _pppJornadaCam(cam) {
   const horas  = hViaje + hDesc;
   return { paradas: paradas, sinUbic: sinUbic, km: kmReal, hViaje: hViaje, hDesc: hDesc,
            horas: horas, excede: horas > cfg.horasMax, max: cfg.horasMax };
+}
+/* v22.44 — LOS CAMIONES DE UN DÍA para la jornada, con el criterio del Resumen
+   (≡ PPP_RES_CAMIONES y la regla Z2+Z3 de `pppRenderRes…`): un camión = un GRUPO DE ZONAS
+   (v21.56), Z2 y Z3 juntas si cada una suma < 1 m³ (v21.95), Z6+Z7 juntas, un camión por
+   cliente súper (v14.23) y Retira sin camión. Cada camión es UNA vuelta al depósito.
+   `_pppCamiones` NO sirve para esto: hace un camión por número de tanda, y el 30/09 tenía 9
+   tandas en 3 camiones → el aviso sumaba 9 vueltas (313 km). Lo que sale en la kangoo
+   (`GV_Vehiculo_Propio`, v16.72) no ocupa camión de fletero. */
+function _pppCamionesJornada(ped) {
+  const byNum = { 1: "Capital Sur", 2: "Capital Centro", 3: "Capital Oeste", 4: "GBA Sur", 5: "GBA Oeste", 6: "GBA Norte", 7: "GBA Norte" };
+  const g = new Map();
+  const add = function (key, nombre, p) {
+    if (!g.has(key)) g.set(key, { key: key, nombre: nombre, zona: nombre, ped: [], tandas: [], m3: 0 });
+    const c = g.get(key); c.ped.push(p); c.m3 += Number(p.m3) || 0;
+    const t = String(p.tanda || "").trim().toUpperCase(); if (t && t !== "—" && c.tandas.indexOf(t) < 0) c.tandas.push(t);
+  };
+  for (const p of ped || []) {
+    const t = String(p.tanda || "").trim().toUpperCase();
+    if (t && _pppVehPropio && _pppVehPropio[t]) continue;
+    if (pppEsSuper(p)) { const k = String(p.cod || p.razon_social || "?"); add("sup:" + k, "Súper · " + (String(p.razon_social || "").trim() || k), p); continue; }
+    const z = String(p.zona || "").trim() || pppZonaDeBarrio(p.localidad || p.barrio || "");
+    if (/retira/i.test(z)) continue;                          // no viaja
+    const m = /Zona\s*(\d+)/i.exec(z), nom = m && byNum[+m[1]];
+    if (nom) add(nom, nom, p); else add("z:" + (z || "?"), z || "Sin zona", p);
+  }
+  const C = g.get("Capital Centro"), O = g.get("Capital Oeste");
+  if (C && O && C.m3 < 1 && O.m3 < 1) {                      // v21.95 (Luis)
+    C.nombre = C.zona = "Capital Centro-Oeste";
+    for (const p of O.ped) C.ped.push(p);
+    for (const t of O.tandas) if (C.tandas.indexOf(t) < 0) C.tandas.push(t);
+    C.m3 += O.m3; g.delete("Capital Oeste");
+  }
+  const arr = [...g.values()];
+  arr.forEach(function (c, i) { c.num = i + 1; });
+  return arr;
 }
 async function pppRefreshGeo() {
   pppRefreshJornadaCfg();   // best-effort, en paralelo: si falla quedan los defaults
