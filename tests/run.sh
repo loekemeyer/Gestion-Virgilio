@@ -29,6 +29,8 @@ echo "== ppp-res-demora-ancla (v22.16: importado diferido / retiro o turno pacta
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-demora-ancla.cjs
 echo "== apr-cuar-isis-confirm (v22.20: NP de ISIS retenida y sumar a tanda respetan la cuarentena) =="
 node tests/apr-cuar-isis-confirm.cjs
+echo "== apr-lotes-carrera (v22.36: una carga por lote en vuelo no pisa la invalidación) =="
+node tests/apr-lotes-carrera.cjs
 echo "== art-nombres-carga (v22.32: el padrón de nombres carga de verdad) =="
 node tests/art-nombres-carga.cjs
 echo "== apr-clasificando-oculto (v22.29: sin clasificar no se dibuja en A Programar) =="
