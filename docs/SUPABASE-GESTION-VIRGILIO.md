@@ -29633,3 +29633,31 @@ sí*. Chequeo: `select * from public.gv_reglas_perdidas;`.
 **Rollback:** volver el `case` de cada `_falta` a `case when not g.imp or g.ya_prog or g.art is null
 then 0 …` (las CTE nuevas quedan sin uso y no molestan) y borrar las 3 filas de centinela.
 `sql/gv_clin_falta_programado_sobrevendido_v2203.sql`.
+
+## §3.my — v22.20: Conciliación — la NP web de LK se valorizaba como Chef (Luis, 2026-09-24)
+
+**Síntoma:** 81 NP con diferencia Gestión vs ISIS en 🔍 Conciliación. 65 eran web de LK, con
+diferencias de % redondo (−8, −10, −12, −14, −16 / +4,55, +13,64, +17,95).
+
+**Causa:** `vista_facturacion_neto_items` decidía la empresa con `np ~ '^9'`: `LK 0131` caía en
+`chef` y el descuento salía de `clientes_dto` de Chef con el código de LK (otro cliente o
+ninguno). Coto (LK 0049) tampoco se reconocía como súper. En cada línea el dto de ISIS = el de
+`clientes_dto` LK.
+
+**Cambio:** mismo criterio que `gv_empresa_de_np_texto`, inline (2 CASE). Y
+`gv_conciliacion_comparar` pela la L de los dos lados (Cencosud: `031` ↔ `031L`).
+
+**Impacto medido:** cambian 73 NP, todas web LK, 0 de ISIS. De las 65 con diferencia, 61 quedan
+iguales hoy. `gv_conciliacion_lista` 1.033 ms.
+
+**Queda abierto (no es de código):**
+- Cencosud (3 NP): la cadena `cencosud` es súper con lista propia pero **no tiene un solo precio
+  en `cobranzas_precios_super`** → cae a lista general con dto 0; ISIS factura precio propio −16 %.
+- Matiz 97889, art. 55219: UxB = 1 en el maestro; la factura del 16/09 lo trae ×6 y la del 23/09 ×1.
+  Precio 5.820 lista vs 5.485 ISIS (la cadena `gigot` no tiene precios cargados).
+- 6 NP facturadas en ISIS **sin** el 2 % web (98541, 98693, 98650, LK 0067, LK 0072, LK 0097):
+  93 de 103 NP de ISIS LK sí lo llevan.
+- Diferencias de cantidad reales armado ↔ factura: 98667 (583E 20 vs 10), 98662, 98673, 98690, LK 0007.
+- CH 0006: la factura asignada tiene otros artículos → el cruce NP↔FC eligió otra factura.
+
+`sql/gv_conciliacion_empresa_np_web_v2219.sql`. Rollback en el archivo.
