@@ -4605,6 +4605,22 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
+## ⚠ REGLA (Luis, 2026-09-24, v22.40): el descuento de OC de una recepción NO se puede perder
+
+**Caso:** 24/09 11:49 la base cortó por timeout y la carga de Blist-Pack (763 + 764) dio 500 en
+`gv_oc_aplicar_recepcion`: el 764 (19 cajas) quedó sin imputar a la OC 1668 (0/15). `recepcion.js`
+la llamaba sin mirar el resultado, y **`supabase.rpc` no rechaza con un 500: resuelve con `{error}`**.
+
+| capa | qué hace |
+|---|---|
+| celular | reintenta hasta 2 veces si viene `error` (4 s y 8 s) |
+| backend | cron **`gv-oc-recepcion-red`** (`13,43 * * * *`) → `gv_oc_recompute_recepciones_recientes(36)`: recalcula las OC de todo código recibido en las últimas 36 h. Idempotente: si cuadra no escribe (22 códigos, 1,4 s) |
+
+⚠ **El cron 93 (miércoles) NO se toca**: es del circuito de OCs automáticas (Luis: *"lo del
+miércoles es que se manden las OCs"*). Probado rompiéndolo en transacción abortada: OC 1668 puesta
+en 0 → la red la devolvió a 15 / recibida. Problema 544. `sql/gv_oc_recepcion_red_v2240.sql`,
+`tests/rcp-oc-reintento.cjs`. Rollback: `select cron.unschedule('gv-oc-recepcion-red');`
+
 ## ⚠ REGLA (Luis, 2026-09-23, v21.63): CLIENTES DE PRUEBA — van a la PPP, el operario no los ve
 
 **Luis:** *"que sus pedidos solo se puedan programar como tanda única (código PruebaX) · si se
