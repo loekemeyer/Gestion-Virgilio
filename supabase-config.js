@@ -91,6 +91,23 @@
     var base = url.replace(/([?&])offset=\d+&?/g, "$1").replace(/[?&]$/, "");
     return base + (base.indexOf("?") >= 0 ? "&" : "?") + "offset=" + off;
   }
+  /* ¿El que llamó YA mandó un header `Range`? Entonces está paginando ÉL con Range
+     (es lo que hace `supaFetchAll` de index.html) y NO hay que completar acá: la
+     completación re-pide con `offset=` reusando `init`, o sea con ESE mismo `Range`
+     puesto, y `offset=1000` + `Range: 0-999` da HTTP 416 → 0 filas. Resultado: el
+     universo quedaba cortado en 1.000 y las filas de más se perdían en silencio (el
+     badge de «Completar Pedido» mostraba 404 porque las ~386 NP de Facturacion_NP
+     fuera del corte se contaban como «sin facturar»). Los dos paginadores chocaban. */
+  function pidioRange(input, init) {
+    try {
+      var h = (init && init.headers) || (input && input.headers) || null;
+      if (!h) return false;
+      if (typeof h.get === "function") return !!h.get("Range");                 // Headers
+      if (Array.isArray(h)) { for (var i = 0; i < h.length; i++) { if (String(h[i][0]).toLowerCase() === "range") return true; } return false; }
+      for (var k in h) { if (Object.prototype.hasOwnProperty.call(h, k) && k.toLowerCase() === "range") return true; }   // objeto plano
+      return false;
+    } catch (_e) { return false; }
+  }
 
   g.fetch = function (input, init) {
     var pedido = orig(input, init);
@@ -99,6 +116,7 @@
         var url = urlDe(input);
         if (!url || url.indexOf("/rest/v1/") < 0) return resp;
         if (!resp || !resp.ok) return resp;
+        if (pidioRange(input, init)) return resp;          // el que llamó pagina por Range: no completar
         var cr = resp.headers && resp.headers.get && resp.headers.get("content-range");
         var m = cr && /^(\d+)-(\d+)\//.exec(cr);
         if (!m) return resp;                               // sin rango: no es una lista
