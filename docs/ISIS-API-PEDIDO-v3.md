@@ -24,6 +24,24 @@ Se descarta el sobre v2.0 como cuerpo: tenía campos que ISIS no maneja (`source
 `payment_term`, `condicion_pago` en texto, `estado_integracion`) y le faltaban los que el
 importador sí usa (`uni`, tramo, leyenda del 2 %).
 
+## El circuito que se busca (Luis, 24/09)
+
+| | hoy | con la API |
+|---|---|---|
+| 1 | en Gestión, módulo Facturación, se genera y se descarga el Excel | se aprieta **Facturar** en Gestión y el pedido sale solo |
+| 2 | en ISIS se importa ese Excel (importación de pedidos) | el pedido entra solo a ISIS |
+| 3 | se factura en ISIS | se factura en ISIS |
+
+⚠ **El dictamen de ISIS no da el paso 2 entero:** dice que *"la generación del pedido … será
+responsabilidad de un operador y mediante acción manual"*. Tal como lo ofrecen, el pedido llega
+solo a una tabla transitoria de ISIS, pero alguien tiene que darlo de alta ahí. Se elimina la
+descarga y el importado del archivo; el alta queda como un paso manual dentro de ISIS. Si se
+quiere que entre dado de alta sin intervención, hay que pedirlo explícito en la Orden de
+Magnitud.
+
+Del lado de Gestión el disparador **ya existe**: `trg_isis_encolar_facturado` (INSERT en
+`Facturacion_NP` → encola en `isis_export_pedidos`; DELETE → anula). Está activo.
+
 ## Estructura
 
 Un documento por pedido (referencia nuestra). Las líneas llevan el **tramo** (`n_pedido`): ISIS
