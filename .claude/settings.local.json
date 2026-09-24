@@ -15,7 +15,8 @@
       "Bash(node scripts/bump-version.cjs 21.98)",
       "Bash(git merge *)",
       "Bash(node tests/encoding-utf8.cjs)",
-      "Bash(node tests/pipe-composicion.cjs)"
+      "Bash(node tests/pipe-composicion.cjs)",
+      "Bash(node scripts/bump-version.cjs 22.15)"
     ]
   }
 }
