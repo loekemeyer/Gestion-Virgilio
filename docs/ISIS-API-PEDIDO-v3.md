@@ -24,14 +24,6 @@ Se descarta el sobre v2.0 como cuerpo: tenía campos que ISIS no maneja (`source
 `payment_term`, `condicion_pago` en texto, `estado_integracion`) y le faltaban los que el
 importador sí usa (`uni`, tramo, leyenda del 2 %).
 
-### Y la facturación directa (punto 2) NO hace falta
-
-El pedido se publica **después del armado**, con las cajas y los códigos **realmente
-preparados**. O sea: lo que ISIS da de alta ya es lo que se va a facturar, y entre el pedido y la
-factura no queda nada que pueda cambiar. El riesgo que marca Horacio (*"modificaciones en
-cantidades, ítems, precios… entre la generación del pedido y la facturación"*) no existe en este
-circuito. **Se pide sólo el proyecto 1.**
-
 ## Estructura
 
 Un documento por pedido (referencia nuestra). Las líneas llevan el **tramo** (`n_pedido`): ISIS
@@ -73,19 +65,17 @@ hoy en el Excel.
 | `pct_dto` | K | `"2% Descuento Web"` si `cond_pago` ∈ 8–13, 18; si no, vacío | regla v14.57 |
 | `num_oc` | L | OC del súper (vacío para clientes) | — |
 
-## Lo que ISIS tiene que validar (las preguntas del mail de respuesta)
+## Lo único que hay que definir con ISIS: DOS bases (Luis, 24/09)
 
-1. **Sucursal:** ¿el importador la toma en texto (como el Excel) o necesita el **código de
-   sucursal** del cliente en ISIS?
-2. **Tramos:** ¿cortamos nosotros de a 18/15 (`n_pedido`) o lo corta el proceso de ISIS al
-   importar?
-3. **`leyenda2` = referencia:** si ISIS la conserva en el pedido y la factura, el vínculo
-   pedido ↔ factura queda directo y dejamos de depender del cruce por fecha y cajas.
-4. **`cond_pago`:** confirmar que el código que manda la página es el de su tabla de
-   condiciones (hoy entra así en la columna J).
-5. **Unidades:** ¿usan `uni` o recalculan desde `cajas` con su UxB?
-6. **Mecánica:** ellos consultan (`GET` desde su servidor, el esquema de las 3 URL que ya
-   probaron). No hace falta IP pública ni puertos de nuestro lado.
+El formato **no se valida**: es el del importador que ya usan (el reporte que mandaban por mail
+las páginas LK y Chef, y que hoy arma nuestro circuito de facturación). Lo que queda abierto es
+el **ruteo**: unos pedidos se procesan en la base de **Loekemeyer** y otros en la de **Chef**.
+Cada pedido lleva `empresa_isis` y el código de cliente **de esa base** — incluido el caso de
+un pedido tomado en la página LK que se factura en Chef (Tierra del Fuego) con el código de
+Chef. Con ISIS se define si toman un proceso por base (`GET /pedidos?empresa=LK|CH`, ya
+soportado) o uno solo que enrute.
+
+La facturación directa (punto 2 del mail) **no se descarta ni se pide** en la respuesta.
 
 ## Lo que falta de nuestro lado (después de que ISIS valide)
 
@@ -100,5 +90,4 @@ llevar al servidor lo que hoy arma el navegador en `_facXlsArmar`:
 | `sucursal` | `lk_pedidos_match` (ya en Virgilio) | usar `order_id` exacto, no el match por fecha ±3 |
 | cola | `isis_export_pedidos`: 226 pendientes, **106 web** (24/09) | sacar clientes de prueba (v21.63) y cambiar el disparador al cierre del armado |
 
-**No se construye antes de la validación:** si ISIS pide código de sucursal o corta los tramos
-ellos, cambia la función. Se escribe una vez.
+**No se construye antes de que ISIS defina el ruteo LK/CH.**
