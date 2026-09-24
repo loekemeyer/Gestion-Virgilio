@@ -2483,7 +2483,7 @@ async function opEnviar() {
   // en cascada, sin negativos). Así las cantidades a recibir BAJAN y la OC deja de figurar/
   // imprimirse cuando se completa — antes cantidad_recibida no se tocaba nunca. Best-effort:
   // si falla, no bloquea la recepción; la OC simplemente no se descuenta esta vez.
-  // v22.41 (Luis, 24/09: "tiene que reintentar hasta que esté"). La imputación va a una COLA
+  // v22.42 (Luis, 24/09: "tiene que reintentar hasta que esté"). La imputación va a una COLA
   // persistente (localStorage) y se reintenta hasta que la base la acepte, aunque se cierre la
   // app: rcpOcDrain corre también al cargar y al volver la conexión. Normalmente entra a la
   // primera (0,16 s); el 24/09 11:49 falló porque la base estaba saturada. Red extra en el
@@ -3542,7 +3542,7 @@ window.recepcionAbrirPendientes = async function (remito) {
   await renderPendientes();
 };
 
-/* ── v22.41: cola persistente de imputación a OC (gv_oc_aplicar_recepcion) ───────────────
+/* ── v22.42: cola persistente de imputación a OC (gv_oc_aplicar_recepcion) ───────────────
    supabase.rpc NO rechaza con un 500: resuelve con {error}. Cada envío queda en la cola hasta
    que vuelve sin error; los reintentos se espacian (5 s → 15 s → 30 s → 1 min → tope 2 min).
    Recalcular dos veces no duplica nada: gv_oc_recompute_recibido recalcula desde cero. */

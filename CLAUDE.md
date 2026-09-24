@@ -4613,7 +4613,7 @@ la llamaba sin mirar el resultado, y **`supabase.rpc` no rechaza con un 500: res
 
 | capa | qué hace |
 |---|---|
-| celular | **cola persistente** (`rcp_oc_pend_v1` en localStorage, v22.41): cada recepción queda ahí **hasta que la base la acepta** — reintenta a los 5 s, 15 s, 30 s, 1 min y después cada 2 min, y también al abrir la app y al volver la conexión. Sobrevive al cierre de la app |
+| celular | **cola persistente** (`rcp_oc_pend_v1` en localStorage, v22.42): cada recepción queda ahí **hasta que la base la acepta** — reintenta a los 5 s, 15 s, 30 s, 1 min y después cada 2 min, y también al abrir la app y al volver la conexión. Sobrevive al cierre de la app |
 | backend | cron **`gv-oc-recepcion-red`** (`7,19,29,43,55 * * * *`, minutos impares fuera del 57 y el 68) → `gv_oc_recompute_recepciones_recientes(36)`: recalcula las OC de todo código recibido en las últimas 36 h. Idempotente: si cuadra no escribe (22 códigos, 1,4 s) |
 
 **Por qué falló, medido:** la función tarda **0,16 s** normalmente. A las 11:49:08 le tocó la cola de

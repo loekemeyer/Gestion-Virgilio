@@ -30,7 +30,7 @@ end $function$;
 
 revoke all on function public.gv_oc_recompute_recepciones_recientes(int) from public, anon, authenticated;
 
--- v22.41: cada ~12 min, minutos impares fuera del 57 (3-59/6) y el 68 (1-59/10)
+-- v22.42: cada ~12 min, minutos impares fuera del 57 (3-59/6) y el 68 (1-59/10)
 select cron.schedule('gv-oc-recepcion-red', '7,19,29,43,55 * * * *',
   'select * from public.gv_oc_recompute_recepciones_recientes(36)');
 

@@ -1,4 +1,4 @@
-// v22.41 (Luis, 24/09: "tiene que reintentar hasta que esté") — la imputación de la recepción a
+// v22.42 (Luis, 24/09: "tiene que reintentar hasta que esté") — la imputación de la recepción a
 // la OC va a una COLA persistente y se reintenta hasta que la base la acepte. supabase.rpc
 // resuelve con {error} ante un 500, así que el reintento tiene que mirar r.error.
 // Corre el código de verdad con un supabase falso que falla 4 veces y después anda.
