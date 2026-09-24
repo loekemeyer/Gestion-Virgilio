@@ -6138,7 +6138,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.25"></script>
+<script type="module" src="recepcion.js?v=22.26"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10090,7 +10090,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.25";
+const APP_VERSION = "v22.26";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21180,7 +21180,7 @@ function _pedImpRender() {
       const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _rg = it.reingresoEst ? String(it.reingresoEst).slice(0, 10) : "";
       const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _codEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
-      h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod) + '</td><td>' + actHtml + '</td></tr>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -21362,44 +21362,62 @@ async function _reingExclCargar() {
     });
     if (!r2.ok) throw new Error("HTTP " + r2.status);
     var rows2 = await r2.json();
-    _webOcul = new Set((rows2 || []).map(function (x) { return _reingNorm(x.cod); }));
+    _webOcul = new Set((rows2 || []).map(function (x) { return _reingNorm(x.cod) + "|" + (x.empresa === "CH" ? "CH" : "LK"); }));
   } catch (_e) { _webOcul = null; }
   _reingExclCargando = false;
   try { if (_stkPop && _stkPop.kind === "pedImp") _pedImpRender(); } catch (_e) {}
 }
 // v22.23 (Luis, 24/09) — switch "Web" por importado: OFF = el artículo NO aparece en la
-// página de LK ni se puede pedir (products.active=false). Lista en GV_Web_Oculto; la aplica
-// sync_reingresos_virgilio de LK cada 5 min, y sólo reactiva lo que ocultó este switch.
-function _webVisibleSwitchHtml(cod) {
-  if (!_webOcul) return "";
-  var on = !_webOcul.has(_reingNorm(cod));
-  var enc = encodeURIComponent(String(cod));
-  return '<label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:4px;margin-top:3px;font-size:11px;white-space:nowrap;cursor:pointer;color:' + (on ? '#065f46' : '#b91c1c') + '" title="Artículo en la página LK: ON = se ve y se puede pedir. OFF = oculto, no se puede pedir. Se aplica en hasta 5 min.">'
-    + '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="pedImpWebVisible(\'' + enc + '\',this.checked)"> Web ' + (on ? 'visible' : 'OCULTO') + '</label>';
+// página ni se puede pedir (active=false). v22.26: POR EMPRESA, según la marca del importado
+// (LK/Loke → página LK; CH → página de Chef): el mismo número puede ser otro artículo en cada
+// una. Lista en GV_Web_Oculto (cod, empresa); la aplica sync_reingresos_virgilio de LK cada
+// 5 min, y sólo reactiva lo que ocultó este switch.
+function _webEmpresasDe(it) {
+  var out = [];
+  ((it && it.det) || []).forEach(function (d) {
+    var m = String(d.marca || "").trim().toUpperCase();
+    var e = (m === "CH" || m === "CHEF") ? "CH" : "LK";
+    if (out.indexOf(e) < 0) out.push(e);
+  });
+  if (!out.length) out.push("LK");
+  return out.sort();
 }
-async function pedImpWebVisible(codEnc, on) {
+function _webVisibleSwitchHtml(cod, it) {
+  if (!_webOcul) return "";
+  var enc = encodeURIComponent(String(cod));
+  var emps = _webEmpresasDe(it), dos = emps.length > 1;
+  return emps.map(function (emp) {
+    var on = !_webOcul.has(_reingNorm(cod) + "|" + emp);
+    var pag = emp === "CH" ? "Chef" : "LK";
+    return '<label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:4px;margin-top:3px;font-size:11px;white-space:nowrap;cursor:pointer;color:' + (on ? '#065f46' : '#b91c1c') + '" title="Artículo en la página ' + pag + ': ON = se ve y se puede pedir. OFF = oculto, no se puede pedir. Se aplica en hasta 5 min.">'
+      + '<input type="checkbox" data-emp="' + emp + '"' + (on ? ' checked' : '') + ' onchange="pedImpWebVisible(\'' + enc + '\',this.checked,\'' + emp + '\')"> Web ' + (dos || emp === "CH" ? pag + ' ' : '') + (on ? 'visible' : 'OCULTO') + '</label>';
+  }).join("");
+}
+async function pedImpWebVisible(codEnc, on, emp) {
   var cod = decodeURIComponent(codEnc);
-  if (!on && !confirm("¿Ocultar " + cod + " de la página?\n\nNo va a aparecer ni se va a poder pedir (en hasta 5 minutos).")) { _pedImpRender(); return; }
+  emp = emp === "CH" ? "CH" : "LK";
+  var pag = emp === "CH" ? "Chef" : "LK";
+  if (!on && !confirm("¿Ocultar " + cod + " de la página " + pag + "?\n\nNo va a aparecer ni se va a poder pedir (en hasta 5 minutos).")) { _pedImpRender(); return; }
   var headers = await facAuthWriteHeaders({ "Content-Type": "application/json" });
   if (!headers) { alert(authNoSesionMsg("Para ocultar o mostrar un artículo en la página necesitás iniciar sesión con Google (supervisor).")); _pedImpRender(); return; }
   try {
     var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_web_oculto_set", {
-      method: "POST", headers: headers, body: JSON.stringify({ p_cod: cod, p_visible: !!on })
+      method: "POST", headers: headers, body: JSON.stringify({ p_cod: cod, p_visible: !!on, p_empresa: emp })
     });
     if (!r.ok) throw new Error((await r.text()) || ("HTTP " + r.status));
     if (!_webOcul) _webOcul = new Set();
-    var k = _reingNorm(cod);
+    var k = _reingNorm(cod) + "|" + emp;
     if (on) _webOcul.delete(k); else _webOcul.add(k);
   } catch (e) { alert("No se pudo cambiar la visibilidad web: " + (e.message || e)); }
   _pedImpRender();
 }
-function _reingWebSwitchHtml(cod) {
-  if (!_reingExcl) return _webVisibleSwitchHtml(cod);
+function _reingWebSwitchHtml(cod, it) {
+  if (!_reingExcl) return _webVisibleSwitchHtml(cod, it);
   var on = !_reingExcl.has(_reingNorm(cod));
   var enc = encodeURIComponent(String(cod));
   return '<label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:4px;margin-top:3px;font-size:11px;white-space:nowrap;cursor:pointer;color:' + (on ? '#065f46' : '#94a3b8') + '" title="Cartel web de reingreso: ON = las páginas LK/CH muestran &quot;Sin stock hasta&quot; y parten el pedido. OFF = ni cartel ni partido.">'
     + '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="pedImpReingresoWeb(\'' + enc + '\',this.checked)"> Cartel web ' + (on ? 'ON' : 'OFF') + '</label>'
-    + _webVisibleSwitchHtml(cod);
+    + _webVisibleSwitchHtml(cod, it);
 }
 async function pedImpReingresoWeb(codEnc, on) {
   var cod = decodeURIComponent(codEnc);

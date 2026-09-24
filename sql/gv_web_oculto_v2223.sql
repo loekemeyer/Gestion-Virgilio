@@ -64,3 +64,18 @@ grant execute on function public.gv_web_ocultos() to anon, authenticated, servic
 --   active=true + desanotado; 599E apagado A MANO siguió inactivo.
 -- Rollback LK: sacar la línea `perform` de sync_reingresos_virgilio y
 --   update products p set active=true from web_oculto_gestion w where p.cod=w.cod;
+
+-- ===================== v22.26 (Luis, 24/09): POR EMPRESA + CHEF =====================
+-- GV_Web_Oculto pasa a PK (cod, empresa) con empresa 'LK'|'CH' (el mismo número puede ser
+-- otro artículo en cada página). gv_web_oculto_set(p_cod, p_visible, p_empresa default 'LK');
+-- gv_web_ocultos() y v_lk_web_ocultos devuelven (cod, empresa). El front dibuja un switch
+-- por empresa según la marca del importado (LK/Loke → LK, CH → Chef).
+-- LK: web_oculto_gestion pasa a PK (cod, tabla) con tabla 'products'|'loke_products'|'chef';
+-- sync_web_ocultos_virgilio aplica LK sobre products y loke_products (línea Loke: 110, 119E…)
+-- y CH sobre chef_ext.products (FDW chef_db, usuario loke_reader) en bloque propio.
+-- Probado en transacción abortada: 360E (products) y 110 (loke_products) se ocultan y vuelven.
+--
+-- ⚠ FALTA, en el SQL editor de CHEF (nkhzocgdpwtgrmwleihr) — sin esto la parte de Chef
+-- falla sola (permission denied) y LK sigue andando:
+--   grant update (active) on public.products to loke_reader;
+-- Es un grant por COLUMNA: loke_reader sólo puede cambiar active, nada más de products.
