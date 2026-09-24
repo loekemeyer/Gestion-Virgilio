@@ -6101,7 +6101,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.40"></script>
+<script type="module" src="recepcion.js?v=22.41"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10052,7 +10052,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.40";
+const APP_VERSION = "v22.41";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -56142,9 +56142,19 @@ function facRender(tandas){
     const _npTip = 'Tanda ' + String(f.tanda || '—') + ' · Salida ' + String(f.fechaSalida || '—');
     return `
       <tr data-fac-np="${escapeHtml(f.np)}" class="${altFlag ? 'fac-tanda-alt' : ''}${_ft ? ' fac-en-progreso' : (_ff ? ' fac-has-falta' : '')}">
-        <td class="center fac-xls-cell">${facNpEsWeb(f.np)
-          ? `<input type="checkbox" class="fac-xls-chk" data-np="${escapeHtml(f.np)}"${_facXlsSel.has(String(f.np)) ? ' checked' : ''} onchange="facXlsToggle(this.getAttribute('data-np'))" title="NP de la página: marcá y bajá el Excel ISIS para facturarla">`
-          : `<span class="fac-xls-no" title="NP de ISIS: se factura con el tilde ✓, no va al Excel">—</span>`}</td>
+        <td class="center fac-xls-cell">${(() => {
+          if (!facNpEsWeb(f.np)) return `<span class="fac-xls-no" title="NP de ISIS: se factura con el tilde ✓, no va al Excel">—</span>`;
+          // v22.41 — una NP de la página con 0 cajas armadas NO se puede bajar al Excel: bajar el
+          // Excel ES facturarla, y no hay que registrar como "mandada a facturar" un pedido sin nada
+          // adentro. La casilla aparece sólo cuando hay cajas para facturar (mismo dato que la
+          // columna Cajas: `_facCajas` = suma de cajas_entregadas de Entregas_Virgilio).
+          const _npc = String(f.np).trim().replace(/\.0+$/, "");
+          if (!(Math.round(Number(_facCajas.get(_npc)) || 0) > 0)) {
+            if (_facXlsSel.has(String(f.np))) { _facXlsSel.delete(String(f.np)); }
+            return `<span class="fac-xls-no" title="Sin cajas armadas: no se puede facturar (bajar el Excel factura la NP). Cuando el armado sume cajas, aparece la casilla.">—</span>`;
+          }
+          return `<input type="checkbox" class="fac-xls-chk" data-np="${escapeHtml(f.np)}"${_facXlsSel.has(String(f.np)) ? ' checked' : ''} onchange="facXlsToggle(this.getAttribute('data-np'))" title="NP de la página: marcá y bajá el Excel ISIS para facturarla">`;
+        })()}</td>
         <td class="fac-np-cell" title="${escapeHtml(_npTip)}">${escapeHtml(f.np)}${_npSrcChip(f.np)}${facModChip(f.np)}${f._sinTanda ? `<span class="fac-sintanda" title="${escapeHtml(f._sinTanda)} — se armó igual (tanda ${escapeHtml(String(f.tanda))}), por eso aparece acá">sin tanda</span>` : ""}</td>
         <td class="center fac-fe-cell">${f.fechaSalida ? escapeHtml(String(f.fechaSalida)) : '<span class="fac-lios0">—</span>'}</td>
         <td class="fac-cod-cell">${escapeHtml(f.cod)}</td>

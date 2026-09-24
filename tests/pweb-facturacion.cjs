@@ -52,6 +52,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         { empresa: "lk", np: 1344, tanda: "GV-02A", zona: "Zona 1", fecha_entrega: "2026-09-11",
           cod_cliente: "4188", razon_social: "Orfali", direccion: "Juncal 2869", barrio: "Martinez", m3: 1.184 }
       ]);
+      // v22.41 — cajas ARMADAS por NP (Entregas_Virgilio): la columna Cajas y la casilla del
+      // Excel dependen de esto (una NP web sin cajas no puede bajarse a facturar).
+      if (url.indexOf("Entregas_Virgilio") >= 0 && url.indexOf("cajas_entregadas") >= 0) return J([
+        { id: 1, np: "LK 1344", cod_art: "586", cajas_pedidas: 1, cajas_entregadas: 1 },
+        { id: 2, np: "98574", cod_art: "100", cajas_pedidas: 2, cajas_entregadas: 2 }
+      ]);
       // las dos tandas tienen picking + armado terminados
       if (url.indexOf("vista_tanda_status") >= 0) return J([{ tanda: "GV-02A" }, { tanda: "C03B" }]);
       // eventos de armado: uno web, uno ISIS, y un texto de tanda suelto (basura de siempre)
@@ -99,6 +105,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // tiene tilde NI esa etiqueta; lo que la manda al Excel es la casilla de la izquierda.
     out.webSinTilde   = filaWeb.length > 0 && filaWeb.indexOf("fac-btn-tick") < 0 && filaWeb.indexOf("fac-tick-web") < 0;
     out.webConCasilla = /class="fac-xls-chk" data-np="LK 1344"/.test(filaWeb);
+    // v22.41 — con 0 cajas armadas la NP web NO se puede bajar al Excel (bajar = facturar): la
+    // casilla desaparece y, si estaba marcada, se saca sola de la selección.
+    const _cajasBak = _facCajas.get("LK 1344");
+    _facXlsSel.add("LK 1344"); _facCajas.set("LK 1344", 0);
+    facRender(_facLastTandas);
+    const html0 = (document.getElementById("facContainer") || {}).innerHTML || "";
+    const filaWeb0 = html0.slice(html0.indexOf('data-fac-np="LK 1344"'), html0.indexOf('</tr>', html0.indexOf('data-fac-np="LK 1344"')));
+    out.webCeroSinCasilla   = filaWeb0.length > 0 && filaWeb0.indexOf("fac-xls-chk") < 0;
+    out.webCeroDeselecciona = !_facXlsSel.has("LK 1344");
+    _facCajas.set("LK 1344", _cajasBak); facRender(_facLastTandas);
     const filaIsis = html.slice(html.indexOf('data-fac-np="98574"'), html.indexOf('</tr>', html.indexOf('data-fac-np="98574"')));
     out.isisConTilde  = filaIsis.indexOf("fac-btn-tick") >= 0;
     out.isisSinCasilla = filaIsis.indexOf("fac-xls-chk") < 0;
@@ -152,6 +168,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ["las dos tandas quedan como FC",                           r.tandasFC === "C03B,GV-02A"],
     ["la fila web NO tiene tilde",                              r.webSinTilde === true],
     ["y SÍ tiene la casilla del Excel",                         r.webConCasilla === true],
+    ["con 0 cajas armadas la NP web NO tiene casilla",          r.webCeroSinCasilla === true],
+    ["y una NP web sin cajas se saca sola de la selección",     r.webCeroDeselecciona === true],
     ["la fila de ISIS SÍ tiene tilde",                          r.isisConTilde === true],
     ["y NO tiene casilla del Excel",                            r.isisSinCasilla === true],
     ["tildar una NP web no escribe nada",                       r.tildeWebNoEscribe === true],
