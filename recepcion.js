@@ -2491,21 +2491,6 @@ async function opEnviar() {
   try { if (typeof window.autoCloseRT === "function") window.autoCloseRT(RECP.legajo); } catch (_e) {}
   rcpDraftClear();   // v7.12: ya se envió, no hay nada que reanudar
 
-  // v1.1 — Pasaje de Papeles: mostrar pop-up para capturar documentación
-  try {
-    if (typeof window.ppShowCaptureDialog === 'function') {
-      window.ppShowCaptureDialog('mercaderia', {
-        tipoDoc: opState.tipoDoc || '',
-        nroRemito: opState.nroRemito || '',
-        nroFactura: opState.nroFactura || '',
-        fechaRemito: opState.fechaRemito || '',
-        fechaFactura: opState.fechaFactura || '',
-        proveedor: opState.tallNombre || '',
-        codProveedor: opState.tallCod || ''   // v1.2 — código del tallerista/prov. AT (para Pasaje de Papeles)
-      });
-    }
-  } catch (_e) { /* no-op si el módulo no está cargado */ }
-
   // v4.06: STOCK — lo recibido ENTRA a "Mercadería a guardar" (Movimientos_Stock).
   // Best-effort; si falla, queda en vir_stock_pend y lo reintenta index.html (stockFlushPend).
   // idea 5490: un client_id ESTABLE por fila; el mismo id se usa en el insert y en la

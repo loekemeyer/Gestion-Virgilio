@@ -6078,43 +6078,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- ============================================================
      PASAJE DE PAPELES — Registro de documentación recibida en Virgilio
      ============================================================ -->
-<style id="pasajePapelesCss">
-  #pasajePapelesModal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f1f5f9; z-index: 200; overflow: auto; padding: 12px; }
-  #pasajePapelesModal.show { display: block; }
-
-  .pp-container { max-width: 1200px; margin: 0 auto; }
-  .pp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-  .pp-header h1 { font-size: 22px; margin: 0; display: flex; align-items: center; gap: 10px; color: #0f172a; }
-  .pp-close-btn { width: auto; margin: 0; padding: 9px 18px; font-size: 14px; border-radius: 9px; background: #e2e8f0; color: #334155; border: none; cursor: pointer; font-weight: 600; }
-  .pp-close-btn:hover { background: #cbd5e1; }
-
-  .pp-empty { text-align: center; padding: 40px 20px; color: #64748b; font-size: 14px; }
-
-  .pp-tblwrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
-  .pp-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .pp-tbl thead th { position: sticky; top: 0; background: #1e3a8a; color: #fff; font-size: 12px; font-weight: 700; padding: 10px 8px; text-align: left; white-space: nowrap; }
-  .pp-tbl tbody td { padding: 9px 8px; border-bottom: 1px solid #e5e7eb; color: #0f172a; font-weight: 500; }
-  .pp-tbl tbody tr:hover { background: #f8fafc; }
-
-  @media (max-width: 640px) {
-    .pp-header h1 { font-size: 18px; }
-    .pp-tbl { font-size: 12px; }
-    .pp-tbl thead th, .pp-tbl tbody td { padding: 7px 5px; }
-  }
-</style>
-
-<div id="pasajePapelesModal">
-  <div class="pp-container">
-    <div class="pp-header">
-      <h1>📄 Pasaje de Papeles</h1>
-      <button class="pp-close-btn" onclick="closePasajePapeles()">Cerrar</button>
-    </div>
-    <div id="ppDocList">
-      <div class="pp-empty">Cargando documentación…</div>
-    </div>
-  </div>
-</div>
-
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
 <div id="versionBadge"></div><!-- vacío a propósito: lo llena el JS (updatePendingIndicator) con APP_VERSION. Si queda VACÍO en pantalla = el JS NO corrió (navegador no soporta el código / error de parseo). NO hardcodear una versión acá: engaña el diagnóstico. -->
 
@@ -6129,7 +6092,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      que ande sin internet en el depósito. -->
 <script src="qrcode.js"></script>
 <script src="planimetria.js?v=15.79"></script>
-<script src="pasaje-papeles.js?v=5.2"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
      Control-Carga-Remitos-FC. Suma las cajas del día a localStorage para que RT
@@ -6139,7 +6101,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.36"></script>
+<script type="module" src="recepcion.js?v=22.37"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6249,7 +6211,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadgeGreen" class="dp-badge" style="left:2px;right:auto;background:#16a34a;display:none;" title="Se pueden corregir pero NO es obligatorio (hay stock del secundario)"></span><span id="corrBadge" class="dp-badge" style="display:none;" title="Hay que corregir SÍ o SÍ (el secundario no tiene stock)"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
       <button class="sup-action-btn" onclick="openExpresoIsis()" style="position:relative;"><span class="sup-ico">🚚</span><span>Agregar Expreso ISIS</span><span id="expIsisBadge" class="dp-badge" style="display:none;" title="Expresos que el cliente eligió desde la página y falta cargar en ISIS. NO frena ningún pedido."></span></button>
-      <button class="sup-action-btn" onclick="openPasajePapeles()" style="position:relative;"><span class="sup-ico">📄</span><span>Pasaje de Papeles</span><span id="ppBadge" class="dp-badge" style="display:none;" title="Documentos pendientes de enviar a Cervantes"></span></button>
       <button class="sup-action-btn" onclick="openColaImpresion()" style="position:relative;"><span class="sup-ico">🖨️</span><span>Cola de impresión NP</span><span id="colaImpBadge" class="dp-badge" style="display:none;" title="Notas de pedido armadas pendientes de imprimir (rojo = alguna hace +24 h)"></span></button>
       <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="stkOpenFaltFact()"><span class="sup-ico">📉</span><span>Faltantes facturados sin completar</span></button>
@@ -10091,7 +10052,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.36";
+const APP_VERSION = "v22.37";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27913,27 +27874,7 @@ async function insConfirmar() {
   closeIns();
   window._insUbicacion = null;  // limpiar
   stockMove(rows);   // offline-safe (vir_stock_pend)
-
-  // v1.3 — Pasaje de Papeles: guardar documentación capturada en el paso previo
-  if (isIn) {
-    try {
-      if (typeof window.ppShowCaptureDialog === 'function') {
-        var _docSt = window._insDocState;
-        if (_docSt && _docSt.tipoDoc) {
-          // Datos ya capturados en askInsDocumentacion → guardar directo
-          window.ppShowCaptureDialog('insumo', {
-            tipoDoc: _docSt.tipoDoc,
-            nroRemito: _docSt.nroRemito || '',
-            nroFactura: _docSt.nroFactura || '',
-            fechaRemito: _docSt.fechaRemito || '',
-            fechaFactura: _docSt.fechaFactura || '',
-            proveedor: _docSt.proveedor || window._insUbicacion || ''
-          });
-        }
-        window._insDocState = null;
-      }
-    } catch (_e) { /* no-op si el módulo no está cargado */ }
-  }
+  try { window._insDocState = null; } catch (_e) {}
 
   try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)." + (ubic ? "\n" + (isIn ? "Origen" : "Destino") + ": " + ubic : "") + gp2Msg); } catch (_e) {}
 }
