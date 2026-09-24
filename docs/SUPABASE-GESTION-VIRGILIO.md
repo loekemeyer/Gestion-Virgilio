@@ -29729,3 +29729,75 @@ Aplicado ~13:35 ART con el depósito trabajando (Luis: *"metele"*), adelantado d
 - Centinelas: `oid_rel` y `"GV_PPP_Web_NP_Cancelada"[\s\S]*armado_tope_pedidos`. El de la v22.09 (`_mp_m\.pedido_origen`) nombraba el alias viejo: se pasó a `m\.pedido_origen::text = p\.order_id` (la regla sigue, cambió el alias). `gv_reglas_perdidas` = 0.
 - `service_role statement_timeout = 25s` (opción A, mismo día) sigue puesto.
 - SQL: `sql/gv_cuar_mismo_pedido_rapido_v2217.sql`, `sql/gv_armado_filtros_antes_tope_v2217.sql`.
+
+## §3.nd — v22.36 (2026-09-24): «Avisar programación» resuelve el teléfono por (EMPRESA, CÓDIGO), no por código solo
+
+**Pedido de Tomas Gonzalez.** Cierra el problema **77**, que estaba medido desde el 13/09 (§3.dm) y
+seguía abierto porque el arreglo no era el join: **faltaba el dato**.
+
+### Qué estaba mal
+
+`vista_avisar_programacion` buscaba el teléfono con
+`LEFT JOIN LATERAL (select telefono from whatsapp_clientes where cod_cliente = g.cod LIMIT 1)`.
+`whatsapp_clientes` tiene PK `cod_cliente` **sin empresa**, y el código de cliente no es único entre
+LK y Chef (regla del dueño v13.76: *"el cod cliente no significa nada, sólo el CUIT vale"*). Sobre
+un código compartido ese `LIMIT 1` agarra el que venga primero, y el WhatsApp puede irle al cliente
+de la otra empresa.
+
+### Cómo se resolvió
+
+La **empresa viaja con el grupo**, deducida de sus NP con `gv_empresa_de_np_texto` (`LK…`/`CH…`, o
+`>90000` = LK) — la misma función que ya usa el resto del sistema. Si las NP de un grupo no
+coinciden en empresa, `empresa` queda **NULL y no se resuelve ningún teléfono**: ante la duda, no se
+manda.
+
+| fuente | cuándo se usa |
+|---|---|
+| **`GV_Clientes_Whatsapp`** (empresa, cod) — 814 filas | siempre que tenga la fila |
+| `whatsapp_clientes` (cod solo) — 963 filas | **sólo** si ese código no está en la canónica para NINGUNA empresa |
+
+Si el código está en la canónica para la **otra** empresa, el número es de ese otro cliente y acá no
+se muestra nada. Dos columnas nuevas al final: **`empresa`** y **`tel_origen`**
+(`canonica` / `historica` / `''`), para poder auditar de dónde salió cada número. El front no se
+tocó: `avpLoad` pide las columnas por nombre.
+
+### Medido
+
+Sobre los 4 grupos vivos: **antes 1 con teléfono, después 2**. El que aparece es **`1941` Alesso
+Vilarino**, un código que existe en LK y en CH **con teléfonos distintos**
+(LK `+5492964563140` / CH `+5491149923942`): por eso nunca se pudo espejar en la tabla vieja y la
+pantalla lo mostraba sin número.
+
+### La carga que lo hizo posible, el mismo día
+
+| | |
+|---|---:|
+| `GV_Clientes_Whatsapp` antes | 358 |
+| \+ 21 teléfonos nuevos que trajo Tomas | 379 |
+| \+ 385 migrados de `whatsapp_clientes` con su empresa | 764 |
+| \+ 50 de los 61 códigos ambiguos, ya decididos por Tomas | **814** |
+
+Clientes con venta en los últimos 12 meses: **713**; con WhatsApp **556**, sin teléfono **157**.
+Backups: `zz_backups."GV_Backup_ClientesWhatsapp_20260924"`, `…_20260924b` y
+`…_whatsapp_clientes_20260924`.
+
+⚠ **Los 50 de códigos ambiguos NO se espejaron en `whatsapp_clientes`** y no hay que hacerlo: esa
+tabla va por código solo, que es justo lo que esos códigos rompen. Llegan a la pantalla por la
+canónica.
+
+### Lo que este cambio NO arregla
+
+**El módulo sigue sin ver los pedidos web.** Su fuente es `vista_ppp_programacion_pendiente`, que
+cuelga de `GV_PPP_Programacion_Diaria` (ISIS) — medido al 24/09: **15 filas, 0 NP web, 4 grupos**.
+Un pedido cargado por la página nunca aparece en «Avisar programación». Es otro cambio.
+
+**Chequeo:**
+
+```sql
+select * from public.gv_reglas_perdidas;        -- vacía = las 3 reglas siguen
+select * from public.gv_aviso_cliente_dudoso;   -- avisos que caen sobre un código ambiguo
+-- y leerla como la lee el celular, que es lo único que prueba la RLS:
+set local role anon; select cod, empresa, tel_cli, tel_origen from public.vista_avisar_programacion;
+```
+
+`sql/gv_avisar_programacion_canonica_v2236.sql`.
