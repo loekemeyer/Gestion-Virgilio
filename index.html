@@ -21334,7 +21334,7 @@ async function pedImpEditFob(codEnc) {
 // (la lee gv_reingresos_feed). Lectura anon (gv_reingreso_excluidos), escritura supervisor
 // (gv_reingreso_web_set). Mientras no se cargó la lista, el switch no se dibuja: un ON
 // supuesto sería mentir.
-var _reingExcl = null, _reingExclCargando = false;
+var _reingExcl = null, _reingExclCargando = false, _webOcul = null;
 function _reingNorm(cod) {   // ≡ gv_cod_stock
   var s = String(cod == null ? "" : cod).toUpperCase().trim();
   s = s.replace(/\s*·.*$/, "").replace(/\s+(LK|CH|LOKE)$/, "").replace(/^0+(?=.)/, "").replace(/([0-9E])L$/, "$1");
@@ -21352,15 +21352,54 @@ async function _reingExclCargar() {
     var rows = await r.json();
     _reingExcl = new Set((rows || []).map(function (x) { return _reingNorm(x.cod); }));
   } catch (_e) { _reingExclCargando = false; return; }
+  // v22.23 — lista del switch "Web" (visible / oculto en la página). Llamada propia: si falla,
+  // el switch "Web" no se dibuja y el de "Cartel web" sigue andando.
+  try {
+    var r2 = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_web_ocultos", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: "{}"
+    });
+    if (!r2.ok) throw new Error("HTTP " + r2.status);
+    var rows2 = await r2.json();
+    _webOcul = new Set((rows2 || []).map(function (x) { return _reingNorm(x.cod); }));
+  } catch (_e) { _webOcul = null; }
   _reingExclCargando = false;
   try { if (_stkPop && _stkPop.kind === "pedImp") _pedImpRender(); } catch (_e) {}
 }
+// v22.23 (Luis, 24/09) — switch "Web" por importado: OFF = el artículo NO aparece en la
+// página de LK ni se puede pedir (products.active=false). Lista en GV_Web_Oculto; la aplica
+// sync_reingresos_virgilio de LK cada 5 min, y sólo reactiva lo que ocultó este switch.
+function _webVisibleSwitchHtml(cod) {
+  if (!_webOcul) return "";
+  var on = !_webOcul.has(_reingNorm(cod));
+  var enc = encodeURIComponent(String(cod));
+  return '<label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:4px;margin-top:3px;font-size:11px;white-space:nowrap;cursor:pointer;color:' + (on ? '#065f46' : '#b91c1c') + '" title="Artículo en la página LK: ON = se ve y se puede pedir. OFF = oculto, no se puede pedir. Se aplica en hasta 5 min.">'
+    + '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="pedImpWebVisible(\'' + enc + '\',this.checked)"> Web ' + (on ? 'visible' : 'OCULTO') + '</label>';
+}
+async function pedImpWebVisible(codEnc, on) {
+  var cod = decodeURIComponent(codEnc);
+  if (!on && !confirm("¿Ocultar " + cod + " de la página?\n\nNo va a aparecer ni se va a poder pedir (en hasta 5 minutos).")) { _pedImpRender(); return; }
+  var headers = await facAuthWriteHeaders({ "Content-Type": "application/json" });
+  if (!headers) { alert(authNoSesionMsg("Para ocultar o mostrar un artículo en la página necesitás iniciar sesión con Google (supervisor).")); _pedImpRender(); return; }
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_web_oculto_set", {
+      method: "POST", headers: headers, body: JSON.stringify({ p_cod: cod, p_visible: !!on })
+    });
+    if (!r.ok) throw new Error((await r.text()) || ("HTTP " + r.status));
+    if (!_webOcul) _webOcul = new Set();
+    var k = _reingNorm(cod);
+    if (on) _webOcul.delete(k); else _webOcul.add(k);
+  } catch (e) { alert("No se pudo cambiar la visibilidad web: " + (e.message || e)); }
+  _pedImpRender();
+}
 function _reingWebSwitchHtml(cod) {
-  if (!_reingExcl) return "";
+  if (!_reingExcl) return _webVisibleSwitchHtml(cod);
   var on = !_reingExcl.has(_reingNorm(cod));
   var enc = encodeURIComponent(String(cod));
   return '<label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:4px;margin-top:3px;font-size:11px;white-space:nowrap;cursor:pointer;color:' + (on ? '#065f46' : '#94a3b8') + '" title="Cartel web de reingreso: ON = las páginas LK/CH muestran &quot;Sin stock hasta&quot; y parten el pedido. OFF = ni cartel ni partido.">'
-    + '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="pedImpReingresoWeb(\'' + enc + '\',this.checked)"> Cartel web ' + (on ? 'ON' : 'OFF') + '</label>';
+    + '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="pedImpReingresoWeb(\'' + enc + '\',this.checked)"> Cartel web ' + (on ? 'ON' : 'OFF') + '</label>'
+    + _webVisibleSwitchHtml(cod);
 }
 async function pedImpReingresoWeb(codEnc, on) {
   var cod = decodeURIComponent(codEnc);
