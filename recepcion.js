@@ -372,12 +372,12 @@ const RCP_HTML = `
 <div id="opCajasModal" class="modal" role="dialog" aria-modal="true">
   <div class="modalCard">
     <div class="modalHeader">
-      <div class="modalTitle">Cajas entregadas</div>
+      <div class="modalTitle" id="opCajasTit">Cajas entregadas</div>
       <button id="opCajasClose" class="modalClose" aria-label="Cerrar">×</button>
     </div>
     <div class="cajasCodLine">Código <strong id="opCajasCod"></strong></div>
     <div id="opCajasOc" class="cajasOc" style="display:none"></div>
-    <label for="opCajasInput" class="cajasLabel">¿Cuántas cajas?</label>
+    <label for="opCajasInput" class="cajasLabel" id="opCajasLbl">¿Cuántas cajas?</label>
     <div class="cajasRow">
       <input id="opCajasInput" class="cajasInput" type="text" inputmode="numeric" />
       <button id="opCajasNext" class="cajasNext">Siguiente</button>
@@ -1330,7 +1330,7 @@ function drawArticulosGrid() {
       altaHtml = '<span class="ocq" title="Alta nueva: Thomy dijo que NO">🆕 ⛔</span>';
     }
     b.innerHTML = '<span>' + a.Cod_Art + '</span>' + ocHtml + altaHtml +
-      (cajas > 0 ? '<span class="cnt">' + cajas + ' caja' + (cajas === 1 ? '' : 's') + (exc ? ' ⚠' : '') + '</span>' : '');
+      (cajas > 0 ? '<span class="cnt">' + cajas + _rcpUd(a.Cod_Art, cajas) + (exc ? ' ⚠' : '') + '</span>' : '');
     b.onclick = () => openCajas(a.Cod_Art);
     grid.appendChild(b);
   });
@@ -1780,7 +1780,7 @@ function renderResumen() {
     const r = document.createElement("div");
     r.className = "resItem";
     const c = document.createElement("span"); c.className = "resCod"; c.textContent = i.cod;
-    const q = document.createElement("span"); q.className = "resCajas"; q.textContent = i.cajas + " caja" + (i.cajas === 1 ? "" : "s");
+    const q = document.createElement("span"); q.className = "resCajas"; q.textContent = i.cajas + _rcpUd(i.cod, i.cajas);
     r.appendChild(c); r.appendChild(q);
     list.appendChild(r);
   });
@@ -1788,8 +1788,10 @@ function renderResumen() {
 
   const tot = document.createElement("div");
   tot.className = "resTotal";
-  const totalCajas = items.reduce((s, i) => s + i.cajas, 0);
-  tot.textContent = "Total: " + items.length + " código(s) · " + totalCajas + " cajas";
+  // v22.27: los artículos en UNIDADES no se suman a las cajas: van aparte.
+  const totalCajas = items.reduce((s, i) => s + (_esCodDecimal(i.cod) ? 0 : i.cajas), 0);
+  const totalUni = items.reduce((s, i) => s + (_esCodDecimal(i.cod) ? i.cajas : 0), 0);
+  tot.textContent = "Total: " + items.length + " código(s) · " + totalCajas + " cajas" + (totalUni ? " + " + totalUni + " unidades" : "");
   opBody.appendChild(tot);
 
   // v15.39 — altas nuevas avisadas a Thomy. Es información: NO traba el envío.
@@ -1903,6 +1905,10 @@ function openCajas(cod) {
   }
   // v11.78: teclado con punto decimal para códigos fraccionarios
   opCajasInput.inputMode = _esCodDecimal(cod) ? "decimal" : "numeric";
+  // v22.27 (Marianela 24/09): 55215/55219/55289 se reciben en UNIDADES, no en cajas.
+  const _tit = document.getElementById("opCajasTit"), _lbl = document.getElementById("opCajasLbl");
+  if (_tit) _tit.textContent = _esCodDecimal(cod) ? "Unidades entregadas" : "Cajas entregadas";
+  if (_lbl) _lbl.textContent = _esCodDecimal(cod) ? "¿Cuántas unidades?" : "¿Cuántas cajas?";
   opCajasModal.classList.add("open");
   setTimeout(() => { opCajasInput.focus(); _opCajasExceso(); }, 50);
 }
@@ -2145,6 +2151,8 @@ function closeCajas() { opCajasModal.classList.remove("open"); opState.cajasCod 
 // v11.78: códigos con decimales permitidos (cajas fraccionarias)
 const _CODS_DECIMAL = ["55215","55219","55289"];
 const _esCodDecimal = (c) => _CODS_DECIMAL.indexOf(String(c).replace(/\D/g,"")) >= 0;
+// v22.27: esos tres van en UNIDADES en todo el sistema (uxb 1): la etiqueta lo dice.
+function _rcpUd(cod, n) { return _esCodDecimal(cod) ? " u" : (" caja" + (n === 1 ? "" : "s")); }
 opCajasInput.oninput = () => {
   if (_esCodDecimal(opState.cajasCod)) {
     opCajasInput.value = opCajasInput.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
