@@ -65,7 +65,8 @@ catch (_e) {
     window.confirm = () => true;
     window.sbAuth = { getAccessToken: async () => "h." + btoa(JSON.stringify({ email: "test@x" })) + ".s" };
     const peds0 = JSON.parse(JSON.stringify(_apr.pedidos));
-    const reset = () => { _apr.pedidos = JSON.parse(JSON.stringify(peds0)); _apr.listo = true; _apr.err = ""; _apr.msg = ""; _apr.msgErr = false; };
+    // v22.17: la cuarentena de cada pedido tiene que estar VERIFICADA para programarlo a mano.
+    const reset = () => { _apr.pedidos = JSON.parse(JSON.stringify(peds0)); _apr.pedidos.forEach((p) => { p._cuarOk = true; }); _apr.listo = true; _apr.err = ""; _apr.msg = ""; _apr.msgErr = false; };
     const tandaFns = () => calls.map((c) => c.fn).filter((f) => /^gv_ppp_web_tanda_/.test(f));
 
     // el drop de verdad: aprDropDia con _apr.drag cargado
@@ -82,6 +83,13 @@ catch (_e) {
     out.falla = { fns: tandaFns(), msg: _apr.msg, err: _apr.msgErr, emp: (calls[0] || { body: {} }).body.p_empresa };
     window.__falla = false;
 
+    // v22.17 (problema 528): cuarentena SIN verificar (la marcación falló) → no se programa nada
+    reset(); calls.length = 0;
+    _apr.pedidos.forEach((p) => { delete p._cuarOk; }); _apr.cuarErr = "500";
+    await aprGenerarTanda("2026-09-15", ["chef:1354"]);
+    out.sinVerif = { fns: tandaFns(), msg: _apr.msg, err: _apr.msgErr };
+    _apr.cuarErr = null;
+
     // aprOver acepta el pedido sobre un día
     _apr.drag = _apr.pedidos[0]; _apr.dragTanda = null;
     let prevented = false; const el = document.createElement("div");
@@ -97,6 +105,7 @@ catch (_e) {
   chk(r.fit.sw <= r.fit.cw + 1, "sin scroll horizontal");
   chk(r.fit30.zoom === "1" && r.fit30.ov === "auto" && r.fit30.sh > r.fit30.ch, "con 80 pedidos tampoco: scrollea a tamaño normal");
   chk(/apr-wrap apr-2col/.test(r.html) && !/apr-col-tandas/.test(r.html) && !/aprNuevaTanda/.test(r.html), "v13.69: sin tandas sin fecha → dos columnas (pedidos | días), sin botones LK/Chef");
+  chk(r.sinVerif.fns.length === 0 && r.sinVerif.err && /no se pudo verificar la cuarentena/i.test(r.sinVerif.msg), "v22.17: sin cuarentena verificada no se programa nada (" + r.sinVerif.fns.join(">") + ")");
   chk(r.drop.fns.join(">") === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar", "pedido soltado en un día = nueva → agregar → programar (" + r.drop.fns.join(">") + ")");
   chk(r.drop.fecha === "2026-09-15" && r.drop.cod === "E09A" && r.drop.emp === "lk", "con el día del drop, el código que dio la base y la empresa del pedido");
   chk(/"art":"027"/.test(r.drop.items), "los artículos viajan al programar");

@@ -143,6 +143,9 @@ catch (_e) {
            cuarentena_motivos: ["deuda", "cliente_nuevo"], cuarentena_detalle: { deuda: 50000, nuevo_pedidos: 1 } }),
       mk({ order_id: 201, razon_social: "Cliente Dos" })
     ];
+    // v22.11: sin el estado del pipeline del backend, «Qué sigue» dice «Cargando…» y no dibuja
+    // botones (a propósito). Se le da el estado, como lo devolvería gv_clin_pipeline_lote.
+    _apr.pipe = { "chef:200": { etapa: "ingresado" } };
     _pppTab = "prog"; aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
     // Los dos submódulos conviven en el mismo render; se parte el HTML por sus títulos.

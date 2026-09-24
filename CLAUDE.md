@@ -2188,6 +2188,22 @@ venía de un feed caído; acá viene de *"no pregunté"*. En los dos casos el fr
 de LK contestando última. Verificado que falla contra el código anterior (*"el pedido de Chef
 perdió su cuarentena"*).
 
+## ⚠⚠ REGLA (Luis, 2026-09-24, v22.17): el freno de cuarentena vale también A MANO — y el liberado se REEVALÚA
+
+**Caso LK 1475 · Oriental Party (LK 1618, deuda $3.222.078,75)**: el 24/09 entre 10:01:21 y
+10:03:43 `gv_cuarentena_marcar` le dio **500 siete veces** al navegador; A Programar lo dibujó
+sano y a las 10:03:38 se programó a mano (terminó en E92A). Nadie lo aprobó. Problema 528.
+
+| capa | qué hace desde v22.17 |
+|---|---|
+| **servidor** | `gv_ppp_web_tanda_programar` y `gv_ppp_web_tanda_reusar` llaman a `gv_cuarentena_retiene_lote` (el MISMO criterio del armador, fail-closed): retenido sin aprobar → error `CUARENTENA: …`; no se pudo evaluar → error *"no se programó nada, probá de nuevo"* |
+| **front** | `aprGenerarTanda` no programa un pedido web cuya cuarentena no se pudo VERIFICAR (`p._cuarOk`, lo pone la marcación sólo en los pedidos de su lote). Sin marca no hay "no retiene": hay "no sé" |
+| **liberar** | `gv_cuarentena_liberar` borra la fila de `GV_PPP_Web_Retenido`: aprobado, el pedido **olvida la tanda de la que lo sacaron** y el armador lo reprograma con la lógica normal. En cuarentena el chip dice *"↻ al aprobarlo se reprograma"*, no *"vuelve a E92A"* |
+
+⚠ **Las NP de ISIS no tienen el freno del servidor** (el armador tampoco las evalúa): sólo web.
+**Chequeo:** `select * from public.gv_reglas_perdidas;` · `node tests/apr-cuar-freno-manual.cjs` ·
+`node tests/apr-fit.cjs`. `sql/gv_cuarentena_freno_manual_v2217.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.89): el PIPELINE **reemplazó** al submódulo de clientes nuevos
 
 **Luis, textual:** *"implementá esta nueva versión de clientes nuevos en «A programar»

@@ -6135,7 +6135,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.16"></script>
+<script type="module" src="recepcion.js?v=22.17"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10087,7 +10087,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.16";
+const APP_VERSION = "v22.17";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -47068,6 +47068,23 @@ async function aprGenerarTanda(fecha, keys, opts) {
   const peds = sel.map(function (k) { return (_apr.pedidos || []).find(function (p) { return aprKey(p.empresa, p.order_id) === k; }); }).filter(Boolean);
   if (!peds.length) { _apr.msg = "No encontré el pedido."; _apr.msgErr = true; aprRender(); return; }
   if (!fecha) { _apr.msg = "Elegí el día de entrega: ninguna tanda queda sin fecha."; _apr.msgErr = true; aprRender(); return; }
+  /* v22.17 (Luis, 24/09, problema 528) — un pedido de la página NO se programa a mano si su
+     cuarentena no se pudo verificar. Caso LK 1475 (Oriental Party): gv_cuarentena_marcar dio 500
+     siete veces, la pantalla lo dibujó sano y se programó con deuda sin aprobar. Sin marca no hay
+     "no retiene": hay "no sé". El freno de verdad está en el servidor (gv_ppp_web_tanda_programar);
+     esto evita el viaje y dice por qué. */
+  const _cuarNoVerif = peds.filter(function (p) { return !p._isis && !p._demo && !p._cuarOk; });
+  const _cuarRet = peds.filter(function (p) { return !p._isis && !p._demo && aprEnCuarentena(p); });
+  if (_cuarRet.length) {
+    _apr.msg = "⚠ " + _cuarRet.map(aprPedLabel).join(", ") + " está en cuarentena y nadie lo aprobó: liberalo desde Cuarentena antes de programarlo.";
+    _apr.msgErr = true; aprRender(); return;
+  }
+  if (_cuarNoVerif.length) {
+    _apr.msg = "⚠ Todavía no se pudo verificar la cuarentena de " + _cuarNoVerif.map(aprPedLabel).join(", ") +
+      (_apr.cuarErr ? " (la consulta falló: " + _apr.cuarErr + ")" : "") +
+      ". No se programó nada: esperá unos segundos o recargá, y volvé a soltarlo.";
+    _apr.msgErr = true; aprRender(); if (_apr.cuarErr) cuarMarcarPedidos(); return;
+  }
   const emps = {}; for (const p of peds) emps[p.empresa || "lk"] = true;
   if (Object.keys(emps).length > 1) { _apr.msg = "Una tanda es de una sola empresa: tildá sólo LK o sólo Chef."; _apr.msgErr = true; aprRender(); return; }
   const emp = Object.keys(emps)[0];
@@ -47938,11 +47955,16 @@ function aprColPedidos() {
               escapeHtml(_aprTandaEstadoTxt(p)) + ' y avanzó SIN este pedido: su mercadería no está en ese pallet. ' +
               'Va a una tanda NUEVA y se pickea y se arma como cualquier otro.">⚠ ' +
               escapeHtml(p.tanda_previa) + ' ' + escapeHtml(_aprTandaEstadoTxt(p)) + ' · va a tanda nueva</span>'
+          : ((p.tanda_previa && aprEnCuarentena(p))
+            // v22.17 (Luis, 24/09): en cuarentena NO vuelve a su tanda: al aprobarlo se olvida de
+            // ella (gv_cuarentena_liberar borra la memoria) y se reprograma con la lógica normal.
+            ? '<span class="apr-chip apr-chip-z" title="Salió de la tanda ' + escapeHtml(p.tanda_previa) +
+                ', pero está en cuarentena: al aprobarlo NO vuelve ahí, se reevalúa y se programa como un pedido nuevo.">↻ al aprobarlo se reprograma</span>'
           : (p.tanda_previa
             ? '<span class="apr-chip apr-chip-vuelve" title="Salió de la tanda ' + escapeHtml(p.tanda_previa) +
                 ', que todavía no se empezó. Al programarlo vuelve a esa misma tanda.">↶ vuelve a ' +
                 escapeHtml(p.tanda_previa) + '</span>'
-            : '')) +
+            : ''))) +
         // v13.21 (dueño): qué día va a poder salir, no la fecha en que llegó (queda en el title)
         aprRepoChip(p) +     // v19.44 (Luis): no cayó en cuarentena por ser reposición chica
         aprMismoPedidoChip(p) +   // v20.53 (Luis): la deuda es de otra NP del mismo pedido
@@ -50940,6 +50962,7 @@ async function cuarMarcarPedidos() {
       if (p._demo) return;
       const k = aprKey(p.empresa, p.order_id);
       if (!askKey[k]) return;   // v21.32: no estaba en el lote de esta llamada → no se toca
+      p._cuarOk = true;         // v22.17: la cuarentena de ESTE pedido se pudo verificar
       if (detKey[k]) p.cuarentena_detalle = detKey[k]; else if (p.cuarentena_detalle) delete p.cuarentena_detalle;
       if (libKey[k]) { p.cuarentena_motivos = libKey[k]; p._cuarLiberado = true; }
       else if (byKey[k] && byKey[k].length) { p.cuarentena_motivos = byKey[k]; p._cuarLiberado = false; }
