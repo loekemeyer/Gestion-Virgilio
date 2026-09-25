@@ -52,6 +52,13 @@ const RACKS = [
     o.modos = [...document.querySelectorAll(".pmap-modos .pmap-modo")].map((e) => e.textContent.trim());
     o.arranca = (document.querySelector(".pmap-modo-on") || {}).id;
     o.gondTab = (document.querySelector("#pmapTabs .lug-tab-on") || {}).textContent;
+    // v22.70: las dos pestañas lado a lado y adentro de la pantalla (el button{width:100%}
+    // global dejaba Racks afuera, vacía).
+    { const g = document.getElementById("pmapModoG").getBoundingClientRect(),
+            r = document.getElementById("pmapModoR").getBoundingClientRect(),
+            w = document.getElementById("pmapModoG").parentElement.getBoundingClientRect();
+      o.tabsLayout = { mismaFila: Math.abs(g.top - r.top) < 2, rDentro: r.right <= w.right + 1 && r.width > 60,
+                       gMitad: g.width < w.width * 0.6 }; }
 
     pmapModo("rack");
     await new Promise((r) => setTimeout(r, 300));
@@ -129,6 +136,8 @@ const RACKS = [
   ok(/Góndola\s*A/.test(out.volvio), "(f) volver a Góndolas no dibuja la góndola: " + out.volvio);
   ok(out.viejaVuelve, "(f) el aviso de la planimetría vieja no vuelve en Góndolas");
 
+  if (!(out.tabsLayout && out.tabsLayout.mismaFila && out.tabsLayout.rDentro && out.tabsLayout.gMitad))
+    fallas.push("las pestañas Góndolas / Racks no quedan lado a lado: " + JSON.stringify(out.tabsLayout));
   if (fallas.length) { console.error("✗ pmap-racks:\n  - " + fallas.join("\n  - ")); process.exit(1); }
   console.log("✓ pmap-racks: dos pestañas, racks por vista, libre/sin lugar, búsqueda y edición por RPC");
 })().catch((e) => { console.error(e); process.exit(1); });
