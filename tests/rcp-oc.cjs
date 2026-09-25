@@ -134,7 +134,7 @@ if (!/window\.supabase/.test(src)) { console.error("rcp-oc: recepcion.js ya no t
       btns[x.querySelector("span").textContent.trim()] = ocq ? ocq.textContent.trim() : null;
     });
     out.btnOc = btns["518"] === "OC 60"              // pedidas
-      && btns["586"] === "OC 40/100"                 // faltan/pedidas cuando hay recibido parcial
+      && btns["586"] === "OC 40"                     // v22.58: sólo lo que falta recibir (antes "40/100")
       && btns["999"] === null;                       // sin OC vigente → sin detalle
 
     // ---- 5) pop-up de cajas: muestra la OC, y exceder NO interrumpe ----
