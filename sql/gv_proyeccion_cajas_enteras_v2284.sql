@@ -1,0 +1,30 @@
+-- v22.84 (Luis, 25/09/2026): "proyeccion en todos lados siempre en cajas redondas".
+-- Ej: 437E CH 3,18 cajas = 76,32 u  ->  3 cajas = 72 u. Redondeo al entero mas cercano.
+-- Retira el round(...,2) de la v22.73 como criterio: ahora la FUENTE ya viene en cajas enteras.
+--
+-- 1) gv_proyeccion_articulo: la definicion viva queda como CTE crudo_cajas y afuera se redondea
+--    proy_lk y proy_ch por separado; proy_cajas_mes = round(lk) + round(ch) (asi el dual LK+CH
+--    suma lo mismo en todas las pantallas). proy_propia, proy_familia y detalle_familia tambien.
+do $$
+declare d text;
+begin
+  d := pg_get_viewdef('public.gv_proyeccion_articulo'::regclass, true);
+  if d ~ 'crudo_cajas' then return; end if;
+  d := regexp_replace(d, ';\s*$', '');
+  execute 'create or replace view public.gv_proyeccion_articulo with (security_invoker = true) as
+  with crudo_cajas as (' || d || ')
+  select cod, round(proy_lk) as proy_lk, round(proy_ch) as proy_ch,
+         round(proy_lk) + round(proy_ch) as proy_cajas_mes,
+         round(proy_propia) as proy_propia, round(proy_familia) as proy_familia,
+         (select jsonb_agg(jsonb_build_object(''cod'', e.v->>''cod'', ''lk'', round((e.v->>''lk'')::numeric),
+                 ''ch'', round((e.v->>''ch'')::numeric)) order by e.n)
+            from jsonb_array_elements(crudo_cajas.detalle_familia) with ordinality e(v, n)) as detalle_familia,
+         es_secundario, principal
+    from crudo_cajas';
+end $$;
+-- 2) vista_generador_oc: el dual partia el total por la proporcion lk/(lk+ch) y dejaba
+--    33,00000000000000000012; con indice 1,5 un 22,0000...014 daba ceil 34 en vez de 33.
+--    Ahora toma proy_lk / proy_ch directo (reemplazo exacto sobre la definicion viva).
+-- Medido al aplicar: 314 codigos con proyeccion, 14 quedan en 0 (todos < 0,5 caja/mes),
+-- Importados 0 filas fuera de multiplo de caja, Stock 0 con decimales, generador 0.
+-- Rollback: zz_backups."GV_Backup_gpa_def_20260925c" y zz_backups."GV_Backup_genoc_def_20260925".

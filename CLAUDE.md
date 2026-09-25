@@ -1200,7 +1200,7 @@ leer la que no es da respuestas que suenan bien y están mal.
 | Para saber… | **LA QUE VALE** | La vieja, NO usar |
 |---|---|---|
 | Qué artículo va en qué sector de **góndola**, y de qué empresa es el sector | **`GV_Lugar` + `GV_Lugar_Item`** → vista **`gv_lugar_articulo`** (y `gv_planimetria_celda`) | `Planimetria` ⚠ ver abajo |
-| Qué hay cargado en cada **rack** | **`Movimientos_Stock`** (racks, `ubicacion` = sector) — `Racks_Planimetria` es una **VISTA** desde la v22.77 | **`Ubicaciones_Articulos`** · `Racks_Planimetria_legacy` |
+| Qué hay cargado en cada **rack** | **`Movimientos_Stock`** (racks, `ubicacion` = sector) — `Racks_Planimetria` es una **VISTA** desde la v22.84 | **`Ubicaciones_Articulos`** · `Racks_Planimetria_legacy` |
 | **Capacidad** de cada celda de góndola (cajas que entran) | **`GV_Lugar_Item.cajas_max`** — `Capacidad_Sector` es una **VISTA** sobre ella desde la v22.75 | `Capacidad_Sector_legacy` (la tabla vieja, sin escritura, sólo para rollback) |
 | De qué **empresa** es un artículo (el dato de la columna LK/CH) | **`gv_empresa_de_articulo(cod)`** y su caché `GV_Articulo_Empresa_Cache` | `gv_articulo_empresa` (la vista rota) |
 
@@ -1322,7 +1322,7 @@ proponer "trasladar de la góndola LK a la de Chef" para ahorrarse la compra**. 
 consecuencia del código compartido es la de siempre: la empresa la da de qué pila salió la caja
 (el pedido), no el artículo.
 
-### ⚠ RACKS: una fuente por dato (Luis, 25/09, v22.77)
+### ⚠ RACKS: una fuente por dato (Luis, 25/09, v22.84)
 
 | dato | dónde vive |
 |---|---|
@@ -1342,7 +1342,7 @@ terminado, textos de insumos). En racks vale sólo lo que `gv_rack_sector()` rec
 La migración movió **0 cajas** del total de racks (14.094 antes y después): 111 ajustes en 42 códigos con `ref = 'ubicar racks · v22.76'`
 que suman 0 por código. Quedaron **21 a contar** y 7 códigos sin posición (505I 1.139, 546 360, 513 260, 816E 120…).
 Insumos en racks (523C, 546V, 102E, 522S, 1000900) quedan «a contar» hasta el paso de alias de ubicación de insumos.
-Rollback: `sql/gv_racks_canon_v2277.sql`. Lo sostiene `tests/pmap-racks.cjs`.
+Rollback: `sql/gv_racks_canon_v2284.sql`. Lo sostiene `tests/pmap-racks.cjs`.
 
 ### ⚠ INSUMOS: dónde está cada uno sale del Mapa (Luis, 25/09, v22.80)
 
@@ -2563,7 +2563,7 @@ discriminado de momento"). Meses sin stock: pendiente de Luis. **Excepciones por
 ⚠ **Sin venta = sin proyección** (Luis, v22.70: *"no le pongas una proyección a mano, ya no va más eso"*): Importados ya no cae al `est_madre_seed`; la fuente dice `sin proyeccion` y vale 0. `sql/gv_importados_sin_seed_v2270.sql`.
 ⚠ En Stock, **buscar exacto un principal trae sus secundarios** (437E → 029, 607E → 565), leídos de `familia_principal`/`es_secundario` de la fila. `tests/stk-busca-secundarios.cjs`.
 ⚠⚠ **El SECUNDARIO no tiene proyección propia en NINGÚN lado** (Luis, v22.72: *"toda la proyección del secundario se vuelca al principal… si el 580E tuvo demanda, no debería aparecer ni en stocks ni en importados"*). Vale para cualquier secundario, sea importado o nacional (580E → 580, 574 → 574E). En `gv_proyeccion_articulo` su fila va en 0; `proy_propia` guarda su venta, que el principal muestra en «incluye». `sql/gv_proyeccion_secundario_cero_v2272.sql`.
-⚠ **Importados NO redondea a unidades enteras** (Luis, v22.73: *"el redondeo me hace ruido"*): `round(proy × uxb, 2)`, así en cajas da igual que Stock (870E 8,33, no 8,25). `sql/gv_importados_sin_redondeo_v2273.sql`.
+⚠⚠ **La proyección va SIEMPRE en CAJAS ENTERAS, en todos lados** (Luis, v22.84: *"76 unidades tiene que figurar 72 (3 cajas redondas)"*). Se redondea en la FUENTE, `gv_proyeccion_articulo`: `proy_lk` y `proy_ch` al entero más cercano y `proy_cajas_mes = round(lk) + round(ch)`; Importados en unidades sale múltiplo exacto de la caja. Retira el criterio de la v22.73 (2 decimales). 14 códigos de menos de 0,5 caja/mes quedan en 0. El generador de OC toma `proy_lk`/`proy_ch` directo en los duales (la proporción dejaba 22,000…014 y el `ceil` del máximo salía 1 de más). `sql/gv_proyeccion_cajas_enteras_v2284.sql`.
 ⚠⚠ **El front NO vuelve a sumar la familia** (Luis, v22.71: el 580 salía 108 = 58,50 + 49 y el 580E "—"): la proyección que llega de la base YA trae la familia sumada. `openStockAdmin` no consolida con `EQUIV_FAMILIAS` y `ocgFetchProyeccion` lee `gv_proyeccion_articulo` (sin secundarios). `tests/stk-proy-sin-doble-familia.cjs`.
 ⚠ `ventas_mensuales_cod` la pisó otra sesión el 25/09 y perdió la familia: ahora tiene centinela.
 **Chequeo:** `select * from public.gv_reglas_perdidas;`. `sql/gv_proyeccion_unica_v2268.sql`.
