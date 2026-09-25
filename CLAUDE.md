@@ -4633,6 +4633,25 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
+## ⚠⚠ REGLA (Luis, 2026-09-25, v22.66): los PRECIOS se cambian en la fuente de la PÁGINA, nunca en `precios_venta*`
+
+**Luis:** *"deberíamos cambiarlo de las tablas que toma la página tocando lógica. Anotá que cualquier
+cambio a precios se tiene que hacer así para que otra sesión no labure al pedo"*.
+
+`precios_venta` (LK) y `precios_venta_chef` (Chef) son **ESPEJOS**: los reescribe la Edge Function
+`sync-precios-venta` (cron **66**, cada 15 min) desde el catálogo de productos de cada página, y lo que
+no está en el catálogo **se borra** (`reconcileStale`). Un `insert`/`update` a mano ahí **dura hasta la
+próxima corrida**. Y `precios_venta_chef` además decide **de qué empresa es un artículo**
+(`gv_articulo_empresa`, `gv_mov_empresa_resuelta`, `vista_nombres_articulos`): meter un código de LK ahí
+lo pasa a Chef en todo Gestión.
+
+> **Un precio se cambia en la tabla de productos de la página (proyecto LK `kwkclwhmoygunqmlegrg` /
+> Chef `nkhzocgdpwtgrmwleihr`) o tocando la LÓGICA que lo resuelve — nunca cargándolo en el espejo.**
+
+Caso que lo originó (25/09): 439E, 809, 838E y 865ED se facturan por Chef (Dorinka, TdF) con precio de
+la **lista LK** y no están en el catálogo de Chef. **Se dejó así** (Luis). Dorinka además tiene lista
+especial (−33 % a +29 % contra lista Chef), así que su factura no sirve de precio de lista.
+
 ## ⚠ REGLA (Luis, 2026-09-25, v22.64): «Ajustes manuales en ISIS» es SÓLO Cencosud y Tierra del Fuego
 
 **Luis:** *"Es para pedidos de Cencosud y Tierra del Fuego eso nomas"*. Dorinka (Chef 2686) aparecía porque
