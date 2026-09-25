@@ -48,7 +48,11 @@
       "Bash(node scripts/bump-version.cjs 22.61)",
       "Bash(node scripts/bump-version.cjs 22.64)",
       "Bash(sed -i 's/-- v22.64 \\(Luis/-- v22.65 \\(Luis/' sql/gv_fecha_carga_normalizar_v2265.sql)",
-      "Bash(node scripts/bump-version.cjs 22.65)"
+      "Bash(node scripts/bump-version.cjs 22.65)",
+      "Bash(node scripts/bump-version.cjs 22.75)",
+      "Bash(node tests/cap-sector-vista.cjs)",
+      "Bash(node tests/smoke.cjs)",
+      "Bash(node tests/regla-L.cjs)"
     ]
   }
 }
