@@ -1449,6 +1449,8 @@ button {
 .apr-chip-vuelve{ background:#dcfce7; color:#14532d; font-weight:800; border:1px solid #bbf7d0; }
 /* v19.44 (Luis): el pedido que NO cayó en cuarentena por ser una reposición chica. */
 .apr-chip-repo{ background:#ecfeff; color:#155e75; font-weight:800; border:1px solid #a5f3fc; }
+.cuar-chip-partido{ background:#fef3c7; color:#92400e; font-weight:800; border:1px solid #fcd34d; margin-left:6px; white-space:nowrap; }
+.cuar-partido-parte{ margin:6px 0 2px; font-size:12px; color:#475569; }
 .apr-chip-z{ background:#e0edff; color:#1e40af; }
 /* v20.51 (Luis) — destino del expreso y provincia marcada, con el mismo naranja que la
    Programación. El naranja pisa el fondo de la tarjeta a propósito (Luis: *"esta bien que pise
@@ -6106,7 +6108,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.46"></script>
+<script type="module" src="recepcion.js?v=22.48"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10057,7 +10059,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.46";
+const APP_VERSION = "v22.48";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -46500,6 +46502,7 @@ let _apr = {
   cuarRepo: null, cuarRepoLoading: false,
   // v20.53 (Luis): la deuda que viene de OTRA NP del mismo pedido no retiene (chip).
   cuarMismo: null, cuarMismoLoading: false,
+  cuarPartidos: null, cuarPartidosLoading: false,   // v22.47: partes diferidas de pedidos partidos
   // v18.04 — log de pedidos ANULADOS (undefined = todavía no se pidió)
   anulados: undefined, anuladosLoading: false, anuModal: false
 };
@@ -48554,12 +48557,14 @@ function aprColCuarentena() {
   clinDtoPagoNeed();       // v21.98 (Vivi): el descuento por plazo de pago, para saber qué cobrar
   clinCuitNeed();          // v20.41 (Luis): el CUIT en la columna de cliente
   cuarMismoNeed();         // v20.53 (Luis): chip "la deuda es de otra NP del mismo pedido"
+  cuarPartidosNeed();      // v22.47 (Luis): el pedido partido va en UNA fila
   if (_apr.cuarDemo) lista = [cuarDemoPedido()].concat(lista);   // v14.84: pedido de ejemplo
   const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
   const _cuarCol = aprColapsado("vir_cuar_colapsado");   // v18.100 (Luis): submódulo colapsable
+  const _cuarGrupos = cuarAgrupar(lista);   // v22.47: un pedido partido cuenta como UNO
   let h = '<div class="apr-col apr-col-cuar' + (_cuarCargando ? ' apr-col-cargando' : '') + (_cuarCol ? ' apr-col-colapsado' : '') + '">' +
     '<div class="apr-col-t apr-col-t-clic" onclick="aprCuarColapsar()" title="' + (_cuarCol ? "Mostrar" : "Ocultar") + ' Cuarentena">' +
-      '<span class="apr-col-caret">' + (_cuarCol ? "▸" : "▾") + '</span> 🚧 Cuarentena <b>(' + (_cuarCargando ? '…' : lista.length) + ')</b>' +
+      '<span class="apr-col-caret">' + (_cuarCol ? "▸" : "▾") + '</span> 🚧 Cuarentena <b>(' + (_cuarCargando ? '…' : _cuarGrupos.length) + ')</b>' +
       '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos, que superan su límite de crédito. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
     '</div>';
   if (_cuarCol) return h + '</div>';   // colapsado: sólo el título con el contador
@@ -48587,8 +48592,10 @@ function aprColCuarentena() {
     '<th>Motivos</th><th class="cuar-td-m3">Monto</th><th>Contacto</th><th>Enviar a</th>' +
     '<th class="cuar-td-com">Coment.</th>' +
     '</tr></thead><tbody>';
-  for (const p of lista) {
-    const np = p._demo ? "web LK 9999" : aprPedLabel(p);
+  for (const g of _cuarGrupos) {
+    const p = g.p, varios = g.miembros.length > 1;
+    const np = p._demo ? "web LK 9999" : g.miembros.map(function (x) { return aprPedLabel(x); }).join(" + ");
+    const m3 = g.miembros.reduce(function (s, x) { return s + (Number(x.m3) || 0); }, 0);
     // v17.57 (Luis): flechita para ver qué pidieron, igual que en la columna de Pedidos a
     // programar. El id lleva "c" adelante para no pisarse con el de esa lista.
     const cid = "c" + p.empresa + p.order_id, cab = !!_apr.exp[cid];
@@ -48598,10 +48605,10 @@ function aprColCuarentena() {
       '<td class="cuar-td-np" onclick="aprToggle(\'' + cid + '\')" title="Ver qué pidieron (códigos y cajas)">' +
         '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
         '<span class="cuar-card-np">' + escapeHtml(np) + '</span>' +
-        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') +
+        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') + cuarPartidoChip(g) +
       '</td>' +
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
-      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
+      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(m3) + ' m³</span></td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) + '</td>' +
       '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
       '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') + '</td>' +
@@ -48620,11 +48627,14 @@ function aprColCuarentena() {
       // lugar está ANULAR, para el pedido que entró mal y no tiene que salir nunca.
       '<td><div class="cuar-td-acc">' +
         '<button class="cuar-enviar" onclick="cuarLiberar(\'' + emp + '\',\'' + oid + '\')" title="Aprobarlo: pide quién lo autoriza y un comentario, y lo manda a «Pedidos a programar»">➡ Enviar a Pedidos a programar</button>' +
-        aprAnularBtn(p, "chico") +
+        g.miembros.map(function (x) { return aprAnularBtn(x, "chico"); }).join("") +
       '</div></td>' +
       '<td class="cuar-td-com">' + cuarComBtnHtml(p) + '</td>' +
       '</tr>';
-    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' +
+      (varios ? g.miembros.map(function (x) {
+        return '<div class="cuar-partido-parte"><b>' + escapeHtml(aprPedLabel(x)) + '</b> · ' + aprNum(x.m3) + ' m³</div>' + aprContenidoHtml(x);
+      }).join("") : aprContenidoHtml(p)) + '</div></td></tr>';
   }
   return h + '</tbody></table></div></div>';
 }
@@ -48796,6 +48806,50 @@ async function cuarMismoCargar() {
   } catch (_e) { _apr.cuarMismo = {}; }   // sin chip; la marcacion NO depende de esto
   _apr.cuarMismoLoading = false;
   if (_pppTab === "prog") aprRender();
+}
+/* v22.47 (Luis, 25/09): un pedido PARTIDO por importados (la parte que espera reingreso sale con
+   otro order_id y pedido_origen = el original) es UN pedido para el cliente. En Cuarentena va en
+   UNA fila que dice que adentro hay varios pedidos. El backend ya los trata juntos: quedan
+   retenidos los dos o ninguno, y aprobar una parte aprueba todo (gv_cuarentena_liberados_familia). */
+function cuarPartidosNeed() { if (_apr.cuarPartidos === null && !_apr.cuarPartidosLoading) cuarPartidosCargar(); }
+async function cuarPartidosCargar() {
+  if (_apr.cuarPartidosLoading) return;
+  _apr.cuarPartidosLoading = true;
+  try {
+    const res = await aprRpc("gv_pedidos_partidos", {});
+    const m = {};
+    (res || []).forEach(function (r) {
+      if (r && r.order_id != null && r.pedido_origen != null) m[aprKey(r.empresa, r.order_id)] = String(r.pedido_origen);
+    });
+    _apr.cuarPartidos = m;
+  } catch (_e) { _apr.cuarPartidos = {}; }   // sin agrupar: cada parte en su fila, como antes
+  _apr.cuarPartidosLoading = false;
+  if (_pppTab === "prog") aprRender();
+}
+function cuarAgrupar(lista) {
+  const orig = _apr.cuarPartidos || {};
+  const grupos = [], idx = {};
+  (lista || []).forEach(function (p) {
+    const raiz = p._demo ? ("demo:" + p.order_id)
+      : aprKey(p.empresa, orig[aprKey(p.empresa, p.order_id)] || p.order_id);
+    if (idx[raiz] == null) { idx[raiz] = grupos.length; grupos.push({ p: p, miembros: [p] }); return; }
+    const g = grupos[idx[raiz]];
+    g.miembros.push(p);
+    // la fila la encabeza el pedido ORIGINAL (el que no tiene pedido_origen)
+    if (!orig[aprKey(p.empresa, p.order_id)]) g.p = p;
+  });
+  grupos.forEach(function (g) {
+    g.miembros.sort(function (a, b) { return Number(a.order_id) - Number(b.order_id); });
+  });
+  return grupos;
+}
+function cuarPartidoChip(g) {
+  if (!g || g.miembros.length < 2) return "";
+  const labels = g.miembros.map(function (x) { return aprPedLabel(x); }).join(" + ");
+  return '<span class="apr-chip cuar-chip-partido" title="' + escapeHtml("Es UN pedido del cliente que el sistema partió en " +
+    g.miembros.length + " para programarlo (la parte con importados sin stock espera el reingreso): " + labels +
+    ". Quedan retenidos juntos y al enviarlo a Pedidos a programar se aprueban todos.") + '">\u{1F9E9} ' +
+    g.miembros.length + ' pedidos (1 partido)</span>';
 }
 function aprMismoPedidoChip(p) {
   if (!p || p._demo) return "";
