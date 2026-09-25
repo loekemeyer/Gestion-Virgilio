@@ -13,9 +13,9 @@
 set -euo pipefail
 SRC="admin/admin-supercot.js"
 OUT="${1:-admin/krikos-parsers.js}"   # con argumento escribe en otro lado (lo usa el test)
-R1="349,401"     # parseNum y helpers numéricos
-R2="444,1660"    # detectSuper, splitLines, findFirstMatch, los 11 parsers, extractPdfTotal, PARSERS
-R3="1826,1874"   # codVariants + findInPool (match de código con variantes)
+R1="357,409"     # parseNum y helpers numéricos
+R2="452,1668"    # detectSuper, splitLines, findFirstMatch, los 11 parsers, extractPdfTotal, PARSERS
+R3="1834,1882"   # codVariants + findInPool (match de código con variantes)
 {
   cat scripts/krikos-parsers.head.txt
   sed -n "${R1}p;${R2}p;${R3}p" "$SRC"

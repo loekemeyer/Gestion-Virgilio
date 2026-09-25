@@ -68,7 +68,18 @@ catch (_e) {
 const AR = (ms) => new Date(new Date(ms).toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
 const key = (ms) => { const d = AR(ms); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 const HOY = key(Date.now());
-const MANANA = key(Date.now() + 86400000);
+/* v22.62 — «mañana» es el PRÓXIMO DÍA HÁBIL, no el día corrido: E32A tiene que decir 1 día de
+   demora, y un viernes el día corrido es sábado (0 hábiles). El test fallaba los viernes y sábados.
+   Salta fines de semana y los feriados de respaldo de tv.html (con el fetch mockeado vacío, son ésos). */
+const _FER_TV = (fs.readFileSync(path.join(__dirname, "..", "monitor", "tv.html"), "utf8")
+  .match(/var FERIADOS = \{[^}]*\}/) || [""])[0].match(/\d{4}-\d{2}-\d{2}/g) || [];
+const MANANA = (function () {
+  for (let t = Date.now() + 86400000, i = 0; i < 15; i++, t += 86400000) {
+    const k = key(t), wd = AR(t).getDay();
+    if (wd !== 0 && wd !== 6 && _FER_TV.indexOf(k) < 0) return k;
+  }
+  return key(Date.now() + 86400000);
+})();
 const H = 3600 * 1000;
 const iso = (ms) => new Date(ms).toISOString();
 /* Fecha de entrada del pedido, para la columna «Días» (v21.18: entrega − pedido).
