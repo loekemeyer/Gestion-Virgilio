@@ -48,7 +48,7 @@ window.supabase = { createClient: function () {
 
 const patched = src + `
 window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnviar: pendEnviar,
-  pendGenCodigo: pendGenCodigo, histRecibioTxt: histRecibioTxt, pendRefreshEnviar: pendRefreshEnviar, pendRows: _pendRows };
+  pendGenCodigo: pendGenCodigo, histRecibioTxt: histRecibioTxt, histOrdenar: histOrdenar, HIST_COLS: HIST_COLS, pendRefreshEnviar: pendRefreshEnviar, pendRows: _pendRows };
 `;
 
 (async () => {
@@ -127,6 +127,14 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     out.foto_ui = !card3.querySelector(".addFoto") && /Agregada después por Pablo/.test(card3.textContent) && !!card3.querySelector(".fotoViewBtn.viewed") && rt3.disabled === false;
     // ---- Histórico: columna Recibió ----
     out.hist_txt = /^Nora · \d\d-\d\d /.test(R.histRecibioTxt({ recPor: "Nora", recAt: "2026-09-25T13:15:00Z" })) && R.histRecibioTxt({ recPor: "" }) === "—";
+    // ---- Histórico: orden por encabezado (v22.57) ----
+    const hr = [{ cod: "A", cajas: 5, recAt: "2026-09-25T10:00:00Z", ymd: "2026-09-23" },
+                { cod: "B", cajas: 50, recAt: null, ymd: "2026-09-25" },
+                { cod: "C", cajas: 20, recAt: "2026-09-25T12:00:00Z", ymd: "2026-09-24" }];
+    const cods = function (xs) { return xs.map(function (x) { return x.cod; }).join(""); };
+    out.orden_recibio = cods(R.histOrdenar(hr, { k: "recibio", dir: "desc" })) === "CAB" && cods(R.histOrdenar(hr, { k: "recibio", dir: "asc" })) === "ACB";
+    out.orden_cajas = cods(R.histOrdenar(hr, { k: "cajas", dir: "desc" })) === "BCA";
+    out.fecha_comprobante = R.HIST_COLS[0].t === "Fecha de comprobante";
     return out;
   });
   const bad = Object.keys(r).filter(function (k) { return r[k] !== true; });

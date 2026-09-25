@@ -346,6 +346,9 @@ const RCP_CSS = `
 #rcpRoot .histNote{ font-size:12.5px; color:#b45309; font-weight:700; margin-bottom:10px; }
 #rcpRoot .histTblWrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--border); border-radius:12px; }
 #rcpRoot table.histTbl{ width:100%; border-collapse:collapse; font-size:14px; min-width:520px; }
+#rcpRoot table.histTbl th.histSortTh{ cursor:pointer; user-select:none; white-space:nowrap; }
+#rcpRoot table.histTbl th.histSortTh.on{ color:#111; }
+#rcpRoot .histSortIco{ font-size:10px; opacity:.7; }
 #rcpRoot table.histTbl th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:#64748b; font-weight:900; padding:10px 12px; background:#f1f5f9; position:sticky; top:0; }
 #rcpRoot table.histTbl td{ padding:9px 12px; border-top:1px solid #eef2f6; vertical-align:top; }
 #rcpRoot .histCodCell{ font-weight:900; color:#111; font-family:Consolas,Menlo,monospace; white-space:nowrap; }
@@ -2950,9 +2953,54 @@ function histRecibioTxt(r) {
   const ms = r.recAt ? Date.parse(r.recAt) : 0;
   return r.recPor + (ms ? " · " + pendFmtFecha(null, ms) + " " + pendFmtHora(ms) : "");
 }
-function histRender(rows, CAP, capped) {
+/* v22.57 (Luis): tocar el encabezado ordena por esa columna — 1er toque de mayor a menor
+   (fecha / recibido: el más nuevo primero), 2º toque al revés. Los vacíos van siempre al final.
+   Ordena lo que ya se trajo; la búsqueda nueva vuelve al orden por fecha. */
+const HIST_COLS = [
+  { k: "fecha",  t: "Fecha de comprobante", tip: "Fecha del remito / factura" },
+  { k: "cod",    t: "Código" },
+  { k: "cajas",  t: "Cajas", der: true },
+  { k: "quien",  t: "Entregó" },
+  { k: "demora", t: "Demora", der: true, tip: "Cuánto tardó en cargarse el remito: hora de carga de la operadora − hora de llegada del remito." },
+  { k: "remito", t: "Remito" },
+  { k: "recibio", t: "Recibió", tip: "Quién tocó «Recibido» en Pendientes, y cuándo" }
+];
+let _histSort = null, _histLast = null;
+function histSortVal(r, k) {
+  switch (k) {
+    case "fecha": return r.ymd ? r.ymd + "|" + String(r.ms || 0).padStart(15, "0") : null;
+    case "cod": return r.cod && r.cod !== "—" ? r.cod : null;
+    case "cajas": return r.cajas;
+    case "quien": return r.quien && r.quien !== "—" ? String(r.quien).toLowerCase() : null;
+    case "demora": return r.demoraHs == null || isNaN(r.demoraHs) ? null : r.demoraHs;
+    case "remito": return r.remito || null;
+    case "recibio": return r.recAt ? Date.parse(r.recAt) : null;
+  }
+  return null;
+}
+function histOrdenar(rows, st) {
+  if (!st) return rows;
+  const col = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
+  return rows.slice().sort(function (a, b) {
+    const va = histSortVal(a, st.k), vb = histSortVal(b, st.k);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    const c = (typeof va === "number" && typeof vb === "number") ? va - vb : col.compare(String(va), String(vb));
+    return st.dir === "desc" ? -c : c;
+  });
+}
+function histSortClick(k) {
+  if (!_histLast) return;
+  _histSort = (_histSort && _histSort.k === k && _histSort.dir === "desc") ? { k: k, dir: "asc" } : { k: k, dir: "desc" };
+  histRender(_histLast.rows, _histLast.CAP, _histLast.capped, true);
+}
+function histRender(rows, CAP, capped, keepSort) {
   const box = document.getElementById("histResults");
   if (!box) return;
+  if (!keepSort) _histSort = null;
+  _histLast = { rows: rows, CAP: CAP, capped: capped };
+  rows = histOrdenar(rows, _histSort);
   const n = rows.length;
   if (!n) { box.innerHTML = '<div class="histEmpty">No hay recepciones para ese filtro.</div>'; return; }
   const total = rows.reduce((s, r) => s + r.cajas, 0);
@@ -2965,9 +3013,14 @@ function histRender(rows, CAP, capped) {
   let html = '<div class="histSummary">' + n + ' recepci' + (n === 1 ? 'ón' : 'ones') + ' · <b>' + total + ' cajas</b></div>';
   if (capped) html += '<div class="histNote">⚠ Hay más de 1000 filas; se muestran las más recientes. Acotá por fecha para ver el resto.</div>';
   else if (n > CAP) html += '<div class="histNote">Mostrando las primeras ' + CAP + ' de ' + n + '. Acotá el filtro para ver menos.</div>';
-  html += '<div class="histTblWrap"><table class="histTbl"><thead><tr>' +
-    '<th>Fecha</th><th>Código</th><th style="text-align:right">Cajas</th><th>Entregó</th><th style="text-align:right" title="Cuánto tardó en cargarse el remito: hora de carga de la operadora − hora de llegada del remito.">Demora</th><th>Remito</th><th title="Quién tocó «Recibido» en Pendientes, y cuándo">Recibió</th>' +
-    '</tr></thead><tbody>';
+  html += '<div class="histTblWrap"><table class="histTbl"><thead><tr>';
+  HIST_COLS.forEach(function (c) {
+    const on = _histSort && _histSort.k === c.k;
+    html += '<th class="histSortTh' + (on ? ' on' : '') + '" data-k="' + c.k + '"' + (c.der ? ' style="text-align:right"' : '') +
+      (c.tip ? ' title="' + escapeHtmlRcp(c.tip) + '"' : '') + '>' + escapeHtmlRcp(c.t) +
+      '<span class="histSortIco">' + (on ? (_histSort.dir === "desc" ? " ▼" : " ▲") : " ↕") + '</span></th>';
+  });
+  html += '</tr></thead><tbody>';
   shown.forEach(function (r) {
     // v6.54: sin badge "Prov" ni la descripción del artículo — solo el nombre (pedido del dueño).
     const who = escapeHtmlRcp(r.quien);
@@ -2985,6 +3038,9 @@ function histRender(rows, CAP, capped) {
   });
   html += '</tbody></table></div>';
   box.innerHTML = html;
+  box.querySelectorAll(".histSortTh").forEach(function (th) {
+    th.onclick = function () { histSortClick(th.getAttribute("data-k")); };
+  });
 }
 /* ===== HISTÓRICO de BAJADAS DE RACKS (v10.15) — todas las bajadas de rack a góndola
    (tabla Racks_Bajadas), SOLO LECTURA, filtrable por fecha y por código / descripción /
