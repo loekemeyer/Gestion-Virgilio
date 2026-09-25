@@ -2497,7 +2497,7 @@ toman la misma vista: código pelado → `proy_cajas_mes`, `COD LK` → `proy_lk
 ⚠ **Nada va fijo en el código**: LK lee los parámetros con `proy_cfg()` por `v_lk_config`, así que
 un cambio impacta en el sync diario de las 06:20 ART, no en el acto.
 ⚠ **Los overrides manuales de Importados siguen aplicando, aparte y a la vista** (Luis: "separado y
-discriminado de momento"). Excepciones por artículo y meses sin stock: pendientes de Luis.
+discriminado de momento"). Meses sin stock: pendiente de Luis. **Excepciones por artículo: NINGUNA** (Luis, 25/09, v22.74: *"están bien todos esos"*): se revisaron las 17 familias y las tres donde el secundario pesa más que el primario están bien cargadas — 574E ← 574 (el 574E no vende nada propio: sus 87 cajas/mes son del 574), 580 ← 580E y 607E ← 565. No volver a proponer sacarlas de la familia.
 ⚠ **Sin venta = sin proyección** (Luis, v22.70: *"no le pongas una proyección a mano, ya no va más eso"*): Importados ya no cae al `est_madre_seed`; la fuente dice `sin proyeccion` y vale 0. `sql/gv_importados_sin_seed_v2270.sql`.
 ⚠ En Stock, **buscar exacto un principal trae sus secundarios** (437E → 029, 607E → 565), leídos de `familia_principal`/`es_secundario` de la fila. `tests/stk-busca-secundarios.cjs`.
 ⚠⚠ **El SECUNDARIO no tiene proyección propia en NINGÚN lado** (Luis, v22.72: *"toda la proyección del secundario se vuelca al principal… si el 580E tuvo demanda, no debería aparecer ni en stocks ni en importados"*). Vale para cualquier secundario, sea importado o nacional (580E → 580, 574 → 574E). En `gv_proyeccion_articulo` su fila va en 0; `proy_propia` guarda su venta, que el principal muestra en «incluye». `sql/gv_proyeccion_secundario_cero_v2272.sql`.
