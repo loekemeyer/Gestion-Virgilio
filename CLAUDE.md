@@ -2459,6 +2459,27 @@ revés, salen **todas** a nombre de Oscar (31 líneas de esos 14 códigos en los
 siempre. **El arreglo es que al recibir esos artículos elijan `Oscar`, no `Log/ Fabr`.**
 Problema 250.
 
+## ⚠ REGLA (Luis, 2026-09-25, v22.68): UNA SOLA PROYECCIÓN — Stock, OC e Importados leen `gv_proyeccion_articulo`
+
+Antes cada módulo armaba la suya (Importados con overrides a mano y familia; Stock sin familia; el
+29L caía del lado CH) y el 437E daba un número distinto en cada pantalla. Hoy los cuatro lectores
+(`vista_stock_procesada`, `vista_generador_oc`, `gv_importados_ordenes`, `v_importados_ordenes`)
+toman la misma vista: código pelado → `proy_cajas_mes`, `COD LK` → `proy_lk`, `COD CH` → `proy_ch`.
+
+| regla | dónde |
+|---|---|
+| sin ventas entre empresas (Chef 1434 = Loekemeyer Hnos, LK 411 = Chef SRL) | LK `ventas_clientes_internos` |
+| venta de Chef con **L** a **Cencosud** o **Tierra del Fuego** → cuenta en **LK** del código base; el resto de Chef (Dorinka, Lia Rojas) queda en Chef | LK `ventas_proy_lineas` |
+| el principal **suma a su familia** (029 → 437E) y el pop-up dice cuánto aporta cada uno | `gv_proyeccion_articulo.detalle_familia` |
+| ventana 6 · piso 4.º mejor mes · fallback 12 · índice 1,5 · meses objetivo importados | `Stock_Config` `proy_*`, editable en **OCs → ⚙ Configuraciones** (`gv_proy_config_guardar`) |
+
+⚠ **Nada va fijo en el código**: LK lee los parámetros con `proy_cfg()` por `v_lk_config`, así que
+un cambio impacta en el sync diario de las 06:20 ART, no en el acto.
+⚠ **Los overrides manuales de Importados siguen aplicando, aparte y a la vista** (Luis: "separado y
+discriminado de momento"). Excepciones por artículo y meses sin stock: pendientes de Luis.
+⚠ `ventas_mensuales_cod` la pisó otra sesión el 25/09 y perdió la familia: ahora tiene centinela.
+**Chequeo:** `select * from public.gv_reglas_perdidas;`. `sql/gv_proyeccion_unica_v2268.sql`.
+
 ## ⚠ Regla del dueño (2026-09-18): en las OC la PROYECCIÓN es siempre rey
 
 **Thomas, 2026-09-18, sobre el generador de OCs:** *"Proyección es siempre rey"*.
