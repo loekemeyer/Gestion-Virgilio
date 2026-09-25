@@ -44,7 +44,8 @@
       "Bash(node scripts/bump-version.cjs 22.59)",
       "Bash(node tests/fac-cruce.cjs)",
       "Bash(git reset *)",
-      "Bash(node scripts/bump-version.cjs 22.60)"
+      "Bash(node scripts/bump-version.cjs 22.60)",
+      "Bash(node scripts/bump-version.cjs 22.61)"
     ]
   }
 }

@@ -1,0 +1,12 @@
+-- v22.61 (Luis, 2026-09-25) — el aviso de Telegram de stock negativo SIGUE saliendo, pero cuando lo
+-- dispara «Recuperar items de FC» (ref <NP>|FCC) dice el motivo y si hay stock en A guardar / Racks /
+-- Racks CH / Excedente, para que registren el movimiento si la mercadería salió de ahí.
+-- Aplicado como parche sobre la definición VIVA de notificar_stock_negativo_telegram() (idempotente,
+-- llave 'neg_fcc_'); dedup por movimiento (neg_fcc_<client_id>), no por código y día.
+-- Mensajes probados en transacción abortada (sin enviar):
+--   ⛔ STOCK EN NEGATIVO — 323E LK / Góndola quedó en -2.0. / Motivo: se facturó con «Recuperar items de FC»
+--   (NP LK 0034, 2 cajas) y se descontó de góndola. / Hay stock en: Racks 5. Si la mercadería salió de ahí,
+--   registren el movimiento (bajar a góndola / mover) para que cuadre.
+--   (sin stock en otro depósito: "No hay stock en A guardar, Racks ni Excedente: revisar si la mercadería existía.")
+-- Centinela: GV_Reglas_Centinela (notificar_stock_negativo_telegram, 'neg_fcc_', v22.61).
+-- Rollback: reemplazar la función sacando el bloque "if coalesce(new.ref,'') like '%|FCC' then … end if;".
