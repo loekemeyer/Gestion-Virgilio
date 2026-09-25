@@ -278,6 +278,9 @@ const RCP_CSS = `
 #rcpRoot .fotoViewBtn{ display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border:2px solid #cbd5e1; border-radius:10px; background:#fff; font-weight:800; font-size:13px; color:#475569; cursor:pointer; flex:1; justify-content:center; min-height:46px; }
 #rcpRoot .fotoViewBtn.viewed{ border-color:var(--ok); color:var(--ok); background:#eef7ee; }
 #rcpRoot .fotoViewBtn.noFoto{ border-color:#e5e7eb; color:#9ca3af; cursor:default; font-style:italic; }
+#rcpRoot .fotoViewBtn.noFoto.addFoto{ cursor:pointer; border-style:dashed; color:#475569; }
+#rcpRoot .pcFotoPost{ flex-basis:100%; font-size:12px; font-weight:700; color:#475569; }
+#rcpRoot .rcbFile{ margin-top:10px; width:100%; font-size:14px; }
 #rcpRoot .fotoOverlay{ position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:1500; padding:16px; overflow:auto; }
 #rcpRoot .fotoOverlay img{ max-width:100%; max-height:88vh; border-radius:8px; object-fit:contain; }
 #rcpRoot .fotoOverlayClose{ position:absolute; top:14px; right:14px; width:48px; height:48px; border-radius:50%; background:#fff; border:0; font-size:22px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.3); z-index:2; }
@@ -353,6 +356,7 @@ const RCP_CSS = `
 #rcpRoot .histWho .provTag{ font-size:10px; font-weight:800; color:#a06000; background:#fff7e6; border:1px solid #ffd98a; border-radius:999px; padding:1px 7px; margin-right:5px; }
 #rcpRoot .histWho .histDesc{ color:#94a3b8; }
 #rcpRoot .histRto{ color:#64748b; font-variant-numeric:tabular-nums; white-space:nowrap; }
+#rcpRoot .histRcb{ color:#15803d; font-weight:700; white-space:nowrap; }
 #rcpRoot .histDem{ text-align:right; font-weight:800; color:#b45309; font-variant-numeric:tabular-nums; white-space:nowrap; }
 #rcpRoot .histLoading, #rcpRoot .histEmpty{ padding:26px; text-align:center; color:#64748b; font-weight:700; }
 `;
@@ -2888,7 +2892,7 @@ async function histLoad(f) {
     // ordenan y filtran de verdad. Antes, con los formatos mezclados, `01/07/26` caía después de
     // `2026-…` y encima el corte de 1000 filas se llevaba puestas las recientes de ese grupo.
     let q = supabase.from("vista_historial_entregas")
-      .select("fuente,fecha,created_at,cod_art,descripcion,cajas,quien,remito,llegada,carga,demora_hs");
+      .select("fuente,fecha,created_at,cod_art,descripcion,cajas,quien,remito,llegada,carga,demora_hs,recibido_por,recibido_at");
     if (f.desde) q = q.gte("fecha", f.desde);
     if (f.hasta) q = q.lte("fecha", f.hasta);
     if (codN) q = q.or("cod_art.ilike.%" + codN + "%,quien.ilike.%" + codN + "%");
@@ -2908,7 +2912,8 @@ async function histLoad(f) {
         cajas: Number(r.cajas) || 0, quien: r.fuente === "tallerista" ? displayName(r.quien || "—") : (r.quien || "—"),
         remito: r.remito || "", origen: r.fuente === "tallerista" ? "tall" : "prov",
         demoraHs: (r.demora_hs != null) ? Number(r.demora_hs) : null,
-        llegada: r.llegada || null, carga: r.carga || null
+        llegada: r.llegada || null, carga: r.carga || null,
+        recPor: r.recibido_por || "", recAt: r.recibido_at || null
       };
     });
     rows.sort(function (a, b) { if (a.ymd !== b.ymd) return a.ymd < b.ymd ? 1 : -1; return b.ms - a.ms; });
@@ -2936,6 +2941,12 @@ function histHoraTip(r) {
     return "Llegó " + new Date(r.llegada).toLocaleString("es-AR", opt) + " · Cargó " + new Date(r.carga).toLocaleString("es-AR", opt);
   } catch (_e) { return ""; }
 }
+/* v22.49 (Luis) — "Recibió": quién tocó «✓ Recibido» en Pendientes y cuándo. */
+function histRecibioTxt(r) {
+  if (!r.recPor) return "—";
+  const ms = r.recAt ? Date.parse(r.recAt) : 0;
+  return r.recPor + (ms ? " · " + pendFmtFecha(null, ms) + " " + pendFmtHora(ms) : "");
+}
 function histRender(rows, CAP, capped) {
   const box = document.getElementById("histResults");
   if (!box) return;
@@ -2952,7 +2963,7 @@ function histRender(rows, CAP, capped) {
   if (capped) html += '<div class="histNote">⚠ Hay más de 1000 filas; se muestran las más recientes. Acotá por fecha para ver el resto.</div>';
   else if (n > CAP) html += '<div class="histNote">Mostrando las primeras ' + CAP + ' de ' + n + '. Acotá el filtro para ver menos.</div>';
   html += '<div class="histTblWrap"><table class="histTbl"><thead><tr>' +
-    '<th>Fecha</th><th>Código</th><th style="text-align:right">Cajas</th><th>Entregó</th><th style="text-align:right" title="Cuánto tardó en cargarse el remito: hora de carga de la operadora − hora de llegada del remito.">Demora</th><th>Remito</th>' +
+    '<th>Fecha</th><th>Código</th><th style="text-align:right">Cajas</th><th>Entregó</th><th style="text-align:right" title="Cuánto tardó en cargarse el remito: hora de carga de la operadora − hora de llegada del remito.">Demora</th><th>Remito</th><th title="Quién tocó «Recibido» en Pendientes, y cuándo">Recibió</th>' +
     '</tr></thead><tbody>';
   shown.forEach(function (r) {
     // v6.54: sin badge "Prov" ni la descripción del artículo — solo el nombre (pedido del dueño).
@@ -2966,6 +2977,7 @@ function histRender(rows, CAP, capped) {
       '<td class="histWho">' + who + '</td>' +
       '<td class="histDem"' + (demTip ? ' title="' + escapeHtmlRcp(demTip) + '"' : '') + '>' + escapeHtmlRcp(demTxt) + '</td>' +
       '<td class="histRto">' + escapeHtmlRcp(r.remito || "—") + '</td>' +
+      '<td class="histRcb">' + escapeHtmlRcp(histRecibioTxt(r)) + '</td>' +
     '</tr>';
   });
   html += '</tbody></table></div>';
@@ -3230,7 +3242,7 @@ async function renderPendientes() {
   let res;
   try {
     res = await supabase.from("Control_Modo_OP")
-      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at,isis,control_partes,foto_url,foto_vista,codigo")
+      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at,isis,control_partes,foto_url,foto_vista,codigo,gv_foto_post_por,gv_foto_post_at")
       .eq("estado", "pendiente")
       .order("created_at", { ascending: true })
       .limit(300);
@@ -3349,24 +3361,35 @@ function pendCard(r) {
 const PEND_RECIBE_PERSONAS = ["Nora", "Pablo"];
 function pendRecibidoAbrir(id, card) {
   const st = _pendRows[id]; if (!st || st.sent) return;
+  const r = st.row || {};
+  pendQuienModal({ pregunta: "¿Quién recibe?", sub: (r.nombre || "") + (r.remito ? " · RTO/FC " + r.remito : ""),
+    faltaQuien: "Decinos quién recibe (Nora, Pablo u Otro).",
+    onOk: function (quien) { return pendRecibido(id, card, quien); } });
+}
+/* v22.49 — el cuadro de "¿quién?" es uno solo para «Recibido» y para la foto a posteriori.
+   Con conFoto:true además exige elegir una imagen antes de habilitar Confirmar. */
+function pendQuienModal(o) {
   const root = document.getElementById("rcpRoot") || document.body;
   const ov = document.createElement("div"); ov.className = "rcbOverlay";
   const box = document.createElement("div"); box.className = "rcbBox";
-  const r = st.row || {};
-  box.innerHTML = '<div class="rcbT">¿Quién recibe? <span style="color:#b42318">*</span></div>' +
-    '<div class="rcbSub">' + escapeHtmlRcp((r.nombre || "") + (r.remito ? " · RTO/FC " + r.remito : "")) + '</div>' +
+  box.innerHTML = (o.titulo ? '<div class="rcbT">' + escapeHtmlRcp(o.titulo) + '</div>' : '') +
+    (o.conFoto ? '<input type="file" accept="image/*" class="rcbFile">' : '') +
+    '<div class="rcbT"' + (o.titulo ? ' style="margin-top:12px;font-size:15px"' : '') + '>' + escapeHtmlRcp(o.pregunta) + ' <span style="color:#b42318">*</span></div>' +
+    '<div class="rcbSub">' + escapeHtmlRcp(o.sub || "") + '</div>' +
     '<div class="rcbOps"></div><input class="rcbOtro" placeholder="¿Quién? (nombre)" style="display:none">' +
     '<div class="rcbErr"></div>' +
     '<div class="rcbBtns"><button type="button" class="btnCancel">Cancelar</button><button type="button" class="btnSend" disabled>Confirmar</button></div>';
   ov.appendChild(box); root.appendChild(ov);
   const ops = box.querySelector(".rcbOps"), otro = box.querySelector(".rcbOtro"),
-        err = box.querySelector(".rcbErr"), ok = box.querySelector(".btnSend");
+        err = box.querySelector(".rcbErr"), ok = box.querySelector(".btnSend"),
+        fin = box.querySelector(".rcbFile");
   let sel = "";
   const valor = function () { return sel === "__otro" ? otro.value.trim() : sel; };
+  const archivo = function () { return fin && fin.files && fin.files[0] ? fin.files[0] : null; };
   const refresh = function () {
     ops.querySelectorAll(".rcbOp").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-v") === sel); });
     otro.style.display = sel === "__otro" ? "" : "none";
-    ok.disabled = !valor();
+    ok.disabled = !valor() || (!!o.conFoto && !archivo());
   };
   PEND_RECIBE_PERSONAS.concat(["__otro"]).forEach(function (n) {
     const b = document.createElement("button"); b.type = "button"; b.className = "rcbOp";
@@ -3375,14 +3398,16 @@ function pendRecibidoAbrir(id, card) {
     ops.appendChild(b);
   });
   otro.oninput = refresh;
+  if (fin) fin.onchange = refresh;
   const cerrar = function () { if (ov.parentNode) ov.parentNode.removeChild(ov); };
   box.querySelector(".btnCancel").onclick = cerrar;
   ok.onclick = async function () {
     const quien = valor();
-    if (!quien) { err.textContent = "Decinos quién recibe (Nora, Pablo u Otro)."; return; }
+    if (!quien) { err.textContent = o.faltaQuien || "Decinos quién (Nora, Pablo u Otro)."; return; }
+    if (o.conFoto && !archivo()) { err.textContent = "Elegí la foto."; return; }
     ok.disabled = true; ok.textContent = "Guardando…";
     try {
-      await pendRecibido(id, card, quien);
+      await o.onOk(quien, archivo());
       cerrar();
     } catch (e) {
       ok.disabled = false; ok.textContent = "Confirmar";
@@ -3449,8 +3474,17 @@ function pendFotoRow(id) {
   const fotoUrl = _pendRows[id].foto_url;
   if (!fotoUrl) {
     // Legacy: item sin foto del operario — auto-check, no bloquea
-    const noF = document.createElement("span"); noF.className = "fotoViewBtn noFoto"; noF.textContent = "Sin foto";
     _pendRows[id].foto_vista = true;
+    /* v22.49 (Luis, 25/09) — "Sin foto" se toca para agregarla a posteriori: pide la imagen y
+       quién la agrega, y queda registrado quién y cuándo (gv_foto_post_por / _at). */
+    const noF = document.createElement("button"); noF.type = "button"; noF.className = "fotoViewBtn noFoto addFoto";
+    noF.textContent = "Sin foto · ＋ agregar"; noF.title = "Agregar la foto a posteriori";
+    noF.onclick = function () {
+      const r = _pendRows[id].row || {};
+      pendQuienModal({ titulo: "Agregar foto a posteriori", pregunta: "¿Quién la agrega?", conFoto: true,
+        sub: (r.nombre || "") + (r.remito ? " · RTO/FC " + r.remito : ""),
+        onOk: function (quien, file) { return pendFotoPosteriori(id, row, quien, file); } });
+    };
     row.appendChild(lbl); row.appendChild(noF); return row;
   }
   const btn = document.createElement("button"); btn.type = "button";
@@ -3484,7 +3518,26 @@ function pendFotoRow(id) {
     ov.appendChild(box); ov.appendChild(cl);
     document.getElementById("rcpRoot").appendChild(ov);
   };
-  row.appendChild(lbl); row.appendChild(btn); return row;
+  row.appendChild(lbl); row.appendChild(btn);
+  const post = pendFotoPostTxt(_pendRows[id].row);
+  if (post) { const n = document.createElement("div"); n.className = "pcFotoPost"; n.textContent = post; row.appendChild(n); }
+  return row;
+}
+function pendFotoPostTxt(r) {
+  if (!r || !r.gv_foto_post_por) return "";
+  const ms = r.gv_foto_post_at ? new Date(r.gv_foto_post_at).getTime() : 0;
+  return "📎 Agregada después por " + r.gv_foto_post_por + (ms ? " · " + pendFmtFecha(null, ms) + " " + pendFmtHora(ms) : "");
+}
+async function pendFotoPosteriori(id, rowEl, quien, file) {
+  const url = await pendUploadFoto(id, file);
+  if (!url) throw new Error("no se obtuvo la URL de la foto");
+  const ahora = new Date().toISOString();
+  await pendPersist(id, { foto_url: url, foto_vista: true, gv_foto_post_por: quien, gv_foto_post_at: ahora });
+  const st = _pendRows[id];
+  st.foto_url = url; st.foto_vista = true;
+  st.row = Object.assign({}, st.row || {}, { foto_url: url, foto_vista: true, gv_foto_post_por: quien, gv_foto_post_at: ahora });
+  if (rowEl && rowEl.parentNode) rowEl.parentNode.replaceChild(pendFotoRow(id), rowEl);
+  pendRefreshEnviar(id);
 }
 /* v12.07 — Panel que acompaña a la foto en el visor: quién entregó, qué remito y,
    sobre todo, CÓDIGO → CAJAS tal cual lo cargó el operario. El detalle ya viene en
@@ -3516,6 +3569,8 @@ function pendFotoInfoPanel(r) {
   const mt = document.createElement("div"); mt.className = "fovMeta"; mt.textContent = mp.filter(Boolean).join(" · ");
   box.appendChild(mt);
   if (r.remito) { const rt = document.createElement("div"); rt.className = "fovRto"; rt.textContent = "RTO/FC " + r.remito; box.appendChild(rt); }
+  const post = pendFotoPostTxt(r);
+  if (post) { const pp = document.createElement("div"); pp.className = "fovMeta"; pp.textContent = post; box.appendChild(pp); }
   const tit = document.createElement("div"); tit.className = "fovTit"; tit.textContent = "Cargado por el operario";
   box.appendChild(tit);
   const items = pendFotoParseDetalle(r.detalle);
