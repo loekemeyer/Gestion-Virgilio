@@ -1129,7 +1129,8 @@ const GOND_BAJA_ROT = 50;          // baja rotación = menos de 50 cajas/mes de 
      `clave` difiere del `cod_art` (para el resto son iguales).
    · código común → todas las filas sumadas, igual que antes de la v16.30 (la vista agrupa por
      (código, empresa), así que un código común igual puede volver en varias filas). */
-function gondAcumPorCod(rows, linea, norm) {
+function gondAcumPorCod(rows, linea, norm, valorDe) {
+  const val = valorDe || function (r) { return Number(r.terminado) || 0; };
   const lin = String(linea || "").toUpperCase();
   const porCod = {}, out = {};
   (rows || []).forEach(function (r) {
@@ -1142,7 +1143,7 @@ function gondAcumPorCod(rows, linea, norm) {
     const usar = esDual
       ? arr.filter(function (r) { return String(r.empresa || "").toUpperCase() === lin; })
       : arr;
-    out[k] = usar.reduce(function (a, r) { return a + (Number(r.terminado) || 0); }, 0);
+    out[k] = usar.reduce(function (a, r) { return a + val(r); }, 0);
   });
   return out;
 }
@@ -1334,7 +1335,7 @@ function drawArticulosGrid() {
     // si ya hay recibido parcial cargado en el módulo de OCs → "OC 40/100" (faltan/pedidas).
     let ocHtml = "";
     if (oc) {
-      const txt = (oc.rec > 0) ? (oc.pend + "/" + oc.ped) : String(oc.ped);
+      const txt = String((oc.rec > 0) ? oc.pend : oc.ped);   // v22.58 (Luis): sólo lo que falta recibir
       const title = "Orden de compra vigente (" + fechaCorta(oc.fecha) + "): " + oc.ped + " caja(s) pedidas" +
         (oc.rec > 0 ? ", " + oc.rec + " ya recibida(s) → faltan " + oc.pend : "");
       ocHtml = '<span class="ocq" title="' + escapeHtmlRcp(title) + '">OC ' + escapeHtmlRcp(txt) + '</span>';
@@ -2101,21 +2102,44 @@ async function _opPrefetchGond(cods) {
     // que es lo mismo que hace el aviso de exceso (gondCapPorCod / gondAcumPorCod).
     const res = await Promise.all([
       supabase.from("Capacidad_Sector").select("cod,cajas_max,empresa").in("cod", ks),
-      supabase.from("vista_saldos_stock").select("cod_art,clave,empresa,terminado").in("cod_art", ks)
+      supabase.from("vista_saldos_stock").select("cod_art,clave,empresa,terminado,excedente,separar_pedidos,a_facturar,a_guardar,racks,para_envasar,racks_ch").in("cod_art", ks)
     ]);
     const _rowsCap = (res[0] && res[0].data) || [], _rowsG = (res[1] && res[1].data) || [];
     const _dual = gondDualesDe(_rowsG, _ocgNorm);
     const _capX = gondCapPorCod(_rowsCap, _dual, opState.linea, _ocgNorm);
     const _gondX = gondAcumPorCod(_rowsG, opState.linea, _ocgNorm);
+    // v22.58 (Luis): lo que compite por la góndola es el stock TOTAL menos lo comprometido
+    // (pickeados + a facturar), no sólo lo que está hoy en la góndola.
+    const _n = function (v) { return Number(v) || 0; };
+    const _totX = gondAcumPorCod(_rowsG, opState.linea, _ocgNorm, function (r) {
+      return _n(r.terminado) + _n(r.excedente) + _n(r.separar_pedidos) + _n(r.a_facturar) +
+             _n(r.a_guardar) + _n(r.racks) + _n(r.para_envasar) + _n(r.racks_ch); });
+    const _compX = gondAcumPorCod(_rowsG, opState.linea, _ocgNorm, function (r) {
+      return _n(r.separar_pedidos) + _n(r.a_facturar); });
     const out = {};
     ks.forEach(function (k) {
       const _k = _ocgNorm(k);
       const hasCap = _rowsCap.some(function (r) { return _ocgNorm(r.cod) === _k; });
       const hasG = _rowsG.some(function (r) { return _ocgNorm(r.cod_art) === _k; });
-      out[_k] = { cap: hasCap ? (_capX[_k] || 0) : null, gond: hasG ? (_gondX[_k] || 0) : null };
+      out[_k] = { cap: hasCap ? (_capX[_k] || 0) : null, gond: hasG ? (_gondX[_k] || 0) : null,
+                  total: hasG ? (_totX[_k] || 0) : null, comp: hasG ? (_compX[_k] || 0) : null };
     });
     opState.excesoGond = out;
   } catch (_e) { /* best-effort: queda {} → "s/dato" */ }
+}
+/* v22.58 (Luis) — ¿entra en góndola? Se compara la CAPACIDAD contra el stock que queda para
+   guardar: total − pickeados − a facturar (lo comprometido ya se va) + lo que se recibe ahora.
+   Antes se miraba sólo la góndola (terminado) y el 066 decía "entra, 1 libre" con 425 cajas. */
+function opExcesoEntraTxt(d, recibo) {
+  d = d || {};
+  if (d.cap == null || d.total == null) return "s/dato de capacidad";
+  const neto = d.total - (d.comp || 0);
+  const queda = neto + (Number(recibo) || 0);
+  const det = "stock " + d.total + " − " + (d.comp || 0) + " comprometidas (pickeados + a facturar) = " + neto +
+              ", + " + recibo + " que recibo = " + queda + " vs capacidad " + d.cap;
+  return queda <= d.cap
+    ? ("entra en góndola (" + det + ", quedan " + (d.cap - queda) + " libres)")
+    : ("NO entra en góndola (" + det + ", sobran " + (queda - d.cap) + ")");
 }
 /* v14.61 / v17.17 — WhatsApp a Thomas (dueño) con el resumen de TODO lo que entró de más. */
 function opWhatsExceso(exc) {
@@ -2137,11 +2161,7 @@ function opWhatsExceso(exc) {
   ];
   exc.forEach(function (i) {
     const d = g[_ocgNorm(i.cod)] || {};
-    const cap = (d.cap != null) ? d.cap : null, gond = (d.gond != null) ? d.gond : null;
-    const libre = (cap != null && gond != null) ? (cap - gond) : null;
-    const entra = (libre != null)
-      ? (libre >= i.exced ? ("entra en góndola, " + libre + " libres") : ("NO entra en góndola, solo " + libre + " libres"))
-      : "s/dato de capacidad";
+    const entra = opExcesoEntraTxt(d, i.cajas);
     // v17.99 — dos casos: sin OC generada (OC = 0, todo es excedente) o se pasó de la OC.
     // v19.57 — y un tercero, que es el que pidió Thomas: el código NO es de este proveedor,
     // la OC la tiene otro. "SIN OC generada" ahí era falso: la OC existe, sólo que no es suya.
@@ -3445,6 +3465,12 @@ function pendRecibidoRow(id, card) {
 /* Quién recibe: igual que Cuarentena — chips fijos + «Otro…» con texto. OBLIGATORIO y sin
    preselección (un valor puesto de fábrica se confirma sin leerlo). */
 const PEND_RECIBE_PERSONAS = ["Nora", "Pablo"];
+/* v22.58 (Luis): "pablo" → "Pablo", "juan  cruz" → "Juan Cruz". Igual que gv_nombre_capitalizar
+   (trigger en la base): así "pablo" no crea un nombre nuevo, es el Pablo que ya existe. */
+function pendNombreCap(s) {
+  return String(s || "").trim().replace(/\s+/g, " ").toLowerCase()
+    .replace(/(^|[^a-záéíóúüñ])([a-záéíóúüñ])/g, function (m, a, b) { return a + b.toUpperCase(); });
+}
 /* v22.53 (Luis): el nombre que se escribe en «Otro…» queda como opción (GV_Recepcion_Receptores). */
 let _pendReceptores = null;
 async function pendReceptoresCargar() {
@@ -3495,7 +3521,7 @@ function pendQuienModal(o) {
         err = box.querySelector(".rcbErr"), ok = box.querySelector(".btnSend"),
         fin = box.querySelector(".rcbFile");
   let sel = "";
-  const valor = function () { return sel === "__otro" ? otro.value.trim() : sel; };
+  const valor = function () { return sel === "__otro" ? pendNombreCap(otro.value) : sel; };
   const archivo = function () { return fin && fin.files && fin.files[0] ? fin.files[0] : null; };
   const refresh = function () {
     ops.querySelectorAll(".rcbOp").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-v") === sel); });

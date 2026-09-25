@@ -48,7 +48,7 @@ window.supabase = { createClient: function () {
 
 const patched = src + `
 window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnviar: pendEnviar,
-  pendGenCodigo: pendGenCodigo, histRecibioTxt: histRecibioTxt, histOrdenar: histOrdenar, HIST_COLS: HIST_COLS, pendRefreshEnviar: pendRefreshEnviar, pendRows: _pendRows };
+  pendGenCodigo: pendGenCodigo, histRecibioTxt: histRecibioTxt, histOrdenar: histOrdenar, opExcesoEntraTxt: opExcesoEntraTxt, pendNombreCap: pendNombreCap, HIST_COLS: HIST_COLS, pendRefreshEnviar: pendRefreshEnviar, pendRows: _pendRows };
 `;
 
 (async () => {
@@ -135,6 +135,12 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     out.orden_recibio = cods(R.histOrdenar(hr, { k: "recibio", dir: "desc" })) === "CAB" && cods(R.histOrdenar(hr, { k: "recibio", dir: "asc" })) === "ACB";
     out.orden_cajas = cods(R.histOrdenar(hr, { k: "cajas", dir: "desc" })) === "BCA";
     out.fecha_comprobante = R.HIST_COLS[0].t === "Fecha de comprobante";
+    // ---- v22.58: ¿entra en góndola? total − comprometido + recibo contra capacidad (caso 066) ----
+    const t066 = R.opExcesoEntraTxt({ cap: 189, gond: 188, total: 425, comp: 5 }, 1);
+    out.gond_066 = /^NO entra/.test(t066) && /= 420/.test(t066) && /= 421/.test(t066) && /sobran 232/.test(t066);
+    out.gond_entra = /^entra en góndola.*quedan 9 libres/.test(R.opExcesoEntraTxt({ cap: 100, total: 95, comp: 5 }, 1));
+    out.gond_sdato = R.opExcesoEntraTxt({}, 1) === "s/dato de capacidad";
+    out.nombre_cap = R.pendNombreCap("  juan   cruz ") === "Juan Cruz" && R.pendNombreCap("pablo") === "Pablo";
     return out;
   });
   const bad = Object.keys(r).filter(function (k) { return r[k] !== true; });
