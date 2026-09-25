@@ -5198,29 +5198,35 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
 /* v14.53 — Los 4 botones (Excel ISIS · JSON ISIS · Cruce · Cerrar) en una grilla
    2×2 pareja: mismo tamaño y alineados en dos filas prolijas, para que en el celular
    no se desborden ni queden de distinto ancho. */
+/* v22.54 (Luis: "achicame la visual de esos botones y hacelos más lindos") — los 5 botones en UNA
+   fila compacta tipo pastilla, alineados a la derecha: blanco con borde y texto del color de cada
+   acción; Recuperar (verde) y Cerrar (rojo) llenos. Antes: grilla de 3 columnas de 40 px de alto. */
 .fac-top-acts{
-  display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px;
-  margin-left:auto; width:100%; max-width:400px; flex:0 0 auto;
+  display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:6px;
+  margin-left:auto; width:auto; max-width:none; flex:0 1 auto;
 }
 .fac-top-acts > button{
-  width:100%; margin:0; box-sizing:border-box; height:40px; min-height:40px;
-  padding:0 10px; font-size:12.5px; font-weight:800; border-radius:8px;
-  border:1px solid transparent;
-  display:inline-flex; align-items:center; justify-content:center; text-align:center;
-  gap:4px; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  cursor:pointer; box-shadow:none;
+  width:auto; margin:0; box-sizing:border-box; height:30px; min-height:30px;
+  padding:0 12px; font-size:12px; font-weight:700; border-radius:999px;
+  border:1px solid #cbd5e1; background:#fff; color:#334155;
+  display:inline-flex; align-items:center; justify-content:center; gap:5px;
+  line-height:1; white-space:nowrap; cursor:pointer;
+  box-shadow:0 1px 2px rgba(15,23,42,.06); transition:background .12s, box-shadow .12s, transform .06s;
 }
-.fac-top-acts > button:hover{ filter:brightness(.97); }
-.fac-top-acts > button > span{ margin-left:0; font-size:11.5px; }  /* el "(NP web)" / "(prueba)" */
-.fac-top-acts #facBtnXlsIsis{ border:1px solid #fcd34d; background:#fffbeb; color:#78350f; }
-.fac-top-acts #facBtnJsonIsis{ border:1px solid #a5b4fc; background:#eef2ff; color:#3730a3; }
-/* v13.73: "Cruce con ISIS" — abre la pestaña del cruce (Deuda / Cobranzas) */
-.fac-top-acts #facBtnCruce{ border:1px solid #93c5fd; background:#eff6ff; color:#1e3a8a; }
-.fac-top-acts .fac-close-btn{ margin:0; border:1px solid #dc2626; }
-/* v22.53 (Luis): «Recuperar pedido», verde. Con 5 botones la grilla pasa a 3 columnas. */
-.fac-top-acts{ grid-template-columns:repeat(3, minmax(0,1fr)); max-width:600px; }
-.fac-top-acts #facBtnRecuperar{ border:1px solid #16a34a; background:#16a34a; color:#fff; }
-.fac-top-acts #facBtnRecuperar{ grid-column:span 2; }   /* fila 2: Recuperar (2) + Cerrar (1), sin huecos */
+.fac-top-acts > button:hover{ box-shadow:0 2px 6px rgba(15,23,42,.12); }
+.fac-top-acts > button:active{ transform:translateY(1px); }
+.fac-top-acts > button:disabled{ opacity:.55; cursor:default; box-shadow:none; }
+.fac-top-acts > button > span{ margin-left:0; font-size:11px; font-weight:600; opacity:.7; }  /* el "(NP web)" / "(prueba)" */
+.fac-top-acts #facBtnXlsIsis{ border-color:#fcd34d; color:#92400e; }
+.fac-top-acts #facBtnXlsIsis:hover{ background:#fffbeb; }
+.fac-top-acts #facBtnJsonIsis{ border-color:#c7d2fe; color:#4338ca; }
+.fac-top-acts #facBtnJsonIsis:hover{ background:#eef2ff; }
+.fac-top-acts #facBtnCruce{ border-color:#bfdbfe; color:#1d4ed8; }
+.fac-top-acts #facBtnCruce:hover{ background:#eff6ff; }
+.fac-top-acts #facBtnRecuperar{ border-color:#16a34a; background:#16a34a; color:#fff; }
+.fac-top-acts #facBtnRecuperar:hover{ background:#15803d; }
+.fac-top-acts .fac-close-btn{ margin:0; border-color:#dc2626; background:#dc2626; color:#fff; }
+.fac-top-acts .fac-close-btn:hover{ background:#b91c1c; }
 .frec-ov{ position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:900; display:flex; align-items:flex-start; justify-content:center; padding:24px 12px; overflow:auto; }
 .frec-box{ background:#fff; border-radius:12px; width:100%; max-width:1100px; box-shadow:0 20px 50px rgba(0,0,0,.25); padding:16px 18px; }
 .frec-hd{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
@@ -5254,11 +5260,9 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
 .frec-lotes{ margin-top:10px; font-size:12.5px; }
 .frec-lotes li{ margin:3px 0; }
 @media (max-width:480px){                       /* celular: los 4 llenan el ancho, sin recortarse */
-  .fac-top-acts{ max-width:none; grid-template-columns:repeat(2, minmax(0,1fr)); }
-  .fac-top-acts #facBtnRecuperar{ grid-column:auto; }
-  .fac-top-acts .fac-close-btn{ grid-column:span 2; }
-  .fac-top-acts > button{ font-size:11.5px; padding:0 6px; }
-  .fac-top-acts > button > span{ font-size:10.5px; }
+  .fac-top-acts{ width:100%; justify-content:flex-start; }
+  .fac-top-acts > button{ font-size:11.5px; padding:0 10px; }
+  .fac-top-acts > button > span{ display:none; }
 }
 /* Casilla "marcar para el Excel de prueba de ISIS" en cada fila de Facturación.
    Grande a propósito: se toca con el dedo desde el celular. */
@@ -5969,7 +5973,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button id="facBtnXlsIsis" onclick="facXlsBajar()" title="Arma el Excel para importar en ISIS con las cajas ENTREGADAS de las NP de la página que marcaste. Al bajarlo, esas NP quedan FACTURADAS (es su tilde). Las NP de ISIS no van acá: se tildan.">⬇ Excel ISIS <span style="font-weight:600;opacity:.85">(NP web)</span></button>
       <button id="facBtnJsonIsis" onclick="facJsonIsis()" title="PRUEBA — TODAVÍA NO ESTÁ OPERATIVO. No envía a ISIS, no factura y no saca la NP de la lista: la facturación real se SIGUE haciendo con el Excel. Sólo arma el MISMO pedido que el Excel (cajas armadas, código con L, ruteo Tierra del Fuego) en el sobre JSON del contrato ISIS API v2.0, para copiar o descargar (prueba de conexión con Horacio).">📤 JSON ISIS <span style="font-weight:600;opacity:.85">(prueba)</span></button>
       <button id="facBtnCruce" onclick="openCobros('cruce')" title="Cruza cada NP facturada (lo que Gestión calculó con las cajas entregadas y la lista) contra la factura real que cargó ISIS (el PDF): neto, cajas y diferencia. Sólo mira, no corrige nada.">🔍 Cruce con ISIS</button>
-      <button id="facBtnRecuperar" onclick="facRecAbrir()" title="Buscar una NP YA FACTURADA y completar su facturación: marcás los códigos que le faltaron (por ejemplo, la mercadería entró entre la factura y la entrega) y los marcás como facturados o bajás el Excel para ISIS sólo con esos códigos.">♻ Recuperar pedido</button>
+      <button id="facBtnRecuperar" onclick="facRecAbrir()" title="Buscar una NP YA FACTURADA y completar su facturación: marcás los códigos que le faltaron (por ejemplo, la mercadería entró entre la factura y la entrega) y los marcás como facturados o bajás el Excel para ISIS sólo con esos códigos.">♻ Recuperar items de FC</button>
       <button class="fac-close-btn" onclick="closeFacturacion()">Cerrar</button>
     </div>
   </div>
@@ -6147,7 +6151,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.53"></script>
+<script type="module" src="recepcion.js?v=22.54"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10098,7 +10102,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.53";
+const APP_VERSION = "v22.54";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -59054,7 +59058,7 @@ function facRecRender() {
   if (!box) return;
   if (_frec.np) { box.innerHTML = _frecDetalleHtml(); return; }
   var rows = _frecFiltradas();
-  var h = '<div class="frec-hd"><h2>♻ Recuperar pedido facturado</h2>' +
+  var h = '<div class="frec-hd"><h2>♻ Recuperar items de FC</h2>' +
     '<button class="frec-b-sec" onclick="facRecCargar()">↻</button>' +
     '<button class="fac-close-btn" onclick="facRecCerrar()">Cerrar</button></div>' +
     '<div class="frec-nota">Elegí una NP ya facturada para completar lo que le faltó. Las cajas que se agregaron con <b>Completar Pedido</b> después de facturar aparecen en verde: son las que suelen faltar facturar.</div>' +
@@ -59298,7 +59302,7 @@ function _concilCompChip(np) {
   var cj = ls.reduce(function (s, l) { return s + (Number(l.cajas) || 0); }, 0);
   var sinF = ls.filter(function (l) { return !l.factura; }).length;
   var fcs = ls.filter(function (l) { return l.factura; }).map(function (l) { return l.factura; }).join(", ");
-  return ' <span class="frec-chip ' + (sinF ? 'sinfc' : 'comp') + '" title="' + escapeHtml("Esta NP se completó con «Recuperar pedido»: " + cj + " cajas facturadas aparte" +
+  return ' <span class="frec-chip ' + (sinF ? 'sinfc' : 'comp') + '" title="' + escapeHtml("Esta NP se completó con «Recuperar items de FC»: " + cj + " cajas facturadas aparte" +
     (fcs ? " en " + fcs : "") + (sinF ? ". " + sinF + " complemento(s) todavía sin factura en ISIS." : ".") +
     " La diferencia contra lo armado de hoy puede estar en esa factura, no en la original.") + '">♻ +' + cj + ' cj' + (sinF ? ' · sin FC' : '') + '</span>';
 }

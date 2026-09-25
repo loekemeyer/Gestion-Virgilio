@@ -33,7 +33,8 @@
       "Bash(node scripts/bump-version.cjs 22.49)",
       "Bash(node scripts/bump-version.cjs 22.50)",
       "Bash(node tests/pend-recibido.cjs)",
-      "Bash(node scripts/bump-version.cjs 22.51)"
+      "Bash(node scripts/bump-version.cjs 22.51)",
+      "Bash(node scripts/bump-version.cjs 22.54)"
     ]
   }
 }

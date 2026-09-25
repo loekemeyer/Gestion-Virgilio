@@ -68,7 +68,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // R1
     const btn = document.getElementById("facBtnRecuperar");
     const grupo = btn && btn.parentElement;
-    out.R1_boton = !!btn && /Recuperar pedido/.test(btn.textContent) && grupo && grupo.classList.contains("fac-top-acts")
+    out.R1_boton = !!btn && /Recuperar items de FC/.test(btn.textContent) && grupo && grupo.classList.contains("fac-top-acts")
       && !!grupo.querySelector("#facBtnXlsIsis") && !!grupo.querySelector("#facBtnCruce") && !!grupo.querySelector(".fac-close-btn");
     out.R1_verde = !!btn && /rgb\(22, 163, 74\)/.test(getComputedStyle(btn).backgroundColor);
 
