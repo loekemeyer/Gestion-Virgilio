@@ -1200,7 +1200,7 @@ leer la que no es da respuestas que suenan bien y están mal.
 | Para saber… | **LA QUE VALE** | La vieja, NO usar |
 |---|---|---|
 | Qué artículo va en qué sector de **góndola**, y de qué empresa es el sector | **`GV_Lugar` + `GV_Lugar_Item`** → vista **`gv_lugar_articulo`** (y `gv_planimetria_celda`) | `Planimetria` ⚠ ver abajo |
-| Qué hay cargado en cada **rack** | **`Movimientos_Stock`** (racks, `ubicacion` = sector) — `Racks_Planimetria` es una **VISTA** desde la v22.84 | **`Ubicaciones_Articulos`** · `Racks_Planimetria_legacy` |
+| Qué hay cargado en cada **rack** | **`Movimientos_Stock`** (racks, `ubicacion` = sector) — `Racks_Planimetria` es una **VISTA** desde la v22.77 | **`Ubicaciones_Articulos`** · `Racks_Planimetria_legacy` |
 | **Capacidad** de cada celda de góndola (cajas que entran) | **`GV_Lugar_Item.cajas_max`** — `Capacidad_Sector` es una **VISTA** sobre ella desde la v22.75 | `Capacidad_Sector_legacy` (la tabla vieja, sin escritura, sólo para rollback) |
 | De qué **empresa** es un artículo (el dato de la columna LK/CH) | **`gv_empresa_de_articulo(cod)`** y su caché `GV_Articulo_Empresa_Cache` | `gv_articulo_empresa` (la vista rota) |
 
@@ -1322,7 +1322,7 @@ proponer "trasladar de la góndola LK a la de Chef" para ahorrarse la compra**. 
 consecuencia del código compartido es la de siempre: la empresa la da de qué pila salió la caja
 (el pedido), no el artículo.
 
-### ⚠ RACKS: una fuente por dato (Luis, 25/09, v22.84)
+### ⚠ RACKS: una fuente por dato (Luis, 25/09, v22.77)
 
 | dato | dónde vive |
 |---|---|
@@ -1342,7 +1342,7 @@ terminado, textos de insumos). En racks vale sólo lo que `gv_rack_sector()` rec
 La migración movió **0 cajas** del total de racks (14.094 antes y después): 111 ajustes en 42 códigos con `ref = 'ubicar racks · v22.76'`
 que suman 0 por código. Quedaron **21 a contar** y 7 códigos sin posición (505I 1.139, 546 360, 513 260, 816E 120…).
 Insumos en racks (523C, 546V, 102E, 522S, 1000900) quedan «a contar» hasta el paso de alias de ubicación de insumos.
-Rollback: `sql/gv_racks_canon_v2284.sql`. Lo sostiene `tests/pmap-racks.cjs`.
+Rollback: `sql/gv_racks_canon_v2277.sql`. Lo sostiene `tests/pmap-racks.cjs`.
 
 ### ⚠ INSUMOS: dónde está cada uno sale del Mapa (Luis, 25/09, v22.80)
 
