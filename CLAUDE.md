@@ -1339,7 +1339,7 @@ El stock sin posición se ve en `gv_rack_sin_ubicar` y se ubica desde el Mapa (`
 ⚠ **`ubicacion` en `Movimientos_Stock` es texto libre en los otros depósitos** (NP en a_facturar, góndola en
 terminado, textos de insumos). En racks vale sólo lo que `gv_rack_sector()` reconoce como posición de `GV_Lugar`.
 
-La migración movió **0 cajas** del total de racks (14.094 antes y después): 140 ajustes con `ref = 'ubicar racks · v22.76'`
+La migración movió **0 cajas** del total de racks (14.094 antes y después): 111 ajustes en 42 códigos con `ref = 'ubicar racks · v22.76'`
 que suman 0 por código. Quedaron **21 a contar** y 7 códigos sin posición (505I 1.139, 546 360, 513 260, 816E 120…).
 Insumos en racks (523C, 546V, 102E, 522S, 1000900) quedan «a contar» hasta el paso de alias de ubicación de insumos.
 Rollback: `sql/gv_racks_canon_v2277.sql`. Lo sostiene `tests/pmap-racks.cjs`.

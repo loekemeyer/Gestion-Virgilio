@@ -55,7 +55,8 @@
       "Bash(node tests/regla-L.cjs)",
       "Bash(mv sql/gv_racks_canon_v2276.sql sql/gv_racks_canon_v2277.sql)",
       "Bash(node scripts/bump-version.cjs 22.77)",
-      "Bash(PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node tests/pmap-racks.cjs)"
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node tests/pmap-racks.cjs)",
+      "Bash(sed -i 's/\\(14.094 antes y después\\): 140 ajustes con/\\(14.094 antes y después\\): 111 ajustes en 42 códigos con/' CLAUDE.md)"
     ]
   }
 }
