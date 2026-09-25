@@ -81,13 +81,13 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     out.tresPasos = card.querySelectorAll(".pcActs .pcRow:not(.pcRecibidoRow)").length === 3;   // + el tilde Recibido (v22.51)
 
     // ---- tildar ISIS persiste y sigue bloqueado (faltan partes + foto) ----
-    card.querySelectorAll(".pcActs .pcRow")[0].querySelector(".tickBtn").click();
+    card.querySelectorAll(".pcActs .pcRow:not(.pcRecibidoRow)")[0].querySelector(".tickBtn").click();
     await wait(30);
     out.isis_persiste = upds().some(function (c) { return c.vals.isis === true && c.eqs.some(function (e) { return e[0] === "id" && e[1] === 55; }); });
     out.isis_sigueBloqueado = btn.disabled === true;
 
     // ---- "No corresponde" completa el paso de partes ----
-    card.querySelectorAll(".pcActs .pcRow")[1].querySelector(".noBtn").click();
+    card.querySelectorAll(".pcActs .pcRow:not(.pcRecibidoRow)")[1].querySelector(".noBtn").click();
     await wait(30);
     out.partes_no = R.pendRows[55].partes === "no" && upds().some(function (c) { return c.vals.control_partes === "no"; });
     out.faltaFoto_bloqueado = btn.disabled === true;
@@ -104,7 +104,8 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     const env = upds();
     out.envia_procesado = env.length === 1 && env[0].vals.estado === "procesado" && !!env[0].vals.procesado_at;
     out.envia_reusaCodigo = env[0].vals.codigo === "4444";
-    out.envia_ui = card.classList.contains("sentRow") && /4444/.test(card.querySelector(".pcFoot").innerHTML);
+    out.envia_ui = card.classList.contains("sentRow") && /Enviado/.test(card.querySelector(".pcFoot").textContent) && !/4444/.test(card.textContent);   // v22.53: sin código a la vista
+    out.recibido_primero = card.querySelector(".pcActs .pcRow").classList.contains("pcRecibidoRow");
     // doble Enviar → no duplica
     await R.pendEnviar(55, card.querySelector(".pcFoot"));
     out.dobleEnvio_noDuplica = upds().length === 1;
