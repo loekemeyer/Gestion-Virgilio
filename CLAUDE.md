@@ -4633,6 +4633,34 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
+## ⚠ REGLA (Luis, 2026-09-25, v22.53): ♻ RECUPERAR PEDIDO — completar la facturación de una NP ya facturada
+
+**Luis:** *"que se pueda completar la facturación de un pedido ya facturado en caso de que ingrese
+mercadería entre la facturación y la entrega al cliente"*. Botón verde **♻ Recuperar pedido** en el
+encabezado de Facturación.
+
+| paso | cómo |
+|---|---|
+| lista | `gv_fac_recuperar_lista(p_dias)`: NP facturadas, buscador por varias palabras, filtro LK/CH, días y «sólo con faltantes» |
+| detalle | `gv_fac_recuperar_detalle(np)`: por código **faltó al facturar** (reconstruido), **completado después** (CP), ya complementado, **pendiente** (tope). Lo completado después viene tildado |
+| ✔ Marcar como facturado | ya se facturó **a mano** en ISIS antes (el confirm lo dice). Graba el lote modo `marcado` |
+| ⬇ Excel ISIS | `_facXlsArmar(nps, {lineas, cab})` con **sólo** los códigos marcados. Graba el lote modo `excel` **antes** de bajar |
+| cruce | `gv_fac_complemento_cruce()` (corre con el cron 90) busca la factura de cada lote: mismo cliente, ±10 días, cajas ±15 %, todos los códigos en la factura. Queda en `GV_Fac_Complemento_Doc` |
+
+⚠ **«Faltó al facturar» se reconstruye**: `cp_reducir_faltante_cap` (Completar Pedido) **suma a
+`cajas_entregadas`** y resta de `cajas_falto`, así que después de un CP la fila ya no dice lo que se
+facturó. Se descuenta lo que CP sumó **después de `facturado_at`** (`Movimientos_Stock` tipo `cp` a
+`a_facturar`, `ref` = NP).
+
+⚠ **El cruce principal se enteró**: la factura de un complemento **no es candidata** para la NP, y lo
+que CP sumó después de facturar se descuenta del `cajas_ent` contra el que compara (en un CTE: por
+subselect pasó de 1,6 s a > 60 s). Conciliación muestra el chip **♻ +N cj** en la NP.
+
+⚠ **No mueve stock**: lo físico va por Completar Pedido, que ya drena `a_facturar` si la NP estaba
+facturada. **No toca `Facturacion_NP`** (una fila por NP): los complementos viven en `GV_Fac_Complemento`.
+
+`sql/gv_fac_recuperar_pedido_v2253.sql`, `tests/fac-recuperar-pedido.cjs` (el marcador interno de las funciones dice `v22.52-compl`: es la llave de idempotencia, no cambiarlo).
+
 ## ⚠ REGLA (Luis, 2026-09-24, v22.40): el descuento de OC de una recepción NO se puede perder
 
 **Caso:** 24/09 11:49 la base cortó por timeout y la carga de Blist-Pack (763 + 764) dio 500 en
