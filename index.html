@@ -6183,7 +6183,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.77"></script>
+<script type="module" src="recepcion.js?v=22.78"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10141,7 +10141,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.77";
+const APP_VERSION = "v22.78";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -26294,7 +26294,15 @@ async function stkInsAceptar(orig) {
     await _stkInsAjustar(it, orig, qty, uni);
     const n = await _stkInsRpc("insumo_identificar", { p_tmp: orig, p_cod: cod, p_nombre: nom || null, p_categoria: cat || null, p_ubicacion: ubi || null });
     // v8.72 — si el admin puso ubicación, crear la fila en Insumos_Ubicaciones
-    if (ubi) await _stkInsUbicSync(cod, [ubi]);
+    // v22.78 — antes pasaba el texto pelado ([ubi]) y _stkInsUbicSync espera {sector,cantidad}: tiraba en
+    // u.sector.toUpperCase() DESPUÉS de identificar, y el admin veía «No se pudo» con el alta hecha. Además,
+    // pasar sólo la nueva borraba las ubicaciones que el código ya tenía: se suman a las actuales.
+    if (ubi) {
+      const actU = ((await _stkInsFetchUbics()) || []).filter(function (u) { return String(u.cod).toUpperCase() === String(cod).toUpperCase(); })
+        .map(function (u) { return { sector: String(u.sector), cantidad: Number(u.cantidad) || 0 }; });
+      if (!actU.some(function (u) { return u.sector.toUpperCase() === String(ubi).toUpperCase(); })) actU.push({ sector: String(ubi).trim(), cantidad: 0 });
+      await _stkInsUbicSync(cod, actU);
+    }
     _stkIns.msg = "✓ " + orig + (existente ? " sumado a " : " → ") + cod + " (" + (n || 0) + " movimiento(s) de stock).";
     await stkInsRefresh(); stkRender();
   } catch (e) { alert("No se pudo: " + (e.message || e)); }
