@@ -639,6 +639,8 @@ echo "== pmap-gondolas (v17.23: 🗺️ Mapa de góndolas — celdas de a 5, la 
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-gondolas.cjs
 echo "== pmap-racks (v22.67: 📦 pestaña Racks del Mapa — solo lectura, vista gv_rack_celda) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-racks.cjs
+echo "== imp-escritura-login (v22.81: el maestro de importados se escribe sólo con la sesión de supervisor) =="
+node tests/imp-escritura-login.cjs
 node tests/cap-sector-vista.cjs
 node tests/ins-aceptar-ubic.cjs
 

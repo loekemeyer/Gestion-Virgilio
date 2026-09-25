@@ -8143,7 +8143,10 @@ fichadas-monitor.html y productividad.html) — rotar la key = editar solo ese a
 >   para master cajas es **`Importados_Volumen.uni_master`** (del Excel). Master cjs = `ceil(a_pedir /
 >   uni_master)` (sin decimales); si un ítem no tiene `uni_master` cargado, cae a `uni_x_caja` como
 >   aprox y se marca con `~`.
-> - **Tabla `Importados_Volumen`** (RLS anon select/insert/update): `cod` (PK, = `cod_art` en mayúsculas),
+> - **Tabla `Importados_Volumen`** (RLS: lectura anon y authenticated; **escritura sólo supervisor
+>   logueado** desde v22.81 — `es_supervisor_virgilio()`, igual que `Importados`; el front escribe
+>   las dos tablas por `_impEscribir()` con el JWT de la sesión Google, ver
+>   `sql/gv_importados_escritura_supervisor_v2281.sql`): `cod` (PK, = `cod_art` en mayúsculas),
 >   `largo_cm`, `ancho_cm`, `alto_cm`, `m3_master`, `uni_master`, `uni_inner`, `fuente`. El ✏ de m³/master
 >   pide `Largo×Ancho×Alto` (cm) y calcula m³ = L·A·H/1e6, o acepta el m³ directo.
 > - **Carga inicial (2026-08-12)**: se subió el Excel "QUIEBRE ART IMP 11-08" (hojas `Todos` +

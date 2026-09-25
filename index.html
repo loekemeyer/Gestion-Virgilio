@@ -6183,7 +6183,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.80"></script>
+<script type="module" src="recepcion.js?v=22.81"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10141,7 +10141,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.80";
+const APP_VERSION = "v22.81";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20805,6 +20805,25 @@ function _provImpRender() {
 }
 function provImpSearch(v) { if (!_stkPop || _stkPop.kind !== "provImp") return; _stkPop.q = v; _stkPop._focusQ = true; _provImpRender(); }
 function provImpToggleSin() { if (!_stkPop || _stkPop.kind !== "provImp") return; _stkPop.soloSin = !_stkPop.soloSin; _stkPop._focusQ = false; _provImpRender(); }
+/* v22.81 — El maestro de importados (Importados / Importados_Volumen) se escribe CON LOGIN.
+   Antes iba con la clave publicable como Bearer (= anon) y las dos tablas aceptaban escritura
+   de cualquiera: la clave está en este repo público y signInAnonymously también da el rol
+   authenticated. Ahora la base sólo deja escribir a supervisores (es_supervisor_virgilio(),
+   políticas imp_write_supervisor / impvol_*_supervisor, sql/gv_importados_escritura_supervisor_v2281.sql)
+   y acá se manda el JWT de la sesión Google (facAuthWriteHeaders).
+   ⚠ Un PATCH que la RLS filtra NO da error: vuelve 0 filas. Por eso se pide la representación y
+   se cuenta — 0 filas = no se guardó, y se avisa (no queda un error mudo). */
+async function _impEscribir(ruta, metodo, cuerpo, prefer) {
+  const h = await facAuthWriteHeaders({ Prefer: prefer || "return=representation" });
+  if (!h) throw new Error(authNoSesionMsg("Iniciá sesión con Google para guardar."));
+  const r = await fetch(SUPABASE_URL + "/rest/v1/" + ruta, { method: metodo, headers: h, body: JSON.stringify(cuerpo) });
+  if (!r.ok) { let t = ""; try { t = await r.text(); } catch (_e) {} throw new Error("HTTP " + r.status + (t ? " — " + t : "")); }
+  if (metodo === "PATCH") {
+    let filas = null; try { filas = await r.json(); } catch (_e) {}
+    if (!Array.isArray(filas) || !filas.length) throw new Error("no se guardó nada (0 filas): sólo un supervisor logueado puede cambiar el maestro de importados.");
+  }
+  return r;
+}
 async function provImpSet(codEnc, prov) {
   if (!_stkPop || _stkPop.kind !== "provImp") return;
   const cod = decodeURIComponent(codEnc);
@@ -20814,13 +20833,9 @@ async function provImpSet(codEnc, prov) {
   _stkPop._focusQ = false;
   try {
     // PATCH del maestro Importados: actualiza el proveedor de TODAS las filas (marcas) de ese cod_art
-    const r = await fetch(SUPABASE_URL + "/rest/v1/Importados?cod_art=eq." + encodeURIComponent(cod), {
-      method: "PATCH",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({ proveedor: prov || null, actualizado: new Date().toISOString() })
-    });
-    if (!r.ok) { if (row) row.proveedor = prev; try { alert("No se pudo guardar (HTTP " + r.status + ")."); } catch (_e) {} }
-  } catch (_e) { if (row) row.proveedor = prev; try { alert("No se pudo guardar (sin conexión)."); } catch (_e2) {} }
+    await _impEscribir("Importados?cod_art=eq." + encodeURIComponent(cod), "PATCH",
+      { proveedor: prov || null, actualizado: new Date().toISOString() });
+  } catch (e) { if (row) row.proveedor = prev; try { alert("No se pudo guardar: " + (e.message || e)); } catch (_e2) {} }
   _provImpRender();
 }
 
@@ -21606,11 +21621,9 @@ async function pedImpEditVol(codEnc) {
   }
   m3 = Math.round(m3 * 1000000) / 1000000;
   try {
-    await fetch(SUPABASE_URL + "/rest/v1/Importados_Volumen?on_conflict=cod", {
-      method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify({ cod: cod, largo_cm: l || null, ancho_cm: a || null, alto_cm: h || null, m3_master: m3, actualizado: new Date().toISOString() })
-    });
+    await _impEscribir("Importados_Volumen?on_conflict=cod", "POST",
+      { cod: cod, largo_cm: l || null, ancho_cm: a || null, alto_cm: h || null, m3_master: m3, actualizado: new Date().toISOString() },
+      "resolution=merge-duplicates,return=minimal");
     await pedImpReload();
   } catch (e) { try { alert("No se pudo guardar el volumen: " + (e.message || e)); } catch (_e) {} }
 }
@@ -21630,11 +21643,8 @@ async function pedImpEditFob(codEnc) {
   if (isNaN(fob) || fob < 0) { try { alert("FOB inválido."); } catch (_e) {} return; }
   fob = Math.round(fob * 100000) / 100000;
   try {
-    await fetch(SUPABASE_URL + "/rest/v1/Importados?cod_art=eq." + encodeURIComponent(cod), {
-      method: "PATCH",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({ fob_uni: fob, actualizado: new Date().toISOString() })
-    });
+    await _impEscribir("Importados?cod_art=eq." + encodeURIComponent(cod), "PATCH",
+      { fob_uni: fob, actualizado: new Date().toISOString() });
     await pedImpReload();
   } catch (e) { try { alert("No se pudo guardar el FOB: " + (e.message || e)); } catch (_e) {} }
 }
@@ -21750,11 +21760,8 @@ async function pedImpSetReingreso(codEnc, val) {
   var cod = decodeURIComponent(codEnc);
   var v = String(val == null ? "" : val).trim();   // 'YYYY-MM-DD' o '' para borrar
   try {
-    await fetch(SUPABASE_URL + "/rest/v1/Importados?cod_art=eq." + encodeURIComponent(cod), {
-      method: "PATCH",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({ reingreso_est: v || null, actualizado: new Date().toISOString() })
-    });
+    await _impEscribir("Importados?cod_art=eq." + encodeURIComponent(cod), "PATCH",
+      { reingreso_est: v || null, actualizado: new Date().toISOString() });
     // reflejar en memoria sin recalcular todo el pedido
     try {
       var data = (_stkPop && _stkPop.data) || {};
@@ -21840,11 +21847,8 @@ async function pedImpSetCurso(id, codEnc, curso) {
     if (iso === null) { try { alert("Fecha inválida (usá dd/mm/aaaa); se dejó como estaba."); } catch (_e) {} }
     else {
       try {
-        await fetch(SUPABASE_URL + "/rest/v1/Importados?cod_art=eq." + encodeURIComponent(cod), {
-          method: "PATCH",
-          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
-          body: JSON.stringify({ reingreso_est: iso || null, actualizado: new Date().toISOString() })
-        });
+        await _impEscribir("Importados?cod_art=eq." + encodeURIComponent(cod), "PATCH",
+          { reingreso_est: iso || null, actualizado: new Date().toISOString() });
       } catch (e) { try { alert("Se guardó 'en curso', pero no la fecha: " + (e.message || e)); } catch (_e) {} }
     }
   }
