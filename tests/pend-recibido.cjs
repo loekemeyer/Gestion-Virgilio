@@ -84,6 +84,7 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     out.persiste = u.length === 1 && u[0].vals.gv_recibido_por === "Fabi" && !!u[0].vals.gv_recibido_at
       && !("estado" in u[0].vals) && u[0].eqs.some(function (e) { return e[0] === "id" && e[1] === 77; });
     out.cierra = !rootEl.querySelector(".rcbOverlay");
+    out.otro_queda = window.__calls.some(function (c) { return c.table === "GV_Recepcion_Receptores" && c.op === "insert" && c.rows && c.rows.nombre === "Fabi"; });
     out.ui = !card.classList.contains("sentRow") && /Fabi · /.test(rr.textContent) && rb.classList.contains("on") && rb.disabled === false;
     // es un paso más: con ISIS + partes + foto vista + recibido, Enviar se habilita y cierra
     const eb = card.querySelector(".enviarBtn");

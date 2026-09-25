@@ -2907,6 +2907,8 @@ async function histLoad(f) {
     // `2026-…` y encima el corte de 1000 filas se llevaba puestas las recientes de ese grupo.
     let q = supabase.from("vista_historial_entregas")
       .select("fuente,fecha,created_at,cod_art,descripcion,cajas,quien,remito,llegada,carga,demora_hs,recibido_por,recibido_at");
+    // v22.53 (Luis): lo que sigue en Pendientes todavía no se recepcionó — no va al Histórico.
+    q = q.eq("pendiente", false);
     if (f.desde) q = q.gte("fecha", f.desde);
     if (f.hasta) q = q.lte("fecha", f.hasta);
     if (codN) q = q.or("cod_art.ilike.%" + codN + "%,quien.ilike.%" + codN + "%");
@@ -3269,6 +3271,8 @@ async function renderPendientes() {
   const rows = res.data || [];
   if (!rows.length) { opBody.innerHTML = '<div class="opOk">✓ No hay recepciones pendientes.</div>'; return; }
   _pendRows = {};
+  await pendReceptoresCargar();
+  if (opState.step !== "pend") return;
   opBody.innerHTML = "";
   const list = document.createElement("div"); list.className = "pendCards";
   rows.forEach(function (r) { list.appendChild(pendCard(r)); });
@@ -3340,6 +3344,7 @@ function pendCard(r) {
   ent.textContent = (r.detalle || "") + (r.cantidad_total != null ? "   ·   " + r.cantidad_total + " cajas" : "");
   card.appendChild(ent);
   const acts = document.createElement("div"); acts.className = "pcActs";
+  acts.appendChild(pendRecibidoRow(id, card));   // v22.53: primero quién lo procesa
   acts.appendChild(pendCheckRow(id, "isis", "Carga ISIS"));
   acts.appendChild(pendPartesRow(id));
   /* v12.03 — se sacó el tilde "Faltantes x Día" (pedido del usuario): ese programa
@@ -3347,7 +3352,6 @@ function pendCard(r) {
      botón Enviar. La columna Control_Modo_OP.faltantes queda en la base con lo ya
      cargado — no se toca ni se borra, solo dejó de usarse desde acá. */
   acts.appendChild(pendFotoRow(id));
-  acts.appendChild(pendRecibidoRow(id, card));
   card.appendChild(acts);
   const foot = document.createElement("div"); foot.className = "pcFoot";
   /* v10.02 — el código lo genera opEnviar() AL CREAR la fila (v8.83), para que el operario
@@ -3355,11 +3359,7 @@ function pendCard(r) {
      procesada": esta lista trae SOLO estado='pendiente'. Antes el `if (r.codigo)` tapaba
      el botón Enviar en toda fila nueva y nada podía salir de Pendientes. Ahora se muestra
      el código (para cotejar contra el remito) Y el botón al lado. */
-  if (r.codigo) {
-    const lab = document.createElement("span"); lab.className = "pcLbl"; lab.textContent = "Código:";
-    const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = r.codigo;
-    foot.appendChild(lab); foot.appendChild(c);
-  }
+  // v22.53 (Luis): el código de 4 dígitos ya no se usa — no se muestra.
   const b = document.createElement("button"); b.type = "button"; b.className = "enviarBtn"; b.textContent = "Enviar"; b.disabled = !pendRowComplete(id);
   b.onclick = function () { pendEnviar(id, foot); };
   foot.appendChild(b);
@@ -3402,6 +3402,31 @@ function pendRecibidoRow(id, card) {
 /* Quién recibe: igual que Cuarentena — chips fijos + «Otro…» con texto. OBLIGATORIO y sin
    preselección (un valor puesto de fábrica se confirma sin leerlo). */
 const PEND_RECIBE_PERSONAS = ["Nora", "Pablo"];
+/* v22.53 (Luis): el nombre que se escribe en «Otro…» queda como opción (GV_Recepcion_Receptores). */
+let _pendReceptores = null;
+async function pendReceptoresCargar() {
+  try {
+    await sessionReady;
+    const r = await supabase.from("GV_Recepcion_Receptores").select("nombre").order("created_at", { ascending: true }).limit(200);
+    if (!r.error && r.data) _pendReceptores = r.data.map(function (x) { return String(x.nombre || "").trim(); }).filter(Boolean);
+  } catch (_e) {}
+  return _pendReceptores || [];
+}
+function pendReceptoresLista() {
+  const out = PEND_RECIBE_PERSONAS.slice(), vis = {};
+  out.forEach(function (n) { vis[n.toLowerCase()] = 1; });
+  (_pendReceptores || []).forEach(function (n) { if (!vis[n.toLowerCase()]) { vis[n.toLowerCase()] = 1; out.push(n); } });
+  return out;
+}
+async function pendReceptorGuardar(nombre) {
+  const n = String(nombre || "").trim(); if (!n) return;
+  if (pendReceptoresLista().some(function (x) { return x.toLowerCase() === n.toLowerCase(); })) return;
+  try {
+    await sessionReady;
+    const r = await supabase.from("GV_Recepcion_Receptores").insert({ nombre: n });
+    if (!r || !r.error) (_pendReceptores = _pendReceptores || []).push(n);
+  } catch (_e) {}
+}
 function pendRecibidoAbrir(id, card) {
   const st = _pendRows[id]; if (!st || st.sent) return;
   const r = st.row || {};
@@ -3434,7 +3459,7 @@ function pendQuienModal(o) {
     otro.style.display = sel === "__otro" ? "" : "none";
     ok.disabled = !valor() || (!!o.conFoto && !archivo());
   };
-  PEND_RECIBE_PERSONAS.concat(["__otro"]).forEach(function (n) {
+  pendReceptoresLista().concat(["__otro"]).forEach(function (n) {
     const b = document.createElement("button"); b.type = "button"; b.className = "rcbOp";
     b.setAttribute("data-v", n); b.textContent = n === "__otro" ? "Otro…" : n;
     b.onclick = function () { sel = (sel === n ? "" : n); err.textContent = ""; refresh(); if (sel === "__otro") otro.focus(); };
@@ -3451,6 +3476,7 @@ function pendQuienModal(o) {
     ok.disabled = true; ok.textContent = "Guardando…";
     try {
       await o.onOk(quien, archivo());
+      if (sel === "__otro") pendReceptorGuardar(quien);   // best-effort: no frena nada
       cerrar();
     } catch (e) {
       ok.disabled = false; ok.textContent = "Confirmar";
@@ -3675,10 +3701,7 @@ async function pendEnviar(id, foot) {
     const codigo = _pendRows[id].codigo || await pendGenCodigo();
     await pendPersist(id, { estado: "procesado", procesado_at: new Date().toISOString(), codigo: codigo });
     _pendRows[id].sent = true; _pendRows[id].codigo = codigo;
-    foot.innerHTML = "";
-    const lab = document.createElement("span"); lab.className = "pcLbl"; lab.textContent = "Código:";
-    const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = codigo;
-    foot.appendChild(lab); foot.appendChild(c);
+    foot.innerHTML = '<span class="pcLbl" style="color:var(--ok);font-weight:900">✓ Enviado — pasó al Histórico</span>';
     const card = foot.parentNode; if (card) card.classList.add("sentRow");
   } catch (e) {
     if (b) { b.disabled = false; b.textContent = "Enviar"; }
