@@ -19,7 +19,10 @@ const SKIP = new Set([
   "parseInt", "parseFloat", "String", "Number", "Boolean", "Array", "Object", "JSON",
   "Math", "Date", "alert", "confirm", "prompt", "isNaN", "isFinite", "RegExp",
   "encodeURIComponent", "decodeURIComponent", "setTimeout", "setInterval", "clearTimeout",
-  "Promise", "Map", "Set", "escape", "unescape"
+  "Promise", "Map", "Set", "escape", "unescape",
+  // v22.83: J = helper LOCAL que arma el argumento al generar el HTML (JSON.stringify + &quot;,
+  // index.html ~45634); en el onclick final ya no está. No es un handler.
+  "J"
 ]);
 
 function extractHandlerFns(src) {
