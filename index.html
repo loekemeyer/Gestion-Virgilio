@@ -5198,29 +5198,71 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
 /* v14.53 — Los 4 botones (Excel ISIS · JSON ISIS · Cruce · Cerrar) en una grilla
    2×2 pareja: mismo tamaño y alineados en dos filas prolijas, para que en el celular
    no se desborden ni queden de distinto ancho. */
+/* v22.54 (Luis: "achicame la visual de esos botones y hacelos más lindos") — los 5 botones en UNA
+   fila compacta tipo pastilla, alineados a la derecha: blanco con borde y texto del color de cada
+   acción; Recuperar (verde) y Cerrar (rojo) llenos. Antes: grilla de 3 columnas de 40 px de alto. */
 .fac-top-acts{
-  display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px;
-  margin-left:auto; width:100%; max-width:400px; flex:0 0 auto;
+  display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:6px;
+  margin-left:auto; width:auto; max-width:none; flex:0 1 auto;
 }
 .fac-top-acts > button{
-  width:100%; margin:0; box-sizing:border-box; height:40px; min-height:40px;
-  padding:0 10px; font-size:12.5px; font-weight:800; border-radius:8px;
-  border:1px solid transparent;
-  display:inline-flex; align-items:center; justify-content:center; text-align:center;
-  gap:4px; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  cursor:pointer; box-shadow:none;
+  width:auto; margin:0; box-sizing:border-box; height:30px; min-height:30px;
+  padding:0 12px; font-size:12px; font-weight:700; border-radius:999px;
+  border:1px solid #cbd5e1; background:#fff; color:#334155;
+  display:inline-flex; align-items:center; justify-content:center; gap:5px;
+  line-height:1; white-space:nowrap; cursor:pointer;
+  box-shadow:0 1px 2px rgba(15,23,42,.06); transition:background .12s, box-shadow .12s, transform .06s;
 }
-.fac-top-acts > button:hover{ filter:brightness(.97); }
-.fac-top-acts > button > span{ margin-left:0; font-size:11.5px; }  /* el "(NP web)" / "(prueba)" */
-.fac-top-acts #facBtnXlsIsis{ border:1px solid #fcd34d; background:#fffbeb; color:#78350f; }
-.fac-top-acts #facBtnJsonIsis{ border:1px solid #a5b4fc; background:#eef2ff; color:#3730a3; }
-/* v13.73: "Cruce con ISIS" — abre la pestaña del cruce (Deuda / Cobranzas) */
-.fac-top-acts #facBtnCruce{ border:1px solid #93c5fd; background:#eff6ff; color:#1e3a8a; }
-.fac-top-acts .fac-close-btn{ margin:0; border:1px solid #dc2626; }
+.fac-top-acts > button:hover{ box-shadow:0 2px 6px rgba(15,23,42,.12); }
+.fac-top-acts > button:active{ transform:translateY(1px); }
+.fac-top-acts > button:disabled{ opacity:.55; cursor:default; box-shadow:none; }
+.fac-top-acts > button > span{ margin-left:0; font-size:11px; font-weight:600; opacity:.7; }  /* el "(NP web)" / "(prueba)" */
+.fac-top-acts #facBtnXlsIsis{ border-color:#fcd34d; color:#92400e; }
+.fac-top-acts #facBtnXlsIsis:hover{ background:#fffbeb; }
+.fac-top-acts #facBtnJsonIsis{ border-color:#c7d2fe; color:#4338ca; }
+.fac-top-acts #facBtnJsonIsis:hover{ background:#eef2ff; }
+.fac-top-acts #facBtnCruce{ border-color:#bfdbfe; color:#1d4ed8; }
+.fac-top-acts #facBtnCruce:hover{ background:#eff6ff; }
+.fac-top-acts #facBtnRecuperar{ border-color:#16a34a; background:#16a34a; color:#fff; }
+.fac-top-acts #facBtnRecuperar:hover{ background:#15803d; }
+.fac-top-acts .fac-close-btn{ margin:0; border-color:#dc2626; background:#dc2626; color:#fff; }
+.fac-top-acts .fac-close-btn:hover{ background:#b91c1c; }
+.frec-ov{ position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:900; display:flex; align-items:flex-start; justify-content:center; padding:24px 12px; overflow:auto; }
+.frec-box{ background:#fff; border-radius:12px; width:100%; max-width:1100px; box-shadow:0 20px 50px rgba(0,0,0,.25); padding:16px 18px; }
+.frec-hd{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.frec-hd h2{ margin:0; font-size:18px; color:#14532d; flex:1; }
+.frec-hd button{ width:auto; margin:0; padding:7px 14px; font-size:14px; height:auto; min-height:0; border-radius:8px; }
+.frec-fil{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+.frec-fil input[type=search]{ flex:1 1 260px; min-width:180px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; }
+.frec-fil select, .frec-fil label{ font-size:13px; }
+.frec-fil select{ padding:7px 8px; border:1px solid #cbd5e1; border-radius:8px; width:auto; }
+.frec-fil label{ display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+.frec-fil input[type=checkbox]{ width:auto; margin:0; }
+.frec-tbl{ width:100%; border-collapse:collapse; font-size:13px; }
+.frec-tbl th{ text-align:left; font-size:11px; text-transform:uppercase; color:#64748b; padding:6px 8px; border-bottom:1px solid #e2e8f0; position:sticky; top:0; background:#fff; cursor:pointer; white-space:nowrap; }
+.frec-tbl td{ padding:6px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+.frec-tbl tr.frec-row:hover{ background:#f0fdf4; cursor:pointer; }
+.frec-tbl td.n{ text-align:right; font-variant-numeric:tabular-nums; }
+.frec-tbl input[type=number]{ width:70px; padding:4px 6px; border:1px solid #cbd5e1; border-radius:6px; text-align:right; margin:0; }
+.frec-tbl input[type=checkbox]{ width:auto; margin:0; }
+.frec-scroll{ max-height:60vh; overflow:auto; border:1px solid #e2e8f0; border-radius:8px; }
+.frec-chip{ display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; font-weight:700; margin-left:4px; white-space:nowrap; }
+.frec-chip.falta{ background:#fee2e2; color:#991b1b; }
+.frec-chip.cp{ background:#dcfce7; color:#166534; }
+.frec-chip.comp{ background:#e0e7ff; color:#3730a3; }
+.frec-chip.sinfc{ background:#fef3c7; color:#92400e; }
+.frec-acts{ display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; margin-top:12px; }
+.frec-acts button{ width:auto; margin:0; padding:10px 16px; font-weight:800; border-radius:8px; }
+.frec-b-marcar{ background:#16a34a; color:#fff; border:1px solid #15803d; }
+.frec-b-xls{ background:#fffbeb; color:#78350f; border:1px solid #fcd34d; }
+.frec-b-sec{ background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; }
+.frec-nota{ font-size:12px; color:#475569; margin:6px 0; }
+.frec-lotes{ margin-top:10px; font-size:12.5px; }
+.frec-lotes li{ margin:3px 0; }
 @media (max-width:480px){                       /* celular: los 4 llenan el ancho, sin recortarse */
-  .fac-top-acts{ max-width:none; }
-  .fac-top-acts > button{ font-size:11.5px; padding:0 6px; }
-  .fac-top-acts > button > span{ font-size:10.5px; }
+  .fac-top-acts{ width:100%; justify-content:flex-start; }
+  .fac-top-acts > button{ font-size:11.5px; padding:0 10px; }
+  .fac-top-acts > button > span{ display:none; }
 }
 /* Casilla "marcar para el Excel de prueba de ISIS" en cada fila de Facturación.
    Grande a propósito: se toca con el dedo desde el celular. */
@@ -5931,6 +5973,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button id="facBtnXlsIsis" onclick="facXlsBajar()" title="Arma el Excel para importar en ISIS con las cajas ENTREGADAS de las NP de la página que marcaste. Al bajarlo, esas NP quedan FACTURADAS (es su tilde). Las NP de ISIS no van acá: se tildan.">⬇ Excel ISIS <span style="font-weight:600;opacity:.85">(NP web)</span></button>
       <button id="facBtnJsonIsis" onclick="facJsonIsis()" title="PRUEBA — TODAVÍA NO ESTÁ OPERATIVO. No envía a ISIS, no factura y no saca la NP de la lista: la facturación real se SIGUE haciendo con el Excel. Sólo arma el MISMO pedido que el Excel (cajas armadas, código con L, ruteo Tierra del Fuego) en el sobre JSON del contrato ISIS API v2.0, para copiar o descargar (prueba de conexión con Horacio).">📤 JSON ISIS <span style="font-weight:600;opacity:.85">(prueba)</span></button>
       <button id="facBtnCruce" onclick="openCobros('cruce')" title="Cruza cada NP facturada (lo que Gestión calculó con las cajas entregadas y la lista) contra la factura real que cargó ISIS (el PDF): neto, cajas y diferencia. Sólo mira, no corrige nada.">🔍 Cruce con ISIS</button>
+      <button id="facBtnRecuperar" onclick="facRecAbrir()" title="Buscar una NP YA FACTURADA y completar su facturación: marcás los códigos que le faltaron (por ejemplo, la mercadería entró entre la factura y la entrega) y los marcás como facturados o bajás el Excel para ISIS sólo con esos códigos.">♻ Recuperar items de FC</button>
       <button class="fac-close-btn" onclick="closeFacturacion()">Cerrar</button>
     </div>
   </div>
@@ -6108,7 +6151,11 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.53"></script>
+<<<<<<< HEAD
+<script type="module" src="recepcion.js?v=22.59"></script>
+=======
+<script type="module" src="recepcion.js?v=22.59"></script>
+>>>>>>> origin/main
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10059,7 +10106,11 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.53";
+<<<<<<< HEAD
+const APP_VERSION = "v22.59";
+=======
+const APP_VERSION = "v22.58";
+>>>>>>> origin/main
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -54792,7 +54843,10 @@ function _facXlsFilasPlanas(filas) {
 
 /* Trae los datos de las NP marcadas y arma las líneas (dedup, tope contra lo pedido,
    orden por código). Los datos de cabecera salen de la lista ya cargada en pantalla. */
-async function _facXlsArmar(nps) {
+/* v22.53 (Luis) — `opts` (opcional), para «Recuperar pedido»: opts.lineas[np] = [{cod, cajas}] reemplaza
+   las líneas que salen de Entregas_Virgilio (sólo van los códigos que marcó el admin), y opts.cab[np] =
+   {cod, rs} da la cabecera de una NP que ya no está en la lista del Facturador (ya se facturó). */
+async function _facXlsArmar(nps, opts) {
   const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
   // v12.67 — Las NP van ENTRECOMILLADAS. Las de ISIS son solo dígitos y daban
   // igual, pero las de la PPP Web son "LK 1343": con el espacio suelto PostgREST
@@ -54927,10 +54981,12 @@ async function _facXlsArmar(nps) {
   const out = [];
   nps.forEach(function (np) {
     np = String(np);
-    const c = cab[np] || { cod: "", rs: "" };
+    const c = cab[np] || (opts && opts.cab && opts.cab[np]) || { cod: "", rs: "" };
     const fecha = fechaBy[np] || "";
     const mapa = porNp[np] || {};
-    const lineas = Object.keys(mapa).map(function (k) { return mapa[k]; })
+    const _fijas = opts && opts.lineas && opts.lineas[np];   // v22.53: Recuperar pedido
+    const lineas = (_fijas ? _fijas.map(function (x) { return { cod: String(x.cod), ent: Number(x.cajas) || 0, ped: Number(x.cajas) || 0, sum: Number(x.cajas) || 0 }; })
+                           : Object.keys(mapa).map(function (k) { return mapa[k]; }))
       .filter(function (x) { return x.ent > 0; })
       .map(function (x) {
         const art = _facXlsPadCod(x.cod);
@@ -58938,6 +58994,294 @@ window.facDescRegistrar = facDescRegistrar;
 window.facDescRender = facDescRender;
 window.facRpc = facRpc;
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   v22.53 (Luis, 2026-09-25) — ♻ RECUPERAR PEDIDO. Completar la facturación de una NP YA
+   facturada cuando entra mercadería entre la factura y la entrega al cliente.
+   · Lista de NP facturadas (gv_fac_recuperar_lista) con buscador y filtros.
+   · Detalle por código (gv_fac_recuperar_detalle): lo que FALTÓ AL FACTURAR — el backend
+     descuenta lo que Completar Pedido sumó después — lo ya complementado y lo pendiente.
+   · «Marcar como facturado» = ya se facturó a mano en ISIS · «Excel ISIS» = baja el Excel
+     sólo con esos códigos. Los dos graban el lote (gv_fac_complemento_registrar), que es lo
+     que el cruce usa para encontrar la factura complementaria y no confundirla con la original.
+   ⚠ No mueve stock: lo físico va por Completar Pedido, que ya drena si la NP estaba facturada.
+   ───────────────────────────────────────────────────────────────────────────── */
+var _frec = { rows: null, cargando: false, q: "", dias: 90, soloFalt: true, emp: "", orden: "fc", np: null, det: null, lotes: [], sel: {} };
+window._frec = _frec;
+
+function facRecAbrir() {
+  if (!requireSupervisor()) return;
+  var ov = document.getElementById("frecOv");
+  if (!ov) {
+    ov = document.createElement("div");
+    ov.id = "frecOv"; ov.className = "frec-ov";
+    ov.innerHTML = '<div class="frec-box" id="frecBox"></div>';
+    ov.addEventListener("click", function (e) { if (e.target === ov) facRecCerrar(); });
+    document.body.appendChild(ov);
+  }
+  ov.style.display = "flex";
+  _frec.np = null; _frec.det = null;
+  facRecRender();
+  facRecCargar();
+}
+function facRecCerrar() { var ov = document.getElementById("frecOv"); if (ov) ov.style.display = "none"; }
+
+async function facRecCargar() {
+  _frec.cargando = true; _frec.err = null; facRecRender();
+  try { _frec.rows = await facRpc("gv_fac_recuperar_lista", { p_dias: Number(_frec.dias) || 90 }) || []; }
+  catch (e) { _frec.err = (e && e.message) || String(e); _frec.rows = []; }
+  _frec.cargando = false; facRecRender();
+}
+
+function _frecFecha(s) {
+  if (!s) return "—";
+  var t = String(s);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t.slice(8, 10) + "/" + t.slice(5, 7);
+  try { var d = new Date(t); return String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); } catch (_e) { return t.slice(0, 10); }
+}
+function _frecNum(n) { var v = Number(n) || 0; return (Math.round(v * 100) / 100).toLocaleString("es-AR"); }
+function _frecNorm(s) { return String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+
+function _frecFiltradas() {
+  var q = _frecNorm(_frec.q).trim(), toks = q ? q.split(/\s+/) : [];
+  var rows = (_frec.rows || []).filter(function (r) {
+    if (_frec.soloFalt && !(Number(r.cajas_falto) > 0)) return false;
+    if (_frec.emp && String(r.empresa || "") !== _frec.emp) return false;
+    if (!toks.length) return true;
+    var h = _frecNorm([r.np, r.tanda, r.cod_cliente, r.razon_social].join(" "));
+    return toks.every(function (t) { return h.indexOf(t) >= 0; });
+  });
+  var o = _frec.orden;
+  rows.sort(function (a, b) {
+    if (o === "falta") return (Number(b.cajas_falto) || 0) - (Number(a.cajas_falto) || 0);
+    if (o === "cp") return (Number(b.cajas_completadas_despues) || 0) - (Number(a.cajas_completadas_despues) || 0);
+    if (o === "cli") return String(a.razon_social || "").localeCompare(String(b.razon_social || ""));
+    if (o === "np") return String(a.np).localeCompare(String(b.np), "es", { numeric: true });
+    return String(b.facturado_at || "").localeCompare(String(a.facturado_at || ""));
+  });
+  return rows;
+}
+
+function facRecRender() {
+  var box = document.getElementById("frecBox");
+  if (!box) return;
+  if (_frec.np) { box.innerHTML = _frecDetalleHtml(); return; }
+  var rows = _frecFiltradas();
+  var h = '<div class="frec-hd"><h2>♻ Recuperar items de FC</h2>' +
+    '<button class="frec-b-sec" onclick="facRecCargar()">↻</button>' +
+    '<button class="fac-close-btn" onclick="facRecCerrar()">Cerrar</button></div>' +
+    '<div class="frec-nota">Elegí una NP ya facturada para completar lo que le faltó. Las cajas que se agregaron con <b>Completar Pedido</b> después de facturar aparecen en verde: son las que suelen faltar facturar.</div>' +
+    '<div class="frec-fil">' +
+      '<input type="search" id="frecQ" placeholder="Buscar NP, cliente, razón social o tanda… (varias palabras)" value="' + escapeHtml(_frec.q) + '" oninput="facRecSetQ(this.value)">' +
+      '<select onchange="facRecSet(\'emp\', this.value)">' +
+        ['', 'lk', 'chef'].map(function (v) { return '<option value="' + v + '"' + (_frec.emp === v ? " selected" : "") + '>' + (v === "" ? "LK y CH" : v === "lk" ? "Sólo LK" : "Sólo CH") + '</option>'; }).join("") +
+      '</select>' +
+      '<select onchange="facRecSetDias(this.value)">' +
+        [15, 30, 60, 90, 180, 365].map(function (d) { return '<option value="' + d + '"' + (Number(_frec.dias) === d ? " selected" : "") + '>Facturadas últimos ' + d + ' días</option>'; }).join("") +
+      '</select>' +
+      '<label><input type="checkbox"' + (_frec.soloFalt ? " checked" : "") + ' onchange="facRecSet(\'soloFalt\', this.checked)"> Sólo con faltantes</label>' +
+    '</div>';
+  if (_frec.cargando && !_frec.rows) return box.innerHTML = h + '<div class="frec-nota">⏳ Cargando NP facturadas…</div>';
+  if (_frec.err) h += '<div class="frec-nota" style="color:#b91c1c">⚠ ' + escapeHtml(_frec.err) + '</div>';
+  var th = function (k, t, cls) { return '<th' + (cls ? ' class="' + cls + '"' : '') + ' onclick="facRecSet(\'orden\', \'' + k + '\')">' + t + (_frec.orden === k ? ' ▾' : '') + '</th>'; };
+  h += '<div class="frec-nota">' + rows.length + ' NP' + (_frec.cargando ? ' · actualizando…' : '') + '</div>' +
+    '<div class="frec-scroll"><table class="frec-tbl"><thead><tr>' +
+      th("np", "NP") + '<th>Tanda</th>' + th("cli", "Cliente") + '<th>Salida</th>' + th("fc", "Facturada") +
+      th("falta", "Faltó al facturar", "n") + th("cp", "Completado después", "n") + '<th>Complementos</th>' +
+    '</tr></thead><tbody>';
+  rows.slice(0, 500).forEach(function (r) {
+    var comp = Number(r.lotes) > 0
+      ? '<span class="frec-chip comp">' + _frecNum(r.cajas_complementadas) + ' cj · ' + r.lotes + ' lote' + (r.lotes > 1 ? 's' : '') + '</span>' +
+        (Number(r.lotes_sin_factura) > 0 ? '<span class="frec-chip sinfc" title="Todavía no apareció la factura de ISIS de ese complemento">' + r.lotes_sin_factura + ' sin factura</span>' : '')
+      : '<span style="color:#94a3b8">—</span>';
+    h += '<tr class="frec-row" onclick="facRecAbrirNp(\'' + escapeHtml(String(r.np)).replace(/'/g, "\\'") + '\')">' +
+      '<td><b>' + escapeHtml(r.np) + '</b></td><td>' + escapeHtml(r.tanda || "") + '</td>' +
+      '<td>' + escapeHtml((r.cod_cliente ? r.cod_cliente + " · " : "") + (r.razon_social || "")) + '</td>' +
+      '<td>' + _frecFecha(r.fecha_salida) + '</td><td>' + _frecFecha(r.facturado_at) + '</td>' +
+      '<td class="n">' + (Number(r.cajas_falto) > 0 ? '<span class="frec-chip falta">' + _frecNum(r.cajas_falto) + ' cj · ' + r.lineas_falto + ' cód</span>' : '<span style="color:#94a3b8">—</span>') + '</td>' +
+      '<td class="n">' + (Number(r.cajas_completadas_despues) > 0 ? '<span class="frec-chip cp">+' + _frecNum(r.cajas_completadas_despues) + ' cj</span>' : '<span style="color:#94a3b8">—</span>') + '</td>' +
+      '<td>' + comp + '</td></tr>';
+  });
+  if (!rows.length && !_frec.cargando) h += '<tr><td colspan="8" style="color:#64748b;padding:14px">No hay NP facturadas con ese filtro.</td></tr>';
+  if (rows.length > 500) h += '<tr><td colspan="8" style="color:#64748b">Se muestran 500 de ' + rows.length + ': afiná la búsqueda.</td></tr>';
+  box.innerHTML = h + '</tbody></table></div>';
+}
+var _frecQT = null;
+function facRecSetQ(v) {
+  _frec.q = v;
+  clearTimeout(_frecQT);
+  _frecQT = setTimeout(function () {
+    facRecRender();
+    var i = document.getElementById("frecQ"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+  }, 150);
+}
+function facRecSet(k, v) { _frec[k] = v; facRecRender(); }
+function facRecSetDias(v) { _frec.dias = Number(v) || 90; facRecCargar(); }
+
+async function facRecAbrirNp(np) {
+  if (String(np) !== String(_frec.np)) _frec.msg = null;
+  _frec.np = String(np); _frec.det = null; _frec.lotes = []; _frec.sel = {}; _frec.detErr = null;
+  facRecRender();
+  try {
+    var res = await Promise.all([
+      facRpc("gv_fac_recuperar_detalle", { p_np: _frec.np }),
+      facRpc("gv_fac_complemento_lista", { p_np: _frec.np }).catch(function () { return []; })
+    ]);
+    _frec.det = res[0] || []; _frec.lotes = res[1] || [];
+    // arranca con lo que se completó después de facturar ya tildado (lo más probable a facturar)
+    _frec.det.forEach(function (d) { if (Number(d.sugerido) > 0) _frec.sel[d.cod_art] = Number(d.sugerido); });
+  } catch (e) { _frec.detErr = (e && e.message) || String(e); _frec.det = []; }
+  facRecRender();
+}
+function facRecVolver() { _frec.np = null; facRecRender(); }
+
+function _frecFila(np) { return (_frec.rows || []).find(function (r) { return String(r.np) === String(np); }) || null; }
+
+function _frecDetalleHtml() {
+  var r = _frecFila(_frec.np) || {};
+  var h = '<div class="frec-hd"><button class="frec-b-sec" onclick="facRecVolver()">← Volver</button>' +
+    '<h2>♻ ' + escapeHtml(_frec.np) + ' · ' + escapeHtml((r.cod_cliente ? r.cod_cliente + " · " : "") + (r.razon_social || "")) + '</h2>' +
+    '<button class="fac-close-btn" onclick="facRecCerrar()">Cerrar</button></div>' +
+    '<div class="frec-nota">Tanda <b>' + escapeHtml(r.tanda || "—") + '</b> · salida ' + _frecFecha(r.fecha_salida) + ' · facturada ' + _frecFecha(r.facturado_at) +
+    '. Marcá los códigos y las cajas que vas a facturar ahora. El tope de cada código es lo que <b>faltó al facturar</b> menos lo ya complementado.</div>' +
+    (_frec.msg ? '<div class="frec-nota" style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 10px;color:#14532d;font-weight:700">' + escapeHtml(_frec.msg) + '</div>' : '');
+  if (!_frec.det) return h + '<div class="frec-nota">⏳ Cargando el contenido de la NP…</div>';
+  if (_frec.detErr) return h + '<div class="frec-nota" style="color:#b91c1c">⚠ ' + escapeHtml(_frec.detErr) + '</div>';
+  h += '<div class="frec-scroll"><table class="frec-tbl"><thead><tr>' +
+    '<th></th><th>Código</th><th>Artículo</th><th class="n">Pedidas</th><th class="n">Facturadas</th><th class="n">Faltó</th>' +
+    '<th class="n">Completado después</th><th class="n">Ya complementado</th><th class="n">Pendiente</th><th class="n">A facturar</th>' +
+    '</tr></thead><tbody>';
+  _frec.det.forEach(function (d, i) {
+    var pend = Number(d.pendiente) || 0, on = _frec.sel[d.cod_art] != null, val = on ? _frec.sel[d.cod_art] : "";
+    var dis = pend <= 0 ? " disabled" : "";
+    h += '<tr' + (pend <= 0 ? ' style="opacity:.55"' : '') + '>' +
+      '<td><input type="checkbox"' + (on ? " checked" : "") + dis + ' onchange="facRecTick(' + i + ', this.checked)"></td>' +
+      '<td><b>' + escapeHtml(d.cod_art) + '</b></td><td>' + escapeHtml(d.descripcion || "") + '</td>' +
+      '<td class="n">' + _frecNum(d.pedidas) + '</td><td class="n">' + _frecNum(d.entregadas_al_fc) + '</td>' +
+      '<td class="n">' + (Number(d.falto_al_fc) > 0 ? '<span class="frec-chip falta">' + _frecNum(d.falto_al_fc) + '</span>' : '—') + '</td>' +
+      '<td class="n">' + (Number(d.completado_despues) > 0 ? '<span class="frec-chip cp">+' + _frecNum(d.completado_despues) + '</span>' : '—') + '</td>' +
+      '<td class="n">' + (Number(d.complementado) > 0 ? '<span class="frec-chip comp">' + _frecNum(d.complementado) + '</span>' : '—') + '</td>' +
+      '<td class="n"><b>' + _frecNum(pend) + '</b></td>' +
+      '<td class="n"><input type="number" min="0" max="' + pend + '" step="1" value="' + escapeHtml(String(val)) + '"' + dis +
+        ' oninput="facRecCant(' + i + ', this.value)"></td></tr>';
+  });
+  if (!_frec.det.length) h += '<tr><td colspan="10" style="color:#64748b;padding:14px">Esta NP no tiene líneas armadas.</td></tr>';
+  h += '</tbody></table></div>';
+  var sel = _frecSeleccion();
+  h += '<div class="frec-nota" id="frecResumen">' + (sel.length ? 'Seleccionado: <b>' + sel.length + ' código' + (sel.length > 1 ? 's' : '') + ' · ' + _frecNum(sel.reduce(function (s, x) { return s + x.cajas; }, 0)) + ' cajas</b>' : 'Todavía no marcaste ningún código.') + '</div>';
+  if (_frec.lotes && _frec.lotes.length) {
+    h += '<div class="frec-lotes"><b>Complementos ya hechos de esta NP</b><ul>' + _frec.lotes.map(function (l) {
+      var it = (l.items || []).map(function (x) { return x.cod + "×" + _frecNum(x.cajas); }).join(", ");
+      return '<li>' + _frecFecha(l.creado_at) + ' · ' + (l.modo === "excel" ? "Excel ISIS" : "marcado a mano") + (l.creado_por ? ' (' + escapeHtml(l.creado_por) + ')' : '') +
+        ' · ' + escapeHtml(it) + ' · ' +
+        (l.ajusto_stock ? '<span class="frec-chip cp" title="Ajuste de stock de este complemento">📦 −' + _frecNum(l.cajas_stock) + ' de góndola</span>' +
+          (Number(l.stock_faltante) > 0 ? ' <span class="frec-chip falta">⚠ ' + _frecNum(l.stock_faltante) + ' sin stock</span>' : '') : '<span class="frec-chip" style="opacity:.7">stock sin tocar</span>') +
+        ' · ' + (l.factura ? '<span class="frec-chip comp">🧾 ' + escapeHtml(l.factura) + '</span>' : '<span class="frec-chip sinfc">esperando la factura de ISIS</span>') + '</li>';
+    }).join("") + '</ul></div>';
+  }
+  h += '<div class="frec-acts">' +
+    '<button class="frec-b-xls" onclick="facRecExcel()">⬇ Excel ISIS</button>' +
+    '<button class="frec-b-marcar" onclick="facRecMarcar()">✔ Marcar como facturado</button></div>';
+  return h;
+}
+function facRecTick(i, on) {
+  var d = _frec.det[i]; if (!d) return;
+  if (on) _frec.sel[d.cod_art] = Number(d.sugerido) > 0 ? Number(d.sugerido) : Number(d.pendiente) || 0;
+  else delete _frec.sel[d.cod_art];
+  facRecRender();
+}
+function facRecCant(i, v) {
+  var d = _frec.det[i]; if (!d) return;
+  var n = Math.max(0, Math.min(Number(d.pendiente) || 0, Math.floor(Number(v) || 0)));
+  if (n > 0) _frec.sel[d.cod_art] = n; else delete _frec.sel[d.cod_art];
+  var cb = document.querySelectorAll("#frecBox .frec-tbl tbody tr")[i];
+  if (cb) { var c = cb.querySelector("input[type=checkbox]"); if (c) c.checked = n > 0; }
+  var sel = _frecSeleccion(), el = document.getElementById("frecResumen");
+  if (el) el.innerHTML = sel.length ? 'Seleccionado: <b>' + sel.length + ' código' + (sel.length > 1 ? 's' : '') + ' · ' + _frecNum(sel.reduce(function (s, x) { return s + x.cajas; }, 0)) + ' cajas</b>' : 'Todavía no marcaste ningún código.';
+}
+function _frecSeleccion() {
+  return Object.keys(_frec.sel).map(function (k) { return { cod: k, cajas: Number(_frec.sel[k]) || 0 }; })
+    .filter(function (x) { return x.cajas > 0; });
+}
+async function _frecRegistrar(modo, items, ajustar) {
+  return facRpc("gv_fac_complemento_registrar", { p_np: _frec.np, p_items: items, p_modo: modo, p_por: await facQuien(), p_ajustar_stock: !!ajustar });
+}
+/* v22.58 (Luis) — al facturar el complemento se pregunta si se sacan esas cajas de góndola.
+   Cancelar = NO se toca el stock (no aborta). El backend descuenta sólo lo que todavía no salió:
+   lo completado con Completar Pedido ya drenó y no se vuelve a descontar. */
+function _frecPreguntaStock(items) {
+  var ya = items.filter(function (x) {
+    var d = (_frec.det || []).find(function (r) { return r.cod_art === x.cod; }) || {};
+    return (Number(d.completado_despues) || 0) - (Number(d.complementado) || 0) >= x.cajas;
+  }).map(function (x) { return x.cod; });
+  return confirm("📦 ¿AJUSTAR EL STOCK?\n\n¿Querés sacar de góndola las cajas que se facturan?\n\n" +
+    items.map(function (x) { return "  " + x.cod + " × " + x.cajas; }).join("\n") +
+    (ya.length ? "\n\nYa salieron con Completar Pedido (no se descuentan de nuevo): " + ya.join(", ") : "") +
+    "\n\nAceptar = SÍ, se descuentan de góndola (sólo lo que hay; queda anotado en esta NP).\nCancelar = NO, el stock queda como está.");
+}
+function _frecMsgStock(lote, ajustar) {
+  if (!ajustar) return " Stock sin tocar.";
+  var l = (_frec.lotes || []).find(function (x) { return x.lote === lote; });
+  if (!l) return "";
+  var s = Number(l.cajas_stock) || 0, f = Number(l.stock_faltante) || 0;
+  return " 📦 " + (s > 0 ? "Se sacaron " + _frecNum(s) + " cajas de góndola." : "No hubo que sacar nada de góndola.") +
+    (f > 0 ? " ⚠ " + _frecNum(f) + " cajas no estaban en stock." : "");
+}
+
+async function facRecMarcar() {
+  var items = _frecSeleccion();
+  if (!items.length) { alert("Marcá al menos un código con cajas."); return; }
+  var txt = items.map(function (x) { return "  " + x.cod + " × " + x.cajas; }).join("\n");
+  if (!confirm("⚠ MARCAR COMO FACTURADO\n\nEsto significa que YA facturaste estos códigos A MANO en ISIS, antes de tocar este botón:\n\n" + txt +
+    "\n\nNo se baja ningún Excel y NO hay que volver a facturarlos. El cruce va a buscar esa factura en ISIS y la va a asociar a " + _frec.np + ".\n\n¿Confirmás?")) return;
+  if (_frec.enviando) return;
+  var aj = _frecPreguntaStock(items);
+  _frec.enviando = true;
+  try {
+    var lote = await _frecRegistrar("marcado", items, aj);
+    await facRecAbrirNp(_frec.np);
+    _frec.msg = "✔ " + items.length + " código(s) marcados como facturados. El cruce va a buscar esa factura en ISIS." + _frecMsgStock(lote, aj);
+    facRecRender();
+    facRecCargar();
+  } catch (e) { alert("No se pudo marcar: " + ((e && e.message) || e)); }
+  finally { _frec.enviando = false; }
+}
+
+async function facRecExcel() {
+  var items = _frecSeleccion();
+  if (!items.length) { alert("Marcá al menos un código con cajas."); return; }
+  var r = _frecFila(_frec.np) || {};
+  var cabOv = {}; cabOv[_frec.np] = { cod: String(r.cod_cliente || ""), rs: String(r.razon_social || "") };
+  var linOv = {}; linOv[_frec.np] = items;
+  try {
+    var filas = await _facXlsArmar([_frec.np], { lineas: linOv, cab: cabOv });
+    if (!filas.length) { alert("No se pudo armar el Excel de esa NP."); return; }
+    if (!confirm("Se va a bajar el Excel para ISIS de " + _frec.np + " SÓLO con:\n\n" +
+      items.map(function (x) { return "  " + x.cod + " × " + x.cajas; }).join("\n") +
+      "\n\nEsos códigos quedan registrados como facturados (complemento de la NP) y el cruce va a buscar la factura nueva en ISIS. ¿Seguimos?")) return;
+    if (_frec.enviando) return;
+    var aj = _frecPreguntaStock(items);
+    _frec.enviando = true;
+    var lote;
+    try { lote = await _frecRegistrar("excel", items, aj); }   // primero valida y graba; si falla no se baja nada
+    finally { _frec.enviando = false; }
+    var _isisDe = function (x) { return x.isisEmp || (/^\s*CH\s/i.test(String(x.np)) ? "CH" : "LK"); };
+    for (var emp of ["LK", "CH"]) {
+      var parte = filas.filter(function (x) { return _isisDe(x) === emp; });
+      if (!parte.length) continue;
+      var arch = (FAC_XLS_FORMATO === "xls") ? _facXlsDescargar(parte, emp) : _facXlsDescargarXlsx(parte, emp);
+      try { await facDescRegistrar(arch, emp, parte); } catch (_e) {}
+    }
+    await facRecAbrirNp(_frec.np);
+    _frec.msg = "⬇ Excel bajado con " + items.length + " código(s). Cuando ISIS la facture, el cruce la asocia a esta NP." + _frecMsgStock(lote, aj);
+    facRecRender();
+    facRecCargar();
+  } catch (e) { alert("No se pudo armar el Excel: " + ((e && e.message) || e)); }
+}
+window.facRecAbrir = facRecAbrir; window.facRecCerrar = facRecCerrar; window.facRecCargar = facRecCargar; window.facRecRender = facRecRender;
+window.facRecSetQ = facRecSetQ; window.facRecSet = facRecSet; window.facRecSetDias = facRecSetDias;
+window.facRecAbrirNp = facRecAbrirNp; window.facRecVolver = facRecVolver; window.facRecTick = facRecTick;
+window.facRecCant = facRecCant; window.facRecMarcar = facRecMarcar; window.facRecExcel = facRecExcel;
+
 
 var _concil = { q: "", empresa: null, rows: [], tot: null, cargando: false, soloDiff: false };
 window._concil = _concil;
@@ -58985,7 +59329,28 @@ async function concilRefresh(forzar) {
     if (_concil.pendiente) { _concil.pendiente = false; setTimeout(function () { concilRefresh(); }, 0); }
   }
 }
+/* v22.53 (Luis) — los COMPLEMENTOS de «Recuperar pedido»: una NP puede tener, además de su
+   factura, otra factura de ISIS sólo por lo que le faltó. Se leen en su propia llamada (si falla,
+   la Conciliación carga igual) y se muestran como chip en la fila de la NP. */
+function _concilCompCargar() {
+  facRpc("gv_fac_complemento_lista", { p_np: null }).then(function (rows) {
+    var m = {};
+    (rows || []).forEach(function (l) { (m[String(l.np)] = m[String(l.np)] || []).push(l); });
+    _concil.comp = m; concilRender();
+  }).catch(function () { /* sin chip */ });
+}
+function _concilCompChip(np) {
+  var ls = (_concil.comp || {})[String(np)];
+  if (!ls || !ls.length) return "";
+  var cj = ls.reduce(function (s, l) { return s + (Number(l.cajas) || 0); }, 0);
+  var sinF = ls.filter(function (l) { return !l.factura; }).length;
+  var fcs = ls.filter(function (l) { return l.factura; }).map(function (l) { return l.factura; }).join(", ");
+  return ' <span class="frec-chip ' + (sinF ? 'sinfc' : 'comp') + '" title="' + escapeHtml("Esta NP se completó con «Recuperar items de FC»: " + cj + " cajas facturadas aparte" +
+    (fcs ? " en " + fcs : "") + (sinF ? ". " + sinF + " complemento(s) todavía sin factura en ISIS." : ".") +
+    " La diferencia contra lo armado de hoy puede estar en esa factura, no en la original.") + '">♻ +' + cj + ' cj' + (sinF ? ' · sin FC' : '') + '</span>';
+}
 async function _concilRefreshInner(cont, forzar) {
+  _concilCompCargar();
   var rb = document.getElementById("concilBtnRefr"); if (rb) { rb.disabled = true; rb.textContent = "Actualizando…"; }
   if (!_concil.rows.length) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
   /* v19.60 — el cruce NP↔factura se recalcula CUANDO ALGUIEN MIRA, no cuando toca el reloj.
@@ -59107,7 +59472,7 @@ function concilRender() {
     var needMot = esD;
     var motivoCell = r.motivo ? escapeHtml(r.motivo) : (needMot ? '<span style="color:#94a3b8;">…</span>' : "");
     return '<tr' + (esD ? ' style="background:#fef2f2;"' : '') + '>' +
-      '<td><b>' + escapeHtml(r.np || "") + '</b> ' + _npSrcChip(r.np) + '</td>' +
+      '<td><b>' + escapeHtml(r.np || "") + '</b> ' + _npSrcChip(r.np) + _concilCompChip(r.np) + '</td>' +
       '<td>' + escapeHtml((r.cod_cliente || "") + " " + (r.razon_social || "—")) + (r.es_super ? " 🛒" : "") + '</td>' +
       '<td style="font-size:12px;color:#64748b;white-space:nowrap;">' + _concilFecha(r.registrado_at) + (r.tanda ? ' <span style="color:#94a3b8;">' + escapeHtml(r.tanda) + '</span>' : '') + '</td>' +
       '<td class="num">' + (r.cajas_ent != null ? Math.round(Number(r.cajas_ent)) : "—") + (r.factura_cajas != null ? ' <span style="color:#94a3b8;">/ ' + Math.round(Number(r.factura_cajas)) + '</span>' : '') + '</td>' +

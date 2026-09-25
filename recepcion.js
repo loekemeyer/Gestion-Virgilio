@@ -346,6 +346,9 @@ const RCP_CSS = `
 #rcpRoot .histNote{ font-size:12.5px; color:#b45309; font-weight:700; margin-bottom:10px; }
 #rcpRoot .histTblWrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--border); border-radius:12px; }
 #rcpRoot table.histTbl{ width:100%; border-collapse:collapse; font-size:14px; min-width:520px; }
+#rcpRoot table.histTbl th.histSortTh{ cursor:pointer; user-select:none; white-space:nowrap; }
+#rcpRoot table.histTbl th.histSortTh.on{ color:#111; }
+#rcpRoot .histSortIco{ font-size:10px; opacity:.7; }
 #rcpRoot table.histTbl th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:#64748b; font-weight:900; padding:10px 12px; background:#f1f5f9; position:sticky; top:0; }
 #rcpRoot table.histTbl td{ padding:9px 12px; border-top:1px solid #eef2f6; vertical-align:top; }
 #rcpRoot .histCodCell{ font-weight:900; color:#111; font-family:Consolas,Menlo,monospace; white-space:nowrap; }
@@ -2475,7 +2478,7 @@ async function opEnviar() {
         let hh = "";
         try { if (primera.created_at) hh = new Date(primera.created_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) {}
         const ref = "remito " + opState.remito + (opState.linea ? " (" + opState.linea + ")" : "") +
-          " ya se cargó hoy" + (hh ? " a las " + hh : "") + (primera.codigo ? " · código " + primera.codigo : "");
+          " ya se cargó hoy" + (hh ? " a las " + hh : "") + "";
         if (repetidos.length) {
           aviso = "⚠ El " + ref + ". Esa carga YA incluía: " + repetidos.join(", ") + "." +
             (nuevos.length ? "\nNuevos en esta carga: " + nuevos.join(", ") + "." : "") +
@@ -2646,20 +2649,7 @@ async function opEnviar() {
   ok.textContent = "✓ Enviado. " + rows.length + " código(s) guardado(s) para " + displayName(opState.tallNombre) +
     " (" + opState.linea + ") · RTO/FC " + opState.remito + ".";
   opBody.appendChild(ok);
-  // v8.83: mostrar código de confirmación al operario
-  if (codigoConf) {
-    const codWrap = document.createElement("div");
-    codWrap.style.cssText = "text-align:center;margin:14px 0 6px;";
-    const codLbl = document.createElement("div");
-    codLbl.style.cssText = "font-size:13px;color:#64748b;margin-bottom:4px;";
-    codLbl.textContent = "Código de confirmación:";
-    const codBox = document.createElement("div");
-    codBox.className = "codigoBox";
-    codBox.textContent = codigoConf;
-    codWrap.appendChild(codLbl);
-    codWrap.appendChild(codBox);
-    opBody.appendChild(codWrap);
-  }
+  // v22.55 (Luis): el código de confirmación ya no se usa — no se le muestra al operario.
 
   opActions.innerHTML = "";
   const cerrar = document.createElement("button");
@@ -2907,6 +2897,8 @@ async function histLoad(f) {
     // `2026-…` y encima el corte de 1000 filas se llevaba puestas las recientes de ese grupo.
     let q = supabase.from("vista_historial_entregas")
       .select("fuente,fecha,created_at,cod_art,descripcion,cajas,quien,remito,llegada,carga,demora_hs,recibido_por,recibido_at");
+    // v22.53 (Luis): lo que sigue en Pendientes todavía no se recepcionó — no va al Histórico.
+    q = q.eq("pendiente", false);
     if (f.desde) q = q.gte("fecha", f.desde);
     if (f.hasta) q = q.lte("fecha", f.hasta);
     if (codN) q = q.or("cod_art.ilike.%" + codN + "%,quien.ilike.%" + codN + "%");
@@ -2961,9 +2953,54 @@ function histRecibioTxt(r) {
   const ms = r.recAt ? Date.parse(r.recAt) : 0;
   return r.recPor + (ms ? " · " + pendFmtFecha(null, ms) + " " + pendFmtHora(ms) : "");
 }
-function histRender(rows, CAP, capped) {
+/* v22.57 (Luis): tocar el encabezado ordena por esa columna — 1er toque de mayor a menor
+   (fecha / recibido: el más nuevo primero), 2º toque al revés. Los vacíos van siempre al final.
+   Ordena lo que ya se trajo; la búsqueda nueva vuelve al orden por fecha. */
+const HIST_COLS = [
+  { k: "fecha",  t: "Fecha de comprobante", tip: "Fecha del remito / factura" },
+  { k: "cod",    t: "Código" },
+  { k: "cajas",  t: "Cajas", der: true },
+  { k: "quien",  t: "Entregó" },
+  { k: "demora", t: "Demora", der: true, tip: "Cuánto tardó en cargarse el remito: hora de carga de la operadora − hora de llegada del remito." },
+  { k: "remito", t: "Remito" },
+  { k: "recibio", t: "Recibió", tip: "Quién tocó «Recibido» en Pendientes, y cuándo" }
+];
+let _histSort = null, _histLast = null;
+function histSortVal(r, k) {
+  switch (k) {
+    case "fecha": return r.ymd ? r.ymd + "|" + String(r.ms || 0).padStart(15, "0") : null;
+    case "cod": return r.cod && r.cod !== "—" ? r.cod : null;
+    case "cajas": return r.cajas;
+    case "quien": return r.quien && r.quien !== "—" ? String(r.quien).toLowerCase() : null;
+    case "demora": return r.demoraHs == null || isNaN(r.demoraHs) ? null : r.demoraHs;
+    case "remito": return r.remito || null;
+    case "recibio": return r.recAt ? Date.parse(r.recAt) : null;
+  }
+  return null;
+}
+function histOrdenar(rows, st) {
+  if (!st) return rows;
+  const col = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
+  return rows.slice().sort(function (a, b) {
+    const va = histSortVal(a, st.k), vb = histSortVal(b, st.k);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    const c = (typeof va === "number" && typeof vb === "number") ? va - vb : col.compare(String(va), String(vb));
+    return st.dir === "desc" ? -c : c;
+  });
+}
+function histSortClick(k) {
+  if (!_histLast) return;
+  _histSort = (_histSort && _histSort.k === k && _histSort.dir === "desc") ? { k: k, dir: "asc" } : { k: k, dir: "desc" };
+  histRender(_histLast.rows, _histLast.CAP, _histLast.capped, true);
+}
+function histRender(rows, CAP, capped, keepSort) {
   const box = document.getElementById("histResults");
   if (!box) return;
+  if (!keepSort) _histSort = null;
+  _histLast = { rows: rows, CAP: CAP, capped: capped };
+  rows = histOrdenar(rows, _histSort);
   const n = rows.length;
   if (!n) { box.innerHTML = '<div class="histEmpty">No hay recepciones para ese filtro.</div>'; return; }
   const total = rows.reduce((s, r) => s + r.cajas, 0);
@@ -2976,9 +3013,14 @@ function histRender(rows, CAP, capped) {
   let html = '<div class="histSummary">' + n + ' recepci' + (n === 1 ? 'ón' : 'ones') + ' · <b>' + total + ' cajas</b></div>';
   if (capped) html += '<div class="histNote">⚠ Hay más de 1000 filas; se muestran las más recientes. Acotá por fecha para ver el resto.</div>';
   else if (n > CAP) html += '<div class="histNote">Mostrando las primeras ' + CAP + ' de ' + n + '. Acotá el filtro para ver menos.</div>';
-  html += '<div class="histTblWrap"><table class="histTbl"><thead><tr>' +
-    '<th>Fecha</th><th>Código</th><th style="text-align:right">Cajas</th><th>Entregó</th><th style="text-align:right" title="Cuánto tardó en cargarse el remito: hora de carga de la operadora − hora de llegada del remito.">Demora</th><th>Remito</th><th title="Quién tocó «Recibido» en Pendientes, y cuándo">Recibió</th>' +
-    '</tr></thead><tbody>';
+  html += '<div class="histTblWrap"><table class="histTbl"><thead><tr>';
+  HIST_COLS.forEach(function (c) {
+    const on = _histSort && _histSort.k === c.k;
+    html += '<th class="histSortTh' + (on ? ' on' : '') + '" data-k="' + c.k + '"' + (c.der ? ' style="text-align:right"' : '') +
+      (c.tip ? ' title="' + escapeHtmlRcp(c.tip) + '"' : '') + '>' + escapeHtmlRcp(c.t) +
+      '<span class="histSortIco">' + (on ? (_histSort.dir === "desc" ? " ▼" : " ▲") : " ↕") + '</span></th>';
+  });
+  html += '</tr></thead><tbody>';
   shown.forEach(function (r) {
     // v6.54: sin badge "Prov" ni la descripción del artículo — solo el nombre (pedido del dueño).
     const who = escapeHtmlRcp(r.quien);
@@ -2996,6 +3038,9 @@ function histRender(rows, CAP, capped) {
   });
   html += '</tbody></table></div>';
   box.innerHTML = html;
+  box.querySelectorAll(".histSortTh").forEach(function (th) {
+    th.onclick = function () { histSortClick(th.getAttribute("data-k")); };
+  });
 }
 /* ===== HISTÓRICO de BAJADAS DE RACKS (v10.15) — todas las bajadas de rack a góndola
    (tabla Racks_Bajadas), SOLO LECTURA, filtrable por fecha y por código / descripción /
@@ -3269,6 +3314,8 @@ async function renderPendientes() {
   const rows = res.data || [];
   if (!rows.length) { opBody.innerHTML = '<div class="opOk">✓ No hay recepciones pendientes.</div>'; return; }
   _pendRows = {};
+  await pendReceptoresCargar();
+  if (opState.step !== "pend") return;
   opBody.innerHTML = "";
   const list = document.createElement("div"); list.className = "pendCards";
   rows.forEach(function (r) { list.appendChild(pendCard(r)); });
@@ -3340,6 +3387,7 @@ function pendCard(r) {
   ent.textContent = (r.detalle || "") + (r.cantidad_total != null ? "   ·   " + r.cantidad_total + " cajas" : "");
   card.appendChild(ent);
   const acts = document.createElement("div"); acts.className = "pcActs";
+  acts.appendChild(pendRecibidoRow(id, card));   // v22.53: primero quién lo procesa
   acts.appendChild(pendCheckRow(id, "isis", "Carga ISIS"));
   acts.appendChild(pendPartesRow(id));
   /* v12.03 — se sacó el tilde "Faltantes x Día" (pedido del usuario): ese programa
@@ -3347,7 +3395,6 @@ function pendCard(r) {
      botón Enviar. La columna Control_Modo_OP.faltantes queda en la base con lo ya
      cargado — no se toca ni se borra, solo dejó de usarse desde acá. */
   acts.appendChild(pendFotoRow(id));
-  acts.appendChild(pendRecibidoRow(id, card));
   card.appendChild(acts);
   const foot = document.createElement("div"); foot.className = "pcFoot";
   /* v10.02 — el código lo genera opEnviar() AL CREAR la fila (v8.83), para que el operario
@@ -3355,11 +3402,7 @@ function pendCard(r) {
      procesada": esta lista trae SOLO estado='pendiente'. Antes el `if (r.codigo)` tapaba
      el botón Enviar en toda fila nueva y nada podía salir de Pendientes. Ahora se muestra
      el código (para cotejar contra el remito) Y el botón al lado. */
-  if (r.codigo) {
-    const lab = document.createElement("span"); lab.className = "pcLbl"; lab.textContent = "Código:";
-    const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = r.codigo;
-    foot.appendChild(lab); foot.appendChild(c);
-  }
+  // v22.53 (Luis): el código de 4 dígitos ya no se usa — no se muestra.
   const b = document.createElement("button"); b.type = "button"; b.className = "enviarBtn"; b.textContent = "Enviar"; b.disabled = !pendRowComplete(id);
   b.onclick = function () { pendEnviar(id, foot); };
   foot.appendChild(b);
@@ -3402,6 +3445,31 @@ function pendRecibidoRow(id, card) {
 /* Quién recibe: igual que Cuarentena — chips fijos + «Otro…» con texto. OBLIGATORIO y sin
    preselección (un valor puesto de fábrica se confirma sin leerlo). */
 const PEND_RECIBE_PERSONAS = ["Nora", "Pablo"];
+/* v22.53 (Luis): el nombre que se escribe en «Otro…» queda como opción (GV_Recepcion_Receptores). */
+let _pendReceptores = null;
+async function pendReceptoresCargar() {
+  try {
+    await sessionReady;
+    const r = await supabase.from("GV_Recepcion_Receptores").select("nombre").order("created_at", { ascending: true }).limit(200);
+    if (!r.error && r.data) _pendReceptores = r.data.map(function (x) { return String(x.nombre || "").trim(); }).filter(Boolean);
+  } catch (_e) {}
+  return _pendReceptores || [];
+}
+function pendReceptoresLista() {
+  const out = PEND_RECIBE_PERSONAS.slice(), vis = {};
+  out.forEach(function (n) { vis[n.toLowerCase()] = 1; });
+  (_pendReceptores || []).forEach(function (n) { if (!vis[n.toLowerCase()]) { vis[n.toLowerCase()] = 1; out.push(n); } });
+  return out;
+}
+async function pendReceptorGuardar(nombre) {
+  const n = String(nombre || "").trim(); if (!n) return;
+  if (pendReceptoresLista().some(function (x) { return x.toLowerCase() === n.toLowerCase(); })) return;
+  try {
+    await sessionReady;
+    const r = await supabase.from("GV_Recepcion_Receptores").insert({ nombre: n });
+    if (!r || !r.error) (_pendReceptores = _pendReceptores || []).push(n);
+  } catch (_e) {}
+}
 function pendRecibidoAbrir(id, card) {
   const st = _pendRows[id]; if (!st || st.sent) return;
   const r = st.row || {};
@@ -3434,7 +3502,7 @@ function pendQuienModal(o) {
     otro.style.display = sel === "__otro" ? "" : "none";
     ok.disabled = !valor() || (!!o.conFoto && !archivo());
   };
-  PEND_RECIBE_PERSONAS.concat(["__otro"]).forEach(function (n) {
+  pendReceptoresLista().concat(["__otro"]).forEach(function (n) {
     const b = document.createElement("button"); b.type = "button"; b.className = "rcbOp";
     b.setAttribute("data-v", n); b.textContent = n === "__otro" ? "Otro…" : n;
     b.onclick = function () { sel = (sel === n ? "" : n); err.textContent = ""; refresh(); if (sel === "__otro") otro.focus(); };
@@ -3451,6 +3519,7 @@ function pendQuienModal(o) {
     ok.disabled = true; ok.textContent = "Guardando…";
     try {
       await o.onOk(quien, archivo());
+      if (sel === "__otro") pendReceptorGuardar(quien);   // best-effort: no frena nada
       cerrar();
     } catch (e) {
       ok.disabled = false; ok.textContent = "Confirmar";
@@ -3675,10 +3744,7 @@ async function pendEnviar(id, foot) {
     const codigo = _pendRows[id].codigo || await pendGenCodigo();
     await pendPersist(id, { estado: "procesado", procesado_at: new Date().toISOString(), codigo: codigo });
     _pendRows[id].sent = true; _pendRows[id].codigo = codigo;
-    foot.innerHTML = "";
-    const lab = document.createElement("span"); lab.className = "pcLbl"; lab.textContent = "Código:";
-    const c = document.createElement("div"); c.className = "codigoBox"; c.textContent = codigo;
-    foot.appendChild(lab); foot.appendChild(c);
+    foot.innerHTML = '<span class="pcLbl" style="color:var(--ok);font-weight:900">✓ Enviado — pasó al Histórico</span>';
     const card = foot.parentNode; if (card) card.classList.add("sentRow");
   } catch (e) {
     if (b) { b.disabled = false; b.textContent = "Enviar"; }

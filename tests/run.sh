@@ -378,6 +378,8 @@ echo "== TODO OK =="
 
 echo "== fac-excel-isis (Paso 0 idea 3717: Excel de prueba para ISIS — dedup, split 18/15, orden por código) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-excel-isis.cjs
+echo "== fac-recuperar-pedido (v22.53: completar la facturación de una NP ya facturada) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-recuperar-pedido.cjs
 
 
 
