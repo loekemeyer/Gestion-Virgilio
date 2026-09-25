@@ -36,9 +36,14 @@ const RACKS = [
   await p.route("**/rest/v1/**", (r) => r.abort());
   await p.route("**/rest/v1/gv_planimetria_celda*", (r) =>
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(GOND) }));
-  await p.route("**/rest/v1/gv_rack_stock_desfase*", (r) =>
+  // v22.77: lo que no cierra entre la planimetría vieja y el stock queda «a contar» (GV_Rack_Revisar),
+  // y el stock de racks sin posición sale de gv_rack_sin_ubicar.
+  await p.route("**/rest/v1/GV_Rack_Revisar*", (r) =>
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
-      { cod: "368E", empresa: "LK", en_posiciones: 132, stock_racks: 36, diferencia: 96, posiciones: "AD06 56, X05 56, Y12 20" }]) }));
+      { id: 7, sector: "X05", cod: "368E", emp: "LK", cajas_planimetria: 16, cajas_stock: 0,
+        motivo: "La planimetría decía 16 cajas y el stock de racks no respalda ninguna" }]) }));
+  await p.route("**/rest/v1/gv_rack_sin_ubicar*", (r) =>
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ cod: "505I", emp: "LK", cajas: 1139 }]) }));
   await p.route("**/rest/v1/gv_rack_celda*", (r) => {
     pidioRack = r.request().url();
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(RACKS) });
@@ -85,6 +90,8 @@ const RACKS = [
     o.formCod = (document.getElementById("prkCod") || {}).value;
     o.formInner = (document.getElementById("prkInner") || {}).value;
     o.desfaseTxt = o.detTxt;
+    o.banner = document.getElementById("prkDesfase").textContent;
+    o.contarCls = (document.querySelector("#pmapGrid .prk-contar") || {}).className || "";
     // (g) editar: sin motivo no llama a la base; con motivo manda la RPC con lo tipeado
     window.__rpc = [];
     window.pmapRpc = async function (fn, body) { window.__rpc.push({ fn: fn, body: body });
@@ -127,7 +134,10 @@ const RACKS = [
   ok(JSON.stringify(out.hit) === '["368E"]', "(d) no resaltó el 368E: " + JSON.stringify(out.hit));
   ok(out.detVisible && /368E/.test(out.detTxt), "(e) el detalle no muestra la posición");
   ok(out.formCod === "368E" && out.formInner === "56", "(e) el editor no trae lo cargado: " + out.formCod + "/" + out.formInner);
-  ok(/stock del depósito racks/.test(out.desfaseTxt) && /132/.test(out.desfaseTxt) && /36/.test(out.desfaseTxt), "(e) el editor no muestra el desfase del 368E: " + out.desfaseTxt);
+  ok(/A contar · 368E/.test(out.desfaseTxt) && /16 cajas/.test(out.desfaseTxt), "(e) el editor no muestra que X05 está a contar: " + out.desfaseTxt);
+  ok(/posición\(es\) a contar/.test(out.banner) && /X05 · 368E/.test(out.banner) && /505I LK · 1\.139 caj/.test(out.banner),
+     "(e) el cartel no lista lo a contar y lo sin ubicar: " + out.banner);
+  ok(/prk-contar/.test(out.contarCls), "(e) la posición a contar no se marca en el mapa");
   ok(out.sinMotivo === 0 && /motivo/i.test(out.sinMotivoMsg), "(g) guardó sin motivo");
   ok(out.rpc.length === 1 && out.rpc[0].fn === "gv_rack_posicion_guardar" && out.rpc[0].body.p_sector === "X05" &&
      out.rpc[0].body.p_cod === "368E" && out.rpc[0].body.p_inner === 62 && out.rpc[0].body.p_motivo === "conteo",
