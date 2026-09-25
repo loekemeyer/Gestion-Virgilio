@@ -5258,6 +5258,19 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
 .frec-b-sec{ background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1; }
 .frec-nota{ font-size:12px; color:#475569; margin:6px 0; }
 .frec-lotes{ margin-top:10px; font-size:12.5px; }
+.frec-st-box{ position:relative; background:#fff; border-radius:12px; padding:18px 18px 14px; width:min(460px,100%); box-shadow:0 10px 30px rgba(15,23,42,.25); }
+.frec-st-box h3{ margin:0 26px 8px 0; font-size:16px; color:#0f172a; }
+.frec-st-box ul{ margin:6px 0 8px 18px; padding:0; font-size:13px; }
+.frec-st-x{ position:absolute; top:8px; right:8px; border:0; background:none; font-size:16px; cursor:pointer; color:#64748b; }
+.frec-st-no label{ display:block; font-size:13px; font-weight:700; margin-top:8px; }
+.frec-st-no textarea{ width:100%; box-sizing:border-box; margin-top:4px; font:inherit; font-weight:400; padding:6px 8px; border:1px solid #cbd5e1; border-radius:8px; }
+.frec-st-err{ color:#b91c1c; font-size:12px; min-height:14px; }
+.frec-st-acts{ display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
+.frec-st-box button{ width:auto; min-height:0; height:auto; margin:0; font-size:13px; line-height:1.2; box-shadow:none; }
+.frec-st-acts button{ border:0; border-radius:999px; padding:8px 16px; font-weight:700; cursor:pointer; }
+.frec-st-box .frec-st-x{ width:28px; height:28px; padding:0; color:#64748b; background:none; }
+.frec-st-si{ background:#16a34a; color:#fff; }
+.frec-st-nob{ background:#e2e8f0; color:#334155; }
 .frec-lotes li{ margin:3px 0; }
 @media (max-width:480px){                       /* celular: los 4 llenan el ancho, sin recortarse */
   .fac-top-acts{ width:100%; justify-content:flex-start; }
@@ -6151,7 +6164,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.58"></script>
+<script type="module" src="recepcion.js?v=22.59"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10102,7 +10115,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.58";
+const APP_VERSION = "v22.59";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -59165,8 +59178,8 @@ function _frecDetalleHtml() {
       var it = (l.items || []).map(function (x) { return x.cod + "×" + _frecNum(x.cajas); }).join(", ");
       return '<li>' + _frecFecha(l.creado_at) + ' · ' + (l.modo === "excel" ? "Excel ISIS" : "marcado a mano") + (l.creado_por ? ' (' + escapeHtml(l.creado_por) + ')' : '') +
         ' · ' + escapeHtml(it) + ' · ' +
-        (l.ajusto_stock ? '<span class="frec-chip cp" title="Ajuste de stock de este complemento">📦 −' + _frecNum(l.cajas_stock) + ' de góndola</span>' +
-          (Number(l.stock_faltante) > 0 ? ' <span class="frec-chip falta">⚠ ' + _frecNum(l.stock_faltante) + ' sin stock</span>' : '') : '<span class="frec-chip" style="opacity:.7">stock sin tocar</span>') +
+        (l.ajusto_stock ? '<span class="frec-chip cp" title="Salió de góndola por esta facturación">📦 −' + _frecNum(l.cajas_stock) + ' de góndola</span>'
+          : '<span class="frec-chip" style="opacity:.8" title="No se sacó de góndola">stock sin tocar' + (l.motivo_no_stock ? ': ' + escapeHtml(l.motivo_no_stock) : '') + '</span>') +
         ' · ' + (l.factura ? '<span class="frec-chip comp">🧾 ' + escapeHtml(l.factura) + '</span>' : '<span class="frec-chip sinfc">esperando la factura de ISIS</span>') + '</li>';
     }).join("") + '</ul></div>';
   }
@@ -59194,29 +59207,53 @@ function _frecSeleccion() {
   return Object.keys(_frec.sel).map(function (k) { return { cod: k, cajas: Number(_frec.sel[k]) || 0 }; })
     .filter(function (x) { return x.cajas > 0; });
 }
-async function _frecRegistrar(modo, items, ajustar) {
-  return facRpc("gv_fac_complemento_registrar", { p_np: _frec.np, p_items: items, p_modo: modo, p_por: await facQuien(), p_ajustar_stock: !!ajustar });
+async function _frecRegistrar(modo, items, st) {
+  return facRpc("gv_fac_complemento_registrar", { p_np: _frec.np, p_items: items, p_modo: modo, p_por: await facQuien(),
+    p_ajustar_stock: !!(st && st.aj), p_motivo_no_stock: (st && !st.aj) ? st.motivo : null });
 }
-/* v22.58 (Luis) — al facturar el complemento se pregunta si se sacan esas cajas de góndola.
-   Cancelar = NO se toca el stock (no aborta). El backend descuenta sólo lo que todavía no salió:
-   lo completado con Completar Pedido ya drenó y no se vuelve a descontar. */
+/* v22.59 (Luis) — «¿Querés que saquemos de góndola los artículos seleccionados?» SÍ / NO.
+   SÍ = se descuentan de góndola aunque quede en negativo, y el movimiento dice que fue por esta
+   facturación. NO = hay que escribir por qué, y queda registrado en el complemento.
+   Cerrar el cartel (✕) = no se hace nada. Devuelve {aj:true} · {aj:false, motivo} · null. */
 function _frecPreguntaStock(items) {
-  var ya = items.filter(function (x) {
-    var d = (_frec.det || []).find(function (r) { return r.cod_art === x.cod; }) || {};
-    return (Number(d.completado_despues) || 0) - (Number(d.complementado) || 0) >= x.cajas;
-  }).map(function (x) { return x.cod; });
-  return confirm("📦 ¿AJUSTAR EL STOCK?\n\n¿Querés sacar de góndola las cajas que se facturan?\n\n" +
-    items.map(function (x) { return "  " + x.cod + " × " + x.cajas; }).join("\n") +
-    (ya.length ? "\n\nYa salieron con Completar Pedido (no se descuentan de nuevo): " + ya.join(", ") : "") +
-    "\n\nAceptar = SÍ, se descuentan de góndola (sólo lo que hay; queda anotado en esta NP).\nCancelar = NO, el stock queda como está.");
+  return new Promise(function (resolve) {
+    var ya = items.filter(function (x) {
+      var d = (_frec.det || []).find(function (r) { return r.cod_art === x.cod; }) || {};
+      return (Number(d.completado_despues) || 0) - (Number(d.complementado) || 0) >= x.cajas;
+    }).map(function (x) { return x.cod; });
+    var ov = document.createElement("div");
+    ov.className = "frec-ov frec-st-ov"; ov.id = "frecStock"; ov.style.zIndex = "950"; ov.style.alignItems = "center";
+    ov.innerHTML = '<div class="frec-st-box">' +
+      '<button class="frec-st-x" type="button" data-r="x" title="Cerrar sin hacer nada">✕</button>' +
+      '<h3>📦 ¿Querés que saquemos de góndola los artículos seleccionados?</h3>' +
+      '<ul>' + items.map(function (x) { return '<li><b>' + escapeHtml(x.cod) + '</b> × ' + _frecNum(x.cajas) + ' cajas</li>'; }).join("") + '</ul>' +
+      (ya.length ? '<div class="frec-nota">Ya salieron con Completar Pedido y no se descuentan de nuevo: <b>' + escapeHtml(ya.join(", ")) + '</b></div>' : '') +
+      '<div class="frec-nota">Si es SÍ, se descuentan aunque la góndola quede en negativo y el movimiento queda anotado como facturado en esta NP.</div>' +
+      '<div class="frec-st-no" style="display:none"><label>¿Por qué no se sacan? <textarea id="frecStockMotivo" rows="2" placeholder="Obligatorio"></textarea></label>' +
+      '<div class="frec-st-err"></div></div>' +
+      '<div class="frec-st-acts"><button type="button" class="frec-st-si" data-r="si">Sí, sacar de góndola</button>' +
+      '<button type="button" class="frec-st-nob" data-r="no">No</button></div></div>';
+    document.body.appendChild(ov);
+    function fin(v) { ov.remove(); resolve(v); }
+    ov.addEventListener("click", function (ev) {
+      var t = ev.target.closest("[data-r]"); if (!t) return;
+      var r = t.getAttribute("data-r");
+      if (r === "x") return fin(null);
+      if (r === "si") return fin({ aj: true });
+      var box = ov.querySelector(".frec-st-no"), ta = ov.querySelector("#frecStockMotivo");
+      if (box.style.display === "none") { box.style.display = ""; t.textContent = "Confirmar NO"; ta.focus(); return; }
+      var m = (ta.value || "").trim();
+      if (m.length < 3) { ov.querySelector(".frec-st-err").textContent = "Escribí por qué no se sacan de góndola."; ta.focus(); return; }
+      fin({ aj: false, motivo: m });
+    });
+  });
 }
-function _frecMsgStock(lote, ajustar) {
-  if (!ajustar) return " Stock sin tocar.";
+function _frecMsgStock(lote, st) {
+  if (!st || !st.aj) return " Stock sin tocar (motivo: " + ((st && st.motivo) || "—") + ").";
   var l = (_frec.lotes || []).find(function (x) { return x.lote === lote; });
   if (!l) return "";
-  var s = Number(l.cajas_stock) || 0, f = Number(l.stock_faltante) || 0;
-  return " 📦 " + (s > 0 ? "Se sacaron " + _frecNum(s) + " cajas de góndola." : "No hubo que sacar nada de góndola.") +
-    (f > 0 ? " ⚠ " + _frecNum(f) + " cajas no estaban en stock." : "");
+  var s = Number(l.cajas_stock) || 0;
+  return " 📦 " + (s > 0 ? "Se sacaron " + _frecNum(s) + " cajas de góndola." : "No hubo que sacar nada de góndola (ya habían salido con Completar Pedido).");
 }
 
 async function facRecMarcar() {
@@ -59226,8 +59263,9 @@ async function facRecMarcar() {
   if (!confirm("⚠ MARCAR COMO FACTURADO\n\nEsto significa que YA facturaste estos códigos A MANO en ISIS, antes de tocar este botón:\n\n" + txt +
     "\n\nNo se baja ningún Excel y NO hay que volver a facturarlos. El cruce va a buscar esa factura en ISIS y la va a asociar a " + _frec.np + ".\n\n¿Confirmás?")) return;
   if (_frec.enviando) return;
-  var aj = _frecPreguntaStock(items);
   _frec.enviando = true;
+  var aj = await _frecPreguntaStock(items);
+  if (!aj) { _frec.enviando = false; return; }
   try {
     var lote = await _frecRegistrar("marcado", items, aj);
     await facRecAbrirNp(_frec.np);
@@ -59251,8 +59289,9 @@ async function facRecExcel() {
       items.map(function (x) { return "  " + x.cod + " × " + x.cajas; }).join("\n") +
       "\n\nEsos códigos quedan registrados como facturados (complemento de la NP) y el cruce va a buscar la factura nueva en ISIS. ¿Seguimos?")) return;
     if (_frec.enviando) return;
-    var aj = _frecPreguntaStock(items);
     _frec.enviando = true;
+    var aj = await _frecPreguntaStock(items);
+    if (!aj) { _frec.enviando = false; return; }
     var lote;
     try { lote = await _frecRegistrar("excel", items, aj); }   // primero valida y graba; si falla no se baja nada
     finally { _frec.enviando = false; }

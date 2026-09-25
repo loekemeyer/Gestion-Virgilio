@@ -64,6 +64,20 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window._facXlsDescargarXlsx = function (filas, emp) { bajadas.push({ emp: emp, filas: JSON.parse(JSON.stringify(filas)), antesDeRegistrar: !llamadas.some(function (l) { return l.fn === "gv_fac_complemento_registrar" && l.body.p_modo === "excel"; }) }); return "archivo.xlsx"; };
     window.facDescRegistrar = async function () {};
     const espera = (ms) => new Promise((res) => setTimeout(res, ms));
+    // v22.59: contesta el cartel de stock (SÍ / NO con motivo / ✕)
+    const cartel = { vistos: 0 };
+    async function contestar(resp, motivo) {
+      for (let i = 0; i < 50; i++) { if (document.getElementById("frecStock")) break; await espera(10); }
+      const ov = document.getElementById("frecStock"); if (!ov) return false;
+      cartel.vistos++; cartel.texto = ov.textContent;
+      if (resp === "x") { ov.querySelector("[data-r=x]").click(); return true; }
+      if (resp === "si") { ov.querySelector("[data-r=si]").click(); return true; }
+      ov.querySelector("[data-r=no]").click();            // abre el motivo
+      ov.querySelector("[data-r=no]").click();            // sin motivo: no cierra
+      cartel.sinMotivoSigue = !!document.getElementById("frecStock") && /por qué/.test(ov.querySelector(".frec-st-err").textContent);
+      ov.querySelector("#frecStockMotivo").value = motivo;
+      ov.querySelector("[data-r=no]").click(); return true;
+    }
 
     // R1
     const btn = document.getElementById("facBtnRecuperar");
@@ -88,7 +102,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.R3_tope = _frec.sel["280"] === 2;
 
     // R4
-    await facRecMarcar(); await espera(30);
+    { const pr = facRecMarcar(); await contestar("si"); await pr; } await espera(30);
     const reg1 = llamadas.filter(function (l) { return l.fn === "gv_fac_complemento_registrar"; });
     out.R4_modo = reg1.length === 1 && reg1[0].body.p_modo === "marcado" && reg1[0].body.p_np === "98017";
     out.R4_items = reg1.length === 1 && JSON.stringify(reg1[0].body.p_items) === JSON.stringify([{ cod: "280", cajas: 2 }, { cod: "534", cajas: 1 }]);
@@ -96,24 +110,27 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
     // R5 — sólo el 534 x 1
     _frec.sel = { "534": 1 };
-    await facRecExcel(); await espera(30);
+    { const pr = facRecExcel(); await contestar("si"); await pr; } await espera(30);
     const reg2 = llamadas.filter(function (l) { return l.fn === "gv_fac_complemento_registrar" && l.body.p_modo === "excel"; });
     out.R5_registra = reg2.length === 1 && JSON.stringify(reg2[0].body.p_items) === JSON.stringify([{ cod: "534", cajas: 1 }]);
     out.R5_orden = bajadas.length === 1 && bajadas[0].antesDeRegistrar === false;
     const lin = bajadas.length ? bajadas[0].filas[0].lineas : [];
     out.R5_lineas = bajadas.length === 1 && lin.length === 1 && lin[0].art === "534" && Number(lin[0].cajas) === 1 && bajadas[0].filas[0].cod === "151";
-    // R6 (v22.58) — pregunta si se ajusta el stock; Aceptar = true, Cancelar = false (no aborta)
-    out.R6_pregunta = confirms.some(function (m) { return /AJUSTAR EL STOCK/.test(m) && /Cancelar = NO/.test(m); });
-    out.R6_si = reg1.length === 1 && reg1[0].body.p_ajustar_stock === true;
-    window.confirm = function (m) { confirms.push(String(m)); return !/AJUSTAR EL STOCK/.test(m); };
+    // R6 (v22.59) — cartel propio «¿Querés que saquemos de góndola…?»: SÍ manda true; NO exige motivo y lo manda
+    out.R6_pregunta = cartel.vistos >= 2 && /saquemos de góndola los artículos seleccionados/.test(cartel.texto);
+    out.R6_si = reg1.length === 1 && reg1[0].body.p_ajustar_stock === true && reg1[0].body.p_motivo_no_stock == null;
     _frec.sel = { "280": 1 };
-    await facRecMarcar(); await espera(30);
+    { const pr = facRecMarcar(); await contestar("no", "lo saca Juan mañana"); await pr; } await espera(30);
     const reg3 = llamadas.filter(function (l) { return l.fn === "gv_fac_complemento_registrar"; });
-    out.R6_no = reg3.length === 3 && reg3[2].body.p_ajustar_stock === false && reg3[2].body.p_modo === "marcado";
-    // R7 — doble clic: mientras se registra no se manda otro
-    _frec.sel = { "280": 1 }; _frec.enviando = true;
+    out.R6_no = reg3.length === 3 && reg3[2].body.p_ajustar_stock === false && reg3[2].body.p_motivo_no_stock === "lo saca Juan mañana";
+    out.R6_no_exige_motivo = cartel.sinMotivoSigue === true;
+    // R7 — ✕ no registra nada · doble clic: mientras se registra no se manda otro
+    _frec.sel = { "280": 1 };
+    { const pr = facRecMarcar(); await contestar("x"); await pr; } await espera(30);
+    out.R7_cerrar = llamadas.filter(function (l) { return l.fn === "gv_fac_complemento_registrar"; }).length === 3 && !_frec.enviando;
+    _frec.enviando = true;
     await facRecMarcar(); await espera(30);
-    out.R7_doble = llamadas.filter(function (l) { return l.fn === "gv_fac_complemento_registrar"; }).length === 3;
+    out.R7_doble = llamadas.filter(function (l) { return l.fn === "gv_fac_complemento_registrar"; }).length === 3 && !document.getElementById("frecStock");
     _frec.enviando = false;
     return out;
   });

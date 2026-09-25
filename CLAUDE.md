@@ -4661,13 +4661,13 @@ facturada. **No toca `Facturacion_NP`** (una fila por NP): los complementos vive
 
 `sql/gv_fac_recuperar_pedido_v2253.sql`, `tests/fac-recuperar-pedido.cjs` (el marcador interno de las funciones dice `v22.52-compl`: es la llave de idempotencia, no cambiarlo).
 
-⚠ **v22.58 (Luis): cada botón PREGUNTA si se saca de góndola** (`p_ajustar_stock`; Cancelar = no se
-toca el stock, no aborta). Se descuenta **sólo lo que todavía no salió**: lo completado con Completar
-Pedido ya drenó y no se descuenta dos veces. Sale de terminado → a_guardar → excedente, **sólo lo que
-hay** (nunca deja negativo; lo que falta queda anotado como `sin_stock`). Movimiento `tipo='ajuste'`,
-`ref='<NP>|FCC'`, y figura en el pedido: `GV_Fac_Complemento.cajas_stock` / `stock_detalle`, chip
-«📦 −N de góndola» en «Complementos ya hechos». Candado `pg_advisory_xact_lock` por NP + freno de doble
-clic en el front. `sql/gv_fac_recuperar_stock_v2258.sql`.
+⚠ **v22.59 (Luis): cada botón abre el cartel «¿Querés que saquemos de góndola los artículos
+seleccionados?» SÍ / NO** (✕ = no se hace nada). **SÍ** descuenta de góndola (`terminado`) **aunque quede
+en negativo**; el movimiento va `tipo='ajuste'`, `ref='<NP>|FCC'` y `descripcion` *"Sale de góndola:
+facturado con «Recuperar items de FC»…"*. **NO exige escribir por qué** (backend: `p_motivo_no_stock`, si
+falta da error) y queda en `GV_Fac_Complemento.stock_detalle.motivo_no`. Lo completado con Completar
+Pedido después de facturar ya drenó y **no se descuenta dos veces**. Candado `pg_advisory_xact_lock` por
+NP + freno de doble clic. `sql/gv_fac_recuperar_stock_v2259.sql` (reemplaza la `_v2258`).
 
 ## ⚠ REGLA (Luis, 2026-09-24, v22.40): el descuento de OC de una recepción NO se puede perder
 
