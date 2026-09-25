@@ -1962,3 +1962,14 @@ select sum(total) from public.vista_generador_oc where activo;
 - `GV_PPP_Base_Pedidos` ids 4583293 (97964/55289 333,33 → 4000) y 4588489 (98426/55219 333,33 → 2000).
   Rollback: `update public."GV_PPP_Base_Pedidos" g set cajas=b.cajas from zz_backups."GV_Backup_Unidades55_BaseISIS_20260923" b where g.id=b.id;`
 - `OC_Maximos.uni_x_caja` = 1 para los 3 códigos. Rollback desde `zz_backups."GV_Backup_Unidades55_OCMax_20260923"`.
+
+## 2026-09-25 · v22.75 · Capacidad_Sector pasa a VISTA sobre GV_Lugar_Item (Luis)
+- La tabla quedó como `public."Capacidad_Sector_legacy"` (sin escritura). `Capacidad_Sector` es vista
+  con trigger INSTEAD OF insert/update → `gv_lugar_item_guardar`. Sin DELETE.
+- Afecta a Producción: su «Importar» (upsert `on_conflict`) y «Borrar todo» fallan; «Guardar sector»
+  (insert plano) sigue andando por el trigger.
+- Rollback: `drop view public."Capacidad_Sector" cascade; alter table public."Capacidad_Sector_legacy"
+  rename to "Capacidad_Sector";` + recrear los 12 dependientes desde
+  `zz_backups."GV_Backup_CapSector_defs_20260925"` (def, idx, grants) y reponer el espejo en
+  `gv_lugar_item_guardar/_sacar` (backup del contenido en `zz_backups."GV_Backup_LugarItem_20260925_unif"`).
+  Detalle: `sql/gv_capacidad_sector_vista_v2275.sql`.

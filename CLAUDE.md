@@ -1201,6 +1201,7 @@ leer la que no es da respuestas que suenan bien y están mal.
 |---|---|---|
 | Qué artículo va en qué sector de **góndola**, y de qué empresa es el sector | **`GV_Lugar` + `GV_Lugar_Item`** → vista **`gv_lugar_articulo`** (y `gv_planimetria_celda`) | `Planimetria` ⚠ ver abajo |
 | Qué hay cargado en cada **rack** | **`Racks_Planimetria`** | **`Ubicaciones_Articulos`** |
+| **Capacidad** de cada celda de góndola (cajas que entran) | **`GV_Lugar_Item.cajas_max`** — `Capacidad_Sector` es una **VISTA** sobre ella desde la v22.75 | `Capacidad_Sector_legacy` (la tabla vieja, sin escritura, sólo para rollback) |
 | De qué **empresa** es un artículo (el dato de la columna LK/CH) | **`gv_empresa_de_articulo(cod)`** y su caché `GV_Articulo_Empresa_Cache` | `gv_articulo_empresa` (la vista rota) |
 
 **Medido el 17/09**, que es lo que decide cuál está viva:
@@ -1320,6 +1321,26 @@ distintos con el mismo número: la caja de Loekemeyer no sirve para un pedido de
 proponer "trasladar de la góndola LK a la de Chef" para ahorrarse la compra**. La única
 consecuencia del código compartido es la de siempre: la empresa la da de qué pila salió la caja
 (el pedido), no el artículo.
+
+### ⚠ `Capacidad_Sector` es una VISTA (Luis, 25/09, v22.75)
+
+Había dos lugares para lo mismo y se desincronizaban: el mapa (`GV_Lugar_Item`) tenía **654 celdas
+sin capacidad** y la capacidad vivía sólo en `Capacidad_Sector`, que escribían tres pantallas por su
+cuenta (Stock → Capacidad «Importar» y «Borrar todo», y Despiece «Guardar sector») más el espejo de
+`gv_lugar_item_guardar`. Hoy **`GV_Lugar_Item` es la única fuente** y `Capacidad_Sector` la lee
+(`security_invoker`, sólo celdas con capacidad, empresa del `GV_Lugar`).
+
+- Escribir: **`gv_lugar_item_guardar`** / **`gv_lugar_item_sacar`**. Un `INSERT`/`UPDATE` sobre la vista
+  (front viejo, Producción) pasa por el trigger `gv_capacidad_sector_escribir` → la misma RPC, que
+  rechaza un lugar que no existe en `GV_Lugar` (`A-62`). **Sin DELETE**: «Borrar todo» ya no existe.
+- ⚠ Producción Virgilio tiene el «Importar» con `on_conflict` (upsert): **sobre una vista falla**. A
+  propósito: era la puerta de los sectores mal escritos.
+- Al pasar se midió la suma de capacidad por código: cambian **sólo 828** (−45: la fila `C-08/828` era
+  falsa, el relevamiento del 11/09 dice C08 = 539E) y **865E** (−60: su celda L57 está inactiva).
+
+**Rollback** y el bloque que se corrió: `sql/gv_capacidad_sector_vista_v2275.sql`. Las definiciones de
+los 12 dependientes quedaron en `zz_backups."GV_Backup_CapSector_defs_20260925"`. Lo sostiene
+`tests/cap-sector-vista.cjs`.
 
 ## ⚠ REGLA: el CÓDIGO DE CLIENTE es por EMPRESA — nunca cruzar por código solo
 

@@ -6182,7 +6182,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.74"></script>
+<script type="module" src="recepcion.js?v=22.75"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10140,7 +10140,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.74";
+const APP_VERSION = "v22.75";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -24932,7 +24932,7 @@ function stkBodyCapacidad() {
     : function (a, b) { const am = (a.meses == null) ? 1e9 : a.meses, bm = (b.meses == null) ? 1e9 : b.meses; return am - bm || (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
   let h = '<div class="stk-cut" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;">Cuántas cajas de cada artículo <b>entran</b> en góndola (por sector) — para ver si el <b>máximo de OC</b> está bien o bajo. Un artículo puede tener varios sectores; la capacidad es la suma. Pegá la tabla <b>Sector ; código ; cajas max</b> (una por línea).</div>';
   h += '<textarea id="stkCapTxt" class="stk-ini-txt" rows="5" placeholder="A-12 ; 505 ; 120&#10;B-03 ; 505 ; 80&#10;A-07 ; 506 ; 60"></textarea>';
-  h += '<div class="stk-ini-btns"><button class="stk-btn ok" onclick="stkCapImport()">📥 Importar</button>' + (cap.length ? ' <button class="stk-btn danger" onclick="stkCapBorrar()">Borrar todo</button>' : '') + '</div>';
+  h += '<div class="stk-ini-btns"><button class="stk-btn ok" onclick="stkCapImport()">📥 Importar</button>' + '</div>';  // v22.75: sin «Borrar todo» — la capacidad vive en el Mapa de góndolas (GV_Lugar_Item)
   if (!arts.length) return h + '<div class="stk-empty" style="margin-top:12px">Todavía no hay capacidad cargada. Pegá la tabla arriba.</div>';
   const f = (_stk.filtro || "").toLowerCase();
   const shown = f ? arts.filter(function (r) { return stkMatchBusq(f, r.cod, r.desc + " " + r.sectores.join(" "), false); }) : arts;   // v21.02
@@ -25038,22 +25038,19 @@ async function stkCapImport() {
     rows.push({ sector: sector, cod: cod, cajas_max: cajas });
   });
   if (!rows.length) { alert("No saqué filas válidas.\nFormato por línea: Sector ; código ; cajas max"); return; }
-  const headers = await facAuthWriteHeaders({ Prefer: "resolution=merge-duplicates,return=minimal" });
-  if (!headers) { alert("Iniciá sesión de supervisor (Google) para importar la capacidad."); return; }
-  try {
-    const r = await fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?on_conflict=sector,cod", { method: "POST", headers: headers, body: JSON.stringify(rows) });
-    if (!r.ok && r.status !== 409) throw new Error("HTTP " + r.status);
-  } catch (e) { alert("Error importando: " + (e.message || e)); return; }
+  // v22.75: Capacidad_Sector es una VISTA sobre GV_Lugar_Item. Cada fila va por la misma RPC del Mapa
+  // de góndolas, que valida que el lugar exista (un "A-62" mal tipeado se rechaza en vez de crear basura).
+  const malas = [];
+  let ok = 0;
+  for (const row of rows) {
+    const sec = String(row.sector).toUpperCase().replace(/-/g, "").replace(/^([A-ZÑ])(\d)$/, "$10$2");
+    const res = await pmapRpc("gv_lugar_item_guardar", { p_sector: sec, p_cod: row.cod, p_clase: "articulo", p_cajas_max: row.cajas_max });
+    if (res.ok) ok++; else malas.push(row.sector + " ; " + row.cod + " → " + res.err);
+  }
   if (_stk) { _stk.capLoaded = false; stkCapLoad(); }
-  try { alert("✓ Importadas " + rows.length + " filas de capacidad."); } catch (_e) {}
+  try { alert("✓ Importadas " + ok + " de " + rows.length + " filas de capacidad." + (malas.length ? "\n\nNo entraron:\n" + malas.slice(0, 15).join("\n") : "")); } catch (_e) {}
 }
-async function stkCapBorrar() {
-  if (!confirm("¿Borrar TODA la capacidad cargada?")) return;
-  const headers = await facAuthWriteHeaders({ Prefer: "return=minimal" });
-  if (!headers) { alert("Iniciá sesión de supervisor para borrar."); return; }
-  try { await fetch(SUPABASE_CAPACIDAD_ENDPOINT + "?id=gt.0", { method: "DELETE", headers: headers }); } catch (_e) {}
-  if (_stk) { _stk.capLoaded = false; stkCapLoad(); }
-}
+// v22.75: stkCapBorrar se fue (vaciaba Capacidad_Sector entera; hoy es una vista sobre GV_Lugar_Item).
 function stkCapSort() { if (!_stk) return; _stk.capSort = (_stk.capSort === "cod") ? "meses" : "cod"; stkRender(); }
 /* v4.39 — CONTEO DE STOCK (martes/jueves). Formato planilla: filas
    Sector · Código · Pilas · Cjas×Pila · Sueltas → cajas = pilas×cjas/pila + sueltas.
@@ -45324,9 +45321,9 @@ async function dpSaveCap(cn) {
   if (!headers) { _dpMsg("dpCapMsg_" + cn, authNoSesionMsg("Iniciá sesión con Google."), false); return; }
   _dpMsg("dpCapMsg_" + cn, "Guardando…", true);
   try {
-    var body = { cod: cod, empresa: empresa, sector: sector, cajas_max: cajasMax };
-    var r = await fetch(SUPABASE_CAPACIDAD_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(body) });
-    if (!r.ok) { _dpMsg("dpCapMsg_" + cn, "Error HTTP " + r.status, false); return; }
+    // v22.75: va al Mapa de góndolas (GV_Lugar_Item) por su RPC; la empresa la da el lugar.
+    var res = await pmapRpc("gv_lugar_item_guardar", { p_sector: sector, p_cod: cod, p_clase: "articulo", p_cajas_max: cajasMax });
+    if (!res.ok) { _dpMsg("dpCapMsg_" + cn, res.err, false); return; }
     _dpMsg("dpCapMsg_" + cn, "✓ Sector guardado", true);
     _dpCache = null;
     setTimeout(function () { dpLoad(true); }, 800);
