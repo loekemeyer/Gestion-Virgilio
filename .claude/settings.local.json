@@ -52,7 +52,10 @@
       "Bash(node scripts/bump-version.cjs 22.75)",
       "Bash(node tests/cap-sector-vista.cjs)",
       "Bash(node tests/smoke.cjs)",
-      "Bash(node tests/regla-L.cjs)"
+      "Bash(node tests/regla-L.cjs)",
+      "Bash(mv sql/gv_racks_canon_v2276.sql sql/gv_racks_canon_v2277.sql)",
+      "Bash(node scripts/bump-version.cjs 22.77)",
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node tests/pmap-racks.cjs)"
     ]
   }
 }
