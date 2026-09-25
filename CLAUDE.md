@@ -2479,6 +2479,7 @@ un cambio impacta en el sync diario de las 06:20 ART, no en el acto.
 discriminado de momento"). Excepciones por artículo y meses sin stock: pendientes de Luis.
 ⚠ **Sin venta = sin proyección** (Luis, v22.70: *"no le pongas una proyección a mano, ya no va más eso"*): Importados ya no cae al `est_madre_seed`; la fuente dice `sin proyeccion` y vale 0. `sql/gv_importados_sin_seed_v2270.sql`.
 ⚠ En Stock, **buscar exacto un principal trae sus secundarios** (437E → 029, 607E → 565), leídos de `familia_principal`/`es_secundario` de la fila. `tests/stk-busca-secundarios.cjs`.
+⚠⚠ **El front NO vuelve a sumar la familia** (Luis, v22.71: el 580 salía 108 = 58,50 + 49 y el 580E "—"): la proyección que llega de la base YA trae la familia sumada. `openStockAdmin` no consolida con `EQUIV_FAMILIAS` y `ocgFetchProyeccion` lee `gv_proyeccion_articulo` (sin secundarios). `tests/stk-proy-sin-doble-familia.cjs`.
 ⚠ `ventas_mensuales_cod` la pisó otra sesión el 25/09 y perdió la familia: ahora tiene centinela.
 **Chequeo:** `select * from public.gv_reglas_perdidas;`. `sql/gv_proyeccion_unica_v2268.sql`.
 
