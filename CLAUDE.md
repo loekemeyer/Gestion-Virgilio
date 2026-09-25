@@ -4633,6 +4633,14 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
+## ⚠ REGLA (Luis, 2026-09-25, v22.64): «Ajustes manuales en ISIS» es SÓLO Cencosud y Tierra del Fuego
+
+**Luis:** *"Es para pedidos de Cencosud y Tierra del Fuego eso nomas"*. Dorinka (Chef 2686) aparecía porque
+factura 439EL y códigos que faltan en `precios_venta_chef` (439E, 809, 838E, 865ED). `gv_fac_ajustes_isis` ahora
+filtra: NP de LK (con L = TdF) o cliente de Chef en `gv_ajustes_isis_clientes_chef()` (2444 + `GV_Cliente_Isis`
+motivo `tierra_del_fuego`). La función es SECURITY DEFINER porque el panel lee con la clave anon y anon no ve
+`GV_Cliente_Isis` (sin ella, los TdF de Chef desaparecían en silencio). `sql/gv_fac_ajustes_isis_sin_dorinka_v2264.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-25, v22.53): ♻ RECUPERAR ITEMS DE FC — completar la facturación de una NP ya facturada
 
 **Luis:** *"que se pueda completar la facturación de un pedido ya facturado en caso de que ingrese
