@@ -44,6 +44,8 @@ function __q(table) {
 window.supabase = { createClient: function () {
   return {
     from: __q,
+    storage: { from: function () { return { upload: function () { return Promise.resolve({ data: {}, error: null }); },
+      getPublicUrl: function (p) { return { data: { publicUrl: "http://x/" + p } }; } }; } },   // v22.51: la foto es obligatoria
     rpc: function () { return Promise.resolve({ data: null, error: null }); },
     auth: {
       getSession: function () { return Promise.resolve({ data: { session: { fake: true } } }); },
@@ -130,6 +132,7 @@ if (!/window\.supabase/.test(src)) { console.error("rcp-reanudar: recepcion.js y
 
     // Enviar la recepción borra el borrador.
     S.step = "resumen"; R.renderResumen();
+    if (!S.fotoFile) S.fotoFile = new File(["x"], "f.jpg", { type: "image/jpeg" });
     await R.opEnviar();
     out.enviarLimpia = localStorage.getItem(K) === null && window.recepcionDraftInfo(LEG, DIA) === null;
 

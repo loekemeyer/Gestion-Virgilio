@@ -307,9 +307,8 @@ const RCP_CSS = `
 #rcpRoot .enviarBtn{ padding:11px 22px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#111; color:#fff; cursor:pointer; }
 #rcpRoot .enviarBtn:disabled{ opacity:.4; cursor:default; }
 /* v22.48 (Luis, 25/09) — botón «Recibido» en Pendientes + cuadro de quién recibe. */
-#rcpRoot .recibidoBtn{ width:100%; margin-top:10px; padding:11px 16px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#15803d; color:#fff; cursor:pointer; }
-#rcpRoot .recibidoBtn:disabled{ opacity:.5; cursor:default; }
-#rcpRoot .pcRecibidoOk{ margin-top:10px; font-size:14px; font-weight:800; color:var(--ok); }
+#rcpRoot .pcRecHint{ margin-left:auto; font-size:12px; font-weight:700; color:#64748b; text-align:right; }
+#rcpRoot .tickBtn:disabled{ opacity:.45; cursor:default; }
 #rcpRoot .rcbOverlay{ position:fixed; inset:0; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px; }
 #rcpRoot .rcbBox{ background:#fff; border-radius:14px; padding:16px; width:100%; max-width:380px; }
 #rcpRoot .rcbT{ font-size:17px; font-weight:900; color:#111; }
@@ -2372,6 +2371,28 @@ async function opEnviar() {
     return;
   }
 
+  /* v22.51 (Luis, 25/09) — la foto es OBLIGATORIA y se sube PRIMERO, antes de grabar la
+     entrega. Antes se subía al final y, si fallaba, el catch seguía "sin foto": así entró
+     Poly 38845 (24/09) con la foto sacada y sin foto en Pendientes. Si no sube, no se graba
+     nada y el operario reintenta. */
+  if (!opState.fotoFile) {
+    btn.disabled = false; btn.textContent = prev;
+    alert("Falta la foto de la mercadería. Sacala antes de confirmar.");
+    return;
+  }
+  let fotoUrl = null, fotoErr = null;
+  for (let intento = 0; intento < 3 && !fotoUrl; intento++) {
+    try {
+      const fId = "op_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7);
+      fotoUrl = await pendUploadFoto(fId, opState.fotoFile);
+    } catch (e) { fotoErr = e; if (intento < 2) await new Promise(r => setTimeout(r, 1500)); }
+  }
+  if (!fotoUrl) {
+    btn.disabled = false; btn.textContent = prev;
+    alert("No se pudo subir la foto (" + ((fotoErr && fotoErr.message) || "sin respuesta") + ").\n\nNo se grabó nada. Revisá la señal y tocá Confirmar de nuevo.");
+    return;
+  }
+
   let tabla, rows;
   if (opState.tipo === 'prov_at') {
     tabla = "Entregas Prov AT";
@@ -2588,14 +2609,7 @@ async function opEnviar() {
     }
   } catch (_e) {}
 
-  // v11.xx — Subir foto de la mercadería ANTES del insert a Control_Modo_OP.
-  let fotoUrl = null;
-  if (opState.fotoFile) {
-    try {
-      const fId = "op_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7);
-      fotoUrl = await pendUploadFoto(fId, opState.fotoFile);
-    } catch (e) { console.warn("Foto upload failed (sigue sin foto):", e); }
-  }
+  // La foto ya se subió al principio (v22.51): fotoUrl está sí o sí.
 
   // v8.83: generar código de 4 dígitos ANTES de insertar, así el operario lo ve de una.
   let codigoConf = null;
@@ -3333,6 +3347,7 @@ function pendCard(r) {
      botón Enviar. La columna Control_Modo_OP.faltantes queda en la base con lo ya
      cargado — no se toca ni se borra, solo dejó de usarse desde acá. */
   acts.appendChild(pendFotoRow(id));
+  acts.appendChild(pendRecibidoRow(id, card));
   card.appendChild(acts);
   const foot = document.createElement("div"); foot.className = "pcFoot";
   /* v10.02 — el código lo genera opEnviar() AL CREAR la fila (v8.83), para que el operario
@@ -3349,12 +3364,30 @@ function pendCard(r) {
   b.onclick = function () { pendEnviar(id, foot); };
   foot.appendChild(b);
   card.appendChild(foot);
-  /* v22.48 (Luis, 25/09) — «Recibido»: acepta la recepción sin exigir los tildes, la saca de
-     Pendientes (estado='procesado') y deja registrado CUÁNDO y QUIÉN la recibió. */
-  const rb = document.createElement("button"); rb.type = "button"; rb.className = "recibidoBtn"; rb.textContent = "✓ Recibido";
-  rb.onclick = function () { pendRecibidoAbrir(id, card); };
-  card.appendChild(rb);
   return card;
+}
+/* v22.48/v22.51 (Luis, 25/09) — «Recibido»: un tilde igual al de Carga ISIS. Al tildarlo pide
+   quién recibe; confirmado, la saca de Pendientes (estado='procesado') y deja registrado
+   CUÁNDO y QUIÉN (se ve en el Histórico). Sin foto no se puede tildar: primero se agrega. */
+function pendRecibidoRow(id, card) {
+  const row = document.createElement("div"); row.className = "pcRow pcRecibidoRow";
+  const b = document.createElement("button"); b.type = "button"; b.className = "tickBtn";
+  const lbl = document.createElement("span"); lbl.className = "pcLbl"; lbl.textContent = "Recibido";
+  const hint = document.createElement("span"); hint.className = "pcRecHint";
+  const sync = function () {
+    const sinFoto = !_pendRows[id].foto_url;
+    b.disabled = sinFoto || _pendRows[id].sent;
+    hint.textContent = sinFoto ? "falta la foto" : "";
+  };
+  b.onclick = function () {
+    if (_pendRows[id].sent) return;
+    if (!_pendRows[id].foto_url) { sync(); return; }
+    pendRecibidoAbrir(id, card);
+  };
+  row._pendSync = sync;
+  row.appendChild(b); row.appendChild(lbl); row.appendChild(hint);
+  sync();
+  return row;
 }
 /* Quién recibe: igual que Cuarentena — chips fijos + «Otro…» con texto. OBLIGATORIO y sin
    preselección (un valor puesto de fábrica se confirma sin leerlo). */
@@ -3426,10 +3459,12 @@ async function pendRecibido(id, card, quien) {
   if (!card) return;
   card.classList.add("sentRow");
   const b = card.querySelector(".enviarBtn"); if (b) b.disabled = true;
-  const rb = card.querySelector(".recibidoBtn");
-  const okDiv = document.createElement("div"); okDiv.className = "pcRecibidoOk";
-  okDiv.textContent = "✓ Recibido por " + quien + " · " + pendFmtFecha(null, Date.now()) + " " + pendFmtHora(Date.now());
-  if (rb) rb.replaceWith(okDiv); else card.appendChild(okDiv);
+  const rr = card.querySelector(".pcRecibidoRow");
+  if (rr) {
+    const t = rr.querySelector(".tickBtn"); if (t) { t.classList.add("on"); t.disabled = true; }
+    const h = rr.querySelector(".pcRecHint");
+    if (h) h.textContent = quien + " · " + pendFmtFecha(null, Date.now()) + " " + pendFmtHora(Date.now());
+  }
 }
 /* Cada cambio se PERSISTE en Supabase al toque (UPDATE de la fila; no duplica, nada
    en localStorage). Al recargar, la tarjeta vuelve con lo ya guardado. */
@@ -3473,8 +3508,9 @@ function pendFotoRow(id) {
   const lbl = document.createElement("span"); lbl.className = "pcLbl"; lbl.textContent = "Foto Mercadería";
   const fotoUrl = _pendRows[id].foto_url;
   if (!fotoUrl) {
-    // Legacy: item sin foto del operario — auto-check, no bloquea
-    _pendRows[id].foto_vista = true;
+    /* v22.51 (Luis): sin foto NO se acepta — ni Enviar ni Recibido. Antes se auto-tildaba
+       (filas viejas, anteriores a la foto obligatoria); hoy la única así es Poly 38845. */
+    _pendRows[id].foto_vista = false;
     /* v22.49 (Luis, 25/09) — "Sin foto" se toca para agregarla a posteriori: pide la imagen y
        quién la agrega, y queda registrado quién y cuándo (gv_foto_post_por / _at). */
     const noF = document.createElement("button"); noF.type = "button"; noF.className = "fotoViewBtn noFoto addFoto";
@@ -3536,7 +3572,11 @@ async function pendFotoPosteriori(id, rowEl, quien, file) {
   const st = _pendRows[id];
   st.foto_url = url; st.foto_vista = true;
   st.row = Object.assign({}, st.row || {}, { foto_url: url, foto_vista: true, gv_foto_post_por: quien, gv_foto_post_at: ahora });
-  if (rowEl && rowEl.parentNode) rowEl.parentNode.replaceChild(pendFotoRow(id), rowEl);
+  if (rowEl && rowEl.parentNode) {
+    const card = rowEl.closest(".pendCard");
+    rowEl.parentNode.replaceChild(pendFotoRow(id), rowEl);
+    const rr = card && card.querySelector(".pcRecibidoRow"); if (rr && rr._pendSync) rr._pendSync();
+  }
   pendRefreshEnviar(id);
 }
 /* v12.07 — Panel que acompaña a la foto en el visor: quién entregó, qué remito y,

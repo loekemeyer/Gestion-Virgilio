@@ -66,8 +66,8 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
                   detalle: "584E → 35", cantidad_total: 35, created_at: new Date().toISOString(),
                   isis: false, control_partes: null, foto_url: "http://x/f.jpg", foto_vista: false, codigo: "2299" };
     const card = R.pendCard(row); rootEl.appendChild(card);
-    const rb = card.querySelector(".recibidoBtn");
-    out.boton_esta = !!rb && /Recibido/.test(rb.textContent);
+    const rr = card.querySelector(".pcActs .pcRecibidoRow"); const rb = rr && rr.querySelector(".tickBtn");
+    out.tilde_esta = !!rb && /Recibido/.test(rr.textContent) && rb.disabled === false;
     rb.click(); await wait(10);
     const ov = rootEl.querySelector(".rcbOverlay");
     const ok = ov && ov.querySelector(".btnSend");
@@ -84,11 +84,11 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     out.persiste = u.length === 1 && u[0].vals.estado === "procesado" && u[0].vals.gv_recibido_por === "Fabi"
       && !!u[0].vals.gv_recibido_at && u[0].vals.codigo === "2299" && u[0].eqs.some(function (e) { return e[0] === "id" && e[1] === 77; });
     out.cierra = !rootEl.querySelector(".rcbOverlay");
-    out.ui = card.classList.contains("sentRow") && /Recibido por Fabi/.test(card.textContent) && !card.querySelector(".recibidoBtn");
+    out.ui = card.classList.contains("sentRow") && /Fabi · /.test(rr.textContent) && rb.classList.contains("on") && rb.disabled === true;
     // Error al guardar -> queda el cuadro con el error
     window.__calls = []; window.__updErr = { message: "boom" };
     const card2 = R.pendCard(Object.assign({}, row, { id: 78 })); rootEl.appendChild(card2);
-    card2.querySelector(".recibidoBtn").click(); await wait(10);
+    card2.querySelector(".pcRecibidoRow .tickBtn").click(); await wait(10);
     const ov2 = rootEl.querySelector(".rcbOverlay");
     ov2.querySelectorAll(".rcbOp")[0].click(); ov2.querySelector(".btnSend").click(); await wait(40);
     out.error_visible = !!rootEl.querySelector(".rcbOverlay") && /boom/.test(ov2.textContent) && R.pendRows[78].sent === false;
@@ -97,6 +97,8 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     const card3 = R.pendCard(Object.assign({}, row, { id: 79, foto_url: null })); rootEl.appendChild(card3);
     const addB = card3.querySelector(".addFoto");
     out.sinFoto_clickeable = !!addB && /agregar/.test(addB.textContent);
+    const rt3 = card3.querySelector(".pcRecibidoRow .tickBtn");
+    out.sinFoto_noRecibe = rt3.disabled === true && /falta la foto/.test(card3.textContent);
     addB.click(); await wait(10);
     rootEl.querySelectorAll(".rcbOverlay").forEach(function (x, i, a) { if (i < a.length - 1) x.remove(); });
     const ov3 = rootEl.querySelector(".rcbOverlay");
@@ -111,7 +113,7 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     const u3 = upds();
     out.foto_persiste = u3.length === 1 && /^http:\/\/x\/79_/.test(u3[0].vals.foto_url) && u3[0].vals.gv_foto_post_por === "Pablo"
       && !!u3[0].vals.gv_foto_post_at && u3[0].vals.foto_vista === true && !("estado" in u3[0].vals);
-    out.foto_ui = !card3.querySelector(".addFoto") && /Agregada después por Pablo/.test(card3.textContent) && !!card3.querySelector(".fotoViewBtn.viewed");
+    out.foto_ui = !card3.querySelector(".addFoto") && /Agregada después por Pablo/.test(card3.textContent) && !!card3.querySelector(".fotoViewBtn.viewed") && rt3.disabled === false;
     // ---- Histórico: columna Recibió ----
     out.hist_txt = /^Nora · \d\d-\d\d /.test(R.histRecibioTxt({ recPor: "Nora", recAt: "2026-09-25T13:15:00Z" })) && R.histRecibioTxt({ recPor: "" }) === "—";
     return out;

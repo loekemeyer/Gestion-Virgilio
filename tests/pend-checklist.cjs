@@ -78,7 +78,7 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     const btn = card.querySelector(".enviarBtn");
     out.arranca_bloqueado = btn.disabled === true && R.pendRowComplete(55) === false;
     // sin "Faltantes x Día" (v12.03): 3 filas de pasos, no 4
-    out.tresPasos = card.querySelectorAll(".pcActs .pcRow").length === 3;
+    out.tresPasos = card.querySelectorAll(".pcActs .pcRow:not(.pcRecibidoRow)").length === 3;   // + el tilde Recibido (v22.51)
 
     // ---- tildar ISIS persiste y sigue bloqueado (faltan partes + foto) ----
     card.querySelectorAll(".pcActs .pcRow")[0].querySelector(".tickBtn").click();
@@ -115,10 +115,11 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     Math.random = origRnd;
     out.codigo_unico = cod === "5500" && /^\d{4}$/.test(cod);
 
-    // ---- fila LEGACY sin foto del operario → el paso Foto se auto-tilda (no bloquea) ----
+    // ---- fila SIN foto → v22.51: NO se auto-tilda, Enviar queda bloqueado ----
     const rowL = Object.assign({}, row, { id: 57, foto_url: null });
     const cardL = R.pendCard(rowL); rootEl.appendChild(cardL);
-    out.legacy_sinFoto_autoTick = R.pendRows[57].foto_vista === true && /Sin foto/.test(cardL.innerHTML);
+    R.pendRows[57].isis = true; R.pendRows[57].partes = "no"; R.pendRefreshEnviar(57);
+    out.sinFoto_bloquea = R.pendRows[57].foto_vista === false && /Sin foto/.test(cardL.innerHTML) && cardL.querySelector(".enviarBtn").disabled === true;
 
     // ---- error al persistir el envío → alert, botón vuelve, sigue pendiente ----
     window.__calls = []; window.__updErr = { message: "boom" }; window.__alert = "";

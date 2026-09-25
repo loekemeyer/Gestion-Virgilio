@@ -56,6 +56,8 @@ function __q(table) {
 window.supabase = { createClient: function () {
   return {
     from: __q,
+    storage: { from: function () { return { upload: function () { return Promise.resolve({ data: {}, error: null }); },
+      getPublicUrl: function (p) { return { data: { publicUrl: "http://x/" + p } }; } }; } },   // v22.51: la foto es obligatoria
     rpc: function (fn) {
       if (fn === "oc_vigentes_por_proveedor") return Promise.resolve({ data: __fake.rows, error: null });
       return Promise.resolve({ data: null, error: null });
@@ -165,6 +167,7 @@ if (!/window\.supabase/.test(src)) { console.error("rcp-oc: recepcion.js ya no t
     window.__ins = [];
     R.renderResumen();
     S.excesoAvisado = R.opExcesoFirma();
+    if (!S.fotoFile) S.fotoFile = new File(["x"], "f.jpg", { type: "image/jpeg" });
     await R.opEnviar();
     const roc = window.__ins.filter(function (x) {
       return x.table === "Registros_Produccion_Virgilio" && x.rows && x.rows.opcion === "ROC";
@@ -177,6 +180,7 @@ if (!/window\.supabase/.test(src)) { console.error("rcp-oc: recepcion.js ya no t
     window.__ins = [];
     R.renderResumen();          // vuelve a crear el botón Confirmar que usa opEnviar
     S.excesoAvisado = R.opExcesoFirma();
+    if (!S.fotoFile) S.fotoFile = new File(["x"], "f.jpg", { type: "image/jpeg" });
     await R.opEnviar();
     out.sinExcesoSinRoc = window.__ins.filter(function (x) {
       return x.table === "Registros_Produccion_Virgilio" && x.rows && x.rows.opcion === "ROC";

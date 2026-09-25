@@ -65,6 +65,8 @@ function __q(table) {
 window.supabase = { createClient: function () {
   return {
     from: __q,
+    storage: { from: function () { return { upload: function () { return Promise.resolve(window.__upFail ? { data: null, error: { message: "sin red" } } : { data: {}, error: null }); },
+      getPublicUrl: function (p) { return { data: { publicUrl: "http://x/" + p } }; } }; } },   // v22.51: la foto es obligatoria
     rpc: function () { return Promise.resolve({ data: null, error: null }); },
     auth: {
       getSession: function () { return Promise.resolve({ data: { session: { fake: true } } }); },
@@ -140,7 +142,13 @@ if (!/GV_Alta_Articulo_Aprobacion/.test(src)) { console.error("rcp-alta-ok: rece
     window.__altaRows = [{ cod: "599", estado: "pendiente", token: "tok1" }];
     await new Promise(r => setTimeout(r, 30));
     window.__ins = []; window.__alerts = [];
-    S.fecha = "2026-09-11"; S.fotoFile = null;
+    S.fecha = "2026-09-11";
+    // v22.51 — sin foto, o con la foto que no sube, NO se graba nada
+    S.fotoFile = null; await R.opEnviar();
+    out.sinFotoNoGraba = window.__ins.length === 0 && window.__alerts.some(m => /Falta la foto/.test(m));
+    S.fotoFile = new File(["x"], "f.jpg", { type: "image/jpeg" }); window.__upFail = true; window.__alerts = [];
+    await R.opEnviar(); window.__upFail = false;
+    out.fotoFallaNoGraba = window.__ins.length === 0 && window.__alerts.some(m => /No se pudo subir la foto/.test(m));
     await R.opEnviar();
     out.noTraba = !window.__alerts.some(m => /No se puede cerrar/.test(m));
     out.envia = window.__ins.length > 0;
@@ -157,6 +165,7 @@ if (!/GV_Alta_Articulo_Aprobacion/.test(src)) { console.error("rcp-alta-ok: rece
     await R.altaRefrescar();
     out.leeRechazo = S.altaNuevos["599"].estado === "rechazado";
     window.__ins = []; window.__alerts = [];
+    if (!S.fotoFile) S.fotoFile = new File(["x"], "f.jpg", { type: "image/jpeg" });
     await R.opEnviar();
     out.rechazadoIgualEnvia = window.__ins.length > 0 &&
       !window.__alerts.some(m => /No se puede cerrar/.test(m));
