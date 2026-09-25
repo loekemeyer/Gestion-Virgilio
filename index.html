@@ -6173,7 +6173,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.67"></script>
+<script type="module" src="recepcion.js?v=22.68"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10130,7 +10130,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.67";
+const APP_VERSION = "v22.68";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17492,10 +17492,16 @@ async function ocgEnterCfg() {
     // uni×caja es read-only (maestro→backup→uxb). Ya no hay Objetivo ni alta manual.
     const res = await Promise.all([
       supaFetchAllSafe(SUPABASE_GENERADOR_ENDPOINT, "select=cod,cod_config,descripcion,proveedor,tiene_prov_real,pr1,proveedor2,pr2,indice,activo,uni_x_caja,en_config,total,cap,llenar_gondola&order=tiene_prov_real.asc,total.desc,cod.asc"),
-      ocgLoadProvs()
+      ocgLoadProvs(),
+      // v22.68 (Luis, 25/09) — parametros de LA proyeccion: Stock_Config (proy_*) + meses objetivo de Importados.
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Config", "select=clave,valor&clave=like.proy_*").catch(function () { return []; }),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados_Config", "select=meses_objetivo&id=eq.1").catch(function () { return []; })
     ]);
     const rows = res[0] || [];
     _oc.cfg.provs = res[1] || [];
+    _oc.cfg.params = {};
+    (res[2] || []).forEach(function (r) { _oc.cfg.params[r.clave] = r.valor; });
+    if (res[3] && res[3][0]) _oc.cfg.params.meses_objetivo_importados = res[3][0].meses_objetivo;
     _oc.cfg.rows = rows.map(function (x) {
       /* v19.84 — `cod` puede venir con la empresa pegada ("437E CH", un dual), pero la CONFIG
          vive en OC_Maximos con el codigo PELADO y es UNA sola para las dos mitades (mismo
@@ -17521,6 +17527,51 @@ function _ocProvOptions(current, provs, emptyLabel) {
   if (cur && !has) o += '<option value="' + escapeHtml(cur) + '" selected>' + escapeHtml(cur) + ' (?)</option>';
   return o;
 }
+/* v22.68 (Luis, 25/09/2026) — PARAMETROS DE LA PROYECCION. Una sola proyeccion para Stock, el
+   generador de OC e Importados (vista gv_proyeccion_articulo), y nada escrito a mano en el codigo:
+   la ventana de meses, el piso (N.º mejor mes), el respaldo cuando la ventana da 0, el indice por
+   defecto y los meses objetivo de Importados se editan aca. Los lee el motor de LK (v_lk_config)
+   en la sincronizacion diaria (06:20): el cambio se ve en la proxima corrida. Guarda por la RPC
+   gv_proy_config_guardar (solo supervisor). */
+var _OC_PROY_PARAMS = [
+  { k: "proy_meses_ventana", t: "Ventana (meses)", h: "Meses cerrados que promedia la proyección", step: 1, def: 6 },
+  { k: "proy_piso_mejor_mes", t: "Piso: N.º mejor mes", h: "La proyección nunca queda por debajo del N.º mejor mes de la ventana", step: 1, def: 4 },
+  { k: "proy_meses_fallback", t: "Respaldo (meses)", h: "Si la ventana da 0, se promedian estos meses", step: 1, def: 12 },
+  { k: "proy_indice_default", t: "Índice por defecto", h: "Máximo = proyección × índice, para los artículos sin índice propio", step: 0.1, def: 1.5 },
+  { k: "meses_objetivo_importados", t: "Meses objetivo importados", h: "Importados pide proyección × estos meses", step: 1, def: 10 }
+];
+function _ocCfgParamsHtml() {
+  const P = (_oc && _oc.cfg && _oc.cfg.params) || {};
+  let h = '<div class="oc-meta" style="margin-top:8px"><b>📐 Parámetros de la proyección</b> — valen para Stock, el generador de OC e Importados. El cambio se ve en la próxima sincronización (06:20).</div><div class="oc-tools" style="flex-wrap:wrap;gap:10px">';
+  _OC_PROY_PARAMS.forEach(function (x) {
+    const v = (P[x.k] != null && P[x.k] !== "") ? P[x.k] : x.def;
+    h += '<label style="font-size:13px" title="' + escapeHtml(x.h) + '">' + escapeHtml(x.t) + ' <input id="ocp_' + x.k + '" class="oc-inp" style="width:70px" type="number" min="0" step="' + x.step + '" value="' + escapeHtml(String(v)) + '"></label>';
+  });
+  h += '<button class="oc-btn ok" onclick="ocCfgParamsSave()">💾 Guardar parámetros</button>';
+  if (_oc && _oc.cfg && _oc.cfg.paramsMsg) h += '<span style="font-size:13px;font-weight:700">' + escapeHtml(_oc.cfg.paramsMsg) + '</span>';
+  return h + '</div>';
+}
+async function ocCfgParamsSave() {
+  if (!_oc || !_oc.cfg) return;
+  const body = {};
+  for (let i = 0; i < _OC_PROY_PARAMS.length; i++) {
+    const x = _OC_PROY_PARAMS[i], el = document.getElementById("ocp_" + x.k);
+    if (!el) continue;
+    const v = Number(String(el.value).replace(",", "."));
+    if (!(v > 0)) { alert(x.t + ": tiene que ser mayor a 0."); return; }
+    body[x.k] = v;
+  }
+  const headers = await facAuthWriteHeaders({ "Content-Type": "application/json" });
+  if (!headers) { alert(authNoSesionMsg("Para cambiar los parámetros necesitás iniciar sesión con Google (supervisor).")); return; }
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_proy_config_guardar", { method: "POST", headers: headers, body: JSON.stringify({ p: body }) });
+    if (!r.ok) { let t = ""; try { t = await r.text(); } catch (_e) {} throw new Error(t || ("HTTP " + r.status)); }
+    const j = await r.json();
+    _oc.cfg.params = j || _oc.cfg.params;
+    _oc.cfg.paramsMsg = "✅ Guardado";
+  } catch (e) { _oc.cfg.paramsMsg = "❌ No se pudo guardar: " + (e.message || e); }
+  ocRender();
+}
 function _ocCfgChangedN() { return (_oc && _oc.cfg) ? Object.keys(_oc.cfg.changed).length : 0; }
 function ocBodyCfg() {
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocgEnter()">← Volver al generador</button><button class="oc-btn ok" onclick="ocCfgProvOpen()">➕ Agregar proveedor</button></div>';
@@ -17528,6 +17579,7 @@ function ocBodyCfg() {
   if (!_oc.cfg || !_oc.cfg.rows) return h + '<div class="oc-loading">Cargando config…</div>';
   if (_oc.cfg.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.cfg.error) + '</div>';
   if (_oc.cfg.altaProv) h += _ocCfgProvForm();
+  h += _ocCfgParamsHtml();
   h += '<div class="oc-tools"><span style="font-size:13px">Índice a todos:</span> <input id="ociAll" class="oc-inp" style="width:80px" type="number" step="0.1" min="0" placeholder="1.5"><button class="oc-btn" onclick="ocCfgSetAllIndice()">Aplicar</button>';
   h += '<button id="ociSaveBtn" class="oc-btn ok" onclick="ocCfgSave()">💾 Guardar' + (_ocCfgChangedN() ? ' (' + _ocCfgChangedN() + ')' : '') + '</button>';
   h += '<input class="oc-filtro" type="search" placeholder="🔎 código / descripción / proveedor" value="' + escapeHtml(_oc.cfg.filtro || "") + '" oninput="if(_oc&&_oc.cfg){_oc.cfg.filtro=this.value;ocRender();}"></div>';
@@ -19817,6 +19869,7 @@ function _stkProyTrendSvg(rows, proyN, prom) {
          '<div style="font-size:15px;font-weight:900;color:#4c1d95;margin:0 0 4px 2px;">📈 Tendencia — ' + escapeHtml(d0) + ' → ' + escapeHtml(d1) + '</div>' + s +
          '<div class="proyv-tip">👆 Tocá un mes del gráfico para ver a quién se le facturó y cuándo se entregó.</div></div>';
 }
+var _stkProyFam = null, _stkProyPiso = 4;
 async function stkShowProyVentas(codEnc, proy) {
   var cod = decodeURIComponent(codEnc);
   var codB = codBase(cod);
@@ -19855,9 +19908,18 @@ async function stkShowProyVentas(codEnc, proy) {
       // v18.33 — el uni×caja del artículo, para el switch cajas/unidades. Fuente única
       // `vista_uxb_articulo` (Articulos_Cajas → OC_Maximos → precios_venta), cacheada: si la
       // pantalla de Stocks ya la cargó, esto no pega a la red.
-      (typeof loadArtUxb === "function" ? loadArtUxb().catch(function () { return null; }) : Promise.resolve(null))
+      (typeof loadArtUxb === "function" ? loadArtUxb().catch(function () { return null; }) : Promise.resolve(null)),
+      // (Luis, 25/09) — de qué códigos de la familia sale la proyección (437E incluye al 029)
+      // y el piso configurado en OC ⚙ (proy_piso_mejor_mes). Vista única gv_proyeccion_articulo.
+      fetch(SUPABASE_URL + "/rest/v1/gv_proyeccion_articulo?select=proy_propia,proy_familia,detalle_familia,proy_lk,proy_ch&cod=eq." +
+            encodeURIComponent(codCanon(codB)), { headers: _H, cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      fetch(SUPABASE_URL + "/rest/v1/Stock_Config?select=valor&clave=eq.proy_piso_mejor_mes", { headers: _H, cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
     ]);
     rows = _par[0];
+    _stkProyFam = (Array.isArray(_par[4]) && _par[4][0]) || null;
+    _stkProyPiso = (Array.isArray(_par[5]) && _par[5][0] && Number(_par[5][0].valor)) || 4;
     entDet = (Array.isArray(_par[2]) ? _par[2] : []).map(function (r) {
       return { mes: _stkProyMes(r.fecha), fecha: r.fecha, cajas: Number(r.cajas) || 0,
                quien: r.quien || "", remito: r.remito || "" };
@@ -19903,7 +19965,7 @@ async function stkShowProyVentas(codEnc, proy) {
     tot: tot, prom: prom, arriba: arriba,
     parcial: parcial, winIni: rows.length - (parcial ? 1 : 0) - win.length,
     totEnt: win.reduce(function (s, x) { var e = ent[x.mes]; return s + (e && e.cub ? e.cajas : 0); }, 0),
-    abierto: "", vta: {},
+    abierto: "", vta: {}, fam: _stkProyFam, pisoN: _stkProyPiso,
     // v18.33 (Luis) — switch cajas ⇄ unidades. `uxb` = unidades por caja del artículo; si no
     // hay dato, el switch no se dibuja y todo queda en cajas. La preferencia se recuerda por
     // navegador (no es un dato del negocio, es cómo lo mira cada uno).
@@ -20114,6 +20176,17 @@ function _stkProyMesesHtml() {
    desde `_stkProy` para poder repintarse solo al abrir o cerrar un mes.
    v18.21 — acá vivía el bloque de barras por mes. El dueño lo mandó a sacar ("con el gráfico
    ya alcanza") y pidió que lo que quedara se viera mucho más grande. */
+/* (Luis, 25/09) — la proyección de un principal SUMA a su familia (Equivalencias_Familia):
+   se dice cuánto aporta cada código, en la empresa de la fila (LK / CH / las dos). */
+function _stkProyFamHtml() {
+  var S = _stkProy; if (!S || !S.fam || !Array.isArray(S.fam.detalle_familia) || !S.fam.detalle_familia.length) return "";
+  var k = S.emp === "LK" ? "lk" : (S.emp === "CH" ? "ch" : "");
+  var partes = S.fam.detalle_familia.map(function (d) {
+    var v = k ? Number(d[k]) || 0 : (Number(d.lk) || 0) + (Number(d.ch) || 0);
+    return v > 0.005 ? escapeHtml(codCanon(String(d.cod))) + ': ' + _stkProyFc(v) : "";
+  }).filter(Boolean);
+  return partes.length ? '<small>incluye ' + partes.join(' · ') + '</small>' : "";
+}
 function _stkProyChartHtml() {
   var S = _stkProy; if (!S) return "";
   var fc = _stkProyFc;
@@ -20133,7 +20206,7 @@ function _stkProyChartHtml() {
   if (S.proyN > 0.05) {
     // v18.33 — la etiqueta sigue al switch: "8.164 proy. caj/mes" sería mentira.
     h += '<div class="proyv-kpi proy"><b>' + fc(S.proyN) + '</b><span>proy. ' + (S.uni && S.uxb > 0 ? 'un' : 'caj') + '/mes</span>' +
-         (piso ? '<small>piso: 4.º mejor mes</small>' : '') + '</div>';
+         (piso ? '<small>piso: ' + (S.pisoN || 4) + '.º mejor mes</small>' : '') + _stkProyFamHtml() + '</div>';
   }
   // v18.58 — VUELVE la ficha del mes en curso («<mes> a este ritmo», v18.24, pedido de Thomas).
   // La v18.34 la sacó junto con las otras cuatro por el pedido de Luis ("sacá lo de promedio, el
