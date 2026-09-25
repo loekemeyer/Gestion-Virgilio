@@ -730,6 +730,21 @@ compara contra algo de la operación (*"menos de una caja"*), no cambiando de un
 
 Vale para TODOS los repos. Es sólo cómo se escribe el mensaje del chat: no cambia nada técnico.
 
+## ⚠ REGLA de TABLAS (Damian, 2026-09-25): ancho de columna SEGÚN EL CONTENIDO, nunca rellenando la hoja
+
+**Damian, textual:** *"siempre tiene que estar optimizado en función del contenido, no en función de
+rellenar la hoja y nada más"*.
+
+Toda tabla —en Excel, SVG, imagen o markdown— lleva **cada columna al ancho del dato más largo que
+contiene** (o del encabezado si es más largo), más un padding mínimo. **Nunca** una columna ancha "al
+pedo" para llenar el espacio, ni ancho fijo, ni relleno, ni espacio muerto. Si la descripción es larga,
+se **abrevia** (`Cuch Untar` en vez de `Cuchillo de Untar`) antes que ensanchar la columna. El ancho lo
+decide el contenido, no el título ni el tamaño de la hoja.
+
+Es la misma regla que ya está en las preferencias del dueño (*"Ancho según dato, no título… sin ancho
+fijo, relleno, color ni espacio muerto"*). Vale para TODOS los repos y para cualquier tabla que arme
+Claude, sin que haya que pedirlo cada vez.
+
 ## 🟥🟥🟥 REGLA (Luis, 2026-09-23, v21.87): UN GRUPO DE ZONAS POR DÍA — y "mismo cliente, mismo día" NO EXISTE MÁS
 
 > ## **DEROGADA: "nunca +1 pedido de un cliente va separado en la PPP".** No se junta al cliente en un día.
