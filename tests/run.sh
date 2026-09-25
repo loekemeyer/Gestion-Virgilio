@@ -637,6 +637,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pmap-gondolas (v17.23: 🗺️ Mapa de góndolas — celdas de a 5, la de arriba primero, con código y capacidad) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-gondolas.cjs
+echo "== pmap-racks (v22.67: 📦 pestaña Racks del Mapa — solo lectura, vista gv_rack_celda) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-racks.cjs
 
 echo "== ppp-operario (v17.48/71: botón PPP en la botonera — días + detalle por camión, tics Pick/Arm/Fact y filtro LK/CH) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-operario.cjs

@@ -2936,6 +2936,15 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .pmap-tabs .lug-tab{ width:auto; flex:0 0 auto; min-width:46px; margin-top:0; }
 .pmap-bar .planim-btn-save{ width:auto; flex:0 0 auto; margin-top:0; }
 .pmap-tab-hit{ box-shadow:0 0 0 2px #fde68a; }
+/* v22.67 — pestañas Góndolas / Racks */
+.pmap-modos{ display:flex; gap:8px; margin-bottom:10px; }
+.pmap-modo{ flex:0 0 auto; padding:8px 18px; border:2px solid #cbd5e1; background:#f8fafc; color:#475569; border-radius:10px; font-size:15px; font-weight:800; cursor:pointer; }
+.pmap-modo-on{ background:#0f172a; border-color:#0f172a; color:#fff; }
+.prk-mc{ font-size:13px; color:#475569; }
+.prk-mc b{ font-weight:800; color:#0f172a; }
+.prk-det{ font-size:15px; line-height:1.6; color:#334155; }
+.prk-det b{ color:#0f172a; }
+.prk-nota{ margin-top:10px; font-size:13px; color:#64748b; }
 .pmap-head{ font-size:14px; color:#475569; margin:2px 0 8px; }
 .pmap-head b{ color:#0f172a; }
 .pmap-wrap{ overflow-x:auto; padding-bottom:6px; }
@@ -6164,7 +6173,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.66"></script>
+<script type="module" src="recepcion.js?v=22.67"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6425,10 +6434,16 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
        gv_planimetria_celda (sql/gv_planimetria_celda.sql). -->
   <div id="planimMapaOverlay" class="recp-admin-overlay">
     <div class="recp-admin-bar">
-      <span class="recp-admin-title">🗺️ Mapa de góndolas</span>
+      <span class="recp-admin-title">🗺️ Mapa de góndolas y racks</span>
       <button class="recp-admin-close" onclick="closePlanimMapa()">Cerrar</button>
     </div>
     <div class="planim-body">
+      <!-- v22.67 (Luis): dos pestañas. Racks es SOLO LECTURA: lo que hay en cada posición
+           lo mueven Ingreso / Bajar / Mover racks (RPC racks_plani_*), no este mapa. -->
+      <div class="pmap-modos">
+        <button id="pmapModoG" class="pmap-modo pmap-modo-on" onclick="pmapModo('gondola')">🧱 Góndolas</button>
+        <button id="pmapModoR" class="pmap-modo" onclick="pmapModo('rack')">📦 Racks</button>
+      </div>
       <div class="pmap-bar">
         <input id="pmapSearch" class="planim-inp planim-search" type="text"
                placeholder="🔍 Código (438E, 505…), celda (F13) o descripción"
@@ -10115,7 +10130,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.66";
+const APP_VERSION = "v22.67";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -45464,6 +45479,7 @@ function pmapAlto(g) { return PMAP_ALTO_X[String(g || "").toUpperCase()] || PMAP
 const PMAP_SELECT = "select=sector,gondola,celda,empresa,orden,cod,descripcion,cajas_max,max_fuente,estado" +
                     "&order=gondola.asc,celda.asc";
 let _pmap = null, _pmapG = "", _pmapQ = "";
+let _pmapModo = "gondola", _prk = null, _prkR = "";   // v22.67 — pestaña Racks
 
 function pmapSetStatus(msg, ok) {
   const el = document.getElementById("pmapStatus");
@@ -45493,6 +45509,7 @@ async function openPlanimMapa() {
   pmapRender();
   // el aviso de lo que quedó en la planimetría vieja se baja una vez, sin frenar el dibujo
   pmapViejaFetch().then(pmapViejaRender).catch(function () {});
+  prkFetch().then(function () { if (_pmapModo === "rack") pmapRender(); }).catch(function () {});
 }
 function closePlanimMapa() {
   const ov = document.getElementById("planimMapaOverlay");
@@ -45520,6 +45537,7 @@ function pmapBuscar(v) {
   _pmapQ = String(v == null ? "" : v).trim().toUpperCase();
   const inp = document.getElementById("pmapSearch");
   if (inp && inp.value !== v && v != null) inp.value = v;
+  if (_pmapModo === "rack") { prkSaltar(); pmapRender(); return; }
   if (_pmapQ) {
     const hayAca = (_pmap || []).some(function (r) {
       return String(r.gondola || "").toUpperCase() === _pmapG && pmapMatch(r, _pmapQ);
@@ -45535,6 +45553,9 @@ function pmapGo(g) { _pmapG = String(g || "").toUpperCase(); pmapRender(); }
 function pmapRender() {
   const tabs = document.getElementById("pmapTabs"), box = document.getElementById("pmapGrid");
   if (!tabs || !box) return;
+  const vj = document.getElementById("pmapVieja");
+  if (_pmapModo === "rack") { if (vj) vj.style.display = "none"; prkRender(); return; }
+  if (vj) vj.style.display = "";
   if (!_pmap) { box.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
   const gs = pmapGondolas();
   if (!gs.length) {
@@ -45674,6 +45695,141 @@ function pmapCellHtml(g, n, porCelda) {
   const click = ' onclick="pmapAbrirCelda(' + JSON.stringify(sec).replace(/"/g, "&quot;") + ')"';
   return '<div class="pmap-cell ' + cls + (hit ? " pmap-hit" : "") + '" title="' + escapeHtml(tip) + '"' + click + '>' +
          '<span class="pmap-sec">' + escapeHtml(sec) + '</span>' + cuerpo + '</div>';
+}
+/* ═══════════════════════════════════════════════════════════════════
+   📦 RACKS — v22.67 (Luis, 2026-09-25: "deberíamos agregar también Racks… separá
+   eso en dos pestañas, Góndola y Racks")
+
+   SOLO LECTURA. Todo sale de UNA vista, `gv_rack_celda` (sql/gv_rack_celda_v2267.sql):
+   el layout de `GV_Lugar` (tipo rack, la tabla que vale) y lo que hay adentro de
+   `Racks_Planimetria`. Lo que hay en cada posición lo mueven los operarios con
+   Ingreso / Bajar / Mover racks (racks_plani_ingreso / _descontar / _mover), que además
+   dejan el movimiento de stock: si este mapa escribiera, el stock de racks no se enteraría.
+   Una posición de Racks_Planimetria que no existe como rack en GV_Lugar sale igual, en
+   amarillo ("sin_lugar"), para que no quede escondida. */
+function pmapModo(m) {
+  _pmapModo = (m === "rack") ? "rack" : "gondola";
+  const g = document.getElementById("pmapModoG"), r = document.getElementById("pmapModoR");
+  if (g) g.classList.toggle("pmap-modo-on", _pmapModo === "gondola");
+  if (r) r.classList.toggle("pmap-modo-on", _pmapModo === "rack");
+  const inp = document.getElementById("pmapSearch");
+  if (inp) inp.placeholder = _pmapModo === "rack"
+    ? "🔍 Código (438E, 505…), posición (X05) o descripción"
+    : "🔍 Código (438E, 505…), celda (F13) o descripción";
+  if (_pmapModo === "rack" && !_prk) {
+    pmapSetStatus("Cargando los racks…", true);
+    prkFetch().then(function () { prkSaltar(); pmapRender(); });
+  }
+  if (_pmapModo === "rack") prkSaltar();
+  pmapRender();
+}
+async function prkFetch() {
+  const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_rack_celda",
+    "select=sector,rack,orden,empresa,uso,cod,descripcion,master_cajas,innercajas,estado&order=rack.asc,sector.asc");
+  if ((filas && filas.length) || !_prk) _prk = filas || [];
+  return _prk;
+}
+function prkNum(sec) { const m = String(sec || "").match(/(\d+)/); return m ? Number(m[1]) : 0; }
+function prkRacks() {
+  const seen = {}, out = [];
+  (_prk || []).forEach(function (r) { const k = String(r.rack || "").toUpperCase(); if (k && !seen[k]) { seen[k] = 1; out.push(k); } });
+  return out.sort(function (a, b) { return a.localeCompare(b, "es"); });
+}
+function prkMatch(r, q) {
+  if (!q) return false;
+  return codEmpiezaCon(r.cod, q) ||
+         String(r.sector || "").toUpperCase().indexOf(q) >= 0 ||
+         String(r.descripcion || "").toUpperCase().indexOf(q) >= 0;
+}
+/* Si lo buscado no está en el rack abierto, salta solo al primero que lo tiene. */
+function prkSaltar() {
+  if (!_pmapQ || !_prk) return;
+  const hayAca = _prk.some(function (r) { return String(r.rack || "").toUpperCase() === _prkR && prkMatch(r, _pmapQ); });
+  if (hayAca) return;
+  const otra = _prk.filter(function (r) { return prkMatch(r, _pmapQ); })[0];
+  if (otra) _prkR = String(otra.rack || "").toUpperCase();
+}
+function prkGo(r) { _prkR = String(r || "").toUpperCase(); pmapRender(); }
+function prkRender() {
+  const tabs = document.getElementById("pmapTabs"), box = document.getElementById("pmapGrid"),
+        leg = document.getElementById("pmapLeg");
+  if (!_prk) { box.innerHTML = '<div class="planim-empty">Cargando…</div>'; if (leg) leg.innerHTML = ""; return; }
+  const rs = prkRacks();
+  if (!rs.length) {
+    tabs.innerHTML = ""; if (leg) leg.innerHTML = "";
+    box.innerHTML = '<div class="planim-empty">No pude leer los racks (sin conexión, o falta la vista <b>gv_rack_celda</b>).</div>';
+    pmapSetStatus(""); return;
+  }
+  if (!_prkR || rs.indexOf(_prkR) < 0) _prkR = rs[0];
+  const hits = {};
+  if (_pmapQ) _prk.forEach(function (r) { if (prkMatch(r, _pmapQ)) { const k = String(r.rack || "").toUpperCase(); hits[k] = (hits[k] || 0) + 1; } });
+  tabs.innerHTML = rs.map(function (k) {
+    const n = hits[k] || 0;
+    return '<button class="lug-tab' + (k === _prkR ? " lug-tab-on" : "") + (n ? " pmap-tab-hit" : "") + '"' +
+           ' onclick="prkGo(' + JSON.stringify(k).replace(/"/g, "&quot;") + ')">' +
+           escapeHtml(k) + (n ? ' <b>' + n + '</b>' : "") + '</button>';
+  }).join("");
+  const rows = _prk.filter(function (r) { return String(r.rack || "").toUpperCase() === _prkR; })
+    .sort(function (a, b) { return prkNum(a.sector) - prkNum(b.sector) || String(a.sector).localeCompare(String(b.sector), "es"); });
+  const n = { ocupado: 0, libre: 0, sin_lugar: 0 }; let mc = 0; const emps = {};
+  rows.forEach(function (r) { n[r.estado] = (n[r.estado] || 0) + 1; mc += Number(r.master_cajas) || 0; if (r.empresa) emps[String(r.empresa).toUpperCase()] = 1; });
+  let h = '<div class="pmap-head">Rack <b>' + escapeHtml(_prkR) + '</b> · ' + rows.length + ' posiciones · ' +
+          n.ocupado + ' ocupadas · ' + n.libre + ' libres · <b>' + pmapNum(mc) + '</b> MC' +
+          (Object.keys(emps).length ? ' · ' + escapeHtml(Object.keys(emps).sort().join("/")) : "") + '</div>';
+  h += '<div class="pmap-wrap"><div class="pmap-cols">' + rows.map(prkCellHtml).join("") + '</div></div>';
+  box.innerHTML = h;
+  if (leg) {
+    const it = function (cls, txt, c) { return '<span><i class="pmap-sw ' + cls + '"></i>' + txt + ' <b>' + c + '</b></span>'; };
+    leg.innerHTML = it("", "con mercadería", n.ocupado) + it("pmap-libre", "posición libre", n.libre) +
+                    it("pmap-smapa", "cargada en una posición que no existe como rack", n.sin_lugar);
+  }
+  const tot = { oc: 0, lib: 0, mc: 0 };
+  _prk.forEach(function (r) { if (r.estado === "libre") tot.lib++; else tot.oc++; tot.mc += Number(r.master_cajas) || 0; });
+  pmapSetStatus(rs.length + " racks · " + _prk.length + " posiciones · " + tot.oc + " ocupadas · " + tot.lib + " libres · " +
+    pmapNum(tot.mc) + " MC en total" +
+    (_pmapQ ? (function () {
+      const q = Object.keys(hits).reduce(function (a, k) { return a + hits[k]; }, 0);
+      return " · " + q + (q === 1 ? " posición" : " posiciones") + ' con "' + _pmapQ + '"';
+    })() : ""));
+}
+function prkCellHtml(r) {
+  const sec = String(r.sector || ""), libre = r.estado === "libre";
+  const cls = libre ? "pmap-libre" : (r.estado === "sin_lugar" ? "pmap-smapa" : "");
+  const hit = _pmapQ && prkMatch(r, _pmapQ);
+  const mc = Number(r.master_cajas) || 0, inn = Number(r.innercajas) || 0;
+  let cuerpo, tip = sec;
+  if (libre) { cuerpo = '<span class="pmap-cod">libre</span>'; tip += " · posición libre"; }
+  else {
+    cuerpo = '<span class="pmap-cod">' + escapeHtml(String(r.cod || "—")) + '</span>' +
+             '<span class="prk-mc">' + (mc ? '<b>' + pmapNum(mc) + '</b> MC' : "") +
+             (mc && inn ? ' · ' : "") + (inn ? pmapNum(inn) + ' caj' : "") + '</span>';
+    const d = pmapDesc(r);
+    tip += " · " + String(r.cod || "") + (d ? " — " + d : "") + (mc ? " · " + mc + " MC" : "") + (inn ? " · " + inn + " cajas" : "") +
+           (r.estado === "sin_lugar" ? " · ⚠ esta posición no existe como rack en Lugares del depósito" : "");
+  }
+  return '<div class="pmap-cell ' + cls + (hit ? " pmap-hit" : "") + '" title="' + escapeHtml(tip) + '"' +
+         ' onclick="prkAbrir(' + JSON.stringify(sec).replace(/"/g, "&quot;") + ')">' +
+         '<span class="pmap-sec">' + escapeHtml(sec) + (r.empresa ? ' · ' + escapeHtml(String(r.empresa)) : "") + '</span>' + cuerpo + '</div>';
+}
+/* Detalle de UNA posición, de solo lectura (en el celular no hay tooltip). */
+function prkAbrir(sector) {
+  const r = (_prk || []).filter(function (x) { return String(x.sector) === String(sector); })[0];
+  const m = document.getElementById("pmapCeldaModal"), tit = document.getElementById("pmapCeldaTit"),
+        box = document.getElementById("pmapCeldaBody");
+  if (!r || !m || !tit || !box) return;
+  _pmapCelda = "";
+  pmapCeldaStatus("");
+  tit.textContent = "Rack · " + sector;
+  const d = pmapDesc(r), mc = Number(r.master_cajas) || 0, inn = Number(r.innercajas) || 0;
+  box.innerHTML = '<div class="prk-det">' +
+    (r.estado === "libre" ? 'Posición <b>libre</b>.'
+      : '<b>' + escapeHtml(String(r.cod || "—")) + '</b>' + (d ? ' — ' + escapeHtml(d) : "") +
+        '<br>' + (mc ? '<b>' + pmapNum(mc) + '</b> MC' : "") + (mc && inn ? ' · ' : "") + (inn ? '<b>' + pmapNum(inn) + '</b> cajas' : "")) +
+    (r.empresa ? '<br>Empresa: <b>' + escapeHtml(String(r.empresa)) + '</b>' : "") +
+    (r.uso ? '<br>Uso: ' + escapeHtml(String(r.uso)) : "") +
+    (r.estado === "sin_lugar" ? '<br>⚠ Esta posición no existe como rack en 📍 Lugares del depósito.' : "") +
+    '</div><div class="prk-nota">Lo que hay en cada posición lo cargan los operarios con Ingreso / Bajar / Mover racks, que dejan también el movimiento de stock. Este mapa sólo lo muestra.</div>';
+  m.classList.add("show");
 }
 /* ═══════════════════════════════════════════════════════════════════
    EDICIÓN DESDE EL MAPA — v17.31 (pedido de Thomas, 2026-09-14: "que se pueda en
