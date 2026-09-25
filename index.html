@@ -2947,6 +2947,7 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .prk-det{ font-size:15px; line-height:1.6; color:#334155; }
 .prk-det b{ color:#0f172a; }
 .prk-nota{ margin-top:10px; font-size:13px; color:#64748b; }
+.prk-contar{ border:2px dashed #f59e0b !important; }
 .prk-form{ display:grid; grid-template-columns:1fr 90px 90px 90px; gap:8px; margin-top:12px; }
 .prk-form label{ display:flex; flex-direction:column; gap:3px; font-size:12px; font-weight:700; color:#475569; }
 .prk-form .prk-mot{ grid-column:1 / -1; }
@@ -6182,7 +6183,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.76"></script>
+<script type="module" src="recepcion.js?v=22.77"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10140,7 +10141,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.76";
+const APP_VERSION = "v22.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -29064,6 +29065,11 @@ async function rkbFetchCxM() {
       const a = agg[k];
       if (Object.keys(a.ratios).length === 1 && a.inner % a.master === 0) map[k] = a.inner / a.master;
     });
+    // v22.77: las cajas por master viven en GV_Rack_CxM (la planimetría ya es una vista y su MC es derivado).
+    try {
+      const rc = await fetch(SUPABASE_URL + "/rest/v1/GV_Rack_CxM?select=cod,cxm", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+      if (rc.ok) (await rc.json()).forEach(function (x) { if (x.cod && Number(x.cxm) > 0) map[_cpNorm(String(x.cod).replace(/\s+/g, ""))] = Number(x.cxm); });
+    } catch (_e) {}
     return { cxm: map, locs: locs };
   } catch (_e) { return { cxm: {}, locs: {} }; }
 }
@@ -45562,6 +45568,8 @@ const PMAP_SELECT = "select=sector,gondola,celda,empresa,orden,cod,descripcion,c
 let _pmap = null, _pmapG = "", _pmapQ = "";
 let _pmapModo = "gondola", _prk = null, _prkR = "";   // v22.67 — pestaña Racks
 let _prkDes = null;   // v22.68 — desfase posiciones vs stock del depósito racks, por "COD|EMP"
+let _prkRev = [];     // v22.77 — «a contar»: lo que la planimetría vieja decía y el stock no respalda (GV_Rack_Revisar)
+let _prkSin = [];     // v22.77 — stock de racks sin posición (gv_rack_sin_ubicar), para ubicarlo a mano
 
 function pmapSetStatus(msg, ok) {
   const el = document.getElementById("pmapStatus");
@@ -45808,13 +45816,16 @@ function pmapModo(m) {
   pmapRender();
 }
 async function prkFetch() {
+  // v22.77: Racks_Planimetria es una VISTA — la cantidad sale del libro de stock (ubicacion = sector).
   const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_rack_celda",
-    "select=sector,rack,orden,empresa,uso,cod,descripcion,master_cajas,innercajas,estado&order=rack.asc,sector.asc");
+    "select=sector,rack,orden,empresa,uso,cod,descripcion,master_cajas,innercajas,estado,fuente,motivo,revisar_id&order=rack.asc,sector.asc");
   if ((filas && filas.length) || !_prk) _prk = filas || [];
   try {
-    const des = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_rack_stock_desfase",
-      "select=cod,empresa,en_posiciones,stock_racks,diferencia,posiciones");
-    if (des) { _prkDes = {}; des.forEach(function (d) { _prkDes[String(d.cod).toUpperCase() + "|" + String(d.empresa || "").toUpperCase()] = d; }); }
+    const rev = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Rack_Revisar",
+      "select=id,sector,cod,emp,cajas_planimetria,cajas_stock,motivo&resuelto_en=is.null&order=sector.asc");
+    if (rev) _prkRev = rev;
+    const sin = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_rack_sin_ubicar", "select=cod,emp,cajas&order=cajas.desc");
+    if (sin) _prkSin = sin;
   } catch (_e) {}
   return _prk;
 }
@@ -45883,7 +45894,8 @@ function prkRender() {
 }
 function prkCellHtml(r) {
   const sec = String(r.sector || ""), libre = r.estado === "libre";
-  const cls = libre ? "pmap-libre" : (r.estado === "sin_lugar" ? "pmap-smapa" : "");
+  const contar = r.fuente === "a_contar" || (_prkRev || []).some(function (v) { return String(v.sector).toUpperCase() === sec.toUpperCase(); });
+  const cls = (libre ? "pmap-libre" : (r.estado === "sin_lugar" ? "pmap-smapa" : "")) + (contar ? " prk-contar" : "");
   const hit = _pmapQ && prkMatch(r, _pmapQ);
   const mc = Number(r.master_cajas) || 0, inn = Number(r.innercajas) || 0;
   let cuerpo, tip = sec;
@@ -45894,8 +45906,10 @@ function prkCellHtml(r) {
              (mc && inn ? ' · ' : "") + (inn ? pmapNum(inn) + ' caj' : "") + '</span>';
     const d = pmapDesc(r);
     tip += " · " + String(r.cod || "") + (d ? " — " + d : "") + (mc ? " · " + mc + " MC" : "") + (inn ? " · " + inn + " cajas" : "") +
-           (r.estado === "sin_lugar" ? " · ⚠ esta posición no existe como rack en Lugares del depósito" : "");
+           (r.estado === "sin_lugar" ? " · ⚠ esta posición no existe como rack en Lugares del depósito" : "") +
+           (r.fuente === "a_contar" ? " · 🔎 A CONTAR: " + (r.motivo || "") : "");
   }
+  if (contar) cuerpo += '<span class="prk-mc" style="color:#b45309">🔎 a contar</span>';
   return '<div class="pmap-cell ' + cls + (hit ? " pmap-hit" : "") + '" title="' + escapeHtml(tip) + '"' +
          ' onclick="prkAbrir(' + JSON.stringify(sec).replace(/"/g, "&quot;") + ')">' +
          '<span class="pmap-sec">' + escapeHtml(sec) + (r.empresa ? ' · ' + escapeHtml(String(r.empresa)) : "") + '</span>' + cuerpo + '</div>';
@@ -45906,13 +45920,23 @@ function prkCellHtml(r) {
    Racks_Planimetria Y anota en Movimientos_Stock (depósito racks) la diferencia: si se
    escribiera una sola de las dos, el stock de racks dejaría de coincidir con lo que dice
    cada posición. El motivo es obligatorio: queda en el movimiento de stock. */
-function prkStockLinea(cod, emp) {
-  if (!cod || /^(PEDIDOS|CAJAS)$/i.test(cod)) return "";
-  const d = (_prkDes || {})[String(cod).toUpperCase() + "|" + String(emp || "LK").toUpperCase()];
-  if (!d) return '<div class="prk-nota">✓ El stock del depósito racks del <b>' + escapeHtml(cod) + '</b> coincide con lo cargado en sus posiciones.</div>';
-  return '<div class="prk-nota" style="color:#b45309">⚠ <b>' + escapeHtml(cod) + ' ' + escapeHtml(String(d.empresa)) + '</b>: en posiciones <b>' +
-    pmapNum(d.en_posiciones) + '</b> cajas · stock del depósito racks <b>' + pmapNum(d.stock_racks) + '</b>' +
-    (d.posiciones ? ' (' + escapeHtml(String(d.posiciones)) + ')' : '') + '. Corregí la posición que esté mal: el stock se ajusta solo.</div>';
+function prkStockLinea(sector) {
+  // v22.77: lo que esta posición tiene «a contar» (la planimetría vieja no coincidía con el stock).
+  const rs = (_prkRev || []).filter(function (v) { return String(v.sector).toUpperCase() === String(sector).toUpperCase(); });
+  if (!rs.length) return "";
+  return rs.map(function (v) {
+    return '<div class="prk-nota" style="color:#b45309">🔎 <b>A contar · ' + escapeHtml(String(v.cod)) + '</b>: ' + escapeHtml(String(v.motivo || "")) +
+      '. Contá lo que hay y guardalo acá abajo; si no hay nada, ' +
+      '<button class="prk-vaciar" onclick="prkRevisarCerrar(' + Number(v.id) + ')">✓ No hay nada: cerrar</button></div>';
+  }).join("");
+}
+async function prkRevisarCerrar(id) {
+  const nota = prompt("¿Qué encontraste? (queda anotado)", "Contado: la posición no tiene ese artículo");
+  if (!nota) return;
+  const r = await pmapRpc("gv_rack_revisar_cerrar", { p_id: id, p_nota: nota });
+  if (!r.ok) { pmapCeldaStatus("No se cerró: " + r.err, false); return; }
+  await prkFetch(); pmapRender();
+  pmapCeldaStatus("✓ Cerrado.", true);
 }
 function prkAbrir(sector) {
   const r = (_prk || []).filter(function (x) { return String(x.sector) === String(sector); })[0];
@@ -45929,7 +45953,7 @@ function prkAbrir(sector) {
     (libre ? 'Posición <b>libre</b>.'
       : '<b>' + escapeHtml(String(r.cod || "—")) + '</b>' + (d ? ' — ' + escapeHtml(d) : "")) +
     (r.estado === "sin_lugar" ? '<br>⚠ Esta posición no existe como rack en 📍 Lugares del depósito.' : "") +
-    '</div>' + (libre ? "" : prkStockLinea(r.cod, emp)) +
+    '</div>' + prkStockLinea(sector) +
     '<div class="prk-form">' +
       '<label>Código<input class="planim-inp" id="prkCod" type="text" value="' + escapeHtml(libre ? "" : String(r.cod || "")) + '" placeholder="438E, 505… (Pedidos / Cajas = reservado)" oninput="this.value=this.value.toUpperCase()"></label>' +
       '<label>MC<input class="planim-inp planim-inp-num" id="prkMc" type="number" inputmode="numeric" min="0" value="' + (libre ? "" : (Number(r.master_cajas) || 0)) + '"></label>' +
@@ -45941,7 +45965,7 @@ function prkAbrir(sector) {
       '<button class="planim-btn-save" onclick="prkGuardar(' + secJ + ',false)">💾 Guardar</button>' +
       (libre ? "" : '<button class="prk-vaciar" onclick="prkGuardar(' + secJ + ',true)">🗑 Vaciar posición</button>') +
     '</div>' +
-    '<div class="prk-nota">Guardar cambia lo que dice la posición y ajusta el stock del depósito racks por la diferencia, en el mismo paso.</div>';
+    '<div class="prk-nota">Guardar deja en el stock de racks lo que hay en ESTA posición (ajusta por la diferencia) y cierra lo que tenía «a contar».</div>';
   m.classList.add("show");
 }
 let _prkGuardando = false;
@@ -45972,19 +45996,62 @@ async function prkGuardar(sector, vaciar) {
 /* Cartel arriba de los racks: qué códigos tienen distinto lo cargado en posiciones y el
    stock del depósito racks. Vacío = las dos tablas cuentan lo mismo. */
 function prkDesfaseRender() {
+  // v22.77 (Luis: "dejalo en el front lo que tengas dudas para que alguien lo cuente y complete").
   const box = document.getElementById("prkDesfase");
   if (!box) return;
-  const ds = Object.keys(_prkDes || {}).map(function (k) { return _prkDes[k]; })
-    .sort(function (a, b) { return Math.abs(b.diferencia) - Math.abs(a.diferencia); });
-  box.hidden = !ds.length;
-  if (!ds.length) return;
-  box.innerHTML = '⚠ <b>' + ds.length + ' código(s) con distinto stock en racks que lo cargado en sus posiciones.</b> ' +
-    'Tocá uno para ir a su posición y corregirla (el stock se ajusta solo):' +
-    '<div>' + ds.map(function (d) {
-      const q = JSON.stringify(String(d.cod)).replace(/"/g, "&quot;");
-      return '<button onclick="pmapBuscar(' + q + ')">' + escapeHtml(String(d.cod)) + ' ' + escapeHtml(String(d.empresa || "")) +
-             ' · pos ' + pmapNum(d.en_posiciones) + ' / stock ' + pmapNum(d.stock_racks) + '</button>';
-    }).join("") + '</div>';
+  const rev = _prkRev || [], sin = (_prkSin || []).filter(function (s) { return Number(s.cajas) !== 0; });
+  box.hidden = !rev.length && !sin.length;
+  if (box.hidden) return;
+  let h = "";
+  if (rev.length) {
+    h += '🔎 <b>' + rev.length + ' posición(es) a contar</b>: la planimetría vieja no coincidía con el stock. Tocá una, contá y guardá:' +
+      '<div>' + rev.map(function (v) {
+        const s = JSON.stringify(String(v.sector)).replace(/"/g, "&quot;");
+        return '<button onclick="prkIrA(' + s + ')">' + escapeHtml(String(v.sector)) + ' · ' + escapeHtml(String(v.cod)) +
+               (v.cajas_planimetria != null ? ' · decía ' + pmapNum(v.cajas_planimetria) : '') + '</button>';
+      }).join("") + '</div>';
+  }
+  if (sin.length) {
+    h += (h ? '<br>' : '') + '📦 <b>Stock de racks sin posición</b>: tocá uno para ubicarlo:' +
+      '<div>' + sin.map(function (s) {
+        const a = [s.cod, s.emp, Number(s.cajas)].map(function (x) { return JSON.stringify(x).replace(/"/g, "&quot;"); }).join(",");
+        return '<button onclick="prkUbicarAbrir(' + a + ')">' + escapeHtml(String(s.cod)) + ' ' + escapeHtml(String(s.emp || "")) +
+               ' · ' + pmapNum(s.cajas) + ' caj</button>';
+      }).join("") + '</div>';
+  }
+  box.innerHTML = h;
+}
+function prkIrA(sector) {
+  const r = (_prk || []).filter(function (x) { return String(x.sector) === String(sector); })[0];
+  if (r) { _prkR = String(r.rack || "").toUpperCase(); pmapRender(); prkAbrir(sector); }
+  else alert("La posición " + sector + " no existe como rack. Ubicá el artículo en la posición correcta desde «Stock de racks sin posición».");
+}
+function prkUbicarAbrir(cod, emp, cajas) {
+  const m = document.getElementById("pmapCeldaModal"), tit = document.getElementById("pmapCeldaTit"),
+        box = document.getElementById("pmapCeldaBody");
+  if (!m || !tit || !box) return;
+  _pmapCelda = ""; pmapCeldaStatus("");
+  tit.textContent = "Ubicar " + cod + " · " + (emp || "");
+  const a = [cod, emp].map(function (x) { return JSON.stringify(x).replace(/"/g, "&quot;"); }).join(",");
+  box.innerHTML = '<div class="prk-det">Hay <b>' + pmapNum(cajas) + '</b> cajas de <b>' + escapeHtml(cod) + '</b> en el stock de racks que no están en ninguna posición.' +
+      (Number(cajas) < 0 ? '<br>⚠ Da negativo: se bajaron cajas sin decir de qué posición. Corregí la posición de donde salieron.' : '') + '</div>' +
+    '<div class="prk-form">' +
+      '<label>Posición<input class="planim-inp" id="prkUbSec" type="text" placeholder="AD07" oninput="this.value=this.value.toUpperCase()"></label>' +
+      '<label>Cajas<input class="planim-inp planim-inp-num" id="prkUbCaj" type="number" min="1" value="' + (Number(cajas) > 0 ? Number(cajas) : "") + '"></label>' +
+      '<label class="prk-mot">Quién lo contó / motivo<input class="planim-inp" id="prkUbMot" type="text" placeholder="Conteo del 25/09"></label>' +
+    '</div>' +
+    '<div class="prk-btns"><button class="planim-btn-save" onclick="prkUbicarGuardar(' + a + ')">📍 Ubicar</button></div>';
+  m.classList.add("show");
+}
+async function prkUbicarGuardar(cod, emp) {
+  const v = function (id) { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+  const sec = v("prkUbSec").toUpperCase(), caj = Number(v("prkUbCaj") || 0), mot = v("prkUbMot");
+  if (!sec || !(caj > 0) || !mot) { pmapCeldaStatus("Completá posición, cajas y motivo.", false); return; }
+  pmapCeldaStatus("Guardando…", true);
+  const r = await pmapRpc("gv_rack_ubicar", { p_cod: cod, p_emp: emp, p_sector: sec, p_cajas: caj, p_motivo: mot });
+  if (!r.ok) { pmapCeldaStatus("No se ubicó: " + r.err, false); return; }
+  await prkFetch(); pmapRender();
+  pmapCeldaStatus("✓ " + caj + " cajas de " + cod + " quedaron en " + sec + ".", true);
 }
 /* ═══════════════════════════════════════════════════════════════════
    EDICIÓN DESDE EL MAPA — v17.31 (pedido de Thomas, 2026-09-14: "que se pueda en

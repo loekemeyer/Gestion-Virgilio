@@ -1973,3 +1973,12 @@ select sum(total) from public.vista_generador_oc where activo;
   `zz_backups."GV_Backup_CapSector_defs_20260925"` (def, idx, grants) y reponer el espejo en
   `gv_lugar_item_guardar/_sacar` (backup del contenido en `zz_backups."GV_Backup_LugarItem_20260925_unif"`).
   Detalle: `sql/gv_capacidad_sector_vista_v2275.sql`.
+
+## 2026-09-25 · v22.77 · Racks_Planimetria pasa a VISTA; la cantidad por posición vive en Movimientos_Stock (Luis)
+- Tabla vieja: `public."Racks_Planimetria_legacy"` (sin escritura). Backup: `zz_backups."GV_Backup_RacksPlani_20260925"`.
+- Funciones reescritas (backup de las definiciones en `zz_backups."GV_Backup_RacksFn_20260925"`): racks_plani_ingreso,
+  _ingreso_nacional, _mover, _descontar (sin efecto), registrar_baja_racks, gv_rack_posicion_guardar. Producción las
+  llama con la misma firma: siguen andando.
+- Rollback: ver cabecera de `sql/gv_racks_canon_v2277.sql` (drop view + rename + dependientes desde
+  `zz_backups."GV_Backup_RacksPlani_defs_20260925"` + funciones desde el backup + borrar los ajustes
+  `ref = 'ubicar racks · v22.76'`, que suman 0 por código).
