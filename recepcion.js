@@ -2475,7 +2475,7 @@ async function opEnviar() {
         let hh = "";
         try { if (primera.created_at) hh = new Date(primera.created_at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) {}
         const ref = "remito " + opState.remito + (opState.linea ? " (" + opState.linea + ")" : "") +
-          " ya se cargó hoy" + (hh ? " a las " + hh : "") + (primera.codigo ? " · código " + primera.codigo : "");
+          " ya se cargó hoy" + (hh ? " a las " + hh : "") + "";
         if (repetidos.length) {
           aviso = "⚠ El " + ref + ". Esa carga YA incluía: " + repetidos.join(", ") + "." +
             (nuevos.length ? "\nNuevos en esta carga: " + nuevos.join(", ") + "." : "") +
@@ -2646,20 +2646,7 @@ async function opEnviar() {
   ok.textContent = "✓ Enviado. " + rows.length + " código(s) guardado(s) para " + displayName(opState.tallNombre) +
     " (" + opState.linea + ") · RTO/FC " + opState.remito + ".";
   opBody.appendChild(ok);
-  // v8.83: mostrar código de confirmación al operario
-  if (codigoConf) {
-    const codWrap = document.createElement("div");
-    codWrap.style.cssText = "text-align:center;margin:14px 0 6px;";
-    const codLbl = document.createElement("div");
-    codLbl.style.cssText = "font-size:13px;color:#64748b;margin-bottom:4px;";
-    codLbl.textContent = "Código de confirmación:";
-    const codBox = document.createElement("div");
-    codBox.className = "codigoBox";
-    codBox.textContent = codigoConf;
-    codWrap.appendChild(codLbl);
-    codWrap.appendChild(codBox);
-    opBody.appendChild(codWrap);
-  }
+  // v22.55 (Luis): el código de confirmación ya no se usa — no se le muestra al operario.
 
   opActions.innerHTML = "";
   const cerrar = document.createElement("button");
