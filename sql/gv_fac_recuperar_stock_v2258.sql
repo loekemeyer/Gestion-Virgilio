@@ -1,4 +1,4 @@
--- v22.56 (Luis, 2026-09-25) — ♻ RECUPERAR ITEMS DE FC: ajuste de stock opcional + candado por NP.
+-- v22.58 (Luis, 2026-09-25) — ♻ RECUPERAR ITEMS DE FC: ajuste de stock opcional + candado por NP.
 --
 -- "Cuando se aprieta alguno de los botones, debería preguntar si quiere que se ajuste el stock
 --  para sacar los items de góndola que se facturan … tiene que figurar en ese pedido … sin romper nada".

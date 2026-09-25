@@ -102,7 +102,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.R5_orden = bajadas.length === 1 && bajadas[0].antesDeRegistrar === false;
     const lin = bajadas.length ? bajadas[0].filas[0].lineas : [];
     out.R5_lineas = bajadas.length === 1 && lin.length === 1 && lin[0].art === "534" && Number(lin[0].cajas) === 1 && bajadas[0].filas[0].cod === "151";
-    // R6 (v22.56) — pregunta si se ajusta el stock; Aceptar = true, Cancelar = false (no aborta)
+    // R6 (v22.58) — pregunta si se ajusta el stock; Aceptar = true, Cancelar = false (no aborta)
     out.R6_pregunta = confirms.some(function (m) { return /AJUSTAR EL STOCK/.test(m) && /Cancelar = NO/.test(m); });
     out.R6_si = reg1.length === 1 && reg1[0].body.p_ajustar_stock === true;
     window.confirm = function (m) { confirms.push(String(m)); return !/AJUSTAR EL STOCK/.test(m); };
