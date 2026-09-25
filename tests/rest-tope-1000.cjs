@@ -31,7 +31,7 @@ const CHICAS = {
 };
 /* Las que leen el universo entero de algo que SÍ crece: tienen que ir por gvRestTodo. */
 const DEBEN_PAGINAR = [
-  "vista_uxb_articulo", "vista_abastecimiento", "PPP_Geo", "GV_Clientes_Nuevos",
+  "gv_proyeccion_articulo", "vista_uxb_articulo", "vista_abastecimiento", "PPP_Geo", "GV_Clientes_Nuevos",
   "PPP_Web_Programacion", "gv_ppp_web_estado", "vista_fc_sin_salida", "Zonas_Barrios",
   // Cola de "Agregar Expreso ISIS": crece sola si nadie la vacia (v21.94).
   "gv_expreso_pendiente",

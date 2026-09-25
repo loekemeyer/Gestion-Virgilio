@@ -6182,7 +6182,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.75"></script>
+<script type="module" src="recepcion.js?v=22.76"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10140,7 +10140,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.75";
+const APP_VERSION = "v22.76";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16800,8 +16800,8 @@ async function ocgFetchProyeccion() {
     // v22.71 — UNA SOLA PROYECCIÓN: gv_proyeccion_articulo (la misma de Stock, OC e Importados).
     // El principal ya trae la familia sumada (Equivalencias_Familia entera, no sólo la semilla del
     // front); el secundario se deja afuera, como hacía la consolidación vieja.
-    const r = await fetch(SUPABASE_URL + "/rest/v1/gv_proyeccion_articulo?select=cod,proy_cajas_mes,es_secundario", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
-    const rows = r.ok ? await r.json() : [];
+    // v22.76: una fila por articulo, crece con el catalogo -> paginada (tope de 1.000 de PostgREST).
+    const rows = await gvRestTodo("gv_proyeccion_articulo?select=cod,proy_cajas_mes,es_secundario");
     const m = {};
     rows.forEach(function (x) { if (x.es_secundario) return; const k = _ocgNorm(x.cod); if (k) m[k] = Number(x.proy_cajas_mes) || 0; });
     return m;
