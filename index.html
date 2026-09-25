@@ -2945,6 +2945,13 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .prk-det{ font-size:15px; line-height:1.6; color:#334155; }
 .prk-det b{ color:#0f172a; }
 .prk-nota{ margin-top:10px; font-size:13px; color:#64748b; }
+.prk-form{ display:grid; grid-template-columns:1fr 90px 90px 90px; gap:8px; margin-top:12px; }
+.prk-form label{ display:flex; flex-direction:column; gap:3px; font-size:12px; font-weight:700; color:#475569; }
+.prk-form .prk-mot{ grid-column:1 / -1; }
+@media (max-width:520px){ .prk-form{ grid-template-columns:1fr 1fr; } }
+.prk-btns{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+.prk-btns .planim-btn-save{ width:auto; margin-top:0; }
+.prk-vaciar{ padding:8px 14px; border:2px solid #b42318; background:#fff; color:#b42318; border-radius:8px; font-weight:800; cursor:pointer; }
 .pmap-head{ font-size:14px; color:#475569; margin:2px 0 8px; }
 .pmap-head b{ color:#0f172a; }
 .pmap-wrap{ overflow-x:auto; padding-bottom:6px; }
@@ -6173,7 +6180,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.67"></script>
+<script type="module" src="recepcion.js?v=22.68"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6452,6 +6459,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       </div>
       <div id="pmapTabs" class="pmap-tabs"></div>
       <div id="pmapVieja" class="pmap-vieja" hidden></div>
+      <div id="prkDesfase" class="pmap-vieja" hidden></div>
       <div id="pmapGrid"></div>
       <div id="pmapLeg" class="pmap-leg"></div>
       <div id="pmapStatus" class="planim-status"></div>
@@ -10130,7 +10138,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.67";
+const APP_VERSION = "v22.68";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -45480,6 +45488,7 @@ const PMAP_SELECT = "select=sector,gondola,celda,empresa,orden,cod,descripcion,c
                     "&order=gondola.asc,celda.asc";
 let _pmap = null, _pmapG = "", _pmapQ = "";
 let _pmapModo = "gondola", _prk = null, _prkR = "";   // v22.67 — pestaña Racks
+let _prkDes = null;   // v22.68 — desfase posiciones vs stock del depósito racks, por "COD|EMP"
 
 function pmapSetStatus(msg, ok) {
   const el = document.getElementById("pmapStatus");
@@ -45554,8 +45563,9 @@ function pmapRender() {
   const tabs = document.getElementById("pmapTabs"), box = document.getElementById("pmapGrid");
   if (!tabs || !box) return;
   const vj = document.getElementById("pmapVieja");
-  if (_pmapModo === "rack") { if (vj) vj.style.display = "none"; prkRender(); return; }
+  if (_pmapModo === "rack") { if (vj) vj.style.display = "none"; prkRender(); prkDesfaseRender(); return; }
   if (vj) vj.style.display = "";
+  const dz = document.getElementById("prkDesfase"); if (dz) dz.hidden = true;
   if (!_pmap) { box.innerHTML = '<div class="planim-empty">Cargando…</div>'; return; }
   const gs = pmapGondolas();
   if (!gs.length) {
@@ -45700,11 +45710,12 @@ function pmapCellHtml(g, n, porCelda) {
    📦 RACKS — v22.67 (Luis, 2026-09-25: "deberíamos agregar también Racks… separá
    eso en dos pestañas, Góndola y Racks")
 
-   SOLO LECTURA. Todo sale de UNA vista, `gv_rack_celda` (sql/gv_rack_celda_v2267.sql):
+   Se lee de UNA vista, `gv_rack_celda` (sql/gv_rack_celda_v2267.sql):
    el layout de `GV_Lugar` (tipo rack, la tabla que vale) y lo que hay adentro de
    `Racks_Planimetria`. Lo que hay en cada posición lo mueven los operarios con
    Ingreso / Bajar / Mover racks (racks_plani_ingreso / _descontar / _mover), que además
-   dejan el movimiento de stock: si este mapa escribiera, el stock de racks no se enteraría.
+   dejan el movimiento de stock. El mapa también edita (v22.68), pero sólo por la RPC
+   gv_rack_posicion_guardar, que escribe la posición Y el ajuste de stock juntos.
    Una posición de Racks_Planimetria que no existe como rack en GV_Lugar sale igual, en
    amarillo ("sin_lugar"), para que no quede escondida. */
 function pmapModo(m) {
@@ -45727,6 +45738,11 @@ async function prkFetch() {
   const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_rack_celda",
     "select=sector,rack,orden,empresa,uso,cod,descripcion,master_cajas,innercajas,estado&order=rack.asc,sector.asc");
   if ((filas && filas.length) || !_prk) _prk = filas || [];
+  try {
+    const des = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_rack_stock_desfase",
+      "select=cod,empresa,en_posiciones,stock_racks,diferencia,posiciones");
+    if (des) { _prkDes = {}; des.forEach(function (d) { _prkDes[String(d.cod).toUpperCase() + "|" + String(d.empresa || "").toUpperCase()] = d; }); }
+  } catch (_e) {}
   return _prk;
 }
 function prkNum(sec) { const m = String(sec || "").match(/(\d+)/); return m ? Number(m[1]) : 0; }
@@ -45811,7 +45827,20 @@ function prkCellHtml(r) {
          ' onclick="prkAbrir(' + JSON.stringify(sec).replace(/"/g, "&quot;") + ')">' +
          '<span class="pmap-sec">' + escapeHtml(sec) + (r.empresa ? ' · ' + escapeHtml(String(r.empresa)) : "") + '</span>' + cuerpo + '</div>';
 }
-/* Detalle de UNA posición, de solo lectura (en el celular no hay tooltip). */
+/* v22.68 (Luis 25/09: "tiene que ser un módulo de front editable que tenga efecto en las
+   tablas del back"). Tocar una posición abre su editor. Se escribe SÓLO por la RPC
+   gv_rack_posicion_guardar, que en la misma transacción deja la posición en
+   Racks_Planimetria Y anota en Movimientos_Stock (depósito racks) la diferencia: si se
+   escribiera una sola de las dos, el stock de racks dejaría de coincidir con lo que dice
+   cada posición. El motivo es obligatorio: queda en el movimiento de stock. */
+function prkStockLinea(cod, emp) {
+  if (!cod || /^(PEDIDOS|CAJAS)$/i.test(cod)) return "";
+  const d = (_prkDes || {})[String(cod).toUpperCase() + "|" + String(emp || "LK").toUpperCase()];
+  if (!d) return '<div class="prk-nota">✓ El stock del depósito racks del <b>' + escapeHtml(cod) + '</b> coincide con lo cargado en sus posiciones.</div>';
+  return '<div class="prk-nota" style="color:#b45309">⚠ <b>' + escapeHtml(cod) + ' ' + escapeHtml(String(d.empresa)) + '</b>: en posiciones <b>' +
+    pmapNum(d.en_posiciones) + '</b> cajas · stock del depósito racks <b>' + pmapNum(d.stock_racks) + '</b>' +
+    (d.posiciones ? ' (' + escapeHtml(String(d.posiciones)) + ')' : '') + '. Corregí la posición que esté mal: el stock se ajusta solo.</div>';
+}
 function prkAbrir(sector) {
   const r = (_prk || []).filter(function (x) { return String(x.sector) === String(sector); })[0];
   const m = document.getElementById("pmapCeldaModal"), tit = document.getElementById("pmapCeldaTit"),
@@ -45819,17 +45848,70 @@ function prkAbrir(sector) {
   if (!r || !m || !tit || !box) return;
   _pmapCelda = "";
   pmapCeldaStatus("");
-  tit.textContent = "Rack · " + sector;
-  const d = pmapDesc(r), mc = Number(r.master_cajas) || 0, inn = Number(r.innercajas) || 0;
+  tit.textContent = "Rack · " + sector + (r.empresa ? " · " + r.empresa : "");
+  const libre = r.estado === "libre", d = pmapDesc(r);
+  const emp = String(r.empresa || "LK").toUpperCase();
+  const secJ = JSON.stringify(String(sector)).replace(/"/g, "&quot;");
   box.innerHTML = '<div class="prk-det">' +
-    (r.estado === "libre" ? 'Posición <b>libre</b>.'
-      : '<b>' + escapeHtml(String(r.cod || "—")) + '</b>' + (d ? ' — ' + escapeHtml(d) : "") +
-        '<br>' + (mc ? '<b>' + pmapNum(mc) + '</b> MC' : "") + (mc && inn ? ' · ' : "") + (inn ? '<b>' + pmapNum(inn) + '</b> cajas' : "")) +
-    (r.empresa ? '<br>Empresa: <b>' + escapeHtml(String(r.empresa)) + '</b>' : "") +
-    (r.uso ? '<br>Uso: ' + escapeHtml(String(r.uso)) : "") +
+    (libre ? 'Posición <b>libre</b>.'
+      : '<b>' + escapeHtml(String(r.cod || "—")) + '</b>' + (d ? ' — ' + escapeHtml(d) : "")) +
     (r.estado === "sin_lugar" ? '<br>⚠ Esta posición no existe como rack en 📍 Lugares del depósito.' : "") +
-    '</div><div class="prk-nota">Lo que hay en cada posición lo cargan los operarios con Ingreso / Bajar / Mover racks, que dejan también el movimiento de stock. Este mapa sólo lo muestra.</div>';
+    '</div>' + (libre ? "" : prkStockLinea(r.cod, emp)) +
+    '<div class="prk-form">' +
+      '<label>Código<input class="planim-inp" id="prkCod" type="text" value="' + escapeHtml(libre ? "" : String(r.cod || "")) + '" placeholder="438E, 505… (Pedidos / Cajas = reservado)" oninput="this.value=this.value.toUpperCase()"></label>' +
+      '<label>MC<input class="planim-inp planim-inp-num" id="prkMc" type="number" inputmode="numeric" min="0" value="' + (libre ? "" : (Number(r.master_cajas) || 0)) + '"></label>' +
+      '<label>Cajas<input class="planim-inp planim-inp-num" id="prkInner" type="number" inputmode="numeric" min="0" value="' + (libre ? "" : (Number(r.innercajas) || 0)) + '"></label>' +
+      '<label>Empresa<select class="planim-inp" id="prkEmp"><option value="LK"' + (emp === "LK" ? " selected" : "") + '>LK</option><option value="CH"' + (emp === "CH" ? " selected" : "") + '>CH</option></select></label>' +
+      '<label class="prk-mot">Motivo (obligatorio)<input class="planim-inp" id="prkMotivo" type="text" placeholder="Conteo del 25/09, palet movido…"></label>' +
+    '</div>' +
+    '<div class="prk-btns">' +
+      '<button class="planim-btn-save" onclick="prkGuardar(' + secJ + ',false)">💾 Guardar</button>' +
+      (libre ? "" : '<button class="prk-vaciar" onclick="prkGuardar(' + secJ + ',true)">🗑 Vaciar posición</button>') +
+    '</div>' +
+    '<div class="prk-nota">Guardar cambia lo que dice la posición y ajusta el stock del depósito racks por la diferencia, en el mismo paso.</div>';
   m.classList.add("show");
+}
+let _prkGuardando = false;
+async function prkGuardar(sector, vaciar) {
+  if (_prkGuardando) return;
+  const v = function (id) { const el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+  const cod = vaciar ? "" : v("prkCod").toUpperCase();
+  const mc = vaciar ? 0 : Number(v("prkMc") || 0), inner = vaciar ? 0 : Number(v("prkInner") || 0);
+  const emp = v("prkEmp") || "LK", motivo = v("prkMotivo");
+  if (!motivo) { pmapCeldaStatus("Escribí el motivo: queda en el movimiento de stock.", false); return; }
+  if (!vaciar && cod && !/^(PEDIDOS|CAJAS)$/.test(cod) && !(inner > 0)) { pmapCeldaStatus("Poné las cajas que hay (o vaciá la posición).", false); return; }
+  if (vaciar && !confirm("¿Vaciar " + sector + "? Sale del stock del depósito racks lo que tenía cargado.")) return;
+  _prkGuardando = true;
+  pmapCeldaStatus("Guardando…", true);
+  const r = await pmapRpc("gv_rack_posicion_guardar", {
+    p_sector: sector, p_cod: cod, p_master: mc, p_inner: inner, p_emp: emp, p_motivo: motivo
+  });
+  _prkGuardando = false;
+  if (!r.ok) { pmapCeldaStatus("No se guardó: " + r.err, false); return; }
+  const mov = ((r.data && r.data.stock) || []).map(function (x) {
+    return x.cod + " " + (x.delta > 0 ? "+" : "") + x.delta;
+  }).join(" · ");
+  await prkFetch();
+  pmapRender();
+  prkAbrir(sector);
+  pmapCeldaStatus("✓ Guardado." + (mov ? " Stock racks: " + mov + " cajas." : " El stock de racks no cambió."), true);
+}
+/* Cartel arriba de los racks: qué códigos tienen distinto lo cargado en posiciones y el
+   stock del depósito racks. Vacío = las dos tablas cuentan lo mismo. */
+function prkDesfaseRender() {
+  const box = document.getElementById("prkDesfase");
+  if (!box) return;
+  const ds = Object.keys(_prkDes || {}).map(function (k) { return _prkDes[k]; })
+    .sort(function (a, b) { return Math.abs(b.diferencia) - Math.abs(a.diferencia); });
+  box.hidden = !ds.length;
+  if (!ds.length) return;
+  box.innerHTML = '⚠ <b>' + ds.length + ' código(s) con distinto stock en racks que lo cargado en sus posiciones.</b> ' +
+    'Tocá uno para ir a su posición y corregirla (el stock se ajusta solo):' +
+    '<div>' + ds.map(function (d) {
+      const q = JSON.stringify(String(d.cod)).replace(/"/g, "&quot;");
+      return '<button onclick="pmapBuscar(' + q + ')">' + escapeHtml(String(d.cod)) + ' ' + escapeHtml(String(d.empresa || "")) +
+             ' · pos ' + pmapNum(d.en_posiciones) + ' / stock ' + pmapNum(d.stock_racks) + '</button>';
+    }).join("") + '</div>';
 }
 /* ═══════════════════════════════════════════════════════════════════
    EDICIÓN DESDE EL MAPA — v17.31 (pedido de Thomas, 2026-09-14: "que se pueda en

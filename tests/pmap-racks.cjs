@@ -7,7 +7,8 @@
        con cada posición: código, MC y cajas; la libre dice "libre";
    (c) una posición cargada que no existe como rack sale marcada (sin_lugar);
    (d) buscar en Racks salta al rack que tiene el código y lo resalta;
-   (e) tocar una posición abre el detalle de SOLO LECTURA (sin campos para editar);
+   (e) tocar una posición abre su editor con lo cargado y el desfase contra el stock de racks;
+   (g) guardar exige motivo y va por la RPC gv_rack_posicion_guardar (posición + stock juntos);
    (f) volver a Góndolas dibuja la góndola de nuevo. */
 const path = require("path");
 let chromium;
@@ -35,6 +36,9 @@ const RACKS = [
   await p.route("**/rest/v1/**", (r) => r.abort());
   await p.route("**/rest/v1/gv_planimetria_celda*", (r) =>
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(GOND) }));
+  await p.route("**/rest/v1/gv_rack_stock_desfase*", (r) =>
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+      { cod: "368E", empresa: "LK", en_posiciones: 132, stock_racks: 36, diferencia: 96, posiciones: "AD06 56, X05 56, Y12 20" }]) }));
   await p.route("**/rest/v1/gv_rack_celda*", (r) => {
     pidioRack = r.request().url();
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(RACKS) });
@@ -71,7 +75,23 @@ const RACKS = [
     prkAbrir("X05");
     o.detVisible = document.getElementById("pmapCeldaModal").classList.contains("show");
     o.detTxt = document.getElementById("pmapCeldaBody").textContent;
-    o.detInputs = document.querySelectorAll("#pmapCeldaBody input, #pmapCeldaBody button").length;
+    o.formCod = (document.getElementById("prkCod") || {}).value;
+    o.formInner = (document.getElementById("prkInner") || {}).value;
+    o.desfaseTxt = o.detTxt;
+    // (g) editar: sin motivo no llama a la base; con motivo manda la RPC con lo tipeado
+    window.__rpc = [];
+    window.pmapRpc = async function (fn, body) { window.__rpc.push({ fn: fn, body: body });
+      return { ok: true, data: { ok: true, stock: [{ cod: "368E", emp: "LK", delta: 6 }] } }; };
+    document.getElementById("prkInner").value = "62";
+    await prkGuardar("X05", false);
+    o.sinMotivo = window.__rpc.length;
+    o.sinMotivoMsg = document.getElementById("pmapCeldaStatus").textContent;
+    prkAbrir("X05");
+    document.getElementById("prkInner").value = "62";
+    document.getElementById("prkMotivo").value = "conteo";
+    await prkGuardar("X05", false);
+    o.rpc = window.__rpc.slice();
+    o.okMsg = document.getElementById("pmapCeldaStatus").textContent;
     pmapCerrarCelda();
 
     pmapBuscar("");
@@ -98,11 +118,17 @@ const RACKS = [
   ok(/pmap-smapa/.test(out.sinLugarCls || ""), "(c) la posición sin lugar no sale marcada");
   ok(out.buscarTab === "X 1" || /^X/.test(out.buscarTab || ""), "(d) buscar no saltó al rack X: " + out.buscarTab);
   ok(JSON.stringify(out.hit) === '["368E"]', "(d) no resaltó el 368E: " + JSON.stringify(out.hit));
-  ok(out.detVisible && /368E/.test(out.detTxt) && /14/.test(out.detTxt), "(e) el detalle no muestra la posición");
-  ok(out.detInputs === 0, "(e) el detalle de rack tiene campos o botones para editar (" + out.detInputs + ")");
+  ok(out.detVisible && /368E/.test(out.detTxt), "(e) el detalle no muestra la posición");
+  ok(out.formCod === "368E" && out.formInner === "56", "(e) el editor no trae lo cargado: " + out.formCod + "/" + out.formInner);
+  ok(/stock del depósito racks/.test(out.desfaseTxt) && /132/.test(out.desfaseTxt) && /36/.test(out.desfaseTxt), "(e) el editor no muestra el desfase del 368E: " + out.desfaseTxt);
+  ok(out.sinMotivo === 0 && /motivo/i.test(out.sinMotivoMsg), "(g) guardó sin motivo");
+  ok(out.rpc.length === 1 && out.rpc[0].fn === "gv_rack_posicion_guardar" && out.rpc[0].body.p_sector === "X05" &&
+     out.rpc[0].body.p_cod === "368E" && out.rpc[0].body.p_inner === 62 && out.rpc[0].body.p_motivo === "conteo",
+     "(g) no llamó bien a gv_rack_posicion_guardar: " + JSON.stringify(out.rpc));
+  ok(/368E \+6/.test(out.okMsg), "(g) no avisa el ajuste de stock: " + out.okMsg);
   ok(/Góndola\s*A/.test(out.volvio), "(f) volver a Góndolas no dibuja la góndola: " + out.volvio);
   ok(out.viejaVuelve, "(f) el aviso de la planimetría vieja no vuelve en Góndolas");
 
   if (fallas.length) { console.error("✗ pmap-racks:\n  - " + fallas.join("\n  - ")); process.exit(1); }
-  console.log("✓ pmap-racks: dos pestañas, racks por vista, libre/sin lugar, búsqueda y detalle de solo lectura");
+  console.log("✓ pmap-racks: dos pestañas, racks por vista, libre/sin lugar, búsqueda y edición por RPC");
 })().catch((e) => { console.error(e); process.exit(1); });
