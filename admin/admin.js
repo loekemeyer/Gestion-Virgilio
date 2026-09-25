@@ -14111,6 +14111,9 @@ function _gvQ(v) {
 // =====================================================================
 var _fcWired = false;
 var _fcData = null; // ultima ficha cargada (JSON de get_ficha_cliente)
+var _fcAcuerdo = null; // JSON de get_acuerdo_cliente (acuerdo y dto maximo)
+var _fcIsis = null; // JSON de get_ficha_isis (FC ISIS, mayor compra, deuda del ERP)
+var _fcIsisError = null;
 var _fcMesesExpandido = false; // false = 6 meses, true = 12
 var _fcBuscarTimer = null;
 var FC_MESES_DEFAULT = 6;
@@ -14238,9 +14241,22 @@ async function cargarFichaCliente(cod) {
   if (status) status.textContent = "Cargando ficha del cliente " + cod + "…";
   if (cont) cont.innerHTML = "";
   try {
-    var r = await sb.rpc("get_ficha_cliente", { p_cod: String(cod) });
+    // Las dos en paralelo: la ficha es cara y el acuerdo no depende de ella.
+    var par = await Promise.all([
+      sb.rpc("get_ficha_cliente", { p_cod: String(cod) }),
+      sb.rpc("get_acuerdo_cliente", { p_cod: String(cod) }),
+      // FC real de ISIS (facturas - NC, con IVA) y la deuda del MISMO Excel que
+      // Cuarentena. Va aparte porque cruza a Gestion Virgilio por FDW.
+      sb.rpc("get_ficha_isis", { p_cod: String(cod) }),
+    ]);
+    var r = par[0];
     if (r.error) throw r.error;
     _fcData = r.data;
+    // Si falla el acuerdo la ficha se muestra igual: es un dato de apoyo.
+    _fcAcuerdo = par[1] && !par[1].error ? par[1].data : null;
+    // Una lectura rota NO es un cero: sin ISIS, la hoja lo dice en vez de "$ 0".
+    _fcIsis = par[2] && !par[2].error ? par[2].data : null;
+    _fcIsisError = par[2] && par[2].error ? par[2].error.message || "error" : null;
     _fcMesesExpandido = false;
     if (status) status.textContent = "";
     fcRender();
@@ -14266,6 +14282,7 @@ function fcRender() {
   var chefCods = Array.isArray(d.chef_cods) ? d.chef_cods : [];
   html +=
     '<div class="fc-cabecera">' +
+    '<div class="fc-cab-txt">' +
     '<div class="fc-cab-nom">' +
     escapeHtml(d.business_name || "(sin razón social)") +
     "</div>" +
@@ -14276,41 +14293,211 @@ function fcRender() {
       ? ' · Chef ' + escapeHtml(chefCods.join(", "))
       : "") +
     "</div>" +
+    "</div>" +
+    '<button type="button" class="fc-excel" onclick="fcDescargarExcel()">' +
+    "Descargar Excel</button>" +
     "</div>";
 
-  // ---- Grilla de datos ----
-  // El tercer argumento marca el valor como copiable con un clic. Hoy lo usa
-  // solo el CUIT: ver el modulo del final del archivo.
-  function dato(lbl, val, copiable) {
-    var vacio = val === "" || val == null;
+  // ---- HOJA DEL CLIENTE (formato planilla) ----
+  // Luis, 25/09/2026: la ficha tiene que tener la data y la visual de la planilla
+  // de cliente (bloques con recuadro, rotulo arriba o a la izquierda, dato al
+  // lado). De donde sale cada dato:
+  //   FC / Mayor compra / Cant. facturas / 1a compra -> get_ficha_isis (facturas
+  //     - NC con IVA de ISIS: es la cifra de la planilla, verificado con Messina).
+  //   Deuda -> el Excel del ERP que usa Cuarentena (gv_deuda_feed), con su fecha.
+  //   Acuerdo cliente / tomado / +-Rent -> get_acuerdo_cliente.
+  // Lo que la base no tiene (tipo de cliente, ultimos pagos, dto x plazo, dias al
+  // cheque) se muestra con "—" y el rotulo en gris: el hueco se ve, no se inventa.
+  var isis = _fcIsis || {};
+  var isisAnios = Array.isArray(isis.anios) ? isis.anios : [];
+  var porAnio = {};
+  isisAnios.forEach(function (y) {
+    porAnio[String(y.anio)] = y;
+  });
+  var anioHoy = new Date().getFullYear();
+  var sinIsis = !_fcIsis;
+  function fcPlata(v) {
+    if (sinIsis) return '<span class="fc-h-sd" title="No se pudo leer ISIS">s/d</span>';
+    return v == null || Number(v) === 0 ? "—" : "$ " + formatMoney(v);
+  }
+  function fcFaltaDato(txt) {
+    return '<span class="fc-h-sd" title="' + escapeHtml(txt) + '">—</span>';
+  }
+  function yv(anio, campo) {
+    var y = porAnio[String(anio)];
+    return y ? y[campo] : null;
+  }
+  var dirsH = Array.isArray(f.direcciones) ? f.direcciones : [];
+  var locEntrega = [];
+  dirsH.forEach(function (a) {
+    var l = String(a.localidad || "").trim();
+    if (l && locEntrega.indexOf(l) < 0) locEntrega.push(l);
+  });
+  // customers.localidad viene vacia en casi todo el padron: cae a la 1a sucursal.
+  var locPtoVenta = d.localidad || locEntrega[0] || "";
+  var dtoVolPct = d.dto_vol != null ? Math.round(Number(d.dto_vol) * 100) + "%" : "—";
+  var chefCodsH = Array.isArray(d.chef_cods) ? d.chef_cods : [];
+  var deudaTxt;
+  if (sinIsis) deudaTxt = '<span class="fc-h-sd" title="No se pudo leer el Excel de deuda">s/d</span>';
+  else if (isis.deuda == null) deudaTxt = "$ 0";
+  else deudaTxt = "$ " + formatMoney(isis.deuda);
+  var deudaLbl = "Deuda";
+  if (isis.deuda_at) {
+    var dd = new Date(isis.deuda_at);
+    deudaLbl +=
+      '<span class="fc-h-sub">Excel ERP ' +
+      String(dd.getDate()).padStart(2, "0") + "/" +
+      String(dd.getMonth() + 1).padStart(2, "0") + "</span>";
+  }
+  var prim = isis.primera_compra ? String(isis.primera_compra).slice(0, 4) : "";
+
+  function fila(l1, v1, l2, v2, cls1, cls2) {
     return (
-      '<div class="fc-dato"><span class="fc-dato-lbl">' +
-      escapeHtml(lbl) +
-      '</span><span class="fc-dato-val"' +
-      (copiable && !vacio ? ' data-copiable="' + escapeHtml(val) + '"' : "") +
-      ">" +
-      (vacio ? "—" : escapeHtml(val)) +
-      "</span></div>"
+      "<tr><th>" + l1 + '</th><td class="' + (cls1 || "fc-h-num") + '">' + v1 +
+      "</td><th>" + l2 + '</th><td class="' + (cls2 || "fc-h-txt") + '">' + v2 +
+      "</td></tr>"
     );
   }
-  var dtoPct =
-    d.dto_vol != null ? (Number(d.dto_vol) * 100).toFixed(1) + "%" : "—";
+
+  html += '<div class="fc-hoja-wrap"><div class="fc-hoja">';
+  html += '<table class="fc-h-tabla">';
+  // Bloque 1: identidad
   html +=
-    '<div class="fc-card"><div class="fc-card-tit">Datos</div>' +
-    '<div class="fc-datos-grid">' +
-    dato("CUIT", d.cuit, true) +
-    dato("Localidad", d.localidad) +
-    dato("Vendedor", d.vendedor || d.vend) +
-    dato("Dto. volumen", dtoPct) +
-    dato("Cond. pago", d.payment_term) +
-    dato("Deuda", d.debt != null ? "$ " + formatMoney(d.debt) : "—") +
-    dato(
-      "Límite crédito",
+    '<tbody class="fc-h-bloque">' +
+    '<tr class="fc-h-cab"><th>Cod<br>Cliente</th><th>Empresa</th><th colspan="2">Razón Social</th></tr>' +
+    '<tr class="fc-h-id"><td class="fc-h-cod">' +
+    escapeHtml(d.cod_cliente != null ? d.cod_cliente : f.cod) +
+    '</td><td class="fc-h-emp">LK' +
+    (chefCodsH.length ? '<span class="fc-h-sub">CH ' + escapeHtml(chefCodsH.join(", ")) + "</span>" : "") +
+    '</td><td colspan="2" class="fc-h-rs">' +
+    escapeHtml(d.business_name || "(sin razón social)") +
+    "</td></tr></tbody>";
+  // Bloque 2: facturacion de los ultimos 3 anios + condiciones
+  html +=
+    '<tbody class="fc-h-bloque">' +
+    fila("FC " + (anioHoy - 2), fcPlata(yv(anioHoy - 2, "fc")), "Plazo de Pago",
+      d.payment_term != null ? escapeHtml(d.payment_term) : "—", null, "fc-h-cen") +
+    fila("FC " + (anioHoy - 1), fcPlata(yv(anioHoy - 1, "fc")), "Dto x Volumen", dtoVolPct, null, "fc-h-cen") +
+    fila("FC " + anioHoy, fcPlata(yv(anioHoy, "fc")), "Dto x Plazo",
+      fcFaltaDato("Dato de la planilla: no está en la base"), null, "fc-h-cen") +
+    "</tbody>";
+  // Bloque 3: mayor compra, limite, deuda
+  html +=
+    '<tbody class="fc-h-bloque">' +
+    fila("Mayor Compra " + (anioHoy - 1), fcPlata(yv(anioHoy - 1, "mayor")),
+      "Cant. Facturas " + (anioHoy - 1),
+      sinIsis ? "s/d" : Number(yv(anioHoy - 1, "n_fact") || 0), null, "fc-h-cen") +
+    fila("Mayor Compra " + anioHoy, fcPlata(yv(anioHoy, "mayor")),
+      "Cant. Facturas " + anioHoy,
+      sinIsis ? "s/d" : Number(yv(anioHoy, "n_fact") || 0), null, "fc-h-cen") +
+    fila("Límite de Crédito",
       d.credit_limit != null ? "$ " + formatMoney(d.credit_limit) : "—",
-    ) +
-    dato("Mail", d.mail) +
-    dato("WhatsApp", d.whatsapp) +
+      "Localidad pto Venta", locPtoVenta ? escapeHtml(locPtoVenta) : "—") +
+    fila(deudaLbl, deudaTxt, "CUIT",
+      d.cuit ? '<span data-copiable="' + escapeHtml(d.cuit) + '">' + escapeHtml(d.cuit) + "</span>" : "—") +
+    "</tbody>";
+  // Bloque 4: vendedor / entrega
+  html +=
+    '<tbody class="fc-h-bloque">' +
+    fila("Vendedor", escapeHtml(d.vendedor || d.vend || "—"),
+      "Localidad Entrega<span class=\"fc-h-sub\">(nosotros)</span>",
+      locEntrega.length ? escapeHtml(locEntrega.join(" · ")) : "—", "fc-h-cen") +
+    "</tbody>";
+  // Bloque 5: historial de pago / antiguedad / contacto
+  html +=
+    '<tbody class="fc-h-bloque">' +
+    fila("Tipo de Cliente", fcFaltaDato("Dato de la planilla: no está en la base"),
+      "Anteúltimo Pago", fcFaltaDato("Dato de la planilla: no está en la base"), "fc-h-cen", "fc-h-cen") +
+    fila("Último Pago", fcFaltaDato("Dato de la planilla: no está en la base"),
+      "Antepenúltimo Pago", fcFaltaDato("Dato de la planilla: no está en la base"), "fc-h-cen", "fc-h-cen") +
+    fila("Año 1° Compra",
+      prim ? escapeHtml(prim) + (prim === "2019" ? '<span class="fc-h-sub">ISIS desde 08/19</span>' : "") : "—",
+      "Mail", d.mail ? escapeHtml(d.mail) : "—", "fc-h-cen") +
+    fila("WhatsApp", d.whatsapp ? escapeHtml(d.whatsapp) : "—", "", "", "fc-h-cen") +
+    "</tbody></table>";
+
+  // Panel derecho: acuerdo
+  var acH = _fcAcuerdo;
+  var indiceTom = acH && acH.parametros ? Number(acH.parametros.indice_lista) / 100 : null;
+  var factorCli = acH ? Number(acH.factor) : null;
+  var rent = indiceTom && factorCli ? (indiceTom / factorCli - 1) * 100 : null;
+  html +=
+    '<table class="fc-h-tabla fc-h-acu">' +
+    '<tbody class="fc-h-bloque">' +
+    '<tr><th>Acuerdo<br>Cliente</th><td class="fc-h-big">' +
+    (factorCli ? factorCli.toFixed(2).replace(".", ",") : "—") + "</td></tr>" +
+    '<tr><th>Acuerdo<br>Tomado</th><td class="fc-h-big">' +
+    (indiceTom ? indiceTom.toFixed(2).replace(".", ",") : "—") + "</td></tr>" +
+    '<tr><th>+-Rent</th><td class="fc-h-big ' +
+    (rent == null ? "" : rent < 0 ? "fc-acu-rojo" : "fc-acu-verde") + '">' +
+    (rent == null ? "—" : (rent > 0 ? "+" : "") + Math.round(rent) + "%") + "</td></tr>" +
+    "</tbody>" +
+    '<tbody class="fc-h-bloque">' +
+    "<tr><th>Dto pago<br>a ofrecer</th><td class=\"fc-h-cen\">" +
+    (acH ? Number(acH.dto_pago_hoy).toFixed(0) + "%" : "—") + "</td></tr>" +
+    "<tr><th>Plazo<br>Pago</th><td class=\"fc-h-cen\">" +
+    fcFaltaDato("Dato de la planilla: no está en la base") + "</td></tr>" +
+    "<tr><th>Días al<br>Cheque</th><td class=\"fc-h-cen\">" +
+    fcFaltaDato("Dato de la planilla: no está en la base") + "</td></tr>" +
+    "</tbody></table>";
+  html += "</div>";
+  html +=
+    '<div class="fc-h-pie">FC = facturas − notas de crédito, con IVA (ISIS). ' +
+    "Acuerdo cliente = índice de lista ÷ lo que queda después de dto, pago, cotizador, flete y comisión." +
+    (_fcIsisError ? ' <span class="fc-acu-rojo">No se pudo leer ISIS: ' + escapeHtml(_fcIsisError) + "</span>" : "") +
     "</div></div>";
+
+  // ---- Acuerdo (que margen deja este cliente y cuanto dto admite) ----
+  // Criterio del duenio, 18/09/2026: el dto de volumen se resta sobre la lista,
+  // el 25% de pago sobre ese saldo y el 2% del cotizador sobre el siguiente (eso
+  // es el CHEQUE); recien ahi se restan flete y comision, los dos sobre el cheque
+  // y NO encadenados entre si. Los parametros salen de la tabla acuerdo_parametros.
+  var ac = _fcAcuerdo;
+  if (ac) {
+    var enRojo = Number(ac.acuerdo) < 0;
+    var margen = Number(ac.margen_dto);
+    html +=
+      '<div class="fc-card"><div class="fc-card-tit">Acuerdo — detalle</div>' +
+      '<div class="fc-acu-nota">' +
+      "Hoy tiene <strong>" + Number(ac.dto_vol).toFixed(2) + "%</strong> de dto. y paga <strong>" +
+      Number(ac.comision).toFixed(2) + "%</strong> de comisión" +
+      (ac.vendedor ? " (" + escapeHtml(ac.vendedor) + ")" : "") + ". " +
+      (margen > 0
+        ? 'Le podés dar <strong>' + margen.toFixed(0) + " punto(s) más</strong> de descuento sin bajar de 100."
+        : margen === 0
+          ? "Está justo en el máximo."
+          : '<span class="fc-acu-rojo">Está ' + Math.abs(margen).toFixed(0) +
+            " punto(s) por encima del máximo: hoy no llega a 100.</span>") +
+      " Cheque " + Number(ac.cheque).toFixed(2) + "." +
+      "</div>" +
+      // Gancho para el cliente dormido: cuando compraba, el pago contado era 8%.
+      '<div class="fc-acu-nota fc-acu-pago">Pago contado: hoy <strong>' +
+      Number(ac.dto_pago_hoy).toFixed(0) + "%</strong>, antes " +
+      Number(ac.dto_pago_antes).toFixed(0) + "% — el precio de contado quedó <strong>" +
+      Number(ac.mejora_pago).toFixed(1) + "% mejor</strong> que cuando regía el viejo." +
+      "</div>";
+
+    var sim = Array.isArray(ac.simulacion) ? ac.simulacion : [];
+    if (sim.length) {
+      html +=
+        '<div class="fc-acu-sim-tit">Si se cambia la comisión</div>' +
+        '<div class="fc-tabla-wrap"><table class="fc-tabla fc-acu-sim"><thead><tr>' +
+        "<th>Comisión</th><th>Dto. máximo</th><th>Acuerdo con el dto. de hoy</th>" +
+        "</tr></thead><tbody>";
+      sim.forEach(function (x) {
+        var esHoy = Math.abs(Number(x.comision) - Number(ac.comision)) < 0.01;
+        var a2 = Number(x.acuerdo_con_dto_actual);
+        html +=
+          '<tr class="' + (esHoy ? "fc-acu-hoy" : "") + '"><td>' +
+          Number(x.comision).toFixed(0) + "%" + (esHoy ? " <em>(hoy)</em>" : "") +
+          '</td><td class="fc-num">' + Number(x.dto_max).toFixed(0) + "%" +
+          '</td><td class="fc-num ' + (a2 < 0 ? "fc-acu-rojo" : "fc-acu-verde") + '">' +
+          (a2 > 0 ? "+" : "") + a2.toFixed(2) + "</td></tr>";
+      });
+      html += "</tbody></table></div>";
+    }
+    html += "</div>";
+  }
 
   // ---- Direcciones de entrega ----
   var dirs = Array.isArray(f.direcciones) ? f.direcciones : [];
@@ -14333,30 +14520,37 @@ function fcRender() {
   }
 
   // ---- Facturación por año ----
+  // La plata es la de ISIS (facturas - NC, con IVA): la misma de la planilla.
+  // Las cajas siguen saliendo de sales_lines, que es donde estan por articulo.
+  // Antes esta tabla valorizaba las cajas a lista de HOY y daba otro numero que
+  // la hoja de arriba (Messina 2025: 36,2 M contra 30,0 M facturados).
   var fact = Array.isArray(f.facturacion_anio) ? f.facturacion_anio : [];
-  if (fact.length) {
+  var cajasAnio = {};
+  fact.forEach(function (y) { cajasAnio[String(y.anio)] = Number(y.cajas) || 0; });
+  var aniosF = {};
+  fact.forEach(function (y) { aniosF[String(y.anio)] = 1; });
+  isisAnios.forEach(function (y) { aniosF[String(y.anio)] = 1; });
+  var listaAnios = Object.keys(aniosF).sort().reverse().filter(function (a) {
+    var y = porAnio[a];
+    return (y && (Number(y.fc) || Number(y.n_fact))) || cajasAnio[a];
+  });
+  if (listaAnios.length) {
     html +=
-      '<div class="fc-card"><div class="fc-card-tit">Facturación por año (neto)</div>' +
+      '<div class="fc-card"><div class="fc-card-tit">Facturación por año</div>' +
       '<div class="fc-tabla-wrap"><table class="fc-tabla"><thead><tr>' +
-      "<th>Año</th><th>LK</th><th>Chef</th><th>Total</th><th>Compras</th><th>Cajas</th>" +
+      "<th>Año</th><th>FC LK</th><th>FC Chef</th><th>FC Total</th>" +
+      "<th>Facturas</th><th>Mayor<br>compra</th><th>Cajas</th>" +
       "</tr></thead><tbody>";
-    fact.forEach(function (y) {
-      var vacio = Number(y.total) === 0 && Number(y.cajas) === 0;
+    listaAnios.forEach(function (a) {
+      var y = porAnio[a] || {};
       html +=
-        '<tr class="' +
-        (vacio ? "fc-row-vacia" : "") +
-        '"><td>' +
-        escapeHtml(y.anio) +
-        '</td><td class="fc-num">' +
-        (Number(y.lk) ? "$ " + formatMoney(y.lk) : "—") +
-        '</td><td class="fc-num">' +
-        (Number(y.chef) ? "$ " + formatMoney(y.chef) : "—") +
-        '</td><td class="fc-num"><strong>' +
-        (Number(y.total) ? "$ " + formatMoney(y.total) : "—") +
-        '</strong></td><td class="fc-num">' +
-        (Number(y.compras) || 0) +
-        '</td><td class="fc-num">' +
-        (Number(y.cajas) || 0) +
+        '<tr><td class="fc-cen">' + escapeHtml(a) +
+        '</td><td class="fc-num">' + fcPlata(y.fc_lk) +
+        '</td><td class="fc-num">' + fcPlata(y.fc_ch) +
+        '</td><td class="fc-num"><strong>' + fcPlata(y.fc) +
+        '</strong></td><td class="fc-num">' + (sinIsis ? "s/d" : Number(y.n_fact || 0)) +
+        '</td><td class="fc-num">' + fcPlata(y.mayor) +
+        '</td><td class="fc-num">' + (cajasAnio[a] || 0).toLocaleString("es-AR") +
         "</td></tr>";
     });
     html += "</tbody></table></div></div>";
@@ -14377,8 +14571,11 @@ function fcRender() {
     "</div>";
   if (pt.length) {
     html +=
-      '<div class="fc-tabla-wrap"><table class="fc-tabla"><thead><tr>' +
-      "<th>Fecha</th><th>Estado</th><th>Total</th><th>Pago</th><th>Origen</th><th>Ítems</th>" +
+      '<div class="fc-tabla-wrap"><table class="fc-tabla fc-tabla--ajustada"><thead><tr>' +
+      "<th>Fecha</th><th>Estado</th>" +
+      '<th class="fc-num">Total</th>' +
+      "<th>Pago</th><th>Origen</th>" +
+      '<th class="fc-num">Ítems</th>' +
       "</tr></thead><tbody>";
     pt.forEach(function (o) {
       var fecha = String(o.created_at || "").slice(0, 10);
@@ -14443,7 +14640,17 @@ function fcRender() {
     mesesShow.forEach(function (m) {
       html += '<th class="fc-num">' + escapeHtml(fcMesLabel(m)) + "</th>";
     });
-    html += '<th class="fc-num">Cajas 12m</th><th class="fc-num">$ neto</th></tr></thead><tbody>';
+    // `a.cajas` y `a.neto` de la RPC son el total HISTORICO (`_art_ficha` agrega
+    // todo `_sl_ficha`, sin corte de fecha), no los 12 meses. La columna decia
+    // "Cajas 12m" y no cerraba contra la suma de los meses de al lado. Ahora el
+    // total de la ventana se calcula sobre `mm`, asi que suma en pantalla por
+    // construccion, y el historico queda en su propia columna, dicho con todas
+    // las letras.
+    html +=
+      '<th class="fc-num">Cajas ' +
+      nShow +
+      'm</th><th class="fc-num">Cajas hist.</th><th class="fc-num">$ hist.</th>' +
+      "</tr></thead><tbody>";
     arts.forEach(function (a) {
       var mm = a.mm || {};
       var esChef = a.empresa === "chef";
@@ -14456,8 +14663,10 @@ function fcRender() {
         '">' +
         escapeHtml(a.descripcion || "(sin descripción)") +
         "</td>";
+      var cajasVentana = 0;
       mesesShow.forEach(function (m) {
         var v = mm[m];
+        cajasVentana += Number(v) || 0;
         html +=
           '<td class="fc-num' +
           (v ? "" : " fc-cero") +
@@ -14467,8 +14676,10 @@ function fcRender() {
       });
       html +=
         '<td class="fc-num"><strong>' +
+        cajasVentana +
+        '</strong></td><td class="fc-num fc-hist">' +
         (Number(a.cajas) || 0) +
-        '</strong></td><td class="fc-num">' +
+        '</td><td class="fc-num fc-hist">' +
         (Number(a.neto) ? "$ " + formatMoney(a.neto) : "—") +
         "</td></tr>";
     });
@@ -14481,6 +14692,268 @@ function fcRender() {
   html += "</div>"; // cierra card articulos
 
   cont.innerHTML = html;
+}
+
+/* ----------------------------------------------------------------------------
+   DESCARGAR LA FICHA A EXCEL
+   ----------------------------------------------------------------------------
+   Forma pedida por Thomas (18/09/2026, con una planilla de muestra): una sola
+   hoja con el articulo por fila y DOS bloques de meses en paralelo — cajas a la
+   izquierda, plata a la derecha — con UxB, $ Lista y $ Compra en el medio, y la
+   fila de totales por mes arriba del bloque de plata.
+
+   De donde sale cada cosa:
+     - cajas por mes: el mapa `mm` de `get_ficha_cliente`, lo mismo que pinta la
+       matriz en pantalla.
+     - UxB y $ Lista: `get_ficha_precios`, que lee `v_item_precio` (NO `products`
+       a secas: ver el checklist de reportes, `products` deja ~47% sin precio).
+     - $ Compra = $ Lista x (1 - dto_vol) x (1 - web_order_discount), la misma
+       cadena que arma un pedido real en `script.js`. El `dto_vol` es de
+       Loekemeyer, asi que NO se le aplica a los articulos de Chef.
+     - $ del mes = cajas x UxB x $ Compra.
+
+   Solo se listan los meses con movimiento: una columna entera en blanco no dice
+   nada y corre las demas fuera de la pantalla.
+---------------------------------------------------------------------------- */
+async function fcDescargarExcel() {
+  if (!_fcData) return;
+  if (typeof XLSX === "undefined") {
+    alert("No se pudo cargar la librería de Excel. Recargá la página.");
+    return;
+  }
+  var btn = document.querySelector(".fc-excel");
+  var txtBtn = btn ? btn.textContent : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Generando…";
+  }
+  try {
+    var f = _fcData;
+    var d = f.datos || {};
+    var cod = d.cod_cliente != null ? d.cod_cliente : f.cod;
+    var rs = d.business_name || "(sin razón social)";
+    var money = "#,##0";
+    var meses = Array.isArray(f.meses) ? f.meses : [];
+    var arts = Array.isArray(f.articulos) ? f.articulos : [];
+
+    // --- Precios: una sola llamada, acotada a los articulos de la ficha ---
+    var precios = {};
+    var dtoVol = 0;
+    var wd = 0.02;
+    var rp = await sb.rpc("get_ficha_precios", {
+      p_cod: String(cod),
+      p_cods: arts.map(function (a) {
+        return a.cod;
+      }),
+    });
+    if (rp.error) throw rp.error;
+    if (rp.data) {
+      dtoVol = Number(rp.data.dto_vol) || 0;
+      wd = Number(rp.data.web_discount) || 0;
+      (rp.data.items || []).forEach(function (it) {
+        precios[it.cod] = it;
+      });
+    }
+
+    function precioCompra(a) {
+      var pr = precios[a.cod];
+      if (!pr || pr.list_price == null) return null;
+      // El dto por volumen es de Loekemeyer; a Chef no se le aplica.
+      var dto = a.empresa === "chef" ? 0 : dtoVol;
+      return Number(pr.list_price) * (1 - dto) * (1 - wd);
+    }
+
+    // --- Meses con movimiento, del mas nuevo al mas viejo ---
+    var mesesConMov = meses.filter(function (m) {
+      return arts.some(function (a) {
+        return Number((a.mm || {})[m]) > 0;
+      });
+    });
+    var n = mesesConMov.length;
+
+    function hoja(wb, nombre, aoa, cols, fmt) {
+      var ws = XLSX.utils.aoa_to_sheet(aoa);
+      if (cols) ws["!cols"] = cols;
+      if (fmt) {
+        var rango = XLSX.utils.decode_range(ws["!ref"]);
+        for (var c in fmt) {
+          for (var r = fmt._desde || 1; r <= rango.e.r; r++) {
+            var cel = ws[XLSX.utils.encode_cell({ c: Number(c), r: r })];
+            if (cel && cel.t === "n") cel.z = fmt[c];
+          }
+        }
+      }
+      XLSX.utils.book_append_sheet(wb, ws, nombre);
+    }
+
+    var wb = XLSX.utils.book_new();
+
+    // ========================= HOJA PRINCIPAL =========================
+    // Columnas: Cód | Descripción | <n meses de cajas> | UxB | $ Lista |
+    //           $ Compra | (separador) | <n meses de plata> | $ total
+    var C_MES_CAJ = 2;
+    var C_UXB = C_MES_CAJ + n;
+    var C_MES_PLATA = C_UXB + 4; // UxB, $ Lista, $ Compra y una columna vacia
+    var C_TOTAL = C_MES_PLATA + n;
+
+    function filaVacia() {
+      var r = [];
+      for (var i = 0; i <= C_TOTAL; i++) r.push("");
+      return r;
+    }
+
+    // Fila 1: el rotulo "Cajas" sobre su bloque y los totales sobre el de plata.
+    var fila1 = filaVacia();
+    fila1[C_MES_CAJ] = n ? "Cajas" : "";
+    fila1[C_MES_PLATA - 1] = n ? "Total $" : "";
+
+    // Fila 2: encabezados.
+    var fila2 = filaVacia();
+    fila2[0] = "Cód";
+    fila2[1] = "Descripción";
+    mesesConMov.forEach(function (m, i) {
+      fila2[C_MES_CAJ + i] = fcMesLabel(m);
+      fila2[C_MES_PLATA + i] = fcMesLabel(m);
+    });
+    fila2[C_UXB] = "UxB";
+    fila2[C_UXB + 1] = "$ Lista";
+    fila2[C_UXB + 2] = "$ Compra";
+    fila2[C_TOTAL] = "$ total";
+
+    var aoa = [fila1, fila2];
+    var totMes = mesesConMov.map(function () {
+      return 0;
+    });
+    var totGeneral = 0;
+
+    arts.forEach(function (a) {
+      var mm = a.mm || {};
+      var pr = precios[a.cod] || {};
+      var uxb = Number(pr.uxb) || 0;
+      var comp = precioCompra(a);
+      var fila = filaVacia();
+      fila[0] = a.cod;
+      fila[1] = a.descripcion || "";
+      fila[C_UXB] = uxb || "";
+      fila[C_UXB + 1] = pr.list_price != null ? Number(pr.list_price) : "";
+      fila[C_UXB + 2] = comp != null ? Math.round(comp) : "";
+      var totFila = 0;
+      mesesConMov.forEach(function (m, i) {
+        var cj = Number(mm[m]) || 0;
+        // Celda en blanco y no 0: una grilla de ceros tapa los meses que si
+        // tienen movimiento, que es lo unico que se mira.
+        fila[C_MES_CAJ + i] = cj || "";
+        var plata = comp != null && uxb ? Math.round(cj * uxb * comp) : 0;
+        fila[C_MES_PLATA + i] = plata || "-";
+        totMes[i] += plata;
+        totFila += plata;
+      });
+      fila[C_TOTAL] = totFila || "-";
+      totGeneral += totFila;
+      aoa.push(fila);
+    });
+
+    mesesConMov.forEach(function (m, i) {
+      fila1[C_MES_PLATA + i] = totMes[i];
+    });
+    fila1[C_TOTAL] = totGeneral;
+
+    var colsM = [{ wch: 9 }, { wch: 34 }];
+    for (var i = 0; i < n; i++) colsM.push({ wch: 8 });
+    colsM.push({ wch: 7 }, { wch: 11 }, { wch: 11 }, { wch: 3 });
+    for (var j = 0; j < n; j++) colsM.push({ wch: 12 });
+    colsM.push({ wch: 14 });
+
+    var fmtM = { _desde: 0 };
+    fmtM[C_UXB + 1] = "#,##0.00";
+    fmtM[C_UXB + 2] = money;
+    for (var k = 0; k < n; k++) fmtM[C_MES_PLATA + k] = money;
+    fmtM[C_TOTAL] = money;
+
+    hoja(wb, "Cajas y $ por mes", aoa, colsM, fmtM);
+
+    // ========================= HOJAS DE CONTEXTO =========================
+    var datos = [
+      ["Campo", "Valor"],
+      ["Código LK", cod],
+      ["Razón social", rs],
+      ["Códigos Chef", (Array.isArray(d.chef_cods) ? d.chef_cods : []).join(", ")],
+      ["CUIT", d.cuit || ""],
+      ["Localidad", d.localidad || ""],
+      ["Vendedor", d.vendedor || d.vend || ""],
+      ["Dto. volumen", dtoVol],
+      ["Dto. pedido web", wd],
+      ["Cond. pago", d.payment_term != null ? d.payment_term : ""],
+      // Misma deuda que la hoja en pantalla y que Cuarentena (Excel del ERP).
+      ["Deuda (Excel ERP)", _fcIsis && _fcIsis.deuda != null ? Number(_fcIsis.deuda) : _fcIsis ? 0 : ""],
+      ["Límite crédito", d.credit_limit != null ? Number(d.credit_limit) : ""],
+      ["Mail", d.mail || ""],
+      ["WhatsApp", d.whatsapp || ""],
+    ];
+    (Array.isArray(f.direcciones) ? f.direcciones : []).forEach(function (a, i) {
+      datos.push([
+        "Dirección de entrega " + (i + 1),
+        [a.label, a.localidad, a.provincia, a.zona_expreso]
+          .filter(Boolean)
+          .join(" · "),
+      ]);
+    });
+    hoja(wb, "Cliente", datos, [{ wch: 24 }, { wch: 52 }]);
+
+    var fact = Array.isArray(f.facturacion_anio) ? f.facturacion_anio : [];
+    var aoaF = [["Año", "LK", "Chef", "Total", "Compras", "Cajas"]];
+    fact.forEach(function (y) {
+      aoaF.push([
+        Number(y.anio),
+        Number(y.lk) || 0,
+        Number(y.chef) || 0,
+        Number(y.total) || 0,
+        Number(y.compras) || 0,
+        Number(y.cajas) || 0,
+      ]);
+    });
+    hoja(
+      wb,
+      "Facturación por año",
+      aoaF,
+      [{ wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 10 }, { wch: 10 }],
+      { 1: money, 2: money, 3: money },
+    );
+
+    var pt = Array.isArray(f.pedidos_trimestre) ? f.pedidos_trimestre : [];
+    var aoaP = [["Fecha", "Estado", "Total", "Pago", "Origen", "Ítems"]];
+    pt.forEach(function (o) {
+      aoaP.push([
+        String(o.created_at || "").slice(0, 10),
+        o.status || "",
+        o.total != null ? Number(o.total) : 0,
+        o.payment_method || "",
+        o.origen || "",
+        Number(o.items) || 0,
+      ]);
+    });
+    hoja(
+      wb,
+      "Pedidos portal",
+      aoaP,
+      [{ wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 24 }, { wch: 16 }, { wch: 8 }],
+      { 2: money },
+    );
+
+    var hoy = new Date();
+    var stamp =
+      hoy.getFullYear() +
+      String(hoy.getMonth() + 1).padStart(2, "0") +
+      String(hoy.getDate()).padStart(2, "0");
+    XLSX.writeFile(wb, "ficha_cliente_" + cod + "_" + stamp + ".xlsx");
+  } catch (err) {
+    alert("No se pudo generar el Excel: " + (err.message || err));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = txtBtn || "Descargar Excel";
+    }
+  }
 }
 
 window.initFichaCliente = initFichaCliente;
