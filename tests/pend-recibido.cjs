@@ -81,10 +81,20 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     out.otro_habilita = ok.disabled === false;
     ok.click(); await wait(40);
     const u = upds();
-    out.persiste = u.length === 1 && u[0].vals.estado === "procesado" && u[0].vals.gv_recibido_por === "Fabi"
-      && !!u[0].vals.gv_recibido_at && u[0].vals.codigo === "2299" && u[0].eqs.some(function (e) { return e[0] === "id" && e[1] === 77; });
+    out.persiste = u.length === 1 && u[0].vals.gv_recibido_por === "Fabi" && !!u[0].vals.gv_recibido_at
+      && !("estado" in u[0].vals) && u[0].eqs.some(function (e) { return e[0] === "id" && e[1] === 77; });
     out.cierra = !rootEl.querySelector(".rcbOverlay");
-    out.ui = card.classList.contains("sentRow") && /Fabi · /.test(rr.textContent) && rb.classList.contains("on") && rb.disabled === true;
+    out.ui = !card.classList.contains("sentRow") && /Fabi · /.test(rr.textContent) && rb.classList.contains("on") && rb.disabled === false;
+    // es un paso más: con ISIS + partes + foto vista + recibido, Enviar se habilita y cierra
+    const eb = card.querySelector(".enviarBtn");
+    out.enviar_exige = eb.disabled === true;
+    R.pendRows[77].isis = true; R.pendRows[77].partes = "no"; R.pendRows[77].foto_vista = true; R.pendRefreshEnviar(77);
+    out.enviar_habilita = eb.disabled === false;
+    // destildar borra quién y cuándo, y vuelve a bloquear Enviar
+    window.__calls = []; rb.click(); await wait(30);
+    const ud = upds();
+    out.destilda = ud.length === 1 && ud[0].vals.gv_recibido_por === null && ud[0].vals.gv_recibido_at === null
+      && !rb.classList.contains("on") && eb.disabled === true;
     // Error al guardar -> queda el cuadro con el error
     window.__calls = []; window.__updErr = { message: "boom" };
     const card2 = R.pendCard(Object.assign({}, row, { id: 78 })); rootEl.appendChild(card2);

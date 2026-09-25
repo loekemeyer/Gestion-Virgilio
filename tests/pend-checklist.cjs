@@ -94,6 +94,8 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
 
     // ---- foto vista (el flujo real la marca al abrir el visor) → Enviar se habilita ----
     R.pendRows[55].foto_vista = true; R.pendRefreshEnviar(55);
+    out.faltaRecibido_bloqueado = btn.disabled === true;   // v22.52: Recibido es un paso más
+    R.pendRows[55].recibido = "Nora"; R.pendRefreshEnviar(55);
     out.completo_habilita = btn.disabled === false && R.pendRowComplete(55) === true;
 
     // ---- Enviar: REUSA el código de la fila (no genera otro) y marca procesado ----
@@ -125,7 +127,7 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     window.__calls = []; window.__updErr = { message: "boom" }; window.__alert = "";
     const row2 = Object.assign({}, row, { id: 56 });
     const card2 = R.pendCard(row2); rootEl.appendChild(card2);
-    R.pendRows[56].isis = true; R.pendRows[56].partes = "corresponde"; R.pendRows[56].foto_vista = true;
+    R.pendRows[56].isis = true; R.pendRows[56].partes = "corresponde"; R.pendRows[56].foto_vista = true; R.pendRows[56].recibido = "Nora";
     R.pendRefreshEnviar(56);
     await R.pendEnviar(56, card2.querySelector(".pcFoot"));
     const btn2 = card2.querySelector(".enviarBtn");

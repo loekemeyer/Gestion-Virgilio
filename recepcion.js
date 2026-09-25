@@ -3256,7 +3256,7 @@ async function renderPendientes() {
   let res;
   try {
     res = await supabase.from("Control_Modo_OP")
-      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at,isis,control_partes,foto_url,foto_vista,codigo,gv_foto_post_por,gv_foto_post_at")
+      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at,isis,control_partes,foto_url,foto_vista,codigo,gv_foto_post_por,gv_foto_post_at,gv_recibido_por,gv_recibido_at")
       .eq("estado", "pendiente")
       .order("created_at", { ascending: true })
       .limit(300);
@@ -3318,7 +3318,7 @@ function pendTickElapsed() {
 }
 function pendCard(r) {
   const id = r.id;
-  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, foto_url: r.foto_url || null, foto_vista: !!r.foto_vista, codigo: r.codigo || null, sent: false, row: r };
+  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, foto_url: r.foto_url || null, foto_vista: !!r.foto_vista, codigo: r.codigo || null, recibido: r.gv_recibido_por || null, recibido_at: r.gv_recibido_at || null, sent: false, row: r };
   const tsMs = r.created_at ? new Date(r.created_at).getTime() : 0;
   const card = document.createElement("div"); card.className = "pendCard"; card.setAttribute("data-id", String(id));
   const head = document.createElement("div"); head.className = "pcHead";
@@ -3366,22 +3366,32 @@ function pendCard(r) {
   card.appendChild(foot);
   return card;
 }
-/* v22.48/v22.51 (Luis, 25/09) — «Recibido»: un tilde igual al de Carga ISIS. Al tildarlo pide
-   quién recibe; confirmado, la saca de Pendientes (estado='procesado') y deja registrado
-   CUÁNDO y QUIÉN (se ve en el Histórico). Sin foto no se puede tildar: primero se agrega. */
+/* v22.48/v22.52 (Luis, 25/09) — «Recibido»: un tilde igual al de Carga ISIS. Al tildarlo pide
+   quién recibe y guarda QUIÉN y CUÁNDO (se ve en el Histórico). Es un paso más: Enviar lo
+   exige y es el que cierra. Sin foto no se puede tildar: primero se agrega. */
 function pendRecibidoRow(id, card) {
   const row = document.createElement("div"); row.className = "pcRow pcRecibidoRow";
   const b = document.createElement("button"); b.type = "button"; b.className = "tickBtn";
   const lbl = document.createElement("span"); lbl.className = "pcLbl"; lbl.textContent = "Recibido";
   const hint = document.createElement("span"); hint.className = "pcRecHint";
   const sync = function () {
-    const sinFoto = !_pendRows[id].foto_url;
-    b.disabled = sinFoto || _pendRows[id].sent;
-    hint.textContent = sinFoto ? "falta la foto" : "";
+    const st = _pendRows[id], sinFoto = !st.foto_url;
+    b.classList.toggle("on", !!st.recibido);
+    b.disabled = (sinFoto && !st.recibido) || st.sent;
+    if (st.recibido) {
+      const ms = st.recibido_at ? new Date(st.recibido_at).getTime() : 0;
+      hint.textContent = st.recibido + (ms ? " · " + pendFmtFecha(null, ms) + " " + pendFmtHora(ms) : "");
+    } else hint.textContent = sinFoto ? "falta la foto" : "";
   };
-  b.onclick = function () {
-    if (_pendRows[id].sent) return;
-    if (!_pendRows[id].foto_url) { sync(); return; }
+  b.onclick = async function () {
+    const st = _pendRows[id];
+    if (st.sent) return;
+    if (st.recibido) {   // destildar: borra quién y cuándo
+      b.disabled = true;
+      try { await pendRecibido(id, card, null); } catch (e) { alert("No se pudo guardar: " + ((e && e.message) || e)); }
+      sync(); return;
+    }
+    if (!st.foto_url) { sync(); return; }
     pendRecibidoAbrir(id, card);
   };
   row._pendSync = sync;
@@ -3449,22 +3459,15 @@ function pendQuienModal(o) {
   };
   refresh();
 }
+/* v22.52 (Luis): Recibido es UN PASO MÁS del checklist, no cierra. Guarda quién y cuándo;
+   la recepción se cierra con Enviar como siempre (y Enviar lo exige). Destildar lo borra. */
 async function pendRecibido(id, card, quien) {
   const st = _pendRows[id]; if (!st || st.sent) return;
   const ahora = new Date().toISOString();
-  const codigo = st.codigo || await pendGenCodigo();
-  await pendPersist(id, { estado: "procesado", procesado_at: ahora, codigo: codigo,
-                          gv_recibido_por: quien, gv_recibido_at: ahora });
-  st.sent = true; st.codigo = codigo;
-  if (!card) return;
-  card.classList.add("sentRow");
-  const b = card.querySelector(".enviarBtn"); if (b) b.disabled = true;
-  const rr = card.querySelector(".pcRecibidoRow");
-  if (rr) {
-    const t = rr.querySelector(".tickBtn"); if (t) { t.classList.add("on"); t.disabled = true; }
-    const h = rr.querySelector(".pcRecHint");
-    if (h) h.textContent = quien + " · " + pendFmtFecha(null, Date.now()) + " " + pendFmtHora(Date.now());
-  }
+  await pendPersist(id, { gv_recibido_por: quien || null, gv_recibido_at: quien ? ahora : null });
+  st.recibido = quien || null; st.recibido_at = quien ? ahora : null;
+  const rr = card && card.querySelector(".pcRecibidoRow"); if (rr && rr._pendSync) rr._pendSync();
+  pendRefreshEnviar(id);
 }
 /* Cada cambio se PERSISTE en Supabase al toque (UPDATE de la fila; no duplica, nada
    en localStorage). Al recargar, la tarjeta vuelve con lo ya guardado. */
@@ -3656,7 +3659,7 @@ async function pendUploadFoto(id, file) {
   const pub = supabase.storage.from("remitos").getPublicUrl(path);
   return (pub && pub.data) ? pub.data.publicUrl : null;
 }
-function pendRowComplete(id) { const s = _pendRows[id]; return !!(s && s.isis && s.partes && s.foto_vista); }
+function pendRowComplete(id) { const s = _pendRows[id]; return !!(s && s.isis && s.partes && s.foto_vista && s.recibido); }
 function pendRefreshEnviar(id) {
   const card = document.querySelector('#rcpRoot .pendCard[data-id="' + id + '"]');
   if (!card) return; const b = card.querySelector(".enviarBtn");
