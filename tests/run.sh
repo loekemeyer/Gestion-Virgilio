@@ -750,6 +750,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== apr-cuar-chef-tarde (Regresión v21) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-chef-tarde.cjs
+echo "== apr-cuar-pedido-partido (v22.47: pedido partido = un item en Cuarentena) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-pedido-partido.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-una-vez.cjs
 
 echo "== apr-retenido-camion (Regresión v20) =="

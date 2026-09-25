@@ -2224,6 +2224,8 @@ La página parte el pedido cuando trae importados sin stock: la parte que espera
 | aprobar una parte aprueba todo el pedido | `gv_cuarentena_liberados_familia` (Liberados + herencia por `pedido_origen`, las dos direcciones), leída por `gv_cuarentena_marcar_calc` (MATERIALIZADA una vez) y `gv_cuarentena_ya_programado` |
 | la parte diferida NO se programa sola si el cliente está retenido | pase **(a0d2)** del armador: `v_dif` pasa por `gv_cuarentena_retiene_lote`. Antes (b2) lo programaba sin mirar: LK 1546 (Solia) → F01A |
 | cuenta como 1 pedido para los 3 de cliente nuevo | LK `gv_clientes_nuevos_calc`: una fecha de factura que es **sólo** de artículos de una parte diferida no suma (`hijo_it` / `fecha_hijo` / `corr`) |
+| **o quedan las dos partes en cuarentena o ninguna** (v22.47) | la reposición chica (v19.44) NO exime a un pedido partido: la parte diferida suele tener 1 código y zafaba sola |
+| en Cuarentena es **UNA fila** (v22.47) | `cuarAgrupar` + `gv_pedidos_partidos()`: chip 🧩 *N pedidos (1 partido)*, m³ sumado, «Enviar» apunta al original y aprueba todo. `tests/apr-cuar-pedido-partido.cjs` |
 
 ⚠ **Caso Solia: la cuarentena NO la causó el partido.** La deuda de $3.421.315,29 es de facturas
 del 17/08 y 10/09 (NP 98427/28, 98613/14). Lo que estaba mal es que la mitad diferida se programó
