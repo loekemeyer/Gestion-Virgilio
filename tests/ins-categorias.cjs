@@ -64,6 +64,8 @@ catch (_e) {
       if (url.indexOf("Insumos_Unidades") >= 0) {
         return J(["Uni", "Kg", "Bolsas", "Paquetes", "MC", "Cajas"].map(function (n, i) { return { nombre: n, orden: i }; }));
       }
+      // v22.80: el catálogo del operario sale de vista_insumos (ubicación resuelta contra el Mapa)
+      if (url.indexOf("vista_insumos") >= 0) return J(CAT);
       if (url.indexOf("/Insumos") >= 0) return J(CAT);
       if (url.indexOf("vista_saldos_insumos_x_unidad") >= 0) {
         return J([

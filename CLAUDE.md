@@ -1344,6 +1344,24 @@ que suman 0 por código. Quedaron **21 a contar** y 7 códigos sin posición (50
 Insumos en racks (523C, 546V, 102E, 522S, 1000900) quedan «a contar» hasta el paso de alias de ubicación de insumos.
 Rollback: `sql/gv_racks_canon_v2277.sql`. Lo sostiene `tests/pmap-racks.cjs`.
 
+### ⚠ INSUMOS: dónde está cada uno sale del Mapa (Luis, 25/09, v22.80)
+
+**Luis:** *"es un mismo depósito físico … son racks de insumos. Dejalos con el nomenclador que ya existe, no inventes
+uno nuevo · AD adelante AT atrás · sí, ponelo en el mapa"*.
+
+- Los racks de insumos son `GV_Lugar` tipo `rack`, **empresa `IN`** (R01AD, K04, X20…). Se sumaron 69 que faltaban:
+  la grilla **A1…L6 con ese nombre** (A1 ≠ A01: A01 es góndola; por eso `gv_lugar_sector_fmt` acepta un dígito) y
+  R07AD, R10AD/AT, R12AT, R16AD, V01AD, V02AT, V05AT, V11AT, V12AT, V13AD, AF02/04/07/16/18, AE04.
+- **`gv_rack_sector(texto)`** resuelve cualquier grafía: primero el nombre exacto (A1), después con cero y AD/AT
+  (`R1Ad` → R01AD, `V9 At` → V09AT, `W1` → W01). Es la misma para racks de artículos y de insumos.
+- `Insumos_Ubicaciones` sigue siendo la tabla del módulo; se lee resuelta en **`gv_insumo_ubicacion`** y se escribe
+  por **`gv_insumo_ubicaciones_guardar`**, que rechaza una posición que no esté en el Mapa. `vista_insumos.ubicacion`
+  (lo que ve el operario en Recibir/Entregar insumos) sale de ahí. Al 25/09: 145 de 149 resuelven; `medio`, Y29 y Z07
+  (celdas de góndola) quedan en rojo ⚠ en la pestaña Insumos.
+- El Mapa de racks muestra los insumos (🧰, con la cantidad declarada en el módulo, en su unidad).
+- `Insumos_Ubicaciones_Unificadas` está muerta desde el 11/08: nadie la lee ni la escribe.
+- `sql/gv_insumos_ubicacion_v2279.sql` (rollback en la cabecera), `tests/ins-aceptar-ubic.cjs`.
+
 ### ⚠ `Capacidad_Sector` es una VISTA (Luis, 25/09, v22.75)
 
 Había dos lugares para lo mismo y se desincronizaban: el mapa (`GV_Lugar_Item`) tenía **654 celdas
