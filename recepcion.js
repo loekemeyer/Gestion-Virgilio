@@ -303,6 +303,20 @@ const RCP_CSS = `
 #rcpRoot .pcFoot{ margin-top:10px; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
 #rcpRoot .enviarBtn{ padding:11px 22px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#111; color:#fff; cursor:pointer; }
 #rcpRoot .enviarBtn:disabled{ opacity:.4; cursor:default; }
+/* v22.48 (Luis, 25/09) — botón «Recibido» en Pendientes + cuadro de quién recibe. */
+#rcpRoot .recibidoBtn{ width:100%; margin-top:10px; padding:11px 16px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#15803d; color:#fff; cursor:pointer; }
+#rcpRoot .recibidoBtn:disabled{ opacity:.5; cursor:default; }
+#rcpRoot .pcRecibidoOk{ margin-top:10px; font-size:14px; font-weight:800; color:var(--ok); }
+#rcpRoot .rcbOverlay{ position:fixed; inset:0; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px; }
+#rcpRoot .rcbBox{ background:#fff; border-radius:14px; padding:16px; width:100%; max-width:380px; }
+#rcpRoot .rcbT{ font-size:17px; font-weight:900; color:#111; }
+#rcpRoot .rcbSub{ font-size:13px; color:#555; margin-top:4px; }
+#rcpRoot .rcbOps{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+#rcpRoot .rcbOp{ padding:9px 16px; border-radius:999px; border:2px solid var(--border); background:#fff; font-weight:800; font-size:15px; cursor:pointer; }
+#rcpRoot .rcbOp.on{ background:#111; border-color:#111; color:#fff; }
+#rcpRoot .rcbOtro{ width:100%; margin-top:10px; padding:10px; font-size:15px; border:2px solid var(--border); border-radius:10px; box-sizing:border-box; }
+#rcpRoot .rcbErr{ color:var(--danger); font-size:13px; font-weight:700; margin-top:8px; min-height:1em; }
+#rcpRoot .rcbBtns{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
 #rcpRoot .codigoBox{ font-size:26px; font-weight:900; letter-spacing:4px; color:#0a7a2f; font-variant-numeric:tabular-nums; }
 /* Histórico de recepción (v6.41): barra de filtros + tabla. */
 #rcpRoot .histBar{ display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:10px; }
@@ -3323,7 +3337,74 @@ function pendCard(r) {
   b.onclick = function () { pendEnviar(id, foot); };
   foot.appendChild(b);
   card.appendChild(foot);
+  /* v22.48 (Luis, 25/09) — «Recibido»: acepta la recepción sin exigir los tildes, la saca de
+     Pendientes (estado='procesado') y deja registrado CUÁNDO y QUIÉN la recibió. */
+  const rb = document.createElement("button"); rb.type = "button"; rb.className = "recibidoBtn"; rb.textContent = "✓ Recibido";
+  rb.onclick = function () { pendRecibidoAbrir(id, card); };
+  card.appendChild(rb);
   return card;
+}
+/* Quién recibe: igual que Cuarentena — chips fijos + «Otro…» con texto. OBLIGATORIO y sin
+   preselección (un valor puesto de fábrica se confirma sin leerlo). */
+const PEND_RECIBE_PERSONAS = ["Nora", "Pablo"];
+function pendRecibidoAbrir(id, card) {
+  const st = _pendRows[id]; if (!st || st.sent) return;
+  const root = document.getElementById("rcpRoot") || document.body;
+  const ov = document.createElement("div"); ov.className = "rcbOverlay";
+  const box = document.createElement("div"); box.className = "rcbBox";
+  const r = st.row || {};
+  box.innerHTML = '<div class="rcbT">¿Quién recibe? <span style="color:#b42318">*</span></div>' +
+    '<div class="rcbSub">' + escapeHtmlRcp((r.nombre || "") + (r.remito ? " · RTO/FC " + r.remito : "")) + '</div>' +
+    '<div class="rcbOps"></div><input class="rcbOtro" placeholder="¿Quién? (nombre)" style="display:none">' +
+    '<div class="rcbErr"></div>' +
+    '<div class="rcbBtns"><button type="button" class="btnCancel">Cancelar</button><button type="button" class="btnSend" disabled>Confirmar</button></div>';
+  ov.appendChild(box); root.appendChild(ov);
+  const ops = box.querySelector(".rcbOps"), otro = box.querySelector(".rcbOtro"),
+        err = box.querySelector(".rcbErr"), ok = box.querySelector(".btnSend");
+  let sel = "";
+  const valor = function () { return sel === "__otro" ? otro.value.trim() : sel; };
+  const refresh = function () {
+    ops.querySelectorAll(".rcbOp").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-v") === sel); });
+    otro.style.display = sel === "__otro" ? "" : "none";
+    ok.disabled = !valor();
+  };
+  PEND_RECIBE_PERSONAS.concat(["__otro"]).forEach(function (n) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "rcbOp";
+    b.setAttribute("data-v", n); b.textContent = n === "__otro" ? "Otro…" : n;
+    b.onclick = function () { sel = (sel === n ? "" : n); err.textContent = ""; refresh(); if (sel === "__otro") otro.focus(); };
+    ops.appendChild(b);
+  });
+  otro.oninput = refresh;
+  const cerrar = function () { if (ov.parentNode) ov.parentNode.removeChild(ov); };
+  box.querySelector(".btnCancel").onclick = cerrar;
+  ok.onclick = async function () {
+    const quien = valor();
+    if (!quien) { err.textContent = "Decinos quién recibe (Nora, Pablo u Otro)."; return; }
+    ok.disabled = true; ok.textContent = "Guardando…";
+    try {
+      await pendRecibido(id, card, quien);
+      cerrar();
+    } catch (e) {
+      ok.disabled = false; ok.textContent = "Confirmar";
+      err.textContent = "No se pudo guardar: " + ((e && e.message) || e);
+    }
+  };
+  refresh();
+}
+async function pendRecibido(id, card, quien) {
+  const st = _pendRows[id]; if (!st || st.sent) return;
+  const ahora = new Date().toISOString();
+  const codigo = st.codigo || await pendGenCodigo();
+  await pendPersist(id, { estado: "procesado", procesado_at: ahora, codigo: codigo,
+                          gv_recibido_por: quien, gv_recibido_at: ahora });
+  st.sent = true; st.codigo = codigo;
+  if (!card) return;
+  card.classList.add("sentRow");
+  const b = card.querySelector(".enviarBtn"); if (b) b.disabled = true;
+  const rb = card.querySelector(".recibidoBtn");
+  const okDiv = document.createElement("div"); okDiv.className = "pcRecibidoOk";
+  okDiv.textContent = "✓ Recibido por " + quien + " · " + pendFmtFecha(null, Date.now()) + " " + pendFmtHora(Date.now());
+  if (rb) rb.replaceWith(okDiv); else card.appendChild(okDiv);
 }
 /* Cada cambio se PERSISTE en Supabase al toque (UPDATE de la fila; no duplica, nada
    en localStorage). Al recargar, la tarjeta vuelve con lo ya guardado. */
