@@ -4667,7 +4667,9 @@ en negativo**; el movimiento va `tipo='ajuste'`, `ref='<NP>|FCC'` y `descripcion
 facturado con «Recuperar items de FC»…"*. **NO exige escribir por qué** (backend: `p_motivo_no_stock`, si
 falta da error) y queda en `GV_Fac_Complemento.stock_detalle.motivo_no`. Lo completado con Completar
 Pedido después de facturar ya drenó y **no se descuenta dos veces**. Candado `pg_advisory_xact_lock` por
-NP + freno de doble clic. `sql/gv_fac_recuperar_stock_v2259.sql` (reemplaza la `_v2258`).
+NP + freno de doble clic. `sql/gv_fac_recuperar_stock_v2259.sql` (reemplaza la `_v2258`). **El aviso de Telegram de
+stock negativo SE DEJA** (Luis): para estos movimientos dice el motivo y el stock en A guardar / Racks /
+Excedente, *"registren el movimiento si salió de ahí"* (`sql/gv_fac_recuperar_aviso_negativo_v2261.sql`).
 
 ## ⚠ REGLA (Luis, 2026-09-24, v22.40): el descuento de OC de una recepción NO se puede perder
 
