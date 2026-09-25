@@ -29774,3 +29774,16 @@ y la vista **`gv_conciliacion_bancaria`** que las junta con banco y empresa.
   Leen sólo supervisores (RLS). anon sin token → *"sin permiso"* (probado).
 - Tablas VACÍAS al crearse: la carga inicial espera el sí del dueño.
 - `sql/gv_conciliacion_bancaria_v2287.sql` (rollback en la cabecera).
+
+## v22.88 (25/09) — Conciliación bancaria: carga histórica completa + macro de Excel
+
+- **Cargado todo lo que traen los 4 Excel** (Thomas: *"cargá todo lo que tengas"*), por la misma
+  RPC que usa la macro: **35.579 movimientos** — Credicoop LK 2022-2026 (26.589), Credicoop Chef
+  2012-2026 (4.441), Santander Chef 2025-2026 (3.843), Santander LK 2022-2026 (706).
+  No se subieron las copias `… (2)` ni las hojas de proyecciones.
+- Las hojas viejas tienen las columnas en otro lugar: `GV_Conc_Columnas` ganó **`anio`**
+  (0 = mapeo por defecto; una fila con año lo pisa; `col` NULL = ese campo no existe en esa hoja).
+  `gv_conc_parsear(banco, filas, anio)`. `sql/gv_conciliacion_bancaria_anios_v2288.sql`.
+- Macro: `docs/conciliacion-bancaria/ConciliacionSupabase.bas` + `INSTALAR.md`. Sube al guardar
+  las hojas tocadas. **El repo tiene `__TOKEN__`**: la copia con el token se entrega aparte
+  (el repo es público).
