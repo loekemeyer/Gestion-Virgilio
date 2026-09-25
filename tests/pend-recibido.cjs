@@ -34,6 +34,9 @@ function __q(table) {
 window.supabase = { createClient: function () {
   return {
     from: __q,
+    storage: { from: function () { return {
+      upload: function (path) { window.__uploads = (window.__uploads || []).concat([path]); return Promise.resolve({ data: {}, error: null }); },
+      getPublicUrl: function (path) { return { data: { publicUrl: "http://x/" + path } }; } }; } },
     rpc: function () { return Promise.resolve({ data: null, error: null }); },
     auth: {
       getSession: function () { return Promise.resolve({ data: { session: { fake: true } } }); },
@@ -45,7 +48,7 @@ window.supabase = { createClient: function () {
 
 const patched = src + `
 window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnviar: pendEnviar,
-  pendGenCodigo: pendGenCodigo, pendRefreshEnviar: pendRefreshEnviar, pendRows: _pendRows };
+  pendGenCodigo: pendGenCodigo, histRecibioTxt: histRecibioTxt, pendRefreshEnviar: pendRefreshEnviar, pendRows: _pendRows };
 `;
 
 (async () => {
@@ -89,6 +92,28 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     const ov2 = rootEl.querySelector(".rcbOverlay");
     ov2.querySelectorAll(".rcbOp")[0].click(); ov2.querySelector(".btnSend").click(); await wait(40);
     out.error_visible = !!rootEl.querySelector(".rcbOverlay") && /boom/.test(ov2.textContent) && R.pendRows[78].sent === false;
+    // ---- Foto a posteriori: "Sin foto" se toca, pide foto + quién, persiste y muestra el registro ----
+    window.__calls = []; window.__updErr = null;
+    const card3 = R.pendCard(Object.assign({}, row, { id: 79, foto_url: null })); rootEl.appendChild(card3);
+    const addB = card3.querySelector(".addFoto");
+    out.sinFoto_clickeable = !!addB && /agregar/.test(addB.textContent);
+    addB.click(); await wait(10);
+    rootEl.querySelectorAll(".rcbOverlay").forEach(function (x, i, a) { if (i < a.length - 1) x.remove(); });
+    const ov3 = rootEl.querySelector(".rcbOverlay");
+    const ok3 = ov3.querySelector(".btnSend");
+    ov3.querySelectorAll(".rcbOp")[1].click();
+    out.foto_sinArchivo_bloquea = ok3.disabled === true;
+    const fin = ov3.querySelector(".rcbFile");
+    const dt = new DataTransfer(); dt.items.add(new File(["x"], "f.jpg", { type: "image/jpeg" })); fin.files = dt.files;
+    fin.dispatchEvent(new Event("change"));
+    out.foto_habilita = ok3.disabled === false;
+    ok3.click(); await wait(40);
+    const u3 = upds();
+    out.foto_persiste = u3.length === 1 && /^http:\/\/x\/79_/.test(u3[0].vals.foto_url) && u3[0].vals.gv_foto_post_por === "Pablo"
+      && !!u3[0].vals.gv_foto_post_at && u3[0].vals.foto_vista === true && !("estado" in u3[0].vals);
+    out.foto_ui = !card3.querySelector(".addFoto") && /Agregada después por Pablo/.test(card3.textContent) && !!card3.querySelector(".fotoViewBtn.viewed");
+    // ---- Histórico: columna Recibió ----
+    out.hist_txt = /^Nora · \d\d-\d\d /.test(R.histRecibioTxt({ recPor: "Nora", recAt: "2026-09-25T13:15:00Z" })) && R.histRecibioTxt({ recPor: "" }) === "—";
     return out;
   });
   const bad = Object.keys(r).filter(function (k) { return r[k] !== true; });
