@@ -40,7 +40,11 @@
       "Bash(sed -i 's/gv_fac_recuperar_stock_v2256/gv_fac_recuperar_stock_v2258/; s/⚠ \\\\*\\\\*v22.56 \\(Luis\\): cada botón/⚠ **v22.58 \\(Luis\\): cada botón/' CLAUDE.md)",
       "Bash(sed -i 's/^-- v22.56 \\(Luis, 2026-09-25\\) — ♻ RECUPERAR/-- v22.58 \\(Luis, 2026-09-25\\) — ♻ RECUPERAR/' sql/gv_fac_recuperar_stock_v2258.sql)",
       "Bash(sed -i 's|// R6 \\(v22.56\\)|// R6 \\(v22.58\\)|' tests/fac-recuperar-pedido.cjs)",
-      "Bash(node scripts/bump-version.cjs 22.58)"
+      "Bash(node scripts/bump-version.cjs 22.58)",
+      "Bash(node scripts/bump-version.cjs 22.59)",
+      "Bash(node tests/fac-cruce.cjs)",
+      "Bash(git reset *)",
+      "Bash(node scripts/bump-version.cjs 22.60)"
     ]
   }
 }
