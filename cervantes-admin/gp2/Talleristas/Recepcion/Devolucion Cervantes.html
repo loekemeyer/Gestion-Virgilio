@@ -748,7 +748,7 @@
       //     StockSP y StockSC restan los envios en su formula (online = ... - enviosTall), asi que
       //     una fila negativa baja el online del tallerista (Control Tall) y recompone el online del
       //     sector que corresponda automaticamente — sin tocar SP Kg / SC Kg a mano.
-      const dia = fechaSeleccionada.slice(8, 10) + "/" + fechaSeleccionada.slice(5, 7); // YYYY-MM-DD -> DD/MM
+      const dia = fechaSeleccionada.slice(8, 10) + "/" + fechaSeleccionada.slice(5, 7) + "/" + fechaSeleccionada.slice(2, 4); // YYYY-MM-DD -> DD/MM/AA (la fecha va con año, v22.64)
       const negRows = items
         .filter(it => (parseFloat(it.kg) || 0) > 0)
         .map(it => {
