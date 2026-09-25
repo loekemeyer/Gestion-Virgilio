@@ -4633,7 +4633,7 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
-## ⚠ REGLA (Luis, 2026-09-25, v22.53): ♻ RECUPERAR PEDIDO — completar la facturación de una NP ya facturada
+## ⚠ REGLA (Luis, 2026-09-25, v22.53): ♻ RECUPERAR ITEMS DE FC — completar la facturación de una NP ya facturada
 
 **Luis:** *"que se pueda completar la facturación de un pedido ya facturado en caso de que ingrese
 mercadería entre la facturación y la entrega al cliente"*. Botón verde **♻ Recuperar pedido** en el
@@ -4660,6 +4660,14 @@ subselect pasó de 1,6 s a > 60 s). Conciliación muestra el chip **♻ +N cj** 
 facturada. **No toca `Facturacion_NP`** (una fila por NP): los complementos viven en `GV_Fac_Complemento`.
 
 `sql/gv_fac_recuperar_pedido_v2253.sql`, `tests/fac-recuperar-pedido.cjs` (el marcador interno de las funciones dice `v22.52-compl`: es la llave de idempotencia, no cambiarlo).
+
+⚠ **v22.56 (Luis): cada botón PREGUNTA si se saca de góndola** (`p_ajustar_stock`; Cancelar = no se
+toca el stock, no aborta). Se descuenta **sólo lo que todavía no salió**: lo completado con Completar
+Pedido ya drenó y no se descuenta dos veces. Sale de terminado → a_guardar → excedente, **sólo lo que
+hay** (nunca deja negativo; lo que falta queda anotado como `sin_stock`). Movimiento `tipo='ajuste'`,
+`ref='<NP>|FCC'`, y figura en el pedido: `GV_Fac_Complemento.cajas_stock` / `stock_detalle`, chip
+«📦 −N de góndola» en «Complementos ya hechos». Candado `pg_advisory_xact_lock` por NP + freno de doble
+clic en el front. `sql/gv_fac_recuperar_stock_v2256.sql`.
 
 ## ⚠ REGLA (Luis, 2026-09-24, v22.40): el descuento de OC de una recepción NO se puede perder
 

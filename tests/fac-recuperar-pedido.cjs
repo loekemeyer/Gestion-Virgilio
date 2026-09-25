@@ -102,6 +102,19 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.R5_orden = bajadas.length === 1 && bajadas[0].antesDeRegistrar === false;
     const lin = bajadas.length ? bajadas[0].filas[0].lineas : [];
     out.R5_lineas = bajadas.length === 1 && lin.length === 1 && lin[0].art === "534" && Number(lin[0].cajas) === 1 && bajadas[0].filas[0].cod === "151";
+    // R6 (v22.56) — pregunta si se ajusta el stock; Aceptar = true, Cancelar = false (no aborta)
+    out.R6_pregunta = confirms.some(function (m) { return /AJUSTAR EL STOCK/.test(m) && /Cancelar = NO/.test(m); });
+    out.R6_si = reg1.length === 1 && reg1[0].body.p_ajustar_stock === true;
+    window.confirm = function (m) { confirms.push(String(m)); return !/AJUSTAR EL STOCK/.test(m); };
+    _frec.sel = { "280": 1 };
+    await facRecMarcar(); await espera(30);
+    const reg3 = llamadas.filter(function (l) { return l.fn === "gv_fac_complemento_registrar"; });
+    out.R6_no = reg3.length === 3 && reg3[2].body.p_ajustar_stock === false && reg3[2].body.p_modo === "marcado";
+    // R7 — doble clic: mientras se registra no se manda otro
+    _frec.sel = { "280": 1 }; _frec.enviando = true;
+    await facRecMarcar(); await espera(30);
+    out.R7_doble = llamadas.filter(function (l) { return l.fn === "gv_fac_complemento_registrar"; }).length === 3;
+    _frec.enviando = false;
     return out;
   });
   await b.close();

@@ -59164,7 +59164,10 @@ function _frecDetalleHtml() {
     h += '<div class="frec-lotes"><b>Complementos ya hechos de esta NP</b><ul>' + _frec.lotes.map(function (l) {
       var it = (l.items || []).map(function (x) { return x.cod + "×" + _frecNum(x.cajas); }).join(", ");
       return '<li>' + _frecFecha(l.creado_at) + ' · ' + (l.modo === "excel" ? "Excel ISIS" : "marcado a mano") + (l.creado_por ? ' (' + escapeHtml(l.creado_por) + ')' : '') +
-        ' · ' + escapeHtml(it) + ' · ' + (l.factura ? '<span class="frec-chip comp">🧾 ' + escapeHtml(l.factura) + '</span>' : '<span class="frec-chip sinfc">esperando la factura de ISIS</span>') + '</li>';
+        ' · ' + escapeHtml(it) + ' · ' +
+        (l.ajusto_stock ? '<span class="frec-chip cp" title="Ajuste de stock de este complemento">📦 −' + _frecNum(l.cajas_stock) + ' de góndola</span>' +
+          (Number(l.stock_faltante) > 0 ? ' <span class="frec-chip falta">⚠ ' + _frecNum(l.stock_faltante) + ' sin stock</span>' : '') : '<span class="frec-chip" style="opacity:.7">stock sin tocar</span>') +
+        ' · ' + (l.factura ? '<span class="frec-chip comp">🧾 ' + escapeHtml(l.factura) + '</span>' : '<span class="frec-chip sinfc">esperando la factura de ISIS</span>') + '</li>';
     }).join("") + '</ul></div>';
   }
   h += '<div class="frec-acts">' +
@@ -59191,8 +59194,29 @@ function _frecSeleccion() {
   return Object.keys(_frec.sel).map(function (k) { return { cod: k, cajas: Number(_frec.sel[k]) || 0 }; })
     .filter(function (x) { return x.cajas > 0; });
 }
-async function _frecRegistrar(modo, items) {
-  return facRpc("gv_fac_complemento_registrar", { p_np: _frec.np, p_items: items, p_modo: modo, p_por: await facQuien() });
+async function _frecRegistrar(modo, items, ajustar) {
+  return facRpc("gv_fac_complemento_registrar", { p_np: _frec.np, p_items: items, p_modo: modo, p_por: await facQuien(), p_ajustar_stock: !!ajustar });
+}
+/* v22.56 (Luis) — al facturar el complemento se pregunta si se sacan esas cajas de góndola.
+   Cancelar = NO se toca el stock (no aborta). El backend descuenta sólo lo que todavía no salió:
+   lo completado con Completar Pedido ya drenó y no se vuelve a descontar. */
+function _frecPreguntaStock(items) {
+  var ya = items.filter(function (x) {
+    var d = (_frec.det || []).find(function (r) { return r.cod_art === x.cod; }) || {};
+    return (Number(d.completado_despues) || 0) - (Number(d.complementado) || 0) >= x.cajas;
+  }).map(function (x) { return x.cod; });
+  return confirm("📦 ¿AJUSTAR EL STOCK?\n\n¿Querés sacar de góndola las cajas que se facturan?\n\n" +
+    items.map(function (x) { return "  " + x.cod + " × " + x.cajas; }).join("\n") +
+    (ya.length ? "\n\nYa salieron con Completar Pedido (no se descuentan de nuevo): " + ya.join(", ") : "") +
+    "\n\nAceptar = SÍ, se descuentan de góndola (sólo lo que hay; queda anotado en esta NP).\nCancelar = NO, el stock queda como está.");
+}
+function _frecMsgStock(lote, ajustar) {
+  if (!ajustar) return " Stock sin tocar.";
+  var l = (_frec.lotes || []).find(function (x) { return x.lote === lote; });
+  if (!l) return "";
+  var s = Number(l.cajas_stock) || 0, f = Number(l.stock_faltante) || 0;
+  return " 📦 " + (s > 0 ? "Se sacaron " + _frecNum(s) + " cajas de góndola." : "No hubo que sacar nada de góndola.") +
+    (f > 0 ? " ⚠ " + _frecNum(f) + " cajas no estaban en stock." : "");
 }
 
 async function facRecMarcar() {
@@ -59201,12 +59225,17 @@ async function facRecMarcar() {
   var txt = items.map(function (x) { return "  " + x.cod + " × " + x.cajas; }).join("\n");
   if (!confirm("⚠ MARCAR COMO FACTURADO\n\nEsto significa que YA facturaste estos códigos A MANO en ISIS, antes de tocar este botón:\n\n" + txt +
     "\n\nNo se baja ningún Excel y NO hay que volver a facturarlos. El cruce va a buscar esa factura en ISIS y la va a asociar a " + _frec.np + ".\n\n¿Confirmás?")) return;
+  if (_frec.enviando) return;
+  var aj = _frecPreguntaStock(items);
+  _frec.enviando = true;
   try {
-    await _frecRegistrar("marcado", items);
-    _frec.msg = "✔ " + items.length + " código(s) marcados como facturados. El cruce va a buscar esa factura en ISIS.";
+    var lote = await _frecRegistrar("marcado", items, aj);
     await facRecAbrirNp(_frec.np);
+    _frec.msg = "✔ " + items.length + " código(s) marcados como facturados. El cruce va a buscar esa factura en ISIS." + _frecMsgStock(lote, aj);
+    facRecRender();
     facRecCargar();
   } catch (e) { alert("No se pudo marcar: " + ((e && e.message) || e)); }
+  finally { _frec.enviando = false; }
 }
 
 async function facRecExcel() {
@@ -59221,7 +59250,12 @@ async function facRecExcel() {
     if (!confirm("Se va a bajar el Excel para ISIS de " + _frec.np + " SÓLO con:\n\n" +
       items.map(function (x) { return "  " + x.cod + " × " + x.cajas; }).join("\n") +
       "\n\nEsos códigos quedan registrados como facturados (complemento de la NP) y el cruce va a buscar la factura nueva en ISIS. ¿Seguimos?")) return;
-    await _frecRegistrar("excel", items);   // primero valida y graba; si falla no se baja nada
+    if (_frec.enviando) return;
+    var aj = _frecPreguntaStock(items);
+    _frec.enviando = true;
+    var lote;
+    try { lote = await _frecRegistrar("excel", items, aj); }   // primero valida y graba; si falla no se baja nada
+    finally { _frec.enviando = false; }
     var _isisDe = function (x) { return x.isisEmp || (/^\s*CH\s/i.test(String(x.np)) ? "CH" : "LK"); };
     for (var emp of ["LK", "CH"]) {
       var parte = filas.filter(function (x) { return _isisDe(x) === emp; });
@@ -59229,8 +59263,9 @@ async function facRecExcel() {
       var arch = (FAC_XLS_FORMATO === "xls") ? _facXlsDescargar(parte, emp) : _facXlsDescargarXlsx(parte, emp);
       try { await facDescRegistrar(arch, emp, parte); } catch (_e) {}
     }
-    _frec.msg = "⬇ Excel bajado con " + items.length + " código(s). Cuando ISIS la facture, el cruce la asocia a esta NP.";
     await facRecAbrirNp(_frec.np);
+    _frec.msg = "⬇ Excel bajado con " + items.length + " código(s). Cuando ISIS la facture, el cruce la asocia a esta NP." + _frecMsgStock(lote, aj);
+    facRecRender();
     facRecCargar();
   } catch (e) { alert("No se pudo armar el Excel: " + ((e && e.message) || e)); }
 }
