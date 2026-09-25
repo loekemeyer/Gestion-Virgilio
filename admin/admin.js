@@ -6430,7 +6430,7 @@ function renderCondicionesDb() {
     : condicionesDbAll;
   if (!filtered.length) {
     body.innerHTML =
-      '<tr><td colspan="5" style="text-align:center;color:#999;padding:20px">Sin resultados</td></tr>';
+      '<tr><td colspan="4" style="text-align:center;color:#999;padding:20px">Sin resultados</td></tr>';
     return;
   }
   body.innerHTML = filtered
@@ -6441,7 +6441,6 @@ function renderCondicionesDb() {
         "<td>" + escapeHtml(c.business_name || "-") + "</td>" +
         '<td style="text-align:right">' + (c.credit_limit ? fmtMoney(c.credit_limit) : "-") + "</td>" +
         '<td style="text-align:right">' + (c.payment_term ? c.payment_term + " días" : "-") + "</td>" +
-        '<td style="text-align:right;font-weight:600">' + fmtMoney(c.debt || 0) + "</td>" +
         "</tr>"
       );
     })
@@ -6460,12 +6459,12 @@ function renderCondicionesDb() {
   var resetBtn = document.getElementById("condicionesResetAllBtn");
   if (resetBtn)
     resetBtn.addEventListener("click", async function () {
-      if (!confirm("¿RESETEAR Límite Crédito, Plazo Pago y Deuda de TODOS los clientes?")) return;
+      if (!confirm("¿RESETEAR Límite Crédito y Plazo Pago de TODOS los clientes?")) return;
       this.disabled = true;
       try {
         var res = await sb
           .from(TABLE_CUSTOMERS)
-          .update({ credit_limit: null, payment_term: null, debt: 0 })
+          .update({ credit_limit: null, payment_term: null })
           .neq("id", "00000000-0000-0000-0000-000000000000");
         if (res.error) throw new Error(res.error.message);
         toast("Condiciones reseteadas para todos los clientes");
