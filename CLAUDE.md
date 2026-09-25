@@ -2210,6 +2210,32 @@ entran más NP de ISIS nuevas (Luis, 24/09), así que no se extiende.
 **Chequeo:** `select * from public.gv_reglas_perdidas;` · `node tests/apr-cuar-freno-manual.cjs` ·
 `node tests/apr-fit.cjs`. `sql/gv_cuarentena_freno_manual_v2217.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-25, v22.46): el PEDIDO PARTIDO por importados es UNO — cuarentena y cliente nuevo
+
+**Luis:** *"si bien se parte en dos pedidos para poder programarse, realmente surge de un mismo pedido
+del cliente"* · *"es solamente un pedido para tema del límite de los 3 primeros pedidos"* · *"todo lk y ch"*.
+
+La página parte el pedido cuando trae importados sin stock: la parte que espera reingreso es otro
+`order_id` con `lk_pedidos_match.pedido_origen` = el original (LK: `orders.sheets_payload`; Chef:
+`chef_orders_cache.sheets_payload`, las dos viajan por `sync_pedidos_match_virgilio`).
+
+| qué | cómo |
+|---|---|
+| aprobar una parte aprueba todo el pedido | `gv_cuarentena_liberados_familia` (Liberados + herencia por `pedido_origen`, las dos direcciones), leída por `gv_cuarentena_marcar_calc` (MATERIALIZADA una vez) y `gv_cuarentena_ya_programado` |
+| la parte diferida NO se programa sola si el cliente está retenido | pase **(a0d2)** del armador: `v_dif` pasa por `gv_cuarentena_retiene_lote`. Antes (b2) lo programaba sin mirar: LK 1546 (Solia) → F01A |
+| cuenta como 1 pedido para los 3 de cliente nuevo | LK `gv_clientes_nuevos_calc`: una fecha de factura que es **sólo** de artículos de una parte diferida no suma (`hijo_it` / `fecha_hijo` / `corr`) |
+
+⚠ **Caso Solia: la cuarentena NO la causó el partido.** La deuda de $3.421.315,29 es de facturas
+del 17/08 y 10/09 (NP 98427/28, 98613/14). Lo que estaba mal es que la mitad diferida se programó
+sola sin aprobación.
+
+⚠ **No meter una función con `= any(...)` dentro del lateral de Liberados**: se probó y la
+marcación pasó de 366 ms a 10 s (timeout 8 s). Va la vista materializada.
+
+⚠ En LK, **`chef_customers` es FDW** (+2 s por lectura): usar `chef_customers_cache`.
+
+`sql/gv_pedido_partido_cuarentena_v2246.sql`, `sql/gv_clientes_nuevos_calc_hijo_v2246_LK.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.89): el PIPELINE **reemplazó** al submódulo de clientes nuevos
 
 **Luis, textual:** *"implementá esta nueva versión de clientes nuevos en «A programar»
