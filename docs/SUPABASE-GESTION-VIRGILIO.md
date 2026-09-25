@@ -29755,3 +29755,22 @@ guarda el código pelado y no tenía empresa: `gv_oc_recompute_recibido` nunca i
 - `gv_ppp_prog_arbol`: excluye `GV_PPP_Web_NP_Cancelada`. LK 0035 (cancelada 24/09) salía en Pedidos
   atrasados el 17/09 por `Facturacion_NP`. Atrasados 1 → 0.
 - `sql/gv_mover_armado_y_cancelada_v2238.sql`. Centinela v21.59 del guard actualizado al patrón nuevo.
+
+## v22.87 (25/09) — Conciliación bancaria: 4 tablas para Cobranzas (Thomas, tarea de Viviana)
+
+Los 4 Excel de conciliación (Credicoop y Santander, LK y Chef) viven en una PC y se editan a mano
+cada mañana. Se crearon **`GV_Conc_Credicoop_LK`**, **`GV_Conc_Santander_LK`**,
+**`GV_Conc_Credicoop_CH`**, **`GV_Conc_Santander_CH`** (mismo formato legible: fecha, operación,
+entrada, salida, saldo, detalle, det, nro_op, nro_recibo, cod_cliente, observación, estado e-cheq,
+estado ISIS, nota, y `tipo` calculado: saldo_inicial / ingreso / egreso / a_depositar / proyeccion)
+y la vista **`gv_conciliacion_bancaria`** que las junta con banco y empresa.
+
+- Carga: **`gv_conc_cargar(banco, año, filas, archivo, token)`** recibe las filas CRUDAS de la hoja
+  y **reemplaza el año entero** de ese banco (las filas no tienen id propio). Un archivo sin
+  movimientos no borra nada. Log en `GV_Conc_Cargas`.
+- El mapeo columna → campo está en **`GV_Conc_Columnas`** (medido sobre la hoja 2026 de cada
+  archivo). Si la planilla cambia de forma, se corrige ahí, no en la macro.
+- Escribe un supervisor logueado o quien tenga el token de `GV_Conc_Token` (la macro del Excel).
+  Leen sólo supervisores (RLS). anon sin token → *"sin permiso"* (probado).
+- Tablas VACÍAS al crearse: la carga inicial espera el sí del dueño.
+- `sql/gv_conciliacion_bancaria_v2287.sql` (rollback en la cabecera).
