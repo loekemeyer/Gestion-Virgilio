@@ -1362,6 +1362,28 @@ uno nuevo · AD adelante AT atrás · sí, ponelo en el mapa"*.
 - `Insumos_Ubicaciones_Unificadas` está muerta desde el 11/08: nadie la lee ni la escribe.
 - `sql/gv_insumos_ubicacion_v2279.sql` (rollback en la cabecera), `tests/ins-aceptar-ubic.cjs`.
 
+### ⚠⚠ EL MAPA ES EL PUNTO PRINCIPAL — y avisa el stock sin lugar (Luis, 25/09, v22.82)
+
+**Luis:** *"que todas las definiciones de qué cosa hay en cada rack/góndola se puedan editar desde mapas; pasa a ser
+el punto principal y cambiarlo ahí informa a todos los demás"* · *"evitá choques con el stock: sería raro que
+Movimientos_Stock diga que hay stock de un código pero ninguna góndola/rack lo tenga"*.
+
+| qué | tabla canónica | se edita en el Mapa por |
+|---|---|---|
+| código y capacidad de cada celda de góndola | `GV_Lugar_Item` (`Capacidad_Sector` es vista) | `gv_lugar_item_guardar` / `_sacar` |
+| qué hay en cada posición de rack de artículos | `Movimientos_Stock` (racks, `ubicacion`) (`Racks_Planimetria` es vista) | `gv_rack_posicion_guardar` · `gv_rack_ubicar` |
+| qué insumo hay en cada posición | `Insumos_Ubicaciones` (lectura resuelta `gv_insumo_ubicacion`) | **`gv_insumo_posicion_guardar`** |
+
+- **La pestaña Insumos ya no tipea la ubicación**: la muestra y tiene **📍 Editar en el Mapa**. La única escritura
+  que queda fuera del Mapa es «Aceptar» un TMP (la ubicación inicial, por `gv_insumo_ubicaciones_guardar`).
+- Una posición de rack con varios insumos es **una** celda; un rack `IN` abre sólo el editor de insumos.
+- **Alerta**: `gv_mapa_stock_sin_lugar` (góndola con cajas y sin celda · racks sin posición · insumo con stock y
+  sin posición · insumo anotado en un lugar que no existe). Se ve arriba del Mapa en las dos pestañas y cada
+  renglón se arregla ahí mismo. Al 25/09: 3 góndola (55219 LK 835 caj) · 7 racks · 38 insumos · 4 sin lugar.
+- ⚠ **38 filas de `Insumos_Ubicaciones` con códigos que no existen en Insumos** (`63`, `N|24`, `---`, `DISC.1`…),
+  todas en 0: se ven como «(no está en Insumos)» y se sacan con 🗑 (la RPC deja quitar aunque el código no exista).
+- `sql/gv_mapa_punto_unico_v2281.sql` (rollback en la cabecera), `tests/pmap-punto-unico.cjs`.
+
 ### ⚠ `Capacidad_Sector` es una VISTA (Luis, 25/09, v22.75)
 
 Había dos lugares para lo mismo y se desincronizaban: el mapa (`GV_Lugar_Item`) tenía **654 celdas

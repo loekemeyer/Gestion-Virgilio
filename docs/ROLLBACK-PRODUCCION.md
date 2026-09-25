@@ -1982,3 +1982,8 @@ select sum(total) from public.vista_generador_oc where activo;
 - Rollback: ver cabecera de `sql/gv_racks_canon_v2277.sql` (drop view + rename + dependientes desde
   `zz_backups."GV_Backup_RacksPlani_defs_20260925"` + funciones desde el backup + borrar los ajustes
   `ref = 'ubicar racks · v22.76'`, que suman 0 por código).
+
+## 2026-09-25 · v22.82 · el Mapa edita los insumos de cada posición + alerta de stock sin lugar (Luis)
+- Objetos nuevos: `gv_insumo_posicion_guardar(text,text,numeric,boolean,text,bigint)` y la vista `gv_mapa_stock_sin_lugar`.
+  No tocan Producción.
+- Rollback: `drop view public.gv_mapa_stock_sin_lugar; drop function public.gv_insumo_posicion_guardar(text,text,numeric,boolean,text,bigint);`

@@ -2947,6 +2947,13 @@ button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:
 .prk-det{ font-size:15px; line-height:1.6; color:#334155; }
 .prk-det b{ color:#0f172a; }
 .prk-nota{ margin-top:10px; font-size:13px; color:#64748b; }
+.pmap-alerta{ background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
+.pmap-alerta summary{ cursor:pointer; font-weight:700; }
+.pmap-alerta button{ width:auto; margin:4px 4px 0 0; padding:3px 8px; font-size:12px; border-radius:8px; border:1px solid #fca5a5; background:#fff; color:#991b1b; }
+.prk-ins{ margin-top:12px; border-top:1px solid #e2e8f0; padding-top:10px; }
+.prk-ins-row{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:6px; font-size:13px; }
+.prk-ins-row .planim-inp{ width:auto; }
+.prk-ins-row button{ width:auto; }
 .prk-contar{ border:2px dashed #f59e0b !important; }
 .prk-form{ display:grid; grid-template-columns:1fr 90px 90px 90px; gap:8px; margin-top:12px; }
 .prk-form label{ display:flex; flex-direction:column; gap:3px; font-size:12px; font-weight:700; color:#475569; }
@@ -6183,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.81"></script>
+<script type="module" src="recepcion.js?v=22.82"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -6460,6 +6467,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
                oninput="pmapBuscar(this.value)">
         <button class="planim-btn-save" onclick="closePlanimMapa();openLugarEditor()">✏️ Editar lugares</button>
       </div>
+      <div id="pmapAlerta" class="pmap-vieja pmap-alerta" hidden></div>
       <div id="pmapTabs" class="pmap-tabs"></div>
       <div id="pmapVieja" class="pmap-vieja" hidden></div>
       <div id="prkDesfase" class="pmap-vieja" hidden></div>
@@ -10141,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.81";
+const APP_VERSION = "v22.82";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -25598,6 +25606,21 @@ function _stkInsUbicEdit(cod, ubics) {
   h += '</div>';
   return h;
 }
+/* v22.82 (Luis: el Mapa es el punto principal). La ubicación de un insumo ya no se tipea acá: se muestra y
+   se edita en 🗺️ Mapa → Racks, que escribe Insumos_Ubicaciones por gv_insumo_posicion_guardar. */
+function _stkInsUbicMapa(it) {
+  return '<div style="min-width:140px;">' + escapeHtml(_stkInsUbicStr(it) || "—") + '<br>' +
+    '<button class="stk-btn" style="padding:1px 8px;font-size:11px;margin-top:2px;" ' +
+    'onclick="stkInsIrAlMapa(\'' + escapeHtml(it.cod) + '\')" title="La ubicación se define en el Mapa de góndolas y racks">📍 Editar en el Mapa</button></div>';
+}
+async function stkInsIrAlMapa(cod) {
+  await openPlanimMapa();
+  pmapModo("rack");
+  if (!_prk || !_prk.length) { try { await prkFetch(); } catch (_e) {} }
+  pmapBuscar(cod);
+  const esta = (_prk || []).some(function (r) { return r.fuente === "insumo" && String(r.cod || "").toUpperCase() === String(cod).toUpperCase(); });
+  if (!esta) prkInsUbicarAbrir(cod, 0, null);
+}
 /* v11.34 — actualizar sector o cantidad del input sin re-render (para no perder foco) */
 function stkInsUbicChg(cod, idx, field, val) {
   if (!_stkIns || !_stkIns.edUbics || !_stkIns.edUbics[cod]) return;
@@ -25895,7 +25918,7 @@ function _stkInsListado(k, items) {
         '<td><input class="stk-inp" id="edCod_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.cod) + '" style="width:88px;" title="Código conocido (clave del stock)"></td>' +
         '<td><input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis" style="width:78px;color:#64748b;" title="Código del sistema (isis)"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:150px;"><br><span class="stk-sub">cat:</span> ' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
-        '<td>' + _stkInsUbicEdit(it.cod, it.ubics) + '</td>' +
+        '<td>' + _stkInsUbicMapa(it) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:70px;" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'qty\')" title="Cantidad primaria (en la unidad base)"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, du.uniP || _stkInsUniMostrar(it)) + '</td>' +
         '<td style="border-left:1px solid #eef2f7;"><input class="stk-inp" id="edSecQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(du.cantS) + '" style="width:66px;" placeholder="cant" oninput="stkInsAutoSec(\'' + escapeHtml(it.cod) + '\',\'sec\')" title="Cargá Cant secundaria O el Factor: el otro se completa solo"></td>' +
@@ -25984,7 +26007,7 @@ function _stkInsTodos(items) {
         '<input class="stk-inp" id="edIsis_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.isis || "") + '" placeholder="isis (sistema)" style="width:100px;margin-top:3px;color:#64748b;" title="Código del sistema (isis) — informativo, no toca el stock"></td>' +
         '<td><input class="stk-inp" id="edNom_' + escapeHtml(it.cod) + '" value="' + escapeHtml(it.nombre) + '" style="width:140px;"></td>' +
         '<td>' + _stkInsCatSel("edCat_" + it.cod, it.cat) + '</td>' +
-        '<td>' + _stkInsUbicEdit(it.cod, it.ubics) + '</td>' +
+        '<td>' + _stkInsUbicMapa(it) + '</td>' +
         '<td><input class="stk-inp" id="edQty_' + escapeHtml(it.cod) + '" type="number" step="any" value="' + escapeHtml(u.saldo) + '" style="width:82px;"></td>' +
         '<td>' + _stkInsUniSel("edUni_" + it.cod, _stkInsUniMostrar(it)) + '</td>' +
         '<td><div style="display:flex;gap:6px;flex-wrap:nowrap;white-space:nowrap;">' +
@@ -26381,8 +26404,6 @@ async function stkInsGuardar(cod) {
   if (!it) return;
   const nuevoCod = _stkInsVal("edCod_" + cod), nom = _stkInsVal("edNom_" + cod);
   const cat = _stkInsVal("edCat_" + cod);
-  // v11.34 — ubicaciones editables (sector + cantidad)
-  const ubicsNuevas = _stkInsUbicLeer(cod);
   const uni = _stkInsVal("edUni_" + cod), qty = _stkInsVal("edQty_" + cod);
   const isis = _stkInsVal("edIsis_" + cod);   // v8.28 — código del sistema (informativo)
   if (!nuevoCod) { alert("El código no puede quedar vacío."); return; }
@@ -26395,9 +26416,7 @@ async function stkInsGuardar(cod) {
     return;
   }
   try {
-    // v22.80: las ubicaciones van PRIMERO — la RPC rechaza una posición que no está en el Mapa, y así no queda
-    // la edición a medias (nombre/cantidad guardados y la ubicación rechazada).
-    await _stkInsUbicSync(cod, ubicsNuevas);             // v11.34 — sectores + cantidades
+    // v22.82: la ubicación ya no se guarda desde acá — se edita en el Mapa (📍 Editar en el Mapa).
     // Sólo se manda lo que CAMBIÓ. Si tocaron nada más la categoría, el insumo se
     // mueve a esa categoría y listo: no se reescribe el resto.
     const cambios = {};
@@ -45562,6 +45581,7 @@ let _pmapModo = "gondola", _prk = null, _prkR = "";   // v22.67 — pestaña Rac
 let _prkDes = null;   // v22.68 — desfase posiciones vs stock del depósito racks, por "COD|EMP"
 let _prkRev = [];     // v22.77 — «a contar»: lo que la planimetría vieja decía y el stock no respalda (GV_Rack_Revisar)
 let _prkSin = [];     // v22.77 — stock de racks sin posición (gv_rack_sin_ubicar), para ubicarlo a mano
+let _pmapAlerta = [];  // v22.82 — gv_mapa_stock_sin_lugar: hay stock y ningún lugar del Mapa lo tiene
 
 function pmapSetStatus(msg, ok) {
   const el = document.getElementById("pmapStatus");
@@ -45592,7 +45612,51 @@ async function openPlanimMapa() {
   // el aviso de lo que quedó en la planimetría vieja se baja una vez, sin frenar el dibujo
   pmapViejaFetch().then(pmapViejaRender).catch(function () {});
   prkFetch().then(function () { if (_pmapModo === "rack") pmapRender(); }).catch(function () {});
+  pmapAlertaFetch().then(pmapAlertaRender).catch(function () {});
 }
+/* v22.82 (Luis 25/09: "evitá choques con el stock: sería raro que Movimientos_Stock diga que hay stock de
+   un código pero ninguna góndola/rack lo tenga, debería salir una alerta en el módulo de mapa").
+   Lo decide la vista gv_mapa_stock_sin_lugar; el front sólo la dibuja y ofrece arreglarlo acá mismo. */
+async function pmapAlertaFetch() {
+  const f = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_mapa_stock_sin_lugar",
+    "select=tipo,cod,emp,cantidad,unidad,detalle,ref_id&order=tipo.asc,cod.asc");
+  if (f) _pmapAlerta = f;
+  return _pmapAlerta;
+}
+function pmapAlertaRender() {
+  const box = document.getElementById("pmapAlerta");
+  if (!box) return;
+  const al = _pmapAlerta || [];
+  box.hidden = !al.length;
+  if (!al.length) { box.innerHTML = ""; return; }
+  const de = function (t) { return al.filter(function (a) { return a.tipo === t; }); };
+  const g = de("gondola"), r = de("rack"), i = de("insumo"), s = de("insumo_sin_lugar");
+  const J = function (x) { return JSON.stringify(x == null ? null : x).replace(/"/g, "&quot;"); };
+  const partes = [];
+  if (g.length) partes.push(g.length + " en góndola");
+  if (r.length) partes.push(r.length + " en racks");
+  if (i.length) partes.push(i.length + " insumos");
+  if (s.length) partes.push(s.length + " insumos en un lugar que no existe");
+  let h = '<details' + (_pmapAlertaAbierta ? " open" : "") + ' ontoggle="_pmapAlertaAbierta=this.open">' +
+    '<summary>⚠ Stock sin lugar en el Mapa: ' + partes.join(" · ") + '</summary>';
+  if (g.length) h += '<div>🧱 <b>Góndola</b>: hay cajas y ninguna celda tiene el código. Tocá uno, elegí la celda y agregalo:<br>' +
+    g.map(function (a) { return '<button onclick="pmapAlertaGondola(' + J(a.cod) + ')" title="' + escapeHtml(a.detalle || "") + '">' +
+      escapeHtml(a.cod) + ' ' + escapeHtml(a.emp || "") + ' · ' + pmapNum(a.cantidad) + ' caj</button>'; }).join("") + '</div>';
+  if (r.length) h += '<div>📦 <b>Racks</b>: stock sin posición. Tocá uno para ubicarlo:<br>' +
+    r.map(function (a) { return '<button onclick="prkUbicarAbrir(' + J(a.cod) + ',' + J(a.emp) + ',' + Number(a.cantidad) + ')">' +
+      escapeHtml(a.cod) + ' ' + escapeHtml(a.emp || "") + ' · ' + pmapNum(a.cantidad) + ' caj</button>'; }).join("") + '</div>';
+  if (i.length || s.length) h += '<div>🧰 <b>Insumos</b>: con stock y sin posición, o anotados en un lugar que no existe. Tocá uno para ubicarlo:<br>' +
+    s.concat(i).map(function (a) { return '<button onclick="prkInsUbicarAbrir(' + J(a.cod) + ',' + (Number(a.cantidad) || 0) + ',' + J(a.ref_id) + ')" title="' + escapeHtml(a.detalle || "") + '">' +
+      (a.tipo === "insumo_sin_lugar" ? "⚠ " : "") + escapeHtml(a.cod) + (Number(a.cantidad) ? ' · ' + pmapNum(a.cantidad) + (a.unidad ? " " + escapeHtml(a.unidad) : "") : "") + '</button>'; }).join("") + '</div>';
+  box.innerHTML = h + '</details>';
+}
+let _pmapAlertaAbierta = false;
+function pmapAlertaGondola(cod) {
+  pmapModo("gondola");
+  pmapBuscar("");
+  pmapSetStatus("📍 " + cod + ": tocá la celda de góndola donde está y agregalo con «＋ Agregar código».", true);
+}
+async function pmapAlertaRefrescar() { try { await pmapAlertaFetch(); } catch (_e) {} pmapAlertaRender(); }
 function closePlanimMapa() {
   const ov = document.getElementById("planimMapaOverlay");
   if (ov) ov.classList.remove("show");
@@ -45636,6 +45700,7 @@ function pmapRender() {
   const tabs = document.getElementById("pmapTabs"), box = document.getElementById("pmapGrid");
   if (!tabs || !box) return;
   const vj = document.getElementById("pmapVieja");
+  pmapAlertaRender();
   if (_pmapModo === "rack") { if (vj) vj.style.display = "none"; prkRender(); prkDesfaseRender(); return; }
   if (vj) vj.style.display = "";
   const dz = document.getElementById("prkDesfase"); if (dz) dz.hidden = true;
@@ -45818,6 +45883,7 @@ async function prkFetch() {
     if (rev) _prkRev = rev;
     const sin = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_rack_sin_ubicar", "select=cod,emp,cajas&order=cajas.desc");
     if (sin) _prkSin = sin;
+    await pmapAlertaFetch();
   } catch (_e) {}
   return _prk;
 }
@@ -45829,6 +45895,7 @@ function prkRacks() {
 }
 function prkMatch(r, q) {
   if (!q) return false;
+  if (r._ins && r._ins.some(function (x) { return prkMatch(x, q); })) return true;
   return codEmpiezaCon(r.cod, q) ||
          String(r.sector || "").toUpperCase().indexOf(q) >= 0 ||
          String(r.descripcion || "").toUpperCase().indexOf(q) >= 0;
@@ -45861,7 +45928,8 @@ function prkRender() {
            ' onclick="prkGo(' + JSON.stringify(k).replace(/"/g, "&quot;") + ')">' +
            escapeHtml(k) + (n ? ' <b>' + n + '</b>' : "") + '</button>';
   }).join("");
-  const rows = _prk.filter(function (r) { return String(r.rack || "").toUpperCase() === _prkR; })
+  // v22.82: una celda por POSICIÓN. Una posición de insumos puede tener varios; se dibujan juntos en la misma celda.
+  const rows = prkGrupos(_prk.filter(function (r) { return String(r.rack || "").toUpperCase() === _prkR; }))
     .sort(function (a, b) { return prkNum(a.sector) - prkNum(b.sector) || String(a.sector).localeCompare(String(b.sector), "es"); });
   const n = { ocupado: 0, libre: 0, sin_lugar: 0 }; let mc = 0; const emps = {};
   rows.forEach(function (r) { n[r.estado] = (n[r.estado] || 0) + 1; mc += Number(r.master_cajas) || 0; if (r.empresa) emps[String(r.empresa).toUpperCase()] = 1; });
@@ -45884,6 +45952,21 @@ function prkRender() {
       return " · " + q + (q === 1 ? " posición" : " posiciones") + ' con "' + _pmapQ + '"';
     })() : ""));
 }
+/* Junta las filas de una misma posición: la principal (el artículo, o el primer insumo) y los demás insumos. */
+function prkGrupos(filas) {
+  const por = {}, orden = [];
+  (filas || []).forEach(function (r) {
+    const k = String(r.sector || "").toUpperCase();
+    if (!por[k]) { por[k] = []; orden.push(k); }
+    por[k].push(r);
+  });
+  return orden.map(function (k) {
+    const fs = por[k], art = fs.filter(function (r) { return r.fuente !== "insumo"; });
+    const base = art[0] || fs[0];
+    const ins = fs.filter(function (r) { return r.fuente === "insumo" && r !== base; });
+    return Object.assign({}, base, { _ins: ins });
+  });
+}
 function prkCellHtml(r) {
   const sec = String(r.sector || ""), libre = r.estado === "libre";
   const contar = r.fuente === "a_contar" || (_prkRev || []).some(function (v) { return String(v.sector).toUpperCase() === sec.toUpperCase(); });
@@ -45902,6 +45985,11 @@ function prkCellHtml(r) {
     tip += " · " + String(r.cod || "") + (d ? " — " + d : "") + (mc ? " · " + mc + " MC" : "") + (inn ? " · " + inn + " cajas" : "") +
            (r.estado === "sin_lugar" ? " · ⚠ esta posición no existe como rack en Lugares del depósito" : "") +
            (r.fuente === "a_contar" ? " · 🔎 A CONTAR: " + (r.motivo || "") : "");
+  }
+  if (r._ins && r._ins.length) {
+    cuerpo += '<span class="prk-mc">🧰 +' + r._ins.length + ' insumo' + (r._ins.length === 1 ? "" : "s") + ': ' +
+      escapeHtml(r._ins.map(function (x) { return String(x.cod || ""); }).join(", ")) + '</span>';
+    tip += " · también: " + r._ins.map(function (x) { return String(x.cod || ""); }).join(", ");
   }
   if (contar) cuerpo += '<span class="prk-mc" style="color:#b45309">🔎 a contar</span>';
   return '<div class="pmap-cell ' + cls + (hit ? " pmap-hit" : "") + '" title="' + escapeHtml(tip) + '"' +
@@ -45933,7 +46021,11 @@ async function prkRevisarCerrar(id) {
   pmapCeldaStatus("✓ Cerrado.", true);
 }
 function prkAbrir(sector) {
-  const r = (_prk || []).filter(function (x) { return String(x.sector) === String(sector); })[0];
+  // v22.82: la fila del ARTÍCULO (no un insumo) es la que llena el formulario; los insumos van abajo.
+  const todas = (_prk || []).filter(function (x) { return String(x.sector) === String(sector); });
+  const art = todas.filter(function (x) { return x.fuente !== "insumo"; })[0];
+  const ins = todas.filter(function (x) { return x.fuente === "insumo"; });
+  const r = art || (todas[0] ? Object.assign({}, todas[0], { estado: "libre", cod: null, master_cajas: null, innercajas: null, descripcion: null, fuente: null }) : null);
   const m = document.getElementById("pmapCeldaModal"), tit = document.getElementById("pmapCeldaTit"),
         box = document.getElementById("pmapCeldaBody");
   if (!r || !m || !tit || !box) return;
@@ -45943,6 +46035,13 @@ function prkAbrir(sector) {
   const libre = r.estado === "libre", d = pmapDesc(r);
   const emp = String(r.empresa || "LK").toUpperCase();
   const secJ = JSON.stringify(String(sector)).replace(/"/g, "&quot;");
+  if (emp === "IN") {   // rack de insumos: sólo insumos, sin formulario de artículo
+    box.innerHTML = '<div class="prk-det">Rack de <b>insumos</b>.' +
+      (r.estado === "sin_lugar" ? '<br>⚠ Esta posición no existe como rack en 📍 Lugares del depósito.' : "") + '</div>' +
+      prkStockLinea(sector) + prkInsHtml(sector, ins);
+    m.classList.add("show");
+    return;
+  }
   box.innerHTML = '<div class="prk-det">' +
     (libre ? 'Posición <b>libre</b>.'
       : '<b>' + escapeHtml(String(r.cod || "—")) + '</b>' + (d ? ' — ' + escapeHtml(d) : "")) +
@@ -45959,8 +46058,77 @@ function prkAbrir(sector) {
       '<button class="planim-btn-save" onclick="prkGuardar(' + secJ + ',false)">💾 Guardar</button>' +
       (libre ? "" : '<button class="prk-vaciar" onclick="prkGuardar(' + secJ + ',true)">🗑 Vaciar posición</button>') +
     '</div>' +
-    '<div class="prk-nota">Guardar deja en el stock de racks lo que hay en ESTA posición (ajusta por la diferencia) y cierra lo que tenía «a contar».</div>';
+    '<div class="prk-nota">Guardar deja en el stock de racks lo que hay en ESTA posición (ajusta por la diferencia) y cierra lo que tenía «a contar».</div>' +
+    prkInsHtml(sector, ins);
   m.classList.add("show");
+}
+/* v22.82 (Luis 25/09: "que todas las definiciones de qué cosa hay en cada rack/góndola se puedan editar
+   desde mapas; cambiarlo ahí informa a todos los demás"). Los insumos de una posición se editan acá y
+   se escriben por gv_insumo_posicion_guardar → Insumos_Ubicaciones, que es lo que lee el módulo de Insumos. */
+function prkInsHtml(sector, ins) {
+  const S = JSON.stringify(String(sector)).replace(/"/g, "&quot;");
+  let h = '<div class="prk-ins"><b>🧰 Insumos en esta posición</b>';
+  if (!ins.length) h += '<div class="prk-nota" style="margin-top:4px">Ninguno.</div>';
+  ins.forEach(function (x, k) {
+    const C = JSON.stringify(String(x.cod || "")).replace(/"/g, "&quot;"), dd = pmapDesc(x);
+    h += '<div class="prk-ins-row"><span><b>' + escapeHtml(String(x.cod || "")) + '</b>' + (dd ? ' — ' + escapeHtml(dd) : ' <span style="color:#b45309">(no está en Insumos)</span>') + '</span>' +
+      '<input class="planim-inp planim-inp-num" id="prkInsQ_' + k + '" type="number" step="any" min="0" value="' + (Number(x.innercajas) || 0) + '">' +
+      '<button class="planim-btn-save" onclick="prkInsGuardar(' + S + ',' + C + ',' + k + ')">💾</button>' +
+      '<button class="prk-vaciar" onclick="prkInsQuitar(' + S + ',' + C + ')">🗑 Quitar</button></div>';
+  });
+  h += '<div class="prk-ins-row"><input class="planim-inp" id="prkInsNuevo" type="text" placeholder="Código de insumo" style="width:130px">' +
+    '<input class="planim-inp planim-inp-num" id="prkInsNuevoQ" type="number" step="any" min="0" placeholder="cant">' +
+    '<button class="planim-btn-save" onclick="prkInsAgregar(' + S + ')">＋ Agregar</button></div>' +
+    '<div class="prk-nota">Esto es lo que ve el módulo de Insumos como ubicación.</div></div>';
+  return h;
+}
+async function prkInsEscribir(sector, body, okMsg) {
+  pmapCeldaStatus("Guardando…", true);
+  const r = await pmapRpc("gv_insumo_posicion_guardar", Object.assign({ p_sector: sector }, body));
+  if (!r.ok) { pmapCeldaStatus("No se guardó: " + r.err, false); return false; }
+  await prkFetch(); pmapRender();
+  if (sector) prkAbrir((r.data && r.data.sector) || sector);
+  pmapCeldaStatus(okMsg, true);
+  return true;
+}
+async function prkInsGuardar(sector, cod, k) {
+  const el = document.getElementById("prkInsQ_" + k), q = el ? Number(el.value || 0) : 0;
+  await prkInsEscribir(sector, { p_cod: cod, p_cantidad: q }, "✓ " + cod + " en " + sector + ": " + pmapNum(q) + ".");
+}
+async function prkInsQuitar(sector, cod) {
+  if (!confirm("¿Sacar " + cod + " de " + sector + "?")) return;
+  await prkInsEscribir(sector, { p_cod: cod, p_cantidad: 0, p_quitar: true }, "✓ " + cod + " salió de " + sector + ".");
+}
+async function prkInsAgregar(sector) {
+  const c = document.getElementById("prkInsNuevo"), q = document.getElementById("prkInsNuevoQ");
+  const cod = c ? String(c.value || "").trim() : "";
+  if (!cod) { pmapCeldaStatus("Escribí el código del insumo.", false); return; }
+  await prkInsEscribir(sector, { p_cod: cod, p_cantidad: q ? Number(q.value || 0) : 0 }, "✓ " + cod + " quedó en " + sector + ".");
+}
+/* Ubicar un insumo que tiene stock y ninguna posición (o está anotado en un lugar que no existe). */
+function prkInsUbicarAbrir(cod, cantidad, refId) {
+  const m = document.getElementById("pmapCeldaModal"), tit = document.getElementById("pmapCeldaTit"),
+        box = document.getElementById("pmapCeldaBody");
+  if (!m || !tit || !box) return;
+  _pmapCelda = ""; pmapCeldaStatus("");
+  tit.textContent = "Ubicar insumo " + cod;
+  const a = [cod, refId == null ? null : Number(refId)].map(function (x) { return JSON.stringify(x).replace(/"/g, "&quot;"); }).join(",");
+  box.innerHTML = '<div class="prk-det"><b>' + escapeHtml(cod) + '</b>: ' +
+      (refId != null ? 'está anotado en un lugar que no es una posición del Mapa.' : 'tiene stock y no está en ninguna posición del Mapa.') + '</div>' +
+    '<div class="prk-form">' +
+      '<label>Posición<input class="planim-inp" id="prkInsUbSec" type="text" placeholder="A1, R01AD, V09AT…" oninput="this.value=this.value.toUpperCase()"></label>' +
+      '<label>Cantidad<input class="planim-inp planim-inp-num" id="prkInsUbQ" type="number" step="any" min="0" value="' + (Number(cantidad) > 0 ? Number(cantidad) : "") + '"></label>' +
+    '</div>' +
+    '<div class="prk-btns"><button class="planim-btn-save" onclick="prkInsUbicarGuardar(' + a + ')">📍 Ubicar</button></div>';
+  m.classList.add("show");
+}
+async function prkInsUbicarGuardar(cod, refId) {
+  const s = document.getElementById("prkInsUbSec"), q = document.getElementById("prkInsUbQ");
+  const sec = s ? String(s.value || "").trim() : "";
+  if (!sec) { pmapCeldaStatus("Escribí la posición.", false); return; }
+  const body = { p_cod: cod, p_cantidad: q ? Number(q.value || 0) : 0 };
+  if (refId != null) body.p_reemplaza_id = refId;
+  await prkInsEscribir(sec, body, "✓ " + cod + " quedó en " + sec + ".");
 }
 let _prkGuardando = false;
 async function prkGuardar(sector, vaciar) {
@@ -46146,6 +46314,7 @@ function pmapCeldaRender() {
 async function pmapRefrescar() {
   const filas = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_planimetria_celda", PMAP_SELECT);
   if (filas && filas.length) _pmap = filas;
+  await pmapAlertaRefrescar();
   pmapRender();
   if (_pmapCelda) pmapCeldaRender();
 }

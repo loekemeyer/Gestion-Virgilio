@@ -21,7 +21,7 @@ const path = require("path");
 /* Objetos que leemos ENTEROS y son chicos por naturaleza — conteo medido el 2026-09-21.
    No crecen con el tiempo (config, catálogos, listas de trabajo del día). */
 const CHICAS = {
-  Camioneros: 13, GV_Rack_CxM: 45, Conteo_Stock: 2, Equivalencias_Codigos: 4, Equivalencias_Familia: 18,
+  Camioneros: 13, GV_Rack_CxM: 45, gv_insumo_ubicacion: 149, vista_insumos: 142, Conteo_Stock: 2, Equivalencias_Codigos: 4, Equivalencias_Familia: 18,
   GV_Krikos_OC: 0, GV_Tandas_Auto_Log: 1, Insumos_Factores: 45, PPP_Web_Config: 62,
   gv_np_prog_sin_base: 0, gv_pedido_mod_np: 8, gv_ppp_cliente_dos_dias: 0,
   gv_ppp_super_mezclado: 0, gv_vista_cola_impresion: 0, gv_vista_control_remitos: 29,
