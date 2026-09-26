@@ -29892,3 +29892,21 @@ los pagos, y que al lado de lo facturado aparezca qué pagó el cliente y si pag
   operadora ya codifica el 99 %. No se automatizó.
 
 **Rollback:** cabecera de `sql/gv_cobranza_deuda_viva_v2293.sql`.
+
+### v22.95 — Cuenta corriente de libro: todas las facturas y pagos del cliente + control de saldo contra el Excel (26/09, Thomas)
+
+- **`gv_cobranza_cuenta(emp, cod)`**: FC/ND/NC de ISIS y pagos de la conciliación del cliente con saldo acumulado.
+  **`gv_cobranza_control_saldos()`**: por cliente, facturado − NC − pagos del banco vs deuda del Excel (70 ms).
+  Las dos SECURITY DEFINER con chequeo de supervisor (la pantalla no puede leer `isis_*`). Pantalla: botón
+  "Todas las facturas y pagos" en el detalle, columnas Saldo calc./Deuda Excel y filtro "Saldo no coincide".
+- **Desde**: LK 01/01/2024, Chef 01/02/2025 (`gv_cobranza_desde`): Chef recién tiene cobros con código de cliente
+  desde 2025 (1 en 2023, 11 en 2024, 602 en 2025). Sin saldo de apertura: lo facturado antes y pagado después queda a favor.
+- **Medido el 26/09** (coincide = diferencia ≤ máx($5.000; 2 % de lo facturado en 12 meses o de la deuda):
+
+| empresa | con deuda en Excel | coinciden | deuda 0 en Excel | coinciden | a favor en Excel | coinciden |
+|---|---:|---:|---:|---:|---:|---:|
+| LK | 131 | 83 | 587 | 453 | 42 | 32 |
+| Chef | 26 | 13 | 106 | 74 | 10 | 3 |
+
+  Las diferencias grandes son súper (Cencosud +$292 M, Coto +$122 M, Dorinka, INC: descuentos/retenciones que no pasan
+  por el banco) y clientes que pagan en efectivo o cheque físico sin código. `sql/gv_cobranza_cuenta_v2295.sql`.
