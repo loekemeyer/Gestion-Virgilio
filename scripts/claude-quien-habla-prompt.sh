@@ -68,6 +68,7 @@ for i, n in NOM.items():
 for t, i in pad.get("alias", {}).items():
     TOK.setdefault(t, set()).add(i)
 TOK.setdefault("thomas", set()).add("TH")   # Thomas -> 20 con prefijo 'Th '
+TOK.setdefault("loekemeyer", set()).add("TH")
 PREF = pad.get("preferido", {})
 PRES = ("soy", "habla", "escribe", "aca", "aqui")
 
@@ -85,6 +86,8 @@ def detectar(txt):
     if not isinstance(txt, str) or not txt.strip() or txt.lstrip().startswith("<"):
         return None
     low = _n(txt)
+    # "Tomás con H" es Thomas (Loekemeyer), no Tomás Beviglia ni Gonzalez Tomas (Thomas, 26/09).
+    low = re.sub(r"\btomas\s+con\s+(?:la\s+)?h\b", "thomas", low)
     # 1) "soy X [Y]" / "habla X" / "te escribe X" en cualquier parte
     w = re.findall(r"[a-z]+", low)
     for k, x in enumerate(w):
