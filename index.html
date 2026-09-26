@@ -60792,10 +60792,12 @@ async function ccRefresh() {
   var r = await sb.rpc("gv_cobranza_clientes");
   if (r.error) { if (cont) cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + _ccEsc(r.error.message) + '</div>'; return; }
   _ccState.rows = r.data || [];
-  ccRender();
+  ccCtaRender();
 }
 window.ccRefresh = ccRefresh;
-function ccRender() {
+/* v22.95 — se llamaba ccRender y PISABA la de Carga Camión (index.html ~31716): la segunda declaración gana y
+   el operario se quedaba sin la lista para cargar el camión. Los nombres de este bloque van con ccCta*. */
+function ccCtaRender() {
   var cont = document.getElementById("ccTabla"), res = document.getElementById("ccResumen");
   if (!cont) return;
   var q = (_ccState.q || "").toLowerCase().trim();
@@ -60843,11 +60845,11 @@ function ccRender() {
   cont.innerHTML = h + '</tbody></table>';
   if (_ccState.abierto) ccCargarDetalle(_ccState.abierto);
 }
-window.ccRender = ccRender;
+window.ccCtaRender = ccCtaRender;
 function ccAbrirCliente(emp, cod) {
   var key = emp + "|" + cod;
   _ccState.abierto = (_ccState.abierto === key) ? null : key;
-  ccRender();
+  ccCtaRender();
 }
 window.ccAbrirCliente = ccAbrirCliente;
 async function ccCargarDetalle(key) {
@@ -60924,9 +60926,9 @@ function cobrosSetTab(tab) {
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
         '<h1 style="margin:0;font-size:20px;">📒 Cuenta corriente de clientes</h1>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-          '<input id="ccQ" placeholder="🔎 Cliente o código" ' + sel + ' oninput="_ccState.q=this.value;ccRender();">' +
-          '<select ' + sel + ' onchange="_ccState.empresa=this.value;ccRender();"><option value="">LK y Chef</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option></select>' +
-          '<select ' + sel + ' onchange="_ccState.filtro=this.value;ccRender();"><option value="deuda">Con deuda</option><option value="vencida">Con deuda vencida</option><option value="mal">Pagaron mal (a reclamar)</option><option value="todos">Todos</option></select>' +
+          '<input id="ccQ" placeholder="🔎 Cliente o código" ' + sel + ' oninput="_ccState.q=this.value;ccCtaRender();">' +
+          '<select ' + sel + ' onchange="_ccState.empresa=this.value;ccCtaRender();"><option value="">LK y Chef</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option></select>' +
+          '<select ' + sel + ' onchange="_ccState.filtro=this.value;ccCtaRender();"><option value="deuda">Con deuda</option><option value="vencida">Con deuda vencida</option><option value="mal">Pagaron mal (a reclamar)</option><option value="todos">Todos</option></select>' +
           '<button onclick="ccRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
         '</div>' +
       '</div>' +

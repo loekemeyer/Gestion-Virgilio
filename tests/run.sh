@@ -650,6 +650,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-punto-unico.cjs
 echo "== imp-escritura-login (v22.81: el maestro de importados se escribe sólo con la sesión de supervisor) =="
 node tests/imp-escritura-login.cjs
+
+echo "== fn-duplicadas (v22.95: ninguna función de nivel superior declarada dos veces — la ccRender de Cobranzas pisó la de Carga Camión) =="
+node tests/fn-duplicadas.cjs
 node tests/cap-sector-vista.cjs
 node tests/ins-aceptar-ubic.cjs
 

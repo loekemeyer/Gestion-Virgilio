@@ -1,3 +1,15 @@
+## Nota v22.95 (2026-09-26) — Carga Camión volvía a dibujarse vacía: la cuenta corriente de Cobranzas pisaba `ccRender`
+
+La v22.93 de Cobranzas (📒 Cuenta corriente, commit `6716e17`) declaró una `function ccRender()` propia. En un
+`<script>` clásico **la segunda declaración gana sin avisar**, así que la de Carga Camión (`showCargaCamion` →
+`ccRender`) pasó a llamar a la de Cobranzas, que busca `#ccTabla`, no lo encuentra y sale: **al operario no se le
+dibujaba la lista para cargar el camión**. Lo cazó `tests/cc-orden-camionero.cjs` (rojo en `main` desde ese commit).
+
+- La de Cobranzas se llama ahora **`ccCtaRender`** (y sus 7 llamadas); Carga Camión recupera la suya.
+- **`tests/fn-duplicadas.cjs`** (nuevo, en `run.sh`): falla si una función de nivel superior se declara dos veces
+  en `index.html`. Verificado que falla contra `main` antes del arreglo (`ccRender`, líneas 31703 y 60785).
+- ⚠ **Al agregar un módulo, el prefijo tiene que ser propio**: `cc` es de Carga Camión desde la v10.
+
 ## Nota v22.95 (2026-09-26) — Importación se escribe SÓLO con login de supervisor (cierra la v22.81)
 
 Thomas, 26/09: *"Si"* a cerrar la escritura del módulo. La v22.81 decía *"sólo supervisor"* y en la base

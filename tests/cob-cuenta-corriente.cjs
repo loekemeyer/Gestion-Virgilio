@@ -53,10 +53,10 @@ catch (_e) {
     out.orden = filas().map((t) => t.split(" ")[0]);
     out.resumen = (document.getElementById("ccResumen") || {}).textContent || "";
     // (c) filtro pagaron mal
-    _ccState.filtro = "mal"; ccRender();
+    _ccState.filtro = "mal"; ccCtaRender();   // v22.95: ccRender es de Carga Camión
     out.mal = filas().length;
     // (d) abrir Torres y Liva
-    _ccState.filtro = "deuda"; ccRender();
+    _ccState.filtro = "deuda"; ccCtaRender();
     ccAbrirCliente("lk", "288");
     await new Promise((res) => setTimeout(res, 300));
     const c = calls.find((x) => x.fn === "gv_cobranza_cliente");
