@@ -6190,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.92"></script>
+<script type="module" src="recepcion.js?v=22.93"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.92";
+const APP_VERSION = "v22.93";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17046,15 +17046,26 @@ async function ocgFetchImportados() {
     const al = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Importados_Alias", "select=cod,canon");
     (al || []).forEach(function (a) { if (a.cod && a.canon) IMP_ALIAS[String(a.cod).toUpperCase().trim()] = String(a.canon).trim(); });
   } catch (_e) {}
+  // v22.93 — un mismo cod_art con filas de las DOS plantas (hoy sólo 809E) son dos productos: cambia el
+  // packaging y el FOB (Thomas, 26/09: "no es lo mismo 809E en LK y 809E en CH"). Van en dos líneas; sumados,
+  // el sobrante de Loeke tapaba lo que le falta a Chef (2.748 u). 437E/438E ya van separados como 437EL/438EL.
+  const _impPlanta = function (m) { return String(m || "").trim().toUpperCase() === "CH" ? "CH" : "LK"; };
+  const _impDosPlantas = {};
+  (function () {
+    const pl = {};
+    (rows || []).forEach(function (r) { const c = String(r.cod_art || "").trim().toUpperCase(); if (!c) return; (pl[c] = pl[c] || {})[_impPlanta(r.marca)] = 1; });
+    Object.keys(pl).forEach(function (c) { if (pl[c].CH && pl[c].LK) _impDosPlantas[c] = 1; });
+  })();
   const by = {};
   let meses = 10;
   (rows || []).forEach(function (r) {
     const codRaw = String(r.cod_art || "").trim(); if (!codRaw) return;
     const cod = IMP_ALIAS[codRaw.toUpperCase()] || codRaw;   // canónico (865ED → 865E)
-    const k = cod.toUpperCase();
-    if (!by[k]) by[k] = { cod: cod, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, uniPed: 0, enCurso: 0, det: [] };
+    const _pl = _impDosPlantas[codRaw.toUpperCase()] ? _impPlanta(r.marca) : "";
+    const k = cod.toUpperCase() + (_pl ? "|" + _pl : "");
+    if (!by[k]) by[k] = { cod: cod, key: k, planta: _pl, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, uniPed: 0, enCurso: 0, det: [] };
     const o = by[k];
-    if (codRaw.toUpperCase() === k && r.descripcion) o.desc = r.descripcion;   // la fila canónica manda la descripción
+    if (codRaw.toUpperCase() === cod.toUpperCase() && r.descripcion) o.desc = r.descripcion;   // la fila canónica manda la descripción
     o.proyUni += Number(r.est_madre_eff) || 0;
     o.stockUni += (r.stock_total != null) ? (Number(r.stock_total) || 0) : (Number(r.stock_actual) || 0);   // v15.27: incluye insumos
     o.stockIns += Number(r.stock_insumos) || 0;
@@ -17097,8 +17108,12 @@ async function ocgFetchImportados() {
   // dd/mm" en el portal cuando el artículo está sin stock.
   const reingresoEst = {};
   try {
-    const rg = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados", "select=cod_art,reingreso_est&reingreso_est=not.is.null");
-    (rg || []).forEach(function (r) { if (r.reingreso_est) reingresoEst[String(r.cod_art).toUpperCase().trim()] = String(r.reingreso_est).slice(0, 10); });
+    const rg = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados", "select=cod_art,marca,reingreso_est&reingreso_est=not.is.null");
+    (rg || []).forEach(function (r) {
+      if (!r.reingreso_est) return;
+      const c = String(r.cod_art).toUpperCase().trim(), f = String(r.reingreso_est).slice(0, 10);
+      reingresoEst[c] = f; reingresoEst[c + "|" + _impPlanta(r.marca)] = f;   // v22.93 — el de cada planta, para las dos líneas de 809E
+    });
   } catch (_e) {}
   const items = [];
   Object.keys(by).forEach(function (k) {
@@ -17129,7 +17144,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[kk] || ""), det: o.det || [] });
+    items.push({ cod: o.cod, key: o.key, planta: o.planta, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -17340,7 +17355,7 @@ function ocBodyGenImportados() {
         try { if (it.parteDet && it.parteDet.length) detTxt = it.parteDet.map(function (d) { return d.cod + ": " + d.proy + (d.stock_uni != null ? " (stock " + d.stock_uni + " u)" : ""); }).join("  ·  "); } catch (_e) {}
         parteBadge = ' <span style="color:#7c3aed;font-weight:800;cursor:help" title="Parte: la proyección es la SUMA de los terminados que la usan, y su stock terminado (' + (it.stockTermU || 0) + ' u) cuenta como stock de la parte → ' + escapeHtml(detTxt) + '">🧩</span>';
       }
-      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + parteBadge + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.meses + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + it.stockUni + '</td><td class="num">' + it.enCurso + '</td><td class="num oc-falt">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
+      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + _impPlantaChip(it) + parteBadge + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.meses + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + it.stockUni + '</td><td class="num">' + it.enCurso + '</td><td class="num oc-falt">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
     });
     h += '</tbody></table></div>';
   });
@@ -21086,7 +21101,13 @@ function _pedHechoNorm(s) { s = String(s == null ? "" : s).toUpperCase().replace
 function _pedHechoItem(cod) {
   var data = (_stkPop && _stkPop.data) || { items: [] };
   var t = _pedHechoNorm(cod); if (!t.raw) return null;
-  return (data.items || []).find(function (x) { var c = _pedHechoNorm(x.cod); return c.raw === t.raw || (!!t.z && c.z === t.z); }) || null;
+  var hits = (data.items || []).filter(function (x) { var c = _pedHechoNorm(x.cod); return c.raw === t.raw || (!!t.z && c.z === t.z); });
+  // v22.93 — 809E viene en dos líneas (LK / CH): para cargar un pedido se ve como UN artículo con dos marcas,
+  // así el flujo de siempre pide la marca ("809E CH 1224") y el bache cae en la fila correcta.
+  if (hits.length > 1 && hits.every(function (x) { return x.cod === hits[0].cod && x.planta; })) {
+    return Object.assign({}, hits[0], { key: hits[0].cod, planta: "", det: hits.reduce(function (a, x) { return a.concat(x.det || []); }, []) });
+  }
+  return hits[0] || null;
 }
 function _pedHechoNum(v) { var n = parseInt(String(v == null ? "" : v).replace(/[^\d]/g, ""), 10); return (n > 0) ? n : 0; }
 function _pedHechoFmt(n) { return Number(n || 0).toLocaleString("es-AR"); }
@@ -21253,6 +21274,7 @@ function _pedHechoRenderCuerpo(soloTabla) {
   items.forEach(function (it) {
     var marcas = _pedHechoMarcas(it);
     if (marcas.length > 1) marcas.forEach(function (m) { rows.push({ it: it, key: it.cod + "|" + m, marca: m }); });
+    else if (it.planta) { var _mk = marcas[0] || it.planta; rows.push({ it: it, key: it.cod + "|" + _mk, marca: _mk }); }   // v22.93 — 809E LK / CH
     else rows.push({ it: it, key: it.cod, marca: "" });
   });
   var filas = rows.map(function (r, i) {
@@ -21344,9 +21366,24 @@ function pedImpSetMC(codEnc, val) {
 }
 /* v10.38 — MC efectivo (override o el calculado) y unidades en master cajas redondas. */
 function _pedImpMcOf(it) {
-  const ov = (_stkPop && _stkPop.mcOverride) ? _stkPop.mcOverride[it.cod] : undefined;
+  const ov = (_stkPop && _stkPop.mcOverride) ? _stkPop.mcOverride[it.key || it.cod] : undefined;   // v22.93 — 809E LK y CH, cada uno el suyo
   if (ov != null) return ov;
   return (it.aPedirCajas != null) ? it.aPedirCajas : 0;
+}
+/* v22.93 — 809E va en dos líneas (LK / CH): chip de planta, búsqueda por clave y a qué filas del maestro
+   escribe un cambio (sólo las de SU planta: el FOB de Chef y el de Loeke son distintos). */
+function _impPlantaChip(it) {
+  if (!it || !it.planta) return "";
+  return ' <span title="Mismo código, otro producto: cambia el packaging. Se pide por separado." style="font-size:10.5px;font-weight:800;color:#fff;background:' + (it.planta === "CH" ? "#b45309" : "#1e6bd6") + ';border-radius:999px;padding:1px 7px">' + it.planta + '</span>';
+}
+function _pedImpItemPorClave(key) {
+  const data = (_stkPop && _stkPop.data) || {}, K = String(key || "").toUpperCase().trim();
+  return (data.items || []).find(function (it) { return String(it.key || it.cod).toUpperCase().trim() === K; })
+      || (data.items || []).find(function (it) { return String(it.cod).toUpperCase().trim() === K; }) || null;
+}
+function _pedImpFiltroFilas(it, cod) {
+  const ids = (it && it.planta) ? (it.det || []).map(function (d) { return d.id; }).filter(function (x) { return x != null; }) : [];
+  return ids.length ? ("id=in.(" + ids.join(",") + ")") : ("cod_art=eq." + encodeURIComponent(cod));
 }
 function _pedImpUniOf(it) { const mc = _pedImpMcOf(it); return (it.uniMaster > 0) ? mc * it.uniMaster : (mc > 0 ? (it.aPedirUni || 0) : 0); }
 function _pedImpUsdOf(it) { return (it.fobUni > 0) ? _pedImpUniOf(it) * it.fobUni : 0; }
@@ -21485,6 +21522,7 @@ function _pedImpRender() {
       // v16.08 — lo que se muestra ya es el DISPONIBLE: stock de hoy menos lo pedido, con piso en 0.
       if (it.uniPedidas > 0) stockTxt += ' <span style="color:#b45309;font-weight:700;font-size:11px" title="Ya descontadas ' + it.uniPedidas + ' u de pedidos abiertos. Si los pedidos superan al stock, esta columna muestra 0, no un negativo.">📋−' + it.uniPedidas + '</span>';
       const _codEncV = encodeURIComponent(it.cod);
+      const _keyEncV = encodeURIComponent(it.key || it.cod);   // v22.93 — MC, FOB y reingreso van por línea (809E LK / CH)
       const actHtml = (it.det || []).map(function (d) {
         const multi = (it.det || []).length > 1;
         const lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
@@ -21500,20 +21538,20 @@ function _pedImpRender() {
         ? '<span title="' + (_dimTip ? escapeHtml(_dimTip) : 'Unidades por master caja') + '">' + it.uniMaster + '</span>'
         : '<span style="cursor:pointer;color:#f59e0b" title="Falta uni por master (cargá el volumen). Sin esto no se puede redondear a master caja." onclick="pedImpEditVol(\'' + _codEncV + '\')">⚠ ✏️</span>';
       const mc = _pedImpMcOf(it);
-      const mcInput = '<input type="number" inputmode="numeric" min="0" value="' + mc + '" onchange="pedImpSetMC(\'' + _codEncV + '\',this.value)" onclick="event.stopPropagation()" style="width:64px;text-align:center;padding:5px 4px;border:2px solid ' + (mc > 0 ? '#0f766e' : '#cbd5e1') + ';border-radius:8px;font-size:14px;font-weight:800;color:#0f172a;background:' + (mc > 0 ? '#f0fdfa' : '#fff') + '">';
+      const mcInput = '<input type="number" inputmode="numeric" min="0" value="' + mc + '" onchange="pedImpSetMC(\'' + _keyEncV + '\',this.value)" onclick="event.stopPropagation()" style="width:64px;text-align:center;padding:5px 4px;border:2px solid ' + (mc > 0 ? '#0f766e' : '#cbd5e1') + ';border-radius:8px;font-size:14px;font-weight:800;color:#0f172a;background:' + (mc > 0 ? '#f0fdfa' : '#fff') + '">';
       const uni = _pedImpUniOf(it);
       const uniTxt = uni > 0 ? '<b style="color:#b45309">' + uni.toLocaleString("es-AR") + '</b>' : '<span style="color:#cbd5e1">0</span>';
       const _fob = Number(it.fobUni) || 0;
       const fobTxt = _fob > 0
-        ? '<span style="cursor:pointer" title="Tocá para editar el FOB" onclick="pedImpEditFob(\'' + _codEncV + '\')">' + _fob.toFixed(3) + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
-        : '<span style="cursor:pointer;color:#cbd5e1" title="Cargar FOB unitario (USD)" onclick="pedImpEditFob(\'' + _codEncV + '\')">✏️</span>';
+        ? '<span style="cursor:pointer" title="Tocá para editar el FOB" onclick="pedImpEditFob(\'' + _keyEncV + '\')">' + _fob.toFixed(3) + ' <span style="color:#94a3b8;font-size:11px">✏️</span></span>'
+        : '<span style="cursor:pointer;color:#cbd5e1" title="Cargar FOB unitario (USD)" onclick="pedImpEditFob(\'' + _keyEncV + '\')">✏️</span>';
       const _usd = _pedImpUsdOf(it);
       const usdTxt = _usd > 0 ? '<b style="color:#065f46">u$s ' + Math.round(_usd).toLocaleString("es-AR") + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _m3 = _pedImpM3Of(it);
       const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _rg = it.reingresoEst ? String(it.reingresoEst).slice(0, 10) : "";
-      const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _codEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
-      h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
+      const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _keyEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
+      h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + _impPlantaChip(it) + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -21535,7 +21573,7 @@ function pedImpPdfProv(provEnc) {
   const td = 'border:1px solid #333;padding:7px 10px';
   const tdc = td + ';text-align:center;font-weight:700';
   let filas = arr.map(function (it) {
-    return '<tr><td style="' + td + '"><b>' + escapeHtml(codCanon(it.cod)) + '</b></td><td style="' + tdc + '">' + _pedImpMcOf(it) + '</td><td style="' + tdc + '">' + _pedImpUniOf(it) + '</td></tr>';
+    return '<tr><td style="' + td + '"><b>' + escapeHtml(codCanon(it.cod) + (it.planta ? " " + it.planta : "")) + '</b></td><td style="' + tdc + '">' + _pedImpMcOf(it) + '</td><td style="' + tdc + '">' + _pedImpUniOf(it) + '</td></tr>';
   }).join("");
   const totMC = arr.reduce(function (s, it) { return s + _pedImpMcOf(it); }, 0);
   const totU = arr.reduce(function (s, it) { return s + _pedImpUniOf(it); }, 0);
@@ -21576,7 +21614,7 @@ function pedImpExportExcel() {
     var caj = (it.aPedirCajas == null) ? "" : it.aPedirCajas;
     var m3m = Number(it.m3Master) || 0, m3t = Number(it.m3Total) || 0; _totM3 += m3t;
     var fob = Number(it.fobUni) || 0, usd = Number(it.usdTotal) || 0; _totUsd += usd;
-    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (fob > 0 ? fob : "") + '</td><td>' + (usd > 0 ? Math.round(usd) : "") + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
+    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(it.cod) + (it.planta ? " " + it.planta : "")) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (fob > 0 ? fob : "") + '</td><td>' + (usd > 0 ? Math.round(usd) : "") + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
   });
   html += '<tr><td colspan="11"><b>TOTALES</b></td><td><b>' + Math.round(_totUsd) + '</b></td><td></td><td><b>' + (Math.round(_totM3 * 100) / 100) + '</b></td></tr>';
   html += '</table></body></html>';
@@ -21640,19 +21678,19 @@ async function pedImpEditVol(codEnc) {
    código en Importados (todas las marcas/plantas comparten el mismo FOB del proveedor). */
 async function pedImpEditFob(codEnc) {
   var cod = decodeURIComponent(codEnc);
-  var cur = 0;
+  var cur = 0, curIt = null;
   try {
-    var data = (_stkPop && _stkPop.data) || {};
-    (data.items || []).some(function (it) { if (String(it.cod).toUpperCase().trim() === cod.toUpperCase().trim()) { cur = Number(it.fobUni) || 0; return true; } return false; });
+    curIt = _pedImpItemPorClave(cod);   // v22.93 — llega la clave de la línea (809E|CH), no el código
+    if (curIt) { cod = curIt.cod; cur = Number(curIt.fobUni) || 0; }
   } catch (_e) {}
-  var val = prompt("FOB unitario (USD por unidad) de " + codCanon(cod) + ":", cur > 0 ? String(cur) : "");
+  var val = prompt("FOB unitario (USD por unidad) de " + codCanon(cod) + (curIt && curIt.planta ? " " + curIt.planta : "") + ":", cur > 0 ? String(cur) : "");
   if (val === null) return;
   val = String(val).trim().replace(/,/g, ".").replace(/[^0-9.]/g, "");
   var fob = parseFloat(val);
   if (isNaN(fob) || fob < 0) { try { alert("FOB inválido."); } catch (_e) {} return; }
   fob = Math.round(fob * 100000) / 100000;
   try {
-    await _impEscribir("Importados?cod_art=eq." + encodeURIComponent(cod), "PATCH",
+    await _impEscribir("Importados?" + _pedImpFiltroFilas(curIt, cod), "PATCH",
       { fob_uni: fob, actualizado: new Date().toISOString() });
     await pedImpReload();
   } catch (e) { try { alert("No se pudo guardar el FOB: " + (e.message || e)); } catch (_e) {} }
@@ -21767,14 +21805,15 @@ async function pedImpReingresoWeb(codEnc, on) {
 // cuando el artículo está sin stock. Vacío = borra la fecha. dd/mm se arma en LK.
 async function pedImpSetReingreso(codEnc, val) {
   var cod = decodeURIComponent(codEnc);
+  var it0 = null; try { it0 = _pedImpItemPorClave(cod); if (it0) cod = it0.cod; } catch (_e) {}   // v22.93 — clave de línea
   var v = String(val == null ? "" : val).trim();   // 'YYYY-MM-DD' o '' para borrar
   try {
-    await _impEscribir("Importados?cod_art=eq." + encodeURIComponent(cod), "PATCH",
+    await _impEscribir("Importados?" + _pedImpFiltroFilas(it0, cod), "PATCH",
       { reingreso_est: v || null, actualizado: new Date().toISOString() });
     // reflejar en memoria sin recalcular todo el pedido
     try {
       var data = (_stkPop && _stkPop.data) || {};
-      (data.items || []).forEach(function (it) { if (String(it.cod).toUpperCase().trim() === cod.toUpperCase().trim()) it.reingresoEst = v; });
+      (data.items || []).forEach(function (it) { if ((it0 && it0.planta) ? it === it0 : String(it.cod).toUpperCase().trim() === cod.toUpperCase().trim()) it.reingresoEst = v; });
     } catch (_e) {}
     _pedImpRender();
   } catch (e) { try { alert("No se pudo guardar el reingreso: " + (e.message || e)); } catch (_e) {} }

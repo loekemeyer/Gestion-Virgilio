@@ -20,7 +20,7 @@ Ordenado por lo que cuesta plata primero. Nada de esto se tocó.
    **1.608 y 1.512** — cajas leídas como unidades. Además el stock de la parte suma
    `separar_pedidos + a_facturar` (lo comprometido, regla v19.85). Dónde: CTE `det` y `dep` de la vista,
    `sql/gv_importados_partes_stock_terminados_v1526.sql`.
-2. **[Seguro] 809E: el módulo funde LK y CH en una sola línea.** `ocgFetchImportados` agrupa por
+2. ✅ **Arreglado en v22.93 (Thomas: *"no es lo mismo 809E en LK y 809E en CH"*): dos líneas, cada una con su FOB y su fila.** **[Seguro] 809E: el módulo funde LK y CH en una sola línea.** `ocgFetchImportados` agrupa por
    `cod_art` (`by[k]`, index.html ≈17052), y 809E es el único dual que en `Importados` va sin L.
    Hoy: LK proy 300 u/mes · stock 4.116 · en curso 1.632 ‖ CH proy 1.080 · stock 480 · en curso 7.200.
    Sumados, el sobrante de Loeke tapa lo que le falta a Chef. 437E/438E no lo sufren porque van
