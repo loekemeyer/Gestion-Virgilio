@@ -28,7 +28,7 @@ function cuerpoDe(nombre) {
   return html.slice(i, j < 0 ? i + 4000 : j);
 }
 [["provImpSet", '"Importados?cod_art=eq."'], ["pedImpEditVol", '"Importados_Volumen?on_conflict=cod"'],
- ["pedImpEditFob", '"Importados?cod_art=eq."'], ["pedImpSetReingreso", '"Importados?cod_art=eq."'],
+ ["pedImpEditFob", '"Importados?" + _pedImpFiltroFilas('], ["pedImpSetReingreso", '"Importados?" + _pedImpFiltroFilas('],   // v22.93: por fila de planta (809E LK/CH)
  ["pedImpSetCurso", '"Importados?cod_art=eq."']].forEach(function (x) {
   const c = cuerpoDe(x[0]);
   ok(c, "(b) no encuentro " + x[0]);
@@ -83,6 +83,38 @@ ok(src, "(c) no existe _impEscribir");
     t = armar("JWT-USUARIO", resp(403, { message: "new row violates row-level security policy" }));
     e = await falla(t.f("Importados_Volumen?on_conflict=cod", "POST", { cod: "437E" }, "resolution=merge-duplicates,return=minimal"));
     ok(e && /403/.test(e), "(c) un 403 no da error: " + e);
+  }
+
+  // (d) v22.95 — las RPC que ESCRIBEN van con la sesión (la base las rechaza sin supervisor); las de lectura, con la clave.
+  const lista = (html.match(/const _PED_IMP_RPC_ESCRITURA = \[([\s\S]*?)\];/) || [])[1] || "";
+  const enLista = (lista.match(/"([a-z_0-9]+)"/g) || []).map(function (x) { return x.replace(/"/g, ""); });
+  ok(enLista.length === 21, "(d) la lista de RPC de escritura tiene " + enLista.length + " (se esperaban 21)");
+  const escrituras = {};
+  (html.match(/_pedImpRpc\("([a-z_0-9]+)"/g) || []).forEach(function (m) {
+    const n = m.slice(12, -1);
+    if (/(_add|_set|_borrar|_editar|_llego|_embarque|_fechas|_ref|_resync|marcar_llegada|set_curso)$/.test(n)) escrituras[n] = 1;
+  });
+  Object.keys(escrituras).forEach(function (n) { ok(enLista.indexOf(n) >= 0, "(d) " + n + " escribe y no está en _PED_IMP_RPC_ESCRITURA (iría con la clave pública)"); });
+  const srcRpc = cuerpoDe("_pedImpRpc");
+  ok(srcRpc, "(d) no existe _pedImpRpc");
+  if (srcRpc) {
+    const correr = async function (token, fn) {
+      const llamadas = [];
+      const f = new Function("facAuthWriteHeaders", "authNoSesionMsg", "fetch", "SUPABASE_URL", "SUPABASE_KEY", "_PED_IMP_RPC_ESCRITURA",
+        srcRpc.replace(/^async function _pedImpRpc/, "return async function") + "\n}")(
+        async function (extra) { return token ? Object.assign({ apikey: "PUB", Authorization: "Bearer " + token }, extra || {}) : null; },
+        function (b) { return b; },
+        async function (url, op) { llamadas.push({ url: url, op: op }); return { ok: true, status: 200, json: async function () { return {}; }, text: async function () { return ""; } }; },
+        "https://x.supabase.co", "PUB", enLista);
+      let err = null; try { await f(fn, {}); } catch (e) { err = String(e.message || e); }
+      return { err: err, auth: llamadas[0] ? llamadas[0].op.headers.Authorization : null, n: llamadas.length };
+    };
+    let x = await correr("JWT-SUP", "gv_imp_pago_add");
+    ok(x.auth === "Bearer JWT-SUP", "(d) un giro no viaja con la sesión: " + JSON.stringify(x));
+    x = await correr(null, "gv_importado_bache_add");
+    ok(x.n === 0 && x.err && /inici/i.test(x.err), "(d) sin sesión un bache se manda igual o no avisa: " + JSON.stringify(x));
+    x = await correr(null, "gv_imp_ntl_resumen");
+    ok(x.auth === "Bearer PUB" && !x.err, "(d) una lectura dejó de andar sin sesión: " + JSON.stringify(x));
   }
 
   if (fallas.length) { console.error("✗ imp-escritura-login:\n  - " + fallas.join("\n  - ")); process.exit(1); }

@@ -63,6 +63,7 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
       { alias: "Chef", canonico: null, es_empresa: true, nota: "es la empresa", movimientos: 6 }
     ];
     const calls = [];
+    window.sbAuth = { getAccessToken: async () => "JWT-SUP" };   // v22.95 — las RPC de escritura van con la sesión del supervisor
     window.fetch = async (u, o) => {
       const url = String(u); calls.push({ u: url.split("/rest/v1/")[1] || url, b: o && o.body });
       let data = [];

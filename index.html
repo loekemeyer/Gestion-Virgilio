@@ -6190,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.94"></script>
+<script type="module" src="recepcion.js?v=22.95"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.94";
+const APP_VERSION = "v22.95";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21629,10 +21629,23 @@ function pedImpExportExcel() {
 /* v9.29 — Pedidos Importación operable: editar "en curso" y marcar llegada.
    Ambas acciones van por RPC SECURITY DEFINER (sql/importados_pedidos_rpc.sql) apuntando
    por Importados.id. Tras cada acción se re-consulta el motor y se re-renderiza. */
+/* v22.95 (Thomas, 26/09: cierra la v22.81) — las RPC que ESCRIBEN (giros, cuenta corriente, baches, fechas de
+   embarque/llegada, NTL, alias, en curso) van con el JWT de la sesión Google del supervisor, no con la clave
+   pública: la base las rechaza si no es supervisor (es_supervisor_virgilio). Las de lectura siguen igual. */
+const _PED_IMP_RPC_ESCRITURA = ["gv_imp_carga_pedido_set", "gv_imp_cc_deuda_add", "gv_imp_cc_deuda_borrar", "gv_imp_cc_deuda_set",
+  "gv_imp_cc_set", "gv_imp_ntl_efectivo_add", "gv_imp_ntl_efectivo_borrar", "gv_imp_pago_add", "gv_imp_pago_borrar",
+  "gv_imp_pago_cargas_set", "gv_imp_prov_alias_set", "gv_importado_bache_add", "gv_importado_bache_borrar",
+  "gv_importado_bache_editar", "gv_importado_bache_embarque", "gv_importado_bache_llego", "gv_importado_pedido_fechas",
+  "gv_importado_pedido_ref", "gv_importados_resync", "importados_marcar_llegada", "importados_set_curso"];
 async function _pedImpRpc(fn, body) {
+  var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+  if (_PED_IMP_RPC_ESCRITURA.indexOf(fn) >= 0) {
+    headers = await facAuthWriteHeaders({ "Content-Type": "application/json" });
+    if (!headers) throw new Error(authNoSesionMsg("Para guardar en Importación necesitás iniciar sesión con Google (supervisor)."));
+  }
   var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
     method: "POST",
-    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    headers: headers,
     body: JSON.stringify(body)
   });
   if (!r.ok) { var t = ""; try { t = await r.text(); } catch (_e) {} throw new Error("HTTP " + r.status + (t ? (" — " + t) : "")); }
@@ -23082,8 +23095,8 @@ async function _impCursoSetFecha(refEnc, provEnc, iso, campo) {
   if (_stkPop && _stkPop.kind === "impCurso") _stkPop.lineas = {};
   await impCursoReload();
 }
-function impCursoSetEmbarque(refEnc, provEnc, iso) { _impCursoSetFecha(refEnc, provEnc, iso, "emb"); }
-function impCursoSetLlegada(refEnc, provEnc, iso) { _impCursoSetFecha(refEnc, provEnc, iso, "lleg"); }
+function impCursoSetEmbarque(refEnc, provEnc, iso) { return _impCursoSetFecha(refEnc, provEnc, iso, "emb"); }
+function impCursoSetLlegada(refEnc, provEnc, iso) { return _impCursoSetFecha(refEnc, provEnc, iso, "lleg"); }
 /* Cambiar el número de PI de un pedido (los baches viejos quedaron con el mail del que cargó). */
 async function impCursoRenombrar(refEnc, provEnc) {
   const ref = decodeURIComponent(refEnc), prov = decodeURIComponent(provEnc);

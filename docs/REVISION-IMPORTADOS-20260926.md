@@ -70,7 +70,7 @@ Ordenado por lo que cuesta plata primero. Nada de esto se tocó.
 
 ## Alto — seguridad: la v22.81 quedó a medias
 
-9. **[Seguro] El maestro y la plata se escriben con la clave pública.** `pg_policies` hoy:
+9. ✅ **Cerrado en v22.95 (Thomas: *"Si"*), salvo `Stock_Config`.** **[Seguro] El maestro y la plata se escriben con la clave pública.** `pg_policies` hoy:
    `Importados.imp_upd_anon` (UPDATE anon, `using true`), `Importados_Volumen.impvol_ins/upd` (anon),
    `Stock_Config.scfg_insert/update` (anon: ahí viven la fecha global del carrito, el mínimo de 25k y el
    cutoff del stock), `Importados_Config` / `Partes_Map` / `Stock_Parte` con `ALL to authenticated

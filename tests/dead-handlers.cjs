@@ -22,7 +22,10 @@ const SKIP = new Set([
   "Promise", "Map", "Set", "escape", "unescape",
   // v22.83: J = helper LOCAL que arma el argumento al generar el HTML (JSON.stringify + &quot;,
   // index.html ~45634); en el onclick final ya no está. No es un handler.
-  "J"
+  "J",
+  // v22.95: _ccEsc = mismo caso que J (Cobranzas → Cuenta corriente, v22.93 de otra sesión): escapa el
+  // cod_cliente al ARMAR el onclick de ccAbrirCliente; en el onclick final ya no está. No es un handler.
+  "_ccEsc"
 ]);
 
 function extractHandlerFns(src) {

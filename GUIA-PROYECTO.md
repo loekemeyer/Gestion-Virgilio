@@ -1,3 +1,27 @@
+## Nota v22.95 (2026-09-26) — Importación se escribe SÓLO con login de supervisor (cierra la v22.81)
+
+Thomas, 26/09: *"Si"* a cerrar la escritura del módulo. La v22.81 decía *"sólo supervisor"* y en la base
+seguían abiertas las reglas viejas: con la clave pública (que viaja en la página) cualquiera cambiaba el maestro
+de importados y, por 21 funciones, cargaba o borraba giros, baches, fechas de embarque/llegada y la cuenta
+corriente. Medido antes de tocar: esas 21 las llama **sólo** el módulo 📦 Importación; ningún cron, trigger ni
+otra pantalla.
+
+| qué | antes | ahora |
+|---|---|---|
+| `Importados` / `Importados_Volumen` | UPDATE/INSERT para anon y para cualquier `authenticated` (incluye ~450 anónimos) | sólo supervisor (`es_supervisor_virgilio`) |
+| `Importados_Config` / `Importados_Partes_Map` / `Importados_Stock_Parte` | ALL `to authenticated using (true)` | sólo supervisor |
+| 21 RPC de escritura (`gv_imp_pago_*`, `gv_imp_cc_*`, `gv_importado_bache_*`, `gv_importado_pedido_*`, `importados_set_curso`, …) | cualquiera | candado al principio: supervisor, o servicio/postgres (crons, MCP) |
+| front | las firmaba con la clave pública | `_pedImpRpc` las firma con la sesión Google (lista `_PED_IMP_RPC_ESCRITURA`); sin sesión avisa y no manda |
+
+- Las **lecturas no cambian** (el portal LK y Gestión leen con la clave pública).
+- Un supervisor con la app vieja cacheada ve *"Sólo un supervisor logueado… si ya estás, actualizá la app"*.
+- **No se tocó `Stock_Config`**: la escriben 10 pantallas con la clave pública (stock, guardado, OCs, importación);
+  cerrarla pide pasar esas 10 a la sesión primero. Queda en `docs/ESTADO-Y-PENDIENTES.md`.
+- Centinela: 21 filas en `GV_Reglas_Centinela` (v22.95). `tests/imp-escritura-login.cjs` (d) muerde si una RPC que
+  escribe no está en la lista o si viaja sin sesión.
+
+`sql/gv_importados_supervisor_v2295.sql` (rollback en el pie).
+
 ## Nota v22.93 (2026-09-26) — 809E en dos líneas en «📦 Importación»: LK y CH son dos productos
 
 Thomas: *"no es lo mismo 809E en LK y 809E en CH"*. Cambia el packaging y el FOB (LK 0,70 · CH 0,47).
