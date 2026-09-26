@@ -2336,6 +2336,22 @@ marcación pasó de 366 ms a 10 s (timeout 8 s). Va la vista materializada.
 
 `sql/gv_pedido_partido_cuarentena_v2246.sql`, `sql/gv_clientes_nuevos_calc_hijo_v2246_LK.sql`.
 
+## ⚠ REGLA (Thomas, 2026-09-26, v22.98): lo DIFERIDO se parte POR FECHA de reingreso, y la NP adelantada se reprograma sola
+
+**Thomas:** *"si son pedidos únicamente de importados que llegan en noviembre, reprogramarlo de manera automática. Si
+tienen parte de una cosa y parte de la otra, dejarlos ahí y particionar los pedidos en dos."*
+
+| pieza | dónde |
+|---|---|
+| una NP diferida **por fecha** de reingreso (la congelada en `pedido_diferido`) | LK: `v_pedidos_web_np` y `gv_pedidos_web_np_chef` |
+| NP diferida programada ANTES de su reingreso → se desprograma y (b2) la reprograma en la misma corrida | Gestión: `gv_ppp_web_diferido_tarde`, llamada por el armador antes de (a000) |
+
+- Compara contra el reingreso **crudo** (sin los +7): lo que llega el mismo día que sale la tanda se deja ahí.
+- **Tanda empezada no se toca**: queda en `gv_ppp_diferido_antes_de_tiempo` (vacía = todo bien) y decide Marianela.
+- ⚠ **`PPP_Web_Base` no borra artículos que salen de una NP** (el Edge Function hace upsert): si el corte de una NP ya
+  programada cambia, limpiar a mano la foto de picking o el artículo queda en las dos NP (pasó en E37A: 954E y 956E
+  pickeados de más). `sql/gv_diferido_por_fecha_v2298.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.89): el PIPELINE **reemplazó** al submódulo de clientes nuevos
 
 **Luis, textual:** *"implementá esta nueva versión de clientes nuevos en «A programar»

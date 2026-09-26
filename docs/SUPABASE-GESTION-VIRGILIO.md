@@ -29961,3 +29961,29 @@ la clave pública, no desde el MCP.
   01/09 con estado mal / tarde / bien / revisar y la explicación. Hoy: 102 bien · 83 mal ($37,2 M) · 8 tarde · 12 revisar.
   Los lee el módulo Cobranzas del Planify de Vivi (repo Planify).
 SQL: `sql/gv_cobranza_pago_manual_v2296.sql`, `sql/gv_cobranza_avisos_v2296.sql`.
+
+## §3.ni — v22.98: lo diferido se parte por fecha de reingreso y la NP adelantada se reprograma sola (Thomas, 2026-09-26)
+
+**LK (kwkclwhmoygunqmlegrg):** `v_pedidos_web_np` y `gv_pedidos_web_np_chef` agrupan lo diferido por
+`pedido_diferido.fecha_reingreso` (congelada): `np_idx = ceil(n_disp/cap) + slots de los grupos anteriores + ceil(rk_g/cap)`.
+Medido antes de aplicar (transacción que abortaba si cambiaba otra cosa): 1.669 → 1.674 NP, sólo cambian 1448, 1474,
+1524 y 1540; Chef idéntico (84 NP, md5). `security_invoker=true` conservado. Backup de las definiciones:
+`zz_backups."LK_Backup_defs_diferido_20260926"`. Se corrió `sync_diferido_virgilio(45)` en la misma transacción:
+`GV_PPP_Web_Diferido` 4 actualizadas + 5 nuevas.
+
+**Gestión:** `gv_ppp_web_diferido_tarde(empresa, filas, simular, por)` (SECURITY DEFINER, sin anon) — desprograma la NP
+diferida con `no_antes_de > fecha_entrega` si no está facturada, ni armada (`Entregas_Virgilio` viva), ni su tanda tiene
+eventos reales (EP, PK, PKC, TP, AP, TAP, CC, CCN, CR, CCR, CRN). La llama `gv_ppp_web_armar_pendientes` antes de (a000),
+envuelta en `begin … exception` (si falla, el armado sigue). Sólo toca NP del feed de esa corrida, para que (b2) las vea.
+Log `GV_Diferido_Reprogramado`. Centinela `gv_ppp_diferido_antes_de_tiempo` (vacía = todo bien) + 3 filas en
+`GV_Reglas_Centinela`. Backup del armador: `zz_backups."GV_Backup_Funciones"` (motivo `pre v22.98 diferido tarde`).
+
+**Datos:** 13 filas de `PPP_Web_Base` borradas (artículos que el corte movió de NP; backup
+`zz_backups."GV_Backup_WebBase_diferido_20260926"`, 167 filas de los 5 pedidos).
+
+**Verificado en la corrida real de las 20:00:** LK 0221 → F08A 09/12 (log 20:00:08), LK 0253 (566E ×3) → F07A 09/12,
+LK 0254 (323E ×3) → E95A 10/11, LK 0206 5 cajas en E37A, LK 0227 2 cajas en E18C. Base duplicada 0, reglas perdidas 0.
+
+**Rollback:** restaurar el armador desde el backup; `drop view gv_ppp_diferido_antes_de_tiempo; drop function
+gv_ppp_web_diferido_tarde(text,jsonb,boolean,text)`; en LK recrear las dos definiciones del backup y correr el sync;
+reinsertar la base desde el backup.

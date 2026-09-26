@@ -1,3 +1,24 @@
+## Nota v22.98 (2026-09-26) — Lo que espera importado se parte POR FECHA, y la NP que salía sin su mercadería se reprograma sola
+
+**Thomas:** *"si son pedidos que son únicamente de artículos importados que llegan en noviembre, habría que
+reprogramarlo de manera automática. Si tienen parte de una cosa y parte de la otra, dejarlos ahí y particionar en dos."*
+
+- **El corte lo hace LK** (`v_pedidos_web_np` y `gv_pedidos_web_np_chef`): lo diferido va en **una NP por fecha de
+  reingreso** (la congelada en `pedido_diferido`). Antes iba todo en una NP con la fecha más lejana: LK 0206 llevaba
+  baches del 29/09 junto al 566E del 29/11. Con una sola fecha el resultado es idéntico (medido: sólo cambiaron 4 pedidos).
+- **Gestión, automático:** `gv_ppp_web_diferido_tarde`, llamada por el armador antes del filtro (a000). Una NP diferida
+  programada para un día ANTERIOR a su reingreso (el de LK, crudo, sin los +7) se desprograma y el pase (b2) la vuelve a
+  programar en la misma corrida. Sólo si la tanda no empezó; si empezó, queda en `gv_ppp_diferido_antes_de_tiempo`.
+  Log: `GV_Diferido_Reprogramado`.
+- **Las tres causas** que la regla cubre: LK 0206 se programó el 22/09 y la marca de diferido llegó el 24/09; LK 0227 se
+  programó 4 min antes de que el sync (cada 10 min) trajera su marca; LK 0221 tenía un reingreso que después se corrió.
+- **Resultado del 26/09:** LK 0221 E49A 30/09 → F08A 09/12 · LK 0206 queda en E37A con los baches · 566E ×3 → **LK 0253**
+  (F07A 09/12) · LK 0227 queda en E18C con 606E · 323E ×3 → **LK 0254** (E95A 10/11).
+- ⚠ **`PPP_Web_Base` no borra artículos que salen de una NP** (el Edge Function hace upsert). E37A se pickeó el 25/09
+  con 6 artículos en LK 0205 y LK 0206 a la vez: 954E y 956E quedaron con 1 caja de más en el pallet. Se borraron las 13
+  líneas duplicadas con backup (`zz_backups."GV_Backup_WebBase_diferido_20260926"`).
+- SQL: `sql/gv_diferido_por_fecha_v2298.sql` (Gestión aplicado + LK documentado + rollback).
+
 ## Nota v22.96 (2026-09-26) — Carga Camión volvía a dibujarse vacía: la cuenta corriente de Cobranzas pisaba `ccRender`
 
 La v22.93 de Cobranzas (📒 Cuenta corriente, commit `6716e17`) declaró una `function ccRender()` propia. En un

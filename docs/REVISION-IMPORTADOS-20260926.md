@@ -43,7 +43,12 @@ Ordenado por lo que cuesta plata primero. Nada de esto se tocó.
 6. **[Seguro] 3 NP diferidas por importado están programadas ANTES de su «no antes de».**
    `GV_PPP_Web_Diferido` ⋈ `PPP_Web_Programacion`: **LK 0206 → 29/09** (E37A, no antes del 29/11) ·
    **LK 0221 → 30/09** (E49A, 29/11) · **LK 0227 → 01/10** (E18C, 03/11). Se pickean sin el importado.
-   Causa [Probable]: la fecha de reingreso se corrió después de programar; la tabla no guarda historial.
+   ~~Causa [Probable]: la fecha de reingreso se corrió después de programar.~~ **RETIRADO (medido 26/09): fueron tres
+   causas.** LK 0206 se programó el 22/09 y la marca de diferido llegó el 24/09; LK 0227 se programó 4 min antes de que
+   el sync (cada 10 min) trajera la marca; sólo LK 0221 es un reingreso que se corrió.
+   **✅ ARREGLADO v22.98 (Thomas: *"lo de noviembre solo se reprograma; lo mezclado se parte en dos"*):** LK 0221 → F08A
+   09/12; LK 0206 y LK 0227 quedan donde estaban y el importado sale en LK 0253 (09/12) y LK 0254 (10/11). La regla
+   quedó automática en el armador (`gv_ppp_web_diferido_tarde`). `sql/gv_diferido_por_fecha_v2298.sql`.
 7. **[Seguro] 360E: se vende y se programa sin stock, sin pedido a China y con el cartel de reingreso
    apagado.** 13 cajas programadas · stock 0 · en curso 0 · en `GV_Reingreso_Excluido` · sin
    `reingreso_est`. La página no avisa nada.
