@@ -1,3 +1,41 @@
+## Nota v22.91 (2026-09-26) — 📒 Cuenta corriente POR PROVEEDOR en «📦 Importación»
+
+Thomas: *"Debería estar la cta corriente de: Hugo Wong; Becky Chen; Ownland"* · sobre el formato: *"la
+que creas mejor, formato que sea entendible y analizable"*.
+
+Hasta acá la plata se veía **por pedido** (🚢 En curso → 💵 Plata) y la cuenta de NTL **por empresa**
+(💱 NTL). Nadie juntaba, por fábrica, cuánto le debemos, cuánto le giramos y por dónde. Medido el 26/09:
+`GV_Imp_Prov_Mov` (las hojas por proveedor del Excel `Cuenta_Corriente_NTL.xlsx`) sólo tenía **Ownland
+(21 movs) y Frontier (7)** —la hoja Becky que traía el Excel nunca se importó y Hugo Wong no tenía hoja—
+y **ninguna pantalla la mostraba**. Y `GV_Imp_CC_Deuda` («formato papá»: real / banco / futuro, 17 filas
+del 16/09) había nacido el 25/09 en la base con 6 RPC, sin pantalla y sin commit.
+
+La solapa nueva **📒 Cta. proveedor** arma, por proveedor canónico (`gv_imp_prov_canon`), tres bloques,
+**cada uno de UNA fuente y con su etiqueta; nunca suma fuentes distintas**:
+
+| bloque | de dónde sale | qué dice |
+|---|---|---|
+| **Hoy** | `gv_imp_cuenta_corriente` (la planilla de deudas del 11/09) | por PI: FOB · girado · por banco contra factura vieja · falta · pago 30 % · embarque · llegada. Fichas arriba: *le debemos hoy* = FOB − girado |
+| **Libro** | los PI + `GV_Imp_Pagos` | cronológico: el PI cuando nos factura, cada giro cuando le pagamos, **saldo corrido** (lo calcula el backend, el front lo muestra) |
+| **Historia** (plegada) | `GV_Imp_Prov_Mov` (la hoja del Excel, **con SU saldo, no se rehace**) + `gv_imp_ntl_cuenta` (lo que NTL le giró / recuperó a esa fábrica) | lo anterior a los pedidos en curso |
+
+Por qué la hoja no se re-suma: en las hojas de Thomas el «Giro» mezcla lo que salió por NTL y lo que salió
+por banco **contra la factura de una carga vieja** (`a través de` / `fue a`, §2 y §4 de
+`docs/IMPORTACIONES-PAGOS-ARGENTINA.md`), y su «Saldo» es el de la factura que sirve de papel, no la deuda
+comercial. Rehacerlo era inventar una regla; se muestra tal cual y se dice de dónde sale.
+
+Avisos automáticos, por proveedor: PI sin ningún giro cargado (hoy `PI B260601`, la 1.ª de Becky, u$s 23.622
+con 0 girado — la hoja decía anticipo 6.920,86), proveedor sin hoja histórica, FOB del PI distinto al del
+motor, y diferencia contra el «formato papá» cuando su *deuda real* no coincide con FOB − girado (Hugo:
+24.599 contra 22.199). **⬇ Excel** baja los tres bloques. Sólo lectura: los giros se cargan en 💵 Giros y
+el extracto en 💱 NTL.
+
+Al 26/09 (backend, corrido como `anon`): Becky saldo 47.877 (2 PI, 1 giro, sin hoja) · Ownland 35.291
+(hoja hasta 03/06 con saldo 34.956,08) · Fujian 22.388 · Hugo Wong 22.199 (3 giros, sin hoja) · Frontier
+10.080 (hoja hasta 24/05) · Zhixin 7.173 · y Kangli / Wenxinda / Qi Qiao / Cestos sólo con extracto NTL.
+`sql/gv_imp_prov_cuenta_v2291.sql` (vista `gv_imp_prov_libro` sin SELECT para anon + RPC SECURITY DEFINER
+`gv_imp_prov_cc_resumen()` / `gv_imp_prov_cc_libro(p_proveedor)`), `tests/imp-cta-proveedor.cjs`.
+
 ## Nota v22.09 (2026-09-23) — Buscador por CÓDIGO en «📦 Pedidos Importación»
 
 El módulo listaba una tarjeta por proveedor chino con todos sus ítems y **no tenía forma de ir a

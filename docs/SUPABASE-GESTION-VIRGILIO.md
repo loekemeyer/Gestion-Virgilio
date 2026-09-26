@@ -29804,3 +29804,39 @@ y la vista **`gv_conciliacion_bancaria`** que las junta con banco y empresa.
 - Medido (FC contado ene-ago 2026): LK 581 bien, 688 mal, $161.266.537 a reclamar; Chef 69 bien,
   82 mal, $12.761.780. Primero en la lista: Torres y Liva, 24 facturas, 72 días prom., $29.326.866.
 - `sql/gv_cobranza_pago_mal_v2289.sql`.
+
+## §3.nf — v22.91: 📒 cuenta corriente POR PROVEEDOR de importación (Thomas, 2026-09-26)
+
+**Pedido:** *"Debería estar la cta corriente de: Hugo Wong; Becky Chen; Ownland"* · *"la que creas mejor,
+formato que sea entendible y analizable"*.
+
+**Medido antes de tocar:** `GV_Imp_Pedido_CC` 6 filas · `GV_Imp_Pagos` 8 · `GV_Imp_Prov_Mov` 28 (**sólo
+Ownland 21 y Frontier 7**: la hoja Becky del Excel no se importó, Hugo Wong no tenía hoja) y **0 lectores
+en el front** · `GV_Imp_NTL_Mov` 252 · `GV_Imp_CC_Deuda` 17 filas creadas el 25/09 («Seed formato papa
+16/09») con 6 RPC (`gv_imp_cc_deuda_*`) **sin pantalla y sin archivo en el repo**. `gv_imp_ntl_cuenta`
+devuelve `referencia` cruda como `proveedor`, por eso el filtro de 💱 NTL muestra «Fuyian», «Xihin»,
+«Jason» y «Stephen Jiang» como proveedores aparte aunque `GV_Imp_Prov_Alias` ya los mapea.
+
+**Objetos nuevos** (`sql/gv_imp_prov_cuenta_v2291.sql`; no crea tablas ni toca datos):
+
+| objeto | qué es | seguridad |
+|---|---|---|
+| `gv_imp_prov_libro` (vista) | un renglón por movimiento, con `prov` canónico y `fuente` ∈ pedido / giro / hoja / ntl | `security_invoker = true`, **SELECT revocado a anon y authenticated** (patrón v18.63) |
+| `gv_imp_prov_cc_libro(p_proveedor)` | el libro de un proveedor, saldo corrido **sólo sobre pedido + giro** (FOB − giros); la hoja trae `saldo_excel` tal cual | `SECURITY DEFINER`, `set search_path = public`, execute a anon/authenticated |
+| `gv_imp_prov_cc_resumen()` | una fila por proveedor: planilla (fob, pagado, pend. giro directo, falta, saldo, fechas), giros, hoja (movs, hasta, saldo), NTL (girado, recuperado), formato papá (real / banco + factura + BL / futuro) | ídem |
+
+**Verificado como `anon`** (la identidad del navegador, regla v20.45): resumen 10 proveedores — Becky
+47.877,48 · Ownland 35.291,44 · Fujian 22.388 · Hugo Wong 22.199 · Frontier 10.080 · Zhixin 7.173 · Kangli,
+Wenxinda, Qi Qiao y Cestos en 0 (sólo extracto). Libro de Hugo Wong: 38.640 → 24.599 → 25.199 → 22.799 →
+**22.199**, igual que *falta* 247 + *pend. giro directo* 21.952 de la planilla. `gv_imp_prov_libro` con
+`anon_sel = false`.
+
+**Front:** solapa 📒 Cta. proveedor en `_impTabsHtml` (`openImpProvCC`, `impProvSet`, `impProvToggleHist`,
+`impProvExportExcel`). Sólo lectura. `tests/imp-cta-proveedor.cjs` (en `run.sh`), `dead-handlers` 856 / 0.
+
+**Rollback:** `drop function public.gv_imp_prov_cc_libro(text); drop function public.gv_imp_prov_cc_resumen();
+drop view public.gv_imp_prov_libro;` y sacar la solapa de `_impTabsHtml`.
+
+**Queda para Thomas (dato):** re-mandar la hoja Becky del Excel · cargar el anticipo 6.920,86 de `PI B260601`
+· alias `Hugo → Hugo Wong` · FOB de Ownland 46.626 vs 49.291,44 (detalle en
+`docs/IMPORTACIONES-PAGOS-ARGENTINA.md` §10).

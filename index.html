@@ -6190,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.90"></script>
+<script type="module" src="recepcion.js?v=22.91"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.90";
+const APP_VERSION = "v22.91";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20763,6 +20763,7 @@ function _impTabsHtml(cur) {
     '<button style="' + t(cur === 'ped') + '" onclick="openPedidosImportacion()">📦 Pedidos</button>' +
     '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">🚢 En curso</button>' +
     '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">💱 NTL</button>' +
+    '<button style="' + t(cur === 'provcc') + '" onclick="openImpProvCC()" title="Una cuenta por fábrica: cuánto le debemos por los pedidos en curso, cada giro, y la historia (hoja del Excel + extracto NTL).">📒 Cta. proveedor</button>' +
     '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button></div>';
 }
 async function stkOpenProvImp() {
@@ -22019,6 +22020,211 @@ async function pedImpBacheBorrar(bacheId) {
   try { await _pedImpRpc("gv_importado_bache_borrar", { p_bache_id: bacheId }); _impBaches.dirty = true; }
   catch (e) { try { alert("No se pudo anular: " + (e.message || e)); } catch (_e) {} return; }
   await _impBachesReload();
+}
+/* v22.91 — 📒 CUENTA CORRIENTE POR PROVEEDOR (Thomas, 26/09: "debería estar la cta corriente de Hugo Wong,
+   Becky Chen, Ownland" · sobre el formato: "la que creas mejor, entendible y analizable").
+   Hasta acá la plata se veía POR PEDIDO (💵 Plata de 🚢 En curso) y la cuenta de NTL POR EMPRESA (💱 NTL):
+   nadie juntaba, por fábrica, cuánto le debemos, cuánto le giramos y por dónde. Tres bloques por
+   proveedor, cada uno de UNA fuente con su etiqueta, sin sumar cosas de fuentes distintas:
+     · HOY   — los pedidos en curso con la planilla de deudas: FOB · girado · a girar por banco · falta.
+     · LIBRO — el PI (nos factura) y cada giro (le giramos) en orden de fecha, saldo corrido = FOB − giros.
+     · HISTORIA — la hoja del proveedor del Excel de Thomas tal cual (con SU saldo, no se rehace) y el
+       extracto de NTL de esa fábrica (girado / recuperado). Sólo lectura: los giros se cargan en 🚢 En
+       curso (💵 Giros) y el extracto en 💱 NTL.
+   Backend: gv_imp_prov_cc_resumen() y gv_imp_prov_cc_libro(p_proveedor) — sql/gv_imp_prov_cuenta_v2291.sql. */
+let _impProv = null;
+async function openImpProvCC() {
+  _stkPopShell("📒 Cuenta corriente por proveedor", "stkPopBody", true);
+  const body = document.getElementById("stkPopBody"); if (!body) return;
+  body.innerHTML = '<div class="stkpop-empty">Cargando las cuentas por proveedor…</div>';
+  _stkPop = { kind: "impProv" };
+  _impProv = { resumen: [], prov: "", libro: [], err: "", errLibro: "", hist: false };
+  try { _impProv.resumen = (await _pedImpRpc("gv_imp_prov_cc_resumen", {})) || []; }
+  catch (e) { _impProv.err = e.message || String(e); }
+  // arranca parado en el que más se le debe (el backend ya los manda en ese orden)
+  const primero = (_impProv.resumen || [])[0];
+  if (primero) await impProvSet(_impCursoEnc(primero.prov)); else _impProvRender();
+}
+async function impProvSet(enc) {
+  if (!_impProv) return;
+  _impProv.prov = decodeURIComponent(enc || "");
+  _impProv.libro = []; _impProv.errLibro = "";
+  try { _impProv.libro = (await _pedImpRpc("gv_imp_prov_cc_libro", { p_proveedor: _impProv.prov })) || []; }
+  catch (e) { _impProv.errLibro = e.message || String(e); }
+  _impProvRender();
+}
+function impProvToggleHist() { if (!_impProv) return; _impProv.hist = !_impProv.hist; _impProvRender(); }
+/* fechas del módulo: dd/mm/aa (v15.18) */
+function _impProvFecha(iso) {
+  if (!iso) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
+  return m ? (m[3] + "/" + m[2] + "/" + m[1].slice(2)) : String(iso);
+}
+function _impProvUsd(n, dec) {
+  if (n == null || n === "") return "—";
+  return _impNtlNum(n, dec == null ? 2 : dec);
+}
+function _impProvCanal(x) {
+  const c = String(x.canal || '').trim();
+  if (!c) return '<span class="ipc-sub">—</span>';
+  if (/^ntl$/i.test(c)) return '<span class="ipc-chip ntl">NTL</span>';
+  if (/^bco$/i.test(c)) return '<span class="ipc-chip bco">Banco</span>';
+  return '<span class="ipc-chip pi">' + escapeHtml(c) + '</span>';
+}
+function _impProvRender() {
+  const body = document.getElementById("stkPopBody"); if (!body || !_stkPop || _stkPop.kind !== "impProv") return;
+  if (!document.getElementById("impProvCss")) {
+    const cs = document.createElement("style"); cs.id = "impProvCss";
+    cs.textContent =
+      ".ipc-tbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:12px}" +
+      ".ipc-tbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#64748b;font-weight:800;padding:7px 7px;border-bottom:2px solid #e2e8f0;text-align:left;white-space:nowrap}" +
+      ".ipc-tbl td{padding:6px 7px;border-bottom:1px solid #f1f5f9;font-size:12.5px;color:#0f172a;vertical-align:middle}" +
+      ".ipc-tbl td.num,.ipc-tbl th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}" +
+      ".ipc-tbl tr.ipc-ped>td{background:#f8fafc;font-weight:800}" +
+      ".ipc-tbl td.saldo{font-weight:800}" +
+      ".ipc-mono{font-family:Consolas,Menlo,monospace;font-size:12px;font-weight:800}" +
+      ".ipc-sub{font-size:10.5px;color:#64748b;font-weight:700}" +
+      ".ipc-chip{font-size:10.5px;font-weight:800;padding:2px 7px;border-radius:999px;white-space:nowrap;display:inline-block}" +
+      ".ipc-chip.ntl{background:#eef2ff;color:#4338ca}.ipc-chip.bco{background:#ecfdf5;color:#047857}" +
+      ".ipc-chip.pi{background:#f1f5f9;color:#475569}" +
+      ".ipc-neg{color:#b91c1c}.ipc-pos{color:#065f46}" +
+      ".ipc-h{font-size:13px;font-weight:900;color:#0f172a;margin:14px 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}" +
+      ".ipc-kpi{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}" +
+      ".ipc-kpi>div{flex:1;min-width:150px;border-radius:10px;padding:9px 13px;border:1px solid #e2e8f0;background:#f8fafc}" +
+      ".ipc-kpi .k{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:#475569}" +
+      ".ipc-kpi .v{font-size:20px;font-weight:900;margin-top:2px}" +
+      ".ipc-aviso{margin-bottom:10px;padding:8px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:12.5px;color:#92400e}" +
+      ".ipc-prov{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}" +
+      ".ipc-prov button{width:auto;margin:0;flex:0 0 auto;padding:6px 11px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12.5px;font-weight:800;cursor:pointer}" +
+      ".ipc-prov button.on{border-color:#0f766e;background:#0f766e;color:#fff}" +
+      ".ipc-prov button b{font-variant-numeric:tabular-nums}" +
+      ".ipc-b{width:auto;margin:0;padding:5px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12px;font-weight:800;cursor:pointer}";
+    document.head.appendChild(cs);
+  }
+  const st = _impProv, res = st.resumen || [];
+  let h = _impTabsHtml('provcc');
+  h += '<div class="stkpop-hint">Una cuenta por <b>fábrica china</b>, armada con lo que ya está cargado. <b>Hoy</b> = la planilla de deudas ' +
+       '(cuánto le debemos por los pedidos en curso y por dónde se paga) · <b>Libro</b> = el PI y cada giro, en orden, con el saldo corrido · ' +
+       '<b>Historia</b> = la hoja del proveedor del Excel (con su saldo tal cual) y lo que el extracto de NTL le giró. ' +
+       'Cada renglón dice de qué fuente sale; no se suman fuentes distintas. Los giros se cargan en 🚢 En curso → 💵 Giros.</div>';
+  if (st.err) h += '<div class="stkpop-empty" style="color:#b91c1c">No se pudo leer: ' + escapeHtml(st.err) + '</div>';
+  if (!res.length) { body.innerHTML = h + '<div class="stkpop-empty">No hay proveedores con cuenta.</div>'; return; }
+  // fichas de proveedor, en el orden del backend (más deuda primero)
+  h += '<div class="ipc-prov"><span class="ipc-sub" style="font-size:12px">🏭 Proveedor:</span>' +
+    res.map(function (r) {
+      const s = Number(r.saldo) || 0;
+      return '<button class="' + (st.prov === r.prov ? 'on' : '') + '" onclick="impProvSet(\'' + _impCursoEnc(r.prov) + '\')" title="' +
+        escapeHtml((r.pedidos || 0) + ' pedido(s) en curso · ' + (r.ntl_movs || 0) + ' mov. en NTL' + (r.hoja_movs ? ' · hoja del Excel' : '')) + '">' +
+        escapeHtml(r.prov) + (s ? ' <b>' + _impProvUsd(s, 0) + '</b>' : '') + '</button>';
+    }).join('') + '</div>';
+  const r = res.find(function (x) { return x.prov === st.prov; });
+  if (!r) { body.innerHTML = h + '<div class="stkpop-empty">Elegí un proveedor.</div>'; return; }
+  const saldo = Number(r.saldo) || 0;
+  const emp = r.empresa === 'TN' ? 'Tierra Nativa' : r.empresa === 'CH' ? 'Chef' : (r.empresa || '');
+  h += '<div class="ipc-h">' + escapeHtml(r.prov) + (emp ? ' <span class="ipc-chip pi">' + escapeHtml(emp) + '</span>' : '') +
+       ' <span class="ipc-sub">' + (r.pedidos || 0) + ' pedido(s) en curso · ' + _impCursoNum(r.unidades || 0) + ' u · ' +
+       (Number(r.m3) || 0).toLocaleString("es-AR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' m³</span>' +
+       '<button class="ipc-b" style="margin-left:auto" onclick="impProvExportExcel()">⬇ Excel</button></div>';
+  // ---- HOY ----
+  const dEmb = _impCursoDias(r.prox_embarque);
+  h += '<div class="ipc-kpi">' +
+    '<div style="background:' + (saldo > 0 ? '#fef2f2;border-color:#fecaca' : '#ecfdf5;border-color:#a7f3d0') + '"><div class="k">Le debemos hoy</div><div class="v ' + (saldo > 0 ? 'ipc-neg' : 'ipc-pos') + '">u$s ' + _impProvUsd(saldo, 0) + '</div><div class="ipc-sub">FOB ' + _impProvUsd(r.fob, 0) + ' − girado ' + _impProvUsd(r.pagado, 0) + '</div></div>' +
+    '<div><div class="k">Le giramos</div><div class="v">u$s ' + _impProvUsd(r.pagado, 0) + '</div><div class="ipc-sub">' + (r.giros || 0) + ' giro(s)' + (r.ultimo_giro ? ' · último ' + _impProvFecha(r.ultimo_giro) : '') + '</div></div>' +
+    '<div><div class="k">Por banco, contra factura vieja</div><div class="v">u$s ' + _impProvUsd(r.pend_giro_directo, 0) + '</div><div class="ipc-sub">' +
+      (r.papa_banco_factura ? 'factura ' + escapeHtml(r.papa_banco_factura) + (r.papa_banco_bl ? ' · BL ' + _impProvFecha(r.papa_banco_bl) : '') : 'pend. giro directo de la planilla') + '</div></div>' +
+    '<div><div class="k">Falta cubrir</div><div class="v">u$s ' + _impProvUsd(r.falta, 0) + '</div><div class="ipc-sub">sin giro y sin factura vieja que lo tape</div></div>' +
+    '<div><div class="k">Próximo embarque · llegada</div><div class="v" style="font-size:16px">' + _impProvFecha(r.prox_embarque) + ' · ' + _impProvFecha(r.prox_llegada) + '</div><div class="ipc-sub">' +
+      (dEmb != null ? 'embarca en ' + dEmb + ' d' : 'sin embarque a futuro') + '</div></div>' +
+    '</div>';
+  // avisos: lo que este cuadro no puede resolver solo
+  const avisos = [];
+  const pedidos = (st.libro || []).filter(function (x) { return x.fuente === 'pedido'; });
+  pedidos.forEach(function (p) {
+    if ((Number(p.fob) || 0) > 0 && !(Number(p.pagado) > 0)) avisos.push('<b>' + escapeHtml(p.carga) + '</b> no tiene ningún giro cargado: figura como deuda entera (u$s ' + _impProvUsd(p.fob, 0) + ').');
+  });
+  if (r.fob_difiere) avisos.push('Hay un PI cuyo FOB cargado difiere del que calcula el motor (ver 💵 Plata en 🚢 En curso).');
+  if (!(r.hoja_movs > 0)) avisos.push('Sin hoja histórica en el Excel (sólo Ownland y Frontier vinieron con hoja): lo anterior a los pedidos en curso está sólo en el extracto de NTL.');
+  if (r.papa_fecha && Math.abs((Number(r.papa_real) || 0) - saldo) > 1) avisos.push('La planilla "formato papá" del ' + _impProvFecha(r.papa_fecha) + ' dice deuda real <b>u$s ' + _impProvUsd(r.papa_real, 0) + '</b> y ésta dice <b>u$s ' + _impProvUsd(saldo, 0) + '</b>: a una de las dos le falta un giro o un FOB.');
+  if (avisos.length) h += '<div class="ipc-aviso">⚠ ' + avisos.join('<br>⚠ ') + '</div>';
+  h += '<div class="ipc-h">Hoy <span class="ipc-sub">pedidos en curso, la planilla de deudas · u$s</span></div>';
+  if (!pedidos.length) h += '<div class="stkpop-empty">Sin pedidos en curso.</div>';
+  else {
+    h += '<table class="ipc-tbl" id="ipcHoy"><thead><tr><th>PI</th><th>A nombre de</th><th class="num">FOB</th><th class="num">Girado</th><th class="num">Por banco</th><th class="num">Falta</th><th>Pago 30%</th><th>Embarque</th><th>Llegada</th></tr></thead><tbody>' +
+      pedidos.map(function (p) {
+        return '<tr><td class="ipc-mono">' + escapeHtml(p.carga) + '</td><td>' + escapeHtml(p.canal || '—') + '</td><td class="num">' + _impProvUsd(p.fob) + '</td><td class="num">' + _impProvUsd(p.pagado) + '</td><td class="num">' + _impProvUsd(p.pend_giro) + '</td>' +
+          '<td class="num saldo ' + ((Number(p.falta) || 0) > 0 ? 'ipc-neg' : 'ipc-pos') + '">' + _impProvUsd(p.falta) + '</td><td>' + _impProvFecha(p.fecha) + '</td><td>' + _impProvFecha(p.embarque) + '</td><td>' + _impProvFecha(p.llegada) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  // ---- LIBRO ----
+  const libro = (st.libro || []).filter(function (x) { return x.fuente === 'pedido' || x.fuente === 'giro'; });
+  h += '<div class="ipc-h">Libro <span class="ipc-sub">el PI cuando nos factura · cada giro cuando le pagamos · saldo corrido = FOB − giros · u$s</span></div>';
+  if (st.errLibro) h += '<div class="stkpop-empty" style="color:#b91c1c">No se pudo leer el libro: ' + escapeHtml(st.errLibro) + '</div>';
+  if (!libro.length) h += '<div class="stkpop-empty">Sin movimientos cargados.</div>';
+  else {
+    h += '<table class="ipc-tbl" id="ipcLibro"><thead><tr><th>Fecha</th><th>Concepto</th><th>Pedido</th><th>Canal</th><th class="num">Nos factura</th><th class="num">Le giramos</th><th class="num">Saldo</th><th>Detalle</th></tr></thead><tbody>' +
+      libro.map(function (x) {
+        const s = Number(x.saldo) || 0;
+        return '<tr class="' + (x.fuente === 'pedido' ? 'ipc-ped' : '') + '"><td>' + _impProvFecha(x.fecha) + '</td><td>' + escapeHtml(x.concepto || '') + '</td><td class="ipc-mono">' + escapeHtml(x.carga || '') + '</td><td>' + _impProvCanal(x) + '</td>' +
+          '<td class="num">' + (x.fob != null ? _impProvUsd(x.fob) : '') + '</td><td class="num">' + (x.pago != null ? _impProvUsd(x.pago) : '') + '</td><td class="num saldo ' + (s > 0 ? 'ipc-neg' : 'ipc-pos') + '">' + _impProvUsd(s) + '</td>' +
+          '<td class="ipc-sub">' + escapeHtml(x.detalle || '') + (x.a_traves_de ? ' · a través de ' + escapeHtml(x.a_traves_de) : '') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  // ---- HISTORIA ----
+  const hoja = (st.libro || []).filter(function (x) { return x.fuente === 'hoja'; });
+  const ntl = (st.libro || []).filter(function (x) { return x.fuente === 'ntl'; });
+  h += '<div class="ipc-h">Historia <span class="ipc-sub">' + hoja.length + ' renglón(es) de la hoja del Excel · ' + ntl.length + ' del extracto NTL (girado u$s ' + _impProvUsd(r.ntl_girado, 0) + ' · recuperado u$s ' + _impProvUsd(r.ntl_recuperado, 0) + ')</span>' +
+       '<button class="ipc-b" id="ipcHistBtn" onclick="impProvToggleHist()">' + (st.hist ? '▲ Ocultar' : '▼ Ver') + '</button></div>';
+  if (st.hist) {
+    if (hoja.length) {
+      h += '<div class="ipc-sub" style="margin-bottom:4px">Hoja <b>' + escapeHtml(r.prov) + '</b> del Excel <i>Cuenta_Corriente_NTL.xlsx</i>, tal cual: <b>Factura</b> = lo que nos facturó la carga · <b>Giro</b> = lo que le salió (por NTL o por banco, «a través de» la factura que se usó de papel) · <b>Saldo hoja</b> = el que calcula el Excel, no se rehace acá.</div>' +
+        '<table class="ipc-tbl" id="ipcHoja"><thead><tr><th>Fecha</th><th>Concepto</th><th>Fue a</th><th>A través de</th><th>Salió por</th><th class="num">Factura</th><th class="num">Giro</th><th class="num">Saldo hoja</th></tr></thead><tbody>' +
+        hoja.map(function (x) {
+          return '<tr><td>' + _impProvFecha(x.fecha) + '</td><td>' + escapeHtml(x.concepto || '') + '</td><td class="ipc-mono">' + escapeHtml(x.carga || '') + '</td><td class="ipc-mono">' + escapeHtml(x.a_traves_de || '') + '</td><td>' + _impProvCanal(x) + '</td>' +
+            '<td class="num">' + (x.fob != null ? _impProvUsd(x.fob) : '') + '</td><td class="num">' + (x.pago != null ? _impProvUsd(x.pago) : '') + '</td><td class="num saldo">' + (x.saldo_excel != null ? _impProvUsd(x.saldo_excel) : '') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+    if (ntl.length) {
+      h += '<div class="ipc-sub" style="margin-bottom:4px">Extracto de <b>NTL</b> (Hong Kong), sólo los renglones de esta fábrica: <b>Girado</b> = lo que NTL le transfirió · <b>Recuperado</b> = lo que volvió a NTL al nacionalizar. Es la cuenta de NTL, no la del proveedor: se mira entera en 💱 NTL.</div>' +
+        '<table class="ipc-tbl" id="ipcNtl"><thead><tr><th>Fecha</th><th>Descripción</th><th>Empresa</th><th class="num">Girado</th><th class="num">Recuperado</th><th>Detalle</th></tr></thead><tbody>' +
+        ntl.map(function (x) {
+          return '<tr><td>' + _impProvFecha(x.fecha) + '</td><td>' + escapeHtml(x.concepto || '') + '</td><td>' + escapeHtml(_impNtlEmpNom(x.empresa)) + '</td><td class="num">' + (x.pago != null ? _impProvUsd(x.pago) : '') + '</td><td class="num">' + (x.recupero != null ? _impProvUsd(x.recupero) : '') + '</td><td class="ipc-sub">' + escapeHtml(x.detalle || '') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+    if (!hoja.length && !ntl.length) h += '<div class="stkpop-empty">Sin historia cargada para este proveedor.</div>';
+  }
+  body.innerHTML = h;
+}
+function impProvExportExcel() {
+  if (!_impProv || !_impProv.prov) return;
+  const st = _impProv, r = (st.resumen || []).find(function (x) { return x.prov === st.prov; }) || {};
+  const esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  const n = function (v) { return v == null || v === "" ? "" : Number(v); };
+  const fecha = _impCursoHoy();
+  let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#0f766e;color:#fff;} h3,h4,p{font-family:Calibri,Arial,sans-serif}</style></head><body>';
+  html += '<h3>Cuenta corriente ' + esc(st.prov) + ' — Gestión Virgilio (' + esc(fecha) + ')</h3>';
+  html += '<p>Le debemos hoy u$s ' + n(r.saldo) + ' · girado ' + n(r.pagado) + ' · por banco contra factura vieja ' + n(r.pend_giro_directo) + ' · falta ' + n(r.falta) + '</p>';
+  const secciones = [
+    ['Libro (PI y giros, saldo corrido)', ['pedido', 'giro'], ['Fecha', 'Concepto', 'Pedido', 'Canal', 'Nos factura', 'Le giramos', 'Saldo', 'A traves de', 'Detalle'],
+      function (x) { return [x.fecha, x.concepto, x.carga, x.canal, n(x.fob), n(x.pago), n(x.saldo), x.a_traves_de, x.detalle]; }],
+    ['Hoja del Excel (tal cual)', ['hoja'], ['Fecha', 'Concepto', 'Fue a', 'A traves de', 'Salio por', 'Factura', 'Giro', 'Saldo hoja'],
+      function (x) { return [x.fecha, x.concepto, x.carga, x.a_traves_de, x.canal, n(x.fob), n(x.pago), n(x.saldo_excel)]; }],
+    ['Extracto NTL (esta fabrica)', ['ntl'], ['Fecha', 'Descripcion', 'Empresa', 'Girado', 'Recuperado', 'Detalle'],
+      function (x) { return [x.fecha, x.concepto, x.empresa, n(x.pago), n(x.recupero), x.detalle]; }]
+  ];
+  secciones.forEach(function (s) {
+    const rows = (st.libro || []).filter(function (x) { return s[1].indexOf(x.fuente) >= 0; });
+    if (!rows.length) return;
+    html += '<h4>' + esc(s[0]) + '</h4><table><tr>' + s[2].map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>' +
+      rows.map(function (x) { return '<tr>' + s[3](x).map(function (v) { return '<td>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>';
+  });
+  html += '</body></html>';
+  try {
+    const blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "Cta_" + String(st.prov).replace(/[^A-Za-z0-9]+/g, "_") + "_" + fecha + ".xls";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (_e) {} }, 1500);
+  } catch (e) { try { alert("No se pudo generar el Excel: " + (e.message || e)); } catch (_e) {} }
 }
 /* v15.85 — "🚢 En curso": los pedidos de importación YA HECHOS, separados del generador.
    Pedido del dueño (11/09): "quiero ver cuáles son los pedidos en curso por separado de si genera

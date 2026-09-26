@@ -420,3 +420,52 @@ directo a **19.552** y la falta vuelve a **2.647**.
 💵 Giros.
 
 SQL y rollback: `sql/gv_imp_hugo_giro3000_v1601.sql`. Backup `GV_Imp_Pagos_bkp_20260912`.
+
+## 10. La cuenta corriente POR PROVEEDOR (v22.91, 26/09/2026)
+
+Thomas: *"Debería estar la cta corriente de: Hugo Wong; Becky Chen; Ownland"* · *"la que creas mejor,
+formato que sea entendible y analizable"*.
+
+### Lo que había, medido
+
+| fuente | qué tiene | quién la mostraba |
+|---|---|---|
+| `GV_Imp_Pedido_CC` + `GV_Imp_Pagos` (§3, la planilla de deudas) | 6 pedidos con cabecera · 8 giros | 🚢 En curso → 💵 Plata, **por pedido** |
+| `GV_Imp_NTL_Mov` (§4, el extracto) | 252 movimientos, `referencia` = proveedor | 💱 NTL, **por empresa**, con filtro por proveedor |
+| `GV_Imp_Prov_Mov` (§4, las hojas por proveedor) | **sólo Ownland (21) y Frontier (7)**: la hoja `Becky` del Excel no se importó; Hugo Wong no tenía hoja | **nadie** (sólo `gv_imp_cargas` y `gv_imp_conciliacion` la usan por detrás) |
+| `GV_Imp_CC_Deuda` («formato papá»: real / banco / futuro, foto del 16/09) | 17 filas: Becky, Hugo, Ownland, Frontier, Fujian, Wexinda, Salero | **nadie**: nació el 25/09 en la base con 6 RPC, sin pantalla ni commit |
+
+### Cómo quedó: 📒 Cta. proveedor
+
+Una vista (`gv_imp_prov_libro`, `security_invoker`, **sin SELECT para anon**) une las cuatro fuentes por
+proveedor canónico, un renglón por movimiento y **con su `fuente`** (`pedido` / `giro` / `hoja` / `ntl`).
+Dos RPC `SECURITY DEFINER` la leen: `gv_imp_prov_cc_resumen()` (una fila por proveedor, las cuatro fuentes
+al lado) y `gv_imp_prov_cc_libro(p_proveedor)` (el libro, con el saldo corrido calculado **sólo sobre
+`pedido` y `giro`**: FOB − giros).
+
+La pantalla, por proveedor: **Hoy** (los PI en curso con la planilla: FOB · girado · por banco contra
+factura vieja · falta · fechas), **Libro** (PI y giros en orden, saldo corrido) e **Historia** plegada (la
+hoja del Excel **con su saldo tal cual** y el extracto de NTL de esa fábrica). La regla: **no se suman
+fuentes distintas**. La hoja de Thomas mezcla giros por NTL y por banco contra facturas viejas y su saldo es
+el de la factura-papel (§2 y §4): rehacerlo era inventar una regla.
+
+El «formato papá» entra sólo como control: la ficha *Por banco, contra factura vieja* muestra la factura y
+el BL de su fila `banco`, y si su *deuda real* no coincide con FOB − girado la pantalla lo avisa (Hugo:
+24.599 contra 22.199 — a uno de los dos le falta un giro). Se casa por nombre canónico o por primera
+palabra (`Hugo` ↔ `Hugo Wong`), porque el alias es dato y lo carga Thomas.
+
+### Lo que espera a Thomas (dato, no código)
+
+1. **La hoja `Becky` del Excel no está importada.** Hay que volver a mandar `Cuenta_Corriente_NTL.xlsx`
+   (o esa hoja sola) para cargarla en `GV_Imp_Prov_Mov` como las de Ownland y Frontier. Sin eso Becky
+   figura *sin hoja histórica*.
+2. **El anticipo de la 1.ª de Becky (`PI B260601`) sigue en 0**: la hoja decía **6.920,86** pagados y
+   16.701,60 pendientes (§4). Se carga desde 💵 Giros; hasta entonces la pantalla la avisa como *PI sin
+   ningún giro cargado* (u$s 23.622 de deuda entera).
+3. **Alias `Hugo` → `Hugo Wong`** en `GV_Imp_Prov_Alias`, para que el «formato papá» y el extracto se casen
+   sin la regla de la primera palabra:
+   `insert into public."GV_Imp_Prov_Alias" (alias, canonico, es_empresa, nota) values ('Hugo','Hugo Wong',false,'formato papá 16/09');`
+4. **Ownland, el FOB del PI OL-10139**: `GV_Imp_Pedido_CC` dice **49.291,44** y la planilla del 11/09 decía
+   **46.626** (§3, "Lo que quedó marcado"). La cuenta muestra 49.291,44 porque es lo cargado.
+
+`sql/gv_imp_prov_cuenta_v2291.sql` · `tests/imp-cta-proveedor.cjs` · GUIA-PROYECTO.md, nota v22.91.

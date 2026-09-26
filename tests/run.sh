@@ -606,6 +606,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== imp-ntl (v15.90: solapa 💱 NTL — extracto del forwarder de Hong Kong, saldo por empresa y recuperos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-ntl.cjs
 
+echo "== imp-cta-proveedor (v22.91: solapa 📒 Cta. proveedor — Hoy / Libro / Historia por fábrica china, saldo del backend) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-cta-proveedor.cjs
+
 echo "== imp-stock-real (v16.04: el stock del módulo de importados sale del depósito real) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-stock-real.cjs
 echo "== pk-deposito-pkc (v15.41: el PKC dice de qué depósito salió cada caja; un evento por (tanda,art)) =="
