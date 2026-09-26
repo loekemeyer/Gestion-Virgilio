@@ -44,9 +44,17 @@ Ordenado por lo que cuesta plata primero. Nada de esto se tocó.
    `GV_PPP_Web_Diferido` ⋈ `PPP_Web_Programacion`: **LK 0206 → 29/09** (E37A, no antes del 29/11) ·
    **LK 0221 → 30/09** (E49A, 29/11) · **LK 0227 → 01/10** (E18C, 03/11). Se pickean sin el importado.
    Causa [Probable]: la fecha de reingreso se corrió después de programar; la tabla no guarda historial.
-7. **[Seguro] 360E y 599E: se venden y se programan sin stock, sin pedido a China y con el cartel de
-   reingreso apagado.** 360E: 13 cajas programadas · stock 0 · en curso 0 · en `GV_Reingreso_Excluido`
-   · sin `reingreso_est`. 599E: 39 cajas · stock 12 · en curso 0 · excluido. La página no avisa nada.
+7. **[Seguro] 360E: se vende y se programa sin stock, sin pedido a China y con el cartel de reingreso
+   apagado.** 13 cajas programadas · stock 0 · en curso 0 · en `GV_Reingreso_Excluido` · sin
+   `reingreso_est`. La página no avisa nada.
+   ~~599E~~ **RETIRADO (Thomas, 26/09): *"599E tengo suelto para envasar, no está registrado en
+   Virgilio porque está en Cervantes"*.** El stock existe; lo que falla es que el sistema no lo ve.
+   Medido: no está en `Insumos` ni en `GV_Importados_Insumo_Map`, y la fila `599ES` de `Importados`
+   (id 91) está en 0. Consecuencia: el módulo le calcula **stock 0 y a pedir ~240 u** (proy 24 u/mes ×
+   10 meses) y las 39 cajas programadas contra 12 en góndola se leen como sobreventa. Para que lo vea,
+   el camino que ya existe es el de `522ES → 522E`: el suelto como insumo + su fila en
+   `GV_Importados_Insumo_Map`. Falta la cantidad y decidir si el depósito de insumos de Virgilio
+   puede tener algo que está físicamente en Cervantes.
 8. **[Seguro] Renombrar un PI deja la plata colgada del nombre viejo.** `gv_importado_pedido_ref` sólo
    renombra `GV_Importados_Baches`; `GV_Imp_Pedido_CC` y `GV_Imp_Pagos` quedan con el `pedido_ref`
    anterior → en Plata (y en 📒 Cta. proveedor) *Falta* vuelve a ser el FOB entero y los giros
@@ -134,8 +142,8 @@ compartido entre la fila LK y CH de un dual · el PDF al chino imprime 437EL jun
 1. Partes a `gv_proyeccion_articulo` y sin comprometido (1) · 809E en dos líneas como 437EL/438EL (2)
    · `pedido_curso` derivado de los baches, no espejo (3) · feed caído = cartel, no cero (4) · sumar
    el exceso vendido a «a pedir» (5).
-2. Reprogramar LK 0206 / 0221 / 0227 después del reingreso (6) — decisión de Marianela · 360E y 599E:
-   o pedido a China o sacar de la web (7).
+2. Reprogramar LK 0206 / 0221 / 0227 después del reingreso (6) — decisión de Marianela · 360E:
+   o pedido a China o sacar de la web (7) · 599E: registrar el suelto de Cervantes para que el módulo lo cuente (7).
 3. Aplicar de verdad la v22.81 en la base + chequeo de supervisor en las 21 RPC (9).
 4. Renombrar PI que arrastre cabecera y giros (8) · monto con coma/punto (10) · CC que no muera al
    llegar (12) · NTL con alias y saldo filtrado (13).
