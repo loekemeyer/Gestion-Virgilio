@@ -29787,3 +29787,20 @@ y la vista **`gv_conciliacion_bancaria`** que las junta con banco y empresa.
 - Macro: `docs/conciliacion-bancaria/ConciliacionSupabase.bas` + `INSTALAR.md`. Sube al guardar
   las hojas tocadas. **El repo tiene `__TOKEN__`**: la copia con el token se entrega aparte
   (el repo es público).
+
+## v22.89 (26/09) — Agente de cobranzas: ¿pagó en el plazo del descuento que se tomó? (Thomas)
+
+- **La factura sale a LISTA; el cliente descuenta el % de su condición al pagar** («Pago Contado -25%»
+  = paga el 75 %). Contado = hasta 14 días o lo que diga su coronita (`cobranzas_excepciones`,
+  escalón `contado`); 15-30 → 20 %, 31-45 → 15 %, 46-60 → 10 %, **más de 60 → sin descuento**.
+  E-cheque: cuenta la fecha de cobro.
+- **`gv_cobranza_facturas_pago`**: una fila por factura (450 días): pagada/impaga (contra la deuda del
+  Excel de Cuarentena), fecha de pago deducida, días, descuento ganado y **a reclamar**
+  = lista × (dto condición − dto ganado). **`gv_cobranza_pago_mal`**: por cliente.
+- La fecha de pago se deduce **hacia atrás desde la deuda de hoy** (los cobros más nuevos pagaron las
+  facturas pagadas más nuevas). La versión hacia adelante daba días negativos (la deuda anterior a la
+  ventana corría todo) y se descartó el mismo día. Las NC no entran (la deuda ya las tiene aplicadas).
+- Coronita cargada: **Torres y Liva** (CUIT 33534724239), contado a 30 días, desde 2019-07-10.
+- Medido (FC contado ene-ago 2026): LK 581 bien, 688 mal, $161.266.537 a reclamar; Chef 69 bien,
+  82 mal, $12.761.780. Primero en la lista: Torres y Liva, 24 facturas, 72 días prom., $29.326.866.
+- `sql/gv_cobranza_pago_mal_v2289.sql`.
