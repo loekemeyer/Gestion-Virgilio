@@ -29840,3 +29840,30 @@ drop view public.gv_imp_prov_libro;` y sacar la solapa de `_impTabsHtml`.
 **Queda para Thomas (dato):** re-mandar la hoja Becky del Excel · cargar el anticipo 6.920,86 de `PI B260601`
 · alias `Hugo → Hugo Wong` · FOB de Ownland 46.626 vs 49.291,44 (detalle en
 `docs/IMPORTACIONES-PAGOS-ARGENTINA.md` §10).
+### v22.92 — Agente de cobranzas: imputación recibo ↔ facturas (26/09, Thomas)
+
+**Pedido:** *"Tenés que aprender cómo analizar la conciliación bancaria vs las facturas, para que sepas
+analizar quién pagó bien"*. Reemplaza la deducción FIFO de la v22.89 (`gv_cobranza_facturas_pago` queda).
+
+**El método** (detalle en la cabecera de `sql/gv_cobranza_imputar_v2291.sql`): el cobro es el RECIBO (suma
+de sus movimientos, fecha = último cobro); la factura sale a lista y el cliente descuenta al pagar; qué está
+pagado lo dice la deuda del Excel de Cuarentena; recibos (por número) y pedidos (facturas por día) se ALINEAN
+por programación dinámica: tramos de 1-3 recibos × 1-3 pedidos × 0-2 NC con `pagado ≈ (lista − NC) × (1 − dto)`,
+residuo −1,2 %..+5 %, saltos a 3,5 %, piezas de más a 0,8 %, dto distinto de la condición a 3 %. **La retención
+del cliente se aprende de sus propios pagos** (mediana de los pares simples si ≥ 60 % coinciden): sin ese prior
+la búsqueda sumaba NC viejas para llegar a 0,0 % antes que aceptar el 2,2 % que Torres y Liva se descuenta
+siempre. Condición `NN FF` / IMPORTADOR → sin descuento, sólo `atraso` contra el plazo. Internos (LK 411,
+Chef 1434) afuera.
+
+**Medido:** Torres y Liva cierra recibo por recibo (14558 → 35217+35218, 64 días, ret 2,23 %; 846 ms).
+Todos los clientes: 753 clientes · 3.637 filas · 35 s → tabla **`GV_Cobranza_Imputacion`** rehecha por el cron
+**`gv-cobranza-imputacion`** (minuto 49) sólo si cambió la conciliación, la deuda o ISIS
+(`gv_cobranza_imputacion_refrescar`, `GV_Cobranza_Imputacion_Meta`). Calidad: 2.096 exactas · 740 con
+retención · 107 pago de más · 151 fallback NC neteadas (3 clientes enormes) · 333 pedidos sin recibo · 177
+recibos sin imputar. Clientes "facilongos" (transfieren el 75 % exacto): Bertotto 1987 (21 de 28), Romagessi
+2191, Gonzalez Pellegrini 4024, Jauregui 3862…
+
+**`GV_Clientes_Agente_Retencion`** (Thomas: "sí"): 18 CUIT del padrón AGIP (IIBB CABA). Todavía no la lee la
+imputación: sirve para que la retención no se lea como pago de menos cuando se cruce.
+
+**Rollback:** cabecera de los dos `.sql`. Pendiente: qué hace el agente con lo detectado (Thomas: "no sé").
