@@ -1,4 +1,4 @@
-/* v22.95 — ninguna función de nivel superior se declara DOS veces en index.html.
+/* v22.96 — ninguna función de nivel superior se declara DOS veces en index.html.
    Por qué: en un <script> clásico la SEGUNDA declaración gana sin avisar. El 26/09 la cuenta corriente de
    Cobranzas (v22.93) declaró otra `ccRender` y pisó la de Carga Camión: al operario no se le dibujaba la lista
    para cargar el camión, sin un solo error en la consola. Este test lo caza estático, antes de pushear.

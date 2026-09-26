@@ -1,4 +1,4 @@
-## Nota v22.95 (2026-09-26) — Carga Camión volvía a dibujarse vacía: la cuenta corriente de Cobranzas pisaba `ccRender`
+## Nota v22.96 (2026-09-26) — Carga Camión volvía a dibujarse vacía: la cuenta corriente de Cobranzas pisaba `ccRender`
 
 La v22.93 de Cobranzas (📒 Cuenta corriente, commit `6716e17`) declaró una `function ccRender()` propia. En un
 `<script>` clásico **la segunda declaración gana sin avisar**, así que la de Carga Camión (`showCargaCamion` →
@@ -10,7 +10,7 @@ dibujaba la lista para cargar el camión**. Lo cazó `tests/cc-orden-camionero.c
   en `index.html`. Verificado que falla contra `main` antes del arreglo (`ccRender`, líneas 31703 y 60785).
 - ⚠ **Al agregar un módulo, el prefijo tiene que ser propio**: `cc` es de Carga Camión desde la v10.
 
-## Nota v22.95 (2026-09-26) — Importación se escribe SÓLO con login de supervisor (cierra la v22.81)
+## Nota v22.96 (2026-09-26) — Importación se escribe SÓLO con login de supervisor (cierra la v22.81)
 
 Thomas, 26/09: *"Si"* a cerrar la escritura del módulo. La v22.81 decía *"sólo supervisor"* y en la base
 seguían abiertas las reglas viejas: con la clave pública (que viaja en la página) cualquiera cambiaba el maestro
@@ -29,10 +29,10 @@ otra pantalla.
 - Un supervisor con la app vieja cacheada ve *"Sólo un supervisor logueado… si ya estás, actualizá la app"*.
 - **No se tocó `Stock_Config`**: la escriben 10 pantallas con la clave pública (stock, guardado, OCs, importación);
   cerrarla pide pasar esas 10 a la sesión primero. Queda en `docs/ESTADO-Y-PENDIENTES.md`.
-- Centinela: 21 filas en `GV_Reglas_Centinela` (v22.95). `tests/imp-escritura-login.cjs` (d) muerde si una RPC que
+- Centinela: 21 filas en `GV_Reglas_Centinela` (v22.96). `tests/imp-escritura-login.cjs` (d) muerde si una RPC que
   escribe no está en la lista o si viaja sin sesión.
 
-`sql/gv_importados_supervisor_v2295.sql` (rollback en el pie).
+`sql/gv_importados_supervisor_v2296.sql` (rollback en el pie).
 
 ## Nota v22.93 (2026-09-26) — 809E en dos líneas en «📦 Importación»: LK y CH son dos productos
 

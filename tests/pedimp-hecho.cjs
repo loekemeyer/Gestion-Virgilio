@@ -51,7 +51,7 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     // guardar: se interceptan RPC y PATCH
     const calls = [];
     window.confirm = () => true; window.alert = (m) => { out.alert = m; };
-    window.sbAuth = { getAccessToken: async () => "JWT-SUP" };   // v22.95 — las RPC de escritura van con la sesión del supervisor
+    window.sbAuth = { getAccessToken: async () => "JWT-SUP" };   // v22.96 — las RPC de escritura van con la sesión del supervisor
     window.fetch = async (u, o) => { calls.push({ u: String(u), m: (o && o.method) || "GET", b: o && o.body }); return { ok: true, status: 200, json: async () => null, text: async () => "" }; };
     _pedHecho.fecha = "2026-11-20";
     pedHechoSetRef("PI TEST-1");

@@ -6190,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.95"></script>
+<script type="module" src="recepcion.js?v=22.96"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.95";
+const APP_VERSION = "v22.96";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21629,7 +21629,7 @@ function pedImpExportExcel() {
 /* v9.29 — Pedidos Importación operable: editar "en curso" y marcar llegada.
    Ambas acciones van por RPC SECURITY DEFINER (sql/importados_pedidos_rpc.sql) apuntando
    por Importados.id. Tras cada acción se re-consulta el motor y se re-renderiza. */
-/* v22.95 (Thomas, 26/09: cierra la v22.81) — las RPC que ESCRIBEN (giros, cuenta corriente, baches, fechas de
+/* v22.96 (Thomas, 26/09: cierra la v22.81) — las RPC que ESCRIBEN (giros, cuenta corriente, baches, fechas de
    embarque/llegada, NTL, alias, en curso) van con el JWT de la sesión Google del supervisor, no con la clave
    pública: la base las rechaza si no es supervisor (es_supervisor_virgilio). Las de lectura siguen igual. */
 const _PED_IMP_RPC_ESCRITURA = ["gv_imp_carga_pedido_set", "gv_imp_cc_deuda_add", "gv_imp_cc_deuda_borrar", "gv_imp_cc_deuda_set",
@@ -60783,19 +60783,31 @@ window.bancoIgnorar = bancoIgnorar;
    La deuda de cada cliente ya no sale del Excel a mano: la calcula la base (GV_Cobranza_Deuda_Viva = último Excel de
    deuda + facturas/NC nuevas de ISIS + pagos nuevos de la conciliación) y el agente explica cada pago contra la factura
    (GV_Cobranza_Imputacion). Toda la lógica vive en gv_cobranza_clientes / gv_cobranza_cliente: acá sólo se dibuja. */
-var _ccState = { rows: [], q: "", empresa: "", filtro: "deuda", abierto: null };
+var _ccState = { rows: [], q: "", empresa: "", filtro: "deuda", abierto: null, vista: "pagos" };
 window._ccState = _ccState;
 function _ccEsc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 async function ccRefresh() {
   var cont = document.getElementById("ccTabla");
   if (cont) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
-  var r = await sb.rpc("gv_cobranza_clientes");
+  // v22.95: la lista (deuda viva + agente) y el control de saldo (facturas − NC − pagos del banco vs Excel) se unen por cliente
+  var rr = await Promise.all([sb.rpc("gv_cobranza_clientes"), sb.rpc("gv_cobranza_control_saldos")]);
+  var r = rr[0], rc = rr[1];
   if (r.error) { if (cont) cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + _ccEsc(r.error.message) + '</div>'; return; }
-  _ccState.rows = r.data || [];
+  var map = {};
+  (r.data || []).forEach(function (x) { map[x.empresa + "|" + x.cod_cliente] = x; });
+  (rc.error ? [] : (rc.data || [])).forEach(function (c) {
+    if (!(Number(c.facturado) > 0 || Number(c.deuda_excel))) return;
+    var k = c.empresa + "|" + c.cod_cliente, x = map[k];
+    if (!x) x = map[k] = { empresa: c.empresa, cod_cliente: c.cod_cliente, cliente: c.cliente, deuda: 0, vencida: 0, a_reclamar: 0, pedidos_mal: 0 };
+    x.saldo_calculado = c.saldo_calculado; x.deuda_excel = c.deuda_excel; x.control = c.estado;
+    x.facturado = c.facturado; x.notas_credito = c.notas_credito; x.pagado_banco = c.pagado_banco;
+  });
+  _ccState.rows = Object.keys(map).map(function (k) { return map[k]; });
+  _ccState.controlError = rc.error ? rc.error.message : null;
   ccCtaRender();
 }
 window.ccRefresh = ccRefresh;
-/* v22.95 — se llamaba ccRender y PISABA la de Carga Camión (index.html ~31716): la segunda declaración gana y
+/* v22.95 — se llamaba ccCtaRender y PISABA la de Carga Camión (index.html ~31716): la segunda declaración gana y
    el operario se quedaba sin la lista para cargar el camión. Los nombres de este bloque van con ccCta*. */
 function ccCtaRender() {
   var cont = document.getElementById("ccTabla"), res = document.getElementById("ccResumen");
@@ -60806,10 +60818,12 @@ function ccCtaRender() {
     if (_ccState.filtro === "deuda" && !(Number(r.deuda) > 0)) return false;
     if (_ccState.filtro === "mal" && !(Number(r.a_reclamar) > 0)) return false;
     if (_ccState.filtro === "vencida" && !(Number(r.vencida) > 0)) return false;
+    if (_ccState.filtro === "nocoincide" && !(r.control && r.control !== "coincide")) return false;
     if (q && ((r.cliente || "") + " " + r.cod_cliente).toLowerCase().indexOf(q) < 0) return false;
     return true;
   });
   rows.sort(function (a, b) {
+    if (_ccState.filtro === "nocoincide") return Math.abs((Number(b.saldo_calculado) || 0) - (Number(b.deuda_excel) || 0)) - Math.abs((Number(a.saldo_calculado) || 0) - (Number(a.deuda_excel) || 0));
     var k = _ccState.filtro === "mal" ? "a_reclamar" : _ccState.filtro === "vencida" ? "vencida" : "deuda";
     return (Number(b[k]) || 0) - (Number(a[k]) || 0);
   });
@@ -60820,13 +60834,22 @@ function ccCtaRender() {
   if (res) res.innerHTML = '<b>' + rows.length + '</b> cliente(s) · deuda <b>' + _fmtPlata(tot) + '</b> · vencida <b style="color:#b91c1c;">' + _fmtPlata(totV) + '</b>' +
     ' · a reclamar por descuento mal tomado <b style="color:#b45309;">' + _fmtPlata(totR) + '</b>' +
     '<br><span style="font-size:12px;">Base: Excel de deuda del ' + (anc ? new Date(anc).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "—") +
-    ' + facturas/NC nuevas de ISIS + pagos nuevos de la conciliación bancaria. Se recalcula sola cada hora.</span>';
+    ' + facturas/NC nuevas de ISIS + pagos nuevos de la conciliación bancaria. Se recalcula sola cada hora.' +
+    (function () {
+      var c = _ccState.rows.filter(function (r) { return r.control && (!_ccState.empresa || r.empresa === _ccState.empresa); });
+      if (!c.length) return _ccState.controlError ? '<br>⚠ Control de saldo: ' + _ccEsc(_ccState.controlError) : '';
+      var cd = c.filter(function (r) { return Number(r.deuda_excel) > 1000; }), c0 = c.filter(function (r) { return Math.abs(Number(r.deuda_excel)) <= 1000; });
+      var ok = function (a) { return a.filter(function (r) { return r.control === "coincide"; }).length; };
+      return '<br>Control (facturas − NC − pagos del banco desde 01/2024 LK · 02/2025 Chef, contra el Excel): con deuda coinciden <b>' + ok(cd) + ' de ' + cd.length +
+             '</b> · deuda cero coinciden <b>' + ok(c0) + ' de ' + c0.length + '</b>';
+    })() + '</span>';
   if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin clientes para este filtro.</div>'; return; }
   var th = 'style="padding:6px 8px;border-bottom:1px solid #cbd5e1;white-space:nowrap;"';
   var h = '<table style="border-collapse:collapse;font-size:13px;"><thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' +
     '<th ' + th + ' align="left">Cliente</th><th ' + th + ' align="right">Deuda ($)</th><th ' + th + ' align="right">Vencida ($)</th>' +
     '<th ' + th + ' align="right">Días más vieja</th><th ' + th + ' align="left">Último pago</th>' +
-    '<th ' + th + ' align="right">Pagos mal</th><th ' + th + ' align="right">A reclamar ($)</th><th ' + th + ' align="right">Retención</th></tr></thead><tbody>';
+    '<th ' + th + ' align="right">Pagos mal</th><th ' + th + ' align="right">A reclamar ($)</th><th ' + th + ' align="right">Retención</th>' +
+    '<th ' + th + ' align="right" title="Facturas − NC − pagos del banco">Saldo calc. ($)</th><th ' + th + ' align="right">Deuda Excel ($)</th></tr></thead><tbody>';
   h += rows.map(function (r) {
     var td = 'style="padding:5px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;"';
     var key = r.empresa + "|" + r.cod_cliente;
@@ -60840,7 +60863,10 @@ function ccCtaRender() {
       '<td ' + td + ' align="right">' + (r.pedidos_mal || '') + '</td>' +
       '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;color:#b45309;font-weight:bold;" align="right">' + (Number(r.a_reclamar) ? _fmtPlata(r.a_reclamar) : '') + '</td>' +
       '<td ' + td + ' align="right">' + (Number(r.ret_cliente) ? (Number(r.ret_cliente) * 100).toFixed(1).replace(".", ",") + ' %' : '') + '</td>' +
-    '</tr>' + (_ccState.abierto === key ? '<tr><td colspan="8" id="ccDet_' + key.replace("|", "_") + '" style="padding:0 0 10px 12px;background:#f8fafc;"></td></tr>' : '');
+      '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;color:' + (r.control === "coincide" ? "#059669" : r.control ? "#b91c1c" : "#94a3b8") + ';" align="right">' +
+        (r.control ? (r.control === "coincide" ? "✔ " : "✖ ") + _fmtPlata(r.saldo_calculado) : '') + '</td>' +
+      '<td ' + td + ' align="right">' + (r.control ? _fmtPlata(r.deuda_excel) : '') + '</td>' +
+    '</tr>' + (_ccState.abierto === key ? '<tr><td colspan="10" id="ccDet_' + key.replace("|", "_") + '" style="padding:0 0 10px 12px;background:#f8fafc;"></td></tr>' : '');
   }).join("");
   cont.innerHTML = h + '</tbody></table>';
   if (_ccState.abierto) ccCargarDetalle(_ccState.abierto);
@@ -60856,6 +60882,9 @@ async function ccCargarDetalle(key) {
   var p = key.split("|"), cel = document.getElementById("ccDet_" + key.replace("|", "_"));
   if (!cel) return;
   cel.innerHTML = '<div style="padding:10px;color:#64748b;">Cargando…</div>';
+  var bt = function (v, t) { return '<button onclick="_ccState.vista=\'' + v + '\';ccCargarDetalle(\'' + key + '\')" style="padding:4px 10px;margin:6px 4px 0 0;border-radius:6px;border:1px solid #cbd5e1;cursor:pointer;font-size:12px;' + (_ccState.vista === v ? 'background:#065f46;color:#fff;' : 'background:#fff;') + '">' + t + '</button>'; };
+  var tabs = bt("pagos", "Qué pagó cada factura") + bt("movs", "Todas las facturas y pagos");
+  if (_ccState.vista === "movs") { await ccCargarMovimientos(p[0], p[1], cel, tabs); return; }
   var r = await sb.rpc("gv_cobranza_cliente", { p_emp: p[0], p_cod: p[1] });
   if (r.error) { cel.innerHTML = '<div style="padding:10px;color:#b91c1c;">Error: ' + _ccEsc(r.error.message) + '</div>'; return; }
   var col = { bien: "#059669", mal: "#b91c1c", tarde: "#b45309", debe: "#1e293b", "a favor": "#2563eb", "sin recibo": "#64748b", "recibo suelto": "#64748b" };
@@ -60873,9 +60902,34 @@ async function ccCargarDetalle(key) {
       '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top;max-width:560px;color:' + (col[x.estado] || "#1e293b") + ';">' +
         '<b>' + (ico[x.estado] || "") + '</b> ' + _ccEsc(x.explicacion || "") + '</td></tr>';
   }).join("");
-  cel.innerHTML = h + '</tbody></table>';
+  cel.innerHTML = tabs + h + '</tbody></table>';
 }
 window.ccCargarDetalle = ccCargarDetalle;
+// v22.95: la cuenta corriente "de libro": todas las facturas/NC/ND de ISIS y todos los pagos del banco, con saldo acumulado
+async function ccCargarMovimientos(emp, cod, cel, tabs) {
+  var r = await sb.rpc("gv_cobranza_cuenta", { p_emp: emp, p_cod: cod });
+  if (r.error) { cel.innerHTML = tabs + '<div style="padding:10px;color:#b91c1c;">Error: ' + _ccEsc(r.error.message) + '</div>'; return; }
+  var rows = r.data || [], x = _ccState.rows.find(function (z) { return z.empresa === emp && z.cod_cliente === cod; }) || {};
+  var tD = 0, tH = 0; rows.forEach(function (m) { tD += Number(m.debe) || 0; tH += Number(m.haber) || 0; });
+  var fin = rows.length ? Number(rows[rows.length - 1].saldo) : 0;
+  var th = 'style="padding:5px 8px;border-bottom:1px solid #cbd5e1;white-space:nowrap;"';
+  var td = 'style="padding:4px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;"';
+  var h = '<div style="margin:8px 0 4px;font-size:12px;color:#334155;">Desde ' + _fmtFecha(emp === "chef" ? "2025-02-01" : "2024-01-01") +
+    ': facturado + ND <b>' + _fmtPlata(tD) + '</b> · NC + pagos <b>' + _fmtPlata(tH) + '</b> · saldo calculado <b>' + _fmtPlata(fin) + '</b> · deuda del Excel <b>' + _fmtPlata(x.deuda_excel) + '</b>' +
+    (x.control ? ' · <b style="color:' + (x.control === "coincide" ? "#059669" : "#b91c1c") + ';">' + (x.control === "coincide" ? "✔ coincide" : "✖ no coincide (" + _fmtPlata(fin - (Number(x.deuda_excel) || 0)) + ")") + '</b>' : '') + '</div>' +
+    '<div style="max-height:420px;overflow:auto;"><table style="border-collapse:collapse;font-size:12px;"><thead style="position:sticky;top:0;background:#f1f5f9;"><tr>' +
+    '<th ' + th + ' align="left">Fecha</th><th ' + th + ' align="left">Tipo</th><th ' + th + ' align="left">Comprobante</th><th ' + th + ' align="right">Debe ($)</th>' +
+    '<th ' + th + ' align="right">Haber ($)</th><th ' + th + ' align="right">Saldo ($)</th><th ' + th + ' align="left">Detalle</th></tr></thead><tbody>';
+  h += rows.slice().reverse().map(function (m) {
+    var col = m.tipo === "Pago" ? "#059669" : m.tipo === "NC" ? "#2563eb" : "#1e293b";
+    return '<tr><td ' + td + '>' + _fmtFecha(m.fecha) + '</td><td ' + td + ' style="padding:4px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;color:' + col + ';font-weight:bold;">' + _ccEsc(m.tipo) + '</td>' +
+      '<td ' + td + '>' + _ccEsc(m.comprobante) + '</td><td ' + td + ' align="right">' + (Number(m.debe) ? _fmtPlata(m.debe) : '') + '</td>' +
+      '<td ' + td + ' align="right">' + (Number(m.haber) ? _fmtPlata(m.haber) : '') + '</td><td ' + td + ' align="right">' + _fmtPlata(m.saldo) + '</td>' +
+      '<td ' + td + ' style="padding:4px 8px;border-bottom:1px solid #e2e8f0;color:#64748b;">' + _ccEsc(m.detalle || m.condicion || '') + '</td></tr>';
+  }).join("");
+  cel.innerHTML = tabs + h + '</tbody></table></div>';
+}
+window.ccCargarMovimientos = ccCargarMovimientos;
 
 /* ---------- Pantalla unificada: Deuda a cobrar + Cobranzas (valor por NP) + Cruce Facturación + Facturable ya ----------
    Un solo botón / una sola pantalla con 4 pestañas. Reusa la lógica existente:
@@ -60928,7 +60982,7 @@ function cobrosSetTab(tab) {
         '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
           '<input id="ccQ" placeholder="🔎 Cliente o código" ' + sel + ' oninput="_ccState.q=this.value;ccCtaRender();">' +
           '<select ' + sel + ' onchange="_ccState.empresa=this.value;ccCtaRender();"><option value="">LK y Chef</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option></select>' +
-          '<select ' + sel + ' onchange="_ccState.filtro=this.value;ccCtaRender();"><option value="deuda">Con deuda</option><option value="vencida">Con deuda vencida</option><option value="mal">Pagaron mal (a reclamar)</option><option value="todos">Todos</option></select>' +
+          '<select ' + sel + ' onchange="_ccState.filtro=this.value;ccCtaRender();"><option value="deuda">Con deuda</option><option value="vencida">Con deuda vencida</option><option value="mal">Pagaron mal (a reclamar)</option><option value="nocoincide">Saldo no coincide con el Excel</option><option value="todos">Todos</option></select>' +
           '<button onclick="ccRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
         '</div>' +
       '</div>' +

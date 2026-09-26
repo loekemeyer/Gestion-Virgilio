@@ -29893,9 +29893,27 @@ los pagos, y que al lado de lo facturado aparezca qué pagó el cliente y si pag
 
 **Rollback:** cabecera de `sql/gv_cobranza_deuda_viva_v2293.sql`.
 
-## §3.ng — v22.95: Importación se escribe sólo con login de supervisor (Thomas, 2026-09-26)
+### v22.95 — Cuenta corriente de libro: todas las facturas y pagos del cliente + control de saldo contra el Excel (26/09, Thomas)
 
-Cierra el "Paso C" que la v22.81 dejó sin aplicar y lo extiende a las RPC. `sql/gv_importados_supervisor_v2295.sql`.
+- **`gv_cobranza_cuenta(emp, cod)`**: FC/ND/NC de ISIS y pagos de la conciliación del cliente con saldo acumulado.
+  **`gv_cobranza_control_saldos()`**: por cliente, facturado − NC − pagos del banco vs deuda del Excel (70 ms).
+  Las dos SECURITY DEFINER con chequeo de supervisor (la pantalla no puede leer `isis_*`). Pantalla: botón
+  "Todas las facturas y pagos" en el detalle, columnas Saldo calc./Deuda Excel y filtro "Saldo no coincide".
+- **Desde**: LK 01/01/2024, Chef 01/02/2025 (`gv_cobranza_desde`): Chef recién tiene cobros con código de cliente
+  desde 2025 (1 en 2023, 11 en 2024, 602 en 2025). Sin saldo de apertura: lo facturado antes y pagado después queda a favor.
+- **Medido el 26/09** (coincide = diferencia ≤ máx($5.000; 2 % de lo facturado en 12 meses o de la deuda):
+
+| empresa | con deuda en Excel | coinciden | deuda 0 en Excel | coinciden | a favor en Excel | coinciden |
+|---|---:|---:|---:|---:|---:|---:|
+| LK | 131 | 83 | 587 | 453 | 42 | 32 |
+| Chef | 26 | 13 | 106 | 74 | 10 | 3 |
+
+  Las diferencias grandes son súper (Cencosud +$292 M, Coto +$122 M, Dorinka, INC: descuentos/retenciones que no pasan
+  por el banco) y clientes que pagan en efectivo o cheque físico sin código. `sql/gv_cobranza_cuenta_v2295.sql`.
+
+## §3.nh — v22.96: Importación se escribe sólo con login de supervisor (Thomas, 2026-09-26)
+
+Cierra el "Paso C" que la v22.81 dejó sin aplicar y lo extiende a las RPC. `sql/gv_importados_supervisor_v2296.sql`.
 
 **Medido antes:** policies abiertas `Importados.imp_upd_anon` / `imp_write`, `Importados_Volumen.impvol_ins` /
 `impvol_upd`, y `ALL to authenticated using (true)` en `Importados_Config`, `Importados_Partes_Map`,
@@ -29905,7 +29923,7 @@ triggers; `gv_importados_resync` además la llaman 5 de ellas por dentro.
 
 **Cambios:** drop de las 4 policies + revoke insert/update/delete de anon en el maestro · las 3 tablas de config
 pasan a `*_write_supervisor` · candado `es_supervisor_virgilio() or gv_es_supervisor_o_servicio()` inyectado al
-principio de las 21 RPC sobre `pg_get_functiondef` (idempotente, marca `v22.95-sup`) · 21 centinelas.
+principio de las 21 RPC sobre `pg_get_functiondef` (idempotente, marca `v22.96-sup`) · 21 centinelas.
 
 **Probado antes de aplicar**, en transacción abortada: 21/21 compilan con el candado, ninguna escribe antes de él,
 `gv_importados_resync(-1)` como supervisor pasa, `es_supervisor_virgilio()` con claims de anon da false. ⚠ Desde el

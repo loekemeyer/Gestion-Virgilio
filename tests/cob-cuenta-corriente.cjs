@@ -41,6 +41,14 @@ catch (_e) {
         calls.push({ fn: m[1], body: JSON.parse((opt && opt.body) || "{}") });
         if (m[1] === "gv_cobranza_clientes") return ok(clientes);
         if (m[1] === "gv_cobranza_cliente") return ok(detalle);
+        if (m[1] === "gv_cobranza_control_saldos") return ok([
+          { empresa: "lk", cod_cliente: "288", cliente: "Torres Y Liva S.A Cif", facturado: 1, notas_credito: 0, pagado_banco: 0, saldo_calculado: 7940215, deuda_excel: 44999903, estado: "calculado menor" },
+          { empresa: "lk", cod_cliente: "862", cliente: "Muller", facturado: 1, notas_credito: 0, pagado_banco: 0, saldo_calculado: 8802249, deuda_excel: 8802249, estado: "coincide" },
+          { empresa: "lk", cod_cliente: "1987", cliente: "Bertotto", facturado: 5, notas_credito: 0, pagado_banco: 5, saldo_calculado: 0, deuda_excel: 0, estado: "coincide" }]);
+        if (m[1] === "gv_cobranza_cuenta") return ok([
+          { fecha: "2026-07-16", tipo: "Factura", comprobante: "FC Electr. A 0004-00035217", condicion: "Pago Contado -25%", debe: 6049284.71, haber: 0, saldo: 6049284.71, detalle: null },
+          { fecha: "2026-09-15", tipo: "NC", comprobante: "NC Electr. A 0004-00011082", condicion: "Sin Cotizador", debe: 0, haber: 1941040.53, saldo: 4108244.18, detalle: null },
+          { fecha: "2026-09-18", tipo: "Pago", comprobante: "Recibo 14558", condicion: null, debe: 0, haber: 5693184.16, saldo: -1584939.98, detalle: "Credicoop · Deposito" }]);
         return ok([]);
       }
       return ok([]);
@@ -53,7 +61,7 @@ catch (_e) {
     out.orden = filas().map((t) => t.split(" ")[0]);
     out.resumen = (document.getElementById("ccResumen") || {}).textContent || "";
     // (c) filtro pagaron mal
-    _ccState.filtro = "mal"; ccCtaRender();   // v22.95: ccRender es de Carga Camión
+    _ccState.filtro = "mal"; ccCtaRender();   // v22.96: ccRender es de Carga Camión
     out.mal = filas().length;
     // (d) abrir Torres y Liva
     _ccState.filtro = "deuda"; ccCtaRender();
@@ -63,6 +71,19 @@ catch (_e) {
     out.detBody = c ? c.body : null;
     const det = document.getElementById("ccDet_lk_288");
     out.detTxt = det ? det.textContent : "";
+    // (e) control de saldo y filtro "no coincide": deja sólo Torres y Liva (Bertotto, deuda 0, entra a la lista)
+    _ccState.abierto = null; out.todosN = (_ccState.filtro = "todos", ccCtaRender(), filas().length);
+    _ccState.abierto = null; _ccState.filtro = "nocoincide"; ccCtaRender();
+    out.nocoincide = filas().map((t) => t.split(" ")[0]);
+    out.resumen2 = (document.getElementById("ccResumen") || {}).textContent || "";
+    // (f) todas las facturas y pagos del cliente
+    _ccState.vista = "movs"; ccAbrirCliente("lk", "288");
+    await new Promise((res) => setTimeout(res, 300));
+    const c2 = calls.find((x) => x.fn === "gv_cobranza_cuenta");
+    out.cuentaBody = c2 ? c2.body : null;
+    const det2 = document.getElementById("ccDet_lk_288");
+    out.movs = det2 ? det2.querySelectorAll(":scope table > tbody > tr").length : 0; out.movHtml = det2 ? Array.from(det2.querySelectorAll(":scope table > tbody > tr")).map(t=>t.textContent.slice(0,80)).join(" // ") : "";
+    out.movTxt = det2 ? det2.textContent : "";
     return out;
   });
   await b.close();
@@ -75,6 +96,11 @@ catch (_e) {
   if (r.mal !== 2) fallas.push("(c) filtro 'pagaron mal' debería dejar 2, dejó " + r.mal);
   if (!r.detBody || r.detBody.p_emp !== "lk" || r.detBody.p_cod !== "288") fallas.push("(d) no pidió el detalle del cliente: " + JSON.stringify(r.detBody));
   if (!/reclamar \$1\.941\.041/.test(r.detTxt) || !/10\.603\.864/.test(r.detTxt)) fallas.push("(d) el detalle no muestra la explicación del pago al lado de lo facturado");
+  if (r.todosN !== 4) fallas.push("(e) 'Todos' debería sumar al cliente con deuda 0 del control (4), dio " + r.todosN);
+  if (r.nocoincide.join(",") !== "Torres") fallas.push("(e) filtro 'no coincide' debería dejar sólo Torres: " + r.nocoincide.join(","));
+  if (!/con deuda coinciden 1 de 2/.test(r.resumen2) || !/deuda cero coinciden 1 de 1/.test(r.resumen2)) fallas.push("(e) el resumen no cuenta cuántos coinciden: " + r.resumen2);
+  if (!r.cuentaBody || r.cuentaBody.p_cod !== "288") fallas.push("(f) no pidió gv_cobranza_cuenta");
+  if (r.movs !== 3 || !/Recibo 14558/.test(r.movTxt) || !/no coincide/.test(r.movTxt)) fallas.push("(f) no muestra las facturas y pagos con el saldo: " + r.movs);
   if (fallas.length) { console.error("FALLA cob-cuenta-corriente:\n  " + fallas.join("\n  ")); process.exit(1); }
-  console.log("OK cob-cuenta-corriente: abre en Cuenta corriente, ordena por deuda, filtra los que pagaron mal y explica cada pago.");
+  console.log("OK cob-cuenta-corriente: abre en Cuenta corriente, ordena por deuda, filtra los que pagaron mal, explica cada pago, controla el saldo contra el Excel y muestra todas las facturas y pagos.");
 })();
