@@ -29930,6 +29930,17 @@ principio de las 21 RPC sobre `pg_get_functiondef` (idempotente, marca `v22.96-s
 MCP `gv_es_supervisor_o_servicio()` da **true** (session_user = postgres): el rechazo de anon se prueba por HTTP con
 la clave pública, no desde el MCP.
 
+**Aplicado el 26/09** después de publicar el front (`457045e`): 21 funciones con candado, 21 centinelas,
+`gv_reglas_perdidas` vacía, `anon` sin INSERT/UPDATE en el maestro. **Verificado por HTTP con la clave pública**
+(ids −1, no tocan nada):
+
+| llamada | antes | después |
+|---|---|---|
+| `rpc/gv_importados_resync` | 204 | **42501** «Sólo un supervisor logueado…» |
+| `rpc/gv_imp_pago_borrar` · `rpc/gv_importado_bache_borrar` | — | **42501** |
+| `PATCH Importados?id=eq.-1` | 200 `[]` | **401** `permission denied for table Importados` |
+| lecturas `rpc/gv_imp_prov_cc_resumen` · `gv_importados_ordenes` | 200 | 200 |
+
 **No se tocó `Stock_Config`** (10 escritores con la clave pública en el front).
 
 **Rollback:** al pie del SQL.
