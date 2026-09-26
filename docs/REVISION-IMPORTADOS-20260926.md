@@ -47,6 +47,10 @@ Ordenado por lo que cuesta plata primero. Nada de esto se tocó.
 7. **[Seguro] 360E: se vende y se programa sin stock, sin pedido a China y con el cartel de reingreso
    apagado.** 13 cajas programadas · stock 0 · en curso 0 · en `GV_Reingreso_Excluido` · sin
    `reingreso_est`. La página no avisa nada.
+   **Confirmado por Thomas (26/09): *"ese sí no hay"*.** Las 13 cajas son 5 NP: LK 0225 (E18C, 4 cj,
+   01/10) · LK 0238 (E18F, 3, 01/10) · LK 0243 (E18G, 3, 01/10) · LK 0066 (E48C, 2, 30/09) · CH 0024
+   (E18B, 1, 01/10). Proveedor Kangli. Sigue a la venta en la web (no está en `GV_Web_Oculto`); el
+   cartel lo apagó Luis el 24/09 *"sin fecha de reingreso"*.
    ~~599E~~ **RETIRADO (Thomas, 26/09): *"599E tengo suelto para envasar, no está registrado en
    Virgilio porque está en Cervantes"*.** El stock existe; lo que falla es que el sistema no lo ve.
    Medido: no está en `Insumos` ni en `GV_Importados_Insumo_Map`, y la fila `599ES` de `Importados`
@@ -55,6 +59,10 @@ Ordenado por lo que cuesta plata primero. Nada de esto se tocó.
    el camino que ya existe es el de `522ES → 522E`: el suelto como insumo + su fila en
    `GV_Importados_Insumo_Map`. Falta la cantidad y decidir si el depósito de insumos de Virgilio
    puede tener algo que está físicamente en Cervantes.
+   Thomas, 26/09: *"no sé, creo que 1.200 uni"*. Cualquier número ≥ 240 u deja la compra en 0, así que
+   el estimado alcanza para compras. **Lo urgente es otro:** hay 39 cajas programadas del 30/09 al
+   02/10 (LK 0166 sola lleva 24) contra 8 libres en góndola: Cervantes tiene que envasar y mandar
+   ~31 cajas (372 u) antes del martes 30/09.
 8. **[Seguro] Renombrar un PI deja la plata colgada del nombre viejo.** `gv_importado_pedido_ref` sólo
    renombra `GV_Importados_Baches`; `GV_Imp_Pedido_CC` y `GV_Imp_Pagos` quedan con el `pedido_ref`
    anterior → en Plata (y en 📒 Cta. proveedor) *Falta* vuelve a ser el FOB entero y los giros
