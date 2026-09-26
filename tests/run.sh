@@ -463,6 +463,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== fac-cruce (v13.73: Cruce con ISIS desde Facturación — rango, totales, cajas ent/fact, NP web + ISIS, 📄 PDF; filtros de Deuda/Cruce globales) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cruce.cjs
+echo "== cob-cuenta-corriente (v22.93: Cobranzas abre en Cuenta corriente — deuda viva, filtro pagaron mal, explicación de cada pago) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cob-cuenta-corriente.cjs
 
 echo "== fac-conciliacion (v14.30: Facturación en 2 solapas; Conciliación = snapshot Gestión vs factura ISIS; el snapshot se registra al facturar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-conciliacion.cjs

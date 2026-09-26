@@ -6190,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.92"></script>
+<script type="module" src="recepcion.js?v=22.93"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.92";
+const APP_VERSION = "v22.93";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -60727,6 +60727,102 @@ async function bancoIgnorar(id) {
 }
 window.bancoIgnorar = bancoIgnorar;
 
+/* ---------- v22.93 · 📒 Cuenta corriente (Thomas, 26/09) ----------
+   La deuda de cada cliente ya no sale del Excel a mano: la calcula la base (GV_Cobranza_Deuda_Viva = último Excel de
+   deuda + facturas/NC nuevas de ISIS + pagos nuevos de la conciliación) y el agente explica cada pago contra la factura
+   (GV_Cobranza_Imputacion). Toda la lógica vive en gv_cobranza_clientes / gv_cobranza_cliente: acá sólo se dibuja. */
+var _ccState = { rows: [], q: "", empresa: "", filtro: "deuda", abierto: null };
+window._ccState = _ccState;
+function _ccEsc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+async function ccRefresh() {
+  var cont = document.getElementById("ccTabla");
+  if (cont) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
+  var r = await sb.rpc("gv_cobranza_clientes");
+  if (r.error) { if (cont) cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + _ccEsc(r.error.message) + '</div>'; return; }
+  _ccState.rows = r.data || [];
+  ccRender();
+}
+window.ccRefresh = ccRefresh;
+function ccRender() {
+  var cont = document.getElementById("ccTabla"), res = document.getElementById("ccResumen");
+  if (!cont) return;
+  var q = (_ccState.q || "").toLowerCase().trim();
+  var rows = _ccState.rows.filter(function (r) {
+    if (_ccState.empresa && r.empresa !== _ccState.empresa) return false;
+    if (_ccState.filtro === "deuda" && !(Number(r.deuda) > 0)) return false;
+    if (_ccState.filtro === "mal" && !(Number(r.a_reclamar) > 0)) return false;
+    if (_ccState.filtro === "vencida" && !(Number(r.vencida) > 0)) return false;
+    if (q && ((r.cliente || "") + " " + r.cod_cliente).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+  rows.sort(function (a, b) {
+    var k = _ccState.filtro === "mal" ? "a_reclamar" : _ccState.filtro === "vencida" ? "vencida" : "deuda";
+    return (Number(b[k]) || 0) - (Number(a[k]) || 0);
+  });
+  var tot = rows.reduce(function (s, r) { return s + (Number(r.deuda) > 0 ? Number(r.deuda) : 0); }, 0);
+  var totV = rows.reduce(function (s, r) { return s + (Number(r.vencida) || 0); }, 0);
+  var totR = rows.reduce(function (s, r) { return s + (Number(r.a_reclamar) || 0); }, 0);
+  var anc = _ccState.rows.reduce(function (m, r) { return r.ancla && (!m || r.ancla > m) ? r.ancla : m; }, null);
+  if (res) res.innerHTML = '<b>' + rows.length + '</b> cliente(s) · deuda <b>' + _fmtPlata(tot) + '</b> · vencida <b style="color:#b91c1c;">' + _fmtPlata(totV) + '</b>' +
+    ' · a reclamar por descuento mal tomado <b style="color:#b45309;">' + _fmtPlata(totR) + '</b>' +
+    '<br><span style="font-size:12px;">Base: Excel de deuda del ' + (anc ? new Date(anc).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "—") +
+    ' + facturas/NC nuevas de ISIS + pagos nuevos de la conciliación bancaria. Se recalcula sola cada hora.</span>';
+  if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin clientes para este filtro.</div>'; return; }
+  var th = 'style="padding:6px 8px;border-bottom:1px solid #cbd5e1;white-space:nowrap;"';
+  var h = '<table style="border-collapse:collapse;font-size:13px;"><thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' +
+    '<th ' + th + ' align="left">Cliente</th><th ' + th + ' align="right">Deuda ($)</th><th ' + th + ' align="right">Vencida ($)</th>' +
+    '<th ' + th + ' align="right">Días más vieja</th><th ' + th + ' align="left">Último pago</th>' +
+    '<th ' + th + ' align="right">Pagos mal</th><th ' + th + ' align="right">A reclamar ($)</th><th ' + th + ' align="right">Retención</th></tr></thead><tbody>';
+  h += rows.map(function (r) {
+    var td = 'style="padding:5px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;"';
+    var key = r.empresa + "|" + r.cod_cliente;
+    return '<tr style="cursor:pointer;" onclick="ccAbrirCliente(\'' + r.empresa + '\',\'' + _ccEsc(r.cod_cliente) + '\')">' +
+      '<td ' + td + '><b>' + _ccEsc(r.cliente || "") + '</b> <span style="color:#64748b;font-size:11px;">' + (r.empresa === "chef" ? "CH" : "LK") + ' ' + _ccEsc(r.cod_cliente) + '</span>' +
+        (r.agente_retencion ? ' <span title="Agente de recaudación IIBB (padrón AGIP)" style="font-size:10px;background:#e0e7ff;color:#3730a3;border-radius:4px;padding:1px 4px;">agente</span>' : '') + '</td>' +
+      '<td ' + td + ' align="right">' + (Number(r.deuda) ? _fmtPlata(r.deuda) : '—') + '</td>' +
+      '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;color:#b91c1c;" align="right">' + (Number(r.vencida) ? _fmtPlata(r.vencida) : '') + '</td>' +
+      '<td ' + td + ' align="right">' + (r.dias_mas_vieja != null && Number(r.deuda) > 0 ? r.dias_mas_vieja : '') + '</td>' +
+      '<td ' + td + '>' + (r.ultimo_pago ? _fmtFecha(r.ultimo_pago) + ' · ' + _fmtPlata(r.ultimo_pago_monto) : '—') + '</td>' +
+      '<td ' + td + ' align="right">' + (r.pedidos_mal || '') + '</td>' +
+      '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;color:#b45309;font-weight:bold;" align="right">' + (Number(r.a_reclamar) ? _fmtPlata(r.a_reclamar) : '') + '</td>' +
+      '<td ' + td + ' align="right">' + (Number(r.ret_cliente) ? (Number(r.ret_cliente) * 100).toFixed(1).replace(".", ",") + ' %' : '') + '</td>' +
+    '</tr>' + (_ccState.abierto === key ? '<tr><td colspan="8" id="ccDet_' + key.replace("|", "_") + '" style="padding:0 0 10px 12px;background:#f8fafc;"></td></tr>' : '');
+  }).join("");
+  cont.innerHTML = h + '</tbody></table>';
+  if (_ccState.abierto) ccCargarDetalle(_ccState.abierto);
+}
+window.ccRender = ccRender;
+function ccAbrirCliente(emp, cod) {
+  var key = emp + "|" + cod;
+  _ccState.abierto = (_ccState.abierto === key) ? null : key;
+  ccRender();
+}
+window.ccAbrirCliente = ccAbrirCliente;
+async function ccCargarDetalle(key) {
+  var p = key.split("|"), cel = document.getElementById("ccDet_" + key.replace("|", "_"));
+  if (!cel) return;
+  cel.innerHTML = '<div style="padding:10px;color:#64748b;">Cargando…</div>';
+  var r = await sb.rpc("gv_cobranza_cliente", { p_emp: p[0], p_cod: p[1] });
+  if (r.error) { cel.innerHTML = '<div style="padding:10px;color:#b91c1c;">Error: ' + _ccEsc(r.error.message) + '</div>'; return; }
+  var col = { bien: "#059669", mal: "#b91c1c", tarde: "#b45309", debe: "#1e293b", "a favor": "#2563eb", "sin recibo": "#64748b", "recibo suelto": "#64748b" };
+  var ico = { bien: "✔", mal: "✖", tarde: "⏱", debe: "•", "a favor": "↩", "sin recibo": "?", "recibo suelto": "?" };
+  var th = 'style="padding:5px 8px;border-bottom:1px solid #cbd5e1;white-space:nowrap;"';
+  var h = '<table style="border-collapse:collapse;font-size:12px;margin-top:6px;"><thead><tr>' +
+    '<th ' + th + ' align="left">Fecha</th><th ' + th + ' align="left">Facturas</th><th ' + th + ' align="right">Facturado ($)</th>' +
+    '<th ' + th + ' align="right">Debe ($)</th><th ' + th + ' align="left">Qué pagó</th></tr></thead><tbody>';
+  h += (r.data || []).map(function (x) {
+    var td = 'style="padding:4px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top;"';
+    return '<tr><td ' + td + ' nowrap>' + _fmtFecha(x.fecha) + '</td>' +
+      '<td ' + td + '>' + _ccEsc(x.comprobantes || "") + '</td>' +
+      '<td ' + td + ' align="right" nowrap>' + (x.facturado != null ? _fmtPlata(x.facturado) : '') + '</td>' +
+      '<td ' + td + ' align="right" nowrap>' + (Number(x.pendiente) ? _fmtPlata(x.pendiente) : '') + '</td>' +
+      '<td style="padding:4px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top;max-width:560px;color:' + (col[x.estado] || "#1e293b") + ';">' +
+        '<b>' + (ico[x.estado] || "") + '</b> ' + _ccEsc(x.explicacion || "") + '</td></tr>';
+  }).join("");
+  cel.innerHTML = h + '</tbody></table>';
+}
+window.ccCargarDetalle = ccCargarDetalle;
+
 /* ---------- Pantalla unificada: Deuda a cobrar + Cobranzas (valor por NP) + Cruce Facturación + Facturable ya ----------
    Un solo botón / una sola pantalla con 4 pestañas. Reusa la lógica existente:
    pestaña "Deuda" = deudaRefresh/deudaRender; pestaña "Valor por NP" = cobLoad/cobRender.
@@ -60746,7 +60842,8 @@ async function openCobros(tab) {
     '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:linear-gradient(90deg,#065f46,#022c22);color:#fff;flex:0 0 auto;flex-wrap:wrap;">' +
       '<b style="font-size:17px;">💰 Deuda / Cobranzas</b>' +
       '<div style="display:flex;gap:6px;margin-left:4px;">' +
-        '<button id="cobrosTabDeuda" onclick="cobrosSetTab(\'deuda\')">💰 Deuda a cobrar</button>' +
+        '<button id="cobrosTabCC" onclick="cobrosSetTab(\'cc\')">📒 Cuenta corriente</button>' +
+        '<button id="cobrosTabDeuda" onclick="cobrosSetTab(\'deuda\')">🗂 Facturas ISIS</button>' +
         '<button id="cobrosTabCob" onclick="cobrosSetTab(\'cob\')">💵 Valor por NP</button>' +
         '<button id="cobrosTabCruce" onclick="cobrosSetTab(\'cruce\')">🔍 Facturación vs ISIS</button>' +
         '<button id="cobrosTabAnticipado" onclick="cobrosSetTab(\'anticipado\')">📦 Facturable ya</button>' +
@@ -60756,11 +60853,11 @@ async function openCobros(tab) {
     '</div>' +
     '<div id="cobrosBody" style="flex:1;overflow:auto;padding:14px 16px;min-height:0;"></div>';
   // v13.73: se puede abrir directo en cualquier pestaña (Facturación abre "cruce")
-  cobrosSetTab(["cob", "cruce", "anticipado", "banco"].indexOf(tab) >= 0 ? tab : "deuda");
+  cobrosSetTab(["cob", "cruce", "anticipado", "banco", "deuda"].indexOf(tab) >= 0 ? tab : "cc");
 }
 window.openCobros = openCobros;
 function cobrosSetTab(tab) {
-  _cobrosTab = (tab === "cob") ? "cob" : (tab === "cruce") ? "cruce" : (tab === "anticipado") ? "anticipado" : (tab === "banco") ? "banco" : "deuda";
+  _cobrosTab = (tab === "cob") ? "cob" : (tab === "cruce") ? "cruce" : (tab === "anticipado") ? "anticipado" : (tab === "banco") ? "banco" : (tab === "deuda") ? "deuda" : "cc";
   var bd = document.getElementById("cobrosBody"); if (!bd) return;
   var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob"), tx = document.getElementById("cobrosTabCruce"), ta = document.getElementById("cobrosTabAnticipado"), tbk = document.getElementById("cobrosTabBanco");
   if (td) td.style.cssText = _cobrosTabCss(_cobrosTab === "deuda");
@@ -60768,7 +60865,23 @@ function cobrosSetTab(tab) {
   if (tx) tx.style.cssText = _cobrosTabCss(_cobrosTab === "cruce");
   if (ta) ta.style.cssText = _cobrosTabCss(_cobrosTab === "anticipado");
   if (tbk) tbk.style.cssText = _cobrosTabCss(_cobrosTab === "banco");
-  if (_cobrosTab === "anticipado") {
+  var tcc = document.getElementById("cobrosTabCC"); if (tcc) tcc.style.cssText = _cobrosTabCss(_cobrosTab === "cc");
+  if (_cobrosTab === "cc") {
+    var sel = 'style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;"';
+    bd.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
+        '<h1 style="margin:0;font-size:20px;">📒 Cuenta corriente de clientes</h1>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<input id="ccQ" placeholder="🔎 Cliente o código" ' + sel + ' oninput="_ccState.q=this.value;ccRender();">' +
+          '<select ' + sel + ' onchange="_ccState.empresa=this.value;ccRender();"><option value="">LK y Chef</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option></select>' +
+          '<select ' + sel + ' onchange="_ccState.filtro=this.value;ccRender();"><option value="deuda">Con deuda</option><option value="vencida">Con deuda vencida</option><option value="mal">Pagaron mal (a reclamar)</option><option value="todos">Todos</option></select>' +
+          '<button onclick="ccRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="ccResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
+      '<div id="ccTabla" style="overflow:auto;"></div>';
+    ccRefresh();
+  } else if (_cobrosTab === "anticipado") {
     bd.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
         '<h1 style="margin:0;font-size:20px;">📦 Facturable ya</h1>' +

@@ -29867,3 +29867,28 @@ recibos sin imputar. Clientes "facilongos" (transfieren el 75 % exacto): Bertott
 imputación: sirve para que la retención no se lea como pago de menos cuando se cruce.
 
 **Rollback:** cabecera de los dos `.sql`. Pendiente: qué hace el agente con lo detectado (Thomas: "no sé").
+
+### v22.93 — Cobranzas: 📒 Cuenta corriente con deuda viva y explicación de cada pago (26/09, Thomas)
+
+**Pedido:** que en Cobranzas figuren las deudas que hoy se cargan por Excel, que se calculen solas con las facturas y
+los pagos, y que al lado de lo facturado aparezca qué pagó el cliente y si pagó bien o mal.
+
+- **`GV_Cobranza_Deuda_Viva`** (una fila por comprobante), la rehace el cron `gv-cobranza-imputacion` (min 49) antes de
+  imputar: **ancla** = último Excel de deuda de Cuarentena · **+** FC/ND/NC de ISIS posteriores que el Excel no tiene ·
+  **−** recibos nuevos de la conciliación y NC nuevas, a **valor nominal**, de la factura más vieja a la más nueva.
+  El 25 % de descuento ISIS lo registra como **NC "Sin Cotizador"** (NC 11082 de TyL = 25 % exacto de 35217+35218), por
+  eso el pago no se "infla". Recibo nuevo = **por número**, no por fecha: el e-cheque figura con la fecha de cobro
+  (hasta 01/2027) y su recibo ya estaba en ISIS. Excel: columna 0 = vencimiento, 1 = emisión.
+- **Error propio corregido (v22.89/v22.92):** el cruce con el Excel usaba `'FC'||letra` y el Excel escribe las MiPyME
+  como FCP/FCPYM y las de exportación como FCE: esas facturas —las más grandes— se daban por pagadas. Clave nueva
+  `gv_cobranza_doc_key` (FCA/FCP/FCPYM/FCE → FC): 374 de 374 comprobantes del Excel cruzan con ISIS.
+- **Pantalla:** Deuda / Cobranzas abre en **📒 Cuenta corriente** (`gv_cobranza_clientes`, 465 clientes, 19 ms);
+  tocar un cliente → `gv_cobranza_cliente(emp, cod)` (6 ms) con cada factura, lo que debe y la explicación del pago.
+  La pestaña vieja "Deuda a cobrar" pasó a llamarse **🗂 Facturas ISIS**: sumaba todas las facturas sin pagos
+  ($22.822 M, `deuda_cobros` tiene 0 cobros vivos). Test: `tests/cob-cuenta-corriente.cjs`.
+- Medido el 26/09: deuda viva LK $461 M · Chef $170 M (sin el interno Chef 1434, $186 M). Pagos nuevos: 0 — la
+  conciliación llega hasta el 24/09 y el Excel es del 25/09; se mueve cuando se instale la macro.
+- **Razón social sin código:** desde 06/2025 sólo 6 ingresos sin código cruzan exacto con un cliente ($34,3 M); la
+  operadora ya codifica el 99 %. No se automatizó.
+
+**Rollback:** cabecera de `sql/gv_cobranza_deuda_viva_v2293.sql`.
