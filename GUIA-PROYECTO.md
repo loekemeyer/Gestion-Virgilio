@@ -1,3 +1,21 @@
+## Nota v22.93 (2026-09-26) — 809E en dos líneas en «📦 Importación»: LK y CH son dos productos
+
+Thomas: *"no es lo mismo 809E en LK y 809E en CH"*. Cambia el packaging y el FOB (LK 0,70 · CH 0,47).
+`ocgFetchImportados` agrupaba por código y sumaba las dos filas del maestro: el sobrante de Loeke tapaba lo que
+le falta a Chef. Con los números del 26/09 pedía **372 u** en una línea; separado da **CH 3.120 u · LK 0**
+(2.748 u que no se estaban pidiendo). 437E/438E ya iban separados porque el maestro los tiene como 437EL/438EL;
+809E es el **único** código con filas de las dos plantas (medido).
+
+- La regla es genérica: si un `cod_art` tiene filas CH y no-CH, va en dos líneas con clave `809E|CH` / `809E|LK`
+  y un chip de planta. Un código de una sola planta no cambia.
+- **Se escribe sólo la fila de su planta**: FOB y reingreso van por `id=in.(…)`, no por `cod_art=eq.809E` (que
+  pisaba el FOB de Chef con el de Loeke). El MC tipeado es por línea.
+- PDF al proveedor, Excel y la sección de OC llevan la planta. «Cargar pedido ya hecho» sigue viéndolo como un
+  artículo con dos marcas (`809E CH 1224`), así el bache cae en la fila correcta.
+- El volumen de la master sigue siendo uno por código (`Importados_Volumen`, 144 u y 0,032 m³ para los dos).
+
+`tests/imp-809e-dos-plantas.cjs` (verificado que falla contra el código anterior).
+
 ## Nota v22.91 (2026-09-26) — 📒 Cuenta corriente POR PROVEEDOR en «📦 Importación»
 
 Thomas: *"Debería estar la cta corriente de: Hugo Wong; Becky Chen; Ownland"* · sobre el formato: *"la
