@@ -6190,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.96"></script>
+<script type="module" src="recepcion.js?v=22.97"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.96";
+const APP_VERSION = "v22.97";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -60883,7 +60883,9 @@ async function ccCargarDetalle(key) {
   if (!cel) return;
   cel.innerHTML = '<div style="padding:10px;color:#64748b;">Cargando…</div>';
   var bt = function (v, t) { return '<button onclick="_ccState.vista=\'' + v + '\';ccCargarDetalle(\'' + key + '\')" style="padding:4px 10px;margin:6px 4px 0 0;border-radius:6px;border:1px solid #cbd5e1;cursor:pointer;font-size:12px;' + (_ccState.vista === v ? 'background:#065f46;color:#fff;' : 'background:#fff;') + '">' + t + '</button>'; };
-  var tabs = bt("pagos", "Qué pagó cada factura") + bt("movs", "Todas las facturas y pagos");
+  var tabs = bt("pagos", "Qué pagó cada factura") + bt("movs", "Todas las facturas y pagos") +
+    '<button onclick="ccPagoManualForm(\'' + key + '\')" style="padding:4px 10px;margin:6px 4px 0 0;border-radius:6px;border:1px solid #059669;color:#059669;background:#fff;cursor:pointer;font-size:12px;font-weight:bold;">＋ Cargar pago en efectivo / cheque</button>' +
+    '<div id="ccPM_' + key.replace("|", "_") + '"></div>';
   if (_ccState.vista === "movs") { await ccCargarMovimientos(p[0], p[1], cel, tabs); return; }
   var r = await sb.rpc("gv_cobranza_cliente", { p_emp: p[0], p_cod: p[1] });
   if (r.error) { cel.innerHTML = '<div style="padding:10px;color:#b91c1c;">Error: ' + _ccEsc(r.error.message) + '</div>'; return; }
@@ -60921,7 +60923,7 @@ async function ccCargarMovimientos(emp, cod, cel, tabs) {
     '<th ' + th + ' align="left">Fecha</th><th ' + th + ' align="left">Tipo</th><th ' + th + ' align="left">Comprobante</th><th ' + th + ' align="right">Debe ($)</th>' +
     '<th ' + th + ' align="right">Haber ($)</th><th ' + th + ' align="right">Saldo ($)</th><th ' + th + ' align="left">Detalle</th></tr></thead><tbody>';
   h += rows.slice().reverse().map(function (m) {
-    var col = m.tipo === "Pago" ? "#059669" : m.tipo === "NC" ? "#2563eb" : "#1e293b";
+    var col = m.tipo === "Pago" ? "#059669" : m.tipo === "NC" ? "#2563eb" : m.tipo === "Deducción súper" ? "#7c3aed" : "#1e293b";
     return '<tr><td ' + td + '>' + _fmtFecha(m.fecha) + '</td><td ' + td + ' style="padding:4px 8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;color:' + col + ';font-weight:bold;">' + _ccEsc(m.tipo) + '</td>' +
       '<td ' + td + '>' + _ccEsc(m.comprobante) + '</td><td ' + td + ' align="right">' + (Number(m.debe) ? _fmtPlata(m.debe) : '') + '</td>' +
       '<td ' + td + ' align="right">' + (Number(m.haber) ? _fmtPlata(m.haber) : '') + '</td><td ' + td + ' align="right">' + _fmtPlata(m.saldo) + '</td>' +
@@ -60930,6 +60932,39 @@ async function ccCargarMovimientos(emp, cod, cel, tabs) {
   cel.innerHTML = tabs + h + '</tbody></table></div>';
 }
 window.ccCargarMovimientos = ccCargarMovimientos;
+// v22.96: pagos que no pasan por el banco (efectivo, cheque físico). Los carga Cobranzas; entran solos a la cuenta,
+// al agente y a la deuda viva (la base los suma a la conciliación como banco "manual").
+function ccPagoManualForm(key) {
+  var box = document.getElementById("ccPM_" + key.replace("|", "_")); if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ""; return; }
+  var hoy = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
+  var inp = 'style="padding:6px;font-size:13px;border:1px solid #cbd5e1;border-radius:6px;"';
+  box.innerHTML = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0;padding:8px;background:#ecfdf5;border-radius:8px;">' +
+    '<input id="ccPMf" type="date" value="' + hoy + '" ' + inp + '>' +
+    '<input id="ccPMm" type="number" step="0.01" min="0" placeholder="Monto ($)"  style="padding:6px;font-size:13px;border:1px solid #cbd5e1;border-radius:6px;width:130px;">' +
+    '<select id="ccPMmed" ' + inp + '><option value="efectivo">Efectivo</option><option value="cheque">Cheque</option><option value="otro">Otro</option></select>' +
+    '<input id="ccPMr" inputmode="numeric" placeholder="Nº recibo ISIS"  style="padding:6px;font-size:13px;border:1px solid #cbd5e1;border-radius:6px;width:120px;">' +
+    '<input id="ccPMn" placeholder="Nota (opcional)"  style="padding:6px;font-size:13px;border:1px solid #cbd5e1;border-radius:6px;min-width:180px;">' +
+    '<button onclick="ccPagoManualGuardar(\'' + key + '\')" style="padding:6px 12px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">Guardar</button>' +
+    '<span id="ccPMmsg" style="font-size:12px;color:#b91c1c;"></span></div>';
+}
+window.ccPagoManualForm = ccPagoManualForm;
+async function ccPagoManualGuardar(key) {
+  if (typeof requireSupervisor === "function" && !requireSupervisor()) return;
+  var p = key.split("|"), msg = document.getElementById("ccPMmsg");
+  var monto = Number((document.getElementById("ccPMm") || {}).value), fecha = (document.getElementById("ccPMf") || {}).value;
+  var recibo = ((document.getElementById("ccPMr") || {}).value || "").trim();
+  if (!(monto > 0)) { if (msg) msg.textContent = "Poné el monto."; return; }
+  if (!fecha) { if (msg) msg.textContent = "Poné la fecha."; return; }
+  if (!recibo && !confirm("¿Guardar sin número de recibo? Va a figurar en la cuenta, pero el agente no lo puede cruzar con las facturas.")) return;
+  var r = await sb.rpc("gv_cobranza_pago_manual_cargar", { p_emp: p[0], p_cod: p[1], p_fecha: fecha, p_monto: monto,
+    p_medio: (document.getElementById("ccPMmed") || {}).value || "efectivo", p_recibo: recibo || null,
+    p_nota: ((document.getElementById("ccPMn") || {}).value || "").trim() || null });
+  if (r.error) { if (msg) msg.textContent = "Error: " + r.error.message; return; }
+  _ccState.vista = "movs";
+  ccCargarDetalle(key);
+}
+window.ccPagoManualGuardar = ccPagoManualGuardar;
 
 /* ---------- Pantalla unificada: Deuda a cobrar + Cobranzas (valor por NP) + Cruce Facturación + Facturable ya ----------
    Un solo botón / una sola pantalla con 4 pestañas. Reusa la lógica existente:

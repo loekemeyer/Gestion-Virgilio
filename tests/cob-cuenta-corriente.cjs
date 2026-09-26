@@ -41,6 +41,7 @@ catch (_e) {
         calls.push({ fn: m[1], body: JSON.parse((opt && opt.body) || "{}") });
         if (m[1] === "gv_cobranza_clientes") return ok(clientes);
         if (m[1] === "gv_cobranza_cliente") return ok(detalle);
+        if (m[1] === "gv_cobranza_pago_manual_cargar") return ok(1);
         if (m[1] === "gv_cobranza_control_saldos") return ok([
           { empresa: "lk", cod_cliente: "288", cliente: "Torres Y Liva S.A Cif", facturado: 1, notas_credito: 0, pagado_banco: 0, saldo_calculado: 7940215, deuda_excel: 44999903, estado: "calculado menor" },
           { empresa: "lk", cod_cliente: "862", cliente: "Muller", facturado: 1, notas_credito: 0, pagado_banco: 0, saldo_calculado: 8802249, deuda_excel: 8802249, estado: "coincide" },
@@ -84,6 +85,14 @@ catch (_e) {
     const det2 = document.getElementById("ccDet_lk_288");
     out.movs = det2 ? det2.querySelectorAll(":scope table > tbody > tr").length : 0; out.movHtml = det2 ? Array.from(det2.querySelectorAll(":scope table > tbody > tr")).map(t=>t.textContent.slice(0,80)).join(" // ") : "";
     out.movTxt = det2 ? det2.textContent : "";
+    // (g) cargar un pago en efectivo desde el detalle
+    ccPagoManualForm("lk|288");
+    document.getElementById("ccPMm").value = "150000";
+    document.getElementById("ccPMr").value = "14999";
+    document.getElementById("ccPMmed").value = "efectivo";
+    await ccPagoManualGuardar("lk|288");
+    const c3 = calls.find((x) => x.fn === "gv_cobranza_pago_manual_cargar");
+    out.pm = c3 ? c3.body : null;
     return out;
   });
   await b.close();
@@ -101,6 +110,8 @@ catch (_e) {
   if (!/con deuda coinciden 1 de 2/.test(r.resumen2) || !/deuda cero coinciden 1 de 1/.test(r.resumen2)) fallas.push("(e) el resumen no cuenta cuántos coinciden: " + r.resumen2);
   if (!r.cuentaBody || r.cuentaBody.p_cod !== "288") fallas.push("(f) no pidió gv_cobranza_cuenta");
   if (r.movs !== 3 || !/Recibo 14558/.test(r.movTxt) || !/no coincide/.test(r.movTxt)) fallas.push("(f) no muestra las facturas y pagos con el saldo: " + r.movs);
+  if (!r.pm || r.pm.p_emp !== "lk" || r.pm.p_cod !== "288" || r.pm.p_monto !== 150000 || r.pm.p_recibo !== "14999" || r.pm.p_medio !== "efectivo")
+    fallas.push("(g) no cargó el pago en efectivo: " + JSON.stringify(r.pm));
   if (fallas.length) { console.error("FALLA cob-cuenta-corriente:\n  " + fallas.join("\n  ")); process.exit(1); }
-  console.log("OK cob-cuenta-corriente: abre en Cuenta corriente, ordena por deuda, filtra los que pagaron mal, explica cada pago, controla el saldo contra el Excel y muestra todas las facturas y pagos.");
+  console.log("OK cob-cuenta-corriente: abre en Cuenta corriente, ordena por deuda, filtra los que pagaron mal, explica cada pago, controla el saldo contra el Excel muestra todas las facturas y pagos y carga pagos en efectivo.");
 })();

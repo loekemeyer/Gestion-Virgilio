@@ -29944,3 +29944,20 @@ la clave pública, no desde el MCP.
 **No se tocó `Stock_Config`** (10 escritores con la clave pública en el front).
 
 **Rollback:** al pie del SQL.
+
+### v22.96 — Cobranzas: deducción de los súper, pagos en efectivo/cheque y avisos para el Planify de Vivi (26/09, Thomas)
+
+- **Deducción súper** (`GV_Cobranza_Super_Deduccion`): de la config del parseo de OC (LK `precios_super.cadena`):
+  Cencosud 16 %, Dorinka 16,5 %, Diarco 10 %. Alberdi quedó en 0: medido, paga el 98,5 % (la factura ya sale con el
+  descuento). Un peso del súper cancela 1/(1−deducción) en la cuenta (fila "Deducción súper"), el control, la deuda viva
+  y el agente (condición NN FF: dto posible = deducción, nada que reclamar). Coto (−14 %) y Libertad (−15 %) no tienen
+  deducción en la config y siguen sin cerrar. Diferencias: Cencosud $129,9 M → $49,4 M · Dorinka $35,3 M → −$10,1 M.
+- **Tolerancia del control** pasó a 2 % de la facturación MENSUAL (antes anual: daba por coincidente a Cencosud con
+  $49 M de diferencia). Medido: con deuda coinciden 80 de 157 · deuda cero 498 de 693 · a favor 30 de 52.
+- **Pagos a mano** (`GV_Cobranza_Pago_Manual`, `gv_cobranza_pago_manual_cargar/_anular`): efectivo / cheque / otro con
+  nº de recibo. Entran a `gv_conciliacion_bancaria` como banco `manual`, así los ven la cuenta, el agente y la deuda
+  viva sin tocar nada más. Botón "＋ Cargar pago en efectivo / cheque" en el detalle del cliente.
+- **Avisos** (`GV_Cobranza_Aviso`, `gv_cobranza_avisos_generar`, al final del cron min 49): un aviso por pago nuevo desde
+  01/09 con estado mal / tarde / bien / revisar y la explicación. Hoy: 102 bien · 83 mal ($37,2 M) · 8 tarde · 12 revisar.
+  Los lee el módulo Cobranzas del Planify de Vivi (repo Planify).
+SQL: `sql/gv_cobranza_pago_manual_v2296.sql`, `sql/gv_cobranza_avisos_v2296.sql`.
