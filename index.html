@@ -6213,7 +6213,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.62"></script>
+<script type="module" src="recepcion.js?v=23.63"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10172,7 +10172,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.62";
+const APP_VERSION = "v23.63";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -29141,6 +29141,7 @@ async function showMGModal(legajo, _resume) {
       return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0);
     });
     _mg = { legajo: String(legajo || ""), items: items, filtro: "", tsInicio: Date.now() };
+    try { mgEmitMarca("MGI", _mg.legajo); _mg._mgi = true; } catch (_e) {}   // v23.63: el monitor ve el guardado EN CURSO
     mgRender();
   } catch (e) { const b = document.getElementById("mgBody"); if (b) b.innerHTML = '<div class="mg-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -29392,7 +29393,26 @@ function mgEmitFueraLista(cod, g, e, legajo) {
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
   try { updatePendingIndicator(); } catch (_e) {}
 }
-function closeMG() { const ov = document.getElementById("mgModal"); if (ov) ov.classList.remove("show"); _mg = null; }
+function closeMG() {
+  const ov = document.getElementById("mgModal"); if (ov) ov.classList.remove("show");
+  // v23.63: salió sin confirmar (el confirmar marca _enviando y emite MG): cierra el MGI del monitor.
+  try { if (_mg && _mg._mgi && !_mg._enviando) mgEmitMarca("MGC", _mg.legajo); } catch (_e) {}
+  _mg = null;
+}
+/* v23.63 — MG sólo emitía al CONFIRMAR (v7.68), así que un operario guardando figuraba
+   "libre · sin tarea abierta" en el monitor y su jornada arrancaba en el primer guardado
+   confirmado (Isidro, 28/09: 20 MG cerrados en 3 días, 0 aperturas). MGI = abrió el módulo,
+   MGC = lo cerró sin guardar. Instantáneos (sin ts_inicio): no suman horas en ningún lado;
+   el tiempo lo sigue llevando el MG del confirmar. */
+function mgEmitMarca(op, legajo) {
+  const leg = String(legajo || "").trim(); if (!leg) return;
+  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
+  const nowMs = Date.now();
+  const payload = { legajo: leg, opcion: op, descripcion: op === "MGI" ? "Guardado a Góndola (abre)" : "Guardado a Góndola (cierra sin guardar)",
+    texto: "", ts: nowMs, id: (op.toLowerCase() + "_" + leg + "_" + nowMs.toString(36)).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: null };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+}
 function mgHasProgress() { return !!(_mg && _mg.items && _mg.items.some(function (it) { return (it.cargar > 0) || (it.exc > 0); })); }
 function mgAskClose() { opAskClose(mgHasProgress(), "MG", _mg && _mg.legajo, "Guardar a góndola", _mg, closeMG); }
 
@@ -53467,6 +53487,9 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
       else if (e.op === "TP") { if (!e.tx || pick === e.tx) pick = null; }
       else if (e.op === "AP") { arm = e.tx; armTs = e.ts; }
       else if (e.op === "TAP") { if (!e.tx || arm === e.tx) arm = null; }
+      else if (e.op === "MGI") { tog = "MG"; togTs = e.ts; }                       // v23.63
+      else if (e.op === "MGC") { if (tog === "MG") tog = null; }
+      else if (e.op === "MG" && e.ini) { if (tog === "MG") tog = null; }
       else if (_MON_ACT_TOGGLES[e.op]) { if (!e.ini) { tog = e.op; togTs = e.ts; } else if (tog === e.op) { tog = null; } }
     }
     var cands = [];                                                  // acciones abiertas → la más reciente manda

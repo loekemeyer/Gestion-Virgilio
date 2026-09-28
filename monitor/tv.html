@@ -932,6 +932,9 @@ function actividadActual(eventos, hoy, fjHoy, fichados) {
       else if (e.op === "TP")  { if (!e.tx || pick === e.tx) pick = null; }
       else if (e.op === "AP")  { arm = e.tx; armTs = e.ts; }
       else if (e.op === "TAP") { if (!e.tx || arm === e.tx) arm = null; }
+      else if (e.op === "MGI") { tog = "MG"; togTs = e.ts; }                       /* ≡ index.html v23.63 */
+      else if (e.op === "MGC") { if (tog === "MG") tog = null; }
+      else if (e.op === "MG" && e.ini) { if (tog === "MG") tog = null; }
       else if (ACT_TOGGLES[e.op]) { if (!e.ini) { tog = e.op; togTs = e.ts; } else if (tog === e.op) { tog = null; } }
     }
     var cands = [];
