@@ -21690,7 +21690,7 @@ const _PED_IMP_RPC_ESCRITURA = ["gv_imp_carga_pedido_set", "gv_imp_cc_deuda_add"
   "gv_imp_pago_cargas_set", "gv_imp_prov_alias_set", "gv_importado_bache_add", "gv_importado_bache_borrar",
   "gv_importado_bache_editar", "gv_importado_bache_embarque", "gv_importado_bache_llego", "gv_importado_pedido_fechas",
   "gv_importado_pedido_ref", "gv_importados_resync", "importados_marcar_llegada", "importados_set_curso",
-  "gv_imp_recibir", "gv_imp_recibir_contexto", "gv_imp_recepcion_historial"];   // v23.45 — sólo authenticated (supervisor)
+  "gv_imp_recibir", "gv_imp_recibir_contexto", "gv_imp_recepcion_historial", "gv_imp_recepcion_anular"];   // v23.45 — sólo authenticated (supervisor)
 async function _pedImpRpc(fn, body) {
   var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   if (_PED_IMP_RPC_ESCRITURA.indexOf(fn) >= 0) {
@@ -22182,7 +22182,8 @@ async function impRecibirBache(bacheId) {
   var soloInsumo = !(ctx.gondola || []).length && (ctx.insumos_cods || []).length > 0 && !uxc;
   var cajasDef = uxc > 0 ? Math.round((Number(ctx.pendiente) || 0) / uxc) : 0;
   _impRec = {
-    ctx: ctx, empresa: ctx.dual ? "" : (ctx.empresa || "LK"), uxc: uxc || "", nota: "", hecho: false, sim: null,
+    ctx: ctx, empresa: ctx.empresa || "LK", empresaBache: ctx.empresa || "", uxc: uxc || "", nota: "", hecho: false, sim: null,
+    cerrar: true, cid: "imprec-" + bacheId + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
     lineas: [soloInsumo
       ? { destino: "insumos", sector: "", cantidad: Number(ctx.pendiente) || "", cod_insumo: (ctx.insumos_cods || [])[0] || ctx.cod_stock, resolucion: "" }
       : { destino: "a_guardar", sector: "", cantidad: cajasDef || "", resolucion: "" }]
@@ -22210,7 +22211,8 @@ function _impRecRender() {
     (uxc > 0 ? ' (' + Math.round(pend / uxc).toLocaleString("es-AR") + ' cajas)' : '') + (Number(c.uni_master) > 0 ? ' · master de ' + c.uni_master + ' u' : '') + '</div></div>';
   if (c.dual) {
     h += '<div class="irc-sec"><h4>¿De qué empresa es? (código dual: son productos distintos)</h4><div class="irc-row">' +
-      ["LK", "CH"].map(function (e) { return '<button class="irc-b ' + (_impRec.empresa === e ? 'on' : 'sec') + '" onclick="impRecSet(\'empresa\',\'' + e + '\')">' + (e === "LK" ? "Loekemeyer (LK)" : "Chef (CH)") + '</button>'; }).join('') + '</div></div>';
+      ["LK", "CH"].map(function (e) { return '<button class="irc-b ' + (_impRec.empresa === e ? 'on' : 'sec') + '" onclick="impRecSet(\'empresa\',\'' + e + '\')">' + (e === "LK" ? "Loekemeyer (LK)" : "Chef (CH)") + '</button>'; }).join('') + '</div>' +
+      (_impRec.empresaBache && _impRec.empresa !== _impRec.empresaBache ? '<div class="irc-conf">⚠ Este pedido se hizo para <b>' + escapeHtml(_impRec.empresaBache) + '</b> y estás recibiendo como <b>' + escapeHtml(_impRec.empresa) + '</b>. El stock va a la góndola / pila de ' + escapeHtml(_impRec.empresa) + '. Confirmá que es así.</div>' : '') + '</div>';
   }
   h += '<div class="irc-sec"><h4>¿Cuánto llegó y a dónde va?</h4>' +
     '<div class="irc-row"><span class="irc-muted">Unidades por caja</span><input type="number" min="1" style="width:80px" value="' + (_impRec.uxc || "") + '" onchange="impRecSet(\'uxc\',this.value)"></div>';
@@ -22236,7 +22238,11 @@ function _impRecRender() {
   h += '<button class="irc-b sec" onclick="impRecAgregar()">＋ Otro destino (partir la carga)</button>' +
     '<div class="irc-muted" style="margin-top:6px">Total: <b>' + tot.cajas + ' cajas</b>' + (tot.insU ? ' + <b>' + tot.insU.toLocaleString("es-AR") + ' u</b> a insumos' : '') +
     ' = <b>' + tot.uni.toLocaleString("es-AR") + ' u</b> de ' + pend.toLocaleString("es-AR") + ' pendientes' +
-    (tot.uni > pend ? ' · <span style="color:#b45309;font-weight:800">llegan ' + (tot.uni - pend).toLocaleString("es-AR") + ' u más de lo pedido</span>' : (tot.uni && tot.uni < pend ? ' · queda en curso ' + (pend - tot.uni).toLocaleString("es-AR") + ' u' : '')) + '</div></div>';
+    (tot.uni > pend ? ' · <span style="color:#b45309;font-weight:800">llegan ' + (tot.uni - pend).toLocaleString("es-AR") + ' u más de lo pedido: entran todas al stock y el pedido queda recibido (lo de más no descuenta otros pedidos en viaje)</span>' : '') + '</div>' +
+    (tot.uni > 0 && tot.uni < pend
+      ? '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:13.5px;cursor:pointer"><input type="checkbox" style="width:18px;height:18px;margin:2px 0 0" ' + (_impRec.cerrar ? 'checked' : '') + ' onchange="impRecSet(\'cerrar\',this.checked)"><span>' +
+        (_impRec.cerrar ? '<b>Dar el pedido por recibido.</b> Las ' + (pend - tot.uni).toLocaleString("es-AR") + ' u que faltan NO siguen en viaje (quedan anotadas como faltante).'
+                        : '<b>El resto sigue en viaje:</b> ' + (pend - tot.uni).toLocaleString("es-AR") + ' u quedan en curso (llega otro envío).') + '</span></label>' : '') + '</div>';
   h += '<div class="irc-sec"><h4>Nota (opcional)</h4><input type="text" style="width:100%;height:36px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 8px;margin:0" placeholder="contenedor, remito, observaciones…" value="' + escapeHtml(_impRec.nota || "") + '" onchange="impRecSet(\'nota\',this.value)"></div>';
   if (_impRec.err) h += '<div class="irc-conf">' + escapeHtml(_impRec.err) + '</div>';
   if (_impRec.sim && _impRec.sim.ok) h += '<div class="irc-ok">✓ Revisado: no hay conflictos de espacio. Tocá <b>Confirmar recepción</b> para grabarla.</div>';
@@ -22307,7 +22313,7 @@ function _impRecValidar() {
 function _impRecBody(simular) {
   return { p_bache_id: _impRec.ctx.bache_id, p_empresa: _impRec.empresa || null, p_uni_x_caja: Number(_impRec.uxc) || null,
     p_destinos: _impRec.lineas.map(function (l) { return { destino: l.destino, sector: l.sector || null, cantidad: Number(l.cantidad), cod_insumo: l.cod_insumo || null, resolucion: l.resolucion || null }; }),
-    p_nota: _impRec.nota || null, p_simular: !!simular };
+    p_nota: _impRec.nota || null, p_simular: !!simular, p_cerrar: _impRec.cerrar !== false, p_client_id: _impRec.cid };
 }
 async function impRecRevisar() {
   if (!_impRec) return;
@@ -22319,16 +22325,25 @@ async function impRecRevisar() {
 async function impRecGrabar() {
   if (!_impRec || _impRec.grabando) return;
   var v = _impRecValidar(); if (v) { _impRec.err = v; _impRecRender(); return; }
+  var tot = _impRecTotales(), pend = Number(_impRec.ctx.pendiente) || 0;
+  var resumen = "Recibir " + tot.uni.toLocaleString("es-AR") + " u de " + (_impRec.ctx.cod_stock || _impRec.ctx.cod_art) +
+    (_impRec.ctx.dual ? " (" + _impRec.empresa + ")" : "") + ":\n" +
+    _impRec.lineas.map(function (l) { return "  · " + l.cantidad + (l.destino === "insumos" ? " u" : " cajas") + " → " + _IMP_REC_DEST[l.destino] + (l.sector ? " " + l.sector : ""); }).join("\n") +
+    "\n\n" + (tot.uni >= pend ? "El pedido queda RECIBIDO" + (tot.uni > pend ? " (llegan " + (tot.uni - pend) + " u de más)." : ".")
+      : (_impRec.cerrar ? "El pedido queda RECIBIDO: las " + (pend - tot.uni) + " u que faltan dejan de figurar en viaje." : "Siguen en viaje " + (pend - tot.uni) + " u.")) +
+    "\n\n¿Confirmás?";
+  if (!confirm(resumen)) return;
   _impRec.grabando = true;
   var r;
   try { r = await _pedImpRpc("gv_imp_recibir", _impRecBody(false)); }
-  catch (e) { _impRec.grabando = false; _impRec.err = _impRecErr(e); _impRecRender(); return; }
+  catch (e) { _impRec.grabando = false; _impRec.err = _impRecErr(e) + " — No se grabó nada. Si fue un corte de red, volvé a tocar Confirmar: no se graba dos veces."; _impRecRender(); return; }
   _impRec.grabando = false;
   if (!r || !r.ok) { _impRec.sim = r; _impRec.err = "Apareció un conflicto de espacio mientras cargabas: resolvelo y confirmá de nuevo."; _impRecRender(); return; }
   _impRec.hecho = true;
   var dest = _impRec.lineas.map(function (l) { return l.cantidad + (l.destino === "insumos" ? " u" : " cj") + " → " + _IMP_REC_DEST[l.destino] + (l.sector ? " " + l.sector : ""); }).join(" · ");
   _impRecShell("📥 Recepción grabada", '<div class="irc-ok">✓ Recibidas <b>' + Number(r.unidades).toLocaleString("es-AR") + ' u</b> (' + r.cajas + ' cajas). ' + escapeHtml(dest) + '</div>' +
-    '<div class="irc-muted" style="margin-top:8px">' + (r.estado === "llegado" ? "El pedido quedó completo." : "El pedido sigue en curso con lo que falta.") +
+    '<div class="irc-muted" style="margin-top:8px">' + (r.repetida ? "(Ya estaba grabada: no se cargó dos veces.) " : "") +
+    (r.estado === "llegado" ? "El pedido quedó RECIBIDO y ya no figura en viaje." + (Number(r.faltante) > 0 ? " Faltaron " + Number(r.faltante).toLocaleString("es-AR") + " u (anotadas)." : "") : "El pedido sigue en curso con lo que falta.") +
     (Number(r.sobra) > 0 ? ' Llegaron ' + Number(r.sobra).toLocaleString("es-AR") + ' u más de lo pedido: entraron al stock igual.' : '') + '</div>' +
     '<div style="margin-top:10px"><button class="irc-b pri" onclick="impRecCerrar()">Listo</button><button class="irc-b sec" onclick="impRecCerrar();openImpHistRecep()">Ver historial de recepción</button></div>');
 }
@@ -22340,6 +22355,15 @@ async function openImpHistRecep() {
   _stkPop = { kind: "impHist", rows: [], q: "", dias: 365 };
   try { _stkPop.rows = (await _pedImpRpc("gv_imp_recepcion_historial", { p_dias: 365 })) || []; }
   catch (e) { _stkPop.err = _impRecErr(e); }
+  _impHistRender();
+}
+async function impHistAnular(id) {
+  var m = prompt("Anular la recepción: se sacan del stock las cajas que entraron y el pedido vuelve a figurar en viaje.\n\n¿Por qué se anula?");
+  if (m == null) return;
+  if (String(m).trim().length < 3) { alert("Escribí por qué se anula."); return; }
+  try { await _pedImpRpc("gv_imp_recepcion_anular", { p_id: id, p_motivo: String(m).trim() }); }
+  catch (e) { alert(_impRecErr(e)); return; }
+  try { _stkPop.rows = (await _pedImpRpc("gv_imp_recepcion_historial", { p_dias: 365 })) || []; } catch (_e) {}
   _impHistRender();
 }
 function impHistBuscar(v) { if (!_stkPop || _stkPop.kind !== "impHist") return; _stkPop.q = v; _impHistRender(); }
@@ -22357,7 +22381,7 @@ function _impHistRender() {
   if (_stkPop.err) h += '<div class="stkpop-empty">No se pudo leer el historial: ' + escapeHtml(_stkPop.err) + '</div>';
   else if (!rows.length) h += '<div class="stkpop-empty">' + (q ? 'Nada coincide con la búsqueda.' : 'Todavía no hay recepciones cargadas con 📥 RECIBIR.') + '</div>';
   else {
-    h += '<div class="mva-tblwrap" style="max-height:66vh;overflow-x:auto"><table class="mva-tbl" style="font-size:13px;width:auto;min-width:0;table-layout:auto"><thead><tr><th>Fecha</th><th>Código</th><th>Emp.</th><th>Proveedor · pedido</th><th class="num">Recibido</th><th>Dónde</th><th>Quién</th><th>Nota</th></tr></thead><tbody>' +
+    h += '<div class="mva-tblwrap" style="max-height:66vh;overflow-x:auto"><table class="mva-tbl" style="font-size:13px;width:auto;min-width:0;table-layout:auto"><thead><tr><th>Fecha</th><th>Código</th><th>Emp.</th><th>Proveedor · pedido</th><th class="num">Recibido</th><th>Dónde</th><th>Quién</th><th>Nota</th><th></th></tr></thead><tbody>' +
       rows.map(function (r) {
         var f = new Date(r.ts);
         var fecha = isNaN(f) ? String(r.ts || "") : f.toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -22365,10 +22389,13 @@ function _impHistRender() {
           return (d.conflicto && d.resolucion === "forzar" ? '<span title="' + escapeHtml(d.conflicto) + '">⚠ </span>' : '') +
             Number(d.cantidad).toLocaleString("es-AR") + (d.unidad === "Uni" ? " u" : " cj") + ' → ' + (_IMP_REC_DEST[d.destino] || d.destino) + (d.sector ? ' <b>' + escapeHtml(d.sector) + '</b>' : '');
         }).join('<br>');
-        return '<tr><td style="white-space:nowrap">' + escapeHtml(fecha) + '</td><td style="white-space:normal;max-width:220px"><b>' + escapeHtml(codCanon(r.cod_art)) + '</b> <span class="irc-muted">' + escapeHtml(r.descripcion || "") + '</span></td>' +
+        return '<tr' + (r.anulada_en ? ' style="opacity:.55;text-decoration:line-through"' : '') + '><td style="white-space:nowrap">' + escapeHtml(fecha) + '</td><td style="white-space:normal;max-width:220px"><b>' + escapeHtml(codCanon(r.cod_art)) + '</b> <span class="irc-muted">' + escapeHtml(r.descripcion || "") + '</span></td>' +
           '<td>' + escapeHtml(r.empresa || "") + '</td><td style="white-space:normal;max-width:180px">' + escapeHtml(r.proveedor || "") + '<br><span class="irc-muted">' + escapeHtml(r.pedido_ref || "") + '</span></td>' +
-          '<td class="num">' + Number(r.unidades).toLocaleString("es-AR") + ' u<br><span class="irc-muted">' + (Number(r.cajas) || 0) + ' cj · ' + (r.estado_bache === "llegado" ? "completo" : "parcial") + '</span></td>' +
-          '<td style="white-space:nowrap">' + donde + '</td><td style="white-space:nowrap">' + escapeHtml(String(r.por || "").replace(/@.*/, "")) + '</td><td style="white-space:normal;max-width:200px">' + escapeHtml(r.nota || "") + '</td></tr>';
+          '<td class="num">' + Number(r.unidades).toLocaleString("es-AR") + ' u<br><span class="irc-muted">' + (Number(r.cajas) || 0) + ' cj · ' + (r.estado_bache === "llegado" ? "recibido" : "sigue en viaje") +
+            (Number(r.faltante) > 0 ? ' · faltaron ' + Number(r.faltante).toLocaleString("es-AR") : '') + (Number(r.sobrante) > 0 ? ' · de más ' + Number(r.sobrante).toLocaleString("es-AR") : '') + '</span></td>' +
+          '<td style="white-space:nowrap">' + donde + '</td><td style="white-space:nowrap">' + escapeHtml(String(r.por || "").replace(/@.*/, "")) + '</td><td style="white-space:normal;max-width:200px">' + escapeHtml(r.nota || "") +
+          (r.anulada_en ? '<br><b style="color:#b91c1c">ANULADA</b> <span class="irc-muted">' + escapeHtml(r.anulada_motivo || "") + '</span>' : '') + '</td>' +
+          '<td>' + (r.es_ultima ? '<button class="stk-btn" style="padding:3px 8px;font-size:12px;background:#fee2e2;color:#b91c1c;border-color:#fecaca" onclick="impHistAnular(' + r.id + ')">↩ Anular</button>' : '') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
   }
   body.innerHTML = h;

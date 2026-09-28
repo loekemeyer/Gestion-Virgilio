@@ -37,7 +37,8 @@ const ITEMS = [
       if (fn === "gv_imp_recibir_contexto") return CTX;
       if (fn === "gv_imp_recepcion_historial") return [{ id: 1, ts: "2026-09-28T15:00:00Z", cod_art: "438E", descripcion: "RALLADOR", empresa: "CH",
         proveedor: "Fujian", pedido_ref: "PI HT26", unidades: 1224, cajas: 51, estado_bache: "llegado", por: "luis@x",
-        destinos: [{ destino: "gondola", sector: "L05", cantidad: 5, unidad: "cajas" }, { destino: "a_guardar", cantidad: 46, unidad: "cajas" }] }];
+        es_ultima: true, destinos: [{ destino: "gondola", sector: "L05", cantidad: 5, unidad: "cajas" }, { destino: "a_guardar", cantidad: 46, unidad: "cajas" }] }];
+      if (fn === "gv_imp_recepcion_anular") return { ok: true };
       if (fn === "gv_imp_recibir") {
         const d = body.p_destinos;
         if (body.p_simular) {
@@ -58,7 +59,11 @@ const ITEMS = [
     await impRecibirAbrir(11);
     const ov = () => document.getElementById("impRecOv");
     out.pideEmpresa = /¿De qué empresa es\?/.test(ov().innerHTML);
-    // B — revisar sin empresa
+    // B — viene elegida la empresa del pedido (CH); cambiarla avisa; sin empresa no deja revisar
+    out.empDefault = _impRec.empresa;
+    impRecSet("empresa", "LK");
+    out.avisaOtraEmpresa = /Este pedido se hizo para/.test(ov().innerHTML);
+    impRecSet("empresa", "");
     await impRecRevisar();
     out.sinEmpresaBloquea = /Elegí de qué empresa/.test(ov().innerHTML) && !window.__calls.some((c) => c.fn === "gv_imp_recibir");
     impRecSet("empresa", "CH");
@@ -73,23 +78,38 @@ const ITEMS = [
     if (partir) { partir.click(); await new Promise((res) => setTimeout(res, 50)); }
     out.lineas = _impRec ? _impRec.lineas.map((l) => l.destino + ":" + (l.sector || "") + ":" + l.cantidad) : [];
     out.revisadoOk = /no hay conflictos de espacio/.test(ov().innerHTML);
+    window.__confirm = ""; window.confirm = (m) => { window.__confirm = m; return true; };
     await impRecGrabar();
+    out.confirmo = /queda RECIBIDO/.test(window.__confirm);
     const real = window.__calls.filter((c) => c.fn === "gv_imp_recibir" && c.body.p_simular === false)[0];
-    out.real = real ? { emp: real.body.p_empresa, dest: real.body.p_destinos.map((x) => x.destino + ":" + (x.sector || "") + ":" + x.cantidad) } : null;
+    out.real = real ? { emp: real.body.p_empresa, dest: real.body.p_destinos.map((x) => x.destino + ":" + (x.sector || "") + ":" + x.cantidad), cerrar: real.body.p_cerrar, cid: !!real.body.p_client_id } : null;
+    // parcial: aparece la casilla «dar por recibido» (marcada) y al desmarcarla manda p_cerrar=false
+    await impRecibirBache(77);
+    impRecSet("empresa", "CH"); impRecLinea(0, "cantidad", 10);
+    out.casilla = /Dar el pedido por recibido/.test(ov().innerHTML);
+    impRecSet("cerrar", false);
+    out.sigueEnViaje = /El resto sigue en viaje/.test(ov().innerHTML);
+    await impRecRevisar(); await impRecGrabar();
+    const parcial = window.__calls.filter((c) => c.fn === "gv_imp_recibir" && c.body.p_simular === false).pop();
+    out.parcialCerrar = parcial ? parcial.body.p_cerrar : null;
     out.grabada = /Recepción grabada/.test(ov().innerHTML);
     impRecCerrar();
     await openImpHistRecep();
     const hb = document.getElementById("stkPopBody").innerHTML;
     out.hist = /Historial recepción/.test(hb) && /L05/.test(hb) && /A guardar/.test(hb) && /1\.224 u|1224 u/.test(hb);
+    window.prompt = () => "prueba"; 
+    await impHistAnular(1);
+    out.anulo = window.__calls.some((c) => c.fn === "gv_imp_recepcion_anular" && c.body.p_id === 1 && c.body.p_motivo === "prueba");
     return out;
   }, ITEMS);
   if (JSON.stringify(r.botones) !== '["026=false","438E=true"]') fail.push("A botón RECIBIR: " + JSON.stringify(r.botones));
-  if (!r.pideEmpresa || !r.sinEmpresaBloquea) fail.push("B empresa dual");
+  if (!r.pideEmpresa || !r.sinEmpresaBloquea || r.empDefault !== "CH" || !r.avisaOtraEmpresa) fail.push("B empresa dual: " + JSON.stringify([r.empDefault, r.avisaOtraEmpresa, r.sinEmpresaBloquea]));
   if (JSON.stringify(r.celdas) !== '["L05"]') fail.push("B celdas por empresa: " + JSON.stringify(r.celdas));
   if (!r.avisaConflicto || !r.hayPartir) fail.push("C conflicto góndola");
   if (JSON.stringify(r.lineas) !== '["gondola:L05:5","a_guardar::46"]' || !r.revisadoOk) fail.push("C partir: " + JSON.stringify(r.lineas));
-  if (!r.real || r.real.emp !== "CH" || JSON.stringify(r.real.dest) !== '["gondola:L05:5","a_guardar::46"]' || !r.grabada) fail.push("D grabar: " + JSON.stringify(r.real));
-  if (!r.hist) fail.push("E historial");
+  if (!r.real || r.real.emp !== "CH" || JSON.stringify(r.real.dest) !== '["gondola:L05:5","a_guardar::46"]' || !r.grabada || r.real.cerrar !== true || !r.real.cid || !r.confirmo) fail.push("D grabar: " + JSON.stringify(r.real));
+  if (!r.casilla || !r.sigueEnViaje || r.parcialCerrar !== false) fail.push("D2 parcial: " + JSON.stringify([r.casilla, r.sigueEnViaje, r.parcialCerrar]));
+  if (!r.hist || !r.anulo) fail.push("E historial/anular: " + JSON.stringify([r.hist, r.anulo]));
   if (errs.length) fail.push("pageerror: " + errs.join(" | "));
   await b.close();
   if (fail.length) { console.log("imp-recibir: ✗ " + fail.join(" · ")); process.exit(1); }
