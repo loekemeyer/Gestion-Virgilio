@@ -1,0 +1,7 @@
+-- v23.59 (Luis 28/09): "el diferido deberia entregarse lo antes posible y en todo caso el 8/10 deberia
+-- reprogramarse (si no fue colocado ahi a mano)". El armado lo sigue poniendo lo antes posible; el
+-- optimizador de las 18 hs (gv_ppp_optimizar_camiones) ya NO lo trata como fijo: lo puede juntar con
+-- otro camion del mismo grupo, nunca antes de su piso (gv_diferido_piso) y con plazo = max(entrada+14, piso+14).
+-- Parche aplicado sobre la definicion viva (marcador v23.59-diferido). Centinela: patron 'coalesce\(c\.piso'.
+-- Caso: F25A (LK 0234, Solia, Z5, 0,021 m3) 08/10 -> 09/10 con F16A/F16B.
+-- Ver definicion: select pg_get_functiondef('public.gv_ppp_optimizar_camiones(boolean,integer)'::regprocedure);
