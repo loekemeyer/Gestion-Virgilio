@@ -6190,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.01"></script>
+<script type="module" src="recepcion.js?v=23.02"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.01";
+const APP_VERSION = "v23.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -14012,7 +14012,7 @@ async function etlLoadGlobal() {
 async function etlToggleGlobal() {
   const nuevo = etlOn() ? "0" : "1";
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "etiqueta_lio", valor: nuevo }) });
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "etiqueta_lio", valor: nuevo }) });
     if (r.ok) etlSetOn(nuevo === "1");
   } catch (_e) {}
   try { if (typeof psRender === "function") psRender(); } catch (_e) {}
@@ -15261,7 +15261,7 @@ async function toggleSsgAlert() {
   const nuevo = sw.classList.contains("on") ? "0" : "1";
   if (hint) hint.textContent = "Guardando…";
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "alerta_sin_stock_gondola", valor: nuevo }) });
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "alerta_sin_stock_gondola", valor: nuevo }) });
     if (!r.ok) { if (hint) hint.textContent = "Error guardando (HTTP " + r.status + ")."; return; }
     ssgSetSwitchUI(nuevo === "1");
   } catch (_e) { if (hint) hint.textContent = "Sin conexión: no se guardó."; }
@@ -18160,11 +18160,11 @@ function prodSetMeta(which, val) {
     m[which] = Math.round(v * 100) / 100;
     try { localStorage.setItem("prod_metas", JSON.stringify(m)); } catch (e) { }
     // fuente de verdad: Stock_Config (global). Si falla la red queda el cache local.
-    fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", {
+    _scfgAuth().then(function (_a) { return fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", {
       method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      headers: Object.assign({}, _a, { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }),
       body: JSON.stringify({ clave: which === "pick" ? "meta_m3h_picking" : "meta_m3h_armado", valor: String(m[which]), actualizado: new Date().toISOString() })
-    }).catch(function () { });
+    }); }).catch(function () { });
   }
   prodRender();
 }
@@ -21021,7 +21021,7 @@ async function pedImpSetNacCfg(clave, valor) {
   try {
     await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", {
       method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
       body: JSON.stringify({ clave: clave, valor: v })
     });
   } catch (_e) {}
@@ -21839,12 +21839,12 @@ async function pedImpSetEntregaGlobal(val) {
     if (!v) {
       await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.entrega_estimada_global", {
         method: "DELETE",
-        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, Prefer: "return=minimal" }
+        headers: { ...(await _scfgAuth()), Prefer: "return=minimal" }
       });
     } else {
       await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", {
         method: "POST",
-        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+        headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
         body: JSON.stringify({ clave: "entrega_estimada_global", valor: v })
       });
     }
@@ -27094,7 +27094,7 @@ async function stockMarcarInicio() {
   if (!confirm("MARCAR INICIO ahora: desde este momento, los movimientos REALES anteriores (recepción/guardado/picking/ajustes/etc.) dejan de contar para el stock. NO se borran. El stock inicial que cargues sigue contando. ¿Seguro?")) return;
   try {
     const nowIso = new Date().toISOString();
-    const rc = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "cutoff_ts", valor: nowIso, actualizado: nowIso }) });
+    const rc = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "cutoff_ts", valor: nowIso, actualizado: nowIso }) });
     if (!rc.ok && rc.status >= 500) throw new Error("config HTTP " + rc.status);
     alert("✓ Inicio marcado. Desde ahora lo anterior (movimientos reales) no se suma; queda guardado igual.");
     openStockAdmin();
@@ -27202,7 +27202,7 @@ async function stkToggleAutoBajada() {
   if (!_stk) return;
   const nuevo = _stk.abrOn ? "0" : "1";
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "bajada_auto_racks", valor: nuevo }) });
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "bajada_auto_racks", valor: nuevo }) });
     if (!r.ok) { try { alert("No se pudo guardar (HTTP " + r.status + ")."); } catch (_e) {} return; }
     _stk.abrOn = (nuevo === "1"); stkRender();
   } catch (_e) { try { alert("Sin conexión: no se guardó."); } catch (_e2) {} }
@@ -55038,7 +55038,7 @@ function facPrintIsOn(){ return _facPrintGlobal === "1"; }
 async function facPrintSetPref(v){
   _facPrintGlobal = String(v);
   try {
-    await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method:"POST", headers:{ apikey:SUPABASE_KEY, Authorization:"Bearer "+SUPABASE_KEY, "Content-Type":"application/json", Prefer:"resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: FAC_PRINT_KEY, valor: String(v) }) });
+    await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method:"POST", headers:{ ...(await _scfgAuth()), "Content-Type":"application/json", Prefer:"resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: FAC_PRINT_KEY, valor: String(v) }) });
   } catch(_e){}
 }
 function facPrintToggle(){ facPrintSetPref(facPrintIsOn() ? "0" : "1").then(function(){ psRender(); }); }
@@ -57394,6 +57394,17 @@ async function facAuthWriteHeaders(extra) {
   };
   if (extra) Object.assign(h, extra);
   return h;
+}
+/* v23.02 (problema 577): Stock_Config ya no se escribe con la clave pública. La base sólo deja
+   escribir a un supervisor logueado (es_supervisor_virgilio()); sin sesión se avisa y no se guarda. */
+async function _scfgAuth() {
+  const h = await facAuthWriteHeaders();
+  if (!h) {
+    const m = authNoSesionMsg("Iniciá sesión con Google para cambiar la configuración.");
+    try { alert(m); } catch (_e) {}
+    throw new Error(m);
+  }
+  return { apikey: h.apikey, Authorization: h.Authorization };
 }
 
 /* Parte B (v6.21): solo la OPERADORA (su mail) puede forzar la facturación de una NP
