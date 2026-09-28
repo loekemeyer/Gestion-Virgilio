@@ -1,4 +1,4 @@
--- v23.47 (Luis, 28/09) — RECIBIR importación, segunda vuelta. Sobre sql/gv_imp_recibir_v2345.sql.
+-- v23.48 (Luis, 28/09) — RECIBIR importación, segunda vuelta. Sobre sql/gv_imp_recibir_v2345.sql.
 -- "Tenés que dejar que ponga más de lo que debería haber llegado. Tiene que afectar stock real y
 --  fijate que escriba bien en las tablas (sin reescribir toda la tabla). Anticipémonos a todo lo que
 --  puede salir mal. Si se marca recibido, debería marcarlo como que ya se recibió y no está más
@@ -50,7 +50,7 @@ begin
   if not (public.es_supervisor_virgilio() or public.gv_es_supervisor_o_servicio()) then
     raise exception 'Sólo un supervisor puede recibir importaciones.' using errcode = '42501';
   end if;
-  -- v23.47 idempotencia: el mismo client_id (doble click, reintento tras corte) devuelve lo ya grabado
+  -- v23.48 idempotencia: el mismo client_id (doble click, reintento tras corte) devuelve lo ya grabado
   if not p_simular and v_cid is not null then
     select * into v_prev from public."GV_Imp_Recepcion" where client_id = v_cid;
     if found then

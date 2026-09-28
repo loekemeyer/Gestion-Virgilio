@@ -30097,7 +30097,7 @@ destino con los lugares del Mapa, aviso de conflicto de espacio) y con historial
   entran 9» · rack AD01 libre · AD09 ocupado por 505I → conflicto), dual 438E CH → L05 + excedente, 505C → insumos A1.
 - Rollback: `drop function` de las tres (las tablas quedan: son auditoría). `sql/gv_imp_recibir_v2345.sql`.
 
-### §3.v2347 — v23.47: RECIBIR importación — cierre del pedido, lo de más, idempotencia y anular — 2026-09-28
+### §3.v2348 — v23.48: RECIBIR importación — cierre del pedido, lo de más, idempotencia y anular — 2026-09-28
 
 **Luis:** *"tiene que afectar stock real … sin reescribir toda la tabla … si se marca recibido, que no esté más
 pedido o en viaje"* · *"si se recibe más de lo que se iba a recibir, cancela lo que se iba a recibir (no queda extra cancelado)"*.
@@ -30110,4 +30110,4 @@ pedido o en viaje"* · *"si se recibe más de lo que se iba a recibir, cancela l
   parcial cierra y saca de viaje 49.536→0, doble click no duplica, segundo intento sobre pedido cerrado frena, anular
   devuelve todo, 120 u sobre 48 pedidas cierra sin tocar el bache LK del mismo código, anular con la mercadería movida
   frena, cantidad basura frena; otros baches: md5 igual).
-- Centinelas 235-239 en `GV_Reglas_Centinela`. `sql/gv_imp_recibir_v2347.sql`.
+- Centinelas 235-239 en `GV_Reglas_Centinela`. `sql/gv_imp_recibir_v2348.sql`.
