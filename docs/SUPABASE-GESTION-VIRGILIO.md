@@ -30065,3 +30065,14 @@ LK 0218) que se cargaron al camión el 28/09 08:44 **sin Recepción Remitos**: n
   Probado: misma cliente Solia (deuda Morón) → pedido Quilmes pasa, Morón / Retira / sin dirección retienen.
 - Front: el botón **✕ Anular** dice el pedido (`✕ Anular web LK 1545`); chip de deuda avisa la de otra sucursal.
 - 627 ms marcar_calc / 146 ms fecha con 150 pedidos. `sql/gv_cuarentena_deuda_sucursal_v2304.sql`.
+
+### §3.v2310 — v23.10: no se desprograma (ni se vuelve a Cuarentena) una NP cuya tanda se está pickeando/armando — 2026-09-28
+
+**Luis:** *"si se estaba pickeando por qué fue para cuarentena y salió de programación?" → "que salte mensaje … y que lo bloquee"*.
+Caso: LK 1506 (Multi Bazar, LK 0178/0179) pickeada en E37E el 25/09 salió de la programación el 28/09 09:09 por
+«↩ Volver a Cuarentena» (la deuda era falsa, v23.03). Se restauró a E37E el 29/09 con el sí de Luis
+(backup `zz_backups."GV_Backup_Web1506_20260928"`).
+- `gv_ppp_web_desprogramar` y `gv_ppp_isis_desprogramar`: si la tanda tiene EP/TP/PKC/AP/TAP de legajo real →
+  *"BLOQUEADO … requiere coordinación entre Cobranzas y Virgilio"*. Retira el criterio de la v17.85/v16.03.
+- `gv_ppp_np_desarmar` marca `gv.desarmando` (devuelve el stock y recién ahí desprograma): no se bloquea.
+- Probado en transacción abortada: pickeada bloquea, sin empezar pasa, desarme pasa, ISIS (98480/D47B) bloquea.
