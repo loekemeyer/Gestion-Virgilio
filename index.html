@@ -6221,7 +6221,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.70"></script>
+<script type="module" src="recepcion.js?v=23.71"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -7221,7 +7221,13 @@ function recepcionResetCajas(legajo) {
    (offline / sin sesión) → el caller cae al contador local. */
 async function recepcionCajasServerTotal(legajo) {
   const leg = String(legajo || ""); if (!leg) return null;
-  const desde = getTodayKey() + "T00:00:00-03:00";
+  /* v23.71 (Luis, 28/09): el total es de ESTA sesión de RT, no del día. Con el piso en las 00:00
+     el cierre de una RT vacía decía las cajas de toda la mañana (Jhonny 25/09 09:40: «67» =
+     35 + 32 de recepciones anteriores, con 0 recibidas en esa sesión). Sin RT abierta no hay
+     sesión que medir: null → el llamador usa el contador local, que arranca en 0 al abrir. */
+  let desde = null;
+  try { const _st = getLegajoState(leg); if (_st && _st.toggles && typeof _st.toggles.RT === "string") desde = _st.toggles.RT; } catch (_e) {}
+  if (!desde) return null;
   try {
     const rows = await supaFetchAll(SUPABASE_STOCK_ENDPOINT, "select=delta&tipo=eq.recepcion&order=id.asc&legajo=eq." + encodeURIComponent(leg) + "&ts=gte." + encodeURIComponent(desde));
     let t = 0; for (let i = 0; i < rows.length; i++) t += Number(rows[i].delta) || 0;
@@ -10180,7 +10186,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.70";
+const APP_VERSION = "v23.71";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10933,6 +10939,14 @@ async function send() {
     }
   }
 
+  /* v23.71 (Luis, 28/09): «Empecé Picking» / «Empecé Armado» SIN tanda no se registra. Quedaba
+     como una tarea abierta que ningún TP/TAP cierra (Jhonny 24/09 13:45 y 25/09 16:40) y el
+     cálculo de horas la tomaba como picking en curso. */
+  if ((opcion === "EP" || opcion === "AP") && !texto) {
+    try { alert("Falta elegir la tanda para " + (opcion === "EP" ? "empezar el picking" : "empezar el armado") + "."); } catch (_e) {}
+    return;
+  }
+
   // ID único por reporte: permite dedup en el server (UNIQUE en client_id).
   const nowMs  = Date.now();
   const nowIso = new Date(nowMs).toISOString();
@@ -11162,15 +11176,22 @@ async function send() {
 /* v11.98: cierra el toggle RT automáticamente cuando el operario envía una
    recepción desde el Modo OP (recepcion.js). Mismo patrón que ccSendClose.
    Se llama desde opEnviar() tras el registro exitoso. */
-window.autoCloseRT = function (legajo) {
+window.autoCloseRT = function (legajo, opt) {
   try {
     const leg = String(legajo);
     const st = getLegajoState(leg);
-    if (!st || !st.toggles || !st.toggles.RT) return;   // RT no está abierto
-    const openIso = (typeof st.toggles.RT === "string") ? st.toggles.RT : null;
-    const cajas = recepcionCajasDelDia(leg);
+    const rtAbierto = !!(st && st.toggles && st.toggles.RT);
+    /* v23.71 (Luis, 28/09): una recepción enviada con RT CERRADO (la 2.ª de la mañana, cargada
+       con «Cargar otra» después del cierre automático de la 1.ª) no tenía tramo: sus minutos no
+       sumaban a nadie. Medido 22/09–28/09: 27 cargas de Jhonny fuera de RT. Ahora esa recepción
+       registra su PROPIO tramo RT, desde que empezó esa carga en el Modo OP hasta el envío. */
+    const inicioMs = opt && Number(opt.inicioMs) > 0 ? Number(opt.inicioMs) : 0;
+    if (!rtAbierto && !inicioMs) return;   // sin RT ni inicio medible: no se inventa un tramo
+    const openIso = rtAbierto ? ((typeof st.toggles.RT === "string") ? st.toggles.RT : null)
+                              : new Date(inicioMs).toISOString();
+    const cajas = rtAbierto ? recepcionCajasDelDia(leg) : (Number(opt && opt.cajas) || 0);
     const texto = cajas > 0 ? String(cajas) : "";
-    toggleStartOrEnd(leg, "RT");   // cierra el toggle local
+    if (rtAbierto) toggleStartOrEnd(leg, "RT");   // cierra el toggle local
     const nowMs = Date.now();
     const payload = {
       legajo: leg, opcion: "RT", descripcion: desc.RT || "Recepción Mercadería",
