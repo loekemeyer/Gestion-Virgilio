@@ -34,11 +34,11 @@ function near(a, b, tol, msg) { ok(Math.abs(a - b) <= (tol || 0.5), msg + "  (di
 
 // --- Consolidada CON NTL (el ejemplo del Excel) ---
 var c = N._pedImpNacionalizar(33381.6, 31.53, { modo: "consolidada", valorM3: 110, tn: 10, ntl: true });
-// v23.77 (Luis): derechos 18% (no 35%) y estadística 3% con tope u$s 180. Excel: 22.147,73 con la tasa vieja;
-// ahora 22.147,73 − 6.292,85 (35%→18% de CIF 37.016,81) − 930,50 (estadística 1.110,50 → 180) = 14.924,38.
-near(c.noRecup, 14924.38, 1, "Consolidada+NTL: no recuperable = 14.924,38 (derechos 18%, estadística tope 180)");
-near(c.factor, 14924.38 / 33381.6, 0.001, "Consolidada+NTL: factor = no recup / FOB");
-near(c.landed, 33381.6 + 14924.38, 1, "Consolidada+NTL: puesto en Arg = FOB + no recup");
+// v23.77 (Luis): derechos 18% (no 35%). Excel: 22.147,73 con la tasa vieja; − 6.292,85 (35%→18% de CIF 37.016,81) = 15.854,88.
+// v23.79: FOB 33.381,6 > 10.000 → estadística 3% del CIF SIN tope (1.110,50).
+near(c.noRecup, 15854.88, 1, "Consolidada+NTL: no recuperable = 15.854,88 (derechos 18%, estadística 3% sin tope: FOB > 10.000)");
+near(c.factor, 15854.88 / 33381.6, 0.001, "Consolidada+NTL: factor = no recup / FOB");
+near(c.landed, 33381.6 + 15854.88, 1, "Consolidada+NTL: puesto en Arg = FOB + no recup");
 near(c.ntl, 1669.08, 0.5, "Consolidada: línea NTL = 5% del FOB");
 
 // --- Consolidada SIN NTL: baja exactamente el 5% del FOB ---
@@ -48,8 +48,8 @@ near(c.noRecup - s.noRecup, 1669.08, 0.5, "Sacar NTL baja el no recuperable en 5
 
 // --- Full Container CON NTL (hoja "Carga Full") ---
 var f = N._pedImpNacionalizar(7282, 26, { modo: "full", fleteFull: 2000, ntl: true });
-near(f.noRecup, 6767.83, 1, "Full+NTL: no recuperable ≈ 6.767,83 (Excel 6.867,38 − estadística 279,55 → 180)");
-near(Math.max.apply(null, f.detalle.filter(function (d) { return /Estad/.test(d[0]); }).map(function (d) { return d[1]; })), 180, 0.01, "Estadística topeada en u$s 180");
+near(f.noRecup, 6767.83, 1, "Full+NTL: no recuperable ≈ 6.767,83 (FOB 7.282 → estadística fija 180)");
+near(Math.max.apply(null, f.detalle.filter(function (d) { return /Estad/.test(d[0]); }).map(function (d) { return d[1]; })), 180, 0.01, "FOB 6.001–10.000: estadística fija u$s 180");
 
 // --- Proyección al mínimo de 25k ---
 var pNunca = N._pedImpProy25k(0, 1448, 14478, 25000);
@@ -93,5 +93,11 @@ ok(N._derechosProv("Fujian") === 0.35 && N._derechosProv(" Fujian ") === 0.35, "
   ok(Math.abs(d35[1] / d18[1] - 35 / 18) < 1e-9, m + ": derechos 35% = 35/18 del de 18%");
   ok(b35.noRecup > b18.noRecup, m + ": Fujian sale más caro");
 });
+// v23.79 (Luis): estadística por tramo de FOB — ≤ 6.000: 3%; 6.001–10.000: 180 fijo; > 10.000: 3% sin tope.
+near(N._nacEstad(5000, 5600).v, 168, 0.01, "FOB 5.000: 3% del CIF");
+near(N._nacEstad(6000, 7000).v, 210, 0.01, "FOB 6.000: 3% del CIF, sin tope");
+near(N._nacEstad(6001, 6100).v, 180, 0.01, "FOB 6.001: 180 fijo");
+near(N._nacEstad(10000, 11000).v, 180, 0.01, "FOB 10.000: 180 fijo");
+near(N._nacEstad(10001, 11000).v, 330, 0.01, "FOB 10.001: 3% sin tope");
 if (fail) { console.error("\n" + fail + " chequeo(s) fallaron."); process.exit(1); }
 console.log("\nOK — nacionalización y proyección 25k.");
