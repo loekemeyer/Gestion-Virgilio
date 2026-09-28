@@ -17,9 +17,13 @@ catch (_e) {
   try { ({ chromium } = require("playwright")); }
   catch (_e2) { console.error("Playwright no encontrado."); process.exit(2); }
 }
-const COLS = ["Operario","Picking m³/h","Picking m³/día","Armado m³/h","Armado m³/día",
-  "Total hs día","Hs prod","Picking hs","Armado hs","Carga camión","Hs no prod.",
-  "Recep. merc.","Guard. merc.","Limpieza","Baño","Hs s/reg"];
+// v23.66 — el ORDEN importa: es el de la planilla de Luis (ritmo junto, total x dia
+// junto, las tres de horas del dia seguidas, y carga de camion en No Productivo).
+const COLS = ["Operario","Picking","Armado","Picking","Armado",
+  "Total Hs Día","Hs Prod","Hs No Productivas","Picking","Armado","Carga Camión",
+  "Recp de Merc","Guardado de Merc","Limpieza","Baño","Hs S/Reg"];
+const BANDAS = [["",1],["Ritmo (m³ x Hs)",2],["Total x Día (m³)",2],["",3],
+  ["Tiempo Productivo",2],["Tiempo No Productivo",6]];
 
 (async () => {
   const b = await chromium.launch();
@@ -68,11 +72,16 @@ const COLS = ["Operario","Picking m³/h","Picking m³/día","Armado m³/h","Arma
       out.scrollW = wrap.scrollWidth; out.clientW = wrap.clientWidth;
       out.entra = wrap.scrollWidth <= wrap.clientWidth + 1;
     }
-    out.ths = [...(tabla ? tabla.querySelectorAll("thead th") : [])]
+    const filasEnc = tabla ? tabla.querySelectorAll("thead tr") : [];
+    out.filasEnc = filasEnc.length;
+    const leer = (tr) => [...(tr ? tr.querySelectorAll("th") : [])]
       .map((t) => t.textContent.replace(/\s+/g, " ").trim());
+    out.bandas = [...(filasEnc[0] ? filasEnc[0].querySelectorAll("th") : [])]
+      .map((t) => [t.textContent.replace(/\s+/g, " ").trim(), Number(t.getAttribute("colspan") || 1)]);
+    out.ths = leer(filasEnc[1]);
 
     // formato de CUADRO SINOPTICO: contenido 14, titulos 16, centrado, sin color de relleno
-    const th0 = tabla && tabla.querySelector("thead th:nth-child(2)");
+    const th0 = tabla && tabla.querySelector("thead tr:nth-child(2) th:nth-child(2)");
     const td0 = tabla && tabla.querySelector("tbody tr td:nth-child(2)");
     const cs = (el) => (el ? getComputedStyle(el) : null);
     out.fsTh = th0 ? parseFloat(cs(th0).fontSize) : 0;
@@ -103,11 +112,22 @@ const COLS = ["Operario","Picking m³/h","Picking m³/día","Armado m³/h","Arma
   ok(r.entra === true, "(b) el cuadro entra entero, sin corte horizontal",
      "scrollWidth=" + r.scrollW + " clientWidth=" + r.clientW);
   ok(r.ths.length === 16, "(c) estan las 16 columnas", "son " + r.ths.length);
-  // el <br> del encabezado no aporta espacio al textContent ("Prom.PickingM3 x Hs"),
-  // asi que se compara sin espacios: lo que importa es que la columna este, no como parte.
+  // el <br> del encabezado no aporta espacio al textContent, asi que se compara sin
+  // espacios. Y se compara la SECUENCIA, no el conjunto: "Picking" aparece 3 veces y
+  // lo unico que las distingue es la posicion (o sea, su banda).
   const pelar = (t) => t.replace(/\s+/g, "");
-  const faltan = COLS.filter((c) => !r.ths.some((t) => pelar(t) === pelar(c)));
-  ok(faltan.length === 0, "(c) no se perdio ninguna columna al compactar", faltan.join(" | "));
+  const mal = COLS.map((c, i) => (pelar(r.ths[i] || "") === pelar(c) ? null : (i + 1) + ": " + (r.ths[i] || "(nada)") + " != " + c))
+    .filter(Boolean);
+  ok(mal.length === 0, "(c) las 16 columnas estan en el ORDEN de la planilla", mal.join(" | "));
+  ok(r.filasEnc === 2, "(j) el encabezado tiene DOS filas: bandas + columnas", "son " + r.filasEnc);
+  const bmal = BANDAS.map((b, i) => {
+    const got = r.bandas[i] || ["(nada)", 0];
+    return (pelar(got[0]) === pelar(b[0]) && got[1] === b[1]) ? null
+      : (i + 1) + ": " + got[0] + "/" + got[1] + " != " + b[0] + "/" + b[1];
+  }).filter(Boolean);
+  ok(bmal.length === 0, "(j) las bandas y sus colspan son los de la planilla", bmal.join(" | "));
+  ok(r.bandas.reduce((a, b) => a + b[1], 0) === 16, "(j) las bandas cubren las 16 columnas",
+     String(r.bandas.reduce((a, b) => a + b[1], 0)));
   ok(r.fechaDefault === r.hoyEsperado, "(d) el selector arranca en HOY",
      r.fechaDefault + " vs " + r.hoyEsperado);
   ok(r.hayDesde && r.hayHasta, "(e) estan los campos Desde y Hasta");
@@ -130,5 +150,5 @@ const COLS = ["Operario","Picking m³/h","Picking m³/día","Armado m³/h","Arma
 
   await b.close();
   if (fails.length) { console.error("rv-cuadro-entero: FALLA (" + fails.length + ")"); process.exit(1); }
-  console.log("rv-cuadro-entero: OK (18 chequeos)");
+  console.log("rv-cuadro-entero: OK (20 chequeos)");
 })();

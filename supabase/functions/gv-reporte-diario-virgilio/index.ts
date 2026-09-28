@@ -8,6 +8,7 @@
 // Autenticacion: verify_jwt = true. wa_token de Meta va en el body (server_secrets.REPORTES_WA_TOKEN).
 // El bucket `reportes` es privado -> se firma la URL (createSignedUrl). Ver README.md.
 //   { "solo_pdf": true, "fecha": ".." }  -> arma el PDF, no manda WhatsApp; devuelve pdfUrl + bloques
+//   { "solo_pdf": true, "fecha": "..", "desde_hora": "13:00", "hasta_hora": "16:30" } -> solo ese lapso
 //   { "wa_token": "...", "test": false } -> hoy, a JUAN (cron 18hs)
 //   { "diag": true, "desde": "..", "hasta": ".." } -> auditoria de m3 por tanda
 
@@ -120,7 +121,7 @@ async function paginar(sb: any, tabla: string, cols: string, filtrar?: (q: any) 
 // calculo.js. Sin nombre queda `600` pelado y sale como "Entrevista (s/nombre)" --
 // NO se le atribuye a nadie por cercania de reloj.
 const LEGAJO_ENTREVISTA = "600";
-const SEP_PRUEBA = "\u00b7"; // punto medio: no aparece en un nombre tipeado
+const SEP_PRUEBA = "·"; // punto medio: no aparece en un nombre tipeado
 
 function legajoConPrueba(legajo: string, nombrePrueba: unknown): string {
   if (legajo !== LEGAJO_ENTREVISTA) return legajo;
@@ -417,7 +418,13 @@ type Fila = {
 type Pendientes = { m3pend: number; dias: number; guardCajas: number; guardRatio: number; guardHoras: number } | null;
 
 function aFila(p: any, dias: number, empMap: Map<string, string>, ex: Extra): Fila {
-  const hsProd = p.pickHs + p.armHs + p.ccHs;
+  // v23.66 - Luis, 28/09: "hs no prod deberian ser todas las tareas que no sean hs prod",
+  // con Carga Camion dibujada bajo Tiempo No Productivo. Hasta la v23.65 hsProd sumaba
+  // tambien ccHs, asi que la carga del camion contaba como produccion y el cuadro se
+  // contradecia solo. PRODUCTIVO = lo que mueve m3 y tiene ritmo: Picking y Armado.
+  // Todo lo demas registrado -- carga de camion incluida -- es No Productivo.
+  // El Total Hs Dia NO se mueve: lo unico que cambia es donde se parte.
+  const hsProd = p.pickHs + p.armHs;
   const noProd = Math.max(0, p.totHs - hsProd);
   const g = ex.det.get(p.legajo) || { RT: 0, MG: 0, Limp: 0, PB: 0 };
   return {
@@ -430,22 +437,47 @@ function aFila(p: any, dias: number, empMap: Map<string, string>, ex: Extra): Fi
   };
 }
 
+// ===== v23.66 - el cuadro va con BANDAS, como la planilla de Luis (25/09) =====
+// Dos filas de encabezado: la banda agrupa y la de abajo nombra. Eso deja que las
+// columnas se llamen "Picking" y "Armado" cuatro veces sin ambiguedad -- lo que las
+// distingue es la banda, no un titulo largo repetido en cada una.
+// El ORDEN tambien cambia: el ritmo (m3/h) junto, el total por dia junto, y las tres
+// de horas del dia seguidas. "Hs No Productivas" sube al lado de "Hs Prod", que es
+// contra lo que se lee.
+// ⚠ Carga Camion va bajo "Tiempo No Productivo", y la CUENTA lo acompaña: desde la
+// v23.66 hsProd = Picking + Armado, sin ccHs (ver aFila). Las dos mitades tienen que
+// moverse juntas o el cuadro se contradice: hasta la v23.65 la banda decia no
+// productivo y la suma lo contaba como productivo.
+const BANDAS: { h: string[]; n: number }[] = [
+  { h: [], n: 1 },                            // Operario
+  { h: ["Ritmo", "(M3 x Hs)"], n: 2 },
+  { h: ["Total x Dia"], n: 2 },
+  { h: [], n: 3 },                            // Total Hs Dia / Hs Prod / Hs No Productivas
+  { h: ["Tiempo", "Productivo"], n: 2 },
+  { h: ["Tiempo No Productivo"], n: 6 },
+];
+
 const COLS: { h: string[]; w: number; get: (f: Fila) => string; left?: boolean; name?: boolean }[] = [
-  { h: ["Operario"], w: 42, get: (f) => f.nombre, left: true, name: true },
-  { h: ["Prom.", "Picking", "M3 x Hs"], w: 16, get: (f) => celda(f.pkH) },
-  { h: ["Prom.", "Picking", "M3 x Dia"], w: 16, get: (f) => celda(f.pkD) },
-  { h: ["Prom.", "Arm", "M3 x Hs"], w: 16, get: (f) => celda(f.arH) },
-  { h: ["Prom.", "Arm", "M3 x Dia"], w: 16, get: (f) => celda(f.arD) },
+  { h: ["Operario"], w: 40, get: (f) => f.nombre, left: true, name: true },
+  // Ritmo (M3 x Hs)
+  { h: ["Picking"], w: 16, get: (f) => celda(f.pkH) },
+  { h: ["Armado"], w: 16, get: (f) => celda(f.arH) },
+  // Total x Dia
+  { h: ["Picking"], w: 16, get: (f) => celda(f.pkD) },
+  { h: ["Armado"], w: 16, get: (f) => celda(f.arD) },
+  // sin banda
   { h: ["Total", "Hs Dia"], w: 15, get: (f) => celdaHs(f.totDia) },
   { h: ["Hs", "Prod"], w: 14, get: (f) => celdaHs(f.hsProd) },
+  { h: ["Hs No", "Productivas"], w: 20, get: (f) => celdaHs(f.noProd) },
+  // Tiempo Productivo
   { h: ["Picking"], w: 14, get: (f) => celdaHs(f.pick) },
   { h: ["Armado"], w: 14, get: (f) => celdaHs(f.arm) },
-  { h: ["Carga de", "Camion"], w: 16, get: (f) => celdaHs(f.cc) },
-  { h: ["Hs No", "Productivas"], w: 18, get: (f) => celdaHs(f.noProd) },
+  // Tiempo No Productivo
+  { h: ["Carga", "Camion"], w: 16, get: (f) => celdaHs(f.cc) },
   { h: ["Recp de", "Merc"], w: 15, get: (f) => celdaHs(f.rt) },
-  { h: ["Guardado", "de Merc"], w: 16, get: (f) => celdaHs(f.mg) },
-  { h: ["Limpieza"], w: 14, get: (f) => celdaHs(f.limp) },
-  { h: ["Baño"], w: 12, get: (f) => celdaHs(f.pb) },
+  { h: ["Guardado", "de Merc"], w: 17, get: (f) => celdaHs(f.mg) },
+  { h: ["Limpieza"], w: 15, get: (f) => celdaHs(f.limp) },
+  { h: ["Ba\u00f1o"], w: 12, get: (f) => celdaHs(f.pb) },
   { h: ["Hs", "S/Reg"], w: 16, get: (f) => celdaHs(f.sinReg) },
 ];
 
@@ -453,10 +485,28 @@ type Bloque = { subtitulo: string; filas: Fila[] };
 
 function construirPdf(titulo: string, bloques: Bloque[], pend: Pendientes) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const mL = 12, top = 15, hF = 7, hEnc = 13;
-  const totW = COLS.reduce((a, c) => a + c.w, 0);
-  const x0 = [mL]; COLS.forEach((c) => x0.push(x0[x0.length - 1] + c.w));
-  const mid = (i: number) => (x0[i] + x0[i + 1]) / 2;
+  // v23.71 - cada banda es una ISLA, como la planilla: un hueco entre bloques y borde
+  // grueso alrededor de cada uno (banda + encabezado + datos). El margen se centra solo.
+  const GAP = 3, top = 15, hF = 7, hEnc = 13, hBanda = 9;
+  const totW = COLS.reduce((a, c) => a + c.w, 0) + GAP * (BANDAS.length - 1);
+  const mL = (297 - totW) / 2;
+  const x0: number[] = [];
+  const islas: { a: number; b: number; h: string[] }[] = [];
+  {
+    let x = mL, ci = 0;
+    BANDAS.forEach((bn, k) => {
+      if (k > 0) x += GAP;
+      const a = ci;
+      for (let j = 0; j < bn.n; j++, ci++) { x0[ci] = x; x += COLS[ci].w; }
+      islas.push({ a, b: ci - 1, h: bn.h });
+    });
+  }
+  const xR = (i: number) => x0[i] + COLS[i].w;
+  const mid = (i: number) => (x0[i] + xR(i)) / 2;
+  const lineas = (ls: string[], xa: number, xb: number, yt: number, h: number) => {
+    const s = yt + (h - ls.length * 3.6) / 2 + 3.2;
+    ls.forEach((ln, k) => doc.text(ln, (xa + xb) / 2, s + k * 3.6, { align: "center" }));
+  };
   const CC = (t: string, xa: number, xb: number, yt: number, h: number) =>
     doc.text(String(t), (xa + xb) / 2, yt + h / 2, { align: "center", baseline: "middle" } as any);
 
@@ -478,14 +528,24 @@ function construirPdf(titulo: string, bloques: Bloque[], pend: Pendientes) {
       doc.setFont("helvetica", "bold"); doc.setFontSize(14);
       doc.text(b.subtitulo, mL, y + 4); y += 6;
     }
-    doc.setFontSize(9); doc.setFont("helvetica", "bold");
-    COLS.forEach((c, i) => {
-      const startY = y + (hEnc - c.h.length * 3.6) / 2 + 3.2;
-      c.h.forEach((ln, k) => doc.text(ln, mid(i), startY + k * 3.6, { align: "center" }));
+    // v23.66 - fila de BANDAS arriba del encabezado. v23.71 - la isla sin titulo de banda
+    // (Operario, y las tres de horas del dia) lleva el encabezado en las dos filas, como la
+    // celda combinada de la planilla.
+    const yB = y, yH = y + hBanda, yD = yH + hEnc;
+    doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.setLineWidth(0.15);
+    islas.forEach((g) => {
+      const xa = x0[g.a], xb = xR(g.b);
+      if (g.h.length) {
+        lineas(g.h, xa, xb, yB, hBanda);
+        doc.line(xa, yH, xb, yH);
+        for (let i = g.a; i <= g.b; i++) lineas(COLS[i].h, x0[i], xR(i), yH, hEnc);
+        for (let i = g.a + 1; i <= g.b; i++) doc.line(x0[i], yH, x0[i], yD);
+      } else {
+        for (let i = g.a; i <= g.b; i++) lineas(COLS[i].h, x0[i], xR(i), yB, hBanda + hEnc);
+        for (let i = g.a + 1; i <= g.b; i++) doc.line(x0[i], yB, x0[i], yD);
+      }
     });
-    doc.setLineWidth(0.7); doc.rect(mL, y, totW, hEnc);
-    doc.setLineWidth(0.15); for (let i = 1; i < COLS.length; i++) doc.line(x0[i], y, x0[i], y + hEnc);
-    y += hEnc;
+    y = yD;
     const yC = y;
     doc.setFont("helvetica", "normal"); doc.setFontSize(14);
     b.filas.forEach((f) => {
@@ -497,10 +557,15 @@ function construirPdf(titulo: string, bloques: Bloque[], pend: Pendientes) {
       });
       y += hF;
     });
-    doc.setLineWidth(0.15);
-    for (let i = 1; i < b.filas.length; i++) doc.line(mL, yC + i * hF, mL + totW, yC + i * hF);
-    for (let i = 1; i < COLS.length; i++) doc.line(x0[i], yC, x0[i], y);
-    doc.setLineWidth(0.7); doc.rect(mL, yC, totW, y - yC);
+    islas.forEach((g) => {
+      const xa = x0[g.a], xb = xR(g.b);
+      doc.setLineWidth(0.15);
+      for (let r = 1; r < b.filas.length; r++) doc.line(xa, yC + r * hF, xb, yC + r * hF);
+      for (let i = g.a + 1; i <= g.b; i++) doc.line(x0[i], yC, x0[i], y);
+      doc.setLineWidth(0.7);
+      doc.line(xa, yC, xb, yC);               // grueso entre encabezado y datos
+      doc.rect(xa, yB, xb - xa, y - yB);      // borde grueso de la isla entera
+    });
   });
 
   if (pend) {
@@ -662,6 +727,7 @@ Deno.serve(async (req: Request) => {
         ventana: ventana ? ventana.etiqueta : null,
         pdf_bytes: bytes.length, pdf_base64: btoa(bin),
         columnas: COLS.map((c) => ({ h: c.h, left: !!c.left, key: c.h.join(" ") })),
+        bandas: BANDAS.map((b) => ({ h: b.h, n: b.n })),
         bloques: bloques.map((b) => ({
           subtitulo: b.subtitulo || "(unico)",
           filas: b.filas.map((f) => ({
@@ -676,7 +742,14 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const numeros = esTest ? DESTINATARIOS_TEST : DESTINATARIOS_PROD;
+    // v23.66 - destinatarios explicitos para una prueba puntual. Sin esto, mandar el
+    // reporte a un numero que no sea el de Juan o el de pruebas obligaba a tocar la
+    // constante y redeployar. Se usan SOLO si vienen en el body; el cron no los manda,
+    // asi que el envio diario sigue yendo a donde siempre.
+    const destPedidos = Array.isArray(body?.destinatarios)
+      ? body.destinatarios.map((n: any) => String(n).replace(/\D/g, "")).filter(Boolean)
+      : [];
+    const numeros = destPedidos.length ? destPedidos : (esTest ? DESTINATARIOS_TEST : DESTINATARIOS_PROD);
     const waToken = Deno.env.get("WA_TOKEN") || String(body?.wa_token || "");
     if (!waToken) {
       return responder({ error: "falta el token de Meta (body.wa_token o secret WA_TOKEN)", pdfUrl }, 500);
@@ -716,7 +789,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return responder({
-      test: esTest, fecha, hora: horaAR(), plantilla: WA_TEMPLATE,
+      test: esTest, fecha, hora: horaAR(), plantilla: WA_TEMPLATE, destinatarios: numeros,
       operarios: totalFilas, eventos: produccion.length,
       enviados: resultados.filter((x) => x.ok).length, total: numeros.length,
       pdfUrl, pendientes: pend, resultados,
