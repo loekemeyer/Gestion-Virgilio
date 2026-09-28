@@ -13,7 +13,8 @@ revoke insert, update, delete, truncate on zz_backups."GV_Backup_cobranzas_excep
 
 -- 1) carga: CUIT resuelto por la última factura de LK del código. Sin CUIT no se carga (4268 La Luguenze).
 --    '30/60' (18 clientes de "Fabrica P") entra como 60 hasta que Thomas defina qué significa.
---    288 Torres y Liva NO se toca: la base dice 30 (25/09) y la planilla 60 → lo define Thomas.
+--    288 Torres y Liva: Thomas (28/09, «la tabla es lo que vale») → pasó de 30 a 60 con un update sobre id 3.
+-- APLICADO el 28/09 con el sí de Thomas: 173 insert + 1 update · 174 coronitas · agente recalculado (51 s).
 with src(cod, nombre, plazo) as (values
   -- ⚠ la lista (175 clientes · código LK · nombre · días) NO va al repo (es público): sale de la planilla
   -- "Clientes con 25 superados los 14 dias.xlsx" de Thomas, columna E. Pegar acá las filas ('cod','nombre','días').
