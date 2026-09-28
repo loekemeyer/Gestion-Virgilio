@@ -49,7 +49,7 @@ ok(/if \(dayKey === isoToDayKey\(Date\.now\(\)\)\)/.test(IDX), "lo abierto se su
 
 // 6) v23.68 — el admin abre directo en la vista TV, y la cuenta de racks inferida está en el monitor grande
 ok(/setMonitorTab\(window\.__tvKioskMode \? "monitor" : "tv"\)/.test(IDX), "el monitor del admin tiene que abrir en la Vista TV");
-ok(/RK_TOPE = 60 \* 60 \* 1000/.test(IDX) && /tipo=eq\.baja_racks/.test(IDX), "falta el trabajo en racks inferido en fetchMonitorDayStats (≡ rk_ag)");
+ok(/entradaMs = tsOfHourOnDay/.test(IDX) && /tipo=eq\.baja_racks/.test(IDX), "falta el trabajo en racks inferido (sin tope) en fetchMonitorDayStats (≡ rk_ag)");
 
 // 3) pestaña Vista TV
 ok(/setMonitorTab\('tv'\)/.test(IDX) && /monitor\/tv\.html\?key=tv/.test(IDX), "falta la pestaña 📺 Vista TV");

@@ -5669,3 +5669,15 @@ de LK viejas del 14/09, ninguna con NP programada). `sql/gv_ppp_web_base_podar_v
 - **v23.69**: el **FJ CIERRA la tarea abierta** (cuenta hasta el FJ; antes la borraba) y sin FJ no pasa del fin de jornada
   (vista `abierta.fin` ≡ admin `fin`). La TV: fuentes más grandes, Tandas a todo el alto, Operarios + «En este momento» en
   el medio (≤ 4 operarios a la vez). `sql/gv_monitor_horas_cierre_dia_v2369.sql`.
+
+## ⚠ REGLA (Luis, 2026-09-28, v23.70): MONITOR — Ritmo y Horas, todo en H:MM, sin tope de tramo
+
+- **La tabla de operarios (TV y 📺 Vista TV) se divide en RITMO y HORAS.** Ritmo = **m³/h picking** y **m³/h armado**
+  (decimal: m³ de las tandas cerradas hoy con TP/TAP ÷ `hs_pick` / `hs_arm`). Horas = **Prod** (incluye el movimiento/racks),
+  **No prod** y **Total** (jornada). **Toda hora va en H:MM**, todo índice en decimal. El «h/tanda» se sacó: la tanda es volátil.
+- **Trabajo en racks inferido SIN TOPE**: el tramo va desde la actividad anterior (o la entrada) hasta la bajada/ingreso.
+  `sql/gv_monitor_horas_sintope_v2370.sql`; el admin (`fetchMonitorDayStats`) replica lo mismo (`tests/mon-vs-vista.cjs`).
+- **Los celulares se actualizan solos**: `sw.js` recarga una vez las ventanas abiertas al activar (`forzado-v2370`) y
+  `checkForUpdate` recarga sola la app si hay versión nueva y el operario no tocó nada hace un rato (`_gvAppInactiva`).
+  No hace falta pedirle al operario que actualice.
+- En el iframe de 📺 Vista TV se ve el cursor (`html.embebido`); en la TV de pared sigue oculto.

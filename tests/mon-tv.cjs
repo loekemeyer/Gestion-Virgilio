@@ -256,7 +256,7 @@ function responder(url) {
   ok(!/E31A/.test(r.tandas), "E31A está terminada: va a 'a facturar', no a la tabla");
   ok(/spin/.test(r.tandas), "la tanda en curso no muestra el reloj girando");
   ok(/>JF</.test(r.tandas), "no salen las iniciales del operario que la empezó (legajo 8 → JF)");
-  ok(/1h3\d/.test(r.tandas), "no sale hace cuánto está abierto el picking (~1h30)");
+  ok(/1:3\d/.test(r.tandas), "no sale hace cuánto está abierto el picking (~1:30, formato H:MM v23.70)");
 
   // 4) facturada + despachada = fuera del tablero
   ok(!/E33A/.test(r.tandas + r.fc), "E33A está facturada Y despachada: no tiene que aparecer en ningún lado");
@@ -345,15 +345,17 @@ function responder(url) {
   // ── v21.17 · tabla de horas por operario
   ok(/Farias J\./.test(r.ops), "la tabla de operarios no muestra el nombre corto");
   ok(/Ortiz F\./.test(r.ops), "falta un operario de la tabla de horas");
-  ok(/h\/tanda/.test(r.ops) && /No<br>prod/.test(r.ops), "faltan las columnas de horas pedidas (v23.69: h\/tanda pick\/arm, Prod, Mov, No prod)");
-  ok(/0,8/.test(r.ops), "no muestra el promedio de horas por tanda pickeada");
-  ok(/6,9/.test(r.ops) && /11,6/.test(r.ops),
-     "la fila de Total no suma bien (prod 4,5+2,4=6,9 · total 6,2+5,4=11,6): " + r.ops.replace(/<[^>]*>/g, " "));
-  /* El % va sobre el tiempo MEDIDO (prod + mov + no prod), no sobre la jornada:
-     CR y RR quedan abiertos mientras el operario hace otra cosa, así que los
-     baldes pueden sumar más que el total de horas del día. */
-  ok(/63% productivas/.test(r.opsTit),
-     "el título no dice el % de horas productivas (6,9 de 6,9+2,9+1,1 = 63%): " + r.opsTit);
+  /* v23.70 (Luis): Ritmo = m³/h picking y armado (decimal) · Horas = Prod (incluye
+     mov) · No prod · Total, todo en H:MM. */
+  ok(/m³\/h<br>picking/.test(r.ops) && /m³\/h<br>armado/.test(r.ops) && /No prod/.test(r.ops),
+     "faltan las columnas Ritmo (m³/h picking/armado) y Horas (Prod, No prod, Total)");
+  ok(/Ritmo/.test(r.ops) && /Horas/.test(r.ops), "falta el encabezado agrupado Ritmo / Horas");
+  ok(!/\d,\d h/.test(r.ops), "las horas tienen que ir en H:MM, no en decimal");
+  ok(/9:48/.test(r.ops) && /11:36/.test(r.ops),
+     "la fila de Total no suma bien (prod 5:18+4:30=9:48 · total 6:12+5:24=11:36): " + r.ops.replace(/<[^>]*>/g, " "));
+  /* El % va sobre el tiempo MEDIDO (prod + no prod), no sobre la jornada. */
+  ok(/90% productivas/.test(r.opsTit),
+     "el título no dice el % de horas productivas (9:48 de 9:48+1:06 = 90%): " + r.opsTit);
   ok(/en vivo/.test(r.estado), "el estado no quedó 'en vivo': " + r.estado);
 
   // sin scroll: la TV no tiene cómo moverse

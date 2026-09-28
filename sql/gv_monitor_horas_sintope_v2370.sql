@@ -1,0 +1,20 @@
+-- v23.70 (Luis, 28/09: "sin tope de tramo") — gv_monitor_horas_operario_dia
+-- APLICADO en la base (parche sobre pg_get_functiondef, marcador 'v23.70-sintope').
+-- Cambio: rk_seg.ini ya no se topa a 60 min. El tramo inferido de racks va desde la
+-- actividad anterior del operario (evento o bajada previa); sin ninguna, desde su entrada.
+-- Huella (GV_Huella_Objeto) re-congelada y centinela rk_ag actualizado. perdidas=0, huellas=0.
+--
+-- CTE vigente:
+--   rk_seg as (
+--     select p.legajo, p.t as fin,
+--            coalesce((select max(z.ts) from (
+--                        select b.ts_cliente as ts from base b where b.legajo = p.legajo and b.ts_cliente < p.t
+--                        union all
+--                        select q.t from rk_pts q where q.legajo = p.legajo and q.t < p.t) z),
+--                     least(p.t, (p_dia + coalesce((select e.h_ent from emp e where e.legajo = p.legajo), time '08:00'))
+--                                  at time zone 'America/Argentina/Buenos_Aires')) as ini
+--       from rk_pts p
+--   ),
+--
+-- Rollback: volver a sql/gv_monitor_horas_cierre_dia_v2369.sql (con el tope de 60 min)
+-- y re-congelar la huella con el md5_actual de gv_huellas_cambiadas.

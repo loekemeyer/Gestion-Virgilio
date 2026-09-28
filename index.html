@@ -6221,7 +6221,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.69"></script>
+<script type="module" src="recepcion.js?v=23.70"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10180,7 +10180,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.69";
+const APP_VERSION = "v23.70";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11472,8 +11472,29 @@ async function checkForUpdate() {
        "!==" a secas, un version.json que quedó atrás del APP_VERSION (pasó en
        v12.04 y de nuevo en v12.15) le clavaba el banner fijo a TODOS los que ya
        tenían la última versión, y recargar no lo sacaba. */
-    if (j && j.version && _verNum(j.version) > _verNum(APP_VERSION)) showUpdateBanner(j.version);
+    if (j && j.version && _verNum(j.version) > _verNum(APP_VERSION)) {
+      /* v23.70 (Luis: *"lo hacés vos"*) — si la app está INACTIVA (3 min sin tocar y sin ningún
+         módulo abierto) se actualiza sola; si alguien la está usando, queda el botón de siempre.
+         La cola y los borradores sobreviven a la recarga. */
+      if (_gvAppInactiva()) { location.replace(location.pathname + "?_=" + Date.now()); return; }
+      showUpdateBanner(j.version);
+    }
   } catch (_e) {}
+}
+var _gvUltimoToque = Date.now();
+["pointerdown", "keydown", "touchstart", "input"].forEach(function (ev) {
+  try { window.addEventListener(ev, function () { _gvUltimoToque = Date.now(); }, { passive: true, capture: true }); } catch (_e) {}
+});
+function _gvAppInactiva() {
+  try {
+    if (Date.now() - _gvUltimoToque < 3 * 60 * 1000) return false;
+    const ae = document.activeElement;
+    if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return false;
+    // un modal abierto = algo en curso: no se toca
+    const abiertos = document.querySelectorAll('[id$="Modal"].show, [id$="Overlay"].show, .modal.show, [id$="Modal"][style*="display: block"], [id$="Modal"][style*="display: flex"]');
+    for (let i = 0; i < abiertos.length; i++) { if (abiertos[i].offsetParent !== null || abiertos[i].getClientRects().length) return false; }
+    return true;
+  } catch (_e) { return false; }
 }
 /* "v12.15" → 12015 (major*1000 + minor). Formato desconocido → -1 (no banner). */
 function _verNum(v) {
@@ -34097,11 +34118,10 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   }
   /* v23.68 (Luis, 28/09: *"no podés recuperar el dato?"*) — TRABAJO EN RACKS SIN TRAMO REGISTRADO.
      Las bajadas (Movimientos_Stock baja_racks) y los ingresos (IR) anteriores a la v23.66 no tienen
-     inicio: se INFIERE desde la actividad anterior del legajo hasta el movimiento, con tope de 60 min
-     por tramo, menos el tiempo muerto adentro. Un movimiento que cae adentro de otra tarea cerrada
+     inicio: se INFIERE desde la actividad anterior del legajo (o la entrada) hasta el movimiento, SIN tope
+     (v23.70), menos el tiempo muerto adentro. Un movimiento que cae adentro de otra tarea cerrada
      no suma (ya está contado). Es una ESTIMACIÓN. ≡ rk_pts / rk_seg / rk_ag de gv_monitor_horas_operario_dia. */
   {
-    const RK_TOPE = 60 * 60 * 1000;
     const evDia = new Map();
     for (const ev of events) {
       const leg = String(ev.legajo || "").trim();
@@ -34128,10 +34148,14 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
         });
       });
       let tot = 0;
+      // v23.70 (Luis: "sin tope de tramo"): desde la actividad anterior; sin ninguna, desde la entrada (≡ rk_seg)
+      const _he = parseHHMMtoHours((horariosMap.get(String(leg)) || {}).entrada);
+      const entradaMs = tsOfHourOnDay(dayKey, _he == null ? 8 : _he);
       for (const t of libres) {
-        let prev = t - RK_TOPE;
-        for (const c of evs) { const x = new Date(c.ts_cliente).getTime(); if (x < t && x > prev) prev = x; }
-        for (const q of libres) if (q < t && q > prev) prev = q;
+        let prev = null;
+        for (const c of evs) { const x = new Date(c.ts_cliente).getTime(); if (x < t && (prev == null || x > prev)) prev = x; }
+        for (const q of libres) if (q < t && (prev == null || q > prev)) prev = q;
+        if (prev == null) prev = Math.min(t, entradaMs);
         const bruto = t - prev;
         tot += Math.max(0, bruto - Math.min(bruto, deadOverlapMs(leg, prev, t)));
       }
