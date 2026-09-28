@@ -6221,7 +6221,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.66"></script>
+<script type="module" src="recepcion.js?v=23.67"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10180,7 +10180,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.66";
+const APP_VERSION = "v23.67";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34013,13 +34013,78 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   }
 
   const isToday = isTodayKey(dayKey);
+  /* v23.67 (Luis, 28/09: *"que cuente tarea abierta"*) — HOY, la tarea ABIERTA suma hasta ahora,
+     igual que `gv_monitor_horas_operario_dia` (v23.66, CTE `abierta`): la más reciente sin su
+     cierre (EP sin TP, AP sin TAP, toggle abierto, MGI, RKI, IRI), sin FJ posterior y de < 12 h,
+     MENOS el tiempo muerto que cae adentro (el baño abierto también). Va a su balde: EP/AP a la
+     fila «En curso», CC/CR/RR a CC+CR+RR, movimiento a Movim., baño/comida/permiso a No prod.
+     ⚠ NO entra al m³/h: una tanda sin cerrar no tiene m³ todavía. Días pasados: sin cambios. */
+  if (dayKey === isoToDayKey(Date.now())) {
+    const nowMs = Date.now();
+    const MUERTO = new Set(DEAD_TIME_CODES), NOPROD_AB = new Set(["AT","PB","Limp","PC","CT","Perm"]);
+    const ABRE = { EP: "EP", AP: "AP", MGI: "MG", RKI: "RKB", IRI: "IRT" };
+    const TOG = new Set(["CR","RR","CC","RT","MG","RI","EI","AT","PB","Limp","PC","Perm","CT"]);
+    const porLeg = new Map();
+    for (const ev of events) {
+      const leg = String(ev.legajo || "").trim();
+      if (!leg || leg === "0" || leg === "1" || ev.opcion === "LT") continue;
+      if (isoToDayKey(ev.ts_cliente) !== dayKey) continue;
+      if (!porLeg.has(leg)) porLeg.set(leg, []);
+      porLeg.get(leg).push(ev);
+    }
+    for (const [leg, evs] of porLeg) {
+      evs.sort((a, b) => new Date(a.ts_cliente) - new Date(b.ts_cliente));
+      const abiertas = [];
+      for (let i = 0; i < evs.length; i++) {
+        const a = evs[i];
+        if (a.ts_inicio) continue;
+        const k = ABRE[a.opcion] || (TOG.has(a.opcion) ? a.opcion : null);
+        if (!k) continue;
+        const ini = new Date(a.ts_cliente).getTime(), tx = String(a.texto || "").trim().toUpperCase();
+        if (!(nowMs - ini < 12 * 3600 * 1000)) continue;
+        let cerrada = false;
+        for (let j = i + 1; j < evs.length && !cerrada; j++) {
+          const c = evs[j], ct = String(c.texto || "").trim().toUpperCase();
+          if (c.opcion === "FJ") cerrada = true;
+          else if (k === "EP") cerrada = c.opcion === "TP" && (!ct || ct === tx);
+          else if (k === "AP") cerrada = c.opcion === "TAP" && (!ct || ct === tx);
+          else if (k === "MG") cerrada = c.opcion === "MG" || c.opcion === "MGC";
+          else cerrada = c.opcion === k && !!c.ts_inicio;
+        }
+        if (!cerrada) abiertas.push({ k: k, ini: ini });
+      }
+      if (!abiertas.length) continue;
+      const deadAb = abiertas.filter(x => MUERTO.has(x.k)).map(x => ({ s: x.ini, e: nowMs }));
+      const trab = abiertas.filter(x => !NOPROD_AB.has(x.k)).sort((a, b) => b.ini - a.ini)[0];
+      const noab = abiertas.filter(x => NOPROD_AB.has(x.k)).sort((a, b) => b.ini - a.ini)[0];
+      if (!perLegajo.has(leg)) perLegajo.set(leg, { firstTs: evs[0].ts_cliente, lastTs: evs[evs.length - 1].ts_cliente,
+        pickedTandas: new Set(), pickedDetail: [], pickMs: 0, armedTandas: new Set(), armedDetail: [], armMs: 0,
+        ccTandas: new Set(), ccDetail: [], ccMs: 0, comidaMs: 0, movMs: 0, movDetail: [], noprodMs: 0, noprodDetail: [],
+        otrosProdMs: 0, otrosProdDetail: [], fjTs: null });
+      const p = perLegajo.get(leg);
+      if (trab) {
+        let muerto = deadOverlapMs(leg, trab.ini, nowMs);
+        for (const d of deadAb) { const ov = Math.min(nowMs, d.e) - Math.max(trab.ini, d.s); if (ov > 0) muerto += ov; }
+        const dur = Math.max(0, nowMs - trab.ini - muerto);
+        const det = { opcion: trab.k, texto: "(en curso)", ts_inicio: new Date(trab.ini).toISOString(), ts_cliente: new Date(nowMs).toISOString(), durMs: dur, brutoMs: nowMs - trab.ini, muertoMs: muerto, abierta: true };
+        if (trab.k === "EP" || trab.k === "AP") p.abiertoProdMs = (p.abiertoProdMs || 0) + dur;
+        else if (PROD_OTROS_CODES.has(trab.k)) { p.otrosProdMs += dur; p.otrosProdDetail.push(det); }
+        else { p.movMs += dur; p.movDetail.push(det); }
+      }
+      if (noab) {
+        const dur = Math.max(0, nowMs - noab.ini);
+        p.noprodMs += dur;
+        p.noprodDetail.push({ opcion: noab.k, texto: "(en curso)", ts_inicio: new Date(noab.ini).toISOString(), ts_cliente: new Date(nowMs).toISOString(), durMs: dur, abierta: true });
+      }
+    }
+  }
   const perOperario = [];
   for (const [leg, p] of perLegajo) {
     // Filtramos a los que NO tocaron nada del trabajo medible (picking, pedido,
     // CC con tanda, ni movimientos). Si tocaron pero no tenemos m³ cargado en
     // el sheet (típico en tandas C-prefix nuevas), igual aparecen.
     if (p.pickedTandas.size === 0 && p.armedTandas.size === 0
-        && p.ccTandas.size === 0 && p.movMs === 0 && p.otrosProdMs === 0) continue;
+        && p.ccTandas.size === 0 && p.movMs === 0 && p.otrosProdMs === 0 && !p.abiertoProdMs) continue;
     const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t), 0);
     const m3Arm  = [...p.armedTandas ].reduce((s, t) => s + tandaM3(t), 0);
     const m3CC   = [...p.ccTandas    ].reduce((s, t) => s + tandaM3(t), 0);
@@ -34038,13 +34103,14 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const otrosProdH = p.otrosProdMs / 3600000;
     /* ≡ `hs_prod` de `gv_monitor_horas_operario_dia`: picking + armado + CC/CR/RR.
        Lo compara `tests/mon-vs-vista.cjs`. */
-    const prodH = pickH + armH + otrosProdH;
+    const abiertoH = (p.abiertoProdMs || 0) / 3600000;   // v23.67: picking/armado en curso (hoy)
+    const prodH = pickH + armH + otrosProdH + abiertoH;
     perOperario.push({
       legajo: leg,
       nombre: nombres.get(leg) || ("Leg " + leg),
       m3Pick, m3Arm, m3CC,
       pickH, armH, ccH,
-      m3hPick, m3hArm, m3hCC, movMin, noprodMin, otrosProdH, prodH,
+      m3hPick, m3hArm, m3hCC, movMin, noprodMin, otrosProdH, prodH, abiertoH,
       pickedDetail: p.pickedDetail,
       armedDetail:  p.armedDetail,
       ccDetail:     p.ccDetail,
@@ -54522,6 +54588,10 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
           <tr>
             <th class="row-label" title="Carga Camión, Control Remitos y Recepción Remitos: trabajo productivo que no tiene m³. Hasta la v21.46 no se medía ninguno de los tres.">CC+CR+RR<br><span class="row-unit">(h)</span></th>
             ${operariosHoy.map(o => cellMin((o.otrosProdH || 0) * 60, o.didOtrosProd, o.legajo, "prodotros")).join("")}
+          </tr>
+          <tr>
+            <th class="row-label" title="Picking o armado ABIERTO ahora: suma hasta este momento, menos baño/comida adentro. No entra al m³/h (la tanda todavía no cerró).">En curso<br><span class="row-unit">(h)</span></th>
+            ${operariosHoy.map(o => (o.abiertoH > 0 ? `<td class="num">${fmt1(o.abiertoH)}</td>` : `<td class="num">—</td>`)).join("")}
           </tr>
           <tr>
             <th class="row-label">Movim.<br><span class="row-unit">(h)</span></th>

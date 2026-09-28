@@ -42,6 +42,11 @@ ok(/function closeRkb\(\) \{[\s\S]{0,300}gvRacksTramo\("RKB"/.test(IDX), "cerrar
 ok(/MOV_TOGGLE_CODES\s*= new Set\(\["MG", "RI", "EI", "RT", "RKB", "IRT"\]\)/.test(IDX), "Hs MOV del monitor grande tiene que sumar RKB e IRT (≡ la vista)");
 ok(/e\.op === "RKI"/.test(IDX) && /e\.op === "RKI"/.test(TV), "los dos monitores tienen que ver el tramo de racks EN CURSO");
 
+// 5) v23.67 — la tabla Mts3 x Hora del admin también cuenta la tarea ABIERTA (≡ la vista)
+ok(/abiertoProdMs/.test(IDX) && /const prodH = pickH \+ armH \+ otrosProdH \+ abiertoH;/.test(IDX), "prodH del admin tiene que sumar lo abierto");
+ok(/En curso<br>/.test(IDX), "falta la fila «En curso» en Mts3 x Hora");
+ok(/if \(dayKey === isoToDayKey\(Date\.now\(\)\)\)/.test(IDX), "lo abierto se suma SÓLO hoy");
+
 // 3) pestaña Vista TV
 ok(/setMonitorTab\('tv'\)/.test(IDX) && /monitor\/tv\.html\?key=tv/.test(IDX), "falta la pestaña 📺 Vista TV");
 

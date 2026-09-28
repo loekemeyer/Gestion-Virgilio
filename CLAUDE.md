@@ -5655,5 +5655,5 @@ de LK viejas del 14/09, ninguna con NP programada). `sql/gv_ppp_web_base_podar_v
   productivas. Días pasados: sin cambios (el 15/09 del test da idéntico).
 - **Trabajo en racks = Hs MOV**: Bajar de racks (RKI al abrir → RKB con `ts_inicio` al confirmar o cerrar) e Ingreso a
   racks (IRI → IRT al cerrar). El tiempo en el módulo cuenta aunque no se registren cajas. `gvRacksTramo` en index.html.
-- ⚠ **Lo abierto sólo lo suma la vista (TV / 📺 Vista TV)**; la tabla Mts3 x Hora del admin sigue con lo cerrado (es m³/h).
+- **Lo abierto lo suman la vista (TV) y la tabla Mts3 x Hora del admin (v23.67)**: fila «En curso (h)» para picking/armado abierto; lo demás a su fila. **No entra al m³/h** (la tanda no cerró).
 - Huella re-congelada (md5 `fcab722b…`), centinela 96 actualizado y fila nueva `ab_ag`. `sql/gv_monitor_horas_abiertas_v2366.sql`.
