@@ -3492,12 +3492,12 @@ o «ponerlo igual» (`resolucion='forzar'`, queda en el historial).
 | `GV_Imp_Recepcion` + `_Destino` | historial → solapa **📜 Historial recepción** (`gv_imp_recepcion_historial`) |
 
 ⚠ `recepcion_imp` y no `recepcion`: ésta dispara el Telegram de «recepción rara» (mediana de talleristas).
-⚠⚠ **Al recibir, el pedido deja de estar en viaje** (Luis, v23.48): `p_cerrar` default true → bache `llegado`
+⚠⚠ **Al recibir, el pedido deja de estar en viaje** (Luis, v23.49): `p_cerrar` default true → bache `llegado`
 aunque llegue menos (el faltante queda anotado) o más. **Lo de más entra ENTERO al stock y NO descuenta otros
 pedidos en viaje del mismo código** (*"no queda extra cancelado"*). Desmarcando «Dar el pedido por recibido»
 el resto sigue en viaje. Doble click / reintento: `p_client_id` único → no graba dos veces. **↩ Anular** en el
 historial (sólo la última del pedido): movimientos inversos, frena si lo recibido ya se movió.
-Centinelas ids 235-239. `sql/gv_imp_recibir_v2348.sql`.
+Centinelas ids 235-239. `sql/gv_imp_recibir_v2349.sql`.
 ⚠ El viejo «📥 Llegó» NO movía stock (sólo `Importados_Mov_Stock`): su botón ya no está.
 ⚠ **No recibir el mismo contenedor también por Recepción (recepcion.js)**: se contaría dos veces.
 `sql/gv_imp_recibir_v2345.sql`, `tests/imp-recibir.cjs`.
