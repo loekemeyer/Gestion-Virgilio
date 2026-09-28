@@ -73,7 +73,9 @@
       "Bash(sed -i 's/v23\\\\.57/v23.59/g' tests/fac-por-dia.cjs CLAUDE.md)",
       "Bash(node scripts/bump-version.cjs 23.59)",
       "Bash(node tests/fac-por-dia.cjs)",
-      "Bash(node tests/fac-fecha-entrega.cjs)"
+      "Bash(node tests/fac-fecha-entrega.cjs)",
+      "Bash(sed -i 's/\\(v23.60: tocar la cabecera pliega/\\(v23.61: tocar la cabecera pliega/' CLAUDE.md)",
+      "Bash(node scripts/bump-version.cjs 23.61)"
     ]
   }
 }

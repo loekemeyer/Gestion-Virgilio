@@ -26,11 +26,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _facLios = new Map(); _facCajas = new Map([["LK 0073", 29], ["LK 0074", 4], ["CH 0022", 25]]); _facClase = new Map();
     _facXlsSel = new Set();
     const ped = (np) => ({ np: np, cod: "1", razonSocial: "X", direccion: "x", m3: 0.1, barrio: "", zona: "" });
-    facRender([
+    window.__tandas = [
       { tanda: "E30A", fechaEntrega: "30/09/2026", fechaEntregaRaw: "2026-09-30", pedidos: [ped("LK 0090"), ped("98700")] },
       { tanda: "E29A", fechaEntrega: "29/09/2026", fechaEntregaRaw: "2026-09-29", pedidos: [ped("CH 0022"), ped("LK 0073"), ped("LK 0074")] },
       { tanda: "E00Z", fechaEntrega: "", fechaEntregaRaw: "", pedidos: [ped("LK 0099")] }
-    ]);
+    ];
+    facRender(window.__tandas);
     const h = c.innerHTML;
     out.cabs = [...c.querySelectorAll("tr.fac-dia-row .fac-dia-lbl")].map((x) => x.textContent.replace(/\s+/g, " ").trim());
     out.sinFechaUltima = h.indexOf("Sin fecha de entrega") > h.indexOf('data-fac-np="98700"');
@@ -45,6 +46,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     dia("2026-09-29").checked = false; dia("2026-09-29").dispatchEvent(new Event("change"));
     out.selSolo30 = [..._facXlsSel].sort();
     out.sinMix = document.getElementById("facXlsMix").style.display === "none";
+    // E. plegar el día 30: sus filas se esconden, las del 29 no; la casilla del día sigue andando
+    c.querySelector('tr.fac-dia-row[data-fac-dia="2026-09-30"] .fac-dia-lbl').click();
+    out.pliega = c.querySelector('tr[data-fac-np="LK 0090"]').style.display === "none" && c.querySelector('tr[data-fac-np="LK 0073"]').style.display === "" && /▸/.test(c.querySelector('tr.fac-dia-row[data-fac-dia="2026-09-30"]').textContent);
+    facRender(window.__tandas);
+    out.siguePlegado = c.querySelector('tr[data-fac-np="LK 0090"]').style.display === "none";
+    c.querySelector('tr.fac-dia-row[data-fac-dia="2026-09-30"] .fac-dia-lbl').click();
+    out.despliega = c.querySelector('tr[data-fac-np="LK 0090"]').style.display === "";
     // D. bajar LK + CH → 2 archivos
     const archivos = [];
     window.requireSupervisor = () => true;
@@ -59,7 +67,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     return out;
   });
   const f = [];
-  if (JSON.stringify(r.cabs.map((x) => x.split(" ·")[0])) !== '["📅 Martes 29/09","📅 Miércoles 30/09","📅 Sin fecha de entrega"]') f.push("A cabeceras: " + JSON.stringify(r.cabs));
+  if (JSON.stringify(r.cabs.map((x) => x.replace(/^[▾▸] /, "").split(" ·")[0])) !== '["📅 Martes 29/09","📅 Miércoles 30/09","📅 Sin fecha de entrega"]') f.push("A cabeceras: " + JSON.stringify(r.cabs));
   if (!/3 NP · 58 cajas/.test(r.cabs[0] || "")) f.push("A totales del día: " + r.cabs[0]);
   if (!r.sinFechaUltima || !r.sinGlobal) f.push("A sin fecha al final / sin casilla global");
   if (JSON.stringify(r.selDia29) !== '["CH 0022","LK 0073","LK 0074"]') f.push("B día 29: " + JSON.stringify(r.selDia29));
@@ -67,8 +75,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   if (JSON.stringify(r.selSolo30) !== '["LK 0090"]') f.push("B desmarcar día: " + JSON.stringify(r.selSolo30));
   if (!r.mixVisible || !/2 archivos/.test(r.boton) || !r.sinMix) f.push("C aviso mezcla: " + JSON.stringify([r.mixVisible, r.boton, r.sinMix]));
   if (JSON.stringify(r.archivos) !== '["LK:LK 0073,LK 0074","CH:CH 0022"]') f.push("D archivos: " + JSON.stringify(r.archivos));
+  if (!r.pliega || !r.siguePlegado || !r.despliega) f.push("E plegar: " + JSON.stringify([r.pliega, r.siguePlegado, r.despliega]));
   if (errs.length) f.push("pageerror: " + errs.join(" | "));
   await b.close();
   if (f.length) { console.log("fac-por-dia: ✗ " + f.join(" · ")); process.exit(1); }
-  console.log("fac-por-dia: OK — cabecera por día · casilla marca sólo su día · aviso LK+CH · 2 archivos");
+  console.log("fac-por-dia: OK — cabecera por día · casilla marca sólo su día · aviso LK+CH · 2 archivos · días plegables");
 })();
