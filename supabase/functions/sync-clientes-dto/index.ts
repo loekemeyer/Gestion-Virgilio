@@ -11,7 +11,7 @@
 // Secrets: WEB_SERVICE_KEY = service_role de LK, WEB_SUPABASE_URL = url de LK, CHEF_SUPABASE_URL =
 // url de Chef, CHEF_SERVICE_KEY = service_role de Chef (agregar a mano). SUPABASE_URL /
 // SUPABASE_SERVICE_ROLE_KEY los inyecta Supabase.
-// verify_jwt = OFF (endpoint interno idempotente; solo pulls -> upsert). Deploy manual/MCP.
+// verify_jwt = ON desde 2026-09-28 (problema 148): sólo la service_role (cron). Deploy manual/MCP.
 //
 // v2 (2026-09-08): UPSERT CONDICIONAL. Antes reescribia las ~2034 filas en CADA corrida (upsert
 // merge-duplicates de todo el padron), lo que generaba dead tuples inutiles al correr seguido.
@@ -78,7 +78,22 @@ async function fetchActual(): Promise<Map<string, number>> {
   return seen;
 }
 
-Deno.serve(async (_req: Request): Promise<Response> => {
+// 2026-09-28 (problema 148, Luis): antes se disparaba con un GET anonimo. Ahora verify_jwt=true
+// y adentro se exige la service_role (la manda el cron desde lecturacvs.app_secrets). El gateway
+// ya valido la firma del JWT, asi que leer el role del payload es confiable.
+function esServicio(req: Request): boolean {
+  const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  if (!tok) return false;
+  if (SB_KEY && tok === SB_KEY) return true;
+  try {
+    const p = tok.split(".")[1] || "";
+    const payload = JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - p.length % 4) % 4)));
+    return payload && payload.role === "service_role";
+  } catch (_e) { return false; }
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (!esServicio(req)) return json({ ok: false, error: "no_autorizado" }, 401);
   try {
     if (!LK_KEY) return json({ ok: false, error: "falta WEB_SERVICE_KEY" }, 501);
 
