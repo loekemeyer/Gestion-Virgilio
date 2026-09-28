@@ -11,6 +11,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
   const r = await p.evaluate(async () => {
     const out = {}, posts = [];
+    // v23.05 (problema 577): Stock_Config se escribe con la sesión de supervisor (_scfgAuth).
+    window.alert = function () {};
+    window.sbAuth = { getAccessToken: function () { return Promise.resolve("tok-supervisor"); } };
     window.fetch = function (url, opts) {
       if (opts && opts.method === "POST") { try { posts.push(JSON.parse(opts.body)); } catch (_e) {} return Promise.resolve({ ok: true, status: 200 }); }
       return Promise.resolve({ ok: true, json: function () { return Promise.resolve([{ valor: "1" }]); } });
@@ -21,13 +24,18 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const last = posts[posts.length - 1] || {};
     out.postedClave = last.clave; out.postedValor = last.valor;
     out.afterToggleOn = document.getElementById("ssgSw").classList.contains("on");
+    // sin sesión: no se escribe nada (la base igual lo frenaría, pero ni se intenta)
+    window.sbAuth = { getAccessToken: function () { return Promise.resolve(null); } };
+    const nAntes = posts.length;
+    await toggleSsgAlert();
+    out.sinSesionNoPostea = posts.length === nAntes;
     window.fetch = function () { return Promise.resolve({ ok: true, json: function () { return Promise.resolve([{ valor: "0" }]); } }); };
     await loadSsgSwitch();
     out.afterLoad0On = document.getElementById("ssgSw").classList.contains("on");
     return out;
   });
   const pass = r.afterLoadOn === true && r.postedClave === "alerta_sin_stock_gondola" &&
-    r.postedValor === "0" && r.afterToggleOn === false && r.afterLoad0On === false && errs.length === 0;
+    r.postedValor === "0" && r.afterToggleOn === false && r.sinSesionNoPostea === true && r.afterLoad0On === false && errs.length === 0;
   console.log("ssg-switch:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);
 })();

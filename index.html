@@ -3533,6 +3533,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-blk > .pn-head{ width:0; min-width:100%; }
 .pga-blk > .pn-head > div:first-child{ min-width:0; }   /* el título puede envolver, no empujar */
 .pga-blk > .pn-head .pn-tools{ flex:0 0 auto; }
+/* v23.09: el encabezado de Pedidos atrasados tampoco manda el ancho (lo da la tabla de abajo). */
+.pga-blk > .patr > .patr-h{ width:0; min-width:100%; box-sizing:border-box; }
+/* y las dos tablas (atrasados y programación) llenan el mismo ancho: los bordes quedan parejos. */
+.pga-blk table.pga{ width:100%; }
 .pn-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:2px 0 12px; }
 .pn-h1{ font-size:24px; font-weight:900; letter-spacing:-.3px; }
 .pn-h2{ color:#64748b; font-size:13px; font-weight:600; margin-top:2px; }
@@ -41481,10 +41485,11 @@ function _pppArbolHtml(programados) {
   // una nota al pie de lo que viene. Reemplaza a la banda "⏰ N atrasados · Ver la
   // lista →", que contaba con otro criterio (no miraba el FSS) y mandaba a otra
   // pantalla; dejar las dos era mostrar dos números distintos de lo mismo.
-  let h = _patrHtml();
   // ⚠ `pga-blk` abre acá y CIERRA EN LAS CUATRO SALIDAS de esta función (las tres tempranas y
   // la final). Si se agrega una salida nueva, el `</div>` va también ahí.
-  h += '<div class="pga-blk">';
+  // v23.09 (Luis, 28/09: "centrá la parte de atrasados para que esté alineada con el resto de
+  // la programación"): Pedidos atrasados va ADENTRO del bloque centrado, así toma su mismo ancho.
+  let h = '<div class="pga-blk">' + _patrHtml();
   // v21.36 (Luis, 22/09: "saca el coso de «tocá un día», ocupa mal el espacio"): la bajada
   // era una línea de 90 caracteres adentro del flex de `.pn-head`, así que en el celular le
   // comía el ancho al título y lo partía en 3 renglones. Lo que explicaba ya se descubre
