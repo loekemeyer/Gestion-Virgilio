@@ -783,6 +783,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== apr-cuar-pedido-partido (v22.47: pedido partido = un item en Cuarentena) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-pedido-partido.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-pedido-partido.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-speech1-sin-precio.cjs
 echo "== apr-cuar-deuda-desde (v23.03: fecha de la deuda en el chip) =="
 node tests/apr-cuar-deuda-desde.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-una-vez.cjs

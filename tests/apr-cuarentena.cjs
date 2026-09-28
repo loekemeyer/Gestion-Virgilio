@@ -166,7 +166,7 @@ catch (_e) {
     out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(cliSec);
     out.cliNuevosSinMixto = !/Cliente Nuevo Deudor/.test(cliSec);
     // (3a-2) v19.94 (Thomas) — Cuarentena también muestra el MONTO del pedido.
-    out.cuarMontoCol = /<th class="cuar-td-m3">Monto<\/th>/.test(cuarSec);
+    out.cuarMontoCol = !/<th class="cuar-td-m3">Monto<\/th>/.test(cuarSec) && /cuar-monto-nuevo/.test(cuarSec);   // v23.12: el monto va bajo Motivos
     out.cuarCols = (cuarSec.match(/<th[ >]/g) || []).length ===
                    ((cuarSec.match(/<tr class="cuar-tr[^"]*"[^>]*>([\s\S]*?)<\/tr>/) || ["", ""])[1].match(/<td[ >]/g) || []).length;
     // (3b-2) v19.05 — columnas nuevas: 1er contacto, Speech 1/2, Acción (Aprobar / Eliminar).
@@ -496,7 +496,7 @@ catch (_e) {
     // la flechita abre el contenido del pedido en una fila aparte, a lo ancho de la tabla
     aprToggle("clk900"); await new Promise((res) => setTimeout(res, 120));
     html = document.getElementById("pppPreview").innerHTML;
-    out.tblDetalle = /cuar-tbl-det/.test(html) && /colspan="7"/.test(html);   // v23.09: 7 columnas (NP+fecha+m³ y cliente+zona juntos)
+    out.tblDetalle = /cuar-tbl-det/.test(html) && /colspan="6"/.test(html);   // v23.12: 6 columnas (el monto va bajo Motivos)
     aprToggle("clk900"); await new Promise((res) => setTimeout(res, 100));
 
     // el 📖 de un retenido abre el MISMO log, con la clave del pedido
@@ -663,7 +663,7 @@ catch (_e) {
   chk(r.cliNuevosSinMixto, "el pedido mixto (deuda+nuevo) NO aparece en Clientes nuevos");
   chk(r.cliCols, "el pipeline tiene las columnas Etapa / Qué sigue / CUIT");
   chk(r.cliSpeech, "Contacto tiene los botones 'Speech 1' y 'Speech 2'");
-  chk(r.cuarMontoCol, "Cuarentena tiene la columna 'Monto'");
+  chk(r.cuarMontoCol, "Cuarentena muestra el monto del cliente nuevo debajo de Motivos, sin columna vacía");
   chk(r.cuarCols, "la tabla de Cuarentena tiene tantos <td> como <th>");
   chk(r.cuarMontoIva, "el retenido muestra su monto ($80.000 y c/IVA $96.800)");
   chk(r.cliComCol, "Clientes nuevos tiene la columna 'Coment.'");

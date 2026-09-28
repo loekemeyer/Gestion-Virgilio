@@ -49520,7 +49520,7 @@ function aprColCuarentena() {
     // v23.09 (Luis, 28/09): "optimización horizontal, doble y triple fila para que no haya que
     // scrollear". NP + fecha + m³ en una celda; cliente + CUIT + zona en otra.
     '<th>NP · Pedido · m³</th><th>Cliente · Zona</th>' +
-    '<th>Motivos</th><th class="cuar-td-m3">Monto</th><th>Contacto</th><th>Enviar a</th>' +
+    '<th>Motivos</th><th>Contacto</th><th>Enviar a</th>' +
     '<th class="cuar-td-com">Coment.</th>' +
     '</tr></thead><tbody>';
   for (const g of _cuarGrupos) {
@@ -49542,15 +49542,18 @@ function aprColCuarentena() {
       '</td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) +
         '<div class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprSucBadge(p) + aprHorBadge(p) + aprObsBadge(p) + '</div></td>' +
-      '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') + '</td>' +
+      // v23.12 (Luis, 28/09: "monto y motivos son redundantes? aparece vacío monto"): la columna
+      // Monto quedaba vacía en todo retenido que no es cliente nuevo (regla v22.40). Ahora el monto
+      // va DEBAJO de los motivos, y sólo cuando aplica.
+      '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') +
       // v22.40 (Thomas): el monto del pedido ACTUAL (lo que se cobra por adelantado) SÓLO corre
       // para CLIENTES NUEVOS. Para el activo retenido por deuda / límite / mal pago no aplica: lo
       // que importa es la DEUDA (badge de Motivos), no el valor de este pedido. Deroga la v19.94,
       // que mostraba el mismo monto para todos. La fila nuevo-con-deuda (motivo cliente_nuevo entre
       // los suyos) sí lo sigue mostrando: es cliente nuevo.
-      '<td class="cuar-td-m3">' + (aprCuarentenaMotivos(p).indexOf("cliente_nuevo") >= 0
-        ? clinNuevosValorFmt(p)
-        : '<span class="cuar-yp-sin" title="El monto del pedido actual sólo aplica a clientes nuevos (pagan el pedido por adelantado). Para un cliente activo lo que importa es la deuda, que está en Motivos.">—</span>') + '</td>' +
+      (aprCuarentenaMotivos(p).indexOf("cliente_nuevo") >= 0
+        ? '<div class="cuar-l2 cuar-monto-nuevo" title="Monto del pedido: el cliente nuevo lo paga por adelantado">' + clinNuevosValorFmt(p, g.miembros) + '</div>'
+        : '') + '</td>' +
       '<td><div class="cuar-td-acc">' + cuarWppContactoBtn(p) +
         '<button class="cuar-wpp cuar-wpp-cob" onclick="cuarWppCobranzas(\'' + emp + '\',\'' + oid + '\')" title="Escribir a Vivi (cobranzas) por WhatsApp (+54 9 11 6557-4113) para que chequee este pedido">💬 A cobranzas (Vivi)</button>' +
       '</div></td>' +
@@ -49562,7 +49565,7 @@ function aprColCuarentena() {
       '</div></td>' +
       '<td class="cuar-td-com">' + cuarComBtnHtml(p) + '</td>' +
       '</tr>';
-    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="7"><div class="apr-card-body">' +
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="6"><div class="apr-card-body">' +
       (varios ? g.miembros.map(function (x) {
         return '<div class="cuar-partido-parte"><b>' + escapeHtml(aprPedLabel(x)) + '</b> · ' + aprNum(x.m3) + ' m³</div>' + aprContenidoHtml(x);
       }).join("") : aprContenidoHtml(p)) + '</div></td></tr>';
@@ -50162,8 +50165,8 @@ async function clinDtoPagoCargar() {
 }
 /* Lo que hay que COBRARLE. Devuelve null si todavía no hay monto; `dto` en null significa
    "no se pudo leer el plazo de pago" y ahí el a-cobrar ES el neto, sin inventar descuento. */
-function clinACobrar(p) {
-  const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
+function clinACobrar(p, vGrupo) {
+  const v = vGrupo || (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
   if (!v || !isFinite(v.valor) || v.valor <= 0) return null;
   const d = (_apr.cliDtoPago || {})[aprKey(p.empresa, p.order_id)];
   const pct = d && isFinite(d.dto) ? Number(d.dto) : null;
@@ -50258,13 +50261,22 @@ function clinBrand(p) { return String((p && p.empresa) || "lk") === "chef" ? "Ch
    pedido ANTES del armado y la entrega, así que el Speech 1 le manda el mismo número que va a
    tener la factura: todo lo que pidió, valorizado por lista, con IVA. Sale de
    gv_clientes_nuevos_valor_lote (valor_con_iva = neto × 1,21; el neto ya trae el 2 % web). */
+/* v23.12: las partes de un pedido PARTIDO (el original + lo que espera reingreso), para cobrar la suma */
+function clinMiembros(p) {
+  if (!p || p._demo) return [p];
+  const k = aprKey(p.empresa, p.order_id);
+  const g = cuarAgrupar((_apr.pedidos || []).filter(function (x) { return !x._demo && !x._isis; }))
+    .find(function (gg) { return gg.miembros.some(function (x) { return aprKey(x.empresa, x.order_id) === k; }); });
+  return g ? g.miembros : [p];
+}
 function clinSpeechMsg1(p) {
   const np = aprPedLabel(p || {});
   /* v21.98 (Vivi): el monto del Speech es el que hay que COBRAR — el neto con el descuento por
      pago adelantado y después el IVA. Sin el dato del plazo de pago cae al total por lista, que
      es lo que decía antes: nunca se inventa el descuento. */
-  const ac = clinACobrar(p);
-  const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
+  const vg = clinValorGrupo(clinMiembros(p));   // v23.12: pedido partido = se cobra la suma
+  const ac = clinACobrar(p, vg);
+  const v = vg || (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
   const iva = ac ? ac.aCobrarIva : (v && isFinite(v.valorIva) && v.valorIva > 0 ? v.valorIva : null);
   const plata = function (n) { return "$" + Number(n).toLocaleString("es-AR", { maximumFractionDigits: 0 }); };
   let m = "Hola, le escribimos de " + clinBrand(p) + " por su pedido " + np + ". ";
@@ -50329,21 +50341,39 @@ function clinAccionBtns(p) {
 /* v19.37 (Luis): el número que importa acá es el TOTAL CON IVA — es el que se le manda al
    cliente nuevo por Speech 1 y el que tiene que pagar antes del armado. El neto queda arriba
    (es el que se compara con el límite de crédito y con la lista), el con IVA abajo. */
-function clinNuevosValorFmt(p) {
+/* v23.12 (Luis, 28/09: "si monto es el pedido/suma de pedidos no está funcionando bien"). Un
+   pedido PARTIDO por importados va en una sola fila (v23.06) y su monto tiene que ser la SUMA de
+   las partes, no sólo la del original. Las partes comparten cliente y plazo de pago, así que el
+   descuento es el del original. Sin el valor de alguna parte todavía: "…", no un número a medias. */
+function clinValorGrupo(miembros) {
+  if (!miembros || miembros.length < 2) return null;
+  const m = _apr.cliValor || {};
+  const s = { valor: 0, valorIva: 0, valorImp: 0, itemsImp: 0, falta: false };
+  miembros.forEach(function (x) {
+    const v = m[aprKey(x.empresa, x.order_id)];
+    if (!v) { s.falta = true; return; }
+    s.valor += Number(v.valor) || 0; s.valorIva += Number(v.valorIva) || 0;
+    s.valorImp += Number(v.valorImp) || 0; s.itemsImp += Number(v.itemsImp) || 0;
+  });
+  return s;
+}
+function clinNuevosValorFmt(p, miembros) {
   if (p && p._demo)
     return '<b title="Ejemplo — precio total por lista (neto, sin IVA)">' + cuarPlata(120480) + '</b>' +
       '<span class="clin-iva" title="Ejemplo — total con IVA: es lo que se le pide pagar por adelantado">c/IVA ' + cuarPlata(145781) + '</span>' +
       pipeCompBtn(p);
   if (p && p._isis) return '<span class="cuar-yp-sin" title="El monto por lista se valoriza sobre los pedidos de la página; este entró por ISIS con NP propia">—</span>';
   if (_apr.cliValor === null) return '<span class="cuar-yp-sin">…</span>';
-  const v = (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
+  const vg = clinValorGrupo(miembros);
+  if (vg && vg.falta && _apr.cliValorLoading) return '<span class="cuar-yp-sin">…</span>';
+  const v = vg || (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
   if (!v || !isFinite(v.valor) || v.valor <= 0)
     return '<span class="cuar-yp-sin" title="Sin precio de lista para los artículos de este pedido">—</span>';
   /* v21.98 (Vivi): el número GRANDE es lo que hay que COBRAR — el neto ya con el descuento por
      pago adelantado — y abajo el mismo con IVA, que es el que se le reclama al cliente.
      ⚠ Si la lectura del plazo de pago falla, `ac.pct` viene null y se muestra lo de siempre:
      NO se asume 25 % (regla: una lectura ROTA no es un CERO). */
-  const ac = clinACobrar(p);
+  const ac = clinACobrar(p, vg);
   const cola =
     // v20.41 (Luis): el importado no entra en el monto - no hay stock, no se cobra por adelantado.
     (isFinite(v.valorImp) && v.valorImp > 0
@@ -51214,6 +51244,7 @@ async function pipeSpeech(empresa, orderId, n) {
   const esDemo = String(orderId) === "__DEMO__";
   const p = (esDemo ? pipeDemoPedido() : pipeBuscar(empresa, orderId))
             || { empresa: empresa, order_id: orderId };
+  if (n === 1 && !esDemo && !(await clinSpeech1PreciosOk(p))) return;
   await pipeEvento(empresa, orderId, n === 2 ? "speech2" : "speech1", null, null);
   if (esDemo) {
     // el telefono del ejemplo es inventado: se muestra el texto que se mandaria, no se manda
@@ -51226,6 +51257,36 @@ async function pipeSpeech(empresa, orderId, n) {
     _apr.msgErr = false; pppRenderProg(); return;
   }
   clinAbrirWa(p, n === 2 ? clinSpeechMsg2(p) : clinSpeechMsg1(p));
+}
+/* v23.12 (Luis, 28/09): "si falta algún valor de algún producto para un cliente nuevo, tiene que
+   saltar una alerta cuando se aprieta contacto 1, ya que el monto que se le va a pedir puede
+   diferir bastante de lo que termina siendo el pedido". Antes de marcar el Speech 1 y abrir
+   WhatsApp se trae la composición (gv_clin_composicion, la misma del 🧾) de cada parte del pedido
+   y, si algún código viene `sin_precio`, se avisa con la lista y se pide confirmar.
+   ⚠ Si la composición NO se pudo leer también se avisa: no poder verificar no es "está todo bien". */
+async function clinSpeech1PreciosOk(p) {
+  const miembros = clinMiembros(p);
+  const sinPrecio = [];
+  let noLeido = false;
+  for (const x of miembros) {
+    try {
+      const r = await aprRpc("gv_clin_composicion",
+        { p_pedidos: pipeCompItemsLote(), p_empresa: x.empresa || "lk", p_order_id: String(x.order_id) });
+      if (!r || !r.length) { noLeido = true; continue; }
+      r.forEach(function (f) { if (f && f.sin_precio && sinPrecio.indexOf(f.art) < 0) sinPrecio.push(f.art); });
+    } catch (_e) { noLeido = true; }
+  }
+  if (!sinPrecio.length && !noLeido) return true;
+  const txt = sinPrecio.length
+    ? "⚠ FALTA EL PRECIO de " + sinPrecio.length + " código" + (sinPrecio.length > 1 ? "s" : "") + " de este pedido:\n\n" +
+      sinPrecio.join(", ") + "\n\nEsos códigos NO están en el monto: lo que se le va a pedir al cliente es MENOR " +
+      "a lo que termina siendo el pedido.\n\n¿Mandar el Speech 1 igual?"
+    : "⚠ No se pudo verificar que todos los códigos tengan precio (la composición no respondió).\n\n" +
+      "El monto que se le va a pedir puede no ser el del pedido completo.\n\n¿Mandar el Speech 1 igual?";
+  if (window.confirm(txt)) return true;
+  _apr.msg = "Speech 1 NO enviado: " + (sinPrecio.length ? "faltan precios de " + sinPrecio.join(", ") + "." : "no se pudo verificar la composición.");
+  _apr.msgErr = true; pppRenderProg();
+  return false;
 }
 /* Aprobar y Eliminar del EJEMPLO: no llaman a cuarLiberar ni a aprAnularAbrir, que tocan
    pedidos de verdad. El ejemplo se cierra solo y avisa qué habría pasado. */
@@ -51430,7 +51491,7 @@ function pipeHtml() {
         // v20.86 (Luis): la zona, con su badge de horario — es lo que se mira para programarlo
         '<div class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprSucBadge(p) + aprHorBadge(p) + aprObsBadge(p) + '</div></td>' +
       '<td class="pipe-td-et">' + pipeEtapaHtml(p) + '</td>' +
-      '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
+      '<td class="cuar-td-m3">' + clinNuevosValorFmt(p, g.miembros) + '</td>' +
       '<td class="pipe-td-acc">' + pipeAccionesHtml(p) + '</td>' +
       '<td class="cuar-td-com">' + (p._demo ? '<span class="cuar-yp-sin">—</span>' : cuarComBtnHtml(p)) + '</td>' +
       '</tr>';
