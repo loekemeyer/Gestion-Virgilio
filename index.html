@@ -3542,7 +3542,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-blk > .pn-head{ width:0; min-width:100%; }
 .pga-blk > .pn-head > div:first-child{ min-width:0; }   /* el título puede envolver, no empujar */
 .pga-blk > .pn-head .pn-tools{ flex:0 0 auto; }
-/* v23.09: el encabezado de Pedidos atrasados tampoco manda el ancho (lo da la tabla de abajo). */
+/* v23.12: el encabezado de Pedidos atrasados tampoco manda el ancho (lo da la tabla de abajo). */
 .pga-blk > .patr > .patr-h{ width:0; min-width:100%; box-sizing:border-box; }
 /* y las dos tablas (atrasados y programación) llenan el mismo ancho: los bordes quedan parejos. */
 .pga-blk table.pga{ width:100%; }
@@ -41496,7 +41496,7 @@ function _pppArbolHtml(programados) {
   // pantalla; dejar las dos era mostrar dos números distintos de lo mismo.
   // ⚠ `pga-blk` abre acá y CIERRA EN LAS CUATRO SALIDAS de esta función (las tres tempranas y
   // la final). Si se agrega una salida nueva, el `</div>` va también ahí.
-  // v23.09 (Luis, 28/09: "centrá la parte de atrasados para que esté alineada con el resto de
+  // v23.12 (Luis, 28/09: "centrá la parte de atrasados para que esté alineada con el resto de
   // la programación"): Pedidos atrasados va ADENTRO del bloque centrado, así toma su mismo ancho.
   let h = '<div class="pga-blk">' + _patrHtml();
   // v21.36 (Luis, 22/09: "saca el coso de «tocá un día», ocupa mal el espacio"): la bajada
