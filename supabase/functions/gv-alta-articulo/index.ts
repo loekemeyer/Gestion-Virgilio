@@ -133,6 +133,50 @@ function norm(c: string) {
   return String(c || "").toUpperCase().trim().replace(/^0+(?=.)/, "");
 }
 
+/* ---- v23.47 (seguridad) ------------------------------------------------------
+   La función no pide clave (la llama la tablet, que entra como anon), así que
+   cualquiera podía mandarle a Thomas WhatsApp + Telegram ilimitados con texto y
+   LINKS inventados (phishing desde el número de la empresa), y la página de
+   confirmación mostraba el código sin escapar. Ahora:
+     - el código sólo letras/números/espacio - / (hasta 20);
+     - el texto libre pierde links y caracteres raros;
+     - el legajo tiene que existir en Empleados (o ser "sup:…", el supervisor);
+       si no, el asiento queda pero SIN WhatsApp (la tablet nunca se traba);
+     - tope de TOPE_HORA avisos nuevos por hora: pasado eso, asiento sin WhatsApp;
+     - la página escapa todo lo que muestra.
+   Cuando exista la sesión de operario (login por legajo + red de la empresa),
+   esta función pasa a exigirla. */
+const TOPE_HORA = 10;
+const COD_RE = /^[A-Z0-9][A-Z0-9 \/-]{0,19}$/;   // sin punto: "EVIL.COM" no pasa
+
+function esc(v: unknown) {
+  return String(v ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
+
+function limpiar(v: unknown, max: number) {
+  return String(v ?? "")
+    .replace(/(https?:\/\/|www\.)\S*/gi, "")
+    .replace(/\S+\.[a-z]{2,}\S*/gi, "")          // dominios sueltos: WhatsApp los vuelve link
+    .replace(/[^\p{L}\p{N} .,:#°\/-]/gu, "")
+    .replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+async function legajoValido(legajo: string) {
+  if (/^sup:[a-z0-9_.-]{1,30}$/i.test(legajo)) return true;
+  if (!/^\d{1,6}$/.test(legajo)) return false;
+  const r = await rest(`Empleados?Legajo=eq.${encodeURIComponent(legajo)}&select=Legajo&limit=1`);
+  const f = r.ok ? await r.json() : [];
+  return Array.isArray(f) && f.length > 0;
+}
+
+async function avisosUltimaHora() {
+  const desde = new Date(Date.now() - 3600_000).toISOString();
+  const r = await rest(`${TABLA}?pedido_at=gte.${encodeURIComponent(desde)}&select=id&limit=${TOPE_HORA + 1}`);
+  const f = r.ok ? await r.json() : [];
+  return Array.isArray(f) ? f.length : TOPE_HORA + 1;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
 
@@ -157,7 +201,7 @@ Deno.serve(async (req: Request) => {
     if (fila.estado !== "pendiente") {
       const ya = fila.estado === "ok" ? "APROBADO" : "RECHAZADO";
       return html(
-        `<h1>Ya estaba resuelto</h1><div class="cod">${fila.cod}</div>
+        `<h1>Ya estaba resuelto</h1><div class="cod">${esc(fila.cod)}</div>
          <p>Quedó <b>${ya}</b>. No hace falta hacer nada más.</p>`,
       );
     }
@@ -169,9 +213,9 @@ Deno.serve(async (req: Request) => {
       const link = `${FN_BASE}?token=${encodeURIComponent(token)}&r=${r}&c=1`;
       return html(
         `<h1>Alta de artículo nuevo</h1>
-         <div class="cod">${fila.cod}</div>
-         <p>Remito <b>${fila.remito || "—"}</b> · ${fila.tallerista || "—"} · línea ${fila.linea || "—"}<br>
-            Legajo <b>${fila.legajo || "—"}</b></p>
+         <div class="cod">${esc(fila.cod)}</div>
+         <p>Remito <b>${esc(fila.remito || "—")}</b> · ${esc(fila.tallerista || "—")} · línea ${esc(fila.linea || "—")}<br>
+            Legajo <b>${esc(fila.legajo || "—")}</b></p>
          <p>Tocá el botón para confirmar.</p>
          <a class="btn ${cls}" href="${link}">${txt}</a>`,
       );
@@ -189,10 +233,10 @@ Deno.serve(async (req: Request) => {
     });
 
     return estado === "ok"
-      ? html(`<h1>Listo</h1><div class="cod">${fila.cod}</div>
+      ? html(`<h1>Listo</h1><div class="cod">${esc(fila.cod)}</div>
               <p class="ok">✅ Aprobado</p>
               <p>Queda asentado.</p>`)
-      : html(`<h1>Listo</h1><div class="cod">${fila.cod}</div>
+      : html(`<h1>Listo</h1><div class="cod">${esc(fila.cod)}</div>
               <p class="bad">❌ Rechazado</p>
               <p>Queda asentado. Ojo: la recepción no se frena sola,
                  avisales vos si hay que dar marcha atrás.</p>`);
@@ -206,11 +250,12 @@ Deno.serve(async (req: Request) => {
 
   const cod = norm(body.cod || "");
   if (!cod) return json({ error: "falta cod" }, 400);
+  if (!COD_RE.test(cod)) return json({ error: "cod invalido" }, 400);
 
-  const remito = String(body.remito || "").slice(0, 40);
-  const legajo = String(body.legajo || "").slice(0, 20);
-  const tall = String(body.tall || "").slice(0, 80);
-  const linea = String(body.linea || "").slice(0, 10);
+  const remito = limpiar(body.remito, 40);
+  const legajo = String(body.legajo || "").trim().slice(0, 34);
+  const tall = limpiar(body.tall, 80);
+  const linea = limpiar(body.linea, 10);
 
   // ¿Ya hay algo para este código? Si ya está aprobado, no molesto a Thomas de nuevo.
   const prevRes = await rest(
@@ -235,6 +280,19 @@ Deno.serve(async (req: Request) => {
     const f = (await otra.json())?.[0];
     if (f) return json({ token: f.token, estado: f.estado, reusado: true });
     return json({ error: "no se pudo registrar el pedido" }, 500);
+  }
+
+  // Sin legajo conocido o pasado el tope: queda el asiento, pero no se molesta a Thomas.
+  const motivoSinAviso = !(await legajoValido(legajo))
+    ? "legajo no reconocido"
+    : ((await avisosUltimaHora()) > TOPE_HORA ? `tope de ${TOPE_HORA} avisos por hora` : "");
+  if (motivoSinAviso) {
+    await rest(`${TABLA}?token=eq.${token}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ wa_ok: false, wa_error: "no enviado: " + motivoSinAviso }),
+    });
+    return json({ token, estado: "pendiente", wa_ok: false, wa_error: "no enviado: " + motivoSinAviso });
   }
 
   const linkOk = `${FN_BASE}?token=${token}&r=ok`;
