@@ -3442,6 +3442,9 @@ privado `loekemeyer/Impo-Comex`**; acá va sólo el build web (`client/dist-web`
   entrega la puerta). Lo sostiene `tests/impo-comex-web.cjs`.
 - Versión nueva = armar en `Impo-Comex`, reemplazar la carpeta (conservando `LEEME.md`) y subir la
   versión de Gestión.
+- **La puerta vive acá**: `supabase/impo-comex-web/index.ts` (deploy `Impo_Comex_web`, verify_jwt). Los datos
+  del controlante de la DDJJ NO están en ningún código: tabla cerrada `impo_comex.ddjj_controlante` + RPC
+  `gv_impo_comex_ddjj_controlante()` (sólo supervisor). `sql/gv_impo_comex_ddjj_controlante_v2322.sql` (v23.22).
 
 ## ⚠ REGLA (Elías, 2026-09-21, v20.58): la fecha se guarda ENTERA — y el blindaje va con centinela
 
