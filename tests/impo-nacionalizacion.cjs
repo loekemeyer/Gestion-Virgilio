@@ -59,5 +59,24 @@ ok(pYa.estado === "ya", "Un proveedor con 40k de demanda ya puede pedir");
 var pSin = N._pedImpProy25k(1000, 0, 50000, 25000);
 ok(pSin.estado === "sinburn", "Sin consumo mensual no se puede estimar la fecha");
 
+// --- v23.75: desglose expandible (Luis) ---
+["consolidada", "full"].forEach(function (m) {
+  var r = N._pedImpNacionalizar(9324, 12.4, { modo: m, valorM3: 110, tn: 0, ntl: true, fleteFull: 2000 });
+  var suma = r.detalle.reduce(function (s, d) { return s + d[1]; }, 0);
+  near(suma, r.noRecup, 0.01, m + ": el desglose suma lo no recuperable");
+  ok(r.detalle.every(function (d) { return typeof d[2] === "string" && d[2].length > 0; }), m + ": cada línea dice cómo se calcula");
+  ok(r.cif > 0 && /FOB/.test(r.cifTxt), m + ": trae la base CIF explicada");
+});
+var itemsB = [{ cod: "970E", desc: "x", proyUni: 1000, fobUni: 2.5, aPedirUni: 3000 }, { cod: "971E", desc: "y", proyUni: 500, fobUni: 0, aPedirUni: 0 }];
+var prB = N._pedImpProy25k(7500, 2500, 60000, 25000);
+var nacB = N._pedImpNacionalizar(9324, 12.4, { modo: "consolidada", valorM3: 110, tn: 0, ntl: false });
+var hB = N._pedImpBandaHtml(prB, nacB, 25000, 9324, { prov: "Becky", items: itemsB, m3: 12.4 });
+ok((hB.match(/<details class="pedimp-desg"/g) || []).length === 2, "La banda tiene los dos chips expandibles");
+ok(/970E/.test(hB) && /sin FOB/.test(hB), "El desglose del consumo lista los artículos y marca los sin FOB");
+ok(/÷/.test(hB) && /Derechos/.test(hB) && /Puesto en Arg/.test(hB), "Muestra la cuenta de meses y las líneas de lo no recuperable");
+ok(!/ open /.test(hB), "Cerrados por defecto");
+N._pedImpDesgAb["Becky|izq"] = 1;
+ok(/data-k="Becky\|izq" ontoggle="_pedImpDesgToggle\(this\)" open/.test(N._pedImpBandaHtml(prB, nacB, 25000, 9324, { prov: "Becky", items: itemsB, m3: 12.4 })), "El abierto sobrevive al re-render");
+
 if (fail) { console.error("\n" + fail + " chequeo(s) fallaron."); process.exit(1); }
 console.log("\nOK — nacionalización y proyección 25k.");
