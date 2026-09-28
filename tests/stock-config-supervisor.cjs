@@ -1,4 +1,4 @@
-// v23.03 (problema 577): ninguna escritura VIVA de Stock_Config puede ir con la clave pública.
+// v23.05 (problema 577): ninguna escritura VIVA de Stock_Config puede ir con la clave pública.
 // Van por _scfgAuth() (JWT de la sesión de supervisor). La única que queda con la anon es
 // stkGuardadoToggleRacks, que no tiene ningún llamador (código muerto).
 const fs = require("fs");
