@@ -1,4 +1,4 @@
--- v23.46 (Luis, 28/09) — RECIBIR importación, segunda vuelta. Sobre sql/gv_imp_recibir_v2345.sql.
+-- v23.47 (Luis, 28/09) — RECIBIR importación, segunda vuelta. Sobre sql/gv_imp_recibir_v2345.sql.
 -- "Tenés que dejar que ponga más de lo que debería haber llegado. Tiene que afectar stock real y
 --  fijate que escriba bien en las tablas (sin reescribir toda la tabla). Anticipémonos a todo lo que
 --  puede salir mal. Si se marca recibido, debería marcarlo como que ya se recibió y no está más
@@ -50,7 +50,7 @@ begin
   if not (public.es_supervisor_virgilio() or public.gv_es_supervisor_o_servicio()) then
     raise exception 'Sólo un supervisor puede recibir importaciones.' using errcode = '42501';
   end if;
-  -- v23.46 idempotencia: el mismo client_id (doble click, reintento tras corte) devuelve lo ya grabado
+  -- v23.47 idempotencia: el mismo client_id (doble click, reintento tras corte) devuelve lo ya grabado
   if not p_simular and v_cid is not null then
     select * into v_prev from public."GV_Imp_Recepcion" where client_id = v_cid;
     if found then
@@ -242,7 +242,7 @@ grant execute on function public.gv_imp_recibir(bigint,text,numeric,jsonb,text,b
 grant execute on function public.gv_imp_recepcion_anular(bigint,text) to authenticated, service_role;
 grant execute on function public.gv_imp_recepcion_historial(int) to authenticated, service_role;
 
--- Centinelas (aplicados con el sí de Luis, 28/09; ids 235-239):
+-- Centinelas (aplicados con el sí de Luis, 28/09; ids 235-239; en la base dicen version 'v23.46', que era el número previsto):
 -- insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version) values
 -- ('gv_imp_recibir','funcion','''recepcion_imp''', 'tipo recepcion_imp (no dispara recepción rara)','Luis','v23.46'),
 -- ('gv_imp_recibir','funcion','gv_rack_pos_chequear','conflicto de rack','Luis','v23.46'),

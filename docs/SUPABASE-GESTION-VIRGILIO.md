@@ -30096,3 +30096,18 @@ destino con los lugares del Mapa, aviso de conflicto de espacio) y con historial
 - Probado en transacción abortada: 026 (A guardar 100 · góndola F01 20 → conflicto «capacidad 240, hay 231,
   entran 9» · rack AD01 libre · AD09 ocupado por 505I → conflicto), dual 438E CH → L05 + excedente, 505C → insumos A1.
 - Rollback: `drop function` de las tres (las tablas quedan: son auditoría). `sql/gv_imp_recibir_v2345.sql`.
+
+### §3.v2347 — v23.47: RECIBIR importación — cierre del pedido, lo de más, idempotencia y anular — 2026-09-28
+
+**Luis:** *"tiene que afectar stock real … sin reescribir toda la tabla … si se marca recibido, que no esté más
+pedido o en viaje"* · *"si se recibe más de lo que se iba a recibir, cancela lo que se iba a recibir (no queda extra cancelado)"*.
+- `gv_imp_recibir` gana `p_cerrar` (default true → bache `llegado`, faltante anotado) y `p_client_id` (índice único
+  parcial: doble click / reintento devuelve la misma recepción). `unidades_llegadas` guarda lo REAL recibido.
+- `gv_imp_recepcion_anular(id, motivo)`: sólo la última viva del bache; inserta movimientos inversos
+  (`recepcion_imp_anula` / `ajuste` en insumos), devuelve el bache a `estado_antes`/`llegadas_antes`; frena si el saldo
+  del depósito ya no alcanza.
+- Escrituras: INSERTs + UPDATE por id del bache + resync de ESE código. Probado en transacción abortada (7 casos:
+  parcial cierra y saca de viaje 49.536→0, doble click no duplica, segundo intento sobre pedido cerrado frena, anular
+  devuelve todo, 120 u sobre 48 pedidas cierra sin tocar el bache LK del mismo código, anular con la mercadería movida
+  frena, cantidad basura frena; otros baches: md5 igual).
+- Centinelas 235-239 en `GV_Reglas_Centinela`. `sql/gv_imp_recibir_v2347.sql`.
