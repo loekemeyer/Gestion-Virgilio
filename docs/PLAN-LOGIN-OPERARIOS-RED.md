@@ -44,6 +44,18 @@ Apps alcanzadas: **Gestión Virgilio** (`index.html` + `recepcion.js` + `sw.js`,
 Telegram una sola vez) · 186.18.168.71 = Loeke fábrica · 181.164.213.179 = Virgilio (centro de distribución).
 Página de prueba: https://loekemeyer.github.io/Prueba-Login-Operarios/ (repo aparte, temporal; legajo 1).
 
+**Regla general (dueño, 28/09): todas las apps usan un login u otro; ninguna escribe con la clave pública sola.**
+
+| Quién | Entra con | Rol |
+|---|---|---|
+| Operarios (tablets de Registro Producción y GV) | legajo + Wi-Fi de la empresa (`login-operario`) | operario |
+| Supervisores / gestión | **mail (Google)** | supervisor |
+| **Admin** | **mail (Google), siempre** — nada de legajo, clave compartida ni contraseña propia | admin |
+| Lo que no es persona (Planify escritorio, agente ISIS, n8n, macros, procesos) | clave de servidor guardada en esa máquina, nunca en una página | servicio |
+
+Trampa a resolver en la etapa 2: hoy casi todas las pantallas piden el login en el navegador pero le hablan a
+la base con la clave pública (la base no sabe quién es). Cada app tiene que MANDAR la sesión en cada pedido.
+
 ## Diseño
 
 1. **Lista de redes**: tabla `public.red_empresa (ip, sede, activo)` con las IP fijas de Cervantes y
