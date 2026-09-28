@@ -1,4 +1,4 @@
--- v23.09 · Coronitas: plazo de contado (25 %) por cliente, desde la planilla de Thomas del 28/09
+-- v23.10 · Coronitas: plazo de contado (25 %) por cliente, desde la planilla de Thomas del 28/09
 -- ("Clientes con 25 superados los 14 dias.xlsx", base de clientes LK, columna E = días).
 -- LA TABLA CANÓNICA ES public.cobranzas_excepciones (por CUIT: sirve para LK y Chef y para
 -- cualquier repo que pegue contra esta base: la leen gv_cobranza_imputar y
