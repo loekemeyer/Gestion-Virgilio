@@ -3675,6 +3675,11 @@ Centinelas ids 235-239. `sql/gv_imp_recibir_v2349.sql`.
 ⚠ **No recibir el mismo contenedor también por Recepción (recepcion.js)**: se contaría dos veces.
 `sql/gv_imp_recibir_v2345.sql`, `tests/imp-recibir.cjs`.
 
+**Desglose de la tarjeta del proveedor (Luis, v23.75):** los dos chips de la banda se expanden. Izq: consumo/mes =
+Σ proy u/mes × FOB por artículo, y meses = (mínimo − a pedir hoy) ÷ consumo. Der: CIF y cada línea de lo no
+recuperable con su fórmula (salen de `_pedImpNacionalizar().detalle[i][2]`, la suma = `noRecup`). El abierto queda en
+`_pedImpDesgAb` por proveedor. `tests/impo-nacionalizacion.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-28, v23.56): si la base de Gestión NO CONTESTA, avisa Telegram — y el vigilante vive en LK
 
 Caída del 28/09 14:11–14:19 ART (reinicio de la plataforma, instancia chica; Luis decidió **no** subir la instancia).
