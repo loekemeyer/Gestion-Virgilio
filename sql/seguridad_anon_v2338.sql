@@ -39,6 +39,20 @@ grant select (id, cod, remito, legajo, tallerista, linea, estado, wa_ok, pedido_
   on public."GV_Alta_Articulo_Aprobacion" to anon, authenticated;
 -- rollback: grant select, insert, update on public."GV_Alta_Articulo_Aprobacion" to anon, authenticated;
 
+-- 4) APLICADO 28/09 (v23.40). leer-produccion-foto (OCR gpt-4o de Maestro Producción) no
+--    pedía nada. Ahora exige sesión de cuenta habilitada + tope diario + tope de tamaño
+--    (supabase/functions/leer-produccion-foto, v49). El tope diario lo cuenta:
+create or replace function public.costo_api_usos_hoy(p_app text)
+returns integer language sql stable security definer set search_path = '' as $$
+  select count(*)::int from costos_api.costos
+   where app = p_app
+     and creado_en >= (date_trunc('day', now() at time zone 'America/Argentina/Buenos_Aires')
+                       at time zone 'America/Argentina/Buenos_Aires');
+$$;
+revoke all on function public.costo_api_usos_hoy(text) from public, anon, authenticated;
+grant execute on function public.costo_api_usos_hoy(text) to service_role;
+--    Verificado: sin nada / clave pública / JWT falso -> 401 sin llamar a OpenAI.
+
 -- 2c) PENDIENTE — remitos_select. Probado en SQL: un INSERT ... RETURNING sin política
 --     SELECT falla por RLS. Si Storage sube con RETURNING, sacarla rompe TODAS las subidas.
 --     Se prueba contra el Storage real antes de tocarla.
