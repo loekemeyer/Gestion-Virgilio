@@ -1,4 +1,4 @@
--- v23.03 (2026-09-28, Luis) — problema 77: cod_cliente sin empresa en vendedor y teléfono.
+-- v23.07 (2026-09-28, Luis) — problema 77: cod_cliente sin empresa en vendedor y teléfono.
 -- clientes_vendedor y whatsapp_clientes no tienen empresa (foto manual del padrón de LK del
 -- 11/08). A 244 clientes de Chef les tocaba el vendedor del cliente de LK con ese mismo número.
 -- La fuente real es el padrón de cada página (customers.vend / customers.whatsapp de LK y de Chef),
