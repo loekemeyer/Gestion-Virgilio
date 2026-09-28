@@ -100,7 +100,7 @@ if (!/coalesce\(array_length\(lb\.motivos,1\),0\) = 0/.test(sql))
   fallos.push("falta el guard del array vacio: los liberados viejos volverian al reten");
 
 /* ── 4d. la ZONA, y el submodulo COLAPSABLE ───────────────────────────────────────────── */
-if (!/<th>Zona<\/th>/.test(html.slice(html.indexOf("function pipeHtml"))))
+if (!/<th>Cliente[^<]*Zona<\/th>/.test(html.slice(html.indexOf("function pipeHtml"))))   // v23.08
   fallos.push("falta la columna Zona en el pipeline (Luis: `agregale zona`)");
 if (!/onclick="aprCliColapsar\(\)"[\s\S]{0,300}Clientes nuevos/.test(html))
   fallos.push("el pipeline no es colapsable como lo era el submodulo viejo");
