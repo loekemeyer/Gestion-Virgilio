@@ -30049,3 +30049,19 @@ LK 0218) que se cargaron al camión el 28/09 08:44 **sin Recepción Remitos**: n
   `allSettled`). 590 ms marcar_calc / 93 ms la fecha, con 150 pedidos.
 - Rollback: re-crear `marcar_calc` sacando el CTE `_cde` y los dos `coalesce((select _cde.deuda …), f.deuda…)`.
   `sql/gv_cuarentena_deuda_efectiva_v2303.sql`.
+
+### §3.v2304 — v23.04: la deuda de Cuarentena se mide por SUCURSAL · 14 días · Anular con código — 2026-09-28
+
+**Luis:** *"implementá la deuda por sucursal · en vez de 30 días hacelo 14 · deuda es deuda"*.
+
+- **`gv_cuarentena_deuda_comprobantes()`** (por comprobante: fecha de EMISIÓN = col B del Excel —
+  la A es el vencimiento—, NP, barrio, palabras de la dirección, retiro, sin entregar ≤ 14 días) y
+  **`gv_cuarentena_deuda_pedido(p_pedidos)`** (deuda del pedido = min(total del cliente, positiva de
+  SU sucursal + no atribuible)). Reemplazan a `gv_cuarentena_deuda_efectiva` (v23.03, borrada).
+- **Otra sucursal se exige probada**: barrios distintos Y ninguna palabra de dirección compartida
+  (`gv_cuar_tokens`), ni retiro de ningún lado. Sin dirección, sin atribución o Retira → retiene.
+  Caso que obligó a las palabras: Matiz "CD Constitucion" = NP ISIS "Constitucion 1665, Burzaco".
+- `marcar_calc` usa `_cdp`; `retiene_lote` (armador) pasa dirección/barrio/zona; el front también.
+  Probado: misma cliente Solia (deuda Morón) → pedido Quilmes pasa, Morón / Retira / sin dirección retienen.
+- Front: el botón **✕ Anular** dice el pedido (`✕ Anular web LK 1545`); chip de deuda avisa la de otra sucursal.
+- 627 ms marcar_calc / 146 ms fecha con 150 pedidos. `sql/gv_cuarentena_deuda_sucursal_v2304.sql`.

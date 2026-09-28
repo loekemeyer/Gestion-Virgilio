@@ -63,7 +63,9 @@
       "Bash(PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers timeout 240 node tests/cob-cuenta-corriente.cjs)",
       "Bash(node scripts/bump-version.cjs --patch)",
       "Bash(node scripts/bump-version.cjs 23.04)",
-      "Bash(node tests/pipe-pedido-partido.cjs)"
+      "Bash(node tests/pipe-pedido-partido.cjs)",
+      "Bash(node scripts/bump-version.cjs 23.07)",
+      "Bash(node tests/apr-cuar-deuda-desde.cjs)"
     ]
   }
 }

@@ -78,6 +78,62 @@ async function fetchActual(): Promise<Map<string, number>> {
   return seen;
 }
 
+// v23.03 (problema 77, Luis): vendedor y WhatsApp de cada padron, por (empresa, cod). Antes
+// Gestion usaba clientes_vendedor / whatsapp_clientes, que no tienen empresa (foto manual de LK
+// del 11/08): a 257 clientes de Chef les tocaba el vendedor del cliente de LK con ese numero.
+interface Cont { cod_cliente: string | number | null; vend: string | number | null; whatsapp: string | null }
+async function fetchContactos(baseUrl: string, key: string): Promise<Map<string, { vend: string | null; whatsapp: string | null }>> {
+  const seen = new Map<string, { vend: string | null; whatsapp: string | null }>();
+  let offset = 0;
+  while (true) {
+    const url = baseUrl + "/rest/v1/customers?select=cod_cliente,vend,whatsapp&order=cod_cliente.asc" +
+      "&limit=" + PAGE + "&offset=" + offset;
+    const r = await fetch(url, { headers: { apikey: key, Authorization: "Bearer " + key } });
+    if (!r.ok) throw new Error("contacto REST " + r.status + ": " + (await r.text()).slice(0, 200));
+    const page: Cont[] = await r.json();
+    for (const x of page) {
+      if (!x || x.cod_cliente == null) continue;
+      const v = x.vend == null ? "" : String(x.vend).trim();
+      const w = x.whatsapp == null ? "" : String(x.whatsapp).trim();
+      seen.set(String(x.cod_cliente).trim(), { vend: v || null, whatsapp: w || null });
+    }
+    if (page.length < PAGE) break;
+    offset += PAGE;
+    if (offset > 100000) break;
+  }
+  return seen;
+}
+async function syncContactos(lk: Map<string, { vend: string | null; whatsapp: string | null }>, chef: Map<string, { vend: string | null; whatsapp: string | null }>, nowIso: string): Promise<number> {
+  const actual = new Map<string, string>();
+  let offset = 0;
+  while (true) {
+    const r = await fetch(SB_URL + "/rest/v1/GV_Clientes_Contacto?select=empresa,cod_cliente,vend,whatsapp&order=cod_cliente.asc&limit=" + PAGE + "&offset=" + offset,
+      { headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY } });
+    if (!r.ok) throw new Error("contacto actual " + r.status + ": " + (await r.text()).slice(0, 200));
+    const page: { empresa: string; cod_cliente: string; vend: string | null; whatsapp: string | null }[] = await r.json();
+    for (const x of page) actual.set(x.empresa + "|" + x.cod_cliente, (x.vend || "") + "|" + (x.whatsapp || ""));
+    if (page.length < PAGE) break;
+    offset += PAGE;
+    if (offset > 100000) break;
+  }
+  const rows: { empresa: string; cod_cliente: string; vend: string | null; whatsapp: string | null; actualizado: string }[] = [];
+  const add = (emp: string, m: Map<string, { vend: string | null; whatsapp: string | null }>) => {
+    for (const [cod, v] of m) {
+      if (actual.get(emp + "|" + cod) !== (v.vend || "") + "|" + (v.whatsapp || "")) rows.push({ empresa: emp, cod_cliente: cod, vend: v.vend, whatsapp: v.whatsapp, actualizado: nowIso });
+    }
+  };
+  add("lk", lk); add("chef", chef);
+  for (let i = 0; i < rows.length; i += 500) {
+    const w = await fetch(SB_URL + "/rest/v1/GV_Clientes_Contacto?on_conflict=empresa,cod_cliente", {
+      method: "POST",
+      headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(rows.slice(i, i + 500)),
+    });
+    if (!w.ok) throw new Error("contacto upsert " + w.status + ": " + (await w.text()).slice(0, 200));
+  }
+  return rows.length;
+}
+
 // 2026-09-28 (problema 148, Luis): antes se disparaba con un GET anonimo. Ahora verify_jwt=true
 // y adentro se exige la service_role (la manda el cron desde lecturacvs.app_secrets). El gateway
 // ya valido la firma del JWT, asi que leer el role del payload es confiable.
@@ -153,7 +209,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    return json({ ok: true, cambios: total, evaluados, lk: lk.size, chef: chef.size, chef_error: chefError || undefined, ts: nowIso });
+    // ── 6) contacto (vendedor + whatsapp) por empresa. Best-effort: si falla, el dto ya quedo ──
+    let contactoCambios = 0, contactoError = "", contactoLk = 0, contactoChef = 0;
+    try {
+      const cLk = await fetchContactos(LK_URL, LK_KEY);
+      let cChef = new Map<string, { vend: string | null; whatsapp: string | null }>();
+      if (CHEF_KEY) cChef = await fetchContactos(CHEF_URL, CHEF_KEY);
+      contactoLk = cLk.size; contactoChef = cChef.size;
+      if (cLk.size) contactoCambios = await syncContactos(cLk, cChef, nowIso);
+    } catch (e) {
+      contactoError = String((e as Error)?.message || e).slice(0, 200);
+    }
+
+    return json({ ok: true, cambios: total, evaluados, lk: lk.size, chef: chef.size, chef_error: chefError || undefined,
+      contacto: { cambios: contactoCambios, lk: contactoLk, chef: contactoChef, error: contactoError || undefined }, ts: nowIso });
   } catch (e) {
     return json({ ok: false, error: String((e as Error)?.message || e).slice(0, 300) }, 500);
   }
