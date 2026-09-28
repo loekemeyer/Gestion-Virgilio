@@ -1,4 +1,28 @@
-# Estado y pendientes — al 2026-09-23 (última actualización: v21.80)
+# Estado y pendientes — al 2026-09-28 (última actualización: v23.13)
+
+> **2026-09-28, tanda de Luis (v23.00 → v23.13) — cerrado, nada quedó a medias.**
+>
+> 1. **Lista de picking web (problema 578, corregido):** `PPP_Web_Base` se escribía sólo con upsert
+>    y nunca sacaba un artículo que dejaba la NP (E37A pickeó 954E y 956E de más). Hoy las tres
+>    escrituras (Edge `gv-ppp-web-tandas-diarias` v43, `pppGuardarWeb`, `gv_ppp_web_tanda_programar`)
+>    llaman a `gv_ppp_web_base_podar`: poda sólo si la tanda no empezó. Lo borrado queda en
+>    `GV_PPP_Web_Base_Podado`; lo de una tanda empezada, en `gv_ppp_web_base_sobrante`
+>    (vacía = todo bien). Al 28/09 marca **2**: 865ED de CH 0025 (E41A, 16 cajas) y CH 0027
+>    (E69A, 32) — **Luis: no se tocan, si el depósito avisa se ajusta.**
+> 2. **`Stock_Config` sólo con sesión de supervisor (problema 577, corregido, v23.05):** las 9
+>    escrituras vivas pasan por `_scfgAuth`; RLS `es_supervisor_virgilio()`; anon sólo lee.
+>    ⚠ En **Producción Virgilio** esos mismos botones ya no guardan.
+> 3. **Marcas de conflicto commiteadas por otras sesiones** en `sw.js` (c21f3b6, problema 579) y en
+>    `.claude/settings.local.json` (0396b2d, problema 585), las dos corregidas. Nuevo
+>    `tests/js-parsea.cjs`: los .js del navegador parsean, ningún archivo tiene marcas de conflicto
+>    y todos los .json son JSON válido.
+> 4. **Pedidos atrasados centrado** con la Programación (v23.13), y `ssg-switch` actualizado a la
+>    escritura con sesión. **Suite completa en verde: 325 corridas, 0 rojos** (sobre v23.16).
+>
+> Regla nueva en `CLAUDE.md`: *una copia que se reescribe con upsert tiene que podar lo que la
+> fuente ya no trae*. Barrido hecho: la NP entera que desaparece ya la borra `ppp_web_resync`;
+> precios tiene `reconcileStale`; direcciones de clientes **no borra y Luis decidió dejarlo así**.
+
 
 > **2026-09-23, pedido de Tomás González (v21.80) — la observación del pedido ya se puede LEER en
 > la PPP, y lo que falta NO es código: es que la página de CHEF la pida.** El badge 💬 de la v21.65
@@ -202,7 +226,7 @@
 | ~~Cargar `KRIKOS_IMAP_PASS` en el Vault de LK~~ | — | **YA ESTÁ** (comprobado 2026-09-13): el secreto está en el Vault de LK desde el 11/09 y la rama de Krikos ya está en `main`. El ingest corre: 21 OC en la bandeja y `ok:true` en cada corrida. |
 
 | **Conciliación bancaria → Cobranzas (v22.87-93, 25-26/09)** | PC de conciliación · Cobranzas → 🕵 Agente / 🏦 Bancos | **(a) ✅ 28/09:** Thomas instaló la macro en los 4 Excel (Chef pasados a `.xlsm`); las 4 hojas 2026 subieron a las 09:29-09:35 (`GV_Conc_Cargas`, `por='macro'`) y desde ahora cada guardado sube solo — ⚠ los `.xlsx` viejos de Chef quedan en la carpeta sin macro: si alguien edita ésos, no sube nada; **(b) ✅** el primer Telegram del agente salió el **28/09 08:45** (1.270 pedidos avisados) y después sólo lo nuevo — si molesta: `select cron.unschedule('gv-cobranza-aviso');`; **(c) ✅ 28/09:** coronitas cargadas desde la planilla de Thomas «Clientes con 25 superados los 14 días» en `cobranzas_excepciones` (174 clientes LK por CUIT: 152 a 20 días, 3 a 30, 19 a 60 —los «30/60» entraron como 60—; Torres y Liva pasó de 30 a 60 por la planilla; La Luguenze 4268 sin CUIT quedó afuera) y el agente recalculado; la lista NO está en el repo (público): `sql/gv_coronitas_carga_v2311.sql` tiene el mecanismo; **(d)** qué se hace con lo detectado (reclamo / nota de débito) es decisión comercial, la pantalla sólo informa. |
-| **`Stock_Config` sigue escribible con la clave pública (v22.96, 26/09)** | 10 lugares de `index.html` que hacen POST/PATCH a `Stock_Config` con `Bearer SUPABASE_KEY` (líneas ~14015, 15264, 18163, 19090, 21022, 21827, 21832, 27084, 27192, 55016) | Ahí viven el `cutoff_ts` del stock, la fecha de entrega global del carrito LK, el mínimo de 25.000 USD y los parámetros de proyección. Cerrarla (sacar `scfg_insert` / `scfg_update` de anon) exige pasar primero esas 10 escrituras a la sesión y mirar si alguna la usa un operario sin login. |
+| ~~`Stock_Config` escribible con la clave pública~~ | — | **CERRADO 28/09 (v23.05, problema 577)**: las 9 escrituras vivas van con la sesión (`_scfgAuth`) y la base sólo deja escribir a `es_supervisor_virgilio()`. Producción Virgilio ya no puede guardar esos ajustes. |
 | **Cuenta corriente por proveedor (v22.91, 26/09): datos que faltan** | 📦 Importación → 📒 Cta. proveedor · `docs/IMPORTACIONES-PAGOS-ARGENTINA.md` §10 | **(a)** la hoja `Becky` del Excel `Cuenta_Corriente_NTL.xlsx` nunca se importó (sólo Ownland y Frontier): hay que volver a mandarla; **(b)** el anticipo **6.920,86** de la 1.ª de Becky (`PI B260601`) sigue en 0 → cargarlo en 💵 Giros; **(c)** alias `Hugo → Hugo Wong` en `GV_Imp_Prov_Alias` (SQL en el §10); **(d)** FOB de Ownland: 49.291,44 cargado vs 46.626 de la planilla del 11/09. La pantalla avisa (a) y (b) sola. |
 | ~~Sacar la app VIEJA (`Produccion-Virgilio`) de las máquinas~~ **DECIDIDO 15/09** | avisado al equipo | **Thomas, 15/09: *"nueva página para mañana, no usen más la otra, usá esta"* → `https://loekemeyer.github.io/Gestion-Virgilio/`, desde el 16/09.** | **Medido el 15/09: esa app sigue en uso** (33 eventos con `gv_app` NULL en 3 días, el último el 15/09 08:02) y por eso Franco recibió remitos con `Cliente —` durante 3 días: el rename de las tablas PPP del 12/09 le rompió los endpoints. Lo tapé con dos vistas de compatibilidad (§3.gc), así que **hoy imprime bien** — pero esa app está 5 versiones mayores atrás y cada cambio de base la puede volver a romper. Las dos vistas son un **puente**: se borran cuando `select count(*) from public."Registros_Produccion_Virgilio" where gv_app is null and ts_cliente >= now() - interval '7 days'` dé 0. Problema 202. |
 
@@ -228,6 +252,11 @@
   15/09**, con ~10 armados por día. Arreglado en la v18.00 (`compTerminar` pregunta él mismo) con
   regresión en `tests/comp-terminar-unificado.cjs`. Si vuelve a aparecer en 0, mirar ahí primero.
 
+- **2026-09-28 (Luis) — las direcciones de clientes NO se podan.** `gv-sync-padron-direcciones`
+  hace upsert y no borra la dirección que desaparece de la página (8 de LK, viejas del 14/09,
+  ninguna con NP programada). Textual: *"no"*. No volver a proponerlo salvo que muerda un pedido.
+- **2026-09-28 (Luis) — el 865ED sobrante de CH 0025 / CH 0027 no se toca.** Textual: *"No toques
+  nada y cerralo, de última el depo avisa y lo ajustamos después"*.
 - **2026-09-23 — los feriados NO se automatizan: se ajustan a mano en enero.** Textual:
   *"no, queda para que se ajuste manual en enero"*. **No volver a proponer el cron.** Se midió
   antes de decidir, y el resultado sirve para que enero sea barato:
