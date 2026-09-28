@@ -41192,7 +41192,7 @@ function _pgaCuerpoHtml(dias, opts) {
         (d.mis ? ' mis' : '') + (sinRep !== null ? ' sinrep' : '') +
         '" onclick="pgaAbrirDia(\'' + d.key + '\')"' +
         (esp ? ' title="Armado y parado a propósito, sin fecha de entrega: no consume cupo, no va en ningún camión y no cuenta como atrasado. Acá se mandan las tandas armadas sin fecha; para sacar una de acá, «📅 Cambiar de día» en la tanda."' : '') + '>' +
-      '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + _pgaDiaHtml(d.key) +
+      '<td><span class="pga-chev">' + (ab ? "▾" : "▸") + '</span>' + _pgaDiaHtml(d.key) + _pgaMontoChip(_pgaValorDia(d)) +
         (d.mis ? '<span class="pga-mis" title="Este día lleva un pedido a una provincia marcada. El camión va al expreso en CABA, pero la mercadería termina en otra provincia: mirar que salga con el expreso que corresponde.">⚠ ' +
           escapeHtml(_pgaMisTxt(d.mis, d.misProv)) + '</span>' : '') +
         // v21.80 (Tomás González): cuántos comentarios lleva el día adentro. Se calcula acá, de
@@ -41217,7 +41217,7 @@ function _pgaCuerpoHtml(dias, opts) {
           (t.mis ? '<span class="pga-mis" title="Esta tanda lleva un pedido a una provincia marcada.">⚠ ' +
             escapeHtml(_pgaMisTxt(t.mis, t.misProv)) + '</span>' : '') +
           _pgaObsGrupoBadge(_pgaObsNps(t.filas), "tanda " + t.tanda) +   // v21.80
-          '<span class="pga-sub">' + escapeHtml(_pgaZonaTanda(t)) + '</span></span>' +
+          '<span class="pga-sub">' + escapeHtml(_pgaZonaTanda(t)) + '</span>' + _pgaMontoChip(_pgaValorTanda(t)) + '</span>' +
           // v19.11 (Thomas): "agregá un botón a cada tanda que sea Cambiar de día y que te permita
           // asignarla en un día diferente". Va en la fila de la TANDA y acá lo heredan las dos tablas
           // — Programación de entregas y Pedidos atrasados—, que comparten este cuerpo.
@@ -41302,9 +41302,8 @@ function _pgaCuerpoHtml(dias, opts) {
                 escapeHtml(String(_dst.provincia || "").toUpperCase()) + '</span>' : '') +
             (r.fecha_pedido ? '<span class="pga-ped" title="Fecha en que entró el pedido">ped. ' +
               escapeHtml(String(r.fecha_pedido).slice(8, 10) + "/" + String(r.fecha_pedido).slice(5, 7)) + '</span>' : '') +
-            // v23.27 (Luis, 28/09): el MONTO del pedido, de gv_ppp_np_valor (a lista, sin IVA). No se recalcula acá.
-            (function () { const vn = _pgaValorNp(r.np); return vn ? '<span class="pga-monto" title="Monto estimado a lista, sin IVA ni descuentos' +
-              (vn.sinPrecio ? ' · ' + vn.sinPrecio + ' línea' + (vn.sinPrecio === 1 ? '' : 's') + ' sin precio (*)' : '') + '">$ ' + _pgpMonto(vn.valor) + (vn.sinPrecio ? ' *' : '') + '</span>' : ''; })() +
+            // v23.27/28 (Luis, 28/09): el MONTO (gv_ppp_np_valor, a lista sin IVA) en NP, tanda y día.
+            _pgaMontoChip(_pgaValorNp(r.np)) +
             '</span>' +
             // v17.90 (Luis): "hacé que los botones sean sólo los íconos y agregá la descripción
             // cuando uno pone el mouse encima". El `title` es el que cuenta qué hace cada uno.
@@ -41887,6 +41886,13 @@ function _pgpLayout(cols) {
 }
 /* El monto de una NP sale de `gv_ppp_np_valor` (valor A LISTA, sin IVA ni descuentos), que ya
    carga `pppRefreshValor()` para el tablero de 6 días. No se recalcula acá. */
+/* v23.28 (Luis, 28/09): chip $ del monto, igual en NP, tanda y día. */
+function _pgaMontoChip(v) {
+  if (!v) return '';
+  return '<span class="pga-monto" title="Monto estimado a lista, sin IVA ni descuentos' +
+    (v.sinPrecio ? ' · ' + v.sinPrecio + ' línea' + (v.sinPrecio === 1 ? '' : 's') + ' sin precio (*)' : '') + '">$ ' +
+    _pgpMonto(v.valor) + (v.sinPrecio ? ' *' : '') + '</span>';
+}
 function _pgaValorNp(np) {
   if (!_pppValor) return null;
   const v = _pppValor.get(_pppNpNorm(np));
