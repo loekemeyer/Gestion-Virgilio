@@ -170,7 +170,7 @@ catch (_e) {
     out.cuarCols = (cuarSec.match(/<th[ >]/g) || []).length ===
                    ((cuarSec.match(/<tr class="cuar-tr[^"]*"[^>]*>([\s\S]*?)<\/tr>/) || ["", ""])[1].match(/<td[ >]/g) || []).length;
     // (3b-2) v19.05 — columnas nuevas: 1er contacto, Speech 1/2, Acción (Aprobar / Eliminar).
-    out.cliCols = /<th>Etapa<\/th>/.test(cliSec) && /Qu[eé] sigue/.test(cliSec) && /<th>Cliente · CUIT · Zona<\/th>/.test(cliSec);   // v23.08: una celda de 3 renglones
+    out.cliCols = /<th>Etapa<\/th>/.test(cliSec) && /Qu[eé] sigue/.test(cliSec) && /<th>Cliente · CUIT · Zona<\/th>/.test(cliSec);   // v23.09: una celda de 3 renglones
     out.cliSpeech = /Speech 1/.test(cliSec) && /Speech 2/.test(cliSec);
     out.cliAccion = /An[aá]lisis Cred\./.test(cliSec) && /Eliminar pedido/.test(cliSec);
     // (3b-2b) v19.90 (Thomas) — el MISMO 📖 de comentarios que Cuarentena, con su columna.
@@ -481,7 +481,7 @@ catch (_e) {
     _apr.cuarComN = { "lk:900": 3 };              // el contador que trae el lote
     aprRender(); await new Promise((res) => setTimeout(res, 200));
     html = document.getElementById("pppPreview").innerHTML;
-    out.tblEs = /cuar-tbl"/.test(html) && /<th>NP · Pedido · m³<\/th>/.test(html) &&   // v23.08
+    out.tblEs = /cuar-tbl"/.test(html) && /<th>NP · Pedido · m³<\/th>/.test(html) &&   // v23.09
                 /<th>Motivos<\/th>/.test(html) && /<th class="cuar-td-com">Coment\.<\/th>/.test(html);
     out.tblSinFichas = !/apr-card apr-card-cuar/.test(html);
     out.tblFecha = /cuar-tbl-fecha[^>]*>04\/09</.test(html);
@@ -496,7 +496,7 @@ catch (_e) {
     // la flechita abre el contenido del pedido en una fila aparte, a lo ancho de la tabla
     aprToggle("clk900"); await new Promise((res) => setTimeout(res, 120));
     html = document.getElementById("pppPreview").innerHTML;
-    out.tblDetalle = /cuar-tbl-det/.test(html) && /colspan="7"/.test(html);   // v23.08: 7 columnas (NP+fecha+m³ y cliente+zona juntos)
+    out.tblDetalle = /cuar-tbl-det/.test(html) && /colspan="7"/.test(html);   // v23.09: 7 columnas (NP+fecha+m³ y cliente+zona juntos)
     aprToggle("clk900"); await new Promise((res) => setTimeout(res, 100));
 
     // el 📖 de un retenido abre el MISMO log, con la clave del pedido
