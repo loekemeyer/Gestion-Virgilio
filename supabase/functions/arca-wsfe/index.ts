@@ -8,6 +8,12 @@
 // CAE (doble tap / timeout / dos sesiones duplicaban la factura real: NP 98277 quedo con
 // 2 CAE con 35 min de diferencia). Override consciente: {forzar:true} (igual que emitir_nc).
 
+// 2026-09-28 (problema 143, Luis) - la funcion estaba ABIERTA: verify_jwt en false y sin
+// ningun chequeo propio, o sea que cualquiera emitia facturas reales ante AFIP. Ahora:
+// verify_jwt = true en el deploy Y, adentro, TODAS las acciones (status incluido) exigen una
+// sesion de SUPERVISOR (RPC es_supervisor_virgilio con el token del que llama) o la
+// service_role. La anon key sola ya no alcanza: es publica. El front manda el token de sesion.
+
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import forge from "npm:node-forge@1.3.1";
 
@@ -256,8 +262,30 @@ async function preciarNp(c: Cfg, np: string, tanda: string): Promise<any> {
   return { np, tanda: tanda || null, cod_cliente: codCliente, cuit, cliente: cust.business_name || null, dto_vol: dto, neto, iva, total, detalle, faltan };
 }
 
+// Quien llama tiene que ser supervisor (o el propio backend con la service_role).
+// Se pregunta a la base con el token del llamador: la regla vive en es_supervisor_virgilio.
+async function esAutorizado(req: Request): Promise<boolean> {
+  const auth = req.headers.get("authorization") || "";
+  const tok = auth.replace(/^Bearer\s+/i, "").trim();
+  if (!tok) return false;
+  const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (svc && tok === svc) return true;
+  const anon = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  if (anon && tok === anon) return false;
+  try {
+    const r = await fetch(sbUrl("rpc/es_supervisor_virgilio"), {
+      method: "POST",
+      headers: { apikey: anon, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
+      body: "{}",
+    });
+    if (!r.ok) return false;
+    return (await r.json()) === true;
+  } catch (_e) { return false; }
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (!(await esAutorizado(req))) return json({ ok: false, error: "no_autorizado", nota: "Hace falta una sesion de supervisor." }, 401);
   const c = readConfig();
   const miss = missingSecrets(c);
   let body: Record<string, unknown> = {};

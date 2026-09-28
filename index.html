@@ -6190,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.00"></script>
+<script type="module" src="recepcion.js?v=23.01"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.00";
+const APP_VERSION = "v23.01";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -57446,8 +57446,11 @@ function facEmitOverride(np, tanda, rs, items){
 var ARCA_FN_URL = SUPABASE_URL + "/functions/v1/arca-wsfe";
 async function arcaCall(action, payload){
   try {
+    // v23.01 (problema 143): arca-wsfe exige sesion de SUPERVISOR; sin token responde 401.
+    var tok = null; try { if (window.sbAuth) tok = await window.sbAuth.getAccessToken(); } catch(_e){}
+    if (!tok) return { status: 401, data: { error: "no_autorizado", nota: "Iniciá sesión como supervisor para facturar." } };
     var res = await fetch(ARCA_FN_URL, {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + tok, "apikey": SUPABASE_KEY },
       body: JSON.stringify(Object.assign({ action: action }, payload || {}))
     });
     var data = null; try { data = await res.json(); } catch(_e){}
