@@ -80,21 +80,21 @@ header{display:flex;align-items:center;gap:1.4vw;flex:0 0 auto}
    una TV 16:9 sobra ancho y falta alto, así que el panel que no entraba a lo
    alto se mueve a lo ancho. Abajo de 1500 px vuelve a dos columnas (la tercera
    se apila bajo la segunda): en una pantalla angosta tres tablas no se leen. */
-main{flex:1;display:grid;grid-template-columns:1.85fr 1.05fr .72fr;gap:.8vw;min-height:0}
+main{flex:1;display:grid;grid-template-columns:1.5fr 1.25fr 1fr;gap:.8vw;min-height:0}
 main.angosto{grid-template-columns:1.55fr 1fr}
 .col{display:flex;flex-direction:column;gap:1vh;min-height:0;min-width:0}
 .card{background:#111c2f;border:1px solid #1e293b;border-radius:1vh;
   padding:.9vh 1vw;min-height:0;display:flex;flex-direction:column;overflow:hidden}
-.card-t{font-size:1.7vh;font-weight:900;color:#93c5fd;letter-spacing:.04em;
+.card-t{font-size:2.1vh;font-weight:900;color:#93c5fd;letter-spacing:.04em;
   margin-bottom:.7vh;flex:0 0 auto;overflow:hidden;line-height:1.2}
 .card-t small{color:#64748b;font-weight:700}
 .grow{flex:1;min-height:0;overflow:hidden}
 
 /* ── Tablas ───────────────────────────────────────────────────────────── */
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-th{font-size:1.4vh;font-weight:800;color:#64748b;text-align:left;
+th{font-size:1.6vh;font-weight:800;color:#64748b;text-align:left;
   padding:.4vh .5vw;border-bottom:.2vh solid #1e293b;text-transform:uppercase;letter-spacing:.04em}
-td{padding:.55vh .5vw;border-bottom:1px solid #16203a;font-size:2vh;font-weight:700}
+td{padding:.6vh .5vw;border-bottom:1px solid #16203a;font-size:2.4vh;font-weight:700}
 .num{text-align:right}
 .cen{text-align:center}
 tr.curso td{background:#1c2a12}
@@ -104,9 +104,9 @@ tr.fact td{background:#14311f}
    violeta (el mismo color que la columna SALIÓ de la PPP) y no verde. */
 tr.salio-sinfc td{background:#2a1f45}
 /* v23.64 — Resumen de días (≡ Programación de la PPP): colores de sus columnas */
-.rd-dia td{padding-top:.9vh;font-weight:900;color:#e2e8f0}
-.rd-dia small{color:#94a3b8;font-weight:700}
-.rd td{text-align:center;font-weight:900;line-height:1.05}
+.rd-dia td{padding-top:1.1vh;font-weight:900;color:#e2e8f0;font-size:2.3vh}
+.rd-dia small{color:#94a3b8;font-weight:700;font-size:1.7vh}
+.rd td{text-align:center;font-weight:900;line-height:1.05;font-size:2.3vh;padding:.5vh .2vw}
 .rd td small{display:block;font-size:.72em;font-weight:700;color:#64748b}
 .rd .sal{color:#a78bfa}.rd .fac{color:#60a5fa}.rd .arm{color:#4ade80}.rd .pro{color:#fbbf24}.rd .pen{color:#f87171}
 .rd .z{color:#334155}
@@ -122,7 +122,7 @@ tr.dia td{background:#0e1830;color:#93c5fd;font-size:1.5vh;font-weight:900;
   border-bottom:.2vh solid #1e293b}
 
 /* Tabla de tandas: el código de tanda es lo que se busca de lejos. */
-.t-tanda{font-weight:900;font-size:2.3vh;color:#f8fafc;letter-spacing:.03em;white-space:nowrap}
+.t-tanda{font-weight:900;font-size:2.5vh;color:#f8fafc;letter-spacing:.03em;white-space:nowrap}
 .t-fe{color:#94a3b8;font-weight:800}
 /* Celda de estado: ✅ terminado · ◍ girando en curso · vacío sin actividad. */
 .st{display:inline-flex;align-items:center;gap:.35vw;justify-content:center;white-space:nowrap}
@@ -143,20 +143,20 @@ tr.dia td{background:#0e1830;color:#93c5fd;font-size:1.5vh;font-weight:900;
    sin `table-layout:fixed` una razón social larga empuja el semáforo fuera de
    la pantalla. */
 table.tandas{table-layout:fixed}
-.t-np{font-size:1.5vh;font-weight:800;color:#93c5fd;white-space:nowrap;
+.t-np{font-size:1.65vh;font-weight:800;color:#93c5fd;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
-.t-cli{font-size:1.75vh;font-weight:800;color:#e2e8f0;white-space:nowrap;
+.t-cli{font-size:2.15vh;font-weight:800;color:#e2e8f0;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
-.t-cli b{color:#64748b;font-weight:900;font-size:1.4vh}
-.t-zona{font-size:1.3vh;font-weight:800;color:#94a3b8;white-space:nowrap;
+.t-cli b{color:#64748b;font-weight:900;font-size:1.7vh}
+.t-zona{font-size:1.65vh;font-weight:800;color:#94a3b8;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
-.t-dias{font-weight:900;font-size:2vh}
+.t-dias{font-weight:900;font-size:2.4vh}
 /* Semáforo: dos luces, picking y armado. Rojo = no empezó · ámbar = en curso ·
    verde = terminado · violeta = abandonado (fichó salida sin cerrar). Son
    círculos dibujados con CSS, NO emoji: los emoji los pinta la fuente del
    televisor y cambian de un modelo a otro. */
 .sem{display:inline-flex;gap:.4vw;align-items:center;justify-content:center;white-space:nowrap}
-.sem i{width:1.7vh;height:1.7vh;border-radius:50%;display:inline-block;font-style:normal;flex:0 0 auto}
+.sem i{width:2.1vh;height:2.1vh;border-radius:50%;display:inline-block;font-style:normal;flex:0 0 auto}
 .sem .s-no{background:#7f1d1d;box-shadow:inset 0 0 0 .2vh #dc2626}
 .sem .s-curso{background:#f59e0b;animation:pulso 1.4s ease-in-out infinite}
 .sem .s-ok{background:#16a34a}
@@ -166,10 +166,10 @@ table.tandas{table-layout:fixed}
 /* ── Horas por operario (v21.17, Damián) ─────────────────────────────────
    Las columnas salen de `gv_monitor_horas_operario`: la clasificación de qué
    hora es productiva vive en el BACKEND, no acá. */
-table.ops th{font-size:1.25vh;letter-spacing:0;padding:.3vh .3vw;line-height:1.15;
+table.ops th{font-size:1.4vh;letter-spacing:0;padding:.3vh .3vw;line-height:1.15;
   white-space:normal;text-align:right}
 table.ops th:first-child{text-align:left}
-table.ops td{font-size:1.75vh;padding:.45vh .3vw;text-align:right}
+table.ops td{font-size:2.25vh;padding:.65vh .25vw;text-align:right}
 table.ops td:first-child{text-align:left;font-weight:900;color:#f8fafc;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .op-prod{color:#4ade80}
@@ -179,25 +179,25 @@ table.ops td:first-child{text-align:left;font-weight:900;color:#f8fafc;
 tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
 
 /* ── Panel "En este momento" ──────────────────────────────────────────── */
-.act{display:flex;align-items:center;gap:.7vw;padding:.55vh .2vw;
-  border-bottom:1px solid #16203a;font-size:1.9vh}
+.act{display:flex;align-items:center;gap:.7vw;padding:.8vh .2vw;
+  border-bottom:1px solid #16203a;font-size:2.4vh}
 .act-idle{opacity:.55}
-.act-who{font-weight:900;color:#e2e8f0;white-space:nowrap;min-width:11vw}
+.act-who{font-weight:900;color:#e2e8f0;white-space:nowrap;min-width:7vw}
 .act-who b{color:#60a5fa;margin-right:.35vw}
 .act-what{flex:1;color:#cbd5e1;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.act-dur{font-weight:900;white-space:nowrap;font-size:1.7vh}
+.act-dur{font-weight:900;white-space:nowrap;font-size:2.1vh}
 
 /* ── Cajones de m³ del día ────────────────────────────────────────────── */
 .m3row{display:flex;gap:.8vw;flex:0 0 auto}
 .m3box{flex:1;background:#111c2f;border:1px solid #1e293b;border-radius:1vh;
   padding:.9vh 1vw;text-align:center}
-.m3lab{font-size:1.4vh;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
-.m3val{font-size:4.4vh;font-weight:900;color:#f8fafc;line-height:1.05;font-variant-numeric:tabular-nums}
+.m3lab{font-size:1.7vh;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+.m3val{font-size:5.2vh;font-weight:900;color:#f8fafc;line-height:1.05;font-variant-numeric:tabular-nums}
 .m3val small{font-size:1.8vh;color:#64748b;font-weight:800}
 
 /* ── Avisos ───────────────────────────────────────────────────────────── */
 .avisos{flex:0 0 auto;display:flex;flex-direction:column;gap:.6vh}
-.aviso{border-radius:.8vh;padding:.7vh 1vw;font-size:1.7vh;font-weight:800;line-height:1.3}
+.aviso{border-radius:.8vh;padding:.7vh 1vw;font-size:2vh;font-weight:800;line-height:1.3}
 .aviso-agr{background:#422006;color:#fde68a;border:1px solid #92400e}
 .aviso-err{background:#450a0a;color:#fecaca;border:1px solid #991b1b}
 /* v20.20 — salió y sin factura: violeta, el mismo color que la columna Salió */
@@ -244,13 +244,6 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
         <div class="card-t" id="tandasTit">Tandas</div>
         <div class="grow" id="tandasBox"></div>
       </div>
-      <!-- Alto FIJO, no "lo que ocupe el contenido": `cabenFilas` mide el panel
-           antes de llenarlo, y un panel que crece con su contenido mide 0 en el
-           primer render. -->
-      <div class="card" style="flex:0 0 34%">
-        <div class="card-t" id="actTit">En este momento</div>
-        <div class="grow" id="actBox"></div>
-      </div>
     </div>
 
     <div class="col" id="col2">
@@ -268,19 +261,26 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
            NO tenía nada por operario: la tabla "Mts3 x Hora" del monitor grande
            se había dejado afuera porque dependía de `computeClosureDur`. Ésta
            no repite ese cálculo: lo lee ya resuelto del backend. -->
-      <div class="card grow">
+      <!-- v23.69 (Luis): casi nunca hay más de 4 operarios a la vez, así que Operarios y
+           «En este momento» comparten la columna del medio y la tabla de tandas usa todo el
+           alto de la izquierda. Alto FIJO: `cabenFilas` mide el panel antes de llenarlo. -->
+      <div class="card" style="flex:0 0 31%">
         <div class="card-t" id="opsTit">Operarios · horas de hoy</div>
         <div class="grow" id="opsBox"></div>
+      </div>
+      <div class="card grow">
+        <div class="card-t" id="actTit">En este momento</div>
+        <div class="grow" id="actBox"></div>
       </div>
       <div class="avisos" id="avisos"></div>
     </div>
 
     <div class="col" id="col3">
-      <div class="card grow">
+      <div class="card" style="flex:1.15 1 0">
         <div class="card-t" id="fcTit">Resumen de días</div>
         <div class="grow" id="fcBox"></div>
       </div>
-      <div class="card grow">
+      <div class="card" style="flex:.85 1 0">
         <div class="card-t">Total por día</div>
         <div class="grow" id="totBox"></div>
       </div>
@@ -1068,7 +1068,7 @@ function actividadActual(eventos, hoy, fjHoy, fichados) {
 function cabenFilas(id, conEncabezado) {
   var box = el(id);
   var alto = box ? box.clientHeight : 0;
-  var fila = Math.max(12, window.innerHeight * 0.034);   // ≈ padding + texto de una fila
+  var fila = Math.max(12, window.innerHeight * 0.041);   // ≈ padding + texto de una fila (v23.69: fuentes más grandes)
   var libre = alto - (conEncabezado ? fila : 0);
   return Math.max(1, Math.floor(libre / fila));
 }
@@ -1225,9 +1225,9 @@ function pintar(d) {
   el("tandasTit").innerHTML = "Tandas <small>· entrega " + esc(etiqueta) + "</small>";
   var topeT = cabenFilas("tandasBox", true);
   el("tandasBox").innerHTML = filas.length
-    ? '<table class="tandas"><colgroup><col style="width:12.5%"><col style="width:12.5%">' +
-      '<col><col style="width:6.5%"><col style="width:6%"><col style="width:15%">' +
-      '<col style="width:16.5%"></colgroup>' +
+    ? '<table class="tandas"><colgroup><col style="width:11.5%"><col style="width:12.5%">' +
+      '<col><col style="width:7%"><col style="width:6.5%"><col style="width:11%">' +
+      '<col style="width:17.5%"></colgroup>' +
       '<thead><tr><th>Tanda</th><th>N° Pedido</th><th>Cliente</th>' +
       '<th class="num">M³</th><th class="cen" title="Días hábiles entre la fecha del pedido y la fecha para la que quedó programado">Días</th>' +
       '<th>Zona</th><th class="cen">Progreso</th></tr></thead><tbody>' +
@@ -1438,12 +1438,12 @@ function pintarHoras(filas) {
   el("opsTit").innerHTML = "Operarios · horas de hoy <small>· " + filas.length +
     " · " + pct + "% productivas</small>";
   el("opsBox").innerHTML = '<table class="ops"><thead><tr><th>Operario</th>' +
-    '<th title="Promedio de horas por tanda pickeada">Prom hs<br>picking</th>' +
-    '<th title="Promedio de horas por tanda armada">Prom hs<br>armado</th>' +
-    '<th title="Picking + armado + carga camión + remitos">Hs<br>prod</th>' +
-    '<th title="Guardado a góndola, recepción de mercadería e insumos">Hs<br>mov</th>' +
-    '<th title="Timbre, baño, limpieza, comida, conteo, permiso">Hs no<br>prod</th>' +
-    '<th>Total<br>hs</th></tr></thead><tbody>' + cuerpo + total + '</tbody></table>' +
+    '<th title="Horas promedio por tanda pickeada">h/tanda<br>pick</th>' +
+    '<th title="Horas promedio por tanda armada">h/tanda<br>arm</th>' +
+    '<th title="Picking + armado + carga camión + remitos">Prod</th>' +
+    '<th title="Guardado a góndola, racks, recepción de mercadería e insumos">Mov</th>' +
+    '<th title="Timbre, baño, limpieza, comida, conteo, permiso">No<br>prod</th>' +
+    '<th>Total</th></tr></thead><tbody>' + cuerpo + total + '</tbody></table>' +
     (filas.length > maxOp ? '<div class="mas">+ ' + (filas.length - maxOp) + ' más</div>' : "");
 }
 

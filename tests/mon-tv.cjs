@@ -345,7 +345,7 @@ function responder(url) {
   // ── v21.17 · tabla de horas por operario
   ok(/Farias J\./.test(r.ops), "la tabla de operarios no muestra el nombre corto");
   ok(/Ortiz F\./.test(r.ops), "falta un operario de la tabla de horas");
-  ok(/Prom hs/.test(r.ops) && /Hs no/.test(r.ops), "faltan las columnas de horas pedidas");
+  ok(/h\/tanda/.test(r.ops) && /No<br>prod/.test(r.ops), "faltan las columnas de horas pedidas (v23.69: h\/tanda pick\/arm, Prod, Mov, No prod)");
   ok(/0,8/.test(r.ops), "no muestra el promedio de horas por tanda pickeada");
   ok(/6,9/.test(r.ops) && /11,6/.test(r.ops),
      "la fila de Total no suma bien (prod 4,5+2,4=6,9 · total 6,2+5,4=11,6): " + r.ops.replace(/<[^>]*>/g, " "));
