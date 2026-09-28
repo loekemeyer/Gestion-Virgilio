@@ -30076,3 +30076,10 @@ Caso: LK 1506 (Multi Bazar, LK 0178/0179) pickeada en E37E el 25/09 salió de la
   *"BLOQUEADO … requiere coordinación entre Cobranzas y Virgilio"*. Retira el criterio de la v17.85/v16.03.
 - `gv_ppp_np_desarmar` marca `gv.desarmando` (devuelve el stock y recién ahí desprograma): no se bloquea.
 - Probado en transacción abortada: pickeada bloquea, sin empezar pasa, desarme pasa, ISIS (98480/D47B) bloquea.
+
+### §3.v2315 — v23.15: barrido de las salidas de programación · freno en cancelar ISIS · centinela — 2026-09-28
+
+Barrido de todo lo que saca una NP de la programación (ver cabecera de `sql/gv_desprogramar_freno_cancelar_isis_v2315.sql`): la única puerta sin
+freno para tanda empezada era la rama ISIS de `gv_ppp_np_cancelar` → ahora bloquea igual (probado con 98480/D47B).
+Centinela: `select * from public.gv_pedido_pickeado_desprogramado;` — vacía = ninguna NP quedó afuera con su
+tanda pickeándose (al 28/09: vacía).
