@@ -1,0 +1,72 @@
+# Plan: login de operarios por legajo + red de la empresa (2026-09-28)
+
+**Objetivo (Thomas, 28/09):** que la clave pública (`sb_publishable_…`, está en repos públicos) no
+sirva para hacer daño. Jerarquía de acceso:
+
+| Nivel | Cómo entra | Desde dónde | Qué puede |
+|---|---|---|---|
+| **operario** | legajo | **solo red de la empresa** (IP fija Cervantes / Virgilio) | cargar SUS registros, deshacer los suyos < 15 min |
+| **supervisor** | Google (whitelist) | cualquier lugar | corregir lo de todos |
+| **admin** | Google (whitelist, rol admin) | cualquier lugar | maestros, precios, empleados |
+| clave pública sola | — | — | **nada** que escriba; solo lo mínimo para mostrar el login |
+
+Datos del dueño (28/09): las dos plantas tienen **IP fija**; el **Wi-Fi de invitados está separado**.
+Medido (28/09): la IP que ve el servidor **no se puede falsificar** con cabeceras (`X-Forwarded-For`,
+`X-Real-IP` probados contra `fichada-qr-fichar` → el gateway los pisa).
+
+Apps alcanzadas: **Gestión Virgilio** (`index.html` + `recepcion.js` + `sw.js`, más las copias de
+`cervantes/` y `cervantes-admin/`) y **Registro Producción 2.0** (`app.js` + `sw.js`, repo
+`loekemeyer/Registro-Produccion-2.0`).
+
+## Diseño
+
+1. **Lista de redes**: tabla `public.red_empresa (ip, sede, activo)` con las IP fijas de Cervantes y
+   Virgilio (hoy la fichada usa `FichadaQR.config.ip_trabajo`: se toma de ahí y se unifica). RLS sin
+   políticas (solo service_role).
+2. **Edge Function `login-operario`** (`verify_jwt=false`, la llama la pantalla de legajo):
+   - toma la **IP real** del pedido y la busca en `red_empresa` → si no está: 403 *"solo desde la red
+     de la empresa"* (y se anota, para detectar un cambio de IP);
+   - valida que el legajo exista y esté activo en `Empleados`;
+   - devuelve una **sesión de Supabase** del usuario `op<legajo>@operarios.interno` (se crea la primera
+     vez, `app_metadata = {rol:'operario', legajo}`), generada del lado del servidor (admin API).
+     La contraseña no existe para nadie: la única puerta es esta función.
+3. **La sesión vence al final del turno**: cron nocturno (23:00 AR) que borra las sesiones de los
+   usuarios operario (`auth.sessions` / `auth.refresh_tokens`). Al día siguiente, legajo de nuevo.
+4. **En la base**: helpers `public.jwt_rol()` y `public.jwt_legajo()` (leen `auth.jwt()->'app_metadata'`).
+   Las políticas y RPCs que hoy dicen `to anon ... using (true)` pasan a
+   `to authenticated using (jwt_rol() in ('operario','supervisor','admin'))`, y las de "lo mío"
+   comparan `legajo = jwt_legajo()`.
+5. **Cola offline (`sw.js`, las dos apps)**: hoy reenvía con la clave pública. La página guarda el
+   último `access_token` en IndexedDB; el SW lo usa; si da 401 el ítem **queda en la cola** (no se
+   pierde) hasta que la página renueve la sesión. Es la parte más delicada: se prueba con la tablet
+   sin red, cargando, y reconectando.
+6. **Supervisores**: sin cambios (Google). Pantallas de admin que hoy escriben con la clave pública
+   (ej. `Stock_Config` desde 10 lugares de `index.html`) pasan a la sesión Google.
+
+## Etapas (en este orden; saltear la 3 es lo que obligó a volver atrás el 16/09)
+
+| # | Qué | Rompe algo | Cómo se sabe que terminó |
+|---|---|---|---|
+| 0 | **Inventario** de toda escritura con la clave pública, por app y por tabla/RPC, sacado de los logs de la API (3–5 días hábiles) + código | no | lista cerrada, cada escritura con su app dueña |
+| 1 | `red_empresa` + `login-operario` + cron de cierre + helpers `jwt_rol/jwt_legajo` | no (nadie los usa aún) | login probado desde la red y rechazado desde afuera |
+| 2 | Las dos apps piden legajo contra `login-operario` y **mandan la sesión** (también el SW). La base todavía acepta anon | no | versión nueva en todas las tablets (`gv_app` / versión en logs) |
+| 3 | **Medir**: en los logs, cero escrituras con rol anon durante N días hábiles | no | 0 escrituras anon, por tabla |
+| 4 | **Cerrar** tabla por tabla / RPC por RPC: anon → `authenticated` con rol. Una tanda por día, con vuelta atrás escrita | si algo quedó afuera del inventario, eso | cada tanda sin 401 nuevos en logs |
+| 5 | Lecturas con datos personales (`Empleados`, `Proveedores`, contactos, fichadas) solo con sesión | pantallas que lean sin sesión | idem |
+
+## Riesgos
+
+- **Cambio de IP** (el proveedor la cambia): nadie puede entrar. Mitigación: `login-operario` avisa
+  por Telegram al primer rechazo por IP desde un legajo válido; actualizar `red_empresa` es una fila.
+- **Operarios en datos móviles**: quedan afuera (buscado).
+- **Alguien en la red con un legajo ajeno**: la IP prueba el lugar, no la persona. Con Wi-Fi de
+  invitados separado el riesgo queda en gente de adentro. Si hace falta más: PIN (etapa futura).
+- **TV de pared / monitores** (solo leen): o se les da un usuario de dispositivo, o las vistas que
+  muestran quedan legibles sin sesión si no tienen datos personales.
+
+## Lo que ya se cerró el 28/09 sin esperar este plan
+
+`diag_ins` (subía a cualquier bucket), `remitos` sin borrar ni pisar, token de altas, `leer-produccion-foto`
+con sesión y tope, `send-rendimiento-matrices` dada de baja, `gv-alta-articulo` acotada,
+`send-whatsapp` sin texto libre público (y arreglado el aviso de sugerencias de Planify). Detalle en
+`sql/seguridad_anon_v2338.sql` y en el informe `SEGURIDAD_ANON_GESTION_VIRGILIO_2026-09-28.md` (repo GP2).
