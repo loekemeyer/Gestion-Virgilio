@@ -166,7 +166,7 @@ catch (_e) {
     out.nuevoCodChip = /cuar-card-cod[^>]*>CH 2533</.test(cliSec);
     out.cliNuevosSinMixto = !/Cliente Nuevo Deudor/.test(cliSec);
     // (3a-2) v19.94 (Thomas) — Cuarentena también muestra el MONTO del pedido.
-    out.cuarMontoCol = !/<th class="cuar-td-m3">Monto<\/th>/.test(cuarSec) && /cuar-monto-nuevo/.test(cuarSec);   // v23.12: el monto va bajo Motivos
+    out.cuarMontoCol = !/<th class="cuar-td-m3">Monto<\/th>/.test(cuarSec) && /cuar-monto-nuevo/.test(cuarSec);   // v23.14: el monto va bajo Motivos
     out.cuarCols = (cuarSec.match(/<th[ >]/g) || []).length ===
                    ((cuarSec.match(/<tr class="cuar-tr[^"]*"[^>]*>([\s\S]*?)<\/tr>/) || ["", ""])[1].match(/<td[ >]/g) || []).length;
     // (3b-2) v19.05 — columnas nuevas: 1er contacto, Speech 1/2, Acción (Aprobar / Eliminar).
@@ -496,7 +496,7 @@ catch (_e) {
     // la flechita abre el contenido del pedido en una fila aparte, a lo ancho de la tabla
     aprToggle("clk900"); await new Promise((res) => setTimeout(res, 120));
     html = document.getElementById("pppPreview").innerHTML;
-    out.tblDetalle = /cuar-tbl-det/.test(html) && /colspan="6"/.test(html);   // v23.12: 6 columnas (el monto va bajo Motivos)
+    out.tblDetalle = /cuar-tbl-det/.test(html) && /colspan="6"/.test(html);   // v23.14: 6 columnas (el monto va bajo Motivos)
     aprToggle("clk900"); await new Promise((res) => setTimeout(res, 100));
 
     // el 📖 de un retenido abre el MISMO log, con la clave del pedido

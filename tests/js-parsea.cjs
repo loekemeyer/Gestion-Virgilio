@@ -32,6 +32,13 @@ for (const f of archivos) {
   }
 }
 
+// 3) los .json versionados tienen que ser JSON válido (el 28/09 settings.local.json quedó con
+//    marcas de conflicto commiteadas y el archivo entero dejó de leerse)
+for (const f of archivos.filter(x => x.endsWith(".json"))) {
+  try { JSON.parse(fs.readFileSync(path.join(root, f), "utf8").replace(/^\uFEFF/, "")); }
+  catch (e) { console.log("FALLA " + f + " no es JSON válido: " + e.message); fallas++; }
+}
+
 console.log(fallas ? "js-parsea: " + fallas + " falla(s)"
                    : "js-parsea: OK — " + scripts.length + " scripts parsean, " + archivos.length + " archivos sin marcas de conflicto");
 process.exit(fallas ? 1 : 0);

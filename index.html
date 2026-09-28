@@ -3542,6 +3542,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-blk > .pn-head{ width:0; min-width:100%; }
 .pga-blk > .pn-head > div:first-child{ min-width:0; }   /* el título puede envolver, no empujar */
 .pga-blk > .pn-head .pn-tools{ flex:0 0 auto; }
+/* v23.13: el encabezado de Pedidos atrasados tampoco manda el ancho (lo da la tabla de abajo). */
+.pga-blk > .patr > .patr-h{ width:0; min-width:100%; box-sizing:border-box; }
+/* y las dos tablas (atrasados y programación) llenan el mismo ancho: los bordes quedan parejos. */
+.pga-blk table.pga{ width:100%; }
 .pn-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:2px 0 12px; }
 .pn-h1{ font-size:24px; font-weight:900; letter-spacing:-.3px; }
 .pn-h2{ color:#64748b; font-size:13px; font-weight:600; margin-top:2px; }
@@ -6201,7 +6205,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.12"></script>
+<script type="module" src="recepcion.js?v=23.14"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10160,7 +10164,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.12";
+const APP_VERSION = "v23.14";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -41490,10 +41494,11 @@ function _pppArbolHtml(programados) {
   // una nota al pie de lo que viene. Reemplaza a la banda "⏰ N atrasados · Ver la
   // lista →", que contaba con otro criterio (no miraba el FSS) y mandaba a otra
   // pantalla; dejar las dos era mostrar dos números distintos de lo mismo.
-  let h = _patrHtml();
   // ⚠ `pga-blk` abre acá y CIERRA EN LAS CUATRO SALIDAS de esta función (las tres tempranas y
   // la final). Si se agrega una salida nueva, el `</div>` va también ahí.
-  h += '<div class="pga-blk">';
+  // v23.13 (Luis, 28/09: "centrá la parte de atrasados para que esté alineada con el resto de
+  // la programación"): Pedidos atrasados va ADENTRO del bloque centrado, así toma su mismo ancho.
+  let h = '<div class="pga-blk">' + _patrHtml();
   // v21.36 (Luis, 22/09: "saca el coso de «tocá un día», ocupa mal el espacio"): la bajada
   // era una línea de 90 caracteres adentro del flex de `.pn-head`, así que en el celular le
   // comía el ancho al título y lo partía en 3 renglones. Lo que explicaba ya se descubre
@@ -49542,7 +49547,7 @@ function aprColCuarentena() {
       '</td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) +
         '<div class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprSucBadge(p) + aprHorBadge(p) + aprObsBadge(p) + '</div></td>' +
-      // v23.12 (Luis, 28/09: "monto y motivos son redundantes? aparece vacío monto"): la columna
+      // v23.14 (Luis, 28/09: "monto y motivos son redundantes? aparece vacío monto"): la columna
       // Monto quedaba vacía en todo retenido que no es cliente nuevo (regla v22.40). Ahora el monto
       // va DEBAJO de los motivos, y sólo cuando aplica.
       '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') +
@@ -50261,7 +50266,7 @@ function clinBrand(p) { return String((p && p.empresa) || "lk") === "chef" ? "Ch
    pedido ANTES del armado y la entrega, así que el Speech 1 le manda el mismo número que va a
    tener la factura: todo lo que pidió, valorizado por lista, con IVA. Sale de
    gv_clientes_nuevos_valor_lote (valor_con_iva = neto × 1,21; el neto ya trae el 2 % web). */
-/* v23.12: las partes de un pedido PARTIDO (el original + lo que espera reingreso), para cobrar la suma */
+/* v23.14: las partes de un pedido PARTIDO (el original + lo que espera reingreso), para cobrar la suma */
 function clinMiembros(p) {
   if (!p || p._demo) return [p];
   const k = aprKey(p.empresa, p.order_id);
@@ -50274,7 +50279,7 @@ function clinSpeechMsg1(p) {
   /* v21.98 (Vivi): el monto del Speech es el que hay que COBRAR — el neto con el descuento por
      pago adelantado y después el IVA. Sin el dato del plazo de pago cae al total por lista, que
      es lo que decía antes: nunca se inventa el descuento. */
-  const vg = clinValorGrupo(clinMiembros(p));   // v23.12: pedido partido = se cobra la suma
+  const vg = clinValorGrupo(clinMiembros(p));   // v23.14: pedido partido = se cobra la suma
   const ac = clinACobrar(p, vg);
   const v = vg || (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)];
   const iva = ac ? ac.aCobrarIva : (v && isFinite(v.valorIva) && v.valorIva > 0 ? v.valorIva : null);
@@ -50341,7 +50346,7 @@ function clinAccionBtns(p) {
 /* v19.37 (Luis): el número que importa acá es el TOTAL CON IVA — es el que se le manda al
    cliente nuevo por Speech 1 y el que tiene que pagar antes del armado. El neto queda arriba
    (es el que se compara con el límite de crédito y con la lista), el con IVA abajo. */
-/* v23.12 (Luis, 28/09: "si monto es el pedido/suma de pedidos no está funcionando bien"). Un
+/* v23.14 (Luis, 28/09: "si monto es el pedido/suma de pedidos no está funcionando bien"). Un
    pedido PARTIDO por importados va en una sola fila (v23.06) y su monto tiene que ser la SUMA de
    las partes, no sólo la del original. Las partes comparten cliente y plazo de pago, así que el
    descuento es el del original. Sin el valor de alguna parte todavía: "…", no un número a medias. */
@@ -51258,7 +51263,7 @@ async function pipeSpeech(empresa, orderId, n) {
   }
   clinAbrirWa(p, n === 2 ? clinSpeechMsg2(p) : clinSpeechMsg1(p));
 }
-/* v23.12 (Luis, 28/09): "si falta algún valor de algún producto para un cliente nuevo, tiene que
+/* v23.14 (Luis, 28/09): "si falta algún valor de algún producto para un cliente nuevo, tiene que
    saltar una alerta cuando se aprieta contacto 1, ya que el monto que se le va a pedir puede
    diferir bastante de lo que termina siendo el pedido". Antes de marcar el Speech 1 y abrir
    WhatsApp se trae la composición (gv_clin_composicion, la misma del 🧾) de cada parte del pedido

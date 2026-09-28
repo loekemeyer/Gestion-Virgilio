@@ -41,7 +41,8 @@ if (!src.includes("function patrNeed")) fallas.push("falta patrNeed (la carga de
 if (!src.includes("function _patrHtml")) fallas.push("falta _patrHtml");
 
 // 2) va arriba de la programación
-const iPatr = src.indexOf("let h = _patrHtml();");
+// v23.13: va ADENTRO del bloque centrado (`pga-blk`), para que tome el mismo ancho que la tabla.
+const iPatr = src.indexOf('let h = \'<div class="pga-blk">\' + _patrHtml();');
 const iProg = src.indexOf('<div class="pn-h1">Programación de entregas</div>');
 if (iPatr < 0) fallas.push("_pppArbolHtml no empieza por el submódulo de atrasados");
 else if (iProg < 0 || iPatr > iProg) fallas.push("el submódulo no queda ARRIBA de «Programación de entregas»");
