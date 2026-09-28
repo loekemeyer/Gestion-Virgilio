@@ -88,7 +88,7 @@ ok(src, "(c) no existe _impEscribir");
   // (d) v22.96 — las RPC que ESCRIBEN van con la sesión (la base las rechaza sin supervisor); las de lectura, con la clave.
   const lista = (html.match(/const _PED_IMP_RPC_ESCRITURA = \[([\s\S]*?)\];/) || [])[1] || "";
   const enLista = (lista.match(/"([a-z_0-9]+)"/g) || []).map(function (x) { return x.replace(/"/g, ""); });
-  ok(enLista.length === 21, "(d) la lista de RPC de escritura tiene " + enLista.length + " (se esperaban 21)");
+  ok(enLista.length === 24, "(d) la lista de RPC de escritura tiene " + enLista.length + " (se esperaban 24: v23.44 suma gv_imp_recibir, _contexto y _recepcion_historial, sólo authenticated)");
   const escrituras = {};
   (html.match(/_pedImpRpc\("([a-z_0-9]+)"/g) || []).forEach(function (m) {
     const n = m.slice(12, -1);

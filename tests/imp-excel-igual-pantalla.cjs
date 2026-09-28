@@ -17,7 +17,8 @@ const ctx = {
   document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } }, setTimeout: () => {},
 };
 vm.createContext(ctx);
-["_pedImpMcOf", "_pedImpUniOf", "_pedImpUsdOf", "_pedImpM3Of", "pedImpExportExcel"].forEach((n) => vm.runInContext(fn(n), ctx));
+// v23.44: el Excel usa _impCodVista/_impPlantaVista desde la v23.28 → se cargan también.
+["_impLRuteo", "_impCodVista", "_impPlantaVista", "_pedImpMcOf", "_pedImpUniOf", "_pedImpUsdOf", "_pedImpM3Of", "pedImpExportExcel"].forEach((n) => vm.runInContext(fn(n), ctx));
 const items = [
   { cod: "440E", key: "440E", prov: "Ningbo", aPedirUni: 0, aPedirCajas: 0, uniMaster: 24, fobUni: 3.95 },
   { cod: "590E", key: "590E", prov: "Ningbo", aPedirUni: 240, aPedirCajas: 10, uniMaster: 24, fobUni: 1, m3Master: 0.1 },
