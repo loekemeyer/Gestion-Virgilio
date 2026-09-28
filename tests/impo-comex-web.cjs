@@ -28,5 +28,16 @@ if (fs.existsSync(path.join(dir, "index.html"))) {
   ok(!/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9/.test(js), "(c) la copia lleva una clave legacy (JWT): usar la sb_publishable_");
 }
 
+// (d) el fuente de la puerta vive acá y tampoco lleva datos personales: los lee de la base
+const puerta = path.join(__dirname, "..", "supabase", "impo-comex-web", "index.ts");
+ok(fs.existsSync(puerta), "(d) falta supabase/impo-comex-web/index.ts (fuente de la puerta)");
+if (fs.existsSync(puerta)) {
+  const ts = fs.readFileSync(puerta, "utf8");
+  ok(!/16894232|Maturana/.test(ts), "(d) la puerta lleva los datos personales de la DDJJ");
+  ok(ts.includes("gv_impo_comex_ddjj_controlante"), "(d) la puerta no lee el controlante de la base");
+}
+for (const f of fs.readdirSync(path.join(__dirname, "..", "sql")).filter(f => /impo_comex/.test(f)))
+  ok(!/16894232|Maturana/.test(fs.readFileSync(path.join(__dirname, "..", "sql", f), "utf8")), `(d) sql/${f} lleva datos personales`);
+
 if (fallas.length) { console.error("✗ impo-comex-web:\n  - " + fallas.join("\n  - ")); process.exit(1); }
 console.log("✓ impo-comex-web: botón en Importación, copia armada web, sin token ni datos personales");
