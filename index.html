@@ -19656,13 +19656,21 @@ var STK_POP_CSS =
   // entre sí) y con overflow-x:hidden cortaba m³ y Acciones. Acá: anchos por <colgroup>,
   // scroll horizontal, header en 2 líneas y primera columna fija al hacer scroll.
   ".mva-tblwrap.wide{overflow-x:auto;-webkit-overflow-scrolling:touch;}" +
-  ".mva-tbl.wide{width:100%;min-width:1366px;}" +   // = suma del <colgroup> de Pedidos Importación (incl. Reingreso)
+  // v23.42 (Luis): sin hueco entre Descripción y Proy. La tabla mide lo que suman sus columnas
+  // (no el 100% del popup), letra más grande y columnas dobles (Proy/Objetivo, En curso/A pedir,
+  // Unidades/FOB, u$s/m³). Descripción en hasta 2 renglones.
+  ".mva-tbl.wide{width:1148px;min-width:1148px;font-size:13px;}" +   // = suma del <colgroup> de Pedidos Importación
+  ".mva-tbl.wide td:nth-child(2){white-space:normal;line-height:1.25;}" +
+  ".mva-tbl.wide td:nth-child(2) .imp-desc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}" +
+  ".mva-tbl.wide td:nth-child(4){white-space:normal;line-height:1.3;}" +
+  ".mva-tbl.wide .imp2 small{display:block;font-size:11.5px;color:#64748b;font-weight:600;margin-top:1px;}" +
+  ".mva-tbl.wide thead th small{display:block;font-weight:700;color:#94a3b8;}" +
   ".mva-tbl.wide th.num,.mva-tbl.wide td.num{width:auto;}" +   // manda el <colgroup>, no el 15% genérico
   ".mva-tbl.wide th,.mva-tbl.wide td{vertical-align:middle;overflow:hidden;}" +
-  ".mva-tbl.wide thead th,.mva-tbl.wide td:nth-child(2){text-overflow:ellipsis;}" +   // solo header y Descripción cortan con «…»
+  ".mva-tbl.wide thead th{text-overflow:ellipsis;}" +   // solo header y Descripción cortan con «…»
   ".mva-tbl.wide thead th{white-space:normal;line-height:1.25;}" +   // 'Proy u/mes' entra en 2 renglones
-  ".mva-tbl.wide th:nth-child(9),.mva-tbl.wide td:nth-child(9){border-left:2px solid #cbd5e1;}" +   // arranca el bloque PEDIDO
-  ".mva-tbl.wide th:nth-child(14),.mva-tbl.wide td:nth-child(14){border-left:1px solid #e2e8f0;}" +
+  ".mva-tbl.wide th:nth-child(7),.mva-tbl.wide td:nth-child(7){border-left:2px solid #cbd5e1;}" +   // arranca el bloque PEDIDO
+  ".mva-tbl.wide th:nth-child(10),.mva-tbl.wide td:nth-child(10){border-left:1px solid #e2e8f0;}" +
   ".mva-tbl.wide th:first-child,.mva-tbl.wide td:first-child{position:sticky;left:0;z-index:1;background:#fff;box-shadow:1px 0 0 #e2e8f0;}" +
   ".mva-tbl.wide thead th:first-child{z-index:3;background:#f8fafc;}" +
   ".mva-tbl.wide tbody tr:hover td:first-child{background:#f9fbff;}" +
@@ -20800,6 +20808,7 @@ function _impTabsHtml(cur) {
     '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">🚢 En curso</button>' +
     '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">💱 NTL</button>' +
     '<button style="' + t(cur === 'provcc') + '" onclick="openImpProvCC()" title="Una cuenta por fábrica: cuánto le debemos por los pedidos en curso, cada giro, y la historia (hoja del Excel + extracto NTL).">📒 Cta. proveedor</button>' +
+    '<button style="' + t(cur === 'hist') + '" onclick="openImpHistRecep()" title="Cada recepción hecha con 📥 RECIBIR: cuándo, qué, cuánto y dónde se guardó.">📜 Historial recepción</button>' +
     '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button>' +
     '<button style="' + t(false) + '" onclick="openImpoComex()" title="Verificación de documentos de importación (IMPO COMEX). Sólo supervisores.">🛃 IMPO COMEX</button></div>';
 }
@@ -21539,8 +21548,8 @@ function _pedImpRender() {
     // v11.70 — anchos explícitos por <colgroup> (suman los 1180px del min-width): sin esto
     // las 14 columnas se pisaban entre sí. Bloque diagnóstico (proy→a pedir) | bloque pedido (MC→m³).
     h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide">' +
-      '<colgroup><col style="width:104px"><col><col style="width:68px"><col style="width:78px"><col style="width:96px"><col style="width:68px"><col style="width:72px"><col style="width:98px"><col style="width:98px"><col style="width:80px"><col style="width:78px"><col style="width:92px"><col style="width:58px"><col style="width:120px"><col style="width:96px"></colgroup>' +
-      '<thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Objetivo</th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master (master cajas redondas)">Unidades</th><th class="num" title="FOB unitario (USD)">FOB u$s/u</th><th class="num" title="u$s = unidades × FOB">u$s</th><th class="num" title="m³ = MC × m³/master">m³</th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
+      '<colgroup><col style="width:100px"><col style="width:200px"><col style="width:78px"><col style="width:104px"><col style="width:82px"><col style="width:66px"><col style="width:94px"><col style="width:96px"><col style="width:92px"><col style="width:128px"><col style="width:108px"></colgroup>' +
+      '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="En curso (unidades ya pedidas que no llegaron) y a pedir (unidades calculadas)">En curso<small>A pedir u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.sort(function (a, b) { return _pedImpUniOf(b) - _pedImpUniOf(a) || (b.aPedirUni - a.aPedirUni); }).forEach(function (it) {
       const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
@@ -21564,7 +21573,8 @@ function _pedImpRender() {
         const lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
         const _prv = encodeURIComponent(d.prov || it.prov || '');
         return '<div style="margin:1px 0">' + (lbl ? lbl + '<br>' : '') + '<span style="white-space:nowrap">' +
-          '<button class="stk-btn" style="padding:3px 9px;font-size:12px" title="Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="pedImpBaches(' + d.id + ',\'' + _codEncV + '\',\'' + _prv + '\')">📦 Baches</button></span></div>';
+          '<button class="stk-btn" style="padding:3px 9px;font-size:12px" title="Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="pedImpBaches(' + d.id + ',\'' + _codEncV + '\',\'' + _prv + '\')">📦 Baches</button></span>' +
+          (Number(d.curso) > 0 ? '<br><button class="stk-btn" style="padding:3px 9px;font-size:12px;margin-top:3px;background:#0f766e;color:#fff;border-color:#0f766e;font-weight:800" title="Recibir lo que llegó de este pedido: cuánto, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Queda en el Historial de recepción." onclick="impRecibirAbrir(' + d.id + ')">📥 RECIBIR</button>' : '') + '</div>';
       }).join('');
       const _m3m = Number(it.m3Master) || 0;
       const _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
@@ -21587,7 +21597,7 @@ function _pedImpRender() {
       const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _rg = it.reingresoEst ? String(it.reingresoEst).slice(0, 10) : "";
       const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _keyEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
-      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td><td class="num imp2">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td><td class="num">' + stockTxt + '</td><td class="num imp2">' + it.enCurso + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -21679,7 +21689,8 @@ const _PED_IMP_RPC_ESCRITURA = ["gv_imp_carga_pedido_set", "gv_imp_cc_deuda_add"
   "gv_imp_cc_set", "gv_imp_ntl_efectivo_add", "gv_imp_ntl_efectivo_borrar", "gv_imp_pago_add", "gv_imp_pago_borrar",
   "gv_imp_pago_cargas_set", "gv_imp_prov_alias_set", "gv_importado_bache_add", "gv_importado_bache_borrar",
   "gv_importado_bache_editar", "gv_importado_bache_embarque", "gv_importado_bache_llego", "gv_importado_pedido_fechas",
-  "gv_importado_pedido_ref", "gv_importados_resync", "importados_marcar_llegada", "importados_set_curso"];
+  "gv_importado_pedido_ref", "gv_importados_resync", "importados_marcar_llegada", "importados_set_curso",
+  "gv_imp_recibir", "gv_imp_recibir_contexto", "gv_imp_recepcion_historial"];   // v23.42 — sólo authenticated (supervisor)
 async function _pedImpRpc(fn, body) {
   var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   if (_PED_IMP_RPC_ESCRITURA.indexOf(fn) >= 0) {
@@ -22040,7 +22051,7 @@ function _impBachesRender() {
       "<td>" + f + "</td>" +
       '<td><span class="ibc-tag ' + (enc ? "en" : "ll") + '">' + (enc ? "en curso" : "llegado") + "</span></td>" +
       '<td style="white-space:nowrap">' +
-        (enc ? '<button class="ibc-b ok" onclick="pedImpBacheLlego(' + r.id + ')">📥 Llegó</button>' +
+        (enc ? '<button class="ibc-b ok" title="Recibir lo que llegó: cuánto, empresa y a dónde va (queda en stock y en el historial)" onclick="impRecibirBache(' + r.id + ')">📥 Recibir</button>' +
                '<button class="ibc-b ed" onclick="pedImpBacheEditar(' + r.id + ')" title="Editar unidades/fecha">✏️</button>' +
                '<button class="ibc-b rm" onclick="pedImpBacheBorrar(' + r.id + ')" title="Anular">🗑</button>' : "—") +
       "</td></tr>";
@@ -22090,6 +22101,277 @@ async function pedImpBacheLlego(bacheId) {
   try { await _pedImpRpc("gv_importado_bache_llego", { p_bache_id: bacheId, p_unidades: uni, p_legajo: leg }); _impBaches.dirty = true; }
   catch (e) { try { alert("No se pudo marcar la llegada: " + (e.message || e)); } catch (_e) {} return; }
   await _impBachesReload();
+}
+/* v23.42 (Luis, 28/09) — 📥 RECIBIR una importación desde el panel.
+   Guiado: qué bache, cuánto llegó, de qué empresa (sólo duales) y a dónde va cada parte
+   (A guardar · Góndola · Rack · Excedente · Insumos) con los lugares del Mapa. Antes de grabar
+   el backend SIMULA (gv_imp_recibir p_simular=true): si una góndola no alcanza o un rack está
+   ocupado / es de otra empresa, lo avisa y la persona elige cómo se resuelve. Graba stock en
+   Movimientos_Stock, descuenta el bache y deja el historial (GV_Imp_Recepcion). */
+var _impRec = null;
+function _impRecErr(e) {
+  var m = String((e && e.message) || e || "");
+  var i = m.indexOf(" — ");
+  if (i >= 0) { try { var j = JSON.parse(m.slice(i + 3)); if (j && j.message) return j.message; } catch (_e) {} }
+  return m;
+}
+var _IMP_REC_DEST = { a_guardar: "A guardar", gondola: "Góndola", rack: "Rack", excedente: "Excedente", insumos: "Insumos" };
+function _impRecCss() {
+  if (document.getElementById("impRecCss")) return;
+  var st = document.createElement("style"); st.id = "impRecCss";
+  st.textContent =
+    "#impRecOv{display:none;position:fixed;inset:0;z-index:1330;background:rgba(2,6,23,.78);overflow:auto;padding:14px}" +
+    "#impRecOv.show{display:block}" +
+    ".irc-card{background:#f8fafc;max-width:min(720px,96vw);margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.55)}" +
+    ".irc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 15px;background:linear-gradient(90deg,#0f766e,#14b8a6);color:#fff}" +
+    ".irc-head b{font-size:16px;font-weight:800}" +
+    ".irc-x{background:rgba(255,255,255,.22);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;margin:0}" +
+    ".irc-body{padding:12px 14px;font-size:14px;color:#0f172a}" +
+    ".irc-sec{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;margin-bottom:10px}" +
+    ".irc-sec h4{margin:0 0 7px;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:#64748b}" +
+    ".irc-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}" +
+    ".irc-row select,.irc-row input{height:36px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 8px;font-size:14px;width:auto;margin:0}" +
+    ".irc-b{border:0;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:800;cursor:pointer;width:auto;margin:0 4px 4px 0}" +
+    ".irc-b.pri{background:#0f766e;color:#fff}.irc-b.sec{background:#e2e8f0;color:#0f172a}.irc-b.rm{background:#fee2e2;color:#b91c1c;padding:6px 10px}" +
+    ".irc-b.on{background:#1d4ed8;color:#fff}.irc-b.warn{background:#b45309;color:#fff}" +
+    ".irc-conf{background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:8px 10px;margin:4px 0 8px;font-size:13px;color:#9a3412}" +
+    ".irc-ok{background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:8px 10px;font-size:13px;color:#166534}" +
+    ".irc-muted{color:#64748b;font-size:12.5px}";
+  document.head.appendChild(st);
+}
+function _impRecOv() {
+  _impRecCss();
+  var ov = document.getElementById("impRecOv");
+  if (!ov) { ov = document.createElement("div"); ov.id = "impRecOv"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  return ov;
+}
+function impRecCerrar() {
+  var ov = document.getElementById("impRecOv"); if (ov) ov.classList.remove("show");
+  var hecho = _impRec && _impRec.hecho; _impRec = null;
+  if (hecho) {
+    try { if (_impBaches) { _impBaches.dirty = true; _impBachesReload(); } } catch (_e) {}
+    try { if (_stkPop && _stkPop.kind === "pedImp") pedImpReload(); } catch (_e) {}
+  }
+}
+function _impRecShell(titulo, inner) {
+  var ov = _impRecOv();
+  ov.innerHTML = '<div class="irc-card"><div class="irc-head"><b>' + titulo + '</b><button class="irc-x" onclick="impRecCerrar()">✕ Cerrar</button></div><div class="irc-body">' + inner + '</div></div>';
+}
+// Desde la tabla: un Importados.id puede tener varios baches en curso → se elige cuál llegó.
+async function impRecibirAbrir(importadoId) {
+  _impRecShell("📥 Recibir importación", '<div class="irc-muted">Cargando pedidos en curso…</div>');
+  var rows;
+  try { rows = (await _pedImpRpc("gv_importado_baches", { p_importado_id: importadoId })) || []; }
+  catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">No se pudieron leer los pedidos: ' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
+  var enc = rows.filter(function (r) { return r.estado === "en_curso" && Number(r.pendiente) > 0; });
+  if (!enc.length) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">Este código no tiene pedidos en curso con unidades pendientes. Si llegó algo que no estaba pedido, cargalo primero como bache (📦 Baches).</div>'); return; }
+  if (enc.length === 1) return impRecibirBache(enc[0].id);
+  var h = '<div class="irc-sec"><h4>¿Qué pedido llegó?</h4>' + enc.map(function (r) {
+    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirBache(' + r.id + ')">📥 ' + escapeHtml(r.pedido_ref || ("bache " + r.id)) + '</button><span class="irc-muted">' +
+      Number(r.pendiente).toLocaleString("es-AR") + ' u pendientes' + (r.fecha_reingreso ? ' · llega ' + escapeHtml(String(r.fecha_reingreso).slice(0, 10)) : '') + '</span></div>';
+  }).join('') + '</div>';
+  _impRecShell("📥 Recibir importación", h);
+}
+async function impRecibirBache(bacheId) {
+  _impRecShell("📥 Recibir importación", '<div class="irc-muted">Cargando lugares del Mapa…</div>');
+  var ctx;
+  try { ctx = await _pedImpRpc("gv_imp_recibir_contexto", { p_bache_id: bacheId }); }
+  catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
+  var uxc = Number(ctx.uni_x_caja) || 0;
+  var soloInsumo = !(ctx.gondola || []).length && (ctx.insumos_cods || []).length > 0 && !uxc;
+  var cajasDef = uxc > 0 ? Math.round((Number(ctx.pendiente) || 0) / uxc) : 0;
+  _impRec = {
+    ctx: ctx, empresa: ctx.dual ? "" : (ctx.empresa || "LK"), uxc: uxc || "", nota: "", hecho: false, sim: null,
+    lineas: [soloInsumo
+      ? { destino: "insumos", sector: "", cantidad: Number(ctx.pendiente) || "", cod_insumo: (ctx.insumos_cods || [])[0] || ctx.cod_stock, resolucion: "" }
+      : { destino: "a_guardar", sector: "", cantidad: cajasDef || "", resolucion: "" }]
+  };
+  _impRecRender();
+}
+function _impRecLugares(l) {
+  var c = _impRec.ctx, emp = _impRec.empresa;
+  if (l.destino === "gondola") return (c.gondola || []).filter(function (g) { return !c.dual || !emp || g.empresa === emp; })
+    .map(function (g) { return { v: g.sector, t: g.sector + (c.dual ? " (" + g.empresa + ")" : "") + " · cap " + (g.cajas_max == null ? "?" : g.cajas_max) + " cj" }; });
+  if (l.destino === "rack") return (c.racks || []).filter(function (r) { return r.estado !== "reservado"; })
+    .map(function (r) {
+      var e = r.estado === "libre" ? "libre" : r.estado === "mismo" ? "ya tiene este código (" + (r.cajas || 0) + " cj)" : "⚠ ocupado: " + r.cod + " (" + (r.cajas || 0) + " cj)";
+      return { v: r.sector, t: r.sector + " · " + r.empresa + " · " + e };
+    });
+  if (l.destino === "insumos") return (c.insumos_pos || []).map(function (p) { return { v: p.sector, t: p.sector + (p.insumos ? " · tiene " + p.insumos : " · vacía") }; });
+  return [];
+}
+function _impRecRender() {
+  if (!_impRec) return;
+  var c = _impRec.ctx, uxc = Number(_impRec.uxc) || 0;
+  var pend = Number(c.pendiente) || 0;
+  var h = '<div class="irc-sec"><div style="font-size:16px;font-weight:800">' + escapeHtml(codCanon(c.cod_stock || c.cod_art)) + ' <span style="font-weight:600;color:#475569">' + escapeHtml(c.descripcion || "") + '</span></div>' +
+    '<div class="irc-muted">' + escapeHtml(c.proveedor || "") + ' · pedido ' + escapeHtml(c.pedido_ref || "—") + ' · pendiente <b>' + pend.toLocaleString("es-AR") + ' u</b>' +
+    (uxc > 0 ? ' (' + Math.round(pend / uxc).toLocaleString("es-AR") + ' cajas)' : '') + (Number(c.uni_master) > 0 ? ' · master de ' + c.uni_master + ' u' : '') + '</div></div>';
+  if (c.dual) {
+    h += '<div class="irc-sec"><h4>¿De qué empresa es? (código dual: son productos distintos)</h4><div class="irc-row">' +
+      ["LK", "CH"].map(function (e) { return '<button class="irc-b ' + (_impRec.empresa === e ? 'on' : 'sec') + '" onclick="impRecSet(\'empresa\',\'' + e + '\')">' + (e === "LK" ? "Loekemeyer (LK)" : "Chef (CH)") + '</button>'; }).join('') + '</div></div>';
+  }
+  h += '<div class="irc-sec"><h4>¿Cuánto llegó y a dónde va?</h4>' +
+    '<div class="irc-row"><span class="irc-muted">Unidades por caja</span><input type="number" min="1" style="width:80px" value="' + (_impRec.uxc || "") + '" onchange="impRecSet(\'uxc\',this.value)"></div>';
+  _impRec.lineas.forEach(function (l, i) {
+    var opts = Object.keys(_IMP_REC_DEST).filter(function (k) { return k !== "insumos" || (c.insumos_cods || []).length; })
+      .map(function (k) { return '<option value="' + k + '"' + (l.destino === k ? ' selected' : '') + '>' + _IMP_REC_DEST[k] + '</option>'; }).join('');
+    var lug = _impRecLugares(l);
+    var lugHtml = '';
+    if (l.destino === "gondola" && !lug.length) lugHtml = '<span class="irc-conf" style="margin:0">Este código no tiene celda de góndola en el Mapa' + (c.dual && _impRec.empresa ? ' para ' + _impRec.empresa : '') + '</span>';
+    else if (lug.length) lugHtml = '<select onchange="impRecLinea(' + i + ',\'sector\',this.value)"><option value="">— lugar —</option>' +
+      lug.map(function (o) { return '<option value="' + escapeHtml(o.v) + '"' + (l.sector === o.v ? ' selected' : '') + '>' + escapeHtml(o.t) + '</option>'; }).join('') + '</select>';
+    var insHtml = (l.destino === "insumos" && (c.insumos_cods || []).length > 1)
+      ? '<select onchange="impRecLinea(' + i + ',\'cod_insumo\',this.value)">' + c.insumos_cods.map(function (x) { return '<option' + (l.cod_insumo === x ? ' selected' : '') + '>' + escapeHtml(x) + '</option>'; }).join('') + '</select>' : '';
+    var unidad = l.destino === "insumos" ? "u" : "cajas";
+    h += '<div class="irc-row"><input type="number" min="1" style="width:92px" value="' + (l.cantidad || "") + '" onchange="impRecLinea(' + i + ',\'cantidad\',this.value)"><span class="irc-muted">' + unidad + ' →</span>' +
+      '<select onchange="impRecLinea(' + i + ',\'destino\',this.value)">' + opts + '</select>' + lugHtml + insHtml +
+      (_impRec.lineas.length > 1 ? '<button class="irc-b rm" onclick="impRecQuitar(' + i + ')">✕</button>' : '') + '</div>';
+    var cf = _impRec.sim && (_impRec.sim.conflictos || []).filter(function (x) { return x.destino === l.destino && (x.sector || "") === (l.sector || ""); })[0];
+    if (cf && !l.resolucion) h += _impRecConfHtml(cf, l, i);
+    else if (l.resolucion === "forzar") h += '<div class="irc-muted" style="margin:-2px 0 6px">⚠ Se manda igual (queda anotado en el historial). <a href="#" onclick="impRecLinea(' + i + ',\'resolucion\',\'\');return false">deshacer</a></div>';
+  });
+  var tot = _impRecTotales();
+  h += '<button class="irc-b sec" onclick="impRecAgregar()">＋ Otro destino (partir la carga)</button>' +
+    '<div class="irc-muted" style="margin-top:6px">Total: <b>' + tot.cajas + ' cajas</b>' + (tot.insU ? ' + <b>' + tot.insU.toLocaleString("es-AR") + ' u</b> a insumos' : '') +
+    ' = <b>' + tot.uni.toLocaleString("es-AR") + ' u</b> de ' + pend.toLocaleString("es-AR") + ' pendientes' +
+    (tot.uni > pend ? ' · <span style="color:#b45309;font-weight:800">llegan ' + (tot.uni - pend).toLocaleString("es-AR") + ' u más de lo pedido</span>' : (tot.uni && tot.uni < pend ? ' · queda en curso ' + (pend - tot.uni).toLocaleString("es-AR") + ' u' : '')) + '</div></div>';
+  h += '<div class="irc-sec"><h4>Nota (opcional)</h4><input type="text" style="width:100%;height:36px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 8px;margin:0" placeholder="contenedor, remito, observaciones…" value="' + escapeHtml(_impRec.nota || "") + '" onchange="impRecSet(\'nota\',this.value)"></div>';
+  if (_impRec.err) h += '<div class="irc-conf">' + escapeHtml(_impRec.err) + '</div>';
+  if (_impRec.sim && _impRec.sim.ok) h += '<div class="irc-ok">✓ Revisado: no hay conflictos de espacio. Tocá <b>Confirmar recepción</b> para grabarla.</div>';
+  h += '<div style="margin-top:10px">' + (_impRec.sim && _impRec.sim.ok
+      ? '<button class="irc-b pri" onclick="impRecGrabar()">✅ Confirmar recepción</button>'
+      : '<button class="irc-b pri" onclick="impRecRevisar()">🔎 Revisar espacio</button>') +
+    '<button class="irc-b sec" onclick="impRecCerrar()">Cancelar</button></div>';
+  _impRecShell("📥 Recibir importación", h);
+}
+function _impRecConfHtml(cf, l, i) {
+  var txt = String(cf.conflicto || ""), op = '';
+  var m = txt.match(/entran ([0-9.]+) de/);
+  var entran = m ? Math.floor(Number(m[1])) : 0;
+  if (/gondola_llena/.test(txt)) {
+    op = (entran > 0 ? '<button class="irc-b pri" onclick="impRecPartir(' + i + ',' + entran + ')">Poner ' + entran + ' en góndola y el resto a A guardar</button>' : '') +
+      '<button class="irc-b sec" onclick="impRecLinea(' + i + ',\'destino\',\'a_guardar\')">Todo a A guardar</button>' +
+      '<button class="irc-b sec" onclick="impRecLinea(' + i + ',\'destino\',\'rack\')">Mandar a un rack</button>' +
+      '<button class="irc-b warn" onclick="impRecLinea(' + i + ',\'resolucion\',\'forzar\')">Ponerlo igual en góndola</button>';
+  } else if (/rack_/.test(txt)) {
+    op = '<button class="irc-b pri" onclick="impRecLinea(' + i + ',\'sector\',\'\')">Elegir otro rack</button>' +
+      '<button class="irc-b sec" onclick="impRecLinea(' + i + ',\'destino\',\'a_guardar\')">Mandar a A guardar</button>' +
+      '<button class="irc-b warn" onclick="impRecLinea(' + i + ',\'resolucion\',\'forzar\')">Ponerlo igual ahí</button>';
+  } else {
+    op = '<button class="irc-b sec" onclick="impRecLinea(' + i + ',\'destino\',\'a_guardar\')">Mandar a A guardar</button>' +
+      '<button class="irc-b warn" onclick="impRecLinea(' + i + ',\'resolucion\',\'forzar\')">Ponerlo igual</button>';
+  }
+  var leg = txt.replace(/gondola_llena:/, 'La góndola no alcanza:').replace(/gondola_sin_capacidad:/, 'Góndola sin capacidad cargada:')
+    .replace(/rack_ocupado:/, 'Rack ocupado:').replace(/rack_otra_empresa:/, 'Rack de otra empresa:');
+  return '<div class="irc-conf">⚠ ' + escapeHtml(leg) + '<div style="margin-top:6px">¿Cómo lo resolvés?</div><div style="margin-top:4px">' + op + '</div></div>';
+}
+function _impRecTotales() {
+  var uxc = Number(_impRec.uxc) || 0, cajas = 0, insU = 0;
+  _impRec.lineas.forEach(function (l) { var q = Number(l.cantidad) || 0; if (l.destino === "insumos") insU += q; else cajas += q; });
+  return { cajas: cajas, insU: insU, uni: cajas * uxc + insU };
+}
+function impRecSet(k, v) { if (!_impRec) return; _impRec[k] = v; _impRec.sim = null; _impRec.err = ""; _impRecRender(); }
+function impRecLinea(i, k, v) {
+  if (!_impRec || !_impRec.lineas[i]) return;
+  var l = _impRec.lineas[i];
+  l[k] = (k === "cantidad") ? (Number(v) || "") : v;
+  if (k === "destino") { l.sector = ""; l.resolucion = ""; if (v === "insumos" && !l.cod_insumo) l.cod_insumo = (_impRec.ctx.insumos_cods || [])[0] || _impRec.ctx.cod_stock; }
+  if (k === "sector" || k === "cantidad") l.resolucion = "";
+  if (k !== "resolucion") { _impRec.sim = null; }
+  _impRec.err = "";
+  if (k === "resolucion" && _impRec.sim) { impRecRevisar(); return; }
+  _impRecRender();
+}
+function impRecAgregar() { if (!_impRec) return; _impRec.lineas.push({ destino: "a_guardar", sector: "", cantidad: "", resolucion: "" }); _impRec.sim = null; _impRecRender(); }
+function impRecQuitar(i) { if (!_impRec) return; _impRec.lineas.splice(i, 1); _impRec.sim = null; _impRecRender(); }
+function impRecPartir(i, entran) {
+  var l = _impRec.lineas[i]; var resto = (Number(l.cantidad) || 0) - entran;
+  l.cantidad = entran; l.resolucion = "";
+  if (resto > 0) _impRec.lineas.splice(i + 1, 0, { destino: "a_guardar", sector: "", cantidad: resto, resolucion: "" });
+  _impRec.sim = null; impRecRevisar();
+}
+function _impRecValidar() {
+  var c = _impRec.ctx;
+  if (c.dual && !_impRec.empresa) return "Elegí de qué empresa es (LK o CH).";
+  var tot = _impRecTotales();
+  if (tot.cajas > 0 && !(Number(_impRec.uxc) > 0)) return "Falta cuántas unidades trae cada caja.";
+  for (var i = 0; i < _impRec.lineas.length; i++) {
+    var l = _impRec.lineas[i];
+    if (!(Number(l.cantidad) > 0)) return "Cada destino tiene que tener una cantidad.";
+    if ((l.destino === "gondola" || l.destino === "rack" || l.destino === "insumos") && !l.sector) return "Elegí el lugar de " + _IMP_REC_DEST[l.destino] + ".";
+  }
+  return "";
+}
+function _impRecBody(simular) {
+  return { p_bache_id: _impRec.ctx.bache_id, p_empresa: _impRec.empresa || null, p_uni_x_caja: Number(_impRec.uxc) || null,
+    p_destinos: _impRec.lineas.map(function (l) { return { destino: l.destino, sector: l.sector || null, cantidad: Number(l.cantidad), cod_insumo: l.cod_insumo || null, resolucion: l.resolucion || null }; }),
+    p_nota: _impRec.nota || null, p_simular: !!simular };
+}
+async function impRecRevisar() {
+  if (!_impRec) return;
+  var v = _impRecValidar(); if (v) { _impRec.err = v; _impRecRender(); return; }
+  try { _impRec.sim = await _pedImpRpc("gv_imp_recibir", _impRecBody(true)); _impRec.err = ""; }
+  catch (e) { _impRec.sim = null; _impRec.err = _impRecErr(e); }
+  _impRecRender();
+}
+async function impRecGrabar() {
+  if (!_impRec || _impRec.grabando) return;
+  var v = _impRecValidar(); if (v) { _impRec.err = v; _impRecRender(); return; }
+  _impRec.grabando = true;
+  var r;
+  try { r = await _pedImpRpc("gv_imp_recibir", _impRecBody(false)); }
+  catch (e) { _impRec.grabando = false; _impRec.err = _impRecErr(e); _impRecRender(); return; }
+  _impRec.grabando = false;
+  if (!r || !r.ok) { _impRec.sim = r; _impRec.err = "Apareció un conflicto de espacio mientras cargabas: resolvelo y confirmá de nuevo."; _impRecRender(); return; }
+  _impRec.hecho = true;
+  var dest = _impRec.lineas.map(function (l) { return l.cantidad + (l.destino === "insumos" ? " u" : " cj") + " → " + _IMP_REC_DEST[l.destino] + (l.sector ? " " + l.sector : ""); }).join(" · ");
+  _impRecShell("📥 Recepción grabada", '<div class="irc-ok">✓ Recibidas <b>' + Number(r.unidades).toLocaleString("es-AR") + ' u</b> (' + r.cajas + ' cajas). ' + escapeHtml(dest) + '</div>' +
+    '<div class="irc-muted" style="margin-top:8px">' + (r.estado === "llegado" ? "El pedido quedó completo." : "El pedido sigue en curso con lo que falta.") +
+    (Number(r.sobra) > 0 ? ' Llegaron ' + Number(r.sobra).toLocaleString("es-AR") + ' u más de lo pedido: entraron al stock igual.' : '') + '</div>' +
+    '<div style="margin-top:10px"><button class="irc-b pri" onclick="impRecCerrar()">Listo</button><button class="irc-b sec" onclick="impRecCerrar();openImpHistRecep()">Ver historial de recepción</button></div>');
+}
+/* Solapa 📜 Historial recepción: cuándo, qué, cuánto, de qué empresa, dónde se puso y quién. */
+async function openImpHistRecep() {
+  _stkPopShell("📜 Historial de recepción de importaciones", "stkPopBody", true);
+  var body = document.getElementById("stkPopBody"); if (!body) return;
+  body.innerHTML = _impTabsHtml('hist') + '<div class="stkpop-empty">Cargando historial…</div>';
+  _stkPop = { kind: "impHist", rows: [], q: "", dias: 365 };
+  try { _stkPop.rows = (await _pedImpRpc("gv_imp_recepcion_historial", { p_dias: 365 })) || []; }
+  catch (e) { _stkPop.err = _impRecErr(e); }
+  _impHistRender();
+}
+function impHistBuscar(v) { if (!_stkPop || _stkPop.kind !== "impHist") return; _stkPop.q = v; _impHistRender(); }
+function _impHistRender() {
+  if (!_stkPop || _stkPop.kind !== "impHist") return;
+  var body = document.getElementById("stkPopBody"); if (!body) return;
+  var q = String(_stkPop.q || "").trim().toLowerCase();
+  var rows = (_stkPop.rows || []).filter(function (r) {
+    if (!q) return true;
+    return [r.cod_art, r.descripcion, r.proveedor, r.pedido_ref, r.por, r.nota].join(" ").toLowerCase().indexOf(q) >= 0;
+  });
+  var h = _impTabsHtml('hist') +
+    '<div class="stkpop-hint">Cada recepción hecha con <b>📥 RECIBIR</b>: cuándo, qué, cuánto, de qué empresa, dónde se guardó y quién la cargó. Lo marcado ⚠ se puso igual aunque el lugar tenía un conflicto de espacio.</div>' +
+    '<input type="search" placeholder="Buscar código, proveedor, pedido o persona" value="' + escapeHtml(_stkPop.q || "") + '" oninput="impHistBuscar(this.value)" style="height:36px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 10px;font-size:14px;width:min(420px,100%);margin:0 0 10px">';
+  if (_stkPop.err) h += '<div class="stkpop-empty">No se pudo leer el historial: ' + escapeHtml(_stkPop.err) + '</div>';
+  else if (!rows.length) h += '<div class="stkpop-empty">' + (q ? 'Nada coincide con la búsqueda.' : 'Todavía no hay recepciones cargadas con 📥 RECIBIR.') + '</div>';
+  else {
+    h += '<div class="mva-tblwrap" style="max-height:66vh;overflow-x:auto"><table class="mva-tbl" style="font-size:13px;width:auto;min-width:0;table-layout:auto"><thead><tr><th>Fecha</th><th>Código</th><th>Emp.</th><th>Proveedor · pedido</th><th class="num">Recibido</th><th>Dónde</th><th>Quién</th><th>Nota</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var f = new Date(r.ts);
+        var fecha = isNaN(f) ? String(r.ts || "") : f.toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+        var donde = (r.destinos || []).map(function (d) {
+          return (d.conflicto && d.resolucion === "forzar" ? '<span title="' + escapeHtml(d.conflicto) + '">⚠ </span>' : '') +
+            Number(d.cantidad).toLocaleString("es-AR") + (d.unidad === "Uni" ? " u" : " cj") + ' → ' + (_IMP_REC_DEST[d.destino] || d.destino) + (d.sector ? ' <b>' + escapeHtml(d.sector) + '</b>' : '');
+        }).join('<br>');
+        return '<tr><td style="white-space:nowrap">' + escapeHtml(fecha) + '</td><td style="white-space:normal;max-width:220px"><b>' + escapeHtml(codCanon(r.cod_art)) + '</b> <span class="irc-muted">' + escapeHtml(r.descripcion || "") + '</span></td>' +
+          '<td>' + escapeHtml(r.empresa || "") + '</td><td style="white-space:normal;max-width:180px">' + escapeHtml(r.proveedor || "") + '<br><span class="irc-muted">' + escapeHtml(r.pedido_ref || "") + '</span></td>' +
+          '<td class="num">' + Number(r.unidades).toLocaleString("es-AR") + ' u<br><span class="irc-muted">' + (Number(r.cajas) || 0) + ' cj · ' + (r.estado_bache === "llegado" ? "completo" : "parcial") + '</span></td>' +
+          '<td style="white-space:nowrap">' + donde + '</td><td style="white-space:nowrap">' + escapeHtml(String(r.por || "").replace(/@.*/, "")) + '</td><td style="white-space:normal;max-width:200px">' + escapeHtml(r.nota || "") + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  body.innerHTML = h;
 }
 async function pedImpBacheEditar(bacheId) {
   if (!_impBaches) return;
