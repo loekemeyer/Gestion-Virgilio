@@ -1,4 +1,4 @@
-/* v23.34 (Luis, 28/09): "fijate que no quede ninguna feature colgada así porque no estamos arrastrando".
+/* v23.35 (Luis, 28/09): "fijate que no quede ninguna feature colgada así porque no estamos arrastrando".
    El pop-up de DÍA OCUPADO no puede ser sólo del arrastre. Se corren los caminos SIN arrastrar:
    (a) tildar + día + ✅ Confirmar (aprConfirmar) con el día ocupado → abre el pop-up, y el aviso
        "ya está completo" NO sale en un confirm aparte (lo muestra el pop-up); elegir 1 arma la tanda.

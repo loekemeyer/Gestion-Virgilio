@@ -6206,7 +6206,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.34"></script>
+<script type="module" src="recepcion.js?v=23.35"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10165,7 +10165,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.34";
+const APP_VERSION = "v23.35";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37838,7 +37838,7 @@ async function pgaPruebaEliminar(key) {
   pgaRecargar();
 }
 window.pgaPruebaEliminar = pgaPruebaEliminar;
-/* v23.34 (Luis): reprogramar una NP de ISIS a un día también pasa por el pop-up de día ocupado. */
+/* v23.35 (Luis): reprogramar una NP de ISIS a un día también pasa por el pop-up de día ocupado. */
 async function pppReprogElegir(iso) {
   if (!_pppMov || !_pppMov.reprogNps) return;
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return;
@@ -47471,7 +47471,7 @@ async function aprConfirmar() {
   if (!fecha) { _apr.msg = "Tocá el día en que sale."; _apr.msgErr = true; aprRender(); return; }
   const r = aprResumenSel();
   const d = (_apr.cal || []).find(function (x) { return String(x.dia).slice(0, 10) === fecha; }) || {};
-  const avisos = [], avisosDia = [];   // v23.34: avisosDia = los que el pop-up de día ocupado ya muestra
+  const avisos = [], avisosDia = [];   // v23.35: avisosDia = los que el pop-up de día ocupado ya muestra
   // v13.84: el día ya no bloquea, pero se pregunta
   if (d.muy_pronto === true) avisos.push("El " + aprDiaCorto(fecha) + " está antes de la anticipación mínima (Gestión programa sola desde el " + (d.dia_minimo ? aprDiaCorto(String(d.dia_minimo).slice(0, 10)) : "día mínimo") + ").");
   if (Number(d.cupo) > 0 && Number(d.m3) >= Number(d.cupo)) avisosDia.push("El " + aprDiaCorto(fecha) + " ya está completo: " + aprNum(d.m3, 2) + " de " + aprNum(d.cupo, 2) + " m³.");
@@ -47502,7 +47502,7 @@ async function aprConfirmar() {
     if (!_apr.msgErr) { _apr.sel = {}; _apr.diaSel = null; _apr.paso = 1; }
     aprRender();
   };
-  // v23.34 (Luis): tildar + Confirmar pasa por el MISMO pop-up de día ocupado que el arrastre.
+  // v23.35 (Luis): tildar + Confirmar pasa por el MISMO pop-up de día ocupado que el arrastre.
   return aprDiaOcupadoAbrir(fecha, null, {
     peds: r.peds, label: r.n === 1 ? aprPedLabel(r.peds[0]) : r.n + " pedidos",
     antes: function () { return preg(avisos); },
@@ -48450,7 +48450,7 @@ async function aprGenerarTanda(fecha, keys, opts) {
 /* Soltar la tanda en un día = programarla. Los artículos van desde acá: viven en
    LK y Virgilio no los puede consultar. Sin ellos el operario abre la tanda y no
    ve un solo renglón. */
-/* v23.34 — una tanda sin fecha soltada en un día pasa por el pop-up de día ocupado, igual que un pedido. */
+/* v23.35 — una tanda sin fecha soltada en un día pasa por el pop-up de día ocupado, igual que un pedido. */
 function aprProgramarTanda(codigo, fecha) {
   _apr.dragTanda = null;
   const porPed = new Map();
@@ -48563,7 +48563,7 @@ function aprDropDia(ev, fecha) {
   ev.currentTarget.classList.remove("apr-drop-on");
   const cod = _apr.dragTanda, ped = _apr.drag;
   aprDndFin();
-  if (cod) aprProgramarTanda(cod, fecha);   // v23.34: también por el pop-up de día ocupado
+  if (cod) aprProgramarTanda(cod, fecha);   // v23.35: también por el pop-up de día ocupado
   // v13.65: un pedido soltado en un día = tanda nueva (código automático) ya programada ese día
   // v21.97 (Luis): si el día YA tiene programación, pop-up con las 3 opciones (aprDiaOcupadoAbrir)
   else if (ped) aprDiaOcupadoAbrir(fecha, ped);
@@ -48620,7 +48620,7 @@ function _adoReporte(fecha, rows, nuevo, modo) {
   const vencen = mov.filter(function (r) { return r.vence && !r.vencia; });
   return { probs: probs, mov: mov, fijos: fijos, vencen: vencen };
 }
-/* v23.34 (Luis, 28/09: "fijate que no quede ninguna feature colgada así porque no estamos arrastrando") —
+/* v23.35 (Luis, 28/09: "fijate que no quede ninguna feature colgada así porque no estamos arrastrando") —
    el pop-up ya NO es sólo del arrastre. Lo abren todos los caminos que programan a mano un día:
      · soltar un pedido en un día (aprDropDia)          · tildar + día + ✅ Confirmar (aprConfirmar)
      · soltar una tanda sin fecha en un día (aprProgramar) · reprogramar una NP de ISIS que no salió (pppReprogElegir)

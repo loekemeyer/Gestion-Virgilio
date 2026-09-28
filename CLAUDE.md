@@ -797,7 +797,7 @@ mismo día" — frenaba los movimientos y movía solos los otros pedidos del cli
 `alter table public."PPP_Web_Programacion" enable trigger gv_web_cliente_un_solo_dia;`
 `sql/gv_ppp_dia_reprogramar_v2197.sql`, `tests/apr-dia-ocupado.cjs`.
 
-⚠ **El pop-up NO es sólo del arrastre** (Luis, 28/09, v23.34: *"fijate que no quede ninguna feature colgada así
+⚠ **El pop-up NO es sólo del arrastre** (Luis, 28/09, v23.35: *"fijate que no quede ninguna feature colgada así
 porque no estamos arrastrando"*). Lo abren los cuatro caminos que programan un día a mano: soltar un pedido
 (`aprDropDia`), **tildar + día + ✅ Confirmar** (`aprConfirmar`, por donde se programó La Anónima al 30/09 sin
 aviso), soltar una tanda sin fecha (`aprProgramarTanda`) y reprogramar una NP de ISIS (`pppReprogElegir`). **Al
