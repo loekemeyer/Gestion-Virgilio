@@ -1,15 +1,12 @@
-// v23.27 (Luis, 28/09): cada NP del árbol de Programación muestra su MONTO, leído de
-// gv_ppp_np_valor vía _pgaValorNp (no se recalcula en el front).
+// v23.27/28 (Luis, 28/09): el árbol de Programación muestra el MONTO en cada NP, tanda y día,
+// leído de gv_ppp_np_valor (_pgaValorNp / _pgaValorTanda / _pgaValorDia), no recalculado.
 const fs = require("fs");
 const src = fs.readFileSync(__dirname + "/../index.html", "latin1");
-const i = src.indexOf('<div class="pga-nrow"><span class="pga-ninfo">');
-const f = src.indexOf("'</span>' +", src.indexOf("pga-ped", i));
-const fila = i > 0 ? src.slice(i, f + 20) : "";
 const ok = {
-  filaNp: i > 0,
-  monto: /pga-monto/.test(fila),
-  deLaVista: /_pgaValorNp\(r\.np\)/.test(fila),
-  formato: /_pgpMonto\(vn\.valor\)/.test(fila),
+  helper: /function _pgaMontoChip\(v\)[\s\S]{0,300}pga-monto[\s\S]{0,300}_pgpMonto\(v\.valor\)/.test(src),
+  np: src.includes("_pgaMontoChip(_pgaValorNp(r.np))"),
+  tanda: src.includes("_pgaMontoChip(_pgaValorTanda(t))"),
+  dia: src.includes("_pgaMontoChip(_pgaValorDia(d))"),
   css: /\.pga-monto\{/.test(src),
 };
 const mal = Object.keys(ok).filter(k => !ok[k]);
