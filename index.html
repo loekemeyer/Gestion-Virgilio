@@ -15,6 +15,7 @@
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
 html { overflow-x: hidden; }
 .hidden { display: none; }
+#tvContent:not(.hidden) { display: flex; }   /* v23.64: pestaña Vista TV del monitor */
 
 /* Números bien centrados: saca las flechitas (spinner) de TODOS los input[type=number]
    de la app — la app usa steppers –/+, las flechas nativas sólo desfasan el número. */
@@ -5802,6 +5803,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
           <button class="mod-tab on" id="monTabMon" onclick="setMonitorTab('monitor')" title="Monitor de operarios (en vivo)">🖥️ Monitor</button>
           <button class="mod-tab" id="monTabAn" onclick="switchToAnalisis()" title="Análisis de productividad">📈 Análisis</button>
           <button class="mod-tab" id="monTabInc" onclick="setMonitorTab('incons')" title="Inconsistencias del día">⚠ Inconsist.</button>
+          <button class="mod-tab" id="monTabTv" onclick="setMonitorTab('tv')" title="La misma vista del monitor de pared de los operarios">📺 Vista TV</button>
         </div>
         <div>
           <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span><span id="monitorVpInfo" style="color:#888;font-size:12px;margin-left:8px"></span><span id="monitorCountdown" style="color:#888;font-size:12px;margin-left:8px"></span></div>
@@ -5823,6 +5825,12 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
     <div id="inconsContent" class="hidden">
       <div class="monitor-loading">Cargando…</div>
+    </div>
+    <!-- v23.64 (Luis): la vista del monitor de pared (monitor/tv.html) adentro del admin.
+         Es la MISMA página en un iframe, no una copia: un solo lugar que mantener. Se carga
+         al abrir la pestaña y se descarga al salir (la TV se refresca sola y ocupa RAM). -->
+    <div id="tvContent" class="hidden" style="flex:1;min-height:0">
+      <iframe id="monTvFrame" title="Monitor TV" style="flex:1;width:100%;min-height:78vh;border:0;border-radius:8px;background:#0b1220"></iframe>
     </div>
   </div>
 </div>
@@ -6213,7 +6221,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.63"></script>
+<script type="module" src="recepcion.js?v=23.64"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10172,7 +10180,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.63";
+const APP_VERSION = "v23.64";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34241,6 +34249,7 @@ function openInconsistencias() {
 
 function closeMonitor() {
   const m = document.getElementById("monitorModal");
+  try { const _tvf = document.getElementById("monTvFrame"); if (_tvf) _tvf.removeAttribute("src"); } catch (_e) {}   // v23.64
   m.classList.remove("show");
   m.classList.remove("tv");
   m.classList.remove("vp-narrow", "vp-medium", "vp-wide", "vp-xwide");
@@ -47481,6 +47490,27 @@ function monitorRawFecha(s) {
 /* Extrae el "camión" de un código de tanda: la primera secuencia de dígitos.
    Ej: C03A → "03", C03B → "03" (mismo camión), B58E → "58".
    Si no hay dígitos (RETIRA, LA ANONIMA), devuelve el código tal cual. */
+/* v23.64 (Luis, 28/09) — el CAMIÓN de una tanda es su GRUPO DE ZONAS, no la letra+número del
+   código: el "Total por día" contaba E37A/E37E/E37F como "E37" y cada número suelto como un
+   camión (el 30/09 decía 11). Lo resuelve la base, `gv_monitor_tanda_camion` (≡ PPP_RES_CAMIONES:
+   Capital Sur/Centro/Oeste —Z2+Z3 juntas si cada una < 1 m³—, GBA Sur/Oeste/Norte, un camión por
+   súper, Retira sin camión). Si la lectura falla, cae a tandaCamion. ≡ monitor/tv.html camionDeTanda. */
+let _monCamionDe = new Map(), _monCamionDeTs = 0;
+async function monCargarCamiones() {
+  if (_monCamionDe.size && (Date.now() - _monCamionDeTs) < 60000) return _monCamionDe;
+  try {
+    const filas = await supaFetchAll(SUPABASE_URL + "/rest/v1/gv_monitor_tanda_camion", "select=tanda,camion&order=tanda.asc");
+    const m = new Map();
+    for (const f of (filas || [])) m.set(String(f.tanda || "").trim().toUpperCase(), String(f.camion || ""));
+    if (m.size) { _monCamionDe = m; _monCamionDeTs = Date.now(); }
+  } catch (e) { console.warn("[monitor] gv_monitor_tanda_camion:", e.message); }
+  return _monCamionDe;
+}
+function monCamionDeTanda(code) {
+  const c = _monCamionDe.get(String(code || "").trim().toUpperCase());
+  if (!c) return tandaCamion(code);
+  return /^Súper · /.test(c) ? "Súper " + c.slice(8).split(/\s+/)[0] : c;
+}
 function tandaCamion(code) {
   // idea 7828 (v13.28): letra + número, como _pppTandaNum del tablero (v13.16). Antes sólo el número:
   // D60A (ISIS), E60A (LK web) y F60A (Chef web) del mismo día caían en el mismo "camión 60".
@@ -53466,8 +53496,25 @@ var _MON_ACT_INFO = {
   RR: { ic: "🚚", tx: "Recepción de remitos" }, AT: { ic: "🔔", tx: "Atendiendo timbre" },
   PB: { ic: "🚽", tx: "En el baño" }, Limp: { ic: "🧹", tx: "Limpiando" },
   PC: { ic: "🍽", tx: "Comiendo" }, Perm: { ic: "🚪", tx: "Permiso de salida" },
-  CT: { ic: "🔢", tx: "Conteo" }
+  CT: { ic: "🔢", tx: "Conteo" },
+  GST: { ic: "📥", tx: "Guardando (bajada de racks)" }   // v23.64: sale de Movimientos_Stock, no de un toggle
 };
+/* v23.64 (Luis, 28/09: *"está guardando"*) — la BAJADA DE RACKS y el guardado se registran en
+   Movimientos_Stock (legajo + ts), no en Registros_Produccion_Virgilio: Isidro bajó racks de
+   11:14 a 15:20 y el monitor decía "sin marcar hace 281 min". Esos movimientos entran como
+   eventos sintéticos `GST` (sin tanda, sin toggle) sólo para "en silencio" y "En este momento".
+   ⚠ NO entran a las horas (gv_monitor_horas_operario_dia) ni a ninguna otra cuenta.
+   ≡ monitor/tv.html cargarGuardadoHoy. */
+const MON_GST_VIVO_MIN = 45;   // un movimiento de guardado más viejo que esto ya no dice "está guardando"
+async function monGuardadoHoy(startTodayIso) {
+  try {
+    const filas = await supaFetchAll(SUPABASE_STOCK_ENDPOINT,
+      "tipo=in.(baja_racks,guardado,guardado_fuera_lista)&deposito=eq.terminado&ts=gte." + encodeURIComponent(startTodayIso) +
+      "&order=ts.asc&select=legajo,ts");
+    return (filas || []).filter(function (f) { return f && f.legajo && f.ts; })
+      .map(function (f) { return { legajo: String(f.legajo).trim(), ts_cliente: f.ts, opcion: "GST", texto: "", ts_inicio: null }; });
+  } catch (e) { console.warn("[monitor] guardado hoy:", e.message); return []; }
+}
 function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
   var byLeg = {};
   for (var i = 0; i < (eventos || []).length; i++) {
@@ -53480,9 +53527,11 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
   for (var leg in byLeg) {
     if (fjHoy && fjHoy.has(leg)) { vistos[leg] = 1; continue; }       // ya cerró jornada → fuera
     var evs = byLeg[leg].sort(function (a, b) { return a.ts - b.ts; });
-    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, lastTs = 0;
+    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, lastTs = 0, gstIni = 0, gstUlt = 0;
     for (var k = 0; k < evs.length; k++) {
       var e = evs[k]; if (e.ts > lastTs) lastTs = e.ts;
+      if (e.op === "GST") { if (!gstIni) gstIni = e.ts; gstUlt = e.ts; continue; }   // v23.64
+      gstIni = 0; gstUlt = 0;                                          // un evento real corta la racha
       if (e.op === "EP") { pick = e.tx; pickTs = e.ts; }
       else if (e.op === "TP") { if (!e.tx || pick === e.tx) pick = null; }
       else if (e.op === "AP") { arm = e.tx; armTs = e.ts; }
@@ -53496,6 +53545,8 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
     if (pick) cands.push({ k: "pick", ts: pickTs, tanda: pick });
     if (arm) cands.push({ k: "arm", ts: armTs, tanda: arm });
     if (tog) cands.push({ k: tog, ts: togTs });
+    // v23.64: sin nada abierto y con guardado reciente → "Guardando" desde el primer movimiento de la racha
+    if (!cands.length && gstUlt && (nowMs - gstUlt) <= MON_GST_VIVO_MIN * 60000) cands.push({ k: "GST", ts: gstIni });
     cands.sort(function (a, b) { return b.ts - a.ts; });
     var row = { legajo: leg, idle: !cands.length, sinceTs: cands.length ? cands[0].ts : lastTs, kind: null, tanda: "", arranco: true };
     if (cands.length) { row.kind = cands[0].k; row.tanda = cands[0].tanda || ""; }
@@ -53626,7 +53677,9 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   const todayKey = isoToDayKey(startTodayMs);
   const empleadosHoy = perDayLegajos.has(todayKey) ? perDayLegajos.get(todayKey).size : 0;
   // idea 2093: operarios "en silencio" ahora mismo (para el chip del tablero).
-  const enSilencio = _monEnSilencio(dataC, todayKey, perDayFJ.get(todayKey) || new Set(), Date.now(), INC_GAP_MIN);
+  const dataGst = await monGuardadoHoy(new Date(startTodayMs).toISOString());   // v23.64
+  const dataCG = dataGst.length ? dataC.concat(dataGst) : dataC;
+  const enSilencio = _monEnSilencio(dataCG, todayKey, perDayFJ.get(todayKey) || new Set(), Date.now(), INC_GAP_MIN);
 
   // Resumen de fichadas de HOY (para el panel del monitor).
   //   total       : cuántos ingresos únicos por legajo se registraron
@@ -53747,7 +53800,7 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   }
 
   // v7.56: qué está haciendo AHORA cada operario (panel "En este momento" del monitor).
-  const currentActivity = _monActividadActual(dataC, todayKey, perDayFJ.get(todayKey) || new Set(), Date.now(), fichadosHoyByLeg);
+  const currentActivity = _monActividadActual(dataCG, todayKey, perDayFJ.get(todayKey) || new Set(), Date.now(), fichadosHoyByLeg);
 
   return { statusMap, alertasOffSheet: [...alertasSet].sort(), empleadosHoy, pastDays, fichadasResumen, enSilencio, currentActivity };
 }
@@ -54081,7 +54134,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
       }
       const g = totalByDate.get(key);
       g.totalSum += t.m3;
-      const cam = tandaCamion(t.tanda);
+      const cam = monCamionDeTanda(t.tanda);   // v23.64: grupo de zonas (gv_monitor_tanda_camion), no letra+número
       if (!g.byCamion.has(cam)) g.byCamion.set(cam, { sum: 0, tandas: [], tandasArmadas: 0 });
       const c = g.byCamion.get(cam);
       c.sum += t.m3;
@@ -54591,6 +54644,7 @@ async function refreshMonitor() {
       fetchMonitorDayStats(todayKeyAr, sheetMap).catch(e => { console.warn("[monitor] dayStats hoy:", e.message); return null; }),
       fetchMonitorDayStats(yesterdayKeyAr, sheetMap).catch(e => { console.warn("[monitor] dayStats ayer:", e.message); return null; })
     ]);
+    await monCargarCamiones();   // v23.64: camión = grupo de zonas
     renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, empleadosHoy, pastDays, null, fichadasResumen, todayStats, yesterdayStats, todayKeyAr, yesterdayKeyAr);
     // idea 2093: chip "operario en silencio" en vivo, debajo de la meta del monitor. Fail-safe.
     try {
@@ -54698,16 +54752,24 @@ function _incHora(iso) {
 function setMonitorTab(tab) {
   const cont = document.getElementById("monitorContent");
   const inc  = document.getElementById("inconsContent");
+  const tvc  = document.getElementById("tvContent"), tvf = document.getElementById("monTvFrame");
   _inconsActive = (tab === "incons");
-  if (cont) cont.classList.toggle("hidden", _inconsActive);
+  const tvOn = (tab === "tv");   // v23.64: la vista del monitor de pared
+  if (cont) cont.classList.toggle("hidden", _inconsActive || tvOn);
   if (inc)  inc.classList.toggle("hidden", !_inconsActive);
+  if (tvc)  tvc.classList.toggle("hidden", !tvOn);
+  if (tvf) {
+    if (tvOn && !tvf.getAttribute("src")) tvf.setAttribute("src", "monitor/tv.html?key=tv");
+    if (!tvOn && tvf.getAttribute("src")) tvf.removeAttribute("src");
+  }
   // v8.69 — Inconsistencias es una pestaña más del módulo unificado: resaltar la activa.
-  const swMon = document.getElementById("monTabMon"), swInc = document.getElementById("monTabInc"), swAn = document.getElementById("monTabAn");
-  if (swMon) swMon.classList.toggle("on", !_inconsActive);
+  const swMon = document.getElementById("monTabMon"), swInc = document.getElementById("monTabInc"), swAn = document.getElementById("monTabAn"), swTv = document.getElementById("monTabTv");
+  if (swMon) swMon.classList.toggle("on", !_inconsActive && !tvOn);
   if (swInc) swInc.classList.toggle("on", _inconsActive);
+  if (swTv)  swTv.classList.toggle("on", tvOn);
   if (swAn)  swAn.classList.remove("on");
   const titleEl = document.getElementById("monitorTitleText");
-  if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : "Monitor Virgilio";
+  if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : (tvOn ? "Vista TV" : "Monitor Virgilio");
   if (_inconsActive) refreshInconsistencias();
 }
 

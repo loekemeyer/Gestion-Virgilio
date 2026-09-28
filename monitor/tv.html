@@ -103,6 +103,13 @@ tr.fact td{background:#14311f}
    papel. Es lo único de esta tabla que hay que resolver hoy, así que se pinta
    violeta (el mismo color que la columna SALIÓ de la PPP) y no verde. */
 tr.salio-sinfc td{background:#2a1f45}
+/* v23.64 — Resumen de días (≡ Programación de la PPP): colores de sus columnas */
+.rd-dia td{padding-top:.9vh;font-weight:900;color:#e2e8f0}
+.rd-dia small{color:#94a3b8;font-weight:700}
+.rd td{text-align:center;font-weight:900;line-height:1.05}
+.rd td small{display:block;font-size:.72em;font-weight:700;color:#64748b}
+.rd .sal{color:#a78bfa}.rd .fac{color:#60a5fa}.rd .arm{color:#4ade80}.rd .pro{color:#fbbf24}.rd .pen{color:#f87171}
+.rd .z{color:#334155}
 .st-salio{font-size:2.1vh}
 .fc-salio{color:#c4b5fd}
 
@@ -270,7 +277,7 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
 
     <div class="col" id="col3">
       <div class="card grow">
-        <div class="card-t" id="fcTit">A facturar</div>
+        <div class="card-t" id="fcTit">Resumen de días</div>
         <div class="grow" id="fcBox"></div>
       </div>
       <div class="card grow">
@@ -342,8 +349,10 @@ var ACT_INFO = {
   RR:{ ic:"🚚", tx:"Recepción de remitos" }, AT:{ ic:"🔔", tx:"Atendiendo timbre" },
   PB:{ ic:"🚽", tx:"En el baño" },        Limp:{ ic:"🧹", tx:"Limpiando" },
   PC:{ ic:"🍽", tx:"Comiendo" },          Perm:{ ic:"🚪", tx:"Permiso de salida" },
-  CT:{ ic:"🔢", tx:"Conteo" }
+  CT:{ ic:"🔢", tx:"Conteo" },
+  GST:{ ic:"📥", tx:"Guardando (bajada de racks)" }   /* v23.64 ≡ index.html */
 };
+var GST_VIVO_MIN = 45;   /* ≡ index.html MON_GST_VIVO_MIN */
 /* Iniciales custom por legajo — ≡ index.html INITIALS_OVERRIDE_BY_LEGAJO */
 var INICIALES_OVERRIDE = { "8": "JF" };
 
@@ -750,6 +759,21 @@ function cargarEventosHoy() {
     "ts_cliente=gte." + encodeURIComponent(desde) +
     "&select=legajo,opcion,texto,ts_cliente,ts_inicio&order=ts_cliente.asc");
 }
+/* v23.64 (Luis: "está guardando") — la bajada de racks y el guardado viven en
+   Movimientos_Stock, no en los eventos: entran como eventos `GST` sólo para
+   "En este momento". Si falla, nada. ≡ index.html monGuardadoHoy. */
+function cargarGuardadoHoy() {
+  var desde = hoyKey() + "T00:00:00-03:00";
+  return getAll("Movimientos_Stock",
+    "tipo=in.(baja_racks,guardado,guardado_fuera_lista)&deposito=eq.terminado&ts=gte." + encodeURIComponent(desde) +
+    "&select=legajo,ts&order=ts.asc")
+    .then(function (filas) {
+      return (filas || []).filter(function (f) { return f && f.legajo && f.ts; }).map(function (f) {
+        return { legajo: String(f.legajo).trim(), ts_cliente: f.ts, opcion: "GST", texto: "", ts_inicio: null };
+      });
+    })
+    .catch(function (e) { console.warn("[tv] guardado:", e.message); return []; });
+}
 
 /* La canónica de feriados. Pisa el fallback de arriba SOLO si vino algo: una
    respuesta vacía dejaría al tablero sin ningún feriado, que es peor. ≡ index.html
@@ -809,6 +833,61 @@ var cargarDeshechas = cache(DESHECHAS_TTL, function () {
    hora es productiva NO se duplica acá: si cambia, cambia en la vista y esta
    pantalla y el monitor grande la heredan juntos. Best-effort: si falla, el
    resto del tablero se dibuja igual. */
+/* v23.64 (Luis): el CAMIÓN de cada tanda = su GRUPO DE ZONAS, no la letra+número del código
+   (E37A/E37E/E37F no son "el camión E37"). Lo resuelve la base, `gv_monitor_tanda_camion`
+   (≡ index.html PPP_RES_CAMIONES): Capital Sur/Centro/Oeste (Z2+Z3 juntas si cada una < 1 m³),
+   GBA Sur/Oeste/Norte, un camión por súper, Retira sin camión. Si falla, cae a tandaCamion. */
+var CAMION_DE = new Map();
+var cargarCamiones = cache(PROG_TTL, function () {
+  return getAll("gv_monitor_tanda_camion", "select=tanda,fecha,camion,usa_camion&order=tanda.asc")
+    .then(function (filas) {
+      var m = new Map();
+      (filas || []).forEach(function (f) { m.set(String(f.tanda || "").trim().toUpperCase(), { camion: f.camion, usa: f.usa_camion !== false }); });
+      return m;
+    })
+    .catch(function (e) { console.warn("[tv] camiones:", e.message); return new Map(); });
+});
+function camionDeTanda(tanda) {
+  var c = CAMION_DE.get(String(tanda || "").trim().toUpperCase());
+  if (!c) return { nombre: tandaCamion(tanda), usa: true };
+  var n = String(c.camion || "");
+  if (/^Súper · /.test(n)) n = "Súper " + n.slice(8).split(/\s+/)[0];
+  return { nombre: n, usa: c.usa };
+}
+/* v23.64 (Luis, 28/09) — "A facturar" pasa a ser el RESUMEN DE LOS 3 DÍAS de la Programación
+   de la PPP: m³, tandas, NP y los cinco estados en % (Salió · Facturado · Armado · En proceso ·
+   Pendiente), excluyentes y netos como allá. ≡ index.html _pgaArbol / _pgaPctFila.
+   Misma fuente: `gv_ppp_prog_arbol`. SALIÓ = CCN sin FSS posterior (`cargarDespachadas`),
+   que es el criterio v20.12 de la PPP ("sólo salió si se cargó a camión"). */
+var cargarArbol = cache(PROG_TTL, function () {
+  var hoy = hoyKey();
+  var hasta = new Date(new Date(hoy + "T12:00:00-03:00").getTime() + 30 * 86400000).toISOString().slice(0, 10);
+  var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  return conTimeout(fetch(SB_URL + "/rest/v1/rpc/gv_ppp_prog_arbol", {
+    method: "POST", cache: "no-store", signal: ctrl ? ctrl.signal : undefined,
+    headers: Object.assign({ "Content-Type": "application/json" }, H),
+    body: JSON.stringify({ p_desde: hoy, p_hasta: hasta })
+  }), ctrl, "gv_ppp_prog_arbol").then(function (r) {
+    if (!r.ok) throw new Error("gv_ppp_prog_arbol HTTP " + r.status);
+    return r.json();
+  }).catch(function (e) { console.warn("[tv] arbol:", e.message); return null; });
+});
+var RD_EST = ["facturado", "armado", "proceso", "pendiente"];
+function resumenDias(filas, despachadas, n) {
+  var dias = new Map(), hoy = hoyKey();
+  (filas || []).forEach(function (r) {
+    var k = String(r.fecha || "").slice(0, 10);
+    if (!k || k < hoy || k >= "9999") return;
+    var d = dias.get(k);
+    if (!d) { d = { key: k, m3: 0, nps: 0, tandas: new Set(), est: {}, estSal: {}, salio: 0 }; RD_EST.forEach(function (e) { d.est[e] = 0; d.estSal[e] = 0; }); dias.set(k, d); }
+    var est = RD_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
+    var np = String(r.np || "").trim().replace(/\.0+$/, "");
+    var sal = despachadas.has(np) ? 1 : 0;
+    d.m3 += Number(r.m3) || 0; d.nps++; d.est[est]++; d.salio += sal; if (sal) d.estSal[est]++;
+    if (r.tanda) d.tandas.add(String(r.tanda).toUpperCase());
+  });
+  return Array.from(dias.values()).sort(function (a, b) { return a.key.localeCompare(b.key); }).slice(0, n);
+}
 var cargarHoras = cache(HORAS_TTL, function () {
   return getAll("gv_monitor_horas_operario",
     "select=legajo,nombre,tandas_pick,prom_hs_pick,tandas_arm,prom_hs_arm," +
@@ -924,10 +1003,12 @@ function actividadActual(eventos, hoy, fjHoy, fichados) {
   for (var leg2 in porLeg) {
     if (fjHoy.has(leg2)) { vistos[leg2] = 1; continue; }   // ya cerró jornada
     var evs = porLeg[leg2].sort(function (a, b) { return a.ts - b.ts; });
-    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, ultTs = 0;
+    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, ultTs = 0, gstIni = 0, gstUlt = 0;
     for (var k = 0; k < evs.length; k++) {
       var e = evs[k];
       if (e.ts > ultTs) ultTs = e.ts;
+      if (e.op === "GST") { if (!gstIni) gstIni = e.ts; gstUlt = e.ts; continue; }   /* v23.64 */
+      gstIni = 0; gstUlt = 0;
       if (e.op === "EP") { pick = e.tx; pickTs = e.ts; }
       else if (e.op === "TP")  { if (!e.tx || pick === e.tx) pick = null; }
       else if (e.op === "AP")  { arm = e.tx; armTs = e.ts; }
@@ -941,6 +1022,7 @@ function actividadActual(eventos, hoy, fjHoy, fichados) {
     if (pick) cands.push({ k: "pick", ts: pickTs, tanda: pick });
     if (arm)  cands.push({ k: "arm",  ts: armTs,  tanda: arm });
     if (tog)  cands.push({ k: tog,    ts: togTs });
+    if (!cands.length && gstUlt && (Date.now() - gstUlt) <= GST_VIVO_MIN * 60000) cands.push({ k: "GST", ts: gstIni });
     cands.sort(function (a, b) { return b.ts - a.ts; });
     out.push({ legajo: leg2, idle: !cands.length, desde: cands.length ? cands[0].ts : ultTs,
                kind: cands.length ? cands[0].k : null,
@@ -1044,8 +1126,8 @@ function pintar(d) {
     if (!porDia.has(dk)) porDia.set(dk, { fecha: v.fecha, total: 0, camiones: new Map() });
     var g = porDia.get(dk);
     g.total += v.m3;
-    var cam = tandaCamion(v.tanda);
-    if (!g.camiones.has(cam)) g.camiones.set(cam, { sum: 0, n: 0, armadas: 0 });
+    var camI = camionDeTanda(v.tanda), cam = camI.nombre;   // v23.64: grupo de zonas, no letra+número
+    if (!g.camiones.has(cam)) g.camiones.set(cam, { sum: 0, n: 0, armadas: 0, usa: camI.usa });
     var c = g.camiones.get(cam);
     c.sum += v.m3; c.n++;
     if (ev.armado === "done") c.armadas++;
@@ -1175,34 +1257,33 @@ function pintar(d) {
   }
   el("avisos").innerHTML = avisos;
 
-  // ── A facturar
-  var totFc = fc.reduce(function (s, x) { return s + (x.v.m3 || 0); }, 0);
-  el("fcTit").innerHTML = "A facturar <small>· " + n1(totFc) + " m³" +
-    (fcSalidas ? " · <b class=\"fc-salio\">" + fcSalidas + (fcSalidas === 1 ? " ya salió" : " ya salieron") +
-      " sin FC</b>" : "") + "</small>";
-  if (fc.length) {
-    var MAX_FC = cabenFilas("fcBox", true);
-    var fcFilas = fc.slice(0, MAX_FC).map(function (x) {
-      var facturada = tandaFacturada(x.v, d.facturadas);
-      var salio = tandaSalio(x.v, d.despachadas);
-      /* v20.19: la que YA SE FUE y todavía no tiene factura es lo urgente de esta
-         tabla — la mercadería está en la calle sin papel. Va marcada. */
-      return '<tr' + (facturada ? ' class="fact"' : (salio ? ' class="salio-sinfc"' : '')) + '>' +
-        '<td class="t-tanda">' + esc(x.v.tanda) + '</td>' +
-        '<td class="num">' + n1(x.v.m3) + '</td>' +
-        '<td class="cen t-fe">' + esc(x.v.fecha) + '</td>' +
-        '<td class="cen st-salio">' + (salio ? "🚚" : "") + '</td>' +
-        '<td class="cen st-done">' + (facturada ? "✅" : "") + '</td></tr>';
-    }).join("");
-    el("fcBox").innerHTML = '<table><thead><tr><th>Tanda</th><th class="num">M³</th>' +
-      '<th class="cen">Salida</th><th class="cen">Salió</th><th class="cen">FC</th></tr></thead><tbody>' +
-      fcFilas + '</tbody></table>' +
-      (fc.length > MAX_FC ? '<div class="mas">+ ' + (fc.length - MAX_FC) + ' más</div>' : "");
+  // ── Resumen de días (v23.64, reemplaza "A facturar") ≡ Programación de la PPP
+  if (d.arbol === null) {
+    el("fcTit").innerHTML = "Resumen de días";
+    el("fcBox").innerHTML = '<div class="vacio">No se pudo leer la programación</div>';
   } else {
-    el("fcBox").innerHTML = '<div class="vacio">Ninguna terminada todavía</div>';
+    var rds = resumenDias(d.arbol, d.despachadas, 3);
+    el("fcTit").innerHTML = "Resumen de días" +
+      (fcSalidas ? " <small>· <b class=\"fc-salio\">" + fcSalidas + (fcSalidas === 1 ? " salió" : " salieron") + " sin FC</b></small>" : "");
+    var pc = function (nn, tot, cls) {
+      var p = tot ? Math.round(100 * nn / tot) : 0;
+      return '<td class="' + cls + (nn ? '' : ' z') + '">' + p + '%<small>' + nn + '</small></td>';
+    };
+    el("fcBox").innerHTML = rds.length ? '<table class="rd"><thead><tr>' +
+      '<th class="cen">Salió</th><th class="cen">Fact</th><th class="cen">Arm</th><th class="cen">Proc</th><th class="cen">Pend</th>' +
+      '</tr></thead><tbody>' + rds.map(function (x) {
+        var neto = function (k) { return x.est[k] - (x.estSal[k] || 0); };
+        return '<tr class="rd-dia"><td colspan="5" style="text-align:left">' + esc(diaEtiqueta(x.key)) +
+          (x.key === hoyKey() ? ' <small>· hoy</small>' : '') +
+          ' <small>· ' + n1(x.m3) + ' m³ · ' + x.tandas.size + ' tandas · ' + x.nps + ' NP</small></td></tr>' +
+          '<tr>' + pc(x.salio, x.nps, "sal") + pc(neto("facturado"), x.nps, "fac") + pc(neto("armado"), x.nps, "arm") +
+          pc(neto("proceso"), x.nps, "pro") + pc(neto("pendiente"), x.nps, "pen") + '</tr>';
+      }).join("") + '</tbody></table>'
+      : '<div class="vacio">Nada programado</div>';
   }
 
-  // ── Total por día / camión
+  // ── Total por día / camión (v23.64: Retira no cuenta como camión)
+  function nCamiones(g) { var n = 0; g.camiones.forEach(function (c) { if (c.usa !== false) n++; }); return n; }
   var dias = Array.from(porDia.entries()).sort(function (a, b) {
     return String(a[0]).localeCompare(String(b[0]));
   });
@@ -1219,7 +1300,7 @@ function pintar(d) {
       var g = par[1];
       if (!desglosar) {
         return '<tr><td class="t-fe">' + esc(g.fecha) + '</td>' +
-          '<td class="cen" style="color:#64748b">' + g.camiones.size + '</td>' +
+          '<td class="cen" style="color:#64748b">' + nCamiones(g) + '</td>' +
           '<td class="num"></td><td class="num t-tanda">' + n1(g.total) + '</td></tr>';
       }
       var cams = Array.from(g.camiones.entries()).sort(function (a, b) {
@@ -1383,9 +1464,11 @@ function ciclo() {
   return Promise.all([
     cargarProgramacion(), cargarEventosHoy(), cargarEmpleados(),
     cargarFichadasHoy(), cargarDeshechas(), cargarFacturadas(), cargarDespachadas(),
-    cargarHoras(), cargarFeriados()
+    cargarHoras(), cargarFeriados(), cargarCamiones(), cargarGuardadoHoy(), cargarArbol()
   ]).then(function (r) {
-    var prog = r[0], eventos = r[1], empleados = r[2], fichadas = r[3],
+    var arbol = r[11];
+    if (r[9] && r[9].size) CAMION_DE = r[9];
+    var prog = r[0], eventos = r[1], guardado = r[10] || [], empleados = r[2], fichadas = r[3],
         deshechas = r[4], facturadas = r[5], despachadas = r[6], horas = r[7];
     var hoy = hoyKey();
     var fechas = fechasVentana(prog, VENTANA_DIAS);
@@ -1424,10 +1507,10 @@ function ciclo() {
 
       pintar({
         prog: prog, status: status, fechas: fechas,
-        actividad: actividadActual(eventos, hoy, fjHoy, fichados),
+        actividad: actividadActual(guardado.length ? eventos.concat(guardado) : eventos, hoy, fjHoy, fichados),
         alertas: Array.from(alertas).sort(),
         empleados: empleados, facturadas: facturadas, despachadas: despachadas,
-        horas: horas
+        horas: horas, arbol: arbol
       });
 
       ultimoOk = Date.now(); fallos = 0;

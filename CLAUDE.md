@@ -5634,3 +5634,15 @@ empezada queda en `gv_ppp_web_base_sobrante` (vacía = todo bien) y todo lo borr
 Barrido del 28/09: `ppp_web_resync` ya borra la NP entera que desaparece (tanda sin empezar);
 `sync-precios-venta` tiene `reconcileStale`; `gv-sync-padron-direcciones` **no borra** (8 direcciones
 de LK viejas del 14/09, ninguna con NP programada). `sql/gv_ppp_web_base_podar_v2300.sql`.
+
+## ⚠ REGLA (Luis, 2026-09-28, v23.64): MONITOR — el camión es el GRUPO DE ZONAS, la bajada de racks es actividad
+
+- **«Total por día» (admin y TV) cuenta camiones con `gv_monitor_tanda_camion`** (Capital Sur/Centro/Oeste —Z2+Z3
+  juntas si cada una < 1 m³—, GBA Sur/Oeste/Norte, un camión por súper, Retira sin camión), ≡ `PPP_RES_CAMIONES`.
+  Antes era la letra+número del código (`tandaCamion`): el 30/09 decía 11 camiones y salen 5. `tandaCamion` queda de fallback.
+- **La bajada de racks y el guardado viven en `Movimientos_Stock`, no en los eventos**: entran como eventos `GST`
+  sólo para «sin marcar» y «En este momento» (📥 Guardando, vivo 45 min). No tocan las horas.
+- **La TV cambió «A facturar» por el RESUMEN DE 3 DÍAS de la PPP** (`gv_ppp_prog_arbol`, % Salió/Fact/Arm/Proc/Pend,
+  netos por Salió = CCN). El admin tiene la pestaña **📺 Vista TV** (la misma `monitor/tv.html` en iframe).
+- Horas: `hs_total` es la jornada y los baldes sólo lo CERRADO — la tarea abierta y la bajada de racks no suman.
+  Pendiente de Luis. `sql/gv_monitor_tanda_camion_v2364.sql`, `tests/mon-guardado-camion.cjs`.

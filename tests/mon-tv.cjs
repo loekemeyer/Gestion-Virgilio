@@ -27,7 +27,9 @@ const fallas = [];
 
 /* ── 1) liviana y de sólo lectura ─────────────────────────────────────────── */
 const KB = Buffer.byteLength(src) / 1024;
-if (KB > 80) fallas.push("pesa " + KB.toFixed(0) + " KB (techo 80): dejó de ser la versión liviana");
+/* v23.64: techo 80 → 100 KB — se sumaron el resumen de días de la PPP, el camión por grupo de
+   zonas y el guardado. Sigue siendo el 2 % del index.html (~5 MB), que es lo que el techo cuida. */
+if (KB > 100) fallas.push("pesa " + KB.toFixed(0) + " KB (techo 100): dejó de ser la versión liviana");
 for (const pesado of ["supabase.umd.js", "supabase.js", "chart.umd", "jspdf", "xlsx", "cdn."]) {
   if (src.includes(pesado)) fallas.push("carga " + pesado + " — la TV no lo necesita");
 }
@@ -165,6 +167,14 @@ const DATOS = {
          { opcion: "CCN", texto: "98807", ts_cliente: iso(Date.now() - 7 * H) },
          { opcion: "CCN", texto: "98808", ts_cliente: iso(Date.now() - 8 * H) }],
   deshechas: [],
+  /* v23.64 — el resumen de días de la PPP (gv_ppp_prog_arbol). 98805 tiene CCN → cuenta en
+     SALIÓ y se descuenta de Armado (neto, como la PPP). */
+  arbol: [
+    { fecha: HOY, tanda: "E31A", np: "98802", m3: 1.5, estado: "facturado" },
+    { fecha: HOY, tanda: "E34A", np: "98805", m3: 2.0, estado: "armado" },
+    { fecha: HOY, tanda: "E30A", np: "98809", m3: 1.0, estado: "proceso" },
+    { fecha: HOY, tanda: "E30A", np: "98810", m3: 0.5, estado: "pendiente" }
+  ],
   /* v21.17 — horas por operario, ya clasificadas por `gv_monitor_horas_operario`.
      La TV NO recalcula nada de esto: si la vista cambia, cambia acá. */
   horas: [
@@ -184,6 +194,7 @@ function responder(url) {
   if (q.includes("/PPP_Web_Programacion"))       return DATOS.web;
   if (q.includes("/gv_tanda_status"))            return DATOS.status.filter(s => q.includes(s.tanda));
   if (q.includes("/gv_tandas_deshechas"))        return DATOS.deshechas;
+  if (q.includes("/rpc/gv_ppp_prog_arbol"))      return DATOS.arbol;
   if (q.includes("/gv_monitor_horas_operario"))  return DATOS.horas;
   if (q.includes("/Facturacion_NP"))             return DATOS.facturadas;
   if (q.includes("/Fichadas_Virgilio"))          return DATOS.fichadas;
@@ -250,16 +261,13 @@ function responder(url) {
   // 4) facturada + despachada = fuera del tablero
   ok(!/E33A/.test(r.tandas + r.fc), "E33A está facturada Y despachada: no tiene que aparecer en ningún lado");
 
-  // a facturar, con su ✅
-  ok(/E31A/.test(r.fc), "E31A no aparece en 'a facturar'");
-  ok(/✅/.test(r.fc), "E31A está facturada (NP 98802) y no tiene el ✅");
-
-  // 4b) v20.21 (Thomas) — la columna SALIÓ del monitor: sólo carga al camión (CCN)
-  ok(/Salió/.test(r.fc), "la tabla 'a facturar' no trae la columna Salió");
-  ok(/E34A/.test(r.fc), "E34A (terminada y cargada al camión, sin FC) no aparece en 'a facturar'");
-  ok(/🚚/.test(r.fc), "E34A tiene CCN (NP 98805): le falta el 🚚 de salió");
-  ok(/salio-sinfc/.test(r.fc), "E34A salió y no está facturada: la fila tiene que quedar marcada");
-  ok(/3 ya salieron sin FC/.test(r.fcTit), "el título no avisa cuántas se fueron sin factura: " + r.fcTit);
+  // v23.64 (Luis) — "A facturar" pasó a ser el RESUMEN DE DÍAS de la PPP (%, neto por Salió)
+  ok(/Resumen de días/.test(r.fcTit), "el cuadro de la derecha tiene que ser el Resumen de días: " + r.fcTit);
+  ok(/Salió/.test(r.fc) && /Fact/.test(r.fc) && /Pend/.test(r.fc), "faltan las columnas de estado del resumen");
+  ok(/5,0 m³ · 3 tandas · 4 NP/.test(r.fc), "la fila del día tiene que decir 5,0 m³ · 3 tandas · 4 NP: " + r.fc.slice(0, 400));
+  ok((r.fc.match(/25%<small>1<\/small>/g) || []).length === 4, "98805 salió: 25 % en Salió, Fact, Proc y Pend, y 0 en Armado");
+  ok(/class="arm z">0%/.test(r.fc), "el armado que salió no se cuenta dos veces (neto)");
+  ok(/3 salieron sin FC/.test(r.fcTit), "el título no avisa cuántas se fueron sin factura: " + r.fcTit);
   // v20.21 (Thomas) — el 🚚 también en la tabla principal, y el cartel a partir de 3
   ok(/E36A/.test(r.tandas), "E36A está en curso: tiene que estar en la tabla principal");
   ok(/🚚/.test(r.tandas), "E36A salió (CCN) sin cerrar el picking: le falta el 🚚 en la tabla principal");
