@@ -31,3 +31,20 @@ alter table public."GV_PPP_Prog_Override" add column if not exists gv_manual_por
 -- Marcado historico de "a mano": 38 tandas / 116 NP del 23 al 28/09, reconstruido cruzando la hora de
 -- cada llamada del panel (edge_logs, POST rpc gv_ppp_*mover/programar/reprog) con actualizado_at (±6 s).
 -- gv_manual_por = 'manual (reconstruido de logs del panel)'.
+
+-- v23.49 (Luis 28/09, v23.50): "NADA DE LO QUE SE PROGRAMA MANUAL SE MUEVE, se programo manual por algun
+-- motivo (programado manual o movido manual)". Una tanda a_mano ya no se corre: sale 'aviso_manual'.
+-- Centinela: GV_Reglas_Centinela (gv_ppp_reprogramar_sin_factura, patron 'aviso_manual').
+-- -- REGLA_CONFIRMADA_POR_USUARIO
+do $x$ declare d text;
+begin
+  d := pg_get_functiondef('public.gv_ppp_reprogramar_sin_factura(boolean,date)'::regprocedure);
+  if d ~ 'aviso_manual' then return; end if;
+  d := replace(d, $a$    elsif r.fijada is not null then$a$,
+                  $a$    elsif r.a_mano then
+      v_acc := 'aviso_manual'; v_avi := v_avi + 1;
+      v_det := 'PROGRAMADA/MOVIDA A MANO: no se mueve sola, lo decide una persona.';
+    elsif r.fijada is not null then$a$);
+  if d !~ 'aviso_manual' then raise exception 'parche no matcheo'; end if;
+  execute d;
+end $x$;
