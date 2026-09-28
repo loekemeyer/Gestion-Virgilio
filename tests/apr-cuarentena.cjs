@@ -602,10 +602,11 @@ catch (_e) {
     ];
     aprRender(); await new Promise((res) => setTimeout(res, 120));
     html = document.getElementById("pppPreview").innerHTML;
-    out.anuChip = /apr-anu-chip[^>]*>✕ 2 anulados</.test(html);
+    // v23.44 (Luis): botón «Historial de cancelados», sin badge ni número
+    out.anuChip = /apr-anu-chip[^>]*>🗂 Historial de cancelados</.test(html) && !/\d+ anulados/.test(html);
     aprAnuAbrir(); await new Promise((res) => setTimeout(res, 120));
     const lh = (document.getElementById("aprAnuModal") || {}).innerHTML || "";
-    out.anuLog = /Pedidos anulados/.test(lh) && /web LK 1416/.test(lh) &&
+    out.anuLog = /Historial de cancelados/.test(lh) && /A Programar/.test(lh) && /web LK 1416/.test(lh) &&
                  /lo cargó mal el cliente/.test(lh) && /<b>Vivi<\/b>/.test(lh) &&
                  /15\/09 10:20/.test(lh) && /LK 3969/.test(lh);
     // v18.05 — la columna NP: el que tenía NP la muestra; el que no, dice "sin NP"
@@ -800,7 +801,7 @@ catch (_e) {
   chk(r.anuIsis, "una NP de ISIS viaja con p_es_isis = true y su etiqueta");
   chk(r.anuCerradoNo, "en 'Pedidos a programar' el botón NO está con la ficha cerrada");
   chk(r.anuAbiertoSi, "al expandir la NP aparece debajo del detalle");
-  chk(r.anuChip, "la cabecera muestra el chip '✕ N anulados'");
+  chk(r.anuChip, "la cabecera muestra el botón 'Historial de cancelados' (sin número)");
   chk(r.anuLog, "el log lista cuándo, qué pedido, cliente, quién y por qué");
   chk(r.anuLogNp, "el log muestra la NP que se quemó (y dice que no se reutiliza)");
   chk(r.anuLogCerrado, "el log se cierra");
