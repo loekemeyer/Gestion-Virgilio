@@ -6221,7 +6221,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.65"></script>
+<script type="module" src="recepcion.js?v=23.66"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10180,7 +10180,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.65";
+const APP_VERSION = "v23.66";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -29739,7 +29739,7 @@ async function showRacksBajarModal(legajo, _resume) {
   if (!ov) { ov = document.createElement("div"); ov.id = "rkbModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
   ov.innerHTML = '<div class="rkb-card"><div class="rkb-head"><span class="rkb-title">🏗 Bajar de racks a góndola</span><button class="rkb-close" onclick="rkbAskClose()">Cerrar</button></div><div class="rkb-body" id="rkbBody"><div class="rkb-empty">Cargando racks…</div></div></div>';
-  if (_resume) { _rkb = _resume; rkbRender(); return; }
+  if (_resume) { _rkb = _resume; _rkb._cerrado = false; _rkb.tsInicio = Date.now(); try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {} rkbRender(); return; }   // v23.66: tramo nuevo
   try {
     const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors()]);
     const saldos = res[0] || {};
@@ -29756,7 +29756,8 @@ async function showRacksBajarModal(legajo, _resume) {
         // sec preseleccionada = la ubicación con más stock (planimetría viva, v5.22)
         return { cod: a.cod, desc: artNombre(a.cod, a.desc), racks: Math.round(a.racks), cxm: _cxmR, locs: locs, sec: (locs[0] ? locs[0].sector : ""), baja: 0, manual: false };
       });
-    _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, filtro: "" };
+    _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, filtro: "", tsInicio: Date.now() };
+    try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {}   // v23.66
     rkbRender();
   } catch (e) { const b = document.getElementById("rkbBody"); if (b) b.innerHTML = '<div class="rkb-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -29818,7 +29819,11 @@ function rkbAddManual(cod) {
 }
 function rkbChg(i, d) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; const mx = it.manual ? 99999 : (it.cxm > 0 ? Math.floor(it.racks / it.cxm) : it.racks); it.baja = Math.max(0, Math.min(mx, it.baja + d)); rkbRender(); }
 function rkbSet(i, v) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); const mx = it.manual ? 99999 : (it.cxm > 0 ? Math.floor(it.racks / it.cxm) : it.racks); if (n > mx) n = mx; it.baja = n; rkbRender(); }
-function closeRkb() { const ov = document.getElementById("rkbModal"); if (ov) ov.classList.remove("show"); _rkb = null; }
+function closeRkb() {
+  const ov = document.getElementById("rkbModal"); if (ov) ov.classList.remove("show");
+  try { if (_rkb && !_rkb._cerrado && _rkb.tsInicio) { gvRacksTramo("RKB", _rkb.legajo, _rkb.tsInicio, "sin bajar"); _rkb._cerrado = true; } } catch (_e) {}   // v23.66
+  _rkb = null;
+}
 function rkbHasProgress() { return !!(_rkb && _rkb.items && _rkb.items.some(function (it) { return (it.baja > 0); })); }
 function rkbAskClose() { opAskClose(rkbHasProgress(), "RKB", _rkb && _rkb.legajo, "Bajar de racks", _rkb, closeRkb); }
 async function rkbConfirmar() {
@@ -29872,9 +29877,32 @@ async function rkbConfirmar() {
   sel.filter(function (it) { return it.manual; }).forEach(function (it) { try { rkbEmitFueraLista(it.cod, it.baja, _rkb.legajo); } catch (_e) {} });
   const totInner = items.reduce(function (s, it) { return s + Number(it.cajas || 0); }, 0);
   try { opDraftClear(_rkb && _rkb.legajo); } catch (_e) {}
+  try { gvRacksTramo("RKB", _rkb.legajo, _rkb.tsInicio, String(totInner)); _rkb._cerrado = true; } catch (_e) {}   // v23.66: el tramo con inicio y fin
   closeRkb();
   postBajaRacks(items);   // v12.35 — fila de bajada + movimientos racks→góndola en UNA transacción (offline-safe)
   try { alert("✓ Bajaste " + totInner + " caja(s) de racks — el stock ya pasó a góndola."); } catch (_e) {}
+}
+/* v23.66 (Luis, 28/09: *"ingreso a racks y guardado a góndola, todo eso es trabajo en racks y
+   debería contar tiempo"*) — Bajar de racks (RKB) e Ingreso a racks (IR) no dejaban el TIEMPO en
+   ningún lado: Isidro bajó racks de 11:14 a 15:20 y sus horas decían 1,3. Ahora cada sesión deja
+   su tramo con inicio y fin, igual que el MG del guardado:
+     · al abrir → marca instantánea (RKI / IRI): el monitor lo ve EN CURSO;
+     · al terminar → evento CERRADO con ts_inicio = la apertura (RKB / IRT): suma a Hs MOV;
+     · al CERRAR el módulo sin confirmar también cierra su tramo: el tiempo que estuvo en racks
+       es trabajo aunque no haya registrado cajas (y si deja un borrador y vuelve, arranca otro).
+   El baño o la comida en el medio se restan igual que en el resto de las tareas (muerto_open_s
+   de gv_monitor_horas_operario_dia). Legajo 0 (supervisor desde Stock) no emite. */
+function gvRacksTramo(op, legajo, iniMs, texto) {
+  const leg = String(legajo || "").trim(); if (!leg || leg === "0" || leg === "1") return;
+  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
+  const nowMs = Date.now();
+  const DESC = { RKI: "Bajar de racks (abre)", RKB: "Bajar de racks", IRI: "Ingreso a racks (abre)", IRT: "Ingreso a racks" };
+  const payload = { legajo: leg, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""), ts: nowMs,
+    id: (op.toLowerCase() + "_" + leg + "_" + nowMs.toString(36)).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: (iniMs && iniMs < nowMs) ? new Date(iniMs).toISOString() : null };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
 }
 function rkbEmitFueraLista(cod, cajas, legajo) {
   const payload = {
@@ -30216,7 +30244,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
   if (!ov) { ov = document.createElement("div"); ov.id = "irModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
   ov.innerHTML = '<div class="ir-card"><div class="ir-head"><span class="ir-title">📥 Ingreso a racks</span><button class="ir-close" onclick="closeIR()">Cerrar</button></div><div class="ir-body" id="irBody"><div class="ir-empty">Cargando racks…</div></div></div>';
-  if (_resume) { _ir = _resume; irRender(); return; }
+  if (_resume) { _ir = _resume; _ir._cerrado = false; _ir.tsInicio = Date.now(); try { gvRacksTramo("IRI", _ir.legajo); } catch (_e) {} irRender(); return; }   // v23.66: tramo nuevo
   try {
     const plani = await racksFetchPlani();
     await loadArtNombres();
@@ -30232,6 +30260,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
     });
     libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
     _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, libres: libres, ocupados: ocupados, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
+    _ir.tsInicio = Date.now(); try { gvRacksTramo("IRI", _ir.legajo); } catch (_e) {}   // v23.66: el tramo de racks arranca al abrir
     irRender();
   } catch (e) { const b = document.getElementById("irBody"); if (b) b.innerHTML = '<div class="ir-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -30358,7 +30387,12 @@ function irRenderConfirm(body) {
   h += '<div class="ir-conf-btns"><button class="ir-back" onclick="irVolver()">← Volver</button><button class="ir-confirm" onclick="irCargar()">✓ Confirmar carga</button></div>';
   body.innerHTML = h;
 }
-function closeIR() { const ov = document.getElementById("irModal"); if (ov) ov.classList.remove("show"); _ir = null; }
+function closeIR() {
+  const ov = document.getElementById("irModal"); if (ov) ov.classList.remove("show");
+  // v23.66: el tiempo en el módulo es trabajo en racks (cargó palets o no): se cierra el tramo con su inicio
+  try { if (_ir && !_ir._cerrado && _ir.tsInicio) { gvRacksTramo("IRT", _ir.legajo, _ir.tsInicio, String((_ir.done || []).length) + " palet(s)"); _ir._cerrado = true; } } catch (_e) {}
+  _ir = null;
+}
 async function irCargar() {
   if (!_ir) return;
   const nac = _ir.modo === "nacional";
@@ -33716,7 +33750,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
      de las líneas imprime "Binary file matches" — o sea que los conteos daban
      cualquier cosa. **Para contar algo en `index.html`: `grep -a`, o Python.**
      Lo cazó `tests/dead-handlers.cjs`. */
-  const MOV_TOGGLE_CODES    = new Set(["MG", "RI", "EI", "RT"]);
+  const MOV_TOGGLE_CODES    = new Set(["MG", "RI", "EI", "RT", "RKB", "IRT"]);   // v23.66: + trabajo en racks (≡ gv_monitor_horas_operario_dia)
   const NOPROD_TOGGLE_CODES = new Set(["AT", "PB", "Limp", "PC", "CT", "Perm"]);
   /* v21.47 (Thomas) — TRABAJO PRODUCTIVO QUE NO TIENE m³: Carga Camión, Control
      Remitos y Recepción Remitos. Hasta acá el monitor grande **no medía ninguno**:
@@ -53513,7 +53547,7 @@ function _monEnSilencio(eventos, todayKey, fjHoy, nowMs, gapMin) {
    o un toggle abierto (apertura sin cierre — el cierre lleva ts_inicio, la apertura no).
    Si no hay nada abierto queda "libre" (idle) con el tiempo desde su último evento. Excluye
    legajos 0/1 y a los que ya hicieron FJ. Alimenta el panel "En este momento" del monitor. */
-var _MON_ACT_TOGGLES = { CR: 1, RR: 1, CC: 1, RT: 1, MG: 1, RI: 1, EI: 1, AT: 1, PB: 1, Limp: 1, PC: 1, Perm: 1, CT: 1 };
+var _MON_ACT_TOGGLES = { CR: 1, RR: 1, CC: 1, RT: 1, MG: 1, RI: 1, EI: 1, AT: 1, PB: 1, Limp: 1, PC: 1, Perm: 1, CT: 1, RKB: 1, IRT: 1 };   // v23.66: RKB/IRT cierran el tramo de racks (abre RKI/IRI)
 var _MON_ACT_INFO = {
   pick: { ic: "🛒", vb: "Pickeando" }, arm: { ic: "🔨", vb: "Armando" },
   CC: { ic: "🚛", tx: "Cargando camión" }, RT: { ic: "🏭", tx: "Recibiendo mercadería" },
@@ -53523,6 +53557,7 @@ var _MON_ACT_INFO = {
   PB: { ic: "🚽", tx: "En el baño" }, Limp: { ic: "🧹", tx: "Limpiando" },
   PC: { ic: "🍽", tx: "Comiendo" }, Perm: { ic: "🚪", tx: "Permiso de salida" },
   CT: { ic: "🔢", tx: "Conteo" },
+  RKB: { ic: "🏗", tx: "Bajando racks" }, IRT: { ic: "🏗", tx: "Ingresando a racks" },
   GST: { ic: "📥", tx: "Guardando (bajada de racks)" }   // v23.64: sale de Movimientos_Stock, no de un toggle
 };
 /* v23.64 (Luis, 28/09: *"está guardando"*) — la BAJADA DE RACKS y el guardado se registran en
@@ -53564,6 +53599,8 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
       else if (e.op === "TAP") { if (!e.tx || arm === e.tx) arm = null; }
       else if (e.op === "MGI") { tog = "MG"; togTs = e.ts; }                       // v23.63
       else if (e.op === "MGC") { if (tog === "MG") tog = null; }
+      else if (e.op === "RKI") { tog = "RKB"; togTs = e.ts; }                      // v23.66: bajando racks
+      else if (e.op === "IRI") { tog = "IRT"; togTs = e.ts; }                      // v23.66: ingresando a racks
       else if (e.op === "MG" && e.ini) { if (tog === "MG") tog = null; }
       else if (_MON_ACT_TOGGLES[e.op]) { if (!e.ini) { tog = e.op; togTs = e.ts; } else if (tog === e.op) { tog = null; } }
     }

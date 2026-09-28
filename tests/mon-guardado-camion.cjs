@@ -35,6 +35,13 @@ ok(/_monCamionDe\.get\(/.test(IDX), "el camión del admin tiene que mirar primer
 ok(/gv_monitor_tanda_camion/.test(IDX) && /gv_monitor_tanda_camion/.test(TV), "los dos monitores leen gv_monitor_tanda_camion");
 ok(/CAMION_DE\.get\(/.test(TV), "el camión de la TV tiene que mirar primero la base");
 
+// 4) v23.66 — el trabajo en racks deja su tramo con inicio y fin, y suma a Hs MOV
+ok(/gvRacksTramo\("RKI"/.test(IDX) && /gvRacksTramo\("RKB", _rkb\.legajo, _rkb\.tsInicio/.test(IDX), "Bajar de racks tiene que abrir (RKI) y cerrar su tramo (RKB con ts_inicio)");
+ok(/gvRacksTramo\("IRI"/.test(IDX) && /gvRacksTramo\("IRT", _ir\.legajo, _ir\.tsInicio/.test(IDX), "Ingreso a racks tiene que abrir (IRI) y cerrar su tramo (IRT con ts_inicio)");
+ok(/function closeRkb\(\) \{[\s\S]{0,300}gvRacksTramo\("RKB"/.test(IDX), "cerrar Bajar de racks sin confirmar también cierra el tramo");
+ok(/MOV_TOGGLE_CODES\s*= new Set\(\["MG", "RI", "EI", "RT", "RKB", "IRT"\]\)/.test(IDX), "Hs MOV del monitor grande tiene que sumar RKB e IRT (≡ la vista)");
+ok(/e\.op === "RKI"/.test(IDX) && /e\.op === "RKI"/.test(TV), "los dos monitores tienen que ver el tramo de racks EN CURSO");
+
 // 3) pestaña Vista TV
 ok(/setMonitorTab\('tv'\)/.test(IDX) && /monitor\/tv\.html\?key=tv/.test(IDX), "falta la pestaña 📺 Vista TV");
 

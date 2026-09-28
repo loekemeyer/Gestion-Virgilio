@@ -5646,3 +5646,14 @@ de LK viejas del 14/09, ninguna con NP programada). `sql/gv_ppp_web_base_podar_v
   netos por Salió = CCN). El admin tiene la pestaña **📺 Vista TV** (la misma `monitor/tv.html` en iframe).
 - Horas: `hs_total` es la jornada y los baldes sólo lo CERRADO — la tarea abierta y la bajada de racks no suman.
   Pendiente de Luis. `sql/gv_monitor_tanda_camion_v2364.sql`, `tests/mon-guardado-camion.cjs`.
+
+## ⚠ REGLA (Luis, 2026-09-28, v23.66): las HORAS cuentan la tarea ABIERTA y el TRABAJO EN RACKS
+
+- **Hoy, la tarea abierta suma hasta ahora** (`gv_monitor_horas_operario_dia`, CTEs `abre`/`abierta`/`ab_*`): la más reciente
+  sin su cierre (EP sin TP, AP sin TAP, toggle, MGI, RKI, IRI), sin FJ posterior y de < 12 h, **menos los tiempos
+  muertos adentro — también el baño abierto** (misma lógica que las cerradas). El muerto abierto y el permiso van a no
+  productivas. Días pasados: sin cambios (el 15/09 del test da idéntico).
+- **Trabajo en racks = Hs MOV**: Bajar de racks (RKI al abrir → RKB con `ts_inicio` al confirmar o cerrar) e Ingreso a
+  racks (IRI → IRT al cerrar). El tiempo en el módulo cuenta aunque no se registren cajas. `gvRacksTramo` en index.html.
+- ⚠ **Lo abierto sólo lo suma la vista (TV / 📺 Vista TV)**; la tabla Mts3 x Hora del admin sigue con lo cerrado (es m³/h).
+- Huella re-congelada (md5 `fcab722b…`), centinela 96 actualizado y fila nueva `ab_ag`. `sql/gv_monitor_horas_abiertas_v2366.sql`.

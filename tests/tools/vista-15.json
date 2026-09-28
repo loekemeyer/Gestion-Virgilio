@@ -1,6 +1,6 @@
 {
   "_comentario": [
-    "Salida de public.gv_monitor_horas_operario_dia(date '2026-09-15'), congelada el 2026-09-22.",
+    "Salida de public.gv_monitor_horas_operario_dia(date '2026-09-15'), congelada el 2026-09-22; re-verificada el 2026-09-28 (v23.66: tarea abierta de HOY + trabajo en racks) — el 15/09 da idéntico.",
     "Es la mitad SQL de la comparación: tests/mon-vs-vista.cjs corre el monitor grande con los",
     "fixtures de ese día y exige que dé lo mismo. Las sesiones no pueden pegarle a Supabase (el",
     "proxy de egress bloquea supabase.co), así que la única forma de tener las dos mitades en un",
