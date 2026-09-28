@@ -816,6 +816,16 @@ aviso), soltar una tanda sin fecha (`aprProgramarTanda`) y reprogramar una NP de
 agregar otro camino que programe un día, pasarlo por `aprDiaOcupadoAbrir(fecha, null, {peds, label, alVacio,
 alSumar})`.** `tests/apr-dia-ocupado-sin-arrastre.cjs`.
 
+⚠ **Y también «📅 Cambiar de día»** (v23.44, Luis 28/09): `pppMovElegir` abre el mismo pop-up antes del paso 2
+(la tanda que se mueve no cuenta como ocupación, `opt.excluir`). **Y el cron de las 18:00**
+(`gv_ppp_reprogramar_sin_factura`) mueve lo no facturado con **`gv_ppp_web_dia_grupo`** salvo lo fijado A MANO
+(`creado_por <> 'sistema'` o `gv_manual_por`, que marca el trigger `gv_marca_manual` cuando el cambio trae mail en el
+JWT). `sql/gv_reprog_sin_factura_grupo_v2344.sql`.
+
+⚠ **Picking duplicado al cambiar la EMPRESA de un artículo** (v23.42): el trigger `zz_pipeline_empresa_estable` hace
+que una fila de picking/separado/facturado de un código NO dual herede la empresa que la tanda ya tiene.
+Centinela: `select * from public.gv_stock_pipeline_dos_empresas;` — vacía = todo bien.
+
 ## ⚠⚠ NO REPORTAR (Luis, 23/09): "entran N pedidos y no se programan" en el log del armado
 
 `GV_PPP_Web_Armado_Log` / `GV_Tandas_Auto_Log` muestran en CADA corrida pedidos que entran y no arman tanda.

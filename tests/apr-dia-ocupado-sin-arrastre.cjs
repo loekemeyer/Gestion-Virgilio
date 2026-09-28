@@ -4,7 +4,9 @@
        "ya está completo" NO sale en un confirm aparte (lo muestra el pop-up); elegir 1 arma la tanda.
    (b) el mismo camino con el día VACÍO → sin pop-up, confirm de siempre (con "completo") y arma.
    (c) una tanda sin fecha soltada en un día (aprProgramarTanda) → pop-up; elegir 3 corre y DESPUÉS programa.
-   (d) reprogramar una NP de ISIS (pppReprogElegir) → pop-up; elegir 1 reprograma sin preguntar de nuevo. */
+   (d) reprogramar una NP de ISIS (pppReprogElegir) → pop-up; elegir 1 reprograma sin preguntar de nuevo.
+   (e) v23.44: «📅 Cambiar de día» (pppMovElegir) → pop-up; elegir 1 sigue al paso 2 (¿en qué tanda?).
+       Si el día sólo tiene la tanda que se mueve, NO abre el pop-up. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -69,7 +71,17 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _pppMov = { reprogNps: ["98617"], reprogLabel: "98617 Riondini" };
     await pppReprogElegir(F); await espera();
     const d = { popup: abierto() }; elegir(0); await espera(); d.log = log.slice(); d.confirms = confirms.slice();
-    return { a: a, b: bb, c: c, d: d };
+    // (e) Cambiar de día de una tanda
+    log.length = 0;
+    window.pppMovPaso2 = async function (iso) { log.push("paso2:" + iso); };
+    _pppMov = { tanda: "E77A", arbolFilas: [{ zona: "Zona 1", m3: 0.5 }] };
+    await pppMovElegir(F); await espera();
+    const e = { popup: abierto() }; elegir(0); await espera(); e.log = log.slice();
+    log.length = 0;
+    _pppMov = { tanda: "E48G", arbolFilas: [{ zona: "Zona 3", m3: 0.5 }] };
+    await pppMovElegir(F); await espera();
+    e.popupPropia = abierto(); e.logPropia = log.slice();
+    return { a: a, b: bb, c: c, d: d, e: e };
   });
 
   const f = [];
@@ -86,6 +98,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   if (!r.d.popup) f.push("(d) ISIS no abrió el pop-up");
   if (!r.d.log.some(function (x) { return x === "isis:2026-09-30"; })) f.push("(d) no reprogramó la NP de ISIS: " + r.d.log.join(" | "));
   if (r.d.confirms.length) f.push("(d) preguntó de nuevo después de elegir");
+  if (!r.e.popup) f.push("(e) Cambiar de día no abrió el pop-up");
+  if (!r.e.log.some(function (x) { return x === "paso2:2026-09-30"; })) f.push("(e) elegir 1 no siguió al paso 2: " + r.e.log.join(" | "));
+  if (r.e.popupPropia) f.push("(e) abrió el pop-up por la tanda que se está moviendo");
+  if (!r.e.logPropia.some(function (x) { return x === "paso2:2026-09-30"; })) f.push("(e) sin otras tandas no siguió al paso 2");
   if (errs.length) f.push("pageerrors: " + errs.join(" | "));
   const ok = !f.length;
   if (!ok) console.log("  ✗ " + f.join("\n  ✗ "));
