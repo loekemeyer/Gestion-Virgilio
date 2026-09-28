@@ -1,4 +1,4 @@
-// v23.07 (problema 579): el service worker y los .js propios tienen que PARSEAR, y ningún
+// v23.08 (problema 579): el service worker y los .js propios tienen que PARSEAR, y ningún
 // archivo del repo puede llevar marcas de conflicto de merge. El 28/09 (c21f3b6) se pusheó
 // sw.js con `<<<<<<< HEAD` adentro: el SW no se instalaba y ningún test lo vio.
 const fs = require("fs");
