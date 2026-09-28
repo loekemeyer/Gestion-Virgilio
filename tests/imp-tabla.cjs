@@ -1,5 +1,5 @@
 /* Regresión v11.70 — la tabla de "📦 Pedidos Importación" no se pisa.
-   v23.42 — compactada (Luis: "mucho espacio vacío entre descripción y proy"): 11 columnas con
+   v23.44 — compactada (Luis: "mucho espacio vacío entre descripción y proy"): 11 columnas con
    celdas dobles (Proy/Objetivo, En curso/A pedir, Unidades/FOB, u$s/m³); la tabla mide 1148px.
 
    El bug: las 14 columnas heredaban el layout genérico de `.mva-tbl`
@@ -79,13 +79,13 @@ const ITEMS = [
   }
   const A = out.ancho || {}, C = out.cel || {};
   const pass =
-    A.cols >= 11 && A.cols === A.ths &&                       // un <col> por columna (el bug era el colgroup desfasado; v23.42: 11 columnas, varias dobles)
+    A.cols >= 11 && A.cols === A.ths &&                       // un <col> por columna (el bug era el colgroup desfasado; v23.44: 11 columnas, varias dobles)
     A.pisadas && A.pisadas.length === 0 &&                    // nada pisado en monitor
     A.scrollX === 0 && A.accVisible && A.tieneBotones &&      // entra entera, con la columna Acciones usable
     C.pisadas && C.pisadas.length === 0 &&                    // ni en celular
     C.scrollX > 0 && C.codSticky &&                           // en celular se desliza, con Código fijo
     C.tablaW >= 1100 &&                                       // no se achica hasta pisarse
-    A.tablaW <= 1160 &&                                       // v23.42 (Luis): sin hueco — la tabla mide lo que suman sus columnas, no el 100% del popup
+    A.tablaW <= 1160 &&                                       // v23.44 (Luis): sin hueco — la tabla mide lo que suman sus columnas, no el 100% del popup
     !A.paginaScrollX && !C.paginaScrollX &&                   // el scroll es de la tabla, no de la página
     errs.length === 0;
   console.log("imp-tabla:", JSON.stringify(out), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");

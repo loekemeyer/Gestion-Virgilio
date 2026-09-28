@@ -6206,7 +6206,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.43"></script>
+<script type="module" src="recepcion.js?v=23.44"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10165,7 +10165,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.43";
+const APP_VERSION = "v23.44";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -19656,7 +19656,7 @@ var STK_POP_CSS =
   // entre sí) y con overflow-x:hidden cortaba m³ y Acciones. Acá: anchos por <colgroup>,
   // scroll horizontal, header en 2 líneas y primera columna fija al hacer scroll.
   ".mva-tblwrap.wide{overflow-x:auto;-webkit-overflow-scrolling:touch;}" +
-  // v23.42 (Luis): sin hueco entre Descripción y Proy. La tabla mide lo que suman sus columnas
+  // v23.44 (Luis): sin hueco entre Descripción y Proy. La tabla mide lo que suman sus columnas
   // (no el 100% del popup), letra más grande y columnas dobles (Proy/Objetivo, En curso/A pedir,
   // Unidades/FOB, u$s/m³). Descripción en hasta 2 renglones.
   ".mva-tbl.wide{width:1148px;min-width:1148px;font-size:13px;}" +   // = suma del <colgroup> de Pedidos Importación
@@ -20151,7 +20151,7 @@ function _stkProyDetHtml(mes) {
   else if (d.error) v = vacio("No se pudo traer el detalle (" + esc(d.error) + ").");
   else if (!d.filas.length) v = vacio("Sin ventas facturadas en " + esc(_stkFmtMes(mes)) + ".");
   else {
-    v = '<table><tr><th>cliente</th><th class="n">' + _stkProyUniTxt() + '</th></tr>';   // v23.42: sigue al switch Cajas/Unidades
+    v = '<table><tr><th>cliente</th><th class="n">' + _stkProyUniTxt() + '</th></tr>';   // v23.44: sigue al switch Cajas/Unidades
     d.filas.forEach(function (r) {
       var otros = String(r.cliente || "").toLowerCase() === "otros";
       v += '<tr' + (otros ? ' class="otros"' : '') + '><td>' + esc(r.cliente || "—") +
@@ -21690,7 +21690,7 @@ const _PED_IMP_RPC_ESCRITURA = ["gv_imp_carga_pedido_set", "gv_imp_cc_deuda_add"
   "gv_imp_pago_cargas_set", "gv_imp_prov_alias_set", "gv_importado_bache_add", "gv_importado_bache_borrar",
   "gv_importado_bache_editar", "gv_importado_bache_embarque", "gv_importado_bache_llego", "gv_importado_pedido_fechas",
   "gv_importado_pedido_ref", "gv_importados_resync", "importados_marcar_llegada", "importados_set_curso",
-  "gv_imp_recibir", "gv_imp_recibir_contexto", "gv_imp_recepcion_historial"];   // v23.42 — sólo authenticated (supervisor)
+  "gv_imp_recibir", "gv_imp_recibir_contexto", "gv_imp_recepcion_historial"];   // v23.44 — sólo authenticated (supervisor)
 async function _pedImpRpc(fn, body) {
   var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   if (_PED_IMP_RPC_ESCRITURA.indexOf(fn) >= 0) {
@@ -22102,7 +22102,7 @@ async function pedImpBacheLlego(bacheId) {
   catch (e) { try { alert("No se pudo marcar la llegada: " + (e.message || e)); } catch (_e) {} return; }
   await _impBachesReload();
 }
-/* v23.42 (Luis, 28/09) — 📥 RECIBIR una importación desde el panel.
+/* v23.44 (Luis, 28/09) — 📥 RECIBIR una importación desde el panel.
    Guiado: qué bache, cuánto llegó, de qué empresa (sólo duales) y a dónde va cada parte
    (A guardar · Góndola · Rack · Excedente · Insumos) con los lugares del Mapa. Antes de grabar
    el backend SIMULA (gv_imp_recibir p_simular=true): si una góndola no alcanza o un rack está

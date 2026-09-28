@@ -3465,6 +3465,26 @@ privado `loekemeyer/Impo-Comex`**; acá va sólo el build web (`client/dist-web`
   del controlante de la DDJJ NO están en ningún código: tabla cerrada `impo_comex.ddjj_controlante` + RPC
   `gv_impo_comex_ddjj_controlante()` (sólo supervisor). `sql/gv_impo_comex_ddjj_controlante_v2322.sql` (v23.22).
 
+## ⚠ REGLA (Luis, 2026-09-28, v23.44): la importación se RECIBE desde el panel — 📥 RECIBIR
+
+Pedidos Importación → Acciones → **📥 RECIBIR** (también en 📦 Baches). Guiado: qué bache, empresa (sólo
+duales), unidades por caja y a dónde va cada parte: **A guardar · Góndola (sus celdas del Mapa) · Rack ·
+Excedente · Insumos (posiciones IN)**. Antes de grabar **simula** (`gv_imp_recibir(..., p_simular=true)`):
+góndola que no alcanza (`cajas_max` de sus celdas contra el saldo) o rack ocupado / de otra empresa
+(`gv_rack_pos_chequear`) → avisa y la persona elige: partir (lo que entra + resto a A guardar), otro lugar
+o «ponerlo igual» (`resolucion='forzar'`, queda en el historial).
+
+| escribe | qué |
+|---|---|
+| `Movimientos_Stock` | una fila por destino: `recepcion_imp` (a_guardar/terminado/excedente), `ingreso` (racks), `recepcion_insumo` (insumos, en u) |
+| `GV_Importados_Baches` | `unidades_llegadas` + estado, y `gv_importados_resync` |
+| `GV_Imp_Recepcion` + `_Destino` | historial → solapa **📜 Historial recepción** (`gv_imp_recepcion_historial`) |
+
+⚠ `recepcion_imp` y no `recepcion`: ésta dispara el Telegram de «recepción rara» (mediana de talleristas).
+⚠ El viejo «📥 Llegó» NO movía stock (sólo `Importados_Mov_Stock`): su botón ya no está.
+⚠ **No recibir el mismo contenedor también por Recepción (recepcion.js)**: se contaría dos veces.
+`sql/gv_imp_recibir_v2344.sql`, `tests/imp-recibir.cjs`.
+
 ## ⚠ REGLA (Elías, 2026-09-21, v20.58): la fecha se guarda ENTERA — y el blindaje va con centinela
 
 Dos cosas que salieron del mismo tirón y no se separan.

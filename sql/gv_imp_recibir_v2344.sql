@@ -1,4 +1,4 @@
--- v23.42 (Luis, 28/09): RECIBIR una importación desde el panel de Pedidos Importación.
+-- v23.44 (Luis, 28/09): RECIBIR una importación desde el panel de Pedidos Importación.
 -- "Cuando se recibe le pregunta cuánto se recibió, de qué empresa es el código (duales) y si lo
 --  quiere enviar a A guardar o a algún otro lugar (guiado con los lugares que tenemos). Si entra
 --  en conflicto con el espacio de rack/góndola tiene que avisar y preguntar cómo se resuelve.

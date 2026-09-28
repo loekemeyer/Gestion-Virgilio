@@ -30083,3 +30083,16 @@ Barrido de todo lo que saca una NP de la programación (ver cabecera de `sql/gv_
 freno para tanda empezada era la rama ISIS de `gv_ppp_np_cancelar` → ahora bloquea igual (probado con 98480/D47B).
 Centinela: `select * from public.gv_pedido_pickeado_desprogramado;` — vacía = ninguna NP quedó afuera con su
 tanda pickeándose (al 28/09: vacía).
+
+### §3.v2344 — v23.44: 📥 RECIBIR importación desde el panel + historial — 2026-09-28
+
+**Luis:** recibir los pedidos de importación desde Pedidos Importación, guiado (cantidad, empresa en duales,
+destino con los lugares del Mapa, aviso de conflicto de espacio) y con historial.
+- Objetos nuevos: `GV_Imp_Recepcion`, `GV_Imp_Recepcion_Destino` (RLS sin policy, sin grants a anon/authenticated),
+  `gv_imp_recibir_contexto(bache)`, `gv_imp_recibir(bache, empresa, uxc, destinos, nota, simular)`,
+  `gv_imp_recepcion_historial(dias)` — las tres SECURITY DEFINER, sólo supervisor, execute sólo `authenticated`.
+- Escribe `Movimientos_Stock` (`recepcion_imp` / `ingreso` a racks / `recepcion_insumo`), `GV_Importados_Baches`
+  (+ resync) e `Importados_Mov_Stock` (log). No toca objetos de Producción.
+- Probado en transacción abortada: 026 (A guardar 100 · góndola F01 20 → conflicto «capacidad 240, hay 231,
+  entran 9» · rack AD01 libre · AD09 ocupado por 505I → conflicto), dual 438E CH → L05 + excedente, 505C → insumos A1.
+- Rollback: `drop function` de las tres (las tablas quedan: son auditoría). `sql/gv_imp_recibir_v2344.sql`.
