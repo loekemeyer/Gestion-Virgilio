@@ -623,7 +623,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== imp-809e-dos-plantas (v22.93: 809E LK y CH son dos productos — dos líneas, cada una con su FOB y su fila) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-809e-dos-plantas.cjs
-echo "== imp-cod-l-vista (v23.28: 437EL se muestra 437E LK; la de Chef 437E CH) =="
+echo "== imp-cod-l-vista (v23.30: 437EL se muestra 437E LK; la de Chef 437E CH) =="
 node tests/imp-cod-l-vista.cjs
 
 echo "== imp-stock-real (v16.04: el stock del módulo de importados sale del depósito real) =="

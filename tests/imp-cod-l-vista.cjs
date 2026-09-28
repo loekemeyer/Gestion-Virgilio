@@ -1,4 +1,4 @@
-// v23.28 (Luis 28/09): en Importados la L del maestro (437EL/438EL/439EL = Loeke) no se muestra como
+// v23.30 (Luis 28/09): en Importados la L del maestro (437EL/438EL/439EL = Loeke) no se muestra como
 // código: sale "437E" con la chapa LK, y la línea de Chef del mismo número con la chapa CH.
 // Corre las funciones reales de index.html (no un candado de texto).
 const fs = require("fs");
