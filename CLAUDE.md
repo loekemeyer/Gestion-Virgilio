@@ -5635,7 +5635,7 @@ Barrido del 28/09: `ppp_web_resync` ya borra la NP entera que desaparece (tanda 
 `sync-precios-venta` tiene `reconcileStale`; `gv-sync-padron-direcciones` **no borra** (8 direcciones
 de LK viejas del 14/09, ninguna con NP programada). `sql/gv_ppp_web_base_podar_v2300.sql`.
 
-## ⚠ REGLA (Luis, 2026-09-28, v23.64): MONITOR — el camión es el GRUPO DE ZONAS, la bajada de racks es actividad
+## ⚠ REGLA (Luis, 2026-09-28, v23.64-65): MONITOR — el camión es el GRUPO DE ZONAS, la bajada de racks es actividad
 
 - **«Total por día» (admin y TV) cuenta camiones con `gv_monitor_tanda_camion`** (Capital Sur/Centro/Oeste —Z2+Z3
   juntas si cada una < 1 m³—, GBA Sur/Oeste/Norte, un camión por súper, Retira sin camión), ≡ `PPP_RES_CAMIONES`.

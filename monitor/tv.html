@@ -427,6 +427,27 @@ function tandaCamion(code) {
   var d = s.match(/\d+/);
   return d ? d[0] : s;
 }
+/* ≡ index.html monCamionDeTanda / monUnirCentroOeste (v23.64) */
+var MON_CAMION_ZONA = { 1: "Capital Sur", 2: "Capital Centro", 3: "Capital Oeste", 4: "GBA Sur", 5: "GBA Oeste", 6: "GBA Norte", 7: "GBA Norte" };
+function monCamionDeTanda(v) {
+  /* primero la base (gv_monitor_tanda_camion, ve el súper con zona numérica); lo de abajo es respaldo */
+  var b = CAMION_DE.get(String((v && v.tanda) || "").trim().toUpperCase());
+  if (b && b.camion) return b.camion;
+  var z = String((v && v.zonas && v.zonas[0]) || "").trim();
+  if (/super/i.test(z)) return "Súper · " + (String((v.clientes && v.clientes[0]) || "").trim() || v.tanda);
+  if (/retira/i.test(z)) return "Retira";
+  var m = /Zona\s*(\d+)/i.exec(z);
+  if (m && MON_CAMION_ZONA[+m[1]]) return MON_CAMION_ZONA[+m[1]];
+  return z || tandaCamion(v && v.tanda);
+}
+function monUnirCentroOeste(porDia) {
+  porDia.forEach(function (g) {
+    var C = g.camiones.get("Capital Centro"), O = g.camiones.get("Capital Oeste");
+    if (!C || !O || !(C.sum < 1 && O.sum < 1)) return;
+    g.camiones.delete("Capital Centro"); g.camiones.delete("Capital Oeste");
+    g.camiones.set("Capital Centro-Oeste", { sum: C.sum + O.sum, n: C.n + O.n, armadas: C.armadas + O.armadas });
+  });
+}
 /* ≡ index.html pwebNpLabel */
 function npLabel(empresa, np) {
   var n = String(np);
@@ -847,13 +868,6 @@ var cargarCamiones = cache(PROG_TTL, function () {
     })
     .catch(function (e) { console.warn("[tv] camiones:", e.message); return new Map(); });
 });
-function camionDeTanda(tanda) {
-  var c = CAMION_DE.get(String(tanda || "").trim().toUpperCase());
-  if (!c) return { nombre: tandaCamion(tanda), usa: true };
-  var n = String(c.camion || "");
-  if (/^Súper · /.test(n)) n = "Súper " + n.slice(8).split(/\s+/)[0];
-  return { nombre: n, usa: c.usa };
-}
 /* v23.64 (Luis, 28/09) — "A facturar" pasa a ser el RESUMEN DE LOS 3 DÍAS de la Programación
    de la PPP: m³, tandas, NP y los cinco estados en % (Salió · Facturado · Armado · En proceso ·
    Pendiente), excluyentes y netos como allá. ≡ index.html _pgaArbol / _pgaPctFila.
@@ -1126,8 +1140,8 @@ function pintar(d) {
     if (!porDia.has(dk)) porDia.set(dk, { fecha: v.fecha, total: 0, camiones: new Map() });
     var g = porDia.get(dk);
     g.total += v.m3;
-    var camI = camionDeTanda(v.tanda), cam = camI.nombre;   // v23.64: grupo de zonas, no letra+número
-    if (!g.camiones.has(cam)) g.camiones.set(cam, { sum: 0, n: 0, armadas: 0, usa: camI.usa });
+    var cam = monCamionDeTanda(v);   /* ≡ index.html v23.64: grupo de zonas, no el número de tanda */
+    if (!g.camiones.has(cam)) g.camiones.set(cam, { sum: 0, n: 0, armadas: 0, usa: cam !== "Retira" });
     var c = g.camiones.get(cam);
     c.sum += v.m3; c.n++;
     if (ev.armado === "done") c.armadas++;
@@ -1284,6 +1298,7 @@ function pintar(d) {
 
   // ── Total por día / camión (v23.64: Retira no cuenta como camión)
   function nCamiones(g) { var n = 0; g.camiones.forEach(function (c) { if (c.usa !== false) n++; }); return n; }
+  monUnirCentroOeste(porDia);
   var dias = Array.from(porDia.entries()).sort(function (a, b) {
     return String(a[0]).localeCompare(String(b[0]));
   });

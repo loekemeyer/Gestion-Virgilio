@@ -291,7 +291,11 @@ function responder(url) {
 
   // m³ por día y camión: E30A (2,5 + 0,8 de la web) + E31A (1,5) + E34A (2,0) = 6,8 hoy
   ok(/9,8/.test(r.tot), "el total de hoy debería ser 9,8 m³ (E30A 3,3 + E31A 1,5 + E34A 2,0 + E36A/E37A/E38A 1,0 c/u)");
-  ok(/E30/.test(r.tot), "no agrupa por camión (E30)");
+  /* v23.64: el camión es el GRUPO DE ZONAS, no el número de tanda. E31A + E34A + E36A (Z1) van
+     en UN camión «Capital Sur»; E30A (Z3) en «Capital Oeste». Antes contaba E30 / E31 / E34 / E36. */
+  ok(/Capital Sur/.test(r.tot), "no agrupa por grupo de zonas (falta «Capital Sur»)");
+  ok(/Capital Oeste/.test(r.tot), "no agrupa por grupo de zonas (falta «Capital Oeste»)");
+  ok(!/E31|E34|E36/.test(r.tot), "el cuadro por día sigue contando un camión por número de tanda");
 
   // header
   ok(/4\/7/.test(r.prog), "la barra de avance debería decir 4/7 (E31A, E34A, E37A y E38A terminadas de 7 en ventana), dice: " + r.prog);

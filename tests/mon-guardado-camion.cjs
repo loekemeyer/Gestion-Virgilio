@@ -31,9 +31,9 @@ ok(/dataCG = dataGst\.length/.test(IDX) && /_monEnSilencio\(dataCG/.test(IDX), "
 ok(/cargarGuardadoHoy\(\)/.test(TV) && /eventos\.concat\(guardado\)/.test(TV), "la TV tiene que ver el guardado");
 
 // 2) camión por grupo de zonas
-ok(/monCamionDeTanda\(t\.tanda\)/.test(IDX), "el Total por día del admin tiene que usar monCamionDeTanda");
+ok(/_monCamionDe\.get\(/.test(IDX), "el camión del admin tiene que mirar primero la base");
 ok(/gv_monitor_tanda_camion/.test(IDX) && /gv_monitor_tanda_camion/.test(TV), "los dos monitores leen gv_monitor_tanda_camion");
-ok(/camionDeTanda\(v\.tanda\)/.test(TV), "la TV tiene que usar camionDeTanda");
+ok(/CAMION_DE\.get\(/.test(TV), "el camión de la TV tiene que mirar primero la base");
 
 // 3) pestaña Vista TV
 ok(/setMonitorTab\('tv'\)/.test(IDX) && /monitor\/tv\.html\?key=tv/.test(IDX), "falta la pestaña 📺 Vista TV");
