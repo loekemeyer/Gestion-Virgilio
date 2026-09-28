@@ -5723,3 +5723,16 @@ Medido sobre Jhonny (104), 22–28/09, con su planilla del 25/09:
 - ⚠ Lo que NO es de código: el **guardado cargado después de hacerlo** (35 cajas en 17 s) es la carga a destiempo;
   desde la v23.63 el tramo arranca al ABRIR el módulo (MGI), y los celulares pasan a esa versión solos (v23.70).
 `tests/tiempos-captura.cjs`.
+
+## ⚠ REGLA (Luis, 2026-09-28, v23.76): lo abierto al terminar el día SUMA — y el Guardado se marca por código
+
+- **Lo que queda abierto en un día pasado suma a SU día** (antes sólo hoy): hasta el FJ, o el fin de jornada sin FJ. En
+  el cruce de día, el día del cierre cuenta sólo desde la entrada (`open_s = 0`): nada se cuenta dos veces.
+- **Una tarea abierta termina donde EMPIEZA la siguiente del legajo** (`v23.72-sig`): no se superpone con lo que hizo
+  después (104 el 15/09: EI abierto 13:08 con el RT de 13:49 → 0,68 h, no 4 h). Vista ≡ `fetchMonitorDayStats`;
+  fixture `tests/tools/ev-15.json` ahora trae las aperturas. `sql/gv_monitor_horas_cruce_dia_v2372.sql`.
+- **Guardado a Góndola por código**: «✓ Guardé este código» (MG con su tramo, el módulo sigue abierto con MGI) y
+  «Ya estaba en góndola» (mueve stock, emite **MGR** instantáneo: sin tiempo). «🏁 Terminé de guardar» cierra.
+- **Celular muerto**: al abrir el legajo en otro celular, `gvRecuperarTogglesServidor` repone los toggles abiertos del
+  servidor (hoy, < 12 h, sin FJ después). Lo que el celular muerto nunca mandó se pierde.
+`tests/mg-por-codigo.cjs`.

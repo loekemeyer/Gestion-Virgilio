@@ -45,7 +45,9 @@ ok(/e\.op === "RKI"/.test(IDX) && /e\.op === "RKI"/.test(TV), "los dos monitores
 // 5) v23.67 — la tabla Mts3 x Hora del admin también cuenta la tarea ABIERTA (≡ la vista)
 ok(/abiertoProdMs/.test(IDX) && /const prodH = pickH \+ armH \+ otrosProdH \+ abiertoH;/.test(IDX), "prodH del admin tiene que sumar lo abierto");
 ok(/En curso<br>/.test(IDX), "falta la fila «En curso» en Mts3 x Hora");
-ok(/if \(dayKey === isoToDayKey\(Date\.now\(\)\)\)/.test(IDX), "lo abierto se suma SÓLO hoy");
+// v23.72-cruce: lo abierto de un día PASADO también suma a su día (hasta el FJ); el tope de 12 h es sólo de hoy
+ok(/esHoy && !\(nowMs - ini < 12 \* 3600 \* 1000\)/.test(IDX), "el tope de 12 h de lo abierto va sólo hoy");
+ok(/const openPortion = 0;/.test(IDX), "cross-day: el tramo del día de apertura no se suma el día del cierre");
 
 // 6) v23.68 — el admin abre directo en la vista TV, y la cuenta de racks inferida está en el monitor grande
 ok(/setMonitorTab\(window\.__tvKioskMode \? "monitor" : "tv"\)/.test(IDX), "el monitor del admin tiene que abrir en la Vista TV");
