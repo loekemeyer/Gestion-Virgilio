@@ -6221,7 +6221,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.67"></script>
+<script type="module" src="recepcion.js?v=23.68"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10180,7 +10180,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.67";
+const APP_VERSION = "v23.68";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -33697,12 +33697,19 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     "&opcion=eq.FJ&order=ts_cliente.desc&limit=1000" +
     "&select=legajo,ts_cliente";
   const headers = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
-  const [r, rf, rfj, nombres, historic] = await Promise.all([
+  /* v23.68 — bajadas de racks del día (Movimientos_Stock): para inferir el tramo de racks que
+     no quedó registrado. Best-effort: si falla, no se infiere nada. ≡ rk_pts de la vista. */
+  const rkUrl = SUPABASE_STOCK_ENDPOINT +
+    "?tipo=eq.baja_racks&deposito=in.(racks,racks_ch)" +
+    "&ts=gte." + encodeURIComponent(dayStartIso) + "&ts=lte." + encodeURIComponent(dayEndIso) +
+    "&order=ts.asc&limit=5000&select=legajo,ts";
+  const [r, rf, rfj, nombres, historic, rkMov] = await Promise.all([
     fetch(evUrl,    { headers }),
     fetch(fichUrl,  { headers }),
     fetch(fjPrevUrl,{ headers }),
     getEmpleadosNombres(),
-    getHistoricMap()
+    getHistoricMap(),
+    fetch(rkUrl, { headers }).then(function (x) { return x.ok ? x.json() : []; }).catch(function () { return []; })
   ]);
   if (!r.ok)  throw new Error("Eventos HTTP " + r.status);
   if (!rf.ok) throw new Error("Fichadas HTTP " + rf.status);
@@ -34078,6 +34085,56 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       }
     }
   }
+  /* v23.68 (Luis, 28/09: *"no podés recuperar el dato?"*) — TRABAJO EN RACKS SIN TRAMO REGISTRADO.
+     Las bajadas (Movimientos_Stock baja_racks) y los ingresos (IR) anteriores a la v23.66 no tienen
+     inicio: se INFIERE desde la actividad anterior del legajo hasta el movimiento, con tope de 60 min
+     por tramo, menos el tiempo muerto adentro. Un movimiento que cae adentro de otra tarea cerrada
+     no suma (ya está contado). Es una ESTIMACIÓN. ≡ rk_pts / rk_seg / rk_ag de gv_monitor_horas_operario_dia. */
+  {
+    const RK_TOPE = 60 * 60 * 1000;
+    const evDia = new Map();
+    for (const ev of events) {
+      const leg = String(ev.legajo || "").trim();
+      if (!leg || leg === "0" || leg === "1" || ev.opcion === "LT") continue;
+      if (isoToDayKey(ev.ts_cliente) !== dayKey) continue;
+      if (!evDia.has(leg)) evDia.set(leg, []);
+      evDia.get(leg).push(ev);
+    }
+    const pts = new Map();
+    const addPt = (leg, ms) => { if (!pts.has(leg)) pts.set(leg, new Set()); pts.get(leg).add(ms); };
+    for (const m of (Array.isArray(rkMov) ? rkMov : [])) {
+      const leg = String(m.legajo == null ? "" : m.legajo).trim();
+      if (!leg || leg === "0" || leg === "1" || isoToDayKey(m.ts) !== dayKey) continue;
+      addPt(leg, new Date(m.ts).getTime());
+    }
+    for (const [leg, evs] of evDia) for (const ev of evs) if (ev.opcion === "IR") addPt(leg, new Date(ev.ts_cliente).getTime());
+    for (const [leg, set] of pts) {
+      const evs = evDia.get(leg) || [];
+      const libres = [...set].filter(function (t) {
+        return !evs.some(function (c) {
+          if (!c.ts_inicio || DEAD_TIME_CODES.includes(c.opcion) || c.opcion === "Perm") return false;
+          const a = new Date(c.ts_inicio).getTime(), b = new Date(c.ts_cliente).getTime();
+          return t > a && t <= b + 60000;
+        });
+      });
+      let tot = 0;
+      for (const t of libres) {
+        let prev = t - RK_TOPE;
+        for (const c of evs) { const x = new Date(c.ts_cliente).getTime(); if (x < t && x > prev) prev = x; }
+        for (const q of libres) if (q < t && q > prev) prev = q;
+        const bruto = t - prev;
+        tot += Math.max(0, bruto - Math.min(bruto, deadOverlapMs(leg, prev, t)));
+      }
+      if (tot <= 0) continue;
+      if (!perLegajo.has(leg)) perLegajo.set(leg, { firstTs: null, lastTs: null,
+        pickedTandas: new Set(), pickedDetail: [], pickMs: 0, armedTandas: new Set(), armedDetail: [], armMs: 0,
+        ccTandas: new Set(), ccDetail: [], ccMs: 0, comidaMs: 0, movMs: 0, movDetail: [], noprodMs: 0, noprodDetail: [],
+        otrosProdMs: 0, otrosProdDetail: [], fjTs: null });
+      const p = perLegajo.get(leg);
+      p.movMs += tot;
+      p.movDetail.push({ opcion: "RKB", texto: "racks (estimado: " + libres.length + " movimiento/s sin tramo)", durMs: tot, inferido: true });
+    }
+  }
   const perOperario = [];
   for (const [leg, p] of perLegajo) {
     // Filtramos a los que NO tocaron nada del trabajo medible (picking, pedido,
@@ -34367,7 +34424,10 @@ function openMonitor() {
     const seg = Math.max(0, Math.ceil((_nextRefreshAt - Date.now()) / 1000));
     el.textContent = seg > 0 ? `próximo refresh en ${seg}s` : "refrescando...";
   }, 1000);
-  setMonitorTab("monitor");
+  // v23.68 (Luis: *"te pedí que el monitor en admin se vea igual a ese"*) — el supervisor entra directo
+  // a la vista de la TV (monitor/tv.html); la vista vieja sigue en la pestaña 🖥️ Monitor. En modo
+  // kiosko (pantalla de pared) queda como estaba.
+  setMonitorTab(window.__tvKioskMode ? "monitor" : "tv");
   startInconsAutoRefresh();
 }
 
