@@ -6205,7 +6205,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.21"></script>
+<script type="module" src="recepcion.js?v=23.23"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10164,7 +10164,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.21";
+const APP_VERSION = "v23.23";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21612,8 +21612,15 @@ function pedImpExportExcel() {
   // v22.09 — con el buscador puesto, el Excel baja lo que se está viendo (y el término gana
   // sobre "Solo Pedido", igual que en pantalla).
   var _q = pedImpQTerms();
+  // v23.23 (Luis): el Excel baja EXACTAMENTE lo que se ve. Parado en un proveedor se ven todos sus
+  // items (aunque no pidan nada, ej. 440E) y el Excel los traía filtrados por "a pedir > 0" y de
+  // TODOS los proveedores. Y las MC tocadas a mano (_pedImpMcOf) no llegaban al Excel.
+  var _provAllX = [];
+  items.forEach(function (it) { var p = it.prov || "(sin proveedor)"; if (_provAllX.indexOf(p) < 0) _provAllX.push(p); });
+  var _provSelX = (_stkPop.provFiltro && _provAllX.indexOf(_stkPop.provFiltro) >= 0) ? _stkPop.provFiltro : "";
   if (_q.length) items = items.filter(function (it) { return pedImpMatch(it, _q); });
-  else if (_stkPop.soloPedir) items = items.filter(function (it) { return it.aPedirUni > 0; });
+  else if (_provSelX) items = items.filter(function (it) { return (it.prov || "(sin proveedor)") === _provSelX; });
+  else if (_stkPop.soloPedir !== false) items = items.filter(function (it) { return _pedImpMcOf(it) > 0; });
   if (!items.length) { try { alert("No hay ítems para exportar."); } catch (_e) {} return; }
   var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
   var fecha = (function () { try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) { return "hoy"; } })();
@@ -21631,9 +21638,9 @@ function pedImpExportExcel() {
   items.forEach(function (it) {
     var imp = _IMPORTADOR_DE[it.prov || ""] || "(sin importador)";
     var stk = Math.max(0, Number(it.stockUni) || 0);   // negativo → 0 (igual que pantalla)
-    var caj = (it.aPedirCajas == null) ? "" : it.aPedirCajas;
-    var m3m = Number(it.m3Master) || 0, m3t = Number(it.m3Total) || 0; _totM3 += m3t;
-    var fob = Number(it.fobUni) || 0, usd = Number(it.usdTotal) || 0; _totUsd += usd;
+    var caj = _pedImpMcOf(it);
+    var m3m = Number(it.m3Master) || 0, m3t = _pedImpM3Of(it); _totM3 += m3t;
+    var fob = Number(it.fobUni) || 0, usd = _pedImpUsdOf(it); _totUsd += usd;
     html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(it.cod) + (it.planta ? " " + it.planta : "")) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (fob > 0 ? fob : "") + '</td><td>' + (usd > 0 ? Math.round(usd) : "") + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
   });
   html += '<tr><td colspan="11"><b>TOTALES</b></td><td><b>' + Math.round(_totUsd) + '</b></td><td></td><td><b>' + (Math.round(_totM3 * 100) / 100) + '</b></td></tr>';
