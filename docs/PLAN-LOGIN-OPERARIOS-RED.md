@@ -18,6 +18,16 @@ Apps alcanzadas: **Gestión Virgilio** (`index.html` + `recepcion.js` + `sw.js`,
 `cervantes/` y `cervantes-admin/`) y **Registro Producción 2.0** (`app.js` + `sw.js`, repo
 `loekemeyer/Registro-Produccion-2.0`).
 
+## Estado
+
+- **Etapa 0 (inventario): EN CURSO** desde el 28/09 — Routine nocturno llena `public.seg_inventario_anon` hasta el 03/10.
+  Primer corte (28/09, hasta las 14:40): 10.382 escrituras con la clave pública; 90 % desde las 3 IP de la
+  empresa; **otras redes fijas**: Caseros 190.247.118.38 (Planify de escritorio) y Lobos 181.105.135.47
+  (pantallas de gestión de GV + `Registros_Produccion_Virgilio`); **celulares con datos móviles**: cargas de
+  producción en Cervantes (≈8 legajos) y Virgilio → con la regla de red quedarían afuera. A decidir.
+- **Etapa 1 (base del login): HECHA** el 28/09 — `login-operario` v2, `red_empresa` (3 IP), `jwt_rol/jwt_legajo`,
+  cierre nocturno. Probada. Ninguna app la usa: no cambia nada de lo actual. SQL: `sql/login_operarios_etapa1.sql`.
+
 ## Diseño
 
 1. **Lista de redes**: tabla `public.red_empresa (ip, sede, activo)` con las IP fijas de Cervantes y
