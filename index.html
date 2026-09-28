@@ -6206,7 +6206,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.33"></script>
+<script type="module" src="recepcion.js?v=23.34"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10165,7 +10165,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.33";
+const APP_VERSION = "v23.34";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -41290,6 +41290,7 @@ function _pgaCuerpoHtml(dias, opts) {
               // pero el texto completo lo da el pop-up, que es lo único que se puede leer en la tablet.
             (_pgaObsDe(r) ? '<span class="pga-obs" onclick="event.stopPropagation();pgaObsAbrir(\'' + escapeHtml(r.np) + '\')"'
               + ' title="Comentario del pedido (tocá para leerlo completo): ' + escapeHtml(_pgaObsDe(r)) + '">💬 comentario</span>' : '') +
+            gvOcChip(gvOcDeObs(_pgaObsDe(r))) +   // v23.34 (Luis): nro de OC del súper
             (r.cod ? '<span class="pga-cod" title="Número de cliente en ' + (r.empresa === "CH" ? "Chef" : "Loekemeyer") + '">' +
               escapeHtml(r.empresa || "LK") + " " + escapeHtml(r.cod) + '</span>' : '') +
             '<span class="pga-cli" title="' + escapeHtml(r.razon_social || "") + '">' + escapeHtml(r.razon_social || "—") + '</span>' +
@@ -48878,7 +48879,14 @@ function aprHorNeed(force) {
     const delCliente = aprGet("lk_pedidos_match?select=empresa,order_id,retiro_fecha,retiro_franja" +
                               "&or=(retiro_fecha.not.is.null,retiro_franja.not.is.null)&limit=2000")
       .catch(function () { return []; });
-    Promise.all([manual, delCliente]).then(function (res) {
+    // v23.34 (Luis, 28/09): el nro de OC del súper leído del PDF. LK lo manda adelante de la
+    // observación ("OC 48074398093 · …") en lk_pedidos_match; acá se arma el mapa del chip 🧾.
+    const ocs = aprGet("lk_pedidos_match?select=empresa,order_id,observaciones&observaciones=like.OC*&limit=2000")
+      .catch(function () { return []; });
+    Promise.all([manual, delCliente, ocs]).then(function (res) {
+      const mo = {};
+      for (const r of (res[2] || [])) { const oc = gvOcDeObs(r.observaciones); if (oc) mo[aprHorKey(r.empresa || "lk", r.order_id)] = oc; }
+      _aprOc = mo;
       const m = {};
       for (const r of (res[1] || [])) {   // primero lo que eligió el cliente…
         m[aprHorKey(r.empresa || "lk", r.order_id)] = { fecha: r.retiro_fecha || "", franja: r.retiro_franja || "", origen: "cliente" };
@@ -48946,6 +48954,17 @@ function aprObsBadge(p) {
     escapeHtml(String(p.empresa || "lk")) + '\',\'' + escapeHtml(String(p.order_id)) + '\')"' +
     ' title="' + escapeHtml("Observación del pedido (tocá para leerla completa): " + o) + '">💬 ' +
     escapeHtml(o.length > 40 ? o.slice(0, 40) + "…" : o) + '</span>';
+}
+/* v23.34 (Luis, 28/09): «se tiene que ver en Programación y en A programar». El nro de OC que el
+   cotizador de súper lee del PDF viaja como prefijo de la observación ("OC 23080640 · …"). */
+let _aprOc = {};
+function gvOcDeObs(o) { const m = /^OC\s+([0-9A-Za-z\-\/]+)/.exec(String(o || "").trim()); return m ? m[1] : ""; }
+function gvOcChip(oc) {
+  return oc ? ' <span class="apr-chip" style="background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;font-weight:800" title="Nro de OC del súper (leído del PDF)">🧾 OC ' + escapeHtml(oc) + '</span>' : "";
+}
+function aprOcBadge(p) {
+  if (!p || p._isis) return "";
+  return gvOcChip((_aprOc || {})[aprHorKey(pppEmpDePedido(p), p.order_id)] || gvOcDeObs(p.obs_pedido));
 }
 /* v23.07 (Luis, 28/09): BADGE DE SUCURSAL. "cuando hay clientes con múltiples sucursales, que
    aparezca el badge de sucursal en zona (identificando que son sucursales diferentes)". Caso Capo SA
@@ -49253,6 +49272,7 @@ function aprColPedidos() {
       aprObsLinea(p) +       // v21.34: observación del pedido
       '<div class="apr-card-d">' +
         aprHorBadge(p) +     // v17.74 (Luis): el cliente coordina horario — tocalo para editarlo
+        aprOcBadge(p) +      // v23.34 (Luis): nro de OC del súper
         aprEsperaChip(p) +   // v13.85: hace cuánto llegó
         aprDiferidoChip(p) + // v15.67: espera un reingreso
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' + aprSucBadge(p) +
