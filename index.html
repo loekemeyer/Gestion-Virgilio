@@ -6206,7 +6206,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.43"></script>
+<script type="module" src="recepcion.js?v=23.44"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10165,7 +10165,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.43";
+const APP_VERSION = "v23.44";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37065,7 +37065,19 @@ async function pppMovElegir(iso) {
   if (!_pppMov) return;
   if (_pppMov.reprogNps) return pppReprogElegir(iso);   // v14.36: pop-up reutilizado para reprogramar un ISIS
   // v19.32 (Luis): elegir el día ya no mueve nada — abre el PASO 2, «¿en qué tanda?».
-  return pppMovPaso2(iso);
+  // v23.44 (Luis, 28/09): antes, si el día ya tiene programación, el pop-up de DÍA OCUPADO
+  //   (sumarlo / reprogramar lo pendiente / correr la programación) — el mismo de A Programar.
+  if (String(iso) === PGA_ESPERA_ISO) return pppMovPaso2(iso);
+  const M = _pppMov;
+  const filas = (M.arbolFilas && M.arbolFilas.length) ? M.arbolFilas
+    : (M.tanda ? (_pppParsed.prog || []).filter(function (p) { return String(p.tanda || "").toUpperCase() === M.tanda; }) : []);
+  const seguir = function () { if (_pppMov === M) return pppMovPaso2(iso); };
+  return aprDiaOcupadoAbrir(iso, null, {
+    peds: filas.map(function (p) { return { zona: p.zona || "", m3: Number(p.m3) || 0 }; }),
+    label: M.pedidoNp ? ("NP " + M.pedidoNp) : ("tanda " + (M.tanda || "")),
+    excluir: M.pedidoNp ? "" : (M.tanda || ""), fuera: true,
+    alVacio: seguir, alSumar: seguir
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -48634,7 +48646,8 @@ async function aprDiaOcupadoAbrir(fecha, ped, opt) {
   let corr = null, auto = null;
   try { corr = await aprRpc("gv_ppp_dia_reprogramar", { p_fecha: fecha, p_modo: "correr", p_simular: true }); }
   catch (_e) { return alVacio(); }
-  const delDia = (corr || []).filter(function (r) { return r.fecha_actual === fecha; });
+  const exT = String(opt.excluir || "").toUpperCase();   // v23.44: la tanda que se está moviendo no cuenta
+  const delDia = (corr || []).filter(function (r) { return r.fecha_actual === fecha && (!exT || String(r.tanda || "").toUpperCase() !== exT); });
   if (!delDia.length) return alVacio();   // día vacío: como siempre
   if (opt.antes && opt.antes() === false) return;
   try { auto = await aprRpc("gv_ppp_dia_reprogramar", { p_fecha: fecha, p_modo: "automatico", p_simular: true }); }

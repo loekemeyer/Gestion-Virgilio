@@ -1,0 +1,23 @@
+-- v23.44 (Luis 28/09): el cron 96 de las 18:00 (gv_ppp_reprogramar_sin_factura) re-optimiza con la
+-- regla de UN GRUPO DE ZONAS POR DIA (gv_ppp_web_dia_grupo) todo lo que NO se programo a mano.
+-- Lo fijado a mano (creado_por <> 'sistema' o marca gv_manual_por) sigue la regla vieja: proximo
+-- dia con camion a su zona. Super, Retira y tanda mitad facturada: aviso, como siempre.
+--
+-- 1) Marca de "a mano": columnas nullables + trigger que las llena SOLO si el cambio entra por
+--    PostgREST con mail en el JWT (una persona). pg_cron y el armador (service_role) no marcan.
+alter table public."PPP_Web_Programacion" add column if not exists gv_manual_por text, add column if not exists gv_manual_at timestamptz;
+alter table public."GV_PPP_Prog_Override" add column if not exists gv_manual_por text, add column if not exists gv_manual_at timestamptz;
+-- (cuerpo de trg_gv_marca_manual: ver pg_get_functiondef; triggers gv_marca_manual en las dos tablas,
+--  before insert or update of fecha_entrega, tanda)
+--
+-- 2) La funcion se parcheo sobre pg_get_functiondef (marcador interno 'v23.43-grupo', llave de
+--    idempotencia): agrega zona_larga / a_mano / entrada / expreso al loop y, si no es a mano,
+--    destino = gv_ppp_web_dia_grupo(zona_larga, entrada, expreso, v_obj + 1, m3).
+--
+-- Probado: simulacion del 29/09 -> E29G Z3 -> 30/09, E90B y E99A Z1 -> 01/10, F01F Z4 -> 05/10, E30A super aviso.
+-- Trigger probado en transaccion abortada: sin JWT no marca; con JWT {"email":...} marca.
+--
+-- Rollback:
+--   drop trigger gv_marca_manual on public."PPP_Web_Programacion";
+--   drop trigger gv_marca_manual on public."GV_PPP_Prog_Override";
+--   y reponer la funcion sin el bloque v23.43-grupo (el else vuelve a gv_ppp_web_dias_ancla solo).
