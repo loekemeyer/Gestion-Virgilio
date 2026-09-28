@@ -1,0 +1,16 @@
+-- v23.32 (Luis, 28/09): el nro de OC del súper que el cotizador lee del PDF
+-- (orders.sheets_payload->>'pdf_oc', LK y chef_orders_cache) viaja a Gestión adelante de la
+-- observación: "OC 23080640 · <obs>". Así aparece en la PPP (badge de observación, detalle de la
+-- NP) y en la hoja de ruta, por el mismo camino que la observación del carrito (v21.34):
+-- lk_pedidos_match.observaciones -> triggers gv_ppp_web_obs_desde_match / gv_match_obs_a_programacion
+-- (sólo completan vacíos, nunca pisan lo cargado a mano).
+-- Se aplicó en LK (kwkclwhmoygunqmlegrg) sobre la definición viva de sync_pedidos_match_virgilio().
+-- Cambio: en los dos inserts, la columna observaciones pasa a ser
+--   nullif(concat_ws(' · ',
+--     case when nullif(btrim(X.sheets_payload->>'pdf_oc'),'') is not null
+--          then 'OC ' || btrim(X.sheets_payload->>'pdf_oc') end,
+--     nullif(btrim(X.sheets_payload->>'observaciones'),'')), '')
+-- con X = orders (lk) / chef_orders_cache (chef).
+-- Verificado: 6 pedidos con OC (lk 1564, 1504, 1485, 1468; chef 231, 229); los 5 programados
+-- quedaron con "OC <nro>" en PPP_Web_Programacion.observaciones.
+-- Rollback: quitar el concat_ws y dejar nullif(btrim(X.sheets_payload->>'observaciones'),'').
