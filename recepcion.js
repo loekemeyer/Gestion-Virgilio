@@ -515,6 +515,7 @@ async function opAnularSesion() {
 
 /* ============== Navegación ============== */
 function opResetState() {
+  opState.t0 = Date.now();      // v23.71: inicio de ESTA carga (tramo de RT si se envía con RT cerrado)
   opState.step = null;
   opState.tipo = null;
   opState.entidades = null;
@@ -2555,7 +2556,7 @@ async function opEnviar() {
   try { rcpOcEncolar(opState.tallNombre, items.map(function (i) { return { cod: i.cod, cajas: i.cajas }; })); } catch (_e) {}
   // v11.98: cierra el toggle RT automáticamente (el operario ya no tiene que volver
   // a la botonera para terminar el inicio→fin de Recepción Mercadería).
-  try { if (typeof window.autoCloseRT === "function") window.autoCloseRT(RECP.legajo); } catch (_e) {}
+  try { if (typeof window.autoCloseRT === "function") window.autoCloseRT(RECP.legajo, { inicioMs: opState.t0, cajas: totalCajas }); } catch (_e) {}
   rcpDraftClear();   // v7.12: ya se envió, no hay nada que reanudar
 
   // v4.06: STOCK — lo recibido ENTRA a "Mercadería a guardar" (Movimientos_Stock).

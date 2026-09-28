@@ -5681,3 +5681,16 @@ de LK viejas del 14/09, ninguna con NP programada). `sql/gv_ppp_web_base_podar_v
   `checkForUpdate` recarga sola la app si hay versión nueva y el operario no tocó nada hace un rato (`_gvAppInactiva`).
   No hace falta pedirle al operario que actualice.
 - En el iframe de 📺 Vista TV se ve el cursor (`html.embebido`); en la TV de pared sigue oculto.
+
+## ⚠ REGLA (Luis, 2026-09-28, v23.71): el TIEMPO de las tareas se captura bien — tres fallas cerradas
+
+Medido sobre Jhonny (104), 22–28/09, con su planilla del 25/09:
+- **RT cerraba con las cajas del DÍA**: `recepcionCajasServerTotal` sumaba desde las 00:00 → una RT vacía decía «67»
+  (35 + 32 de antes). Ahora suma desde la **apertura de esa RT**; sin RT abierta devuelve null (vale el contador local).
+- **Recepción enviada con RT cerrado no tenía tiempo** (la 2.ª carga con «Cargar otra» después del cierre automático):
+  27 cargas en 7 días. Ahora `autoCloseRT(legajo, {inicioMs, cajas})` registra su **propio tramo RT** desde que empezó
+  esa carga en el Modo OP (`opState.t0`, lo pone `opResetState`).
+- **EP / AP sin tanda** quedaban como tarea abierta que ningún TP/TAP cierra: ahora `send()` no los registra.
+- ⚠ Lo que NO es de código: el **guardado cargado después de hacerlo** (35 cajas en 17 s) es la carga a destiempo;
+  desde la v23.63 el tramo arranca al ABRIR el módulo (MGI), y los celulares pasan a esa versión solos (v23.70).
+`tests/tiempos-captura.cjs`.
