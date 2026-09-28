@@ -1,0 +1,13 @@
+-- v23.21 · Cobranzas: el CUIT del cliente sale del PADRÓN antes que de la factura
+-- Caso (28/09): la última factura de LK 2523 (Peluncha) trae el CUIT de Federación Patronal y la de
+-- LK 4179 (Tapia) el de Ciudad de Juegos. gv_cobranza_imputar tomaba cualquier factura (limit 1 sin
+-- orden) y gv_cobranza_deuda_viva_refrescar el max() de los CUIT: con eso la coronita cargada por el
+-- CUIT real no se veía. Y La Luguenze (4268) nunca se facturó: su CUIT está sólo en el padrón.
+-- Aplicado como parche sobre pg_get_functiondef (marcador interno 'v23.18-cuit-padron', llave de
+-- idempotencia): en las dos funciones, GV_Clientes_Direcciones (empresa, cod) pisa lo de las facturas.
+-- Centinelas en GV_Reglas_Centinela (patrón '"GV_Clientes_Direcciones" g').
+-- Datos (con el sí de Thomas, backup zz_backups."GV_Backup_cobranzas_excepciones_20260928b"):
+--   LK 2523 → deudor_id 30715398369 · LK 4179 → 20284182635 · alta LK 4268 La Luguenze 30691745488, 20 días.
+-- Decisión de Thomas (28/09): lo detectado NO se reclama; se avisa al cliente para adelante.
+-- gv_cobranza_aviso_texto y la pantalla del agente dicen «descontado de más» en vez de «a reclamar».
+-- Rollback de las funciones: restaurar desde sql/gv_cobranza_imputar_v2291.sql y sql/gv_cobranza_agente_v2293.sql.

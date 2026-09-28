@@ -6205,7 +6205,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.20"></script>
+<script type="module" src="recepcion.js?v=23.21"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10164,7 +10164,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.20";
+const APP_VERSION = "v23.21";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -61035,13 +61035,13 @@ function agenteRender() {
   var totRec = rows.reduce(function (a, r) { return a + (Number(r.a_reclamar) || 0); }, 0);
   var totMal = rows.reduce(function (a, r) { return a + (Number(r.pedidos_mal) || 0); }, 0);
   var totAtr = rows.reduce(function (a, r) { return a + (Number(r.pedidos_atrasados) || 0); }, 0);
-  if (res) res.innerHTML = '<b>' + rows.length + '</b> cliente(s) · <b>' + totMal + '</b> pedidos con el descuento mal tomado · <b>' + totAtr + '</b> pagados con atraso · a reclamar <b style="color:#dc2626">' + _fmtPlata(totRec) + '</b>' +
+  if (res) res.innerHTML = '<b>' + rows.length + '</b> cliente(s) · <b>' + totMal + '</b> pedidos con el descuento mal tomado · <b>' + totAtr + '</b> pagados con atraso · descontado de más <b style="color:#dc2626">' + _fmtPlata(totRec) + '</b>' +
     ' <span style="color:#94a3b8;">· calculado ' + _agFechaHora(_agState.meta) + ' (se recalcula solo cada hora si cambió algo)</span>' +
-    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">Cómo lee: cada recibo de la conciliación bancaria se cruza con el pedido que pagó. «Tomó» = el descuento que se descontó el cliente; «ganado» = el que le correspondía por los días que tardó (contado 14 d o su coronita · 15-30 → 20 % · 31-45 → 15 % · 46-60 → 10 % · +60 → 0). A reclamar = lista × la diferencia. Sólo informa: no manda nada a nadie.</div>';
+    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">Cómo lee: cada recibo de la conciliación bancaria se cruza con el pedido que pagó. «Tomó» = el descuento que se descontó el cliente; «ganado» = el que le correspondía por los días que tardó (contado 14 d o su coronita · 15-30 → 20 % · 31-45 → 15 % · 46-60 → 10 % · +60 → 0). De más = lista × la diferencia. No se reclama lo pasado (Thomas, 28/09): sirve para avisarle al cliente, para adelante, que el descuento vale sólo pagando en su plazo.</div>';
   if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Nada para mostrar con estos filtros.</div>'; return; }
   var th = function (t, al) { return '<th style="padding:8px;text-align:' + (al || 'left') + ';border-bottom:1px solid #cbd5e1;white-space:nowrap;">' + t + '</th>'; };
   var h = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:13px;">' +
-    '<thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' + th('Cliente') + th('Emp.') + th('Pedidos mal / imput.', 'right') + th('Atrasados', 'right') + th('Días prom.', 'right') + th('Atraso máx.', 'right') + th('A reclamar', 'right') + th('Sin cruzar', 'right') + th('Período') + th('') + '</tr></thead><tbody>';
+    '<thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' + th('Cliente') + th('Emp.') + th('Pedidos mal / imput.', 'right') + th('Atrasados', 'right') + th('Días prom.', 'right') + th('Atraso máx.', 'right') + th('De más', 'right') + th('Sin cruzar', 'right') + th('Período') + th('') + '</tr></thead><tbody>';
   h += rows.map(function (r) {
     var k = r.empresa + '|' + r.cod_cliente, open = _agState.abierto === k;
     var tr = '<tr class="ag-row" data-k="' + escapeHtml(k) + '">' +
@@ -61070,7 +61070,7 @@ function _agDetalleHtml(rows) {
   var th = function (t, al) { return '<th style="padding:4px 6px;text-align:' + (al || 'left') + ';white-space:nowrap;">' + t + '</th>'; };
   var h = '<table style="border-collapse:collapse;font-size:12.5px;"><thead><tr style="background:#e2e8f0;">' +
     th('Pedido') + th('Facturas') + th('Lista', 'right') + th('NC') + th('Recibo(s)') + th('Pagó') + th('Medio') + th('Pagado', 'right') +
-    th('Tomó', 'right') + th('Retención', 'right') + th('Días / plazo', 'right') + th('Atraso', 'right') + th('Ganado', 'right') + th('A reclamar', 'right') + th('Cruce') + '</tr></thead><tbody>';
+    th('Tomó', 'right') + th('Retención', 'right') + th('Días / plazo', 'right') + th('Atraso', 'right') + th('Ganado', 'right') + th('De más', 'right') + th('Cruce') + '</tr></thead><tbody>';
   h += rows.map(function (m) {
     var mal = Number(m.a_reclamar) > 0, atr = Number(m.atraso) > 0;
     var bg = mal ? 'background:#fef2f2;' : (atr ? 'background:#fffbeb;' : '');
@@ -61470,7 +61470,7 @@ function cobrosSetTab(tab) {
           '<select id="agEmp" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;" onchange="_agState.empresa=this.value||null;agenteRender();">' +
             '<option value="">Todas las empresas</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option>' +
           '</select>' +
-          '<label style="font-size:13px;white-space:nowrap;"><input type="checkbox" id="agSolo" checked onchange="_agState.soloReclamo=this.checked;agenteRender();"> sólo con reclamo</label>' +
+          '<label style="font-size:13px;white-space:nowrap;"><input type="checkbox" id="agSolo" checked onchange="_agState.soloReclamo=this.checked;agenteRender();"> sólo con descuento de más</label>' +
           '<button onclick="agenteRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
         '</div>' +
       '</div>' +

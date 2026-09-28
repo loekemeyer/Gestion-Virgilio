@@ -4798,6 +4798,7 @@ que rehace el cron 103 cada hora si cambió algo; **no se llama `gv_cobranza_imp
 (cron 104), **una vez por pedido** (`GV_Cobranza_Avisadas`). Reclamar o hacer nota de débito lo decide una persona.
 `banco_movimientos` (importador de Interbanking) tiene 0 filas y quedó plegado: el extracto entra por el Excel.
 `sql/gv_cobranza_imputar_v2291.sql`, `sql/gv_cobranza_agente_v2293.sql`, `tests/cob-agente.cjs`.
+**Coronitas** (plazo de contado por cliente) = `cobranzas_excepciones`, por **CUIT del padrón** (`GV_Clientes_Direcciones`), no de la factura: una factura de ISIS puede traer el CUIT de otra empresa (v23.18). **Lo detectado no se reclama** (Thomas, 28/09): se avisa al cliente para adelante; por eso se dice «descontado de más», no «a reclamar».
 
 ## ⚠⚠ REGLA (Luis, 2026-09-25, v22.66): los PRECIOS se cambian en la fuente de la PÁGINA, nunca en `precios_venta*`
 
