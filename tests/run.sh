@@ -989,4 +989,5 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 node tests/imp-excel-igual-pantalla.cjs
 node tests/apr-oc-super.cjs
 node tests/claude-reglas-guard.cjs
+node tests/proy-det-unidades.cjs
 _resumen
