@@ -820,7 +820,8 @@ alSumar})`.** `tests/apr-dia-ocupado-sin-arrastre.cjs`.
 (la tanda que se mueve no cuenta como ocupación, `opt.excluir`). **Y el cron de las 18:00**
 (`gv_ppp_reprogramar_sin_factura`) mueve lo no facturado con **`gv_ppp_web_dia_grupo`** salvo lo fijado A MANO
 (`creado_por <> 'sistema'` o `gv_manual_por`, que marca el trigger `gv_marca_manual` cuando el cambio trae mail en el
-JWT). `sql/gv_reprog_sin_factura_grupo_v2344.sql`.
+JWT). **No mueve** lo EN PROCESO, lo DIFERIDO por reingreso ni al CLIENTE NUEVO aprobado (avisa), y respeta
+*armar → facturar → salir* (sin empezar: no antes del 2.º hábil). `sql/gv_reprog_sin_factura_grupo_v2344.sql`.
 
 ⚠ **Picking duplicado al cambiar la EMPRESA de un artículo** (v23.42): el trigger `zz_pipeline_empresa_estable` hace
 que una fila de picking/separado/facturado de un código NO dual herede la empresa que la tanda ya tiene.

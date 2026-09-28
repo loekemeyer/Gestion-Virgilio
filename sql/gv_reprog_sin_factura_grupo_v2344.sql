@@ -21,3 +21,13 @@ alter table public."GV_PPP_Prog_Override" add column if not exists gv_manual_por
 --   drop trigger gv_marca_manual on public."PPP_Web_Programacion";
 --   drop trigger gv_marca_manual on public."GV_PPP_Prog_Override";
 --   y reponer la funcion sin el bloque v23.43-grupo (el else vuelve a gv_ppp_web_dias_ancla solo).
+
+-- v23.45 (Luis 28/09) sobre la misma funcion (marcadores 'v23.45-proceso' y 'v23.45-fijada'):
+--   · EN PROCESO (pickeo/armado empezado sin TAP) -> aviso_en_proceso, no se mueve.
+--   · DIFERIDO por reingreso (GV_PPP_Web_Diferido) o CLIENTE NUEVO aprobado (gv_clin_prioritarios)
+--     -> aviso_fijada, no se reacomoda.
+--   · Piso "un dia se arma, el siguiente se factura, el siguiente sale": armada -> desde v_obj+1;
+--     sin empezar -> desde el habil siguiente a v_obj + 1.
+-- Marcado historico de "a mano": 38 tandas / 116 NP del 23 al 28/09, reconstruido cruzando la hora de
+-- cada llamada del panel (edge_logs, POST rpc gv_ppp_*mover/programar/reprog) con actualizado_at (±6 s).
+-- gv_manual_por = 'manual (reconstruido de logs del panel)'.

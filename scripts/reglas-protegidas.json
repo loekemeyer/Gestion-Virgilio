@@ -87,6 +87,11 @@
 "quien": "Luis"
 },
 {
+"objeto": "gv_cuarentena_comentario_cod",
+"regla": "Un comentario de cuarentena sin cod se completa con el cliente del pedido; sin eso no aparece en el historial del cliente",
+"quien": "Luis"
+},
+{
 "objeto": "gv_cuarentena_deuda_sucursal",
 "regla": "la deuda busca su comprobante por índice, no recalcula la clave de los 41.000 de ISIS",
 "quien": "Luis"
@@ -392,6 +397,11 @@
 "quien": "Luis"
 },
 {
+"objeto": "gv_ppp_reprogramar_sin_factura",
+"regla": "18:00 reprograma por grupo de zonas lo no fijado a mano; no mueve en proceso, diferido ni cliente nuevo aprobado; respeta armar -> facturar -> salir",
+"quien": "Luis"
+},
+{
 "objeto": "gv_ppp_tanda_mover",
 "regla": "gv_ppp_tanda_mover le pasa v_t (la tanda de origen) como quinto argumento a gv_ppp_nps_mover_a: es lo que declara que viaja la tanda ENTERA. Problema 458.",
 "quien": "Luis, Marianela"
@@ -592,6 +602,11 @@
 "quien": "Luis 16/09, problema 336, problema 378"
 },
 {
+"objeto": "trg_pipeline_empresa_estable",
+"regla": "picking de codigo no dual hereda la empresa de la tanda",
+"quien": "Luis"
+},
+{
 "objeto": "v_importados_ordenes",
 "regla": "La proyeccion sale de UNA sola vista (gv_proyeccion_articulo, familia sumada al principal). Stock, generador de OC e Importados la leen; ninguno arma la suya. S",
 "quien": "Luis"
@@ -625,11 +640,6 @@
 "objeto": "vista_stock_procesada",
 "regla": "La demanda de un codigo DUAL (437E/438E/439E/809E) se keyea CON la empresa: el de Loeke y el de Chef son dos productos en dos gondolas distintas. Si este patron",
 "quien": "Luis, Thomas"
-},
-{
-"objeto": "gv_cuarentena_comentario_cod",
-"regla": "Un comentario de cuarentena sin cod se completa con el cliente del pedido; sin eso no aparece en el historial del cliente",
-"quien": "Luis"
 }
 ]
 }
