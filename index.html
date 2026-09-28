@@ -6213,7 +6213,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.63"></script>
+<script type="module" src="recepcion.js?v=23.64"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10172,7 +10172,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.63";
+const APP_VERSION = "v23.64";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34079,6 +34079,32 @@ function isTodayKey(dayKey) {
   } catch (_e) { return false; }
 }
 
+/* v23.64 — EL CAMIÓN DE UNA TANDA en el cuadro «Total por día» del monitor. Antes era el número del
+   código (tandaCamion: E29G → E29), que desde que el código lo da el armado no dice nada de a dónde va:
+   el 29/09 contaba 11 «camiones» para 4 que salen. Mismo criterio que la PPP (_pppCamionesJornada,
+   regla del 23/09): un camión por grupo de zonas, uno por cliente súper, Retira sin camión, y
+   Capital Centro + Oeste juntas si cada una suma < 1 m³ (monUnirCentroOeste). ≡ monitor/tv.html. */
+var MON_CAMION_ZONA = { 1: "Capital Sur", 2: "Capital Centro", 3: "Capital Oeste", 4: "GBA Sur", 5: "GBA Oeste", 6: "GBA Norte", 7: "GBA Norte" };
+function monCamionDeTanda(t) {
+  const p = (t && t.pedidos && t.pedidos[0]) || {};
+  const z = String(p.zona || t.zona || "").trim();
+  let sup = /super/i.test(z);
+  if (!sup) { try { sup = typeof pppEsSuper === "function" && pppEsSuper({ zona: z, razon_social: p.razonSocial, cod: p.cod }); } catch (_e) { sup = false; } }
+  if (sup) return "Súper · " + (String(p.razonSocial || "").trim() || p.cod || (t && t.tanda) || "?");
+  if (/retira/i.test(z)) return "Retira";
+  const m = /Zona\s*(\d+)/i.exec(z);
+  if (m && MON_CAMION_ZONA[+m[1]]) return MON_CAMION_ZONA[+m[1]];
+  return z || tandaCamion(t && t.tanda);
+}
+function monUnirCentroOeste(totalByDate) {
+  for (const g of totalByDate.values()) {
+    const C = g.byCamion.get("Capital Centro"), O = g.byCamion.get("Capital Oeste");
+    if (!C || !O || !(C.sum < 1 && O.sum < 1)) continue;
+    const U = { sum: C.sum + O.sum, tandas: C.tandas.concat(O.tandas), tandasArmadas: C.tandasArmadas + O.tandasArmadas };
+    g.byCamion.delete("Capital Centro"); g.byCamion.delete("Capital Oeste");
+    g.byCamion.set("Capital Centro-Oeste", U);
+  }
+}
 /* Muestra modal con las tandas que componen un camión del día y el estado
    de armado individual (verde=armado, rojo=no armado). Reusa el tandaModal. */
 async function showCamionDetail(dateKey, camion) {
@@ -54081,7 +54107,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
       }
       const g = totalByDate.get(key);
       g.totalSum += t.m3;
-      const cam = tandaCamion(t.tanda);
+      const cam = monCamionDeTanda(t);   // v23.64: grupo de zonas, no el número de tanda
       if (!g.byCamion.has(cam)) g.byCamion.set(cam, { sum: 0, tandas: [], tandasArmadas: 0 });
       const c = g.byCamion.get(cam);
       c.sum += t.m3;
@@ -54281,6 +54307,7 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // (cada número de tanda agrupa las que comparten el mismo número: C03A +
   // C03B = camión 03). Fecha y Total se mergean (rowspan) cuando hay varios
   // camiones en el mismo día.
+  monUnirCentroOeste(totalByDate);
   _monitorTotalCache = totalByDate;   // para que showCamionDetail() pueda leerlo
   const totalEntries = [...totalByDate.entries()].sort();
   // Helper render: tabla de "Total por día" para un subset de entries.
