@@ -49354,11 +49354,12 @@ function aprCuarBadgesHtml(p) {
   }
   if (has("deuda")) {
     const m = cuarPlata(d.deuda);
-    // v23.03 (Luis, 28/09): la fecha del comprobante MÁS VIEJO que cuenta, sacada del Excel.
+    // v23.03 (Luis, 28/09): fecha de EMISIÓN (col B del Excel) del comprobante más viejo que cuenta.
     const ds = /^\d{4}-\d{2}-\d{2}/.test(String(d.deuda_desde || "")) ? String(d.deuda_desde) : "";
     const dsTxt = ds ? ds.slice(8, 10) + "/" + ds.slice(5, 7) : "";
     const dsTit = ds ? " Factura impaga más vieja: " + ds.slice(8, 10) + "/" + ds.slice(5, 7) + "/" + ds.slice(0, 4) +
-      (d.deuda_comp ? " (" + d.deuda_comp + " comprobante" + (d.deuda_comp === 1 ? "" : "s") + ")" : "") + "." : "";
+      (d.deuda_comp ? " (" + d.deuda_comp + " comprobante" + (d.deuda_comp === 1 ? "" : "s") + ")" : "") + "." +
+      (d.deuda_otra > 0 ? " Además debe " + cuarPlata(d.deuda_otra) + " de OTRA sucursal, que no retiene este pedido." : "") : "";
     h += '<span class="cuar-badge b-deuda" title="El cliente tiene deuda mayor a $1.000' + (m ? " (" + m + ")" : "") + '.' + escapeHtml(dsTit) + '">💰 Deuda' + (m ? " " + m : "") + (dsTxt ? " · desde " + dsTxt : "") + '</span>';
   }
   if (has("limite_credito")) {
@@ -49767,7 +49768,9 @@ function aprAnularBtn(p, tam) {
   if (!p || p._demo) return "";
   return '<button class="apr-anular' + (tam === "chico" ? " apr-anular-chico" : "") + '"' +
     ' onclick="event.stopPropagation();aprAnularAbrir(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')"' +
-    ' title="El pedido entró MAL: sacarlo de A Programar para que no lo tome ni el armado automático ni nadie. Pide quién lo anula y por qué, y queda en el log de anulados.">✕ Anular pedido</button>';
+    // v23.04 (Luis, 28/09): "si hay múltiples pedidos en la fila no se sabe cuál anula cuál" →
+    // el botón dice SIEMPRE qué pedido anula, haya uno o varios.
+    ' title="Anular ' + escapeHtml(aprPedLabel(p)) + ': el pedido entró MAL, sacarlo de A Programar para que no lo tome ni el armado automático ni nadie. Pide quién lo anula y por qué, y queda en el log de anulados.">✕ Anular ' + escapeHtml(aprPedLabel(p)) + '</button>';
 }
 function aprAnularAbrir(empresa, orderId) {
   if (String(orderId) === "EJEMPLO") return;
@@ -52168,7 +52171,9 @@ async function cuarRpcMarcar(peds) {
   const payload = { p_pedidos: peds.map(function (p) {
     // v17.23: np y razón social viajan para que el LOG de Cuarentena se lea sin joins
     return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim(),
-             np: aprPedLabel(p), razon_social: p.razon_social || null };
+             np: aprPedLabel(p), razon_social: p.razon_social || null,
+             // v23.04 (Luis): la deuda se mide por SUCURSAL → viaja a dónde va el pedido
+             direccion: p.direccion || null, barrio: p.barrio || p.localidad || null, zona: p.zona || null };
   }) };
   try { return await aprRpc("gv_cuarentena_marcar", payload); }
   catch (_e) {
@@ -52219,7 +52224,8 @@ async function _cuarMarcarPedidos0() {
       aprRpc("gv_cuarentena_liberados"),  // v14.88: los liberados van a la lista normal, con badge
       // v23.03: la FECHA de la deuda (chip de Motivos). Sola en el allSettled: si falla, el chip sale sin fecha.
       aprRpc("gv_cuarentena_deuda_desde", { p_pedidos: peds.filter(function (p) { return !p._demo; }).map(function (p) {
-        return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim() };
+        return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim(),
+                 direccion: p.direccion || null, barrio: p.barrio || p.localidad || null, zona: p.zona || null };
       }) })
     ]);
     const res  = _st[0].status === "fulfilled" ? _st[0].value : null;
@@ -52247,6 +52253,7 @@ async function _cuarMarcarPedidos0() {
       const k = String(r.empresa) + ":" + String(r.order_id);
       if (detKey[k] && detKey[k].deuda != null && r.desde) {
         detKey[k].deuda_desde = String(r.desde); detKey[k].deuda_comp = Number(r.comprobantes) || 0;
+        detKey[k].deuda_otra = Number(r.otra_sucursal) || 0;   // v23.04: deuda de OTRA sucursal, no retiene
       }
     });
     (lim || []).forEach(function (r) {
