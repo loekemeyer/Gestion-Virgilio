@@ -30032,3 +30032,20 @@ LK 0254 (323E ×3) → E95A 10/11, LK 0206 5 cajas en E37A, LK 0227 2 cajas en E
 **Rollback:** restaurar el armador desde el backup; `drop view gv_ppp_diferido_antes_de_tiempo; drop function
 gv_ppp_web_diferido_tarde(text,jsonb,boolean,text)`; en LK recrear las dos definiciones del backup y correr el sync;
 reinsertar la base desde el backup.
+
+### §3.v2303 — v23.03: la deuda de Cuarentena no cuenta facturas de mercadería sin entregar · fecha en el chip — 2026-09-28
+
+**Luis:** *"se actualizó la carga del Excel de deuda y figuran con deuda clientes que no tienen … en
+Motivos debería aparecer de qué fecha es"*. Medido: el Excel estaba bien (coincide con ISIS). Multi
+Bazar (LK 4042) y Nistico (LK 31) salían retenidos por facturas del 25/09 *Pago Contado* (LK 0177,
+LK 0218) que se cargaron al camión el 28/09 08:44 **sin Recepción Remitos**: no recibieron nada.
+
+- **`gv_cuarentena_deuda_efectiva()`**: por cliente, la deuda del detalle del Excel **sin** los
+  comprobantes positivos cuya NP no tiene CRN y tienen ≤ 30 días; `desde` = el más viejo que cuenta
+  (col A del Excel, serial). Al 28/09 saca 49 comprobantes (LK 37 · Chef 12), los de < 30 días.
+- **`gv_cuarentena_marcar_calc`** usa esa deuda (parche sobre la viva, idempotente; centinela
+  `gv_cuarentena_deuda_efectiva`). Cliente sin detalle → cae al total de `GV_Cuarentena_Fuente`.
+- **`gv_cuarentena_deuda_desde(p_pedidos)`** → chip *💰 Deuda $X · desde dd/mm* (su propia RPC en el
+  `allSettled`). 590 ms marcar_calc / 93 ms la fecha, con 150 pedidos.
+- Rollback: re-crear `marcar_calc` sacando el CTE `_cde` y los dos `coalesce((select _cde.deuda …), f.deuda…)`.
+  `sql/gv_cuarentena_deuda_efectiva_v2303.sql`.
