@@ -6190,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=22.92"></script>
+<script type="module" src="recepcion.js?v=22.93"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v22.92";
+const APP_VERSION = "v22.93";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -59309,7 +59309,7 @@ function deudaRender() {
   if (res) res.innerHTML =
     '<b>' + _deudaState.total + '</b> cliente(s) con factura en los últimos 12 meses · Saldo <b>' + _fmtPlata(totalSaldo) +
     '</b> · Vencido <b style="color:#dc2626">' + _fmtPlata(totalVencido) + '</b> · Sin plazo <b style="color:#64748b">' + _fmtPlata(totalSinPlazo) + '</b>' +
-    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">⚠ Saldo neto de cobros registrados A MANO (botón 💰/💵 en el detalle). Todavía no hay conciliación automática contra el extracto bancario — un cobro que no cargues acá sigue apareciendo como deuda.</div>';
+    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">⚠ Saldo neto de cobros registrados A MANO (botón 💰/💵 en el detalle): el saldo NO se cruza solo con los bancos. Lo que Cobranzas ya concilió en los 4 Excel se ve en 🏦 Bancos y, por cliente, en el Detalle (recibos según bancos, con el pedido que pagó cada uno).</div>';
   if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin facturas en el período. Probá ampliar el filtro.</div>'; return; }
   var h = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
     '<thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' +
@@ -59393,9 +59393,10 @@ async function deudaAnularCobro(id, deudorId) {
 window.deudaAnularCobro = deudaAnularCobro;
 
 async function deudaVerDetalle(deudorId) {
-  var [r, rCob] = await Promise.all([
+  var [r, rCob, rBk] = await Promise.all([
     sb.rpc("deudores_detalle", { p_deudor_id: deudorId }),
-    sb.rpc("deuda_cobros_lista", { p_deudor_id: deudorId })
+    sb.rpc("deuda_cobros_lista", { p_deudor_id: deudorId }),
+    sb.rpc("gv_cobranza_cliente_cuit", { p_cuit: deudorId })   // v22.93: recibos según bancos, con el pedido que pagó cada uno
   ]);
   if (r.error) { alert("Error: " + r.error.message); return; }
   var rows = r.data || [];
@@ -59426,6 +59427,26 @@ async function deudaVerDetalle(deudorId) {
     h += cobros.map(function(c) {
       return '<tr><td>' + c.fecha + '</td><td>' + (c.medio || '—') + (c.documento_id ? '' : ' (general)') + '</td><td class="p">' + _fmtPlata(c.monto) + '</td><td>' + (c.nota || '') + '</td>' +
         '<td><button onclick="opener.deudaAnularCobro(' + c.id + ',\'' + deudorId + '\')">Anular</button></td></tr>';
+    }).join("");
+    h += '</tbody></table>';
+  }
+  // v22.93: lo que dicen los BANCOS de este cliente (agente de cobranzas: recibo ↔ pedido que pagó)
+  var bk = (rBk && !rBk.error) ? (rBk.data || []) : null;
+  h += '<h3>🏦 Recibos según bancos <small style="color:#94a3b8;font-weight:normal;">(conciliación de Cobranzas · agente: qué pedido pagó cada recibo y con qué descuento)</small></h3>';
+  if (bk === null) h += '<p style="color:#b91c1c;">No se pudo leer la conciliación bancaria.</p>';
+  else if (!bk.length) h += '<p style="color:#64748b;">Sin recibos ni pedidos pagados en los bancos en los últimos 450 días.</p>';
+  else {
+    h += '<table><thead><tr><th>Pedido</th><th>Facturas</th><th class="p">Lista</th><th>Recibo</th><th>Pagó</th><th>Medio</th><th class="p">Pagado</th><th class="p">Tomó</th><th class="p">Días / plazo</th><th class="p">Atraso</th><th class="p">A reclamar</th><th>Cruce</th></tr></thead><tbody>';
+    h += bk.map(function(m) {
+      var mal = Number(m.a_reclamar) > 0, atr = Number(m.atraso) > 0;
+      return '<tr style="' + (mal ? 'background:#fef2f2;' : (atr ? 'background:#fffbeb;' : '')) + '"><td>' + (m.pedido ? _fmtFecha(m.pedido) : '—') + '</td><td>' + (m.facturas || '—') +
+        '</td><td class="p">' + (m.lista != null ? _fmtPlata(m.lista) : '—') + '</td><td>' + (m.recibo || '—') + '</td><td>' + (m.fecha_pago ? _fmtFecha(m.fecha_pago) : '—') +
+        '</td><td>' + (m.medio || '—') + '</td><td class="p">' + (m.pagado != null ? _fmtPlata(m.pagado) : '—') +
+        '</td><td class="p">' + (m.dto_tomado != null ? Math.round(Number(m.dto_tomado) * 100) + ' %' : '—') +
+        '</td><td class="p">' + (m.dias != null ? m.dias + ' / ' + (m.plazo != null ? m.plazo : '—') : '—') +
+        '</td><td class="p" style="' + (atr ? 'color:#dc2626;font-weight:bold;' : '') + '">' + (atr ? m.atraso + ' d' : '—') +
+        '</td><td class="p" style="' + (mal ? 'color:#b91c1c;font-weight:bold;' : '') + '">' + (mal ? _fmtPlata(m.a_reclamar) : '—') +
+        '</td><td style="color:#64748b;">' + (m.calidad || '') + '</td></tr>';
     }).join("");
     h += '</tbody></table>';
   }
@@ -60727,6 +60748,171 @@ async function bancoIgnorar(id) {
 }
 window.bancoIgnorar = bancoIgnorar;
 
+/* ---------- v22.93: 🕵 Agente de cobranzas + 🏦 Bancos (conciliación de los 4 Excel) ----------
+   Backend: sql/gv_cobranza_agente_v2293.sql. El agente (gv_cobranza_imputar, v22.90) cruza cada RECIBO de la
+   conciliación bancaria con el PEDIDO que pagó (facturas del día menos lo que sigue en la deuda) y dice qué
+   descuento se TOMÓ el cliente y cuál le correspondía por los días que tardó. Sólo informa: reclamar es
+   decisión de una persona. Se recalcula solo (cron 103, cada hora, si cambió conciliación/deuda/facturas). */
+var _agState = { rows: [], q: "", empresa: null, soloReclamo: true, abierto: null, det: {}, meta: null };
+window._agState = _agState;
+function _agPct(x) { return (x == null) ? "—" : Math.round(Number(x) * 100) + " %"; }
+function _agFechaHora(ts) {
+  if (!ts) return "—";
+  var d = new Date(ts); if (isNaN(d.getTime())) return String(ts);
+  return d.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+async function agenteRefresh() {
+  var cont = document.getElementById("agTabla");
+  if (cont && !_agState.rows.length) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
+  var r = await sb.rpc("gv_cobranza_agente_resumen", {});
+  if (r.error) { if (cont) cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + escapeHtml(r.error.message) + '</div>'; return; }
+  _agState.rows = r.data || [];
+  _agState.meta = _agState.rows.length ? _agState.rows[0].calculado_en : null;
+  agenteRender();
+}
+window.agenteRefresh = agenteRefresh;
+function _agFiltradas() {
+  var q = (_agState.q || "").trim().toLowerCase();
+  return _agState.rows.filter(function (r) {
+    if (_agState.empresa && r.empresa !== _agState.empresa) return false;
+    if (_agState.soloReclamo && !(Number(r.a_reclamar) > 0)) return false;
+    if (q && String(r.cod_cliente).indexOf(q) < 0 && String(r.cliente || "").toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  }).sort(function (a, b) {   // mayor plata primero, después el atraso (regla de tablas del dueño); no se confía en el orden del backend
+    return (Number(b.a_reclamar) || 0) - (Number(a.a_reclamar) || 0) || (Number(b.pedidos_atrasados) || 0) - (Number(a.pedidos_atrasados) || 0);
+  });
+}
+function agenteRender() {
+  var cont = document.getElementById("agTabla"), res = document.getElementById("agResumen");
+  if (!cont) return;
+  var rows = _agFiltradas();
+  var totRec = rows.reduce(function (a, r) { return a + (Number(r.a_reclamar) || 0); }, 0);
+  var totMal = rows.reduce(function (a, r) { return a + (Number(r.pedidos_mal) || 0); }, 0);
+  var totAtr = rows.reduce(function (a, r) { return a + (Number(r.pedidos_atrasados) || 0); }, 0);
+  if (res) res.innerHTML = '<b>' + rows.length + '</b> cliente(s) · <b>' + totMal + '</b> pedidos con el descuento mal tomado · <b>' + totAtr + '</b> pagados con atraso · a reclamar <b style="color:#dc2626">' + _fmtPlata(totRec) + '</b>' +
+    ' <span style="color:#94a3b8;">· calculado ' + _agFechaHora(_agState.meta) + ' (se recalcula solo cada hora si cambió algo)</span>' +
+    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">Cómo lee: cada recibo de la conciliación bancaria se cruza con el pedido que pagó. «Tomó» = el descuento que se descontó el cliente; «ganado» = el que le correspondía por los días que tardó (contado 14 d o su coronita · 15-30 → 20 % · 31-45 → 15 % · 46-60 → 10 % · +60 → 0). A reclamar = lista × la diferencia. Sólo informa: no manda nada a nadie.</div>';
+  if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Nada para mostrar con estos filtros.</div>'; return; }
+  var th = function (t, al) { return '<th style="padding:8px;text-align:' + (al || 'left') + ';border-bottom:1px solid #cbd5e1;white-space:nowrap;">' + t + '</th>'; };
+  var h = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:13px;">' +
+    '<thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' + th('Cliente') + th('Emp.') + th('Pedidos mal / imput.', 'right') + th('Atrasados', 'right') + th('Días prom.', 'right') + th('Atraso máx.', 'right') + th('A reclamar', 'right') + th('Sin cruzar', 'right') + th('Período') + th('') + '</tr></thead><tbody>';
+  h += rows.map(function (r) {
+    var k = r.empresa + '|' + r.cod_cliente, open = _agState.abierto === k;
+    var tr = '<tr class="ag-row" data-k="' + escapeHtml(k) + '">' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;"><b>' + escapeHtml(r.cod_cliente) + '</b> ' + escapeHtml(r.cliente || '—') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;">' + (r.empresa === 'chef' ? 'CH' : 'LK') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.pedidos_mal || 0) + ' / ' + (r.pedidos_imputados || 0) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.pedidos_atrasados || 0) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + (r.dias_prom != null ? Math.round(r.dias_prom) : '—') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;color:' + (Number(r.atraso_max) > 30 ? '#dc2626' : '#0f172a') + ';">' + (r.atraso_max != null ? r.atraso_max + ' d' : '—') + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:bold;color:' + (Number(r.a_reclamar) > 0 ? '#b91c1c' : '#059669') + ';">' + _fmtPlata(r.a_reclamar) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:right;color:#64748b;font-size:12px;white-space:nowrap;">' + (r.recibos_sin_imputar || 0) + ' rec · ' + (r.pedidos_sin_recibo || 0) + ' ped</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;white-space:nowrap;">' + _fmtFecha(r.desde) + ' → ' + _fmtFecha(r.hasta) + '</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:center;"><button class="ag-det-btn" onclick="agenteDetalle(\'' + r.empresa + '\',\'' + escapeHtml(r.cod_cliente) + '\')" style="padding:4px 8px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;font-size:12px;">' + (open ? 'Cerrar' : 'Detalle') + '</button></td></tr>';
+    if (open) tr += '<tr class="ag-det"><td colspan="10" style="padding:6px 8px 12px;background:#f8fafc;border-bottom:2px solid #cbd5e1;">' + _agDetalleHtml(_agState.det[k]) + '</td></tr>';
+    return tr;
+  }).join("");
+  h += '</tbody></table></div>';
+  cont.innerHTML = h;
+}
+window.agenteRender = agenteRender;
+function _agDetalleHtml(rows) {
+  if (rows === undefined) return '<div style="color:#64748b;padding:8px;">Cargando…</div>';
+  if (rows === null) return '<div style="color:#b91c1c;padding:8px;">No se pudo leer el detalle.</div>';
+  if (!rows.length) return '<div style="color:#64748b;padding:8px;">Sin recibos ni pedidos pagados en los últimos 450 días.</div>';
+  var td = function (t, al, st) { return '<td style="padding:4px 6px;border-bottom:1px solid #e2e8f0;text-align:' + (al || 'left') + ';' + (st || '') + '">' + t + '</td>'; };
+  var th = function (t, al) { return '<th style="padding:4px 6px;text-align:' + (al || 'left') + ';white-space:nowrap;">' + t + '</th>'; };
+  var h = '<table style="border-collapse:collapse;font-size:12.5px;"><thead><tr style="background:#e2e8f0;">' +
+    th('Pedido') + th('Facturas') + th('Lista', 'right') + th('NC') + th('Recibo(s)') + th('Pagó') + th('Medio') + th('Pagado', 'right') +
+    th('Tomó', 'right') + th('Retención', 'right') + th('Días / plazo', 'right') + th('Atraso', 'right') + th('Ganado', 'right') + th('A reclamar', 'right') + th('Cruce') + '</tr></thead><tbody>';
+  h += rows.map(function (m) {
+    var mal = Number(m.a_reclamar) > 0, atr = Number(m.atraso) > 0;
+    var bg = mal ? 'background:#fef2f2;' : (atr ? 'background:#fffbeb;' : '');
+    var cal = m.calidad || '';
+    var calCol = /sin imputar|sin recibo/.test(cal) ? '#64748b' : (/pago de mas/.test(cal) ? '#7c3aed' : '#0f172a');
+    return '<tr style="' + bg + '">' +
+      td(m.pedido ? _fmtFecha(m.pedido) : '—') + td(escapeHtml(m.facturas || '—')) + td(m.lista != null ? _fmtPlata(m.lista) : '—', 'right') +
+      td(m.nc ? escapeHtml(m.nc) + ' (' + _fmtPlata(m.lista_nc) + ')' : '—') +
+      td(escapeHtml(m.recibo || '—')) + td(m.fecha_pago ? _fmtFecha(m.fecha_pago) : '—') + td(escapeHtml(m.medio || '—')) + td(m.pagado != null ? _fmtPlata(m.pagado) : '—', 'right') +
+      td(_agPct(m.dto_tomado), 'right') + td(m.retencion != null ? (Number(m.retencion) * 100).toFixed(1) + ' %' : '—', 'right') +
+      td(m.dias != null ? m.dias + ' / ' + (m.plazo != null ? m.plazo : '—') : '—', 'right') +
+      td(atr ? m.atraso + ' d' : (m.atraso === 0 ? '0' : '—'), 'right', atr ? 'color:#dc2626;font-weight:bold;' : '') +
+      td(_agPct(m.dto_ganado), 'right') +
+      td(mal ? _fmtPlata(m.a_reclamar) : '—', 'right', mal ? 'color:#b91c1c;font-weight:bold;' : '') +
+      td('<span style="color:' + calCol + ';">' + escapeHtml(cal) + '</span>') + '</tr>';
+  }).join("");
+  return h + '</tbody></table>';
+}
+async function agenteDetalle(empresa, cod) {
+  var k = empresa + '|' + cod;
+  if (_agState.abierto === k) { _agState.abierto = null; agenteRender(); return; }
+  _agState.abierto = k;
+  if (_agState.det[k] === undefined) {
+    agenteRender();
+    var r = await sb.rpc("gv_cobranza_agente_cliente", { p_empresa: empresa, p_cod: cod });
+    _agState.det[k] = r.error ? null : (r.data || []);
+  }
+  agenteRender();
+}
+window.agenteDetalle = agenteDetalle;
+
+/* 🏦 Bancos: la conciliación de los 4 Excel (GV_Conc_*), paginada en el servidor (gv_cobranza_bancos):
+   son 35 mil filas, nunca se lee entera (regla v20.45). */
+var _bkState = { rows: [], q: "", banco: "", empresa: "", tipo: "", desde: null, hasta: null, offset: 0, limit: 300, total: 0, sumE: 0, sumS: 0, cargas: [] };
+window._bkState = _bkState;
+function _bkISO(d) { return new Date(d.getTime() - 3 * 3600e3).toISOString().slice(0, 10); }   // ART fijo UTC-3
+var _BK_BANCO = { credicoop_lk: "Credicoop LK", santander_lk: "Santander LK", credicoop_ch: "Credicoop Chef", santander_ch: "Santander Chef" };
+async function bancosRefresh(reset) {
+  if (reset !== false) { _bkState.offset = 0; _bkState.rows = []; }
+  var cont = document.getElementById("bkTabla");
+  if (cont && !_bkState.rows.length) cont.innerHTML = '<div style="padding:20px;color:#64748b;">Cargando…</div>';
+  if (!_bkState.desde) _bkState.desde = _bkISO(new Date(Date.now() - 30 * 86400e3));
+  var pr = [sb.rpc("gv_cobranza_bancos", { p_banco: _bkState.banco || null, p_empresa: _bkState.empresa || null, p_q: _bkState.q || null,
+                                            p_desde: _bkState.desde || null, p_hasta: _bkState.hasta || null, p_tipo: _bkState.tipo || null,
+                                            p_limit: _bkState.limit, p_offset: _bkState.offset })];
+  if (!_bkState.cargas.length) pr.push(sb.rpc("gv_cobranza_bancos_cargas", {}));
+  var rs = await Promise.all(pr);
+  var r = rs[0];
+  if (rs[1] && !rs[1].error) _bkState.cargas = rs[1].data || [];
+  if (r.error) { if (cont) cont.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + escapeHtml(r.error.message) + '</div>'; return; }
+  var data = r.data || [];
+  _bkState.rows = _bkState.offset ? _bkState.rows.concat(data) : data;
+  if (data.length) { _bkState.total = Number(data[0].total_count) || data.length; _bkState.sumE = Number(data[0].suma_entrada) || 0; _bkState.sumS = Number(data[0].suma_salida) || 0; }
+  else if (!_bkState.offset) { _bkState.total = 0; _bkState.sumE = 0; _bkState.sumS = 0; }
+  bancosRender();
+}
+window.bancosRefresh = bancosRefresh;
+function bancosCargarMas() { _bkState.offset += _bkState.limit; bancosRefresh(false); }
+window.bancosCargarMas = bancosCargarMas;
+function bancosRender() {
+  var cont = document.getElementById("bkTabla"), res = document.getElementById("bkResumen"), car = document.getElementById("bkCargas");
+  if (!cont) return;
+  if (car) car.innerHTML = _bkState.cargas.length
+    ? _bkState.cargas.map(function (c) { return '<span style="display:inline-block;margin:2px 8px 2px 0;padding:2px 8px;background:#f1f5f9;border-radius:999px;font-size:12px;"><b>' + (_BK_BANCO[c.banco] || c.banco) + '</b> · último mov. ' + _fmtFecha(c.ultima_fecha) + ' · subido ' + _agFechaHora(c.cargado_en) + '</span>'; }).join("")
+    : '<span style="color:#94a3b8;font-size:12px;">Sin cargas registradas: el Excel de conciliación sube al guardar (macro ConciliacionSupabase, docs/conciliacion-bancaria).</span>';
+  var rows = _bkState.rows;
+  if (res) res.innerHTML = '<b>' + _bkState.total + '</b> movimiento(s) · entradas <b style="color:#059669">' + _fmtPlata(_bkState.sumE) + '</b> · salidas <b style="color:#dc2626">' + _fmtPlata(_bkState.sumS) + '</b>' +
+    '<div style="margin-top:4px;font-size:12px;color:#94a3b8;">La conciliación que lleva Cobranzas en los 4 Excel (Credicoop y Santander, LK y Chef), tal cual está cargada: fecha, entrada/salida, recibo, OP, cliente, estado del e-cheque y de ISIS. Un e-cheque figura en la fecha en que se cobra (por eso hay fechas futuras).</div>';
+  if (!rows.length) { cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin movimientos con estos filtros.</div>'; return; }
+  var th = function (t, al) { return '<th style="padding:6px 8px;text-align:' + (al || 'left') + ';border-bottom:1px solid #cbd5e1;white-space:nowrap;">' + t + '</th>'; };
+  var td = function (t, al, st) { return '<td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;text-align:' + (al || 'left') + ';' + (st || '') + '">' + t + '</td>'; };
+  var h = '<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:12.5px;"><thead style="background:#f1f5f9;position:sticky;top:0;"><tr>' +
+    th('Fecha') + th('Banco') + th('Operación') + th('Detalle') + th('Entrada', 'right') + th('Salida', 'right') + th('Recibo') + th('OP') + th('Cliente') + th('E-cheq') + th('ISIS') + th('Obs.') + '</tr></thead><tbody>';
+  h += rows.map(function (m) {
+    var bk = m.banco + '_' + (m.empresa === 'chef' ? 'ch' : 'lk');
+    var st = m.tipo === 'a_depositar' ? 'background:#fffbeb;' : (m.tipo === 'proyeccion' ? 'color:#94a3b8;' : '');
+    return '<tr class="bk-row" style="' + st + '">' + td(_fmtFecha(m.fecha), 'left', 'white-space:nowrap;') + td(_BK_BANCO[bk] || bk) +
+      td(escapeHtml(m.operacion || '') + (m.tipo === 'a_depositar' ? ' <span style="color:#b45309;font-size:11px;">(a depositar)</span>' : '')) +
+      td(escapeHtml(m.detalle || '') + (m.nota ? ' <span style="color:#94a3b8;">· ' + escapeHtml(m.nota) + '</span>' : '')) +
+      td(m.entrada != null ? _fmtPlata(m.entrada) : '', 'right', 'color:#059669;white-space:nowrap;') + td(m.salida != null ? _fmtPlata(m.salida) : '', 'right', 'color:#dc2626;white-space:nowrap;') +
+      td(escapeHtml(m.nro_recibo || '')) + td(escapeHtml(m.nro_op || '')) + td(escapeHtml(m.cod_cliente || '')) + td(escapeHtml(m.estado_echeq || '')) + td(escapeHtml(m.estado_isis || '')) + td(escapeHtml(m.observacion || '')) + '</tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  if (rows.length < _bkState.total) h += '<div style="text-align:center;padding:12px;"><button onclick="bancosCargarMas()" style="padding:8px 16px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">Cargar más (' + (_bkState.total - rows.length) + ' restantes)</button></div>';
+  cont.innerHTML = h;
+}
+window.bancosRender = bancosRender;
+
 /* ---------- Pantalla unificada: Deuda a cobrar + Cobranzas (valor por NP) + Cruce Facturación + Facturable ya ----------
    Un solo botón / una sola pantalla con 4 pestañas. Reusa la lógica existente:
    pestaña "Deuda" = deudaRefresh/deudaRender; pestaña "Valor por NP" = cobLoad/cobRender.
@@ -60750,24 +60936,26 @@ async function openCobros(tab) {
         '<button id="cobrosTabCob" onclick="cobrosSetTab(\'cob\')">💵 Valor por NP</button>' +
         '<button id="cobrosTabCruce" onclick="cobrosSetTab(\'cruce\')">🔍 Facturación vs ISIS</button>' +
         '<button id="cobrosTabAnticipado" onclick="cobrosSetTab(\'anticipado\')">📦 Facturable ya</button>' +
-        '<button id="cobrosTabBanco" onclick="cobrosSetTab(\'banco\')">🏦 Extracto banco</button>' +
+        '<button id="cobrosTabAgente" onclick="cobrosSetTab(\'agente\')">🕵 Agente</button>' +
+        '<button id="cobrosTabBanco" onclick="cobrosSetTab(\'banco\')">🏦 Bancos</button>' +
       '</div>' +
       '<button onclick="cobrosClose()" style="margin-left:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer;">Cerrar</button>' +
     '</div>' +
     '<div id="cobrosBody" style="flex:1;overflow:auto;padding:14px 16px;min-height:0;"></div>';
   // v13.73: se puede abrir directo en cualquier pestaña (Facturación abre "cruce")
-  cobrosSetTab(["cob", "cruce", "anticipado", "banco"].indexOf(tab) >= 0 ? tab : "deuda");
+  cobrosSetTab(["cob", "cruce", "anticipado", "banco", "agente"].indexOf(tab) >= 0 ? tab : "deuda");
 }
 window.openCobros = openCobros;
 function cobrosSetTab(tab) {
-  _cobrosTab = (tab === "cob") ? "cob" : (tab === "cruce") ? "cruce" : (tab === "anticipado") ? "anticipado" : (tab === "banco") ? "banco" : "deuda";
+  _cobrosTab = (tab === "cob") ? "cob" : (tab === "cruce") ? "cruce" : (tab === "anticipado") ? "anticipado" : (tab === "banco") ? "banco" : (tab === "agente") ? "agente" : "deuda";
   var bd = document.getElementById("cobrosBody"); if (!bd) return;
-  var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob"), tx = document.getElementById("cobrosTabCruce"), ta = document.getElementById("cobrosTabAnticipado"), tbk = document.getElementById("cobrosTabBanco");
+  var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob"), tx = document.getElementById("cobrosTabCruce"), ta = document.getElementById("cobrosTabAnticipado"), tbk = document.getElementById("cobrosTabBanco"), tag = document.getElementById("cobrosTabAgente");
   if (td) td.style.cssText = _cobrosTabCss(_cobrosTab === "deuda");
   if (tc) tc.style.cssText = _cobrosTabCss(_cobrosTab === "cob");
   if (tx) tx.style.cssText = _cobrosTabCss(_cobrosTab === "cruce");
   if (ta) ta.style.cssText = _cobrosTabCss(_cobrosTab === "anticipado");
   if (tbk) tbk.style.cssText = _cobrosTabCss(_cobrosTab === "banco");
+  if (tag) tag.style.cssText = _cobrosTabCss(_cobrosTab === "agente");
   if (_cobrosTab === "anticipado") {
     bd.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
@@ -60823,9 +61011,47 @@ function cobrosSetTab(tab) {
       '<div id="deudaResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
       '<div id="deudaTabla"></div>';
     deudaRefresh();
-  } else if (_cobrosTab === "banco") {
+  } else if (_cobrosTab === "agente") {
+    // v22.93: el agente de cobranzas (gv_cobranza_imputar): qué descuento se tomó cada cliente y cuál le correspondía
     bd.innerHTML =
-      '<h1 style="margin:0 0 8px;font-size:20px;">🏦 Extracto banco</h1>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap;">' +
+        '<h1 style="margin:0;font-size:20px;">🕵 Agente de cobranzas</h1>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
+          '<input id="agQ" placeholder="🔎 Cliente / código" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;min-width:200px;" oninput="_agState.q=this.value;agenteRender();">' +
+          '<select id="agEmp" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;" onchange="_agState.empresa=this.value||null;agenteRender();">' +
+            '<option value="">Todas las empresas</option><option value="lk">Loekemeyer</option><option value="chef">Chef</option>' +
+          '</select>' +
+          '<label style="font-size:13px;white-space:nowrap;"><input type="checkbox" id="agSolo" checked onchange="_agState.soloReclamo=this.checked;agenteRender();"> sólo con reclamo</label>' +
+          '<button onclick="agenteRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="agResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
+      '<div id="agTabla"></div>';
+    _agState.abierto = null;
+    agenteRefresh();
+  } else if (_cobrosTab === "banco") {
+    // v22.93: la conciliación bancaria que lleva Cobranzas (los 4 Excel, subidos por la macro al guardar)
+    bd.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;">' +
+        '<h1 style="margin:0;font-size:20px;">🏦 Bancos</h1>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
+          '<input id="bkQ" placeholder="🔎 Cliente / recibo / OP / detalle" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;min-width:220px;" oninput="_bkState.q=this.value;clearTimeout(window._bkQT);window._bkQT=setTimeout(function(){bancosRefresh();},400);">' +
+          '<select id="bkCuenta" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;" onchange="var v=this.value.split(\'|\');_bkState.banco=v[0]||\'\';_bkState.empresa=v[1]||\'\';bancosRefresh();">' +
+            '<option value="">Los 4 bancos</option><option value="credicoop|lk">Credicoop LK</option><option value="santander|lk">Santander LK</option>' +
+            '<option value="credicoop|chef">Credicoop Chef</option><option value="santander|chef">Santander Chef</option>' +
+          '</select>' +
+          '<select id="bkTipo" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;" onchange="_bkState.tipo=this.value;bancosRefresh();">' +
+            '<option value="">Todos los movimientos</option><option value="ingreso">Ingresos</option><option value="a_depositar">E-cheques a depositar</option><option value="egreso">Egresos</option>' +
+          '</select>' +
+          '<input id="bkDesde" type="date" title="Desde" value="' + (_bkState.desde || _bkISO(new Date(Date.now() - 30 * 86400e3))) + '" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;width:auto;" onchange="_bkState.desde=this.value||null;bancosRefresh();">' +
+          '<input id="bkHasta" type="date" title="Hasta" value="' + (_bkState.hasta || '') + '" style="padding:8px;font-size:14px;border:1px solid #cbd5e1;border-radius:6px;width:auto;" onchange="_bkState.hasta=this.value||null;bancosRefresh();">' +
+          '<button onclick="bancosRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="bkCargas" style="margin-bottom:6px;"></div>' +
+      '<div id="bkResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
+      '<div id="bkTabla"></div>' +
+      '<details id="bancoViejo" style="margin-top:18px;border-top:1px dashed #cbd5e1;padding-top:8px;"><summary style="cursor:pointer;color:#64748b;font-size:12.5px;">Importador viejo de Interbanking (sin uso: 0 movimientos cargados; el extracto entra por el Excel de conciliación)</summary>' +
       '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px;">' +
         '<b>Importar extracto de Interbanking</b> <span style="color:#94a3b8;font-size:12px;">(Consultas → Extracto de cuenta → exportar Excel)</span><br>' +
         '<input id="bancoBancoNombre" value="Santander Rio" placeholder="Banco" style="padding:6px;font-size:13px;border:1px solid #cbd5e1;border-radius:6px;margin-top:8px;margin-right:8px;width:160px;">' +
@@ -60837,10 +61063,12 @@ function cobrosSetTab(tab) {
         '<button onclick="bancoRefresh()" style="padding:8px 12px;background:#1e6bd6;color:#fff;border:none;border-radius:6px;cursor:pointer;">↻ Refrescar</button>' +
       '</div>' +
       '<div id="bancoResumen" style="margin-bottom:10px;color:#64748b;font-size:13px;">Cargando…</div>' +
-      '<div id="bancoTabla"></div>';
+      '<div id="bancoTabla"></div></details>';
     var _bancoFi = document.getElementById("bancoFileInput");
     if (_bancoFi) _bancoFi.onchange = function () { if (this.files && this.files[0]) bancoImportarArchivo(this.files[0]); };
-    bancoRefresh();
+    var _bkDet = document.getElementById("bancoViejo");
+    if (_bkDet) _bkDet.ontoggle = function () { if (this.open) bancoRefresh(); };
+    bancosRefresh();
   } else {
     _cob = { emp: "todos", q: "", rows: [], view: "list", det: null };
     bd.innerHTML = '<div id="cobBody"><div style="text-align:center;color:#94a3b8;padding:24px;">Cargando…</div></div>';

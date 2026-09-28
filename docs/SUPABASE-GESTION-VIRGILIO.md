@@ -29867,3 +29867,49 @@ recibos sin imputar. Clientes "facilongos" (transfieren el 75 % exacto): Bertott
 imputación: sirve para que la retención no se lea como pago de menos cuando se cruce.
 
 **Rollback:** cabecera de los dos `.sql`. Pendiente: qué hace el agente con lo detectado (Thomas: "no sé").
+
+## §3.ng — v22.93: el agente de cobranzas SE VE y AVISA — solapas 🕵 Agente y 🏦 Bancos, recibos en Deuda, Telegram diario (Thomas, 2026-09-26)
+
+**Pedido:** continuar la conciliación bancaria en Cobranzas (1) y definir qué hace el agente con lo que
+detecta (3). Decidido: **pantalla + aviso diario**; nota de débito o reclamo lo decide una persona.
+
+**Medido antes de tocar:** `GV_Cobranza_Imputacion` (v22.92) 3.637 filas · 753 clientes · **360 con reclamo,
+$ 375.628.107** · 240 recibos sin imputar · 393 pedidos pagados sin recibo. `banco_movimientos` (el importador
+viejo de Interbanking de la solapa «Extracto banco») **0 filas**: nadie lo usó nunca. Ninguna pantalla leía
+`gv_conciliacion_bancaria` ni `gv_cobranza_pago_mal`.
+
+**Objetos nuevos** (`sql/gv_cobranza_agente_v2293.sql`, rollback en la cabecera; el motor sigue en
+`sql/gv_cobranza_imputar_v2291.sql`):
+
+| objeto | qué es | seguridad |
+|---|---|---|
+| `gv_cobranza_agente_resumen()` | una fila por cliente (de `gv_cobranza_pago_mal`), ordenada por a reclamar | SECURITY DEFINER, chequeo de supervisor adentro; execute sólo authenticated/service_role |
+| `gv_cobranza_agente_cliente(emp, cod)` | el detalle: cada recibo con el pedido que pagó (o suelto) | ídem |
+| `gv_cobranza_cliente_cuit(cuit)` | lo mismo por CUIT, para el detalle de Deuda a cobrar (un CUIT puede ser cliente en las dos empresas) | ídem |
+| `gv_cobranza_bancos(banco, empresa, q, desde, hasta, tipo, limit, offset)` | la conciliación paginada en el servidor con `total_count` y sumas; 35.579 filas, nunca entera (regla v20.45). 24 ms con filtro | ídem |
+| `gv_cobranza_bancos_cargas()` | última carga de cada Excel y hasta qué fecha llega | ídem |
+| **`GV_Cobranza_Avisadas`** | tramo (empresa, cliente, recibo, pedido) ya avisado | RLS, sólo supervisor lee, nadie escribe salvo la función |
+| `gv_cobranza_aviso_nuevos()` / `gv_cobranza_aviso_texto()` | lo detectado sin avisar (reclamo > 0 o atraso > 0) y el texto del mensaje; el texto se puede leer **sin mandar nada** | ídem |
+| `gv_cobranza_aviso_telegram()` | día hábil → encola el texto (`tg_enqueue`, dedup por día), marca avisados, `tg_outbox_flush` | sólo service_role |
+| cron **104 `gv-cobranza-aviso`** | `45 11 * * 1-5` = lun-vie 08:45 ART, después del recálculo de las :49 | — |
+
+**Front (`index.html`):** en 💰 Deuda / Cobranzas, solapa **🕵 Agente** (filtro empresa / cliente / «sólo con
+reclamo», tabla por cliente ordenada por plata, «Detalle» despliega los tramos con pedido, facturas, recibo,
+medio, tomó / ganado, días / plazo, atraso, a reclamar y calidad del cruce) y solapa **🏦 Bancos** (reemplaza
+«Extracto banco»: los 4 Excel con filtros de cuenta, tipo, texto y fechas, «Cargar más» por offset, última
+carga por banco; el importador viejo queda plegado en un `<details>`). **Deuda → Detalle** suma la sección
+«🏦 Recibos según bancos» y el cartel ya no dice que no hay conciliación. No hay botón «recalcular»:
+`gv_cobranza_imputacion_refrescar` tarda 35 s y el timeout de `authenticated` es 8 s; lo hace el cron 103.
+
+**Primer aviso (medido con `gv_cobranza_aviso_texto()`, sin mandar):** 1.295 pedidos de 381 clientes, $ 375.628.107,
+174 con atraso sin reclamo; lista los 12 más grandes (Yuriti 5,1 M · Muller 4,7 M · …) y «… y 1283 más». Es el
+backlog de 450 días en UN mensaje; desde el segundo día sólo sale lo nuevo. Miles con punto (`replace` sobre
+`to_char … G`, que en esta base da coma).
+
+⚠ **Probado como `anon`: sin execute** (las RPC no le existen). Lo de `set local role authenticated` desde el MCP
+**no prueba nada**: `gv_es_supervisor_o_servicio()` mira `session_user`, que sigue siendo `postgres`.
+
+**Chequeo:** `select public.gv_cobranza_aviso_texto();` (null = nada nuevo) · `select * from
+public."GV_Cobranza_Avisadas" order by avisado_at desc limit 20;` · `select * from public.gv_reglas_perdidas;`
+(2 centinelas nuevos) · `node tests/cob-agente.cjs`.
+

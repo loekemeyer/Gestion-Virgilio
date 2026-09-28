@@ -466,6 +466,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== fac-conciliacion (v14.30: Facturación en 2 solapas; Conciliación = snapshot Gestión vs factura ISIS; el snapshot se registra al facturar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-conciliacion.cjs
+
+echo "== cob-agente (v22.93: Cobranzas — solapa Agente (recibo↔pedido, dto tomado vs ganado), solapa Bancos paginada y recibos en Deuda) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cob-agente.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/concil-recalc-paralelo.cjs
 
 echo "== fac-tdf (v13.77: NP LK de Tierra del Fuego → Excel ISIS CHEF con código Chef, tope 15, artículos con L) =="

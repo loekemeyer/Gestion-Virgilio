@@ -6368,6 +6368,13 @@ Pedido de Luis. Dos cosas:
 > `deudores_resumen` acota a los **últimos 12 meses por defecto**: sumar todo desde 2019
 > sin restar pagos da un número que no significa nada (se midió: **$8.900 M** sólo en el
 > tramo +90 de LK contando la historia completa). **Front** (`index.html`): el botón
+> **v22.93 (26/09) — la conciliación bancaria YA está en Cobranzas.** Solapa **🏦 Bancos** = los 4 Excel
+> (`gv_conciliacion_bancaria`, paginada por `gv_cobranza_bancos`); solapa **🕵 Agente** = `gv_cobranza_pago_mal`
+> / `gv_cobranza_imputacion` (recibo ↔ pedido, descuento tomado vs ganado, a reclamar); **Deuda → Detalle** trae
+> los recibos del CUIT (`gv_cobranza_cliente_cuit`). Aviso diario lun-vie 08:45 por Telegram de lo nuevo
+> (`gv_cobranza_aviso_telegram`, cron 104, una vez por pedido: `GV_Cobranza_Avisadas`). El importador de
+> Interbanking de abajo (0 filas) quedó plegado. §3.ng, `sql/gv_cobranza_agente_v2293.sql`, `tests/cob-agente.cjs`.
+
 > **💰 Deuda a cobrar / Cobranzas** (ya existía) ahora pinta desde `deudores_resumen` —
 > tabla por cliente con saldo, peor tramo, próximo corte de descuento (escalón + fecha
 > + %) y filtro por empresa/tramo/búsqueda; "Detalle" abre el historial de comprobantes

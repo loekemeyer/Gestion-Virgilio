@@ -4757,6 +4757,18 @@ distintas de `Pedernera` en `Talleristas_Contacto` — no es un alias.
 vista y el texto de la celda Tallerista). Si vuelve a aparecer la idea de una lista hardcodeada de
 códigos con doble OC, **es la señal de que falta el alias de entrega**, que es otra cosa.
 
+## ⚠ REGLA (Thomas, 2026-09-26, v22.87-93): la CONCILIACIÓN BANCARIA vive en `GV_Conc_*` y el AGENTE de cobranzas en `GV_Cobranza_Imputacion`
+
+Los 4 Excel de conciliación (Credicoop y Santander, LK y Chef) suben a **`GV_Conc_<Banco>_<Emp>`** por la macro
+del Excel al guardar (`docs/conciliacion-bancaria/`); se leen juntos por **`gv_conciliacion_bancaria`** (35 mil
+filas: **nunca entera desde el navegador**, va por `gv_cobranza_bancos` paginada). El **agente** cruza cada recibo
+con el pedido que pagó (`gv_cobranza_imputar`, DP recibos × pedidos × NC) y deja **`GV_Cobranza_Imputacion`**,
+que rehace el cron 103 cada hora si cambió algo; **no se llama `gv_cobranza_imputacion_refrescar` desde el front**
+(35 s contra 8 s de timeout). Lo que detecta se ve en Cobranzas → 🕵 Agente y sale por Telegram lun-vie 08:45
+(cron 104), **una vez por pedido** (`GV_Cobranza_Avisadas`). Reclamar o hacer nota de débito lo decide una persona.
+`banco_movimientos` (importador de Interbanking) tiene 0 filas y quedó plegado: el extracto entra por el Excel.
+`sql/gv_cobranza_imputar_v2291.sql`, `sql/gv_cobranza_agente_v2293.sql`, `tests/cob-agente.cjs`.
+
 ## ⚠⚠ REGLA (Luis, 2026-09-25, v22.66): los PRECIOS se cambian en la fuente de la PÁGINA, nunca en `precios_venta*`
 
 **Luis:** *"deberíamos cambiarlo de las tablas que toma la página tocando lógica. Anotá que cualquier
