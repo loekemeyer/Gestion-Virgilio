@@ -6190,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.03"></script>
+<script type="module" src="recepcion.js?v=23.04"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.03";
+const APP_VERSION = "v23.04";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49354,7 +49354,12 @@ function aprCuarBadgesHtml(p) {
   }
   if (has("deuda")) {
     const m = cuarPlata(d.deuda);
-    h += '<span class="cuar-badge b-deuda" title="El cliente tiene deuda mayor a $1.000' + (m ? " (" + m + ")" : "") + '.">💰 Deuda' + (m ? " " + m : "") + '</span>';
+    // v23.03 (Luis, 28/09): la fecha del comprobante MÁS VIEJO que cuenta, sacada del Excel.
+    const ds = /^\d{4}-\d{2}-\d{2}/.test(String(d.deuda_desde || "")) ? String(d.deuda_desde) : "";
+    const dsTxt = ds ? ds.slice(8, 10) + "/" + ds.slice(5, 7) : "";
+    const dsTit = ds ? " Factura impaga más vieja: " + ds.slice(8, 10) + "/" + ds.slice(5, 7) + "/" + ds.slice(0, 4) +
+      (d.deuda_comp ? " (" + d.deuda_comp + " comprobante" + (d.deuda_comp === 1 ? "" : "s") + ")" : "") + "." : "";
+    h += '<span class="cuar-badge b-deuda" title="El cliente tiene deuda mayor a $1.000' + (m ? " (" + m + ")" : "") + '.' + escapeHtml(dsTit) + '">💰 Deuda' + (m ? " " + m : "") + (dsTxt ? " · desde " + dsTxt : "") + '</span>';
   }
   if (has("limite_credito")) {
     const ex = cuarPlata(d.exceso), li = cuarPlata(d.limite);
@@ -52211,11 +52216,16 @@ async function _cuarMarcarPedidos0() {
                    fecha_recep: p.fecha_recep || "", cond: p.cond || "", items: cuarItemsDe(p) };
         })
       }) : Promise.resolve([]),
-      aprRpc("gv_cuarentena_liberados")   // v14.88: los liberados van a la lista normal, con badge
+      aprRpc("gv_cuarentena_liberados"),  // v14.88: los liberados van a la lista normal, con badge
+      // v23.03: la FECHA de la deuda (chip de Motivos). Sola en el allSettled: si falla, el chip sale sin fecha.
+      aprRpc("gv_cuarentena_deuda_desde", { p_pedidos: peds.filter(function (p) { return !p._demo; }).map(function (p) {
+        return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim() };
+      }) })
     ]);
     const res  = _st[0].status === "fulfilled" ? _st[0].value : null;
     const lim  = _st[1].status === "fulfilled" ? _st[1].value : null;
     const libs = _st[2].status === "fulfilled" ? _st[2].value : null;
+    const desd = _st[3].status === "fulfilled" ? _st[3].value : null;
     _apr.cuarErr = (_st[0].status === "rejected")
       ? (String((_st[0].reason && _st[0].reason.message) || _st[0].reason || "").slice(0, 160) || "no se pudo consultar")
       : (_st[1].status === "rejected" ? "no se pudo calcular el límite de crédito" : null);
@@ -52232,6 +52242,12 @@ async function _cuarMarcarPedidos0() {
       if (r.deuda != null) detKey[k].deuda = Number(r.deuda);
       if (r.estado) detKey[k].estado = String(r.estado);
       if (r.nuevo_pedidos != null) detKey[k].nuevo_pedidos = Number(r.nuevo_pedidos);   // v17.12
+    });
+    (desd || []).forEach(function (r) {   // v23.03: sólo se pega a quien ya tiene detalle de deuda
+      const k = String(r.empresa) + ":" + String(r.order_id);
+      if (detKey[k] && detKey[k].deuda != null && r.desde) {
+        detKey[k].deuda_desde = String(r.desde); detKey[k].deuda_comp = Number(r.comprobantes) || 0;
+      }
     });
     (lim || []).forEach(function (r) {
       const k = String(r.empresa) + ":" + String(r.order_id);
