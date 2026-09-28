@@ -29913,3 +29913,122 @@ backlog de 450 días en UN mensaje; desde el segundo día sólo sale lo nuevo. M
 public."GV_Cobranza_Avisadas" order by avisado_at desc limit 20;` · `select * from public.gv_reglas_perdidas;`
 (2 centinelas nuevos) · `node tests/cob-agente.cjs`.
 
+### v22.93 — Cobranzas: 📒 Cuenta corriente con deuda viva y explicación de cada pago (26/09, Thomas)
+
+**Pedido:** que en Cobranzas figuren las deudas que hoy se cargan por Excel, que se calculen solas con las facturas y
+los pagos, y que al lado de lo facturado aparezca qué pagó el cliente y si pagó bien o mal.
+
+- **`GV_Cobranza_Deuda_Viva`** (una fila por comprobante), la rehace el cron `gv-cobranza-imputacion` (min 49) antes de
+  imputar: **ancla** = último Excel de deuda de Cuarentena · **+** FC/ND/NC de ISIS posteriores que el Excel no tiene ·
+  **−** recibos nuevos de la conciliación y NC nuevas, a **valor nominal**, de la factura más vieja a la más nueva.
+  El 25 % de descuento ISIS lo registra como **NC "Sin Cotizador"** (NC 11082 de TyL = 25 % exacto de 35217+35218), por
+  eso el pago no se "infla". Recibo nuevo = **por número**, no por fecha: el e-cheque figura con la fecha de cobro
+  (hasta 01/2027) y su recibo ya estaba en ISIS. Excel: columna 0 = vencimiento, 1 = emisión.
+- **Error propio corregido (v22.89/v22.92):** el cruce con el Excel usaba `'FC'||letra` y el Excel escribe las MiPyME
+  como FCP/FCPYM y las de exportación como FCE: esas facturas —las más grandes— se daban por pagadas. Clave nueva
+  `gv_cobranza_doc_key` (FCA/FCP/FCPYM/FCE → FC): 374 de 374 comprobantes del Excel cruzan con ISIS.
+- **Pantalla:** Deuda / Cobranzas abre en **📒 Cuenta corriente** (`gv_cobranza_clientes`, 465 clientes, 19 ms);
+  tocar un cliente → `gv_cobranza_cliente(emp, cod)` (6 ms) con cada factura, lo que debe y la explicación del pago.
+  La pestaña vieja "Deuda a cobrar" pasó a llamarse **🗂 Facturas ISIS**: sumaba todas las facturas sin pagos
+  ($22.822 M, `deuda_cobros` tiene 0 cobros vivos). Test: `tests/cob-cuenta-corriente.cjs`.
+- Medido el 26/09: deuda viva LK $461 M · Chef $170 M (sin el interno Chef 1434, $186 M). Pagos nuevos: 0 — la
+  conciliación llega hasta el 24/09 y el Excel es del 25/09; se mueve cuando se instale la macro.
+- **Razón social sin código:** desde 06/2025 sólo 6 ingresos sin código cruzan exacto con un cliente ($34,3 M); la
+  operadora ya codifica el 99 %. No se automatizó.
+
+**Rollback:** cabecera de `sql/gv_cobranza_deuda_viva_v2293.sql`.
+
+### v22.95 — Cuenta corriente de libro: todas las facturas y pagos del cliente + control de saldo contra el Excel (26/09, Thomas)
+
+- **`gv_cobranza_cuenta(emp, cod)`**: FC/ND/NC de ISIS y pagos de la conciliación del cliente con saldo acumulado.
+  **`gv_cobranza_control_saldos()`**: por cliente, facturado − NC − pagos del banco vs deuda del Excel (70 ms).
+  Las dos SECURITY DEFINER con chequeo de supervisor (la pantalla no puede leer `isis_*`). Pantalla: botón
+  "Todas las facturas y pagos" en el detalle, columnas Saldo calc./Deuda Excel y filtro "Saldo no coincide".
+- **Desde**: LK 01/01/2024, Chef 01/02/2025 (`gv_cobranza_desde`): Chef recién tiene cobros con código de cliente
+  desde 2025 (1 en 2023, 11 en 2024, 602 en 2025). Sin saldo de apertura: lo facturado antes y pagado después queda a favor.
+- **Medido el 26/09** (coincide = diferencia ≤ máx($5.000; 2 % de lo facturado en 12 meses o de la deuda):
+
+| empresa | con deuda en Excel | coinciden | deuda 0 en Excel | coinciden | a favor en Excel | coinciden |
+|---|---:|---:|---:|---:|---:|---:|
+| LK | 131 | 83 | 587 | 453 | 42 | 32 |
+| Chef | 26 | 13 | 106 | 74 | 10 | 3 |
+
+  Las diferencias grandes son súper (Cencosud +$292 M, Coto +$122 M, Dorinka, INC: descuentos/retenciones que no pasan
+  por el banco) y clientes que pagan en efectivo o cheque físico sin código. `sql/gv_cobranza_cuenta_v2295.sql`.
+
+## §3.nh — v22.96: Importación se escribe sólo con login de supervisor (Thomas, 2026-09-26)
+
+Cierra el "Paso C" que la v22.81 dejó sin aplicar y lo extiende a las RPC. `sql/gv_importados_supervisor_v2296.sql`.
+
+**Medido antes:** policies abiertas `Importados.imp_upd_anon` / `imp_write`, `Importados_Volumen.impvol_ins` /
+`impvol_upd`, y `ALL to authenticated using (true)` en `Importados_Config`, `Importados_Partes_Map`,
+`Importados_Stock_Parte` (`authenticated` incluye ~450 usuarios anónimos). 21 RPC `SECURITY DEFINER` de escritura
+ejecutables por anon sin chequeo; callers: sólo `index.html` (módulo Importación, vía `_pedImpRpc`); 0 crons, 0
+triggers; `gv_importados_resync` además la llaman 5 de ellas por dentro.
+
+**Cambios:** drop de las 4 policies + revoke insert/update/delete de anon en el maestro · las 3 tablas de config
+pasan a `*_write_supervisor` · candado `es_supervisor_virgilio() or gv_es_supervisor_o_servicio()` inyectado al
+principio de las 21 RPC sobre `pg_get_functiondef` (idempotente, marca `v22.96-sup`) · 21 centinelas.
+
+**Probado antes de aplicar**, en transacción abortada: 21/21 compilan con el candado, ninguna escribe antes de él,
+`gv_importados_resync(-1)` como supervisor pasa, `es_supervisor_virgilio()` con claims de anon da false. ⚠ Desde el
+MCP `gv_es_supervisor_o_servicio()` da **true** (session_user = postgres): el rechazo de anon se prueba por HTTP con
+la clave pública, no desde el MCP.
+
+**Aplicado el 26/09** después de publicar el front (`457045e`): 21 funciones con candado, 21 centinelas,
+`gv_reglas_perdidas` vacía, `anon` sin INSERT/UPDATE en el maestro. **Verificado por HTTP con la clave pública**
+(ids −1, no tocan nada):
+
+| llamada | antes | después |
+|---|---|---|
+| `rpc/gv_importados_resync` | 204 | **42501** «Sólo un supervisor logueado…» |
+| `rpc/gv_imp_pago_borrar` · `rpc/gv_importado_bache_borrar` | — | **42501** |
+| `PATCH Importados?id=eq.-1` | 200 `[]` | **401** `permission denied for table Importados` |
+| lecturas `rpc/gv_imp_prov_cc_resumen` · `gv_importados_ordenes` | 200 | 200 |
+
+**No se tocó `Stock_Config`** (10 escritores con la clave pública en el front).
+
+**Rollback:** al pie del SQL.
+
+### v22.96 — Cobranzas: deducción de los súper, pagos en efectivo/cheque y avisos para el Planify de Vivi (26/09, Thomas)
+
+- **Deducción súper** (`GV_Cobranza_Super_Deduccion`): de la config del parseo de OC (LK `precios_super.cadena`):
+  Cencosud 16 %, Dorinka 16,5 %, Diarco 10 %. Alberdi quedó en 0: medido, paga el 98,5 % (la factura ya sale con el
+  descuento). Un peso del súper cancela 1/(1−deducción) en la cuenta (fila "Deducción súper"), el control, la deuda viva
+  y el agente (condición NN FF: dto posible = deducción, nada que reclamar). Coto (−14 %) y Libertad (−15 %) no tienen
+  deducción en la config y siguen sin cerrar. Diferencias: Cencosud $129,9 M → $49,4 M · Dorinka $35,3 M → −$10,1 M.
+- **Tolerancia del control** pasó a 2 % de la facturación MENSUAL (antes anual: daba por coincidente a Cencosud con
+  $49 M de diferencia). Medido: con deuda coinciden 80 de 157 · deuda cero 498 de 693 · a favor 30 de 52.
+- **Pagos a mano** (`GV_Cobranza_Pago_Manual`, `gv_cobranza_pago_manual_cargar/_anular`): efectivo / cheque / otro con
+  nº de recibo. Entran a `gv_conciliacion_bancaria` como banco `manual`, así los ven la cuenta, el agente y la deuda
+  viva sin tocar nada más. Botón "＋ Cargar pago en efectivo / cheque" en el detalle del cliente.
+- **Avisos** (`GV_Cobranza_Aviso`, `gv_cobranza_avisos_generar`, al final del cron min 49): un aviso por pago nuevo desde
+  01/09 con estado mal / tarde / bien / revisar y la explicación. Hoy: 102 bien · 83 mal ($37,2 M) · 8 tarde · 12 revisar.
+  Los lee el módulo Cobranzas del Planify de Vivi (repo Planify).
+SQL: `sql/gv_cobranza_pago_manual_v2296.sql`, `sql/gv_cobranza_avisos_v2296.sql`.
+
+## §3.ni — v22.98: lo diferido se parte por fecha de reingreso y la NP adelantada se reprograma sola (Thomas, 2026-09-26)
+
+**LK (kwkclwhmoygunqmlegrg):** `v_pedidos_web_np` y `gv_pedidos_web_np_chef` agrupan lo diferido por
+`pedido_diferido.fecha_reingreso` (congelada): `np_idx = ceil(n_disp/cap) + slots de los grupos anteriores + ceil(rk_g/cap)`.
+Medido antes de aplicar (transacción que abortaba si cambiaba otra cosa): 1.669 → 1.674 NP, sólo cambian 1448, 1474,
+1524 y 1540; Chef idéntico (84 NP, md5). `security_invoker=true` conservado. Backup de las definiciones:
+`zz_backups."LK_Backup_defs_diferido_20260926"`. Se corrió `sync_diferido_virgilio(45)` en la misma transacción:
+`GV_PPP_Web_Diferido` 4 actualizadas + 5 nuevas.
+
+**Gestión:** `gv_ppp_web_diferido_tarde(empresa, filas, simular, por)` (SECURITY DEFINER, sin anon) — desprograma la NP
+diferida con `no_antes_de > fecha_entrega` si no está facturada, ni armada (`Entregas_Virgilio` viva), ni su tanda tiene
+eventos reales (EP, PK, PKC, TP, AP, TAP, CC, CCN, CR, CCR, CRN). La llama `gv_ppp_web_armar_pendientes` antes de (a000),
+envuelta en `begin … exception` (si falla, el armado sigue). Sólo toca NP del feed de esa corrida, para que (b2) las vea.
+Log `GV_Diferido_Reprogramado`. Centinela `gv_ppp_diferido_antes_de_tiempo` (vacía = todo bien) + 3 filas en
+`GV_Reglas_Centinela`. Backup del armador: `zz_backups."GV_Backup_Funciones"` (motivo `pre v22.98 diferido tarde`).
+
+**Datos:** 13 filas de `PPP_Web_Base` borradas (artículos que el corte movió de NP; backup
+`zz_backups."GV_Backup_WebBase_diferido_20260926"`, 167 filas de los 5 pedidos).
+
+**Verificado en la corrida real de las 20:00:** LK 0221 → F08A 09/12 (log 20:00:08), LK 0253 (566E ×3) → F07A 09/12,
+LK 0254 (323E ×3) → E95A 10/11, LK 0206 5 cajas en E37A, LK 0227 2 cajas en E18C. Base duplicada 0, reglas perdidas 0.
+
+**Rollback:** restaurar el armador desde el backup; `drop view gv_ppp_diferido_antes_de_tiempo; drop function
+gv_ppp_web_diferido_tarde(text,jsonb,boolean,text)`; en LK recrear las dos definiciones del backup y correr el sync;
+reinsertar la base desde el backup.

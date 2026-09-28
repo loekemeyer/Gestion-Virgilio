@@ -463,6 +463,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== fac-cruce (v13.73: Cruce con ISIS desde Facturación — rango, totales, cajas ent/fact, NP web + ISIS, 📄 PDF; filtros de Deuda/Cruce globales) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-cruce.cjs
+echo "== cob-cuenta-corriente (v22.93: Cobranzas abre en Cuenta corriente — deuda viva, filtro pagaron mal, explicación de cada pago) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cob-cuenta-corriente.cjs
 
 echo "== fac-conciliacion (v14.30: Facturación en 2 solapas; Conciliación = snapshot Gestión vs factura ISIS; el snapshot se registra al facturar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-conciliacion.cjs
@@ -612,6 +614,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== imp-cta-proveedor (v22.91: solapa 📒 Cta. proveedor — Hoy / Libro / Historia por fábrica china, saldo del backend) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-cta-proveedor.cjs
 
+echo "== imp-809e-dos-plantas (v22.93: 809E LK y CH son dos productos — dos líneas, cada una con su FOB y su fila) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-809e-dos-plantas.cjs
+
 echo "== imp-stock-real (v16.04: el stock del módulo de importados sale del depósito real) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-stock-real.cjs
 echo "== pk-deposito-pkc (v15.41: el PKC dice de qué depósito salió cada caja; un evento por (tanda,art)) =="
@@ -648,6 +653,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-punto-unico.cjs
 echo "== imp-escritura-login (v22.81: el maestro de importados se escribe sólo con la sesión de supervisor) =="
 node tests/imp-escritura-login.cjs
+
+echo "== fn-duplicadas (v22.96: ninguna función de nivel superior declarada dos veces — la ccRender de Cobranzas pisó la de Carga Camión) =="
+node tests/fn-duplicadas.cjs
 node tests/cap-sector-vista.cjs
 node tests/ins-aceptar-ubic.cjs
 

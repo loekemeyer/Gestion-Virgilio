@@ -1,3 +1,78 @@
+## Nota v22.98 (2026-09-26) — Lo que espera importado se parte POR FECHA, y la NP que salía sin su mercadería se reprograma sola
+
+**Thomas:** *"si son pedidos que son únicamente de artículos importados que llegan en noviembre, habría que
+reprogramarlo de manera automática. Si tienen parte de una cosa y parte de la otra, dejarlos ahí y particionar en dos."*
+
+- **El corte lo hace LK** (`v_pedidos_web_np` y `gv_pedidos_web_np_chef`): lo diferido va en **una NP por fecha de
+  reingreso** (la congelada en `pedido_diferido`). Antes iba todo en una NP con la fecha más lejana: LK 0206 llevaba
+  baches del 29/09 junto al 566E del 29/11. Con una sola fecha el resultado es idéntico (medido: sólo cambiaron 4 pedidos).
+- **Gestión, automático:** `gv_ppp_web_diferido_tarde`, llamada por el armador antes del filtro (a000). Una NP diferida
+  programada para un día ANTERIOR a su reingreso (el de LK, crudo, sin los +7) se desprograma y el pase (b2) la vuelve a
+  programar en la misma corrida. Sólo si la tanda no empezó; si empezó, queda en `gv_ppp_diferido_antes_de_tiempo`.
+  Log: `GV_Diferido_Reprogramado`.
+- **Las tres causas** que la regla cubre: LK 0206 se programó el 22/09 y la marca de diferido llegó el 24/09; LK 0227 se
+  programó 4 min antes de que el sync (cada 10 min) trajera su marca; LK 0221 tenía un reingreso que después se corrió.
+- **Resultado del 26/09:** LK 0221 E49A 30/09 → F08A 09/12 · LK 0206 queda en E37A con los baches · 566E ×3 → **LK 0253**
+  (F07A 09/12) · LK 0227 queda en E18C con 606E · 323E ×3 → **LK 0254** (E95A 10/11).
+- ⚠ **`PPP_Web_Base` no borra artículos que salen de una NP** (el Edge Function hace upsert). E37A se pickeó el 25/09
+  con 6 artículos en LK 0205 y LK 0206 a la vez: 954E y 956E quedaron con 1 caja de más en el pallet. Se borraron las 13
+  líneas duplicadas con backup (`zz_backups."GV_Backup_WebBase_diferido_20260926"`).
+- SQL: `sql/gv_diferido_por_fecha_v2298.sql` (Gestión aplicado + LK documentado + rollback).
+
+## Nota v22.96 (2026-09-26) — Carga Camión volvía a dibujarse vacía: la cuenta corriente de Cobranzas pisaba `ccRender`
+
+La v22.93 de Cobranzas (📒 Cuenta corriente, commit `6716e17`) declaró una `function ccRender()` propia. En un
+`<script>` clásico **la segunda declaración gana sin avisar**, así que la de Carga Camión (`showCargaCamion` →
+`ccRender`) pasó a llamar a la de Cobranzas, que busca `#ccTabla`, no lo encuentra y sale: **al operario no se le
+dibujaba la lista para cargar el camión**. Lo cazó `tests/cc-orden-camionero.cjs` (rojo en `main` desde ese commit).
+
+- La de Cobranzas se llama ahora **`ccCtaRender`** (y sus 7 llamadas); Carga Camión recupera la suya.
+- **`tests/fn-duplicadas.cjs`** (nuevo, en `run.sh`): falla si una función de nivel superior se declara dos veces
+  en `index.html`. Verificado que falla contra `main` antes del arreglo (`ccRender`, líneas 31703 y 60785).
+- ⚠ **Al agregar un módulo, el prefijo tiene que ser propio**: `cc` es de Carga Camión desde la v10.
+
+## Nota v22.96 (2026-09-26) — Importación se escribe SÓLO con login de supervisor (cierra la v22.81)
+
+Thomas, 26/09: *"Si"* a cerrar la escritura del módulo. La v22.81 decía *"sólo supervisor"* y en la base
+seguían abiertas las reglas viejas: con la clave pública (que viaja en la página) cualquiera cambiaba el maestro
+de importados y, por 21 funciones, cargaba o borraba giros, baches, fechas de embarque/llegada y la cuenta
+corriente. Medido antes de tocar: esas 21 las llama **sólo** el módulo 📦 Importación; ningún cron, trigger ni
+otra pantalla.
+
+| qué | antes | ahora |
+|---|---|---|
+| `Importados` / `Importados_Volumen` | UPDATE/INSERT para anon y para cualquier `authenticated` (incluye ~450 anónimos) | sólo supervisor (`es_supervisor_virgilio`) |
+| `Importados_Config` / `Importados_Partes_Map` / `Importados_Stock_Parte` | ALL `to authenticated using (true)` | sólo supervisor |
+| 21 RPC de escritura (`gv_imp_pago_*`, `gv_imp_cc_*`, `gv_importado_bache_*`, `gv_importado_pedido_*`, `importados_set_curso`, …) | cualquiera | candado al principio: supervisor, o servicio/postgres (crons, MCP) |
+| front | las firmaba con la clave pública | `_pedImpRpc` las firma con la sesión Google (lista `_PED_IMP_RPC_ESCRITURA`); sin sesión avisa y no manda |
+
+- Las **lecturas no cambian** (el portal LK y Gestión leen con la clave pública).
+- Un supervisor con la app vieja cacheada ve *"Sólo un supervisor logueado… si ya estás, actualizá la app"*.
+- **No se tocó `Stock_Config`**: la escriben 10 pantallas con la clave pública (stock, guardado, OCs, importación);
+  cerrarla pide pasar esas 10 a la sesión primero. Queda en `docs/ESTADO-Y-PENDIENTES.md`.
+- Centinela: 21 filas en `GV_Reglas_Centinela` (v22.96). `tests/imp-escritura-login.cjs` (d) muerde si una RPC que
+  escribe no está en la lista o si viaja sin sesión.
+
+`sql/gv_importados_supervisor_v2296.sql` (rollback en el pie).
+
+## Nota v22.93 (2026-09-26) — 809E en dos líneas en «📦 Importación»: LK y CH son dos productos
+
+Thomas: *"no es lo mismo 809E en LK y 809E en CH"*. Cambia el packaging y el FOB (LK 0,70 · CH 0,47).
+`ocgFetchImportados` agrupaba por código y sumaba las dos filas del maestro: el sobrante de Loeke tapaba lo que
+le falta a Chef. Con los números del 26/09 pedía **372 u** en una línea; separado da **CH 3.120 u · LK 0**
+(2.748 u que no se estaban pidiendo). 437E/438E ya iban separados porque el maestro los tiene como 437EL/438EL;
+809E es el **único** código con filas de las dos plantas (medido).
+
+- La regla es genérica: si un `cod_art` tiene filas CH y no-CH, va en dos líneas con clave `809E|CH` / `809E|LK`
+  y un chip de planta. Un código de una sola planta no cambia.
+- **Se escribe sólo la fila de su planta**: FOB y reingreso van por `id=in.(…)`, no por `cod_art=eq.809E` (que
+  pisaba el FOB de Chef con el de Loeke). El MC tipeado es por línea.
+- PDF al proveedor, Excel y la sección de OC llevan la planta. «Cargar pedido ya hecho» sigue viéndolo como un
+  artículo con dos marcas (`809E CH 1224`), así el bache cae en la fila correcta.
+- El volumen de la master sigue siendo uno por código (`Importados_Volumen`, 144 u y 0,032 m³ para los dos).
+
+`tests/imp-809e-dos-plantas.cjs` (verificado que falla contra el código anterior).
+
 ## Nota v22.91 (2026-09-26) — 📒 Cuenta corriente POR PROVEEDOR en «📦 Importación»
 
 Thomas: *"Debería estar la cta corriente de: Hugo Wong; Becky Chen; Ownland"* · sobre el formato: *"la
