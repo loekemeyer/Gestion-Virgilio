@@ -60,7 +60,8 @@
       "Bash(sed -i 's/v22\\\\.79-vir/v22.80-vir/' sw.js)",
       "Bash(sed -i 's/\"v22.79\"/\"v22.80\"/' version.json)",
       "Bash(node tests/version-tokens.cjs)",
-      "Bash(PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers timeout 240 node tests/cob-cuenta-corriente.cjs)"
+      "Bash(PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers timeout 240 node tests/cob-cuenta-corriente.cjs)",
+      "Bash(node scripts/bump-version.cjs --patch)"
     ]
   }
 }
