@@ -38,6 +38,12 @@ Apps alcanzadas: **Gestión Virgilio** (`index.html` + `recepcion.js` + `sw.js`,
   de la fichada. OJO etapa 2: desde la PC del dueño salen 6.336 pedidos SIN sesión (clave pública) contra
   297 con sesión: las pantallas de gestión de GV también tienen que mandar la sesión Google antes de cerrar.
 
+**Red de operarios (public.red_empresa, 28/09)** — las sedes salen de `FichadaQR.config.ip_trabajo_nota`
+(ya estaban anotadas ahí; mirar esa nota antes de preguntar):
+190.245.164.168 = Cervantes ("loekemeyer"; probado desde el Wi-Fi: entra; con datos móviles: rechazado y aviso por
+Telegram una sola vez) · 186.18.168.71 = Loeke fábrica · 181.164.213.179 = Virgilio (centro de distribución).
+Página de prueba: https://loekemeyer.github.io/Prueba-Login-Operarios/ (repo aparte, temporal; legajo 1).
+
 ## Diseño
 
 1. **Lista de redes**: tabla `public.red_empresa (ip, sede, activo)` con las IP fijas de Cervantes y
