@@ -38,6 +38,7 @@ node tests/art-nombres-carga.cjs
 echo "== apr-clasificando-oculto (v22.29: sin clasificar no se dibuja en A Programar) =="
 node tests/apr-clasificando-oculto.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-dia-ocupado.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-dia-ocupado-sin-arrastre.cjs
 
 echo "== ppp-tanda-candado-codigo (v21.76: una tanda empezada conserva su codigo al cambiar de dia) =="
 node tests/ppp-tanda-candado-codigo.cjs

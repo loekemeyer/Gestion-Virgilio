@@ -6206,7 +6206,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.33"></script>
+<script type="module" src="recepcion.js?v=23.34"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10165,7 +10165,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.33";
+const APP_VERSION = "v23.34";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37838,12 +37838,25 @@ async function pgaPruebaEliminar(key) {
   pgaRecargar();
 }
 window.pgaPruebaEliminar = pgaPruebaEliminar;
+/* v23.34 (Luis): reprogramar una NP de ISIS a un día también pasa por el pop-up de día ocupado. */
 async function pppReprogElegir(iso) {
+  if (!_pppMov || !_pppMov.reprogNps) return;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return;
+  const nps = _pppMov.reprogNps.map(String);
+  const filas = (_pppParsed && _pppParsed.prog || []).filter(function (p) { return nps.indexOf(String(p.np)) >= 0; });
+  const seguir = function () { return pppReprogElegirYa(iso); };
+  return aprDiaOcupadoAbrir(m[1] + "-" + m[2] + "-" + m[3], null, {
+    peds: filas.map(function (p) { return { zona: p.zona || "", m3: Number(p.m3) || 0 }; }),
+    label: _pppMov.reprogLabel || nps.join(", "), fuera: true,
+    alVacio: seguir, alSumar: function () { return pppReprogElegirYa(iso, true); }
+  });
+}
+async function pppReprogElegirYa(iso, yaConfirmado) {
   if (!_pppMov || !_pppMov.reprogNps) return;
   const nps = _pppMov.reprogNps.slice();
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return;
   const dTxt = m[3] + "/" + m[2];
-  if (!confirm("¿Reprogramar " + (_pppMov.reprogLabel || nps.join(", ")) + " para el " + dTxt + "?\n\n" +
+  if (!yaConfirmado && !confirm("¿Reprogramar " + (_pppMov.reprogLabel || nps.join(", ")) + " para el " + dTxt + "?\n\n" +
                "Se programa con su número de ISIS (no se renumera). Lo ven todos, también el operario.")) return;
   pppSetStatus("Reprogramando " + nps.join(", ") + "…", true);
   try {
@@ -47457,10 +47470,10 @@ async function aprConfirmar() {
   if (!fecha) { _apr.msg = "Tocá el día en que sale."; _apr.msgErr = true; aprRender(); return; }
   const r = aprResumenSel();
   const d = (_apr.cal || []).find(function (x) { return String(x.dia).slice(0, 10) === fecha; }) || {};
-  const avisos = [];
+  const avisos = [], avisosDia = [];   // v23.34: avisosDia = los que el pop-up de día ocupado ya muestra
   // v13.84: el día ya no bloquea, pero se pregunta
   if (d.muy_pronto === true) avisos.push("El " + aprDiaCorto(fecha) + " está antes de la anticipación mínima (Gestión programa sola desde el " + (d.dia_minimo ? aprDiaCorto(String(d.dia_minimo).slice(0, 10)) : "día mínimo") + ").");
-  if (Number(d.cupo) > 0 && Number(d.m3) >= Number(d.cupo)) avisos.push("El " + aprDiaCorto(fecha) + " ya está completo: " + aprNum(d.m3, 2) + " de " + aprNum(d.cupo, 2) + " m³.");
+  if (Number(d.cupo) > 0 && Number(d.m3) >= Number(d.cupo)) avisosDia.push("El " + aprDiaCorto(fecha) + " ya está completo: " + aprNum(d.m3, 2) + " de " + aprNum(d.cupo, 2) + " m³.");
   // v13.84 (dueño: "si quiero programar menos de 0,60, que me pregunte si estoy seguro"): PPP_Web_Config.tanda_m3_min
   const min = Number(_apr.m3Min) > 0 ? Number(_apr.m3Min) : 0.6;
   if (r.m3 < min) avisos.push("La tanda queda en " + aprNum(r.m3, 2) + " m³, menos de los " + aprNum(min, 2) + " m³ que conviene por camión.");
@@ -47474,7 +47487,7 @@ async function aprConfirmar() {
     }) || [];
     const nuevos = cam.filter(function (c) { return !c.ya_va && !c.es_super && Number(c.camiones_dia) > 0; });
     if (nuevos.length) {
-      avisos.push("El " + aprDiaCorto(fecha) + " ya salen " + Number(nuevos[0].camiones_dia) + " camión(es) y esto abre otro: " +
+      avisosDia.push("El " + aprDiaCorto(fecha) + " ya salen " + Number(nuevos[0].camiones_dia) + " camión(es) y esto abre otro: " +
         nuevos.map(function (c) { return c.camion; }).join(", ") + ". ¿Seguro que vas a usar un segundo camión?");
     }
   } catch (_e) {}
@@ -47482,10 +47495,19 @@ async function aprConfirmar() {
   const dif = r.peds.filter(function (p) { return p.no_antes_de && String(p.no_antes_de).slice(0, 10) > fecha; });
   if (dif.length) avisos.push("Hay " + dif.length + " pedido(s) con artículos sin stock hasta el " +
     aprDiaCorto(String(dif[0].no_antes_de).slice(0, 10)) + ": el " + aprDiaCorto(fecha) + " la mercadería todavía no está en el depósito.");
-  if (avisos.length && !confirm("⚠ " + avisos.join("\n⚠ ") + "\n\n¿Programo igual " + r.n + " pedido" + (r.n === 1 ? "" : "s") + " para el " + aprDiaCorto(fecha) + "?")) return;
-  await aprGenerarTanda(fecha, keys, { sinConfirm: true });   // arma + programa; si falla, descarta (ninguna tanda sin fecha)
-  if (!_apr.msgErr) { _apr.sel = {}; _apr.diaSel = null; _apr.paso = 1; }
-  aprRender();
+  const preg = function (arr) { return !arr.length || confirm("⚠ " + arr.join("\n⚠ ") + "\n\n¿Programo igual " + r.n + " pedido" + (r.n === 1 ? "" : "s") + " para el " + aprDiaCorto(fecha) + "?"); };
+  const programar = async function () {
+    await aprGenerarTanda(fecha, keys, { sinConfirm: true });   // arma + programa; si falla, descarta (ninguna tanda sin fecha)
+    if (!_apr.msgErr) { _apr.sel = {}; _apr.diaSel = null; _apr.paso = 1; }
+    aprRender();
+  };
+  // v23.34 (Luis): tildar + Confirmar pasa por el MISMO pop-up de día ocupado que el arrastre.
+  return aprDiaOcupadoAbrir(fecha, null, {
+    peds: r.peds, label: r.n === 1 ? aprPedLabel(r.peds[0]) : r.n + " pedidos",
+    antes: function () { return preg(avisos); },
+    alVacio: function () { if (preg(avisos.concat(avisosDia))) return programar(); },
+    alSumar: programar
+  });
 }
 function aprResumenSel() {
   const peds = aprSelPedidos();
@@ -48427,6 +48449,23 @@ async function aprGenerarTanda(fecha, keys, opts) {
 /* Soltar la tanda en un día = programarla. Los artículos van desde acá: viven en
    LK y Virgilio no los puede consultar. Sin ellos el operario abre la tanda y no
    ve un solo renglón. */
+/* v23.34 — una tanda sin fecha soltada en un día pasa por el pop-up de día ocupado, igual que un pedido. */
+function aprProgramarTanda(codigo, fecha) {
+  _apr.dragTanda = null;
+  const porPed = new Map();
+  for (const p of _apr.pedidosTodos || []) porPed.set(aprKey(p.empresa, p.order_id), p);
+  const vistos = {}, peds = [];
+  for (const it of (_apr.items[codigo] || [])) {
+    const k = aprKey(it.empresa || aprTandaEmp(codigo), it.order_id);
+    if (vistos[k]) continue; vistos[k] = true;
+    const p = porPed.get(k); if (p) peds.push(p);
+  }
+  return aprDiaOcupadoAbrir(fecha, null, {
+    peds: peds, label: "la tanda " + codigo,
+    alVacio: function () { return aprProgramar(codigo, fecha); },
+    alSumar: function () { return aprProgramar(codigo, fecha); }
+  });
+}
 async function aprProgramar(codigo, fecha) {
   _apr.dragTanda = null;
   const its = _apr.items[codigo] || [];
@@ -48523,7 +48562,7 @@ function aprDropDia(ev, fecha) {
   ev.currentTarget.classList.remove("apr-drop-on");
   const cod = _apr.dragTanda, ped = _apr.drag;
   aprDndFin();
-  if (cod) aprProgramar(cod, fecha);
+  if (cod) aprProgramarTanda(cod, fecha);   // v23.34: también por el pop-up de día ocupado
   // v13.65: un pedido soltado en un día = tanda nueva (código automático) ya programada ese día
   // v21.97 (Luis): si el día YA tiene programación, pop-up con las 3 opciones (aprDiaOcupadoAbrir)
   else if (ped) aprDiaOcupadoAbrir(fecha, ped);
@@ -48569,7 +48608,7 @@ function _adoReporte(fecha, rows, nuevo, modo) {
   const porDia = {};
   const add = function (d, r) { (porDia[d] = porDia[d] || []).push(r); };
   rows.forEach(function (r) { add(r.accion === "mueve" ? r.fecha_nueva : r.fecha_actual, r); });
-  add(fecha, nuevo);
+  (Array.isArray(nuevo) ? nuevo : [nuevo]).forEach(function (n) { add(fecha, n); });
   let probs = [];
   Object.keys(porDia).sort().forEach(function (d) {
     if (modo === "sumar" && d !== fecha) return;
@@ -48580,22 +48619,35 @@ function _adoReporte(fecha, rows, nuevo, modo) {
   const vencen = mov.filter(function (r) { return r.vence && !r.vencia; });
   return { probs: probs, mov: mov, fijos: fijos, vencen: vencen };
 }
-async function aprDiaOcupadoAbrir(fecha, ped) {
-  const keys = [aprKey(ped.empresa, ped.order_id)];
+/* v23.34 (Luis, 28/09: "fijate que no quede ninguna feature colgada así porque no estamos arrastrando") —
+   el pop-up ya NO es sólo del arrastre. Lo abren todos los caminos que programan a mano un día:
+     · soltar un pedido en un día (aprDropDia)          · tildar + día + ✅ Confirmar (aprConfirmar)
+     · soltar una tanda sin fecha en un día (aprProgramar) · reprogramar una NP de ISIS que no salió (pppReprogElegir)
+   `opt` (opcional): { peds:[{zona,m3}], label, alVacio(), alSumar(), antes() → false cancela, fuera:true si
+   no corre dentro de A Programar }. alVacio corre si el día está vacío o la simulación falla (el camino de
+   siempre, con sus propios avisos); alSumar es lo que se hace después de elegir cualquiera de las 3. */
+async function aprDiaOcupadoAbrir(fecha, ped, opt) {
+  opt = opt || {};
+  const keys = ped ? [aprKey(ped.empresa, ped.order_id)] : [];
+  const alVacio = opt.alVacio || function () { return aprGenerarTanda(fecha, keys); };
   let corr = null, auto = null;
   try { corr = await aprRpc("gv_ppp_dia_reprogramar", { p_fecha: fecha, p_modo: "correr", p_simular: true }); }
-  catch (_e) { return aprGenerarTanda(fecha, keys); }
+  catch (_e) { return alVacio(); }
   const delDia = (corr || []).filter(function (r) { return r.fecha_actual === fecha; });
-  if (!delDia.length) return aprGenerarTanda(fecha, keys);   // día vacío: como siempre
+  if (!delDia.length) return alVacio();   // día vacío: como siempre
+  if (opt.antes && opt.antes() === false) return;
   try { auto = await aprRpc("gv_ppp_dia_reprogramar", { p_fecha: fecha, p_modo: "automatico", p_simular: true }); }
   catch (_e) { auto = null; }
-  const nuevo = { tanda: "(nuevo)", zona: ped.zona || "", m3: Number(ped.m3) || 0, accion: "nuevo", fecha_actual: fecha };
+  const pedsN = opt.peds || (ped ? [ped] : []);
+  const nuevo = pedsN.map(function (x) { return { tanda: "(nuevo)", zona: x.zona || "", m3: Number(x.m3) || 0, accion: "nuevo", fecha_actual: fecha }; });
+  const m3Nuevo = nuevo.reduce(function (s, x) { return s + x.m3; }, 0);
+  const label = opt.label || (ped ? aprPedLabel(ped) : "lo nuevo");
   const rep = {
     sumar: _adoReporte(fecha, delDia.map(function (r) { return Object.assign({}, r, { accion: "fijo" }); }), nuevo, "sumar"),
     automatico: auto ? _adoReporte(fecha, auto, nuevo, "automatico") : null,
     correr: _adoReporte(fecha, corr || [], nuevo, "correr")
   };
-  _apr.doCtx = { fecha: fecha, keys: keys, ped: ped };
+  _apr.doCtx = { fecha: fecha, keys: keys, ped: ped, alSumar: opt.alSumar || null, fuera: !!opt.fuera };
   const lista = function (arr, fmt, max) {
     if (!arr.length) return "";
     const n = max || 6;
@@ -48619,7 +48671,7 @@ async function aprDiaOcupadoAbrir(fecha, ped) {
   let ov = document.getElementById("aprDoOv");
   if (!ov) { ov = document.createElement("div"); ov.id = "aprDoOv"; document.body.appendChild(ov); }
   ov.innerHTML = '<div class="ado-box"><div class="ado-h">El ' + aprDiaCorto(fecha) + ' ya tiene programación (' + delDia.length +
-    ' tanda/s). ¿Qué hacemos con ' + escapeHtml(aprPedLabel(ped)) + ' · ' + aprNum(nuevo.m3) + ' m³?</div><div class="ado-ops">' +
+    ' tanda/s). ¿Qué hacemos con ' + escapeHtml(label) + ' · ' + aprNum(m3Nuevo) + ' m³?</div><div class="ado-ops">' +
     card("sumar", "1) Sumarlo", "Va a este día y no se mueve nada más.", rep.sumar) +
     card("automatico", "2) Reprogramar el resto", "Va a este día y lo PENDIENTE del día se reprograma con la lógica automática.", rep.automatico) +
     card("correr", "3) Correr la programación", "Va a este día y todo lo programado desde acá se corre 1 día con reparto.", rep.correr) +
@@ -48633,16 +48685,19 @@ async function aprDiaOcupadoElegir(op) {
   const c = _apr.doCtx; aprDiaOcupadoCerrar();
   if (!c) return;
   if (op !== "sumar") {
-    _apr.ocupado = true; aprRender();
+    _apr.ocupado = true; if (!c.fuera) aprRender();
     try {
       await aprRpc("gv_ppp_dia_reprogramar", { p_fecha: c.fecha, p_modo: op, p_simular: false, p_por: await aprQuien() });
     } catch (e) {
       _apr.ocupado = false;
-      _apr.msg = "⚠ No se reprogramó nada: " + (e && e.message ? e.message : String(e)); _apr.msgErr = true;
+      const m = "⚠ No se reprogramó nada: " + (e && e.message ? e.message : String(e));
+      if (c.fuera) { try { pppSetStatus(m, false); alert(m); } catch (_e) {} return; }
+      _apr.msg = m; _apr.msgErr = true;
       aprRender(); return;
     }
     _apr.ocupado = false;
   }
+  if (c.alSumar) return c.alSumar();
   await aprGenerarTanda(c.fecha, c.keys, { sinConfirm: true });
 }
 
