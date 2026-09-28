@@ -34,9 +34,11 @@ function near(a, b, tol, msg) { ok(Math.abs(a - b) <= (tol || 0.5), msg + "  (di
 
 // --- Consolidada CON NTL (el ejemplo del Excel) ---
 var c = N._pedImpNacionalizar(33381.6, 31.53, { modo: "consolidada", valorM3: 110, tn: 10, ntl: true });
-near(c.noRecup, 22147.73, 1, "Consolidada+NTL: no recuperable = 22.147,73 (Excel H4)");
-near(c.factor, 0.6635, 0.001, "Consolidada+NTL: factor = 0,6635 (Excel D2)");
-near(c.landed, 33381.6 + 22147.73, 1, "Consolidada+NTL: puesto en Arg = FOB + no recup");
+// v23.77 (Luis): derechos 18% (no 35%) y estadística 3% con tope u$s 180. Excel: 22.147,73 con la tasa vieja;
+// ahora 22.147,73 − 6.292,85 (35%→18% de CIF 37.016,81) − 930,50 (estadística 1.110,50 → 180) = 14.924,38.
+near(c.noRecup, 14924.38, 1, "Consolidada+NTL: no recuperable = 14.924,38 (derechos 18%, estadística tope 180)");
+near(c.factor, 14924.38 / 33381.6, 0.001, "Consolidada+NTL: factor = no recup / FOB");
+near(c.landed, 33381.6 + 14924.38, 1, "Consolidada+NTL: puesto en Arg = FOB + no recup");
 near(c.ntl, 1669.08, 0.5, "Consolidada: línea NTL = 5% del FOB");
 
 // --- Consolidada SIN NTL: baja exactamente el 5% del FOB ---
@@ -46,7 +48,8 @@ near(c.noRecup - s.noRecup, 1669.08, 0.5, "Sacar NTL baja el no recuperable en 5
 
 // --- Full Container CON NTL (hoja "Carga Full") ---
 var f = N._pedImpNacionalizar(7282, 26, { modo: "full", fleteFull: 2000, ntl: true });
-near(f.noRecup, 6867.38, 1, "Full+NTL: no recuperable ≈ 6.867,38 (Excel H9)");
+near(f.noRecup, 6767.83, 1, "Full+NTL: no recuperable ≈ 6.767,83 (Excel 6.867,38 − estadística 279,55 → 180)");
+near(Math.max.apply(null, f.detalle.filter(function (d) { return /Estad/.test(d[0]); }).map(function (d) { return d[1]; })), 180, 0.01, "Estadística topeada en u$s 180");
 
 // --- Proyección al mínimo de 25k ---
 var pNunca = N._pedImpProy25k(0, 1448, 14478, 25000);

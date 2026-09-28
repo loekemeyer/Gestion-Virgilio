@@ -6221,7 +6221,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.76"></script>
+<script type="module" src="recepcion.js?v=23.77"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10239,7 +10239,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.76";
+const APP_VERSION = "v23.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21071,7 +21071,7 @@ function _pedImpNacionalizar(fob, m3, opts) {
     var fleteF = _nacNum(opts.fleteFull, _NAC_DEFAULTS.fleteFull);
     var cifF = fleteF + seguroF + fob;
     var derechosF = 0.18 * cifF;
-    var estadF = 0.03 * cifF;
+    var estadF = Math.min(180, 0.03 * cifF);            // v23.77: tope u$s 180 (Luis)
     var ntl5F = ntl ? 0.05 * fob : 0;
     var tasasF = 10 + 180;                                   // Sim + Tasa Est.
     var despachF = Math.max(300, fob * 0.01) + 150 + 100 + 30;
@@ -21081,7 +21081,7 @@ function _pedImpNacionalizar(fob, m3, opts) {
     det = [["Flete + terminal", fleteDepF, "container 2.000 + marítima 750 + terminal 800"],
       ["Seguro (0,5% FOB)", seguroF, "0,5% × FOB " + _nacF(fob)],
       ["Derechos (18% CIF)", derechosF, "18% × CIF " + _nacF(cifF)],
-      ["Estadística (3% CIF)", estadF, "3% × CIF " + _nacF(cifF)],
+      ["Estadística (3% CIF, tope 180)", estadF, "3% × CIF " + _nacF(cifF) + ", tope 180"],
       ["Tasas (Sim + est.)", tasasF, "Sim 10 + tasa est. 180"],
       ["Gastos varios", gastosF, "flete a depósito 150 + bancarios 40"],
       ["Despachante", despachF, "máx(300; 1% FOB) + 150 + 100 + 30"]];
@@ -21095,13 +21095,13 @@ function _pedImpNacionalizar(fob, m3, opts) {
     var seguroA = (fob + certA) * 0.01;
     var cifA = fob + seguroA + certA;
     var derechosA = 0.18 * cifA;
-    var estadA = 0.03 * cifA;
+    var estadA = Math.min(180, 0.03 * cifA);
     var ivaImpA = (derechosA + cifA) * 0.21;
     var tasaDesA = 50, gestionA = 85;
     var noRecupA = seguroA + derechosA + tasaDesA + gestionA + fleteA + estadA + ivaImpA;
     det = [["Flete FEDEX", fleteA, _nacF(kg) + " kg × 13,5"], ["Certif. FEDEX", certA, "20% × flete"],
       ["Seguro (1%)", seguroA, "1% × (FOB + certif.)"], ["Derechos (18%)", derechosA, "18% × CIF " + _nacF(cifA)],
-      ["Estadística (3%)", estadA, "3% × CIF " + _nacF(cifA)], ["IVA importación", ivaImpA, "21% × (derechos + CIF)"],
+      ["Estadística (3%, tope 180)", estadA, "3% × CIF " + _nacF(cifA) + ", tope 180"], ["IVA importación", ivaImpA, "21% × (derechos + CIF)"],
       ["Tasa desembolso", tasaDesA, "fijo"], ["Gestión Comex", gestionA, "fijo"]];
     return { modo: modo, ok: (kg > 0), cif: cifA, cifTxt: "FOB " + _nacF(fob) + " + seguro " + _nacF(seguroA) + " + certif. " + _nacF(certA), noRecup: noRecupA, ntl: 0, factor: noRecupA / fob, landed: fob + noRecupA, detalle: det, sinPeso: !(kg > 0) };
   }
@@ -21110,9 +21110,9 @@ function _pedImpNacionalizar(fob, m3, opts) {
   var fleteCif = valorM3 * m3;                       // parte marítima que entra al CIF (D41)
   var seguro = 0.005 * fob;                          // D13
   var cif = fleteCif + seguro + fob;                 // D14
-  var derechos = 0.35 * cif;                         // D16
+  var derechos = 0.18 * cif;                         // v23.77: 18% de base (Luis; cada artículo tiene su arancel)
   var ntl5 = ntl ? 0.05 * fob : 0;                   // D17 (línea "NTL")
-  var estad = 0.03 * cif;                            // D18
+  var estad = Math.min(180, 0.03 * cif);             // v23.77: 3% con tope u$s 180 (Luis)
   var tasaFija = 180;                                // D19
   var sim = 10;                                      // D38
   var libreCirc = 0.005 * fob;                       // D33
@@ -21120,8 +21120,8 @@ function _pedImpNacionalizar(fob, m3, opts) {
   var despach = Math.max(300, fob * 0.01) + 120 + 0 + 30;   // F26 (honorarios 1% + gtos + digital.)
   var noRecup = fleteTot + derechos + estad + sim + gastosVarios + despach + tasaFija + ntl5 + libreCirc;
   det = [["Flete + dep. fiscal", fleteTot, "fijos 1.080 + 35 + 90 + " + (tn < 1 ? "4" : "4 × " + _nacF2(tn) + " TN") + " + (" + _nacF(valorM3) + " + 25) × " + _nacF2(m3) + " m³"],
-    ["Derechos (35% CIF)", derechos, "35% × CIF " + _nacF(cif)],
-    ["Estadística (3% CIF)", estad, "3% × CIF " + _nacF(cif)],
+    ["Derechos (18% CIF)", derechos, "18% × CIF " + _nacF(cif) + " (base; cada artículo tiene su arancel)"],
+    ["Estadística (3% CIF, tope 180)", estad, "3% × CIF " + _nacF(cif) + ", tope 180"],
     ["Libre circulación (0,5%)", libreCirc, "0,5% × FOB " + _nacF(fob)],
     ["Tasas (Sim + est.)", sim + tasaFija, "Sim 10 + tasa est. 180"],
     ["Gastos varios", gastosVarios, "flete a depósito 30 + bancarios 40"],
