@@ -1497,6 +1497,8 @@ button {
 .apr-hor:hover{ background:#bae6fd; }
 .apr-card-obs{ margin:4px 0 2px; padding:4px 8px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px;
   color:#78350f; font-size:12.5px; font-weight:600; white-space:pre-wrap; word-break:break-word; }   /* v21.34 */
+.apr-suc{ font-size:11.5px; font-weight:700; color:#1e3a8a; background:#eff6ff; border:1px solid #bfdbfe;
+  border-radius:999px; padding:1px 8px; margin-left:4px; white-space:nowrap; }                     /* v23.07 */
 .apr-obs{ font-size:11.5px; font-weight:700; color:#78350f; background:#fffbeb; border:1px solid #fde68a;
   border-radius:999px; padding:1px 8px; margin-left:4px; white-space:nowrap; }                     /* v21.34 */
 /* v21.80 (Tomás González, 23/09): el badge de la observación se TOCA. El texto vivía sólo en el
@@ -6190,7 +6192,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.04"></script>
+<script type="module" src="recepcion.js?v=23.09"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10151,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.04";
+const APP_VERSION = "v23.09";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -14012,7 +14014,7 @@ async function etlLoadGlobal() {
 async function etlToggleGlobal() {
   const nuevo = etlOn() ? "0" : "1";
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "etiqueta_lio", valor: nuevo }) });
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "etiqueta_lio", valor: nuevo }) });
     if (r.ok) etlSetOn(nuevo === "1");
   } catch (_e) {}
   try { if (typeof psRender === "function") psRender(); } catch (_e) {}
@@ -15261,7 +15263,7 @@ async function toggleSsgAlert() {
   const nuevo = sw.classList.contains("on") ? "0" : "1";
   if (hint) hint.textContent = "Guardando…";
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "alerta_sin_stock_gondola", valor: nuevo }) });
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "alerta_sin_stock_gondola", valor: nuevo }) });
     if (!r.ok) { if (hint) hint.textContent = "Error guardando (HTTP " + r.status + ")."; return; }
     ssgSetSwitchUI(nuevo === "1");
   } catch (_e) { if (hint) hint.textContent = "Sin conexión: no se guardó."; }
@@ -18160,11 +18162,11 @@ function prodSetMeta(which, val) {
     m[which] = Math.round(v * 100) / 100;
     try { localStorage.setItem("prod_metas", JSON.stringify(m)); } catch (e) { }
     // fuente de verdad: Stock_Config (global). Si falla la red queda el cache local.
-    fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", {
+    _scfgAuth().then(function (_a) { return fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", {
       method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      headers: Object.assign({}, _a, { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }),
       body: JSON.stringify({ clave: which === "pick" ? "meta_m3h_picking" : "meta_m3h_armado", valor: String(m[which]), actualizado: new Date().toISOString() })
-    }).catch(function () { });
+    }); }).catch(function () { });
   }
   prodRender();
 }
@@ -21021,7 +21023,7 @@ async function pedImpSetNacCfg(clave, valor) {
   try {
     await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", {
       method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
       body: JSON.stringify({ clave: clave, valor: v })
     });
   } catch (_e) {}
@@ -21839,12 +21841,12 @@ async function pedImpSetEntregaGlobal(val) {
     if (!v) {
       await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.entrega_estimada_global", {
         method: "DELETE",
-        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, Prefer: "return=minimal" }
+        headers: { ...(await _scfgAuth()), Prefer: "return=minimal" }
       });
     } else {
       await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", {
         method: "POST",
-        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+        headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
         body: JSON.stringify({ clave: "entrega_estimada_global", valor: v })
       });
     }
@@ -27094,7 +27096,7 @@ async function stockMarcarInicio() {
   if (!confirm("MARCAR INICIO ahora: desde este momento, los movimientos REALES anteriores (recepción/guardado/picking/ajustes/etc.) dejan de contar para el stock. NO se borran. El stock inicial que cargues sigue contando. ¿Seguro?")) return;
   try {
     const nowIso = new Date().toISOString();
-    const rc = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "cutoff_ts", valor: nowIso, actualizado: nowIso }) });
+    const rc = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "cutoff_ts", valor: nowIso, actualizado: nowIso }) });
     if (!rc.ok && rc.status >= 500) throw new Error("config HTTP " + rc.status);
     alert("✓ Inicio marcado. Desde ahora lo anterior (movimientos reales) no se suma; queda guardado igual.");
     openStockAdmin();
@@ -27202,7 +27204,7 @@ async function stkToggleAutoBajada() {
   if (!_stk) return;
   const nuevo = _stk.abrOn ? "0" : "1";
   try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "bajada_auto_racks", valor: nuevo }) });
+    const r = await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method: "POST", headers: { ...(await _scfgAuth()), "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: "bajada_auto_racks", valor: nuevo }) });
     if (!r.ok) { try { alert("No se pudo guardar (HTTP " + r.status + ")."); } catch (_e) {} return; }
     _stk.abrOn = (nuevo === "1"); stkRender();
   } catch (_e) { try { alert("Sin conexión: no se guardó."); } catch (_e2) {} }
@@ -48894,6 +48896,51 @@ function aprObsBadge(p) {
     ' title="' + escapeHtml("Observación del pedido (tocá para leerla completa): " + o) + '">💬 ' +
     escapeHtml(o.length > 40 ? o.slice(0, 40) + "…" : o) + '</span>';
 }
+/* v23.07 (Luis, 28/09): BADGE DE SUCURSAL. "cuando hay clientes con múltiples sucursales, que
+   aparezca el badge de sucursal en zona (identificando que son sucursales diferentes)". Caso Capo SA
+   (LK 4286): 3 pedidos el mismo día a Tafí Viejo, S.M. Tucumán y Alberdi que se leían como el
+   mismo pedido repetido. Es INTELIGENTE: sólo sale si ese cliente (empresa + cod: el código es por
+   empresa) tiene pedidos pendientes a MÁS DE UNA dirección. Un cliente con una sola sucursal, o
+   con varios pedidos a la misma, no lleva badge. Se mide sobre TODOS los pendientes
+   (_apr.pedidosTodos), así el badge es el mismo en Pedidos a programar, Cuarentena y el pipeline. */
+function aprSucDirKey(d) {
+  return String(d || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+}
+function aprSucTexto(d) {
+  let s = String(d || "").trim();
+  const m = /^Exp\..*\((.*)\)\s*$/.exec(s);      // pwebDireccion: "Exp. X — dir (sucursal)"
+  if (m) s = m[1].trim();
+  return s;
+}
+function aprSucMapa() {
+  // cacheado por IDENTIDAD de las dos listas: cada carga arma arrays nuevos y ahí se recalcula
+  if (_apr._sucMapa && _apr._sucSrcT === _apr.pedidosTodos && _apr._sucSrcP === _apr.pedidos) return _apr._sucMapa;
+  const todos = (_apr.pedidosTodos || []).concat(_apr.pedidos || []);
+  const m = {};
+  todos.forEach(function (x) {
+    if (!x || x._demo) return;
+    const cod = String(x.cod || "").trim(), dk = aprSucDirKey(x.direccion);
+    if (!cod || !dk) return;
+    const k = String(x.empresa || "lk") + ":" + cod;
+    (m[k] = m[k] || {})[dk] = aprSucTexto(x.direccion);
+  });
+  _apr._sucMapa = m;
+  _apr._sucSrcT = _apr.pedidosTodos; _apr._sucSrcP = _apr.pedidos;
+  return m;
+}
+function aprSucBadge(p) {
+  if (!p || p._demo) return "";
+  const cod = String(p.cod || "").trim(), dk = aprSucDirKey(p.direccion);
+  if (!cod || !dk) return "";
+  const dirs = aprSucMapa()[String(p.empresa || "lk") + ":" + cod] || {};
+  const n = Object.keys(dirs).length;
+  if (n < 2) return "";
+  const txt = aprSucTexto(p.direccion);
+  const corto = txt.length > 32 ? txt.slice(0, 32) + "…" : txt;
+  return ' <span class="apr-suc" title="' + escapeHtml("Este cliente tiene pedidos a " + n + " sucursales distintas: " +
+    Object.keys(dirs).map(function (k) { return dirs[k]; }).join(" · ") + ". Éste va a: " + txt) + '">🏬 ' +
+    escapeHtml(corto) + '</span>';
+}
 function aprHorBadge(p) {
   const oc = aprTurnoOc(p);
   if (!aprPideHorario(p) && !oc) return "";
@@ -49157,7 +49204,7 @@ function aprColPedidos() {
         aprHorBadge(p) +     // v17.74 (Luis): el cliente coordina horario — tocalo para editarlo
         aprEsperaChip(p) +   // v13.85: hace cuánto llegó
         aprDiferidoChip(p) + // v15.67: espera un reingreso
-        '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' +
+        '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' + aprSucBadge(p) +
         // v20.51 (Luis): el destino del expreso, y el badge si la provincia está marcada.
         aprDestinoChip(p) + aprMisBadge(p) +
         // v16.03 — el pedido estuvo en una tanda y esa tanda YA se pickeó y se armó (la mercadería
@@ -49354,11 +49401,12 @@ function aprCuarBadgesHtml(p) {
   }
   if (has("deuda")) {
     const m = cuarPlata(d.deuda);
-    // v23.03 (Luis, 28/09): la fecha del comprobante MÁS VIEJO que cuenta, sacada del Excel.
+    // v23.03 (Luis, 28/09): fecha de EMISIÓN (col B del Excel) del comprobante más viejo que cuenta.
     const ds = /^\d{4}-\d{2}-\d{2}/.test(String(d.deuda_desde || "")) ? String(d.deuda_desde) : "";
     const dsTxt = ds ? ds.slice(8, 10) + "/" + ds.slice(5, 7) : "";
     const dsTit = ds ? " Factura impaga más vieja: " + ds.slice(8, 10) + "/" + ds.slice(5, 7) + "/" + ds.slice(0, 4) +
-      (d.deuda_comp ? " (" + d.deuda_comp + " comprobante" + (d.deuda_comp === 1 ? "" : "s") + ")" : "") + "." : "";
+      (d.deuda_comp ? " (" + d.deuda_comp + " comprobante" + (d.deuda_comp === 1 ? "" : "s") + ")" : "") + "." +
+      (d.deuda_otra > 0 ? " Además debe " + cuarPlata(d.deuda_otra) + " de OTRA sucursal, que no retiene este pedido." : "") : "";
     h += '<span class="cuar-badge b-deuda" title="El cliente tiene deuda mayor a $1.000' + (m ? " (" + m + ")" : "") + '.' + escapeHtml(dsTit) + '">💰 Deuda' + (m ? " " + m : "") + (dsTxt ? " · desde " + dsTxt : "") + '</span>';
   }
   if (has("limite_credito")) {
@@ -49482,7 +49530,7 @@ function aprColCuarentena() {
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
       '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(m3) + ' m³</span></td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) + '</td>' +
-      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
+      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprSucBadge(p) + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
       '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') + '</td>' +
       // v22.40 (Thomas): el monto del pedido ACTUAL (lo que se cobra por adelantado) SÓLO corre
       // para CLIENTES NUEVOS. Para el activo retenido por deuda / límite / mal pago no aplica: lo
@@ -49767,7 +49815,9 @@ function aprAnularBtn(p, tam) {
   if (!p || p._demo) return "";
   return '<button class="apr-anular' + (tam === "chico" ? " apr-anular-chico" : "") + '"' +
     ' onclick="event.stopPropagation();aprAnularAbrir(\'' + (p.empresa || "lk") + '\',\'' + escapeHtml(String(p.order_id)) + '\')"' +
-    ' title="El pedido entró MAL: sacarlo de A Programar para que no lo tome ni el armado automático ni nadie. Pide quién lo anula y por qué, y queda en el log de anulados.">✕ Anular pedido</button>';
+    // v23.04 (Luis, 28/09): "si hay múltiples pedidos en la fila no se sabe cuál anula cuál" →
+    // el botón dice SIEMPRE qué pedido anula, haya uno o varios.
+    ' title="Anular ' + escapeHtml(aprPedLabel(p)) + ': el pedido entró MAL, sacarlo de A Programar para que no lo tome ni el armado automático ni nadie. Pide quién lo anula y por qué, y queda en el log de anulados.">✕ Anular ' + escapeHtml(aprPedLabel(p)) + '</button>';
 }
 function aprAnularAbrir(empresa, orderId) {
   if (String(orderId) === "EJEMPLO") return;
@@ -50352,7 +50402,7 @@ function clinNuevosHtml() {
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
       '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) + '</td>' +
-      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
+      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprSucBadge(p) + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
       '<td class="clin-td-tiempo">' + clinTiempoHtml(p) + '</td>' +
       '<td>' + clinContactoBtns(p) + '</td>' +
       '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
@@ -51310,7 +51360,8 @@ function pipeHtml() {
     '<div class="apr-col-t apr-col-t-clic" onclick="aprCliColapsar()" title="' +
       (_cliCol ? "Mostrar" : "Ocultar") + ' el pipeline de clientes nuevos">' +
     '<span class="apr-col-caret">' + (_cliCol ? "▸" : "▾") + '</span> ' +
-    '🧭 Clientes nuevos <b>(' + (cargando ? '…' : pipeLista().filter(function (p) { return !p._demo; }).length) + ')</b>' +
+    // v23.06 (Luis): un pedido PARTIDO por importados cuenta como UNO, igual que en Cuarentena
+    '🧭 Clientes nuevos <b>(' + (cargando ? '…' : cuarAgrupar(pipeLista().filter(function (p) { return !p._demo; })).length) + ')</b>' +
     '<span class="apr-cuar-help" title="El camino completo de un cliente nuevo: análisis crediticio en Equifax y ' +
       'después UNO DE DOS estados — Referenciado (no paga por adelantado, como un cliente habitual) o No ' +
       'referenciado (paga por adelantado sus 3 primeros pedidos: Speech 1, Speech 2 a las 24 h, y recién con el ' +
@@ -51326,6 +51377,7 @@ function pipeHtml() {
 
   const lista = pipeLista();
   pipeNeed(); pipeCfgNeed(); clinNuevosValorNeed(); clinDtoPagoNeed(); clinCuitNeed(); clinWppNeed(); cuarComNeed(); clinTickStart();
+  cuarPartidosNeed();   // v23.06 (Luis, 28/09): el pedido partido va en UNA fila, como en Cuarentena
 
   if (!lista.length)
     return h + '<div class="apr-vacio">Sin pedidos de clientes nuevos. Acá caen los pedidos de ' +
@@ -51339,29 +51391,42 @@ function pipeHtml() {
     '<th>Pedido</th><th>Fecha</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>CUIT</th>' +
     '<th>Zona</th><th>Etapa</th><th class="cuar-td-m3">Monto</th><th class="pipe-th-acc">Qué sigue</th>' +
     '<th class="cuar-td-com">Coment.</th></tr></thead><tbody>';
-  for (const p of lista) {
+  /* v23.06 (Luis, 28/09): "si todos esos surgen de 1 pedido deberían figurar en una sola línea".
+     La parte que espera reingreso de importados es otro order_id con pedido_origen = el original
+     (v22.46): va en la fila del original, con el m³ sumado y el chip 🧩. Los botones actúan sobre
+     el original y el backend aprueba toda la familia (gv_cuarentena_liberados_familia). ⚠ Dos
+     pedidos del mismo cliente a SUCURSALES distintas siguen siendo dos filas: son dos pedidos. */
+  for (const g of cuarAgrupar(lista)) {
+    const p = g.p, varios = g.miembros.length > 1;
+    const m3g = varios ? g.miembros.reduce(function (s, x) { return s + (Number(x.m3) || 0); }, 0) : p.m3;
     const cid = "pipe" + p.empresa + p.order_id, cab = !!_apr.exp[cid];
     const et = pipeEtapa(p);
-    const nblo = Number(p.np_total) || ((p.bloques && p.bloques.length) || 1);
+    const nblo = varios ? g.miembros.reduce(function (s, x) { return s + (Number(x.np_total) || ((x.bloques && x.bloques.length) || 1)); }, 0)
+      : (Number(p.np_total) || ((p.bloques && p.bloques.length) || 1));
     h += '<tr class="cuar-tr pipe-tr pipe-tr-' + et + (cab ? ' cuar-tr-open' : '') + '">' +
       '<td class="cuar-td-np" onclick="aprToggle(\'' + cid + '\')" title="Ver qué pidió (códigos y cajas)">' +
         '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
         '<span class="cuar-card-np">' + escapeHtml(p._demo ? "web LK 9999" : aprPedLabel(p)) + '</span>' +
         (nblo > 1 ? '<span class="cuar-demo-tag" title="Este pedido se parte en ' + nblo + ' NP">' + nblo + ' NP</span>' : '') +
+        (varios ? '<br>' + cuarPartidoChip(g) : '') +
       '</td>' +
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
-      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
+      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(m3g) + ' m³</span></td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) +
         (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') + aprCuarBadgesHtml(p) + '</td>' +
       '<td class="pipe-td-cuit">' + pipeCuitHtml(p) + '</td>' +
       // v20.86 (Luis): la zona, con su badge de horario — es lo que se mira para programarlo
-      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
+      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprSucBadge(p) + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
       '<td class="pipe-td-et">' + pipeEtapaHtml(p) + '</td>' +
       '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
       '<td class="pipe-td-acc">' + pipeAccionesHtml(p) + '</td>' +
       '<td class="cuar-td-com">' + (p._demo ? '<span class="cuar-yp-sin">—</span>' : cuarComBtnHtml(p)) + '</td>' +
       '</tr>';
-    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' +
+      (varios ? g.miembros.map(function (x) {
+        return '<div class="pipe-parte-t"><b>' + escapeHtml(aprPedLabel(x)) + '</b>' +
+          (x === p ? '' : ' · espera reingreso de importados') + '</div>' + aprContenidoHtml(x);
+      }).join('') : aprContenidoHtml(p)) + '</div></td></tr>';
   }
   h += '</tbody></table></div></div>';
   return h + pipeFirmaHtml() + pipeVincHtml() + pipeCompHtml();
@@ -52168,7 +52233,9 @@ async function cuarRpcMarcar(peds) {
   const payload = { p_pedidos: peds.map(function (p) {
     // v17.23: np y razón social viajan para que el LOG de Cuarentena se lea sin joins
     return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim(),
-             np: aprPedLabel(p), razon_social: p.razon_social || null };
+             np: aprPedLabel(p), razon_social: p.razon_social || null,
+             // v23.04 (Luis): la deuda se mide por SUCURSAL → viaja a dónde va el pedido
+             direccion: p.direccion || null, barrio: p.barrio || p.localidad || null, zona: p.zona || null };
   }) };
   try { return await aprRpc("gv_cuarentena_marcar", payload); }
   catch (_e) {
@@ -52219,7 +52286,8 @@ async function _cuarMarcarPedidos0() {
       aprRpc("gv_cuarentena_liberados"),  // v14.88: los liberados van a la lista normal, con badge
       // v23.03: la FECHA de la deuda (chip de Motivos). Sola en el allSettled: si falla, el chip sale sin fecha.
       aprRpc("gv_cuarentena_deuda_desde", { p_pedidos: peds.filter(function (p) { return !p._demo; }).map(function (p) {
-        return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim() };
+        return { order_id: String(p.order_id), empresa: p.empresa || "lk", cod: String(p.cod || "").trim(),
+                 direccion: p.direccion || null, barrio: p.barrio || p.localidad || null, zona: p.zona || null };
       }) })
     ]);
     const res  = _st[0].status === "fulfilled" ? _st[0].value : null;
@@ -52247,6 +52315,7 @@ async function _cuarMarcarPedidos0() {
       const k = String(r.empresa) + ":" + String(r.order_id);
       if (detKey[k] && detKey[k].deuda != null && r.desde) {
         detKey[k].deuda_desde = String(r.desde); detKey[k].deuda_comp = Number(r.comprobantes) || 0;
+        detKey[k].deuda_otra = Number(r.otra_sucursal) || 0;   // v23.04: deuda de OTRA sucursal, no retiene
       }
     });
     (lim || []).forEach(function (r) {
@@ -55054,7 +55123,7 @@ function facPrintIsOn(){ return _facPrintGlobal === "1"; }
 async function facPrintSetPref(v){
   _facPrintGlobal = String(v);
   try {
-    await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method:"POST", headers:{ apikey:SUPABASE_KEY, Authorization:"Bearer "+SUPABASE_KEY, "Content-Type":"application/json", Prefer:"resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: FAC_PRINT_KEY, valor: String(v) }) });
+    await fetch(SUPABASE_URL + "/rest/v1/Stock_Config?on_conflict=clave", { method:"POST", headers:{ ...(await _scfgAuth()), "Content-Type":"application/json", Prefer:"resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ clave: FAC_PRINT_KEY, valor: String(v) }) });
   } catch(_e){}
 }
 function facPrintToggle(){ facPrintSetPref(facPrintIsOn() ? "0" : "1").then(function(){ psRender(); }); }
@@ -57410,6 +57479,17 @@ async function facAuthWriteHeaders(extra) {
   };
   if (extra) Object.assign(h, extra);
   return h;
+}
+/* v23.05 (problema 577): Stock_Config ya no se escribe con la clave pública. La base sólo deja
+   escribir a un supervisor logueado (es_supervisor_virgilio()); sin sesión se avisa y no se guarda. */
+async function _scfgAuth() {
+  const h = await facAuthWriteHeaders();
+  if (!h) {
+    const m = authNoSesionMsg("Iniciá sesión con Google para cambiar la configuración.");
+    try { alert(m); } catch (_e) {}
+    throw new Error(m);
+  }
+  return { apikey: h.apikey, Authorization: h.Authorization };
 }
 
 /* Parte B (v6.21): solo la OPERADORA (su mail) puede forzar la facturación de una NP
