@@ -625,6 +625,11 @@
 "objeto": "vista_stock_procesada",
 "regla": "La demanda de un codigo DUAL (437E/438E/439E/809E) se keyea CON la empresa: el de Loeke y el de Chef son dos productos en dos gondolas distintas. Si este patron",
 "quien": "Luis, Thomas"
+},
+{
+"objeto": "gv_cuarentena_comentario_cod",
+"regla": "Un comentario de cuarentena sin cod se completa con el cliente del pedido; sin eso no aparece en el historial del cliente",
+"quien": "Luis"
 }
 ]
 }
