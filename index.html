@@ -886,7 +886,7 @@ button {
 /* v20.61 (Luis): 🧭 Pipeline de clientes nuevos — pestaña propia del módulo PPP.
    Reusa las clases de Cuarentena (`cuar-tbl`, `cuar-td-*`) y agrega sólo lo suyo. */
 .pipe-col{ margin:0; }
-.pipe-tbl th.pipe-th-acc{ min-width:210px; }
+.pipe-tbl th.pipe-th-acc{ min-width:0; }
 .pipe-td-acc{ white-space:normal; }
 .pipe-td-et{ white-space:nowrap; }
 /* la fila se tiñe apenas según la etapa: el ojo encuentra en qué está cada pedido sin leer */
@@ -896,7 +896,7 @@ button {
 .pipe-tr-no_valido,.pipe-tr-cancelado{ background:#fef2f2; }
 .pipe-tr-aprobado{ background:#f8fafc; color:#64748b; }
 
-.pipe-td-cuit{ white-space:nowrap; }
+.pipe-td-cuit{ white-space:nowrap; margin-top:2px; }
 .pipe-mem{ display:block; margin-top:3px; font-size:11px; color:#0f766e; font-weight:700; }
 .pipe-mem-dec{ color:#7c3aed; }
 /* la espera, arriba de los botones de «Qué sigue» */
@@ -1253,8 +1253,8 @@ button {
    la información. Las fichas y su grilla de 340px se borraron: ningún `.js` emite ya esas
    clases (ver la nota de arriba). */
 .cuar-tblwrap{ overflow-x:auto; border:1px solid #f0d2bb; border-radius:10px; background:#fff; }
-.cuar-tbl{ width:100%; border-collapse:collapse; font-size:12px; color:#7c2d12; }
-.cuar-tbl th{ text-align:left; font-size:10px; letter-spacing:.4px; text-transform:uppercase;
+.cuar-tbl{ width:100%; border-collapse:collapse; font-size:14px; color:#7c2d12; }
+.cuar-tbl th{ text-align:left; font-size:11.5px; letter-spacing:.4px; text-transform:uppercase;
   color:#9a3412; background:#fff7ed; border-bottom:1px solid #f0d2bb; padding:6px 8px; white-space:nowrap; }
 .cuar-tbl td{ border-top:1px solid #faece1; padding:6px 8px; vertical-align:middle; }
 .cuar-tbl tbody tr:hover{ background:#fffaf5; }
@@ -1273,12 +1273,21 @@ button {
 .cuar-td-zona{ min-width:125px; }
 .cuar-td-com{ text-align:center; }
 .cuar-tbl .cuar-badges{ margin-top:0; gap:4px; }
-.cuar-tbl .cuar-badge{ font-size:9.5px; padding:1px 7px; }
+.cuar-tbl .cuar-badge{ font-size:12px; padding:2px 8px; white-space:normal; }
 /* los mismos botones de la ficha, compactos: acá no tienen que ocupar el ancho de una tarjeta,
    así que se les saca el width:100% y el grid-column que traían de la grilla de acciones. */
 .cuar-td-acc{ display:flex; flex-wrap:wrap; gap:4px; align-items:center; }
-.cuar-tbl .cuar-wpp{ width:auto; font-size:10.5px; padding:3px 8px; }
-.cuar-tbl .cuar-enviar{ width:auto; grid-column:auto; font-size:11px; padding:4px 10px; }
+.cuar-tbl .cuar-wpp{ width:auto; font-size:13px; padding:4px 9px; }
+.cuar-tbl .cuar-enviar{ width:auto; grid-column:auto; font-size:13px; padding:6px 10px; white-space:normal; text-align:left; }
+/* v23.09 (Luis, 28/09): celdas de 2-3 renglones en vez de columnas sueltas, sin scroll horizontal */
+.cuar-l2{ margin-top:4px; white-space:normal; }
+.cuar-tbl .cuar-td-np{ white-space:normal; }
+.cuar-tbl .cuar-td-zona{ min-width:0; margin-top:4px; font-weight:600; color:#7c2d12; }
+.cuar-tbl .cuar-td-cli{ min-width:0; }
+.cuar-tbl .pipe-b{ font-size:13px; padding:5px 9px; }
+.cuar-tbl .pipe-td-acc{ max-width:300px; }
+.cuar-tbl .clin-cuit{ font-size:12.5px; }
+.cuar-tbl .apr-anular-chico{ font-size:12px; }
 .cuar-tbl .cuar-yp-lib{ border-color:#f0d2bb; }
 .cuar-tbl .cuar-yp-lib:hover{ background:#fff1e7; }
 .cuar-tbl .cuar-yp-lib b{ color:#9a3412; }
@@ -49508,7 +49517,9 @@ function aprColCuarentena() {
   // chip del número de cliente, el m³, la zona, el horario, los badges de motivo, la flechita
   // que abre el contenido y los 4 botones están todos acá.
   h += '<div class="cuar-tblwrap"><table class="cuar-tbl"><thead><tr>' +
-    '<th>NP</th><th>Pedido</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>Zona</th>' +
+    // v23.09 (Luis, 28/09): "optimización horizontal, doble y triple fila para que no haya que
+    // scrollear". NP + fecha + m³ en una celda; cliente + CUIT + zona en otra.
+    '<th>NP · Pedido · m³</th><th>Cliente · Zona</th>' +
     '<th>Motivos</th><th class="cuar-td-m3">Monto</th><th>Contacto</th><th>Enviar a</th>' +
     '<th class="cuar-td-com">Coment.</th>' +
     '</tr></thead><tbody>';
@@ -49525,12 +49536,12 @@ function aprColCuarentena() {
       '<td class="cuar-td-np" onclick="aprToggle(\'' + cid + '\')" title="Ver qué pidieron (códigos y cajas)">' +
         '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
         '<span class="cuar-card-np">' + escapeHtml(np) + '</span>' +
-        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') + cuarPartidoChip(g) +
+        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') +
+        (varios ? '<div class="cuar-l2">' + cuarPartidoChip(g) + '</div>' : '') +
+        '<div class="cuar-l2">' + cuarFechaPedidoHtml(p) + ' <span class="cuar-card-m3">' + aprNum(m3) + ' m³</span></div>' +
       '</td>' +
-      '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
-      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(m3) + ' m³</span></td>' +
-      '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) + '</td>' +
-      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprSucBadge(p) + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
+      '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) + clinCuitFmt(p) +
+        '<div class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprSucBadge(p) + aprHorBadge(p) + aprObsBadge(p) + '</div></td>' +
       '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') + '</td>' +
       // v22.40 (Thomas): el monto del pedido ACTUAL (lo que se cobra por adelantado) SÓLO corre
       // para CLIENTES NUEVOS. Para el activo retenido por deuda / límite / mal pago no aplica: lo
@@ -49551,7 +49562,7 @@ function aprColCuarentena() {
       '</div></td>' +
       '<td class="cuar-td-com">' + cuarComBtnHtml(p) + '</td>' +
       '</tr>';
-    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' +
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="7"><div class="apr-card-body">' +
       (varios ? g.miembros.map(function (x) {
         return '<div class="cuar-partido-parte"><b>' + escapeHtml(aprPedLabel(x)) + '</b> · ' + aprNum(x.m3) + ' m³</div>' + aprContenidoHtml(x);
       }).join("") : aprContenidoHtml(p)) + '</div></td></tr>';
@@ -51388,8 +51399,10 @@ function pipeHtml() {
 
   h += pipeDemoRowHtml();
   h += '<div class="cuar-tblwrap"><table class="cuar-tbl pipe-tbl"><thead><tr>' +
-    '<th>Pedido</th><th>Fecha</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>CUIT</th>' +
-    '<th>Zona</th><th>Etapa</th><th class="cuar-td-m3">Monto</th><th class="pipe-th-acc">Qué sigue</th>' +
+    // v23.09 (Luis, 28/09): sin scroll horizontal — pedido + fecha + m³ en una celda, cliente +
+    // CUIT + zona en otra, y los botones de «Qué sigue» bajan en dos filas.
+    '<th>Pedido · Fecha · m³</th><th>Cliente · CUIT · Zona</th>' +
+    '<th>Etapa</th><th class="cuar-td-m3">Monto</th><th class="pipe-th-acc">Qué sigue</th>' +
     '<th class="cuar-td-com">Coment.</th></tr></thead><tbody>';
   /* v23.06 (Luis, 28/09): "si todos esos surgen de 1 pedido deberían figurar en una sola línea".
      La parte que espera reingreso de importados es otro order_id con pedido_origen = el original
@@ -51408,21 +51421,20 @@ function pipeHtml() {
         '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
         '<span class="cuar-card-np">' + escapeHtml(p._demo ? "web LK 9999" : aprPedLabel(p)) + '</span>' +
         (nblo > 1 ? '<span class="cuar-demo-tag" title="Este pedido se parte en ' + nblo + ' NP">' + nblo + ' NP</span>' : '') +
-        (varios ? '<br>' + cuarPartidoChip(g) : '') +
+        (varios ? '<div class="cuar-l2">' + cuarPartidoChip(g) + '</div>' : '') +
+        '<div class="cuar-l2">' + cuarFechaPedidoHtml(p) + ' <span class="cuar-card-m3">' + aprNum(m3g) + ' m³</span></div>' +
       '</td>' +
-      '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
-      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(m3g) + ' m³</span></td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) +
-        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') + aprCuarBadgesHtml(p) + '</td>' +
-      '<td class="pipe-td-cuit">' + pipeCuitHtml(p) + '</td>' +
-      // v20.86 (Luis): la zona, con su badge de horario — es lo que se mira para programarlo
-      '<td class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprSucBadge(p) + aprHorBadge(p) + aprObsBadge(p) + '</td>' +
+        (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') + aprCuarBadgesHtml(p) +
+        '<div class="pipe-td-cuit">' + pipeCuitHtml(p) + '</div>' +
+        // v20.86 (Luis): la zona, con su badge de horario — es lo que se mira para programarlo
+        '<div class="cuar-td-zona">📍 ' + escapeHtml(p.zona || "sin zona") + aprSucBadge(p) + aprHorBadge(p) + aprObsBadge(p) + '</div></td>' +
       '<td class="pipe-td-et">' + pipeEtapaHtml(p) + '</td>' +
       '<td class="cuar-td-m3">' + clinNuevosValorFmt(p) + '</td>' +
       '<td class="pipe-td-acc">' + pipeAccionesHtml(p) + '</td>' +
       '<td class="cuar-td-com">' + (p._demo ? '<span class="cuar-yp-sin">—</span>' : cuarComBtnHtml(p)) + '</td>' +
       '</tr>';
-    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' +
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="6"><div class="apr-card-body">' +
       (varios ? g.miembros.map(function (x) {
         return '<div class="pipe-parte-t"><b>' + escapeHtml(aprPedLabel(x)) + '</b>' +
           (x === p ? '' : ' · espera reingreso de importados') + '</div>' + aprContenidoHtml(x);

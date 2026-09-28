@@ -54,7 +54,7 @@ catch (e) { try { ({ chromium } = require("playwright")); }
     await new Promise(r => setTimeout(r, 120));
     out.vecesQuePidio = out.pidio;
     const h = pipeHtml();
-    out.celda = (h.match(/<td class="pipe-td-cuit">(.*?)<\/td>/) || [])[1] || "";
+    out.celda = (h.match(/<(?:td|div) class="pipe-td-cuit">(.*?)<\/(?:td|div)>/) || [])[1] || "";
     out.cuitEnPantalla = /20-36359993-2/.test(h);
     return out;
   });

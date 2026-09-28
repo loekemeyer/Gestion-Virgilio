@@ -47,7 +47,7 @@ catch (e) { try { ({ chromium } = require("playwright")); }
     out.cuarTieneAlPuro    = cuar.indexOf("NUEVO PURO SRL") >= 0;       // tiene que ser FALSE
 
     // (b) la zona, con su badge
-    out.zonaEnCabecera = /<th>Zona<\/th>/.test(pipe);
+    out.zonaEnCabecera = /<th>Cliente · CUIT · Zona<\/th>/.test(pipe);   // v23.09
     out.zonaDelPedido  = pipe.indexOf("Zona 3 - CABA Oeste") >= 0;
 
     // (c) dos estados: No referenciado si, No valido no
