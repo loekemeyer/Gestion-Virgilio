@@ -743,6 +743,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-cliente-dos-dias-salidos (v20.67: lo que ya salio no parte al cliente en dos dias) =="
 node tests/ppp-cliente-dos-dias-salidos.cjs
+echo "== apr-sin-alarma-dos-dias (v23.58: regla mismo cliente mismo dia derogada) =="
+node tests/apr-sin-alarma-dos-dias.cjs
 
 echo "== ppp-tanda-armada-sin-armado (v20.70: tanda con TAP cuyos pedidos de hoy no tienen armado propio) =="
 node tests/ppp-tanda-armada-sin-armado.cjs

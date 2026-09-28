@@ -6206,7 +6206,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.57"></script>
+<script type="module" src="recepcion.js?v=23.58"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10165,7 +10165,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.57";
+const APP_VERSION = "v23.58";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49057,7 +49057,7 @@ function aprRender() {
   // v17.74 (Luis): quién lleva badge de horario y qué horario tiene cada pedido
   aprHorNeed();
   // v15.48: alerta de mismo cliente en dos días de la misma semana
-  if (_apr.dosDias === undefined && !_apr.dosDiasLoading) aprDosDiasCargar();
+  // v23.58 (Luis 28/09): "mismo cliente, mismo día" está DEROGADA (v21.87). La alarma no se carga ni se dibuja.
   // v15.85: OC de súper que bajó Krikos y todavía no se cargaron
   if (_apr.krikos === undefined && !_apr.krikosLoading) aprKrikosCargar();
   let h = "";
@@ -49096,7 +49096,7 @@ function aprRender() {
     escapeHtml(_dobHoy.map(_dobTxt).join(" · ")) + '. Si el de ISIS LK está mal, anulalo ahí y recargá.</div>';
   if (_dobFc.length) h += '<div class="apr-err">🧾 ' + _dobFc.length + ' pedido(s) de Chef son de clientes a los que LK les factura artículos de Loeke (FC Electr. en ISIS LK en los últimos ' + (_apr.dobleDias || 180) + ' días): NO se programan, los tipea compras en ISIS LK: ' +
     escapeHtml(_dobFc.map(_dobTxt).join(" · ")) + '.</div>';
-  h += aprDosDiasHtml();   // v15.48 — mismo cliente en dos días de la misma semana
+  // v23.58: aprDosDiasHtml() ya no se dibuja (regla derogada). La función queda sin puerta.
   h += aprKrikosHtml();    // v15.85 — OC de súper de Krikos sin cargar
   if (_apr.msg) h += '<div class="' + (_apr.msgErr ? "apr-err" : "apr-msg") + '">' + escapeHtml(_apr.msg) + '</div>';
   h += aprLogHtml();   // idea 2048
