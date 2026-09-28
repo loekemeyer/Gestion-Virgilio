@@ -81,5 +81,17 @@ ok(!/ open /.test(hB), "Cerrados por defecto");
 N._pedImpDesgAb["Becky|izq"] = 1;
 ok(/data-k="Becky\|izq" ontoggle="_pedImpDesgToggle\(this\)" open/.test(N._pedImpBandaHtml(prB, nacB, 25000, 9324, { prov: "Becky", items: itemsB, m3: 12.4 })), "El abierto sobrevive al re-render");
 
+// v23.78 (Luis): derechos 35% sólo Fujian, 18% el resto.
+ok(N._derechosProv("Fujian") === 0.35 && N._derechosProv(" Fujian ") === 0.35, "Fujian paga 35% de derechos");
+["Frontier", "Kangli", "Becky", "Ownland", ""].forEach(function (p) { ok(N._derechosProv(p) === 0.18, (p || "(vacío)") + " paga 18%"); });
+["consolidada", "full", "avion"].forEach(function (m) {
+  var b18 = N._pedImpNacionalizar(9324, 12.4, { modo: m, valorM3: 110, tn: 1, ntl: true, fleteFull: 2000 });
+  var b35 = N._pedImpNacionalizar(9324, 12.4, { modo: m, valorM3: 110, tn: 1, ntl: true, fleteFull: 2000, derechos: 0.35 });
+  var d18 = b18.detalle.filter(function (d) { return /^Derechos/.test(d[0]); })[0];
+  var d35 = b35.detalle.filter(function (d) { return /^Derechos/.test(d[0]); })[0];
+  ok(/18%/.test(d18[0]) && /35%/.test(d35[0]), m + ": el rótulo dice la tasa");
+  ok(Math.abs(d35[1] / d18[1] - 35 / 18) < 1e-9, m + ": derechos 35% = 35/18 del de 18%");
+  ok(b35.noRecup > b18.noRecup, m + ": Fujian sale más caro");
+});
 if (fail) { console.error("\n" + fail + " chequeo(s) fallaron."); process.exit(1); }
 console.log("\nOK — nacionalización y proyección 25k.");

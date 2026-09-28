@@ -3681,6 +3681,7 @@ recuperable con su fórmula (salen de `_pedImpNacionalizar().detalle[i][2]`, la 
 `_pedImpDesgAb` por proveedor. `tests/impo-nacionalizacion.cjs`.
 **Tasas (Luis, v23.77):** derechos **18 % del CIF** en los tres modos (base; cada artículo tiene su arancel) y
 estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la consolidada del Excel viejo.
+**Fujian paga 35 %** (v23.78, Luis: *"solo ponele 35% a fujian / 18% al resto"*): `_DERECHOS_PROV` / `_derechosProv(prov)`, los tres modos.
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.56): si la base de Gestión NO CONTESTA, avisa Telegram — y el vigilante vive en LK
 
