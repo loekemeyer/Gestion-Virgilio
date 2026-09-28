@@ -3735,9 +3735,16 @@ async function pendUploadFoto(id, file) {
   await sessionReady;
   const ext = (file.name && file.name.indexOf(".") >= 0) ? file.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") : "jpg";
   const path = id + "_" + Date.now() + "." + (ext || "jpg");
-  const opts = { upsert: true, contentType: file.type || "image/jpeg" };
+  // v23.38 — SIN upsert (seguridad). El nombre ya es único (id + hora en ms), así que
+  // pisar nunca hizo falta, y el upsert es lo único que obligaba a dejarle a la clave
+  // pública las reglas de LISTAR y PISAR fotos del bucket. Sin él, sólo hace falta
+  // subir (insert). Si un reintento choca con "ya existe", es que un intento anterior
+  // llegó aunque la respuesta se perdiera: la foto está, se sigue.
+  const opts = { upsert: false, contentType: file.type || "image/jpeg" };
+  const yaEsta = (r) => !!(r && r.error && (String(r.error.statusCode) === "409" ||
+    /already exists|duplicate/i.test(String(r.error.message || ""))));
   let up = await supabase.storage.from("remitos").upload(path, file, opts);
-  if (up && up.error) {
+  if (up && up.error && !yaEsta(up)) {
     // v6.72 — Fallback anti "row-level security policy": el login anónimo puede vencer
     // o caerse (pasó el 31/07: 0 usuarios anónimos nuevos) y el cliente manda una
     // sesión rota. La RLS del bucket `remitos` (y de Control_Modo_OP) permite rol
@@ -3745,12 +3752,12 @@ async function pendUploadFoto(id, file) {
     // con la publishable key (rol anon). Así la foto entra igual sin depender del login.
     try { await supabase.auth.signInAnonymously(); } catch (_e) {}
     up = await supabase.storage.from("remitos").upload(path, file, opts);
-    if (up && up.error) {
+    if (up && up.error && !yaEsta(up)) {
       try { await supabase.auth.signOut(); } catch (_e) {}
       up = await supabase.storage.from("remitos").upload(path, file, opts);
     }
   }
-  if (up.error) throw up.error;
+  if (up.error && !yaEsta(up)) throw up.error;
   const pub = supabase.storage.from("remitos").getPublicUrl(path);
   return (pub && pub.data) ? pub.data.publicUrl : null;
 }
