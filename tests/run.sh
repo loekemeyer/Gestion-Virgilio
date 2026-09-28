@@ -95,6 +95,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-atrasados-modulo (submodulo Pedidos atrasados: el criterio lo pone el backend) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-atrasados-modulo.cjs
+node tests/pga-monto-np.cjs
 
 echo "== ppp-tanda-por-camion (la tanda de un cliente se parte por camion: Balvanera y Ciudadela no viajan juntas) =="
 node tests/ppp-tanda-por-camion.cjs

@@ -3810,6 +3810,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
   border-radius:6px; padding:0 7px; font-size:12.5px; font-weight:800; margin-left:8px;
   vertical-align:1px; white-space:nowrap; }
 .pga-ped{ color:#94a3b8; font-size:13px; margin-left:8px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.pga-monto{ color:#047857; font-weight:600; font-size:13px; margin-left:8px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 /* v17.85 (Luis): las acciones de la fila de la NP.
    v17.94: van ANCLADAS A LA DERECHA de la columna, no colgando detrás del texto. Quedan siempre en
    el mismo lugar (se apuntan sin buscarlas) y le devuelven al renglón los ~90 px que ocupaban, que
@@ -6205,7 +6206,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.26"></script>
+<script type="module" src="recepcion.js?v=23.27"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10164,7 +10165,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.26";
+const APP_VERSION = "v23.27";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -41286,6 +41287,9 @@ function _pgaCuerpoHtml(dias, opts) {
                 escapeHtml(String(_dst.provincia || "").toUpperCase()) + '</span>' : '') +
             (r.fecha_pedido ? '<span class="pga-ped" title="Fecha en que entró el pedido">ped. ' +
               escapeHtml(String(r.fecha_pedido).slice(8, 10) + "/" + String(r.fecha_pedido).slice(5, 7)) + '</span>' : '') +
+            // v23.27 (Luis, 28/09): el MONTO del pedido, de gv_ppp_np_valor (a lista, sin IVA). No se recalcula acá.
+            (function () { const vn = _pgaValorNp(r.np); return vn ? '<span class="pga-monto" title="Monto estimado a lista, sin IVA ni descuentos' +
+              (vn.sinPrecio ? ' · ' + vn.sinPrecio + ' línea' + (vn.sinPrecio === 1 ? '' : 's') + ' sin precio (*)' : '') + '">$ ' + _pgpMonto(vn.valor) + (vn.sinPrecio ? ' *' : '') + '</span>' : ''; })() +
             '</span>' +
             // v17.90 (Luis): "hacé que los botones sean sólo los íconos y agregá la descripción
             // cuando uno pone el mouse encima". El `title` es el que cuenta qué hace cada uno.
