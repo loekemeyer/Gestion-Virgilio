@@ -28,6 +28,16 @@ Apps alcanzadas: **Gestión Virgilio** (`index.html` + `recepcion.js` + `sw.js`,
 - **Etapa 1 (base del login): HECHA** el 28/09 — `login-operario` v2, `red_empresa` (3 IP), `jwt_rol/jwt_legajo`,
   cierre nocturno. Probada. Ninguna app la usa: no cambia nada de lo actual. SQL: `sql/login_operarios_etapa1.sql`.
 
+
+**Decisiones del dueño (28/09):**
+- La regla de red es **solo para operarios** (entran por legajo). Quien entra con **mail (Google)** —dueño,
+  supervisores, gestión— **está exento**: entra desde cualquier lugar.
+- Operarios con datos móviles: **sin excepción, usan el Wi-Fi** de la empresa.
+- Redes vistas en el inventario: Lobos 181.105.135.47 = el dueño (cuenta Google) → exento; Caseros
+  190.247.118.38 = Planify de escritorio → fuera de este plan (tanda Planify). Red de operarios = las 3 IP
+  de la fichada. OJO etapa 2: desde la PC del dueño salen 6.336 pedidos SIN sesión (clave pública) contra
+  297 con sesión: las pantallas de gestión de GV también tienen que mandar la sesión Google antes de cerrar.
+
 ## Diseño
 
 1. **Lista de redes**: tabla `public.red_empresa (ip, sede, activo)` con las IP fijas de Cervantes y
