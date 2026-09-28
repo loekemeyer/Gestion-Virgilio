@@ -21,9 +21,15 @@ drop policy if exists remitos_delete on storage.objects;
 -- rollback: create policy remitos_delete on storage.objects for delete
 --             to anon, authenticated using (bucket_id = 'remitos');
 
--- 2b) PENDIENTE — recién cuando NINGÚN equipo de recepción corra una versión < v23.38
---     (la app NO se actualiza sola: muestra el botón "Actualizar" y espera). Hasta
---     v23.37 la foto se subía con upsert, que exige SELECT + UPDATE; desde v23.38 sólo
---     INSERT. Borrarlas antes deja sin foto a las tablets viejas.
--- drop policy if exists remitos_update on storage.objects;
+-- 2b) APLICADO 28/09 (dueño: con UPDATE abierto cualquiera "borra" pisando la foto con un
+--     archivo vacío). Verificado: anon actualiza 0 filas y sigue pudiendo subir.
+--     COSTO ACEPTADO: una tablet < v23.38 sube con upsert (exige UPDATE) → ve "No se pudo
+--     subir la foto… No se grabó nada" y no cierra la recepción hasta tocar "Actualizar".
+drop policy if exists remitos_update on storage.objects;
+-- rollback: create policy remitos_update on storage.objects for update to anon, authenticated
+--             using (bucket_id = 'remitos') with check (bucket_id = 'remitos');
+
+-- 2c) PENDIENTE — remitos_select. Probado en SQL: un INSERT ... RETURNING sin política
+--     SELECT falla por RLS. Si Storage sube con RETURNING, sacarla rompe TODAS las subidas.
+--     Se prueba contra el Storage real antes de tocarla.
 -- drop policy if exists remitos_select on storage.objects;
