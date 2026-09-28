@@ -61,20 +61,25 @@ function json(body: unknown, status: number, origin: string | null) {
 // Mail del supervisor, o null si el JWT no es de un supervisor.
 // La clave publica la manda el navegador (sb_publishable_): se usa esa, con la del entorno de
 // respaldo. Con la del entorno sola, la consulta daba 401 y todo supervisor salia rechazado.
+// El mail sale del JWT, que ya valido la plataforma (verify_jwt) y que es_supervisor_virgilio()
+// acaba de aceptar. NO se pregunta a /auth/v1/user: si la sesion de Google se renovo o se cerro
+// en otra pestana, contesta 403 session_not_found con un token todavia valido (paso el 28/09).
+function mailDelJwt(auth: string): string | null {
+  try {
+    const p = auth.replace(/^Bearer\s+/, '').split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const j = JSON.parse(atob(p + '='.repeat((4 - p.length % 4) % 4)));
+    return typeof j.email === 'string' && j.email ? j.email : null;
+  } catch { return null; }
+}
+
 async function supervisor(auth: string, apikey: string): Promise<string | null> {
-  const h = { apikey, Authorization: auth, 'Content-Type': 'application/json' };
-  const [rs, ru] = await Promise.all([
-    fetch(`${SUPABASE_URL}/rest/v1/rpc/es_supervisor_virgilio`, { method: 'POST', headers: h, body: '{}' }),
-    fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: h }),
-  ]);
-  if (!rs.ok || !ru.ok) {
-    console.error(`[web] supervisor rpc=${rs.status} user=${ru.status} ${(await rs.text()).slice(0, 200)} | ${(await ru.text()).slice(0, 200)}`);
-    return null;
-  }
+  const rs = await fetch(`${SUPABASE_URL}/rest/v1/rpc/es_supervisor_virgilio`, {
+    method: 'POST', body: '{}', headers: { apikey, Authorization: auth, 'Content-Type': 'application/json' },
+  });
+  if (!rs.ok) { console.error(`[web] supervisor rpc=${rs.status} ${(await rs.text()).slice(0, 200)}`); return null; }
   const es = await rs.json();
   if (es !== true) { console.error(`[web] es_supervisor_virgilio=${JSON.stringify(es)}`); return null; }
-  const u = await ru.json().catch(() => null);
-  return (u && typeof u.email === 'string' && u.email) || null;
+  return mailDelJwt(auth);
 }
 
 Deno.serve(async (req: Request) => {
