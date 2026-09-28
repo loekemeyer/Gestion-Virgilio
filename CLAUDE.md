@@ -176,6 +176,18 @@ de tanda ya está en cero se descarta y queda anotado. **`gv_stock_negativos` no
 agrega por código sin mirar la tanda, así que el saldo positivo de otra tanda tapa el agujero — el
 17/09 mostraba 3 de los 12 códigos que D66D había dejado en negativo. §3.gr.
 
+### 3 bis. Y la sesión que intenta cambiar una regla FRENA sola (Luis, 28/09, v23.37)
+
+El hook **`scripts/claude-reglas-guard.cjs`** (PreToolUse de `execute_sql` / `apply_migration`) frena
+todo `CREATE OR REPLACE` / `DROP` / `ALTER` —y el parche por texto `execute … pg_get_functiondef`— sobre
+un objeto de **`GV_Reglas_Centinela`**, o sobre el centinela mismo. Le muestra al modelo la regla y
+quién la pidió: **se le explica al usuario y se espera su "sí"**; recién ahí se reintenta con el
+comentario `-- REGLA_CONFIRMADA_POR_USUARIO` y el permiso sale en pantalla. La lista vive en
+**`scripts/reglas-protegidas.json`**: al agregar una fila al centinela, regenerarla (la consulta está
+en la cabecera del hook). El centinela vigila además **triggers** (`clase = 'trigger'`).
+⚠ Sólo corre en sesiones de ESTE repo: una sesión de LK o Chef que pegue contra esta base no lo tiene.
+`tests/claude-reglas-guard.cjs`.
+
 ### 4. Las tablas que valen hoy
 
 La lista viva está en la regla **"LAS TABLAS QUE VALEN"** más abajo, con la medición de cuál se
