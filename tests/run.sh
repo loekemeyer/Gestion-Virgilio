@@ -131,6 +131,8 @@ echo "== pweb-base-paginada (regresión: la base de picking web se pagina; limit
 node tests/pweb-base-paginada.cjs
 echo "== pweb-base-podar (problema 578: la foto de picking web poda lo que la NP ya no trae) =="
 node tests/pweb-base-podar.cjs
+echo "== stock-config-supervisor (problema 577: Stock_Config se escribe sólo con sesión de supervisor) =="
+node tests/stock-config-supervisor.cjs
 
 echo "== tanda-mia-seguir (regresión: la tanda que empecé YO no se bloquea — se retoma, aunque el celular perdiera el estado) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-mia-seguir.cjs
@@ -778,6 +780,9 @@ echo "== apr-cuar-chef-tarde (Regresión v21) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-chef-tarde.cjs
 echo "== apr-cuar-pedido-partido (v22.47: pedido partido = un item en Cuarentena) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-pedido-partido.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-pedido-partido.cjs
+echo "== apr-cuar-deuda-desde (v23.03: fecha de la deuda en el chip) =="
+node tests/apr-cuar-deuda-desde.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-una-vez.cjs
 
 echo "== apr-retenido-camion (Regresión v20) =="

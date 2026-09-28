@@ -5377,3 +5377,20 @@ devolver **5** objetos, no 4.
 
 **Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
 `sql/gv_ppp_tanda_renombrar_prog_web_v2088.sql`, `tests/ppp-renombrar-prog-web.cjs`, §3.lw.
+
+## ⚠ REGLA (Luis, 2026-09-28, v23.00): una COPIA que se reescribe con upsert tiene que PODAR lo que la fuente ya no trae
+
+Caso (problema 578): `PPP_Web_Base` —la lista de picking de cada NP web— se escribía sólo con
+upsert (`merge-duplicates` / `on conflict do update`). El upsert **suma y pisa, nunca saca**: si un
+artículo salía de la NP después de programada (corte de diferido del 24/09, pedido 1524), quedaba en
+las dos NP y E37A pickeó 954E y 956E de más. Hoy las tres escrituras llaman a
+`gv_ppp_web_base_podar`: saca lo que la NP ya no trae **sólo si la tanda no empezó**; lo de una tanda
+empezada queda en `gv_ppp_web_base_sobrante` (vacía = todo bien) y todo lo borrado en
+`GV_PPP_Web_Base_Podado`.
+
+> **Al escribir un sync con upsert, la pregunta es: si en la fuente algo DESAPARECE, ¿quién lo
+> borra acá?** Si la respuesta es "nadie", la copia miente para siempre.
+
+Barrido del 28/09: `ppp_web_resync` ya borra la NP entera que desaparece (tanda sin empezar);
+`sync-precios-venta` tiene `reconcileStale`; `gv-sync-padron-direcciones` **no borra** (8 direcciones
+de LK viejas del 14/09, ninguna con NP programada). `sql/gv_ppp_web_base_podar_v2300.sql`.
