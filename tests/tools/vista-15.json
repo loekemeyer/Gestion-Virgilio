@@ -8,7 +8,9 @@
     "SI SE CAMBIA UNA REGLA DE HORAS A PROPÓSITO: se vuelve a correr ese SELECT con el MCP y se",
     "pega el resultado acá. Si se cambia sin querer, el test se pone rojo, que es el punto.",
     "v23.68 (28/09): re-congelada con el trabajo en racks INFERIDO de las bajadas sin tramo (rk_ag): 94 hs_mov 2,63 -> 6,33 y 104 1,08 -> 1,15. El resto idéntico.",
-    "v23.70 (28/09): sin tope de tramo en racks inferido: 94 hs_mov 6,33 -> 7,97."
+    "v23.70 (28/09): sin tope de tramo en racks inferido: 94 hs_mov 6,33 -> 7,97.",
+    "v23.72 (28/09): lo abierto que cruza de día suma a SU día hasta el FJ; en el día de cierre sólo el tramo desde la entrada: 8 hs_arm 7,40 -> 6,75, hs_prod 10,73 -> 10,09.",
+    "v23.72-sig: la tarea abierta termina donde empieza la siguiente del legajo: 104 hs_mov 1,15 -> 1,83 (EI abierto 13:08 hasta el RT de 13:49)."
   ],
   "dia": "2026-09-15",
   "operarios": [
@@ -17,12 +19,12 @@
       "tandas_pick": 1,
       "prom_hs_pick": 0.01,
       "tandas_arm": 3,
-      "prom_hs_arm": 2.47,
+      "prom_hs_arm": 2.25,
       "hs_pick": 0.01,
-      "hs_arm": 7.4,
+      "hs_arm": 6.75,
       "hs_mov": 0.0,
       "hs_noprod": 0.89,
-      "hs_prod": 10.73
+      "hs_prod": 10.09
     },
     {
       "legajo": "94",
@@ -44,7 +46,7 @@
       "prom_hs_arm": 0,
       "hs_pick": 0.0,
       "hs_arm": 0.0,
-      "hs_mov": 1.15,
+      "hs_mov": 1.83,
       "hs_noprod": 0.57,
       "hs_prod": 0.36
     },
@@ -53,12 +55,12 @@
       "tandas_pick": 0,
       "prom_hs_pick": 0,
       "tandas_arm": 12,
-      "prom_hs_arm": 0.49,
+      "prom_hs_arm": 0.47,
       "hs_pick": 0.0,
-      "hs_arm": 5.91,
+      "hs_arm": 5.6,
       "hs_mov": 0.0,
       "hs_noprod": 2.4,
-      "hs_prod": 5.91
+      "hs_prod": 5.6
     },
     {
       "legajo": "277",

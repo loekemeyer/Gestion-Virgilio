@@ -116,6 +116,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== mon-tv (monitor liviano de TV: solo lectura, mismas fuentes que el monitor grande) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-tv.cjs
 node tests/tiempos-captura.cjs
+node tests/mg-por-codigo.cjs
 
 echo "== mon-guardado-camion (v23.64: bajada de racks = actividad · camion = grupo de zonas · pestaña Vista TV) =="
 node tests/mon-guardado-camion.cjs
