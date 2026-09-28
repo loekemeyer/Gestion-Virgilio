@@ -3503,6 +3503,15 @@ Centinelas ids 235-239. `sql/gv_imp_recibir_v2349.sql`.
 ⚠ **No recibir el mismo contenedor también por Recepción (recepcion.js)**: se contaría dos veces.
 `sql/gv_imp_recibir_v2345.sql`, `tests/imp-recibir.cjs`.
 
+## ⚠ REGLA (Luis, 2026-09-28, v23.56): si la base de Gestión NO CONTESTA, avisa Telegram — y el vigilante vive en LK
+
+Caída del 28/09 14:11–14:19 ART (reinicio de la plataforma, instancia chica; Luis decidió **no** subir la instancia).
+El vigilante **no puede vivir en la base que vigila**: corre en **LK** (cron `gv-watch-gestion`, cada minuto,
+`gv_watch_gestion_tick()`), pega a `rpc/gv_ping` de Gestión con la publishable y, con **3 fallas seguidas (~3 min)**,
+manda 🔴 al grupo de Gestión; al volver, 🟢 con los minutos de caída. `gv_ping()` sólo devuelve `now()`.
+**Chequeo (LK):** `select * from public.gv_watch_gestion order by id desc limit 10;` · Rollback en
+`sql/gv_watch_gestion_v2356_LK.sql`. Probado en transacción abortada (caída y vuelta), sin mandar mensajes.
+
 ## ⚠ REGLA (Elías, 2026-09-21, v20.58): la fecha se guarda ENTERA — y el blindaje va con centinela
 
 Dos cosas que salieron del mismo tirón y no se separan.
