@@ -72,6 +72,8 @@ node tests/checkhtml.cjs
 
 echo "== version-sync (APP_VERSION == SW_VERSION base — evita PWA cacheando app vieja) =="
 node tests/version-sync.cjs
+echo "== js-parsea (problema 579: sw.js y los .js propios parsean, sin marcas de conflicto) =="
+node tests/js-parsea.cjs
 
 echo "== version-tokens (los ?v= de los .js propios vs APP_VERSION — el bug que dejo main en rojo 2 veces el 13/09) =="
 node tests/version-tokens.cjs
