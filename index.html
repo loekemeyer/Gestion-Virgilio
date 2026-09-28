@@ -6206,7 +6206,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.28"></script>
+<script type="module" src="recepcion.js?v=23.29"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10165,7 +10165,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.28";
+const APP_VERSION = "v23.29";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49495,7 +49495,7 @@ function aprCuarentenaMotivos(p) {
   return [];
 }
 function aprCuarentenaEtiqueta(p) {
-  const T = { deuda: "Deuda", suspendido: "Suspendido", sin_cta_cte: "Sin Cta.Cte.", limite_credito: "Excede crédito", cliente_nuevo: "Cliente nuevo", cuarentena: "Retenido" };
+  const T = { deuda: "Deuda", suspendido: "Suspendido", sin_cta_cte: "Sin Cta.Cte.", limite_credito: "Excede crédito", cliente_nuevo: "Cliente nuevo", cliente_sin_padron: "Código de cliente inexistente", cuarentena: "Retenido" };
   const ms = aprCuarentenaMotivos(p);
   return ms.length ? ms.map(function (m) { return T[m] || m; }).join(" · ") : "Retenido";
 }
@@ -49510,6 +49510,8 @@ function aprCuarentenaMotivo(p) {
       (cuarPlata(d.exceso) ? " por " + cuarPlata(d.exceso) : "") + ".",
     cliente_nuevo: "Cliente nuevo" +
       (d.nuevo_pedidos != null ? " (" + Number(d.nuevo_pedidos) + " pedido" + (Number(d.nuevo_pedidos) === 1 ? "" : "s") + " facturado" + (Number(d.nuevo_pedidos) === 1 ? "" : "s") + " en toda su historia)" : "") + ".",
+    // v23.24 (Luis): el pedido trae un código de cliente que no está en el padrón (caso Capo 4318 → 4286).
+    cliente_sin_padron: "El código de cliente del pedido no existe en el padrón: corregirlo en la página.",
     cuarentena: "Pedido retenido en cuarentena.",
   };
   const ms = aprCuarentenaMotivos(p);
