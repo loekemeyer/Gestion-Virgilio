@@ -1,12 +1,13 @@
 {
   "_comentario": [
-    "Salida de public.gv_monitor_horas_operario_dia(date '2026-09-15'), congelada el 2026-09-22.",
+    "Salida de public.gv_monitor_horas_operario_dia(date '2026-09-15'), congelada el 2026-09-22; re-verificada el 2026-09-28 (v23.66: tarea abierta de HOY + trabajo en racks) — el 15/09 da idéntico.",
     "Es la mitad SQL de la comparación: tests/mon-vs-vista.cjs corre el monitor grande con los",
     "fixtures de ese día y exige que dé lo mismo. Las sesiones no pueden pegarle a Supabase (el",
     "proxy de egress bloquea supabase.co), así que la única forma de tener las dos mitades en un",
     "test es congelar ésta.",
     "SI SE CAMBIA UNA REGLA DE HORAS A PROPÓSITO: se vuelve a correr ese SELECT con el MCP y se",
-    "pega el resultado acá. Si se cambia sin querer, el test se pone rojo, que es el punto."
+    "pega el resultado acá. Si se cambia sin querer, el test se pone rojo, que es el punto.",
+    "v23.68 (28/09): re-congelada con el trabajo en racks INFERIDO de las bajadas sin tramo (rk_ag): 94 hs_mov 2,63 -> 6,33 y 104 1,08 -> 1,15. El resto idéntico."
   ],
   "dia": "2026-09-15",
   "operarios": [
@@ -30,7 +31,7 @@
       "prom_hs_arm": 0,
       "hs_pick": 0.0,
       "hs_arm": 0.0,
-      "hs_mov": 2.63,
+      "hs_mov": 6.33,
       "hs_noprod": 0.0,
       "hs_prod": 0.0
     },
@@ -42,7 +43,7 @@
       "prom_hs_arm": 0,
       "hs_pick": 0.0,
       "hs_arm": 0.0,
-      "hs_mov": 1.08,
+      "hs_mov": 1.15,
       "hs_noprod": 0.57,
       "hs_prod": 0.36
     },

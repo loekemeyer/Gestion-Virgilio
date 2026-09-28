@@ -5646,3 +5646,23 @@ de LK viejas del 14/09, ninguna con NP programada). `sql/gv_ppp_web_base_podar_v
   netos por Salió = CCN). El admin tiene la pestaña **📺 Vista TV** (la misma `monitor/tv.html` en iframe).
 - Horas: `hs_total` es la jornada y los baldes sólo lo CERRADO — la tarea abierta y la bajada de racks no suman.
   Pendiente de Luis. `sql/gv_monitor_tanda_camion_v2364.sql`, `tests/mon-guardado-camion.cjs`.
+
+## ⚠ REGLA (Luis, 2026-09-28, v23.66): las HORAS cuentan la tarea ABIERTA y el TRABAJO EN RACKS
+
+- **Hoy, la tarea abierta suma hasta ahora** (`gv_monitor_horas_operario_dia`, CTEs `abre`/`abierta`/`ab_*`): la más reciente
+  sin su cierre (EP sin TP, AP sin TAP, toggle, MGI, RKI, IRI), sin FJ posterior y de < 12 h, **menos los tiempos
+  muertos adentro — también el baño abierto** (misma lógica que las cerradas). El muerto abierto y el permiso van a no
+  productivas. Días pasados: sin cambios (el 15/09 del test da idéntico).
+- **Trabajo en racks = Hs MOV**: Bajar de racks (RKI al abrir → RKB con `ts_inicio` al confirmar o cerrar) e Ingreso a
+  racks (IRI → IRT al cerrar). El tiempo en el módulo cuenta aunque no se registren cajas. `gvRacksTramo` en index.html.
+- **Lo abierto lo suman la vista (TV) y la tabla Mts3 x Hora del admin (v23.67)**: fila «En curso (h)» para picking/armado abierto; lo demás a su fila. **No entra al m³/h** (la tanda no cerró).
+- Huella re-congelada (md5 `fcab722b…`), centinela 96 actualizado y fila nueva `ab_ag`. `sql/gv_monitor_horas_abiertas_v2366.sql`.
+
+## ⚠ REGLA (Luis, 2026-09-28, v23.68): el trabajo en racks sin tramo se INFIERE — y el admin abre en la Vista TV
+
+- Bajadas de racks (`Movimientos_Stock` baja_racks) e ingresos (IR) **sin tramo RKB/IRT** (celular viejo o anteriores a
+  la v23.66): tramo = desde la actividad anterior del legajo hasta el movimiento, **tope 60 min**, menos tiempo muerto;
+  suma a Hs MOV. Si el movimiento cae adentro de otra tarea cerrada, no suma. **Es estimación.** Vista (`rk_pts`/`rk_seg`/
+  `rk_ag`) ≡ `fetchMonitorDayStats` (`RK_TOPE`); fixture `tests/tools/rk-15.json` + `vista-15.json` re-congelada (94 → 6,33).
+- El monitor del admin abre directo en **📺 Vista TV** (kiosko de pared sigue en el monitor viejo).
+- ⚠ «Guardando» en vivo desde que abre el módulo (MGI) exige el celular en **v23.63+**; con uno más viejo sólo se ve al confirmar cada guardado.

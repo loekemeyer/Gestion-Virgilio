@@ -35,6 +35,22 @@ ok(/_monCamionDe\.get\(/.test(IDX), "el camión del admin tiene que mirar primer
 ok(/gv_monitor_tanda_camion/.test(IDX) && /gv_monitor_tanda_camion/.test(TV), "los dos monitores leen gv_monitor_tanda_camion");
 ok(/CAMION_DE\.get\(/.test(TV), "el camión de la TV tiene que mirar primero la base");
 
+// 4) v23.66 — el trabajo en racks deja su tramo con inicio y fin, y suma a Hs MOV
+ok(/gvRacksTramo\("RKI"/.test(IDX) && /gvRacksTramo\("RKB", _rkb\.legajo, _rkb\.tsInicio/.test(IDX), "Bajar de racks tiene que abrir (RKI) y cerrar su tramo (RKB con ts_inicio)");
+ok(/gvRacksTramo\("IRI"/.test(IDX) && /gvRacksTramo\("IRT", _ir\.legajo, _ir\.tsInicio/.test(IDX), "Ingreso a racks tiene que abrir (IRI) y cerrar su tramo (IRT con ts_inicio)");
+ok(/function closeRkb\(\) \{[\s\S]{0,300}gvRacksTramo\("RKB"/.test(IDX), "cerrar Bajar de racks sin confirmar también cierra el tramo");
+ok(/MOV_TOGGLE_CODES\s*= new Set\(\["MG", "RI", "EI", "RT", "RKB", "IRT"\]\)/.test(IDX), "Hs MOV del monitor grande tiene que sumar RKB e IRT (≡ la vista)");
+ok(/e\.op === "RKI"/.test(IDX) && /e\.op === "RKI"/.test(TV), "los dos monitores tienen que ver el tramo de racks EN CURSO");
+
+// 5) v23.67 — la tabla Mts3 x Hora del admin también cuenta la tarea ABIERTA (≡ la vista)
+ok(/abiertoProdMs/.test(IDX) && /const prodH = pickH \+ armH \+ otrosProdH \+ abiertoH;/.test(IDX), "prodH del admin tiene que sumar lo abierto");
+ok(/En curso<br>/.test(IDX), "falta la fila «En curso» en Mts3 x Hora");
+ok(/if \(dayKey === isoToDayKey\(Date\.now\(\)\)\)/.test(IDX), "lo abierto se suma SÓLO hoy");
+
+// 6) v23.68 — el admin abre directo en la vista TV, y la cuenta de racks inferida está en el monitor grande
+ok(/setMonitorTab\(window\.__tvKioskMode \? "monitor" : "tv"\)/.test(IDX), "el monitor del admin tiene que abrir en la Vista TV");
+ok(/RK_TOPE = 60 \* 60 \* 1000/.test(IDX) && /tipo=eq\.baja_racks/.test(IDX), "falta el trabajo en racks inferido en fetchMonitorDayStats (≡ rk_ag)");
+
 // 3) pestaña Vista TV
 ok(/setMonitorTab\('tv'\)/.test(IDX) && /monitor\/tv\.html\?key=tv/.test(IDX), "falta la pestaña 📺 Vista TV");
 

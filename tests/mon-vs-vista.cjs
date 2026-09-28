@@ -53,6 +53,7 @@ const VISTA = require("./tools/vista-15.json");
 const EV = require("./tools/ev-15.json");
 const FJPREV = require("./tools/fjprev-14.json");
 const EMP = require("./tools/emp.json");
+const RK = require("./tools/rk-15.json");   // v23.68: bajadas de racks del 15/09 (Movimientos_Stock)
 const FICH = [];                       // 0 fichadas ese día: medido, el QR no se usa más
 
 const DIA = VISTA.dia;
@@ -70,6 +71,7 @@ const TOL = 0.011;
     let body = "[]";
     if (u.indexOf("Fichadas_Virgilio") >= 0) body = JSON.stringify(FICH);
     else if (u.indexOf("Empleados") >= 0) body = JSON.stringify(EMP);
+    else if (u.indexOf("Movimientos_Stock") >= 0) body = JSON.stringify(RK);
     else if (u.indexOf("Registros_Produccion_Virgilio") >= 0) {
       body = (u.indexOf("opcion=eq.FJ") >= 0) ? JSON.stringify(FJPREV) : JSON.stringify(EV);
     }

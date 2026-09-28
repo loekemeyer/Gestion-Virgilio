@@ -278,8 +278,8 @@
 },
 {
 "objeto": "gv_monitor_horas_operario_dia",
-"regla": "Hs MOVIMIENTO son SOLO MG/RT/RI/EI. Baño, limpieza, timbre, comida, conteo y permiso NO son movimiento de mercaderia: van a no productivas (el MOV_TOGGLE_CODES ",
-"quien": "Damian (via Marianela), Luis (v19.07) / Damian, Thomas"
+"regla": "Hs MOVIMIENTO son MG/RT/RI/EI + trabajo en racks (RKB bajar de racks, IRT ingreso a racks; Luis v23.66). Baño, limpieza, timbre, comida, conteo y permiso NO son ",
+"quien": "Damian (via Marianela), Luis (v19.07, v23.66) / Damian, Thomas"
 },
 {
 "objeto": "gv_mov_empresa_resuelta",
