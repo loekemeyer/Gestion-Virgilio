@@ -6221,7 +6221,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.68"></script>
+<script type="module" src="recepcion.js?v=23.69"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10180,7 +10180,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.68";
+const APP_VERSION = "v23.69";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34070,19 +34070,29 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
         if (!k) continue;
         const ini = new Date(a.ts_cliente).getTime(), tx = String(a.texto || "").trim().toUpperCase();
         if (!(nowMs - ini < 12 * 3600 * 1000)) continue;
-        let cerrada = false;
-        for (let j = i + 1; j < evs.length && !cerrada; j++) {
+        let cerrada = false, finFJ = null;
+        for (let j = i + 1; j < evs.length && !cerrada && finFJ == null; j++) {
           const c = evs[j], ct = String(c.texto || "").trim().toUpperCase();
-          if (c.opcion === "FJ") cerrada = true;
+          if (c.opcion === "FJ") finFJ = new Date(c.ts_cliente).getTime();   // v23.69: el FJ CIERRA la tarea, no la borra
           else if (k === "EP") cerrada = c.opcion === "TP" && (!ct || ct === tx);
           else if (k === "AP") cerrada = c.opcion === "TAP" && (!ct || ct === tx);
           else if (k === "MG") cerrada = c.opcion === "MG" || c.opcion === "MGC";
           else cerrada = c.opcion === k && !!c.ts_inicio;
         }
-        if (!cerrada) abiertas.push({ k: k, ini: ini });
+        if (!cerrada) {
+          // v23.69 ≡ vista: sin FJ, hasta ahora pero no más allá del fin de jornada (max(último evento, hora_salida))
+          let fin = finFJ;
+          if (fin == null) {
+            const _hs = parseHHMMtoHours((horariosMap.get(String(leg)) || {}).salida);
+            const finJor = tsOfHourOnDay(dayKey, _hs == null ? 17 : _hs);
+            const ult = new Date(evs[evs.length - 1].ts_cliente).getTime();
+            fin = Math.min(nowMs, Math.max(ult, finJor));
+          }
+          abiertas.push({ k: k, ini: ini, fin: fin });
+        }
       }
       if (!abiertas.length) continue;
-      const deadAb = abiertas.filter(x => MUERTO.has(x.k)).map(x => ({ s: x.ini, e: nowMs }));
+      const deadAb = abiertas.filter(x => MUERTO.has(x.k)).map(x => ({ s: x.ini, e: x.fin }));
       const trab = abiertas.filter(x => !NOPROD_AB.has(x.k)).sort((a, b) => b.ini - a.ini)[0];
       const noab = abiertas.filter(x => NOPROD_AB.has(x.k)).sort((a, b) => b.ini - a.ini)[0];
       if (!perLegajo.has(leg)) perLegajo.set(leg, { firstTs: evs[0].ts_cliente, lastTs: evs[evs.length - 1].ts_cliente,
@@ -34091,18 +34101,18 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
         otrosProdMs: 0, otrosProdDetail: [], fjTs: null });
       const p = perLegajo.get(leg);
       if (trab) {
-        let muerto = deadOverlapMs(leg, trab.ini, nowMs);
-        for (const d of deadAb) { const ov = Math.min(nowMs, d.e) - Math.max(trab.ini, d.s); if (ov > 0) muerto += ov; }
-        const dur = Math.max(0, nowMs - trab.ini - muerto);
-        const det = { opcion: trab.k, texto: "(en curso)", ts_inicio: new Date(trab.ini).toISOString(), ts_cliente: new Date(nowMs).toISOString(), durMs: dur, brutoMs: nowMs - trab.ini, muertoMs: muerto, abierta: true };
+        let muerto = deadOverlapMs(leg, trab.ini, trab.fin);
+        for (const d of deadAb) { const ov = Math.min(trab.fin, d.e) - Math.max(trab.ini, d.s); if (ov > 0) muerto += ov; }
+        const dur = Math.max(0, trab.fin - trab.ini - muerto);
+        const det = { opcion: trab.k, texto: "(en curso)", ts_inicio: new Date(trab.ini).toISOString(), ts_cliente: new Date(trab.fin).toISOString(), durMs: dur, brutoMs: trab.fin - trab.ini, muertoMs: muerto, abierta: true };
         if (trab.k === "EP" || trab.k === "AP") p.abiertoProdMs = (p.abiertoProdMs || 0) + dur;
         else if (PROD_OTROS_CODES.has(trab.k)) { p.otrosProdMs += dur; p.otrosProdDetail.push(det); }
         else { p.movMs += dur; p.movDetail.push(det); }
       }
       if (noab) {
-        const dur = Math.max(0, nowMs - noab.ini);
+        const dur = Math.max(0, noab.fin - noab.ini);
         p.noprodMs += dur;
-        p.noprodDetail.push({ opcion: noab.k, texto: "(en curso)", ts_inicio: new Date(noab.ini).toISOString(), ts_cliente: new Date(nowMs).toISOString(), durMs: dur, abierta: true });
+        p.noprodDetail.push({ opcion: noab.k, texto: "(en curso)", ts_inicio: new Date(noab.ini).toISOString(), ts_cliente: new Date(noab.fin).toISOString(), durMs: dur, abierta: true });
       }
     }
   }

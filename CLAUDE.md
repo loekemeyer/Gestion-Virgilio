@@ -5666,3 +5666,6 @@ de LK viejas del 14/09, ninguna con NP programada). `sql/gv_ppp_web_base_podar_v
   `rk_ag`) ≡ `fetchMonitorDayStats` (`RK_TOPE`); fixture `tests/tools/rk-15.json` + `vista-15.json` re-congelada (94 → 6,33).
 - El monitor del admin abre directo en **📺 Vista TV** (kiosko de pared sigue en el monitor viejo).
 - ⚠ «Guardando» en vivo desde que abre el módulo (MGI) exige el celular en **v23.63+**; con uno más viejo sólo se ve al confirmar cada guardado.
+- **v23.69**: el **FJ CIERRA la tarea abierta** (cuenta hasta el FJ; antes la borraba) y sin FJ no pasa del fin de jornada
+  (vista `abierta.fin` ≡ admin `fin`). La TV: fuentes más grandes, Tandas a todo el alto, Operarios + «En este momento» en
+  el medio (≤ 4 operarios a la vez). `sql/gv_monitor_horas_cierre_dia_v2369.sql`.
