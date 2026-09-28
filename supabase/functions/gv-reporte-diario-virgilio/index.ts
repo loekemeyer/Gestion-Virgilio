@@ -8,6 +8,7 @@
 // Autenticacion: verify_jwt = true. wa_token de Meta va en el body (server_secrets.REPORTES_WA_TOKEN).
 // El bucket `reportes` es privado -> se firma la URL (createSignedUrl). Ver README.md.
 //   { "solo_pdf": true, "fecha": ".." }  -> arma el PDF, no manda WhatsApp; devuelve pdfUrl + bloques
+//   { "solo_pdf": true, "fecha": "..", "desde_hora": "13:00", "hasta_hora": "16:30" } -> solo ese lapso
 //   { "wa_token": "...", "test": false } -> hoy, a JUAN (cron 18hs)
 //   { "diag": true, "desde": "..", "hasta": ".." } -> auditoria de m3 por tanda
 
@@ -120,7 +121,7 @@ async function paginar(sb: any, tabla: string, cols: string, filtrar?: (q: any) 
 // calculo.js. Sin nombre queda `600` pelado y sale como "Entrevista (s/nombre)" --
 // NO se le atribuye a nadie por cercania de reloj.
 const LEGAJO_ENTREVISTA = "600";
-const SEP_PRUEBA = "\u00b7"; // punto medio: no aparece en un nombre tipeado
+const SEP_PRUEBA = "·"; // punto medio: no aparece en un nombre tipeado
 
 function legajoConPrueba(legajo: string, nombrePrueba: unknown): string {
   if (legajo !== LEGAJO_ENTREVISTA) return legajo;
@@ -417,7 +418,13 @@ type Fila = {
 type Pendientes = { m3pend: number; dias: number; guardCajas: number; guardRatio: number; guardHoras: number } | null;
 
 function aFila(p: any, dias: number, empMap: Map<string, string>, ex: Extra): Fila {
-  const hsProd = p.pickHs + p.armHs + p.ccHs;
+  // v23.66 - Luis, 28/09: "hs no prod deberian ser todas las tareas que no sean hs prod",
+  // con Carga Camion dibujada bajo Tiempo No Productivo. Hasta la v23.65 hsProd sumaba
+  // tambien ccHs, asi que la carga del camion contaba como produccion y el cuadro se
+  // contradecia solo. PRODUCTIVO = lo que mueve m3 y tiene ritmo: Picking y Armado.
+  // Todo lo demas registrado -- carga de camion incluida -- es No Productivo.
+  // El Total Hs Dia NO se mueve: lo unico que cambia es donde se parte.
+  const hsProd = p.pickHs + p.armHs;
   const noProd = Math.max(0, p.totHs - hsProd);
   const g = ex.det.get(p.legajo) || { RT: 0, MG: 0, Limp: 0, PB: 0 };
   return {
@@ -430,22 +437,47 @@ function aFila(p: any, dias: number, empMap: Map<string, string>, ex: Extra): Fi
   };
 }
 
+// ===== v23.66 - el cuadro va con BANDAS, como la planilla de Luis (25/09) =====
+// Dos filas de encabezado: la banda agrupa y la de abajo nombra. Eso deja que las
+// columnas se llamen "Picking" y "Armado" cuatro veces sin ambiguedad -- lo que las
+// distingue es la banda, no un titulo largo repetido en cada una.
+// El ORDEN tambien cambia: el ritmo (m3/h) junto, el total por dia junto, y las tres
+// de horas del dia seguidas. "Hs No Productivas" sube al lado de "Hs Prod", que es
+// contra lo que se lee.
+// ⚠ Carga Camion va bajo "Tiempo No Productivo", y la CUENTA lo acompaña: desde la
+// v23.66 hsProd = Picking + Armado, sin ccHs (ver aFila). Las dos mitades tienen que
+// moverse juntas o el cuadro se contradice: hasta la v23.65 la banda decia no
+// productivo y la suma lo contaba como productivo.
+const BANDAS: { h: string[]; n: number }[] = [
+  { h: [], n: 1 },                            // Operario
+  { h: ["Ritmo", "(M3 x Hs)"], n: 2 },
+  { h: ["Total x Dia"], n: 2 },
+  { h: [], n: 3 },                            // Total Hs Dia / Hs Prod / Hs No Productivas
+  { h: ["Tiempo", "Productivo"], n: 2 },
+  { h: ["Tiempo No Productivo"], n: 6 },
+];
+
 const COLS: { h: string[]; w: number; get: (f: Fila) => string; left?: boolean; name?: boolean }[] = [
   { h: ["Operario"], w: 42, get: (f) => f.nombre, left: true, name: true },
-  { h: ["Prom.", "Picking", "M3 x Hs"], w: 16, get: (f) => celda(f.pkH) },
-  { h: ["Prom.", "Picking", "M3 x Dia"], w: 16, get: (f) => celda(f.pkD) },
-  { h: ["Prom.", "Arm", "M3 x Hs"], w: 16, get: (f) => celda(f.arH) },
-  { h: ["Prom.", "Arm", "M3 x Dia"], w: 16, get: (f) => celda(f.arD) },
+  // Ritmo (M3 x Hs)
+  { h: ["Picking"], w: 16, get: (f) => celda(f.pkH) },
+  { h: ["Armado"], w: 16, get: (f) => celda(f.arH) },
+  // Total x Dia
+  { h: ["Picking"], w: 16, get: (f) => celda(f.pkD) },
+  { h: ["Armado"], w: 16, get: (f) => celda(f.arD) },
+  // sin banda
   { h: ["Total", "Hs Dia"], w: 15, get: (f) => celdaHs(f.totDia) },
   { h: ["Hs", "Prod"], w: 14, get: (f) => celdaHs(f.hsProd) },
+  { h: ["Hs No", "Productivas"], w: 18, get: (f) => celdaHs(f.noProd) },
+  // Tiempo Productivo
   { h: ["Picking"], w: 14, get: (f) => celdaHs(f.pick) },
   { h: ["Armado"], w: 14, get: (f) => celdaHs(f.arm) },
-  { h: ["Carga de", "Camion"], w: 16, get: (f) => celdaHs(f.cc) },
-  { h: ["Hs No", "Productivas"], w: 18, get: (f) => celdaHs(f.noProd) },
+  // Tiempo No Productivo
+  { h: ["Carga", "Camion"], w: 16, get: (f) => celdaHs(f.cc) },
   { h: ["Recp de", "Merc"], w: 15, get: (f) => celdaHs(f.rt) },
   { h: ["Guardado", "de Merc"], w: 16, get: (f) => celdaHs(f.mg) },
   { h: ["Limpieza"], w: 14, get: (f) => celdaHs(f.limp) },
-  { h: ["Baño"], w: 12, get: (f) => celdaHs(f.pb) },
+  { h: ["Ba\u00f1o"], w: 12, get: (f) => celdaHs(f.pb) },
   { h: ["Hs", "S/Reg"], w: 16, get: (f) => celdaHs(f.sinReg) },
 ];
 
@@ -453,7 +485,7 @@ type Bloque = { subtitulo: string; filas: Fila[] };
 
 function construirPdf(titulo: string, bloques: Bloque[], pend: Pendientes) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const mL = 12, top = 15, hF = 7, hEnc = 13;
+  const mL = 12, top = 15, hF = 7, hEnc = 13, hBanda = 9;
   const totW = COLS.reduce((a, c) => a + c.w, 0);
   const x0 = [mL]; COLS.forEach((c) => x0.push(x0[x0.length - 1] + c.w));
   const mid = (i: number) => (x0[i] + x0[i + 1]) / 2;
@@ -478,6 +510,22 @@ function construirPdf(titulo: string, bloques: Bloque[], pend: Pendientes) {
       doc.setFont("helvetica", "bold"); doc.setFontSize(14);
       doc.text(b.subtitulo, mL, y + 4); y += 6;
     }
+    // v23.66 - fila de BANDAS arriba del encabezado. Cada banda es su propia caja, con
+    // su borde: las que no tienen titulo (Operario, y las tres de horas del dia) salen
+    // vacias a proposito, como en la planilla.
+    doc.setFontSize(9); doc.setFont("helvetica", "bold");
+    let _bc = 0;
+    // `bn`, no `b`: adentro estamos en el forEach de bloques, que ya usa `b`. Sombrearla
+    // anda igual y es justo el tipo de cosa que despues muerde.
+    BANDAS.forEach((bn) => {
+      const xa = x0[_bc], xb = x0[_bc + bn.n];
+      doc.setLineWidth(0.7); doc.rect(xa, y, xb - xa, hBanda);
+      const startB = y + (hBanda - bn.h.length * 3.6) / 2 + 3.2;
+      bn.h.forEach((ln, k) => doc.text(ln, (xa + xb) / 2, startB + k * 3.6, { align: "center" }));
+      _bc += bn.n;
+    });
+    y += hBanda;
+
     doc.setFontSize(9); doc.setFont("helvetica", "bold");
     COLS.forEach((c, i) => {
       const startY = y + (hEnc - c.h.length * 3.6) / 2 + 3.2;
@@ -662,6 +710,7 @@ Deno.serve(async (req: Request) => {
         ventana: ventana ? ventana.etiqueta : null,
         pdf_bytes: bytes.length, pdf_base64: btoa(bin),
         columnas: COLS.map((c) => ({ h: c.h, left: !!c.left, key: c.h.join(" ") })),
+        bandas: BANDAS.map((b) => ({ h: b.h, n: b.n })),
         bloques: bloques.map((b) => ({
           subtitulo: b.subtitulo || "(unico)",
           filas: b.filas.map((f) => ({
@@ -676,7 +725,14 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const numeros = esTest ? DESTINATARIOS_TEST : DESTINATARIOS_PROD;
+    // v23.66 - destinatarios explicitos para una prueba puntual. Sin esto, mandar el
+    // reporte a un numero que no sea el de Juan o el de pruebas obligaba a tocar la
+    // constante y redeployar. Se usan SOLO si vienen en el body; el cron no los manda,
+    // asi que el envio diario sigue yendo a donde siempre.
+    const destPedidos = Array.isArray(body?.destinatarios)
+      ? body.destinatarios.map((n: any) => String(n).replace(/\D/g, "")).filter(Boolean)
+      : [];
+    const numeros = destPedidos.length ? destPedidos : (esTest ? DESTINATARIOS_TEST : DESTINATARIOS_PROD);
     const waToken = Deno.env.get("WA_TOKEN") || String(body?.wa_token || "");
     if (!waToken) {
       return responder({ error: "falta el token de Meta (body.wa_token o secret WA_TOKEN)", pdfUrl }, 500);
@@ -716,7 +772,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return responder({
-      test: esTest, fecha, hora: horaAR(), plantilla: WA_TEMPLATE,
+      test: esTest, fecha, hora: horaAR(), plantilla: WA_TEMPLATE, destinatarios: numeros,
       operarios: totalFilas, eventos: produccion.length,
       enviados: resultados.filter((x) => x.ok).length, total: numeros.length,
       pdfUrl, pendientes: pend, resultados,

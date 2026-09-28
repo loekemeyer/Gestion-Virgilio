@@ -20528,23 +20528,37 @@ function stkNpFaltanExport() {
 // m³/día, hs). El ancho lo tiene que dar el DATO, no el título: "Prom. Picking M3 x Hs"
 // medía más que "0,70" y estiraba la columna al pedo. Y las dos columnas que decían
 // "Picking" (una en m³/h y otra en horas) ahora se distinguen solas.
+// v23.66 — el cuadro va con BANDAS (planilla de Luis, 25/09). La banda agrupa y la fila
+// de abajo nombra: por eso "Picking" y "Armado" pueden repetirse — lo que las distingue
+// es la banda, no un título largo en cada columna.
+// ⚠ Carga Camión va en Tiempo No Productivo, y la CUENTA lo acompaña: la edge calcula
+// Hs Prod = Picking + Armado (sin carga de camión) desde la v23.66. Las dos mitades se
+// mueven juntas o el cuadro se contradice solo.
+const RV_BANDAS = [
+  { h: "", n: 1 },                       // Operario
+  { h: "Ritmo<br>(m³ x Hs)", n: 2 },
+  { h: "Total x Día<br>(m³)", n: 2 },
+  { h: "", n: 3 },                       // Total Hs Día · Hs Prod · Hs No Productivas
+  { h: "Tiempo<br>Productivo", n: 2 },
+  { h: "Tiempo No Productivo", n: 6 },
+];
 const RV_COLS = [
   { k: "nombre", h: "Operario", name: true },
-  { k: "pkH", h: "Picking<br>m³/h" },
-  { k: "pkD", h: "Picking<br>m³/día" },
-  { k: "arH", h: "Armado<br>m³/h" },
-  { k: "arD", h: "Armado<br>m³/día" },
-  { k: "totDia", h: "Total<br>hs día" },
-  { k: "hsProd", h: "Hs<br>prod" },
-  { k: "pick", h: "Picking<br>hs" },
-  { k: "arm", h: "Armado<br>hs" },
-  { k: "cc", h: "Carga<br>camión" },
-  { k: "noProd", h: "Hs no<br>prod." },
-  { k: "rt", h: "Recep.<br>merc." },
-  { k: "mg", h: "Guard.<br>merc." },
+  { k: "pkH", h: "Picking" },
+  { k: "arH", h: "Armado" },
+  { k: "pkD", h: "Picking" },
+  { k: "arD", h: "Armado" },
+  { k: "totDia", h: "Total<br>Hs Día" },
+  { k: "hsProd", h: "Hs<br>Prod" },
+  { k: "noProd", h: "Hs No<br>Productivas" },
+  { k: "pick", h: "Picking" },
+  { k: "arm", h: "Armado" },
+  { k: "cc", h: "Carga<br>Camión" },
+  { k: "rt", h: "Recp de<br>Merc" },
+  { k: "mg", h: "Guardado<br>de Merc" },
   { k: "limp", h: "Limpieza" },
   { k: "pb", h: "Baño" },
-  { k: "sinReg", h: "Hs<br>s/reg" },
+  { k: "sinReg", h: "Hs<br>S/Reg" },
 ];
 function openReporteVirgilio() {
   // v21.28 — tarjeta ANCHA (1760): con 760 las 16 columnas quedaban cortadas y el cuadro
@@ -20590,10 +20604,17 @@ function _rvBloqueHtml(b) {
   // celular; en el monitor no tiene que hacer falta tocarlo.
   h += '<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:6px">' +
     '<table style="border-collapse:collapse;table-layout:auto;font-size:14px;background:#fff">';
-  h += '<thead><tr>' + RV_COLS.map(function (c) {
-    const al = c.name ? "left" : "right";
+  // fila de BANDAS: una celda por grupo, con colspan. Las que no tienen título van
+  // vacías a propósito (Operario y las tres de horas del día), igual que en la planilla.
+  h += '<thead><tr>' + RV_BANDAS.map(function (bn) {
+    return '<th colspan="' + bn.n + '" style="padding:5px 10px;text-align:center;vertical-align:middle;' +
+      'background:#fff;color:#0f172a;font-size:15px;font-weight:800;line-height:1.2;white-space:nowrap;' +
+      'border-bottom:1px solid #cbd5e1;' + (bn.h ? 'border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;' : '') +
+      '">' + bn.h + '</th>';
+  }).join("") + '</tr><tr>' + RV_COLS.map(function (c) {
+    const al = c.name ? "left" : "center";
     const sticky = c.name ? "position:sticky;left:0;z-index:3;background:#fff;" : "";
-    return '<th style="' + sticky + 'padding:6px 10px;text-align:' + al + ';vertical-align:middle;background:#fff;color:#0f172a;font-size:16px;font-weight:800;line-height:1.2;border-bottom:2px solid #cbd5e1;white-space:nowrap;position:sticky;top:0;">' + c.h + '</th>';
+    return '<th style="' + sticky + 'padding:6px 7px;text-align:' + al + ';vertical-align:middle;background:#fff;color:#0f172a;font-size:16px;font-weight:800;line-height:1.2;border-bottom:2px solid #cbd5e1;white-space:nowrap;">' + c.h + '</th>';
   }).join("") + '</tr></thead><tbody>';
   h += filas.map(function (f) {
     return '<tr>' + RV_COLS.map(function (c) {

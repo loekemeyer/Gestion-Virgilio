@@ -30116,3 +30116,64 @@ pedido o en viaje"* · *"si se recibe más de lo que se iba a recibir, cancela l
 Caída 14:11–14:19 ART (reinicio de plataforma; tráfico normal, sin consulta culpable). Gestión: `gv_ping()` (anon, sólo `now()`).
 LK: `gv_watch_gestion` + `gv_watch_gestion_estado` (RLS, sin grants) y cron `gv-watch-gestion` cada minuto → `gv_watch_gestion_tick()`:
 3 fallas seguidas → 🔴 Telegram al grupo; primer OK → 🟢 con minutos. Probado en transacción abortada. Rollback en `sql/gv_watch_gestion_v2356_LK.sql`.
+
+## §3.mn — v23.69: el Reporte diario va con BANDAS, y Hs Prod = Picking + Armado
+
+**Luis, 2026-09-28**, con la planilla del 25/09: *"arma el pdf del modulo de arriba de esta forma"*
+· *"hs no prod deberian ser todas las tareas que no sean hs prod"*.
+
+### 1. Hs Prod ya NO cuenta la carga de camión
+
+Hasta la v23.65, `aFila` de la edge `gv-reporte-diario-virgilio` hacía
+`hsProd = pickHs + armHs + ccHs`, mientras la planilla dibujaba **Carga Camión bajo
+"Tiempo No Productivo"**: el cuadro se contradecía solo. Hoy **`hsProd = pickHs + armHs`** y
+`noProd = totHs − hsProd` se lleva la carga de camión con todo lo demás.
+
+**El Total Hs Día no se mueve**; sólo cambia dónde se parte. Medido el 25/09 (v23 → v24):
+
+| operario | Total Hs Día | Hs Prod antes → ahora | Hs No Prod antes → ahora |
+|---|---|---|---|
+| Farias Juan Hilario | 8:16 | 5:45 → **4:42** | 2:31 → **3:34** |
+| Jhonny Moncayo | 6:51 | 3:12 → **3:02** | 3:39 → **3:49** |
+| Isidro Tevez | 4:25 | — | 4:25 (sin cambio) |
+
+⚠ **Esto llega al WhatsApp de las 18 hs a Juan**: es el mismo reporte.
+
+### 2. Qué trae cada columna, para no volver a preguntarlo
+
+- **Hs Prod** = Picking + Armado (lo que mueve m³ y tiene ritmo).
+- **Hs No Prod** = todo lo demás marcado. Sólo 5 tienen columna (Carga Camión, Recp de Merc,
+  Guardado de Merc, Limpieza, Baño); **9 suman sin columna propia**: Recep. Insumos, Entrega
+  Insumos, Control Remitos, Conteo, Atendí Timbre, Recep. Remitos, Completar Pedido, Almuerzo,
+  Permiso. Por eso las columnas de "Tiempo No Productivo" **no suman** Hs No Prod.
+- **Hs S/Reg** = la jornada sin ninguna marca. Jornada = Hs Prod + Hs No Prod + Hs S/Reg.
+- ⚠ Cuando dos tareas se pisan, el tiempo va a la **de adentro** (un timbre en medio de un
+  picking le descuenta al picking). Es la pila de `calculo.js`, no un error.
+
+### 3. Bandas y orden (PDF y pantalla, iguales)
+
+`BANDAS` en la edge y `RV_BANDAS` en `index.html`, con el orden de la planilla:
+Operario · **Ritmo (m³ x Hs)**: Picking, Armado · **Total x Día (m³)**: Picking, Armado ·
+Total Hs Día, Hs Prod, Hs No Productivas · **Tiempo Productivo**: Picking, Armado ·
+**Tiempo No Productivo**: Carga Camión, Recp de Merc, Guardado de Merc, Limpieza, Baño, Hs S/Reg.
+La respuesta `solo_pdf` publica `bandas`, así se verifica sin abrir el PDF.
+
+### 4. `destinatarios` en el body
+
+`{ "fecha": "2026-09-25", "test": false, "destinatarios": ["5491131181027"], "wa_token": … }`
+manda la prueba **sólo** a esos números. El cron 98 no lo manda, así que el envío diario sigue
+yendo a Juan. Para disparar una prueba sin que el token pase por la sesión:
+`wa_token := (select v from lecturacvs.server_secrets where k = 'REPORTES_WA_TOKEN')` dentro del
+mismo `net.http_post`. Probado el 28/09: 1/1 entregado.
+
+### ⚠ Encontrado y NO tocado: Hs S/Reg se corta antes de tiempo con un número impar de CP
+
+`calcExtra` cuenta los toggles (`TOG = CC, CR, RR, CP, RT, MG`) y si un código queda impar lo
+toma como **abierto** y deja de contar sin-registro desde ahí. Pero **CP y MG se registran como
+un solo evento con `ts_inicio`** (inicio y fin en la misma fila): cada uno ya es un par cerrado.
+Con 3 CP (Jhonny, 25/09, 14:52–14:53) el reporte lo toma como abierto a las 14:53 y le saca **4
+minutos** de sin-registro (1:54 en vez de 1:58). Con un número par de CP/MG no se nota. El
+arreglo es no contar en `togCnt` los eventos que traen `ts_inicio`. No se aplicó: queda para
+decidir.
+
+**Chequeo:** `node tests/rv-cuadro-entero.cjs` (bandas, orden y ancho, medidos en el render).
