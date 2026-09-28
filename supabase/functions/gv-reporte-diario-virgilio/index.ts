@@ -458,7 +458,7 @@ const BANDAS: { h: string[]; n: number }[] = [
 ];
 
 const COLS: { h: string[]; w: number; get: (f: Fila) => string; left?: boolean; name?: boolean }[] = [
-  { h: ["Operario"], w: 42, get: (f) => f.nombre, left: true, name: true },
+  { h: ["Operario"], w: 40, get: (f) => f.nombre, left: true, name: true },
   // Ritmo (M3 x Hs)
   { h: ["Picking"], w: 16, get: (f) => celda(f.pkH) },
   { h: ["Armado"], w: 16, get: (f) => celda(f.arH) },
@@ -468,15 +468,15 @@ const COLS: { h: string[]; w: number; get: (f: Fila) => string; left?: boolean; 
   // sin banda
   { h: ["Total", "Hs Dia"], w: 15, get: (f) => celdaHs(f.totDia) },
   { h: ["Hs", "Prod"], w: 14, get: (f) => celdaHs(f.hsProd) },
-  { h: ["Hs No", "Productivas"], w: 18, get: (f) => celdaHs(f.noProd) },
+  { h: ["Hs No", "Productivas"], w: 20, get: (f) => celdaHs(f.noProd) },
   // Tiempo Productivo
   { h: ["Picking"], w: 14, get: (f) => celdaHs(f.pick) },
   { h: ["Armado"], w: 14, get: (f) => celdaHs(f.arm) },
   // Tiempo No Productivo
   { h: ["Carga", "Camion"], w: 16, get: (f) => celdaHs(f.cc) },
   { h: ["Recp de", "Merc"], w: 15, get: (f) => celdaHs(f.rt) },
-  { h: ["Guardado", "de Merc"], w: 16, get: (f) => celdaHs(f.mg) },
-  { h: ["Limpieza"], w: 14, get: (f) => celdaHs(f.limp) },
+  { h: ["Guardado", "de Merc"], w: 17, get: (f) => celdaHs(f.mg) },
+  { h: ["Limpieza"], w: 15, get: (f) => celdaHs(f.limp) },
   { h: ["Ba\u00f1o"], w: 12, get: (f) => celdaHs(f.pb) },
   { h: ["Hs", "S/Reg"], w: 16, get: (f) => celdaHs(f.sinReg) },
 ];
@@ -485,10 +485,28 @@ type Bloque = { subtitulo: string; filas: Fila[] };
 
 function construirPdf(titulo: string, bloques: Bloque[], pend: Pendientes) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const mL = 12, top = 15, hF = 7, hEnc = 13, hBanda = 9;
-  const totW = COLS.reduce((a, c) => a + c.w, 0);
-  const x0 = [mL]; COLS.forEach((c) => x0.push(x0[x0.length - 1] + c.w));
-  const mid = (i: number) => (x0[i] + x0[i + 1]) / 2;
+  // v23.71 - cada banda es una ISLA, como la planilla: un hueco entre bloques y borde
+  // grueso alrededor de cada uno (banda + encabezado + datos). El margen se centra solo.
+  const GAP = 3, top = 15, hF = 7, hEnc = 13, hBanda = 9;
+  const totW = COLS.reduce((a, c) => a + c.w, 0) + GAP * (BANDAS.length - 1);
+  const mL = (297 - totW) / 2;
+  const x0: number[] = [];
+  const islas: { a: number; b: number; h: string[] }[] = [];
+  {
+    let x = mL, ci = 0;
+    BANDAS.forEach((bn, k) => {
+      if (k > 0) x += GAP;
+      const a = ci;
+      for (let j = 0; j < bn.n; j++, ci++) { x0[ci] = x; x += COLS[ci].w; }
+      islas.push({ a, b: ci - 1, h: bn.h });
+    });
+  }
+  const xR = (i: number) => x0[i] + COLS[i].w;
+  const mid = (i: number) => (x0[i] + xR(i)) / 2;
+  const lineas = (ls: string[], xa: number, xb: number, yt: number, h: number) => {
+    const s = yt + (h - ls.length * 3.6) / 2 + 3.2;
+    ls.forEach((ln, k) => doc.text(ln, (xa + xb) / 2, s + k * 3.6, { align: "center" }));
+  };
   const CC = (t: string, xa: number, xb: number, yt: number, h: number) =>
     doc.text(String(t), (xa + xb) / 2, yt + h / 2, { align: "center", baseline: "middle" } as any);
 
@@ -510,30 +528,24 @@ function construirPdf(titulo: string, bloques: Bloque[], pend: Pendientes) {
       doc.setFont("helvetica", "bold"); doc.setFontSize(14);
       doc.text(b.subtitulo, mL, y + 4); y += 6;
     }
-    // v23.66 - fila de BANDAS arriba del encabezado. Cada banda es su propia caja, con
-    // su borde: las que no tienen titulo (Operario, y las tres de horas del dia) salen
-    // vacias a proposito, como en la planilla.
-    doc.setFontSize(9); doc.setFont("helvetica", "bold");
-    let _bc = 0;
-    // `bn`, no `b`: adentro estamos en el forEach de bloques, que ya usa `b`. Sombrearla
-    // anda igual y es justo el tipo de cosa que despues muerde.
-    BANDAS.forEach((bn) => {
-      const xa = x0[_bc], xb = x0[_bc + bn.n];
-      doc.setLineWidth(0.7); doc.rect(xa, y, xb - xa, hBanda);
-      const startB = y + (hBanda - bn.h.length * 3.6) / 2 + 3.2;
-      bn.h.forEach((ln, k) => doc.text(ln, (xa + xb) / 2, startB + k * 3.6, { align: "center" }));
-      _bc += bn.n;
+    // v23.66 - fila de BANDAS arriba del encabezado. v23.71 - la isla sin titulo de banda
+    // (Operario, y las tres de horas del dia) lleva el encabezado en las dos filas, como la
+    // celda combinada de la planilla.
+    const yB = y, yH = y + hBanda, yD = yH + hEnc;
+    doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.setLineWidth(0.15);
+    islas.forEach((g) => {
+      const xa = x0[g.a], xb = xR(g.b);
+      if (g.h.length) {
+        lineas(g.h, xa, xb, yB, hBanda);
+        doc.line(xa, yH, xb, yH);
+        for (let i = g.a; i <= g.b; i++) lineas(COLS[i].h, x0[i], xR(i), yH, hEnc);
+        for (let i = g.a + 1; i <= g.b; i++) doc.line(x0[i], yH, x0[i], yD);
+      } else {
+        for (let i = g.a; i <= g.b; i++) lineas(COLS[i].h, x0[i], xR(i), yB, hBanda + hEnc);
+        for (let i = g.a + 1; i <= g.b; i++) doc.line(x0[i], yB, x0[i], yD);
+      }
     });
-    y += hBanda;
-
-    doc.setFontSize(9); doc.setFont("helvetica", "bold");
-    COLS.forEach((c, i) => {
-      const startY = y + (hEnc - c.h.length * 3.6) / 2 + 3.2;
-      c.h.forEach((ln, k) => doc.text(ln, mid(i), startY + k * 3.6, { align: "center" }));
-    });
-    doc.setLineWidth(0.7); doc.rect(mL, y, totW, hEnc);
-    doc.setLineWidth(0.15); for (let i = 1; i < COLS.length; i++) doc.line(x0[i], y, x0[i], y + hEnc);
-    y += hEnc;
+    y = yD;
     const yC = y;
     doc.setFont("helvetica", "normal"); doc.setFontSize(14);
     b.filas.forEach((f) => {
@@ -545,10 +557,15 @@ function construirPdf(titulo: string, bloques: Bloque[], pend: Pendientes) {
       });
       y += hF;
     });
-    doc.setLineWidth(0.15);
-    for (let i = 1; i < b.filas.length; i++) doc.line(mL, yC + i * hF, mL + totW, yC + i * hF);
-    for (let i = 1; i < COLS.length; i++) doc.line(x0[i], yC, x0[i], y);
-    doc.setLineWidth(0.7); doc.rect(mL, yC, totW, y - yC);
+    islas.forEach((g) => {
+      const xa = x0[g.a], xb = xR(g.b);
+      doc.setLineWidth(0.15);
+      for (let r = 1; r < b.filas.length; r++) doc.line(xa, yC + r * hF, xb, yC + r * hF);
+      for (let i = g.a + 1; i <= g.b; i++) doc.line(x0[i], yC, x0[i], y);
+      doc.setLineWidth(0.7);
+      doc.line(xa, yC, xb, yC);               // grueso entre encabezado y datos
+      doc.rect(xa, yB, xb - xa, y - yB);      // borde grueso de la isla entera
+    });
   });
 
   if (pend) {

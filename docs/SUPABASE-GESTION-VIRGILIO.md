@@ -30117,7 +30117,12 @@ Caída 14:11–14:19 ART (reinicio de plataforma; tráfico normal, sin consulta 
 LK: `gv_watch_gestion` + `gv_watch_gestion_estado` (RLS, sin grants) y cron `gv-watch-gestion` cada minuto → `gv_watch_gestion_tick()`:
 3 fallas seguidas → 🔴 Telegram al grupo; primer OK → 🟢 con minutos. Probado en transacción abortada. Rollback en `sql/gv_watch_gestion_v2356_LK.sql`.
 
-## §3.mn — v23.69: el Reporte diario va con BANDAS, y Hs Prod = Picking + Armado
+## §3.nj — v23.72: el Reporte diario va con BANDAS, y Hs Prod = Picking + Armado
+
+**v23.72 (edge v25):** el PDF dibuja cada banda como una **ISLA** — hueco de 3 mm entre
+bloques y borde grueso alrededor de cada uno (banda + encabezado + datos); Operario y las
+tres de horas del día llevan el encabezado en las dos filas, como la celda combinada de la
+planilla. El margen se centra solo. Verificado con el 25/09 (200, mismos números).
 
 **Luis, 2026-09-28**, con la planilla del 25/09: *"arma el pdf del modulo de arriba de esta forma"*
 · *"hs no prod deberian ser todas las tareas que no sean hs prod"*.
