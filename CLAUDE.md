@@ -5378,7 +5378,7 @@ devolver **5** objetos, no 4.
 **Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien.
 `sql/gv_ppp_tanda_renombrar_prog_web_v2088.sql`, `tests/ppp-renombrar-prog-web.cjs`, §3.lw.
 
-## ⚠ REGLA (Luis, 2026-09-28, v23.00): una COPIA que se reescribe con upsert tiene que PODAR lo que la fuente ya no trae
+## ⚠ REGLA (Luis, 2026-09-28, v23.00, v23.03): una COPIA que se reescribe con upsert tiene que PODAR lo que la fuente ya no trae
 
 Caso (problema 578): `PPP_Web_Base` —la lista de picking de cada NP web— se escribía sólo con
 upsert (`merge-duplicates` / `on conflict do update`). El upsert **suma y pisa, nunca saca**: si un

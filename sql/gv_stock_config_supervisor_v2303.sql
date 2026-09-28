@@ -1,4 +1,4 @@
--- v23.02 (problema 577): Stock_Config se escribe SÓLO con login de supervisor.
+-- v23.03 (problema 577): Stock_Config se escribe SÓLO con login de supervisor.
 -- Antes: scfg_insert / scfg_update para anon con `true` → cualquiera con la clave pública
 -- cambiaba la fecha de entrega del carrito LK, el mínimo de 25.000 USD o el cutoff del stock.
 -- Las 9 escrituras vivas de index.html están en pantallas de supervisor y pasan a mandar el JWT
