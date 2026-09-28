@@ -57,3 +57,21 @@ grant execute on function public.costo_api_usos_hoy(text) to service_role;
 --     SELECT falla por RLS. Si Storage sube con RETURNING, sacarla rompe TODAS las subidas.
 --     Se prueba contra el Storage real antes de tocarla.
 -- drop policy if exists remitos_select on storage.objects;
+
+-- 7) APLICADO 28/09. send-whatsapp v55 (supabase/functions/send-whatsapp, versionada ahora):
+--    texto libre y destinatario libre solo desde el servidor (clave de servicio); con la clave
+--    pública, solo 4 plantillas y parámetros sin links. Y se ARREGLA el aviso "sugerencia
+--    aprobada" del Recorrido de Planify (roto desde el 15/09: mandaba destinatario y recibía
+--    400): se acepta el teléfono solo si es de un empleado con una sugerencia aprobada hace
+--    < 30 min y todavía no avisada. Una por sugerencia, anotada en:
+create table if not exists planify.recorrido_sugerencia_aviso_wa (
+  sugerencia_id bigint primary key references planify.recorrido_sugerencias(id) on delete cascade,
+  telefono text not null,
+  enviado_at timestamptz not null default now(),
+  ok boolean,
+  error text
+);
+alter table planify.recorrido_sugerencia_aviso_wa enable row level security;
+revoke all on planify.recorrido_sugerencia_aviso_wa from anon, authenticated;
+--    Verificado: texto libre con clave pública 403, plantilla ajena 403, destinatario con otra
+--    plantilla 400, sugerencia a un teléfono que no es de empleado 403.
