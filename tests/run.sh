@@ -659,6 +659,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pmap-punto-unico.cjs
 echo "== imp-escritura-login (v22.81: el maestro de importados se escribe sólo con la sesión de supervisor) =="
 node tests/imp-escritura-login.cjs
+echo "== impo-comex-web (v23.19: IMPO COMEX web dentro de Importación, sin token ni datos personales) =="
+node tests/impo-comex-web.cjs
 
 echo "== fn-duplicadas (v22.96: ninguna función de nivel superior declarada dos veces — la ccRender de Cobranzas pisó la de Carga Camión) =="
 node tests/fn-duplicadas.cjs

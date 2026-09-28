@@ -3429,6 +3429,20 @@ borró). Layout:
   pedir nada**. Para volver a prenderlo hay que tocar el OTRO repo: `true` ahí y bumpear
   el `?v=` de `auth-guard.js` en sus HTML.
 
+## ⚠ IMPO COMEX bajo `/impo-comex/` es una COPIA ARMADA (Elías, 2026-09-28, v23.19)
+
+Se abre desde Pedidos Importación → **🛃 IMPO COMEX** (`openImpoComex`). El **fuente vive en el repo
+privado `loekemeyer/Impo-Comex`**; acá va sólo el build web (`client/dist-web`). **No se edita acá.**
+
+- Entra sólo un **supervisor**: la web manda la sesión de Google de Gestión a la function
+  **`Impo_Comex_web`**, que valida `es_supervisor_virgilio()` (un usuario anónimo no tiene mail →
+  no pasa), acepta sólo los orígenes de Gestión (Pages y Vercel) y reenvía a las `Impo_Comex_*` con
+  el token del servidor. **El portable sigue igual**, con su token.
+- **Este repo es público**: en la copia no van el token ni los datos personales de la DDJJ (los
+  entrega la puerta). Lo sostiene `tests/impo-comex-web.cjs`.
+- Versión nueva = armar en `Impo-Comex`, reemplazar la carpeta (conservando `LEEME.md`) y subir la
+  versión de Gestión.
+
 ## ⚠ REGLA (Elías, 2026-09-21, v20.58): la fecha se guarda ENTERA — y el blindaje va con centinela
 
 Dos cosas que salieron del mismo tirón y no se separan.
