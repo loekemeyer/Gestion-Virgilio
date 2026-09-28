@@ -67,7 +67,8 @@
       "Bash(node tests/pipe-pedido-partido.cjs)",
       "Bash(node scripts/bump-version.cjs 23.07)",
       "Bash(node tests/apr-cuar-deuda-desde.cjs)",
-      "Bash(node scripts/bump-version.cjs 23.42)"
+      "Bash(node scripts/bump-version.cjs 23.42)",
+      "Bash(node scripts/bump-version.cjs 23.48)"
     ]
   }
 }
