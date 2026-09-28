@@ -697,6 +697,18 @@ async function procesarEmpresa(
       throw new Error(`PPP_Web_Base: HTTP ${rb.status} ${(await rb.text()).slice(0, 300)} ` +
         `— la tanda quedó programada pero el operario la vería vacía.`);
     }
+    // v23.00 (problema 578): el upsert suma pero no saca. Lo que la NP tenía y ya no trae
+    // (p.ej. el corte de diferido que llega después de programada) se poda, sólo si su tanda
+    // no empezó; lo de una tanda empezada queda anotado en gv_ppp_web_base_sobrante.
+    try {
+      await vgRpc("gv_ppp_web_base_podar", {
+        p_empresa: emp,
+        p_lineas: lineas.map((l) => ({ order_id: l.order_id, np_idx: l.np_idx, articulo: l.articulo })),
+        p_origen: "gv-ppp-web-tandas-diarias",
+      });
+    } catch (e) {
+      console.error("gv_ppp_web_base_podar:", (e as Error).message);
+    }
   }
 
   return { np_leidas: filas.length, np_programadas: programadas.size, tandas, codFecha };

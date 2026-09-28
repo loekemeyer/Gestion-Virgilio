@@ -9,7 +9,7 @@
    ========================================================= */
 importScripts("supabase-config.js");
 <<<<<<< HEAD
-const SW_VERSION = "v22.99-vir";
+const SW_VERSION = "v23.00-vir";
 =======
 const SW_VERSION = "v22.98-vir";
 >>>>>>> origin/main
