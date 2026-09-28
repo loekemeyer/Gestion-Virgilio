@@ -30084,7 +30084,7 @@ freno para tanda empezada era la rama ISIS de `gv_ppp_np_cancelar` → ahora blo
 Centinela: `select * from public.gv_pedido_pickeado_desprogramado;` — vacía = ninguna NP quedó afuera con su
 tanda pickeándose (al 28/09: vacía).
 
-### §3.v2344 — v23.44: 📥 RECIBIR importación desde el panel + historial — 2026-09-28
+### §3.v2345 — v23.45: 📥 RECIBIR importación desde el panel + historial — 2026-09-28
 
 **Luis:** recibir los pedidos de importación desde Pedidos Importación, guiado (cantidad, empresa en duales,
 destino con los lugares del Mapa, aviso de conflicto de espacio) y con historial.
@@ -30095,4 +30095,4 @@ destino con los lugares del Mapa, aviso de conflicto de espacio) y con historial
   (+ resync) e `Importados_Mov_Stock` (log). No toca objetos de Producción.
 - Probado en transacción abortada: 026 (A guardar 100 · góndola F01 20 → conflicto «capacidad 240, hay 231,
   entran 9» · rack AD01 libre · AD09 ocupado por 505I → conflicto), dual 438E CH → L05 + excedente, 505C → insumos A1.
-- Rollback: `drop function` de las tres (las tablas quedan: son auditoría). `sql/gv_imp_recibir_v2344.sql`.
+- Rollback: `drop function` de las tres (las tablas quedan: son auditoría). `sql/gv_imp_recibir_v2345.sql`.

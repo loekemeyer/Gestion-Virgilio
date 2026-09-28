@@ -1,4 +1,4 @@
-/* v23.44 (Luis, 28/09) — 📥 RECIBIR una importación desde el panel.
+/* v23.45 (Luis, 28/09) — 📥 RECIBIR una importación desde el panel.
    Corre el flujo de verdad en el navegador, con _pedImpRpc falso (sin red):
    A. la tabla muestra 📥 RECIBIR sólo en la línea con pedido en curso;
    B. dual: sin elegir empresa no deja revisar (ni llama a gv_imp_recibir);
