@@ -5044,6 +5044,14 @@ filtra: NP de LK (con L = TdF) o cliente de Chef en `gv_ajustes_isis_clientes_ch
 motivo `tierra_del_fuego`). La función es SECURITY DEFINER porque el panel lee con la clave anon y anon no ve
 `GV_Cliente_Isis` (sin ella, los TdF de Chef desaparecían en silencio). `sql/gv_fac_ajustes_isis_sin_dorinka_v2264.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-28, v23.59): Facturación va POR DÍA — y LK + CH juntas bajan 2 Excel
+
+La tabla del Facturador se agrupa por **fecha de entrega**, como la Programación de la PPP: una cabecera por
+día (las sin fecha al final) con su casilla, que marca **sólo las NP web de ese día**; marcar varios días suma
+sus NP. **No hay casilla global.** Si la selección tiene NP de **LK y de CH**, sale el aviso amarillo y el botón
+dice *«2 archivos LK + CH»*; al bajar salen **dos Excel**, uno por ISIS (la división ya existía por `isisEmp`:
+una NP LK de Tierra del Fuego va al de CH). `facXlsDia`, `facXlsMezcla`, `tests/fac-por-dia.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-25, v22.53): ♻ RECUPERAR ITEMS DE FC — completar la facturación de una NP ya facturada
 
 **Luis:** *"que se pueda completar la facturación de un pedido ya facturado en caso de que ingrese

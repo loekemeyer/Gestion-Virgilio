@@ -4599,7 +4599,13 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .fac-np-tbl td.fac-fe-cell{ font-size: 12px; font-weight: 700; color: #0f172a; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fac-np-tbl th .fac-th-siva{ font-size: 9px; font-weight: 700; color: #94a3b8; white-space: nowrap; }
 /* v13.16: casillas del Excel ISIS tocables desde el celular (nativas quedaban en 13px) */
-.fac-np-tbl .fac-xls-chk, .fac-np-tbl #facXlsChkAll{ width: auto; transform: scale(1.4); cursor: pointer; }
+.fac-np-tbl .fac-xls-chk, .fac-np-tbl #facXlsChkAll, .fac-np-tbl .fac-dia-chk{ width: auto; transform: scale(1.4); cursor: pointer; }
+/* v23.59 — cabecera de día (como la Programación de la PPP) + aviso de mezcla LK/CH */
+table.fac-np-tbl tbody tr.fac-dia-row{ background: #e0e7ff; border-top: 2px solid #6366f1; }
+table.fac-np-tbl tbody tr.fac-dia-row:hover{ background: #e0e7ff; }
+table.fac-np-tbl td.fac-dia-lbl{ font-weight: 800; color: #312e81; font-size: 13px; padding: 6px 8px; }
+table.fac-np-tbl .fac-dia-sub{ font-weight: 600; color: #4f46e5; font-size: 12px; }
+.fac-xls-mix{ margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; background: #fef3c7; border: 1px solid #f59e0b; color: #78350f; font-size: 13px; font-weight: 600; }
 .fac-neto-click{ cursor: pointer; }
 .fac-neto-click:hover .fac-neto-val{ text-decoration: underline; }
 /* v11.86 — Modal desglose por ítem (reusa .facfc-). */
@@ -6206,7 +6212,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.58"></script>
+<script type="module" src="recepcion.js?v=23.59"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10165,7 +10171,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.58";
+const APP_VERSION = "v23.59";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -55982,12 +55988,55 @@ function facXlsTodas(v) {
   });
   facXlsBtnSync();
 }
+/* v23.59 (Luis) — la casilla de un DÍA marca/desmarca sólo las NP web de ese día. */
+function facXlsDia(dia, v) {
+  document.querySelectorAll("input.fac-xls-chk").forEach(function (c) {
+    if (String(c.getAttribute("data-dia") || "") !== String(dia || "")) return;
+    c.checked = !!v;
+    const np = String(c.getAttribute("data-np") || "");
+    if (!np) return;
+    if (v) _facXlsSel.add(np); else _facXlsSel.delete(np);
+  });
+  facXlsBtnSync();
+}
+/* Título del día: «Lunes 29/09». Sin fecha → «Sin fecha de entrega». */
+function facDiaTitulo(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+  if (!m) return "Sin fecha de entrega";
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12);
+  const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  return dias[d.getDay()] + " " + m[3] + "/" + m[2];
+}
+/* LK y CH marcadas juntas → se avisa: el Excel sale en 2 archivos, uno por ISIS. */
+function facXlsMezcla() {
+  let lk = 0, ch = 0;
+  _facXlsSel.forEach(function (np) { if (/^\s*CH\s/i.test(np)) ch++; else if (/^\s*LK\s/i.test(np)) lk++; });
+  return { lk: lk, ch: ch, mezcla: lk > 0 && ch > 0 };
+}
 /* Pone el contador en el botón del encabezado y lo habilita/deshabilita. */
 function facXlsBtnSync() {
+  try {
+    document.querySelectorAll("input.fac-dia-chk").forEach(function (dc) {
+      const dia = String(dc.getAttribute("data-dia") || "");
+      let tot = 0, sel = 0;
+      document.querySelectorAll("input.fac-xls-chk").forEach(function (c) {
+        if (String(c.getAttribute("data-dia") || "") !== dia) return;
+        tot++; if (_facXlsSel.has(String(c.getAttribute("data-np") || ""))) sel++;
+      });
+      dc.checked = tot > 0 && sel >= tot;
+      dc.indeterminate = sel > 0 && sel < tot;
+    });
+    const mx = facXlsMezcla(), box = document.getElementById("facXlsMix");
+    if (box) {
+      box.style.display = mx.mezcla ? "" : "none";
+      box.innerHTML = mx.mezcla ? "⚠ Marcaste NP de <b>LK (" + mx.lk + ")</b> y de <b>CH (" + mx.ch + ")</b>: el Excel sale en <b>2 archivos</b>, uno para el ISIS de cada empresa." : "";
+    }
+  } catch (_e) {}
   const b = document.getElementById("facBtnXlsIsis");
   if (!b) return;
   const n = _facXlsSel.size;
-  b.innerHTML = "⬇ Excel ISIS" + (n ? " (" + n + ")" : "") + ' <span style="font-weight:600;opacity:.85">(NP web)</span>';
+  const _mx = facXlsMezcla();
+  b.innerHTML = "⬇ Excel ISIS" + (n ? " (" + n + ")" : "") + ' <span style="font-weight:600;opacity:.85">' + (_mx.mezcla ? "· 2 archivos LK + CH" : "(NP web)") + '</span>';
   b.style.opacity = n ? "1" : ".55";
   b.title = n
     ? "Baja el Excel para ISIS con las " + n + " NP web marcadas. Al bajarlo quedan FACTURADAS (es su tilde)."
@@ -56046,8 +56095,12 @@ async function facXlsBajar() {
     // v13.77: una NP LK de Tierra del Fuego va al archivo CH (isisEmp), con el código Chef del cliente.
     const _isisDe = function (r) { return r.isisEmp || (/^\s*CH\s/i.test(String(r.np)) ? "CH" : "LK"); };
     const porEmp = { LK: filas.filter(function (r) { return _isisDe(r) === "LK"; }), CH: filas.filter(function (r) { return _isisDe(r) === "CH"; }) };
+    let _nArch = 0;
     for (const emp of ["LK", "CH"]) {
       if (!porEmp[emp].length) continue;
+      // v23.59 — con LK y CH juntas salen 2 archivos: una pausa corta entre los dos para que el
+      // navegador no se coma la segunda descarga.
+      if (_nArch++) await new Promise(function (res) { setTimeout(res, 600); });
       // v14.36: el archivo y su detalle quedan guardados (GV_Fac_Export) para poder mirarlo
       // después. Best-effort: si la RPC falla, el Excel ya se bajó igual.
       const _arch = (FAC_XLS_FORMATO === "xls") ? _facXlsDescargar(porEmp[emp], emp) : _facXlsDescargarXlsx(porEmp[emp], emp);
@@ -57850,8 +57903,9 @@ function facRender(tandas){
   }
 
   // Orden: fecha salida ASC → tanda ASC → NP ASC
+  // v23.59 — las sin fecha van al FINAL (quedan en su propio bloque «Sin fecha de entrega»).
   filas.sort((a,b) =>
-    (a.fechaEntregaRaw || "").localeCompare(b.fechaEntregaRaw || "")
+    (a.fechaEntregaRaw || "9999").localeCompare(b.fechaEntregaRaw || "9999")
     || (a.tanda || "").localeCompare(b.tanda || "")
     || (a.np || "").localeCompare(b.np || "")
   );
@@ -57890,7 +57944,26 @@ function facRender(tandas){
   // el header de grupo dando agrupamiento visual sin ocupar espacio.
   let prevTanda = null;
   let altFlag = false;
+  // v23.59 (Luis) — la tabla va POR DÍA, como la Programación de la PPP: una fila de cabecera por
+  // fecha de entrega, con su casilla que marca las NP web de ESE día (y sólo de ese día).
+  const _diaInfo = {};
+  filasView.forEach(function (f) {
+    const k = f.fechaEntregaRaw || "";
+    const d = _diaInfo[k] || (_diaInfo[k] = { n: 0, web: 0, cajas: 0 });
+    d.n++; if (facNpEsWeb(f.np)) d.web++;
+    const c = _facCajas.get(String(f.np).trim().replace(/\.0+$/, "")); if (c) d.cajas += Number(c) || 0;
+  });
+  let prevDia = null;
   const rowsHtml = filasView.map(f => {
+    const _dk = f.fechaEntregaRaw || "";
+    let _cab = "";
+    if (_dk !== prevDia){
+      prevDia = _dk; prevTanda = null;
+      const di = _diaInfo[_dk];
+      _cab = `<tr class="fac-dia-row" data-fac-dia="${escapeHtml(_dk)}"><td class="center">${di.web
+        ? `<input type="checkbox" class="fac-dia-chk" data-dia="${escapeHtml(_dk)}" onchange="facXlsDia(this.getAttribute('data-dia'), this.checked)" title="Marca o desmarca las NP web de este día (sólo de este día)">`
+        : ''}</td><td colspan="9" class="fac-dia-lbl">📅 ${escapeHtml(facDiaTitulo(_dk))} <span class="fac-dia-sub">· ${di.n} NP${di.cajas ? ' · ' + Math.round(di.cajas) + ' cajas' : ''}</span></td></tr>`;
+    }
     if (f.tanda !== prevTanda){ altFlag = !altFlag; prevTanda = f.tanda; }
     const args = JSON.stringify({
       np: f.np, tanda: f.tanda, m3: f.m3 || 0,
@@ -57907,10 +57980,10 @@ function facRender(tandas){
     const _ft = (_ftRaw && _ff && Number(_ff.cajas || 0) > 0) ? _ftRaw : null;
     // v12.23 — tooltip en la celda NP: tanda + fecha de salida (reemplazan las columnas que sacamos).
     const _npTip = 'Tanda ' + String(f.tanda || '—') + ' · Salida ' + String(f.fechaSalida || '—');
-    return `
+    return _cab + `
       <tr data-fac-np="${escapeHtml(f.np)}" class="${altFlag ? 'fac-tanda-alt' : ''}${_ft ? ' fac-en-progreso' : (_ff ? ' fac-has-falta' : '')}">
         <td class="center fac-xls-cell">${facNpEsWeb(f.np)
-          ? `<input type="checkbox" class="fac-xls-chk" data-np="${escapeHtml(f.np)}"${_facXlsSel.has(String(f.np)) ? ' checked' : ''} onchange="facXlsToggle(this.getAttribute('data-np'))" title="NP de la página: marcá y bajá el Excel ISIS para facturarla">`
+          ? `<input type="checkbox" class="fac-xls-chk" data-np="${escapeHtml(f.np)}" data-dia="${escapeHtml(_dk)}"${_facXlsSel.has(String(f.np)) ? ' checked' : ''} onchange="facXlsToggle(this.getAttribute('data-np'))" title="NP de la página: marcá y bajá el Excel ISIS para facturarla">`
           : `<span class="fac-xls-no" title="NP de ISIS: se factura con el tilde ✓, no va al Excel">—</span>`}</td>
         <td class="fac-np-cell" title="${escapeHtml(_npTip)}">${escapeHtml(f.np)}${_npSrcChip(f.np)}${facModChip(f.np)}${f._sinTanda ? `<span class="fac-sintanda" title="${escapeHtml(f._sinTanda)} — se armó igual (tanda ${escapeHtml(String(f.tanda))}), por eso aparece acá">sin tanda</span>` : ""}</td>
         <td class="center fac-fe-cell">${f.fechaSalida ? escapeHtml(String(f.fechaSalida)) : '<span class="fac-lios0">—</span>'}</td>
@@ -57941,11 +58014,12 @@ function facRender(tandas){
   }).join("");
 
   container.innerHTML = `
+    <div id="facXlsMix" class="fac-xls-mix" style="display:none"></div>
     <div class="fac-table-wrap">
       <table class="fac-np-tbl">
         <thead>
           <tr>
-            <th class="center" style="width:4%" title="Excel ISIS: sólo las NP de la página (LK / CH). Las de ISIS se facturan con el tilde. La casilla de arriba marca o desmarca todas las web."><input type="checkbox" id="facXlsChkAll" onchange="facXlsTodas(this.checked)"></th>
+            <th class="center" style="width:4%" title="Excel ISIS: sólo las NP de la página (LK / CH). Las de ISIS se facturan con el tilde. La casilla de cada DÍA marca o desmarca las web de ese día."></th>
             <th style="width:11%" title="Nota de pedido. Pasá el mouse sobre el número para ver Tanda y fecha de Salida.">NP</th>
             <th class="center" style="width:8%" title="Fecha de ENTREGA de la PPP (el día para el que está programado el pedido). Las filas vienen ordenadas por esta fecha.">📅 Entrega</th>
             <th style="width:7%">Cod</th>
