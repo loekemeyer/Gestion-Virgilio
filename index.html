@@ -6206,7 +6206,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.27"></script>
+<script type="module" src="recepcion.js?v=23.28"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10165,7 +10165,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.27";
+const APP_VERSION = "v23.28";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17131,6 +17131,11 @@ async function ocgFetchImportados() {
       reingresoEst[c] = f; reingresoEst[c + "|" + _impPlanta(r.marca)] = f;   // v22.93 — el de cada planta, para las dos líneas de 809E
     });
   } catch (_e) {}
+  // v23.28 — si existe la línea de Loeke con L (437EL), la de Chef del mismo número (437E) lleva la chapa CH
+  Object.keys(by).forEach(function (k) {
+    const m = /^(.*[0-9E])L$/.exec(k);
+    if (m && by[m[1]] && !by[m[1]].planta) by[m[1]].plantaVista = "CH";
+  });
   const items = [];
   Object.keys(by).forEach(function (k) {
     const o = by[k];
@@ -17160,7 +17165,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, key: o.key, planta: o.planta, desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
+    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -17371,7 +17376,7 @@ function ocBodyGenImportados() {
         try { if (it.parteDet && it.parteDet.length) detTxt = it.parteDet.map(function (d) { return d.cod + ": " + d.proy + (d.stock_uni != null ? " (stock " + d.stock_uni + " u)" : ""); }).join("  ·  "); } catch (_e) {}
         parteBadge = ' <span style="color:#7c3aed;font-weight:800;cursor:help" title="Parte: la proyección es la SUMA de los terminados que la usan, y su stock terminado (' + (it.stockTermU || 0) + ' u) cuenta como stock de la parte → ' + escapeHtml(detTxt) + '">🧩</span>';
       }
-      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + _impPlantaChip(it) + parteBadge + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.meses + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + it.stockUni + '</td><td class="num">' + it.enCurso + '</td><td class="num oc-falt">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
+      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(_impCodVista(it))) + _impPlantaChip(it) + parteBadge + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.meses + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + it.stockUni + '</td><td class="num">' + it.enCurso + '</td><td class="num oc-falt">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
     });
     h += '</tbody></table></div>';
   });
@@ -21393,9 +21398,19 @@ function _pedImpMcOf(it) {
 }
 /* v22.93 — 809E va en dos líneas (LK / CH): chip de planta, búsqueda por clave y a qué filas del maestro
    escribe un cambio (sólo las de SU planta: el FOB de Chef y el de Loeke son distintos). */
+/* v23.28 (Luis 28/09) — la L es de ruteo, no parte del código: el maestro guarda 437EL/438EL/439EL
+   (Loeke) al lado de 437E (Chef), y en pantalla/Excel/PDF salía "437EL". Se MUESTRA 437E con la chapa
+   LK; por dentro sigue 437EL (volumen, reingreso y las RPC van por cod_art). */
+function _impLRuteo(it) {
+  return !!it && !it.planta && /[0-9E]L$/i.test(String(it.cod || "")) &&
+    (it.det || []).every(function (d) { return String(d.marca || "").trim().toUpperCase() !== "CH"; });
+}
+function _impCodVista(it) { return _impLRuteo(it) ? String(it.cod).replace(/([0-9E])L$/i, "$1") : it.cod; }
+function _impPlantaVista(it) { return (it && (it.planta || it.plantaVista)) || (_impLRuteo(it) ? "LK" : ""); }
 function _impPlantaChip(it) {
-  if (!it || !it.planta) return "";
-  return ' <span title="Mismo código, otro producto: cambia el packaging. Se pide por separado." style="font-size:10.5px;font-weight:800;color:#fff;background:' + (it.planta === "CH" ? "#b45309" : "#1e6bd6") + ';border-radius:999px;padding:1px 7px">' + it.planta + '</span>';
+  var pl = _impPlantaVista(it);
+  if (!pl) return "";
+  return ' <span title="Mismo código, otro producto: cambia el packaging. Se pide por separado." style="font-size:10.5px;font-weight:800;color:#fff;background:' + (pl === "CH" ? "#b45309" : "#1e6bd6") + ';border-radius:999px;padding:1px 7px">' + pl + '</span>';
 }
 function _pedImpItemPorClave(key) {
   const data = (_stkPop && _stkPop.data) || {}, K = String(key || "").toUpperCase().trim();
@@ -21572,7 +21587,7 @@ function _pedImpRender() {
       const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _rg = it.reingresoEst ? String(it.reingresoEst).slice(0, 10) : "";
       const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _keyEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
-      h += '<tr><td><b>' + escapeHtml(codCanon(it.cod)) + '</b>' + _impPlantaChip(it) + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td style="font-size:12px;white-space:nowrap" title="' + escapeHtml(it.desc || "") + '">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + stockTxt + '</td><td class="num">' + it.enCurso + '</td><td class="num" style="color:#94a3b8">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num">' + uniTxt + '</td><td class="num">' + fobTxt + '</td><td class="num">' + usdTxt + '</td><td class="num">' + m3Txt + '</td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -21594,7 +21609,7 @@ function pedImpPdfProv(provEnc) {
   const td = 'border:1px solid #333;padding:7px 10px';
   const tdc = td + ';text-align:center;font-weight:700';
   let filas = arr.map(function (it) {
-    return '<tr><td style="' + td + '"><b>' + escapeHtml(codCanon(it.cod) + (it.planta ? " " + it.planta : "")) + '</b></td><td style="' + tdc + '">' + _pedImpMcOf(it) + '</td><td style="' + tdc + '">' + _pedImpUniOf(it) + '</td></tr>';
+    return '<tr><td style="' + td + '"><b>' + escapeHtml(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</b></td><td style="' + tdc + '">' + _pedImpMcOf(it) + '</td><td style="' + tdc + '">' + _pedImpUniOf(it) + '</td></tr>';
   }).join("");
   const totMC = arr.reduce(function (s, it) { return s + _pedImpMcOf(it); }, 0);
   const totU = arr.reduce(function (s, it) { return s + _pedImpUniOf(it); }, 0);
@@ -21642,7 +21657,7 @@ function pedImpExportExcel() {
     var caj = _pedImpMcOf(it);
     var m3m = Number(it.m3Master) || 0, m3t = _pedImpM3Of(it); _totM3 += m3t;
     var fob = Number(it.fobUni) || 0, usd = _pedImpUsdOf(it); _totUsd += usd;
-    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(it.cod) + (it.planta ? " " + it.planta : "")) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (fob > 0 ? fob : "") + '</td><td>' + (usd > 0 ? Math.round(usd) : "") + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
+    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (fob > 0 ? fob : "") + '</td><td>' + (usd > 0 ? Math.round(usd) : "") + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
   });
   html += '<tr><td colspan="11"><b>TOTALES</b></td><td><b>' + Math.round(_totUsd) + '</b></td><td></td><td><b>' + (Math.round(_totM3 * 100) / 100) + '</b></td></tr>';
   html += '</table></body></html>';
@@ -21724,7 +21739,7 @@ async function pedImpEditFob(codEnc) {
     curIt = _pedImpItemPorClave(cod);   // v22.93 — llega la clave de la línea (809E|CH), no el código
     if (curIt) { cod = curIt.cod; cur = Number(curIt.fobUni) || 0; }
   } catch (_e) {}
-  var val = prompt("FOB unitario (USD por unidad) de " + codCanon(cod) + (curIt && curIt.planta ? " " + curIt.planta : "") + ":", cur > 0 ? String(cur) : "");
+  var val = prompt("FOB unitario (USD por unidad) de " + (curIt ? codCanon(_impCodVista(curIt)) + (_impPlantaVista(curIt) ? " " + _impPlantaVista(curIt) : "") : codCanon(cod)) + ":", cur > 0 ? String(cur) : "");
   if (val === null) return;
   val = String(val).trim().replace(/,/g, ".").replace(/[^0-9.]/g, "");
   var fob = parseFloat(val);
