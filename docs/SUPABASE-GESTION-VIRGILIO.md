@@ -30111,3 +30111,8 @@ pedido o en viaje"* · *"si se recibe más de lo que se iba a recibir, cancela l
   devuelve todo, 120 u sobre 48 pedidas cierra sin tocar el bache LK del mismo código, anular con la mercadería movida
   frena, cantidad basura frena; otros baches: md5 igual).
 - Centinelas 235-239 en `GV_Reglas_Centinela`. `sql/gv_imp_recibir_v2349.sql`.
+
+### §3.v2356 — Vigilante externo de la base de Gestión (v23.56, 28/09, Luis)
+Caída 14:11–14:19 ART (reinicio de plataforma; tráfico normal, sin consulta culpable). Gestión: `gv_ping()` (anon, sólo `now()`).
+LK: `gv_watch_gestion` + `gv_watch_gestion_estado` (RLS, sin grants) y cron `gv-watch-gestion` cada minuto → `gv_watch_gestion_tick()`:
+3 fallas seguidas → 🔴 Telegram al grupo; primer OK → 🟢 con minutos. Probado en transacción abortada. Rollback en `sql/gv_watch_gestion_v2356_LK.sql`.
