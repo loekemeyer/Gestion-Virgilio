@@ -6190,7 +6190,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.05"></script>
+<script type="module" src="recepcion.js?v=23.06"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10149,7 +10149,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.05";
+const APP_VERSION = "v23.06";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -51310,7 +51310,8 @@ function pipeHtml() {
     '<div class="apr-col-t apr-col-t-clic" onclick="aprCliColapsar()" title="' +
       (_cliCol ? "Mostrar" : "Ocultar") + ' el pipeline de clientes nuevos">' +
     '<span class="apr-col-caret">' + (_cliCol ? "▸" : "▾") + '</span> ' +
-    '🧭 Clientes nuevos <b>(' + (cargando ? '…' : pipeLista().filter(function (p) { return !p._demo; }).length) + ')</b>' +
+    // v23.06 (Luis): un pedido PARTIDO por importados cuenta como UNO, igual que en Cuarentena
+    '🧭 Clientes nuevos <b>(' + (cargando ? '…' : cuarAgrupar(pipeLista().filter(function (p) { return !p._demo; })).length) + ')</b>' +
     '<span class="apr-cuar-help" title="El camino completo de un cliente nuevo: análisis crediticio en Equifax y ' +
       'después UNO DE DOS estados — Referenciado (no paga por adelantado, como un cliente habitual) o No ' +
       'referenciado (paga por adelantado sus 3 primeros pedidos: Speech 1, Speech 2 a las 24 h, y recién con el ' +
@@ -51326,6 +51327,7 @@ function pipeHtml() {
 
   const lista = pipeLista();
   pipeNeed(); pipeCfgNeed(); clinNuevosValorNeed(); clinDtoPagoNeed(); clinCuitNeed(); clinWppNeed(); cuarComNeed(); clinTickStart();
+  cuarPartidosNeed();   // v23.06 (Luis, 28/09): el pedido partido va en UNA fila, como en Cuarentena
 
   if (!lista.length)
     return h + '<div class="apr-vacio">Sin pedidos de clientes nuevos. Acá caen los pedidos de ' +
@@ -51339,18 +51341,27 @@ function pipeHtml() {
     '<th>Pedido</th><th>Fecha</th><th class="cuar-td-m3">m³</th><th>Cliente</th><th>CUIT</th>' +
     '<th>Zona</th><th>Etapa</th><th class="cuar-td-m3">Monto</th><th class="pipe-th-acc">Qué sigue</th>' +
     '<th class="cuar-td-com">Coment.</th></tr></thead><tbody>';
-  for (const p of lista) {
+  /* v23.06 (Luis, 28/09): "si todos esos surgen de 1 pedido deberían figurar en una sola línea".
+     La parte que espera reingreso de importados es otro order_id con pedido_origen = el original
+     (v22.46): va en la fila del original, con el m³ sumado y el chip 🧩. Los botones actúan sobre
+     el original y el backend aprueba toda la familia (gv_cuarentena_liberados_familia). ⚠ Dos
+     pedidos del mismo cliente a SUCURSALES distintas siguen siendo dos filas: son dos pedidos. */
+  for (const g of cuarAgrupar(lista)) {
+    const p = g.p, varios = g.miembros.length > 1;
+    const m3g = varios ? g.miembros.reduce(function (s, x) { return s + (Number(x.m3) || 0); }, 0) : p.m3;
     const cid = "pipe" + p.empresa + p.order_id, cab = !!_apr.exp[cid];
     const et = pipeEtapa(p);
-    const nblo = Number(p.np_total) || ((p.bloques && p.bloques.length) || 1);
+    const nblo = varios ? g.miembros.reduce(function (s, x) { return s + (Number(x.np_total) || ((x.bloques && x.bloques.length) || 1)); }, 0)
+      : (Number(p.np_total) || ((p.bloques && p.bloques.length) || 1));
     h += '<tr class="cuar-tr pipe-tr pipe-tr-' + et + (cab ? ' cuar-tr-open' : '') + '">' +
       '<td class="cuar-td-np" onclick="aprToggle(\'' + cid + '\')" title="Ver qué pidió (códigos y cajas)">' +
         '<span class="apr-card-chev">' + (cab ? "▾" : "▸") + '</span>' +
         '<span class="cuar-card-np">' + escapeHtml(p._demo ? "web LK 9999" : aprPedLabel(p)) + '</span>' +
         (nblo > 1 ? '<span class="cuar-demo-tag" title="Este pedido se parte en ' + nblo + ' NP">' + nblo + ' NP</span>' : '') +
+        (varios ? '<br>' + cuarPartidoChip(g) : '') +
       '</td>' +
       '<td class="cuar-td-fecha">' + cuarFechaPedidoHtml(p) + '</td>' +
-      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(p.m3) + ' m³</span></td>' +
+      '<td class="cuar-td-m3"><span class="cuar-card-m3">' + aprNum(m3g) + ' m³</span></td>' +
       '<td class="cuar-td-cli">' + cuarCodChip(p) + escapeHtml(p.razon_social || p.cod || ("#" + p.order_id)) +
         (p._demo ? '<span class="cuar-demo-tag">EJEMPLO</span>' : '') + aprCuarBadgesHtml(p) + '</td>' +
       '<td class="pipe-td-cuit">' + pipeCuitHtml(p) + '</td>' +
@@ -51361,7 +51372,11 @@ function pipeHtml() {
       '<td class="pipe-td-acc">' + pipeAccionesHtml(p) + '</td>' +
       '<td class="cuar-td-com">' + (p._demo ? '<span class="cuar-yp-sin">—</span>' : cuarComBtnHtml(p)) + '</td>' +
       '</tr>';
-    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' + aprContenidoHtml(p) + '</div></td></tr>';
+    if (cab) h += '<tr class="cuar-tbl-det"><td colspan="10"><div class="apr-card-body">' +
+      (varios ? g.miembros.map(function (x) {
+        return '<div class="pipe-parte-t"><b>' + escapeHtml(aprPedLabel(x)) + '</b>' +
+          (x === p ? '' : ' · espera reingreso de importados') + '</div>' + aprContenidoHtml(x);
+      }).join('') : aprContenidoHtml(p)) + '</div></td></tr>';
   }
   h += '</tbody></table></div></div>';
   return h + pipeFirmaHtml() + pipeVincHtml() + pipeCompHtml();
