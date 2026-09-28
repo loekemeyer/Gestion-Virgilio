@@ -38,6 +38,9 @@ function revisar(sql, reglas) {
 function main(input) {
   let ev = {};
   try { ev = JSON.parse(input || "{}"); } catch (_e) { return ""; }
+  // Las reglas son de la base de Gestion Virgilio: SQL contra otro proyecto (LK, Chef) no se mira.
+  const pid = (ev.tool_input && ev.tool_input.project_id) || "";
+  if (pid && pid !== "hrxfctzncixxqmpfhskv") return "";
   const sql = (ev.tool_input && (ev.tool_input.query || ev.tool_input.sql)) || "";
   const hits = revisar(sql, cargar());
   if (!hits.length) return "";

@@ -12,4 +12,6 @@ ok(run("select * from public.gv_ppp_web_super_tanda_sola_x") === "libre", "una l
 ok(run("select pg_get_functiondef('public.gv_cuarentena_marcar_calc'::regproc)") === "libre", "leer la definición viva no se frena");
 ok(run("create or replace view public.vista_saldos_stock as select 1") === "libre", "un objeto sin regla no se frena");
 ok(run("create or replace function public.gv_ppp_web_camion_x() returns int as $$ select 1 $$") === "libre", "un nombre que sólo empieza igual no se frena");
+const otro = main(JSON.stringify({ tool_input: { project_id: "kwkclwhmoygunqmlegrg", query: "drop trigger gv_ppp_web_super_tanda_sola on x" } }));
+ok(otro === "", "SQL contra otro proyecto (LK) no se frena");
 process.exit(bad ? 1 : 0);
