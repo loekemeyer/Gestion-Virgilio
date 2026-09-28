@@ -1478,7 +1478,9 @@ function _ocgNorm(c) { return String(c == null ? "" : c).toUpperCase().trim().re
    en qué remito, si el WhatsApp salió, y después la respuesta de Thomas. Con la anon
    key sólo se puede LEER; escribe la Edge Function `gv-alta-articulo` (service_role),
    que es la que manda el WhatsApp. La respuesta de Thomas es información (se ve en el
-   botón), no un permiso. */
+   botón), no un permiso.
+   v23.39 — la anon key ya NO ve la columna `token` (con él se contesta el link de
+   WhatsApp como si fuera Thomas). Por eso acá se pide sólo cod y estado. */
 const ALTA_FN_URL = SUPABASE_URL + "/functions/v1/gv-alta-articulo";
 
 /* Altas del "+" de esta recepción y el estado del aviso. Vive en el borrador para que
@@ -1521,7 +1523,7 @@ async function altaRefrescar() {
   let cambio = false;
   try {
     const res = await supabase.from("GV_Alta_Articulo_Aprobacion")
-      .select("cod,estado,token").in("cod", cods);
+      .select("cod,estado").in("cod", cods);
     ((res && res.data) || []).forEach(function (r) {
       const c = _ocgNorm(r.cod);
       if (pend[c] && pend[c].estado !== r.estado) {

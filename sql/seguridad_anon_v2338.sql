@@ -29,6 +29,16 @@ drop policy if exists remitos_update on storage.objects;
 -- rollback: create policy remitos_update on storage.objects for update to anon, authenticated
 --             using (bucket_id = 'remitos') with check (bucket_id = 'remitos');
 
+-- 3) APLICADO 28/09 (v23.39). GV_Alta_Articulo_Aprobacion: anon leía el TOKEN con el que
+--    se contesta el link de WhatsApp de un alta ("Cargar igual" en RT). recepcion.js sólo
+--    necesita cod y estado. Se cierra a nivel columna; INSERT/UPDATE de anon ya los frenaba
+--    la RLS (sólo hay política SELECT) y se revocan igual por prolijidad.
+revoke all on public."GV_Alta_Articulo_Aprobacion" from anon, authenticated;
+grant select (id, cod, remito, legajo, tallerista, linea, estado, wa_ok, pedido_at,
+              resuelto_at, resuelto_por, nota)
+  on public."GV_Alta_Articulo_Aprobacion" to anon, authenticated;
+-- rollback: grant select, insert, update on public."GV_Alta_Articulo_Aprobacion" to anon, authenticated;
+
 -- 2c) PENDIENTE — remitos_select. Probado en SQL: un INSERT ... RETURNING sin política
 --     SELECT falla por RLS. Si Storage sube con RETURNING, sacarla rompe TODAS las subidas.
 --     Se prueba contra el Storage real antes de tocarla.
