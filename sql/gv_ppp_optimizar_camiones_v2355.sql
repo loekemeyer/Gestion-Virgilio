@@ -1,0 +1,11 @@
+-- v23.55 (Luis 28/09): "se programa a la mejor fecha posible cuando llega el pedido, y despues
+-- corremos el cron que reprograme para OPTIMIZAR". El armado NO se toca; el cron 96 (18:00 ART)
+-- corre ademas gv_ppp_optimizar_camiones(true, 120), que junta camiones enteros del mismo grupo
+-- de zonas (Z1·Z2·Z3·Z4·Z5·Z6+Z7) cuando TODAS sus tandas se pueden mover. Nunca abre camion.
+-- No mueve: a mano, super, retira, diferido, cliente nuevo aprobado, empezado, facturado, ISIS.
+-- Destino >= 3.er habil (armar -> facturar -> salir) y dentro del plazo (entrada+14 / expreso+13).
+-- Log: GV_Reprog_Sin_Factura_Log con accion 'opt_*'. Simular: select * from gv_ppp_optimizar_camiones(false,120);
+-- Rollback cron: select cron.alter_job(96, command := 'select public.gv_ppp_reprogramar_sin_factura(true, null);');
+-- Centinela: GV_Reglas_Centinela patron 'having not bool_or\(t\.fija\)'.
+-- La definicion completa se trae viva: select pg_get_functiondef('public.gv_ppp_optimizar_camiones(boolean,integer)'::regprocedure);
+select cron.alter_job(96, command := 'select public.gv_ppp_reprogramar_sin_factura(true, null); select public.gv_ppp_optimizar_camiones(true, 120);');
