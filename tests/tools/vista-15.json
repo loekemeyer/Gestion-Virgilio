@@ -7,7 +7,8 @@
     "test es congelar ésta.",
     "SI SE CAMBIA UNA REGLA DE HORAS A PROPÓSITO: se vuelve a correr ese SELECT con el MCP y se",
     "pega el resultado acá. Si se cambia sin querer, el test se pone rojo, que es el punto.",
-    "v23.68 (28/09): re-congelada con el trabajo en racks INFERIDO de las bajadas sin tramo (rk_ag): 94 hs_mov 2,63 -> 6,33 y 104 1,08 -> 1,15. El resto idéntico."
+    "v23.68 (28/09): re-congelada con el trabajo en racks INFERIDO de las bajadas sin tramo (rk_ag): 94 hs_mov 2,63 -> 6,33 y 104 1,08 -> 1,15. El resto idéntico.",
+    "v23.70 (28/09): sin tope de tramo en racks inferido: 94 hs_mov 6,33 -> 7,97."
   ],
   "dia": "2026-09-15",
   "operarios": [
@@ -31,7 +32,7 @@
       "prom_hs_arm": 0,
       "hs_pick": 0.0,
       "hs_arm": 0.0,
-      "hs_mov": 6.33,
+      "hs_mov": 7.97,
       "hs_noprod": 0.0,
       "hs_prod": 0.0
     },

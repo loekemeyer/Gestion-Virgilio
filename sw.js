@@ -8,7 +8,7 @@
    (Además admin/admin.js tiene la anon key del proyecto LK — esa es aparte.)
    ========================================================= */
 importScripts("supabase-config.js");
-const SW_VERSION = "v23.69-vir";
+const SW_VERSION = "v23.70-vir";
 /* nota: v7.68 — generador de OCs desde stock (vista_generador_oc). */
 
 const SUPABASE_URL = self.VIR_SUPABASE_URL;
@@ -214,9 +214,30 @@ self.addEventListener("activate", (event) => {
     // quedado de antes → cuando un device agarra este SW, se auto-despega.
     try {
       const names = await caches.keys();
-      await Promise.all(names.map((n) => caches.delete(n)));
+      await Promise.all(names.filter((n) => n !== "gv-flags").map((n) => caches.delete(n)));
     } catch (e) { /* no-op */ }
     await self.clients.claim();
+    /* v23.70 (Luis: *"olvidate de que Isidro haga algo puntual, lo hacés vos"*) — UNA sola vez, recargar
+       las pestañas de la app que quedaron con un index.html viejo (sin auto-actualización). Desde la
+       v23.70 la propia página se actualiza sola cuando está inactiva (checkForUpdate), así que esto
+       no se repite: la marca queda en la caché "gv-flags", que el borrado de arriba respeta.
+       La cola de envíos vive en IndexedDB/localStorage y el picking y los módulos guardan borrador:
+       recargar no pierde datos. Sólo la app (raíz o index.html), nunca /admin/ ni la TV. */
+    try {
+      const fc = await caches.open("gv-flags");
+      const ya = await fc.match("forzado-v2370");
+      if (!ya) {
+        await fc.put("forzado-v2370", new Response("1"));
+        const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        for (const c of wins) {
+          try {
+            const u = new URL(c.url);
+            const esApp = /\/(index\.html)?$/.test(u.pathname) && !/\/(admin|monitor|cervantes|selector)\//.test(u.pathname);
+            if (esApp && c.navigate) await c.navigate(u.pathname + "?_=" + Date.now());
+          } catch (_e) {}
+        }
+      }
+    } catch (_e) { /* no-op */ }
   })());
 });
 self.addEventListener("sync", (event) => {

@@ -51,6 +51,7 @@
 html,body{height:100%;overflow:hidden;background:#0b1220;color:#e2e8f0;
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
   -webkit-font-smoothing:antialiased;cursor:none;user-select:none}
+html.embebido body{cursor:default}
 /* La TV recorta los bordes (overscan). 1,6% de colchón para que no se coma
    ni el reloj ni la última columna. */
 #app{height:100%;display:flex;flex-direction:column;padding:1.6vh 1.6vw;gap:1vh}
@@ -173,6 +174,9 @@ table.ops td{font-size:2.25vh;padding:.65vh .25vw;text-align:right}
 table.ops td:first-child{text-align:left;font-weight:900;color:#f8fafc;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .op-prod{color:#4ade80}
+.op-rit{color:#e2e8f0;font-weight:900}
+.op-sep{border-right:.2vh solid #1e293b}
+tr.op-grp th{text-align:center;color:#93c5fd;font-size:1.5vh;border-bottom:0;padding-bottom:0}
 .op-mov{color:#93c5fd}
 .op-no{color:#fbbf24}
 .op-tot{color:#f8fafc;font-weight:900}
@@ -246,7 +250,22 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
       </div>
     </div>
 
+    <!-- v23.70 (Luis): sin espacio muerto. Medio: Operarios (Ritmo + Horas) y «En este momento»
+         toman el alto de su contenido (≤ 4 operarios); los avisos usan el resto. Derecha: m³ del día,
+         Resumen de días al alto de su contenido y Total por día el resto. -->
     <div class="col" id="col2">
+      <div class="card" style="flex:0 0 auto">
+        <div class="card-t" id="opsTit">Operarios</div>
+        <div id="opsBox"></div>
+      </div>
+      <div class="card" style="flex:0 0 auto">
+        <div class="card-t" id="actTit">En este momento</div>
+        <div id="actBox"></div>
+      </div>
+      <div class="avisos" id="avisos" style="flex:1 1 auto;min-height:0;overflow:hidden"></div>
+    </div>
+
+    <div class="col" id="col3">
       <div class="m3row">
         <div class="m3box">
           <div class="m3lab">Pickeado hoy</div>
@@ -257,30 +276,11 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
           <div class="m3val" id="m3Arm">—<small> m³</small></div>
         </div>
       </div>
-      <!-- Horas por operario (v21.17, pedido de Damián via Marianela). La TV
-           NO tenía nada por operario: la tabla "Mts3 x Hora" del monitor grande
-           se había dejado afuera porque dependía de `computeClosureDur`. Ésta
-           no repite ese cálculo: lo lee ya resuelto del backend. -->
-      <!-- v23.69 (Luis): casi nunca hay más de 4 operarios a la vez, así que Operarios y
-           «En este momento» comparten la columna del medio y la tabla de tandas usa todo el
-           alto de la izquierda. Alto FIJO: `cabenFilas` mide el panel antes de llenarlo. -->
-      <div class="card" style="flex:0 0 31%">
-        <div class="card-t" id="opsTit">Operarios · horas de hoy</div>
-        <div class="grow" id="opsBox"></div>
+      <div class="card" style="flex:0 0 auto">
+        <div class="card-t" id="fcTit">Resumen de días</div>
+        <div id="fcBox"></div>
       </div>
       <div class="card grow">
-        <div class="card-t" id="actTit">En este momento</div>
-        <div class="grow" id="actBox"></div>
-      </div>
-      <div class="avisos" id="avisos"></div>
-    </div>
-
-    <div class="col" id="col3">
-      <div class="card" style="flex:1.15 1 0">
-        <div class="card-t" id="fcTit">Resumen de días</div>
-        <div class="grow" id="fcBox"></div>
-      </div>
-      <div class="card" style="flex:.85 1 0">
         <div class="card-t">Total por día</div>
         <div class="grow" id="totBox"></div>
       </div>
@@ -289,6 +289,11 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
 </div>
 
 <script src="../supabase-config.js?v=1202"></script>
+<script>
+/* v23.70 (Luis): dentro del admin (📺 Vista TV, en un iframe) el mouse se tiene que ver.
+   En la TV de pared sigue oculto. */
+try { if (window.self !== window.top) document.documentElement.classList.add("embebido"); } catch (_e) { document.documentElement.classList.add("embebido"); }
+</script>
 <script>
 (function () {
 "use strict";
@@ -371,8 +376,11 @@ function n1(x) { return (Math.round((Number(x) || 0) * 10) / 10).toFixed(1).repl
    se escribe "—": en una pared un cero y un "no hizo nada" se leen igual, y el
    guion no se confunde con un dato. */
 function nH(x) {
+  /* v23.70 (Luis): TODA hora va en H:MM (horas:minutos); los índices (m³/h) en decimal. */
   var v = Number(x) || 0;
-  return v > 0.049 ? n1(v) : "—";
+  if (!(v > 0.0083)) return "—";                       // menos de medio minuto = nada
+  var m = Math.round(v * 60);
+  return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0");
 }
 /* Nombre para la tabla de operarios: nombre de pila + inicial del apellido.
    "Farias Juan Hilario" → "Farias J." — el apellido va primero porque así
@@ -467,7 +475,7 @@ function iniciales(nombre, legajo) {
 }
 function fmtMin(min) {
   if (!(min >= 0)) return "";
-  return min >= 60 ? (Math.floor(min / 60) + "h" + String(min % 60).padStart(2, "0")) : (min + "m");
+  return Math.floor(min / 60) + ":" + String(min % 60).padStart(2, "0");   // v23.70: H:MM
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -906,7 +914,7 @@ function resumenDias(filas, despachadas, n) {
 var cargarHoras = cache(HORAS_TTL, function () {
   return getAll("gv_monitor_horas_operario",
     "select=legajo,nombre,tandas_pick,prom_hs_pick,tandas_arm,prom_hs_arm," +
-    "hs_prod,hs_mov,hs_noprod,hs_total,en_jornada")
+    "hs_pick,hs_arm,hs_prod,hs_mov,hs_noprod,hs_total,en_jornada")
     .catch(function (e) { console.warn("[tv] horas:", e.message); return []; });
 });
 
@@ -1344,10 +1352,10 @@ function pintar(d) {
   }
 
   // ── Operarios · horas de hoy (v21.17, Damián)
-  pintarHoras(d.horas);
+  pintarHoras(d.horas, d);
 
   // ── En este momento
-  var MAX_ACT = cabenFilas("actBox", false);
+  var MAX_ACT = Math.max(6, cabenFilas("actBox", false));   // v23.70: el panel crece con su contenido
   var trabajando = d.actividad.filter(function (r) { return !r.idle; }).length;
   el("actTit").innerHTML = "🟢 En este momento <small>· " + trabajando + " trabajando" +
     (d.actividad.length > trabajando ? " · " + (d.actividad.length - trabajando) + " libre(s)" : "") + "</small>";
@@ -1396,55 +1404,61 @@ function diaEtiqueta(raw) {
 /* Horas de hoy por operario. Las cuatro columnas de la derecha son la pregunta
    de Damián: cuánto tardó en promedio cada tanda, y en qué se fue el resto del
    día. El criterio de qué es productivo está en `gv_monitor_horas_operario`. */
-function pintarHoras(filas) {
+function pintarHoras(filas, d) {
+  /* v23.70 (Luis) — dos bloques:
+     · RITMO (índice, decimal): m³/h de picking y de armado = m³ de las tandas que ese operario
+       cerró HOY (TP / TAP, cada tanda una vez) ÷ sus horas de picking / armado (`hs_pick` / `hs_arm`
+       de la vista, lo cerrado). Reemplaza al «h/tanda», que no servía: una tanda no mide nada fijo.
+     · HORAS (H:MM): Prod = picking + armado + carga + remitos + MOVIMIENTO (guardado, racks,
+       recepción: es trabajo); No prod = baño, comida, timbre, limpieza, conteo, permiso; Total = jornada. */
   filas = filas || [];
   if (!filas.length) {
-    el("opsTit").innerHTML = "Operarios · horas de hoy";
+    el("opsTit").innerHTML = "Operarios";
     el("opsBox").innerHTML = '<div class="vacio">Todavía nadie cerró una tarea</div>';
     return;
   }
-  var tope = cabenFilas("opsBox", true);
-  /* La fila de totales ocupa lugar: se le descuenta al tope para no cortar un
-     operario por mostrarla. */
-  var maxOp = Math.max(1, tope - 1);
-  var tProd = 0, tMov = 0, tNo = 0, tTot = 0;
-  filas.forEach(function (o) {
-    tProd += Number(o.hs_prod) || 0;  tMov += Number(o.hs_mov) || 0;
-    tNo   += Number(o.hs_noprod) || 0; tTot += Number(o.hs_total) || 0;
+  var m3 = {};                                   // legajo -> { pick: {tanda:m3}, arm: {...} }
+  ((d && d.eventos) || []).forEach(function (ev) {
+    if (ev.opcion !== "TP" && ev.opcion !== "TAP") return;
+    if (!ev.ts_inicio || dayKey(ev.ts_cliente) !== hoyKey()) return;
+    var leg = String(ev.legajo == null ? "" : ev.legajo).trim(), t = String(ev.texto || "").trim().toUpperCase();
+    if (!leg || !t) return;
+    var v = d.prog && d.prog.get(t); if (!v) return;
+    var k = ev.opcion === "TP" ? "pick" : "arm";
+    (m3[leg] = m3[leg] || { pick: {}, arm: {} })[k][t] = Number(v.m3) || 0;
   });
-  var cuerpo = filas.slice(0, maxOp).map(function (o) {
-    return '<tr><td title="' + esc(o.nombre) + '">' +
-      esc(nombreCorto(o.nombre, o.legajo)) +
+  var suma = function (o) { var s2 = 0; for (var k in o) s2 += o[k]; return s2; };
+  var ritmo = function (m, h) { h = Number(h) || 0; return (h > 0.05 && m > 0) ? n1(m / h) : "—"; };
+  var tPm = 0, tPh = 0, tAm = 0, tAh = 0, tProd = 0, tNo = 0, tTot = 0;
+  var cuerpo = filas.map(function (o) {
+    var mm = m3[String(o.legajo)] || { pick: {}, arm: {} };
+    var mp = suma(mm.pick), ma = suma(mm.arm);
+    var prod = (Number(o.hs_prod) || 0) + (Number(o.hs_mov) || 0);
+    tPm += mp; tPh += Number(o.hs_pick) || 0; tAm += ma; tAh += Number(o.hs_arm) || 0;
+    tProd += prod; tNo += Number(o.hs_noprod) || 0; tTot += Number(o.hs_total) || 0;
+    return '<tr><td title="' + esc(o.nombre) + '">' + esc(nombreCorto(o.nombre, o.legajo)) +
       (o.en_jornada ? "" : ' <span style="color:#475569;font-weight:800">✓</span>') + '</td>' +
-      '<td>' + nH(o.prom_hs_pick) + '</td>' +
-      '<td>' + nH(o.prom_hs_arm) + '</td>' +
-      '<td class="op-prod">' + nH(o.hs_prod) + '</td>' +
-      '<td class="op-mov">' + nH(o.hs_mov) + '</td>' +
+      '<td class="op-rit">' + ritmo(mp, o.hs_pick) + '</td>' +
+      '<td class="op-rit op-sep">' + ritmo(ma, o.hs_arm) + '</td>' +
+      '<td class="op-prod">' + nH(prod) + '</td>' +
       '<td class="op-no">' + nH(o.hs_noprod) + '</td>' +
       '<td class="op-tot">' + nH(o.hs_total) + '</td></tr>';
   }).join("");
-  var total = '<tr class="op-tot-row"><td>Total</td><td></td><td></td>' +
-    '<td class="op-prod">' + nH(tProd) + '</td>' +
-    '<td class="op-mov">' + nH(tMov) + '</td>' +
-    '<td class="op-no">' + nH(tNo) + '</td>' +
+  var total = '<tr class="op-tot-row"><td>Total</td>' +
+    '<td class="op-rit">' + ritmo(tPm, tPh) + '</td><td class="op-rit op-sep">' + ritmo(tAm, tAh) + '</td>' +
+    '<td class="op-prod">' + nH(tProd) + '</td><td class="op-no">' + nH(tNo) + '</td>' +
     '<td class="op-tot">' + nH(tTot) + '</td></tr>';
-  /* ⚠ El % se saca sobre el tiempo MEDIDO (prod + mov + no prod), NO sobre la
-     jornada: `CR` y `RR` son toggles que quedan abiertos mientras el operario
-     hace otra cosa, así que la suma de los baldes puede pasarse del total de
-     horas del día (medido: 8,62 contra 6,03 en un caso real del 22/09). Contra
-     la jornada el número daría más de 100 % y nadie le creería. */
-  var medido = tProd + tMov + tNo;
+  var medido = tProd + tNo;
   var pct = medido > 0 ? Math.round(tProd * 100 / medido) : 0;
-  el("opsTit").innerHTML = "Operarios · horas de hoy <small>· " + filas.length +
-    " · " + pct + "% productivas</small>";
-  el("opsBox").innerHTML = '<table class="ops"><thead><tr><th>Operario</th>' +
-    '<th title="Horas promedio por tanda pickeada">h/tanda<br>pick</th>' +
-    '<th title="Horas promedio por tanda armada">h/tanda<br>arm</th>' +
-    '<th title="Picking + armado + carga camión + remitos">Prod</th>' +
-    '<th title="Guardado a góndola, racks, recepción de mercadería e insumos">Mov</th>' +
-    '<th title="Timbre, baño, limpieza, comida, conteo, permiso">No<br>prod</th>' +
-    '<th>Total</th></tr></thead><tbody>' + cuerpo + total + '</tbody></table>' +
-    (filas.length > maxOp ? '<div class="mas">+ ' + (filas.length - maxOp) + ' más</div>' : "");
+  el("opsTit").innerHTML = "Operarios <small>· " + filas.length + " · " + pct + "% productivas</small>";
+  el("opsBox").innerHTML = '<table class="ops"><thead>' +
+    '<tr class="op-grp"><th></th><th colspan="2" class="op-sep">Ritmo</th><th colspan="3">Horas</th></tr>' +
+    '<tr><th>Operario</th>' +
+    '<th title="m³ pickeados hoy ÷ horas de picking">m³/h<br>picking</th>' +
+    '<th class="op-sep" title="m³ armados hoy ÷ horas de armado">m³/h<br>armado</th>' +
+    '<th title="Picking, armado, carga, remitos y movimiento (guardado, racks, recepción)">Prod</th>' +
+    '<th title="Baño, comida, timbre, limpieza, conteo, permiso">No prod</th>' +
+    '<th>Total</th></tr></thead><tbody>' + cuerpo + total + '</tbody></table>';
 }
 
 /* v20.21 (Thomas) — ¿esta tanda YA SALIÓ? Es la misma pregunta que contesta la
@@ -1528,7 +1542,7 @@ function ciclo() {
         actividad: actividadActual(guardado.length ? eventos.concat(guardado) : eventos, hoy, fjHoy, fichados),
         alertas: Array.from(alertas).sort(),
         empleados: empleados, facturadas: facturadas, despachadas: despachadas,
-        horas: horas, arbol: arbol
+        horas: horas, arbol: arbol, eventos: eventos
       });
 
       ultimoOk = Date.now(); fallos = 0;
