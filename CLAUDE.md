@@ -6292,3 +6292,23 @@ en el cartel de CORTE de las 15:00 — lo prueba `tests/tv-meta-camion.cjs`, que
 **Chequeo:** `node tests/mon-header-codigo.cjs` (bloque **f**: el rótulo, la misma línea, el tamaño
 y el centrado medidos sobre la pantalla; verificado que falla contra el index anterior) ·
 `node tests/mon-tv.cjs` (candado invertido: si vuelve una de las líneas sacadas, se pone rojo).
+
+### ⚠ v24.39 (Luis): la TV es una PARED — un día = UNA fila, y el veredicto vive arriba a la izquierda
+
+**Luis, con la captura del 4.º día cortado:** *"esto esta pensado para estar en un monitor (tv
+samsung) … CLARIDAD VISUAL Y SIMPLEZA … la tabla asi es horriblemente ineficiente"*.
+
+| qué | cómo queda |
+|---|---|
+| tabla de «Días» | **una fila por día**: el día a la izquierda y sus 5 porcentajes al lado. Antes eran **dos** filas (el día a `colspan=5` y los números abajo), o sea el doble de alto para lo mismo — por eso el viernes quedaba cortado |
+| el subtexto `· hoy · 5,9 m³ · 5 tandas · 13 NP` | **se fue** (*"es al pedo eso"*) |
+| encabezados | **todos centrados**: `.card-t` va `text-align:center` y la clase `.izq-t` queda por si alguno tiene que volver a la izquierda |
+| el veredicto (`⛔ Terminó la jornada…` + `Pasar de día`) y los **carteles de aviso** | encabezan la **columna izquierda**, arriba de la tabla de tandas (*"usá ese realstate para poner los carteles de aviso"*) |
+| «En este momento» | pasa a `grow`: se queda el alto que dejaron los avisos al mudarse |
+
+⚠ **El alto de la pared es lo escaso, no el ancho.** Toda fila que se agregue al cuadro de Días
+le come un día al resumen: si hace falta un dato por día, va como **columna**, no como segunda
+fila ni como subtexto.
+
+⚠ `pintarMeta` sigue escribiendo en `#metaBox` y devolviendo el cartel de CORTE para `#avisos`:
+lo que cambió es **dónde están esos dos divs**, no la lógica. `tests/tv-meta-camion.cjs` no se tocó.

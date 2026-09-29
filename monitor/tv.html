@@ -100,10 +100,12 @@ main.angosto{grid-template-columns:1fr 1.3fr}
 .col{display:flex;flex-direction:column;gap:1vh;min-height:0;min-width:0}
 .card{background:#111c2f;border:1px solid #1e293b;border-radius:1vh;
   padding:.9vh 1vw;min-height:0;display:flex;flex-direction:column;overflow:hidden}
-.card-t{font-size:2.1vh;font-weight:900;color:#93c5fd;letter-spacing:.04em;
+/* v24.39 (Luis): *"Headers centrados"*. Todos los titulos de tarjeta van centrados; la
+   clase .izq-t queda por si algun dia hay que dejar uno a la izquierda. */
+.card-t{font-size:2.1vh;font-weight:900;color:#93c5fd;letter-spacing:.04em;text-align:center;
   margin-bottom:.7vh;flex:0 0 auto;overflow:hidden;line-height:1.2}
 .card-t small{color:#64748b;font-weight:700}
-.card-t.cen-t{text-align:center}
+.card-t.izq-t{text-align:left}
 .grow{flex:1;min-height:0;overflow:hidden}
 
 /* ── Tablas ───────────────────────────────────────────────────────────── */
@@ -120,10 +122,18 @@ tr.fact td{background:#14311f}
    violeta (el mismo color que la columna SALIÓ de la PPP) y no verde. */
 tr.salio-sinfc td{background:#2a1f45}
 /* v23.64 — Resumen de días (≡ Programación de la PPP): colores de sus columnas */
-.rd-dia td{padding-top:1.1vh;font-weight:900;color:#e2e8f0;font-size:2.3vh}
-.rd-dia small{color:#94a3b8;font-weight:700;font-size:1.7vh}
-.rd td{text-align:center;font-weight:900;line-height:1.05;font-size:2.3vh;padding:.5vh .2vw}
-.rd td small{display:block;font-size:.72em;font-weight:700;color:#64748b}
+/* v24.39 (Luis): *"ahi tenes el viernes cortado … olvidate del texto abajo de los dias …
+   la tabla asi es horriblemente ineficiente"*. UNA fila por dia: el dia a la izquierda y
+   sus cinco porcentajes al lado. Antes eran DOS filas (el dia a colspan=5 con su m3/tandas/NP
+   y los numeros abajo), o sea el doble de alto para la misma informacion: por eso el 4.º dia
+   quedaba cortado en la pared. */
+.rd th{text-align:center;font-size:1.6vh;font-weight:800;color:#64748b;letter-spacing:.05em;
+  padding:.2vh .2vw;text-transform:uppercase}
+.rd td{text-align:center;font-weight:900;line-height:1.05;font-size:2.6vh;padding:.7vh .2vw}
+.rd td.rd-fe{text-align:left;color:#e2e8f0;white-space:nowrap;font-size:2.4vh}
+.rd tr+tr td{border-top:1px solid #16203a}
+.rd td small{display:block;font-size:.62em;font-weight:700;color:#64748b}
+.rd tr.hoy td.rd-fe{color:#93c5fd}
 .rd .sal{color:#a78bfa}.rd .fac{color:#60a5fa}.rd .arm{color:#4ade80}.rd .pro{color:#fbbf24}.rd .pen{color:#f87171}
 .rd .z{color:#334155}
 .st-salio{font-size:2.1vh}
@@ -204,7 +214,8 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
 /* v23.86 (Luis) — ¿LLEGAN? La meta del día es ARMAR lo que sale en 2 días hábiles (armado → factura →
    salida). A las 15:00 se corta: si al ritmo de hoy no llegan, se corrige la PPP ese mismo día.
    v23.92 — dejó de ser una tarjeta: es la banda que encabeza el resumen de días. */
-.mt-ver{font-size:2.6vh;font-weight:900;line-height:1.15;margin:.1vh 0 .5vh;text-align:center}
+.mt-ver{font-size:2.6vh;font-weight:900;line-height:1.15;margin:.1vh 0 .5vh;text-align:center;
+  text-wrap:balance}   /* que no deje el «m³» solo en el segundo renglon */
 .mt-ok{color:#4ade80}.mt-no{color:#f87171}.mt-duda{color:#fbbf24}.mt-gris{color:#94a3b8}
 .mt-bar{height:1.1vh;border-radius:999px;background:#1e293b;overflow:hidden;margin:.3vh 0 .6vh}
 .mt-bar i{display:block;height:100%;background:#16a34a}
@@ -269,7 +280,13 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
   </header>
 
   <main>
+    <!-- v24.39 (Luis): *"eso de TERMINO LA JORNADA podes ponerlo arriba de la tabla de la
+         izquierda y usar ese realstate para poner los carteles de aviso"*. La banda del
+         veredicto y los carteles pasan a encabezar la columna de tandas; el cuadro de Días
+         se queda sólo con la tabla, que es lo que tiene que entrar entero en la pared. -->
     <div class="col">
+      <div id="metaBox"></div>
+      <div class="avisos" id="avisos" style="flex:0 0 auto"></div>
       <div class="card grow">
         <div class="grow" id="tandasBox"></div>
       </div>
@@ -280,14 +297,13 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
          Resumen de días al alto de su contenido y Total por día el resto. -->
     <div class="col" id="col2">
       <div class="card" style="flex:0 0 auto">
-        <div class="card-t cen-t" id="opsTit">Operarios</div>
+        <div class="card-t" id="opsTit">Operarios</div>
         <div id="opsBox"></div>
       </div>
-      <div class="card" style="flex:0 0 auto">
+      <div class="card grow">
         <div class="card-t" id="actTit">En este momento</div>
         <div id="actBox"></div>
       </div>
-      <div class="avisos" id="avisos" style="flex:1 1 auto;min-height:0;overflow:hidden"></div>
     </div>
 
     <!-- v23.92 (Luis): «¿Llegan?» dejó de ser una tarjeta aparte — el ritmo sólo se entiende
@@ -295,7 +311,6 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
     <div class="col" id="col3">
       <div class="card" style="flex:0 0 auto">
         <div class="card-t" id="fcTit">Días</div>
-        <div id="metaBox"></div>
         <div id="fcBox"></div>
       </div>
       <div class="card grow">
@@ -1336,14 +1351,13 @@ function pintar(d) {
       var p = tot ? Math.round(100 * nn / tot) : 0;
       return '<td class="' + cls + (nn ? '' : ' z') + '">' + p + '%<small>' + nn + '</small></td>';
     };
-    el("fcBox").innerHTML = rds.length ? '<table class="rd"><thead><tr>' +
-      '<th class="cen">Salió</th><th class="cen">Fact</th><th class="cen">Arm</th><th class="cen">Proc</th><th class="cen">Pend</th>' +
+    el("fcBox").innerHTML = rds.length ? '<table class="rd"><thead><tr><th></th>' +
+      '<th>Salió</th><th>Fact</th><th>Arm</th><th>Proc</th><th>Pend</th>' +
       '</tr></thead><tbody>' + rds.map(function (x) {
         var neto = function (k) { return x.est[k] - (x.estSal[k] || 0); };
-        return '<tr class="rd-dia"><td colspan="5" style="text-align:left">' + esc(diaEtiqueta(x.key)) +
-          (x.key === hoyKey() ? ' <small>· hoy</small>' : '') +
-          ' <small>· ' + n1(x.m3) + ' m³ · ' + x.tandas.size + ' tandas · ' + x.nps + ' NP</small></td></tr>' +
-          '<tr>' + pc(x.salio, x.nps, "sal") + pc(neto("facturado"), x.nps, "fac") + pc(neto("armado"), x.nps, "arm") +
+        return '<tr' + (x.key === hoyKey() ? ' class="hoy"' : '') + '>' +
+          '<td class="rd-fe">' + esc(diaEtiqueta(x.key)) + '</td>' +
+          pc(x.salio, x.nps, "sal") + pc(neto("facturado"), x.nps, "fac") + pc(neto("armado"), x.nps, "arm") +
           pc(neto("proceso"), x.nps, "pro") + pc(neto("pendiente"), x.nps, "pen") + '</tr>';
       }).join("") + '</tbody></table>'
       : '<div class="vacio">Nada programado</div>';
@@ -1386,7 +1400,7 @@ function pintar(d) {
           '</tr>';
       }).join("");
     }).join("");
-    el("totBox").innerHTML = '<table><thead><tr><th>Fecha</th>' +
+    el("totBox").innerHTML = '<table><thead><tr><th class="cen">Fecha</th>' +
       '<th class="cen">' + (desglosar ? "Camión" : "Camiones") + '</th>' +
       '<th class="num">M³</th><th class="num">Total</th></tr></thead><tbody>' + totFilas + '</tbody></table>';
   } else {

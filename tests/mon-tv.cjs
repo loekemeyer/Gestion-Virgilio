@@ -263,7 +263,13 @@ function responder(url) {
   // v23.64 (Luis) — "A facturar" pasó a ser el RESUMEN DE DÍAS de la PPP (%, neto por Salió)
   ok(/Días/.test(r.fcTit), "el cuadro de la derecha tiene que ser el de días: " + r.fcTit);
   ok(/Salió/.test(r.fc) && /Fact/.test(r.fc) && /Pend/.test(r.fc), "faltan las columnas de estado del resumen");
-  ok(/5,0 m³ · 3 tandas · 4 NP/.test(r.fc), "la fila del día tiene que decir 5,0 m³ · 3 tandas · 4 NP: " + r.fc.slice(0, 400));
+  /* v24.39 (Luis): *"olvidate del texto abajo de los dias … es al pedo eso"*. La fila del día
+     es el día y sus cinco porcentajes, en UNA fila: el m³ / tandas / NP se fue. Candado
+     invertido: si vuelve el subtexto, esto se pone rojo. */
+  ok(/<td class="rd-fe">/.test(r.fc) && !/tandas · \d+ NP/.test(r.fc),
+     "la fila del día va sola, sin el subtexto de m³/tandas/NP: " + r.fc.slice(0, 300));
+  ok((r.fc.match(/<tr[^>]*>/g) || []).length === 2,
+     "un día = UNA fila (más la del encabezado): " + (r.fc.match(/<tr[^>]*>/g) || []).length);
   ok((r.fc.match(/25%<small>1<\/small>/g) || []).length === 4, "98805 salió: 25 % en Salió, Fact, Proc y Pend, y 0 en Armado");
   ok(/class="arm z">0%/.test(r.fc), "el armado que salió no se cuenta dos veces (neto)");
   ok(/3 salieron sin FC/.test(r.fcTit), "el título no avisa cuántas se fueron sin factura: " + r.fcTit);
@@ -337,7 +343,7 @@ function responder(url) {
   ok(/resumenDias\(d\.arbol, d\.despachadas, 4\)/.test(
        require("fs").readFileSync(require("path").join(__dirname, "..", "monitor", "tv.html"), "utf8")),
      "el resumen de días tiene que pedir 4 días (el fixture sólo trae uno: va estático)");
-  ok(/<tr class="rd-dia">/.test(r.dias), "el resumen de días no se dibujó");
+  ok(/<td class="rd-fe">/.test(r.dias), "el resumen de días no se dibujó");
 
   // ── v21.17 · tabla de horas por operario
   ok(/Farias J\./.test(r.ops), "la tabla de operarios no muestra el nombre corto");
