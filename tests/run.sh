@@ -879,6 +879,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== oc-muestra-los-en-cero (Regresion v21) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/oc-muestra-los-en-cero.cjs
 
+echo "== oc-recibido-backend (v24.00: recibido del backend + selector de fecha) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/oc-recibido-backend.cjs
+
 echo "== ocg-dual-empresa (Regresión v19) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ocg-dual-empresa.cjs
 

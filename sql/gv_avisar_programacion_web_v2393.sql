@@ -62,11 +62,18 @@ alter view public.vista_ppp_programacion_pendiente set (security_invoker = true)
 --   set local role anon; select count(*) into n from public.vista_avisar_programacion; reset role;
 --   raise notice 'anon ve %', n; end $$;
 
--- ── centinela (pendiente del «sí» del dueño: es un insert) ────────────────────
+-- ── centinela ✅ APLICADO el 29/09 con el «sí» de Luis (id 250) ───────────────
+-- El patrón es `PPP_Web_Programacion` porque aparece UNA sola vez en el cuerpo, y es el FROM de la
+-- rama web: si alguien pisa la vista con una copia vieja, esa palabra se va y gv_reglas_perdidas lo
+-- dice. (Regla v21.84: el patrón se elige del código, y la pregunta es «si borro la regla, ¿esta
+-- palabra se va?».) Y el objeto se agregó a scripts/reglas-protegidas.json, que es lo que hace que
+-- el hook claude-reglas-guard.cjs frene a la próxima sesión que quiera reemplazarla.
+--
 -- insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
 -- values ('vista_ppp_programacion_pendiente','vista','PPP_Web_Programacion',
---         'Avisar programación tiene que tomar TAMBIÉN los pedidos web, no sólo los de ISIS',
+--         'Avisar programacion tiene que tomar TAMBIEN los pedidos web, no solo los de ISIS (v23.93)',
 --         'Luis','v23.93');
+-- select * from public.gv_reglas_perdidas;   -- vacía = todo bien (verificado el 29/09)
 
 -- ── rollback ─────────────────────────────────────────────────────────────────
 -- create or replace view public.vista_ppp_programacion_pendiente

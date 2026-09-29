@@ -6214,7 +6214,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.98"></script>
+<script type="module" src="recepcion.js?v=24.00"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10256,7 +10256,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.98";
+const APP_VERSION = "v24.00";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15968,7 +15968,20 @@ function ocBuildRecep() {
 /* Recibido de una línea = lo que la RECEPCIÓN registró en el período vigente de la OC
    (no acumula pasado; ver ocBuildRecep). Es la única fuente del "recibido" que muestra
    el visualizador (v7.58: se unificó con la columna manual). */
-function ocRecEff(r) { return (_oc && _oc.recepByRow && _oc.recepByRow[r && r.id]) || 0; }
+/* v24.00 (Luis, 29/09) — EL RECIBIDO SALE DEL BACKEND, no del recálculo del front.
+   `Ordenes_Compra.cantidad_recibida` lo mantiene `gv_oc_recompute_recibido` (al recibir y por
+   el cron `gv-oc-recepcion-red`), que resuelve los ALIAS de proveedor —`gv_norm_prov_keys`
+   mapea `pettofrezza → rafael`— y los fabricantes de `GV_OC_Fabrica_Para`, y además reparte
+   las entregas externas. `ocBuildRecep` (acá abajo) compara los nombres CRUDOS, así que una
+   OC a "Pettofrezza" contra una entrega a nombre de "Rafael" no matchea y daba 0.
+   Medido el 29/09: 12 OC del 23/09 mostraban 0 con recibido real — el 501 decía 0 de 1153
+   con 300 cajas entregadas el 24. Se toma el MAYOR de los dos: el front queda de respaldo
+   por si el recompute todavía no corrió para una entrega recién cargada. */
+function ocRecEff(r) {
+  const front = (_oc && _oc.recepByRow && _oc.recepByRow[r && r.id]) || 0;
+  const back = Math.max(0, Number(r && r.cantidad_recibida) || 0);
+  return Math.max(front, back);
+}
 async function openOCAdmin() {
   if (!document.getElementById("ocCss")) {
     const s = document.createElement("style"); s.id = "ocCss";
@@ -17297,7 +17310,8 @@ function ocBodyGenArt() {
   let h = '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + conPedido.length + '</b> artículo(s) a pedir · <b>' + totCajas + '</b> cajas'
     + (sinN ? ' · <b style="color:#b45309">' + sinN + '</b> sin proveedor' : '')
     + (enCero ? ' · <b style="color:#64748b" title="Están en o sobre el máximo: hoy no se piden. Se muestran al final.">' + enCero + '</b> en 0' : '') + '.</div>';
-  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Tallerista</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Tallerista</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num" title="De la OC VIGENTE de este código: cajas recibidas / cajas pedidas.">Recib.</th><th class="num">A pedir</th></tr></thead><tbody>';
+  const _recMap = _ocgRecibMap();
   fgrupos.forEach(function (g) {
     const proyTxt = (g.fuente === "proy") ? (Math.round(g.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
     // v21.08 - el que queda en 0 se ve atenuado y al final: esta para mirarlo, no se pide.
@@ -17306,10 +17320,47 @@ function ocBodyGenArt() {
     // la celda Tallerista de un articulo que SI se pide sigue mostrando solo a los que reciben
     // cajas (como antes de la v21.08); el que queda en 0 muestra a todos los que lo hacen.
     const subsV = cero ? g.subs : g.subs.filter(function (s) { return s.falta > 0; });
-    h += '<tr' + trAttr + '><td class="oc-cod">' + escapeHtml(codCanon(g.cod)) + '</td><td>' + escapeHtml(artNombre(g.cod, g.desc)) + '</td><td>' + _ocgProvCell(subsV) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + g.indice + '</td><td class="num">' + g.max + '</td><td class="num">' + g.demanda + '</td><td class="num">' + g.stock + '</td><td class="num' + (cero ? '" style="color:#94a3b8;font-weight:700' : ' oc-falt') + '">' + g.falta + '</td></tr>';
+    h += '<tr' + trAttr + '><td class="oc-cod">' + escapeHtml(codCanon(g.cod)) + '</td><td>' + escapeHtml(artNombre(g.cod, g.desc)) + '</td><td>' + _ocgProvCell(subsV) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + g.indice + '</td><td class="num">' + g.max + '</td><td class="num">' + g.demanda + '</td><td class="num">' + g.stock + '</td>' + _ocgRecibCell(g.cod, _recMap) + '<td class="num' + (cero ? '" style="color:#94a3b8;font-weight:700' : ' oc-falt') + '">' + g.falta + '</td></tr>';
   });
   h += '</tbody></table></div>';
   return h + ocBodyGenImportados();
+}
+/* v24.00 (Luis, 29/09) — "que muestre el neto pero que también muestre cuántas se fueron
+   recibiendo". "A pedir" es el NETO que se va a ordenar hoy; esta columna dice qué pasó con la
+   orden ANTERIOR del mismo código: cuánto se le pidió y cuánto entregó el tallerista hasta ahora.
+   Vigente = la OC más reciente que no está anulada ni cerrada (misma idea que el `es_ultima` de
+   gv_oc_recompute_recibido). Si un código salió el mismo día a dos talleristas (506 → Martin C y
+   Carlos E) se suman: la pregunta es por el código, no por el proveedor.
+   ⚠ NO se cachea a propósito: `_oc.rows` se recarga al generar OC y un mapa viejo diría que no
+   entró nada. Son ~1.700 filas, cuesta menos que invalidarlo bien. */
+function _ocgRecibMap() {
+  const m = {};
+  ((_oc && _oc.rows) || []).forEach(function (r) {
+    const est = String(r.estado || "").toLowerCase();
+    if (est === "anulada" || est === "cerrada") return;
+    const k = _ocgNorm(r.codigo); if (!k) return;
+    const f = String(r.fecha || ""), cur = m[k];
+    if (cur && String(cur.fecha || "") > f) return;
+    if (cur && String(cur.fecha || "") === f) {
+      cur.ped += Number(r.cantidad) || 0; cur.rec += ocRecEff(r);
+      if (cur.prov && r.proveedor && cur.prov.indexOf(r.proveedor) < 0) cur.prov += " + " + r.proveedor;
+      return;
+    }
+    m[k] = { fecha: f, prov: r.proveedor || "", ped: Number(r.cantidad) || 0, rec: ocRecEff(r) };
+  });
+  return m;
+}
+/* Celda "Recib." — recibidas/pedidas de la OC vigente. Verde = completó, ámbar = parcial,
+   rojo = no entregó nada todavía, "—" = no hay OC vigente de ese código. */
+function _ocgRecibCell(cod, mapa) {
+  const m = mapa || _ocgRecibMap(), k = _ocgNorm(cod);
+  const o = m[k] || m[k.replace(/\s+(LK|CH)$/, "")];
+  if (!o || !(o.ped > 0)) return '<td class="num" style="color:#cbd5e1" title="No hay una OC vigente de este c\u00f3digo">\u2014</td>';
+  const falta = Math.max(0, o.ped - o.rec);
+  const col = (o.rec >= o.ped) ? "#15803d" : (o.rec > 0 ? "#b45309" : "#b91c1c");
+  return '<td class="num" title="OC vigente del ' + escapeHtml(_ocDdmm(o.fecha)) + ' a ' + escapeHtml(o.prov || "\u2014")
+    + ': pedidas ' + o.ped + ', recibidas ' + o.rec + ', faltan ' + falta + '">'
+    + '<b style="color:' + col + '">' + o.rec + '</b><span style="color:#94a3b8">/' + o.ped + '</span></td>';
 }
 // Celda "Tallerista": uno solo → el nombre. Repartido → "2 talleristas" y, debajo, cada uno con su
 // % y las cajas que le tocan (es la OC que se le va a generar a cada uno). v19.76.
@@ -17346,12 +17397,13 @@ function ocBodyGenTall() {
     const fTotU = fitems.reduce(function (s, it) { return s + (_ocU(it) ? it.falta : 0); }, 0);
     const nPedir = fitems.filter(function (it) { return it.falta > 0; }).length;
     h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + fitems.length + ' artículo(s) · <b>' + nPedir + '</b> a pedir · ' + fTotal + ' cajas' + (fTotU ? ' + ' + fTotU.toLocaleString("es-AR") + ' u' : '') + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones</span>' : '') + '</div>';
-    h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num">A pedir</th></tr></thead><tbody>';
+    h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num" title="De la OC VIGENTE de este código: cajas recibidas / cajas pedidas.">Recib.</th><th class="num">A pedir</th></tr></thead><tbody>';
+    const _recMapT = _ocgRecibMap();
     fitems.forEach(function (it) {
       const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0)">0</span>';
       const faltCls = it.falta > 0 ? " oc-falt" : "";
       const faltTxt = it.falta > 0 ? it.falta : '<span style="color:#cbd5e1">0</span>';
-      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + it.max + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td><td class="num' + faltCls + '">' + faltTxt + '</td></tr>';
+      h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + it.max + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td>' + _ocgRecibCell(it.cod, _recMapT) + '<td class="num' + faltCls + '">' + faltTxt + '</td></tr>';
     });
     h += '</tbody></table></div>';
   });
@@ -17806,13 +17858,22 @@ function stkAsOfControl() {
   // centrado con inline-flex. Antes usaban .stk-btn (borde 1px, sin flex) y quedaban
   // desnivelados respecto a los chips.
   const _pill = 'width:auto;margin:0;flex:0 0 auto;padding:0 12px;height:38px;border-radius:9px;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;line-height:1;';
-  let h = '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;display:inline-flex;align-items:center;">Ver stock:</span>';
+  // v24.00 — los tres controles van dentro de UN contenedor flex propio: la barra de filtros
+  // scrollea en horizontal, y suelto el grupo se partía al medio ("Ver stock: 🔴 En vivo" de un
+  // lado y el campo de fecha del otro). Junto, o entra entero o se scrollea entero.
+  let h = '<span style="flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;">';
+  h += '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;display:inline-flex;align-items:center;">Ver stock:</span>';
   h += '<button onclick="stkAsOfLive()" style="' + _pill + 'border:1.5px solid ' + (on ? '#cbd5e1' : '#16a34a') + ';background:' + (on ? '#fff' : '#16a34a') + ';color:' + (on ? '#334155' : '#fff') + ';">🔴 En vivo</button>';
   if (showPicker) {
-    h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:158px;min-width:0;height:38px;box-sizing:border-box;border:1.5px solid #cbd5e1;border-radius:9px;padding:0 6px;font-size:11px;">';
+    // v24.00 (Luis, 29/09) — el ancho FIJO de 158px con font 11 no alcanza para el widget nativo
+    // de `datetime-local`: Chrome dibuja dd/mm/aaaa --:-- más el botón de calendario y necesita
+    // ~170px, así que en pantallas chicas el campo salía cortado contra su propio borde. El ancho
+    // lo da el CONTENIDO (`width:auto` + `min-width`), que es la regla de tablas del dueño
+    // aplicada a un control: el ancho lo decide el dato, no un número puesto a mano.
+    h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:auto;min-width:172px;height:38px;box-sizing:border-box;border:1.5px solid #cbd5e1;border-radius:9px;padding:0 8px;font-size:12px;">';
   }
   h += '<button onclick="stkAsOfDateBtn()" style="' + _pill + 'border:1.5px solid ' + (on ? '#16a34a' : '#cbd5e1') + ';background:#fff;color:#334155;">📅 A esa fecha</button>';
-  return h;
+  return h + '</span>';
 }
 /* v11.37 — 1er toque "A esa fecha": revela el selector de fecha/hora. 2º toque (ya visible
    y con valor): aplica el histórico. */
@@ -63216,7 +63277,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=23.98"></script>
+<script src="cobranzas.js?v=24.00"></script>
 
 </body>
 </html>
