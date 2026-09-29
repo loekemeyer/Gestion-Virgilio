@@ -6234,7 +6234,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.89"></script>
+<script type="module" src="recepcion.js?v=23.90"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10279,7 +10279,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.89";
+const APP_VERSION = "v23.90";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17232,7 +17232,9 @@ async function ocgFetchImportados() {
     const cod = IMP_ALIAS[codRaw.toUpperCase()] || codRaw;   // canónico (865ED → 865E)
     const _pl = _impDosPlantas[codRaw.toUpperCase()] ? _impPlanta(r.marca) : "";
     const k = cod.toUpperCase() + (_pl ? "|" + _pl : "");
-    if (!by[k]) by[k] = { cod: cod, key: k, planta: _pl, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, uniPed: 0, enCurso: 0, det: [] };
+    // v23.90 — `mesesArt`: desde la v23.89 los meses objetivo se pisan POR PROVEEDOR, así que
+    // ya no hay UN número para toda la pantalla. El global `meses` queda para el encabezado.
+    if (!by[k]) by[k] = { cod: cod, key: k, planta: _pl, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, uniPed: 0, enCurso: 0, mesesArt: 0, det: [] };
     const o = by[k];
     if (codRaw.toUpperCase() === cod.toUpperCase() && r.descripcion) o.desc = r.descripcion;   // la fila canónica manda la descripción
     o.proyUni += Number(r.est_madre_eff) || 0;
@@ -17244,7 +17246,7 @@ async function ocgFetchImportados() {
     // filas subyacentes (por marca/planta) para poder editar "en curso" y marcar llegada por Importados.id
     if (r.id != null) o.det.push({ id: r.id, marca: String(r.marca || "").trim(), prov: String(r.proveedor || "").trim(), curso: Number(r.pedido_curso) || 0, uxc: Number(r.uni_x_caja) || 0 });
     const u = Number(r.uni_x_caja) || 0; if (u > o.uxc) o.uxc = u;
-    const m = Number(r.meses_objetivo) || 0; if (m > 0) meses = m;
+    const m = Number(r.meses_objetivo) || 0; if (m > 0) { meses = m; if (m > o.mesesArt) o.mesesArt = m; }
     if (!o.desc && r.descripcion) o.desc = r.descripcion;
     if ((o.prov === "(sin proveedor)") && r.proveedor) o.prov = String(r.proveedor).trim();
   });
@@ -17303,7 +17305,8 @@ async function ocgFetchImportados() {
     // considerar el stock de las partes" → 1546903 ve el 546 terminado, 505C las cuchillas ya armadas).
     const stockTermU = esParte ? (pp.stockTerm || 0) : 0;
     const stockTot = o.stockUni + stockParteU + stockTermU;   // el stock de la parte cuenta como stock del terminado, y el del terminado como stock de la parte
-    const objetivoUni = Math.round(proyUni * meses);
+    const mesesIt = (o.mesesArt > 0) ? o.mesesArt : meses;   // v23.90 — los de SU proveedor
+    const objetivoUni = Math.round(proyUni * mesesIt);
     const aPedirUni = Math.max(0, Math.ceil(objetivoUni - stockTot - o.enCurso));
     // v10.07 — MASTER CAJAS: el divisor correcto es uni_master (del Excel/Importados_Volumen), NO
     // uni_x_caja (que es la caja INNER). Si no hay uni_master cargado, caemos a uni_x_caja como aprox.
@@ -17318,7 +17321,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: meses, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
+    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -21093,7 +21096,7 @@ function _esProvNtl(prov) { return !!_NTL_PROVEEDORES[String(prov || "").trim()]
 let _NAC_TASAS = { estad_pct: 0.03, estad_fob_desde: 6000, estad_fob_hasta: 10000, estad_fijo: 180,
                    iva_pct: 0.21, iva_adic_pct: 0.20, gcias_pct: 0.06, iibb_pct: 0.0017,
                    derechos_pct: 0.18, ntl_pct: 0.05, valor_m3: 110, flete_full: 2000,
-                   min_usd: 25000, meses_objetivo: 10 };
+                   min_usd: 25000, meses_objetivo: 10, moq: 1000, moq_meses_max: 12 };
 function _nacPct(n) { return (Math.round(_nacNum(n, 0) * 10000) / 100).toLocaleString("es-AR"); }
 // v23.79 (Luis): estadística por tramo de FOB — hasta el piso paga su %; en el tramo del medio,
 // un fijo en u$s; arriba del techo, el % sin tope. Base del %: el CIF (como el resto).
@@ -21267,17 +21270,36 @@ function _pedImpDesgIzq(proy, minUsd, items) {
   return h;
 }
 function _pedImpDesgDer(nac, totUsd, m3) {
-  // v23.80 (Luis): más grande, y lo recuperable separado de lo que queda en el costo.
-  var td = 'style="padding:4px 8px;border-bottom:1px solid #c7d2fe;vertical-align:top"';
-  var tdn = 'style="padding:4px 8px;border-bottom:1px solid #c7d2fe;text-align:right;white-space:nowrap;vertical-align:top;font-weight:700"';
-  var tit = function (txt, col) { return '<tr><td colspan="3" style="padding:8px 8px 3px;font-weight:800;font-size:14px;color:' + col + '">' + txt + '</td></tr>'; };
-  var fila = function (d, col) { return '<tr><td ' + td + '>' + escapeHtml(d[0]) + '</td><td ' + td + ' style="color:' + col + ';font-size:12.5px">' + escapeHtml(d[2] || "") + '</td><td ' + tdn + '>' + _usd0(d[1]) + '</td></tr>'; };
-  var tot = function (lbl, txt, v, bg) { return '<tr style="background:' + bg + '"><td style="padding:5px 8px"><b>' + lbl + '</b></td><td style="padding:5px 8px;font-size:12.5px">' + txt + '</td><td style="padding:5px 8px;text-align:right;white-space:nowrap;font-size:15px"><b>' + _usd0(v) + '</b></td></tr>'; };
+  /* v23.90 (Luis, 29/09) — DOS COLUMNAS: concepto (con su % entre paréntesis) e importe.
+     La fórmula ya no ocupa una columna fija: se abre al tocar el renglón. Antes eran tres
+     columnas y la del medio, con las cuentas de todos los ítems a la vez, era la que hacía
+     ilegible el cuadro.
+     ⚠ El % de cada concepto viene YA en su nombre, armado por _pedImpNacionalizar con las
+     tasas de la base (_NAC_TASAS): acá no se escribe ningún número. */
+  var esc = escapeHtml;
+  var tdN = 'style="padding:0;border-bottom:1px solid #c7d2fe"';
+  var tdI = 'style="padding:5px 8px;border-bottom:1px solid #c7d2fe;text-align:right;white-space:nowrap;font-weight:700;vertical-align:top"';
+  var tit = function (txt, col) { return '<tr><td colspan="2" style="padding:9px 8px 3px;font-weight:800;font-size:14px;color:' + col + '">' + txt + '</td></tr>'; };
+  var fila = function (d, col) {
+    var det = String(d[2] || "");
+    if (!det) return '<tr><td style="padding:5px 8px;border-bottom:1px solid #c7d2fe">' + esc(d[0]) + '</td><td ' + tdI + '>' + _usd0(d[1]) + '</td></tr>';
+    return '<tr><td ' + tdN + '>' +
+      '<details style="padding:5px 8px"><summary style="cursor:pointer;list-style:none">' + esc(d[0]) +
+      ' <span style="font-size:11px;color:' + col + ';font-weight:800">▸ detalle</span></summary>' +
+      '<div style="margin:4px 0 2px 2px;font-size:12.5px;color:' + col + '">' + esc(det) + '</div></details>' +
+      '</td><td ' + tdI + '>' + _usd0(d[1]) + '</td></tr>';
+  };
+  var tot = function (lbl, txt, v, bg) {
+    return '<tr style="background:' + bg + '"><td style="padding:6px 8px"><b>' + lbl + '</b>' +
+      (txt ? '<div style="font-size:11.5px;font-weight:600;color:#475569">' + esc(txt) + '</div>' : '') +
+      '</td><td style="padding:6px 8px;text-align:right;white-space:nowrap;font-size:15px;vertical-align:middle"><b>' + _usd0(v) + '</b></td></tr>';
+  };
   var rec = nac.detRecup || [];
   var h = '<div style="margin-top:8px;font-size:13.5px;color:#312e81">' +
     (nac.cif > 0 ? '<div style="margin-bottom:6px"><b>CIF</b> = ' + nac.cifTxt + ' = <b>' + _usd0(nac.cif) + '</b> (base de derechos y estadística)</div>' : '') +
-    '<table style="border-collapse:collapse;width:100%"><tbody>' +
-    '<tr><td ' + td + '><b>FOB del pedido</b></td><td ' + td + '>' + _nacF2(m3) + ' m³</td><td ' + tdn + '>' + _usd0(totUsd) + '</td></tr>' +
+    '<div style="font-size:11.5px;color:#6366f1;margin-bottom:5px">👆 Tocá un renglón para ver de dónde sale el número.</div>' +
+    '<table style="border-collapse:collapse;width:100%"><colgroup><col><col style="width:110px"></colgroup><tbody>' +
+    '<tr><td style="padding:5px 8px;border-bottom:1px solid #c7d2fe"><b>FOB del pedido</b> <span style="color:#6366f1;font-size:12px">· ' + _nacF2(m3) + ' m³</span></td><td ' + tdI + '>' + _usd0(totUsd) + '</td></tr>' +
     tit('🔴 No recuperable · queda en el costo', '#b91c1c') +
     (nac.detalle || []).map(function (d) { return fila(d, "#4338ca"); }).join('') +
     tot('Total no recuperable', '÷ FOB = +' + Math.round(nac.factor * 100) + '%', nac.noRecup, '#fee2e2') +
@@ -21326,13 +21348,21 @@ function _pedImpBandaHtml(proy, nac, minUsd, totUsd, ext) {
    ⚠ Al agregar un parámetro nuevo de importados: va a la tabla y se hidrata acá. No se
    vuelve a escribir un número en este archivo. */
 let _impCfgProv = {};          // proveedor → fila de gv_imp_proveedor_cfg
+let _impCfgArt = {};           // cod_art  → { derechos_pct, prov } de gv_imp_articulo_cfg
 async function _impCfgCargar() {
   try {
     const res = await Promise.all([
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_imp_proveedor_cfg", "select=*&order=orden.asc,proveedor.asc").catch(function () { return []; }),
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_imp_nac_config", "select=*").catch(function () { return []; })
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_imp_nac_config", "select=*").catch(function () { return []; }),
+      // v23.90 (Luis) — los derechos pueden ser del ARTÍCULO (su partida arancelaria)
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_imp_articulo_cfg", "select=cod_art,derechos_pct,proveedor").catch(function () { return []; })
     ]);
     const pr = res[0], nac = res[1];
+    _impCfgArt = {};
+    (res[2] || []).forEach(function (a) {
+      const c = String(a.cod_art || "").trim().toUpperCase(); if (!c) return;
+      _impCfgArt[c] = { derechos_pct: (a.derechos_pct == null ? null : Number(a.derechos_pct)), prov: String(a.proveedor || "").trim() };
+    });
     if (nac && nac[0]) { Object.keys(_NAC_TASAS).forEach(function (k) { if (nac[0][k] != null) _NAC_TASAS[k] = Number(nac[0][k]); }); }
     if (pr && pr.length) {
       // se hidratan los cuatro cachés; lo que la tabla no diga NO se inventa
@@ -21355,6 +21385,90 @@ function _impProvNum(prov, campo, fb) {
   const r = _impCfgProv[String(prov || "").trim()];
   const v = r ? Number(r[campo]) : NaN;
   return isFinite(v) ? v : _nacNum(fb, 0);
+}
+
+/* v23.90 (Luis) — los DERECHOS bajan en cascada: artículo → proveedor → general.
+   El % del artículo es su partida arancelaria, así que gana sobre el del proveedor. */
+function _derechosArt(cod, prov) {
+  const a = _impCfgArt[String(cod || "").trim().toUpperCase()];
+  if (a && a.derechos_pct != null && isFinite(a.derechos_pct)) return a.derechos_pct;
+  return _derechosProv(prov);
+}
+/* La tasa de derechos del EMBARQUE: promedio ponderado por FOB de sus artículos. Con todos
+   en la misma tasa devuelve esa tasa, o sea que no cambia nada de lo que hay hoy. */
+function _derechosPedido(items, prov) {
+  var fob = 0, der = 0;
+  (items || []).forEach(function (it) {
+    var u = (typeof _pedImpUsdOf === "function") ? (_pedImpUsdOf(it) || 0) : 0;
+    if (!(u > 0)) return;
+    fob += u; der += u * _derechosArt(it.cod, it.prov || prov);
+  });
+  return fob > 0 ? (der / fob) : _derechosProv(prov);
+}
+
+/* ══ v23.90 (Luis, 29/09) — EL CÓDIGO ABRE LA PROYECCIÓN ════════════════════════════
+   Es el MISMO pop-up de la pantalla de Stocks (`stkShowProyVentas`), no una copia: si
+   cambia la forma de proyectar, cambia en los dos lados solo. Lo único que se agrega es
+   el «← Volver al pedido», porque `_stkPopShell` pisa la tarjeta y `stkPopClose()` deja
+   la pantalla de importación cerrada.
+   ⚠ `stkShowProyVentas` es async pero dibuja el shell ANTES del primer await, así que
+   cuando vuelve el control el header ya existe y se le puede colgar el botón. */
+function pedImpProyAbrir(codEnc, proyCajas) {
+  const prev = (typeof _stkPop !== "undefined") ? _stkPop : null;
+  stkShowProyVentas(codEnc, proyCajas);
+  if (!prev || prev.kind !== "pedImp") return;
+  const head = document.querySelector("#stkPopModal .stkpop-head");
+  const cerrar = head && head.querySelector(".stkpop-close");
+  if (!head || !cerrar) return;
+  const b = document.createElement("button");
+  b.className = "stkpop-close"; b.textContent = "← Volver al pedido";
+  b.style.marginRight = "6px";
+  b.onclick = function () {
+    _stkPop = prev;
+    _stkPopShell("📦 Pedidos Importación", "stkPopBody", true);
+    _pedImpRender();
+  };
+  head.insertBefore(b, cerrar);
+}
+
+/* ══ v23.90 (Luis, 29/09) — MOQ: el mínimo que el chino acepta fabricar ══════════════
+   "agregá al editor por proveedor MOQ … debería tener un indicador en caso de que no se
+    llegue al MOQ que diga que permite margen hasta 12 meses de cobertura … en caso de que
+    sea más de 12 meses, que indique que está fuera del target".
+   Se mide POR ARTÍCULO y en UNIDADES, que es como lo pide la fábrica. La pregunta no es
+   "¿cuántas unidades faltan?" sino "¿cuántos MESES de cobertura hay que comprar para que
+   el pedido de ESTE código llegue al MOQ?":
+       meses necesarios = (MOQ + stock + en curso) / proyección mensual
+   · entra con el objetivo del proveedor (10 meses)  → sin chip, no hay nada que decir
+   · entra estirando hasta el tope (12 por defecto)  → 🟡 se puede, fuera del target
+   · ni con el tope                                  → 🔴 fuera de target
+   El MOQ y el tope de meses salen de GV_Imp_Proveedor (default 1.000 u y 12 meses) y se
+   editan en el ⚙ del proveedor. ⚠ Acá NO se escribe ningún número. */
+function _pedImpMoqCalc(it) {
+  const prov = String((it && it.prov) || "").trim();
+  const moq = _impProvNum(prov, "moq", _NAC_TASAS.moq);
+  const topeMeses = _impProvNum(prov, "moq_meses_max", _NAC_TASAS.moq_meses_max);
+  const uni = (typeof _pedImpUniOf === "function") ? (_pedImpUniOf(it) || 0) : (Number(it.aPedirUni) || 0);
+  const out = { moq: moq, topeMeses: topeMeses, uni: uni, estado: "ok", mesesNec: 0, meses: Number(it.meses) || 0 };
+  if (!(moq > 0) || !(uni > 0) || uni >= moq) return out;           // sin pedido o ya lo cumple
+  const proy = Number(it.proyUni) || 0;
+  if (!(proy > 0)) { out.estado = "sinproy"; return out; }          // sin venta no hay cobertura que valga
+  const stock = Math.max(0, Number(it.stockUni) || 0), curso = Number(it.enCurso) || 0;
+  out.mesesNec = (moq + stock + curso) / proy;
+  out.estado = (out.mesesNec <= topeMeses) ? "estira" : "fuera";
+  return out;
+}
+function _pedImpMoqChip(it) {
+  const m = _pedImpMoqCalc(it);
+  if (m.estado === "ok") return "";
+  const moqTxt = Math.round(m.moq).toLocaleString("es-AR");
+  const uniTxt = Math.round(m.uni).toLocaleString("es-AR");
+  if (m.estado === "sinproy")
+    return ' <span style="font-size:10px;font-weight:800;color:#475569;background:#f1f5f9;border-radius:999px;padding:1px 6px" title="El pedido es de ' + uniTxt + ' u y el MOQ de ' + moqTxt + ' u, pero este código no tiene proyección de venta: no se puede calcular con cuántos meses de cobertura llegaría.">MOQ ?</span>';
+  const mesesTxt = (Math.round(m.mesesNec * 10) / 10).toLocaleString("es-AR");
+  if (m.estado === "estira")
+    return ' <span style="font-size:10px;font-weight:800;color:#92400e;background:#fef3c7;border-radius:999px;padding:1px 6px" title="No llega al MOQ de ' + moqTxt + ' u con el objetivo de ' + m.meses + ' meses (hoy son ' + uniTxt + ' u). Con ' + mesesTxt + ' meses de cobertura sí: se puede pedir, pero queda fuera del target de ' + m.meses + ' meses.">🟡 MOQ ' + mesesTxt + 'm</span>';
+  return ' <span style="font-size:10px;font-weight:800;color:#fff;background:#b91c1c;border-radius:999px;padding:1px 6px" title="Ni estirando la cobertura a ' + m.topeMeses + ' meses llega al MOQ de ' + moqTxt + ' u: harían falta ' + mesesTxt + ' meses. Está fuera del target — se consolida con otro código o se habla el MOQ con la fábrica.">🔴 MOQ</span>';
 }
 
 /* ── El pop-up ⚙ Configurar parámetros, al lado del nombre del proveedor ────────────── */
@@ -21415,6 +21529,9 @@ function _impCfgRender() {
     h += campo("impCfgMeses", "Meses objetivo", r.meses_objetivo_propio == null ? "" : String(r.meses_objetivo_propio), String(g.meses_objetivo), "cuántos meses de venta se piden · general " + g.meses_objetivo);
     h += campo("impCfgMin", "Mínimo del pedido (u$s)", r.min_usd_propio == null ? "" : String(r.min_usd_propio), String(g.min_usd), "general " + _nacF(g.min_usd));
     h += campo("impCfgM3", "Valor del m³ de flete (u$s)", r.valor_m3_propio == null ? "" : String(r.valor_m3_propio), String(g.valor_m3), "general " + _nacF(g.valor_m3));
+    // v23.90 (Luis) — MOQ del proveedor y hasta cuántos meses de cobertura se admite estirar
+    h += campo("impCfgMoq", "MOQ (unidades por código)", r.moq_propio == null ? "" : String(r.moq_propio), String(g.moq), "mínimo que la fábrica acepta · general " + _nacF(g.moq));
+    h += campo("impCfgMoqMeses", "MOQ: tope de cobertura (meses)", r.moq_meses_max_propio == null ? "" : String(r.moq_meses_max_propio), String(g.moq_meses_max), "hasta acá se puede estirar · general " + g.moq_meses_max);
     h += '</div>';
     h += '<div style="margin-top:12px"><label style="font-size:11px;font-weight:800;color:#475569">Nota</label>' +
       '<input id="impCfgNotas" value="' + esc(r.notas || "") + '" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%"></div>';
@@ -21429,13 +21546,18 @@ function _impCfgRender() {
       const mios = arts.filter(function (a) { return String(a.proveedor || "").trim() === prov; });
       const q = String(P.q || "").trim().toUpperCase();
       const otros = q ? arts.filter(function (a) { return String(a.proveedor || "").trim() !== prov && stkMatchBusq(q, a.cod, a.descripcion, false); }).slice(0, 40) : [];
-      h += '<div style="font-size:12px;color:#64748b;margin-bottom:9px">Se guarda en el maestro <code>Importados</code> (el mismo que usa 🏭 Proveedores). Sacar un código <b>no lo borra</b>: queda sin proveedor.</div>';
+      h += '<div style="font-size:12px;color:#64748b;margin-bottom:9px">Se guarda en el maestro <code>Importados</code> (el mismo que usa 🏭 Proveedores). Sacar un código <b>no lo borra</b>: queda sin proveedor.<br><b>Der. %</b> son los derechos de ESE artículo (su partida arancelaria): vacío = usa el ' + _nacPct(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '% del proveedor.</div>';
       h += '<div style="font-size:12.5px;font-weight:800;color:#0f172a;margin-bottom:6px">' + mios.length + ' código(s) de ' + esc(prov) + '</div>';
       h += '<div style="max-height:210px;overflow:auto;border:1px solid #e2e8f0;border-radius:9px;margin-bottom:12px">';
       h += mios.length ? mios.map(function (a) {
+        // v23.90 (Luis) — los derechos, editables por artículo, acá mismo
+        const _ac = _impCfgArt[String(a.cod).trim().toUpperCase()] || {};
+        const _der = (_ac.derechos_pct == null) ? "" : _impCfgPctTxt(_ac.derechos_pct);
         return '<div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border-bottom:1px solid #f1f5f9">' +
           '<b style="font-size:12.5px;min-width:64px">' + esc(String(a.cod)) + '</b>' +
           '<span style="font-size:11.5px;color:#64748b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
+          '<input value="' + esc(_der) + '" placeholder="' + _impCfgPctTxt(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '" onchange="pedImpCfgArtDer(\'' + encodeURIComponent(String(a.cod)) + '\',this.value)" title="Derechos de este artículo, en porcentaje (35 = 35%). Vacío = el del proveedor." style="width:58px;text-align:center;padding:3px 5px;border:1px solid ' + (_der ? '#0f766e' : '#cbd5e1') + ';border-radius:7px;font-size:12px;font-weight:700;background:' + (_der ? '#f0fdfa' : '#fff') + '">' +
+          '<span style="font-size:11px;color:#94a3b8;font-weight:700">% der.</span>' +
           '<button onclick="pedImpCfgCodigo(\'' + encodeURIComponent(String(a.cod)) + '\',\'\')" title="Sacarlo de ' + esc(prov) + '" style="background:#fee2e2;color:#b91c1c;border:0;border-radius:7px;padding:3px 9px;font-weight:800;font-size:12px;cursor:pointer">✕</button></div>';
       }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:12.5px">Todavía no tiene códigos.</div>';
       h += '</div>';
@@ -21470,6 +21592,8 @@ function _impCfgRender() {
     h += campo("impCfgGM3", "Valor del m³ (u$s)", String(g.valor_m3), "", "flete consolidado");
     h += campo("impCfgGFull", "Flete contenedor (u$s)", String(g.flete_full), "", "contenedor propio");
     h += campo("impCfgGMin", "Mínimo del pedido (u$s)", String(g.min_usd), "", "para poder emitir");
+    h += campo("impCfgGMoq", "MOQ (unidades por código)", String(g.moq), "", "mínimo de la fábrica");
+    h += campo("impCfgGMoqM", "MOQ: tope de cobertura (meses)", String(g.moq_meses_max), "", "hasta acá se estira");
     h += '</div>';
     h += '<div style="margin-top:14px"><button onclick="pedImpCfgGuardarGral()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:8px 16px;font-weight:800;font-size:13px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar generales") + '</button></div>';
   }
@@ -21501,6 +21625,8 @@ async function pedImpCfgGuardar() {
     meses_objetivo: _impCfgNum("impCfgMeses") === "" ? null : Number(_impCfgNum("impCfgMeses")),
     min_usd: _impCfgNum("impCfgMin") === "" ? null : Number(_impCfgNum("impCfgMin")),
     valor_m3: _impCfgNum("impCfgM3") === "" ? null : Number(_impCfgNum("impCfgM3")),
+    moq: _impCfgNum("impCfgMoq") === "" ? null : Number(_impCfgNum("impCfgMoq")),
+    moq_meses_max: _impCfgNum("impCfgMoqMeses") === "" ? null : Number(_impCfgNum("impCfgMoqMeses")),
     notas: nEl ? nEl.value : null };
   _impCfgPop.guardando = true; _impCfgPop.msg = ""; _impCfgRender();
   try {
@@ -21520,7 +21646,8 @@ async function pedImpCfgGuardarGral() {
     estad_pct: _impCfgPctVal("impCfgGEstad"),
     estad_fob_desde: Number(_impCfgNum("impCfgGEstD")), estad_fob_hasta: Number(_impCfgNum("impCfgGEstH")),
     estad_fijo: Number(_impCfgNum("impCfgGEstF")), valor_m3: Number(_impCfgNum("impCfgGM3")),
-    flete_full: Number(_impCfgNum("impCfgGFull")), min_usd: Number(_impCfgNum("impCfgGMin")) };
+    flete_full: Number(_impCfgNum("impCfgGFull")), min_usd: Number(_impCfgNum("impCfgGMin")),
+    moq: Number(_impCfgNum("impCfgGMoq")), moq_meses_max: Number(_impCfgNum("impCfgGMoqM")) };
   _impCfgPop.guardando = true; _impCfgPop.msg = ""; _impCfgRender();
   try {
     await _impCfgRpc("gv_imp_nac_config_guardar", { p: p });
@@ -21529,6 +21656,24 @@ async function pedImpCfgGuardarGral() {
     if (_stkPop && _stkPop.kind === "pedImp") _pedImpRender();
   } catch (e) { _impCfgPop.msg = "!No se pudo guardar: " + (e.message || e); }
   _impCfgPop.guardando = false; _impCfgRender();
+}
+/* v23.90 (Luis) — los derechos de UN artículo. Vacío = vuelve al % del proveedor. */
+async function pedImpCfgArtDer(codEnc, valor) {
+  if (!_impCfgPop) return;
+  const cod = decodeURIComponent(codEnc || "");
+  const v = String(valor == null ? "" : valor).trim().replace(",", ".");
+  const pct = (v === "") ? null : (Number(v) / 100);
+  if (pct != null && (!isFinite(pct) || pct < 0 || pct > 1)) {
+    _impCfgPop.msg = "!El % de derechos va entre 0 y 100."; _impCfgRender(); return;
+  }
+  _impCfgPop.msg = "";
+  try {
+    await _impCfgRpc("gv_imp_articulo_derechos", { p_cod: cod, p_pct: pct });
+    await _impCfgCargar();
+    _impCfgPop.msg = (pct == null) ? (cod + ": vuelve al % del proveedor.") : (cod + ": derechos " + v + "%.");
+    if (_stkPop && _stkPop.kind === "pedImp") _pedImpRender();
+  } catch (e) { _impCfgPop.msg = "!No se pudo guardar: " + (e.message || e); }
+  _impCfgRender();
 }
 async function pedImpCfgCodigo(codEnc, provEnc) {
   if (!_impCfgPop) return;
@@ -22062,7 +22207,9 @@ function _pedImpRender() {
     const _valorM3P = _impProvNum(prov, "valor_m3", _nac.valorM3);
     const _proy = _pedImpProy25k(_fobHoyN, _burnN, _techoN, _minUsdP);
     // costo de nacionalización SOBRE EL PEDIDO ACTUAL (respeta el MC editado)
-    const _nacR = _pedImpNacionalizar(totUsd, totM3, { modo: _nac.modo, valorM3: _valorM3P, tn: _nac.tn, ntl: _isNtl, derechos: _derechosProv(prov) });
+    // v23.90 — la tasa del embarque sale de sus artículos (cada uno puede tener la suya)
+    const _derPed = _derechosPedido(arr, prov);
+    const _nacR = _pedImpNacionalizar(totUsd, totM3, { modo: _nac.modo, valorM3: _valorM3P, tn: _nac.tn, ntl: _isNtl, derechos: _derPed });
     h += '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0">' +
       '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div></div>' +
@@ -22126,7 +22273,10 @@ function _pedImpRender() {
       const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _rg = it.reingresoEst ? String(it.reingresoEst).slice(0, 10) : "";
       const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _keyEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
-      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td><td class="num imp2">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td><td class="num">' + stockTxt + '</td><td class="num imp2">' + it.enCurso + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
+      // v23.90 (Luis) — el código abre el MISMO pop-up de proyección que la pantalla de Stocks.
+      // La proyección se le pasa en CAJAS (la pantalla de importados la muestra en unidades).
+      const _proyCaj = (Number(it.uxc) > 0) ? (Number(it.proyUni) || 0) / Number(it.uxc) : 0;
+      h += '<tr><td><b style="cursor:pointer;color:#6d28d9;text-decoration:underline dotted" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td><td class="num imp2">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td><td class="num">' + stockTxt + '</td><td class="num imp2">' + it.enCurso + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });

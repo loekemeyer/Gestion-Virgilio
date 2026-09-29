@@ -30255,3 +30255,60 @@ lee `gv_imp_nac_config`.
 hidratación desde la vista, el % en tanto por uno, el vacío = heredado y que sacar un código no
 borra) — verificado que **falla** contra el `index.html` anterior. Y `tests/impo-nacionalizacion.cjs`,
 que sigue midiendo el fallback del front contra los números del Excel.
+
+---
+
+## §3.v2390 — v23.90: MOQ por proveedor y derechos por ARTÍCULO — 2026-09-29
+
+Pedido de Luis, sobre la v23.89. Tres cosas de pantalla y dos de base.
+
+### Base
+
+| objeto | qué |
+|---|---|
+| `GV_Imp_Proveedor.moq` / `.moq_meses_max` | MOQ del proveedor (default **1.000 u**) y hasta cuántos meses de cobertura se admite estirar el pedido para alcanzarlo (**12**). Nullable = hereda el general |
+| `Importados_Config.moq` / `.moq_meses_max` | los generales |
+| `Importados.derechos_pct` | el arancel del ARTÍCULO. Nullable = usa el del proveedor |
+| `gv_imp_articulo_cfg` | vista (`security_invoker`): `cod_art → derechos_pct, proveedor`, agregando las marcas |
+| `gv_imp_articulo_derechos(text, numeric)` | RPC, SECURITY DEFINER + guard de supervisor. `null` = vuelve al % del proveedor; rechaza un % > 1 |
+
+Las dos vistas de config sumaron las columnas de MOQ **al final** — `CREATE OR REPLACE VIEW`
+no deja meterlas en el medio (`cannot change name of view column "activo" to "moq"`, que es
+justo el error que salió al intentarlo). Las dos RPC de guardado se parchearon sobre
+`pg_get_functiondef`, idempotentes y con `raise` si el texto no matchea.
+
+⚠ **Por qué `gv_imp_articulo_cfg` y no una columna en `gv_importados_ordenes`:** esa vista
+tiene centinela y dependientes, y esto es un dato chico. Se lee aparte.
+
+### La cascada de derechos, y qué cambia hoy
+
+```
+artículo (su partida arancelaria)  →  proveedor  →  general
+```
+
+Y la tasa del **embarque** es el promedio **ponderado por FOB** de sus artículos
+(`_derechosPedido`). Con todos en la misma tasa devuelve esa tasa: al 29/09 hay **153
+artículos y 0 con arancel propio**, así que **ningún número de la pantalla se mueve**.
+
+### El indicador de MOQ
+
+No pregunta cuántas unidades faltan, sino cuántos **meses de cobertura** hay que comprar:
+
+```
+meses necesarios = (MOQ + stock + en curso) / proyección mensual
+```
+
+`≤ objetivo` → sin chip · `≤ tope (12)` → 🟡 se puede, fuera del target · más → 🔴 fuera de
+target · sin proyección → «MOQ ?» (no se inventa una cobertura).
+
+### Y un bug latente que dejó la v23.89, corregido acá
+
+`ocgFetchImportados` tenía `let meses = 10` **global**, que se quedaba con el `meses_objetivo`
+de la ÚLTIMA fila leída. Mientras el número era uno solo para todos daba igual; desde que la
+v23.89 dejó pisarlo por proveedor, el objetivo de un artículo podía salir con los meses de
+otro proveedor. Ahora es `o.mesesArt`, por artículo.
+
+**Tests:** `tests/pedimp-moq-proy.cjs` (código → proyección y vuelta, los cuatro estados del
+MOQ sirviendo un MOQ distinto desde la vista, el desglose de 2 columnas y la cascada de
+derechos con su promedio ponderado) — verificado que **falla** contra el `index.html` anterior.
+`sql/gv_imp_moq_derechos_v2390.sql`.

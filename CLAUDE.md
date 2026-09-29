@@ -3739,6 +3739,55 @@ sesiones tocan estos objetos). Las dos tienen su fila en `GV_Reglas_Centinela`.
 `select proveedor, meses_objetivo, derechos_pct, usa_ntl, codigos from public.gv_imp_proveedor_cfg order by orden;`
 · `node tests/pedimp-config-proveedor.cjs`. `sql/gv_imp_proveedor_config_v2389.sql`.
 
+### ⚠ v23.90 (Luis, 29/09): MOQ por proveedor · derechos por ARTÍCULO · el código abre la proyección
+
+| qué | dónde vive | cómo se edita |
+|---|---|---|
+| **MOQ** (mínimo que la fábrica acepta, en unidades por código) | `GV_Imp_Proveedor.moq`, default **1.000** | ⚙ → Parámetros |
+| **tope de cobertura** para estirar el pedido | `.moq_meses_max`, default **12** | ⚙ → Parámetros |
+| **derechos del ARTÍCULO** (su partida arancelaria) | `Importados.derechos_pct` → vista `gv_imp_articulo_cfg` | ⚙ → **Códigos**, la casilla «% der.» de cada renglón |
+
+> **Los derechos bajan en cascada: artículo → proveedor → general.** El % del artículo gana,
+> porque es su partida arancelaria. Lo resuelve `_derechosArt(cod, prov)`.
+
+⚠ **La tasa del EMBARQUE es el promedio ponderado por FOB de sus artículos**
+(`_derechosPedido`). Con todos en la misma tasa devuelve esa tasa, así que **hoy no cambia
+ningún número**: al 29/09 hay 153 artículos y **0 con arancel propio**.
+
+⚠ **El indicador de MOQ no pregunta «¿cuántas unidades faltan?» sino «¿cuántos MESES de
+cobertura hay que comprar para llegar?»**:
+
+```
+meses necesarios = (MOQ + stock + en curso) / proyección mensual
+```
+
+| caso | chip |
+|---|---|
+| entra con el objetivo del proveedor (10 meses) | sin chip |
+| entra estirando hasta el tope (12) | **🟡 MOQ N,Nm** — se puede pedir, fuera del target |
+| ni con el tope | **🔴 MOQ** — fuera de target: se consolida o se habla el MOQ con la fábrica |
+| sin proyección de venta | **MOQ ?** — no se inventa una cobertura |
+
+El chip va en la celda de **Unidades**, no en la del código: es sobre la cantidad que manda el
+MOQ. (Y ponerlo en la del código rompe cualquier test que lea esa celda — pasó.)
+
+⚠⚠ **Los meses objetivo pasaron a ser POR ARTÍCULO en `ocgFetchImportados`** (`o.mesesArt`). El
+`let meses = 10` global se quedaba con el de la ÚLTIMA fila leída: desde que la v23.89 dejó
+pisarlos por proveedor, ese número dejó de existir. El global queda sólo para el encabezado.
+
+⚠ **El código del artículo abre el MISMO pop-up de proyección de la pantalla de Stocks**
+(`stkShowProyVentas`), no una copia. Se le agrega **«← Volver al pedido»** porque
+`_stkPopShell` pisa la tarjeta y `stkPopClose()` cierra todo. La proyección se le pasa en
+**cajas** (`proyUni / uxc`): la pantalla de importados la muestra en unidades.
+
+⚠ **El desglose de «Puesto en Arg» es de DOS columnas** (concepto con su % · importe) y la
+fórmula de cada renglón se abre al tocarlo. El % viene YA en el nombre, armado por
+`_pedImpNacionalizar` con las tasas de la base: **acá no se escribe ningún número**.
+
+**Chequeo:** `select proveedor, moq, moq_meses_max from public.gv_imp_proveedor_cfg order by orden;`
+· `select count(*), count(derechos_pct) from public.gv_imp_articulo_cfg;`
+· `node tests/pedimp-moq-proy.cjs`. `sql/gv_imp_moq_derechos_v2390.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-29, v23.86): se arma POR CAMIÓN — y a las 15:00 la TV dice si llegan
 
 - **Orden de armado = `gv_monitor_tanda_camion.orden_camion`**: por día, 1° el camión con más m³, Retira al final.
