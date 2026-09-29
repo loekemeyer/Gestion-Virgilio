@@ -6363,3 +6363,10 @@ lo que cambió es **dónde están esos dos divs**, no la lógica. `tests/tv-meta
   (`Importados.activo = false`, con el motivo de `Articulos_Discontinuados`). Sin textos de explicación.
 - Los tests de pantalla que no miden el MOQ lo ponen en 0 (`_NAC_TASAS.moq = 0`); la regla la miden
   `tests/pedimp-prioridad-damian.cjs` (D) y `tests/pedimp-moq-proy.cjs` (B).
+
+### ⚠ v24.57 (Thomas, 29/09): la CABECERA de Pedidos Importación es de 3 filas — «ocupa mucho espacio»
+
+Solapas y proveedores en **UNA fila que se desliza** (antes 4 y 6 filas en el celular); la alerta es **⚠N**
+(el «N con < 4 meses» va en el `title`); **Excel · Cargar pedido ya hecho · ⓘ Cómo se usa** viven en el menú
+**⋯**; la fecha del portal es un chip 📅; totales + nacionalización (desplegable, m³, mín, ⚙) en una barra.
+A 390 px la tabla del primer proveedor arranca en y≈635. `tests/pedimp-cabecera-compacta.cjs`.

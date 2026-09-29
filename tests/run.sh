@@ -651,6 +651,7 @@ echo "== qbp-liquidar (v24.52: lo que no se vende no se manda a guardar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/qbp-liquidar.cjs
 echo "== pedimp-botones-celular (v24.54: los PDF del proveedor entran en el celular) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-botones-celular.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-cabecera-compacta.cjs
 node tests/pedimp-meses-proveedor.cjs
 
 echo "== imp-hist-pedidos (v23.91: 📜 Historial = pedidos + recepciones) =="

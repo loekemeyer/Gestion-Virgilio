@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.56"></script>
+<script type="module" src="recepcion.js?v=24.57"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.56";
+const APP_VERSION = "v24.57";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20967,8 +20967,9 @@ let _PROV_IMP_LISTA = ["Fujian", "Hugo Wong", "Becky", "Kangli", "Ownland", "Zhi
 function _impTabsHtml(cur) {
   // v11.70 — `width:auto;margin:0` explícitos: el `button{width:100%;padding:16px;margin-top:14px}`
   // global convertía las dos solapas en barras apiladas de ancho completo.
-  const t = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:7px 14px;border-radius:999px;border:1px solid ' + (on ? '#1d4ed8' : '#cbd5e1') + ';background:' + (on ? '#1d4ed8' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:13px;font-weight:800;cursor:pointer'; };
-  return '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
+  // v24.57 (Thomas) — UNA fila que se desliza al costado: en el celular eran 4 filas de solapas.
+  const t = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:5px 11px;border-radius:999px;border:1px solid ' + (on ? '#1d4ed8' : '#cbd5e1') + ';background:' + (on ? '#1d4ed8' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap'; };
+  return '<div class="imp-tabs" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px">' +
     '<button style="' + t(cur === 'ped') + '" onclick="openPedidosImportacion()">📦 Pedidos</button>' +
     '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">🚢 En curso</button>' +
     '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">💱 NTL</button>' +
@@ -22245,7 +22246,7 @@ function _pedImpMesesCell(it) {
   return '<td class="num pedimp-meses" title="(' + stk + ' u stock + ' + cam + ' u en camino) ÷ ' + proy + ' u/mes' + (cam > 0 ? ' · sólo stock: ' + _pedImpMesesFmt(stk / proy) + ' meses' : '') + '"' + (bajo ? ' style="color:#b91c1c;font-weight:800;background:#fef2f2"' : '') + '>' + (bajo ? '⚠ ' : '') + _pedImpMesesFmt(m) + '</td>';
 }
 function _pedImpAlertaBadge(n) {
-  return n > 0 ? ' <span class="pedimp-alerta" style="font-size:11px;font-weight:800;color:#fff;background:#dc2626;border-radius:999px;padding:1px 8px" title="Artículos de este proveedor con menos de ' + _PEDIMP_MESES_ALERTA + ' meses de stock">⚠ ' + n + ' con &lt; ' + _PEDIMP_MESES_ALERTA + ' meses</span>' : '';
+  return n > 0 ? ' <span class="pedimp-alerta" style="font-size:11px;font-weight:800;color:#fff;background:#dc2626;border-radius:999px;padding:0 6px" title="' + n + ' con &lt; ' + _PEDIMP_MESES_ALERTA + ' meses de stock (stock + en camino)">⚠' + n + '</span>' : '';
 }
 function _pedImpMcOf(it) {
   const ov = (_stkPop && _stkPop.mcOverride) ? _stkPop.mcOverride[it.key || it.cod] : undefined;   // v22.93 — 809E LK y CH, cada uno el suyo
@@ -22306,66 +22307,60 @@ function _pedImpRender() {
   items.forEach(function (it) { const prov = it.prov || "(sin proveedor)"; if (!byProv[prov]) { byProv[prov] = []; provOrder.push(prov); } byProv[prov].push(it); });
   provOrder.sort(function (a, b) { const ia = _IMPORTADOR_DE[a] || "zz", ib = _IMPORTADOR_DE[b] || "zz"; return String(ia).localeCompare(String(ib)) || String(a).localeCompare(String(b)); });
   let h = _impTabsHtml('ped');
-  h += '<div class="stkpop-hint">Pedidos a los proveedores chinos (índice <b>' + (data.meses || 10) + ' meses</b>). El pedido va en <b>master cajas redondas</b> — tocá la celda <b>MC</b> para ajustarlo (poné <b>0</b> para no pedir). <b>Unidades = MC × uni/master</b>. 🧩 = parte. <b>✏️</b> en curso (unidades + fecha estimada de entrega) · <b>📥</b> llegó · <b>🖨</b> PDF por proveedor (Cód · MC · Inner · Unidades, sin FOB) para que el chino cotice. <small style="color:#94a3b8">En pantalla angosta la tabla se <b>desliza al costado</b> (la columna Código queda fija).</small></div>';
-  // Fecha estimada de ENTREGA global (se muestra en el carrito del portal LK).
+  // v24.57 (Thomas: «ocupa mucho espacio») — la cabecera entera en 3 filas: herramientas ·
+  // proveedores (una fila que se desliza) · totales + nacionalización. Lo que se explicaba en
+  // párrafos pasó al ⓘ del menú ⋯ y a los `title`.
   const _entrega = (data.entregaGlobal || "");
-  h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px">' +
-    '<span style="font-size:13px;font-weight:800;color:#1e3a8a">📅 Fecha estimada de entrega (portal LK)</span>' +
-    _pedImpFechaInputHtml(_entrega, "pedImpSetEntregaGlobal(v)", 'style="width:92px;padding:6px 8px;border:1px solid ' + (_entrega ? '#1d4ed8' : '#cbd5e1') + ';border-radius:8px;font-size:13px;background:#fff"') +
-    '<span style="font-size:11px;color:#64748b">Se muestra a los clientes en el carrito antes de confirmar. Vacío = no se muestra.</span>' +
+  const _seg = function (on, first) { return 'width:auto;margin:0;flex:0 0 auto;padding:6px 11px;border:1px solid #0f766e;' + (first ? 'border-radius:999px 0 0 999px;border-right:0' : 'border-radius:0 999px 999px 0') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#0f766e') + ';font-size:12.5px;font-weight:800;cursor:pointer'; };
+  const _chip = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:5px 10px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap'; };
+  const _menuBtn = 'display:block;width:100%;margin:0;padding:8px 12px;border:0;border-radius:6px;background:#fff;color:#0f172a;font-size:13px;font-weight:700;text-align:left;cursor:pointer;white-space:nowrap';
+  h += '<div class="pedimp-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">' +
+    '<input class="pedimp-q" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 Código(s) o descripción" value="' + escapeHtml(_qRaw) + '" oninput="pedImpSetQ(this.value)" style="width:auto;margin:0;flex:1 1 170px;min-width:150px;max-width:360px;height:32px;border:1.5px solid ' + (_buscando ? '#0f766e' : '#cbd5e1') + ';border-radius:8px;padding:0 10px;font-size:13.5px;box-sizing:border-box;background:#fff">' +
+    (_buscando ? '<button class="mva-clear" style="width:auto;margin:0" onclick="pedImpSetQ(\'\')" title="Limpiar la búsqueda">✕</button>' : '') +
+    '<span style="display:inline-flex;flex:0 0 auto"><button style="' + _seg(soloPedir, true) + '" onclick="pedImpSetFiltro(true)" title="Sólo lo que hay que pedir">Solo Pedido</button><button style="' + _seg(!soloPedir, false) + '" onclick="pedImpSetFiltro(false)" title="Todos los artículos">Ver Todo</button></span>' +
+    '<label title="Fecha estimada de entrega que ven los clientes en el carrito del portal LK antes de confirmar. Vacía = no se muestra." style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:#1e3a8a;flex:0 0 auto">📅 ' +
+    _pedImpFechaInputHtml(_entrega, "pedImpSetEntregaGlobal(v)", 'style="width:80px;margin:0;height:30px;padding:0 6px;border:1px solid ' + (_entrega ? '#1d4ed8' : '#cbd5e1') + ';border-radius:8px;font-size:12.5px;background:#fff;box-sizing:border-box"') + '</label>' +
+    '<details class="pedimp-mas" style="position:relative;flex:0 0 auto"><summary title="Más acciones" style="list-style:none;cursor:pointer;padding:3px 11px;border:1px solid #cbd5e1;border-radius:999px;background:#fff;font-size:15px;font-weight:900;color:#334155;user-select:none">⋯</summary>' +
+      '<div style="position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.18);padding:4px;min-width:220px">' +
+      '<button style="' + _menuBtn + '" onclick="this.closest(\'details\').open=false;pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Excel</button>' +
+      '<button style="' + _menuBtn + '" onclick="this.closest(\'details\').open=false;pedImpCargarPedidoHecho()" title="Registrar un pedido ya hecho por fuera (unidades en curso + fecha estimada de entrega)">➕ Cargar pedido ya hecho</button>' +
+      '<details style="padding:4px 12px 6px"><summary style="cursor:pointer;font-size:13px;font-weight:700;color:#0f172a">ⓘ Cómo se usa</summary>' +
+        '<div class="stkpop-hint" style="margin:6px 0 0;white-space:normal;max-width:300px">Índice <b>' + (data.meses || 10) + ' meses</b>. El pedido va en <b>master cajas redondas</b>: tocá la celda <b>MC</b> para ajustarlo (<b>0</b> = no pedir). <b>Unidades = MC × uni/master</b>. 🧩 = parte · ✏️ en curso · 📥 llegó · 🖨 PDF para que el chino cotice (sin FOB). En pantalla angosta la tabla se desliza al costado.</div></details>' +
+      '</div></details>' +
+    (_buscando ? '<span style="font-size:11.5px;color:#0f766e;font-weight:700;flex-basis:100%">' + items.length + ' ítem(s) · se busca en <b>todos</b> los proveedores, pidan o no</span>' : '') +
     '</div>';
-  // filtro Solo Pedido / Ver Todo + Excel
-  const _fbtn = function (on) { return 'width:auto;flex:0 0 auto;padding:8px 14px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:13px;font-weight:800;cursor:pointer'; };
-  // v22.09 — buscador por código (ver pedImpSetQ). Clase `pedimp-q` para que _renderKeepFocus
-  // lo encuentre entre re-render y re-render y no se pierda el foco a cada tecla.
-  h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
-    '<input class="pedimp-q" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 Buscar código (varios: 026 031 508) o descripción" value="' + escapeHtml(_qRaw) + '" oninput="pedImpSetQ(this.value)" style="width:auto;margin:0;flex:1 1 280px;min-width:200px;max-width:440px;height:38px;border:1.5px solid ' + (_buscando ? '#0f766e' : '#cbd5e1') + ';border-radius:9px;padding:0 11px;font-size:14px;box-sizing:border-box;background:#fff">' +
-    (_buscando ? '<button class="mva-clear" onclick="pedImpSetQ(\'\')" title="Limpiar la búsqueda">✕ Limpiar</button>' +
-       '<span style="font-size:12px;color:#0f766e;font-weight:700">' + items.length + ' ítem(s) · se busca en <b>todos</b> los proveedores, pidan o no</span>' : '') +
-    '</div>';
-  h += '<div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">' +
-    '<button style="' + _fbtn(soloPedir) + '" onclick="pedImpSetFiltro(true)">Solo Pedido</button>' +
-    '<button style="' + _fbtn(!soloPedir) + '" onclick="pedImpSetFiltro(false)">Ver Todo</button>' +
-    '<button class="mva-clear" style="background:#166534;color:#fff;border-color:#166534" onclick="pedImpExportExcel()" title="Bajar a Excel lo que se está viendo">📥 Excel</button>' +
-    '<button class="mva-clear" style="background:#b45309;color:#fff;border-color:#b45309" onclick="pedImpCargarPedidoHecho()" title="Registrar un pedido ya hecho por fuera (unidades en curso + fecha estimada de entrega)">➕ Cargar pedido ya hecho</button></div>';
-  // Filtro por proveedor chino: "Todos" (todas las tarjetas) o una sola. Las fichas salen de
-  // provAll (todos los proveedores con importados), no de los que tienen algo a pedir.
+  // Proveedores: UNA fila que se desliza; la alerta va como número (⚠N) con el detalle en el title.
   if (provAll.length > 1) {
-    h += '<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
-      '<span style="font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.4px">🏭 Proveedor:</span>' +
-      '<button style="' + _fbtn(!provSel) + '" onclick="pedImpSetProv(\'\')">Todos</button>' +
-      provAll.map(function (p) { return '<button style="' + _fbtn(provSel === p) + '" onclick="pedImpSetProv(\'' + encodeURIComponent(p) + '\')">' + escapeHtml(p) + _pedImpAlertaBadge(allItems.filter(function (it) { const m = _pedImpMesesStock(it); return (it.prov || "(sin proveedor)") === p && m != null && m < _PEDIMP_MESES_ALERTA; }).length) + '</button>'; }).join('') +
-      (_buscando && provSel ? '<span style="font-size:11.5px;color:#0f766e;font-weight:700">· mientras buscás se miran <b>todos</b> los proveedores</span>' : (provSel ? '<span style="font-size:11.5px;color:#64748b">· se muestran <b>todos</b> los artículos de ' + escapeHtml(provSel) + ', pidan o no</span>' : '')) +
+    h += '<div class="pedimp-provs" style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;align-items:center;padding-bottom:2px">' +
+      '<button style="' + _chip(!provSel) + '" onclick="pedImpSetProv(\'\')">Todos</button>' +
+      provAll.map(function (p) { return '<button style="' + _chip(provSel === p) + '" onclick="pedImpSetProv(\'' + encodeURIComponent(p) + '\')">' + escapeHtml(p) + _pedImpAlertaBadge(allItems.filter(function (it) { const m = _pedImpMesesStock(it); return (it.prov || "(sin proveedor)") === p && m != null && m < _PEDIMP_MESES_ALERTA; }).length) + '</button>'; }).join('') +
       '</div>';
+    if (provSel) h += '<div style="font-size:11.5px;color:' + (_buscando ? '#0f766e' : '#64748b') + ';margin:-4px 0 8px">' + (_buscando ? '· mientras buscás se miran <b>todos</b> los proveedores' : '· se muestran <b>todos</b> los artículos de ' + escapeHtml(provSel) + ', pidan o no') + '</div>';
   }
-  // totales (respetan el MC editado y el proveedor elegido)
+  // totales (respetan el MC editado y el proveedor elegido) + nacionalización, en UNA barra
   const itemsView = provFiltro ? items.filter(function (it) { return (it.prov || "(sin proveedor)") === provFiltro; }) : items;
   const _gUsd = itemsView.reduce(function (s, it) { return s + _pedImpUsdOf(it); }, 0);
   const _gM3 = itemsView.reduce(function (s, it) { return s + _pedImpM3Of(it); }, 0);
   const _nSinFob = itemsView.filter(function (it) { return _pedImpMcOf(it) > 0 && !(it.fobUni > 0); }).length;
   const _nSinVol = itemsView.filter(function (it) { return _pedImpMcOf(it) > 0 && !(it.m3Master > 0); }).length;
-  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">' +
-    '<div style="flex:1;min-width:150px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Total pedido (FOB)' + (_buscando ? ' <span style="color:#0f766e">· filtrado</span>' : '') + '</div><div style="font-size:22px;font-weight:800;color:#065f46">u$s ' + Math.round(_gUsd).toLocaleString("es-AR") + '</div>' + (_nSinFob ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinFob + ' ítem(s) sin FOB cargado</div>' : '') + '</div>' +
-    '<div style="flex:1;min-width:150px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 14px"><div style="font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Volumen total' + (_buscando ? ' <span style="color:#0f766e">· filtrado</span>' : '') + '</div><div style="font-size:22px;font-weight:800;color:#1e3a8a">' + (Math.round(_gM3 * 100) / 100).toLocaleString("es-AR") + ' m³</div>' + (_nSinVol ? '<div style="font-size:11px;color:#b45309">⚠ ' + _nSinVol + ' ítem(s) sin volumen cargado</div>' : '') + '</div>' +
-    '</div>';
-  // v22.37 — barra de nacionalización + mínimo del pedido. El modo (marítimo consolidado /
-  // contenedor propio / avión) y el valor m³ flete se guardan en Stock_Config; la proyección
-  // usa el mínimo por proveedor (25k default). El costo de traer de China lo calcula
-  // _pedImpNacionalizar (portado del Excel). Cada proveedor = su propio embarque.
+  // v22.37 — modo de nacionalización (marítimo consolidado / contenedor propio / avión), valor m³
+  // flete y mínimo del pedido: se guardan en Stock_Config. Cada proveedor = su propio embarque.
   const _nac = (data.nac || { modo: "consolidada", valorM3: 110, tn: 0 });
   const _minUsd = _nacNum(data.minUsd, _IMPO_MIN_USD_DEFAULT);
-  const _modoBtn = function (m, txt) { const on = _nac.modo === m; return '<button style="width:auto;flex:0 0 auto;padding:6px 12px;border-radius:999px;border:1px solid ' + (on ? '#7c3aed' : '#cbd5e1') + ';background:' + (on ? '#7c3aed' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer" onclick="pedImpSetNacCfg(\'impo_nac_modo\',\'' + m + '\')">' + txt + '</button>'; };
-  h += '<div style="display:flex;gap:10px 14px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:10px 14px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px">' +
-    '<span style="font-size:12px;font-weight:800;color:#6b21a8;text-transform:uppercase;letter-spacing:.4px">🚢 Nacionalización</span>' +
-    _modoBtn("consolidada", "Consolidada (marítimo)") + _modoBtn("full", "Contenedor propio") + _modoBtn("avion", "Avión") +
-    '<span style="width:1px;height:22px;background:#e9d5ff"></span>' +
-    (_nac.modo === "consolidada" ? '<label style="font-size:12px;color:#6b21a8;font-weight:700;display:flex;align-items:center;gap:5px">Valor m³ flete u$s <input type="number" inputmode="decimal" min="0" value="' + _nac.valorM3 + '" onchange="pedImpSetNacCfg(\'impo_nac_valor_m3\',this.value)" style="width:64px;height:30px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>' : '') +
-    (_nac.modo === "avion" ? '<label style="font-size:12px;color:#6b21a8;font-weight:700;display:flex;align-items:center;gap:5px" title="Peso total del embarque en toneladas (avión cobra por kg)">Peso (TN) <input type="number" inputmode="decimal" min="0" value="' + (_nac.tn || "") + '" onchange="pedImpSetNacTn(this.value)" placeholder="0" style="width:60px;height:30px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>' : '') +
-    '<span style="width:1px;height:22px;background:#e9d5ff"></span>' +
-    '<label style="font-size:12px;color:#6b21a8;font-weight:700;display:flex;align-items:center;gap:5px" title="Mínimo por proveedor para emitir un pedido. La proyección dice cuándo se llega a este monto.">Mínimo pedido u$s <input type="number" inputmode="numeric" min="0" step="1000" value="' + _minUsd + '" onchange="pedImpSetNacCfg(\'impo_pedido_min_usd\',this.value)" style="width:82px;height:30px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>' +
+  const _numIn = 'margin:0;height:28px;border:1px solid #c4b5fd;border-radius:7px;padding:0 5px;font-size:12.5px;text-align:right;box-sizing:border-box;background:#fff';
+  const _lbl = 'font-size:12px;color:#6b21a8;font-weight:700;display:inline-flex;align-items:center;gap:4px;flex:0 0 auto';
+  h += '<div class="pedimp-tot" style="display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:7px 12px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px">' +
+    '<span style="font-size:16px;font-weight:800;color:#065f46;white-space:nowrap" title="Total del pedido FOB' + (_buscando ? ' (filtrado)' : '') + '">u$s ' + Math.round(_gUsd).toLocaleString("es-AR") + '</span>' +
+    '<span style="font-size:16px;font-weight:800;color:#1e3a8a;white-space:nowrap" title="Volumen total' + (_buscando ? ' (filtrado)' : '') + '">' + (Math.round(_gM3 * 100) / 100).toLocaleString("es-AR") + ' m³</span>' +
+    (_nSinFob || _nSinVol ? '<span style="font-size:11px;color:#b45309;font-weight:700">⚠ ' + [_nSinFob ? _nSinFob + ' sin FOB' : '', _nSinVol ? _nSinVol + ' sin volumen' : ''].filter(Boolean).join(' · ') + '</span>' : '') +
+    '<span style="flex:1 1 0;min-width:0"></span>' +
+    '<label style="' + _lbl + '" title="Cómo viaja el pedido. El costo NO recuperable (derechos, flete, tasas, despachante' + (Object.keys(_NTL_PROVEEDORES).length ? ' y 5% NTL en los proveedores que facturan por NTL' : '') + ') queda pegado al costo del artículo. Cada proveedor se calcula como su propio embarque.">🚢 <select class="pedimp-modo" onchange="pedImpSetNacCfg(\'impo_nac_modo\',this.value)" style="width:auto;margin:0;height:28px;border:1px solid #c4b5fd;border-radius:7px;padding:0 4px;font-size:12.5px;font-weight:700;color:#6b21a8;background:#fff">' +
+      [["consolidada", "Consolidada"], ["full", "Contenedor"], ["avion", "Avión"]].map(function (o) { return '<option value="' + o[0] + '"' + (_nac.modo === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
+    (_nac.modo === "consolidada" ? '<label style="' + _lbl + '" title="Valor del m³ de flete, en u$s">m³ u$s <input type="number" inputmode="decimal" min="0" value="' + _nac.valorM3 + '" onchange="pedImpSetNacCfg(\'impo_nac_valor_m3\',this.value)" style="width:54px;' + _numIn + '"></label>' : '') +
+    (_nac.modo === "avion" ? '<label style="' + _lbl + '" title="Peso total del embarque en toneladas (avión cobra por kg)">TN <input type="number" inputmode="decimal" min="0" value="' + (_nac.tn || "") + '" onchange="pedImpSetNacTn(this.value)" placeholder="0" style="width:50px;' + _numIn + '"></label>' : '') +
+    '<label style="' + _lbl + '" title="Mínimo por proveedor para emitir un pedido. La proyección dice cuándo se llega a este monto.">Mín u$s <input type="number" inputmode="numeric" min="0" step="1000" value="' + _minUsd + '" onchange="pedImpSetNacCfg(\'impo_pedido_min_usd\',this.value)" style="width:70px;' + _numIn + '"></label>' +
     // v23.91 (Luis) — los parámetros generales se editan acá, no adentro del ⚙ de un proveedor
-    '<button class="mva-clear" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="pedImpCfgGralAbrir()" title="Tasas, tope de estadística, valor del m³, mínimo y MOQ que valen para todos los proveedores que no tengan el suyo propio">⚙ Generales</button>' +
-    '<span style="font-size:11px;color:#7c3aed;flex-basis:100%">El costo NO recuperable (derechos, flete, tasas, despachante' + (Object.keys(_NTL_PROVEEDORES).length ? ' y 5% NTL en los proveedores que facturan por NTL' : '') + ') queda pegado al costo del artículo. Cada proveedor se calcula como su propio embarque.</span>' +
+    '<button class="mva-clear" style="width:auto;margin:0;padding:4px 9px;font-size:12px;background:#4338ca;color:#fff;border-color:#4338ca" onclick="pedImpCfgGralAbrir()" title="⚙ Generales: tasas, tope de estadística, valor del m³, mínimo y MOQ que valen para todos los proveedores que no tengan el suyo propio">⚙</button>' +
     '</div>';
   let algo = false;
   // v24.32 — la tarjeta se achica al ancho de la tabla más ancha que se dibuje
@@ -63976,7 +63971,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.56"></script>
+<script src="cobranzas.js?v=24.57"></script>
 
 </body>
 </html>
