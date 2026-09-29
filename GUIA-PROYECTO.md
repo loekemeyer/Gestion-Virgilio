@@ -14279,6 +14279,23 @@ cuatro fuentes que el árbol: web → ISIS → `Facturacion_NP` → histórico d
 
 ### Monitor TV — `monitor/tv.html` (v18.74, pedido de Luis)
 
+> ⚠ **v23.96 (Luis, 29/09) — la pantalla quedó con MÍNIMO TEXTO.** Lo que cambió, para no
+> reponerlo sin querer:
+>
+> | qué | cómo quedó |
+> |---|---|
+> | header | **el código de login GRANDE con su rueda** (se vacía en el minuto que dura), reloj y estado. Se fueron el título «MONITOR VIRGILIO», la barra de avance y los conteos |
+> | tabla de tandas | **tanda · m³ · progreso**, centrada y con fuentes grandes, sin título de tarjeta. Se fueron el N° de pedido, el cliente, los días, la zona y el rótulo del camión — el orden por camión (v23.86) **sigue**, lo que no se escribe es el rótulo |
+> | las dos luces | llevan **P** (picking) y **A** (armado) adentro |
+> | Operarios | el título va solo y **centrado**, sin el «N · % productivas» |
+> | ¿Llegan? | **dejó de ser una tarjeta**: es la banda que encabeza el cuadro de días, porque el ritmo sólo se lee contra lo que hay programado. La tabla por camión se reemplazó por una línea que sólo aparece si algún camión no llega |
+> | dentro del admin | el header de la TV **no se dibuja** (`html.embebido`): el del modal ya pone el código y la fecha |
+>
+> La cuenta de terminadas / en ventana / en curso **no se borró**: vive en `window.__tvUlt` y es lo
+> que mira `tests/mon-tv.cjs`. Y se fueron `resumirCliente`, `zonaCorta`, `diasDemora` y
+> `colorDemora`, que quedaron sin llamador; el dato sigue viajando en la tanda por si vuelve una
+> columna.
+
 Versión **liviana y de solo lectura** del tablero, para la TV colgada en planta.
 **No reemplaza al monitor grande**: es una segunda vista de los mismos datos.
 

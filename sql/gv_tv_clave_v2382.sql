@@ -100,3 +100,45 @@ begin
                               and btrim(r.legajo::text) = btrim(e."Legajo"))) x), '[]'::jsonb));
 end $$;
 grant execute on function public.gv_tv_clave_validar(text) to anon, authenticated;
+
+-- ── v23.93 (Luis, 29/09): EL CÓDIGO DURA UN MINUTO, no 15 ──────────────────────────────────
+-- Pedido: *"codigo de login de 4 digitos mas grande y que dure 1 minutos (con countdown)"*.
+-- El tramo pasa de 900 s a 60 s en las DOS funciones — si se toca una sola, la TV muestra un
+-- código que la base no valida. Sigue valiendo el tramo actual y el anterior (60 a 120 s de
+-- validez real), que es lo que da margen para tipearlo.
+-- El front dibuja la rueda con `cambia_en_s`, o sea que el dibujo no se puede desfasar del
+-- código: el que manda es el backend. Aplicado como migración gv_tv_clave_60s_v2393.
+-- Medido al aplicarlo: cambia_en_s ≤ 60 · valida la de ahora ✓ · valida la anterior ✓ ·
+-- rechaza una de hace 5 minutos ✓.
+create or replace function public.gv_tv_clave_actual()
+returns jsonb language sql stable security definer set search_path = public, pg_catalog as $$
+  select jsonb_build_object(
+    'clave', public.gv_tv_clave_de(floor(extract(epoch from now()) / 60)::bigint),
+    'cambia_en_s', 60 - (floor(extract(epoch from now()))::bigint % 60));
+$$;
+grant execute on function public.gv_tv_clave_actual() to anon, authenticated;
+
+create or replace function public.gv_tv_clave_validar(p_clave text)
+returns jsonb language plpgsql stable security definer set search_path = public, pg_catalog as $$
+declare
+  v_t bigint := floor(extract(epoch from now()) / 60)::bigint;
+  v_c text := regexp_replace(coalesce(p_clave, ''), '\D', '', 'g');
+begin
+  if v_c = '' or (v_c <> public.gv_tv_clave_de(v_t) and v_c <> public.gv_tv_clave_de(v_t - 1)) then
+    return jsonb_build_object('ok', false);
+  end if;
+  -- v23.84: los que trabajaron en Virgilio en 15 días. v23.85: apodos 104 J. Colombia, 277 Jhonny.
+  return jsonb_build_object('ok', true, 'operarios', coalesce((
+    select jsonb_agg(jsonb_build_object('legajo', x.legajo, 'nombre', x.nombre) order by x.nombre)
+      from (select btrim(e."Legajo") legajo,
+                   case btrim(e."Legajo") when '104' then 'J. Colombia' when '277' then 'Jhonny'
+                        else btrim(e."Empleado") end nombre
+              from public."Empleados" e
+             where upper(btrim(coalesce(e."Activo", ''))) <> 'NO'
+               and btrim(coalesce(e."Legajo", '')) not in ('', '0', '1', '600')
+               and btrim(coalesce(e."Empleado", '')) <> ''
+               and exists (select 1 from public."Registros_Produccion_Virgilio" r
+                            where r.ts_cliente >= now() - interval '15 days'
+                              and btrim(r.legajo::text) = btrim(e."Legajo"))) x), '[]'::jsonb));
+end $$;
+grant execute on function public.gv_tv_clave_validar(text) to anon, authenticated;

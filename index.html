@@ -687,6 +687,27 @@ button {
 .mod-tab.on{ background: #1d4ed8; color: #fff; }
 .mod-tab:not(.on):hover{ color: #e2e8f0; background: #334155; }
 .mod-hdr-left{ display: flex; align-items: center; gap: 14px; min-width: 0; }
+/* v23.92 (Luis) — Análisis e Inconsistencias son UNA pestaña con dos subpestañas. */
+.mod-sub{ display: inline-flex; gap: 4px; flex: 0 0 auto; }
+.mod-sub .mod-tab{ padding: 5px 11px; font-size: 13px; border-radius: 7px;
+  background: #0f172a; border: 1px solid #334155; }
+.mod-sub .mod-tab.on{ background: #334155; color: #fff; border-color: #475569; }
+#anSubBar{ display: flex; gap: 8px; align-items: center; padding: 8px 0 2px; }
+#anSubBar.hidden{ display: none; }
+/* Código de login de la TV, con la rueda que se vacía en el minuto que dura (v23.92).
+   Reemplaza al QR de fichada: se ficha entrando con este número. */
+.mon-clave{ display: flex; align-items: center; gap: 10px; flex: 0 0 auto; margin-left: auto; }
+.mon-clave svg{ width: clamp(34px, 4.6vh, 58px); height: clamp(34px, 4.6vh, 58px);
+  transform: rotate(-90deg); flex: 0 0 auto; }
+.mon-clave svg circle{ fill: none; stroke-width: 3.2; }
+.mon-clave .clv-pista{ stroke: #1e293b; }
+.mon-clave .clv-arco{ stroke: #38bdf8; stroke-linecap: round; stroke-dasharray: 100.53;
+  transition: stroke-dashoffset .9s linear, stroke .3s; }
+.mon-clave .clv-arco.poco{ stroke: #fbbf24; }
+.mon-clave-lab{ font-size: clamp(9px, 1.1vh, 13px); font-weight: 800; color: #64748b;
+  text-transform: uppercase; letter-spacing: .08em; line-height: 1; }
+.mon-clave-num{ font-size: clamp(26px, 4vh, 48px); font-weight: 900; color: #f8fafc;
+  letter-spacing: .16em; line-height: 1.05; font-variant-numeric: tabular-nums; }
 /* Modo TV (monitor a pantalla completa): el switch escala como el resto del header. */
 #monitorModal.tv .mod-switch{ border-radius: clamp(11px, 1.4vh, 16px); }
 #monitorModal.tv .mod-tab{ font-size: clamp(13px, 1.9vh, 22px);
@@ -710,56 +731,9 @@ button {
   color: #f8fafc;
 }
 
-/* QR de fichada — abajo a la derecha, solo visible cuando el monitor está
-   abierto. La regla #monitorModal.show ~ #qrFichadaBox hace el override. */
-#qrFichadaBox{
-  display: none;
-  position: fixed;
-  bottom: 8px;
-  right: 8px;
-  z-index: 250;          /* sobre el modal del monitor (z-index 200) */
-  background: #fff;
-  border: 2px solid #1e6bd6;
-  border-radius: 8px;
-  padding: 6px 8px 8px 8px;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-}
-#monitorModal.show ~ #qrFichadaBox{
-  display: block;
-}
-#qrFichadaBox .qr-label{
-  font-size: 12px;
-  font-weight: bold;
-  color: #1e6bd6;
-  margin-bottom: 4px;
-  letter-spacing: 0.5px;
-}
-#qrFichadaBox #qrCanvas{
-  display: block;
-  margin: 0 auto;
-  width: 120px;
-  height: 120px;
-}
-#qrFichadaBox .qr-countdown{
-  font-size: 11px;
-  color: #666;
-  margin-top: 4px;
-}
-#qrFichadaBox #qrSecs{ color: #1e6bd6; }
-/* TV en pantalla ANCHA (PC viendo el monitor): QR tamaño original. */
-#monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{
-  width: clamp(140px, 11vh, 190px);
-  height: clamp(140px, 11vh, 190px);
-}
-/* Viewport ANGOSTO (TV box en Chrome modo ordenador, ~980px): QR chico y
-   compacto, abajo a la derecha. (En PC ancha NO aplica → queda grande.) */
-@media (max-width: 1150px){
-  #monitorModal.tv.show ~ #qrFichadaBox{ right: 8px; left: auto; padding: 3px 5px 5px 5px; }
-  #monitorModal.tv.show ~ #qrFichadaBox .qr-label{ font-size: 9px; margin-bottom: 1px; letter-spacing: 0; }
-  #monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 8px; margin-top: 1px; }
-  #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(40px, 4.5vh, 56px); height: clamp(40px, 4.5vh, 56px); }
-}
+/* v23.92 (Luis) — EL QR DE FICHADA SE FUE: se ficha entrando con el código de 4 dígitos que
+   muestra la TV (v23.82), así que el QR de la esquina era una segunda puerta para lo mismo.
+   `fichada.html` y `fichada-config.js` quedan en el repo: el link viejo sigue andando. */
 .monitor-meta{ font-size: 11px; color: #666; margin-top: 2px; }
 /* v12.98 (idea 5070) — barra de avance del día en el header del monitor. */
 .mon-prog{ display:flex; align-items:center; gap:8px; margin-top:4px; max-width:520px; }
@@ -5649,10 +5623,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      por orden a la regla chica de @media(max-width:1150px). bottom/right ajustados
      para que quede CENTRADO en su zona (entre los stats arriba y "Total por día"
      a la izquierda), no pegado a la esquina. */
-  #monitorModal.tv.show ~ #qrFichadaBox{ padding: 6px 8px 8px 8px; bottom: 20px; right: 12px; }
-  #monitorModal.tv.show ~ #qrFichadaBox .qr-label{ font-size: 12px; margin-bottom: 3px; letter-spacing: 0.3px; }
-  #monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 11px; margin-top: 3px; }
-  #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(120px, 24vh, 150px); height: clamp(120px, 24vh, 150px); }
 }
 
 /* v7.87 — Modal para crear códigos nuevos */
@@ -5810,21 +5780,33 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div class="monitor-card">
     <div class="monitor-header">
       <div class="mod-hdr-left">
-        <!-- v7.44: pestañas del módulo unificado (Monitor ↔ Análisis). Se oculta en
-             modo kiosko/pared (openMonitor lo esconde si __tvKioskMode). -->
+        <!-- v23.92 (Luis): DOS pestañas. El monitor viejo se sacó (la vista de la TV es la única)
+             y Análisis e Inconsistencias son una sola, con subpestañas. Se oculta en modo
+             kiosko/pared (openMonitor lo esconde si __tvKioskMode). -->
         <div class="mod-switch" id="monTabSwitch">
-          <button class="mod-tab on" id="monTabMon" onclick="setMonitorTab('monitor')" title="Monitor de operarios (en vivo)">🖥️ Monitor</button>
-          <button class="mod-tab" id="monTabAn" onclick="switchToAnalisis()" title="Análisis de productividad">📈 Análisis</button>
-          <button class="mod-tab" id="monTabInc" onclick="setMonitorTab('incons')" title="Inconsistencias del día">⚠ Inconsist.</button>
-          <button class="mod-tab" id="monTabTv" onclick="setMonitorTab('tv')" title="La misma vista del monitor de pared de los operarios">📺 Vista TV</button>
+          <button class="mod-tab on" id="monTabTv" onclick="setMonitorTab('tv')" title="El tablero de planta, el mismo que ve la TV">📺 Monitor</button>
+          <button class="mod-tab" id="monTabAn" onclick="setMonitorTab('incons')" title="Productividad e inconsistencias">📊 Análisis</button>
         </div>
-        <div>
-          <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span><span id="monitorVpInfo" style="color:#888;font-size:12px;margin-left:8px"></span><span id="monitorCountdown" style="color:#888;font-size:12px;margin-left:8px"></span></div>
+        <!-- El título, la meta, la barra de avance y el buscador eran del monitor viejo, que ya
+             no tiene puerta (sus funciones siguen en el archivo y le siguen escribiendo acá).
+             Quedan ocultos: el header es pestañas · código · fecha · Cerrar. -->
+        <div id="monLegacyHdr" style="display:none">
+          <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span><span id="monitorVpInfo"></span><span id="monitorCountdown"></span></div>
           <div class="monitor-meta" id="monitorMeta"></div>
           <div class="mon-filter-wrap">
             <input id="monFilter" class="mon-filter" type="search" placeholder="🔎 Buscar tanda / operario" oninput="_monApplyFilter()" autocomplete="off">
             <span id="monFilterNote" class="mon-filter-note"></span>
           </div>
+        </div>
+      </div>
+      <div class="mon-clave" id="monClaveBox" title="Código para entrar desde el celular — dura un minuto">
+        <svg viewBox="0 0 36 36" aria-hidden="true">
+          <circle class="clv-pista" cx="18" cy="18" r="16"></circle>
+          <circle class="clv-arco" id="monClvArco" cx="18" cy="18" r="16" stroke-dashoffset="0"></circle>
+        </svg>
+        <div>
+          <div class="mon-clave-lab">Código</div>
+          <div class="mon-clave-num" id="monClave">----</div>
         </div>
       </div>
       <div id="monitorClock"></div>
@@ -5835,6 +5817,12 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div id="monitorOfflineBanner" class="hidden"></div>
     <div id="monitorContent">
       <div class="monitor-loading">Cargando…</div>
+    </div>
+    <div id="anSubBar" class="hidden">
+      <div class="mod-sub">
+        <button class="mod-tab" onclick="switchToAnalisis()" title="Gráficos de productividad">📈 Productividad</button>
+        <button class="mod-tab on" onclick="setMonitorTab('incons')" title="Inconsistencias del día">⚠ Inconsistencias</button>
+      </div>
     </div>
     <div id="inconsContent" class="hidden">
       <div class="monitor-loading">Cargando…</div>
@@ -5852,13 +5840,15 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <div id="analisisModal">
   <div class="analisis-header">
     <div class="mod-hdr-left">
-      <!-- v7.44: mismas pestañas del módulo unificado (Monitor ↔ Análisis). -->
+      <!-- v23.92: las mismas dos pestañas del monitor, con las subpestañas de Análisis. -->
       <div class="mod-switch" id="anTabSwitch">
-        <button class="mod-tab" onclick="switchToMonitor()" title="Monitor de operarios (en vivo)">🖥️ Monitor</button>
-        <button class="mod-tab on" onclick="switchToAnalisis()" title="Análisis de productividad">📈 Análisis</button>
-        <button class="mod-tab" onclick="switchToIncons()" title="Inconsistencias del día">⚠ Inconsist.</button>
+        <button class="mod-tab" onclick="switchToMonitor()" title="El tablero de planta">📺 Monitor</button>
+        <button class="mod-tab on">📊 Análisis</button>
       </div>
-      <div class="analisis-title">📈 Análisis Productividad</div>
+      <div class="mod-sub">
+        <button class="mod-tab on" title="Gráficos de productividad">📈 Productividad</button>
+        <button class="mod-tab" onclick="switchToIncons()" title="Inconsistencias del día">⚠ Inconsistencias</button>
+      </div>
     </div>
     <button class="hist-modal-close" onclick="closeAnalisis()" style="background:#1e293b;color:#f8fafc;border-color:#334155;width:auto;margin:0;flex:0 0 auto;">Cerrar</button>
   </div>
@@ -6214,16 +6204,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
 <div id="versionBadge"></div><!-- vacío a propósito: lo llena el JS (updatePendingIndicator) con APP_VERSION. Si queda VACÍO en pantalla = el JS NO corrió (navegador no soporta el código / error de parseo). NO hardcodear una versión acá: engaña el diagnóstico. -->
 
-<!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
-     30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
-<div id="qrFichadaBox">
-  <div class="qr-label">Fichada</div>
-  <canvas id="qrCanvas" width="180" height="180" aria-label="QR de fichada"></canvas>
-  <div class="qr-countdown">Próximo en <strong id="qrSecs">--</strong>s</div>
-</div>
-<!-- Librería qrcode-generator (Kazuhiko Arase, MIT) — hosteada local para
-     que ande sin internet en el depósito. -->
-<script src="qrcode.js"></script>
 <script src="planimetria.js?v=15.79"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
@@ -6234,12 +6214,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.94"></script>
-<!-- Config del módulo de fichada (compartido con fichada.html). El secret
-     hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
-     archivo evitamos que se desincronicen. -->
-<script src="fichada-config.js"></script>
-
+<script type="module" src="recepcion.js?v=23.99"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6353,6 +6328,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- CHICOS: uso ocasional. -->
     <div class="sup-actions sup-secondary">
       <button class="sup-action-btn" onclick="openCobros()"><span class="sup-ico">💰</span><span>Deuda a cobrar / Cobranzas</span></button>
+      <button class="sup-action-btn" onclick="openCobranzas()"><span class="sup-ico">💳</span><span>Cobranzas (nuevo)</span></button>
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpHoras" style="display:none;font-size:12px;font-weight:800;background:rgba(255,255,255,.18);padding:2px 9px;border-radius:8px;line-height:1.15;white-space:nowrap;" title="Horas de guardado pendientes (lo que entra ahora a góndola ÷ cajas/h)"></span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
@@ -10280,7 +10256,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.94";
+const APP_VERSION = "v23.99";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11694,177 +11670,56 @@ setInterval(flushQueue, 3000);
 /* Intento inicial al abrir la app. */
 flushQueue();
 
+/* v23.92 (Luis) — EL QR DE FICHADA SE SACÓ. Se ficha entrando desde el celular con el código
+   de 4 dígitos que muestra la TV (v23.82), así que el QR rotativo de la esquina era una segunda
+   puerta para lo mismo, con su propio secreto y su propia librería. Se fue entero: el markup, el
+   CSS, `qrcode.js` y `fichada-config.js`.
+   ⚠ `fichada.html` NO se borró: el link viejo (y los QR impresos, si quedó alguno) siguen
+   andando contra su propia copia de la config. */
+
 /* ============================================================
-   QR DE FICHADA (TOTP rotativo) — integración con FichadaQR
+   CÓDIGO DE LOGIN EN EL HEADER DEL MONITOR (v23.92, Luis)
    ============================================================
-   El QR de la esquina inferior derecha genera tokens HMAC-SHA256
-   cada 30s. Cada token se codifica en una URL que apunta al form
-   de FichadaQR (https://loekemeyer.github.io/FichadaQR/?t=...).
-   El operario escanea con el celu, abre el form, marca Entrada/
-   Comida Inicia/Comida Termina/Salida y envía a un Google Form.
-
-   El secreto, periodo y demás vienen de fichada-config.js — mismo archivo
-   que carga fichada.html, así no se desincronizan. */
-const FICHADA_HMAC_SECRET = (window.FICHADA_CONFIG && window.FICHADA_CONFIG.hmacSecret) || "";
-const FICHADA_PERIOD_SEC  = (window.FICHADA_CONFIG && window.FICHADA_CONFIG.tokenPeriodSec) || 30;
-function buildFichadaUrl(token) {
-  // URL absoluta hacia fichada.html en el mismo dominio, con el token como
-  // query string. El celu del operario lo escanea y aterriza en el form.
-  const u = new URL("./fichada.html", location.href);
-  u.searchParams.set("t", token);
-  return u.toString();
+   El mismo número que muestra la TV (gv_tv_clave_actual): dura UN MINUTO y la rueda que lo
+   rodea se vacía mientras tanto. Reemplaza al QR de fichada, que era una segunda puerta para
+   lo mismo. ⚠ El que manda es el backend: `cambia_en_s` sincroniza la rueda con el tramo real,
+   así que el dibujo no se puede desfasar del código que la base valida. */
+const MON_CLV_CICLO = 60;       /* ≡ gv_tv_clave_actual */
+const MON_CLV_LARGO = 100.53;   /* 2πr con r = 16 */
+let _monClvQueda = 0, _monClvTimer = null;
+function _monClvAnillo() {
+  const a = document.getElementById("monClvArco");
+  if (!a) return;
+  const f = Math.max(0, Math.min(1, _monClvQueda / MON_CLV_CICLO));
+  a.setAttribute("stroke-dashoffset", (MON_CLV_LARGO * (1 - f)).toFixed(1));
+  a.setAttribute("class", "clv-arco" + (_monClvQueda <= 10 ? " poco" : ""));
 }
-
-async function _fichadaHmacSha256Hex(secret, message) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
-  return Array.from(new Uint8Array(sig))
-    .map(b => b.toString(16).padStart(2, "0")).join("");
-}
-function _fichadaCurrentBucket(periodSec) {
-  return Math.floor(Date.now() / 1000 / periodSec);
-}
-async function _fichadaBuildToken(secret, periodSec) {
-  const bucket = _fichadaCurrentBucket(periodSec);
-  const sig = (await _fichadaHmacSha256Hex(secret, String(bucket))).slice(0, 16);
-  return bucket + "." + sig;
-}
-function _fichadaSecondsUntilNext(periodSec) {
-  const nowSec = Date.now() / 1000;
-  const nextStart = (Math.floor(nowSec / periodSec) + 1) * periodSec;
-  return nextStart - nowSec;
-}
-
-let _qrLastToken = null;
-
-/* QR de fichada rotativo (TOTP) — HABILITADO. El flujo end-to-end está
-   verificado contra Supabase: fichada.html inserta el ingreso en
-   Fichadas_Virgilio (el trigger trg_fichadas_virgilio_espejo lo copia
-   a Fichadas_Historico server-side; imported_at/created_at default now()), y el
-   legajo se resuelve por email desde Empleados (anon SELECT OK).
-   Si hubiera que frenarlo de nuevo, poner true: muestra "EN CONSTRUCCIÓN". */
-const QR_DISABLED = false;
-
-/* Cartel "EN CONSTRUCCIÓN" pintado en el canvas en vez del QR.
-   Naranja para que sea bien visible desde lejos en la TV. */
-function _qrRenderConstruccion(canvas) {
-  const size = 320;
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  // fondo amarillo bandera
-  ctx.fillStyle = "#fde68a";
-  ctx.fillRect(0, 0, size, size);
-  // borde naranja
-  ctx.strokeStyle = "#ea580c";
-  ctx.lineWidth = 8;
-  ctx.strokeRect(4, 4, size - 8, size - 8);
-  // icono ⚠
-  ctx.fillStyle = "#9a3412";
-  ctx.font = "bold 80px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("⚠", size / 2, size / 2 - 50);
-  // texto principal
-  ctx.font = "bold 32px system-ui, sans-serif";
-  ctx.fillText("EN", size / 2, size / 2 + 30);
-  ctx.fillText("CONSTRUCCIÓN", size / 2, size / 2 + 70);
-}
-
-/* Render usando qrcode-generator (variable global "qrcode"). Pinta el QR
-   directamente en el canvas con fillRect por cada módulo. */
-function _qrRenderToCanvas(canvas, text, opts) {
-  const ecc  = (opts && opts.errorCorrectionLevel) || "M";
-  const size = (opts && opts.width) || 320;
-  const margin = (opts && opts.margin) || 1;
-  const dark = (opts && opts.color && opts.color.dark) || "#000000";
-  const light = (opts && opts.color && opts.color.light) || "#ffffff";
-
-  const qr = qrcode(0, ecc);   // 0 = typeNumber auto
-  qr.addData(text);
-  qr.make();
-  const moduleCount = qr.getModuleCount();
-  const totalMods = moduleCount + margin * 2;
-  const moduleSize = size / totalMods;
-
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = light;
-  ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = dark;
-  for (let row = 0; row < moduleCount; row++) {
-    for (let col = 0; col < moduleCount; col++) {
-      if (qr.isDark(row, col)) {
-        ctx.fillRect(
-          Math.floor((col + margin) * moduleSize),
-          Math.floor((row + margin) * moduleSize),
-          Math.ceil(moduleSize),
-          Math.ceil(moduleSize)
-        );
-      }
-    }
-  }
-}
-
-async function tickFichadaQr() {
-  const canvas = document.getElementById("qrCanvas");
-  const secsEl = document.getElementById("qrSecs");
-  if (!canvas || !secsEl) return;
-  if (typeof qrcode === "undefined") return;
+async function monClaveRefrescar() {
+  const e = document.getElementById("monClave");
+  if (!e) return;
   try {
-    const token = await _fichadaBuildToken(FICHADA_HMAC_SECRET, FICHADA_PERIOD_SEC);
-    if (token !== _qrLastToken) {
-      _qrLastToken = token;
-      const url = buildFichadaUrl(token);
-      _qrRenderToCanvas(canvas, url, {
-        width: 320, margin: 1, errorCorrectionLevel: "M",
-        color: { dark: "#202124", light: "#ffffff" }
-      });
-    }
-    const left = _fichadaSecondsUntilNext(FICHADA_PERIOD_SEC);
-    secsEl.textContent = String(Math.max(0, Math.ceil(left)));
-  } catch (e) {
-    console.warn("[QR] tick error:", e.message || e);
-    secsEl.textContent = "err";
-  }
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_tv_clave_actual", {
+      method: "POST", cache: "no-store",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: "{}" });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !j.clave) return;
+    e.textContent = j.clave;
+    _monClvQueda = Math.max(1, Math.min(MON_CLV_CICLO, Number(j.cambia_en_s) || MON_CLV_CICLO));
+    _monClvAnillo();
+  } catch (_e) { /* sin red el número queda como está: mejor el de antes que ninguno */ }
 }
-let _qrStartAttempts = 0;
-function _startFichadaQr() {
-  // Bypass del QR rotativo mientras se debuggea el bridge al sheet.
-  // Pinta el cartel "EN CONSTRUCCIÓN" una vez y no arranca ticks.
-  if (QR_DISABLED) {
-    const canvas = document.getElementById("qrCanvas");
-    const secsEl = document.getElementById("qrSecs");
-    const labelEl = document.querySelector("#qrFichadaBox .qr-label");
-    const countdownEl = document.querySelector("#qrFichadaBox .qr-countdown");
-    if (canvas) _qrRenderConstruccion(canvas);
-    if (labelEl) labelEl.textContent = "Fichada";
-    // Escondemos el contador (no tiene sentido sin tokens rotando).
-    if (countdownEl) countdownEl.style.display = "none";
-    if (secsEl) secsEl.textContent = "—";
-    console.log("[QR] Deshabilitado — mostrando cartel En Construcción");
-    return;
-  }
-  if (typeof qrcode === "undefined") {
-    _qrStartAttempts++;
-    if (_qrStartAttempts > 50) {
-      console.error("[QR] La librería qrcode no cargó (qrcode.js falta?).");
-      const secsEl = document.getElementById("qrSecs");
-      if (secsEl) secsEl.textContent = "sin lib";
-      return;
-    }
-    setTimeout(_startFichadaQr, 200);
-    return;
-  }
-  console.log("[QR] qrcode-generator lista, arrancando ticks");
-  tickFichadaQr();
-  setInterval(tickFichadaQr, 250);
+function monClaveStart() {
+  monClaveRefrescar();
+  if (_monClvTimer) clearInterval(_monClvTimer);
+  _monClvTimer = setInterval(() => {
+    if (_monClvQueda <= 0) return;
+    _monClvQueda--; _monClvAnillo();
+    if (_monClvQueda <= 0) monClaveRefrescar();
+  }, 1000);
 }
-_startFichadaQr();
+function monClaveStop() { if (_monClvTimer) { clearInterval(_monClvTimer); _monClvTimer = null; } }
 
 /* ============================================================
    RELOJ EN EL HEADER DEL MONITOR — formato "ddd dd/mm HH:MM"
@@ -19816,16 +19671,36 @@ var STK_POP_CSS =
   // v23.45 (Luis): sin hueco entre Descripción y Proy. La tabla mide lo que suman sus columnas
   // (no el 100% del popup), letra más grande y columnas dobles (Proy/Objetivo, En curso/A pedir,
   // Unidades/FOB, u$s/m³). Descripción en hasta 2 renglones.
-  ".mva-tbl.wide{width:1148px;min-width:1148px;font-size:13px;}" +   // = suma del <colgroup> de Pedidos Importación
+  // v23.95 (Luis) — la tabla OCUPA el ancho que tiene (sin hueco a la derecha) y nunca baja del
+  // mínimo en el que las columnas se pisan: el sobrante se lo lleva Descripción (col sin width).
+  ".mva-tbl.wide{width:100%;min-width:1188px;font-size:15px;}" +
+  ".pedimp-banda{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:8px;padding:8px 11px;background:#fff;border-bottom:1px solid #f1f5f9;align-items:stretch;}" +
+  ".pedimp-chip{display:flex;align-items:center;gap:8px;border:1px solid;border-radius:9px;padding:6px 7px 6px 11px;font-size:11.5px;line-height:1.35;min-width:0;}" +
+  ".pedimp-chip .pc-txt{flex:1;min-width:0;}" +
+  ".pedimp-chip .pc-big{font-size:18px;font-weight:800;}" +
+  ".pedimp-chip .pc-mas{flex:0 0 auto;width:26px;height:26px;margin:0;padding:0;border-radius:50%;border:1px solid currentColor;background:rgba(255,255,255,.55);color:inherit;font-size:17px;font-weight:800;line-height:1;cursor:pointer;opacity:.75;}" +
+  ".pedimp-chip .pc-mas:hover{opacity:1;background:#fff;}" +
+  ".pedimp-mesessel{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:#334155;background:#f8fafc;border:1px solid #cbd5e1;border-radius:9px;padding:3px 9px;white-space:nowrap;}" +
+  ".pedimp-mesessel select{width:auto;margin:0;height:28px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;font-size:13.5px;font-weight:800;padding:0 4px;}" +
+  ".pedimp-mesessel .pm-vig{color:#0f766e;}" +
   ".mva-tbl.wide td:nth-child(2){white-space:normal;line-height:1.25;}" +
   ".mva-tbl.wide td:nth-child(2) .imp-desc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}" +
   ".mva-tbl.wide td:nth-child(4){white-space:normal;line-height:1.3;}" +
-  ".mva-tbl.wide .imp2 small{display:block;font-size:11.5px;color:#64748b;font-weight:600;margin-top:1px;}" +
+  ".mva-tbl.wide .imp2 small{display:block;font-size:13px;color:#64748b;font-weight:600;margin-top:1px;}" +
   ".mva-tbl.wide thead th small{display:block;font-weight:700;color:#94a3b8;}" +
   ".mva-tbl.wide th.num,.mva-tbl.wide td.num{width:auto;}" +   // manda el <colgroup>, no el 15% genérico
   ".mva-tbl.wide th,.mva-tbl.wide td{vertical-align:middle;overflow:hidden;}" +
   ".mva-tbl.wide thead th{text-overflow:ellipsis;}" +   // solo header y Descripción cortan con «…»
-  ".mva-tbl.wide thead th{white-space:normal;line-height:1.25;}" +   // 'Proy u/mes' entra en 2 renglones
+  ".mva-tbl.wide thead th{white-space:normal;line-height:1.25;font-size:12px;}" +   // 'Proy u/mes' entra en 2 renglones
+  // v23.91 (Luis): la PROYECCIÓN se toca en su propia celda (el código dejó de ser un link)
+  ".mva-tbl.wide td.pedimp-proy{cursor:pointer;background:#faf5ff;color:#6d28d9;}" +
+  ".mva-tbl.wide td.pedimp-proy:hover{background:#f3e8ff;}" +
+  ".mva-tbl.wide td.pedimp-proy small{color:#a78bfa;}" +
+  // el global button{width:100%;padding:16px;font-size:22px;margin-top:14px} estiraba cada botón
+  // del pop-up ⚙ Configurar de punta a punta (Luis, 29/09: "botones largos horribles").
+  "#impCfgOv button{width:auto;margin-top:0;}" +
+  // y el input global (width:100% + padding, sin box-sizing) se desbordaba del pop-up
+  "#impCfgOv input{box-sizing:border-box;margin:0;}" +
   ".mva-tbl.wide th:nth-child(7),.mva-tbl.wide td:nth-child(7){border-left:2px solid #cbd5e1;}" +   // arranca el bloque PEDIDO
   ".mva-tbl.wide th:nth-child(10),.mva-tbl.wide td:nth-child(10){border-left:1px solid #e2e8f0;}" +
   ".mva-tbl.wide th:first-child,.mva-tbl.wide td:first-child{position:sticky;left:0;z-index:1;background:#fff;box-shadow:1px 0 0 #e2e8f0;}" +
@@ -19953,14 +19828,30 @@ var STK_POP_CSS =
   ".proyv-cols>div{flex:1 1 240px;min-width:0;}";
 /* v11.70 — `wide`: tarjeta ancha (hasta 1340px) para los pop-ups con tablas de muchas
    columnas (Importación). Los demás llaman con 2 argumentos y quedan igual que siempre. */
+let _stkPopAlt = null;   // v23.95: id del overlay alternativo (el pop-up NO reemplaza la tarjeta de abajo)
 function _stkPopShell(title, bodyId, wide) {
   if (!document.getElementById("stkPopCss")) { const st = document.createElement("style"); st.id = "stkPopCss"; st.textContent = STK_POP_CSS; document.head.appendChild(st); }
+  if (_stkPopAlt) {
+    // Overlay propio, ENCIMA de lo que ya está abierto. El body NO lleva id: el de la pantalla
+    // de abajo se llama igual y getElementById devolvería aquél.
+    let alt = document.getElementById(_stkPopAlt);
+    if (!alt) {
+      alt = document.createElement("div"); alt.id = _stkPopAlt;
+      alt.setAttribute("style", "position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99998;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto");
+      alt.addEventListener("click", function (ev) { if (ev.target === alt) alt.remove(); });
+      document.body.appendChild(alt);
+    }
+    alt.innerHTML = '<div class="stkpop-card' + (wide === "mid" ? ' mid' : (wide ? ' wide' : '')) + '" style="margin:0"><div class="stkpop-head"><span class="stkpop-title">' + title + '</span>' +
+      '<button class="stkpop-close" onclick="(document.getElementById(\'' + _stkPopAlt + '\')||{remove:function(){}}).remove()">Cerrar</button></div><div class="stkpop-body"></div></div>';
+    return alt.querySelector(".stkpop-body");
+  }
   let ov = document.getElementById("stkPopModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "stkPopModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
   // v18.32 — `wide` acepta además "mid": tarjeta intermedia (1060px) para los pop-ups que no
   // necesitan 1760 pero sí más de 760, como el de Proyección.
   ov.innerHTML = '<div class="stkpop-card' + (wide === "mid" ? ' mid' : (wide ? ' wide' : '')) + '"><div class="stkpop-head"><span class="stkpop-title">' + title + '</span><button class="stkpop-close" onclick="stkPopClose()">Cerrar</button></div><div class="stkpop-body" id="' + bodyId + '"></div></div>';
+  return document.getElementById(bodyId);
 }
 function stkPopClose() { const ov = document.getElementById("stkPopModal"); if (ov) ov.classList.remove("show"); _stkPop = null; }
 /* v11.48 — Pop-up "de dónde surge la proyección": al tocar el número de PROY. CAJ/MES muestra las
@@ -20097,8 +19988,8 @@ async function stkShowProyVentas(codEnc, proy) {
   var sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
   var emp = sfx ? sfx[1].toUpperCase().replace("LOKE", "LK") : "";
   var empTag = emp ? ' <span style="font-size:14px;font-weight:800;color:' + (emp === "LK" ? "#b91c1c" : "#1e40af") + ';">' + emp + '</span>' : '';
-  _stkPopShell("📈 Proyección — " + escapeHtml(codCanon(codB)) + empTag, "stkPopBody", "mid");   // v18.32
-  var body = document.getElementById("stkPopBody"); if (!body) return;
+  var body = _stkPopShell("📈 Proyección — " + escapeHtml(codCanon(codB)) + empTag, "stkPopBody", "mid");   // v18.32
+  if (!body) return;
   var nombre = artNombre(cod, "") || "";
   var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
   body.innerHTML = '<div class="stkpop-empty">Cargando ventas facturadas de los últimos 12 meses' + (emp ? ' (' + emp + ')' : ' (LK + Chef)') + '…</div>';
@@ -21324,24 +21215,34 @@ function _pedImpBandaHtml(proy, nac, minUsd, totUsd, ext) {
   // tabla hacia abajo. Ahora el chip es una línea y «ver desglose» abre un pop-up.
   // Los datos para rearmarlo quedan en _pedImpDesgData, así el pop-up no depende del HTML.
   var chip = function (bg, bd, col, html, desg, lado) {
-    var base = 'flex:1 1 300px;min-width:250px;background:' + bg + ';border:1px solid ' + bd + ';border-radius:9px;padding:10px 13px;font-size:14px;color:' + col + ';line-height:1.45';
-    if (!desg) return '<div style="' + base + '">' + html + '</div>';
-    return '<div style="' + base + '">' + html +
-      ' <button onclick="pedImpDesgPop(\'' + encodeURIComponent(String(ext.prov || "")) + '\',\'' + lado + '\')" style="background:none;border:0;padding:0;margin-left:2px;font-size:11.5px;font-weight:800;color:inherit;text-decoration:underline;cursor:pointer">ver desglose</button></div>';
+    var base = 'background:' + bg + ';border-color:' + bd + ';color:' + col;
+    var cuerpo = '<div class="pc-txt">' + html + '</div>';
+    if (desg) cuerpo += '<button class="pc-mas" title="Ver el desglose" onclick="pedImpDesgPop(\'' + encodeURIComponent(String(ext.prov || "")) + '\',\'' + lado + '\')">›</button>';
+    return '<div class="pedimp-chip" style="' + base + '">' + cuerpo + '</div>';
   };
   _pedImpDesgData[String(ext.prov || "")] = { proy: proy, nac: nac, minUsd: minUsd, totUsd: totUsd, ext: ext };
   var izq;
-  if (proy.estado === "ya") izq = chip("#ecfdf5", "#a7f3d0", "#065f46", '✅ <b>Ya se puede pedir</b> — hay ' + _usd0(proy.fobHoy) + ' de demanda, sobre el mínimo de <b>' + _usd0(minUsd) + '</b>.');
-  else if (proy.estado === "nunca") izq = chip("#fef2f2", "#fecaca", "#991b1b", '⚠ <b>No llega a ' + _usd0(minUsd) + ' solo</b> — ni con el stock en 0 (techo ' + _usd0(proy.techo) + ' en 10 meses). <span style="color:#b91c1c">Se consolida con otro proveedor.</span>');
-  else if (proy.estado === "sinburn") izq = chip("#f1f5f9", "#e2e8f0", "#475569", '📉 Sin proyección de consumo cargada: no se puede estimar cuándo llega a ' + _usd0(minUsd) + '.');
-  else izq = chip("#fffbeb", "#fde68a", "#92400e", '⏳ <b>Llega a ' + _usd0(minUsd) + ' en ' + _pedImpMesesTxt(proy.meses) + '</b>' + (proy.fechaIso ? ' (≈ ' + _isoToDdMmAa(proy.fechaIso) + ')' : '') + '. <span style="color:#b45309">Consumo ' + _usd0(_nacNum(proy.burn, 0)) + '/mes.</span>', _pedImpDesgIzq(proy, minUsd, ext.items), "izq");
+  // lo que se lee de un vistazo va en 19px; el contexto, en la letra base del chip (11,5px)
+  var _big = function (txt, col2) { return '<span class="pc-big"' + (col2 ? ' style="color:' + col2 + '"' : '') + '>' + txt + '</span>'; };
+  var _pie = function (txt) { return '<div style="opacity:.85">' + txt + '</div>'; };
+  if (proy.estado === "ya") izq = chip("#ecfdf5", "#a7f3d0", "#065f46", _big("✅ Ya se puede pedir") + _pie('demanda ' + _usd0(proy.fobHoy) + ' · mínimo ' + _usd0(minUsd)));
+  else if (proy.estado === "nunca") izq = chip("#fef2f2", "#fecaca", "#991b1b", _big("⚠ No llega solo") + _pie('mínimo ' + _usd0(minUsd) + ' · techo ' + _usd0(proy.techo) + ' — se consolida con otro proveedor'));
+  else if (proy.estado === "sinburn") izq = chip("#f1f5f9", "#e2e8f0", "#475569", _big("📉 Sin proyección") + _pie('no se puede estimar cuándo llega a ' + _usd0(minUsd)));
+  else izq = chip("#fffbeb", "#fde68a", "#92400e",
+    _big("⏳ " + _pedImpMesesTxt(proy.meses)) + ' ' + _big(_usd0(_nacNum(proy.burn, 0)) + "/mes", "#b45309") +
+    _pie('para el mínimo de ' + _usd0(minUsd) + (proy.fechaIso ? ' ≈ ' + _isoToDdMmAa(proy.fechaIso) : '')),
+    _pedImpDesgIzq(proy, minUsd, ext.items), "izq");
   // el chip de proyección necesita fobHoy/burn; se los pasa el llamador vía proy (los adjunto abajo)
   var der;
   var modoTxt = { consolidada: "Consolidada", full: "Contenedor", avion: "Avión" }[nac.modo] || nac.modo;
   if (!(totUsd > 0)) der = chip("#f1f5f9", "#e2e8f0", "#475569", '🚢 Poné el pedido (columna <b>MC</b>) para ver el costo <b>puesto en Argentina</b>.');
   else if (nac.sinPeso) der = chip("#fef2f2", "#fecaca", "#991b1b", '✈️ <b>Avión:</b> cargá el <b>peso (TN)</b> arriba para calcular el flete FEDEX.');
-  else der = chip("#eef2ff", "#c7d2fe", "#3730a3", '🚢 <span style="font-size:17px"><b>Puesto en Arg: ' + _usd0(nac.landed) + '</b></span> <span style="color:#4338ca">(' + modoTxt + ')</span><br>FOB ' + _usd0(totUsd) + ' + <b style="color:#b91c1c">' + _usd0(nac.noRecup) + ' no recuperable (+' + Math.round(nac.factor * 100) + '%)</b>' + (nac.ntl > 0 ? ' · incl. comisión NTL ' + _usd0(nac.ntl) : '') + (nac.recup > 0 ? '<br><b style="color:#047857">+ ' + _usd0(nac.recup) + ' recuperable</b> <span style="color:#047857">(IVA y percepciones: vuelven como crédito)</span>' : ''), _pedImpDesgDer(nac, totUsd, ext.m3), "der");
-  return '<div style="display:flex;gap:10px;flex-wrap:wrap;padding:10px 13px;background:#fff;border-bottom:1px solid #f1f5f9">' + izq + der + '</div>';
+  else der = chip("#eef2ff", "#c7d2fe", "#3730a3",
+    _big("🚢 +" + Math.round(nac.factor * 100) + "% · " + _usd0(nac.noRecup), "#b91c1c") + ' <span style="font-weight:800;color:#b91c1c">no recuperable</span>' +
+    _pie('puesto en Arg ' + _usd0(nac.landed) + ' · FOB ' + _usd0(totUsd) + ' · ' + modoTxt + (nac.ntl > 0 ? ' · NTL ' + _usd0(nac.ntl) : '') +
+      (nac.recup > 0 ? ' · <span style="color:#047857;font-weight:700">' + _usd0(nac.recup) + ' recuperable</span>' : '')),
+    _pedImpDesgDer(nac, totUsd, ext.m3), "der");
+  return '<div class="pedimp-banda">' + izq + der + '</div>';
 }
 /* ══ v23.89 (Luis, 29/09) — LA CONFIG DE IMPORTADOS VIVE EN TABLAS ═══════════════════
    "Fijate que no vivan en el front los datos, sino que modifiquen las tablas pertinentes".
@@ -21420,22 +21321,45 @@ function _derechosPedido(items, prov) {
    la pantalla de importación cerrada.
    ⚠ `stkShowProyVentas` es async pero dibuja el shell ANTES del primer await, así que
    cuando vuelve el control el header ya existe y se le puede colgar el botón. */
-function pedImpProyAbrir(codEnc, proyCajas) {
-  const prev = (typeof _stkPop !== "undefined") ? _stkPop : null;
-  stkShowProyVentas(codEnc, proyCajas);
-  if (!prev || prev.kind !== "pedImp") return;
-  const head = document.querySelector("#stkPopModal .stkpop-head");
-  const cerrar = head && head.querySelector(".stkpop-close");
-  if (!head || !cerrar) return;
-  const b = document.createElement("button");
-  b.className = "stkpop-close"; b.textContent = "← Volver al pedido";
-  b.style.marginRight = "6px";
-  b.onclick = function () {
-    _stkPop = prev;
-    _stkPopShell("📦 Pedidos Importación", "stkPopBody", true);
+/* ══ v23.95 (Luis, 29/09) — MESES OBJETIVO por proveedor, en su encabezado ═══════════
+   "el parámetro de meses objetivo ponelo configurable al lado del nombre de cada proveedor
+   (menú desplegable con los números del 1 al 24 … que afecte a todos los códigos de ese
+   proveedor)". Es la MISMA columna que edita el ⚙ (GV_Imp_Proveedor.meses_objetivo): no hay
+   un segundo lugar donde guardarlo. Vacío en la tabla = hereda el general, y el select lo
+   muestra como «gral N». */
+function _pedImpMesesSel(prov, provEnc) {
+  const r = _impCfgProv[String(prov || "").trim()] || {};
+  const gral = _nacNum((_NAC_TASAS || {}).meses_objetivo, 10);
+  const propio = (r.meses_objetivo_propio == null || r.meses_objetivo_propio === "") ? null : Math.round(Number(r.meses_objetivo_propio));
+  let op = '<option value=""' + (propio == null ? ' selected' : '') + '>gral (' + gral + ')</option>';
+  for (let i = 1; i <= 24; i++) op += '<option value="' + i + '"' + (propio === i ? ' selected' : '') + '>' + i + '</option>';
+  return '<label class="pedimp-mesessel" title="Meses de venta que se piden. Cambia el objetivo y el «a pedir» de TODOS los códigos de ' + escapeHtml(prov) + '.">' +
+    'Meses obj <select onchange="pedImpSetMeses(\'' + provEnc + '\',this.value)">' + op + '</select></label>';
+}
+async function pedImpSetMeses(provEnc, v) {
+  const prov = decodeURIComponent(provEnc || ""); if (!prov) return;
+  const n = String(v || "").trim() === "" ? null : Number(v);
+  if (n != null && !(n >= 1 && n <= 24)) return;
+  try {
+    await _impCfgRpc("gv_imp_proveedor_guardar", { p: { proveedor: prov, meses_objetivo: n } });
+    await _impCfgCargar();                       // la config nueva
+    const data = await ocgFetchImportados();     // el objetivo y el «a pedir» los recalcula la base
+    // ⚠ sólo se reemplaza si el refetch trajo algo: una lectura vacía dejaría la pantalla en
+    // blanco, y "no pude leer" no es "no hay importados" (§ una lectura ROTA no es un CERO).
+    if (_stkPop && _stkPop.kind === "pedImp") {
+      if (data && data.items && data.items.length) _stkPop.data = data;
+      _pedImpRender();
+    }
+  } catch (e) {
+    alert("No se pudieron guardar los meses objetivo de " + prov + ":\n" + (e && e.message ? e.message : e));
     _pedImpRender();
-  };
-  head.insertBefore(b, cerrar);
+  }
+}
+function pedImpProyAbrir(codEnc, proyCajas) {
+  // v23.95 (Luis: "sigue saliendo de importación cuando aprieto") — la proyección se dibuja en
+  // SU PROPIO overlay, encima del módulo, que queda intacto abajo. Sin «volver»: se cierra y ya.
+  _stkPopAlt = "impProyOv";
+  try { stkShowProyVentas(codEnc, proyCajas); } finally { _stkPopAlt = null; }
 }
 
 /* ══ v23.90 (Luis, 29/09) — MOQ: el mínimo que el chino acepta fabricar ══════════════
@@ -21509,17 +21433,17 @@ function _impCfgRender() {
   const P = _impCfgPop, prov = P.prov, r = _impCfgProv[prov] || {};
   const soloGral = !prov;   // v23.91 — el pop-up de los parámetros generales, sin proveedor
   const g = _NAC_TASAS, esc = escapeHtml;
-  const tabB = function (id, txt) { return '<button onclick="pedImpCfgTab(\'' + id + '\')" style="padding:6px 12px;border-radius:999px;border:1px solid ' + (P.tab === id ? '#0f766e' : '#cbd5e1') + ';background:' + (P.tab === id ? '#0f766e' : '#fff') + ';color:' + (P.tab === id ? '#fff' : '#334155') + ';font-weight:800;font-size:12.5px;cursor:pointer">' + txt + '</button>'; };
+  const tabB = function (id, txt) { return '<button onclick="pedImpCfgTab(\'' + id + '\')" style="padding:7px 18px;border-radius:999px;border:1px solid ' + (P.tab === id ? '#0f766e' : '#cbd5e1') + ';background:' + (P.tab === id ? '#0f766e' : '#fff') + ';color:' + (P.tab === id ? '#fff' : '#334155') + ';font-weight:800;font-size:14.5px;cursor:pointer">' + txt + '</button>'; };
   const campo = function (id, lbl, val, ph, hint) {
     return '<div style="display:flex;flex-direction:column;gap:3px;min-width:0">' +
-      '<label style="font-size:11px;font-weight:800;color:#475569">' + lbl + '</label>' +
-      '<input id="' + id + '" value="' + esc(val == null ? "" : String(val)) + '" placeholder="' + esc(ph) + '" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%">' +
-      (hint ? '<span style="font-size:10.5px;color:#94a3b8">' + hint + '</span>' : '') + '</div>';
+      '<label style="font-size:12.5px;font-weight:800;color:#475569">' + lbl + '</label>' +
+      '<input id="' + id + '" value="' + esc(val == null ? "" : String(val)) + '" placeholder="' + esc(ph) + '" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;font-weight:700;width:100%">' +
+      (hint ? '<span style="font-size:11.5px;color:#94a3b8">' + hint + '</span>' : '') + '</div>';
   };
   let h = '<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#0f766e;color:#fff">' +
-    '<div style="font-size:16px;font-weight:800">' + (prov ? '⚙ Configurar — ' + esc(prov) : '⚙ Parámetros generales de importación') + '</div>' +
-    '<button onclick="pedImpCfgCerrar()" style="background:#fff;color:#0f766e;border:0;border-radius:8px;padding:5px 12px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
+    '<div style="font-size:18px;font-weight:800">' + (prov ? '⚙ Configurar — ' + esc(prov) : '⚙ Parámetros generales de importación') + '</div>' +
+    '<button onclick="pedImpCfgCerrar()" style="background:#fff;color:#0f766e;border:0;border-radius:8px;padding:6px 16px;font-size:14.5px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
     '<div style="padding:14px 16px">' +
     // v23.91 (Luis: "no entiendo por qué hay un general ahí y qué modifica esos") — los
     // generales salieron a su propio botón del módulo: acá sólo lo de ESTE proveedor.
@@ -21528,7 +21452,7 @@ function _impCfgRender() {
   if (P.msg) h += '<div style="margin-bottom:10px;padding:7px 10px;border-radius:8px;font-size:12.5px;font-weight:700;background:' + (P.msg[0] === "!" ? "#fef2f2" : "#f0fdf4") + ';color:' + (P.msg[0] === "!" ? "#b91c1c" : "#166534") + '">' + esc(P.msg.replace(/^!/, "")) + '</div>';
 
   if (P.tab === "params") {
-    h += '<div style="font-size:12px;color:#64748b;margin-bottom:10px">Lo que se deje <b>vacío</b> usa el valor general (el que aparece en gris). Los porcentajes van en <b>porcentaje</b>: 35 = 35%.</div>';
+    h += '<div style="font-size:13px;color:#64748b;margin-bottom:10px">Lo que se deje <b>vacío</b> usa el valor general (el que aparece en gris). Los porcentajes van en <b>porcentaje</b>: 35 = 35%.</div>';
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">';
     h += '<div style="display:flex;flex-direction:column;gap:3px"><label style="font-size:11px;font-weight:800;color:#475569">Importador</label>' +
       '<input id="impCfgImportador" value="' + esc(r.importador || "") + '" placeholder="Chef / Tierra Nativa" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></div>';
@@ -21546,7 +21470,7 @@ function _impCfgRender() {
     h += '<div style="margin-top:12px"><label style="font-size:11px;font-weight:800;color:#475569">Nota</label>' +
       '<input id="impCfgNotas" value="' + esc(r.notas || "") + '" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%"></div>';
     h += '<div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">' +
-      '<button onclick="pedImpCfgGuardar()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:8px 16px;font-weight:800;font-size:13px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar") + '</button>' +
+      '<button onclick="pedImpCfgGuardar()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:9px 20px;font-weight:800;font-size:15px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar") + '</button>' +
       (r.actualizado ? '<span style="font-size:11px;color:#94a3b8">último cambio ' + esc(String(r.actualizado).slice(0, 16).replace("T", " ")) + (r.actualizado_por ? " · " + esc(r.actualizado_por) : "") + '</span>' : '') +
       '</div>';
   } else if (P.tab === "cods") {
@@ -21556,37 +21480,37 @@ function _impCfgRender() {
       const mios = arts.filter(function (a) { return String(a.proveedor || "").trim() === prov; });
       const q = String(P.q || "").trim().toUpperCase();
       const otros = q ? arts.filter(function (a) { return String(a.proveedor || "").trim() !== prov && stkMatchBusq(q, a.cod, a.descripcion, false); }).slice(0, 40) : [];
-      h += '<div style="font-size:12px;color:#64748b;margin-bottom:9px">Se guarda en el maestro <code>Importados</code> (el mismo que usa 🏭 Proveedores). Sacar un código <b>no lo borra</b>: queda sin proveedor.<br><b>Der. %</b> son los derechos de ESE artículo (su partida arancelaria): vacío = usa el ' + _nacPct(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '% del proveedor.</div>';
-      h += '<div style="font-size:12.5px;font-weight:800;color:#0f172a;margin-bottom:6px">' + mios.length + ' código(s) de ' + esc(prov) + '</div>';
-      h += '<div style="max-height:210px;overflow:auto;border:1px solid #e2e8f0;border-radius:9px;margin-bottom:12px">';
+      h += '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px"><span style="font-size:15px;font-weight:800;color:#0f172a">' + mios.length + ' código(s) de ' + esc(prov) + '</span>' +
+        '<span style="font-size:12px;color:#94a3b8">% der. vacío = ' + _nacPct(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '% del proveedor</span></div>';
+      h += '<div style="max-height:300px;overflow:auto;border:1px solid #e2e8f0;border-radius:9px;margin-bottom:12px">';
       h += mios.length ? mios.map(function (a) {
         // v23.90 (Luis) — los derechos, editables por artículo, acá mismo
         const _ac = _impCfgArt[String(a.cod).trim().toUpperCase()] || {};
         const _der = (_ac.derechos_pct == null) ? "" : _impCfgPctTxt(_ac.derechos_pct);
-        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border-bottom:1px solid #f1f5f9">' +
-          '<b style="font-size:12.5px;min-width:64px">' + esc(String(a.cod)) + '</b>' +
-          '<span style="font-size:11.5px;color:#64748b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
-          '<input value="' + esc(_der) + '" placeholder="' + _impCfgPctTxt(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '" onchange="pedImpCfgArtDer(\'' + encodeURIComponent(String(a.cod)) + '\',this.value)" title="Derechos de este artículo, en porcentaje (35 = 35%). Vacío = el del proveedor." style="width:58px;text-align:center;padding:3px 5px;border:1px solid ' + (_der ? '#0f766e' : '#cbd5e1') + ';border-radius:7px;font-size:12px;font-weight:700;background:' + (_der ? '#f0fdfa' : '#fff') + '">' +
-          '<span style="font-size:11px;color:#94a3b8;font-weight:700">% der.</span>' +
-          '<button onclick="pedImpCfgSacar(\'' + encodeURIComponent(String(a.cod)) + '\')" title="Sacarlo de ' + esc(prov) + ' (pide confirmación)" style="background:#fee2e2;color:#b91c1c;border:0;border-radius:6px;padding:1px 5px;font-weight:800;font-size:10.5px;line-height:1.3;cursor:pointer">✕</button></div>';
-      }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:12.5px">Todavía no tiene códigos.</div>';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 13px 6px 10px;border-bottom:1px solid #f1f5f9">' +
+          '<b style="font-size:15px;min-width:74px">' + esc(String(a.cod)) + '</b>' +
+          '<span style="font-size:13.5px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
+          '<input value="' + esc(_der) + '" placeholder="' + _impCfgPctTxt(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '" onchange="pedImpCfgArtDer(\'' + encodeURIComponent(String(a.cod)) + '\',this.value)" title="Derechos de este artículo, en porcentaje (35 = 35%). Vacío = el del proveedor." style="width:62px;text-align:center;padding:4px 6px;border:1px solid ' + (_der ? '#0f766e' : '#cbd5e1') + ';border-radius:7px;font-size:14px;font-weight:800;background:' + (_der ? '#f0fdfa' : '#fff') + '">' +
+          '<span style="font-size:12px;color:#94a3b8;font-weight:700">% der.</span>' +
+          '<button onclick="pedImpCfgSacar(\'' + encodeURIComponent(String(a.cod)) + '\')" title="Sacarlo de ' + esc(prov) + ' (pide confirmación; no lo borra: queda sin proveedor)" style="background:#fee2e2;color:#b91c1c;border:0;border-radius:7px;padding:3px 10px;font-weight:800;font-size:13px;line-height:1.3;cursor:pointer">✕</button></div>';
+      }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:13.5px">Todavía no tiene códigos.</div>';
       h += '</div>';
-      h += '<div style="font-size:12.5px;font-weight:800;color:#0f172a;margin-bottom:6px">Agregar un código</div>';
-      h += '<input id="impCfgQ" value="' + esc(P.q || "") + '" oninput="pedImpCfgBuscar(this.value)" placeholder="Buscar código o descripción…" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%;margin-bottom:8px">';
-      h += '<div style="max-height:190px;overflow:auto;border:1px solid #e2e8f0;border-radius:9px">';
-      h += !q ? '<div style="padding:12px;color:#94a3b8;font-size:12.5px">Escribí un código o una descripción.</div>'
+      h += '<div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:6px">Agregar un código</div>';
+      h += '<input id="impCfgQ" value="' + esc(P.q || "") + '" oninput="pedImpCfgBuscar(this.value)" placeholder="Buscar código o descripción…" style="padding:7px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;width:100%;margin-bottom:8px">';
+      h += '<div style="max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:9px">';
+      h += !q ? '<div style="padding:12px;color:#94a3b8;font-size:13.5px">Escribí un código o una descripción.</div>'
         : (otros.length ? otros.map(function (a) {
           const act = String(a.proveedor || "").trim();
-          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border-bottom:1px solid #f1f5f9">' +
-            '<b style="font-size:12.5px;min-width:64px">' + esc(String(a.cod)) + '</b>' +
-            '<span style="font-size:11.5px;color:#64748b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
+          return '<div style="display:flex;align-items:center;gap:8px;padding:6px 13px 6px 10px;border-bottom:1px solid #f1f5f9">' +
+            '<b style="font-size:15px;min-width:74px">' + esc(String(a.cod)) + '</b>' +
+            '<span style="font-size:13.5px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
             (act ? '<span style="font-size:10.5px;font-weight:800;color:#b45309;background:#fffbeb;border-radius:999px;padding:1px 7px" title="Hoy es de ' + esc(act) + ': al agregarlo se lo saca de ahí">' + esc(act) + '</span>' : '') +
-            '<button onclick="pedImpCfgCodigo(\'' + encodeURIComponent(String(a.cod)) + '\',\'' + encodeURIComponent(prov) + '\')" style="background:#dcfce7;color:#166534;border:0;border-radius:7px;padding:3px 9px;font-weight:800;font-size:12px;cursor:pointer">+</button></div>';
-        }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:12.5px">Sin resultados.</div>');
+            '<button onclick="pedImpCfgCodigo(\'' + encodeURIComponent(String(a.cod)) + '\',\'' + encodeURIComponent(prov) + '\')" style="background:#dcfce7;color:#166534;border:0;border-radius:7px;padding:4px 13px;font-weight:800;font-size:15px;cursor:pointer">+</button></div>';
+        }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:13.5px">Sin resultados.</div>');
       h += '</div>';
     }
   } else {
-    h += '<div style="font-size:12px;color:#64748b;margin-bottom:10px">Valen para <b>todos</b> los proveedores que no tengan el suyo propio, y para los artículos sin arancel propio. Los porcentajes en <b>porcentaje</b>: 21 = 21%.</div>';
+    h += '<div style="font-size:13px;color:#64748b;margin-bottom:10px">Valen para <b>todos</b> los proveedores que no tengan el suyo propio, y para los artículos sin arancel propio. Los porcentajes en <b>porcentaje</b>: 21 = 21%.</div>';
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">';
     h += campo("impCfgGMeses", "Meses objetivo", String(g.meses_objetivo), "", "cuántos meses de venta se piden");
     h += campo("impCfgGDer", "Derechos (%)", _impCfgPctTxt(g.derechos_pct), "", "sobre el CIF");
@@ -21605,7 +21529,7 @@ function _impCfgRender() {
     h += campo("impCfgGMoq", "MOQ (unidades por código)", String(g.moq), "", "mínimo de la fábrica");
     h += campo("impCfgGMoqM", "MOQ: tope de cobertura (meses)", String(g.moq_meses_max), "", "hasta acá se estira");
     h += '</div>';
-    h += '<div style="margin-top:14px"><button onclick="pedImpCfgGuardarGral()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:8px 16px;font-weight:800;font-size:13px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar generales") + '</button></div>';
+    h += '<div style="margin-top:14px"><button onclick="pedImpCfgGuardarGral()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:9px 20px;font-weight:800;font-size:15px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar generales") + '</button></div>';
   }
   h += '</div></div>';
   ov.innerHTML = h;
@@ -22266,9 +22190,12 @@ function _pedImpRender() {
     h += '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0">' +
       '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div></div>' +
-      '<div style="display:flex;gap:7px;flex:0 0 auto;flex-wrap:wrap">' +
+      '<div style="display:flex;gap:7px;flex:0 0 auto;flex-wrap:wrap;align-items:center">' +
+      // v23.95 (Luis) — los meses objetivo, a un toque: cambian el objetivo y el «a pedir» de
+      // TODOS los códigos de este proveedor (GV_Imp_Proveedor.meses_objetivo).
+      _pedImpMesesSel(prov, provEnc) +
       // v23.89 (Luis) — los parámetros de ESTE proveedor se editan acá, no en el módulo de OCs
-      '<button class="mva-clear" style="background:#0f766e;color:#fff;border-color:#0f766e" onclick="pedImpCfgAbrir(\'' + provEnc + '\')" title="Meses objetivo, derechos, comisión NTL, mínimo y los códigos de este proveedor">⚙ Configurar parámetros</button>' +
+      '<button class="mva-clear" style="background:#0f766e;color:#fff;border-color:#0f766e" onclick="pedImpCfgAbrir(\'' + provEnc + '\')" title="Derechos, comisión NTL, mínimo, MOQ y los códigos de este proveedor">⚙ Configurar</button>' +
       '<button class="mva-clear" style="background:#1e6bd6;color:#fff;border-color:#1e6bd6" onclick="pedImpPdfProv(\'' + provEnc + '\')" title="PDF del pedido de este proveedor: solo Código, Master Cajas y Unidades (sin FOB)">🖨 PDF pedido</button>' +
       '</div>' +
       '</div>';
@@ -22277,24 +22204,28 @@ function _pedImpRender() {
     // v11.70 — anchos explícitos por <colgroup> (suman los 1180px del min-width): sin esto
     // las 14 columnas se pisaban entre sí. Bloque diagnóstico (proy→a pedir) | bloque pedido (MC→m³).
     h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide">' +
-      '<colgroup><col style="width:100px"><col style="width:200px"><col style="width:78px"><col style="width:104px"><col style="width:82px"><col style="width:66px"><col style="width:94px"><col style="width:96px"><col style="width:92px"><col style="width:128px"><col style="width:108px"></colgroup>' +
+      '<colgroup><col style="width:104px"><col><col style="width:92px"><col style="width:110px"><col style="width:92px"><col style="width:72px"><col style="width:94px"><col style="width:104px"><col style="width:100px"><col style="width:128px"><col style="width:112px"></colgroup>' +
       '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="En curso (unidades ya pedidas que no llegaron) y a pedir (unidades calculadas)">En curso<small>A pedir u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.sort(function (a, b) { return _pedImpUniOf(b) - _pedImpUniOf(a) || (b.aPedirUni - a.aPedirUni); }).forEach(function (it) {
       const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
-      var stockTxt = (it.stockParteU > 0)
-        ? _stkShow + ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + '">🔧+' + it.stockParteU + '</span>'
+      // v23.91 (Luis) — el número YA es el DISPONIBLE (v16.08): lo comprometido se lee en el
+      // tooltip, no como un «−N» al lado, que hacía leer dos veces la misma resta.
+      const _stkNum = (it.uniPedidas > 0)
+        ? '<span title="Disponible: ya descontadas ' + it.uniPedidas + ' u de pedidos abiertos. Si los pedidos superan al stock, muestra 0, no un negativo.">' + _stkShow + '</span>'
         : String(_stkShow);
+      var stockTxt = (it.stockParteU > 0)
+        ? _stkNum + ' <span style="color:#7c3aed;font-weight:700;font-size:12px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + '">🔧+' + it.stockParteU + '</span>'
+        : _stkNum;
       // v15.26 — parte: el stock incluye los TERMINADOS que la usan (góndola/racks/a guardar de Virgilio)
       if (it.stockTermU > 0) {
         var _termDet = "";
         try { if (it.parteDet && it.parteDet.length) _termDet = it.parteDet.map(function (d) { return d.cod + ": " + (d.stock_uni != null ? d.stock_uni : "?") + " u"; }).join("  ·  "); } catch (_e) {}
-        stockTxt += ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockTermU + ' u de terminados armados con esta parte → ' + escapeHtml(_termDet) + '">🧩+' + it.stockTermU + '</span>';
+        stockTxt += ' <span style="color:#7c3aed;font-weight:700;font-size:12px" title="Incluye ' + it.stockTermU + ' u de terminados armados con esta parte → ' + escapeHtml(_termDet) + '">🧩+' + it.stockTermU + '</span>';
       }
       // v15.27 — depósito insumos (parte suelta o importado sin reenvasar), convertido a unidades
-      if (it.stockInsU > 0) stockTxt += ' <span style="color:#0369a1;font-weight:700;font-size:11px" title="Incluye ' + it.stockInsU + ' u del depósito insumos (Movimientos_Stock, convertido con Insumos_Factores). En una parte, este stock reemplaza al seed del Excel.">🧰' + it.stockInsU + '</span>';
+      if (it.stockInsU > 0) stockTxt += ' <span style="color:#0369a1;font-weight:700;font-size:12px" title="Incluye ' + it.stockInsU + ' u del depósito insumos (Movimientos_Stock, convertido con Insumos_Factores). En una parte, este stock reemplaza al seed del Excel.">🧰' + it.stockInsU + '</span>';
       // v16.08 — lo que se muestra ya es el DISPONIBLE: stock de hoy menos lo pedido, con piso en 0.
-      if (it.uniPedidas > 0) stockTxt += ' <span style="color:#b45309;font-weight:700;font-size:11px" title="Ya descontadas ' + it.uniPedidas + ' u de pedidos abiertos. Si los pedidos superan al stock, esta columna muestra 0, no un negativo.">📋−' + it.uniPedidas + '</span>';
       const _codEncV = encodeURIComponent(it.cod);
       const _keyEncV = encodeURIComponent(it.key || it.cod);   // v22.93 — MC, FOB y reingreso van por línea (809E LK / CH)
       const actHtml = (it.det || []).map(function (d) {
@@ -22326,10 +22257,13 @@ function _pedImpRender() {
       const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _rg = it.reingresoEst ? String(it.reingresoEst).slice(0, 10) : "";
       const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _keyEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
-      // v23.90 (Luis) — el código abre el MISMO pop-up de proyección que la pantalla de Stocks.
+      // v23.90 (Luis) — el MISMO pop-up de proyección que la pantalla de Stocks.
       // La proyección se le pasa en CAJAS (la pantalla de importados la muestra en unidades).
+      // v23.91 (Luis) — lo que se toca es la CELDA de la proyección, igual que en Stocks; el
+      // código volvió a ser texto. Tocar el código para ver una proyección no se adivina.
       const _proyCaj = (Number(it.uxc) > 0) ? (Number(it.proyUni) || 0) / Number(it.uxc) : 0;
-      h += '<tr><td><b style="cursor:pointer;color:#6d28d9;text-decoration:underline dotted" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td><td class="num imp2">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td><td class="num">' + stockTxt + '</td><td class="num imp2">' + it.enCurso + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
+      const _proyCell = '<td class="num imp2 pedimp-proy" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td>' + _proyCell + '<td class="num">' + stockTxt + '</td><td class="num imp2">' + it.enCurso + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -35280,6 +35214,7 @@ function openMonitor() {
   // a la vista de la TV (monitor/tv.html); la vista vieja sigue en la pestaña 🖥️ Monitor. En modo
   // kiosko (pantalla de pared) queda como estaba.
   setMonitorTab(window.__tvKioskMode ? "monitor" : "tv");
+  monClaveStart();
   startInconsAutoRefresh();
 }
 
@@ -35304,6 +35239,7 @@ function closeMonitor() {
   }
   if (monitorIntervalId) { clearInterval(monitorIntervalId); monitorIntervalId = null; }
   if (_monitorCountdownIntervalId) { clearInterval(_monitorCountdownIntervalId); _monitorCountdownIntervalId = null; }
+  monClaveStop();
   stopInconsAutoRefresh();
   // Reset del snapshot — al reabrir, el primer refresh no flashea masivo.
   _prevStatusMap = new Map();
@@ -55815,12 +55751,13 @@ function setMonitorTab(tab) {
     if (tvOn && !tvf.getAttribute("src")) tvf.setAttribute("src", "monitor/tv.html?key=tv");
     if (!tvOn && tvf.getAttribute("src")) tvf.removeAttribute("src");
   }
-  // v8.69 — Inconsistencias es una pestaña más del módulo unificado: resaltar la activa.
-  const swMon = document.getElementById("monTabMon"), swInc = document.getElementById("monTabInc"), swAn = document.getElementById("monTabAn"), swTv = document.getElementById("monTabTv");
-  if (swMon) swMon.classList.toggle("on", !_inconsActive && !tvOn);
-  if (swInc) swInc.classList.toggle("on", _inconsActive);
-  if (swTv)  swTv.classList.toggle("on", tvOn);
-  if (swAn)  swAn.classList.remove("on");
+  /* v23.92 (Luis) — dos pestañas: 📺 Monitor (la vista de la TV) y 📊 Análisis, que abre las
+     subpestañas Productividad / Inconsistencias. `monTabMon` y `monTabInc` ya no existen. */
+  const swAn = document.getElementById("monTabAn"), swTv = document.getElementById("monTabTv");
+  if (swTv) swTv.classList.toggle("on", tvOn);
+  if (swAn) swAn.classList.toggle("on", _inconsActive);
+  const subBar = document.getElementById("anSubBar");
+  if (subBar) subBar.classList.toggle("hidden", !_inconsActive);
   const titleEl = document.getElementById("monitorTitleText");
   if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : (tvOn ? "Vista TV" : "Monitor Virgilio");
   if (_inconsActive) refreshInconsistencias();
@@ -60574,6 +60511,9 @@ const SB_KEY = SUPABASE_KEY;
 const sb = createClient(SB_URL, SB_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce" }
 });
+// v23.98 - sb vive adentro de esta IIFE, asi que un .js externo (cobranzas.js) no lo ve.
+// Se expone el MISMO objeto: no crea un segundo cliente ni una segunda sesion.
+window.sb = sb;
 
 const $ = (id) => document.getElementById(id);
 
@@ -63274,6 +63214,9 @@ window.cobrosSetTab = cobrosSetTab;
 
 <!-- Módulo: Editar Talleristas / Proveedores AT -->
 <script src="modulo_talleristas_edit.js"></script>
+
+<!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
+<script src="cobranzas.js?v=23.99"></script>
 
 </body>
 </html>

@@ -96,27 +96,41 @@ const CFG_NAC = [{ meses_objetivo: 10, derechos_pct: 0.18, ntl_pct: 0.05, iva_pc
   if (/MOQ/.test(filas2["222"] || "")) fail("(B) bajando el MOQ a 100 la fila no tenía que marcar nada: " + filas2["222"]);
   await p.evaluate(() => { _impCfgProv["Frontier"].moq = 1000; });
 
-  // ── (A) el código abre la proyección y se puede volver ────────────────────────────
+  // ── (A) la CELDA de la proyección abre el pop-up SIN sacar de Pedidos Importación ─────
+  //    v23.95 (Luis: "sigue saliendo de importación cuando aprieto"): la proyección se dibuja
+  //    en su propio overlay (#impProyOv) y el módulo queda vivo abajo; al cerrar, sigue ahí.
   await pintar();
-  const onclick = await p.evaluate(() => {
-    const b = document.querySelector(".mva-tbl.wide tbody tr td b");
-    return b ? (b.getAttribute("onclick") || "") : "(sin celda)";
+  const cel = await p.evaluate(() => {
+    const tr = document.querySelector(".mva-tbl.wide tbody tr");
+    if (!tr) return { proy: "(sin fila)", cod: "" };
+    return {
+      proy: (tr.cells[2] && tr.cells[2].getAttribute("onclick")) || "(sin onclick)",
+      cod: (tr.cells[0] && tr.cells[0].innerHTML) || ""
+    };
   });
-  if (!/pedImpProyAbrir\(/.test(onclick)) fail("(A) el código no abre la proyección: " + onclick);
+  if (!/pedImpProyAbrir\(/.test(cel.proy)) fail("(A) la celda de la proyección no abre el pop-up: " + cel.proy);
+  if (/pedImpProyAbrir\(/.test(cel.cod)) fail("(A) el código volvió a ser clickeable: " + cel.cod);
+
   await p.evaluate(() => pedImpProyAbrir(encodeURIComponent("111"), 12.5));
   const proy = await p.evaluate(() => ({
-    titulo: (document.querySelector("#stkPopModal .stkpop-title") || {}).textContent || "",
-    volver: [...document.querySelectorAll("#stkPopModal .stkpop-head button")].map(x => x.textContent.trim())
+    titulo: (document.querySelector("#impProyOv .stkpop-title") || {}).textContent || "(no abrió)",
+    // el módulo tiene que seguir abierto DEBAJO, con sus filas
+    modulo: (document.querySelector("#stkPopModal .stkpop-title") || {}).textContent || "",
+    filas: document.querySelectorAll("#stkPopModal .mva-tbl.wide tbody tr").length
   }));
   if (!/Proyección/.test(proy.titulo)) fail("(A) no se abrió el pop-up de proyección: " + proy.titulo);
-  if (!proy.volver.some(t => /Volver al pedido/.test(t))) fail("(A) falta el «← Volver al pedido»: " + proy.volver.join(" | "));
-  await p.evaluate(() => [...document.querySelectorAll("#stkPopModal .stkpop-head button")].find(x => /Volver al pedido/.test(x.textContent)).click());
+  if (!/Pedidos Importación/.test(proy.modulo) || proy.filas !== items.length)
+    fail("(A) el pop-up se comió la pantalla de importación: " + JSON.stringify(proy));
+
+  await p.evaluate(() => { const b = document.querySelector("#impProyOv .stkpop-close"); if (b) b.click(); });
   const volvio = await p.evaluate(() => ({
+    proyAbierta: !!document.getElementById("impProyOv"),
     titulo: (document.querySelector("#stkPopModal .stkpop-title") || {}).textContent || "",
-    filas: document.querySelectorAll(".mva-tbl.wide tbody tr").length
+    filas: document.querySelectorAll("#stkPopModal .mva-tbl.wide tbody tr").length
   }));
+  if (volvio.proyAbierta) fail("(A) el pop-up de proyección no se cerró");
   if (!/Pedidos Importación/.test(volvio.titulo) || volvio.filas !== items.length)
-    fail("(A) al volver no se redibujó el pedido: " + JSON.stringify(volvio));
+    fail("(A) al cerrar la proyección no quedó el pedido: " + JSON.stringify(volvio));
 
   // ── (C) el desglose es de DOS columnas y la fórmula se abre al tocar ──────────────
   const desg = await p.evaluate(() => {
@@ -158,5 +172,5 @@ const CFG_NAC = [{ meses_objetivo: 10, derechos_pct: 0.18, ntl_pct: 0.05, iva_pc
 
   if (errs.length) fail("errores de página: " + errs.join(" | "));
   await b.close();
-  if (!process.exitCode) console.log("pedimp-moq-proy: OK — código → proyección (y vuelve) · MOQ 🟡/🔴/? desde la vista · desglose en 2 columnas · derechos por artículo, ponderados por FOB");
+  if (!process.exitCode) console.log("pedimp-moq-proy: OK — celda de proyección (y vuelve) · MOQ 🟡/🔴/? desde la vista · desglose en 2 columnas · derechos por artículo, ponderados por FOB");
 })();

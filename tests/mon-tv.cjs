@@ -232,12 +232,12 @@ function responder(url) {
     return {
       arranco: document.getElementById("splash").classList.contains("hide"),
       tandas: t("tandasBox"), fc: t("fcBox"), fcTit: t("fcTit"), tot: t("totBox"),
-      ops: t("opsBox"), opsTit: t("opsTit"), tandasTit: t("tandasTit"),
+      ops: t("opsBox"), opsTit: t("opsTit"), meta: t("metaBox"),
       act: t("actBox"), avisos: t("avisos"),
       m3Pick: (document.getElementById("m3Pick") || {}).textContent || "",
       m3Arm: (document.getElementById("m3Arm") || {}).textContent || "",
-      prog: (document.getElementById("progTxt") || {}).textContent || "",
-      meta: (document.getElementById("meta") || {}).textContent || "",
+      ult: window.__tvUlt || {},
+      clave: (document.getElementById("tvClave") || {}).textContent || "",
       estado: (document.getElementById("estado") || {}).textContent || "",
       // ¿sobresale algo del alto de la pantalla? En una TV no hay cómo scrollear.
       desborda: document.documentElement.scrollHeight > window.innerHeight + 2
@@ -262,7 +262,7 @@ function responder(url) {
   ok(!/E33A/.test(r.tandas + r.fc), "E33A está facturada Y despachada: no tiene que aparecer en ningún lado");
 
   // v23.64 (Luis) — "A facturar" pasó a ser el RESUMEN DE DÍAS de la PPP (%, neto por Salió)
-  ok(/Resumen de días/.test(r.fcTit), "el cuadro de la derecha tiene que ser el Resumen de días: " + r.fcTit);
+  ok(/Días/.test(r.fcTit), "el cuadro de la derecha tiene que ser el de días: " + r.fcTit);
   ok(/Salió/.test(r.fc) && /Fact/.test(r.fc) && /Pend/.test(r.fc), "faltan las columnas de estado del resumen");
   ok(/5,0 m³ · 3 tandas · 4 NP/.test(r.fc), "la fila del día tiene que decir 5,0 m³ · 3 tandas · 4 NP: " + r.fc.slice(0, 400));
   ok((r.fc.match(/25%<small>1<\/small>/g) || []).length === 4, "98805 salió: 25 % en Salió, Fact, Proc y Pend, y 0 en Armado");
@@ -297,50 +297,41 @@ function responder(url) {
   ok(/Capital Oeste/.test(r.tot), "no agrupa por grupo de zonas (falta «Capital Oeste»)");
   ok(!/E31|E34|E36/.test(r.tot), "el cuadro por día sigue contando un camión por número de tanda");
 
-  // header
-  ok(/4\/7/.test(r.prog), "la barra de avance debería decir 4/7 (E31A, E34A, E37A y E38A terminadas de 7 en ventana), dice: " + r.prog);
-  ok(/2 en curso/.test(r.meta), "el header no cuenta las tandas en curso (E30A y E36A): " + r.meta);
+  /* v23.92 (Luis) — la barra de avance y los conteos salieron del header (texto que de lejos no
+     se lee), pero la CUENTA sigue viva: es la que decide qué tanda vale por terminada. */
+  ok(r.ult.terminadas === 4 && r.ult.enVentana === 7,
+     "deberían ser 4 de 7 terminadas (E31A, E34A, E37A y E38A): " + JSON.stringify(r.ult));
+  ok(r.ult.enCurso === 2, "tienen que contarse 2 tandas en curso (E30A y E36A): " + JSON.stringify(r.ult));
 
-  /* ── v21.17 · lo que pidió Damián (via Marianela, 22/09) ───────────────────
-     UNA fila por tanda con el N° de pedido, el cliente resumido, los días que
-     lleva esperando, la zona y el progreso como semáforo. */
-  ok(/N° Pedido/.test(r.tandas) && /Cliente/.test(r.tandas) && /Zona/.test(r.tandas)
-     && /Progreso/.test(r.tandas), "faltan las columnas nuevas de la tabla de tandas");
-  ok(/98801/.test(r.tandas), "la tabla no muestra el N° de pedido");
-  /* E30A lleva la NP de ISIS (Bazar Mandarin) y la web (Casa Pepe): UNA fila,
-     el primer cliente + «+1». Si esto se rompe, volvió la fila por NP. */
-  ok(/Bazar Mandarin/.test(r.tandas), "no resume el cliente de la tanda");
-  ok(!/S\.R\.L/.test(r.tandas), "no le saca la forma societaria al cliente (ocupa lugar y no distingue)");
-  ok(/\+1<\/b>/.test(r.tandas), "una tanda con dos clientes tiene que decir «+1», no repetir la fila");
+  /* ── v23.92 (Luis) — la tabla es TANDA · M³ · PROGRESO y nada más ─────────
+     Salieron el N° de pedido, el cliente, los días y la zona: en una pared lo que
+     se lee es el código y si está hecha. El candado es invertido: si alguna de esas
+     columnas vuelve, el test se pone en rojo. */
+  ok(/>Tanda</.test(r.tandas) && /M³/.test(r.tandas) && /Progreso/.test(r.tandas),
+     "faltan las tres columnas de la tabla de tandas");
+  ok(!/N° Pedido/.test(r.tandas) && !/Cliente/.test(r.tandas) && !/>Zona</.test(r.tandas)
+     && !/>Días</.test(r.tandas), "volvió una columna que Luis sacó de la tabla (v23.92)");
+  ok(!/98801/.test(r.tandas) && !/Bazar Mandarin/.test(r.tandas),
+     "la tabla no tiene que mostrar ni el N° de pedido ni el cliente");
+  ok(!/Z3 CO/.test(r.tandas) && !/CABA/.test(r.tandas), "la zona salió de la tabla");
   ok((r.tandas.match(/E30A/g) || []).length === 1, "E30A aparece más de una vez: la tanda va en UNA fila");
-  /* v21.19 (Thomas: "acorta"): la etiqueta larga no entraba en la columna y se
-     cortaba por un carácter. Ahora ciudad y punto cardinal van en sigla. */
-  ok(/Z3 CO/.test(r.tandas), "no acorta la zona (Zona 3 - CABA Oeste → Z3 CO)");
-  ok(/Z1 CS/.test(r.tandas), "no acorta la zona (Zona 1 - CABA Sur → Z1 CS)");
-  ok(!/CABA/.test(r.tandas), "la zona sigue escribiendo CABA entero: no se acortó");
-  ok(/Retira/.test(r.tandas), "Retira NO es un número de zona y tiene que verse tal cual");
-  /* Semáforo: E30A pickeando (ámbar + rojo), E36A igual; ningún ✅ suelto en
-     la columna de progreso. */
+  ok(/3,3/.test(r.tandas), "falta la columna de m³ (E30A = 2,5 de ISIS + 0,8 de la web)");
+  /* Semáforo: dos luces CON SU LETRA — P de picking, A de armado (Luis, v23.92).
+     E30A está pickeando: ámbar con la P y rojo con la A. */
+  ok(/s-curso[^>]*>P</.test(r.tandas), "la luz de picking no lleva la P adentro");
+  ok(/s-no[^>]*>A</.test(r.tandas), "la luz de armado no lleva la A adentro");
   ok(/s-curso/.test(r.tandas), "el semáforo no marca lo que está EN CURSO");
   ok(/s-no/.test(r.tandas), "el semáforo no marca lo que NO se empezó");
-  /* Días = hábiles entre la fecha del pedido y la de programación (Thomas, 22/09).
-     E30A entró hace 28 días y se entrega HOY → más de 10 hábiles, rojo. E31A entró
-     hoy y sale hoy → 0. ⚠ E32A entró hoy y sale MAÑANA: si el número se calculara
-     "hasta hoy" daría 0 y este test no lo distinguiría — por eso se mira E32A = 1. */
-  /* Se mira la celda de Días, no el color suelto: #f87171 ya lo usa el reloj de
-     una fase que lleva más de 2 h, así que un `/#f87171/` pelado da verde solo. */
-  ok(/class="cen t-dias" style="color:#f87171"/.test(r.tandas),
-     "un pedido de hace 28 días no se marca como demorado en la columna Días");
-  ok(/class="cen t-dias" style="color:#94a3b8">0</.test(r.tandas),
-     "un pedido que entró hoy y sale hoy tiene que decir 0 y no marcar demora");
-  ok(/class="cen t-dias" style="color:#94a3b8">1</.test(r.tandas),
-     "un pedido que entró hoy y sale MAÑANA tiene que decir 1 (entrega − pedido, no 'hasta hoy')");
-  ok(/Mié|Lun|Mar|Jue|Vie|Sáb|Dom/.test(r.tandasTit), "el título no dice el día de la semana: " + r.tandasTit);
-  /* La columna «Salida» salió de la tabla: el día tiene que quedar igual a la
-     vista, como separador, o hoy y mañana se mezclan sin que se note. */
-  ok(/<tr class="dia"><td colspan="7">/.test(r.tandas), "falta el separador de día en la tabla de tandas");
+  /* El separador de día es lo único escrito que queda: sin él hoy y mañana se
+     mezclan sin que se note (el título de la tarjeta se sacó). */
+  ok(/<tr class="dia"><td colspan="3">/.test(r.tandas), "falta el separador de día en la tabla de tandas");
+  ok(/Mié|Lun|Mar|Jue|Vie|Sáb|Dom/.test(r.tandas), "el separador no dice el día de la semana");
   ok((r.tandas.match(/<tr class="dia">/g) || []).length === 2,
      "tiene que haber UN separador por día de entrega (hoy y mañana)");
+  /* v23.92 — «¿Llegan?» dejó de ser una tarjeta: es la banda que encabeza el cuadro de días,
+     y los m³ de hoy viven ahí. */
+  ok(/mt-ver/.test(r.meta) && /mt-bar/.test(r.meta), "falta la banda del ritmo arriba del resumen de días");
+  ok(/pickeado/.test(r.meta) && /armado/.test(r.meta), "la banda no dice los m³ de hoy");
 
   // ── v21.17 · tabla de horas por operario
   ok(/Farias J\./.test(r.ops), "la tabla de operarios no muestra el nombre corto");
@@ -354,9 +345,12 @@ function responder(url) {
   ok(/9:48/.test(r.ops) && /11:36/.test(r.ops),
      "la fila de Total no suma bien (prod 5:18+4:30=9:48 · total 6:12+5:24=11:36): " + r.ops.replace(/<[^>]*>/g, " "));
   /* El % va sobre el tiempo MEDIDO (prod + no prod), no sobre la jornada. */
-  ok(/90% productivas/.test(r.opsTit),
-     "el título no dice el % de horas productivas (9:48 de 9:48+1:06 = 90%): " + r.opsTit);
+  /* v23.92 (Luis): «Operarios» va solo y centrado — sin el conteo ni el % al lado. */
+  ok(r.opsTit.trim() === "Operarios", "el título de operarios tiene que decir sólo «Operarios»: " + r.opsTit);
   ok(/en vivo/.test(r.estado), "el estado no quedó 'en vivo': " + r.estado);
+
+  ok(r.clave.trim() === "----" || /^\d{4}$/.test(r.clave.trim()),
+     "el código de login tiene que ser 4 dígitos pelados (sin 🔑): " + r.clave);
 
   // sin scroll: la TV no tiene cómo moverse
   ok(!r.desborda, "el contenido se sale de la pantalla y en una TV no hay forma de scrollear");

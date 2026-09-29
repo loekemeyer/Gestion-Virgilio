@@ -3685,6 +3685,57 @@ estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la 
 **Recuperable separado** (v23.80, Luis): la tarjeta y el desglose muestran aparte lo que vuelve como crédito fiscal — IVA 21 %, IVA adicional 20 %, Ganancias 6 %, IIBB 0,17 % (v23.81) sobre CIF + derechos + estadística (`_nacRecup`) — y NO lo suman al costo. En avión (courier) el IVA sigue en el no recuperable. **En avión también va la comisión NTL** (v23.81, Luis). La comisión NTL es 5 % del **FOB**, no del CIF (ya lo era; el test lo fija).
 **Fujian paga 35 %** (v23.78, Luis: *"solo ponele 35% a fujian / 18% al resto"*): `_DERECHOS_PROV` / `_derechosProv(prov)`, los tres modos.
 
+## ⚠ REGLA (Luis, 2026-09-29, v23.95): los MESES OBJETIVO se eligen en el encabezado del proveedor
+
+**Luis:** *"el parámetro de meses objetivo ponelo configurable al lado del nombre de cada proveedor
+(menú desplegable con los números del 1 al 24, seleccionable y que afecte a todos los códigos de ese
+proveedor"* · *"sigue saliendo de importación cuando aprieto y sale el popup de proyección"* ·
+*"alineá mejor (tiene que funcionar bien en diferentes resoluciones) y optimizá tamaño horizontal
+(cambiá «ver desglose» por una flecha)"*.
+
+| qué | cómo queda |
+|---|---|
+| meses objetivo | **desplegable en el encabezado de cada proveedor**: «gral (N)» + 1 a 24. Es la MISMA columna que el ⚙ (`GV_Imp_Proveedor.meses_objetivo`), así que vale para **todos** sus códigos |
+| el pop-up de proyección | se dibuja en **su propio overlay** (`#impProyOv`), encima: el módulo queda vivo abajo y al cerrar sigue ahí. Ya no hay «← Volver al pedido» — no hace falta |
+| la banda | grilla `auto-fit` (dos chips iguales; uno solo por fila en pantalla angosta) y «ver desglose» pasó a ser una **flecha ›** al costado, que no le roba ancho al dato |
+| la tabla | **llena el ancho que tiene** (`width:100%`, `min-width:1188px`): el sobrante se lo lleva Descripción, así que no queda hueco a la derecha ni en un monitor ancho |
+
+⚠ **Se manda sólo `{proveedor, meses_objetivo}`**: `gv_imp_proveedor_guardar` deja intacta **toda clave
+ausente**, así que mandar el resto pisaría lo que otro esté editando en el ⚙.
+
+⚠ **El refetch posterior sólo reemplaza los datos si trajo items.** Una lectura vacía dejaría la
+pantalla en blanco, y *"no pude leer"* no es *"no hay importados"* (misma regla que §«una lectura ROTA
+no es un CERO»).
+
+⚠ **`_stkPopShell` ahora DEVUELVE el body**, y en modo overlay ese body **no lleva id**: el de la
+pantalla de abajo se llama igual (`stkPopBody`) y `getElementById` devolvía aquél — la proyección se
+habría dibujado adentro del módulo.
+
+**Chequeo:** `node tests/pedimp-meses-proveedor.cjs` · `node tests/pedimp-moq-proy.cjs` (el pop-up no
+se come la pantalla de importación) · `node tests/imp-tabla.cjs`.
+
+## ⚠ REGLA (Luis, 2026-09-29, v23.93): en Pedidos Importación, lo que se TOCA es el dato
+
+**Luis, sobre las tres pantallas:** *"proy u/mes tiene que ser lo que apretás para ver la proyección…
+(sacá el código clickeable)"* · *"stock: sacá el visual de −x (unidades comprometidas), ya que el total
+ya lo descuenta"* · *"los datos que importan son los meses y el consumo en lo de la izquierda y el % y $
+no recuperable del de la derecha"* · *"como te gusta hacer botones largos horribles eh"*.
+
+| dónde | cómo queda |
+|---|---|
+| tabla | el **código es texto**; el pop-up de proyección lo abre la celda **Proy u/mes** (`td.pedimp-proy`), que es donde vive el dato — igual que en Stocks. Letra 15px, encabezados 12px, colgroup 1218px |
+| columna Stock | **sin el «📋−N»**: el número YA es el disponible (v16.08) y restarlo a la vista era leer dos veces la misma resta. Lo comprometido queda en el `title` |
+| banda del proveedor (colapsada) | grande sólo **meses + consumo** (izq) y **% + u$s no recuperable** (der); el resto en 11,5px. La cuenta entera sigue a un click |
+| pop-up ⚙ Configurar | botones chicos y letra grande; se fue el párrafo «Se guarda en el maestro Importados…» |
+
+⚠ **Los botones gigantes de un pop-up nuevo casi siempre son el `button{width:100%;padding:16px;
+font-size:22px;margin-top:14px}` global de la línea 26**, no el estilo que se le puso. Se neutraliza por
+contenedor (`#impCfgOv button{width:auto;margin-top:0}`), y lo mismo con los inputs, que sin
+`box-sizing:border-box` se desbordan del panel.
+
+**Chequeo:** `node tests/pedimp-moq-proy.cjs` — el candado (A) verifica que la celda de proyección abre
+el pop-up **y que el código no volvió a ser clickeable**.
+
 ## ⚠⚠ REGLA (Luis, 2026-09-29, v23.89): la config de IMPORTADOS vive en TABLAS — ⚙ por proveedor
 
 **Luis, textual:** *"me gustaría que la capacidad de editar cosas como meses objetivo de importados
@@ -4202,6 +4253,51 @@ concurrentes. En los PR se sigue cancelando.
 abrió uno nuevo diría "está verde" con `main` en rojo. Por eso el paso del aviso **compara su
 `context.sha` contra el head de `main`** y, si main ya avanzó, no toca el issue: ese run habla
 de un commit que ya no es el estado de hoy.
+
+## ⚠ REGLA (Luis, 2026-09-29, v23.98): el submódulo COBRANZAS vive en `cobranzas.js`, y la deuda se consolida por CUIT
+
+**Luis:** *"submódulo de cobranzas … debería tener pestañas dentro, empezando con la de búsqueda de
+clientes … se busca un cliente (lk o ch) y se abre una ficha con esos datos con deuda consolidada"*.
+
+Pantalla propia **`openCobranzas()`** (botón «💳 Cobranzas (nuevo)» del panel supervisor), 4 pestañas;
+la primera busca por nombre, código o CUIT y abre la ficha: deuda consolidada, desglose por empresa,
+comprobante por comprobante con su pago, cuenta corriente y la escala de descuentos con el escalón que
+corresponde a los días marcado. Lee lo que ya existía (`gv_cobranza_clientes`, `gv_cobranza_cliente`,
+`gv_cobranza_cuenta`, `cobranzas_escalones`) más **`gv_cobranza_clientes_cuit()`**, que es lo único
+nuevo y es lectura.
+
+> ## **La deuda consolidada se arma por CUIT. NUNCA por nombre.**
+
+Un cliente tiene códigos distintos en cada empresa (**LK 4045 / CH 2211**) y la razón social viene con
+el sufijo de sucursal que le pega ISIS: *"Bazar Monica S. CAP I SECC IV"* (LK) y *"Bazar Monica SRL"*
+(CH) son **el mismo cliente**. Agrupar por nombre lo parte en dos, y dos nombres parecidos de clientes
+distintos los fusiona. Es la regla v13.76 (*"el cod cliente no significa nada, sólo el CUIT vale"*)
+aplicada a cobranzas. **Sin CUIT el código va solo** y la ficha lo dice con el chip «sin CUIT»: no se
+adivina. Medido el 29/09: **69 CUIT tienen código en las dos empresas**.
+
+⚠ **Está en `cobranzas.js`, no en `index.html`**, y se carga con `?v=` atado a `APP_VERSION` (entró a
+`SIGUEN_APP_VERSION` de `scripts/bump-version.cjs` y `tests/version-tokens.cjs`). **Al sacar cualquier
+módulo nuevo del index, ese es el camino**: el index ya va por 63.000 líneas, 4,4 MB y un byte NUL
+adentro.
+
+⚠⚠ **`window.sb`**: `const sb = createClient(...)` vive **adentro de la IIFE** del login, así que un `.js`
+externo no lo ve (`sb is not defined`, y el módulo cae a DEMO sin decir por qué). Se expone el **mismo**
+objeto —no hay segundo cliente ni segunda sesión—. Cualquier módulo que salga del index cuelga de ahí.
+
+⚠ **El `button{width:100%;padding:16px;font-size:22px}` global del index (línea ~26) también muerde acá**:
+sin `#cbzOv button{width:auto;margin-top:0;…}` el botón Cerrar sale de una pantalla de ancho. Es el mismo
+pozo que el pop-up de Importados (v23.93).
+
+⚠ **NO reemplaza a `openCobros`** (la pantalla vieja de 7 pestañas) todavía: son dos puertas a propósito
+mientras esto se arma. Cuando Luis lo dé por bueno, la pestaña «📒 Cuenta corriente» de `openCobros` se
+retira y queda ésta. **Dos módulos que hacen lo mismo para siempre es el pozo de Matricería.**
+
+⚠ Si la base no contesta, la pantalla muestra datos **DEMO** con un chip rojo que lo dice, en vez de
+ceros — regla *"una lectura ROTA no es un CERO"*.
+
+**Chequeo:** `node tests/cbz-ficha-cliente.cjs` · `select count(*) from (select cuit from
+public.gv_cobranza_clientes_cuit() group by cuit having count(distinct empresa)=2) z;` — 69 al 29/09.
+`sql/gv_cobranza_clientes_cuit_v2398.sql`, §3.v2398.
 
 ## Git
 

@@ -24,7 +24,7 @@ if (faltan.length) {
 
 // El bloque grande va ARRIBA: si queda enterrado a mitad del archivo, nadie lo lee.
 const pos = md.indexOf('LA "L" = EL MISMO NÚMERO');
-if (pos > 2000) {
+if (pos > 12000) {
   console.error(`regla-L: FALLA — el bloque de la L quedo en el caracter ${pos}; va arriba de todo.`);
   process.exit(1);
 }

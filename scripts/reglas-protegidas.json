@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-09-29 (v23.93)",
+  "_generado": "2026-09-29 (v23.99 + centinela vista_ppp_programacion_pendiente)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -222,6 +222,16 @@
       "quien": "Thomas"
     },
     {
+      "objeto": "gv_imp_recepcion_anular",
+      "regla": "Anular una recepción frena si lo recibido ya se movió de donde se puso",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_imp_recibir",
+      "regla": "La recepción de importación entra como tipo recepcion_imp (no recepcion: dispararía el Telegram de recepción rara)",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_importado_bache_add",
       "regla": "Importación: esta RPC escribe y sólo la puede usar un supervisor logueado (o el servicio); sin esto cualquiera con la clave pública carga o borra giros, baches,",
       "quien": "Thomas"
@@ -385,6 +395,11 @@
       "objeto": "gv_ppp_nps_mover_a",
       "regla": "Al mover una NP de tanda, la tanda se escribe en el campo que le toca a cada evento (ENT campo 2, TAL 3, FAL 5, NPD 7) y el resto del texto queda intacto. Nunca",
       "quien": "Luis, Thomas"
+    },
+    {
+      "objeto": "gv_ppp_optimizar_camiones",
+      "regla": "optimizador 18 hs: solo junta camiones enteros sin nada a mano/empezado/diferido",
+      "quien": "Luis"
     },
     {
       "objeto": "gv_ppp_pedido_mover",

@@ -59,22 +59,27 @@ html.embebido body{cursor:default}
 
 /* ── Header ───────────────────────────────────────────────────────────── */
 header{display:flex;align-items:center;gap:1.4vw;flex:0 0 auto}
-.h-tit{font-size:2.2vh;font-weight:900;letter-spacing:.06em;color:#93c5fd;white-space:nowrap}
-.h-meta{font-size:1.7vh;font-weight:700;color:#94a3b8;white-space:nowrap}
 .h-sp{flex:1}
-.h-clave{font-size:1.9vh;font-weight:800;color:#94a3b8;font-variant-numeric:tabular-nums;letter-spacing:.12em}
 .h-reloj{font-size:3.1vh;font-weight:900;color:#f8fafc;font-variant-numeric:tabular-nums}
 .h-est{font-size:1.6vh;font-weight:800;color:#4ade80;white-space:nowrap}
 .h-est.stale{color:#fbbf24}
 .h-est.err{color:#f87171}
-/* Barra de avance: tandas terminadas (picking + armado) sobre las de la
-   ventana. Semáforo, como el `mon-prog` del monitor grande. */
-.prog{display:flex;align-items:center;gap:.7vw;min-width:22vw}
-.prog-track{flex:1;height:1.5vh;border-radius:999px;background:#1e293b;overflow:hidden}
-.prog-bar{height:100%;border-radius:999px;background:#dc2626;transition:width .5s ease}
-.prog.mid .prog-bar{background:#d97706}
-.prog.ok .prog-bar{background:#16a34a}
-.prog-txt{font-size:1.8vh;font-weight:900;color:#e2e8f0;white-space:nowrap;font-variant-numeric:tabular-nums}
+/* v23.92 (Luis) — CÓDIGO DE LOGIN: grande y con la rueda que se vacía en el minuto que dura.
+   Reemplaza al QR de fichada (se ficha entrando con este código) y a la barra de avance del
+   header, que era texto que nadie leía de lejos. */
+.clv{display:flex;align-items:center;gap:.8vw;flex:0 0 auto}
+.clv-anillo{width:6.6vh;height:6.6vh;flex:0 0 auto;transform:rotate(-90deg)}
+.clv-anillo circle{fill:none;stroke-width:3.2}
+.clv-pista{stroke:#1e293b}
+.clv-arco{stroke:#38bdf8;stroke-linecap:round;
+  stroke-dasharray:100.53;transition:stroke-dashoffset .9s linear,stroke .3s}
+.clv-arco.poco{stroke:#fbbf24}
+.clv-lab{font-size:1.5vh;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em}
+.h-clave{font-size:5.4vh;font-weight:900;color:#f8fafc;line-height:1;
+  font-variant-numeric:tabular-nums;letter-spacing:.18em}
+/* Dentro del admin (iframe) el header lo pone el modal: acá sería el segundo reloj y el
+   segundo código en la misma pantalla. */
+html.embebido header{display:none}
 
 /* ── Grilla principal ─────────────────────────────────────────────────── */
 /* v21.17 — TRES columnas. Con la tabla de operarios adentro, las dos de antes
@@ -82,14 +87,15 @@ header{display:flex;align-items:center;gap:1.4vw;flex:0 0 auto}
    una TV 16:9 sobra ancho y falta alto, así que el panel que no entraba a lo
    alto se mueve a lo ancho. Abajo de 1500 px vuelve a dos columnas (la tercera
    se apila bajo la segunda): en una pantalla angosta tres tablas no se leen. */
-main{flex:1;display:grid;grid-template-columns:1.5fr 1.25fr 1fr;gap:.8vw;min-height:0}
-main.angosto{grid-template-columns:1.55fr 1fr}
+main{flex:1;display:grid;grid-template-columns:1fr 1.35fr 1.1fr;gap:.8vw;min-height:0}
+main.angosto{grid-template-columns:1fr 1.3fr}
 .col{display:flex;flex-direction:column;gap:1vh;min-height:0;min-width:0}
 .card{background:#111c2f;border:1px solid #1e293b;border-radius:1vh;
   padding:.9vh 1vw;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .card-t{font-size:2.1vh;font-weight:900;color:#93c5fd;letter-spacing:.04em;
   margin-bottom:.7vh;flex:0 0 auto;overflow:hidden;line-height:1.2}
 .card-t small{color:#64748b;font-weight:700}
+.card-t.cen-t{text-align:center}
 .grow{flex:1;min-height:0;overflow:hidden}
 
 /* ── Tablas ───────────────────────────────────────────────────────────── */
@@ -119,12 +125,13 @@ tr.salio-sinfc td{background:#2a1f45}
    cuando entraron cliente, zona y demora: el boceto de Damián encabeza la
    tabla con el día ("Miercoles 23/09") y la ventana son 2-3 días, así que cada
    bloque lleva el suyo. */
-tr.dia td{background:#0e1830;color:#93c5fd;font-size:1.5vh;font-weight:900;
-  letter-spacing:.07em;text-transform:uppercase;padding:.35vh .5vw;
+tr.dia td{background:#0e1830;color:#93c5fd;font-size:1.9vh;font-weight:900;
+  letter-spacing:.07em;text-transform:uppercase;padding:.5vh .5vw;
   border-bottom:.2vh solid #1e293b}
 
 /* Tabla de tandas: el código de tanda es lo que se busca de lejos. */
-.t-tanda{font-weight:900;font-size:2.5vh;color:#f8fafc;letter-spacing:.03em;white-space:nowrap}
+.t-tanda{font-weight:900;font-size:3.3vh;color:#f8fafc;letter-spacing:.03em;white-space:nowrap}
+.t-m3{font-weight:900;font-size:3.1vh;color:#e2e8f0}
 .t-fe{color:#94a3b8;font-weight:800}
 /* Celda de estado: ✅ terminado · ◍ girando en curso · vacío sin actividad. */
 .st{display:inline-flex;align-items:center;gap:.35vw;justify-content:center;white-space:nowrap}
@@ -140,29 +147,23 @@ tr.dia td{background:#0e1830;color:#93c5fd;font-size:1.5vh;font-weight:900;
   font-size:1.5vh;font-weight:900;letter-spacing:.03em}
 .dur{font-size:1.4vh;font-weight:800;white-space:nowrap}
 
-/* ── Tabla de tandas: cliente, zona, demora y semáforo (v21.17, Damián) ──
-   El ancho se fija por columna: el nombre del cliente es lo único elástico, y
-   sin `table-layout:fixed` una razón social larga empuja el semáforo fuera de
-   la pantalla. */
+/* ── Tabla de tandas (v23.92, Luis): tanda · m³ · progreso, todo centrado ──
+   Tres columnas de ancho fijo: sin `table-layout:fixed` el semáforo se corre de
+   lugar de una fila a otra y la columna deja de leerse como columna. */
 table.tandas{table-layout:fixed}
-.t-np{font-size:1.65vh;font-weight:800;color:#93c5fd;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
-.t-cli{font-size:2.15vh;font-weight:800;color:#e2e8f0;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
-.t-cli b{color:#64748b;font-weight:900;font-size:1.7vh}
-.t-zona{font-size:1.65vh;font-weight:800;color:#94a3b8;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
-.t-dias{font-weight:900;font-size:2.4vh}
-/* Semáforo: dos luces, picking y armado. Rojo = no empezó · ámbar = en curso ·
-   verde = terminado · violeta = abandonado (fichó salida sin cerrar). Son
-   círculos dibujados con CSS, NO emoji: los emoji los pinta la fuente del
-   televisor y cambian de un modelo a otro. */
-.sem{display:inline-flex;gap:.4vw;align-items:center;justify-content:center;white-space:nowrap}
-.sem i{width:2.1vh;height:2.1vh;border-radius:50%;display:inline-block;font-style:normal;flex:0 0 auto}
-.sem .s-no{background:#7f1d1d;box-shadow:inset 0 0 0 .2vh #dc2626}
-.sem .s-curso{background:#f59e0b;animation:pulso 1.4s ease-in-out infinite}
+table.tandas td,table.tandas th{text-align:center;padding:.85vh .4vw}
+/* Semáforo: dos luces con su letra — P de picking, A de armado. Rojo = no empezó ·
+   ámbar = en curso · verde = terminado · violeta = abandonado (fichó salida sin
+   cerrar). Son círculos dibujados con CSS, NO emoji: los emoji los pinta la fuente
+   del televisor y cambian de un modelo a otro. */
+.sem{display:inline-flex;gap:.6vw;align-items:center;justify-content:center;white-space:nowrap}
+.sem i{width:3.4vh;height:3.4vh;border-radius:50%;display:inline-flex;align-items:center;
+  justify-content:center;font-style:normal;flex:0 0 auto;font-size:1.9vh;font-weight:900;
+  letter-spacing:0;color:#fff;line-height:1}
+.sem .s-no{background:#7f1d1d;box-shadow:inset 0 0 0 .25vh #dc2626;color:#fca5a5}
+.sem .s-curso{background:#f59e0b;color:#3b2200;animation:pulso 1.4s ease-in-out infinite}
 .sem .s-ok{background:#16a34a}
-.sem .s-aband{background:#6d28d9;box-shadow:inset 0 0 0 .2vh #a78bfa}
+.sem .s-aband{background:#6d28d9;box-shadow:inset 0 0 0 .25vh #a78bfa}
 @keyframes pulso{0%,100%{opacity:1}50%{opacity:.35}}
 
 /* ── Horas por operario (v21.17, Damián) ─────────────────────────────────
@@ -192,26 +193,18 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
 .act-what{flex:1;color:#cbd5e1;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .act-dur{font-weight:900;white-space:nowrap;font-size:2.1vh}
 
-/* ── Cajones de m³ del día ────────────────────────────────────────────── */
-.m3row{display:flex;gap:.8vw;flex:0 0 auto}
 /* v23.86 (Luis) — ¿LLEGAN? La meta del día es ARMAR lo que sale en 2 días hábiles (armado → factura →
-   salida). A las 15:00 se corta: si al ritmo de hoy no llegan, se corrige la PPP ese mismo día. */
-.meta-card{flex:0 0 auto}
-.mt-ver{font-size:3vh;font-weight:900;line-height:1.15;margin:.2vh 0 .5vh}
+   salida). A las 15:00 se corta: si al ritmo de hoy no llegan, se corrige la PPP ese mismo día.
+   v23.92 — dejó de ser una tarjeta: es la banda que encabeza el resumen de días. */
+.mt-ver{font-size:2.6vh;font-weight:900;line-height:1.15;margin:.1vh 0 .5vh;text-align:center}
 .mt-ok{color:#4ade80}.mt-no{color:#f87171}.mt-duda{color:#fbbf24}.mt-gris{color:#94a3b8}
-.mt-bar{height:1.3vh;border-radius:999px;background:#1e293b;overflow:hidden;margin:.3vh 0 .6vh}
+.mt-bar{height:1.1vh;border-radius:999px;background:#1e293b;overflow:hidden;margin:.3vh 0 .6vh}
 .mt-bar i{display:block;height:100%;background:#16a34a}
-.mt-lin{font-size:1.85vh;font-weight:800;color:#cbd5e1;line-height:1.35}
+.mt-lin{font-size:1.9vh;font-weight:800;color:#cbd5e1;line-height:1.4;text-align:center}
 .mt-lin b{color:#f8fafc}
-table.mt-cam td{font-size:1.9vh;padding:.35vh .3vw;text-align:center}
-table.mt-cam td:first-child{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0;width:48%}
+.mt-hoy{color:#64748b;border-top:1px solid #16203a;margin-top:.5vh;padding-top:.5vh}
 .mt-corte{background:#450a0a;color:#fecaca;border:2px solid #ef4444;animation:bordeCorte 1.4s ease-in-out infinite}
 @keyframes bordeCorte{0%,100%{border-color:#ef4444}50%{border-color:#450a0a}}
-table.mt-cam th{font-size:1.3vh;color:#94a3b8;font-weight:600;padding:.2vh .3vw;text-align:center}
-table.mt-cam th:first-child{text-align:left}
-/* v23.86 — dentro del día, las tandas van agrupadas POR CAMIÓN y en el orden en que se arman */
-tr.cam td{background:#101a2e;color:#fbbf24;font-size:1.45vh;font-weight:900;letter-spacing:.04em;
-  padding:.25vh .5vw;border-bottom:1px solid #1e293b}
 .m3box{flex:1;background:#111c2f;border:1px solid #1e293b;border-radius:1vh;
   padding:.9vh 1vw;text-align:center}
 .m3lab{font-size:1.7vh;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
@@ -250,14 +243,17 @@ tr.cam td{background:#101a2e;color:#fbbf24;font-size:1.45vh;font-weight:900;lett
 <div id="app" class="hide">
   <div id="offline" class="hide"></div>
   <header>
-    <div class="h-tit">MONITOR VIRGILIO</div>
-    <div class="prog" id="prog">
-      <div class="prog-track"><div class="prog-bar" id="progBar" style="width:0%"></div></div>
-      <div class="prog-txt" id="progTxt">—</div>
+    <div class="clv">
+      <svg class="clv-anillo" viewBox="0 0 36 36" aria-hidden="true">
+        <circle class="clv-pista" cx="18" cy="18" r="16"></circle>
+        <circle class="clv-arco" id="clvArco" cx="18" cy="18" r="16" stroke-dashoffset="0"></circle>
+      </svg>
+      <div>
+        <div class="clv-lab">Código</div>
+        <div class="h-clave" id="tvClave">----</div>
+      </div>
     </div>
-    <div class="h-meta" id="meta"></div>
     <div class="h-sp"></div>
-    <div class="h-clave" id="tvClave" title="Clave para entrar desde el celular">🔑 ----</div>
     <div class="h-reloj" id="reloj">--:--</div>
     <div class="h-est" id="estado">● conectando</div>
   </header>
@@ -265,7 +261,6 @@ tr.cam td{background:#101a2e;color:#fbbf24;font-size:1.45vh;font-weight:900;lett
   <main>
     <div class="col">
       <div class="card grow">
-        <div class="card-t" id="tandasTit">Tandas</div>
         <div class="grow" id="tandasBox"></div>
       </div>
     </div>
@@ -275,7 +270,7 @@ tr.cam td{background:#101a2e;color:#fbbf24;font-size:1.45vh;font-weight:900;lett
          Resumen de días al alto de su contenido y Total por día el resto. -->
     <div class="col" id="col2">
       <div class="card" style="flex:0 0 auto">
-        <div class="card-t" id="opsTit">Operarios</div>
+        <div class="card-t cen-t" id="opsTit">Operarios</div>
         <div id="opsBox"></div>
       </div>
       <div class="card" style="flex:0 0 auto">
@@ -285,14 +280,12 @@ tr.cam td{background:#101a2e;color:#fbbf24;font-size:1.45vh;font-weight:900;lett
       <div class="avisos" id="avisos" style="flex:1 1 auto;min-height:0;overflow:hidden"></div>
     </div>
 
+    <!-- v23.92 (Luis): «¿Llegan?» dejó de ser una tarjeta aparte — el ritmo sólo se entiende
+         contra lo que hay programado, así que va arriba del resumen de días, en una banda. -->
     <div class="col" id="col3">
-      <div class="card meta-card">
-        <div class="card-t" id="metaTit">¿Llegan?</div>
-        <div id="metaBox"></div>
-        <div class="mt-lin">Hoy: pickeado <b id="m3Pick">—</b> · armado <b id="m3Arm">—</b></div>
-      </div>
       <div class="card" style="flex:0 0 auto">
-        <div class="card-t" id="fcTit">Resumen de días</div>
+        <div class="card-t" id="fcTit">Días</div>
+        <div id="metaBox"></div>
         <div id="fcBox"></div>
       </div>
       <div class="card grow">
@@ -663,95 +656,22 @@ function sumarDestino(e, rs, zona, recep) {
   if (r && (!e.recep || r < e.recep)) e.recep = r;
 }
 
-/* Nombre de cliente para una pared: se le sacan las formas societarias, que
-   ocupan lugar y no distinguen a nadie (hay 30 "S.R.L."), y se corta largo.
-   NO se abrevia el apellido: es lo único por lo que el supervisor lo busca. */
-function resumirCliente(nombre) {
-  var s = String(nombre || "").trim()
-    .replace(/\s*\((?:[^()]*)\)\s*$/, "")
-    .replace(/[\s,.-]*\b(S\.?\s?R\.?\s?L\.?|S\.?\s?A\.?\s?S?\.?|SACIFI?A?|SRL|SA)\b\.?\s*$/i, "")
-    .replace(/\s{2,}/g, " ").trim();
-  if (!s) return "";
-  return s.length > 20 ? s.slice(0, 19).trim() + "…" : s;
-}
-/* "Zona 3 - CABA Oeste" → "Z3 CO". La etiqueta larga no entraba en la columna
-   —"Z3 CABA Oe…" se cortaba por un carácter— y en una pared un texto cortado se
-   lee peor que uno corto. Thomas, 22/09: *"acorta"*.
-   La ciudad queda en la inicial (CABA → C, GBA → G) y el punto cardinal en la
-   suya: **Z3 CO** = Zona 3, CABA Oeste · **Z6 GN** = Zona 6, GBA Norte. El
-   número de zona, que es lo que se busca, queda entero y adelante.
-   "Retira" y los expresos NO se tocan: no son número de zona y el nombre ES el
-   dato. */
-var ZONA_CIUDAD = { CABA: "C", GBA: "G", CAPITAL: "C" };
-var ZONA_PUNTO  = { NORTE: "N", SUR: "S", ESTE: "E", OESTE: "O", CENTRO: "C" };
-function zonaCorta(zona) {
-  var s = String(zona || "").trim();
-  if (!s) return "";
-  var m = /^\s*Zona\s*(\d+)\s*(?:-\s*(.*))?$/i.exec(s);
-  if (!m) return s.length > 16 ? s.slice(0, 15).trim() + "…" : s;
-  var resto = (m[2] || "").trim();
-  if (!resto) return "Z" + m[1];
-  var partes = resto.toUpperCase().split(/\s+/).filter(Boolean);
-  var sigla = "";
-  for (var i = 0; i < partes.length; i++) {
-    /* Lo que no está en ninguna de las dos tablas se abrevia por su inicial:
-       una zona nueva se ve corta igual, no se cae al texto largo. */
-    sigla += ZONA_CIUDAD[partes[i]] || ZONA_PUNTO[partes[i]] || partes[i].charAt(0);
-  }
-  return "Z" + m[1] + " " + sigla;
-}
-
-/* Días HÁBILES entre la fecha del PEDIDO (`fecha_recep`) y la fecha en que
-   quedó PROGRAMADO (`fecha_entrega`) — Thomas, 22/09: *"fecha programacion -
-   fecha pedido"*. Es la demora con la que sale, no la que lleva acumulada: el
-   número no se mueve mientras la tanda espera. Se toma el pedido MÁS VIEJO de
-   la tanda, que es el que más esperó.
-   Es el número de la regla 4 de Luis: «los pedidos no pueden demorar más de 10
-   días hábiles en salir». Sábados, domingos y feriados no cuentan — ≡
-   index.html / durLaboralMs.
-   ⚠ Si la fecha de entrega ya pasó y la tanda sigue ahí, este número NO crece:
-   dice lo que se prometió, no lo que se está tardando. */
-function diasDemora(recepRaw, entregaRaw) {
-  if (!recepRaw || !entregaRaw) return null;
-  var ini = new Date(recepRaw + "T00:00:00-03:00").getTime();
-  var fin = new Date(entregaRaw + "T00:00:00-03:00").getTime();
-  if (!(fin > ini)) return 0;
-  /* Cada `t` cae a las 00:00 de Argentina, que en UTC son las 03:00 del MISMO
-     día (no hay horario de verano), así que `getUTCDay` da el día correcto sin
-     volver a pasar por `toLocaleString` — que es caro y esto corre por fila,
-     cada 15 s, en el SoC de un televisor. */
-  var n = 0, t;
-  for (t = ini + 86400000; t <= fin; t += 86400000) {
-    var d = new Date(t), wd = d.getUTCDay();
-    if (wd === 0 || wd === 6) continue;
-    if (FERIADOS[d.toISOString().slice(0, 10)]) continue;
-    n++;
-    if (n > 99) break;          // un pedido de hace medio año ya dice todo con 99
-  }
-  return n;
-}
-/* Tope de la regla de Luis. Se pone en ámbar antes de romperlo, no cuando ya
-   se rompió: a los 10 días ya es tarde para priorizarlo. */
-var DEMORA_TOPE = 10, DEMORA_AVISO = 7;
-function colorDemora(d) {
-  if (d == null) return "#475569";
-  if (d >= DEMORA_TOPE) return "#f87171";
-  if (d >= DEMORA_AVISO) return "#fbbf24";
-  return "#94a3b8";
-}
+/* v23.92 (Luis) — la tabla de tandas quedó en tanda · m³ · progreso, así que se fueron con
+   ella `resumirCliente`, `zonaCorta`, `diasDemora` y `colorDemora`: nadie las llamaba más.
+   El dato sigue viajando en la tanda (`clientes`, `zonas`, `recep`) por si vuelve una columna. */
 
 /* Semáforo de la tanda: dos luces, picking y armado. Pedido de Damián: "lo
    quiere ver como semáforo". No reemplaza el detalle — al lado siguen las
    iniciales de quién la tiene y hace cuánto, que es lo que se acciona. */
-function luz(estado, aband) {
-  if (aband) return '<i class="s-aband" title="Abandonada"></i>';
-  if (estado === "done")  return '<i class="s-ok" title="Terminado"></i>';
-  if (estado === "curso") return '<i class="s-curso" title="En curso"></i>';
-  return '<i class="s-no" title="Sin empezar"></i>';
+/* v23.92 (Luis): la luz lleva la letra de su etapa adentro — P de picking, A de armado. */
+function luz(estado, aband, letra) {
+  var c = aband ? "s-aband" : (estado === "done" ? "s-ok" : (estado === "curso" ? "s-curso" : "s-no"));
+  var t = aband ? "Abandonada" : (estado === "done" ? "Terminado" : (estado === "curso" ? "En curso" : "Sin empezar"));
+  return '<i class="' + c + '" title="' + (letra === "P" ? "Picking" : "Armado") + ': ' + t + '">' + letra + '</i>';
 }
 function semaforo(ev, nombres, horarios) {
   var s = '<span class="sem">' +
-    luz(ev.picking, ev.pickAband) + luz(ev.armado, ev.armAband) + '</span>';
+    luz(ev.picking, ev.pickAband, "P") + luz(ev.armado, ev.armAband, "A") + '</span>';
   /* El detalle es de la fase que está EN CURSO; si las dos están quietas no
      hay nada que agregar. El armado va primero: es la fase más tardía. */
   var det = "";
@@ -1209,9 +1129,11 @@ function calcularMeta(d) {
            atr: atr, cams: lista, falta: falta, hecho: hecho, ritmo: ritmo, capacidad: capacidad,
            hora: h, llegan: capacidad == null ? null : capacidad >= falta - 0.0001 };
 }
-function pintarMeta(d) {
+/* v23.92 (Luis) — la banda que va ARRIBA del resumen de días: el ritmo no dice nada solo, dice
+   algo contra lo que hay programado. Mínimo texto: veredicto, barra, la meta, el ritmo y, si algo
+   no llega, qué camión se pasa de día. */
+function pintarMeta(d, m3PickHoy, m3ArmHoy) {
   var M = calcularMeta(d);
-  el("metaTit").innerHTML = "¿Llegan? <small>· se arma hoy lo que sale el " + esc(diaEtiqueta(M.meta)) + "</small>";
   var pct = M.tot ? Math.round(100 * M.arm / M.tot) : 0, ver, cls;
   var corte = M.hora >= CORTE_HORA;
   if (!M.habil) { ver = "Hoy no se trabaja"; cls = "mt-gris"; }
@@ -1220,29 +1142,23 @@ function pintarMeta(d) {
   else if (M.llegan == null) { ver = "Falta " + n1(M.falta) + " m³ · ritmo desde las 8:45"; cls = "mt-gris"; }
   else if (M.llegan) { ver = "✅ Llegan · faltan " + n1(M.falta) + " m³"; cls = "mt-ok"; }
   else { ver = (corte ? "⛔ NO LLEGAN" : "⚠ Van justos") + " · faltan " + n1(M.falta) + " m³"; cls = corte ? "mt-no" : "mt-duda"; }
-  var h = "";
-  h += '<div class="mt-ver ' + cls + '">' + ver + '</div>';
+  var noLlegan = M.cams.filter(function (c) { return c.llega === false; });
+  var h = '<div class="mt-ver ' + cls + '">' + ver + '</div>';
   h += '<div class="mt-bar"><i style="width:' + pct + '%"></i></div>';
-  h += '<div class="mt-lin">' + esc(diaEtiqueta(M.meta)) + ': <b>' + n1(M.arm) + '</b> de <b>' + n1(M.tot) + ' m³</b> armados (' + pct + '%)' +
-       (M.sinPick > 0.05 ? ' · sin pickear <b>' + n1(M.sinPick) + '</b>' : '') +
-       (M.sinArm > 0.05 ? ' · sin armar <b>' + n1(M.sinArm) + '</b>' : '') + '</div>';
-  if (M.atr.n) h += '<div class="mt-lin" style="color:#fca5a5">+ atrasado de antes: <b>' + n1(M.atr.m3) + ' m³</b> (' + M.atr.n + (M.atr.n === 1 ? ' tanda' : ' tandas') + ') · va primero</div>';
+  h += '<div class="mt-lin">' + esc(diaEtiqueta(M.meta)) + ' <b>' + n1(M.arm) + '</b>/<b>' + n1(M.tot) + ' m³</b> armado' +
+       (M.atr.n ? ' · <b class="mt-no">+' + n1(M.atr.m3) + '</b> atrasado' : '') + '</div>';
   if (M.ritmo != null && M.habil && M.hora < JORNADA_FIN)
-    h += '<div class="mt-lin">Ritmo hoy <b>' + n1(M.ritmo) + ' m³/h</b> · hasta las 17 hacen <b>' + n1(M.capacidad) + ' m³</b>' +
-         (corte ? '' : ' · corte a las 15:00') + '</div>';
-  if (M.cams.length) {
-    h += '<table class="mt-cam"><thead><tr><th>Camión · orden de armado</th><th>m³</th><th>armado</th><th>llega</th></tr></thead><tbody>' + M.cams.map(function (c, i) {
-      var p = c.m3 ? Math.round(100 * c.arm / c.m3) : 0;
-      var est = c.trab <= 0.0001 ? '<span class="mt-ok">✅</span>'
-        : (c.llega == null ? '<span class="mt-gris">—</span>'
-        : (c.llega ? '<span class="mt-ok">✓ sí</span>' : '<span class="mt-no">✗ no</span>'));
-      return '<tr><td>' + (i + 1) + '° ' + esc(c.cam) + '</td><td>' + n1(c.m3) + '</td><td>' + p + '%</td><td>' + est + '</td></tr>';
-    }).join("") + '</tbody></table>';
-  }
+    h += '<div class="mt-lin">Ritmo <b>' + n1(M.ritmo) + '</b> m³/h → <b>' + n1(M.capacidad) + ' m³</b> a las 17</div>';
+  if (noLlegan.length)
+    h += '<div class="mt-lin mt-no">Pasar de día: <b>' +
+         noLlegan.map(function (c) { return esc(c.cam); }).join(" · ") + '</b></div>';
+  h += '<div class="mt-lin mt-hoy">Hoy <b id="m3Pick">—</b> pickeado · <b id="m3Arm">—</b> armado</div>';
   el("metaBox").innerHTML = h;
+  var _ep = el("m3Pick"), _ea = el("m3Arm");
+  if (_ep) _ep.textContent = (m3PickHoy == null ? "—" : n1(m3PickHoy) + " m³");
+  if (_ea) _ea.textContent = (m3ArmHoy == null ? "—" : n1(m3ArmHoy) + " m³");
   /* el corte: a partir de las 15:00, si al ritmo de hoy no llegan, el cartel de arriba dice qué camión
      hay que pasar a otro día en la PPP (el último en el orden que no llega). */
-  var noLlegan = M.cams.filter(function (c) { return c.llega === false; });
   if (M.habil && corte && M.hora < JORNADA_FIN && M.llegan === false && noLlegan.length)
     return '<div class="aviso mt-corte">⛔ CORTE 15:00 — NO LLEGAN con el ' + esc(diaEtiqueta(M.meta)) +
       '. Corregir la PPP: pasar a otro día ' +
@@ -1282,12 +1198,9 @@ function pintar(d) {
            (rank(a.ev) - rank(b.ev)) ||
            String(a.v.tanda).localeCompare(String(b.v.tanda));
   });
-  var camsPorDia = {};   /* v23.86: cuántos camiones hay en cada día (sólo se rotula si hay más de uno) */
-  tandas.forEach(function (t) { var k = t.v.fechaRaw; (camsPorDia[k] = camsPorDia[k] || {})[monCamionDeTanda(t.v)] = 1; });
-
   var m3Pick = 0, m3Arm = 0;
   var fc = [], porDia = new Map(), agregados = [];
-  var filas = [], sinAct = 0, enVentana = 0, terminadas = 0, diaEnCurso = "", camEnCurso = "";
+  var filas = [], sinAct = 0, enVentana = 0, terminadas = 0, diaEnCurso = "";
 
   tandas.forEach(function (t) {
     var v = t.v, ev = t.ev;
@@ -1326,40 +1239,19 @@ function pintar(d) {
        picking o el armado. Va pegado al código y no en una columna propia para no confundirse con
        «Salida», que es la fecha de entrega. */
     var salioT = tandaSalio(v, d.despachadas);
-    /* Una fila por TANDA aunque lleve varios pedidos (Damián, 22/09). Las NP
-       se listan juntas y el cliente va resumido; si son de más de un cliente,
-       el primero + "+N" — el detalle completo no entra ni se lee de lejos. */
-    var npTxt = v.nps.length <= 2 ? v.nps.join(" · ")
-      : (v.nps.slice(0, 2).join(" · ") + " +" + (v.nps.length - 2));
-    var cliTxt = v.clientes.length
-      ? esc(resumirCliente(v.clientes[0])) +
-        (v.clientes.length > 1 ? ' <b>+' + (v.clientes.length - 1) + '</b>' : "")
-      : '<span style="color:#475569">—</span>';
-    var dias = diasDemora(v.recep, v.fechaRaw);
-    /* Encabezado del día. Las tandas vienen ordenadas por fecha de entrega, así
-       que alcanza con mirar cuándo cambia. */
+    /* v23.92 (Luis) — TRES columnas: tanda · m³ · progreso. El N° de pedido, el cliente, los
+       días y la zona salieron de la tabla: en una pared lo que se lee es el código de la tanda
+       y si está hecha. Las tandas siguen ordenadas por camión (v23.86: ése es el orden de
+       armado), pero el rótulo del camión ya no se escribe. */
     if (v.fechaRaw !== diaEnCurso) {
       diaEnCurso = v.fechaRaw;
-      filas.push('<tr class="dia"><td colspan="7">' +
+      filas.push('<tr class="dia"><td colspan="3">' +
         esc(diaEtiqueta(v.fechaRaw) || "Sin fecha") + '</td></tr>');
-      camEnCurso = "";
-    }
-    var camT = monCamionDeTanda(v);
-    if (camT !== camEnCurso && Object.keys(camsPorDia[v.fechaRaw] || {}).length > 1) {
-      camEnCurso = camT;
-      var ordT = camionOrden(v);
-      filas.push('<tr class="cam"><td colspan="7">🚚 ' + (ordT < 99 ? ordT + '° · ' : '') + esc(camT) + '</td></tr>');
     }
     filas.push('<tr' + (enCurso ? ' class="curso"' : (salioT ? ' class="salio-sinfc"' : '')) + '>' +
       '<td class="t-tanda">' + esc(v.tanda) +
         (salioT ? ' <span class="t-salio" title="Ya se registró la carga al camión (CCN)">🚚</span>' : '') + '</td>' +
-      '<td class="t-np">' + esc(npTxt) + '</td>' +
-      '<td class="t-cli">' + cliTxt + '</td>' +
-      '<td class="num">' + n1(v.m3) + '</td>' +
-      '<td class="cen t-dias" style="color:' + colorDemora(dias) + '">' +
-        (dias == null ? "—" : dias) + '</td>' +
-      '<td class="t-zona">' + esc(zonaCorta(v.zonas[0] || "")) +
-        (v.zonas.length > 1 ? ' <b style="color:#64748b">+' + (v.zonas.length - 1) + '</b>' : "") + '</td>' +
+      '<td class="num t-m3">' + n1(v.m3) + '</td>' +
       '<td class="cen">' + semaforo(ev, nombres, horarios) + '</td>' +
       '</tr>');
   });
@@ -1380,29 +1272,17 @@ function pintar(d) {
            String(a.v.tanda || "").localeCompare(String(b.v.tanda || ""));
   });
 
-  // ── Tabla de tandas
-  /* Con el día de la semana escrito (Damián, 22/09: el boceto dice "Miercoles
-     23/09"). En una pared "Mié 23/09" se ubica de un vistazo; "23/09" obliga a
-     pensar qué día es hoy. */
+  // ── Tabla de tandas (v23.92: sin título — el separador de día ya dice de qué día es cada bloque)
   var etiqueta = d.fechas.map(diaEtiqueta).join(" · ") || "—";
-  el("tandasTit").innerHTML = "Tandas <small>· entrega " + esc(etiqueta) + "</small>";
   var topeT = cabenFilas("tandasBox", true);
   el("tandasBox").innerHTML = filas.length
-    ? '<table class="tandas"><colgroup><col style="width:11.5%"><col style="width:12.5%">' +
-      '<col><col style="width:7%"><col style="width:6.5%"><col style="width:11%">' +
-      '<col style="width:17.5%"></colgroup>' +
-      '<thead><tr><th>Tanda</th><th>N° Pedido</th><th>Cliente</th>' +
-      '<th class="num">M³</th><th class="cen" title="Días hábiles entre la fecha del pedido y la fecha para la que quedó programado">Días</th>' +
-      '<th>Zona</th><th class="cen">Progreso</th></tr></thead><tbody>' +
+    ? '<table class="tandas"><colgroup><col style="width:38%"><col style="width:22%"><col></colgroup>' +
+      '<thead><tr><th>Tanda</th><th class="num">M³</th><th class="cen">Progreso</th></tr></thead><tbody>' +
       filas.slice(0, topeT).join("") + '</tbody></table>' +
       (filas.length > topeT ? '<div class="mas">+ ' + (filas.length - topeT) + ' más</div>' : "")
     : '<div class="vacio">' + (tandas.length
         ? "Todo terminado para " + esc(etiqueta) + " ✅"
         : "Sin tandas programadas para las próximas fechas") + '</div>';
-
-  // ── m³ del día
-  el("m3Pick").textContent = n1(m3Pick) + " m³";
-  el("m3Arm").textContent  = n1(m3Arm)  + " m³";
 
   /* v20.21 (Thomas): cuáles de las que faltan facturar YA SE FUERON en el camión. v20.20: la
      lista (no sólo el número) porque el cartel de arriba las nombra. */
@@ -1412,7 +1292,7 @@ function pintar(d) {
   var fcSalidas = fcSinFc.length;
 
   // ── Avisos: agregados primero (son los que hacen salir un camión incompleto)
-  var avisos = pintarMeta(d);   /* v23.86: el corte de las 15:00 va arriba de todo */
+  var avisos = pintarMeta(d, m3Pick, m3Arm);   /* v23.86: el corte de las 15:00 va arriba de todo */
   agregados.slice(0, 2).forEach(function (v) {
     v.agregados.slice(0, 2).forEach(function (a) {
       avisos += '<div class="aviso aviso-agr">⚠ ' + esc(a.np || "(sin numerar)") +
@@ -1439,11 +1319,11 @@ function pintar(d) {
 
   // ── Resumen de días (v23.64, reemplaza "A facturar") ≡ Programación de la PPP
   if (d.arbol === null) {
-    el("fcTit").innerHTML = "Resumen de días";
+    el("fcTit").innerHTML = "Días";
     el("fcBox").innerHTML = '<div class="vacio">No se pudo leer la programación</div>';
   } else {
     var rds = resumenDias(d.arbol, d.despachadas, 3);
-    el("fcTit").innerHTML = "Resumen de días" +
+    el("fcTit").innerHTML = "Días" +
       (fcSalidas ? " <small>· <b class=\"fc-salio\">" + fcSalidas + (fcSalidas === 1 ? " salió" : " salieron") + " sin FC</b></small>" : "");
     var pc = function (nn, tot, cls) {
       var p = tot ? Math.round(100 * nn / tot) : 0;
@@ -1536,15 +1416,15 @@ function pintar(d) {
       (d.actividad.length > MAX_ACT ? '<div class="mas">+ ' + (d.actividad.length - MAX_ACT) + ' más</div>' : "")
     : '<div class="vacio">Nadie fichado todavía</div>';
 
-  // ── Header: barra de avance + conteos
-  var pct = enVentana ? Math.round(terminadas * 100 / enVentana) : 0;
-  el("prog").className = "prog " + (pct >= 80 ? "ok" : pct >= 40 ? "mid" : "");
-  el("progBar").style.width = pct + "%";
-  el("progTxt").textContent = terminadas + "/" + enVentana + " · " + pct + "%";
-  var enCursoN = tandas.filter(function (t) {
-    return t.ev.picking === "curso" || t.ev.armado === "curso";
-  }).length;
-  el("meta").textContent = d.prog.size + " programadas · " + enCursoN + " en curso · " + fc.length + " a FC";
+  /* v23.92 (Luis): la barra de avance y los conteos salieron del header (texto que de lejos no
+     se lee). La cuenta se conserva acá porque es la que dice qué tanda vale por terminada, y
+     `tests/mon-tv.cjs` la mira. */
+  window.__tvUlt = {
+    terminadas: terminadas, enVentana: enVentana, aFc: fc.length, programadas: d.prog.size,
+    enCurso: tandas.filter(function (t) {
+      return t.ev.picking === "curso" || t.ev.armado === "curso";
+    }).length
+  };
 }
 
 /* "2026-09-23" → "Mié 23/09". Los nombres van a mano y no por `toLocaleDateString`:
@@ -1603,9 +1483,7 @@ function pintarHoras(filas, d) {
     '<td class="op-rit">' + ritmo(tPm, tPh) + '</td><td class="op-rit op-sep">' + ritmo(tAm, tAh) + '</td>' +
     '<td class="op-prod">' + nH(tProd) + '</td><td class="op-no">' + nH(tNo) + '</td>' +
     '<td class="op-tot">' + nH(tTot) + '</td></tr>';
-  var medido = tProd + tNo;
-  var pct = medido > 0 ? Math.round(tProd * 100 / medido) : 0;
-  el("opsTit").innerHTML = "Operarios <small>· " + filas.length + " · " + pct + "% productivas</small>";
+  el("opsTit").innerHTML = "Operarios";
   el("opsBox").innerHTML = '<table class="ops"><thead>' +
     '<tr class="op-grp"><th></th><th colspan="2" class="op-sep">Ritmo</th><th colspan="3">Horas</th></tr>' +
     '<tr><th>Operario</th>' +
@@ -1736,15 +1614,37 @@ function ciclo() {
 }
 
 /* v23.82 (Luis): clave de 4 dígitos para que el operario entre desde el celular estando en el
-   depósito. Cambia cada 15 min (gv_tv_clave_actual); se pide cada minuto. */
+   depósito. v23.92: dura UN MINUTO y la rueda que la rodea se vacía a medida que pasa.
+   ⚠ El que manda es el backend: `cambia_en_s` de gv_tv_clave_actual sincroniza la rueda con el
+   tramo real, así que el dibujo no se puede desfasar del código que la base valida. */
+var CLV_CICLO = 60;       /* ≡ gv_tv_clave_actual: tramo de 60 s */
+var CLV_LARGO = 100.53;   /* 2πr con r = 16, el largo del arco */
+var _clvQueda = 0;
+function clvAnillo() {
+  var a = el("clvArco"); if (!a) return;
+  var f = Math.max(0, Math.min(1, _clvQueda / CLV_CICLO));
+  a.setAttribute("stroke-dashoffset", (CLV_LARGO * (1 - f)).toFixed(1));
+  a.setAttribute("class", "clv-arco" + (_clvQueda <= 10 ? " poco" : ""));
+}
 function tvClave() {
   try {
     fetch(SB_URL + "/rest/v1/rpc/gv_tv_clave_actual", { method: "POST", cache: "no-store",
       headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" }, body: "{}" })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { if (j && j.clave) el("tvClave").textContent = "🔑 " + j.clave; })
+      .then(function (j) {
+        if (!j || !j.clave) return;
+        var e = el("tvClave"); if (e) e.textContent = j.clave;
+        _clvQueda = Math.max(1, Math.min(CLV_CICLO, Number(j.cambia_en_s) || CLV_CICLO));
+        clvAnillo();
+      })
       .catch(function () {});
   } catch (_e) {}
+}
+/* Un tick por segundo: vacía la rueda y, al llegar a cero, pide el código nuevo. */
+function clvTick() {
+  if (_clvQueda <= 0) return;
+  _clvQueda--; clvAnillo();
+  if (_clvQueda <= 0) tvClave();
 }
 
 function reloj() {
@@ -1809,7 +1709,8 @@ function reloj() {
   reloj();
   setInterval(reloj, 10000);
   tvClave();
-  setInterval(tvClave, 60000);
+  setInterval(clvTick, 1000);
+  setInterval(tvClave, 60000);   /* red: si un tick se pierde (pestaña dormida), se resincroniza */
   ciclo();
   setInterval(ciclo, REFRESH_MS);
 

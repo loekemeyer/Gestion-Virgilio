@@ -16,7 +16,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const ARCHIVOS = ["index.html", "sw.js", "recepcion.js", "planimetria.js", "supabase-config.js"];
+const ARCHIVOS = ["index.html", "sw.js", "recepcion.js", "planimetria.js", "supabase-config.js", "cobranzas.js"];
 const fail = [];
 
 for (const rel of ARCHIVOS) {

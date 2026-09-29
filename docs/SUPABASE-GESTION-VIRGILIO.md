@@ -30345,6 +30345,38 @@ pero la lectura no expone nada que no esté ya en la pantalla de En curso.
 muestra cada una y que la búsqueda filtra las dos) — verificado que **falla** contra el
 `index.html` anterior. `sql/gv_imp_pedidos_historial_v2391.sql`.
 
+---
+
+## v23.96 (2026-09-29, Luis) — el CÓDIGO DE LOGIN de la TV dura UN MINUTO
+
+**Pedido textual:** *"codigo de login de 4 digitos mas grande y que dure 1 minutos (con countdown)"*
+y *"saca el qr ya que usamos la fichada con el login"*.
+
+El tramo de `gv_tv_clave_de` pasó de **900 s a 60 s**, en las **DOS** funciones:
+`gv_tv_clave_actual` (la que lee la TV) y `gv_tv_clave_validar` (la que valida el celular). ⚠ Si se
+toca una sola, la TV muestra un código que la base rechaza. Sigue valiendo el tramo **actual y el
+anterior**, así que la validez real es de 60 a 120 s: es el margen para tipearlo.
+
+Medido al aplicarlo (migración `gv_tv_clave_60s_v2393`):
+
+| chequeo | resultado |
+|---|---|
+| `cambia_en_s` ≤ 60 | ✓ |
+| valida la clave de ahora | ✓ |
+| valida la del minuto anterior | ✓ |
+| rechaza una de hace 5 minutos | ✓ |
+
+⚠ **La rueda del front NO tiene su propio reloj: la sincroniza `cambia_en_s`.** Por eso el dibujo no
+se puede desfasar del código que la base valida — el que manda es el backend. Vale para los dos
+lugares donde se muestra: `monitor/tv.html` (la TV de pared) y el header del monitor del admin.
+
+⚠ **Con esto se fue el QR de fichada** (`#qrFichadaBox`, `qrcode.js`, `fichada-config.js` y el
+bloque TOTP de `index.html`): se ficha entrando con este código, así que el QR era una segunda
+puerta para lo mismo, con su propio secreto. `fichada.html` **no se borró** y sigue andando con su
+propia copia de la config: el link viejo no se rompe.
+
+`sql/gv_tv_clave_v2382.sql` (el bloque v23.93 al final), `tests/tv-clave-login.cjs`.
+
 ## §3.v2393 — «📲 Avisar programación» estaba tomando SÓLO las NP de ISIS (v23.93, Luis, 29/09)
 
 **Luis, textual:** *"Que avisar programacion tome pedidos web que actualmente esta roto"*.
@@ -30412,3 +30444,45 @@ módulo tiene cargado (`_stkPop.rows + gaps + sinBase`).
 
 **Tests:** `tests/sup-panel-v2393.cjs` — candado estático, verificado que **falla con 6** contra el
 `index.html` anterior.
+
+### §3.v2398 — v23.98: submódulo Cobranzas (front) + `gv_cobranza_clientes_cuit()` — 2026-09-29
+
+**Pedido de Luis:** *"submódulo de cobranzas. De momento empecemos con el front y después vemos
+dónde conectamos todo. Debería tener pestañas dentro, empezando con la de búsqueda de clientes.
+Cuando se abre, se busca un cliente (lk o ch) y se abre una ficha con esos datos con deuda
+consolidada."*
+
+**Lo nuevo en la base es UNA función de lectura**, `gv_cobranza_clientes_cuit()` → `(empresa,
+cod_cliente, cuit)`. No toca datos. Misma fuente (`isis_lk`/`isis_ch.documentos`, 450 días) y
+mismo guard de supervisor que `gv_cobranza_cliente_cuit(text)`, que ya existía.
+`sql/gv_cobranza_clientes_cuit_v2398.sql` (rollback adentro).
+
+⚠ **Por qué hizo falta: la deuda consolidada NO se puede armar por nombre.** Un cliente tiene
+códigos distintos en cada empresa (LK 4045 / CH 2211) y la razón social viene con el sufijo de
+sucursal que le pega ISIS — *"Bazar Monica S. CAP I SECC IV"* (LK) contra *"Bazar Monica SRL"*
+(CH) es **el mismo cliente**. Agrupar por nombre lo parte en dos, y dos nombres parecidos de
+clientes distintos los fusiona. La identidad la da el **CUIT** (regla v13.76). Sin CUIT el código
+va **solo** y la ficha lo dice con el chip «sin CUIT»: no se adivina.
+
+**Medido el 29/09:** 760 códigos con CUIT en LK · 175 en Chef · **69 CUIT con código en las dos
+empresas** (ésos son los que la ficha consolida) · 927 filas devuelve la RPC.
+
+**El front vive en `cobranzas.js`, no en `index.html`.** Pantalla propia (`openCobranzas`) con 4
+pestañas; la primera —Clientes— busca por nombre, código o CUIT y abre la ficha: deuda
+consolidada, desglose por empresa, comprobante por comprobante con su pago
+(`gv_cobranza_cliente`), cuenta corriente (`gv_cobranza_cuenta`) y la escala de
+`cobranzas_escalones` con el escalón que corresponde a los días marcado.
+
+⚠ **`window.sb`**: `const sb = createClient(...)` vive **adentro de la IIFE** del login, así que un
+`.js` externo no lo ve (`sb is not defined`). Se expone el **mismo** objeto —no se crea un segundo
+cliente ni una segunda sesión— y de ahí cuelga este módulo y cualquier otro que se saque del index.
+
+⚠ **NO reemplaza a `openCobros`** (la pantalla vieja de 7 pestañas) todavía: son dos puertas a
+propósito mientras esto se arma. Cuando Luis lo dé por bueno, la pestaña «📒 Cuenta corriente» de
+`openCobros` se retira. Dos módulos que hacen lo mismo para siempre es el pozo de Matricería.
+
+⚠ Si la base no contesta, la pantalla muestra datos **DEMO** con un chip rojo que lo dice, en vez
+de ceros: un cero no puede confundirse con *"no pude leer"*.
+
+**Chequeo:** `select count(*) from (select cuit from public.gv_cobranza_clientes_cuit() group by
+cuit having count(distinct empresa)=2) z;` — 69 al 29/09 · `node tests/cbz-ficha-cliente.cjs`.

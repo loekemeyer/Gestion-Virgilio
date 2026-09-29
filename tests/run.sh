@@ -119,6 +119,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tandas-orden-camion.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/operario-queda-botonera.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tv-clave-login.cjs
+echo "== mon-header-codigo (v23.93: sin QR, dos pestanas con subpestanas y el codigo con su rueda) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-header-codigo.cjs
 node tests/tiempos-captura.cjs
 node tests/mg-por-codigo.cjs
 
@@ -485,6 +487,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== cob-cuenta-corriente (v22.93: Cobranzas abre en Cuenta corriente — deuda viva, filtro pagaron mal, explicación de cada pago) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cob-cuenta-corriente.cjs
 
+echo "== cbz-ficha-cliente (v23.98: submodulo Cobranzas - busqueda de cliente y ficha con deuda consolidada LK+CH por CUIT) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cbz-ficha-cliente.cjs
+
 echo "== fac-conciliacion (v14.30: Facturación en 2 solapas; Conciliación = snapshot Gestión vs factura ISIS; el snapshot se registra al facturar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-conciliacion.cjs
 
@@ -629,6 +634,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pedimp-moq-proy (v23.90: código → proyección · MOQ con margen hasta 12 meses · desglose en 2 columnas · derechos por artículo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-moq-proy.cjs
+node tests/pedimp-meses-proveedor.cjs
 
 echo "== imp-hist-pedidos (v23.91: 📜 Historial = pedidos + recepciones) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-hist-pedidos.cjs
