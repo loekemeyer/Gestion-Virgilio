@@ -6335,12 +6335,11 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
       <button class="sup-action-btn" onclick="openExpresoIsis()" style="position:relative;"><span class="sup-ico">🚚</span><span>Agregar Expreso ISIS</span><span id="expIsisBadge" class="dp-badge" style="display:none;" title="Expresos que el cliente eligió desde la página y falta cargar en ISIS. NO frena ningún pedido."></span></button>
       <button class="sup-action-btn" onclick="openColaImpresion()" style="position:relative;"><span class="sup-ico">🖨️</span><span>Cola de impresión NP</span><span id="colaImpBadge" class="dp-badge" style="display:none;" title="Notas de pedido armadas pendientes de imprimir (rojo = alguna hace +24 h)"></span></button>
-      <button class="sup-action-btn" onclick="stkOpenNpFaltan()" style="position:relative;"><span class="sup-ico">⚠️</span><span>Pedidos sin cargar en PPP</span><span id="npFaltanBadge" class="dp-badge" style="display:none;"></span></button>
-      <button class="sup-action-btn" onclick="stkOpenFaltFact()"><span class="sup-ico">📉</span><span>Faltantes facturados sin completar</span></button>
+      <!-- v23.93 (Luis, 29/09): "Pedidos sin cargar en PPP" y "Faltantes facturados sin completar" salieron del panel.
+           Las funciones siguen en el archivo (stkOpenNpFaltan / stkOpenFaltFact): lo que no puede volver es la PUERTA. -->
       <button class="sup-action-btn" onclick="openPedidosImportacion()"><span class="sup-ico">📦</span><span>Importación — pedidos y proveedores</span></button>
       <button class="sup-action-btn" onclick="openAvisoProg()"><span class="sup-ico">📲</span><span>Avisar programación</span></button>
       <button class="sup-action-btn" onclick="openPlataPerdida()"><span class="sup-ico">💸</span><span>Plata perdida de facturar</span></button>
-      <button class="sup-action-btn" onclick="openDatosProducto()" style="position:relative;"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       <button class="sup-action-btn" onclick="openConfiguracion()"><span class="sup-ico">⚙️</span><span>Configuración</span></button>
       <button class="sup-action-btn" onclick="openAdminCervantes()"><span class="sup-ico">🏭</span><span>Admin Cervantes (GP2)</span></button>
       <button class="sup-action-btn" onclick="openOperarioView()"><span class="sup-ico">👁️</span><span>Ver módulo operarios</span></button>
@@ -6606,6 +6605,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="sup-action-btn" onclick="cfgGo(openPppSupers)" title="Agregar/quitar clientes súper (salen en camión propio)"><span class="sup-ico">🛒</span><span>Clientes súper</span></button>
         <button class="sup-action-btn" onclick="cfgGo(pppConnectPdfDir)" title="Conectar las carpetas con los PDF de ISIS (ej. X:\PDF_ISIS y X:\PDF_ISISCHEF). Una por vez. Necesita Chrome/Edge en PC."><span class="sup-ico">🖨️</span><span>Carpeta(s) PDF de ISIS</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openZonasMapa)" title="Geocodifica las direcciones y las muestra en un mapa por zona, marcando desajustes"><span class="sup-ico">📍</span><span>Mapa de zonas</span></button>
+        <!-- v23.93 (Luis, 29/09): vino del panel supervisor. El badge lo sigue poniendo dpLoadBadge() al entrar. -->
+        <button class="sup-action-btn" onclick="cfgGo(openDatosProducto)" style="position:relative;" title="Artículos a los que les falta m³, unidades por caja o descripción"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
       </div>
       <!-- idea 5162: los interruptores del pipeline web, visibles (sólo lectura; se cambian por SQL a pedido del dueño) -->
       <div class="sup-cfg" id="pwebCfgRow" style="max-width:none;margin:16px auto 0;">
@@ -60598,7 +60599,7 @@ function showSupervisor(email) {
   try { dpLoadBadge(); } catch (_e) {}
   // badges "Corregir códigos de NPs" y "Pedidos sin cargar en PPP" (fire-and-forget)
   try { corrLoadBadge(); } catch (_e) {}
-  try { npFaltanLoadBadge(); } catch (_e) {}
+  // v23.93: npFaltanLoadBadge() ya no corre al entrar (el botón salió del panel); la función queda.
   try { qbpLoadBadge(); } catch (_e) {}   // badge SOS de "Qué bajar primero"
   try { recepLoadBadge(); } catch (_e) {}   // v9.53: badge remitos pendientes de cargar (Recepción)
   try { facLoadBadge(); } catch (_e) {}   // v9.69: badge pedidos listos para facturar

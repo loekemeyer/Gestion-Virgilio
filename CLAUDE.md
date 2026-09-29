@@ -1,5 +1,31 @@
 # CLAUDE.md — Producción Virgilio
 
+## 🟥🟥🟥 LA "L" = EL MISMO NÚMERO, PERO DE LOEKEMEYER. NADA MÁS.
+
+> ## `702EL` es el `702E` **de LK**.
+> ## `026L` es el `026` **de LK**.
+> ## La L se saca y queda el código; la empresa que agrega es **LK**.
+
+**Luis, 2026-09-21, después de explicarlo varias veces:** *"la L solo indica que son códigos de
+LK pero sin la L (702EL = 702E de LK), ¿se entiende?"*
+
+### Las tres conclusiones FALSAS que hay que no volver a sacar
+
+| lo que alguien piensa | por qué está MAL |
+|---|---|
+| *"7xx y 8xx son de Chef, así que esa L está mal puesta"* | **El número NO dice la empresa.** El mismo número existe de los dos lados. `702E` de LK y `702E` de Chef son **dos artículos distintos**, como los duales. La L es justamente lo que los separa. |
+| *"este código no está en la lista de precios de LK, entonces la L es un error del pedido"* | Que a LK le falte ese número **en una tabla** no convierte la L en un error. Es un dato incompleto de esa tabla, y se reporta como tal. |
+| *"le saco la L para que matchee"* | Sacarla manda el picking a la góndola equivocada y la factura sale con el artículo equivocado. **Nunca** se saca de `PPP_Web_Base`. |
+
+### Qué se hace cuando un código con L no resuelve (precio, m³, góndola)
+
+Se reporta que **falta el dato de ese código en LK**, con el número pelado y la tabla donde falta.
+No se toca el pedido, no se saca la L, y no se dice que el pedido esté mal cargado.
+
+El detalle de dónde viaja la L y dónde no (picking sin L, factura con L cruda, `pkResolveArt`)
+está más abajo, en **"LA «L» NO ES UN CÓDIGO — ES UNA DENOTACIÓN"**. Lo sostiene
+`tests/regla-L.cjs`.
+
 ## ⚠ CÓMO RESPONDER (vale para TODOS los repos — copiar este bloque entero al `CLAUDE.md` del repo nuevo)
 
 Pedido de Elías, 28/09/2026. Son las preferencias del dueño, escritas acá para que valgan
@@ -176,32 +202,6 @@ rótulo arriba: **~530 px**, sin una celda vacía. Lo sostiene `tests/ficha-hoja
 lo que la tabla NO cuenta: **qué decidió el dueño y no hay que revisitar**, **qué sólo puede
 destrabar él** (redeploy de Vercel, rotar las credenciales de Meta y OpenAI) y **qué quedó a
 medias**. Mantenerlo al día al cerrar cada tanda de trabajo.
-
-## 🟥🟥🟥 LA "L" = EL MISMO NÚMERO, PERO DE LOEKEMEYER. NADA MÁS.
-
-> ## `702EL` es el `702E` **de LK**.
-> ## `026L` es el `026` **de LK**.
-> ## La L se saca y queda el código; la empresa que agrega es **LK**.
-
-**Luis, 2026-09-21, después de explicarlo varias veces:** *"la L solo indica que son códigos de
-LK pero sin la L (702EL = 702E de LK), ¿se entiende?"*
-
-### Las tres conclusiones FALSAS que hay que no volver a sacar
-
-| lo que alguien piensa | por qué está MAL |
-|---|---|
-| *"7xx y 8xx son de Chef, así que esa L está mal puesta"* | **El número NO dice la empresa.** El mismo número existe de los dos lados. `702E` de LK y `702E` de Chef son **dos artículos distintos**, como los duales. La L es justamente lo que los separa. |
-| *"este código no está en la lista de precios de LK, entonces la L es un error del pedido"* | Que a LK le falte ese número **en una tabla** no convierte la L en un error. Es un dato incompleto de esa tabla, y se reporta como tal. |
-| *"le saco la L para que matchee"* | Sacarla manda el picking a la góndola equivocada y la factura sale con el artículo equivocado. **Nunca** se saca de `PPP_Web_Base`. |
-
-### Qué se hace cuando un código con L no resuelve (precio, m³, góndola)
-
-Se reporta que **falta el dato de ese código en LK**, con el número pelado y la tabla donde falta.
-No se toca el pedido, no se saca la L, y no se dice que el pedido esté mal cargado.
-
-El detalle de dónde viaja la L y dónde no (picking sin L, factura con L cruda, `pkResolveArt`)
-está más abajo, en **"LA «L» NO ES UN CÓDIGO — ES UNA DENOTACIÓN"**. Lo sostiene
-`tests/regla-L.cjs`.
 
 ## ⚠⚠⚠ REGLA: TRAER SIEMPRE LA DEFINICIÓN VIVA, Y USAR SIEMPRE LA TABLA VIGENTE
 
@@ -5902,3 +5902,21 @@ Medido sobre Jhonny (104), 22–28/09, con su planilla del 25/09:
 - **Celular muerto**: al abrir el legajo en otro celular, `gvRecuperarTogglesServidor` repone los toggles abiertos del
   servidor (hoy, < 12 h, sin FJ después). Lo que el celular muerto nunca mandó se pierde.
 `tests/mg-por-codigo.cjs`.
+
+## ⚠ REGLA (Luis, 2026-09-29, v23.93): «📲 Avisar programación» toma TAMBIÉN los pedidos web
+
+**Luis:** *"Que avisar programacion tome pedidos web que actualmente esta roto"*. Medido antes:
+`vista_ppp_programacion_pendiente` devolvía **15 filas y 0 web** — leía sólo `gv_ppp_prog_rs`, el
+espejo de ISIS, cuando desde la v13.47 casi todo lo programado vive en `PPP_Web_Programacion`.
+Hoy es un `UNION ALL` con la rama web: **141 filas, 126 con prefijo, 0 NP duplicadas**, y
+`vista_avisar_programacion` no se tocó (ya resuelve empresa, teléfono y vendedor por empresa).
+
+⚠ La NP web se etiqueta con **`gv_ppp_web_np_label(empresa, np, np_idx)`**, nunca con `np` pelado:
+el código de cliente es por empresa y sin prefijo el `4181` de LK y el de Chef son dos personas.
+⚠ Se saltean las canceladas y las facturadas con cierre. ⚠ `security_invoker = true` se repone con
+el `alter view`. `sql/gv_avisar_programacion_web_v2393.sql`, §3.v2393.
+
+**Y el panel supervisor perdió dos puertas** (*"Saca Pedidos sin cargar en ppp y faltantes
+facturados sin completar"*): `stkOpenNpFaltan` y `stkOpenFaltFact` **siguen en el archivo**, lo que
+no vuelve es el botón. **«Completar datos producto» se mudó a ⚙️ Configuración** con su `#dpBadge`
+(si el id no viaja con el botón, `dpLoadBadge()` escribe en la nada). `tests/sup-panel-v2393.cjs`.
