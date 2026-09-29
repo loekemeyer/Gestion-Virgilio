@@ -767,6 +767,8 @@ echo "== pipe-clientes-nuevos (v20.86: el pipeline reemplazo al submodulo viejo,
 node tests/pipe-clientes-nuevos.cjs
 echo "== pipe-en-a-programar (v20.86: cuarentena primero, zona, dos estados y colapsable — corrido, no leido) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-en-a-programar.cjs
+echo "== pipe-imprimir-excel (v24.04: el boton de cliente de prueba es Imprimir, con la columna Comentarios) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-imprimir-excel.cjs
 
 echo "== ppp-cliente-dos-dias-salidos (v20.67: lo que ya salio no parte al cliente en dos dias) =="
 node tests/ppp-cliente-dos-dias-salidos.cjs

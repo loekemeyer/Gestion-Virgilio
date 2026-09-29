@@ -6214,7 +6214,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.3"></script>
+<script type="module" src="recepcion.js?v=24.04"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10256,7 +10256,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.3";
+const APP_VERSION = "v24.04";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -52245,15 +52245,127 @@ function pipeDemoToggle() {
 async function pipeDemoReiniciar() {
   await pipeEvento("lk", "__DEMO__", "reabrir", null, null);
 }
+/* v24.04 (Luis, 29/09: *"cambiá el botón de cliente de prueba por un botón de imprimir que
+   promptee la impresión de un excel"*). Es el mismo camino que ya tomó Cuarentena en la v20.53:
+   el ejemplo era la ayuda de la primera semana y el reporte se usa todos los días.
+   `pipeDemoToggle` y `pipeDemoPedido` siguen vivos (como `gv_ppp_np_desarmar` en la v18.77): lo
+   que no vuelve es la PUERTA — el ejemplo se prende desde la consola si hay que explicar la
+   pantalla, y ahí reaparece su «↺ Reiniciar ejemplo». */
 function pipeDemoRowHtml() {
   return '<div class="cuar-demo-row">' +
-    '<span class="cuar-demo-hint">Cliente de prueba: los botones funcionan de verdad y las etapas avanzan, ' +
-      'pero no toca ningún pedido real, no deja nada en el log y no abre WhatsApp.</span>' +
+    '<span class="cuar-demo-hint">El Excel baja lo que se ve acá, con <b>todos los comentarios</b> de cada gestión en una celda.</span>' +
     (_apr.pipeDemo
-      ? '<button class="cuar-demo-btn" onclick="pipeDemoReiniciar()" title="Lo deja como recién llegado">↺ Reiniciar ejemplo</button>'
+      ? '<button class="cuar-demo-btn" onclick="pipeDemoReiniciar()" title="Lo deja como recién llegado">↺ Reiniciar ejemplo</button>' +
+        '<button class="cuar-demo-btn" onclick="pipeDemoToggle()">✕ Quitar ejemplo</button>'
       : '') +
-    '<button class="cuar-demo-btn" onclick="pipeDemoToggle()">' +
-      (_apr.pipeDemo ? "✕ Quitar ejemplo" : "👁 Ver cliente de prueba") + '</button></div>';
+    '<button class="cuar-demo-btn" onclick="pipeExportarExcel()" ' +
+    'title="Bajar la gestión de clientes nuevos en Excel, con los comentarios de cada pedido">\u{1F5A8} Imprimir</button></div>';
+}
+/* ── El Excel de Clientes nuevos ───────────────────────────────────────────────────────
+   Se arma en el FRONT a propósito, igual que el de Cuarentena: no hay ninguna regla de negocio
+   acá — son los mismos pedidos y los mismos números que ya pinta la tabla. SheetJS se carga bajo
+   demanda (vendor/xlsx.full.min.js).
+   ⚠ Los COMENTARIOS no están en la pantalla: la tabla sólo muestra cuántos hay (el 📖 sale de
+   `gv_cuarentena_comentarios_lote`, que devuelve el conteo). El texto se pide por pedido con
+   `gv_cuarentena_comentarios`, una llamada por gestión y todas en paralelo. Si una falla, esa
+   celda lo DICE — no queda vacía: una lectura rota no es "no hay comentarios". */
+function _pipeFechaHoraTxt(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return String(ts);
+  try {
+    const q = {};
+    new Intl.DateTimeFormat("es-AR", { timeZone: "America/Argentina/Buenos_Aires",
+      day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })
+      .formatToParts(d).forEach(function (x) { q[x.type] = x.value; });
+    return q.day + "/" + q.month + "/" + q.year + " " + q.hour + ":" + q.minute;
+  } catch (_e) { return String(ts).slice(0, 16).replace("T", " "); }
+}
+/* Los comentarios de UNA gestión en UNA celda. Un pedido partido por importados es una sola
+   gestión (v23.06), así que se juntan los de todas sus partes y se ordenan por fecha.
+   Numerados y con el separador visible: SheetJS community NO escribe estilos, así que no se
+   puede forzar `wrapText` — sin el salto de línea a la vista, el "1) … · 2) …" es lo que hace
+   que se lean separados igual. El salto va igual, para quien prenda el ajuste de texto. */
+async function _pipeComentariosDe(miembros) {
+  const partes = [];
+  for (const x of (miembros || [])) {
+    try {
+      const r = await aprRpc("gv_cuarentena_comentarios",
+        { p_empresa: x.empresa || "lk", p_order_id: String(x.order_id) });
+      (r || []).forEach(function (c) { partes.push({ ts: c.creado_at, np: aprPedLabel(x), c: c }); });
+    } catch (_e) { return "(no se pudieron leer los comentarios)"; }
+  }
+  if (!partes.length) return "";
+  partes.sort(function (a, b) { return String(a.ts || "").localeCompare(String(b.ts || "")); });
+  const varias = (miembros || []).length > 1;
+  return partes.map(function (x, i) {
+    const c = x.c;
+    const quien = String(c.persona || c.por || "").trim();
+    return (i + 1) + ") " + _pipeFechaHoraTxt(c.creado_at) +
+      (varias ? " · " + x.np : "") +
+      (quien ? " · " + quien : "") + ": " + String(c.texto || "").replace(/\s+/g, " ").trim();
+  }).join("\n");
+}
+async function pipeExportarExcel() {
+  const grupos = cuarAgrupar(pipeLista().filter(function (p) { return !p._demo; }));
+  if (!grupos.length) { try { alert("No hay clientes nuevos para exportar."); } catch (_e) {} return; }
+  let XLSX;
+  try { XLSX = await pppLoadXlsx(); }
+  catch (e) { try { alert("No pude cargar el generador de Excel: " + ((e && e.message) || e)); } catch (_e) {} return; }
+
+  let coms;
+  try { coms = await Promise.all(grupos.map(function (g) { return _pipeComentariosDe(g.miembros); })); }
+  catch (_e) { coms = grupos.map(function () { return "(no se pudieron leer los comentarios)"; }); }
+
+  const filas = grupos.map(function (g, i) {
+    const p = g.p, varios = g.miembros.length > 1;
+    const e = pipeEst(p) || {};
+    const et = pipeEtapa(p), etd = PIPE_ETAPAS[et] || PIPE_ETAPAS.ingresado;
+    const f = _cuarFechaPedido(p);
+    const m3 = varios ? g.miembros.reduce(function (s, x) { return s + (Number(x.m3) || 0); }, 0) : (Number(p.m3) || 0);
+    const nblo = varios ? g.miembros.reduce(function (s, x) { return s + (Number(x.np_total) || ((x.bloques && x.bloques.length) || 1)); }, 0)
+      : (Number(p.np_total) || ((p.bloques && p.bloques.length) || 1));
+    const vg = clinValorGrupo(g.miembros);
+    const v = vg || (_apr.cliValor || {})[aprKey(p.empresa, p.order_id)] || {};
+    const ac = clinACobrar(p, vg);
+    const espera = e.reloj_desde ? pipeFmtEspera(e.reloj_desde) : "";
+    return {
+      "Pedido": g.miembros.map(function (x) { return aprPedLabel(x); }).join(" + "),
+      "NP": nblo,
+      "Fecha del pedido": f ? f.slice(8, 10) + "/" + f.slice(5, 7) + "/" + f.slice(0, 4) : "",
+      "Dias desde el pedido": _cuarDiasDesde(f),
+      "m3": Math.round(m3 * 1000) / 1000,
+      "Empresa": cuarEmpCod(p.empresa),
+      "Cod. cliente": String(p.cod || ""),
+      "Razon social": String(p.razon_social || p.cod || ""),
+      "CUIT": pipeCuitTxt(p) === "\u2026" ? "" : pipeCuitTxt(p),
+      "Telefono": String(clinWppTel(p) || ""),
+      "Zona": String(p.zona || ""),
+      "Etapa": etd.t,
+      "Esperando hace": espera,
+      "Vencido": e.vencido ? "SI" : "",
+      "Definido por": String(e.decision_persona || e.cli_decision_persona || ""),
+      "A cobrar (neto)": ac && isFinite(ac.aCobrar) ? Math.round(ac.aCobrar) : (isFinite(v.valor) ? Math.round(v.valor) : ""),
+      "A cobrar c/IVA": ac && isFinite(ac.aCobrarIva) ? Math.round(ac.aCobrarIva) : (isFinite(v.valorIva) ? Math.round(v.valorIva) : ""),
+      "Descuento": ac && ac.pct > 0 ? (Math.round(ac.pct * 1000) / 10 + "% " + (ac.label || "pago adelantado")) : "",
+      "Importados en falta": isFinite(v.valorImp) && v.valorImp > 0 ? Math.round(v.valorImp) : "",
+      "Comentarios": coms[i] || ""
+    };
+  }).sort(function (a, b) {
+    return (Number(b["Dias desde el pedido"]) || 0) - (Number(a["Dias desde el pedido"]) || 0) ||
+           String(a["Razon social"]).localeCompare(String(b["Razon social"]));
+  });
+
+  const hoy = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+  const dmy = hoy.slice(8, 10) + "-" + hoy.slice(5, 7) + "-" + hoy.slice(2, 4);
+  const ws = XLSX.utils.json_to_sheet(filas);
+  ws["!cols"] = [{ wch: 20 }, { wch: 5 }, { wch: 15 }, { wch: 19 }, { wch: 8 }, { wch: 8 },
+                 { wch: 12 }, { wch: 32 }, { wch: 15 }, { wch: 15 }, { wch: 22 }, { wch: 16 },
+                 { wch: 16 }, { wch: 9 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 24 },
+                 { wch: 18 }, { wch: 90 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Clientes nuevos");
+  XLSX.writeFile(wb, "clientes nuevos " + dmy + ".xlsx");
 }
 
 /* ── estado del pipeline, por lote (una sola vuelta de red para toda la pantalla) ────── */
@@ -53166,7 +53278,7 @@ function pipeHtml() {
     return h + '<div class="apr-vacio">Sin pedidos de clientes nuevos. Acá caen los pedidos de ' +
       '<b>clientes nuevos</b> sin ningún otro problema; si tienen <b>deuda</b>, están <b>suspendidos</b> o ' +
       '<b>superan su límite</b>, primero pasan por <b>Cuarentena</b> y vuelven acá cuando se les libera ' +
-      'ese motivo. Tocá <b>👁 Ver cliente de prueba</b> para probar los botones sin tocar nada.</div>' +
+      'ese motivo.</div>' +
       pipeDemoRowHtml() + '</div>' + pipeFirmaHtml() + pipeVincHtml() + pipeCompHtml();
 
   h += pipeDemoRowHtml();
@@ -63447,7 +63559,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.3"></script>
+<script src="cobranzas.js?v=24.04"></script>
 
 </body>
 </html>
