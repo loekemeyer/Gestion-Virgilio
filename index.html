@@ -696,18 +696,36 @@ button {
 #anSubBar.hidden{ display: none; }
 /* Código de login de la TV, con la rueda que se vacía en el minuto que dura (v23.92).
    Reemplaza al QR de fichada: se ficha entrando con este número. */
-.mon-clave{ display: flex; align-items: center; gap: 10px; flex: 0 0 auto; margin-left: auto; }
-.mon-clave svg{ width: clamp(34px, 4.6vh, 58px); height: clamp(34px, 4.6vh, 58px);
+/* v24.38 (Luis): el codigo va CENTRADO en el header y en UNA linea
+   —«CODIGO DE INGRESO: 4145»— con su rueda al lado. Se saca de la fila con
+   position:absolute: quedandose en el flujo, para centrarlo habria que
+   equilibrar a mano el ancho de las pestanas contra el del reloj + Cerrar. */
+.monitor-header{ position: relative; }
+.mon-clave{ display: flex; align-items: center; gap: clamp(10px, 1.2vw, 18px); flex: 0 0 auto;
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0;
+  pointer-events: none; }
+.mon-clave svg{ width: clamp(42px, 6.2vh, 76px); height: clamp(42px, 6.2vh, 76px);
   transform: rotate(-90deg); flex: 0 0 auto; }
 .mon-clave svg circle{ fill: none; stroke-width: 3.2; }
 .mon-clave .clv-pista{ stroke: #1e293b; }
 .mon-clave .clv-arco{ stroke: #38bdf8; stroke-linecap: round; stroke-dasharray: 100.53;
   transition: stroke-dashoffset .9s linear, stroke .3s; }
 .mon-clave .clv-arco.poco{ stroke: #fbbf24; }
-.mon-clave-lab{ font-size: clamp(9px, 1.1vh, 13px); font-weight: 800; color: #64748b;
-  text-transform: uppercase; letter-spacing: .08em; line-height: 1; }
-.mon-clave-num{ font-size: clamp(26px, 4vh, 48px); font-weight: 900; color: #f8fafc;
-  letter-spacing: .16em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.mon-clave-txt{ display: flex; align-items: baseline; gap: clamp(8px, .9vw, 16px);
+  white-space: nowrap; }
+.mon-clave-lab{ font-size: clamp(12px, 1.9vh, 24px); font-weight: 800; color: #94a3b8;
+  text-transform: uppercase; letter-spacing: .07em; line-height: 1; }
+.mon-clave-num{ font-size: clamp(34px, 5.8vh, 68px); font-weight: 900; color: #f8fafc;
+  letter-spacing: .14em; line-height: 1; font-variant-numeric: tabular-nums; }
+/* El codigo salio del flujo, asi que el reloj heredaria el hueco y se le montaria
+   encima: el `margin-left:auto` que empujaba al codigo pasa a ser del reloj. */
+.monitor-header > #monitorClock{ margin-left: auto; }
+/* Pantalla angosta: vuelve al flujo, o se monta arriba de las pestanas. */
+@media (max-width: 1150px){
+  .mon-clave{ position: static; transform: none; margin-left: auto; pointer-events: auto; }
+  .mon-clave-lab{ font-size: clamp(10px, 1.2vh, 14px); }
+  .mon-clave-num{ font-size: clamp(26px, 4vh, 48px); }
+}
 /* Modo TV (monitor a pantalla completa): el switch escala como el resto del header. */
 #monitorModal.tv .mod-switch{ border-radius: clamp(11px, 1.4vh, 16px); }
 #monitorModal.tv .mod-tab{ font-size: clamp(13px, 1.9vh, 22px);
@@ -5804,9 +5822,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
           <circle class="clv-pista" cx="18" cy="18" r="16"></circle>
           <circle class="clv-arco" id="monClvArco" cx="18" cy="18" r="16" stroke-dashoffset="0"></circle>
         </svg>
-        <div>
-          <div class="mon-clave-lab">Código</div>
-          <div class="mon-clave-num" id="monClave">----</div>
+        <div class="mon-clave-txt">
+          <span class="mon-clave-lab">Código de ingreso:</span>
+          <span class="mon-clave-num" id="monClave">----</span>
         </div>
       </div>
       <div id="monitorClock"></div>
@@ -6214,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.37"></script>
+<script type="module" src="recepcion.js?v=24.38"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6268,7 +6286,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
          elige su nombre, o «+» si no está y tipea el legajo. -->
     <div id="legajoLoginRow">
       <div id="tvClaveStep">
-        <div class="tvclave-lbl">🔑 Clave que muestra la TV del depósito</div>
+        <div class="tvclave-lbl">🔑 Código de ingreso (en la TV)</div>
         <input id="tvClaveInput" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4 números" onkeydown="if(event.key==='Enter')loginConClaveTv()">
         <button class="primary-btn" onclick="loginConClaveTv()">Entrar</button>
         <button class="tvnom-mas" style="margin-top:10px" onclick="tvMostrarLegajo()">Entrar con mi legajo</button>
@@ -10256,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.37";
+const APP_VERSION = "v24.38";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -63669,7 +63687,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.37"></script>
+<script src="cobranzas.js?v=24.38"></script>
 
 </body>
 </html>

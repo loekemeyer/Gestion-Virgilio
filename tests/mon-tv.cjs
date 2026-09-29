@@ -234,8 +234,7 @@ function responder(url) {
       tandas: t("tandasBox"), fc: t("fcBox"), fcTit: t("fcTit"), tot: t("totBox"),
       ops: t("opsBox"), opsTit: t("opsTit"), meta: t("metaBox"),
       act: t("actBox"), avisos: t("avisos"),
-      m3Pick: (document.getElementById("m3Pick") || {}).textContent || "",
-      m3Arm: (document.getElementById("m3Arm") || {}).textContent || "",
+      dias: (document.getElementById("fcBox") || {}).innerHTML || "",
       ult: window.__tvUlt || {},
       clave: (document.getElementById("tvClave") || {}).textContent || "",
       estado: (document.getElementById("estado") || {}).textContent || "",
@@ -275,9 +274,9 @@ function responder(url) {
   ok(/E34A/.test(r.avisos) && /E37A/.test(r.avisos) && /E38A/.test(r.avisos),
     "el cartel tiene que nombrar las tres tandas: " + r.avisos);
 
-  // m³ terminados hoy
-  ok(/1,5/.test(r.m3Pick), "m³ pickeados hoy debería ser 1,5 (E31A) y dice: " + r.m3Pick);
-  ok(/1,5/.test(r.m3Arm), "m³ armados hoy debería ser 1,5 (E31A) y dice: " + r.m3Arm);
+  /* v24.38 (Luis): *"saca todo ese texto que es al pedo"* — los m³ de hoy se fueron de la
+     banda, así que el `#m3Pick` / `#m3Arm` que este test medía ya no existe. El ritmo de hoy
+     sigue entrando en la cuenta del veredicto: lo prueba `tests/tv-meta-camion.cjs`. */
 
   // en este momento
   ok(/Pickeando/.test(r.act), "el panel no dice que alguien está pickeando");
@@ -328,10 +327,17 @@ function responder(url) {
   ok(/Mié|Lun|Mar|Jue|Vie|Sáb|Dom/.test(r.tandas), "el separador no dice el día de la semana");
   ok((r.tandas.match(/<tr class="dia">/g) || []).length === 2,
      "tiene que haber UN separador por día de entrega (hoy y mañana)");
-  /* v23.92 — «¿Llegan?» dejó de ser una tarjeta: es la banda que encabeza el cuadro de días,
-     y los m³ de hoy viven ahí. */
-  ok(/mt-ver/.test(r.meta) && /mt-bar/.test(r.meta), "falta la banda del ritmo arriba del resumen de días");
-  ok(/pickeado/.test(r.meta) && /armado/.test(r.meta), "la banda no dice los m³ de hoy");
+  /* v23.92 — «¿Llegan?» dejó de ser una tarjeta: es la banda que encabeza el cuadro de días.
+     v24.38 (Luis) — de esa banda quedan SÓLO el veredicto y «Pasar de día»: la barra de avance,
+     la meta, el ritmo y los m³ de hoy se sacaron, y el lugar que dejan es el 4.º día del
+     resumen. El candado va invertido: si vuelve una de esas líneas, este test se pone rojo. */
+  ok(/mt-ver/.test(r.meta), "falta el veredicto arriba del resumen de días");
+  ok(!/mt-bar|pickeado|Ritmo |m³<\/b> armado/.test(r.meta),
+     "volvió texto que Luis mandó sacar de la banda: " + r.meta.slice(0, 200));
+  ok(/resumenDias\(d\.arbol, d\.despachadas, 4\)/.test(
+       require("fs").readFileSync(require("path").join(__dirname, "..", "monitor", "tv.html"), "utf8")),
+     "el resumen de días tiene que pedir 4 días (el fixture sólo trae uno: va estático)");
+  ok(/<tr class="rd-dia">/.test(r.dias), "el resumen de días no se dibujó");
 
   // ── v21.17 · tabla de horas por operario
   ok(/Farias J\./.test(r.ops), "la tabla de operarios no muestra el nombre corto");

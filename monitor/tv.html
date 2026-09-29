@@ -58,7 +58,11 @@ html.embebido body{cursor:default}
 .hide{display:none!important}
 
 /* ── Header ───────────────────────────────────────────────────────────── */
-header{display:flex;align-items:center;gap:1.4vw;flex:0 0 auto}
+/* v24.38 (Luis): TRES columnas —vacia | codigo | reloj+estado— para que el codigo
+   quede centrado en la PANTALLA, no en el hueco que dejan los vecinos. Sigue en el
+   flujo, asi que el alto del header lo da la rueda y nada se corta. */
+header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1.4vw;flex:0 0 auto}
+.h-der{display:flex;align-items:center;justify-content:flex-end;gap:1.4vw;min-width:0}
 .h-sp{flex:1}
 .h-reloj{font-size:3.1vh;font-weight:900;color:#f8fafc;font-variant-numeric:tabular-nums}
 .h-est{font-size:1.6vh;font-weight:800;color:#4ade80;white-space:nowrap}
@@ -67,16 +71,20 @@ header{display:flex;align-items:center;gap:1.4vw;flex:0 0 auto}
 /* v23.92 (Luis) — CÓDIGO DE LOGIN: grande y con la rueda que se vacía en el minuto que dura.
    Reemplaza al QR de fichada (se ficha entrando con este código) y a la barra de avance del
    header, que era texto que nadie leía de lejos. */
-.clv{display:flex;align-items:center;gap:.8vw;flex:0 0 auto}
-.clv-anillo{width:6.6vh;height:6.6vh;flex:0 0 auto;transform:rotate(-90deg)}
+/* v24.38 (Luis): CENTRADO y en UNA linea — «CODIGO DE INGRESO: 4145» — con su
+   rueda al lado. ≡ index.html (.mon-clave). Sale del flujo con position:absolute:
+   quedandose en la fila habria que equilibrar a mano contra el reloj + estado. */
+.clv{display:flex;align-items:center;gap:1.1vw;flex:0 0 auto;justify-self:center}
+.clv-anillo{width:8.6vh;height:8.6vh;flex:0 0 auto;transform:rotate(-90deg)}
 .clv-anillo circle{fill:none;stroke-width:3.2}
 .clv-pista{stroke:#1e293b}
 .clv-arco{stroke:#38bdf8;stroke-linecap:round;
   stroke-dasharray:100.53;transition:stroke-dashoffset .9s linear,stroke .3s}
 .clv-arco.poco{stroke:#fbbf24}
-.clv-lab{font-size:1.5vh;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.08em}
-.h-clave{font-size:5.4vh;font-weight:900;color:#f8fafc;line-height:1;
-  font-variant-numeric:tabular-nums;letter-spacing:.18em}
+.clv-txt{display:flex;align-items:baseline;gap:.9vw;white-space:nowrap}
+.clv-lab{font-size:2.4vh;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;line-height:1}
+.h-clave{font-size:7.4vh;font-weight:900;color:#f8fafc;line-height:1;
+  font-variant-numeric:tabular-nums;letter-spacing:.16em}
 /* Dentro del admin (iframe) el header lo pone el modal: acá sería el segundo reloj y el
    segundo código en la misma pantalla. */
 html.embebido header{display:none}
@@ -243,19 +251,21 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
 <div id="app" class="hide">
   <div id="offline" class="hide"></div>
   <header>
+    <div></div>
     <div class="clv">
       <svg class="clv-anillo" viewBox="0 0 36 36" aria-hidden="true">
         <circle class="clv-pista" cx="18" cy="18" r="16"></circle>
         <circle class="clv-arco" id="clvArco" cx="18" cy="18" r="16" stroke-dashoffset="0"></circle>
       </svg>
-      <div>
-        <div class="clv-lab">Código</div>
-        <div class="h-clave" id="tvClave">----</div>
+      <div class="clv-txt">
+        <span class="clv-lab">Código de ingreso:</span>
+        <span class="h-clave" id="tvClave">----</span>
       </div>
     </div>
-    <div class="h-sp"></div>
-    <div class="h-reloj" id="reloj">--:--</div>
-    <div class="h-est" id="estado">● conectando</div>
+    <div class="h-der">
+      <div class="h-reloj" id="reloj">--:--</div>
+      <div class="h-est" id="estado">● conectando</div>
+    </div>
   </header>
 
   <main>
@@ -1134,7 +1144,7 @@ function calcularMeta(d) {
    no llega, qué camión se pasa de día. */
 function pintarMeta(d, m3PickHoy, m3ArmHoy) {
   var M = calcularMeta(d);
-  var pct = M.tot ? Math.round(100 * M.arm / M.tot) : 0, ver, cls;
+  var ver, cls;
   var corte = M.hora >= CORTE_HORA;
   if (!M.habil) { ver = "Hoy no se trabaja"; cls = "mt-gris"; }
   else if (M.falta <= 0.0001) { ver = "✅ Listo: " + esc(diaEtiqueta(M.meta)) + " armado"; cls = "mt-ok"; }
@@ -1143,20 +1153,17 @@ function pintarMeta(d, m3PickHoy, m3ArmHoy) {
   else if (M.llegan) { ver = "✅ Llegan · faltan " + n1(M.falta) + " m³"; cls = "mt-ok"; }
   else { ver = (corte ? "⛔ NO LLEGAN" : "⚠ Van justos") + " · faltan " + n1(M.falta) + " m³"; cls = corte ? "mt-no" : "mt-duda"; }
   var noLlegan = M.cams.filter(function (c) { return c.llega === false; });
+  /* v24.38 (Luis): *"saca todo ese texto que es al pedo y pone otro dia mas en ese cuadro"*.
+     De la banda quedan las DOS líneas que se leen de lejos y sobre las que se hace algo: el
+     veredicto y, si algo no llega, qué camión se pasa de día. Se van la barra de avance, la
+     línea de la meta, la del ritmo y la de «Hoy … pickeado · … armado»: son el detalle de la
+     misma cuenta que el veredicto ya resume, y en una pared nadie los lee. El espacio que
+     dejan es el día 4.º del resumen. */
   var h = '<div class="mt-ver ' + cls + '">' + ver + '</div>';
-  h += '<div class="mt-bar"><i style="width:' + pct + '%"></i></div>';
-  h += '<div class="mt-lin">' + esc(diaEtiqueta(M.meta)) + ' <b>' + n1(M.arm) + '</b>/<b>' + n1(M.tot) + ' m³</b> armado' +
-       (M.atr.n ? ' · <b class="mt-no">+' + n1(M.atr.m3) + '</b> atrasado' : '') + '</div>';
-  if (M.ritmo != null && M.habil && M.hora < JORNADA_FIN)
-    h += '<div class="mt-lin">Ritmo <b>' + n1(M.ritmo) + '</b> m³/h → <b>' + n1(M.capacidad) + ' m³</b> a las 17</div>';
   if (noLlegan.length)
     h += '<div class="mt-lin mt-no">Pasar de día: <b>' +
          noLlegan.map(function (c) { return esc(c.cam); }).join(" · ") + '</b></div>';
-  h += '<div class="mt-lin mt-hoy">Hoy <b id="m3Pick">—</b> pickeado · <b id="m3Arm">—</b> armado</div>';
   el("metaBox").innerHTML = h;
-  var _ep = el("m3Pick"), _ea = el("m3Arm");
-  if (_ep) _ep.textContent = (m3PickHoy == null ? "—" : n1(m3PickHoy) + " m³");
-  if (_ea) _ea.textContent = (m3ArmHoy == null ? "—" : n1(m3ArmHoy) + " m³");
   /* el corte: a partir de las 15:00, si al ritmo de hoy no llegan, el cartel de arriba dice qué camión
      hay que pasar a otro día en la PPP (el último en el orden que no llega). */
   if (M.habil && corte && M.hora < JORNADA_FIN && M.llegan === false && noLlegan.length)
@@ -1322,7 +1329,7 @@ function pintar(d) {
     el("fcTit").innerHTML = "Días";
     el("fcBox").innerHTML = '<div class="vacio">No se pudo leer la programación</div>';
   } else {
-    var rds = resumenDias(d.arbol, d.despachadas, 3);
+    var rds = resumenDias(d.arbol, d.despachadas, 4);   /* v24.38 (Luis): un día más */
     el("fcTit").innerHTML = "Días" +
       (fcSalidas ? " <small>· <b class=\"fc-salio\">" + fcSalidas + (fcSalidas === 1 ? " salió" : " salieron") + " sin FC</b></small>" : "");
     var pc = function (nn, tot, cls) {

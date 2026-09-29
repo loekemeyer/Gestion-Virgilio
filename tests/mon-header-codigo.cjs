@@ -71,6 +71,21 @@ catch (_e) {
       verReloj: vis("monitorClock"), verClave: vis("monClaveBox"),
       subVisibleEnTv: vis("anSubBar")
     };
+    /* (f) v24.38 — «CÓDIGO DE INGRESO: 4145», en una línea, grande y CENTRADO. */
+    const caja = document.getElementById("monClaveBox");
+    const hdr  = caja ? caja.closest(".monitor-header") : null;
+    const lab  = caja ? caja.querySelector(".mon-clave-lab") : null;
+    const num  = document.getElementById("monClave");
+    if (caja && hdr && lab && num) {
+      const rc = caja.getBoundingClientRect(), rh = hdr.getBoundingClientRect();
+      const rl = lab.getBoundingClientRect(),  rn = num.getBoundingClientRect();
+      out.lab = lab.textContent.trim();
+      out.px = parseFloat(getComputedStyle(num).fontSize);
+      // desvío del centro de la caja contra el centro del header, en % del ancho del header
+      out.desvio = Math.abs((rc.left + rc.width / 2) - (rh.left + rh.width / 2)) / rh.width * 100;
+      // misma línea: las cajas del rótulo y del número se solapan verticalmente
+      out.mismaLinea = Math.min(rl.bottom, rn.bottom) - Math.max(rl.top, rn.top) > 0;
+    }
     setMonitorTab("incons");
     out.subVisibleEnAn = vis("anSubBar");
     out.subTabs = Array.from(document.querySelectorAll("#anSubBar .mod-tab")).map((x) => x.textContent.trim());
@@ -95,6 +110,16 @@ catch (_e) {
   ok(r.subTabs.length === 2 && /Productividad/.test(r.subTabs[0]) && /Inconsistencias/.test(r.subTabs[1]),
      "(e) las subpestañas son Productividad e Inconsistencias: " + JSON.stringify(r.subTabs));
   ok(/\bon\b/.test(r.anOn), "(e) la pestaña Análisis queda marcada como activa");
+  /* (f) v24.38 (Luis): *"quiero que ese codigo este mas grande, centrado y que sea
+     «CÓDIGO DE INGRESO: XXXX» con el timer y toda la bola"*. */
+  ok(/^código de ingreso:?$/i.test(String(r.lab || "").trim()),
+     "(f) el rótulo dice «Código de ingreso:»: " + JSON.stringify(r.lab));
+  ok(r.mismaLinea === true, "(f) el rótulo y el número van en la MISMA línea");
+  ok(Number(r.px) >= 34,
+     "(f) el número es más grande que antes (era 26-48px, ahora ≥ 34): " + r.px + "px");
+  ok(Number(r.desvio) < 2,
+     "(f) la caja está centrada en el header (desvío < 2 % del ancho): " +
+     (r.desvio == null ? "sin medir" : r.desvio.toFixed(2) + " %"));
   ok(errs.length === 0, "sin errores de JS: " + errs.slice(0, 3).join(" | "));
 
   await b.close();

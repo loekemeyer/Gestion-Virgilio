@@ -6263,3 +6263,32 @@ hasta un `Runtime.evaluate` de `1+1` por CDP se comían el timeout, mientras `De
 entrando (o sea: el renderer vivo y el hilo trabado). Se aisló sirviendo el mismo `index.html` con el
 `navigator.serviceWorker.register` neutralizado → **VIVO**; con el SW puesto y sin el `await` del
 `navigate` → **VIVO**. Ese test es el centinela: no hay otro.
+
+## ⚠ REGLA (Luis, 2026-09-29, v24.38): el CÓDIGO DE INGRESO va centrado y grande — y la banda de «Días» no lleva texto
+
+**Luis:** *"quiero que ese codigo este mas grande, centrado y que sea «CÓDIGO DE INGRESO: XXXX» con
+el timer y toda la bola"* · *"en la landing que diga «CODIGO DE INGRESO (EN LA TV)»"* · *"saca todo
+ese texto que es al pedo y pone otro dia mas en ese cuadro"*.
+
+| dónde | cómo queda |
+|---|---|
+| header del monitor del admin (`index.html`, `.mon-clave`) | rueda + **«CÓDIGO DE INGRESO: 4145»** en UNA línea, centrado en el header y al doble de tamaño |
+| TV de pared (`monitor/tv.html`) | lo mismo; el header pasó a **grid de 3 columnas** (vacía · código · reloj+estado) |
+| landing del celular | el rótulo dice **«🔑 Código de ingreso (en la TV)»** |
+| banda de «Días» de la TV | quedan **sólo** el veredicto y «Pasar de día»; el resumen muestra **4 días** |
+
+⚠ **Centrar sacando del flujo tiene su contra:** en el admin el código va `position:absolute`, así
+que el reloj hereda su hueco y se le monta encima — por eso el `margin-left:auto` pasó a ser del
+`#monitorClock`. Abajo de 1150 px el código vuelve al flujo, o se monta arriba de las pestañas.
+
+⚠ **En la TV NO se usó `absolute`**: el alto del header lo da la rueda, y sacarla del flujo dejaba
+el header de la altura del reloj y el código cortado al medio. Va en grid, que centra en la
+PANTALLA (no en el hueco entre los vecinos) y conserva el alto.
+
+⚠ **Lo que se sacó de la banda es el DETALLE de la misma cuenta que el veredicto resume** (barra de
+avance, la meta, el ritmo, «Hoy … pickeado · … armado»). El ritmo sigue entrando en el veredicto y
+en el cartel de CORTE de las 15:00 — lo prueba `tests/tv-meta-camion.cjs`, que no se tocó.
+
+**Chequeo:** `node tests/mon-header-codigo.cjs` (bloque **f**: el rótulo, la misma línea, el tamaño
+y el centrado medidos sobre la pantalla; verificado que falla contra el index anterior) ·
+`node tests/mon-tv.cjs` (candado invertido: si vuelve una de las líneas sacadas, se pone rojo).
