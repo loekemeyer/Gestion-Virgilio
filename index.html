@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.45"></script>
+<script type="module" src="recepcion.js?v=24.46"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.45";
+const APP_VERSION = "v24.46";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -22512,7 +22512,7 @@ function pedImpPdfProv(provEnc) {
    tampoco, dice "sin foto". Medido 29/09: 97 de 150 importados tienen foto en LK. */
 const _PEDIMP_FOTO_LK = "https://kwkclwhmoygunqmlegrg.supabase.co/storage/v1/object/public/products-images/";
 const _PEDIMP_FOTO_CH = "https://nkhzocgdpwtgrmwleihr.supabase.co/storage/v1/object/public/products-images/";
-function _pedImpFotoHtml(cod) {
+function _pedImpFotoHtml(cod, emp) {
   const c0 = String(cod || "").trim().toUpperCase();
   if (!c0) return '<span class="sf">sin foto</span>';
   // v24.43 — las mismas variantes que usa la página LK (script.js / osa): el código, con o sin «E»,
@@ -22521,8 +22521,19 @@ function _pedImpFotoHtml(cod) {
   const alts = [c0, /E$/.test(c0) ? c0.slice(0, -1) : c0 + "E", c0.replace(/(E)[SD]$/, "$1"), c0.replace(/[A-Z]+$/, "")];
   const urls = [];
   // v24.45 — la página de Chef (paginach, script.js) guarda las fotos en .jpg, no en .webp.
-  [[_PEDIMP_FOTO_LK, ".webp"], [_PEDIMP_FOTO_CH, ".jpg"]].forEach(function (bx) { alts.forEach(function (a) { const u = bx[0] + encodeURIComponent(a) + bx[1]; if (a && urls.indexOf(u) < 0) urls.push(u); }); });
+  // v24.46 — el mismo número en LK y en Chef son artículos DISTINTOS (regla de la L): un artículo de
+  // una empresa busca sólo en SU bucket. Sin empresa conocida, LK y después Chef.
+  const bxs = emp === "CH" ? [[_PEDIMP_FOTO_CH, ".jpg"]] : emp === "LK" ? [[_PEDIMP_FOTO_LK, ".webp"]] : [[_PEDIMP_FOTO_LK, ".webp"], [_PEDIMP_FOTO_CH, ".jpg"]];
+  bxs.forEach(function (bx) { alts.forEach(function (a) { const u = bx[0] + encodeURIComponent(a) + bx[1]; if (a && urls.indexOf(u) < 0) urls.push(u); }); });
   return '<img src="' + urls[0] + '" data-alts="' + urls.slice(1).join("|") + '" onerror="var l=(this.dataset.alts||\'\').split(\'|\').filter(Boolean);if(l.length){this.dataset.alts=l.slice(1).join(\'|\');this.src=l[0];}else{this.outerHTML=\'<span class=sf>sin foto</span>\';}">';
+}
+function _pedImpEmpFoto(it) {
+  const pl = _impPlantaVista(it); if (pl) return String(pl).toUpperCase();
+  const ms = (it && it.det || []).map(function (d) { return String(d.marca || "").trim().toUpperCase(); }).filter(Boolean);
+  if (!ms.length) return "";
+  if (ms.every(function (m) { return m === "CH"; })) return "CH";
+  if (ms.every(function (m) { return m !== "CH"; })) return "LK";
+  return "";
 }
 function _pedImpDamianData(prov) {
   const data = (_stkPop && _stkPop.data) || { items: [] };
@@ -22548,7 +22559,7 @@ function pedImpPdfDamian(provEnc) {
     const cod = codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "");
     return '<tr' + (bajo ? ' class="bajo"' : '') + '><td class="c"><b>' + escapeHtml(cod) + '</b></td>' +
       '<td class="dsc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td>' +
-      '<td class="c ft">' + (it.esParte ? '<span class="sf">insumo</span>' : _pedImpFotoHtml(codCanon(it.cod))) + '</td>' +   // v24.44 (Thomas): los insumos van sin foto por ahora
+      '<td class="c ft">' + (it.esParte ? '<span class="sf">insumo</span>' : _pedImpFotoHtml(codCanon(it.cod), _pedImpEmpFoto(it))) + '</td>' +   // v24.44 (Thomas): los insumos van sin foto por ahora
 
       '<td class="c">' + fmt(Math.max(0, Number(it.stockUni) || 0)) + '<small>' + (bajo ? '⚠ ' : '') + (m == null ? 'sin proy.' : _pedImpMesesFmt(m) + ' meses') + '</small></td>' +
       '<td class="c">' + _pedImpEnCaminoHtml(it, 'ecf') + '</td>' +
@@ -63828,7 +63839,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.45"></script>
+<script src="cobranzas.js?v=24.46"></script>
 
 </body>
 </html>
