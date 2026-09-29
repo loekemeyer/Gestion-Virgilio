@@ -28,7 +28,7 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     const tabla = body.querySelector("table");
     return { tabsFila: new Set(tb.map(Math.round)).size, provFila: new Set(pb.map(Math.round)).size, vis, menu,
       badges: [...body.querySelectorAll(".pedimp-provs .pedimp-alerta")].map((x) => x.textContent + "|" + x.title),
-      modo: !!body.querySelector("select.pedimp-modo"), consumo: (body.querySelector(".pedimp-consumo") || {}).textContent || "", consumoTot: (body.querySelector(".pedimp-consumo-tot") || {}).textContent || "", tablaTop: tabla ? tabla.getBoundingClientRect().top : 9999,
+      modo: !!body.querySelector("select.pedimp-modo"), consumo: (body.querySelector(".pedimp-consumo") || {}).textContent || "", consumoTot: (body.querySelector(".pedimp-consumo-tot") || {}).textContent || "", fobPx: (function () { const e = body.querySelector(".pedimp-fob"); return e ? parseFloat(getComputedStyle(e).fontSize) : 0; })(), tablaTop: tabla ? tabla.getBoundingClientRect().top : 9999,
       largoPag: document.documentElement.scrollWidth };
   });
   if (r.tabsFila !== 1) fail("las solapas tienen que ir en UNA fila: " + r.tabsFila);
@@ -40,6 +40,8 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (!/consumo u\$s 100\/mes/.test(r.consumo)) fail("el encabezado del proveedor muestra el consumo por mes: " + r.consumo);
   // 7 proveedores × 100 u/mes × u$s 1 = u$s 700/mes arriba
   if (!/consumo u\$s 700\/mes/.test(r.consumoTot)) fail("la barra de arriba muestra el consumo total por mes: " + r.consumoTot);
+  // v24.61 (Thomas: «está muy chico el FOB»)
+  if (!(r.fobPx >= 16)) fail("el FOB del proveedor va grande (>= 16 px): " + r.fobPx);
   if (!r.modo) fail("el modo de nacionalización es un desplegable");
   if (r.tablaTop > 844) fail("la tabla tiene que empezar en la primera pantalla: top " + r.tablaTop);
   if (r.largoPag > 390) fail("la página se desborda de costado: " + r.largoPag);
