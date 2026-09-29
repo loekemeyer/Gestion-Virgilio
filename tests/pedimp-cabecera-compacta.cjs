@@ -28,9 +28,12 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     const tabla = body.querySelector("table");
     return { tabsFila: new Set(tb.map(Math.round)).size, provFila: new Set(pb.map(Math.round)).size, vis, menu,
       badges: [...body.querySelectorAll(".pedimp-provs .pedimp-alerta")].map((x) => x.textContent + "|" + x.title),
-      modo: !!body.querySelector("select.pedimp-modo"), consumo: (body.querySelector(".pedimp-consumo") || {}).textContent || "", consumoTot: (body.querySelector(".pedimp-consumo-tot") || {}).textContent || "", fobPx: (function () { const e = body.querySelector(".pedimp-fob"); return e ? parseFloat(getComputedStyle(e).fontSize) : 0; })(), tablaTop: tabla ? tabla.getBoundingClientRect().top : 9999,
+      modo: !!body.querySelector("select.pedimp-modo"), consumo: (body.querySelector(".pedimp-consumo") || {}).textContent || "", consumoTot: (body.querySelector(".pedimp-consumo-tot") || {}).textContent || "", fobPx: (function () { const e = body.querySelector(".pedimp-fob"); return e ? parseFloat(getComputedStyle(e).fontSize) : 0; })(), tablaTop: tabla ? tabla.getBoundingClientRect().top : 9999, filaH: tabla && tabla.tBodies[0] && tabla.tBodies[0].rows[0] ? tabla.tBodies[0].rows[0].getBoundingClientRect().height : 0,
       largoPag: document.documentElement.scrollWidth };
   });
+  // la fila se re-dibuja cuando llegan los switches de la web (Cartel / Web visible): medir DESPUÉS
+  await p.waitForTimeout(1500);
+  r.filaH = await p.evaluate(() => { const t = document.querySelector("#stkPopBody table"); return t && t.tBodies[0].rows[0] ? t.tBodies[0].rows[0].getBoundingClientRect().height : 0; });
   if (r.tabsFila !== 1) fail("las solapas tienen que ir en UNA fila: " + r.tabsFila);
   if (r.provFila !== 1) fail("los proveedores tienen que ir en UNA fila: " + r.provFila);
   if (r.vis) fail("Excel y «Cargar pedido ya hecho» van adentro del menú ⋯ (hay " + r.vis + " a la vista)");
@@ -42,6 +45,8 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (!/consumo u\$s 700\/mes/.test(r.consumoTot)) fail("la barra de arriba muestra el consumo total por mes: " + r.consumoTot);
   // v24.61 (Thomas: «está muy chico el FOB»)
   if (!(r.fobPx >= 16)) fail("el FOB del proveedor va grande (>= 16 px): " + r.fobPx);
+  // v24.62 (Thomas) — filas bajas: antes 64 px por artículo (Baches y RECIBIR apilados)
+  if (!(r.filaH > 0 && r.filaH <= 50)) fail("cada artículo tiene que ocupar <= 50 px de alto: " + r.filaH);
   if (!r.modo) fail("el modo de nacionalización es un desplegable");
   if (r.tablaTop > 844) fail("la tabla tiene que empezar en la primera pantalla: top " + r.tablaTop);
   if (r.largoPag > 390) fail("la página se desborda de costado: " + r.largoPag);

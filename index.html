@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.61"></script>
+<script type="module" src="recepcion.js?v=24.62"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.61";
+const APP_VERSION = "v24.62";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -19709,6 +19709,8 @@ var STK_POP_CSS =
   ".stkpop-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:14px;font-weight:800;cursor:pointer;width:auto;margin:0;}" +
   ".stkpop-body{padding:13px 14px;max-height:calc(100vh - 110px);overflow:auto;}" +
   ".stkpop-hint{font-size:12px;color:#64748b;margin-bottom:10px;line-height:1.4;}" +
+  /* v24.62 (Thomas) — la tabla de Pedidos Importación con filas bajas: cada artículo ocupaba mucho alto en el celular */
+  ".mva-tbl.pedimp-tbl td{padding:4px 7px;line-height:1.25;}.mva-tbl.pedimp-tbl th{padding:5px 7px;line-height:1.2;}" +
   ".stkpop-grp{margin-bottom:15px;}" +
   ".stkpop-grp-h{display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:800;color:#0f172a;padding:6px 2px;border-bottom:2px solid #cbd5e1;margin-bottom:7px;}" +
   ".stkpop-grp-tot{font-size:12px;font-weight:800;color:#1e6bd6;}" +
@@ -22415,10 +22417,10 @@ function _pedImpRender() {
     // v24.32 — anchos explícitos por <colgroup> y la tabla mide EXACTAMENTE lo que suman: hasta
     // la v24.3 Descripción era la única col SIN width y se comía todo el sobrante de la tarjeta
     // (el hueco muerto entre ella y Proy u/mes, que reclamó Luis el 29/09).
-    const _cols = [104, 232, 92, 110, 74, 92, 72, 94, 104, 100, 128, 112];
+    const _cols = [104, 232, 92, 110, 74, 92, 72, 94, 104, 100, 128, 92];
     const _ancho = _cols.reduce(function (a, b) { return a + b; }, 0);
     _anchoMax = Math.max(_anchoMax, _ancho);
-    h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide" style="min-width:' + _ancho + 'px">' +
+    h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide pedimp-tbl" style="min-width:' + _ancho + 'px">' +
       '<colgroup>' + _cols.map(function (w) { return '<col style="width:' + w + 'px">'; }).join('') + '</colgroup>' +
       '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="Meses de stock = (stock disponible + en camino) ÷ proyección por mes. En rojo, menos de 4 meses. Sin proyección: —. La tabla se ordena por esta columna (menos meses primero).">Meses<small>stock</small></th><th class="num" title="En camino: unidades ya pedidas que no llegaron, con la fecha estimada de llegada (dd/mm). Abajo, a pedir (unidades calculadas)">En camino<small>A pedir u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.forEach(function (it) {
@@ -22448,8 +22450,8 @@ function _pedImpRender() {
         const lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
         const _prv = encodeURIComponent(d.prov || it.prov || '');
         return '<div style="margin:1px 0">' + (lbl ? lbl + '<br>' : '') + '<span style="white-space:nowrap">' +
-          '<button class="stk-btn" style="padding:3px 9px;font-size:12px" title="Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="pedImpBaches(' + d.id + ',\'' + _codEncV + '\',\'' + _prv + '\')">📦 Baches</button></span>' +
-          (Number(d.curso) > 0 ? '<br><button class="stk-btn" style="padding:3px 9px;font-size:12px;margin-top:3px;background:#0f766e;color:#fff;border-color:#0f766e;font-weight:800" title="Recibir lo que llegó de este pedido: cuánto, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Queda en el Historial de recepción." onclick="impRecibirAbrir(' + d.id + ')">📥 RECIBIR</button>' : '') + '</div>';
+          '<button class="stk-btn" style="padding:3px 8px;font-size:14px" title="📦 Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="pedImpBaches(' + d.id + ',\'' + _codEncV + '\',\'' + _prv + '\')">📦</button>' +   // v24.62 (Thomas): íconos lado a lado, la fila no crece
+          (Number(d.curso) > 0 ? ' <button class="stk-btn" style="padding:3px 8px;font-size:14px;background:#0f766e;color:#fff;border-color:#0f766e;font-weight:800" title="📥 RECIBIR: recibir lo que llegó de este pedido: cuánto, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Queda en el Historial de recepción." onclick="impRecibirAbrir(' + d.id + ')">📥</button>' : '') + '</span></div>';
       }).join('');
       const _m3m = Number(it.m3Master) || 0;
       const _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
@@ -22471,14 +22473,14 @@ function _pedImpRender() {
       const _m3 = _pedImpM3Of(it);
       const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _rg = it.reingresoEst ? String(it.reingresoEst).slice(0, 10) : "";
-      const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _keyEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
+      const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _keyEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:2px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
       // v23.90 (Luis) — el MISMO pop-up de proyección que la pantalla de Stocks.
       // La proyección se le pasa en CAJAS (la pantalla de importados la muestra en unidades).
       // v23.91 (Luis) — lo que se toca es la CELDA de la proyección, igual que en Stocks; el
       // código volvió a ser texto. Tocar el código para ver una proyección no se adivina.
       const _proyCaj = (Number(it.uxc) > 0) ? (Number(it.proyUni) || 0) / Number(it.uxc) : 0;
       const _proyCell = '<td class="num imp2 pedimp-proy" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td>';
-      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td>' + _proyCell + '<td class="num">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num imp2">' + _pedImpEnCaminoHtml(it) + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td>' + _proyCell + '<td class="num">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num imp2">' + _pedImpEnCaminoHtml(it) + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + '<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:8px">' + _reingWebSwitchHtml(it.cod, it) + '</div></td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -22889,8 +22891,8 @@ function _webVisibleSwitchHtml(cod, it) {
   return emps.map(function (emp) {
     var on = !_webOcul.has(_reingNorm(cod) + "|" + emp);
     var pag = emp === "CH" ? "Chef" : "LK";
-    return '<label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:4px;margin-top:3px;font-size:11px;white-space:nowrap;cursor:pointer;color:' + (on ? '#065f46' : '#b91c1c') + '" title="Artículo en la página ' + pag + ': ON = se ve y se puede pedir. OFF = oculto, no se puede pedir. Se aplica en hasta 5 min.">'
-      + '<input type="checkbox" data-emp="' + emp + '"' + (on ? ' checked' : '') + ' onchange="pedImpWebVisible(\'' + enc + '\',this.checked,\'' + emp + '\')"> Web ' + (dos || emp === "CH" ? pag + ' ' : '') + (on ? 'visible' : 'OCULTO') + '</label>';
+    return '<label onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:3px;margin:2px 0 0 0;font-size:11px;line-height:1;white-space:nowrap;cursor:pointer;font-weight:' + (on ? '400' : '800') + ';color:' + (on ? '#065f46' : '#b91c1c') + '" title="Artículo en la página ' + pag + ': ON = se ve y se puede pedir. OFF = oculto, no se puede pedir. Se aplica en hasta 5 min.">'
+      + '<input type="checkbox" style="margin:0" data-emp="' + emp + '"' + (on ? ' checked' : '') + ' onchange="pedImpWebVisible(\'' + enc + '\',this.checked,\'' + emp + '\')">Web' + (dos || emp === "CH" ? ' ' + pag : '') + (on ? '' : ' OCULTO') + '</label>';   // v24.62 — corto y al lado del cartel
   }).join("");
 }
 async function pedImpWebVisible(codEnc, on, emp) {
@@ -22915,8 +22917,8 @@ function _reingWebSwitchHtml(cod, it) {
   if (!_reingExcl) return _webVisibleSwitchHtml(cod, it);
   var on = !_reingExcl.has(_reingNorm(cod));
   var enc = encodeURIComponent(String(cod));
-  return '<label onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:4px;margin-top:3px;font-size:11px;white-space:nowrap;cursor:pointer;color:' + (on ? '#065f46' : '#94a3b8') + '" title="Cartel web de reingreso: ON = las páginas LK/CH muestran &quot;Sin stock hasta&quot; y parten el pedido. OFF = ni cartel ni partido.">'
-    + '<input type="checkbox"' + (on ? ' checked' : '') + ' onchange="pedImpReingresoWeb(\'' + enc + '\',this.checked)"> Cartel web ' + (on ? 'ON' : 'OFF') + '</label>'
+  return '<label onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:3px;margin:2px 0 0 0;font-size:11px;line-height:1;white-space:nowrap;cursor:pointer;color:' + (on ? '#065f46' : '#94a3b8') + '" title="Cartel web de reingreso: ON = las páginas LK/CH muestran &quot;Sin stock hasta&quot; y parten el pedido. OFF = ni cartel ni partido.">'
+    + '<input type="checkbox" style="margin:0"' + (on ? ' checked' : '') + ' onchange="pedImpReingresoWeb(\'' + enc + '\',this.checked)">Cartel' + (on ? '' : ' OFF') + '</label>'
     + _webVisibleSwitchHtml(cod, it);
 }
 async function pedImpReingresoWeb(codEnc, on) {
@@ -63976,7 +63978,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.61"></script>
+<script src="cobranzas.js?v=24.62"></script>
 
 </body>
 </html>

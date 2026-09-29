@@ -6375,3 +6375,5 @@ A 390 px la tabla del primer proveedor arranca en y≈635. `tests/pedimp-cabecer
 cubrir"*. Se fueron el chip «No llega solo / ⏳ para el mínimo», el input «Mín u$s» y los campos del ⚙. El dato
 (`min_usd`) sigue en la base, sin uso en pantalla. No volver a ponerlo como requisito del pedido.
 El **consumo por mes** (proy × FOB) quedó en el encabezado de cada proveedor (v24.59, `.pedimp-consumo`) y el total en la barra de arriba (v24.60, `.pedimp-consumo-tot`).
+Filas bajas en la tabla (v24.62): 📦 / 📥 como íconos lado a lado, «Cartel» y «Web» al lado bajo la fecha de
+reingreso, celdas `.pedimp-tbl` con 4px de relleno. **64 → 45 px por artículo** a 390 px (el test mide ≤ 50).
