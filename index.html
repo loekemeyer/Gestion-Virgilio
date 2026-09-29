@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.58"></script>
+<script type="module" src="recepcion.js?v=24.59"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.58";
+const APP_VERSION = "v24.59";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -22393,7 +22393,9 @@ function _pedImpRender() {
     const _nBajo = arr.filter(function (it) { const m = _pedImpMesesStock(it); return m != null && m < _PEDIMP_MESES_ALERTA; }).length;
     h += '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0">' +
-      '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + _pedImpAlertaBadge(_nBajo) + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div></div>' +
+      '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + _pedImpAlertaBadge(_nBajo) + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') +
+        // v24.59 (Thomas) — el consumo por mes (proyección × FOB) vuelve acá, sin el mínimo
+        (_burnN > 0 ? ' · <span class="pedimp-consumo" style="color:#b45309;font-weight:700" title="Consumo por mes: proyección u/mes × FOB de cada artículo">consumo ' + _usd0(_burnN) + '/mes</span>' : '') + '</div></div>' +
       '<div style="display:flex;gap:7px;flex:1 1 auto;min-width:0;max-width:100%;flex-wrap:wrap;align-items:center;justify-content:flex-end">' +   // v24.54 (Thomas): en el celular los botones se cortaban (no se veían los PDF): ahora bajan de línea
       // v23.95 (Luis) — los meses objetivo, a un toque: cambian el objetivo y el «a pedir» de
       // TODOS los códigos de este proveedor (GV_Imp_Proveedor.meses_objetivo).
@@ -63970,7 +63972,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.58"></script>
+<script src="cobranzas.js?v=24.59"></script>
 
 </body>
 </html>

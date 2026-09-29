@@ -28,7 +28,7 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     const tabla = body.querySelector("table");
     return { tabsFila: new Set(tb.map(Math.round)).size, provFila: new Set(pb.map(Math.round)).size, vis, menu,
       badges: [...body.querySelectorAll(".pedimp-provs .pedimp-alerta")].map((x) => x.textContent + "|" + x.title),
-      modo: !!body.querySelector("select.pedimp-modo"), tablaTop: tabla ? tabla.getBoundingClientRect().top : 9999,
+      modo: !!body.querySelector("select.pedimp-modo"), consumo: (body.querySelector(".pedimp-consumo") || {}).textContent || "", tablaTop: tabla ? tabla.getBoundingClientRect().top : 9999,
       largoPag: document.documentElement.scrollWidth };
   });
   if (r.tabsFila !== 1) fail("las solapas tienen que ir en UNA fila: " + r.tabsFila);
@@ -36,6 +36,8 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (r.vis) fail("Excel y «Cargar pedido ya hecho» van adentro del menú ⋯ (hay " + r.vis + " a la vista)");
   if (!r.menu.some((x) => /Excel/.test(x)) || !r.menu.some((x) => /Cargar pedido ya hecho/.test(x))) fail("el menú ⋯ tiene que tener Excel y Cargar pedido ya hecho: " + JSON.stringify(r.menu));
   if (!r.badges.length || !r.badges.every((x) => /^⚠\d+\|\d+ con < 4 meses/.test(x))) fail("alerta compacta ⚠N con el detalle en el title: " + JSON.stringify(r.badges));
+  // v24.59 — Frontier: proy 100 u/mes × FOB 1 = u$s 100/mes
+  if (!/consumo u\$s 100\/mes/.test(r.consumo)) fail("el encabezado del proveedor muestra el consumo por mes: " + r.consumo);
   if (!r.modo) fail("el modo de nacionalización es un desplegable");
   if (r.tablaTop > 844) fail("la tabla tiene que empezar en la primera pantalla: top " + r.tablaTop);
   if (r.largoPag > 390) fail("la página se desborda de costado: " + r.largoPag);
