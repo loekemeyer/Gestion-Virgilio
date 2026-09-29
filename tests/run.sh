@@ -770,6 +770,8 @@ echo "== pipe-clientes-nuevos (v20.86: el pipeline reemplazo al submodulo viejo,
 node tests/pipe-clientes-nuevos.cjs
 echo "== pipe-en-a-programar (v20.86: cuarentena primero, zona, dos estados y colapsable — corrido, no leido) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-en-a-programar.cjs
+echo "== pipe-imprimir-excel (v24.32: el boton de cliente de prueba es Imprimir, con la columna Comentarios) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-imprimir-excel.cjs
 
 echo "== ppp-cliente-dos-dias-salidos (v20.67: lo que ya salio no parte al cliente en dos dias) =="
 node tests/ppp-cliente-dos-dias-salidos.cjs
@@ -1024,8 +1026,8 @@ node tests/impo-nac-por-articulo.cjs
 echo "== imp-nac-articulo-pantalla (v24.01: la nacionalizacion por articulo en la pantalla En curso) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-nac-articulo-pantalla.cjs
 
-echo "== pedimp-nac-articulo (v24.31: sin hueco muerto en la tabla + la nacionalizacion por articulo se abre desde el proveedor) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-nac-articulo.cjs
+echo "== pedimp-ancho-tabla (v24.32: sin hueco muerto entre Descripcion y Proy u/mes; la tarjeta mide lo que la tabla) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-ancho-tabla.cjs
 
 echo "== ppp-retira-badge (v22.40: un RETIRA no se lee como reparto 'Zona 6 · 🚚 CABA') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-retira-badge.cjs
