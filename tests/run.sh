@@ -567,6 +567,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-sin-a-programar (candado v20.77: desde Programación sólo se reprograma o se cancela) =="
 node tests/ppp-sin-a-programar.cjs
+echo "== sup-panel-v2393 (candado: dos puertas menos y «Completar datos producto» en Configuración) =="
+node tests/sup-panel-v2393.cjs
 
 echo "== ppp-fit-acordeon (v13.95: con un acordeón abierto la PPP scrollea en vez de achicarse y cortar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-fit-acordeon.cjs
