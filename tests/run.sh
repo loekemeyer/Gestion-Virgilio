@@ -490,6 +490,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== cbz-ficha-cliente (v23.98: submodulo Cobranzas - busqueda de cliente y ficha con deuda consolidada LK+CH por CUIT) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cbz-ficha-cliente.cjs
 
+echo "== cbz-conciliacion (v24.32: pestana Conciliacion - cuanto de cada extracto quedo identificado y que falta para conciliar solo) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cbz-conciliacion.cjs
+
 echo "== fac-conciliacion (v14.30: Facturación en 2 solapas; Conciliación = snapshot Gestión vs factura ISIS; el snapshot se registra al facturar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-conciliacion.cjs
 
