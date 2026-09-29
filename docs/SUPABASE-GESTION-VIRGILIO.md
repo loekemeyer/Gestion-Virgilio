@@ -30486,3 +30486,36 @@ de ceros: un cero no puede confundirse con *"no pude leer"*.
 
 **Chequeo:** `select count(*) from (select cuit from public.gv_cobranza_clientes_cuit() group by
 cuit having count(distinct empresa)=2) z;` — 69 al 29/09 · `node tests/cbz-ficha-cliente.cjs`.
+
+### §3.v2403 — v24.3: la ficha de Cobranzas junta deuda (Cuarentena) + conciliación + facturación — 2026-09-29
+
+**Pedido de Luis:** *"tenemos la data de la deuda que se sube para la cuarentena, tenés acceso a la
+facturación y a la conciliación. tratá de conectar esas fuentes a la ficha para la generación de la
+misma."*
+
+**Una sola función nueva: `gv_cobranza_ficha(p_emp, p_cod)` → `jsonb`**, con cuatro bloques y una
+sola vuelta de red. `sql/gv_cobranza_ficha_v2403.sql`.
+
+| bloque | de dónde sale | qué aporta |
+|---|---|---|
+| `deuda` | **`GV_Cobranza_Deuda_Viva`** | el **Excel de deuda que se sube para la Cuarentena** (el ancla) + las facturas y NC posteriores de ISIS − lo que la **conciliación bancaria** ya vio cobrado. Cada fila trae `pendiente_ancla`, `cancelado_banco` (con sus `recibos_banco`) y `origen` (`excel` / `isis nuevo`) |
+| `recibos` | **`GV_Cobranza_Imputacion`** | cada pago del banco cruzado contra las facturas que cancela: `dto_tomado` vs `dto_ganado`, retención, `a_reclamar` y `calidad` |
+| `entregas` | **`Facturacion_NP`** | lo que Gestión facturó: NP, tanda, m³, día de salida |
+| `cabecera` / `totales` | las tres | CUIT, localidad y provincia de entrega, deuda, vencida, comprobantes abiertos, días de la más vieja y el `ancla` del Excel |
+
+⚠ **La empresa de una entrega sale de la NP (`gv_emp_de_np`), nunca del código de cliente solo**: el
+mismo número es otro cliente en la otra empresa.
+
+⚠ **Los totales de la ficha ya no salen de la lista**: la lista es el respaldo mientras carga o si la
+RPC no contesta. La consolidación LK+CH la hace el front, llamando una vez por código del grupo.
+
+**Medido el 29/09 con INC (LK 1651): 27 ms como `authenticated`** (el timeout de ese rol es 8 s) ·
+deuda 127.002.447 · vencida 18.920.032 · 7 comprobantes · 126 días · último pago 14.250.082 del
+21/09 — los mismos números que muestra la pantalla.
+
+⚠ **Bug que cerró de paso:** el front llamaba `gv_cobranza_cliente({p_empresa, p_cod})` y el
+parámetro se llama **`p_emp`**, así que la ficha salía con *"Could not find the function … in the
+schema cache"*. PostgREST resuelve la función por el **nombre de los argumentos**, no por su orden.
+
+**Chequeo:** `select public.gv_cobranza_ficha('lk','1651')->'totales';` ·
+`node tests/cbz-ficha-cliente.cjs`.

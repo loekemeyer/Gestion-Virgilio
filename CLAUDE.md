@@ -3870,7 +3870,7 @@ banda NO los lleve, que los dos chips abran el pop-up y que el contenido siga co
 **Chequeo:** `node tests/imp-hist-pedidos.cjs` · `node tests/pedimp-config-proveedor.cjs` ·
 `select * from public.gv_imp_pedidos_historial(400);`. `sql/gv_imp_pedidos_historial_v2391.sql`.
 
-## ⚠ REGLA (Luis, 2026-09-29, v24.01): el COSTO DE NACIONALIZACIÓN se ve POR ARTÍCULO — y repartir todo por m³ NO es neutro
+## ⚠ REGLA (Luis, 2026-09-29, v24.3): el COSTO DE NACIONALIZACIÓN se ve POR ARTÍCULO — y repartir todo por m³ NO es neutro
 
 **Luis:** *"cada artículo en el listado tenga el coste de nacionalización, calculable por m³ y que
 sea variable (se pueda ajustar)"*.
@@ -4346,6 +4346,30 @@ retira y queda ésta. **Dos módulos que hacen lo mismo para siempre es el pozo 
 
 ⚠ Si la base no contesta, la pantalla muestra datos **DEMO** con un chip rojo que lo dice, en vez de
 ceros — regla *"una lectura ROTA no es un CERO"*.
+
+### La ficha se arma con `gv_cobranza_ficha(emp, cod)` — tres fuentes, una llamada (v24.3)
+
+**Luis, 29/09:** *"tenemos la data de la deuda que se sube para la cuarentena, tenés acceso a la
+facturación y a la conciliación. tratá de conectar esas fuentes a la ficha"*.
+
+| bloque | fuente | qué aporta |
+|---|---|---|
+| `deuda` | **`GV_Cobranza_Deuda_Viva`** | el **Excel de deuda de la Cuarentena** (el ancla) + facturas y NC posteriores de ISIS − lo que la **conciliación bancaria** vio cobrado (`pendiente_ancla`, `cancelado_banco`, `recibos_banco`, `origen`) |
+| `recibos` | **`GV_Cobranza_Imputacion`** | cada pago del banco contra las facturas que cancela: `dto_tomado` vs `dto_ganado`, retención, `a_reclamar`, `calidad` |
+| `entregas` | **`Facturacion_NP`** | lo que Gestión facturó: NP, tanda, m³, día de salida |
+
+⚠ **La empresa de una entrega la da la NP (`gv_emp_de_np`), NUNCA el código de cliente solo.**
+
+⚠ **Los totales de la ficha salen de la RPC, no de la lista** (la lista es el respaldo mientras
+carga o si no contesta). La consolidación LK+CH la hace el front: una llamada por código y se suman.
+
+⚠⚠ **PostgREST resuelve una función por el NOMBRE de sus argumentos, no por el orden.** Llamar
+`gv_cobranza_cliente({p_empresa, p_cod})` cuando el parámetro se llama **`p_emp`** no da un error de
+tipos: da *"Could not find the function … in the schema cache"*, como si la función no existiera.
+Antes de escribir la llamada: `select pg_get_function_arguments(oid) from pg_proc where proname = …`.
+
+Medido el 29/09 con INC (LK 1651): **27 ms como `authenticated`** (timeout del rol: 8 s), y los
+números coinciden con la pantalla. `sql/gv_cobranza_ficha_v2403.sql`, §3.v2403.
 
 **Chequeo:** `node tests/cbz-ficha-cliente.cjs` · `select count(*) from (select cuit from
 public.gv_cobranza_clientes_cuit() group by cuit having count(distinct empresa)=2) z;` — 69 al 29/09.
