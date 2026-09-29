@@ -30656,3 +30656,30 @@ que los cheques se cargan uno por uno como **A DEPOSITAR** con su cliente y su r
 **4.821 filas de depósito/cheque en la base, 3.776 con cliente (78 %) y 3.747 con recibo.**
 
 **Chequeo:** `select banco, count(*) from public."GV_Conc_Regla" group by 1;` — 21 credicoop, 11 santander.
+
+### §3.v2436 — v24.36: Santander SÍ trae CUIT en las transferencias — medido contra la conciliación ya hecha — 2026-09-29
+
+> **Se retira lo que decía la §3.v2435 («Santander NO trae CUIT»).** El extracto corto no tenía
+> transferencias. En el largo (203 movimientos, 01 al 29/09, Santander Chef) las transferencias traen
+> el CUIT al final (`… - De aloe/dario rafael / … - fac / 20210080415`). Lo que no lo trae es el
+> efectivo en sucursal y los cheques / e-cheq.
+
+Las reglas de Santander se rehicieron **por código operativo** (`GV_Conc_Regla.codop`, 28 reglas).
+
+**Medido contra lo que la persona ya cargó en la conciliación** (mismo importe, fecha ±10 días):
+
+| entradas | cuántas | la persona identificó | el motor identificó | coinciden |
+|---|---:|---:|---:|---:|
+| con CUIT | 27 | 27 | 25 | **24** |
+| sin CUIT (efectivo, cheques) | 14 | 6 | 0 | — |
+
+- **La que difiere** ($883.469,27, *De loekemeyer hnos srl*): la persona la cargó como **Arylo S.A.
+  (2419)** — LK cobró por cuenta de un cliente. Un CUIT de empresa propia ya **no** saca el movimiento
+  de la cobranza: sale con alerta para identificarlo a mano (`GV_Conc_Cuit_Propio`).
+- **Las 2 sin código**: paga un tercero. Lisia Nina Manzetti → Sucesión de Zapata Ricardo (1796);
+  Mario Dealbera → Mardo Mayorista (2677). Tabla nueva **`GV_Conc_Alias_Pagador`**, que se consulta
+  antes que el padrón. **Nace vacía**: los dos alias esperan el sí de Luis.
+- **Sin CUIT**: de 14, la persona identificó 6 (5 e-cheq que ya estaban como A DEPOSITAR con cliente
+  y recibo, y 1 efectivo en Rosario = P & M Bazar). Las otras 8 quedaron *No Identificado* también
+  en la planilla. El motor todavía no aparea contra A DEPOSITAR: las marca con alerta.
+- Un depósito no identificado sale con **det = 1**, como pide el Manual.

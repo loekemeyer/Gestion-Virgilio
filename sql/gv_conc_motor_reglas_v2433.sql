@@ -145,3 +145,36 @@ revoke insert, update, delete, truncate on public."GV_Conc_Regla" from anon, aut
 --
 -- ROLLBACK: las reglas de santander se sacan con
 --   delete from public."GV_Conc_Regla" where banco = 'santander';
+
+-- ============================================================================
+-- v24.36 — SANTANDER, con el extracto largo (203 movimientos, 01 al 29/09, Santander Chef)
+--
+-- ⚠ SE RETIRA lo que decia la v24.35 ("Santander NO trae CUIT"): el extracto corto no tenia
+--    transferencias. Santander SI trae el CUIT en las transferencias, al final:
+--      "Transferencia recibida - De aloe/dario rafael      / ... - fac / 20210080415"
+--      "Transf recibida cvu dif titular - De guillermina soledad troil/ mercado pago /27318504836"
+--      "Pago a proveedores recibido - Castets y tanino srl  30606858058 03 1780871"
+--    Lo que NO lo trae: el efectivo en sucursal (2030) y los cheques/e-cheq (3036, 3042, 3034,
+--    0867, 0869, 0870).
+--
+-- Reglas de santander rehechas POR CODIGO OPERATIVO (columna nueva GV_Conc_Regla.codop):
+-- 28 reglas; gv_conc_parse recibe p_codop y lo prefiere al texto.
+--
+-- MEDIDO contra la conciliacion que ya cargaron (gv_conciliacion_bancaria, santander/chef,
+-- mismo importe y fecha +-10 dias):
+--   entradas con CUIT: 27 -> la persona identifico 27 · el motor 25 · COINCIDEN 24 · difiere 1
+--     · difiere: $883.469,27 "De loekemeyer hnos srl" -> la persona lo cargo como ARYLO S.A (2419):
+--       LK cobro por cuenta de un cliente. => un CUIT propio YA NO saca el movimiento de la
+--       cobranza: sale con alerta para identificarlo a mano (GV_Conc_Cuit_Propio).
+--     · sin codigo (2): quien paga no es el cliente. Lisia Nina Manzetti (27120479437) pago por
+--       SUCESION DE ZAPATA RICARDO (1796); Mario Dealbera (20278713017) por MARDO MAYORISTA (2677).
+--       => tabla nueva GV_Conc_Alias_Pagador (empresa, cuit_pagador, cod_cliente): se consulta
+--       ANTES que el padron. Nace VACIA: los dos alias medidos esperan el si de Luis.
+--   entradas sin CUIT: 14 -> la persona identifico 6 (5 e-cheq que ya estaban A DEPOSITAR con
+--     cliente y recibo + 1 efectivo en Rosario = P & M BAZAR 2701); los otros 8 tambien quedaron
+--     "No Identificado" (det 1) en la planilla. El motor todavia no aparea contra A DEPOSITAR:
+--     los marca con alerta.
+--   Manual: un deposito que no se pudo identificar va con det = 1 (no D). gv_conc_proponer lo hace.
+--
+-- La planilla cargada NO guarda el concepto crudo del banco (solo en la observacion de los no
+-- identificados): el historico no sirve para saber que traia el extracto; los extractos crudos si.
