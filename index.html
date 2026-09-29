@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.49"></script>
+<script type="module" src="recepcion.js?v=24.50"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.49";
+const APP_VERSION = "v24.50";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17169,7 +17169,7 @@ async function ocgFetchImportados() {
   const volMaster = {};
   try {
     const vm = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados_Volumen", "select=cod,largo_cm,ancho_cm,alto_cm,m3_master,uni_master,uni_inner");
-    (vm || []).forEach(function (r) { volMaster[String(r.cod).toUpperCase().trim()] = { m3: Number(r.m3_master) || 0, um: Number(r.uni_master) || 0, ui: Number(r.uni_inner) || 0, l: Number(r.largo_cm) || 0, a: Number(r.ancho_cm) || 0, h: Number(r.alto_cm) || 0 }; });
+    (vm || []).forEach(function (r) { volMaster[String(r.cod).toUpperCase().trim()] = { m3: Number(r.m3_master) || 0, um: Number(r.uni_master) || 0, ui: Number(r.uni_inner) || 0, uiSuelto: r.uni_inner != null && Number(r.uni_inner) === 0, l: Number(r.largo_cm) || 0, a: Number(r.ancho_cm) || 0, h: Number(r.alto_cm) || 0 }; });
   } catch (_e) {}
   // Reingreso estimado por artículo importado (columna Importados.reingreso_est).
   // Lo edita el usuario acá; LK lo lee (vista v_lk_reingresos) para mostrar "Reingreso Est
@@ -17218,7 +17218,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
+    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, innerSuelto: !!(vm && vm.uiSuelto), cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -22492,8 +22492,8 @@ function pedImpPdfProv(provEnc) {
   const fmt = function (n) { return Number(n).toLocaleString("es-AR"); };
   let faltaInner = 0;
   let filas = arr.map(function (it) {
-    const inn = _pedImpInnerOf(it); if (inn == null) faltaInner++;
-    return '<tr><td style="' + tdc + '"><b>' + escapeHtml(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</b></td><td style="' + tdc + '">' + fmt(_pedImpMcOf(it)) + '</td><td style="' + tdc + '">' + (inn == null ? '—' : fmt(inn)) + '</td><td style="' + tdc + '">' + fmt(_pedImpUniOf(it)) + '</td></tr>';
+    const inn = _pedImpInnerOf(it); if (inn == null && !it.innerSuelto) faltaInner++;   // v24.50 (Thomas): uni_inner = 0 = viene SUELTO, sin inner (no es un dato que falta)
+    return '<tr><td style="' + tdc + '"><b>' + escapeHtml(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</b></td><td style="' + tdc + '">' + fmt(_pedImpMcOf(it)) + '</td><td style="' + tdc + '">' + (inn == null ? (it.innerSuelto ? 'suelto' : '—') : fmt(inn)) + '</td><td style="' + tdc + '">' + fmt(_pedImpUniOf(it)) + '</td></tr>';
   }).join("");
   const totMC = arr.reduce(function (s, it) { return s + _pedImpMcOf(it); }, 0);
   const totI = arr.reduce(function (s, it) { const v = _pedImpInnerOf(it); return s + (v || 0); }, 0);
@@ -63878,7 +63878,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.49"></script>
+<script src="cobranzas.js?v=24.50"></script>
 
 </body>
 </html>
