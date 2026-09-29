@@ -83,7 +83,9 @@
       "Bash(git worktree *)",
       "Bash(node tests/oc-recibido-backend.cjs)",
       "Bash(node scripts/bump-version.cjs 24.00)",
-      "Bash(node tests/cbz-ficha-cliente.cjs)"
+      "Bash(node tests/cbz-ficha-cliente.cjs)",
+      "Bash(node tests/pedimp-ancho-tabla.cjs)",
+      "Bash(node tests/imp-nac-articulo-pantalla.cjs)"
     ]
   }
 }
