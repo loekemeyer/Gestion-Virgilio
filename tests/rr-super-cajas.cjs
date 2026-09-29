@@ -11,7 +11,8 @@ eq({ lios: null, clase: "Etiqueta", cajas: 12 }, "12c", true, "súper sin dato d
 eq({ lios: 3, clase: "etiqueta", cajas: 40 }, "3", false, "súper con líos declarados → líos");
 eq({ lios: 0, clase: "nada", cajas: 7 }, "7c", true, "retira sigue igual");
 eq({ lios: 6, clase: "lio", cajas: 30 }, "6", false, "cliente común → líos");
-eq({ lios: 0, clase: "lio", cajas: 30 }, "0", false, "cliente común con 0 líos no cambia");
+eq({ lios: 0, clase: "lio", cajas: 30 }, "30c", true, "súper armado como lío pero sin líos → cajas");
+eq({ lios: null, clase: "", cajas: null }, "—", false, "sin líos ni cajas → —");
 if (!/data-label="\$\{cell\.esCajas \? "Cajas" : "Líos"\}"/.test(src)) fails.push("RR: el rótulo de la celda tiene que decir Cajas");
 if (!/const cell = _liosCajasCell\(it\);   \/\/ v24\.51/.test(src)) fails.push("Carga Camión tiene que usar _liosCajasCell para todos, no sólo Retira");
 if (fails.length) { console.log("✗ rr-super-cajas\n  " + fails.join("\n  ")); process.exit(1); }
