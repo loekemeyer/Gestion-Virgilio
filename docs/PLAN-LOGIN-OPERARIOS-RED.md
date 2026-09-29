@@ -1,6 +1,6 @@
 # Plan: login de operarios por legajo + red de la empresa (2026-09-28)
 
-**Objetivo (Thomas, 28/09):** que la clave pública (`sb_publishable_…`, está en repos públicos) no
+**Objetivo (Elías Irace, 28/09):** que la clave pública (`sb_publishable_…`, está en repos públicos) no
 sirva para hacer daño. Jerarquía de acceso:
 
 | Nivel | Cómo entra | Desde dónde | Qué puede |
