@@ -85,8 +85,8 @@ const ITEMS = [
     C.pisadas && C.pisadas.length === 0 &&                    // ni en celular
     C.scrollX > 0 && C.codSticky &&                           // en celular se desliza, con Código fijo
     C.tablaW >= 1100 &&                                       // no se achica hasta pisarse
-    A.tablaW <= 1230 &&                                       // v23.45 (Luis): sin hueco — la tabla mide lo que suman sus columnas, no el 100% del popup
-                                                              // (v23.93: 1148 → 1218, porque la letra pasó de 13 a 15px y el colgroup la acompañó)
+    A.tablaW >= A.wrapW - 2 &&                                // v23.95 (Luis, "optimizá el espacio"): sin hueco — la tabla LLENA el ancho
+                                                              // que tiene (el sobrante se lo lleva Descripción) y nunca baja de 1.188px
     !A.paginaScrollX && !C.paginaScrollX &&                   // el scroll es de la tabla, no de la página
     errs.length === 0;
   console.log("imp-tabla:", JSON.stringify(out), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
