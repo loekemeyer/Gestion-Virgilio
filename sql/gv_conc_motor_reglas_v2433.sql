@@ -76,3 +76,40 @@ revoke insert, update, delete, truncate on public."GV_Conc_Regla" from anon, aut
 -- drop function if exists public.gv_conc_cliente_por_cuit(text);
 -- drop function if exists public.gv_conc_parse(text,text,numeric,numeric);
 -- drop table if exists public."GV_Conc_Regla";
+
+-- ============================================================================
+-- v24.34 — DEFINICIONES DE LUIS (29/09) y lo que cambiaron
+--
+-- 1) "cada empresa maneja su deuda en sus cuentas. un cliente que tiene deuda por compras
+--     con chef va a pagar por medio de chef y lo mismo con loeke"
+--    => LA EMPRESA LA DA LA CUENTA BANCARIA, no la deuda. Lo que entra al Credicoop de
+--       Loeke es de LK, punto. El CUIT solo elige el CODIGO dentro de esa empresa.
+--       gv_cobranza_cliente_por_cuit paso a recibir la empresa: gv_conc_cliente_por_cuit(cuit, empresa).
+--       Se retira el desempate por deuda que tenia la version anterior.
+--       Si el CUIT no tiene codigo en la empresa de la cuenta, la fila sale con alerta
+--       ("pago en la cuenta equivocada o falta darlo de alta"): NO se lo manda a la otra empresa.
+--       Medido: los 11 CUIT distintos de los extractos dan codigo UNICO en LK.
+--
+-- 2) "el programa lo arma uno por uno ... pero todos los datos al maximo que se puedan derivar"
+--    => nada de agrupar los gastos en un renglon por dia: eso queda para la vista o la impresion.
+--       El motor devuelve una fila por movimiento del extracto.
+--
+-- 3) "nro de recibo es un numero que se genera de ISIS. dejalo vacio vos"
+--    => la columna I sale siempre NULL.
+--
+-- gv_conc_proponer(banco, empresa, movimientos jsonb) arma las filas de la conciliacion
+-- desde el extracto crudo, con todo lo que se puede derivar:
+--   fecha | operacion | entrada | salida | detalle | det | nro_op | nro_recibo (vacio) |
+--   cod_cliente | cliente | cuit | cbu | es_cobranza | deuda_cliente | cancela | alerta
+-- "cancela" propone el comprobante cuando el importe coincide EXACTO con un pendiente del
+-- cliente; el cruce fino de pagos parciales ya lo hace gv_cobranza_imputar.
+--
+-- Prueba (5 movimientos reales del 25 y 28/09):
+--   select * from public.gv_conc_proponer('credicoop','lk','[{"fecha":"2026-09-28",
+--     "concepto":"Credito Inmediato (DEBIN) dist titular 30718101243-VAR-BAZAR MONICA S CAP I SE CBU Origen:3220001805000054570077",
+--     "debito":0,"credito":472524.71,"nro_op":"80009"}]'::jsonb);
+--   -> Deposito | D | 4045 | Bazar Monica S. CAP I SECC IV | 30718101243 | sin alerta
+--
+-- ROLLBACK de esta parte:
+-- drop function if exists public.gv_conc_proponer(text,text,jsonb);
+-- drop function if exists public.gv_conc_cliente_por_cuit(text,text);

@@ -30608,3 +30608,24 @@ cheque proyectado a su fecha de vencimiento**. Al contarlas como cobranza se res
 **Chequeo:** `select public.gv_conc_parse('credicoop','Credito Inmediato (DEBIN) dist titular
 30718101243-VAR-BAZAR MONICA S CAP I SE CBU Origen:3220001805000054570077',0,472524.71);` ·
 `select * from public.gv_conc_cliente_por_cuit('30718101243');`
+
+### §3.v2434 — v24.34: las tres definiciones de Luis y el armado fila por fila — 2026-09-29
+
+| definición (Luis, 29/09) | qué cambió |
+|---|---|
+| *"cada empresa maneja su deuda en sus cuentas … un cliente que tiene deuda por compras con chef va a pagar por medio de chef"* | **La empresa la da la CUENTA BANCARIA, no la deuda.** Lo que entra al Credicoop de Loeke es de LK y punto; el CUIT sólo elige el **código dentro de esa empresa**. Se retiró el desempate por deuda de la v24.33. Si el CUIT no tiene código en esa empresa, la fila sale con alerta (*pagó en la cuenta equivocada o falta darlo de alta*) y **no se lo manda a la otra empresa** |
+| *"el programa lo arma uno por uno … todos los datos al máximo que se puedan derivar"* | **Nada de agrupar los gastos en un renglón por día**: eso queda para la vista o la impresión. Una fila por movimiento |
+| *"nro de recibo es un número que se genera de ISIS: dejalo vacío"* | la columna I sale siempre `NULL` |
+
+**Medido:** los 11 CUIT distintos de los dos extractos dan **código único en LK**. Cero ambigüedad.
+
+**`gv_conc_proponer(banco, empresa, movimientos jsonb)`** arma las filas desde el extracto crudo:
+`fecha · operacion · entrada · salida · detalle · det · nro_op · nro_recibo (vacío) · cod_cliente ·
+cliente · cuit · cbu · es_cobranza · deuda_cliente · cancela · alerta`. `cancela` propone el
+comprobante cuando el importe coincide **exacto** con un pendiente del cliente; los pagos parciales
+los sigue cruzando `gv_cobranza_imputar`.
+
+**Chequeo:** `select * from public.gv_conc_proponer('credicoop','lk','[{"fecha":"2026-09-28",
+"concepto":"Credito Inmediato (DEBIN) dist titular 30718101243-VAR-BAZAR MONICA S CAP I SE CBU
+Origen:3220001805000054570077","debito":0,"credito":472524.71,"nro_op":"80009"}]'::jsonb);` →
+`Deposito · D · 4045 · Bazar Monica · 30718101243`, sin alerta.
