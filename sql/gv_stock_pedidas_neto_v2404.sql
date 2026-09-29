@@ -36,10 +36,20 @@
 --
 -- ROLLBACK, una linea:   drop view if exists public.gv_stock_pedidas_neto;
 --
--- MEDIDO en transaccion abortada (29/09):
---   · 237 filas · 680 ms · anon ve las 237 (NO cae en la trampa de la v20.45: una vista
+-- ✅ APLICADA el 29/09 con el si de Luis. Backup previo de la derivada que lee la pantalla:
+--    zz_backups."GV_Backup_StocksCargaRapida_20260929" (367 filas, RLS prendida y escritura
+--    revocada en el mismo paso). No hacia falta —la vista no toca nada existente— pero Luis lo
+--    pidio: *"hace un backup por si acaso, despues se limpia si todo ok"*.
+--
+-- MEDIDO al aplicarla (29/09), no en transaccion abortada:
+--   · 237 filas · 550 / 548 / 555 ms como `authenticated` (timeout del rol: 8.000 ms, o sea 14x
+--     de margen) · anon ve las 237 (NO cae en la trampa de la v20.45: una vista
 --     security_invoker sobre tablas con RLS no da error, da MENOS filas — se probo con
 --     `set local role anon`, no desde el MCP, que entra como postgres).
+--   ⚠ La pantalla la lee EN PARALELO y sin await (Luis: *"hace la carga en paralelo, evalua para
+--     evitar timeouts"*): la tabla se dibuja con el total y se redibuja cuando llega el neto. Si
+--     la lectura falla o tarda, Stocks queda igual que la v24.03. Techo de 20 s en el fetch, que
+--     es para la RED colgada: la base corta sola a los 8 s.
 --   · suma de `total` = 13.132,3334 = `sum(cajas_pedidas)` de la matview, EXACTO: la vista
 --     replica el total y por eso la resta (total = neto + con_tp) cierra.
 --   · 501: tot 251 / neto 225 / tp 26 · 505: 551 / 481 / 70 · 839: fam 838E, es_secundario.
