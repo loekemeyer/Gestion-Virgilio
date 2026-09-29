@@ -3689,7 +3689,7 @@ estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la 
 
 La TV (`monitor/tv.html`) muestra chiquito **🔑 + 4 dígitos** (`gv_tv_clave_actual`, cambia cada **15 min**, vale
 también la anterior). En el celular: clave → **elige su nombre** (Empleados activos sede V o sin sede,
-`gv_tv_clave_validar`) o **＋ No estoy en la lista** → legajo. Sin clave el legajo no entra. Google (supervisor) sigue igual.
+`gv_tv_clave_validar`) o **＋ No estoy en la lista** → legajo. **Desde la v23.83 el legajo entra también SIN clave** (Luis: *"que puedan loguearse con pin o con legajo. No los limitemos"*): botón «Entrar con mi legajo». Google (supervisor) sigue igual.
 ⚠ **No es un candado**: la TV lee con la clave pública; es para que se entre estando en el depósito. La clave sale de un
 md5 del `system_identifier` del cluster (no hay secreto en el repo, que es público).
 `sql/gv_tv_clave_v2382.sql`, `tests/tv-clave-login.cjs`.

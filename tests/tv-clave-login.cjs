@@ -59,7 +59,8 @@ const OPS = [{ legajo: "104", nombre: "Jhonny Cartaya" }, { legajo: "77", nombre
     // (d-bis) legajo sin clave
     document.getElementById("legajoLoginInput").value = "300";
     await window.loginWithLegajo();
-    out.sinClave = { entro: !!ses(), err: err() };
+    out.sinClave = { entro: ses(), err: err() };
+    localStorage.removeItem("vir_legajo_auth");
     // (b) clave mala
     document.getElementById("tvClaveInput").value = "0000";
     await window.loginConClaveTv();
@@ -82,7 +83,7 @@ const OPS = [{ legajo: "104", nombre: "Jhonny Cartaya" }, { legajo: "77", nombre
     out.sesion = localStorage.getItem("vir_legajo_auth");
     return out;
   }, CLAVE);
-  ok(!res.sinClave.entro && /clave/i.test(res.sinClave.err), "(d) el legajo sin clave NO entra: «" + res.sinClave.err + "»");
+  ok(res.sinClave.entro && res.sinClave.entro.legajo === "300", "(d) v23.83: el legajo entra también SIN clave (pin o legajo, sin limitar)");
   ok(!res.mala.lista && /incorrecta/i.test(res.mala.err), "(b) clave incorrecta no deja pasar");
   ok(res.buena.lista && res.buena.btns.join("|") === "Jhonny Cartaya|Juan Perez", "(c) clave buena muestra los nombres: " + res.buena.btns.join(", "));
   ok(res.mas.legajo && !res.mas.lista, "(d) «+» muestra el legajo");
