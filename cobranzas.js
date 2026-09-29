@@ -41,12 +41,15 @@ var _cbz = {
   demo: false,
   error: null,
   sel: null,            // clave del grupo abierto
-  sub: "comp",          // "comp" | "cta" | "escala"
+  sub: "resumen",       // "resumen" | "deuda" | "pagos" | "comp" | "entregas" | "cta"
   comp: null,           // comprobantes de la ficha
   cta: null,            // cuenta corriente de la ficha
   abierta: null,        // fila de comprobante desplegada
   escalones: null,
-  cc: { vista: "extracto", cuenta: "credicoop|lk", movs: null, cargando: false, err: null, filtro: null, msg: "", abierto: null, wpp: {} }
+  cc: { vista: "bancos", cuenta: "credicoop|lk", movs: null, cargando: false, err: null, filtro: null, msg: "", abierto: null, wpp: {}, pend: null, pendFiltro: "todas" },
+  pop: null,
+  ops: null,
+  opSel: null
 };
 
 /* ------------------------------ utilidades ------------------------------- */
@@ -181,6 +184,65 @@ function _cbzCss() {
     ".cbz-conccard .bar i{display:block;height:100%;}",
     ".cbz-pend{padding:34px 16px;text-align:center;color:#64748b;}",
     ".cbz-pend h3{margin:0 0 6px;color:#334155;font-size:16px;}",
+    /* v24.41 — badge, tarjetas de banco, pop-up, planilla del cliente */
+    ".cbz-badge{display:inline-block;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:#dc2626;color:#fff;font-size:11px;font-weight:800;line-height:18px;text-align:center;vertical-align:middle;}",
+    ".cbz-badge-abs{position:absolute;top:8px;right:10px;}",
+    ".cbz-bank{position:relative;text-align:left;cursor:pointer;font:inherit;color:inherit;}",
+    ".cbz-bank:hover{border-color:#0f766e;box-shadow:0 2px 10px rgba(15,118,110,.18);}",
+    ".cbz-bank-abrir{margin-top:8px;font-size:12px;font-weight:800;color:#0f766e;}",
+    ".cbz-cargas{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;}",
+    ".cbz-cargas-k{font-size:12px;font-weight:800;color:#334155;margin-right:4px;}",
+    ".cbz-cargar-s{border:1px solid #0f766e;color:#0f766e;background:#f0fdfa;border-radius:7px;padding:4px 10px;font-weight:700;font-size:12px;cursor:pointer;}",
+    ".cbz-cargar-s:hover{background:#ccfbf1;}",
+    "#cbzPop{position:fixed;inset:0;z-index:9700;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;padding:18px 12px;}",
+    ".cbz-pop-card{background:#fff;border-radius:14px;box-shadow:0 12px 40px rgba(15,23,42,.35);width:min(1180px,100%);max-height:calc(100vh - 36px);display:flex;flex-direction:column;overflow:hidden;}",
+    ".cbz-pop-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #e2e8f0;background:#f8fafc;}",
+    ".cbz-pop-head>div:first-child{flex:1;min-width:220px;}",
+    ".cbz-pop-body{overflow:auto;flex:1;}",
+    ".cbz-pop-body .cbz-t thead th{position:sticky;top:0;z-index:1;background:#f1f5f9;}",
+    ".cbz-plt td{padding:4px 8px;font-size:12.5px;}",
+    ".cbz-plt tr.cbz-proy td{color:#64748b;background:#fcfcfd;}",
+    ".cbz-plt tr.cbz-conext td:first-child{box-shadow:inset 3px 0 0 #059669;}",
+    ".cbz-linea td{background:#fde047 !important;color:#713f12 !important;font-weight:800;text-align:center;font-size:12px;}",
+    ".cbz-resgrid{display:grid;grid-template-columns:230px minmax(0,1fr);gap:12px;padding:12px;align-items:start;}",
+    "@media (max-width:760px){.cbz-resgrid{grid-template-columns:1fr;}}",
+    ".cbz-oplist{display:flex;flex-direction:column;gap:5px;max-height:620px;overflow:auto;}",
+    ".cbz-oph{font-size:10.5px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin:6px 2px 1px;}",
+    ".cbz-opi{text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:9px;cursor:pointer;font:inherit;}",
+    ".cbz-opi:hover{border-color:#94a3b8;}",
+    ".cbz-opi.on{border-color:#0f766e;background:#f0fdfa;box-shadow:inset 3px 0 0 #0f766e;}",
+    ".cbz-opi .a{font-weight:700;font-size:12.5px;}",
+    ".cbz-opi .b{font-size:11.5px;color:#64748b;margin-top:1px;font-variant-numeric:tabular-nums;}",
+    ".cbz-pl{border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;background:#fff;}",
+    ".cbz-plhead{display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;border-bottom:2px solid #0f766e;padding-bottom:8px;}",
+    ".cbz-plhead>button{margin-left:auto;}",
+    ".cbz-plhead .k,.cbz-plk{font-size:10px;color:#64748b;font-weight:800;text-transform:uppercase;letter-spacing:.5px;}",
+    ".cbz-plhead .n{font-size:17px;font-weight:800;}",
+    ".cbz-plk{margin:10px 0 4px;}",
+    ".cbz-plgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;}",
+    ".cbz-plx{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums;}",
+    ".cbz-plx th{font-size:10.5px;color:#475569;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid #cbd5e1;padding:4px 6px;text-align:center;white-space:nowrap;}",
+    ".cbz-plx td{border-bottom:1px solid #f1f5f9;padding:4px 6px;text-align:center;white-space:nowrap;}",
+    ".cbz-plx tr.nc td{color:#3730a3;}",
+    ".cbz-plesc tr.on td{background:#ecfdf5;font-weight:800;color:#065f46;box-shadow:inset 0 1px 0 #059669,inset 0 -1px 0 #059669;}",
+    ".cbz-pltot{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e2e8f0;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-top:12px;}",
+    ".cbz-pltot>div{background:#f8fafc;padding:8px 10px;text-align:center;}",
+    ".cbz-pltot .k{font-size:10px;color:#64748b;font-weight:800;text-transform:uppercase;letter-spacing:.4px;}",
+    ".cbz-pltot .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px;}",
+    ".cbz-pltot .big .v{font-size:26px;color:#0f766e;}",
+    "@media (max-width:620px){.cbz-pltot{grid-template-columns:repeat(2,1fr);}}",
+    ".cbz-plres{border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;font-size:13px;}",
+    ".cbz-plres .lin{display:flex;justify-content:space-between;gap:10px;padding:3px 0;}",
+    ".cbz-plnc{margin:8px 0;padding:8px 10px;border-radius:9px;background:#eef2ff;border:1px solid #c7d2fe;text-align:center;}",
+    ".cbz-plnc .t{font-weight:800;color:#3730a3;}",
+    ".cbz-plnc .v{font-size:19px;font-weight:800;color:#3730a3;font-variant-numeric:tabular-nums;}",
+    ".cbz-plfin{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:8px 10px;border-radius:9px;font-size:15px;}",
+    ".cbz-plfin b{font-size:18px;font-variant-numeric:tabular-nums;}",
+    ".cbz-plfin.deuda{background:#fef9c3;color:#854d0e;}",
+    ".cbz-plfin.favor{background:#e0f2fe;color:#075985;}",
+    ".cbz-plfin.ok{background:#dcfce7;color:#166534;}",
+    ".cbz-mini{font-size:10.5px;color:#94a3b8;}",
+    "@media print{.cbz-noprint{display:none!important;}}",
     ".cbz-amb{background:#fef9c3;color:#854d0e;}",
     ".cbz-cargar{background:#0f766e;color:#fff;border-radius:8px;padding:7px 13px;font-weight:800;font-size:13px;cursor:pointer;}",
     ".cbz-ccmsg{margin-top:8px;padding:8px 12px;border-radius:9px;background:#ecfdf5;color:#065f46;font-size:13px;border:1px solid #a7f3d0;}",
@@ -230,17 +292,23 @@ async function openCobranzas(tab) {
   _cbz.sel = null; _cbz.abierta = null;
   cbzRender();
   if (!_cbz.rows.length) cbzCargarClientes();
+  if (!_cbz.conc && !_cbz.concCargando) cbzConcTablero();   // para el badge, aunque se abra en Clientes
 }
 function cbzClose() { var ov = document.getElementById("cbzOv"); if (ov) ov.style.display = "none"; }
-function cbzSetTab(t) { _cbz.tab = t; _cbz.sel = null; cbzRender(); if (t === "escalones") cbzCargarEscalones(); }
+/* v24.41 (Luis): cambiar de pestaña NO cierra el cliente abierto: al volver a «Clientes» sigue ahí */
+function cbzSetTab(t) { _cbz.tab = t; cbzRender(); if (t === "escalones") cbzCargarEscalones(); }
 
+/* el badge rojo de «Conciliación» = movimientos del extracto que esperan a una persona (v24.41) */
+function cbzTabsPintar() {
+  var tabs = document.getElementById("cbzTabs"); if (!tabs) return;
+  var n = (typeof cbzConcPendN === "function") ? cbzConcPendN() : 0;
+  tabs.innerHTML = _CBZ_TABS.map(function (x) {
+    return '<button class="cbz-tab' + (_cbz.tab === x.id ? " on" : "") + '" onclick="cbzSetTab(\'' + x.id + '\')">' + x.t +
+      (x.id === "conc" && n ? ' <span class="cbz-badge" id="cbzConcBadge">' + n + "</span>" : "") + "</button>";
+  }).join("");
+}
 function cbzRender() {
-  var tabs = document.getElementById("cbzTabs");
-  if (tabs) {
-    tabs.innerHTML = _CBZ_TABS.map(function (x) {
-      return '<button class="cbz-tab' + (_cbz.tab === x.id ? " on" : "") + '" onclick="cbzSetTab(\'' + x.id + '\')">' + x.t + '</button>';
-    }).join("");
-  }
+  cbzTabsPintar();
   var w = document.getElementById("cbzWrap"); if (!w) return;
   if (_cbz.tab === "clientes")  { w.innerHTML = _cbz.sel ? cbzFichaHtml() : cbzBuscadorHtml(); if (_cbz.sel) cbzFichaCargar(); return; }
   if (_cbz.tab === "conc")      { w.innerHTML = cbzConcHtml(); cbzConcCargar(); return; }
@@ -383,12 +451,13 @@ function cbzConsolidar(rows, cuits) {
 
    Un grupo con código en LK y en Chef pide las dos y se suman: los totales de la
    cabecera salen de acá, no de la lista. */
-function cbzAbrir(key) { _cbz.sel = key; _cbz.sub = "deuda"; _cbz.ficha = null; _cbz.comp = null; _cbz.cta = null; _cbz.abierta = null; cbzRender(); }
-function cbzVolver() { _cbz.sel = null; _cbz.ficha = null; _cbz.comp = null; _cbz.cta = null; cbzRender(); }
+function cbzAbrir(key) { _cbz.sel = key; _cbz.sub = "resumen"; _cbz.ficha = null; _cbz.comp = null; _cbz.cta = null; _cbz.ops = null; _cbz.opSel = null; _cbz.abierta = null; cbzRender(); }
+function cbzVolver() { _cbz.sel = null; _cbz.ficha = null; _cbz.comp = null; _cbz.cta = null; _cbz.ops = null; _cbz.opSel = null; cbzRender(); }
 function cbzSub(s) { _cbz.sub = s; cbzRender(); }
 function cbzGrupo() { var k = _cbz.sel; return _cbz.grupos.filter(function (g) { return g.key === k; })[0] || null; }
 
 var _CBZ_SUBS = [
+  { id: "resumen",  t: "📋 Resumen" },
   { id: "deuda",    t: "💳 Deuda" },
   { id: "pagos",    t: "🧾 Pagos y descuentos" },
   { id: "comp",     t: "📄 Explicación" },
@@ -498,6 +567,11 @@ async function cbzFichaCargar() {
     if (_cbz.sel === g.key) { var w = document.getElementById("cbzWrap"); if (w) w.innerHTML = cbzFichaHtml(); }
   }
   var pan = document.getElementById("cbzPanel"); if (!pan) return;
+  if (_cbz.sub === "resumen") {
+    if (!_cbz.ops) { var key = g.key; _cbz.ops = await cbzOpsTraer(g); if (_cbz.sel !== key) return; }
+    pan = document.getElementById("cbzPanel"); if (pan && _cbz.sub === "resumen") pan.innerHTML = cbzResumenHtml();
+    return;
+  }
   if (_cbz.sub === "deuda")    { pan.innerHTML = cbzDeudaHtml(); return; }
   if (_cbz.sub === "pagos")    { pan.innerHTML = cbzPagosHtml(); return; }
   if (_cbz.sub === "entregas") { pan.innerHTML = cbzEntregasHtml(); return; }
@@ -560,6 +634,18 @@ function cbzDeudaHtml() {
 }
 
 /* ---- PAGOS: cada recibo del banco contra las facturas que cancela -------- */
+/* «Ret.» NO es una retención medida: es lo que queda de la cuenta después del descuento y las NC,
+   1 − pagado / esperado. Positivo = pagó de MENOS (retención de IIBB/Ganancias o un descuento sin
+   registrar); negativo = pagó de MÁS. Por eso un e-cheq puede dar las dos (Luis, 29/09). */
+function cbzRetHtml(r) {
+  var x = _cbzNum(r.retencion);
+  if (!x || Math.abs(x) < 0.0005) return "—";
+  var rc = _cbzNum(r.ret_cliente) || ((cbzGrupo() || { cods: [] }).cods.reduce(function (m, c) { return Math.max(m, _cbzNum(c.ret_cliente)); }, 0));
+  if (x < 0) return '<span class="cbz-chip cbz-info" title="Pagó más de lo que da la cuenta: no hay ND que lo explique">+' + _cbzPlata(-x * 100, 2) + " % de más</span>";
+  return '<span title="Pagó menos de lo que da la cuenta: retención o descuento sin registrar' +
+    (rc ? "" : ". Este cliente NO figura como agente de retención") + '">' + _cbzPlata(x * 100, 2) + " %" +
+    (rc ? "" : ' <span class="cbz-rojo">?</span>') + "</span>";
+}
 function cbzPagosHtml() {
   var f = _cbz.ficha; if (!f) return '<div class="cbz-vacio">Cargando…</div>';
   if (f.err && !f.recibos.length) return '<div class="cbz-vacio">No pude leer: ' + _cbzEsc(f.err) + "</div>";
@@ -567,7 +653,7 @@ function cbzPagosHtml() {
   var multi = (cbzGrupo() || { cods: [] }).cods.length > 1;
   var h = '<table class="cbz-t"><thead><tr><th>Recibo</th>' + (multi ? "<th>Emp</th>" : "") +
     "<th>Fecha</th><th style='text-align:left;'>Medio</th><th>Pagado</th><th style='text-align:left;'>Facturas</th>" +
-    "<th>De lista</th><th>Días</th><th>Dto tomado</th><th>Dto ganado</th><th>Ret.</th><th>A reclamar</th><th>Calidad</th></tr></thead><tbody>";
+    "<th>De lista</th><th>Días</th><th>Dto tomado</th><th>Dto ganado</th><th title=\"1 − pagado ÷ lo que da la cuenta: + pagó de menos, − pagó de más\">Dif.</th><th>A reclamar</th><th>Calidad</th></tr></thead><tbody>";
   h += f.recibos.map(function (r) {
     var mal = _cbzNum(r.a_reclamar) > 0;
     var cal = String(r.calidad || "");
@@ -584,13 +670,15 @@ function cbzPagosHtml() {
         (r.atraso != null && _cbzNum(r.atraso) > 0 ? '<div style="font-size:10.5px;" class="cbz-rojo">+' + _cbzPlata(r.atraso) + "</div>" : "") + "</td>" +
       "<td>" + (r.dto_tomado != null ? _cbzPlata(_cbzNum(r.dto_tomado) * 100, 1) + " %" : "—") + "</td>" +
       "<td>" + (r.dto_ganado != null ? _cbzPlata(_cbzNum(r.dto_ganado) * 100, 1) + " %" : "—") + "</td>" +
-      "<td>" + (_cbzNum(r.retencion) ? _cbzPlata(_cbzNum(r.retencion) * 100, 2) + " %" : "—") + "</td>" +
+      "<td>" + cbzRetHtml(r) + "</td>" +
       '<td class="cbz-ambar"><b>' + (mal ? _cbzPlata(r.a_reclamar) : "—") + "</b></td>" +
       '<td><span class="cbz-chip ' + chip + '">' + _cbzEsc(cal || "—") + "</span></td></tr>";
   }).join("");
   h += "</tbody></table>";
   h += '<div class="cbz-nota">Sale de la conciliación bancaria imputada: «Dto tomado» es lo que el cliente se descontó al pagar y ' +
-    "«Dto ganado» lo que le correspondía por los días. La diferencia es lo que hay que reclamar. <b>Sin imputar</b> = el pago entró " +
+    "«Dto ganado» lo que le correspondía por los días. La diferencia es lo que hay que reclamar. «Dif.» es lo que no cierra de la cuenta: " +
+    "positiva = pagó de menos (retención o descuento sin registrar; con <span class=\"cbz-rojo\">?</span> si el cliente no figura como agente), " +
+    "negativa = pagó de más. Un recibo que pagó varios juegos de facturas aparece en cada uno con el importe entero. <b>Sin imputar</b> = el pago entró " +
     "al banco pero todavía no se pudo cruzar contra una factura.</div>";
   return h;
 }
@@ -723,6 +811,212 @@ function cbzEscalonesHtml() {
     '</tbody></table><div class="cbz-nota">Vive en <code>cobranzas_escalones</code>: cambiarla es un <code>update</code>, no un deploy. Las excepciones por cliente (las “coronitas”) están en <code>cobranzas_excepciones</code> y se cruzan por CUIT del padrón.</div></div>';
 }
 
+/* ============================ RESUMEN (v24.41) ============================
+   Luis: "el módulo del cliente abra en un RESUMEN que sea una ficha como esa (pero más linda)" — la
+   planilla de cobranza: facturas · pagos con sus días y la ponderación · total · escala de descuentos
+   · la NC de descuento y lo que queda a favor o en deuda.
+   Una OPERACIÓN es un juego de facturas: las cobradas salen de la imputación de la conciliación
+   (gv_cobranza_operaciones → pagadas) y las abiertas de la deuda viva, agrupadas por día de factura.
+   La cuenta de la planilla es la del Excel: días ponderados por lo pagado, NC dto = facturado × %,
+   saldo = facturado − NC ya emitidas − pagado. */
+function _cbzCompDe(txt) {
+  var p = String(txt || "").trim().split(/\s+/);
+  return { comp: p[0] || "", nro: String(p[p.length - 1] || "").split("-").pop().replace(/^0+/, "") };
+}
+function _cbzTipoCorto(t) {
+  var s = String(t || "").toUpperCase(), l = (/\b([ABCE])\s*$/.exec(s) || [])[1] || "";
+  return (/^NC/.test(s) ? "NC" : (/^ND/.test(s) ? "ND" : "FC")) + l;
+}
+function _cbzDiasDesde(f) { if (!f) return null; var d = new Date(String(f).slice(0, 10) + "T12:00:00"); return Math.max(0, Math.round((Date.now() - d.getTime()) / 86400000)); }
+function cbzDtoPorDias(d) {
+  if (d == null) return null;
+  var es = cbzEscalones();
+  for (var i = 0; i < es.length; i++) if (d <= es[i].dias) return es[i];
+  return null;
+}
+function cbzOpAbierta(a, emp, cod) {
+  var fac = (a.facturas || []).map(function (x) {
+    var c = _cbzCompDe(x.comprobante);
+    return { fecha: x.fecha, comp: c.comp, nro: c.nro, importe: _cbzNum(x.lista != null ? x.lista : x.pendiente),
+             pendiente: _cbzNum(x.pendiente), condicion: x.condicion, vence: x.vence };
+  });
+  var pagos = (a.facturas || []).filter(function (x) { return _cbzNum(x.cancelado_banco) > 0; }).map(function (x) {
+    return { fecha: null, importe: _cbzNum(x.cancelado_banco), recibo: x.recibos_banco || "", dias: null, obs: "cobro parcial" };
+  });
+  var imp = fac.reduce(function (s, x) { return s + x.importe; }, 0);
+  var pag = pagos.reduce(function (s, x) { return s + x.importe; }, 0);
+  var d = _cbzDiasDesde(a.fecha), esc = cbzDtoPorDias(d);
+  return { key: "a|" + emp + "|" + a.fecha, tipo: "abierta", emp: emp, cod: cod, fecha: a.fecha, facturas: fac, ncs: [], pagos: pagos,
+           importe: imp, ncTotal: 0, pagado: pag, saldo: _cbzNum(a.pendiente), dias: d,
+           dtoGanado: esc ? esc.dto : 0, dtoTomado: null, aReclamar: 0, retencion: null, calidad: "abierta" };
+}
+function cbzOpPagada(p, emp, cod) {
+  var fac = (p.facturas || []).map(function (x) {
+    return { fecha: x.fecha, comp: _cbzTipoCorto(x.tipo), nro: x.numero, importe: _cbzNum(x.total) };
+  });
+  if (!fac.length) fac = String(p.facturas_txt || "").split("+").map(function (n, i) {
+    return { fecha: p.fecha_fc, comp: "FC", nro: n, importe: i === 0 ? _cbzNum(p.lista) : null };
+  });
+  var ncs = (p.ncs || []).map(function (x) { return { fecha: x.fecha, comp: _cbzTipoCorto(x.tipo), nro: x.numero, importe: _cbzNum(x.total), gravado: _cbzNum(x.gravado) }; });
+  var pagos = (p.pagos || []).map(function (x) {
+    return { fecha: x.fecha, importe: _cbzNum(x.pagado), recibo: x.recibo || "", medio: x.medio, dias: x.dias, grupos: _cbzNum(x.grupos) };
+  });
+  var pag = pagos.reduce(function (s, x) { return s + x.importe; }, 0);
+  var dd = pag ? pagos.reduce(function (s, x) { return s + x.importe * _cbzNum(x.dias); }, 0) / pag : null;
+  var imp = _cbzNum(p.lista), ncT = Math.abs(_cbzNum(p.lista_nc));
+  return { key: "p|" + emp + "|" + p.facturas_txt, tipo: "pagada", emp: emp, cod: cod, fecha: p.fecha_fc || (fac[0] && fac[0].fecha),
+           facturas: fac, ncs: ncs, pagos: pagos, importe: imp, ncTotal: ncT, pagado: pag, saldo: imp - ncT - pag,
+           dias: dd == null ? null : Math.round(dd), dtoGanado: _cbzNum(p.dto_ganado), dtoTomado: p.dto_tomado == null ? null : _cbzNum(p.dto_tomado),
+           plazo: p.plazo == null ? null : _cbzNum(p.plazo),
+           aReclamar: _cbzNum(p.a_reclamar), retencion: p.retencion == null ? null : _cbzNum(p.retencion),
+           compartido: pagos.some(function (x) { return x.grupos > 1; }), calidad: p.calidad || "", ultimo: p.ultimo_pago };
+}
+async function cbzOpsTraer(g) {
+  var rr = await Promise.all(g.cods.map(function (c) { return _cbzRpc("gv_cobranza_operaciones", { p_emp: c.empresa, p_cod: c.cod_cliente }); }));
+  var ab = [], pg = [], err = null;
+  rr.forEach(function (r, i) {
+    if (r.error) { err = r.error; return; }
+    var d = r.data || {}, emp = g.cods[i].empresa, cod = g.cods[i].cod_cliente;
+    (d.abiertas || []).forEach(function (a) { ab.push(cbzOpAbierta(a, emp, cod)); });
+    (d.pagadas || []).forEach(function (p) { pg.push(cbzOpPagada(p, emp, cod)); });
+  });
+  if ((err || (!ab.length && !pg.length)) && _cbz.demo) pg = [cbzOpPagada(_CBZ_DEMO_OP, "lk", "4045")];
+  ab.sort(function (a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });   // la deuda más vieja primero
+  return { ops: ab.concat(pg), err: err };
+}
+function cbzOpSel(k) { _cbz.opSel = k; var p = document.getElementById("cbzPanel"); if (p) p.innerHTML = cbzResumenHtml(); }
+
+function cbzResumenHtml() {
+  var o = _cbz.ops; if (!o) return '<div class="cbz-vacio">Cargando…</div>';
+  if (!o.ops.length) return '<div class="cbz-vacio">' + (o.err ? "No pude leer: " + _cbzEsc(o.err) : "Este cliente no tiene operaciones con pagos ni deuda abierta.") + "</div>";
+  var sel = o.ops.filter(function (x) { return x.key === _cbz.opSel; })[0] || o.ops[0];
+  var multi = (cbzGrupo() || { cods: [] }).cods.length > 1;
+  var lista = '<div class="cbz-oplist">' + o.ops.map(function (x, i) {
+    var prev = o.ops[i - 1], head = "";
+    if (!prev || prev.tipo !== x.tipo) head = '<div class="cbz-oph">' + (x.tipo === "abierta" ? "Deuda abierta" : "Cobradas") + "</div>";
+    var nros = x.facturas.map(function (f) { return f.nro; }).filter(Boolean);
+    var rot = (x.facturas[0] ? x.facturas[0].comp : "FC") + " " + (nros.length > 2 ? nros[0] + " +" + (nros.length - 1) : nros.join("+"));
+    var chip = x.tipo === "abierta" ? '<span class="cbz-chip cbz-lk">' + _cbzPlata(x.dias) + " d</span>"
+      : (x.aReclamar > 0.5 ? '<span class="cbz-chip cbz-warn">reclamar</span>' : '<span class="cbz-chip cbz-ok">' + (x.dias != null ? _cbzPlata(x.dias) + " d" : "ok") + "</span>");
+    return head + '<button class="cbz-opi' + (x.key === sel.key ? " on" : "") + '" onclick="cbzOpSel(\'' + _cbzEsc(x.key).replace(/'/g, "\\'") + '\')">' +
+      '<div class="a">' + (multi ? '<span class="cbz-chip ' + (x.emp === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(x.emp) + "</span> " : "") + _cbzEsc(rot) + " " + chip + "</div>" +
+      '<div class="b">' + _cbzFecha(x.fecha) + " · $ " + _cbzPlata(x.tipo === "abierta" ? x.saldo : x.importe) + "</div></button>";
+  }).join("") + "</div>";
+  return '<div class="cbz-resgrid">' + lista + '<div style="min-width:0;">' + cbzPlanillaHtml(sel) + "</div></div>";
+}
+
+function cbzPlanillaHtml(op) {
+  var g = cbzGrupo() || { nombre: "", cods: [] };
+  var cod = (op.emp === "chef" ? "CH " : "LK ") + op.cod;
+  var abierta = op.tipo === "abierta";
+  /* facturas + NC */
+  var fh = '<table class="cbz-plx"><thead><tr><th>Fecha FC</th><th>Comp</th><th>Nro</th><th>Importe FC</th></tr></thead><tbody>' +
+    op.facturas.map(function (f) {
+      return "<tr><td>" + _cbzFecha(f.fecha) + "</td><td>" + _cbzEsc(f.comp) + "</td><td><b>" + _cbzEsc(f.nro) + "</b></td><td>" +
+        (f.importe != null ? _cbzPlata(f.importe, 2) : "—") + "</td></tr>";
+    }).join("") +
+    op.ncs.map(function (n) {
+      return '<tr class="nc"><td>' + _cbzFecha(n.fecha) + "</td><td>" + _cbzEsc(n.comp) + "</td><td><b>" + _cbzEsc(n.nro) + "</b></td><td>−" + _cbzPlata(n.importe, 2) + "</td></tr>";
+    }).join("") +
+    (!op.ncs.length && op.ncTotal ? '<tr class="nc"><td colspan="3">NC ya emitidas</td><td>−' + _cbzPlata(op.ncTotal, 2) + "</td></tr>" : "") +
+    "</tbody></table>";
+  /* pagos con la ponderación del Excel: pond = días × pagado / total pagado */
+  var pag = op.pagado;
+  var ph = '<table class="cbz-plx"><thead><tr><th>Fecha pago</th><th>Importe</th><th>Recibo</th><th>Días</th><th>Pond.</th></tr></thead><tbody>' +
+    (op.pagos.length ? op.pagos.map(function (x) {
+      var pond = (pag && x.dias != null) ? _cbzNum(x.dias) * x.importe / pag : null;
+      return "<tr><td>" + (x.fecha ? _cbzFecha(x.fecha) : "—") + "</td><td><b>" + _cbzPlata(x.importe, 2) + "</b>" +
+        (x.grupos > 1 ? '<div class="cbz-mini" title="El mismo recibo pagó ' + x.grupos + ' juegos de facturas: el importe es el del recibo entero">↔ recibo compartido</div>' : "") + "</td>" +
+        "<td>" + _cbzEsc(x.recibo || x.obs || "—") + (x.medio ? '<div class="cbz-mini">' + _cbzEsc(x.medio) + "</div>" : "") + "</td>" +
+        "<td>" + (x.dias != null ? _cbzPlata(x.dias) : "—") + "</td><td>" + (pond != null ? _cbzPlata(pond, 2) : "—") + "</td></tr>";
+    }).join("") : '<tr><td colspan="5" style="color:#94a3b8;">' + (abierta ? "Todavía sin pagos" : "—") + "</td></tr>") +
+    "</tbody></table>";
+  /* total */
+  var dias = op.dias;
+  var tot = '<div class="cbz-pltot">' +
+    '<div><div class="k">Importe FC</div><div class="v">$ ' + _cbzPlata(op.importe, 2) + "</div></div>" +
+    '<div class="big"><div class="k">' + (abierta ? "Días al día de hoy" : "Días de cobranza") + '</div><div class="v">' + (dias != null ? _cbzPlata(dias) : "—") + "</div></div>" +
+    '<div><div class="k">Importe pagado</div><div class="v cbz-verde">$ ' + _cbzPlata(pag, 2) + "</div></div>" +
+    '<div><div class="k">Saldo</div><div class="v">$ ' + _cbzPlata(op.saldo, 2) + "</div></div></div>";
+  /* escala: el % de cada escalón sobre lo facturado, y el que le toca marcado */
+  /* En una cobrada manda lo que decidió el agente (dto_ganado), no la escala pelada: un cliente
+     con PLAZO propio (Cuyana 60 d) que paga en 63 días no gana nada aunque la escala diga −5 %. */
+  var es = cbzEscalones(), gan = abierta ? cbzDtoPorDias(dias)
+    : (es.filter(function (e) { return Math.abs(e.dto - _cbzNum(op.dtoGanado)) < 0.0001; })[0] || null);
+  var esc = '<table class="cbz-plx cbz-plesc"><thead><tr><th>Plazo</th><th>Dto</th><th>Descuento</th><th>' + (abierta ? "A pagar" : "Neto") + "</th></tr></thead><tbody>" +
+    es.map(function (e) {
+      var on = gan && gan.orden === e.orden;
+      return '<tr class="' + (on ? "on" : "") + '"><td>' + _cbzEsc(e.label) + "</td><td>−" + _cbzPlata(e.dto * 100, 0) + " %</td><td>$ " +
+        _cbzPlata(op.importe * e.dto, 2) + "</td><td>$ " + _cbzPlata(op.importe * (1 - e.dto) - (abierta ? pag : 0), 2) + "</td></tr>";
+    }).join("") + "</tbody></table>";
+  /* resultado */
+  var ganPct = abierta ? (gan ? gan.dto : 0) : op.dtoGanado;
+  var ncDto = op.importe * ganPct;
+  /* la NC de descuento que FALTA emitir: lo que le corresponde menos las NC que ya tiene, y nunca más que el saldo */
+  var ncFalta = abierta ? 0 : Math.max(0, Math.min(Math.max(op.saldo, 0), ncDto - (op.ncTotal || 0)));
+  var res = abierta ? op.saldo : op.saldo - ncFalta;
+  var neto = ncFalta / 1.21, iva = ncFalta - neto;
+  var r = '<div class="cbz-plres">';
+  if (abierta) {
+    r += '<div class="lin"><span>Si paga hoy (' + _cbzPlata(dias) + " días)</span><b>" + (gan ? "−" + _cbzPlata(gan.dto * 100, 0) + " %" : "sin descuento") + "</b></div>" +
+      '<div class="lin"><span>Paga</span><b>$ ' + _cbzPlata(op.importe * (1 - ganPct) - pag, 2) + "</b></div>";
+    var sig = es.filter(function (e) { return dias != null && e.dias >= dias; })[0];
+    if (gan && sig) r += '<div class="cbz-mini" style="margin-top:4px;">Mantiene el −' + _cbzPlata(gan.dto * 100, 0) + " % hasta el día " + gan.dias + " (" + _cbzFecha(new Date(new Date(String(op.fecha).slice(0, 10) + "T12:00:00").getTime() + gan.dias * 86400000).toISOString().slice(0, 10)) + ").</div>";
+  } else {
+    r += '<div class="lin"><span>Le corresponde</span><b>' + (ganPct ? "−" + _cbzPlata(ganPct * 100, 0) + " %" : "sin descuento") + "</b></div>" +
+      (op.plazo ? '<div class="lin"><span>Plazo pactado del cliente</span><b>' + _cbzPlata(op.plazo) + " días" +
+        (dias != null && dias > op.plazo ? ' <span class="cbz-rojo">· pagó ' + _cbzPlata(dias - op.plazo) + " días tarde</span>" : "") + "</b></div>" : "") +
+      (op.dtoTomado != null ? '<div class="lin"><span>Se descontó</span><b class="' + (op.dtoTomado > ganPct + 0.0001 ? "cbz-rojo" : "") + '">−' + _cbzPlata(op.dtoTomado * 100, 1) + " %</b></div>" : "");
+    if (ncFalta > 0.5) r += '<div class="cbz-plnc"><div class="t">NC Dto ' + _cbzPlata(ganPct * 100, 0) + ' %</div><div class="v">$ ' + _cbzPlata(ncFalta, 2) + "</div>" +
+      '<div class="cbz-mini">N. gravado $ ' + _cbzPlata(neto, 2) + " · IVA $ " + _cbzPlata(iva, 2) + "</div></div>";
+    if (op.aReclamar > 0.5) r += '<div class="lin cbz-ambar"><span>Descuento mal tomado</span><b>$ ' + _cbzPlata(op.aReclamar, 2) + "</b></div>";
+    if (op.retencion != null && Math.abs(op.retencion) >= 0.001) {
+      r += '<div class="cbz-mini" style="margin-top:4px;">' + (op.retencion > 0
+        ? "Pagó " + _cbzPlata(op.retencion * 100, 2) + " % menos de lo que da la cuenta: retención (IIBB/Ganancias) o un descuento que no está registrado."
+        : "Pagó " + _cbzPlata(-op.retencion * 100, 2) + " % de más: no hay ND que lo explique; puede cubrir parte de otra factura.") + "</div>";
+    }
+  }
+  r += '<div class="cbz-plfin ' + (res > 0.5 ? "deuda" : (res < -0.5 ? "favor" : "ok")) + '"><span>' + (res > 0.5 ? "Deuda" : (res < -0.5 ? "A favor" : "Saldado")) + "</span><b>$ " + _cbzPlata(Math.abs(res), 2) + "</b></div></div>";
+
+  return '<div class="cbz-pl" id="cbzPl">' +
+    '<div class="cbz-plhead"><div><div class="k">Razón social</div><div class="n">' + _cbzEsc(g.nombre) + "</div></div>" +
+      '<div><div class="k">Cod</div><div class="n">' + _cbzEsc(cod) + "</div></div>" +
+      (g.cuit ? '<div><div class="k">CUIT</div><div class="n" style="font-size:14px;">' + _cbzEsc(g.cuit) + "</div></div>" : "") +
+      '<button class="cbz-back cbz-noprint" onclick="cbzPlImprimir()">🖨 Imprimir para el cliente</button></div>' +
+    '<div class="cbz-plgrid"><div><div class="cbz-plk">Facturas</div>' + fh + '</div><div><div class="cbz-plk">Pagos</div>' + ph + "</div></div>" +
+    tot +
+    '<div class="cbz-plgrid"><div><div class="cbz-plk">Escala de descuentos</div>' + esc + '</div><div><div class="cbz-plk">Resultado</div>' + r + "</div></div>" +
+    "</div>";
+}
+/* imprime SÓLO la planilla, en un iframe: la app no se toca */
+function cbzPlImprimir() {
+  var el = document.getElementById("cbzPl"); if (!el) return;
+  var css = (document.getElementById("cbzCss") || {}).textContent || "";
+  var fr = document.createElement("iframe");
+  fr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+  document.body.appendChild(fr);
+  var d = fr.contentWindow.document;
+  d.open();
+  d.write('<!doctype html><html><head><meta charset="utf-8"><title>Cobranza</title><style>' + css +
+    "body{font-family:system-ui,Segoe UI,Arial,sans-serif;color:#0f172a;background:#fff;margin:14px;}.cbz-noprint{display:none!important;}</style></head><body>" +
+    el.outerHTML + "</body></html>");
+  d.close();
+  setTimeout(function () { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (_e) {} setTimeout(function () { fr.remove(); }, 1500); }, 250);
+}
+var _CBZ_DEMO_OP = {
+  facturas_txt: "35292", nc_txt: null, lista: 1080583.02, lista_nc: 0, fecha_fc: "2026-07-24", plazo: 60,
+  dto_tomado: 0.10, dto_ganado: 0.10, retencion: 0, a_reclamar: 0, calidad: "exacta", ultimo_pago: "2026-09-28",
+  facturas: [{ tipo: "FC Electr. A", numero: "35292", fecha: "2026-07-24", total: 1080583.02 }], ncs: [],
+  pagos: [{ recibo: "14588", fecha: "2026-09-15", pagado: 500000, medio: "deposito", dias: 53, grupos: 1 },
+          { recibo: "14601", fecha: "2026-09-28", pagado: 472524.71, medio: "transferencia", dias: 66, grupos: 1 }]
+};
+window.cbzOpSel = cbzOpSel;
+window.cbzResumenHtml = cbzResumenHtml;
+window.cbzPlanillaHtml = cbzPlanillaHtml;
+window.cbzPlImprimir = cbzPlImprimir;
+window.cbzOpPagada = cbzOpPagada;
+window.cbzOpAbierta = cbzOpAbierta;
+
 /* ============================ 3) CONCILIACIÓN ============================
    Hoy la conciliación se hace A MANO en cuatro Excel (Credicoop y Santander, LK y
    Chef): alguien mira el extracto y le escribe al renglón el cliente y el recibo.
@@ -734,74 +1028,269 @@ function cbzEscalonesHtml() {
 
    Desde la v24.37 esto es la vista «📊 Planillas» de la pestaña; la principal es
    «📥 Extracto» (3b, más abajo), que carga el extracto del banco y lo cruza solo. */
+/* v24.41 (Luis, 29/09) — la pestaña se reorganizó:
+     🏦 Bancos            una tarjeta por cuenta que abre SU conciliación en un pop-up (planilla,
+                          extracto cargado y lo sin identificar) + 4 botones chicos para cargar el
+                          extracto de cada banco.
+     ✍ Completar datos   lo que el motor no pudo cuadrar solo, de las 4 cuentas juntas. Su número
+                          es el badge rojo de la pestaña «Conciliación».
+   La planilla (el Excel) llega sola: la macro la sube al guardar. «↻ Actualizar» la vuelve a LEER;
+   no hay forma de empujar el Excel desde la web. */
 function cbzConcCargar() {
-  if (_cbz.cc.vista === "planillas") { if (_cbz.conc) cbzConcPintar(); else cbzConcTablero(); return; }
-  if (!_cbz.cc.movs && !_cbz.cc.cargando) cbzCcTraer();
+  if (!_cbz.conc && !_cbz.concCargando) cbzConcTablero();
+  if (_cbz.cc.vista === "completar" && !_cbz.cc.pend && !_cbz.cc.pendCargando) cbzCcPendTraer();
 }
-function cbzConcPintar() { if (_cbz.tab === "conc") { var w = document.getElementById("cbzWrap"); if (w) w.innerHTML = cbzConcHtml(); } }
+function cbzConcPintar() {
+  if (_cbz.tab === "conc") { var w = document.getElementById("cbzWrap"); if (w) w.innerHTML = cbzConcHtml(); }
+  cbzCcPopPintar();
+}
 function cbzConcTablero() {
-  if (_cbz.conc) return;
-  Promise.all([_cbzRpc("gv_conc_salud"), _cbzRpc("gv_conc_sin_identificar", { p_dias: 90, p_limit: 200 })])
+  _cbz.concCargando = true;
+  return Promise.all([_cbzRpc("gv_conc_salud"), _cbzRpc("gv_conc_sin_identificar", { p_dias: 90, p_limit: 300 }), _cbzRpc("gv_conc_tablero")])
     .then(function (rr) {
+      _cbz.concCargando = false;
       _cbz.conc = {
         salud: rr[0].error ? [] : (rr[0].data || []),
         sin: rr[1].error ? [] : (rr[1].data || []),
+        tab: rr[2].error ? [] : (rr[2].data || []),
         err: rr[0].error || rr[1].error || null
       };
       if (!_cbz.conc.salud.length && _cbz.demo) _cbz.conc.salud = _CBZ_DEMO_CONC.slice();
-      cbzConcPintar();
+      cbzTabsPintar(); cbzConcPintar();
     });
 }
+/* sólo el tablero (el badge): después de resolver algo no hace falta releer las planillas */
+function cbzConcTabRefrescar() {
+  return _cbzRpc("gv_conc_tablero").then(function (r) {
+    if (!r.error && _cbz.conc) _cbz.conc.tab = r.data || [];
+    cbzTabsPintar(); cbzConcPintar();
+  });
+}
+function cbzConcPendN(cuentaId) {
+  var t = (_cbz.conc && _cbz.conc.tab) || [];
+  return t.reduce(function (s, x) {
+    if (cuentaId && (x.banco + "|" + x.empresa) !== cuentaId) return s;
+    return s + _cbzNum(x.preguntas) + _cbzNum(x.propuestos);
+  }, 0);
+}
+function _cbzCuentaDe(id) { var p = String(id).split("|"); return { banco: p[0], empresa: p[1] }; }
+function _cbzCuentaT(id) { var c = _CBZ_CUENTAS.filter(function (x) { return x.id === id; })[0]; return c ? c.t : id; }
+function _cbzHace(ts) {
+  if (!ts) return "—";
+  var d = new Date(ts), min = Math.round((Date.now() - d.getTime()) / 60000);
+  var s = d.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return s + (min >= 0 && min < 60 ? " (hace " + min + " min)" : (min < 1440 ? " (hace " + Math.round(min / 60) + " h)" : " (hace " + Math.round(min / 1440) + " d)"));
+}
 
-function cbzConcPlanillasHtml() {
+function cbzConcHtml() {
+  var cc = _cbz.cc, n = cbzConcPendN();
+  var h = '<div class="cbz-buscar" style="justify-content:space-between;">' +
+    '<div><b style="font-size:15px;">🏦 Conciliación bancaria</b>' +
+    '<div style="color:#64748b;font-size:12px;margin-top:2px;">Lo que cuadra se concilia solo; lo que no, queda en «Completar datos».</div></div>' +
+    '<div class="cbz-seg">' +
+      '<button class="' + (cc.vista !== "completar" ? "on" : "") + '" onclick="cbzCcSetVista(\'bancos\')">🏦 Bancos</button>' +
+      '<button class="' + (cc.vista === "completar" ? "on" : "") + '" onclick="cbzCcSetVista(\'completar\')">✍ Completar datos' +
+        (n ? ' <span class="cbz-badge">' + n + "</span>" : "") + "</button>" +
+    "</div>" +
+    '<button class="cbz-back" onclick="_cbz.conc=null;_cbz.cc.pend=null;cbzConcCargar();" title="Vuelve a leer lo que ya está en la base. La planilla la sube la macro del Excel al guardar: desde la web no se la puede empujar.">↻ Actualizar</button>' +
+    "</div>";
+  if (cc.msg) h += '<div class="cbz-ccmsg' + (/^⚠/.test(cc.msg) ? " err" : "") + '">' + _cbzEsc(cc.msg) + "</div>";
+  return h + (cc.vista === "completar" ? cbzCcCompletarHtml() : cbzConcBancosHtml());
+}
+
+function cbzConcBancosHtml() {
   var c = _cbz.conc;
-  var h = '<div style="color:#64748b;font-size:12px;margin:10px 2px 0;">Lo que ya está en los cuatro Excel de conciliación: cuánto de cada uno quedó identificado con cliente y recibo.</div>';
-  if (!c) return h + '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">Cargando…</div></div>';
-  if (c.err && !c.salud.length) return h + '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">No pude leer: ' + _cbzEsc(c.err) + "</div></div>";
-
-  h += '<div class="cbz-concgrid">' + c.salud.map(function (r) {
-    var ent = _cbzNum(r.entradas), ok = _cbzNum(r.con_cliente);
+  if (!c) return '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">Cargando…</div></div>';
+  if (c.err && !c.salud.length) return '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">No pude leer: ' + _cbzEsc(c.err) + "</div></div>";
+  var tab = {}; (c.tab || []).forEach(function (x) { tab[x.banco + "|" + x.empresa] = x; });
+  var sal = {}; (c.salud || []).forEach(function (x) { sal[x.banco + "|" + x.empresa] = x; });
+  var h = '<div class="cbz-concgrid">' + _CBZ_CUENTAS.map(function (cu) {
+    var r = sal[cu.id], t = tab[cu.id] || {}, cta = _cbzCuentaDe(cu.id);
+    var ent = _cbzNum(r && r.entradas), ok = _cbzNum(r && r.con_cliente);
     var pct = ent ? Math.round(ok * 100 / ent) : 0;
     var col = pct >= 90 ? "#047857" : (pct >= 50 ? "#b45309" : "#b91c1c");
-    return '<div class="cbz-conccard">' +
-      '<div class="t">' + _cbzEsc(String(r.banco || "").toUpperCase()) + " · " +
-        '<span class="cbz-chip ' + (r.empresa === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(r.empresa) + "</span></div>" +
-      '<div class="p" style="color:' + col + ';">' + _cbzPlata(pct) + " %</div>" +
-      '<div class="s">' + _cbzPlata(ok) + " de " + _cbzPlata(ent) + " entradas con cliente</div>" +
-      '<div class="bar"><i style="width:' + pct + "%;background:" + col + ';"></i></div>' +
-      '<div class="s" style="margin-top:6px;">Sin identificar: <b>' + _cbzPlata(r.sin_identificar) + "</b>" +
-        (_cbzNum(r.monto_sin_identificar) ? " · $ " + _cbzPlata(r.monto_sin_identificar) : "") + "</div>" +
-      '<div class="s">Último movimiento: <b>' + _cbzFecha(r.ultima) + "</b></div>" +
-      (r.archivo ? '<div class="s" title="' + _cbzEsc(r.archivo) + '" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _cbzEsc(r.archivo) + "</div>" : "") +
-      "</div>";
+    var pend = _cbzNum(t.preguntas) + _cbzNum(t.propuestos);
+    return '<button class="cbz-conccard cbz-bank" onclick="cbzCcPopAbrir(\'' + cu.id + '\')">' +
+      (pend ? '<span class="cbz-badge cbz-badge-abs" title="Movimientos a completar">' + pend + "</span>" : "") +
+      '<div class="t">' + _cbzEsc(cta.banco.toUpperCase()) + " · " +
+        '<span class="cbz-chip ' + (cta.empresa === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(cta.empresa) + "</span></div>" +
+      (r ? '<div class="p" style="color:' + col + ';">' + _cbzPlata(pct) + " %</div>" +
+           '<div class="s">' + _cbzPlata(ok) + " de " + _cbzPlata(ent) + " entradas con cliente</div>" +
+           '<div class="bar"><i style="width:' + pct + "%;background:" + col + ';"></i></div>'
+         : '<div class="p" style="color:#94a3b8;">—</div><div class="s">sin planilla cargada</div>') +
+      '<div class="s" style="margin-top:6px;">Conciliado al <b>' + (t.conciliado_al ? _cbzFecha(t.conciliado_al) : "—") + "</b>" +
+        (t.saldo_linea != null ? " · saldo $ " + _cbzPlata(t.saldo_linea, 2) : "") + "</div>" +
+      '<div class="s">Planilla subida: <b>' + _cbzEsc(_cbzHace(t.subido_en || (r && r.cargado_en))) + "</b></div>" +
+      '<div class="s">Extracto: ' + (_cbzNum(t.movs_extracto) ? "<b>" + _cbzPlata(t.movs_extracto) + "</b> mov. hasta " + _cbzFecha(t.ultimo_extracto) : "sin cargar") + "</div>" +
+      (r && _cbzNum(r.sin_identificar) ? '<div class="s">Sin identificar en la planilla: <b>' + _cbzPlata(r.sin_identificar) + "</b>" +
+        (_cbzNum(r.monto_sin_identificar) ? " · $ " + _cbzPlata(r.monto_sin_identificar) : "") + "</div>" : "") +
+      '<div class="cbz-bank-abrir">Abrir conciliación →</div>' +
+      "</button>";
   }).join("") + "</div>";
 
-  h += '<div class="cbz-panel" style="margin-top:12px;">';
-  if (!c.sin.length) {
-    h += '<div class="cbz-vacio">Ninguna entrada sin identificar en los últimos 90 días. 👌</div>';
-  } else {
-    var tot = c.sin.reduce(function (s2, r) { return s2 + _cbzNum(r.entrada); }, 0);
-    h += '<div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;font-size:13px;">' +
-      "<b>" + c.sin.length + "</b> entrada(s) sin cliente ni recibo en 90 días · <b>$ " + _cbzPlata(tot) + "</b>" +
-      '<div style="color:#64748b;font-size:12px;margin-top:2px;">Es lo que hoy alguien identifica a mano en el Excel. El texto del extracto es de donde van a salir las reglas.</div></div>';
-    h += '<table class="cbz-t"><thead><tr><th>Fecha</th><th>Banco</th><th>Emp</th><th>Entrada</th>' +
-      '<th style="text-align:left;">Detalle del extracto</th><th style="text-align:left;">Operación</th><th>Nro op.</th></tr></thead><tbody>';
-    h += c.sin.map(function (r) {
-      return "<tr><td>" + _cbzFecha(r.fecha) + "</td><td>" + _cbzEsc(r.banco || "") + "</td>" +
-        '<td><span class="cbz-chip ' + (r.empresa === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(r.empresa) + "</span></td>" +
-        '<td class="cbz-verde"><b>' + _cbzPlata(r.entrada) + "</b></td>" +
-        '<td class="l">' + _cbzEsc(r.detalle || "—") + "</td>" +
-        '<td class="l" style="color:#64748b;">' + _cbzEsc(r.operacion || r.tipo || "—") + "</td>" +
-        "<td>" + _cbzEsc(r.nro_op || "—") + "</td></tr>";
-    }).join("");
-    h += "</tbody></table>";
-  }
-  h += "</div>";
+  h += '<div class="cbz-cargas"><span class="cbz-cargas-k">📥 Cargar extracto del banco</span>' + _CBZ_CUENTAS.map(function (cu) {
+    return '<label class="cbz-cargar-s" title="El .xls tal como lo baja el banco">' + _cbzEsc(cu.t) +
+      '<input type="file" accept=".xls,.xlsx,.csv" onchange="cbzCcSubir(\'' + cu.id + '\', this)" style="display:none;"></label>';
+  }).join("") + "</div>";
 
+  h += '<div class="cbz-nota" style="border:none;padding:8px 2px 0;">El % dice cuántas entradas de la planilla tienen cliente escrito, no si la conciliación está bien: ' +
+    "una transferencia entre cuentas propias, un rechazo o un «No Identificado» cuentan como sin cliente. «Conciliado al» es la línea amarilla del Excel; " +
+    "lo que está debajo es proyección, por eso una fecha futura no es un error.</div>";
   return h;
 }
-window.cbzConcPlanillasHtml = cbzConcPlanillasHtml;
+
+/* ------------------------------ Completar datos ------------------------------ */
+async function cbzCcPendTraer() {
+  _cbz.cc.pendCargando = true;
+  var r = await _cbzRpc("gv_conc_pendientes_lista");
+  _cbz.cc.pendCargando = false;
+  _cbz.cc.pendErr = r.error || null;
+  _cbz.cc.pend = r.error ? [] : (Array.isArray(r.data) ? r.data : []);
+  cbzConcPintar(); cbzCcTelefonos(_cbz.cc.pend);
+}
+function cbzCcPendFiltro(f) { _cbz.cc.pendFiltro = f; cbzConcPintar(); }
+function cbzCcCompletarHtml() {
+  var cc = _cbz.cc;
+  if (cc.pendCargando || !cc.pend) return '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">Cargando…</div></div>';
+  if (cc.pendErr) return '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">No pude leer: ' + _cbzEsc(cc.pendErr) + "</div></div>";
+  if (!cc.pend.length) return '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">No hay nada para completar. 👌<br>' +
+    '<span style="font-size:12px;">Cuando se carga un extracto, lo que el motor no puede cuadrar solo aparece acá.</span></div></div>';
+  var f = cc.pendFiltro || "todas";
+  var cnt = {}; cc.pend.forEach(function (m) { var k = m.banco + "|" + m.empresa; cnt[k] = (cnt[k] || 0) + 1; });
+  var ver = cc.pend.filter(function (m) { return f === "todas" || (m.banco + "|" + m.empresa) === f; });
+  var prop = ver.filter(function (m) { return m.estado === "propuesto"; });
+  var h = '<div class="cbz-ccest"><button class="' + (f === "todas" ? "on" : "") + '" onclick="cbzCcPendFiltro(\'todas\')">Todas <b>' + cc.pend.length + "</b></button>" +
+    _CBZ_CUENTAS.filter(function (x) { return cnt[x.id]; }).map(function (x) {
+      return '<button class="' + (f === x.id ? "on" : "") + '" onclick="cbzCcPendFiltro(\'' + x.id + '\')">' + _cbzEsc(x.t) + " <b>" + cnt[x.id] + "</b></button>";
+    }).join("") +
+    (prop.length ? '<button class="cbz-conf" onclick="cbzCcConfirmar([' + prop.map(function (m) { return m.id; }).join(",") + '])">✔ Confirmar los ' + prop.length + " propuestos</button>" : "") +
+    '<button class="cbz-back" onclick="cbzCcRecruzar()" title="Vuelve a cruzar todo lo pendiente: sirve después de proyectar algo nuevo en la planilla">↻ Volver a cruzar</button>' +
+    "</div>";
+  return h + '<div class="cbz-qlist">' + ver.map(cbzCcPreguntaHtml).join("") + "</div>";
+}
+
+/* ------------------------------ pop-up de un banco ------------------------------ */
+function cbzCcPopAbrir(id) {
+  _cbz.cc.cuenta = id; _cbz.cc.movs = null; _cbz.cc.filtro = null; _cbz.cc.abierto = null;
+  _cbz.pop = { cuenta: id, tab: "planilla", plan: null, planErr: null };
+  var ov = document.getElementById("cbzOv"); if (!ov) return;
+  var p = document.getElementById("cbzPop");
+  if (!p) { p = document.createElement("div"); p.id = "cbzPop"; ov.appendChild(p); }
+  p.style.display = "flex";
+  cbzCcPopPintar();
+  var c = _cbzCuentaDe(id);
+  _cbzRpc("gv_conc_planilla", { p_banco: c.banco, p_empresa: c.empresa, p_dias: 45 }).then(function (r) {
+    if (!_cbz.pop || _cbz.pop.cuenta !== id) return;
+    _cbz.pop.plan = r.error ? { filas: [] } : (r.data || { filas: [] });
+    _cbz.pop.planErr = r.error || null;
+    cbzCcPopPintar(); cbzCcPopLinea();
+  });
+  cbzCcTraer();
+}
+function cbzCcPopCerrar() { _cbz.pop = null; var p = document.getElementById("cbzPop"); if (p) p.style.display = "none"; cbzConcPintar(); }
+function cbzCcPopTab(t) { if (_cbz.pop) { _cbz.pop.tab = t; cbzCcPopPintar(); if (t === "planilla") cbzCcPopLinea(); } }
+function cbzCcPopLinea() {
+  setTimeout(function () { var l = document.getElementById("cbzPlLinea"); if (l && l.scrollIntoView) l.scrollIntoView({ block: "center" }); }, 0);
+}
+function cbzCcPopPintar() {
+  var p = document.getElementById("cbzPop");
+  if (!p || !_cbz.pop || p.style.display === "none") return;
+  var pop = _cbz.pop, id = pop.cuenta, c = _cbzCuentaDe(id), cc = _cbz.cc;
+  var t = ((_cbz.conc && _cbz.conc.tab) || []).filter(function (x) { return x.banco + "|" + x.empresa === id; })[0] || {};
+  var sin = ((_cbz.conc && _cbz.conc.sin) || []).filter(function (x) { return x.banco === c.banco && x.empresa === c.empresa; });
+  var nMov = (cc.movs || []).length, pend = _cbzNum(t.preguntas) + _cbzNum(t.propuestos);
+  var tabs = [
+    { id: "planilla", t: "📒 Planilla" },
+    { id: "extracto", t: "🏦 Extracto cargado" + (cc.movs ? " (" + nMov + ")" : "") },
+    { id: "sin", t: "❔ Sin identificar (" + sin.length + ")" }
+  ];
+  var h = '<div class="cbz-pop-card">' +
+    '<div class="cbz-pop-head"><div><b style="font-size:16px;">' + _cbzEsc(_cbzCuentaT(id)) + "</b>" +
+      '<div style="font-size:12px;color:#64748b;">Conciliado al <b>' + (t.conciliado_al ? _cbzFecha(t.conciliado_al) : "—") + "</b>" +
+      (t.saldo_linea != null ? " · saldo $ " + _cbzPlata(t.saldo_linea, 2) : "") +
+      " · planilla subida " + _cbzEsc(_cbzHace(t.subido_en)) +
+      (pend ? ' · <b class="cbz-rojo">' + pend + " a completar</b>" : "") + "</div></div>" +
+      '<div class="cbz-sub" style="margin:0;">' + tabs.map(function (x) {
+        return '<button class="' + (pop.tab === x.id ? "on" : "") + '" onclick="cbzCcPopTab(\'' + x.id + '\')">' + x.t + "</button>";
+      }).join("") + "</div>" +
+      '<label class="cbz-cargar" style="font-size:12px;">📥 Cargar extracto<input type="file" accept=".xls,.xlsx,.csv" onchange="cbzCcSubir(\'' + id + '\', this)" style="display:none;"></label>' +
+      '<button class="cbz-x" style="margin-left:0;" onclick="cbzCcPopCerrar()">Cerrar</button></div>' +
+    '<div class="cbz-pop-body">';
+  if (pop.tab === "planilla") h += cbzCcPlanillaHtml(pop);
+  else if (pop.tab === "sin") h += cbzCcSinHtml(sin);
+  else h += cbzCcExtractoHtml();
+  /* repintar no puede tirar el scroll arriba: la planilla se abre centrada en la línea amarilla
+     y el extracto llega DESPUÉS (otra llamada), que vuelve a pintar el pop-up entero */
+  var ob = p.querySelector(".cbz-pop-body"), st = (ob && p.getAttribute("data-tab") === pop.tab) ? ob.scrollTop : 0;
+  p.innerHTML = h + "</div></div>";
+  p.setAttribute("data-tab", pop.tab);
+  var nb = p.querySelector(".cbz-pop-body"); if (nb && st) nb.scrollTop = st;
+}
+function cbzCcPlanillaHtml(pop) {
+  if (!pop.plan) return '<div class="cbz-vacio">Cargando la planilla…</div>';
+  if (pop.planErr) return '<div class="cbz-vacio">No pude leer la planilla: ' + _cbzEsc(pop.planErr) + "</div>";
+  var fil = pop.plan.filas || [];
+  if (!fil.length) return '<div class="cbz-vacio">Esta cuenta no tiene planilla cargada.</div>';
+  var linea = false;
+  var h = '<table class="cbz-t cbz-plt"><thead><tr><th>Fecha</th><th>Operación</th><th>Entrada</th><th>Salida</th><th>Saldo</th>' +
+    '<th style="text-align:left;">Detalle</th><th>DET</th><th>Nro OP</th><th>Recibo</th><th>Cliente</th></tr></thead><tbody>';
+  fil.forEach(function (r) {
+    if (r.proyectado && !linea) {
+      linea = true;
+      h += '<tr id="cbzPlLinea" class="cbz-linea"><td colspan="10">▲ conciliado al ' + _cbzFecha(pop.plan.conciliado_al) +
+        (pop.plan.saldo_linea != null ? " · saldo $ " + _cbzPlata(pop.plan.saldo_linea, 2) : "") + " · ▼ proyectado</td></tr>";
+    }
+    h += '<tr class="' + (r.proyectado ? "cbz-proy" : "") + (r.mov_id ? " cbz-conext" : "") + '"' + (r.mov_id ? ' title="Cruzado con el extracto cargado"' : "") + ">" +
+      "<td>" + _cbzFecha(r.fecha) + '</td><td class="l">' + _cbzEsc(r.operacion || "") + "</td>" +
+      '<td class="cbz-verde">' + (_cbzNum(r.entrada) ? _cbzPlata(r.entrada, 2) : "") + "</td>" +
+      '<td class="cbz-rojo">' + (_cbzNum(r.salida) ? _cbzPlata(r.salida, 2) : "") + "</td>" +
+      "<td>" + (r.saldo != null ? _cbzPlata(r.saldo, 2) : "") + "</td>" +
+      '<td class="l">' + _cbzEsc(r.detalle || "") + "</td><td>" + _cbzEsc(r.det || "") + "</td>" +
+      "<td>" + _cbzEsc(r.nro_op || "") + "</td><td>" + _cbzEsc(r.nro_recibo || "") + "</td><td>" + _cbzEsc(r.cod_cliente || "") + "</td></tr>";
+  });
+  return h + '</tbody></table><div class="cbz-nota">Últimos 45 días de la planilla y todo lo proyectado. La franja amarilla es la línea del Excel. ' +
+    "Las filas con borde verde ya se cruzaron con un movimiento del extracto cargado.</div>";
+}
+function cbzCcSinHtml(sin) {
+  if (!sin.length) return '<div class="cbz-vacio">Ninguna entrada sin identificar en los últimos 90 días. 👌</div>';
+  var tot = sin.reduce(function (s, r) { return s + _cbzNum(r.entrada); }, 0);
+  return '<div style="padding:10px 14px;font-size:13px;"><b>' + sin.length + "</b> entrada(s) sin cliente ni recibo en la planilla · <b>$ " + _cbzPlata(tot) + "</b></div>" +
+    '<table class="cbz-t"><thead><tr><th>Fecha</th><th>Entrada</th><th style="text-align:left;">Detalle</th><th style="text-align:left;">Operación</th><th>Nro op.</th></tr></thead><tbody>' +
+    sin.map(function (r) {
+      return "<tr><td>" + _cbzFecha(r.fecha) + '</td><td class="cbz-verde"><b>' + _cbzPlata(r.entrada) + "</b></td>" +
+        '<td class="l">' + _cbzEsc(r.detalle || "—") + '</td><td class="l" style="color:#64748b;">' + _cbzEsc(r.operacion || r.tipo || "—") + "</td>" +
+        "<td>" + _cbzEsc(r.nro_op || "—") + "</td></tr>";
+    }).join("") + "</tbody></table>";
+}
+function cbzCcExtractoHtml() {
+  var cc = _cbz.cc;
+  if (cc.cargando || !cc.movs) return '<div class="cbz-vacio">Cargando…</div>';
+  if (cc.err) return '<div class="cbz-vacio">No pude leer los movimientos: ' + _cbzEsc(cc.err) + "</div>";
+  if (!cc.movs.length) return '<div class="cbz-vacio">Todavía no se cargó ningún extracto de esta cuenta en los últimos 45 días.<br>Subí el .xls tal como lo baja el banco con «📥 Cargar extracto».</div>';
+  var cnt = {}; cc.movs.forEach(function (m) { cnt[m.estado] = (cnt[m.estado] || 0) + 1; });
+  var f = cc.filtro || "todos";
+  var h = '<div class="cbz-ccest" style="padding:8px 10px 0;">' + _CBZ_CC_EST.map(function (e) {
+    return '<button class="' + (f === e.id ? "on" : "") + '" onclick="cbzCcFiltro(\'' + e.id + '\')">' + e.t + " <b>" + (cnt[e.id] || 0) + "</b></button>";
+  }).join("") + '<button class="' + (f === "todos" ? "on" : "") + '" onclick="cbzCcFiltro(\'todos\')">Todos <b>' + cc.movs.length + "</b></button>" +
+    (cnt.propuesto ? '<button class="cbz-conf" onclick="cbzCcConfirmarPropuestos()">✔ Confirmar los ' + cnt.propuesto + " propuestos</button>" : "") +
+    '<button class="cbz-back" onclick="cbzCcCopiar()" title="Columnas A–J de la planilla: Fecha · Operación · Entrada · Salida · Saldo · Detalle · DET · Nro OP · Nro Recibo · Cliente">📋 Copiar para la planilla</button></div>';
+  var ver = cc.movs.filter(function (m) { return f === "todos" || m.estado === f; });
+  if (f === "pregunta" || f === "propuesto") {
+    ver.sort(function (a, b) { return _cbzNum(b.credito) - _cbzNum(a.credito); });
+    return h + (ver.length ? '<div class="cbz-qlist" style="padding:0 10px 10px;">' + ver.map(cbzCcPreguntaHtml).join("") + "</div>" : '<div class="cbz-vacio">Nada. 👌</div>');
+  }
+  return h + cbzCcTablaHtml(ver);
+}
+function cbzCcSubir(id, inp) { _cbz.cc.cuenta = id; return cbzCcArchivo(inp); }
+
 window.cbzConcCargar = cbzConcCargar;
+window.cbzConcTablero = cbzConcTablero;
+window.cbzCcPopAbrir = cbzCcPopAbrir;
+window.cbzCcPopCerrar = cbzCcPopCerrar;
+window.cbzCcPopTab = cbzCcPopTab;
+window.cbzCcSubir = cbzCcSubir;
+window.cbzCcPendFiltro = cbzCcPendFiltro;
+window.cbzCcPendTraer = cbzCcPendTraer;
 
 /* ===================== 3b) CONCILIACIÓN — EXTRACTO DEL DÍA =====================
    v24.37 (Luis, 29/09): "el módulo debería resolver automáticamente todo lo que pueda con
@@ -836,8 +1325,15 @@ var _CBZ_CC_EST = [
 var _CBZ_CC_LOTE = 15;
 
 function cbzCcCuenta() { var p = String(_cbz.cc.cuenta).split("|"); return { banco: p[0], empresa: p[1] }; }
-function cbzCcSetCuenta(id) { _cbz.cc.cuenta = id; _cbz.cc.movs = null; _cbz.cc.msg = ""; _cbz.cc.abierto = null; cbzRender(); }
-function cbzCcSetVista(v) { _cbz.cc.vista = v; cbzRender(); }
+function cbzCcSetCuenta(id) { _cbz.cc.cuenta = id; _cbz.cc.movs = null; _cbz.cc.msg = ""; _cbz.cc.abierto = null; cbzCcTraer(); }
+function cbzCcSetVista(v) { _cbz.cc.vista = v; cbzConcPintar(); cbzConcCargar(); }
+/* después de resolver o cargar: releer lo que está a la vista y el badge */
+function cbzCcRefrescar() {
+  _cbz.cc.movs = null;
+  if (_cbz.pop) cbzCcTraer();
+  if (_cbz.cc.vista === "completar" || _cbz.cc.pend) cbzCcPendTraer();
+  return cbzConcTabRefrescar();
+}
 function cbzCcFiltro(f) { _cbz.cc.filtro = f; cbzConcPintar(); }
 
 function _cbzIso(d) { return d.toISOString().slice(0, 10); }
@@ -969,8 +1465,7 @@ async function cbzCcCargarMovs(nombre, movs) {
   _cbz.cc.msg = "✔ " + nombre + ": " + (d.nuevos || 0) + " movimientos nuevos" +
     (repetidos ? " · " + repetidos + " ya estaban (no se duplican)" : "") +
     (fallas ? " · ⚠ " + fallas + " lote(s) no se cruzaron: tocá «↻ Volver a cruzar»" : "");
-  _cbz.cc.filtro = null; _cbz.cc.movs = null;
-  cbzCcTraer();
+  cbzCcRefrescar();
 }
 /* De a 15 y en orden. Después, una segunda pasada sobre lo que quedó en pregunta: el cruce
    "junto con otro pago del cliente" necesita que los vecinos ya estén identificados. */
@@ -984,12 +1479,13 @@ async function cbzCcMotor(ids, rotulo) {
   return fallas;
 }
 async function cbzCcRecruzar() {
-  var ids = (_cbz.cc.movs || []).filter(function (m) { return m.estado === "pregunta" || m.estado === "propuesto"; })
+  var base = (_cbz.cc.vista === "completar" && !_cbz.pop) ? (_cbz.cc.pend || []) : (_cbz.cc.movs || []);
+  var ids = base.filter(function (m) { return m.estado === "pregunta" || m.estado === "propuesto"; })
     .map(function (m) { return Number(m.id); });
   if (!ids.length) { _cbz.cc.msg = "No hay nada pendiente para volver a cruzar."; cbzConcPintar(); return; }
   var f = await cbzCcMotor(ids, "Volviendo a cruzar");
   _cbz.cc.msg = f ? "⚠ " + f + " lote(s) no se cruzaron. Probá de nuevo." : "✔ Volví a cruzar " + ids.length + " movimientos.";
-  _cbz.cc.movs = null; cbzCcTraer();
+  cbzCcRefrescar();
 }
 
 /* ------------------------------ resolver ------------------------------- */
@@ -999,7 +1495,7 @@ async function cbzCcResolver(id, cod) {
   if (r.error) { alert("No se guardó: " + r.error); return; }
   var d = r.data || {};
   _cbz.cc.msg = cod ? "✔ Asignado a " + (d.cliente || cod) + (d.alias ? " · el CUIT queda recordado para ese cliente" : "") : "✔ Marcado como No identificado";
-  _cbz.cc.abierto = null; _cbz.cc.movs = null; cbzCcTraer();
+  _cbz.cc.abierto = null; cbzCcRefrescar();
 }
 function cbzCcAsignar(id) {
   var i = document.getElementById("cbzCod" + id), v = i ? String(i.value || "").trim() : "";
@@ -1011,7 +1507,7 @@ async function cbzCcConfirmar(ids) {
   var r = await _cbzRpc("gv_conc_confirmar", { p_ids: ids.map(Number) });
   if (r.error) { alert("No se confirmó: " + r.error); return; }
   _cbz.cc.msg = "✔ Confirmados: " + (typeof r.data === "number" ? r.data : ids.length);
-  _cbz.cc.movs = null; cbzCcTraer();
+  cbzCcRefrescar();
 }
 function cbzCcConfirmarPropuestos() {
   cbzCcConfirmar((_cbz.cc.movs || []).filter(function (m) { return m.estado === "propuesto"; }).map(function (m) { return m.id; }));
@@ -1020,13 +1516,13 @@ function cbzCcAbrir(id) { _cbz.cc.abierto = (_cbz.cc.abierto === id) ? null : id
 
 /* Teléfono de cada candidato: el mismo lookup por (empresa, cod) del pipeline de clientes
    nuevos. Se pide en SU propia llamada: si falla, la pantalla sigue sin teléfonos. */
-async function cbzCcTelefonos() {
-  var c = cbzCcCuenta(), pedir = {}, lista = [];
-  (_cbz.cc.movs || []).forEach(function (m) {
+async function cbzCcTelefonos(movs) {
+  var pedir = {}, lista = [];
+  (movs || _cbz.cc.movs || []).forEach(function (m) {
     if (m.estado !== "pregunta" && m.estado !== "propuesto") return;
     ((m.candidatos && m.candidatos.lista) || []).forEach(function (x) {
       var k = String(x.cod || ""); if (!k || pedir[k] || (_cbz.cc.wpp && _cbz.cc.wpp[k] !== undefined)) return;
-      pedir[k] = 1; lista.push({ empresa: c.empresa, cod: k });
+      pedir[k] = 1; lista.push({ empresa: m.empresa, cod: k });
     });
   });
   if (!lista.length) return;
@@ -1066,52 +1562,13 @@ async function cbzCcCopiar() {
 }
 
 /* ------------------------------- pantalla ------------------------------- */
-function cbzConcHtml() {
-  var cc = _cbz.cc;
-  var h = '<div class="cbz-buscar" style="justify-content:space-between;">' +
-    '<div><b style="font-size:15px;">🏦 Conciliación bancaria</b>' +
-    '<div style="color:#64748b;font-size:12px;margin-top:2px;">Se sube el extracto del banco; lo que cuadra se concilia solo y lo que no, se pregunta.</div></div>' +
-    '<div class="cbz-seg">' +
-      '<button class="' + (cc.vista !== "planillas" ? "on" : "") + '" onclick="cbzCcSetVista(\'extracto\')">📥 Extracto</button>' +
-      '<button class="' + (cc.vista === "planillas" ? "on" : "") + '" onclick="cbzCcSetVista(\'planillas\')">📊 Planillas</button>' +
-    "</div></div>";
-  if (cc.vista === "planillas") return h + cbzConcPlanillasHtml();
-
-  h += '<div class="cbz-buscar" style="margin-top:10px;">' +
-    '<div class="cbz-seg">' + _CBZ_CUENTAS.map(function (x) {
-      return '<button class="' + (cc.cuenta === x.id ? "on" : "") + '" onclick="cbzCcSetCuenta(\'' + x.id + '\')">' + x.t + "</button>";
-    }).join("") + "</div>" +
-    '<label class="cbz-cargar">📥 Cargar extracto (.xls)<input type="file" id="cbzCcFile" accept=".xls,.xlsx,.csv" onchange="cbzCcArchivo(this)" style="display:none;"></label>' +
-    '<button class="cbz-back" onclick="cbzCcRecruzar()" title="Vuelve a cruzar preguntas y propuestos: sirve después de proyectar algo nuevo en la planilla">↻ Volver a cruzar</button>' +
-    '<button class="cbz-back" onclick="cbzCcCopiar()" title="Columnas A–J de la planilla: Fecha · Operación · Entrada · Salida · Saldo · Detalle · DET · Nro OP · Nro Recibo · Cliente">📋 Copiar para la planilla</button>' +
-    "</div>";
-  if (cc.msg) h += '<div class="cbz-ccmsg' + (/^⚠/.test(cc.msg) ? " err" : "") + '">' + _cbzEsc(cc.msg) + "</div>";
-  if (cc.cargando || !cc.movs) return h + '<div class="cbz-panel" style="margin-top:10px;"><div class="cbz-vacio">Cargando…</div></div>';
-  if (cc.err) return h + '<div class="cbz-panel" style="margin-top:10px;"><div class="cbz-vacio">No pude leer los movimientos: ' + _cbzEsc(cc.err) + "</div></div>";
-  if (!cc.movs.length) return h + '<div class="cbz-panel" style="margin-top:10px;"><div class="cbz-vacio">Todavía no se cargó ningún extracto de esta cuenta en los últimos 45 días.<br>Subí el .xls tal como lo baja el banco.</div></div>';
-
-  var cnt = {}; cc.movs.forEach(function (m) { cnt[m.estado] = (cnt[m.estado] || 0) + 1; });
-  h += '<div class="cbz-ccest">' + _CBZ_CC_EST.map(function (e) {
-    return '<button class="' + (cc.filtro === e.id ? "on" : "") + '" onclick="cbzCcFiltro(\'' + e.id + '\')">' + e.t + " <b>" + (cnt[e.id] || 0) + "</b></button>";
-  }).join("") + '<button class="' + (cc.filtro === "todos" ? "on" : "") + '" onclick="cbzCcFiltro(\'todos\')">Todos <b>' + cc.movs.length + "</b></button>";
-  if (cnt.propuesto) h += '<button class="cbz-conf" onclick="cbzCcConfirmarPropuestos()">✔ Confirmar los ' + cnt.propuesto + " propuestos</button>";
-  h += "</div>";
-
-  var ver = cc.movs.filter(function (m) { return cc.filtro === "todos" || m.estado === cc.filtro; });
-  if (cc.filtro === "pregunta" || cc.filtro === "propuesto") {
-    if (!ver.length) return h + '<div class="cbz-panel" style="margin-top:10px;"><div class="cbz-vacio">Nada ' + (cc.filtro === "pregunta" ? "para preguntar" : "propuesto") + ". 👌</div></div>";
-    ver.sort(function (a, b) { return _cbzNum(b.credito) - _cbzNum(a.credito); });   // por plata, mayor → menor
-    return h + '<div class="cbz-qlist">' + ver.map(cbzCcPreguntaHtml).join("") + "</div>";
-  }
-  return h + cbzCcTablaHtml(ver);
-}
-
 function cbzCcPreguntaHtml(m) {
   var cand = (m.candidatos && m.candidatos.lista) || [], ap = m.candidatos && m.candidatos.apareo;
   var prop = m.estado === "propuesto";
   var h = '<div class="cbz-q' + (prop ? " prop" : "") + '">' +
     '<div class="cbz-qhead"><div><span class="cbz-qimp">$ ' + _cbzPlata(m.credito || m.debito, 2).replace(/,00$/, "") + "</span> " +
       '<span style="color:#64748b;">' + _cbzFecha(m.fecha) + (m.sucursal ? " · " + _cbzEsc(m.sucursal) : "") + "</span>" +
+      ' <span class="cbz-chip ' + (m.empresa === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEsc(_cbzCuentaT(m.banco + "|" + m.empresa)) + "</span>" +
       (m.det === "3" ? ' <span class="cbz-chip cbz-info">cheque</span>' : "") + "</div>" +
       (prop ? '<button class="cbz-conf" onclick="cbzCcConfirmar([' + m.id + '])">✔ Confirmar ' + _cbzEsc(m.cod_cliente || "") + "</button>" : "") +
     "</div>" +

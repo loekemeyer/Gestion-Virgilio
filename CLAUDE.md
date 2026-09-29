@@ -4513,7 +4513,7 @@ public.gv_cobranza_clientes_cuit() group by cuit having count(distinct empresa)=
 
 ### ⚠ v24.37: la CONCILIACIÓN se hace subiendo el extracto del banco — el motor cruza y PREGUNTA lo que no cuadra
 
-Cobranzas → 🏦 Conciliación → **📥 Extracto**: se elige la cuenta, se sube el .xls **tal como lo baja el
+Cobranzas → 🏦 Conciliación → (desde v24.41: la tarjeta del banco o su botón chico de carga) se sube el .xls **tal como lo baja el
 banco** y `gv_conc_motor` lo cruza (regla → CUIT → apareo con la planilla → importe contra facturas
 impagas → pista de la sucursal). Estados: ✅ auto · 🟡 propuesto (un click) · ❓ pregunta (candidatos +
 teléfono) · 👤 confirmado · ⚪ no identificado. **📋 Copiar para la planilla** da las columnas A–J.
@@ -4524,6 +4524,27 @@ teléfono) · 👤 confirmado · ⚪ no identificado. **📋 Copiar para la plan
 - El motor se llama **de a 15** desde la pantalla: 60 movimientos tardan 13 s y authenticated corta a los 8 s.
 - Medición y tablas: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.v2437, `sql/gv_conc_motor_cruce_v2437.sql`,
   `tests/cbz-conc-extracto.cjs`.
+
+### ⚠ v24.41 (Luis): la ficha abre en RESUMEN y la conciliación son CUATRO botones con pop-up
+
+- **📋 Resumen** = la planilla de cobranza del Excel, por operación (juego de facturas): facturas y NC ·
+  pagos con su ponderación (`días × pagado / total pagado`) · días ponderados · escala con el escalón
+  marcado · NC de descuento que falta, en neto + IVA · Deuda / A favor / Saldado. La deuda abierta va
+  primero. 🖨 imprime sólo la planilla. Fuente: `gv_cobranza_operaciones(emp, cod)`.
+- ⚠ **En una cobrada la escala marca lo que decidió el agente (`dto_ganado`), NO la escala pelada**: con
+  plazo pactado (Cuyana, 60 días) pagar en 63 no gana nada aunque la escala diga −5 %. La planilla lo dice.
+- **Cambiar de pestaña NO cierra el cliente** (`cbzSetTab` no toca `_cbz.sel`).
+- **🏦 Conciliación** abre en **Bancos**: 4 tarjetas-botón → pop-up (📒 Planilla centrada en la línea
+  amarilla · 🏦 Extracto cargado · ❔ Sin identificar) + 4 botones chicos para cargar el extracto.
+  **✍ Completar datos** junta lo que espera de las 4 cuentas (`gv_conc_pendientes_lista`). El **badge rojo**
+  (pestaña y tarjeta) = preguntas + propuestos de `gv_conc_tablero`.
+- **La planilla la sube la macro del Excel al guardar**: «↻ Actualizar» la RELEE, no la empuja.
+- **«Dif.» en Pagos es un residuo**, no una retención cargada: `1 − pagado / esperado`. Positivo = pagó de
+  menos; negativo = pagó de más.
+- ⚠ Repintar el pop-up conserva el scroll (el extracto llega después de la planilla y lo repinta entero).
+
+`sql/gv_cobranza_resumen_conc_v2441.sql`, §3.v2441 · `tests/cbz-ficha-cliente.cjs` (h, i) ·
+`tests/cbz-conciliacion.cjs` · `tests/cbz-conc-extracto.cjs`.
 
 ## Git
 

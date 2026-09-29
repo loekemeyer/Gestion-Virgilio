@@ -30684,6 +30684,24 @@ Las reglas de Santander se rehicieron **por código operativo** (`GV_Conc_Regla.
   en la planilla. El motor todavía no aparea contra A DEPOSITAR: las marca con alerta.
 - Un depósito no identificado sale con **det = 1**, como pide el Manual.
 
+### §3.v2441 — v24.41: Cobranzas — RESUMEN del cliente (la planilla de cobranza) + Conciliación por banco en pop-ups — 2026-09-29
+
+Luis: *"el módulo del cliente abra en un RESUMEN que sea una ficha como esa (pero más linda)"* · *"cuatro
+botones que te abran las conciliaciones en popups · una pestaña «Completar datos» · un badge rojo con número
+cuando hay datos a completar · 4 botones más chicos para cargar el registro de movimientos"*. Todo **lectura**:
+no se escribió ninguna fila. `sql/gv_cobranza_resumen_conc_v2441.sql`.
+
+| objeto | qué devuelve |
+|---|---|
+| `gv_cobranza_operaciones(emp, cod)` | `{pagadas, abiertas}`: cada juego de facturas con sus pagos (recibo, días, medio, en cuántos juegos se repartió el recibo), las NC y el plazo pactado; y la deuda abierta por fecha. Filtra `documentos` por número (2,5 s → 42 ms) |
+| `gv_conc_planilla(banco, empresa, dias)` | los últimos N días de la planilla + todo lo proyectado, con la línea amarilla y el `mov_id` si ya se cruzó con el extracto |
+| `gv_conc_tablero()` | las 4 cuentas: conciliado al, saldo de la línea, cuándo se subió la planilla, preguntas + propuestos (el badge), extracto cargado |
+| `gv_conc_pendientes_lista()` | lo que espera a una persona, de las 4 cuentas (la pestaña «Completar datos») |
+
+- **La planilla la sigue subiendo la macro del Excel al guardar.** «↻ Actualizar» la vuelve a LEER; desde la web no se la puede empujar.
+- **En una operación cobrada, la escala marca lo que decidió el agente (`dto_ganado`), no la escala pelada**: un cliente con plazo propio (Cuyana, 60 días) que paga en 63 no gana nada aunque la escala diga −5 %.
+- **«Dif.» en Pagos** es el residuo `1 − pagado / esperado`: positivo = pagó de menos (retención o descuento no registrado); negativo = pagó de más.
+
 ### §3.v2437 — v24.37: MOTOR DE CRUCE de la conciliación — se sube el extracto del día y pregunta sólo lo que no cuadra — 2026-09-29
 
 Luis: *"el módulo debería resolver automáticamente todo lo que pueda con la carga de los extractos de
@@ -30725,3 +30743,50 @@ transacción abortada:
 **Datos de configuración cargados sin sí previo** (tablas nuevas del módulo, no de negocio):
 `GV_Conc_Sucursal_Provincia` (48 ciudades). `GV_Conc_Alias_Pagador` sigue **vacía** (Luis: "1 no").
 Scratch de prueba: `zz_backups."GV_Conc_Test_Extracto"` (el extracto de Santander, cerrado).
+---
+
+## §3.v2440 — Balvanera y Once pasan a ZONA SUR (Z1) · Luis, 29/09/2026
+
+**Luis, textual:** *"balvanera pasa a ser zona sur"* · *"z1"* · *"once tambien"*.
+
+> ⚠ **Cambiar la zona sola NO alcanza: para Z1 el camión lo decide el SECTOR.**
+> `gv_ppp_web_camion` resuelve por zona **únicamente 2, 3, 6 y 7** (v21.43 / v21.91); para el
+> resto cae a `GV_Sectores.camion` del sector. Balvanera y Once eran sector **F** (Capital
+> Centro), así que con sólo el cambio de zona habrían quedado *"Zona 1"* saliendo en el camión
+> **Capital Centro-Oeste**. Por eso van los dos cambios.
+
+| qué | dónde | antes | ahora |
+|---|---|---|---|
+| zona | **`GV_Zonas_Barrios`** (override; `Zonas_Barrios` es la base y **no se toca**) | Zona 2 - CABA Centro | **Zona 1 - CABA Sur** |
+| sector | `GV_Barrios_Sector` | F (Capital Centro) | **A** (Capital Sur) |
+
+Sector **A** = Capital Sur-Este: Barracas, Constitución, La Boca, P. Patricios, San Cristóbal,
+San Telmo. Balvanera linda con San Cristóbal y Once está adentro de Balvanera.
+
+⚠ **El mapeo vive acá, no en LK.** La página manda el **barrio** en `zona_expreso`
+(`Balvanera`, `Once`), no la zona; Gestión la resuelve con `gv_zona_de_barrio`, que mira
+**primero `GV_Zonas_Barrios`** y después `Zonas_Barrios`.
+
+⚠ **Es forward-facing: lo ya programado NO se mueve.** `PPP_Web_Programacion.zona` está
+**guardada**, así que las **13 NP** que ya estaban programadas siguen en Zona 2 — Bazar y Cia,
+R Cuarto y Jazquel, en las tandas **F17D** (01/10), **E97A** y **F18B** (05/10) y **F11A**
+(11/11). Mismo criterio que la v21.87. Moverlas es otra decisión y parte F18B y E97A en dos
+camiones.
+
+**Medido después de aplicar:** Balvanera y Once, en cualquier grafía, dan
+`Zona 1 - CABA Sur · sector A · camión Capital Sur`, y `gv_ppp_tanda_camion_mezclado` sigue
+**vacía**. Backups: `zz_backups."GV_Backup_BarriosSector_20260929"` (139 filas) y
+`zz_backups."GV_Backup_ZonasBarrios_20260929"` (11), las dos con RLS y sin escritura para
+`anon`/`authenticated`.
+
+**Chequeo:**
+```sql
+select b, public.gv_zona_de_barrio(b) zona,
+       public.gv_ppp_web_sector(public.gv_zona_de_barrio(b), b, null) sector,
+       public.gv_ppp_web_camion(public.gv_zona_de_barrio(b),
+            public.gv_ppp_web_sector(public.gv_zona_de_barrio(b), b, null)) camion
+  from unnest(array['Balvanera','Once']) b;
+select * from public.gv_ppp_tanda_camion_mezclado;   -- vacía = todo bien
+```
+
+`sql/gv_balvanera_once_zona1_v2440.sql` (rollback en la cabecera).
