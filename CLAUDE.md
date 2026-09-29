@@ -2753,7 +2753,41 @@ excepción. **Si se suma una escritura nueva a `gv_clin_evento`, va con `and not
 
 **Chequeo:** `select * from public.gv_clin_vencidos;` — lo que espera hace demasiado (el pedido
 **no se cancela solo**). Y `select * from public.gv_clin_prioritarios;` — lo aprobado que tiene
-que salir en 2 días hábiles. `sql/gv_clin_dos_estados_v2086.sql` (vigente; se aplicó como v20.89 — la v20.86, la v20.87 y la v20.88 se las llevaron otras sesiones) y
+que salir en 2 días hábiles.
+
+### ⚠ v24.32 (Luis, 29/09): el botón del cliente de prueba es 🖨 IMPRIMIR
+
+*"cambiá el botón de cliente de prueba por un botón de imprimir que promptee la impresión de un
+excel … asegurate de que haya una columna que se llame «Comentarios» que tenga todos los
+comentarios de esa gestión en una celda (bien ordenados, separados y visibles)"*. Es el mismo
+camino que tomó Cuarentena en la v20.53: el ejemplo era la ayuda de la primera semana y el
+reporte se usa todos los días. `pipeDemoToggle` y `pipeDemoPedido` **siguen en el archivo** — lo
+que no vuelve es la **puerta**: el ejemplo se prende desde la consola (`_apr.pipeDemo = true`) y
+ahí reaparece su «↺ Reiniciar ejemplo».
+
+El Excel (`pipeExportarExcel`) se arma en el FRONT, como el de Cuarentena: **20 columnas** con lo
+que ya pinta la tabla (pedido y sus partes, NP, fecha y días, m³, empresa, código, razón social,
+CUIT, teléfono, zona, etapa, espera, vencido, quién lo definió, a cobrar neto y c/IVA, descuento,
+importados en falta) más **Comentarios**.
+
+⚠ **Los comentarios NO están en la pantalla**: la tabla sólo muestra **cuántos** hay (el 📖 sale
+de `gv_cuarentena_comentarios_lote`, que devuelve el conteo). El texto se pide por pedido con
+`gv_cuarentena_comentarios`, **una llamada por parte** de la gestión —un pedido partido por
+importados es UNA fila (v23.06), así que se juntan los de todas sus partes y se ordenan por
+fecha— y todas en paralelo.
+
+⚠ **Si esa lectura falla, la celda lo DICE** (`(no se pudieron leer los comentarios)`), no queda
+vacía: una lectura rota no es *"sin comentarios"*.
+
+⚠⚠ **SheetJS community NO escribe estilos, así que `wrapText` no se puede forzar** — medido el
+29/09 sobre `vendor/xlsx.full.min.js` 0.20.3: se le pone `cell.s.alignment` y el `styles.xml` que
+genera sale con `cellXfs count="1"` sin alignment. Por eso cada comentario va **numerado y con su
+fecha y su autor** (`1) 26/09/26 09:00 · Vivi: …`) y separado además por salto de línea: sin el
+ajuste de texto se leen igual, y con el ajuste puesto quedan uno por renglón. **No volver a
+intentar el wrap desde el front.**
+
+**Chequeo:** `node tests/pipe-imprimir-excel.cjs` — corre el export de verdad con la RPC
+mockeada (verificado que falla contra el index anterior). `sql/gv_clin_dos_estados_v2086.sql` (vigente; se aplicó como v20.89 — la v20.86, la v20.87 y la v20.88 se las llevaron otras sesiones) y
 `sql/gv_clin_pipeline_v2066.sql` (tablas, config, vínculo y vistas), §3.ln.
 
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
