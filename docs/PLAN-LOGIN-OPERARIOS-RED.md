@@ -10,7 +10,8 @@ sirva para hacer daño. Jerarquía de acceso:
 | **admin** | Google (whitelist, rol admin) | cualquier lugar | maestros, precios, empleados |
 | clave pública sola | — | — | **nada** que escriba; solo lo mínimo para mostrar el login |
 
-Datos del dueño (28/09): las dos plantas tienen **IP fija**; el **Wi-Fi de invitados está separado**.
+Datos del dueño (28/09): las dos plantas tienen **IP fija**. **Corrección 29/09: NO hay Wi-Fi de invitados; cada
+sede tiene un solo Wi-Fi.** En Cervantes los operarios cargan desde su **celular propio**.
 Medido (28/09): la IP que ve el servidor **no se puede falsificar** con cabeceras (`X-Forwarded-For`,
 `X-Real-IP` probados contra `fichada-qr-fichar` → el gateway los pisa).
 
@@ -97,8 +98,9 @@ la base con la clave pública (la base no sabe quién es). Cada app tiene que MA
 - **Cambio de IP** (el proveedor la cambia): nadie puede entrar. Mitigación: `login-operario` avisa
   por Telegram al primer rechazo por IP desde un legajo válido; actualizar `red_empresa` es una fila.
 - **Operarios en datos móviles**: quedan afuera (buscado).
-- **Alguien en la red con un legajo ajeno**: la IP prueba el lugar, no la persona. Con Wi-Fi de
-  invitados separado el riesgo queda en gente de adentro. Si hace falta más: PIN (etapa futura).
+- **Alguien en la red con un legajo ajeno**: la IP prueba el lugar, no la persona. Como hay un solo Wi-Fi
+  por sede (29/09), entra cualquiera que tenga esa clave (visitas, ex empleados) + un legajo activo. Mitigación
+  barata: cambiar la clave del Wi-Fi cuando alguien se va. Si hace falta más: PIN (etapa futura).
 - **TV de pared / monitores** (solo leen): o se les da un usuario de dispositivo, o las vistas que
   muestran quedan legibles sin sesión si no tienen datos personales.
 
