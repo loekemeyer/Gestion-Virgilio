@@ -3870,6 +3870,58 @@ banda NO los lleve, que los dos chips abran el pop-up y que el contenido siga co
 **Chequeo:** `node tests/imp-hist-pedidos.cjs` · `node tests/pedimp-config-proveedor.cjs` ·
 `select * from public.gv_imp_pedidos_historial(400);`. `sql/gv_imp_pedidos_historial_v2391.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-29, v24.01): el COSTO DE NACIONALIZACIÓN se ve POR ARTÍCULO — y repartir todo por m³ NO es neutro
+
+**Luis:** *"cada artículo en el listado tenga el coste de nacionalización, calculable por m³ y que
+sea variable (se pueda ajustar)"*.
+
+En 🚢 **En curso**, al abrir el PI cada artículo trae **🛃 Nac. u$s** (y u$s por unidad) y **Puesto
+u$s/u** = FOB por unidad + lo que le toca de nacionalización. Arriba, la banda dice el costo del
+embarque, el % sobre el FOB y **el u$s/m³ editable**.
+
+> **El embarque es el PEDIDO.** El costo se calcula UNA vez con el FOB y los m³ de la fila del
+> pedido —los mismos que se ven arriba— y las líneas sólo dicen cómo se REPARTE. Al revés
+> (sumando líneas) un detalle incompleto infla el factor y nada avisa.
+
+⚠⚠ **Repartir TODO por m³ le cobra los derechos al VOLUMEN, y por eso el default NO es m³.** De lo
+que cuesta el embarque, lo único que se paga por volumen es el **flete**; derechos, estadística,
+seguro, libre circulación, despachante y comisión NTL son **% del FOB / CIF**. Por m³ puro, un
+artículo voluminoso y barato paga derechos que no generó y uno chico y caro los paga de menos.
+
+| criterio | qué hace |
+|---|---|
+| **mixto** (default) | cada concepto por SU base: el flete por m³, el resto por FOB |
+| **por m³** | todo por volumen — lo que Luis pidió textual, a un click |
+| **por FOB** | todo por plata (el factor parejo de siempre) |
+
+- La base de cada concepto viaja en el **4.º elemento de `res.detalle`** (`"m3"` / `"fob"`), puesta
+  por `_pedImpNacionalizar`: **no se adivina por el nombre del renglón**. Al agregar un concepto
+  nuevo a la nacionalización hay que decir su base, o cae en `fob` por defecto.
+- El reparto lo hace **`_impNacReparto(res, items, crit)`** y **la suma da exactamente
+  `res.noRecup`** (se escala al final: en **avión** la suma del detalle no coincide con el no
+  recuperable, porque el certificado FEDEX entra al CIF y no se suma como costo propio).
+- ⚠ **Guards:** si la base elegida suma 0 se cae a la otra; si las dos son 0 reparte por unidades;
+  sin nada, parejo. **Nunca divide por cero ni le tira todo al primer renglón** — un pedido sin m³
+  cargado es el caso normal, no el raro.
+- **El u$s/m³ es del PROVEEDOR** (`GV_Imp_Proveedor.valor_m3`, regla v23.89: la config vive en
+  tablas) y vale también para 📦 Pedidos: es la misma fuente. Se manda **sólo `{proveedor,
+  valor_m3}`** — la RPC deja intacta toda clave ausente, así que mandar el resto pisaría lo que
+  otro esté editando en el ⚙ (regla v23.95).
+- El criterio de reparto **no toca ninguna tabla**: es cómo se muestra el mismo u$s. El Excel de la
+  pantalla baja el detalle con el criterio elegido.
+
+⚠ **`_derechosPedido` no sirve acá**: lee el FOB con `_pedImpUsdOf`, que es del generador de
+pedidos. Las líneas del pedido en curso traen `usd` del backend, y por eso existe
+`_impCursoDerechos` — sin ese shim la tasa del embarque salía siempre la general.
+
+⚠ **Probado: `width:99%` en Descripción NO va.** Empuja las numéricas a la derecha y deja un hueco
+muerto en el medio (más parte la marca en dos líneas). El reparto natural de la tabla queda más
+apretado, que es lo que pide la regla rectora de espacio.
+
+**Chequeo:** `node tests/impo-nac-por-articulo.cjs` (la función pura, los tres criterios y los
+guards) · `node tests/imp-nac-articulo-pantalla.cjs` (corre la pantalla: las columnas, que el total
+no cambie al cambiar el criterio y que el u$s/m³ guarde sólo su clave).
+
 ## ⚠ REGLA (Luis, 2026-09-29, v23.86): se arma POR CAMIÓN — y a las 15:00 la TV dice si llegan
 
 - **Orden de armado = `gv_monitor_tanda_camion.orden_camion`**: por día, 1° el camión con más m³, Retira al final.

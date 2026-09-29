@@ -6214,7 +6214,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.00"></script>
+<script type="module" src="recepcion.js?v=24.01"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10256,7 +10256,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.00";
+const APP_VERSION = "v24.01";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21114,14 +21114,14 @@ function _pedImpNacionalizar(fob, m3, opts) {
     var gastosF = 150 + 40;                                  // flete depósito + bancarios
     var fleteDepF = 2000 + 750 + 800;                        // container + marítima + terminal
     var noRecupF = fleteDepF + seguroF + derechosF + estadF + tasasF + gastosF + despachF + ntl5F;
-    det = [["Flete + terminal", fleteDepF, "container 2.000 + marítima 750 + terminal 800"],
-      ["Seguro (0,5% FOB)", seguroF, "0,5% × FOB " + _nacF(fob)],
-      ["Derechos (" + pctDer + "% CIF)", derechosF, pctDer + "% × CIF " + _nacF(cifF)],
-      [_eF.lbl, estadF, _eF.txt],
-      ["Tasas (Sim + est.)", tasasF, "Sim 10 + tasa est. 180"],
-      ["Gastos varios", gastosF, "flete a depósito 150 + bancarios 40"],
-      ["Despachante", despachF, "máx(300; 1% FOB) + 150 + 100 + 30"]];
-    if (ntl) det.push(["Comisión NTL (5% FOB)", ntl5F, "5% × FOB " + _nacF(fob) + " (sobre FOB, no CIF)"]);
+    det = [["Flete + terminal", fleteDepF, "container 2.000 + marítima 750 + terminal 800", "m3"],
+      ["Seguro (0,5% FOB)", seguroF, "0,5% × FOB " + _nacF(fob), "fob"],
+      ["Derechos (" + pctDer + "% CIF)", derechosF, pctDer + "% × CIF " + _nacF(cifF), "fob"],
+      [_eF.lbl, estadF, _eF.txt, "fob"],
+      ["Tasas (Sim + est.)", tasasF, "Sim 10 + tasa est. 180", "fob"],
+      ["Gastos varios", gastosF, "flete a depósito 150 + bancarios 40", "fob"],
+      ["Despachante", despachF, "máx(300; 1% FOB) + 150 + 100 + 30", "fob"]];
+    if (ntl) det.push(["Comisión NTL (5% FOB)", ntl5F, "5% × FOB " + _nacF(fob) + " (sobre FOB, no CIF)", "fob"]);
     var _rF = _nacRecup(cifF, derechosF, estadF);
     return { modo: modo, ok: true, cif: cifF, cifTxt: "flete " + _nacF(fleteF) + " + seguro " + _nacF(seguroF) + " + FOB " + _nacF(fob), ntl: ntl5F, noRecup: noRecupF, factor: noRecupF / fob, landed: fob + noRecupF, detalle: det, recup: _rF.total, detRecup: _rF.detalle, baseRecup: _rF.base };
   }
@@ -21137,11 +21137,11 @@ function _pedImpNacionalizar(fob, m3, opts) {
     var tasaDesA = 50, gestionA = 85;
     var ntl5A = ntl ? 0.05 * fob : 0;   // v23.81 (Luis): en avión también va la comisión NTL
     var noRecupA = seguroA + derechosA + tasaDesA + gestionA + fleteA + estadA + ivaImpA + ntl5A;
-    det = [["Flete FEDEX", fleteA, _nacF(kg) + " kg × 13,5"], ["Certif. FEDEX", certA, "20% × flete"],
-      ["Seguro (1%)", seguroA, "1% × (FOB + certif.)"], ["Derechos (" + pctDer + "%)", derechosA, pctDer + "% × CIF " + _nacF(cifA)],
-      [_eA.lbl, estadA, _eA.txt], ["IVA importación", ivaImpA, "21% × (derechos + CIF)"],
-      ["Tasa desembolso", tasaDesA, "fijo"], ["Gestión Comex", gestionA, "fijo"]];
-    if (ntl) det.push(["Comisión NTL (5% FOB)", ntl5A, "5% × FOB " + _nacF(fob) + " (sobre FOB, no CIF)"]);
+    det = [["Flete FEDEX", fleteA, _nacF(kg) + " kg × 13,5", "m3"], ["Certif. FEDEX", certA, "20% × flete", "m3"],
+      ["Seguro (1%)", seguroA, "1% × (FOB + certif.)", "fob"], ["Derechos (" + pctDer + "%)", derechosA, pctDer + "% × CIF " + _nacF(cifA), "fob"],
+      [_eA.lbl, estadA, _eA.txt, "fob"], ["IVA importación", ivaImpA, "21% × (derechos + CIF)", "fob"],
+      ["Tasa desembolso", tasaDesA, "fijo", "fob"], ["Gestión Comex", gestionA, "fijo", "fob"]];
+    if (ntl) det.push(["Comisión NTL (5% FOB)", ntl5A, "5% × FOB " + _nacF(fob) + " (sobre FOB, no CIF)", "fob"]);
     return { modo: modo, ok: (kg > 0), cif: cifA, cifTxt: "FOB " + _nacF(fob) + " + seguro " + _nacF(seguroA) + " + certif. " + _nacF(certA), noRecup: noRecupA, ntl: ntl5A, factor: noRecupA / fob, landed: fob + noRecupA, detalle: det, recup: 0, detRecup: [], sinPeso: !(kg > 0) };
   }
   // consolidada (default) — marítimo LCL
@@ -21158,16 +21158,77 @@ function _pedImpNacionalizar(fob, m3, opts) {
   var gastosVarios = 30 + 40;                        // F20 (flete depósito + bancarios)
   var despach = Math.max(300, fob * 0.01) + 120 + 0 + 30;   // F26 (honorarios 1% + gtos + digital.)
   var noRecup = fleteTot + derechos + estad + sim + gastosVarios + despach + tasaFija + ntl5 + libreCirc;
-  det = [["Flete + dep. fiscal", fleteTot, "fijos 1.080 + 35 + 90 + " + (tn < 1 ? "4" : "4 × " + _nacF2(tn) + " TN") + " + (" + _nacF(valorM3) + " + 25) × " + _nacF2(m3) + " m³"],
-    ["Derechos (" + pctDer + "% CIF)", derechos, pctDer + "% × CIF " + _nacF(cif) + (tasaDer === 0.18 ? " (base; cada artículo tiene su arancel)" : "")],
-    [_eC.lbl, estad, _eC.txt],
-    ["Libre circulación (0,5%)", libreCirc, "0,5% × FOB " + _nacF(fob)],
-    ["Tasas (Sim + est.)", sim + tasaFija, "Sim 10 + tasa est. 180"],
-    ["Gastos varios", gastosVarios, "flete a depósito 30 + bancarios 40"],
-    ["Despachante", despach, "máx(300; 1% FOB) + 120 + 30"]];
-  if (ntl) det.push(["Comisión NTL (5% FOB)", ntl5, "5% × FOB " + _nacF(fob) + " (sobre FOB, no CIF)"]);
+  det = [["Flete + dep. fiscal", fleteTot, "fijos 1.080 + 35 + 90 + " + (tn < 1 ? "4" : "4 × " + _nacF2(tn) + " TN") + " + (" + _nacF(valorM3) + " + 25) × " + _nacF2(m3) + " m³", "m3"],
+    ["Derechos (" + pctDer + "% CIF)", derechos, pctDer + "% × CIF " + _nacF(cif) + (tasaDer === 0.18 ? " (base; cada artículo tiene su arancel)" : ""), "fob"],
+    [_eC.lbl, estad, _eC.txt, "fob"],
+    ["Libre circulación (0,5%)", libreCirc, "0,5% × FOB " + _nacF(fob), "fob"],
+    ["Tasas (Sim + est.)", sim + tasaFija, "Sim 10 + tasa est. 180", "fob"],
+    ["Gastos varios", gastosVarios, "flete a depósito 30 + bancarios 40", "fob"],
+    ["Despachante", despach, "máx(300; 1% FOB) + 120 + 30", "fob"]];
+  if (ntl) det.push(["Comisión NTL (5% FOB)", ntl5, "5% × FOB " + _nacF(fob) + " (sobre FOB, no CIF)", "fob"]);
   var _rC = _nacRecup(cif, derechos, estad);
   return { recup: _rC.total, detRecup: _rC.detalle, baseRecup: _rC.base, modo: modo, ok: true, cif: cif, cifTxt: "flete marítimo " + _nacF(valorM3) + " × " + _nacF2(m3) + " m³ = " + _nacF(fleteCif) + " + seguro 0,5% " + _nacF(seguro) + " + FOB " + _nacF(fob), ntl: ntl5, noRecup: noRecup, factor: noRecup / fob, landed: fob + noRecup, detalle: det };
+}
+/* ══ v24.01 (Luis, 29/09) — EL COSTO DE NACIONALIZACIÓN POR ARTÍCULO ═══════════════
+   Luis: "cada artículo en el listado tenga el coste de nacionalización, calculable por m³
+   y que sea variable (se pueda ajustar)".
+
+   ⚠ REPARTIR TODO POR m³ NO ES NEUTRO, y por eso hay TRES criterios y el default NO es m³:
+   del costo del embarque, lo único que se paga por VOLUMEN es el flete; los derechos, la
+   estadística, el seguro, la libre circulación, el despachante y la comisión NTL son un %
+   del FOB / CIF. Repartiendo todo por m³, un artículo voluminoso y barato paga derechos
+   que no generó y uno chico y caro los paga de menos.
+     · "mixto" (default) → cada concepto por SU base: el flete por m³, el resto por FOB.
+     · "m3"   → todo por m³   (lo que Luis pidió textual: el costo se mira contra el volumen)
+     · "fob"  → todo por FOB  (el factor parejo de siempre)
+   La base de cada concepto viaja en el 4.º elemento de res.detalle ("m3" | "fob"), puesta
+   por _pedImpNacionalizar: no se adivina acá por el nombre del renglón.
+
+   `items` = [{m3, fob, uni}] en el MISMO orden que las líneas. Devuelve un array paralelo
+   con los u$s de cada uno, y la suma da EXACTAMENTE res.noRecup (se escala al final: en
+   modo avión la suma del detalle no coincide con el no recuperable, porque el certificado
+   FEDEX entra al CIF y no se suma como costo propio).
+
+   Guards, porque una base puede venir vacía y una división por cero se lleva la pantalla:
+   si la base elegida suma 0 se cae a la otra, y si las dos son 0 reparte por unidades; si
+   tampoco hay unidades, parejo. Nunca le tira todo al primer renglón. */
+function _impNacReparto(res, items, crit) {
+  crit = (crit === "m3" || crit === "fob") ? crit : "mixto";
+  items = (items || []).map(function (it) {
+    return { m3: _nacNum(it && it.m3, 0), fob: _nacNum(it && it.fob, 0), uni: _nacNum(it && it.uni, 0) };
+  });
+  var n = items.length;
+  var cero = items.map(function () { return 0; });
+  if (!n || !res || !res.ok || !(_nacNum(res.noRecup, 0) > 0))
+    return { crit: crit, items: cero, total: 0, porBase: { m3: 0, fob: 0 }, usadas: [], sumaM3: 0, sumaFob: 0, sumaUni: 0 };
+  var sM3 = 0, sFob = 0, sUni = 0;
+  items.forEach(function (it) { sM3 += it.m3; sFob += it.fob; sUni += it.uni; });
+  function pesos(base) {
+    var usa = base, s = (base === "m3" ? sM3 : sFob);
+    if (!(s > 0)) { usa = (base === "m3" ? "fob" : "m3"); s = (usa === "m3" ? sM3 : sFob); }
+    if (!(s > 0)) { usa = "unidades"; s = sUni; }
+    if (!(s > 0)) return { usa: "parejo", w: items.map(function () { return 1 / n; }) };
+    return { usa: usa, w: items.map(function (it) { return (usa === "m3" ? it.m3 : usa === "fob" ? it.fob : it.uni) / s; }) };
+  }
+  var acum = cero.slice(), porBase = { m3: 0, fob: 0 }, usadas = {};
+  (res.detalle || []).forEach(function (d) {
+    var imp = _nacNum(d && d[1], 0); if (!(imp > 0)) return;
+    var base = (crit === "mixto") ? (d[3] === "m3" ? "m3" : "fob") : crit;
+    porBase[base] += imp;
+    var p = pesos(base); usadas[p.usa] = true;
+    p.w.forEach(function (w, i) { acum[i] += imp * w; });
+  });
+  var suma = acum.reduce(function (a, b) { return a + b; }, 0);
+  var k = suma > 0 ? (_nacNum(res.noRecup, 0) / suma) : 0;
+  acum = acum.map(function (v) { return v * k; });
+  return { crit: crit, items: acum, total: acum.reduce(function (a, b) { return a + b; }, 0),
+           porBase: porBase, usadas: Object.keys(usadas), sumaM3: sM3, sumaFob: sFob, sumaUni: sUni };
+}
+/* Qué dice la etiqueta del criterio elegido (para el chip y el title). */
+function _impNacCritTxt(crit) {
+  if (crit === "m3") return { lbl: "por m³", tip: "Todo el costo se reparte por VOLUMEN. Ojo: los derechos y la estadística son % del FOB, así que acá un artículo voluminoso y barato paga derechos que no generó." };
+  if (crit === "fob") return { lbl: "por FOB", tip: "Todo el costo se reparte por PLATA (u$s FOB de cada artículo). Es el factor parejo de siempre." };
+  return { lbl: "mixto", tip: "Cada concepto por su base: el flete por m³ (se paga por volumen) y derechos, estadística, seguro, despachante y NTL por FOB (son % del FOB/CIF). Es el reparto que no le cobra derechos al volumen." };
 }
 /* v22.37 — proyección del corte de min USD por proveedor: dado lo que hoy hay a pedir en FOB,
    el consumo mensual en FOB (proy×fob) y el techo (objetivo lleno en FOB), dice cuándo se llega
@@ -23416,8 +23477,24 @@ async function openImpEnCurso() {
   _stkPopShell("🚢 Pedidos de importación en curso", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Cargando pedidos en curso…</div>';
-  _stkPop = { kind: "impCurso", rows: [], abierto: "", lineas: {}, provFiltro: "", refFiltro: "", cc: {}, vistaPlata: false };
+  _stkPop = { kind: "impCurso", rows: [], abierto: "", lineas: {}, provFiltro: "", refFiltro: "", cc: {}, vistaPlata: false,
+    nac: { modo: _NAC_DEFAULTS.modo, valorM3: _NAC_DEFAULTS.valorM3, tn: 0 }, nacCrit: "mixto" };
+  await _impCursoCargarNac();
   await impCursoReload();
+}
+/* v24.01 — las tasas y los parámetros por proveedor salen de la BASE (regla v23.89: no viven
+   en el front). Si el fetch falla se queda con el fallback escrito en _NAC_TASAS y la cuenta da
+   igual que siempre — lo que no puede es quedar en 0 y hacerle creer a nadie que no hay costo. */
+async function _impCursoCargarNac() {
+  try { await _impCfgCargar(); } catch (_e) {}
+  try {
+    const cfg = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Config", "select=clave,valor&clave=in.(impo_nac_modo,impo_nac_valor_m3)");
+    const m = {}; (cfg || []).forEach(function (r) { m[r.clave] = r.valor; });
+    if (_stkPop && _stkPop.kind === "impCurso") {
+      _stkPop.nac = { modo: (m.impo_nac_modo || _NAC_DEFAULTS.modo),
+        valorM3: _nacNum(m.impo_nac_valor_m3, _NAC_TASAS.valor_m3 || _NAC_DEFAULTS.valorM3), tn: 0 };
+    }
+  } catch (_e) {}
 }
 async function impCursoReload() {
   if (!_stkPop || _stkPop.kind !== "impCurso") return;
@@ -23651,7 +23728,7 @@ function _impCursoRender() {
       '<td>' + _impCursoEstado(r) + '</td></tr>';
     if (abierto) {
       const ls = _stkPop.lineas[key];
-      h += '<tr><td class="imcu-det" colspan="9">' + (ls ? _impCursoLineasHtml(ls) : '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Cargando artículos…</div>') + '</td></tr>';
+      h += '<tr><td class="imcu-det" colspan="9">' + (ls ? _impCursoLineasHtml(ls, r) : '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Cargando artículos…</div>') + '</td></tr>';
     }
   });
   h += '</tbody></table></div>';
@@ -23684,12 +23761,21 @@ async function impCursoExportExcel() {
       '</td><td>' + esc(dm(r.fecha_embarque)) + '</td><td>' + esc(dm(r.fecha_llegada)) + '</td></tr>';
   });
   html += '<tr><td colspan="4"><b>TOTAL</b></td><td><b>' + tU + '</b></td><td><b>' + Math.round(tD) + '</b></td><td><b>' + (Math.round(tM * 100) / 100) + '</b></td><td></td><td></td></tr></table>';
-  html += '<h3>Detalle por artículo</h3><table><tr><th>Pedido (PI)</th><th>Proveedor</th><th>Codigo</th><th>Marca</th><th>Descripcion</th><th>Unidades</th><th>FOB u$s/u</th><th>u$s</th><th>m3</th><th>Llegada</th></tr>';
+  // v24.01 — el detalle lleva la nacionalización repartida con el MISMO criterio que la pantalla
+  html += '<h3>Detalle por artículo — nacionalización repartida ' + esc(_impNacCritTxt((_stkPop.nacCrit || "mixto")).lbl) + '</h3>' +
+    '<table><tr><th>Pedido (PI)</th><th>Proveedor</th><th>Codigo</th><th>Marca</th><th>Descripcion</th><th>Unidades</th><th>FOB u$s/u</th><th>u$s</th><th>m3</th><th>Nac u$s</th><th>Nac u$s/u</th><th>Puesto u$s/u</th><th>Llegada</th></tr>';
   vista.forEach(function (r) {
-    (_stkPop.lineas[_impCursoKey(r)] || []).forEach(function (l) {
+    const _ls = _stkPop.lineas[_impCursoKey(r)] || [];
+    const _N = _ls.length ? _impCursoNac(r, _ls) : null;
+    _ls.forEach(function (l, i) {
+      const _uni = Number(l.pendiente) || 0;
+      const _nacU = _N ? (Number(_N.rep.items[i]) || 0) : 0;
+      const _nacUni = _uni > 0 ? _nacU / _uni : 0;
+      const _fobU = _uni > 0 ? ((Number(l.usd) || 0) / _uni) : (Number(l.fob_uni) || 0);
       html += '<tr><td>' + esc(r.pedido_ref) + '</td><td>' + esc(r.proveedor) + '</td><td>' + esc(codCanon(l.cod_art)) + '</td><td>' + esc(l.marca || "") +
-        '</td><td>' + esc(l.descripcion || "") + '</td><td>' + (Number(l.pendiente) || 0) + '</td><td>' + (Number(l.fob_uni) || "") + '</td><td>' + Math.round(Number(l.usd) || 0) +
-        '</td><td>' + (l.m3 == null ? "" : l.m3) + '</td><td>' + esc(dm(l.fecha_reingreso)) + '</td></tr>';
+        '</td><td>' + esc(l.descripcion || "") + '</td><td>' + _uni + '</td><td>' + (Number(l.fob_uni) || "") + '</td><td>' + Math.round(Number(l.usd) || 0) +
+        '</td><td>' + (l.m3 == null ? "" : l.m3) + '</td><td>' + (Math.round(_nacU * 100) / 100) + '</td><td>' + (Math.round(_nacUni * 10000) / 10000) +
+        '</td><td>' + (Math.round((_fobU + _nacUni) * 10000) / 10000) + '</td><td>' + esc(dm(l.fecha_reingreso)) + '</td></tr>';
     });
   });
   html += '</table></body></html>';
@@ -24186,17 +24272,101 @@ function _impPagoCargasCell(x) {
   }
   return '<button class="imcu-b" onclick="impPagoCargas(' + x.id + ')">+ cargas</button>';
 }
-function _impCursoLineasHtml(ls) {
+/* v24.01 (Luis) — la nacionalización de ESTE pedido y su reparto por artículo.
+   El embarque es el PEDIDO (un proveedor = un embarque, igual que en 📦 Pedidos), así que el
+   costo se calcula una vez con el FOB y los m³ del pedido y después se reparte entre sus líneas
+   con `_impNacReparto`. La tasa de derechos sale del promedio ponderado por FOB de SUS artículos
+   (`_derechosPedido`), no de una tasa suelta: cada código puede tener su partida arancelaria. */
+function _impCursoNac(r, ls) {
+  const nac = (_stkPop && _stkPop.nac) || { modo: _NAC_DEFAULTS.modo, valorM3: _NAC_DEFAULTS.valorM3, tn: 0 };
+  const prov = String(r && r.proveedor || "");
+  const valorM3 = _impProvNum(prov, "valor_m3", nac.valorM3);
+  // El EMBARQUE es el pedido entero, así que el costo se calcula con el FOB y los m³ del PEDIDO
+  // — los mismos que muestra su fila. Las líneas sólo dicen cómo se REPARTE. Al revés (sumando
+  // líneas) un detalle incompleto inflaría el factor sin que nada avise.
+  let fob = _nacNum(r && r.usd, 0), m3 = _nacNum(r && r.m3, 0);
+  if (!(fob > 0)) (ls || []).forEach(function (l) { fob += _nacNum(l.usd, 0); });
+  if (!(m3 > 0)) (ls || []).forEach(function (l) { m3 += _nacNum(l.m3, 0); });
+  const der = _impCursoDerechos(ls, prov);
+  const res = _pedImpNacionalizar(fob, m3, { modo: nac.modo, valorM3: valorM3, tn: nac.tn,
+    ntl: _esProvNtl(prov), derechos: der });
+  const rep = _impNacReparto(res, (ls || []).map(function (l) {
+    return { m3: l.m3, fob: l.usd, uni: l.pendiente };
+  }), (_stkPop && _stkPop.nacCrit) || "mixto");
+  return { res: res, rep: rep, fob: fob, m3: m3, valorM3: valorM3, prov: prov, modo: nac.modo };
+}
+/* ⚠ `_derechosPedido` lee el FOB con `_pedImpUsdOf`, que es del otro módulo y acá no aplica:
+   las líneas del pedido en curso traen `usd` calculado por el backend. Este shim se lo da sin
+   tocar aquella función (que sigue siendo la del generador de pedidos). */
+function _impCursoDerechos(ls, prov) {
+  var fob = 0, der = 0;
+  (ls || []).forEach(function (l) {
+    var u = _nacNum(l.usd, 0); if (!(u > 0)) return;
+    fob += u; der += u * _derechosArt(l.cod_art, prov);
+  });
+  return fob > 0 ? (der / fob) : _derechosProv(prov);
+}
+function _impCursoLineasHtml(ls, r) {
   if (!ls.length) return '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Este pedido no tiene líneas en curso.</div>';
-  return '<table><thead><tr><th style="text-align:left">Código</th><th style="text-align:left">Descripción</th><th style="text-align:right">Unidades</th><th style="text-align:right">u$s</th><th style="text-align:right">m³</th><th style="text-align:left">Llegada</th></tr></thead><tbody>' +
-    ls.map(function (l) {
-      return '<tr><td style="font-weight:800;font-family:Consolas,Menlo,monospace">' + escapeHtml(codCanon(l.cod_art)) + (l.marca ? ' <span style="font-size:10px;color:#64748b">' + escapeHtml(l.marca) + '</span>' : '') + '</td>' +
-        '<td style="color:#475569">' + escapeHtml(String(artNombre(l.cod_art, l.descripcion) || "").slice(0, 40)) + '</td>' +
-        '<td style="text-align:right;font-variant-numeric:tabular-nums">' + _impCursoNum(l.pendiente) + '</td>' +
-        '<td style="text-align:right;color:#065f46">' + (Number(l.usd) > 0 ? _impCursoNum(Math.round(l.usd)) : '—') + '</td>' +
-        '<td style="text-align:right;color:#0369a1">' + (Number(l.m3) > 0 ? (Math.round(l.m3 * 100) / 100).toLocaleString("es-AR") : '—') + '</td>' +
-        '<td>' + (l.fecha_reingreso ? _isoToDdMmAa(String(l.fecha_reingreso).slice(0, 10)) : '<span style="color:#b45309">sin fecha</span>') + '</td></tr>';
-    }).join("") + '</tbody></table>';
+  const N = _impCursoNac(r, ls), crit = (_stkPop && _stkPop.nacCrit) || "mixto", ct = _impNacCritTxt(crit);
+  const provEnc = _impCursoEnc(N.prov);
+  const fx = N.res.ok && N.fob > 0 ? (Math.round(N.res.factor * 1000) / 10).toLocaleString("es-AR") : "—";
+  const bt = function (c, t) {
+    return '<span class="imcu-b" style="' + (crit === c ? 'background:#4c1d95;color:#fff;border-color:#4c1d95;' : '') + 'padding:3px 9px" onclick="impCursoNacCrit(\'' + c + '\')" title="' + escapeHtml(_impNacCritTxt(c).tip) + '">' + t + '</span>';
+  };
+  let h = '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 12px;margin:2px 0 8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;font-size:12.5px;color:#4c1d95">' +
+    '<b>🛃 Nacionalización del embarque:</b> <b style="font-size:14px">u$s ' + _nacF(N.res.noRecup) + '</b>' +
+    '<span style="color:#6b21a8">= ' + fx + '% del FOB · ' + escapeHtml(N.modo) + '</span>' +
+    '<label style="display:flex;align-items:center;gap:5px;font-weight:700" title="Lo que cuesta cada m³ de flete marítimo. Se guarda en el proveedor (' + escapeHtml(N.prov) + ') y vale también para el módulo 📦 Pedidos: es la misma fuente.">u$s/m³ <input type="number" inputmode="decimal" min="0" step="1" value="' + N.valorM3 + '" onchange="impCursoSetNacM3(\'' + provEnc + '\',this.value)" style="width:66px;height:28px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>' +
+    '<span style="display:flex;align-items:center;gap:5px"><b>repartir:</b> ' + bt("mixto", "mixto") + bt("m3", "por m³") + bt("fob", "por FOB") + '</span>' +
+    '<span style="color:#6b21a8;flex:1 1 100%;font-size:11.5px">' + escapeHtml(ct.tip) + '</span>' +
+    '</div>';
+  // ⚠ SIN width:99% en Descripción: se probó y deja un hueco muerto entre ella y Unidades (y parte
+  // la marca en dos líneas). El reparto natural de la tabla queda más apretado, que es la regla.
+  h += '<table><thead><tr><th style="text-align:left">Código</th><th style="text-align:left">Descripción</th><th style="text-align:right">Unidades</th><th style="text-align:right">u$s</th><th style="text-align:right">m³</th>' +
+    '<th style="text-align:right;white-space:nowrap" title="Costo de nacionalización de ESTE artículo: la parte que le toca del costo del embarque, repartida ' + escapeHtml(ct.lbl) + '. Abajo, por unidad.">🛃 Nac. u$s<small style="display:block;font-weight:600;opacity:.75">u$s/u</small></th>' +
+    '<th style="text-align:right;white-space:nowrap" title="Puesto en Argentina por unidad = FOB por unidad + la nacionalización que le toca. Es el costo real de la caja cuando llega al depósito.">Puesto<small style="display:block;font-weight:600;opacity:.75">u$s/u</small></th>' +
+    '<th style="text-align:left">Llegada</th></tr></thead><tbody>';
+  h += ls.map(function (l, i) {
+    const nacU = _nacNum(N.rep.items[i], 0);
+    const uni = _nacNum(l.pendiente, 0);
+    const fobU = uni > 0 ? (_nacNum(l.usd, 0) / uni) : _nacNum(l.fob_uni, 0);
+    const nacUni = uni > 0 ? (nacU / uni) : 0;
+    return '<tr><td style="font-weight:800;font-family:Consolas,Menlo,monospace">' + escapeHtml(codCanon(l.cod_art)) + (l.marca ? ' <span style="font-size:10px;color:#64748b">' + escapeHtml(l.marca) + '</span>' : '') + '</td>' +
+      '<td style="color:#475569">' + escapeHtml(String(artNombre(l.cod_art, l.descripcion) || "").slice(0, 40)) + '</td>' +
+      '<td style="text-align:right;font-variant-numeric:tabular-nums">' + _impCursoNum(uni) + '</td>' +
+      '<td style="text-align:right;color:#065f46">' + (Number(l.usd) > 0 ? _impCursoNum(Math.round(l.usd)) : '—') + '</td>' +
+      '<td style="text-align:right;color:#0369a1">' + (Number(l.m3) > 0 ? (Math.round(l.m3 * 100) / 100).toLocaleString("es-AR") : '—') + '</td>' +
+      '<td style="text-align:right;color:#6d28d9;font-weight:700">' + (nacU > 0 ? _nacF(nacU) : '—') +
+        (nacUni > 0 ? '<div style="font-size:10.5px;color:#7c3aed;font-weight:600">' + _nacF2(nacUni) + '</div>' : '') + '</td>' +
+      '<td style="text-align:right;font-weight:800;color:#0f172a">' + ((fobU + nacUni) > 0 ? _nacF2(fobU + nacUni) : '—') + '</td>' +
+      '<td>' + (l.fecha_reingreso ? _isoToDdMmAa(String(l.fecha_reingreso).slice(0, 10)) : '<span style="color:#b45309">sin fecha</span>') + '</td></tr>';
+  }).join("");
+  h += '<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;font-weight:700;color:#334155">TOTAL nacionalización repartida</td>' +
+    '<td style="text-align:right;font-weight:800;color:#6d28d9">' + _nacF(N.rep.total) + '</td><td colspan="2"></td></tr>';
+  return h + '</tbody></table>';
+}
+/* Cambiar el criterio de reparto: es sólo cómo se MUESTRA el costo del embarque repartido —
+   no toca ninguna tabla ni el total, que sigue siendo el mismo u$s. */
+function impCursoNacCrit(c) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  _stkPop.nacCrit = (c === "m3" || c === "fob") ? c : "mixto";
+  _impCursoRender();
+}
+/* El u$s/m³ de flete SÍ toca la base: es `GV_Imp_Proveedor.valor_m3` de ese proveedor (regla
+   v23.89, la config de importados vive en tablas). Se manda SÓLO esa clave: la RPC deja intacta
+   toda clave ausente, así que mandar el resto pisaría lo que otro esté editando en el ⚙. */
+async function impCursoSetNacM3(provEnc, v) {
+  if (!_stkPop || _stkPop.kind !== "impCurso") return;
+  const prov = decodeURIComponent(provEnc || ""); if (!prov) return;
+  const n = Number(v);
+  if (!isFinite(n) || n < 0) { _impCursoRender(); return; }
+  // reflejo inmediato, sin esperar al backend
+  if (_impCfgProv && _impCfgProv[prov]) _impCfgProv[prov].valor_m3 = n;
+  _impCursoRender();
+  try { await _impCfgRpc("gv_imp_proveedor_guardar", { p: { proveedor: prov, valor_m3: n } }); await _impCfgCargar(); }
+  catch (e) { try { alert("No se pudo guardar el valor del m³: " + (e.message || e)); } catch (_e) {} }
+  if (_stkPop && _stkPop.kind === "impCurso") _impCursoRender();
 }
 async function impCursoToggle(refEnc, provEnc) {
   if (!_stkPop || _stkPop.kind !== "impCurso") return;
@@ -63277,7 +63447,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.00"></script>
+<script src="cobranzas.js?v=24.01"></script>
 
 </body>
 </html>

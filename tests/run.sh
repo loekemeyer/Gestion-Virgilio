@@ -1015,6 +1015,12 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== impo-nacionalizacion (v22.37: costo de traer de China + proyeccion al minimo de 25k por proveedor) =="
 node tests/impo-nacionalizacion.cjs
 
+echo "== impo-nac-por-articulo (v24.01: el costo de nacionalizacion repartido por articulo, mixto/m3/FOB) =="
+node tests/impo-nac-por-articulo.cjs
+
+echo "== imp-nac-articulo-pantalla (v24.01: la nacionalizacion por articulo en la pantalla En curso) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-nac-articulo-pantalla.cjs
+
 echo "== ppp-retira-badge (v22.40: un RETIRA no se lee como reparto 'Zona 6 · 🚚 CABA') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-retira-badge.cjs
 
