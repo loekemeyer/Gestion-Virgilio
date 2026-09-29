@@ -84,7 +84,9 @@ var hB = N._pedImpBandaHtml(prB, nacB, 25000, 9324, { prov: "Becky", items: item
    datos para rearmarlo quedan en _pedImpDesgData. Lo que se mide ahora es eso: que la banda
    sea chica y que el contenido siga estando completo, que es lo que el test cuidaba. */
 ok(!/<details class="pedimp-desg"/.test(hB), "La banda ya no lleva el desglose adentro (v23.91)");
-ok((hB.match(/pedImpDesgPop\(/g) || []).length === 2, "Los dos chips abren el desglose en el pop-up");
+ok((hB.match(/pedImpDesgPop\(/g) || []).length === 1, "Un solo chip (el costo) abre el desglose en el pop-up");
+// v24.58 (Thomas) — el mínimo de 25k ya no se muestra: es una norma general, no un requisito.
+ok(!/mínimo|No llega solo|Ya se puede pedir/.test(hB), "La banda no habla del mínimo del pedido");
 ok(!!N._pedImpDesgData["Becky"], "La banda deja los datos para que el pop-up rearme el desglose");
 var dIzq = N._pedImpDesgIzq(prB, 25000, itemsB), dDer = N._pedImpDesgDer(nacB, 9324, 12.4);
 ok(/970E/.test(dIzq) && /sin FOB/.test(dIzq), "El desglose del consumo lista los artículos y marca los sin FOB");

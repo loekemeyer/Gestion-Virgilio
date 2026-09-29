@@ -6370,3 +6370,7 @@ Solapas y proveedores en **UNA fila que se desliza** (antes 4 y 6 filas en el ce
 (el «N con < 4 meses» va en el `title`); **Excel · Cargar pedido ya hecho · ⓘ Cómo se usa** viven en el menú
 **⋯**; la fecha del portal es un chip 📅; totales + nacionalización (desplegable, m³, mín, ⚙) en una barra.
 A 390 px la tabla del primer proveedor arranca en y≈635. `tests/pedimp-cabecera-compacta.cjs`.
+
+⚠ **v24.58 (Thomas): el MÍNIMO de 25k ya NO se muestra** — *"es una norma general, no algo que sí o sí hay que
+cubrir"*. Se fueron el chip «No llega solo / ⏳ para el mínimo», el input «Mín u$s» y los campos del ⚙. El dato
+(`min_usd`) sigue en la base, sin uso en pantalla. No volver a ponerlo como requisito del pedido.

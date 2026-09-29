@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.57"></script>
+<script type="module" src="recepcion.js?v=24.58"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.57";
+const APP_VERSION = "v24.58";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21398,7 +21398,9 @@ function _pedImpBandaHtml(proy, nac, minUsd, totUsd, ext) {
     _pie('puesto en Arg ' + _usd0(nac.landed) + ' · FOB ' + _usd0(totUsd) + ' · ' + modoTxt + (nac.ntl > 0 ? ' · NTL ' + _usd0(nac.ntl) : '') +
       (nac.recup > 0 ? ' · <span style="color:#047857;font-weight:700">' + _usd0(nac.recup) + ' recuperable</span>' : '')),
     _pedImpDesgDer(nac, totUsd, ext.m3), "der");
-  return '<div class="pedimp-banda">' + izq + der + '</div>';
+  // v24.58 (Thomas) — el chip del mínimo (izq) ya no se dibuja: «es una norma general, no algo que
+  // sí o sí hay que cubrir». Queda sólo el costo puesto en Argentina.
+  return '<div class="pedimp-banda">' + der + '</div>';
 }
 /* ══ v23.89 (Luis, 29/09) — LA CONFIG DE IMPORTADOS VIVE EN TABLAS ═══════════════════
    "Fijate que no vivan en el front los datos, sino que modifiquen las tablas pertinentes".
@@ -21632,7 +21634,6 @@ function _impCfgRender() {
     h += campo("impCfgNtlPct", "Comisión NTL (%)", _impCfgPctTxt(r.ntl_pct_propio), _impCfgPctTxt(g.ntl_pct), "sobre el FOB · general " + _nacPct(g.ntl_pct) + "%");
     h += campo("impCfgDer", "Derechos (%)", _impCfgPctTxt(r.derechos_pct_propio), _impCfgPctTxt(g.derechos_pct), "sobre el CIF · general " + _nacPct(g.derechos_pct) + "%");
     h += campo("impCfgMeses", "Meses objetivo", r.meses_objetivo_propio == null ? "" : String(r.meses_objetivo_propio), String(g.meses_objetivo), "cuántos meses de venta se piden · general " + g.meses_objetivo);
-    h += campo("impCfgMin", "Mínimo del pedido (u$s)", r.min_usd_propio == null ? "" : String(r.min_usd_propio), String(g.min_usd), "general " + _nacF(g.min_usd));
     h += campo("impCfgM3", "Valor del m³ de flete (u$s)", r.valor_m3_propio == null ? "" : String(r.valor_m3_propio), String(g.valor_m3), "general " + _nacF(g.valor_m3));
     // v23.90 (Luis) — MOQ del proveedor y hasta cuántos meses de cobertura se admite estirar
     h += campo("impCfgMoq", "MOQ (unidades por código)", r.moq_propio == null ? "" : String(r.moq_propio), String(g.moq), "mínimo que la fábrica acepta · general " + _nacF(g.moq));
@@ -21696,7 +21697,6 @@ function _impCfgRender() {
     h += campo("impCfgGEstF", "Estadística: fijo (u$s)", String(g.estad_fijo), "", "en el tramo del medio");
     h += campo("impCfgGM3", "Valor del m³ (u$s)", String(g.valor_m3), "", "flete consolidado");
     h += campo("impCfgGFull", "Flete contenedor (u$s)", String(g.flete_full), "", "contenedor propio");
-    h += campo("impCfgGMin", "Mínimo del pedido (u$s)", String(g.min_usd), "", "para poder emitir");
     h += campo("impCfgGMoq", "MOQ (unidades por código)", String(g.moq), "", "mínimo de la fábrica");
     h += campo("impCfgGMoqM", "MOQ: tope de cobertura (meses)", String(g.moq_meses_max), "", "hasta acá se estira");
     h += campo("impCfgGMoqP", "MOQ: mínimo a llegar (%)", _impCfgPctTxt(g.moq_pct != null ? g.moq_pct : 0.8), "", "si no se llega a este % del MOQ, no se pide");   // v24.56 (Thomas)
@@ -21729,7 +21729,6 @@ async function pedImpCfgGuardar() {
     ntl_pct: _impCfgPctVal("impCfgNtlPct"),
     derechos_pct: _impCfgPctVal("impCfgDer"),
     meses_objetivo: _impCfgNum("impCfgMeses") === "" ? null : Number(_impCfgNum("impCfgMeses")),
-    min_usd: _impCfgNum("impCfgMin") === "" ? null : Number(_impCfgNum("impCfgMin")),
     valor_m3: _impCfgNum("impCfgM3") === "" ? null : Number(_impCfgNum("impCfgM3")),
     moq: _impCfgNum("impCfgMoq") === "" ? null : Number(_impCfgNum("impCfgMoq")),
     moq_meses_max: _impCfgNum("impCfgMoqMeses") === "" ? null : Number(_impCfgNum("impCfgMoqMeses")),
@@ -21752,7 +21751,7 @@ async function pedImpCfgGuardarGral() {
     estad_pct: _impCfgPctVal("impCfgGEstad"),
     estad_fob_desde: Number(_impCfgNum("impCfgGEstD")), estad_fob_hasta: Number(_impCfgNum("impCfgGEstH")),
     estad_fijo: Number(_impCfgNum("impCfgGEstF")), valor_m3: Number(_impCfgNum("impCfgGM3")),
-    flete_full: Number(_impCfgNum("impCfgGFull")), min_usd: Number(_impCfgNum("impCfgGMin")),
+    flete_full: Number(_impCfgNum("impCfgGFull")),
     moq: Number(_impCfgNum("impCfgGMoq")), moq_meses_max: Number(_impCfgNum("impCfgGMoqM")), moq_pct: _impCfgPctVal("impCfgGMoqP") };
   _impCfgPop.guardando = true; _impCfgPop.msg = ""; _impCfgRender();
   try {
@@ -22358,7 +22357,7 @@ function _pedImpRender() {
       [["consolidada", "Consolidada"], ["full", "Contenedor"], ["avion", "Avión"]].map(function (o) { return '<option value="' + o[0] + '"' + (_nac.modo === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
     (_nac.modo === "consolidada" ? '<label style="' + _lbl + '" title="Valor del m³ de flete, en u$s">m³ u$s <input type="number" inputmode="decimal" min="0" value="' + _nac.valorM3 + '" onchange="pedImpSetNacCfg(\'impo_nac_valor_m3\',this.value)" style="width:54px;' + _numIn + '"></label>' : '') +
     (_nac.modo === "avion" ? '<label style="' + _lbl + '" title="Peso total del embarque en toneladas (avión cobra por kg)">TN <input type="number" inputmode="decimal" min="0" value="' + (_nac.tn || "") + '" onchange="pedImpSetNacTn(this.value)" placeholder="0" style="width:50px;' + _numIn + '"></label>' : '') +
-    '<label style="' + _lbl + '" title="Mínimo por proveedor para emitir un pedido. La proyección dice cuándo se llega a este monto.">Mín u$s <input type="number" inputmode="numeric" min="0" step="1000" value="' + _minUsd + '" onchange="pedImpSetNacCfg(\'impo_pedido_min_usd\',this.value)" style="width:70px;' + _numIn + '"></label>' +
+    // v24.58 (Thomas) — el mínimo del pedido (25k) se sacó: es una norma general, no un requisito.
     // v23.91 (Luis) — los parámetros generales se editan acá, no adentro del ⚙ de un proveedor
     '<button class="mva-clear" style="width:auto;margin:0;padding:4px 9px;font-size:12px;background:#4338ca;color:#fff;border-color:#4338ca" onclick="pedImpCfgGralAbrir()" title="⚙ Generales: tasas, tope de estadística, valor del m³, mínimo y MOQ que valen para todos los proveedores que no tengan el suyo propio">⚙</button>' +
     '</div>';
@@ -63971,7 +63970,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.57"></script>
+<script src="cobranzas.js?v=24.58"></script>
 
 </body>
 </html>
