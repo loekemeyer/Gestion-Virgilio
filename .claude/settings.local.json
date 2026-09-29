@@ -85,7 +85,11 @@
       "Bash(node scripts/bump-version.cjs 24.00)",
       "Bash(node tests/cbz-ficha-cliente.cjs)",
       "Bash(node tests/pedimp-ancho-tabla.cjs)",
-      "Bash(node tests/imp-nac-articulo-pantalla.cjs)"
+      "Bash(node tests/imp-nac-articulo-pantalla.cjs)",
+      "Bash(sed -i 's/\\(v24.01: el Acuerdo Cliente de la ficha se toca\\)/\\(v24.33: el Acuerdo Cliente de la ficha se toca\\)/' tests/run.sh)",
+      "Bash(git -c user.name=Claude -c user.email=noreply@anthropic.com commit -q -m 'v24.33: bump tras traer main \\(el desglose del Acuerdo Cliente ya entro en v24.01\\) *)",
+      "Bash(node tests/fc-acuerdo-desglose-copia.cjs)",
+      "Bash(git -c user.name=Claude -c user.email=noreply@anthropic.com commit -q -m 'Permisos: comandos de esta sesion al allow local *)"
     ]
   }
 }
