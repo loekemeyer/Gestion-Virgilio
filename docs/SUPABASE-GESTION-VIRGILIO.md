@@ -30743,3 +30743,50 @@ transacción abortada:
 **Datos de configuración cargados sin sí previo** (tablas nuevas del módulo, no de negocio):
 `GV_Conc_Sucursal_Provincia` (48 ciudades). `GV_Conc_Alias_Pagador` sigue **vacía** (Luis: "1 no").
 Scratch de prueba: `zz_backups."GV_Conc_Test_Extracto"` (el extracto de Santander, cerrado).
+---
+
+## §3.v2440 — Balvanera y Once pasan a ZONA SUR (Z1) · Luis, 29/09/2026
+
+**Luis, textual:** *"balvanera pasa a ser zona sur"* · *"z1"* · *"once tambien"*.
+
+> ⚠ **Cambiar la zona sola NO alcanza: para Z1 el camión lo decide el SECTOR.**
+> `gv_ppp_web_camion` resuelve por zona **únicamente 2, 3, 6 y 7** (v21.43 / v21.91); para el
+> resto cae a `GV_Sectores.camion` del sector. Balvanera y Once eran sector **F** (Capital
+> Centro), así que con sólo el cambio de zona habrían quedado *"Zona 1"* saliendo en el camión
+> **Capital Centro-Oeste**. Por eso van los dos cambios.
+
+| qué | dónde | antes | ahora |
+|---|---|---|---|
+| zona | **`GV_Zonas_Barrios`** (override; `Zonas_Barrios` es la base y **no se toca**) | Zona 2 - CABA Centro | **Zona 1 - CABA Sur** |
+| sector | `GV_Barrios_Sector` | F (Capital Centro) | **A** (Capital Sur) |
+
+Sector **A** = Capital Sur-Este: Barracas, Constitución, La Boca, P. Patricios, San Cristóbal,
+San Telmo. Balvanera linda con San Cristóbal y Once está adentro de Balvanera.
+
+⚠ **El mapeo vive acá, no en LK.** La página manda el **barrio** en `zona_expreso`
+(`Balvanera`, `Once`), no la zona; Gestión la resuelve con `gv_zona_de_barrio`, que mira
+**primero `GV_Zonas_Barrios`** y después `Zonas_Barrios`.
+
+⚠ **Es forward-facing: lo ya programado NO se mueve.** `PPP_Web_Programacion.zona` está
+**guardada**, así que las **13 NP** que ya estaban programadas siguen en Zona 2 — Bazar y Cia,
+R Cuarto y Jazquel, en las tandas **F17D** (01/10), **E97A** y **F18B** (05/10) y **F11A**
+(11/11). Mismo criterio que la v21.87. Moverlas es otra decisión y parte F18B y E97A en dos
+camiones.
+
+**Medido después de aplicar:** Balvanera y Once, en cualquier grafía, dan
+`Zona 1 - CABA Sur · sector A · camión Capital Sur`, y `gv_ppp_tanda_camion_mezclado` sigue
+**vacía**. Backups: `zz_backups."GV_Backup_BarriosSector_20260929"` (139 filas) y
+`zz_backups."GV_Backup_ZonasBarrios_20260929"` (11), las dos con RLS y sin escritura para
+`anon`/`authenticated`.
+
+**Chequeo:**
+```sql
+select b, public.gv_zona_de_barrio(b) zona,
+       public.gv_ppp_web_sector(public.gv_zona_de_barrio(b), b, null) sector,
+       public.gv_ppp_web_camion(public.gv_zona_de_barrio(b),
+            public.gv_ppp_web_sector(public.gv_zona_de_barrio(b), b, null)) camion
+  from unnest(array['Balvanera','Once']) b;
+select * from public.gv_ppp_tanda_camion_mezclado;   -- vacía = todo bien
+```
+
+`sql/gv_balvanera_once_zona1_v2440.sql` (rollback en la cabecera).
