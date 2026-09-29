@@ -8,7 +8,7 @@
    (Además admin/admin.js tiene la anon key del proyecto LK — esa es aparte.)
    ========================================================= */
 importScripts("supabase-config.js");
-const SW_VERSION = "v24.31-vir";
+const SW_VERSION = "v24.32-vir";
 /* nota: v7.68 — generador de OCs desde stock (vista_generador_oc). */
 
 const SUPABASE_URL = self.VIR_SUPABASE_URL;
@@ -229,12 +229,28 @@ self.addEventListener("activate", (event) => {
       if (!ya) {
         await fc.put("forzado-v2370", new Response("1"));
         const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        /* v24.32 - el `await c.navigate(...)` de aca ADENTRO del waitUntil COLGABA la pestana.
+           `activate` no termina hasta que se asiente lo que el waitUntil espera, y la pagina que
+           todavia esta booteando pasa sus fetch por el SW: si esa navegacion no resuelve (una red
+           que no contesta, un recurso abortado), el SW queda a medio activar y el hilo principal
+           de la pestana se queda esperandolo — sin errores, sin cartel, la app muda. Lo cazo
+           `tests/vendor-sin-cdn.cjs`, que corta toda salida a internet: la pagina llegaba a
+           `complete` y a los ~1,9 s dejaba de responder para siempre.
+           Se dispara la navegacion SIN esperarla una por una y se le pone un techo de 2 s al
+           conjunto: la recarga sigue saliendo y `activate` no puede colgarse nunca. */
+        const navs = [];
         for (const c of wins) {
           try {
             const u = new URL(c.url);
             const esApp = /\/(index\.html)?$/.test(u.pathname) && !/\/(admin|monitor|cervantes|selector)\//.test(u.pathname);
-            if (esApp && c.navigate) await c.navigate(u.pathname + "?_=" + Date.now());
+            if (esApp && c.navigate) navs.push(Promise.resolve(c.navigate(u.pathname + "?_=" + Date.now())).catch(function () {}));
           } catch (_e) {}
+        }
+        if (navs.length) {
+          await Promise.race([
+            Promise.all(navs),
+            new Promise(function (res) { setTimeout(res, 2000); })
+          ]);
         }
       }
     } catch (_e) { /* no-op */ }

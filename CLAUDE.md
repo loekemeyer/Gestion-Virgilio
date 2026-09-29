@@ -6132,3 +6132,24 @@ el `alter view`. `sql/gv_avisar_programacion_web_v2393.sql`, §3.v2393.
 facturados sin completar"*): `stkOpenNpFaltan` y `stkOpenFaltFact` **siguen en el archivo**, lo que
 no vuelve es el botón. **«Completar datos producto» se mudó a ⚙️ Configuración** con su `#dpBadge`
 (si el id no viaja con el botón, `dpLoadBadge()` escribe en la nada). `tests/sup-panel-v2393.cjs`.
+
+## ⚠ REGLA (v24.32): lo que el `activate` del SW ESPERA puede dejar la pestaña MUDA
+
+El `event.waitUntil()` de `activate` no termina hasta que se asienta lo que le pasaste, y la página
+que todavía está booteando pasa sus `fetch` por ese Service Worker. **Un `await` adentro del
+`waitUntil` que no resuelve deja el SW a medio activar y el hilo principal de la pestaña esperándolo
+para siempre**: sin error, sin cartel, la app muda.
+
+El que mordió: la recarga única de la v23.70 (`forzado-v2370`) hacía `await c.navigate(...)` **cliente
+por cliente**. Si esa navegación no resuelve —red que no contesta, recurso abortado— se colgaba todo.
+Hoy las navegaciones se disparan **sin esperarlas una por una** y el conjunto tiene un techo de 2 s:
+la recarga sigue saliendo y `activate` no se puede colgar.
+
+> **Al agregar algo al `waitUntil` de `install` o `activate`: o no se espera, o se espera con techo.**
+
+⚠ **Lo cazó un test, no la lectura.** `tests/vendor-sin-cdn.cjs` corta toda salida a internet: la
+página llegaba a `readyState = complete` y a los **~1,9 s** dejaba de responder — `page.evaluate` y
+hasta un `Runtime.evaluate` de `1+1` por CDP se comían el timeout, mientras `Debugger.pause` seguía
+entrando (o sea: el renderer vivo y el hilo trabado). Se aisló sirviendo el mismo `index.html` con el
+`navigator.serviceWorker.register` neutralizado → **VIVO**; con el SW puesto y sin el `await` del
+`navigate` → **VIVO**. Ese test es el centinela: no hay otro.
