@@ -687,6 +687,27 @@ button {
 .mod-tab.on{ background: #1d4ed8; color: #fff; }
 .mod-tab:not(.on):hover{ color: #e2e8f0; background: #334155; }
 .mod-hdr-left{ display: flex; align-items: center; gap: 14px; min-width: 0; }
+/* v23.92 (Luis) — Análisis e Inconsistencias son UNA pestaña con dos subpestañas. */
+.mod-sub{ display: inline-flex; gap: 4px; flex: 0 0 auto; }
+.mod-sub .mod-tab{ padding: 5px 11px; font-size: 13px; border-radius: 7px;
+  background: #0f172a; border: 1px solid #334155; }
+.mod-sub .mod-tab.on{ background: #334155; color: #fff; border-color: #475569; }
+#anSubBar{ display: flex; gap: 8px; align-items: center; padding: 8px 0 2px; }
+#anSubBar.hidden{ display: none; }
+/* Código de login de la TV, con la rueda que se vacía en el minuto que dura (v23.92).
+   Reemplaza al QR de fichada: se ficha entrando con este número. */
+.mon-clave{ display: flex; align-items: center; gap: 10px; flex: 0 0 auto; margin-left: auto; }
+.mon-clave svg{ width: clamp(34px, 4.6vh, 58px); height: clamp(34px, 4.6vh, 58px);
+  transform: rotate(-90deg); flex: 0 0 auto; }
+.mon-clave svg circle{ fill: none; stroke-width: 3.2; }
+.mon-clave .clv-pista{ stroke: #1e293b; }
+.mon-clave .clv-arco{ stroke: #38bdf8; stroke-linecap: round; stroke-dasharray: 100.53;
+  transition: stroke-dashoffset .9s linear, stroke .3s; }
+.mon-clave .clv-arco.poco{ stroke: #fbbf24; }
+.mon-clave-lab{ font-size: clamp(9px, 1.1vh, 13px); font-weight: 800; color: #64748b;
+  text-transform: uppercase; letter-spacing: .08em; line-height: 1; }
+.mon-clave-num{ font-size: clamp(26px, 4vh, 48px); font-weight: 900; color: #f8fafc;
+  letter-spacing: .16em; line-height: 1.05; font-variant-numeric: tabular-nums; }
 /* Modo TV (monitor a pantalla completa): el switch escala como el resto del header. */
 #monitorModal.tv .mod-switch{ border-radius: clamp(11px, 1.4vh, 16px); }
 #monitorModal.tv .mod-tab{ font-size: clamp(13px, 1.9vh, 22px);
@@ -710,56 +731,9 @@ button {
   color: #f8fafc;
 }
 
-/* QR de fichada — abajo a la derecha, solo visible cuando el monitor está
-   abierto. La regla #monitorModal.show ~ #qrFichadaBox hace el override. */
-#qrFichadaBox{
-  display: none;
-  position: fixed;
-  bottom: 8px;
-  right: 8px;
-  z-index: 250;          /* sobre el modal del monitor (z-index 200) */
-  background: #fff;
-  border: 2px solid #1e6bd6;
-  border-radius: 8px;
-  padding: 6px 8px 8px 8px;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-}
-#monitorModal.show ~ #qrFichadaBox{
-  display: block;
-}
-#qrFichadaBox .qr-label{
-  font-size: 12px;
-  font-weight: bold;
-  color: #1e6bd6;
-  margin-bottom: 4px;
-  letter-spacing: 0.5px;
-}
-#qrFichadaBox #qrCanvas{
-  display: block;
-  margin: 0 auto;
-  width: 120px;
-  height: 120px;
-}
-#qrFichadaBox .qr-countdown{
-  font-size: 11px;
-  color: #666;
-  margin-top: 4px;
-}
-#qrFichadaBox #qrSecs{ color: #1e6bd6; }
-/* TV en pantalla ANCHA (PC viendo el monitor): QR tamaño original. */
-#monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{
-  width: clamp(140px, 11vh, 190px);
-  height: clamp(140px, 11vh, 190px);
-}
-/* Viewport ANGOSTO (TV box en Chrome modo ordenador, ~980px): QR chico y
-   compacto, abajo a la derecha. (En PC ancha NO aplica → queda grande.) */
-@media (max-width: 1150px){
-  #monitorModal.tv.show ~ #qrFichadaBox{ right: 8px; left: auto; padding: 3px 5px 5px 5px; }
-  #monitorModal.tv.show ~ #qrFichadaBox .qr-label{ font-size: 9px; margin-bottom: 1px; letter-spacing: 0; }
-  #monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 8px; margin-top: 1px; }
-  #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(40px, 4.5vh, 56px); height: clamp(40px, 4.5vh, 56px); }
-}
+/* v23.92 (Luis) — EL QR DE FICHADA SE FUE: se ficha entrando con el código de 4 dígitos que
+   muestra la TV (v23.82), así que el QR de la esquina era una segunda puerta para lo mismo.
+   `fichada.html` y `fichada-config.js` quedan en el repo: el link viejo sigue andando. */
 .monitor-meta{ font-size: 11px; color: #666; margin-top: 2px; }
 /* v12.98 (idea 5070) — barra de avance del día en el header del monitor. */
 .mon-prog{ display:flex; align-items:center; gap:8px; margin-top:4px; max-width:520px; }
@@ -5649,10 +5623,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      por orden a la regla chica de @media(max-width:1150px). bottom/right ajustados
      para que quede CENTRADO en su zona (entre los stats arriba y "Total por día"
      a la izquierda), no pegado a la esquina. */
-  #monitorModal.tv.show ~ #qrFichadaBox{ padding: 6px 8px 8px 8px; bottom: 20px; right: 12px; }
-  #monitorModal.tv.show ~ #qrFichadaBox .qr-label{ font-size: 12px; margin-bottom: 3px; letter-spacing: 0.3px; }
-  #monitorModal.tv.show ~ #qrFichadaBox .qr-countdown{ font-size: 11px; margin-top: 3px; }
-  #monitorModal.tv.show ~ #qrFichadaBox #qrCanvas{ width: clamp(120px, 24vh, 150px); height: clamp(120px, 24vh, 150px); }
 }
 
 /* v7.87 — Modal para crear códigos nuevos */
@@ -5810,21 +5780,33 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div class="monitor-card">
     <div class="monitor-header">
       <div class="mod-hdr-left">
-        <!-- v7.44: pestañas del módulo unificado (Monitor ↔ Análisis). Se oculta en
-             modo kiosko/pared (openMonitor lo esconde si __tvKioskMode). -->
+        <!-- v23.92 (Luis): DOS pestañas. El monitor viejo se sacó (la vista de la TV es la única)
+             y Análisis e Inconsistencias son una sola, con subpestañas. Se oculta en modo
+             kiosko/pared (openMonitor lo esconde si __tvKioskMode). -->
         <div class="mod-switch" id="monTabSwitch">
-          <button class="mod-tab on" id="monTabMon" onclick="setMonitorTab('monitor')" title="Monitor de operarios (en vivo)">🖥️ Monitor</button>
-          <button class="mod-tab" id="monTabAn" onclick="switchToAnalisis()" title="Análisis de productividad">📈 Análisis</button>
-          <button class="mod-tab" id="monTabInc" onclick="setMonitorTab('incons')" title="Inconsistencias del día">⚠ Inconsist.</button>
-          <button class="mod-tab" id="monTabTv" onclick="setMonitorTab('tv')" title="La misma vista del monitor de pared de los operarios">📺 Vista TV</button>
+          <button class="mod-tab on" id="monTabTv" onclick="setMonitorTab('tv')" title="El tablero de planta, el mismo que ve la TV">📺 Monitor</button>
+          <button class="mod-tab" id="monTabAn" onclick="setMonitorTab('incons')" title="Productividad e inconsistencias">📊 Análisis</button>
         </div>
-        <div>
-          <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span><span id="monitorVpInfo" style="color:#888;font-size:12px;margin-left:8px"></span><span id="monitorCountdown" style="color:#888;font-size:12px;margin-left:8px"></span></div>
+        <!-- El título, la meta, la barra de avance y el buscador eran del monitor viejo, que ya
+             no tiene puerta (sus funciones siguen en el archivo y le siguen escribiendo acá).
+             Quedan ocultos: el header es pestañas · código · fecha · Cerrar. -->
+        <div id="monLegacyHdr" style="display:none">
+          <div class="monitor-title"><img class="hdr-logo" src="icon.svg" alt=""><span id="monitorTitleText">Monitor Virgilio</span> <span id="monitorRefresh" class="monitor-refresh"></span><span id="monitorVpInfo"></span><span id="monitorCountdown"></span></div>
           <div class="monitor-meta" id="monitorMeta"></div>
           <div class="mon-filter-wrap">
             <input id="monFilter" class="mon-filter" type="search" placeholder="🔎 Buscar tanda / operario" oninput="_monApplyFilter()" autocomplete="off">
             <span id="monFilterNote" class="mon-filter-note"></span>
           </div>
+        </div>
+      </div>
+      <div class="mon-clave" id="monClaveBox" title="Código para entrar desde el celular — dura un minuto">
+        <svg viewBox="0 0 36 36" aria-hidden="true">
+          <circle class="clv-pista" cx="18" cy="18" r="16"></circle>
+          <circle class="clv-arco" id="monClvArco" cx="18" cy="18" r="16" stroke-dashoffset="0"></circle>
+        </svg>
+        <div>
+          <div class="mon-clave-lab">Código</div>
+          <div class="mon-clave-num" id="monClave">----</div>
         </div>
       </div>
       <div id="monitorClock"></div>
@@ -5835,6 +5817,12 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div id="monitorOfflineBanner" class="hidden"></div>
     <div id="monitorContent">
       <div class="monitor-loading">Cargando…</div>
+    </div>
+    <div id="anSubBar" class="hidden">
+      <div class="mod-sub">
+        <button class="mod-tab" onclick="switchToAnalisis()" title="Gráficos de productividad">📈 Productividad</button>
+        <button class="mod-tab on" onclick="setMonitorTab('incons')" title="Inconsistencias del día">⚠ Inconsistencias</button>
+      </div>
     </div>
     <div id="inconsContent" class="hidden">
       <div class="monitor-loading">Cargando…</div>
@@ -5852,13 +5840,15 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <div id="analisisModal">
   <div class="analisis-header">
     <div class="mod-hdr-left">
-      <!-- v7.44: mismas pestañas del módulo unificado (Monitor ↔ Análisis). -->
+      <!-- v23.92: las mismas dos pestañas del monitor, con las subpestañas de Análisis. -->
       <div class="mod-switch" id="anTabSwitch">
-        <button class="mod-tab" onclick="switchToMonitor()" title="Monitor de operarios (en vivo)">🖥️ Monitor</button>
-        <button class="mod-tab on" onclick="switchToAnalisis()" title="Análisis de productividad">📈 Análisis</button>
-        <button class="mod-tab" onclick="switchToIncons()" title="Inconsistencias del día">⚠ Inconsist.</button>
+        <button class="mod-tab" onclick="switchToMonitor()" title="El tablero de planta">📺 Monitor</button>
+        <button class="mod-tab on">📊 Análisis</button>
       </div>
-      <div class="analisis-title">📈 Análisis Productividad</div>
+      <div class="mod-sub">
+        <button class="mod-tab on" title="Gráficos de productividad">📈 Productividad</button>
+        <button class="mod-tab" onclick="switchToIncons()" title="Inconsistencias del día">⚠ Inconsistencias</button>
+      </div>
     </div>
     <button class="hist-modal-close" onclick="closeAnalisis()" style="background:#1e293b;color:#f8fafc;border-color:#334155;width:auto;margin:0;flex:0 0 auto;">Cerrar</button>
   </div>
@@ -6214,16 +6204,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- Badge de versión + estado de cola (abajo a la izquierda) -->
 <div id="versionBadge"></div><!-- vacío a propósito: lo llena el JS (updatePendingIndicator) con APP_VERSION. Si queda VACÍO en pantalla = el JS NO corrió (navegador no soporta el código / error de parseo). NO hardcodear una versión acá: engaña el diagnóstico. -->
 
-<!-- QR de fichada (TOTP rotativo) — abajo a la derecha. Genera tokens cada
-     30s que apuntan a la app FichadaQR; los operarios escanean para fichar. -->
-<div id="qrFichadaBox">
-  <div class="qr-label">Fichada</div>
-  <canvas id="qrCanvas" width="180" height="180" aria-label="QR de fichada"></canvas>
-  <div class="qr-countdown">Próximo en <strong id="qrSecs">--</strong>s</div>
-</div>
-<!-- Librería qrcode-generator (Kazuhiko Arase, MIT) — hosteada local para
-     que ande sin internet en el depósito. -->
-<script src="qrcode.js"></script>
 <script src="planimetria.js?v=15.79"></script>
 <!-- Modo OP de Recepción de Mercadería (se abre al tocar RT). Módulo aislado bajo
      #rcpRoot, con su propio cliente Supabase (login anónimo). Portado de la app
@@ -6235,11 +6215,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
 <script type="module" src="recepcion.js?v=23.91"></script>
-<!-- Config del módulo de fichada (compartido con fichada.html). El secret
-     hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
-     archivo evitamos que se desincronicen. -->
-<script src="fichada-config.js"></script>
-
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -11693,177 +11668,56 @@ setInterval(flushQueue, 3000);
 /* Intento inicial al abrir la app. */
 flushQueue();
 
+/* v23.92 (Luis) — EL QR DE FICHADA SE SACÓ. Se ficha entrando desde el celular con el código
+   de 4 dígitos que muestra la TV (v23.82), así que el QR rotativo de la esquina era una segunda
+   puerta para lo mismo, con su propio secreto y su propia librería. Se fue entero: el markup, el
+   CSS, `qrcode.js` y `fichada-config.js`.
+   ⚠ `fichada.html` NO se borró: el link viejo (y los QR impresos, si quedó alguno) siguen
+   andando contra su propia copia de la config. */
+
 /* ============================================================
-   QR DE FICHADA (TOTP rotativo) — integración con FichadaQR
+   CÓDIGO DE LOGIN EN EL HEADER DEL MONITOR (v23.92, Luis)
    ============================================================
-   El QR de la esquina inferior derecha genera tokens HMAC-SHA256
-   cada 30s. Cada token se codifica en una URL que apunta al form
-   de FichadaQR (https://loekemeyer.github.io/FichadaQR/?t=...).
-   El operario escanea con el celu, abre el form, marca Entrada/
-   Comida Inicia/Comida Termina/Salida y envía a un Google Form.
-
-   El secreto, periodo y demás vienen de fichada-config.js — mismo archivo
-   que carga fichada.html, así no se desincronizan. */
-const FICHADA_HMAC_SECRET = (window.FICHADA_CONFIG && window.FICHADA_CONFIG.hmacSecret) || "";
-const FICHADA_PERIOD_SEC  = (window.FICHADA_CONFIG && window.FICHADA_CONFIG.tokenPeriodSec) || 30;
-function buildFichadaUrl(token) {
-  // URL absoluta hacia fichada.html en el mismo dominio, con el token como
-  // query string. El celu del operario lo escanea y aterriza en el form.
-  const u = new URL("./fichada.html", location.href);
-  u.searchParams.set("t", token);
-  return u.toString();
+   El mismo número que muestra la TV (gv_tv_clave_actual): dura UN MINUTO y la rueda que lo
+   rodea se vacía mientras tanto. Reemplaza al QR de fichada, que era una segunda puerta para
+   lo mismo. ⚠ El que manda es el backend: `cambia_en_s` sincroniza la rueda con el tramo real,
+   así que el dibujo no se puede desfasar del código que la base valida. */
+const MON_CLV_CICLO = 60;       /* ≡ gv_tv_clave_actual */
+const MON_CLV_LARGO = 100.53;   /* 2πr con r = 16 */
+let _monClvQueda = 0, _monClvTimer = null;
+function _monClvAnillo() {
+  const a = document.getElementById("monClvArco");
+  if (!a) return;
+  const f = Math.max(0, Math.min(1, _monClvQueda / MON_CLV_CICLO));
+  a.setAttribute("stroke-dashoffset", (MON_CLV_LARGO * (1 - f)).toFixed(1));
+  a.setAttribute("class", "clv-arco" + (_monClvQueda <= 10 ? " poco" : ""));
 }
-
-async function _fichadaHmacSha256Hex(secret, message) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
-  return Array.from(new Uint8Array(sig))
-    .map(b => b.toString(16).padStart(2, "0")).join("");
-}
-function _fichadaCurrentBucket(periodSec) {
-  return Math.floor(Date.now() / 1000 / periodSec);
-}
-async function _fichadaBuildToken(secret, periodSec) {
-  const bucket = _fichadaCurrentBucket(periodSec);
-  const sig = (await _fichadaHmacSha256Hex(secret, String(bucket))).slice(0, 16);
-  return bucket + "." + sig;
-}
-function _fichadaSecondsUntilNext(periodSec) {
-  const nowSec = Date.now() / 1000;
-  const nextStart = (Math.floor(nowSec / periodSec) + 1) * periodSec;
-  return nextStart - nowSec;
-}
-
-let _qrLastToken = null;
-
-/* QR de fichada rotativo (TOTP) — HABILITADO. El flujo end-to-end está
-   verificado contra Supabase: fichada.html inserta el ingreso en
-   Fichadas_Virgilio (el trigger trg_fichadas_virgilio_espejo lo copia
-   a Fichadas_Historico server-side; imported_at/created_at default now()), y el
-   legajo se resuelve por email desde Empleados (anon SELECT OK).
-   Si hubiera que frenarlo de nuevo, poner true: muestra "EN CONSTRUCCIÓN". */
-const QR_DISABLED = false;
-
-/* Cartel "EN CONSTRUCCIÓN" pintado en el canvas en vez del QR.
-   Naranja para que sea bien visible desde lejos en la TV. */
-function _qrRenderConstruccion(canvas) {
-  const size = 320;
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  // fondo amarillo bandera
-  ctx.fillStyle = "#fde68a";
-  ctx.fillRect(0, 0, size, size);
-  // borde naranja
-  ctx.strokeStyle = "#ea580c";
-  ctx.lineWidth = 8;
-  ctx.strokeRect(4, 4, size - 8, size - 8);
-  // icono ⚠
-  ctx.fillStyle = "#9a3412";
-  ctx.font = "bold 80px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("⚠", size / 2, size / 2 - 50);
-  // texto principal
-  ctx.font = "bold 32px system-ui, sans-serif";
-  ctx.fillText("EN", size / 2, size / 2 + 30);
-  ctx.fillText("CONSTRUCCIÓN", size / 2, size / 2 + 70);
-}
-
-/* Render usando qrcode-generator (variable global "qrcode"). Pinta el QR
-   directamente en el canvas con fillRect por cada módulo. */
-function _qrRenderToCanvas(canvas, text, opts) {
-  const ecc  = (opts && opts.errorCorrectionLevel) || "M";
-  const size = (opts && opts.width) || 320;
-  const margin = (opts && opts.margin) || 1;
-  const dark = (opts && opts.color && opts.color.dark) || "#000000";
-  const light = (opts && opts.color && opts.color.light) || "#ffffff";
-
-  const qr = qrcode(0, ecc);   // 0 = typeNumber auto
-  qr.addData(text);
-  qr.make();
-  const moduleCount = qr.getModuleCount();
-  const totalMods = moduleCount + margin * 2;
-  const moduleSize = size / totalMods;
-
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = light;
-  ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = dark;
-  for (let row = 0; row < moduleCount; row++) {
-    for (let col = 0; col < moduleCount; col++) {
-      if (qr.isDark(row, col)) {
-        ctx.fillRect(
-          Math.floor((col + margin) * moduleSize),
-          Math.floor((row + margin) * moduleSize),
-          Math.ceil(moduleSize),
-          Math.ceil(moduleSize)
-        );
-      }
-    }
-  }
-}
-
-async function tickFichadaQr() {
-  const canvas = document.getElementById("qrCanvas");
-  const secsEl = document.getElementById("qrSecs");
-  if (!canvas || !secsEl) return;
-  if (typeof qrcode === "undefined") return;
+async function monClaveRefrescar() {
+  const e = document.getElementById("monClave");
+  if (!e) return;
   try {
-    const token = await _fichadaBuildToken(FICHADA_HMAC_SECRET, FICHADA_PERIOD_SEC);
-    if (token !== _qrLastToken) {
-      _qrLastToken = token;
-      const url = buildFichadaUrl(token);
-      _qrRenderToCanvas(canvas, url, {
-        width: 320, margin: 1, errorCorrectionLevel: "M",
-        color: { dark: "#202124", light: "#ffffff" }
-      });
-    }
-    const left = _fichadaSecondsUntilNext(FICHADA_PERIOD_SEC);
-    secsEl.textContent = String(Math.max(0, Math.ceil(left)));
-  } catch (e) {
-    console.warn("[QR] tick error:", e.message || e);
-    secsEl.textContent = "err";
-  }
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_tv_clave_actual", {
+      method: "POST", cache: "no-store",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: "{}" });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !j.clave) return;
+    e.textContent = j.clave;
+    _monClvQueda = Math.max(1, Math.min(MON_CLV_CICLO, Number(j.cambia_en_s) || MON_CLV_CICLO));
+    _monClvAnillo();
+  } catch (_e) { /* sin red el número queda como está: mejor el de antes que ninguno */ }
 }
-let _qrStartAttempts = 0;
-function _startFichadaQr() {
-  // Bypass del QR rotativo mientras se debuggea el bridge al sheet.
-  // Pinta el cartel "EN CONSTRUCCIÓN" una vez y no arranca ticks.
-  if (QR_DISABLED) {
-    const canvas = document.getElementById("qrCanvas");
-    const secsEl = document.getElementById("qrSecs");
-    const labelEl = document.querySelector("#qrFichadaBox .qr-label");
-    const countdownEl = document.querySelector("#qrFichadaBox .qr-countdown");
-    if (canvas) _qrRenderConstruccion(canvas);
-    if (labelEl) labelEl.textContent = "Fichada";
-    // Escondemos el contador (no tiene sentido sin tokens rotando).
-    if (countdownEl) countdownEl.style.display = "none";
-    if (secsEl) secsEl.textContent = "—";
-    console.log("[QR] Deshabilitado — mostrando cartel En Construcción");
-    return;
-  }
-  if (typeof qrcode === "undefined") {
-    _qrStartAttempts++;
-    if (_qrStartAttempts > 50) {
-      console.error("[QR] La librería qrcode no cargó (qrcode.js falta?).");
-      const secsEl = document.getElementById("qrSecs");
-      if (secsEl) secsEl.textContent = "sin lib";
-      return;
-    }
-    setTimeout(_startFichadaQr, 200);
-    return;
-  }
-  console.log("[QR] qrcode-generator lista, arrancando ticks");
-  tickFichadaQr();
-  setInterval(tickFichadaQr, 250);
+function monClaveStart() {
+  monClaveRefrescar();
+  if (_monClvTimer) clearInterval(_monClvTimer);
+  _monClvTimer = setInterval(() => {
+    if (_monClvQueda <= 0) return;
+    _monClvQueda--; _monClvAnillo();
+    if (_monClvQueda <= 0) monClaveRefrescar();
+  }, 1000);
 }
-_startFichadaQr();
+function monClaveStop() { if (_monClvTimer) { clearInterval(_monClvTimer); _monClvTimer = null; } }
 
 /* ============================================================
    RELOJ EN EL HEADER DEL MONITOR — formato "ddd dd/mm HH:MM"
@@ -35279,6 +35133,7 @@ function openMonitor() {
   // a la vista de la TV (monitor/tv.html); la vista vieja sigue en la pestaña 🖥️ Monitor. En modo
   // kiosko (pantalla de pared) queda como estaba.
   setMonitorTab(window.__tvKioskMode ? "monitor" : "tv");
+  monClaveStart();
   startInconsAutoRefresh();
 }
 
@@ -35303,6 +35158,7 @@ function closeMonitor() {
   }
   if (monitorIntervalId) { clearInterval(monitorIntervalId); monitorIntervalId = null; }
   if (_monitorCountdownIntervalId) { clearInterval(_monitorCountdownIntervalId); _monitorCountdownIntervalId = null; }
+  monClaveStop();
   stopInconsAutoRefresh();
   // Reset del snapshot — al reabrir, el primer refresh no flashea masivo.
   _prevStatusMap = new Map();
@@ -55814,12 +55670,13 @@ function setMonitorTab(tab) {
     if (tvOn && !tvf.getAttribute("src")) tvf.setAttribute("src", "monitor/tv.html?key=tv");
     if (!tvOn && tvf.getAttribute("src")) tvf.removeAttribute("src");
   }
-  // v8.69 — Inconsistencias es una pestaña más del módulo unificado: resaltar la activa.
-  const swMon = document.getElementById("monTabMon"), swInc = document.getElementById("monTabInc"), swAn = document.getElementById("monTabAn"), swTv = document.getElementById("monTabTv");
-  if (swMon) swMon.classList.toggle("on", !_inconsActive && !tvOn);
-  if (swInc) swInc.classList.toggle("on", _inconsActive);
-  if (swTv)  swTv.classList.toggle("on", tvOn);
-  if (swAn)  swAn.classList.remove("on");
+  /* v23.92 (Luis) — dos pestañas: 📺 Monitor (la vista de la TV) y 📊 Análisis, que abre las
+     subpestañas Productividad / Inconsistencias. `monTabMon` y `monTabInc` ya no existen. */
+  const swAn = document.getElementById("monTabAn"), swTv = document.getElementById("monTabTv");
+  if (swTv) swTv.classList.toggle("on", tvOn);
+  if (swAn) swAn.classList.toggle("on", _inconsActive);
+  const subBar = document.getElementById("anSubBar");
+  if (subBar) subBar.classList.toggle("hidden", !_inconsActive);
   const titleEl = document.getElementById("monitorTitleText");
   if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : (tvOn ? "Vista TV" : "Monitor Virgilio");
   if (_inconsActive) refreshInconsistencias();
