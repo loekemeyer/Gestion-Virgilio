@@ -393,6 +393,7 @@ button {
   color: #1e6bd6;
   margin-bottom: 6px;
 }
+.tandas-cam-lbl{flex-basis:100%;font-size:12px;font-weight:700;color:#b45309;margin:4px 0 0}
 .tandas-chips{
   display: flex;
   flex-wrap: wrap;
@@ -6233,7 +6234,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.85"></script>
+<script type="module" src="recepcion.js?v=23.86"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -9543,11 +9544,23 @@ async function populateTandasList(filterMode) {
     if (!byDate.has(it.fechaRaw)) byDate.set(it.fechaRaw, { fechaDisplay: it.fechaDisplay, codes: new Set() });
     byDate.get(it.fechaRaw).codes.add(it.tanda);
   }
-  const grouped = [...byDate.entries()].sort().map(([raw, g]) => ({
-    fechaRaw: raw,
-    fechaDisplay: g.fechaDisplay,
-    codes: [...g.codes].sort()
-  }));
+  // v23.86 (Luis): dentro del día, las tandas van ordenadas POR CAMIÓN (1° el de más m³): primero
+  // se arma todo lo de un camión y después el otro, así si no llegan se patea un camión entero y no
+  // dos a medias. Sin el dato (vista caída), queda el orden alfabético de siempre.
+  try { await Promise.race([monCargarCamiones(), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+  const _ord = c => { const v = _monCamionOrden.get(String(c).toUpperCase()); return v == null ? 99 : v; };
+  const grouped = [...byDate.entries()].sort().map(([raw, g]) => {
+    const codes = [...g.codes].sort((a, b) => (_ord(a) - _ord(b)) || a.localeCompare(b));
+    const cams = new Set(codes.map(c => _monCamionDe.get(String(c).toUpperCase()) || "?"));
+    return { fechaRaw: raw, fechaDisplay: g.fechaDisplay, codes, variosCam: cams.size > 1 && _monCamionOrden.size > 0 };
+  });
+  // el rótulo va antes del primer chip de cada camión, sólo si el día tiene más de uno
+  const _camLbl = (g, c, i) => {
+    if (!g.variosCam) return "";
+    const k = String(c).toUpperCase(), cam = _monCamionDe.get(k) || "";
+    if (i > 0 && (_monCamionDe.get(String(g.codes[i - 1]).toUpperCase()) || "") === cam) return "";
+    return `<div class="tandas-cam-lbl">🚚 ${_ord(c) < 99 ? _ord(c) + "° · " : ""}${escapeHtml(cam || "sin camión")}</div>`;
+  };
   // Mostrar solo los primeros N días; botón "Ver más" expande el resto.
   const visible = _tandasListExpanded
     ? grouped
@@ -9560,7 +9573,7 @@ async function populateTandasList(filterMode) {
     <div class="tandas-day-group${g.fechaRaw === _hoyKey ? " hoy" : ""}">
       <div class="tandas-day-header${g.fechaRaw === _hoyKey ? " hoy" : ""}">${escapeHtml(g.fechaDisplay)}${g.fechaRaw === _hoyKey ? ' <span class="tandas-hoy-badge">HOY</span>' : ""}</div>
       <div class="tandas-chips">
-        ${g.codes.map(c => {
+        ${g.codes.map((c, _ci) => _camLbl(g, c, _ci) + (() => {
           // v18.46 — LA MÍA PRIMERO: si el que la tiene abierta soy yo, no va candado, va
           // «seguir» y me devuelve adentro. El candado es sólo para la de otro.
           if (_apMio.has(c)) {
@@ -9579,7 +9592,7 @@ async function populateTandasList(filterMode) {
             return `<button class="tanda-chip ocupada" type="button" disabled title="Lo está pickeando ${lg ? "el legajo " + escapeHtml(lg) : "otro operario"}. Lo cierra el que lo empezó.">${escapeHtml(c)} 🔒</button>`;
           }
           return `<button class="tanda-chip" type="button" data-code="${escapeHtml(c)}" onclick="textInput.value=this.dataset.code;textInput.focus()">${escapeHtml(c)}</button>`;
-        }).join("")}
+        })()).join("")}
       </div>
       ${g.codes.some(c => _apMio.has(c) || _pkMio.has(c))
         ? `<div class="tandas-mia-txt">▶ seguir = la dejaste empezada vos (${g.codes.filter(c => _apMio.has(c) || _pkMio.has(c)).map(escapeHtml).join(" · ")}). Tocala para volver adentro y cerrarla.</div>`
@@ -10266,7 +10279,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.85";
+const APP_VERSION = "v23.86";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -48017,13 +48030,20 @@ function monitorRawFecha(s) {
    Capital Sur/Centro/Oeste —Z2+Z3 juntas si cada una < 1 m³—, GBA Sur/Oeste/Norte, un camión por
    súper, Retira sin camión). Si la lectura falla, cae a tandaCamion. ≡ monitor/tv.html camionDeTanda. */
 let _monCamionDe = new Map(), _monCamionDeTs = 0;
+/* v23.86 (Luis): orden de armado por camión — 1° el camión con más m³ del día, Retira al final
+   (`gv_monitor_tanda_camion.orden_camion`). Si no se llega, se patea el último camión entero. */
+let _monCamionOrden = new Map();
 async function monCargarCamiones() {
   if (_monCamionDe.size && (Date.now() - _monCamionDeTs) < 60000) return _monCamionDe;
   try {
-    const filas = await supaFetchAll(SUPABASE_URL + "/rest/v1/gv_monitor_tanda_camion", "select=tanda,camion&order=tanda.asc");
-    const m = new Map();
-    for (const f of (filas || [])) m.set(String(f.tanda || "").trim().toUpperCase(), String(f.camion || ""));
-    if (m.size) { _monCamionDe = m; _monCamionDeTs = Date.now(); }
+    const filas = await supaFetchAll(SUPABASE_URL + "/rest/v1/gv_monitor_tanda_camion", "select=tanda,camion,orden_camion&order=tanda.asc");
+    const m = new Map(), o = new Map();
+    for (const f of (filas || [])) {
+      const k = String(f.tanda || "").trim().toUpperCase();
+      m.set(k, String(f.camion || ""));
+      if (f.orden_camion != null) o.set(k, Number(f.orden_camion) || 99);
+    }
+    if (m.size) { _monCamionDe = m; _monCamionOrden = o; _monCamionDeTs = Date.now(); }
   } catch (e) { console.warn("[monitor] gv_monitor_tanda_camion:", e.message); }
   return _monCamionDe;
 }

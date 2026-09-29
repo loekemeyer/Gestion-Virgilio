@@ -194,6 +194,24 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
 
 /* ── Cajones de m³ del día ────────────────────────────────────────────── */
 .m3row{display:flex;gap:.8vw;flex:0 0 auto}
+/* v23.86 (Luis) — ¿LLEGAN? La meta del día es ARMAR lo que sale en 2 días hábiles (armado → factura →
+   salida). A las 15:00 se corta: si al ritmo de hoy no llegan, se corrige la PPP ese mismo día. */
+.meta-card{flex:0 0 auto}
+.mt-ver{font-size:3vh;font-weight:900;line-height:1.15;margin:.2vh 0 .5vh}
+.mt-ok{color:#4ade80}.mt-no{color:#f87171}.mt-duda{color:#fbbf24}.mt-gris{color:#94a3b8}
+.mt-bar{height:1.3vh;border-radius:999px;background:#1e293b;overflow:hidden;margin:.3vh 0 .6vh}
+.mt-bar i{display:block;height:100%;background:#16a34a}
+.mt-lin{font-size:1.85vh;font-weight:800;color:#cbd5e1;line-height:1.35}
+.mt-lin b{color:#f8fafc}
+table.mt-cam td{font-size:1.9vh;padding:.35vh .3vw;text-align:center}
+table.mt-cam td:first-child{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0;width:48%}
+.mt-corte{background:#450a0a;color:#fecaca;border:2px solid #ef4444;animation:bordeCorte 1.4s ease-in-out infinite}
+@keyframes bordeCorte{0%,100%{border-color:#ef4444}50%{border-color:#450a0a}}
+table.mt-cam th{font-size:1.3vh;color:#94a3b8;font-weight:600;padding:.2vh .3vw;text-align:center}
+table.mt-cam th:first-child{text-align:left}
+/* v23.86 — dentro del día, las tandas van agrupadas POR CAMIÓN y en el orden en que se arman */
+tr.cam td{background:#101a2e;color:#fbbf24;font-size:1.45vh;font-weight:900;letter-spacing:.04em;
+  padding:.25vh .5vw;border-bottom:1px solid #1e293b}
 .m3box{flex:1;background:#111c2f;border:1px solid #1e293b;border-radius:1vh;
   padding:.9vh 1vw;text-align:center}
 .m3lab{font-size:1.7vh;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
@@ -268,15 +286,10 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
     </div>
 
     <div class="col" id="col3">
-      <div class="m3row">
-        <div class="m3box">
-          <div class="m3lab">Pickeado hoy</div>
-          <div class="m3val" id="m3Pick">—<small> m³</small></div>
-        </div>
-        <div class="m3box">
-          <div class="m3lab">Armado hoy</div>
-          <div class="m3val" id="m3Arm">—<small> m³</small></div>
-        </div>
+      <div class="card meta-card">
+        <div class="card-t" id="metaTit">¿Llegan?</div>
+        <div id="metaBox"></div>
+        <div class="mt-lin">Hoy: pickeado <b id="m3Pick">—</b> · armado <b id="m3Arm">—</b></div>
       </div>
       <div class="card" style="flex:0 0 auto">
         <div class="card-t" id="fcTit">Resumen de días</div>
@@ -871,10 +884,10 @@ var cargarDeshechas = cache(DESHECHAS_TTL, function () {
    GBA Sur/Oeste/Norte, un camión por súper, Retira sin camión. Si falla, cae a tandaCamion. */
 var CAMION_DE = new Map();
 var cargarCamiones = cache(PROG_TTL, function () {
-  return getAll("gv_monitor_tanda_camion", "select=tanda,fecha,camion,usa_camion&order=tanda.asc")
+  return getAll("gv_monitor_tanda_camion", "select=tanda,fecha,camion,usa_camion,orden_camion,m3_camion&order=tanda.asc")
     .then(function (filas) {
       var m = new Map();
-      (filas || []).forEach(function (f) { m.set(String(f.tanda || "").trim().toUpperCase(), { camion: f.camion, usa: f.usa_camion !== false }); });
+      (filas || []).forEach(function (f) { m.set(String(f.tanda || "").trim().toUpperCase(), { camion: f.camion, usa: f.usa_camion !== false, orden: Number(f.orden_camion) || 99 }); });
       return m;
     })
     .catch(function (e) { console.warn("[tv] camiones:", e.message); return new Map(); });
@@ -1111,6 +1124,136 @@ function celdaEstado(estado, legajo, inicio, aband, fjTs, nombres, horarios) {
   return '<span class="st">' + icono + tag + dur + '</span>';
 }
 
+/* v23.86 (Luis) — orden de ARMADO por camión: 1° el camión con más m³ (si no llegan, se patea el más
+   chico y sale la mayor cantidad de mercadería), Retira al final. Lo calcula la base
+   (gv_monitor_tanda_camion.orden_camion). Sin ese dato: 99 → orden alfabético de siempre. */
+function camionOrden(v) {
+  var b = CAMION_DE.get(String((v && v.tanda) || "").trim().toUpperCase());
+  return (b && b.orden) || 99;
+}
+var JORNADA_INI = 8, JORNADA_FIN = 17, CORTE_HORA = 15;   // horas AR
+function sumarHabiles(key, n) {
+  var t = new Date(key + "T12:00:00-03:00").getTime(), k = key;
+  while (n > 0) {
+    t += 86400000; k = new Date(t).toISOString().slice(0, 10);
+    var wd = new Date(k + "T12:00:00-03:00").getUTCDay();
+    if (wd === 0 || wd === 6 || FERIADOS[k]) continue;
+    n--;
+  }
+  return k;
+}
+function horaAR(ms) { var d = new Date(ms - 3 * 3600000); return d.getUTCHours() + d.getUTCMinutes() / 60; }
+/* ¿LLEGAN? Trabajo = m³ × (½ picking + ½ armado): una tanda pickeada y sin armar está a la mitad.
+   Pendiente = todo lo que sale hasta la fecha meta y no está armado (lo atrasado primero, después la
+   fecha meta camión por camión, en su orden). Ritmo = lo terminado hoy ÷ horas desde las 8. */
+function calcularMeta(d) {
+  var hoy = hoyKey(), ahora = Date.now();
+  var wdHoy = new Date(hoy + "T12:00:00-03:00").getUTCDay();
+  var habil = !(wdHoy === 0 || wdHoy === 6 || FERIADOS[hoy]);
+  var meta = sumarHabiles(hoy, 2);
+  // si ese día no tiene nada programado (sin reparto), la meta es el próximo con tandas
+  var conTandas = [];
+  d.prog.forEach(function (v) { if (v.fechaRaw && v.fechaRaw >= meta) conTandas.push(v.fechaRaw); });
+  conTandas.sort();
+  if (conTandas.length && conTandas[0] !== meta) meta = conTandas[0];
+  var cams = new Map(), atr = { m3: 0, trab: 0, sinPick: 0, sinArm: 0, n: 0 };
+  var tot = 0, arm = 0, sinPick = 0, sinArm = 0;
+  d.prog.forEach(function (v, k) {
+    if (!v.fechaRaw || v.fechaRaw > meta) return;
+    if (tandaSalio(v, d.despachadas)) return;
+    var ev = d.status.get(k) || {};
+    var pk = ev.picking === "done", ar = ev.armado === "done";
+    var trab = (pk ? 0 : v.m3 / 2) + (ar ? 0 : v.m3 / 2);
+    if (v.fechaRaw < meta) {
+      if (ar) return;                    // lo de antes ya armado no es trabajo de hoy
+      atr.m3 += v.m3; atr.trab += trab; atr.n++;
+      if (!pk) atr.sinPick += v.m3; else atr.sinArm += v.m3;
+      return;
+    }
+    var cam = monCamionDeTanda(v), o = camionOrden(v);
+    if (!cams.has(cam)) cams.set(cam, { cam: cam, orden: o, m3: 0, arm: 0, trab: 0 });
+    var c = cams.get(cam);
+    c.m3 += v.m3; c.trab += trab; if (ar) c.arm += v.m3;
+    if (o < c.orden) c.orden = o;
+    tot += v.m3; if (ar) arm += v.m3;
+    if (!pk) sinPick += v.m3; else if (!ar) sinArm += v.m3;
+  });
+  // lo terminado HOY (una vez por tanda y etapa)
+  var hecho = 0, visto = {};
+  (d.eventos || []).forEach(function (ev) {
+    if (ev.opcion !== "TP" && ev.opcion !== "TAP") return;
+    if (!ev.ts_inicio || dayKey(ev.ts_cliente) !== hoy) return;
+    var t = String(ev.texto || "").trim().toUpperCase(), kk = ev.opcion + "|" + t;
+    if (!t || visto[kk]) return; visto[kk] = 1;
+    var v = d.prog.get(t); if (v) hecho += (Number(v.m3) || 0) / 2;
+  });
+  var h = horaAR(ahora);
+  var trans = Math.max(0, Math.min(h, JORNADA_FIN) - JORNADA_INI);
+  var resta = Math.max(0, JORNADA_FIN - Math.max(h, JORNADA_INI));
+  var ritmo = trans >= 0.75 ? hecho / trans : null;
+  var capacidad = ritmo == null ? null : ritmo * resta;
+  var lista = Array.from(cams.values()).sort(function (a, b) { return (a.orden - b.orden) || (b.m3 - a.m3); });
+  // la capacidad se gasta en orden: primero lo atrasado, después camión por camión
+  var falta = atr.trab + lista.reduce(function (s2, c) { return s2 + c.trab; }, 0);
+  /* Se arma en orden (1°, 2°…). Si no alcanza, se pasan a otro día los ÚLTIMOS camiones del orden
+     hasta que lo que queda entre en lo que hacen hasta las 17: así se patea un camión entero y no
+     dos a medias. Lo atrasado de antes no se mueve (ya está vencido). */
+  var sobra = capacidad == null ? null : falta - capacidad;
+  for (var i = lista.length - 1; i >= 0; i--) {
+    var c = lista[i];
+    if (c.trab <= 0.0001) { c.llega = true; continue; }
+    if (sobra == null) { c.llega = null; continue; }
+    if (sobra > 0.0001) { c.llega = false; sobra -= c.trab; } else c.llega = true;
+  }
+  return { hoy: hoy, habil: habil, meta: meta, tot: tot, arm: arm, sinPick: sinPick, sinArm: sinArm,
+           atr: atr, cams: lista, falta: falta, hecho: hecho, ritmo: ritmo, capacidad: capacidad,
+           hora: h, llegan: capacidad == null ? null : capacidad >= falta - 0.0001 };
+}
+function pintarMeta(d) {
+  var M = calcularMeta(d);
+  el("metaTit").innerHTML = "¿Llegan? <small>· se arma hoy lo que sale el " + esc(diaEtiqueta(M.meta)) + "</small>";
+  var pct = M.tot ? Math.round(100 * M.arm / M.tot) : 0, ver, cls;
+  var corte = M.hora >= CORTE_HORA;
+  if (!M.habil) { ver = "Hoy no se trabaja"; cls = "mt-gris"; }
+  else if (M.falta <= 0.0001) { ver = "✅ Listo: " + esc(diaEtiqueta(M.meta)) + " armado"; cls = "mt-ok"; }
+  else if (M.hora >= JORNADA_FIN) { ver = "⛔ Terminó la jornada: faltan " + n1(M.falta) + " m³"; cls = "mt-no"; }
+  else if (M.llegan == null) { ver = "Falta " + n1(M.falta) + " m³ · ritmo desde las 8:45"; cls = "mt-gris"; }
+  else if (M.llegan) { ver = "✅ Llegan · faltan " + n1(M.falta) + " m³"; cls = "mt-ok"; }
+  else { ver = (corte ? "⛔ NO LLEGAN" : "⚠ Van justos") + " · faltan " + n1(M.falta) + " m³"; cls = corte ? "mt-no" : "mt-duda"; }
+  var h = "";
+  h += '<div class="mt-ver ' + cls + '">' + ver + '</div>';
+  h += '<div class="mt-bar"><i style="width:' + pct + '%"></i></div>';
+  h += '<div class="mt-lin">' + esc(diaEtiqueta(M.meta)) + ': <b>' + n1(M.arm) + '</b> de <b>' + n1(M.tot) + ' m³</b> armados (' + pct + '%)' +
+       (M.sinPick > 0.05 ? ' · sin pickear <b>' + n1(M.sinPick) + '</b>' : '') +
+       (M.sinArm > 0.05 ? ' · sin armar <b>' + n1(M.sinArm) + '</b>' : '') + '</div>';
+  if (M.atr.n) h += '<div class="mt-lin" style="color:#fca5a5">+ atrasado de antes: <b>' + n1(M.atr.m3) + ' m³</b> (' + M.atr.n + (M.atr.n === 1 ? ' tanda' : ' tandas') + ') · va primero</div>';
+  if (M.ritmo != null && M.habil && M.hora < JORNADA_FIN)
+    h += '<div class="mt-lin">Ritmo hoy <b>' + n1(M.ritmo) + ' m³/h</b> · hasta las 17 hacen <b>' + n1(M.capacidad) + ' m³</b>' +
+         (corte ? '' : ' · corte a las 15:00') + '</div>';
+  if (M.cams.length) {
+    h += '<table class="mt-cam"><thead><tr><th>Camión · orden de armado</th><th>m³</th><th>armado</th><th>llega</th></tr></thead><tbody>' + M.cams.map(function (c, i) {
+      var p = c.m3 ? Math.round(100 * c.arm / c.m3) : 0;
+      var est = c.trab <= 0.0001 ? '<span class="mt-ok">✅</span>'
+        : (c.llega == null ? '<span class="mt-gris">—</span>'
+        : (c.llega ? '<span class="mt-ok">✓ sí</span>' : '<span class="mt-no">✗ no</span>'));
+      return '<tr><td>' + (i + 1) + '° ' + esc(c.cam) + '</td><td>' + n1(c.m3) + '</td><td>' + p + '%</td><td>' + est + '</td></tr>';
+    }).join("") + '</tbody></table>';
+  }
+  el("metaBox").innerHTML = h;
+  /* el corte: a partir de las 15:00, si al ritmo de hoy no llegan, el cartel de arriba dice qué camión
+     hay que pasar a otro día en la PPP (el último en el orden que no llega). */
+  var noLlegan = M.cams.filter(function (c) { return c.llega === false; });
+  if (M.habil && corte && M.hora < JORNADA_FIN && M.llegan === false && noLlegan.length)
+    return '<div class="aviso mt-corte">⛔ CORTE 15:00 — NO LLEGAN con el ' + esc(diaEtiqueta(M.meta)) +
+      '. Corregir la PPP: pasar a otro día ' +
+      noLlegan.map(function (c) { return '<b>' + esc(c.cam) + '</b>'; }).join(" · ") +
+      ' y terminar el resto en orden.</div>';
+  return "";
+}
+
+/* para tests/tv-meta-camion.cjs (la cuenta vive adentro del IIFE) */
+window.__tvMeta = { calcular: calcularMeta, pintar: pintarMeta, camiones: function (m) { CAMION_DE = m; } };
+
 function pintar(d) {
   var nombres = d.empleados.nombres, horarios = d.empleados.horarios;
 
@@ -1135,13 +1278,16 @@ function pintar(d) {
   };
   tandas.sort(function (a, b) {
     return String(a.v.fechaRaw).localeCompare(String(b.v.fechaRaw)) ||
+           (camionOrden(a.v) - camionOrden(b.v)) ||          /* v23.86: por camión, en su orden */
            (rank(a.ev) - rank(b.ev)) ||
            String(a.v.tanda).localeCompare(String(b.v.tanda));
   });
+  var camsPorDia = {};   /* v23.86: cuántos camiones hay en cada día (sólo se rotula si hay más de uno) */
+  tandas.forEach(function (t) { var k = t.v.fechaRaw; (camsPorDia[k] = camsPorDia[k] || {})[monCamionDeTanda(t.v)] = 1; });
 
   var m3Pick = 0, m3Arm = 0;
   var fc = [], porDia = new Map(), agregados = [];
-  var filas = [], sinAct = 0, enVentana = 0, terminadas = 0, diaEnCurso = "";
+  var filas = [], sinAct = 0, enVentana = 0, terminadas = 0, diaEnCurso = "", camEnCurso = "";
 
   tandas.forEach(function (t) {
     var v = t.v, ev = t.ev;
@@ -1196,6 +1342,13 @@ function pintar(d) {
       diaEnCurso = v.fechaRaw;
       filas.push('<tr class="dia"><td colspan="7">' +
         esc(diaEtiqueta(v.fechaRaw) || "Sin fecha") + '</td></tr>');
+      camEnCurso = "";
+    }
+    var camT = monCamionDeTanda(v);
+    if (camT !== camEnCurso && Object.keys(camsPorDia[v.fechaRaw] || {}).length > 1) {
+      camEnCurso = camT;
+      var ordT = camionOrden(v);
+      filas.push('<tr class="cam"><td colspan="7">🚚 ' + (ordT < 99 ? ordT + '° · ' : '') + esc(camT) + '</td></tr>');
     }
     filas.push('<tr' + (enCurso ? ' class="curso"' : (salioT ? ' class="salio-sinfc"' : '')) + '>' +
       '<td class="t-tanda">' + esc(v.tanda) +
@@ -1248,8 +1401,8 @@ function pintar(d) {
         : "Sin tandas programadas para las próximas fechas") + '</div>';
 
   // ── m³ del día
-  el("m3Pick").innerHTML = n1(m3Pick) + "<small> m³</small>";
-  el("m3Arm").innerHTML  = n1(m3Arm)  + "<small> m³</small>";
+  el("m3Pick").textContent = n1(m3Pick) + " m³";
+  el("m3Arm").textContent  = n1(m3Arm)  + " m³";
 
   /* v20.21 (Thomas): cuáles de las que faltan facturar YA SE FUERON en el camión. v20.20: la
      lista (no sólo el número) porque el cartel de arriba las nombra. */
@@ -1259,7 +1412,7 @@ function pintar(d) {
   var fcSalidas = fcSinFc.length;
 
   // ── Avisos: agregados primero (son los que hacen salir un camión incompleto)
-  var avisos = "";
+  var avisos = pintarMeta(d);   /* v23.86: el corte de las 15:00 va arriba de todo */
   agregados.slice(0, 2).forEach(function (v) {
     v.agregados.slice(0, 2).forEach(function (a) {
       avisos += '<div class="aviso aviso-agr">⚠ ' + esc(a.np || "(sin numerar)") +

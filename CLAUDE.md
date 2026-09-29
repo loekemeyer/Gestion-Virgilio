@@ -3685,6 +3685,17 @@ estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la 
 **Recuperable separado** (v23.80, Luis): la tarjeta y el desglose muestran aparte lo que vuelve como crédito fiscal — IVA 21 %, IVA adicional 20 %, Ganancias 6 %, IIBB 0,17 % (v23.81) sobre CIF + derechos + estadística (`_nacRecup`) — y NO lo suman al costo. En avión (courier) el IVA sigue en el no recuperable. **En avión también va la comisión NTL** (v23.81, Luis). La comisión NTL es 5 % del **FOB**, no del CIF (ya lo era; el test lo fija).
 **Fujian paga 35 %** (v23.78, Luis: *"solo ponele 35% a fujian / 18% al resto"*): `_DERECHOS_PROV` / `_derechosProv(prov)`, los tres modos.
 
+## ⚠ REGLA (Luis, 2026-09-29, v23.86): se arma POR CAMIÓN — y a las 15:00 la TV dice si llegan
+
+- **Orden de armado = `gv_monitor_tanda_camion.orden_camion`**: por día, 1° el camión con más m³, Retira al final.
+  La botonera del celular (`populateTandasList`) ordena las tandas de cada día así, con rótulo «🚚 N° · camión» si el
+  día tiene más de uno. Sin el dato, orden alfabético. Objetivo: si no llegan, se patea UN camión entero, no dos a medias.
+- **TV → tarjeta «¿Llegan?»**: meta = hoy + 2 hábiles (norma armar → facturar → salir). Trabajo = m³ × (½ picking + ½
+  armado); ritmo = lo terminado hoy ÷ horas desde las 8; capacidad = ritmo × horas hasta las 17. Lo atrasado va primero.
+  Si no alcanza, se marcan «✗ no» los ÚLTIMOS camiones del orden hasta que el resto entre. **Desde las 15:00** sale el
+  cartel rojo de CORTE con los camiones a pasar de día en la PPP. Es aviso: no mueve nada.
+- `sql/gv_monitor_tanda_camion_orden_v2386.sql`, `tests/tv-meta-camion.cjs`, `tests/tandas-orden-camion.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-29, v23.82): el operario entra con la CLAVE DE LA TV
 
 La TV (`monitor/tv.html`) muestra chiquito **🔑 + 4 dígitos** (`gv_tv_clave_actual`, cambia cada **15 min**, vale
