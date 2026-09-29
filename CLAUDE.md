@@ -3682,7 +3682,7 @@ recuperable con su fórmula (salen de `_pedImpNacionalizar().detalle[i][2]`, la 
 **Tasas (Luis, v23.77):** derechos **18 % del CIF** en los tres modos (base; cada artículo tiene su arancel) y
 estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la consolidada del Excel viejo.
 **Estadística por tramo de FOB** (v23.79, Luis): hasta 6.000 → 3 % del CIF; 6.001–10.000 → u$s 180 fijos; más de 10.000 → 3 % sin tope (`_nacEstad`). Retira el «tope 180» parejo de la v23.77.
-**Recuperable separado** (v23.80, Luis): la tarjeta y el desglose muestran aparte lo que vuelve como crédito fiscal — IVA 21 %, IVA adicional 20 %, Ganancias 6 %, IIBB 2,5 % sobre CIF + derechos + estadística (`_nacRecup`) — y NO lo suman al costo. En avión (courier) el IVA sigue en el no recuperable. La comisión NTL es 5 % del **FOB**, no del CIF (ya lo era; el test lo fija).
+**Recuperable separado** (v23.80, Luis): la tarjeta y el desglose muestran aparte lo que vuelve como crédito fiscal — IVA 21 %, IVA adicional 20 %, Ganancias 6 %, IIBB 0,17 % (v23.81) sobre CIF + derechos + estadística (`_nacRecup`) — y NO lo suman al costo. En avión (courier) el IVA sigue en el no recuperable. **En avión también va la comisión NTL** (v23.81, Luis). La comisión NTL es 5 % del **FOB**, no del CIF (ya lo era; el test lo fija).
 **Fujian paga 35 %** (v23.78, Luis: *"solo ponele 35% a fujian / 18% al resto"*): `_DERECHOS_PROV` / `_derechosProv(prov)`, los tres modos.
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.56): si la base de Gestión NO CONTESTA, avisa Telegram — y el vigilante vive en LK
