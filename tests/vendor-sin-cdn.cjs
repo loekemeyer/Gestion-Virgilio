@@ -44,7 +44,16 @@ const MIME = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/jav
   const base = "http://127.0.0.1:" + server.address().port;
 
   const browser = await chromium.launch();
-  const page = await browser.newPage();
+  /* v23.99 — el SERVICE WORKER era la carrera, no `load`. sw.js, la primera vez que se activa en
+     un origen, NAVEGA la ventana (`c.navigate(u.pathname + "?_=" + Date.now())`, el flag
+     "forzado-v2370") para que el celular del operario tome la version nueva sola. Cada corrida de
+     este test levanta el server en un PUERTO distinto, o sea un origen nuevo, o sea que esa primera
+     vez es SIEMPRE — y cae en cualquier momento: si pega durante un page.evaluate, el test muere con
+     "Execution context was destroyed". Verificado que fallaba igual en v23.97, sin ningun cambio del
+     dia. Se bloquea el SW: lo que el test mide es que los globales salgan de vendor/ y no de un CDN,
+     y para eso el SW no aporta nada. */
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
+  const page = await ctx.newPage();
   const pageerrors = [];
   const externos = [];
   page.on("pageerror", (e) => pageerrors.push(String(e && e.message || e)));
