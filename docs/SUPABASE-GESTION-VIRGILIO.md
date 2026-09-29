@@ -30347,7 +30347,7 @@ muestra cada una y que la búsqueda filtra las dos) — verificado que **falla**
 
 ---
 
-## v23.95 (2026-09-29, Luis) — el CÓDIGO DE LOGIN de la TV dura UN MINUTO
+## v23.96 (2026-09-29, Luis) — el CÓDIGO DE LOGIN de la TV dura UN MINUTO
 
 **Pedido textual:** *"codigo de login de 4 digitos mas grande y que dure 1 minutos (con countdown)"*
 y *"saca el qr ya que usamos la fichada con el login"*.

@@ -92,7 +92,7 @@ catch (_e) {
     if (!document.getElementById("stkPopBody")) {
       const d = document.createElement("div"); d.id = "stkPopBody"; document.body.appendChild(d);
     }
-    window._stkPopShell = function () {};
+    window._stkPopShell = function () { return document.getElementById("stkPopBody"); };   // v23.95: devuelve el body
 
     await stkShowProyVentas(encodeURIComponent("321"), 367.2);
     let body = document.getElementById("stkPopBody");

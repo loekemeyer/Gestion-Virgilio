@@ -3685,6 +3685,35 @@ estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la 
 **Recuperable separado** (v23.80, Luis): la tarjeta y el desglose muestran aparte lo que vuelve como crédito fiscal — IVA 21 %, IVA adicional 20 %, Ganancias 6 %, IIBB 0,17 % (v23.81) sobre CIF + derechos + estadística (`_nacRecup`) — y NO lo suman al costo. En avión (courier) el IVA sigue en el no recuperable. **En avión también va la comisión NTL** (v23.81, Luis). La comisión NTL es 5 % del **FOB**, no del CIF (ya lo era; el test lo fija).
 **Fujian paga 35 %** (v23.78, Luis: *"solo ponele 35% a fujian / 18% al resto"*): `_DERECHOS_PROV` / `_derechosProv(prov)`, los tres modos.
 
+## ⚠ REGLA (Luis, 2026-09-29, v23.95): los MESES OBJETIVO se eligen en el encabezado del proveedor
+
+**Luis:** *"el parámetro de meses objetivo ponelo configurable al lado del nombre de cada proveedor
+(menú desplegable con los números del 1 al 24, seleccionable y que afecte a todos los códigos de ese
+proveedor"* · *"sigue saliendo de importación cuando aprieto y sale el popup de proyección"* ·
+*"alineá mejor (tiene que funcionar bien en diferentes resoluciones) y optimizá tamaño horizontal
+(cambiá «ver desglose» por una flecha)"*.
+
+| qué | cómo queda |
+|---|---|
+| meses objetivo | **desplegable en el encabezado de cada proveedor**: «gral (N)» + 1 a 24. Es la MISMA columna que el ⚙ (`GV_Imp_Proveedor.meses_objetivo`), así que vale para **todos** sus códigos |
+| el pop-up de proyección | se dibuja en **su propio overlay** (`#impProyOv`), encima: el módulo queda vivo abajo y al cerrar sigue ahí. Ya no hay «← Volver al pedido» — no hace falta |
+| la banda | grilla `auto-fit` (dos chips iguales; uno solo por fila en pantalla angosta) y «ver desglose» pasó a ser una **flecha ›** al costado, que no le roba ancho al dato |
+| la tabla | **llena el ancho que tiene** (`width:100%`, `min-width:1188px`): el sobrante se lo lleva Descripción, así que no queda hueco a la derecha ni en un monitor ancho |
+
+⚠ **Se manda sólo `{proveedor, meses_objetivo}`**: `gv_imp_proveedor_guardar` deja intacta **toda clave
+ausente**, así que mandar el resto pisaría lo que otro esté editando en el ⚙.
+
+⚠ **El refetch posterior sólo reemplaza los datos si trajo items.** Una lectura vacía dejaría la
+pantalla en blanco, y *"no pude leer"* no es *"no hay importados"* (misma regla que §«una lectura ROTA
+no es un CERO»).
+
+⚠ **`_stkPopShell` ahora DEVUELVE el body**, y en modo overlay ese body **no lleva id**: el de la
+pantalla de abajo se llama igual (`stkPopBody`) y `getElementById` devolvía aquél — la proyección se
+habría dibujado adentro del módulo.
+
+**Chequeo:** `node tests/pedimp-meses-proveedor.cjs` · `node tests/pedimp-moq-proy.cjs` (el pop-up no
+se come la pantalla de importación) · `node tests/imp-tabla.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-29, v23.93): en Pedidos Importación, lo que se TOCA es el dato
 
 **Luis, sobre las tres pantallas:** *"proy u/mes tiene que ser lo que apretás para ver la proyección…
