@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.51"></script>
+<script type="module" src="recepcion.js?v=24.52"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.51";
+const APP_VERSION = "v24.52";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -30845,6 +30845,19 @@ function mgChooserGo(which) { closeMGChooser(); if (which === "orden") showGuard
    guardado (a guardar + excedente + racks/racks_ch) y las ordena por GÓNDOLA MÁS VACÍA
    (stock góndola ÷ capacidad de Capacidad_Sector). Le dice al operario qué conviene bajar antes. */
 let _gorden = null;
+/* v24.52 (Thomas, 29/09: "el 396 es un artículo a liquidar stock, no debe mandarse a guardar") —
+   lo que está en Articulos_Discontinuados con motivo «no se vende» / «liquidar» NO se manda a
+   góndola: sale de ¿Qué bajar primero?, del SOS y de las horas de guardado. Lo que sólo «no se
+   repone más» (634, 636) SÍ se sigue guardando: se vende hasta agotar y se pickea de góndola.
+   Si la lectura falla, el set queda vacío y la pantalla es la de antes (no esconde nada). */
+async function _gordenNoGuardarSet() {
+  var set = {};
+  try {
+    var r = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos_Discontinuados", "select=cod,motivo");
+    (r || []).forEach(function (x) { if (x && /no se vende|liquid/i.test(String(x.motivo || ""))) { var k = _ocgNorm(x.cod); if (k) set[k] = true; } });
+  } catch (_e) {}
+  return set;
+}
 async function showGuardarOrden(legajo) {
   let ov = document.getElementById("gordenModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "gordenModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1297;background:rgba(2,6,23,.74);overflow:auto;padding:12px;"; document.body.appendChild(ov); }
@@ -30853,13 +30866,14 @@ async function showGuardarOrden(legajo) {
     + '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1e3a8a);color:#fff;"><b style="font-size:17px;">📋 ¿Qué bajar primero?</b><button onclick="closeGuardarOrden()" style="width:auto;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;">Cerrar</button></div>'
     + '<div id="gordenBody" style="padding:13px 14px;"><div style="text-align:center;color:#64748b;padding:24px;">Calculando prioridades…</div></div></div>';
   try {
-    const res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(),
+    const res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.guardado_cajas_por_hora&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
-    const saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[3] && res[3].cxm) || {}, _facG = res[4] || {};
+    const saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[3] && res[3].cxm) || {}, _facG = res[4] || {}, _noG = res[5] || {};
     // v8.91 — ratio de guardado (cajas/h) directo de Stock_Config; si no hay, 380. Para la tarjeta de horas.
-    var _rateRow = (res[5] && res[5][0]) || null; var _gRateVal = _rateRow ? parseFloat(_rateRow.valor) : 380; if (!(_gRateVal > 0)) _gRateVal = 380;
+    var _rateRow = (res[6] && res[6][0]) || null; var _gRateVal = _rateRow ? parseFloat(_rateRow.valor) : 380; if (!(_gRateVal > 0)) _gRateVal = 380;
     const items = Object.keys(saldos).map(function (k) {
       const a = saldos[k];
+      if (_noG[_ocgNorm(a.cod)]) return null;   // v24.52 — a liquidar: no se manda a guardar
       const aGuardar = Math.round(Number(a.a_guardar) || 0), exc = Math.round(Number(a.excedente) || 0), racks = Math.round(Number(a.racks) || 0);
       if (aGuardar + exc + racks <= 0) return null;   // nada esperando para bajar
       const cap = Math.round(capMap[_ocgNorm(a.cod)] || 0), gond = Math.round(Number(a.terminado) || 0);
@@ -30873,6 +30887,7 @@ async function showGuardarOrden(legajo) {
     var _URG = 0.20;
     var urgentes = Object.keys(saldos).map(function (k) {
       var a = saldos[k];
+      if (_noG[_ocgNorm(a.cod)]) return null;   // v24.52
       var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return null;
       var gond = Math.round(Number(a.terminado) || 0);
       var ratio = gond / cap; if (ratio >= _URG) return null;
@@ -46675,12 +46690,13 @@ async function qbpLoadBadge() {
     // v22.39 — además del badge de SOS, la tarjeta de HORAS DE GUARDADO PENDIENTES en el
     // propio botón (mismo cálculo que ¿Qué bajar primero?: cajas que ENTRAN ahora a góndola
     // ÷ cajas/h). Se traen cxm y ratio para que coincida con la pantalla, no una cuenta aparte.
-    var res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), rkbFetchCxM(), stockFetchArtFactors(),
+    var res = await Promise.all([stockFetchSaldos(), ocgFetchCapacidad(), rkbFetchCxM(), stockFetchArtFactors(), _gordenNoGuardarSet(),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?clave=eq.guardado_cajas_por_hora&select=valor", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })]);
-    var saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[2] && res[2].cxm) || {}, _facG = res[3] || {}, n = 0, totCajas = 0;
-    var _rateRow = (res[4] && res[4][0]) || null; var rate = _rateRow ? parseFloat(_rateRow.valor) : 380; if (!(rate > 0)) rate = 380;
+    var saldos = res[0] || {}, capMap = res[1] || {}, cxmMap = (res[2] && res[2].cxm) || {}, _facG = res[3] || {}, _noG = res[4] || {}, n = 0, totCajas = 0;
+    var _rateRow = (res[5] && res[5][0]) || null; var rate = _rateRow ? parseFloat(_rateRow.valor) : 380; if (!(rate > 0)) rate = 380;
     Object.keys(saldos).forEach(function (k) {
       var a = saldos[k];
+      if (_noG[_ocgNorm(a.cod)]) return;   // v24.52 — a liquidar: ni SOS ni horas de guardado
       var cap = Math.round(capMap[_ocgNorm(a.cod)] || 0); if (cap <= 0) return;
       var back = Math.round((Number(a.a_guardar) || 0) + (Number(a.excedente) || 0) + (Number(a.racks) || 0));
       if (back > 0 && (Math.round(Number(a.terminado) || 0)) / cap < 0.20) n++;   // SOS: góndola < 20% con stock atrás
@@ -63881,7 +63897,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.51"></script>
+<script src="cobranzas.js?v=24.52"></script>
 
 </body>
 </html>

@@ -647,6 +647,8 @@ echo "== imp-discontinuos (v24.49: solapa 🚫 Discontinuos de Importación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-discontinuos.cjs
 echo "== rr-super-cajas (v24.51: súper sin líos → cajas) =="
 node tests/rr-super-cajas.cjs
+echo "== qbp-liquidar (v24.52: lo que no se vende no se manda a guardar) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/qbp-liquidar.cjs
 node tests/pedimp-meses-proveedor.cjs
 
 echo "== imp-hist-pedidos (v23.91: 📜 Historial = pedidos + recepciones) =="
