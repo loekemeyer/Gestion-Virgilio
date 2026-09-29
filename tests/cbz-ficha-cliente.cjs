@@ -15,6 +15,11 @@
          banco), Pagos (conciliación imputada: dto tomado vs ganado, a reclamar),
          Entregas (Facturacion_NP), Explicación (con la escala y el escalón marcado)
          y Cuenta corriente;
+     (h) v24.41: la ficha ABRE en «📋 Resumen», la planilla de cobranza del Excel: facturas,
+         pagos con su ponderación, días ponderados (59), la escala con el escalón marcado y la
+         NC de descuento que falta, partida en neto e IVA; la deuda abierta va primero;
+     (i) v24.41: cambiar a Conciliación y volver NO cierra el cliente (Luis: "debería quedarse
+         en el cliente que elegí");
      (g) si la base NO contesta, la pantalla lo dice (chip DEMO) en vez de mostrar cero
          — regla "una lectura ROTA no es un CERO".
    Sale 1 si falla. */
@@ -100,6 +105,14 @@ catch (_e) {
           { empresa: "chef", cod_cliente: "2211", cuit: "30712345678" },
           { empresa: "lk", cod_cliente: "288", cuit: "30556677889" }
         ]);
+        if (m[1] === "gv_cobranza_operaciones") return ok(body.p_emp === "lk" ? {
+          abiertas: [{ fecha: "2026-09-22", pendiente: 250000, facturas: [{ comprobante: "FC Electr. A 0005-00035986", fecha: "2026-09-22", pendiente: 250000, lista: 250000 }] }],
+          pagadas: [{ facturas_txt: "35292", lista: 1080583.02, lista_nc: 0, fecha_fc: "2026-07-24", plazo: null,
+            dto_tomado: 0.10, dto_ganado: 0.10, retencion: 0, a_reclamar: 0, calidad: "exacta",
+            facturas: [{ tipo: "FC Electr. A", numero: "35292", fecha: "2026-07-24", total: 1080583.02 }], ncs: [],
+            pagos: [{ recibo: "14588", fecha: "2026-09-15", pagado: 500000, medio: "deposito", dias: 53, grupos: 1 },
+                    { recibo: "14601", fecha: "2026-09-28", pagado: 472524.71, medio: "transferencia", dias: 66, grupos: 1 }] }]
+        } : { abiertas: [], pagadas: [] });
         if (m[1] === "gv_cobranza_ficha")   return ok(body.p_emp === "lk" ? fichaLK : fichaCH);
         if (m[1] === "gv_cobranza_cliente") return ok(body.p_emp === "lk" ? comp : []);
         if (m[1] === "gv_cobranza_cuenta")  return ok(cta);
@@ -153,6 +166,20 @@ catch (_e) {
     out.subActiva = (document.querySelector(".cbz-sub button.on") || {}).textContent || "";
 
     const panel = () => (document.getElementById("cbzPanel") || {}).textContent || "";
+    await espera(300);
+    out.resOps = Array.from(document.querySelectorAll("#cbzPanel .cbz-opi")).map((x) => x.textContent.replace(/\s+/g, " ").trim());
+    out.hayPlanilla = !!document.getElementById("cbzPl");
+    cbzOpSel(_cbz.ops.ops[1].key); await espera(100);
+    out.resTexto = panel();
+    out.escOn = ((document.querySelector("#cbzPl .cbz-plesc tr.on") || {}).textContent || "").replace(/\s+/g, " ").trim();
+    out.pidioOps = calls.filter((c) => String(c).indexOf("gv_cobranza_operaciones") === 0).length;
+
+    /* (i) Conciliación y vuelta: el cliente sigue abierto */
+    cbzSetTab("conc"); await espera(200);
+    cbzSetTab("clientes"); await espera(250);
+    out.sigueCliente = !!document.getElementById("cbzPl") && /Bazar Monica/i.test((document.getElementById("cbzWrap") || {}).textContent || "");
+
+    cbzSub("deuda"); await espera(300);
     out.deudaFilas = document.querySelectorAll("#cbzPanel table.cbz-t tbody tr").length;
     out.deudaTexto = panel();
 
@@ -218,8 +245,19 @@ catch (_e) {
   q(/Cuarentena/i.test(r.cabecera || ""), "(e) la cabecera no dice de dónde sale la deuda (Excel de Cuarentena + ISIS − banco)");
   q((r.desglose || []).length === 2, "(e) falta el desglose por empresa (hay " + (r.desglose || []).length + ")");
 
-  q((r.subTabs || []).length === 5, "(f) esperaba 5 sub-pestañas, hay " + JSON.stringify(r.subTabs));
-  q(/Deuda/.test(r.subActiva || ""), "(f) la ficha no arranca en Deuda (arrancó en " + r.subActiva + ")");
+  q((r.subTabs || []).length === 6, "(f) esperaba 6 sub-pestañas, hay " + JSON.stringify(r.subTabs));
+  q(/Resumen/.test(r.subActiva || ""), "(h) la ficha tiene que abrir en Resumen (arrancó en " + r.subActiva + ")");
+  q(r.pidioOps === 2, "(h) Resumen pide gv_cobranza_operaciones una vez por código (2), pidió " + r.pidioOps);
+  q(r.hayPlanilla, "(h) Resumen no dibujó la planilla");
+  q((r.resOps || []).length === 2 && /35986/.test(r.resOps[0]) && /35292/.test(r.resOps[1]),
+    "(h) la deuda abierta va primero y la cobrada después: " + JSON.stringify(r.resOps));
+  q(/Días de cobranza\s*59/.test(r.resTexto || ""), "(h) los días ponderados de 35292 son 59 (53 y 66 por lo pagado)");
+  q(/Pond/.test(r.resTexto || "") && /27,25/.test(r.resTexto || "") && /32,07/.test(r.resTexto || ""),
+    "(h) falta la ponderación de cada pago (53 × 500.000 / 972.524,71 = 27,25 · 66 × 472.524,71 / … = 32,07)");
+  q(/NC Dto 10 %/.test(r.resTexto || "") && /108\.058,30/.test(r.resTexto || ""), "(h) falta la NC de descuento del 10 % por $ 108.058,30");
+  q(/89\.304,38/.test(r.resTexto || "") && /18\.753,92/.test(r.resTexto || ""), "(h) la NC tiene que partirse en neto 89.304,38 + IVA 18.753,92");
+  q(/−10 %/.test(r.escOn || ""), "(h) la escala tiene que marcar el escalón que le tocó (−10 %), marca " + JSON.stringify(r.escOn));
+  q(r.sigueCliente, "(i) cambiar a Conciliación y volver tiene que dejar el cliente abierto, no la lista");
   q(r.deudaFilas === 2, "(f) Deuda tendría que traer los 2 comprobantes (uno por empresa), trae " + r.deudaFilas);
   q(/35292/.test(r.deudaTexto || "") && /972\.525/.test(r.deudaTexto || ""),
     "(f) Deuda no muestra el comprobante y lo cobrado por banco (la conciliación)");

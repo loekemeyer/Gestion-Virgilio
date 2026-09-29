@@ -11,6 +11,8 @@
          teléfono y el chip de provincia; «Es este» llama a gv_conc_resolver con ese código;
      (e) 🟡 propuestos: «Confirmar los N» manda los N ids a gv_conc_confirmar;
      (f) el copiado para la planilla sale en 10 columnas (A–J) y el Nº de recibo NO se inventa.
+   v24.41: el extracto de una cuenta vive en el POP-UP del banco (pestaña «🏦 Extracto cargado»),
+   no en la pantalla principal: acá se abre el pop-up de Santander CH y se mide ahí adentro.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -93,15 +95,16 @@ catch (_e) {
     };
 
     await openCobranzas("conc");
-    cbzCcSetCuenta("santander|chef");
+    cbzCcPopAbrir("santander|chef");
+    cbzCcPopTab("extracto");
     await espera(500);
-    out.filtroInicial = ((document.querySelector(".cbz-ccest button.on") || {}).textContent || "").trim();
-    out.preguntas = Array.from(document.querySelectorAll(".cbz-q .cbz-qimp")).map((x) => x.textContent.trim());
-    out.textoPreg = (document.getElementById("cbzWrap") || {}).textContent || "";
+    out.filtroInicial = ((document.querySelector("#cbzPop .cbz-ccest button.on") || {}).textContent || "").trim();
+    out.preguntas = Array.from(document.querySelectorAll("#cbzPop .cbz-q .cbz-qimp")).map((x) => x.textContent.trim());
+    out.textoPreg = (document.getElementById("cbzPop") || {}).textContent || "";
 
     /* (d) Es este -> resolver con el código y el recordar */
     const rec = document.getElementById("cbzRec13"); if (rec) rec.checked = true;
-    const btn = Array.from(document.querySelectorAll(".cbz-q .cbz-es")).filter((x) => /cbzCcResolver\(13,'2677'\)/.test(x.getAttribute("onclick") || ""))[0];
+    const btn = Array.from(document.querySelectorAll("#cbzPop .cbz-q .cbz-es")).filter((x) => /cbzCcResolver\(13,'2677'\)/.test(x.getAttribute("onclick") || ""))[0];
     out.hayBoton = !!btn;
     if (btn) btn.click();
     await espera(400);
@@ -109,9 +112,9 @@ catch (_e) {
 
     /* (e) propuestos */
     cbzCcFiltro("propuesto"); await espera(300);
-    out.textoProp = (document.getElementById("cbzWrap") || {}).textContent || "";
-    out.telefono = !!document.querySelector('.cbz-q a[href^="https://wa.me/5493415551234"]');
-    const conf = Array.from(document.querySelectorAll(".cbz-ccest .cbz-conf"))[0];
+    out.textoProp = (document.getElementById("cbzPop") || {}).textContent || "";
+    out.telefono = !!document.querySelector('#cbzPop .cbz-q a[href^="https://wa.me/5493415551234"]');
+    const conf = Array.from(document.querySelectorAll("#cbzPop .cbz-ccest .cbz-conf"))[0];
     out.hayConfirmar = conf ? conf.textContent.trim() : "";
     if (conf) conf.click();
     await espera(400);

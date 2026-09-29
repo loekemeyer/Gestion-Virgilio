@@ -30684,6 +30684,24 @@ Las reglas de Santander se rehicieron **por código operativo** (`GV_Conc_Regla.
   en la planilla. El motor todavía no aparea contra A DEPOSITAR: las marca con alerta.
 - Un depósito no identificado sale con **det = 1**, como pide el Manual.
 
+### §3.v2441 — v24.41: Cobranzas — RESUMEN del cliente (la planilla de cobranza) + Conciliación por banco en pop-ups — 2026-09-29
+
+Luis: *"el módulo del cliente abra en un RESUMEN que sea una ficha como esa (pero más linda)"* · *"cuatro
+botones que te abran las conciliaciones en popups · una pestaña «Completar datos» · un badge rojo con número
+cuando hay datos a completar · 4 botones más chicos para cargar el registro de movimientos"*. Todo **lectura**:
+no se escribió ninguna fila. `sql/gv_cobranza_resumen_conc_v2441.sql`.
+
+| objeto | qué devuelve |
+|---|---|
+| `gv_cobranza_operaciones(emp, cod)` | `{pagadas, abiertas}`: cada juego de facturas con sus pagos (recibo, días, medio, en cuántos juegos se repartió el recibo), las NC y el plazo pactado; y la deuda abierta por fecha. Filtra `documentos` por número (2,5 s → 42 ms) |
+| `gv_conc_planilla(banco, empresa, dias)` | los últimos N días de la planilla + todo lo proyectado, con la línea amarilla y el `mov_id` si ya se cruzó con el extracto |
+| `gv_conc_tablero()` | las 4 cuentas: conciliado al, saldo de la línea, cuándo se subió la planilla, preguntas + propuestos (el badge), extracto cargado |
+| `gv_conc_pendientes_lista()` | lo que espera a una persona, de las 4 cuentas (la pestaña «Completar datos») |
+
+- **La planilla la sigue subiendo la macro del Excel al guardar.** «↻ Actualizar» la vuelve a LEER; desde la web no se la puede empujar.
+- **En una operación cobrada, la escala marca lo que decidió el agente (`dto_ganado`), no la escala pelada**: un cliente con plazo propio (Cuyana, 60 días) que paga en 63 no gana nada aunque la escala diga −5 %.
+- **«Dif.» en Pagos** es el residuo `1 − pagado / esperado`: positivo = pagó de menos (retención o descuento no registrado); negativo = pagó de más.
+
 ### §3.v2437 — v24.37: MOTOR DE CRUCE de la conciliación — se sube el extracto del día y pregunta sólo lo que no cuadra — 2026-09-29
 
 Luis: *"el módulo debería resolver automáticamente todo lo que pueda con la carga de los extractos de
