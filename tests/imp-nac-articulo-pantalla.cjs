@@ -49,7 +49,13 @@ const okk = (c, m) => { if (c) console.log("✓ " + m); else fail(m); };
     window.__calls = calls;
 
     await openImpEnCurso();
-    await impCursoToggle(_impCursoEnc("PI TEST"), _impCursoEnc("Becky"));
+    // v24.32 (Luis: "apretás sobre el proveedor y debería expandirse las unidades"): el detalle
+    // se abre CLICKEANDO LA CELDA DEL PROVEEDOR, no sólo el número de PI.
+    const tdProv = document.querySelector("#stkPopBody .imcu-tbl tbody td.imcu-provtd");
+    out.provClickeable = !!tdProv;
+    if (tdProv) { tdProv.click(); await new Promise((r) => setTimeout(r, 80)); }
+    out.abrioDesdeProv = !!document.querySelector("#stkPopBody .imcu-det");
+    if (!out.abrioDesdeProv) await impCursoToggle(_impCursoEnc("PI TEST"), _impCursoEnc("Becky"));
     const det = () => document.querySelector("#stkPopBody .imcu-det");
     const txt = () => det().innerText.replace(/\s+/g, " ");
     const nums = () => [...det().querySelectorAll("tbody tr")]
@@ -93,6 +99,8 @@ const okk = (c, m) => { if (c) console.log("✓ " + m); else fail(m); };
     return out;
   });
 
+  okk(r.provClickeable, "(0) el PROVEEDOR de 🚢 En curso abre el detalle (celda clickeable)");
+  okk(r.abrioDesdeProv, "(0) tocando el proveedor se expanden las unidades con la nacionalización");
   okk(r.banda, "(A) la banda dice el costo de nacionalización del embarque");
   okk(r.tieneFactor, "(A) dice el % sobre el FOB");
   okk(r.colNac, "(B) hay columna de nacionalización por artículo");
