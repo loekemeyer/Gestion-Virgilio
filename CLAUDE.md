@@ -3685,6 +3685,28 @@ estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la 
 **Recuperable separado** (v23.80, Luis): la tarjeta y el desglose muestran aparte lo que vuelve como crédito fiscal — IVA 21 %, IVA adicional 20 %, Ganancias 6 %, IIBB 0,17 % (v23.81) sobre CIF + derechos + estadística (`_nacRecup`) — y NO lo suman al costo. En avión (courier) el IVA sigue en el no recuperable. **En avión también va la comisión NTL** (v23.81, Luis). La comisión NTL es 5 % del **FOB**, no del CIF (ya lo era; el test lo fija).
 **Fujian paga 35 %** (v23.78, Luis: *"solo ponele 35% a fujian / 18% al resto"*): `_DERECHOS_PROV` / `_derechosProv(prov)`, los tres modos.
 
+## ⚠ REGLA (Luis, 2026-09-29, v23.93): en Pedidos Importación, lo que se TOCA es el dato
+
+**Luis, sobre las tres pantallas:** *"proy u/mes tiene que ser lo que apretás para ver la proyección…
+(sacá el código clickeable)"* · *"stock: sacá el visual de −x (unidades comprometidas), ya que el total
+ya lo descuenta"* · *"los datos que importan son los meses y el consumo en lo de la izquierda y el % y $
+no recuperable del de la derecha"* · *"como te gusta hacer botones largos horribles eh"*.
+
+| dónde | cómo queda |
+|---|---|
+| tabla | el **código es texto**; el pop-up de proyección lo abre la celda **Proy u/mes** (`td.pedimp-proy`), que es donde vive el dato — igual que en Stocks. Letra 15px, encabezados 12px, colgroup 1218px |
+| columna Stock | **sin el «📋−N»**: el número YA es el disponible (v16.08) y restarlo a la vista era leer dos veces la misma resta. Lo comprometido queda en el `title` |
+| banda del proveedor (colapsada) | grande sólo **meses + consumo** (izq) y **% + u$s no recuperable** (der); el resto en 11,5px. La cuenta entera sigue a un click |
+| pop-up ⚙ Configurar | botones chicos y letra grande; se fue el párrafo «Se guarda en el maestro Importados…» |
+
+⚠ **Los botones gigantes de un pop-up nuevo casi siempre son el `button{width:100%;padding:16px;
+font-size:22px;margin-top:14px}` global de la línea 26**, no el estilo que se le puso. Se neutraliza por
+contenedor (`#impCfgOv button{width:auto;margin-top:0}`), y lo mismo con los inputs, que sin
+`box-sizing:border-box` se desbordan del panel.
+
+**Chequeo:** `node tests/pedimp-moq-proy.cjs` — el candado (A) verifica que la celda de proyección abre
+el pop-up **y que el código no volvió a ser clickeable**.
+
 ## ⚠⚠ REGLA (Luis, 2026-09-29, v23.89): la config de IMPORTADOS vive en TABLAS — ⚙ por proveedor
 
 **Luis, textual:** *"me gustaría que la capacidad de editar cosas como meses objetivo de importados
