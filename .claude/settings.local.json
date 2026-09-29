@@ -76,7 +76,8 @@
       "Bash(node tests/fac-fecha-entrega.cjs)",
       "Bash(sed -i 's/\\(v23.60: tocar la cabecera pliega/\\(v23.61: tocar la cabecera pliega/' CLAUDE.md)",
       "Bash(node scripts/bump-version.cjs 23.61)",
-      "Bash(git ls-remote *)"
+      "Bash(git ls-remote *)",
+      "Bash(node scripts/bump-version.cjs 23.87)"
     ]
   }
 }

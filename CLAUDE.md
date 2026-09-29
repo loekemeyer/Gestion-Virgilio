@@ -3696,6 +3696,13 @@ estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la 
   cartel rojo de CORTE con los camiones a pasar de día en la PPP. Es aviso: no mueve nada.
 - `sql/gv_monitor_tanda_camion_orden_v2386.sql`, `tests/tv-meta-camion.cjs`, `tests/tandas-orden-camion.cjs`.
 
+## ⚠ REGLA (Luis, 2026-09-29, v23.87): el operario NO vuelve a la pantalla del legajo
+
+- Después de registrar una tarea (`send()`) **se queda en su botonera**; al «Resumen de hoy» se va con la ← de arriba.
+- Si ya eligió Virgilio HOY (`localStorage.vir_planta_dia`, se guarda en `chooseVirgilio`), una recarga lo lleva
+  **directo a la botonera**, sin selector de planta ni pantalla del legajo. Se borra con «Cambiar planta», Terminar Día
+  o cerrar sesión; vale el día calendario. `tests/operario-queda-botonera.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-29, v23.82): el operario entra con la CLAVE DE LA TV
 
 La TV (`monitor/tv.html`) muestra chiquito **🔑 + 4 dígitos** (`gv_tv_clave_actual`, cambia cada **15 min**, vale

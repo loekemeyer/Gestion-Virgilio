@@ -6234,7 +6234,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.86"></script>
+<script type="module" src="recepcion.js?v=23.87"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10279,7 +10279,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.86";
+const APP_VERSION = "v23.87";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -11243,9 +11243,12 @@ async function send() {
   }
 
   resetSelection();
-  optionsScreen.classList.add("hidden");
-  legajoScreen.classList.remove("hidden");
-  document.getElementById("btnHistDias").classList.remove("hidden");
+  /* v23.87 (Luis): después de registrar una tarea el operario SE QUEDA en su botonera.
+     Antes volvía a la pantalla del legajo y tenía que tocar «Continuar» cada vez. Al
+     «Resumen de hoy» se llega con la flecha ← de arriba. */
+  optionsScreen.classList.remove("hidden");
+  legajoScreen.classList.add("hidden");
+  document.getElementById("btnHistDias").classList.add("hidden");
 
   // No se borra el legajo: el operario suele encadenar varios reportes seguidos.
   // Para cambiar de operario alcanza con tocar el input y reescribir.
@@ -60298,8 +60301,27 @@ function _renderIdentity() {
 }
 /* Tras autenticar: si es modo monitor (TV/supervisor con ?monitor=) o ya se
    eligió planta en esta carga, vamos directo a Virgilio. Si no, al selector. */
+/* v23.87 (Luis): el operario que ya entró HOY a Virgilio no vuelve a ver ni el selector de
+   planta ni la pantalla del legajo: una recarga (actualización automática, celular que se
+   durmió) lo deja directo en su botonera. Vale el día calendario, igual que la sesión. */
+const PLANTA_DIA_KEY = "vir_planta_dia";
+function _plantaDiaGuardar(planta) {
+  try { localStorage.setItem(PLANTA_DIA_KEY, JSON.stringify({ planta: planta, day: todayKeyBsAs() || "" })); } catch (_e) {}
+}
+function _plantaDiaHoy() {
+  try {
+    const o = JSON.parse(localStorage.getItem(PLANTA_DIA_KEY) || "null");
+    return (o && o.day && o.day === todayKeyBsAs()) ? o.planta : null;
+  } catch (_e) { return null; }
+}
 function _routeAfterAuth() {
   if (window.__pendingMonitorParam || __plantChosen) { _renderIdentity(); return; }
+  if (__identity && __identity.type === "operario" && _plantaDiaHoy() === "virgilio") {
+    __plantChosen = true;
+    _renderIdentity();
+    try { if (typeof goToOptions === "function") goToOptions(); } catch (_e) {}
+    return;
+  }
   showSelector();
 }
 
@@ -60354,6 +60376,16 @@ async function showLoggedIn(user) {
 window.chooseVirgilio = function () {
   __plantChosen = true;
   _renderIdentity();
+  // v23.87: el operario entra directo a su botonera y no vuelve a ver esta pantalla en el día.
+  if (__identity && __identity.type === "operario") {
+    _plantaDiaGuardar("virgilio");
+    try { if (typeof goToOptions === "function") goToOptions(); } catch (_e) {}
+  }
+};
+/* v23.87: para tests/operario-queda-botonera.cjs (el ruteo vive adentro de initAuth). */
+window.__gvAuthTest = {
+  route: function () { return _routeAfterAuth(); },
+  setOperario: function (emp) { __identity = { type: "operario", emp: emp, nombre: emp.nombre || ("Legajo " + emp.legajo) }; __plantChosen = false; }
 };
 window.chooseCervantes = function () {
   // v14.73 — El SUPERVISOR que elige Cervantes NO va a la pantalla de operario:
@@ -60391,6 +60423,7 @@ window.abrirAdminCervantes = function (cual) {
 };
 window.cambiarPlanta = function () {
   __plantChosen = false;
+  try { localStorage.removeItem("vir_planta_dia"); } catch (_e) {}
   showSelector();
 };
 
@@ -60425,7 +60458,7 @@ function saveLegajoSession(emp, day) {
   } catch (_e) {}
 }
 function clearLegajoSession() {
-  try { localStorage.removeItem(LEGAJO_AUTH_KEY); } catch (_e) {}
+  try { localStorage.removeItem(LEGAJO_AUTH_KEY); localStorage.removeItem("vir_planta_dia"); } catch (_e) {}
 }
 
 /* Clave donde supabase-js guarda la sesión (default del bundle para este proyecto).

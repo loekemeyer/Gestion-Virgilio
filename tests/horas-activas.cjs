@@ -83,8 +83,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
        13 h trabajadas de verdad y el cartel tiene que salir. Lo que se prueba es la
        INVARIANTE: el cartel sale si y sólo si las horas ACTIVAS pasan el umbral, y el
        número que muestra es el activo, nunca el de reloj. */
-    const ayer1645 = new Date(Date.now() - 24 * 3600000);
-    ayer1645.setHours(16, 45, 0, 0);
+    /* v23.87: «ayer 16:45» en hora ARGENTINA, no del contenedor. Con setHours sobre UTC,
+       corriendo entre las 21:00 y las 24:00 AR el tramo no cruzaba la noche argentina y el
+       test fallaba según la hora (activo = reloj). */
+    const _hoyAR = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
+    const ayer1645 = new Date(new Date(_hoyAR + "T16:45:00-03:00").getTime() - 24 * 3600000);
     const _iniB = ayer1645.getTime();
     window.__enc4.length = 0; preguntado = ""; alertado = "";
     abrirPicking("Z96A", ayer1645.toISOString());
