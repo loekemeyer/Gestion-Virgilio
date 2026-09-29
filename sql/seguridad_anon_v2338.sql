@@ -53,10 +53,15 @@ revoke all on function public.costo_api_usos_hoy(text) from public, anon, authen
 grant execute on function public.costo_api_usos_hoy(text) to service_role;
 --    Verificado: sin nada / clave pública / JWT falso -> 401 sin llamar a OpenAI.
 
--- 2c) PENDIENTE — remitos_select. Probado en SQL: un INSERT ... RETURNING sin política
---     SELECT falla por RLS. Si Storage sube con RETURNING, sacarla rompe TODAS las subidas.
---     Se prueba contra el Storage real antes de tocarla.
--- drop policy if exists remitos_select on storage.objects;
+-- 2c) APLICADO 29/09 (OK del dueño). remitos_select. Antes: 1 día sin tablets < v23.38 y
+--     0 subidas fallidas desde el cambio. Probado contra el Storage REAL con la clave pública:
+--     subir sin upsert → 200; listar el bucket → [] (ya no se ven los nombres); link público → 200.
+--     Queda el archivo de prueba remitos/__prueba_seguridad_select_20260929.jpg (borrar desde el panel).
+drop policy if exists remitos_select on storage.objects;
+-- rollback: create policy remitos_select on storage.objects for select to anon, authenticated
+--             using (bucket_id = 'remitos');
+-- Queda en remitos SOLO remitos_insert. Sigue abierto (opción A de login): quien tenga un link
+-- ve la foto, y los links están en Control_Modo_OP.foto_url (legible con la clave pública).
 
 -- 7) APLICADO 28/09. send-whatsapp v55 (supabase/functions/send-whatsapp, versionada ahora):
 --    texto libre y destinatario libre solo desde el servidor (clave de servicio); con la clave
