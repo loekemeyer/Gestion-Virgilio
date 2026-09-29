@@ -56,8 +56,14 @@ const MIME = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/jav
     return route.abort();
   });
 
-  await page.goto(base + "/index.html");
-  await page.waitForFunction(() => document.readyState === "complete");
+  // v23.97 — `load` no es la señal: este test ABORTA todo lo externo, así que un recurso
+  // abortado puede dejar la página sin llegar nunca a `complete` y el test moría por timeout
+  // sin haber medido nada (verde en el run 1442 y rojo en el 1441, 1443 y 1444 con el MISMO
+  // código: era una carrera, no una regresión). Lo que el test mide es que los globales
+  // existan y salgan de vendor/, y para eso alcanza con el DOM listo.
+  await page.goto(base + "/index.html", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => document.readyState === "complete", { timeout: 20000 })
+            .catch(() => {});   // si no llega, se sigue: los globales se chequean igual
   // recepcion.js es un MÓDULO: si supabase-js no estuviera, tiraría y esto nunca aparece.
   await page.waitForFunction(() => typeof window.openRecepcionOp === "function", { timeout: 15000 })
            .catch(() => {});
