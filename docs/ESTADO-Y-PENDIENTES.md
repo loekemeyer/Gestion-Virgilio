@@ -1,5 +1,20 @@
 # Estado y pendientes — al 2026-09-23 (última actualización: v21.80)
 
+
+> **2026-09-29, Thomas (v24.64) — 936E / 938E: la mercadería está con el CÓDIGO CAMBIADO, y se corrige
+> cuando llegue el PI B260601.** El 936E que hay en góndola (56 cajas LK = 672 u; 240 u ya en pedidos)
+> **es la ESPUMADERA**, traída con el código equivocado. El **936E verdadero es una CUCHARA CALADA** y viene
+> en el PI B260601 (1.008 u, reingreso estimado 29/09) junto con **2.880 u de 938E, que es la espumadera**.
+> **Thomas decidió esperar a que llegue esa carga para hacer el cambio.** El plan, para no rehacerlo:
+> 1. los pedidos pendientes de 936E (espumaderas) salen con lo que hay en góndola;
+> 2. lo que sobre de 936E se re-etiqueta a 938E (ajuste −N 936E / +N 938E, mismo depósito, total igual);
+> 3. página LK: crear 938E «Espumadera Nylon Mgo Madera» ($3.175, foto del 936E) y pasar el 936E a
+>    «Cuchara calada» con su precio (lo define Thomas);
+> 4. al recibir el PI, la cuchara entra como 936E sólo cuando ya no quede espumadera con ese código
+>    (si no, se mezclan dos artículos en la misma góndola).
+> Mientras tanto, la proyección del 936E (180 u/mes) es venta de ESPUMADERA: cuando el cambio se haga,
+> esa historia tiene que ir al 938E, no quedarse en la cuchara. Tarea en Planify: «Th 936E→938E al llegar PI B260601».
+
 > **2026-09-23, pedido de Tomás González (v21.80) — la observación del pedido ya se puede LEER en
 > la PPP, y lo que falta NO es código: es que la página de CHEF la pida.** El badge 💬 de la v21.65
 > ahora es un botón (pop-up con el texto completo), el comentario se ve al abrir la NP, y el día y
