@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.63"></script>
+<script type="module" src="recepcion.js?v=24.64"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.63";
+const APP_VERSION = "v24.64";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21497,6 +21497,29 @@ function _pedImpMesesSel(prov, provEnc) {
   return '<label class="pedimp-mesessel" title="Meses de venta que se piden. Cambia el objetivo y el «a pedir» de TODOS los códigos de ' + escapeHtml(prov) + '.">' +
     'Meses obj <select onchange="pedImpSetMeses(\'' + provEnc + '\',this.value)">' + op + '</select></label>';
 }
+/* v24.64 (Thomas) — los botones 📦 y 📥 de la tabla son íconos sin texto: antes de abrir
+   piden confirmar en un pop-up que dice qué hacen. */
+const _PEDIMP_ACC = {
+  baches:  { t: "📦 Baches", d: "Ver y editar los pedidos en curso de este artículo: cada bache con sus unidades, su fecha de reingreso y sus llegadas (total o parcial).", b: "Abrir Baches", c: "#475569" },
+  recibir: { t: "📥 Recibir", d: "Registrar lo que LLEGÓ de este pedido: cuántas unidades, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Mueve el stock.", b: "Recibir", c: "#0f766e" }
+};
+function _pedImpAccionConfirmar(tipo, codEnc, fn) {
+  const a = _PEDIMP_ACC[tipo]; if (!a) { fn(); return; }
+  let ov = document.getElementById("pedImpAccOv"); if (ov) ov.remove();
+  ov = document.createElement("div"); ov.id = "pedImpAccOv";
+  ov.setAttribute("style", "position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99998;display:flex;align-items:center;justify-content:center;padding:16px");
+  ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:360px;width:100%;padding:16px 18px;box-shadow:0 12px 32px rgba(15,23,42,.3)">' +
+    '<div style="font-size:17px;font-weight:800;color:#0f172a;margin-bottom:6px">' + a.t + ' — ' + escapeHtml(decodeURIComponent(codEnc || "")) + '</div>' +
+    '<div style="font-size:13.5px;color:#475569;line-height:1.4;margin-bottom:14px">' + a.d + '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+    '<button class="pedimp-acc-no" style="width:auto;margin:0;padding:8px 14px;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:14px;font-weight:700;cursor:pointer">Cancelar</button>' +
+    '<button class="pedimp-acc-si" style="width:auto;margin:0;padding:8px 14px;border-radius:9px;border:1px solid ' + a.c + ';background:' + a.c + ';color:#fff;font-size:14px;font-weight:800;cursor:pointer">' + a.b + '</button></div></div>';
+  const cerrar = function () { ov.remove(); };
+  ov.addEventListener("click", function (ev) { if (ev.target === ov) cerrar(); });
+  document.body.appendChild(ov);
+  ov.querySelector(".pedimp-acc-no").onclick = cerrar;
+  ov.querySelector(".pedimp-acc-si").onclick = function () { cerrar(); fn(); };
+}
 async function pedImpSetMeses(provEnc, v) {
   const prov = decodeURIComponent(provEnc || ""); if (!prov) return;
   const n = String(v || "").trim() === "" ? null : Number(v);
@@ -22451,8 +22474,8 @@ function _pedImpRender() {
         const lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
         const _prv = encodeURIComponent(d.prov || it.prov || '');
         return '<div style="margin:1px 0">' + (lbl ? lbl + '<br>' : '') + '<span style="white-space:nowrap">' +
-          '<button class="stk-btn" style="padding:3px 8px;font-size:14px" title="📦 Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="pedImpBaches(' + d.id + ',\'' + _codEncV + '\',\'' + _prv + '\')">📦</button>' +   // v24.62 (Thomas): íconos lado a lado, la fila no crece
-          (Number(d.curso) > 0 ? ' <button class="stk-btn" style="padding:3px 8px;font-size:14px;background:#0f766e;color:#fff;border-color:#0f766e;font-weight:800" title="📥 RECIBIR: recibir lo que llegó de este pedido: cuánto, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Queda en el Historial de recepción." onclick="impRecibirAbrir(' + d.id + ')">📥</button>' : '') + '</span></div>';
+          '<button class="stk-btn" style="padding:3px 8px;font-size:14px" title="📦 Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="_pedImpAccionConfirmar(\'baches\',\'' + _codEncV + '\',function(){pedImpBaches(' + d.id + ',\'' + _codEncV + '\',\'' + _prv + '\')})">📦</button>' +   // v24.62 (Thomas): íconos lado a lado, la fila no crece
+          (Number(d.curso) > 0 ? ' <button class="stk-btn" style="padding:3px 8px;font-size:14px;background:#0f766e;color:#fff;border-color:#0f766e;font-weight:800" title="📥 RECIBIR: recibir lo que llegó de este pedido: cuánto, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Queda en el Historial de recepción." onclick="_pedImpAccionConfirmar(\'recibir\',\'' + _codEncV + '\',function(){impRecibirAbrir(' + d.id + ')})">📥</button>' : '') + '</span></div>';
       }).join('');
       const _m3m = Number(it.m3Master) || 0;
       const _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
@@ -63979,7 +64002,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.63"></script>
+<script src="cobranzas.js?v=24.64"></script>
 
 </body>
 </html>
