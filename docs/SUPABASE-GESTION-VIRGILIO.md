@@ -30344,3 +30344,71 @@ pero la lectura no expone nada que no esté ya en la pantalla de En curso.
 **Tests:** `tests/imp-hist-pedidos.cjs` (corre la solapa: el nombre nuevo, las dos vistas, lo que
 muestra cada una y que la búsqueda filtra las dos) — verificado que **falla** contra el
 `index.html` anterior. `sql/gv_imp_pedidos_historial_v2391.sql`.
+
+## §3.v2393 — «📲 Avisar programación» estaba tomando SÓLO las NP de ISIS (v23.93, Luis, 29/09)
+
+**Luis, textual:** *"Que avisar programacion tome pedidos web que actualmente esta roto"*.
+
+**Medido antes de tocar nada:**
+
+```sql
+select count(*) filas, count(*) filter (where np ~ '^(LK|CH) ') web
+  from public.vista_ppp_programacion_pendiente;   -- 15 filas, 0 web
+```
+
+**La causa:** `vista_ppp_programacion_pendiente` leía únicamente `gv_ppp_prog_rs`, el espejo de
+ISIS. Desde que los pedidos de la página se programan solos (v13.47) casi todo lo programado vive
+en `PPP_Web_Programacion`, así que el aviso al cliente no salía para prácticamente nadie.
+
+**El arreglo es un `UNION ALL` con la rama web, y nada aguas abajo se tocó:**
+`vista_avisar_programacion` ya resuelve empresa, teléfono y vendedor **por empresa** a partir de la
+NP (`gv_empresa_de_np_texto`), así que con el prefijo `LK 0123` / `CH 0045` agrupa sola.
+
+⚠ **La NP web se etiqueta con `gv_ppp_web_np_label(empresa, np, np_idx)`, nunca con `np` pelado**:
+el código de cliente es por empresa (regla de Thomas, 16/09) y sin prefijo el `4181` de LK y el
+`4181` de Chef son dos personas distintas.
+
+⚠ **Se saltean las canceladas** (`GV_PPP_Web_NP_Cancelada`) y las facturadas con cierre, igual que
+la rama de ISIS: avisarle a un cliente de un pedido cancelado es peor que no avisarle.
+
+⚠ **`security_invoker = true` se repone con el `alter view`**: un `CREATE OR REPLACE VIEW` sin
+`WITH (...)` borra las `reloptions` y la vista pasa a correr como `postgres`, salteando la RLS.
+
+**Medición después (29/09):** 141 filas · 126 con prefijo web · **0 NP duplicadas** ·
+`vista_avisar_programacion` = 82 grupos, 67 con teléfono, 0 sin empresa.
+
+```sql
+select count(*) filas, count(*) filter (where np ~ '^(LK|CH) ') web
+  from public.vista_ppp_programacion_pendiente;
+select count(*) from (select np from public.vista_ppp_programacion_pendiente
+                       group by np having count(*) > 1) z;   -- 0
+```
+
+`sql/gv_avisar_programacion_web_v2393.sql` (con el rollback y el centinela propuesto).
+
+## §3.v2393b — el panel supervisor pierde dos puertas y «Completar datos producto» se muda
+
+**Luis, textual:** *"Saca Pedidos sin cargar en ppp y faltantes facturados sin completar /
+Completar datos de producto mandalo a configuracion"*.
+
+| botón | qué pasó |
+|---|---|
+| ⚠️ Pedidos sin cargar en PPP | sale del panel. `stkOpenNpFaltan` y `npFaltanLoadBadge` **siguen en el archivo** |
+| 📉 Faltantes facturados sin completar | sale del panel. `stkOpenFaltFact` sigue |
+| 🚦 Completar datos producto | pasa a **⚙️ Configuración**, con su `#dpBadge` |
+
+Mismo criterio que la v20.80 y que `gv_ppp_np_desarmar` en la v18.77: **lo que no puede volver es
+la PUERTA**, la función se deja.
+
+⚠ **El `#dpBadge` viaja con el botón.** `dpLoadBadge()` se sigue llamando al entrar al panel y
+escribe sobre ese id: si el id se quedaba en el panel viejo (o se duplicaba), el badge se dibujaba
+en la nada y nadie se enteraba de los artículos sin m³. El test cuenta que aparezca **una sola vez**.
+
+⚠ **`npFaltanLoadBadge()` ya no corre al entrar**: eran 3 fetch por carga para un badge sin botón.
+
+⚠ **`tests/npf-prog-sin-base.cjs` quedó viejo con esto y se actualizó en el mismo commit**
+(regla v21.53): medía el conteo en el `textContent` del badge, que ya no existe; hoy mide lo que el
+módulo tiene cargado (`_stkPop.rows + gaps + sinBase`).
+
+**Tests:** `tests/sup-panel-v2393.cjs` — candado estático, verificado que **falla con 6** contra el
+`index.html` anterior.

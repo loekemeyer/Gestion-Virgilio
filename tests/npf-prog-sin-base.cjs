@@ -9,8 +9,9 @@
    que pide con mucha anticipación queda fuera de la ventana del Sheet de la base).
    El tachado va a NP_Sin_Base_Revisadas y la vista lo excluye, así que también apaga
    la alerta de Telegram.
-   Verifica: A) la sección se dibuja con sus NP; B) el badge del panel suma las TRES
-   fuentes; C) con la vista vacía la sección no aparece; D) la ✕ postea el tachado y
+   Verifica: A) la sección se dibuja con sus NP; B) el módulo suma las TRES
+   fuentes (hasta la v23.91 eso se medía en el badge del panel, que ya no existe: el botón
+   salió del panel supervisor a pedido de Luis); C) con la vista vacía la sección no aparece; D) la ✕ postea el tachado y
    saca la fila. Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -45,7 +46,6 @@ catch (_e) {
     stub(PROG_SIN_BASE);
     await stkOpenNpFaltan();
     const html = document.getElementById("stkPopBody").innerHTML;
-    const badge = document.getElementById("npFaltanBadge");
     const conSeccion = {
       seccionVisible: html.indexOf("SIN artículos en la base") >= 0,
       titulo2: html.indexOf("2 NP programada(s)") >= 0,
@@ -57,12 +57,10 @@ catch (_e) {
       // sigue mostrando lo de siempre
       seccionSalteadas: html.indexOf("salteada") >= 0,
       filaSinProgramar: html.indexOf("98111") >= 0,
-      badgeModulo: badge ? badge.textContent : null   // 1 + 1 + 2 = 4
+      // v23.93: el badge del panel ya no existe (el botón salió del panel supervisor), así que
+      // lo que se mide es lo que el módulo tiene cargado: 1 sin programar + 1 salteada + 2 sin base.
+      totalModulo: (_stkPop.rows || []).length + (_stkPop.gaps || []).length + (_stkPop.sinBase || []).length
     };
-
-    // El badge del panel (se calcula aparte, sin abrir el módulo) tiene que dar lo mismo.
-    await npFaltanLoadBadge();
-    const badgePanel = document.getElementById("npFaltanBadge").textContent;
 
     // Sin NPs sin base: la sección no se dibuja y el resto queda igual.
     stub([]);
@@ -71,7 +69,7 @@ catch (_e) {
     const sinSeccion = {
       seccionOculta: html2.indexOf("SIN artículos en la base") < 0,
       salteadasSiguen: html2.indexOf("salteada") >= 0,
-      badgeModulo: document.getElementById("npFaltanBadge").textContent   // 1 + 1 + 0 = 2
+      totalModulo: (_stkPop.rows || []).length + (_stkPop.gaps || []).length + (_stkPop.sinBase || []).length   // 1 + 1 + 0 = 2
     };
 
     // v12.27 — tachar una NP: "no es un error" (upsert en NP_Sin_Base_Revisadas).
@@ -107,22 +105,22 @@ catch (_e) {
       tituloBaja1: htmlDespues.indexOf("1 NP programada(s)") >= 0
     };
 
-    return { conSeccion, badgePanel, sinSeccion, tachado };
+    return { conSeccion, sinSeccion, tachado };
   });
   await b.close();
 
   const A = r.conSeccion.seccionVisible && r.conSeccion.titulo2 && r.conSeccion.np98574 &&
             r.conSeccion.np98575 && r.conSeccion.tandaD52B && r.conSeccion.antesDeSalteadas &&
             r.conSeccion.seccionSalteadas && r.conSeccion.filaSinProgramar;
-  const B = r.conSeccion.badgeModulo === "4" && r.badgePanel === "4";
-  const C = r.sinSeccion.seccionOculta && r.sinSeccion.salteadasSiguen && r.sinSeccion.badgeModulo === "2";
+  const B = r.conSeccion.totalModulo === 4;
+  const C = r.sinSeccion.seccionOculta && r.sinSeccion.salteadasSiguen && r.sinSeccion.totalModulo === 2;
   const D = r.tachado.hayBotonX && r.tachado.posteoOk && r.tachado.npPosteada === "98574" &&
             r.tachado.estadoPosteado === "no_es_problema" && !!r.tachado.motivoPosteado &&
             r.tachado.saleDeLaLista && r.tachado.quedaLaOtra && r.tachado.tituloBaja1;
 
   console.log("npf-prog-sin-base:", JSON.stringify(r));
   console.log("  pageerrors:", errs.length ? errs.join(" | ") : "none");
-  console.log("  A sección ✓/✗:", A ? "✓" : "✗", "· B badge:", B ? "✓" : "✗", "· C vacío:", C ? "✓" : "✗",
+  console.log("  A sección ✓/✗:", A ? "✓" : "✗", "· B total:", B ? "✓" : "✗", "· C vacío:", C ? "✓" : "✗",
               "· D tachar:", D ? "✓" : "✗",
               "·", (A && B && C && D && !errs.length) ? "OK" : "FAIL");
   process.exit((A && B && C && D && !errs.length) ? 0 : 1);
