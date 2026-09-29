@@ -4467,6 +4467,8 @@ adivina. Medido el 29/09: **69 CUIT tienen código en las dos empresas**.
 módulo nuevo del index, ese es el camino**: el index ya va por 63.000 líneas, 4,4 MB y un byte NUL
 adentro.
 
+⚠ **El módulo de Pedidos Importación vive en `importacion.js` (v24.65); al tocar importados, editar ahí.** Mismo patrón (script clásico, todo global, `?v=` atado a `APP_VERSION`); los tests que extraen funciones de importados leen `index.html` + `importacion.js`.
+
 ⚠⚠ **`window.sb`**: `const sb = createClient(...)` vive **adentro de la IIFE** del login, así que un `.js`
 externo no lo ve (`sb is not defined`, y el módulo cae a DEMO sin decir por qué). Se expone el **mismo**
 objeto —no hay segundo cliente ni segunda sesión—. Cualquier módulo que salga del index cuelga de ahí.

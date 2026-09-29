@@ -11,7 +11,7 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+const html = (fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8") + "\n" + fs.readFileSync(path.join(__dirname, "..", "importacion.js"), "utf8"));
 /* El bloque puro va desde la declaración de _NTL_PROVEEDORES hasta justo antes del bloque
    de config de la v23.89 (que ya toca DOM y red). ⚠ v23.89: los objetos pasaron de `const`
    a `let` porque son CACHÉ — la fuente es GV_Imp_Proveedor. Lo que queda escrito en el

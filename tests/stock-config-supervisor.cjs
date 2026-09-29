@@ -2,7 +2,7 @@
 // Van por _scfgAuth() (JWT de la sesión de supervisor). La única que queda con la anon es
 // stkGuardadoToggleRacks, que no tiene ningún llamador (código muerto).
 const fs = require("fs");
-const src = fs.readFileSync(require("path").join(__dirname, "..", "index.html"), "latin1");
+const src = (fs.readFileSync(require("path").join(__dirname, "..", "index.html"), "latin1") + "\n" + fs.readFileSync(require("path").join(__dirname, "..", "importacion.js"), "latin1"));
 const L = src.split("\n");
 let fallas = 0, escrituras = 0;
 for (let i = 0; i < L.length; i++) {

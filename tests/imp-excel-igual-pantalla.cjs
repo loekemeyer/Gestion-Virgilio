@@ -2,7 +2,7 @@
 // Parado en un proveedor se ven todos sus ítems (aunque no pidan nada, ej. 440E) y el Excel
 // los filtraba por "a pedir > 0" y de todos los proveedores; las MC tocadas a mano no llegaban.
 const fs = require("fs"), vm = require("vm");
-const src = fs.readFileSync(__dirname + "/../index.html", "latin1");
+const src = (fs.readFileSync(__dirname + "/../index.html", "latin1") + "\n" + fs.readFileSync(__dirname + "/../importacion.js", "latin1"));
 function fn(name) {
   const i = src.indexOf("function " + name + "(");
   if (i < 0) throw new Error("no encuentro " + name);

@@ -46,7 +46,7 @@ function extractHandlerFns(src) {
 }
 
 (async () => {
-  const src = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  const src = (fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8") + "\n" + fs.readFileSync(path.join(__dirname, "..", "importacion.js"), "utf8"));
   const fns = extractHandlerFns(src);
   const b = await chromium.launch();
   const p = await b.newPage();

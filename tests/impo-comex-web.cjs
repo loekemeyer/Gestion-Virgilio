@@ -10,7 +10,7 @@ const raiz = path.join(__dirname, "..");
 const fallas = [];
 const ok = (c, m) => { if (!c) fallas.push(m); };
 
-const html = fs.readFileSync(path.join(raiz, "index.html"), "utf8");
+const html = (fs.readFileSync(path.join(raiz, "index.html"), "utf8") + "\n" + fs.readFileSync(path.join(raiz, "importacion.js"), "utf8"));
 const i = html.indexOf("function _impTabsHtml(");
 const tabs = i >= 0 ? html.slice(i, html.indexOf("\n}\n", i)) : "";
 ok(/onclick="openImpoComex\(\)"[^>]*>🛃 IMPO COMEX</.test(tabs), "(a) falta el botón 🛃 IMPO COMEX en _impTabsHtml");

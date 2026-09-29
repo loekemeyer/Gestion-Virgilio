@@ -22,7 +22,7 @@
    Sale 1 si falla. */
 const fs = require("fs");
 const path = require("path");
-const src = fs.readFileSync(path.join(__dirname, "..", "index.html"), "latin1");
+const src = (fs.readFileSync(path.join(__dirname, "..", "index.html"), "latin1") + "\n" + fs.readFileSync(path.join(__dirname, "..", "importacion.js"), "latin1"));
 
 /* Medido contra la base el 2026-09-15. El umbral de entrada son ~700 filas: a ritmo normal
    eso es cuestión de semanas, y el día que cruza no avisa nadie. */

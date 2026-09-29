@@ -2,7 +2,7 @@
 // código: sale "437E" con la chapa LK, y la línea de Chef del mismo número con la chapa CH.
 // Corre las funciones reales de index.html (no un candado de texto).
 const fs = require("fs");
-const s = fs.readFileSync(__dirname + "/../index.html", "latin1");
+const s = (fs.readFileSync(__dirname + "/../index.html", "latin1") + "\n" + fs.readFileSync(__dirname + "/../importacion.js", "latin1"));
 const a = s.indexOf("function _impLRuteo"), z = s.indexOf("function _pedImpItemPorClave");
 if (a < 0 || z < 0) { console.error("FALTA _impLRuteo/_pedImpItemPorClave"); process.exit(1); }
 eval(Buffer.from(s.slice(a, z), "latin1").toString("utf8"));

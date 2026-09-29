@@ -12,7 +12,7 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+const html = (fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8") + "\n" + fs.readFileSync(path.join(__dirname, "..", "importacion.js"), "utf8"));
 const ini = html.indexOf("let _NTL_PROVEEDORES");
 const _finCfg = html.indexOf("v23.89 (Luis, 29/09) — LA CONFIG DE IMPORTADOS VIVE EN TABLAS");
 const fin = _finCfg > 0 ? html.lastIndexOf("/*", _finCfg) : html.indexOf("async function openPedidosImportacion");

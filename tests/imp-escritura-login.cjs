@@ -12,7 +12,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+const html = (fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8") + "\n" + fs.readFileSync(path.join(__dirname, "..", "importacion.js"), "utf8"));
 const fallas = [];
 const ok = (c, m) => { if (!c) fallas.push(m); };
 

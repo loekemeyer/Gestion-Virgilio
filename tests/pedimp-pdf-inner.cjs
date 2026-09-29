@@ -1,7 +1,7 @@
 // v24.40 — el PDF del pedido de importación lleva INNER CAJAS (unidades ÷ uni_inner).
 // Corre pedImpPdfProv de verdad (extraída del index) con dependencias mockeadas.
 const fs = require("fs"), path = require("path"), vm = require("vm");
-const src = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+const src = (fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8") + "\n" + fs.readFileSync(path.join(__dirname, "..", "importacion.js"), "utf8"));
 function fn(name) {
   const i = src.indexOf("function " + name + "(");
   if (i < 0) throw new Error("no está " + name);

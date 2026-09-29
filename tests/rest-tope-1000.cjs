@@ -40,7 +40,9 @@ const DEBEN_PAGINAR = [
   "gv_stock_pedidas_neto",
 ];
 
-const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "latin1");
+/* v24.65: los módulos que salieron del index (importacion.js, cobranzas.js) se barren igual. */
+const html = ["index.html", "importacion.js", "cobranzas.js"]
+  .map(function (f) { return fs.readFileSync(path.join(__dirname, "..", f), "latin1"); }).join("\n");
 const fallos = [];
 
 if (!/async function gvRestTodo\(/.test(html)) fallos.push("no existe gvRestTodo()");
