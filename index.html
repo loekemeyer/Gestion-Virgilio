@@ -17168,8 +17168,8 @@ async function ocgFetchImportados() {
   // v10.05 — VOLUMEN de la MASTER caja (m³) por código, editable (tabla Importados_Volumen).
   const volMaster = {};
   try {
-    const vm = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados_Volumen", "select=cod,largo_cm,ancho_cm,alto_cm,m3_master,uni_master");
-    (vm || []).forEach(function (r) { volMaster[String(r.cod).toUpperCase().trim()] = { m3: Number(r.m3_master) || 0, um: Number(r.uni_master) || 0, l: Number(r.largo_cm) || 0, a: Number(r.ancho_cm) || 0, h: Number(r.alto_cm) || 0 }; });
+    const vm = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados_Volumen", "select=cod,largo_cm,ancho_cm,alto_cm,m3_master,uni_master,uni_inner");
+    (vm || []).forEach(function (r) { volMaster[String(r.cod).toUpperCase().trim()] = { m3: Number(r.m3_master) || 0, um: Number(r.uni_master) || 0, ui: Number(r.uni_inner) || 0, l: Number(r.largo_cm) || 0, a: Number(r.ancho_cm) || 0, h: Number(r.alto_cm) || 0 }; });
   } catch (_e) {}
   // Reingreso estimado por artículo importado (columna Importados.reingreso_est).
   // Lo edita el usuario acá; LK lo lee (vista v_lk_reingresos) para mostrar "Reingreso Est
@@ -17218,7 +17218,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
+    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -22255,7 +22255,7 @@ function _pedImpRender() {
   items.forEach(function (it) { const prov = it.prov || "(sin proveedor)"; if (!byProv[prov]) { byProv[prov] = []; provOrder.push(prov); } byProv[prov].push(it); });
   provOrder.sort(function (a, b) { const ia = _IMPORTADOR_DE[a] || "zz", ib = _IMPORTADOR_DE[b] || "zz"; return String(ia).localeCompare(String(ib)) || String(a).localeCompare(String(b)); });
   let h = _impTabsHtml('ped');
-  h += '<div class="stkpop-hint">Pedidos a los proveedores chinos (índice <b>' + (data.meses || 10) + ' meses</b>). El pedido va en <b>master cajas redondas</b> — tocá la celda <b>MC</b> para ajustarlo (poné <b>0</b> para no pedir). <b>Unidades = MC × uni/master</b>. 🧩 = parte. <b>✏️</b> en curso (unidades + fecha estimada de entrega) · <b>📥</b> llegó · <b>🖨</b> PDF por proveedor (Cód · MC · Unidades, sin FOB) para que el chino cotice. <small style="color:#94a3b8">En pantalla angosta la tabla se <b>desliza al costado</b> (la columna Código queda fija).</small></div>';
+  h += '<div class="stkpop-hint">Pedidos a los proveedores chinos (índice <b>' + (data.meses || 10) + ' meses</b>). El pedido va en <b>master cajas redondas</b> — tocá la celda <b>MC</b> para ajustarlo (poné <b>0</b> para no pedir). <b>Unidades = MC × uni/master</b>. 🧩 = parte. <b>✏️</b> en curso (unidades + fecha estimada de entrega) · <b>📥</b> llegó · <b>🖨</b> PDF por proveedor (Cód · MC · Inner · Unidades, sin FOB) para que el chino cotice. <small style="color:#94a3b8">En pantalla angosta la tabla se <b>desliza al costado</b> (la columna Código queda fija).</small></div>';
   // Fecha estimada de ENTREGA global (se muestra en el carrito del portal LK).
   const _entrega = (data.entregaGlobal || "");
   h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px">' +
@@ -22353,7 +22353,7 @@ function _pedImpRender() {
       _pedImpMesesSel(prov, provEnc) +
       // v23.89 (Luis) — los parámetros de ESTE proveedor se editan acá, no en el módulo de OCs
       '<button class="mva-clear" style="background:#0f766e;color:#fff;border-color:#0f766e" onclick="pedImpCfgAbrir(\'' + provEnc + '\')" title="Derechos, comisión NTL, mínimo, MOQ y los códigos de este proveedor">⚙ Configurar</button>' +
-      '<button class="mva-clear" style="background:#1e6bd6;color:#fff;border-color:#1e6bd6" onclick="pedImpPdfProv(\'' + provEnc + '\')" title="PDF del pedido de este proveedor: solo Código, Master Cajas y Unidades (sin FOB)">🖨 PDF pedido</button>' +
+      '<button class="mva-clear" style="background:#1e6bd6;color:#fff;border-color:#1e6bd6" onclick="pedImpPdfProv(\'' + provEnc + '\')" title="PDF del pedido de este proveedor: Código, Master Cajas, Inner Cajas y Unidades (sin FOB)">🖨 PDF pedido</button>' +
       '</div>' +
       '</div>';
     // v22.37 — banda de proyección al mínimo + costo de nacionalización estimado.
@@ -22436,8 +22436,11 @@ function _pedImpRender() {
   try { const _card = body.closest ? body.closest(".stkpop-card") : null; if (_card) _card.style.maxWidth = _anchoMax > 0 ? ('min(' + (_anchoMax + 34) + 'px,98vw)') : ''; } catch (_e) {}
   _renderKeepFocus(body, h);   // v22.09 — el buscador re-renderiza en cada tecla: sin esto se pierde el foco
 }
-/* v10.38 — PDF del pedido de UN proveedor: solo Código · Master Cajas · Unidades (SIN FOB),
-   para mandarle al proveedor chino a cotizar. Respeta el MC editado (0 = no va). */
+/* v10.38 — PDF del pedido de UN proveedor: Código · Master Cajas · Inner Cajas · Unidades (SIN FOB),
+   para mandarle al proveedor chino a cotizar. Respeta el MC editado (0 = no va).
+   v24.40 — suma INNER CAJAS = unidades ÷ uni_inner (Importados_Volumen). Sin uni_inner cargado va "—":
+   no se inventa (medido 29/09: 134 de 155 lo tienen y en los 134 divide exacto a la master). */
+function _pedImpInnerOf(it) { const ui = Number(it && it.uniInner) || 0; if (!(ui > 0)) return null; const u = _pedImpUniOf(it); return u > 0 ? Math.round(u / ui * 100) / 100 : 0; }
 function pedImpPdfProv(provEnc) {
   const prov = decodeURIComponent(provEnc);
   const data = (_stkPop && _stkPop.data) || { items: [] };
@@ -22445,18 +22448,23 @@ function pedImpPdfProv(provEnc) {
     .sort(function (a, b) { return String(codCanon(a.cod)).localeCompare(String(codCanon(b.cod)), undefined, { numeric: true }); });
   if (!arr.length) { try { alert("No hay ítems con pedido (MC > 0) para " + prov + "."); } catch (_e) {} return; }
   const fecha = new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 10);
-  const th = 'border:1px solid #333;padding:7px 10px;background:#eaeaea;text-align:left;font-weight:800';
+  const th = 'border:1px solid #333;padding:7px 10px;background:#eaeaea;text-align:center;font-weight:800';
   const td = 'border:1px solid #333;padding:7px 10px';
   const tdc = td + ';text-align:center;font-weight:700';
+  const fmt = function (n) { return Number(n).toLocaleString("es-AR"); };
+  let faltaInner = 0;
   let filas = arr.map(function (it) {
-    return '<tr><td style="' + td + '"><b>' + escapeHtml(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</b></td><td style="' + tdc + '">' + _pedImpMcOf(it) + '</td><td style="' + tdc + '">' + _pedImpUniOf(it) + '</td></tr>';
+    const inn = _pedImpInnerOf(it); if (inn == null) faltaInner++;
+    return '<tr><td style="' + tdc + '"><b>' + escapeHtml(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</b></td><td style="' + tdc + '">' + fmt(_pedImpMcOf(it)) + '</td><td style="' + tdc + '">' + (inn == null ? '—' : fmt(inn)) + '</td><td style="' + tdc + '">' + fmt(_pedImpUniOf(it)) + '</td></tr>';
   }).join("");
   const totMC = arr.reduce(function (s, it) { return s + _pedImpMcOf(it); }, 0);
+  const totI = arr.reduce(function (s, it) { const v = _pedImpInnerOf(it); return s + (v || 0); }, 0);
   const totU = arr.reduce(function (s, it) { return s + _pedImpUniOf(it); }, 0);
-  filas += '<tr><td style="' + td + ';font-weight:800;background:#f4f4f4">TOTAL</td><td style="' + tdc + ';background:#f4f4f4">' + totMC + '</td><td style="' + tdc + ';background:#f4f4f4">' + totU.toLocaleString("es-AR") + '</td></tr>';
+  filas += '<tr><td style="' + tdc + ';font-weight:800;background:#f4f4f4">TOTAL</td><td style="' + tdc + ';background:#f4f4f4">' + fmt(totMC) + '</td><td style="' + tdc + ';background:#f4f4f4">' + fmt(totI) + (faltaInner ? '*' : '') + '</td><td style="' + tdc + ';background:#f4f4f4">' + fmt(totU) + '</td></tr>';
   const inner = '<div style="text-align:center;font-weight:800;font-size:1.5em;margin-bottom:2px">PEDIDO · ' + escapeHtml(prov) + '</div>' +
     '<div style="text-align:center;color:#555;margin-bottom:12px">Producción Virgilio — ' + fecha + ' — ' + arr.length + ' artículo(s)</div>' +
-    '<table style="width:100%;border-collapse:collapse;font-size:1.05em"><thead><tr><th style="' + th + '">Código</th><th style="' + th + ';text-align:center">Master Cajas</th><th style="' + th + ';text-align:center">Unidades</th></tr></thead><tbody>' + filas + '</tbody></table>';
+    '<table style="margin:0 auto;border-collapse:collapse;font-size:1.05em"><thead><tr><th style="' + th + '">Código</th><th style="' + th + '">Master Cajas</th><th style="' + th + '">Inner Cajas</th><th style="' + th + '">Unidades</th></tr></thead><tbody>' + filas + '</tbody></table>' +
+    (faltaInner ? '<div style="text-align:center;color:#555;font-size:.85em;margin-top:6px">* ' + faltaInner + ' artículo(s) sin unidades por inner cargadas (—): no suman al total de inner.</div>' : '');
   remitoPrintDoc(inner);
 }
 /* v10.02 — Bajar a Excel los Pedidos Importación (lo que se está viendo, respeta "Solo lo que hay
