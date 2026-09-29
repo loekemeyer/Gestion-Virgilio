@@ -3904,45 +3904,40 @@ banda NO los lleve, que los dos chips abran el pop-up y que el contenido siga co
 **Chequeo:** `node tests/imp-hist-pedidos.cjs` · `node tests/pedimp-config-proveedor.cjs` ·
 `select * from public.gv_imp_pedidos_historial(400);`. `sql/gv_imp_pedidos_historial_v2391.sql`.
 
-## ⚠ REGLA (Luis, 2026-09-29, v24.31): el COSTO DE NACIONALIZACIÓN se abre DESDE EL PROVEEDOR, en 📦 Pedidos Importación — y Descripción dejó de comerse el ancho
+## ⚠ REGLA (Luis, 2026-09-29, v24.32): la nacionalización por artículo es de 🚢 EN CURSO — y el proveedor la abre
 
-**Luis, textual:** *"mirá la cantidad de espacio muerto entre «descripción» y «proy u/mes». Arreglalo
-ya. OPTIMIZACIÓN DE ESPACIO"* · *"no veo lo que te pedí en ningún lado. Apretás sobre el proveedor y
-debería expandirse las unidades con lo que te dije"*.
+**Luis, textual:** *"no me estás entendiendo. Es en la pestaña «en curso» que quería lo que te pedí.
+Sacá eso que hiciste en el proveedor pestaña «pedidos» y metelo en «en curso»"* · *"apretás sobre el
+proveedor y debería expandirse las unidades"*.
 
-El bloque de abajo puso el costo por artículo en **🚢 En curso**, que es donde se mira lo que ya
-viaja. **La compra se decide en 📦 Pedidos Importación**, así que ahí tiene que estar: el encabezado
-de cada proveedor (`▸ 🏭 Fujian · ver nacionalización por artículo`) abre **dos columnas más** —
-**🛃 Nac. u$s** (total y por unidad) y **Puesto u$s/u** = FOB por unidad + lo que le toca — con el
-**u$s/m³ editable** y los tres criterios de reparto, y una fila **TOTAL** que tiene que dar
-exactamente el no recuperable del embarque.
+Se había leído *"apretás sobre el proveedor"* como **📦 Pedidos Importación** —el encabezado 🏭 de
+cada chino— y **no es ahí**: el proveedor que Luis toca es **la columna Proveedor de la tabla de
+🚢 En curso**. Ahí ya estaba el detalle, pero se abría **sólo desde el número de PI**.
 
-- Reparto: **`_impNacReparto`**, sin tocarlo. Default **mixto** (cada concepto por SU base: el flete
-  por m³, derechos y tasas por FOB); `por m³` y `por FOB` a un click. **El criterio no toca ninguna
-  tabla**: es cómo se muestra el mismo u$s.
-- El **u$s/m³** es del proveedor (`GV_Imp_Proveedor.valor_m3`, regla v23.89) y se manda **sólo
-  `{proveedor, valor_m3}`** — la RPC deja intacta toda clave ausente (regla v23.95).
-- ⚠ **El orden de `arr` se fija ANTES del reparto**: el reparto va por índice y las filas se dibujan
-  después. Ordenar adentro del loop de filas (como estaba) le daría a cada artículo el costo de otro.
+> **En 🚢 En curso, la celda del PROVEEDOR abre el mismo detalle que el PI** (`impCursoToggle`), con
+> 🛃 Nac. u$s (total y por unidad), Puesto u$s/u, el u$s/m³ editable y los tres criterios de reparto.
 
-### El hueco muerto: Descripción era la ÚNICA columna sin `width`
+**Se RETIRA todo lo que la v24.31 había puesto en 📦 Pedidos Importación**: el encabezado del
+proveedor vuelve a ser texto, la tabla vuelve a 11 columnas y `pedImpNacToggle` / `pedImpNacCrit` /
+`pedImpSetNacM3` / `_pedImpNacBandaHtml` se borraron. **La nacionalización por artículo vive en UN
+solo lugar** — dos módulos haciendo lo mismo es el pozo de Matricería.
+
+### Lo que SÍ queda de la v24.31: el hueco muerto de la tabla de Pedidos
 
 `.mva-tbl.wide` iba a `width:100%` dentro de una tarjeta de **1760 px** y el `<colgroup>` daba ancho
 a **10 de las 11** columnas. Todo el sobrante —**~700 px** en un monitor ancho— caía en Descripción,
-que es exactamente el hueco entre ella y Proy u/mes.
+que es exactamente el hueco entre ella y Proy u/mes que reclamó Luis.
 
 > **La tabla mide lo que suman sus columnas, y la TARJETA se achica a eso.** No al revés.
 
 Medido al 29/09 en 1920 px: tabla **1.242 px** en una tarjeta de **1.274** (antes 1.760), Descripción
-**232 px**. Abierta la nacionalización: 13 columnas, **1.446 px**. El ancho lo pone `_cols` en JS y
-`_anchoMax` fija el `max-width` de la tarjeta después de dibujar.
+**232 px**. El ancho lo pone `_cols` en JS y `_anchoMax` fija el `max-width` de la tarjeta después de
+dibujar. ⚠ La v23.95 decía lo contrario (*"el sobrante se lo lleva Descripción (col sin width)"*):
+**queda retirada**.
 
-⚠ La v23.95 decía lo contrario (*"el sobrante se lo lleva Descripción (col sin width)"*): **queda
-retirada**.
-
-**Chequeo:** `node tests/pedimp-nac-articulo.cjs` — corre la pantalla y mide el ancho real de la
-celda; verificado que **falla** poniendo Descripción en 700 px. Mide además que por m³ dos artículos
-con el mismo m³ pagan igual, que por FOB el de 10× de FOB paga ~10×, y que el u$s/m³ manda 2 claves.
+**Chequeo:** `node tests/pedimp-ancho-tabla.cjs` — mide el ancho REAL de la celda con la pantalla
+corriendo y que no quede ninguna `<col>` sin width; verificado que falla con Descripción en 700 px.
+Y `node tests/imp-nac-articulo-pantalla.cjs`, que ahora abre el detalle **clickeando el proveedor**.
 
 ## ⚠ REGLA (Luis, 2026-09-29, v24.3): el COSTO DE NACIONALIZACIÓN se ve POR ARTÍCULO — y repartir todo por m³ NO es neutro
 

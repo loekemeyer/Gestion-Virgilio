@@ -30562,3 +30562,49 @@ en los cuatro Excel. Lo que falta para escribirlo (el manual, los extractos crud
 conciliación ya cerrada para medir contra ella) queda escrito **en la propia pantalla**, no sólo acá.
 
 **Chequeo:** `select * from public.gv_conc_salud();` · `node tests/cbz-conciliacion.cjs`.
+
+### §3.v2433 — v24.33: el motor de conciliación lee el extracto CRUDO de Credicoop — 2026-09-29
+
+Luis pasó el **Manual N°39**, la **conciliación cerrada al 24/09** (saldo 129.389.443,37) y los
+**extractos crudos** de Credicoop Loeke del 27 y 28/09.
+
+> ## El extracto crudo SÍ trae el CUIT. El Excel de conciliación no: se pierde al copiar a mano.
+
+```
+Credito Inmediato (DEBIN) dist titular 30718101243-VAR-BAZAR MONICA S CAP I SE CBU Origen:3220001805000054570077
+                                       └─ CUIT ──┘     └────── nombre ──────┘     └──────── CBU ────────┘
+```
+
+**Medido sobre los 189 movimientos de los dos extractos:**
+
+| | |
+|---|---:|
+| movimientos clasificados por regla (operación + código del Manual) | **189 de 189** |
+| entradas (cobranzas) | 13 |
+| …con CUIT en el texto | **12** (la 13ª es *Acreditacion Valores Camara*: son cheques de terceros acreditándose, no trae CUIT por diseño) |
+| …CUIT encontrados en el padrón → cliente y código | **12 de 12** |
+
+**Tres objetos nuevos, todos de lectura** (`sql/gv_conc_motor_reglas_v2433.sql`):
+
+- **`GV_Conc_Regla`** — 21 reglas para Credicoop. Cada una: patrón (regex sobre el concepto),
+  lado (crédito/débito), la **operación** y el **código del Manual N°39** que le corresponde, si
+  es cobranza y si hay que sacarle el CUIT. **Agregar una regla es un `insert`, no un deploy.**
+- **`gv_conc_parse(banco, concepto, débito, crédito)`** → jsonb con `operacion`, `det`, `cuit`,
+  `nombre`, `cbu` y `es_cobranza`.
+- **`gv_conc_cliente_por_cuit(cuit)`** → los códigos de ese CUIT en LK y en Chef, con su deuda.
+  ⚠ **Cuando el CUIT tiene código en las dos empresas, desempata la deuda abierta**; si las dos
+  tienen deuda devuelve las dos con `elegido = false` y **lo decide una persona: no se adivina**.
+
+**Lo que el Manual manda y quedó escrito en las reglas:** débito = egreso y crédito = ingreso ·
+arriba de la línea amarilla lo conciliado, abajo lo proyectado (transferencias, cargas sociales y
+sueldos van siempre proyectados) · los gastos en **una sola línea por día**, salvo **SIRCREB**, que
+va aparte · los cheques se cargan uno por uno como **A DEPOSITAR** y pasan a **DEP./CH** al
+acreditarse · *Depósito/Crédito Inmediato*, *Crédito Inmediato (DEBIN)* y *Transf. Inmediata* en la
+columna de Crédito son **depósitos**.
+
+⚠ **Eso explica las 914 filas repetidas** que la v24.32 midió: no son pagos distintos, es **el mismo
+cheque proyectado a su fecha de vencimiento**. Al contarlas como cobranza se resta de más.
+
+**Chequeo:** `select public.gv_conc_parse('credicoop','Credito Inmediato (DEBIN) dist titular
+30718101243-VAR-BAZAR MONICA S CAP I SE CBU Origen:3220001805000054570077',0,472524.71);` ·
+`select * from public.gv_conc_cliente_por_cuit('30718101243');`
