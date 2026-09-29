@@ -6234,7 +6234,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.88"></script>
+<script type="module" src="recepcion.js?v=23.89"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10279,7 +10279,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.88";
+const APP_VERSION = "v23.89";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20969,7 +20969,10 @@ function stkFaltFactExport() {
    desplegable, hace PATCH del proveedor en Importados (todas las marcas de ese código). Este
    maestro alimenta el circuito de OC de importados (v_importados_ordenes, índice = 10 meses en
    Importados_Config). García NO está: reenvasa lo de insumos, no importa. */
-const _PROV_IMP_LISTA = ["Fujian", "Hugo Wong", "Becky", "Kangli", "Ownland", "Zhixin", "Frontier"];
+/* v23.89 (Luis) — FALLBACK, no la fuente: la lista viva es la tabla GV_Imp_Proveedor
+   (vista gv_imp_proveedor_cfg), que hidrata _impCfgCargar(). Queda escrita para que la
+   pantalla siga andando si el fetch falla. */
+let _PROV_IMP_LISTA = ["Fujian", "Hugo Wong", "Becky", "Kangli", "Ownland", "Zhixin", "Frontier"];
 /* v11.17 — Un solo botón "Importación" en el panel: adentro, solapas para cambiar entre
    📦 Pedidos (openPedidosImportacion) y 🏭 Proveedores (stkOpenProvImp). La llamada
    _impTabsHtml('ped') existía desde v10.42 pero la función nunca se definió (popup roto). */
@@ -21077,32 +21080,45 @@ async function provImpSet(codEnc, prov) {
    v_importados_ordenes + lógica de partes). Agrupa por IMPORTADOR (Chef / Tierra Nativa) →
    proveedor chino. Muestra proy, objetivo, stock, en curso y lo a pedir (unidades y cajas).
    Solo lectura por ahora (la emisión/curso se afina aparte). */
-const _IMPORTADOR_DE = { "Ownland": "Chef", "Kangli": "Chef", "Fujian": "Chef", "Frontier": "Chef",
-                         "Becky": "Tierra Nativa", "Hugo Wong": "Tierra Nativa", "Zhixin": "Tierra Nativa" };
+let _IMPORTADOR_DE = { "Ownland": "Chef", "Kangli": "Chef", "Fujian": "Chef", "Frontier": "Chef",
+                       "Becky": "Tierra Nativa", "Hugo Wong": "Tierra Nativa", "Zhixin": "Tierra Nativa" };
 /* v22.37 — Proveedores que NO nos facturan directo: le facturan a NTL y NTL nos factura a
    nosotros. Por ese servicio NTL cobra un 5% (la línea "NTL" del Excel de nacionalización,
    0,05×FOB). Ownland, Becky y Hugo Wong NO usan ese servicio → no llevan el 5%. */
-const _NTL_PROVEEDORES = { "Frontier": true, "Fujian": true, "Kangli": true, "Zhixin": true };
+let _NTL_PROVEEDORES = { "Frontier": true, "Fujian": true, "Kangli": true, "Zhixin": true };
 function _esProvNtl(prov) { return !!_NTL_PROVEEDORES[String(prov || "").trim()]; }
-// v23.79 (Luis): estadística por tramo de FOB — hasta 6.000 paga 3%; de 6.001 a 10.000, u$s 180 fijos;
-// más de 10.000, 3% sin tope. Base del 3%: el CIF (como el resto de los tributos).
+/* v23.89 (Luis) — las TASAS también salen de la base (Importados_Config → gv_imp_nac_config).
+   Esto es el FALLBACK con los números de la v23.79/80/81: si el fetch falla la cuenta no cambia,
+   pero la fuente es la tabla y se edita desde el ⚙ del proveedor (pestaña Generales). */
+let _NAC_TASAS = { estad_pct: 0.03, estad_fob_desde: 6000, estad_fob_hasta: 10000, estad_fijo: 180,
+                   iva_pct: 0.21, iva_adic_pct: 0.20, gcias_pct: 0.06, iibb_pct: 0.0017,
+                   derechos_pct: 0.18, ntl_pct: 0.05, valor_m3: 110, flete_full: 2000,
+                   min_usd: 25000, meses_objetivo: 10 };
+function _nacPct(n) { return (Math.round(_nacNum(n, 0) * 10000) / 100).toLocaleString("es-AR"); }
+// v23.79 (Luis): estadística por tramo de FOB — hasta el piso paga su %; en el tramo del medio,
+// un fijo en u$s; arriba del techo, el % sin tope. Base del %: el CIF (como el resto).
 function _nacEstad(fob, cif) {
-  if (fob > 6000 && fob <= 10000) return { v: 180, lbl: "Estadística (FOB 6.001–10.000: fijo 180)", txt: "FOB " + _nacF(fob) + " entre 6.001 y 10.000 → u$s 180 fijos" };
-  return { v: 0.03 * cif, lbl: "Estadística (3% CIF)", txt: "3% × CIF " + _nacF(cif) + " (FOB " + _nacF(fob) + (fob > 10000 ? " > 10.000: sin tope)" : " ≤ 6.000)") };
+  const T = _NAC_TASAS;
+  if (fob > T.estad_fob_desde && fob <= T.estad_fob_hasta)
+    return { v: T.estad_fijo, lbl: "Estadística (FOB " + _nacF(T.estad_fob_desde + 1) + "–" + _nacF(T.estad_fob_hasta) + ": fijo " + _nacF(T.estad_fijo) + ")", txt: "FOB " + _nacF(fob) + " entre " + _nacF(T.estad_fob_desde + 1) + " y " + _nacF(T.estad_fob_hasta) + " → u$s " + _nacF(T.estad_fijo) + " fijos" };
+  return { v: T.estad_pct * cif, lbl: "Estadística (" + _nacPct(T.estad_pct) + "% CIF)", txt: _nacPct(T.estad_pct) + "% × CIF " + _nacF(cif) + " (FOB " + _nacF(fob) + (fob > T.estad_fob_hasta ? " > " + _nacF(T.estad_fob_hasta) + ": sin tope)" : " ≤ " + _nacF(T.estad_fob_desde) + ")") };
 }
 // v23.80 (Luis): lo RECUPERABLE, separado. Base imponible = CIF + derechos + estadística (la de aduana).
 // Tasas generales: IVA 21%, IVA adicional 20%, Ganancias 6%, IIBB 0,17% (v23.81, Luis). Se pagan al despachar y
 // vuelven como crédito fiscal: NO van al costo del artículo, pero sí hay que tener la plata.
 function _nacRecup(cif, derechos, estad) {
+  var T = _NAC_TASAS;
   var base = cif + derechos + estad;
   var bt = "base " + _nacF(base) + " (CIF + derechos + estadística)";
-  var d = [["IVA (21%)", 0.21 * base, "21% × " + bt], ["IVA adicional (20%)", 0.20 * base, "20% × base"],
-    ["Ganancias (6%)", 0.06 * base, "6% × base"], ["Ingresos Brutos (0,17%)", 0.0017 * base, "0,17% × base"]];
+  var d = [["IVA (" + _nacPct(T.iva_pct) + "%)", T.iva_pct * base, _nacPct(T.iva_pct) + "% × " + bt],
+    ["IVA adicional (" + _nacPct(T.iva_adic_pct) + "%)", T.iva_adic_pct * base, _nacPct(T.iva_adic_pct) + "% × base"],
+    ["Ganancias (" + _nacPct(T.gcias_pct) + "%)", T.gcias_pct * base, _nacPct(T.gcias_pct) + "% × base"],
+    ["Ingresos Brutos (" + _nacPct(T.iibb_pct) + "%)", T.iibb_pct * base, _nacPct(T.iibb_pct) + "% × base"]];
   return { base: base, total: d.reduce(function (s, x) { return s + x[1]; }, 0), detalle: d };
 }
 // v23.78 (Luis): derechos 35% del CIF sólo para Fujian; el resto 18% de base.
-const _DERECHOS_PROV = { "Fujian": 0.35 };
-function _derechosProv(prov) { var t = _DERECHOS_PROV[String(prov || "").trim()]; return t != null ? t : 0.18; }
+let _DERECHOS_PROV = { "Fujian": 0.35 };
+function _derechosProv(prov) { var t = _DERECHOS_PROV[String(prov || "").trim()]; return t != null ? t : _NAC_TASAS.derechos_pct; }
 /* v22.37 — mínimo por proveedor para poder emitir un pedido de importación (config editable
    Stock_Config['impo_pedido_min_usd']; default 25.000 USD FOB). */
 const _IMPO_MIN_USD_DEFAULT = 25000;
@@ -21298,11 +21314,243 @@ function _pedImpBandaHtml(proy, nac, minUsd, totUsd, ext) {
   else der = chip("#eef2ff", "#c7d2fe", "#3730a3", '🚢 <span style="font-size:17px"><b>Puesto en Arg: ' + _usd0(nac.landed) + '</b></span> <span style="color:#4338ca">(' + modoTxt + ')</span><br>FOB ' + _usd0(totUsd) + ' + <b style="color:#b91c1c">' + _usd0(nac.noRecup) + ' no recuperable (+' + Math.round(nac.factor * 100) + '%)</b>' + (nac.ntl > 0 ? ' · incl. comisión NTL ' + _usd0(nac.ntl) : '') + (nac.recup > 0 ? '<br><b style="color:#047857">+ ' + _usd0(nac.recup) + ' recuperable</b> <span style="color:#047857">(IVA y percepciones: vuelven como crédito)</span>' : ''), _pedImpDesgDer(nac, totUsd, ext.m3), "der");
   return '<div style="display:flex;gap:10px;flex-wrap:wrap;padding:10px 13px;background:#fff;border-bottom:1px solid #f1f5f9">' + izq + der + '</div>';
 }
+/* ══ v23.89 (Luis, 29/09) — LA CONFIG DE IMPORTADOS VIVE EN TABLAS ═══════════════════
+   "Fijate que no vivan en el front los datos, sino que modifiquen las tablas pertinentes".
+   Hasta la v23.87 el importador de cada proveedor, quién factura por NTL, el % de derechos,
+   las tasas de nacionalización y el mínimo estaban ESCRITOS ACÁ, y los meses objetivo eran
+   uno solo para todos (se editaban en OCs → ⚙ Configuraciones, que es otro módulo). Ahora:
+     GV_Imp_Proveedor  (vista gv_imp_proveedor_cfg) → uno por proveedor, con lo que pisa
+     Importados_Config (vista gv_imp_nac_config)    → los generales
+   Los objetos de arriba (_PROV_IMP_LISTA, _IMPORTADOR_DE, _NTL_PROVEEDORES, _DERECHOS_PROV
+   y _NAC_TASAS) quedan de FALLBACK: si el fetch falla la pantalla calcula igual que siempre.
+   ⚠ Al agregar un parámetro nuevo de importados: va a la tabla y se hidrata acá. No se
+   vuelve a escribir un número en este archivo. */
+let _impCfgProv = {};          // proveedor → fila de gv_imp_proveedor_cfg
+async function _impCfgCargar() {
+  try {
+    const res = await Promise.all([
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_imp_proveedor_cfg", "select=*&order=orden.asc,proveedor.asc").catch(function () { return []; }),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_imp_nac_config", "select=*").catch(function () { return []; })
+    ]);
+    const pr = res[0], nac = res[1];
+    if (nac && nac[0]) { Object.keys(_NAC_TASAS).forEach(function (k) { if (nac[0][k] != null) _NAC_TASAS[k] = Number(nac[0][k]); }); }
+    if (pr && pr.length) {
+      // se hidratan los cuatro cachés; lo que la tabla no diga NO se inventa
+      const lista = [], impDe = {}, ntl = {}, der = {};
+      _impCfgProv = {};
+      pr.forEach(function (r) {
+        const nom = String(r.proveedor || "").trim(); if (!nom) return;
+        _impCfgProv[nom] = r;
+        if (r.activo !== false) lista.push(nom);
+        if (r.importador) impDe[nom] = r.importador;
+        if (r.usa_ntl) ntl[nom] = true;
+        if (r.derechos_pct_propio != null) der[nom] = Number(r.derechos_pct_propio);
+      });
+      _PROV_IMP_LISTA = lista; _IMPORTADOR_DE = impDe; _NTL_PROVEEDORES = ntl; _DERECHOS_PROV = der;
+    }
+  } catch (_e) {}
+}
+/* Un número de ESTE proveedor, con el general de fallback (la vista ya resolvió el coalesce). */
+function _impProvNum(prov, campo, fb) {
+  const r = _impCfgProv[String(prov || "").trim()];
+  const v = r ? Number(r[campo]) : NaN;
+  return isFinite(v) ? v : _nacNum(fb, 0);
+}
+
+/* ── El pop-up ⚙ Configurar parámetros, al lado del nombre del proveedor ────────────── */
+let _impCfgPop = null;
+async function pedImpCfgAbrir(provEnc) {
+  const prov = decodeURIComponent(provEnc || ""); if (!prov) return;
+  _impCfgPop = { prov: prov, tab: "params", q: "", arts: null, guardando: false, msg: "" };
+  _impCfgRender();
+  // los artículos se traen una vez y se reusan entre pestañas
+  try {
+    const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+    const rows = await fetch(SUPABASE_URL + "/rest/v1/vista_prov_importacion?select=cod,descripcion,marca,proveedor&order=cod&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
+    if (_impCfgPop) { _impCfgPop.arts = rows || []; _impCfgRender(); }
+  } catch (_e) { if (_impCfgPop) { _impCfgPop.arts = []; _impCfgRender(); } }
+}
+function pedImpCfgCerrar() { _impCfgPop = null; const o = document.getElementById("impCfgOv"); if (o) o.remove(); }
+function pedImpCfgTab(t) { if (!_impCfgPop) return; _impCfgPop.tab = t; _impCfgPop.msg = ""; _impCfgRender(); }
+function pedImpCfgBuscar(v) { if (!_impCfgPop) return; _impCfgPop.q = v || ""; _impCfgRender(); }
+function _impCfgPctTxt(v) { return v == null || v === "" ? "" : String(Math.round(Number(v) * 10000) / 100).replace(".", ","); }
+function _impCfgNum(id) { const e = document.getElementById(id); return e ? String(e.value || "").trim().replace(",", ".") : ""; }
+
+function _impCfgRender() {
+  let ov = document.getElementById("impCfgOv");
+  if (!_impCfgPop) { if (ov) ov.remove(); return; }
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "impCfgOv";
+    ov.setAttribute("style", "position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99999;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto");
+    ov.addEventListener("click", function (ev) { if (ev.target === ov) pedImpCfgCerrar(); });
+    document.body.appendChild(ov);
+  }
+  const P = _impCfgPop, prov = P.prov, r = _impCfgProv[prov] || {};
+  const g = _NAC_TASAS, esc = escapeHtml;
+  const tabB = function (id, txt) { return '<button onclick="pedImpCfgTab(\'' + id + '\')" style="padding:6px 12px;border-radius:999px;border:1px solid ' + (P.tab === id ? '#0f766e' : '#cbd5e1') + ';background:' + (P.tab === id ? '#0f766e' : '#fff') + ';color:' + (P.tab === id ? '#fff' : '#334155') + ';font-weight:800;font-size:12.5px;cursor:pointer">' + txt + '</button>'; };
+  const campo = function (id, lbl, val, ph, hint) {
+    return '<div style="display:flex;flex-direction:column;gap:3px;min-width:0">' +
+      '<label style="font-size:11px;font-weight:800;color:#475569">' + lbl + '</label>' +
+      '<input id="' + id + '" value="' + esc(val == null ? "" : String(val)) + '" placeholder="' + esc(ph) + '" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%">' +
+      (hint ? '<span style="font-size:10.5px;color:#94a3b8">' + hint + '</span>' : '') + '</div>';
+  };
+  let h = '<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#0f766e;color:#fff">' +
+    '<div style="font-size:16px;font-weight:800">⚙ Configurar — ' + esc(prov) + '</div>' +
+    '<button onclick="pedImpCfgCerrar()" style="background:#fff;color:#0f766e;border:0;border-radius:8px;padding:5px 12px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
+    '<div style="padding:14px 16px">' +
+    '<div style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap">' + tabB("params", "Parámetros") + tabB("cods", "Códigos") + tabB("gral", "Generales") + '</div>';
+
+  if (P.msg) h += '<div style="margin-bottom:10px;padding:7px 10px;border-radius:8px;font-size:12.5px;font-weight:700;background:' + (P.msg[0] === "!" ? "#fef2f2" : "#f0fdf4") + ';color:' + (P.msg[0] === "!" ? "#b91c1c" : "#166534") + '">' + esc(P.msg.replace(/^!/, "")) + '</div>';
+
+  if (P.tab === "params") {
+    h += '<div style="font-size:12px;color:#64748b;margin-bottom:10px">Lo que se deje <b>vacío</b> usa el valor general (el que aparece en gris). Los porcentajes van en <b>porcentaje</b>: 35 = 35%.</div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">';
+    h += '<div style="display:flex;flex-direction:column;gap:3px"><label style="font-size:11px;font-weight:800;color:#475569">Importador</label>' +
+      '<input id="impCfgImportador" value="' + esc(r.importador || "") + '" placeholder="Chef / Tierra Nativa" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></div>';
+    h += '<div style="display:flex;flex-direction:column;gap:3px"><label style="font-size:11px;font-weight:800;color:#475569">Factura vía NTL</label>' +
+      '<label style="display:flex;align-items:center;gap:7px;font-size:13px;padding:6px 0"><input type="checkbox" id="impCfgNtl"' + (r.usa_ntl ? ' checked' : '') + '> le factura a NTL (comisión)</label></div>';
+    h += campo("impCfgNtlPct", "Comisión NTL (%)", _impCfgPctTxt(r.ntl_pct_propio), _impCfgPctTxt(g.ntl_pct), "sobre el FOB · general " + _nacPct(g.ntl_pct) + "%");
+    h += campo("impCfgDer", "Derechos (%)", _impCfgPctTxt(r.derechos_pct_propio), _impCfgPctTxt(g.derechos_pct), "sobre el CIF · general " + _nacPct(g.derechos_pct) + "%");
+    h += campo("impCfgMeses", "Meses objetivo", r.meses_objetivo_propio == null ? "" : String(r.meses_objetivo_propio), String(g.meses_objetivo), "cuántos meses de venta se piden · general " + g.meses_objetivo);
+    h += campo("impCfgMin", "Mínimo del pedido (u$s)", r.min_usd_propio == null ? "" : String(r.min_usd_propio), String(g.min_usd), "general " + _nacF(g.min_usd));
+    h += campo("impCfgM3", "Valor del m³ de flete (u$s)", r.valor_m3_propio == null ? "" : String(r.valor_m3_propio), String(g.valor_m3), "general " + _nacF(g.valor_m3));
+    h += '</div>';
+    h += '<div style="margin-top:12px"><label style="font-size:11px;font-weight:800;color:#475569">Nota</label>' +
+      '<input id="impCfgNotas" value="' + esc(r.notas || "") + '" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%"></div>';
+    h += '<div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">' +
+      '<button onclick="pedImpCfgGuardar()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:8px 16px;font-weight:800;font-size:13px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar") + '</button>' +
+      (r.actualizado ? '<span style="font-size:11px;color:#94a3b8">último cambio ' + esc(String(r.actualizado).slice(0, 16).replace("T", " ")) + (r.actualizado_por ? " · " + esc(r.actualizado_por) : "") + '</span>' : '') +
+      '</div>';
+  } else if (P.tab === "cods") {
+    const arts = P.arts;
+    if (arts == null) h += '<div style="padding:16px;color:#64748b">Cargando códigos…</div>';
+    else {
+      const mios = arts.filter(function (a) { return String(a.proveedor || "").trim() === prov; });
+      const q = String(P.q || "").trim().toUpperCase();
+      const otros = q ? arts.filter(function (a) { return String(a.proveedor || "").trim() !== prov && stkMatchBusq(q, a.cod, a.descripcion, false); }).slice(0, 40) : [];
+      h += '<div style="font-size:12px;color:#64748b;margin-bottom:9px">Se guarda en el maestro <code>Importados</code> (el mismo que usa 🏭 Proveedores). Sacar un código <b>no lo borra</b>: queda sin proveedor.</div>';
+      h += '<div style="font-size:12.5px;font-weight:800;color:#0f172a;margin-bottom:6px">' + mios.length + ' código(s) de ' + esc(prov) + '</div>';
+      h += '<div style="max-height:210px;overflow:auto;border:1px solid #e2e8f0;border-radius:9px;margin-bottom:12px">';
+      h += mios.length ? mios.map(function (a) {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border-bottom:1px solid #f1f5f9">' +
+          '<b style="font-size:12.5px;min-width:64px">' + esc(String(a.cod)) + '</b>' +
+          '<span style="font-size:11.5px;color:#64748b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
+          '<button onclick="pedImpCfgCodigo(\'' + encodeURIComponent(String(a.cod)) + '\',\'\')" title="Sacarlo de ' + esc(prov) + '" style="background:#fee2e2;color:#b91c1c;border:0;border-radius:7px;padding:3px 9px;font-weight:800;font-size:12px;cursor:pointer">✕</button></div>';
+      }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:12.5px">Todavía no tiene códigos.</div>';
+      h += '</div>';
+      h += '<div style="font-size:12.5px;font-weight:800;color:#0f172a;margin-bottom:6px">Agregar un código</div>';
+      h += '<input id="impCfgQ" value="' + esc(P.q || "") + '" oninput="pedImpCfgBuscar(this.value)" placeholder="Buscar código o descripción…" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%;margin-bottom:8px">';
+      h += '<div style="max-height:190px;overflow:auto;border:1px solid #e2e8f0;border-radius:9px">';
+      h += !q ? '<div style="padding:12px;color:#94a3b8;font-size:12.5px">Escribí un código o una descripción.</div>'
+        : (otros.length ? otros.map(function (a) {
+          const act = String(a.proveedor || "").trim();
+          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border-bottom:1px solid #f1f5f9">' +
+            '<b style="font-size:12.5px;min-width:64px">' + esc(String(a.cod)) + '</b>' +
+            '<span style="font-size:11.5px;color:#64748b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
+            (act ? '<span style="font-size:10.5px;font-weight:800;color:#b45309;background:#fffbeb;border-radius:999px;padding:1px 7px" title="Hoy es de ' + esc(act) + ': al agregarlo se lo saca de ahí">' + esc(act) + '</span>' : '') +
+            '<button onclick="pedImpCfgCodigo(\'' + encodeURIComponent(String(a.cod)) + '\',\'' + encodeURIComponent(prov) + '\')" style="background:#dcfce7;color:#166534;border:0;border-radius:7px;padding:3px 9px;font-weight:800;font-size:12px;cursor:pointer">+</button></div>';
+        }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:12.5px">Sin resultados.</div>');
+      h += '</div>';
+    }
+  } else {
+    h += '<div style="font-size:12px;color:#64748b;margin-bottom:10px">Valen para <b>todos</b> los proveedores que no tengan el suyo propio. Los porcentajes en <b>porcentaje</b>: 21 = 21%.</div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">';
+    h += campo("impCfgGMeses", "Meses objetivo", String(g.meses_objetivo), "", "cuántos meses de venta se piden");
+    h += campo("impCfgGDer", "Derechos (%)", _impCfgPctTxt(g.derechos_pct), "", "sobre el CIF");
+    h += campo("impCfgGNtl", "Comisión NTL (%)", _impCfgPctTxt(g.ntl_pct), "", "sobre el FOB");
+    h += campo("impCfgGIva", "IVA (%)", _impCfgPctTxt(g.iva_pct), "", "recuperable");
+    h += campo("impCfgGIvaA", "IVA adicional (%)", _impCfgPctTxt(g.iva_adic_pct), "", "recuperable");
+    h += campo("impCfgGGcias", "Ganancias (%)", _impCfgPctTxt(g.gcias_pct), "", "recuperable");
+    h += campo("impCfgGIibb", "Ingresos Brutos (%)", _impCfgPctTxt(g.iibb_pct), "", "recuperable");
+    h += campo("impCfgGEstad", "Estadística (%)", _impCfgPctTxt(g.estad_pct), "", "sobre el CIF");
+    h += campo("impCfgGEstD", "Estadística: FOB desde", String(g.estad_fob_desde), "", "hasta acá, el %");
+    h += campo("impCfgGEstH", "Estadística: FOB hasta", String(g.estad_fob_hasta), "", "en el tramo, el fijo");
+    h += campo("impCfgGEstF", "Estadística: fijo (u$s)", String(g.estad_fijo), "", "en el tramo del medio");
+    h += campo("impCfgGM3", "Valor del m³ (u$s)", String(g.valor_m3), "", "flete consolidado");
+    h += campo("impCfgGFull", "Flete contenedor (u$s)", String(g.flete_full), "", "contenedor propio");
+    h += campo("impCfgGMin", "Mínimo del pedido (u$s)", String(g.min_usd), "", "para poder emitir");
+    h += '</div>';
+    h += '<div style="margin-top:14px"><button onclick="pedImpCfgGuardarGral()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:8px 16px;font-weight:800;font-size:13px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar generales") + '</button></div>';
+  }
+  h += '</div></div>';
+  ov.innerHTML = h;
+  if (P.tab === "cods") { const qi = document.getElementById("impCfgQ"); if (qi && P.q) { qi.focus(); try { qi.setSelectionRange(qi.value.length, qi.value.length); } catch (_e) {} } }
+}
+/* Los % se muestran en PORCENTAJE y se guardan en TANTO POR UNO (la RPC rechaza > 1). */
+function _impCfgPctVal(id) { const v = _impCfgNum(id); return v === "" ? null : (Number(v) / 100); }
+async function _impCfgRpc(fn, cuerpo) {
+  const h = await _scfgAuth();
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST", headers: Object.assign({}, h, { "Content-Type": "application/json" }), body: JSON.stringify(cuerpo) });
+  if (!r.ok) {
+    let t = ""; try { t = await r.text(); } catch (_e) {}
+    let m = t; try { m = JSON.parse(t).message || t; } catch (_e2) {}
+    throw new Error(m || ("HTTP " + r.status));
+  }
+  return r.json().catch(function () { return null; });
+}
+async function pedImpCfgGuardar() {
+  if (!_impCfgPop || _impCfgPop.guardando) return;
+  const prov = _impCfgPop.prov;
+  const nEl = document.getElementById("impCfgNotas"), iEl = document.getElementById("impCfgImportador"), cEl = document.getElementById("impCfgNtl");
+  const p = { proveedor: prov,
+    importador: iEl ? iEl.value : null,
+    usa_ntl: cEl ? !!cEl.checked : false,
+    ntl_pct: _impCfgPctVal("impCfgNtlPct"),
+    derechos_pct: _impCfgPctVal("impCfgDer"),
+    meses_objetivo: _impCfgNum("impCfgMeses") === "" ? null : Number(_impCfgNum("impCfgMeses")),
+    min_usd: _impCfgNum("impCfgMin") === "" ? null : Number(_impCfgNum("impCfgMin")),
+    valor_m3: _impCfgNum("impCfgM3") === "" ? null : Number(_impCfgNum("impCfgM3")),
+    notas: nEl ? nEl.value : null };
+  _impCfgPop.guardando = true; _impCfgPop.msg = ""; _impCfgRender();
+  try {
+    await _impCfgRpc("gv_imp_proveedor_guardar", { p: p });
+    await _impCfgCargar();
+    _impCfgPop.msg = "Guardado.";
+    if (_stkPop && _stkPop.kind === "pedImp") _pedImpRender();
+  } catch (e) { _impCfgPop.msg = "!No se pudo guardar: " + (e.message || e); }
+  _impCfgPop.guardando = false; _impCfgRender();
+}
+async function pedImpCfgGuardarGral() {
+  if (!_impCfgPop || _impCfgPop.guardando) return;
+  const p = { meses_objetivo: Number(_impCfgNum("impCfgGMeses")),
+    derechos_pct: _impCfgPctVal("impCfgGDer"), ntl_pct: _impCfgPctVal("impCfgGNtl"),
+    iva_pct: _impCfgPctVal("impCfgGIva"), iva_adic_pct: _impCfgPctVal("impCfgGIvaA"),
+    gcias_pct: _impCfgPctVal("impCfgGGcias"), iibb_pct: _impCfgPctVal("impCfgGIibb"),
+    estad_pct: _impCfgPctVal("impCfgGEstad"),
+    estad_fob_desde: Number(_impCfgNum("impCfgGEstD")), estad_fob_hasta: Number(_impCfgNum("impCfgGEstH")),
+    estad_fijo: Number(_impCfgNum("impCfgGEstF")), valor_m3: Number(_impCfgNum("impCfgGM3")),
+    flete_full: Number(_impCfgNum("impCfgGFull")), min_usd: Number(_impCfgNum("impCfgGMin")) };
+  _impCfgPop.guardando = true; _impCfgPop.msg = ""; _impCfgRender();
+  try {
+    await _impCfgRpc("gv_imp_nac_config_guardar", { p: p });
+    await _impCfgCargar();
+    _impCfgPop.msg = "Guardado.";
+    if (_stkPop && _stkPop.kind === "pedImp") _pedImpRender();
+  } catch (e) { _impCfgPop.msg = "!No se pudo guardar: " + (e.message || e); }
+  _impCfgPop.guardando = false; _impCfgRender();
+}
+async function pedImpCfgCodigo(codEnc, provEnc) {
+  if (!_impCfgPop) return;
+  const cod = decodeURIComponent(codEnc || ""), prov = decodeURIComponent(provEnc || "");
+  const a = (_impCfgPop.arts || []).find(function (x) { return String(x.cod) === cod; });
+  const prev = a ? a.proveedor : null;
+  if (a) a.proveedor = prov || null;      // optimista
+  _impCfgPop.msg = ""; _impCfgRender();
+  try {
+    await _impCfgRpc("gv_imp_codigo_proveedor", { p_cod: cod, p_proveedor: prov || null });
+    await _impCfgCargar();
+    _impCfgPop.msg = prov ? (cod + " ahora es de " + prov + ".") : (cod + " quedó sin proveedor.");
+  } catch (e) { if (a) a.proveedor = prev; _impCfgPop.msg = "!No se pudo guardar: " + (e.message || e); }
+  _impCfgRender();
+}
 async function openPedidosImportacion() {
   _stkPopShell("📦 Pedidos Importación", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = '<div class="stkpop-empty">Calculando pedidos de importación…</div>';
   let data = { items: [], meses: 10 };
+  // v23.89 — la config de importados (por proveedor y general) sale de la BASE, no del front
+  await _impCfgCargar();
   try { data = await ocgFetchImportados(); } catch (_e) {}
   // Fecha estimada de entrega global (Stock_Config) — la muestra el carrito de LK.
   // v22.37 — y en la misma tirada: el mínimo por proveedor (25k default) y los parámetros
@@ -21809,16 +22057,23 @@ function _pedImpRender() {
     const _fobHoyN = arr.reduce(function (s, it) { return s + (it.aPedirUni > 0 && it.fobUni > 0 ? it.aPedirUni * it.fobUni : 0); }, 0);
     const _burnN = arr.reduce(function (s, it) { return s + (it.proyUni > 0 && it.fobUni > 0 ? it.proyUni * it.fobUni : 0); }, 0);
     const _techoN = arr.reduce(function (s, it) { return s + (it.objetivoUni > 0 && it.fobUni > 0 ? it.objetivoUni * it.fobUni : 0); }, 0);
-    const _proy = _pedImpProy25k(_fobHoyN, _burnN, _techoN, _minUsd);
+    // v23.89 — el mínimo y el valor del m³ pueden ser propios de este proveedor (GV_Imp_Proveedor)
+    const _minUsdP = _impProvNum(prov, "min_usd", _minUsd);
+    const _valorM3P = _impProvNum(prov, "valor_m3", _nac.valorM3);
+    const _proy = _pedImpProy25k(_fobHoyN, _burnN, _techoN, _minUsdP);
     // costo de nacionalización SOBRE EL PEDIDO ACTUAL (respeta el MC editado)
-    const _nacR = _pedImpNacionalizar(totUsd, totM3, { modo: _nac.modo, valorM3: _nac.valorM3, tn: _nac.tn, ntl: _isNtl, derechos: _derechosProv(prov) });
+    const _nacR = _pedImpNacionalizar(totUsd, totM3, { modo: _nac.modo, valorM3: _valorM3P, tn: _nac.tn, ntl: _isNtl, derechos: _derechosProv(prov) });
     h += '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0">' +
       '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div></div>' +
-      '<button class="mva-clear" style="background:#1e6bd6;color:#fff;border-color:#1e6bd6;flex:0 0 auto" onclick="pedImpPdfProv(\'' + provEnc + '\')" title="PDF del pedido de este proveedor: solo Código, Master Cajas y Unidades (sin FOB)">🖨 PDF pedido</button>' +
+      '<div style="display:flex;gap:7px;flex:0 0 auto;flex-wrap:wrap">' +
+      // v23.89 (Luis) — los parámetros de ESTE proveedor se editan acá, no en el módulo de OCs
+      '<button class="mva-clear" style="background:#0f766e;color:#fff;border-color:#0f766e" onclick="pedImpCfgAbrir(\'' + provEnc + '\')" title="Meses objetivo, derechos, comisión NTL, mínimo y los códigos de este proveedor">⚙ Configurar parámetros</button>' +
+      '<button class="mva-clear" style="background:#1e6bd6;color:#fff;border-color:#1e6bd6" onclick="pedImpPdfProv(\'' + provEnc + '\')" title="PDF del pedido de este proveedor: solo Código, Master Cajas y Unidades (sin FOB)">🖨 PDF pedido</button>' +
+      '</div>' +
       '</div>';
     // v22.37 — banda de proyección al mínimo + costo de nacionalización estimado.
-    h += _pedImpBandaHtml(_proy, _nacR, _minUsd, totUsd, { prov: prov, items: arr, m3: totM3 });
+    h += _pedImpBandaHtml(_proy, _nacR, _minUsdP, totUsd, { prov: prov, items: arr, m3: totM3 });
     // v11.70 — anchos explícitos por <colgroup> (suman los 1180px del min-width): sin esto
     // las 14 columnas se pisaban entre sí. Bloque diagnóstico (proy→a pedir) | bloque pedido (MC→m³).
     h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide">' +

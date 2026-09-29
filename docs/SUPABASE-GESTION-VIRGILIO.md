@@ -30182,3 +30182,76 @@ arreglo es no contar en `togCnt` los eventos que traen `ts_inicio`. No se aplic�
 decidir.
 
 **Chequeo:** `node tests/rv-cuadro-entero.cjs` (bandas, orden y ancho, medidos en el render).
+
+---
+
+## §3.v2389 — v23.89: la config de IMPORTADOS pasa a TABLAS, y los meses objetivo son POR PROVEEDOR — 2026-09-29
+
+**Pedido de Luis:** un botón «⚙ Configurar parámetros» al lado de cada proveedor de importación,
+que edite sus valores y sus códigos, *"y que no vivan en el front los datos, sino que modifiquen
+las tablas pertinentes"*.
+
+### Objetos nuevos
+
+| objeto | qué es |
+|---|---|
+| `GV_Imp_Proveedor` | tabla, PK `proveedor`. `importador`, `usa_ntl`, `ntl_pct`, `derechos_pct`, `meses_objetivo`, `min_usd`, `valor_m3`, `activo`, `orden`, `notas`. **Todo lo numérico es nullable = heredado del general.** RLS con `select` abierto; INSERT/UPDATE/DELETE revocados a `anon` y `authenticated` |
+| `gv_imp_proveedor_cfg` | vista (`security_invoker`): el valor **efectivo** (coalesce prov → general → default) más el crudo (`*_propio`) y el conteo de códigos |
+| `gv_imp_nac_config` | vista (`security_invoker`): los generales de `Importados_Config`, una fila |
+| `gv_imp_proveedor_guardar(jsonb)` | RPC, SECURITY DEFINER + guard de supervisor. Clave ausente = no se toca; clave en null = vuelve a heredado. Rechaza un % > 1 |
+| `gv_imp_nac_config_guardar(jsonb)` | RPC, los generales. Valida el tramo de estadística (desde ≤ hasta) |
+| `gv_imp_codigo_proveedor(text,text)` | RPC: agrega o saca un código **desde el lado del proveedor**. Escribe `Importados.proveedor` de todas las filas (marcas) de ese `cod_art`; `null` = sin proveedor, **no borra el artículo** |
+
+### Columnas nuevas en `Importados_Config` (id = 1)
+
+`derechos_pct` 0,18 · `ntl_pct` 0,05 · `iva_pct` 0,21 · `iva_adic_pct` 0,20 · `gcias_pct` 0,06 ·
+`iibb_pct` 0,0017 · `estad_pct` 0,03 · `estad_fob_desde` 6000 · `estad_fob_hasta` 10000 ·
+`estad_fijo` 180 · `valor_m3` 110 · `flete_full` 2000 · `min_usd` 25000.
+
+**Son exactamente los números que estaban escritos en `index.html`** (v23.78 a v23.81), así que la
+cuenta de nacionalización no se mueve ni un centavo. Nullable, sin default que reescriba.
+
+### `gv_importados_ordenes` y `v_importados_ordenes`
+
+El `meses_objetivo` era `(select meses_objetivo from Importados_Config)` — **uno para todos**.
+Ahora:
+
+```sql
+COALESCE((SELECT gip.meses_objetivo FROM "GV_Imp_Proveedor" gip WHERE gip.proveedor = btrim(i.proveedor)),
+         (SELECT cfg.meses_objetivo FROM cfg)) AS meses_objetivo
+```
+
+Aplicado **sobre `pg_get_viewdef`**, idempotente (si ya nombra `GV_Imp_Proveedor` no toca nada) y
+con `raise` si el texto no matchea. `security_invoker` repuesto en las dos (§ la trampa del
+`CREATE OR REPLACE VIEW` que borra las `reloptions`).
+
+### Impacto medido (29/09)
+
+- Los 7 proveedores quedaron con **lo mismo que decía el front**: Fujian 0,35 de derechos, el
+  resto 0,18; NTL en Frontier, Fujian, Kangli y Zhixin; importador Chef / Tierra Nativa igual.
+- **Ningún proveedor tiene meses objetivo propio**, así que los 156 artículos siguen en 10.
+  Verificado por proveedor: `min = max = 10`.
+- Probado corriendo las RPC en transacción abortada: pisar Fujian a 6 meses se ve en las **dos**
+  vistas y Becky sigue en 10 · volver a null vuelve al general · un `derechos_pct = 22` (el error
+  de cargar 22 en vez de 0,22) **explota** · mover un código sube el conteo del proveedor destino.
+- `anon` ve las dos vistas (7 filas y 1): probado con `set local role anon`, que es la trampa de
+  la v20.45 — una vista `security_invoker` sobre una tabla con RLS no da error, da menos filas.
+
+### Centinelas
+
+Dos filas en `GV_Reglas_Centinela` (patrón `GV_Imp_Proveedor`, una por vista).
+`select * from public.gv_reglas_perdidas;` — vacía.
+⚠ Quedaron etiquetadas `version = 'v23.88'`: el hook `claude-reglas-guard.cjs` frena cualquier
+`update` sobre esa tabla y no se pidió el «sí» para un cambio cosmético. No afecta la vigilancia.
+
+### Rollback
+
+En la cabecera de `sql/gv_imp_proveedor_config_v2389.sql`. Para volver las vistas al general:
+reemplazar el `COALESCE(...)` por `(SELECT cfg.meses_objetivo FROM cfg)` y reponer
+`security_invoker`. Las columnas de `Importados_Config` pueden quedar: son nullable y sólo las
+lee `gv_imp_nac_config`.
+
+**Tests:** `tests/pedimp-config-proveedor.cjs` (corre la pantalla: el ⚙ por proveedor, la
+hidratación desde la vista, el % en tanto por uno, el vacío = heredado y que sacar un código no
+borra) — verificado que **falla** contra el `index.html` anterior. Y `tests/impo-nacionalizacion.cjs`,
+que sigue midiendo el fallback del front contra los números del Excel.

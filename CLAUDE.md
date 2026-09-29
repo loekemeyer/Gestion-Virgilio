@@ -3685,6 +3685,60 @@ estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la 
 **Recuperable separado** (v23.80, Luis): la tarjeta y el desglose muestran aparte lo que vuelve como crédito fiscal — IVA 21 %, IVA adicional 20 %, Ganancias 6 %, IIBB 0,17 % (v23.81) sobre CIF + derechos + estadística (`_nacRecup`) — y NO lo suman al costo. En avión (courier) el IVA sigue en el no recuperable. **En avión también va la comisión NTL** (v23.81, Luis). La comisión NTL es 5 % del **FOB**, no del CIF (ya lo era; el test lo fija).
 **Fujian paga 35 %** (v23.78, Luis: *"solo ponele 35% a fujian / 18% al resto"*): `_DERECHOS_PROV` / `_derechosProv(prov)`, los tres modos.
 
+## ⚠⚠ REGLA (Luis, 2026-09-29, v23.89): la config de IMPORTADOS vive en TABLAS — ⚙ por proveedor
+
+**Luis, textual:** *"me gustaría que la capacidad de editar cosas como meses objetivo de importados
+esté editable en cada proveedor de importados (un botón al lado del nombre … «Configurar
+parámetros») … así como agregarle/sacarle códigos de los ya existentes"* · *"fijate que no vivan
+en el front los datos, sino que modifiquen las tablas pertinentes"*.
+
+Hasta la v23.88 el módulo de importados tenía **la mitad de su configuración escrita en
+`index.html`** y la otra mitad en el módulo de **OCs**, que es otro módulo:
+
+| qué | dónde estaba | dónde está |
+|---|---|---|
+| importador de cada proveedor (Chef / Tierra Nativa) | `_IMPORTADOR_DE` | `GV_Imp_Proveedor.importador` |
+| quién factura vía NTL y su comisión | `_NTL_PROVEEDORES` (5 % fijo) | `.usa_ntl` + `.ntl_pct` |
+| derechos (35 % Fujian, 18 % el resto) | `_DERECHOS_PROV` | `.derechos_pct` (+ el general) |
+| mínimo del pedido y valor del m³ | `_IMPO_MIN_USD_DEFAULT`, `_NAC_DEFAULTS` | `.min_usd`, `.valor_m3` |
+| IVA, IVA adicional, Ganancias, IIBB, estadística y sus tramos | dentro de `_nacEstad` / `_nacRecup` | `Importados_Config` |
+| **meses objetivo** | `Importados_Config`, pero **uno solo para todos**, y editable en **OCs → ⚙** | `.meses_objetivo` **por proveedor**, con el general de fallback |
+
+> **El botón ⚙ «Configurar parámetros» está en el encabezado de cada proveedor**, en Pedidos
+> Importación, con tres pestañas: **Parámetros** (los de ese proveedor) · **Códigos** (agregar y
+> sacar, escribe `Importados.proveedor`) · **Generales** (los de todos).
+
+- Lo que se deja **vacío** hereda el general. La vista **`gv_imp_proveedor_cfg`** resuelve el
+  `coalesce` y devuelve además el valor crudo (`*_propio`), que es lo que el pop-up necesita para
+  saber qué está pisado y qué no. Los generales, en **`gv_imp_nac_config`**.
+- Los porcentajes se **muestran en porcentaje** (35) y se **guardan en tanto por uno** (0,35): la
+  RPC rechaza cualquier valor > 1, que es el error de carga que se comería un pedido entero.
+- Escriben **`gv_imp_proveedor_guardar`**, **`gv_imp_nac_config_guardar`** y
+  **`gv_imp_codigo_proveedor`**, las tres SECURITY DEFINER con guard de supervisor. La tabla no
+  tiene INSERT/UPDATE para `anon` ni `authenticated`.
+- **Sacar un código NO lo borra**: queda sin proveedor, igual que en la pestaña 🏭 Proveedores
+  (que sigue existiendo y escribe la misma columna).
+
+⚠ **Los objetos del front quedan de FALLBACK, no de fuente.** `_PROV_IMP_LISTA`,
+`_IMPORTADOR_DE`, `_NTL_PROVEEDORES`, `_DERECHOS_PROV` y `_NAC_TASAS` son `let` y los hidrata
+`_impCfgCargar()` al abrir el módulo: si el fetch falla, la pantalla calcula **exactamente igual
+que la v23.88** (lo mide `tests/impo-nacionalizacion.cjs`, que corre justo sobre ese bloque).
+**Al agregar un parámetro nuevo de importados va a la tabla y se hidrata acá: no se vuelve a
+escribir un número en `index.html`.**
+
+⚠ **Impacto medido el 29/09: CERO.** La semilla de `GV_Imp_Proveedor` es exactamente lo que decía
+el front (Fujian 0,35 · el resto 0,18 · NTL en Frontier, Fujian, Kangli y Zhixin) y ningún
+proveedor tiene meses objetivo propio, así que los 156 artículos siguen en 10 meses. Lo que
+cambia es **dónde** se edita.
+
+⚠ El parche de `gv_importados_ordenes` y `v_importados_ordenes` se aplicó **sobre
+`pg_get_viewdef`**, es idempotente y **falla con un `raise` si el texto no matchea** (varias
+sesiones tocan estos objetos). Las dos tienen su fila en `GV_Reglas_Centinela`.
+
+**Chequeo:** `select * from public.gv_reglas_perdidas;` — vacía = todo bien ·
+`select proveedor, meses_objetivo, derechos_pct, usa_ntl, codigos from public.gv_imp_proveedor_cfg order by orden;`
+· `node tests/pedimp-config-proveedor.cjs`. `sql/gv_imp_proveedor_config_v2389.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-29, v23.86): se arma POR CAMIÓN — y a las 15:00 la TV dice si llegan
 
 - **Orden de armado = `gv_monitor_tanda_camion.orden_camion`**: por día, 1° el camión con más m³, Retira al final.

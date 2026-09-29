@@ -12,9 +12,14 @@ const path = require("path");
 const vm = require("vm");
 
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-// El bloque puro va desde `const _NTL_PROVEEDORES` hasta justo antes de openPedidosImportacion.
-const ini = html.indexOf("const _NTL_PROVEEDORES");
-const fin = html.indexOf("async function openPedidosImportacion");
+/* El bloque puro va desde la declaración de _NTL_PROVEEDORES hasta justo antes del bloque
+   de config de la v23.89 (que ya toca DOM y red). ⚠ v23.89: los objetos pasaron de `const`
+   a `let` porque son CACHÉ — la fuente es GV_Imp_Proveedor. Lo que queda escrito en el
+   archivo es el FALLBACK, y es justo lo que mide este test: si el fetch falla, la cuenta
+   tiene que dar igual que siempre. */
+const ini = html.indexOf("let _NTL_PROVEEDORES") >= 0 ? html.indexOf("let _NTL_PROVEEDORES") : html.indexOf("const _NTL_PROVEEDORES");
+const _finCfg = html.indexOf("v23.89 (Luis, 29/09) — LA CONFIG DE IMPORTADOS VIVE EN TABLAS");
+const fin = _finCfg > 0 ? html.lastIndexOf("/*", _finCfg) : html.indexOf("async function openPedidosImportacion");
 if (ini < 0 || fin < 0 || fin < ini) { console.error("No se encontró el bloque de nacionalización en index.html"); process.exit(2); }
 const src = html.slice(ini, fin);
 

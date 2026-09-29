@@ -622,6 +622,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-web-visible.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-buscador.cjs
 
+echo "== pedimp-config-proveedor (v23.89: ⚙ Configurar parámetros por proveedor — la config sale de GV_Imp_Proveedor, no del front) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-config-proveedor.cjs
+
 echo "== imp-encurso (v15.72: solapa 🚢 En curso — un renglón por pedido, embarque + llegada, días que faltan) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-encurso.cjs
 
