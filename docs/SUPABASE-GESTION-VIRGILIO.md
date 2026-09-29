@@ -30344,3 +30344,35 @@ pero la lectura no expone nada que no esté ya en la pantalla de En curso.
 **Tests:** `tests/imp-hist-pedidos.cjs` (corre la solapa: el nombre nuevo, las dos vistas, lo que
 muestra cada una y que la búsqueda filtra las dos) — verificado que **falla** contra el
 `index.html` anterior. `sql/gv_imp_pedidos_historial_v2391.sql`.
+
+---
+
+## v23.93 (2026-09-29, Luis) — el CÓDIGO DE LOGIN de la TV dura UN MINUTO
+
+**Pedido textual:** *"codigo de login de 4 digitos mas grande y que dure 1 minutos (con countdown)"*
+y *"saca el qr ya que usamos la fichada con el login"*.
+
+El tramo de `gv_tv_clave_de` pasó de **900 s a 60 s**, en las **DOS** funciones:
+`gv_tv_clave_actual` (la que lee la TV) y `gv_tv_clave_validar` (la que valida el celular). ⚠ Si se
+toca una sola, la TV muestra un código que la base rechaza. Sigue valiendo el tramo **actual y el
+anterior**, así que la validez real es de 60 a 120 s: es el margen para tipearlo.
+
+Medido al aplicarlo (migración `gv_tv_clave_60s_v2393`):
+
+| chequeo | resultado |
+|---|---|
+| `cambia_en_s` ≤ 60 | ✓ |
+| valida la clave de ahora | ✓ |
+| valida la del minuto anterior | ✓ |
+| rechaza una de hace 5 minutos | ✓ |
+
+⚠ **La rueda del front NO tiene su propio reloj: la sincroniza `cambia_en_s`.** Por eso el dibujo no
+se puede desfasar del código que la base valida — el que manda es el backend. Vale para los dos
+lugares donde se muestra: `monitor/tv.html` (la TV de pared) y el header del monitor del admin.
+
+⚠ **Con esto se fue el QR de fichada** (`#qrFichadaBox`, `qrcode.js`, `fichada-config.js` y el
+bloque TOTP de `index.html`): se ficha entrando con este código, así que el QR era una segunda
+puerta para lo mismo, con su propio secreto. `fichada.html` **no se borró** y sigue andando con su
+propia copia de la config: el link viejo no se rompe.
+
+`sql/gv_tv_clave_v2382.sql` (el bloque v23.93 al final), `tests/tv-clave-login.cjs`.
