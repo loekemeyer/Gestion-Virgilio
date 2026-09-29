@@ -6354,8 +6354,8 @@ lo que cambió es **dónde están esos dos divs**, no la lógica. `tests/tv-meta
 - Lo calculado ya llega al **80 % del MOQ** → se pide eso. No llega → se **sube al 80 %** (en master cajas) **sólo si**
   la cobertura queda dentro del tope del proveedor (`moq_meses_max`, 12). Ni así, o sin proyección → **no se pide** (0).
 - Vive en `_pedImpMoqCalc` y la aplica `_pedImpMcOf`, así que vale en la pantalla, el Excel y los dos PDF. Una
-  cantidad puesta **a mano** (`mcOverride`) gana siempre. El 80 % es `_NAC_TASAS.moq_pct` (default 0,8; pendiente
-  pasarlo a `GV_Imp_Proveedor`/config, necesita DDL con el «sí» del dueño).
+  cantidad puesta **a mano** (`mcOverride`) gana siempre. El 80 % es `Importados_Config.moq_pct` (default 0,8), editable en
+  **⚙ Generales → «MOQ: mínimo a llegar (%)»**; llega al front como `_NAC_TASAS.moq_pct` (v24.56).
 - **PDF para Damián = 3 hojas**: 1) **Pedido <prov> dd/mmm** (sólo UNIDADES, sin MC ni inner; los totales de FOB,
   m³ —1 decimal— y los meses del máximo en su propia fila arriba del rótulo; «Llegan» sólo si algo viene en camino,
   con la fecha en el rótulo si es una sola; el aviso «↑ 80% MOQ» a la derecha de la tabla; separadores finitos

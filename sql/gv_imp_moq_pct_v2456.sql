@@ -1,0 +1,6 @@
+-- v24.56 (Thomas, 29/09): el 80 % del MOQ pasa a config editable.
+-- Aplicado: columna Importados_Config.moq_pct (=0,8), gv_imp_nac_config expone
+-- COALESCE(moq_pct,0.8) AS moq_pct (security_invoker se conserva) y
+-- gv_imp_nac_config_guardar acepta la clave 'moq_pct' (valores <= 1).
+-- Rollback: el front cae al default 0,8 si la columna no viene.
+--   alter table public."Importados_Config" drop column moq_pct;  -- antes, recrear la vista sin la columna
