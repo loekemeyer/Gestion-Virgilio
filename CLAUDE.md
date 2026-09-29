@@ -95,6 +95,14 @@ el 28/09/2026:
 3. **La nota de la tarea lleva el formato obligatorio**, no "1-3 líneas sueltas":
    `Falta: <qué hay que hacer>. Pedido de <Nombre> · cargada por Claude, sesión <url>`.
 
+### DECISIONES PENDIENTES CON CÓDIGO (Thomas, 29/09/2026)
+
+- Cada decisión que se le pide al dueño lleva un **código único D1, D2, D3…** que **no se reusa nunca**
+  en la sesión. Él contesta *"D2 sí"*. Una decisión ya contestada se retira y su código no vuelve.
+- Se responde **sólo lo pendiente**, conciso: el análisis arriba y las decisiones al final.
+- **El cierre lista TODAS las decisiones pendientes de la sesión**, no sólo las del último mensaje
+  (*"culminás siempre el mensaje con el resumen de todos los pendientes, todos juntos en uno solo"*).
+
 ### ⚠ ANTES DE EMPEZAR A TOCAR UN REPO: mirar el semáforo
 
 Pedido de Elías, 28/09/2026: *"con esto podés poner 'estás haciendo push o commit ahí' y

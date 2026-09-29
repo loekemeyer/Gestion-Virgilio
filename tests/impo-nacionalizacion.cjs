@@ -1,5 +1,5 @@
-/* v22.37 — Costo de nacionalización + proyección al mínimo (25k) del módulo Pedidos Importación.
-   Verifica las funciones PURAS (_pedImpNacionalizar, _pedImpProy25k, _esProvNtl) contra los
+/* v22.37 — Costo de nacionalización + MOQ/derechos del módulo Pedidos Importación.
+   Verifica las funciones PURAS (_pedImpNacionalizar, _esProvNtl) contra los
    números del Excel "Calculo_Nacionalizacion" que trajo el usuario. Se extraen del index.html
    y se evalúan en un sandbox, así el test avisa si alguien cambia una tasa o la fórmula.
 
@@ -56,17 +56,6 @@ var f = N._pedImpNacionalizar(7282, 26, { modo: "full", fleteFull: 2000, ntl: tr
 near(f.noRecup, 6767.83, 1, "Full+NTL: no recuperable ≈ 6.767,83 (FOB 7.282 → estadística fija 180)");
 near(Math.max.apply(null, f.detalle.filter(function (d) { return /Estad/.test(d[0]); }).map(function (d) { return d[1]; })), 180, 0.01, "FOB 6.001–10.000: estadística fija u$s 180");
 
-// --- Proyección al mínimo de 25k ---
-var pNunca = N._pedImpProy25k(0, 1448, 14478, 25000);
-ok(pNunca.estado === "nunca", "Frontier (techo 14.478) NUNCA llega a 25k solo");
-var pFalta = N._pedImpProy25k(18380, 9659, 96587, 25000);
-ok(pFalta.estado === "falta", "Ownland está en camino a 25k");
-near(pFalta.meses, (25000 - 18380) / 9659, 0.001, "Ownland: meses = (25k - hoy) / consumo mensual");
-var pYa = N._pedImpProy25k(40000, 5000, 90000, 25000);
-ok(pYa.estado === "ya", "Un proveedor con 40k de demanda ya puede pedir");
-var pSin = N._pedImpProy25k(1000, 0, 50000, 25000);
-ok(pSin.estado === "sinburn", "Sin consumo mensual no se puede estimar la fecha");
-
 // --- v23.75: desglose expandible (Luis) ---
 ["consolidada", "full"].forEach(function (m) {
   var r = N._pedImpNacionalizar(9324, 12.4, { modo: m, valorM3: 110, tn: 0, ntl: true, fleteFull: 2000 });
@@ -76,9 +65,8 @@ ok(pSin.estado === "sinburn", "Sin consumo mensual no se puede estimar la fecha"
   ok(r.cif > 0 && /FOB/.test(r.cifTxt), m + ": trae la base CIF explicada");
 });
 var itemsB = [{ cod: "970E", desc: "x", proyUni: 1000, fobUni: 2.5, aPedirUni: 3000 }, { cod: "971E", desc: "y", proyUni: 500, fobUni: 0, aPedirUni: 0 }];
-var prB = N._pedImpProy25k(7500, 2500, 60000, 25000);
 var nacB = N._pedImpNacionalizar(9324, 12.4, { modo: "consolidada", valorM3: 110, tn: 0, ntl: false });
-var hB = N._pedImpBandaHtml(prB, nacB, 25000, 9324, { prov: "Becky", items: itemsB, m3: 12.4 });
+var hB = N._pedImpBandaHtml(nacB, 9324, { prov: "Becky", items: itemsB, m3: 12.4 });
 /* v23.91 (Luis): el desglose ya NO se abre DENTRO del chip — lo hacía crecer y empujaba la
    tabla. La banda quedó de una línea con un botón «ver desglose» que abre el pop-up, y los
    datos para rearmarlo quedan en _pedImpDesgData. Lo que se mide ahora es eso: que la banda
@@ -88,9 +76,10 @@ ok((hB.match(/pedImpDesgPop\(/g) || []).length === 1, "Un solo chip (el costo) a
 // v24.58 (Thomas) — el mínimo de 25k ya no se muestra: es una norma general, no un requisito.
 ok(!/mínimo|No llega solo|Ya se puede pedir/.test(hB), "La banda no habla del mínimo del pedido");
 ok(!!N._pedImpDesgData["Becky"], "La banda deja los datos para que el pop-up rearme el desglose");
-var dIzq = N._pedImpDesgIzq(prB, 25000, itemsB), dDer = N._pedImpDesgDer(nacB, 9324, 12.4);
-ok(/970E/.test(dIzq) && /sin FOB/.test(dIzq), "El desglose del consumo lista los artículos y marca los sin FOB");
-ok(/÷/.test(dDer) && /Derechos/.test(dDer) && /Puesto en Arg/.test(dDer), "Muestra la cuenta de meses y las líneas de lo no recuperable");
+var dDer = N._pedImpDesgDer(nacB, 9324, 12.4);
+ok(/÷/.test(dDer) && /Derechos/.test(dDer) && /Puesto en Arg/.test(dDer), "Muestra las líneas de lo no recuperable");
+// v24.66 — el código del mínimo (25k) se borró: no puede volver
+ok(typeof N._pedImpProy25k === "undefined" && typeof N._pedImpDesgIzq === "undefined", "Sin código del mínimo del pedido");
 ok(/<details/.test(dDer), "Cada concepto sigue siendo expandible (la lógica de detalle se mantiene)");
 
 // v23.78 (Luis): derechos 35% sólo Fujian, 18% el resto.

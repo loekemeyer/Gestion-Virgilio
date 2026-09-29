@@ -135,7 +135,7 @@ function _esProvNtl(prov) { return !!_NTL_PROVEEDORES[String(prov || "").trim()]
 let _NAC_TASAS = { estad_pct: 0.03, estad_fob_desde: 6000, estad_fob_hasta: 10000, estad_fijo: 180,
                    iva_pct: 0.21, iva_adic_pct: 0.20, gcias_pct: 0.06, iibb_pct: 0.0017,
                    derechos_pct: 0.18, ntl_pct: 0.05, valor_m3: 110, flete_full: 2000,
-                   min_usd: 25000, meses_objetivo: 10, moq: 1000, moq_meses_max: 12, moq_pct: 0.8 };
+                   meses_objetivo: 10, moq: 1000, moq_meses_max: 12, moq_pct: 0.8 };
 function _nacPct(n) { return (Math.round(_nacNum(n, 0) * 10000) / 100).toLocaleString("es-AR"); }
 // v23.79 (Luis): estadística por tramo de FOB — hasta el piso paga su %; en el tramo del medio,
 // un fijo en u$s; arriba del techo, el % sin tope. Base del %: el CIF (como el resto).
@@ -161,9 +161,6 @@ function _nacRecup(cif, derechos, estad) {
 // v23.78 (Luis): derechos 35% del CIF sólo para Fujian; el resto 18% de base.
 let _DERECHOS_PROV = { "Fujian": 0.35 };
 function _derechosProv(prov) { var t = _DERECHOS_PROV[String(prov || "").trim()]; return t != null ? t : _NAC_TASAS.derechos_pct; }
-/* v22.37 — mínimo por proveedor para poder emitir un pedido de importación (config editable
-   Stock_Config['impo_pedido_min_usd']; default 25.000 USD FOB). */
-const _IMPO_MIN_USD_DEFAULT = 25000;
 /* v22.37 — parámetros de nacionalización del embarque (los pocos que cambian por pedido).
    El resto de las tasas están fijas dentro de _pedImpNacionalizar, iguales al Excel. */
 const _NAC_DEFAULTS = { modo: "consolidada", valorM3: 110, fleteFull: 2000, tn: 0 };
@@ -316,27 +313,6 @@ function _impNacCritTxt(crit) {
   if (crit === "fob") return { lbl: "por FOB", tip: "Todo el costo se reparte por PLATA (u$s FOB de cada artículo). Es el factor parejo de siempre." };
   return { lbl: "mixto", tip: "Cada concepto por su base: el flete por m³ (se paga por volumen) y derechos, estadística, seguro, despachante y NTL por FOB (son % del FOB/CIF). Es el reparto que no le cobra derechos al volumen." };
 }
-/* v22.37 — proyección del corte de min USD por proveedor: dado lo que hoy hay a pedir en FOB,
-   el consumo mensual en FOB (proy×fob) y el techo (objetivo lleno en FOB), dice cuándo se llega
-   al mínimo. Si el techo no alcanza el mínimo, el proveedor NUNCA llega solo (se consolida). */
-function _pedImpProy25k(fobHoy, burnMes, techo, minUsd) {
-  fobHoy = _nacNum(fobHoy, 0); burnMes = _nacNum(burnMes, 0); techo = _nacNum(techo, 0);
-  minUsd = _nacNum(minUsd, _IMPO_MIN_USD_DEFAULT);
-  var comun = { fobHoy: fobHoy, burn: burnMes, techo: techo, min: minUsd };
-  if (fobHoy >= minUsd) return Object.assign({ estado: "ya", meses: 0, fechaIso: "" }, comun);
-  if (techo < minUsd) return Object.assign({ estado: "nunca", meses: null, fechaIso: "" }, comun);
-  if (!(burnMes > 0)) return Object.assign({ estado: "sinburn", meses: null, fechaIso: "" }, comun);
-  var meses = (minUsd - fobHoy) / burnMes;
-  var d = new Date(Date.now() - 3 * 3600000);
-  d.setDate(d.getDate() + Math.ceil(meses * 30));
-  return Object.assign({ estado: "falta", meses: meses, fechaIso: d.toISOString().slice(0, 10) }, comun);
-}
-/* v22.37 — texto lindo de "cuánto falta" (días si < 1 mes, si no meses con 1 decimal). */
-function _pedImpMesesTxt(meses) {
-  if (!(meses > 0)) return "ya";
-  if (meses < 1) { var dias = Math.max(1, Math.ceil(meses * 30)); return "~" + dias + (dias === 1 ? " día" : " días"); }
-  return "~" + (Math.round(meses * 10) / 10).toLocaleString("es-AR") + (meses < 2 ? " mes" : " meses");
-}
 function _usd0(n) { return "u$s " + Math.round(_nacNum(n, 0)).toLocaleString("es-AR"); }
 /* v23.75 — (Luis) cada chip de la banda se EXPANDE con el desglose: de dónde sale el consumo
    por mes y los meses al mínimo (izq), y cómo se arma lo no recuperable (der). El abierto/cerrado
@@ -346,32 +322,6 @@ var _pedImpDesgAb = {};
    junto a lo que lo usa: declarado más abajo quedaba en zona muerta para _pedImpBandaHtml. */
 var _pedImpDesgData = {};
 function _pedImpDesgToggle(el) { try { var k = el.getAttribute("data-k"); if (el.open) _pedImpDesgAb[k] = 1; else delete _pedImpDesgAb[k]; } catch (_e) {} }
-function _pedImpDesgIzq(proy, minUsd, items) {
-  var filas = (items || []).filter(function (it) { return it.proyUni > 0; }).map(function (it) {
-    var usd = it.fobUni > 0 ? it.proyUni * it.fobUni : 0;
-    return { cod: it.cod, desc: it.desc || "", proy: it.proyUni, fob: it.fobUni || 0, usd: usd };
-  }).sort(function (a, b) { return b.usd - a.usd; });
-  var sinFob = filas.filter(function (f) { return !(f.fob > 0); }).length;
-  var td = 'style="padding:2px 6px;border-bottom:1px solid #fde68a;text-align:right;white-space:nowrap"';
-  var th = 'style="padding:2px 6px;text-align:right;white-space:nowrap"';
-  var h = '<div style="max-height:260px;overflow:auto;margin-top:6px"><table style="border-collapse:collapse;font-size:11.5px;color:#78350f">' +
-    '<thead><tr><th style="text-align:left;padding:2px 6px">Código</th><th ' + th + '>Proy u/mes</th><th ' + th + '>× FOB u$s/u</th><th ' + th + '>= u$s/mes</th></tr></thead><tbody>' +
-    filas.map(function (f) {
-      return '<tr><td style="padding:2px 6px;border-bottom:1px solid #fde68a;white-space:nowrap" title="' + escapeHtml(f.desc) + '"><b>' + escapeHtml(String(f.cod)) + '</b></td><td ' + td + '>' + _nacF(f.proy) + '</td><td ' + td + '>' + (f.fob > 0 ? (Math.round(f.fob * 100) / 100).toLocaleString("es-AR") : '<span style="color:#b91c1c">sin FOB</span>') + '</td><td ' + td + '>' + (f.usd > 0 ? _nacF(f.usd) : '0') + '</td></tr>';
-    }).join('') +
-    '<tr><td style="padding:3px 6px"><b>Total</b></td><td></td><td></td><td style="padding:3px 6px;text-align:right"><b>' + _usd0(proy.burn) + '/mes</b></td></tr></tbody></table></div>';
-  h += '<div style="margin-top:6px;font-size:11.5px;line-height:1.5">' +
-    '<b>Consumo/mes</b> = Σ proyección u/mes × FOB de cada artículo.' + (sinFob ? ' <span style="color:#b91c1c">' + sinFob + ' sin FOB no suman.</span>' : '') + '<br>' +
-    '<b>A pedir hoy</b> (objetivo − stock − en curso, a FOB): ' + _usd0(proy.fobHoy) + '.<br>';
-  if (proy.estado === "falta") {
-    var falta = proy.min - proy.fobHoy;
-    h += '<b>Falta</b> ' + _usd0(proy.min) + ' − ' + _usd0(proy.fobHoy) + ' = ' + _usd0(falta) + '.<br>' +
-      '<b>Meses</b> = ' + _usd0(falta) + ' ÷ ' + _usd0(proy.burn) + '/mes = <b>' + (Math.round(proy.meses * 10) / 10).toLocaleString("es-AR") + '</b>' +
-      (proy.fechaIso ? ' → hoy + ' + Math.ceil(proy.meses * 30) + ' días ≈ <b>' + _isoToDdMmAa(proy.fechaIso) + '</b>' : '') + '.<br>';
-  }
-  h += '<span style="color:#b45309">Techo (objetivo lleno a FOB): ' + _usd0(proy.techo) + '. Si no llega al mínimo, este proveedor nunca junta ' + _usd0(minUsd) + ' solo.</span></div>';
-  return h;
-}
 function _pedImpDesgDer(nac, totUsd, m3) {
   /* v23.90 (Luis, 29/09) — DOS COLUMNAS: concepto (con su % entre paréntesis) e importe.
      La fórmula ya no ocupa una columna fija: se abre al tocar el renglón. Antes eran tres
@@ -416,8 +366,8 @@ function _pedImpDesgDer(nac, totUsd, m3) {
   h += '</tbody></table>' + (nac.modo === "avion" ? '<div style="margin-top:6px;color:#6366f1">Avión (courier): el IVA no se recupera, por eso va en el costo.</div>' : '') + '</div>';
   return h;
 }
-/* Banda por proveedor: proyección al mínimo (izq) + costo de nacionalización del pedido (der). */
-function _pedImpBandaHtml(proy, nac, minUsd, totUsd, ext) {
+/* Banda por proveedor: costo de nacionalización del pedido. */
+function _pedImpBandaHtml(nac, totUsd, ext) {
   ext = ext || {};
   // v23.91 (Luis) — el desglose ya NO se abre DENTRO del chip: lo hacía crecer y empujaba la
   // tabla hacia abajo. Ahora el chip es una línea y «ver desglose» abre un pop-up.
@@ -428,19 +378,9 @@ function _pedImpBandaHtml(proy, nac, minUsd, totUsd, ext) {
     if (desg) cuerpo += '<button class="pc-mas" title="Ver el desglose" onclick="pedImpDesgPop(\'' + encodeURIComponent(String(ext.prov || "")) + '\',\'' + lado + '\')">›</button>';
     return '<div class="pedimp-chip" style="' + base + '">' + cuerpo + '</div>';
   };
-  _pedImpDesgData[String(ext.prov || "")] = { proy: proy, nac: nac, minUsd: minUsd, totUsd: totUsd, ext: ext };
-  var izq;
-  // lo que se lee de un vistazo va en 19px; el contexto, en la letra base del chip (11,5px)
+  _pedImpDesgData[String(ext.prov || "")] = { nac: nac, totUsd: totUsd, ext: ext };
   var _big = function (txt, col2) { return '<span class="pc-big"' + (col2 ? ' style="color:' + col2 + '"' : '') + '>' + txt + '</span>'; };
   var _pie = function (txt) { return '<div style="opacity:.85">' + txt + '</div>'; };
-  if (proy.estado === "ya") izq = chip("#ecfdf5", "#a7f3d0", "#065f46", _big("✅ Ya se puede pedir") + _pie('demanda ' + _usd0(proy.fobHoy) + ' · mínimo ' + _usd0(minUsd)));
-  else if (proy.estado === "nunca") izq = chip("#fef2f2", "#fecaca", "#991b1b", _big("⚠ No llega solo") + _pie('mínimo ' + _usd0(minUsd) + ' · techo ' + _usd0(proy.techo) + ' — se consolida con otro proveedor'));
-  else if (proy.estado === "sinburn") izq = chip("#f1f5f9", "#e2e8f0", "#475569", _big("📉 Sin proyección") + _pie('no se puede estimar cuándo llega a ' + _usd0(minUsd)));
-  else izq = chip("#fffbeb", "#fde68a", "#92400e",
-    _big("⏳ " + _pedImpMesesTxt(proy.meses)) + ' ' + _big(_usd0(_nacNum(proy.burn, 0)) + "/mes", "#b45309") +
-    _pie('para el mínimo de ' + _usd0(minUsd) + (proy.fechaIso ? ' ≈ ' + _isoToDdMmAa(proy.fechaIso) : '')),
-    _pedImpDesgIzq(proy, minUsd, ext.items), "izq");
-  // el chip de proyección necesita fobHoy/burn; se los pasa el llamador vía proy (los adjunto abajo)
   var der;
   var modoTxt = { consolidada: "Consolidada", full: "Contenedor", avion: "Avión" }[nac.modo] || nac.modo;
   if (!(totUsd > 0)) der = chip("#f1f5f9", "#e2e8f0", "#475569", '🚢 Poné el pedido (columna <b>MC</b>) para ver el costo <b>puesto en Argentina</b>.');
@@ -846,7 +786,8 @@ function pedImpDesgPop(provEnc, lado) {
   const prov = decodeURIComponent(provEnc || "");
   const d = _pedImpDesgData[prov]; if (!d) return;
   const esDer = (lado === "der");
-  const cuerpo = esDer ? _pedImpDesgDer(d.nac, d.totUsd, d.ext.m3) : _pedImpDesgIzq(d.proy, d.minUsd, d.ext.items);
+  if (!esDer) return;
+  const cuerpo = _pedImpDesgDer(d.nac, d.totUsd, d.ext.m3);
   const titulo = esDer ? ('🚢 Puesto en Argentina — ' + prov) : ('⏳ Cuándo llega al mínimo — ' + prov);
   let ov = document.getElementById("impDesgOv");
   if (!ov) {
@@ -923,23 +864,21 @@ async function openPedidosImportacion() {
   // v22.37 — y en la misma tirada: el mínimo por proveedor (25k default) y los parámetros
   // de nacionalización guardados (modo / valor m³ flete), todos con default si no hay fila.
   try {
-    const cfg = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Config", "select=clave,valor&clave=in.(entrega_estimada_global,impo_pedido_min_usd,impo_nac_modo,impo_nac_valor_m3)");
+    const cfg = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Stock_Config", "select=clave,valor&clave=in.(entrega_estimada_global,impo_nac_modo,impo_nac_valor_m3)");
     const _cfgMap = {}; (cfg || []).forEach(function (r) { _cfgMap[r.clave] = r.valor; });
     data.entregaGlobal = _cfgMap.entrega_estimada_global ? String(_cfgMap.entrega_estimada_global).slice(0, 10) : "";
-    data.minUsd = _nacNum(_cfgMap.impo_pedido_min_usd, _IMPO_MIN_USD_DEFAULT);
     data.nac = { modo: (_cfgMap.impo_nac_modo || _NAC_DEFAULTS.modo), valorM3: _nacNum(_cfgMap.impo_nac_valor_m3, _NAC_DEFAULTS.valorM3), tn: 0 };
-  } catch (_e) { data.entregaGlobal = ""; data.minUsd = _IMPO_MIN_USD_DEFAULT; data.nac = { modo: _NAC_DEFAULTS.modo, valorM3: _NAC_DEFAULTS.valorM3, tn: 0 }; }
+  } catch (_e) { data.entregaGlobal = ""; data.nac = { modo: _NAC_DEFAULTS.modo, valorM3: _NAC_DEFAULTS.valorM3, tn: 0 }; }
   _stkPop = { kind: "pedImp", data: data, soloPedir: true };
   _pedImpRender();
 }
 /* v22.37 — guarda un parámetro de nacionalización / el mínimo en Stock_Config y re-renderiza.
-   clave: 'impo_pedido_min_usd' | 'impo_nac_modo' | 'impo_nac_valor_m3'. */
+   clave: 'impo_nac_modo' | 'impo_nac_valor_m3'. */
 async function pedImpSetNacCfg(clave, valor) {
   if (!_stkPop || _stkPop.kind !== "pedImp") return;
   var v = String(valor == null ? "" : valor).trim();
   // reflejo inmediato en memoria (no esperamos al backend para pintar)
-  if (clave === "impo_pedido_min_usd") _stkPop.data.minUsd = _nacNum(v, _IMPO_MIN_USD_DEFAULT);
-  else if (clave === "impo_nac_modo") _stkPop.data.nac.modo = v || _NAC_DEFAULTS.modo;
+  if (clave === "impo_nac_modo") _stkPop.data.nac.modo = v || _NAC_DEFAULTS.modo;
   else if (clave === "impo_nac_valor_m3") _stkPop.data.nac.valorM3 = _nacNum(v, _NAC_DEFAULTS.valorM3);
   _pedImpRender();
   try {
@@ -1421,7 +1360,6 @@ function _pedImpRender() {
   // v22.37 — modo de nacionalización (marítimo consolidado / contenedor propio / avión), valor m³
   // flete y mínimo del pedido: se guardan en Stock_Config. Cada proveedor = su propio embarque.
   const _nac = (data.nac || { modo: "consolidada", valorM3: 110, tn: 0 });
-  const _minUsd = _nacNum(data.minUsd, _IMPO_MIN_USD_DEFAULT);
   const _numIn = 'margin:0;height:28px;border:1px solid #c4b5fd;border-radius:7px;padding:0 5px;font-size:12.5px;text-align:right;box-sizing:border-box;background:#fff';
   const _lbl = 'font-size:12px;color:#6b21a8;font-weight:700;display:inline-flex;align-items:center;gap:4px;flex:0 0 auto';
   h += '<div class="pedimp-tot" style="display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:7px 12px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px">' +
@@ -1457,13 +1395,9 @@ function _pedImpRender() {
     // v22.37 — proyección al mínimo (usa la demanda NATURAL, no el MC editado): FOB a pedir
     // hoy, consumo mensual (proy×fob) y techo (objetivo lleno×fob).
     const _isNtl = _esProvNtl(prov);
-    const _fobHoyN = arr.reduce(function (s, it) { return s + (it.aPedirUni > 0 && it.fobUni > 0 ? it.aPedirUni * it.fobUni : 0); }, 0);
     const _burnN = arr.reduce(function (s, it) { return s + (it.proyUni > 0 && it.fobUni > 0 ? it.proyUni * it.fobUni : 0); }, 0);
-    const _techoN = arr.reduce(function (s, it) { return s + (it.objetivoUni > 0 && it.fobUni > 0 ? it.objetivoUni * it.fobUni : 0); }, 0);
     // v23.89 — el mínimo y el valor del m³ pueden ser propios de este proveedor (GV_Imp_Proveedor)
-    const _minUsdP = _impProvNum(prov, "min_usd", _minUsd);
     const _valorM3P = _impProvNum(prov, "valor_m3", _nac.valorM3);
-    const _proy = _pedImpProy25k(_fobHoyN, _burnN, _techoN, _minUsdP);
     // costo de nacionalización SOBRE EL PEDIDO ACTUAL (respeta el MC editado)
     // v23.90 — la tasa del embarque sale de sus artículos (cada uno puede tener la suya)
     const _derPed = _derechosPedido(arr, prov);
@@ -1487,7 +1421,7 @@ function _pedImpRender() {
       '</div>' +
       '</div>';
     // v22.37 — banda de proyección al mínimo + costo de nacionalización estimado.
-    h += _pedImpBandaHtml(_proy, _nacR, _minUsdP, totUsd, { prov: prov, items: arr, m3: totM3 });
+    h += _pedImpBandaHtml(_nacR, totUsd, { prov: prov, items: arr, m3: totM3 });
     // v24.32 — anchos explícitos por <colgroup> y la tabla mide EXACTAMENTE lo que suman: hasta
     // la v24.3 Descripción era la única col SIN width y se comía todo el sobrante de la tarjeta
     // (el hueco muerto entre ella y Proy u/mes, que reclamó Luis el 29/09).
