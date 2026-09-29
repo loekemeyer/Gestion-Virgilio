@@ -35,6 +35,9 @@ const DEBEN_PAGINAR = [
   "PPP_Web_Programacion", "gv_ppp_web_estado", "vista_fc_sin_salida", "Zonas_Barrios",
   // Cola de "Agregar Expreso ISIS": crece sola si nadie la vacia (v21.94).
   "gv_expreso_pendiente",
+  // Cajas pedidas netas de Stocks: una fila por codigo con demanda viva (237 al 29/09), crece
+  // con el catalogo (v24.33).
+  "gv_stock_pedidas_neto",
 ];
 
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "latin1");

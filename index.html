@@ -15698,6 +15698,16 @@ async function openStockAdmin(soloConteo) {
     var _insFromView_Rápido = (saldosRapido || []).filter(function (r) { return r.es_insumo; }).map(function (r) { return String(r.cod).trim().toUpperCase(); });
 
     _stk = { movs: [], cutoff: {}, factors: {}, ordenes: [], bajadas: [], tab: _solo ? "conteo" : "stocks", soloConteo: _solo, filtro: "", openArt: null, ingMode: "remito", asOf: null, asOfInput: "", dem: _demFromView_Rápido, cap: _capRápido, gConf: [], fcs: _fcsRápido, fcsLoaded: false, insumosCods: _insFromView_Rápido, cxm: {}, proy: _proyMap_Rápido, viewRows: saldosRapido, alertas: [], discSet: {}, ocultarDisc: false, conteosUI: { pendientes: [], historico: null } };
+
+    /* v24.04 (Luis) — el NETO de cajas pedidas va EN PARALELO: se dispara acá y NO se espera,
+       así la tabla se dibuja ya con el total (lo de siempre) y se redibuja cuando llega. Si la
+       lectura falla o tarda, la pantalla queda como la v24.03 — no hay ningún await de por medio
+       que la pueda colgar (regla v19.44). */
+    stkFetchPedidasNeto().then(function (_m) {
+      if (!_m || !_stk) return;
+      _stk.pedNeto = _m;
+      try { stkRender(); } catch (_e) {}
+    }).catch(function () {});
     stkRender();  // Renderizar instant con stocks_carga_rapida
     // v12.42 — el código canónico (035E, no 35E) sale de OC_Maximos vía loadCodCanon().
     // La tabla usa codCanon() pero este path nunca lo cargaba → mostraba el código sin
@@ -19498,6 +19508,9 @@ function stkBodyStocks() {
   shown.forEach(function (a) {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);  // v7.54: racks_ch sumado al total
     const _ped = _demOf(a.cod);
+    /* v24.04 — la celda muestra el NETO (lo que falta cubrir, el mismo número que OCs) y el
+       desglose va al tooltip. Sin el dato todavía, muestra el total: nunca queda vacía. */
+    const _pn = _pedNetoOf(a.cod);
     const _cap = _capOf(a.cod);
     // v8.88 — desconcatenación: si el código tiene sufijo LK/CH/LOKE, la marca
     // sale del propio código (no de OC_Maximos); y en CÓDIGO se muestra el base.
@@ -19515,7 +19528,7 @@ function stkBodyStocks() {
       else _famTag = ' <span title="SECUNDARIO — no deben entrar pedidos acá. El principal es ' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '." style="color:#1e40af;font-size:10px;font-weight:800;">⇄' + escapeHtml(_equivDisp(_fam, _fam._defN)) + '</span>';
     }
     const _proy = _proyOf(a.cod);
-    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + '<td class="num stk-pick-cell" style="background:#faf5ff;color:' + (_proy > 0.05 ? '#6d28d9' : '#c4b5fd') + ';cursor:pointer" onclick="event.stopPropagation();stkShowProyVentas(\'' + encodeURIComponent(a.cod) + '\',' + (Math.round((_proy || 0) * 100) / 100) + ')" title="Tocá para ver de dónde surge (ventas facturadas de los últimos 6 meses)">' + (_proy > 0.05 ? Math.round(_proy) : '—') + '</td>' + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP"><b>' + fmtCajas(_ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e">—</td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
+    let tds = '<td class="stk-cod">' + escapeHtml(_codDisplay) + _famTag + '</td><td style="text-align:center;font-weight:800;font-size:11px;padding:3px 4px;color:' + (_lin === "LK" ? "#b91c1c" : (_lin === "CH" ? "#1e40af" : "#94a3b8")) + ';">' + (_lin || "—") + '</td><td class="stk-desc">' + escapeHtml(artNombre(a.cod, a.desc) || "—") + '</td>' + '<td class="num stk-pick-cell" style="background:#faf5ff;color:' + (_proy > 0.05 ? '#6d28d9' : '#c4b5fd') + ';cursor:pointer" onclick="event.stopPropagation();stkShowProyVentas(\'' + encodeURIComponent(a.cod) + '\',' + (Math.round((_proy || 0) * 100) / 100) + ')" title="Tocá para ver de dónde surge (ventas facturadas de los últimos 6 meses)">' + (_proy > 0.05 ? Math.round(_proy) : '—') + '</td>' + '<td class="num ' + (_tot < 0 ? "stk-neg" : "") + '" style="background:#f8fafc"><b>' + fmtCajas(_tot) + '</b></td>' + (_ped ? '<td class="num stk-pick-cell" style="background:#fffbeb;color:#92400e" onclick="event.stopPropagation();stkOpenCajasPedidasArt(\'' + encodeURIComponent(a.cod) + '\')" title="' + escapeHtml(_stkPedTitle(_pn, _ped)) + '"><b>' + fmtCajas(_pn ? _pn.neto : _ped) + '</b>' + (_demSPOf(a.cod) > 0.05 ? ' <span title="⚠ ' + fmtCajas(_demSPOf(a.cod)) + ' caja(s) pedidas están en la base de pedidos pero SIN programar en el PPP (Programación Diaria)" style="cursor:help">⚠️</span>' : '') + '</td>' : '<td class="num" style="background:#fffbeb;color:#92400e">—</td>') + (_cap ? '<td class="num stk-pick-cell" style="background:#f0fdf4;color:#166534" onclick="event.stopPropagation();stkOpenCapArt(\'' + encodeURIComponent(a.cod) + '\')" title="Ubicaciones y capacidad de góndola"><b>' + fmtCajas(_cap) + '</b></td>' : '<td class="num" style="background:#f0fdf4;color:#166534">—</td>');
     cols.forEach(function (c) {
       const v = (c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0));
       // v5.82: columnas clickeables → detalle. Pickeados/A facturar → NPs; Excedente/Racks → ubicación.
@@ -25370,18 +25383,21 @@ function stkDescargarExcel() {
   // Excel los trate como numéricos y no como texto.
   const num = function (n) { return Math.round((Number(n) || 0) * 10) / 10; };
   const _fcArt = (_stk.fcs && _stk.fcs.porArt) || {};
-  const headers = ["Código", "Descripción", "Total Stock", "Cajas Pedidas", "Capacidad Góndola", "Góndola", "Excedente", "Pickeados", "A facturar", "A guardar", "Racks", "P/ envasar", "FC s/Salida"];
+  const headers = ["Código", "Descripción", "Total Stock", "Cajas Pedidas", "Ped. ya pickeadas (TP)", "Ped. picking s/TP", "Capacidad Góndola", "Góndola", "Excedente", "Pickeados", "A facturar", "A guardar", "Racks", "P/ envasar", "FC s/Salida"];
   const aoa = [headers];
   shown.forEach(function (a) {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);
     const _ped = _demOf(a.cod);
+    const _pnx = _pedNetoOf(a.cod);   // v24.04 — el mismo neto que la pantalla, o el Excel diría otro número
     const _cap = _capOf(a.cod);
     const _fcV = Number(a.fc_sin_salida) || 0;   // v21.13: de la propia fila
     aoa.push([
       String(codBase(a.cod) || ""),
       String(artNombre(a.cod, a.desc) || ""),
       num(_tot),
-      num(_ped),
+      num(_pnx ? _pnx.neto : _ped),
+      num(_pnx ? _pnx.tp : 0),
+      num(_pnx ? _pnx.curso : 0),
       num(_cap),
       num(a.terminado),
       num(a.excedente),
@@ -28431,6 +28447,86 @@ async function stockFetchArtFactors() {
   } catch (_e) { return {}; }
 }
 async function racksFetchOrdenes() { try { const r = await fetch(SUPABASE_RACKS_ORD_ENDPOINT + "?select=*&order=fecha.desc&limit=200", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }); return r.ok ? r.json() : []; } catch (_e) { return []; } }
+/* ============================================================================
+   v24.04 (Luis, 2026-09-29) — LAS CAJAS PEDIDAS SE CONTEMPLAN IGUAL ACA Y EN OCs
+
+   Luis: *"si lo comprometido no es stock disponible, esta bien. pero se tiene que contemplar
+   igual en OCs que en Stocks"* · *"el neto adelante y el pickeado en el tooltip"*.
+
+   Stocks decia 251 cajas pedidas del 501 y OCs decia 225. No era redondeo: son DOS columnas
+   de la MISMA fila de vista_stock_procesada con dos criterios (`cajas_pedidas`, toda la
+   demanda viva, y `cajas_pedidas_familia`, sin las NP cuya tanda ya tiene TP — regla v19.85
+   de Thomas) y cada pantalla leia una. El criterio de OCs es el bueno: una caja ya pickeada
+   esta separada para su pedido, no es demanda a comprar, igual que no es stock disponible.
+
+   ⚠ VA EN PARALELO Y NO BLOQUEA EL RENDER. La tabla se dibuja con el total (lo de siempre) y
+   cuando llega el neto se vuelve a dibujar. Tiene su propio catch: si esto falla, la pantalla
+   queda exactamente como la v24.03 (regla v19.44 — lo nuevo no puede ir adentro del await de
+   lo que ya funciona). Medido como `authenticated`: 550 ms contra los 8 s de timeout del rol.
+   ⚠ El techo de 20 s es para la RED colgada, no para la base: la base corta sola a los 8 s.
+   ============================================================================ */
+async function stkFetchPedidasNeto() {
+  try {
+    /* ⚠ PAGINADA con gvRestTodo: es una fila por código con demanda viva (237 al 29/09) y eso
+       crece con el catálogo. Un `limit=1000` acá sería una expresión de deseo — el día que pase
+       las 1.000 no avisa nadie (regla v20.45/§rest-tope-1000, que es la que lo cazó).
+       ⚠ El techo de 20 s es para la RED colgada, no para la base: la base corta sola a los 8 s.
+       Sin él, una promesa que nunca resuelve deja el redibujado esperando para siempre. */
+    var rows = await Promise.race([
+      gvRestTodo("gv_stock_pedidas_neto?select=cod,familia,es_secundario,total,neto,con_tp,en_curso,fam_con_tp,fam_en_curso,fam_miembros"),
+      new Promise(function (res) { setTimeout(function () { res(null); }, 20000); })
+    ]);
+    // ⚠ null / vacío = "no pude leer", NO "no hay": el render cae al total de siempre
+    if (!Array.isArray(rows) || !rows.length) return null;
+    var m = {};
+    rows.forEach(function (x) {
+      var k = _ocgNorm(x.cod); if (!k) return;
+      m[k] = { tot: Number(x.total) || 0, neto: Number(x.neto) || 0, tp: Number(x.con_tp) || 0,
+               curso: Number(x.en_curso) || 0, fam: String(x.familia || ""), sec: !!x.es_secundario,
+               famTp: Number(x.fam_con_tp) || 0, famCurso: Number(x.fam_en_curso) || 0,
+               famN: Number(x.fam_miembros) || 1 };
+    });
+    return m;
+  } catch (_e) { return null; }
+}
+/* El tooltip de la celda. Luis: *"que pickeado seria «pickeados», osea los que TP, y los que
+   estan pickeados ahora sin TP. que lo aclare el tooltip"* · *"que el tooltip avise en casos de
+   familia y escondelo cuando da 0 (si a uno con familia tiene valor, mostralo en toda la
+   familia)"*. Sin el dato del neto devuelve el texto de siempre. */
+/* v24.04 — la fila de gv_stock_pedidas_neto de ESTE código (neto · pickeadas · en curso).
+   Mismo criterio de lookup que _stkLookupEmp: exacto primero, y un DUAL nunca cae al base
+   (437E LK y 437E CH son dos productos distintos). null = todavía no llegó o no se pudo leer,
+   y ahí la celda muestra el total de siempre.
+   ⚠ Es GLOBAL a propósito: la usan la tabla y el Excel, que son dos funciones distintas. Con una
+   copia en cada scope los dos números se desfasarían, que es el bug que esto viene a arreglar. */
+function _pedNetoOf(cod) {
+  var m = (typeof _stk !== "undefined" && _stk && _stk.pedNeto) || null;
+  if (!m) return null;
+  var k = _ocgNorm(cod);
+  if (m[k]) return m[k];
+  if (_stkTieneSufijoEmp(cod)) return null;
+  return m[_ocgNorm(codBase(cod))] || null;
+}
+function _stkPedTitle(pn, totalViejo) {
+  // ⚠ fmtCajas es LOCAL de stkBodyStocks; este helper es global. Mismo redondeo, acá.
+  var fmtCajas = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
+  if (!pn) return "Todas las cajas pedidas (programadas o no) todavía no facturadas. Tocá para ver el detalle por NP";
+  var L = [];
+  L.push(fmtCajas(pn.neto) + " a cubrir — es lo que se compra (mismo criterio que el generador de OC)");
+  if (pn.tp > 0.005)    L.push(fmtCajas(pn.tp) + " ya pickeadas · su tanda tiene TP (el picking cerró): están separadas para su pedido, no se compran");
+  if (pn.curso > 0.005) L.push(fmtCajas(pn.curso) + " con el picking EMPEZADO sin TP · la tanda no cerró, así que siguen contando");
+  if (Math.abs(pn.tot - pn.neto) > 0.005) L.push(fmtCajas(pn.tot) + " pedidas en total");
+  // familia: la línea se muestra en TODOS los miembros cuando alguno tiene algo pickeado
+  var _hayFam = pn.sec || pn.famN > 1;
+  if (_hayFam && (pn.famTp > 0.005 || pn.famCurso > 0.005)) {
+    var _f = [];
+    if (pn.famTp > 0.005)    _f.push(fmtCajas(pn.famTp) + " pickeadas");
+    if (pn.famCurso > 0.005) _f.push(fmtCajas(pn.famCurso) + " con picking empezado");
+    L.push("🧩 familia " + pn.fam + ": entre todos sus códigos hay " + _f.join(" y ") + (pn.sec ? " (este código es SECUNDARIO de la familia)" : ""));
+  }
+  L.push("Tocá para ver el detalle por NP");
+  return L.join("\n");
+}
 async function racksFetchBajadas() { try { const r = await fetch(SUPABASE_RACKS_BAJ_ENDPOINT + "?select=*&order=ts.desc&limit=2000", { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" }); return r.ok ? r.json() : []; } catch (_e) { return []; } }
 function stkUnits(cajas, cod, factors) {
   const f = (factors || {})[String(cod).toUpperCase()] || {};

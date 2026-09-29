@@ -2896,6 +2896,72 @@ select count(*) filter (where llenar_gondola)                as pisan_la_proyecc
   from public.vista_generador_oc;
 ```
 
+## ⚠ REGLA (Luis, 2026-09-29, v24.33): las CAJAS PEDIDAS se cuentan IGUAL en Stocks que en OCs
+
+**Luis, textual:** *"si lo comprometido no es stock disponible, esta bien. pero se tiene que
+contemplar igual en OCs que en Stocks. eso es lo que estoy diciendo"* · *"el neto adelante y el
+pickeado en el tooltip"*.
+
+Stocks decía **251** cajas pedidas del 501 y OCs decía **225**. No era redondeo: son **dos columnas
+de la MISMA fila** de `vista_stock_procesada` con dos criterios —`cajas_pedidas` (toda la demanda
+viva) y `cajas_pedidas_familia` (sin las NP cuya tanda ya tiene **TP**, la regla v19.85 de Thomas)—
+y cada pantalla leía una.
+
+> **El criterio de OCs es el bueno y NO se toca.** Una caja ya pickeada está separada para su
+> pedido: no es demanda a comprar, igual que no es stock disponible. La que contaba de más era
+> Stocks. Los 26 del 501 no son los 18 de «Pickeados» (el depósito `separar_pedidos`): son dos
+> conjuntos distintos, y por eso el número no cerraba mirándolos de a uno.
+
+| dónde | qué muestra |
+|---|---|
+| celda **Cajas Pedidas** | el **neto**: lo que falta cubrir |
+| tooltip | `N a cubrir` · `N ya pickeadas (tanda con TP)` · `N con el picking empezado sin TP, siguen contando` · `N pedidas en total` |
+| Excel de la tabla | el mismo neto + dos columnas nuevas con el desglose |
+
+Lo resuelve **`gv_stock_pedidas_neto`** (`cod, familia, es_secundario, total, neto, con_tp,
+en_curso, fam_*`). `total = neto + con_tp`, y `sum(total)` coincide **exacto** con
+`sum(cajas_pedidas)` de la matview (13.132,3334): si eso deja de dar igual, la vista se desfasó.
+Impacto: 109 códigos, 13.132,33 → 11.279,33 cajas. **Cero en la compra**: el generador ya usaba
+el neto.
+
+⚠ **UN objeto nuevo y nada existente tocado**, a propósito: la matview **no** se puede reemplazar
+(su `DROP CASCADE` arrastra `gv_importados_stock_dep` y, en 2.º nivel, `gv_importados_ordenes` —
+lo que dejó Importados en 404 en la v16.20 y la v16.33), y `refresh_stocks_carga_rapida()` la
+editan varias sesiones.
+
+⚠⚠ **Y `cajas_pedidas` NO se toca**: sostiene `visible_en_stock`. Cambiándola, 9 códigos quedaban
+en 0 pedidos y **5 desaparecían del listado** (198E, 951E, 952E, 953E, 970E) por tener stock 0 —
+el pozo de la v20.95.
+
+⚠ **La lectura va PAGINADA (`gvRestTodo`, y está en `DEBEN_PAGINAR`): una fila por código con
+demanda viva, 237 al 29/09, y eso crece con el catálogo.** Lo cazó `tests/rest-tope-1000.cjs` en
+la primera corrida de la suite, con el `limit=1000` puesto.
+
+⚠ **La lectura va EN PARALELO y sin `await`** (Luis: *"hace la carga en paralelo, evalua para
+evitar timeouts"*): la tabla se dibuja con el total y se redibuja cuando llega el neto. Con su
+propio catch — si falla, la pantalla queda como la v24.32 y la celda muestra el total, nunca 0
+(*"no pude leer"* no es *"no hay"*). Medido como `authenticated`: **550 / 548 / 555 ms** contra los
+8.000 del timeout del rol. El techo de 20 s del fetch es para la **red** colgada; la base corta sola.
+
+⚠ **El primer intento (`sql/gv_stock_pedidas_neto_v2402.sql`) NO se ejecutó y está borrado.**
+Parchaba `refresh_stocks_carga_rapida()` con un `LEFT JOIN LATERAL` contra una función
+set-returning, que **no se inlinea** (`SET search_path`) y se habría corrido **una vez por fila**:
+367 × 682 ms ≈ **4 minutos por refresco, cada 2**. Es el pozo de `gv_destino_score` (v20.62) y
+`gv_espejo_np_pasa` (v20.78) otra vez. Se midió la consulta suelta **antes** de aplicarlo.
+
+⚠ **La familia agrupa por (principal, EMPRESA)**, no por el código pelado: sin el sufijo en el
+`partition by`, `437E LK` y `437E CH` caían en la misma bolsa y son dos productos distintos.
+
+⚠ **`fmtCajas` es local de `stkBodyStocks`**: `_stkPedTitle` es global y no la ve. Y `_pedNetoOf`
+es **global a propósito** — la usan la tabla y el Excel, que son dos funciones distintas; con una
+copia en cada scope los dos números se desfasan, que es justo el bug que esto arregla.
+
+**Chequeo:** `select (select sum(total) from public.gv_stock_pedidas_neto) vista,
+(select sum(cajas_pedidas) from public.vista_stock_procesada) matview;` — iguales ·
+`node tests/stk-pedidas-neto.cjs` (verificado que falla con 6 chequeos en rojo contra el index
+anterior). **Rollback, una línea:** `drop view if exists public.gv_stock_pedidas_neto;`
+`sql/gv_stock_pedidas_neto_v2404.sql`.
+
 ## ⚠ Regla del dueño (2026-09-18, v19.85): lo COMPROMETIDO no es stock disponible
 
 **Thomas, 2026-09-18:** *"lo comprometido (separar_pedidos y a_facturar) no debería contar como
