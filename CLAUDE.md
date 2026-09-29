@@ -3685,6 +3685,15 @@ estadística **3 % del CIF con tope u$s 180**. Retira el 35 % de derechos de la 
 **Recuperable separado** (v23.80, Luis): la tarjeta y el desglose muestran aparte lo que vuelve como crédito fiscal — IVA 21 %, IVA adicional 20 %, Ganancias 6 %, IIBB 0,17 % (v23.81) sobre CIF + derechos + estadística (`_nacRecup`) — y NO lo suman al costo. En avión (courier) el IVA sigue en el no recuperable. **En avión también va la comisión NTL** (v23.81, Luis). La comisión NTL es 5 % del **FOB**, no del CIF (ya lo era; el test lo fija).
 **Fujian paga 35 %** (v23.78, Luis: *"solo ponele 35% a fujian / 18% al resto"*): `_DERECHOS_PROV` / `_derechosProv(prov)`, los tres modos.
 
+## ⚠ REGLA (Luis, 2026-09-29, v23.82): el operario entra con la CLAVE DE LA TV
+
+La TV (`monitor/tv.html`) muestra chiquito **🔑 + 4 dígitos** (`gv_tv_clave_actual`, cambia cada **15 min**, vale
+también la anterior). En el celular: clave → **elige su nombre** (Empleados activos sede V o sin sede,
+`gv_tv_clave_validar`) o **＋ No estoy en la lista** → legajo. Sin clave el legajo no entra. Google (supervisor) sigue igual.
+⚠ **No es un candado**: la TV lee con la clave pública; es para que se entre estando en el depósito. La clave sale de un
+md5 del `system_identifier` del cluster (no hay secreto en el repo, que es público).
+`sql/gv_tv_clave_v2382.sql`, `tests/tv-clave-login.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-28, v23.56): si la base de Gestión NO CONTESTA, avisa Telegram — y el vigilante vive en LK
 
 Caída del 28/09 14:11–14:19 ART (reinicio de la plataforma, instancia chica; Luis decidió **no** subir la instancia).
