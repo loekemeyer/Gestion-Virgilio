@@ -6345,5 +6345,6 @@ lo que cambió es **dónde están esos dos divs**, no la lógica. `tests/tv-meta
   fotos (`_pedImpPrintConFotos`, techo 8 s): `remitoPrintDoc` imprime a los 400 ms y saldrían en blanco.
 - **Las fotos son las de la página** (bucket `products-images`, `<cod>.webp`, el mismo que usa `pagina-LK-copia`),
   con sus variantes: con/sin «E» y sin sufijo S/D/C; después el bucket de Chef. Medido 29/09: 106 de 150 en LK.
+- **Los INSUMOS (partes, `esParte`) van SIN foto** en el PDF de Damián (Thomas, v24.44: 505C, 523C, 587C, 1000900, 1546903).
 - El PDF del chino (🖨 PDF pedido) lleva **Inner Cajas** = unidades ÷ `Importados_Volumen.uni_inner` (v24.40).
 `tests/pedimp-prioridad-damian.cjs`, `tests/pedimp-pdf-inner.cjs`.
