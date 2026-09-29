@@ -99,5 +99,19 @@ near(N._nacEstad(6000, 7000).v, 210, 0.01, "FOB 6.000: 3% del CIF, sin tope");
 near(N._nacEstad(6001, 6100).v, 180, 0.01, "FOB 6.001: 180 fijo");
 near(N._nacEstad(10000, 11000).v, 180, 0.01, "FOB 10.000: 180 fijo");
 near(N._nacEstad(10001, 11000).v, 330, 0.01, "FOB 10.001: 3% sin tope");
+// v23.80 (Luis): recuperable separado; la comisión NTL va sobre el FOB, no sobre el CIF.
+var r80 = N._pedImpNacionalizar(33381.6, 31.53, { modo: "consolidada", valorM3: 110, tn: 10, ntl: true });
+var d80 = r80.detalle.filter(function (d) { return /NTL/.test(d[0]); })[0];
+near(d80[1], 0.05 * 33381.6, 0.01, "NTL = 5% del FOB (no del CIF)");
+ok(r80.cif > 33381.6 && Math.abs(d80[1] - 0.05 * r80.cif) > 1, "NTL no usa el CIF");
+var base80 = r80.cif + r80.detalle.filter(function (d) { return /^Derechos/.test(d[0]); })[0][1] + r80.detalle.filter(function (d) { return /^Estad/.test(d[0]); })[0][1];
+near(r80.recup, base80 * (0.21 + 0.20 + 0.06 + 0.025), 0.01, "Recuperable = 49,5% de (CIF + derechos + estadística)");
+near(r80.noRecup, 15854.88, 1, "Lo recuperable NO se suma al no recuperable");
+var fu80 = N._pedImpNacionalizar(7282, 26, { modo: "full", fleteFull: 2000, ntl: true });
+ok(fu80.recup > 0 && fu80.detRecup.length === 4, "Contenedor también muestra lo recuperable");
+var av80 = N._pedImpNacionalizar(9324, 12.4, { modo: "avion", tn: 1 });
+ok(av80.recup === 0, "Avión (courier): el IVA no se recupera, queda en el costo");
+var h80 = N._pedImpDesgDer(r80, 33381.6, 31.53);
+ok(/No recuperable/.test(h80) && /Recuperable ·/.test(h80) && /Total recuperable/.test(h80) && /Plata a tener al despachar/.test(h80), "El desglose separa recuperable de no recuperable");
 if (fail) { console.error("\n" + fail + " chequeo(s) fallaron."); process.exit(1); }
 console.log("\nOK — nacionalización y proyección 25k.");

@@ -6221,7 +6221,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.79"></script>
+<script type="module" src="recepcion.js?v=23.80"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10239,7 +10239,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.79";
+const APP_VERSION = "v23.80";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -21047,6 +21047,16 @@ function _nacEstad(fob, cif) {
   if (fob > 6000 && fob <= 10000) return { v: 180, lbl: "Estadística (FOB 6.001–10.000: fijo 180)", txt: "FOB " + _nacF(fob) + " entre 6.001 y 10.000 → u$s 180 fijos" };
   return { v: 0.03 * cif, lbl: "Estadística (3% CIF)", txt: "3% × CIF " + _nacF(cif) + " (FOB " + _nacF(fob) + (fob > 10000 ? " > 10.000: sin tope)" : " ≤ 6.000)") };
 }
+// v23.80 (Luis): lo RECUPERABLE, separado. Base imponible = CIF + derechos + estadística (la de aduana).
+// Tasas generales: IVA 21%, IVA adicional 20%, Ganancias 6%, IIBB 2,5%. Se pagan al despachar y
+// vuelven como crédito fiscal: NO van al costo del artículo, pero sí hay que tener la plata.
+function _nacRecup(cif, derechos, estad) {
+  var base = cif + derechos + estad;
+  var bt = "base " + _nacF(base) + " (CIF + derechos + estadística)";
+  var d = [["IVA (21%)", 0.21 * base, "21% × " + bt], ["IVA adicional (20%)", 0.20 * base, "20% × base"],
+    ["Ganancias (6%)", 0.06 * base, "6% × base"], ["Ingresos Brutos (2,5%)", 0.025 * base, "2,5% × base"]];
+  return { base: base, total: d.reduce(function (s, x) { return s + x[1]; }, 0), detalle: d };
+}
 // v23.78 (Luis): derechos 35% del CIF sólo para Fujian; el resto 18% de base.
 const _DERECHOS_PROV = { "Fujian": 0.35 };
 function _derechosProv(prov) { var t = _DERECHOS_PROV[String(prov || "").trim()]; return t != null ? t : 0.18; }
@@ -21096,8 +21106,9 @@ function _pedImpNacionalizar(fob, m3, opts) {
       ["Tasas (Sim + est.)", tasasF, "Sim 10 + tasa est. 180"],
       ["Gastos varios", gastosF, "flete a depósito 150 + bancarios 40"],
       ["Despachante", despachF, "máx(300; 1% FOB) + 150 + 100 + 30"]];
-    if (ntl) det.push(["NTL (5% FOB)", ntl5F, "5% × FOB " + _nacF(fob) + " (factura vía NTL)"]);
-    return { modo: modo, ok: true, cif: cifF, cifTxt: "flete " + _nacF(fleteF) + " + seguro " + _nacF(seguroF) + " + FOB " + _nacF(fob), ntl: ntl5F, noRecup: noRecupF, factor: noRecupF / fob, landed: fob + noRecupF, detalle: det };
+    if (ntl) det.push(["Comisión NTL (5% FOB)", ntl5F, "5% × FOB " + _nacF(fob) + " (sobre FOB, no CIF)"]);
+    var _rF = _nacRecup(cifF, derechosF, estadF);
+    return { modo: modo, ok: true, cif: cifF, cifTxt: "flete " + _nacF(fleteF) + " + seguro " + _nacF(seguroF) + " + FOB " + _nacF(fob), ntl: ntl5F, noRecup: noRecupF, factor: noRecupF / fob, landed: fob + noRecupF, detalle: det, recup: _rF.total, detRecup: _rF.detalle, baseRecup: _rF.base };
   }
   if (modo === "avion") {
     var kg = tn * 1000;
@@ -21114,7 +21125,7 @@ function _pedImpNacionalizar(fob, m3, opts) {
       ["Seguro (1%)", seguroA, "1% × (FOB + certif.)"], ["Derechos (" + pctDer + "%)", derechosA, pctDer + "% × CIF " + _nacF(cifA)],
       [_eA.lbl, estadA, _eA.txt], ["IVA importación", ivaImpA, "21% × (derechos + CIF)"],
       ["Tasa desembolso", tasaDesA, "fijo"], ["Gestión Comex", gestionA, "fijo"]];
-    return { modo: modo, ok: (kg > 0), cif: cifA, cifTxt: "FOB " + _nacF(fob) + " + seguro " + _nacF(seguroA) + " + certif. " + _nacF(certA), noRecup: noRecupA, ntl: 0, factor: noRecupA / fob, landed: fob + noRecupA, detalle: det, sinPeso: !(kg > 0) };
+    return { modo: modo, ok: (kg > 0), cif: cifA, cifTxt: "FOB " + _nacF(fob) + " + seguro " + _nacF(seguroA) + " + certif. " + _nacF(certA), noRecup: noRecupA, ntl: 0, factor: noRecupA / fob, landed: fob + noRecupA, detalle: det, recup: 0, detRecup: [], sinPeso: !(kg > 0) };
   }
   // consolidada (default) — marítimo LCL
   var fleteTot = 1080 + 35 + 90 + (tn < 1 ? 4 : tn * 4) + (valorM3 + 25) * m3;   // Costo Flete total (D10)
@@ -21137,8 +21148,9 @@ function _pedImpNacionalizar(fob, m3, opts) {
     ["Tasas (Sim + est.)", sim + tasaFija, "Sim 10 + tasa est. 180"],
     ["Gastos varios", gastosVarios, "flete a depósito 30 + bancarios 40"],
     ["Despachante", despach, "máx(300; 1% FOB) + 120 + 30"]];
-  if (ntl) det.push(["NTL (5% FOB)", ntl5, "5% × FOB " + _nacF(fob) + " (factura vía NTL)"]);
-  return { modo: modo, ok: true, cif: cif, cifTxt: "flete marítimo " + _nacF(valorM3) + " × " + _nacF2(m3) + " m³ = " + _nacF(fleteCif) + " + seguro 0,5% " + _nacF(seguro) + " + FOB " + _nacF(fob), ntl: ntl5, noRecup: noRecup, factor: noRecup / fob, landed: fob + noRecup, detalle: det };
+  if (ntl) det.push(["Comisión NTL (5% FOB)", ntl5, "5% × FOB " + _nacF(fob) + " (sobre FOB, no CIF)"]);
+  var _rC = _nacRecup(cif, derechos, estad);
+  return { recup: _rC.total, detRecup: _rC.detalle, baseRecup: _rC.base, modo: modo, ok: true, cif: cif, cifTxt: "flete marítimo " + _nacF(valorM3) + " × " + _nacF2(m3) + " m³ = " + _nacF(fleteCif) + " + seguro 0,5% " + _nacF(seguro) + " + FOB " + _nacF(fob), ntl: ntl5, noRecup: noRecup, factor: noRecup / fob, landed: fob + noRecup, detalle: det };
 }
 /* v22.37 — proyección del corte de min USD por proveedor: dado lo que hoy hay a pedir en FOB,
    el consumo mensual en FOB (proy×fob) y el techo (objetivo lleno en FOB), dice cuándo se llega
@@ -21194,25 +21206,35 @@ function _pedImpDesgIzq(proy, minUsd, items) {
   return h;
 }
 function _pedImpDesgDer(nac, totUsd, m3) {
-  var td = 'style="padding:2px 6px;border-bottom:1px solid #c7d2fe;vertical-align:top"';
-  var tdn = 'style="padding:2px 6px;border-bottom:1px solid #c7d2fe;text-align:right;white-space:nowrap;vertical-align:top"';
-  var h = '<div style="margin-top:6px;font-size:11.5px;color:#312e81">' +
-    (nac.cif > 0 ? '<div style="margin-bottom:4px"><b>CIF</b> = ' + nac.cifTxt + ' = <b>' + _usd0(nac.cif) + '</b> (base de derechos y estadística)</div>' : '') +
+  // v23.80 (Luis): más grande, y lo recuperable separado de lo que queda en el costo.
+  var td = 'style="padding:4px 8px;border-bottom:1px solid #c7d2fe;vertical-align:top"';
+  var tdn = 'style="padding:4px 8px;border-bottom:1px solid #c7d2fe;text-align:right;white-space:nowrap;vertical-align:top;font-weight:700"';
+  var tit = function (txt, col) { return '<tr><td colspan="3" style="padding:8px 8px 3px;font-weight:800;font-size:14px;color:' + col + '">' + txt + '</td></tr>'; };
+  var fila = function (d, col) { return '<tr><td ' + td + '>' + escapeHtml(d[0]) + '</td><td ' + td + ' style="color:' + col + ';font-size:12.5px">' + escapeHtml(d[2] || "") + '</td><td ' + tdn + '>' + _usd0(d[1]) + '</td></tr>'; };
+  var tot = function (lbl, txt, v, bg) { return '<tr style="background:' + bg + '"><td style="padding:5px 8px"><b>' + lbl + '</b></td><td style="padding:5px 8px;font-size:12.5px">' + txt + '</td><td style="padding:5px 8px;text-align:right;white-space:nowrap;font-size:15px"><b>' + _usd0(v) + '</b></td></tr>'; };
+  var rec = nac.detRecup || [];
+  var h = '<div style="margin-top:8px;font-size:13.5px;color:#312e81">' +
+    (nac.cif > 0 ? '<div style="margin-bottom:6px"><b>CIF</b> = ' + nac.cifTxt + ' = <b>' + _usd0(nac.cif) + '</b> (base de derechos y estadística)</div>' : '') +
     '<table style="border-collapse:collapse;width:100%"><tbody>' +
-    '<tr><td ' + td + '><b>FOB del pedido</b></td><td ' + td + '>' + _nacF2(m3) + ' m³</td><td ' + tdn + '><b>' + _usd0(totUsd) + '</b></td></tr>' +
-    (nac.detalle || []).map(function (d) {
-      return '<tr><td ' + td + '>+ ' + escapeHtml(d[0]) + '</td><td ' + td + ' style="color:#4338ca">' + escapeHtml(d[2] || "") + '</td><td ' + tdn + '>' + _usd0(d[1]) + '</td></tr>';
-    }).join('') +
-    '<tr><td style="padding:3px 6px"><b>No recuperable</b></td><td style="padding:3px 6px;color:#4338ca">' + _usd0(nac.noRecup) + ' ÷ FOB ' + _usd0(totUsd) + ' = <b>+' + Math.round(nac.factor * 100) + '%</b></td><td style="padding:3px 6px;text-align:right;white-space:nowrap"><b>' + _usd0(nac.noRecup) + '</b></td></tr>' +
-    '<tr><td style="padding:3px 6px"><b>Puesto en Arg</b></td><td style="padding:3px 6px">FOB + no recuperable</td><td style="padding:3px 6px;text-align:right;white-space:nowrap"><b>' + _usd0(nac.landed) + '</b></td></tr>' +
-    '</tbody></table>' + (nac.modo !== "avion" ? '<div style="margin-top:4px;color:#6366f1">No entran el IVA ni las percepciones que se recuperan: sólo lo que queda pegado al costo.</div>' : '') + '</div>';
+    '<tr><td ' + td + '><b>FOB del pedido</b></td><td ' + td + '>' + _nacF2(m3) + ' m³</td><td ' + tdn + '>' + _usd0(totUsd) + '</td></tr>' +
+    tit('🔴 No recuperable · queda en el costo', '#b91c1c') +
+    (nac.detalle || []).map(function (d) { return fila(d, "#4338ca"); }).join('') +
+    tot('Total no recuperable', '÷ FOB = +' + Math.round(nac.factor * 100) + '%', nac.noRecup, '#fee2e2') +
+    tot('Puesto en Arg', 'FOB + no recuperable', nac.landed, '#e0e7ff');
+  if (rec.length) {
+    h += tit('🟢 Recuperable · se paga al despachar y vuelve como crédito fiscal', '#047857') +
+      rec.map(function (d) { return fila(d, "#047857"); }).join('') +
+      tot('Total recuperable', 'no va al costo del artículo', nac.recup, '#d1fae5') +
+      tot('Plata a tener al despachar', 'FOB + no recuperable + recuperable', nac.landed + nac.recup, '#fef3c7');
+  }
+  h += '</tbody></table>' + (nac.modo === "avion" ? '<div style="margin-top:6px;color:#6366f1">Avión (courier): el IVA no se recupera, por eso va en el costo.</div>' : '') + '</div>';
   return h;
 }
 /* Banda por proveedor: proyección al mínimo (izq) + costo de nacionalización del pedido (der). */
 function _pedImpBandaHtml(proy, nac, minUsd, totUsd, ext) {
   ext = ext || {};
   var chip = function (bg, bd, col, html, desg, lado) {
-    var base = 'flex:1 1 300px;min-width:250px;background:' + bg + ';border:1px solid ' + bd + ';border-radius:9px;padding:8px 11px;font-size:12.5px;color:' + col + ';line-height:1.4';
+    var base = 'flex:1 1 300px;min-width:250px;background:' + bg + ';border:1px solid ' + bd + ';border-radius:9px;padding:10px 13px;font-size:14px;color:' + col + ';line-height:1.45';
     if (!desg) return '<div style="' + base + '">' + html + '</div>';
     var k = String(ext.prov || "") + "|" + lado;
     return '<details class="pedimp-desg" data-k="' + escapeHtml(k) + '" ontoggle="_pedImpDesgToggle(this)"' + (_pedImpDesgAb[k] ? ' open' : '') + ' style="' + base + '">' +
@@ -21228,7 +21250,7 @@ function _pedImpBandaHtml(proy, nac, minUsd, totUsd, ext) {
   var modoTxt = { consolidada: "Consolidada", full: "Contenedor", avion: "Avión" }[nac.modo] || nac.modo;
   if (!(totUsd > 0)) der = chip("#f1f5f9", "#e2e8f0", "#475569", '🚢 Poné el pedido (columna <b>MC</b>) para ver el costo <b>puesto en Argentina</b>.');
   else if (nac.sinPeso) der = chip("#fef2f2", "#fecaca", "#991b1b", '✈️ <b>Avión:</b> cargá el <b>peso (TN)</b> arriba para calcular el flete FEDEX.');
-  else der = chip("#eef2ff", "#c7d2fe", "#3730a3", '🚢 <b>Puesto en Arg: ' + _usd0(nac.landed) + '</b> <span style="color:#4338ca">(' + modoTxt + ')</span><br>FOB ' + _usd0(totUsd) + ' + ' + _usd0(nac.noRecup) + ' no recuperable <b>(+' + Math.round(nac.factor * 100) + '%)</b>' + (nac.ntl > 0 ? ' · incl. NTL ' + _usd0(nac.ntl) : ''), _pedImpDesgDer(nac, totUsd, ext.m3), "der");
+  else der = chip("#eef2ff", "#c7d2fe", "#3730a3", '🚢 <span style="font-size:17px"><b>Puesto en Arg: ' + _usd0(nac.landed) + '</b></span> <span style="color:#4338ca">(' + modoTxt + ')</span><br>FOB ' + _usd0(totUsd) + ' + <b style="color:#b91c1c">' + _usd0(nac.noRecup) + ' no recuperable (+' + Math.round(nac.factor * 100) + '%)</b>' + (nac.ntl > 0 ? ' · incl. comisión NTL ' + _usd0(nac.ntl) : '') + (nac.recup > 0 ? '<br><b style="color:#047857">+ ' + _usd0(nac.recup) + ' recuperable</b> <span style="color:#047857">(IVA y percepciones: vuelven como crédito)</span>' : ''), _pedImpDesgDer(nac, totUsd, ext.m3), "der");
   return '<div style="display:flex;gap:10px;flex-wrap:wrap;padding:10px 13px;background:#fff;border-bottom:1px solid #f1f5f9">' + izq + der + '</div>';
 }
 async function openPedidosImportacion() {
