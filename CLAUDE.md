@@ -6333,3 +6333,17 @@ fila ni como subtexto.
 
 ⚠ `pintarMeta` sigue escribiendo en `#metaBox` y devolviendo el cartel de CORTE para `#avisos`:
 lo que cambió es **dónde están esos dos divs**, no la lógica. `tests/tv-meta-camion.cjs` no se tocó.
+
+## ⚠ REGLA (Thomas, 2026-09-29, v24.43): Pedidos Importación va por PRIORIDAD — meses de stock CON lo en camino
+
+- **Meses stock = (stock disponible + en camino) ÷ proyección por mes** (`_pedImpMesesStock`). Cada proveedor se
+  ordena por ahí (`_pedImpPrioCmp`): menos meses primero, sin proyección al final. < 4 meses → rojo con ⚠ y badge
+  «⚠ N con < 4 meses» en el proveedor y en su ficha del filtro.
+- La columna **En camino** muestra las unidades y la fecha **dd/mm** (`Importados.reingreso_est`); sin fecha, «s/f».
+- **📄 PDF para Damián** (`pedImpPdfDamian`): Código · Descripción · Foto · Stock · En camino · Máximo (meses arriba) ·
+  Pedido en MC · FOB (total arriba) · m³ (total arriba) + el resumen de cómo se compone. Imprime esperando las
+  fotos (`_pedImpPrintConFotos`, techo 8 s): `remitoPrintDoc` imprime a los 400 ms y saldrían en blanco.
+- **Las fotos son las de la página** (bucket `products-images`, `<cod>.webp`, el mismo que usa `pagina-LK-copia`),
+  con sus variantes: con/sin «E» y sin sufijo S/D/C; después el bucket de Chef. Medido 29/09: 106 de 150 en LK.
+- El PDF del chino (🖨 PDF pedido) lleva **Inner Cajas** = unidades ÷ `Importados_Volumen.uni_inner` (v24.40).
+`tests/pedimp-prioridad-damian.cjs`, `tests/pedimp-pdf-inner.cjs`.

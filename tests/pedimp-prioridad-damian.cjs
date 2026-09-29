@@ -25,6 +25,7 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   };
   const items = [
     it("AAA", "Frontier", { stockUni: 900, aPedirUni: 100 }),   // 9 meses
+    it("FFF", "Frontier", { stockUni: 100, enCurso: 500, reingresoEst: "2026-11-18", aPedirUni: 400 }),   // 1 mes de stock, 6 con lo en camino
     it("BBB", "Frontier", { stockUni: 250, aPedirUni: 800 }),   // 2,5 meses → alerta
     it("CCC", "Frontier", { stockUni: 50, proyUni: 0, aPedirUni: 300 }),   // sin proyección
     it("DDD", "Frontier", { stockUni: 350, aPedirUni: 700 }),   // 3,5 meses → alerta
@@ -34,7 +35,9 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     _stkPopShell("📦 Pedidos Importación", "stkPopBody", true);
     _stkPop = { kind: "pedImp", data: { items: its, meses: 10, minUsd: 25000, nac: { modo: "consolidada", valorM3: 110, tn: 0 } }, soloPedir: false, mcOverride: {} };
     _pedImpRender();
-    const filas = [...document.querySelectorAll(".mva-tbl.wide tbody tr")].map((tr) => ({ cod: tr.cells[0].textContent.trim(), meses: tr.cells[4].textContent.trim(), rojo: /b91c1c/.test(tr.cells[4].getAttribute("style") || "") }));
+    const trs = [...document.querySelectorAll(".mva-tbl.wide tbody tr")];
+    const filas = trs.map((tr) => ({ cod: tr.cells[0].textContent.trim(), meses: tr.cells[4].textContent.trim(), rojo: /b91c1c/.test(tr.cells[4].getAttribute("style") || "") }));
+    const trF = trs.find((tr) => tr.cells[0].textContent.trim() === "FFF"); const camino = trF ? trF.cells[5].textContent.replace(/\s+/g, " ").trim() : "";
     const ths = [...document.querySelectorAll(".mva-tbl.wide")][0].querySelectorAll("thead th");
     const badges = [...document.querySelectorAll(".pedimp-alerta")].map((x) => x.textContent.trim());
     let html = ""; window._pedImpPrintConFotos = (h) => { html = h; };
@@ -42,10 +45,13 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     const d = document.createElement("div"); d.innerHTML = html.replace(/^[\s\S]*<body>/, "").replace(/<\/body>[\s\S]*$/, "");
     const pdfTh = [...d.querySelectorAll("thead th")].map((x) => x.textContent.trim());
     const pdfCods = [...d.querySelectorAll("tbody tr")].map((tr) => tr.cells[0].textContent.trim());
-    return { filas, th4: ths[4].textContent.trim(), badges, pdfTh, pdfCods, res: (d.querySelector(".res") || {}).textContent || "", imgs: d.querySelectorAll("tbody img").length };
+    return { filas, camino, th4: ths[4].textContent.trim(), badges, pdfTh, pdfCods, res: (d.querySelector(".res") || {}).textContent || "", imgs: d.querySelectorAll("tbody img").length };
   }, items);
   const cods = r.filas.map((f) => f.cod).join(",");
-  if (cods !== "BBB,DDD,AAA,CCC,EEE") fail("(A) orden por prioridad: esperaba BBB,DDD,AAA,CCC,EEE y dio " + cods);
+  if (cods !== "BBB,DDD,FFF,AAA,CCC,EEE") fail("(A) orden por prioridad (stock + en camino): esperaba BBB,DDD,FFF,AAA,CCC,EEE y dio " + cods);
+  const fff = r.filas.find((x) => x.cod === "FFF");
+  if (!fff || !/6,0/.test(fff.meses) || fff.rojo) fail("(A) FFF suma lo en camino: (100+500)/100 = 6,0 sin alerta: " + JSON.stringify(fff));
+  if (!/500 18\/11/.test(r.camino)) fail("(A) la columna En camino muestra unidades y dd/mm: " + r.camino);
   if (!/Meses/.test(r.th4)) fail("(B) la 5.ª columna tiene que ser Meses stock: " + r.th4);
   const f = Object.fromEntries(r.filas.map((x) => [x.cod, x]));
   if (!/2,5/.test(f.BBB.meses) || !f.BBB.rojo || !/⚠/.test(f.BBB.meses)) fail("(B) BBB 2,5 meses en rojo con ⚠: " + JSON.stringify(f.BBB));
@@ -53,13 +59,13 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (f.CCC.meses !== "—") fail("(B) sin proyección va —: " + f.CCC.meses);
   if (!r.badges.some((x) => /2 con < 4 meses/.test(x))) fail("(B) badge ⚠ 2 con < 4 meses en Frontier: " + JSON.stringify(r.badges));
   if (r.badges.some((x) => /1 con/.test(x))) fail("(B) Kangli no tiene alerta: " + JSON.stringify(r.badges));
-  const exp = ["Código", "Descripción", "Foto", "Stock", "Máximo", "Pedido", "FOB", "m³"];
+  const exp = ["Código", "Descripción", "Foto", "Stock", "En camino", "Máximo", "Pedido", "FOB", "m³"];
   exp.forEach((h, i) => { if (!(r.pdfTh[i] || "").startsWith(h)) fail("(C) columna " + (i + 1) + " del PDF tiene que ser " + h + ": " + r.pdfTh[i]); });
-  if (!/10 meses/.test(r.pdfTh[4])) fail("(C) Máximo lleva los meses arriba: " + r.pdfTh[4]);
-  if (!/total u\$s 1\.900/.test(r.pdfTh[6])) fail("(C) FOB lleva el total arriba (1.900): " + r.pdfTh[6]);
-  if (!/total 0,95/.test(r.pdfTh[7])) fail("(C) m³ lleva el total arriba (19 MC × 0,05 = 0,95): " + r.pdfTh[7]);
-  if (r.pdfCods.join(",") !== "BBB,DDD,AAA,CCC") fail("(C) PDF por prioridad y sólo Frontier: " + r.pdfCods.join(","));
-  if (r.imgs !== 4) fail("(C) una foto por artículo: " + r.imgs);
+  if (!/10 meses/.test(r.pdfTh[5])) fail("(C) Máximo lleva los meses arriba: " + r.pdfTh[5]);
+  if (!/total u\$s 2\.300/.test(r.pdfTh[7])) fail("(C) FOB lleva el total arriba (2.300): " + r.pdfTh[7]);
+  if (!/total 1,15/.test(r.pdfTh[8])) fail("(C) m³ lleva el total arriba (23 MC × 0,05 = 1,15): " + r.pdfTh[8]);
+  if (r.pdfCods.join(",") !== "BBB,DDD,FFF,AAA,CCC") fail("(C) PDF por prioridad y sólo Frontier: " + r.pdfCods.join(","));
+  if (r.imgs !== 5) fail("(C) una foto por artículo: " + r.imgs);
   if (!/Cómo se compone/.test(r.res) || !/master cajas/.test(r.res) || !/2 artículo\(s\) con menos de 4 meses/.test(r.res)) fail("(C) resumen incompleto: " + r.res);
   if (errs.length) fail("errores JS: " + errs.join(" | "));
   await b.close();

@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.42"></script>
+<script type="module" src="recepcion.js?v=24.43"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.42";
+const APP_VERSION = "v24.43";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -22196,12 +22196,20 @@ function pedImpSetMC(codEnc, val) {
   _pedImpRender();
 }
 /* v10.38 — MC efectivo (override o el calculado) y unidades en master cajas redondas. */
-/* v24.42 — MESES DE STOCK = stock disponible ÷ proyección por mes (lo que dice la columna Stock ÷
-   Proy u/mes). Sin proyección no hay meses: null ("—"), y va al final del orden. La alerta es < 4 meses. */
+/* v24.42 — MESES DE STOCK = (stock disponible + EN CAMINO) ÷ proyección por mes. v24.43 (Thomas):
+   suma lo que está en camino, y la columna En camino muestra la fecha (dd/mm) de reingreso.
+   Sin proyección no hay meses: null ("—"), y va al final del orden. La alerta es < 4 meses. */
 const _PEDIMP_MESES_ALERTA = 4;
 function _pedImpMesesStock(it) {
   const proy = Number(it && it.proyUni) || 0; if (!(proy > 0)) return null;
-  return Math.max(0, Number(it.stockUni) || 0) / proy;
+  return (Math.max(0, Number(it.stockUni) || 0) + Math.max(0, Number(it.enCurso) || 0)) / proy;
+}
+function _pedImpDdmm(f) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(f || "")); return m ? m[3] + "/" + m[2] : ""; }
+function _pedImpEnCaminoHtml(it, cls) {
+  const u = Math.max(0, Number(it.enCurso) || 0);
+  if (!(u > 0)) return '<span style="color:#cbd5e1">0</span>';
+  const f = _pedImpDdmm(it.reingresoEst);
+  return u.toLocaleString("es-AR") + (f ? ' <span class="' + (cls || 'pedimp-camino-f') + '" style="color:#0369a1;font-weight:700;font-size:12px" title="Llega (reingreso estimado)">' + f + '</span>' : ' <span style="color:#b45309;font-size:11px" title="Sin fecha de reingreso cargada">s/f</span>');
 }
 function _pedImpPrioCmp(a, b) {
   const ma = _pedImpMesesStock(a), mb = _pedImpMesesStock(b);
@@ -22215,10 +22223,9 @@ function _pedImpMesesCell(it) {
   const m = _pedImpMesesStock(it);
   if (m == null) return '<td class="num" style="color:#cbd5e1" title="Sin proyección de venta: no hay meses de stock">—</td>';
   const proy = Number(it.proyUni) || 0;
-  const stk = Math.max(0, Number(it.stockUni) || 0);
-  const conCurso = (Number(it.enCurso) > 0) ? ' · con lo en curso: ' + _pedImpMesesFmt((stk + Number(it.enCurso)) / proy) + ' meses' : '';
+  const stk = Math.max(0, Number(it.stockUni) || 0), cam = Math.max(0, Number(it.enCurso) || 0);
   const bajo = m < _PEDIMP_MESES_ALERTA;
-  return '<td class="num pedimp-meses" title="' + stk + ' u ÷ ' + proy + ' u/mes' + conCurso + '"' + (bajo ? ' style="color:#b91c1c;font-weight:800;background:#fef2f2"' : '') + '>' + (bajo ? '⚠ ' : '') + _pedImpMesesFmt(m) + '</td>';
+  return '<td class="num pedimp-meses" title="(' + stk + ' u stock + ' + cam + ' u en camino) ÷ ' + proy + ' u/mes' + (cam > 0 ? ' · sólo stock: ' + _pedImpMesesFmt(stk / proy) + ' meses' : '') + '"' + (bajo ? ' style="color:#b91c1c;font-weight:800;background:#fef2f2"' : '') + '>' + (bajo ? '⚠ ' : '') + _pedImpMesesFmt(m) + '</td>';
 }
 function _pedImpAlertaBadge(n) {
   return n > 0 ? ' <span class="pedimp-alerta" style="font-size:11px;font-weight:800;color:#fff;background:#dc2626;border-radius:999px;padding:1px 8px" title="Artículos de este proveedor con menos de ' + _PEDIMP_MESES_ALERTA + ' meses de stock">⚠ ' + n + ' con &lt; ' + _PEDIMP_MESES_ALERTA + ' meses</span>' : '';
@@ -22396,7 +22403,7 @@ function _pedImpRender() {
     _anchoMax = Math.max(_anchoMax, _ancho);
     h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide" style="min-width:' + _ancho + 'px">' +
       '<colgroup>' + _cols.map(function (w) { return '<col style="width:' + w + 'px">'; }).join('') + '</colgroup>' +
-      '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="Meses de stock = stock disponible ÷ proyección por mes. En rojo, menos de 4 meses. Sin proyección: —. La tabla se ordena por esta columna (menos meses primero).">Meses<small>stock</small></th><th class="num" title="En curso (unidades ya pedidas que no llegaron) y a pedir (unidades calculadas)">En curso<small>A pedir u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
+      '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="Meses de stock = (stock disponible + en camino) ÷ proyección por mes. En rojo, menos de 4 meses. Sin proyección: —. La tabla se ordena por esta columna (menos meses primero).">Meses<small>stock</small></th><th class="num" title="En camino: unidades ya pedidas que no llegaron, con la fecha estimada de llegada (dd/mm). Abajo, a pedir (unidades calculadas)">En camino<small>A pedir u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.forEach(function (it) {
       const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
@@ -22454,7 +22461,7 @@ function _pedImpRender() {
       // código volvió a ser texto. Tocar el código para ver una proyección no se adivina.
       const _proyCaj = (Number(it.uxc) > 0) ? (Number(it.proyUni) || 0) / Number(it.uxc) : 0;
       const _proyCell = '<td class="num imp2 pedimp-proy" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td>';
-      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td>' + _proyCell + '<td class="num">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num imp2">' + it.enCurso + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td>' + _proyCell + '<td class="num">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num imp2">' + _pedImpEnCaminoHtml(it) + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -22506,9 +22513,15 @@ function pedImpPdfProv(provEnc) {
 const _PEDIMP_FOTO_LK = "https://kwkclwhmoygunqmlegrg.supabase.co/storage/v1/object/public/products-images/";
 const _PEDIMP_FOTO_CH = "https://nkhzocgdpwtgrmwleihr.supabase.co/storage/v1/object/public/products-images/";
 function _pedImpFotoHtml(cod) {
-  const c = encodeURIComponent(String(cod || "").trim());
-  if (!c) return '<span class="sf">sin foto</span>';
-  return '<img src="' + _PEDIMP_FOTO_LK + c + '.webp" data-alt="' + _PEDIMP_FOTO_CH + c + '.webp" onerror="if(this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=\'\';}else{this.outerHTML=\'<span class=sf>sin foto</span>\';}">';
+  const c0 = String(cod || "").trim().toUpperCase();
+  if (!c0) return '<span class="sf">sin foto</span>';
+  // v24.43 — las mismas variantes que usa la página LK (script.js / osa): el código, con o sin «E»,
+  // y sin el sufijo de suelto/parte (323ES → 323E, 505C → 505). Después, el bucket de Chef.
+  // Medido 29/09: con las variantes LK encuentra 106 de 150 importados (97 sin ellas).
+  const alts = [c0, /E$/.test(c0) ? c0.slice(0, -1) : c0 + "E", c0.replace(/(E)[SD]$/, "$1"), c0.replace(/[A-Z]+$/, "")];
+  const urls = [];
+  [_PEDIMP_FOTO_LK, _PEDIMP_FOTO_CH].forEach(function (base) { alts.forEach(function (a) { const u = base + encodeURIComponent(a) + ".webp"; if (a && urls.indexOf(u) < 0) urls.push(u); }); });
+  return '<img src="' + urls[0] + '" data-alts="' + urls.slice(1).join("|") + '" onerror="var l=(this.dataset.alts||\'\').split(\'|\').filter(Boolean);if(l.length){this.dataset.alts=l.slice(1).join(\'|\');this.src=l[0];}else{this.outerHTML=\'<span class=sf>sin foto</span>\';}">';
 }
 function _pedImpDamianData(prov) {
   const data = (_stkPop && _stkPop.data) || { items: [] };
@@ -22536,19 +22549,20 @@ function pedImpPdfDamian(provEnc) {
       '<td class="dsc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</td>' +
       '<td class="c ft">' + _pedImpFotoHtml(codCanon(it.cod)) + '</td>' +
       '<td class="c">' + fmt(Math.max(0, Number(it.stockUni) || 0)) + '<small>' + (bajo ? '⚠ ' : '') + (m == null ? 'sin proy.' : _pedImpMesesFmt(m) + ' meses') + '</small></td>' +
+      '<td class="c">' + _pedImpEnCaminoHtml(it, 'ecf') + '</td>' +
       '<td class="c">' + fmt(it.objetivoUni) + '<small>' + fmt(it.proyUni) + ' u/mes × ' + (Number(it.meses) || d.mesesGral) + '</small></td>' +
       '<td class="c"><b>' + fmt(mc) + ' MC</b><small>' + fmt(u) + ' u' + (it.uniMaster > 0 ? ' (' + it.uniMaster + '/MC)' : '') + '</small></td>' +
       '<td class="c">' + (usd > 0 ? 'u$s ' + fmt(usd) : '—') + '<small>' + (it.fobUni > 0 ? fmt(it.fobUni, 3) + ' /u' : 'sin FOB') + '</small></td>' +
       '<td class="c">' + (m3 > 0 ? fmt(m3, 2) : '—') + '</td></tr>';
   }).join("");
-  const head = '<tr><th>Código</th><th>Descripción</th><th>Foto</th><th>Stock<small>meses de stock</small></th>' +
+  const head = '<tr><th>Código</th><th>Descripción</th><th>Foto</th><th>Stock<small>meses (stock + en camino)</small></th><th>En camino<small>llega dd/mm</small></th>' +
     '<th>Máximo<small>' + mesesTxt + ' meses</small></th><th>Pedido<small>master cajas</small></th>' +
     '<th>FOB<small>total u$s ' + fmt(tot.usd) + '</small></th><th>m³<small>total ' + fmt(tot.m3, 2) + '</small></th></tr>';
   const resumen = '<div class="res"><div class="rt">Cómo se compone el pedido</div><ol>' +
     '<li><b>Máximo</b> = proyección de venta por mes × <b>' + mesesTxt + ' meses</b> objetivo de ' + escapeHtml(prov) + '.</li>' +
     '<li><b>A pedir</b> = máximo − stock disponible (ya descontados los pedidos abiertos) − lo que está en camino.</li>' +
     '<li>Eso se <b>redondea para arriba a master cajas</b> enteras (' + (arr.some(function (it) { return (_stkPop.mcOverride || {})[it.key || it.cod] != null; }) ? 'hay master cajas ajustadas a mano' : 'ninguna ajustada a mano') + ').</li>' +
-    '<li>Orden: primero lo que tiene <b>menos meses de stock</b> (stock ÷ proyección por mes).</li></ol>' +
+    '<li>Orden: primero lo que tiene <b>menos meses de stock</b> ((stock + en camino) ÷ proyección por mes).</li></ol>' +
     '<div class="tt"><b>' + arr.length + '</b> artículos · <b>' + fmt(tot.mc) + '</b> master cajas · <b>' + fmt(tot.u) + '</b> unidades · FOB <b>u$s ' + fmt(tot.usd) + '</b> · <b>' + fmt(tot.m3, 2) + ' m³</b></div>' +
     (bajos.length ? '<div class="al">⚠ ' + bajos.length + ' artículo(s) con menos de ' + _PEDIMP_MESES_ALERTA + ' meses de stock: ' + bajos.map(function (it) { return escapeHtml(codCanon(_impCodVista(it))) + ' (' + _pedImpMesesFmt(_pedImpMesesStock(it)) + ')'; }).join(", ") + '</div>' : '') +
     ((sinFob || sinM3) ? '<div class="nt">' + (sinFob ? sinFob + ' sin FOB cargado (no suman al total). ' : '') + (sinM3 ? sinM3 + ' sin volumen cargado (no suman m³).' : '') + '</div>' : '') + '</div>';
@@ -22561,7 +22575,7 @@ function pedImpPdfDamian(provEnc) {
     '.res{display:table;margin:10px auto 0;max-width:1000px;border:1px solid #444;padding:6px 10px}.rt{font-weight:800;margin-bottom:3px}.res ol{margin:0 0 5px;padding-left:18px}' +
     '.tt{margin-top:3px}.al{margin-top:4px;color:#b91c1c;font-weight:700}.nt{margin-top:3px;color:#555;font-size:11px}';
   const html = '<!doctype html><html><head><meta charset="utf-8"><title>Pedido ' + escapeHtml(prov) + ' — para Damián</title><style>' + css + '</style></head><body>' +
-    '<h1>PEDIDO · ' + escapeHtml(prov) + '</h1><div class="sub">Para Damián — ' + fecha + ' — ordenado por prioridad (menos meses de stock primero)</div>' +
+    '<h1>PEDIDO · ' + escapeHtml(prov) + '</h1><div class="sub">Para Damián — ' + fecha + ' — ordenado por prioridad (menos meses de stock + en camino primero)</div>' +
     '<table><thead>' + head + '</thead><tbody>' + filas + '</tbody></table>' + resumen + '</body></html>';
   _pedImpPrintConFotos(html);
 }
@@ -22614,7 +22628,7 @@ function pedImpExportExcel() {
   });
   var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#166534;color:#fff;text-align:left;}</style></head><body>';
   html += '<h3>Pedidos Importación — Producción Virgilio (' + esc(fecha) + ', índice ' + (data.meses || 10) + ' meses)' + (_q.length ? ' — búsqueda: ' + esc(_q.join(" ")) : '') + '</h3>';
-  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>Meses stock</th><th>En curso</th><th>A pedir u</th><th>Master cjs</th><th>FOB u$s/u</th><th>u$s pedido</th><th>m3/master</th><th>m3 pedido</th></tr>';
+  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>Meses (stock+camino)</th><th>En camino</th><th>Llega</th><th>A pedir u</th><th>Master cjs</th><th>FOB u$s/u</th><th>u$s pedido</th><th>m3/master</th><th>m3 pedido</th></tr>';
   var _totM3 = 0, _totUsd = 0;
   items.forEach(function (it) {
     var imp = _IMPORTADOR_DE[it.prov || ""] || "(sin importador)";
@@ -22622,9 +22636,9 @@ function pedImpExportExcel() {
     var caj = _pedImpMcOf(it);
     var m3m = Number(it.m3Master) || 0, m3t = _pedImpM3Of(it); _totM3 += m3t;
     var fob = Number(it.fobUni) || 0, usd = _pedImpUsdOf(it); _totUsd += usd;
-    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (_pedImpMesesStock(it) == null ? '' : _pedImpMesesFmt(_pedImpMesesStock(it))) + '</td><td>' + (it.enCurso || 0) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (fob > 0 ? fob : "") + '</td><td>' + (usd > 0 ? Math.round(usd) : "") + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
+    html += '<tr><td>' + esc(imp) + '</td><td>' + esc(it.prov || "") + '</td><td>' + esc(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</td><td>' + esc(artNombre(it.cod, it.desc)) + '</td><td>' + (it.proyUni || 0) + '</td><td>' + (it.objetivoUni || 0) + '</td><td>' + stk + '</td><td>' + (_pedImpMesesStock(it) == null ? '' : _pedImpMesesFmt(_pedImpMesesStock(it))) + '</td><td>' + (it.enCurso || 0) + '</td><td>' + esc(_pedImpDdmm(it.reingresoEst)) + '</td><td>' + (it.aPedirUni || 0) + '</td><td>' + caj + '</td><td>' + (fob > 0 ? fob : "") + '</td><td>' + (usd > 0 ? Math.round(usd) : "") + '</td><td>' + (m3m > 0 ? m3m : "") + '</td><td>' + (m3t > 0 ? (Math.round(m3t * 100) / 100) : "") + '</td></tr>';
   });
-  html += '<tr><td colspan="12"><b>TOTALES</b></td><td><b>' + Math.round(_totUsd) + '</b></td><td></td><td><b>' + (Math.round(_totM3 * 100) / 100) + '</b></td></tr>';
+  html += '<tr><td colspan="13"><b>TOTALES</b></td><td><b>' + Math.round(_totUsd) + '</b></td><td></td><td><b>' + (Math.round(_totM3 * 100) / 100) + '</b></td></tr>';
   html += '</table></body></html>';
   try {
     var blob = new Blob(["﻿" + html], { type: "application/vnd.ms-excel" });
@@ -63812,7 +63826,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.42"></script>
+<script src="cobranzas.js?v=24.43"></script>
 
 </body>
 </html>
