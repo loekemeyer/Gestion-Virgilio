@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.47"></script>
+<script type="module" src="recepcion.js?v=24.48"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.47";
+const APP_VERSION = "v24.48";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -22513,10 +22513,13 @@ function pedImpPdfProv(provEnc) {
 const _PEDIMP_FOTO_LK = "https://kwkclwhmoygunqmlegrg.supabase.co/storage/v1/object/public/products-images/";
 const _PEDIMP_FOTO_CH = "https://nkhzocgdpwtgrmwleihr.supabase.co/storage/v1/object/public/products-images/";
 // v24.47 (Thomas) — artículos sin foto propia que usan la de otro: misma foto, otro código.
-const _PEDIMP_FOTO_ALIAS = { "838E": "323E", "877E": "809E", "198E": "598E" };
+// La clave "COD|CH" vale sólo para el artículo de esa empresa (el 809E de LK sigue con su foto).
+const _PEDIMP_FOTO_ALIAS = { "838E": "323E", "877E": "809E", "198E": "598E", "692E": "816E",
+  "809E|CH": "574E", "437E|CH": "437E", "438E|CH": "438E", "439E|CH": "439E" };
 function _pedImpFotoHtml(cod, emp) {
   let c0 = String(cod || "").trim().toUpperCase();
-  if (_PEDIMP_FOTO_ALIAS[c0]) { c0 = _PEDIMP_FOTO_ALIAS[c0]; emp = ""; }   // la foto es de otro artículo: LK primero (877E → 809E de Loeke)
+  const _al = _PEDIMP_FOTO_ALIAS[c0 + "|" + (emp || "")] || _PEDIMP_FOTO_ALIAS[c0];
+  if (_al) { c0 = _al; emp = ""; }   // la foto es de otro artículo: LK primero (877E → 809E de Loeke)
   if (!c0) return '<span class="sf">sin foto</span>';
   // v24.43 — las mismas variantes que usa la página LK (script.js / osa): el código, con o sin «E»,
   // y sin el sufijo de suelto/parte (323ES → 323E, 505C → 505). Después, el bucket de Chef.
@@ -63842,7 +63845,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.47"></script>
+<script src="cobranzas.js?v=24.48"></script>
 
 </body>
 </html>
