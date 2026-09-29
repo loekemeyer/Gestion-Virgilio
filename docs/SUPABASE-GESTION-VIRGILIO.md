@@ -30124,6 +30124,9 @@ bloques y borde grueso alrededor de cada uno (banda + encabezado + datos); Opera
 tres de horas del día llevan el encabezado en las dos filas, como la celda combinada de la
 planilla. El margen se centra solo. Verificado con el 25/09 (200, mismos números).
 
+**v23.92 (edge v26):** la banda de *Total x Día* lleva la unidad debajo, **(M3)**, igual que
+*Ritmo (M3 x Hs)* y que la pantalla. Verificado con el 25/09 (200, 3 operarios).
+
 **Luis, 2026-09-28**, con la planilla del 25/09: *"arma el pdf del modulo de arriba de esta forma"*
 · *"hs no prod deberian ser todas las tareas que no sean hs prod"*.
 

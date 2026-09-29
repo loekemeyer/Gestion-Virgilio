@@ -451,7 +451,7 @@ function aFila(p: any, dias: number, empMap: Map<string, string>, ex: Extra): Fi
 const BANDAS: { h: string[]; n: number }[] = [
   { h: [], n: 1 },                            // Operario
   { h: ["Ritmo", "(M3 x Hs)"], n: 2 },
-  { h: ["Total x Dia"], n: 2 },
+  { h: ["Total x Dia", "(M3)"], n: 2 },
   { h: [], n: 3 },                            // Total Hs Dia / Hs Prod / Hs No Productivas
   { h: ["Tiempo", "Productivo"], n: 2 },
   { h: ["Tiempo No Productivo"], n: 6 },
