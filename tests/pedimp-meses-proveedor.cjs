@@ -54,11 +54,15 @@ const CFG_NAC = [{ meses_objetivo: 10, derechos_pct: 0.18, ntl_pct: 0.05, iva_pc
     n: s.options.length,
     primera: s.options[0].value,
     max: Math.max.apply(null, [...s.options].map((o) => Number(o.value) || 0)),
-    elegida: s.value
+    elegida: s.value,
+    textos: [...s.options].map((o) => o.textContent)
   })));
   if (sels.length !== 2) fail("(A) esperaba un selector de meses por proveedor y hay " + sels.length);
-  if (sels[0] && (sels[0].n !== 25 || sels[0].max !== 24 || sels[0].primera !== ""))
-    fail("(A) el desplegable tiene que ir de 1 a 24 más «gral»: " + JSON.stringify(sels[0]));
+  // v24.63 (Thomas: «sacá el (gral)») — el general es su número pelado (10) y no se repite: 24 opciones
+  if (sels[0] && (sels[0].n !== 24 || sels[0].max !== 24 || sels[0].primera !== ""))
+    fail("(A) el desplegable tiene que ir de 1 a 24, con el general como número: " + JSON.stringify(sels[0]));
+  if (sels[0] && (sels[0].textos[0] !== "10" || sels[0].textos.some((x) => /gral/i.test(x)) || sels[0].textos.filter((x) => x === "10").length !== 1))
+    fail("(A) sin «gral»: la primera opción es «10» y no se repite: " + JSON.stringify(sels[0].textos));
   if (sels[0] && sels[0].elegida !== "") fail("(A) Frontier no tiene meses propios: tenía que quedar en «gral», y quedó en " + sels[0].elegida);
   if (sels[1] && sels[1].elegida !== "6") fail("(A) Kangli tiene 6 meses propios y el select dice " + (sels[1] || {}).elegida);
 
