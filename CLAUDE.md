@@ -4254,6 +4254,51 @@ abrió uno nuevo diría "está verde" con `main` en rojo. Por eso el paso del av
 `context.sha` contra el head de `main`** y, si main ya avanzó, no toca el issue: ese run habla
 de un commit que ya no es el estado de hoy.
 
+## ⚠ REGLA (Luis, 2026-09-29, v23.98): el submódulo COBRANZAS vive en `cobranzas.js`, y la deuda se consolida por CUIT
+
+**Luis:** *"submódulo de cobranzas … debería tener pestañas dentro, empezando con la de búsqueda de
+clientes … se busca un cliente (lk o ch) y se abre una ficha con esos datos con deuda consolidada"*.
+
+Pantalla propia **`openCobranzas()`** (botón «💳 Cobranzas (nuevo)» del panel supervisor), 4 pestañas;
+la primera busca por nombre, código o CUIT y abre la ficha: deuda consolidada, desglose por empresa,
+comprobante por comprobante con su pago, cuenta corriente y la escala de descuentos con el escalón que
+corresponde a los días marcado. Lee lo que ya existía (`gv_cobranza_clientes`, `gv_cobranza_cliente`,
+`gv_cobranza_cuenta`, `cobranzas_escalones`) más **`gv_cobranza_clientes_cuit()`**, que es lo único
+nuevo y es lectura.
+
+> ## **La deuda consolidada se arma por CUIT. NUNCA por nombre.**
+
+Un cliente tiene códigos distintos en cada empresa (**LK 4045 / CH 2211**) y la razón social viene con
+el sufijo de sucursal que le pega ISIS: *"Bazar Monica S. CAP I SECC IV"* (LK) y *"Bazar Monica SRL"*
+(CH) son **el mismo cliente**. Agrupar por nombre lo parte en dos, y dos nombres parecidos de clientes
+distintos los fusiona. Es la regla v13.76 (*"el cod cliente no significa nada, sólo el CUIT vale"*)
+aplicada a cobranzas. **Sin CUIT el código va solo** y la ficha lo dice con el chip «sin CUIT»: no se
+adivina. Medido el 29/09: **69 CUIT tienen código en las dos empresas**.
+
+⚠ **Está en `cobranzas.js`, no en `index.html`**, y se carga con `?v=` atado a `APP_VERSION` (entró a
+`SIGUEN_APP_VERSION` de `scripts/bump-version.cjs` y `tests/version-tokens.cjs`). **Al sacar cualquier
+módulo nuevo del index, ese es el camino**: el index ya va por 63.000 líneas, 4,4 MB y un byte NUL
+adentro.
+
+⚠⚠ **`window.sb`**: `const sb = createClient(...)` vive **adentro de la IIFE** del login, así que un `.js`
+externo no lo ve (`sb is not defined`, y el módulo cae a DEMO sin decir por qué). Se expone el **mismo**
+objeto —no hay segundo cliente ni segunda sesión—. Cualquier módulo que salga del index cuelga de ahí.
+
+⚠ **El `button{width:100%;padding:16px;font-size:22px}` global del index (línea ~26) también muerde acá**:
+sin `#cbzOv button{width:auto;margin-top:0;…}` el botón Cerrar sale de una pantalla de ancho. Es el mismo
+pozo que el pop-up de Importados (v23.93).
+
+⚠ **NO reemplaza a `openCobros`** (la pantalla vieja de 7 pestañas) todavía: son dos puertas a propósito
+mientras esto se arma. Cuando Luis lo dé por bueno, la pestaña «📒 Cuenta corriente» de `openCobros` se
+retira y queda ésta. **Dos módulos que hacen lo mismo para siempre es el pozo de Matricería.**
+
+⚠ Si la base no contesta, la pantalla muestra datos **DEMO** con un chip rojo que lo dice, en vez de
+ceros — regla *"una lectura ROTA no es un CERO"*.
+
+**Chequeo:** `node tests/cbz-ficha-cliente.cjs` · `select count(*) from (select cuit from
+public.gv_cobranza_clientes_cuit() group by cuit having count(distinct empresa)=2) z;` — 69 al 29/09.
+`sql/gv_cobranza_clientes_cuit_v2398.sql`, §3.v2398.
+
 ## Git
 
 - **Trabajar SIEMPRE directo en `main`**: commitear y pushear ahí sin preguntar.

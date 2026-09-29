@@ -22,7 +22,7 @@ const root = path.join(__dirname, "..");
 // (separador de claves de _pppGeoCod); los patrones que buscamos son ASCII.
 const html = fs.readFileSync(path.join(root, "index.html"), "latin1");
 
-const SIGUEN_APP_VERSION = ["recepcion.js"];
+const SIGUEN_APP_VERSION = ["recepcion.js", "cobranzas.js"];
 const VERSION_PROPIA = ["planimetria.js", "supabase-config.js"];
 
 const mApp = html.match(/APP_VERSION\s*=\s*["']v?([0-9][0-9.]*)["']/);

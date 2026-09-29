@@ -6214,7 +6214,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.97"></script>
+<script type="module" src="recepcion.js?v=23.98"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6328,6 +6328,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <!-- CHICOS: uso ocasional. -->
     <div class="sup-actions sup-secondary">
       <button class="sup-action-btn" onclick="openCobros()"><span class="sup-ico">💰</span><span>Deuda a cobrar / Cobranzas</span></button>
+      <button class="sup-action-btn" onclick="openCobranzas()"><span class="sup-ico">💳</span><span>Cobranzas (nuevo)</span></button>
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpHoras" style="display:none;font-size:12px;font-weight:800;background:rgba(255,255,255,.18);padding:2px 9px;border-radius:8px;line-height:1.15;white-space:nowrap;" title="Horas de guardado pendientes (lo que entra ahora a góndola ÷ cajas/h)"></span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
@@ -10255,7 +10256,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.97";
+const APP_VERSION = "v23.98";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -60510,6 +60511,9 @@ const SB_KEY = SUPABASE_KEY;
 const sb = createClient(SB_URL, SB_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce" }
 });
+// v23.98 - sb vive adentro de esta IIFE, asi que un .js externo (cobranzas.js) no lo ve.
+// Se expone el MISMO objeto: no crea un segundo cliente ni una segunda sesion.
+window.sb = sb;
 
 const $ = (id) => document.getElementById(id);
 
@@ -63210,6 +63214,9 @@ window.cobrosSetTab = cobrosSetTab;
 
 <!-- Módulo: Editar Talleristas / Proveedores AT -->
 <script src="modulo_talleristas_edit.js"></script>
+
+<!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
+<script src="cobranzas.js?v=23.98"></script>
 
 </body>
 </html>
