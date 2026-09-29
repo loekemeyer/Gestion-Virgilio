@@ -29,7 +29,7 @@ const casos = [
   ["a", "otra cosa sin nombre", "", "silencio"],          // ya contestó: se calla
   ["b", "Luis pidió que muevas la tanda E74A", "", "pregunta"], // de pasada no cuenta
   ["c", "soy marianela, fijate la tanda", "", "Becker Marianela#38"],
-  ["d", "Thomas: mirá esto", "", "Thomas#20"],
+  ["d", "Thomas: mirá esto", "", "Thomas#3"],
   ["e", "hola, necesito mover una tanda de martin", "", "pregunta"],
   ["f", "dale seguí", tr, "pregunta"],                   // la charla NO se relee
   ["g", "martin", "", "ambiguo"],                        // Cornejo y Pregelj
@@ -40,9 +40,9 @@ const casos = [
   ["k", "Juan Cruz: mirá esto", "", "Juan Cruz Karaygan#51"],
   ["l", "hola elías", "", "Elias Irace#1"],
   // Thomas, 26/09: "Soy Tomás con H" se leía como Beviglia/Gonzalez (ambiguo).
-  ["m", "Soy Tomás con H. No puede ser que haya solo una NP", "", "Thomas#20"],
-  ["n", "tomas con h", "", "Thomas#20"],
-  ["o", "soy thomas loekemeyer", "", "Thomas#20"],
+  ["m", "Soy Tomás con H. No puede ser que haya solo una NP", "", "Thomas#3"],
+  ["n", "tomas con h", "", "Thomas#3"],
+  ["o", "soy thomas loekemeyer", "", "Thomas#3"],
 ];
 let mal = 0;
 for (const [sid, pr, trp, esp] of casos) {
