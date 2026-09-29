@@ -1,4 +1,4 @@
-/* v24.41 — Pedidos Importación, corriendo la pantalla:
+/* v24.42 — Pedidos Importación, corriendo la pantalla:
    (A) cada proveedor se ordena por PRIORIDAD: menos meses de stock (stock ÷ proy/mes) primero,
        sin proyección al final.
    (B) columna «Meses stock» con el número; < 4 meses va en rojo con ⚠, y el proveedor lleva el

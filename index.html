@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.41"></script>
+<script type="module" src="recepcion.js?v=24.42"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.41";
+const APP_VERSION = "v24.42";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -22196,7 +22196,7 @@ function pedImpSetMC(codEnc, val) {
   _pedImpRender();
 }
 /* v10.38 — MC efectivo (override o el calculado) y unidades en master cajas redondas. */
-/* v24.41 — MESES DE STOCK = stock disponible ÷ proyección por mes (lo que dice la columna Stock ÷
+/* v24.42 — MESES DE STOCK = stock disponible ÷ proyección por mes (lo que dice la columna Stock ÷
    Proy u/mes). Sin proyección no hay meses: null ("—"), y va al final del orden. La alerta es < 4 meses. */
 const _PEDIMP_MESES_ALERTA = 4;
 function _pedImpMesesStock(it) {
@@ -22370,7 +22370,7 @@ function _pedImpRender() {
     // v23.90 — la tasa del embarque sale de sus artículos (cada uno puede tener la suya)
     const _derPed = _derechosPedido(arr, prov);
     const _nacR = _pedImpNacionalizar(totUsd, totM3, { modo: _nac.modo, valorM3: _valorM3P, tn: _nac.tn, ntl: _isNtl, derechos: _derPed });
-    // v24.41 — orden por PRIORIDAD: primero lo que tiene menos meses de stock; sin proyección, al final.
+    // v24.42 — orden por PRIORIDAD: primero lo que tiene menos meses de stock; sin proyección, al final.
     arr.sort(_pedImpPrioCmp);
     const _nBajo = arr.filter(function (it) { const m = _pedImpMesesStock(it); return m != null && m < _PEDIMP_MESES_ALERTA; }).length;
     h += '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff">';
@@ -22497,7 +22497,7 @@ function pedImpPdfProv(provEnc) {
     (faltaInner ? '<div style="text-align:center;color:#555;font-size:.85em;margin-top:6px">* ' + faltaInner + ' artículo(s) sin unidades por inner cargadas (—): no suman al total de inner.</div>' : '');
   remitoPrintDoc(inner);
 }
-/* v24.41 — PDF PARA DAMIÁN (interno): por proveedor, ordenado por PRIORIDAD (menos meses de stock
+/* v24.42 — PDF PARA DAMIÁN (interno): por proveedor, ordenado por PRIORIDAD (menos meses de stock
    primero). Columnas: Código · Descripción · Foto · Stock (y sus meses) · Máximo (con los meses
    objetivo arriba) · Pedido en MASTER CAJAS (las unidades abajo) · FOB (total arriba) · m³ (total
    arriba). Abajo, el resumen de cómo se compone el pedido que arma el programa.
@@ -22610,7 +22610,7 @@ function pedImpExportExcel() {
     var ia = _IMPORTADOR_DE[a.prov || ""] || "(sin importador)", ib = _IMPORTADOR_DE[b.prov || ""] || "(sin importador)";
     if (ia !== ib) return ia < ib ? -1 : 1;
     var pa = a.prov || "", pb = b.prov || ""; if (pa !== pb) return pa < pb ? -1 : 1;
-    return _pedImpPrioCmp(a, b);   // v24.41 — mismo orden que la pantalla: menos meses de stock primero
+    return _pedImpPrioCmp(a, b);   // v24.42 — mismo orden que la pantalla: menos meses de stock primero
   });
   var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#166534;color:#fff;text-align:left;}</style></head><body>';
   html += '<h3>Pedidos Importación — Producción Virgilio (' + esc(fecha) + ', índice ' + (data.meses || 10) + ' meses)' + (_q.length ? ' — búsqueda: ' + esc(_q.join(" ")) : '') + '</h3>';
@@ -63812,7 +63812,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.41"></script>
+<script src="cobranzas.js?v=24.42"></script>
 
 </body>
 </html>
