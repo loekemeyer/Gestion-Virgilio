@@ -79,12 +79,17 @@ var itemsB = [{ cod: "970E", desc: "x", proyUni: 1000, fobUni: 2.5, aPedirUni: 3
 var prB = N._pedImpProy25k(7500, 2500, 60000, 25000);
 var nacB = N._pedImpNacionalizar(9324, 12.4, { modo: "consolidada", valorM3: 110, tn: 0, ntl: false });
 var hB = N._pedImpBandaHtml(prB, nacB, 25000, 9324, { prov: "Becky", items: itemsB, m3: 12.4 });
-ok((hB.match(/<details class="pedimp-desg"/g) || []).length === 2, "La banda tiene los dos chips expandibles");
-ok(/970E/.test(hB) && /sin FOB/.test(hB), "El desglose del consumo lista los artículos y marca los sin FOB");
-ok(/÷/.test(hB) && /Derechos/.test(hB) && /Puesto en Arg/.test(hB), "Muestra la cuenta de meses y las líneas de lo no recuperable");
-ok(!/ open /.test(hB), "Cerrados por defecto");
-N._pedImpDesgAb["Becky|izq"] = 1;
-ok(/data-k="Becky\|izq" ontoggle="_pedImpDesgToggle\(this\)" open/.test(N._pedImpBandaHtml(prB, nacB, 25000, 9324, { prov: "Becky", items: itemsB, m3: 12.4 })), "El abierto sobrevive al re-render");
+/* v23.91 (Luis): el desglose ya NO se abre DENTRO del chip — lo hacía crecer y empujaba la
+   tabla. La banda quedó de una línea con un botón «ver desglose» que abre el pop-up, y los
+   datos para rearmarlo quedan en _pedImpDesgData. Lo que se mide ahora es eso: que la banda
+   sea chica y que el contenido siga estando completo, que es lo que el test cuidaba. */
+ok(!/<details class="pedimp-desg"/.test(hB), "La banda ya no lleva el desglose adentro (v23.91)");
+ok((hB.match(/pedImpDesgPop\(/g) || []).length === 2, "Los dos chips abren el desglose en el pop-up");
+ok(!!N._pedImpDesgData["Becky"], "La banda deja los datos para que el pop-up rearme el desglose");
+var dIzq = N._pedImpDesgIzq(prB, 25000, itemsB), dDer = N._pedImpDesgDer(nacB, 9324, 12.4);
+ok(/970E/.test(dIzq) && /sin FOB/.test(dIzq), "El desglose del consumo lista los artículos y marca los sin FOB");
+ok(/÷/.test(dDer) && /Derechos/.test(dDer) && /Puesto en Arg/.test(dDer), "Muestra la cuenta de meses y las líneas de lo no recuperable");
+ok(/<details/.test(dDer), "Cada concepto sigue siendo expandible (la lógica de detalle se mantiene)");
 
 // v23.78 (Luis): derechos 35% sólo Fujian, 18% el resto.
 ok(N._derechosProv("Fujian") === 0.35 && N._derechosProv(" Fujian ") === 0.35, "Fujian paga 35% de derechos");

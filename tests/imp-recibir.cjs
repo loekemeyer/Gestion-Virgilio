@@ -96,7 +96,9 @@ const ITEMS = [
     impRecCerrar();
     await openImpHistRecep();
     const hb = document.getElementById("stkPopBody").innerHTML;
-    out.hist = /Historial recepción/.test(hb) && /L05/.test(hb) && /A guardar/.test(hb) && /1\.224 u|1224 u/.test(hb);
+    // v23.91: la solapa pasó a llamarse «Historial» y abre con dos vistas (Pedidos /
+    // Recepciones). La de recepciones, que es la que mide este test, es la de arranque.
+    out.hist = /📥 Recepciones/.test(hb) && /L05/.test(hb) && /A guardar/.test(hb) && /1\.224 u|1224 u/.test(hb);
     window.prompt = () => "prueba"; 
     await impHistAnular(1);
     out.anulo = window.__calls.some((c) => c.fn === "gv_imp_recepcion_anular" && c.body.p_id === 1 && c.body.p_motivo === "prueba");
