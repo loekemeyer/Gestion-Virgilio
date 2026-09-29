@@ -74,3 +74,29 @@ begin
                       and btrim(r.legajo::text) = btrim(e."Legajo"))), '[]'::jsonb));
 end $$;
 grant execute on function public.gv_tv_clave_validar(text) to anon, authenticated;
+
+-- ── v23.85 (Luis, 29/09): apodos en la lista — 104 = «J. Colombia», 277 = «Jhonny» ──
+-- (hay dos Jhonny). Aplicado como migración gv_tv_clave_validar_apodos_v2385.
+create or replace function public.gv_tv_clave_validar(p_clave text)
+returns jsonb language plpgsql stable security definer set search_path = public, pg_catalog as $$
+declare
+  v_t bigint := floor(extract(epoch from now()) / 900)::bigint;
+  v_c text := regexp_replace(coalesce(p_clave, ''), '\D', '', 'g');
+begin
+  if v_c = '' or (v_c <> public.gv_tv_clave_de(v_t) and v_c <> public.gv_tv_clave_de(v_t - 1)) then
+    return jsonb_build_object('ok', false);
+  end if;
+  return jsonb_build_object('ok', true, 'operarios', coalesce((
+    select jsonb_agg(jsonb_build_object('legajo', x.legajo, 'nombre', x.nombre) order by x.nombre)
+      from (select btrim(e."Legajo") legajo,
+                   case btrim(e."Legajo") when '104' then 'J. Colombia' when '277' then 'Jhonny'
+                        else btrim(e."Empleado") end nombre
+              from public."Empleados" e
+             where upper(btrim(coalesce(e."Activo", ''))) <> 'NO'
+               and btrim(coalesce(e."Legajo", '')) not in ('', '0', '1', '600')
+               and btrim(coalesce(e."Empleado", '')) <> ''
+               and exists (select 1 from public."Registros_Produccion_Virgilio" r
+                            where r.ts_cliente >= now() - interval '15 days'
+                              and btrim(r.legajo::text) = btrim(e."Legajo"))) x), '[]'::jsonb));
+end $$;
+grant execute on function public.gv_tv_clave_validar(text) to anon, authenticated;

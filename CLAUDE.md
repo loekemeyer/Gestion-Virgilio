@@ -3691,6 +3691,7 @@ La TV (`monitor/tv.html`) muestra chiquito **🔑 + 4 dígitos** (`gv_tv_clave_a
 también la anterior). En el celular: clave → **elige su nombre** (los que tienen eventos en Virgilio en los **últimos 15 días**, sin mirar la sede — v23.84, `gv_tv_clave_validar`) o **＋ No estoy en la lista** → legajo. **Desde la v23.83 el legajo entra también SIN clave** (Luis: *"que puedan loguearse con pin o con legajo. No los limitemos"*): botón «Entrar con mi legajo». Google (supervisor) sigue igual.
 ⚠ **No es un candado**: la TV lee con la clave pública; es para que se entre estando en el depósito. La clave sale de un
 md5 del `system_identifier` del cluster (no hay secreto en el repo, que es público).
+**Lista = los que trabajaron en Virgilio en 15 días** (v23.84); apodos en la lista: 104 → «J. Colombia», 277 → «Jhonny» (v23.85, en `gv_tv_clave_validar`).
 `sql/gv_tv_clave_v2382.sql`, `tests/tv-clave-login.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.56): si la base de Gestión NO CONTESTA, avisa Telegram — y el vigilante vive en LK
