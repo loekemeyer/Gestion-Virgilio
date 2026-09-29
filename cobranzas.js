@@ -171,6 +171,13 @@ function _cbzCss() {
     ".cbz-esc .p{font-size:15px;font-weight:800;color:#0f766e;}",
     ".cbz-esc .v{font-size:12.5px;color:#64748b;font-variant-numeric:tabular-nums;}",
     ".cbz-nota{color:#64748b;font-size:12px;padding:10px 14px;border-top:1px solid #f1f5f9;}",
+    ".cbz-concgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:10px;margin-top:12px;}",
+    ".cbz-conccard{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 13px;box-shadow:0 1px 2px rgba(15,23,42,.06);}",
+    ".cbz-conccard .t{font-size:12.5px;font-weight:800;color:#334155;}",
+    ".cbz-conccard .p{font-size:26px;font-weight:800;line-height:1.1;margin-top:2px;font-variant-numeric:tabular-nums;}",
+    ".cbz-conccard .s{font-size:11.5px;color:#64748b;margin-top:1px;}",
+    ".cbz-conccard .bar{height:5px;border-radius:99px;background:#e2e8f0;overflow:hidden;margin-top:6px;}",
+    ".cbz-conccard .bar i{display:block;height:100%;}",
     ".cbz-pend{padding:34px 16px;text-align:center;color:#64748b;}",
     ".cbz-pend h3{margin:0 0 6px;color:#334155;font-size:16px;}"
   ].join("\n");
@@ -180,6 +187,7 @@ function _cbzCss() {
 /* ------------------------------- pantalla -------------------------------- */
 var _CBZ_TABS = [
   { id: "clientes",  t: "👤 Clientes" },
+  { id: "conc",      t: "🏦 Conciliación" },
   { id: "reclamos",  t: "⚠ A reclamar" },
   { id: "recibos",   t: "🧾 Recibos" },
   { id: "escalones", t: "📐 Escala" }
@@ -215,6 +223,7 @@ function cbzRender() {
   }
   var w = document.getElementById("cbzWrap"); if (!w) return;
   if (_cbz.tab === "clientes")  { w.innerHTML = _cbz.sel ? cbzFichaHtml() : cbzBuscadorHtml(); if (_cbz.sel) cbzFichaCargar(); return; }
+  if (_cbz.tab === "conc")      { w.innerHTML = cbzConcHtml(); cbzConcCargar(); return; }
   if (_cbz.tab === "escalones") { w.innerHTML = cbzEscalonesHtml(); return; }
   w.innerHTML = cbzPendienteHtml(_cbz.tab);
 }
@@ -341,16 +350,44 @@ function cbzConsolidar(rows, cuits) {
   return Object.keys(map).map(function (k) { return map[k]; });
 }
 
-/* ------------------------------ 2) la ficha ------------------------------ */
-function cbzAbrir(key) { _cbz.sel = key; _cbz.sub = "comp"; _cbz.comp = null; _cbz.cta = null; _cbz.abierta = null; cbzRender(); }
-function cbzVolver() { _cbz.sel = null; _cbz.comp = null; _cbz.cta = null; cbzRender(); }
+/* ------------------------------ 2) la ficha ------------------------------
+   La ficha se arma con UNA llamada por código: `gv_cobranza_ficha(emp, cod)`,
+   que junta las tres fuentes que ya existían y no se hablaban entre sí:
+
+     · DEUDA    → GV_Cobranza_Deuda_Viva = el Excel de deuda que se sube para la
+                  Cuarentena (el ancla) + las facturas y NC nuevas de ISIS + lo
+                  que la conciliación bancaria ya vio cobrado.
+     · PAGOS    → GV_Cobranza_Imputacion = cada recibo del banco cruzado contra
+                  las facturas que cancela, con el descuento tomado vs el ganado.
+     · ENTREGAS → Facturacion_NP = lo que Gestión facturó (NP, tanda, m³, salida).
+
+   Un grupo con código en LK y en Chef pide las dos y se suman: los totales de la
+   cabecera salen de acá, no de la lista. */
+function cbzAbrir(key) { _cbz.sel = key; _cbz.sub = "deuda"; _cbz.ficha = null; _cbz.comp = null; _cbz.cta = null; _cbz.abierta = null; cbzRender(); }
+function cbzVolver() { _cbz.sel = null; _cbz.ficha = null; _cbz.comp = null; _cbz.cta = null; cbzRender(); }
 function cbzSub(s) { _cbz.sub = s; cbzRender(); }
 function cbzGrupo() { var k = _cbz.sel; return _cbz.grupos.filter(function (g) { return g.key === k; })[0] || null; }
+
+var _CBZ_SUBS = [
+  { id: "deuda",    t: "💳 Deuda" },
+  { id: "pagos",    t: "🧾 Pagos y descuentos" },
+  { id: "comp",     t: "📄 Explicación" },
+  { id: "entregas", t: "🚚 Entregas facturadas" },
+  { id: "cta",      t: "📒 Cuenta corriente" }
+];
 
 function cbzFichaHtml() {
   var g = cbzGrupo();
   if (!g) return '<div class="cbz-vacio">Cliente no encontrado. <button class="cbz-back" onclick="cbzVolver()">← Volver</button></div>';
+  var f = _cbz.ficha;
   var ret = g.cods.reduce(function (m, c) { return Math.max(m, _cbzNum(c.ret_cliente)); }, 0);
+  /* los totales los manda la ficha (deuda viva de HOY); la lista es el respaldo
+     mientras carga, o si la RPC no contesta */
+  var deuda = f ? f.tot.deuda : g.deuda, vencida = f ? f.tot.vencida : g.vencida;
+  var abiertos = f ? f.tot.comprobantes : g.abiertos, dias = f ? f.tot.dias : g.dias;
+  var cuit = (f && f.cab.cuit) || g.cuit;
+  var loc = f && (f.cab.localidad || f.cab.provincia)
+    ? [f.cab.localidad, f.cab.provincia].filter(Boolean).join(", ") : "";
   var h = '<div class="cbz-ficha-top">' +
     '<div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">' +
       '<button class="cbz-back" onclick="cbzVolver()">← Clientes</button>' +
@@ -359,7 +396,8 @@ function cbzFichaHtml() {
         '<div style="margin-top:5px;">' + g.cods.map(function (c) {
           return '<span class="cbz-chip ' + (c.empresa === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(c.empresa) + " " + _cbzEsc(c.cod_cliente) + "</span>";
         }).join(" ") +
-        (g.cuit ? ' <span class="cbz-chip" style="background:#f1f5f9;color:#475569;">CUIT ' + _cbzEsc(g.cuit) + "</span>" : ' <span class="cbz-chip cbz-warn" title="Sin CUIT no se puede consolidar con la otra empresa">sin CUIT</span>') +
+        (cuit ? ' <span class="cbz-chip" style="background:#f1f5f9;color:#475569;">CUIT ' + _cbzEsc(cuit) + "</span>" : ' <span class="cbz-chip cbz-warn" title="Sin CUIT no se puede consolidar con la otra empresa">sin CUIT</span>') +
+        (loc ? ' <span class="cbz-chip" style="background:#f1f5f9;color:#475569;">' + _cbzEsc(loc) + "</span>" : "") +
         (g.agente ? ' <span class="cbz-chip cbz-info">agente de recaudación</span>' : "") +
         (ret ? ' <span class="cbz-chip cbz-info">retención ' + _cbzPlata(ret * 100, 1) + " %</span>" : "") +
         (_cbz.demo ? ' <span class="cbz-chip cbz-warn">DEMO</span>' : "") +
@@ -367,28 +405,32 @@ function cbzFichaHtml() {
       "</div>" +
     "</div>" +
     '<div class="cbz-kpis">' +
-      cbzKpi("Deuda total", "$ " + _cbzPlata(g.deuda), g.cods.length > 1 ? "consolidada LK + CH" : "", "") +
-      cbzKpi("Vencida", g.vencida ? "$ " + _cbzPlata(g.vencida) : "—", "", g.vencida ? "cbz-rojo" : "") +
-      cbzKpi("Comprob.", _cbzPlata(g.abiertos), "abiertos", "") +
-      cbzKpi("Más vieja", g.dias ? _cbzPlata(g.dias) : "—", "días", g.dias > 60 ? "cbz-rojo" : "") +
+      cbzKpi("Deuda total", "$ " + _cbzPlata(deuda), g.cods.length > 1 ? "consolidada LK + CH" : (f ? "deuda viva" : ""), "") +
+      cbzKpi("Vencida", vencida ? "$ " + _cbzPlata(vencida) : "—", "", vencida ? "cbz-rojo" : "") +
+      cbzKpi("Comprob.", _cbzPlata(abiertos), "abiertos", "") +
+      cbzKpi("Más vieja", dias ? _cbzPlata(dias) : "—", "días", dias > 60 ? "cbz-rojo" : "") +
       cbzKpi("Último pago", g.ultimo ? "$ " + _cbzPlata(g.ultimoMonto) : "—", g.ultimo ? _cbzFecha(g.ultimo) : "", "cbz-verde") +
       cbzKpi("A reclamar", g.reclamar ? "$ " + _cbzPlata(g.reclamar) : "—", "descuento mal tomado", g.reclamar ? "cbz-ambar" : "") +
     "</div>";
   if (g.cods.length > 1) {
     h += '<div class="cbz-desglose">' + g.cods.map(function (c) {
+      var d = f && f.porCod[c.empresa + "|" + c.cod_cliente];
+      var dd = d ? _cbzNum(d.totales && d.totales.deuda) : Math.max(0, _cbzNum(c.deuda));
+      var vv = d ? _cbzNum(d.totales && d.totales.vencida) : _cbzNum(c.vencida);
       return '<div class="cbz-dcard"><span class="cbz-chip ' + (c.empresa === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(c.empresa) + " " + _cbzEsc(c.cod_cliente) + "</span> " +
-        "deuda <b>$ " + _cbzPlata(Math.max(0, _cbzNum(c.deuda))) + "</b>" +
-        (_cbzNum(c.vencida) ? ' · vencida <b class="cbz-rojo">$ ' + _cbzPlata(c.vencida) + "</b>" : "") +
+        "deuda <b>$ " + _cbzPlata(dd) + "</b>" +
+        (vv ? ' · vencida <b class="cbz-rojo">$ ' + _cbzPlata(vv) + "</b>" : "") +
         (_cbzNum(c.a_reclamar) ? ' · reclamar <b class="cbz-ambar">$ ' + _cbzPlata(c.a_reclamar) + "</b>" : "") + "</div>";
     }).join("") + "</div>";
   }
+  if (f && f.ancla) h += '<div class="cbz-hint" style="margin:8px 2px 0;">Deuda del Excel de Cuarentena del <b>' +
+    _cbzEsc(new Date(f.ancla).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })) +
+    "</b>, más las facturas y NC posteriores de ISIS, menos lo que la conciliación bancaria ya vio cobrado.</div>";
   h += "</div>";
-  h += '<div class="cbz-sub">' +
-    '<button class="' + (_cbz.sub === "comp" ? "on" : "") + '" onclick="cbzSub(\'comp\')">📄 Comprobantes y pagos</button>' +
-    '<button class="' + (_cbz.sub === "cta" ? "on" : "") + '" onclick="cbzSub(\'cta\')">📒 Cuenta corriente</button>' +
-    '<button class="' + (_cbz.sub === "escala" ? "on" : "") + '" onclick="cbzSub(\'escala\')">📐 Escala de descuentos</button>' +
-  "</div>";
-  h += '<div class="cbz-panel" id="cbzPanel">' + (_cbz.sub === "escala" ? cbzEscalaPanelHtml(g) : '<div class="cbz-vacio">Cargando…</div>') + "</div>";
+  h += '<div class="cbz-sub">' + _CBZ_SUBS.map(function (s) {
+    return '<button class="' + (_cbz.sub === s.id ? "on" : "") + '" onclick="cbzSub(\'' + s.id + '\')">' + s.t + "</button>";
+  }).join("") + "</div>";
+  h += '<div class="cbz-panel" id="cbzPanel"><div class="cbz-vacio">Cargando…</div></div>';
   return h;
 }
 function cbzKpi(k, v, s, cls) {
@@ -396,17 +438,56 @@ function cbzKpi(k, v, s, cls) {
     (s ? '<div class="s">' + _cbzEsc(s) + "</div>" : "") + "</div>";
 }
 
+/* trae la ficha (una llamada por código) y deja todo junto en _cbz.ficha */
+async function cbzFichaTraer(g) {
+  var rr = await Promise.all(g.cods.map(function (c) { return _cbzRpc("gv_cobranza_ficha", { p_emp: c.empresa, p_cod: c.cod_cliente }); }));
+  var f = { porCod: {}, deuda: [], recibos: [], entregas: [], cab: {}, tot: { deuda: 0, vencida: 0, comprobantes: 0, dias: 0 }, ancla: null, err: null };
+  rr.forEach(function (r, i) {
+    var c = g.cods[i];
+    if (r.error) { f.err = r.error; return; }
+    var d = r.data;
+    if (Array.isArray(d)) d = d[0];           // PostgREST devuelve el jsonb pelado o en array
+    if (!d) return;
+    f.porCod[c.empresa + "|" + c.cod_cliente] = d;
+    var marcar = function (x) { x._emp = c.empresa; x._cod = c.cod_cliente; return x; };
+    (d.deuda || []).forEach(function (x) { f.deuda.push(marcar(x)); });
+    (d.recibos || []).forEach(function (x) { f.recibos.push(marcar(x)); });
+    (d.entregas || []).forEach(function (x) { f.entregas.push(marcar(x)); });
+    var t = d.totales || {};
+    f.tot.deuda += _cbzNum(t.deuda); f.tot.vencida += _cbzNum(t.vencida);
+    f.tot.comprobantes += _cbzNum(t.comprobantes);
+    f.tot.dias = Math.max(f.tot.dias, _cbzNum(t.dias_mas_vieja));
+    if (t.ancla && (!f.ancla || t.ancla > f.ancla)) f.ancla = t.ancla;
+    var cab = d.cabecera || {};
+    Object.keys(cab).forEach(function (k) { if (f.cab[k] == null && cab[k] != null) f.cab[k] = cab[k]; });
+  });
+  var pf = function (k) { return function (a, b) { return String(b[k] || "").localeCompare(String(a[k] || "")); }; };
+  f.deuda.sort(pf("fecha")); f.recibos.sort(pf("fecha_pago")); f.entregas.sort(pf("facturado_at"));
+  return f;
+}
+
 async function cbzFichaCargar() {
   var g = cbzGrupo(); if (!g) return;
+  if (!_cbz.ficha) {
+    var f = await cbzFichaTraer(g);
+    if ((f.err || (!f.deuda.length && !f.recibos.length && !f.entregas.length)) && _cbz.demo) {
+      f.deuda = _CBZ_DEMO_DEUDA.slice(); f.recibos = _CBZ_DEMO_PAGOS.slice(); f.entregas = _CBZ_DEMO_ENTREGAS.slice();
+      f.tot = { deuda: g.deuda, vencida: g.vencida, comprobantes: g.abiertos, dias: g.dias };
+    }
+    _cbz.ficha = f;
+    if (_cbz.sel === g.key) { var w = document.getElementById("cbzWrap"); if (w) w.innerHTML = cbzFichaHtml(); }
+  }
   var pan = document.getElementById("cbzPanel"); if (!pan) return;
-  if (_cbz.sub === "escala") { pan.innerHTML = cbzEscalaPanelHtml(g); return; }
+  if (_cbz.sub === "deuda")    { pan.innerHTML = cbzDeudaHtml(); return; }
+  if (_cbz.sub === "pagos")    { pan.innerHTML = cbzPagosHtml(); return; }
+  if (_cbz.sub === "entregas") { pan.innerHTML = cbzEntregasHtml(); return; }
   if (_cbz.sub === "comp") {
     if (_cbz.comp) { pan.innerHTML = cbzCompHtml(); return; }
-    var rr = await Promise.all(g.cods.map(function (c) { return _cbzRpc("gv_cobranza_cliente", { p_empresa: c.empresa, p_cod: c.cod_cliente }); }));
+    var rr = await Promise.all(g.cods.map(function (c) { return _cbzRpc("gv_cobranza_cliente", { p_emp: c.empresa, p_cod: c.cod_cliente }); }));
     var filas = [], err = null;
     rr.forEach(function (r, i) {
       if (r.error) { err = r.error; return; }
-      (r.data || []).forEach(function (f) { f._emp = g.cods[i].empresa; f._cod = g.cods[i].cod_cliente; filas.push(f); });
+      (r.data || []).forEach(function (x) { x._emp = g.cods[i].empresa; x._cod = g.cods[i].cod_cliente; filas.push(x); });
     });
     if ((err || !filas.length) && _cbz.demo) filas = _CBZ_DEMO_COMP.slice();
     filas.sort(function (a, b) { return String(b.orden || b.fecha || "").localeCompare(String(a.orden || a.fecha || "")); });
@@ -415,15 +496,103 @@ async function cbzFichaCargar() {
     return;
   }
   if (_cbz.cta) { pan.innerHTML = cbzCtaHtml(); return; }
-  var r2 = await Promise.all(g.cods.map(function (c) { return _cbzRpc("gv_cobranza_cuenta", { p_empresa: c.empresa, p_cod: c.cod_cliente }); }));
+  var r2 = await Promise.all(g.cods.map(function (c) { return _cbzRpc("gv_cobranza_cuenta", { p_emp: c.empresa, p_cod: c.cod_cliente }); }));
   var mov = [], err2 = null;
   r2.forEach(function (r, i) {
     if (r.error) { err2 = r.error; return; }
-    (r.data || []).forEach(function (f) { f._emp = g.cods[i].empresa; mov.push(f); });
+    (r.data || []).forEach(function (x) { x._emp = g.cods[i].empresa; mov.push(x); });
   });
   if ((err2 || !mov.length) && _cbz.demo) mov = _CBZ_DEMO_CTA.slice();
   _cbz.cta = mov; _cbz.ctaErr = err2;
   pan.innerHTML = cbzCtaHtml();
+}
+
+/* ---- DEUDA (Excel de Cuarentena + ISIS − banco) -------------------------- */
+function cbzDeudaHtml() {
+  var f = _cbz.ficha; if (!f) return '<div class="cbz-vacio">Cargando…</div>';
+  if (f.err && !f.deuda.length) return '<div class="cbz-vacio">No pude leer: ' + _cbzEsc(f.err) + "</div>";
+  if (!f.deuda.length) return '<div class="cbz-vacio">Sin deuda abierta. 👌</div>';
+  var multi = (cbzGrupo() || { cods: [] }).cods.length > 1;
+  var h = '<table class="cbz-t"><thead><tr><th style="text-align:left;">Comprobante</th>' + (multi ? "<th>Emp</th>" : "") +
+    "<th>Fecha</th><th>Vence</th><th>Días</th><th style='text-align:left;'>Condición</th>" +
+    "<th>De lista</th><th>Del Excel</th><th>Cobrado banco</th><th>Pendiente</th><th>Origen</th></tr></thead><tbody>";
+  h += f.deuda.map(function (r) {
+    var venc = r.vencido;
+    return '<tr' + (venc ? ' style="background:#fff7f7;"' : "") + '>' +
+      '<td class="l"><b>' + _cbzEsc(r.comprobante || "") + "</b></td>" +
+      (multi ? '<td><span class="cbz-chip ' + (r._emp === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(r._emp) + "</span></td>" : "") +
+      "<td>" + _cbzFecha(r.fecha) + "</td>" +
+      '<td class="' + (venc ? "cbz-rojo" : "") + '">' + _cbzFecha(r.vence) + "</td>" +
+      "<td>" + (r.dias != null ? r.dias : "—") + "</td>" +
+      '<td class="l" style="color:#64748b;">' + _cbzEsc(r.condicion || "—") +
+        (_cbzNum(r.dto_cond) ? " · −" + _cbzPlata(_cbzNum(r.dto_cond) * 100, 0) + " %" : "") + "</td>" +
+      "<td>" + (r.lista != null ? _cbzPlata(r.lista) : "—") + "</td>" +
+      "<td>" + (r.pendiente_ancla != null ? _cbzPlata(r.pendiente_ancla) : "—") + "</td>" +
+      '<td class="cbz-verde">' + (_cbzNum(r.cancelado_banco) ? _cbzPlata(r.cancelado_banco) : "—") +
+        (r.recibos_banco ? '<div style="font-size:10.5px;color:#94a3b8;">' + _cbzEsc(r.recibos_banco) + "</div>" : "") + "</td>" +
+      '<td><b class="' + (venc ? "cbz-rojo" : "") + '">' + _cbzPlata(r.pendiente) + "</b></td>" +
+      '<td><span class="cbz-chip ' + (String(r.origen || "").indexOf("isis") >= 0 ? "cbz-info" : "cbz-lk") + '">' + _cbzEsc(r.origen || "—") + "</span></td></tr>";
+  }).join("");
+  h += "</tbody></table>";
+  h += '<div class="cbz-nota">«Del Excel» es lo que decía el archivo de deuda de la Cuarentena; «Cobrado banco» lo que la conciliación ' +
+    "encontró después. La fila <b>isis nuevo</b> es una factura posterior al Excel, que el archivo todavía no tenía.</div>";
+  return h;
+}
+
+/* ---- PAGOS: cada recibo del banco contra las facturas que cancela -------- */
+function cbzPagosHtml() {
+  var f = _cbz.ficha; if (!f) return '<div class="cbz-vacio">Cargando…</div>';
+  if (f.err && !f.recibos.length) return '<div class="cbz-vacio">No pude leer: ' + _cbzEsc(f.err) + "</div>";
+  if (!f.recibos.length) return '<div class="cbz-vacio">Sin pagos imputados.</div>';
+  var multi = (cbzGrupo() || { cods: [] }).cods.length > 1;
+  var h = '<table class="cbz-t"><thead><tr><th>Recibo</th>' + (multi ? "<th>Emp</th>" : "") +
+    "<th>Fecha</th><th style='text-align:left;'>Medio</th><th>Pagado</th><th style='text-align:left;'>Facturas</th>" +
+    "<th>De lista</th><th>Días</th><th>Dto tomado</th><th>Dto ganado</th><th>Ret.</th><th>A reclamar</th><th>Calidad</th></tr></thead><tbody>";
+  h += f.recibos.map(function (r) {
+    var mal = _cbzNum(r.a_reclamar) > 0;
+    var cal = String(r.calidad || "");
+    var chip = cal === "exacta" ? "cbz-ok" : (cal.indexOf("sin imputar") >= 0 ? "cbz-warn" : "cbz-info");
+    return "<tr>" +
+      "<td><b>" + _cbzEsc(r.recibo || "—") + "</b></td>" +
+      (multi ? '<td><span class="cbz-chip ' + (r._emp === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(r._emp) + "</span></td>" : "") +
+      "<td>" + _cbzFecha(r.fecha_pago) + "</td>" +
+      '<td class="l" style="color:#64748b;">' + _cbzEsc(r.medio || "—") + "</td>" +
+      '<td class="cbz-verde"><b>' + (r.pagado != null ? _cbzPlata(r.pagado) : "—") + "</b></td>" +
+      '<td class="l">' + _cbzEsc(r.facturas || "—") + (r.nc ? ' <span class="cbz-chip cbz-info">NC ' + _cbzEsc(r.nc) + "</span>" : "") + "</td>" +
+      "<td>" + (r.lista != null ? _cbzPlata(r.lista) : "—") + "</td>" +
+      "<td>" + (r.dias != null ? r.dias : "—") +
+        (r.atraso != null && _cbzNum(r.atraso) > 0 ? '<div style="font-size:10.5px;" class="cbz-rojo">+' + _cbzPlata(r.atraso) + "</div>" : "") + "</td>" +
+      "<td>" + (r.dto_tomado != null ? _cbzPlata(_cbzNum(r.dto_tomado) * 100, 1) + " %" : "—") + "</td>" +
+      "<td>" + (r.dto_ganado != null ? _cbzPlata(_cbzNum(r.dto_ganado) * 100, 1) + " %" : "—") + "</td>" +
+      "<td>" + (_cbzNum(r.retencion) ? _cbzPlata(_cbzNum(r.retencion) * 100, 2) + " %" : "—") + "</td>" +
+      '<td class="cbz-ambar"><b>' + (mal ? _cbzPlata(r.a_reclamar) : "—") + "</b></td>" +
+      '<td><span class="cbz-chip ' + chip + '">' + _cbzEsc(cal || "—") + "</span></td></tr>";
+  }).join("");
+  h += "</tbody></table>";
+  h += '<div class="cbz-nota">Sale de la conciliación bancaria imputada: «Dto tomado» es lo que el cliente se descontó al pagar y ' +
+    "«Dto ganado» lo que le correspondía por los días. La diferencia es lo que hay que reclamar. <b>Sin imputar</b> = el pago entró " +
+    "al banco pero todavía no se pudo cruzar contra una factura.</div>";
+  return h;
+}
+
+/* ---- ENTREGAS facturadas por Gestión ------------------------------------ */
+function cbzEntregasHtml() {
+  var f = _cbz.ficha; if (!f) return '<div class="cbz-vacio">Cargando…</div>';
+  if (!f.entregas.length) return '<div class="cbz-vacio">Sin entregas facturadas registradas en Gestión.</div>';
+  var multi = (cbzGrupo() || { cods: [] }).cods.length > 1;
+  var m3 = f.entregas.reduce(function (s, r) { return s + _cbzNum(r.m3); }, 0);
+  var h = '<table class="cbz-t"><thead><tr><th>NP</th>' + (multi ? "<th>Emp</th>" : "") +
+    "<th>Tanda</th><th>Salió</th><th>m³</th><th>Facturada</th></tr></thead><tbody>";
+  h += f.entregas.map(function (r) {
+    return "<tr><td><b>" + _cbzEsc(r.np || "") + "</b></td>" +
+      (multi ? '<td><span class="cbz-chip ' + (r._emp === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(r._emp) + "</span></td>" : "") +
+      "<td>" + _cbzEsc(r.tanda || "—") + "</td><td>" + _cbzFecha(r.fecha_salida) + "</td>" +
+      "<td>" + (r.m3 != null ? _cbzPlata(r.m3, 3) : "—") + "</td>" +
+      "<td>" + _cbzFecha(r.facturado_at) + "</td></tr>";
+  }).join("");
+  h += "</tbody></table>";
+  h += '<div class="cbz-nota">Las últimas ' + f.entregas.length + " entregas facturadas por Gestión · <b>" + _cbzPlata(m3, 3) + " m³</b> en total.</div>";
+  return h;
 }
 
 /* ---- comprobantes: lo que la planilla de cobranza tiene arriba ---------- */
@@ -525,11 +694,6 @@ function cbzEscalaHtml(importe, dias) {
     (gan ? "<b>" + _cbzEsc(es.filter(function (e) { return e.orden === gan; })[0].label) + "</b>" : "<b>ningún descuento</b>") + ".</div>";
   return h;
 }
-function cbzEscalaPanelHtml(g) {
-  var base = g && g.deuda ? g.deuda : 0;
-  return '<div style="padding:14px;">' + cbzEscalaHtml(base, null) +
-    '<div class="cbz-nota" style="border:none;padding:10px 0 0;">Importes calculados sobre la deuda abierta de este cliente ($ ' + _cbzPlata(base) + ").</div></div>";
-}
 function cbzEscalonesHtml() {
   var es = cbzEscalones();
   return '<div class="cbz-panel"><table class="cbz-t"><thead><tr><th style="text-align:left;">Escalón</th><th>Hasta (días)</th><th>Descuento</th></tr></thead><tbody>' +
@@ -538,6 +702,104 @@ function cbzEscalonesHtml() {
     }).join("") +
     '</tbody></table><div class="cbz-nota">Vive en <code>cobranzas_escalones</code>: cambiarla es un <code>update</code>, no un deploy. Las excepciones por cliente (las “coronitas”) están en <code>cobranzas_excepciones</code> y se cruzan por CUIT del padrón.</div></div>';
 }
+
+/* ============================ 3) CONCILIACIÓN ============================
+   Hoy la conciliación se hace A MANO en cuatro Excel (Credicoop y Santander, LK y
+   Chef): alguien mira el extracto y le escribe al renglón el cliente y el recibo.
+   Esa planilla entra a Gestión por la macro y se lee en gv_conciliacion_bancaria.
+
+   Esta pestaña es el tablero de eso: cuánto de cada extracto quedó identificado,
+   qué entradas están sin identificar (que son las que el motor de reglas va a tener
+   que resolver solo) y de qué archivo salió cada carga.
+
+   ⚠ Todavía NO hay motor de reglas: falta el manual y las definiciones. Lo que
+   falta está escrito abajo, en la pantalla, para que no se pierda. */
+function cbzConcCargar() {
+  if (_cbz.conc) { cbzConcPintar(); return; }
+  Promise.all([_cbzRpc("gv_conc_salud"), _cbzRpc("gv_conc_sin_identificar", { p_dias: 90, p_limit: 200 })])
+    .then(function (rr) {
+      _cbz.conc = {
+        salud: rr[0].error ? [] : (rr[0].data || []),
+        sin: rr[1].error ? [] : (rr[1].data || []),
+        err: rr[0].error || rr[1].error || null
+      };
+      if (!_cbz.conc.salud.length && _cbz.demo) _cbz.conc.salud = _CBZ_DEMO_CONC.slice();
+      cbzConcPintar();
+    });
+}
+function cbzConcPintar() { if (_cbz.tab === "conc") { var w = document.getElementById("cbzWrap"); if (w) w.innerHTML = cbzConcHtml(); } }
+
+function cbzConcHtml() {
+  var c = _cbz.conc;
+  var h = '<div class="cbz-buscar" style="justify-content:space-between;">' +
+      '<div><b style="font-size:15px;">🏦 Conciliación bancaria</b>' +
+      '<div style="color:#64748b;font-size:12px;margin-top:2px;">Cuánto de cada extracto quedó identificado con cliente y recibo.</div></div>' +
+      '<button class="cbz-back" onclick="_cbz.conc=null;cbzConcCargar();">↻ Actualizar</button></div>';
+  if (!c) return h + '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">Cargando…</div></div>';
+  if (c.err && !c.salud.length) return h + '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">No pude leer: ' + _cbzEsc(c.err) + "</div></div>";
+
+  h += '<div class="cbz-concgrid">' + c.salud.map(function (r) {
+    var ent = _cbzNum(r.entradas), ok = _cbzNum(r.con_cliente);
+    var pct = ent ? Math.round(ok * 100 / ent) : 0;
+    var col = pct >= 90 ? "#047857" : (pct >= 50 ? "#b45309" : "#b91c1c");
+    return '<div class="cbz-conccard">' +
+      '<div class="t">' + _cbzEsc(String(r.banco || "").toUpperCase()) + " · " +
+        '<span class="cbz-chip ' + (r.empresa === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(r.empresa) + "</span></div>" +
+      '<div class="p" style="color:' + col + ';">' + _cbzPlata(pct) + " %</div>" +
+      '<div class="s">' + _cbzPlata(ok) + " de " + _cbzPlata(ent) + " entradas con cliente</div>" +
+      '<div class="bar"><i style="width:' + pct + "%;background:" + col + ';"></i></div>' +
+      '<div class="s" style="margin-top:6px;">Sin identificar: <b>' + _cbzPlata(r.sin_identificar) + "</b>" +
+        (_cbzNum(r.monto_sin_identificar) ? " · $ " + _cbzPlata(r.monto_sin_identificar) : "") + "</div>" +
+      '<div class="s">Último movimiento: <b>' + _cbzFecha(r.ultima) + "</b></div>" +
+      (r.archivo ? '<div class="s" title="' + _cbzEsc(r.archivo) + '" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _cbzEsc(r.archivo) + "</div>" : "") +
+      "</div>";
+  }).join("") + "</div>";
+
+  h += '<div class="cbz-panel" style="margin-top:12px;">';
+  if (!c.sin.length) {
+    h += '<div class="cbz-vacio">Ninguna entrada sin identificar en los últimos 90 días. 👌</div>';
+  } else {
+    var tot = c.sin.reduce(function (s2, r) { return s2 + _cbzNum(r.entrada); }, 0);
+    h += '<div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;font-size:13px;">' +
+      "<b>" + c.sin.length + "</b> entrada(s) sin cliente ni recibo en 90 días · <b>$ " + _cbzPlata(tot) + "</b>" +
+      '<div style="color:#64748b;font-size:12px;margin-top:2px;">Es lo que hoy alguien identifica a mano en el Excel. El texto del extracto es de donde van a salir las reglas.</div></div>';
+    h += '<table class="cbz-t"><thead><tr><th>Fecha</th><th>Banco</th><th>Emp</th><th>Entrada</th>' +
+      '<th style="text-align:left;">Detalle del extracto</th><th style="text-align:left;">Operación</th><th>Nro op.</th></tr></thead><tbody>';
+    h += c.sin.map(function (r) {
+      return "<tr><td>" + _cbzFecha(r.fecha) + "</td><td>" + _cbzEsc(r.banco || "") + "</td>" +
+        '<td><span class="cbz-chip ' + (r.empresa === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(r.empresa) + "</span></td>" +
+        '<td class="cbz-verde"><b>' + _cbzPlata(r.entrada) + "</b></td>" +
+        '<td class="l">' + _cbzEsc(r.detalle || "—") + "</td>" +
+        '<td class="l" style="color:#64748b;">' + _cbzEsc(r.operacion || r.tipo || "—") + "</td>" +
+        "<td>" + _cbzEsc(r.nro_op || "—") + "</td></tr>";
+    }).join("");
+    h += "</tbody></table>";
+  }
+  h += "</div>";
+
+  h += '<div class="cbz-panel" style="margin-top:12px;"><div style="padding:14px 16px;">' +
+    '<b style="font-size:14px;">⚙ Motor de reglas — lo que falta para que concilie solo</b>' +
+    '<div style="color:#64748b;font-size:12.5px;margin-top:6px;line-height:1.5;">' +
+    "Todavía no hay motor: la conciliación se hace a mano en los cuatro Excel. Para escribir las reglas hacen falta " +
+    "el manual, los extractos crudos del banco (como los baja el banco, no la planilla ya trabajada) y una conciliación " +
+    "ya cerrada a una fecha, para medir contra ella cuántos renglones acierta.</div>" +
+    '<ul style="color:#334155;font-size:12.5px;margin:9px 0 0 18px;line-height:1.6;">' +
+    "<li>De qué campo del extracto sale el <b>CUIT</b> y de cuál el nombre (hoy el Excel no trae CUIT).</li>" +
+    "<li>Qué hace el <b>número de recibo</b>: si lo emite ISIS después del pago o si ya viene en el extracto.</li>" +
+    "<li>Cómo se trata un <b>e-cheque</b>: si la fila va con la fecha de acreditación o con la de vencimiento " +
+    "(hoy hay 914 filas repetidas del mismo recibo, $779.279.758, que parecen cuotas del mismo cheque).</li>" +
+    "<li>Qué entradas <b>no son cobranza</b> (transferencias entre cuentas propias, devoluciones, intereses).</li>" +
+    "<li>Si un pago puede cancelar facturas de <b>las dos empresas</b> a la vez.</li>" +
+    "</ul></div></div>";
+  return h;
+}
+window.cbzConcHtml = cbzConcHtml;
+window.cbzConcCargar = cbzConcCargar;
+
+var _CBZ_DEMO_CONC = [
+  { banco: "credicoop", empresa: "lk", movimientos: 26619, entradas: 13845, con_cliente: 12689, con_recibo: 10506, sin_identificar: 1110, monto_sin_identificar: 1031493020, primera: "2021-01-07", ultima: "2026-09-28", archivo: "CONCILIACION CREDICOOP LOEKE.xls" },
+  { banco: "credicoop", empresa: "chef", movimientos: 4444, entradas: 606, con_cliente: 12, con_recibo: 16, sin_identificar: 589, monto_sin_identificar: 1022438804, primera: "2012-03-01", ultima: "2026-09-28", archivo: "BANCO CREDICOOP CHEF.xlsm" }
+];
 
 /* ------------------------------ datos DEMO ------------------------------- */
 /* Sólo se usan si la base no contesta, y la pantalla lo dice con un chip. */
@@ -555,6 +817,26 @@ var _CBZ_DEMO_COMP = [
   { orden: "2026-09-25", fecha: "2026-09-25", comprobantes: "FCA 0004-00036023", facturado: 10603863.77, pendiente: 10603863.77, estado: "debe",
     pago_recibo: null, pago_fecha: null, pago_monto: null, dias: 4, dto_tomado: null, dto_ganado: null, a_reclamar: null,
     explicacion: "Debe $10.603.864 · facturada hace 4 días · vence el 24/11." }
+];
+var _CBZ_DEMO_DEUDA = [
+  { comprobante: "FCA 0004-00035292", fecha: "2026-07-24", vence: "2026-09-22", condicion: "Pago Contado -25%", dto_cond: 0.25,
+    lista: 1080583.02, pendiente_ancla: 108058.31, cancelado_banco: 972524.71, pendiente: 108058.31, origen: "excel",
+    recibos_banco: "14588+14601", dias: 67, vencido: true },
+  { comprobante: "FCA 0004-00035901", fecha: "2026-09-12", vence: "2026-11-11", condicion: "Cta Cte 60", dto_cond: 0,
+    lista: 818771.18, pendiente_ancla: 818771.18, cancelado_banco: 0, pendiente: 818771.18, origen: "isis nuevo",
+    recibos_banco: null, dias: 17, vencido: false }
+];
+var _CBZ_DEMO_PAGOS = [
+  { recibo: "14601", fecha_pago: "2026-09-28", medio: "transferencia", pagado: 472524.71, facturas: "35292", lista: 1080583.02,
+    nc: null, dias: 66, dto_tomado: 0.10, dto_ganado: 0.10, retencion: 0, a_reclamar: 0, calidad: "exacta", plazo: 60, atraso: 6 },
+  { recibo: "14588", fecha_pago: "2026-09-15", medio: "deposito", pagado: 500000, facturas: "35292", lista: 1080583.02,
+    nc: null, dias: 53, dto_tomado: 0.10, dto_ganado: 0.10, retencion: 0, a_reclamar: 0, calidad: "parcial", plazo: 60, atraso: 0 },
+  { recibo: "14512", fecha_pago: "2026-09-08", medio: "e-cheque", pagado: 352168.44, facturas: "35640", lista: 440210.55,
+    nc: null, dias: 9, dto_tomado: 0.25, dto_ganado: 0.25, retencion: 0, a_reclamar: 0, calidad: "exacta", plazo: 14, atraso: 0 }
+];
+var _CBZ_DEMO_ENTREGAS = [
+  { np: "LK 0122", tanda: "E30A", fecha_salida: "2026-09-29", m3: 3.119, facturado_at: "2026-09-28" },
+  { np: "98619", tanda: "D61A", fecha_salida: "2026-09-08", m3: 4.309, facturado_at: "2026-09-08" }
 ];
 var _CBZ_DEMO_CTA = [
   { fecha: "2026-07-24", tipo: "Factura", comprobante: "FC Electr. A 0004-00035292", condicion: "Pago Contado -25%", debe: 1080583.02, haber: 0, saldo: 1080583.02, detalle: null },
@@ -577,3 +859,7 @@ window.cbzSub = cbzSub;
 window.cbzFila = cbzFila;
 window.cbzConsolidar = cbzConsolidar;
 window.cbzEscalaHtml = cbzEscalaHtml;
+window.cbzDeudaHtml = cbzDeudaHtml;
+window.cbzPagosHtml = cbzPagosHtml;
+window.cbzEntregasHtml = cbzEntregasHtml;
+window.cbzFichaTraer = cbzFichaTraer;

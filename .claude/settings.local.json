@@ -80,8 +80,12 @@
       "Bash(node scripts/bump-version.cjs 23.87)",
       "Bash(sed -i 's/gv_tv_clave_60s_v2393/gv_tv_clave_60s_v2393 \\(aplicada asi\\)/' /dev/null)",
       "Bash(until git *)",
+      "Bash(git worktree *)",
       "Bash(node tests/oc-recibido-backend.cjs)",
-      "Bash(node scripts/bump-version.cjs 24.00)"
+      "Bash(node scripts/bump-version.cjs 24.00)",
+      "Bash(node tests/cbz-ficha-cliente.cjs)",
+      "Bash(node tests/pedimp-ancho-tabla.cjs)",
+      "Bash(node tests/imp-nac-articulo-pantalla.cjs)"
     ]
   }
 }

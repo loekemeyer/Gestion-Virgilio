@@ -2753,7 +2753,41 @@ excepción. **Si se suma una escritura nueva a `gv_clin_evento`, va con `and not
 
 **Chequeo:** `select * from public.gv_clin_vencidos;` — lo que espera hace demasiado (el pedido
 **no se cancela solo**). Y `select * from public.gv_clin_prioritarios;` — lo aprobado que tiene
-que salir en 2 días hábiles. `sql/gv_clin_dos_estados_v2086.sql` (vigente; se aplicó como v20.89 — la v20.86, la v20.87 y la v20.88 se las llevaron otras sesiones) y
+que salir en 2 días hábiles.
+
+### ⚠ v24.32 (Luis, 29/09): el botón del cliente de prueba es 🖨 IMPRIMIR
+
+*"cambiá el botón de cliente de prueba por un botón de imprimir que promptee la impresión de un
+excel … asegurate de que haya una columna que se llame «Comentarios» que tenga todos los
+comentarios de esa gestión en una celda (bien ordenados, separados y visibles)"*. Es el mismo
+camino que tomó Cuarentena en la v20.53: el ejemplo era la ayuda de la primera semana y el
+reporte se usa todos los días. `pipeDemoToggle` y `pipeDemoPedido` **siguen en el archivo** — lo
+que no vuelve es la **puerta**: el ejemplo se prende desde la consola (`_apr.pipeDemo = true`) y
+ahí reaparece su «↺ Reiniciar ejemplo».
+
+El Excel (`pipeExportarExcel`) se arma en el FRONT, como el de Cuarentena: **20 columnas** con lo
+que ya pinta la tabla (pedido y sus partes, NP, fecha y días, m³, empresa, código, razón social,
+CUIT, teléfono, zona, etapa, espera, vencido, quién lo definió, a cobrar neto y c/IVA, descuento,
+importados en falta) más **Comentarios**.
+
+⚠ **Los comentarios NO están en la pantalla**: la tabla sólo muestra **cuántos** hay (el 📖 sale
+de `gv_cuarentena_comentarios_lote`, que devuelve el conteo). El texto se pide por pedido con
+`gv_cuarentena_comentarios`, **una llamada por parte** de la gestión —un pedido partido por
+importados es UNA fila (v23.06), así que se juntan los de todas sus partes y se ordenan por
+fecha— y todas en paralelo.
+
+⚠ **Si esa lectura falla, la celda lo DICE** (`(no se pudieron leer los comentarios)`), no queda
+vacía: una lectura rota no es *"sin comentarios"*.
+
+⚠⚠ **SheetJS community NO escribe estilos, así que `wrapText` no se puede forzar** — medido el
+29/09 sobre `vendor/xlsx.full.min.js` 0.20.3: se le pone `cell.s.alignment` y el `styles.xml` que
+genera sale con `cellXfs count="1"` sin alignment. Por eso cada comentario va **numerado y con su
+fecha y su autor** (`1) 26/09/26 09:00 · Vivi: …`) y separado además por salto de línea: sin el
+ajuste de texto se leen igual, y con el ajuste puesto quedan uno por renglón. **No volver a
+intentar el wrap desde el front.**
+
+**Chequeo:** `node tests/pipe-imprimir-excel.cjs` — corre el export de verdad con la RPC
+mockeada (verificado que falla contra el index anterior). `sql/gv_clin_dos_estados_v2086.sql` (vigente; se aplicó como v20.89 — la v20.86, la v20.87 y la v20.88 se las llevaron otras sesiones) y
 `sql/gv_clin_pipeline_v2066.sql` (tablas, config, vínculo y vistas), §3.ln.
 
 ## ⚠ Regla del dueño (2026-09-15): Oscar hace el SKIN — la OC va a su nombre y NO se toca
@@ -3870,6 +3904,93 @@ banda NO los lleve, que los dos chips abran el pop-up y que el contenido siga co
 **Chequeo:** `node tests/imp-hist-pedidos.cjs` · `node tests/pedimp-config-proveedor.cjs` ·
 `select * from public.gv_imp_pedidos_historial(400);`. `sql/gv_imp_pedidos_historial_v2391.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-29, v24.32): la nacionalización por artículo es de 🚢 EN CURSO — y el proveedor la abre
+
+**Luis, textual:** *"no me estás entendiendo. Es en la pestaña «en curso» que quería lo que te pedí.
+Sacá eso que hiciste en el proveedor pestaña «pedidos» y metelo en «en curso»"* · *"apretás sobre el
+proveedor y debería expandirse las unidades"*.
+
+Se había leído *"apretás sobre el proveedor"* como **📦 Pedidos Importación** —el encabezado 🏭 de
+cada chino— y **no es ahí**: el proveedor que Luis toca es **la columna Proveedor de la tabla de
+🚢 En curso**. Ahí ya estaba el detalle, pero se abría **sólo desde el número de PI**.
+
+> **En 🚢 En curso, la celda del PROVEEDOR abre el mismo detalle que el PI** (`impCursoToggle`), con
+> 🛃 Nac. u$s (total y por unidad), Puesto u$s/u, el u$s/m³ editable y los tres criterios de reparto.
+
+**Se RETIRA todo lo que la v24.31 había puesto en 📦 Pedidos Importación**: el encabezado del
+proveedor vuelve a ser texto, la tabla vuelve a 11 columnas y `pedImpNacToggle` / `pedImpNacCrit` /
+`pedImpSetNacM3` / `_pedImpNacBandaHtml` se borraron. **La nacionalización por artículo vive en UN
+solo lugar** — dos módulos haciendo lo mismo es el pozo de Matricería.
+
+### Lo que SÍ queda de la v24.31: el hueco muerto de la tabla de Pedidos
+
+`.mva-tbl.wide` iba a `width:100%` dentro de una tarjeta de **1760 px** y el `<colgroup>` daba ancho
+a **10 de las 11** columnas. Todo el sobrante —**~700 px** en un monitor ancho— caía en Descripción,
+que es exactamente el hueco entre ella y Proy u/mes que reclamó Luis.
+
+> **La tabla mide lo que suman sus columnas, y la TARJETA se achica a eso.** No al revés.
+
+Medido al 29/09 en 1920 px: tabla **1.242 px** en una tarjeta de **1.274** (antes 1.760), Descripción
+**232 px**. El ancho lo pone `_cols` en JS y `_anchoMax` fija el `max-width` de la tarjeta después de
+dibujar. ⚠ La v23.95 decía lo contrario (*"el sobrante se lo lleva Descripción (col sin width)"*):
+**queda retirada**.
+
+**Chequeo:** `node tests/pedimp-ancho-tabla.cjs` — mide el ancho REAL de la celda con la pantalla
+corriendo y que no quede ninguna `<col>` sin width; verificado que falla con Descripción en 700 px.
+Y `node tests/imp-nac-articulo-pantalla.cjs`, que ahora abre el detalle **clickeando el proveedor**.
+
+## ⚠ REGLA (Luis, 2026-09-29, v24.3): el COSTO DE NACIONALIZACIÓN se ve POR ARTÍCULO — y repartir todo por m³ NO es neutro
+
+**Luis:** *"cada artículo en el listado tenga el coste de nacionalización, calculable por m³ y que
+sea variable (se pueda ajustar)"*.
+
+En 🚢 **En curso**, al abrir el PI cada artículo trae **🛃 Nac. u$s** (y u$s por unidad) y **Puesto
+u$s/u** = FOB por unidad + lo que le toca de nacionalización. Arriba, la banda dice el costo del
+embarque, el % sobre el FOB y **el u$s/m³ editable**.
+
+> **El embarque es el PEDIDO.** El costo se calcula UNA vez con el FOB y los m³ de la fila del
+> pedido —los mismos que se ven arriba— y las líneas sólo dicen cómo se REPARTE. Al revés
+> (sumando líneas) un detalle incompleto infla el factor y nada avisa.
+
+⚠⚠ **Repartir TODO por m³ le cobra los derechos al VOLUMEN, y por eso el default NO es m³.** De lo
+que cuesta el embarque, lo único que se paga por volumen es el **flete**; derechos, estadística,
+seguro, libre circulación, despachante y comisión NTL son **% del FOB / CIF**. Por m³ puro, un
+artículo voluminoso y barato paga derechos que no generó y uno chico y caro los paga de menos.
+
+| criterio | qué hace |
+|---|---|
+| **mixto** (default) | cada concepto por SU base: el flete por m³, el resto por FOB |
+| **por m³** | todo por volumen — lo que Luis pidió textual, a un click |
+| **por FOB** | todo por plata (el factor parejo de siempre) |
+
+- La base de cada concepto viaja en el **4.º elemento de `res.detalle`** (`"m3"` / `"fob"`), puesta
+  por `_pedImpNacionalizar`: **no se adivina por el nombre del renglón**. Al agregar un concepto
+  nuevo a la nacionalización hay que decir su base, o cae en `fob` por defecto.
+- El reparto lo hace **`_impNacReparto(res, items, crit)`** y **la suma da exactamente
+  `res.noRecup`** (se escala al final: en **avión** la suma del detalle no coincide con el no
+  recuperable, porque el certificado FEDEX entra al CIF y no se suma como costo propio).
+- ⚠ **Guards:** si la base elegida suma 0 se cae a la otra; si las dos son 0 reparte por unidades;
+  sin nada, parejo. **Nunca divide por cero ni le tira todo al primer renglón** — un pedido sin m³
+  cargado es el caso normal, no el raro.
+- **El u$s/m³ es del PROVEEDOR** (`GV_Imp_Proveedor.valor_m3`, regla v23.89: la config vive en
+  tablas) y vale también para 📦 Pedidos: es la misma fuente. Se manda **sólo `{proveedor,
+  valor_m3}`** — la RPC deja intacta toda clave ausente, así que mandar el resto pisaría lo que
+  otro esté editando en el ⚙ (regla v23.95).
+- El criterio de reparto **no toca ninguna tabla**: es cómo se muestra el mismo u$s. El Excel de la
+  pantalla baja el detalle con el criterio elegido.
+
+⚠ **`_derechosPedido` no sirve acá**: lee el FOB con `_pedImpUsdOf`, que es del generador de
+pedidos. Las líneas del pedido en curso traen `usd` del backend, y por eso existe
+`_impCursoDerechos` — sin ese shim la tasa del embarque salía siempre la general.
+
+⚠ **Probado: `width:99%` en Descripción NO va.** Empuja las numéricas a la derecha y deja un hueco
+muerto en el medio (más parte la marca en dos líneas). El reparto natural de la tabla queda más
+apretado, que es lo que pide la regla rectora de espacio.
+
+**Chequeo:** `node tests/impo-nac-por-articulo.cjs` (la función pura, los tres criterios y los
+guards) · `node tests/imp-nac-articulo-pantalla.cjs` (corre la pantalla: las columnas, que el total
+no cambie al cambiar el criterio y que el u$s/m³ guarde sólo su clave).
+
 ## ⚠ REGLA (Luis, 2026-09-29, v23.86): se arma POR CAMIÓN — y a las 15:00 la TV dice si llegan
 
 - **Orden de armado = `gv_monitor_tanda_camion.orden_camion`**: por día, 1° el camión con más m³, Retira al final.
@@ -4294,6 +4415,30 @@ retira y queda ésta. **Dos módulos que hacen lo mismo para siempre es el pozo 
 
 ⚠ Si la base no contesta, la pantalla muestra datos **DEMO** con un chip rojo que lo dice, en vez de
 ceros — regla *"una lectura ROTA no es un CERO"*.
+
+### La ficha se arma con `gv_cobranza_ficha(emp, cod)` — tres fuentes, una llamada (v24.3)
+
+**Luis, 29/09:** *"tenemos la data de la deuda que se sube para la cuarentena, tenés acceso a la
+facturación y a la conciliación. tratá de conectar esas fuentes a la ficha"*.
+
+| bloque | fuente | qué aporta |
+|---|---|---|
+| `deuda` | **`GV_Cobranza_Deuda_Viva`** | el **Excel de deuda de la Cuarentena** (el ancla) + facturas y NC posteriores de ISIS − lo que la **conciliación bancaria** vio cobrado (`pendiente_ancla`, `cancelado_banco`, `recibos_banco`, `origen`) |
+| `recibos` | **`GV_Cobranza_Imputacion`** | cada pago del banco contra las facturas que cancela: `dto_tomado` vs `dto_ganado`, retención, `a_reclamar`, `calidad` |
+| `entregas` | **`Facturacion_NP`** | lo que Gestión facturó: NP, tanda, m³, día de salida |
+
+⚠ **La empresa de una entrega la da la NP (`gv_emp_de_np`), NUNCA el código de cliente solo.**
+
+⚠ **Los totales de la ficha salen de la RPC, no de la lista** (la lista es el respaldo mientras
+carga o si no contesta). La consolidación LK+CH la hace el front: una llamada por código y se suman.
+
+⚠⚠ **PostgREST resuelve una función por el NOMBRE de sus argumentos, no por el orden.** Llamar
+`gv_cobranza_cliente({p_empresa, p_cod})` cuando el parámetro se llama **`p_emp`** no da un error de
+tipos: da *"Could not find the function … in the schema cache"*, como si la función no existiera.
+Antes de escribir la llamada: `select pg_get_function_arguments(oid) from pg_proc where proname = …`.
+
+Medido el 29/09 con INC (LK 1651): **27 ms como `authenticated`** (timeout del rol: 8 s), y los
+números coinciden con la pantalla. `sql/gv_cobranza_ficha_v2403.sql`, §3.v2403.
 
 **Chequeo:** `node tests/cbz-ficha-cliente.cjs` · `select count(*) from (select cuit from
 public.gv_cobranza_clientes_cuit() group by cuit having count(distinct empresa)=2) z;` — 69 al 29/09.
@@ -6016,3 +6161,24 @@ el `alter view`. `sql/gv_avisar_programacion_web_v2393.sql`, §3.v2393.
 facturados sin completar"*): `stkOpenNpFaltan` y `stkOpenFaltFact` **siguen en el archivo**, lo que
 no vuelve es el botón. **«Completar datos producto» se mudó a ⚙️ Configuración** con su `#dpBadge`
 (si el id no viaja con el botón, `dpLoadBadge()` escribe en la nada). `tests/sup-panel-v2393.cjs`.
+
+## ⚠ REGLA (v24.32): lo que el `activate` del SW ESPERA puede dejar la pestaña MUDA
+
+El `event.waitUntil()` de `activate` no termina hasta que se asienta lo que le pasaste, y la página
+que todavía está booteando pasa sus `fetch` por ese Service Worker. **Un `await` adentro del
+`waitUntil` que no resuelve deja el SW a medio activar y el hilo principal de la pestaña esperándolo
+para siempre**: sin error, sin cartel, la app muda.
+
+El que mordió: la recarga única de la v23.70 (`forzado-v2370`) hacía `await c.navigate(...)` **cliente
+por cliente**. Si esa navegación no resuelve —red que no contesta, recurso abortado— se colgaba todo.
+Hoy las navegaciones se disparan **sin esperarlas una por una** y el conjunto tiene un techo de 2 s:
+la recarga sigue saliendo y `activate` no se puede colgar.
+
+> **Al agregar algo al `waitUntil` de `install` o `activate`: o no se espera, o se espera con techo.**
+
+⚠ **Lo cazó un test, no la lectura.** `tests/vendor-sin-cdn.cjs` corta toda salida a internet: la
+página llegaba a `readyState = complete` y a los **~1,9 s** dejaba de responder — `page.evaluate` y
+hasta un `Runtime.evaluate` de `1+1` por CDP se comían el timeout, mientras `Debugger.pause` seguía
+entrando (o sea: el renderer vivo y el hilo trabado). Se aisló sirviendo el mismo `index.html` con el
+`navigator.serviceWorker.register` neutralizado → **VIVO**; con el SW puesto y sin el `await` del
+`navigate` → **VIVO**. Ese test es el centinela: no hay otro.

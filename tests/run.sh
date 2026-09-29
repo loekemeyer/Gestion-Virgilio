@@ -490,6 +490,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== cbz-ficha-cliente (v23.98: submodulo Cobranzas - busqueda de cliente y ficha con deuda consolidada LK+CH por CUIT) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cbz-ficha-cliente.cjs
 
+echo "== cbz-conciliacion (v24.32: pestana Conciliacion - cuanto de cada extracto quedo identificado y que falta para conciliar solo) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cbz-conciliacion.cjs
+
 echo "== fac-conciliacion (v14.30: Facturación en 2 solapas; Conciliación = snapshot Gestión vs factura ISIS; el snapshot se registra al facturar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-conciliacion.cjs
 
@@ -767,6 +770,8 @@ echo "== pipe-clientes-nuevos (v20.86: el pipeline reemplazo al submodulo viejo,
 node tests/pipe-clientes-nuevos.cjs
 echo "== pipe-en-a-programar (v20.86: cuarentena primero, zona, dos estados y colapsable — corrido, no leido) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-en-a-programar.cjs
+echo "== pipe-imprimir-excel (v24.32: el boton de cliente de prueba es Imprimir, con la columna Comentarios) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-imprimir-excel.cjs
 
 echo "== ppp-cliente-dos-dias-salidos (v20.67: lo que ya salio no parte al cliente en dos dias) =="
 node tests/ppp-cliente-dos-dias-salidos.cjs
@@ -1017,6 +1022,15 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== impo-nacionalizacion (v22.37: costo de traer de China + proyeccion al minimo de 25k por proveedor) =="
 node tests/impo-nacionalizacion.cjs
+
+echo "== impo-nac-por-articulo (v24.01: el costo de nacionalizacion repartido por articulo, mixto/m3/FOB) =="
+node tests/impo-nac-por-articulo.cjs
+
+echo "== imp-nac-articulo-pantalla (v24.01: la nacionalizacion por articulo en la pantalla En curso) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-nac-articulo-pantalla.cjs
+
+echo "== pedimp-ancho-tabla (v24.32: sin hueco muerto entre Descripcion y Proy u/mes; la tarjeta mide lo que la tabla) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-ancho-tabla.cjs
 
 echo "== ppp-retira-badge (v22.40: un RETIRA no se lee como reparto 'Zona 6 · 🚚 CABA') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-retira-badge.cjs
