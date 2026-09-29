@@ -14279,7 +14279,7 @@ cuatro fuentes que el árbol: web → ISIS → `Facturacion_NP` → histórico d
 
 ### Monitor TV — `monitor/tv.html` (v18.74, pedido de Luis)
 
-> ⚠ **v23.94 (Luis, 29/09) — la pantalla quedó con MÍNIMO TEXTO.** Lo que cambió, para no
+> ⚠ **v23.95 (Luis, 29/09) — la pantalla quedó con MÍNIMO TEXTO.** Lo que cambió, para no
 > reponerlo sin querer:
 >
 > | qué | cómo quedó |

@@ -6214,7 +6214,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.94"></script>
+<script type="module" src="recepcion.js?v=23.95"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10255,7 +10255,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.94";
+const APP_VERSION = "v23.95";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -19670,16 +19670,25 @@ var STK_POP_CSS =
   // v23.45 (Luis): sin hueco entre Descripción y Proy. La tabla mide lo que suman sus columnas
   // (no el 100% del popup), letra más grande y columnas dobles (Proy/Objetivo, En curso/A pedir,
   // Unidades/FOB, u$s/m³). Descripción en hasta 2 renglones.
-  ".mva-tbl.wide{width:1148px;min-width:1148px;font-size:13px;}" +   // = suma del <colgroup> de Pedidos Importación
+  ".mva-tbl.wide{width:1218px;min-width:1218px;font-size:15px;}" +   // = suma del <colgroup> de Pedidos Importación
   ".mva-tbl.wide td:nth-child(2){white-space:normal;line-height:1.25;}" +
   ".mva-tbl.wide td:nth-child(2) .imp-desc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}" +
   ".mva-tbl.wide td:nth-child(4){white-space:normal;line-height:1.3;}" +
-  ".mva-tbl.wide .imp2 small{display:block;font-size:11.5px;color:#64748b;font-weight:600;margin-top:1px;}" +
+  ".mva-tbl.wide .imp2 small{display:block;font-size:13px;color:#64748b;font-weight:600;margin-top:1px;}" +
   ".mva-tbl.wide thead th small{display:block;font-weight:700;color:#94a3b8;}" +
   ".mva-tbl.wide th.num,.mva-tbl.wide td.num{width:auto;}" +   // manda el <colgroup>, no el 15% genérico
   ".mva-tbl.wide th,.mva-tbl.wide td{vertical-align:middle;overflow:hidden;}" +
   ".mva-tbl.wide thead th{text-overflow:ellipsis;}" +   // solo header y Descripción cortan con «…»
-  ".mva-tbl.wide thead th{white-space:normal;line-height:1.25;}" +   // 'Proy u/mes' entra en 2 renglones
+  ".mva-tbl.wide thead th{white-space:normal;line-height:1.25;font-size:12px;}" +   // 'Proy u/mes' entra en 2 renglones
+  // v23.91 (Luis): la PROYECCIÓN se toca en su propia celda (el código dejó de ser un link)
+  ".mva-tbl.wide td.pedimp-proy{cursor:pointer;background:#faf5ff;color:#6d28d9;}" +
+  ".mva-tbl.wide td.pedimp-proy:hover{background:#f3e8ff;}" +
+  ".mva-tbl.wide td.pedimp-proy small{color:#a78bfa;}" +
+  // el global button{width:100%;padding:16px;font-size:22px;margin-top:14px} estiraba cada botón
+  // del pop-up ⚙ Configurar de punta a punta (Luis, 29/09: "botones largos horribles").
+  "#impCfgOv button{width:auto;margin-top:0;}" +
+  // y el input global (width:100% + padding, sin box-sizing) se desbordaba del pop-up
+  "#impCfgOv input{box-sizing:border-box;margin:0;}" +
   ".mva-tbl.wide th:nth-child(7),.mva-tbl.wide td:nth-child(7){border-left:2px solid #cbd5e1;}" +   // arranca el bloque PEDIDO
   ".mva-tbl.wide th:nth-child(10),.mva-tbl.wide td:nth-child(10){border-left:1px solid #e2e8f0;}" +
   ".mva-tbl.wide th:first-child,.mva-tbl.wide td:first-child{position:sticky;left:0;z-index:1;background:#fff;box-shadow:1px 0 0 #e2e8f0;}" +
@@ -21178,24 +21187,34 @@ function _pedImpBandaHtml(proy, nac, minUsd, totUsd, ext) {
   // tabla hacia abajo. Ahora el chip es una línea y «ver desglose» abre un pop-up.
   // Los datos para rearmarlo quedan en _pedImpDesgData, así el pop-up no depende del HTML.
   var chip = function (bg, bd, col, html, desg, lado) {
-    var base = 'flex:1 1 300px;min-width:250px;background:' + bg + ';border:1px solid ' + bd + ';border-radius:9px;padding:10px 13px;font-size:14px;color:' + col + ';line-height:1.45';
+    var base = 'flex:1 1 280px;min-width:240px;background:' + bg + ';border:1px solid ' + bd + ';border-radius:9px;padding:7px 11px;font-size:11.5px;color:' + col + ';line-height:1.35';
     if (!desg) return '<div style="' + base + '">' + html + '</div>';
     return '<div style="' + base + '">' + html +
-      ' <button onclick="pedImpDesgPop(\'' + encodeURIComponent(String(ext.prov || "")) + '\',\'' + lado + '\')" style="background:none;border:0;padding:0;margin-left:2px;font-size:11.5px;font-weight:800;color:inherit;text-decoration:underline;cursor:pointer">ver desglose</button></div>';
+      ' <button onclick="pedImpDesgPop(\'' + encodeURIComponent(String(ext.prov || "")) + '\',\'' + lado + '\')" style="background:none;border:0;padding:0;margin-left:2px;font-size:10.5px;font-weight:800;color:inherit;text-decoration:underline;white-space:nowrap;cursor:pointer">ver desglose</button></div>';
   };
   _pedImpDesgData[String(ext.prov || "")] = { proy: proy, nac: nac, minUsd: minUsd, totUsd: totUsd, ext: ext };
   var izq;
-  if (proy.estado === "ya") izq = chip("#ecfdf5", "#a7f3d0", "#065f46", '✅ <b>Ya se puede pedir</b> — hay ' + _usd0(proy.fobHoy) + ' de demanda, sobre el mínimo de <b>' + _usd0(minUsd) + '</b>.');
-  else if (proy.estado === "nunca") izq = chip("#fef2f2", "#fecaca", "#991b1b", '⚠ <b>No llega a ' + _usd0(minUsd) + ' solo</b> — ni con el stock en 0 (techo ' + _usd0(proy.techo) + ' en 10 meses). <span style="color:#b91c1c">Se consolida con otro proveedor.</span>');
-  else if (proy.estado === "sinburn") izq = chip("#f1f5f9", "#e2e8f0", "#475569", '📉 Sin proyección de consumo cargada: no se puede estimar cuándo llega a ' + _usd0(minUsd) + '.');
-  else izq = chip("#fffbeb", "#fde68a", "#92400e", '⏳ <b>Llega a ' + _usd0(minUsd) + ' en ' + _pedImpMesesTxt(proy.meses) + '</b>' + (proy.fechaIso ? ' (≈ ' + _isoToDdMmAa(proy.fechaIso) + ')' : '') + '. <span style="color:#b45309">Consumo ' + _usd0(_nacNum(proy.burn, 0)) + '/mes.</span>', _pedImpDesgIzq(proy, minUsd, ext.items), "izq");
+  // lo que se lee de un vistazo va en 19px; el contexto, en la letra base del chip (11,5px)
+  var _big = function (txt, col2) { return '<span style="font-size:19px;font-weight:800' + (col2 ? ';color:' + col2 : '') + '">' + txt + '</span>'; };
+  var _pie = function (txt) { return '<div style="opacity:.85">' + txt + '</div>'; };
+  if (proy.estado === "ya") izq = chip("#ecfdf5", "#a7f3d0", "#065f46", _big("✅ Ya se puede pedir") + _pie('demanda ' + _usd0(proy.fobHoy) + ' · mínimo ' + _usd0(minUsd)));
+  else if (proy.estado === "nunca") izq = chip("#fef2f2", "#fecaca", "#991b1b", _big("⚠ No llega solo") + _pie('mínimo ' + _usd0(minUsd) + ' · techo ' + _usd0(proy.techo) + ' — se consolida con otro proveedor'));
+  else if (proy.estado === "sinburn") izq = chip("#f1f5f9", "#e2e8f0", "#475569", _big("📉 Sin proyección") + _pie('no se puede estimar cuándo llega a ' + _usd0(minUsd)));
+  else izq = chip("#fffbeb", "#fde68a", "#92400e",
+    _big("⏳ " + _pedImpMesesTxt(proy.meses)) + ' ' + _big(_usd0(_nacNum(proy.burn, 0)) + "/mes", "#b45309") +
+    _pie('para el mínimo de ' + _usd0(minUsd) + (proy.fechaIso ? ' ≈ ' + _isoToDdMmAa(proy.fechaIso) : '')),
+    _pedImpDesgIzq(proy, minUsd, ext.items), "izq");
   // el chip de proyección necesita fobHoy/burn; se los pasa el llamador vía proy (los adjunto abajo)
   var der;
   var modoTxt = { consolidada: "Consolidada", full: "Contenedor", avion: "Avión" }[nac.modo] || nac.modo;
   if (!(totUsd > 0)) der = chip("#f1f5f9", "#e2e8f0", "#475569", '🚢 Poné el pedido (columna <b>MC</b>) para ver el costo <b>puesto en Argentina</b>.');
   else if (nac.sinPeso) der = chip("#fef2f2", "#fecaca", "#991b1b", '✈️ <b>Avión:</b> cargá el <b>peso (TN)</b> arriba para calcular el flete FEDEX.');
-  else der = chip("#eef2ff", "#c7d2fe", "#3730a3", '🚢 <span style="font-size:17px"><b>Puesto en Arg: ' + _usd0(nac.landed) + '</b></span> <span style="color:#4338ca">(' + modoTxt + ')</span><br>FOB ' + _usd0(totUsd) + ' + <b style="color:#b91c1c">' + _usd0(nac.noRecup) + ' no recuperable (+' + Math.round(nac.factor * 100) + '%)</b>' + (nac.ntl > 0 ? ' · incl. comisión NTL ' + _usd0(nac.ntl) : '') + (nac.recup > 0 ? '<br><b style="color:#047857">+ ' + _usd0(nac.recup) + ' recuperable</b> <span style="color:#047857">(IVA y percepciones: vuelven como crédito)</span>' : ''), _pedImpDesgDer(nac, totUsd, ext.m3), "der");
-  return '<div style="display:flex;gap:10px;flex-wrap:wrap;padding:10px 13px;background:#fff;border-bottom:1px solid #f1f5f9">' + izq + der + '</div>';
+  else der = chip("#eef2ff", "#c7d2fe", "#3730a3",
+    _big("🚢 +" + Math.round(nac.factor * 100) + "% · " + _usd0(nac.noRecup), "#b91c1c") + ' <span style="font-weight:800;color:#b91c1c">no recuperable</span>' +
+    _pie('puesto en Arg ' + _usd0(nac.landed) + ' · FOB ' + _usd0(totUsd) + ' · ' + modoTxt + (nac.ntl > 0 ? ' · NTL ' + _usd0(nac.ntl) : '') +
+      (nac.recup > 0 ? ' · <span style="color:#047857;font-weight:700">' + _usd0(nac.recup) + ' recuperable</span>' : '')),
+    _pedImpDesgDer(nac, totUsd, ext.m3), "der");
+  return '<div style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 11px;background:#fff;border-bottom:1px solid #f1f5f9">' + izq + der + '</div>';
 }
 /* ══ v23.89 (Luis, 29/09) — LA CONFIG DE IMPORTADOS VIVE EN TABLAS ═══════════════════
    "Fijate que no vivan en el front los datos, sino que modifiquen las tablas pertinentes".
@@ -21363,17 +21382,17 @@ function _impCfgRender() {
   const P = _impCfgPop, prov = P.prov, r = _impCfgProv[prov] || {};
   const soloGral = !prov;   // v23.91 — el pop-up de los parámetros generales, sin proveedor
   const g = _NAC_TASAS, esc = escapeHtml;
-  const tabB = function (id, txt) { return '<button onclick="pedImpCfgTab(\'' + id + '\')" style="padding:6px 12px;border-radius:999px;border:1px solid ' + (P.tab === id ? '#0f766e' : '#cbd5e1') + ';background:' + (P.tab === id ? '#0f766e' : '#fff') + ';color:' + (P.tab === id ? '#fff' : '#334155') + ';font-weight:800;font-size:12.5px;cursor:pointer">' + txt + '</button>'; };
+  const tabB = function (id, txt) { return '<button onclick="pedImpCfgTab(\'' + id + '\')" style="padding:7px 18px;border-radius:999px;border:1px solid ' + (P.tab === id ? '#0f766e' : '#cbd5e1') + ';background:' + (P.tab === id ? '#0f766e' : '#fff') + ';color:' + (P.tab === id ? '#fff' : '#334155') + ';font-weight:800;font-size:14.5px;cursor:pointer">' + txt + '</button>'; };
   const campo = function (id, lbl, val, ph, hint) {
     return '<div style="display:flex;flex-direction:column;gap:3px;min-width:0">' +
-      '<label style="font-size:11px;font-weight:800;color:#475569">' + lbl + '</label>' +
-      '<input id="' + id + '" value="' + esc(val == null ? "" : String(val)) + '" placeholder="' + esc(ph) + '" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%">' +
-      (hint ? '<span style="font-size:10.5px;color:#94a3b8">' + hint + '</span>' : '') + '</div>';
+      '<label style="font-size:12.5px;font-weight:800;color:#475569">' + lbl + '</label>' +
+      '<input id="' + id + '" value="' + esc(val == null ? "" : String(val)) + '" placeholder="' + esc(ph) + '" style="padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;font-weight:700;width:100%">' +
+      (hint ? '<span style="font-size:11.5px;color:#94a3b8">' + hint + '</span>' : '') + '</div>';
   };
   let h = '<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#0f766e;color:#fff">' +
-    '<div style="font-size:16px;font-weight:800">' + (prov ? '⚙ Configurar — ' + esc(prov) : '⚙ Parámetros generales de importación') + '</div>' +
-    '<button onclick="pedImpCfgCerrar()" style="background:#fff;color:#0f766e;border:0;border-radius:8px;padding:5px 12px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
+    '<div style="font-size:18px;font-weight:800">' + (prov ? '⚙ Configurar — ' + esc(prov) : '⚙ Parámetros generales de importación') + '</div>' +
+    '<button onclick="pedImpCfgCerrar()" style="background:#fff;color:#0f766e;border:0;border-radius:8px;padding:6px 16px;font-size:14.5px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
     '<div style="padding:14px 16px">' +
     // v23.91 (Luis: "no entiendo por qué hay un general ahí y qué modifica esos") — los
     // generales salieron a su propio botón del módulo: acá sólo lo de ESTE proveedor.
@@ -21382,7 +21401,7 @@ function _impCfgRender() {
   if (P.msg) h += '<div style="margin-bottom:10px;padding:7px 10px;border-radius:8px;font-size:12.5px;font-weight:700;background:' + (P.msg[0] === "!" ? "#fef2f2" : "#f0fdf4") + ';color:' + (P.msg[0] === "!" ? "#b91c1c" : "#166534") + '">' + esc(P.msg.replace(/^!/, "")) + '</div>';
 
   if (P.tab === "params") {
-    h += '<div style="font-size:12px;color:#64748b;margin-bottom:10px">Lo que se deje <b>vacío</b> usa el valor general (el que aparece en gris). Los porcentajes van en <b>porcentaje</b>: 35 = 35%.</div>';
+    h += '<div style="font-size:13px;color:#64748b;margin-bottom:10px">Lo que se deje <b>vacío</b> usa el valor general (el que aparece en gris). Los porcentajes van en <b>porcentaje</b>: 35 = 35%.</div>';
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">';
     h += '<div style="display:flex;flex-direction:column;gap:3px"><label style="font-size:11px;font-weight:800;color:#475569">Importador</label>' +
       '<input id="impCfgImportador" value="' + esc(r.importador || "") + '" placeholder="Chef / Tierra Nativa" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px"></div>';
@@ -21400,7 +21419,7 @@ function _impCfgRender() {
     h += '<div style="margin-top:12px"><label style="font-size:11px;font-weight:800;color:#475569">Nota</label>' +
       '<input id="impCfgNotas" value="' + esc(r.notas || "") + '" style="padding:6px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%"></div>';
     h += '<div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">' +
-      '<button onclick="pedImpCfgGuardar()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:8px 16px;font-weight:800;font-size:13px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar") + '</button>' +
+      '<button onclick="pedImpCfgGuardar()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:9px 20px;font-weight:800;font-size:15px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar") + '</button>' +
       (r.actualizado ? '<span style="font-size:11px;color:#94a3b8">último cambio ' + esc(String(r.actualizado).slice(0, 16).replace("T", " ")) + (r.actualizado_por ? " · " + esc(r.actualizado_por) : "") + '</span>' : '') +
       '</div>';
   } else if (P.tab === "cods") {
@@ -21410,37 +21429,37 @@ function _impCfgRender() {
       const mios = arts.filter(function (a) { return String(a.proveedor || "").trim() === prov; });
       const q = String(P.q || "").trim().toUpperCase();
       const otros = q ? arts.filter(function (a) { return String(a.proveedor || "").trim() !== prov && stkMatchBusq(q, a.cod, a.descripcion, false); }).slice(0, 40) : [];
-      h += '<div style="font-size:12px;color:#64748b;margin-bottom:9px">Se guarda en el maestro <code>Importados</code> (el mismo que usa 🏭 Proveedores). Sacar un código <b>no lo borra</b>: queda sin proveedor.<br><b>Der. %</b> son los derechos de ESE artículo (su partida arancelaria): vacío = usa el ' + _nacPct(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '% del proveedor.</div>';
-      h += '<div style="font-size:12.5px;font-weight:800;color:#0f172a;margin-bottom:6px">' + mios.length + ' código(s) de ' + esc(prov) + '</div>';
-      h += '<div style="max-height:210px;overflow:auto;border:1px solid #e2e8f0;border-radius:9px;margin-bottom:12px">';
+      h += '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px"><span style="font-size:15px;font-weight:800;color:#0f172a">' + mios.length + ' código(s) de ' + esc(prov) + '</span>' +
+        '<span style="font-size:12px;color:#94a3b8">% der. vacío = ' + _nacPct(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '% del proveedor</span></div>';
+      h += '<div style="max-height:300px;overflow:auto;border:1px solid #e2e8f0;border-radius:9px;margin-bottom:12px">';
       h += mios.length ? mios.map(function (a) {
         // v23.90 (Luis) — los derechos, editables por artículo, acá mismo
         const _ac = _impCfgArt[String(a.cod).trim().toUpperCase()] || {};
         const _der = (_ac.derechos_pct == null) ? "" : _impCfgPctTxt(_ac.derechos_pct);
-        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border-bottom:1px solid #f1f5f9">' +
-          '<b style="font-size:12.5px;min-width:64px">' + esc(String(a.cod)) + '</b>' +
-          '<span style="font-size:11.5px;color:#64748b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
-          '<input value="' + esc(_der) + '" placeholder="' + _impCfgPctTxt(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '" onchange="pedImpCfgArtDer(\'' + encodeURIComponent(String(a.cod)) + '\',this.value)" title="Derechos de este artículo, en porcentaje (35 = 35%). Vacío = el del proveedor." style="width:58px;text-align:center;padding:3px 5px;border:1px solid ' + (_der ? '#0f766e' : '#cbd5e1') + ';border-radius:7px;font-size:12px;font-weight:700;background:' + (_der ? '#f0fdfa' : '#fff') + '">' +
-          '<span style="font-size:11px;color:#94a3b8;font-weight:700">% der.</span>' +
-          '<button onclick="pedImpCfgSacar(\'' + encodeURIComponent(String(a.cod)) + '\')" title="Sacarlo de ' + esc(prov) + ' (pide confirmación)" style="background:#fee2e2;color:#b91c1c;border:0;border-radius:6px;padding:1px 5px;font-weight:800;font-size:10.5px;line-height:1.3;cursor:pointer">✕</button></div>';
-      }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:12.5px">Todavía no tiene códigos.</div>';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 13px 6px 10px;border-bottom:1px solid #f1f5f9">' +
+          '<b style="font-size:15px;min-width:74px">' + esc(String(a.cod)) + '</b>' +
+          '<span style="font-size:13.5px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
+          '<input value="' + esc(_der) + '" placeholder="' + _impCfgPctTxt(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '" onchange="pedImpCfgArtDer(\'' + encodeURIComponent(String(a.cod)) + '\',this.value)" title="Derechos de este artículo, en porcentaje (35 = 35%). Vacío = el del proveedor." style="width:62px;text-align:center;padding:4px 6px;border:1px solid ' + (_der ? '#0f766e' : '#cbd5e1') + ';border-radius:7px;font-size:14px;font-weight:800;background:' + (_der ? '#f0fdfa' : '#fff') + '">' +
+          '<span style="font-size:12px;color:#94a3b8;font-weight:700">% der.</span>' +
+          '<button onclick="pedImpCfgSacar(\'' + encodeURIComponent(String(a.cod)) + '\')" title="Sacarlo de ' + esc(prov) + ' (pide confirmación; no lo borra: queda sin proveedor)" style="background:#fee2e2;color:#b91c1c;border:0;border-radius:7px;padding:3px 10px;font-weight:800;font-size:13px;line-height:1.3;cursor:pointer">✕</button></div>';
+      }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:13.5px">Todavía no tiene códigos.</div>';
       h += '</div>';
-      h += '<div style="font-size:12.5px;font-weight:800;color:#0f172a;margin-bottom:6px">Agregar un código</div>';
-      h += '<input id="impCfgQ" value="' + esc(P.q || "") + '" oninput="pedImpCfgBuscar(this.value)" placeholder="Buscar código o descripción…" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;width:100%;margin-bottom:8px">';
-      h += '<div style="max-height:190px;overflow:auto;border:1px solid #e2e8f0;border-radius:9px">';
-      h += !q ? '<div style="padding:12px;color:#94a3b8;font-size:12.5px">Escribí un código o una descripción.</div>'
+      h += '<div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:6px">Agregar un código</div>';
+      h += '<input id="impCfgQ" value="' + esc(P.q || "") + '" oninput="pedImpCfgBuscar(this.value)" placeholder="Buscar código o descripción…" style="padding:7px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;width:100%;margin-bottom:8px">';
+      h += '<div style="max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:9px">';
+      h += !q ? '<div style="padding:12px;color:#94a3b8;font-size:13.5px">Escribí un código o una descripción.</div>'
         : (otros.length ? otros.map(function (a) {
           const act = String(a.proveedor || "").trim();
-          return '<div style="display:flex;align-items:center;gap:8px;padding:5px 9px;border-bottom:1px solid #f1f5f9">' +
-            '<b style="font-size:12.5px;min-width:64px">' + esc(String(a.cod)) + '</b>' +
-            '<span style="font-size:11.5px;color:#64748b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
+          return '<div style="display:flex;align-items:center;gap:8px;padding:6px 13px 6px 10px;border-bottom:1px solid #f1f5f9">' +
+            '<b style="font-size:15px;min-width:74px">' + esc(String(a.cod)) + '</b>' +
+            '<span style="font-size:13.5px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
             (act ? '<span style="font-size:10.5px;font-weight:800;color:#b45309;background:#fffbeb;border-radius:999px;padding:1px 7px" title="Hoy es de ' + esc(act) + ': al agregarlo se lo saca de ahí">' + esc(act) + '</span>' : '') +
-            '<button onclick="pedImpCfgCodigo(\'' + encodeURIComponent(String(a.cod)) + '\',\'' + encodeURIComponent(prov) + '\')" style="background:#dcfce7;color:#166534;border:0;border-radius:7px;padding:3px 9px;font-weight:800;font-size:12px;cursor:pointer">+</button></div>';
-        }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:12.5px">Sin resultados.</div>');
+            '<button onclick="pedImpCfgCodigo(\'' + encodeURIComponent(String(a.cod)) + '\',\'' + encodeURIComponent(prov) + '\')" style="background:#dcfce7;color:#166534;border:0;border-radius:7px;padding:4px 13px;font-weight:800;font-size:15px;cursor:pointer">+</button></div>';
+        }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:13.5px">Sin resultados.</div>');
       h += '</div>';
     }
   } else {
-    h += '<div style="font-size:12px;color:#64748b;margin-bottom:10px">Valen para <b>todos</b> los proveedores que no tengan el suyo propio, y para los artículos sin arancel propio. Los porcentajes en <b>porcentaje</b>: 21 = 21%.</div>';
+    h += '<div style="font-size:13px;color:#64748b;margin-bottom:10px">Valen para <b>todos</b> los proveedores que no tengan el suyo propio, y para los artículos sin arancel propio. Los porcentajes en <b>porcentaje</b>: 21 = 21%.</div>';
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">';
     h += campo("impCfgGMeses", "Meses objetivo", String(g.meses_objetivo), "", "cuántos meses de venta se piden");
     h += campo("impCfgGDer", "Derechos (%)", _impCfgPctTxt(g.derechos_pct), "", "sobre el CIF");
@@ -21459,7 +21478,7 @@ function _impCfgRender() {
     h += campo("impCfgGMoq", "MOQ (unidades por código)", String(g.moq), "", "mínimo de la fábrica");
     h += campo("impCfgGMoqM", "MOQ: tope de cobertura (meses)", String(g.moq_meses_max), "", "hasta acá se estira");
     h += '</div>';
-    h += '<div style="margin-top:14px"><button onclick="pedImpCfgGuardarGral()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:8px 16px;font-weight:800;font-size:13px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar generales") + '</button></div>';
+    h += '<div style="margin-top:14px"><button onclick="pedImpCfgGuardarGral()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:9px 20px;font-weight:800;font-size:15px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar generales") + '</button></div>';
   }
   h += '</div></div>';
   ov.innerHTML = h;
@@ -22131,24 +22150,28 @@ function _pedImpRender() {
     // v11.70 — anchos explícitos por <colgroup> (suman los 1180px del min-width): sin esto
     // las 14 columnas se pisaban entre sí. Bloque diagnóstico (proy→a pedir) | bloque pedido (MC→m³).
     h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide">' +
-      '<colgroup><col style="width:100px"><col style="width:200px"><col style="width:78px"><col style="width:104px"><col style="width:82px"><col style="width:66px"><col style="width:94px"><col style="width:96px"><col style="width:92px"><col style="width:128px"><col style="width:108px"></colgroup>' +
+      '<colgroup><col style="width:104px"><col style="width:210px"><col style="width:92px"><col style="width:110px"><col style="width:92px"><col style="width:72px"><col style="width:94px"><col style="width:104px"><col style="width:100px"><col style="width:128px"><col style="width:112px"></colgroup>' +
       '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="En curso (unidades ya pedidas que no llegaron) y a pedir (unidades calculadas)">En curso<small>A pedir u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.sort(function (a, b) { return _pedImpUniOf(b) - _pedImpUniOf(a) || (b.aPedirUni - a.aPedirUni); }).forEach(function (it) {
       const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
-      var stockTxt = (it.stockParteU > 0)
-        ? _stkShow + ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + '">🔧+' + it.stockParteU + '</span>'
+      // v23.91 (Luis) — el número YA es el DISPONIBLE (v16.08): lo comprometido se lee en el
+      // tooltip, no como un «−N» al lado, que hacía leer dos veces la misma resta.
+      const _stkNum = (it.uniPedidas > 0)
+        ? '<span title="Disponible: ya descontadas ' + it.uniPedidas + ' u de pedidos abiertos. Si los pedidos superan al stock, muestra 0, no un negativo.">' + _stkShow + '</span>'
         : String(_stkShow);
+      var stockTxt = (it.stockParteU > 0)
+        ? _stkNum + ' <span style="color:#7c3aed;font-weight:700;font-size:12px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + '">🔧+' + it.stockParteU + '</span>'
+        : _stkNum;
       // v15.26 — parte: el stock incluye los TERMINADOS que la usan (góndola/racks/a guardar de Virgilio)
       if (it.stockTermU > 0) {
         var _termDet = "";
         try { if (it.parteDet && it.parteDet.length) _termDet = it.parteDet.map(function (d) { return d.cod + ": " + (d.stock_uni != null ? d.stock_uni : "?") + " u"; }).join("  ·  "); } catch (_e) {}
-        stockTxt += ' <span style="color:#7c3aed;font-weight:700;font-size:11px" title="Incluye ' + it.stockTermU + ' u de terminados armados con esta parte → ' + escapeHtml(_termDet) + '">🧩+' + it.stockTermU + '</span>';
+        stockTxt += ' <span style="color:#7c3aed;font-weight:700;font-size:12px" title="Incluye ' + it.stockTermU + ' u de terminados armados con esta parte → ' + escapeHtml(_termDet) + '">🧩+' + it.stockTermU + '</span>';
       }
       // v15.27 — depósito insumos (parte suelta o importado sin reenvasar), convertido a unidades
-      if (it.stockInsU > 0) stockTxt += ' <span style="color:#0369a1;font-weight:700;font-size:11px" title="Incluye ' + it.stockInsU + ' u del depósito insumos (Movimientos_Stock, convertido con Insumos_Factores). En una parte, este stock reemplaza al seed del Excel.">🧰' + it.stockInsU + '</span>';
+      if (it.stockInsU > 0) stockTxt += ' <span style="color:#0369a1;font-weight:700;font-size:12px" title="Incluye ' + it.stockInsU + ' u del depósito insumos (Movimientos_Stock, convertido con Insumos_Factores). En una parte, este stock reemplaza al seed del Excel.">🧰' + it.stockInsU + '</span>';
       // v16.08 — lo que se muestra ya es el DISPONIBLE: stock de hoy menos lo pedido, con piso en 0.
-      if (it.uniPedidas > 0) stockTxt += ' <span style="color:#b45309;font-weight:700;font-size:11px" title="Ya descontadas ' + it.uniPedidas + ' u de pedidos abiertos. Si los pedidos superan al stock, esta columna muestra 0, no un negativo.">📋−' + it.uniPedidas + '</span>';
       const _codEncV = encodeURIComponent(it.cod);
       const _keyEncV = encodeURIComponent(it.key || it.cod);   // v22.93 — MC, FOB y reingreso van por línea (809E LK / CH)
       const actHtml = (it.det || []).map(function (d) {
@@ -22180,10 +22203,13 @@ function _pedImpRender() {
       const m3Txt = _m3 > 0 ? '<b style="color:#0369a1">' + (Math.round(_m3 * 100) / 100) + '</b>' : '<span style="color:#cbd5e1">—</span>';
       const _rg = it.reingresoEst ? String(it.reingresoEst).slice(0, 10) : "";
       const rgInput = _pedImpFechaInputHtml(_rg, "pedImpSetReingreso(\'" + _keyEncV + "\',v)", 'onclick="event.stopPropagation()" title="Fecha de reingreso estimado (se muestra en el portal LK cuando está sin stock)" style="width:76px;padding:4px 6px;border:1px solid ' + (_rg ? '#b45309' : '#cbd5e1') + ';border-radius:8px;font-size:12px;background:' + (_rg ? '#fff7ed' : '#fff') + '"');
-      // v23.90 (Luis) — el código abre el MISMO pop-up de proyección que la pantalla de Stocks.
+      // v23.90 (Luis) — el MISMO pop-up de proyección que la pantalla de Stocks.
       // La proyección se le pasa en CAJAS (la pantalla de importados la muestra en unidades).
+      // v23.91 (Luis) — lo que se toca es la CELDA de la proyección, igual que en Stocks; el
+      // código volvió a ser texto. Tocar el código para ver una proyección no se adivina.
       const _proyCaj = (Number(it.uxc) > 0) ? (Number(it.proyUni) || 0) / Number(it.uxc) : 0;
-      h += '<tr><td><b style="cursor:pointer;color:#6d28d9;text-decoration:underline dotted" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td><td class="num imp2">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td><td class="num">' + stockTxt + '</td><td class="num imp2">' + it.enCurso + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
+      const _proyCell = '<td class="num imp2 pedimp-proy" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td>' + _proyCell + '<td class="num">' + stockTxt + '</td><td class="num imp2">' + it.enCurso + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
