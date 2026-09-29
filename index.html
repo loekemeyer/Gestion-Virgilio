@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.44"></script>
+<script type="module" src="recepcion.js?v=24.45"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.44";
+const APP_VERSION = "v24.45";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -22520,7 +22520,8 @@ function _pedImpFotoHtml(cod) {
   // Medido 29/09: con las variantes LK encuentra 106 de 150 importados (97 sin ellas).
   const alts = [c0, /E$/.test(c0) ? c0.slice(0, -1) : c0 + "E", c0.replace(/(E)[SD]$/, "$1"), c0.replace(/[A-Z]+$/, "")];
   const urls = [];
-  [_PEDIMP_FOTO_LK, _PEDIMP_FOTO_CH].forEach(function (base) { alts.forEach(function (a) { const u = base + encodeURIComponent(a) + ".webp"; if (a && urls.indexOf(u) < 0) urls.push(u); }); });
+  // v24.45 — la página de Chef (paginach, script.js) guarda las fotos en .jpg, no en .webp.
+  [[_PEDIMP_FOTO_LK, ".webp"], [_PEDIMP_FOTO_CH, ".jpg"]].forEach(function (bx) { alts.forEach(function (a) { const u = bx[0] + encodeURIComponent(a) + bx[1]; if (a && urls.indexOf(u) < 0) urls.push(u); }); });
   return '<img src="' + urls[0] + '" data-alts="' + urls.slice(1).join("|") + '" onerror="var l=(this.dataset.alts||\'\').split(\'|\').filter(Boolean);if(l.length){this.dataset.alts=l.slice(1).join(\'|\');this.src=l[0];}else{this.outerHTML=\'<span class=sf>sin foto</span>\';}">';
 }
 function _pedImpDamianData(prov) {
@@ -63827,7 +63828,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.44"></script>
+<script src="cobranzas.js?v=24.45"></script>
 
 </body>
 </html>
