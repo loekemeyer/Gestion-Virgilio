@@ -6214,7 +6214,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.04"></script>
+<script type="module" src="recepcion.js?v=24.32"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10256,7 +10256,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.04";
+const APP_VERSION = "v24.32";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -19732,9 +19732,13 @@ var STK_POP_CSS =
   // v23.45 (Luis): sin hueco entre Descripción y Proy. La tabla mide lo que suman sus columnas
   // (no el 100% del popup), letra más grande y columnas dobles (Proy/Objetivo, En curso/A pedir,
   // Unidades/FOB, u$s/m³). Descripción en hasta 2 renglones.
-  // v23.95 (Luis) — la tabla OCUPA el ancho que tiene (sin hueco a la derecha) y nunca baja del
-  // mínimo en el que las columnas se pisan: el sobrante se lo lleva Descripción (col sin width).
-  ".mva-tbl.wide{width:100%;min-width:1188px;font-size:15px;}" +
+  // v24.31 (Luis) — el sobrante YA NO se lo lleva Descripción (era el hueco muerto entre ella y
+  // Proy u/mes): todas las columnas tienen width en el <colgroup>, la tabla mide lo que suman
+  // (min-width inline, cambia al abrir la nacionalización) y la TARJETA se achica a ese ancho.
+  ".mva-tbl.wide{width:100%;min-width:0;font-size:15px;}" +
+  ".pedimp-nacb{display:inline-block;border:1px solid #c4b5fd;border-radius:999px;padding:3px 9px;margin-right:4px;font-weight:800;cursor:pointer;background:#fff;color:#4c1d95;}" +
+  ".pedimp-provtog{cursor:pointer;}" +
+  ".pedimp-provtog:hover .pt-cta{text-decoration:underline;}" +
   ".pedimp-banda{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:8px;padding:8px 11px;background:#fff;border-bottom:1px solid #f1f5f9;align-items:stretch;}" +
   ".pedimp-chip{display:flex;align-items:center;gap:8px;border:1px solid;border-radius:9px;padding:6px 7px 6px 11px;font-size:11.5px;line-height:1.35;min-width:0;}" +
   ".pedimp-chip .pc-txt{flex:1;min-width:0;}" +
@@ -21256,6 +21260,56 @@ function _usd0(n) { return "u$s " + Math.round(_nacNum(n, 0)).toLocaleString("es
    por mes y los meses al mínimo (izq), y cómo se arma lo no recuperable (der). El abierto/cerrado
    queda en _pedImpDesgAb por proveedor, así sobrevive a los re-render (editar un MC redibuja). */
 var _pedImpDesgAb = {};
+/* ══ v24.31 (Luis, 29/09) — EL COSTO DE NACIONALIZACIÓN, ARTÍCULO POR ARTÍCULO, ACÁ ═════
+   "Apretás sobre el proveedor y debería expandirse las unidades". El módulo donde se DECIDE
+   la compra es éste, no 🚢 En curso: el costo puesto en Argentina tiene que estar a la vista
+   al elegir cuántas master cajas se piden. Reparto y criterios: _impNacReparto (v24.01). */
+var _pedImpNacAb = {};     // proveedor → abierto
+var _pedImpNacCrit = {};   // proveedor → mixto | m3 | fob
+function pedImpNacToggle(provEnc) {
+  var pr = decodeURIComponent(provEnc || ""); if (!pr) return;
+  if (_pedImpNacAb[pr]) delete _pedImpNacAb[pr]; else _pedImpNacAb[pr] = 1;
+  _pedImpRender();
+}
+/* El criterio es sólo cómo se MUESTRA repartido el mismo u$s: no toca ninguna tabla. */
+function pedImpNacCrit(provEnc, c) {
+  var pr = decodeURIComponent(provEnc || ""); if (!pr) return;
+  _pedImpNacCrit[pr] = (c === "m3" || c === "fob") ? c : "mixto";
+  _pedImpRender();
+}
+/* El u$s/m³ de flete SÍ toca la base: es `GV_Imp_Proveedor.valor_m3` (regla v23.89, la config
+   de importados vive en tablas). Se manda SÓLO esa clave: la RPC deja intacta toda clave
+   ausente, así que mandar el resto pisaría lo que otro esté editando en el ⚙ (regla v23.95). */
+async function pedImpSetNacM3(provEnc, v) {
+  const prov = decodeURIComponent(provEnc || ""); if (!prov) return;
+  const n = Number(v);
+  if (!isFinite(n) || n < 0) { _pedImpRender(); return; }
+  if (_impCfgProv && _impCfgProv[prov]) _impCfgProv[prov].valor_m3 = n;   // reflejo inmediato
+  _pedImpRender();
+  try { await _impCfgRpc("gv_imp_proveedor_guardar", { p: { proveedor: prov, valor_m3: n } }); await _impCfgCargar(); }
+  catch (e) { try { alert("No se pudo guardar el valor del m³: " + (e.message || e)); } catch (_e) {} }
+  _pedImpRender();
+}
+/* La banda violeta que se abre al tocar el proveedor: total del embarque, % sobre el FOB,
+   el u$s/m³ editable y los tres criterios de reparto. */
+function _pedImpNacBandaHtml(provEnc, nac, totUsd, crit, valorM3, modo) {
+  const ct = _impNacCritTxt(crit);
+  const fx = (nac && nac.ok && totUsd > 0) ? (Math.round(nac.factor * 1000) / 10).toLocaleString("es-AR") : "—";
+  const modoTxt = { consolidada: "Consolidada", full: "Contenedor", avion: "Avión" }[modo] || String(modo || "");
+  const bt = function (c, t) {
+    return '<span class="pedimp-nacb"' + (crit === c ? ' style="background:#4c1d95;color:#fff;border-color:#4c1d95"' : '') +
+      ' onclick="pedImpNacCrit(\'' + provEnc + '\',\'' + c + '\')" title="' + escapeHtml(_impNacCritTxt(c).tip) + '">' + t + '</span>';
+  };
+  return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 12px;margin:0 11px 9px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;font-size:12.5px;color:#4c1d95">' +
+    '<b>🛃 Nacionalización del pedido:</b> <b style="font-size:14px">u$s ' + _nacF(_nacNum(nac && nac.noRecup, 0)) + '</b>' +
+    '<span style="color:#6b21a8">= ' + fx + '% del FOB · ' + escapeHtml(modoTxt) + '</span>' +
+    (modo === "consolidada"
+      ? '<label style="display:flex;align-items:center;gap:5px;font-weight:700" title="Lo que cuesta cada m³ de flete marítimo. Se guarda en este proveedor (GV_Imp_Proveedor.valor_m3) y vale también para 🚢 En curso: es la misma fuente.">u$s/m³ <input type="number" inputmode="decimal" min="0" step="1" value="' + _nacNum(valorM3, 0) + '" onchange="pedImpSetNacM3(\'' + provEnc + '\',this.value)" onclick="event.stopPropagation()" style="width:66px;height:28px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>'
+      : '') +
+    '<span style="display:flex;align-items:center;gap:5px"><b>repartir:</b> ' + bt("mixto", "mixto") + bt("m3", "por m³") + bt("fob", "por FOB") + '</span>' +
+    '<span style="color:#6b21a8;flex:1 1 100%;font-size:11.5px">' + escapeHtml(ct.tip) + '</span>' +
+    '</div>';
+}
 /* v23.91 — los datos con los que el pop-up rearma el desglose de cada proveedor. Va acá,
    junto a lo que lo usa: declarado más abajo quedaba en zona muerta para _pedImpBandaHtml. */
 var _pedImpDesgData = {};
@@ -22285,6 +22339,8 @@ function _pedImpRender() {
     '<span style="font-size:11px;color:#7c3aed;flex-basis:100%">El costo NO recuperable (derechos, flete, tasas, despachante' + (Object.keys(_NTL_PROVEEDORES).length ? ' y 5% NTL en los proveedores que facturan por NTL' : '') + ') queda pegado al costo del artículo. Cada proveedor se calcula como su propio embarque.</span>' +
     '</div>';
   let algo = false;
+  // v24.31 — la tarjeta se achica al ancho de la tabla más ancha que se dibuje
+  let _anchoMax = 0;
   provOrder.forEach(function (prov) {
     if (provFiltro && prov !== provFiltro) return;   // ver solo el chino elegido
     const arr = byProv[prov]; if (!arr || !arr.length) return;
@@ -22309,9 +22365,18 @@ function _pedImpRender() {
     // v23.90 — la tasa del embarque sale de sus artículos (cada uno puede tener la suya)
     const _derPed = _derechosPedido(arr, prov);
     const _nacR = _pedImpNacionalizar(totUsd, totM3, { modo: _nac.modo, valorM3: _valorM3P, tn: _nac.tn, ntl: _isNtl, derechos: _derPed });
+    // v24.31 (Luis) — tocando el proveedor se abre el costo de nacionalización POR ARTÍCULO.
+    // ⚠ el orden de `arr` se fija ACÁ: el reparto va por índice y las filas se dibujan después.
+    const _nacAb = !!_pedImpNacAb[prov];
+    const _nacCrit = _pedImpNacCrit[prov] || "mixto";
+    arr.sort(function (a, b) { return _pedImpUniOf(b) - _pedImpUniOf(a) || (b.aPedirUni - a.aPedirUni); });
+    const _nacRep = _nacAb
+      ? _impNacReparto(_nacR, arr.map(function (it) { return { m3: _pedImpM3Of(it), fob: _pedImpUsdOf(it), uni: _pedImpUniOf(it) }; }), _nacCrit)
+      : null;
     h += '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0">' +
-      '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') + '</div></div>' +
+      '<div class="pedimp-provtog" style="min-width:0" onclick="pedImpNacToggle(\'' + provEnc + '\')" title="Tocá el proveedor: se abre el costo de NACIONALIZACIÓN de cada artículo (repartido por m³ o por FOB) y el puesto en Argentina por unidad."><span style="font-size:16px;font-weight:800;color:#0f172a">' + (_nacAb ? '▾' : '▸') + ' 🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span style="color:#065f46">u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') +
+      ' · <span class="pt-cta" style="color:#6d28d9;font-weight:800">🛃 ' + (_nacAb ? 'ocultar nacionalización' : 'ver nacionalización por artículo') + '</span></div></div>' +
       '<div style="display:flex;gap:7px;flex:0 0 auto;flex-wrap:wrap;align-items:center">' +
       // v23.95 (Luis) — los meses objetivo, a un toque: cambian el objetivo y el «a pedir» de
       // TODOS los códigos de este proveedor (GV_Imp_Proveedor.meses_objetivo).
@@ -22323,12 +22388,19 @@ function _pedImpRender() {
       '</div>';
     // v22.37 — banda de proyección al mínimo + costo de nacionalización estimado.
     h += _pedImpBandaHtml(_proy, _nacR, _minUsdP, totUsd, { prov: prov, items: arr, m3: totM3 });
-    // v11.70 — anchos explícitos por <colgroup> (suman los 1180px del min-width): sin esto
-    // las 14 columnas se pisaban entre sí. Bloque diagnóstico (proy→a pedir) | bloque pedido (MC→m³).
-    h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide">' +
-      '<colgroup><col style="width:104px"><col><col style="width:92px"><col style="width:110px"><col style="width:92px"><col style="width:72px"><col style="width:94px"><col style="width:104px"><col style="width:100px"><col style="width:128px"><col style="width:112px"></colgroup>' +
-      '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="En curso (unidades ya pedidas que no llegaron) y a pedir (unidades calculadas)">En curso<small>A pedir u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
-    arr.sort(function (a, b) { return _pedImpUniOf(b) - _pedImpUniOf(a) || (b.aPedirUni - a.aPedirUni); }).forEach(function (it) {
+    // v24.31 (Luis) — el costo de nacionalización POR ARTÍCULO se abre desde el proveedor.
+    if (_nacAb) h += _pedImpNacBandaHtml(provEnc, _nacR, totUsd, _nacCrit, _valorM3P, _nac.modo);
+    // v24.31 — anchos explícitos por <colgroup> y la tabla mide EXACTAMENTE lo que suman: hasta
+    // la v24.01 Descripción era la única col SIN width y se comía todo el sobrante de la tarjeta
+    // (el hueco muerto entre ella y Proy u/mes). Abierta la nacionalización entran 2 columnas más.
+    const _cols = [104, 232, 92, 110, 92, 72, 94, 104, 100].concat(_nacAb ? [100, 104] : []).concat([128, 112]);
+    const _ancho = _cols.reduce(function (a, b) { return a + b; }, 0);
+    _anchoMax = Math.max(_anchoMax, _ancho);
+    const _thNac = _nacAb ? '<th class="num" title="Costo de nacionalización de ESTE artículo: la parte que le toca del costo del pedido, repartida según el criterio elegido arriba. Abajo, por unidad.">🛃 Nac. u$s<small>u$s/u</small></th><th class="num" title="Puesto en Argentina por unidad = FOB por unidad + la nacionalización que le toca. Es el costo real de la unidad cuando llega al depósito.">Puesto<small>u$s/u</small></th>' : '';
+    h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide" style="min-width:' + _ancho + 'px">' +
+      '<colgroup>' + _cols.map(function (w) { return '<col style="width:' + w + 'px">'; }).join('') + '</colgroup>' +
+      '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="En curso (unidades ya pedidas que no llegaron) y a pedir (unidades calculadas)">En curso<small>A pedir u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th>' + _thNac + '<th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
+    arr.forEach(function (it, _ix) {
       const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
       // v23.91 (Luis) — el número YA es el DISPONIBLE (v16.08): lo comprometido se lee en el
@@ -22385,13 +22457,31 @@ function _pedImpRender() {
       // código volvió a ser texto. Tocar el código para ver una proyección no se adivina.
       const _proyCaj = (Number(it.uxc) > 0) ? (Number(it.proyUni) || 0) / Number(it.uxc) : 0;
       const _proyCell = '<td class="num imp2 pedimp-proy" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td>';
-      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td>' + _proyCell + '<td class="num">' + stockTxt + '</td><td class="num imp2">' + it.enCurso + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
+      // v24.31 — lo que le toca a ESTE artículo del costo del embarque, y el puesto en Arg por unidad
+      var _nacCells = '';
+      if (_nacAb) {
+        var _nacU = _nacRep ? _nacNum(_nacRep.items[_ix], 0) : 0;
+        var _uniRow = _pedImpUniOf(it);
+        var _nacUni = _uniRow > 0 ? (_nacU / _uniRow) : 0;
+        var _fobUni = Number(it.fobUni) || 0;
+        _nacCells = '<td class="num imp2" style="color:#6d28d9;font-weight:800">' + (_nacU > 0 ? _nacF(_nacU) : '<span style="color:#cbd5e1">—</span>') +
+          (_nacUni > 0 ? '<small style="color:#7c3aed">' + _nacF2(_nacUni) + '</small>' : '') + '</td>' +
+          '<td class="num" style="font-weight:800;color:#0f172a">' + ((_fobUni + _nacUni) > 0 ? _nacF2(_fobUni + _nacUni) : '<span style="color:#cbd5e1">—</span>') + '</td>';
+      }
+      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td>' + _proyCell + '<td class="num">' + stockTxt + '</td><td class="num imp2">' + it.enCurso + '<small>' + it.aPedirUni + '</small></td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td>' + _nacCells + '<td class="num">' + rgInput + _reingWebSwitchHtml(it.cod, it) + '</td><td>' + actHtml + '</td></tr>';
     });
+    // ⚠ la suma del reparto es EXACTAMENTE el no recuperable del embarque (se escala al final):
+    // si no cuadra, el reparto está mal, no el total.
+    if (_nacAb && _nacRep) h += '<tr style="background:#f8fafc"><td colspan="9" style="text-align:right;font-weight:800;color:#334155">TOTAL nacionalización repartida</td>' +
+      '<td class="num" style="font-weight:800;color:#6d28d9">' + _nacF(_nacRep.total) + '</td><td colspan="3"></td></tr>';
     h += '</tbody></table></div></div>';
   });
   if (!algo) h += '<div class="stkpop-empty">' + (_buscando
     ? ('Ningún importado coincide con <b>' + escapeHtml(_qRaw) + '</b>. Se buscó en los ' + allItems.length + ' importados, de todos los proveedores.')
     : ('No hay importados ' + (soloPedir ? 'para pedir (todo en o sobre el objetivo)' : 'cargados') + '.')) + '</div>';
+  // v24.31 (Luis) — "OPTIMIZACIÓN DE ESPACIO": la tarjeta mide lo que mide la tabla. Sin esto
+  // la tarjeta iba a 1760px, la tabla estiraba al 100% y todo el sobrante caía en Descripción.
+  try { const _card = body.closest ? body.closest(".stkpop-card") : null; if (_card) _card.style.maxWidth = _anchoMax > 0 ? ('min(' + (_anchoMax + 34) + 'px,98vw)') : ''; } catch (_e) {}
   _renderKeepFocus(body, h);   // v22.09 — el buscador re-renderiza en cada tecla: sin esto se pierde el foco
 }
 /* v10.38 — PDF del pedido de UN proveedor: solo Código · Master Cajas · Unidades (SIN FOB),
@@ -52245,7 +52335,7 @@ function pipeDemoToggle() {
 async function pipeDemoReiniciar() {
   await pipeEvento("lk", "__DEMO__", "reabrir", null, null);
 }
-/* v24.04 (Luis, 29/09: *"cambiá el botón de cliente de prueba por un botón de imprimir que
+/* v24.32 (Luis, 29/09: *"cambiá el botón de cliente de prueba por un botón de imprimir que
    promptee la impresión de un excel"*). Es el mismo camino que ya tomó Cuarentena en la v20.53:
    el ejemplo era la ayuda de la primera semana y el reporte se usa todos los días.
    `pipeDemoToggle` y `pipeDemoPedido` siguen vivos (como `gv_ppp_np_desarmar` en la v18.77): lo
@@ -63559,7 +63649,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.04"></script>
+<script src="cobranzas.js?v=24.32"></script>
 
 </body>
 </html>

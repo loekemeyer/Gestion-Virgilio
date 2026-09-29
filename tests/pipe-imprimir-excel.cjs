@@ -1,4 +1,4 @@
-/* v24.04 — CLIENTES NUEVOS: el boton de «cliente de prueba» es ahora 🖨 Imprimir.
+/* v24.32 — CLIENTES NUEVOS: el boton de «cliente de prueba» es ahora 🖨 Imprimir.
 
    Luis, 29/09: "cambia el boton de cliente de prueba por un boton de imprimir que promptee la
    impresion de un excel ... asegurate de que haya una columna que se llame «Comentarios» que
