@@ -96,13 +96,19 @@ const CFG_NAC = [{ meses_objetivo: 10, derechos_pct: 0.18, ntl_pct: 0.05, iva_pc
   if (/MOQ/.test(filas2["222"] || "")) fail("(B) bajando el MOQ a 100 la fila no tenía que marcar nada: " + filas2["222"]);
   await p.evaluate(() => { _impCfgProv["Frontier"].moq = 1000; });
 
-  // ── (A) el código abre la proyección y se puede volver ────────────────────────────
+  // ── (A) la CELDA de la proyección abre el pop-up y se puede volver ────────────────
+  //    v23.91 (Luis): el que se toca es el número de la proyección, no el código.
   await pintar();
-  const onclick = await p.evaluate(() => {
-    const b = document.querySelector(".mva-tbl.wide tbody tr td b");
-    return b ? (b.getAttribute("onclick") || "") : "(sin celda)";
+  const cel = await p.evaluate(() => {
+    const tr = document.querySelector(".mva-tbl.wide tbody tr");
+    if (!tr) return { proy: "(sin fila)", cod: "" };
+    return {
+      proy: (tr.cells[2] && tr.cells[2].getAttribute("onclick")) || "(sin onclick)",
+      cod: (tr.cells[0] && tr.cells[0].innerHTML) || ""
+    };
   });
-  if (!/pedImpProyAbrir\(/.test(onclick)) fail("(A) el código no abre la proyección: " + onclick);
+  if (!/pedImpProyAbrir\(/.test(cel.proy)) fail("(A) la celda de la proyección no abre el pop-up: " + cel.proy);
+  if (/pedImpProyAbrir\(/.test(cel.cod)) fail("(A) el código volvió a ser clickeable: " + cel.cod);
   await p.evaluate(() => pedImpProyAbrir(encodeURIComponent("111"), 12.5));
   const proy = await p.evaluate(() => ({
     titulo: (document.querySelector("#stkPopModal .stkpop-title") || {}).textContent || "",
@@ -158,5 +164,5 @@ const CFG_NAC = [{ meses_objetivo: 10, derechos_pct: 0.18, ntl_pct: 0.05, iva_pc
 
   if (errs.length) fail("errores de página: " + errs.join(" | "));
   await b.close();
-  if (!process.exitCode) console.log("pedimp-moq-proy: OK — código → proyección (y vuelve) · MOQ 🟡/🔴/? desde la vista · desglose en 2 columnas · derechos por artículo, ponderados por FOB");
+  if (!process.exitCode) console.log("pedimp-moq-proy: OK — celda de proyección (y vuelve) · MOQ 🟡/🔴/? desde la vista · desglose en 2 columnas · derechos por artículo, ponderados por FOB");
 })();
