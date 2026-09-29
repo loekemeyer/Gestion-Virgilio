@@ -30629,3 +30629,30 @@ los sigue cruzando `gv_cobranza_imputar`.
 "concepto":"Credito Inmediato (DEBIN) dist titular 30718101243-VAR-BAZAR MONICA S CAP I SE CBU
 Origen:3220001805000054570077","debito":0,"credito":472524.71,"nro_op":"80009"}]'::jsonb);` →
 `Deposito · D · 4045 · Bazar Monica · 30718101243`, sin alerta.
+
+### §3.v2435 — v24.35: Santander es otro formato y NO trae CUIT — 2026-09-29
+
+Extracto `descargaUltimosMovimientos.xls` (Santander Chef, cuenta 058-004885/5):
+`Fecha · Suc. Origen · Desc. Sucursal · Cod. Operativo · Referencia · Concepto · Importe · Saldo`.
+
+- **Dos bloques en la misma hoja** (*Movimientos del Día* y *Últimos Movimientos*), cada uno con su
+  encabezado: hay que leer los dos y deduplicar.
+- **El importe va en una sola columna**: entre paréntesis = débito, sin paréntesis = crédito.
+  Formato es-AR, `"(2.149,55)"` = −2.149,55.
+
+> ## Santander NO trae CUIT ni nombre. Credicoop sí. No se pueden conciliar igual.
+
+Lo que Santander sí trae y sirve: el **Cod. Operativo** (2030 depósito de efectivo en sucursal ·
+0867/0870 valor al cobro · 0869 cheque a 48 h · 4633/4637 impuesto al cheque · 3253/3254/1923
+percepciones · 2960/3489/0960 comisiones) y la **sucursal de origen** (Rosario, Río Cuarto,
+Córdoba), que dice dónde se depositó.
+
+**Medido:** 12 de 12 movimientos clasificados por regla, **0 con CUIT**. El importe exacto tampoco
+alcanza: las 5 entradas dieron **0 candidatos** contra la deuda viva de Chef.
+
+**Entonces el cliente no sale del extracto: sale del apareo contra lo PROYECTADO.** El manual dice
+que los cheques se cargan uno por uno como **A DEPOSITAR** con su cliente y su recibo, y pasan a
+**DEP./CH** al acreditarse — el dato ya está cargado antes de que el banco lo muestre. Medido:
+**4.821 filas de depósito/cheque en la base, 3.776 con cliente (78 %) y 3.747 con recibo.**
+
+**Chequeo:** `select banco, count(*) from public."GV_Conc_Regla" group by 1;` — 21 credicoop, 11 santander.

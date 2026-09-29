@@ -113,3 +113,35 @@ revoke insert, update, delete, truncate on public."GV_Conc_Regla" from anon, aut
 -- ROLLBACK de esta parte:
 -- drop function if exists public.gv_conc_proponer(text,text,jsonb);
 -- drop function if exists public.gv_conc_cliente_por_cuit(text,text);
+
+-- ============================================================================
+-- v24.35 — SANTANDER: otro formato, y NO trae CUIT
+--
+-- Extracto "descargaUltimosMovimientos.xls" (Santander Chef, cuenta 058-004885/5):
+--   Fecha | Suc. Origen | Desc. Sucursal | Cod. Operativo | Referencia | Concepto | Importe | Saldo
+--   · DOS bloques en la misma hoja: "Movimientos del Dia" y "Ultimos Movimientos",
+--     cada uno con su propio encabezado. Hay que leer los dos y deduplicar.
+--   · El IMPORTE viene en UNA sola columna: entre parentesis = DEBITO, sin parentesis = CREDITO.
+--     Formato es-AR (punto de miles, coma decimal): "(2.149,55)" = -2.149,55.
+--   · El saldo de la ultima fila del bloque del dia viene vacio.
+--
+-- ⚠⚠ LA DIFERENCIA QUE MANDA: Santander NO trae CUIT ni nombre. El concepto es generico
+--    ("Deposito de efectivo en sucursal - Tarj nro... atm... op..."). Lo que SI trae y sirve:
+--      · Cod. Operativo — el codigo del banco, estable: 2030 deposito de efectivo en sucursal ·
+--        0867 valor al cobro comp elect propia localidad · 0870 idem otra localidad ·
+--        0869 deposito ch 48 hs camara local · 4633/4637 impuesto al cheque · 3253/3254/1923
+--        percepciones · 2960/3489/0960 comisiones.
+--      · Suc. Origen + Desc. Sucursal — DONDE se deposito (Rosario, Rio Cuarto, Cordoba).
+--
+-- Medido sobre el extracto: 12 de 12 movimientos clasificados por regla, 0 con CUIT.
+-- El importe exacto tampoco alcanza: las 5 entradas dieron 0 candidatos contra la deuda
+-- viva de Chef (que hoy tiene 97 filas / 36 clientes).
+--
+-- => PARA SANTANDER EL CLIENTE NO SALE DEL EXTRACTO. Sale del apareo contra lo PROYECTADO:
+--    el manual dice que los cheques se cargan uno por uno como "A DEPOSITAR" con su cliente y
+--    su recibo, y pasan a "DEP./CH" cuando se acreditan. O sea que el dato ya esta cargado
+--    antes: el motor tiene que aparear importe (y fecha) contra esas filas, no inventarlo.
+--    Medido: 4.821 filas de deposito/cheque en la base, 3.776 con cliente (78 %) y 3.747 con recibo.
+--
+-- ROLLBACK: las reglas de santander se sacan con
+--   delete from public."GV_Conc_Regla" where banco = 'santander';
