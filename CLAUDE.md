@@ -6374,4 +6374,4 @@ A 390 px la tabla del primer proveedor arranca en y≈635. `tests/pedimp-cabecer
 ⚠ **v24.58 (Thomas): el MÍNIMO de 25k ya NO se muestra** — *"es una norma general, no algo que sí o sí hay que
 cubrir"*. Se fueron el chip «No llega solo / ⏳ para el mínimo», el input «Mín u$s» y los campos del ⚙. El dato
 (`min_usd`) sigue en la base, sin uso en pantalla. No volver a ponerlo como requisito del pedido.
-El **consumo por mes** (proy × FOB) quedó en el encabezado de cada proveedor (v24.59, `.pedimp-consumo`).
+El **consumo por mes** (proy × FOB) quedó en el encabezado de cada proveedor (v24.59, `.pedimp-consumo`) y el total en la barra de arriba (v24.60, `.pedimp-consumo-tot`).
