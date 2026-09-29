@@ -645,6 +645,8 @@ echo "== pedimp-prioridad-damian (v24.42: orden por meses de stock · alerta < 4
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-prioridad-damian.cjs
 echo "== imp-discontinuos (v24.49: solapa 🚫 Discontinuos de Importación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-discontinuos.cjs
+echo "== rr-super-cajas (v24.51: súper sin líos → cajas) =="
+node tests/rr-super-cajas.cjs
 node tests/pedimp-meses-proveedor.cjs
 
 echo "== imp-hist-pedidos (v23.91: 📜 Historial = pedidos + recepciones) =="

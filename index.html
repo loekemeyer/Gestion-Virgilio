@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.50"></script>
+<script type="module" src="recepcion.js?v=24.51"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.50";
+const APP_VERSION = "v24.51";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -33479,11 +33479,11 @@ function ccRender() {
     }
     pos++;
     const on = _cc.checked.has(it.np);
-    const cell = esRetira ? _liosCajasCell(it) : null;
-    const liosTxt = esRetira ? cell.txt : (it.lios == null ? "—" : String(it.lios));
-    const liosCls = esRetira ? ((cell.txt === "—") ? " cc-lios0" : "") : ((it.lios == null || it.lios === 0) ? " cc-lios0" : "");
-    const liosIcon = esRetira ? (cell.esCajas ? "🧺" : "📦") : "📦";
-    const liosTtl = esRetira ? (cell.esCajas ? "cajas (retira)" : "líos") : "líos";
+    const cell = _liosCajasCell(it);   // v24.51: también el súper (etiqueta) sin líos → cajas
+    const liosTxt = cell.txt;
+    const liosCls = cell.esCajas ? ((cell.txt === "—") ? " cc-lios0" : "") : ((it.lios == null || it.lios === 0) ? " cc-lios0" : "");
+    const liosIcon = cell.esCajas ? "🧺" : "📦";
+    const liosTtl = cell.esCajas ? "cajas" : "líos";
     const ubic = it.ubic ? `<span class="cc-ubic" title="dónde quedó armado">📌 ${escapeHtml(it.ubic)}</span>` : "";
     html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
             (!esRetira && enRuta ? `<span class="cc-pos">${pos}</span>` : "") +
@@ -33825,12 +33825,12 @@ function crRender() {
     const npc = String(it.np).replace(/[^0-9A-Za-z]/g, "");
     const cell = _liosCajasCell(it);
     const liosCls = (cell.txt === "—") ? " cr-lios0" : "";
-    const liosTtl = cell.esCajas ? "cajas (retira)" : "líos";
+    const liosTtl = cell.esCajas ? "cajas" : "líos";
     rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${npc}')">` +
             `<td class="cr-td-np" data-label="NP">${crNpCell(it)}${it.loadMs ? `<div class="cr-cc-date">🚚 ${crFmtCC(it.loadMs)}</div>` : ""}</td>` +
             `<td class="cr-td-cod" data-label="Cod Cliente">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
             `<td class="cr-td-rs" data-label="Razón Social">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
-            `<td class="cr-td-lios${liosCls}" data-label="${cell.esCajas ? "Cajas (retira)" : "Líos"}" title="${liosTtl}">${escapeHtml(cell.txt)}</td>` +
+            `<td class="cr-td-lios${liosCls}" data-label="${cell.esCajas ? "Cajas" : "Líos"}" title="${liosTtl}">${escapeHtml(cell.txt)}</td>` +
             `<td class="cr-td-ctrl" data-label="Controlado"><span class="cr-chk">${on ? "✓" : ""}</span></td>` +
             `<td class="cr-td-act" data-label="Volvió"><button class="cr-sinsal-btn" onclick="event.stopPropagation();crMarkSinSalida('${npc}')" title="El cliente no recibió — la mercadería volvió al depósito. Sale de acá y queda en «FC s/Salida» (Stocks).">↩ s/salida</button></td></tr>`;
   }
@@ -34050,7 +34050,10 @@ async function fetchCCRData() {
 function _liosCajasCell(it) {
   var esRetira = (it.esRetira != null) ? !!it.esRetira : (String(it.clase || "").toLowerCase() === "nada");
   var sinLios = (it.lios == null || it.lios === 0);
-  if (esRetira && sinLios) {
+  // v24.51 (Thomas, 29/09): el SÚPER se arma por etiqueta (clase 'etiqueta'), no en líos → sin líos
+  // muestra las CAJAS, igual que Retira. Antes salía «Líos: 0» (INC, LK 0122, 593 cajas).
+  var esEtiqueta = String(it.clase || "").toLowerCase() === "etiqueta";
+  if ((esRetira || esEtiqueta) && sinLios) {
     var c = (it.cajas == null) ? null : it.cajas;
     return { txt: (c == null ? "—" : (c + "c")), esCajas: true };
   }
@@ -34093,7 +34096,7 @@ function ccrRender() {
       const cell = _liosCajasCell(it);
       const liosCls = (cell.txt === "—") ? " cc-lios0" : "";
       const icon = cell.esCajas ? "🧺" : "📦";
-      const ttl = cell.esCajas ? "cajas (retira)" : "líos";
+      const ttl = cell.esCajas ? "cajas" : "líos";
       html += `<div class="cc-np${on ? " cc-on" : ""}" onclick="ccrToggle('${String(it.np).replace(/[^0-9A-Za-z]/g, "")}')">` +
               `<span class="cc-chk">${on ? "✓" : ""}</span>` +
               `<span class="cc-npnum">${escapeHtml(it.np)}</span>` +
@@ -63878,7 +63881,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.50"></script>
+<script src="cobranzas.js?v=24.51"></script>
 
 </body>
 </html>
