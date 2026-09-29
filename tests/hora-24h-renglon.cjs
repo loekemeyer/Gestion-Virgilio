@@ -30,6 +30,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
                               viewport: { width: 360, height: 740 }, deviceScaleFactor: 2,
                               isMobile: true, hasTouch: true });
   const errs = []; p.on("pageerror", (e) => errs.push(e.message));
+  // v24.65 — (E) prueba el camino de FALLA del servidor. Local no hay red y se daba solo; en CI el
+  // CDN carga, el cliente de Supabase existe y la consulta CONTESTA (vacío) → «No hay reportes hoy».
+  // Se corta la base a propósito para que el test mida lo mismo en los dos lados.
+  await p.route(/supabase\.co\//, (rt) => rt.abort());
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
 
   const r = await p.evaluate(async () => {
