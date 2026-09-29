@@ -30519,3 +30519,46 @@ schema cache"*. PostgREST resuelve la función por el **nombre de los argumentos
 
 **Chequeo:** `select public.gv_cobranza_ficha('lk','1651')->'totales';` ·
 `node tests/cbz-ficha-cliente.cjs`.
+
+### §3.v2432 — v24.32: pestaña 🏦 Conciliación + se puede seguir la deuda desde el ancla — 2026-09-29
+
+**Dos cosas que pidió Luis, y la primera es una medición, no una opinión.**
+
+#### 1. ¿Se puede trackear la deuda de cada cliente y seguir calculándola?
+
+**Desde el ancla hacia adelante, sí.** Lo que hay: el Excel de deuda que se sube para la Cuarentena
+(28/09 09:03, **432 comprobantes abiertos**), ISIS al día para las dos empresas (facturas, NC y ND
+hasta el 28/09) y la conciliación bancaria (35.622 movimientos). `GV_Cobranza_Deuda_Viva` ya los
+junta y `gv_cobranza_deuda_viva_refrescar` mira las tres familias (`nc_venta`, `nd_venta` y banco).
+
+**Desde cero, no.** `gv_cobranza_control_saldos` recalcula el saldo desde 01/2024 (LK) y 02/2025
+(Chef) y lo compara contra el Excel: **coinciden 598 clientes, no coinciden 307** (175 calculado
+mayor, 132 menor). Mirando sólo a los que tienen deuda: **72 de 157 (46 %)**. O sea que el punto de
+partida tiene que seguir siendo el Excel, no un recálculo histórico.
+
+**Los tres agujeros que hay que tapar para que el seguimiento no se desvíe:**
+
+| agujero | medido |
+|---|---|
+| **Credicoop Chef no se carga**: los pagos de Chef por ese banco no se pueden imputar a nadie | 606 entradas, **12 con cliente (2 %)**; $1.022.438.804 sin identificar |
+| **E-cheques repetidos**: el mismo recibo + cliente + importe aparece en varias fechas (parecen las cuotas o el vencimiento del cheque) | **557 grupos, 914 filas de más, $779.279.758** |
+| **Pagos que no pasan por banco** (efectivo, cheque en mano) | `GV_Cobranza_Pago_Manual` tiene **0 filas** cargadas |
+
+De los pagos que sí se imputan, la calidad es buena: de 2.733 recibos, **238 quedan «sin imputar»
+(8,7 %)**; el resto cierra exacto, con retención o con NC neteadas.
+
+#### 2. La pestaña 🏦 Conciliación
+
+Dos funciones de lectura nuevas, `sql/gv_conc_salud_v2432.sql`:
+
+- **`gv_conc_salud()`** — una fila por banco + empresa: movimientos, entradas, cuántas tienen
+  cliente y recibo, cuántas quedaron sin identificar y por cuánto, el período y de qué archivo salió
+  la última carga. Es lo que hace visible el agujero de Credicoop Chef.
+- **`gv_conc_sin_identificar(dias, limit)`** — las entradas sin cliente ni recibo, **con el texto
+  crudo del extracto**, que es de donde van a salir las reglas del motor.
+
+⚠ **El motor de reglas todavía NO existe** y la pantalla lo dice: hoy la conciliación se hace a mano
+en los cuatro Excel. Lo que falta para escribirlo (el manual, los extractos crudos y una
+conciliación ya cerrada para medir contra ella) queda escrito **en la propia pantalla**, no sólo acá.
+
+**Chequeo:** `select * from public.gv_conc_salud();` · `node tests/cbz-conciliacion.cjs`.

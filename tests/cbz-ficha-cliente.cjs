@@ -191,7 +191,7 @@ catch (_e) {
   const q = (c, m) => { if (!c) fallas.push(m); };
 
   q(r.abre, "(a) openCobranzas no abrió el overlay");
-  q(r.pestanas && r.pestanas.length === 4, "(a) esperaba 4 pestañas, hay " + JSON.stringify(r.pestanas));
+  q(r.pestanas && r.pestanas.length === 5, "(a) esperaba 5 pestañas, hay " + JSON.stringify(r.pestanas));
   q(/Clientes/.test(r.tabActiva || ""), "(a) no arranca en la pestaña Clientes (arrancó en " + r.tabActiva + ")");
   q((r.pidio || []).indexOf("gv_cobranza_clientes") >= 0, "(a) no pidió gv_cobranza_clientes");
 
