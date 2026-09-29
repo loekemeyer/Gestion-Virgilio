@@ -942,6 +942,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== regla-L =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/regla-L.cjs
 
+echo "== fc-acuerdo-desglose-copia (v24.33: el Acuerdo Cliente de la ficha se toca) =="
+node tests/fc-acuerdo-desglose-copia.cjs
+
 echo "== regla-L-super (v21.09: la L es de Cencosud y TdF) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/regla-L-super.cjs
 
