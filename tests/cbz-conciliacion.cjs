@@ -1,4 +1,6 @@
 /* v24.32 — pestaña 🏦 Conciliación del submódulo Cobranzas (Luis, 29/09).
+   v24.37 — el tablero pasó a la vista «📊 Planillas»; la principal es «📥 Extracto»
+   (la mide tests/cbz-conc-extracto.cjs). Acá se entra a Planillas a propósito.
    Hoy la conciliación se hace a mano en cuatro Excel; la pestaña es el tablero de eso:
    cuánto de cada extracto quedó identificado con cliente, qué entradas quedaron sin
    identificar (las que el motor de reglas va a tener que resolver) y qué falta definir.
@@ -58,12 +60,16 @@ catch (_e) {
         calls.push(m[1]);
         if (m[1] === "gv_conc_salud") return ok(salud);
         if (m[1] === "gv_conc_sin_identificar") return ok(sin);
+        if (m[1] === "gv_conc_movs") return ok([]);
         return ok([]);
       }
       return ok([]);
     };
 
     await openCobranzas("conc");
+    await espera(300);
+    out.vistaInicial = /Extracto/.test((document.querySelector("#cbzWrap .cbz-seg button.on") || {}).textContent || "");
+    cbzCcSetVista("planillas");
     await espera(450);
 
     out.pestanas = Array.from(document.querySelectorAll("#cbzTabs .cbz-tab")).map((x) => x.textContent.trim());
@@ -101,8 +107,7 @@ catch (_e) {
   q(r.filasSin === 2, "(d) esperaba las 2 entradas sin identificar, hay " + r.filasSin);
   q(/1\.250\.000/.test(r.texto || ""), "(d) no muestra el importe de la entrada sin identificar");
 
-  q(/manual/i.test(r.texto || "") && /e-cheque/i.test(r.texto || ""),
-    "(e) no queda escrito qué falta definir para que concilie solo");
+  q(r.vistaInicial, "(e) la pestaña tiene que abrir en «📥 Extracto» (la carga del día), no en el tablero");
 
   if (errs.length) fallas.push("errores de JS en la página: " + errs.join(" | "));
 
@@ -113,6 +118,6 @@ catch (_e) {
   }
   console.log("cbz-conciliacion: OK — pestaña propia, una tarjeta por banco+empresa con el % identificado " +
     "(Credicoop LK 92 %, Credicoop Chef 2 %), las entradas sin identificar con el texto del extracto, " +
-    "y lo que falta definir escrito en pantalla.");
+    "y abre en la vista de Extracto.");
   process.exit(0);
 })();

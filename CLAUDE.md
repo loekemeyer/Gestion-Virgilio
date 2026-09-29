@@ -4510,6 +4510,21 @@ números coinciden con la pantalla. `sql/gv_cobranza_ficha_v2403.sql`, §3.v2403
 public.gv_cobranza_clientes_cuit() group by cuit having count(distinct empresa)=2) z;` — 69 al 29/09.
 `sql/gv_cobranza_clientes_cuit_v2398.sql`, §3.v2398.
 
+
+### ⚠ v24.37: la CONCILIACIÓN se hace subiendo el extracto del banco — el motor cruza y PREGUNTA lo que no cuadra
+
+Cobranzas → 🏦 Conciliación → **📥 Extracto**: se elige la cuenta, se sube el .xls **tal como lo baja el
+banco** y `gv_conc_motor` lo cruza (regla → CUIT → apareo con la planilla → importe contra facturas
+impagas → pista de la sucursal). Estados: ✅ auto · 🟡 propuesto (un click) · ❓ pregunta (candidatos +
+teléfono) · 👤 confirmado · ⚪ no identificado. **📋 Copiar para la planilla** da las columnas A–J.
+
+- El motor **nunca inventa el Nº de recibo** (lo genera ISIS) y **nunca escribe un alias** de pagador:
+  eso lo hace la persona al tildar «recordar este CUIT».
+- El apareo respeta la **línea amarilla** (`gv_conc_linea`): después de la línea, sólo contra lo proyectado.
+- El motor se llama **de a 15** desde la pantalla: 60 movimientos tardan 13 s y authenticated corta a los 8 s.
+- Medición y tablas: `docs/SUPABASE-GESTION-VIRGILIO.md` §3.v2437, `sql/gv_conc_motor_cruce_v2437.sql`,
+  `tests/cbz-conc-extracto.cjs`.
+
 ## Git
 
 - **Trabajar SIEMPRE directo en `main`**: commitear y pushear ahí sin preguntar.

@@ -492,6 +492,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== cbz-conciliacion (v24.32: pestana Conciliacion - cuanto de cada extracto quedo identificado y que falta para conciliar solo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cbz-conciliacion.cjs
+echo "== cbz-conc-extracto (v24.37: carga del extracto del dia, motor de cruce de a 15, preguntas con candidatos, confirmar propuestos, copia A-J) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cbz-conc-extracto.cjs
 
 echo "== fac-conciliacion (v14.30: Facturación en 2 solapas; Conciliación = snapshot Gestión vs factura ISIS; el snapshot se registra al facturar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-conciliacion.cjs

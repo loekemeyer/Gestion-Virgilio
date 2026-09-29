@@ -45,7 +45,8 @@ var _cbz = {
   comp: null,           // comprobantes de la ficha
   cta: null,            // cuenta corriente de la ficha
   abierta: null,        // fila de comprobante desplegada
-  escalones: null
+  escalones: null,
+  cc: { vista: "extracto", cuenta: "credicoop|lk", movs: null, cargando: false, err: null, filtro: null, msg: "", abierto: null, wpp: {} }
 };
 
 /* ------------------------------ utilidades ------------------------------- */
@@ -179,7 +180,26 @@ function _cbzCss() {
     ".cbz-conccard .bar{height:5px;border-radius:99px;background:#e2e8f0;overflow:hidden;margin-top:6px;}",
     ".cbz-conccard .bar i{display:block;height:100%;}",
     ".cbz-pend{padding:34px 16px;text-align:center;color:#64748b;}",
-    ".cbz-pend h3{margin:0 0 6px;color:#334155;font-size:16px;}"
+    ".cbz-pend h3{margin:0 0 6px;color:#334155;font-size:16px;}",
+    ".cbz-amb{background:#fef9c3;color:#854d0e;}",
+    ".cbz-cargar{background:#0f766e;color:#fff;border-radius:8px;padding:7px 13px;font-weight:800;font-size:13px;cursor:pointer;}",
+    ".cbz-ccmsg{margin-top:8px;padding:8px 12px;border-radius:9px;background:#ecfdf5;color:#065f46;font-size:13px;border:1px solid #a7f3d0;}",
+    ".cbz-ccmsg.err{background:#fef2f2;color:#991b1b;border-color:#fecaca;}",
+    ".cbz-ccest{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center;}",
+    ".cbz-ccest button{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:999px;font-weight:700;cursor:pointer;}",
+    ".cbz-ccest button.on{background:#0f766e;border-color:#0f766e;color:#fff;}",
+    ".cbz-conf{background:#059669 !important;border:none !important;color:#fff !important;border-radius:8px !important;font-weight:800;cursor:pointer;}",
+    ".cbz-qlist{display:grid;gap:10px;margin-top:10px;}",
+    ".cbz-q{background:#fff;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:10px;padding:10px 12px;}",
+    ".cbz-q.prop{border-color:#fde68a;border-left-color:#d97706;}",
+    ".cbz-qhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}",
+    ".cbz-qimp{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;}",
+    ".cbz-qtxt{font-size:12.5px;color:#334155;margin-top:3px;word-break:break-word;}",
+    ".cbz-qsub{font-size:12px;color:#64748b;margin-top:3px;}",
+    ".cbz-qal{font-size:12px;color:#b45309;margin-top:3px;font-weight:600;}",
+    ".cbz-qt{margin-top:8px;width:auto;}",
+    ".cbz-es{background:#0f766e;color:#fff;border:none;border-radius:7px;font-weight:800;cursor:pointer;padding:4px 10px !important;}",
+    ".cbz-qacc{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;}"
   ].join("\n");
   document.head.appendChild(st);
 }
@@ -712,10 +732,15 @@ function cbzEscalonesHtml() {
    qué entradas están sin identificar (que son las que el motor de reglas va a tener
    que resolver solo) y de qué archivo salió cada carga.
 
-   ⚠ Todavía NO hay motor de reglas: falta el manual y las definiciones. Lo que
-   falta está escrito abajo, en la pantalla, para que no se pierda. */
+   Desde la v24.37 esto es la vista «📊 Planillas» de la pestaña; la principal es
+   «📥 Extracto» (3b, más abajo), que carga el extracto del banco y lo cruza solo. */
 function cbzConcCargar() {
-  if (_cbz.conc) { cbzConcPintar(); return; }
+  if (_cbz.cc.vista === "planillas") { if (_cbz.conc) cbzConcPintar(); else cbzConcTablero(); return; }
+  if (!_cbz.cc.movs && !_cbz.cc.cargando) cbzCcTraer();
+}
+function cbzConcPintar() { if (_cbz.tab === "conc") { var w = document.getElementById("cbzWrap"); if (w) w.innerHTML = cbzConcHtml(); } }
+function cbzConcTablero() {
+  if (_cbz.conc) return;
   Promise.all([_cbzRpc("gv_conc_salud"), _cbzRpc("gv_conc_sin_identificar", { p_dias: 90, p_limit: 200 })])
     .then(function (rr) {
       _cbz.conc = {
@@ -727,14 +752,10 @@ function cbzConcCargar() {
       cbzConcPintar();
     });
 }
-function cbzConcPintar() { if (_cbz.tab === "conc") { var w = document.getElementById("cbzWrap"); if (w) w.innerHTML = cbzConcHtml(); } }
 
-function cbzConcHtml() {
+function cbzConcPlanillasHtml() {
   var c = _cbz.conc;
-  var h = '<div class="cbz-buscar" style="justify-content:space-between;">' +
-      '<div><b style="font-size:15px;">🏦 Conciliación bancaria</b>' +
-      '<div style="color:#64748b;font-size:12px;margin-top:2px;">Cuánto de cada extracto quedó identificado con cliente y recibo.</div></div>' +
-      '<button class="cbz-back" onclick="_cbz.conc=null;cbzConcCargar();">↻ Actualizar</button></div>';
+  var h = '<div style="color:#64748b;font-size:12px;margin:10px 2px 0;">Lo que ya está en los cuatro Excel de conciliación: cuánto de cada uno quedó identificado con cliente y recibo.</div>';
   if (!c) return h + '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">Cargando…</div></div>';
   if (c.err && !c.salud.length) return h + '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">No pude leer: ' + _cbzEsc(c.err) + "</div></div>";
 
@@ -777,24 +798,398 @@ function cbzConcHtml() {
   }
   h += "</div>";
 
-  h += '<div class="cbz-panel" style="margin-top:12px;"><div style="padding:14px 16px;">' +
-    '<b style="font-size:14px;">⚙ Motor de reglas — lo que falta para que concilie solo</b>' +
-    '<div style="color:#64748b;font-size:12.5px;margin-top:6px;line-height:1.5;">' +
-    "Todavía no hay motor: la conciliación se hace a mano en los cuatro Excel. Para escribir las reglas hacen falta " +
-    "el manual, los extractos crudos del banco (como los baja el banco, no la planilla ya trabajada) y una conciliación " +
-    "ya cerrada a una fecha, para medir contra ella cuántos renglones acierta.</div>" +
-    '<ul style="color:#334155;font-size:12.5px;margin:9px 0 0 18px;line-height:1.6;">' +
-    "<li>De qué campo del extracto sale el <b>CUIT</b> y de cuál el nombre (hoy el Excel no trae CUIT).</li>" +
-    "<li>Qué hace el <b>número de recibo</b>: si lo emite ISIS después del pago o si ya viene en el extracto.</li>" +
-    "<li>Cómo se trata un <b>e-cheque</b>: si la fila va con la fecha de acreditación o con la de vencimiento " +
-    "(hoy hay 914 filas repetidas del mismo recibo, $779.279.758, que parecen cuotas del mismo cheque).</li>" +
-    "<li>Qué entradas <b>no son cobranza</b> (transferencias entre cuentas propias, devoluciones, intereses).</li>" +
-    "<li>Si un pago puede cancelar facturas de <b>las dos empresas</b> a la vez.</li>" +
-    "</ul></div></div>";
   return h;
 }
-window.cbzConcHtml = cbzConcHtml;
+window.cbzConcPlanillasHtml = cbzConcPlanillasHtml;
 window.cbzConcCargar = cbzConcCargar;
+
+/* ===================== 3b) CONCILIACIÓN — EXTRACTO DEL DÍA =====================
+   v24.37 (Luis, 29/09): "el módulo debería resolver automáticamente todo lo que pueda con
+   la carga de los extractos de movimientos por día y consultarle al humano por las cosas
+   que no puede cuadrar. Quiero un buen motor de cruce en este, esmerate".
+
+   Flujo: se elige la cuenta → 📥 se sube el extracto TAL COMO LO BAJA EL BANCO (.xls de
+   Credicoop o de Santander) → el navegador lo lee (vendor/xlsx) → gv_conc_extracto_cargar
+   lo guarda sin duplicar (huella) → gv_conc_motor lo cruza DE A 15 (el rol authenticated
+   corta a los 8 s; 60 movimientos de Credicoop tardan 13 s) → la pantalla muestra:
+     ❓ PREGUNTAS   lo que no cuadró solo, con los candidatos y el teléfono de cada uno
+     🟡 PROPUESTOS  cruce por importe con ventaja clara: se confirma de un click
+     ✅ AUTOMÁTICOS CUIT, apareo con la planilla, gastos, impuestos, sueldos
+   y se copia a la planilla en sus columnas A–J.
+
+   Cómo decide el motor, medido, está en sql/gv_conc_motor_cruce_v2437.sql. Acá no se
+   decide nada: la pantalla muestra y la persona resuelve (gv_conc_resolver).
+   El Nº de recibo lo genera ISIS (Luis): la pantalla nunca lo inventa. */
+var _CBZ_CUENTAS = [
+  { id: "credicoop|lk",   t: "Credicoop LK" },
+  { id: "santander|chef", t: "Santander CH" },
+  { id: "credicoop|chef", t: "Credicoop CH" },
+  { id: "santander|lk",   t: "Santander LK" }
+];
+var _CBZ_CC_EST = [
+  { id: "pregunta",        t: "❓ Preguntas",       cls: "cbz-warn" },
+  { id: "propuesto",       t: "🟡 Propuestos",      cls: "cbz-amb" },
+  { id: "auto",            t: "✅ Automáticos",     cls: "cbz-ok" },
+  { id: "confirmado",      t: "👤 Confirmados",     cls: "cbz-info" },
+  { id: "no_identificado", t: "⚪ No identificados", cls: "" }
+];
+var _CBZ_CC_LOTE = 15;
+
+function cbzCcCuenta() { var p = String(_cbz.cc.cuenta).split("|"); return { banco: p[0], empresa: p[1] }; }
+function cbzCcSetCuenta(id) { _cbz.cc.cuenta = id; _cbz.cc.movs = null; _cbz.cc.msg = ""; _cbz.cc.abierto = null; cbzRender(); }
+function cbzCcSetVista(v) { _cbz.cc.vista = v; cbzRender(); }
+function cbzCcFiltro(f) { _cbz.cc.filtro = f; cbzConcPintar(); }
+
+function _cbzIso(d) { return d.toISOString().slice(0, 10); }
+async function cbzCcTraer() {
+  var c = cbzCcCuenta(), hoy = new Date();
+  var desde = new Date(hoy.getTime() - 45 * 86400000), hasta = new Date(hoy.getTime() + 86400000);
+  _cbz.cc.cargando = true; cbzConcPintar();
+  var r = await _cbzRpc("gv_conc_movs", { p_banco: c.banco, p_empresa: c.empresa, p_desde: _cbzIso(desde), p_hasta: _cbzIso(hasta) });
+  _cbz.cc.cargando = false;
+  if (r.error) { _cbz.cc.err = r.error; _cbz.cc.movs = []; }
+  else { _cbz.cc.err = null; _cbz.cc.movs = Array.isArray(r.data) ? r.data : []; }
+  if (!_cbz.cc.filtro) {
+    var hay = function (e) { return _cbz.cc.movs.some(function (m) { return m.estado === e; }); };
+    _cbz.cc.filtro = hay("pregunta") ? "pregunta" : (hay("propuesto") ? "propuesto" : "todos");
+  }
+  cbzConcPintar();
+  cbzCcTelefonos();
+}
+
+/* ------------------------- lectura del extracto ------------------------- */
+function _cbzCcNum(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return isFinite(v) ? v : null;
+  var s = String(v).trim().replace(/\$/g, "").replace(/\s/g, "");
+  if (!s) return null;
+  var neg = /^\(.*\)$/.test(s) || /^-/.test(s);
+  s = s.replace(/[()]/g, "").replace(/^-/, "");
+  if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, "").replace(",", ".");   // es-AR: 1.234,56
+  else s = s.replace(/,/g, "");                                            // 1,234.56 o 1234.56
+  var n = Number(s);
+  return isFinite(n) ? (neg ? -n : n) : null;
+}
+function _cbzCcFecha(v) {
+  if (v instanceof Date) return _cbzIso(new Date(Date.UTC(v.getFullYear(), v.getMonth(), v.getDate())));
+  if (typeof v === "number" && v > 20000 && v < 80000) return _cbzIso(new Date(Math.round((v - 25569) * 86400000)));
+  var m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(String(v || "").trim());
+  if (!m) return null;
+  var y = m[3].length === 2 ? "20" + m[3] : m[3];
+  return y + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2);
+}
+function _cbzCcKey(s) { return String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z]/g, ""); }
+/* Lee las filas crudas de la hoja. Detecta el formato por los ENCABEZADOS, no por el nombre del
+   archivo, y re-detecta cada vez que aparece un encabezado: Santander trae dos bloques
+   ("Movimientos del Día" y "Últimos Movimientos") que se pisan. Devuelve {banco, movs}. */
+function cbzCcParse(rows) {
+  var col = null, banco = null, movs = [], vistos = {};
+  (rows || []).forEach(function (r) {
+    if (!Array.isArray(r)) return;
+    var ks = r.map(_cbzCcKey);
+    if (ks.indexOf("fecha") >= 0 && ks.indexOf("concepto") >= 0 && ks.indexOf("saldo") >= 0) {
+      col = {};
+      ks.forEach(function (k, i) {
+        if (k === "fecha") col.fecha = i;
+        else if (k === "concepto") col.concepto = i;
+        else if (k === "nrocpbte" || k === "referencia") col.ref = i;
+        else if (k === "debito") col.deb = i;
+        else if (k === "credito") col.cred = i;
+        else if (k === "importe") col.imp = i;
+        else if (k === "saldo") col.saldo = i;
+        else if (k === "cod" || k === "codoperativo") col.codop = i;
+        else if (k === "descsucursal") col.suc = i;
+      });
+      banco = (col.imp != null) ? "santander" : "credicoop";
+      return;
+    }
+    if (!col) return;
+    var fe = _cbzCcFecha(r[col.fecha]);
+    if (!fe) return;
+    var deb = 0, cred = 0;
+    if (col.imp != null) {
+      var im = _cbzCcNum(r[col.imp]); if (im == null) return;
+      if (im < 0) deb = -im; else cred = im;
+    } else {
+      deb = Math.abs(_cbzCcNum(r[col.deb]) || 0); cred = Math.abs(_cbzCcNum(r[col.cred]) || 0);
+      if (!deb && !cred) return;
+    }
+    var m = {
+      fecha: fe,
+      concepto: String(r[col.concepto] == null ? "" : r[col.concepto]).replace(/\s+/g, " ").trim(),
+      referencia: col.ref != null && r[col.ref] != null ? String(r[col.ref]).trim() : "",
+      codop: col.codop != null && r[col.codop] != null ? String(r[col.codop]).trim() : "",
+      sucursal: col.suc != null && r[col.suc] != null ? String(r[col.suc]).trim() : "",
+      debito: deb, credito: cred, saldo: _cbzCcNum(r[col.saldo])
+    };
+    var k = [m.fecha, m.referencia, m.debito, m.credito, m.concepto, banco === "credicoop" ? m.saldo : ""].join("|");
+    if (vistos[k]) return;
+    vistos[k] = 1; movs.push(m);
+  });
+  return { banco: banco, movs: movs };
+}
+async function _cbzXlsx() {
+  if (window.XLSX) return window.XLSX;
+  if (typeof pppLoadXlsx === "function") return pppLoadXlsx();
+  return new Promise(function (res, rej) {
+    var sc = document.createElement("script"); sc.src = "vendor/xlsx.full.min.js";
+    sc.onload = function () { window.XLSX ? res(window.XLSX) : rej(new Error("SheetJS no cargó")); };
+    sc.onerror = function () { rej(new Error("No pude cargar SheetJS")); };
+    document.head.appendChild(sc);
+  });
+}
+async function cbzCcArchivo(inp) {
+  var f = inp && inp.files && inp.files[0]; if (!f) return;
+  inp.value = "";
+  var c = cbzCcCuenta();
+  try {
+    _cbz.cc.msg = "Leyendo " + f.name + "…"; cbzConcPintar();
+    var X = await _cbzXlsx();
+    var wb = X.read(await f.arrayBuffer(), { type: "array" });
+    /* raw:false a proposito: el .xls de Santander es HTML y SheetJS lee "(2.070,00)" como -2,07
+       (toma la coma por separador de miles). El texto que muestra el banco es la verdad. */
+    var rows = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: null });
+    var p = cbzCcParse(rows);
+    if (!p.banco || !p.movs.length) { _cbz.cc.msg = "⚠ No reconocí movimientos en " + f.name + ": ¿es el extracto tal como lo baja el banco?"; cbzConcPintar(); return; }
+    if (p.banco !== c.banco) {
+      _cbz.cc.msg = "⚠ El archivo es un extracto de " + p.banco.toUpperCase() + " y la cuenta elegida es " + c.banco.toUpperCase() + ". No cargué nada.";
+      cbzConcPintar(); return;
+    }
+    await cbzCcCargarMovs(f.name, p.movs);
+  } catch (e) { _cbz.cc.msg = "⚠ No pude leer el archivo: " + ((e && e.message) || e); cbzConcPintar(); }
+}
+async function cbzCcCargarMovs(nombre, movs) {
+  var c = cbzCcCuenta();
+  _cbz.cc.msg = "Guardando " + movs.length + " movimientos…"; cbzConcPintar();
+  var r = await _cbzRpc("gv_conc_extracto_cargar", { p_banco: c.banco, p_empresa: c.empresa, p_cuenta: null, p_archivo: nombre, p_movs: movs });
+  if (r.error) { _cbz.cc.msg = "⚠ No se guardó el extracto: " + r.error + ". Probá de nuevo: no quedó nada a medias."; cbzConcPintar(); return; }
+  var d = r.data || {}, ids = (d.ids || []).map(Number);
+  var repetidos = (d.movimientos || movs.length) - (d.nuevos || 0);
+  var fallas = await cbzCcMotor(ids, "Cruzando");
+  _cbz.cc.msg = "✔ " + nombre + ": " + (d.nuevos || 0) + " movimientos nuevos" +
+    (repetidos ? " · " + repetidos + " ya estaban (no se duplican)" : "") +
+    (fallas ? " · ⚠ " + fallas + " lote(s) no se cruzaron: tocá «↻ Volver a cruzar»" : "");
+  _cbz.cc.filtro = null; _cbz.cc.movs = null;
+  cbzCcTraer();
+}
+/* De a 15 y en orden. Después, una segunda pasada sobre lo que quedó en pregunta: el cruce
+   "junto con otro pago del cliente" necesita que los vecinos ya estén identificados. */
+async function cbzCcMotor(ids, rotulo) {
+  var fallas = 0;
+  for (var i = 0; i < ids.length; i += _CBZ_CC_LOTE) {
+    _cbz.cc.msg = (rotulo || "Cruzando") + "… " + Math.min(i + _CBZ_CC_LOTE, ids.length) + " de " + ids.length; cbzConcPintar();
+    var r = await _cbzRpc("gv_conc_motor", { p_ids: ids.slice(i, i + _CBZ_CC_LOTE) });
+    if (r.error) { r = await _cbzRpc("gv_conc_motor", { p_ids: ids.slice(i, i + _CBZ_CC_LOTE) }); if (r.error) fallas++; }
+  }
+  return fallas;
+}
+async function cbzCcRecruzar() {
+  var ids = (_cbz.cc.movs || []).filter(function (m) { return m.estado === "pregunta" || m.estado === "propuesto"; })
+    .map(function (m) { return Number(m.id); });
+  if (!ids.length) { _cbz.cc.msg = "No hay nada pendiente para volver a cruzar."; cbzConcPintar(); return; }
+  var f = await cbzCcMotor(ids, "Volviendo a cruzar");
+  _cbz.cc.msg = f ? "⚠ " + f + " lote(s) no se cruzaron. Probá de nuevo." : "✔ Volví a cruzar " + ids.length + " movimientos.";
+  _cbz.cc.movs = null; cbzCcTraer();
+}
+
+/* ------------------------------ resolver ------------------------------- */
+async function cbzCcResolver(id, cod) {
+  var rec = document.getElementById("cbzRec" + id);
+  var r = await _cbzRpc("gv_conc_resolver", { p_id: Number(id), p_cod: cod || null, p_nota: null, p_recordar: !!(rec && rec.checked) });
+  if (r.error) { alert("No se guardó: " + r.error); return; }
+  var d = r.data || {};
+  _cbz.cc.msg = cod ? "✔ Asignado a " + (d.cliente || cod) + (d.alias ? " · el CUIT queda recordado para ese cliente" : "") : "✔ Marcado como No identificado";
+  _cbz.cc.abierto = null; _cbz.cc.movs = null; cbzCcTraer();
+}
+function cbzCcAsignar(id) {
+  var i = document.getElementById("cbzCod" + id), v = i ? String(i.value || "").trim() : "";
+  if (!v) { if (i) i.focus(); return; }
+  cbzCcResolver(id, v);
+}
+async function cbzCcConfirmar(ids) {
+  if (!ids || !ids.length) return;
+  var r = await _cbzRpc("gv_conc_confirmar", { p_ids: ids.map(Number) });
+  if (r.error) { alert("No se confirmó: " + r.error); return; }
+  _cbz.cc.msg = "✔ Confirmados: " + (typeof r.data === "number" ? r.data : ids.length);
+  _cbz.cc.movs = null; cbzCcTraer();
+}
+function cbzCcConfirmarPropuestos() {
+  cbzCcConfirmar((_cbz.cc.movs || []).filter(function (m) { return m.estado === "propuesto"; }).map(function (m) { return m.id; }));
+}
+function cbzCcAbrir(id) { _cbz.cc.abierto = (_cbz.cc.abierto === id) ? null : id; cbzConcPintar(); }
+
+/* Teléfono de cada candidato: el mismo lookup por (empresa, cod) del pipeline de clientes
+   nuevos. Se pide en SU propia llamada: si falla, la pantalla sigue sin teléfonos. */
+async function cbzCcTelefonos() {
+  var c = cbzCcCuenta(), pedir = {}, lista = [];
+  (_cbz.cc.movs || []).forEach(function (m) {
+    if (m.estado !== "pregunta" && m.estado !== "propuesto") return;
+    ((m.candidatos && m.candidatos.lista) || []).forEach(function (x) {
+      var k = String(x.cod || ""); if (!k || pedir[k] || (_cbz.cc.wpp && _cbz.cc.wpp[k] !== undefined)) return;
+      pedir[k] = 1; lista.push({ empresa: c.empresa, cod: k });
+    });
+  });
+  if (!lista.length) return;
+  var r = await _cbzRpc("gv_cliente_nuevo_wpp_lote", { p_pedidos: lista });
+  if (r.error) return;
+  _cbz.cc.wpp = _cbz.cc.wpp || {};
+  (r.data || []).forEach(function (x) { _cbz.cc.wpp[String(x.cod)] = x.telefono || null; });
+  cbzConcPintar();
+}
+
+/* ---------------------------- export planilla ---------------------------- */
+function _cbzCcXlsNum(v) { var n = _cbzNum(v); return n ? String(n.toFixed(2)).replace(".", ",") : ""; }
+function cbzCcTsv() {
+  var ms = (_cbz.cc.movs || []).slice().sort(function (a, b) { return String(a.fecha).localeCompare(String(b.fecha)) || (a.id - b.id); });
+  return ms.map(function (m) {
+    var ident = m.estado !== "pregunta";   // lo que nadie resolvio sale como el Manual manda: No Identificado
+    var f = String(m.fecha || "").split("-");
+    return [
+      f.length === 3 ? f[2] + "/" + f[1] + "/" + f[0] : "", m.operacion || "", _cbzCcXlsNum(m.credito), _cbzCcXlsNum(m.debito), "",
+      ident ? (m.detalle || m.operacion || "") : "No Identificado",
+      m.det === "?" ? "" : (m.det || ""), m.nro_op || "", m.nro_recibo || "", m.cod_cliente || ""
+    ].map(function (x) { return String(x).replace(/[\t\n]/g, " "); }).join("\t");
+  }).join("\n");
+}
+async function cbzCcCopiar() {
+  var t = cbzCcTsv(), n = (_cbz.cc.movs || []).length;
+  var pend = (_cbz.cc.movs || []).filter(function (m) { return m.estado === "pregunta"; }).length;
+  try { await navigator.clipboard.writeText(t); _cbz.cc.msg = "✔ Copiadas " + n + " filas (columnas A–J de la planilla). Pegalas arriba de la línea amarilla."; }
+  catch (_e) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([t], { type: "text/tab-separated-values" }));
+    a.download = "conciliacion-" + String(_cbz.cc.cuenta).replace("|", "-") + ".tsv"; a.click();
+    _cbz.cc.msg = "✔ Bajé " + n + " filas en un .tsv (el navegador no dejó copiar).";
+  }
+  if (pend) _cbz.cc.msg += " ⚠ Quedan " + pend + " preguntas sin resolver: salen como «No Identificado».";
+  cbzConcPintar();
+}
+
+/* ------------------------------- pantalla ------------------------------- */
+function cbzConcHtml() {
+  var cc = _cbz.cc;
+  var h = '<div class="cbz-buscar" style="justify-content:space-between;">' +
+    '<div><b style="font-size:15px;">🏦 Conciliación bancaria</b>' +
+    '<div style="color:#64748b;font-size:12px;margin-top:2px;">Se sube el extracto del banco; lo que cuadra se concilia solo y lo que no, se pregunta.</div></div>' +
+    '<div class="cbz-seg">' +
+      '<button class="' + (cc.vista !== "planillas" ? "on" : "") + '" onclick="cbzCcSetVista(\'extracto\')">📥 Extracto</button>' +
+      '<button class="' + (cc.vista === "planillas" ? "on" : "") + '" onclick="cbzCcSetVista(\'planillas\')">📊 Planillas</button>' +
+    "</div></div>";
+  if (cc.vista === "planillas") return h + cbzConcPlanillasHtml();
+
+  h += '<div class="cbz-buscar" style="margin-top:10px;">' +
+    '<div class="cbz-seg">' + _CBZ_CUENTAS.map(function (x) {
+      return '<button class="' + (cc.cuenta === x.id ? "on" : "") + '" onclick="cbzCcSetCuenta(\'' + x.id + '\')">' + x.t + "</button>";
+    }).join("") + "</div>" +
+    '<label class="cbz-cargar">📥 Cargar extracto (.xls)<input type="file" id="cbzCcFile" accept=".xls,.xlsx,.csv" onchange="cbzCcArchivo(this)" style="display:none;"></label>' +
+    '<button class="cbz-back" onclick="cbzCcRecruzar()" title="Vuelve a cruzar preguntas y propuestos: sirve después de proyectar algo nuevo en la planilla">↻ Volver a cruzar</button>' +
+    '<button class="cbz-back" onclick="cbzCcCopiar()" title="Columnas A–J de la planilla: Fecha · Operación · Entrada · Salida · Saldo · Detalle · DET · Nro OP · Nro Recibo · Cliente">📋 Copiar para la planilla</button>' +
+    "</div>";
+  if (cc.msg) h += '<div class="cbz-ccmsg' + (/^⚠/.test(cc.msg) ? " err" : "") + '">' + _cbzEsc(cc.msg) + "</div>";
+  if (cc.cargando || !cc.movs) return h + '<div class="cbz-panel" style="margin-top:10px;"><div class="cbz-vacio">Cargando…</div></div>';
+  if (cc.err) return h + '<div class="cbz-panel" style="margin-top:10px;"><div class="cbz-vacio">No pude leer los movimientos: ' + _cbzEsc(cc.err) + "</div></div>";
+  if (!cc.movs.length) return h + '<div class="cbz-panel" style="margin-top:10px;"><div class="cbz-vacio">Todavía no se cargó ningún extracto de esta cuenta en los últimos 45 días.<br>Subí el .xls tal como lo baja el banco.</div></div>';
+
+  var cnt = {}; cc.movs.forEach(function (m) { cnt[m.estado] = (cnt[m.estado] || 0) + 1; });
+  h += '<div class="cbz-ccest">' + _CBZ_CC_EST.map(function (e) {
+    return '<button class="' + (cc.filtro === e.id ? "on" : "") + '" onclick="cbzCcFiltro(\'' + e.id + '\')">' + e.t + " <b>" + (cnt[e.id] || 0) + "</b></button>";
+  }).join("") + '<button class="' + (cc.filtro === "todos" ? "on" : "") + '" onclick="cbzCcFiltro(\'todos\')">Todos <b>' + cc.movs.length + "</b></button>";
+  if (cnt.propuesto) h += '<button class="cbz-conf" onclick="cbzCcConfirmarPropuestos()">✔ Confirmar los ' + cnt.propuesto + " propuestos</button>";
+  h += "</div>";
+
+  var ver = cc.movs.filter(function (m) { return cc.filtro === "todos" || m.estado === cc.filtro; });
+  if (cc.filtro === "pregunta" || cc.filtro === "propuesto") {
+    if (!ver.length) return h + '<div class="cbz-panel" style="margin-top:10px;"><div class="cbz-vacio">Nada ' + (cc.filtro === "pregunta" ? "para preguntar" : "propuesto") + ". 👌</div></div>";
+    ver.sort(function (a, b) { return _cbzNum(b.credito) - _cbzNum(a.credito); });   // por plata, mayor → menor
+    return h + '<div class="cbz-qlist">' + ver.map(cbzCcPreguntaHtml).join("") + "</div>";
+  }
+  return h + cbzCcTablaHtml(ver);
+}
+
+function cbzCcPreguntaHtml(m) {
+  var cand = (m.candidatos && m.candidatos.lista) || [], ap = m.candidatos && m.candidatos.apareo;
+  var prop = m.estado === "propuesto";
+  var h = '<div class="cbz-q' + (prop ? " prop" : "") + '">' +
+    '<div class="cbz-qhead"><div><span class="cbz-qimp">$ ' + _cbzPlata(m.credito || m.debito, 2).replace(/,00$/, "") + "</span> " +
+      '<span style="color:#64748b;">' + _cbzFecha(m.fecha) + (m.sucursal ? " · " + _cbzEsc(m.sucursal) : "") + "</span>" +
+      (m.det === "3" ? ' <span class="cbz-chip cbz-info">cheque</span>' : "") + "</div>" +
+      (prop ? '<button class="cbz-conf" onclick="cbzCcConfirmar([' + m.id + '])">✔ Confirmar ' + _cbzEsc(m.cod_cliente || "") + "</button>" : "") +
+    "</div>" +
+    '<div class="cbz-qtxt">' + _cbzEsc(m.concepto) + "</div>" +
+    (m.cuit ? '<div class="cbz-qsub">CUIT <b>' + _cbzEsc(m.cuit) + "</b>" + (m.nombre_banco ? " · " + _cbzEsc(m.nombre_banco) : "") + "</div>" : "") +
+    (m.alerta ? '<div class="cbz-qal">' + _cbzEsc(m.alerta) + "</div>" : "") +
+    (ap && ap.detalle ? '<div class="cbz-qsub">En la planilla: <b>' + _cbzEsc(ap.detalle) + "</b> (" + _cbzEsc(ap.operacion || "") + ")</div>" : "");
+  if (cand.length) {
+    h += '<table class="cbz-t cbz-qt"><thead><tr><th style="text-align:left;">Candidato</th><th>Cuadra con</th><th>Dto</th><th>Días</th><th>Coincide</th><th>Tel.</th><th></th></tr></thead><tbody>' +
+      cand.slice(0, prop ? 5 : 3).map(function (x) {
+        var sc = _cbzNum(x.score), niv = sc < 0.0025 ? ["muy alta", "cbz-verde"] : (sc < 0.006 ? ["alta", "cbz-ambar"] : ["baja", ""]);
+        var tel = _cbz.cc.wpp ? _cbz.cc.wpp[String(x.cod)] : undefined;
+        var telH = tel ? '<a href="https://wa.me/' + _cbzEsc(String(tel).replace(/\D/g, "")) + '" target="_blank" rel="noopener">📞 ' + _cbzEsc(tel) + "</a>" : (tel === null ? '<span style="color:#94a3b8;">sin tel.</span>' : "—");
+        var cuadra = (x.via === "junto" ? "junto con otro pago · " : "") + "FC " + _cbzEsc(x.facturas || "—");
+        return '<tr><td class="l"><b>' + _cbzEsc(x.cod) + "</b> " + _cbzEsc(x.cliente || "") +
+            (x.geo === "misma" ? ' <span class="cbz-chip cbz-ok" title="El depósito se hizo en su provincia">📍 ' + _cbzEsc((x.provincia || [])[0] || "") + "</span>" : "") + "</td>" +
+          "<td>" + cuadra + "</td><td>−" + _cbzPlata(_cbzNum(x.dto) * 100, 0) + " %</td><td>" + _cbzEsc(x.dias == null ? "—" : x.dias) + "</td>" +
+          '<td class="' + niv[1] + '"><b>' + niv[0] + "</b></td><td>" + telH + "</td>" +
+          '<td><button class="cbz-es" onclick="cbzCcResolver(' + m.id + ",'" + _cbzEsc(x.cod) + "')\">Es este</button></td></tr>";
+      }).join("") + "</tbody></table>";
+  } else {
+    h += '<div class="cbz-qsub" style="margin-top:6px;">Ningún importe de factura impaga lo explica.</div>';
+  }
+  h += '<div class="cbz-qacc">' +
+    '<input id="cbzCod' + m.id + '" class="cbz-inp" style="flex:0 0 120px;min-width:0;padding:6px 9px;font-size:13px;" placeholder="Código" onkeydown="if(event.key===\'Enter\')cbzCcAsignar(' + m.id + ')">' +
+    '<button class="cbz-back" onclick="cbzCcAsignar(' + m.id + ')">Asignar</button>' +
+    '<button class="cbz-back" onclick="cbzCcResolver(' + m.id + ',null)">No identificado</button>' +
+    (m.cuit ? '<label class="cbz-qsub" style="margin:0;"><input type="checkbox" id="cbzRec' + m.id + '"> recordar que este CUIT paga por ese cliente</label>' : "") +
+    "</div></div>";
+  return h;
+}
+
+function cbzCcTablaHtml(ver) {
+  var h = '<div class="cbz-panel" style="margin-top:10px;overflow:auto;"><table class="cbz-t"><thead><tr>' +
+    "<th>Fecha</th><th>Operación</th><th>Entrada</th><th>Salida</th><th style=\"text-align:left;\">Detalle</th><th>DET</th><th>Nro OP</th><th>Cliente</th><th>Estado</th><th style=\"text-align:left;\">Extracto</th></tr></thead><tbody>";
+  h += ver.map(function (m) {
+    var e = _CBZ_CC_EST.filter(function (x) { return x.id === m.estado; })[0] || { t: m.estado, cls: "" };
+    return '<tr class="cbz-clic" onclick="cbzCcAbrir(' + m.id + ')"><td>' + _cbzFecha(m.fecha) + "</td><td>" + _cbzEsc(m.operacion || "—") + "</td>" +
+      '<td class="cbz-verde">' + (_cbzNum(m.credito) ? _cbzPlata(m.credito, 2) : "") + "</td>" +
+      '<td class="cbz-rojo">' + (_cbzNum(m.debito) ? _cbzPlata(m.debito, 2) : "") + "</td>" +
+      '<td class="l">' + _cbzEsc(m.detalle || "—") + "</td><td>" + _cbzEsc(m.det && m.det !== "?" ? m.det : "—") + "</td>" +
+      "<td>" + _cbzEsc(m.nro_op || "—") + "</td><td>" + _cbzEsc(m.cod_cliente || "—") + "</td>" +
+      '<td><span class="cbz-chip ' + e.cls + '">' + String(e.t).replace(/s$/, "") + "</span></td>" +
+      '<td class="l" style="color:#64748b;max-width:340px;overflow:hidden;text-overflow:ellipsis;" title="' + _cbzEsc(m.concepto) + '">' + _cbzEsc(m.concepto) + "</td></tr>" +
+      (_cbz.cc.abierto === m.id ? '<tr><td colspan="10" class="cbz-exp">' + cbzCcDetalle(m) + "</td></tr>" : "");
+  }).join("");
+  return h + "</tbody></table></div>";
+}
+function cbzCcDetalle(m) {
+  var lin = [];
+  lin.push("Cómo lo resolvió: <b>" + _cbzEsc(m.metodo || "—") + "</b>" + (m.confianza != null ? " · confianza " + _cbzPlata(_cbzNum(m.confianza) * 100, 0) + " %" : ""));
+  if (m.cuit) lin.push("CUIT del extracto: <b>" + _cbzEsc(m.cuit) + "</b>" + (m.nombre_banco ? " (" + _cbzEsc(m.nombre_banco) + ")" : ""));
+  if (m.cancela) lin.push("Cancela la(s) factura(s): <b>" + _cbzEsc(m.cancela) + "</b>");
+  if (m.candidatos && m.candidatos.apareo) {
+    var a = m.candidatos.apareo;
+    lin.push("Fila de la planilla: <b>" + _cbzEsc(a.detalle || "—") + "</b> · " + _cbzEsc(a.operacion || "") + (a.conciliada ? " · ya conciliada por la persona" : " · proyectada") + (a.dias ? " · a " + a.dias + " días" : ""));
+  }
+  if (m.alerta) lin.push('<span class="cbz-rojo">⚠ ' + _cbzEsc(m.alerta) + "</span>");
+  if (m.confirmado_por) lin.push("Confirmó: " + _cbzEsc(m.confirmado_por));
+  var puede = m.estado !== "pregunta" && m.estado !== "propuesto";
+  return lin.join("<br>") + (puede ? '<div class="cbz-qacc"><input id="cbzCod' + m.id + '" class="cbz-inp" style="flex:0 0 120px;min-width:0;padding:6px 9px;font-size:13px;" placeholder="Otro código"><button class="cbz-back" onclick="event.stopPropagation();cbzCcAsignar(' + m.id + ')">Corregir</button></div>' : cbzCcPreguntaHtml(m));
+}
+
+window.cbzConcHtml = cbzConcHtml;
+window.cbzCcSetCuenta = cbzCcSetCuenta;
+window.cbzCcSetVista = cbzCcSetVista;
+window.cbzCcFiltro = cbzCcFiltro;
+window.cbzCcArchivo = cbzCcArchivo;
+window.cbzCcCargarMovs = cbzCcCargarMovs;
+window.cbzCcParse = cbzCcParse;
+window.cbzCcRecruzar = cbzCcRecruzar;
+window.cbzCcResolver = cbzCcResolver;
+window.cbzCcAsignar = cbzCcAsignar;
+window.cbzCcConfirmar = cbzCcConfirmar;
+window.cbzCcConfirmarPropuestos = cbzCcConfirmarPropuestos;
+window.cbzCcAbrir = cbzCcAbrir;
+window.cbzCcCopiar = cbzCcCopiar;
+window.cbzCcTsv = cbzCcTsv;
 
 var _CBZ_DEMO_CONC = [
   { banco: "credicoop", empresa: "lk", movimientos: 26619, entradas: 13845, con_cliente: 12689, con_recibo: 10506, sin_identificar: 1110, monto_sin_identificar: 1031493020, primera: "2021-01-07", ultima: "2026-09-28", archivo: "CONCILIACION CREDICOOP LOEKE.xls" },

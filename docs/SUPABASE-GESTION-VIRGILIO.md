@@ -30683,3 +30683,45 @@ Las reglas de Santander se rehicieron **por código operativo** (`GV_Conc_Regla.
   y recibo, y 1 efectivo en Rosario = P & M Bazar). Las otras 8 quedaron *No Identificado* también
   en la planilla. El motor todavía no aparea contra A DEPOSITAR: las marca con alerta.
 - Un depósito no identificado sale con **det = 1**, como pide el Manual.
+
+### §3.v2437 — v24.37: MOTOR DE CRUCE de la conciliación — se sube el extracto del día y pregunta sólo lo que no cuadra — 2026-09-29
+
+Luis: *"el módulo debería resolver automáticamente todo lo que pueda con la carga de los extractos de
+movimientos por día y consultarle al humano por las cosas que no puede cuadrar. Quiero un buen motor de
+cruce en este, esmerate"*. `sql/gv_conc_motor_cruce_v2437.sql`, `tests/cbz-conc-extracto.cjs`.
+
+| objeto | qué es |
+|---|---|
+| `GV_Conc_Carga_Extracto` / `GV_Conc_Mov` | cada extracto subido y cada movimiento, con la decisión del motor y la de la persona. RLS sin policy, sin grants a anon |
+| `gv_conc_extracto_cargar` | guarda el extracto; la **huella** evita duplicar cuando dos extractos se pisan |
+| `gv_conc_motor(ids)` | regla → CUIT → apareo con la planilla → cruce por importe → pregunta |
+| `gv_conc_linea` | la **línea amarilla** de cada planilla (el hueco en `fila` que deja la macro) |
+| `GV_Conc_Sucursal_Provincia` + `gv_conc_sucursal_provincia` | un depósito en Rosario es de un cliente de Santa Fe (sólo ciudades del interior; agregar = un insert) |
+| `gv_conc_movs` · `gv_conc_resolver` · `gv_conc_confirmar` | lo que ve y decide la persona. «Recordar este CUIT» escribe `GV_Conc_Alias_Pagador` **sólo** si la persona lo tilda |
+
+**El apareo respeta la línea amarilla**: un movimiento posterior a la línea sólo se cruza con lo
+**proyectado** (debajo); contra lo ya conciliado no, porque esa fila es de otro movimiento del banco
+(gastos fijos y transferencias repiten importe). Uno de un día ya conciliado toma la fila de la persona.
+
+**Medido a ciegas** (`set gv.conc_ciego = '1'`: sin mirar lo que la persona ya concilió), en
+transacción abortada:
+
+| cuenta | movimientos | tiempo | auto por CUIT | propuestos | preguntas |
+|---|---:|---:|---:|---:|---:|
+| Santander Chef 01–29/09 | 203 (41 entradas) | 2,5 s | 24 | 4 | 13 |
+| Credicoop LK 18–28/09 (sólo entradas) | 60 | 13 s | 50 | 1 | 9 |
+
+- **Propuestos: 3 de 3 coinciden con la persona** donde la persona identificó (Zapata 1796, P & M
+  2701, Bazar del Gastronómico 2007 en Mar del Plata). Los otros 2 son los efectivos del 25/09 que la
+  persona dejó **No Identificado**: el motor propone **Sarali (2448, Santa Fe) — depósito en Rosario**
+  y **Elbantonio (2466, Córdoba) — en Río Cuarto**, cada uno cuadrando con su factura al 25 %.
+- **Preguntas: en 3 de 5 con respuesta conocida el primer candidato es el correcto** (Riondini 2381,
+  Carbone 2211, Mardo 2677 va 2.º). Los cheques (e-cheq de Cencosud/Dorinka) no se identifican por
+  importe: salen bien cuando están proyectados como A DEPOSITAR.
+- 60 movimientos de Credicoop tardan 13 s → la pantalla llama al motor **de a 15** (authenticated corta a los 8 s).
+- ⚠ El .xls de Santander es HTML: SheetJS lee `(2.070,00)` como −2,07. La pantalla lee el **texto**
+  (`raw:false`).
+
+**Datos de configuración cargados sin sí previo** (tablas nuevas del módulo, no de negocio):
+`GV_Conc_Sucursal_Provincia` (48 ciudades). `GV_Conc_Alias_Pagador` sigue **vacía** (Luis: "1 no").
+Scratch de prueba: `zz_backups."GV_Conc_Test_Extracto"` (el extracto de Santander, cerrado).
