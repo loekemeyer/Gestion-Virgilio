@@ -171,6 +171,13 @@ function _cbzCss() {
     ".cbz-esc .p{font-size:15px;font-weight:800;color:#0f766e;}",
     ".cbz-esc .v{font-size:12.5px;color:#64748b;font-variant-numeric:tabular-nums;}",
     ".cbz-nota{color:#64748b;font-size:12px;padding:10px 14px;border-top:1px solid #f1f5f9;}",
+    ".cbz-concgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:10px;margin-top:12px;}",
+    ".cbz-conccard{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 13px;box-shadow:0 1px 2px rgba(15,23,42,.06);}",
+    ".cbz-conccard .t{font-size:12.5px;font-weight:800;color:#334155;}",
+    ".cbz-conccard .p{font-size:26px;font-weight:800;line-height:1.1;margin-top:2px;font-variant-numeric:tabular-nums;}",
+    ".cbz-conccard .s{font-size:11.5px;color:#64748b;margin-top:1px;}",
+    ".cbz-conccard .bar{height:5px;border-radius:99px;background:#e2e8f0;overflow:hidden;margin-top:6px;}",
+    ".cbz-conccard .bar i{display:block;height:100%;}",
     ".cbz-pend{padding:34px 16px;text-align:center;color:#64748b;}",
     ".cbz-pend h3{margin:0 0 6px;color:#334155;font-size:16px;}"
   ].join("\n");
@@ -180,6 +187,7 @@ function _cbzCss() {
 /* ------------------------------- pantalla -------------------------------- */
 var _CBZ_TABS = [
   { id: "clientes",  t: "👤 Clientes" },
+  { id: "conc",      t: "🏦 Conciliación" },
   { id: "reclamos",  t: "⚠ A reclamar" },
   { id: "recibos",   t: "🧾 Recibos" },
   { id: "escalones", t: "📐 Escala" }
@@ -215,6 +223,7 @@ function cbzRender() {
   }
   var w = document.getElementById("cbzWrap"); if (!w) return;
   if (_cbz.tab === "clientes")  { w.innerHTML = _cbz.sel ? cbzFichaHtml() : cbzBuscadorHtml(); if (_cbz.sel) cbzFichaCargar(); return; }
+  if (_cbz.tab === "conc")      { w.innerHTML = cbzConcHtml(); cbzConcCargar(); return; }
   if (_cbz.tab === "escalones") { w.innerHTML = cbzEscalonesHtml(); return; }
   w.innerHTML = cbzPendienteHtml(_cbz.tab);
 }
@@ -693,6 +702,104 @@ function cbzEscalonesHtml() {
     }).join("") +
     '</tbody></table><div class="cbz-nota">Vive en <code>cobranzas_escalones</code>: cambiarla es un <code>update</code>, no un deploy. Las excepciones por cliente (las “coronitas”) están en <code>cobranzas_excepciones</code> y se cruzan por CUIT del padrón.</div></div>';
 }
+
+/* ============================ 3) CONCILIACIÓN ============================
+   Hoy la conciliación se hace A MANO en cuatro Excel (Credicoop y Santander, LK y
+   Chef): alguien mira el extracto y le escribe al renglón el cliente y el recibo.
+   Esa planilla entra a Gestión por la macro y se lee en gv_conciliacion_bancaria.
+
+   Esta pestaña es el tablero de eso: cuánto de cada extracto quedó identificado,
+   qué entradas están sin identificar (que son las que el motor de reglas va a tener
+   que resolver solo) y de qué archivo salió cada carga.
+
+   ⚠ Todavía NO hay motor de reglas: falta el manual y las definiciones. Lo que
+   falta está escrito abajo, en la pantalla, para que no se pierda. */
+function cbzConcCargar() {
+  if (_cbz.conc) { cbzConcPintar(); return; }
+  Promise.all([_cbzRpc("gv_conc_salud"), _cbzRpc("gv_conc_sin_identificar", { p_dias: 90, p_limit: 200 })])
+    .then(function (rr) {
+      _cbz.conc = {
+        salud: rr[0].error ? [] : (rr[0].data || []),
+        sin: rr[1].error ? [] : (rr[1].data || []),
+        err: rr[0].error || rr[1].error || null
+      };
+      if (!_cbz.conc.salud.length && _cbz.demo) _cbz.conc.salud = _CBZ_DEMO_CONC.slice();
+      cbzConcPintar();
+    });
+}
+function cbzConcPintar() { if (_cbz.tab === "conc") { var w = document.getElementById("cbzWrap"); if (w) w.innerHTML = cbzConcHtml(); } }
+
+function cbzConcHtml() {
+  var c = _cbz.conc;
+  var h = '<div class="cbz-buscar" style="justify-content:space-between;">' +
+      '<div><b style="font-size:15px;">🏦 Conciliación bancaria</b>' +
+      '<div style="color:#64748b;font-size:12px;margin-top:2px;">Cuánto de cada extracto quedó identificado con cliente y recibo.</div></div>' +
+      '<button class="cbz-back" onclick="_cbz.conc=null;cbzConcCargar();">↻ Actualizar</button></div>';
+  if (!c) return h + '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">Cargando…</div></div>';
+  if (c.err && !c.salud.length) return h + '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-vacio">No pude leer: ' + _cbzEsc(c.err) + "</div></div>";
+
+  h += '<div class="cbz-concgrid">' + c.salud.map(function (r) {
+    var ent = _cbzNum(r.entradas), ok = _cbzNum(r.con_cliente);
+    var pct = ent ? Math.round(ok * 100 / ent) : 0;
+    var col = pct >= 90 ? "#047857" : (pct >= 50 ? "#b45309" : "#b91c1c");
+    return '<div class="cbz-conccard">' +
+      '<div class="t">' + _cbzEsc(String(r.banco || "").toUpperCase()) + " · " +
+        '<span class="cbz-chip ' + (r.empresa === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(r.empresa) + "</span></div>" +
+      '<div class="p" style="color:' + col + ';">' + _cbzPlata(pct) + " %</div>" +
+      '<div class="s">' + _cbzPlata(ok) + " de " + _cbzPlata(ent) + " entradas con cliente</div>" +
+      '<div class="bar"><i style="width:' + pct + "%;background:" + col + ';"></i></div>' +
+      '<div class="s" style="margin-top:6px;">Sin identificar: <b>' + _cbzPlata(r.sin_identificar) + "</b>" +
+        (_cbzNum(r.monto_sin_identificar) ? " · $ " + _cbzPlata(r.monto_sin_identificar) : "") + "</div>" +
+      '<div class="s">Último movimiento: <b>' + _cbzFecha(r.ultima) + "</b></div>" +
+      (r.archivo ? '<div class="s" title="' + _cbzEsc(r.archivo) + '" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _cbzEsc(r.archivo) + "</div>" : "") +
+      "</div>";
+  }).join("") + "</div>";
+
+  h += '<div class="cbz-panel" style="margin-top:12px;">';
+  if (!c.sin.length) {
+    h += '<div class="cbz-vacio">Ninguna entrada sin identificar en los últimos 90 días. 👌</div>';
+  } else {
+    var tot = c.sin.reduce(function (s2, r) { return s2 + _cbzNum(r.entrada); }, 0);
+    h += '<div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;font-size:13px;">' +
+      "<b>" + c.sin.length + "</b> entrada(s) sin cliente ni recibo en 90 días · <b>$ " + _cbzPlata(tot) + "</b>" +
+      '<div style="color:#64748b;font-size:12px;margin-top:2px;">Es lo que hoy alguien identifica a mano en el Excel. El texto del extracto es de donde van a salir las reglas.</div></div>';
+    h += '<table class="cbz-t"><thead><tr><th>Fecha</th><th>Banco</th><th>Emp</th><th>Entrada</th>' +
+      '<th style="text-align:left;">Detalle del extracto</th><th style="text-align:left;">Operación</th><th>Nro op.</th></tr></thead><tbody>';
+    h += c.sin.map(function (r) {
+      return "<tr><td>" + _cbzFecha(r.fecha) + "</td><td>" + _cbzEsc(r.banco || "") + "</td>" +
+        '<td><span class="cbz-chip ' + (r.empresa === "chef" ? "cbz-ch" : "cbz-lk") + '">' + _cbzEmpLabel(r.empresa) + "</span></td>" +
+        '<td class="cbz-verde"><b>' + _cbzPlata(r.entrada) + "</b></td>" +
+        '<td class="l">' + _cbzEsc(r.detalle || "—") + "</td>" +
+        '<td class="l" style="color:#64748b;">' + _cbzEsc(r.operacion || r.tipo || "—") + "</td>" +
+        "<td>" + _cbzEsc(r.nro_op || "—") + "</td></tr>";
+    }).join("");
+    h += "</tbody></table>";
+  }
+  h += "</div>";
+
+  h += '<div class="cbz-panel" style="margin-top:12px;"><div style="padding:14px 16px;">' +
+    '<b style="font-size:14px;">⚙ Motor de reglas — lo que falta para que concilie solo</b>' +
+    '<div style="color:#64748b;font-size:12.5px;margin-top:6px;line-height:1.5;">' +
+    "Todavía no hay motor: la conciliación se hace a mano en los cuatro Excel. Para escribir las reglas hacen falta " +
+    "el manual, los extractos crudos del banco (como los baja el banco, no la planilla ya trabajada) y una conciliación " +
+    "ya cerrada a una fecha, para medir contra ella cuántos renglones acierta.</div>" +
+    '<ul style="color:#334155;font-size:12.5px;margin:9px 0 0 18px;line-height:1.6;">' +
+    "<li>De qué campo del extracto sale el <b>CUIT</b> y de cuál el nombre (hoy el Excel no trae CUIT).</li>" +
+    "<li>Qué hace el <b>número de recibo</b>: si lo emite ISIS después del pago o si ya viene en el extracto.</li>" +
+    "<li>Cómo se trata un <b>e-cheque</b>: si la fila va con la fecha de acreditación o con la de vencimiento " +
+    "(hoy hay 914 filas repetidas del mismo recibo, $779.279.758, que parecen cuotas del mismo cheque).</li>" +
+    "<li>Qué entradas <b>no son cobranza</b> (transferencias entre cuentas propias, devoluciones, intereses).</li>" +
+    "<li>Si un pago puede cancelar facturas de <b>las dos empresas</b> a la vez.</li>" +
+    "</ul></div></div>";
+  return h;
+}
+window.cbzConcHtml = cbzConcHtml;
+window.cbzConcCargar = cbzConcCargar;
+
+var _CBZ_DEMO_CONC = [
+  { banco: "credicoop", empresa: "lk", movimientos: 26619, entradas: 13845, con_cliente: 12689, con_recibo: 10506, sin_identificar: 1110, monto_sin_identificar: 1031493020, primera: "2021-01-07", ultima: "2026-09-28", archivo: "CONCILIACION CREDICOOP LOEKE.xls" },
+  { banco: "credicoop", empresa: "chef", movimientos: 4444, entradas: 606, con_cliente: 12, con_recibo: 16, sin_identificar: 589, monto_sin_identificar: 1022438804, primera: "2012-03-01", ultima: "2026-09-28", archivo: "BANCO CREDICOOP CHEF.xlsm" }
+];
 
 /* ------------------------------ datos DEMO ------------------------------- */
 /* Sólo se usan si la base no contesta, y la pantalla lo dice con un chip. */
