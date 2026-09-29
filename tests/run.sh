@@ -641,6 +641,8 @@ echo "== pedimp-moq-proy (v23.90: código → proyección · MOQ con margen hast
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-moq-proy.cjs
 echo "== pedimp-pdf-inner (v24.40: el PDF del pedido lleva Inner Cajas) =="
 node tests/pedimp-pdf-inner.cjs
+echo "== pedimp-prioridad-damian (v24.41: orden por meses de stock · alerta < 4 · PDF para Damián) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-prioridad-damian.cjs
 node tests/pedimp-meses-proveedor.cjs
 
 echo "== imp-hist-pedidos (v23.91: 📜 Historial = pedidos + recepciones) =="
