@@ -49,3 +49,28 @@ grant execute on function public.gv_tv_clave_validar(text) to anon, authenticate
 -- Rollback:
 -- drop function public.gv_tv_clave_validar(text); drop function public.gv_tv_clave_actual();
 -- drop function public.gv_tv_clave_de(bigint);
+
+-- ── v23.84 (Luis, 29/09): la lista = los que TRABAJARON en Virgilio en los últimos 15 días ──
+-- (eventos de Registros_Produccion_Virgilio), sin mirar la sede. El resto entra por «+».
+-- Aplicado como migración gv_tv_clave_validar_15dias_v2384. Al 29/09 devuelve 5.
+create or replace function public.gv_tv_clave_validar(p_clave text)
+returns jsonb language plpgsql stable security definer set search_path = public, pg_catalog as $$
+declare
+  v_t bigint := floor(extract(epoch from now()) / 900)::bigint;
+  v_c text := regexp_replace(coalesce(p_clave, ''), '\D', '', 'g');
+begin
+  if v_c = '' or (v_c <> public.gv_tv_clave_de(v_t) and v_c <> public.gv_tv_clave_de(v_t - 1)) then
+    return jsonb_build_object('ok', false);
+  end if;
+  return jsonb_build_object('ok', true, 'operarios', coalesce((
+    select jsonb_agg(jsonb_build_object('legajo', btrim(e."Legajo"), 'nombre', btrim(e."Empleado"))
+                     order by btrim(e."Empleado"))
+      from public."Empleados" e
+     where upper(btrim(coalesce(e."Activo", ''))) <> 'NO'
+       and btrim(coalesce(e."Legajo", '')) not in ('', '0', '1', '600')
+       and btrim(coalesce(e."Empleado", '')) <> ''
+       and exists (select 1 from public."Registros_Produccion_Virgilio" r
+                    where r.ts_cliente >= now() - interval '15 days'
+                      and btrim(r.legajo::text) = btrim(e."Legajo"))), '[]'::jsonb));
+end $$;
+grant execute on function public.gv_tv_clave_validar(text) to anon, authenticated;
