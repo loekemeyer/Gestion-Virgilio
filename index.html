@@ -6214,7 +6214,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.32"></script>
+<script type="module" src="recepcion.js?v=24.33"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10256,7 +10256,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.32";
+const APP_VERSION = "v24.33";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -28466,14 +28466,17 @@ async function racksFetchOrdenes() { try { const r = await fetch(SUPABASE_RACKS_
    ⚠ El techo de 20 s es para la RED colgada, no para la base: la base corta sola a los 8 s.
    ============================================================================ */
 async function stkFetchPedidasNeto() {
-  var ctl = null, to = null;
   try {
-    try { ctl = new AbortController(); to = setTimeout(function () { try { ctl.abort(); } catch (_e) {} }, 20000); } catch (_e) { ctl = null; }
-    var r = await fetch(SUPABASE_URL + "/rest/v1/gv_stock_pedidas_neto?select=cod,familia,es_secundario,total,neto,con_tp,en_curso,fam_con_tp,fam_en_curso,fam_miembros&limit=1000",
-      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store", signal: ctl ? ctl.signal : undefined });
-    if (to) clearTimeout(to);
-    if (!r.ok) return null;                       // ⚠ null = "no pude leer", NO "no hay": el render cae al total
-    var rows = await r.json();
+    /* ⚠ PAGINADA con gvRestTodo: es una fila por código con demanda viva (237 al 29/09) y eso
+       crece con el catálogo. Un `limit=1000` acá sería una expresión de deseo — el día que pase
+       las 1.000 no avisa nadie (regla v20.45/§rest-tope-1000, que es la que lo cazó).
+       ⚠ El techo de 20 s es para la RED colgada, no para la base: la base corta sola a los 8 s.
+       Sin él, una promesa que nunca resuelve deja el redibujado esperando para siempre. */
+    var rows = await Promise.race([
+      gvRestTodo("gv_stock_pedidas_neto?select=cod,familia,es_secundario,total,neto,con_tp,en_curso,fam_con_tp,fam_en_curso,fam_miembros"),
+      new Promise(function (res) { setTimeout(function () { res(null); }, 20000); })
+    ]);
+    // ⚠ null / vacío = "no pude leer", NO "no hay": el render cae al total de siempre
     if (!Array.isArray(rows) || !rows.length) return null;
     var m = {};
     rows.forEach(function (x) {
@@ -28484,7 +28487,7 @@ async function stkFetchPedidasNeto() {
                famN: Number(x.fam_miembros) || 1 };
     });
     return m;
-  } catch (_e) { if (to) clearTimeout(to); return null; }
+  } catch (_e) { return null; }
 }
 /* El tooltip de la celda. Luis: *"que pickeado seria «pickeados», osea los que TP, y los que
    estan pickeados ahora sin TP. que lo aclare el tooltip"* · *"que el tooltip avise en casos de
@@ -63666,7 +63669,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.32"></script>
+<script src="cobranzas.js?v=24.33"></script>
 
 </body>
 </html>
