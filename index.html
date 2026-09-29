@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.48"></script>
+<script type="module" src="recepcion.js?v=24.49"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.48";
+const APP_VERSION = "v24.49";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20974,6 +20974,7 @@ function _impTabsHtml(cur) {
     '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">💱 NTL</button>' +
     '<button style="' + t(cur === 'provcc') + '" onclick="openImpProvCC()" title="Una cuenta por fábrica: cuánto le debemos por los pedidos en curso, cada giro, y la historia (hoja del Excel + extracto NTL).">📒 Cta. proveedor</button>' +
     '<button style="' + t(cur === 'hist') + '" onclick="openImpHistRecep()" title="Los pedidos hechos y las recepciones: qué se pidió, cuándo, cuánto llegó y dónde se guardó.">📜 Historial</button>' +
+    '<button style="' + t(cur === 'disc') + '" onclick="openImpDisc()" title="Los importados dados de baja (Importados.activo = false): no salen en Pedidos ni en el PDF.">🚫 Discontinuos</button>' +
     '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button>' +
     '<button style="' + t(false) + '" onclick="openImpoComex()" title="Verificación de documentos de importación (IMPO COMEX). Sólo supervisores.">🛃 IMPO COMEX</button></div>';
 }
@@ -23334,6 +23335,38 @@ async function impRecGrabar() {
     (r.estado === "llegado" ? "El pedido quedó RECIBIDO y ya no figura en viaje." + (Number(r.faltante) > 0 ? " Faltaron " + Number(r.faltante).toLocaleString("es-AR") + " u (anotadas)." : "") : "El pedido sigue en curso con lo que falta.") +
     (Number(r.sobra) > 0 ? ' Llegaron ' + Number(r.sobra).toLocaleString("es-AR") + ' u más de lo pedido: entraron al stock igual.' : '') + '</div>' +
     '<div style="margin-top:10px"><button class="irc-b pri" onclick="impRecCerrar()">Listo</button><button class="irc-b sec" onclick="impRecCerrar();openImpHistRecep()">Ver historial de recepción</button></div>');
+}
+/* Solapa 🚫 Discontinuos (v24.49, Thomas: "no deben aparecer en módulo importados, sino dentro de
+   discontinuos de importados"). Son los de Importados.activo = false: la pantalla de Pedidos los
+   saca con activo=eq.true, y acá se listan con su stock y en camino para que no se pierdan. */
+async function openImpDisc() {
+  _stkPopShell("🚫 Importados discontinuos", "stkPopBody", true);
+  var body = document.getElementById("stkPopBody"); if (!body) return;
+  body.innerHTML = _impTabsHtml('disc') + '<div class="stkpop-empty">Cargando…</div>';
+  _stkPop = { kind: "impDisc" };
+  var rows = null, mot = {};
+  try {
+    var r = await Promise.all([
+      supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=cod_art,marca,proveedor,descripcion,stock_total,pedido_curso&principal=eq.true&activo=eq.false"),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Articulos_Discontinuados", "select=cod,motivo").catch(function () { return []; })
+    ]);
+    rows = r[0] || [];
+    (r[1] || []).forEach(function (x) { if (x && x.cod) mot[String(x.cod).trim().toUpperCase()] = x.motivo || ""; });
+  } catch (e) { rows = null; }
+  if (!_stkPop || _stkPop.kind !== "impDisc") return;
+  var h = _impTabsHtml('disc');
+  if (rows === null) { body.innerHTML = h + '<div class="stkpop-empty" style="color:#b91c1c">No se pudo leer la lista. Probá de nuevo.</div>'; return; }
+  if (!rows.length) { body.innerHTML = h + '<div class="stkpop-empty">No hay importados discontinuos.</div>'; return; }
+  rows.sort(function (a, b) { return String(a.cod_art).localeCompare(String(b.cod_art), "es", { numeric: true }); });
+  var n = function (v) { var x = Number(v) || 0; return x ? x.toLocaleString("es-AR", { maximumFractionDigits: 0 }) : '<span style="color:#94a3b8">0</span>'; };
+  h += '<div style="font-size:12px;color:#64748b;margin:0 0 6px;text-align:center">' + rows.length + ' códigos dados de baja · no salen en 📦 Pedidos ni en el PDF</div>' +
+    '<table class="mva-tbl" style="margin:0 auto;width:auto"><thead><tr><th>Código</th><th>Descripción</th><th>Emp.</th><th>Proveedor</th><th class="num">Stock<br><small>u</small></th><th class="num">En camino<br><small>u</small></th><th>Motivo</th></tr></thead><tbody>' +
+    rows.map(function (r) {
+      var c = String(r.cod_art || "").trim();
+      var m = String(r.marca || "").trim().toUpperCase() === "CH" ? "CH" : "LK";
+      return '<tr><td class="c"><b>' + escapeHtml(c) + '</b></td><td>' + escapeHtml(r.descripcion || "") + '</td><td class="c">' + m + '</td><td class="c">' + escapeHtml(r.proveedor || "—") + '</td><td class="num">' + n(r.stock_total) + '</td><td class="num">' + n(r.pedido_curso) + '</td><td>' + escapeHtml(mot[c.toUpperCase()] || "—") + '</td></tr>';
+    }).join("") + '</tbody></table>';
+  body.innerHTML = h;
 }
 /* Solapa 📜 Historial (v23.91, Luis: "debería pasar a ser Historial y mostrar recepción y
    pedidos"). Dos vistas del mismo circuito: lo que se PIDIÓ (baches, agrupados por pedido y
@@ -63845,7 +63878,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.48"></script>
+<script src="cobranzas.js?v=24.49"></script>
 
 </body>
 </html>
