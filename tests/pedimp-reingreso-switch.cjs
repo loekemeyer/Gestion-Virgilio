@@ -24,6 +24,8 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     return r.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
+  // v24.55 — la regla del 80 % del MOQ se prueba en pedimp-prioridad-damian / pedimp-moq-proy: acá no toca las cantidades
+  await p.evaluate(() => { _NAC_TASAS.moq = 0; });
   const it = (cod) => ({ cod, desc: "art " + cod, prov: "X", proyUni: 10, objetivoUni: 0, stockUni: 0, enCurso: 0, aPedirUni: 100, aPedirCajas: 10, uniMaster: 10, det: [{ id: 1, curso: 0, marca: "" }] });
   const a = await p.evaluate((items) => {
     _reingExcl = null; _reingExclCargando = true;           // simula la carga en vuelo

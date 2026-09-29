@@ -87,8 +87,9 @@ const CFG_NAC = [{ meses_objetivo: 10, derechos_pct: 0.25, ntl_pct: 0.05, iva_pc
   if (hidr.minKangli !== 40000) fail("(d) el mínimo de Kangli sale de su fila (40.000) y dio " + hidr.minKangli);
 
   // ── (a) el botón está en el encabezado de cada proveedor ───────────────────────────
-  const it = (cod, prov) => ({ cod, prov, desc: cod, proyUni: 10, objetivoUni: 100, stockUni: 0, enCurso: 0,
-    aPedirUni: 100, aPedirCajas: 1, uniMaster: 100, fobUni: 0.2, m3Master: 0.05, det: [{ id: 1, curso: 0, marca: "" }] });
+  // v24.55 — con la regla del 80 % del MOQ un pedido de 100 u no se pide: el ítem pide 1.000 (llega al MOQ).
+  const it = (cod, prov) => ({ cod, prov, desc: cod, proyUni: 100, objetivoUni: 1000, stockUni: 0, enCurso: 0,
+    aPedirUni: 1000, aPedirCajas: 10, uniMaster: 100, fobUni: 0.2, m3Master: 0.05, det: [{ id: 1, curso: 0, marca: "" }] });
   const botones = await p.evaluate((items) => {
     _stkPopShell("📦 Pedidos Importación", "stkPopBody", true);
     _stkPop = { kind: "pedImp", data: { items: items, meses: 10, minUsd: 25000, nac: { modo: "consolidada", valorM3: 110, tn: 0 } }, soloPedir: true, mcOverride: {} };

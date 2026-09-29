@@ -12,13 +12,15 @@ function fn(name) {
 let html = "";
 const ctx = {
   _stkPop: null, _IMPORTADOR_DE: {}, console,
+  // v24.55 — _pedImpMcOf aplica la regla del 80 % del MOQ: acá el MOQ va en 0 (no toca las cantidades del test).
+  _NAC_TASAS: { moq: 0, moq_meses_max: 12, moq_pct: 0.8 }, _impProvNum: (p, k, d) => d,
   codCanon: (c) => c, artNombre: (c, d) => d || c, pedImpQTerms: () => [], pedImpMatch: () => true,
   alert: () => {}, Blob: function (p) { html = p.join(""); }, URL: { createObjectURL: () => "u", revokeObjectURL: () => {} },
   document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } }, setTimeout: () => {},
 };
 vm.createContext(ctx);
 // v23.45: el Excel usa _impCodVista/_impPlantaVista desde la v23.28 → se cargan también.
-["_impLRuteo", "_impCodVista", "_impPlantaVista", "_pedImpMcOf", "_pedImpUniOf", "_pedImpUsdOf", "_pedImpM3Of", "_pedImpMesesStock", "_pedImpPrioCmp", "_pedImpMesesFmt", "_pedImpDdmm", "pedImpExportExcel"].forEach((n) => vm.runInContext(fn(n), ctx));
+["_impLRuteo", "_impCodVista", "_impPlantaVista", "_pedImpMoqCalc", "_pedImpMcOf", "_pedImpUniOf", "_pedImpUsdOf", "_pedImpM3Of", "_pedImpMesesStock", "_pedImpPrioCmp", "_pedImpMesesFmt", "_pedImpDdmm", "pedImpExportExcel"].forEach((n) => vm.runInContext(fn(n), ctx));
 const items = [
   { cod: "440E", key: "440E", prov: "Ningbo", aPedirUni: 0, aPedirCajas: 0, uniMaster: 24, fobUni: 3.95 },
   { cod: "590E", key: "590E", prov: "Ningbo", aPedirUni: 240, aPedirCajas: 10, uniMaster: 24, fobUni: 1, m3Master: 0.1 },

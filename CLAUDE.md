@@ -6348,3 +6348,18 @@ lo que cambió es **dónde están esos dos divs**, no la lógica. `tests/tv-meta
 - **Los INSUMOS (partes, `esParte`) van SIN foto** en el PDF de Damián (Thomas, v24.44: 505C, 523C, 587C, 1000900, 1546903).
 - El PDF del chino (🖨 PDF pedido) lleva **Inner Cajas** = unidades ÷ `Importados_Volumen.uni_inner` (v24.40).
 `tests/pedimp-prioridad-damian.cjs`, `tests/pedimp-pdf-inner.cjs`.
+
+### ⚠ v24.55 (Thomas, 29/09): el MOQ MUEVE la cantidad — «o llego al 80 % del MOQ o no pido nada»
+
+- Lo calculado ya llega al **80 % del MOQ** → se pide eso. No llega → se **sube al 80 %** (en master cajas) **sólo si**
+  la cobertura queda dentro del tope del proveedor (`moq_meses_max`, 12). Ni así, o sin proyección → **no se pide** (0).
+- Vive en `_pedImpMoqCalc` y la aplica `_pedImpMcOf`, así que vale en la pantalla, el Excel y los dos PDF. Una
+  cantidad puesta **a mano** (`mcOverride`) gana siempre. El 80 % es `_NAC_TASAS.moq_pct` (default 0,8; pendiente
+  pasarlo a `GV_Imp_Proveedor`/config, necesita DDL con el «sí» del dueño).
+- **PDF para Damián = 3 hojas**: 1) **Pedido <prov> dd/mmm** (sólo UNIDADES, sin MC ni inner; los totales de FOB,
+  m³ —1 decimal— y los meses del máximo en su propia fila arriba del rótulo; «Llegan» sólo si algo viene en camino,
+  con la fecha en el rótulo si es una sola; el aviso «↑ 80% MOQ» a la derecha de la tabla; separadores finitos
+  Foto|Stock y Pedido|FOB) · 2) **Sin pedir**, por meses de stock, con «Por qué» · 3) **Discontinuos** del proveedor
+  (`Importados.activo = false`, con el motivo de `Articulos_Discontinuados`). Sin textos de explicación.
+- Los tests de pantalla que no miden el MOQ lo ponen en 0 (`_NAC_TASAS.moq = 0`); la regla la miden
+  `tests/pedimp-prioridad-damian.cjs` (D) y `tests/pedimp-moq-proy.cjs` (B).

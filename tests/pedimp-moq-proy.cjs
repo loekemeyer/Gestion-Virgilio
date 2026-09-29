@@ -87,7 +87,8 @@ const CFG_NAC = [{ meses_objetivo: 10, derechos_pct: 0.18, ntl_pct: 0.05, iva_pc
   if (/MOQ/.test(filas["111"] || "")) fail("(B) 1.500 u contra MOQ 1.000 no debía marcar nada: " + filas["111"]);
   if (!/🟡 MOQ 10m/.test(filas["222"] || "")) fail("(B) esperaba «🟡 MOQ 10m» (llega estirando a 10 meses) y dio: " + filas["222"]);
   if (!/🔴 MOQ/.test(filas["333"] || "")) fail("(B) con 20 meses necesarios tenía que salir 🔴 y dio: " + filas["333"]);
-  if (!/MOQ \?/.test(filas["444"] || "")) fail("(B) sin proyección tenía que decir «MOQ ?» y dio: " + filas["444"]);
+  // v24.55 (Thomas: "o llego al 80 % del MOQ o no pido nada") — sin proyección no se puede estirar: no se pide
+  if (!/🔴 MOQ · no se pide/.test(filas["444"] || "")) fail("(B) sin proyección y bajo el MOQ: «🔴 MOQ · no se pide», y dio: " + filas["444"]);
   if (!/🔴 MOQ|🟡 MOQ/.test(filas["555"] || "")) fail("(B) el MOQ propio de Kangli (2.000) no se aplicó: " + filas["555"]);
 
   // el MOQ sale de la VISTA, no del archivo: con otro MOQ, otro resultado
@@ -157,8 +158,8 @@ const CFG_NAC = [{ meses_objetivo: 10, derechos_pct: 0.18, ntl_pct: 0.05, iva_pc
     _impCfgArt["111"] = { derechos_pct: 0.35, prov: "Frontier" };
     out.conPropio = _derechosArt("111", "Frontier");          // ahora manda el del artículo
     // mitad y mitad por FOB: 35% y 18% → 26,5%
-    const items = [{ cod: "111", prov: "Frontier", usdTotal: 1000, aPedirCajas: 1, uniMaster: 1, fobUni: 1000, aPedirUni: 1000 },
-                   { cod: "222", prov: "Frontier", usdTotal: 1000, aPedirCajas: 1, uniMaster: 1, fobUni: 1000, aPedirUni: 1000 }];
+    const items = [{ cod: "111", prov: "Frontier", usdTotal: 1000, aPedirCajas: 1000, uniMaster: 1, fobUni: 1, aPedirUni: 1000 },
+                   { cod: "222", prov: "Frontier", usdTotal: 1000, aPedirCajas: 1000, uniMaster: 1, fobUni: 1, aPedirUni: 1000 }];
     _stkPop = { kind: "pedImp", data: { items: items, meses: 10, minUsd: 25000, nac: { modo: "consolidada", valorM3: 110, tn: 0 } }, soloPedir: false, mcOverride: {} };
     out.pedido = _derechosPedido(items, "Frontier");
     delete _impCfgArt["111"];
