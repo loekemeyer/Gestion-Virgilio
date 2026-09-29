@@ -6234,7 +6234,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=23.90"></script>
+<script type="module" src="recepcion.js?v=23.92"></script>
 <!-- Config del módulo de fichada (compartido con fichada.html). El secret
      hmacSecret tiene que ser el mismo acá y allá; cargándolo desde un solo
      archivo evitamos que se desincronicen. -->
@@ -10279,7 +10279,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v23.90";
+const APP_VERSION = "v23.92";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20997,7 +20997,7 @@ function _impTabsHtml(cur) {
     '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">🚢 En curso</button>' +
     '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">💱 NTL</button>' +
     '<button style="' + t(cur === 'provcc') + '" onclick="openImpProvCC()" title="Una cuenta por fábrica: cuánto le debemos por los pedidos en curso, cada giro, y la historia (hoja del Excel + extracto NTL).">📒 Cta. proveedor</button>' +
-    '<button style="' + t(cur === 'hist') + '" onclick="openImpHistRecep()" title="Cada recepción hecha con 📥 RECIBIR: cuándo, qué, cuánto y dónde se guardó.">📜 Historial recepción</button>' +
+    '<button style="' + t(cur === 'hist') + '" onclick="openImpHistRecep()" title="Los pedidos hechos y las recepciones: qué se pidió, cuándo, cuánto llegó y dónde se guardó.">📜 Historial</button>' +
     '<button style="' + t(cur === 'prov') + '" onclick="stkOpenProvImp()">🏭 Proveedores</button>' +
     '<button style="' + t(false) + '" onclick="openImpoComex()" title="Verificación de documentos de importación (IMPO COMEX). Sólo supervisores.">🛃 IMPO COMEX</button></div>';
 }
@@ -21251,6 +21251,9 @@ function _usd0(n) { return "u$s " + Math.round(_nacNum(n, 0)).toLocaleString("es
    por mes y los meses al mínimo (izq), y cómo se arma lo no recuperable (der). El abierto/cerrado
    queda en _pedImpDesgAb por proveedor, así sobrevive a los re-render (editar un MC redibuja). */
 var _pedImpDesgAb = {};
+/* v23.91 — los datos con los que el pop-up rearma el desglose de cada proveedor. Va acá,
+   junto a lo que lo usa: declarado más abajo quedaba en zona muerta para _pedImpBandaHtml. */
+var _pedImpDesgData = {};
 function _pedImpDesgToggle(el) { try { var k = el.getAttribute("data-k"); if (el.open) _pedImpDesgAb[k] = 1; else delete _pedImpDesgAb[k]; } catch (_e) {} }
 function _pedImpDesgIzq(proy, minUsd, items) {
   var filas = (items || []).filter(function (it) { return it.proyUni > 0; }).map(function (it) {
@@ -21325,13 +21328,16 @@ function _pedImpDesgDer(nac, totUsd, m3) {
 /* Banda por proveedor: proyección al mínimo (izq) + costo de nacionalización del pedido (der). */
 function _pedImpBandaHtml(proy, nac, minUsd, totUsd, ext) {
   ext = ext || {};
+  // v23.91 (Luis) — el desglose ya NO se abre DENTRO del chip: lo hacía crecer y empujaba la
+  // tabla hacia abajo. Ahora el chip es una línea y «ver desglose» abre un pop-up.
+  // Los datos para rearmarlo quedan en _pedImpDesgData, así el pop-up no depende del HTML.
   var chip = function (bg, bd, col, html, desg, lado) {
     var base = 'flex:1 1 280px;min-width:240px;background:' + bg + ';border:1px solid ' + bd + ';border-radius:9px;padding:7px 11px;font-size:11.5px;color:' + col + ';line-height:1.35';
     if (!desg) return '<div style="' + base + '">' + html + '</div>';
-    var k = String(ext.prov || "") + "|" + lado;
-    return '<details class="pedimp-desg" data-k="' + escapeHtml(k) + '" ontoggle="_pedImpDesgToggle(this)"' + (_pedImpDesgAb[k] ? ' open' : '') + ' style="' + base + '">' +
-      '<summary style="cursor:pointer;list-style:none">' + html + ' <span style="font-size:10.5px;font-weight:800;text-decoration:underline;white-space:nowrap">ver desglose</span></summary>' + desg + '</details>';
+    return '<div style="' + base + '">' + html +
+      ' <button onclick="pedImpDesgPop(\'' + encodeURIComponent(String(ext.prov || "")) + '\',\'' + lado + '\')" style="background:none;border:0;padding:0;margin-left:2px;font-size:10.5px;font-weight:800;color:inherit;text-decoration:underline;white-space:nowrap;cursor:pointer">ver desglose</button></div>';
   };
+  _pedImpDesgData[String(ext.prov || "")] = { proy: proy, nac: nac, minUsd: minUsd, totUsd: totUsd, ext: ext };
   var izq;
   // lo que se lee de un vistazo va en 19px; el contexto, en la letra base del chip (11,5px)
   var _big = function (txt, col2) { return '<span style="font-size:19px;font-weight:800' + (col2 ? ';color:' + col2 : '') + '">' + txt + '</span>'; };
@@ -21519,6 +21525,7 @@ function _impCfgRender() {
     document.body.appendChild(ov);
   }
   const P = _impCfgPop, prov = P.prov, r = _impCfgProv[prov] || {};
+  const soloGral = !prov;   // v23.91 — el pop-up de los parámetros generales, sin proveedor
   const g = _NAC_TASAS, esc = escapeHtml;
   const tabB = function (id, txt) { return '<button onclick="pedImpCfgTab(\'' + id + '\')" style="padding:7px 18px;border-radius:999px;border:1px solid ' + (P.tab === id ? '#0f766e' : '#cbd5e1') + ';background:' + (P.tab === id ? '#0f766e' : '#fff') + ';color:' + (P.tab === id ? '#fff' : '#334155') + ';font-weight:800;font-size:14.5px;cursor:pointer">' + txt + '</button>'; };
   const campo = function (id, lbl, val, ph, hint) {
@@ -21529,10 +21536,12 @@ function _impCfgRender() {
   };
   let h = '<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#0f766e;color:#fff">' +
-    '<div style="font-size:18px;font-weight:800">⚙ Configurar — ' + esc(prov) + '</div>' +
+    '<div style="font-size:18px;font-weight:800">' + (prov ? '⚙ Configurar — ' + esc(prov) : '⚙ Parámetros generales de importación') + '</div>' +
     '<button onclick="pedImpCfgCerrar()" style="background:#fff;color:#0f766e;border:0;border-radius:8px;padding:6px 16px;font-size:14.5px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
     '<div style="padding:14px 16px">' +
-    '<div style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap">' + tabB("params", "Parámetros") + tabB("cods", "Códigos") + tabB("gral", "Generales") + '</div>';
+    // v23.91 (Luis: "no entiendo por qué hay un general ahí y qué modifica esos") — los
+    // generales salieron a su propio botón del módulo: acá sólo lo de ESTE proveedor.
+    (prov ? '<div style="display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap">' + tabB("params", "Parámetros") + tabB("cods", "Códigos") + '</div>' : '');
 
   if (P.msg) h += '<div style="margin-bottom:10px;padding:7px 10px;border-radius:8px;font-size:12.5px;font-weight:700;background:' + (P.msg[0] === "!" ? "#fef2f2" : "#f0fdf4") + ';color:' + (P.msg[0] === "!" ? "#b91c1c" : "#166534") + '">' + esc(P.msg.replace(/^!/, "")) + '</div>';
 
@@ -21577,7 +21586,7 @@ function _impCfgRender() {
           '<span style="font-size:13.5px;color:#475569;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(artNombre(a.cod, a.descripcion) || "—") + '</span>' +
           '<input value="' + esc(_der) + '" placeholder="' + _impCfgPctTxt(_impProvNum(prov, "derechos_pct", g.derechos_pct)) + '" onchange="pedImpCfgArtDer(\'' + encodeURIComponent(String(a.cod)) + '\',this.value)" title="Derechos de este artículo, en porcentaje (35 = 35%). Vacío = el del proveedor." style="width:62px;text-align:center;padding:4px 6px;border:1px solid ' + (_der ? '#0f766e' : '#cbd5e1') + ';border-radius:7px;font-size:14px;font-weight:800;background:' + (_der ? '#f0fdfa' : '#fff') + '">' +
           '<span style="font-size:12px;color:#94a3b8;font-weight:700">% der.</span>' +
-          '<button onclick="pedImpCfgCodigo(\'' + encodeURIComponent(String(a.cod)) + '\',\'\')" title="Sacarlo de ' + esc(prov) + ' (no lo borra: queda sin proveedor)" style="background:#fee2e2;color:#b91c1c;border:0;border-radius:7px;padding:4px 11px;font-weight:800;font-size:14px;cursor:pointer">✕</button></div>';
+          '<button onclick="pedImpCfgSacar(\'' + encodeURIComponent(String(a.cod)) + '\')" title="Sacarlo de ' + esc(prov) + ' (pide confirmación; no lo borra: queda sin proveedor)" style="background:#fee2e2;color:#b91c1c;border:0;border-radius:7px;padding:3px 10px;font-weight:800;font-size:13px;line-height:1.3;cursor:pointer">✕</button></div>';
       }).join("") : '<div style="padding:12px;color:#94a3b8;font-size:13.5px">Todavía no tiene códigos.</div>';
       h += '</div>';
       h += '<div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:6px">Agregar un código</div>';
@@ -21595,7 +21604,7 @@ function _impCfgRender() {
       h += '</div>';
     }
   } else {
-    h += '<div style="font-size:13px;color:#64748b;margin-bottom:10px">Valen para <b>todos</b> los proveedores que no tengan el suyo propio. Los porcentajes en <b>porcentaje</b>: 21 = 21%.</div>';
+    h += '<div style="font-size:13px;color:#64748b;margin-bottom:10px">Valen para <b>todos</b> los proveedores que no tengan el suyo propio, y para los artículos sin arancel propio. Los porcentajes en <b>porcentaje</b>: 21 = 21%.</div>';
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">';
     h += campo("impCfgGMeses", "Meses objetivo", String(g.meses_objetivo), "", "cuántos meses de venta se piden");
     h += campo("impCfgGDer", "Derechos (%)", _impCfgPctTxt(g.derechos_pct), "", "sobre el CIF");
@@ -21676,6 +21685,47 @@ async function pedImpCfgGuardarGral() {
   } catch (e) { _impCfgPop.msg = "!No se pudo guardar: " + (e.message || e); }
   _impCfgPop.guardando = false; _impCfgRender();
 }
+/* ══ v23.91 (Luis, 29/09) — EL DESGLOSE SE ABRE EN UN POP-UP ════════════════════════
+   Adentro del chip lo hacía crecer y empujaba la tabla; y con el pedido de varios
+   proveedores abiertos a la vez, la pantalla se volvía ilegible. La lógica de expandir
+   cada concepto NO cambia: sigue siendo un <details> por renglón, ahora dentro del pop-up. */
+function pedImpDesgPop(provEnc, lado) {
+  const prov = decodeURIComponent(provEnc || "");
+  const d = _pedImpDesgData[prov]; if (!d) return;
+  const esDer = (lado === "der");
+  const cuerpo = esDer ? _pedImpDesgDer(d.nac, d.totUsd, d.ext.m3) : _pedImpDesgIzq(d.proy, d.minUsd, d.ext.items);
+  const titulo = esDer ? ('🚢 Puesto en Argentina — ' + prov) : ('⏳ Cuándo llega al mínimo — ' + prov);
+  let ov = document.getElementById("impDesgOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "impDesgOv";
+    ov.setAttribute("style", "position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99998;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto");
+    ov.addEventListener("click", function (ev) { if (ev.target === ov) pedImpDesgCerrar(); });
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:620px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#3730a3;color:#fff">' +
+    '<div style="font-size:15px;font-weight:800">' + escapeHtml(titulo) + '</div>' +
+    '<button onclick="pedImpDesgCerrar()" style="background:#fff;color:#3730a3;border:0;border-radius:8px;padding:4px 11px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
+    '<div style="padding:10px 14px 14px">' + cuerpo + '</div></div>';
+}
+function pedImpDesgCerrar() { const o = document.getElementById("impDesgOv"); if (o) o.remove(); }
+
+/* v23.91 — los parámetros GENERALES, en su propio botón del módulo (no adentro del ⚙ de un
+   proveedor, donde no se entendía a quién modificaban). Reusa el mismo pop-up, sin proveedor. */
+function pedImpCfgGralAbrir() {
+  _impCfgPop = { prov: "", tab: "gral", q: "", arts: null, guardando: false, msg: "" };
+  _impCfgRender();
+}
+/* v23.91 — sacar un código pide confirmación: es el maestro, y el ✕ quedaba al lado del input. */
+function pedImpCfgSacar(codEnc) {
+  if (!_impCfgPop) return;
+  const cod = decodeURIComponent(codEnc || "");
+  let ok = false;
+  try { ok = confirm("¿Sacar " + cod + " de " + _impCfgPop.prov + "?\n\nEl artículo NO se borra: queda sin proveedor y deja de figurar en el pedido de " + _impCfgPop.prov + "."); } catch (_e) { ok = false; }
+  if (!ok) return;
+  return pedImpCfgCodigo(codEnc, "");
+}
+
 /* v23.90 (Luis) — los derechos de UN artículo. Vacío = vuelve al % del proveedor. */
 async function pedImpCfgArtDer(codEnc, valor) {
   if (!_impCfgPop) return;
@@ -22202,7 +22252,9 @@ function _pedImpRender() {
     (_nac.modo === "avion" ? '<label style="font-size:12px;color:#6b21a8;font-weight:700;display:flex;align-items:center;gap:5px" title="Peso total del embarque en toneladas (avión cobra por kg)">Peso (TN) <input type="number" inputmode="decimal" min="0" value="' + (_nac.tn || "") + '" onchange="pedImpSetNacTn(this.value)" placeholder="0" style="width:60px;height:30px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>' : '') +
     '<span style="width:1px;height:22px;background:#e9d5ff"></span>' +
     '<label style="font-size:12px;color:#6b21a8;font-weight:700;display:flex;align-items:center;gap:5px" title="Mínimo por proveedor para emitir un pedido. La proyección dice cuándo se llega a este monto.">Mínimo pedido u$s <input type="number" inputmode="numeric" min="0" step="1000" value="' + _minUsd + '" onchange="pedImpSetNacCfg(\'impo_pedido_min_usd\',this.value)" style="width:82px;height:30px;border:1px solid #c4b5fd;border-radius:8px;padding:0 6px;font-size:13px;text-align:right"></label>' +
-    '<span style="font-size:11px;color:#7c3aed;flex-basis:100%">El costo NO recuperable (derechos, flete, tasas, despachante' + (Object.keys(_NTL_PROVEEDORES).length ? ' y 5% NTL en Frontier/Fujian/Kangli/Zhixin' : '') + ') queda pegado al costo del artículo. Cada proveedor se calcula como su propio embarque.</span>' +
+    // v23.91 (Luis) — los parámetros generales se editan acá, no adentro del ⚙ de un proveedor
+    '<button class="mva-clear" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="pedImpCfgGralAbrir()" title="Tasas, tope de estadística, valor del m³, mínimo y MOQ que valen para todos los proveedores que no tengan el suyo propio">⚙ Generales</button>' +
+    '<span style="font-size:11px;color:#7c3aed;flex-basis:100%">El costo NO recuperable (derechos, flete, tasas, despachante' + (Object.keys(_NTL_PROVEEDORES).length ? ' y 5% NTL en los proveedores que facturan por NTL' : '') + ') queda pegado al costo del artículo. Cada proveedor se calcula como su propio embarque.</span>' +
     '</div>';
   let algo = false;
   provOrder.forEach(function (prov) {
@@ -23052,15 +23104,52 @@ async function impRecGrabar() {
     (Number(r.sobra) > 0 ? ' Llegaron ' + Number(r.sobra).toLocaleString("es-AR") + ' u más de lo pedido: entraron al stock igual.' : '') + '</div>' +
     '<div style="margin-top:10px"><button class="irc-b pri" onclick="impRecCerrar()">Listo</button><button class="irc-b sec" onclick="impRecCerrar();openImpHistRecep()">Ver historial de recepción</button></div>');
 }
-/* Solapa 📜 Historial recepción: cuándo, qué, cuánto, de qué empresa, dónde se puso y quién. */
+/* Solapa 📜 Historial (v23.91, Luis: "debería pasar a ser Historial y mostrar recepción y
+   pedidos"). Dos vistas del mismo circuito: lo que se PIDIÓ (baches, agrupados por pedido y
+   proveedor → gv_imp_pedidos_historial) y lo que se RECIBIÓ con 📥 RECIBIR. */
 async function openImpHistRecep() {
-  _stkPopShell("📜 Historial de recepción de importaciones", "stkPopBody", true);
+  _stkPopShell("📜 Historial de importaciones", "stkPopBody", true);
   var body = document.getElementById("stkPopBody"); if (!body) return;
   body.innerHTML = _impTabsHtml('hist') + '<div class="stkpop-empty">Cargando historial…</div>';
-  _stkPop = { kind: "impHist", rows: [], q: "", dias: 365 };
-  try { _stkPop.rows = (await _pedImpRpc("gv_imp_recepcion_historial", { p_dias: 365 })) || []; }
-  catch (e) { _stkPop.err = _impRecErr(e); }
+  _stkPop = { kind: "impHist", rows: [], peds: [], q: "", dias: 365, vista: "rec" };
+  var r = await Promise.all([
+    _pedImpRpc("gv_imp_recepcion_historial", { p_dias: 365 }).catch(function (e) { _stkPop.err = _impRecErr(e); return []; }),
+    _pedImpRpc("gv_imp_pedidos_historial", { p_dias: 365 }).catch(function (e) { _stkPop.errPed = _impRecErr(e); return []; })
+  ]);
+  _stkPop.rows = r[0] || []; _stkPop.peds = r[1] || [];
   _impHistRender();
+}
+function impHistVista(v) { if (!_stkPop || _stkPop.kind !== "impHist") return; _stkPop.vista = v; _impHistRender(); }
+/* Los PEDIDOS: un renglón por (pedido, proveedor), con lo pedido, lo llegado y su estado. */
+function _impHistPedidosHtml() {
+  var q = String(_stkPop.q || "").trim().toLowerCase();
+  var rows = (_stkPop.peds || []).filter(function (r) {
+    if (!q) return true;
+    return [r.pedido_ref, r.proveedor, r.codigos, r.creado_por, r.estado].join(" ").toLowerCase().indexOf(q) >= 0;
+  });
+  if (_stkPop.errPed) return '<div class="stkpop-empty">No se pudieron leer los pedidos: ' + escapeHtml(_stkPop.errPed) + '</div>';
+  if (!rows.length) return '<div class="stkpop-empty">' + (q ? 'Ningún pedido coincide con la búsqueda.' : 'Todavía no hay pedidos cargados.') + '</div>';
+  var _f = function (d) { return d ? _isoToDdMmAa(String(d).slice(0, 10)) : "—"; };
+  var _n = function (v) { return Math.round(Number(v) || 0).toLocaleString("es-AR"); };
+  var _chip = function (e) {
+    var c = { "en curso": ["#eef2ff", "#3730a3"], "llegado": ["#dcfce7", "#166534"], "anulado": ["#fee2e2", "#b91c1c"] }[e] || ["#f1f5f9", "#475569"];
+    return '<span style="background:' + c[0] + ';color:' + c[1] + ';border-radius:999px;padding:1px 8px;font-size:11px;font-weight:800">' + escapeHtml(e) + '</span>';
+  };
+  return '<div class="mva-tblwrap" style="max-height:66vh;overflow-x:auto"><table class="mva-tbl" style="font-size:13px;width:auto;min-width:0;table-layout:auto">' +
+    '<thead><tr><th>Pedido</th><th>Proveedor</th><th>Cargado</th><th>Embarque</th><th>Reingreso</th><th class="num">Ítems</th><th class="num">Unidades</th><th class="num">u$s</th><th>Estado</th><th>Códigos</th></tr></thead><tbody>' +
+    rows.map(function (r) {
+      var lleg = Number(r.llegadas) || 0, uni = Number(r.unidades) || 0;
+      return '<tr><td style="white-space:normal;max-width:190px"><b>' + escapeHtml(r.pedido_ref || "") + '</b>' +
+        (Number(r.anulados) > 0 ? '<br><span class="irc-muted">' + r.anulados + ' línea(s) anulada(s)</span>' : '') + '</td>' +
+        '<td style="white-space:nowrap">' + escapeHtml(r.proveedor || "") + '</td>' +
+        '<td style="white-space:nowrap">' + _f(r.creado) + (r.creado_por ? '<br><span class="irc-muted">' + escapeHtml(String(r.creado_por).replace(/@.*/, "")) + '</span>' : '') + '</td>' +
+        '<td style="white-space:nowrap">' + _f(r.embarque) + '</td><td style="white-space:nowrap">' + _f(r.reingreso) + '</td>' +
+        '<td class="num">' + (Number(r.items) || 0) + '</td>' +
+        '<td class="num">' + _n(uni) + (lleg > 0 ? '<br><span class="irc-muted">llegaron ' + _n(lleg) + '</span>' : '') + '</td>' +
+        '<td class="num">' + (Number(r.usd) > 0 ? 'u$s ' + _n(r.usd) : '—') + '</td>' +
+        '<td style="white-space:nowrap">' + _chip(r.estado || "") + '</td>' +
+        '<td style="white-space:normal;max-width:240px;font-size:11.5px;color:#475569">' + escapeHtml(r.codigos || "") + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
 }
 async function impHistAnular(id) {
   var m = prompt("Anular la recepción: se sacan del stock las cajas que entraron y el pedido vuelve a figurar en viaje.\n\n¿Por qué se anula?");
@@ -23080,9 +23169,20 @@ function _impHistRender() {
     if (!q) return true;
     return [r.cod_art, r.descripcion, r.proveedor, r.pedido_ref, r.por, r.nota].join(" ").toLowerCase().indexOf(q) >= 0;
   });
+  // v23.91 — dos vistas: los PEDIDOS y las RECEPCIONES. La búsqueda vale para las dos.
+  var esPed = (_stkPop.vista === "ped");
+  var sub = function (id, txt, n) {
+    var on = (esPed === (id === "ped"));
+    return '<button onclick="impHistVista(\'' + id + '\')" style="padding:5px 13px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-weight:800;font-size:12.5px;cursor:pointer">' + txt + ' <span style="opacity:.75">' + n + '</span></button>';
+  };
   var h = _impTabsHtml('hist') +
-    '<div class="stkpop-hint">Cada recepción hecha con <b>📥 RECIBIR</b>: cuándo, qué, cuánto, de qué empresa, dónde se guardó y quién la cargó. Lo marcado ⚠ se puso igual aunque el lugar tenía un conflicto de espacio.</div>' +
+    '<div style="display:flex;gap:7px;margin:0 0 9px;flex-wrap:wrap">' +
+      sub("ped", "🚢 Pedidos", (_stkPop.peds || []).length) + sub("rec", "📥 Recepciones", (_stkPop.rows || []).length) + '</div>' +
+    '<div class="stkpop-hint">' + (esPed
+      ? 'Lo que se le <b>pidió</b> a cada fábrica: un renglón por pedido, con cuándo se cargó, cuándo embarca, cuándo reingresa y cuánto llegó. Un pedido sin PI se agrupa por el día en que se cargó.'
+      : 'Cada recepción hecha con <b>📥 RECIBIR</b>: cuándo, qué, cuánto, de qué empresa, dónde se guardó y quién la cargó. Lo marcado ⚠ se puso igual aunque el lugar tenía un conflicto de espacio.') + '</div>' +
     '<input type="search" placeholder="Buscar código, proveedor, pedido o persona" value="' + escapeHtml(_stkPop.q || "") + '" oninput="impHistBuscar(this.value)" style="height:36px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 10px;font-size:14px;width:min(420px,100%);margin:0 0 10px">';
+  if (esPed) { body.innerHTML = h + _impHistPedidosHtml(); return; }
   if (_stkPop.err) h += '<div class="stkpop-empty">No se pudo leer el historial: ' + escapeHtml(_stkPop.err) + '</div>';
   else if (!rows.length) h += '<div class="stkpop-empty">' + (q ? 'Nada coincide con la búsqueda.' : 'Todavía no hay recepciones cargadas con 📥 RECIBIR.') + '</div>';
   else {

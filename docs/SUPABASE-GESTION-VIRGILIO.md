@@ -30124,6 +30124,9 @@ bloques y borde grueso alrededor de cada uno (banda + encabezado + datos); Opera
 tres de horas del día llevan el encabezado en las dos filas, como la celda combinada de la
 planilla. El margen se centra solo. Verificado con el 25/09 (200, mismos números).
 
+**v23.92 (edge v26):** la banda de *Total x Día* lleva la unidad debajo, **(M3)**, igual que
+*Ritmo (M3 x Hs)* y que la pantalla. Verificado con el 25/09 (200, 3 operarios).
+
 **Luis, 2026-09-28**, con la planilla del 25/09: *"arma el pdf del modulo de arriba de esta forma"*
 · *"hs no prod deberian ser todas las tareas que no sean hs prod"*.
 
@@ -30312,3 +30315,32 @@ otro proveedor. Ahora es `o.mesesArt`, por artículo.
 MOQ sirviendo un MOQ distinto desde la vista, el desglose de 2 columnas y la cascada de
 derechos con su promedio ponderado) — verificado que **falla** contra el `index.html` anterior.
 `sql/gv_imp_moq_derechos_v2390.sql`.
+
+---
+
+## §3.v2391 — v23.91: `gv_imp_pedidos_historial` — la solapa «Historial» muestra también los pedidos — 2026-09-29
+
+Luis: *"historial de recepción debería pasar a ser «Historial» y mostrar recepción y pedidos"*.
+
+Lo recibido ya lo daba `gv_imp_recepcion_historial`. Lo **pedido** sólo existía por artículo
+(los baches, uno por código), así que no había forma de ver un pedido entero.
+
+`gv_imp_pedidos_historial(p_dias)` devuelve un renglón por **(pedido, proveedor)**: cuándo se
+cargó y quién, embarque, reingreso, ítems, unidades, cuánto llegó, u$s (unidades × FOB del
+maestro), los códigos y el estado del grupo — *en curso* si queda alguna línea abierta, *llegado*
+si no y alguna llegó, *anulado* si están todas anuladas. Las anuladas no suman unidades ni u$s,
+pero se cuentan aparte.
+
+⚠ **El pedido sin PI se agrupa por su DÍA de carga**, o todos los viejos caían en un renglón
+único. La clave se arma en un subselect porque un agregado no puede ir adentro del `GROUP BY`
+(error 42803, que salió en el primer intento).
+
+Al 29/09 devuelve **13 pedidos**: 9 en curso (el mayor, PI OL-10139 de Ownland, 16 ítems y
+u$s 49.291), 3 llegados y 1 anulado.
+
+`security definer` + `grant execute` a `anon`: la solapa la abre el supervisor desde el panel,
+pero la lectura no expone nada que no esté ya en la pantalla de En curso.
+
+**Tests:** `tests/imp-hist-pedidos.cjs` (corre la solapa: el nombre nuevo, las dos vistas, lo que
+muestra cada una y que la búsqueda filtra las dos) — verificado que **falla** contra el
+`index.html` anterior. `sql/gv_imp_pedidos_historial_v2391.sql`.

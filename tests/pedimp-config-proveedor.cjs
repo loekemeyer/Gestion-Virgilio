@@ -133,7 +133,37 @@ const CFG_NAC = [{ meses_objetivo: 10, derechos_pct: 0.25, ntl_pct: 0.05, iva_pc
   if (!c) fail("(f) no se llamó a gv_imp_codigo_proveedor");
   else if (c.body.p_cod !== "231" || c.body.p_proveedor !== null) fail("(f) sacar un código mandó: " + JSON.stringify(c.body));
 
+  // ── (G) v23.91 — el ⚙ del proveedor tiene DOS pestañas; los generales salieron a su
+  //        propio botón ("no entiendo por qué hay un general ahí y qué modifica esos") ──
+  await p.evaluate(() => pedImpCfgAbrir(encodeURIComponent("Kangli")));
+  await p.waitForFunction(() => !!document.getElementById("impCfgOv"));
+  const tabs = await p.evaluate(() => [...document.querySelectorAll("#impCfgOv button")]
+    .map(x => x.textContent.trim()).filter(t => ["Parámetros", "Códigos", "Generales"].indexOf(t) >= 0));
+  if (tabs.join() !== "Parámetros,Códigos") fail("(G) las pestañas del proveedor son: " + tabs.join(" | "));
+  await p.evaluate(() => pedImpCfgGralAbrir());
+  await p.waitForFunction(() => !!document.getElementById("impCfgGMeses"));
+  const gral = await p.evaluate(() => ({
+    titulo: (document.querySelector("#impCfgOv div") || {}).textContent || "",
+    tabs: [...document.querySelectorAll("#impCfgOv button")].map(x => x.textContent.trim()).filter(t => ["Parámetros", "Códigos"].indexOf(t) >= 0),
+    moq: !!document.getElementById("impCfgGMoq")
+  }));
+  if (gral.tabs.length) fail("(G) el pop-up de generales no lleva las pestañas del proveedor: " + gral.tabs.join(" | "));
+  if (!/generales/i.test(gral.titulo)) fail("(G) el título no dice que son los generales: " + gral.titulo.slice(0, 60));
+  if (!gral.moq) fail("(G) faltan los campos generales (MOQ)");
+
+  // ── (H) v23.91 — sacar un código PIDE CONFIRMACIÓN; si se cancela, no escribe ──────
+  await p.evaluate(() => pedImpCfgAbrir(encodeURIComponent("Frontier")));
+  await p.waitForFunction(() => !!document.getElementById("impCfgOv"));
+  await p.evaluate(() => pedImpCfgTab("cods"));
+  await p.waitForFunction(() => /Frontier/.test(document.getElementById("impCfgOv").innerHTML));
+  const antes = rpc.filter(x => x.fn === "gv_imp_codigo_proveedor").length;
+  await p.evaluate(() => { window.confirm = () => false; return pedImpCfgSacar(encodeURIComponent("587C")); });
+  if (rpc.filter(x => x.fn === "gv_imp_codigo_proveedor").length !== antes) fail("(H) cancelando la confirmación igual sacó el código");
+  await p.evaluate(() => { window.confirm = () => true; return pedImpCfgSacar(encodeURIComponent("587C")); });
+  const sac = rpc.filter(x => x.fn === "gv_imp_codigo_proveedor").pop();
+  if (!sac || sac.body.p_cod !== "587C" || sac.body.p_proveedor !== null) fail("(H) confirmando no sacó el código: " + JSON.stringify(sac && sac.body));
+
   if (errs.length) fail("errores de página: " + errs.join(" | "));
   await b.close();
-  if (!process.exitCode) console.log("pedimp-config-proveedor: OK — ⚙ por proveedor · la config sale de la base · % en tanto por uno · vacío = heredado · sacar código no borra");
+  if (!process.exitCode) console.log("pedimp-config-proveedor: OK — ⚙ por proveedor · config desde la base · % en tanto por uno · vacío = heredado · 2 pestañas + generales aparte · ✕ con confirmación");
 })();

@@ -3788,6 +3788,37 @@ fórmula de cada renglón se abre al tocarlo. El % viene YA en el nombre, armado
 · `select count(*), count(derechos_pct) from public.gv_imp_articulo_cfg;`
 · `node tests/pedimp-moq-proy.cjs`. `sql/gv_imp_moq_derechos_v2390.sql`.
 
+### ⚠ v23.91 (Luis, 29/09): el desglose es un POP-UP · el ⚙ del proveedor son 2 pestañas · «Historial» = pedidos + recepciones
+
+1. **El desglose salió del chip.** Adentro lo hacía crecer y empujaba la tabla; con varios
+   proveedores abiertos la pantalla era ilegible. El chip volvió a una línea con «ver desglose»
+   → **`pedImpDesgPop(prov, lado)`**. La lógica de expandir **no cambió**: sigue habiendo un
+   `<details>` por concepto, ahora dentro del pop-up. Los datos para rearmarlo quedan en
+   **`_pedImpDesgData`**, declarado junto a `_pedImpDesgAb` — más abajo quedaba en zona muerta
+   para `_pedImpBandaHtml` y el test del bloque puro no lo veía.
+2. **El ⚙ del proveedor tiene SÓLO «Parámetros» y «Códigos»** (Luis: *"no entiendo por qué hay
+   un general ahí y qué modifica esos"*). Los generales pasaron a **⚙ Generales**, un botón de
+   la barra de nacionalización del módulo: es lo que vale para **todos**, así que no puede vivir
+   adentro del pop-up de **uno**. Es el mismo `_impCfgRender` con `prov` vacío.
+3. **El ✕ de sacar un código es chico y pide confirmación** (`pedImpCfgSacar`): está al lado del
+   input de derechos y toca el maestro. El cartel aclara que el artículo **no se borra**.
+4. **La solapa «📜 Historial recepción» es «📜 Historial»** y tiene dos vistas: **🚢 Pedidos**
+   (`gv_imp_pedidos_historial`: un renglón por pedido y proveedor, con lo pedido, lo llegado, el
+   embarque, el reingreso y el estado) y **📥 Recepciones** (lo de siempre). Arranca en
+   Recepciones, que es lo que la solapa mostraba antes. La búsqueda vale para las dos.
+
+⚠ **El pedido sin PI se agrupa por su DÍA de carga.** Son los baches viejos, anteriores al
+campo; sin eso todos caían en un renglón único. La clave se arma en un subselect: un agregado
+no puede ir adentro del `GROUP BY` (42803).
+
+⚠ **Dos tests quedaron viejos con esto y se actualizaron en el mismo commit**, que es la regla:
+`impo-nacionalizacion` medía los `<details class="pedimp-desg"` de la banda (ahora mide que la
+banda NO los lleve, que los dos chips abran el pop-up y que el contenido siga completo) e
+`imp-recibir` buscaba el texto «Historial recepción».
+
+**Chequeo:** `node tests/imp-hist-pedidos.cjs` · `node tests/pedimp-config-proveedor.cjs` ·
+`select * from public.gv_imp_pedidos_historial(400);`. `sql/gv_imp_pedidos_historial_v2391.sql`.
+
 ## ⚠ REGLA (Luis, 2026-09-29, v23.86): se arma POR CAMIÓN — y a las 15:00 la TV dice si llegan
 
 - **Orden de armado = `gv_monitor_tanda_camion.orden_camion`**: por día, 1° el camión con más m³, Retira al final.
