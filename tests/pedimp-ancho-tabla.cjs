@@ -65,7 +65,7 @@ const ITEMS = [it("AAA", { fobUni: 90 }), it("BBB", { fobUni: 9 })];
     };
   });
 
-  if (m.cols !== 12) fail("esperaba 12 columnas y hay " + m.cols);
+  if (m.cols !== 13) fail("esperaba 13 columnas (v24.73: En camino y A pedir separadas) y hay " + m.cols);
   if (m.sinWidth) fail("quedan " + m.sinWidth + " columna(s) sin width en el <colgroup>: se comen el sobrante de la tarjeta");
   if (m.desc > 280) fail("Descripción se está comiendo el sobrante: " + m.desc + "px (el hueco muerto que reclamó Luis)");
   if (m.card - m.tabla > 60) fail("la tarjeta (" + m.card + "px) es mucho más ancha que la tabla (" + m.tabla + "px): queda espacio muerto a la derecha");
