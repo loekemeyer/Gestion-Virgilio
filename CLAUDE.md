@@ -6529,7 +6529,7 @@ página crea 2 pedidos). Lo que no hay sale como faltante.
 ⚠ Lo ya diferido antes del cambio (16 pedidos) sigue partido: borrar esas filas cambiaría el corte
 de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (en `pagina-LK-copia`).
 
-## ⚠ REGLA (Thomas, 2026-09-30, v25.02): el INSUMO importado no tiene empresa y se pide para 12M
+## ⚠ REGLA (Thomas, 2026-09-30, v25.4): el INSUMO importado no tiene empresa y se pide para 12M
 
 - **Insumo** = parte de `vista_importados_partes` cuyo propio código NO está entre los terminados que la usan
   (1000900, 505C, 523C, 587C, 1546903; **590E no**: se vende). `esInsumo` en `ocgFetchImportados`.
