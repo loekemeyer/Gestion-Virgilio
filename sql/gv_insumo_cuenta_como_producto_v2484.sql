@@ -28,3 +28,14 @@ insert into public."Importados_Stock_Parte" (terminado, parte, parte_x_caja) val
 -- delete from public."GV_Importados_Insumo_Map" where insumo_cod = '323ES In';
 -- delete from public."Insumos_Factores" where cod_art = '323ES In';
 -- delete from public."Insumos" where cod = '323ES In';
+
+-- ===== v24.89 (Luis, 30/09): APLICADO =====
+-- g) todo insumo es 'Mixto': backup zz_backups."GV_Backup_MovStock_insumos_empresa_20260930" (12 filas, 7 códigos:
+--    035E, 102E, 440E, 523C, 584E, 590E, 599ES; totales por código sin cambio, el 584E partido LK/Mixto queda en 0)
+--    update public."Movimientos_Stock" set empresa='Mixto' where deposito='insumos' and empresa is distinct from 'Mixto';
+--    y gv_insumo_unidad_base (BEFORE INSERT, deposito insumos) fuerza new.empresa := 'Mixto'. Probado: null y LK entran Mixto.
+--    Rollback: update ... set empresa = b.empresa from zz_backups."GV_Backup_MovStock_insumos_empresa_20260930" b where id = b.id;
+-- h) ETA vencida ACTIVADA: cron gv-importados-eta-vencida '7 3 * * *' (00:07 ART). Primera corrida 30/09: 20 pedidos
+--    -> 07/10 (GV_Importados_ETA_Log). La fecha vive en GV_Importados_Baches.fecha_reingreso -> Importados.reingreso_est
+--    (gv_importados_resync): de ahí leen el módulo de Importados y gv_reingresos_feed -> reingreso_cache de LK (cada 5 min).
+--    Rollback: select cron.unschedule('gv-importados-eta-vencida');

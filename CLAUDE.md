@@ -3794,6 +3794,10 @@ no pide UxB ni cajas). **`Importados_Stock_Parte`** = «el stock de esta parte c
 con **`parte_x_caja`** (u de la parte por caja; NULL = 1 por unidad): 12 u de `323ES In` = 1 caja de 323E **y** de 838E.
 Es POSIBILIDAD de armar: sólo apaga el cartel «Sin stock» de `gv_reingresos_feed` (sólo importados). Centinela 255.
 `sql/gv_insumo_cuenta_como_producto_v2484.sql`.
+**v24.89 (Luis, 30/09):** todo movimiento de **insumos** es empresa **`Mixto`** (lo fuerza `gv_insumo_unidad_base`). Y un
+pedido en viaje cuya **fecha de reingreso ya pasó** sin recibirse corre solo a **hoy + 7** (`gv_importados_eta_vencida`,
+cron `gv-importados-eta-vencida` 00:07 ART, log `GV_Importados_ETA_Log`): una sola fuente, `GV_Importados_Baches` →
+`Importados.reingreso_est` → módulo de Importados y cartel de las páginas.
 
 **Desglose de la tarjeta del proveedor (Luis, v23.75):** los dos chips de la banda se expanden. Izq: consumo/mes =
 Σ proy u/mes × FOB por artículo, y meses = (mínimo − a pedir hoy) ÷ consumo. Der: CIF y cada línea de lo no
