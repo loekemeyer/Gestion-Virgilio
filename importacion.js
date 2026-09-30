@@ -1274,6 +1274,39 @@ function _pedImpMesesCell(it) {
   const bajo = m < _PEDIMP_MESES_ALERTA;
   return '<td class="num pedimp-meses" title="(' + stk + ' u stock + ' + cam + ' u en camino) ÷ ' + proy + ' u/mes' + (cam > 0 ? ' · sólo stock: ' + _pedImpMesesFmt(stk / proy) + ' meses' : '') + '"' + (bajo ? ' style="color:#b91c1c;font-weight:800;background:#fef2f2"' : '') + '>' + (bajo ? '⚠ ' : '') + _pedImpMesesFmt(m) + '</td>';
 }
+/* v24.75 (Thomas) — QUIEBRE ANTES DE QUE LLEGUE LA IMPORTACIÓN. Con el stock REAL de hoy en
+   Argentina (sin lo en camino) le quedan < 4 meses y se termina ANTES de la fecha de llegada del
+   pedido en viaje (Importados.reingreso_est). Sin importación en camino, o en camino sin fecha,
+   también avisa: no hay nada que llegue a tiempo. Sin proyección no se calcula (null).
+   Devuelve { quiebra: 'aaaa-mm-dd', llega: 'aaaa-mm-dd'|'' , dias: días sin stock | null }. */
+function _pedImpQuiebre(it, hoyMs) {
+  const proy = Number(it && it.proyUni) || 0; if (!(proy > 0)) return null;
+  const stk = Math.max(0, Number(it.stockUni) || 0);
+  const mesesReal = stk / proy;
+  if (!(mesesReal < _PEDIMP_MESES_ALERTA)) return null;
+  const hoy = hoyMs != null ? hoyMs : (Date.now() - 3 * 3600000);
+  const dQ = Math.floor(mesesReal * 30.4);
+  const fQ = new Date(hoy + dQ * 86400000).toISOString().slice(0, 10);
+  const cam = Math.max(0, Number(it.enCurso) || 0);
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(it.reingresoEst || ""));
+  if (cam > 0 && m) {
+    const fL = m[1] + "-" + m[2] + "-" + m[3];
+    if (fL <= fQ) return null;   // llega antes de quebrar
+    return { quiebra: fQ, llega: fL, dias: Math.round((Date.parse(fL) - Date.parse(fQ)) / 86400000) };
+  }
+  return { quiebra: fQ, llega: "", dias: null, sinCamino: !(cam > 0) };
+}
+function _pedImpQuiebreChip(it) {
+  const q = _pedImpQuiebre(it); if (!q) return "";
+  const fq = _pedImpDdmm(q.quiebra);
+  const txt = q.llega ? ('⛔ quiebra ' + fq + ' · llega ' + _pedImpDdmm(q.llega)) : ('⛔ quiebra ' + fq + (q.sinCamino ? ' · nada en camino' : ' · llegada s/f'));
+  const tip = 'Con el stock real de hoy (' + Math.max(0, Number(it.stockUni) || 0) + ' u ÷ ' + it.proyUni + ' u/mes) se termina el ' + fq +
+    (q.llega ? ' y la importación llega el ' + _pedImpDdmm(q.llega) + ': ' + q.dias + ' días sin stock.' : (q.sinCamino ? ' y no hay importación en camino.' : ' y la importación en camino no tiene fecha de llegada.')) + ' Ver si se puede hacer algo (adelantar, avión, reemplazo).';
+  return '<div class="pedimp-quiebre" style="margin-top:2px"><span style="display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:#dc2626;border-radius:6px;padding:1px 5px;line-height:1.25" title="' + escapeHtml(tip) + '">' + txt + (q.dias ? ' · ' + q.dias + 'd' : '') + '</span></div>';
+}
+function _pedImpQuiebreBadge(n) {
+  return n > 0 ? ' <span class="pedimp-quiebre-n" style="font-size:11px;font-weight:800;color:#fff;background:#7f1d1d;border-radius:999px;padding:0 6px" title="' + n + ' artículo(s) quiebran antes de que llegue la importación (stock real &lt; ' + _PEDIMP_MESES_ALERTA + ' meses)">⛔' + n + '</span>' : '';
+}
 function _pedImpAlertaBadge(n) {
   return n > 0 ? ' <span class="pedimp-alerta" style="font-size:11px;font-weight:800;color:#fff;background:#dc2626;border-radius:999px;padding:0 6px" title="' + n + ' con &lt; ' + _PEDIMP_MESES_ALERTA + ' meses de stock (stock + en camino)">⚠' + n + '</span>' : '';
 }
@@ -1364,7 +1397,7 @@ function _pedImpRender() {
   if (provAll.length > 1) {
     h += '<div class="pedimp-provs" style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;align-items:center;padding-bottom:2px">' +
       '<button style="' + _chip(!provSel) + '" onclick="pedImpSetProv(\'\')">Todos</button>' +
-      provAll.map(function (p) { return '<button style="' + _chip(provSel === p) + '" onclick="pedImpSetProv(\'' + encodeURIComponent(p) + '\')">' + escapeHtml(p) + _pedImpAlertaBadge(allItems.filter(function (it) { const m = _pedImpMesesStock(it); return (it.prov || "(sin proveedor)") === p && m != null && m < _PEDIMP_MESES_ALERTA; }).length) + '</button>'; }).join('') +
+      provAll.map(function (p) { return '<button style="' + _chip(provSel === p) + '" onclick="pedImpSetProv(\'' + encodeURIComponent(p) + '\')">' + escapeHtml(p) + _pedImpAlertaBadge(allItems.filter(function (it) { const m = _pedImpMesesStock(it); return (it.prov || "(sin proveedor)") === p && m != null && m < _PEDIMP_MESES_ALERTA; }).length) + _pedImpQuiebreBadge(allItems.filter(function (it) { return (it.prov || "(sin proveedor)") === p && _pedImpQuiebre(it); }).length) + '</button>'; }).join('') +
       '</div>';
     if (provSel) h += '<div style="font-size:11.5px;color:' + (_buscando ? '#0f766e' : '#64748b') + ';margin:-4px 0 8px">' + (_buscando ? '· mientras buscás se miran <b>todos</b> los proveedores' : '· se muestran <b>todos</b> los artículos de ' + escapeHtml(provSel) + ', pidan o no') + '</div>';
   }
@@ -1430,7 +1463,7 @@ function _pedImpRender() {
     const _nBajo = arr.filter(function (it) { const m = _pedImpMesesStock(it); return m != null && m < _PEDIMP_MESES_ALERTA; }).length;
     h += '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0">' +
-      '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + _pedImpAlertaBadge(_nBajo) + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span class="pedimp-fob" style="color:#065f46;font-size:16px;font-weight:800;white-space:nowrap" title="FOB del pedido de este proveedor">FOB u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') +
+      '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + _pedImpAlertaBadge(_nBajo) + _pedImpQuiebreBadge(arr.filter(function (it) { return _pedImpQuiebre(it); }).length) + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span class="pedimp-fob" style="color:#065f46;font-size:16px;font-weight:800;white-space:nowrap" title="FOB del pedido de este proveedor">FOB u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') +
         (totCamUsd > 0 ? ' · <span class="pedimp-camino-fob" style="color:#0369a1;font-weight:800;white-space:nowrap" title="u$s totales de ' + nCam + ' pedido(s) en viaje de este proveedor (los mismos de 🚢 En curso)">en viaje FOB ' + _usd0(totCamUsd) + '</span>' : '') +
         // v24.59 (Thomas) — el consumo por mes (proyección × FOB) vuelve acá, sin el mínimo
         (_burnN > 0 ? ' · <span class="pedimp-consumo" style="color:#b45309;font-weight:700" title="Consumo por mes: proyección u/mes × FOB de cada artículo">consumo ' + _usd0(_burnN) + '/mes</span>' : '') + '</div></div>' +
@@ -1512,7 +1545,7 @@ function _pedImpRender() {
       // código volvió a ser texto. Tocar el código para ver una proyección no se adivina.
       const _proyCaj = (Number(it.uxc) > 0) ? (Number(it.proyUni) || 0) / Number(it.uxc) : 0;
       const _proyCell = '<td class="num imp2 pedimp-proy" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td>';
-      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td>' + _proyCell + '<td class="num">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num">' + _pedImpEnCaminoHtml(it) + '</td><td class="num pedimp-apedir">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + '<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:8px">' + _reingWebSwitchHtml(it.cod, it) + '</div></td><td>' + actHtml + '</td></tr>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span>' + _pedImpQuiebreChip(it) + '</td>' + _proyCell + '<td class="num">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num">' + _pedImpEnCaminoHtml(it) + '</td><td class="num pedimp-apedir">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + '<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:8px">' + _reingWebSwitchHtml(it.cod, it) + '</div></td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
