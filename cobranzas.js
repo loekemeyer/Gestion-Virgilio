@@ -296,7 +296,7 @@ async function openCobranzas(tab) {
 }
 function cbzClose() { var ov = document.getElementById("cbzOv"); if (ov) ov.style.display = "none"; }
 /* v24.41 (Luis): cambiar de pestaña NO cierra el cliente abierto: al volver a «Clientes» sigue ahí */
-function cbzSetTab(t) { _cbz.tab = t; cbzRender(); if (t === "escalones") cbzCargarEscalones(); }
+function cbzSetTab(t) { _cbz.tab = t; cbzRender(); if (t === "escalones") { cbzCargarEscalones(); cbzCargarCoronitas(); } }
 
 /* el badge rojo de «Conciliación» = movimientos del extracto que esperan a una persona (v24.41) */
 function cbzTabsPintar() {
@@ -786,6 +786,67 @@ async function cbzCargarEscalones() {
     }
   } catch (_e) {}
   if (_cbz.tab === "escalones") cbzRender();
+  cbzCargarCoronitas();
+}
+/* ---- coronitas (v24.71, Luis) --------------------------------------------
+   "Tener coronita" (Thomas) = trato preferencial de plazo: el cliente cobra el descuento de CONTADO
+   (−25 %) aunque pague después de los 14 días, hasta su plazo propio (20, 30 o 60 días).
+   Vive en cobranzas_excepciones (se cruza por CUIT); la lee el agente de cobranzas. Lectura propia,
+   con su propio catch: si falla, la escala se sigue viendo y la lista lo DICE (no queda vacía). */
+async function cbzCargarCoronitas() {
+  if (_cbz.coronitas || _cbz.coronitasCargando) return;
+  _cbz.coronitasCargando = true;
+  try {
+    var r = await sb.from("cobranzas_excepciones")
+      .select("id,deudor_id,cod_cliente,escalon,dias,dto,vigente_desde,vigente_hasta,autorizado_por,motivo").limit(2000);
+    if (r.error) throw r.error;
+    _cbz.coronitas = (r.data || []).map(function (x) {
+      var m = String(x.motivo || ""), mm = m.match(/:\s*(.+?)\s*·\s*(.+)$/);
+      var nom = mm ? mm[1] : (m.match(/\(([^)]+)\)/) || [])[1] || "";
+      return { cuit: x.deudor_id || "", cod: x.cod_cliente || "", nombre: nom || x.cod_cliente || "—",
+               dias: _cbzNum(x.dias), dto: _cbzNum(x.dto), planilla: mm ? mm[2] : m,
+               desde: x.vigente_desde, hasta: x.vigente_hasta, aut: x.autorizado_por || "" };
+    }).sort(function (a, b) { return (b.dias - a.dias) || a.nombre.localeCompare(b.nombre, "es"); });
+    _cbz.coronitasErr = null;
+  } catch (e) { _cbz.coronitasErr = (e && e.message) || String(e); }
+  _cbz.coronitasCargando = false;
+  if (_cbz.tab === "escalones") cbzRender();
+}
+function cbzCoronitasFiltrar(v) {
+  _cbz.coronitasQ = v || "";
+  var b = document.getElementById("cbzCorBody"); if (b) b.innerHTML = _cbzCoronitasFilas();
+}
+function _cbzCoronitasFilas() {
+  var q = String(_cbz.coronitasQ || "").toLowerCase().split(/\s+/).filter(Boolean);
+  var rows = (_cbz.coronitas || []).filter(function (c) {
+    var t = (c.nombre + " " + c.cod + " " + c.cuit).toLowerCase();
+    return q.every(function (w) { return t.indexOf(w) >= 0; });
+  });
+  if (!rows.length) return '<tr><td colspan="6" style="color:#64748b;">Ningún cliente con coronita coincide.</td></tr>';
+  return rows.map(function (c) {
+    var fd = c.desde ? String(c.desde).slice(8, 10) + "/" + String(c.desde).slice(5, 7) + "/" + String(c.desde).slice(2, 4) : "—";
+    return '<tr><td class="l"><b>' + _cbzEsc(c.nombre) + "</b></td><td>" + _cbzEsc(c.cod) + "</td><td>" + _cbzEsc(c.cuit || "—") +
+      "</td><td><b>" + _cbzPlata(c.dias) + '</b></td><td class="cbz-verde"><b>−' + _cbzPlata(c.dto * 100, 0) + " %</b></td><td>" + fd +
+      (c.hasta ? " → " + _cbzEsc(c.hasta) : "") + "</td></tr>";
+  }).join("");
+}
+function cbzCoronitasHtml() {
+  if (_cbz.coronitasErr) return '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-nota" style="color:#b91c1c;">👑 No se pudo leer la lista de coronitas (' + _cbzEsc(_cbz.coronitasErr) + "). No es que no haya.</div></div>";
+  if (!_cbz.coronitas) return '<div class="cbz-panel" style="margin-top:12px;"><div class="cbz-nota">👑 Cargando coronitas…</div></div>';
+  var cnt = {}; _cbz.coronitas.forEach(function (c) { cnt[c.dias] = (cnt[c.dias] || 0) + 1; });
+  var res = Object.keys(cnt).map(Number).sort(function (a, b) { return b - a; })
+    .map(function (d) { return "<b>" + cnt[d] + "</b> a " + d + " días"; }).join(" · ");
+  return '<div class="cbz-panel" style="margin-top:12px;">' +
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;">' +
+      '<b style="font-size:15px;">👑 Coronitas · ' + _cbz.coronitas.length + " clientes</b>" +
+      '<span style="font-size:12.5px;color:#475569;">' + res + "</span>" +
+      '<input id="cbzCorQ" placeholder="Buscar cliente, código o CUIT" value="' + _cbzEsc(_cbz.coronitasQ || "") +
+        '" oninput="cbzCoronitasFiltrar(this.value)" style="margin-left:auto;padding:5px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px;width:240px;max-width:100%;box-sizing:border-box;">' +
+    "</div>" +
+    '<table class="cbz-t"><thead><tr><th style="text-align:left;">Cliente</th><th>Cód</th><th>CUIT</th><th>Contado<br>hasta (días)</th><th>Dto</th><th>Desde</th></tr></thead>' +
+    '<tbody id="cbzCorBody">' + _cbzCoronitasFilas() + "</tbody></table>" +
+    '<div class="cbz-nota">“Tener coronita” = cobra el descuento de <b>contado</b> aunque pague después de los 14 días, hasta su plazo. ' +
+    'Vive en <code>cobranzas_excepciones</code> (autoriza Thomas) y se cruza por CUIT del padrón.</div></div>';
 }
 /* dias = en cuántos días se cobró; marca el escalón que le corresponde */
 function cbzEscalaHtml(importe, dias) {
@@ -808,7 +869,8 @@ function cbzEscalonesHtml() {
     es.map(function (e) {
       return '<tr><td class="l"><b>' + _cbzEsc(e.label) + "</b></td><td>" + _cbzPlata(e.dias) + '</td><td class="cbz-verde"><b>−' + _cbzPlata(e.dto * 100, 0) + " %</b></td></tr>";
     }).join("") +
-    '</tbody></table><div class="cbz-nota">Vive en <code>cobranzas_escalones</code>: cambiarla es un <code>update</code>, no un deploy. Las excepciones por cliente (las “coronitas”) están en <code>cobranzas_excepciones</code> y se cruzan por CUIT del padrón.</div></div>';
+    '</tbody></table><div class="cbz-nota">Vive en <code>cobranzas_escalones</code>: cambiarla es un <code>update</code>, no un deploy.</div></div>' +
+    cbzCoronitasHtml();
 }
 
 /* ============================ RESUMEN (v24.41) ============================
@@ -1711,6 +1773,7 @@ window.cbzSub = cbzSub;
 window.cbzFila = cbzFila;
 window.cbzConsolidar = cbzConsolidar;
 window.cbzEscalaHtml = cbzEscalaHtml;
+window.cbzCoronitasFiltrar = cbzCoronitasFiltrar;
 window.cbzDeudaHtml = cbzDeudaHtml;
 window.cbzPagosHtml = cbzPagosHtml;
 window.cbzEntregasHtml = cbzEntregasHtml;

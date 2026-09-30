@@ -491,6 +491,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== cbz-ficha-cliente (v23.98: submodulo Cobranzas - busqueda de cliente y ficha con deuda consolidada LK+CH por CUIT) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cbz-ficha-cliente.cjs
+echo "== cbz-coronitas (v24.72: Cobranzas - Escala muestra la lista de coronitas de cobranzas_excepciones) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cbz-coronitas.cjs
 
 echo "== cbz-conciliacion (v24.32: pestana Conciliacion - cuanto de cada extracto quedo identificado y que falta para conciliar solo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cbz-conciliacion.cjs

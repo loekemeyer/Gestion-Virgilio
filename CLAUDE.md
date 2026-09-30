@@ -5316,6 +5316,24 @@ otra** si la que viene no tiene saldo en esa tanda y la otra sí. No se tocó
 **sólo para la empresa nueva**: la vieja hay que refrescarla aparte (un `update` sin cambios sobre
 otro movimiento de esa empresa).
 
+## ⚠ CONCEPTO (Luis, 2026-09-30, v24.72): «TENER CORONITA» = plazo preferencial dentro del descuento de CONTADO
+
+**Luis:** *"trato preferencial de algunos clientes en términos de plazos para cobrarles que los
+consideramos dentro del descuento de contado … internamente Thomy les dice que «tienen coronita»"*.
+
+> **Un cliente con coronita cobra el −25 % de CONTADO aunque pague después de los 14 días de la
+> escala, hasta SU plazo** (20, 30 o 60 días). No es otro escalón: es el contado estirado.
+
+- **Dónde vive:** `public.cobranzas_excepciones` (una fila por cliente; `deudor_id` = **CUIT**,
+  `cod_cliente` = `LK 288 / CH 271`, `escalon='contado'`, `dias` = plazo, `dto` = 0,25,
+  `autorizado_por` = Thomas). Se cruza **por CUIT del padrón**, no de la factura (v23.18). La lee el
+  agente de cobranzas (`gv_cobranza_imputar`) para no marcar como «descontado de más» a quien tiene coronita.
+- **Dónde se ve:** Cobranzas → **📐 Escala**, debajo de la escala, con buscador (`cbzCoronitasHtml`,
+  `cobranzas.js`). Al 30/09: **175 clientes** — 153 a 20 días, 3 a 30, 19 a 60 (los «30/60» de la
+  planilla quedaron en 60). Fuente: planilla de Thomas del 28/09 (el `motivo` guarda el texto original).
+- **Alta / cambio:** es un `insert`/`update` en esa tabla (lo autoriza Thomas), no un deploy.
+- `tests/cbz-coronitas.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-22, v21.15): pelar la L de LOS DOS LADOS es no matchear nunca
 
 Tercera pieza del agujero de la v21.12. **`reporte_agentes_equivalencia_facturar()`** —el aviso de
