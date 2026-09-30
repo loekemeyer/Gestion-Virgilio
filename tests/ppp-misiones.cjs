@@ -173,7 +173,7 @@ catch (_e) {
   if (a.cambia.web || !a.cambia.web2) fallos.push("A Programar: la provincia marcada está hardcodeada, no sigue la config");
   // el naranja en la tarjeta y que el chip esté enganchado al render
   if (!/apr-card\.mis\{/.test(html)) fallos.push("falta el CSS .apr-card.mis");
-  if (!/aprDestinoChip\(p\) \+ aprMisBadge\(p\)/.test(html)) fallos.push("la tarjeta de A Programar no pinta los chips");
+  if (!/aprDestinoChip\(p\) \+ (aprDirRealChip\(p\) \+ )?aprMisBadge\(p\)/.test(html)) fallos.push("la tarjeta de A Programar no pinta los chips");
   if (!/aprEsProvMarcada\(p\) \? ' mis' : ''/.test(html)) fallos.push("la tarjeta de A Programar no se pinta de naranja");
 
   // ── v20.62: el backend que resuelve el destino (candados sobre el SQL del repo) ────────

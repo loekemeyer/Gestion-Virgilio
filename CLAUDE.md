@@ -5342,6 +5342,30 @@ consideramos dentro del descuento de contado … internamente Thomy les dice que
 - **Alta / cambio:** es un `insert`/`update` en esa tabla (lo autoriza Thomas), no un deploy.
 - `tests/cbz-coronitas.cjs`.
 
+## ⚠ REGLA (Luis, 2026-09-30, v24.76): en lo que sale por EXPRESO se ve la DIRECCIÓN REAL — y la sucursal del Excel ISIS sale del PEDIDO
+
+**Luis:** *"que diga para los que se despachan en expreso la dirección de entrega real también en A
+programar y en Programación"*.
+
+> En la ficha de la página, **`direccion_entrega` es el GALPÓN del expreso** (Pergamino 2820, Juan B.
+> Justo 7594); la **sucursal real** del cliente es la **ETIQUETA** (`label`: "Chacabuco 228- Mendoza",
+> "Río Gall (25 de mayo)") + localidad y provincia. La zona de la PPP es la del galpón.
+
+- **Programación**: chip azul **📍** (`.pga-dreal`) con `gvDirRealTxt(sucursal, localidad, provincia)`.
+  Lo trae `gv_np_destino_lista`, que desde la v24.76 devuelve además `localidad_destino`, `sucursal` y
+  `es_expreso` (no se tocó `gv_np_destino`, que tiene centinela). Para una NP de ISIS la sucursal sale
+  del slot del padrón con esa localidad **sólo si es UNO**: dos sucursales en la misma ciudad (Multibazar
+  en Bariloche) no se adivinan.
+- **A Programar**: chip **📍** (`aprDirRealChip`) desde el feed (`direccion` = etiqueta, `localidad`).
+- **Es expreso** si trae galpón o nombre de expreso, o la NP dice `Exp.`, o la provincia no es CABA ni
+  Buenos Aires. Retira nunca.
+- ⚠ **El Excel ISIS buscaba la sucursal por cliente + fecha ±3 + ítems**, y con un código que estaba en
+  varios pedidos del mismo cliente elegía el primero: **LK 0179** (sólo 607E, Río Gallegos) salió
+  **«Brc Onelli»** (Bariloche) el 29/09. Hoy va primero por el **order_id** exacto de la NP web, y si la
+  heurística empata con sucursales distintas **deja la celda vacía**. Medido sobre 60 días de Excel: 142
+  NP web, 1 con sucursal equivocada y 6 sin sucursal.
+- `sql/gv_np_destino_dir_real_v2476.sql`, `tests/ppp-dir-real-expreso.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-22, v21.15): pelar la L de LOS DOS LADOS es no matchear nunca
 
 Tercera pieza del agujero de la v21.12. **`reporte_agentes_equivalencia_facturar()`** —el aviso de
