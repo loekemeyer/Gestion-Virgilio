@@ -50,10 +50,12 @@
       "mcp__github__actions_list",
       "mcp__github__actions_get",
       "mcp__github__get_job_logs",
-      "mcp__github__get_check_run"
+      "mcp__github__get_check_run",
+      "Bash(git push:*)",
+      "Bash(git merge:*)",
+      "Bash(git pull:*)"
     ],
     "ask": [
-      "Bash(git push:*)",
       "Bash(curl:*)",
       "Bash(wget:*)",
       "mcp__Supabase__apply_migration",

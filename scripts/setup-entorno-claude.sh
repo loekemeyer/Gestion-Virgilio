@@ -65,11 +65,12 @@ ALLOW = [
     "mcp__github__search_commits", "mcp__github__get_me",
     "mcp__github__actions_list", "mcp__github__actions_get",
     "mcp__github__get_job_logs", "mcp__github__get_check_run",
+    "Bash(git push:*)", "Bash(git merge:*)", "Bash(git pull:*)",
 ]
 ASK = [
-    # esto SI pregunta, una vez por comando y por sesion: es lo que sale
-    # para afuera (push) o toca la red a mano (curl). Regla del CLAUDE.md.
-    "Bash(git push:*)", "Bash(curl:*)", "Bash(wget:*)",
+    # esto SI pregunta: toca la red a mano (curl). El git push NO pregunta
+    # desde el 30/09 (Luis, D1): el push forzado sigue en DENY.
+    "Bash(curl:*)", "Bash(wget:*)",
 ]
 DENY = [
     "Bash(rm -rf:*)", "Bash(rm -fr:*)", "Bash(sudo rm:*)",
