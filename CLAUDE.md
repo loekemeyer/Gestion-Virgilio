@@ -6522,3 +6522,17 @@ página crea 2 pedidos). Lo que no hay sale como faltante.
 
 ⚠ Lo ya diferido antes del cambio (16 pedidos) sigue partido: borrar esas filas cambiaría el corte
 de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (en `pagina-LK-copia`).
+
+## ⚠ REGLA (Thomas, 2026-09-30, v25.01): el INSUMO importado no tiene empresa y se pide para 12M
+
+- **Insumo** = parte de `vista_importados_partes` cuyo propio código NO está entre los terminados que la usan
+  (1000900, 505C, 523C, 587C, 1546903; **590E no**: se vende). `esInsumo` en `ocgFetchImportados`.
+- **Sin empresa**: `_impPlantaVista` y `_pedImpEmpFoto` devuelven vacío. `Importados.marca` sigue en `LK` en la base.
+- **Objetivo = (meses del proveedor + 2) × proyección de los productos que lo usan** (`INSUMO_MESES_PRODUCTO`),
+  también en el tope del MOQ. Chip **«12M»** al lado del código.
+- **Tocar Stock** abre el desglose (`pedImpStockDesglose`): propio · cada insumo (`gv_importados_stock_insumos`) ·
+  parte · productos ya armados, y abajo los productos con su proyección. En un insumo, tocar Proy abre lo mismo.
+- **GV lee el inventario de GP2** (mismo proyecto, schema `GP2`) por **`gv_gp2_inventario`** (detalle) y
+  **`gv_gp2_stock_componente`** (total por componente), sólo lectura. Al 30/09: 1.137 filas, 5 con stock.
+  **No hay vínculo** entre el código importado (1000900) y el componente GP2 (D1 «Espiral Sacacorcho»?): no se adivina.
+  `sql/gv_gp2_inventario_v2501.sql`, `tests/pedimp-insumo-12m.cjs`.

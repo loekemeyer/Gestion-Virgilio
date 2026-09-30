@@ -530,6 +530,9 @@ async function pedImpSetMeses(provEnc, v) {
   }
 }
 function pedImpProyAbrir(codEnc, proyCajas) {
+  // v25.01 — un INSUMO no vende: su proyección es la de los productos que arma. Se abre ese desglose.
+  const _it = _pedImpItemPorClave(decodeURIComponent(codEnc || ""));
+  if (_it && _it.esInsumo) { pedImpStockDesglose(codEnc, "proy"); return; }
   // v23.95 (Luis: "sigue saliendo de importación cuando aprieto") — la proyección se dibuja en
   // SU PROPIO overlay, encima del módulo, que queda intacto abajo. Sin «volver»: se cierra y ya.
   _stkPopAlt = "impProyOv";
@@ -560,7 +563,7 @@ function pedImpProyAbrir(codEnc, proyCajas) {
 function _pedImpMoqCalc(it) {
   const prov = String((it && it.prov) || "").trim();
   const moq = _impProvNum(prov, "moq", _NAC_TASAS.moq);
-  const topeMeses = _impProvNum(prov, "moq_meses_max", _NAC_TASAS.moq_meses_max);
+  const topeMeses = _impProvNum(prov, "moq_meses_max", _NAC_TASAS.moq_meses_max) + ((it && it.esInsumo) ? INSUMO_MESES_PRODUCTO : 0);   // v25.01 — el insumo lleva sus 2 meses de producto también en el tope
   const pct = (Number(_NAC_TASAS.moq_pct) > 0 && Number(_NAC_TASAS.moq_pct) <= 1) ? Number(_NAC_TASAS.moq_pct) : 0.8;
   const div = (Number(it && it.uniMaster) > 0) ? Number(it.uniMaster) : (Number(it && it.uxc) > 0 ? Number(it.uxc) : 0);
   const mcBase = (it && it.aPedirCajas != null) ? Number(it.aPedirCajas) || 0 : 0;
@@ -802,6 +805,63 @@ function pedImpDesgPop(provEnc, lado) {
     '<button onclick="pedImpDesgCerrar()" style="background:#fff;color:#3730a3;border:0;border-radius:8px;padding:4px 11px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
     '<div style="padding:10px 14px 14px">' + cuerpo + '</div></div>';
 }
+/* v25.01 (Thomas, 30/09) — «12M»: el insumo se pide para 10 meses de insumo + 2 de producto. */
+function _pedImpInsumoChip(it) {
+  const mi = Number(it.meses) || 0, mp = Number(it.mesesProv) || 0;
+  return ' <span class="pedimp-12m" style="font-size:10.5px;font-weight:800;color:#fff;background:#0369a1;border-radius:999px;padding:1px 6px" title="INSUMO (no es de ninguna empresa): se pide para ' + mp + ' meses de insumo + ' + (mi - mp) + ' meses de producto armado = ' + mi + ' meses de la proyección de los productos que lo usan">' + mi + 'M</span>';
+}
+/* v25.01 (Thomas, 30/09: "si aprieto en stock se abra el desglose de qué es lo que está contando") —
+   el número de la columna Stock suma hasta cuatro fuentes; acá se ven una por una, con el detalle
+   por insumo (gv_importados_stock_insumos) y por producto armado (vista_importados_partes). */
+async function pedImpStockDesglose(keyEnc, foco) {
+  const it = _pedImpItemPorClave(decodeURIComponent(keyEnc || "")); if (!it) return;
+  const f = function (n) { return Math.round(Number(n) || 0).toLocaleString("es-AR"); };
+  let ov = document.getElementById("impStkDesgOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "impStkDesgOv";
+    ov.setAttribute("style", "position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:99998;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto");
+    ov.addEventListener("click", function (ev) { if (ev.target === ov) pedImpStockDesgCerrar(); });
+    document.body.appendChild(ov);
+  }
+  const pintar = function (insDet, insErr) {
+    const tr = function (a, b, c) { return '<tr><td style="text-align:left">' + a + '</td><td class="num">' + b + '</td><td style="text-align:left;color:#64748b;font-size:12px">' + (c || "") + '</td></tr>'; };
+    let h = '';
+    if (foco !== "proy") {
+      h += '<table class="mva-tbl" style="width:100%"><thead><tr><th style="text-align:left">Qué cuenta</th><th class="num">u</th><th style="text-align:left">De dónde</th></tr></thead><tbody>';
+      h += tr('Stock propio del artículo', f(it.stockPropioModulo), 'depósitos de Virgilio' + (it.uniPedidas > 0 ? ', ya descontadas ' + f(it.uniPedidas) + ' u de pedidos abiertos' : ''));
+      if (insErr) h += tr('Depósito insumos', f(it.stockInsU), '<span style="color:#b91c1c">no se pudo leer el detalle</span>');
+      else if (insDet && insDet.length) insDet.forEach(function (d) { if (Number(d.saldo) || Number(d.uni)) h += tr('🧰 Insumo ' + escapeHtml(d.insumo), f(d.uni), escapeHtml(f(d.saldo) + ' ' + (d.unidad || '') + (Number(d.factor) > 1 ? ' × ' + f(d.factor) : ''))); });
+      else h += tr('Depósito insumos', f(it.stockInsU), '');
+      if (it.stockTermU > 0) h += tr('🧩 Productos ya armados', f(it.stockTermU), 'stock de los terminados que usan ' + (it.esInsumo ? 'este insumo' : 'esta parte') + ' (detalle abajo)');
+      if (it.stockParteU > 0) h += tr('🔧 Parte ' + escapeHtml(it.stockParteCods || ''), f(it.stockParteU), 'el stock de la parte cuenta como stock de este artículo');
+      h += '</tbody><tfoot><tr><th style="text-align:left">Total</th><th class="num">' + f(it.stockUni) + '</th><th></th></tr></tfoot></table>';
+    }
+    const det = it.parteDet || [];
+    if (det.length) {
+      let tp = 0, ts = 0;
+      h += '<div style="margin-top:12px;font-weight:800">' + (it.esInsumo ? '🧩 Productos armados con este insumo' : '🧩 Terminados que usan esta parte') + '</div>';
+      h += '<table class="mva-tbl" style="width:100%"><thead><tr><th style="text-align:left">Producto</th><th class="num">Proy u/mes</th><th class="num">Stock u</th></tr></thead><tbody>';
+      det.slice().sort(function (a, b) { return (Number(b.proy) || 0) - (Number(a.proy) || 0); }).forEach(function (d) {
+        tp += Number(d.proy) || 0; ts += Number(d.stock_uni) || 0;
+        h += '<tr><td style="text-align:left">' + escapeHtml(codCanon(d.cod)) + ' <span style="color:#64748b">' + escapeHtml(artNombre(d.cod, "")) + '</span></td><td class="num">' + f(d.proy) + '</td><td class="num">' + f(d.stock_uni) + '</td></tr>';
+      });
+      h += '</tbody><tfoot><tr><th style="text-align:left">Total</th><th class="num">' + f(tp) + '</th><th class="num">' + f(ts) + '</th></tr></tfoot></table>';
+      if (it.esInsumo) h += '<div style="margin-top:8px;color:#475569;font-size:13px">Objetivo = ' + f(it.proyUni) + ' u/mes × ' + it.meses + ' meses (' + it.mesesProv + ' de insumo + ' + (it.meses - it.mesesProv) + ' de producto) = <b>' + f(it.objetivoUni) + ' u</b>.</div>';
+    }
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:620px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#0369a1;color:#fff">' +
+      '<div style="font-size:15px;font-weight:800">' + (foco === "proy" ? '📈 Proyección — ' : '📦 Stock — ') + escapeHtml(codCanon(_impCodVista(it))) + (it.esInsumo ? ' · insumo' : '') + '</div>' +
+      '<button onclick="pedImpStockDesgCerrar()" style="width:auto;margin-top:0;background:#fff;color:#0369a1;border:0;border-radius:8px;padding:4px 11px;font-size:14px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
+      '<div style="padding:10px 14px 14px">' + h + '</div></div>';
+  };
+  pintar(null, false);
+  if (foco === "proy" || !(it.stockInsU > 0)) return;
+  try {
+    const r = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_importados_stock_insumos", "select=detalle&cod=eq." + encodeURIComponent(it.cod));
+    if (document.getElementById("impStkDesgOv")) pintar((r && r[0] && r[0].detalle) || [], false);
+  } catch (_e) { if (document.getElementById("impStkDesgOv")) pintar(null, true); }
+}
+function pedImpStockDesgCerrar() { const o = document.getElementById("impStkDesgOv"); if (o) o.remove(); }
 function pedImpDesgCerrar() { const o = document.getElementById("impDesgOv"); if (o) o.remove(); }
 
 /* v23.91 — los parámetros GENERALES, en su propio botón del módulo (no adentro del ⚙ de un
@@ -1325,7 +1385,7 @@ function _impLRuteo(it) {
     (it.det || []).every(function (d) { return String(d.marca || "").trim().toUpperCase() !== "CH"; });
 }
 function _impCodVista(it) { return _impLRuteo(it) ? String(it.cod).replace(/([0-9E])L$/i, "$1") : it.cod; }
-function _impPlantaVista(it) { return (it && (it.planta || it.plantaVista)) || (_impLRuteo(it) ? "LK" : ""); }
+function _impPlantaVista(it) { if (it && it.esInsumo) return ""; return (it && (it.planta || it.plantaVista)) || (_impLRuteo(it) ? "LK" : ""); }   // v25.01: un insumo no es de ninguna empresa
 function _impPlantaChip(it) {
   var pl = _impPlantaVista(it);
   if (!pl) return "";
@@ -1489,7 +1549,7 @@ function _pedImpRender() {
       '<colgroup>' + _cols.map(function (w) { return '<col style="width:' + w + 'px">'; }).join('') + '</colgroup>' +
       '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="Meses de stock = (stock disponible + en camino) ÷ proyección por mes. En rojo, menos de 4 meses. Sin proyección: —. La tabla se ordena por esta columna (menos meses primero).">Meses<small>stock</small></th><th class="num" title="En camino: unidades ya pedidas que no llegaron, con la fecha estimada de llegada (dd/mm)">En camino<small>u · llega</small></th><th class="num" title="A pedir: unidades calculadas para llegar al objetivo">A pedir<small>u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.forEach(function (it) {
-      const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
+      const badge = it.esInsumo ? _pedImpInsumoChip(it) : (it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '');
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
       // v23.91 (Luis) — el número YA es el DISPONIBLE (v16.08): lo comprometido se lee en el
       // tooltip, no como un «−N» al lado, que hacía leer dos veces la misma resta.
@@ -1546,7 +1606,7 @@ function _pedImpRender() {
       // código volvió a ser texto. Tocar el código para ver una proyección no se adivina.
       const _proyCaj = (Number(it.uxc) > 0) ? (Number(it.proyUni) || 0) / Number(it.uxc) : 0;
       const _proyCell = '<td class="num imp2 pedimp-proy" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td>';
-      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span>' + _pedImpQuiebreChip(it) + '</td>' + _proyCell + '<td class="num">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num">' + _pedImpEnCaminoHtml(it) + '</td><td class="num pedimp-apedir">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + '<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:8px">' + _reingWebSwitchHtml(it.cod, it) + '</div></td><td>' + actHtml + '</td></tr>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span>' + _pedImpQuiebreChip(it) + '</td>' + _proyCell + '<td class="num pedimp-stk" title="Tocá para ver qué está contando este stock" onclick="event.stopPropagation();pedImpStockDesglose(\'' + _keyEncV + '\')">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num">' + _pedImpEnCaminoHtml(it) + '</td><td class="num pedimp-apedir">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + '<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:8px">' + _reingWebSwitchHtml(it.cod, it) + '</div></td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -1619,6 +1679,7 @@ function _pedImpFotoHtml(cod, emp) {
   return '<img src="' + urls[0] + '" data-alts="' + urls.slice(1).join("|") + '" onerror="var l=(this.dataset.alts||\'\').split(\'|\').filter(Boolean);if(l.length){this.dataset.alts=l.slice(1).join(\'|\');this.src=l[0];}else{this.outerHTML=\'<span class=sf>sin foto</span>\';}">';
 }
 function _pedImpEmpFoto(it) {
+  if (it && it.esInsumo) return "";   // v25.01 — el insumo no tiene empresa
   const pl = _impPlantaVista(it); if (pl) return String(pl).toUpperCase();
   const ms = (it && it.det || []).map(function (d) { return String(d.marca || "").trim().toUpperCase(); }).filter(Boolean);
   if (!ms.length) return "";
