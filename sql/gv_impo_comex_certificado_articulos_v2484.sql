@@ -23,3 +23,7 @@ select cc.codigo,
 -- v24.86: país de origen y depósito del RNE (antes la IA los leía y se descartaban). Aplicado.
 alter table impo_comex.certificados_inal add column if not exists pais_origen text, add column if not exists deposito text;
 -- v_certificados_estado: se agregaron pais_origen, deposito AL FINAL (security_invoker=true conservado).
+
+-- v24.87 (Elías): "Descripción" = NOMBRE del artículo. Anexo por código -> productos_referencia ->
+-- precios_venta (LK) -> precios_venta_chef -> vista_nombres_articulos. Nunca la descripción general
+-- del certificado: sin nombre, queda vacía. Aplicado con create or replace (security_invoker=true).
