@@ -6169,6 +6169,19 @@ regla vieja del dual partido —base pelada con stock 0— y tiene **proyección
 capacidad 66**. El guard del front sólo exige stock y pedidos en cero, así que hoy no se ve.
 Queda reportado; no se tocó.
 
+## ⚠ REGLA (Thomas, 2026-09-30, v25.28): un ajuste a un código que NO EXISTE se confirma antes — en la app y en el chat
+
+**Thomas:** *"si alguien te dice «restale 40 al 999FT» que la sesión le diga «no existe ese código, lo creo y le pongo -40?»"*.
+Caso **365ED**: se tipeó en vez de 865ED (13:57), se grabó −47 y quedó un fantasma en negativo; se cargó bien a las 14:00.
+
+- **App** (Stocks → Ajustar / Fijar): `_stkCodExisteConfirmar` pregunta a `gv_stock_cod_conocido` (los siete maestros).
+  No existe → *"No existe el código X. ¿Lo creo y le pongo −40?"*; sin respuesta de la base también pregunta
+  ("no pude leer" no es "existe"). `tests/stk-ajuste-cod-inexistente.cjs`.
+- **Sesión de Claude**: antes de un `insert` a `Movimientos_Stock` con un código que dio el usuario, correr
+  `select public.gv_stock_cod_conocido('<cod>')`; si da `false`, preguntar con esas palabras y esperar el «sí».
+- ⚠ Antes de revertir un movimiento, mirar si **otra sesión ya lo revirtió**: el −47 del 365ED lo había revertido
+  otra sesión a las 14:01 y la reversión de las 15:27 lo dejó en +47 (se anuló en el acto).
+
 ## ⚠⚠ REGLA (Vivi, 2026-09-23, v22.03): estar PROGRAMADO no garantiza la caja — si no hay stock, no se cobra
 
 **Vivi, textual:** *"si ya no hay stock del 323E, no debo cobrarselo. esa logica no la tenes ya
