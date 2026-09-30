@@ -4013,6 +4013,13 @@ Stk. · E.M. (proyección u/mes) · Meses Stk. (⚠ si < 4; = stock REAL disponi
 ordenada por esos meses (menos primero). **Una sola tabla**: cada proveedor es una fila-rótulo gris con sus totales (v24.79, *«mínima la separación»*), y antes de imprimir sale una **vista previa** (`pedImpRepVista`). **m³ y u$s son sólo de lo que genera pedido**; el total va
 arriba de cada columna. `tests/pedimp-reporte-pdf.cjs`.
 
+⚠⚠ **v25.13 (Thomas, 30/09): la SALIDA de ese botón ahora son las hojas del PDF para Damián** (*"misma
+funcionalidad de hoy, que te muestre todos, pero con la lógica del PDF de Damián"*). Mismo pop-up y vista previa;
+por cada proveedor tildado salen sus hojas (pedido · sin pedir · discontinuos), una tanda atrás de otra; con «Sólo
+lo que genera pedido», sólo la hoja del pedido. Las dos puertas usan `_pedImpDamianHojas(prov, opt)` +
+`_pedImpDamianDoc`; los discontinuos se leen una sola vez (`_pedImpDamianDisc`). **Se retira el reporte de una
+tabla** (`_pedImpRepHtml`, Cód · Stk · E.M. · Meses…): no volver a ponerlo.
+
 ## ⚠ REGLA (Luis, 2026-09-29, v24.32): la nacionalización por artículo es de 🚢 EN CURSO — y el proveedor la abre
 
 **Luis, textual:** *"no me estás entendiendo. Es en la pestaña «en curso» que quería lo que te pedí.
@@ -6456,6 +6463,14 @@ lo que cambió es **dónde están esos dos divs**, no la lógica. `tests/tv-meta
 - **v25.3 (Thomas, 30/09): el PDF para Damián va en A4 VERTICAL y lleva la columna Marca** (LK / CH / Loke, de
   `Importados.marca`) en las 3 hojas; reemplaza la chapa de planta pegada al código. Medido: la hoja del pedido
   mide 708 px de 733 útiles con el aviso del MOQ (el renglón más ancho). No volver a ponerla horizontal.
+- **v25.13 (Thomas, 30/09): el PDF para Damián va AGRUPADO POR TIPO DE PRODUCTO** (las marcas del mismo producto
+  juntas: Colador Ø 8 cm = 026 LK · 824 CH · 110 Loke; el grupo va donde cae su artículo más urgente, adentro LK · CH ·
+  Loke, raya gruesa al empezar cada grupo) **y marca «INAL»** debajo del código. Fuentes: `GV_Producto_Tipo` (su Excel
+  de equivalencias) y `GV_Articulo_INAL` (certificados), resueltas por la vista `gv_imp_articulo_extra`.
+  **La «libre circulación» ahora es «Autorización de Impo»: `Importados_Config.autoriz_impo_pct` (0,007) × FOB de lo
+  que lleva INAL** (base «inal» en el reparto por artículo). Sin el dato INAL va sobre todo el FOB (lo conservador).
+  **Va en los TRES modos** (consolidada, contenedor y avión; Thomas D7). Loke 111 y 112 llevan INAL (D6, sin
+  certificado cargado todavía). Aplicado el 30/09: 321 tipos, 94 INAL, 59 importados con INAL. `sql/gv_imp_tipo_inal_v2513.sql`.
 - Los tests de pantalla que no miden el MOQ lo ponen en 0 (`_NAC_TASAS.moq = 0`); la regla la miden
   `tests/pedimp-prioridad-damian.cjs` (D) y `tests/pedimp-moq-proy.cjs` (B).
 

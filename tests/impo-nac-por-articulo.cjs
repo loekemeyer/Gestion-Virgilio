@@ -36,7 +36,7 @@ ok(res.ok === true, "el embarque de referencia calcula");
 
 // A) cada concepto declara su base — sin eso "mixto" no puede existir
 const bases = (res.detalle || []).map((d) => d[3]);
-ok(bases.every((b) => b === "m3" || b === "fob"), "todo concepto del detalle declara su base (m3 | fob)");
+ok(bases.every((b) => b === "m3" || b === "fob" || b === "inal"), "todo concepto del detalle declara su base (m3 | fob | inal)");
 const flete = (res.detalle || []).filter((d) => /Flete/.test(d[0]));
 ok(flete.length > 0 && flete.every((d) => d[3] === "m3"), "el FLETE se reparte por m³ (se paga por volumen)");
 const der = (res.detalle || []).filter((d) => /Derechos|Estad|NTL|Despachante/.test(d[0]));
@@ -67,11 +67,12 @@ ok(rmix.items[0] > rm3.items[0] && rmix.items[0] < rfob.items[0],
 ok(rmix.items[1] < rm3.items[1] && rmix.items[1] > rfob.items[1],
   "mixto: el barato paga menos que por m³ y más que por FOB");
 // y la parte por m³ del mixto es exactamente el flete, repartido en partes iguales (mismo m³)
+// (v25.13: la base «inal» sin artículos marcados cae a FOB, así que cuenta como FOB acá)
 const fleteTot = suma(flete.map((d) => d[1]));
 const k = res.noRecup / suma((res.detalle || []).map((d) => d[1]));
-near(rmix.items[0] - rmix.items[1], k * (suma(der.concat((res.detalle || []).filter((d) => d[3] === "fob" && !/Derechos|Estad|NTL|Despachante/.test(d[0]))).map((d) => d[1]))) * (30000 - 3000) / 33000,
+near(rmix.items[0] - rmix.items[1], k * (suma(der.concat((res.detalle || []).filter((d) => d[3] !== "m3" && !/Derechos|Estad|NTL|Despachante/.test(d[0]))).map((d) => d[1]))) * (30000 - 3000) / 33000,
   0.5, "mixto: la diferencia entre los dos es SÓLO la parte por FOB");
-near(rmix.items[0] + rmix.items[1] - k * fleteTot, k * suma((res.detalle || []).filter((d) => d[3] === "fob").map((d) => d[1])), 0.5,
+near(rmix.items[0] + rmix.items[1] - k * fleteTot, k * suma((res.detalle || []).filter((d) => d[3] !== "m3").map((d) => d[1])), 0.5,
   "mixto: lo que no es flete se reparte por FOB");
 
 // F) guards: sin m³ no se divide por cero — cae a FOB
@@ -102,6 +103,20 @@ near(suma(rav.items), av.noRecup, 0.01, "avión: la suma repartida es el no recu
   const t = N._impNacCritTxt(c);
   ok(t && t.lbl && t.tip && t.tip.length > 20, "criterio " + c + ": tiene etiqueta y explicación");
 });
+
+// K) v25.13 (Thomas): la Autorización de Impo (base «inal») la pagan SÓLO los artículos con INAL, por su FOB
+const rI = N._pedImpNacionalizar(3000, 3, { modo: "consolidada", valorM3: 110, tn: 1, ntl: false, fobInal: 1000 });
+const autI = rI.detalle.filter((d) => /^Autorización de Impo/.test(d[0]))[0];
+ok(!!autI && autI[3] === "inal", "la Autorización de Impo declara base «inal»");
+const itI = [{ m3: 1, fob: 1000, uni: 10, inal: true }, { m3: 1, fob: 2000, uni: 10, inal: false }];
+const soloAut = { ok: true, noRecup: autI[1], detalle: [autI] };
+const rpI = N._impNacReparto(soloAut, itI, "mixto");
+near(rpI.items[0], autI[1], 0.001, "mixto: toda la Autorización de Impo cae en el artículo con INAL");
+near(rpI.items[1], 0, 0.001, "mixto: el que no lleva INAL no paga Autorización de Impo");
+const rpN = N._impNacReparto(soloAut, itI.map((x) => Object.assign({}, x, { inal: false })), "mixto");
+near(rpN.items[0] + rpN.items[1], autI[1], 0.001, "sin ningún artículo con INAL cae a FOB y no se pierde plata");
+const rpT = N._impNacReparto(rI, itI, "mixto");
+near(suma(rpT.items), rI.noRecup, 0.01, "con la base «inal» la suma sigue siendo el no recuperable");
 
 console.log(fail ? "\n✗ " + fail + " fallo(s)" : "\n✓ nacionalización por artículo OK");
 process.exit(fail ? 1 : 0);
