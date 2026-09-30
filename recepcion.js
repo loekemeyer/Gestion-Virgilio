@@ -3457,6 +3457,7 @@ function pendRecibidoRow(id, card) {
     b.disabled = (sinFoto && !st.recibido) || st.sent;
     no.classList.toggle("on", !!st.no_recibido_at);
     no.disabled = st.sent;
+    no.style.display = st.recibido ? "none" : "";   // v24.93 (Mel): ya recibido, no se ofrece
     if (st.recibido) {
       const ms = st.recibido_at ? new Date(st.recibido_at).getTime() : 0;
       hint.textContent = st.recibido + (ms ? " · " + pendFmtFecha(null, ms) + " " + pendFmtHora(ms) : "");

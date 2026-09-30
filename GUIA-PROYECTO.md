@@ -7,6 +7,7 @@ tocándolo de nuevo y es excluyente con el tilde de Recibido. Al prenderlo abre 
 las 14:58 de Log/ Fabr, confirmame porfa que lo tenés o si ya lo mandaste"* (día y hora = cuando se
 cargó la recepción). Queda guardado en `Control_Modo_OP.gv_no_recibido_at` y la tarjeta muestra
 *"avisado · dd-mm hh:mm"*. **No habilita Enviar**: la recepción se sigue cerrando sólo con Recibido.
+**v24.93 (Mel):** con **Recibido** tildado el botón «No recibido» **no se muestra**; destildando Recibido vuelve.
 `recepcion.js` (`pendRecibidoRow`, `pendNoRecibidoMsg`, `WA_MARIAN`), `tests/pend-no-recibido.cjs`,
 `docs/SUPABASE-GESTION-VIRGILIO.md` §3.v2489.
 

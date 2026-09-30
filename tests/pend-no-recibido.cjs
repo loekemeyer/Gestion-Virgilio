@@ -1,7 +1,8 @@
 /* v24.89 (Mel, 30/09) — «No recibido» a la derecha de Recibido en Pendientes de Recepción.
    Mismo criterio que «No corresponde»: excluyente con el tilde y se destilda tocándolo de nuevo.
    Al prenderlo abre WhatsApp a Marian (5491131181186) con el remito, el día, la hora y quién lo
-   trajo, y persiste gv_no_recibido_at. NO habilita Enviar. Sale 1 si falla. */
+   trajo, y persiste gv_no_recibido_at. NO habilita Enviar. Con Recibido tildado no se muestra
+   (v24.93, Mel). Sale 1 si falla. */
 const fs = require("fs");
 const path = require("path");
 let chromium;
@@ -102,18 +103,21 @@ window.__rcp = { pendCard: pendCard, pendRowComplete: pendRowComplete, pendEnvia
     out.recibido_lo_apaga = u3.length === 1 && u3[0].vals.gv_recibido_por === "Nora" && u3[0].vals.gv_no_recibido_at === null
       && !no.classList.contains("on") && tick.classList.contains("on");
     out.recibido_habilita = card.querySelector(".enviarBtn").disabled === false;
-    // y al revés: con Recibido tildado, No recibido lo destilda
+    // v24.93 (Mel): con Recibido tildado, «No recibido» no se ofrece
+    out.oculto_con_recibido = no.style.display === "none" && no.offsetParent === null;
+    // destildar Recibido lo vuelve a mostrar
     window.__calls = [];
-    no.click(); await wait(30);
-    const u4 = upds();
-    out.no_recibido_destilda = u4.length === 1 && u4[0].vals.gv_recibido_por === null && u4[0].vals.gv_recibido_at === null
-      && !tick.classList.contains("on") && card.querySelector(".enviarBtn").disabled === true;
+    tick.click(); await wait(30);
+    out.vuelve_al_destildar = !tick.classList.contains("on") && no.style.display === "" && no.offsetParent !== null;
     // sin foto: Recibido bloqueado, No recibido disponible
     const card2 = R.pendCard(Object.assign({}, row, { id: 92, foto_url: null })); rootEl.appendChild(card2);
     out.sin_foto = card2.querySelector(".pcRecibidoRow .tickBtn").disabled === true && card2.querySelector(".noRecBtn").disabled === false;
     // recarga: la marca guardada vuelve prendida
     const card3 = R.pendCard(Object.assign({}, row, { id: 93, gv_no_recibido_at: "2026-09-30T14:02:00Z" })); rootEl.appendChild(card3);
     out.recarga = card3.querySelector(".noRecBtn").classList.contains("on") && /avisado · 30-09/.test(card3.textContent);
+    // recarga de una recepción ya recibida: el botón no aparece
+    const card4 = R.pendCard(Object.assign({}, row, { id: 94, gv_recibido_por: "Mel", gv_recibido_at: "2026-09-30T13:10:00Z" })); rootEl.appendChild(card4);
+    out.recarga_recibido_oculto = card4.querySelector(".noRecBtn").style.display === "none";
     return out;
   });
   const bad = Object.keys(r).filter(function (k) { return r[k] !== true; });
