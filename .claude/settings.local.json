@@ -92,7 +92,14 @@
       "Bash(node tests/fc-acuerdo-desglose-copia.cjs)",
       "Bash(git -c user.name=Claude -c user.email=noreply@anthropic.com commit -q -m 'Permisos: comandos de esta sesion al allow local *)",
       "Bash(sed -i 's/pedimp-camino-fob \\(v24.73: FOB en camino; En camino y A pedir separadas\\)/pedimp-camino-fob \\(v24.74: FOB en viaje = u$s de los pedidos en curso; En camino y A pedir separadas\\)/' tests/run.sh)",
-      "Bash(node scripts/bump-version.cjs 24.74)"
+      "Bash(node scripts/bump-version.cjs 24.74)",
+      "Bash(node --check importacion.js)",
+      "Bash(node tests/pedimp-reporte-pdf.cjs)",
+      "Bash(node tests/pedimp-quiebre.cjs)",
+      "Bash(node scripts/bump-version.cjs 24.76)",
+      "Bash(sed -i 's/\\(Luis, 2026-09-30, v24.75\\): 🖨 IMPRIMIR PDF/\\(Luis, 2026-09-30, v24.76\\): 🖨 IMPRIMIR PDF/' CLAUDE.md)",
+      "Bash(sed -i 's/v24.73 \\(Luis\\) — reporte en PDF/v24.76 \\(Luis\\) — reporte en PDF/; s/v24.73 \\(Luis 30\\\\/09\\) — 🖨 IMPRIMIR PDF/v24.76 \\(Luis 30\\\\/09\\) — 🖨 IMPRIMIR PDF/' importacion.js)",
+      "Bash(sed -i 's/v24.73 \\(Luis 30\\\\/09\\)/v24.76 \\(Luis 30\\\\/09\\)/' tests/pedimp-reporte-pdf.cjs)"
     ]
   }
 }

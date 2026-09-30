@@ -1,4 +1,4 @@
-/* v24.73 (Luis 30/09) — 🖨 IMPRIMIR PDF en Pedidos Importación: botón en la barra de arriba,
+/* v24.76 (Luis 30/09) — 🖨 IMPRIMIR PDF en Pedidos Importación: botón en la barra de arriba,
    pop-up con los proveedores + «Sólo lo que genera pedido», y el reporte con Cód · Stk · E.M. ·
    Meses Stk (⚠ < 4) · m³ · u$s (sólo de lo que pide) · Pedido en curso, del más urgente al menos. */
 const path = require("path");

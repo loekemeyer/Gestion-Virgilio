@@ -1389,7 +1389,7 @@ function _pedImpRender() {
       '<details style="padding:4px 12px 6px"><summary style="cursor:pointer;font-size:13px;font-weight:700;color:#0f172a">ⓘ Cómo se usa</summary>' +
         '<div class="stkpop-hint" style="margin:6px 0 0;white-space:normal;max-width:300px">Índice <b>' + (data.meses || 10) + ' meses</b>. El pedido va en <b>master cajas redondas</b>: tocá la celda <b>MC</b> para ajustarlo (<b>0</b> = no pedir). <b>Unidades = MC × uni/master</b>. 🧩 = parte · ✏️ en curso · 📥 llegó · 🖨 PDF para que el chino cotice (sin FOB). En pantalla angosta la tabla se desliza al costado.</div></details>' +
       '</div></details>' +
-    // v24.73 (Luis) — reporte en PDF de los proveedores que se elijan, en el hueco de la derecha
+    // v24.76 (Luis) — reporte en PDF de los proveedores que se elijan, en el hueco de la derecha
     '<button class="pedimp-rep-btn" onclick="pedImpRepAbrir()" title="Reporte PDF: Cód · Stock · E.M. · Meses stock · m³ y u$s de lo que genera pedido · Pedido en curso, por proveedor y del más urgente al menos urgente" style="width:auto;margin:0 0 0 auto;flex:0 0 auto;padding:6px 14px;border:1px solid #1e3a8a;border-radius:8px;background:#1e3a8a;color:#fff;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap">🖨 IMPRIMIR PDF</button>' +
     (_buscando ? '<span style="font-size:11.5px;color:#0f766e;font-weight:700;flex-basis:100%">' + items.length + ' ítem(s) · se busca en <b>todos</b> los proveedores, pidan o no</span>' : '') +
     '</div>';
@@ -1744,7 +1744,7 @@ async function pedImpPdfDamian(provEnc) {
     hoja1 + hoja2 + hoja3 + '</body></html>';
   _pedImpPrintConFotos(html);
 }
-/* v24.73 (Luis 30/09) — 🖨 IMPRIMIR PDF: reporte de los proveedores elegidos. Una tabla por
+/* v24.76 (Luis 30/09) — 🖨 IMPRIMIR PDF: reporte de los proveedores elegidos. Una tabla por
    proveedor, del más urgente (menos meses de stock, con lo en camino) al menos urgente; sin
    proyección, al final. m³ y u$s son SÓLO de lo que genera pedido. Arial 15, rótulos centrados en
    2 líneas, ancho según el dato. */

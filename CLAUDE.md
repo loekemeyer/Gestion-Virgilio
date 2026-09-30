@@ -3978,7 +3978,7 @@ banda NO los lleve, que los dos chips abran el pop-up y que el contenido siga co
 **Chequeo:** `node tests/imp-hist-pedidos.cjs` · `node tests/pedimp-config-proveedor.cjs` ·
 `select * from public.gv_imp_pedidos_historial(400);`. `sql/gv_imp_pedidos_historial_v2391.sql`.
 
-## ⚠ REGLA (Luis, 2026-09-30, v24.75): 🖨 IMPRIMIR PDF de Pedidos Importación = reporte por proveedor
+## ⚠ REGLA (Luis, 2026-09-30, v24.76): 🖨 IMPRIMIR PDF de Pedidos Importación = reporte por proveedor
 
 Botón arriba a la derecha de la barra (`pedImpRepAbrir`): pop-up con los proveedores a tildar + «Sólo lo que
 genera pedido». El PDF (`_pedImpRepHtml`, Arial 15, A4 vertical) tiene una tabla por proveedor con **Cód. ·
