@@ -99,7 +99,8 @@
       "Bash(node scripts/bump-version.cjs 24.76)",
       "Bash(sed -i 's/\\(Luis, 2026-09-30, v24.75\\): 🖨 IMPRIMIR PDF/\\(Luis, 2026-09-30, v24.76\\): 🖨 IMPRIMIR PDF/' CLAUDE.md)",
       "Bash(sed -i 's/v24.73 \\(Luis\\) — reporte en PDF/v24.76 \\(Luis\\) — reporte en PDF/; s/v24.73 \\(Luis 30\\\\/09\\) — 🖨 IMPRIMIR PDF/v24.76 \\(Luis 30\\\\/09\\) — 🖨 IMPRIMIR PDF/' importacion.js)",
-      "Bash(sed -i 's/v24.73 \\(Luis 30\\\\/09\\)/v24.76 \\(Luis 30\\\\/09\\)/' tests/pedimp-reporte-pdf.cjs)"
+      "Bash(sed -i 's/v24.73 \\(Luis 30\\\\/09\\)/v24.76 \\(Luis 30\\\\/09\\)/' tests/pedimp-reporte-pdf.cjs)",
+      "Bash(node scripts/bump-version.cjs 25.00)"
     ]
   }
 }

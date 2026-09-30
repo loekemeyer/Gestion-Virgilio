@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-09-30 (+ centinelas gv_conc_motor / gv_conc_resolver)",
+  "_generado": "2026-09-30 (+ centinelas gv_insumo_unidad_base / gv_imp_recibir insumo canon)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -285,6 +285,11 @@
       "objeto": "gv_importados_resync",
       "regla": "Importación: esta RPC escribe y sólo la puede usar un supervisor logueado (o el servicio); sin esto cualquiera con la clave pública carga o borra giros, baches,",
       "quien": "Thomas"
+    },
+    {
+      "objeto": "gv_insumo_unidad_base",
+      "regla": "Todo movimiento de insumos es empresa Mixto",
+      "quien": "Luis"
     },
     {
       "objeto": "gv_match_cod_a_programacion",
