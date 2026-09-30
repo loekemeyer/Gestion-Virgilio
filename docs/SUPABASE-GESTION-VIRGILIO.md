@@ -30879,3 +30879,19 @@ evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositiv
 - **Rollback:** `drop trigger gv_ingreso_virgilio_denegado on "GP2".ingreso_virgilio;` y
   `drop trigger gv_ingreso_virgilio_unidades on "GP2".ingreso_virgilio;` (el resto es aditivo).
   `sql/gv_ingreso_cervantes_denegado_v2537.sql`.
+
+## §3.v2539 — GP2 ve el stock de ARTÍCULOS de Virgilio (espejo, v25.39, 30/09/2026)
+
+- **Pedido (GP2, Stock General en 3 cajas):** la caja «Virgilio > Art. Terminado» muestra el stock real de
+  Virgilio de los artículos que arma Fábrica. GP2 no lee `public` (Regla 0), así que va por espejo, mismo molde
+  que la v25.17.
+- **Función tocada (sólo se agregó el bloque 4):** `public.gv_gp2_espejo_sync()` reescribe
+  `"GP2".virgilio_articulo_stock` desde `stocks_carga_rapida` (sin insumos, 375 filas, en CAJAS) **sólo si cambió
+  el md5**. Los bloques 1-3 se copiaron de la definición viva: md5 de la versión sin el bloque 4 =
+  `2643e3cf…` = el de la base antes de tocarla. Mismo cron 112 (`gv-gp2-espejo-sync`, `5-59/10`).
+- **La tabla la crea GP2** (`db/migracion_tablet_virgilio.sql` de gestion-productiva-2.0): RLS + policy de
+  SELECT a anon/authenticated, sin escritura.
+- **Medido:** primera corrida `articulo` (375 filas), la segunda `sin cambios`. 40 de los 41 artículos de Fábrica
+  cruzan por código normalizado; el 718 no tiene fila en `stocks_carga_rapida`.
+- **Rollback:** volver a correr `sql/gv_gp2_espejo_v2517.sql` (la función sin el bloque 4) y
+  `drop table "GP2".virgilio_articulo_stock;`. `sql/gv_gp2_espejo_articulo_v2539.sql`.

@@ -1,4 +1,6 @@
--- v25.38 (2026-09-30) — GP2 ve el stock de ARTÍCULOS de Virgilio (espejo de solo lectura)
+-- v25.39 (2026-09-30) — GP2 ve el stock de ARTÍCULOS de Virgilio (espejo de solo lectura)
+-- (adentro de la función el bloque 4 dice "(v25.38)": es la etiqueta con que se aplicó, antes de que
+-- otra sesión tomara la v25.38. No cambiarla: la función viva la tiene así.)
 --
 -- [usuario 30/09, Stock General de GP2] "que haya 3 box: 1) Cervantes … 2) Virgilio: Bolsas Plásticas,
 -- SC, SP, Plásticos, Flejes, Cajas, Art. Terminado 3) Terceros". El «Art. Terminado» de la caja
