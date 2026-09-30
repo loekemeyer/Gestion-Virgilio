@@ -1721,7 +1721,12 @@ async function pedImpPdfDamian(provEnc) {
   const titulo = function (t) { return t + ' ' + escapeHtml(prov) + ' ' + hoyTxt; };
   const desc = function (it) { return escapeHtml(String(artNombre(it.cod, it.desc) || "").replace(/⌀/g, "Ø")).replace(/Ø /g, "Ø "); };   // el ⌀ no está en la fuente del PDF
   const foto = function (it) { return it.esParte ? '<span class="sf">insumo</span>' : _pedImpFotoHtml(codCanon(it.cod), _pedImpEmpFoto(it)); };   // v24.44: los insumos van sin foto
-  const codTxt = function (it) { return escapeHtml(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")); };
+  const codTxt = function (it) { return escapeHtml(codCanon(_impCodVista(it))); };
+  // v25.3 (Thomas) — la MARCA del maestro Importados (LK / CH / Loke) en su propia columna. Reemplaza la
+  // chapa de planta pegada al código (809E LK): sale del mismo dato. Sin marca cargada, la planta; sin nada, —.
+  const marcaTd = function (it) { const ms = [], ks = [];
+    (it.det || []).forEach(function (x) { const m = String(x.marca || "").trim(); if (m && ks.indexOf(m.toUpperCase()) < 0) { ks.push(m.toUpperCase()); ms.push(m); } });
+    return '<td>' + escapeHtml(ms.length ? ms.join("/") : (_impPlantaVista(it) || "—")) + '</td>'; };
   const stockTd = function (it) { const m = _pedImpMesesStock(it), bajo = m != null && m < _PEDIMP_MESES_ALERTA;
     return '<td>' + fmt(Math.max(0, Number(it.stockUni) || 0)) + '<small>' + (bajo ? '⚠ ' : '') + (m == null ? 's/proy' : _pedImpMesesFmt(m) + ' m') + '</small></td>'; };
   // «Llegan» sólo si algo del set viene en camino; si todo llega el MISMO día, la fecha va una vez en el rótulo.
@@ -1743,15 +1748,15 @@ async function pedImpPdfDamian(provEnc) {
     const hayMoq = arr.some(function (it) { return !!_pedImpMoqPdf(it); });   // el aviso del 80 % del MOQ, A LA DERECHA
     const filas = arr.map(function (it) {
       const u = _pedImpUniOf(it), usd = _pedImpUsdOf(it), m3 = _pedImpM3Of(it);
-      return '<tr><td><b>' + codTxt(it) + '</b></td><td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
+      return '<tr><td><b>' + codTxt(it) + '</b></td>' + marcaTd(it) + '<td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
         (cm.hay ? cm.td(it) : '') + maxTd(it) +
         '<td><b>' + fmt(u) + '</b></td><td class="sp"></td>' +   // el pedido SÓLO en unidades (sin MC ni inner)
         '<td>' + (usd > 0 ? fmt(usd) : '—') + '<small>' + (it.fobUni > 0 ? fmt(it.fobUni, 2) + '/u' : 's/FOB') + '</small></td>' +
         '<td>' + (m3 > 0 ? fmt(m3, 1) : '—') + '</td>' + (hayMoq ? '<td class="nota">' + _pedImpMoqPdf(it) + '</td>' : '') + '</tr>';
     }).join("");
     // los totales en su PROPIA fila, arriba del rótulo (meses del máximo, FOB, m³ — sin total de unidades); a la izquierda, el título.
-    const head = '<tr><th colspan="' + (cm.hay ? 6 : 5) + '" class="tit">' + titulo("Pedido") + '</th><th class="tot">' + mesesTxt + ' m</th><th rowspan="2">Pedido<small>u</small></th><th class="sp" rowspan="2"></th><th class="tot">' + fmt(tot.usd) + '</th><th class="tot">' + fmt(tot.m3, 1) + '</th>' + (hayMoq ? '<th class="nota"></th>' : '') + '</tr>' +
-      '<tr><th>Cód</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u · m</small></th>' + (cm.hay ? cm.th : '') + '<th>Máx<small>u</small></th><th>FOB<small>u$s</small></th><th>m³</th>' + (hayMoq ? '<th class="nota"></th>' : '') + '</tr>';
+    const head = '<tr><th colspan="' + (cm.hay ? 7 : 6) + '" class="tit">' + titulo("Pedido") + '</th><th class="tot">' + mesesTxt + ' m</th><th rowspan="2">Pedido<small>u</small></th><th class="sp" rowspan="2"></th><th class="tot">' + fmt(tot.usd) + '</th><th class="tot">' + fmt(tot.m3, 1) + '</th>' + (hayMoq ? '<th class="nota"></th>' : '') + '</tr>' +
+      '<tr><th>Cód</th><th>Marca</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u · m</small></th>' + (cm.hay ? cm.th : '') + '<th>Máx<small>u</small></th><th>FOB<small>u$s</small></th><th>m³</th>' + (hayMoq ? '<th class="nota"></th>' : '') + '</tr>';
     hoja1 = '<div class="hoja"><table><thead>' + head + '</thead><tbody>' + filas + '</tbody></table></div>';
   }
 
@@ -1764,11 +1769,11 @@ async function pedImpPdfDamian(provEnc) {
       return !(Number(it.proyUni) > 0) ? "sin proyección" : "alcanza";
     };
     const filas = sinPedir.map(function (it) {
-      return '<tr><td><b>' + codTxt(it) + '</b></td><td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
+      return '<tr><td><b>' + codTxt(it) + '</b></td>' + marcaTd(it) + '<td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
         (cm.hay ? cm.td(it) : '') + maxTd(it) + '<td>' + motivo(it) + '</td></tr>';
     }).join("");
-    hoja2 = '<div class="hoja"><table><thead><tr><th colspan="' + (cm.hay ? 8 : 7) + '" class="tit">' + titulo("Sin pedir") + '</th></tr>' +
-      '<tr><th>Cód</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u · m</small></th>' + (cm.hay ? cm.th : '') + '<th>Máx<small>u · ' + mesesTxt + ' m</small></th><th>Por qué</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
+    hoja2 = '<div class="hoja"><table><thead><tr><th colspan="' + (cm.hay ? 9 : 8) + '" class="tit">' + titulo("Sin pedir") + '</th></tr>' +
+      '<tr><th>Cód</th><th>Marca</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u · m</small></th>' + (cm.hay ? cm.th : '') + '<th>Máx<small>u · ' + mesesTxt + ' m</small></th><th>Por qué</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
   }
 
   // ── Hoja 3: los discontinuados de ese proveedor (Importados.activo = false) ──
@@ -1787,14 +1792,15 @@ async function pedImpPdfDamian(provEnc) {
     disc.sort(function (a, b) { return String(a.cod_art).localeCompare(String(b.cod_art), "es", { numeric: true }); });
     const filas = disc.map(function (r) {
       const c = String(r.cod_art || "").trim(), em = String(r.marca || "").trim().toUpperCase() === "CH" ? "CH" : "LK";
-      return '<tr><td><b>' + escapeHtml(c) + '</b></td><td class="dsc">' + escapeHtml(String(r.descripcion || "").replace(/⌀/g, "Ø")) + '</td><td class="ft">' + _pedImpFotoHtml(c, em) + '</td><td class="sp"></td>' +
+      return '<tr><td><b>' + escapeHtml(c) + '</b></td><td>' + escapeHtml(String(r.marca || "").trim() || "—") + '</td><td class="dsc">' + escapeHtml(String(r.descripcion || "").replace(/⌀/g, "Ø")) + '</td><td class="ft">' + _pedImpFotoHtml(c, em) + '</td><td class="sp"></td>' +
         '<td>' + fmt(Math.max(0, Number(r.stock_total) || 0)) + '</td><td class="dsc">' + escapeHtml(mot[c.toUpperCase()] || "—") + '</td></tr>';
     }).join("");
-    hoja3 = '<div class="hoja"><table><thead><tr><th colspan="6" class="tit">' + titulo("Discontinuos") + '</th></tr>' +
-      '<tr><th>Cód</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u</small></th><th>Motivo</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
+    hoja3 = '<div class="hoja"><table><thead><tr><th colspan="7" class="tit">' + titulo("Discontinuos") + '</th></tr>' +
+      '<tr><th>Cód</th><th>Marca</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u</small></th><th>Motivo</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
   }
 
-  const css = '@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;margin:0;font-size:14px}' +
+  // v25.3 (Thomas): la hoja va VERTICAL (A4 portrait); la tabla entra en los 194 mm útiles.
+  const css = '@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;margin:0;font-size:14px}' +
     '.hoja+.hoja{page-break-before:always;break-before:page}' +
     'th.sp,td.sp{width:5px;min-width:5px;padding:0;border-top:0;border-bottom:0}' +   // v24.55 (Thomas): columna vacía finita que separa bloques
     'table{border-collapse:collapse;margin:0 auto}th,td{border:1px solid #444;padding:1px 3px;vertical-align:middle;text-align:center;white-space:nowrap;line-height:1.1}th{font-size:14px}' +
