@@ -307,7 +307,11 @@ const RCP_CSS = `
 #rcpRoot .enviarBtn{ padding:11px 22px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#111; color:#fff; cursor:pointer; }
 #rcpRoot .enviarBtn:disabled{ opacity:.4; cursor:default; }
 /* v22.48 (Luis, 25/09) — botón «Recibido» en Pendientes + cuadro de quién recibe. */
-#rcpRoot .pcRecHint{ margin-left:auto; font-size:12px; font-weight:700; color:#64748b; text-align:right; }
+#rcpRoot .pcRecHint{ font-size:12px; font-weight:700; color:#64748b; }
+/* v24.89 (Mel, 30/09) — «No recibido» a la derecha de Recibido, mismo criterio que «No corresponde».
+   El rótulo y el quién/cuándo van apilados para que el botón entre en la misma fila. */
+#rcpRoot .pcRecLblBox{ display:flex; flex-direction:column; min-width:0; }
+#rcpRoot .pcActs .noBtn{ min-width:128px; text-align:center; }
 #rcpRoot .tickBtn:disabled{ opacity:.45; cursor:default; }
 #rcpRoot .rcbOverlay{ position:fixed; inset:0; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; z-index:9999; padding:16px; }
 #rcpRoot .rcbBox{ background:#fff; border-radius:14px; padding:16px; width:100%; max-width:380px; }
@@ -2000,6 +2004,7 @@ function _opCajasExceso() {
    `opState.excesoAvisado` guarda la firma `cod:cajas` de lo que se avisó: si el operario
    vuelve atrás y cambia cantidades, el botón se vuelve a exigir. */
 const WA_THOMAS = "5491162521635";
+const WA_MARIAN = "5491131181186";   // v24.89: «No recibido» de Pendientes
 /* Artículos cargados que superan lo que falta recibir por OC. */
 function opExcesoItems() {
   // v17.99 (Luis): un código SIN OC vigente es OC = 0, así que CUALQUIER cantidad es
@@ -3324,7 +3329,7 @@ async function renderPendientes() {
   let res;
   try {
     res = await supabase.from("Control_Modo_OP")
-      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at,isis,control_partes,foto_url,foto_vista,codigo,gv_foto_post_por,gv_foto_post_at,gv_recibido_por,gv_recibido_at")
+      .select("id,fecha,tipo,nombre,linea,remito,detalle,cantidad_total,created_at,isis,control_partes,foto_url,foto_vista,codigo,gv_foto_post_por,gv_foto_post_at,gv_recibido_por,gv_recibido_at,gv_no_recibido_at")
       .eq("estado", "pendiente")
       .order("created_at", { ascending: true })
       .limit(300);
@@ -3388,7 +3393,7 @@ function pendTickElapsed() {
 }
 function pendCard(r) {
   const id = r.id;
-  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, foto_url: r.foto_url || null, foto_vista: !!r.foto_vista, codigo: r.codigo || null, recibido: r.gv_recibido_por || null, recibido_at: r.gv_recibido_at || null, sent: false, row: r };
+  _pendRows[id] = { isis: !!r.isis, partes: r.control_partes || null, foto_url: r.foto_url || null, foto_vista: !!r.foto_vista, codigo: r.codigo || null, recibido: r.gv_recibido_por || null, recibido_at: r.gv_recibido_at || null, no_recibido_at: r.gv_no_recibido_at || null, sent: false, row: r };
   const tsMs = r.created_at ? new Date(r.created_at).getTime() : 0;
   const card = document.createElement("div"); card.className = "pendCard"; card.setAttribute("data-id", String(id));
   const head = document.createElement("div"); head.className = "pcHead";
@@ -3438,15 +3443,26 @@ function pendCard(r) {
 function pendRecibidoRow(id, card) {
   const row = document.createElement("div"); row.className = "pcRow pcRecibidoRow";
   const b = document.createElement("button"); b.type = "button"; b.className = "tickBtn";
+  const box = document.createElement("span"); box.className = "pcRecLblBox";
   const lbl = document.createElement("span"); lbl.className = "pcLbl"; lbl.textContent = "Recibido";
   const hint = document.createElement("span"); hint.className = "pcRecHint";
+  /* v24.89 (Mel, 30/09) — «No recibido»: mismo criterio que «No corresponde» (excluyente con el
+     tilde, se destilda tocándolo de nuevo) y al prenderlo abre el WhatsApp a Marian con el
+     remito. NO habilita Enviar: la recepción se sigue cerrando sólo con Recibido. */
+  const no = document.createElement("button"); no.type = "button"; no.className = "noBtn noRecBtn"; no.textContent = "No recibido";
+  no.title = "Avisarle a Marian por WhatsApp que el remito no llegó";
   const sync = function () {
     const st = _pendRows[id], sinFoto = !st.foto_url;
     b.classList.toggle("on", !!st.recibido);
     b.disabled = (sinFoto && !st.recibido) || st.sent;
+    no.classList.toggle("on", !!st.no_recibido_at);
+    no.disabled = st.sent;
     if (st.recibido) {
       const ms = st.recibido_at ? new Date(st.recibido_at).getTime() : 0;
       hint.textContent = st.recibido + (ms ? " · " + pendFmtFecha(null, ms) + " " + pendFmtHora(ms) : "");
+    } else if (st.no_recibido_at) {
+      const ms = new Date(st.no_recibido_at).getTime();
+      hint.textContent = "avisado" + (ms ? " · " + pendFmtFecha(null, ms) + " " + pendFmtHora(ms) : "");   // corto: entra en una línea
     } else hint.textContent = sinFoto ? "falta la foto" : "";
   };
   b.onclick = async function () {
@@ -3460,10 +3476,57 @@ function pendRecibidoRow(id, card) {
     if (!st.foto_url) { sync(); return; }
     pendRecibidoAbrir(id, card);
   };
+  no.onclick = async function () {
+    const st = _pendRows[id];
+    if (st.sent) return;
+    const prender = !st.no_recibido_at;
+    /* El WhatsApp se abre ANTES del await: después de esperar a la base el navegador ya no lo
+       toma como un toque y bloquea la ventana. Si igual la bloquea, se navega al final. */
+    let w = null, url = "";
+    if (prender) {
+      url = "https://wa.me/" + WA_MARIAN + "?text=" + encodeURIComponent(pendNoRecibidoMsg(st.row));
+      try { w = window.open(url, "_blank"); } catch (_e) { w = null; }
+    }
+    b.disabled = no.disabled = true;
+    const ahora = new Date().toISOString();
+    const patch = prender ? { gv_no_recibido_at: ahora, gv_recibido_por: null, gv_recibido_at: null } : { gv_no_recibido_at: null };
+    try {
+      await pendPersist(id, patch);
+      st.no_recibido_at = prender ? ahora : null;
+      if (prender) { st.recibido = null; st.recibido_at = null; }
+    } catch (e) { alert("No se pudo guardar: " + ((e && e.message) || e)); }
+    sync(); pendRefreshEnviar(id);
+    if (prender && !w) { try { location.href = url; } catch (_e2) {} }
+  };
   row._pendSync = sync;
-  row.appendChild(b); row.appendChild(lbl); row.appendChild(hint);
+  box.appendChild(lbl); box.appendChild(hint);
+  row.appendChild(b); row.appendChild(box); row.appendChild(no);
   sync();
   return row;
+}
+/* v24.89 — el mensaje a Marian: día y hora en que se cargó la recepción (cuando llegó), el
+   número de remito y quién lo trajo. */
+function pendNoRecibidoMsg(r) {
+  r = r || {};
+  const ms = r.created_at ? new Date(r.created_at).getTime() : 0;
+  let dia = "", hora = "";
+  if (ms) {
+    try {
+      // en-GB y no es-AR: es-AR da "23/9" (sin el cero del mes) en Chrome.
+      dia = new Date(ms).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", timeZone: "America/Argentina/Buenos_Aires" });
+      hora = new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Argentina/Buenos_Aires" });
+    } catch (_e) {
+      const d = new Date(ms);
+      dia = String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
+      hora = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    }
+  } else {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(r.fecha || ""));
+    if (m) dia = m[3] + "/" + m[2];
+  }
+  return "Hola Marian, no recibí el remito " + (r.remito ? r.remito + " " : "") +
+    "que te llegó el día " + (dia || "?") + (hora ? " a las " + hora : "") +
+    " de " + (r.nombre || "?") + ", confirmame porfa que lo tenés o si ya lo mandaste";
 }
 /* Quién recibe: igual que Cuarentena — chips fijos + «Otro…» con texto. OBLIGATORIO y sin
    preselección (un valor puesto de fábrica se confirma sin leerlo). */
@@ -3562,8 +3625,11 @@ function pendQuienModal(o) {
 async function pendRecibido(id, card, quien) {
   const st = _pendRows[id]; if (!st || st.sent) return;
   const ahora = new Date().toISOString();
-  await pendPersist(id, { gv_recibido_por: quien || null, gv_recibido_at: quien ? ahora : null });
+  const patch = { gv_recibido_por: quien || null, gv_recibido_at: quien ? ahora : null };
+  if (quien) patch.gv_no_recibido_at = null;   // v24.89: excluyente con «No recibido»
+  await pendPersist(id, patch);
   st.recibido = quien || null; st.recibido_at = quien ? ahora : null;
+  if (quien) st.no_recibido_at = null;
   const rr = card && card.querySelector(".pcRecibidoRow"); if (rr && rr._pendSync) rr._pendSync();
   pendRefreshEnviar(id);
 }

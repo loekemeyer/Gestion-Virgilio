@@ -30790,3 +30790,23 @@ select * from public.gv_ppp_tanda_camion_mezclado;   -- vacía = todo bien
 ```
 
 `sql/gv_balvanera_once_zona1_v2440.sql` (rollback en la cabecera).
+
+
+## §3.v2489 — `Control_Modo_OP.gv_no_recibido_at`: «No recibido» en Pendientes de Recepción · Mel, 30/09/2026
+
+**Pedido (Mel):** un botón **«No recibido»** a la derecha de «Recibido», con el mismo criterio que
+«No corresponde», que abra WhatsApp a Marian (5491131181186) con el remito.
+
+```sql
+alter table public."Control_Modo_OP" add column if not exists gv_no_recibido_at timestamptz;
+```
+
+- Columna nueva **nullable, sin default y sin backfill** (regla de la tabla compartida: se agrega,
+  no se modifica). Ninguna fila cambió. `anon` y `authenticated` la leen y la escriben por el grant
+  de tabla que ya existía (medido con `has_column_privilege`: SELECT y UPDATE en `true`).
+- Los triggers de la tabla (`exigir_foto_procesado`, `gv_control_modo_op_nombres`) no la tocan.
+- **Excluyente con `gv_recibido_por`**: prender «No recibido» borra el recibido, y tildar Recibido
+  borra `gv_no_recibido_at`. **No habilita Enviar**: `pendRowComplete` sigue exigiendo Recibido.
+- **Rollback, una línea:** `alter table public."Control_Modo_OP" drop column gv_no_recibido_at;`
+  (antes, sacar la columna del `select` de `renderPendientes` en `recepcion.js`, o Pendientes da error).
+- Test: `tests/pend-no-recibido.cjs`.
