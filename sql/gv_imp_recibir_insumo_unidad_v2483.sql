@@ -38,3 +38,8 @@ end $$;
 --   bache 134 (323ES) es_insumo true, cods ['323ES In'].
 --   Rollback: insert into public."GV_Importados_Alias" select * from zz_backups."GV_Backup_ImpAlias_20260930"
 --             where cod in ('323E','838E');
+
+-- v25.7 (Luis 30/09: "323ES nunca fue un código de stock... usá 323ES para el insumo"): '323ES In' -> '323ES'
+--   en Insumos, Insumos_Factores, GV_Importados_Insumo_Map (insumo_cod) e Importados_Stock_Parte (parte).
+--   0 movimientos con ese código. Backup: zz_backups."GV_Backup_323ESIn_20260930" (5 filas, to_jsonb).
+--   Verificado: gv_imp_recibir_contexto(134) -> insumos_cods ['323ES'], es_insumo true.

@@ -3802,6 +3802,8 @@ El cartel de un producto toma la fecha **más temprana** entre su pedido y el de
 **v25.2 (Luis, 30/09): 323E y 838E NO se agrupan con 323ES** (*"no debería juntarlos así"*): se borraron sus filas de
 `GV_Importados_Alias` (backup `zz_backups."GV_Backup_ImpAlias_20260930"`; queda sólo 865ED→865E) y `gv_imp_recibir_contexto`
 ya no usa el alias: los pedidos de 323E/838E se reciben en cajas, sólo el de 323ES entra como insumo `323ES In`.
+**v25.7 (Luis, 30/09): el insumo se llama `323ES`, no `323ES In`** (*"323ES nunca fue un código de stock"*): renombrado en
+`Insumos`, `Insumos_Factores`, `GV_Importados_Insumo_Map` e `Importados_Stock_Parte` (0 movimientos; backup `zz_backups."GV_Backup_323ESIn_20260930"`).
 
 **Desglose de la tarjeta del proveedor (Luis, v23.75):** los dos chips de la banda se expanden. Izq: consumo/mes =
 Σ proy u/mes × FOB por artículo, y meses = (mínimo − a pedir hoy) ÷ consumo. Der: CIF y cada línea de lo no
