@@ -449,7 +449,7 @@ insert into public."GV_Articulo_INAL" (codigo, tomado_de, marca, descripcion, im
   ('092E',null,'Loekemeyer - Loke - Chef',null,'CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('093E',null,'Loekemeyer - Loke - Chef',null,'CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('110E','110','Loekemeyer - Loke - Chef','Colador 8cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
-  ('111E',null,'Loekemeyer - Loke - Chef','Abrelata Mariposa Blanco','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
+  ('111E','111','Loekemeyer - Loke - Chef','Colador 10cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('113E','113','Loekemeyer - Loke - Chef','Colador 20cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('437E',null,'LK','Colador 16cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('437EL',null,'LK','Colador 16cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
@@ -459,14 +459,15 @@ insert into public."GV_Articulo_INAL" (codigo, tomado_de, marca, descripcion, im
   ('439EL',null,'LK','Cola Pasta 22cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('440E',null,'LK','Colador Extensible','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('440EL',null,'LK','Colador Extensible','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
-  ('442E',null,'Loekemeyer - Loke - Chef','Bowl Ac. Inox. Base Silicona 16cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
-  ('442EL','442E','Loekemeyer - Loke - Chef','Bowl Ac. Inox. Base Silicona 16cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
-  ('443E',null,'Loekemeyer - Loke - Chef',null,'CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
-  ('443EL',null,'Loekemeyer - Loke - Chef',null,'CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
-  ('823E','823','Loekemeyer - Loke - Chef','Exprimidor De Cítricos','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
+  ('442E',null,'Loekemeyer - Loke - Chef','Colador Espumadera 17cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
+  ('442EL','442E','Loekemeyer - Loke - Chef','Colador Espumadera 17cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
+  ('443E',null,'Loekemeyer - Loke - Chef','Colador Espumadera 20cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
+  ('443EL','443E','Loekemeyer - Loke - Chef','Colador Espumadera 20cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
+  ('823E','823','Loekemeyer - Loke - Chef','Colador Ø 7cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('824E','824','Loekemeyer - Loke - Chef','Colador Ø 8cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('825E','825','Loekemeyer - Loke - Chef','Colador Ø 10 Cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('826E','826','Loekemeyer - Loke - Chef','Colador 13','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
+  -- D11 (Thomas, 30/09): descripciones del certificado SENASA corregidas según su lista (111E, 442E, 443E, 823E son coladores).
   -- D6/D9 (Thomas, 30/09): el 111 es el «111E» del certificado SENASA (la planilla le puso mal la
   -- descripción: es el Colador 10 cm, no un abrelatas). El 112 y el 035E van en un INAL NUEVO todavía
   -- sin número (tarea de Viviana en Planify, 13/10): llevan INAL con el certificado pendiente.

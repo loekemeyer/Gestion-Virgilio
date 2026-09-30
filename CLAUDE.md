@@ -1570,6 +1570,15 @@ que suman 0 por código. Quedaron **21 a contar** y 7 códigos sin posición (50
 Insumos en racks (523C, 546V, 102E, 522S, 1000900) quedan «a contar» hasta el paso de alias de ubicación de insumos.
 Rollback: `sql/gv_racks_canon_v2277.sql`. Lo sostiene `tests/pmap-racks.cjs`.
 
+⚠⚠ **El CONTEO del Mapa no se SUMA a lo sin posición** (Marianela, 30/09, v25.15: *"el conteo está bien, lo que
+suma está mal"*). `gv_rack_posicion_guardar`, si lo contado es MAYOR a lo que tenía la posición, primero **traslada**
+lo sin posición del mismo código (es la misma mercadería) y sólo el resto entra como ajuste. Antes lo sumaba: 505I
+quedó en 2614 con 1475 contadas, 056E +84, 816E +120 (corregidos a mano ese día). Marcador `sinpos-mapa-3009`,
+centinela id 260, problema 648. `sql/gv_rack_posicion_guardar_sinpos_v2515.sql`.
+Y ese día se dieron de alta **O02** y **O05** (racks LK que no existían) y **Z07 pasó de góndola a rack** (su celda
+del 363E era falsa: la góndola del 363E es J04). Problema 646. Al contar en una posición que el Mapa no conoce,
+se da de alta en `GV_Lugar`, no se carga en otra.
+
 ### ⚠ INSUMOS: dónde está cada uno sale del Mapa (Luis, 25/09, v22.80)
 
 **Luis:** *"es un mismo depósito físico … son racks de insumos. Dejalos con el nomenclador que ya existe, no inventes
@@ -3668,6 +3677,13 @@ borró). Layout:
 
 ### Admin de Cervantes — dos pantallas, COPIADAS acá (`cervantes-admin/`)
 
+> ⚠⚠ **v25.19 (Luis, 30/09, D9): GP2 YA NO ES COPIA — es LINK DIRECTO** a
+> `https://gesti-n-productiva-2-0.vercel.app/GP2_MODULOS.html` (`GP2_URL` / `abrirAdminCervantes`, otra pestaña).
+> La copia se quedaba atrás (v1.137 contra v1.211) y se borró: en `cervantes-admin/gp2/` quedan sólo docs
+> (`LEEME.md`, el CLAUDE.md renombrado, `CONOCIMIENTO_GP2.md`, `GP2_MAPA.md`, `agentes/`). Al ser otro sitio,
+> **GP2 pide su propio login** (Google + su lista de mails) y no hereda la sesión de Gestión. Todo lo de abajo
+> sobre la copia de GP2 queda como historia; el admin «entero» sigue siendo copia.
+
 - **El supervisor que elige Cervantes en el selector de planta NO va a la pantalla de
   operario: va al admin** (`chooseCervantes` → `showCervAdmin`, v14.73). El operario sigue
   derecho a `./cervantes/`. La distinción es `__identity.type === "supervisor"`.
@@ -3681,7 +3697,7 @@ borró). Layout:
   tampoco entra `db/A_Costos_VIGENTES.xlsx`**: es la planilla madre de costos, o sea datos, y
   este repo se sirve por GitHub Pages. Que el `.gitignore` del origen la deje pasar allá no
   significa que tenga que viajar acá.
-- **Re-sincronizada el 2026-09-12 (v16.32)**, con 92 diferencias acumuladas. Cómo se hace, para
+- **Re-sincronizada el 2026-09-30 (v25.17, GP2 v1.211.0; antes la copia estaba en v1.137.0 — el 12/09, v16.32)**, con 92 diferencias acumuladas. Cómo se hace, para
   la próxima: copiar `gestion-productiva-2.0` entero salvo lo de arriba, **re-aplicar a mano los
   parches de la copia** (los de abajo) y **verificarlos uno por uno antes de commitear** — el
   del `signOut` es el que importa: si se pierde, un supervisor que no esté en la whitelist de
@@ -6598,3 +6614,48 @@ de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (
   con `aceptado` = ya tiene código real (no `TMP-`). La escribe `gv_gp2_aceptado_sync()` (cron `gv-gp2-aceptado-sync`,
   cada 10 min, poda lo que desaparece). Al 30/09: 24 filas, 7 aceptadas, 17 con TMP. **323ES quedó Mixto.**
   `sql/gv_gp2_aceptado_virgilio_v2515.sql`.
+- **v25.17 (Luis, 30/09, D5): GP2 ve el stock de insumos y el Mapa de Virgilio**, en tres tablas de **solo lectura** del
+  schema GP2 (así no rompe su Regla 0): `virgilio_insumo_stock`, `virgilio_insumo_ubicacion` y `virgilio_lugar`. Las
+  llena `gv_gp2_espejo_sync()` (cron `gv-gp2-espejo-sync`, c/10 min, reescribe sólo si cambió el md5). Luis: *"que los
+  dos tengan acceso a los datos y que puedan hablar"*; el vínculo de códigos (D3) va después. `sql/gv_gp2_espejo_v2517.sql`.
+
+## ⚠ REGLA (Luis, 2026-09-30, v25.18): «⟳ Refrescar ya» en Stocks — el SALDO ya es en vivo, lo que espera es lo DERIVADO
+
+**Luis:** *"pone un boton en la tabla de stocks que permita refrescarla «por la fuerza». 2 minutos es un monton"* ·
+*"esto no estaba en vivo entonces?"*.
+
+| dato de la tabla de Stocks | cuándo se actualiza |
+|---|---|
+| saldo por depósito (góndola, excedente, pickeados, a facturar…) | **en vivo**: `trigger_actualizar_saldo_stock` reescribe la fila de `stocks_carga_rapida` en cada movimiento y el realtime (`stkSubscribeRealtime`) la parchea en pantalla |
+| cajas pedidas, proyección, capacidad, FC s/salida, altas/bajas de códigos | **hasta 2 min** (cron 55 → `gv_refresh_stock_si_cambio`), porque salen de la matview |
+
+El botón adelanta lo segundo. El refresco completo tarda **~7,4 s** (matview 1,7 + carga_rapida 5,7) y
+`authenticated` corta a los **8 s**, así que **el navegador NO lo corre**: `gv_stock_refrescar_ya()` (supervisor)
+agenda un job de pg_cron de **un disparo** (`'2 seconds'`, corre como postgres sin timeout) que **se borra a sí
+mismo primero** y llama a `gv_refresh_stock_si_cambio(0, false)`; si el lock 5768 está tomado, espera y reescribe
+la derivada igual. La pantalla mira `gv_stock_refresco_ultimo()` cada 1,5 s y reabre Stocks **conservando solapa y
+búsqueda**. Medido: ~9 s del click a la tabla nueva. Doble click → `en_curso`, no agenda dos.
+
+⚠ Hacer TODO en vivo (lo derivado incluido) no es viable: cambia por pedidos, capacidad y proyección, que son otras
+tablas, y reescribir la derivada cuesta 7 s por cambio.
+`sql/gv_stock_refrescar_ya_v2518.sql`, `tests/stk-refrescar-ya.cjs`.
+
+## ⚠ REGLA (Marianela, 2026-09-30, v25.20): la cola offline de stock se reintenta FILA POR FILA — y «Fijar» lee el saldo del servidor
+
+**Marianela:** *"El operario 104 hizo un movimiento de góndola a Cervantes por el art 328E de 48 cajas y no impactó, ¿por qué?"*
+
+- **La cola `vir_stock_pend` se mandaba en UN POST**, y el insert es una transacción: una sola fila que el server
+  rechaza hacía fallar el lote entero en cada recarga, y todo lo de atrás quedaba trabado **para siempre** en ese
+  celular. Medido el 30/09: el del legajo 104 reintentaba ~20 veces por día un guardado del 599E que ya había
+  entrado el 21/09 (400 del candado de A guardar), y atrás quedó la salida a Cervantes del 328E (48 cj).
+- Hoy `stockFlushPend` va fila por fila: ok → sale · 409 duplicado (ya estaba) → sale · 400/422 de datos → sale y
+  queda en **`vir_stock_rech`** (localStorage) · red / 5xx / permisos → queda. Lo que se encole mientras tanto no se pierde.
+- ⚠ **Cuando el celular trabado se actualiza, lo atrasado ENTRA SOLO**, con fecha de hoy. Antes de cargar a mano un
+  movimiento "que no impactó", mirar si no llegó con la actualización: si no, se duplica.
+- **«Fijar» (ajuste admin) calculaba el saldo con `_stk.movs`**, que se carga en segundo plano (el libro entero):
+  antes de que llegara veía 0, decía "ya es 0" y no grababa (566E). Ahora pregunta a `gv_saldos_por_clave`; sin
+  lectura no fija nada.
+- **Cómo se ve una cola trabada:** edge logs con POST `/rest/v1/Movimientos_Stock` en 400/409 repetidos desde la
+  misma IP/celular; el `raise` del trigger está en `postgres_logs`, y el legajo sale cruzando la hora contra
+  `Registros_Produccion_Virgilio.created_at`.
+- `tests/stock-cola-por-fila.cjs` (verificado que falla contra la v25.15).
