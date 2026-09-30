@@ -6236,7 +6236,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.18"></script>
+<script type="module" src="recepcion.js?v=25.19"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10278,7 +10278,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.18";
+const APP_VERSION = "v25.19";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -57678,7 +57678,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.18"></script>
+<script src="importacion.js?v=25.19"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -58086,8 +58086,13 @@ window.showCervAdmin = showCervAdmin;
    no links a otros repos: esto es una integración, todo vive en Gestión (decisión del
    dueño, 2026-09-10). Cada copia entra por su propio index.html, que decide si va al
    menú o al login; la sesión de Google ya es la misma. */
+/* v25.19 (Luis, 30/09, D9): GP2 va por LINK DIRECTO a su publicación, no a la copia: la copia se
+   quedaba atrás (el 30/09 estaba en v1.137 con la real en v1.211). Se abre en otra pestaña porque es
+   otro sitio: ahí pide su propio login. El "entero" sigue siendo la copia de acá. */
+var GP2_URL = "https://gesti-n-productiva-2-0.vercel.app/GP2_MODULOS.html";
 window.abrirAdminCervantes = function (cual) {
-  window.location.href = (cual === "gp2") ? "cervantes-admin/gp2/" : "cervantes-admin/entero/";
+  if (cual === "gp2") { var w = window.open(GP2_URL, "_blank", "noopener"); if (!w) window.location.href = GP2_URL; return; }
+  window.location.href = "cervantes-admin/entero/";
 };
 window.cambiarPlanta = function () {
   __plantChosen = false;
@@ -60438,7 +60443,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.18"></script>
+<script src="cobranzas.js?v=25.19"></script>
 
 </body>
 </html>

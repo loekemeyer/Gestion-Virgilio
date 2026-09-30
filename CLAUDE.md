@@ -3668,6 +3668,13 @@ borró). Layout:
 
 ### Admin de Cervantes — dos pantallas, COPIADAS acá (`cervantes-admin/`)
 
+> ⚠⚠ **v25.19 (Luis, 30/09, D9): GP2 YA NO ES COPIA — es LINK DIRECTO** a
+> `https://gesti-n-productiva-2-0.vercel.app/GP2_MODULOS.html` (`GP2_URL` / `abrirAdminCervantes`, otra pestaña).
+> La copia se quedaba atrás (v1.137 contra v1.211) y se borró: en `cervantes-admin/gp2/` quedan sólo docs
+> (`LEEME.md`, el CLAUDE.md renombrado, `CONOCIMIENTO_GP2.md`, `GP2_MAPA.md`, `agentes/`). Al ser otro sitio,
+> **GP2 pide su propio login** (Google + su lista de mails) y no hereda la sesión de Gestión. Todo lo de abajo
+> sobre la copia de GP2 queda como historia; el admin «entero» sigue siendo copia.
+
 - **El supervisor que elige Cervantes en el selector de planta NO va a la pantalla de
   operario: va al admin** (`chooseCervantes` → `showCervAdmin`, v14.73). El operario sigue
   derecho a `./cervantes/`. La distinción es `__identity.type === "supervisor"`.
