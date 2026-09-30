@@ -1,4 +1,4 @@
-/* v24.86 — (k) ISLAS como el PDF: hueco entre bloques y borde grueso (Elias, 29/09).
+/* v25.23 — (k) ISLAS como el PDF: hueco entre bloques y borde grueso (Elias, 29/09).
    v21.28 — Reporte diario Virgilio: el CUADRO tiene que entrar ENTERO, arrancar en HOY y
    dejar medir un LAPSO de horas.
    Luis, 22/09, con la captura del modal cortado: "tiene que mostrar todo el cuadro sinoptico

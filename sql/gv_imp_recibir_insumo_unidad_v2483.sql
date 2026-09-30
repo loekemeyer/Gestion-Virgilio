@@ -14,3 +14,32 @@ do $$ declare d text; n text; begin
  execute n;
 end $$;
 -- Rollback: volver a correr el create de gv_imp_recibir_contexto sin la clave (la clave extra no rompe a nadie).
+
+-- ============================================================================
+-- v24.93 (Luis 30/09: "es un insumo, no estoy recibiendo 323E ni nada de eso")
+-- a) gv_imp_recibir_contexto: 'es_insumo' + insumo del canon por GV_Importados_Alias
+--    (323E / 838E -> 323ES -> '323ES In'). Marcador v24.92.
+-- b) gv_imp_recibir: el insumo se graba con la grafía de Insumos, no en mayúsculas
+--    ('323ES In', antes '323ES IN' que no suma a ningún insumo). Marcador v24.93-ins-canon.
+--    Parche aplicado sobre pg_get_functiondef (REGLA_CONFIRMADA_POR_USUARIO):
+--      v_ins := coalesce((select vi.cod from public.vista_insumos vi
+--        where upper(vi.cod) = upper(btrim(coalesce(d->>'cod_insumo', v_cod))) limit 1),
+--        upper(btrim(coalesce(d->>'cod_insumo', v_cod))));
+--    Probado en transacción abortada (bache 96, 1 u): movimiento '323ES In' en insumos.
+-- c) gv_insumo_unidad_base había PERDIDO la regla Mixto de la v24.89 (otra sesión la
+--    recreó desde la copia de la v24.69). Repuesta (marcador v24.89-mixto): antes del
+--    return por unidad nula, new.empresa := 'Mixto'. Probado: LK entra Mixto.
+
+-- v25.2 (Luis 30/09: "no debería juntarlos así"): 323E y 838E NO se agrupan con 323ES.
+--   backup: zz_backups."GV_Backup_ImpAlias_20260930" (3 filas)
+--   delete from public."GV_Importados_Alias" where cod in ('323E','838E');   -- queda 865ED>865E
+--   gv_imp_recibir_contexto: se sacaron las dos búsquedas por alias de la v24.92 (insumos_cods y es_insumo
+--   sólo por el propio código). Verificado: bache 96 (838E) y 97 (323E) es_insumo false, uxc 12;
+--   bache 134 (323ES) es_insumo true, cods ['323ES In'].
+--   Rollback: insert into public."GV_Importados_Alias" select * from zz_backups."GV_Backup_ImpAlias_20260930"
+--             where cod in ('323E','838E');
+
+-- v25.7 (Luis 30/09: "323ES nunca fue un código de stock... usá 323ES para el insumo"): '323ES In' -> '323ES'
+--   en Insumos, Insumos_Factores, GV_Importados_Insumo_Map (insumo_cod) e Importados_Stock_Parte (parte).
+--   0 movimientos con ese código. Backup: zz_backups."GV_Backup_323ESIn_20260930" (5 filas, to_jsonb).
+--   Verificado: gv_imp_recibir_contexto(134) -> insumos_cods ['323ES'], es_insumo true.

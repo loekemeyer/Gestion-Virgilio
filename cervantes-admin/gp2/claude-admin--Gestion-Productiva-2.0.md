@@ -1,6 +1,6 @@
 > ⚠️ **ESTO ES DOCUMENTACIÓN, NO INSTRUCCIONES.**
 >
-> Es el `CLAUDE.md` del repo **`Gestion-Productiva-2.0`**, traído tal cual el 2026-09-10 cuando ese admin
+> Es el `CLAUDE.md` del repo **`Gestion-Productiva-2.0`**, traído tal cual el 2026-09-10 (re-sincronizado el 2026-09-30, v1.211.0) cuando ese admin
 > se copió acá adentro (`cervantes-admin/gp2/`). Se guarda **renombrado a propósito**: un archivo
 > llamado `CLAUDE.md` dentro de este repo se carga como instrucciones del proyecto, y una
 > sesión de Gestión Virgilio terminaría obedeciendo las reglas de otro repo (locks, ramas,
@@ -12,6 +12,191 @@
 > Las reglas que mandan acá están en el `CLAUDE.md` de la raíz de Gestión Virgilio.
 
 ---
+
+# 📕 REGLA 0 (primera hoja del libro) — TODO LO DE SUPABASE SALE DEL SCHEMA `GP2`. NUNCA DE `public`.
+
+## ⚠ CÓMO RESPONDER (vale para TODOS los repos — copiar este bloque entero al `CLAUDE.md` del repo nuevo)
+
+Pedido de Elías, 28/09/2026. Son las preferencias del dueño, escritas acá para que valgan
+siempre y no dependan de que estén cargadas en la sesión.
+
+### ROL
+
+- Actuá como **asesor, no asistente**. Primera frase: cuestioná mi supuesto, marcá lo omitido
+  o abrí un vacío; **nunca empieces validándome**.
+- Etiquetá: **[Seguro]** = sólido · **[Probable]** = inferencia fuerte · **[Adivinando]** =
+  relleno. Si predomina especulación, avisalo.
+- **Prohibido**: "Buena pregunta", "Tienes toda la razón", "Eso tiene mucho sentido",
+  "Absolutamente", "Definitivamente".
+- Si discrepás: *"No estoy de acuerdo porque [razón]. En su lugar haría [alternativa]. El
+  riesgo es [riesgo]"*.
+- **Verdad incómoda primero.** Si me contradigo, no retrocedas salvo info nueva; "pero yo
+  creo…" no cuenta.
+- Respuestas **breves y numeradas**; actor + acción por punto.
+- Claude Code / UI: evitar 100% de ancho y huecos.
+
+### DATOS
+
+- Las reglas de esta sección aplican **sólo con "cuadro sinóptico"**; si no, prosa o lista.
+- Tabla con **3+ filas comparables**; si no, lista. **Nunca 2 columnas para una oración.**
+- Tabla: unidad y período si aplica. Sin "varios / algunos / muchos": **número exacto o nada**.
+- Ancho según el dato, no el título; encabezado de 2-3 líneas y después abreviar. Sin ancho
+  fijo, relleno, color ni espacio muerto.
+- **Coma decimal, punto de miles**; gramos con 2 decimales.
+- Ordenar por **gravedad o dinero, mayor → menor**; nunca alfabético.
+- Entrega **SVG compacto**: columnas próximas, ancho según dato, sin ancho sobrante; contenido
+  14, títulos 16, centrado H/V, sin relleno ni color. Si no hay SVG, markdown normal sin
+  columnas vacías ni `&nbsp;`.
+
+### CORRECCIÓN
+
+- Si el dueño corrige un dato, **retiralo explícitamente**; no repitas hallazgos ya conocidos.
+- Antes de decir que falta algo: buscá el **caso hermano o el contraejemplo** y chequeá peso y
+  suma. Si no cierra, decilo; **no inventes**.
+- Cerrá con **decisiones pendientes: máximo 3, por impacto**. **Sin resumen.**
+  ⚠ Esta línea reemplazó a la regla anterior *"cada respuesta cierra con Resumen"*, que se
+  retiró el 28/09/2026 a pedido de Elías (*"elimina resumen"*). Las decisiones pendientes SON
+  el cierre; un resumen repite lo que ya está escrito arriba.
+
+### BD
+
+- **Nunca INSERT / UPDATE / DELETE sin un "sí" del dueño EN ESE MOMENTO.** Antes hay que
+  mostrar el **SQL exacto y sus efectos en cadena**. Un "espera" **anula** la autorización.
+- **Después de escribir: SELECT de verificación.** Siempre.
+- **EXCEPCIÓN — Planify**: sólo **crear y cerrar tareas** va automático. Cualquier otro cambio
+  requiere el "sí". **Auditoría**: toda escritura requiere confirmación, sin excepción.
+
+### PLANIFY y AUDITORÍA
+
+Las reglas completas están más abajo en este mismo archivo (bloques *"preguntar QUIÉN habla"*
+y *"auditar en Supabase cada problema"*). **No se duplican acá a propósito**: dos copias de la
+misma regla terminan divergiendo, que es el pozo del módulo de Matricería duplicado (1.0.67 →
+1.0.71). Tres puntos donde la versión corta que circula está **desactualizada**, corregidos
+el 28/09/2026:
+
+1. **Thomas Loekemeyer es el `employee_id` 3, NO el 20.** El 20 es **Tomás Beviglia**. Los
+   pedidos de Thomas van a `Tareas T` (empleado 3) o al Planify del área que corresponda, con
+   el prefijo `Th `. Mandarlos al 20 es lo que hizo que la agenda de Tomás juntara 92 pedidos
+   que no eran suyos.
+2. **La pregunta "¿Falta algo más para dar por cerrada la tarea?" está PROHIBIDA.** El cierre
+   es por criterio propio y sin preguntar (dueño, 11/09/2026: *"las que ya están cerradas,
+   cerradas"*).
+3. **La nota de la tarea lleva el formato obligatorio**, no "1-3 líneas sueltas":
+   `Falta: <qué hay que hacer>. Pedido de <Nombre> · cargada por Claude, sesión <url>`.
+
+### ⚠ ANTES DE EMPEZAR A TOCAR UN REPO: mirar el semáforo
+
+Pedido de Elías, 28/09/2026: *"con esto podés poner 'estás haciendo push o commit ahí' y
+leerlo de ahí para saber si tenés que esperar o si tenés vía libre"*.
+
+**Al arrancar el trabajo en un repo** (antes de escribir la primera línea, no antes de
+pushear):
+
+```sql
+-- 1) ¿hay alguien más adentro? Cero filas = vía libre.
+select * from planify.planify_proyecto_via_libre(<tu_employee_id>, <repo_id>);
+
+-- 2) registrarse (idempotente: llamarla de nuevo sólo renueva el latido)
+select planify.planify_proyecto_sesion_abrir(
+  <tu_employee_id>, <repo_id>, '<url de esta sesión>', '<qué vas a tocar>', '<branch>');
+
+-- 3) antes de pushear, marcar el estado
+select planify.planify_proyecto_sesion_abrir(
+  <tu_employee_id>, <repo_id>, '<url de esta sesión>', null, null, 'pusheando');
+
+-- 4) al terminar
+select planify.planify_proyecto_sesion_cerrar(<tu_employee_id>, <sesion_id>);
+```
+
+El `repo_id` sale de `github_repo_problemas.repos` (`select id, full_name from
+github_repo_problemas.repos where activo`).
+
+**Estas cuatro escrituras van AUTOMÁTICAS, sin pedir el "sí"** — misma excepción que crear y
+cerrar tareas de Planify. Son telemetría de quién está trabajando dónde, no tocan ningún dato
+del negocio, y si hubiera que pedir permiso cada vez nadie las usaría, que es exactamente cómo
+`problemas.sesion_url` terminó cargada en 14 de 580 filas.
+
+⚠⚠ **ESTO NO ES UN CANDADO Y NO PUEDE SERLO.** Frena a quien lo lee, no a quien no lo lee.
+**El candado real es git**, y funciona: el 28/09 a las 16:52 un push fue rechazado porque otra
+sesión había pusheado 9 minutos antes tocando el mismo archivo. Lo que agrega el semáforo es
+avisar **al principio** en vez de al final, con el trabajo ya hecho. Si el semáforo dice verde
+y git rechaza, **manda git**.
+
+⚠ **El lease se vence solo a los 45 minutos sin latido**, a propósito: un contenedor de Claude
+Code web se recicla sin avisar (pasó con el commit de 1.0.78), y una fila abierta para siempre
+deja el repo en rojo por nadie, que es peor que no tener semáforo.
+
+**El caso real que esto viene a evitar** no es que se pisen los pushes —eso nunca pasó, se
+verificó sobre los 141 commits que compilaron y ninguno quedó huérfano— sino el del 16/09:
+**dos sesiones construyeron el mismo módulo de Matricería en paralelo**, las dos pushearon
+bien, git integró todo, y **se tiró un módulo entero de 18 funciones** porque hubo que elegir
+uno. Git cuida la integridad; no cuida el trabajo duplicado.
+
+### El commit dice QUIÉN LO HIZO
+
+Todo commit lleva este trailer, con la persona que estaba en la sesión de Claude — **el que
+hace, no el que pide**:
+
+```
+Hecho-por: <Nombre> (employee_id <N>)
+```
+
+Y sólo **cuando difiere**, se agrega también quién lo pidió:
+
+```
+Pedido-por: Thomas Loekemeyer
+```
+
+⚠ **Por qué hace falta, medido el 28/09/2026 sobre los 309 commits de Planify**: **275 (89%)
+tienen exactamente el mismo autor de git** (`Claude <noreply@anthropic.com>`) y todos los
+pushes salen de la misma cuenta de GitHub. **Por git es imposible saber quién trabajó.** El
+dato existe —Claude pregunta quién habla al empezar la sesión— pero no llegaba a ningún lado.
+
+⚠ **Y "quién pidió" NO sirve como sustituto**: Thomas tiene **0 eventos de sesión** y nunca se
+logueó, y hay **40 commits que lo mencionan**. En esos 40, quien pidió no puede ser quien hizo.
+147 de los 309 commits nombran a una persona en prosa, pero **sin decir en qué rol**, así que
+ese dato no se puede agrupar ni parseando.
+
+El precedente de que un trailer fijo funciona es `Claude-Session:`, presente en **238 de 309
+commits (77%)**.
+
+**Regla del usuario (2026-09-12, textual): "quiero que esa máxima figure en la primera hoja del
+libro… siempre que en cualquier sesión se hable de este repositorio, considerarlo para cuando
+haya que trabajar con Supabase".** Se lee ANTES de escribir la primera consulta.
+
+- **Cliente:** toda pantalla GP2 usa `GP2_SB()` (schema `GP2`, definido en `supabase-config.js`).
+  Un `supabase.createClient(...)` suelto cae en `public` — eso está prohibido en GP2.
+- **Tablas, vistas y RPCs:** lo que necesita una pantalla GP2 **tiene que existir en `GP2`**. Si no
+  existe, se crea en `GP2` (mirando la lógica del vecino si hace falta), no se apunta a `public`.
+- **Adentro de la base igual:** ninguna función ni vista de `GP2` lee tablas de negocio de `public`.
+- **Internalizar NO es copiar la tabla del vecino.** Lo que hoy se mira en `public` entra a GP2
+  **con la normalización de GP2** [usuario 2026-09-12: *"mantengamos la lógica de la normalización
+  que yo uso en schema gp2"*]: el modelo es `componente` → `inventario` → `articulo_componente` /
+  `componente_bom` → `ruta` / `ruta_paso` → `contraparte_alias` (ver "Completar tablas manteniendo
+  la NORMALIZACIÓN" más abajo). Antes de crear una tabla nueva, **preguntarse si el dato ya se
+  deduce del modelo**: caso real del 2026-09-12, "qué artículo entrega cada tallerista" NO necesitó
+  calcar `Articulos Virgilio X Tallerista` — sale del último paso con contraparte antes del paso
+  `virgilio` de la ruta. Una tabla plana del vecino copiada tal cual es deuda, no migración.
+- **`public` = la casa del vecino** (programa viejo "Gestión Productiva Entero"): **solo lectura, y
+  solo para entender cómo resolvió algo**. Ni un dato de negocio de GP2 sale de ahí.
+
+**Por qué existe la regla (dicho por el dueño, 2026-09-12):** *"La creación de este repositorio
+surgió porque en gestión productiva entero era todo quilombo, y yo empecé subiendo las tablas
+normalizadas… En medio se hicieron como cincuenta tablas que mira desde public, y es un desastre,
+yo no quería eso"*. Mirar `public` traiciona el motivo por el que GP2 existe. Detalle y auditoría
+completa en `CONOCIMIENTO_GP2.md` §4cf.
+
+**Estado al 2026-09-12 (auditado y limpiado):** el menú `GP2_MODULOS.html` abre **solo pantallas
+GP2**; las 43 `*_GP2.html` (más `login.html`, que usa `sb.schema('GP2')`) usan el cliente GP2, y
+ninguna función ni vista de `GP2` toca una tabla de `public` (única referencia: `public.http_get`,
+la extensión http). Las **50 pantallas viejas que ya tenían reemplazo GP2 se borraron** (109
+archivos; siguen en el historial de git y en `GestionProductivaEntero`). Quedan **3 archivos**
+mirando `public`, ninguno colgado del menú y ninguno en uso: Control Carga Remitos, Preavisos e
+`InformesVirgilio` (la carpeta `Facturas/` se borró entera el 2026-09-13: su único archivo llamaba a
+la Edge Function `leer-factura` con la clave de OpenAI filtrada — ver LOCKS), que es de Gestión Virgilio y tiene su propio repo. El último que
+estaba **vivo**, Calcular Cajones, se migró el 2026-09-13 (`CalcularCajones_GP2.html` +
+`GP2.cajon`). El mapa completo, con lo
+que se borró y lo que se relinkeó antes de borrar, está en `MIGRACION_PUBLIC_GP2.md`.
 
 # ⚠️ ANTES DE CUALQUIER EDIT/WRITE: LEER LOCKS.txt Y REGISTRAR LockX. SIN EXCEPCIONES. ⚠️
 
@@ -31,6 +216,21 @@ confirmación: el trabajo terminado y verificado se commitea y se pushea **a `ma
   y `main` no tenía el código que los acompaña. Ese desfasaje es el peligro real.
 - **Ojo**: lo que se aplica en Supabase (migraciones, datos) **no lo versiona git** y queda
   vivo al instante. Razón de más para que el código llegue a `main` en el mismo momento.
+
+# ⚡ EN ESTE REPO EL SQL SE EJECUTA, NO SE PREGUNTA (2026-09-23)
+
+**Regla del usuario (2026-09-23, textual): "Guárdate como regla en este repo no me preguntes si
+ejecutar o no. Ejecutalo directamente."** Reemplaza, **sólo en este repositorio**, la regla general
+de pedir un "sí" antes de cada `INSERT` / `UPDATE` / `DELETE`.
+
+- **No se pide confirmación** para los cambios de datos o de schema que el pedido ya implica: se
+  ejecutan y después se informa **qué se ejecutó** y el `SELECT` de verificación. El registro va
+  *después* del hecho, no antes. Preguntar "¿lo ejecuto?" es perder el turno.
+- **Sí se sigue mostrando el SQL y la medición antes/después** de lo que mueve plata o stock. Eso
+  no es pedir permiso: es dejar rastro de lo que ya se hizo.
+- **Lo que NO cambia:** nunca un `DELETE` masivo ni un `TRUNCATE` de tablas madre (ver "Tablas
+  Madre y Derivadas"), nunca borrar la auditoría, y **lo que está fuera de lo pedido se propone,
+  no se ejecuta**. La regla saca el permiso previo, no el criterio.
 
 # Gestion Productiva - Instrucciones para Claude
 
@@ -210,39 +410,58 @@ and secret API keys and disable the anon and service_role keys."*
 **NO apretarlo todavia:** apaga TAMBIEN la `anon`, que es la que usa el frontend. Hoy eso
 tira abajo la app entera.
 
-### 3. EXCEPCION MEDIDA: Storage rechaza las claves nuevas al ESCRIBIR
+### 3. ⚠ EL STORAGE SI ACEPTA LAS CLAVES NUEVAS — lo que falta es el header `apikey`
 
-Comprobado en vivo el 2026-09-11 contra los dos proyectos (hrxfctzncixxqmpfhskv y
-kwkclwhmoygunqmlegrg). El Storage API de estos proyectos NO entiende el formato nuevo
-cuando la operacion escribe:
+**Este bloque cambio DOS veces el mismo dia, y la segunda es la buena.** Vale la pena leer las
+dos, porque la equivocacion del medio es facil de repetir:
 
-| Operacion | Clave legacy (JWT) | Clave nueva (`sb_publishable_` / `sb_secret_`) |
-|---|---|---|
-| `GET /storage/v1/object/...` | anda | anda |
-| `POST /storage/v1/object/...` (upload) | anda | **403 `Invalid Compact JWS` / AccessDenied** |
-| `POST /rest/v1/rpc/...` (PostgREST) | anda | anda |
-| Edge Functions con `verify_jwt` | anda | anda |
+- **11/09** decia *"el Storage rechaza las claves nuevas al ESCRIBIR"* y que por eso no se podian
+  apagar las legacy.
+- **13/09 (v16.56)** dije que esa excepcion ya no existia, porque mande un upload con la
+  `sb_publishable_` y dio 200. **Estaba mal la conclusion, no la medicion**: en esa prueba mande
+  la clave en `apikey` **y** en `Authorization`, y no me di cuenta de que el que hacia el trabajo
+  era el primero.
+- **13/09 (v16.62), la buena:** el formato de la clave nunca fue el problema. **Lo que faltaba es
+  el header `apikey`.**
 
-`Invalid Compact JWS` = el Storage intento parsear el token como JWT y no pudo. No es la
-clave equivocada ni un permiso faltante: el servicio no soporta el formato. Repro exacta:
+Medicion contra el Storage real (bucket `inbox` de LK, objeto de prueba creado y borrado):
+
+| Request | Resultado |
+|---|---|
+| `Bearer sb_secret_…` y nada mas | **403 `Invalid Compact JWS`** |
+| `Bearer sb_secret_…` **+ `apikey: sb_secret_…`** | **200**, el objeto se sube |
+| `Bearer sb_publishable_…` y nada mas | 403 `Invalid Compact JWS` |
+| `Bearer sb_publishable_…` **+ `apikey: …`** | 403 **`new row violates row-level security policy`** ← paso auth; lo frena la RLS, que es lo correcto para una clave publica |
+
+**Por que la legacy andaba sin `apikey`:** la legacy **es** un JWT, asi que el Storage la podia
+parsear del Bearer. Con la clave nueva intenta lo mismo, no puede, y contesta `Invalid Compact
+JWS`. Ese error significa *"no pude parsear el token"*, no *"no soporto el formato"*.
+
+**Y por eso la app nunca estuvo rota:** `supabase-js` manda `apikey` siempre. Los que fallaban
+eran los `curl` / `Invoke-RestMethod` escritos a mano, que mandan solo el Bearer — exactamente el
+caso del workflow de Planify (runs 112 a 115 del 11/09). **Ya corregido**: `build-deploy.yml` y
+`deploy-only.yml` de `loekemeyer/Planify` mandan las dos cabeceras desde el commit `75179d7`.
+
+Repro, para volver a medirlo (ojo: **si da 200 crea el objeto**, hay que borrarlo con un `DELETE`
+a la misma URL — `storage.objects` no se puede borrar por SQL, `storage.protect_delete()` lo
+impide):
 
 ```sql
-select r.status, r.content from public.http((
-  'POST','https://<ref>.supabase.co/storage/v1/object/__no_existe__/x.txt',
-  array[public.http_header('Authorization','Bearer <clave>')],
-  'text/plain','x')::public.http_request) r;
+select net.http_post(
+  url := 'https://<ref>.supabase.co/storage/v1/object/<bucket>/__prueba__.json',
+  headers := jsonb_build_object('Authorization','Bearer <clave>','apikey','<clave>',
+                                'Content-Type','application/json'),
+  body := '{"p":1}'::jsonb);
 ```
 
-**Consecuencia:** cualquier cosa que SUBA a Storage tiene que seguir con la
-`service_role` legacy hasta que Supabase actualice el Storage de estos proyectos. Caso
-real: el workflow `build-deploy.yml` de `loekemeyer/Planify` sube el `Planify.exe` a
-`planify_updates`; al cambiarle el secret `SUPABASE_SERVICE_KEY` por una `sb_secret_`
-empezo a fallar el paso "Upload to Supabase Storage" en 2 segundos, con el `.exe` ya
-compilado (runs 112 a 115 del 2026-09-11).
+**Inventario de lo que escribe en Storage, al 13/09** (todos con `supabase-js` salvo Planify, o
+sea que ya mandan `apikey`): `recepcion.js` de Gestion (bucket `remitos`), `krikos-ingest` de LK
+(`krikos-oc`), `script.js` de LK (`.remove()` de videos) y los workflows de Planify (corregidos).
 
-**Antes de apagar las legacy, buscar todo lo que escriba en Storage** (`storage/v1/object`
-con POST/PUT, `.storage.from(...).upload(`, `.upload(`) y confirmar que ese camino sigue
-andando. Si no anda, NO se apagan las legacy todavia.
+⚠ **Y hay un pedazo de `recepcion.js` que quedo muerto**: `pendUploadFoto` tiene un tercer intento
+que hace `signOut()` y sube con la clave pelada como Bearer. Estaba pensado para la anon legacy.
+Hoy el primer intento anda, asi que no molesta, pero el comentario que dice que ese fallback
+"sube igual" hay que leerlo con esta nota al lado.
 
 ### Orden obligatorio
 
@@ -254,11 +473,16 @@ andando. Si no anda, NO se apagan las legacy todavia.
 2. Reemplazar esa cadena por la `sb_publishable_...` del proyecto Supabase de ESTE repo
    (cada proyecto tiene la suya; no mezclar).
 3. Migrar todo backend que use `service_role` (Edge Functions, n8n, scripts) a `sb_secret_...`.
-4. Inventariar lo que escribe en Storage (ver la excepcion de arriba) y dejarlo con la
-   `service_role` legacy; si algo de eso ya se paso a `sb_secret_`, volverlo atras.
+4. Inventariar lo que escribe en Storage (ver el punto 3) y confirmar que **cada uno manda el
+   header `apikey`**, no solo el Bearer. Ya NO hay que dejar nada en legacy por eso: con
+   `apikey` el Storage acepta tanto `sb_secret_` como `sb_publishable_` (medido el 13/09).
+   Lo que usa `supabase-js` ya lo manda solo; lo escrito a mano (`curl`, `Invoke-RestMethod`)
+   hay que mirarlo uno por uno.
 5. Recien con 1-4 hechos en TODOS los repos que peguen contra ese proyecto:
-   `Disable JWT-based API keys`. Mientras exista un upload a Storage vivo, este paso
-   queda bloqueado.
+   `Disable JWT-based API keys`. **Ya no esta bloqueado por el Storage** (punto 3). Lo que
+   falta: que el dueno cambie el secret `SUPABASE_SERVICE_KEY` de Planify por una
+   `sb_secret_` y mire ese primer build, y que ningun cliente siga mandando la anon legacy.
+   El boton lo aprieta el dueno, no Claude: apaga la `anon` que usa el frontend.
 
 ### Paso opcional: rotar el JWT secret
 
@@ -629,6 +853,46 @@ Cada modulo es una carpeta con su propio HTML/JS/CSS. Los modulos principales:
 - `Inicio/` - Dashboard principal
 - `Verificacion/` - Trazado de Rutas (REESCRITO 2026-04-18, ver abajo)
 
+## ⚠ REGLA: qué tipo de operario ve qué botón (app de operarios / tablet)
+
+**El operario no ve todos los botones: ve los de SU rol, y el rol vive en la BASE, no en el
+código.** Las columnas están en `public.Empleados`, una fila por legajo: `es_matriceria`,
+`es_piedra`, `es_alimentador`, `ve_cm`, `ve_trm`, `ve_tl`, `ve_rem`, `ve_mm`, `ve_ctm`, `ve_am`.
+La implementación canónica es `capsDe()` + `botonVisible()` de `app.js` en el repo
+`loekemeyer/Registro-Produccion-2.0` (v1.9.0): antes de agregar, sacar o mostrar un botón en
+cualquier app de operarios, mirar esas dos funciones.
+
+| Rol (cómo se reconoce) | Qué botones ve |
+|---|---|
+| **Balancín** = operario base, ningún flag prendido | E, C, PB, BC, LIMP, Perm, AL, PC, PM, RM, PCM + **MOV** |
+| **Alimentador** (`es_alimentador`) | lo mismo + **PR**, **RD** y **CM** (el flag ya implica CM) |
+| **Piedra** (`es_piedra`) | lo mismo pero **MOV P** en lugar de MOV; + **MM** si `ve_mm` |
+| **Matricería** (`es_matriceria`) | **sólo** TRM (`ve_trm`), TL (`ve_tl`), REM (`ve_rem`) y CM (`ve_cm`). Ningún botón normal, ni siquiera E o C |
+| Cualquiera con `ve_cm` | agrega **CM** aunque no sea alimentador (caso real: David Ayala, legajo 233, es de piedra) |
+
+El orden importa: `botonVisible()` pregunta **primero** por matricería, así que un matricero con
+otro flag prendido igual ve nada más que sus cuatro botones.
+
+Tres cosas que no se negocian:
+
+1. **Nunca ramificar por legajo.** Si un operario tiene que ver algo distinto, es un flag en
+   `Empleados`, no un `if legajo === "19"`. El día que esa persona cambia de puesto o se va,
+   el `if` queda mintiendo y nadie se entera.
+2. **Botón nuevo = flag nuevo en `Empleados` + su casilla en el ABM de operarios**, en el mismo
+   commit. Un flag sin código (o al revés) es una promesa que la app no cumple: hoy pasa con
+   `ve_ctm` (botón CTM, Control Matriz) y `ve_am` (botón AM, Ayuda Matricería), prendidos los dos
+   para Oscar Bordon (legajo 282) y **sin una línea de código en ningún repo**.
+3. **CM (Cambiar Matriz) es tiempo muerto**: el 1er toque lo abre —pide matriz nueva y en qué
+   balancín, y asigna la matriz al balancín en `public.Balancines`— y el 2do lo cierra midiendo
+   la duración. No es un evento puntual. Los que no son tiempo muerto son E, C, RM, RD y LT.
+
+**Estado al 2026-09-23 de la tablet de operarios de GP2** (`Produccion/RegistroApp/`,
+`operarios_gp2.js` + `Registro_GP2.html`): **no aplica nada de esto todavía**. Muestra la misma
+lista de botones a todo el mundo, no lee ningún flag, y ramifica por `LEGAJO_EDUARDO = "19"`
+hardcodeado (le agrega el botón CT y le cambia el comportamiento de PR) — justo lo que el punto 1
+prohíbe. Además le faltan CM, RD y REM, sacados el 2026-08-29 por uso histórico bajo. Cuando esa
+pantalla vuelva a tocar botones, se arranca por acá.
+
 ## Verificacion - Trazado de Rutas (reescrito 2026-04-18)
 
 Modulo unificado para trazar rutas productivas y validar integridad. Reemplaza el viejo
@@ -747,3 +1011,112 @@ Leer ese archivo antes de tocar el modulo de OC.**
   - `ID_Ejecucion`, `Dia`, `Mes`
 - La tabla `Empleados` tiene campo `Activo` (valor "SI" para activos)
 - La tabla `Matrices` tiene `N_Matriz`, `Matriz` (nombre), `Tiempo_Historico`
+
+## REGLA: toda copia de respaldo nace sin RLS
+
+**Vale para TODOS los repos** (igual que las reglas de Planify y de auditoria: copiar este bloque
+al `CLAUDE.md` de cualquier repo nuevo).
+
+**⚠️ `CREATE TABLE AS` y `SELECT INTO` NO heredan Row Level Security de la tabla de origen.** La
+copia queda con `relrowsecurity = false` aunque la madre este protegida, y los `GRANT` del schema
+le siguen aplicando, asi que `anon` hereda SELECT/INSERT/UPDATE/DELETE. Postgres no emite ninguna
+advertencia. **Prender RLS en el MISMO paso en que se crea la copia**, no despues:
+
+```sql
+create table <schema>.<copia> as select * from <schema>.<madre>;
+alter table <schema>.<copia> enable row level security;  -- sin politicas = deny-all para anon
+```
+
+Sin politicas, RLS habilitada deja la tabla accesible solo para `service_role`, que es exactamente
+lo que se quiere en un respaldo.
+
+**Caso real (2026-09-14):** `planify.bkp_items_mayo_20260914`, respaldo de la liquidacion de sueldos
+de mayo hecho —bien— antes de tocarla, quedo con 56 sueldos completos (legajo, nombre,
+`sueldo_bolsillo`, banco, aportes) legibles y borrables por cualquiera con la clave publishable,
+durante 24 horas. El respaldo estuvo bien; lo que falto fue el `alter`.
+
+Para barrer copias abiertas en un proyecto:
+
+```sql
+select n.nspname, c.relname
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where c.relkind = 'r' and c.relrowsecurity = false
+   and has_table_privilege('anon', c.oid, 'SELECT')
+   and n.nspname not in ('pg_catalog','information_schema','pg_toast');
+```
+
+## ⚠ REGLA: por qué Claude pide permiso para TODO — y dónde se apaga de verdad
+
+**Vale para TODOS los repos** (copiar este bloque al `CLAUDE.md` del repo nuevo, junto con el
+bloque `permissions` de `.claude/settings.json`). Thomas, 2026-09-18: *"otras sesiones están
+pidiendo muchísimos permisos para editar todo y antes no pasaba"*. Son tres cosas, en este orden.
+
+### 1. Lo que MÁS pesa es el MODO de la sesión, y no se configura por archivo
+
+En **Manual** (config value `default`) **sólo las lecturas corren solas**: todo lo demás pregunta,
+haya o no regla de `allow`. En **Auto** corre todo con chequeo en segundo plano. El modo se elige
+en el **selector de la sesión** (en la web, arriba del cuadro de mensaje) y se puede cambiar con
+la sesión andando.
+
+⚠ `permissions.defaultMode` con `"auto"` o `"bypassPermissions"` **se ignora** desde el
+`.claude/settings.json` de un repo; sólo vale desde el settings de **usuario**, que en cloud no se
+lee (punto 2). O sea: **en cloud, el modo se elige a mano y punto.** Una sesión en Manual va a
+pedir permiso para todo por más lista que haya.
+
+Cómo se reconoce: si te pide autorización hasta para un `select`, mirá el modo antes que el JSON.
+
+### 2. La lista de permisos sale del `.claude/settings.json` DEL REPO — el único que llega
+
+La doc de Claude Code lo dice sin vueltas:
+
+> *"**User and project local settings** (`~/.claude/settings.json` and `.claude/settings.local.json`):
+> **not read**. Both stay on your machine, and the local file isn't in the clone."*
+
+Escribirlo desde el setup script del entorno **no sirve** para una sesión cloud. El 18/09 se perdió
+medio día por creer lo contrario.
+
+⚠ **Y hay una condición que tumba hasta eso:** el repo manda **sólo si la sesión tiene UN
+repositorio**. Con varios adjuntos la sesión arranca **arriba** de los clones y de cada
+`.claude/settings.json` toma únicamente los plugins y marketplaces — **ni permisos, ni hooks, ni
+`env`**. Una sesión con 3 repos adjuntos pide permiso para todo y no hay archivo que lo arregle:
+ahí el modo es lo único que queda.
+
+### 3. Un `hooks` mal formado tira el archivo ENTERO, sin avisar
+
+El formato viejo —`{"matcher":"", "command":"..."}`— ya no vale. Hoy va con el array `hooks`
+adentro:
+
+```jsonc
+"hooks": { "PreToolUse": [ { "matcher": "",
+  "hooks": [ { "type": "command", "command": "echo hola" } ] } ] }
+```
+
+Con el formato viejo Claude Code **descarta el `.claude/settings.json` completo**, así que la
+`permissions.allow` deja de existir. No tira ningún error: simplemente no pasa nada. Así estuvo
+este repo desde el commit `542ab7e` (16/09), y de yapa el hook de caveman nunca corrió ni una vez.
+
+### ⚠ Cómo NO probarlo: `claude --print` adentro del contenedor
+
+Ese `claude` es un CLI local: **sí** lee `~/.claude/settings.json` y **sí** exige el trust del
+workspace (`~/.claude.json` → `hasTrustDialogAccepted`). La sesión cloud no hace ninguna de las
+dos cosas. El 18/09 esa prueba dio verde tres veces seguidas mientras el usuario seguía
+autorizando de a uno. **Se prueba en una sesión nueva de verdad**; el cartel dice el nombre de la
+herramienta, y ése es el string que se agrega a `allow`.
+
+### Lo que hay hoy en `.claude/settings.json`
+
+`allow`: lectura/edición, subagentes, `WebFetch`/`WebSearch`, **`Bash` entero** y el SQL de
+Supabase (`execute_sql`) más las herramientas de lectura de Supabase y GitHub.
+`ask`: `git push`, `curl`, `wget`, `apply_migration`, `deploy_edge_function`.
+`deny`: `rm -rf`, `sudo rm`, force-push, `git reset --hard`, `psql`, `supabase db`, leer `.env`.
+
+⚠ Un `ask` matchea por **prefijo del comando**: `Bash(git push:*)` **no** agarra
+`git -C /ruta push …`, que empieza con `git -C`. Medido el 18/09: por eso un push con `-C` salió
+sin preguntar. Si un comando tiene que frenar sí o sí, va en `deny`, no en `ask`.
+
+⚠ Que `execute_sql` no pregunte **no cambia la regla del 26/08**: los datos no se tocan sin
+permiso explícito. Eso lo sostiene este archivo, no el diálogo de permisos.
+
+`scripts/claude-permisos.sh` y `scripts/setup-entorno-claude.sh` quedan para las sesiones
+**locales**, donde sí manda el settings de usuario y hace falta el trust. En cloud no hacen nada.
+

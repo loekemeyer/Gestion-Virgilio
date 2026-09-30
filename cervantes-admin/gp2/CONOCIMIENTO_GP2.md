@@ -113,6 +113,96 @@ Reglas comunes que ya viven adentro:
   - **Kollplast se quedó sin piezas asignadas**: figura como inyector pero no tiene ninguna.
     Pendiente menor: confirmar si le corresponde alguna o si por ahora no le compramos.
 
+#### El circuito real del inyector `[usuario 2026-09-14]`
+*"Nosotros le mandamos las bolsas plásticas y nos las devuelven como partes plásticas."* O sea:
+**mandamos la resina (bolsas de sector 14) al inyector → él la inyecta → nos devuelve la pieza
+plástica (sector 6)**, más el 4 % de master bach para el color. Es un **servicio**, no una compra.
+
+- **Hoy la pieza está modelada como COMPRADA**, no como inyectada: `componente.proveedor` = el
+  inyector (Pat Bet Plast 34, Pettofrezza 13, Kollplast 1, Eduardo Pintos 1 = 49 piezas) y se
+  recibe en Recepción de Insumos (rubro Plásticos) como cualquier insumo comprado.
+- **EL MODELO YA ESTABA EN LA BASE — no hubo cirugía `[2026-09-15]`.** La resina de cada pieza vive en
+  **`componente.material_id`** (apunta al componente-resina del sector 14). 45 de las 48 ya lo tenían
+  cargado y COINCIDÍA con la planilla del usuario. NO se costean por el material: `v_costo_componente`
+  las da por su **precio de compra** (`origen='precio'`, lo que se le paga al inyector por la pieza
+  hecha); `material_id` maneja la **demanda de resina** (cuánta bolsa mandar) y el descuento de resina
+  al recibir la pieza (`crear_recepcion_insumo`, sólo si `material_id` está y el inyector tiene ubicación
+  — invariante A2). Por eso poner/cambiar `material_id` NO mueve el costo.
+- **Fuente del material por pieza:** la planilla del sector plástico, **ahora en
+  `db/Conteo_y_Pedido_Sector_Plastico_VACIO.xls`** (hojas *Consumo x Parte* / *Consumo x Cod Articulo*,
+  col Material + MB color). kg por pieza en `componente.kg_x_uni`.
+- **Lo que se completó/corrigió (usuario dictó los 3):**
+  - **PA3** Muñeco → **Santoprene** (`SANTO` id 930, creada sin precio) + kg 0,008 (planilla).
+  - **PC16** Inserto Chef → **PP 2630** + kg 0,0038.
+  - **PB8A** Mgo Sacac → estaba en PP; el usuario dijo "seguí la planilla" → **ABS**.
+  - PEP5 "Mango Madera" queda sin material a propósito (es madera, no inyectado).
+- **Corrección:** el cruce por peso contra `A_Costos` daba **PV8 "Corta Torta" = Alto Impacto**; tanto
+  la planilla del sector como el `material_id` ya cargado dicen **Ny Recuperado**. La planilla del
+  sector manda, `A_Costos` no.
+- **Santoprene sin precio:** hasta que tenga precio, la demanda/costeo por material de PA3 no computa
+  (PA3 igual costea por su precio de compra).
+- **Dónde se eligen los inyectores en la Tablet — tres vueltas, y la última es la que vale:**
+  1. *2026-09-14, descartado:* un botón **"Inyectores"** en Enviar que era un link a
+     `Compras/Inyectores_GP2.html`. El usuario lo rechazó (*"saca el boton de inyectores y arranca
+     la cirugia"*): no quería un atajo a otra pantalla, quería mandarles las bolsas desde la Tablet.
+  2. *2026-09-15, v1.3.0:* los inyectores pasaron a mostrarse **dentro de "Prov. de servicio"**, sin
+     cirugía: `tablet_bundle` los devuelve como contraparte tipo `'inyector'` con sus **resinas**
+     (sector 14) y `tablet_registrar` rutea el envío a `enviar_material_inyector`. NO se los convirtió
+     en `proveedor_servicio` de la base: eso habría sido un segundo modelo redundante y habría
+     cambiado el costeo de la pieza de *comprada* a *inyectada*.
+  3. **HOY — 2026-09-18, v1.14.0:** el usuario los quiere **aparte**, textual: *"quiero que a JL
+     Matricera, Kollplast, Pat Bet Plas y Pettofrezza Rafael los pongas aparte como inyectores, no
+     adentro de proveedores de servicio"*. Enviar tiene ahora un **cuarto tipo, "Inyectores"** (💉),
+     y "Prov. de servicio" volvió a ser sólo PS. Cambió **únicamente dónde se los elige**: adentro es
+     la misma pantalla de siempre (sugerido en kg desde la O.C., columna **O.C.** en vez de Máximo,
+     cantidad vacía y sin memoria) y el registro sigue yendo a `enviar_material_inyector`.
+  **Lo que NO cambió en ninguna de las tres:** en la base los inyectores son `proveedor_insumo` +
+  `componente.material_id`, nunca `proveedor_servicio`, y las piezas se costean por su precio de
+  compra. Los 4 salen de `componente.proveedor` cruzado contra `proveedor_insumo.nombre`.
+
+#### Cuánta bolsa mandarle al inyector — el máximo sale de la PARTE, no de la bolsa `[usuario 2026-09-16]`
+**Regla general de máximos (textual):** *"Los máximos surgen de estadística madre × cant de meses
+por ubic."* → `maximo = est_madre (demanda) × ubicacion.meses_stock`. Es lo que ya hace
+`recalcular_maximos_*`; el origen queda `est_madre`.
+
+**Inyectores (caso específico) `[usuario 2026-09-16, textual]`:** *"según el máximo de partes
+plásticas − stock de partes plásticas = O.C. de partes plásticas, mandarle la cantidad de bolsas
+plásticas según esa orden de compra. Porque básicamente le mandamos bolsas plásticas para que luego
+nos manden las partes plásticas."* O sea, el máximo/OC **vive en la PARTE plástica (sector 6), no en
+la bolsa**:
+1. `OC_parte (uni) = max(0, maximo_parte − stock_parte)` (la parte, en el Sector Plástico).
+2. `bolsas a mandar (kg de resina) = Σ_partes( OC_parte × componente.kg_x_uni ) − resina ya en poder
+   del inyector`, **agrupado por `material_id`** (la resina/bolsa, sector 14). `kg_x_uni` = kg de
+   resina por pieza, ya cargado. La resina en poder del inyector vive en `inventario` @
+   `ubic_de('inyector', prov_insumo_id)` (ahí la deja `enviar_material_inyector`, que la mueve del sector 14).
+   - **`OC_parte` = O.C. REAL, no el déficit automático `[usuario 2026-09-16, textual]`:** *"si no se
+     hizo la o.c. aparezca 0, por lo tanto sugerido 0. Recién cuando se manda la o.c. tienen que
+     cambiar estos valores."* Así que en el tablet el inyector muestra O.C.=0 y sugerido=0 hasta que
+     exista una **orden_compra de las partes plásticas en estado `enviada`** con `proveedor` = el
+     inyector (se crea en `Compras/OC_GP2`, que ya cubre las partes de sector 6). `OC_parte` =
+     `Σ (orden_compra_item.cantidad − recibido)` de esas OC enviadas. (rep_iny en `tablet_bundle`.)
+   - **Distinto de PS/talleristas:** ahí el sugerido SÍ sale del déficit vivo (máximo − stock de la
+     salida); el gatillo por O.C. es sólo del inyector.
+- **El factor y los máximos ya existen:** las partes de los 4 inyectores ya tienen máximo est_madre
+  (JL Matriceria 2/2, Kollplast 1/1, Pat Bet Plast 32/33 —falta 1 sin consumo—, Pettofrezza 13/13).
+  Lo que **falta es que la tablet lo muestre como sugerido de bolsas** para el inyector (hoy en
+  Enviar el inyector lista sus resinas con "online sector" y sin sugerido — quedó afuera del
+  `envConSugerido` de v1.4.0, que sólo cubre PS y talleristas).
+- **Ejemplo medido (Pat Bet Plast, partes en stock 0 → piden el máximo entero):** PP 2630 1.985,28 kg
+  · Nylon Recuperado 399,70 · ABS GP 22 248,76 · PE Baja 63,43 · Nylon Virgen 22,64 · Santoprene 5,44.
+
+#### Conversión de unidad en el sugerido kg→uni, y el descorazonador mal marcado `[usuario 2026-09-16]`
+Cuando lo que se ENVÍA es un fleje/chapa (kg) y la SALIDA es una pieza contada (uni), el sugerido
+del tablet ahora convierte el déficit de la salida a kg por su `kg_x_uni` (CTE `rep`, factor `fu`).
+Antes daba el número de piezas tratado como kg (ej. CHAPA430 → Eclipse: "402 kg" cuando eran 402
+descorazonadores). `fu` NO contempla la merma del corte (para eso iría `ruta_paso.cantidad` = kg de
+chapa por pieza).
+- **Trampa de datos:** el fu se dispara mirando `componente.unidad_medida` de la salida. El
+  **Descorazonador (1686, id 596) está marcado `unidad_medida='kg'`** siendo el único de los 86 de
+  Sector Procesado así (los otros 85 son 'unidad'); por eso su chapa seguía dando 402. Es un dato
+  mal cargado (consumo 402 uni/mes, kg_x_uni 0,014508 = peso de UNA pieza; 0 movimientos, stock 0).
+  Corregirlo a 'unidad' hace que la chapa dé 402 × 0,014508 ≈ 5,83 kg.
+
 ### `D1` (Espiral Sacacorcho): lo importado con su margen a la vista `[usuario 2026-09-02]`
 
 Dicho textual: *"D1: costo TN 0.067usd. Vende a LK a 0.24usd"*.
@@ -188,6 +278,14 @@ una **decisión ya tomada**. Por eso `componente.estado_compra`:
   (ni para PC1A ni para PC1B), y sin tarifa de Esther el costo de ese calado sigue en 0.
   **Traba concreta**: hoy NO existe un componente "crudo" (sin calar) separado de PC1A/PC1B,
   y sin ese par crudo→calado no se puede trazar el paso sin inventar un componente nuevo.
+  - **Los mangos crudos SÍ existen como componente** `[dato: GP2.componente]`: **PC2** (id 622,
+    "Mgo Pelapapa 505 Sin Calar") → Esther lo cala → **PC1A**; **PC3B** (id 621, "Mgo Pelapapa
+    123 Sin Calar") → Esther lo cala → **PC1B**. Esa aclaración de proceso (quién cala y hacia
+    qué código sale) **vive acá, no en la descripción del componente** `[usuario 2026-09-17:
+    "no quiero que los componentes tengan descripciones así de largas… las aclaraciones
+    guardalas en el conocimiento"]`: la descripción quedó en el nombre corto y el paso
+    crudo→calado se documenta en este archivo. Falta todavía cargar la ruta PC2→PC1A / PC3B→PC1B
+    y la tarifa de Esther.
 - **`PCP3` (Clavo 505): se compra a Trefilados Industriales.** `[usuario 2026-09-02]` Compra
   directa (sin proceso). **Ya aplicado** `[dato: GP2, verificado 2026-09-02]`: Trefilados
   Industriales está en el maestro `proveedor_insumo` (rubro *Sector Plástico*) y PCP3
@@ -419,6 +517,11 @@ Insumo. **Aplica a los 88 flejes de la base**, distribuidos en 2 sectores:
   `A10-M365 → IA10-M365, B3-M32 → IB3-M32, F3-M37 → IF3-M37`, etc. Se filtró
   por `descripcion ILIKE '%fleje%'` para no tocar los 10 no-flejes del sector 3
   (Rompenuez, Cuchilla, Varilla, Destapa) que comparten el patrón `código-Mn`.
+  - **`B1-M78` (id 486, "Rompenuez Ch Pint. Remachado") y `D5-M78` (id 485, "Rompenuez LK
+    Crom. Remachado")**: el `-M78` es porque son la variante **remachada tras pasar por la
+    matriz M78** `[dato: GP2.componente]`. Ese "tras M78" se saca de la descripción y se anota
+    acá `[usuario 2026-09-17: "las aclaraciones guardalas en el conocimiento, no en las
+    descripciones"]`; la descripción quedó como nombre corto ("…Remachado").
 
 La regla **aplica solo a flejes por ahora** (otros insumos —cartones, cajas,
 plásticos, remaches, bombillas— mantienen su convención sin prefijo). Motivo:
@@ -563,6 +666,20 @@ operario suma con "+ pallet" si el remito trajo más. Ver `fieldsFleje(prov)` en
   El tornillo se importa **ya niquelado**: el código **CV20** ("p/Niquelar") **no se compra
   más** y el paso de niquelado en Guazzaroni se sacó de las rutas 382/577/589, que ahora
   entran el V20 comprado y van derecho al tallerista. `[usuario 2026-08-29]`
+- **La Cremallera (IE13) se recibe en el rubro Importados, no en Flejes** `[usuario 2026-09-22:
+  "La cremallera mandala al módulo importado. Borra el módulo importado dentro de flejes"]`.
+  Se hizo con `estado_compra='importado'` (id 219): la Recepción arma Importados por esa marca y
+  Flejes la excluye, así que el chip "Importado" de Flejes desapareció solo.
+  **CORREGIDO el 2026-09-23**: ya no se llama `IE13` ni vive en Sector Fleje — es **`E13`, Sector
+  Procesado, y se cuenta por UNIDAD** (no en kg). Lo que arriba decía "se recibe en unidades y se
+  guarda en kg" era justamente el problema: mientras estuvo en el sector de los flejes **no costeó
+  nada**. Ver §4ft.
+- **BOM8B Tela Manga Repostera: se cuenta por ROLLO, 900 uni por rollo; se compra a Rueda y Cia**
+  (`proveedor_insumo` 'Rueda', cod_prov 3372) `[usuario 2026-09-22]`. **CORRECCIÓN:** el nombre
+  viejo del componente (id 619) decía "950 uni por rollo" — estaba mal; son **900**. El paréntesis
+  se sacó del nombre (`descripcion='Tela Manga Repostera'`). `uni_x_paquete` sigue NULL hasta que
+  se decida cargarlo (ojo, en OC puede redondear a rollo entero). La planilla de costos lista a
+  SIMKO SA como "(tela Manga Repostera)", pero esa fila es Santoprene: NO es el proveedor de la tela.
 - **Garage (GRJ*)**: no llevan proveedor, los arman los talleristas. Además el sector se
   está vaciando: hoy quedan 3 códigos (`[usuario + dato]`). **Un GRJ se jubila cuando el
   tallerista arma las partes sueltas en vez de un sub-armado previo** `[usuario 2026-09-08]`:
@@ -1597,6 +1714,8 @@ recibe `p_comp_sp_id`, porque al recibir hay que decir cuál de los tres mangos 
 afilar las piedras**, no es una parte de nada. No es una ruta rota: es una herramienta. Las
 otras dos rutas sin `articulo_id` son la 632 (produce el pliego adhesivado, un intermedio) y
 ya ninguna más — las 10 del 581 y el 104 lo recuperaron.
+`[usuario 2026-09-29]` Confirmado otra vez: *"RULETA no se usa para ningún artículo, es para afilar la piedra
+que afila"*. Por eso no tiene consumo y su máximo (27.175) queda `fisico`: la regla de consumo le daría 0.
 
 **El `articulo_id` de la ruta y la receta son DOS cosas, y hacen falta las dos (2026-09-03)**
 `[dato]`: al 581 y a su clon 104 se les puso el `articulo_id` que les faltaba `[usuario:
@@ -1633,8 +1752,9 @@ propio**, porque su costo es el crudo más el baño.
 
 **Un GRJ armado reemplaza a sus componentes en la receta, no se suma (2026-09-03)** `[usuario:
 "GRJ1 se usa para el quinientos"]`: la receta del **500** tenía `C1 + C10 + V9` sueltos, que son
-**exactamente el BOM del `GRJ1`**. Se reemplazaron por el GRJ1, igual que el **506** lleva
-`GRJ7` en vez de `A10 + C10 + V9`. **Si se dejan los dos, el armado se cuenta dos veces.** El
+**exactamente el BOM del `GRJ1`**. Se reemplazaron por el GRJ1, igual que el **506** llevaba
+`GRJ7` en vez de `A10 + C10 + V9` (**⚠ corregido el 2026-09-17: el GRJ7 se borró y el 506 volvió a
+las tres partes sueltas, ver §4eb; el 500 y su GRJ1 NO se tocaron**). **Si se dejan los dos, el armado se cuenta dos veces.** El
 costo del 500 no se movió ni un peso, que es la prueba de que el reemplazo era exacto. La
 receta quedó `A11 + GRJ1 + Pliego Ad 500`, calcada del 506.
 
@@ -1664,7 +1784,10 @@ chequear que un pliego está bien cargado:
 En la receta va **`1/posiciones`**. **Los 12 artículos que llevan pliego quedaron uniformes el
 2026-09-03** `[usuario: "los pliegos de bombilla todos, el 557 al 769 vienen de dieciséis. Y el
 pliego del 506 y el 500 vienen de doce"]`: **500 y 506 a 1/12** ($917 el pliego → $76,42 por
-artículo) y los **diez de bombilla a 1/16** ($915 → $57,19). El `Pliego Ad 500` estaba con
+artículo) y los **diez de bombilla a 1/16** ($915 → $57,19).
+⚠ **Corregido el 2026-09-18 (ver §4el): el 500 y el 506 YA NO LLEVAN PLIEGO** — pasaron a cartón
+(`CART500` / `CART506`, ×1, $89). **Hoy los artículos con pliego son 10**, los de bombilla, y son
+los únicos a los que se les aplica esta regla. El `Pliego Ad 500` estaba con
 precio $89 y cantidad 1, o sea con el precio POR POSICIÓN: pasó al pliego entero, como todos.
 Eso cierra la idea 6116.
 
@@ -2060,6 +2183,22 @@ exactos por pieza; la vista de costos usa el exacto y cae al plano si no hay).
   Plata" y "del Sur" son EL MISMO proveedor** (siempre se confundieron los nombres).
   **Recicor cotiza las mismas 9 cajas ~19% más barato** (ago-26) — cargadas como
   referencia sin vincular, la vigente es del Plata por decisión del usuario.
+- **RECICOR TAMBIÉN ENTREGA LAS CAJAS, desde el 2026-09-17** `[usuario, textual: "dentro de
+  cajas, además de corrugadora del plata, tenés que agregar al proveedor Recicor. Entrega las
+  mismas cajas que corrugadora. El control de remito es igual al de corrugadora"]`. Son **las
+  mismas 11 cajas de GP2** (no hay cajas propias de Recicor) y el control de remito es el
+  mismo: `modo_control='ninguno'`, sin pesaje ni rollos. `cod_prov` ISIS **4370** (salió de su
+  propia lista de precios, `precio_proveedor.cod_prov='4370'`).
+  **A Recicor también se le emite O.C.** `[usuario 2026-09-17: "en las órdenes de compra
+  tendrías que agregar a recicor también"]`, y la O.C. sale con **SU** precio: sus 8 precios que
+  matchean una caja de GP2 se vincularon al componente y `oc_bundle` manda ahora el precio de
+  cada proveedor (`precios_prov`). **El precio VIGENTE no cambió** —el que usa el costo sigue
+  siendo el del Plata— porque el desempate es por `cod_prov` contra el proveedor asignado al
+  componente, no por fecha. Verificado antes y después: los 11 precios y los 11 costos, iguales.
+  **FALTA EL DATO**: Recicor **no cotiza las cajas N°15, N°16 y N°22** (su lista trae la N°27,
+  que en GP2 no existe). En una O.C. a Recicor esas tres van **sin precio** —no se les pone el de
+  Corrugadora, sería inventar plata— y la barra avisa "⚠ N ítems sin precio". Si Recicor las
+  entrega, hay que pedirle el precio y cargarlo.
 - **Plásticos: la lista de Pat Bet Plast es INYECCIÓN SOLA, SIN material** `[dato:
   hoja Plasticos]`. El precio real de la pieza = pellet × gramos (+4% desperdicio) +
   inyección — está calculado en la hoja "Plasticos" col "Total Mat e Inyeccion", y ESO
@@ -2103,6 +2242,9 @@ exactos por pieza; la vista de costos usa el exacto y cae al plano si no hay).
 - **Kollplast vs Pat Bet, misma pieza, otro precio**: Pirolo $51,76 vs $20,07 (×2,5),
   Buje $20,48 vs $21,06. Todo quedó cargado con Pat Bet (así está `componente.proveedor`);
   revisar al repartir los inyectores. `[dato]`
+  **CORREGIDO EN PARTE EL 2026-09-23 (§4fo)**: los dos **bujes** (`PA8A`/`PA8B`) ya son de
+  **Kollplast** a $20,48, por decisión del dueño. El **Pirolo sigue en Pat Bet** y ahí el barato
+  es Pat Bet, así que no hay nada que mover.
 - **A9 (mango alambre corta queso): la lista de Pedernera dice 21 g, GP2 tiene 39 g** —
   el precio exacto usa los gramos de la lista. `[dato, sin resolver]`
 - **La lista de un proveedor puede seguir mostrando lo que ya no se le compra**: Pat Bet
@@ -2216,10 +2358,31 @@ en ese archivo):
 - `[dato]` **El precio del cartón sigue cocinado en 73 filas**: `carton_formato` no tiene
   columna de precio, así que "sube el pliego y se recalculan las 4 tarifas" todavía no es
   verdad. Falta `precio_pliego` + `posiciones_x_pliego`.
-- `[dato]` **`precio_proveedor` no tiene FK al proveedor** (solo `cod_prov` text sin
-  destino). Trampa activa: los 9 precios de Recicor son referencia con fecha MÁS NUEVA que
-  los vigentes del Plata; si alguien los vincula a un componente, las 9 cajas cambian de
-  proveedor solas. Hoy el único discriminador es una mayúscula en `rubro`.
+- `[dato, corregido 2026-09-17]` **`precio_proveedor` no tiene FK al proveedor** (solo
+  `cod_prov` text sin destino). **La trampa que decía esta línea ya no existe**: decía que
+  vincular los precios de Recicor a un componente haría que las 9 cajas cambiaran de proveedor
+  solas, porque el único desempate era `fecha_lista DESC`. Eso dejó de ser cierto el 2026-09-10,
+  cuando `pv` (en `oc_bundle`, `crear_oc` y `v_costo_componente`) pasó a desempatar **primero
+  por `cod_prov` contra el proveedor asignado al componente**. Los 8 precios de Recicor que
+  matchean una caja SE VINCULARON el 2026-09-17 y ni un precio ni un costo se movió (medido).
+  Lo que sigue faltando es la FK: el proveedor se sigue deduciendo por `cod_prov`.
+- `[dato 2026-09-17]` **Un componente puede tener MÁS DE UN proveedor: `componente_proveedor_alt`.**
+  `componente.proveedor` es un texto y es el proveedor **principal** — el que manda en la O.C.
+  y en el costo. Los que **también** entregan esa misma pieza van a la tabla puente
+  `GP2.componente_proveedor_alt (componente_id, proveedor)`, y `recepcion_bundle` los manda
+  como `proveedores_alt` para que Recepción de Insumos muestre la pieza bajo los dos chips.
+  **Por qué puente y no duplicar el componente**: una caja duplicada serían dos filas de
+  inventario para la misma caja física, o sea dos stocks y dos máximos de la misma cosa.
+  Primer caso: Recicor + las 11 cajas de Corrugadora (arriba).
+  **La O.C. también se le puede emitir a cualquiera de ellos** (2026-09-17, mismo día): la
+  botonera de `OC_GP2` sale de principal + alternativos y el **precio sigue al proveedor
+  elegido** (`oc_bundle.insumos[].precios_prov`). Si el elegido no cotizó esa pieza, la fila va
+  sin precio: no se rellena con la del otro.
+  **El cruce contra O.C. ya mira quién entregó**: `_aplicar_recepcion_a_oc` toma un
+  `p_proveedor` y aplica **primero** la O.C. de ese proveedor; si no alcanza, sigue con las
+  demás (una entrega tapa la necesidad igual, así nada queda colgado). Antes cruzaba la más
+  vieja sin mirar quién trajo la mercadería, y con dos proveedores de la misma caja eso le
+  descontaba a la O.C. equivocada.
 - `[dato]` **Dos agujeros de escritura anónima**: `GP2.empleado` (policies INSERT/UPDATE
   `TO anon` — no se puede cerrar sin migrar antes `Produccion/abm_GP2.html`, que escribe
   directo) y `GP2.inv_delta` (RPC anon que escribe inventario salteando `movimiento`, sin
@@ -2529,7 +2692,12 @@ no los del maestro**: m60 corte **2,30** s/uni (maestro dice 3) · m61 estampado
 (maestro 8) · m75 estampado izq **10,49** (maestro 8). Los tres estampados de balancín dan
 ~10-11 s, que sí cierra con "el balancín tarda 6 a 10 segundos" (§2c-ter).
 
-## 2c-septies. El 506 va con SKIN: Gentile y el garage (2026-08-31)
+## 2c-septies. El 506 va con SKIN: Gentile y el garage (2026-08-31) — ⚠ DADO DE BAJA el 2026-09-17
+
+> **Esta sección ya no describe la realidad.** El 2026-09-17 el dueño dio marcha atrás: Gentile
+> no ensambla ni envasa más el 506, el `GRJ7` se borró y arman Martin Cornejo o Alex Escalante,
+> que entregan directo a Virgilio (el molde del 500/510). **Lo vigente está en §4eb.** Se deja
+> el texto porque explica de dónde salían el skin y el paso por el garage.
 
 `[usuario 2026-08-31]` Dicho textual: *"El 506 va con skin (o sea con Gentile y con
 Martin/Carlos entregando en Cervantes garage)"*. Es el **mismo patrón de las bombillas
@@ -2815,6 +2983,9 @@ mínimo de antes y el recalculado) para poder volver atrás. `[2026-09-04]` La t
 `REFACTOR_GP2.md`): las copias de datos no viven en la base, viven en git.
 
 ## 2e. Faltantes y máximos de Crudo/Procesado: 5 cajones por ubicación (2026-08-31)
+
+> ⚠️ **CAMBIADO EL 2026-09-29 (§4gu):** el máximo de Crudo/Procesado es consumo × `meses_stock` del sector
+> **con tope de 5 cajones** (el menor de los dos). El faltante automático ya no es "< 1 cajón": es **stock < máximo**.
 
 `[usuario 2026-08-30]` **"En crudo y procesado, el stock máximo tendría que ser 5
 CAJONES por ubicación."** El máximo físico de cada componente de Sector Crudo y Sector
@@ -3334,13 +3505,20 @@ si dice "buscalo vos", se busca — no se inventa ni se asume.
 ## 3. Reglas del negocio ya incorporadas
 
 - **Algunos talleristas pueden entregar partes EN CERVANTES** (además de Virgilio):
-  **Martín Cornejo, ALEX ESCALANTE e IJUPA.** `[usuario 2026-08-31, corregido]` El dato
+  **Martín Cornejo, ALEX ESCALANTE, IJUPA y LUCHO.** `[usuario 2026-08-31, corregido]` El dato
   original decía Carlos Aguirre, pero el usuario lo corrigió: *"Carlos es el papá de
   Alex, por eso le erré"* — son familia y por eso el cruce de nombres. Normalizado en
   `GP2.tallerista.entrega_cervantes` (true para ids 6, 2 y 10 — migraciones
   `talleristas_que_entregan_en_cervantes` + `entrega_cervantes_correccion_alex_no_carlos`).
   `[2026-09-04]` Esa columna se **borró** (ningún código la leía); el dato queda acá: los que
-  entregan en Cervantes son Martin Cornejo (6), Alex Escalante (2) e IJUPA (10).
+  entregan en Cervantes son Martin Cornejo (6), Alex Escalante (2), IJUPA (10) **y Lucho (5)**.
+  `[usuario 2026-09-13, correctivo: "3 lucho tambien"]` Lucho faltaba en esta lista pero SÍ
+  estaba en las rutas (J1 Tochos Zinc p/Rectificar → Sector Crudo, 3 rutas): la lista escrita
+  a mano era la que estaba vieja, no la parametrización. **No hay tabla de configuración de
+  quién entrega en Cervantes: sale de `ruta_paso`** — todo paso `tallerista` cuyo
+  `comp_salida` NO cae en Terminado (sector 12) es una entrega en Cervantes; si cae en
+  Terminado va por Recepción Virgilio. Antes de decir que alguien "no debería estar", mirar
+  la ruta: la ruta manda.
   Cierra con las rutas: Alex arma los GRJ (ej. Batidor Pera del 544) y los entrega en el
   Sector Garage de Cervantes. OJO: `Recepcion Cervantes.html` del programa VIEJO tiene
   hardcodeado ARTICULOS_EMPRESA con CARLOS y MARTIN — puede venir de la misma confusión
@@ -3855,7 +4033,7 @@ tallerista) son idénticas:
 
 | Crudo | Proveedor del crudo | Niquela | Niquelado | Arma | Artículos |
 |---|---|---|---|---|---|
-| `CV18D` Tornillo Sacafuente p/Niquelar | Tornillos Suipacha | Guazzaroni Patricio | `V18D` | Martin Cornejo | 508, 708 |
+| `CV18D` Tornillo Sacafuente p/Niquelar | ~~Tornillos Suipacha~~ **Imel** (corregido 2026-09-25, 4gi) | Guazzaroni Patricio | `V18D` | Martin Cornejo | 508, 708 |
 | `CV13` Rem Plaquita 3 en 1 p/Niquelar | Electrónica Mandelli | Guazzaroni Patricio | `V13` | Martin Cornejo | 043, 511 |
 
 **Consecuencia para precios (regla):** el `precio_proveedor` va SIEMPRE colgado del `CV`
@@ -4907,6 +5085,10 @@ y se anota el cambio de realidad.
 **El molde ya existe y está probado**: el 510 es exactamente el patrón destino, incluso con la
 misma caja y los mismos dos talleristas. No hay que inventar nada, hay que copiarlo.
 
+**⚠ 2026-09-17 — esta tabla es la foto de ANTES.** El cambio se hizo, pero sólo en la mitad que
+pidió el dueño: el 506 pasó al molde del 510 en armado y entrega (Martin/Alex, sin GRJ7, sin
+Gentile), y **se quedó con el pliego adhesivado**, no con el cartón suelto. Ver §4eb.
+
 **Plata**: se van $76,42 (pliego) + $70 (Gentile) = **$146,42/uni** y entra el cartón suelto a
 **$89** → **ahorro ~$57/uni** `[deducido, a confirmar el precio del cartón 506 troquelado
 individual con Pol: el $89 es el que hoy paga el 510, y el 506 es del mismo formato C]`. Más lo
@@ -5078,6 +5260,25 @@ hacía Gentile. Respuestas textuales a las 6 preguntas:
 11 filas nuevas en `GP2.precio_tallerista` para el tallerista 13 (Blist-Pack), una por cada
 `XXX Terminado`, con el `referencia` diciendo que el cartón no está incluido. Los precios viejos
 de Gentile (tallerista 8) **quedan**: sirven de comparación y son el histórico de lo que se pagó.
+
+> `[usuario 2026-09-28]` *"Sigue apareciendo Gentile Norberto y ya no es más tallerista"*.
+> `[dato 2026-09-28]` Para esa fecha Gentile ya tenía **0 `ruta_paso`** (la cirugía de abajo se
+> hizo) pero seguía `tallerista.activo = true`. Se pasó a `activo = false`; sus 13 filas de
+> inventario (todas en 0) quedan en la base y Stock General las oculta.
+> `[usuario 2026-09-28]` *"todo lo que es inventario de virgilio eliminalo (para eso está gestión
+> virgilio)"*: **Stock General no muestra la ubicación Virgilio** (tipo `virgilio` /
+> `virgilio_sector`) ni la columna "En Virgilio". El sector Bolsas Plásticas (en Virgilio) sí
+> queda: es materia prima de GP2.
+> `[usuario 2026-09-28]` "Sí" a borrar las filas de Virgilio de la base. `[dato]` De las 268 filas de
+> `inventario` en ubicación 33 (todas cantidad 0) se borraron **189**; quedan **79**: terminados
+> (sector 12) con `maximo` cargado, porque `v_reposicion` toma ESA fila como el máximo del terminado
+> y de ahí leen `oc_bundle` y `valorizacion_bundle` (264.453 uni de sugerido). Borrarlas cambiaba OC
+> y valorización. Respaldo: `GP2.bkp_inventario_virgilio_20260928` (268 filas, RLS prendida).
+> `[usuario 2026-09-29]` "Borra": el respaldo se eliminó (`drop table`). Con él se perdieron los
+> `maximo` de 86 de las 189 filas borradas; no hay otra copia. Ese mismo día se vaciaron también
+> `GP2.movimiento` (2 filas, `entrega_ps` de prueba) y `entrega_control`, y todo `inventario.cantidad`
+> quedó en 0 (las 1.137 filas y sus `maximo` siguen).
+> `inv_delta` hace upsert, así que un movimiento nuevo a Virgilio recrea la fila sola.
 
 ### ⚠️ Lo que todavía NO se hizo: las rutas siguen apuntando a Gentile
 
@@ -6195,32 +6396,11 @@ envasado de Fábrica**. Mientras falte el precio, el 720/722 muestran `faltan_pr
 doble conteo conocido (idea 7275: la vista cuenta el componente en la receta Y en la ruta), no un
 error de carga; se va a 0 solo al cargar el precio.
 
-### 4an. Batidores 515 y 615: están EN VENTA, y el Resorte Bicónico tampoco es discontinuo (2026-09-10)
+### 4an + 4an-ter. El 515/615 — BORRADO (ver §4cq)
 
-[usuario 2026-09-10, textual: *"no sé si en algún momento te dije que está discontinuado, pero es un
-artículo continuo, está en venta"* / *"el resorte bicónico... no es discontinuo, está activo"*].
-
-Corregido: **`articulo` 615 → `discontinuado = false`** (el 515 ya estaba activo) y **`BOM10`
-"Resorte Bicónico" → `estado_compra = null`** (se compra; su proveedor **Resortes Charcas** estaba
-intacto). El BOM10 nunca se había sacado de la receta: sigue en `componente_bom` de `C12` (cant 1)
-y tiene sus rutas 563/564 hacia el 515 y el 615.
-
-**Lo que sí lo hacía desaparecer de la pantalla era un bug nuestro, no el dato** — ver más abajo.
-
-**Sigue marcado `discontinuo` y contradice que el artículo esté activo** (pendiente del usuario):
-- **`C12` "Paleta Batidor Resorte"** — es la paleta del batidor, la fabrica Alex Escalante a
-  partir de `IE1`/`W1B`. Si se fabrica, el estado que corresponde es **`fabricacion`**, no
-  `discontinuo` (para el motor de costos da lo mismo: los dos la sacan de "comprado"; cambia lo
-  que muestran OC, Recepción y Faltantes).
-- **`A1C1` "Cartón 515"** — se compra, y **quedó sin proveedor**. `marcar_estado_compra` borra el
-  proveedor cuando se marca `fabricacion`/`discontinuo`
-  (`proveedor = case when v_e is null then proveedor else null end`), así que el dato se perdió al
-  marcarlo. Los otros cartones de la familia son de **Talleres Gráficos Pol**, pero **no se asume**:
-  lo tiene que confirmar el usuario. Mientras esté `discontinuo`, el cartón **no suma costo** al 515.
-
-**Trampa a recordar**: marcar un componente `fabricacion` o `discontinuo` **le borra el proveedor**.
-Al revertir el estado hay que volver a cargarlo — no aparece solo.
-
+Acá vivían dos secciones del 2026-09-10 sobre los batidores 515/615, sus partes y sus pendientes.
+**El artículo y todas sus partes exclusivas se borraron de la base el 2026-09-13** y el tema está
+cerrado: la historia está en el backup y en git. **No analizarlo ni volver a proponerlo.** §4cq.
 ### 4an-bis. Regresión propia: la Rama de un insumo quedaba vacía ("? produce BOM10")
 
 La v1.114.0 dejó que las ramas de un convergente usaran rutas de **insumo** (para mostrar el
@@ -6233,29 +6413,6 @@ Arreglado en la **v1.116.0**: el origen de la rama también se toma del paso `in
 —como `ingreso`— no cuenta como paso productivo. Lo cubre `tests/ui/test_programa_insumo_conv.js`
 con la convergencia C12 real. **Lección**: al ampliar qué rutas entran a un render, revisar el caso
 de la ruta de **un solo paso**.
-
-### 4an-ter. Cierre del 515/615: C12 lo fabrica Alex, el Cartón 515 es de Gráficos Pol (2026-09-10)
-
-[usuario 2026-09-10, textual: *"C12 lo fabrica Alex Escalante. No está discontinuo"* / *"el cartón es
-de talleres gráficos pol"*]. Cierra lo que había quedado colgado en §4an:
-
-| Componente | Antes | Ahora |
-|---|---|---|
-| `C12` Paleta Batidor Resorte | `discontinuo`, sin proveedor | **`fabricacion`** (la hace Alex Escalante desde IE1/W1B) |
-| `A1C1` Cartón 515 | `discontinuo`, **sin proveedor** (se lo había borrado el marcado) | **se compra** (estado null), proveedor **Talleres Gráficos Pol** |
-
-Efecto: el cartón volvió a costar en el 515 → **$1.261,14 → $1.303,86** (los $42,72 del cartón, que
-sí tenía precio cargado). El 615 no se movió ($1.559,63). Quedan 10 componentes en `discontinuo`,
-ninguno de esta familia.
-
-**Lo que falta y es plata real: `BOM10` "Resorte Bicónico" no tiene precio** — se compra a
-**Resortes Charcas** (`kg_x_uni` 0,00963; Charcas cobra por kg y se pide por paquete, ver
-`parametro.charcas_kg_x_paquete`). Mientras no esté, el resorte entra gratis al costo del 515 y del
-615. Demanda actual: 515 = 486 uni/mes, 615 = 24 uni/mes.
-
-**[deducido, SIN confirmar]**: `A1C1` "Cartón 515" tiene `marca = CHEF`, pero el 515 es el artículo
-de **Loekemeyer** (el gemelo Chef es el 615, y su cartón `O2A` también figura CHEF). Si la marca del
-A1C1 está mal, la Recepción de cartones lo va a listar bajo la marca equivocada. Preguntar.
 
 ### 4ao. `articulo` ya tiene DESCRIPCIÓN y MARCA (2026-09-10)
 
@@ -7605,20 +7762,32 @@ N°24 y N°4 que ni existen como componente. **No volver a usarlo para asignar u
 856, 857, 858. Se corrigió `articulo.articulos_por_caja` **y** la cantidad de la receta, que es
 exactamente `1 / articulos_por_caja`.
 
-### 4bq. El artículo se elige en DOS PASOS: marca y después artículo (2026-09-11)
+### 4bq. El artículo se elige en UN PASO: el buscador con todo, y la marca como filtro (2026-09-11, corregido el 2026-09-23)
 
-`[usuario, textual]` **"cuando toco articulo. que me aparezca para seleccionar marca: (loeke,
-chef o loke) y ahi se desplieguen los articulos"**.
+⚠ **CORREGIDO el 2026-09-23 — el paso de marca se sacó.** `[usuario, textual]` **"No me hagas
+elegir por marca, que el buscador aparezca en todas directamente"**. El panel abre **directo en el
+buscador con todos los artículos vivos**; las cuatro marcas quedaron como **chips de filtro
+opcional** arriba del buscador, arrancando en *Todas* en cada apertura (no se guarda el filtro de
+la vez anterior) y sin borrar lo tipeado al tocarlos. Se fue el botón "←": ya no hay paso previo.
+El foco automático en el buscador **sólo en pantalla ancha** (>560px): en el celular el teclado
+taparía la lista recién abierta.
 
-En `Programa/Programa.html` el combo plano se reemplazó por un botón que abre un panel:
-**paso 1** las cuatro marcas (Loeke / Loke / Chef / Todas), **paso 2** el buscador y la lista
-agrupada por familia. El `<select id="art">` **sigue existiendo, oculto**: es el modelo que lee el
-resto de la pantalla, así que `render()` y todo lo que cuelga de `sel.value` quedó intacto.
+Lo que sigue valiendo del pedido original (2026-09-11, `[usuario, textual]` *"cuando toco
+articulo. que me aparezca para seleccionar marca: (loeke, chef o loke) y ahi se desplieguen los
+articulos"*): en `Programa/Programa.html` el combo plano es un **botón que abre un panel** con la
+lista agrupada por familia, y el `<select id="art">` **sigue existiendo, oculto**: es el modelo que
+lee el resto de la pantalla, así que `render()` y todo lo que cuelga de `sel.value` quedó intacto.
 
-**Regla nueva del panel:** filtrar (cambiar de marca o escribir en el buscador) **NO cambia el
-artículo elegido**; eso pasa sólo al tocar una fila. Antes el filtro movía la selección solo.
+**Regla del panel, intacta:** filtrar (chip de marca o escribir en el buscador) **NO cambia el
+artículo elegido**; eso pasa sólo al tocar una fila.
 
-Lo cubre `tests/ui/test_programa_marca.js` (20 checks, reescrito para el panel).
+**La lección:** el filtro por marca separa poco (3 marcas para ~190 artículos) y el que entra ya
+sabe el código que busca; ponerlo como paso obligatorio agregaba un toque a cada consulta sin
+achicar la lista de verdad. Como filtro al costado no estorba.
+
+Lo cubre `tests/ui/test_programa_marca.js` (35 checks, dado vuelta el 2026-09-23: fija que el
+buscador está a la vista al abrir, que no existe `#pickBack`, que los chips viven adentro del panel
+y que al reabrir vuelve a *Todas*).
 
 ### 4br. Se recorrieron las 861 rutas de punta a punta: qué se cortaba y por qué (2026-09-11)
 
@@ -7968,9 +8137,9 @@ Tres casos que no cierran en un sí/no:
 **Lo más atrasado es Prov Servicio, en 0 de 11**: New Metal, Chormium, Gaston Almafuerte y Valeria
 siguen sin cargarse.
 
-**PENDIENTE del usuario** (dijo "2 limpia" y quedó sin definir qué): (a) `GRJ28` y `GRJ29` tienen
+**PENDIENTE del usuario** (dijo "2 limpia" y quedó sin definir qué): (a) ~~`GRJ28` y `GRJ29` tienen
 la MISMA descripción "Cepillo Limpia Bombilla" — son el 555 Loeke y el 764 Chef, y habría que
-distinguirlos como se hizo con GRJ13/GRJ14; (b) `GRJ21` "Bowls 330ml" está discontinuo y es resto
+distinguirlos como se hizo con GRJ13/GRJ14~~ → **resuelto 2026-09-25: se unificaron en `GRJ28`** (ver 4ga); (b) `GRJ21` "Bowls 330ml" está discontinuo y es resto
 de la numeración vieja.
 
 ### 4cc. El mango de Maspoli viene CON LA VIROLA PUESTA (2026-09-12)
@@ -8112,3 +8281,5666 @@ para detectar el patrón.
 | 181, 306 | no existen en GP2 | — |
 
 **Conclusión: el rompenueces es el único caso.** No hay una familia de errores atrás.
+
+### 4cf. El 515 y el 615 fueron BORRADOS y se reconstruyeron a mano (2026-09-14)
+
+`[usuario 2026-09-14, textual: "El 515 y 615 quiero que aparezcan de nuevo" · "los stock que
+habia no me importan"]`
+
+**Lo que pasó, en orden** (reconstruido del transcript y de `supabase_migrations`):
+
+| Cuándo | Qué | Quién |
+|---|---|---|
+| 12-09 11:19 AR | Migración `el_resorte_sale_del_bom_de_la_paleta_y_el_515_615_quedan_discontinuados`: borra la fila `componente_bom(C12 ← BOM10)` y marca `articulo.discontinuado = true`. **No borra nada más.** | esta sesión |
+| 12-09 20:36 AR | Migración `discontinuar_partes_exclusivas_del_515_y_615`: agrega `componente.discontinuado` y marca las 8 piezas. **Tampoco borra.** Cita `[usuario 2026-09-13: "Discontinua todas las partes que usen 515 y 615"]` | otro chat |
+| después | **DELETE físico, con `execute_sql` suelto y sin migración**: desaparecen los 2 artículos, los 8 componentes (`C12`, `W1B`, `IE1`, `BOM10`, `A1C1`, `O2A` y los dos terminados) y sus rutas | sin rastro |
+
+**Regla que sale de esto: `discontinuado` existe para no borrar.** Un artículo que "no se
+fabrica más" se marca; borrarlo tira receta, rutas, precios e historial, y no hay vuelta atrás
+sin un backup. Lo mismo vale para el componente desde el 12-09.
+
+**Lo que salvó la reconstrucción fue una CAPTURA DE PANTALLA.** El usuario mandó
+`Programa.html` abierto en una pestaña vieja, cargada ANTES del borrado: de ahí salió la forma
+exacta de las rutas, que **no estaba en ninguna otra parte** — el vecino `public."Causa-Efecto"`
+no tiene ninguna fila de estas piezas, y las migraciones no las habían creado (vinieron de la
+carga masiva original). El vecino sí aportó los pesos (`W1B` 0,0015 kg, `BOM10` 0,00963 kg) y la
+migración `20260901091333` el `kg_x_uni` 0,0241 de los dos terminados.
+
+**La ruta del batidor, como quedó** (idéntica para 515 y 615, cambia la cola):
+
+```
+Rama 1: IF11 Fleje N°19 → M138 "Corte Grampa Batidor" → W1B → Guazzaroni (niquela) → W1B ─┐
+Rama 2: IE1 Fleje N°33 ────────────────────────────────────────────────────────────────  ┼→ Alex arma C12
+                                                                                          │   (Paleta Batidor Resorte)
+                                                                                          ↓
+                          Pedernera Ilario (croma) → C12 → Alex arma el artículo → Virgilio
+Aparte, derecho al tallerista: 515 → PC10, PA13, A1C1, BOM10, A8(1/12)
+                               615 → PA19, PB6,  O2A,  BOM10, A8(1/12)
+```
+
+**`C12` es una convergencia de tipo `tallerista`, no de matriz** — dos ramas con distinta
+entrada y la MISMA salida, el patrón de la M135. No es una rareza: `GRJ10` (12 ramas), `GRJ7`
+(8), `GRJ5`, `GRJ6` y `GRJ10A` son iguales. **`__sim_articulo` da `ok:false` en todas**: la
+conservación a Virgilio cierra (120 de 120) pero deja "colgados" los componentes de la
+convergencia. El 515 y el 615 quedan con 3 colgados; sus pares de la familia tienen entre 3 y 7.
+Es un punto ciego del arnés con las convergencias de tallerista, no un defecto del dato.
+
+**Se reconstruyó SIN la "Rama 3" que muestra la captura** (el `BOM10` metido dentro del `C12`,
+además del `BOM10` que entra suelto al tallerista): es el doble conteo de la idea 7298, que el
+usuario ya había contestado `["1 lo agrega alex"]` — el resorte no viene dentro de la paleta.
+
+**Lo que NO se pudo recuperar y quedó en `null` a propósito** (no se inventa): `kg_x_uni` de
+`C12` y de `IE1`, el `carton_formato` de `O2A`, los ids viejos, el stock (el usuario lo dio por
+perdido) y **los precios**. Por eso el 515 costea **$306,31** contra los $1.303,86 documentados y
+el 615 **$428,67** contra $1.559,63: son 5 `faltan_precios` en cada uno.
+
+**Hallazgo de paso que era una bomba de tiempo en TODA la base**: las secuencias de id de GP2
+nunca se habían avanzado (las cargas masivas usaron ids explícitos), así que el primer `insert`
+que dependiera de la secuencia reventaba con `duplicate key value violates unique constraint`.
+Pasó acá con `componente_pkey` id 916. Migración `las_secuencias_de_id_estaban_atrasadas`:
+resincroniza `componente`, `articulo`, `ruta`, `ruta_paso`, `articulo_componente` e `inventario`.
+
+**Dato que se retira**: en §4an-ter quedó anotado como `[deducido, SIN confirmar]` que la marca
+de `A1C1` "Cartón 515" podía estar mal por figurar `CHEF`. **Es `LOEKE`** — lo fijó la migración
+`20260911150532` con la regla "la marca del cartón es la del artículo que nombra". Por esa misma
+regla `O2A` "Cartón 615" se recreó como `CHEF`.
+
+### 4cf. Por qué existe GP2 y por qué NADA suyo mira `public` (2026-09-12)
+
+**[usuario, textual]:** *"La creación de este repositorio surgió porque en gestión productiva
+entero era todo quilombo, y yo empecé subiendo las tablas normalizadas de toda la info que creía
+que requería un nuevo repo ordenadito. En medio se hicieron como cincuenta tablas que mira desde
+public, y es un desastre, yo no quería eso."* Y el pedido que sale de ahí: *"Las tablas de public
+que pasen a mirarse internamente."*
+
+Es el **origen** del proyecto dicho por el dueño, no una preferencia de estilo: GP2 nació de las
+tablas normalizadas que él cargó, y cualquier lectura a `public` traiciona el motivo por el que
+existe. Por eso la Regla 0 quedó en la primera hoja de `CLAUDE.md`.
+
+**Lo que la auditoría del 2026-09-12 encontró (y hay que decirlo porque desarma el susto):**
+
+- El schema `GP2` **nunca** leyó `public`: de sus 142 funciones y 18 vistas, la única referencia
+  es `public.http_get` en `actualizar_dolar_oficial` — la extensión http, no una tabla de negocio.
+- Las ~50 pantallas que sí pegan contra `public` son **las del programa viejo que quedaron
+  conviviendo en esta carpeta** (`Produccion/`, `StockFlejes/`, `Prov Serv/`, `Talleristas/` sin
+  sufijo `_GP2`, `Despiece*`, `Facturas/`, `Verificacion/`, …). No son tablas nuevas mal hechas:
+  es código heredado sin borrar. Nunca fueron parte de GP2.
+- **La única fuga real** era el menú: `GP2_MODULOS.html` tenía una fila marcada `"vieja"`,
+  *Entrega Virgilio*, que abría `Talleristas/Recepcion/Recepcion Virgilio.html` — y esa sí leía
+  `public` (`Articulos Virgilio X Tallerista`, `Despiece x Articulo`) y escribía en
+  `Entregas Tallerista Virgilio`.
+
+**Cómo se cerró:** la pantalla se reescribió como `Talleristas/Recepcion/RecepcionVirgilio_GP2.html`
+sobre lo que GP2 ya tenía: el bundle `GP2.movimientos_bundle()` y el RPC
+`GP2.recepcion_virgilio(jsonb)` (que ya existía y ya se usaba — los 64 movimientos
+`recepcion_virgilio` del 31-08 al 11-09 son reales; hasta ahora se cargaban a mano por SQL porque
+**no había pantalla**). Al bundle se le agregó `prov_at` y el `pat` del paso, que faltaban: Virgilio
+recibe terminados de talleristas **y** de proveedores de artículo terminado (39 artículos de 11
+proveedores AT). Quién entrega cada artículo **no necesita tabla**: sale del último paso con
+contraparte antes del paso `virgilio` de la ruta (779 pasos de tallerista + 76 de proveedor AT,
+sin ninguno huérfano).
+
+**Cerrado el mismo día** `[usuario: "Primero las 50 muertas"]`: se borraron **109 archivos** — las
+50 pantallas viejas que ya tenían reemplazo GP2, con su HTML/JS/CSS. Siguen en el historial de git
+y en `GestionProductivaEntero`. **Lo que el borrado destapó y hay que recordar:** dos cosas vivas
+apuntaban a las viejas y se relinkearon antes de borrar — `envios-only.html` (los 4 botones del rol
+`envios`) y, lo delicado, **la whitelist del rol `envios` en `auth-guard.js`**, que nombraba
+`enviostall.html`, `recepcion cervantes.html`, `stockflejes/recepcion.html`, `produccion/monitor.html`
+y `maestro.html`: sin actualizarla, ese rol se quedaba sin acceso a NADA. Quedan mirando `public`
+**cinco** archivos, todos fuera del menú GP2 y ninguno en uso: Facturas (2), Control Carga Remitos,
+Preavisos e `InformesVirgilio`, que es de Gestión Virgilio y tiene su propio repo. El sexto,
+`calcular-cajones.html`, era el único **vivo** y se migró el 2026-09-13 (ver §4cg). El mapa vive en
+`MIGRACION_PUBLIC_GP2.md`.
+
+### 4cg. El CAJÓN no es la CAJA: dos cosas distintas con la misma palabra y numeración propia (2026-09-13)
+
+Salió al migrar la calculadora de la planta (`calcular-cajones.html` → `CalcularCajones_GP2.html`).
+
+- **Cajón** = la caja de movimiento **retornable** que se llena de piezas y se pone en la balanza.
+  Van del **N°1 al N°10** y lo que importa de cada uno es su **tara** (1,30 a 5,20 kg): el
+  operario pesa bruto y hay que descontarla. GP2 pensaba en cajones en todos lados
+  (`componente.uni_x_cajon`, `parametro.max_cajones_x_ubicacion`, `faltante_cajones_umbral`)
+  pero **no tenía el peso del cajón vacío**: vivía en `public.peso_cajones`, del programa viejo.
+  Ahora es **`GP2.cajon` (numero, tara_kg)**, 10 filas migradas con el dato que midió el usuario.
+- **Caja** = la caja de **cartón del artículo terminado**, la que se despacha. Es `Sector Caja`
+  (id 11): `A1` "Caja N°1", `A8` "Caja N°2", `A9` "Caja N°22", `A11` "Caja N°29"… **Tiene su
+  propia numeración**, que se pisa con la de los cajones: la "Caja N°1" (A1) **no** es el "Cajón
+  N°1" de tara 1,70 kg. Lo que importa de ella es `articulo.articulos_por_caja`, no su peso — de
+  hecho ninguna de las 12 tiene `kg_x_uni` cargado.
+
+**Trampa concreta:** si alguien "ve" que GP2 ya tenía cajas numeradas y decide que ahí va la tara,
+mete el peso del cajón retornable en la caja de cartón del terminado y rompe las dos cosas. Son
+tablas distintas a propósito.
+
+**De paso, la calculadora nueva cubre más que la vieja:** la vieja tenía cuatro categorías fijas
+(SP, SC, Plásticos, Remaches) y el Garage deshabilitado "porque no tiene peso x unidad". Como GP2
+saca los kg de `componente.kg_x_uni`, hoy salen **331 piezas en 10 sectores** — Garage incluido (6),
+más Bombilla (14), Fleje (51) y Alambre. Y como `componente.uni_x_cajon` existe, además de las
+unidades muestra **a cuántos cajones llenos equivale**, que la vieja no podía calcular.
+
+### 4ch. La columna vertebral de GP2, dictada por el dueño (2026-09-13)
+
+**[usuario, textual]:** *"La ruta general es: OC → Recepcion → Insumos → Produccion
+Alimentador/Balancines → SC → Envio Ps → Entrega Ps → SP → Envio Tall → Entrega Tall → virgilio"*.
+
+Lo dijo corrigiendo un croquis que había dibujado los sectores como **una nube** con flechas de ida
+y vuelta. Está mal dibujado así: GP2 tiene **una línea**, y lo demás son ramas colgadas de ella.
+
+**La base lo confirma** (pasos de `ruta_paso`, 2026-09-13): Fleje → Crudo por matriz **120** pasos
+(+91 que pasan por `Mat N`), Crudo → Procesado por proveedor de servicio **122**, Procesado →
+Terminado por tallerista **173**, y **855** pasos `virgilio` desde Terminado. Las máquinas de
+producción son **balancín (70 matrices)** y **alimentador (43)** — `matriz.maquina`, el vocabulario
+de la planta.
+
+Tres cosas que la cadena esconde y hay que tener a mano:
+- **`Mat N` (Sector Movimiento) es parte de Producción**, no un sector aparte: son las piezas a
+  medio hacer entre matriz y matriz.
+- **No todo pasa por PS**: 41 pasos de servicio devuelven al mismo SC (procesos que no cambian de
+  sector) y 14 rutas tienen al tallerista tomando directo de SC. La línea es el camino **normal**,
+  no una obligación.
+- **Los insumos que no son fleje** (cartón, caja, plástico, bombilla, remache, garage) no entran
+  por producción: se le mandan **al tallerista**, y se descuentan por la receta al entregar en
+  Virgilio. El proveedor de artículo terminado se saltea la fábrica entera.
+
+El croquis vive en `GP2_CROQUIS.md`.
+
+### 4ci. Cómo debe funcionar la lectura de facturas: la IA extrae, GP2 decide (2026-09-13)
+
+**[usuario, textual]:** *"Lectura facturas deberia a traves de API de Claude o local (con previo
+entrenamiento) leer las facturas para simplificar la recepcion"*. O sea: el objetivo **no es
+archivar la factura, es que la recepción sea más rápida** — que el que recibe no tipee 20 renglones.
+
+**El reparto de trabajo, que es lo que hay que no confundir:**
+
+| Paso | Quién | Con qué |
+|---|---|---|
+| Leer el papel (código, descripción, cantidad, precio) | **la IA** | API de Claude, el PDF como bloque `document` o la foto como `image`, y `output_config.format` con JSON Schema para que la forma del JSON esté **garantizada** en vez de pedida |
+| Decidir **qué componente GP2 es cada renglón** | **GP2, no la IA** | `factura_alias` (lo aprendido) → `fleje_detalle.cod_isis` → `componente.codigo` → parecido de descripción dentro de la lista de productos de ese proveedor |
+| Escribir el stock | **la persona** | confirma y recién ahí corren `crear_recepcion_insumo` / `crear_entrega_ps`, que ya cruzan contra las OC abiertas |
+
+**CORRECCIÓN del 2026-09-13 (importante, lo había dicho mal):** `precio_proveedor.cod_prov` **NO
+es el código del artículo, es el código del PROVEEDOR** — 2147 es Talleres Gráficos Pol, 890 es
+Bella Vista. Por eso un renglón del 2147 devolvía 93 "candidatos". **GP2 no tiene hoy los códigos
+de artículo de sus proveedores**: los únicos códigos de tercero cargados son los 51
+`fleje_detalle.cod_isis`.
+
+**"Previo entrenamiento" NO es fine-tuning**, y ahora se sabe exactamente qué es: **llenar
+`factura_alias`**, que arranca vacía. La primera factura de cada proveedor se ata a mano renglón
+por renglón; de ahí en más sale sola. Lo que sí aporta `precio_proveedor` es **la lista de
+productos de cada proveedor**, y con eso el match propone por parecido de descripción *dentro de
+ese proveedor* (pg_trgm): auto-asigna sólo si el parecido es ≥ 0,55 y el segundo candidato quedó
+0,15 atrás; si no, devuelve candidatos y elige la persona. El proveedor se reconoce por nombre
+("TALLERES GRAFICOS POL S.A." matchea "Talleres Gráficos Pol" con 0,85).
+
+**Lo que ya existe y sirve de referencia:** el programa viejo tiene cuatro Edge Functions vivas que
+hacen esto con **gpt-4o** — `leer-factura`, `leer-remito-tallerista`, `leer-oc` y
+`leer-produccion-foto` — más `factura_combine` y `gp_file_b64`. El prompt de `leer-factura` ya tiene
+peleadas las trampas de la factura argentina (ARCA/AFIP): el punto de miles (`1.000` = mil), la coma
+decimal, el CUIT con guiones, razón social legal vs. nombre de fantasía, y el **código de artículo**
+como campo crítico. Eso se reusa; lo que cambia es el proveedor de IA y que el resultado entra por
+las RPC de GP2 en vez de escribir tablas de `public`.
+
+**Trampa encontrada al mirarlas (2026-09-13):** `leer-factura` tiene la **clave de OpenAI
+hardcodeada como fallback** (`Deno.env.get("OPENAI_API_KEY") || "sk-proj-…"`). No está en git —se
+verificó en los dos repos— pero está en el código de la función, y además hace que la función ande
+aunque el secret no esté puesto, así que nadie se entera. Quedó en la auditoría como problema
+abierto. **En GP2 la clave va sólo como secret de Supabase, sin fallback en el código.**
+
+Idea 7338.
+
+### 4cj. El preaviso: la promesa vive aparte del movimiento (2026-09-13)
+
+Construido el hueco ① del croquis. **Qué es:** el tallerista o el proveedor avisa *qué va a traer
+y cuándo*, antes de traerlo. Sin esto no se sabe qué entra mañana y el faltante se descubre tarde.
+
+**Cómo quedó, y por qué así:**
+- `GP2.preaviso` guarda **sólo la promesa** (contraparte, pieza, cantidad, fecha prometida). **No
+  mueve stock**: el movimiento lo sigue haciendo la pantalla de entrega que corresponda. Mezclar
+  las dos cosas era el error fácil — una promesa no es un ingreso.
+- **Qué puede entregar cada contraparte NO se cargó en ninguna tabla nueva**: sale de `ruta_paso`,
+  igual que en Recepción Virgilio (la salida de sus pasos; para el proveedor AT, la entrada del
+  paso `virgilio` que le sigue). Son **32 contrapartes y 329 pares contraparte–pieza**, todos
+  deducidos. La pantalla vieja mezclaba `Articulos Virgilio X Tallerista` con `Partes x PS` para
+  lo mismo.
+- `v_preaviso_estado` **cruza la promesa contra el libro sin escribir**: dice los días que faltan
+  (negativo = vencido) y cuánto de esa pieza entregó esa contraparte desde que lo prometió. Quién
+  lo da por cumplido es la persona, no la vista.
+
+Idea 7340. Pantalla: `Preavisos/Preavisos_GP2.html`, en el menú dentro de Tallerista.
+
+### 4ck. La entrega del tallerista EN CERVANTES: qué es y cómo está parametrizada (2026-09-13)
+
+Pregunta del usuario. Hay **dos entregas de tallerista distintas** y conviene no mezclarlas:
+
+| Entrega | Dónde cae | Pantalla | Movimientos |
+|---|---|---|---|
+| **En Virgilio** | el artículo **terminado** al centro logístico | `RecepcionVirgilio_GP2` | `recepcion_virgilio` + `consumo_virgilio` (la receta) |
+| **En Cervantes** | una **pieza a un sector** (semi-elaborado) | `EntregasTalleristas_GP2` | `entrega_tallerista` + `consumo_tall` |
+
+**Cómo está parametrizada la de Cervantes:** no hay tabla de configuración — **sale de la ruta**.
+Es todo paso `ruta_paso` de tipo `tallerista` cuyo `comp_salida` cae en un sector que **no** es
+Terminado (12). Hoy son **11 piezas y 4 talleristas** (el resto sólo entrega terminados):
+
+- **Martin Cornejo**: `GRJ5`, `GRJ6`, `GRJ7` (Garage) y `X4` Cuchilla Pelapapa Cerrada (Crudo)
+- **Alex Escalante**: `GRJ7`, `GRJ10`, `GRJ10A` (Garage) y `C12` Paleta Batidor Resorte (Bombilla)
+- **IJUPA**: `M6` y `M8`, los mangos de pelapapa para cromar (Crudo)
+- **Lucho**: `J1` Tochos Zinc para rectificar (Crudo)
+
+**Qué se le descuenta al entregar, que es la parte que importa:**
+1. Si la pieza tiene **`componente_bom`** (los GRJ y el C12), se descuenta **todo el BOM** —
+   p. ej. `GRJ7 = A10 + C10 + V9`, `GRJ10 = LL7B + LLF8 + IE4 ×3 + IE5`. Por eso `ruta_paso` lista
+   varias entradas para el mismo paso: **no son alternativas, son todas las partes del armado**.
+2. Si **no tiene BOM** (`M6`, `M8`, `J1`, `X4`), es una **transformación 1:1** de su entrada:
+   `M10→M6`, `M9→M8`, `F7→J1`, `X1→X4`.
+3. Si no tiene entrada, es un **paso in-place**: devuelve lo mismo que recibió.
+
+El motor lo resuelve solo (`GP2M.recepcionTall` → `crear_entrega_tallerista`, con
+`p_descontar_bom` y `p_comp_entrada_id`): **la pantalla no le pregunta al operario qué consumió**.
+El único caso que no puede deducir es una pieza con varias entradas posibles y **sin BOM cargado**
+— ahí la pantalla frena y pide cargar el BOM, en vez de adivinar.
+
+Lo que se le paga al tallerista vive aparte, en `precio_tallerista` (por kg).
+### 4cl. TODOS LOS ARTÍCULOS YA ESTÁN DESPIEZADOS — qué se destraba y qué queda (2026-09-13)
+
+`[usuario 2026-09-13, textual]` *"Todos los articulos ya estan despiezados"*. **Verificado contra la
+base y es así**: **190 artículos, 190 con receta** (780 líneas de `articulo_componente` + 44 de
+`componente_bom`), **0 artículos sin ruta**, **0 componentes de receta sin fila de inventario**.
+Para dimensionar el salto: la foto original del Excel eran 84 artículos.
+
+**La base está sana.** `db/verificar.sql` entero da 0 en todos los invariantes menos dos, y los dos
+se miraron hoy (abajo). 868 rutas, 3.315 pasos, 802 componentes, 1.308 filas de inventario.
+
+**Lo que se destraba (el número que importa):** con el despiece completo, la Est Madre explota a
+componentes para el **82,5 % de la demanda proyectada** (185 códigos, 208.073 uni/mes de 252.170).
+`[dato: GP2.est_madre x GP2.articulo]` El 17,5 % que no cruza **no es un hueco de GP2**: son **182
+códigos (42.107 uni/mes) que GP2 no modela y que el vecino tampoco despieza** — reventa e importado,
+casi todos con sufijo `E` (529E, 102E, 582E, 438E…, ninguno con nombre en `public."Despiece x
+Articulo"`). Sólo **38 códigos (1.990 uni/mes, 0,8 %)** son variantes con sufijo de un artículo que
+GP2 sí tiene: ésos sí convendría sumarlos al código base cuando se toque el cruce. **Esto corrige
+la lectura vieja de §4ax** ("34 artículos del Excel sin despiece plástico deja corto el consumo"):
+ese agujero ya no existe.
+
+**Lo único que queda pendiente del despiece — 10 artículos SIN CAJA NI CARTÓN en la receta**
+`[dato 2026-09-13]`: los tres palos de amasar (**231, 232, 233**) y los siete de acero inox
+(**941E, 942E, 943E, 944E, 945E, 946E, 948E**, cuya única línea es `PEST1` Insertos Mango de
+Madera). **No es un error de carga de GP2: el vecino está igual** — los siete `E` figuran en
+`public."Despiece x Articulo"` con `PEST1` y **sin `N_Caja`**, y los palos de amasar ni figuran
+(son de GP2). Tampoco tienen fila en `uni_x_articulo_x_caja`. **Pregunta al usuario: ¿van sin caja
+(a granel / en la caja de otro artículo) o falta cargarla?** Mientras no se responda, la OC de
+cartones y cajas queda corta para esos 10. Los otros 12 artículos de receta de una sola línea
+**están bien**: son compra terminada a un `proveedor_at` y lo único que se les agrega es la caja
+(070, 246, 326, 591, 618, 619, 761, 823, 900, 922) o el cartón (222, 910).
+
+**Los dos invariantes que daban > 0:**
+
+1. **`N_funciones_con_public_en_search_path` = 1 → arreglado hoy, y deja regla.** Era
+   `factura_match` (nacida ayer con la lectura de facturas, §4ci) con `search_path = GP2, public,
+   extensions`. **La causa vale como conocimiento: en este proyecto `pg_trgm` está instalada en
+   `public`, NO en `extensions`** (`unaccent` sí está en `extensions`), así que cualquier función
+   GP2 que use `similarity()` se ve tentada de meter `public` en el search_path — y ahí adentro
+   cualquier nombre sin calificar puede caer en una tabla del vecino. **Lo correcto es calificar
+   `public.similarity(...)` y dejar `search_path = GP2, extensions`**, que es lo mismo que ya hacía
+   `actualizar_dolar_oficial` con `public.http`. Hecho y probado llamando la función (proveedor
+   "TALLERES GRAFICOS POL S.A." → Talleres Gráficos Pol 0,85; un renglón por código y otro
+   `sin_match`); `db/funciones_GP2.sql` sincronizado y verificado por md5 contra la base.
+2. **`Z2_parametro_que_nadie_lee` = 2 → era la LISTA la que estaba vieja, no los parámetros.**
+   `master_bach_pct` (4) lo lee `recalcular_maximo_material()` y `facturas_lecturas_x_dia` (50) lo
+   lee `factura_lectura_permitida()` (idea 7339, de hoy). Los dos se agregaron a las dos listas de
+   `db/verificar.sql` y Z/Z2 vuelven a 0. **La trampa de este invariante es esa**: la lista de
+   claves está escrita a mano en el chequeo, así que un parámetro nuevo lo hace dar > 0 aunque el
+   código lo lea perfectamente — antes de creerle que un parámetro está muerto, hay que grepear el
+   `db/` (y, si el chequeo dice lo contrario, la que se corrige es la lista).
+
+
+### 4cm. Los que GP2 NO tiene: 46 son trabajo, 174 son reventa (2026-09-13)
+
+`[usuario 2026-09-13]` *"Veamos los que no tenés"*, por los 220 códigos de la Est Madre que no
+cruzan con un artículo de GP2 (44.097 uni/mes, el 17,5 % de la demanda). **El listado completo, con
+nombre, volumen y tallerista, está en `ARTICULOS_FUERA_DE_GP2.md`.** Lo que hay que saber:
+
+**El corte NO es el volumen, es si alguien los fabrica** `[dato: public."Despiece x Articulo" +
+public."Articulos Virgilio X Tallerista"]`:
+
+- **46 códigos (10.504 uni/mes, 4,2 % de la demanda) FALTAN DE VERDAD**: un tallerista los entrega
+  o el vecino los despieza. **Los 5 primeros son el 70 % del grupo y los cinco son de García**:
+  438E Colador N°20 (2.788), 437E Colador N°16 (2.388), 590E Pincel Silicona (1.188), 566E Aceitera
+  100 (624) y 584E Aceitera 400 (551).
+- **174 códigos (33.593 uni/mes, 13,3 %) son reventa e importado**: ni despiece ni tallerista, se
+  compran terminados (sacacorchos, ralladores, peladores, cortadores, pinzas, utensilios de
+  nylon/silicona con mango de madera o bambú). **No hay nada que modelar en GP2**, por más que
+  vendan: 529E solo son 3.708 uni/mes.
+
+**Tres cosas que aparecieron al mirarlos y evitan trabajo de más:**
+
+1. **Los coladores Loke 110/111/112/113 y los 438E/437E son la misma familia con dos
+   numeraciones** — antes de dar de alta seis artículos hay que ver si no son variantes del mismo
+   despiece.
+2. **El bloque de cubiertos inox de «Carlos» (332-337, 630-637, 613, 710) son 16 códigos y sólo
+   426 uni/mes, pero es el más barato de migrar**: casi todos tienen el despiece cargado en el
+   vecino (3 a 7 partes) y **GP2 ya tiene los 941E-948E, que son cubiertos inox del mismo estilo**,
+   así que hay componentes reusables. Los `CH` (630-637, 801, 809) son los mismos artículos con el
+   código de venta de Chef.
+3. **`55215` (Palo de Amasar 40 cm, Tierra Nativa) es el mismo producto que el `232` que GP2 ya
+   tiene**: no es un alta, es decidir si es un alias.
+
+**Los 75 códigos terminados en `L` suman 435 uni/mes ENTRE TODOS** — son códigos de venta por Chef
+de esa misma mercadería, no artículos distintos; no justifican trabajo propio. Y **`838E` y `877E`
+no tienen ni descripción en el vecino**: hay que preguntar qué son antes de tocarlos.
+
+
+### 4co. Qué se importa listo y qué se envasa acá: el corte de García (2026-09-13)
+
+Respuesta del dueño a "¿voy por los 5 de García?" (§4cm). **Cuatro de los cinco ya no son trabajo
+de GP2 y el quinto es el caso más interesante que apareció en toda la revisión.**
+
+**1) Lo que ahora se importa LISTO PARA LA REVENTA** `[usuario 2026-09-13, textual]`: *"438E es
+importado a partir de ahora y esta listo para la reventa. Lo mismo 437E, 566E y 584E"*. Los cuatro
+salen del grupo de "faltan": no se fabrican ni se envasan acá. Son **6.351 uni/mes, el 60 % de ese
+grupo**, que pasa de 46 códigos y 10.504 uni/mes a **43 y 4.160**.
+
+> **Excepción transitoria del 584E** `[usuario]`: quedan **1.200 unidades en Virgilio** que se le
+> mandan a García **para reenvasar de cajas de 60 a cajas x6**, y esas **cajas x6 no son cajas del
+> sistema**. Es stock viejo, no el circuito nuevo; mientras dure, ese consumo de cajas no se puede
+> registrar en GP2 sin dar de alta ese formato. **No inventarlo**: si hay que registrarlo, lo dice
+> el dueño.
+
+**2) El pincel 590E: UN insumo a granel, TRES artículos** `[usuario 2026-09-13, textual]`: *"590E se
+stockea en Virgilio en cajas x600uni, que se le mandan a garcia para que las envase"*. Lo que los
+diferencia **no es la pieza, es el envase**:
+
+| Artículo | Empresa | Cartón | Caja | uni/caja | uni/mes |
+|---|---|---|---|---:|---:|
+| 590E | LK | sí | 29 (`A11`) | 12 | 1.188 |
+| 890E | Chef | sí | 29 (`A11`) | 12 | 7 |
+| 590ES | LK | **no** | 29 (`A11`) | 50 | 0 |
+
+`[dato 2026-09-13]` Confirmado contra la base: **Caja N°29 = `A11`** (Sector Caja), **García =
+`Danica García`, tallerista id 1, activo**, y los tres códigos están en la Est Madre con el `uxb`
+que corresponde (12, 12, 50). El vecino modela el 590E con `590E-CC` (caja chica 1/12) y `590E-MC`
+(mastercaja 1/600): **la caja x600 es cómo llega importado**, no una parte del terminado.
+
+**Lo que falta para darlos de alta, y que sólo puede decir el dueño**: el código y el sector del
+**componente del pincel a granel** (no existe; su ubicación va a ser Virgilio), y los **dos
+cartones** (LK y Chef), que tampoco existen y **se codifican por posición de estantería** (`G2B` =
+Cartón 229, `G6B` = Cartón 299), no con un número inventado. También si el 890E lleva cartón propio
+de Chef o el mismo que LK. Detalle y orden de la cirugía en `ARTICULOS_FUERA_DE_GP2.md`.
+
+**Quedó una pregunta abierta y ya está contestada en §4cp**: `439E` (Colador Pasta) y `440E`
+(Colador Extensible) son de la misma familia de coladores, y el dueño dijo que **todos los coladores
+pasan a importados** — no se modelan. No volver a abrirla.
+
+
+### 4cp. Coladores de salida, cubiertos inox discontinuados, y dos códigos que eran otra cosa (2026-09-13)
+
+Segunda vuelta del dueño sobre la lista de §4cm/§4co. **El grupo de "faltan de verdad" arrancó en
+46 códigos / 10.504 uni/mes y quedó en 26 / 3.655** — y de eso, 1.038 uni/mes son coladores que
+también se van. Detalle en `ARTICULOS_FUERA_DE_GP2.md`.
+
+**1) Los coladores** `[usuario 2026-09-13, textual]`: *"Coladores, ahora pasan a ser importados
+dentro de muy poco, pero por ahora las hace Jose Lopez y entrega. Solo le damos el carton de cada
+uno (salvo 16 y 20cm de Chef y Loeke)"*. Tres cosas que salen de ahí:
+- **De un colador, lo único que pone GP2 es el cartón** — la pieza la hace y la entrega José López.
+- **Los de 16 y 20 cm (de las dos empresas) ni siquiera llevan nuestro cartón.**
+- Es un estado **transitorio**: pasan a importados. **Recomendación: no modelarlos** (110, 111, 112,
+  113, 439E, 440E). Además **José López no existe como tallerista en GP2** `[dato: los 13 cargados
+  son Danica García, Alex Escalante, Fábrica, Cavallero, Lucho, Martín Cornejo, Maspoli, Gentile,
+  Carlos Aguirre, IJUPA, Pettofrezza, Tierra Nativa y Blist-Pack]`, así que darlos de alta obliga a
+  crear un tallerista para algo que se discontinúa solo.
+- `[usuario 2026-09-13, textual: "439E no tiene nada que cer con 441"]` **El `439E` NO es el `441`.**
+  **Queda sin efecto** la suposición `[deducido]` que había acá de que el 439E fuera el `441`
+  Colador de Pasta Plástico (`GRJ25`) con otro código de venta: son artículos distintos. No cambia
+  la recomendación — el 439E es colador, y los coladores no se modelan porque se van a importar.
+
+**2) Los cubiertos de acero inox ya están resueltos, por otro camino** `[usuario 2026-09-13,
+textual]`: *"332/7 y 630/7 son discontinuos. Se reemplazaron por 941/8E"*. Son 14 códigos (332-337
+de LK y 630-637 de Chef, 425 uni/mes) y **los reemplazos `941E`-`948E` YA ESTÁN en GP2**, con
+receta y ruta. Justo el bloque que §4cm proponía migrar "porque era el más barato": no hay nada que
+migrar. `[dato]` GP2 tiene 941E-946E y 948E; **el `947E` no existe** `[usuario 2026-09-13, textual:
+"947E no"]`, así que **el juego está completo y no falta ninguno**. Pregunta cerrada.
+
+**3) Dos códigos que eran otro artículo ya conocido** `[usuario]`: **`838E` es el `323E` con otro
+cartón** `[usuario 2026-09-13, textual: "838E=323E con otro carton, no 323 (sin E)"]` — el Rallador
+Mini de Chef, y lo único que los separa es el cartón —, y **`877E` es el corta pizza, el mismo que
+el `809E` de Loeke**. Los dos se compran: van al grupo de reventa. **El `323` (sin E) Rallador
+Cilíndrico Chico es OTRA COSA**, no confundirlo con el 838E: sigue en la lista de los que faltan.
+
+**4) `55215`** (Palo de Amasar 40 cm, Tierra Nativa) `[usuario, textual]`: *"se entrego solo una
+vez. No lo analicemos. Y no se va a volver a vender"*. Fuera de la lista. **Deja sin efecto** lo que
+decía §4cm de que era un alias del 232.
+
+**La moraleja que deja esta vuelta** `[deducido]`: la Est Madre proyecta sobre lo que se vendió, así
+que **arrastra artículos discontinuados, códigos duplicados de la otra empresa y entregas de una
+sola vez**. Un código que aparece ahí y no está en GP2 no es, por sí solo, trabajo pendiente: hay
+que preguntar antes de modelar. De 46 candidatos, 20 se cayeron con cuatro frases del dueño.
+
+
+### 4cq. El 515/615 SE BORRÓ DE LA BASE — no volver a mencionarlo (2026-09-13)
+
+`[usuario 2026-09-13, textual]` *"Borra lo del 515/615 ya por favor. En otra sesion me lo sigue
+mencionando"*. **El tema está cerrado: no existe más en GP2 y no hay nada que analizar, proponer ni
+preguntar sobre él.** Si una sesión lo encuentra nombrado en un archivo viejo, es historia.
+
+**Qué se borró** (el 12-09 se habían discontinuado; hoy se eliminaron): los artículos **515 y 615**
+(Batidor Resorte) y sus 8 componentes exclusivos — `C12` Paleta, `W1B` Grampa, `IE1` Fleje N°33,
+`BOM10` Resorte Bicónico, `A1C1` Cartón 515, `O2A` Cartón 615 y los dos terminados (407, 433) — con
+todo lo que colgaba: 14 rutas, 55 pasos, 10 líneas de receta, 2 de BOM, 16 de inventario, 9
+movimientos, 1 recepción, 7 precios, 2 ítems de relevamiento y 1 fila de `fleje_detalle`.
+
+**Por qué se pudo borrar sin romper nada, y cómo se comprobó ANTES de tocar**: las tres consultas
+que hay que hacer siempre antes de un borrado así dieron vacío — ningún `ruta_paso` de otro
+artículo, ninguna receta de otro artículo y ningún `componente_bom` con un componente de afuera
+tocaban esas piezas; **todas tenían stock 0** y los 9 movimientos eran entre ellas mismas
+(`comp_transformado_id` siempre adentro del grupo), así que borrarlos no le movió el stock a nadie
+vivo. Con eso el borrado es una amputación limpia y no una mutilación.
+
+**Respaldo**: `zz_backups."GP2_Backup_515_615_20260913"` — 127 filas, cada una con su tabla de
+origen y la fila entera en `jsonb`. Con RLS y sin escritura para `anon`.
+
+**Después del borrado**: `db/verificar.sql` entero en 0, GP2 quedó en **188 artículos** (los 188 con
+receta y con ruta), 794 componentes, 854 rutas y 3.260 pasos.
+
+> **Regla que deja para el próximo borrado de un artículo**: discontinuar no alcanza si lo que se
+> quiere es que deje de aparecer — un discontinuado sigue en las listas, en las auditorías y en las
+> ideas, y cada sesión nueva lo vuelve a levantar. Si el dueño dice que no se fabrica más y no va a
+> volver, **se borra con backup**, y se cierra la sección del conocimiento en vez de dejarla abierta.
+
+### 4cr. El tipo de caja queda CERRADO; los precios esperan la lista del lunes (2026-09-13)
+
+`[usuario, textual]` **"Corregí el tipo de caja. Los precios, me parece raro pero el lunes subo
+los precios vigentes."** Dos cosas distintas que se venían mezclando:
+
+**1. QUÉ CAJA usa cada artículo: cerrado.** Los 52 que se pisaron el 11-09 con la hoja "Cajas" de
+`A_Costos_VIGENTES` **quedan como están, no se revierte nada**. La prueba que lo cerró no fue la
+hoja Cajas sino la hoja **Costos**, que es la que calcula el costo del artículo: su columna **M**
+(costo de caja por unidad) sale **por fórmula** apuntando a la hoja Cajas.
+
+| artículo | fila en Costos | fórmula de M | valor | caja |
+|---|---:|---|---:|---|
+| 546 Corta Queso mgo Lk | 67 | `='Cajas '!G167` | 12,2017 | **N°22** |
+| 315 Pisa Papas A. Inox | 112 | `='Cajas '!G97` | 30,00 | **N°12** |
+
+Y los gemelos heredan de esas mismas celdas (546L y 118 Loke toman `M67`; el 121 Loke toma
+`M112`; el 609 Chef y el 28 Chef también están en N°12). **Método a repetir:** cuando dos fuentes
+discutan qué caja va, no mirar la hoja Cajas — mirar de qué celda la toma la hoja **Costos**.
+
+**Impacto medido del cambio de los 52** `[dato]`: bajó el costo de caja **$47.636 por mes**
+(bruto movido $131.076). Dos artículos explican $43.270 de ese bruto: el 546 (7.700 uni/mes) y el
+315 (4.022 uni/mes); los otros 45 juntos mueven menos que el 546 solo.
+
+**2. LOS PRECIOS de las cajas: NO TOCAR hasta la lista del lunes.** Se cruzaron los 12 precios de
+caja de GP2 contra la planilla: **11 coinciden al centavo** (misma fecha de lista, 20-07-2026). El
+único que no:
+
+| | planilla | GP2 |
+|---|---:|---:|
+| Caja N°22 | 146,42 | **208,00** |
+
+Si la planilla tuviera razón serían ~$39.500/mes de más sólo en el 546. **El usuario lo vio y
+decidió esperar** — sube los precios vigentes el lunes. **Ninguna sesión debe "corregir" la N°22
+antes de esa lista**: la diferencia probablemente sea un aumento que la planilla todavía no tiene,
+no un error de carga.
+
+**Lo único que sigue abierto del tema caja:** 9 artículos (789, 800, 823, 825, 840, 844, 845, 858,
+862) piden **Caja N°8** o **Caja N°28**, que no existen como componente. Falta su **posición de
+estantería** para crearlas — no se inventa. Y el batidor pera (544 y 802) queda en N°12 por
+decisión del usuario, contra la N°6 que dice la planilla.
+
+### 4cs. La Caja N°8 está DISCONTINUADA: el gemelo LK cierra los 9 que faltaban (2026-09-13)
+
+`[usuario]` **"Fijate su equivalente en LK"**. Los 9 artículos que pedían una caja inexistente
+quedaron resueltos **sin crear ninguna caja**, y la razón estaba escrita en el propio informe de
+faltantes del 08-09: *"12 de 13; **la N°8 no va porque es discontinua**"*. La planilla la sigue
+pidiendo, pero ya no se compra — y lo que GP2 tiene hoy es el reemplazo que usa el gemelo Loeke.
+
+El mapeo Chef↔Loeke sale de la hoja **`Conversion cod Loeke Chef`** de `A_Costos_VIGENTES`
+(columna **J** = Cod Loeke, **K/L/M** = Cod Chef 1/2/3). Vale la pena recordarla: es la fuente
+oficial del gemelo y evita adivinarlo por descripción.
+
+**6 de 9 ya estaban donde dice el gemelo — no se tocó nada:**
+
+| Chef | pedía | gemelo LK | caja del LK y de GP2 |
+|---|---|---|---|
+| 789 Pisa Papas Nylon Con Mgo | N°8 | 355 | N°7 |
+| 800 Pinza Corta Alambre 21 Cm | N°8 | 560 | N°2 |
+| 825 Colador Ø 10 Cm | N°8 | 027 | N°2 |
+| 844 Cuchara Fideos Nylon | N°8 | 391 | N°7 |
+| 845 Cucharón Nylon | N°8 | 392 | N°7 |
+| 840 Rallador Cilíndrico 21 Cm | N°28 | 321 | N°10 |
+
+**Uno se corrigió:** el **862 Corta Pizza Familiar** estaba en Caja N°2 y su gemelo **562** va en
+**N°22**, con la misma uni x caja (12). Migración `el_862_va_en_la_caja_22_como_su_gemelo_lk_562`
+(artículo + receta + los dos pasos de ruta). El costo de caja baja de $21,82 a $17,33 por unidad.
+
+**Dos quedan como están, a propósito:**
+- **858 Pala De Canelones Ac. Inox.** — el gemelo 570 va en N°7, pero **la uni x caja no coincide**
+  (858 de a 12, el 570 de a 24): no es el mismo empaque, así que el gemelo NO manda acá. Queda en
+  N°12. **Regla: el gemelo sólo decide la caja si además coincide la uni x caja.**
+- **823 Exprimidor De Cítricos** — es Loeke, no tiene gemelo. Queda en N°10.
+
+**Con esto el tema caja queda cerrado del todo**, salvo los precios, que esperan la lista del
+lunes (§4cr). Ya no hay ningún artículo pidiendo una caja que no exista.
+
+### 4ct. El circuito del pincel YA ESTÁ EN LA BASE — y el número del cartón es el código del artículo (2026-09-13)
+
+**Estado: dado de alta y verificado contra la base.** La §4co y la entrada de `[HISTORIAL]` del
+13-09 decían *"NO SE DIO DE ALTA NADA todavía porque faltan tres datos que sólo tiene el dueño"*.
+**Eso quedó viejo**: los tres artículos, los tres componentes y las ocho rutas están cargados. Esta
+sección es la foto real, para que ninguna sesión vuelva a preguntar por lo que ya existe.
+
+**Un solo insumo a granel que sale como TRES artículos** `[usuario 2026-09-13, textual: "590E se
+stockea en Virgilio en cajas x600uni, que se le mandan a garcia para que las envase"]`. Lo que
+separa a los tres **no es la pieza, es el envase**:
+
+| Artículo | id | Empresa | Cartón | Caja | uni/caja | Familia |
+|---|---:|---|---|---|---:|---|
+| `590E` Pincel Silicona 11 Gms | 229 | LK | `CART590` | `A11` (Caja N°29) | 12 | Repostería |
+| `890E` Pincel Silicona 11 Gms | 230 | Chef | `CART890` | `A11` (Caja N°29) | 12 | Repostería |
+| `590ES` Pincel Silicona 11 gms s/Cartón | 231 | LK | **ninguno** | `A11` (Caja N°29) | 50 | Repostería |
+
+**Los componentes** `[dato: GP2.componente]`: `PINCEL590` (id 910) *Pincel Silicona 11 gms
+(granel)*, **Sector Plástico**, proveedor `Importado`, inventario en **Virgilio (Distribución)** —
+que es donde se stockea; `CART590` (id 911) y `CART890` (id 912), **Sector Cartón**, inventario en
+Sector Cartón. La **Caja N°29 = `A11`**, Sector Caja, proveedor Corrugadora del Plata.
+
+**Las recetas** (`articulo_componente`) y **las 8 rutas**, una por insumo, todas con el tallerista
+**Danica García (id 1)** y el patrón `insumo → tallerista → virgilio`, calcado 1:1 de los artículos
+550/760:
+
+| Artículo | Receta | Rutas |
+|---|---|---|
+| `590E` | PINCEL590 ×1 · CART590 ×1 · A11 ×1/12 (0,0833) | 964, 965, 966 |
+| `890E` | PINCEL590 ×1 · CART890 ×1 · A11 ×1/12 (0,0833) | 967, 968, 969 |
+| `590ES` | PINCEL590 ×1 · A11 ×1/50 (0,02) | 970, 971 |
+
+**Base después del alta** `[dato]`: **191 artículos, 800 componentes, 862 rutas, 3.284 pasos**;
+0 sin receta, 0 sin ruta, 0 componentes de receta sin inventario, y los 35 invariantes de
+`db/verificar.sql` en 0.
+
+#### La regla del número de cartón: 147 de 152, y las 5 excepciones dicen algo
+
+**El número que lleva el cartón en su descripción es el código del artículo que envuelve.** Medido
+sobre los 152 cartones de GP2 que tienen un número en la descripción: **147 de esos números son un
+código de artículo de GP2**. Por eso `Cartón 590` y `Cartón 890`, y no un número inventado.
+
+**Las 5 que no cierran no son ruido, son dos cosas distintas** `[dato 2026-09-13]`:
+
+| Cartón | Código | Por qué no cierra |
+|---|---|---|
+| `Cartón 590` | `CART590` | El artículo es `590E`, con la E. El cartón es del pincel igual. |
+| `Cartón 890` | `CART890` | Ídem con `890E`. |
+| `Cartón 574` | `C1B` | **`574` no existe como artículo en GP2** — y está en el grupo A de los que faltan. |
+| `Cartón 119` | `I3B` | **`119` no existe como artículo en GP2.** |
+| `Cartón 809` | `O6A` | **`809` no existe como artículo en GP2** — también está en el grupo A. |
+
+**Lo que deja como método:** un cartón cargado cuyo número no cruza con ningún artículo es **un
+artículo que falta, no un cartón mal codificado**. Para el `574 Corta Queso Alambre` y el `809
+Corta Queso Alambre Chef` el cartón **ya está**; lo que falta es el artículo. Eso baja el trabajo
+de esos dos a la mitad y conviene mirarlo antes de darlos de alta desde cero.
+
+#### Dos cabos sueltos del pincel, a propósito
+
+1. **Faltan TRES precios, no uno.** `v_costo_componente` marca `faltan_precios` en `PINCEL590`,
+   **`CART590` y `CART890`** (la §4co y el pedido original sólo nombraban el pincel). Consecuencia
+   medida: los tres artículos dan **$166,86** de costo, que es **exactamente el costo de la caja
+   `A11`** — o sea que hoy el pincel "cuesta su caja". No es que el pincel sea gratis: no tiene
+   precio cargado. **Al mirar el costo de estos tres, leer `faltan_precios` antes de creerle al
+   total** (la misma trampa que dejó §4cn con `BOM10`).
+2. **`CART590` y `CART890` no tienen posición de estantería.** El código `CART###` es **provisorio**
+   (precedentes `CART058`, `CART059`, `CART186`, `CART715`). La convención de la casa codifica el
+   cartón **por posición** (`G2B` = Cartón 229, `G6B` = Cartón 299), así que el código definitivo
+   sale de dónde se guardan, y eso lo tiene que decir el dueño. No se inventa.
+
+#### Los dos cartones del pincel son FORMATO HUEVO — y eran los únicos de la casa sin formato (2026-09-13, misma noche)
+
+`[usuario 2026-09-13, textual: "590/890 usan carton huevo" y "Chef tambien tiene formato huevo"]`.
+Al leerlo, la primera lectura fue "un cartón compartido llamado huevo" — **estaba mal, y se retira**:
+`Huevo` es un **`carton_formato`** de GP2 (el troquel: 25 posiciones por pliego, pedido múltiplo de
+25.000, mínimo 2.000 por código, bolsa de 2.000) y ya lo usaban **36 cartones** (21 LOEKE, 15 CHEF;
+ej. `C1B` Cartón 574 y `D5B` Cartón 867). Cada artículo sigue teniendo **su** cartón; lo que se
+comparte es el formato. `[dato: GP2.carton_formato + planilla, hoja " Cartones" fila 429: 590E →
+tipo 15 "Loekemeyer Huevo"; el 548 Pincel Pastelero usa el mismo tipo 15]`.
+
+Lo que se aplicó (backup `zz_backups."GP2_Backup_carton_huevo_20260913"`, 2 filas, con RLS):
+
+| Componente | id | `carton_formato` | `marca` | `proveedor` |
+|---|---:|---|---|---|
+| `CART590` Cartón 590 (590E, LK) | 911 | `Huevo` | `LOEKE` | Talleres Gráficos Pol |
+| `CART890` Cartón 890 (890E, Chef) | 912 | `Huevo` | `CHEF` | Talleres Gráficos Pol |
+
+**Eran los únicos dos cartones de todo GP2 con `carton_formato` y `marca` en NULL** (chequeo después:
+0). Sin formato no entraban a la familia Huevo de `oc_bundle` / `_oc_validar_carton`, así que la OC
+no les aplicaba los múltiplos. Proveedor Pol confirmado por el dueño (es el de los hermanos Huevo).
+Invariantes en 0. **El cabo suelto 2 (posición de estantería) sigue abierto; el 1 (los tres precios)
+también.**
+
+### 4cu. La M78 es una convergencia (como la M135): qué entró, qué NO dio lo esperado y por qué (2026-09-13)
+
+**Aplicado con "dale" del dueño**, en dos migraciones: `la_matriz_78_pasa_a_ser_una_convergencia`
+(rutas) y `la_receta_del_rompenueces_pide_la_pieza_remachada` (receta + BOM). Respaldo:
+`zz_backups."GP2_Backup_M78_20260913"` (58 filas: 38 `ruta_paso`, 4 `componente`, 4 `inventario`,
+10 `articulo_componente`, 2 `precio_servicio_pieza`).
+
+**El patrón de la casa para "una matriz que UNE varias piezas"** `[dato: 521/M135 y ahora 507-707/M78]`:
+1. **Una ruta por rama de entrada**, todas con el **mismo paso de matriz** y la **misma pieza de
+   salida** (521: K5, K8 y V3 → M135 → G4; 507: D6, D5 y V4 → M78 → `D5-M78`; 707: B1, B2 y V4 →
+   M78 → `B1-M78`).
+2. **`componente_bom` con la pieza de salida como padre** y las entradas como hijos (G4 ← K5+K8+V3;
+   `D5-M78` ← D5+D6+V4; `B1-M78` ← B1+B2+V4).
+3. **La receta del artículo pide lo que llega al tallerista**, no las partes (el 521 pide C16, que
+   está aguas abajo de G4; el 507 pide `D5-M78`, el 707 `B1-M78`).
+Las "mitades remachadas" que no existían (484 `D6-M78`, 487 `B2-M78`) se borraron; el remache V4
+ahora pasa por la M78 en vez de llegar suelto al tallerista.
+
+**Dos cosas que el pedido daba por ciertas y la base desmintió:**
+
+- **"La M78 se cobra dos veces, el 507 y el 707 bajan ~$28,80."** [Seguro] Falso. `v_costo_componente`
+  agrupa la mano de obra **por matriz** (`group by comp_id, matriz_id`), así que la M78 ya contaba
+  una sola vez aunque hubiera dos pasos. Los costos del 507 (887,53) y del 521 (1.428,69) **no se
+  movieron un centavo** con la migración; el 707 bajó por otra causa (el precio de Jade, abajo). El
+  problema 113 diagnosticó bien la forma (dos pasos paralelos) y mal el síntoma (la plata).
+- **"La simulación tiene que dar `colgado = []`."** [Seguro] Inalcanzable para *cualquier*
+  convergencia: `__sim_articulo` corre cada ruta entera, así que tres ramas producen tres veces la
+  pieza de salida y el tallerista consume una. **El testigo 521 deja exactamente lo mismo**
+  (`C16 +240`). El criterio correcto es "se comporta como el 521": `a_virgilio = 120` y lo colgado es
+  sólo la pieza de salida en positivo. Las piezas sueltas en negativo (D5, D6, V4 a −120) sí eran el
+  bug, y desaparecieron con la receta.
+
+**Precio de Jade: por el rompenuez entero, no por mitad** `[usuario 2026-09-13: "Me da que 305 cuesta
+pintar entero"]`. Lo confirman dos cosas: la planilla dice *"Rompenueces Pintado"* $305 en una sola
+línea (fila 654) y para el cromado dice explícito *"Abierto o Cerrado"* por kg (fila 740); y las
+otras 12 piezas que pinta Jade valen $127 o $150 — las mitades a $305 cada una eran el doble del
+máximo. Corregido a **$152,50 por mitad** (ids 71 y 72): el 707 pasa de 1.264,56 a **959,56**. La
+diferencia real 507/707 son ~$72: cartón (−22) y pintar vs cromar (+94). Auditoría: problema 114.
+
+**Hallazgo de paso, NO corregido (para el auditor de costos):** [Probable] el motor deduplica
+aristas del grafo (`wd` = distinct sobre entrada/salida/paso). Las dos mitades del rompenuez salen
+del **mismo fleje IE10 vía M73**, así que el fleje y la M73 se cuentan **una** vez para las dos. El
+507/707 está **sub**-costeado en una mitad de fleje + una pasada de M73. Es anterior a esta
+migración (las rutas 45/46 ya compartían esa arista) y afecta a cualquier artículo cuyas ramas
+convergentes arranquen del mismo insumo.
+
+**Se borró `db/pendiente/2026-09-12_mb_color_y_matriz78.sql`**: la parte (a) (colores de Master
+Bach) ya estaba aplicada y la (b) es esto. `db/` no cambia: fueron migraciones de datos, no de schema.
+
+
+### 4cv. La Versión Tablet: el contrato lo manda la base, y dos trampas de unidad (2026-09-13)
+
+**Qué pasó.** Una sesión construyó la "Versión Tablet" (una pantalla con Enviar / Recibir / Conteo
+para la tablet del galpón) y **su código se perdió**: la rama nunca llegó a `origin`. Pero el backend
+**sí quedó vivo en la base**: `GP2.alerta_recepcion`, `tablet_bundle()`, `tablet_registrar(p)`,
+`alerta_recepcion_marcar(...)` y `alertas_bundle()` con la clave `recepcion_de_mas`. Es exactamente el
+desfasaje que el CLAUDE.md marca como el peligro real (la base adelantada, `main` sin el código). El
+frente se **rehízo leyendo el cuerpo real de las funciones** (`pg_get_functiondef`), no la memoria de
+lo que "debería" devolver. `[dato: base, 2026-09-13]`
+
+**Lo que fija el contrato** (el detalle en `GP2_MAPA.md`, sección "Versión Tablet"):
+- `um` en el bundle es `componente.unidad_medida`: **`'kg'` o `'unidad'`**; `tablet_registrar` acepta
+  **`'uni'` o `'kg'`**. La pantalla traduce. Un `'unidad'` mandado crudo revienta con "Unidad invalida".
+- `ref` es **texto** siempre (el id como string, el nombre del proveedor de insumo, o `'virgilio'`), y
+  **el prov. AT viene con `ref = '*'` en `enviar`**: cualquier cartón/caja va a cualquier prov. AT.
+- El **esperado** sale de la OC si trae un proveedor (`oc`; **null si no hay OC**, y sin esperado no
+  hay alerta), y del stock online si trae un tallerista / PS (`online_tall` / `online_ps`) o Virgilio.
+- Desde la tablet **no se le envía** a Virgilio ni al proveedor de insumo; el PS exige
+  `comp_entrada_id` (el SC que consume); `tablet_registrar` no acepta `modo = 'conteo'`.
+
+**Las dos trampas de unidad** `[usuario, vía la sesión perdida; verificado contra las RPC]`:
+1. **El proveedor de artículo terminado entrega CAJAS.** `crear_entrega_prov_at` pide `p_cajas`. La
+   pantalla carga cajas, muestra "= N uni x caja", y manda `cantidad` = cajas con `unidad 'uni'` y
+   `por_caja`; la base compara `cajas × por_caja` contra la OC, que está en unidades.
+2. **Una pieza en kg se manda y se recibe en kg** (fleje cortado, chapa, el 1686 de Eclipse): teclado
+   decimal con coma, y `unidad 'kg'` en el payload. Mezclar kg con uni en esas piezas es lo que hacía
+   imposible recibir CV18D / V18D / V20 (§ kg ↔ uni en `gp2-numero.js`).
+
+**La alerta de "recibí de más" avisa pero no frena** `[usuario, vía la sesión perdida]`: la base
+registra el movimiento **primero** y la alerta **después**; la pantalla marca la fila, dice "podés
+registrar igual" y deja el botón habilitado. Quien revisa lo hace en Alertas (bloque "Se recibió de
+más", botón Revisada → estado `vista`) y el menú muestra cuántas quedan sobre el botón Alertas.
+
+**El Conteo no escribe.** Compara lo contado contra el online del sector y baja un CSV. El ajuste de
+stock sigue el circuito de siempre — Relevamientos (el operario cuenta) → Validación de Stock (el
+operador del sistema decide) — y `tablet_registrar` no tiene un modo para eso.
+
+**Deuda que quedó en el backend, NO en la pantalla** (idea 7345): para recibir de un **tallerista**
+`tablet_registrar` llama a `crear_entrega_tallerista`, y el propio `comment` de esa función dice que
+**no es el motor** (el motor es `gp2-motor.js` + `registrar_movimientos`, idea 7316). Se documenta y
+se deja abierto: esta sesión no podía tocar la base.
+
+### 4cw. Cruce contra loekemeyer.com: 11 artículos activos sin despiece — y la Est Madre miente con el 515 (2026-09-13)
+
+**Pedido del dueño:** *"Revisá loekemeyer.com. Revisá si te falta el despiece de algún artículo."*
+La página no se puede leer desde la sesión (el proxy la bloquea), así que se cruzó **la fuente de
+la página**: `public.products` del proyecto LK (`kwkclwhmoygunqmlegrg`), que es lo que el sitio
+muestra `[dato 2026-09-13]`.
+
+**Universo:** 264 productos, **199 activos** = 87 importados (terminan en E, reventa: fuera de GP2
+por diseño, §4cm) + **112 propios**. De los 112, **101 tienen despiece en GP2** (0 sin receta, 0 sin
+ruta) y **11 no**:
+
+| Cód | Artículo | uni/mes Est Madre | Estado en GP2 |
+|---|---|---:|---|
+| 515 | Batidor Resorte | 486 | **borrado el 13-09** por orden del dueño (§4cq) — **ver abajo** |
+| 332 | Espátula Calada Ac. Inox | 136 | "discontinuo → 941E-948E" (dueño, §4cp) |
+| 509 | Pala Batidora | 104 | grupo A, Carlos; el vecino tampoco lo despieza |
+| 396 | Enrulador de Manteca | 80 | grupo A, sin tallerista |
+| 335 | Cuchara Calada Ac. Inox | 64 | "discontinuo → 941E-948E" |
+| 573 | Bombilla Colores Metalizados | 52 | **nuevo**: no figuraba en ningún listado, sin despiece en el vecino |
+| 337 | Pinche Ac. Inox | 48 | "discontinuo → 941E-948E" |
+| 537 | Pela y Pica Ajo | 0 | pendiente a propósito (dueño) |
+| 567 | Corta Palta | 0 | ídem |
+| 556 | Sacayerba | 0 | **nuevo** |
+| 517 | Pinza Acero Inox 25 cm | 0 | **nuevo** |
+
+**Contradicción que se le mostró al dueño:** 515, 332, 335 y 337 están **activos en la página** y
+GP2 los tiene como borrado / discontinuos. Su respuesta sobre el 515 `[usuario 2026-09-13, textual:
+"No hay chance que se venda 486 uni de 515"]` → **la proyección de la Est Madre para el 515 es
+falsa** y el borrado queda como está. **Regla que deja:** `GP2.est_madre.proy_uni_mes` no es
+evidencia de que un artículo se vende — proyecta sobre lo vendido histórico y arrastra
+discontinuados (§4cp ya lo decía para los 46 candidatos; el 515 es el caso más grande: 486 uni/mes
+de un artículo que ya no se fabrica). Antes de usar ese número para decidir un alta, mirar ventas
+reales recientes o preguntarle al dueño. Los otros tres inox (332/335/337) y los tres códigos nuevos
+(573, 556, 517) siguen sin decisión del dueño; 509 y 396 siguen en el grupo A.
+
+**Lo que NO cambia:** los 45 propios inactivos de la página no se miran (no se venden); los 87 E
+no van a GP2.
+
+## 4cx. Los palos de amasar 231/232/233: caja, bandita y quién los termina (2026-09-13)
+
+**Decisión del dueño, textual:** *"231 y 232 van en misma caja que 234"* · *"1 ponele la 15"* ·
+*"2 ponele 12 a los 4 items"* · *"3 si"*. O sea: **los cuatro palos** (231 de 30 cm, 232 de 40 cm,
+233 de 50 cm y el 234 Palo Francés de 40 cm) van en la **Caja N°15** (`A9B`, componente 604, Sector
+Caja) y **12 unidades por caja**. Antes los tres primeros tenían la caja vacía y decían 24. `[usuario]`
+
+**Cómo es el circuito** `[usuario, reconstruido con la base]`: Tierra Nativa vende el palo hecho, se
+guarda en el garage como `GRJ22/23/24`, y **Fábrica le pone la bandita y lo entrega en Virgilio**.
+Por eso la ruta de cada palo es la misma forma de siempre: `insumo → Fábrica → virgilio`, tres pasos.
+
+**La bandita no existía en la base y se creó**: componente `BANDITA` id **916**, Sector Cartón,
+marca LOEKE, unidad `unidad`, inventario en Sector Cartón arrancando en 0. Va **×1 en los tres
+palos**, y **el 234 NO la lleva** — ésa es la única diferencia de receta entre el francés y los otros
+tres. `[dato: articulo_componente 917–922, rutas 972–977, pasos 3726–3743]`
+
+**Tres cosas que quedaron sin resolver y conviene no re-descubrir:**
+
+1. **Quién provee la bandita: no se sabe.** El componente quedó con `proveedor = NULL` a propósito.
+   En la planilla hay tres candidatos y **ninguno dice "palo de amasar"**: Gráfica Pol "Bandita
+   Ralladores" $8.250 y "Banditas 35 × 194 mm" $8.250 (las dos con col C = "Falta Prov"), y López
+   José Daniel "Super Bands Bolsa N°15 (Bandita Negra)" $1,08 la unidad. Elegir a ojo es inventar.
+2. **El máximo de la bandita queda NULL** porque **231/232/233 no están en `est_madre`** (el 234 sí,
+   396 uni/mes). Sin demanda cargada, `recalcular_maximos_insumos()` no tiene de dónde sacar el
+   máximo. No es un bug: es que falta el dato de cuánto se vende de cada palo.
+3. **`articulo_prov_at` todavía dice que Tierra Nativa entrega los tres TERMINADOS** (ids 92/94/95,
+   activos). **Eso contradice lo que explicó el dueño** (Tierra Nativa vende el palo, la bandita la
+   pone Fábrica). Mientras siga activo, una entrega de Prov AT de un 231 descontaría GRJ22 + A9B +
+   BANDITA desde la ubicación 54 (Prov. Art. Term. Tierra Nativa), que está vacía, y la dejaría en
+   negativo. **Desactivarlo es una línea, pero es una pregunta, no una deducción.** `[deducido]`
+
+**Costo:** los tres siguen con `faltan_precios` ≥ 2 (los `GRJ22/23/24` no tienen precio y la bandita
+tampoco), así que lo único que hoy suma al costo es la caja ($28,69 por unidad). En la lista de
+precios sólo están "Palo de Amasar Frances 40cm" $600 y "Torneado Palo de Amasar 40cm" $1.245, los
+dos de Tierra Nativa: **no hay precio para el 30, el 40 ni el 50 lisos**. `[dato: v_planilla_precio]`
+
+
+**Corrección al punto 3, medida el 2026-09-13 a la tarde (segunda vuelta):** eran **cuatro** filas,
+no tres — el **234 (id 93)** tiene el mismo agujero, misma ruta `insumo → Fábrica → virgilio` y
+mismo proveedor. Y el `activo=false` **no cierra la puerta del todo**: ver §4cy. `[dato]`
+
+**Y la respuesta del dueño al punto 3, textual (2026-09-13): *"es la misma lógica que lo de cimarron
+con las bombillas que entrega en cervantes"*.** Con eso la pregunta se cierra: **los palos son una
+COMPRA DE INSUMO, no una entrega de Prov AT.** La base ya lo dice — `GRJ22/23/24` y `GRJ17` son
+Sector Garage, proveedor de insumo Tierra Nativa, stock en Sector Garage, `estado_compra` NULL,
+**exactamente la misma forma que `GRJ4` (Bomb AutoLimp Inox, proveedor Cimarrón)**: Cimarrón entrega
+la bombilla en Cervantes, se guarda en el garage como GRJ y recién después alguien la termina y la
+manda a Virgilio. El palo es eso mismo con Tierra Nativa y con Fábrica poniendo la bandita.
+
+**Consecuencia:** las 4 filas de `articulo_prov_at` de los palos (ids 92/93/94/95, los tres + el
+**234**) no describen nada real y hay que desactivarlas. De Tierra Nativa como Prov AT queda sólo el
+**591** (Despolvillador), que sí entra terminado y tiene su paso `proveedor_at` en la ruta 956.
+**Regla que deja: un proveedor puede ser las dos cosas a la vez** — insumo para unos artículos y
+Prov AT para otros —, así que la pregunta correcta nunca es "¿qué es este proveedor?" sino "¿qué
+llega de él para ESTE artículo: una pieza al garage, o el artículo terminado a Virgilio?". `[usuario]`
+
+## 4cy. `articulo_prov_at` no garantiza nada, y `activo` sólo lo ve la pantalla (2026-09-13)
+
+Salió de traer al dueño la pregunta del punto 3 de §4cx. Lo que apareció es más grande que los palos.
+
+**1. La forma correcta de "entra terminado" es un paso `proveedor_at` en la ruta, no una fila en
+`articulo_prov_at`.** El testigo bien modelado es el **591**: ruta 956 = `A4 (insumo) → proveedor_at
+13 → virgilio`. `[dato]`
+
+**2. De las 91 filas de `articulo_prov_at`, 34 son artículos de GP2 cuya ruta NO tiene ese paso**
+(Cabral 26, Tierra Nativa 4 = los cuatro palos, Maspoli 3, Pettofrezza 1) y otras 12 ni siquiera
+son artículos de GP2. Las 45 restantes están bien. **Los palos no son la excepción, son 4 de 34.**
+`[dato]`
+
+**3. Qué pasa si se registra una entrega de una de esas 34:** `crear_entrega_prov_at` delega en
+`recepcion_virgilio`, que consume **toda la receta** desde `ubic_de('proveedor_at', N)`. La
+ubicación 54 (Tierra Nativa) **no tiene ni una fila de inventario**, así que todo queda en negativo.
+Con las 26 de Cabral es peor: el 501 arrastra 14 rutas. Hoy no pasó nunca (0 entregas en esas 34).
+`[dato]`
+
+**4. La trampa fina: `activo=false` saca el artículo de la PANTALLA, no de la RPC.**
+`entregas_prov_at_bundle` filtra `coalesce(a.activo,true)` y `EntregasAT_GP2.html` es la única
+pantalla que llama a `crear_entrega_prov_at` — así que para un operario la puerta queda cerrada.
+Pero la RPC misma chequea **existencia de la fila, sin mirar `activo`** (el `if not exists` se
+aflojó a propósito en su momento, por 5 filas con `descripcion` vacía — aquello era por
+`descripcion`, no por `activo`, así que agregarle `and coalesce(a.activo,true)` no revive ese bug).
+**Regla: antes de decir "con desactivarlo alcanza", leer la función con `pg_get_functiondef`, no
+`db/`.** `[dato]`
+
+### La respuesta del dueño sobre Cabral: NO es Prov AT, y el 031 es un respaldo (2026-09-21)
+
+Cerró el punto 2 de arriba (las 26 filas de Cabral sin paso `proveedor_at`). Textual:
+*"Cabral saca todo, solo el 031 se puede llevar a hacer (en caso de que no llegue ijupa con
+todos los pedidos)"*. `[usuario]`
+
+- **Cabral sale del padrón de Prov AT.** Las filas de `articulo_prov_at` contra Cabral no
+  describen de dónde viene el artículo: de los 32 activos, **26 se fabrican adentro** (el 031 entre ellos) y su ruta lo
+  dice (matriz + proveedor de servicio + tallerista → virgilio, sin ningún paso `proveedor_at`);
+  el **574** ni siquiera existe en `GP2.articulo`. `[dato]`
+- **El 031 (Filtro de Café 10cm) lo hace IJUPA**, tallerista 10, en sus 3 rutas. A Cabral se le
+  *lleva a hacer* sólo cuando IJUPA no llega con los pedidos: es contingencia, no el circuito
+  normal. Por eso el 031 es el único que queda. `[usuario]`
+- **Encaja con lo ya sabido**: Cabral aparece en el archivo de cartones como proveedor de la
+  **bolsa de filtro** ($39,32 contra los $63 de Vihal) — o sea que es un proveedor real, pero del
+  insumo del filtro, no del artículo terminado. `[dato]`
+
+**"Todo" es todo: las 5 con ruta real también salen.** `[usuario 2026-09-21]` Lo contestó sin
+que hiciera falta repreguntar, mirando la tablet: *"cuando voy a enviar a prov de art terminado no
+me aparece la cja y carton de 031 nomás"* — o sea, esperaba ver **sólo** la caja y el cartón del
+031 y seguía viendo las 39 piezas de los 32 artículos. **Ejecutado con su "sí"**: 31 filas a
+`activo=false`, queda el **031**. Verificado: Cabral pasa de 39 piezas a 2 en Enviar
+(`A1B` Cartón 031 + `A9` Caja N°22) y de 32 artículos a 1 en Recibir.
+
+**La pantalla de Enviar sale de `articulo_prov_at`, NO de la ruta** — por eso desactivar alcanzó
+para que la tablet haga lo que él quiere. Es el cruce `articulo_prov_at → articulo →
+articulo_componente` que puso el fix v1.3.1 de la tablet (2026-09-15). `[dato]`
+
+**El `activo=false` NO toca las rutas, y de ahí salió el reclamo del día siguiente.** El dueño
+abrió el despiece del 246 en `Programa.html` y vio "Maspoli **o** Cabral": *"te dije que solo
+entrega el 031… ¿por qué sigue apareciendo acá en el 246?"*. **El despiece lee `ruta_paso`, no
+`articulo_prov_at`** — medido con `pg_get_functiondef`: `programa_bundle` ni nombra al padrón. Son
+dos libros distintos y hay que tocar los dos. `[dato]`
+
+**Resuelto el 2026-09-21 con el sí del dueño** (*"Si"* + *"Ni siquiera lo tenés que poner. En el
+031"*): se borraron las **7 rutas** de Cabral de 223 (915, 924), 224 (917, 926), 246 (929) y 577
+(921, 935) —21 pasos— y la fila del **031** pasó a `activo=false`. **Cabral queda en 0 filas
+activas y 0 rutas** en esos cuatro. Verificado: 223 y 224 siguen con Pintos (2 rutas cada uno),
+246 con Maspoli y 577 con Pettofrezza; **0 rutas huérfanas**. La `ubicacion` 34 (Prov. Art. Term.
+Cabral) se deja: guarda el historial y no se ve en ninguna pantalla. `[dato]`
+
+**El 338 fue el único que frenó, y el dueño lo contestó: lo entrega Alex Escalante** (tallerista
+2, activo) — primero dijo "Carlos" y se corrigió en el mensaje siguiente. Sus 2 rutas (920 por la
+caja `A2`, 934 por el cartón `K5B`) son las **únicas** que le quedan a Cabral, y se dejaron vivas
+a propósito: borrarlas antes de reasignarlas dejaba al 338 sin ninguna ruta. **Pasa de Prov AT a
+tallerista**, el mismo movimiento que la otra sesión le hizo hoy al `070` (de `proveedor_at`
+Pettofrezza a tallerista Fábrica, §4eq). `[usuario 2026-09-21]`
+
+⚠ **Lo que ese cambio deja al descubierto: la receta del 338 es SÓLO envase** (caja `A2` + cartón
+`K5B`), sin ninguna pieza de producto. Eso es normal en un artículo que se compra terminado, pero
+con un tallerista significa que Alex "produce" la espátula de la nada y **lo que entra nunca llega
+al costo** — exactamente la trampa de §"El paso de tallerista tiene que declarar QUÉ ENTRA".
+Preguntado: de dónde sale la espátula lisa que Alex envasa. `[deducido, sin confirmar]`
+
+**También sin respuesta: qué es "llevar a hacer" el 031.** Si Cabral nos vende el filtro terminado
+es un paso `proveedor_at` en una ruta alternativa; si le mandamos las partes y él arma, es un
+tallerista o un proveedor de servicio, y `articulo_prov_at` no es el lugar. Hoy el 031 quedó en
+`articulo_prov_at` **sin** paso `proveedor_at` en ninguna de sus 3 rutas, que siguen siendo de
+IJUPA: es justamente la forma que §4cy punto 1 llama mal modelada. Se deja así a propósito hasta
+que el dueño defina el circuito.
+
+### Cuáles artículos de Prov AT están modelados en GP2 y cuáles no (2026-09-21)
+
+El dueño preguntó *"de todos los artículos que me mandaste que arman los proveedores de artículos
+terminados decime cuáles tenemos modelados… porque por ejemplo en paternal goma está la espátula
+goma, como no lo tenemos en GP2 no me interesa verlo"*.
+
+**Su ejemplo estaba equivocado y conviene dejarlo escrito para no repetirlo: el 618 y el 619 de
+Paternal Goma SÍ están modelados** — existen en `GP2.articulo`, tienen ruta con paso
+`proveedor_at` y figuran en `est_madre`. Lo que tienen es **demanda mínima (2 y 20 uni/mes)**, que
+no es lo mismo que no existir. Antes de dar de baja algo "porque no lo tenemos", mirar
+`est_madre`: un artículo de 2 uni/mes se lee como inexistente y no lo es. `[dato]`
+
+**De los 56 códigos activos de `articulo_prov_at`, 45 son artículos de GP2 y 11 no.** Los 11, por
+demanda mensual (`est_madre.proy_uni_mes`): `565` Pinza de Hielo (Manfer, 528), `110` Colador N°8
+(López José, 384), `111` Colador N°10 (López José, 296), `193` sin descripción (Kuffo, 176), `112`
+Ø16 Env. (López José, 160), `852` Pinza de Hielo 14 (Manfer, 7), `830` Colador Ø20 (López José,
+3), `828` Colador Ø16 (López José, 2), y sin demanda `029` Colador N°16 (López José), `122`
+Rallador Cilíndrico (Carriero) y `554` Cucharita Matera (Melinox). **Los 8 primeros se venden y no
+existen como artículo en GP2**; los 3 últimos no están ni en la Est Madre. `[dato]`
+
+**Por proveedor, el peor es López José: 6 de sus 10 sin modelar.** Manfer 2 de 2, Kuffo 1 de 1,
+Carriero 1 de 3, Melinox 1 de 2. Completos: Pintos (13), Pettofrezza (10), Maspoli (7), The Plast
+(4), Paternal Goma (2), Tierra Nativa (1) y Cabral (1, el 031). `[dato]`
+
+**Sospecha a confirmar con el dueño: `026`/`027` y `110`/`111` parecen el MISMO colador con dos
+códigos.** 026 (Ø8) y 027 (Ø10) existen en `GP2.articulo` pero **sin** fila en `est_madre`; 110
+(N°8) y 111 (N°10) tienen la demanda pero **no** existen en `GP2.articulo`. Si son el mismo
+producto no faltan dos artículos: falta unificar el código. Mismo patrón posible en 029/828 (Ø16)
+y en 112. `[deducido, sin confirmar]`
+
+### Tanda de bajas del padrón de Prov AT (2026-09-21). El padrón queda en 48
+
+El dueño repasó la lista limpia de 45 artículos y corrigió cuatro cosas de corrido. Todo
+ejecutado con su *"Sí, corré"*.
+
+**1. Maspoli NO entrega terminado el 508, 518 ni 564: sólo el mango, y lo entrega en Cervantes.**
+*`[usuario]`: "508, 518, 564 no los arma Maspoli. Solo el mango entrega en Cervantes (por ejemplo
+PC12)"*. **La ruta ya lo decía bien y la fila del padrón mentía**: las tres rutas tienen a
+**Maspoli SRL como `proveedor_servicio`** (508: `D13 → PC12`, 518: `D13 → PEP7`, 564: `D13 →
+PEP8`) y después van al tallerista; ninguna tiene paso `proveedor_at`. Se desactivaron las 3
+filas. **Maspoli queda como Prov AT sólo de 246, 900, 222 y 910.** `[dato]`
+
+**2. Discontinuados: 618, 619 (Paternal Goma), 761 (Melinox) y 591 (Tierra Nativa).** Se marcó
+`discontinuado=true` en `articulo` **y** en `componente` (el terminado), se desactivaron sus filas
+del padrón y los tres proveedores quedaron `activo=false` como Prov AT. **No se borró nada**: el
+dueño dijo "eliminá", pero `discontinuado` es el mecanismo de la casa —conserva componente, receta
+y ruta, y sale de la OC y de las pantallas de compra— y se revierte con un update. Los cuatro
+tenían 0 entregas registradas. ⚠ **El 591 proyecta 398 uni/mes en la Est Madre** (los otros tres:
+618 = 2, 619 = 20, 761 = 32): se avisó antes de ejecutar y el dueño lo reafirmó. Si más adelante
+alguien se pregunta por qué un artículo con esa demanda está discontinuado, la respuesta es que
+fue deliberado. `[usuario 2026-09-21]`
+
+**3. El reclamo del 222 ya estaba resuelto cuando llegó.** *"El 222 no aparece la ruta en el
+despiece para mandarle caja y carton y si le mandamos"*. Medido: el 222 tiene **4 rutas** —cartón
+`M2B` y caja `A2`, una por Pintos y otra por Maspoli—; las dos de la caja (980, 981) tienen id
+alto, o sea que se crearon después del resto, casi seguro en la tanda de la sesión paralela del
+mismo día. **Y no hay más casos**: ni un componente de receta sin su ruta de insumo en ningún
+artículo con paso `proveedor_at`. `[dato]`
+
+⚠ **El hueco que SÍ queda es el otro: 9 artículos de Prov AT cuya receta no tiene cartón** (sólo
+caja). Con las bajas de hoy quedan **5**: `246` y `900` (Maspoli), `823` (Pettofrezza), `922`
+(Pintos) y `326` (The Plast). El 326 y el 922 tienen evidencia fuerte de que les falta —su gemelo
+de la otra marca sí lo tiene (848 y 223)—; los otros tres hay que confirmarlos uno por uno, porque
+puede que alguno vaya sin cartón de verdad. `[dato]`
+
+**4. El circuito real de los tapones de Pettofrezza** `[usuario 2026-09-21]`: *"575, 579, 817,
+816: le damos v15 y él entrega cada art que requiere una unidad por item de v15"*, y el **577**
+*"le damos v15 y LEV serig: es un componente que inyecta Pettofrezza Rafael (lev sin serigrafear)
+y lo mandamos a Ximpa (Julio Hernandez) a serigrafiar"*.
+
+- **`V15` = remache de hierro, Sector Remache (8), proveedor Bella Vista.** Rompe el patrón de los
+  otros remaches, que son `CVx` crudo → Guazzaroni → `Vx` niquelado: **el V15 se compra ya hecho**,
+  sin paso de niquelado.
+- **`LEV` = levas, Sector Plástico (6), las inyecta Pettofrezza Rafael**; el serigrafiado lo hace
+  **Hernández Julio** (`proveedor_servicio` 8), que es el "Ximpa" del dueño.
+- **Ninguno de los dos existe todavía en GP2** — hay que darlos de alta con la cadena completa
+  (componente → inventario → receta → ruta).
+- **Y esto reclasifica a Pettofrezza:** si le mandamos el V15 y él devuelve el artículo armado,
+  es un **tallerista** (Pettofrezza Rafael, id 11, activo), no un Prov AT — el Prov AT es el que
+  nos vende el producto hecho. Mismo movimiento que el `070` (§4eq) y que el 338 con Alex.
+
+## 4cz. El cruce de la lista de precios se hace por `cod_isis`, no por el nombre del producto (2026-09-13)
+
+Se buscó el proveedor de **`PEST1`** (Insertos Mango de Madera, 768, el único insumo comprable sin
+proveedor) y por texto no aparecía: en el bloque de Pat Bet Plast la línea se llama **"Insertos
+Importados"**. Cruzando por `cod_isis` aparece que **es el mismo artículo**: `4776` lo cotizan
+**Pat Bet Plast a $90,26** (última compra 28-11-2025) y **Kollplast a $219,97** con el nombre
+literal **"Inserto Mgo Madera"**. `[dato: v_planilla_precio]`
+
+- El hermano `PEST2` (Insertos Pisa Papas, 735) ya está en **Pat Bet Plast**, mismo sector y **mismo
+  `material_id` 742** (PP 2630). Kollplast cotiza los dos códigos (4776 y 3096): es la alternativa
+  de Pat Bet Plast en toda la línea, no un proveedor suelto.
+- **La plata:** PEST1 consume 684 uni/mes → la diferencia entre los dos precios es **$1,06 M por
+  año**. Elegir "el que suena parecido" acá cuesta plata de verdad.
+
+**DECISIÓN DEL DUEÑO (2026-09-13, textual): *"PEST 1, KollPlast. pero deja registrado que a partir
+de noviembre aprox no se debería inyectar más"*.** Aplicado: `GP2.componente` 768 `proveedor =
+'Kollplast'` (antes NULL). Verificado con SELECT; invariante `A2` sigue en 0 (Kollplast ya tenía
+ubicación de inyector, la 60) y el costo no se movió porque **PEST1 no tiene fila en
+`precio_proveedor`** (sigue `faltan_precios = 1`). Después del cambio, el único insumo comprable sin
+proveedor es `BANDITA`. `[usuario + dato]`
+
+**⏳ PEST1 se deja de inyectar alrededor de NOVIEMBRE 2026.** Es un insumo con fecha de vencimiento:
+va en los 7 artículos `941E`–`948E` (684 uni/mes) y cuadra con que esos siete son **importados** —
+la LP los tiene comprados hechos a Tierra Nativa a USD 1,36. Qué hacer llegado noviembre, y qué NO
+hacer antes: `[usuario]`
+- **No cargarle precio nuevo ni stock mínimo pensando en el largo plazo**, y mirar con desconfianza
+  cualquier OC de PEST1 con horizonte mayor a esa fecha (el sugerido es `máximo − stock`, y su
+  máximo hoy son 2.736 uni de `est_madre`: eso es más de lo que va a consumir).
+- Cuando se confirme, **`estado_compra` pasa a `discontinuo`** y hay que revisar las 7 recetas y las
+  7 rutas antes de tocar el componente (no se borra: tiene recetas y rutas colgando, misma regla que
+  `GRJ21`).
+- El inventario de PEST1 hoy está en **−372 uni** (stock inicial nunca cargado). Si se discontinúa
+  sin cerrar ese negativo queda arrastrando para siempre.
+
+**Regla que deja: para encontrar un insumo en la lista de precios, cruzar por `cod_isis` y recién
+después por texto. Dos proveedores con el mismo `cod_isis` son dos alternativas del mismo artículo**
+(igual que los dos Prov AT de §4bk), no un duplicado a limpiar. `[deducido]`
+
+## 4da. La caja puede estar en el FK y no estar en la receta: $821.628 al año sin costear (2026-09-13)
+
+`GP2.articulo.componente_caja_id` dice **qué** caja usa el artículo; lo que hace que la caja **cueste**
+es su línea en `articulo_componente` (y su ruta). **175 de los 189 artículos con caja la tienen en la
+receta. 14 no**, y en esos 14 la caja vale $0 en `v_costo_componente`: `[dato]`
+
+| Art | Caja | uni x caja | $/mes sin costear |
+|---|---|--:|--:|
+| **222** | A2 | 12 | **32.580** |
+| 312 | A2 | 12 | 9.420 |
+| 395 | A8 | 12 | 8.509 |
+| 943E · 942E · 948E · 945E · 944E | A2 | 12 | 16.200 (los cinco) |
+| 311 | A2 | 12 | 1.020 |
+| 910 | A2 | 12 | 720 |
+| 715 | A1 | 24 | 20 |
+| 818 · 058 · 059 | A4 / A9 | 12 | 0 (sin Est Madre) |
+
+**Total $68.469/mes = $821.628/año.** El más caro no es ninguno de los que se estaban mirando (los
+94xE): es el **222**, que solo explica casi la mitad.
+
+**APLICADO el 2026-09-13 (dueño: *"cajas, dale"*).** Las 14 cajas entraron a la receta a
+`1/articulos_por_caja` y cada artículo recibió su ruta de caja `insumo → <su actor> → virgilio`,
+calcada del 223 (el actor NO se inventó: se copió del paso que ya cerraba cada artículo). **222 y
+910 llevan DOS rutas de caja cada uno** porque tienen dos alternativas de Prov AT (Maspoli y
+Pintos) y la regla §4bk dice que cada alternativa lleva su caja; los dos declaran `n_caja` NULL,
+así que las dos rutas van con A2. Total: **14 recetas (923–936), 16 rutas (978–993), 48 pasos
+(3744–3791)**. Snapshot previo en `zz_backups."GP2_Snap_costos_cajas_20260913"`. Invariantes
+35/35 en 0. **Ya no queda ningún artículo con caja en el FK y sin línea de receta.** `[usuario + dato]`
+
+**⚠ PERO EL COSTO NO SUBIÓ $30 POR UNIDAD: SUBIÓ $360. Ver §4dc — el bug es de la vista, no de la
+receta.**
+
+**Regla: `componente_caja_id` sin línea de receta es un costo que no existe. Al tocar la caja de un
+artículo, verificar las dos cosas** (es la misma regla de "completar tablas manteniendo la
+normalización", aplicada a la caja). `[deducido]`
+
+## 4db. Los cubiertos inox 332-337 se reemplazaron por los 94xE, y el sitio quedó viejo (2026-09-13)
+
+`[usuario 2026-09-13, textual]` *"332/7 y 630/7 son discontinuos. Se reemplazaron por 941/8E"*.
+**332, 335 y 337 no están "discontinuados en GP2": no existen en `GP2.articulo`.** Aparecen en
+`est_madre` (136 / 64 / 48 uni/mes) porque la Est Madre arrastra discontinuados — la misma trampa
+del 515 (§4cw). Que loekemeyer.com los muestre activos es trabajo del repo del sitio, no de GP2.
+`[dato]`
+
+**Y lo de "573, 556 y 517 no tienen despiece en ningún lado" era falso para dos de los tres:**
+`[dato: GP2.planilla_fila]`
+
+- **573 Bombilla Color Metalizado** — despiece completo en la hoja **Bombillas** (fila 2, *"ART:
+  755/L573"*): caño 135 mm + resorte + niquelado + tapón aluminio + anodizado + corte cañito =
+  $578,98, con tiempos. Gemelo Chef **755**.
+- **517 Pinza Gastronómica** — despiece completo entre **Materiales Loeke** (filas 166-167: pala
+  121,3 × 0,8 y manija 167,3 × 0,8, las dos `517D`, tallerista **GUILLE**) y **Remaches** (fila 54:
+  **SR1 + SR2 + SR3**). Lo que está roto es su fila en Materiales (`#REF!`) y que no figura en Costos.
+- **556 Sacayerba** — el único sin despiece de verdad: Costos fila 225 dice `Fab` pero con
+  `E='xx'`, o sea **lo costea sólo como envase** (cartón 89 + caja 10,91 + 5,90 = $105,81). Ni la
+  planilla sabe de qué está hecho.
+
+**Regla: antes de decir "no tiene despiece", buscarlo en la hoja del RUBRO** (Bombillas, Materiales
+Loeke, Remaches, Flejes, Plásticos), no sólo en Costos y Cartones. Un artículo puede estar
+despiezado en tres hojas y en ninguna de las dos que uno mira primero. `[deducido]`
+
+
+## 4dc. `v_costo_componente` cobra la CAJA ENTERA por unidad: ARS 38,5 M por mes de sobrecosto (2026-09-13)
+
+**Salió de medir el efecto de cargar las 14 cajas de §4da.** Se esperaba que el 942E subiera $30
+(la caja de $360 dividida por 12). **Subió $360.** El mismo error estaba de antes en los otros 175
+artículos: el **234** da $944,26 = $600 del palo **+ los $344,26 de la caja entera**, cuando la
+caja de a 12 tendría que aportar $28,69. `[dato]`
+
+**Dónde está, leído de `pg_get_viewdef`:** la vista arma el costo por dos caminos y la caja entra
+por el equivocado.
+
+| CTE | De dónde saca | ¿Usa la cantidad? |
+|---|---|---|
+| `insumox` | los pasos `tipo_paso='insumo'` | **sí**, `cantidad * precio` |
+| `mat` | `edges` = los pasos `matriz` / `proveedor_servicio` / `tallerista` | **no**, `cb.precio` pelado (salvo sector 5, los flejes, que multiplica por kg) |
+
+La caja aparece en los **dos**: como entrada del paso `insumo` (0,0833) y como entrada del paso
+`tallerista` (el que la convierte en el terminado). Y `insumox` tiene este `case`:
+`when exists (edges e where e.ent = insumo_id) then greatest(cantidad - 1, 0) * precio`. Como la
+caja **sí** es entrada de un edge, `greatest(0,0833 − 1, 0) = 0` → **`insumox` aporta 0 y `mat`
+aporta el precio entero.** El `− 1` está pensado para una pieza que se transforma (entra 1, sale 1)
+y le pega de lleno a todo insumo con cantidad < 1: cajas, cartones, pliegos. `[dato]`
+
+**La plata:** sumando `precio_caja × (1 − 1/uni_x_caja) × uni_mes` sobre los 189 artículos con caja
+da **ARS 38.538.090 por mes**. Es de lejos el número más grande que apareció en esta auditoría, y
+**es anterior a cualquier cambio de hoy** — lo de §4da sólo sumó 14 artículos más a la misma cuenta.
+
+**Prueba de que el modelo querido es el otro:** la planilla, hoja Costos, columna M del 942E dice
+**15** = 360 ÷ 24, la parte por unidad. Y la cuenta que el dueño validó el 11-09 para la Caja N22
+del 546 (§4cr, *"~$39.500/mes de más"*) es `7.700 × (208 − 146,42) / 12`: **dividida por 12**. O sea
+el negocio siempre pensó en la parte; la vista es la que cobra la caja entera. `[dato]`
+
+**ARREGLADO el 2026-09-13** (dueño: *"1 arregla"*), migración `la_caja_se_cobra_por_su_parte_no_entera`.
+Se tomó la opción 2, en su forma mínima: `mat` pasa de cobrar `cb.precio` pelado a cobrar
+`cb.precio × least(coalesce(cantidad_del_paso_insumo, 1), 1)`. La cuenta queda exacta para todo `q`:
+
+    antes:  mat = 1 × precio          + insumox = greatest(q−1,0) × precio  =  max(q,1) × precio
+    ahora:  mat = least(q,1) × precio + insumox = greatest(q−1,0) × precio  =  q × precio
+
+**Lo que NO se tocó, a propósito:** el `greatest(q−1,0)` de `insumox` (existe para que una pieza que
+entra 1 y sale 1 no se cuente dos veces) y los flejes (sector 5, que ya escalan por `kg_ref`).
+`insumo_por_art` se movió arriba de `mat` para poder leerse desde ahí, sin cambiarle una coma.
+
+**Verificado en seis testigos, todos exactos al centavo:** 234 `944,26 → 628,69` (= 600 del palo +
+28,69 de caja) · 942E `360,00 → 30,00` · 311 `515,48 → 185,48` · 312 `1.671,08 → 1.341,08` ·
+395 `559,80 → 319,80` · 546 `1.659,70 → 1.469,03` (= 208 − 17,33 menos). Ningún costo quedó nulo ni
+negativo, y ninguno subió (matemáticamente no puede: `least(q,1) ≤ 1`). El costo mensual valorizado
+de los 191 artículos queda en **ARS 141.866.763**. `db/vistas_GP2.sql` regenerado y **verificado por
+md5 contra la vista viva**. `[usuario + dato]`
+
+**Regla que deja: en GP2 un insumo que además es la ENTRADA del paso que lo consume se cobra
+entero, no por su cantidad. Antes de creerle a `total_pesos`, comparar contra la columna M de la
+hoja Costos.** `[deducido]`
+
+
+## 4dd. 942E y 945E quedan en 12 por caja, contra lo que dice la planilla (2026-09-13)
+
+`[usuario 2026-09-13, textual: *"2 12."*]`. La planilla los da de a **24** en sus dos hojas
+(Cajas F=24 y Costos M=15=360/24) y GP2 los tenía en **12**; el dueño confirmó **12**. **Se retira
+el hallazgo de §7.4(b) de `PENDIENTES_CAJAS_PALOS`**: no hay nada que corregir en la base, la que
+está desactualizada es la planilla.
+
+Consecuencia concreta, ahora que la caja se cobra bien (§4dc): 942E y 945E aportan **$30,00** de
+caja por unidad, no $15. Sobre 214 uni/mes son **$3.210 más por mes** que lo que dice la planilla —
+diferencia real, no error de carga. `[deducido]`
+
+**Regla que deja: la planilla no gana automáticamente.** El 11-09 la hoja Costos fue la que cerró la
+discusión de qué caja usa cada artículo (§4cr); acá el dueño la contradice en la uni x caja y manda
+él. La hoja Costos es la mejor fuente cuando **nadie** sabe, no cuando el dueño ya decidió.
+
+
+## 4de. 573 y 517 son discontinuos: no se dan de alta aunque tengan despiece (2026-09-13)
+
+`[usuario 2026-09-13, textual: *"2 discontinuos"*]`, contestando si se daban de alta el **573**
+Bombilla Color Metalizado y el **517** Pinza Gastronómica, que §4db había encontrado **con despiece
+completo en la planilla**. **No se modelan.** Tener el despiece no los hace vivos: la planilla
+guarda el despiece de cosas que ya no se venden, igual que la Est Madre arrastra discontinuados
+(§4cw, el caso del 515).
+
+Con esto los tres del cruce contra loekemeyer.com quedan cerrados y **ninguno entra a GP2**:
+
+| Cód | Qué es | Por qué no entra |
+|---|---|---|
+| 573 | Bombilla Color Metalizado | discontinuo `[usuario]`. Ojo: **sigue en `est_madre` con 52 uni/mes** — misma basura que el 515 |
+| 517 | Pinza Gastronómica | discontinuo `[usuario]`. No está en est_madre ni en la hoja Costos |
+| 556 | Sacayerba | el único sin despiece de verdad; la planilla lo costea sólo como envase (§4db) |
+
+**Queda por decidir:** si se borra la fila `573` de `est_madre` (52 uni/mes), como se hizo con el
+515. No se tocó. **Y loekemeyer.com los sigue mostrando activos**, igual que a los 332/335/337 —
+eso es trabajo del repo del sitio, no de GP2. `[dato]`
+
+## 4df. El precio de la bandita: la planilla lo tiene y NO lo cobra (2026-09-13)
+
+El dueño pidió *"el mismo precio que la que se usaba para 323, no tenés esa?"*. **No, y hay dos
+motivos, los dos medidos:** `[dato]`
+
+1. **El 323 no está en GP2** (Rallador Cilíndrico Chico, grupo A de `ARTICULOS_FUERA_DE_GP2`,
+   124 uni/mes, tallerista Garcia). Ningún componente de GP2 tiene esa bandita.
+2. **La planilla tampoco la cobra.** El 323 en la hoja Costos (fila 154) da
+   `E 918,1033 + K 16,606 + L 33 + M 25,2292 + N 3,0862 = O 996,0247`, **exacto al centavo y sin
+   lugar para una bandita**. La columna K no es la bandita: el encabezado (fila 6) dice
+   **"Envas. Terc."** (envasado por terceros); L es Cartón, M Cajas y N "Cod y Precint".
+
+Lo que sí existe es la **línea en la lista de precios**: `Bandita Ralladores` (Gráfica Pol, cod ISIS
+**0317**) a **$8.250**, y `Banditas 35 × 194 mm` (mismo proveedor, ISIS 0357) **al mismo precio
+exacto, $8.250**. Así que "el mismo precio que la del 323" da $8.250 por cualquiera de los dos
+caminos — el problema es **de qué** son esos $8.250.
+
+**⚠ NO se cargó, y el motivo es un pozo en el que la casa YA se cayó:** el comment de
+`precio_proveedor` del `Pliego 506` dice textual *"POR PLIEGO (el paquete de 100 sale $77.700).
+Corregido 2026-09-03: estaba cargado el precio del PAQUETE y la OC pide en pliegos, así que valuaba
+100x"*. **Los precios de Pol en la lista vienen por paquete**, y la lista no tiene columna de
+cantidad. Cargar $8.250 como precio unitario le sumaría $8.250 a CADA palo de amasar — y desde
+§4dc la caja ya se cobra bien, así que el error se vería entero en el costo.
+
+**Falta el único dato que no está en ningún lado: cuántas banditas trae el paquete de $8.250.**
+
+**Regla que deja: un precio de Gráfica Pol es del PAQUETE hasta que se demuestre lo contrario.
+Antes de cargarlo, buscar la cantidad por paquete; si no aparece, preguntar.** `[deducido]`
+
+
+## 4dg. Se borro el 573 de est_madre — y son 235 filas, no una (2026-09-13)
+
+`[usuario 2026-09-13, textual: *"2 si"*]`. Borrada la fila `573` de `GP2.est_madre`
+(52 uni/mes, uxb 24), como se hizo con el 515 el mismo dia (§4cw). Backup en
+`zz_backups."GP2_Backup_est_madre_573_20260913"`. `est_madre` queda en **404 filas**.
+
+**Medido antes y despues: el md5 de TODOS los maximos de `inventario` es IDENTICO**
+(`3ff3dad8…`). No podia ser de otra forma y conviene entender por que: `recalcular_maximos_insumos()`
+llega al maximo por la RECETA del articulo, y el 573 **no existe como articulo en GP2**, asi que su
+fila nunca alimento un solo calculo. **Borrarla no arregla ningun numero: saca un dato que confunde
+al que lo lee.** `[dato]`
+
+**Y no es una fila, son 218.** `[CORREGIDO el mismo dia: primero escribi 235, con un `join` por
+codigo exacto. Esta mal — ver abajo.]` De las 404 filas que le quedan a `est_madre`, **218 no cruzan
+con ningun articulo de GP2**. La Est Madre es una foto del sistema viejo: trae discontinuados,
+reventa e importados que GP2 no modela. El desglose completo, grupo por grupo, esta en
+`EST_MADRE_HUERFANAS_2026-09-13.md`. `[dato]`
+
+**⚠ LA TRAMPA DEL CERO ADELANTE, que casi me hace reportar un bug que no existe.** `est_madre`
+escribe `31`, `26`, `27`, `34`, `66`, `57`, `58`, `59`, `99`, `97`, `70`, `55`, `43`, `53`, `54` y
+`52`, y GP2 los tiene como `031`, `026`, … Un `join` por codigo exacto los marca como huerfanos —
+son **16 codigos y 28.812 uni/mes**, entre ellos el **031 Filtro de Cafe con 15.144 uni/mes, el
+articulo de mayor demanda de la casa**. Llegue a concluir que sus insumos estaban sub-dimensionados
+en la OC. **Es falso:** `v_consumo_demanda` cruza con
+`regexp_replace(em.cod,'^0+','') = regexp_replace(a.codigo,'^0+','')`, o sea **ya normaliza**, y el
+consumo del carton `A1B` da exactamente 15.144. **Regla: para cruzar `est_madre` con `articulo`,
+sacar los ceros de adelante de los dos lados — es lo que hace el motor.** `[dato]`
+
+**De las 218, las unicas que pueden ser trabajo son 16** (las que la hoja Costos marca `Fab`), y
+**13 ya estan resueltas**: 332-337 son los cubiertos inox discontinuos (§4db), el 548 es el pincel
+que ya entro como 590E/890E/590ES (§4ct), y 513L/546L/520L/505L/586L son **variantes con sufijo `L`
+de articulos que GP2 ya tiene** (513, 546, 520, 505, 586). **Quedan tres preguntas: el 561 Pinza
+Grande Alambre (324 uni/mes), el 396 Enrulador de Manteca (80) y si los cinco codigos `L` son una
+variante real o basura.** Y un detalle: **el 515 sigue en `est_madre` con 486 uni/mes** — si alguna
+vez se quiso borrar, no se borro. `[dato]`
+
+**Regla que deja: una fila de `est_madre` sin articulo de GP2 no mueve ningun maximo — es ruido de
+lectura, no un bug de calculo. Y `proy_uni_mes` NO es evidencia de que algo se venda**
+(§4cw, textual del dueño sobre el 515: *"No hay chance que se venda 486 uni de 515"*). Antes de
+borrar de a una, vale preguntarse si conviene limpiar las 234 de un saque o dejarlas y no leerlas.
+
+## 4dh. La bandita queda SIN precio: el dueño tampoco sabe cuantas trae el paquete (2026-09-13)
+
+`[usuario 2026-09-13, textual: *"1 nose"*]`, contestando cuantas banditas vienen en el paquete de
+$8.250 de Grafica Pol. **`BANDITA` (componente 916) queda con proveedor Pol y SIN precio**, y esa es
+la decision correcta: cargar $8.250 como unitario le sumaria $8.250 a cada palo de amasar (§4df, la
+trampa del `Pliego 506` que ya costo una correccion el 03-09).
+
+**Lo que hay que preguntarle a Pol cuando se pueda:** cuantas unidades trae el paquete de $8.250 del
+ISIS **0317** (Bandita Ralladores) o del **0357** (Banditas 35 × 194 mm) — los dos al mismo precio.
+Con ese numero el precio unitario sale solo y se carga en `precio_proveedor`.
+
+**Mientras tanto los tres palos siguen con `faltan_precios` ≥ 2** (los `GRJ22/23/24` tampoco tienen
+precio: la LP solo lista el Palo Frances $600 y el Torneado 40cm $1.245). O sea que hoy el costo de
+un palo es **solo su caja, $28,69**. No es un bug: es que faltan dos precios. `[dato]`
+
+
+## 4di. Que es un `GRJ` (el dueño pregunto, y conviene que quede escrito) (2026-09-13)
+
+`[usuario 2026-09-13, textual: *"nose que es eso"*]`, preguntando por el precio de los
+`GRJ22/23/24`. **Un `GRJ` es una pieza del Sector Garage: algo que se COMPRA hecho, entra por el
+garage y despues alguien lo termina.** No es un articulo que se venda: es el insumo principal del
+articulo.
+
+En el caso de los palos: **`GRJ22` es el palo de amasar de 30 cm en si** — la madera torneada que
+vende Tierra Nativa. `GRJ23` el de 40 y `GRJ24` el de 50. Fabrica les pone la bandita y los entrega
+en Virgilio, y eso los convierte en los articulos 231 / 232 / 233. Es el mismo patron que el `GRJ4`
+de Cimarron (§4cy).
+
+**Ninguno de los tres tiene precio cargado, y la lista tampoco lo tiene:** el bloque de Tierra
+Nativa solo lista *"Palo de Amasar Frances 40cm"* $600 (que es el `GRJ17`, el del 234) y
+*"Torneado Palo de Amasar 40cm"* $1.245. **Para los palos lisos de 30, 40 y 50 no hay precio en
+ningun lado.** Por eso hoy un palo cuesta $28,69, que es solo su caja. `[dato]`
+
+
+## 4dj. La `L` final: es Chef vendiendo Loeke, y GP2 pierde 301 uni/mes por no pelarla (2026-09-13)
+
+`[usuario 2026-09-13: *"Ya lo explique lo 1 en GV, busca"*]`. Encontrado en
+`loekemeyer/Gestion-Virgilio`, `CLAUDE.md` linea 396 y `GUIA-PROYECTO.md` §4737. **La regla, textual
+de ese repo:**
+
+> *"Un cliente de LK que pide por la página de Chef: el pedido es de Chef de punta a punta, se
+> factura por Chef, y cada artículo de Loekemeyer va con **'L' al final** (505 → 505L; 438E →
+> 438EL). … la L manda el stock a la góndola LK"*. Y el caso mas comun, `[dueño 07-09 en GV]`:
+> un pedido con entrega en **Tierra del Fuego** (Factura E) se arma como Loeke con L y el Excel ISIS
+> va al de Chef.
+
+**O sea `546L` NO es un artículo: es el 546, vendido por Chef.** No hay que darlos de alta en GP2.
+
+**PERO hay una consecuencia que no estaba vista: GP2 pierde esa demanda.** En `est_madre` hay **75
+códigos con `L`**; **32 cruzan con un artículo de GP2 al pelarla**, y suman **301 uni/mes** que hoy
+**no llegan a ninguna receta** porque `v_consumo_demanda` normaliza el cero de adelante pero **no la
+L**. Los mas grandes: `31L` 55 (Filtro de Café), `123L` 52, `504L` 30, `315L` 29, `544L` 21,
+`513L` 18. `[dato]`
+
+**Gestión Virgilio ya resolvió exactamente esto, y al reves:** su `vista_generador_oc`
+*"strippea la 'L' final y aglomera en el código base sumando UNIDADES / uni×caja del base → el 505L
+cae dentro del 505 (se pide 505, nunca 505L)"*; antes eran *"63 códigos ≈ 1.265 cajas fantasma que
+inflaban la lista"*. A GV le inflaba la OC; a GP2 se la **desinfla**, porque directamente ignora esas
+filas. **APLICADO el 2026-09-13**, migracion `la_venta_con_L_de_chef_suma_al_articulo_de_loeke`
+`[dueño, textual: *"Los de L: es venta que facturo chef de articulos de Loeke, el consumo realmente
+es de loeke, se debe considerar ahi. Ejemplo 513L, es venta de loeke"*]`. El join de
+`v_consumo_demanda` pasa a pelar tambien la L, igual que ya pelaba el cero de adelante. Como `seed`
+agrupa y **suma** por (articulo, componente), las dos filas de `est_madre` (el `513` y el `513L`)
+se suman solas en el articulo 513 — no hizo falta tocar nada mas. `[usuario]`
+
+**Verificado antes de aplicar:** **ningun articulo de GP2 termina en `L`**, asi que el pelado no
+puede producir un falso positivo. Y 74 de los 75 codigos `L` ya tenian su base en `est_madre`.
+
+**Efecto medido:** `recalcular_maximos_insumos()` actualizo **81 maximos**, todos **para arriba**
+(ninguno bajo: solo se suma demanda), **+4.587 unidades** en total. El testigo que pidio el dueño
+cierra exacto: el **carton del 513 (`B1A`) subio 108 = 18 uni/mes del `513L` × 6 meses de stock**.
+Los que mas se movieron: `A1B` Carton 031 +330, `I42` Carton 123 +312, `PCP3`/`D9` Clavo 505 +288,
+`CV5` +240. Snapshot previo en `zz_backups."GP2_Snap_maximos_antes_L_20260913"` (las 1.295 filas de
+`inventario`). Invariantes 35/35 en 0, `db/vistas_GP2.sql` regenerado y verificado por md5.
+
+**Lo que esto significa en la practica: la OC venia pidiendo de menos.** Cada `L` es una venta real
+que Chef factura de un articulo de Loeke, y su consumo no llegaba al insumo. `[dato]`
+
+**Regla que deja: un codigo que termina en `L` es el mismo articulo sin la L.** Vale para `est_madre`,
+para los listados y para cualquier cruce. El `590EL` es el `590E`; el `438EL` es el `438E`.
+
+## 4dk. Las ventas REALES existen y estan en `sales_lines` — hay que mirarlas antes de dar algo por muerto (2026-09-13)
+
+Buscando quien compra el 515 aparecio que **la evidencia de venta que faltaba en todas estas
+discusiones ya existe**: `public.sales_lines` del proyecto **`kwkclwhmoygunqmlegrg`**
+("loekemeyer's web"), con `item_code`, `boxes`, `invoice_date`, `customer_code` y `empresa`
+(`lk` / `chef`), desde 2020. **Es la fuente que zanja "¿esto se vende?", que `est_madre` NO puede
+contestar** (§4cw). `[dato]`
+
+Medido el 13-09, ultimos 12 meses (desde 2025-09-13):
+
+| Cód | Artículo | Cajas 12m | Clientes 12m | Última venta | Lo que se dijo |
+|---|---|--:|--:|---|---|
+| 515 | Batidor Resorte | **396** | **75** | **2026-08-25** | *"No hay chance que se venda 486 uni de 515"* |
+| 561 | Pinza Grande | **246** | **75** | **2026-08-13** | *"discontinuos, no se fabrican más"* |
+| 333 | Espumadera Ac. Inox. | 109 | 45 | 2026-04-15 | discontinuo (bloque 332-337) |
+| 336 | Cucharón Ac. Inox. | 76 | 49 | 2026-07-06 | ídem |
+| 332 | Espátula A. Inox. | 64 | 37 | 2026-08-27 | ídem |
+| 334 | Cuchara Salsera | 48 | 35 | 2026-05-14 | ídem |
+| 573 | Bombilla Color Metaliz | 46 | 19 | 2026-07-06 | discontinuo |
+| 396 | Enrulador De Manteca | 40 | 20 | 2026-08-17 | *"no se fabrican más"* |
+| 335 | Cuchara Calada | 21 | 18 | 2026-08-27 | discontinuo |
+| 337 | Pinche Ac. Inox. | 20 | 15 | 2026-06-10 | discontinuo |
+| 548 | Pincel Pastelero | 6 | 2 | 2026-05-08 | ya entro como 590E/890E |
+| 525 | Sac Cabo Madera | 1 | 1 | 2026-03-09 | 0 uni/mes en est_madre |
+| **556** | Sacayerba | **0** | **0** | 2025-05-05 | sin despiece |
+| **517** | Pinza Gastronómica | **0** | **0** | **2021-11-26** | discontinuo |
+
+**DECISION DEL DUEÑO (2026-09-13, textual): *"515 dejalo activo"*.** La fila del 515 en `est_madre`
+**NO se borra** — se retira la idea de sacarlo, que venia de §4cw. Los 75 clientes y la factura del
+25-08 lo respaldan. `[usuario]`
+
+**Lectura, sin decidir nada:** *"discontinuo"* en boca del dueño significa **"no se fabrica mas"**,
+no *"no se vende"* — lo dijo asi de los 561/396, y los numeros lo confirman: se sigue facturando del
+stock. **Los unicos dos muertos de verdad son el 517 (ultima venta hace casi 5 años) y el 556
+(16 meses).** Y **el 515 se vende**: 75 clientes distintos en 12 meses y factura del 25-08-2026,
+o sea que la frase del §4cw *"No hay chance que se venda 486 uni de 515"* **no se sostiene contra la
+facturacion** (396 cajas / 12 meses = 33 cajas/mes; est_madre pide 486 uni/mes = 40,5 cajas). No se
+toco nada: el dueño decide.
+
+**El `515L` tambien existe**: 22 cajas, **1 solo cliente**, ultima venta 2026-08-31 — ese es el caso
+de §4dj, Chef vendiendole Loeke a Tierra del Fuego.
+
+**Regla que deja: antes de dar un articulo por muerto, mirar `sales_lines` del proyecto
+`kwkclwhmoygunqmlegrg`. `est_madre` dice lo que se proyecta; `sales_lines` dice lo que se facturo.**
+
+
+## 4dl. La Est Madre SUBESTIMA la cola: hasta 14x menos de lo que se factura (2026-09-13)
+
+Recalculando el grupo A de `ARTICULOS_FUERA_DE_GP2.md` con `sales_lines` en vez de `est_madre`
+aparecio un sesgo con forma: **cuanto mas chico es el numero de la Est Madre, mas se equivoca.**
+`[dato: sales_lines, 12 meses al 2026-09-13, uni/mes = cajas/12 × uxb]`
+
+| Cód | Est Madre | Vendidas | Cuánto más |
+|---|--:|--:|---|
+| 456 Espátula Lisa Nylon | 1 | 14 | **14×** |
+| 710 Enrulador Manteca | 1 | 13 | **13×** |
+| 839 Rallador Chocolate | 10 | 114 | **11×** |
+| 852 Pinza De Hielo 14 cm | 7 | 80 | **11×** |
+| 801 Pinza Grande CH | 2 | 16 | 8× |
+| 809 Corta Queso Chef | 1 | 8 | 8× |
+| 977 Platos Pizza x6 | 2 | 11 | 5× |
+| 574 Corta Queso Alambre | 88 | **319** | 3,6× |
+| 747 · 717 · 613 | **0** | 6 · 2 · 1 | tienen facturas de 2026 |
+
+Los grandes, en cambio, cierran bien: el `111`, el `112` y el `113` dan **exacto**, y el `565` y el
+`439E` quedan cerca. **O sea la Est Madre esta bien donde hay volumen y se rompe en la cola larga**
+— justo donde se venia usando para descartar (*"tiene 1 uni/mes, no importa"*). El caso mas caro es
+el **574 Corta Queso Alambre**: 88 segun la proyeccion, 319 vendidas a 41 clientes, factura del
+17-08-2026; era el decimo de la lista y es el tercero.
+
+**Regla: `est_madre` decide el MAXIMO de stock (es lo que consume el motor); `sales_lines` decide
+QUE VALE LA PENA MODELAR. No mezclar los dos usos.** Es la version general de lo que ya habia
+mordido con el 515 (§4cw) y con el 573 (§4de). `[deducido]`
+
+
+## 4dm. El $28,69 es SOLO de los tres palos nuevos, y el 234 no: corrijo lo que dije (2026-09-13)
+
+`[usuario 2026-09-13, textual: *"Igual el palo de amasar no lo vende tierra a $28.69. Te falta el
+costo de lo que vende tn tambien"*]`. **Tiene razon y la frase estaba mal dicha en §4dh y en el
+chat.** Lo medido, componente por componente:
+
+| Componente | Artículo | ¿Tiene precio? | Costo del artículo hoy |
+|---|---|---|--:|
+| `GRJ17` Palo de Amasar Frances 40 cm | **234** | **sí, $600** (LP f888, ISIS 103, lista 03-11-2025) | **$628,69** = 600 + 28,69 de caja |
+| `GRJ22` Palo de Amasar 30cm | 231 | **no** | $28,69 (solo la caja) |
+| `GRJ23` Palo de Amasar 40cm | 232 | **no** | $28,69 |
+| `GRJ24` Palo de Amasar 50cm | 233 | **no** | $28,69 |
+
+O sea **el $28,69 nunca fue "lo que cuesta un palo": es lo que GP2 puede calcular de los tres que no
+tienen precio de Tierra Nativa.** El 234, que sí lo tiene, da $628,69.
+
+**Y el bloque entero de Tierra Nativa en la lista de precios (72 filas, cod_prov 3917) tiene SOLO
+DOS lineas de palo de amasar:** `[dato: v_planilla_precio]`
+
+| Fila | cod ISIS | Producto | Precio | Fecha lista | Última compra | Asignado en GP2 |
+|--:|---|---|--:|---|---|---|
+| 888 | 103 | Palo de Amasar **Frances** 40cm | $600 | 03-11-2025 | 18-12-2024 | ✔ `GRJ17` (art 234) |
+| 901 | 234L | **Torneado** Palo de Amasar 40cm | **$1.245** | **07-08-2026** | — | **sin asignar** |
+
+**No hay linea para el de 30 ni para el de 50.** La unica libre es el Torneado de 40, que por medida
+seria el **232**, pero el nombre no lo dice y el `cod_isis` de esa fila (`234L`) apunta al 234, no al
+232 — **asignarla a ojo es inventar**. Falta que el dueño diga: (a) si el Torneado 40 es el 232, y
+(b) que precio tienen el de 30 y el de 50, que en la lista no estan. `[dato]`
+
+**Regla que deja: antes de decir "este articulo cuesta X", mirar `faltan_precios` Y decir de que
+componentes falta el precio.** Un total bajo casi nunca es un articulo barato: es un componente sin
+precio (misma trampa del BOM10 en §4cn y del pincel en §4ct).
+
+
+## 4dn. Lo que realmente falta no son los palos: son 106 precios, y 67 son de Pol (2026-09-13)
+
+`[usuario 2026-09-13: *"Nose"*]` sobre el precio de los palos de 30 y 50 — **nadie en la casa lo
+sabe, hay que preguntarle a Tierra Nativa.** Eso disparo medir el agujero completo en vez de seguir
+de a un componente, y el resultado cambia la prioridad: `[dato, medido el 13-09]`
+
+| | |
+|---|--:|
+| Artículos de GP2 | 191 |
+| **Artículos con al menos un precio faltante** | **96 (50 %)** |
+| **Componentes comprables vivos SIN precio** | **106** |
+| De esos 106, cuántos no tienen ni proveedor | **0** |
+
+**Los 106 tienen proveedor asignado: lo unico que falta es el numero.** Y estan muy concentrados:
+
+| Proveedor | Componentes | Consumo uni/mes |
+|---|--:|--:|
+| **Talleres Gráficos Pol** | **67** | **41.318** |
+| Pat Bet Plast | 11 | 11.584 |
+| Papelera Nueve de Julio | 2 | 4.050 |
+| Cimarron | 5 | 2.540 |
+| Gilardi Esther | 2 | 1.816 |
+| Rueda · Imel · Importado | 3 | 4.185 |
+| Tierra Nativa SA (los 3 palos) | 3 | 0 |
+| los otros 9 proveedores | 13 | ~2.700 |
+
+**Una sola lista de precios — la de cartones de Pol — cierra 67 de los 106 y el 63 % del consumo
+afectado.** Los mas grandes son `C2A` Carton 026 (7.092 uni/mes), `F5A` Carton 321 (4.406),
+`C2B` Carton 027 (3.320), `L2C` Carton 325 (1.600), `F1A` Carton 280 (1.570). Los tres palos, en
+cambio, son **3 de 106 y con consumo 0** (los 231/232/233 no estan en `est_madre`).
+
+**Regla que deja: cuando aparezca "a este articulo le falta un precio", no perseguir el componente
+suelto — contar cuantos faltan y agruparlos por proveedor.** Casi siempre es UNA lista que nadie
+cargo, no N datos sueltos. `[deducido]`
+
+**Las dos preguntas de los palos quedan ABIERTAS, para Tierra Nativa:** (a) si el *"Torneado Palo de
+Amasar 40cm"* $1.245 (ISIS 234L, lista 07-08-2026) es el **232**, y (b) que precio tienen el de
+**30 (231)** y el de **50 (233)**, que no figuran en las 72 filas de TN.
+
+### 4cg. El 515/615 probado de punta a punta con los RPC reales (2026-09-14)
+
+`[usuario 2026-09-14: "No agregaste la convergencia (componente bomb) ademas quiero saber si se
+puede recepcionar, fabricar, enviar segun corresponda en gp2"]` — las dos cosas eran ciertas.
+
+**1) Faltaba `componente_bom`.** La reconstrucción dejó los PASOS de ruta que convergen en `C12`
+pero no declaró los hijos. **Eso es lo que la pantalla usa para dibujar la convergencia**:
+`Programa.html` agrupa por `D.children[cs]`, así que sin la fila el batidor se veía como "2 rutas
+simples" en vez de "Convergencia · C12". Cargado `C12 ← W1B (1) + IE1 (1)`, con la convención de
+las otras 26 convergencias (`D5-M78 ← D5+D6+V4`, `G4 ← K5+K8+V3`, `GRJ7 ← A10+C10+V9`…).
+El `BOM10` NO va ahí: `[usuario 2026-09-12: "1 lo agrega alex"]`.
+
+**2) El ciclo completo corre.** Probado con los RPC de verdad y rollback, 120 unidades del 515:
+
+| # | Paso | RPC | Resultado |
+|---|---|---|---|
+| 1 | Recepción de 4 insumos | `crear_recepcion_insumo` | OK |
+| 2 | Fabricación en matriz 138 | `registrar_produccion` | 120 W1B |
+| 3 | Guazzaroni niquela | `crear_envio_ps` / `crear_entrega_ps` | OK |
+| 4 | Envío a Alex | `crear_envio_tallerista` | W1B 120 · IE1 120 |
+| 5 | **Convergencia** | `crear_entrega_tallerista` | C12 120, y el BOM deja W1B y IE1 en **0** |
+| 6 | Pedernera croma | `crear_envio_ps` / `crear_entrega_ps` | OK |
+| 7 | Envío del resto a Alex | `crear_envio_tallerista` | OK |
+| 8 | Entrega en Virgilio | `recepcion_virgilio` | **120 del 515, cero sobras** |
+
+**Dos errores míos que sólo aparecieron al correr el ciclo** — ninguna consulta los mostraba:
+
+- **`IE1` sin `kg_x_uni`**: `to_canonical` cortaba con *"componente 917 sin kg_x_uni válido para
+  uni→kg"*. No se podía **ni recibir ni enviar**. Cargado **0,0241** — el mismo número que el
+  vecino da para `FE1` "Varilla Batidor" y que la migración `20260901091333` ya usaba para los dos
+  terminados.
+- **`IE1` en `kg` cuando va por pieza**: al enviarle 120 uni a Alex el stock quedaba en **2,892**
+  (= 120 × 0,0241, convertido a kg) y el BOM le restaba **120 unidades**, dejando −117,108.
+  **Contraejemplo que lo probó**: `IE4` y `IE5`, que alimentan la convergencia `GRJ10` igual que
+  `IE1` alimenta `C12`, son `unidad` y conservan su `kg_x_uni`. `IE1` era el **único** fleje en kg
+  usado como hijo de un BOM en toda la base — una anomalía de una sola fila es firma de dato mal
+  cargado. `IF11` queda en kg: ese va a la matriz y se consume por kilo.
+
+**Regla que sale de esto: un fleje que va DERECHO al tallerista se cuenta por pieza
+(`unidad_medida='unidad'`, con su `kg_x_uni` cargado igual); el que entra a una matriz va en kg.**
+
+**Lección de método**: la simulación de rutas (`__sim_articulo`) daba bien las dos veces, con y sin
+el error de unidad. Lo único que lo destapó fue correr **los RPC reales** contra el inventario.
+
+
+
+
+## 4do. Los 7 inox 941E-948E van en Caja N°15, no en la N°12 — y la "E" no es la regla (2026-09-14)
+
+`[usuario 2026-09-14, textual: *"Todos los articulos que terminan con E: 941E 942E 943E 944E 945E
+946E 948E. Llevan caja N°15, no 12"*, y ante la repregunta: *"Si, caja 15 solo para los que te
+liste"*]`.
+
+**Lo primero, porque es la trampa: el sufijo "E" NO define la caja.** `[dato]` En GP2 hay **9**
+artículos que terminan en E, no 7: los otros dos son `590E` y `890E` (Pincel Silicona 11 Gms), que
+van en **Caja N°29** (`A11`) y **quedan como están** por decisión explícita del dueño. Los siete de
+la lista son la línea de **acero inoxidable**, y eso es lo que tienen en común, no la letra. Si en
+otra sesión aparece "los artículos con E", preguntar cuáles: leerlo como regla de sufijo mete a
+590E/890E en la caja equivocada.
+
+**Estado antes del cambio** `[dato, medido el 14-09]`: los siete estaban de dos formas distintas.
+
+| Art | Descripción | Caja antes | uni/mes | Δ costo $/mes |
+|:---:|:---:|:---:|---:|---:|
+| 941E | Espátula Lisa Inox | **ninguna** | 86 | **+2.467,20** |
+| 946E | Cuchara Calada Inox | **ninguna** | 58 | **+1.663,92** |
+| 943E | Cucharón Inox | N°12 (`A2`) | 144 | −188,88 |
+| 942E | Cuchara Inox | N°12 (`A2`) | 132 | −173,14 |
+| 948E | Espumadera Inox | N°12 (`A2`) | 108 | −141,66 |
+| 945E | Espátula Calada Inox | N°12 (`A2`) | 82 | −107,56 |
+| 944E | Cuchara Fideos Inox | N°12 (`A2`) | 74 | −97,06 |
+
+**`941E` y `946E` no tenían caja en ningún lado** — ni el FK `articulo.componente_caja_id`, ni línea
+de receta, ni ruta de caja — porque la planilla los trata como importados terminados (§3 de
+`PENDIENTES_CAJAS_PALOS_2026-09-13.md`, que **se retira**: la planilla estaba equivocada). Para esos
+dos no fue "15 en vez de 12": fue caja donde no había, y ahí está casi toda la plata del cambio.
+
+**Lo que se escribió** (una transacción, `2026-09-14`): los 7 al FK `A9B`; los 5 que ya tenían `A2`
+cambiaron de caja en receta y en su ruta de caja; `941E` y `946E` recibieron su línea de receta
+(`A9B × 1/12`) y **una ruta de caja nueva cada uno**, calcada de las otras cinco
+(`insumo A9B 1/12 → tallerista Fábrica → virgilio`). **Las cuatro tablas de la cadena se tocaron
+juntas**, que es lo que pide la regla de normalización: tocar sólo el FK habría dejado la caja fuera
+del costo y fuera de la OC, que es exactamente el agujero que tenían 941E y 946E.
+
+**Los 12 uni x caja NO se tocaron** — sigue en pie la decisión del 13-09 (§4dd) contra la planilla,
+que dice 24 para 942E y 945E.
+
+**Efecto medido** `[dato]`:
+
+| | Antes | Después |
+|---|--:|--:|
+| Consumo `A2` Caja N°12 | 1.196 uni/mes (29 art) | **1.151** (24 art) |
+| Consumo `A9B` Caja N°15 | 205 uni/mes (7 art) | **262** (14 art) |
+| Máximo de `A9B` en Sector Caja | 1.230 | **1.572** |
+| Costo unitario de los 7 | $30,00 los cinco · $0 los dos | **$28,69 los siete** |
+
+Neto **+$3.422,82/mes** de costo que antes no se cobraba. Los dos son del mismo proveedor
+(Corrugadora del Plata) y sin `carton_formato`, así que **la familia de OC es la misma y no se
+partió ningún pedido mínimo**. El máximo de `A2` **no se movió** y está bien: es `maximo_origen =
+'fisico'` (4.275 fijado a mano por el lugar que hay, contra 6.906 que daría el cálculo), y
+`recalcular_maximos_insumos` no pisa los físicos. **El de `A9B` sí subió porque es `est_madre`
+(262 × 6 meses) y NO tiene tope físico cargado** — si el lugar de la N°15 no da para 1.572 cajas, hay
+que cargarle el máximo físico, o la OC va a pedir de más. `[deducido, sin confirmar]`
+
+**`faltan_precios` sigue en 1 para los siete**, y es `PEST1` (Kollplast, §7.3): el costo de $28,69 es
+**sólo la caja**. Misma trampa de §4dm — un total bajo no es un artículo barato.
+
+### 4ch. La paleta C12 se arma con TRES partes, y eso deja el resorte contado dos veces (2026-09-14)
+
+`[usuario 2026-09-14, textual: "pone la rama 3 tal cual la foto. dentro de la tabla de componente
+bomb se tiene que netender esto que c12 se arma con esas 3 partes"]`
+
+**Corrige lo que yo había entendido del `"1 lo agrega alex"` del 2026-09-12.** Lo tomé como "el
+resorte no va dentro de la paleta" y borré la fila `componente_bom(C12 ← BOM10)`. La foto del
+Programa anterior al borrado mostraba la Rama 3, y el usuario la confirma:
+
+> `C12` Paleta Batidor Resorte = `W1B` grampa + `IE1` varilla + `BOM10` resorte.
+
+Cargado el BOM con las tres y agregada la Rama 3 en las dos rutas
+(`Insumo BOM10 -> C12 -> Art 515` y `... Art 615`), con la misma forma que la rama del Fleje 33.
+
+**Medido con el ciclo real en rollback, y el resultado es el que había que ver:**
+
+| Momento | W1B | IE1 | BOM10 | C12 |
+|---|---|---|---|---|
+| Después de mandarle las 3 entradas a Alex | 120 | 120 | 120 | 0 |
+| Alex entrega 120 paletas (el BOM descuenta) | **0** | **0** | **0** | 120 |
+| Entrega de 120 del 515 en Virgilio | 0 | 0 | **−120** | 0 |
+
+La convergencia de tres partes anda. **Lo que queda mal es que `BOM10` sigue ADEMÁS en la receta
+del artículo (`articulo_componente`) y con su ruta suelta al tallerista** (el bloque 4 de la
+pantalla), así que `recepcion_virgilio` lo vuelve a descontar: **el resorte se consume dos veces**.
+
+**Hoy no se ve en la plata porque `BOM10` no tiene precio** ($306,31 y $428,67 antes y después,
+idénticos). En cuanto Resortes Charcas entre a `precio_proveedor`, el 515 y el 615 empiezan a
+cobrar dos resortes. El stock, en cambio, ya se rompe hoy.
+
+**Espera decisión del usuario** (idea 7339): sacar `BOM10` de la receta del 515 y del 615 y borrar
+las dos rutas sueltas `Insumo BOM10 -> Art 515/615`, dejándolo sólo dentro de la paleta.
+
+
+## 4dp. Se borró el mínimo: la reposición la dispara el MÁXIMO (2026-09-14)
+
+`[usuario 2026-09-14, textual: *"lo de minimo borralo. la orden de compra tiene que disparar segun
+el maximo. es algo que habiamos hecho mal"*, y antes: *"La columna de mínimo en la tabla de
+inventario hay que borrarla. Ya está la columna de máximo que reemplaza a esta (por más que
+parezcan cosas distintas lo que se quiere en ambos es que sale el faltante)"*, y después:
+*"todo lo que usaba el minimo ahora que use el maximo. es la misma lógica"*]`.
+
+**Se retira la idea 7273 y la v1.21.0 de la OC entera.** El 08-09 se había metido un punto de
+pedido separado del techo (el mínimo dispara, el máximo dimensiona). El dueño lo dio por error de
+diseño: hay UNA sola pregunta — *¿le falta para llegar al máximo?* — y un solo número.
+
+**Lo que se le dijo antes de hacerlo, y que él resolvió igual** (queda escrito para que ninguna
+sesión futura lo "redescubra" y proponga volver atrás): mínimo y máximo NO eran lo mismo en la
+base — `ubicacion` tenía `meses_minimo` y `meses_stock` cargados **distintos en 7 de los 11
+sectores** (Cartón, Caja y Fleje 4 vs 6; Garage 1 vs 2; Crudo y Procesado 2 vs 1; Bombilla 4 vs 3),
+o sea alguien los había configurado aparte a propósito. **Y el costo medido de sacarlo es chico:
+el gatillo viejo frenaba 12 líneas por ARS 320.036 sobre una corrida de ~ARS 197 M**, porque hoy
+casi todo el stock está en 0 y ya cae abajo del mínimo. Ese número crece cuando el stock esté
+cargado de verdad. `[dato, medido el 14-09]`
+
+**Qué se escribió, en orden.** Primero la migración de datos, **sólo donde no había máximo**
+`[usuario: *"pero no migres todos. migra solo los que no tienen maximo"*]`:
+
+| Dónde | Filas migradas | Qué quedó |
+|:---:|---:|:---:|
+| `inventario` · tallerista | 196 | `maximo = minimo`, origen `migrado_de_minimo` |
+| `inventario` · Virgilio | 80 | ídem |
+| `inventario` · sector | 12 | ídem |
+| `inventario` · prov. servicio | 11 | ídem |
+| `ubicacion` sin `meses_stock` | 13 | `meses_stock = meses_minimo` |
+
+Verificado contra el backup: **0 máximos preexistentes pisados**, y las **456** filas que tenían
+los dos números se quedaron con SU máximo. Las 7 ubicaciones con los dos valores distintos se
+quedaron con `meses_stock`.
+
+Después el borrado: `inventario.minimo`, `inventario.minimo_origen`, `ubicacion.meses_minimo` y la
+función `recalcular_minimos()`. Backups en `zz_backups.GP2_Backup_inventario_minimo_20260914` y
+`GP2_Backup_ubicacion_meses_minimo_20260914`.
+
+**Lo que NO era obvio y hay que saber antes de tocar estas pantallas:**
+
+1. **En Stock por Sector los nombres estaban cruzados.** La columna que decía **"Máximo"** mostraba
+   `inventario.minimo`, y la que decía **"Capacidad"** mostraba `inventario.maximo`. Ahora hay una
+   sola columna, "Máximo", con `inventario.maximo`; de dónde sale cada valor lo dice
+   `maximo_origen`. `[dato, leído de gp2-stock-sector.js]`
+2. **`movimientos_bundle` emitía `'meses'` desde `ubicacion.meses_minimo`, y con ese número
+   `Despiece_GP2.html` calcula el "máximo por sector"** — o sea el máximo del Despiece se estaba
+   calculando con los meses del *punto de pedido*. Ahora `'meses'` sale de `meses_stock`. Ése es
+   probablemente el "algo que habíamos hecho mal" del que habla el dueño. `[deducido]`
+3. **En Flejes, la columna "a pedir" era `minimo − stock`**; ahora es `maximo − stock`.
+4. **Se fue el botón "Aprovechar el viaje" de la OC**: era la válvula de escape del gatillo viejo
+   (sumar a mano lo que estaba arriba del mínimo). Sin estado intermedio no queda nada que
+   aprovechar — lo que está abajo del techo entra solo y lo que llegó tiene sugerido 0.
+
+**La regla nueva de la OC, en una línea:** `estadoRepo` = `'pedir'` si `stock < maximo`, `'lleno'`
+si llegó, `'sin-gatillo'` (se carga igual, fail-safe) si falta el máximo o el stock.
+
+**Queda pendiente**: la alerta `stock_bajo_minimo` de `alertas_bundle` sigue desactivada con el
+motivo *"falta decidir con qué regla avisa (mínimo por ubicación vs máximo, y a quién)"* — la
+primera mitad de esa pregunta ya está contestada (el máximo); falta **a quién** se le avisa.
+
+**Resuelto el mismo día** `[usuario: "SI"]`, migración `el_resorte_va_solo_dentro_de_la_paleta_no_suelto`
+(idea 7339): se borraron las dos líneas de receta (`articulo_componente` 941 y 947) y las dos rutas
+sueltas (`ruta` 999 y 1006 con sus 3 pasos cada una). **El resorte entra sólo por la paleta.**
+No se tocó `componente_bom(C12 ← BOM10)`, ni las Ramas 3, ni el componente, ni su historial.
+
+Cómo quedan los dos artículos, y coincide con el encabezado de la foto ("5 partes BOM"):
+
+| Artículo | Receta (5) | Rutas (7) |
+|---|---|---|
+| 515 | `C12`, `PC10`, `PA13`, `A1C1`, `A8` | 3 ramas de la paleta + 4 insumos al tallerista |
+| 615 | `C12`, `PA19`, `PB6`, `O2A`, `A8` | 3 ramas de la paleta + 4 insumos al tallerista |
+
+Ciclo real re-corrido de punta a punta: **120 unidades del 515 en Virgilio y cero sobras**, el
+`BOM10` ya no queda en −120. Invariante ledger-vs-inventario en 0, suite 52/52.
+
+**Regla que sale de esto: una pieza que es hijo de un sub-conjunto en `componente_bom` NO va
+además como línea suelta de la receta del artículo.** Si está en los dos lados se descuenta dos
+veces: una la entrega del tallerista que arma el sub-conjunto, otra `recepcion_virgilio` por la
+receta. Vale para revisar las otras 26 convergencias.
+
+### 4ci. Barrido de las 26 convergencias y los dos precios que se pudieron reponer (2026-09-14)
+
+`[usuario 2026-09-14: "si"]` a las dos preguntas: cargar los precios y revisar las otras
+convergencias buscando el mismo doble descuento del batidor.
+
+**A) El doble descuento era ÚNICO.** Dos barridos, los dos en cero:
+
+| Barrido | Resultado |
+|---|---|
+| Pieza que es hijo de un sub-conjunto **y** línea suelta de la receta de un artículo que usa ese sub-conjunto | **0** |
+| Variante amplia: la pieza en la receta y alguna ruta del artículo **produce** el sub-conjunto | **0** |
+
+**B) Pero el barrido destapó otras dos cosas, comparando ramas contra `componente_bom`:**
+
+- **`G7` "sin BOM" es un FALSO POSITIVO**, y vale como recordatorio del método. Las rutas 45/47
+  hacen `IE10 → M73 → M74 → G7` y las 46/48 hacen `IE10 → M73 → G7` salteando la M74: son **dos
+  variantes del mismo camino**, no dos piezas que se juntan. Es la misma trampa de la Matriz 80
+  (§4ce): compartir salida no prueba convergencia. `G7` **no necesita** `componente_bom`.
+- **`H15` sí converge y tiene el BOM mal.** Dos flejes distintos llegan a la misma pieza para el
+  artículo 066: `IE11 → H7 → H7-M173 → H7-M10 → H15` (ruta 107) e `IC7 → I12 → I12-M8 → I14 →
+  PS → I16 → H15` (ruta 552). El BOM declara **`H7` + `I16`**, pero la rama entrega **`H7-M10`**,
+  dos matrices después. **Impacto hoy: nulo en stock y en plata** — `H15` la produce una *matriz*,
+  no un tallerista, así que `crear_entrega_tallerista` no descuenta ese BOM, y el costo lo saca de
+  las aristas de ruta (`H7-M10` $142,91 + `I16` $109,01 + MO = $268,93, que es lo que da). Queda
+  como inconsistencia de dato: el día que alguien entregue `H15` por tallerista, descontaría `H7`,
+  que nadie tiene. Arreglo de una línea, **espera OK** (idea 7340).
+
+**C) Precios repuestos, sólo los dos con fuente escrita:**
+
+| Qué | Valor | Fuente |
+|---|---|---|
+| `precio_tallerista` de `C12`, Alex Escalante | **$62,7375** | migración `20260911004542`, Excel hoja `Lista de Precios `, bloque 4175, fila f619 "Batidor Resorte Armado" — el usuario ya lo había confirmado con "ok" |
+| `precio_proveedor` de `A1C1` Cartón 515, Gráficos Pol | **$42,72** | el valor que estaba en la base antes del borrado (§4an-ter) |
+
+Efecto: `C12` $25,76 → **$88,49**; 515 $306,31 → **$411,76**; 615 $428,67 → **$491,40**.
+
+**Sin cargar, porque no hay dato**: `BOM10` (Resortes Charcas — ya faltaba ANTES del borrado,
+§4an-ter), `IE1` Fleje N° 33, `O2A` Cartón 615 y el **envasado** del terminado (en el bloque de
+Alex los batidores van de a pares armado + envasado, f619/f620; tenemos la f619, no la f620).
+
+**Discrepancia sin resolver del Cartón 515**: la hoja ` Cartones` fila 376 le pone **$48,00**
+(formato Huevo) y la base tenía **$42,72**. Se repuso lo que había — reponer no es decidir un
+precio. Cambiarlo a 48 es un update de una línea.
+
+**No comparar contra los $1.303,86 / $1.559,63 de §4an-ter**: son de antes del 13-09, y la
+migración `la_caja_se_cobra_por_su_parte_no_entera` de esa fecha cambió cómo se costea la caja
+(la `A8` vale $261,82 y el artículo usa 1/12). Los números viejos y los nuevos no son comparables.
+
+### 4cx. La tablet del galpón es de CERVANTES: qué se recibe ahí y qué no (2026-09-14)
+
+**Lo que el dueño corrigió** `[usuario 2026-09-14, textual]`: *"Proveedor de artículo terminado no va
+dentro de recibir, sacalo. Porque entregan en Virgilio, y este módulo de tablet es para Cervantes"*.
+Es conocimiento de negocio, no una preferencia de pantalla: **el proveedor de artículo terminado
+entrega EN VIRGILIO**, así que en una tablet que está en Cervantes ese botón sólo podía generar una
+carga en el lugar equivocado. Se le sigue **enviando** desde Cervantes (cartones y cajas): el que se
+fue es el lado de **recibir**. Con él se fue la única carga en **CAJAS** de la tablet (§4cv, trampa 1):
+hoy en la tablet no se recibe nada por caja. La RPC `crear_entrega_prov_at` sigue viva y el circuito
+sigue siendo Prov Art Terminado → Entregas.
+
+**Quién trae a Cervantes, entonces**: talleristas, proveedores de servicio, proveedores de **insumos**
+y Virgilio (lo que vuelve del depósito). Nada más.
+
+**Y lo que NO se vuelve a modelar** `[usuario 2026-09-14, textual]`: *"recibir, toca insumo y me
+aparece todo lo que está en recepción de insumos, como ya lo modelamos"* y, para el conteo, *"dentro
+del módulo conteo tendría que aparecer lo del módulo de relevamientos. Es esa lógica"*. Las dos cosas
+ya existen (Recepción de Insumos con sus rubros, el pesaje de pallets y el cruce contra OC;
+Relevamientos con el cronograma por sector y el conteo por envase + sueltas), así que la tablet **las
+abre** con `?volver=tablet` en vez de tener una segunda copia. **El conteo propio de la tablet — la
+tabla contra el online con CSV, §4cv — se borró**: el conteo del operario es el Relevamiento, y el
+ajuste lo sigue decidiendo el operador del sistema en Validación de Stock.
+
+**Cómo se elige a quién** `[usuario 2026-09-14]`: primero el **tipo** (tallerista / prov. de servicio /
+prov. de art. terminado) y recién adentro la contraparte. Antes caían las 33 juntas en una grilla:
+en la tablet del galpón eso no se lee. Si un tipo tiene una sola contraparte (Virgilio), se entra
+derecho.
+
+### 4dq. Stock General: entran Prov AT y tránsito, se va Virgilio (2026-09-14)
+
+Tres pedidos del dueño en una sola pantalla `[usuario 2026-09-14, textual: *"Acá en stock general
+falta el stock transito PS"*, *"agrega provedor de at con sus repectivas cajas y cartones"*,
+*"agrega sector transito porque tengo que saber cuanto tengo de stock transito: cuando vuelve del
+ps correspondiente subiria el stock y si va al siguiente ps sale del stock de transito"*, *"no
+quiero que aparezca este modulo de virgilio dentro de stock general"*]`.
+
+**El hallazgo de fondo: el árbol armaba grupos con 4 tipos de ubicación y descartaba EN SILENCIO
+los otros 4.** `[dato]` `proveedor_at` (12 ubicaciones), `inyector` (4), `virgilio_sector` (2) y
+`analisis` (1) no tenían grupo: si entraba stock ahí, era **invisible**. Hoy las 19 están en 0, por
+eso nadie lo había notado.
+
+**Tránsito PS NO es una ubicación, es un corte.** `[Seguro, leído de stock_transito_ps_bundle]` La
+pieza que un PS ya devolvió y espera para irse al PS siguiente **vive físicamente en el sector del
+componente** (Crudo, Procesado, Bombilla) y ya está contada ahí. Por eso el grupo nuevo lo dice
+explícito y **no suma a ningún total**: si se sumara, esas unidades se contarían dos veces. El
+número es exactamente el que describió el dueño: **entregas del PS de origen − envíos al PS
+siguiente**. Hoy son 15 pares y los 15 están en 0 (todavía no hay movimientos de ese tipo).
+
+**Prov AT: mostrar su inventario no alcanzaba.** `[dato]` Las 12 ubicaciones de Proveedor de
+Artículo Terminado tienen **0 filas de inventario**, así que el grupo habría salido vacío. Lo que se
+muestra son las **cajas y cartones que la receta de sus artículos consume**, con el stock real en la
+ubicación del proveedor — que está en 0, y ese es justamente el dato: hay que cargarlo. Son
+**9 proveedores activos**, de 1 a 39 piezas cada uno:
+
+| Prov AT | Cajas + cartones |
+|:---:|---:|
+| Cabral | 39 |
+| Pintos | 16 |
+| Maspoli | 9 |
+| Lopez Jose | 6 |
+| The Plast | 4 |
+| Carriero | 3 |
+| Melinox · Paternal Goma · Tierra Nativa SA | 1 c/u |
+
+**Ojo con Pettofrezza**: tiene **10 artículos asignados** en `articulo_prov_at` pero está
+`proveedor_at.activo = false`, así que no aparece. O queda inactivo y esas 10 asignaciones sobran, o
+hay que reactivarlo. `[dato — falta que lo diga el dueño]`
+
+**Dónde vive:** RPC nueva `stock_general_extra_bundle()`, aparte de `movimientos_bundle` a propósito
+(ese lo comparten todas las pantallas y no hay que inflarlo). Si la RPC falla, Stock General **no se
+cae**: muestra el resto del árbol sin esos dos grupos.
+
+**Y un tercer nombre cruzado, de la misma familia que los de §4dp:** en Stock General la columna
+decía **"Máximo"** y leía el **mínimo** del bundle. Ya lee el máximo.
+
+
+## 4dr. Generar OC: tocar el Máximo muestra de qué se compone (2026-09-14)
+
+`[usuario 2026-09-14, textual: *"el módulo de generar órdenes de compra? quiero que, al tocar en
+máximo, pueda ver de qué se compone. Por ejemplo, quiero ver cuántos meses es el máximo definido y
+qué artículos y qué venta responde a ese máximo... Primero en unidades para después pasarse a
+kilos"*]`.
+
+La celda **Máximo** de Generar OC ahora es clickable (cuando no es "—") y abre un modal con el
+desglose. Sale de la RPC nueva **`oc_maximo_desglose(p_componente_id)`** (lectura pura, 154→155
+funciones). Muestra: máximo + origen, **meses** (`ubicacion.meses_stock` del sector), consumo/mes y
+**consumo × meses**, y la tabla que lo arma.
+
+**Hay DOS caminos, porque la demanda de un insumo se arma distinto según qué sea** `[Seguro]`:
+
+1. **Insumo por receta** (cartones, cajas, plásticos-pieza, bombillas, remaches, garage, flejes): el
+   consumo sale de `v_consumo_demanda` (est_madre → receta `articulo_componente` → `componente_bom`
+   → rutas). El desglose es **por ARTÍCULO**: su venta (`est_madre.proy_uni_mes`) y lo que ese
+   artículo consume del insumo (uni/mes). En flejes el aporte se muestra también en kg (× `kg_x_uni`).
+2. **Resina** (sector 14, Bolsas Plásticas): NO entra en ninguna receta — se relaciona por
+   `componente.material_id`. El desglose es **por PIEZA inyectada** (los mangos), con su consumo y
+   sus kg (× `kg_x_uni` × (1+desperdicio)). El máximo de resina se redondea a bolsas de 25 kg, así
+   que `consumo × meses` (p.ej. PP 770,5 kg × 2,5 = 1.926) no da exacto el máximo guardado (2.025,
+   que además es `fisico`, una foto vieja): el modal lo aclara.
+
+**Regla que deja para leer un máximo:** el desglose EXPLICA el número sólo cuando el origen es
+`est_madre` / `consumo_x_meses` (ahí máximo = consumo × meses, exacto). Cuando es `fisico`,
+`migrado_de_minimo`, `cinco_cajones` o master, el máximo se puso a mano o por otra regla, y el modal
+muestra el consumo real **como referencia**, avisando que no viene de la demanda.
+
+## 4ds. Proporciones: "artículo compartido" NO es lo mismo que "reparto de volumen" (2026-09-14)
+
+**Pedido del dueño, textual:** *"En el módulo de proporciones dentro de tallerista. Quiero que
+aparezcan, quiero que borres lo que hay y que aparezcan solo los artículos compartidos. Es decir,
+los artículos que según las rutas se lo llevan más de un tallerista."* Y a continuación:
+*"Después te digo las proporciones."* Así que la pantalla queda mostrando **sólo** los compartidos
+y la columna Proporción sigue en PENDIENTE, esperando que él dicte los porcentajes.
+
+**El hallazgo que importa** [dato: `ruta_paso` × `ruta` × `tallerista`, 2026-09-14]: que dos
+talleristas toquen el mismo artículo **no significa que se repartan el volumen**. Hay dos casos
+distintos y sólo uno admite un porcentaje:
+
+| Caso | Qué pasa en la ruta | ¿Lleva %? | Hoy |
+|---|---|---|---|
+| **Mismo paso** | dos talleristas producen **el mismo `comp_salida`** (la ruta está duplicada por tallerista) | **SÍ**: ahí se parte el volumen | **6 artículos** |
+| **Paso propio** | cada uno hace **un paso distinto** de la misma ruta (uno el mango, el otro el armado) | NO: van en cadena, cada uno hace el 100 % de lo suyo | 13 artículos |
+
+Total: **19 artículos** con ≥2 talleristas, de los cuales **sólo 6** esperan un porcentaje.
+
+Los 6 con paso duplicado: **315** y **609** (Cavallero German / Pettofrezza Rafael), **500** y
+**510** (Alex Escalante / Martin Cornejo), **505** (Danica Garcia / Lucho — el tercero, Martin
+Cornejo, hace X4, otro paso) y **506** (Alex Escalante / Martin Cornejo en GRJ7 — el tercero,
+Gentile Norberto, hace el 506 terminado).
+
+**Trampa a no repetir:** el artículo 505 aparece con `num_talleristas = 3` y el 506 también, pero
+en los dos el tercero hace otra cosa. Si alguien reparte 100 % entre los 3 por mirar sólo el
+contador, reparte mal. La cuenta del porcentaje se hace **por paso**, no por artículo.
+
+**Dónde está escrito:** `Talleristas/Proporciones/Proporciones_GP2.html` (la distinción se calcula
+en el front sobre `articulos_compartidos` del bundle: una parte que declaran 2+ talleristas del
+mismo artículo = mismo paso). `proporciones_bundle()` no cambió; su rama `talleristas` (la vista
+vieja, que listaba también los exclusivos) quedó sin usar.
+
+## 4dt. Los porcentajes que dictó el dueño: 2 son reparto y 3 son rutas mal cargadas (2026-09-14)
+
+Al ver la pantalla con los 6 pasos compartidos, el dueño dictó [usuario, textual]:
+*"505 Danica Garcia 40/ Lucho 60 — 506 Alex Escalante 70/ Martin Cornejo 30 — 500 solo martin —
+510 solo carlos — 315 y 609 solo pettofrezza"*.
+
+**Sólo 2 de los 5 renglones son porcentajes.** Los otros dicen "solo fulano", o sea que el segundo
+tallerista **no debería estar en la ruta**: no es un reparto mal medido, es un dato mal cargado.
+
+| Artículo | Qué dijo | Qué hay hoy en `ruta_paso` | Qué es |
+|---|---|---|---|
+| 505 | Danica 40 / Lucho 60 | Danica + Lucho en el paso `505` | **reparto** |
+| 506 | Alex 70 / Martin 30 | Alex + Martin en `GRJ7` | **reparto** |
+| 500 | solo Martin | Alex (5 rutas) + Martin (5 rutas) | **borrar las de Alex** |
+| 315 | solo Pettofrezza | Cavallero (5) + Pettofrezza (5) | **borrar las de Cavallero** |
+| 609 | solo Pettofrezza | Cavallero (5) + Pettofrezza (5) | **borrar las de Cavallero** |
+| 510 | solo Carlos | **Alex (5) + Martin (5); Carlos NO está** | **no cierra, preguntado** |
+
+**El 510 no cierra** [dato: `ruta_paso` del art 510, 2026-09-14]: Carlos Aguirre (tallerista 9) no
+aparece en ninguna ruta del 510 — ahí están Alex Escalante y Martin Cornejo — y en GP2 hace
+Repostería (115, 544, 580, 802), no Abrelatas. El 510 era "Abrelata Uña Cromado" (hoy "Abrelata Uña Inox", ver abajo). No se tocó nada
+hasta que el dueño aclare si (a) quiso decir otro tallerista, o (b) Carlos hace el 510 y las dos
+rutas que hay son las equivocadas. **No se adivina.**
+
+**Dónde van a vivir los porcentajes:** hoy **en ningún lado**. GP2 no tiene tabla de proporciones
+(la vieja `Proporcion_Articulo_Tallerista` de `public` estaba vacía y por eso nació el PENDIENTE).
+Hace falta crearla en GP2 — clave (artículo, paso/`comp_salida`, tallerista) + `pct`, con la suma
+del grupo en 100 — antes de poder guardar el 40/60 y el 70/30.
+
+**Dato que descarta un miedo razonable** [dato: `db/vistas_GP2.sql`]: la ruta duplicada por
+tallerista **no** duplica el consumo ni el costo. Las vistas de demanda arman los `edges` con
+`SELECT DISTINCT comp_entrada_id, comp_salida_id`, así que dos rutas iguales colapsan en una
+arista. Borrar las rutas de más corrige el "quién lo hace", no cambia ningún número de plata.
+
+## 4du. El reparto ya manda sobre el máximo de cada tallerista (2026-09-15)
+
+El dueño autorizó los tres borrados de ruta y la tabla de proporciones, y agregó [usuario,
+textual]: *"fijate que los maximos tienen que tener en cuenta esta proporcion"*. Eso destapó que
+**el máximo de un tallerista nunca se calculaba**.
+
+**Lo que estaba mal** [dato: `inventario` × `ubicacion`, 2026-09-15]: de los 288 máximos en
+ubicaciones de tallerista, 196 eran `migrado_de_minimo` (el mínimo viejo del 14-09) y 92 estaban
+en null. **Ninguno** salía de la demanda, porque `v_nivel_stock` —la vista que alimenta
+`recalcular_maximos_insumos`— filtra `u.tipo = 'sector'` y nunca miró una fila de tallerista.
+Con la ruta duplicada, el efecto era el doble conteo: Danica y Lucho tenían **15.000 de Cartón 505
+cada uno** para una demanda de 28.108 uni/mes del 505, y lo mismo en Clavo, Mango y Cuchilla.
+
+**Lo que se construyó** (schema GP2, detalle en `GP2_MAPA.md`):
+
+| Objeto | Para qué |
+|---|---|
+| `reparto_tallerista` | la tabla del % por paso (artículo + `comp_salida` + tallerista) |
+| `v_reparto_efectivo` | el % efectivo: el dictado, o 100 si el paso lo hace uno solo |
+| `v_consumo_tallerista` | demanda del artículo × ese % = lo que consume cada tallerista |
+| `v_nivel_stock_tallerista` | `max_calc = consumo × meses_stock` (los 12 talleristas tienen 1 mes) |
+| `recalcular_maximos_talleristas()` | escribe el máximo con origen `est_madre_x_reparto` |
+| `reparto_guardar()` | la puerta de la pantalla: valida, guarda y recalcula de una |
+
+**Resultado en los 16 máximos que se tocaron** (sólo la cadena del 505 y el 506):
+
+| Componente | Tallerista | Antes | Ahora |
+|---|---|---|---|
+| Cuchilla Pela Afilada Caja (Z23) | Danica Garcia | 30.000 | 11.243 |
+| Cuchilla Pela Afilada Caja (Z23) | Lucho | 30.000 | 16.865 |
+| Cartón 505 (B3A) | Danica Garcia | 15.000 | 11.243 |
+| Cartón 505 (B3A) | Lucho | 15.000 | 16.865 |
+| Uñas Zinc. (C10) | Martin Cornejo | 33.172 | 12.844 |
+| Uñas Zinc. (C10) | Alex Escalante | 28.280 | 15.020 |
+
+11.243 + 16.865 = 28.108, que es exactamente la demanda del 505: antes sumaban 30.000 y 60.000.
+
+**Dos decisiones que quedan escritas:**
+1. **No se limpia el máximo de la fila que quedó sin consumo** (24 filas hoy). Un consumo 0 puede
+   ser un dato que falta (un artículo sin proyección en `est_madre`), no una verdad. Se informan.
+2. **Un paso compartido sin reparto dictado parte en partes iguales**, marcado `es_supuesto`. Es
+   un default para no contar el 100 % dos veces; el número real lo dice el dueño. Hoy el único
+   así es el **510** (Alex / Martin), que espera su respuesta.
+
+**Lo que NO se tocó y sigue esperando decisión:** los otros **284 máximos de tallerista**, que
+siguen siendo el mínimo viejo migrado. `recalcular_maximos_talleristas(false)` los recalcula
+todos de una (294 filas cambiarían, la suma baja 18 %: de 1.241.303 a 1.019.605 unidades).
+
+## 4dv. C12B: la paleta sin cromar es un código propio, y eso es la convención de la casa (2026-09-15)
+
+**Lo que pidió el dueño** [usuario 2026-09-14, textual]: *"En el articulo 515 y 615, cuando vuelve de
+alex escalante quiero que sea C12B y despues de cromarse C12"*.
+
+**Cómo quedaron las 6 rutas** (994/995/1010 del 515 y 1001/1002/1011 del 615):
+
+```
+… → Alex Escalante (armado) → C12B → Pedernera Ilario (cromado) → C12 → Alex Escalante → 515/615
+```
+
+Antes, Alex entregaba C12 y Pedernera hacía un paso `entrada = salida` sobre C12: el cromado no
+tenía dónde apoyarse, porque la pieza entraba y salía con el mismo código.
+
+**ESTO NO ES UNA EXCEPCIÓN, ES LA REGLA QUE YA SEGUÍA EL RESTO DE GP2.** Medido el 2026-09-15:
+**260 pasos de proveedor de servicio en 240 rutas ya tienen entrada ≠ salida**, contra 71 pasos en
+65 rutas con entrada = salida. Y el sufijo `B` para "antes del servicio" ya estaba en uso:
+`PA4B→PA4`, `PA5B→PA5`, `PA10B→PA10`, `PA13B→PA13`, `PA18B→PA18`, `PC15AB→PC15A`, `PC3B→PC1B`,
+`D13B→D13`, `Z2B→Z2A`, `Z3B→Z3A`. 515/615 eran la excepción; ahora no lo son.
+
+**El costo NO se movió, y eso se verificó dentro de la misma transacción** (la migración tenía un
+`raise` que revertía todo si algo cambiaba un centavo):
+
+| Código | Antes | Después |
+|---|---|---|
+| 515 | 411,76 | 411,76 |
+| 615 | 491,40 | 491,40 |
+| C12 | 88,49 | 88,49 |
+
+**LA TRAMPA QUE CASI CUESTA $ 62,74 POR UNIDAD:** `v_costo_componente` pega el precio del tallerista
+por **(tallerista, `comp_salida_id` del paso)** — o sea, sobre la pieza que el tallerista ENTREGA.
+El precio de Alex ("Batidor Resorte Armado", ARS 62,7375) estaba cargado sobre C12. Al pasar el
+armado a entregar C12B, **si el precio se quedaba en C12 ningún paso entregaba C12 y el armado
+desaparecía del costo** de 515, 615 y C12. Por eso la migración lo mueve a C12B. Vale para cualquier
+corte futuro de este tipo: **el precio del tallerista viaja con la pieza que entrega, no con el nombre.**
+
+**Por qué el servicio de Pedernera siguió valiendo lo mismo:** el paso dejó de ser `selfsrv`
+(entrada = salida) y pasó a ser una arista de `edges`, pero las dos ramas de la CTE `srv` terminan
+dando el mismo par `(componente, Pedernera)`. El valor y el conteo de `faltan_precios` no se movieron.
+
+**Efecto lateral BUENO:** el cromado ahora tiene dónde apoyarse. Hoy `C12B` y `C12` cuestan los dos
+88,49 porque **Pedernera / Cromado no tiene precio cargado**; el día que se cargue, la diferencia
+entre los dos ES el cromado. Antes no había forma de separarlo.
+
+**El máximo lo puso la base sola, no la migración.** `trg_maximos_rutas` (en `ruta_paso`, FOR EACH
+STATEMENT → `fn_recalc_maximos_insumos`) se disparó con el UPDATE y le calculó a C12B **máximo 1656,
+origen `est_madre`** — el mismo que C12. Es exactamente lo que ya pasa con los pares existentes
+(`PA4B` y `PA4` tienen los dos 7.680 `est_madre`). **Consecuencia a tener presente:** Sector Bombilla
+ahora muestra DOS líneas de 1.656 para lo que físicamente es la misma pieza en dos etapas, así que el
+"falta" del sector la cuenta dos veces. Es el comportamiento que ya tenían los otros 10 pares, no un
+bug nuevo — pero si molesta, se corrige poniendo el máximo sólo en el código que se consume (C12).
+
+**Detalle de ubicación que queda a criterio del dueño:** C12B se creó en el **mismo sector que C12**
+(7, Bombilla), como `PA4B`/`PA4`. Otros pares se modelan al revés: `D13B` y `Z2B` viven en Sector
+Crudo y sus pares cromados en Sector Procesado. Si la paleta sin cromar en realidad se guarda en otro
+lado, se mueve la fila de `inventario`, no el componente.
+
+**Lo que NO se tocó, a propósito:** la receta del artículo (`articulo_componente`) sigue diciendo
+515 → C12 y 615 → C12, porque el artículo se arma con la pieza YA cromada. Y los 6 pasos
+`tallerista` que van de C12 a 515/615 quedaron igual.
+
+## 4dw. El 510 lo hace solo Alex, la pantalla queda de sólo lectura, y por qué (2026-09-15)
+
+**Tres cosas del mismo tirón** [usuario, textual]: *"510 solo alex lo hace"*, *"Que no se pueda
+modificar la proporción en el programa"* y *"quiero que me pongas los máximos de cada parte del
+artículo que se está proporcionando"*.
+
+**1. El 510.** Se borraron las 5 rutas de Martin Cornejo (601, 602, 604, 605, 607). Alex Escalante
+pasa al 100 %: A15 y Cartón 510 van de 3.170 a **6.340**, Uñas Zinc. y Remache de 15.020 a
+**18.190**. Con eso ya no queda ningún paso compartido sin porcentaje dictado: los dos que quedan
+son el 505 (Danica 40 / Lucho 60) y el 506 (Alex 70 / Martin 30).
+
+**2. Por qué la pantalla ya no se edita — el incidente.** Mientras se cargaban los porcentajes,
+alguien abrió la pantalla y apretó **Guardar** en los tres pasos (15:00:24, :26 y :27). La pantalla
+mostraba el **50/50 que era un DEFAULT** para el 510, y ese clic lo grabó en
+`reparto_tallerista` como si fuera un dato dictado. Resultado: cuando después se sacó a Martin,
+Alex se quedó con el 50 % guardado, o sea **la mitad del máximo que necesita**.
+
+Dos arreglos, no uno:
+- **La pantalla no escribe más.** `reparto_guardar` perdió el `EXECUTE` para `anon`; el % se carga
+  por SQL. Un default que se puede guardar con un clic deja de ser un default.
+- **`v_reparto_efectivo` normaliza.** El % guardado se lleva a base 100 **sobre los talleristas que
+  siguen haciendo el paso**: borrar la ruta de uno ya no puede dejar al otro con su mitad. Si
+  ninguno tiene % —o sólo algunos— va mitad y mitad marcado `es_supuesto`, que es "falta que lo
+  diga el dueño", no un dato.
+
+**3. Los máximos en la pantalla.** Cada paso compartido muestra sus partes con el máximo de cada
+tallerista, una columna por cabeza con su %. Ahí se ve que las dos columnas **suman** el consumo
+del artículo en vez de duplicarlo: Cartón 505 = 11.243 (Danica) + 16.865 (Lucho) = 28.108.
+
+**Lo que quedó suelto y hay que mirar:** Martin Cornejo conserva máximos de partes que ya no usa
+(A15 y Cartón 510 en 3.170), porque la regla es **no limpiar la fila que quedó sin consumo** — un
+consumo 0 puede ser un dato que falta. Hoy son 27 filas así en todos los talleristas.
+
+## 4dx. Los 284 máximos migrados y las 27 filas sin consumo: cerrado (2026-09-15)
+
+El dueño dio el "dale" a las dos pendientes de 4du/4dw.
+
+**1. Se recalcularon TODOS los máximos de tallerista** (`recalcular_maximos_talleristas(false)`):
+**270 filas** cambiaron. El mínimo viejo migrado ya no manda en ninguna: hoy **291 de 292** filas
+con máximo dicen `est_madre_x_reparto`, o sea demanda × su % × meses. La suma baja de **1.241.303
+a 1.024.041 unidades (−17,5 %)**, y no es un ajuste parejo: Danica sube (51.819 → 71.467, porque
+el mínimo viejo le quedaba corto) y Martin, IJUPA y Gentile bajan fuerte.
+
+**2. La regla para la fila que queda sin consumo** — la duda de 4du quedó resuelta partiéndola en
+dos, que es la distinción que importa:
+
+| Caso | Qué significa | Qué se hace |
+|---|---|---|
+| Sin consumo **y sin ruta** | ese tallerista ya no recibe esa parte (quedó de una ruta borrada o de la migración) | **se limpia** (25 filas) |
+| Sin consumo **pero con ruta** | sí la recibe; lo que falta es la demanda (artículo sin proyección en `est_madre`) | **no se toca**, se informa |
+
+Las 25 que se limpiaron son justamente la resaca de la limpieza de rutas: los 5 cartones y
+capuchones de Cavallero German (315 y 609), el A15 de Martin Cornejo (510), el "Pliego Ad 500" de
+Gentile Norberto y 7 piezas de rompenueces de Fábrica, entre otras.
+
+**Las 2 que quedan abiertas, y son un dato que falta, no un error:** `PB6` (Inser. Neg. Espat) en
+Alex Escalante con 60, y `E6-M194` (Pala Canelón tras M194) en Fábrica con 696. Las dos tienen
+ruta pero su artículo no proyecta venta en `est_madre`.
+
+## 4dy. El máximo de Crudo/Procesado ahora es demanda×meses, no "5 cajones"; y el PS no tiene máximo (2026-09-15)
+
+`[usuario]` textual, mirando el módulo **Faltantes** (columna "MÁXIMO (5 CAJ)"): *"El maximo
+recalculalo. Tiene que salir de la demanda por la cantidad de meses. Esto estaría mal"*. O sea:
+el máximo físico de **5 cajones** (capacidad del lugar) estaba mal como criterio; el máximo tiene
+que ser **consumo × meses_stock del sector** (lo que ya calcula `GP2.v_nivel_stock.max_calc`).
+
+**Por qué no se recalculaban solos:** `recalcular_maximos_insumos()` tiene un `where es_insumo`
+que **saltea Sector Crudo (1) y Procesado (2)**. Por eso esas piezas conservaban el `cinco_cajones`
+sembrado, y las que no lo tenían (Descorazonador 1686, Grampa Batidor W1B) quedaban en NULL aunque
+la vista ya tenía el número. `v_nivel_stock` filtra `u.tipo='sector'` pero **no** filtra `es_insumo`:
+la maquinaria estaba, faltaba que la RPC la usara.
+
+**Lo que se ejecutó (con OK del dueño, meses=1, incluyendo la reserva FAAT):**
+```sql
+update "GP2".inventario i set maximo = v.max_calc, maximo_origen = 'est_madre'
+from "GP2".v_nivel_stock v
+where i.id = v.inv_id and v.sector_id in (1,2) and v.max_calc > 0
+  and i.maximo is distinct from v.max_calc;   -- 159 filas
+```
+- **159 filas** pasaron de físico/NULL a `est_madre`. Suma vieja Crudo+Procesado ~1,77 M → nueva ~0,83 M,
+  pero **NO es parejo**: las de alta demanda SUBEN (A10 Cpo Uña 8.475 → 16.928, porque 1 mes de venta
+  es más que 5 cajones) y los físicos sobredimensionados BAJAN fuerte (LL7B 94.340 → 6.644; ABPM
+  75.000 → 114). Descorazonador → 402, Grampa Batidor → 552.
+- **2 quedan con `cinco_cajones`** porque su artículo no proyecta demanda en `est_madre`: **RULETA**
+  (27.175) y **A9 Cpo Mango Alambre Corta Queso** (3.845). No se inventan; dato pendiente.
+- **Deuda:** el `where es_insumo` sigue en la RPC, así que el próximo recálculo de insumos NO mantiene
+  Crudo/Procesado, y una corrida de "5 cajones" podría volver a pisarlos. Para que la demanda quede
+  como regla permanente hay que sacar ese guard (cambio de función, pendiente de OK).
+
+**El PS no tiene máximo propio** `[usuario]`: *"en proveedor de servicio no tiene que haber un
+maximo... a los PS se les manda segun el maximo que necesita el sector procesado"*. Se pusieron en
+**0 las 108 filas de inventario de PS** (los 22 que tenían valor —reserva FAAT y mínimos migrados— más
+los 86 en NULL). En la pantalla Stock General el rubro Prov. Servicio ya no muestra la columna Máximo.
+Inyector (4 ubic) y Prov AT (12 ubic) no tienen filas de inventario, así que ya estaban en 0.
+
+**Dos ubicaciones singleton que se preguntaron:**
+- **`analisis` ("Para Analizar", id 46)** — NO es basura: es el **buzón de las piezas sin sector**.
+  Un flujo manda ahí el componente que no tiene `sector_id` (`ubic_de('analisis')`, y **revienta** si
+  la ubicación no existe), y hay una vista que muestra "stock apartado en Para Analizar". Tiene función,
+  **no se borra**.
+- **`virgilio` ("Virgilio (Distribución)", id 33)** — el dueño pidió "eliminar por ahora", pero **no se
+  borró**: la usan recepción Virgilio, los traslados (mueve stock entre `virgilio_sector` y `virgilio`)
+  y es el **fallback** de una pieza sin sector (`coalesce(ubic_de('sector'), ubic_de('virgilio'))`), y
+  tiene **268 filas de inventario** colgadas. De la pantalla Stock General ya está fuera (4dq). Borrarla
+  de verdad rompe esos flujos: espera definición del objetivo real.
+
+## 4dz — Auditoría de simplificación de tablas (2026-09-15, dueño: "emprolijá sin pedir permiso, sin romper, menos tablas y con nombres claros")
+
+Recorrida tabla por tabla del schema GP2 buscando qué sacar. Regla del dueño: fewer/clearer tables, pero "sin romper el programa". Resultado:
+
+**Borrado (seguro, verificado):**
+- **Simulador muerto `__sim`**: tabla `__sim_base` (3 col, 0 filas, "pizarrón" de un arnés de prueba de rutas) + funciones `__sim_articulo` / `__sim_exec` / `__sim_ruta`. Cero llamadores (ninguna función/vista/pantalla), sin FKs. `db/verificar.sql` lo nombra solo en un COMENTARIO (de dónde salió el invariante RECETA vs RUTA), no lo ejecuta. −1 tabla.
+- **`articulo_prov_at.creado_en`**: timestamp de auditoría con 0 lecturas. (Ojo: las otras dos que el dueño quería sacar de esa tabla, `marca` y `n_caja`, SÍ están en uso — las devuelve `entregas_prov_at_bundle` a EntregasAT.)
+
+**NO se tocó (la premisa "no sirve" era falsa):**
+- **`carton_formato` (10) + `carton_categoria` (5)**: NO son dos listas repetidas, son DOS NIVELES. formato = reglas numéricas (múltiplos/mínimos/pliegos); categoría = subdivisión del formato "C" (Abrelatas/Pelapapas/Pisapapas/Resto/Sacacorchos) + el comodín `mezcla_libre` (Sacacorchos). `_oc_validar_carton` usa las dos (formato para los números, categoría para agrupar pliegos del tipo C y el comodín). Fusionarlas = tabla auto-referenciada que complica el validador. Pocas filas = son parámetros, no datos. **Se dejan separadas.**
+- **`alerta_recepcion`**: 0 filas hoy pero VIVA — la escribe `tablet_registrar` cuando recibido > esperado; la leen `inicio_bundle`/`alertas_bundle`; la cierra `alerta_recepcion_marcar`. 0 filas = todavía no hubo exceso, no muerta.
+- **`articulo_prov_at` (91 filas)**: la usan 7 funciones + 3 pantallas (Control/Entregas/Envíos AT). Fusionarla con `articulo` + modelar cartones/cajas por `ruta_paso` es MIGRACIÓN real (su clave es `(proveedor_at_id, cod_art)`, el mismo cod_art se repite entre proveedores; `articulo` es único por código), no un borrado. Queda como proyecto propio, con OK del dueño.
+
+**Pendiente de decisión del dueño (refactors, no tidy-ups):**
+- **`articulo.discontinuado` → borrar el artículo al discontinuar**: hoy 1 fila en true (art 311 "Cuchillo De Torta"). Las FKs entrantes son RESTRICT, así que un DELETE pelado FALLA: hay que arrastrar `articulo_componente` (6) + `ruta`/`ruta_paso` (6) + revisar `est_madre` (join por cod). `articulo` y `componente` tienen CADA UNO su `discontinuado` (distintas: `v_reposicion` filtra por la del componente, `v_consumo_demanda` por la del artículo). Recomendación: conservar la columna salvo que se construya una baja-en-cascada probada; con 1 caso la columna cuesta casi nada y el borrado pierde histórico/reactivación.
+
+**Housekeeping**: `db/` (backup del schema) queda a regenerar por los borrados de `__sim`/`creado_en`; no rompe nada estar desfasado (el test chequea que lo que las pantallas usan exista en db/, no la ausencia de extras).
+
+## 4ea — Cómo se le ENVÍA a cada proveedor: la unidad la pone el proveedor, el bulto lo pone la pieza (2026-09-17)
+
+`[usuario]` La tablet ya no manda "unidades" a todos. Cada proveedor dice en qué se le envía, y eso
+vive en `GP2.proveedor_servicio.envio_unidad` / `envio_uni_x`. Hay dos formas, y la diferencia
+entre ellas es de dónde sale el bulto:
+
+- **Una unidad para TODO el proveedor** — `AJ Adhesivos` (id 12): `envio_unidad='paquetes'`,
+  `envio_uni_x=100`. El sugerido y la cantidad se muestran y se cargan en paquetes (techo), y al
+  registrar se multiplica por 100: el inventario nunca ve paquetes.
+- **Por PESO, con el bulto al lado** — `Hernandez Julio` / Ximpa (id 8): `envio_unidad='kg'`, sin
+  `envio_uni_x`. `[usuario 2026-09-17, textual: "para lo que son partes plásticas, que empieza con la
+  letra P, el envío sugerido tiene que estar nominado en bolsas… cuántos kilos le están mandando y
+  cuántas bolsas eso significa. Después, para A1, B12, B4B y C2, el sugerido en kilos y en cajones a
+  enviar"]`. Acá el bulto **no es uno solo para el proveedor: cambia por pieza**, y lo decide el
+  sector — **Sector Plástico → bolsas, el resto → cajones**. El tamaño del bulto es
+  `componente.uni_x_cajon` en los dos casos (en los plásticos esa columna **es** el tamaño de la
+  bolsa, mismo criterio que la OC de partes plásticas).
+
+> **2026-09-18 — la pantalla de Julio dejó de tener columna de bulto** (v1.14.0): sus
+> bolsas/cajones pasaron al renglón chico de debajo del campo de kg, como en todas las demás
+> formas, y se calculan de los kg (ya no se corrigen a mano). Lo de abajo describe el modelo —qué
+> es el bulto y de dónde sale—, que no cambió; el layout sí. Ver 4ee.
+
+Cómo queda la pantalla de Julio (Tablet, Enviar): `Pieza | Sugerido | Cantidad (kg) | Cantidad
+(bolsas / cajones)`. `[usuario 2026-09-17]` El **sugerido se mira en bultos ENTEROS** (no en kilos),
+la Cantidad (kg) se precarga con el peso de esos bultos completos (2 cajones de 750 a 0,04 kg = 60
+kg), y **las dos cantidades son el mismo tipo de campo**: la de bolsas no se muestra distinto que la
+de cajones. **Un bulto nunca va partido**: bolsas y cajones se redondean **para arriba** en el
+sugerido, en el autocompletado desde los kg y en lo que se registra (`"no puedes poner 4,83, sino
+que pones 5"`). Los **kg son lo que se tipea y lo que se registra** (la balanza
+manda; viaja `unidad='kg'` y la base lo pasa a unidades con `kg_x_uni`). Los **bultos se
+autocompletan** desde los kg mientras el operario no los toque (si los corrige a mano no se le
+pisan) y viajan a `movimiento.cajones` vía `crear_envio_ps(..., p_cajones)`. Sin `kg_x_uni` la fila NO se convierte: se carga en unidades
+como siempre — no se inventa el factor. `[dato 2026-09-17]` las 11 piezas de Julio (A1, B12, B4B,
+C2 metálicas; PA10B, PA13B, PA18B, PA4B, PA5B, PC15AB, PEP2 plásticas) tienen las dos columnas
+cargadas, así que las 11 convierten.
+
+**Qué falta:** el resto de los proveedores sigue en unidades; la unidad de envío se define caso por
+caso con el dueño (ése fue el acuerdo al arrancar con AJ). **Ahora son CUATRO formas, no dos: ver
+4ec (Ester) y 4ef (Guazzaroni, Jade y otros cinco), con la tabla de las cuatro en 4ef.**
+**Y el sugerido ya no se precarga en el campo Cantidad de los P.S.: sólo se muestra (ver 4ee), que
+además se eligen y se cargan por TARJETAS (4eg).**
+
+## 4eb. El 506 pasa al molde del 500/510 (sin GRJ7) y el adhesivado de pliego es un PASO, no un subcomponente (2026-09-17)
+
+> ⚠ **La parte de PLIEGO de esta sección caducó el 2026-09-18 (§4el)**: el 500 y el 506 dejaron de
+> llevar pliego y llevan cartón (`CART500` / `CART506`), así que su cadena `pliego → AJ → pliego
+> adhesivado` ya no existe. Todo lo demás de acá (el 506 sin GRJ7, los dos talleristas, el resto de
+> las rutas) sigue vigente, y la regla del adhesivado como PASO sigue valiendo para los otros 10 pliegos.
+
+`[usuario 2026-09-17, textual]` *"Te hago un cambio para el 506: Ahora va a ser la misma lógica
+que el 500 y 510. Gentile Norberto no ensambla más. Ahora ensambla Martin Cornejo o Alex
+Escalante. Y desaparece el GRJ7. Ahora C10, CV9 Y A10 se le manda a el tallerista final. No hay
+conversion a GRJ7."* Y, aparte: *"La ruta para todos los pliegos es: pliego sin adhesivar --> AJ
+adhesivados --> pliego adhesivado --> tallerista final. Esa sería la ruta paso, esta mal que lo
+tomes como un subcomponente. Borralo si es que esta en componente bomb y agrega la ruta como te
+digo."* Sobre el precio del tallerista nuevo: *"Fijate en el gemelo 500 o 510 para el costo."*
+
+### Lo que quedó en la base
+
+**506** (artículo 29, componente terminado 400). Receta: `A10 ×1 + C10 ×1 + V9 ×1 + A11 ×1/12 +
+Pliego Ad 506 ×1/12` — calcada del 500. **10 rutas** (5 cadenas × 2 talleristas, la convención de
+la casa cuando dos hacen el mismo paso), todas con el nombre del tallerista en el título para que
+no se vuelvan a leer como duplicadas:
+
+```
+Fleje 13   -> M23 -> Jade        -> A10          -> Martin | Alex -> 506 -> Virgilio
+Fleje 57   -> M24 -> FAAT -> Guazzaroni -> C10    -> Martin | Alex -> 506 -> Virgilio
+CV9        -> Guazzaroni -> V9                    -> Martin | Alex -> 506 -> Virgilio
+Pliego 506 -> AJ Adhesivos -> Pliego Ad 506       -> Martin | Alex -> 506 -> Virgilio
+A11 (1/12)                                        -> Martin | Alex -> 506 -> Virgilio
+```
+
+**Las duplicadas que vio el usuario eran dos cosas distintas**, y sólo una era un error: (a) las
+rutas de `A10` como insumo suelto (594/595) **sobraban** — el A10 lo produce la propia ruta del
+Fleje 13, igual que el 500 no tiene ruta de insumo para su `C1`/`C10`; se borraron. (b) `CV9`
+aparecía dos veces porque el paso del GRJ7 lo hacían dos talleristas: eso **no es un error**, es
+el duplicado por tallerista, y ahora se distingue por el nombre de la ruta.
+
+**GRJ7 borrado de todos lados** (componente 284, Sector Garage): receta del 506, su BOM
+(`A10`/`C10`/`V9`), las 16 apariciones en `ruta_paso`, las 2 filas de `inventario` (Sector Garage
+y Tallerista Gentile, las dos en stock 0, sólo tenían máximo), y el componente. **Cero
+movimientos**, así que no se perdió historia. Las **Proporciones** (`reparto_tallerista`
+Alex 70 / Martin 30) se mudaron del GRJ7 al `506` terminado: el reparto sigue siendo el mismo, lo
+que cambió es sobre qué salida se aplica. `sector 9` (Garage) **sigue existiendo**: viven ahí los
+otros 21 GRJ.
+
+**Precios de tallerista**: las filas del GRJ7 se repuntaron al `506` (Martin $8,99 · Alex $8,988,
+concepto "Abrelata Uña 506 Armado") — es exactamente el molde del 500, donde Martin cobra $9,00
+por armar Y envasar. **Se borró el "Envasado 506" de Gentile ($70/uni, cargado el 2026-09-01)**:
+Gentile ya no toca el 506 y el gemelo no tiene una línea aparte de envasado. Si algún día vuelve,
+el número era 70 ARS.
+
+### Los pliegos: el adhesivado estaba modelado DOS veces
+
+Había tres cosas diciendo lo mismo para cada uno de los **12 pliegos** (500, 506, 557, 558, 654,
+658, 659, 758, 759, 762, 763, 769): un `componente_bom` `Pliego Ad X = 1 × Pliego X`, una ruta
+huérfana `Insumo PLIEGOX -> PLIEGO ADX (AJ Adhesivado)` sin artículo, y la ruta del artículo que
+arrancaba directo en el `Pliego Ad`. Quedó **una sola** ruta por artículo:
+
+```
+Pliego X (insumo, 1/12 ó 1/16) -> AJ Adhesivos -> Pliego Ad X -> tallerista final -> Virgilio
+```
+
+Se borraron los 12 BOM y las 12 rutas huérfanas. La **receta sigue con `Pliego Ad X`** y eso es
+deliberado: `v_consumo_demanda` siembra en la receta (lo que el tallerista recibe) y camina hacia
+atrás por las aristas de la ruta hasta el pliego sin adhesivar. Si se pusiera el sin adhesivar en
+la receta, el `Pliego Ad` se quedaría sin demanda y la tablet/OC de AJ se rompería. **Verificado:
+el consumo de los 12 sin adhesivar no se movió ni una unidad.**
+
+**La fracción NO es la de la caja**: 1/12 en 500 y 506 (caja de 12) pero **1/16** en las
+bombillas, que van en caja de 24. Es cuántos blísters salen de un pliego, un dato propio.
+
+### La plata: el pliego dejó de cobrarse ENTERO por unidad
+
+Esto no se pidió, pero sale solo del cambio, y es grande. `v_costo_componente` multiplica el
+precio del nodo comprado por `LEAST(cantidad_del_paso_insumo, 1)` — y buscaba esa cantidad por el
+componente **comprado**. Con el `Pliego Ad` (fabricado) como insumo del artículo y el pliego
+comprado un salto más arriba, **la fracción se perdía y cada unidad se comía un pliego entero**.
+Ahora el paso `insumo` está sobre el pliego comprado y la fracción se aplica:
+
+| | antes | después | delta |
+|---|---|---|---|
+| 506 | 1.276,75 | **494,50** | −782,25 (−712,25 pliego, −70 Gentile) |
+| 500 | 1.285,83 | **573,58** | −712,25 |
+| 557 · 558 | 1.259,95 | **523,07** | −736,88 |
+| 762 · 763 | 1.259,27 | **522,40** | −736,87 |
+| 658 · 758 | 2.029,91 | **1.293,03** | −736,88 |
+| 654 | 2.572,91 | **1.836,03** | −736,88 |
+| 769 | 2.572,23 | **1.835,36** | −736,87 |
+| 659 · 759 | 2.999,91 | **2.263,03** | −736,88 |
+
+Ningún otro costo del sistema se movió, `faltan_precios` quedó en 0 en los 13, y el consumo sólo
+perdió la línea del GRJ7. **Esto cierra el "$1.084 que no salen de la receta" de §2c-septies**
+(*"Hay que medirlo antes y después del cambio"*): eran el pliego entero. El 506 a mano daba ~$436
+y ahora la vista da $494,50; lo que falta para cerrar es el punto de abajo.
+
+### ⚠ Lo que QUEDA mal y no se tocó: el servicio de AJ tampoco se fracciona
+
+El material del pliego ya se divide por 12/16, pero el **servicio de adhesivado sí se sigue
+cobrando entero por unidad** ($140 en 500/506, $129 en el resto) porque el CTE `srv` de
+`v_costo_componente` no mira ninguna cantidad. Si AJ cobra por pliego —y por precio parece que
+sí: $140 contra $777 de cartón— cada unidad de los 12 artículos tiene ~$120-128 de sobrecosto.
+Arreglarlo es cirugía del motor de costos (toca a todos los artículos), **no entraba en el pedido
+y se dejó anotado como idea, no hecho**. `[deducido, a confirmar con el dueño si AJ cobra por
+pliego o por blíster]`.
+
+## 4ec. La tercera forma de enviar: Ester mira BOLSAS y escribe KG (2026-09-17)
+
+Complementa 4ea, que quedó escrita el mismo día por otra sesión: ahí están las dos formas que
+existían (AJ escribe el envase; Hernandez Julio escribe kg y el bulto sale del sector de cada
+pieza). Ester es una tercera, y por eso hizo falta una columna más.
+
+Cada proveedor de servicio pide/recibe en su propio envase, y eso **no es un detalle de pantalla:
+es dato de la base**. Vive en `GP2.proveedor_servicio` con tres columnas:
+
+| columna | qué dice | AJ Adhesivos (12) | Ester (14) |
+|---|---|---|---|
+| `envio_unidad` | el rótulo del envase | `paquetes` | `bolsas` |
+| `envio_uni_x` | cuántas unidades canónicas entran en uno | 100 (pliegos) | 1800 (mangos) |
+| `envio_carga_unidad` | en qué unidad se ESCRIBE la cantidad | `null` = en paquetes | `kg` |
+
+**La columna nueva es `envio_carga_unidad`** `[usuario: "en el caso de Ester, el sugerido
+que aparezca en bolsas (1800 uni por bolsa) redondeas por arriba y la cantidad pones kg y te
+aparece al lado bolsas"]`. Hasta ese día sugerido y cantidad iban en la MISMA unidad (AJ mira 3
+paquetes y escribe 3). **Ester mira bolsas pero PESA lo que carga**, así que el sugerido se ve en
+bolsas y el campo se escribe en kg, con "= N bolsas" debajo. Los dos casos son la misma máquina
+con distinta unidad de carga; no hay un "modo Ester" hardcodeado.
+
+**Ojo con esto: bolsa ≠ cajón.** `componente.uni_x_cajon` de PC2 es **1852** y de PC3B **1800**,
+pero la bolsa que pidió el dueño es **1800 para las dos**. Por eso el factor va en
+`proveedor_servicio` (uno por proveedor) y no se saca del componente. 1 bolsa = 1800 × `kg_x_uni`
+(0,0054) = **9,72 kg**.
+
+**El inventario nunca ve bolsas ni paquetes.** Cuando se carga en kg, el kg viaja tal cual con
+`unidad='kg'` y `to_canonical` lo pasa a mangos con `kg_x_uni` (`crear_envio_ps` ya recibía kg);
+cuando se carga en paquetes, el front multiplica por el factor antes de mandar. Las bolsas quedan
+anotadas en `movimiento.cajones` (mismo criterio que las bolsas calculadas de Julio en 4ea):
+informativo, el stock lo mueve la cantidad. El redondeo del
+sugerido es **siempre para arriba** (no se pide menos de lo que falta): 112.432 mangos ÷ 1800 =
+62,46 → **63 bolsas** → 612,36 kg.
+
+**Si a la pieza le falta `kg_x_uni` no hay forma de pasar de bolsas a kg**, y ahí la fila cae al
+modo de AJ (se carga en el envase) en vez de mostrar un kg inventado. Hoy las dos piezas de Ester
+lo tienen, así que no pasa.
+
+**Dónde se ve**: `Tablet/Tablet_GP2.html` (v1.8.0) y `Prov Serv/Envios/EnviosPS_GP2.html` (v1.5.0,
+donde además se fue la columna "Cajón envío" para ese proveedor: el cajón no es la unidad con la
+que se le manda y era ruido). Lo sirven `tablet_bundle` (en cada contraparte) y `envios_ps_bundle`
+(en cada PS). **Pendiente: seguir caso por caso con los demás proveedores** — van definidos AJ,
+Hernandez Julio, Ester y los 7 del cajón por pieza. **Ya son cuatro formas: ver 4ef.** El sugerido
+se sigue MOSTRANDO en su unidad, pero desde el 2026-09-17 ya no se precarga en el campo Cantidad
+(ver 4ee).
+
+## 4ed. La tabla de la tablet ENCOGE: el blanco va adentro de la celda, no entre columnas (2026-09-17)
+
+`[usuario 2026-09-17, textual: "optimizame todos los espacios en blanco que hay entre las columnas
+en todas las pantallas de envío a ps en la versión tablet"]` (sobre el screenshot de AJ Adhesivos:
+3 columnas repartidas en 1.180px, con ~300px de blanco entre "Pliego 506" y su sugerido).
+
+**Por qué pasaba:** `table.t` de `gp2-modulo.css` es `width:100%`. Eso está bien con 8 columnas,
+pero desde que Enviar quedó en `Pieza | Sugerido | Cantidad` (§ v1.5.0) el navegador reparte todo
+el ancho sobrante de la tablet entre 3 o 4 columnas, y el ojo tiene que cruzar media pantalla para
+leer una fila. **Menos columnas hacen MÁS blanco, no menos.**
+
+**La regla que queda** (Tablet, vale para todas las vistas de esa tabla — PS por paquetes, PS por
+bolsas+kg, PS por peso, PS/tallerista/inyector común y Recibir, que son un solo render): el bloque de carga (buscador +
+cartel de alerta + tabla) **encoge con la tabla**, cada columna mide lo que necesita su contenido
+(el encabezado suele ser el que manda: "SUGERIDO (PAQUETES)" es más ancho que el "3"), y el aire
+que hace falta va **adentro** de cada celda (padding 12px) en vez de entre columnas. El buscador
+mide exactamente lo que miden las columnas, así que no queda una caja ancha arriba de una tabla
+angosta. En el celular (≤640px) no hay blanco que recortar: la tabla vuelve a ocupar todo el ancho.
+
+Lo cuida `tests/ui/test_tablet.js` midiendo a 1.280px (la tablet, no los 390px del celular): la
+tabla tiene que medir lo mismo que su contenido (`max-content`) y el buscador lo mismo que la tabla.
+Si alguna pantalla futura vuelve a quedar con pocas columnas, éste es el patrón a copiar.
+## 4ee. El SUGERIDO es referencia, no orden: a los P.S. no se les precarga la cantidad (2026-09-17/18)
+
+`[usuario 2026-09-17, textual: "en el caso de envío a proveedores de servicio en la versión tablet,
+no me preescribas lo que voy a enviar la cantidad que voy a enviar sino que lo voy a escribir yo
+porque puede generar confusiones"]`
+
+Desde v1.4.0 la tablet metía el sugerido DENTRO del campo Cantidad, en la unidad de cada proveedor
+(3 paquetes de AJ, 40 kg de Julio, 612,36 kg de Ester). **Eso se terminó para los proveedores de
+servicio**: el campo arranca **vacío** y lo escribe quien envía. La columna **Sugerido se sigue
+mostrando** con toda su maquinaria (techo, unidad del proveedor, equivalencia en bultos): la
+cuenta no cambió, lo que cambió es que ya no se escribe sola en el campo.
+
+**Por qué importa la distinción**: el sugerido sale de `máximo − stock − lo que ya está en el
+destino`, o sea es lo que la base **cree** que falta. Lo que sale por la puerta es lo que hay en la
+mano en ese momento. Cuando el número venía puesto, confirmar sin mirar registraba el cálculo en
+lugar del envío real — y un envío mal cargado desbalancea el stock del P.S. en las dos puntas.
+
+- **Alcance**: P.S. **e inyectores** (en la tablet se eligen dentro de "Prov. de servicio", así que
+  para el que la usa son lo mismo). A los **talleristas se les sigue precargando**: no se pidió
+  para ellos. Vive en `precargaCantidad()` de `Tablet/Tablet_GP2.html` (v1.12.0; la falta de memoria, en v1.13.0).
+- **Efecto de rebote bueno**: el botón `Enviar (N)` vuelve a contar lo que la persona cargó de
+  verdad. Con la precarga, abrir una contraparte ya dejaba todas las filas "cargadas" (por eso en
+  2026-09-16 se sacó el cartelito "N sin registrar" de los botones de tipo, ver el historial de LOCKS del 2026-09-16).
+- **Y en los P.S. la tablet NO se acuerda de lo tipeado** `[usuario 2026-09-18, textual: "hay
+  algunos que siguen anotados. Si cargue algo yo, cuando salgo quiero que desaparezca, no que se
+  guarde, por lo tanto todas las cantidades deben estar vacias"]`. Sacar la precarga no alcanzó: el
+  buffer de `localStorage` guardaba igual lo que había tipeado una persona, así que al volver a
+  entrar aparecían cantidades de otro día — **el mismo problema con otro origen**. Ahora el buffer de
+  esa contraparte se borra al **entrar**, al **salir** ("← Cambiar", "Cambiar tipo", cambio de modo)
+  y al **cerrar o recargar** la pantalla (`pagehide`). Se sigue usando mientras la contraparte está
+  abierta: es de donde sale lo que se registra y lo que aguanta un toque de más. `envSinMemoria()` /
+  `olvidarCargado()`, Tablet v1.13.0.
+- **Al tallerista no se le tocó nada**: ahi la precarga sigue viva y el buffer tiene sentido (lo
+  que se le manda se arma en varias vueltas). Su precarga queda firmada en `it.qAuto`, y mientras
+  `it.q === it.qAuto` nadie la tocó, así que se refresca con el sugerido del día.
+- **Y el campo vacío no dice "= 0 cajones"**: la equivalencia en bultos aparece cuando hay un número
+  tipeado. Debajo de un campo en blanco era ruido.
+- **`EnviosPS_GP2` (pantalla de escritorio) no se tocó**: el pedido fue "en la versión tablet".
+
+## 4ef. La cuarta forma de enviar: el CAJÓN DE CADA PIEZA se mira, y se escribe KG — Guazzaroni (2026-09-17), Jade y otros cinco (2026-09-18)
+
+`[usuario, textual: "dentro del version tablet, y envio a ps. Siguiendo la lógica del módulo
+Ester ---> en el módulo de guazzaroni patricio, el sugerido tendría que aparecer en cajones y en
+cantidad pones kg y que te diga cuantos cajones son (redondeando)"]`
+
+Es lo de Ester (4ec) con **una** diferencia, y es la que importa: **el envase no es uno solo para
+el proveedor, lo pone cada pieza**. Guazzaroni niquela/templa/zinca 25 piezas distintas y cada una
+viene en su propio cajón, así que el factor sale de `componente.uni_x_cajon` fila por fila — igual
+que el bulto de Hernandez Julio (4ea), pero acá el cajón **es** la unidad del sugerido, no una
+columna al costado.
+
+**La regla nueva no es una columna, es un significado**: en `GP2.proveedor_servicio`,
+**`envio_uni_x` NULL ya no quiere decir "sin unidad de envío"**, quiere decir *"el factor no es del
+proveedor, sale de la pieza"*. Con eso las cuatro formas entran en las mismas tres columnas:
+
+| proveedor | `envio_unidad` | `envio_uni_x` | `envio_carga_unidad` | qué se ve |
+|---|---|---|---|---|
+| AJ Adhesivos (12) | `paquetes` | 100 | `null` | sugerido y cantidad en paquetes |
+| Ester (14) | `bolsas` | 1800 | `kg` | sugerido en bolsas, cantidad en kg |
+| **Guazzaroni Patricio (4)** | `cajones` | **null** | `kg` | **sugerido en cajones de ESA pieza, cantidad en kg** |
+| **Jade (5)** | `cajones` | **null** | `kg` | idem Guazzaroni (2026-09-18) |
+| **FAAT (2), Mabra (3), Pedernera (6), Scorrano (7), Maspoli (15)** | `cajones` | **null** | `kg` | idem (2026-09-18) |
+| Hernandez Julio (8) | `kg` | null | `null` | sugerido en bultos, cantidad en kg; el bulto lo pone el SECTOR |
+
+Ejemplo real: CV1 (remache espiral) tiene 57.143 uni por cajón y 0,00035 kg por unidad → **1 cajón
+= 20,00 kg**. Sugerido 34.992 remaches → **1 cajón** (techo, como siempre: no se pide menos de lo
+que falta) y la cantidad se precarga en 20,00 kg.
+
+**El "(redondeando)" del pedido es la equivalencia de abajo del campo**: se tipean los kg y la
+pantalla dice a cuántos cajones equivalen. ⚠ CADUCADO la tarde del 2026-09-18: ese redondeo se dio
+vuelta y hoy va **con decimales** (70 kg → **"= 3,5 cajones"**). Ver la sección de abajo.
+
+### ⚠ EL ENVASE SÍ SE PARTE: el equivalente va CON DECIMALES (2026-09-18, TARDE)
+
+**Esta regla se dio vuelta el mismo día que se escribió.** A la mañana el usuario pidió redondear
+(`"acordate que todo lo que sea envío de cajones y bolsas redondear. En este caso, el pasaje serían
+6 bolsas"`, sobre un "= 6,17 bolsas" de Ester) y a la tarde pidió lo contrario, viendo un "menos de
+1 bolsa" debajo de 1 kg: `[usuario, textual: "Que pueda anotar decimales a la hora de poner la
+cantidad de kg. Además, no quiero que redondees las bolsas, cajones → lo quiero ver con decimales
+también"]`. **Vale la segunda.** Lo que queda:
+
+| lo que se mira | cómo se muestra | por qué |
+|---|---|---|
+| **el equivalente en bultos de lo que se manda** | el número **exacto, 2 decimales** (6,17 bolsas; 3,5 cajones) | es una descripción de lo que va en el camión: media bolsa existe |
+| **el sugerido** | **para arriba** (techo), sin cambios | es *lo que falta*, y pedir menos no llena el lugar `[usuario 2026-09-17, Ester: "redondeás por arriba"]` |
+
+Siguen siendo dos reglas distintas — la trampa es creer que es la misma. Lo que se dio vuelta es
+sólo la primera.
+
+El texto lo arma `textoEnvases()`: siempre **"="** y el número con coma; se fueron el **"≈"** y el
+**"menos de 1 bolsa"** en palabras (ahora dice **"= 0,69 bolsas"**, que informa más). Misma función
+en la Tablet y su gemela `equivEnvase()` en Envío a PS.
+
+**Lo que se REGISTRA acompaña a lo que se ve**: `movimiento.cajones` (y el `p_cajones` de
+`crear_envio_ps`) vuelve a guardar el número con 2 decimales, como antes de la mañana. La columna
+es `numeric`, así que la base nunca fue el límite. Con el entero se perdía información: 0,4 bolsas
+se anotaban como nada y 1,4 como 1.
+
+**La cantidad en kg YA aceptaba decimales** (`inputmode="decimal"` + `GP2N`): "12,5" entra bien,
+medido el 18/09 en Ester. Lo que **no** entra es el **punto**, que para la regla de la casa es el
+separador de miles ("1.5" se lee 15). Si el teclado de la tablet escribe punto en vez de coma, eso
+hay que decidirlo aparte: la regla de número es **una sola** para todas las pantallas
+(`gp2-numero.js`) y cambiarla ahí se siente en todos lados.
+
+**Ese renglón chico es AHORA EL ÚNICO FORMATO, en las cuatro formas** `[usuario 2026-09-18,
+textual: "está bien que me lo ponga chiquito abajo, pero modificá Hernandez Julio así quedan todos
+así"]`. Julio era el que quedaba distinto: tenía el bulto en una **columna aparte**, con su propio
+campo. Desde la v1.14.0 su tabla también es `Pieza | Sugerido | Cantidad (kg)` y sus bolsas/cajones
+salen abajo del campo. **Lo que se perdió a propósito**: el bulto ya no se corrige a mano — se
+calcula de los kg con techo y es lo que se anota en `movimiento.cajones` (informativo; el stock lo
+mueve la cantidad en kg). En el código hay **un solo** `eqFila(x, q)` que decide el renglón para
+las dos maneras de convertir (envase del proveedor / bulto por sector).
+
+**Jade (id 5), 2026-09-18** `[usuario, textual: "Seguimos con Jade. El sugerido tiene que aparecer
+en cajones y la cantidad… Pones los kilos y te tira cuántos cajones es el equivalente. Es parecido
+a lo que hicimos en Guazzaroni"]`. Exactamente la misma forma: **no hizo falta tocar una línea de
+código**, sólo las tres columnas de `proveedor_servicio`. `[dato]` las **12 piezas** que Jade pinta
+/ croma / zinca (G13, G2, G7, H11, H15, I1, I6, J13, J2, J5, K2, K5) tienen `uni_x_cajon` **y**
+`kg_x_uni` cargados, así que **las 12 convierten** y ninguna cae a unidades. Los cajones de Jade
+son grandes (606 a 1.685 piezas) y sus sugeridos a veces chicos: **con el techo, un sugerido de 54
+unidades pide 1 cajón entero de 1.145** (G2). Es la regla de la casa —no se pide menos de lo que
+falta— y el operario igual escribe los kg reales; queda anotado por si el dueño prefiere otra cosa
+para los sugeridos chicos.
+
+**Los otros cinco, 2026-09-18** `[usuario, textual: "Lo mismo con Laboratorio FAAT, Mabra
+Metalurgica, Maspoli SRL… Y Pedernera Ilario y Scorrano Mario, la misma lógica"; "es decir, Jade,
+FAAT, Mabra, Maspoli, Pedernera y Scorrano modelalo igual el sugerido y cantidad"]`. Otra vez
+**sólo datos**: `update proveedor_servicio set envio_unidad='cajones', envio_uni_x=null,
+envio_carga_unidad='kg' where id in (2,3,6,7,15)`. `[dato]` FAAT 10 piezas, Mabra 1, Pedernera 33,
+Scorrano 1, Maspoli 1; sólo **Pedernera** tiene una pieza sin `uni_x_cajon` y una sin `kg_x_uni`
+(esas quedan en unidades y la celda lo dice).
+
+**Con esto ya no queda ningún P.S. con piezas sin unidad de envío definida**: los 7 del cajón por
+pieza, AJ por paquetes, Ester por bolsas y Julio por peso cubren todos los que reciben algo. Los
+que siguen en `null` (Rec Color, Daniel, Blist-Pack) **no tienen piezas en ruta**, y los dos
+híbridos (Charcas, Eclipse) ni siquiera aparecen en Enviar. En los tests, el "P.S. común" —el
+render de siempre, cajón + kg— lo representa **Blist-Pack**.
+
+**Lo que NO se convierte**: `[dato 2026-09-17]` 5 de las 25 piezas de Guazzaroni no tienen
+`uni_x_cajon` cargado (CV12, CV18D, CV6, CV9, W1B) y CV18D tampoco tiene `kg_x_uni`. Esas filas
+**se cargan en unidades** y la celda lo dice ("sin cajón cargado"): no se inventa un cajón. Si el
+dueño carga el `uni_x_cajon` de esas 5, pasan solas al modo cajones/kg — no hay que tocar código.
+
+**El inventario sigue sin ver cajones**: viaja el kg (`unidad='kg'`) y `to_canonical` lo pasa a
+unidades con `kg_x_uni`; los cajones quedan anotados en `movimiento.cajones`, informativos.
+
+**Dónde se ve**: `Tablet/Tablet_GP2.html` (v1.11.0 — v1.9.0 y v1.10.0 las tomaron el mismo día otras dos sesiones: el encogido de columnas y el sugerido en bultos de Julio) y `Prov Serv/Envios/EnviosPS_GP2.html` (v1.6.0). **Sumar un proveedor más a esta forma es un UPDATE, no un deploy**: el alta de Jade (2026-09-18) no tocó ningún archivo de pantalla ni bumpeó versión.
+En Envío a PS el sugerido **ya se calculaba en cajones**, así que ahí sólo cambió el rótulo y el
+layout (se va la columna "Cajón envío", queda un solo campo en kg). **Ya no queda pendiente ningún
+P.S. que reciba piezas**: van definidos 10 de los 15 (AJ, Ester, Julio y los 7 del cajón por pieza)
+y los 5 que faltan son los que no tienen piezas en ruta o son híbridos.
+
+### El bug que salió de paso: la Cantidad precargada quedaba VIEJA
+
+> **Al día siguiente esto se volvió historia para los P.S.**: el dueño pidió que en Enviar a
+> proveedor de servicio la Cantidad no se precargue **ni se guarde** (4ee), así que ahí el buffer
+> se borra al entrar y al salir. Lo que sigue vale para el **tallerista**, que es donde la
+> precarga quedó viva.
+
+`[usuario 2026-09-17: "fijate que hoy aparece el sugerido y la cantidad preescrita distinta en
+guazzaroni, chequea"]`. La Tablet precarga el Sugerido en la Cantidad, pero **sólo si el campo está
+vacío** — para no pisarle al operario lo que cargó a mano. El buffer vive en `localStorage`
+(`gp2_tablet_buffer`) y **sobrevive días**, así que cuando el sugerido del bundle cambiaba (se movió
+el máximo o el stock) la pantalla mostraba el **Sugerido de hoy con la Cantidad de otro día**. La
+migración que existía sólo corría para proveedores con unidad de envío propia, así que todos los
+demás quedaban desfasados y nadie lo veía.
+
+**Cómo se arregló**: la precarga queda firmada en `it.qAuto`. Mientras `it.q === it.qAuto` (el
+operario no la tocó) se refresca con el sugerido del día; cualquier otro valor es una edición real
+y **no se pisa nunca**. Vale para todos los proveedores. La lección general: *un valor derivado
+guardado en `localStorage` necesita saber si sigue siendo derivado o ya lo editó una persona* —
+guardar el valor no alcanza, hay que guardar también que lo puso la máquina.
+
+
+
+## 4eg. Enviar a un P.S. se elige por TARJETAS, y la carga es una pantalla por parte (2026-09-18)
+
+`[usuario 2026-09-18, textual: "En la versión tablet, dentro del módulo “Envío a proveedores de
+servicio”, quiero modificar la forma en que se seleccionan las partes. Actualmente se muestran en
+formato de listado. Quiero reemplazar ese listado por boxes o tarjetas individuales. Cada box debe
+mostrar, como mínimo: código o nombre de la parte, descripción de la parte. Al seleccionar una
+parte, debe abrirse una vista donde se muestre: la cantidad sugerida a enviar, un campo para
+indicar la cantidad efectiva que se va a enviar"]`
+
+El listado de un P.S. dejó de ser una tabla: es una **grilla de tarjetas**, una por parte, y al
+tocar una se abre **la vista de esa parte** con el sugerido arriba y el campo de la cantidad abajo.
+
+- **Alcance: Enviar → Prov. de servicio, inyectores incluidos** (se eligen dentro de ese mismo
+  botón, así que para el que usa la tablet son lo mismo). Es **el mismo conjunto** que ya no se
+  acuerda de lo tipeado (4ee): en el código la vista de tarjetas y `envSinMemoria()` son la misma
+  cuenta, a propósito. **Talleristas, prov. de art. terminado y TODO Recibir siguen con la tabla**:
+  ahí hay esperado, exceso y remito, que se leen de corrido y no de a una parte.
+- **La tarjeta** muestra código (con su unidad), descripción, el **sugerido** de referencia y, abajo,
+  lo que hoy se va a mandar: *"sin cargar"* en gris, o *"✓ envía N"* en verde con el borde verde.
+  Ese renglón de estado es lo que reemplaza al vistazo que daba la tabla: de un golpe se ve qué
+  falta cargar, sin abrir nada.
+- **La vista de la parte** mantiene **todas** las formas de enviar de 4ea/4ec/4ef sin excepción:
+  paquetes (AJ), kg con "= N bolsas" (Ester), kg con "≈ N cajones" redondeados (los 7 del cajón por
+  pieza) y por peso (Julio), que **desde el mismo 2026-09-18 también tiene un solo campo**: sus
+  bolsas/cajones son el renglón chico de debajo de los kg, como en todas las demás (ver 4ef). El
+  segundo campo del bulto existió menos de un día.
+- **Y no hay atajo para copiar el sugerido al campo** `[usuario 2026-09-18, textual: "no quiero que
+  aparezca la opción de enviar sugerido"]`. La primera versión de esta pantalla tenía un botón
+  "Usar el sugerido"; se sacó el mismo día. Es la misma línea de 4ee llevada hasta el final: si el
+  sugerido es **referencia**, tampoco puede haber un botón que lo convierta en la cantidad de un
+  toque — eso es la precarga otra vez, con un click en el medio. El único botón de la vista es
+  "Listo", que cierra la parte.
+- **No cambió nada de datos**: mismo buffer, mismo payload, mismas RPC. La cuenta del sugerido quedó
+  en **una sola función** (`sugeridoInfo()` para mostrarlo, `sugeridoEnCarga()` para escribirlo) que
+  ahora usan la tabla, la tarjeta, la vista de la parte y la precarga del tallerista: antes eran
+  cuatro copias de la misma aritmética y se podían separar.
+- **`EnviosPS_GP2` (escritorio) no se tocó**: el pedido fue "en la versión tablet". Sigue con la
+  tabla, igual que antes.
+
+## 4eh. En la tablet el botón de los inyectores dice "bolsas plásticas", y la tarjeta no corta texto (2026-09-18)
+
+`[usuario 2026-09-18, textual: "En versión tablet, en vez de bolsas de resina, bolsas plásticas
+poné"]` — el subtítulo del botón **Inyectores** de Enviar. Cambio de **palabra en pantalla**, nada
+más: adentro sigue viajando **resina en kg** por `enviar_material_inyector`, con el sugerido que
+sale de la O.C. de partes (4ea). Los comentarios del código y esta memoria siguen diciendo
+"resina" porque eso es lo que se mueve; "bolsas plásticas" es cómo lo nombra el que carga.
+
+`[usuario 2026-09-18, textual: "ojo que por ejemplo, en guazzaroni, aparece así" + captura de la
+tarjeta de CV12 con "Sugerido 13.272 uni · sin cajón cargad" comido por el borde]` — **el texto de
+la tarjeta se cortaba**. La causa era `white-space:nowrap` en `.pc-sug`: en la tablet real la
+grilla arma columnas de 230px y esa línea, la más larga que produce la pantalla (sugerido +
+unidad + la nota "sin cajón cargado" de 4ef), no entra en un renglón. Ahora baja de renglón, y la
+tarjeta entera lleva `overflow-wrap:anywhere` para que un código o una descripción larga tampoco
+se puedan ir afuera.
+
+**Lo que hay que recordar de esto:** el recorte **no se ve a 390px**, donde la tarjeta ocupa el
+ancho completo y la línea entra — se ve a **1.280px**, que es la tablet de verdad. Los dos anchos
+se miden en `test_tablet.js`, y el chequeo del recorte va en el bloque de 1.280. Y se mide
+comparando el ancho real del texto (`Range.getBoundingClientRect()`) contra el de su caja:
+`scrollWidth` **no** sirve, porque con `nowrap` la caja mide bien y el texto se va afuera igual
+(medido: el guardián con `scrollWidth` daba OK con el bug puesto; con `Range` dio 48px de desborde).
+
+## 4ei. El FASONERO: a Maspoli se le emite O.C., y el envío de virolas sale de esa O.C. (2026-09-18)
+
+`[usuario 2026-09-18, textual]`: *"que el envío a Maspoli de virolas no surja hasta que se hace una
+orden de compra. Cuando se hace la orden de compra, imaginate que se hizo una orden de compra por 10
+mangos. Por esos 10 mangos hay que mandarle 10 virolas. Entonces, en la cantidad sugerida tendría
+que aparecer el equivalente a 10 unidades de virola."*
+
+**Qué es un fasonero, y por qué no es un PS común ni un híbrido.** Tres figuras distintas, que hasta
+hoy GP2 trataba como dos:
+
+| Figura | Qué pone él | Qué le compramos | Cómo se le pide |
+|---|---|---|---|
+| PS común (Guazzaroni niquela, Pedernera croma) | sólo mano de obra | nada, se le paga el servicio | el envío sale del **máximo** de la pieza |
+| PS **híbrido** (Charcas, Eclipse) | procesa materia prima que le compramos **a un tercero** | la pieza, y de paso la O.C. gemela al dueño de la MP | `proveedor_servicio.hibrido` |
+| **Fasonero** (Maspoli) | **su propio material** (la madera del mango) | la pieza que devuelve | `proveedor_servicio.pedido_por_oc` ← **nuevo** |
+
+Maspoli recibe la virola `D13` (nuestra, niquelada por Guazzaroni) y devuelve el mango de madera con
+la virola adentro: `PC12` (508/708), `PEP7` (518) y `PEP8` (564/863). Ver 4b y 4cc.
+
+**La trampa que costó media hora y hay que no repetir: NO se le toca el `estado_compra`.** Las tres
+piezas están en `estado_compra='fabricacion'`, que es lo que las sacaba de la O.C. El reflejo es
+ponerlo en `null` — y eso las mete en el CTE `comprado` de `v_costo_componente`, que corta el
+recorrido de la ruta. **Medido antes de aplicar nada** (en una transacción con `rollback`): los cinco
+artículos perdían **$710,89 cada uno** — el 508 pasaba de 1.553,91 a 843,02 — porque el mango dejaba
+de costearse por la ruta (virola + servicio de armado) y pasaba a costear por su `precio_proveedor`,
+que **no existe**. Por eso el flag va en el proveedor y no en la pieza: `oc_bundle` deja entrar las
+salidas de un PS `pedido_por_oc` **con su `estado_compra` intacto**.
+
+**Cómo quedó el circuito (es el mismo que ya tenía el inyector con sus bolsas, 4ea):**
+
+1. **O.C.** — `Compras/OC_GP2.html` muestra a Máspoli SRL con sus 3 mangos (sugerido = máximo −
+   stock: PC12 2.448, PEP7 2.864, PEP8 2.552). `proveedor_insumo` "Máspoli SRL" pasó a `activo`.
+2. **Envío** — Maspoli aparece **siempre**, con O.C. o sin ella, y lo que cambia es el número:
+   sin orden el sugerido es **0**, y con una O.C. **enviada** de 10 mangos dice **10 virolas** (1 a
+   1) menos las que ya tiene en su poder. El borrador NO dispara: recién cuando la orden sale.
+   `[usuario 2026-09-18, segunda vuelta: "los inyectores por más que no esté cargada la orden de
+   compra aparecen igual con cero sugerido; tendría que aparecer Maspoli con cero sugerido y cuando
+   sale la orden de compra ahí sube el sugerido de entrega de virolas"]`. **La primera versión lo
+   escondía** mientras no hubiera O.C. y el dueño lo corrigió a las dos horas: un proveedor que
+   desaparece de la pantalla no se distingue de una pantalla rota, y además el operario pierde la
+   referencia de que ese proveedor existe. **Regla general que sale de acá: una fila con 0 informa;
+   una fila que no está, no.**
+3. **Entrega** — sigue por Entrega P.S., y desde hoy `crear_entrega_ps` **descuenta la O.C.**
+   con el mismo cruce FIFO de la recepción de insumos. Sin eso la orden quedaba abierta para siempre
+   y el sugerido de virolas nunca bajaba — el bug que se hubiera comido el cambio entero.
+
+**El nombre no sirve para identificarlo.** "Maspoli SRL" (`proveedor_servicio`) y "Máspoli SRL"
+(`proveedor_insumo`) son la misma persona escrita distinto; la exclusión "lo que produce un PS no se
+compra" no lo agarraba **por la tilde**, no por diseño. Ahora esa exclusión matchea por nombre **o
+por `cod_prov`** (los dos son 2339) y el fasonero queda afuera de ella a propósito, por el flag.
+
+**Lo que falta (no bloquea):** el **precio del mango de Maspoli**. Los $683,72 que esta memoria citaba
+en 4b (`precio_proveedor` 16/17/18, cod_prov 2339) **ya no están en la base**: hoy el único precio con
+cod_prov 2339 es el del `PEP5` ($108, "Mango Madera Cuchillo Untar"), y encima `PEP5` figura a nombre
+de *Eduardo Pintos*. Sin ese precio la O.C. a Maspoli sale **sin importe**. Dos cosas para el dueño:
+cargar la lista de Maspoli, y decidir si el `PEP5` es de Pintos o de Maspoli.
+
+## 4ej. Virgilio se APAGA como fuente de movimientos: ledger en cero y la canilla cerrada (2026-09-18)
+
+`[usuario 2026-09-18, textual: "Quiero que en gestión productiva 2 por ahora no me agregues todo
+lo que es Virgilio, no me lo generes como movimiento. Así que todos los movimientos borralos, que
+quede todo en cero y el stock que se modificó por estos movimientos también deja todo en cero"]`
+
+**Lo que había** `[dato, medido antes de tocar]`: `GP2.movimiento` tenía **51 filas y NINGUNA otra
+cosa** — 38 `consumo_virgilio` + 13 `recepcion_virgilio`, todas del 17 y 18/09. O sea: el único
+libro de movimientos que GP2 llegó a tener era el espejo de Virgilio. Y las **60 filas de
+`inventario` con cantidad ≠ 0 eran exactamente** los 60 pares (componente, ubicación) que tocaban
+esos 51 movimientos: ni una fila de stock venía de otro lado. Por eso "borrar todo" y "dejar todo
+en cero" terminaron siendo **la misma operación**.
+
+**No hizo falta tocar `inventario` a mano.** `trg_movimiento_aplicar` es `AFTER INSERT OR DELETE OR
+UPDATE`, y en el `DELETE` revierte los dos deltas (`-old._delta_dest` al destino, `+old._delta_orig`
+al origen). Un `delete from "GP2".movimiento` desarma el stock solo. Verificado fila por fila
+**antes** de ejecutar: las 60 quedaban en 0,00 exacto y no había ninguna no-cero ajena al espejo.
+Escribir el `update … set cantidad = 0` hubiera sido pisar el motor, no usarlo.
+
+**Lo que se ejecutó** (con el sí del usuario, 2026-09-18):
+
+```sql
+delete from "GP2".movimiento;                 -- 51 filas
+delete from "GP2".virgilio_espejo_pend;       -- 26 filas en cola (4bs)
+alter table public."Entregas Tallerista Virgilio"
+  disable trigger trg_virgilio_espejo_gp2;    -- la canilla
+```
+
+Después: `movimiento` 0, `virgilio_espejo_pend` 0, `inventario` 1.311 filas todas en 0,00 (suma
+total 0), invariante ledger-vs-inventario en 0.
+
+**La parte que importa para la próxima sesión: borrar los movimientos NO alcanzaba.** Los generaba
+solo `trg_virgilio_espejo_gp2`, un trigger que vive sobre `public."Entregas Tallerista Virgilio"`
+(casa del vecino) y llama a `GP2.fn_entregas_virgilio_espejo`. Si no se apagaba, la primera entrega
+cargada en Virgilio volvía a escribir en `GP2.movimiento` y el "todo en cero" duraba horas. Ese
+trigger **no está en `db/`** (el README lo dice: los dos triggers espejo sobre `public` quedan
+afuera del respaldo), así que su estado sólo se ve en la base:
+
+```sql
+select tgname, tgenabled from pg_trigger t join pg_class c on c.oid = t.tgrelid
+ where c.relname = 'Entregas Tallerista Virgilio';   -- 'D' = apagado, 'O' = vivo
+```
+
+**Lo que se pierde mientras esté apagado** `[avisado al usuario antes del sí]`: las entregas que se
+carguen en Virgilio en el ínterin **no quedan ni en la cola** de `virgilio_espejo_pend` — el trigger
+es el que encola, así que con el trigger apagado no hay rastro que reprocesar. Volver a prenderlo
+(`enable trigger`) **no recupera el hueco**: hay que cargar esas entregas a mano o reconstruirlas
+desde `public."Entregas Tallerista Virgilio"`, que sí las tiene. Se ofreció la variante "el trigger
+sigue encolando pero no crea movimiento" (conserva el historial); el usuario eligió el apagado seco.
+
+**Es "por ahora", no una decisión de arquitectura.** La integración entera sigue en pie:
+`INTEGRACION_GESTION_VIRGILIO.md`, las RPC `recepcion_virgilio` / `reprocesar_espejo_virgilio` /
+`enviar_material_virgilio`, la pantalla `Talleristas/Recepcion/RecepcionVirgilio_GP2.html` y los
+tipos `recepcion_virgilio` / `consumo_virgilio` del vocabulario **no se tocaron**. Para volver:
+`alter table public."Entregas Tallerista Virgilio" enable trigger trg_virgilio_espejo_gp2;`.
+
+**La pantalla queda con candado, no borrada** `[usuario 2026-09-18: "Dale"]`. En
+`GP2_MODULOS.html` (menú v1.17.0) la entrada **Entrega Virgilio** pasa de href a `null`, que es la
+forma que ya tenía la casa para un módulo apagado: se ve el botón con 🔒 y no se puede abrir. El
+archivo `Talleristas/Recepcion/RecepcionVirgilio_GP2.html` **no se borró** y su RPC tampoco, así que
+volver es reponer el href — un renglón. Se eligió el candado y no borrar la línea justamente porque
+esto es "por ahora": una entrada que desaparece del menú se olvida; una con candado se ve.
+## 4ek. Al TALLERISTA la unidad de envío la pone la PIEZA (2026-09-18)
+
+`[usuario 2026-09-18, textual: "Cartón según el formato se le manda según cómo viene el paquetón…
+según el formato de cartón vienen o mil unidades o dos mil. Y las cajas en paquetes de 25. Entonces
+el sugerido y la cantidad va para ambos en paquetes, cartones y cajas. En cambio para el resto el
+sugerido va en cajones y la cantidad va en kilos… y abajo chiquito te pone a cuántos cajones
+equivale"]`
+
+Las cuatro formas de 4ea/4ec/4ef son **del proveedor**: AJ manda todo en paquetes de 100, Ester todo
+en bolsas de 1800. Con un tallerista eso no se puede: **recibe de todo** — cartones, cajas, mangos,
+flejes, plásticos — y cada cosa viaja en su propio envase. Así que acá la unidad **no es del
+destino, es de la pieza**, y la dice la base (`tablet_bundle` → `env_unidad` / `env_factor` /
+`env_carga` en cada fila de tallerista):
+
+| pieza | sugerido | cantidad | de dónde sale el factor |
+|---|---|---|---|
+| Sector Cartón (10) | paquetes | **paquetes** | `carton_formato.uni_x_bolsa` del formato de esa pieza |
+| Sector Caja (11) | paquetes | **paquetes** | `parametro.caja_uni_x_paquete` = **25** |
+| todo lo demás | **cajones** | **kg**, con "≈ N cajones" abajo | `componente.uni_x_cajon` de esa pieza |
+
+**El "paquetón" del cartón es la BOLSA del formato, no el paquete de 250.** En GP2 conviven los dos
+números: `parametro.carton_uni_x_paquete` = 250 (el paquete chico, el de la O.C.) y
+`carton_formato.uni_x_bolsa`, que es **1.000** (formatos C, LOKE, Manga), **2.000** (Huevo), **3.000**
+(formato 8) y **100** (Pliego). El usuario dijo "o mil unidades o dos mil", que es exactamente esa
+columna — por eso el envío usa `uni_x_bolsa` aunque en la pantalla se rotule "paquetes", que es la
+palabra que usó él. `[dato 2026-09-18]`
+
+**Lo que NO tiene el dato no se convierte** (misma regla que Guazzaroni en 4ef): la pieza queda en
+unidades y la tarjeta lo dice. Al 2026-09-18, de las **285** piezas que se les mandan a talleristas:
+- **6 cartones sin paquetón** porque su formato no lo tiene cargado (A1B, A1B1, BOLSA550, BOLSA760,
+  G8C, O2A — formatos Bandita, Bolsa, Corbata, Rallador);
+- **23 sin `uni_x_cajon`**, que quedan en unidades (1686, BOM10, BOM13, BOM14, C12, C13, D9, GRJ13,
+  GRJ14, GRJ28, GRJ29, IE1, PA17, PC6, PEST2, PINCEL590, PV17, PV8, PV8B, V18D, W1B, Z12, Z21);
+- **2 con cajón pero sin `kg_x_uni`** (GRJ18, GRJ19): tienen sugerido en cajones y **se cargan en
+  cajones**, porque sin el peso no hay cómo pasar a kg;
+- **254 andan completas**. Cargar el dato que falta las pasa solas al modo bueno: **no hay que tocar
+  código**.
+
+**Y con esto ya no queda nadie con la cantidad precargada**: el tallerista era el último
+`[usuario 2026-09-18, eligiendo entre tres opciones: "igual que P.S.: vacío y sin memoria"]`. Se
+fueron `precargaCantidad()`, `sugeridoEnCarga()` y la firma `qAuto` de 4ee — ya no hay ningún valor
+derivado guardado en `localStorage` que pueda quedar viejo, que era el bug de fondo de aquella
+sección. La **tabla** queda viva solo para el **prov. de art. terminado** y para **todo Recibir**.
+
+**Trampa que se repitió acá** `[dato 2026-09-18]`: entre que se aplicó el cambio en
+`tablet_bundle` y que se terminó el front, **otra sesión volvió a crear la función y se llevó puesto
+el parche**. Se detectó porque el bundle devolvía `env_unidad` en null y se re-aplicó sobre la
+definición viva (que ya traía la feature de la otra sesión, el fasonero Maspoli). Moraleja: cuando
+se parchea una función compartida, **verificar el resultado del bundle al final, no al aplicar**.
+
+### Y el PROV. DE ART. TERMINADO hereda lo mismo (2026-09-18)
+
+`[usuario 2026-09-18: "seguís de la misma manera con prov de art terminado"]`. Era el último destino
+de Enviar con tabla. Le tocó gratis la unidad: **recibe solo cartones y cajas** (sectores 10 y 11),
+que son justo las dos cosas que van en **paquetes**, así que el mismo `case` del bundle lo cubre —
+cambió una línea (`tipo in ('tallerista','proveedor_at')`).
+
+**Su referencia no es el sugerido, porque no tiene**: la tarjeta y la vista muestran el **online del
+sector** (lo que hay en Cervantes para mandarle), con ese rótulo. Lo resuelve `refInfo()`, que
+devuelve la misma forma para los dos casos. El online se muestra **en la unidad de la pieza** (988
+uni) y no en paquetes: es un stock, no algo que se manda. `[decidido 2026-09-18, avisado al usuario]`
+
+Al 2026-09-18 son **68 piezas**: las **10 cajas** andan completas y de los **58 cartones**, **42**
+tienen el paquetón de su formato y **16 no** (A1B, C2A, C2B, F5A, M1, M2A, M2C, M3A, M3B, P2A, Q5D1,
+Q5E, Q6B, Q6C, Q7C1, Q7D): esos quedan en unidades y la tarjeta lo dice. Es el **mismo hueco** que
+el de 4ek — formatos sin `uni_x_bolsa` cargado — y se tapa cargando el dato, sin tocar código.
+
+**Con esto, en Enviar no queda tabla ni memoria en ningún destino**: `envSinMemoria()` son los
+cuatro. La tabla sigue viva solo en **Recibir**.
+
+## 4el. El 500 y el 506 dejan el pliego: ahora llevan CARTÓN, como el resto (2026-09-18)
+
+`[usuario 2026-09-18, textual]` *"El pliego 500 y el pliego 506 ya no se compran más. Borra las
+rutas de todos lados. Ahora lo reemplaza los cartones 500 y 506. Agregalos. […] eliminar todas
+las rutas de pliegos, tanto sin adhesivar como adhesivado, del 500 y el 506, y agregar las rutas
+tanto de compra como de recepción en gráficos Pol. De cartón 500 y 506. El precio es igual al
+resto de los cartones. Y la ruta se le manda a los mismos talleristas que ensamblan."*
+
+Da vuelta la parte de pliego de **§4eb** (17/09, *"la ruta para todos los pliegos es: pliego sin
+adhesivar → AJ adhesivados → pliego adhesivado → tallerista final"*). **Esa regla sigue viva para
+los otros 10 pliegos** (557, 558, 654, 658, 659, 758, 759, 762, 763, 769); el 500 y el 506 salen
+de ella: ya no hay pliego ni adhesivado, hay un cartón comprado hecho.
+
+### Lo que quedó en la base
+
+| | Antes | Ahora |
+|---|---|---|
+| Pieza | `Pliego 500` (594) → AJ → `Pliego Ad 500` (306) | **`CART500`** "Cartón 500" (931) |
+| Pieza | `Pliego 506` (564) → AJ → `Pliego Ad 506` (311) | **`CART506`** "Cartón 506" (932) |
+| Receta | pliego adhesivado **×1/12** | cartón **×1** |
+| Ruta | 3 pasos (insumo 1/12 → AJ Adhesivos → tallerista) | 2 pasos (insumo ×1 → tallerista) |
+
+- Los dos cartones son **formato `C`, categoría `Abrelatas`, `Talleres Gráficos Pol`, marca
+  `LOEKE`, $89** — calcados del gemelo exacto, `A2B` "Cartón 510", que es el mismo formato y la
+  misma categoría. Los 6 cartones C/Abrelatas valen $89 sin excepción, así que *"el precio es
+  igual al resto de los cartones"* no tuvo que adivinarse. **Ojo**: dentro del formato `C` conviven
+  $89 y $79 (Pelapapas); el precio lo fija la **categoría**, no el formato.
+- **Compra y recepción no se configuran en ningún lado.** Una pieza con sector de insumo +
+  `proveedor` que existe en `proveedor_insumo` + `estado_compra` null aparece sola en `oc_bundle`
+  y en `recepcion_bundle`. Verificado: los dos salen bajo Talleres Gráficos Pol con su $89 y su
+  máximo (CART500 6.696 · CART506 101.568).
+- **Talleristas: los mismos que ensamblan.** 500 → Martin Cornejo (ruta 603). 506 → Martin Cornejo
+  (1045) y Alex Escalante (1050), que es el reparto 30/70 de §4eb. Inventario en 0 creado en Sector
+  Cartón y en el taller de cada uno.
+- Los 4 pliegos pasaron a `estado_compra='discontinuo'` + `discontinuado=true`: **no se borran**
+  (conservan historial), pero desaparecen de la OC y de Recepción de Insumos. No tenían ni un
+  movimiento, ni una OC, ni una recepción — stock 0 — así que no se perdió nada.
+- Se borró la tarifa de adhesivado de AJ para esas dos piezas (`precio_servicio_pieza` 110 y 89).
+  AJ sigue adhesivando los otros 10 pliegos.
+
+### Lo que apareció de paso: el adhesivado se estaba cobrando DOS VECES
+
+El costo del 500 **bajó** $115,75 y el del 506 también, cuando la cuenta del cartón decía que
+tenían que **subir** $12,58 (de $76,42 el pliego a $89 el cartón). La diferencia son **$140 por
+artículo** que se iban en un doble conteo que ya estaba pusheado:
+
+- el precio del `Pliego Ad 506` es **$917 = $777 (Pol) + $140 (AJ)** — el adhesivado ya está
+  adentro, y la receta lo pagaba a 1/12, o sea $11,67 de adhesivado por artículo, que es lo correcto;
+- y **además** el paso `proveedor_servicio` de la ruta cobraba la tarifa de AJ **$140 × 1 por
+  artículo**, no por pliego.
+
+O sea: el adhesivado se pagaba dos veces y la segunda a 12× la escala. Al borrar el paso de la
+ruta el doble conteo se fue solo. **La regla que deja**: cuando el precio de una pieza YA incluye
+un servicio (acá el skin del pliego), ese servicio no puede estar también como paso de ruta — y si
+está, mirar la ESCALA, porque el paso se cobra por artículo y el precio de la pieza se prorratea.
+Los otros 10 pliegos tienen la misma forma (`precio_servicio_pieza` de AJ + paso PS en la ruta):
+**hay que revisarlos uno por uno**, no se tocaron en este cambio.
+
+| Artículo | Antes | Ahora | |
+|---|---|---|---|
+| **500** | $573,58 | $457,83 | −$115,75 |
+| **506** | $494,50 | $378,75 | −$115,75 |
+
+El material sí subió como estaba previsto: el 506 quedó con **$107,35 de material en pesos, el
+mismo peso al peso que el 510**, que es el gemelo — buena señal de que la receta quedó pareja.
+
+## 4el. RECIBIR de un tallerista: el esperado se mira en CAJONES y la cantidad se escribe en KG (2026-09-18)
+
+`[usuario 2026-09-18, textual: "de talleristas, todos se entregan en cajones… tanto en esperado como
+en recibido, tenés que poner la unidad de medida. En esperado va a ser en cajones… y en recibido va
+a ser en kilos. Y pones en chiquito cuántos cajones equivalen. La única excepción que no es en
+cajones sino en bolsas son las bombillas GRJ5 y GRJ6. Entregan bolsas de 120 unidades"]`
+
+Es la misma idea que el envío (4ek) del otro lado del mostrador: **la unidad la pone la pieza**.
+Lo que cambia es de dónde sale y cómo se llama lo de arriba:
+
+| | Enviar | Recibir |
+|---|---|---|
+| referencia | **Sugerido** (lo que falta) | **Esperado** (lo que el tallerista tiene, `online_tall`) |
+| campo | Cantidad a enviar | **Cantidad** — el usuario pidió que no se llame más "Recibido" |
+| unidad del campo | según la pieza | **kg**, siempre, con "≈ N cajones" debajo |
+
+**Cómo se guarda la excepción**: no con un `if` por código. Dos columnas nuevas en
+`GP2.componente` — `entrega_unidad` y `entrega_uni_x` — que **sobreescriben el default**
+(`cajones` + `uni_x_cajon`). Hoy las tienen cargadas **solo GRJ5 y GRJ6** (`bolsas` / **120**). Si
+mañana otra pieza entrega distinto, se carga el dato y listo. `tablet_bundle` las manda en cada
+fila de `recibir` con las **mismas claves** que ya usaba Enviar (`env_unidad` / `env_factor` /
+`env_carga`), así que el front no aprendió un modelo nuevo: `envaseDe()` ahora también mira Recibir.
+
+**La trampa que apareció acá — y que vale para cualquier pantalla que cambie de unidad:** el
+**esperado viene en unidades** (es un stock) y ahora se escriben **kg**. Dos lugares donde eso se
+comparaba crudo:
+1. el aviso de "recibí de más" de la pantalla → se arregló con `canonDe()`, que lleva lo tipeado a
+   la unidad canónica antes de restar;
+2. `tablet_registrar`, que compara `cantidad > esperado` **tal cual vienen** para escribir
+   `alerta_recepcion`. Ahí no se tocó la base: **el front manda el esperado en la misma unidad que
+   la cantidad** (1.000 uni × 0,01 = 10 kg). Si alguna vez se cambia una unidad en otra pantalla,
+   este es el segundo lugar que hay que mirar.
+
+**Lo que NO se registra**: los cajones equivalentes. `crear_entrega_tallerista` no tiene dónde
+anotarlos (a diferencia de `crear_envio_ps`, que tiene `p_cajones`); el kg es lo que mueve el stock
+y el cajón es ayuda visual. `[deducido 2026-09-18]`
+
+**Alcance al 2026-09-18**: las 9 filas de Recibir de talleristas — 7 en cajones (una, `C12B`, sin
+`uni_x_cajon`, así que queda en unidades y la tarjeta lo dice) y las 2 bombillas en bolsas. El
+**P.S. sigue con la tabla**: es lo que sigue.
+
+### Y la ENTREGA de un P.S. copia la unidad del envío (2026-09-18)
+
+`[usuario 2026-09-18, textual: "AJ adhesivos entrega en paquetes de 200. El resto copia la lógica
+del envío: si enviamos en bolsas recepcionamos en bolsas, si lo hacemos en cajones, en cajones.
+Charcas cajones"]`
+
+La regla se escribió **una sola vez**: por defecto la entrega de un P.S. usa el **mismo envase con
+el que se le envía** (`packEnvio` / `pesoEnvio`, que ya existían), así que **no hubo que cargar un
+dato por proveedor**. Solo los que difieren tienen columnas propias — `proveedor_servicio.
+entrega_unidad` / `entrega_uni_x` — y hoy son dos:
+
+| proveedor | envía | entrega | por qué |
+|---|---|---|---|
+| **AJ Adhesivos** | paquetes de **100** | paquetes de **200** | lo dijo el dueño; se escribe en paquetes |
+| **Maspoli SRL** | cajón de cada pieza, en kg | **bolsas de 250 mangos**, se escribe en bolsas | `[usuario 2026-09-18: "Maspoli entrega en bolsas de 250 mangos"]` — y 250 es justo el `uni_x_cajon` de sus tres mangos |
+| **Resortes Charcas** | — (es híbrido, no está en Enviar) | **paquetes de 10 kg** | no tenía unidad de la cual copiar `[usuario 2026-09-18: "Charcas en paquetes"]` |
+
+**El paquete de Charcas son 10 kg** `[usuario 2026-09-18, respondiendo la pregunta]`. Importa
+porque sus dos piezas son flejes que se miden **en kg** (`IC3`, `IC3V`): sin ese dato el factor
+caía al `uni_x_cajon` de la pieza (**1.205** y **24**), que para algo medido en kg se lee como *kg
+por paquete* — un paquete de fleje de 1.205 kg no existe. Con `entrega_uni_x = 10` el esperado sale
+en paquetes de verdad y la cantidad se escribe en paquetes (10 kg cada uno).
+
+⚠ **Ese 10 está escrito en dos lugares**: `proveedor_servicio.entrega_uni_x` (la entrega, esta
+pantalla) y `parametro.charcas_kg_x_paquete` (la **compra**: la O.C. a Charcas se pide en paquetes y
+se guarda en kg, ver la sección de OC). Es el mismo paquete físico, así que **si cambia, hay que
+cambiar los dos**; queda dicho también en el comment de la columna.
+
+El resto sale solo: Guazzaroni, Jade, FAAT, Mabra, Maspoli, Pedernera y Scorrano entregan en **el
+cajón de cada pieza** (su envase de envío), Ester en **bolsas de 1800** y Hernandez Julio en el
+**bulto de su sector** (bolsas los plásticos, cajones el resto). Un P.S. **sin unidad definida**
+(Blist-Pack, Rec Color, Daniel, Blist…) sigue como estaba: esperado y cantidad en la unidad de la
+pieza. `[dato 2026-09-18]`
+
+**El detalle que importa del "copia la lógica"**: copia el **envase Y la forma de cargar**. Donde el
+envío se escribe en kg (Ester, los del cajón por pieza, Julio), la entrega también — con el mismo
+renglón "≈ N cajones" debajo. Donde el envío se escribe en el envase (AJ, paquetes), la entrega
+también. Por eso `packEnvio()` y `pesoEnvio()` dejaron de exigir `MODO === 'enviar'`: son del
+**proveedor**, no del modo.
+## 4em. Lo que se manda PESADO se anota en las DOS unidades, y la pantalla las cruza (2026-09-18)
+
+`[usuario 2026-09-18, textual: "en cantidad a enviar tengo que poder poner cajones primero y después
+los kg. Lo mismo con lo que se envía en bolsas. Si después de cargar cajones/bolsas y kg y no
+coinciden por mucho (es decir, por ejemplo, si tengo 10k que equivalen a 2 bolsas y puse 3) que me
+salte alerta pero que me deje poner listo igual. Si no coincide por poco (por ejemplo: 10kg eran 2
+bolsas y media y puse 2) que no salte ninguna alerta. Que no pueda poner listo hasta que haya
+cargado en las dos unidades de medida"]`
+
+**Da vuelta la decisión de la mañana** (v1.15.2 había sacado el segundo campo de Hernandez Julio
+para que el bulto fuera un renglón calculado). El motivo del cambio es bueno y conviene tenerlo
+escrito: **los dos números existen en la realidad y los mide gente distinta** — el envase es lo que
+el operario **cuenta** mientras carga el camión, el kg es lo que marca la **balanza**. Si uno se
+calcula a partir del otro, un error de carga es **invisible**: sale un número perfecto y coherente
+que no se parece a lo que subió al camión. Anotando los dos, la pantalla puede **cruzarlos**.
+
+- **Alcance**: toda fila de **Enviar** con envase + kg (Julio por peso, Ester, los del cajón por
+  pieza, los talleristas). Las que se escriben **solo en el envase** (AJ, cartón, cajas) y **todo
+  Recibir** siguen con un campo. `[deducido — el usuario habló de "cantidad a enviar"]`
+- **Orden**: primero el envase, después los kg. Así se carga en la realidad. Y van **uno al lado
+  del otro** `[usuario 2026-09-18: "que sea una al lado de la otra… queda muy ancho"]`: apilados, la
+  vista se hacía larga y el campo quedaba ancho al pedo. Las dos columnas **se achican**, no
+  envuelven, así que a 390px siguen entrando.
+- **Lo que FRENA**: falta una de las dos → "Listo" deshabilitado, la vista dice cuál falta y la
+  tarjeta se pinta naranja. Una fila a medias **no entra** en el conteo del botón Registrar ni viaja
+  en el payload: no se registra media carga.
+- **Lo que AVISA pero no frena**: el desvío entre lo anotado y lo que dicen los kg.
+
+**La tolerancia es el envase entero de arriba y el de abajo**, no "media unidad". Si los kg dan
+**2,5** bolsas, anotar **2 o 3** está bien; si dan **2 justas**, anotar 3 ya avisa — que son los dos
+ejemplos del usuario. Se probó primero con media unidad pelada y se descartó: **el kg por envase
+casi nunca da redondo** (un cajón de A1 son 57.143 × 0,00035 = 20,00005 kg), así que 4 cajones
+contra 3,49999 saltaban por una millonésima. `[dato 2026-09-18, medido en el test]`
+
+**Al registrar viaja el envase ANOTADO**, no el calculado, en `movimiento.cajones`.
+
+### Y el punto tipeado vale como coma
+
+`[usuario 2026-09-18: "cuando voy a cargar quiero que me deje poner . o , para poner decimales"]`.
+Está en `gp2-numero.js`, que es donde vive la regla de número de la casa. **Se hace en
+`beforeinput`, sobre la tecla recién apretada, y NO en `conMiles()`**: ahí no se puede distinguir el
+punto que tipeó la persona del que puso el separador automático de miles, y "1.000" más una tecla se
+convertiría en 1,0005. En los campos de **enteros** (cajones, bolsas) el punto sigue sin entrar, que
+es lo que ya pasaba. La regla de fondo no cambió: **el punto sigue siendo miles** para `num()`.
+## 4en. El bulto del remache: 20 kg el crudo, 2 kg el niquelado (2026-09-18)
+
+`[usuario, sobre CV12 que mostraba "sin cajón cargado" en la Tablet: "agregale la uni x bolsa. Del
+crudo que sería 25kg dividido el peso por uni" → corregido dos mensajes después: "es 20 kg"]`.
+
+**El envase de un remache se carga en kg, no en unidades**: `componente.uni_x_cajon` = kg del bulto
+÷ `kg_x_uni`. Los valores de la tabla lo confirman: los 13 remaches **CV** (crudo, "p/Niquelar")
+dan **20,000 kg** exactos y los **V** (niquelado) dan **2 kg** (algunos 10). No es casualidad: se
+cargaron así.
+
+Aplicado el 18/09: `CV12` (id 469) tenía el bulto vacío y se le cargó **20.683 uni** = 20,000 kg
+con su `kg_x_uni` de 0,000967. Nada más se tocó.
+
+⚠ **El 0,00085 kg/uni que se pasó ese día para CV12/V12 quedó DESCARTADO por el propio usuario**
+(`"tiralo"`): el peso sigue siendo **0,000967** en los dos. Queda anotado para que una sesión futura
+no lo "recupere" de este historial creyendo que se perdió.
+
+**Por qué no rompió nada** (medido antes de escribir): `recalcular_maximos_cajones` sólo toca
+`sector_id in (1,2)` y Remache es el **8**, así que el máximo de CV12 (13.272, `est_madre`) no se
+movió; el precio de CV12 es **por unidad** (`precio_proveedor.precio_por_kg = false`), así que el
+costo tampoco; y el stock estaba en 0.
+
+**Lo que sigue sin resolver**: para un sector que no es plástico la pantalla rotula el bulto
+**"cajones"**, así que el remache va a decir "cajones" aunque venga en bolsa. Preguntado al usuario,
+sin respuesta.
+
+
+## 4eo. Los remaches vuelven de Guazzaroni EN LOS MISMOS CAJONES — y el `uni_x_cajon` del niquelado es la BOLSA del fraccionado (2026-09-18)
+
+Salió de una pregunta del dueño: `[usuario 2026-09-18, textual: "Mandé 5 cajones de cv11 y el
+esperado de recepcion de v11 es 50 cajones. Por qué?"]`.
+
+**El esperado estaba bien; el envase con el que se mostraba, no.** El esperado de un P.S. es lo que
+tiene en su poder, o sea la pieza que le **mandamos** (CV11), contada en unidades de esa pieza:
+5 cajones × 20 kg = 100 kg = **136.425 remaches**, correcto. La tablet lo dividía por el
+`uni_x_cajon` de la pieza que **devuelve** (V11 = 2.729 uni = **2 kg**) → 50. El ×10 era la
+diferencia entre dos números que se llaman igual y no son lo mismo.
+
+**Qué es cada número** `[usuario 2026-09-18]`:
+
+| número | qué es de verdad |
+|---|---|
+| `CV11.uni_x_cajon` = 27.285 (**20 kg**) | el **bulto** con el que se le manda el remache crudo a niquelar, y con el que vuelve. Ojo: la pantalla lo rotula *cajones* porque `bultoDe()` decide el rótulo con un regex sobre el nombre del sector (plástico → bolsas, el resto → cajones) — el remache crudo en realidad viene en **bolsa**, y eso quedó anotado como **idea 7353** |
+| `V11.uni_x_cajon` = 2.729 (**2 kg**) | la **bolsa** en la que se fracciona DESPUÉS de recibirlo, con la **matriz de embolsado**. No es un cajón |
+
+`[usuario, textual: "Guazzaroni nos entrega los remaches niquelados en los mismos cajones que se lo
+enviamos. Pero vos tenes que los cajones del ya niquelado es de menos peso porque luego de que
+llegan, con una matriz de embolsado fraccionan en bolsas de 2kg"]` y `[usuario: "si envío 2 cajones
+lo esperado es recibir 2 cajones aprox (el peso niquelado es un poquito mas - muy infima la
+diferencia)"]`. **El dato de la base está bien**: lo que estaba mal era leer la bolsa como cajón.
+
+⚠ **LA REGLA NO ES UNIVERSAL** `[usuario 2026-09-18, textual: "No aplica para todos los casos. Esto
+te lo estoy diciendo en el caso de los remaches"]`. Por eso **la base decide dónde aplica y el front
+obedece**: `tablet_bundle` manda `ent_uxc` / `ent_kgu` (el cajón y el peso de la pieza enviada) en
+las filas de `recibir` **sólo del sector Remache**, y la tablet los prefiere cuando vienen. Los
+otros **105** pares de P.S. quedan exactamente como estaban (el cajón de la pieza devuelta).
+Cuando aparezca otro proveedor que devuelva en el mismo envase, se amplía esa condición — un lugar.
+
+**Se cruza con 4en**, que salió en paralelo esa misma tarde y cargó el bulto de 20 kg de CV12:
+esa sección dice **qué** es cada número; ésta, **con cuál se mira el esperado**. Y contesta a medias
+lo que 4en dejó abierto ("la pantalla rotula 'cajones' aunque venga en bolsa"): el **rótulo** sigue
+mal — es la idea **7353** — pero el **factor** ya es el correcto.
+
+⚠ **Y el envase del PROVEEDOR DE INSUMO es otro más**: `[usuario 2026-09-18, textual: "Cuando vienen
+del prov de insumo vienen en bolsas de 25kg, no 20"]`. O sea, para el mismo remache conviven **tres**
+envases: bolsa de **25 kg** del proveedor (Bella Vista / Mandelli / Suipacha) → cajón de **20 kg**
+para ir y volver del niquelado → bolsa de **2 kg** (algunos 10) del fraccionado interno. La O.C. de
+remaches se pide **en kg** (ver REGLAS_OC_INSUMOS) y hoy **no** redondea a bolsa de 25 kg: queda
+PENDIENTE decidir si se pide en bolsas enteras, como los plásticos.
+
+**Dato al pasar, para cuando haga falta**: los 9 crudos con cajón cargado dan **20,00 kg** clavados
+los 9, y los niquelados dan 2 kg (V1, V2, V4, V9, V10, V11, V12, V13) o 10 kg (V3, V5, V7, V8) —
+o sea que la bolsa del fraccionado no es una sola. **Tres crudos no tienen cajón cargado** (CV6,
+CV9, CV18D): esas filas caen al envase de la pieza devuelta, que es lo único que hay. `[dato
+2026-09-18, GP2.componente]`
+
+## 4ep. En Recibir el número de referencia se llama por lo que es: el STOCK de la contraparte (2026-09-21)
+
+`[usuario 2026-09-21, textual: "En la versión tablet, cuando voy a recibir, en vez de esperado
+quiero que diga Stock tallerista o stock proveedor de servicio según corresponda"]`.
+
+**No es un cambio de número, es un cambio de nombre — y el nombre viejo mentía.** Ese dato nunca
+fue "lo que calculamos que va a traer": es **lo que la contraparte tiene en su poder** según la
+base (`esperado_origen = online_tall` / `online_ps`), o sea lo que le mandamos y todavía no
+devolvió. "Esperado" se leía como una expectativa de esta entrega, y de ahí salieron las dos
+confusiones del 18/09 (4eo: "mandé 5 cajones y el esperado dice 50"). Con el rótulo correcto, el
+operario que ve un número raro sabe qué mirar: el stock del tallerista, no la entrega de hoy.
+
+- **Tallerista** → "Stock tallerista". **P.S.** → "Stock prov. de servicio".
+- **Virgilio sigue diciendo "Esperado"**: ahí el número es su online y el usuario nombró sólo los
+  dos. `[deducido]` — si alguna vez molesta, es un renglón en `rotuloRef()` de la tablet.
+- **El número, su unidad (cajones/bolsas/paquetes) y la alerta de "recibí de más" no se tocaron.**
+- De paso, en la tarjeta el rótulo bajó a su propio renglón chico y gris: "Stock prov. de servicio"
+  en los 21px de negrita naranja se comía tres renglones y tapaba el número, que es lo que se lee
+  de lejos. Vale también para "Sugerido" y "Online sector".
+
+**Ampliación del mismo día — SIN STOCK SE DICE 0** `[usuario 2026-09-21, textual: "pero que me
+diga 0 si no tiene stock"]`. Mostrar el rótulo correcto dejó a la vista un agujero viejo: cuando la
+contraparte no tiene nada nuestro, la tarjeta decía "Stock tallerista" y **ningún número**. No era
+que faltara el dato — `tablet_bundle` manda el esperado del tallerista y del P.S. con
+`coalesce(..., 0)`, o sea que **para esos dos nunca es null** —, era que `textoEnvases()` devuelve
+`""` cuando el número no es > 0. Eso está bien donde nació (el renglón "= N cajones" de abajo del
+campo, que con el campo vacío no escribe nada) y estaba mal acá. Ahora el cero se escribe.
+
+- **`0` y `—` no son lo mismo y siguen separados**: `0` = la base sabe y la contraparte no tiene
+  nada; `—  sin referencia` = el esperado vino **null**, que hoy sólo pasa fuera de tallerista/P.S.
+- **Consecuencia que conviene saber**: con stock 0, cualquier cantidad que se reciba dispara la
+  alerta de "recibí de más" (`exceso = recibido − 0`). Eso **ya era así** antes de este cambio —el
+  número siempre fue 0—, sólo que el operario no lo veía venir. `[dato, GP2.alerta_recepcion]`
+## 4eq. Tanda de correcciones de despiece del usuario (2026-09-21)
+
+Ocho correcciones dictadas de corrido por el dueño en una sola charla. Van juntas porque comparten
+el mismo patrón: **el despiece que estaba cargado no era el que se arma en la planta**, y en la
+mitad de los casos el dato nuevo contradijo algo que ya estaba escrito acá.
+
+### a) Los coladores 026 y 027: "Telametal" **es** José López
+
+`[usuario 2026-09-21, textual]` *"El colador 026 y 027 los arma el prov de art terminado
+Telametal"* → preguntado si era un proveedor nuevo o el mismo, contestó *"Es Lopez Jose"*.
+O sea **Telametal = el `GP2.proveedor_at` id 4 "Lopez Jose"**, que ya tenía los dos coladores
+asignados con 6 entregas históricas cada uno. **No hubo cambio de despiece: ya estaba bien.**
+Corrige de paso lo que decía §4cn (los coladores los hace José López y sólo le damos el cartón,
+`[usuario 2026-09-13]`): sigue siendo cierto, Telametal es el otro nombre del mismo.
+**PENDIENTE, preguntado 3 veces y sin respuesta:** si se guarda como **alias**
+(`contraparte_alias` 'TELAMETAL' → proveedor_at 4, las pantallas siguen diciendo "Lopez Jose") o
+se **renombra** el proveedor a Telametal (cambia el nombre en sus 10 coladores y 24 entregas).
+Hasta que conteste, la base quedó **sin tocar**.
+
+### b) La pinza lleva DOS cachas, no una — y estaba mal en las 6
+
+`[usuario 2026-09-21]` *"El 053 le faltan las cachas azules PC8, lleva 2"*, y al marcarle que los
+hermanos tenían 1: *"los otros 5 también llevan 2 cachas"*. El **053** (Pinza de Fiambre Inox) era
+el único de las seis pinzas **sin `PC8`**; se le dio el alta con cantidad **2** más su ruta espejo
+(insumo → tallerista Pettofrezza → virgilio), y **054, 055, 594, 595 y 596 pasaron de 1 a 2**, en la
+receta y en el paso `insumo` de sus rutas. Lo que dio pie a preguntar: la base ya usaba 2 donde va
+un par (la puntera de ensalada `F11` está ×2 en 054 y 596), así que el 1 de PC8 era el error.
+Plata: PC8 = **$270,49** la unidad → el 053 sube $540,98 y los otros cinco $270,49 cada uno.
+**PENDIENTE:** el **731** (Sacacorcho Combinado Color) también lleva `PC8` y quedó en **1** — no es
+pinza, el usuario dijo "los otros 5" y ahí se paró.
+
+### c) El 059 lo envasa Lucho, no la Fábrica
+
+`[usuario 2026-09-21]` *"El 059 lo envasa Lucho"*. Los **3 pasos** del 059 (Cuchillo de Untar
+Plástico x2) pasaron de tallerista **Fábrica (3)** a **Lucho (5)**: los tres son el mismo acto de
+envasado (PEP9 ×2, CART059, caja A9). Cierra con lo que ya había: Lucho hace los hermanos **519** y
+**719** (Cuchillo Untar Mgo Madera x2), a $72,282 (AyE) y $77,112 (reenvasado).
+**PENDIENTE:** el 059 **no tiene `precio_tallerista`** de nadie, así que al salir de Fábrica su
+costo quedó subvaluado hasta que se cargue lo que cobra Lucho.
+
+### d) El 070 lo arma la FÁBRICA, y le faltaban dos partes
+
+`[usuario 2026-09-21]` *"Al 070 hay que agregarle Etiqueta 070 (ETIQ070) y Set Tuppers (GRJ30)"*,
+*"Lleva 1 de c/u"*, *"Los provee cimarron"*, y después *"El 070 arma fábrica"*. El 070 (Set Tapers
+0,8/1,5/3 Lts) tenía **sólo la caja A4** y su ruta colgaba del `proveedor_at` **"Pettofrezza" (id 9,
+`activo=false`** por duplicado con el tallerista Pettofrezza Rafael id 11): al pasar a Fábrica, esa
+dependencia de una contraparte desactivada **se fue sola**. Alta de **`GRJ30` "Set Tapers"**
+(Sector Garage, proveedor Cimarrón, ×1, con ruta propia); los 3 pasos del artículo son hoy
+`tallerista → Fábrica`, y el stock de sus insumos vive en la ubicación de Fábrica (23).
+**El nombre de la pieza NO es el que dictó el pedido**: se dio de alta como *"Set Tuppers"* (la
+palabra que usó el usuario) y unas horas después él mismo la corrigió `[usuario 2026-09-21: "y grj30
+que la descripcion sea Set Tapers"]` — **`GRJ30` = "Set Tapers"**, igual que el artículo 070 que
+arma. *Tupper* es la marca; *taper* es como se llama acá y es lo que dice el resto de la base.
+
+### e) ~~Lo que se compra es el ROLLO, no la etiqueta~~ — **DADO DE BAJA EL MISMO DÍA**
+
+**LA ETIQUETA NO SE EVALÚA POR AHORA** `[usuario 2026-09-21, textual: "En el articulo 070 aparece
+el rollo etiquetas. Eliminá, no queremos evaluar por ahora las etiquetas. Eliminá de todos los art
+que agregaste"]`, ejecutado con el "Sí" sobre el SQL exacto. Se borró **todo** lo que había entrado
+por este punto, unas horas después de cargarlo: `ROLLOETIQ` (comp 934), sus 2 filas de
+`articulo_componente` (070 y 071), sus 2 rutas (1054 y 1055) con los 6 pasos, sus 2 filas de
+`inventario` (las dos en 0) y el proveedor **Sumatik** (`proveedor_insumo` 49), que **sólo existía
+por la etiqueta** — sin O.C., sin recepciones y sin precios. **El 070 queda `GRJ30 ×1 + A4 ×0,25`
+y el 071 `GRJ21 ×1 + A4 ×0,25`.** El costo no se movió: el rollo nunca tuvo precio cargado.
+
+**Ojo con el nombre del proveedor**: el pedido de baja decía *"Y saca melinox por lo tanto"*, y
+**Melinox no tiene nada que ver con la etiqueta** — es el `proveedor_at` 7 que entrega el **761**
+Cucharita Matera y el proveedor de `Z21` y `Z22`, con precio cargado; borrarlo dejaba al 761 sin
+quién lo entrega y rompía `test_programa_prov_at.js`. El que entró **por** el rollo era **Sumatik**.
+Se avisó antes de ejecutar y Melinox quedó intacto. **Regla que deja: un "sacá X por lo tanto" se
+verifica contra quién entró en esa misma tanda, no contra el nombre que uno recuerda.**
+
+**Lo que igual vale la pena no perder, para cuando se retome:** lo que se compra es el **rollo**
+(8.000 etiquetas), no la etiqueta suelta — *"agregá como rollo etiquetas, NO etiq070… en realidad
+se compra el rollo"*, *"8000 etiquetas en un rollo"*, *"El 071 también lleva etiqueta"*. Va en
+**Sector Cartón**, no en un sector propio (*"No crees el sector etiquetas. Pone dentro de sector
+carton"*), con `carton_formato` en **null** para que no le apliquen múltiplos, familias ni pliegos;
+la cantidad es una **fracción como la caja** (1 de 8.000 = **0,000125**, cargarla con "1" mete un
+rollo entero por artículo); y el código por artículo (`ETIQ070`) **no se crea**: imprimirle el
+código es un paso posterior de la casa, no algo que se compre.
+
+### f) La arandela chica inox era `K9` en Crudo; es `E3` en Procesado
+
+`[usuario 2026-09-21, textual]` *"La arandela chica afila inox dice sector K9 pero es sector
+procesado E3"*. El componente id 39 pasó a **código `E3` + Sector Procesado**, y su fila de
+inventario (máximo 87.890) se mudó de la ubicación Crudo a Procesado. Cierra con la estructura:
+sale de matriz desde el fleje `IF2` y va **derecho al tallerista** en las 3 rutas de los afiladores
+(097, 114, 504), sin pasar por zincado ni cromado. **OJO con el código repetido**: en el Excel viejo
+`E3` era la arandela **grande** (hoy `F7`); el detalle y cómo distinguirlas está en
+`Renombres_Sectores.md`. La idea **7245** quedó actualizada (nombraba `K9`).
+
+### g) El nombre de una ruta mentía sobre el insumo que lleva — 110 casos
+
+Salió de la 670: se llamaba *"Insumo GRJ13 -> Art 071"* y lleva **GRJ21** (GRJ13 es el Cepillo Limpia
+Mamadera, otra pieza). Barrido completo: de 234 rutas cuyo nombre no coincide con el código real,
+**124 son apodos** legítimos (`CART053`, `V6`, `PLIEGO557`, "Caja") y **110 nombraban otro
+componente que existe de verdad** — esas son las que engañan al leer (la 522 decía "A9" y lleva A3).
+Se corrigieron las 110 reconstruyendo el nombre desde el insumo real y respetando el sufijo de
+tallerista; los 124 apodos **no se tocaron**. Invariante nuevo de la casa, de hecho: el nombre de la
+ruta no es decorativo, se lee para saber qué se manda.
+
+### h) Lo que quedó rojo y NO es de esta tanda
+
+`AE_paso_virgilio_y_codigo_dan_distinto` da **2**: los artículos **567** (Corta Palta) y **537**
+(Pela y Pica Ajo) tienen su componente terminado en el sector 12 pero **ninguna ruta**, así que el
+paso `virgilio` no existe. Es preexistente, no lo tocó esta sesión. El resto de los invariantes que
+pegan con lo que se cambió (A, I, K, L, S, U, W, X, Y, AA, AB, AD) dan **0**.
+
+## 4er. OTRO CARTÓN: cuando no hay stock del que va, se manda el de otro artículo y se le pega la etiqueta (2026-09-21)
+
+`[usuario 2026-09-21, textual: "puede pasar de que no haya stock del cartón que quiero mandar y le
+mande el cartón de otro artículo y se le pegue la etiqueta del artículo correspondiente. Entonces lo
+tengo que modelar para que baje el stock del cartón que le mando realmente"]`. Vale para los **dos**
+que reciben cartón: **tallerista** y **prov. de art. terminado**.
+
+**El envío nunca fue el problema.** El movimiento descuenta el `comp_id` que se elige, así que el
+stock que baja siempre fue el del cartón que sale de verdad. **El agujero estaba en el CONSUMO**: al
+entregar el artículo terminado, `recepcion_virgilio` consume la **receta** (`articulo_componente`),
+o sea el cartón **oficial** — que en poder del proveedor no está. Resultado sin esto: el oficial
+quedaba **negativo** en la ubicación del tercero y el sustituto **clavado ahí para siempre**.
+
+**El modelo: una columna, sin tabla nueva.** `GP2.movimiento.sustituye_comp_id` = el cartón OFICIAL
+al que reemplaza el de `comp_id`. Lo llevan las **dos puntas**: el envío ("este va en lugar de
+aquel") y el consumo ("este se gastó a cuenta de aquel"). El **saldo sale del ledger**
+(`v_carton_sustituto_saldo` = envíos − consumos por ubicación), así que no hay derivada que se
+desincronice y **borrar un movimiento se auto-corrige** — mismo criterio que el resto de GP2.
+
+**Cómo se consume**: al recibir el terminado, cada línea de receta de sector 10/11 gasta **primero
+el sustituto con saldo** (FIFO por fecha del envío) y **el resto el oficial**. Si nunca hubo
+sustitución, sale igual que antes. `recepcion_virgilio` acumula lo asignado **dentro de la misma
+llamada** (`v_usado`): la vista todavía no ve los movimientos que se están armando, y sin eso dos
+artículos del mismo remito gastarían dos veces el mismo saldo.
+
+**Dónde se declara**: en la **Tablet**, modo Enviar, adentro del tallerista o del prov. AT
+`[usuario 2026-09-21: "dentro de envío a tallerista y prov at en la versión tablet"]`. Al final de
+sus tarjetas aparece **➕ Otro cartón** → catálogo de los que ese destino **no** usa (RPC
+`cartones_para_reemplazo`, no viaja en el bundle: son ~190 filas que casi ningún envío mira) →
+**en reemplazo de cuál** de los suyos. Con un solo oficial del mismo sector no pregunta. La fila
+entra como una tarjeta más, marcada *"↔ en lugar de XXX"*, y se carga en paquetes como cualquier
+cartón. **Cartón por cartón y caja por caja**: la base rechaza reemplazar un cartón con una caja, y
+que el reemplazado no sea pieza de ese destino (si no, la sustitución no se consumiría nunca).
+
+⚠ **Lo que NO cambia**: la receta y el **costo**. El artículo sigue costeando con **su** cartón; la
+sustitución es física, no contable. Si el sustituto vale distinto, esa diferencia hoy no se ve.
+
+**Dos cosas que aparecieron al medir la cadena, y conviene tener a mano** `[dato 2026-09-21]`:
+1. **Mandar cartón a un tallerista por `EnviosTalleristas_GP2.html` (escritorio) REVIENTA**: esa
+   pantalla lista los cartones (141 `ruta_paso` de tipo tallerista los tienen como entrada) pero
+   pide **Kg**, y los **180 cartones no tienen `kg_x_uni`** → `to_canonical` levanta excepción. No
+   hay dato sucio porque **nunca se usó** (0 movimientos `envio_tallerista`). El camino bueno es la
+   **tablet**, que los manda en paquetes.
+2. **El cartón no está en NINGÚN `componente_bom`** (0 de 37): al tallerista que entrega una
+   *parte*, el cartón **no se le descuenta nunca**. Sólo se consume cuando lo que entrega es el
+   **artículo terminado** (`recepcion_virgilio`), que es justo el caso que el dueño confirmó
+   `[usuario 2026-09-21, elegido entre tres: "el artículo terminado"]`.
+
+## 4es. El 311 y el 312 llevan UN capuchón, el PA13 — el PA18 no va (2026-09-21)
+
+`[usuario 2026-09-21, textual: "El 312 y 311 usan solo PA13, no usan PA18"; ejecutado con su
+"Eliminá PA18 para esos dos art"]`
+
+**Qué estaba mal:** el **311** (Cuchillo de Torta) y el **312** (Pala de Torta) tenían en la receta
+los **dos** capuchones — `PA13` *Capuchón Batidor LK* **y** `PA18` *Capuchón Espátula LK* — más el
+mango `PA17`. Un artículo lleva **un** capuchón; el segundo era grasa que venía de la carga
+original.
+
+**Qué se borró** (sólo datos, cero DDL): las 2 filas de `articulo_componente` del PA18 (ids 768 y
+773) y las **2 rutas enteras** que lo traían, con sus 8 pasos — `814 "Insumo PA18B -> Art 311"` y
+`819 "Insumo PA18B -> Art 312"` (el circuito era `PA18B` → P.S. 8 → `PA18` → tallerista 6 → art →
+Virgilio). Los dos quedan con **5 componentes y 5 rutas**, una por insumo, que es como tiene que
+cerrar.
+
+**Lo que cambió el número** `[dato 2026-09-21]`: el consumo de `PA18` baja de **14.232 a 13.922
+uni/mes** y de 10 a 9 artículos, o sea baja el sugerido de O.C. de `PA18B`. A `PA13` no le cambia
+nada (ya estaba en los dos). El costo del 312 baja **$77,74/uni**, que es lo que vale el capuchón.
+
+**LA TRAMPA DEL NÚMERO, que vale para cualquier cuenta de consumo:** la baja es **310**, no las 336
+que salen de sumar las dos demandas de `est_madre` (311 → 34, 312 → 302). Son dos cosas:
+1. **El 311 está `discontinuado = true` y NO cuenta**: `v_consumo_demanda` filtra `not
+   a.discontinuado`. Sus 34 uni/mes están en `est_madre` pero no llegan a ninguna compra. Igual se
+   le corrigió la receta, porque el día que se reactive arrastraba el error.
+2. **Existe `312L` con 8 uni/mes**, y la vista lo mapea al **mismo** artículo 312
+   (`regexp_replace(em.cod,'L$','')`). O sea el 312 real consume por **310**, no por 302. Antes de
+   explicar una diferencia en un consumo, mirar si el código tiene hermano con `L`.
+
+**Lo que sigue roto y NO se tocó** (queda preguntado): `PA17` *Mangos Cuch y P Torta* **no tiene
+precio** (`faltan_precios = 1`), así que el costo del 312 sigue incompleto aunque el capuchón de
+más ya no esté; y el **311 discontinuado con demanda viva en `est_madre`** es un dato que se
+contradice solo.
+
+Invariantes de `db/verificar.sql` que pegan con lo tocado (L, U, W, X, AA, AB, AD): **0**. `AE` da
+**2** y es **preexistente** (artículos 567 y 537, ya anotado el 2026-09-21).
+
+## 4et. El stock en poder de un tercero se cuenta con el CAJÓN QUE ANOTÓ LOGÍSTICA, no con el teórico (2026-09-21)
+
+`[usuario, textual: "Cuando mando un cajón de 21kg a guazzaroni de cv1, después en recepción me
+aparece para recibir 1.05 cajones" → "tiene que aparecer en su stock los cajones que escribe
+logística, no los que se calcula a partir de los kg"]`.
+
+**El número era correcto y aun así estaba mal.** El movimiento real (id 85501, 21/09): CV1, Sector
+Remache → Guazzaroni, `cantidad = 21 kg`, `cajones = 1`, delta 60.000 unidades. La Tablet mostraba
+ese stock dividiendo por el cajón del maestro — `componente.uni_x_cajon` de CV1 = 57.143 uni, que
+son **20,000 kg exactos** (ver 4en: los remaches se cargaron así a propósito) — y daba
+60.000 / 57.143 = **1,05 cajones**. Salió UN cajón del galpón y la pantalla decía 1,05.
+
+**La distinción que hay que guardar**: `uni_x_cajon` es **cuánto entra en un cajón en promedio**
+(sirve para el sugerido, los máximos y las O.C.), no **cuánto pesó el cajón que salió**. Para el
+stock en poder de un tercero manda el segundo, y ese dato ya se venía guardando: `movimiento.cajones`
+es lo que el operario **anota** al enviar (desde la v1.22 de la Tablet viaja el número tipeado, no
+el calculado de los kg).
+
+**Cómo quedó** (sin tabla nueva, todo sale del ledger):
+1. `GP2.v_caj_contraparte` — por (ubicación de la contraparte, componente): `uni_x_cajon_anotado` =
+   unidades enviadas ÷ cajones anotados, sólo sobre movimientos **con cajones > 0**.
+2. `envios_ps_bundle` manda `sc_unixcaj_anot` y `tablet_bundle` manda `ent_uxc_anot` (este último
+   sólo donde ya mandaba `ent_uxc`: P.S. + sector Remache, la regla de 4eo).
+3. El front lo prefiere sobre el maestro: `GP2EE.uxcEnPoder()` en Envío PS y Entrega PS,
+   `uxcRef()` en la Tablet. **Sin cajones anotados no cambia nada** — los talleristas no los anotan
+   (`crear_envio_tallerista` no tiene `p_cajones`) y siguen con el cajón del maestro.
+
+**Por qué NO se llevó un segundo libro de cajones** (enviados − devueltos, que era la otra forma):
+al RECIBIR nadie anota cajones — `tablet_registrar` llama a `crear_entrega_ps` con `p_cajones =>
+null` —, así que ese saldo nunca bajaría. Con el factor anotado el número **se concilia solo contra
+el kg**: si el proveedor devuelve la mitad dice medio cajón, y si devuelve todo dice cero.
+
+**Lo que el usuario pidió además, en la misma charla** `[usuario, textual: "En recepcion de
+proveedores de servicio se tiene que seguir la lógica de primero cargar lo que dice el remito y
+despues hacer el control (como en recepcion de insumos) en el remito que sea en kg y despues
+controlar en kg y cajones (o unidad de medida correspondiente según la parte)"]`: **ya está hecho,
+ver 4eu** (esta línea decía "queda pendiente" y se corrigió el mismo día, cuando se construyó).
+
+
+## 4eu. Recepcionar un P.S. son DOS pasos: primero el remito, después el control (2026-09-21)
+
+`[usuario, textual: "En recepcion de proveedores de servicio se tiene que seguir la lógica de
+primero cargar lo que dice el remito y despues hacer el control (como en recepcion de insumos) en
+el remito que sea en kg y despues controlar en kg y cajones (o unidad de medida correspondiente
+según la parte)"; y enseguida: "Despues de recepcionar tengo que ir al control"]`.
+
+**La forma ya existía en la casa y se copió tal cual**: en la recepción de insumos el remito deja
+`recepcion_insumo` con `controlado=false`, y después `controlar_recepcion_kg` guarda lo declarado,
+**pisa la cantidad y ajusta el movimiento** — o sea el stock queda con lo que se contó, no con lo
+que dijo el papel. Lo mismo, ahora, para lo que entrega un proveedor de servicio.
+
+**Cómo quedó** `[usuario 2026-09-21, elegido entre opciones: control en PANTALLA PROPIA a la que la
+tablet manda al cerrar, y los dos pasos EN LA TABLET]`:
+
+1. **El remito** se sigue cargando donde se cargaba (Tablet → Recibir → P.S.), sin cambios: viaja
+   el kg y `crear_entrega_ps` mueve el stock como siempre.
+2. Al registrar, la Tablet **se va sola** a `Tablet/ControlEntregaPS_GP2.html`, sin cartel
+   intermedio — mismo criterio que insumos `[usuario 2026-09-03: "me gusta que me mande directo"]`.
+   **Única excepción**: si quedó una alerta de "recibí de más" se muestra la fase 3 con el aviso y
+   el paso al control va con un botón; esa alerta el operario tiene que leerla.
+3. **El control** se carga por pieza: lo CONTADO (en kg o en unidades, según la pieza) y los
+   BULTOS contados (cajones, o el envase del proveedor: AJ entrega en paquetes). Los campos
+   **arrancan vacíos a propósito**: el control es un dato nuevo, no una confirmación — precargarlo
+   con el remito invita a firmar sin contar. El remito queda arriba, a la vista, para comparar.
+4. `controlar_entrega_ps` guarda la fila en `GP2.entrega_ps_control` (declarado + controlado +
+   bultos + quién) y pisa `movimiento.cantidad` / `cantidad_transformada` / `cajones`; los triggers
+   reacomodan el inventario de las dos puntas solos.
+5. **Tolerancia**: la misma del pesaje de insumos (`parametro.tol_ctrl_peso_pct`, hoy 2 %). Abajo
+   de eso se registra sin preguntar; arriba, la tarjeta se pinta y el confirmar avisa que el stock
+   va a quedar con lo contado.
+
+**Qué es "pendiente de controlar"**: un movimiento `entrega_ps` SIN fila en `entrega_ps_control`.
+No hace falta un flag: el pendiente sale del ledger, igual que el saldo de cartones sustitutos
+(4er). Los pendientes no caducan — una entrega sin controlar de hace un mes se sigue viendo — y el
+encabezado de la Tablet los cuenta (`Control (N)`), que es lo que evita que quede algo colgado.
+
+⚠ **La entrega de escritorio (`Prov Serv/Entregas/EntregaPS_GP2.html`) NO manda al control**: sólo
+la Tablet, que es donde el usuario dijo que se hace el circuito. Lo que se cargue por ahí igual
+aparece como pendiente en la pantalla de control, así que no se pierde.
+
+⚠ **Lo que el control NO reajusta todavía**: si el P.S. es FASONERO (`pedido_por_oc`, hoy Maspoli),
+`crear_entrega_ps` descontó la O.C. con lo que decía el remito y el control no corrige esa resta.
+Es la misma limitación que tiene el control de insumos (`controlar_recepcion_kg` tampoco vuelve
+sobre la O.C.), y se deja anotada en vez de inventar una regla: cuando aparezca un desvío real en
+un fasonero hay que decidir si la O.C. sigue al remito o al control.
+
+## 4eu. El 731 no lleva cachas azules: lleva el ESPIRAL (2026-09-21)
+
+`[usuario 2026-09-21, textual: "Saca las cachas azules del 731 y agregá el espiral d1"; ejecutado
+con su "Sí"]`
+
+**El síntoma que lo delata, y que estaba a la vista:** el **731** (Sacacorcho Combinado Color)
+llevaba `V1` *Remache Espiral* **sin el espiral** — el remache de una pieza que no figuraba en la
+receta. Lo que sí tenía era `PC8` *Cachas Azules*, que en un sacacorchos no va.
+
+**Se borró:** la fila `articulo_componente` id 395 (`PC8` x1) y la ruta **425 `"Insumo PC8 -> Art
+731"`** con sus 3 pasos.
+**Se dio de alta:** `D1` *Espiral Sacacorcho* x1 y la ruta **1056 `"Insumo D1 -> Art 731"`**
+(`insumo D1 → tallerista 6 → 731 → virgilio`), calcada de la **576 del 531**.
+
+**EL 731 Y EL 531 SON EL MISMO PRODUCTO** `[dato 2026-09-21]`: los dos se llaman *Sacacorcho
+Combinado Color* y comparten `C8`, `D4`, `D14`, `V1`, `V2`, `V3`. Lo único que los separa es el
+**cuerpo** (`B7` serigrafiado en el 731, `B4` pintado azul en el 531), la **caja** (A8 / A11) y el
+**cartón** (T3B / E3B). El 531 ya llevaba `D1` y nunca llevó `PC8`: **el hermano era la prueba**.
+Cuando dos códigos son el mismo producto, la receta del que está bien es el patrón, no hay que
+adivinar.
+
+**PC8 era del rubro equivocado** `[dato 2026-09-21]`: lo usan las **6 pinzas** (053, 054, 055, 594,
+595, 596), todas **x2**, y el 731 era el único que no es pinza, y con x1. Esto **cierra el
+pendiente** que había dejado la tanda de correcciones del mismo día (`4eq`: *"el 731 también lleva
+PC8 y quedó en 1"*): no había que ponerle 2 — había que **sacarlo**. Ahora `PC8` queda en 6
+artículos y 1.604 uni/mes.
+
+**Lo que mueve la plata, y va para arriba:** el costo del 731 **sube $97,91/uni** (−$270,49 la
+cacha, +$368,40 el espiral) sobre **404 uni/mes**, o sea el artículo estaba **subestimado ~$39.556
+al mes**. El consumo de `D1` sube a 10.102 uni/mes: más O.C. de espirales. Una corrección de
+receta que *sube* el costo es la que más urge, porque mientras tanto se estuvo cotizando barato.
+
+Queda con **10 componentes y 10 rutas**, una por insumo. Invariantes de `db/verificar.sql` que
+pegan con lo tocado (L, S, U, W, X, AA, AB, AD): **0**. `AE` da **2** y es **preexistente**
+(artículos 567 y 537).
+
+## 4ev. Buscar un componente sin saber en qué rubro está (2026-09-21)
+
+**Lo que dijo el usuario, textual:** *"Que me deje buscar por fuera de algún sector y por dentro.
+Porque hoy en día si no se a que sector pertenece el componente tengo que entrar uno por uno"*.
+Es sobre `Stocks General/StockGeneral_GP2.html`, cuyo buscador filtraba **solo el rubro abierto**.
+
+**Por qué dolía más de lo que parece:** no era solo cuestión de clicks. De las **1.324 filas de
+`GP2.inventario`, 275 no tenían ningún botón que las mostrara** — 269 de Virgilio, 5 de inyectores
+y 1 de un sector sin rubro en el selector (`Y1` *Cuchilla para Afilar*, Sector Afilado, con máximo
+43.946). Entrando "uno por uno" por los 15 rubros esas filas **no aparecían nunca**.
+
+**Cómo quedó (v2.1.0):** rubro `🔎 Todos los rubros` (una tabla con todo el inventario, columnas
+`Rubro` + `Dónde`, sin columnas de movimiento porque cada rubro tiene las suyas) y, estando adentro
+de un rubro, el renglón **"También en otros rubros: …"** con la cuenta por rubro y el salto en un
+click conservando lo tipeado. Las filas sin rubro propio se muestran igual, etiquetadas por lo que
+son (Virgilio, Inyector, o el nombre del sector).
+
+**El dato sale de `movimientos_bundle`, que la pantalla YA carga** (`D.inv` es el inventario
+entero): **cero RPC nuevas**. Los únicos dos lugares que no viven ahí —prov. AT y tránsito PS—
+se suman desde `stock_general_extra_bundle`, igual que en sus rubros.
+
+**Regla que deja, para cualquier pantalla con selector:** un filtro que solo mira la pestaña
+abierta obliga al usuario a saber la respuesta antes de preguntar. Si el índice completo ya está
+en memoria (y acá lo estaba), la búsqueda transversal no cuesta nada y encima destapa lo que
+ningún botón mostraba.
+
+## 4ew. El 863 lleva mango de MADERA, aunque se llame "Mgo Chef" (2026-09-21)
+
+`[usuario 2026-09-21, textual: "El 863 no usa ni PC6 ni PB6 ni PA19"; ejecutado con su "Sí", después
+de plantearle que el nombre del artículo decía lo contrario]`
+
+**La contradicción, que vale más que el cambio:** el **863** se llama *"Corta Pizza Gastro. **Mgo
+Chef** Ø 8 Cm"* y lo que había que sacarle era justamente `PA19` **Mangos Chef**. Parecía un error
+del pedido. No lo era: **el 863 llevaba DOS mangos**, `PA19` (chef) y `PEP8` (*Mango Madera Pizza
+Ø9*), y el que queda es el de madera.
+
+**Cómo se probó antes de ejecutar** `[dato 2026-09-21]` — el hermano:
+
+| | receta |
+|---|---|
+| 863 (después) | A8, E9, LL1, **PEP8**, S1A, V12, Z35 |
+| 564 *"Corta Pizza 8cm **Mgo Madera**"* | A3, E9, F4B, LL1, **PEP8**, V12, Z35 |
+
+Idénticos salvo **caja** (A8 / A3) y **cartón** (S1A / F4B). Y los otros dos que se sacaron son los
+accesorios que acompañan al mango chef en los 5 artículos que lo usan de verdad (709, 720, 722,
+856, 857): `PB6` *Inser. Neg. Espat* y `PC6` *Ojales Neg/Blanco*. **Los tres son un kit y salen
+juntos.** El corta pizza que sí es de mango chef es el **862**, que lleva `PA19` sin `PEP8`.
+
+**Entonces lo que está mal es la DESCRIPCIÓN del 863, no la receta** `[deducido 2026-09-21, sin
+confirmar]`. Se dejó el nombre como está: el dueño no contestó si el nombre comercial se corrige.
+**Queda preguntado.**
+
+**Se borró:** `articulo_componente` ids 779 (`PA19`), 780 (`PB6`), 781 (`PC6`) y las **3 rutas**
+825 / 826 / 827 (`"Insumo PA19|PB6|PC6 -> Art 863"`) con sus 9 pasos. Queda con **7 componentes y
+7 rutas**.
+
+**Plata:** el costo del 863 baja **$381,09/uni** sobre 34 uni/mes (~$12.957/mes), y es **piso**
+porque `PC6` **no tiene precio cargado** (`faltan_precios = 1`), o sea que la baja real es mayor y
+hoy no se puede medir. Consumo: `PA19` 13 → 12 artículos (1.336 uni/mes), `PB6` 6 → 5 (90),
+`PC6` 4 → 3 (134).
+
+Invariantes de `db/verificar.sql` que pegan con lo tocado (L, S, U, W, X, AA, AB, AD): **0**. `AE`
+da **2** y es **preexistente** (artículos 567 y 537).
+
+**REGLA QUE DEJAN LAS TRES CORRECCIONES DE HOY** (`4es` el 311/312, `4eu` el 731, ésta): cuando un
+artículo tiene **dos piezas que cumplen la misma función** — dos capuchones, una cacha donde va un
+espiral, dos mangos — **una sobra**, y el que dice cuál es el **hermano**: el artículo que hace lo
+mismo y está bien cargado. El nombre del artículo **no** es evidencia; la receta del hermano sí.
+
+## 4ex. Una botonera que ya eligió se cierra; Sector y Proveedor son dos cajas (2026-09-21)
+
+[usuario, textual] *"quiero que cuando toco un sector me desaparezca el resto de los sectores y
+además haya un botón que diga Todos"* + *"separame bien lo que es sector y proveedor porque no se
+entiende bien la separación"*. Dicho sobre `Compras/OC_GP2.html` (v1.34.0), pero es una **regla de
+pantalla**, no un arreglo de esa pantalla: vale para cualquier botonera de filtro de GP2.
+
+1. **Elegido = el resto desaparece.** Con un sector elegido se ve **ese chip y nada más**, más un
+   chip **"Todos"** que lo suelta y devuelve la botonera entera. Los 9 sectores ocupaban dos
+   renglones **después** de elegir, que es justo cuando ya no se miran.
+2. **Cada filtro, su propia caja**, con la etiqueta adentro a la izquierda. Dos botoneras pegadas
+   una debajo de la otra, sin borde, se leen como una sola lista corrida — por eso el usuario no
+   veía dónde terminaba Sector y empezaba Proveedor.
+3. **La caja abraza el contenido** (`inline-flex`): con un sector elegido queda chica, no una barra
+   vacía a lo ancho. Es la regla de la casa de no dejar huecos.
+4. **El PROVEEDOR no se colapsa, y es a propósito** [deducido, sin confirmar]: ahí se **compara**
+   entre proveedores del mismo sector (quién cotiza más barato la misma caja: Corrugadora contra
+   Recicor, que entrega las mismas 11 y ~19% más barato), y esconderlos
+   obligaría a abrir y cerrar en cada comparación. El sector, en cambio, se elige una vez. Si el
+   dueño lo pide, es la misma línea de código.
+5. **"Todos" no muestra todo:** sin sector no hay lista (regla del 2026-09-04, *"si no pongo el
+   sector y no pongo el proveedor, que no me aparezca la lista"*), así que "Todos" vuelve al cartel
+   "Elegí un sector". El chip elegido también se sigue soltando tocándolo, como siempre.
+
+## 4ey. El sustento del consumo sale de la O.C.: módulo propio "Consumo x Componente" (2026-09-21)
+
+**Lo que dijo el usuario, textual:** *"Quiero que me hagas un módulo que pueda ver por componente,
+por sector, el consumo... por ejemplo, ya las órdenes de compra, hay algo parecido, de que yo en
+PB6 cuando toco el máximo me dice en qué artículo se usa. Bueno, lo quiero eso, pero afuera. Otro
+módulo aparte"*.
+
+**Lo que había:** el desglose del Máximo de la O.C. (`oc_maximo_desglose`, pantalla
+`Compras/OC_GP2.html`) y el popup compartido `consumo-detalle.js`, que ya contestaba "qué artículos
+usan esta parte". El problema no era la información: era **el lugar**. La O.C. lista sólo lo
+**comprable** y agrupado por rubro de compra, así que para mirar el sustento había que entrar a
+comprar, y los componentes que no se compran no se podían mirar en ningún lado.
+
+**El número: 567 componentes tienen consumo atribuido, y la O.C. muestra una fracción.** Los
+**193 de los sectores que NO son insumo** (`sector.es_insumo = false`: Procesado 84, Crudo 75,
+Movimiento 33, Afilado 1 — se fabrican, no se compran) no aparecían en ninguna pantalla con su
+consumo mensual.
+
+**Cómo quedó:** `Consumo/Consumo_GP2.html` (grupo Despiece del menú, al lado de *Despiece x
+Artículo* — son las dos puntas del mismo mapa: del artículo a sus partes, y de la parte a los
+artículos que la piden). Selector por sector con la cuenta de componentes, búsqueda, orden por
+consumo de mayor a menor, CSV, y al tocar la fila el mismo popup de siempre. Una sola RPC nueva,
+`consumo_bundle()` (~170 KB, 567 filas).
+
+**No hay cuenta nueva: es el mismo motor que decide las compras.** `uni/mes` sale de
+`v_consumo_componente`, el kg/mes de fleje de `v_consumo_fleje_kg`, y el kg/mes de resina del mismo
+rollup por pieza que ya usaba `oc_maximo_desglose` (peso × consumo × `inyeccion_desperdicio_pct`).
+
+**Lo que destapó, y es el hallazgo:** una **resina no está en ninguna receta**, así que
+`v_consumo_demanda` no la toca y el popup le contestaba *"ningún artículo de la Est Madre llega a
+esta parte"* — justo donde hay más kg en juego (9 resinas, **1.602,65 kg/mes**, el PP 2630 solo
+807). El sustento de una resina son las **PIEZAS** que se inyectan con ella, no los artículos. Se
+le agregó esa rama a `consumo_detalle` (clave `base`: `articulos` | `piezas`) y al popup, así que
+también la ganan Pintores y Orden de Producción.
+
+**Dos cosas que quedaron AFUERA a propósito:**
+1. **El sector Terminado (198 componentes).** Un terminado no se consume, se vende: su número es la
+   proyección de la Est Madre del artículo. Mezclarlo haría leer como consumo lo que es demanda.
+2. **Stock y máximo.** Eso es la O.C.; esta pantalla contesta *cuánto se gasta y quién lo gasta*.
+
+**Trampa a recordar al leer cualquier consumo de esta pantalla** (ya estaba en 4es): el consumo
+sale de la Est Madre, así que un artículo `discontinuado` aporta **cero** aunque tenga proyección
+viva, y un código con hermano `L` (p. ej. `312L`) suma al mismo artículo. Una diferencia entre "lo
+que suman las recetas" y lo que muestra la pantalla casi siempre es una de esas dos.
+
+## 4ez. Los Pisa Papas (121, 315, 609): el disco con vástago y el armado son de Pettofrezza (2026-09-22)
+
+> ⚠ **CORREGIDA EL 2026-09-23 POR LA §4fl**: el `M1` (disco con vástago) **desaparece** del modelo.
+> A Rafael se le manda el `M2` y el vástago **sueltos**, como cualquier otro componente. Lo que sigue
+> vale como historia de por qué el paso existió un día; el modelo vigente es el de la §4fl.
+
+`[usuario 2026-09-22, textual: "El 121 arma el disco con vástago Rafael Pettofrezza y también lo envasa
+el. Modifica las rutas… y que se le pueda mandar todo en envio talleristas"` y, para los otros dos:
+`"Para el 315 y 609 también hace el vástago"`]
+
+- **Antes** `[dato]`: el `M1` (*Disco Inox C/Vástago Alu* = `M2` + `V18C`) lo hacía la **Matriz 113**
+  en los tres, y el 121 lo armaba y envasaba **Cavallero German**. El `V18C` **no estaba en ninguna
+  ruta**, así que no se le podía mandar a nadie.
+- **Ahora**: el paso `M2 → M1` es tallerista **Pettofrezza Rafael** (id 11) en las rutas 136, 553 y
+  558; el armado del 121 (rutas 136, 266, 267, 268, 477) pasó de Cavallero a Pettofrezza; y hay una
+  ruta nueva por artículo `insumo V18C → Pettofrezza (V18C→M1) → Pettofrezza (M1→art) → virgilio`.
+- **Envío Talleristas no necesitó código**: `talleristas_bundle` lee `v_contraparte_parte`, que sale
+  de `ruta_paso`. Verificado: la entrada de Pettofrezza ya lista `M2`, `V18C`, `PA10B`, `PC11`, `I3C`, `A3`.
+- **Cavallero German quedó sin rutas** (tenía sólo el 121; 0 stock y 0 movimientos: no quedó nada colgado).
+- ⚠ **Costo**: la Matriz 113 salió de los tres. Pettofrezza **no tiene precio para el 121** (el de
+  Cavallero, $85, ya no aplica); el 315 y el 609 tienen $140 "AyE". Pendiente que el usuario diga
+  el precio del 121 y si el disco con vástago va aparte o está dentro del AyE.
+- ⚠ Hay **dos componentes con código `M1`**: 146 (el disco) y 823 (*Cartón 220*). Buscar por id.
+
+## 4fa. El maestro de matrices se completó con el del vecino: 406 matrices (2026-09-22)
+
+`[usuario]` textual: *"En caso que falten matrices listadas en Gestión Productiva 2.0, quiero que les
+sumes los N° y Descripción de las matrices faltantes que si aparezcan en Gestión Productiva Entero"* +
+*"Carga las 290 que mencionas y también la de pruebas; las que dicen discontinuas no las cargues...
+quiero que les cargues en Tiempo cargado el valor cargado en T Hist... si alguno de los tiempos
+cargados en Gestión Productiva 2.0 es diferente... deja el de Gestion Productiva Entero"*.
+
+- **EXCEPCIÓN A LA REGLA 0, pedida por el dueño y de una sola vez:** `GP2.matriz` pasó de 115 a
+  **406** filas copiando N°, descripción y `Tiempo_Historico` de `public."Matrices"` (413 filas).
+  No quedó nada leyendo `public`: fue un INSERT puntual, no una vista ni una función.
+- Afuera: las 8 con `Disc=true` (43, 115, 158, 159, 160, 168, 337, 351, descripción "(discontinuada)").
+  Adentro, a pedido: la **0 "Pruebas"** (T Hist 1).
+- Las nuevas entran **activas** y con `uni_x_golpe` en 1 (el default: el vecino lo tiene casi todo vacío),
+  así que el operario las ve para elegir. De las 291, solo 126 tuvieron alguna producción en el vecino.
+- **Tiempos: manda el vecino.** Solo 2 difirieron: **360** vacío → 1,3 y **365** 2,41 → **1,7**. OJO:
+  el 2,41 de la 365 era la MEDIANA MEDIDA de 5 producciones reales (tabla de §2c-vicies); el
+  dueño eligió igual el 1,7 del vecino. No "corregirlo" de vuelta sin preguntarle.
+- `[dato]` Después de la carga: 0 tiempos distintos entre los dos programas, 150 matrices sin tiempo.
+- La pantalla Tiempos Matrices ya lista el maestro entero (commit 288d6a0 del mismo día).
+- **360 y 360B se llaman igual ("Corte Ahueca")** — posible duplicado del vecino. `[usuario 2026-09-22]`: *"por ahora dejalas ambas asi como están, más adelante te digo como las cambiamos"*. No tocar hasta que lo diga.
+
+
+## 4fb. Correcciones de recetas que salieron del despiece (2026-09-22)
+
+`[usuario 2026-09-22]` Thomas revisó el Excel `Despiece_x_Articulo_GP2.xlsx` y pidió corregirlo **en GP2**
+(*"no en el Excel, porque ya lo estoy modificando yo"*). Todo ejecutado con su "sí" y verificado:
+
+| Art. | Cambio | Dicho |
+|---|---|---|
+| 223, 224, 225, 922, 911, 901 (cucharas madera 25/30/35) | Caja N°16 (A7B) → **Caja N°12 (A2)** | "usan caja N°12, NO 16" |
+| 248 (Cuchara Nylon Reforzada 33) | Caja N°16 → **N°12**; armado Fábrica → **Alex Escalante** | |
+| 307 (Cepillo Limpia Vaso) | Caja N°15 → **Caja N°6 (A5)**, sigue 24 x caja | |
+| 234 (Palo Amasar Francés) | + **BANDITA** x1, igual que 231/232/233 | "lleva bandita… una" |
+| 246, 900 (Prensa Matambre) | + **`BANDITAM` Bandita Prensa Matambre** x1 (alta nueva: Sector Cartón, unidad, Talleres Gráficos Pol, ruta insumo → Maspoli → Virgilio) | "se lo compramos al mismo proveedor que la bandita palo de amasar" |
+| 280 (Manga Repostera) | Tela `BOM8B` **1/900** (el rollo trae 900): la tela se cuenta en **ROLLOS**, máximo 4.812 → 5,35, nombre "(rollo x 900)"; armado Fábrica → Blist-Pack SA → **de vuelta a Gentile Norberto el 2026-09-23** (ver 4fk) | |
+| 338 (Espátula Lisa) | **discontinuado** | |
+| 031, 120, 836 (IC3) y 034, 867 (IC3V) | Fleje N° 90 **1 por unidad**: IC3/IC3V pasaron de `kg` a `unidad` | "lleva un alambre" |
+
+**Fleje 90 en unidad, sin tocar código** `[dato]`: el ledger convierte con `to_canonical` según
+`componente.unidad_medida` y `kg_x_uni`. `cargar_recepcion_charcas` sigue grabando el movimiento en **kg de
+balanza** y el stock de IC3/IC3V entra en **unidades** (0,83 kg de IC3 = 100 uni). `charcas_pendiente` y el
+objetivo de Altrak siguen en kg (leen `recepcion_insumo`, que queda en kg). Es el mismo modelo del IE4/IE5.
+Se pudo hacer sin migrar porque IC3/IC3V tenían 0 stock, 0 movimientos, 0 recepciones y 0 OC; los máximos
+se convirtieron (÷ kg_x_uni).
+
+**Quedan sin precio de tallerista** (el costo no suma ese paso): 121 Pettofrezza, 248 Alex, 280 **Gentile Norberto** (era Blist-Pack; volvió a Gentile el 2026-09-23 y sigue sin precio).
+
+## 4fc. El Prov. de Art. Terminado ya tiene consumo, máximo y sugerido (2026-09-23)
+
+> **CORREGIDO AL DÍA SIGUIENTE (2026-09-24, §4fw):** el dueño dio vuelta esta decisión. El prov AT
+> **ya NO va como el tallerista a façon** (máximo de la casa, consumo × mes): va **como talleristas
+> O.C.**, con **sugerido 0**, porque es gente de menos confianza y lo que hay que mandarle sale de
+> una O.C. de Gestión Virgilio que GP2 no lee. La maquinaria de abajo (`reparto_prov_at`,
+> `v_consumo_prov_at`, `recalcular_maximos_prov_at`) **queda dormida** —nunca escribió un máximo
+> (inventario de prov AT = 0 filas)—, así que no se borra: si el dueño vuelve a querer el máximo de
+> la casa, se reactiva. Lo de abajo queda como historia de lo que se construyó.
+
+`[usuario, textual]`: *"En el módulo prov de art terminado, cuando voy a enviar: me aparece 0
+sugerido para enviar. El inventario máximo de los prov de art terminado tiene que ser al igual que
+los talleristas de un mes de consumo. Si hay más de un prov de art terminado o tallerista que haga
+un artículo tenés que dividir según la proporción. Si no está la proporción → por default 50% cada
+uno"*.
+
+**El 0 no era un máximo sin cargar: era una cuenta que no se hacía.** El sugerido de la Tablet no
+sale de `inventario.maximo` — lo calcula al vuelo la CTE `rep` de `GP2.tablet_bundle`, y esa CTE
+filtraba `where tipo in ('proveedor_servicio','tallerista')`. El Prov AT nunca entraba, así que su
+fila viajaba con `maximo` y `sugerido` en NULL y la tablet mostraba "Online sector". Cargar máximos
+a mano no lo hubiera arreglado.
+
+**Lo que se construyó** (calcado de lo que ya existía para talleristas, §4du):
+
+| Objeto | Para qué |
+|---|---|
+| `reparto_prov_at` | el % dictado por artículo + prov AT (se carga por SQL, no hay pantalla) |
+| `v_hace_articulo` | quién produce o entrega el TERMINADO: prov AT y tallerista del sector 12 |
+| `v_reparto_at_efectivo` | el % efectivo; sin dictar, partes iguales entre los que lo hacen |
+| `v_consumo_prov_at` | demanda del artículo × ese % = cartón/caja que consume cada prov AT |
+| `v_nivel_stock_prov_at` | `max_calc = consumo × meses_stock` de SU ubicación (default 1 mes) |
+| `recalcular_maximos_prov_at()` | escribe `inventario.maximo`, origen `est_madre_x_reparto` |
+| `tablet_bundle` | `rep` cubre `proveedor_at`; los meses salen de la ubicación del prov AT |
+
+Todo el SQL, con su porqué, en `db/migracion_maximo_prov_at.sql`. Las dos funciones quedaron
+**verificadas por md5** contra la base.
+
+**Lo medido al aplicarlo:** 5 prov AT reciben cartón/caja hoy (Pintos 15 piezas, Lopez Jose 6,
+Maspoli 5, The Plast 4, Carriero 3) y **las 33 filas quedaron con número**: ninguna sigue en "—".
+Los dos artículos con dos proveedores son el **222** y el **910** (Maspoli / Pintos): su cartón pasa
+a 545 + 545 y 142 + 142, el 50/50 por default. Si el dueño dicta otra proporción, va en
+`reparto_prov_at` y el número cambia solo.
+
+**Tres cosas que quedan escritas:**
+1. **Ningún artículo lo hacen hoy un prov AT y un tallerista a la vez** (medido: 0 filas). Por eso
+   `v_consumo_tallerista` NO se tocó. Si mañana aparece uno, el prov AT ya queda en 50 % y el
+   tallerista seguiría en 100 % hasta que el dueño confirme — la fila sucia de `articulo_prov_at`
+   (§4cy) es la razón de no bajarle el máximo a un tallerista solo.
+2. **Las 12 ubicaciones de prov AT tienen `meses_stock` NULL y CERO filas de `inventario`.** El
+   "1 mes" lo pone un `coalesce`, y `recalcular_maximos_prov_at()` informa lo que le falta fila en
+   vez de fallar; con `p_crear_faltantes => true` las crea en 0 con su máximo. **No se corrió:
+   crear filas es escribir datos y eso lo autoriza el dueño.**
+3. **16 de los 33 cartones no tienen formato cargado** (`carton_formato` sin `uni_x_bolsa`), así que
+   su sugerido se ve en unidades y la tarjeta avisa "sin paquete cargado". Con el formato cargado
+   pasaría a paquetones, como el resto.
+
+## 4fw. El Prov. de Art. Terminado va como "Talleristas O.C.": sugerido 0 (2026-09-24)
+
+`[usuario, textual]`: *"En el envío a proveedor de artículo terminado, al igual que talleristas
+orden de compra, no tienen un máximo de inventario allá ellos, de un mes, como los talleristas,
+porque proveedor de artículo terminado y talleristas OC es gente que no tenemos la misma confianza
+que con los talleristas. Tenés que modelarlo al igual que talleristas OC, que no tienen un máximo
+allá, por lo tanto no tiene que haber un sugerido de qué mandarle, sino que tiene que aparecer en
+cero. ¿Cuándo va a aparecer? Cuando salga orden de compra de Virgilio, que todavía no lo modelamos,
+porque lo hace otro sistema ahora"*.
+
+**Da vuelta §4fc de AYER.** El 2026-09-23 se decidió que el prov AT tuviera máximo = consumo × un
+mes, igual que el tallerista a façon; el 2026-09-24 el dueño lo **reagrupa con la gente de menos
+confianza** (talleristas O.C., §4fr). El eje del cambio es de negocio, no técnico: al prov AT **no
+le fiamos un mes de stock** como al tallerista de confianza; lo que tiene que hacer lo dicta una
+**O.C. que emite Gestión Virgilio**, sistema que GP2 **todavía no lee**. Por eso su sugerido es 0 y
+subirá cuando esa O.C. se modele acá (hoy la hace otro sistema).
+
+**El cambio es una línea en la base.** `GP2.tablet_bundle`, CTE `rep`, case del techo:
+`when e.tipo = 'proveedor_at' then 0` — mismo criterio que el fasonero sin O.C.
+(`proveedor_servicio.pedido_por_oc`) y el tallerista con O.C. de Virgilio
+(`tallerista.pedido_por_oc_virgilio`). **No hace falta flag por proveedor: TODO el rubro va así.**
+En el front (`Tablet_GP2.html`, v1.36.0) el título de la carga agrega **"· O.C. Virgilio"** también
+para el prov AT, porque un 0 pelado se lee como "no hay que mandarle nada".
+
+**Medido antes → después:** las 47 filas de prov AT del Enviar pasaron de **33 con sugerido
+(28.905 uni)** a **0**. Talleristas normales (**316** con sugerido), talleristas O.C. (**0**) y P.S.
+(**108**) **intactos** — el cambio es quirúrgico.
+
+**La maquinaria de §4fc queda dormida, NO se borra:** `reparto_prov_at` (0 filas),
+`v_consumo_prov_at`, `v_reparto_at_efectivo`, `v_hace_articulo`, `v_nivel_stock_prov_at`,
+`recalcular_maximos_prov_at`. Nunca escribió un máximo (las 12 ubicaciones de prov AT tienen 0 filas
+de `inventario`), así que **no hay nada que revertir**. Si el dueño vuelve a querer el máximo de la
+casa, ese `then 0` es lo único que se cambia. SQL en `db/migracion_prov_at_oc_virgilio.sql`.
+
+## 4fd. Recibir de un P.S. es EL REMITO, y el remito va en unidades (2026-09-23)
+
+`[usuario, sobre cinco proveedores distintos el mismo día]`: *"cuando voy a recibir de AJ adhesivos
+el remito marca en unidades de pliego y después cuando voy a controlar sí, marco paquetes"*; lo
+mismo con **Ester** (*"en el remito aparece en unidades y después el control si lo hago en bolsas y
+kilos"*), **Hernández Julio** (*"me aparece en unidades y el control sí en cajones y kilos"*),
+**Jade** y **Maspoli**.
+
+**Son dos momentos y cada uno tiene su unidad.** Lo que se carga en la Tablet es el **remito**, y el
+remito del proveedor viene contado en unidades de la pieza. El **envase** (bolsas de Ester, paquetes
+de 200 de AJ, cajones de Jade y Julio) y los **kilos** son del **control**
+(`ControlEntregaPS_GP2.html`), la pantalla a la que la tablet manda derecho desde la v1.28.0.
+
+**Da vuelta la regla de v1.20.0** (*"la entrega copia la unidad del envío"*, 18/09). Esa regla no
+estaba mal: se escribió **tres días antes de que el control fuera una pantalla aparte**, cuando lo
+que se cargaba en la tablet era lo contado. Cuando el flujo se partió en dos, la unidad del envase
+se quedó en el lado equivocado.
+
+**El cambio es una línea**: la rama de recibir de `envaseDe()` devuelve `null` para el P.S. Con eso
+la tarjeta dice el stock en unidades, el campo va en unidades, y se van el renglón "≈ N bolsas" y la
+doble carga envase + kg. **Cero base**: `proveedor_servicio.entrega_unidad` / `entrega_uni_x` siguen
+existiendo porque las usa el Control, que es su lugar.
+
+**El TALLERISTA no se tocó**: ahí no hay pantalla de control y el esperado en cajones + la cantidad
+en kg los pidió el usuario el 18/09 (§v1.19.0 de la Tablet). Si también tiene que ir en unidades, es
+el mismo cambio de una línea.
+
+## 4fe. El control de un P.S. se cuenta en el envase y en kilos (2026-09-23)
+
+`[usuario, textual]`: *"Cuando voy a hacer el control de AJ adhesivos me aparece para marcar uni. Y
+yo te dije solo paquetes"* y, enseguida: *"Lo mismo con Esther. El control lo hago en bolsas y
+kilos, no en unibolsas. Me estás poniendo unidades cuando yo arriba te dije otra cosa"*.
+
+Es la otra mitad de §4fd. Si el **remito** va en unidades, el **control** va en lo que se cuenta de
+verdad: el **envase** (paquetes de AJ, bolsas de Ester y Maspoli, cajones de Julio y Jade, paquetes
+de Charcas) y, donde la pieza se pesa, los **kilos**. El campo "Contado (uni)" se fue de
+`ControlEntregaPS_GP2.html`: la unidad de la pieza dejó de ser algo que alguien tipea y pasó a ser
+el **resultado**, que la tarjeta muestra antes de confirmar ("= 400 uni · Diferencia …") porque es
+lo que se guarda y lo que pisa el stock.
+
+**Cuál manda si están los dos: el PESO.** Mismo criterio que el control de la recepción de insumos,
+donde los kg de la balanza son los que se guardan. Sin kg cargados, manda el envase.
+
+**El dato tiene que estar, y esto es lo que falta** `[usuario: "Si vos tenés el dato de uni por
+paquete o kilo por uni, podrías hacer el control. Si no lo tenés, lo tendríamos que agregar"]`.
+Medido el 2026-09-23 sobre las piezas que devuelven los P.S. no híbridos:
+
+| Falta | Piezas |
+|---|---|
+| Sin `kg_x_uni` (no se puede pesar) | los **10 pliegos de AJ Adhesivos** (control sólo en paquetes) |
+| Sin envase (ni factor del proveedor ni `uni_x_cajon`) | **V18D** y **W1B** (Guazzaroni) y **C12** (Pedernera) |
+
+Las tres últimas caen al campo suelto en unidades hasta que se les cargue el cajón. El resto —25
+piezas de Guazzaroni, 34 de Pedernera, las de Ester, Julio, Jade, Maspoli y Charcas— ya tiene todo.
+
+## 4ff. "Recibí de más" no se dispara por un decimal (2026-09-23)
+
+`[usuario, con 1.852 uni de PC1A contra 1.852 esperadas]`: *"¿Por qué salta la alerta? Es
+exactamente la misma cantidad"*. El cartel decía **"⚠ 0 de más"**, que es la firma del problema.
+
+**La causa es el saldo del tercero, que arrastra decimales.** A Esther se le mandan 10 kg de mangos
+y eso son **1.851,8518… unidades** (10 / 0,0054): ese 0,8518 queda colgando en su stock. Al recibir
+1.852 el sistema comparaba crudo (`recibido > esperado`), veía 0,1481 de exceso y anotaba una fila
+en `GP2.alerta_recepcion`. La alerta **id 5** (Ester, PC1A, esperado 1851,851851, recibido 1852,
+exceso 0,148148) es exactamente eso, y quedó abierta.
+
+**La tolerancia es media unidad, o 5 gramos si la pieza se mide en kg**, y vive en las **dos
+puntas**: `exceso()` de la Tablet (el cartel que ve el operario) y el `if v_comparable > v_esp` de
+`GP2.tablet_registrar` (el que escribe la alerta). Tocar sólo el front hubiera sacado el cartel y
+dejado la alerta anotándose igual.
+
+**Lo que NO se tocó**: la alerta 5 sigue abierta. Cerrarla es escribir datos y lo autoriza el dueño
+(`alerta_recepcion_marcar(5, 'resuelta', …)`).
+
+## 4fg. La diferencia se juzga en el control, contra el remito, y recién arriba del 5 % (2026-09-23)
+
+`[usuario, textual]`: *"espero que el cartel aparezca si hay más de un cinco por ciento de
+diferencia, tanto en kilos como en unidades. Pero este cartel, esta alerta, me tiene que aparecer no
+a la hora de recibir, sino a la hora de hacer el control. Porque puede haber 1.800 unidades de stock
+de proveedor de servicio… y capaz recibo menos"*. Y enseguida: *"El remito en unidades y el control
+en kilos"* y *"en el control que las bolsas o los cajones sirvan nada más de dato. Vos lo que tenés
+que comparar es los kilos con los kilos o los kilos con las unidades, en el caso de que tengas que
+hacer el pasaje"*.
+
+**Son tres reglas que cierran el circuito de §4fd y §4fe:**
+
+| Momento | Qué se carga | Contra qué se compara |
+|---|---|---|
+| **Recibir** (Tablet) | el REMITO, en unidades de la pieza | **contra nada**: el stock del P.S. no es lo que va a traer |
+| **Control** (ControlEntregaPS) | los KILOS (el envase es un dato) | contra el remito, y avisa arriba del **5 %** |
+
+**Por qué al recibir no se compara:** el saldo que el proveedor tiene en su poder es una referencia,
+no una promesa. Una entrega parcial —1.800 en su poder y traer 600— es lo normal, y convertir eso en
+"recibí de más" llena `GP2.alerta_recepcion` de ruido. En los **otros destinos** (tallerista, prov.
+AT, Virgilio) el aviso quedó, pero con el mismo umbral del 5 %.
+
+**Por qué el peso manda en el control:** es lo que se mide con la balanza. El envase se sigue
+anotando (`controlar_entrega_ps.p_cajones`, el dato físico de bultos) pero no decide el número. Donde
+la pieza se pesa, el kilo es **obligatorio**; donde no hay `kg_x_uni` —los 10 pliegos de AJ— el
+envase es lo único que hay y con eso alcanza.
+
+**Dónde vive cada número** (los dos con clave propia y su default, así no hace falta cargar nada):
+
+- el 5 % del control: `control_entrega_ps_bundle` lee `parametro.tol_ctrl_ps_pct`, y sin esa fila
+  vale 5. **Antes compartía `tol_ctrl_peso_pct` con el pesaje de insumos, que sigue en 2 %.**
+- el 5 % del aviso al recibir: `exceso()` de la Tablet y el `if` de `GP2.tablet_registrar`, con el
+  piso de media unidad (5 gramos en kg) de §4ff para el caso de esperado 0.
+
+## 4fh. El remito del tallerista también va en unidades (2026-09-23)
+
+`[usuario, textual]`: *"Hicimos todas las recepciones de proveedores de servicio. Ahora seguimos con
+las recepciones de talleristas. Lucho. Remito en unidades y control en kg y cajones (acordate de
+hacer el control por kg — cajones es solo dato)"*.
+
+Misma regla que §4fd, del otro lado: lo que se carga en la Tablet es **el papel**, y el papel viene
+en unidades de la pieza. Da vuelta la v1.19.0 de la Tablet (*"de talleristas, todos se entregan en
+cajones… en recibido va a ser en kilos"*, 18/09), escrita cuando lo que se cargaba ahí era lo
+contado. `componente.entrega_unidad` / `entrega_uni_x` (las bolsas de 120 de GRJ5 y GRJ6) **no se
+tocan**: son el envase con el que se va a contar en el control.
+
+**Lo que todavía NO existe: el control de talleristas.** `ControlEntregaPS_GP2.html` y su circuito
+(`control_entrega_ps_bundle`, `controlar_entrega_ps`, `entrega_ps_control`) sólo miran movimientos
+`entrega_ps`. Por eso el aviso del 5 % al recibir de un tallerista **sigue vivo** en la Tablet: es
+la única red que queda hasta que el control exista. El día que exista, esa comparación se va de la
+recepción igual que se fue la del P.S.
+
+**La decisión que hay que tomar antes de construirlo** (planteada al dueño el 2026-09-23): la
+entrega de un tallerista NO es un movimiento solo. `crear_entrega_tallerista` escribe el
+`entrega_tallerista` de la pieza que entra **y** uno o varios `consumo_tall` (la pieza que
+transformó, o las partes del BOM), todos con la misma cantidad y sin columna que los vincule.
+Si el control pisa la cantidad de la entrega, hay que decidir qué pasa con esos consumos:
+
+| Opción | Qué significa |
+|---|---|
+| **Escalar** los consumos por el mismo factor | entregó 98 de 100 → consumió 98: el 1:1 y el BOM quedan coherentes |
+| **Dejarlos** con lo declarado | entregó 98 y consumió 100: los 2 que faltan son merma del tallerista |
+
+No es lo mismo para el stock del tallerista, y lo tiene que decir el dueño.
+
+## 4fi. La unidad del remito la dice la PIEZA, no el destino (2026-09-23)
+
+`[usuario, textual]`: *"Martin Cornejo. El remito de las bombillas en uni. Control en bolsas. El
+remito de la cuchilla en kg y control kg y cajones (cajones dato)"*.
+
+Esto corrige el §4fh del mismo día, que había dejado **todo** el remito del tallerista en unidades:
+**dos piezas del MISMO tallerista vienen en unidades distintas**. Las bombillas (GRJ5/GRJ6) se
+cuentan; la cuchilla (X4) se pesa. No lo decide el destino ni el sector: es una propiedad de la
+pieza.
+
+**Columna nueva `componente.remito_unidad`** (`'uni'` | `'kg'`, NULL = la unidad canónica).
+`tablet_bundle` la manda en cada fila de Recibir y la Tablet la usa para el stock que muestra, para
+el campo y para lo que viaja a la base (`uniRemito()` / `cargaEnKg()`). El envase del control
+(`entrega_unidad` / `entrega_uni_x`, las bolsas de 120 de GRJ5 y GRJ6) **no se toca**: es otra cosa.
+
+**Lo dictado hasta ahora**, para cargar el dato: X4 (Cuchilla Pelapapa Cerrada) en **kg**; bombillas
+GRJ5/GRJ6 en **uni**; J1 de Lucho en **uni**; E4 de Scorrano en **uni**. Todo lo demás queda en su
+unidad canónica (uni) hasta que el dueño diga lo contrario — el dato se carga pieza por pieza, no se
+adivina por sector.
+## 4fj. Enviar a un tallerista se ordena por RUBRO, no por código (2026-09-23)
+
+`[usuario, textual]` *"En el módulo de envío a talleristas dentro de la versión tablet, quiero que
+me ordenes no alfanuméricamente, sino que primero me pongas todo lo que se le manda de sector crudo,
+después todo lo de sector procesado, después todo los remaches, después todo lo de partes plásticas,
+después todo lo de cajas y después todo lo de cartones"* + *"me refiero dentro de cada tallerista"*
++ *"Garage ponelo primero, fleje segundo y bombilla último"*.
+
+**El orden definitivo, el que está en `RUBRO_ORDEN` de `Tablet_GP2.html`:**
+
+| # | Rubro | | # | Rubro |
+|--:|---|---|--:|---|
+| 1 | Garage | | 6 | Plásticas |
+| 2 | Fleje | | 7 | Cajas |
+| 3 | Crudo | | 8 | Cartones |
+| 4 | Procesado | | 9 | Bombilla |
+| 5 | Remaches | | 10 | lo que no esté en la lista |
+
+**El orden de una lista de picking lo dicta el galpón, no el abecedario.** El envío se arma
+caminando: el crudo y el procesado están en un lado, los cartones y las cajas en otro. Alfabético,
+las cinco piezas del fixture de Martin (A10 crudo, BANDITA cartón, C10 cartón, CJ7 caja, F7 fleje)
+obligan a cuatro paradas en cinco tarjetas, y el cartón queda partido en dos con la caja en el
+medio. Por rubro, cada bloque es una parada.
+
+**El rótulo del rubro no es decoración.** Con el código fuera de secuencia y nada que explique por
+qué, el orden nuevo se lee como un desorden: cada bloque lleva su nombre de sector arriba
+(`.pc-rubro`, ancho entero de la grilla, así que a 390px se ve igual).
+
+**Los tres sectores que el primer pedido no nombró existen, y por eso el orden se cerró en nueve**
+`[dato, medido sobre GP2.tablet_bundle el 2026-09-23]`: a los talleristas también se les manda
+**Fleje** (6 filas, 3 talleristas), **Bombilla** (15 en 5) y **Garage** (11 en 4) — 32 de las 350
+filas de Enviar a tallerista. Quedaron un rato al final por descarte; con el número a la vista el
+dueño los ubicó él (*"Garage ponelo primero, fleje segundo y bombilla último"*). **Lección de
+método: cuando un pedido enumera categorías, contar primero cuántas hay en la base.** Si ese conteo
+no se hacía, 32 filas se decidían solas.
+
+**Un sector que no esté en la lista cae al fondo, detrás de Bombilla.** Hoy no hay ninguno en Enviar
+a tallerista (Movimiento, Terminado y Bolsas Plásticas no llegan). El día que aparezca uno, el lugar
+honesto para algo que nadie clasificó es abajo y a la vista, no colado en el medio.
+
+**El "➕ Otro cartón" cierra el bloque de cartones, no la grilla** `[usuario 2026-09-23: "el módulo
+de otro cartón no lo dejes al final de todo, ponelo a lo último de los cartones"]`. Desde el
+2026-09-21 iba al final de todas las tarjetas, que con una lista alfabética era "al lado de nada";
+con bloques por rubro, "al final" pasó a ser tres bloques debajo de los cartones. **Es un cartón
+más, así que vive donde están los cartones.** Sin bloques (prov. de art. terminado) sigue al final.
+
+**Solo el tallerista.** P.S., prov. de art. terminado e inyector siguen alfabéticos y Recibir no se
+tocó: el pedido fue explícito sobre el tallerista, y el mismo orden se puede extender cuando lo
+pida. **Cero base**: el `sector` de cada pieza ya viajaba en `tablet_bundle.enviar`.
+
+## 4fk. El control ahora también es de los talleristas (2026-09-23)
+
+Cierra lo que §4fh dejó abierto. El circuito del control —remito primero, conteo después— dejó de
+ser sólo del P.S.:
+
+| Antes | Ahora |
+|---|---|
+| `control_entrega_ps_bundle` / `controlar_entrega_ps` | **`control_entrega_bundle`** / **`controlar_entrega`** |
+| tabla `entrega_ps_control` | tabla **`entrega_control`** (misma estructura, 0 filas al renombrar) |
+| sólo movimientos `entrega_ps` | `entrega_ps` **y** `entrega_tallerista`, en una sola lista |
+
+**El envase del tallerista lo dice la PIEZA** (`componente.entrega_unidad` / `entrega_uni_x`: bolsas
+de 120 en GRJ5 y GRJ6, cajones en el resto) y viaja en las mismas claves que el P.S., así que la
+pantalla no aprendió un modelo nuevo. **Quién se pesa lo decide la base** (clave `pesa` del bundle):
+una pieza de tallerista que declara su propio envase **se cuenta y no se pesa** —las bombillas—,
+mientras que la cuchilla va en cajones + kilos y manda el peso. Es exactamente lo que dictó el
+dueño: *"El remito de las bombillas en uni. Control en bolsas. El remito de la cuchilla en kg y
+control kg y cajones (cajones dato)"*.
+
+**LA COLUMNA QUE FALTABA: `movimiento.mov_padre_id`.** Una entrega de tallerista NO es un movimiento
+solo: `crear_entrega_tallerista` escribe el `entrega_tallerista` **y** uno o varios `consumo_tall`
+(la pieza transformada o las partes del BOM). Hasta hoy nada los vinculaba, y **no alcanzaba con la
+fecha**: la Tablet manda día + 12:00, así que todas las entregas del día comparten la misma marca.
+Ahora cada consumo cuelga de su entrega.
+
+**Qué hace el control con esos consumos** `[decisión del dueño, 2026-09-23, entre dos opciones que
+se le plantearon]`: **se escalan con el mismo factor**. Entregó 98 donde el remito decía 100 →
+consumió 98, y el 1:1 y el BOM quedan coherentes. La alternativa (dejarlos en 100 y leer la
+diferencia como merma del tallerista) quedó descartada.
+
+**Y el aviso de "recibí de más" se fue de la recepción del tallerista**, igual que se había ido de
+la del P.S.: ahora tiene dónde compararse de verdad. Al registrar el remito, la Tablet manda
+derecho al control, también en el tallerista.
+
+## 4fl. Los Pisa Papas (121, 315, 609): el `M1` desaparece — a Rafael se le manda el disco calado y el vástago suelto (2026-09-23)
+
+`[usuario 2026-09-23, textual]` *"Va a desaparecer el componente M1. Ahora se le manda el disco
+pizapapa calado. Y el vástago de aluminio a Rafael. Como cualquiera de los otros componentes. Como
+los insertos, como el cartón, como el mango. Y él entrega el artículo terminado en Virgilio.
+Además… El vástago aluminio V18C tendría que ser V18 porque no es crudo. Como es aluminio, ya se
+compra así y sería el procesado, digamos."*
+
+**Corrige la §4ez del 2026-09-22 (un día de vida).** Ahí el `M1` había sobrevivido como paso de
+Pettofrezza (`M2 → M1`, y después `M1 → artículo`). El dueño lo saca del modelo: **el disco con
+vástago no es una pieza, es el artículo empezando a armarse.** Rafael recibe el `M2` (Disco Pisa
+Papa Calado) y el vástago sueltos, igual que el inserto, el cartón y el mango, y devuelve el
+terminado. Un intermedio que sólo existe adentro del taller del que lo arma es un nodo de más:
+obliga a un paso de ida y vuelta consigo mismo y a una fila de stock en cada ubicación por la que
+no pasa nada.
+
+- **Antes** `[dato]`: `M1` = `M2` + `V18C` (`componente_bom` 9 y 10), receta de los tres artículos
+  con `M1` cantidad 1, y **12 filas de `ruta_paso`** — el `M2 → M1` de las rutas 136/553/558 y el
+  `V18C → M1` + `M1 → art` de las rutas 1057/1058/1059.
+- **Ahora**: la ruta del fleje termina `matriz 349 → M2 → Pettofrezza (M2 → art) → virgilio`, y la
+  del vástago es `insumo V18 → Pettofrezza (V18 → art) → virgilio` — exactamente la forma que ya
+  tenían `PA10B`, `PC11`, `I3C` y `A3`. La receta cambia `M1` por `M2` (1) + `V18` (1).
+- **`M1` se puede borrar limpio** `[dato 2026-09-23]`: id 146, **0 stock y 0 movimientos**, y no lo
+  referencia nada más que sus 4 filas de `inventario`, sus 2 de `componente_bom`, sus 3 de
+  `articulo_componente` y sus 12 de `ruta_paso` (barrido de las 28 FK a `componente`). Beneficio de
+  paso: se va el **`M1` duplicado** — quedaba el disco (146) y el *Cartón 220* (823) con el mismo
+  código, y había que buscar por id.
+- **`V18C` → `V18`, y el motivo del dueño es correcto aunque la letra no sea la del crudo**: en GP2
+  los crudos de remache llevan **prefijo `CV`** (§ de los 12 `CV*`), así que el crudo de este
+  vástago sería `CV18` y **no existe, porque no se fabrica: se compra terminado a Bella Vista**. La
+  `C` de `V18C` era una variante de familia, como la `D` de `V18D` (Tornillo Sacafuente). Sacarla
+  deja el maestro parejo (`V18` comprado, `V18D` fabricado) y no pisa nada: `V18` estaba libre.
+- **Queda en Sector Remache (8), no pasa a Procesado**: el insumo vive donde el usuario lo cuenta y
+  lo pide (mismo criterio que los aceites de Dilmax, que tampoco son remaches y viven ahí). "Sería
+  el procesado" describe **que se compra terminado**, no una mudanza de sector.
+
+**⚠ EL HALLAZGO DE PLATA: el vástago es la línea MÁS CARA de los tres artículos y GP2 la tiene en
+$0.** `[dato, medido contra la planilla del propio dueño]` `v_planilla_costo` de los códigos 121 y
+315 trae `remaches = 448,5373` tomado de `'Lista de Precios '!L171` — la fila 171 del bloque 890
+Bella Vista, *"Remache Pisapapas 8 x 97"*, cod ISIS 0885, lista 2026-07-08. **Es por unidad, no por
+kilo**: la planilla lo suma tal cual a un costo de artículo de $1.025,59, y GP2 hoy cierra el 315 en
+$561,26 justamente porque el vástago entra en cero. Dos cosas lo mantienen en cero y hay que
+arreglar las dos: `estado_compra='discontinuo'` (herencia de la decisión del 2026-08-31 *"el remache
+de aluminio no va más"*, que **la planilla vigente desmiente**) y **cero filas en
+`precio_proveedor`**. Las dos se arreglaron el mismo día con el "sí" del dueño.
+
+**EJECUTADO el 2026-09-23** (`db/migracion_m1_desaparece.sql`, bloques A y B), con este efecto
+medido en `v_costo_componente`:
+
+| | Antes | Después |
+|---|---|---|
+| 315 | $561,26 | **$1.009,79** |
+| 609 | $500,00 | **$948,53** |
+| 121 | $397,49 | **$846,02** |
+| `V18` | $0,00 (origen `ruta`) | **$448,54** (origen `precio`) |
+
+La planilla pone el 315 en $1.025,59, o sea que quedan **$15,80** de diferencia — y encima GP2 usa
+el tallerista de Pettofrezza ($140) donde la planilla usa el de Cavallero ($85), así que el resto
+tendría que dar $55 MENOS que la planilla. Hay ~$71 repartidos en otras líneas sin perseguir.
+`db/verificar.sql`: invariantes de modelo en 0. La única regla > 0 quedó en
+`AE_paso_virgilio_y_codigo_dan_distinto = 2`, y **es ajena a esto**: los artículos **567 "Corta
+Palta"** y **537 "Pela y Pica Ajo"** tienen componente terminado en el sector 12 pero **0 rutas y 0
+receta** — están creados y sin cargar.
+
+**Lo que se hizo además del cambio en sí, y por qué:**
+1. **Se creó la fila de `inventario` del `M2` en la ubicación de Pettofrezza (31)**, que no existía
+   (sólo estaba en Sector Procesado). `recalcular_maximos_talleristas` **sólo actualiza filas que
+   existen, no las crea**: sin esa fila el Envío a Talleristas no le podía poner máximo ni sugerido
+   al disco calado, que es justo la pieza que ahora se le manda. Después del recálculo, el `M2` y el
+   `V18` quedaron los dos en **máximo 5.078** (`est_madre_x_reparto`) en la ubicación de Rafael.
+2. **Se borraron las filas huérfanas de Cavallero German** (`M1` y `V18C` en la ubicación 24, las
+   dos en 0, de cuando hacía el 121).
+
+**Lo único que sigue faltando: Pettofrezza no tiene precio para el 121** (el $85 era de Cavallero,
+que quedó sin rutas). El 315 y el 609 tienen $140 "AyE". Con el `M1` afuera el trabajo de Rafael es
+**un solo paso**, así que el "AyE" ya cubre poner el vástago en el disco — deja de tener sentido la
+pregunta del 2026-09-22 sobre si el disco con vástago se cobraba aparte. **Ojo con el semáforo**: el
+121 quedó con `faltan_precios = 0` y `servicios_pesos = 0,00` al mismo tiempo, o sea que **un
+servicio de tallerista sin precio NO se denuncia como faltante** (el 609 sí marca 1, por otra
+pieza). No confiarse de ese contador para saber si un armado se está cobrando.
+
+**Y a Pettofrezza NO se le recibe más nada — eso está bien y no necesita código**
+`[usuario 2026-09-23: "Ya no recibiríamos más del tallerista Pettofrezza Rafael", con la pantalla a
+la vista: Recibir → Pettofrezza mostraba UNA tarjeta, el `M1`, en 0 y "sin cargar"]`. La rama de
+talleristas de `rec` en `GP2.tablet_bundle` lista las salidas del tallerista **salvo las del sector
+12 (Terminado)**, porque un terminado no vuelve a Cervantes: se entrega en Virgilio. Los 15
+terminados de Rafael ya estaban afuera por eso, así que el `M1` era **lo único** que quedaba — y era
+un intermedio que él se hacía a sí mismo. Al irse, su `n_rec` queda en 0 y **la propia pantalla lo
+saca del selector de Recibir** (`cpsDelModo()` filtra por `n_rec > 0`). Cero líneas de JS: el día
+que un tallerista vuelva a devolver una pieza que no es terminado, reaparece solo.
+
+## 4fm. El 280 vuelve a Gentile Norberto (2026-09-23)
+
+`[usuario, textual]`: *"Quiero que el artículo 280 lo devuelvas a gentile norberto. Sacaselo a blist
+pack"*. Revierte el movimiento del 2026-09-22 (§4fb), que lo había pasado de Fábrica a Blist-Pack.
+
+**Lo que se tocó: cuatro pasos y nada más.** El 280 tiene una ruta por pieza que entra, y en las
+cuatro el paso de tallerista pasó de Blist-Pack SA (14) a **Gentile Norberto (8)**: `ruta_paso`
+3067 (PV14), 3070 (BOM8B), 3073 (F1A) y 3076 (A2, Caja N°12).
+
+**Medido antes y después:**
+
+| | Antes | Después |
+|---|---|---|
+| Consumo de Gentile | 7.186 uni/mes | **15.341** |
+| Consumo de Blist-Pack | 10.628 uni/mes | **2.473** |
+| Piezas que recibe Gentile | 17 | **21** |
+
+A Blist-Pack le quedan el **555** y el **764** (los cepillos limpia bombilla), así que no queda
+vacío. **No tenía ni una fila de inventario ni un movimiento**, o sea que no quedó stock colgado en
+su poder.
+
+**Dos cosas que el cambio NO arregla y conviene saber:**
+1. **El 280 sigue sin precio de tallerista.** Ni Blist-Pack ni Gentile lo tienen cargado, así que
+   ese armado no se cobra en el costeo del artículo — antes tampoco. El precio del tallerista viaja
+   con la pieza que entrega (§4dv), así que el día que se cargue va sobre el componente 280.
+2. **Gentile no tiene fila de inventario para las cuatro piezas** (PV14 6.416 uni/mes, F1A 1.604,
+   A2 134, BOM8B 2). Sin fila no hay máximo guardado; el sugerido de la Tablet igual sale, porque
+   se calcula al vuelo. Alinear los máximos es `recalcular_maximos_talleristas()`, que es otra
+   escritura y la autoriza el dueño.
+
+## 4fn. El 498 tiene su propio crudo: nace `I9` "Destapador Pie p/cromar" (2026-09-23)
+
+`[usuario, textual]`: *"Ahora, luego de la matriz 27, va a parar al sector crudo I9: 'Destapador Pie
+p/cromar', no I1"*, con su **sí** sobre el SQL exacto, en GP2 y en el vecino.
+
+**No era un renombre: `I9` no existía en ningún lado.** Lo que pasó es que **`I1` se partió en dos**.
+Hasta hoy la matriz 27 (Corte Cuerpo Uña Pie, sobre el Fleje 29 / `IA5`) sacaba un único crudo,
+`I1` "Destapador Pie p/pintar", y la bifurcación ocurría recién en el proveedor de servicio:
+`I1` → **Jade** (pintado) → `B12` para el **499**, e `I1` → **Pedernera** (cromado) → `Z45` para el
+**498**. Ahora cada rama tiene su crudo: **`I1` se queda con el 499** (sigue igual, no se tocó ni un
+paso suyo) y **`I9` se lleva el 498**.
+
+| | Antes | Después |
+|---|---|---|
+| Ruta 101 (498), paso 2 matriz 27 | sale `I1` | sale **`I9`** |
+| Ruta 101 (498), paso 3 Pedernera | entra `I1` | entra **`I9`** |
+| Ruta 100 (499) | `I1` → Jade → `B12` | **sin cambios** |
+
+**Lo que se escribió, y nada más que eso.** En GP2: `componente` **936** `I9` (Sector Crudo,
+unidad, 0,02863 kg/uni, 1048 uni/cajón), dos filas de `inventario` en 0 (Sector Crudo con máximo
+**5.240** = 5 cajones, y Pedernera / Carlos Aguirre), los `ruta_paso` **661** y **662**, y el borrado
+de la fila de inventario de `I1` en Pedernera (id 500, en 0 y ya sin ruta que la justifique). En
+`public`: alta en `SC Kg` (cod_verificacion 100130), una fila nueva en `Causa-Efecto`
+(27 · Fleje 29 · `I9`, la de `I1` **queda** porque es el 499) y `Partes x PS` id 313 pasa a `SC='I9'`.
+
+**El peso de `I9` es el de `I1`** (0,02863 kg/uni, 30 kg/cajón): es la misma estampada del mismo
+fleje con la misma matriz. `[usuario confirmó el 2026-09-23]`.
+
+**El costo no se movió, medido antes y después**: `I9` $145,51 (idéntico a `I1`), `Z45` $213,85 y
+el 498 terminado **$431,35**, sin faltantes de precio, kg ni tiempos. Era lo esperado: Pedernera
+cobra por la pieza que **devuelve** ($2.293,15/kg sobre `Z45`), no por la que recibe.
+
+**Dos cosas del vecino que conviene tener anotadas:**
+1. **`v_produccion_por_sector` le va a asignar a `I9` TODA la producción de la matriz 27**, igual
+   que ya hacía con `I1` y `J13`: esa vista reparte el total de la matriz a cada fila `Aumenta`, sin
+   prorratear. Es un defecto viejo del vecino, no de este cambio; ahora son tres filas en vez de dos.
+2. **Insertar en `SC Kg` dispara `trg_pesos_sc`**, que llama a `actualizar_partes_tallerista()`,
+   `actualizar_despiece()` y `actualizar_partes_ps()` — recálculo **global** de las tres derivadas.
+   Los pesos de la fila de Pedernera no se movieron porque `actualizar_partes_ps` resuelve por el
+   **SP** (`Z45`) y sólo cae al SC si no hay SP.
+
+**Lo que NO hizo falta tocar, y por qué:** la receta del 498 (`articulo_componente`) pide `Z45`, no
+el crudo — receta y ruta no se usan para lo mismo (§4cc); `Despiece x Articulo` y
+`Partes x Tallerista` del vecino tampoco nombran el crudo (Garcia recibe `Z45`); el precio de
+cromado cuelga del componente de salida; y `parte_proveedor_servicio` (los pintores de una pieza)
+sigue con `I1` → Daniel/Jade, que es exactamente la rama que `I1` conserva.
+
+**La entrega histórica de `I1` cromado en `Entregas PS` (1 fila) quedó como estaba**: la historia no
+se reescribe.
+
+## 4fo. La plancha de níquel se compra y se controla en kg — y la tolerancia del control es UNA sola, 5 % (2026-09-23)
+
+**Lo que pidió el dueño, textual:** *"Ya vimos todo lo que es recepcion de ps y talleristas.
+Insumos esta bastante modelado ya pero vamos a modificar a algunos proveedores. CC galvanoquimica.
+plancha niquel en el remito viene en kg y se controla en kg"* y, enseguida, *"acordate de la regla
+de que todo control no puede exceder el 5% de diferencia"*.
+
+### El toggle no era el problema: la pieza no podía recibirse en kg
+
+`PCP2` (Plancha de Níquel, CC Galvanoquímica, Sector Plástico) estaba declarada en **unidades** y
+**sin `kg_x_uni`**. Con eso, elegir "Kg" en el popup de Recepción reventaba en el RPC
+(`to_canonical: componente 612 sin kg_x_uni valido para kg->uni`): **en kg no se podía recibir**.
+Nadie lo había notado porque la pieza tiene stock 0 y ni un movimiento.
+
+Como el remito y el control son los dos en kg —nadie cuenta planchas—, la unidad canónica tiene
+que ser el kg. **`PCP2` pasa a `unidad_medida='kg'`**, que es como ya viven 61 componentes (47
+flejes, 13 bolsas plásticas, 1 alambre), más `remito_unidad='kg'`. Al no tener receta, ni
+movimientos, ni recepciones, no hubo nada que convertir.
+
+### `componente.remito_unidad` ahora también manda en la Recepción de Insumos
+
+- **Metalúrgica Giser se recibe en KG** [usuario 2026-09-28: *"Metalúrgica Giser se recepciona en kg"*]. Su única pieza, **BOM12** (Caño Inox 140 mm, bombillas, `kg_x_uni` 0,0095), quedó con `remito_unidad='kg'`: la Recepción pide *Cantidad kg* y `to_canonical` lo pasa a unidades al guardar (1,9 kg = 200 uni) [dato]. Si Giser suma piezas, cada una lleva el mismo `remito_unidad`.
+- **Cimarron se recibe en UNIDADES** [usuario 2026-09-28: *"Los remitos de Cimarron son en unidades"*]. Sus 10 piezas (GRJ4, GRJ5, GRJ6, GRJ18, GRJ19, GRJ21, GRJ25, GRJ26, GRJ27, GRJ30) quedaron con `remito_unidad='uni'` [dato]. 7 no tienen `kg_x_uni`: en el control se cuentan, no se pesan.
+- **Eduardo Pintos y Gilardi Esther se reciben en UNIDADES** [usuario 2026-09-28: *"El remito de Pintos y Gilardi es en unidades"*]. `remito_unidad='uni'` en GRJ12, GRJ12B, PEP5 (Pintos) y GRJ13, GRJ14, GRJ28 (Gilardi) [dato]. Los GRJ de Pintos están en Garage, fuera del alcance de `PLAST_UNI` (que sólo cubre Plásticos): por eso hacía falta la bandera en la pieza. GRJ12 y GRJ12B no tienen `kg_x_uni`.
+- **Tierra Nativa SA se recibe en UNIDADES** [usuario 2026-09-28: *"El remito de tierra nativa tambien es en unidades"*]. `remito_unidad='uni'` en GRJ17, GRJ22, GRJ23, GRJ24 (palos de amasar) [dato]. Ninguno tiene `kg_x_uni`: en el control se cuentan.
+- **Las bolsas plásticas se reciben en KG, todas** [usuario 2026-09-28: *"Todo lo que es bolsas plásticas el remito es en kg"*]. `remito_unidad='kg'` en las 13 piezas de Sector Bolsas Plásticas (Arcolor, Beta Plásticos, Indarnyl, Julio Garcia e Hijos, Santa Rosa Plásticos, Simco) [dato]. Su `unidad_medida` ya era kg y no tienen `kg_x_uni`: no hay conversión, se guarda lo pesado. Una bolsa nueva de ese sector tiene que nacer con `remito_unidad='kg'`.
+- **El control después de la recepción es en KG para Garage, Bolsas Plásticas e Importado** [usuario 2026-09-28: *"Todos los proveedores que te di en este chat, el control luego de la recepción es en kg"* + Importado: *"Remito en unidades y control en kg"*]. Hasta hoy esos rubros no tenían control: `CONTROL_URL` de la Recepción sólo mandaba 6, 7, 8 y 11. Se sumaron 9 (Garage) y 14 (Bolsas) a `control-remaches.html?sector=N`, e Importado **por proveedor** (`CONTROL_URL_PROV`, `?sector=2&prov=Importado`) porque el Sector Procesado lo comparte con Eclipse/Charcas, que tienen su propio pesaje. Importado: `remito_unidad='uni'` en D1, E13, Z23A, Z23B, PINCEL590; C13 sigue en `'envase'` [dato]. Una pieza con remito en uni y SIN `kg_x_uni` no se puede controlar en kg: la pantalla pide contarla. Faltan pesos en GRJ12, GRJ12B, GRJ17, GRJ18, GRJ21-GRJ27, GRJ30 y PINCEL590.
+- **GRJ19 (Bombilla Plana Ancha, Cimarron): `kg_x_uni` = 0,0667** [usuario 2026-09-28]. Vienen 720 uni por envase y el envase pesa 48 kg (48 / 720 = 0,0667). Primero dijo 0,05 y se corrigió: el 0,05 no cerraba con los 48 kg.
+- **"Rueda" pasó a llamarse "Rueda y CIA"** [usuario 2026-09-28]: `proveedor_insumo` id 26; las FK `ON UPDATE CASCADE` arrastraron el nombre a `componente` (BOM8B).
+
+Es la misma columna que la Tablet usa para las entregas de talleristas (§4fi). Si la pieza dice
+`'kg'` o `'uni'`, la Recepción fuerza esa unidad y **esconde el toggle Kg/Unidades**: no hay nada
+que elegir. La rama va **primera** en el if-chain de `abrirPopup()`, antes que la regla del rubro
+(cartones, cajas, flejes) y que la del proveedor (`PLAST_UNI`), porque es el dato más específico
+que hay. `recepcion_bundle` manda la columna con cada insumo.
+
+**Ojo con la conversión silenciosa:** cuando la pieza tiene `kg_x_uni` y no está en `PLAST_UNI`, la
+pantalla venía multiplicando lo tipeado en unidades por el peso y **guardando kg**. Decir "este
+remito viene contado" y guardarlo en kg es lo mismo que no decirlo, así que `remito_unidad='uni'`
+también apaga esa conversión.
+
+### Una sola tolerancia de control: `parametro.tol_ctrl_pct` = 5
+
+Hasta hoy la misma diferencia pasaba o no **según por qué puerta entrara la mercadería**:
+
+| Control | Antes | Dónde estaba el número |
+|---|---|---|
+| Insumos por peso y cajas | 10 % | escrito a mano en `control-remaches.js` / `control-cajas.js` |
+| Pesaje de pallets de fleje | 2 % | `parametro.tol_ctrl_peso_pct` |
+| Entrega de P.S. / tallerista | 5 % | `tol_ctrl_ps_pct`, clave que **no existía** (caía al default) |
+
+`tol_ctrl_peso_pct` se renombró **`tol_ctrl_pct`** y vale **5**. La leen `v_control_pallet`,
+`recepcion_tara`, `control_entrega_bundle` y —nueva— `control_recepcion_bundle`, que la manda en
+`tol_pct`. Los dos controles de insumos la muestran en el cartel ("tolerancia 5 %").
+**El piso de 0,5 kg de `tolKg()` queda**: el 5 % de un remito chico son gramos y ninguna balanza
+afina tanto.
+
+### Quién declara su remito, al 2026-09-23
+
+El dueño fue dictando proveedor por proveedor. Lo cargado, con su **sí** en cada caso:
+
+| Pieza | Proveedor | Remito | Control | Por qué el control es ése |
+|---|---|---|---|---|
+| PCP2 Plancha de Níquel | CC Galvanoquímica | kg | kg | la pieza vive en kg: no hay conversión |
+| PC4, PEP9 | JL Matricería | uni | kg | tienen `kg_x_uni`: se pesa y se guardan unidades |
+| PEST1 Insertos Mango de Madera | Kollplast | uni | kg | idem |
+| PCP4A Cintas Adhesivas 48x100 | Packaging y Servicios | uni | uni | **no tiene `kg_x_uni`**: no hay con qué pesar |
+
+**Lo que el `remito_unidad='uni'` arregló en JL Matricería y Kollplast:** esas piezas tienen
+`kg_x_uni` y su proveedor no está en `PLAST_UNI`, así que la pantalla venía multiplicando lo
+tipeado y **guardando kg**. El toggle decía "Unidades" y la base se llevaba otra cosa. Ninguna de
+las cuatro tenía recepciones cargadas, así que no hubo historia que migrar.
+
+**⚠ Trampa para la próxima:** el control de `PCP4A` es en unidades **porque le falta el peso por
+unidad**, no porque alguien lo haya decidido. El día que se le cargue un `kg_x_uni`, el control va
+a pedir kg solo. Es la misma trampa anotada para los pliegos de AJ en §4fe: si una pieza tiene que
+quedar contada para siempre, eso hay que decirlo con un dato, no dejando un campo vacío.
+## 4fp. Quién entrega cada artículo, y que lo discontinuado NO se vea (2026-09-23)
+
+Salió de cruzar los **talleristas finales por artículo de GP2** contra los de la O.C. de Gestión
+Virgilio (`public."OC_Maximos"`). De los 195 códigos que existen en los dos sistemas, coincidían
+160; el usuario resolvió las 35 diferencias de una y dictó estos cambios.
+
+### Los dos nombres que estaban cruzados
+
+| Virgilio | es, en GP2 |
+|---|---|
+| **"Carlos E" / "Carlos"** | **Alex Escalante** (tallerista 2) |
+| **"Pedernera"** | **Carlos Aguirre** (tallerista 9) |
+
+Medido: los 12 códigos de "Carlos" en `Articulos Virgilio X Tallerista` son los de Alex Escalante
+(52 entregas, 1.827 cajas), y "Pedernera" entrega 115/544/560/802 — que entregaba
+**`AGUIRRE CARLOS RODOLFO`** hasta el 04/06, justo antes de que Pedernera arranque el 10/06.
+
+⚠ **Por eso el alias `CARLOS` → tallerista 9 de `GP2.contraparte_alias` está MAL**: manda las
+entregas de "Carlos" al tallerista equivocado. **No se tocó** — corregirlo es escribir datos y lo
+autoriza el dueño.
+
+### Lo que se cambió (dictado por el usuario)
+
+| artículo | queda |
+|---|---|
+| 338, 618, 070, 591, 761, 818 | **discontinuados** (los 6 con stock 0) |
+| 709, 908 | Alex Escalante |
+| 280 | Fábrica |
+| 557, 558, 654, 658, 659, 758, 759, 762, 763, 769 | Blist-Pack SA (555 y 764 ya estaban) |
+| 222, 910 | sólo Pintos (se borraron las 4 rutas de Maspoli) |
+| 123 | Garcia + Lucho, 50/50 |
+| 355, 789 | Pettofrezza + German, 50/50 |
+
+⚠ **Gentile Norberto (Oscar) quedó con CERO artículos**: sus 11 son exactamente los que se
+reasignaron. No se lo dio de baja — eso lo decide el dueño.
+
+⚠ El 50/50 se carga con **`reparto_guardar`**, que **valida contra las rutas**: el segundo
+tallerista tiene que hacer el paso, así que primero se duplica la ruta (una por tallerista, la
+convención de la casa) y recién después se guarda el reparto. Y la RPC **recalcula los máximos de
+todos los talleristas**, no sólo de los tocados.
+
+### ⚠ `articulo.discontinuado = true` NO alcanza para ocultarlo
+
+[usuario 2026-09-23: *"lo discontinuado no quiero seguir viéndolo en el programa"*]. **De los 27
+objetos de GP2 que leen rutas o el catálogo de prov AT, sólo 6 miraban el flag.** Lo que hacía
+falta, medido llamando a los bundles de verdad (no leyéndolos):
+
+| dónde | qué se hizo |
+|---|---|
+| `articulo_prov_at.activo = false` | con eso solo ya salieron de Recepción, Envíos, OC, Orden de producción, Proporciones y Stock general |
+| `despiece_verif_bundle` | filtro en el bloque `art` y en `rutas_full` (se ocultan sus rutas) |
+| `preavisos_bundle` | filtro en las 3 ramas del CTE `z` |
+| `Programa/Programa.html` | `llenarArticulos()` no los ofrece, y se fue el rótulo `(discontinuado)` de las 2 listas |
+| `RecepcionVirgilio_GP2.html` | ya los filtraba (`.filter(x => !x.disc)`), no se tocó |
+
+⚠ **`movimientos_bundle` y `programa_bundle` los siguen mandando TODOS con el flag `disc`, a
+propósito**: el que decide qué se ve es la pantalla. No se les puso filtro.
+
+⚠ **En el ABM de Artículos sí tienen que verse** — es donde se los des-discontinúa. No tocar.
+
+⚠ **Un `"338"` dentro del JSON de un bundle no siempre es el artículo 338.** Buscando el código
+como texto, `registro_operarios_bundle` daba positivo y era la **matriz 338 "Embolsar Bombilla"**,
+y en `movimientos_bundle` varios eran `ruta_id`. Antes de dar por mostrado un código, mirar el
+contexto de la clave.
+
+## 4fq. El despiece de la Pinza Corta Alambre (560 / 800) — y las matrices sin ruta (2026-09-23)
+
+**De dónde salió:** el dueño preguntó *"en qué despiece usás la matriz 131, 130, 129"*. Respuesta
+medida: **en ninguno**. Las tres existían en `GP2.matriz`, activas y con producción real cargada
+hasta abril/mayo 2026 (129: 14.504 uni · 130: 16.546 · 131: 17.614), pero **no figuraban en ningún
+`ruta_paso`**.
+
+**No es un agujero de esas tres:** al 2026-09-23, **299 de 405 matrices activas** no aparecen en
+ninguna ruta GP2. La migración de rutas quedó a medias. [dato: `ruta_paso` vs `matriz`]
+
+**La cadena real, dictada por el dueño** (y coincide con la del vecino en `public."Causa-Efecto"`):
+
+```
+IE6 (Fleje N° 79) → 131 Estampado Punta Pinzas → 130 Doblado Agarre Pinzas
+                  → 129 Estampa Pinza chica   → 132 Estampado y Agujero Pinzas
+                  → 133 Doblado Punta Pinza chica → 134 Remachado pinza Chica/Gde
+                  → N7 → Guazzaroni Patricio → Carlos Aguirre → Virgilio
+```
+
+**Tres cosas que fija este caso y valen para cualquier ruta de matrices:**
+
+1. **La pieza intermedia entre dos matrices vive en el Sector Movimiento** (`sector_id` 3,
+   `ubicacion_id` 3), con código `<fleje>-M<matriz>` y descripción `"<fleje> tras M<matriz>"`
+   (`IE6-M131`, `IE6-M130`, …), unidad `unidad`, sin `kg_x_uni`, y nace con stock 0. Es la
+   convención que ya usaban `IA4-M64` e `IE6-M133`.
+2. **Un paso que junta dos piezas se modela en `componente_bom`, no en la ruta.** `ruta_paso` tiene
+   UNA entrada; el remachado toma dos. Entonces: `N7 = 2 × IE6-M133 + 1 × CV14`
+   [usuario 2026-09-23: *"N7 sería dos componentes que salen de la matriz 133 … y un remache Cv14"*].
+   Mismo patrón que `B1-M78` / `D5-M78` (rompenuez = las dos mitades + el remache `V4`).
+3. **Un insumo que se consume en una matriz NO va también en la receta del artículo.**
+   `v_consumo_demanda` explota `articulo_componente` **y después** `componente_bom` en cascada: si
+   `CV14` queda en los dos lados, el remache consume 2 por pinza. Por eso salió de
+   `articulo_componente` de 560 y 800, y se borraron las rutas 457/458 que se lo mandaban a Carlos
+   Aguirre [usuario: *"se lo estás mandando a Carlos Aguirre y está mal. Lo consumís en esta matriz"*].
+
+**Dos límites del motor de costos que este caso dejó a la vista** (medidos, NO arreglados):
+
+- **`v_costo_componente` no multiplica por la cantidad.** Suma cada matriz una sola vez, así que el
+  `×2` no se cobra: la mano de obra real de una pinza es 2 × 36,25 s (las cinco matrices por mitad)
+  + 32 s del remachado = **104,50 s**, y la vista calcula **74,25 s**. Son **60,50 $/uni** que 560 y
+  800 no están cobrando.
+- **El BOM no se propaga hacia arriba.** `bomx` se aplica sólo en la fila del componente padre: el
+  remache aparece en el costo de `N7` (material 0 → 4,45) pero **no** llega al artículo terminado,
+  que bajó 4,45 (560: 674,36 → 669,91 · 800: 652,11 → 647,66). Antes tampoco estaba bien (entraba
+  por `insumox` en 800 y no entraba en 560, que lo tenía como paso `ingreso`): el cambio hizo
+  visible una inconsistencia que ya existía, no la creó.
+
+**Sin resolver:** el vecino arranca esta cadena en **Fleje 82** y GP2 la arranca en **Fleje N° 79
+(IE6)**. Uno de los dos está mal; `Fleje N° 82` ni siquiera existe como componente en GP2.
+## 4fr. Talleristas O.C.: a Blist-Pack y Carlos Aguirre el trabajo se lo pide Gestión Virgilio (2026-09-23)
+
+`[usuario, con la foto de la Tablet: "A blist pack sa y carlos aguirre quiero que me los saques
+afuera de talleristas y me los pongas en un módulo nuevo de talleristas o.c."]` + `[usuario, al
+preguntarle qué cambia además del lugar: "No es o.c. de insumos. Es orden de compra que se hace
+desde Gestión Virgilio que hoy no está modelado acá. Por ahora sugerí 0"]` + `[usuario, sobre
+dónde: "Solo en la versión tablet dentro del módulo enviar"]`.
+
+**El dato de negocio nuevo:** hay talleristas a los que **no se les manda contra el máximo de la
+casa**. Lo que tienen que hacer se lo pide una **orden de compra que emite Gestión Virgilio**, un
+sistema que GP2 todavía **no lee**. Hoy son dos: **Carlos Aguirre (9)** y **Blist-Pack SA (14)**.
+Mientras esa O.C. no se modele acá, GP2 **no tiene con qué calcular cuánto mandarles**, y por eso
+su sugerido es **0** — no porque no haya que mandarles nada.
+
+**NO se los sacó de `GP2.tallerista`, y ese es el punto.** Carlos Aguirre tiene **32 pasos** de
+ruta con `tipo_paso='tallerista'` y Blist-Pack **38**: cambiarles el tipo volteaba rutas,
+inventario, reparto y costeo. Lo que se separó es **la vitrina**:
+
+| Dónde | Qué cambia |
+|---|---|
+| `GP2.tallerista.pedido_por_oc_virgilio` | flag nuevo, `false` por defecto; en `true` los dos de arriba |
+| `tablet_bundle` | manda `oc` en cada contraparte, y el **techo** de esas filas es **0** (y con él el sugerido) |
+| `Tablet_GP2.html`, **solo Enviar** | baldosa aparte **"🧾 Talleristas O.C."**; el título de la carga agrega "· O.C. Virgilio" |
+| Recibir, y todo lo demás | **igual que antes**: siguen siendo talleristas comunes |
+
+**El criterio del techo 0 no es nuevo**: es el mismo del **fasonero** (`proveedor_servicio.
+pedido_por_oc`, Maspoli) cuando no hay O.C. enviada. La diferencia es de dónde viene la orden —
+la del fasonero se emite **acá** (`GP2.orden_compra`) y el sugerido sube sola cuando sale; la de
+estos dos se emite **afuera**, así que el 0 se queda hasta que alguien modele esa O.C.
+**Cuando se modele, lo único que se cambia es ese `then 0` de la CTE `t` de `tablet_bundle`.**
+
+⚠ **Por qué el título dice "· O.C. Virgilio"**: un sugerido en 0 sin explicación se lee como "no
+hay que mandarle nada", que es lo contrario de lo que pasa. El rótulo es lo que separa "no
+corresponde" de "no lo sé".
+
+⚠ **Cómo se parte una baldosa en la Tablet** (por si aparece otro corte así): `TIPOS` acepta
+`clave` (el `data-tipo` del botón, para que dos baldosas del mismo tipo no compartan selector) y
+`oc` (el lado del flag). Una baldosa **sin** `oc` no filtra nada — por eso Recibir quedó intacto.
+`selTipo` pasó a guardar **la baldosa entera**: con dos baldosas `tallerista`, el string del tipo
+ya no alcanza para volver.
+
+**Lo que NO se tocó y sigue pendiente:** nada en `Talleristas/` (Envíos, Recepción, Control,
+Proporciones) los separa — ahí los dos siguen mezclados con el resto, que es lo que el usuario
+pidió por ahora. Y GP2 sigue **sin leer** la O.C. de Gestión Virgilio: ése es el hueco real.
+## 4fs. Los bujes mariposa pasan de Pat Bet a Kollplast (2026-09-23)
+
+`[usuario, textual]`: *"Los dos bujes mariposa ahora se los compramos a Kollplast. Remito en uni
+control en kg"*, con su **sí** sobre el SQL exacto.
+
+**Qué se movió** (`PA8A` Buje Blanco 237 y `PA8B` Buje Negro 226, los dos del Sector Plástico, que
+entran en los artículos **066 / 502 / 512**, los abrelatas mariposa):
+
+| | Antes | Después |
+|---|---|---|
+| `componente.proveedor` | Pat Bet Plast | **Kollplast** |
+| Precio que toma el costo | $21,06 (lista Pat Bet, 01-08-26) | **$20,48** (lista Kollplast, 19-08-26) |
+| Costo del buje | $21,06 | **$20,48** (−2,8 %) |
+| Recepción | remito en uni (Pat Bet ya estaba en `PLAST_UNI`) | **igual**, ahora por Kollplast |
+
+**La fila vieja de Pat Bet en `precio_proveedor` NO se borró, y no hace falta borrarla**: la vista
+`v_costo_componente` ordena `DISTINCT ON (componente_id)` poniendo **primero la fila cuyo `cod_prov`
+coincide con el `cod_prov` del proveedor asignado al componente** y recién después por `fecha_lista`.
+Con Kollplast (4465) cargado, la de Pat Bet (797) queda de histórico y no gana nunca. **Corolario
+para la próxima vez que cambie un proveedor: cambiar `componente.proveedor` sin cargar la fila de
+precio del proveedor nuevo deja el costo con el precio del viejo, sin ningún aviso** — `faltan_precios`
+sigue en 0 porque precio hay, sólo que es el de otro.
+
+**Esto cierra la trampa anotada en §"Kollplast vs Pat Bet, misma pieza, otro precio"** (2026-08-31):
+ahí quedó registrado que Kollplast cotizaba el buje a $20,48 contra $21,06 de Pat Bet y que "todo
+quedó cargado con Pat Bet, revisar al repartir los inyectores". El buje ya está repartido; **el
+Pirolo sigue pendiente** (`PA7A`/`PA7B`: Kollplast $51,76 vs Pat Bet $20,07, ×2,5 — ahí el barato es
+Pat Bet).
+
+**Sin ripple de stock**: los dos bujes estaban en **0** y no había ninguna OC abierta.
+
+**"Remito en uni, control en kg" se dice en la BASE, no en el código**: `componente.remito_unidad
+= 'uni'` en los dos bujes, la columna que estrenó la §4fo unas horas antes. Con eso la Recepción
+fuerza unidades, esconde el toggle y **apaga la conversión silenciosa** (sin la bandera, una pieza
+con `kg_x_uni` cuyo proveedor no está en `PLAST_UNI` se tipea en unidades y se guarda en kg).
+El control sigue pidiendo los kg de la balanza y dividiendo por `kg_x_uni`, que es lo que el dueño
+pidió. **`PEST1`, la otra pieza de Kollplast, ya tenía su bandera** puesta el mismo día.
+
+**Lo que NO se hizo, y por qué importa `[deducido, decidido en el merge]`:** la primera versión de
+este cambio agregaba `'kollplast'` a `PLAST_UNI`, la lista de proveedores hardcodeada en el JS.
+Funcionaba, pero **habría dejado dos formas de decir lo mismo** en la misma pantalla, y por ser
+**por proveedor** se habría llevado puesta cualquier pieza futura de Kollplast sin que nadie lo
+decida. `PLAST_UNI` es el mecanismo viejo y va último en el if-chain; **lo nuevo que se agregue va
+por `remito_unidad`**. La lista queda sólo por los tres proveedores que ya dependen de ella.
+
+---
+
+## 4ft. La cremallera no es un fleje: `IE13` → `E13`, Sector Procesado, por unidad (2026-09-23)
+
+`[usuario, textual: "La cremallera IE13. Es E13 y está dentro de sector procesado. No fleje. Lo vi
+en pettofrezza rafael"]`, con su **"Sí"** sobre el SQL exacto.
+
+**Era un renombre en apariencia y un agujero de plata en los hechos: mientras la cremallera estuvo
+en el Sector Fleje, costó $0 en los dos sacacorchos que la llevan.**
+
+### Por qué costaba cero
+
+`v_costo_componente` tiene una rama especial para el sector 5: `precio × kg_ref`, donde `kg_ref`
+es el `kg_x_uni` del componente **fabricado** — o sea, el fleje se cobra por el peso de la pieza
+que sale. Correcto para un fleje, que se compra por kilo. Pero:
+
+- La cremallera **se importa armada y se paga por unidad**: USD 1,10 c/u = **$1.688,50**
+  (planilla del dueño, fila 885, `cod_isis` 523C, Tierra Nativa SA, rubro Talleristas).
+- El "523 Terminado" **no tiene `kg_x_uni`** → `kg_ref` NULL → el producto daba NULL → la suma lo
+  ignoraba. El semáforo lo venía diciendo: los dos artículos estaban con **`faltan_kg = 1`**.
+
+⚠ **`precio_proveedor.precio_por_kg` no sirve para distinguirlo**: los **48** flejes con precio lo
+tienen en `false`, cobren por kilo o no. El que avisa es el texto de `producto` (acá decía
+"importada, **por unidad**") y, sobre todo, el rubro de la planilla.
+
+### El origen: la migración del 2026-09-03 la metió en la bolsa equivocada
+
+La idea 7221 pasó `IC3`, `IE13` e `IZ19A` de `unidad` a `kg` porque eran "los 3 únicos flejes que no
+estaban en kg". Para `IC3` (alambre galvanizado de Altrak, USD 1,715 **el kilo**) fue el arreglo
+correcto. Para la cremallera fue al revés: **no era un fleje mal cargado, era una pieza procesada
+mal clasificada**, y la migración le puso la receta en `0,0602 kg` donde decía `1 unidad`.
+Aquella sesión verificó que "no cambió el costo de ningún componente" — cierto, pero porque ya
+valía $0 antes y después.
+
+### Lo que se escribió (4 UPDATE, con snapshot previo de los 803 costos)
+
+| tabla | cambio |
+|---|---|
+| `componente` (219) | `codigo` IE13 → **E13**, `sector_id` 5 → **2**, `unidad_medida` kg → **unidad** |
+| `articulo_componente` | arts **523** y **723**: cantidad 0,0602 → **1** |
+| `ruta_paso` | rutas **339** y **416**, paso `insumo`: cantidad 0,0602 → **1** |
+| `inventario` (213) | ubicación Sector Fleje → **Sector Procesado**; máximo 667,50 kg → **11.088 uni** |
+
+El máximo vuelve exacto: los 667,50 kg salieron de multiplicar 11.088 uni × 0,0602 en la misma
+migración del 03/09 (`maximo_origen='migrado_de_minimo'`, que sigue siendo cierto).
+`kg_x_uni = 0,0602` **se queda**: es el peso real de la pieza (60,2 g — la planilla de Pedernera la
+lista con `cod_art` "60.2"), y ahora es sólo peso, no unidad de cuenta.
+
+### Costo medido, antes → después (sólo estos 2 de los 803 componentes se movieron)
+
+| art | antes | después | Δ |
+|---|---:|---:|---:|
+| 523 Sacacorcho Doble Aleta | 1.304,96 | **2.993,46** | +1.688,50 (+129 %) |
+| 723 Sacacorcho D. Aleta Nylon Reforzado | 1.262,12 | **2.950,62** | +1.688,50 (+134 %) |
+
+`faltan_kg` pasó de 1 a **0** en los dos. Stock era **0** en las dos ubicaciones, así que no se
+movió ni un peso de inventario y no hizo falta tocar `movimiento`.
+
+### Lo que NO cambia
+
+- **Sigue en Recepción → Importados.** Ese rubro se arma por `estado_compra='importado'`
+  (`_es_comprable`: "pieza importada, viva donde viva"), nunca por el sector. Cero código tocado.
+- Sale del **relevamiento de flejes** y del consumo en kg (`v_consumo_fleje_kg` sólo mira sector 5):
+  ahora consume por unidades, que es como se pide.
+- El máximo de Pettofrezza (inventario 746, 119, `est_madre_x_reparto`) **quedó como estaba** —
+  viene de cuando el componente era kg. Recalcularlo es otra escritura, pendiente del sí del dueño.
+
+### La regla que queda
+
+**Antes de meter un componente en el Sector Fleje, preguntar si se compra por kilo.** El sector 5
+no es "donde va el metal": es "lo que se paga por peso". Una pieza importada armada, aunque sea de
+acero y aunque hoy entre por el mismo remito, va a su sector real o el costo se cae en silencio.
+
+## 4fr. La mitad CERRADA del rompenueces nace: `G8` "Pieza Cerrada Rompenuez p/cromar" (2026-09-24)
+
+`[usuario 2026-09-24, textual: "Después de la matriz 77 va al sector G8 que es Pieza Cerrada
+Rompenuez p/cromar"]`, con su **"Sí a todo"** sobre crear el componente, redirigir la salida de la
+M77 y mover el paso de cromado/pintado de la rama cerrada.
+
+**El bug (dato, no código; venía pusheado):** en las rutas de **507** y **707** la **M74
+"Estampado Rompenuez"** ya sacaba `G7` "Pieza Abierta Rompenuez p/cromar", y la **M77 "Aplastado
+Punta Rompenuez"** —que es el CIERRE de la pieza— volvía a salir a **la misma `G7`**. O sea: la
+mitad cerrada no tenía código propio antes del cromado, y el paso de servicio de la rama cerrada
+(**Pedernera → `D6`** en el 507, **Jade → `B1`** en el 707) entraba por `G7`, la pieza abierta.
+El trazado abierta/cerrada estaba pisado.
+
+**Cruza con §4ce y con la M78:** §4ce dejó dicho que el rompenueces converge de verdad porque la
+receta del 507/707 pide **las dos mitades a la vez**, y que la **M78** las junta devolviendo 4
+salidas (`B1`/`B2`/`D5`/`D6`). Lo que faltaba era que esa separación abierta/cerrada existiera ya
+**antes** del cromado: hasta ahora las dos mitades compartían `G7`. El barrido de §4ce miraba
+**convergencias**, no esta **divergencia** aguas arriba, por eso no la había cazado. Ojo para el
+futuro: un mismo `comp_salida_id` en dos matrices distintas de una misma ruta es sospechoso.
+
+**Lo que se escribió (DB-only, manteniendo la normalización):**
+- `GP2.componente` id **940**: `G8` "Pieza Cerrada Rompenuez p/cromar", clonando de `G7` (id 9)
+  `sector_id`, `unidad_medida`, `kg_x_uni` 0,046166667 y `uni_x_cajon` 606 → **costo sin cambio**.
+- `GP2.inventario`: una fila de `G8` en 0 (ubicación 1).
+- `GP2.ruta_paso`: **M77** (pasos 284 del 507, 299 del 707) `comp_salida_id` `G7` → `G8`; y el
+  paso de servicio de la rama **cerrada** (285 Pedernera→`D6` del 507, 300 Jade→`B1` del 707)
+  `comp_entrada_id` `G7` → `G8`.
+
+⚠ **Sólo se movió la rama CERRADA.** La abierta (M74 → `G7`; Pedernera→`D5` / Jade→`B2`) **queda
+en `G7`**: mover los dos pasos de servicio a `G8`, como sugería la pregunta inicial en grueso,
+habría roto la mitad abierta. Verificado con SELECT: 507 y 707 quedan M74→`G7`, M77→`G8`,
+servicio-abierto←`G7`, servicio-cerrado←`G8`.
+
+Auditoría `github_repo_problemas`: problema **538** registrado (categoría `datos`, severidad
+`medio`) y cerrado con el commit de este cambio. DB-only: `db/` (respaldo de schema) no cambia,
+sin bump de versión (no se tocó HTML/JS/CSS).
+
+## 4fu. Una CONVERGENCIA descuenta TODAS sus entradas, no una sola (2026-09-24)
+
+**Bug real que llegó al usuario** [Thomas, textual: *"todo lo que es convergencia, por lo menos
+en matrices, me está descontando mal el despiece… si pongo a producir la matriz 10, varilla con
+cuchilla para cromar, que es una convergencia entre I16 y H7, me descuenta solo de I16 y no de
+H7… también con el ahueca papas: cuando voy a hacer N2 me descuenta solo de la flechita N3 y no
+de la bochita N4 en la matriz 183"*].
+
+**Convergencia** = una matriz que ARMA una salida a partir de **2+ entradas** (soldar, remachar,
+armar): varilla+cuchilla → `H11`; flechita+bochita → `N2`. El motor tiene que descontar **todas**
+las entradas y producir la salida **una** vez.
+
+**Causa raíz — el motor tomaba UNA entrada.** `GP2.registrar_produccion` y
+`GP2.registrar_evento_prod` resolvían `comp_entrada_id` con `... limit 1` e insertaban un solo
+`movimiento` de `fabricacion`. Con 2+ entradas descontaba la primera y dejaba el resto. `ruta_paso`
+tiene **una** entrada por paso (`comp_entrada_id` singular): una convergencia se modela como
+**varios pasos con la misma matriz y misma salida**, cada uno con una entrada — igual que la
+matriz 10 arma `H11` con `I16` (rutas del Fleje 2) **y** `H7` (rutas del Fleje 30). El motor
+juntaba mal esos pasos.
+
+**Fix del motor (DDL) — nuevo `GP2.fabricar_stock(mid, salida, uni, fecha)`.** Recorre TODAS las
+entradas distintas de `(matriz, salida)` en `ruta_paso` (agrupadas, `qty = max(cantidad)`): la
+**1ª** lleva la producción de la salida (`comp_transformado_id=salida`, `cantidad_transformada=uni`);
+las demás son **consumo puro** (`cantidad_transformada=0` → +0 a la salida, −cant a la entrada).
+`registrar_produccion` y `registrar_evento_prod` ahora la llaman en vez del `limit 1`. Medido en
+matriz 10 (10 uni): `H7 −10`, `I16 −10`, `H11 +10`. En 183/`N2` (5 uni): `N3 −5`, `N4 −5`, `N2 +5`.
+
+**Convergencias que arregla el motor (ambas entradas ya estaban cargadas):**
+matriz **10** (`H11` ← `H7`+`I16`), **174** (`H15` ← `H7-M10`+`I16`), **151** (`Z36` ← `Z5`+`Z6`),
+**78** (`B1-M78` ← `B1`+`B2`+`V4`; `D5-M78` ← `D5`+`D6`+`V4`), **135** (`G4` ← `K5`+`K8`+`V3`).
+
+**Fix de datos — la ahueca estaba en TRES matrices** [Thomas: "183 es el paso único → unifico"].
+El mismo soldado físico (flechita + bochita) tenía dos números de matriz porque las dos piezas
+vienen de flejes distintos: **Fleje 59** → flechita `N3` soldaba en **183**; **Fleje 61** → bochita
+`N4` (papa) / `N5` (fruta) soldaba en **363** / **362**. Se repuntó el paso de soldado del lado
+bochita (rutas 177/178/179/180) de 362/363 a **183**, y 362/363 quedaron `activa=false`. Resultado:
+**183** → `N2` ← `N3`+`N4` (ahuecapapa = flechita + bochita papa), `N1` ← `N3`+`N5` (ahuecafruta =
+flechita + bochita fruta). Componentes: `N3` Flechita Ahueca Cruda, `N4` Bochita Ahuecapapa,
+`N5` Bochita Ahuecafruta.
+
+⚠ **Regla que queda:** una convergencia se carga como varios `ruta_paso` con la MISMA matriz y
+misma `comp_salida_id`, una por entrada. Si el mismo armado aparece con números de matriz
+distintos según de qué fleje viene cada pieza, es el mismo bug de la ahueca: unificar en una sola
+matriz.
+
+**Sospechosos NO tocados (posible misma clase, matriz de unión con una sola entrada):** **194**
+Remachado Pala Canelones (`E6`→`E6-M194`) y **134** Remachado pinza (`IE6-M133`→`N7`) — a revisar
+si les falta el remache como 2ª entrada.
+
+`db/funciones_GP2.sql` actualizado (las 3 funciones). El repunteo de `ruta_paso` es dato (no va a
+`db/`). Sin bump de versión (no se tocó HTML/JS/CSS). Auditoría `github_repo_problemas`: problema
+**539** *"Convergencia de matriz: al producir se descuenta solo una entrada del despiece"*
+(categoría `bug`, severidad `alto`) registrado y cerrado con el commit de este cambio.
+
+### 4fu (bis). El motor de fabricación lee la RECETA (`componente_bom`), no `ruta_paso` (2026-09-24)
+
+Ampliación del mismo día. Revisando pinza (134) y pala (194) con Thomas apareció que **la receta
+real de cada convergencia vive en `componente_bom`, no en `ruta_paso`** — y es más completa:
+`ruta_paso` tiene UNA entrada por paso, así que el remache o el vástago que se suman en la
+soldadura/remachado quedan sólo en el BOM. (La lectura anterior de que "el BOM estaba vacío" fue un
+error de una consulta multi-statement que se comió el resultado: **todas** las convergencias tienen
+BOM.)
+
+**`GP2.fabricar_stock` pasó a BOM-first:** si la salida tiene `componente_bom`, descuenta esa
+receta (hijo × cantidad); si no, cae a las entradas de `ruta_paso` (transformación simple). Coincide
+con cómo `v_costo_componente` costea el intermedio (que también arranca del BOM/ruta). La 1ª línea
+lleva la producción de la salida, las demás son consumo puro.
+
+Casos verificados (10 uni cada uno, filas de prueba borradas):
+- **Pinza N7 (134):** el remache **CV14** estaba en el BOM (`2× IE6-M133 + 1× CV14`) pero no en
+  `ruta_paso` → ahora descuenta IE6-M133 −20 y CV14 −10. La receta de 560/800 ya referenciaba `N7`,
+  no las piezas sueltas: sin doble.
+- **Pala E6-M194 (194):** era una convergencia **no modelada como tal** [Thomas: "E6-M194 tiene los
+  tres: pala E6 + vástago F2 + 2 remaches V10; al artículo se le manda E6-M194, no las partes
+  sueltas"]. Se creó `componente_bom(E6-M194) = E6×1 + F2×1 + V10×2` y se **alineó la receta** del
+  570/858: se sacaron `E6/F2/V10` sueltos y se puso `E6-M194 ×1` (antes el route armaba E6-M194 que
+  nadie consumía y E6 se descontaba dos veces). Ahora producir E6-M194 descuenta E6 −10, F2 −10,
+  V10 −20.
+- **H15 (174):** su `componente_bom` apuntaba a `H7` (varilla recta); la varilla **curva** usa
+  `H7-M10`. Corregido el BOM. (El costo no se movió: ya salía por la ruta, que tenía `H7-M10`.)
+
+**Costo:** neutro. `v_costo_componente` costea el terminado **por la ruta** (recorre `ruta_paso`
+hasta los comprados) + insumos del BOM (`bomx`, sólo sectores `es_insumo`), **no** por
+`articulo_componente`; por eso 570/858 no se movieron (708,04 / 865,24) al cambiar la receta.
+E6-M194 subió 203→240,82 (sumó los 2 remaches vía `bomx`). ⚠ El **vástago F2** (sector 2, no
+insumo) **sigue sin propagarse** al costo del terminado: es la limitación pre-existente ya anotada
+en 4fq ("bomx no se propaga hacia arriba"), no la introdujo este cambio.
+
+**Regla:** una convergencia se carga en `componente_bom` del intermedio (con cantidades), y al
+artículo se le pone el intermedio, no las piezas sueltas. Así el descuento de producción y la
+entrega no cuentan lo mismo dos veces (`recepcion_virgilio` descuenta `articulo_componente` sin
+explotar BOM; el tallerista sí explota BOM de la parte).
+
+**151 resuelto** [Thomas: "el remachado saca fuente se hace con el remache saca fuente V6"]: el
+`componente_bom(Z36)` pasó de `Z5+Z6` a `Z5+Z6+V6×1` ("Rem Sacafuente", sector 8). Z36 (sacafuente
+pizzero) se usa en el **art 518** (Fleje 6→Z6 y Fleje 8→Z5, convergen en M151→Z36→Pedernera→Lucho);
+la receta de 518 **no** listaba V6, así que no hay doble. V6 sigue suelto en 508/708, que son el
+sacafuente **articulado** (Z1A), otro producto — ahí no se toca. Verificado: producir Z36 en 151
+descuenta Z5 −10, Z6 −10, V6 −10. `db/funciones_GP2.sql` con `fabricar_stock` BOM-first; los BOM de
+E6-M194, H15 y Z36 y la receta 570/858 son datos. Auditoría 539: `agregar_commit` de esta ampliación.
+
+## 4fv. Los artículos DISCONTINUADOS no aparecen en envío/recepción de talleristas (2026-09-24)
+
+[Thomas, textual: *"te pongo como regla a todos los discontinuados acá, los de las rutas. Tanto
+para enviar como para recepcionar. No tiene que aparecer más."*] Salió de un caso concreto: el
+**"Corta Torta Chef"** (`PV8B`, parte del artículo **818 "Corta Torta" marca CHEF**,
+`discontinuado=true`, consumo 0) seguía apareciendo en el envío a **Alex Escalante**.
+
+**Por qué aparecía:** la pantalla de Envíos por Tallerista (y su gemela de Entregas/Recepción) NO
+mira el consumo — arma la lista de partes desde `ruta_paso` (vía `talleristas_bundle`). Discontinuar
+un artículo **no** borra su `ruta`/`ruta_paso`, así que sus componentes quedaban colgados. Es deuda
+de datos, no un bug de pantalla.
+
+**Fix (una sola función, cubre los dos lados):** `talleristas_bundle` dejó de leer el CTE `cfg`
+desde `v_contraparte_parte` y lo reconstruye directo desde `ruta_paso` con
+`join articulo a on … and not coalesce(a.discontinuado,false)`. Como el `group by` deduplica igual
+que hacía la vista, **una parte que también vive en una ruta activa se conserva** (p.ej. la Caja
+N°10, que es de 547 activo y de 818 discontinuado, se queda por el 547); sólo cae la que no tiene
+ninguna ruta activa. `entrada` = lo que se le envía, `salida` = lo que recibe, así que un solo
+filtro tapa "enviar" y "recepcionar".
+
+Con el filtro se fueron exactamente 3 discontinuados que polucionaban en tallerista: **818** (Alex
+Escalante), **070** "Set Tapers"/GRJ30 (Fábrica) y **311** (Martin Cornejo). Ninguna parte activa cayó.
+
+### 4fv (bis). La regla vale para las CUATRO contrapartes y la Tablet (2026-09-24)
+
+[Thomas, textual: *"la misma regla es para todos los envíos y recepciones, ya sea insumo, proveedor
+de artículo terminado, proveedor de servicios, tallerista. Quiero que del programa no se pueda hacer
+más nada con los componentes de ese artículo. Ahora, si los componentes se usan para otro artículo
+activo, no los borres."*] El primer fix sólo tapó `talleristas_bundle`; el dueño seguía viendo `PV8B`
+en la **Tablet** (que usa `tablet_bundle`, otra función).
+
+**Concepto único — `GP2.v_componente_muerto` (vista, `db/vistas_GP2.sql`):** un componente está
+*muerto* si pertenece a algún artículo **discontinuado** (por `ruta_paso` **o** `articulo_componente`)
+y **no** pertenece a ningún artículo **activo** (ni por ruta ni por receta). Es una regla **derivada**:
+cuando el dueño marca un artículo `discontinuado`, sus componentes exclusivos entran solos; los
+compartidos con un activo **nunca** aparecen ahí (no se tocan). Hoy son **13** componentes de 8
+artículos (070, 311, 338, 591, 618, 619, 761, 818): sus "X Terminado", los cartones exclusivos
+(`O2D`/818, `F2C`/311, `K5B`/338) y `GRJ30` Set Tapers. Verificado que ninguno es hijo de un BOM vivo
+ni intermedio, así que congelar el set no rompe nada.
+
+**Dónde se aplica el filtro** (todos los bundles de envío/recepción/OC honran la vista o el flag de
+artículo):
+
+| Bundle | Pantalla | Cómo filtra |
+|---|---|---|
+| `talleristas_bundle` | Envío/Recepción tallerista (desktop) | ruta activa (fix original) |
+| `tablet_bundle` | Tablet enviar/recibir (las 4) | `v_componente_muerto` en `env_x`/`rec_x` + `not a.discontinuado` en las ramas AT |
+| `envios_ps_bundle` | Envío/Entrega PS | descarta pares con entrada/salida muerta |
+| `envios_prov_at_bundle` | Envío Prov AT | catálogo sin muertos + `prov_insumos` sin artículos discontinuados |
+| `entregas_prov_at_bundle` | Entrega Prov AT | lista y conteo sin artículos discontinuados |
+| `recepcion_bundle` | Recepción de Insumos | insumos sin muertos |
+| `oc_bundle` | Órdenes de Compra | no ofrece comprar muertos |
+
+**Por qué AT filtra por artículo y el resto por componente:** el Prov AT es *article-driven* (cartones
+de los artículos que arma), así que un cartón **compartido** (una caja) debe seguir para el artículo
+activo pero no listarse bajo el discontinuado → se filtra `articulo.discontinuado` en la rama AT. Los
+demás son *component-driven* (la parte tiene id propio), y ahí `v_componente_muerto` respeta lo
+compartido solo. Medido después: 0 muertos en los 7 bundles, totales sanos (tablet 518 enviar / 161
+recibir, OC 343, recepción 347) y la Caja N°10 sigue apareciendo. `cartones_para_reemplazo` y
+`partes_por_ps` quedaron sin tocar (no son envío/recepción). Cambio pedido por el dueño → sin auditoría.
+
+## 4fx. `uni_x_cajon` NO es "unidades por cajón": es cantidad por ENVASE (2026-09-24)
+
+[Thomas, textual: *"que no sea uni por cajón, sino uni/kg por envase o algo genérico. Porque puede
+ser uni por bolsa, uni por cajón"*.] La columna `GP2.componente.uni_x_cajon` es histórica y su
+nombre miente: **el número es la cantidad que entra en el envase con el que se maneja esa pieza**, y
+el envase cambia según el ítem. El nombre técnico **no se tocó** (está en 23 funciones + 2 vistas de
+GP2 y 29 archivos del front, 184 usos: renombrar arrastra medio programa). En su lugar quedó un
+`COMMENT ON COLUMN` que lo aclara en el editor de Supabase.
+
+**Qué unidad es en cada caso:**
+- **Plásticos (sector 6):** uni por **bolsa** — el inyector entrega en bolsas de N uni y la OC pide
+  por bolsa entera (ya lo usaba así `uniPorBolsa()` de la OC). Es el caso general de la columna en
+  plástico.
+- **Sectores crudo/procesado/garage:** uni por **cajón** (el cajón de despacho), como el nombre.
+- **Excepciones cargadas el 2026-09-24, que NO son bolsa ni cajón** (por eso van anotadas, para que
+  nadie las lea como uni/cajón): `PCP2` Plancha de Níquel = **kg por plancha** (10); `PCP4A` Cintas
+  Adhesivas 48×100 = **uni por caja** (36); `D9` Clavo 505 Niq. = **kg por caja** (15,6). ⚠ Cruce a
+  confirmar: conviven `PCP3 "Clavo 505" = 4.594` (uni) y `D9 "Clavo 505 Niq." = 15,6` (kg/caja) —
+  distinta unidad y distinto código, a validar con el dueño.
+
+**Datos de uni/bolsa que faltaban en plástico, cargados el 2026-09-24** (salieron de la hoja "Pedido
+VACIO" del Excel `Conteo_y_Pedido_Sector_Plastico`, columna "Uni x Bolsa"): PA17=1.000, PA3=1.000,
+PC6=500, PEST1=2.000, PEST2=2.000, PIEA=1, PIEB=1, PV8=100, PV14=1.000, PV17=2.000. **Cerrados
+después** [Thomas 2026-09-24]: `PINCEL590` Pincel Silicona = **600 uni/caja** (importado, `entrega_unidad='cajas'`,
+NO bolsa); `PV8B` Corta Torta Chef queda **sin dato porque está discontinuado** (art 818 CHEF, ya no
+aparece en envío por la regla de discontinuados).
+
+**Carga previa del mismo día:** `C12` Paleta Batidor Resorte pasó de Sector Bombilla (mal) a
+**Procesado** con kg_x_uni 0,03634 y uni_x_cajon 233; `C12B` (sin cromar) pasó a **Crudo** (peso y
+uni/cajón todavía pendientes). `BOM10` Resorte Biconico (Sector Bombilla) = **400 uni/cajón** — acá
+sí es cajón, el sugerido va en cajones.
+
+**El envase del envío se define por PIEZA, no por pantalla (2026-09-24, implementado).** [Thomas:
+*"para sector plástico estás usando cajones, quiero que uses bolsas"* + enfoque elegido: *"poblar
+`entrega_unidad='bolsas'` en los plásticos + cablear el Envío Talleristas de escritorio"* + alcance:
+*"también"* PS.] La verdad única es `componente.entrega_unidad` (+`entrega_uni_x`); si están en null,
+se cae a `'cajones'` con factor `uni_x_cajon`. Se marcaron **63 plásticos con `entrega_unidad='bolsas'`**
+(sector 6 con `uni_x_cajon`, EXCLUIDOS los que no son bolsa: clavos PCP3/D9, plancha PCP2, cinta PCP4A).
+`entrega_uni_x` queda **null a propósito**: el factor cae a `uni_x_cajon`, así no se duplica el número
+y la OC de bolsas (que lee `uni_x_cajon`) no se toca.
+- **Tablet:** ya lo respetaba (`env_unidad`/`env_factor`), así que con el dato quedó sola.
+- **Envío Talleristas escritorio:** `talleristas_bundle` ahora expone `entrega_unidad`/`entrega_uni_x`,
+  y la pantalla rota la unidad por fila (helper `envase(x)`): columna "A Env.", el remito y el
+  resumen dicen "bolsas" en plástico y "cajones" en el resto. Rótulos genéricos ("A Env." / "Cant.").
+- **Envío PS escritorio:** NO se tocó porque **el plástico nunca entra a PS** (empareja crudo→procesado);
+  su unidad la sigue dando el proveedor. Si algún día se rutea un plástico a un PS, se cablea igual.
+
+**Otros `uni_x_cajon` en cajón cargados el 2026-09-24:** `BOM10` Resorte Biconico = 400 (Bombilla),
+`W1B` Grampa Batidor = 24.615 (Remache). **`PIEA`/`PIEB` "Rueda Recta" van SUELTAS** [Thomas 2026-09-24]:
+se les sacó el `entrega_unidad='bolsas'` y el `uni_x_cajon` (ambos null) — se cuentan por unidad, sin
+envase.
+
+**El cartón NO usa `uni_x_cajon`/`entrega_unidad`: su paquetón sale del FORMATO (2026-09-24).** En el
+envío (Tablet/Prov AT), Sector Cartón (10) se rotula **"paquetes"** y el factor es
+`carton_formato.uni_x_bolsa` (no el componente). `oc_bundle` **no** usa `uni_x_bolsa`, así que
+cambiarlo es cost-neutral para la OC (la OC agrupa por múltiplos/categoría). Caso 2026-09-24 [Thomas]:
+el formato **'Bolsa'** (packaging Vihal) estaba en null y lo compartían 5 ítems con **paquetón
+distinto**: `BOLSA550`/`BOLSA760` van en **paquetes de 200** y los cartones `A1B`(031)/`A1B1`(120)/`G8C`(836)
+en **7.500**. Como el paquetón es por formato, se **partió**: los 3 cartones pasaron a un formato nuevo
+**'Bolsa Cartón'** (uni_x_bolsa=7.500, múltiplos y pedido mínimo copiados de 'Bolsa' tal cual) y 'Bolsa'
+quedó en **200** para las dos bolsas. ⚠ El `pedido_minimo=20.000` heredado por 'Bolsa Cartón' es el de
+la bolsa Vihal y queda **a confirmar** para cartones. (`carton_formato` es dato, no va a `db/`.)
+
+## 4fy. Filtro y Precinto de Bombilla pasan a Sector Garage: `GRJ21A` / `GRJ21B` (2026-09-24)
+
+[Thomas: *"el filtro para bombilla y el precinto para bombilla van a pasar a sector garage. El
+filtro va a ser GRJ21A y el precinto GRJ21B"*.] Reclasificación de dos componentes que estaban en
+Sector Bombilla (7): `BOM13` "Filtro p/Bombilla" → **`GRJ21A`** y `BOM14` "Precinto p/Bombilla" →
+**`GRJ21B`**, ambos **sector 7 → 9 (Garage)**. Son partes de los artículos 90 "Filtro Para Bombillas"
+y 105 "Filtro de Bombilla" (entrada y salida de las rutas 622/623/698/699) y los entregan Danica
+García e IJUPA. **Stock 0 en todas las ubicaciones y 0 movimientos**, así que no hubo ripple: se movió
+sólo la fila "casa" de inventario de la ubicación del sector Bombilla (7) a la del Garage (9); las
+filas de los talleristas quedaron. **Cost-neutral** (GRJ21A 13,25 y GRJ21B 38,00 antes = después; son
+fabricados por ruta, el sector no cambia su costeo). El código se referencia por `id` (no por string):
+0 referencias a `BOM13`/`BOM14` en el repo, rutas y recetas intactas. DB-only, `db/` no cambia.
+
+**Se compran a "4 Zurdos", sin descomposición** [Thomas 2026-09-24: *"está bien que no tenga
+descomposición"* + corrección *"grj1a y grj1b se compran a 4 Zurdos"* (dijo primero Cimarrón y se
+corrigió)]: `componente.proveedor='4 Zurdos'` en los dos. **"4 Zurdos" NO existía en `proveedor_insumo`**,
+se dio de alta (activo, modo_control='ninguno', **`cod_prov` pendiente** — no lo dio). Ojo al insertar:
+la secuencia del `id` estaba desfasada → hubo que poner el id explícito (`max(id)+1`). Cada uno ya tiene
+su `precio_proveedor` (de ahí el costo 13,25 / 38,00) y `componente_bom` como padre = 0 (comprados, no
+armados). No hace falta receta.
+
+**Remito en unidades, control en kg; al tallerista se le manda en kg** [Thomas 2026-09-25: *"la recepción
+de tablet insumos tendría que ser. Remito: unidades. Control: kg. Y al tallerista en la tablet envío a
+talleristas se le manda en kg"*]. Hecho: `remito_unidad='uni'` en 550/551 (la Recepción de Insumos fuerza
+unidades y esconde el toggle). **Falta el dato para que el resto ande solo** — hoy los dos tienen
+`kg_x_uni` y `uni_x_cajon` en **null**: (1) sin `kg_x_uni` el control no puede pasar de kg a unidades y
+queda pidiendo unidades (misma trampa que `PCP4A`); (2) el Enviar a tallerista ya carga en kg para todo
+lo que no es cartón/caja (`env_carga='kg'`), pero exige un envase (`uni_x_cajon`) y `kg_x_uni`, si no
+cae a unidades. **Peso cargado** [Thomas 2026-09-25]: `kg_x_uni` GRJ21A = 0,00015, GRJ21B = 0,000335 (costo intacto 13,25 / 38,00) → el control ya puede pedir kg. **Envase** `[usuario 2026-09-25: "Van 5400 uni x caja"]`: `entrega_unidad='cajas'`, `entrega_uni_x=5400` en los dos (caja de filtros = 0,81 kg; de precintos = 1,809 kg). El Enviar a tallerista los carga en kg y muestra cajas. Se usó `entrega_uni_x` y no `uni_x_cajon` (ése lo leen máximos/OC). Costo intacto.
+`[dato]` La Lista de Precios de la planilla trae a 4 Zurdos como **cod. 4444** (cod ISIS 1897 "Prescintos
+Omega" $38, 4966 "Filtro p/Bombilla s/Envasar" $13,25) — `[usuario 2026-09-25: "sí"]` cargado `proveedor_insumo.cod_prov='4444'` (costos 13,25/38,00 intactos).
+
+### 4fz. IC3 / IC3V (Fleje N° 90 corto / largo): fleje que se CUENTA, en paquetes de 10 kg (2026-09-25)
+
+- `[usuario 2026-09-25]` *"IC3 e IC3V vienen en paquetes de 10kg cada uno."* → `entrega_unidad='paquetes'`
+  en los dos; `uni_x_cajon` = unidades por paquete: IC3 1.205 (10 / 0,0083), IC3V **746** (10 / 0,0134;
+  antes decía 24, que daba un "cajón" de 0,32 kg).
+- `[dato]` Son los **únicos 2 del sector Fleje (5) con `unidad_medida='unidad'`**; el resto se pesa.
+  Por eso `tablet_bundle` ya no manda todo el sector 5 al consumo en kg: sólo el que es `kg`. Antes el
+  sugerido a IJUPA daba 0 (commit `2737d21`). Hoy: IC3 15,66 paq., IC3V 1,47 paq. (1 mes de consumo).
+
+### 4fz-bis. Flejes 31/32/33, Varillas B Pera Mini y Alambre Ganchito: al tallerista en PAQUETES / BOLSAS (2026-09-25)
+
+`[usuario]` *"Los flejes 33, 31, 32 y los 2 de batidor pera mini (corto y largo) se manda en paquetes también.
+fleje 33: 13.6kg por paquete. El resto 10kg por paquete"*. Son piezas en **kg**, así que el factor va en kg:
+`entrega_unidad='paquetes'` + `entrega_uni_x` = **13,6** en `IE1` (Fleje N° 33) y **10** en `IE4` (N° 31),
+`IE5` (N° 32), `IVBCM` (Varilla B Pera Corta Mini, N° 96) e `IVBLM` (Larga Mini, N° 95). Se usó
+`entrega_uni_x` y **no** `uni_x_cajon` a propósito: `uni_x_cajon` lo leen 23 funciones (máximos, OC,
+calculadora de cajones) y ese número es del envío, no del stock. Costo intacto.
+
+**Corrección 2026-09-29** `[usuario]` *"Del batidor mini viene la varilla corta en diámetro 1.25 y 228mm de largo y
+la larga 300mm de largo y diámetro 1.25. Ambas en paquetes de 2.5kg"*. → `IVBCM`/`IVBLM`: `entrega_uni_x`
+**10 → 2,5** (el "10 kg" de arriba vale sólo para 31/32) y medidas en `fleje_detalle`: N° 96 corta **Ø1,25 x 228**,
+N° 95 larga **Ø1,25 x 300**. ⚠ `[deducido]` El `kg_x_uni` cargado **no cierra con esas medidas**: el acero
+teórico da **2,20 g** (corta) y **2,89 g** (larga), la base tiene 8,02 g y 7,32 g — ~3× y **la corta más pesada
+que la larga**. No se tocó (mueve costo); pendiente de confirmar.
+
+`[usuario]` *"el alambre aluminio ganchito se manda en bolsas de 1kg"* + *"pesa 0.000165 por uni"*: `Z12`
+(por unidad) → `kg_x_uni=0,000165`, `entrega_unidad='bolsas'`, `entrega_uni_x=6.060,61` uni (= 1 kg).
+**⚠ Movió el costo: Z12 $10,84 → $6,47.** Z12 sale por ruta del `IE8` Fleje N° 55 (matriz 56), y el costeo
+usa el peso de la pieza que sale: antes caía al `kg_x_uni` del fleje (0,0004356 kg/pieza), ahora usa el de
+Z12 (0,000165). **Los dos números no cierran entre sí (×2,6)** → `[usuario 2026-09-25]` *"tiene desperdicio"*: el 0,0004356 es `1/matriz.partes_por_kilo_de_fleje` de la matriz 56, que **incluye el scrap**.
+**Choca con la regla de costeo vigente (§ costeo, punto 3):** el material del fleje usa el `kg_x_uni` de la pieza (sin scrap) y sólo cae a `partes_por_kilo_de_fleje` si falta el peso. `[dato 2026-09-25]` De 51 piezas que salen de fleje por matriz con los dos datos, **45 tienen consumo de matriz > peso de pieza** (+5 %): el costo de todas ignora el desperdicio, no sólo el de Z12. **NO se cambió la vista** — es una decisión de costeo global (sube el costo de ~45 piezas), pendiente del dueño. Z12 queda en $6,47 hasta entonces.
+
+## 4ga. El Cepillo Limpia Bombilla es UNA sola pieza: `GRJ28` para 555 y 764; se compra a Gilardi Esther (2026-09-25)
+
+[usuario, Thomas] *"En sector garage hay dos cepillos limpiabombilla. GRJ29 y GRJ28. Unificalos porque el
+555 y el 764, ambos artículos usan GRJ28"* + *"Y se lo compramos a Gilardi Esther"*.
+
+- `GRJ29` (id 900) **se borró**: stock 0 en todas las ubicaciones, 0 movimientos, sin precios ni OC.
+- Receta del 764 (`articulo_componente` 894) y su ruta 949 (pasos 3666/3667, insumo → Gentile) apuntan a `GRJ28` (899).
+- Inventario: la fila de GRJ29 en Sector Garage se borró y el máximo de GRJ28 pasó a 3.816 + 984 = 4.800
+  (suma de los dos máximos Est Madre); la fila de Gentile (ubic 28, stock 0) pasó a GRJ28.
+- `GRJ28.proveedor` Cimarron → **Gilardi Esther** (id 30, rubro Sector Garage). Corrige lo anotado el 2026-09-13
+  (Cimarrón). Sin precio cargado: costo sigue en 0 para esa pieza.
+- **Envase (2026-09-28)** [Thomas, con la foto de la Tablet: *"Peso por uni 0.00193 y vienen 3000 por caja.
+  Sugerido en caja"*]: `kg_x_uni=0,00193`, `entrega_unidad='cajas'`, `entrega_uni_x=3000` (5,79 kg/caja),
+  `uni_x_cajon` null — mismo modelo que `Z31`/`C13`. Tablet → Enviar (Sector Garage): sugerido 1.980 uni =
+  **1 caja** (techo); la cantidad se escribe en kg. `v_costo_componente` idéntico antes/después (805 filas, mismo hash).
+
+## 4gb. `C13` Corta Queso Bastidor c/Cilindro va en CAJAS DE 144 (2026-09-25)
+
+[Thomas, textual: *"El corta queso bastidor c/cilindro se recepciona en cajas de 144 uni y se le manda
+a lucho en esas cajas. modelalo para que el sugerido en la tablet aparezca así"*.] El bastidor importado
+(`C13`, id 547, Sector Procesado, art 546) no se reenvasa: la caja que llega es la que va a Lucho.
+Modelado igual que el caso hermano `Z31` Descorazonador (mismo sector, cajas de 2.400):
+`componente.entrega_unidad='cajas'`, `entrega_uni_x=144`; `uni_x_cajon` **queda null a propósito**
+(no es cajón de despacho, y así no se cuela en los cálculos de cajones del sector).
+- **Tablet → Enviar → Lucho:** `tablet_bundle` ya manda `env_unidad='cajas'`, `env_factor=144`.
+  Medido: sugerido 7.854 uni = **55 cajas** (techo). Como `C13` no tiene `kg_x_uni`, la cantidad
+  también se escribe **en cajas** (no en kg) — correcto: se manda la caja cerrada.
+- ~~Recepción de insumos NO lee el envase: el remito del C13 se sigue cargando en unidades.~~
+  **Corregido el mismo día** (ver abajo).
+
+**Remito en cajas + peso (mismo día)** [Thomas: *"Sí"* a recibirlo en cajas; *"4.4kg por caja. Hacé la
+cuenta"*]:
+- **Peso:** `C13.kg_x_uni` = 4,4 / 144 = **0,030556 kg/uni** (antes null). Medido: `v_costo_componente`
+  idéntico antes/después (805 filas, total $526.858,63, hash igual; C13 sigue $1.047,20 porque es
+  comprado, su costo es el precio). Efecto en la Tablet: como ahora hay peso, la **cantidad** del envío a
+  Lucho se escribe en **kg** con el renglón "= N cajas" debajo (4,4 kg = 1 caja), igual
+  que el Z31 y el resto de los talleristas; el **sugerido sigue en cajas** (55).
+- **Recepción en cajas:** `componente.remito_unidad` acepta un tercer valor, **`'envase'`** (check
+  `componente_remito_unidad_chk` ampliado): el remito viene contado en el envase de la pieza
+  (`entrega_unidad` × `entrega_uni_x`). `recepcion_bundle` ahora manda `entrega_unidad`/`entrega_uni_x`, y
+  `RecepcionInsumos_GP2.html` v3.62.0 pide "Cantidad cajas" y guarda cajas × 144 en **unidades** (3 cajas
+  = 432 uni). El 144 vive en un solo lugar: el mismo dato con que la Tablet se lo manda a Lucho.
+  Sin factor, `'envase'` no se reconoce y la pieza cae a su regla de siempre (importado → unidades).
+
+## 4gc. `V18D` Tornillo Sacafuente va a Martín Cornejo en BOLSAS de 2 kg (2026-09-25)
+
+[Thomas, con la foto de su planilla: *"Viendo el envío a Martín Cornejo en versión tablet del tornillo
+Sacafuente, que me lo pone en unidades. Quiero que me lo ponga en bolsas"* — KG x Uni **0,0305**, Kg x
+Bolsa **2**.] `V18D` (id 281, Sector Remache, sale niquelado de Guazzaroni y lo arma Martín Cornejo en el
+508 y el 708) no tenía ni peso ni envase, así que la Tablet caía a unidades.
+- **Dato:** `kg_x_uni=0,0305`, `entrega_unidad='bolsas'`, `entrega_uni_x` = 2 / 0,0305 = **65,57 uni por
+  bolsa** (no redondo, como la bolsa de 1 kg del Z12: la bolsa se arma pesando). Tablet medida: sugerido
+  612 uni = **10 bolsas** (techo de 9,33); la cantidad se escribe en kg (≈ 18,67 kg).
+- ⚠ **Movió el costo, y es una corrección:** sin `kg_x_uni` el niquelado de Guazzaroni (cobra por kg,
+  **$2.606/kg**, la misma tarifa que V1/V11/V12/V13/D9/D13) daba **$0**. Ahora `V18D` $68,70 → **$148,18**
+  (+$79,48 de servicio) y arrastra a **508** $1.554,93 → $1.634,41 y **708** $1.531,98 → $1.611,47. Nada
+  más cambió (diff por componente: 3 filas).
+
+## 4gd. `Z21` Cuchillo Torta va a Martín Cornejo en CAJAS de 450, de 6,5 kg (2026-09-25)
+
+[Thomas: *"El cuchillo torta se manda en cajas de 450 uni y cada caja pesa 6.5kg"*.] `Z21` (id 757,
+Sector Bombilla, insumo que Martín Cornejo arma en el 311 y el 857): `entrega_unidad='cajas'`,
+`entrega_uni_x=450`, y `kg_x_uni` = 6,5 / 450 = **0,014444** `[CORRECCIÓN]`: antes decía **0,01932**, que
+daría 8,69 kg por caja — no cierra con la caja pesada (y la caja con cartón incluido pesa MÁS que las
+piezas, no menos). Manda el dato del dueño. Costo neutro (comprado: su costo es el precio; diff por
+componente vacío). Tablet: sugerido de hoy 4 uni = 1 caja.
+- **Sigue activo** `[Thomas 2026-09-25: "Sigue activo. Que se le mande en cajas"]` `[CORRECCIÓN]`: el
+  `estado_compra='discontinuo'` se le había puesto el 2026-09-11 al discontinuar el **311**, pero el
+  **857** lo sigue usando. Pasa a `null` (igual que su hermano `Z22` de Melinox): vuelve a OC/recepción.
+- **La cantidad se escribe en CAJAS, no en kg** (aunque tenga peso). Columna nueva
+  **`componente.envio_carga`** (`'envase'` | `'kg'` | null = regla del sector: cartón/caja en envase, el
+  resto en kg). `tablet_bundle` la usa para `env_carga`; el front ya sabía escribir en el envase (lo usan
+  cartones y cajas) y guarda cajas × 450 en unidades. Hoy sólo `Z21='envase'`. Test en `test_tablet.js`.
+- **Vuelve a la OC de Melinox** `[Thomas 2026-09-25: "Si"]`, aunque la planilla de costos del vecino lo
+  marque «NO COMPRAR +» (esa marca era del 311). Medido en `oc_bundle`: consumo 4 uni/mes (Est Madre del
+  857), máximo 12, **sugerido 12 uni** a $890. ⚠ La OC NO redondea a la caja de 450: el redondeo por
+  envase de la OC es por norma de rubro y Sector Bombilla no tiene; si Melinox sólo vende la caja
+  cerrada, falta esa regla.
+
+
+## 4ge. Crudos p/niquelar a Guazzaroni en CAJONES + cartones Rallador/Huevo en PAQUETES (2026-09-25)
+
+[Thomas: *"0.0022kg por uni 2kg por cajon remache sacafuente / 0.0305 kg por uni 2kg por cajon tornillo
+sacafuente / 0.0006 kg por uni 10kg por cajon remache uña p/niquelar. Para el envio a guazzaroni que
+aparezca en cajones el sugerido"*.]
+- **Dato:** `CV6` kg_x_uni 0,00215 → **0,0022**, uni_x_cajon **909,09** (2 kg); `CV18D` 0,0305, **65,57**
+  (2 kg); `CV9` 0,000567 → **0,0006**, **16.666,67** (10 kg). `V18D` uni_x_cajon null → 65,57 (sin eso el
+  sugerido del SP daba "—"). Costo neutro (diff de `v_costo_componente` vacío). `V6`/`V9` (niquelados)
+  quedan con su kg viejo (0,00215 / 0,000567): a confirmar si también cambian.
+- **Bug corregido (EnviosPS v1.11.1):** con envase por pieza el sugerido salía en cajones del SP (V1 =
+  5.714) rotulado como cajón del SC (CV1 = 57.143). Ahora se calcula en unidades (máx SP − online SP −
+  en poder del PS) ÷ cajón del SC. Ester (factor fijo 1.800) no se tocó.
+- **Cartones a prov. AT** [Thomas: *"Se les manda a Carriero. En paquetes de 3500. El formato rayador es
+  en paquetes de 3500"* / *"El 824 y el 825 son tipo corbata. El 026 y 027 son tipo 8"* y enseguida *"Me corrijo. 026 y 027 son tipo huevo"*]:
+  formato `Rallador` uni_x_bolsa null → ~~3.500~~ **2.500** (F5A 321, P2A 840; ver 4gg); `C2A` 026 y `C2B` 027 pasan de
+  Corbata a formato **Huevo** (paquete 2.000). `Q6B` 824 / `Q6C` 825 siguen Corbata: paquete de **1.000** [Thomas: *"1000"*].
+  El sugerido de hoy es 0 en todos porque máximo del destino = 0 y el Sector Cartón no tiene stock.
+
+## 4gf. La Bandita Prensa Matambre va a Maspoli en BOLSITAS de 2.000 (2026-09-25)
+
+[Thomas: *"La bandita prensa matambre en bolsitas de 2000"*.] `BANDITAM` (id 935) compartía el formato
+`Bandita` con la del Palo de Amasar (`BANDITA`), y en cartón el paquete de envío es **por formato**. Para
+no arrastrar a la otra, se hizo lo mismo que con "Bolsa Cartón" (4fx): formato nuevo **`Bandita Matambre`**
+(múltiplos copiados de `Bandita`, OC igual) con `uni_x_bolsa=2000`. `BANDITA` queda sin paquete.
+- **Rótulo:** `tablet_bundle` ponía "paquetes" fijo a todo cartón/caja; ahora respeta
+  `componente.entrega_unidad` si está cargado (hoy solo `BANDITAM='bolsas'`, único del sector 10/11 con
+  dato) → la Tablet dice **bolsas**. Sin dato sigue diciendo paquetes.
+
+## 4gg. El paquete de envío del cartón es POR CÓDIGO, no por formato (2026-09-25)
+
+[Thomas, con `Conteo_Cartones_VACIO.xlsx`: *"para poner el sugerido en paquetes busca según el código de
+artículo… si es cartón 222 busca en la columna de código 222 y después en la columna de uni por paquete
+tenés el dato"* / *"En la hoja pedido vacio"*.] La planilla muestra que el paquete **no es del formato**:
+dentro de Huevo hay 1.000 y 2.500, dentro de Corb8 1.000 y 2.500, y el 700 (LOKE) va de 2.000.
+- **Regla nueva:** `componente.entrega_uni_x` del cartón manda; si está en null cae a
+  `carton_formato.uni_x_bolsa`. Cambiado en `tablet_bundle` (env_factor) y `cartones_para_reemplazo`.
+  **Relevamiento también** (`relev_factor`, Thomas dijo que sí): el paquetón que se cuenta es el del cartón.
+  **O.C. no lo usa** (agrupa por múltiplos de pliego). **Recepción también** [Thomas: *"Trae las unidades que
+  dice el uni x paquete x cartón que acabas de cargar"*]: la bolsa de la gráfica = `entrega_uni_x` del cartón
+  (2.500 = 10 paquetes de 250, +10 en la tarjeta). `guardar_control_cartones` y RecepcionInsumos v3.64.0.
+- **El formato es SOLO EL NOMBRE** [Thomas: *"tendría que nada más decir el formato y esa tabla fija por formato
+  de uni por paquete, sacala"*]. Se cargó `entrega_uni_x` a los 85 cartones que no lo tenían (con el número que
+  tenían por formato) y a los pliegos (100), y se sacó toda caída al formato: `tablet_bundle`,
+  `cartones_para_reemplazo`, `relev_factor`, `guardar_control_cartones`, `recepcion_bundle` (uni_x_bolsa_cat) y
+  la tabla fija `UNI_X_BOLSA` del front. `carton_formato.uni_x_bolsa` queda en la tabla pero **nadie lo lee**
+  para el paquete. Único cartón sin paquete: `BANDITA` (Palo de Amasar) → "sin paquete cargado".
+- **Los 13 que no estaban en la planilla** quedaron fijos por cartón con el número de su formato [Thomas:
+  *"usa esas uni x paquete"*]: 059/500/510/516/715/818/909 = 1.000 (C), 355/515/590/867/890 = 2.000 (Huevo),
+  708 = 1.000 (LOKE). Ojo: la hoja tenía "590E" (2.500) y "890E" (1.000); **manda lo dicho por Thomas** (2.000).
+  Los Bolsa Cartón (031/120/836 = 7.500) siguen por formato.
+- **Dato:** 137 cartones de la base cruzan con la hoja (`Cartón NNN` = col Cod). **52** difieren del
+  formato y se cargaron por pieza (`entrega_uni_x` + `entrega_unidad='paquetes'`, para que el escritorio
+  no los rotule "cajones"): p.ej. M2B 222 = 2.500, M1/M2A/M2C/M3A/M3B = 2.500, C2A/C2B = 2.500,
+  O1B 700 = 2.000, 23 Huevo en 1.000. Los otros 85 coinciden con su formato.
+- `F5A` 321 y `P2A` 840 = **2.500** `[CORRECCIÓN]`: primero se cargó 3.500 (dicho en el chat); Thomas
+  confirmó *"Tomá el que dice la planilla: 2500"* → formato `Rallador` uni_x_bolsa = 2.500. 824/825/901 dicen 998/999/1001 → se dejan en 1.000 (typo).
+
+## 4gh. Las BOLSAS no tienen formato: formato es sólo de los cartones de Gráficos Pol (2026-09-25)
+
+`[usuario 2026-09-25, Thomas]`: *"no tiene formato. Formato tienen solo los cartones de gráfica pol"*.
+Aplicado a las 5 bolsas del sector cartón (se eligió: las 3 de Envases Vihal + las 2 de Papelera
+Nueve de Julio; **NO** a los pliegos de AJ Adhesivos ni a los 2 C de Blist-Pack, que siguen con formato):
+
+- Descripción **"Bolsa NNN"**, no "Cartón NNN": `A1B` Bolsa 031, `A1B1` Bolsa 120, `G8C` Bolsa 836.
+- Código de posición como el resto de los cartones (lo eligió Claude a pedido, junto a sus hermanas):
+  `BOLSA550` → **`A1B2`** (Bolsa 550, LOEKE) y `BOLSA760` → **`G8C1`** (Bolsa 760, CHEF). Todo lo
+  referencia por id, así que el rename no rompió nada.
+- `carton_formato = NULL` en las 5. El paquete de envío se pasó ANTES a la pieza (`entrega_uni_x` +
+  `entrega_unidad='paquetes'`, mismo camino que 4gg): Vihal **7.500**, Papelera **200**. Tablet,
+  relevamiento y reemplazo leen `coalesce(entrega_uni_x, formato)` → sin cambio de comportamiento.
+- ⚠ Lo que SÍ se perdió: el aviso de **pedido mínimo 20.000** de la OC (vivía en el formato y estaba
+  sin confirmar). Recepción las muestra en el chip "Sin formato" y las sigue contando en paquetes.
+- Los formatos `Bolsa` y `Bolsa Cartón` de `GP2.carton_formato` quedaron sin uso (no se borraron).
+- **Continuación (mismo día)** `[usuario]`: se **borraron** los formatos `Bolsa` y `Bolsa Cartón`
+  (*"Sí"*), y Recepción Insumos (v3.63.0) ya no muestra la fila FORMATO cuando ningún ítem de la
+  marca tiene formato: con Vihal y Papelera aparecen las bolsas de cada marca, sin clasificación.
+- **`BANDITAM` es formato `Bandita`** `[usuario 2026-09-25: "Bandita matambre es formato bandita"]`.
+  Da vuelta el formato aparte `Bandita Matambre` de 4gf: la bolsita de **2.000** pasó a la pieza
+  (`entrega_uni_x=2000`, `entrega_unidad='bolsas'` ya estaba) y el formato `Bandita Matambre` se
+  borró. Los múltiplos de OC eran los mismos de Bandita, así que la OC no cambia.
+
+## 4gi. Proveedores del sacafuente: tornillo a Imel, vástago a Bella Vista (2026-09-25)
+
+[Thomas: *"El tornillo sacafuente se lo compramos a IMEL. Y el vástago sacafuente se lo compramos a bella
+vista"*.] `[CORRECCIÓN]` Estaban cruzados: `CV18D` Tornillo Sacafuente p/Niquelar decía **Tornillos
+Suipacha** → **Imel**; `W8` Vástago Sacafuente Pizzero decía **Imel** → **Bella Vista**. Costo neutro (diff
+de `v_costo_componente` vacío). Afecta en qué proveedor aparecen en OC y Recepción de Insumos.
+- **Tornillos Suipacha dado de baja** (`proveedor_insumo.activo=false`) [Thomas: *"dalo de baja porque no le
+  compramos más el tornillo corta queso"*]. Tras pasar `CV18D` a Imel no le quedaba ninguna pieza, ni proveedor
+  alternativo, ni O.C. abierta. No se borra: queda para el historial de O.C. y recepciones.
+
+## 4gj. Cruce de las 5 planillas VACIO contra el programa (2026-09-25, noche)
+
+`[dato]` Informe completo en `RELEVAMIENTO_VS_GP2_2026-09-25.md` (+ `_detalle.xlsx`). Lo que conviene
+recordar sin abrirlo:
+
+- **La Est. Madre de GP2 da ~30 % menos que la "Sugerencia" de las planillas en LOEKE y ~56 % menos en
+  CHEF** (sólo 2 de 199 artículos coinciden). Es la causa de casi toda diferencia de consumo, máximo y
+  sugerido. Manda `GP2.est_madre` (§4h) hasta que el dueño diga otra cosa `[pendiente D0]`.
+- **Meses del máximo distintos de la planilla**: cartón 6 (planilla 3), remache 4 (6), MP plástica 2,5
+  (4); plástico 4 y bombilla 3 coinciden. Garage: la planilla usa capacidad física en cajones.
+- **Bolsa de remache: tres números** — Relevamiento cuenta bolsas de 20 kg (`uni_x_cajon`), la O.C.
+  redondea a 25 kg (`remache_kg_x_bolsa`), la planilla usa 2 o 10 kg `[pendiente D4]`.
+- **`relev_factor` cae a `entrega_uni_x` cuando la pieza no tiene `uni_x_cajon`** (fuera de cartón,
+  caja y fleje), con el envase de `entrega_unidad`. Sin eso GRJ13/GRJ14 (cajas de 100), GRJ21A/B
+  (5.400) y Z21 (450) sólo se podían contar sueltas. OJO: **no** se usa `entrega_uni_x` cuando hay
+  `uni_x_cajon`, porque no siempre es el mismo envase (GRJ5/GRJ6: cajón 960 en el sector, bolsa de
+  120 al tallerista).
+- La planilla de cartones **da posiciones que GP2 tenía como provisorias**: CART186 = `I4C`,
+  CART058 = `G8C` (choca con la Bolsa 836), CCE2B = `E2B`, CCG6B = `G6A`, CCC4 = `D5A`, K5D = `H2A`.
+- `CV15` Rem Tapón Hierro (id 617, cargado el 04-09) **ya no existe** en GP2 y la planilla lo sigue
+  pidiendo; no hay rastro del borrado `[pendiente D8]`.
+- `db/` estaba desfasado (6 funciones + `v_consumo_fleje_kg` cambiadas en vivo): se resincronizó y
+  quedó verificado por md5, 163/163 funciones.
+- **550 Filtro para bombillas lleva 2 filtros (`GRJ21A`) y 2 precintos (`GRJ21B`) por unidad**
+  `[Thomas 2026-09-26: "el blister viene por dos"]`. La receta GP2 (×2) está bien; la planilla de
+  Garage (Consumo Art, ×1) está mal. El 760 (gemelo CHEF) tiene la misma receta ×2 `[deducido]`.
+- **Est. Madre ponderada, corrección de la línea de arriba**: sobre artículos vivos, GP2 da −15,5 %
+  en LOEKE y −37 % en CHEF contra la planilla Madre 7-26 (la mediana −30/−56 % incluía artículos
+  que GP2 no tiene).
+- **DECIDIDO: manda la Est. Madre de GP2** `[Thomas 2026-09-26: "Considerá la est madre de GP2"]`, no la
+  de las planillas (Madre 7-26 / 10-25). Cruzada contra Gestión Virgilio (`gv_proyeccion_articulo`):
+  iguales salvo que **GP2 no suma la familia** (secundario → principal). Le falta demanda a 580 (el 580E
+  aporta 49 caj/mes) y a 941E-948E y 590E (secundarios 332-338 y 548, que GP2 no tiene como artículo).
+  Arreglo propuesto, no hecho: familias en una tabla propia de GP2 `[pendiente D9]`.
+
+## 4gk. Familias de artículos en GP2: la venta del secundario va al principal (2026-09-26)
+
+`[Thomas 2026-09-26: "Avanzá si podés vos"]` Hecho tras el cruce con Gestión Virgilio (§4gj). Tabla
+**`GP2.articulo_familia (cod_secundario pk, cod_principal)`**, 19 pares copiados de
+`public."Equivalencias_Familia"` (una vez; REGLA 0: ninguna función/vista GP2 lee `public`). La
+regla es la de Virgilio (v22.68/v22.72): **la Est. Madre del secundario se suma al principal y el
+secundario queda en 0** aunque exista como artículo GP2 (caso 338 → 941E). Vive en
+`v_consumo_demanda` (CTE `dem`); un trigger sobre la tabla recalcula máximos. Mantenimiento: a mano;
+`db/verificar.sql` regla `AG` compara con `Equivalencias_Familia` y avisa si se desfasa.
+Efecto: el 580 Batidor Mini pasó de 114 a 702 uni/mes (el 580E aporta 588) y con él EP10, G7A,
+GRJ10A, ABPM, IVBCM, IVBLM; los importados de acero 941E-948E suman sus secundarios 332-338
+(PEST1 684 → 1.178). **Hallazgo de paso**: `trg_maximos_est_madre` no recalcula talleristas ni Prov AT
+(68 máximos de tallerista estaban viejos); propuesto, no hecho `[pendiente D10]`.
+- **Bolsa de remache: "depende"** `[Thomas 2026-09-26]` — dos envases: bolsa del proveedor (planilla 2/10 kg,
+  O.C. múltiplos de 25 kg) y cajón de 20 kg a Guazzaroni (`uni_x_cajon`, medido 21 kg). Nada cambiado.
+- Datos aplicados 2026-09-26: cartón Q7E en receta 922; C12 inventario a Procesado (máx 1.165 por 5
+  cajones); fila C12B en Bombilla borrada; PA8A uni_x_cajon 5.000 (planilla); máximos físicos PIEA 1,
+  PIEB 1, PCP4A 800, PCP2 145 kg.
+
+## 4gl. Los máximos se recalculan UNA vez por transacción, al COMMIT (2026-09-26)
+
+`[Thomas 2026-09-26: "Dale" a D10]` + panel de 5 agentes (3 lentes + 2 refutadores) antes de tocar.
+- **Corrección a §4gk**: la Tablet **no** lee `inventario.maximo` de talleristas (calcula el techo en vivo:
+  consumo × meses); ese máximo guardado lo muestran sólo Proporciones_GP2 y la vista Talleristas de Stock
+  General. Lo de "afecta la Tablet" estaba mal dicho.
+- **Hallazgo `[dato, pg_stat_statements]`**: el sync de LK hace `DELETE FROM proyeccion_madre` + 330
+  `INSERT` de una fila, en una transacción, ~1,8 veces por día; `fn_est_madre_sync` es por fila, así que el
+  trigger statement-level de `est_madre` corría `recalcular_maximos_insumos` **658 veces por sync** (~54 s;
+  el DELETE 21,2 s promedio). Nadie lo notaba porque el rol `lk_ppp_reader` tiene timeout de 120 s.
+- **Arreglo**: `fn_recalc_maximos_diferido` + los 4 `trg_maximos_*` como **constraint triggers
+  DEFERRABLE INITIALLY DEFERRED** con bandera transaccional. Al COMMIT corre una sola vez insumos +
+  **talleristas** (antes nadie recalculaba talleristas al cambiar la Est. Madre: 68 estaban viejos).
+  Prov AT no entra (techo 0, regla 24-09). Probado con EP10/580. `fn_recalc_maximos_insumos` se borró.
+- **Regla que queda**: en ubicaciones de tallerista el único origen que el recálculo respeta es `fisico`;
+  un máximo cargado a mano por SQL con otro origen se pisa en el próximo sync. Hoy no hay ninguno.
+- 13 máximos de tallerista sin ruta ni consumo (Gentile 9, Cavallero 3, Cornejo PC8) se limpiaron a null.
+
+## 4gm. GP2 lee la O.C. de Gestión Virgilio: al Prov AT se le mandan las partes de su orden (2026-09-26)
+
+> **2026-09-28 — "📄 Ver O.C." en la Tablet** `[usuario: "en el envío a prov de art terminado y talleristas
+> o.c. … me aparezca arriba de 'buscar por código' una box que me diga ver o.c. y pueda ver la o.c. de gestión
+> virgilio"]`. En Enviar, para las contrapartes cuyo sugerido sale de esta O.C. (tallerista O.C. y prov AT), hay
+> una box arriba del buscador que abre lo PENDIENTE de `v_oc_virgilio_pendiente` (tipo + ref_id, con la
+> descripción de `articulo`): código, fecha de la O.C., pedido, recibido y pendiente en cajas. Se lee al abrir, no
+> viaja en `tablet_bundle`. Tablet v1.37.0, `tests/ui/test_tablet_ver_oc.js`.
+
+`[Thomas 2026-09-26: "Para los proveedores de artículo terminado solamente tenemos que mandarle partes
+para que puedan hacer lo que les pide su orden de compra"]`. Cierra el hueco que §4fr y §4fw dejaron
+escrito ("cuando salga orden de compra de Virgilio, que todavía no lo modelamos").
+
+**Cómo genera Virgilio las O.C.** `[dato: repo Gestion-Virgilio, sql/generar_ocs_automaticas.sql,
+gv_generador_oc_*, oc_nueva_pisa_vieja_v1460.sql]`: `vista_generador_oc` arma por artículo
+**máximo = ceil(proyección × índice)** (proyección = `gv_proyeccion_articulo`, índice default 1,5,
+"la proyección es rey": no se topa a la góndola), **a pedir = máximo + pedidos pendientes − stock
+disponible**, y el cron diario `gv_oc_auto_corrida()` (ancla `GV_OC_Auto`, cadencia 7 días) inserta
+una línea por (proveedor, código) en `public."Ordenes_Compra"` (rubro `Art Term`, unidad `Cajas`,
+estado `pendiente`, `oc_uni_caja`). El proveedor sale de `OC_Maximos.proveedor` (quién fabrica), salvo
+Blistpack/Oscar/Pedernera, cuya O.C. se emite a **Log/ Fabr** (`GV_OC_Fabrica_Para`). Al recibir,
+`gv_oc_recompute_recibido` cruza entregas contra O.C. por (proveedor, código) y sube
+`cantidad_recibida`/`estado`. **Regla "la nueva pisa la vieja"**: por (proveedor, código) sólo vive
+la O.C. de fecha más nueva no cerrada/anulada (ventana 120 días); pendiente = cantidad − recibida.
+Los proveedores de esa tabla son también nuestros talleristas (Lucho, Poly=IJUPA, Martin C, Garcia,
+German, Oscar, Pettofrezza, Carlos E) y fasoneros (Pedernera).
+
+**Lo hecho en GP2 (REGLA 0: sin leer `public` desde GP2):**
+- **`GP2.oc_virgilio`**: espejo fila a fila de `Ordenes_Compra` por el trigger `trg_oc_virgilio_espejo_gp2`
+  (en `public`, patrón `est_madre`; `fn_oc_virgilio_espejo` nunca frena a Virgilio: `raise warning`).
+  Semilla 872 filas; `db/verificar.sql` regla `AH` avisa si se desfasa.
+- **`v_oc_virgilio_pendiente`**: O.C. vigente por (contraparte GP2, código) con la regla de Virgilio;
+  el proveedor se resuelve a contraparte **activa** por nombre de `proveedor_at` (con o sin " SA"),
+  `contraparte_alias`, nombre de tallerista exacto o por prefijo ("Martin C" → Martin Cornejo).
+  **"Carlos E" = Alex Escalante** `[Thomas 2026-09-26: "Carlos E es el papá de Alex (el que
+  factura)"]`: Virgilio le emite la O.C. al padre porque es quien factura; el trabajo lo hace Alex
+  (tallerista 2). Alias `CARLOS E` → tallerista 2 cargado en `contraparte_alias` el 2026-09-26
+  (17 líneas de O.C. vigentes resolvieron: 506, 510, 248, 535, 515, 395, 333…). El alias `CARLOS`
+  a secas sigue siendo Aguirre (§1-nonies): no confundir. Como Escalante NO es `pedido_por_oc_virgilio`,
+  su techo en la Tablet no cambia (sigue consumo × meses).
+  Sin resolver hoy: "Log/ Fabr", "Blistpack", "Basconia" (flejes), "Paternal Goma" (prov AT inactivo).
+  `uni_pend` = cajas × `articulos_por_caja` (o la caja de la O.C.; en `Uni` ya son unidades).
+- **`v_oc_virgilio_partes`**: `uni_pend` × receta, sólo cartón y caja (lo que GP2 le manda al prov AT).
+- **`tablet_bundle`**: el techo del prov AT pasa de `0` a esas partes; sugerido = techo − lo que ya
+  tiene. Medido: 24 filas con sugerido en 5 prov AT (Pintos 13, Carriero 3, Maspoli 5, The Plast 3);
+  Cabral, Kuffo, Lopez Jose y Manfer sin O.C. vigente → 0, como antes.
+- Códigos de O.C. que **no son artículo GP2**: Manfer 565, Maspoli 55219, Tierra Nativa 55215 → no
+  generan partes (se ven en la vista con `articulo_id` null).
+
+**Pendiente (no hecho)**: los **talleristas O.C.** (Carlos Aguirre, Blist-Pack, §4fr) siguen con techo 0;
+la misma vista sirve, pero sus partes salen de `ruta_paso` (comp_entrada del paso del tallerista),
+no de la receta plana `[idea 7356]`. Pedernera (fasonero) idem.
+
+**Ampliación del mismo día — talleristas O.C.** `[Thomas 2026-09-26: "Los prov AT le tenemos que mandar
+mercadería en función de su OC. Lo mismo lo que entregan los talleristas en garage"]`:
+- **`v_oc_virgilio_demanda`**: la O.C. vigente explotada por artículo y componente (receta + BOM +
+  rutas, el mismo recorrido que `v_consumo_demanda` hace con la Est. Madre), sin importar a quién
+  esté emitida la orden.
+- **`v_oc_virgilio_partes_tallerista`**: partes que necesita un **tallerista O.C.**
+  (`pedido_por_oc_virgilio`: Carlos Aguirre, Blist-Pack) para su O.C., todos sus pasos — cierra la
+  idea 7356 y el `then 0` de §4fr. uni_requeridas = demanda por O.C. × % del tallerista
+  (`v_reparto_efectivo`).
+- **Medido**: Aguirre C1A/GRJ10 0 → 3.948; Blist-Pack GRJ28 0 → 1.980, GRJ4 960, GRJ6 768.
+
+**⚠ Corrección del dueño, mismo día — el GARAGE NO va por la O.C. de Virgilio.** Durante unas horas
+(commit `db409de`) los pasos de cualquier tallerista con salida en Sector Garage (Cornejo GRJ5/GRJ6,
+Escalante GRJ10/GRJ10A) también tomaban el techo de la O.C. de Virgilio. `[Thomas 2026-09-26, textual:
+"En realidad no, mentira, te mentí. Los que llenan garage se tienen que llenar por orden de compra de
+INSUMOS, no por orden de compra de artículo terminado. Sí a Martín o a Carlos o a Poli debemos
+mandarle mercadería, pero es para que llenen el sector de garage o lo que entrega Poli o lo que
+entrega Lucho o lo que entrega Alex."]`. **Revertido** en la base y en `db/`: la vista quedó sólo con
+`pedido_por_oc_virgilio` (sin columna `entrega_garage`) y `tablet_bundle` sin la rama `sector_id = 9`;
+Cornejo y Escalante vuelven al máximo de la casa (consumo × meses).
+- `[deducido, sin confirmar]` Lo que el dueño describe para el garage es el **patrón fasonero** (§4b,
+  Maspoli): el GRJ lo compra GP2 con una **O.C. de insumos** (`GP2.orden_compra` al tallerista como
+  `proveedor_insumo`) y el techo de lo que se le manda son las partes de esa O.C. pendiente
+  (`oc_ps` de `tablet_bundle`). Hoy los GRJ son `estado_compra='fabricacion'` y no aparecen en
+  `oc_bundle`; sólo Gilardi Esther es `proveedor_insumo` de rubro Garage. **Falta definir con Thomas**
+  qué abarca "lo que entrega Poli / Lucho / Alex" (¿sólo GRJ o todo lo que entregan?) antes de modelarlo.
+
+### 4ga. El login vuelve a estar PRENDIDO, y ahora la base sabe quién llama (2026-09-28)
+
+**Decisión del dueño** `[usuario 2026-09-28]`, contestando la auditoría de seguridad
+(`SEGURIDAD_GP2_2026-09-28.md`, punto 1): **"1 si"** → se vuelve a pedir login con Google;
+**"2 si tiene"** → la tablet de operarios **sí** tiene login de Google (no hace falta un token
+por dispositivo); **"n8n no escribe"** → n8n no es un llamador que escriba en GP2.
+Revierte la decisión del 2026-08-29 (login apagado: "la página ya está privada… prefiero que
+esté suelta").
+
+**Por qué molestaba el login de antes** `[dato: auth-guard.js viejo]`: deslogueaba apenas vencía
+el token de acceso (1 hora) y las pantallas usaban un cliente *sin sesión*, así que nadie lo
+renovaba → Google de nuevo cada hora. **Fase A (hecha):** `GP2_SB()` usa la sesión guardada y la
+renueva sola (un solo cliente por página: dos se pisan al renovar y desloguean); el guard solo
+pide login si no hay sesión (sin `refresh_token`); al volver del login se regresa a la misma
+pantalla (`?next=`, solo rutas propias); las 31 pantallas GP2 que no cargaban el guard ahora lo
+cargan. El guard no actúa bajo `file://` (así abren los tests; la app real va por https).
+
+**Fase B — HECHA el mismo día** `[usuario: "b: no se está utilizando actualmente"]`: como el
+sistema no está en uso, no se esperó a los logs. Las 62 RPC que escriben exigen un usuario de la
+whitelist (`public.usuarios_permitidos`, hoy 2 cuentas: una `admin` y una `envios`) y `anon` ya no
+las ejecuta. **Toda cuenta que tenga que escribir (incluidas las tablets) tiene que estar en esa
+tabla**; la cuenta `envios` además sólo ve su lista de pantallas en `auth-guard.js`.
+
+**Lo que quedaba pendiente antes de la fase B (histórico):** la base sigue aceptando a `anon`. Desde ahora los pedidos
+de un usuario logueado llegan como `authenticated` con su email; la **fase B** (exigir la
+whitelist en las RPCs y sacarle `EXECUTE` a `anon`) va recién cuando se vea en los logs que los
+pedidos reales llegan con sesión — si se corta antes, una tablet con la versión vieja cacheada
+queda muda. La macro `MACRO_ENTREGAS_SUPABASE.bas` solo **lee** `public."Entregas Tallerista
+Virgilio"` `[dato: el .bas]`, no toca GP2.
+
+
+## 4gn. El menú principal son DOS grupos: Stocks y Herramientas (2026-09-28)
+
+- [usuario, Thomas] *"Dos módulos en vez de 10"*. Lo que se ve en `GP2_MODULOS.html`: las dos
+  pastillas de tablet (Logística y Operarios — lo que usan logística y los operarios) y dos grupos:
+  - **Stocks**: Stock General, Control Partes Talleristas, Control Partes PS, Control Partes Prov. AT,
+    Faltantes, Validación de Stock, Proporciones.
+  - **Herramientas**: O.C., O.P., Despiece x Art., Consumo x Componente, Tiempos Matrices,
+    Casos Especiales, Devolución Cervantes.
+- [usuario] *"El resto ocultalos, si en algún momento te pido que los vuelvas a poner tenés que
+  poder"*. Por eso **no se borró nada**: los 10 grupos anteriores siguen enteros en `MENU_OCULTO`
+  (mismo archivo). Reponer un grupo = moverlo de `MENU_OCULTO` a `MENU`; un módulo suelto = copiar
+  su línea. `GP2_MODULOS.html?todos=1` muestra todo junto, sin editar. Las pantallas siguen
+  abriendo por su URL directa.
+- [deducido] Quedan fuera del menú normal, entre otras, Recepción Insumos, Envíos/Entregas de
+  tallerista/PS/Prov AT, el Relevamiento (conteo) y todo Producción salvo Tiempos Matrices. Los que
+  se usan desde la tablet siguen accesibles por ahí; los de oficina sólo por `?todos=1` o URL.
+
+- **Los dos grupos quedan SIEMPRE abiertos y no se pueden cerrar** [usuario, Thomas 2026-09-28: *"Por default quiero los dos módulos abiertos ... No lo quiero poder cerrar. Que esté expandido ambos"*]. v1.201.0: en el menú normal no hay chevron ni click que los cierre (clase `body.fijo`); con `?todos=1` sigue el acordeón de siempre, porque 13 grupos abiertos no entran. En celular las baldosas bajan de alto para que los 2 grupos entren juntos en una pantalla, y las pastillas de Tablet pasan a una barra fija abajo (una al lado de la otra) porque apiladas tapaban la última baldosa. [dato] En pantalla baja (375×600) la última fila queda detrás de la barra y se ve scrolleando 70px.
+
+## 4go. O.C.: la pantalla es un cuadro sinóptico, sin textos de ayuda (2026-09-28)
+
+- [usuario] Thomas: *"quiero que elimines todos esos textos... optimizame todo como cuadro sinóptico, lo más optimizado posible (tanto la página principal como el recuadro cuando tocás máximo)"*.
+- Fuera de `Compras/OC_GP2.html` (v1.35.0): el cartel "Elegí un proveedor…", la leyenda de "Pedir", la ayuda de la fecha ("se propone sola") y los dos cartelitos debajo de Pedir ("sugerido N · máx − stock" y "hay que pedir / no hace falta"). La fecha se sigue proponiendo sola; el sugerido sigue viniendo cargado en Pedir; el stock en rojo es lo que dice "abajo del máximo".
+- Queda sólo "ya pediste N (en camino)": es lo único que explica por qué una fila abajo del máximo llega vacía.
+- Tabla, barra y buscador abrazan el dato (sin 100% de ancho ni anchos fijos); las dos barras son una. El modal del Máximo: los 4 recuadros son una fila de tabla con la unidad en el encabezado, el desglose va ordenado por consumo mayor → menor y el modal toma el ancho de la tabla.
+- **No volver a meter texto explicativo en esta pantalla**: si algo necesita explicarse, es una columna o un dato, no una leyenda.
+- **v1.36.0 (mismo día)** [usuario] Thomas: *"quiero que me aparezca esta ventanita cuando me pongo arriba de máximo, sin tener que clickear... solo esos datos. El resto no lo quiero"*. El desglose ya no es un modal: es una ventanita flotante pegada a la celda Máximo que se abre al pasar el mouse y se cierra al salir. Muestra **sólo** Artículo (o Pieza) · Venta · Consume · kg/mes + Total; se fueron el título, la fila Máximo/Origen/Meses/Consumo y el aviso de origen. En tablet/celular (sin mouse) un toque la abre y otro, o tocar afuera, la cierra.
+- **v1.37.0** [usuario] Thomas: *"de todo esto quede el botón de Crear O.C. nomás. Que aparezca abajo de Buscar Insumo"*. Usar sugeridos, Limpiar, total en plata, Entrega y Nota quedan **ocultos** (`#barraOculta`), no borrados: la fecha se sigue proponiendo sola (hoy + `dias_entrega`) y viaja a `crear_oc`; la nota va vacía.
+- **v1.38.0 — LA O.C. SE PIDE EN LA UNIDAD DEL REMITO** [usuario] Thomas: *"te dije en todas las recepciones con qué unidad de medida va el remito. Usá las mismas unidades para las órdenes de compra. Y al lado de pedir una columna Uni Medida... los resortes batidor los pido en unidades"*. `umRemito()` en `OC_GP2.html` replica la decisión de `abrirPopup()` de `RecepcionInsumos_GP2.html`: `remito_unidad` de la pieza → cartón en paquetes de 250 (pliego en uni) → remaches/bombillas/cajas en uni → plástico uni por proveedor → fleje por proveedor/UM → `recibe_en_cajas` kg → UM. `oc_bundle` ahora trae `remito_unidad`, `recibe_en_cajas`, `entrega_unidad`, `entrega_uni_x`. El campo Pedir se ve en esa unidad; internamente y a `crear_oc` sigue viajando la unidad de stock (así el cartón valida múltiplos en unidades).
+  - [dato] Medido sobre `oc_bundle` (342 insumos): 153 cartones cambian a paquetes; 3 resortes de Charcas (EP10, LLF8, BOM10) pasan de paquetes de 10 kg a **uni**; BOM12 y PCP3 pasan a kg; el resto ya coincidía.
+  - **El paquete de 10 kg de Charcas es sólo para sus flejes (sector 5).** Los resortes que nos vende se piden y se reciben en unidades. Antes 3 paq de EP10 se guardaban como 30 kg.
+  - ⚠ Son dos copias de la misma regla (Recepción y OC). Si cambia la unidad de remito de un rubro, cambiar las dos.
+
+## 4gp. Mínimos de pedido por pieza: la planilla los tiene, GP2 los muestra bajo "Pedir" (2026-09-28)
+
+`[Thomas 2026-09-28: "comencemos a ver los mínimos de los pedidos de órdenes de compra"]`. Cruce en
+`MINIMOS_OC_2026-09-28_detalle.xlsx`.
+
+- `[dato: planillas de relevamiento]` **Cartón**: el "Pedi Min Uni" NO es por pieza, es el múltiplo de
+  pliego por (tipo, marca): C-LK 12.000, LOKE-CH 16.000, Huevo-CH 25.000, **Huevo-LK 12.000**,
+  Corb8-LK 12.000 / **Corb8-CH 30.000**, Rallador 24.000, tapones 18.000. GP2 tiene un solo
+  `pliegos_multiplo` por formato → 46 códigos no coinciden y 28 tienen otro formato que la planilla.
+  **Sin decidir**: si el múltiplo depende de la marca.
+- `[dato]` **Resina**: los 5 pisos en kg (`proveedor_insumo.pedido_minimo_kg`) coinciden.
+- `[usuario 2026-09-28: "cargá esos mínimos"]` **Bombilla, cargado en `componente.pedido_minimo_uni`**:
+  EP10, LLF8, BOM8 10.000 · BOM10 5.000 · BOM12 1.760 (planilla 1.764,7 = 1 cajón) · Z22 1.200 ·
+  Z25A/Z25B 1.000 (en la planilla figuran como Z2S/Z2SB "Aro/Argolla p/Llavero"). De los 22 códigos
+  con mínimo en la planilla, **14 no existen en GP2** (BOM2/3/4/5/6/7/9/11/14, Z19A/B, Z32, AA6/AE10,
+  tapitas). "A1 Arandelas Corta Queso" (Skotnica) no es el A1 de GP2, que es una caja. BOM8: la
+  planilla dice Resortes Alfredo, GP2 Grudzien Claudia Laura — `[deducido]` el mismo proveedor.
+- **Cómo se muestra** (`OC_GP2.html` v1.36.0): una línea "mín. proveedor N uni" debajo del campo
+  Pedir (para Charcas también "= N paq"), en negrita si lo pedido queda corto. **Sólo informa**: el
+  recuadro amarillo con "Subir al mínimo" se sacó el 14-09 y no vuelve; la OC dispara por el máximo.
+- `[usuario 2026-09-28: "Sí, cargá"]` **Remaches, cargado en `componente.pedido_minimo_uni`** (16, sector 8):
+  el mínimo va en la pieza que se COMPRA (`CV*` "p/Niquelar"), no en la niquelada `V*`. CV1 165.000 ·
+  W8 150.000 · CV2 95.000 · CV9 90.000 · CV4 75.000 · V10 73.750 (no tiene CV) · CV3 70.000 · CV6 65.000 ·
+  CV12 58.000 · CV11 39.000 · CV7 26.300 · CV8 16.000 · CV14 11.111 · V18 10.000 · CV5 6.700 · CV13 1.000
+  (Mandelli). `[deducido]` W8 = "V16C Vástago Sacafuente 5,2×100" y V18 = "V18C Vástago Pisapapas",
+  apareados por kg/uni (0,0305 y 0,01437), no por código. `[deducido]` CV5 6.700 desentona (la planilla
+  tiene kg/uni 0,22 en esa fila, 57× el real): posible error de planilla, cargado tal cual.
+  Sin componente en GP2: V17C Cremallera Doble Aleta (Bella Vista 16.632; GP2 tiene E13 de "Importado"),
+  Tornillos Corta Queso (Suipacha, de baja) y Rem. Tapón Hierro (12.000).
+- `[usuario 2026-09-28: "Manda la planilla"]` **Cartón aplicado**: la tirada del pliego depende de la
+  marca. Sin tocar código: `carton_formato` nuevo **`Huevo LK`** (25 posiciones, múltiplo 12.000, mín.
+  por código 1.000 `[deducido]`), **`8` pasa a 12.000** (es la corbata de 30 posiciones LOEKE; `Corbata`
+  queda CHEF en 30.000), **`Manga` 12.000**. Formatos movidos según la planilla, cruzando POR ARTÍCULO
+  (el código de estante se repite en la planilla: F4A, Q7C, Q5D, O2C, N2A figuran dos veces con
+  artículos distintos): G4A/G4B/G4C C→Huevo LK; C2A/C2B/L4B/CART590 Huevo→8; M1/M2A/M2C/M3A/M3B
+  Corbata→8; M2B LOKE→8; Q3D 8→Corbata; P4A/Q5 LOKE→Corbata; Q5D/O2C/N2A LOKE→Huevo; T3A C→LOKE;
+  G8C1 (sin formato)→LOKE; G2A LOKE→C Resto; A1B2 (sin formato)→C Resto; Ñ4A/P6A ("Pelador", 12
+  posiciones) LOKE→C Pelapapas. Tapones F4A1/F4B1/F4C (18.000) y Q4B/K1A (25.000) van como familias
+  aparte `[Thomas 2026-09-28: "Sí"]`: formatos `Huevo LK Tapon` y `Huevo LK 25` (un formato = un
+  múltiplo; la categoría no cambia el múltiplo). **Quedó sin aplicar**: BANDITA/BANDITAM y P2A
+  (la planilla tiene "Rallador" y "Bandita" cruzados); CCG6B del 760 (tipo C LOEKE en un artículo CH).
+  Sin formato siguen G8C, A1B, A1B1. Familias resultantes en `oc_bundle`: 8 LOEKE 18 · C LOEKE 41 ·
+  C CHEF 4 · Corbata CHEF 10 · Huevo CHEF 20 · Huevo LK 21 · LOKE CHEF 23 · LOKE LOEKE 8.
+- **⚠ Corrección del dueño (2026-09-29): "En cartones los mínimos son por cartón, aunque estén
+  agrupados por familia."** El "Pedi Min Uni" de la planilla NO es la tirada de la familia (como leí el
+  28/09): es el **mínimo de cada cartón**. Cargado en `componente.pedido_minimo_uni` para **129 cartones**,
+  cruzado por artículo (12.000 ×71 · 16.000 ×25 · 25.000 ×19 · 30.000 ×10 · 18.000 ×3 · 24.000 ×1); 28
+  cartones sin fila en la planilla quedan sin mínimo. La O.C. lo muestra bajo Pedir como en los demás
+  sectores ("mín. proveedor N uni", rojo si corto) y **no frena**. Los formatos por marca (`Huevo LK`,
+  `8` 12.000, `Huevo LK Tapon`, `Huevo LK 25`) quedan: sirven para agrupar y para el redondeo de
+  "Sugerir", pero ya no son "el mínimo". `[Thomas 2026-09-29: "quiero que en la o.c. me separes por
+  familia"]` → la tabla de cartones va con un renglón de título por familia (formato + marca +
+  categoría), `OC_GP2.html` v1.42.0.
+- `[Thomas 2026-09-29: "Seguimos con plásticos… Ahora sí el mínimo va por familia, no por parte. Es decir:
+  entre todos los pirolos tengo que llegar a 36000. Separame por familia al igual que los cartones"]`
+  **Plástico — familia de pedido = matriz del inyector.** Nueva tabla `GP2.familia_pedido` (30 familias,
+  de la columna "Descripcion Matriz" de la planilla) y `componente.familia_pedido` en 49 piezas. El mínimo
+  es de la familia (`familia_pedido.pedido_minimo_uni`); `componente.pedido_minimo_uni` por pieza queda
+  pero la O.C. no lo muestra cuando hay familia. `oc_bundle` manda `familia_pedido` y `familia_minimo`;
+  la O.C. (v1.43.0) agrupa el sector Plástico por familia con título "Pirolos · 3 piezas · mín. familia
+  36.000 uni · pedido N uni", rojo si no llega; no frena.
+  **Qué parte de la planilla es qué en GP2**: lo que se COMPRA es la variante sin serigrafía / sin calar:
+  PA10→PA10B, PA13→PA13B, PA18→PA18B, PA4→PA4B (+PA5B Chef), PC1A/PC1B (calados) → PC2/PC3B (sin calar,
+  36.000), PC15→PC15AB (+PC15B), PB8→PB8A, PB7→PB8B, PEP4A/PEP4B→PEP4, PA9=A11 Capuchón Mariposa. Las
+  serigrafiadas/caladas (PA10, PA13, PA18, PA4, PA5, PC1A, PC1B, PC15A, PEP3) son `estado_compra=fabricacion`
+  y no van a la O.C. `[deducido]` PB5 (manguito negro) en "Manguitos Abrelata" y PA5B en "Mango Cuchillo
+  Untar" por matriz común. Familias con más de una pieza: Pirolos (PA7A/PA7B/PA12, 36.000), Bujes
+  (PA8A/PA8B, 33.000), Mango Pelador 505/123 (PC2/PC3B, 36.000), Manguitos Abrelata (PC13/PC14/PB5, 19.200),
+  Capuchones (PA10B/PA13B/PA18B, 10.000), Mango Tellería (PEP1/PEP2, 10.000), Mango Cuchillo Untar
+  (PA4B/PA5B, 10.000), Plaquitas (PA1/PA2, 6.000), Mangos LK (PA17/PC10/PC11, 6.000), Insertos
+  (PB6/PB8B/PEST2/PEST1, 2.000 — `[Thomas 2026-09-29: "los insertos son todos una familia. El único que
+  tiene un mín aparte es el inserto canelón que es 5000. Resto 2000"]`; PEST1 es de Kollplast y aun así
+  suma con los de Pat Bet Plast), Cuerpo Sacacorcho Plast (PC15AB/PC15B, 2.000), Espátulas (PV3/PV7, 1.500),
+  Cucharas Calada y Fideos (PV5/PV6, 1.500), Corta Torta (PV8/PV8B, 1.500). El resto son de una pieza.
+  **No están en GP2** (8): PA15 Capuchón ф10, PA16 Mangos ф10 LK, PB1 Cilindro Corta Queso (12.000),
+  PEP6 Cabo Madera 525, CP7 Mangos Corta Queso, CP5 Afila Caladas Blanco, HP2 Inserto Cuch y Pal, FP3
+  (sin descripción, "Manolo"). Sin familia (no son matriz): Maspoli PC12/PEP7/PEP8 (500), Pintos PEP5,
+  consumibles PCP2/PCP3/PCP4A, ruedas PIEA/PIEB → en la O.C. van bajo un solo título "Otros", ordenadas por proveedor (v1.44.1;
+  `[Thomas: "La sección de otros solo en plásticos y agrupámela por proveedor. Cartones está bien así"]`).
+  `[Thomas 2026-09-29: "el mín es en kg en este caso, creo que siempre los mín es la unidad de medida que
+  aparece en el remito de recepción y en la columna de la orden de compra"]` **El mínimo se lee en la
+  unidad de la O.C.**: la planilla lo da en la unidad del remito (los bloques de Facciolo y Galvanoquímica
+  dicen "Pedi Min KG"; cartón, remache, bombilla y el resto del plástico "Uni"). En la base
+  `pedido_minimo_uni` sigue en la unidad canónica de la pieza (uni o kg): Clavo 505 PCP3 = 1.000 kg =
+  153.139 uni (kg_x_uni 0,00653); Plancha de Níquel PCP2 = 10 kg (canónica kg). La O.C. muestra
+  "mín. pedido 1.000 kg (= 153.139 uni)" / "48 paq 250 (= 12.000 uni)".
+  `[Thomas 2026-09-29: "Las tres cosas de Tellería y la de Rodar mandalo a Rafael Pettofrezza"]` La planilla
+  pone PB2, PEP1 y PEP2 bajo "Tellería" y PA4 bajo "Rodar", que no existen como proveedor de insumo en GP2:
+  las cuatro quedan en **Pettofrezza Rafael** (PEP2 cambió de Pat Bet Plast; las otras tres ya estaban).
+  Con eso la familia "Mango Tellería" (PEP1/PEP2) es de un solo proveedor. `[Thomas 2026-09-29: "Las dos de Pat Bet Plast mandalas a
+  Pat Bet Plast"]` PA8A/PA8B (Bujes) y PEST1 pasan de Kollplast a **Pat Bet Plast**, como la planilla. Con
+  esto todas las familias son de un solo proveedor y Kollplast no tiene piezas plásticas en GP2.
+  `[Thomas 2026-09-29: "Por qué no veo el mínimo? Estoy viendo que en el relevamiento aparece"]` Los mínimos
+  por pieza del plástico sin familia también se cargaron: Maspoli PC12/PEP7/PEP8 = 500 uni (era lo único que
+  faltaba; PIEA rueda de Barbetta no tiene mínimo en la planilla). `[Thomas 2026-09-29: "A estos dos no les pongas
+  mínimo"]` Las ruedas PIEA/PIEB de Barbetta quedan **sin mínimo** (PIEB tenía 1, sacado).
+  `[Thomas 2026-09-29: "Chequeá que no se te haya escapado alguno"]` Barrido de TODO lo comprable sin mínimo
+  ni familia contra las 5 planillas: se habían escapado **dos**: la Bolsa Filtro Café LK (A1B, art. 031,
+  Vihal) con mínimo 55.000 uni y el piso de **Simco** (Santoprene) de 25 kg (`proveedor_insumo.pedido_minimo_kg`;
+  la planilla lo escribe "Simko"). Cargados. Lo demás sin mínimo no tiene dato en las planillas: flejes,
+  cajas y alambre (sin planilla), 24 cartones que no figuran (515, 510, 059, 186, 500, 715, 867, 355, 101,
+  103, 108, 114, 115, 116, 121, 123, 104, 708, 909, banditas, bolsas 120 y 836), BOM8B, Z21, PIEA, garage
+  (la planilla no tiene columna de mínimo) y CV18D/EST1/EST2 (ya avisados). Las etiquetas de Cía Integral
+  (C3A/H4C/T4A 10.000) no son componentes GP2.
+  Las familias salen de la columna **"Descripcion Matriz"** de la planilla `[Thomas 2026-09-29: "Sacaste
+  las familias de la columna descripcion matriz no?"]`, con nombres normalizados (Regatones → Pirolos).
+- **v1.39.0** [usuario] Thomas: *"entre columna y columna veo espacios"* + *"si no cumple con el mínimo que aparezca igual pero con color rojo y negrita"*. Causa de los huecos: `table.t{width:100%}` de `gp2-modulo.css` le ganaba en especificidad a `.t-insumos{width:auto}` (y en los tests no se veía porque el CSS está stubeado). Ahora `table.t.t-insumos{width:auto}` y el `.table-wrap` abraza la tabla. "mín. proveedor" en rojo y negrita cuando lo pedido queda por debajo; vacío no se marca.
+- **v1.40.0** [usuario] Thomas: *"quiero que esté todo centrado y sin tanto blanco. Si es necesario poné proveedores sobrantes abajo"*. La tarjeta de OC mide lo que mide la tabla (`.card{width:fit-content}`, piso 720px para cuando no hay tabla), todo centrado, y la botonera de proveedores baja de renglón al lado de su etiqueta en vez de ensanchar la página (`contain:inline-size` en los filtros: no cuentan para el ancho).
+- **v1.40.1** [usuario] Thomas: *"todo esto alineación a la izquierda"*: dentro de la tarjeta, botones Generar/Órdenes, filtros, cartel del proveedor, buscador y Crear OC van a la **izquierda**. La tarjeta sigue centrada en la página y del ancho de la tabla.
+
+## 4gq. El maestro de empleados es `planify.employees` (lo gestiona RRHH); la letra del legajo es la empresa (2026-09-29)
+
+- [usuario] Elías Irace: *"que el de planify sea el que se usa (lo gestiona RRHH); el que usábamos era manual"*. La lista
+  de operarios de la app nueva de registro de producción (repo `GP2-Registro-Produccion`) sale de
+  `planify.employees`, **no** de `public."Empleados"` (cargada a mano, queda desactualizada).
+- [usuario] *"el c es porque pertenece a otra empresa; para diferenciar los legajos se le puso una letra adelante"*.
+  → **El legajo es texto y la letra es parte de la clave.** El número solo NO identifica a nadie.
+- [dato, consulta 29/09] Colisiones reales: `29` = Viviana Gauna y `c29` = Nora Heredia; `122` = Adrián Villalba
+  y `C122` = Martín Castillo (baja). Hay `c` y `C` mezcladas (normalizar a minúscula al comparar).
+  `public."Empleados"` guarda `94` para quien en Planify es `c94` (perdió la letra).
+- [dato] De 35 activos en `Empleados`: 29 están en Planify; los 6 que faltan y los 6 que Planify tiene de baja
+  **no cargaron producción en los últimos 30 días** → RRHH tiene razón; pasar a Planify no deja afuera a nadie activo.
+- [dato] `planify.employees.tipo` dice "administrativo" también para operarios de la otra empresa (ej. c19
+  Eduardo): no sirve para saber quién es operario. Los permisos de botones (`es_piedra`, `ve_cm`, …) y
+  `hora_entrada` de producción solo existen en `Empleados` → hay que llevarlos a una tabla GP2 atada al
+  `planify.employees.id` (no al legajo).
+- [usuario 29/09] *"de planify es para utilizar los legajos y filtrando por operario"* + *"la letra es parte del
+  legajo"*. El operario tipea el legajo completo (`c94`). Como el teclado del celular es numérico por regla, la
+  pantalla de legajo lleva un **teclado propio en pantalla (0-9 + C)**, con botones grandes. `login-operario` hoy
+  valida contra `public."Empleados"`: cambiar a `planify.employees` activo y de tipo operario.
+- [usuario 29/09, captura de Planify] **Planify SÍ clasifica**: el campo es `planify.empleados_liquidacion.tipo_empleado`
+  (Planta / Administrativo / Pasante / sin especificar), NO `planify.employees.tipo` (ese dice "administrativo" para
+  los 56 y no sirve). **Operario = `tipo_empleado='planta'` y activo**, unido por `employee_id`.
+- [dato 29/09] 19 de planta activos. Todos los que cargaron producción en 30 días son planta, salvo **261 Jennifer
+  Muñoz** (sin tipo; 1 solo registro) y **504 Melany Pierola**, que tiene DOS filas activas de liquidación (una
+  administrativo y otra planta). La empresa también está ahí (`empresa`): `c` = **CHEF SRL**, sin letra =
+  **Loekemeyer SRL**, 50x = **Agencia**.
+- [usuario 29/09] El legajo **600** es un caso especial para pruebas (carga en Virgilio): no es un empleado.
+- ⚠ `empleados_liquidacion` es la tabla de SUELDOS (CBU, CUIL, banco). La app de operarios nunca la lee directo:
+  una función `SECURITY DEFINER` que devuelva solo legajo, nombre y si es planta.
+- [dato 29/09] La producción histórica guarda el legajo **sin la letra** (`94`, `104`, `8`, `19`, `92`): al migrar,
+  mapear número→legajo con letra usando Planify, y ojo con 29/c29 y 122/C122.
+- [dato 29/09] El horario del operario está en `empleados_liquidacion.horario_laboral` (texto "08:30 a 17:30", los
+  19 de planta lo tienen); `planify.employees.hora_entrada` está VACÍO para todos ellos. `GP2.operario_por_legajo`
+  devuelve entrada y salida parseadas de ahí. Ej.: 501 Graciela Santillán entra 07:00 (hoy la app la mide desde 08:30).
+- [dato 29/09] **Planta NO alcanza para decir "operario de producción"**: Martín Pregelj (203, Técnico) y Martín
+  Cornejo (c91, Oficial) son planta y [usuario] *"no son operarios pero también están en la app"*. Tampoco sirve la
+  categoría (74 Omar Bachur es "Chofer de Carga" y carga producción). Falta un permiso propio "registra producción".
+
+## 4gr. Registro de producción (app nueva): decisiones del dueño (2026-09-29)
+
+Contexto: app unificada `GP2-Registro-Produccion`, se arranca por Cervantes. Tabla completa en
+`docs/INVENTARIO-FUNCIONES.md` §7.3 de ese repo.
+- [usuario] **Llegada tarde**: con el horario de Planify de cada operario, no 08:30 fijo.
+- [usuario] **PM (paro de matriz)**: igual que Registro Producción = tiempo muerto con duración, + aviso WhatsApp al
+  abrirlo (existe: `app.js` → `send-whatsapp`, plantilla `problemas_en_matriz_reducido`, permitida en v55).
+- [usuario] **CM (cambiar matriz)**: *"solo personas específicas + matricería + alimentador lo hacen, no el operario
+  común"* → quien hace CM NO es quien produce con esa matriz: CM asigna matriz↔balancín y **no** deja la matriz activa
+  para el que la cambió.
+- [usuario] **RM**: igual que hoy (cierra el cajón como completo y pasa a CM) + aviso WhatsApp "Rompió Matriz".
+- [usuario] **Deshacer / editar**: va en el **admin**, no en la app del operario. [usuario] *"el admin es gestión productiva 2"*: el panel admin del registro de producción (habilitar "pendiente de pesar", cargar pesos, editar/deshacer) es una pantalla de **este repo** (GP2), no de Registro-Produccion-2.0. [usuario, aclaración] *"el de Cervantes a Gestión Productiva 2.0, el admin; el de Virgilio en Gestión Virgilio"*: el admin/maestro de producción de **Cervantes** (ver y corregir el día, pesos, deshacer) se **muda a GP2**; el de **Virgilio** queda en **Gestión Virgilio**. Registro-Produccion-2.0 deja de tener maestro.
+- [usuario] **Terminar día con TM abierto**: se cierra solo (hoy ya lo hace: `app.js` `confirmarTerminarDia`, paso 2).
+- [usuario] **Seguir cajón al día siguiente**: se mantiene; el código de Logística (hoy `151515` escrito en `app.js`,
+  repo público) pasa a ser un **secreto en la base**, validado del lado del servidor.
+- [usuario] **Rollos**: los maneja el **alimentador** (Eduardo c19 lo es), distinto de un balancín común → permiso de
+  rol, no `legajo === "19"`.
+- [usuario] **Turnos después de medianoche**: no hay. Cerrar lo abierto al terminar el día cierra los TIEMPOS MUERTOS,
+  no el cajón marcado "sigo mañana" (no se pisa con lo anterior).
+- [usuario] **WhatsApp**: los que ya están en las funciones (matriz sin tiempo, paro, rotura).
+- [usuario] **Botones**: los de Registro Producción (`capsDe`/`botonVisible` + flags), incluidos RD, REM, MM, TRM, TL, PCM.
+- [usuario] **Cajón**: *"toma como matriz de uni las que tienen salida de 1 unidad x golpe"* → `GP2.matriz.carga_en`:
+  `golpes` solo si `uni_x_golpe > 1` (18 matrices: 7, 14, 15, 16, 20, 21, 22, 29, 40, 60, 64, 66, 71, 72, 116, 344,
+  348, S/N), `unidades` el resto (388), `kg` la piedra 501.
+- [usuario] **Piedra (501) es por KG**: el operario tipea con coma o con punto y las dos valen como decimal. [dato] RP
+  hoy guarda el crudo con coma ("5,72") y el espejo como número (`db_n8n_espejo."Uni"` es `real`: 5.72). En la base
+  nueva va **numérico** (sin coma ni punto: es un número). Ojo con la regla GP2N (punto = miles): en el campo de kg
+  el punto es DECIMAL (valores < 1000). [dato] Hay cajones de 501 con "0" / "00" kg.
+- [usuario] Los 0 kg de piedra (legajo 245, 22–28/09) fueron **por un problema en la fábrica: en ese lapso se pesaba lo
+  hecho al día siguiente**. El 233 cargó 5,6 fijo porque **pesaba antes** (su dato es válido). [dato] Los pesos del día
+  siguiente nunca volvieron a la base: esos cajones quedaron en 0.
+- [usuario] **Opción "pendiente de pesar"** en la app nueva: el operario marca el cajón de piedra sin peso; el peso real
+  se carga después en el admin y queda en el cajón original (su día y su tiempo), con aviso si pasa un día sin pesar.
+  **Solo aparece si el admin la habilita en el panel admin** (apagada por defecto; la base rechaza un "pendiente" si
+  está apagada, no solo la pantalla).
+- [usuario Elías 29/09] **Casilla "registra producción" = OK.** Entra a la app de producción quien: **activo en Planify
+  (alta) + planta + casilla prendida**. Tabla `GP2.operario` (una fila por `planify.employees.id`), la maneja el admin GP2.
+  [dato] Carga inicial: 15 prendidos (los que cargaron en 90 días + **Alberto Práctico, prendido por decisión del
+  dueño**), 4 apagados: Pregelj 203 (Técnico 3º), Cornejo c91 (Oficial), Pages 2 (Chofer de Carga), González 191
+  (Logística). La categoría NO sirve de filtro: Cornejo y Farías (c8, 4.035 registros) son los dos "Oficial"; Bachur
+  (74, 807 registros) y Pages son los dos "Chofer de Carga".
+- [dato 29/09] Planify tiene 14 inactivos y los 14 tienen también la ficha de liquidación de baja (coinciden); ninguno
+  cargó producción en 30 días. El que se da de baja en Planify queda afuera solo (`operario_por_legajo` exige activo).
+- **CORRECCIÓN (mismo día)** [usuario Elías]: *"que queden habilitados"* — la casilla se dio vuelta: **entra todo
+  activo + planta**; `GP2.operario.registra_produccion = false` es la excepción (sin fila = habilitado, así el alta
+  nueva de RRHH entra sola). Los 19 quedaron habilitados. [dato, `public."Empleados"`] **Pregelj (203) y Cornejo (91)
+  son los 2 de matricería** de Registro Producción 2.0 (TRM, REM, CM; Cornejo también TL): no son operarios de
+  balancín pero SÍ usan la app con los botones de matricería. Lo que dije de "planta no alcanza" era falso.
+- [dato] En `public."Empleados"` el legajo **1 = "Pruebas"**; en Planify el 1 es **Alberto Práctico**. Los 2 registros
+  del "1" pueden ser pruebas, no de él. Otra colisión a tener en cuenta al migrar.
+- [usuario Elías] **Estos cambios son para GP2-Registro-Produccion**: Registro Producción 2.0 (la app en uso) no se toca
+  (ej.: deja entrar legajos de baja porque no mira `Activo`; eso se corrige en la app nueva, no en la vieja).
+- [dato 29/09] **Permisos de botones migrados a `GP2.operario`** (una sola vez, desde `public."Empleados"`, casando el
+  número con el legajo de Planify activo + planta): es_matriceria, es_piedra, es_alimentador, ve_cm, ve_trm, ve_tl,
+  ve_rem, ve_mm. 7 con algún flag: matricería 203 y c91; piedra 233 (+CM +MM), 245, c92; alimentador c19 (+CM);
+  282 con CM. `ve_ctm`/`ve_am` (Oscar Bordon) NO se migraron: no tienen código en ninguna app. 260 Valdés tenía
+  piedra pero está de baja. `GP2.operario_por_legajo` devuelve `permisos` (jsonb) para la sesión del operario.
+- [dato 29/09] **Matriz con variante vs matriz con varias piezas** (pregunta de Elías "¿por qué se ve diferente una
+  bifurcada?"): son dos cosas. (1) *Variante* = otra matriz con letra (12/12B/12C; 39 en `GP2.matriz`, 40 en public
+  —falta **325C** en GP2—): RP 2.0 pide el número base y abre un cartel "Seleccioná el tipo" (8 con etiquetas escritas
+  en `app.js`: 10, 12, 28, 39, 79, 80, 81, 127; el resto las detecta de la base); la app GP2 muestra cada variante como
+  otra tarjeta. (2) *Varias salidas* = la MISMA matriz saca piezas distintas (28: A15 del fleje 94 y J2/J5 del 13):
+  solo GP2 lo sabe (`matriz_salidas`) y pide "Fabricás …" para que el stock vaya a la pieza correcta.
+- [dato 29/09] **67 matrices usadas en 90 días no están en ninguna ruta de GP2**; 63 son tareas de mano de obra
+  (envasar, reenvasar, armar importados, sacar film) sin Causa-Efecto tampoco en la base vieja. [usuario Elías]
+  *"Fábrica sí tiene que estar porque se hacen en fábrica"*: deben figurar en la ruta del artículo como paso del
+  tallerista **"Fábrica"** (`GP2.tallerista` id 3). **CORRECCIÓN mismo día** [Elías, sobre el PDF]: *"Fábrica" queda
+  como tallerista, está bien así* — el "tallerista es un 3ro" vale para los demás; Fábrica es el interno y NO es un
+  error de modelo (retirado el punto 7 del informe). Falta decidir cómo se asocia la matriz al paso de Fábrica
+  (hoy los pasos de tallerista no llevan `matriz_id`). Listado: `PROBLEMAS_MATRICES_2026-09-29.md` (+ `.pdf`).
+- [usuario Elías 29/09, verificado en la app] **La 28B está en GP2 como matriz 28 + pieza J5** (la 28 ofrece A15, J2, J5):
+  GP2 reemplazó la variante con letra por la elección de pieza. Para la app nueva hace falta un mapeo
+  variante → (matriz base, pieza). ⚠ Conflicto de nombres a resolver: RP 2.0 dice 28B = Cromar (JF5); GP2 dice
+  J5 = "Cuerpo Uña s/M p/Pintar".
+- [usuario Elías 29/09] **"LK" en el cartel de la 12 = Loekemeyer.** [dato, rutas GP2 + Causa-Efecto] Qué artículo sale de
+  cada variante de la 12 (Doblado Mango Plano):
+  12 (Loekemeyer) → I6 Mango Plano 502 doblado → abrelatas mariposa 066, 502, 512 (LOEKE);
+  12B → G13 Mango Plano 501 doblado p/pintar → abrelatas a manija 101 y 501;
+  12C (Chef) → I11 Mango Plano 701 doblado c/marca → abrelatas a manija 701 (CHEF).
+  Los rótulos del cartel de RP 2.0 están BIEN. Lo que está mal: la descripción de la 12 en Causa-Efecto dice
+  "(Chef Marip)" y GP2 pone I11 (701 Chef) como pieza de la **matriz 12** en vez de la **12C**.
+- [dato 29/09, CORRECCIÓN del análisis de matrices] **GP2 = 115 matrices originales (Excel del dueño, con tipo; 107 con ruta)
+  + 292 de catálogo (22/09, §4fa, sin tipo ni ruta a propósito).** Las variantes con letra están todas en el catálogo
+  (salvo 12B, que tiene ruta): el Excel original modela esos casos como PIEZA de la matriz base. No confundir "sin ruta"
+  o "sin tipo" de las de catálogo con un error de GP2. Errores reales: 138 tipo A con máquina balancín; 129/130/131 con
+  ruta y sin tipo; 9 matrices con tiempo en la vieja y vacío en GP2 (182, 21, 325B, 361, 509, 512, 62, 63, 64).
+  Informe: `PROBLEMAS_MATRICES_2026-09-29.md` (versión 2).
+- [usuario Elías 29/09] **Matriz 28: GP2 está bien.** *"Cambió y ya no se croma; se compra el fleje inox para ese"* → la
+  versión cromada es A15 (fleje inox). La 28B "p/Cromar" de la base vieja quedó vieja. [dato] Igual en Registro
+  Producción 2.0 se siguió cargando 28B hasta el 01/09 (22 cajones, 34.460 u.): el cartel ofrece "Cromar (JF5)".
+- [dato 29/09] **114A / 114B → sacacorcho doble aleta 523 (LOEKE) y 723 (CHEF).** Cadena en GP2: Fleje IC2 → 116 Corte
+  Aleta (L11 izq / L12 der) → **114** Doblado (L9 / L10) → 221 Estampado (D3 / D2) → Pettofrezza → 523/723. La vieja
+  hace lo mismo con 114A (izq) y 114B (der). En un año solo se cargó la 114 (28 cajones); 114A/114B nunca.
+
+## 4gs. La materia prima que corta un PS no tiene consumo propio: su máximo sale del máximo de las piezas (2026-09-28)
+
+- [usuario] *"Tiene que mandarse según máximos de sector de alambres y descorazonador. Es decir, si
+  tengo que tener 10 alambres y eso equivale a 0.1 de fleje hay que mandarle eso"* + *"calcula el
+  maximo segun los meses del sector x consumo de articulo"* + *"y agrega el maximo en la o.c."*.
+- **Regla**: `maximo_mp (kg, en la ubicación del PS) = Σ maximo_pieza × kg_x_uni_pieza / (1 − desperdicio_pct del PS)`.
+  `maximo_pieza` = el máximo de la pieza en su sector; si está vacío, consumo (Est Madre) × `meses_stock`
+  del sector. Función `recalcular_maximo_mp_ps()`, origen `maximo_origen='derivado_pieza'`; la corre
+  `fn_recalc_maximos_diferido` DESPUÉS de insumos/talleristas. Aplica a todo paso de PS con entrada en kg
+  y salida contada: hoy FLEJE90_BRUTO → Charcas → IC3/IC3V y CHAPA430 → Eclipse → Z31.
+- [dato] Al 2026-09-28: **FLEJE90_BRUTO 1.028,07 kg** (IC3 113.208 × 0,0083 + IC3V 6.600 × 0,0134, Charcas
+  sin desperdicio) y **CHAPA430 3,31 kg** (Z31 402 × 0,0049 / (1 − 40,28 %), con 402 = consumo × 1 mes de
+  Procesado porque Z31 no tiene máximo). La O.C. los muestra solos: `oc_bundle` ya leía el máximo de la
+  ubicación del PS, que estaba en 0.
+- **Las rutas de IC3/IC3V (art 120, 031, 836, 867, 034) arrancan en FLEJE90_BRUTO**, igual que la de chapa
+  (antes arrancaban en IC3 y el bruto no aparecía en el despiece). El título "Fleje" de la ruta
+  (`despiece_verif_bundle` / `programa_bundle`) acepta también el sector 13 (Alambre, único componente:
+  FLEJE90_BRUTO). Las rutas confirmadas de esos 5 artículos cambian de firma: hay que reconfirmarlas.
+- **`v_nivel_stock`**: solo el fleje que se PESA (sector 5 con `unidad_medida='kg'`) va por kg/mes. IC3/IC3V
+  son sector 5 pero en unidades y daban `max_calc` 0 (misma regla que ya tenía `tablet_bundle`). Efecto:
+  IC3V pasó de vacío a 6.600 y **IC3 de 100.800 (`migrado_de_minimo`) a 113.208 (`est_madre`)**. Ningún
+  otro máximo ni consumo se movió (firma md5 de inventario/consumos/niveles igual antes y después).
+- ⚠ [dato] **Sigue mal el CONSUMO en kg de estas materias primas** (no el máximo): `v_consumo_fleje_kg` da
+  388 kg/mes de CHAPA430 (1 kg por descorazonador; real ≈ 3,3) y `v_consumo_componente` da 19.968 "uni"
+  de FLEJE90_BRUTO. Hoy no pesa: la O.C. usa el máximo y no muestra el consumo, y la Tablet deja afuera
+  a los PS híbridos. Si algo empieza a leer ese consumo, corregirlo primero.
+- [dato] La ruta del art 709 arranca en Z31 (insumo) sin la chapa: su descorazonador no cuenta chapa.
+- [usuario Elías 29/09] **La 10B no existe: la varilla con cuchilla curva (H15) es la matriz 174** "Armado de Varilla
+  Curva C/Cuchilla" (8,5 s, ya tenía ruta → H15). **Se eliminó la 10B de `GP2.matriz`** (id 409; sin producción ni
+  rutas en GP2; queda su fila histórica en `matriz_racha`). En la base vieja 10B tuvo 1 cajón en el año (17/07, 385 u.)
+  y el cartel de Registro Producción 2.0 todavía la ofrece como "Varilla c/ Cuchilla Curva": en la app nueva, la
+  varilla curva va a la 174.
+- [usuario Elías 29/09, "sí y sí"] **La 10B se borró también de la base vieja**: `public."Matrices"` (id 374, queda en
+  `Matrices_audit`) y `public."UnixCajon_Stock_Registro_Prod_Cerv"`. Causa-Efecto no tenía fila de la 10B. Registro
+  Producción 2.0 **v1.9.1** (commit 47618cf): el cartel de la 10 "Varilla c/ Cuchilla Curva" ahora registra la **174**.
+  Excepción puntual a la regla "public = solo lectura", pedida por Elías.
+- [usuario Elías 29/09] **349: el disco del pisapapas ya sale calado en el primer corte** (349 → M2). La 123 "Perfora
+  disco" de la base vieja ya no va: la ruta de GP2 está bien.
+- [usuario Elías 29/09] **Las aletas del sacacorcho doble aleta ahora son inox**, igual que el cuerpo uña de la 28. Se está
+  cambiando en GP2 en otra sesión (GP2 está más actualizado que la vieja, pero puede tener errores): no tocar desde acá.
+- [dato 29/09] **138 en GP2 = "Corte Grampa Batidor"** (Fleje N° 19 → W1B Grampa → Guazzaroni → Alex Escalante → Pedernera →
+  batidores 515/615), tipo A pero máquina balancín, **9 s**. En la vieja el 138 es "Doblado Sacafuente" (B, 9 s). Sin
+  producción en 2 años en ninguna. El 9 s lo copió la carga del 22/09 del vecino: [deducido] es el tiempo del doblado,
+  no del corte (un corte en alimentador anda en ~1,5 s), y entra en el costo del batidor.
+- [usuario Elías 29/09] **138 = alimentador.** Corregido `GP2.matriz.maquina` 'balancin' → 'alimentador' (tipo ya era A).
+  El tiempo de 9 s sigue pendiente de medir/confirmar (sospecha: es el del doblado sacafuente de la vieja).
+- [usuario 29/09] **103 y 510 se llaman "Abrelata Uña Inox"** (antes "Abrelatas Uña Cromado" / "Abrelata Uña Cromado").
+  Cambiado `GP2.articulo.descripcion` (ids 12 y 32) y `GP2.uni_x_articulo_x_caja` id 57 (510, "ABRELATA UÑA INOX").
+  El 103 no tenía fila en `uni_x_articulo_x_caja`.
+
+
+## 4gt. Rompenueces, sacacorcho doble aleta y Art 66: correcciones de ruta del dueño (2026-09-29)
+
+- [usuario 29/09] **Art 66: la matriz 10 NO va.** Ruta "Fleje 30 → Art 66" queda IE11 → M6 → M173 → **M174** → Jade
+  (Z41) → IJUPA. Se borró el stock movimiento `H7-M10` (0 stock, 0 movimientos) y la receta de H15 pasó a H7-M173 × 1
+  + I16 × 1. H15/Z41 bajaron $12,60 (los 6,3 s de M10). M10 sigue viva en las otras 10 rutas (501/701/101/502/512).
+- [usuario 29/09] **G7/G8 son SOLO del 507; el 707 lleva G5 (Pieza Abierta Rompenuez S/M p/Pintar) y G6 (Pieza
+  Cerrada Rompenuez S/M p/Pintar).** Rutas 47/48: M77 → G6 → Jade → B1; M74 → G5 → Jade → B2. G5/G6 = mismo peso y
+  cajón que G7/G8 (0,0462 kg, 606 u) [usuario: "sí"]. G7 ya no pasa por Jade (fila de inventario borrada).
+- [usuario 29/09] **Máximo de G5/G6/G7/G8 = consumo × meses_stock del sector** ("Consumo x maximo de meses por
+  sector"), no 5 cajones. Nuevo `maximo_origen = 'consumo_meses'` (opt-in por fila, `recalcular_maximos_consumo_meses`,
+  lo refresca `fn_recalc_maximos_diferido`; `recalcular_maximos_cajones` no lo pisa). Hoy Crudo tiene meses_stock = 1
+  → G5/G6 = 30, G7/G8 = 456. ⚠ [deducido] con umbral de faltante = 1 cajón, G5/G6 figuran en faltante aun llenos.
+  Migración: `db/migracion_maximo_consumo_meses.sql`.
+- [usuario 29/09] **L9, L10, L11, L12 DESAPARECEN** (aletas del 523/723). Corrección del mismo día: primero se
+  pasaron a Sector Movimiento con su código — mal, el dueño: *"desaparecen… los nuevos stocks movimientos llevan la
+  descripción de stock movimiento que es componente tal tras matriz tal"*. Quedan **IC2-M116-I / -D** (Fleje N° 92 tras M116 (Izq/Der),
+  ex L11/L12) e **IC2-M114-I / -D** (Fleje N° 92 tras M114 (Izq/Der), ex L9/L10). Izquierda y derecha van SEPARADAS
+  con sufijo -I / -D [usuario: "sí", para no sumar el stock de las dos aletas]. Rutas 210/211 (izq) → D3, 212/213 (der) → D2. Borrados L9-L12 (stock
+  0, sin movimientos ni recetas). D2 $114,19 → $114,92 y D3 $114,30 → $115,26: el material ahora sale del fleje (37,8 u/kg).
+  **Convención del stock movimiento** [usuario]: código `<raíz>-M<matriz>`, descripción `<desc. raíz> tras M<matriz>`, sin
+  kg ni cajón; la raíz es el fleje/crudo de origen y se mantiene a lo largo de la cadena.
+- [usuario 29/09] **Las aletas del 523/723 NO se croman: son inox.** La ruta IC2 → M116 → M114 → M221 → D3/D2 sin
+  proveedor de cromado es correcta; el "p/Cromar" de las viejas L9/L10 era un resto (esos códigos ya no existen).
+
+## 4gq. Flejes: mínimos y proveedores del relevamiento "Conteo Gral FLEJES y Alambre" (2026-09-29)
+
+`[Thomas 2026-09-29: "Te paso el de flejes para que compruebes ahora"]`. Hoja "Pedido Flejes", columna
+"Ped Min KG", por número de fleje (`componente.descripcion` "Fleje N° X" en GP2).
+
+- `[dato]` **Mínimo en kg por fleje, cargado en `componente.pedido_minimo_uni`** (los flejes son canónicos
+  en kg): Basconia 500 (23 flejes), Aperam 300 (11) y 200 (fleje 95), Hermac 200 (5), Szapiro 150 (fleje
+  46), Brawin 25 (5 varillas). Sin cargar: Altrak fleje 90 (la planilla dice 0), JL Metales fleje 55
+  (dice 0,1: no se entiende) e IVBCM fleje 96 (no está en la planilla).
+- `[Thomas 2026-09-29: "Fleje 59: HERMAC"]` Fleje **59** (IB7) pasa de Aperam a **Hermac** (mínimo 200 kg,
+  como el resto de Hermac). Sin precio de Hermac cargado para ese fleje. Y un cruce de
+  numeración: la planilla llama **95** al "Vást. C Pizza 60×2" de Aperam, y en GP2 el 95 es la
+  "Varilla B Pera Larga Mini" de Brawin (IVBLM). Sin tocar hasta que el dueño diga.
+- `[dato]` **39 flejes de la planilla no existen en GP2** (piezas de otros artículos: Estribo Bombilla 91,
+  Arandela Chica Afila 11/12, C/Queso 78/80, Espiral Doble Aleta 47, Paleta Batidora 34, Ganchito 50
+  de Estametal, Arandela Base 36, cuchara/espátula/cucharón/espumadera inox 43/44/45, PP Ajo 65/66/67,
+  doble aleta 56/63/64/72, etc.). Los demás 50 coinciden en proveedor.
+- Archivo: copia en el scratchpad de la sesión; el original lo tiene el dueño.
+
+
+
+## 4gu. Máximos de sector = consumo × meses, también en Crudo y Procesado (2026-09-29)
+
+- [usuario 29/09, textual] *"Chequeá los máximos de los sectores. Tendrían que ser el máximo del sector en meses x
+  el consumo de sus artículos correspondientes"* → *"USÁ LA REGLA DE CONSUMO, NO DE 5 CAJONES"*. **Retira la regla de 5
+  cajones (§2e).** Todo Sector Crudo y Sector Procesado pasa a `maximo_origen = 'consumo_meses'`
+  (`recalcular_maximos_consumo_meses`, ya no es opt-in); `recalcular_maximos_cajones` quedó de nombre y delega en
+  ella. Sin consumo → máximo NULL. Excepciones que no se pisan: `fisico` y `faat_reserva_lote`.
+- [usuario 29/09] **Los máximos `fisico` de Caja (9) y Remache (11) se corrigen** ("CORREGÍ"): vuelven a
+  `est_madre`. Esto **revierte** la nota de §2e-bis (02/09) de que V9 con 10.581 "era la planta y no se arreglaba":
+  hoy V9 = 113.304, V5 = 68.008, A9 Caja N°22 = 32.346, A5 Caja N°6 = 240. Quedan `fisico` sólo los 4 de Plástico sin
+  consumo (PCP4A, PCP2, PIEA, PIEB), las 13 de resina/MB (regla propia, §4dr) y RULETA.
+- [usuario 29/09] **Y1** (Sector Afilado) también a consumo × meses: 43.946 → 44.068.
+- [usuario 29/09] **Z12, C13, Z31** (Procesado, sin `uni_x_cajon`) ahora tienen máximo por consumo: 9.034 / 7.854 / 402 (sin tope de cajones hasta que se cargue `uni_x_cajon`).
+- [usuario 29/09] **A9 "Cpo Mango Alambre Corta Queso Crom." (id 84) BORRADO: discontinuo.** Tenía 0 movimientos, 0
+  recetas, 0 rutas. Se fueron con él 2 filas de inventario en 0 y su precio de cromado (Pedernera $4.757,70/kg, lista
+  01/07/2026, `precio_servicio_pieza` id 1).
+- [dato, `valorizacion_bundle`] **Máximo por sector: $947,3 M → $913,2 M.** Crudo $53,2 M → $38,5 M; Procesado
+  $80,4 M → $59,4 M; Remache $20,1 M → $21,9 M; Caja $26,6 M → $26,3 M. En unidades: Crudo 871.397 → 439.599, Procesado
+  782.380 → 407.174 (los dos tienen `meses_stock` = 1).
+- [usuario 29/09, textual] **"El máximo de sector crudo y sector procesado no puede exceder los 5 cajones"** → el
+  máximo es el MENOR entre consumo × meses y 5 × `uni_x_cajon` (`parametro.max_cajones_x_ubicacion`). 28 piezas se
+  pasaban (D1 Espiral Sacacorcho: 21,4 cajones; H11, B13, Z23, H7, M6, M5, M10: 15-20). Sin `uni_x_cajon` no hay tope
+  (Z12, C13, Z31). Con el tope, 31 piezas quedan con `ubicacion_corta` (el máximo no cubre 30 días): es la señal de que
+  ahí hay que reponer más de una vez por mes. Máximo en uni: Crudo 310.535, Procesado 318.866; en $: Crudo $24,5 M,
+  Procesado $39,7 M; **Máximo por sector total $879,4 M**. Migración `db/migracion_maximo_tope_cajones_faltante.sql`.
+- [usuario 29/09, textual] **Faltante automático = stock menor al máximo** ("Menor al máximo"; antes < 1 cajón, que
+  con máximos chicos marcaba faltante con el sector lleno). `faltante_cajones_umbral` quedó sin uso en la regla (el
+  bundle lo sigue mandando). Hoy las 161 piezas figuran en faltante porque las 161 tienen stock 0 (sin conteo cargado).
+  Faltantes v1.1.0: el cartel dice "bajo el máximo: faltan N uni".
+- **Cómo se arma el consumo de un artículo que tiene "familia"** (`articulo_familia`, 19 pares) `[dato, v_consumo_demanda]`:
+  cuando un artículo se vende con dos códigos (ej. **580 Batidor Mini** y **580E**), la venta del código secundario
+  se SUMA a la del principal y la receta del principal consume por las dos: 580 vende 114/mes + 580E 588/mes → la
+  receta del 580 consume por **702/mes**. El secundario no cuenta por separado (para no contarlo dos veces). Es la
+  única diferencia entre "venta del artículo × receta" y el consumo que usa el máximo.
+- Migración: `db/migracion_maximo_consumo_sectores.sql`.
+
+## 4gv. El fleje bruto de Charcas se llama ALAMBRE (2026-09-29)
+
+- [usuario] Thomas: *"En vez de fleje 90 bruto que se llame ALAMBRE"*. `GP2.componente` id 583: `codigo`
+  `FLEJE90_BRUTO` → **`ALAMBRE`**. La descripción (`Fleje N° 90`) no se tocó.
+- [dato] El código estaba fijo en 5 funciones (`control_ps_bundle`, `oc_bundle`, `cargar_recepcion_charcas`,
+  `recalcular_maximo_mp_ps`, `fn_recalc_maximos_diferido`) y en 2 pantallas (Recepción Insumos, Entrega PS):
+  se reemplazó en todas. Ninguna tabla lo guardaba como texto salvo `componente.codigo`.
+  Las menciones a `FLEJE90_BRUTO` en docs anteriores a esta fecha se refieren a este mismo componente.
+- [usuario] Thomas, mismo día: *"en vez de chapa 430, Fleje Descorazonador"*. `componente` id 595: `CHAPA430` /
+  `Chapa 430` → **`FLEJE_DESCORAZONADOR` / `Fleje Descorazonador`** (Aperam → Eclipse). Reemplazado en 4 funciones
+  (`cargar_recepcion_eclipse`, `recalcular_maximo_mp_ps`, `control_ps_bundle`, `fn_recalc_maximos_diferido`) y en
+  Recepción Insumos / Entrega PS. El proceso de Eclipse sigue rotulado "Corte Chapa 430" en Entrega PS.
+- [usuario] Thomas, mismo día, sobre Consumo (`ALAMBRE · Sector Alambre · 19.968 uni`): *"ES SECTOR FLEJE, NO
+  ALAMBRE"*. `componente` 583 `sector_id` 13 → **5 (Sector Fleje)**. Era el único componente del sector 13, que queda
+  vacío (no se borró: `sector.oc_rubro_id` 13→5 sigue para la OC). Stock intacto: su inventario vive en la ubicación
+  de Resortes Charcas, no en una ubicación de sector. `despiece_verif_bundle` / `programa_bundle` ya aceptaban (5, 13).
+- [dato] Esos 19.968 no eran alambre: eran las **piezas** cortadas (IC3 18.868 + IC3V 1.100/mes). Al pasar a Fleje la
+  pantalla lo lee en kg de `v_consumo_fleje_kg`, que multiplicaba piezas × `kg_x_uni` **de la entrada** (1 en la
+  materia prima a granel) → daba 19.968 kg. Se corrigió la vista: si la entrada es `kg` con `kg_x_uni = 1`, usa el
+  `kg_x_uni` de la pieza que sale. ALAMBRE: **171,3 kg/mes**. Mismo pozo, caso hermano ya vivo:
+  FLEJE_DESCORAZONADOR mostraba **388 kg/mes** y son **1,9** (Z31, 0,0049 kg). Los máximos no cambian: los dos son
+  `derivado_pieza` (§4gs), no salen de esta vista.
+
+## 4gw. Ralladores y Pelador Mgo Madera: importados que viven en Garage (2026-09-30)
+
+- [usuario] Thomas, sobre Recepción Insumos → Importados: *"añadime acá: Ralladores, Pelador Mgo Madera. Ambos van a
+  tener ubicación en garage"*. Se crearon `GRJ31` "Ralladores" (id 949) y `GRJ32` "Pelador Mgo Madera" (id 950):
+  `sector_id` 9 (Garage), `proveedor='Importado'`, `estado_compra='importado'`, `remito_unidad='uni'`, e `inventario`
+  en la ubicación 9 con cantidad 0. Cero código: el rubro Importados se arma por `estado_compra` (§ de arriba, "viva
+  donde viva") y la recepción suma en la ubicación del sector de la pieza (`ubic_de('sector', 9)`). Códigos: siguiente
+  libre de la serie GRJ; no se reusó `GRJ29` (borrado) ni `GRJ16` (Batidor Mini 580 en la base vieja).
+- [dato] El control posterior va por `CONTROL_URL[9]` (Garage, en kg). Sin `kg_x_uni` la pantalla pide contarlas, igual
+  que el resto de los GRJ sin peso.
+- **Pendiente, sin receta** [deducido]: los Ralladores 321 (LOEKE) y 840 (CHEF) tienen receta de sólo caja A4 + cartón,
+  sin el rallador en sí; `GRJ31` sería esa pieza ×1, pero no se cargó sin confirmación. "Pelador Mgo Madera" **no existe
+  como artículo** en `GP2.articulo` (los peladores son de mango plástico o metálico). Sin receta no tienen consumo ni
+  máximo: la OC no los sugiere.
+- **Conflicto abierto** [usuario, mismo día]: *"ubicacion GRJ 23 y 24"*. Esos dos códigos **ya son** `GRJ23` Palo de
+  Amasar 40cm (id 737, art. 232) y `GRJ24` Palo de Amasar 50cm (id 738, art. 233), de Tierra Nativa, vivos. No se
+  pisaron: `codigo` no es único en la base y un código repetido rompe todo lo que busca por código. Queda en
+  `GRJ31`/`GRJ32` hasta que el dueño diga si los palos se mueven de código o si es otra numeración.
+
+## 4gz. GP2 ve el stock de insumos y el Mapa de Virgilio en tablas de SOLO LECTURA (2026-09-30)
+
+- [usuario] Luis (D5): *"mete la tabla de solo lectura … me interesa que los dos tengan acceso a los datos y que puedan
+  hablar, después vemos si hablan en chino o japonés"*. O sea: primero que se vean; el vínculo de códigos (D3) va después.
+- Tres tablas en GP2 que llena Virgilio cada 10 min (`public.gv_gp2_espejo_sync`, cron `gv-gp2-espejo-sync`); GP2 sólo lee:
+  - `virgilio_insumo_stock` — saldo de cada insumo de Virgilio por unidad (164 filas al 30/09).
+  - `virgilio_insumo_ubicacion` — en qué posición del Mapa está cada insumo (149).
+  - `virgilio_lugar` — el Mapa entero: góndolas y racks, empresa, uso y qué códigos tiene cada celda (943).
+- Respeta la Regla 0: GP2 lee su propio schema. La copia se reescribe entera sólo si cambió algo (compara md5).
+- Con 4gx (`ingreso_virgilio`) y 4gy (`aceptado_virgilio`) son las tablas por donde "hablan" las dos plantas.
+
+## 4gy. Lo que Virgilio le ACEPTA a Cervantes queda en GP2.aceptado_virgilio (2026-09-30)
+
+- [usuario] Luis: *"crea una tabla con los datos de lo que gestion virgilio le acepta a GP2 que los dos puedan leer"*.
+- [dato] Fuente: las recepciones de insumos de Virgilio que vinieron de Cervantes (`recepcion_insumo`, ref Cervantes):
+  24 al 30/09, **7 aceptadas** (ya con código real: N°44, 10, N° 43, N°94, 1060500, D4, N°41) y **17 con código
+  temporal TMP-** (todavía nadie las identificó en Virgilio).
+- La tabla vive en GP2 y la llena Virgilio (función `public.gv_gp2_aceptado_sync`, cada 10 min). GP2 sólo la lee.
+- `componente_id` está vacío a propósito: el vínculo código de Virgilio ↔ `GP2.componente` no existe y no se adivina.
+- Es el espejo de 4gx (`ingreso_virgilio`: lo que Virgilio le manda a Cervantes).
+
+## 4gx. Lo que Virgilio manda a Cervantes aparece en la portada de GP2 (2026-09-30)
+
+[usuario, Luis 30/09] *"Cuando Gestión Virgilio marca que se ingresa algo en Cervantes, tiene que figurar
+un cartel grande en la página principal de GP2 que diga «VIRGILIO DICE QUE TE LLEGÓ ESTO [detalle],
+CONFIRMALO Y UBICALO» (falta implementar confirmación y ubicación)"*.
+
+- En Gestión Virgilio, la **recepción de importados** tiene el destino **«Cervantes»** primero en la lista
+  (sobre todo insumos). Lo que va ahí **no entra al stock de Virgilio**.
+- Queda una fila en **`GP2.ingreso_virgilio`** (`estado = 'pendiente'`): cantidad, unidad, código importado,
+  código de insumo, descripción, proveedor, pedido, nota. La escribe `public.gv_imp_recibir` (del lado de
+  Virgilio, SECURITY DEFINER). **GP2 no lee `public`**: el dato vive en su propio schema (Regla 0).
+- `GP2_MODULOS.html` lo muestra en un cartel grande (`#avisoVirgilio`) mientras esté pendiente.
+- Si Virgilio anula esa recepción, la fila pasa a `anulado` y el cartel deja de mostrarla. No se puede anular
+  si Cervantes ya la confirmó.
+- **Falta**: confirmar (pasa a `confirmado`) y ubicar (entra al `inventario` en su `ubicacion`, con
+  `componente_id`). [dato] Hoy **no hay** vínculo entre el código importado/insumo de Virgilio (1000900,
+  H201Part, 007) y el `componente` de GP2: ubicar exige ese mapeo primero.
+
+## 4gz. El botón "Control" de la tablet es de TODO lo que se recibe, y sólo en Recibir (2026-09-30)
+
+- [usuario] Nazareno: *"Cargué una recepción en recepción de insumos y no hice el control. Ahora voy a control y no
+  me aparece"*. Y la regla: *"Me gustaría que aparezca en el botón de control que está a la izquierda del botón atrás
+  … Tendrías que poner los de talleristas, p.s. y prov de insumo. Además quiero que este botón sea visible cuando estoy
+  en el módulo recibir (lo que traen): si estoy en enviar no quiero que aparezca"*.
+- [dato] El caso: E13, C13 (Sector Procesado) y GRJ31, GRJ32 (Garage), todos de Importado, `recepcion_insumo.controlado
+  = false`. Su control vive en `control-remaches.html` (sector 2 + prov Importado, y sector 9), y a esa pantalla **sólo
+  se llegaba por la redirección automática al guardar**: ningún menú ni botón la linkeaba. Saliendo sin controlar, la
+  recepción quedaba huérfana (Recepción de Insumos sólo retoma flejes; el Control de la tablet sólo miraba P.S. y
+  talleristas). Registrado en auditoría como bug.
+- Cómo quedó: `control_entrega_bundle` manda `insumos_pend` (agrupado por sector + proveedor; flejes con `via='pesaje'`
+  por `v_recepcion_control`), la lista "qué rubro se controla en qué página" se mudó a `gp2-control-insumo.js` (GP2CI,
+  una sola copia para Recepción de Insumos, el Control y la tablet), el Control de la tablet muestra una tarjeta por
+  grupo con "Controlar →", y el botón cuenta P.S. + talleristas + insumos y sólo aparece en Recibir.
+- **Pendiente** [deducido]: los **cartones** que quedan sin controlar tampoco tienen dónde retomarse (su control vive
+  adentro de Recepción de Insumos y la barra de pendientes sólo mira flejes). No se muestran en el Control porque no
+  hay pantalla a la cual mandarlos; hace falta que Recepción de Insumos los retome.

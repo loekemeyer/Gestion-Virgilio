@@ -100,6 +100,11 @@ const DATOS = {
       razon_social: "Perez Zarate S.R.L.", zona: "Zona 1 - CABA Sur", fecha_recep: HOY },
     { tanda: "E32A", np: "98803", m3: 3.0, fecha_entrega: MANANA,
       razon_social: "Simon Zeitune E Hijo S.A", zona: "Retira", fecha_recep: HOY },
+    /* v24.92: E32A lleva 8 NP más (m³ 0, no mueven ninguna cuenta) → no entran en la celda y
+       tienen que ROTAR; las de una sola NP quedan quietas. */
+    ...[98811, 98812, 98813, 98814, 98815, 98816, 98817, 98818].map((n) => ({
+      tanda: "E32A", np: String(n), m3: 0, fecha_entrega: MANANA,
+      razon_social: "Cortopassi Horacio Saturnino Distribuciones Mayoristas S.A", zona: "Retira", fecha_recep: HOY })),
     { tanda: "E33A", np: "98804", m3: 4.0, fecha_entrega: HOY,
       razon_social: "Gifel S.R.L.", zona: "Zona 6 - GBA Norte", fecha_recep: HOY },
     { tanda: "E34A", np: "98805", m3: 2.0, fecha_entrega: HOY,
@@ -170,10 +175,10 @@ const DATOS = {
   /* v23.64 — el resumen de días de la PPP (gv_ppp_prog_arbol). 98805 tiene CCN → cuenta en
      SALIÓ y se descuenta de Armado (neto, como la PPP). */
   arbol: [
-    { fecha: HOY, tanda: "E31A", np: "98802", m3: 1.5, estado: "facturado" },
-    { fecha: HOY, tanda: "E34A", np: "98805", m3: 2.0, estado: "armado" },
-    { fecha: HOY, tanda: "E30A", np: "98809", m3: 1.0, estado: "proceso" },
-    { fecha: HOY, tanda: "E30A", np: "98810", m3: 0.5, estado: "pendiente" }
+    { fecha: HOY, tanda: "E31A", np: "98802", m3: 1.5, estado: "facturado", razon_social: "Perez Zarate S.R.L." },
+    { fecha: HOY, tanda: "E34A", np: "98805", m3: 2.0, estado: "armado", razon_social: "Nexxo S.R.L." },
+    { fecha: HOY, tanda: "E30A", np: "98809", m3: 1.0, estado: "proceso", razon_social: "Bazar Mandarin S.R.L." },
+    { fecha: HOY, tanda: "E30A", np: "98810", m3: 0.5, estado: "pendiente", razon_social: "Bazar Mandarin S.R.L." }
   ],
   /* v21.17 — horas por operario, ya clasificadas por `gv_monitor_horas_operario`.
      La TV NO recalcula nada de esto: si la vista cambia, cambia acá. */
@@ -240,6 +245,21 @@ function responder(url) {
         document.getElementById("fcBox").closest(".col") === document.getElementById("opsBox").closest(".col") &&
         document.getElementById("actBox").closest(".col") === document.getElementById("opsBox").closest(".col")),
       ult: window.__tvUlt || {},
+      pen: (document.getElementById("penBox") || {}).innerHTML || "",
+      penTit: (document.getElementById("penTit") || {}).innerHTML || "",
+      semCentro: [...document.querySelectorAll("#tandasBox td .sem")].map((s) => {
+        const a = s.getBoundingClientRect(), c = s.closest("td").getBoundingClientRect();
+        return Math.round(Math.abs((a.left + a.width / 2) - (c.left + c.width / 2))); }),
+      tkCli: [...document.querySelectorAll("#tandasBox tr")].filter((tr) => tr.querySelector(".t-cli .tk"))
+        .map((tr) => ({ tanda: tr.querySelector(".t-tanda").textContent.trim(),
+          rota: tr.querySelector(".t-cli .tk").classList.contains("rota"), txt: tr.querySelector(".t-cli .tk").textContent,
+          dur: tr.querySelector(".t-cli .tk").style.animationDuration, orig: tr.querySelector(".t-cli .tk").getAttribute("data-txt") || "" })),
+      ticker: [...document.querySelectorAll("#tandasBox tr")].filter((tr) => tr.querySelector(".t-np .tk"))
+        .map((tr) => { const tk = tr.querySelector(".t-np .tk"), caja = tk.parentNode;
+          return { tanda: tr.querySelector(".t-tanda").textContent.trim(), rota: tk.classList.contains("rota"),
+            anim: getComputedStyle(tk).animationName, lineas: Math.round(caja.clientHeight / parseFloat(getComputedStyle(caja).lineHeight)),
+            txt: tk.textContent, w: caja.clientWidth, sw: tk.scrollWidth }; }),
+      desb: ["actBox", "penBox", "col2"].map((id) => { const e = document.getElementById(id); return e ? e.scrollHeight - e.clientHeight : -1; }),
       clave: (document.getElementById("tvClave") || {}).textContent || "",
       estado: (document.getElementById("estado") || {}).textContent || "",
       // ¿sobresale algo del alto de la pantalla? En una TV no hay cómo scrollear.
@@ -274,8 +294,26 @@ function responder(url) {
      "la fila del día va sola, sin el subtexto de m³/tandas/NP: " + r.fc.slice(0, 300));
   ok((r.fc.match(/<tr[^>]*>/g) || []).length === 2,
      "un día = UNA fila (más la del encabezado): " + (r.fc.match(/<tr[^>]*>/g) || []).length);
-  ok((r.fc.match(/25%<small>1<\/small>/g) || []).length === 4, "98805 salió: 25 % en Salió, Fact, Proc y Pend, y 0 en Armado");
-  ok(/class="arm z">0%/.test(r.fc), "el armado que salió no se cuenta dos veces (neto)");
+  /* v25.01 (Luis): el número de pedidos grande y el % chiquito abajo. */
+  ok((r.fc.match(/>1<small>25%<\/small>/g) || []).length === 4, "98805 salió: 1 (25 %) en Salió, Fact, Proc y Pend, y 0 en Armado: " + r.fc.slice(0, 400));
+  ok(/class="arm z">0<small>0%/.test(r.fc), "el armado que salió no se cuenta dos veces (neto)");
+  /* v25.01 (Luis): «Pendientes de hoy» — lo de hoy que no salió: E30A (98809 proc + 98810 pend)
+     y E31A (98802 facturada sin CCN). 98805 salió y no va. */
+  ok(/2 pedidos · 3 NP/.test(r.penTit), "Pendientes de hoy tiene que decir 2 pedidos · 3 NP: " + r.penTit);
+  ok(/E30A/.test(r.pen) && /E31A/.test(r.pen) && !/98805/.test(r.pen), "Pendientes de hoy lista mal los pedidos: " + r.pen);
+  ok(/class="pen">Pend</.test(r.pen) && /class="fac">Fact</.test(r.pen), "cada pedido pendiente dice su estado (el más atrasado)");
+  ok(r.pen.indexOf("E30A") < r.pen.indexOf("E31A"), "lo más atrasado va primero");
+  /* v25.01 (Luis): las luces P/A no se corren cuando alguien agarra la tanda. */
+  const cliE32 = r.tkCli.find((x) => /^E32A/.test(x.tanda)), cliE30 = r.tkCli.find((x) => /^E30A/.test(x.tanda));
+  ok(cliE32 && cliE32.rota && /Simon Zeitune E Hijo · Cortopassi/.test(cliE32.txt) && !/\+\d/.test(cliE32.txt), "el cliente de E32A no entra: tiene que rotar " + JSON.stringify(cliE32));
+  /* v25.6 (Luis): los «+N» muestran los nombres, y el cartel va a 3/4 de la velocidad (4,5 caracteres/s). */
+  ok(cliE32 && cliE32.dur === Math.max(8, Math.round((cliE32.orig.length + 7) / 4.5)) + "s", "el cartel tiene que ir a 4,5 caracteres por segundo (3/4 de la v24.92)");
+  ok(cliE30 && /Bazar Mandarin · Casa Pepe/.test(cliE30.orig), "E30A tiene 2 clientes: tienen que ir los dos nombres " + JSON.stringify(cliE30));
+  const cliSolo = r.tkCli.filter((x) => x.orig && x.orig.indexOf("·") < 0 && x.orig.length < 18);
+  ok(cliSolo.length && cliSolo.every((x) => !x.rota), "un cliente solo y corto entra: tiene que quedar quieto " + JSON.stringify(cliSolo));
+  /* v25.6 (Luis): *"queda cortado En este momento"*. Nada de la columna derecha se pasa de su alto. */
+  ok(r.desb.every((x) => x >= 0 && x <= 1), "la columna derecha se corta (En este momento / Pendientes): " + JSON.stringify(r.desb));
+  ok(r.semCentro.length && r.semCentro.every((x) => x <= 3), "las luces P/A tienen que quedar centradas en su celda: " + JSON.stringify(r.semCentro));
   ok(/3 salieron sin FC/.test(r.fcTit), "el título no avisa cuántas se fueron sin factura: " + r.fcTit);
   // v20.21 (Thomas) — el 🚚 también en la tabla principal, y el cartel a partir de 3
   ok(/E36A/.test(r.tandas), "E36A está en curso: tiene que estar en la tabla principal");
@@ -311,16 +349,22 @@ function responder(url) {
      "deberían ser 4 de 7 terminadas (E31A, E34A, E37A y E38A): " + JSON.stringify(r.ult));
   ok(r.ult.enCurso === 2, "tienen que contarse 2 tandas en curso (E30A y E36A): " + JSON.stringify(r.ult));
 
-  /* ── v23.92 (Luis) — la tabla es TANDA · M³ · PROGRESO y nada más ─────────
-     Salieron el N° de pedido, el cliente, los días y la zona: en una pared lo que
-     se lee es el código y si está hecha. El candado es invertido: si alguna de esas
-     columnas vuelve, el test se pone en rojo. */
-  ok(/>Tanda</.test(r.tandas) && /M³/.test(r.tandas) && /Progreso/.test(r.tandas),
-     "faltan las tres columnas de la tabla de tandas");
-  ok(!/N° Pedido/.test(r.tandas) && !/Cliente/.test(r.tandas) && !/>Zona</.test(r.tandas)
-     && !/>Días</.test(r.tandas), "volvió una columna que Luis sacó de la tabla (v23.92)");
-  ok(!/98801/.test(r.tandas) && !/Bazar Mandarin/.test(r.tandas),
-     "la tabla no tiene que mostrar ni el N° de pedido ni el cliente");
+  /* ── v24.88 (Luis) — TANDA · M³ · CLIENTE · NP · PROGRESO ───────────────
+     La v23.92 había sacado el N° de pedido y el cliente; Luis los pidió de vuelta
+     (*"el cliente y detalle de NPs"*). La zona y los días siguen afuera. */
+  ok(/>Tanda</.test(r.tandas) && /M³/.test(r.tandas) && />Cliente</.test(r.tandas)
+     && />NP</.test(r.tandas) && /Progreso/.test(r.tandas),
+     "faltan las cinco columnas de la tabla de tandas");
+  ok(!/>Zona</.test(r.tandas) && !/>Días</.test(r.tandas), "volvió una columna que Luis sacó de la tabla (v23.92)");
+  ok(/98801/.test(r.tandas) && /Bazar Mandarin/.test(r.tandas),
+     "la tabla tiene que mostrar el cliente y las NP de la tanda");
+  /* v24.92 (Luis): «si hay más NPs de las que entran, que rote estilo cartel de Wall Street». */
+  const tkE32 = r.ticker.find((x) => /^E32A/.test(x.tanda)), tkE31 = r.ticker.find((x) => /^E30A/.test(x.tanda));
+  ok(tkE32 && tkE32.rota && tkE32.anim === "ticker", "E32A tiene 9 NP y no entran: la celda tiene que rotar " + JSON.stringify(tkE32));
+  ok(tkE32 && /98818/.test(tkE32.txt) && (tkE32.txt.match(/98803/g) || []).length === 2,
+     "el cartel rotativo tiene que llevar TODAS las NP, duplicadas para girar sin salto " + JSON.stringify(tkE32));
+  ok(tkE31 && !tkE31.rota && tkE31.anim === "none", "E30A tiene pocas NP: tiene que quedar quieta " + JSON.stringify(tkE31));
+  ok(r.ticker.every((x) => x.lineas === 1), "las NP van en UNA línea: " + JSON.stringify(r.ticker.map((x) => x.lineas)));
   ok(!/Z3 CO/.test(r.tandas) && !/CABA/.test(r.tandas), "la zona salió de la tabla");
   ok((r.tandas.match(/E30A/g) || []).length === 1, "E30A aparece más de una vez: la tanda va en UNA fila");
   ok(/3,3/.test(r.tandas), "falta la columna de m³ (E30A = 2,5 de ISIS + 0,8 de la web)");
@@ -332,7 +376,7 @@ function responder(url) {
   ok(/s-no/.test(r.tandas), "el semáforo no marca lo que NO se empezó");
   /* El separador de día es lo único escrito que queda: sin él hoy y mañana se
      mezclan sin que se note (el título de la tarjeta se sacó). */
-  ok(/<tr class="dia"><td colspan="3">/.test(r.tandas), "falta el separador de día en la tabla de tandas");
+  ok(/<tr class="dia"><td colspan="5">/.test(r.tandas), "falta el separador de día en la tabla de tandas");
   ok(/Mié|Lun|Mar|Jue|Vie|Sáb|Dom/.test(r.tandas), "el separador no dice el día de la semana");
   ok((r.tandas.match(/<tr class="dia">/g) || []).length === 2,
      "tiene que haber UN separador por día de entrega (hoy y mañana)");

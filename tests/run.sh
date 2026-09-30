@@ -93,6 +93,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== stock-idempotent (regresión: stockMove con client_id + ignore-duplicates; reintento no duplica) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stock-idempotent.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stock-cola-por-fila.cjs
 
 echo "== ppp-atrasados-modulo (submodulo Pedidos atrasados: el criterio lo pone el backend) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-atrasados-modulo.cjs
@@ -376,6 +377,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pend-checklist (idea 5267: checklist de Pendientes — completitud, envío y código único) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pend-checklist.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pend-recibido.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pend-no-recibido.cjs
 
 echo "== ppp-errores (idea 5334: _pppComputeErrors — panel de errores de la PPP) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-errores.cjs
@@ -646,6 +648,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pedimp-moq-proy (v23.90: código → proyección · MOQ con margen hasta 12 meses · desglose en 2 columnas · derechos por artículo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-moq-proy.cjs
+node tests/pedimp-insumo-12m.cjs
+node tests/imp-recibir-cervantes.cjs
 echo "== pedimp-pdf-inner (v24.40: el PDF del pedido lleva Inner Cajas) =="
 node tests/pedimp-pdf-inner.cjs
 echo "== pedimp-prioridad-damian (v24.42: orden por meses de stock · alerta < 4 · PDF para Damián) =="
@@ -659,6 +663,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pedimp-botones-celular (v24.54: los PDF del proveedor entran en el celular) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-botones-celular.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-cabecera-compacta.cjs
+node tests/pedimp-cartel-sync.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-reporte-pdf.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-acciones-confirmar.cjs
 node tests/pedimp-meses-proveedor.cjs
@@ -994,6 +999,8 @@ echo "== stk-buscar-cero (Regresion v20) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-buscar-cero.cjs
 echo "== stk-pedidas-neto (Regresion v24.04) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-pedidas-neto.cjs
+echo "== stk-refrescar-ya (v25.18) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-refrescar-ya.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-busca-secundarios.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-proy-sin-doble-familia.cjs
 

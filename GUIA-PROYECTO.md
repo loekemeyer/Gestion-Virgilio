@@ -1,3 +1,16 @@
+## Nota v24.89 (2026-09-30) — Pendientes de Recepción: botón «No recibido» con WhatsApp a Marian
+
+Pedido de Mel. En cada tarjeta de **Recepción → Pendientes**, a la derecha de **Recibido**, está el
+botón **«No recibido»**, con el mismo criterio que «No corresponde»: se prende en rojo, se apaga
+tocándolo de nuevo y es excluyente con el tilde de Recibido. Al prenderlo abre WhatsApp a **Marian
+(5491131181186)** con el mensaje *"Hola Marian, no recibí el remito 38868 que te llegó el día 23/09 a
+las 14:58 de Log/ Fabr, confirmame porfa que lo tenés o si ya lo mandaste"* (día y hora = cuando se
+cargó la recepción). Queda guardado en `Control_Modo_OP.gv_no_recibido_at` y la tarjeta muestra
+*"avisado · dd-mm hh:mm"*. **No habilita Enviar**: la recepción se sigue cerrando sólo con Recibido.
+**v24.93 (Mel):** con **Recibido** tildado el botón «No recibido» **no se muestra**; destildando Recibido vuelve.
+`recepcion.js` (`pendRecibidoRow`, `pendNoRecibidoMsg`, `WA_MARIAN`), `tests/pend-no-recibido.cjs`,
+`docs/SUPABASE-GESTION-VIRGILIO.md` §3.v2489.
+
 ## Nota v22.98 (2026-09-26) — Lo que espera importado se parte POR FECHA, y la NP que salía sin su mercadería se reprograma sola
 
 **Thomas:** *"si son pedidos que son únicamente de artículos importados que llegan en noviembre, habría que

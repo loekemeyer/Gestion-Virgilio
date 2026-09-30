@@ -30127,7 +30127,7 @@ planilla. El margen se centra solo. Verificado con el 25/09 (200, mismos número
 **v23.92 (edge v26):** la banda de *Total x Día* lleva la unidad debajo, **(M3)**, igual que
 *Ritmo (M3 x Hs)* y que la pantalla. Verificado con el 25/09 (200, 3 operarios).
 
-**v24.86 (sólo front):** la **pantalla** (📈 Reporte diario Virgilio) va con las mismas islas que el PDF:
+**v25.23 (sólo front):** la **pantalla** (📈 Reporte diario Virgilio) va con las mismas islas que el PDF:
 hueco de 6 px entre bloque y bloque (columna vacía `.rv-gap`), borde grueso de 2 px alrededor de cada
 bloque y Operario + las tres de horas del día con el encabezado en las dos filas (`rowspan`). Lo sostiene
 el bloque (k) de `tests/rv-cuadro-entero.cjs`.
@@ -30795,3 +30795,56 @@ select * from public.gv_ppp_tanda_camion_mezclado;   -- vacía = todo bien
 ```
 
 `sql/gv_balvanera_once_zona1_v2440.sql` (rollback en la cabecera).
+
+
+## §3.v2489 — `Control_Modo_OP.gv_no_recibido_at`: «No recibido» en Pendientes de Recepción · Mel, 30/09/2026
+
+**Pedido (Mel):** un botón **«No recibido»** a la derecha de «Recibido», con el mismo criterio que
+«No corresponde», que abra WhatsApp a Marian (5491131181186) con el remito.
+
+```sql
+alter table public."Control_Modo_OP" add column if not exists gv_no_recibido_at timestamptz;
+```
+
+- Columna nueva **nullable, sin default y sin backfill** (regla de la tabla compartida: se agrega,
+  no se modifica). Ninguna fila cambió. `anon` y `authenticated` la leen y la escriben por el grant
+  de tabla que ya existía (medido con `has_column_privilege`: SELECT y UPDATE en `true`).
+- Los triggers de la tabla (`exigir_foto_procesado`, `gv_control_modo_op_nombres`) no la tocan.
+- **Excluyente con `gv_recibido_por`**: prender «No recibido» borra el recibido, y tildar Recibido
+  borra `gv_no_recibido_at`. **No habilita Enviar**: `pendRowComplete` sigue exigiendo Recibido.
+- **Rollback, una línea:** `alter table public."Control_Modo_OP" drop column gv_no_recibido_at;`
+  (antes, sacar la columna del `select` de `renderPendientes` en `recepcion.js`, o Pendientes da error).
+- Test: `tests/pend-no-recibido.cjs`.
+
+## §3.v258 — Conciliación de Facturación sin timeouts: neto en foto + RPC materializadas · Thomas, 30/09/2026
+
+- **Síntoma:** 72 timeouts de `gv_cruce_facturacion_totales` el 30/09 entre 08:56 y 09:28 ART.
+- **Medido:** la RPC tardaba **9,2 s** (timeout del rol: 8 s) mientras leer la vista entera tardaba 0,23 s:
+  con los parámetros el planner armaba otro plan. Y `gv_vista_cruce_facturacion` recalculaba el neto de
+  las 1.114 NP en cada lectura (1,4–1,7 s).
+- **Cambio:** `gv_facturacion_neto_mat` (foto del neto por NP, refresco `concurrently` cada 10 min en
+  minutos impares, cron `gv-facturacion-neto-mat`); la vista la lee y calcula EN VIVO sólo las NP que no
+  están en la foto (`= ANY(ARRAY(...))`, baja por el GROUP BY). `gv_cruce_facturacion_totales` y
+  `_resumen` leen la vista `MATERIALIZED`.
+- **Resultado (como `authenticated`):** totales 290 ms · resumen 271 ms. Salida idéntica (`EXCEPT ALL` 0/0).
+- **Costo aceptado:** una NP ya en la foto cuyo armado cambia (rearmado, Recuperar items) muestra el neto
+  viejo hasta 10 min.
+- Mismo día: el cruce de cobranzas (cron 103) pasa a correr sólo fuera de horario
+  (`49 0-10,21-23 * * *` UTC = 18:49 a 07:49 ART); rollback `cron.alter_job(103, schedule := '49 * * * *')`.
+- `sql/gv_facturacion_neto_mat_v258.sql` (rollback al final).
+
+## §3.v2510 — `lk_pedidos_match` corrige los pedidos VIEJOS editados después · Luis, 30/09/2026
+
+- El sync de LK (cron 24) sólo recarga los últimos 14 días: un pedido más viejo corregido en la página
+  quedaba con los ítems viejos acá (LK 1450 · Matiz: 166,67 cajas en vez de 1.000/2.000).
+- LK: `sync_pedidos_match_virgilio_viejos()`, cron `gv-pedidos-match-viejos` (`37 * * * *`): corrige SÓLO
+  `items_string` de pedidos LK de hasta 60 días antes del corte, si difiere. Primera corrida: 1450 y 1358.
+- Chef queda afuera (su vista tarda 4 s por fila). Backup `zz_backups."GV_Backup_LkPedMatch_items_20260930"`.
+- `sql/lk_pedidos_match_viejos_v2510_LK.sql` (rollback al final).
+
+### §3.v2511 — lk_pedidos_match: pedidos viejos también de Chef + barrido semanal de todo el historial (Luis, 30/09)
+
+`sync_pedidos_match_virgilio_viejos(p_dias, p_chef_remoto)` en LK corrige `items_string` y `match_string` de LK **y Chef**
+anteriores a la ventana de 14 días del cron 24. Cada hora (:37): 60 días, Chef desde `chef_orders_cache`. **Domingos 04:23 ART**
+(`gv-pedidos-match-viejos-todo`, `23 7 * * 0`): todo el historial, Chef por FDW (~3,5 s). Primera corrida: 4 `match_string` de LK,
+0 de Chef. Backup `zz_backups."GV_Backup_LkPedMatch_items_match_20260930b"`. Rollback en `sql/lk_pedidos_match_viejos_v2511_LK.sql`.

@@ -1570,6 +1570,15 @@ que suman 0 por código. Quedaron **21 a contar** y 7 códigos sin posición (50
 Insumos en racks (523C, 546V, 102E, 522S, 1000900) quedan «a contar» hasta el paso de alias de ubicación de insumos.
 Rollback: `sql/gv_racks_canon_v2277.sql`. Lo sostiene `tests/pmap-racks.cjs`.
 
+⚠⚠ **El CONTEO del Mapa no se SUMA a lo sin posición** (Marianela, 30/09, v25.15: *"el conteo está bien, lo que
+suma está mal"*). `gv_rack_posicion_guardar`, si lo contado es MAYOR a lo que tenía la posición, primero **traslada**
+lo sin posición del mismo código (es la misma mercadería) y sólo el resto entra como ajuste. Antes lo sumaba: 505I
+quedó en 2614 con 1475 contadas, 056E +84, 816E +120 (corregidos a mano ese día). Marcador `sinpos-mapa-3009`,
+centinela id 260, problema 648. `sql/gv_rack_posicion_guardar_sinpos_v2515.sql`.
+Y ese día se dieron de alta **O02** y **O05** (racks LK que no existían) y **Z07 pasó de góndola a rack** (su celda
+del 363E era falsa: la góndola del 363E es J04). Problema 646. Al contar en una posición que el Mapa no conoce,
+se da de alta en `GV_Lugar`, no se carga en otra.
+
 ### ⚠ INSUMOS: dónde está cada uno sale del Mapa (Luis, 25/09, v22.80)
 
 **Luis:** *"es un mismo depósito físico … son racks de insumos. Dejalos con el nomenclador que ya existe, no inventes
@@ -3668,6 +3677,13 @@ borró). Layout:
 
 ### Admin de Cervantes — dos pantallas, COPIADAS acá (`cervantes-admin/`)
 
+> ⚠⚠ **v25.19 (Luis, 30/09, D9): GP2 YA NO ES COPIA — es LINK DIRECTO** a
+> `https://gesti-n-productiva-2-0.vercel.app/GP2_MODULOS.html` (`GP2_URL` / `abrirAdminCervantes`, otra pestaña).
+> La copia se quedaba atrás (v1.137 contra v1.211) y se borró: en `cervantes-admin/gp2/` quedan sólo docs
+> (`LEEME.md`, el CLAUDE.md renombrado, `CONOCIMIENTO_GP2.md`, `GP2_MAPA.md`, `agentes/`). Al ser otro sitio,
+> **GP2 pide su propio login** (Google + su lista de mails) y no hereda la sesión de Gestión. Todo lo de abajo
+> sobre la copia de GP2 queda como historia; el admin «entero» sigue siendo copia.
+
 - **El supervisor que elige Cervantes en el selector de planta NO va a la pantalla de
   operario: va al admin** (`chooseCervantes` → `showCervAdmin`, v14.73). El operario sigue
   derecho a `./cervantes/`. La distinción es `__identity.type === "supervisor"`.
@@ -3681,7 +3697,7 @@ borró). Layout:
   tampoco entra `db/A_Costos_VIGENTES.xlsx`**: es la planilla madre de costos, o sea datos, y
   este repo se sirve por GitHub Pages. Que el `.gitignore` del origen la deje pasar allá no
   significa que tenga que viajar acá.
-- **Re-sincronizada el 2026-09-12 (v16.32)**, con 92 diferencias acumuladas. Cómo se hace, para
+- **Re-sincronizada el 2026-09-30 (v25.17, GP2 v1.211.0; antes la copia estaba en v1.137.0 — el 12/09, v16.32)**, con 92 diferencias acumuladas. Cómo se hace, para
   la próxima: copiar `gestion-productiva-2.0` entero salvo lo de arriba, **re-aplicar a mano los
   parches de la copia** (los de abajo) y **verificarlos uno por uno antes de commitear** — el
   del `signOut` es el que importa: si se pierde, un supervisor que no esté en la whitelist de
@@ -3788,6 +3804,27 @@ Centinelas ids 235-239. `sql/gv_imp_recibir_v2349.sql`.
 (`pedImpBachesDe`) elige de cuál. **Cada artículo recibe con SU código** (Luis: *"recibir 323ES es 323ES, no 323E"*).
 **La cantidad va en cajas o en UNIDADES**: en unidades se convierte con la UxB a la caja más cercana
 (3.000 u ÷ 144 → 21 cajas) y el popup dice la diferencia (+24 u). `tests/imp-recibir-codigo-unidades.cjs`.
+**v24.83-84 (Luis, 30/09): un importado que es INSUMO entra como insumo y su stock cuenta para el producto.**
+`323ES` (pedido) → insumo **`323ES In`** (`GV_Importados_Insumo_Map`), en su unidad (`Insumos_Factores`; el popup
+no pide UxB ni cajas). **`Importados_Stock_Parte`** = «el stock de esta parte cuenta como stock de este producto»,
+con **`parte_x_caja`** (u de la parte por caja; NULL = 1 por unidad): 12 u de `323ES In` = 1 caja de 323E **y** de 838E.
+Es POSIBILIDAD de armar: sólo apaga el cartel «Sin stock» de `gv_reingresos_feed` (sólo importados). Centinela 255.
+`sql/gv_insumo_cuenta_como_producto_v2484.sql`.
+**v24.89 (Luis, 30/09):** todo movimiento de **insumos** es empresa **`Mixto`** (lo fuerza `gv_insumo_unidad_base`). Y un
+pedido en viaje cuya **fecha de reingreso ya pasó** sin recibirse corre solo a **hoy + 7** (`gv_importados_eta_vencida`,
+cron `gv-importados-eta-vencida` 00:07 ART, log `GV_Importados_ETA_Log`): una sola fuente, `GV_Importados_Baches` →
+`Importados.reingreso_est` → módulo de Importados y cartel de las páginas.
+El cartel de un producto toma la fecha **más temprana** entre su pedido y el de sus partes (v24.91: 323E/838E → la del 323ES).
+**v25.12 (Luis, 30/09): el cartel llega a la página al toque.** Tocar «Cartel», la fecha de reingreso o la entrega
+global llama a **`sync_reingresos_cartel_virgilio`** de LK (sólo el cartel, ~1,6 s, anon la puede correr) en vez de
+esperar el cron 39 (≤ 5 min). La sync entera tarda ~11 s (8,4 s son los ocultos) y anon corta a los 3 s: por eso
+el switch «Web» sigue en ≤ 5 min. Si la llamada falla, el cron la rehace igual. `sql/lk_sync_reingresos_cartel_v2512_LK.sql`,
+`tests/pedimp-cartel-sync.cjs`.
+**v25.2 (Luis, 30/09): 323E y 838E NO se agrupan con 323ES** (*"no debería juntarlos así"*): se borraron sus filas de
+`GV_Importados_Alias` (backup `zz_backups."GV_Backup_ImpAlias_20260930"`; queda sólo 865ED→865E) y `gv_imp_recibir_contexto`
+ya no usa el alias: los pedidos de 323E/838E se reciben en cajas, sólo el de 323ES entra como insumo `323ES In`.
+**v25.12 (Luis, 30/09): el insumo se llama `323ES`, no `323ES In`** (*"323ES nunca fue un código de stock"*): renombrado en
+`Insumos`, `Insumos_Factores`, `GV_Importados_Insumo_Map` e `Importados_Stock_Parte` (0 movimientos; backup `zz_backups."GV_Backup_323ESIn_20260930"`).
 
 **Desglose de la tarjeta del proveedor (Luis, v23.75):** los dos chips de la banda se expanden. Izq: consumo/mes =
 Σ proy u/mes × FOB por artículo, y meses = (mínimo − a pedir hoy) ÷ consumo. Der: CIF y cada línea de lo no
@@ -3991,6 +4028,13 @@ genera pedido». El PDF (`_pedImpRepHtml`, Arial 15, A4 vertical) tiene una tabl
 Stk. · E.M. (proyección u/mes) · Meses Stk. (⚠ si < 4; = stock REAL disponible ÷ E.M., **sin** lo en camino — Luis v24.78) · m³ · u$s · Pedido en curso** (unidades + dd/mm, o «No»),
 ordenada por esos meses (menos primero). **Una sola tabla**: cada proveedor es una fila-rótulo gris con sus totales (v24.79, *«mínima la separación»*), y antes de imprimir sale una **vista previa** (`pedImpRepVista`). **m³ y u$s son sólo de lo que genera pedido**; el total va
 arriba de cada columna. `tests/pedimp-reporte-pdf.cjs`.
+
+⚠⚠ **v25.13 (Thomas, 30/09): la SALIDA de ese botón ahora son las hojas del PDF para Damián** (*"misma
+funcionalidad de hoy, que te muestre todos, pero con la lógica del PDF de Damián"*). Mismo pop-up y vista previa;
+por cada proveedor tildado salen sus hojas (pedido · sin pedir · discontinuos), una tanda atrás de otra; con «Sólo
+lo que genera pedido», sólo la hoja del pedido. Las dos puertas usan `_pedImpDamianHojas(prov, opt)` +
+`_pedImpDamianDoc`; los discontinuos se leen una sola vez (`_pedImpDamianDisc`). **Se retira el reporte de una
+tabla** (`_pedImpRepHtml`, Cód · Stk · E.M. · Meses…): no volver a ponerlo.
 
 ## ⚠ REGLA (Luis, 2026-09-29, v24.32): la nacionalización por artículo es de 🚢 EN CURSO — y el proveedor la abre
 
@@ -6432,6 +6476,17 @@ lo que cambió es **dónde están esos dos divs**, no la lógica. `tests/tv-meta
   con la fecha en el rótulo si es una sola; el aviso «↑ 80% MOQ» a la derecha de la tabla; separadores finitos
   Foto|Stock y Pedido|FOB) · 2) **Sin pedir**, por meses de stock, con «Por qué» · 3) **Discontinuos** del proveedor
   (`Importados.activo = false`, con el motivo de `Articulos_Discontinuados`). Sin textos de explicación.
+- **v25.3 (Thomas, 30/09): el PDF para Damián va en A4 VERTICAL y lleva la columna Marca** (LK / CH / Loke, de
+  `Importados.marca`) en las 3 hojas; reemplaza la chapa de planta pegada al código. Medido: la hoja del pedido
+  mide 708 px de 733 útiles con el aviso del MOQ (el renglón más ancho). No volver a ponerla horizontal.
+- **v25.13 (Thomas, 30/09): el PDF para Damián va AGRUPADO POR TIPO DE PRODUCTO** (las marcas del mismo producto
+  juntas: Colador Ø 8 cm = 026 LK · 824 CH · 110 Loke; el grupo va donde cae su artículo más urgente, adentro LK · CH ·
+  Loke, raya gruesa al empezar cada grupo) **y marca «INAL»** debajo del código. Fuentes: `GV_Producto_Tipo` (su Excel
+  de equivalencias) y `GV_Articulo_INAL` (certificados), resueltas por la vista `gv_imp_articulo_extra`.
+  **La «libre circulación» ahora es «Autorización de Impo»: `Importados_Config.autoriz_impo_pct` (0,007) × FOB de lo
+  que lleva INAL** (base «inal» en el reparto por artículo). Sin el dato INAL va sobre todo el FOB (lo conservador).
+  **Va en los TRES modos** (consolidada, contenedor y avión; Thomas D7). Loke 111 y 112 llevan INAL (D6, sin
+  certificado cargado todavía). Aplicado el 30/09: 321 tipos, 94 INAL, 59 importados con INAL. `sql/gv_imp_tipo_inal_v2513.sql`.
 - Los tests de pantalla que no miden el MOQ lo ponen en 0 (`_NAC_TASAS.moq = 0`); la regla la miden
   `tests/pedimp-prioridad-damian.cjs` (D) y `tests/pedimp-moq-proy.cjs` (B).
 
@@ -6479,3 +6534,128 @@ día. «Total por día» sacalo, que quede una vision estilo «dos columnas»"*.
 - La mudanza a dos columnas para pantallas < 1500 px se borró: ahora siempre son dos.
 - `monUnirCentroOeste` queda en el archivo sin llamador (≡ index.html).
 - **Chequeo:** `node tests/mon-tv.cjs` (verificado que falla contra la v24.69: 3 columnas, sin M³, con «Total por día»).
+
+### ⚠ v24.88 (Luis): la tabla de tandas de la TV vuelve a llevar CLIENTE y NP
+
+**Luis:** *"tiene que aparecer en la parte de la izquierda junto a las tandas y los m3: el cliente y detalle de NPs"*.
+Se retira el «tanda · m³ · progreso y nada más» de la v23.92. Columnas: **Tanda · M³ · Cliente · NP · Progreso**
+(la zona y los días siguen afuera). Cliente resumido (sin SRL/SA) y **«+N»** si la tanda lleva varios; las NP con el
+prefijo una vez por empresa (`LK 0101·0102 · 98615`), hasta 2 renglones; el `title` trae la lista completa. La
+columna izquierda pasó a **1,15fr** contra 1fr. `resumirCliente` / `clienteTanda` / `npsCortas` en `monitor/tv.html`.
+**Chequeo:** `node tests/mon-tv.cjs`.
+**v24.92 (Luis): las NP van en UNA línea y, si no entran, ROTAN como cartel de Wall Street** (*"en caso de que haya
+más NPs de las que entran, que empiece a rotar"*). `activarTicker` duplica el texto sólo en la celda que se desborda
+(giro sin salto, ~6 caracteres por segundo); las que entran quedan quietas. Columnas 17/9/26/28 %. Candado en `mon-tv` (E32A con 9 NP rota, E30A no).
+**v25.01 (Luis, 30/09):** en **Días** el número de pedidos va grande y el % chiquito abajo, los dos en color · rota
+también el **cliente** · las luces **P/A quedan centradas** (quién la tiene y hace cuánto va ABAJO, `.semdet`) · cuadro
+nuevo **🚚 Pendientes de hoy** (`pendientesHoy`: lo de hoy sin CCN, por tanda + cliente, con el estado del más atrasado,
+lo más atrasado primero). `activarTicker` es idempotente y se re-mide al cambiar el tamaño (la pestaña oculta del admin
+mide 0). Columnas 16/9/33/28 %. La TV pesa 99 KB contra el techo de 100 de `mon-tv`.
+**v25.6 (Luis, 30/09):** el cliente muestra **todos los nombres** (no «+N») y rota si no entra · el cartel va a **3/4** de
+velocidad (4,5 caracteres/s) · **nada de la columna derecha se corta**: «En este momento» muestra sólo lo que entra
+(se fue el mínimo de 6) y «Pendientes de hoy» toma a lo sumo la mitad del alto libre, con «+ N más» · las letras van en
+**`--u` = min(1vh, 0,5625vw)**, así en una pantalla más angosta que 16:9 achican con el ancho.
+
+## ⚠ REGLA (Luis, 2026-09-30, v25.5): el DESGLOSE por cliente del pop-up de proyección cuenta lo MISMO que el total
+
+Caso 702E julio: el total decía 1.644 u (137 cajas: 18 del 702E + 119 del **702EN**, su secundario) y el
+desglose «🧾 Facturado» 216 u. El total (`ventas_mensuales_cod`) suma la familia y lee `ventas_proy_lineas`
+(regla L, sin ventas entre empresas); el desglose pedía sólo el principal sobre `sales_lines` cruda.
+Hoy `gv_ventas_clientes_mes_cod` manda la familia a **`fn_ventas_clientes_mes_fam_virgilio`** (LK), con los
+mismos tres criterios, y cada cliente dice de qué código salió (`702E 7 · 702EN 59`, columna `codigos`).
+`fn_ventas_clientes_mes_virgilio` (la vieja) queda sin llamador, de rollback. Centinela `Equivalencias_Familia`.
+**Al tocar un criterio del total mensual, tocar también el desglose.** Problema 640.
+`sql/gv_proy_desglose_familia_v254.sql`, `sql/gv_proy_desglose_familia_v254_LK.sql`, `tests/proy-entregadas.cjs`.
+
+## ⚠ REGLA (Luis, 2026-09-30): el pedido con importados sin stock va COMPLETO — ya no se parte
+
+**Luis:** *"que deje de partir el pedido… programá el pedido completo (como antes del cambio)"*.
+Se retira la regla del 11/09 (Thomas: `pedido_diferido` corta la NP) y la del 23/09 (Luis: la
+página crea 2 pedidos). Lo que no hay sale como faltante.
+
+| capa | qué cambió |
+|---|---|
+| páginas LK y Chef (`script.js`) | `PARTIR_POR_REINGRESO = false`: un solo pedido y la confirmación dice "listo antes del" |
+| base LK | `marcar_pedido_diferido` / `marcar_diferidos_chef_ids` ya no escriben `pedido_diferido`: anotan en **`pedido_sin_stock`** (empresa, pedido, artículo, cliente, cajas, unidades, fecha, reingreso estimado) — también el cliente nuevo |
+| Gestión | nada: los pases de diferido quedan sin trabajo nuevo |
+
+⚠ Lo ya diferido antes del cambio (16 pedidos) sigue partido: borrar esas filas cambiaría el corte
+de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (en `pagina-LK-copia`).
+
+## ⚠ REGLA (Thomas, 2026-09-30, v25.4): el INSUMO importado no tiene empresa y se pide para 12M
+
+- **Insumo** = parte de `vista_importados_partes` cuyo propio código NO está entre los terminados que la usan
+  (1000900, 505C, 523C, 587C, 1546903; **590E no**: se vende). `esInsumo` en `ocgFetchImportados`.
+- **Sin empresa**: `_impPlantaVista` y `_pedImpEmpFoto` devuelven vacío. En la base, `Importados.marca` y sus baches
+  son **`Mixto`** (v25.9, Luis: *"debería ser Mixto desde el vamos"*), igual que los movimientos de insumos. `Mixto` se lee
+  como LK en todo lector (no es CH). Centinela: `select * from public.gv_importados_insumo_con_empresa;` — vacía = todo bien.
+  `sql/gv_importados_insumo_mixto_v2509.sql`.
+- **Objetivo = (meses del proveedor + 2) × proyección de los productos que lo usan** (`INSUMO_MESES_PRODUCTO`),
+  también en el tope del MOQ. Chip **«12M»** al lado del código.
+- **Tocar Stock** abre el desglose (`pedImpStockDesglose`): propio · cada insumo (`gv_importados_stock_insumos`) ·
+  parte · productos ya armados, y abajo los productos con su proyección. En un insumo, tocar Proy abre lo mismo.
+- **GV lee el inventario de GP2** (mismo proyecto, schema `GP2`) por **`gv_gp2_inventario`** (detalle) y
+  **`gv_gp2_stock_componente`** (total por componente), sólo lectura. Al 30/09: 1.137 filas, 5 con stock.
+  **No hay vínculo** entre el código importado (1000900) y el componente GP2 (D1 «Espiral Sacacorcho»?): no se adivina.
+  `sql/gv_gp2_inventario_v2501.sql`, `tests/pedimp-insumo-12m.cjs`.
+
+## ⚠ REGLA (Luis, 2026-09-30, v25.14): RECIBIR un importado en CERVANTES — no entra al stock de Virgilio, avisa en GP2
+
+- En 📥 RECIBIR el destino **🏭 Cervantes** va **primero** de la lista. Para un insumo va en **unidades**.
+- `gv_imp_recibir` con destino `cervantes` **no escribe `Movimientos_Stock`**: inserta en **`"GP2".ingreso_virgilio`**
+  (estado `pendiente`), y la portada de GP2 (`GP2_MODULOS.html`) muestra el cartel **«VIRGILIO DICE QUE TE LLEGÓ ESTO…
+  CONFIRMALO Y UBICALO»**. Confirmar y ubicar del lado de GP2 **falta implementar** (columnas `confirmado_*`,
+  `ubicacion_id`, `componente_id` ya están).
+- **↩ Anular** pasa la fila a `anulado`, y **frena si Cervantes ya confirmó**.
+- ⚠ No hay vínculo código importado ↔ `GP2.componente`: no se adivina.
+- `sql/gv_imp_recibir_cervantes_v2511.sql`, `tests/imp-recibir-cervantes.cjs`.
+- **v25.15 (Luis, 30/09): y al revés — lo que Virgilio le ACEPTA a GP2** vive en **`"GP2".aceptado_virgilio`** (la leen
+  GP2 y GV): una fila por recepción de insumo que vino de Cervantes (`Movimientos_Stock` `recepcion_insumo`, ref Cervantes),
+  con `aceptado` = ya tiene código real (no `TMP-`). La escribe `gv_gp2_aceptado_sync()` (cron `gv-gp2-aceptado-sync`,
+  cada 10 min, poda lo que desaparece). Al 30/09: 24 filas, 7 aceptadas, 17 con TMP. **323ES quedó Mixto.**
+  `sql/gv_gp2_aceptado_virgilio_v2515.sql`.
+- **v25.17 (Luis, 30/09, D5): GP2 ve el stock de insumos y el Mapa de Virgilio**, en tres tablas de **solo lectura** del
+  schema GP2 (así no rompe su Regla 0): `virgilio_insumo_stock`, `virgilio_insumo_ubicacion` y `virgilio_lugar`. Las
+  llena `gv_gp2_espejo_sync()` (cron `gv-gp2-espejo-sync`, c/10 min, reescribe sólo si cambió el md5). Luis: *"que los
+  dos tengan acceso a los datos y que puedan hablar"*; el vínculo de códigos (D3) va después. `sql/gv_gp2_espejo_v2517.sql`.
+
+## ⚠ REGLA (Luis, 2026-09-30, v25.18): «⟳ Refrescar ya» en Stocks — el SALDO ya es en vivo, lo que espera es lo DERIVADO
+
+**Luis:** *"pone un boton en la tabla de stocks que permita refrescarla «por la fuerza». 2 minutos es un monton"* ·
+*"esto no estaba en vivo entonces?"*.
+
+| dato de la tabla de Stocks | cuándo se actualiza |
+|---|---|
+| saldo por depósito (góndola, excedente, pickeados, a facturar…) | **en vivo**: `trigger_actualizar_saldo_stock` reescribe la fila de `stocks_carga_rapida` en cada movimiento y el realtime (`stkSubscribeRealtime`) la parchea en pantalla |
+| cajas pedidas, proyección, capacidad, FC s/salida, altas/bajas de códigos | **hasta 2 min** (cron 55 → `gv_refresh_stock_si_cambio`), porque salen de la matview |
+
+El botón adelanta lo segundo. El refresco completo tarda **~7,4 s** (matview 1,7 + carga_rapida 5,7) y
+`authenticated` corta a los **8 s**, así que **el navegador NO lo corre**: `gv_stock_refrescar_ya()` (supervisor)
+agenda un job de pg_cron de **un disparo** (`'2 seconds'`, corre como postgres sin timeout) que **se borra a sí
+mismo primero** y llama a `gv_refresh_stock_si_cambio(0, false)`; si el lock 5768 está tomado, espera y reescribe
+la derivada igual. La pantalla mira `gv_stock_refresco_ultimo()` cada 1,5 s y reabre Stocks **conservando solapa y
+búsqueda**. Medido: ~9 s del click a la tabla nueva. Doble click → `en_curso`, no agenda dos.
+
+⚠ Hacer TODO en vivo (lo derivado incluido) no es viable: cambia por pedidos, capacidad y proyección, que son otras
+tablas, y reescribir la derivada cuesta 7 s por cambio.
+`sql/gv_stock_refrescar_ya_v2518.sql`, `tests/stk-refrescar-ya.cjs`.
+
+## ⚠ REGLA (Marianela, 2026-09-30, v25.20): la cola offline de stock se reintenta FILA POR FILA — y «Fijar» lee el saldo del servidor
+
+**Marianela:** *"El operario 104 hizo un movimiento de góndola a Cervantes por el art 328E de 48 cajas y no impactó, ¿por qué?"*
+
+- **La cola `vir_stock_pend` se mandaba en UN POST**, y el insert es una transacción: una sola fila que el server
+  rechaza hacía fallar el lote entero en cada recarga, y todo lo de atrás quedaba trabado **para siempre** en ese
+  celular. Medido el 30/09: el del legajo 104 reintentaba ~20 veces por día un guardado del 599E que ya había
+  entrado el 21/09 (400 del candado de A guardar), y atrás quedó la salida a Cervantes del 328E (48 cj).
+- Hoy `stockFlushPend` va fila por fila: ok → sale · 409 duplicado (ya estaba) → sale · 400/422 de datos → sale y
+  queda en **`vir_stock_rech`** (localStorage) · red / 5xx / permisos → queda. Lo que se encole mientras tanto no se pierde.
+- ⚠ **Cuando el celular trabado se actualiza, lo atrasado ENTRA SOLO**, con fecha de hoy. Antes de cargar a mano un
+  movimiento "que no impactó", mirar si no llegó con la actualización: si no, se duplica.
+- **«Fijar» (ajuste admin) calculaba el saldo con `_stk.movs`**, que se carga en segundo plano (el libro entero):
+  antes de que llegara veía 0, decía "ya es 0" y no grababa (566E). Ahora pregunta a `gv_saldos_por_clave`; sin
+  lectura no fija nada.
+- **Cómo se ve una cola trabada:** edge logs con POST `/rest/v1/Movimientos_Stock` en 400/409 repetidos desde la
+  misma IP/celular; el `raise` del trigger está en `postgres_logs`, y el legajo sale cruzando la hora contra
+  `Registros_Produccion_Virgilio.created_at`.
+- `tests/stock-cola-por-fila.cjs` (verificado que falla contra la v25.15).

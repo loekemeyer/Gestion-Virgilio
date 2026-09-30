@@ -132,7 +132,8 @@ confirmar acá que la clave existe; si un bundle cambia, actualizar esta tabla e
 | Bundle | Pantalla que lo pide | Claves de primer nivel |
 |---|---|---|
 | `abm_articulos_bundle()` | ABM Artículos | `art, partes, sect` |
-| `alertas_bundle()` | Alertas | `generado_en, matriz_sin_tiempo, pendientes, pm, ref_fecha, rm, ventana_dias` |
+| `alertas_bundle()` | Alertas | `generado_en, matriz_sin_tiempo, pendientes, pm, recepcion_de_mas, ref_fecha, rm, ventana_dias` (`recepcion_de_mas` = `{total, items}` de `alerta_recepcion` en estado `abierta`, 2026-09-13) |
+| `calculadora_cajones_bundle()` | Calcular Cajones | `cajones, sectores, comps` |
 | `control_recepcion_bundle(p_sector_id)` | control-cajas.js (11) y control-remaches.js (5, 8, …) | `recepciones, sector, sector_id, uni_x_paq_default` (reemplaza a `control_cajas_bundle` + `control_kg_bundle`, 2026-09-05) |
 | `control_envios_bundle(p_desde, p_hasta)` | Control Envíos y Entregas | (por vista/tipo, ver la pantalla) |
 | `control_ps_bundle()` | Control PS | `generado_en, proveedores` (cada proveedor trae `nombre_corto`) |
@@ -148,21 +149,23 @@ confirmar acá que la clave existe; si un bundle cambia, actualizar esta tabla e
 | `flejes_bundle()` | Flejes | **LISTA** de 55 flejes: `cod_isis, codigo, comp_id, cons, descripcion, kg_uni_desp, kg_x_cajon, maximo, medida, minimo, n_fleje, parte, proveedor, stock` |
 | `informes_bundle(p_desde, p_hasta)` | Informe por persona | `desde, hasta, personas` |
 | `informes_matriz_bundle(p_desde, p_hasta, p_incluir_piedra)` | Informe por matriz | `desde, hasta, empleados, hsTotalByEmp, matrices` |
-| `inicio_bundle()` | GP2_MODULOS (menú) | `alertas, dia, generado_en, hoy, mes` |
+| `inicio_bundle()` | GP2_MODULOS (menú) | `alertas, dia, generado_en, hoy, mes` (`alertas.recepcion_de_mas` = cuántas alertas de recepción siguen abiertas, 2026-09-13) |
 | `inyectores_bundle()` | Inyectores | `generado_en, partes, proveedores, sector, sectores` |
 | `movimientos_bundle()` | gp2-motor.js (Stocks General, Entregas Talleristas), Registro operarios | `art, bom_art, bom_comp, c2a, comp, inv, mat, prov_serv, rp, sect, tall, tipos_mov, ubic` |
-| `oc_bundle()` | OC | `charcas_kg_x_paquete, generado_en, insumos, ocs, paq, pliego_uni_x_paquete, proveedores, tc` |
+| `oc_bundle()` | OC | `charcas_kg_x_paquete, generado_en, insumos, ocs, paq, pliego_uni_x_paquete, proveedores, tc`. Cada `insumos[]` trae ademas **`proveedores_alt[]`** (los de `componente_proveedor_alt`, que entregan la misma pieza) y **`precios_prov`** = {proveedor: {precio, moneda}} (CTE `pvx`), para que la O.C. salga con el precio del proveedor elegido; `precio` sigue siendo el VIGENTE, el del proveedor asignado. 2026-09-17 |
 | `orden_produccion_bundle()` | Orden de Producción | `componentes, destinos, generado_en, matrices, pasos` |
 | `pintores_bundle()` | Pintores | `partes, pintores` |
 | `problemas_matrices_bundle(p_desde, p_hasta)` | Problemas con Matrices | (eventos RM/PM) |
 | `produccion_bundle(p_matriz, p_anio)` | rendimiento_GP2.js | `matrices, empleados, rows` (ver sección propia) |
 | `produccion_maestro_bundle(p_desde, p_hasta)` | Maestro de producción | `desde, empleados, hasta, matrices, rows` |
 | `programa_bundle()` | Programa | `art, bom, children, comp, fl, mat, prov, rp, rutas, rutas_by_art, sect, tall, tall_art` (nombres CORTOS, ver sección propia; idea 7252) |
-| `proporciones_bundle()` | Proporciones | `articulos_compartidos, generado_en, nota, proporcion_disponible, talleristas` |
-| `recepcion_bundle()` | Recepción Insumos | `insumos, pallets, proveedores, recepciones, rollos, sectores, tara` |
+| `proporciones_bundle()` | Proporciones (**solo lectura**) | `generado_en, pasos` — reescrita el 2026-09-15. `pasos` = los PASOS (`articulo_id` + `comp_salida_id`) que hacen **2 o más talleristas**, con `art_codigo, familia, paso_cod, paso_desc, n_talleristas, suma_pct`, `talleristas[{tall_id, tallerista, pct, es_supuesto}]` y `partes[{cod, desc, por_tall[{tall_id, maximo, stock, origen}]}]` (el máximo de cada parte en la casa de cada tallerista). Ya no devuelve `articulos_compartidos`: la lógica de "mismo paso" vive en la función, no en el front |
+| `reparto_guardar(p_articulo_id, p_comp_salida_id, p_filas)` | **nadie: se corre por SQL** | `p_filas` = `[{tallerista_id, pct}]`; exige que sumen 100 y que cada tallerista haga ESE paso según las rutas. Escribe `GP2.reparto_tallerista` y **recalcula los máximos** (`recalcular_maximos_talleristas(true)`). Desde el 2026-09-15 **no tiene EXECUTE para `anon`**: la pantalla es solo lectura [usuario: "que no se pueda modificar la proporción en el programa"] |
+| `recepcion_bundle()` | Recepción Insumos | `insumos, pallets, proveedores, recepciones, rollos, sectores, tara`. Cada `insumos[]` trae `proveedor` (el principal, `componente.proveedor`) y **`proveedores_alt[]`** (los de `componente_proveedor_alt`, que entregan la misma pieza sin duplicar el componente; 2026-09-17, caso Recicor en Cajas) |
 | `registro_operarios_bundle()` | App de operarios | `empleados, matrices, matriz_fleje, matriz_fleje_pieza, matriz_salidas, registro_en_golpes, rollos_abiertos, rollos_saldo` |
 | `relevamiento_bundle()` | Relevamiento | `cronograma, hoy` |
 | `rollos_bundle()` | Flejes (rollos) | `eventos, flejes, saldos, usos` |
+| `tablet_bundle()` | Versión Tablet (`Tablet/Tablet_GP2.html`) | `alertas_abiertas, contrapartes, enviar, generado_en, recibir` (ver sección propia, 2026-09-13) |
 | `stock_sector_bundle(p_sector_id)` | gp2-stock-sector.js (los 10 sectores) | `filas (+en_virgilio), generado_en, sector, ubicacion_id, ubicacion_virgilio_id` |
 | `stock_transito_ps_bundle()` | Stock Tránsito PS | `filas, generado_en` |
 | `talleristas_bundle()` | Envíos Talleristas y Control Talleristas | `generado_en, partes, tall` (`partes` = dict por tallerista `{entrada:[...], salida:[...]}`) |
@@ -179,7 +182,7 @@ Todo esto salio de recorrer las **861 rutas** de los 189 articulos ejecutando la
 | **`GP2.tipo_movimiento`** (tabla nueva) | El vocabulario de `movimiento.tipo_mov` dejo de ser un CHECK de literales: ahora es una tabla (`clave, label, lado, clase, orden`) y `movimiento.tipo_mov` tiene **FK** contra ella. `movimientos_bundle` la sirve en **`tipos_mov`** (dict `clave → {lbl, lado, cls, ord}`). Un tipo nuevo se agrega a la tabla y a `db/vocabulario_GP2.sql`; las pantallas lo muestran solas. `tests/ui/test_vocabulario_mov.js` falla si un JS nombra una palabra que no esta en el catalogo (pasaba: `gp2-stock-sector.js` sumaba columnas por `produccion`, `envio_prov`, `envio_tall`, `recepcion_prov` y `recepcion_tall`, cinco palabras que la base nunca escribio). |
 | **`faltantes_bundle.aporte`** | dict `'art:comp' → uni_mes` desde `v_consumo_demanda`: lo que ESE articulo consume de ESE componente por mes, ya explotado (receta + sub-BOM + intermedios de la ruta). Despiece lo usa en vez de recalcularlo; antes le ponia cantidad 1 a todo intermedio de ruta y en 59 pares la base decia otra cosa. |
 | **`v_reposicion`** (vista nueva) | Donde se repone cada componente (la ubicacion de su sector, o Virgilio para los terminados) con `cantidad, minimo, maximo, maximo_origen, sugerido`. **Unica definicion** de "cuanto falta para llenar el lugar": la leen `oc_bundle` y `valorizacion_bundle`, que antes calculaban cosas distintas (54 de 342 componentes no cerraban entre las dos pantallas). |
-| **`crear_entrega_ps` acepta `p_unidad`** (default `'kg'`) | Una pieza que se cuenta y no se pesa (los 11 `Pliego Ad` de AJ Adhesivos, `C12`, `V18D`: sin `kg_x_uni`) se entrega en unidades. `envios_ps_bundle.partes[]` trae `sp_um` y `sp_kgxuni` para que la pantalla sepa cual pedir. |
+| **`crear_entrega_ps` acepta `p_unidad`** (default `'kg'`) | Una pieza que se cuenta y no se pesa (los `Pliego Ad` de AJ Adhesivos -- **10 desde el 2026-09-18**, que el 500 y el 506 pasaron a carton y sus pliegos quedaron discontinuos, ver CONOCIMIENTO 4el --, `C12`, `V18D`: sin `kg_x_uni`) se entrega en unidades. `envios_ps_bundle.partes[]` trae `sp_um` y `sp_kgxuni` para que la pantalla sepa cual pedir. |
 | **`crear_entrega_prov_at` mueve stock** | Delega en `recepcion_virgilio(origen_tipo='proveedor_at')`: consume la receta completa del articulo desde la ubicacion del proveedor y deja el terminado en Virgilio. Antes solo escribia en `entrega_prov_at` y el articulo comprado terminado **nunca entraba al inventario** (38 articulos, 75 rutas); el carton y la caja que se le mandaban no se consumian nunca. |
 | **`_es_comprable(comp_id)`** | Reemplaza al chequeo por sector de `crear_recepcion_insumo` y al filtro hardcodeado de `recepcion_bundle`: se compra lo que es de un sector de insumo, **o** es `estado_compra='importado'`, **o** lo entrega un PS hibrido. `recepcion_bundle.insumos[]` trae ahora `estado_compra` y la pantalla de Recepcion tiene el rubro **Importados** (C13, D1, Z23A, Z23B, que viven en Sector Procesado y no se podian recepcionar por ningun lado). |
 | **`fn_ubicacion_de_contraparte`** (trigger) | Un tallerista / Prov AT / PS / sector de insumo nuevo **se crea con su ubicacion de stock**. Antes solo `alta_proveedor_servicio` la creaba y un alta por migracion la salteaba: Blist-Pack SA quedo sin ubicacion y no se le podia enviar nada. |
@@ -225,6 +228,26 @@ select count(*) filter (where (r->>'ok')::boolean) cierran_perfecto,
 Al 2026-09-11: **189 de 189 dejan las 120 unidades en Virgilio**; 122 cierran perfecto y el resto
 tiene colgado, casi todo por intermedios (GRJ, sub-conjuntos) que el arnes simula rama por rama.
 Los descuadres REALES de receta contra ruta son 7 articulos y estan en la idea **7324**.
+
+## Reparto entre talleristas y el maximo de cada uno (2026-09-15)
+
+Cuando **dos talleristas hacen EL MISMO paso** (mismo `articulo` + mismo `comp_salida`, o sea la
+ruta duplicada por tallerista), el volumen se reparte. Cuando hacen pasos DISTINTOS del mismo
+articulo van en cadena y cada uno hace el 100 % de lo suyo: eso NO es un reparto.
+
+| Objeto | Que es |
+|---|---|
+| `GP2.reparto_tallerista` | La tabla: `(articulo_id, comp_salida_id, tallerista_id, pct)`, unica por esa terna. Sin fila = 100 % |
+| `GP2.v_reparto_efectivo` | El % efectivo de cada paso, **normalizado sobre los talleristas que siguen haciendo el paso** (si se borra la ruta de uno, el otro pasa a 100, no se queda con su mitad). `es_supuesto` = ninguno o solo algunos tienen % dictado -> parte en partes iguales (default, no dato) |
+| `GP2.v_consumo_tallerista` | uni/mes por `(tallerista, componente que recibe)` = demanda del articulo (`v_consumo_demanda`) x su % |
+| `GP2.v_nivel_stock_tallerista` | `max_calc = consumo repartido x ubicacion.meses_stock` (los 12 talleristas tienen `meses_stock = 1`) |
+| `GP2.recalcular_maximos_talleristas(p_solo_repartidos, p_componentes, p_limpiar_sin_ruta)` | Escribe `inventario.maximo` con `maximo_origen = 'est_madre_x_reparto'`. Los dos primeros filtros se combinan con Y (null/false = sin filtro) y nunca pisa un `fisico`. `p_limpiar_sin_ruta` borra el maximo de la fila **sin consumo Y sin ruta** (el tallerista ya no recibe esa parte); la que tiene ruta pero no demanda NO se toca y vuelve en `sin_consumo_con_ruta` |
+| `GP2.reparto_guardar(...)` | La puerta de la pantalla: valida, guarda y recalcula en una sola llamada |
+
+**El maximo de un tallerista NO sale de `v_nivel_stock`**: esa vista cubre solo ubicaciones de
+tipo `sector` (`u.tipo = 'sector'`), y por eso `recalcular_maximos_insumos` nunca toco una fila
+de tallerista. De ahi que los 288 maximos de talleristas fueran todos `migrado_de_minimo` o nulos
+hasta el 2026-09-15.
 
 ## Convenciones implicitas (fragiles — hoy viven hardcodeadas en el JS)
 
@@ -382,7 +405,8 @@ respuesta sea una sola. Ninguna funcion busca mas una ubicacion por nombre
 |---|---|---|---|
 | `movimiento` | `trg_movimiento_calc` / `trg_movimiento_aplicar` | `fn_movimiento_calc`, `fn_movimiento_aplicar` | El motor de inventario: convierte kg/uni a `_delta_*` y aplica el delta en `inventario` |
 | `componente`, `parametro` | `trg_maximos_cajones_*` | `fn_recalc_maximos_cajones` | Maximo "5 cajones" de Crudo/Procesado al cambiar `uni_x_cajon` o el parametro |
-| `articulo_componente`, `est_madre`, `ruta_paso` | `trg_maximos_receta` / `_est_madre` / `_rutas` | `fn_recalc_maximos_insumos` | Maximo de insumos por Est Madre explotada |
+| `articulo_componente`, `est_madre`, `ruta_paso`, `articulo_familia` | `trg_maximos_receta` / `_est_madre` / `_rutas` / `_familia` (constraint triggers DEFERRABLE INITIALLY DEFERRED, por fila) | `fn_recalc_maximos_diferido` | Al COMMIT, UNA vez por transaccion: maximo de insumos por Est Madre explotada + maximos de tallerista (2026-09-26; antes era statement-level y corria 658 veces por sync de LK) |
+| `public."Ordenes_Compra"` | `trg_oc_virgilio_espejo_gp2` (vive en `public`, como `trg_est_madre_sync_gp2`) | `fn_oc_virgilio_espejo` | Espejo fila a fila en `GP2.oc_virgilio`; `v_oc_virgilio_pendiente` (O.C. vigente por contraparte, "la nueva pisa la vieja"), `v_oc_virgilio_demanda` (explotada por receta/ruta), `v_oc_virgilio_partes` (prov AT: cartón y caja) y `v_oc_virgilio_partes_tallerista` (sólo talleristas O.C.; el Garage NO: va por O.C. de insumos, corrección del dueño) son el techo del Enviar de la Tablet (2026-09-26) |
 | `precio_tallerista` | `trg_precio_tallerista_kg` | `fn_precio_tallerista_kg` | Precio por kg derivado |
 | `recepcion_control_rollo` | `trg_rollo_desde_control` | `fn_rollo_desde_control` | Da de alta el rollo al pesar el pallet |
 | `public."Entregas Tallerista Virgilio"` | `trg_virgilio_espejo_gp2` | `fn_entregas_virgilio_espejo` | **Espejo public → GP2**: cada entrega en Virgilio se registra en `movimiento` (o queda en `virgilio_espejo_pend` si no cruza) |
@@ -391,6 +415,72 @@ respuesta sea una sola. Ninguna funcion busca mas una ubicacion por nombre
 
 Cron: un solo job de GP2 entre los 49 del proyecto, `gp2-dolar-oficial` (`10 9 * * *` UTC →
 `"GP2".actualizar_dolar_oficial()`). Los otros 48 son de `public`/`planify` (la casa del vecino).
+
+## Versión Tablet (2026-09-13) — `tablet_bundle()` / `tablet_registrar(p)` — Tablet/Tablet_GP2.html
+
+Una pantalla, tres modos (Enviar / Recibir / Conteo). **El contrato lo manda la base**: la pantalla se
+rehízo el 13-09 leyendo `pg_get_functiondef` de las dos funciones, porque la sesión que las creó perdió
+el frente. `tablet_registrar` **no inventa movimientos**: despacha a las RPC de siempre por tipo de
+contraparte (`crear_envio_tallerista` / `crear_envio_ps` / `crear_envio_prov_at`;
+`crear_entrega_tallerista` / `crear_entrega_ps` / `crear_entrega_prov_at` / `crear_recepcion_insumo`;
+para Virgilio inserta un `traslado` Virgilio → sector). El Conteo **no llama a nada que escriba**.
+
+⚠ **La pantalla usa MENOS de lo que el bundle trae (2026-09-14, pedido del dueño).** La base no
+cambió; lo que cambió es qué agarra la tablet, que está en **Cervantes**:
+- **Recibir ya no ofrece el prov. de art. terminado** (entrega en Virgilio): las filas
+  `recibir[tipo='proveedor_at']` que el bundle sigue devolviendo **no se dibujan**, y con ellas se
+  fue la única carga en CAJAS — la pantalla **ya no manda `por_caja`** (el backend lo sigue
+  aceptando; lo usa la pantalla de Prov Art Terminado → Entregas).
+- **Recibir → Prov. de insumos NO carga acá**: abre `StockFlejes/RecepcionInsumos_GP2.html?volver=tablet`
+  (rubros, pesaje de pallets, cruce contra OC). Las filas `recibir[tipo='proveedor_insumo']` del
+  bundle tampoco se dibujan.
+- **El Conteo dejó de ser un modo**: es un link a `Relevamiento/Relevamiento_GP2.html?volver=tablet`.
+  `tablet_registrar` nunca aceptó `modo='conteo'`, así que no hay contrato que romper.
+- Enviar y Recibir preguntan primero el **tipo** de contraparte y recién después cuál.
+
+### `tablet_bundle()` → jsonb
+
+| Clave | Forma |
+|---|---|
+| `contrapartes` | LISTA `{ tipo, ref, nombre, oc, n_env, n_rec }`. **`oc`** (2026-09-23) = `tallerista.pedido_por_oc_virgilio`: a ese tallerista el trabajo se lo pide una O.C. de **Gestión Virgilio** que GP2 no lee, así que sus filas de `enviar` vienen con **máximo y sugerido 0** y la Tablet los muestra en la baldosa aparte "Talleristas O.C." (**solo en Enviar**). Hoy: Carlos Aguirre (9) y Blist-Pack SA (14). `tipo` ∈ tallerista \| proveedor_servicio \| proveedor_at \| proveedor_insumo \| virgilio; `ref` es **texto** (el id, o el nombre del proveedor de insumo, o `'virgilio'`). `n_env`/`n_rec` = cuántas piezas puede enviar / recibir. Talleristas activos menos Fábrica (id 3). |
+| `enviar` | LISTA `{ tipo, ref, comp_id, cod, desc, sector, um, uxc, kg_x_uni, online_sector }`. `um` es `componente.unidad_medida`: **`'kg'` o `'unidad'`** (no `'uni'`). `online_sector` = stock en la ubicación del sector de la pieza (Cervantes). **El prov. AT viene con `ref = '*'`**: cualquier cartón/caja (sectores 10 y 11) se le puede enviar a cualquiera. |
+| `recibir` | LISTA `{ tipo, ref, comp_id, comp_entrada_id, n_entradas, tiene_bom, cod_art, cod, desc, sector, um, uxc, kg_x_uni, por_caja, ent_cod, ent_desc, esperado, esperado_origen }`. `esperado` = lo que se espera recibir: OC abierta (`esperado_origen = 'oc'`, prov. AT e insumo; **null si no hay OC**), stock en poder del tallerista / PS (`online_tall` / `online_ps`) u online de Virgilio (`online_virgilio`). Prov. AT: `comp_id` **null**, la pieza es `cod_art` y `por_caja` = `articulo.articulos_por_caja`. PS: `comp_entrada_id` = el SC que consume (obligatorio para `crear_entrega_ps`). |
+| `alertas_abiertas` | cuántas `alerta_recepcion` siguen `abierta` |
+
+### `tablet_registrar(p jsonb)` → `{ ok, n, contraparte, modo, items:[{cod, cantidad, unidad, res}], alertas:[{id, cod, esperado, recibido, exceso}] }`
+
+`p = { modo: 'enviar'|'recibir', tipo, ref (texto), fecha (timestamptz; la pantalla manda 'YYYY-MM-DDT12:00:00'),
+remito (sólo recibir, opcional), items: [ { comp_id, comp_entrada_id, cod_art, cantidad, unidad: 'uni'|'kg',
+esperado, esperado_origen, por_caja } ] }`. Reglas que fija la base: `unidad` sólo `uni` o `kg`;
+cantidad > 0; a Virgilio y al prov. de insumo **no se les envía** desde la tablet; el PS exige
+`comp_entrada_id`; el prov. AT exige `cod_art` y su cantidad son **CAJAS** (`crear_entrega_prov_at`
+pide cajas) — para la alerta la base compara `cantidad × por_caja` contra el `esperado` en unidades.
+
+**La alerta de "recibí de más" avisa y no frena**: si `modo = 'recibir'`, viene `esperado` y lo
+comparable supera al esperado, la base inserta en `GP2.alerta_recepcion` **después** de haber
+registrado el movimiento, y lo devuelve en `alertas`. La revisan en Alertas (bloque "Se recibió de
+más", `alerta_recepcion_marcar(p_id, p_estado 'vista'|'resuelta'|'abierta', p_nota, p_usuario)`).
+
+⚠ **Deuda que dejó el backend, no la pantalla** (idea 7345): para `recibir` de un **tallerista**,
+`tablet_registrar` llama a `crear_entrega_tallerista`, y el `comment` de esa función dice que **NO es el
+motor** de la entrega de tallerista (el motor vivo es `gp2-motor.js` + `registrar_movimientos`, idea 7316;
+difiere en el origen de los armados, en `comp_transformado_id` y en el descuento por BOM). Hasta que se
+unifique, una recepción de tallerista por la tablet queda registrada con el modelo viejo.
+
+## Lectura de facturas (2026-09-13) — la IA lee, GP2 decide, la persona confirma
+
+No es un bundle: son tres piezas encadenadas, y **ninguna escribe stock sola**.
+
+| Pieza | Qué es | Contrato |
+|---|---|---|
+| `gp2_leer_factura` | **Edge Function**, no RPC. `POST {archivo_b64, mime}` con la clave publicable en `apikey`. Llama a la API de Claude con el PDF como bloque `document` o la foto como `image`, y `output_config.format` con JSON Schema. | Devuelve `{ok, factura:{razon_social_emisor, cuit_emisor, fecha_emision, tipo_comprobante, punto_venta, numero_comprobante, remito, items:[{codigo, descripcion, cantidad, unidad_medida, precio_unitario, subtotal}], importe_total}, uso}` |
+| `factura_match(p jsonb)` | RPC **solo lectura**: ata cada renglón a un componente. Orden de confianza: `factura_alias` (aprendido) → `fleje_detalle.cod_isis` → `componente.codigo` → parecido de descripción dentro de la lista de productos de ese proveedor. | `p = {proveedor, items:[{codigo, descripcion, cantidad, unidad, precio_unitario}]}` → `{ok, proveedor_texto, proveedor:{id,nombre,cod_prov,sim}, items:[{…, comp_id, comp_cod, via, confianza, sim, candidatos}], resueltos, sugeridos, sin_match, total}` |
+| `factura_alias_guardar(p_proveedor, p_cod_prov, p_comp_id, p_descripcion, p_usuario)` | Ata a mano el código de un proveedor a una pieza. **Es el único "entrenamiento" que hace falta.** | Devuelve el `id` de `GP2.factura_alias` |
+
+**Ojo con `precio_proveedor.cod_prov`: es el código DEL PROVEEDOR, no del artículo** (2147 =
+Talleres Gráficos Pol). GP2 no tiene los códigos de artículo de sus proveedores; los únicos códigos
+de tercero cargados son los 51 `fleje_detalle.cod_isis`. Por eso `factura_alias` arranca vacía y es
+la tabla que hay que llenar con el uso.
 
 ## Puntos de contacto con `public` (la casa del vecino) — son estos y nada mas
 

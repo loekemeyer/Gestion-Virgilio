@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-09-30 (+ centinelas gv_conc_motor / gv_conc_resolver)",
+  "_generado": "2026-09-30 (+ centinela gv_rack_posicion_guardar sin posición)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -287,6 +287,11 @@
       "quien": "Thomas"
     },
     {
+      "objeto": "gv_insumo_unidad_base",
+      "regla": "Todo movimiento de insumos es empresa Mixto",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_match_cod_a_programacion",
       "regla": "el código corregido del cliente llega a la programación sólo en NP no facturadas",
       "quien": "Luis"
@@ -515,6 +520,11 @@
       "objeto": "gv_ppp_web_zona",
       "regla": "RETIRA se matchea EXACTO, nunca por subcadena: \"Retiro\" es un barrio de CABA (Zona 2). Con ~* 'retir' esas direcciones quedaban marcadas como retiro en fabrica ",
       "quien": "Thomas (problema 433)"
+    },
+    {
+      "objeto": "gv_rack_posicion_guardar",
+      "regla": "El conteo del Mapa de racks, si cuenta DE MAS, primero traslada lo SIN POSICION del mismo codigo (es la misma mercaderia); si no, el total de racks se duplica (",
+      "quien": "Marianela"
     },
     {
       "objeto": "gv_refrescar_articulo_empresa",

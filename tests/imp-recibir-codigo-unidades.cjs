@@ -69,6 +69,13 @@ const ITEMS = [
     out.insSinUxb = !/Unidades por caja/.test(ov().innerHTML);
     out.insSinSelect = !ov().querySelector('select[title="Cargar en cajas o en unidades"]');
     out.insLabel = /unidades →/.test(ov().innerHTML);
+    // E (v24.92): el pozo del 323ES es INSUMO → las 3 opciones dicen 323ES, y entra en insumos aunque tenga UxB
+    CTX.uni_x_caja = 144; CTX.es_insumo = true; CTX.insumos_cods = ["323ES"]; CTX.insumos_unidad = { "323ES": "Uni" };
+    await impRecibirCodigo(encodeURIComponent(JSON.stringify(items[0].det)));
+    out.insOpc = [...ov().querySelectorAll("button.irc-b.pri")].map((x) => x.textContent.trim());
+    await impRecibirBache(96);
+    out.insPool = _impRec.lineas[0].destino + ":" + _impRec.lineas[0].cod_insumo;
+    out.insHead = /323ES/.test(ov().querySelector(".irc-sec").textContent);
     return out;
   }, ITEMS);
   await b.close();
@@ -82,6 +89,8 @@ const ITEMS = [
   if (r.mandado !== "a_guardar:21|uxc144") fail.push("C: mandado " + r.mandado);
   if (r.insDest !== "insumos" || r.insCant !== 3000) fail.push("D: insumo arranca en " + r.insDest + ":" + r.insCant);
   if (!r.insSinUxb || !r.insSinSelect || !r.insLabel) fail.push("D: insumo con UxB/cajas " + JSON.stringify([r.insSinUxb, r.insSinSelect, r.insLabel]));
+  if (r.insOpc.length !== 3 || !r.insOpc.every((t) => /323ES/.test(t)) || r.insOpc.some((t) => /838E|323E LK/.test(t))) fail.push("E: selector insumo " + JSON.stringify(r.insOpc));
+  if (r.insPool !== "insumos:323ES" || !r.insHead) fail.push("E: pozo insumo " + r.insPool + " head " + r.insHead);
   if (errs.length) fail.push("pageerrors: " + errs.join(" | "));
   if (fail.length) { console.log("imp-recibir-codigo-unidades: ✗ " + fail.join(" · ")); process.exit(1); }
   console.log("imp-recibir-codigo-unidades: OK — 1 📥 por código, selector de pedidos, carga en unidades → cajas · insumo en su unidad");
