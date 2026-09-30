@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.67"></script>
+<script type="module" src="recepcion.js?v=24.68"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.67";
+const APP_VERSION = "v24.68";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -25285,6 +25285,8 @@ function stkBodyRacks() {
   h += '<button class="stk-btn ok" onclick="racksCrearOrden()">📋 OCs generadas — emitir orden de bajar racks</button>';
   const saldos = stockComputeSaldos(_stk.movs, _stk.cutoff);
   const props = (_stk.bajadas || []).filter(function (b) { return b.estado === "propuesta"; });
+  h += '<div id="stkRkConteos"></div>';   // v24.68: conteos a ciegas que no coincidieron → aprueba el supervisor
+  setTimeout(function () { try { rkcCargar(); } catch (_e) {} }, 0);
   h += '<div class="stk-aj-h" style="margin-top:16px">Bajadas propuestas por operarios (' + props.length + ")</div>";
   if (!props.length) h += '<div class="stk-empty">Nada para aprobar.</div>';
   else h += props.map(function (b) {
@@ -25332,6 +25334,31 @@ function racksBajadaAlerta(b, saldos) {
   if (!neg && !otras.length) return null;
   const f = (_stk.factors || {})[String(b.cod_art).toUpperCase()] || {};
   return { neg: neg, saldoRacks: Math.round(saldoRacks * 100) / 100, pedir: pedir, otras: otras, M: (f.cajasXMaster > 0 ? f.cajasXMaster : 0) };
+}
+/* v24.68 (Thomas, D24) — los conteos de Bajar de racks que NO coinciden con el sistema se ajustan
+   recién cuando los aprueba un supervisor (gv_rack_conteo_resolver). Rechazar no toca el stock. */
+async function rkcCargar() {
+  const box = document.getElementById("stkRkConteos"); if (!box) return;
+  const cli = window.sb; if (!cli) { box.innerHTML = ""; return; }
+  const r = await cli.rpc("gv_rack_conteo_pendientes");
+  if (r.error) { box.innerHTML = '<div class="stk-empty">No se pudieron leer los conteos a aprobar: ' + escapeHtml(r.error.message || "") + '</div>'; return; }
+  const rows = r.data || [];
+  let h = '<div class="stk-aj-h" style="margin-top:4px">🔎 Conteos a aprobar (' + rows.length + ')</div>';
+  if (!rows.length) { box.innerHTML = h + '<div class="stk-empty">Nada para aprobar.</div>'; return; }
+  h += rows.map(function (c) {
+    const dif = Number(c.diferencia) || 0;
+    const lugar = c.tipo === "rack" ? ("rack " + (c.lugar || "?")) : "góndola";
+    return '<div class="stk-rk-baj"><div class="stk-rk-baji"><span class="stk-cod">' + escapeHtml(codBase(c.cod_art)) + '</span> <span class="stk-desc">' + escapeHtml(artNombre(c.cod_art, c.descripcion) || "") + '</span>' +
+      '<div class="stk-rk-q">' + escapeHtml(lugar) + ' · sistema <b>' + c.sistema + '</b> · contó <b>' + c.contado + '</b> · <b style="color:' + (dif < 0 ? "#b91c1c" : "#15803d") + '">' + (dif > 0 ? "+" : "") + dif + ' cj</b> · legajo ' + escapeHtml(String(c.legajo || "")) + '</div></div>' +
+      '<div style="display:flex;flex-direction:column;gap:5px;flex:0 0 auto"><button class="stk-btn ok" onclick="rkcResolver(' + c.id + ',true)">✓ Aprobar</button><button class="stk-btn danger" onclick="rkcResolver(' + c.id + ',false)">✗ Rechazar</button></div></div>';
+  }).join("");
+  box.innerHTML = h;
+}
+async function rkcResolver(id, aprobar) {
+  if (!confirm(aprobar ? "¿Aprobar el conteo? Se ajusta el stock a lo contado." : "¿Rechazar el conteo? El stock queda como está.")) return;
+  const r = await window.sb.rpc("gv_rack_conteo_resolver", { p_id: id, p_aprobar: !!aprobar });
+  if (r.error) { alert("No se pudo: " + (r.error.message || "")); return; }
+  rkcCargar();
 }
 async function racksAprobar(bajadaId) {
   const b = (_stk.bajadas || []).find(function (x) { return x.id === bajadaId; });
@@ -27369,7 +27396,7 @@ async function rkbFetchCxM() {
 async function showRacksBajarModal(legajo, _resume) {
   if (!document.getElementById("rkbCss")) {
     const s = document.createElement("style"); s.id = "rkbCss";
-    s.textContent = "#rkbModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#rkbModal.show{display:block;}.rkb-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rkb-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1d4ed8);color:#fff;}.rkb-title{font-size:17px;font-weight:800;}.rkb-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.rkb-body{padding:13px 14px;}.rkb-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.rkb-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.rkb-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:13px;padding:10px 12px;margin-bottom:8px;background:#fff;}.rkb-info{flex:1;min-width:0;}.rkb-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.rkb-desc{font-size:12px;color:#475569;}.rkb-av{font-size:11.5px;color:#64748b;}.rkb-mano{font-weight:800;color:#b45309;}.rkb-stp{display:flex;align-items:center;gap:6px;}.rkb-stpcol{display:flex;flex-direction:column;align-items:center;gap:3px;}.rkb-u{font-size:10.5px;color:#64748b;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:.3px;}.rkb-locs{margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;}.rkb-loc{border:1.5px solid #cbd5e1;border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:800;color:#475569;background:#f8fafc;cursor:pointer;}.rkb-loc.on{border-color:#1e6bd6;background:#eff6ff;color:#1d4ed8;}.rkb-sb{width:42px;height:46px;border:none;border-radius:9px;font-size:24px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;}.rkb-inp{width:54px;height:46px;box-sizing:border-box;text-align:center;font-size:20px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.rkb-inp::-webkit-outer-spin-button,.rkb-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.rkb-add{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;line-height:1.4;}.rkb-addbtn{margin-top:6px;background:#1e6bd6;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;display:inline-block;}.rkb-sug{margin-top:5px;font-size:12px;font-weight:700;}.rkb-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#1e6bd6;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.rkb-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.rkb-empty{padding:18px;text-align:center;color:#64748b;font-size:14px;}";
+    s.textContent = "#rkbModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#rkbModal.show{display:block;}.rkb-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.rkb-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#1e6bd6,#1d4ed8);color:#fff;}.rkb-title{font-size:17px;font-weight:800;}.rkb-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.rkb-body{padding:13px 14px;}.rkb-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;line-height:1.35;}.rkb-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.rkb-row{display:flex;align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:13px;padding:10px 12px;margin-bottom:8px;background:#fff;}.rkb-info{flex:1;min-width:0;}.rkb-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.rkb-desc{font-size:12px;color:#475569;}.rkb-av{font-size:11.5px;color:#64748b;}.rkb-mano{font-weight:800;color:#b45309;}.rkb-stp{display:flex;align-items:center;gap:6px;}.rkb-stpcol{display:flex;flex-direction:column;align-items:center;gap:3px;}.rkb-u{font-size:10.5px;color:#64748b;font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:.3px;}.rkb-locs{margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;}.rkb-loc{border:1.5px solid #cbd5e1;border-radius:8px;padding:3px 8px;font-size:11.5px;font-weight:800;color:#475569;background:#f8fafc;cursor:pointer;}.rkb-loc.on{border-color:#1e6bd6;background:#eff6ff;color:#1d4ed8;}.rkb-sb{width:42px;height:46px;border:none;border-radius:9px;font-size:24px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;}.rkb-inp{width:54px;height:46px;box-sizing:border-box;text-align:center;font-size:20px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.rkb-inp::-webkit-outer-spin-button,.rkb-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.rkb-add{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;line-height:1.4;}.rkb-addbtn{margin-top:6px;background:#1e6bd6;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;display:inline-block;}.rkb-sug{margin-top:5px;font-size:12px;font-weight:700;}.rkb-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#1e6bd6;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.rkb-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.rkb-empty{padding:18px;text-align:center;color:#64748b;font-size:14px;}.rkb-pos{height:34px;border:2px solid #f59e0b;border-radius:8px;padding:0 8px;font-size:14px;font-weight:800;width:150px;text-transform:uppercase;}.rkb-gon{font-size:11.5px;color:#475569;margin-top:5px;}.rkb-usar{width:auto;margin:0 0 0 4px;padding:3px 8px;font-size:11.5px;font-weight:800;border:none;border-radius:7px;background:#dcfce7;color:#166534;cursor:pointer;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("rkbModal");
@@ -27378,22 +27405,23 @@ async function showRacksBajarModal(legajo, _resume) {
   ov.innerHTML = '<div class="rkb-card"><div class="rkb-head"><span class="rkb-title">🏗 Bajar de racks a góndola</span><button class="rkb-close" onclick="rkbAskClose()">Cerrar</button></div><div class="rkb-body" id="rkbBody"><div class="rkb-empty">Cargando racks…</div></div></div>';
   if (_resume) { _rkb = _resume; _rkb._cerrado = false; _rkb.tsInicio = Date.now(); try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {} rkbRender(); return; }   // v23.66: tramo nuevo
   try {
-    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors()]);
+    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), ocgFetchCapacidad().catch(function () { return {}; })]);
     const saldos = res[0] || {};
     const plani = res[2] || {};
-    const cxmMap = plani.cxm || {}, locsMap = plani.locs || {}, _facRkb = res[3] || {};
+    const cxmMap = plani.cxm || {}, locsMap = plani.locs || {}, _facRkb = res[3] || {}, capMap = res[4] || {};
     const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
     const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; })
       .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
       .map(function (a) {
-        const kN = _cpNorm(a.cod), locs = locsMap[kN] || [];
+        const kN = _cpNorm(a.cod), locs = (locsMap[kN] || []).slice().sort(function (x, y) { return x.inner - y.inner; });   // v24.68: la que MENOS tiene primero (se vacía y libera el lugar)
         // v8.90: cxm de planimetría; fallback a Cajas_x_Master de la tabla de artículos
         var _cxmR = cxmMap[kN] || 0;
         if (!_cxmR) { var _fR = _facRkb[String(a.cod).toUpperCase()]; if (_fR && _fR.cajasXMaster > 0) _cxmR = _fR.cajasXMaster; }
         // sec preseleccionada = la ubicación con más stock (planimetría viva, v5.22)
-        return { cod: a.cod, desc: artNombre(a.cod, a.desc), racks: Math.round(a.racks), cxm: _cxmR, locs: locs, sec: (locs[0] ? locs[0].sector : ""), baja: 0, manual: false };
+        return { cod: a.cod, desc: artNombre(a.cod, a.desc), racks: Math.round(a.racks), cxm: _cxmR, locs: locs, sec: (locs[0] ? locs[0].sector : ""), baja: 0, manual: false,
+                 cap: Number(capMap[_ocgNorm(a.cod)]) || 0, gon: Math.round(Number(a.terminado) || 0) };   // v24.68: capacidad y lo que hay en góndola
       });
-    _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, filtro: "", tsInicio: Date.now() };
+    _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, capMap: capMap, filtro: "", tsInicio: Date.now() };
     try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {}   // v23.66
     rkbRender();
   } catch (e) { const b = document.getElementById("rkbBody"); if (b) b.innerHTML = '<div class="rkb-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -27435,22 +27463,81 @@ function rkbRender() {
         return '<span class="rkb-loc' + on + '" onclick="rkbSetSec(' + i + ',\'' + escapeHtml(L.sector) + '\')">' + escapeHtml(L.sector) + " · " + q + "</span>";
       }).join("") + "</div>";
     }
-    return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="rkb-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span><div>' + head + '</div>' + locsHtml + '</div>' +
+    // v24.68 (Thomas, D23): sin posición no se registra; si el código no tiene posición en el Mapa, se escribe.
+    if (!(it.locs && it.locs.length)) locsHtml += '<div class="rkb-locs"><input class="rkb-pos" placeholder="Posición (ej AD05)" value="' + escapeHtml(it.sec || "") + '" oninput="rkbSetPos(' + i + ',this.value)"></div>';
+    else if (!it.sec) locsHtml += '<div class="rkb-sug" style="color:#dc2626">⚠ Tocá de qué posición bajás.</div>';
+    const room = rkbRoom(it);
+    let gonHtml = "";
+    if (it.cap > 0) gonHtml = '<div class="rkb-gon">Góndola: hay <b>' + it.gon + '</b> cj · entran <b>' + room + '</b> cj' + (room > 0 && !it.manual ? ' <button class="rkb-usar" onclick="rkbUsarRoom(' + i + ')">Bajar lo que entra</button>' : '') + '</div>';
+    const exc = rkbExc(it);
+    if (exc > 0) gonHtml += '<div class="rkb-sug" style="color:#b45309">⚠ No entran ' + exc + ' cj en góndola: van a EXCEDENTE. Mejor bajar sólo lo que entra.</div>';
+    return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="rkb-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span><div>' + head + '</div>' + locsHtml + gonHtml + '</div>' +
       '<div class="rkb-stpcol"><span class="rkb-u">' + (usaMaster ? "master" : "cajas") + '</span><div class="rkb-stp"><button class="rkb-sb" onclick="rkbChg(' + i + ',-1)">–</button><input class="rkb-inp" type="number" min="0" max="' + mx + '" inputmode="numeric" value="' + it.baja + '" oninput="rkbSet(' + i + ',this.value)"><button class="rkb-sb" onclick="rkbChg(' + i + ',1)">+</button></div></div></div>';
   }).join("");
   const tot = _rkb.items.reduce(function (s, it) { return s + (it.baja || 0); }, 0);
   const totInner = _rkb.items.reduce(function (s, it) { return s + (it.baja || 0) * ((it.cxm > 0 && !it.manual) ? it.cxm : 1); }, 0);
-  h += '<button class="rkb-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="rkbConfirmar()">✓ Registrar bajada' + (totInner > 0 ? " (" + totInner + " cajas)" : "") + '</button>';
+  const sinPos = _rkb.items.filter(function (it) { return it.baja > 0 && !String(it.sec || "").trim(); }).length;
+  if (sinPos) h += '<div class="rkb-sug" style="color:#dc2626;text-align:center">⚠ Falta la posición de ' + sinPos + ' código(s): sin posición no se registra.</div>';
+  h += '<button class="rkb-fin"' + (tot <= 0 || sinPos ? " disabled" : "") + ' onclick="rkbConfirmar()">✓ Registrar bajada' + (totInner > 0 ? " (" + totInner + " cajas)" : "") + '</button>';
   _renderKeepFocus(body, h);
 }
 function rkbSearchInput(v) { if (!_rkb) return; _rkb.filtro = String(v == null ? "" : v); rkbRender(); }
 function rkbSetSec(i, sec) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; it.sec = String(sec || ""); rkbRender(); }
+/* v24.68 (Thomas, 30/09, D23/D24) — BAJAR DE RACKS con posición obligatoria, lo que entra en
+   góndola, sobrante a EXCEDENTE y CONTEO A CIEGAS del rack y de la góndola. Si el conteo no
+   coincide con el sistema queda pendiente en GV_Rack_Conteo y lo aprueba un supervisor. */
+function _rkbInner(it) { return (it.cxm > 0 && !it.manual) ? (it.baja * it.cxm) : it.baja; }
+function rkbRoom(it) { return it.cap > 0 ? Math.max(0, it.cap - Math.max(0, it.gon || 0)) : 0; }
+function rkbExc(it) { return (it.cap > 0 && it.baja > 0) ? Math.max(0, _rkbInner(it) - rkbRoom(it)) : 0; }
+function rkbSetPos(i, v) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; it.sec = String(v || "").toUpperCase().replace(/\s+/g, ""); rkbRender(); }
+function rkbUsarRoom(i) {
+  if (!_rkb) return; const it = _rkb.items[i]; if (!it) return;
+  const room = rkbRoom(it), usaM = it.cxm > 0 && !it.manual;
+  const mx = usaM ? Math.floor(it.racks / it.cxm) : it.racks;
+  let n = usaM ? Math.floor(room / it.cxm) : room;
+  if (usaM && n === 0 && room > 0) n = 1;   // un master entero aunque sobre alguna caja: el sobrante va a excedente
+  it.baja = Math.max(0, Math.min(mx, n)); rkbRender();
+}
+function rkbConteoPedir(sel) {
+  return new Promise(function (resolve) {
+    const ov = document.createElement("div");
+    ov.id = "rkbConteoOv";
+    ov.style.cssText = "position:fixed;inset:0;background:rgba(2,6,23,.74);z-index:9999;overflow:auto;padding:12px;";
+    let h = '<div style="background:#fff;max-width:440px;margin:0 auto;border-radius:14px;padding:16px;">' +
+      '<div style="font-size:17px;font-weight:800;margin-bottom:4px;">🔎 Contá lo que quedó</div>' +
+      '<div style="font-size:12.5px;color:#64748b;margin-bottom:10px;">Contá de verdad, sin adivinar. Si no coincide con el sistema, lo revisa un supervisor.</div>';
+    sel.forEach(function (it, k) {
+      const usaM = it.cxm > 0 && !it.manual;
+      h += '<div style="border:1px solid #e2e8f0;border-radius:11px;padding:10px;margin-bottom:8px;">' +
+        '<div style="font-weight:800;font-family:Consolas,Menlo,monospace;">' + escapeHtml(codCanonSuf(it.cod)) + ' <span style="font-family:inherit;font-weight:600;color:#475569;font-size:12px;">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span></div>' +
+        '<label style="display:block;font-size:13px;margin-top:6px;">¿Cuántos <b>' + (usaM ? "master" : "cajas") + '</b> quedaron en <b>' + escapeHtml(it.sec) + '</b>?' +
+        '<input id="rkcR' + k + '" type="number" min="0" inputmode="numeric" style="width:100%;height:42px;font-size:18px;font-weight:800;text-align:center;border:2px solid #cbd5e1;border-radius:9px;margin-top:3px;box-sizing:border-box;"></label>' +
+        '<label style="display:block;font-size:13px;margin-top:6px;">Ya acomodado: ¿cuántas <b>cajas</b> hay ahora en la góndola?' +
+        '<input id="rkcG' + k + '" type="number" min="0" inputmode="numeric" style="width:100%;height:42px;font-size:18px;font-weight:800;text-align:center;border:2px solid #cbd5e1;border-radius:9px;margin-top:3px;box-sizing:border-box;"></label></div>';
+    });
+    h += '<div id="rkcErr" style="color:#dc2626;font-weight:700;font-size:13px;min-height:16px;"></div>' +
+      '<button id="rkcOk" style="width:100%;padding:13px;border:none;border-radius:11px;background:#1e6bd6;color:#fff;font-size:16px;font-weight:800;">✓ Confirmar conteo</button></div>';
+    ov.innerHTML = h;
+    document.body.appendChild(ov);
+    document.getElementById("rkcOk").onclick = function () {
+      const out = [];
+      for (let k = 0; k < sel.length; k++) {
+        const r = document.getElementById("rkcR" + k).value, g = document.getElementById("rkcG" + k).value;
+        if (r === "" || g === "" || Number(r) < 0 || Number(g) < 0) { document.getElementById("rkcErr").textContent = "Completá los dos conteos de cada código."; return; }
+        const it = sel[k], usaM = it.cxm > 0 && !it.manual;
+        out.push({ rack: usaM ? Number(r) * it.cxm : Number(r), gondola: Number(g) });
+      }
+      ov.remove(); resolve(out);
+    };
+  });
+}
 function rkbAddManual(cod) {
   if (!_rkb) return; cod = String(cod || "").toUpperCase().trim(); if (!cod) return;
   if (!_rkb.items.some(function (it) { return String(it.cod).toUpperCase() === cod; })) {
     const inCat = _rkb.saldosN[_cpNorm(cod)];
     const kN = _cpNorm(cod), mlocs = (_rkb.locsMap && _rkb.locsMap[kN]) || [];
-    _rkb.items.push({ cod: cod, desc: artNombre(cod, ""), racks: 0, cxm: (_rkb.cxmMap && _rkb.cxmMap[kN]) || 0, locs: mlocs, sec: (mlocs[0] ? mlocs[0].sector : ""), baja: 1, manual: !inCat });
+    _rkb.items.push({ cod: cod, desc: artNombre(cod, ""), racks: 0, cxm: (_rkb.cxmMap && _rkb.cxmMap[kN]) || 0, locs: mlocs, sec: (mlocs[0] ? mlocs[0].sector : ""), baja: 1, manual: !inCat,
+                      cap: Number((_rkb.capMap || {})[_ocgNorm(cod)]) || 0, gon: Math.round(Number((inCat || {}).terminado) || 0) });
   }
   _rkb.filtro = ""; rkbRender();
 }
@@ -27467,7 +27554,10 @@ async function rkbConfirmar() {
   if (!_rkb) return;
   const sel = _rkb.items.filter(function (it) { return it.baja > 0; });
   if (!sel.length) return;
-  // v9.27: Mostrar código 4 dígitos para escribir en rack (sin verificación)
+  if (sel.some(function (it) { return !String(it.sec || "").trim(); })) { alert("Falta la posición de rack de algún código: sin posición no se registra."); return; }
+  // v24.68: lo que no entra en góndola va a EXCEDENTE, avisado antes
+  const excTot = sel.reduce(function (s, it) { return s + rkbExc(it); }, 0);
+  if (excTot > 0 && !confirm("⚠ No entran " + excTot + " caja(s) en góndola: van a EXCEDENTE.\n\nLo correcto es bajar sólo lo que entra. ¿Seguir igual?")) return;
   await (new Promise(function (resolve) {
     const code = Math.floor(1000 + Math.random() * 9000).toString();
     const overlay = document.createElement("div");
@@ -27493,9 +27583,12 @@ async function rkbConfirmar() {
   // cajas = INNER (si baja en master, convierto master × CxM). Mismo patrón que brConfirmar (v8.73).
   // v12.35 — baja ATÓMICA vía RPC (una transacción, idempotente por client_id).
   // cajas = INNER (si baja en master, convierto master × CxM). Mismo patrón que brConfirmar.
-  const items = sel.map(function (it) {
+  const conteos = await rkbConteoPedir(sel);   // v24.68: conteo a ciegas del rack y de la góndola
+  if (!_rkb) return;
+  const items = sel.map(function (it, k) {
     const inner = (it.cxm > 0 && !it.manual) ? (it.baja * it.cxm) : it.baja;
-    return { cod_art: it.cod, descripcion: it.desc || null, cajas: inner, sector: it.sec || null, orden_id: null, legajo: String(_rkb.legajo || "0"), ref: "rack " + (it.sec || "s/sector") };
+    return { cod_art: it.cod, descripcion: it.desc || null, cajas: inner, sector: it.sec || null, orden_id: null, legajo: String(_rkb.legajo || "0"), ref: "rack " + (it.sec || "s/sector"),
+             excedente: rkbExc(it), conteo_rack: conteos[k].rack, conteo_gondola: conteos[k].gondola };
   });
   // Planimetría viva (v5.22): descontar de la UBICACIÓN elegida. Best-effort:
   // si la RPC todavía no existe en Supabase, falla silencioso (queda el ledger).
@@ -57451,7 +57544,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=24.67"></script>
+<script src="importacion.js?v=24.68"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60211,7 +60304,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.67"></script>
+<script src="cobranzas.js?v=24.68"></script>
 
 </body>
 </html>

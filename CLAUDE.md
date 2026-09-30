@@ -6387,3 +6387,10 @@ cubrir"*. Se fueron el chip «No llega solo / ⏳ para el mínimo», el input «
 El **consumo por mes** (proy × FOB) quedó en el encabezado de cada proveedor (v24.59, `.pedimp-consumo`) y el total en la barra de arriba (v24.60, `.pedimp-consumo-tot`).
 Filas bajas en la tabla (v24.62): 📦 / 📥 como íconos lado a lado, «Cartel» y «Web» al lado bajo la fecha de
 reingreso, celdas `.pedimp-tbl` con 4px de relleno. **64 → 45 px por artículo** a 390 px (el test mide ≤ 50).
+
+## ⚠ REGLA (Thomas, 2026-09-30, v24.68): BAJAR DE RACKS — posición obligatoria y conteo a ciegas que aprueba un supervisor
+
+- **Sin posición de rack no se registra la bajada** (`rkbConfirmar`). Las posiciones se muestran de MENOR a mayor: se vacía primero la que menos tiene y se libera el lugar. Si el código no tiene posición en el Mapa, el operario la escribe.
+- **Lo que entra en góndola** = capacidad (`Capacidad_Sector`) − lo que hay; «Bajar lo que entra». Lo que no entra va a **EXCEDENTE** (campo `excedente` de `registrar_baja_racks`, movimiento `-x`), avisado antes.
+- **Conteo a ciegas** después del código: cuántas quedaron en la posición y cuántas hay en la góndola ya acomodada (`conteo_rack` en cajas, `conteo_gondola`). Se guarda en **`GV_Rack_Conteo`**; si no coincide con el sistema queda **pendiente** + Telegram, y **no mueve stock hasta que lo apruebe un supervisor** (Stock → Racks → «🔎 Conteos a aprobar», `gv_rack_conteo_resolver`: ajuste por la diferencia contada; rechazar no toca nada).
+- `sql/gv_rack_conteo_v2468.sql`, `tests/racks-propuesta.cjs`.
