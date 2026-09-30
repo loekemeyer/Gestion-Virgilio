@@ -50,6 +50,7 @@ as $function$
                  - (extract(year from f.desde)*12 + extract(month from f.desde))) as meses
            from _vt_f f join _vt_l l on l.item = f.item and l.m >= f.desde
           where f.desde >= (date_trunc('month', current_date) - interval '6 months')::date
+            and f.item !~ '^[0-9]{5,}$'   -- los de 5 dígitos no se stockean: se hacen contra pedido (Thomas 30/09)
           group by f.item, f.desde
        ),
        merged as (
