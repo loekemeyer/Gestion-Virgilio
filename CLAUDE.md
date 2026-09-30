@@ -5364,7 +5364,12 @@ programar y en Programación"*.
   **«Brc Onelli»** (Bariloche) el 29/09. Hoy va primero por el **order_id** exacto de la NP web, y si la
   heurística empata con sucursales distintas **deja la celda vacía**. Medido sobre 60 días de Excel: 142
   NP web, 1 con sucursal equivocada y 6 sin sucursal.
-- `sql/gv_np_destino_dir_real_v2476.sql`, `tests/ppp-dir-real-expreso.cjs`.
+- ⚠⚠ **v24.78 (Luis: *"no sé por qué inventa datos si el dato de la sucursal viaja con el pedido"*):
+  una NP WEB NUNCA pasa por la heurística.** Orden: la fila exacta de `lk_pedidos_match` (por
+  `order_id`) → la etiqueta que viajó con la NP (`PPP_Web_Programacion.direccion`, entre paréntesis)
+  → vacío. La heurística queda sólo para NP de ISIS, que no traen pedido. Problema 633.
+- `sql/gv_np_destino_dir_real_v2476.sql`, `tests/ppp-dir-real-expreso.cjs`, y el chip 📍 de las dos
+  pantallas lo prueba corriéndolas `tests/ppp-misiones.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-22, v21.15): pelar la L de LOS DOS LADOS es no matchear nunca
 

@@ -98,6 +98,13 @@ catch (_e) {
     out.dMis    = trs.filter(function (x) { return /pga-d[^"]* mis"/.test(x.split(">")[0]); }).length;
 
     // ── y ahora con OTRA provincia marcada: el front no puede tener Misiones adentro ──────
+    // v24.77 (Luis): el chip 📍 con la sucursal REAL en lo que sale por expreso — caso Multibazar
+    // (sin nombre de expreso cargado: antes no se veía NADA). Y el de CABA sin expreso no lo lleva.
+    dest.set("LK 0027", { np: "LK 0027", provincia: "Santa Cruz", expreso: null, alerta: false, destino_txt: "Santa Cruz",
+                          es_expreso: true, sucursal: "Río Gall (25 de mayo)", localidad_destino: "Rio Gallegos" });
+    const hR = _pgaCuerpoHtml(_pgaArbol(filas), {});
+    out.drealProg = (hR.match(/class="pga-dreal"[^>]*>([^<]*)</) || [])[1] || "";
+    out.drealProgN = (hR.match(/class="pga-dreal"/g) || []).length;
     dest.set("LK 0029", { np: "LK 0029", provincia: "Chubut", expreso: "Cruz Del Sur", alerta: true, destino_txt: "Cruz Del Sur · Chubut" });
     const h2 = _pgaCuerpoHtml(_pgaArbol(filas), {});
     out.chubut = /CHUBUT/.test(h2) && /Hay pedido Chubut/.test(h2);
@@ -109,6 +116,8 @@ catch (_e) {
 
   const d25 = (r.dias || []).find((x) => x.key === "20260925") || {};
   const d26 = (r.dias || []).find((x) => x.key === "20260926") || {};
+  if (r.drealProg !== "📍 Río Gall (25 de mayo) · Rio Gallegos, Santa Cruz" || r.drealProgN !== 1)
+    fallos.push("Programación: el chip 📍 de la sucursal real no sale (o sale de más): " + JSON.stringify([r.drealProg, r.drealProgN]));
   if (d25.mis !== 1) fallos.push("el día 25/09 tendría que contar 1 pedido marcado, cuenta " + d25.mis);
   if ((d25.provs || []).join() !== "Misiones") fallos.push("el día no guardó la provincia: " + JSON.stringify(d25.provs));
   if (d26.mis !== 0) fallos.push("el día 26/09 no tiene pedidos marcados y cuenta " + d26.mis);
@@ -154,6 +163,14 @@ catch (_e) {
     out.web2  = { marcada: aprEsProvMarcada(web2), chip: aprDestinoChip(web2), badge: aprMisBadge(web2) };
     out.caba  = { marcada: aprEsProvMarcada(caba), chip: aprDestinoChip(caba) };
     out.isis  = { marcada: aprEsProvMarcada(isis), chip: aprDestinoChip(isis), badge: aprMisBadge(isis) };
+    // v24.77: la sucursal REAL — web (del feed) e ISIS (de gv_np_destino_lista), y nada en CABA
+    const mb = { order_id: 1506, empresa: "lk", cod: "4042", razon_social: "Multi Bazar S.R.L", zona: "Zona 3 - CABA Oeste",
+                 localidad: "Villa Luro", provincia: "Santa Cruz", expreso: "", dest_exp: true,
+                 dest_suc: "Multi Bazar S.R.L — Río Gall (25 de mayo)", dest_loc: "Rio Gallegos" };
+    _pgaDest.set("98616", { np: "98616", provincia: "Mendoza", expreso: "Andesmar", alerta: false, destino_txt: "Andesmar · Mendoza",
+                            es_expreso: true, sucursal: "P de los Andes 1359-Godoy Cruz", localidad_destino: "Godoy Cruz" });
+    const isis2 = { order_id: 0, np: "98616", _isis: true, empresa: "lk", cod: "1", razon_social: "X", zona: "Zona 3", provincia: "", expreso: "" };
+    out.dreal = { web: aprDirRealChip(mb), isis: aprDirRealChip(isis2), caba: aprDirRealChip(caba) };
     // y con la provincia marcada cambiada, el front tiene que seguir a la config
     _aprProvAlerta = new Set(["santa fe"]);
     out.cambia = { web: aprEsProvMarcada(web), web2: aprEsProvMarcada(web2) };
@@ -163,6 +180,9 @@ catch (_e) {
   if (errs2.length) fallos.push("errores de página (A Programar): " + errs2.join(" | "));
 
   if (!a.web.marcada) fallos.push("A Programar: el pedido web a Misiones no queda marcado");
+  if (!/📍 Río Gall \(25 de mayo\) · Rio Gallegos, Santa Cruz</.test(a.dreal.web)) fallos.push("A Programar: falta la sucursal real del pedido web por expreso: " + a.dreal.web);
+  if (!/📍 P de los Andes 1359-Godoy Cruz · Mendoza</.test(a.dreal.isis)) fallos.push("A Programar: falta la sucursal real de la NP de ISIS por expreso: " + a.dreal.isis);
+  if (a.dreal.caba) fallos.push("A Programar: un pedido de CABA sin expreso no lleva la sucursal real");
   if (!/apr-chip-mis[^>]*>MISIONES</.test(a.web.badge)) fallos.push("A Programar: falta el badge MISIONES");
   if (!/Snaider · Misiones/.test(a.web.chip)) fallos.push("A Programar: falta el destino del expreso");
   if (a.web2.marcada) fallos.push("A Programar: Santa Fe no está marcada y se pintó igual");

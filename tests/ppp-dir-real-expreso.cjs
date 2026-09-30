@@ -33,8 +33,13 @@ for (const [a, esp] of casos) { const r = f(...a); if (r !== esp) fails.push("(a
 if (!/class="pga-dreal"/.test(utf) || !/_dst\.es_expreso/.test(utf)) fails.push("(b) falta el chip de Programación");
 if (!/function aprDirRealChip/.test(utf) || !/aprDestinoChip\(p\) \+ aprDirRealChip\(p\)/.test(utf)) fails.push("(b) falta el chip de A Programar");
 const fx = fn("_facXlsArmar");
-const iOb = fx.indexOf("String(m.order_id) === String(_ob.order_id)"), iCands = fx.indexOf("const cands = suc ? [] :");
+const iOb = fx.indexOf("String(m.order_id) === String(_ob.order_id)"), iCands = fx.indexOf("const cands = (suc || _ob) ? [] :");
 if (iOb < 0 || iCands < 0 || iOb > iCands) fails.push("(c) la sucursal del Excel ISIS no busca primero por order_id");
 if (!/sucsTop\.size > 1 \? ""/.test(fx)) fails.push("(c) el empate de la heurística sigue adivinando");
+// v24.77 (Luis): una NP WEB nunca pasa por la heurística; sin fila en lk_pedidos_match usa la
+// etiqueta que viajó con la NP (PPP_Web_Programacion.direccion), y si no, vacío.
+if (fx.indexOf("const cands = (suc || _ob) ? [] :") < 0) fails.push("(d) una NP web todavía puede caer en la heurística");
+if (!/if \(!suc\) suc = _ob\.lab \|\| ""/.test(fx)) fails.push("(d) falta el respaldo de la etiqueta que viaja con la NP");
+if (!/PPP_Web_Programacion\?select=[^"]*direccion/.test(fx)) fails.push("(d) no lee la dirección de la NP web");
 if (fails.length) { console.error("FALLA ppp-dir-real-expreso:\n  " + fails.join("\n  ")); process.exit(1); }
 console.log("OK ppp-dir-real-expreso");
