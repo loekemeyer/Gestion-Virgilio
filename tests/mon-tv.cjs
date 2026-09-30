@@ -252,12 +252,14 @@ function responder(url) {
         return Math.round(Math.abs((a.left + a.width / 2) - (c.left + c.width / 2))); }),
       tkCli: [...document.querySelectorAll("#tandasBox tr")].filter((tr) => tr.querySelector(".t-cli .tk"))
         .map((tr) => ({ tanda: tr.querySelector(".t-tanda").textContent.trim(),
-          rota: tr.querySelector(".t-cli .tk").classList.contains("rota"), txt: tr.querySelector(".t-cli .tk").textContent })),
+          rota: tr.querySelector(".t-cli .tk").classList.contains("rota"), txt: tr.querySelector(".t-cli .tk").textContent,
+          dur: tr.querySelector(".t-cli .tk").style.animationDuration, orig: tr.querySelector(".t-cli .tk").getAttribute("data-txt") || "" })),
       ticker: [...document.querySelectorAll("#tandasBox tr")].filter((tr) => tr.querySelector(".t-np .tk"))
         .map((tr) => { const tk = tr.querySelector(".t-np .tk"), caja = tk.parentNode;
           return { tanda: tr.querySelector(".t-tanda").textContent.trim(), rota: tk.classList.contains("rota"),
             anim: getComputedStyle(tk).animationName, lineas: Math.round(caja.clientHeight / parseFloat(getComputedStyle(caja).lineHeight)),
             txt: tk.textContent, w: caja.clientWidth, sw: tk.scrollWidth }; }),
+      desb: ["actBox", "penBox", "col2"].map((id) => { const e = document.getElementById(id); return e ? e.scrollHeight - e.clientHeight : -1; }),
       clave: (document.getElementById("tvClave") || {}).textContent || "",
       estado: (document.getElementById("estado") || {}).textContent || "",
       // ¿sobresale algo del alto de la pantalla? En una TV no hay cómo scrollear.
@@ -303,8 +305,14 @@ function responder(url) {
   ok(r.pen.indexOf("E30A") < r.pen.indexOf("E31A"), "lo más atrasado va primero");
   /* v25.01 (Luis): las luces P/A no se corren cuando alguien agarra la tanda. */
   const cliE32 = r.tkCli.find((x) => /^E32A/.test(x.tanda)), cliE30 = r.tkCli.find((x) => /^E30A/.test(x.tanda));
-  ok(cliE32 && cliE32.rota && /\+1/.test(cliE32.txt), "el cliente de E32A no entra: tiene que rotar " + JSON.stringify(cliE32));
-  ok(cliE30 && !cliE30.rota, "el cliente de E30A entra: tiene que quedar quieto " + JSON.stringify(cliE30));
+  ok(cliE32 && cliE32.rota && /Simon Zeitune E Hijo · Cortopassi/.test(cliE32.txt) && !/\+\d/.test(cliE32.txt), "el cliente de E32A no entra: tiene que rotar " + JSON.stringify(cliE32));
+  /* v25.6 (Luis): los «+N» muestran los nombres, y el cartel va a 3/4 de la velocidad (4,5 caracteres/s). */
+  ok(cliE32 && cliE32.dur === Math.max(8, Math.round((cliE32.orig.length + 7) / 4.5)) + "s", "el cartel tiene que ir a 4,5 caracteres por segundo (3/4 de la v24.92)");
+  ok(cliE30 && /Bazar Mandarin · Casa Pepe/.test(cliE30.orig), "E30A tiene 2 clientes: tienen que ir los dos nombres " + JSON.stringify(cliE30));
+  const cliSolo = r.tkCli.filter((x) => x.orig && x.orig.indexOf("·") < 0 && x.orig.length < 18);
+  ok(cliSolo.length && cliSolo.every((x) => !x.rota), "un cliente solo y corto entra: tiene que quedar quieto " + JSON.stringify(cliSolo));
+  /* v25.6 (Luis): *"queda cortado En este momento"*. Nada de la columna derecha se pasa de su alto. */
+  ok(r.desb.every((x) => x >= 0 && x <= 1), "la columna derecha se corta (En este momento / Pendientes): " + JSON.stringify(r.desb));
   ok(r.semCentro.length && r.semCentro.every((x) => x <= 3), "las luces P/A tienen que quedar centradas en su celda: " + JSON.stringify(r.semCentro));
   ok(/3 salieron sin FC/.test(r.fcTit), "el título no avisa cuántas se fueron sin factura: " + r.fcTit);
   // v20.21 (Thomas) — el 🚚 también en la tabla principal, y el cartel a partir de 3

@@ -102,7 +102,9 @@
       "Bash(sed -i 's/v24.73 \\(Luis 30\\\\/09\\)/v24.76 \\(Luis 30\\\\/09\\)/' tests/pedimp-reporte-pdf.cjs)",
       "Bash(node scripts/bump-version.cjs 25.00)",
       "Bash(sed -i 's/v24\\\\.97 \\(Luis/v25.2 \\(Luis/g' index.html CLAUDE.md sql/gv_imp_recibir_insumo_unidad_v2483.sql)",
-      "Bash(sed -i 's/^-- v24\\\\.97 \\(Luis 30\\\\/09: \"no/-- v25.2 \\(Luis 30\\\\/09: \"no/' sql/gv_imp_recibir_insumo_unidad_v2483.sql)"
+      "Bash(sed -i 's/^-- v24\\\\.97 \\(Luis 30\\\\/09: \"no/-- v25.2 \\(Luis 30\\\\/09: \"no/' sql/gv_imp_recibir_insumo_unidad_v2483.sql)",
+      "Bash(sed -i 's/\\\\*\\\\*v25\\\\.3 \\(Luis, 30\\\\/09\\): el insumo se llama/**v25.7 \\(Luis, 30\\\\/09\\): el insumo se llama/' CLAUDE.md)",
+      "Bash(sed -i 's/^-- v25\\\\.3 \\(Luis 30\\\\/09: \"323ES nunca/-- v25.7 \\(Luis 30\\\\/09: \"323ES nunca/' sql/gv_imp_recibir_insumo_unidad_v2483.sql)"
     ]
   }
 }

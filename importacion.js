@@ -2484,7 +2484,7 @@ async function impRecibirCodigo(enc) {
   } catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">No se pudieron leer los pedidos: ' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
   if (!enc2.length) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">Este código no tiene pedidos en curso con unidades pendientes. Si llegó algo que no estaba pedido, cargalo primero como bache (📦 Baches).</div>'); return; }
   if (enc2.length === 1) return impRecibirBache(enc2[0].r.id);
-  // v24.92: si el pedido entra como INSUMO (323E/838E/323ES → 323ES In), el rótulo es el insumo, no el artículo.
+  // v24.92: si el pedido entra como INSUMO (323E/838E/323ES → 323ES), el rótulo es el insumo, no el artículo.
   try {
     var ctxs = await Promise.all(enc2.map(function (x) { return _pedImpRpc("gv_imp_recibir_contexto", { p_bache_id: x.r.id }).catch(function () { return null; }); }));
     ctxs.forEach(function (c, k) { if (c && c.es_insumo && (c.insumos_cods || []).length) enc2[k].ins = c.insumos_cods[0]; });
