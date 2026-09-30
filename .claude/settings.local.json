@@ -106,7 +106,8 @@
       "Bash(sed -i 's/\\\\*\\\\*v25\\\\.3 \\(Luis, 30\\\\/09\\): el insumo se llama/**v25.7 \\(Luis, 30\\\\/09\\): el insumo se llama/' CLAUDE.md)",
       "Bash(sed -i 's/^-- v25\\\\.3 \\(Luis 30\\\\/09: \"323ES nunca/-- v25.7 \\(Luis 30\\\\/09: \"323ES nunca/' sql/gv_imp_recibir_insumo_unidad_v2483.sql)",
       "Bash(mv sql/lk_pedidos_match_viejos_v259_LK.sql sql/lk_pedidos_match_viejos_v2510_LK.sql)",
-      "Bash(node scripts/bump-version.cjs 25.10)"
+      "Bash(node scripts/bump-version.cjs 25.10)",
+      "Bash(sed -i 's/^v25\\\\.12: PDF para Damián/v25.13: PDF para Damián/; s/gv_imp_tipo_inal_v2512/gv_imp_tipo_inal_v2513/' /tmp/claude-0/msg.txt)"
     ]
   }
 }

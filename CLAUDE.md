@@ -6602,3 +6602,8 @@ de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (
 - **↩ Anular** pasa la fila a `anulado`, y **frena si Cervantes ya confirmó**.
 - ⚠ No hay vínculo código importado ↔ `GP2.componente`: no se adivina.
 - `sql/gv_imp_recibir_cervantes_v2511.sql`, `tests/imp-recibir-cervantes.cjs`.
+- **v25.15 (Luis, 30/09): y al revés — lo que Virgilio le ACEPTA a GP2** vive en **`"GP2".aceptado_virgilio`** (la leen
+  GP2 y GV): una fila por recepción de insumo que vino de Cervantes (`Movimientos_Stock` `recepcion_insumo`, ref Cervantes),
+  con `aceptado` = ya tiene código real (no `TMP-`). La escribe `gv_gp2_aceptado_sync()` (cron `gv-gp2-aceptado-sync`,
+  cada 10 min, poda lo que desaparece). Al 30/09: 24 filas, 7 aceptadas, 17 con TMP. **323ES quedó Mixto.**
+  `sql/gv_gp2_aceptado_virgilio_v2515.sql`.
