@@ -6236,7 +6236,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.37"></script>
+<script type="module" src="recepcion.js?v=25.38"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10281,7 +10281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.37";
+const APP_VERSION = "v25.38";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -51193,10 +51193,12 @@ async function _cuarMarcarPedidos0() {
        realidad es "no pude preguntar" es el pozo de §"una lectura ROTA no es un CERO". */
     if (res === null) { if (_pppTab === "prog") aprRender(); return; }
     const byKey = {};   // retenidos (no liberados) → sector
+    const marcKey = {}; // v25.38: lo que el BACKEND sigue reteniendo (ya descontó lo liberado)
     const detKey = {};  // v15.04: montos del motivo (deuda / exceso de crédito / estado)
     (res || []).forEach(function (r) {
       const k = String(r.empresa) + ":" + String(r.order_id);
       byKey[k] = (r.motivos || []).slice();
+      marcKey[k] = (r.motivos || []).slice();
       detKey[k] = detKey[k] || {};
       if (r.deuda != null) detKey[k].deuda = Number(r.deuda);
       if (r.estado) detKey[k].estado = String(r.estado);
@@ -51225,7 +51227,17 @@ async function _cuarMarcarPedidos0() {
       if (!askKey[k]) return;   // v21.32: no estaba en el lote de esta llamada → no se toca
       p._cuarOk = true;         // v22.17: la cuarentena de ESTE pedido se pudo verificar
       if (detKey[k]) p.cuarentena_detalle = detKey[k]; else if (p.cuarentena_detalle) delete p.cuarentena_detalle;
-      if (libKey[k]) { p.cuarentena_motivos = libKey[k]; p._cuarLiberado = true; }
+      /* v25.38 (caso LK 1576 · Hsu Ya Wen, 30/09) — UNA LIBERACIÓN PARCIAL NO LIBERA TODO.
+         Vivi liberó "limite_credito"; el botón de Cuarentena nunca libera "cliente_nuevo" (v20.89:
+         ese lo levanta el ✅ del pipeline). El backend lo siguió reteniendo por cliente nuevo
+         (gv_cuarentena_retiene_lote), pero acá la fila de Liberados ganaba: el pedido iba a la
+         lista normal con "Liberado de cuarentena" y el chip "🆕 cliente nuevo sin aprobar · no se
+         arma solo" — fuera del pipeline, sin ✅ para aprobarlo, y con el freno manual (v22.17)
+         impidiendo programarlo a mano. Trabado. Si el backend todavía retiene por un motivo que
+         esa liberación no levantó, el pedido sigue retenido con ESE motivo. */
+      const quedan = libKey[k] ? (marcKey[k] || []).filter(function (m) { return libKey[k].indexOf(m) < 0; }) : [];
+      if (libKey[k] && !quedan.length) { p.cuarentena_motivos = libKey[k]; p._cuarLiberado = true; }
+      else if (libKey[k]) { p.cuarentena_motivos = quedan; p._cuarLiberado = false; }
       else if (byKey[k] && byKey[k].length) { p.cuarentena_motivos = byKey[k]; p._cuarLiberado = false; }
       else { if (p.cuarentena_motivos) delete p.cuarentena_motivos; if (p._cuarLiberado) delete p._cuarLiberado; }
     });
@@ -57823,7 +57835,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.37"></script>
+<script src="importacion.js?v=25.38"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60624,7 +60636,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.37"></script>
+<script src="cobranzas.js?v=25.38"></script>
 
 </body>
 </html>
