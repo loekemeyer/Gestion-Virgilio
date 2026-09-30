@@ -6232,7 +6232,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.68"></script>
+<script type="module" src="recepcion.js?v=24.69"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10274,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.68";
+const APP_VERSION = "v24.69";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -26349,11 +26349,13 @@ function _insQtyHtml(it, i, isIn) {
       ? ('stock: ' + it.stockByUni.map(function (u) { return '<b>' + _insNum(u.saldo) + '</b> ' + escapeHtml(u.uni); }).join(' · '))
       : (it.unidad ? ('stock: ' + _insNum(stk) + ' ' + escapeHtml(it.unidad)) : 'stock: ' + _insNum(it.stock));
   const _k = insCatOf(it);
-  const chips = _insUnitsFor(it, insLoadUnits()).map(function (u) {
+  const _mcSolo = _insSaleMC(it);   // v24.69: sale sólo en MC
+  let chips = _mcSolo ? ('<button class="ins-uchip on">' + escapeHtml(_mcSolo) + '</button> <span style="font-size:12px;color:#64748b;">sale siempre en MC enteras</span>') : _insUnitsFor(it, insLoadUnits()).map(function (u) {
     const ok = insUniPermitida(_k, u);
     return '<button class="ins-uchip' + (it.unidad === u ? " on" : "") + (ok ? "" : " no") + '" onclick="insSetUnidad(' + i + ',\'' + u.replace(/'/g, "") + '\')"' +
       (ok ? "" : ' title="No permitida en esta categoría"') + '>' + escapeHtml(u) + (ok ? "" : " ⛔") + '</button>';
   }).join("") + '<button class="ins-uchip ins-uadd" onclick="insAddUnidad(' + i + ')" title="Agregar unidad">+</button>';
+  if (_mcSolo && it.qty > 0) { const _fmc = insFactorDe(it.cod, _mcSolo); if (_fmc) chips += '<div style="font-size:12px;color:#475569;margin-top:4px;">= ' + _insNum(it.qty * _fmc) + ' ' + escapeHtml((insFactDe(it.cod) || {}).base || "u") + '</div>'; }
   return '<div class="ins-qov" onclick="if(event.target===this)insCloseQty()"><div class="ins-qc">' +
     '<div class="ins-qh"><div><div class="ins-qcod">' + escapeHtml(_insBtnCod(it)) + '</div>' +
     (it.nombre ? '<div class="ins-qnom">' + escapeHtml(it.nombre) + '</div>' : "") +
@@ -26369,7 +26371,16 @@ function _insQtyHtml(it, i, isIn) {
     '<button class="ins-qok ' + (isIn ? "in" : "out") + '"' + (it.qty > 0 && (!it.unidad || !insUniPermitida(_k, it.unidad)) ? " disabled" : "") + ' onclick="insCloseQty()">Listo</button>' +
     '</div></div>';
 }
-function insOpenQty(i) { if (!_ins || !_ins.items[i]) return; _ins.qty = i; insRender(); }
+function insOpenQty(i) { if (!_ins || !_ins.items[i]) return; const _mc = _insSaleMC(_ins.items[i]); if (_mc) _ins.items[i].unidad = _mc; _ins.qty = i; insRender(); }
+/* v24.69 (Thomas, 30/09, D11): un insumo que tiene MC (Insumos_Factores) SALE siempre en MC
+   enteras — a Cervantes o bajado de racks: *"lo mínimo que se le manda es 1 MC… no bajan uni
+   sueltas, siempre por MC"*. El stock queda en su unidad base y el movimiento dice las MC. */
+function _insSaleMC(it) {
+  if (!_ins || _ins.mode !== "EI" || !it) return "";
+  const f = insFactDe(it.cod); if (!f || !f.unis) return "";
+  const mc = f.unis.filter(function (u) { return _insUEq(u.u, "MC") && !u.base; })[0];
+  return mc ? mc.u : "";
+}
 function insCloseQty() { if (!_ins) return; _ins.qty = null; insRender(); }
 function insBack() { if (!_ins) return; _ins.cat = ""; _ins.filtro = ""; _ins.nuevo = null; _ins.qty = null; insRender(); }
 /* Entrar a una categoría (pantalla 2). Volver a tocarla desde adentro = volver. */
@@ -26395,6 +26406,8 @@ async function insConfirmar() {
     _ins.qty = _ins.items.indexOf(it0);
     insRender(); return;
   }
+  // v24.69: lo que tiene MC sale en MC — si quedó otra unidad (cargada antes), se corrige acá
+  if (!isIn) sel.forEach(function (it) { const mc = _insSaleMC(it); if (mc) it.unidad = mc; });
   const sinUni = sel.filter(function (it) { return !it.unidad; });
   if (sinUni.length) {
     try { alert("Falta la unidad de:\n\n  " + sinUni.map(function (it) { return _insBtnCod(it) + (it.nombre ? " · " + it.nombre : ""); }).join("\n  ") + "\n\nTe abro el primero para que la elijas."); } catch (_e) {}
@@ -26410,12 +26423,12 @@ async function insConfirmar() {
      duales (ej: Uni positivo + MC negativo) cuando se entrega en MC. */
   const rows = sel.map(function (it) {
     var fDef = insFactDe(it.cod);
-    var uni = it.unidad, qty = it.qty;
+    var uni = it.unidad, qty = it.qty, nota = "";
     if (fDef && fDef.base && uni && !_insUEq(uni, fDef.base)) {
       var fa = insFactorDe(it.cod, uni);
-      if (fa != null) { qty = qty * fa; uni = fDef.base; }
+      if (fa != null) { nota = " · cargado " + it.qty + " " + uni + " × " + fa; qty = qty * fa; uni = fDef.base; }   // v24.69: queda escrito lo que se cargó
     }
-    return { cod_art: it.cod, descripcion: it.nombre || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
+    return { cod_art: it.cod, descripcion: ((it.nombre || "") + nota).trim() || null, deposito: "insumos", delta: isIn ? qty : -qty, tipo: isIn ? "recepcion_insumo" : "entrega_insumo", ref: ubic, legajo: _ins.legajo || null, unidad: uni, ubicacion: it.ubic || it.sector || null };
   });
   const tot = sel.reduce(function (s, it) { return s + it.qty; }, 0);
   // v14.95 — bolsas plásticas ↔ GP2: PRIMERO GP2 (es el que manda). Si rechaza, el operario decide
@@ -57544,7 +57557,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=24.68"></script>
+<script src="importacion.js?v=24.69"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60304,7 +60317,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.68"></script>
+<script src="cobranzas.js?v=24.69"></script>
 
 </body>
 </html>

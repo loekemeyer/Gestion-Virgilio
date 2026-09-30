@@ -196,6 +196,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== racks-propuesta (regresión: MG 'De los racks' propone para aprobar, no mueve stock) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/racks-propuesta.cjs
+echo "== ins-sale-mc (v24.69: insumo con MC sale sólo en MC, stock en base) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-sale-mc.cjs
 
 echo "== ssg-switch (regresión: switch admin del aviso 'picking sin stock') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ssg-switch.cjs
