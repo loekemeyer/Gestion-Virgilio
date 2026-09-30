@@ -3782,6 +3782,12 @@ Centinelas ids 235-239. `sql/gv_imp_recibir_v2349.sql`.
 ⚠ El viejo «📥 Llegó» NO movía stock (sólo `Importados_Mov_Stock`): su botón ya no está.
 ⚠ **No recibir el mismo contenedor también por Recepción (recepcion.js)**: se contaría dos veces.
 `sql/gv_imp_recibir_v2345.sql`, `tests/imp-recibir.cjs`.
+**v24.80 (Luis, 30/09): UN 📦 y UN 📥 por código** — un código que junta varios artículos del maestro (323ES =
+323ES suelto + 323E LK + 838E CH, `GV_Importados_Alias`) mostraba un par de botones por artículo. Hoy el 📥
+(`impRecibirCodigo`) abre un selector con los pedidos en viaje de todos y de ahí el popup de siempre; el 📦
+(`pedImpBachesDe`) elige de cuál. **Cada artículo recibe con SU código** (Luis: *"recibir 323ES es 323ES, no 323E"*).
+**La cantidad va en cajas o en UNIDADES**: en unidades se convierte con la UxB a la caja más cercana
+(3.000 u ÷ 144 → 21 cajas) y el popup dice la diferencia (+24 u). `tests/imp-recibir-codigo-unidades.cjs`.
 
 **Desglose de la tarjeta del proveedor (Luis, v23.75):** los dos chips de la banda se expanden. Izq: consumo/mes =
 Σ proy u/mes × FOB por artículo, y meses = (mínimo − a pedir hoy) ÷ consumo. Der: CIF y cada línea de lo no

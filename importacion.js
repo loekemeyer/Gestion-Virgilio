@@ -1510,14 +1510,15 @@ function _pedImpRender() {
       // v16.08 — lo que se muestra ya es el DISPONIBLE: stock de hoy menos lo pedido, con piso en 0.
       const _codEncV = encodeURIComponent(it.cod);
       const _keyEncV = encodeURIComponent(it.key || it.cod);   // v22.93 — MC, FOB y reingreso van por línea (809E LK / CH)
-      const actHtml = (it.det || []).map(function (d) {
-        const multi = (it.det || []).length > 1;
-        const lbl = (multi && d.marca) ? ('<span style="font-size:10px;color:#64748b;margin-right:2px">' + escapeHtml(d.marca) + '</span>') : '';
-        const _prv = encodeURIComponent(d.prov || it.prov || '');
-        return '<div style="margin:1px 0">' + (lbl ? lbl + '<br>' : '') + '<span style="white-space:nowrap">' +
-          '<button class="stk-btn" style="padding:3px 8px;font-size:14px" title="📦 Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="_pedImpAccionConfirmar(\'baches\',\'' + _codEncV + '\',function(){pedImpBaches(' + d.id + ',\'' + _codEncV + '\',\'' + _prv + '\')})">📦</button>' +   // v24.62 (Thomas): íconos lado a lado, la fila no crece
-          (Number(d.curso) > 0 ? ' <button class="stk-btn" style="padding:3px 8px;font-size:14px;background:#0f766e;color:#fff;border-color:#0f766e;font-weight:800" title="📥 RECIBIR: recibir lo que llegó de este pedido: cuánto, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Queda en el Historial de recepción." onclick="_pedImpAccionConfirmar(\'recibir\',\'' + _codEncV + '\',function(){impRecibirAbrir(' + d.id + ')})">📥</button>' : '') + '</span></div>';
-      }).join('');
+      /* v24.80 (Luis, 30/09): UN 📦 y UN 📥 por código. Un código puede juntar varios artículos del
+         maestro (323ES = 323ES suelto + 323E LK + 838E CH) y antes salía un par de botones por cada uno.
+         Con más de uno, el botón abre un selector con cada pedido en viaje y de ahí el popup de siempre. */
+      const _dets = it.det || [];
+      const _detsEnc = encodeURIComponent(JSON.stringify(_dets.map(function (d) { return { id: d.id, cod: d.cod || it.cod, marca: d.marca || "", prov: d.prov || it.prov || "" }; }))).replace(/'/g, "%27");
+      const _hayCurso = _dets.some(function (d) { return Number(d.curso) > 0; });
+      const actHtml = !_dets.length ? '' : '<div style="margin:1px 0"><span style="white-space:nowrap">' +
+          '<button class="stk-btn" style="padding:3px 8px;font-size:14px" title="📦 Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="_pedImpAccionConfirmar(\'baches\',\'' + _codEncV + '\',function(){pedImpBachesDe(\'' + _detsEnc + '\',\'' + _codEncV + '\')})">📦</button>' +
+          (_hayCurso ? ' <button class="stk-btn" style="padding:3px 8px;font-size:14px;background:#0f766e;color:#fff;border-color:#0f766e;font-weight:800" title="📥 RECIBIR: recibir lo que llegó de este código: cuánto, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Queda en el Historial de recepción." onclick="_pedImpAccionConfirmar(\'recibir\',\'' + _codEncV + '\',function(){impRecibirCodigo(\'' + _detsEnc + '\')})">📥</button>' : '') + '</span></div>';
       const _m3m = Number(it.m3Master) || 0;
       const _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
       // v14.97 — uni/master NO se edita desde la tabla (dueño: "al pedo editarlo desde ahí").
@@ -2387,6 +2388,36 @@ async function impRecibirAbrir(importadoId) {
   }).join('') + '</div>';
   _impRecShell("📥 Recibir importación", h);
 }
+// v24.80 — el 📥 del código: junta los pedidos en viaje de TODOS sus artículos del maestro.
+function _impDetsDe(enc) { try { return JSON.parse(decodeURIComponent(enc)) || []; } catch (_e) { return []; } }
+function _impDetLbl(d) { return escapeHtml(codCanon(d.cod || "")) + (d.marca ? ' ' + escapeHtml(d.marca) : ''); }
+async function impRecibirCodigo(enc) {
+  var dets = _impDetsDe(enc);
+  if (dets.length === 1) return impRecibirAbrir(dets[0].id);
+  _impRecShell("📥 Recibir importación", '<div class="irc-muted">Cargando pedidos en curso…</div>');
+  var enc2 = [];
+  try {
+    var res = await Promise.all(dets.map(function (d) { return _pedImpRpc("gv_importado_baches", { p_importado_id: d.id }); }));
+    res.forEach(function (rows, k) { (rows || []).forEach(function (r) { if (r.estado === "en_curso" && Number(r.pendiente) > 0) enc2.push({ r: r, d: dets[k] }); }); });
+  } catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">No se pudieron leer los pedidos: ' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
+  if (!enc2.length) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">Este código no tiene pedidos en curso con unidades pendientes. Si llegó algo que no estaba pedido, cargalo primero como bache (📦 Baches).</div>'); return; }
+  if (enc2.length === 1) return impRecibirBache(enc2[0].r.id);
+  var h = '<div class="irc-sec"><h4>¿Qué llegó?</h4>' + enc2.map(function (x) {
+    var r = x.r;
+    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirBache(' + r.id + ')">📥 ' + _impDetLbl(x.d) + '</button><span class="irc-muted">' +
+      escapeHtml(r.pedido_ref || ("bache " + r.id)) + ' · ' + Number(r.pendiente).toLocaleString("es-AR") + ' u pendientes' + (r.fecha_reingreso ? ' · llega ' + escapeHtml(_isoToDdMmAa(String(r.fecha_reingreso).slice(0, 10))) : '') + '</span></div>';
+  }).join('') + '</div>';
+  _impRecShell("📥 Recibir importación", h);
+}
+// v24.80 — el 📦 del código: con más de un artículo del maestro, se elige de cuál son los baches.
+function pedImpBachesDe(enc, codEnc) {
+  var dets = _impDetsDe(enc);
+  if (dets.length === 1) return pedImpBaches(dets[0].id, codEnc, encodeURIComponent(dets[0].prov || ""));
+  var h = '<div class="irc-sec"><h4>¿Baches de cuál?</h4>' + dets.map(function (d) {
+    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecCerrar();pedImpBaches(' + d.id + ',\'' + encodeURIComponent(d.cod || "") + '\',\'' + encodeURIComponent(d.prov || "") + '\')">📦 ' + _impDetLbl(d) + '</button></div>';
+  }).join('') + '</div>';
+  _impRecShell("📦 Baches", h);
+}
 async function impRecibirBache(bacheId) {
   _impRecShell("📥 Recibir importación", '<div class="irc-muted">Cargando lugares del Mapa…</div>');
   var ctx;
@@ -2440,10 +2471,24 @@ function _impRecRender() {
       lug.map(function (o) { return '<option value="' + escapeHtml(o.v) + '"' + (l.sector === o.v ? ' selected' : '') + '>' + escapeHtml(o.t) + '</option>'; }).join('') + '</select>';
     var insHtml = (l.destino === "insumos" && (c.insumos_cods || []).length > 1)
       ? '<select onchange="impRecLinea(' + i + ',\'cod_insumo\',this.value)">' + c.insumos_cods.map(function (x) { return '<option' + (l.cod_insumo === x ? ' selected' : '') + '>' + escapeHtml(x) + '</option>'; }).join('') + '</select>' : '';
-    var unidad = l.destino === "insumos" ? "u" : "cajas";
-    h += '<div class="irc-row"><input type="number" min="1" style="width:92px" value="' + (l.cantidad || "") + '" onchange="impRecLinea(' + i + ',\'cantidad\',this.value)"><span class="irc-muted">' + unidad + ' →</span>' +
+    /* v24.80 (Luis, 30/09): la carga puede ir en CAJAS o en UNIDADES. En unidades se convierte a cajas
+       con la UxB (la recepción graba cajas enteras): se redondea a la caja más cercana y se dice la diferencia. */
+    var enU = l.destino !== "insumos" && l.modo === "u";
+    var qIn = '<input type="number" min="1" style="width:92px" value="' + ((enU ? l.uni : l.cantidad) || "") + '" onchange="impRecLinea(' + i + ',\'' + (enU ? 'uni' : 'cantidad') + '\',this.value)">';
+    var uSel = l.destino === "insumos" ? '<span class="irc-muted">u →</span>'
+      : '<select title="Cargar en cajas o en unidades" onchange="impRecLinea(' + i + ',\'modo\',this.value)"><option value="cajas"' + (enU ? '' : ' selected') + '>cajas</option><option value="u"' + (enU ? ' selected' : '') + '>unidades</option></select><span class="irc-muted">→</span>';
+    h += '<div class="irc-row">' + qIn + uSel +
       '<select onchange="impRecLinea(' + i + ',\'destino\',this.value)">' + opts + '</select>' + lugHtml + insHtml +
       (_impRec.lineas.length > 1 ? '<button class="irc-b rm" onclick="impRecQuitar(' + i + ')">✕</button>' : '') + '</div>';
+    if (enU && Number(l.uni) > 0) {
+      var _uxcL = Number(_impRec.uxc) || 0;
+      if (!(_uxcL > 0)) h += '<div class="irc-conf" style="margin:-2px 0 6px">Para convertir unidades a cajas falta cuántas unidades trae cada caja (arriba).</div>';
+      else {
+        var _difU = (Number(l.cantidad) || 0) * _uxcL - Number(l.uni);
+        h += '<div class="irc-muted" style="margin:-2px 0 6px">= <b>' + (Number(l.cantidad) || 0).toLocaleString("es-AR") + ' cajas</b> de ' + _uxcL + ' u' +
+          (_difU ? ' · <span style="color:#b45309;font-weight:800">no da cajas enteras: ' + Number(l.uni).toLocaleString("es-AR") + ' u ÷ ' + _uxcL + ' = ' + (Number(l.uni) / _uxcL).toLocaleString("es-AR", { maximumFractionDigits: 2 }) + ', se graban ' + ((Number(l.cantidad) || 0) * _uxcL).toLocaleString("es-AR") + ' u (' + (_difU > 0 ? '+' : '') + _difU.toLocaleString("es-AR") + ' u)</span>' : '') + '</div>';
+      }
+    }
     var cf = _impRec.sim && (_impRec.sim.conflictos || []).filter(function (x) { return x.destino === l.destino && (x.sector || "") === (l.sector || ""); })[0];
     if (cf && !l.resolucion) h += _impRecConfHtml(cf, l, i);
     else if (l.resolucion === "forzar") h += '<div class="irc-muted" style="margin:-2px 0 6px">⚠ Se manda igual (queda anotado en el historial). <a href="#" onclick="impRecLinea(' + i + ',\'resolucion\',\'\');return false">deshacer</a></div>';
@@ -2492,13 +2537,25 @@ function _impRecTotales() {
   _impRec.lineas.forEach(function (l) { var q = Number(l.cantidad) || 0; if (l.destino === "insumos") insU += q; else cajas += q; });
   return { cajas: cajas, insU: insU, uni: cajas * uxc + insU };
 }
-function impRecSet(k, v) { if (!_impRec) return; _impRec[k] = v; _impRec.sim = null; _impRec.err = ""; _impRecRender(); }
+// v24.80 — una línea cargada en unidades: cajas = unidades ÷ UxB, redondeado a la caja más cercana.
+function _impRecUniACajas(l) {
+  if (!l || l.destino === "insumos" || l.modo !== "u") return;
+  var u = Number(l.uni) || 0, x = Number(_impRec && _impRec.uxc) || 0;
+  l.cantidad = (u > 0 && x > 0) ? (Math.round(u / x) || 1) : "";
+}
+function impRecSet(k, v) {
+  if (!_impRec) return; _impRec[k] = v; _impRec.sim = null; _impRec.err = "";
+  if (k === "uxc") _impRec.lineas.forEach(_impRecUniACajas);
+  _impRecRender();
+}
 function impRecLinea(i, k, v) {
   if (!_impRec || !_impRec.lineas[i]) return;
   var l = _impRec.lineas[i];
-  l[k] = (k === "cantidad") ? (Number(v) || "") : v;
+  l[k] = (k === "cantidad" || k === "uni") ? (Number(v) || "") : v;
+  if (k === "modo" && v === "u" && !l.uni && Number(l.cantidad) > 0 && Number(_impRec.uxc) > 0) l.uni = Number(l.cantidad) * Number(_impRec.uxc);
+  if (k === "uni" || k === "modo") _impRecUniACajas(l);
   if (k === "destino") { l.sector = ""; l.resolucion = ""; if (v === "insumos" && !l.cod_insumo) l.cod_insumo = (_impRec.ctx.insumos_cods || [])[0] || _impRec.ctx.cod_stock; }
-  if (k === "sector" || k === "cantidad") l.resolucion = "";
+  if (k === "sector" || k === "cantidad" || k === "uni") l.resolucion = "";
   if (k !== "resolucion") { _impRec.sim = null; }
   _impRec.err = "";
   if (k === "resolucion" && _impRec.sim) { impRecRevisar(); return; }
@@ -2519,6 +2576,7 @@ function _impRecValidar() {
   if (tot.cajas > 0 && !(Number(_impRec.uxc) > 0)) return "Falta cuántas unidades trae cada caja.";
   for (var i = 0; i < _impRec.lineas.length; i++) {
     var l = _impRec.lineas[i];
+    if (l.destino !== "insumos" && l.modo === "u" && Number(l.uni) > 0 && !(Number(_impRec.uxc) > 0)) return "Para convertir unidades a cajas falta cuántas unidades trae cada caja.";
     if (!(Number(l.cantidad) > 0)) return "Cada destino tiene que tener una cantidad.";
     if ((l.destino === "gondola" || l.destino === "rack" || l.destino === "insumos") && !l.sector) return "Elegí el lugar de " + _IMP_REC_DEST[l.destino] + ".";
   }

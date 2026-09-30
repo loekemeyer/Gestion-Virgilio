@@ -55,7 +55,7 @@ const ITEMS = [
     _stkPop = { kind: "pedImp", data: { items: items, meses: 10 }, soloPedir: false, mcOverride: {} };
     _pedImpRender();
     const out = {};
-    out.botones = [...document.querySelectorAll(".mva-tbl.wide tbody tr")].map((tr) => tr.cells[0].textContent.trim().slice(0, 4) + "=" + /impRecibirAbrir/.test(tr.innerHTML)).sort();
+    out.botones = [...document.querySelectorAll(".mva-tbl.wide tbody tr")].map((tr) => tr.cells[0].textContent.trim().slice(0, 4) + "=" + /impRecibirCodigo/.test(tr.innerHTML)).sort();
     await impRecibirAbrir(11);
     const ov = () => document.getElementById("impRecOv");
     out.pideEmpresa = /¿De qué empresa es\?/.test(ov().innerHTML);
