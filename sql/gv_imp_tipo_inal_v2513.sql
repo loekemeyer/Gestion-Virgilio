@@ -467,10 +467,12 @@ insert into public."GV_Articulo_INAL" (codigo, tomado_de, marca, descripcion, im
   ('824E','824','Loekemeyer - Loke - Chef','Colador Ø 8cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('825E','825','Loekemeyer - Loke - Chef','Colador Ø 10 Cm','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
   ('826E','826','Loekemeyer - Loke - Chef','Colador 13','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
-  -- D6 (Thomas, 30/09): los coladores Loke 111 y 112 también llevan INAL (no estaban en la planilla;
-  -- sin certificado cargado: se completa cuando llegue)
-  ('111',null,'Loke','Ø 8 Colador N10 (Thomas 30/09)',null,null,null,null),
-  ('112',null,'Loke','Colador 16 cm Ac. Inox. (Thomas 30/09)',null,null,null,null)
+  -- D6/D9 (Thomas, 30/09): el 111 es el «111E» del certificado SENASA (la planilla le puso mal la
+  -- descripción: es el Colador 10 cm, no un abrelatas). El 112 y el 035E van en un INAL NUEVO todavía
+  -- sin número (tarea de Viviana en Planify, 13/10): llevan INAL con el certificado pendiente.
+  ('111',null,'Loekemeyer - Loke - Chef','Ø 8 Colador N10 (Thomas 30/09)','CHEF SRL','ZHEJIANG HONGTAI KITCHENWARE CO,.LTD','CE-2026-80730216-APN-DNIYCA#SENASA','2031-08-21'),
+  ('112',null,'Loke','Colador 16 cm Ac. Inox. (Thomas 30/09)',null,null,null,null),
+  ('035E',null,'LK','Cernidor Harina Ac. Inox. (INAL nuevo, pendiente)',null,null,null,null)
 on conflict (codigo) do update set tomado_de = excluded.tomado_de, marca = excluded.marca, descripcion = excluded.descripcion,
   importador = excluded.importador, elaborador = excluded.elaborador, certificado = excluded.certificado,
   vence = excluded.vence, cargado_en = now();
