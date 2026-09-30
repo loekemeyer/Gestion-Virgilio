@@ -20301,7 +20301,13 @@ function _stkProyDetHtml(mes) {
     v = '<table><tr><th>cliente</th><th class="n">' + _stkProyUniTxt() + '</th></tr>';   // v23.44: sigue al switch Cajas/Unidades
     d.filas.forEach(function (r) {
       var otros = String(r.cliente || "").toLowerCase() === "otros";
+      // v25.01 (Luis) la familia entra en el detalle: de qué código salió cada cliente
+      // ("702E 7 · 702EN 59", en cajas desde la base; se pasa por fc() para seguir al switch).
+      var cods = r.codigos ? String(r.codigos).split(" · ").map(function (p) {
+        var m = p.match(/^(\S+)\s+(-?[\d.]+)$/); return m ? esc(m[1]) + " " + fc(m[2]) : esc(p);
+      }).join(" · ") : "";
       v += '<tr' + (otros ? ' class="otros"' : '') + '><td>' + esc(r.cliente || "—") +
+           (cods ? '<div style="font-size:11.5px;font-weight:600;color:#64748b;">' + cods + '</div>' : '') +
            '</td><td class="n">' + fc(r.cajas) + '</td></tr>';
     });
     v += '</table>';

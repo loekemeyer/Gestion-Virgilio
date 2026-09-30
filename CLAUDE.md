@@ -6503,6 +6503,17 @@ columna izquierda pasó a **1,15fr** contra 1fr. `resumirCliente` / `clienteTand
 más NPs de las que entran, que empiece a rotar"*). `activarTicker` duplica el texto sólo en la celda que se desborda
 (giro sin salto, ~6 caracteres por segundo); las que entran quedan quietas. Columnas 17/9/26/28 %. Candado en `mon-tv` (E32A con 9 NP rota, E30A no).
 
+## ⚠ REGLA (Luis, 2026-09-30, v25.01): el DESGLOSE por cliente del pop-up de proyección cuenta lo MISMO que el total
+
+Caso 702E julio: el total decía 1.644 u (137 cajas: 18 del 702E + 119 del **702EN**, su secundario) y el
+desglose «🧾 Facturado» 216 u. El total (`ventas_mensuales_cod`) suma la familia y lee `ventas_proy_lineas`
+(regla L, sin ventas entre empresas); el desglose pedía sólo el principal sobre `sales_lines` cruda.
+Hoy `gv_ventas_clientes_mes_cod` manda la familia a **`fn_ventas_clientes_mes_fam_virgilio`** (LK), con los
+mismos tres criterios, y cada cliente dice de qué código salió (`702E 7 · 702EN 59`, columna `codigos`).
+`fn_ventas_clientes_mes_virgilio` (la vieja) queda sin llamador, de rollback. Centinela `Equivalencias_Familia`.
+**Al tocar un criterio del total mensual, tocar también el desglose.** Problema 640.
+`sql/gv_proy_desglose_familia_v2501.sql`, `sql/gv_proy_desglose_familia_v2501_LK.sql`, `tests/proy-entregadas.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-30): el pedido con importados sin stock va COMPLETO — ya no se parte
 
 **Luis:** *"que deje de partir el pedido… programá el pedido completo (como antes del cambio)"*.
