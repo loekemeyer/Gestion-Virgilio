@@ -6236,7 +6236,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.16"></script>
+<script type="module" src="recepcion.js?v=25.20"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10278,7 +10278,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.16";
+const APP_VERSION = "v25.20";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15913,6 +15913,38 @@ function stkSubscribeRealtime() {
 function stkUnsubscribeRealtime() {
   if (_stkRtSub) { try { sb.removeChannel(_stkRtSub); } catch(_e){} _stkRtSub = null; }
 }
+/* v25.18 (Luis, 30/09): "⟳ Refrescar ya". El refresco completo tarda ~7,4 s y el rol del
+   navegador corta a los 8 s, así que NO se corre desde acá: gv_stock_refrescar_ya() agenda un
+   job de pg_cron de un disparo (≈2 s) y esta función espera mirando gv_stock_refresco_ultimo()
+   hasta que cambia; recién ahí vuelve a leer stocks_carga_rapida y redibuja en la misma solapa. */
+async function stkRefrescarYa() {
+  var btn = document.getElementById("stkRefYaBtn");
+  var set = function (t, dis) { var b2 = document.getElementById("stkRefYaBtn"); if (b2) { b2.textContent = t; b2.disabled = !!dis; } };
+  if (btn && btn.disabled) return;
+  var cli = window.sb;
+  if (!cli) { alert("No hay sesión de supervisor para refrescar."); return; }
+  set("⟳ Refrescando…", true);
+  try {
+    var r = await cli.rpc("gv_stock_refrescar_ya");
+    if (r.error) throw r.error;
+    var antes = r.data && r.data.antes ? Date.parse(r.data.antes) : 0;
+    var t0 = Date.now(), listo = false;
+    while (Date.now() - t0 < 45000) {
+      await new Promise(function (res) { setTimeout(res, 1500); });
+      var u = await cli.rpc("gv_stock_refresco_ultimo");
+      if (!u.error && u.data && Date.parse(u.data) > antes) { listo = true; break; }
+    }
+    if (!listo) { set("⟳ Refrescar ya", false); alert("El refresco sigue corriendo en el servidor; en un momento se ve solo."); return; }
+    if (!_stk) return;
+    var keep = { tab: _stk.tab, filtro: _stk.filtro, solo: _stk.soloConteo };
+    closeStockAdmin();
+    await openStockAdmin(keep.solo);
+    if (_stk) { _stk.tab = keep.tab; _stk.filtro = keep.filtro; stkRender(); }
+  } catch (e) {
+    set("⟳ Refrescar ya", false);
+    alert("No se pudo refrescar: " + ((e && e.message) || e) + "\nNo se cambió nada; probá de nuevo.");
+  }
+}
 function closeStockAdmin() { const ov = document.getElementById("stockAdminOverlay"); if (ov) ov.classList.remove("show"); stkUnsubscribeRealtime(); _stk = null; }
 
 /* ===== ÓRDENES DE COMPRA (v4.11): visualización/carga de OCs y match recibido vs pedido.
@@ -19533,6 +19565,10 @@ function stkBodyStocks() {
         ? '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="#16a34a" stroke="none"/><path d="M6.5 11.5 L9.5 14.5 L15.5 8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
         : '<svg width="22" height="22" viewBox="0 0 22 22" style="animation:stkSpin 1s linear infinite"><circle cx="11" cy="11" r="9" fill="none" stroke="#e2e8f0" stroke-width="2.5"/><circle cx="11" cy="11" r="9" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-dasharray="40 60" stroke-linecap="round"/></svg>') +
     '</span>' +
+    // v25.6 (Luis) — forzar el refresco de lo que NO es saldo (pedidas, proyección, capacidad,
+    // FC s/salida, altas y bajas de códigos). Los saldos ya llegan en vivo por el trigger +
+    // realtime; esto adelanta el cron de 2 min. Ver stkRefrescarYa.
+    '<button type="button" id="stkRefYaBtn" onclick="stkRefrescarYa()" title="Recalcula ya pedidas, proyección, capacidad y FC s/salida (sin esperar los 2 min del ciclo automático). Los saldos por depósito ya se ven en vivo." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;color:#1e3a8a;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">⟳ Refrescar ya</button>' +
     '</div>';
   // v10.44 — aviso "histórico" (cuando se mira stock a una fecha pasada), debajo de la barra única.
   if (_stk.asOf) h += '<div style="margin:0 0 10px;font-size:12.5px;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:5px 9px;">📅 Stock al <b>' + escapeHtml(stockFmtTs(_stk.asOf)) + '</b> hs (histórico, no el actual)</div>';
@@ -57693,7 +57729,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.16"></script>
+<script src="importacion.js?v=25.20"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -58101,8 +58137,13 @@ window.showCervAdmin = showCervAdmin;
    no links a otros repos: esto es una integración, todo vive en Gestión (decisión del
    dueño, 2026-09-10). Cada copia entra por su propio index.html, que decide si va al
    menú o al login; la sesión de Google ya es la misma. */
+/* v25.19 (Luis, 30/09, D9): GP2 va por LINK DIRECTO a su publicación, no a la copia: la copia se
+   quedaba atrás (el 30/09 estaba en v1.137 con la real en v1.211). Se abre en otra pestaña porque es
+   otro sitio: ahí pide su propio login. El "entero" sigue siendo la copia de acá. */
+var GP2_URL = "https://gesti-n-productiva-2-0.vercel.app/GP2_MODULOS.html";
 window.abrirAdminCervantes = function (cual) {
-  window.location.href = (cual === "gp2") ? "cervantes-admin/gp2/" : "cervantes-admin/entero/";
+  if (cual === "gp2") { var w = window.open(GP2_URL, "_blank", "noopener"); if (!w) window.location.href = GP2_URL; return; }
+  window.location.href = "cervantes-admin/entero/";
 };
 window.cambiarPlanta = function () {
   __plantChosen = false;
@@ -60453,7 +60494,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.16"></script>
+<script src="cobranzas.js?v=25.20"></script>
 
 </body>
 </html>
