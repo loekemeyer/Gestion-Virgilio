@@ -2435,7 +2435,10 @@ function _impRecErr(e) {
   if (i >= 0) { try { var j = JSON.parse(m.slice(i + 3)); if (j && j.message) return j.message; } catch (_e) {} }
   return m;
 }
-var _IMP_REC_DEST = { a_guardar: "A guardar", gondola: "Góndola", rack: "Rack", excedente: "Excedente", insumos: "Insumos" };
+/* v25.10 (Luis, 30/09): «Cervantes» va PRIMERO — lo importado que va directo a Cervantes (sobre todo insumos)
+   no entra al stock de Virgilio: queda como aviso en la portada de GP2 («VIRGILIO DICE QUE TE LLEGÓ ESTO»,
+   tabla GP2.ingreso_virgilio). Un insumo va en su unidad; lo demás, en cajas. */
+var _IMP_REC_DEST = { cervantes: "Cervantes", a_guardar: "A guardar", gondola: "Góndola", rack: "Rack", excedente: "Excedente", insumos: "Insumos" };
 function _impRecCss() {
   if (document.getElementById("impRecCss")) return;
   var st = document.createElement("style"); st.id = "impRecCss";
@@ -2537,7 +2540,7 @@ async function impRecibirBache(bacheId) {
   var soloInsumo = !!ctx.es_insumo || (!(ctx.gondola || []).length && (ctx.insumos_cods || []).length > 0 && !uxc);
   var cajasDef = uxc > 0 ? Math.round((Number(ctx.pendiente) || 0) / uxc) : 0;
   _impRec = {
-    ctx: ctx, empresa: ctx.empresa || "LK", empresaBache: ctx.empresa || "", uxc: uxc || "", nota: "", hecho: false, sim: null,
+    ctx: ctx, soloInsumo: soloInsumo, empresa: ctx.empresa || "LK", empresaBache: ctx.empresa || "", uxc: uxc || "", nota: "", hecho: false, sim: null,
     cerrar: true, cid: "imprec-" + bacheId + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
     lineas: [soloInsumo
       ? { destino: "insumos", sector: "", cantidad: Number(ctx.pendiente) || "", cod_insumo: (ctx.insumos_cods || [])[0] || ctx.cod_stock, resolucion: "" }
@@ -2545,6 +2548,7 @@ async function impRecibirBache(bacheId) {
   };
   _impRecRender();
 }
+function _impRecU(l) { return !!l && (l.destino === "insumos" || (l.destino === "cervantes" && !!(_impRec && _impRec.soloInsumo))); }
 function _impRecLugares(l) {
   var c = _impRec.ctx, emp = _impRec.empresa;
   if (l.destino === "gondola") return (c.gondola || []).filter(function (g) { return !c.dual || !emp || g.empresa === emp; })
@@ -2571,7 +2575,7 @@ function _impRecRender() {
   }
   h += '<div class="irc-sec"><h4>¿Cuánto llegó y a dónde va?</h4>' +
     // v24.83 — un insumo no lleva UxB: el renglón sólo aparece si algún destino va en cajas
-    (_impRec.lineas.some(function (l) { return l.destino !== "insumos"; })
+    (_impRec.lineas.some(function (l) { return !_impRecU(l); })
       ? '<div class="irc-row"><span class="irc-muted">Unidades por caja</span><input type="number" min="1" style="width:80px" value="' + (_impRec.uxc || "") + '" onchange="impRecSet(\'uxc\',this.value)"></div>' : '');
   _impRec.lineas.forEach(function (l, i) {
     var opts = Object.keys(_IMP_REC_DEST).filter(function (k) { return k !== "insumos" || (c.insumos_cods || []).length; })
@@ -2581,16 +2585,16 @@ function _impRecRender() {
     if (l.destino === "gondola" && !lug.length) lugHtml = '<span class="irc-conf" style="margin:0">Este código no tiene celda de góndola en el Mapa' + (c.dual && _impRec.empresa ? ' para ' + _impRec.empresa : '') + '</span>';
     else if (lug.length) lugHtml = '<select onchange="impRecLinea(' + i + ',\'sector\',this.value)"><option value="">— lugar —</option>' +
       lug.map(function (o) { return '<option value="' + escapeHtml(o.v) + '"' + (l.sector === o.v ? ' selected' : '') + '>' + escapeHtml(o.t) + '</option>'; }).join('') + '</select>';
-    var insHtml = (l.destino === "insumos" && (c.insumos_cods || []).length > 1)
+    var insHtml = (_impRecU(l) && (c.insumos_cods || []).length > 1)
       ? '<select onchange="impRecLinea(' + i + ',\'cod_insumo\',this.value)">' + c.insumos_cods.map(function (x) { return '<option' + (l.cod_insumo === x ? ' selected' : '') + '>' + escapeHtml(x) + '</option>'; }).join('') + '</select>' : '';
     /* v24.80 (Luis, 30/09): la carga puede ir en CAJAS o en UNIDADES. En unidades se convierte a cajas
        con la UxB (la recepción graba cajas enteras): se redondea a la caja más cercana y se dice la diferencia. */
-    var enU = l.destino !== "insumos" && l.modo === "u";
+    var enU = !_impRecU(l) && l.modo === "u";
     var qIn = '<input type="number" min="1" style="width:92px" value="' + ((enU ? l.uni : l.cantidad) || "") + '" onchange="impRecLinea(' + i + ',\'' + (enU ? 'uni' : 'cantidad') + '\',this.value)">';
     /* v24.83 (Luis, 30/09): un insumo NO se carga en cajas ni por UxB: se pregunta cuánto entra en SU unidad de
        medida (la base de Insumos_Factores, que trae el contexto; sin dato = unidades). */
-    var _insU = l.destino === "insumos" ? ((c.insumos_unidad || {})[l.cod_insumo || ""] || "Uni") : "";
-    var uSel = l.destino === "insumos" ? '<span class="irc-muted" title="Unidad de medida del insumo ' + escapeHtml(l.cod_insumo || "") + '">' + escapeHtml(_insU === "Uni" ? "unidades" : _insU) + ' →</span>'
+    var _insU = _impRecU(l) ? ((c.insumos_unidad || {})[l.cod_insumo || ""] || "Uni") : "";
+    var uSel = _impRecU(l) ? '<span class="irc-muted" title="Unidad de medida del insumo ' + escapeHtml(l.cod_insumo || "") + '">' + escapeHtml(_insU === "Uni" ? "unidades" : _insU) + ' →</span>'
       : '<select title="Cargar en cajas o en unidades" onchange="impRecLinea(' + i + ',\'modo\',this.value)"><option value="cajas"' + (enU ? '' : ' selected') + '>cajas</option><option value="u"' + (enU ? ' selected' : '') + '>unidades</option></select><span class="irc-muted">→</span>';
     h += '<div class="irc-row">' + qIn + uSel +
       '<select onchange="impRecLinea(' + i + ',\'destino\',this.value)">' + opts + '</select>' + lugHtml + insHtml +
@@ -2610,7 +2614,7 @@ function _impRecRender() {
   });
   var tot = _impRecTotales();
   h += '<button class="irc-b sec" onclick="impRecAgregar()">＋ Otro destino (partir la carga)</button>' +
-    '<div class="irc-muted" style="margin-top:6px">Total: <b>' + tot.cajas + ' cajas</b>' + (tot.insU ? ' + <b>' + tot.insU.toLocaleString("es-AR") + ' u</b> a insumos' : '') +
+    '<div class="irc-muted" style="margin-top:6px">Total: <b>' + tot.cajas + ' cajas</b>' + (tot.insU ? ' + <b>' + tot.insU.toLocaleString("es-AR") + ' u</b> de insumo' : '') +
     ' = <b>' + tot.uni.toLocaleString("es-AR") + ' u</b> de ' + pend.toLocaleString("es-AR") + ' pendientes' +
     (tot.uni > pend ? ' · <span style="color:#b45309;font-weight:800">llegan ' + (tot.uni - pend).toLocaleString("es-AR") + ' u más de lo pedido: entran todas al stock y el pedido queda recibido (lo de más no descuenta otros pedidos en viaje)</span>' : '') + '</div>' +
     (tot.uni > 0 && tot.uni < pend
@@ -2649,12 +2653,12 @@ function _impRecConfHtml(cf, l, i) {
 }
 function _impRecTotales() {
   var uxc = Number(_impRec.uxc) || 0, cajas = 0, insU = 0;
-  _impRec.lineas.forEach(function (l) { var q = Number(l.cantidad) || 0; if (l.destino === "insumos") insU += q; else cajas += q; });
+  _impRec.lineas.forEach(function (l) { var q = Number(l.cantidad) || 0; if (_impRecU(l)) insU += q; else cajas += q; });
   return { cajas: cajas, insU: insU, uni: cajas * uxc + insU };
 }
 // v24.80 — una línea cargada en unidades: cajas = unidades ÷ UxB, redondeado a la caja más cercana.
 function _impRecUniACajas(l) {
-  if (!l || l.destino === "insumos" || l.modo !== "u") return;
+  if (!l || _impRecU(l) || l.modo !== "u") return;
   var u = Number(l.uni) || 0, x = Number(_impRec && _impRec.uxc) || 0;
   l.cantidad = (u > 0 && x > 0) ? (Math.round(u / x) || 1) : "";
 }
@@ -2669,7 +2673,7 @@ function impRecLinea(i, k, v) {
   l[k] = (k === "cantidad" || k === "uni") ? (Number(v) || "") : v;
   if (k === "modo" && v === "u" && !l.uni && Number(l.cantidad) > 0 && Number(_impRec.uxc) > 0) l.uni = Number(l.cantidad) * Number(_impRec.uxc);
   if (k === "uni" || k === "modo") _impRecUniACajas(l);
-  if (k === "destino") { l.sector = ""; l.resolucion = ""; if (v === "insumos" && !l.cod_insumo) l.cod_insumo = (_impRec.ctx.insumos_cods || [])[0] || _impRec.ctx.cod_stock; }
+  if (k === "destino") { l.sector = ""; l.resolucion = ""; if ((v === "insumos" || (v === "cervantes" && _impRec.soloInsumo)) && !l.cod_insumo) l.cod_insumo = (_impRec.ctx.insumos_cods || [])[0] || _impRec.ctx.cod_stock; }
   if (k === "sector" || k === "cantidad" || k === "uni") l.resolucion = "";
   if (k !== "resolucion") { _impRec.sim = null; }
   _impRec.err = "";
@@ -2691,7 +2695,7 @@ function _impRecValidar() {
   if (tot.cajas > 0 && !(Number(_impRec.uxc) > 0)) return "Falta cuántas unidades trae cada caja.";
   for (var i = 0; i < _impRec.lineas.length; i++) {
     var l = _impRec.lineas[i];
-    if (l.destino !== "insumos" && l.modo === "u" && Number(l.uni) > 0 && !(Number(_impRec.uxc) > 0)) return "Para convertir unidades a cajas falta cuántas unidades trae cada caja.";
+    if (!_impRecU(l) && l.modo === "u" && Number(l.uni) > 0 && !(Number(_impRec.uxc) > 0)) return "Para convertir unidades a cajas falta cuántas unidades trae cada caja.";
     if (!(Number(l.cantidad) > 0)) return "Cada destino tiene que tener una cantidad.";
     if ((l.destino === "gondola" || l.destino === "rack" || l.destino === "insumos") && !l.sector) return "Elegí el lugar de " + _IMP_REC_DEST[l.destino] + ".";
   }
@@ -2699,7 +2703,7 @@ function _impRecValidar() {
 }
 function _impRecBody(simular) {
   return { p_bache_id: _impRec.ctx.bache_id, p_empresa: _impRec.empresa || null, p_uni_x_caja: Number(_impRec.uxc) || null,
-    p_destinos: _impRec.lineas.map(function (l) { return { destino: l.destino, sector: l.sector || null, cantidad: Number(l.cantidad), cod_insumo: l.cod_insumo || null, resolucion: l.resolucion || null }; }),
+    p_destinos: _impRec.lineas.map(function (l) { return { destino: l.destino, sector: l.sector || null, cantidad: Number(l.cantidad), cod_insumo: l.cod_insumo || null, resolucion: l.resolucion || null, unidad: _impRecU(l) ? "Uni" : null }; }),
     p_nota: _impRec.nota || null, p_simular: !!simular, p_cerrar: _impRec.cerrar !== false, p_client_id: _impRec.cid };
 }
 async function impRecRevisar() {
@@ -2715,7 +2719,7 @@ async function impRecGrabar() {
   var tot = _impRecTotales(), pend = Number(_impRec.ctx.pendiente) || 0;
   var resumen = "Recibir " + tot.uni.toLocaleString("es-AR") + " u de " + (_impRec.ctx.cod_stock || _impRec.ctx.cod_art) +
     (_impRec.ctx.dual ? " (" + _impRec.empresa + ")" : "") + ":\n" +
-    _impRec.lineas.map(function (l) { return "  · " + l.cantidad + (l.destino === "insumos" ? " u" : " cajas") + " → " + _IMP_REC_DEST[l.destino] + (l.sector ? " " + l.sector : ""); }).join("\n") +
+    _impRec.lineas.map(function (l) { return "  · " + l.cantidad + (_impRecU(l) ? " u" : " cajas") + " → " + _IMP_REC_DEST[l.destino] + (l.sector ? " " + l.sector : ""); }).join("\n") +
     "\n\n" + (tot.uni >= pend ? "El pedido queda RECIBIDO" + (tot.uni > pend ? " (llegan " + (tot.uni - pend) + " u de más)." : ".")
       : (_impRec.cerrar ? "El pedido queda RECIBIDO: las " + (pend - tot.uni) + " u que faltan dejan de figurar en viaje." : "Siguen en viaje " + (pend - tot.uni) + " u.")) +
     "\n\n¿Confirmás?";
@@ -2727,11 +2731,12 @@ async function impRecGrabar() {
   _impRec.grabando = false;
   if (!r || !r.ok) { _impRec.sim = r; _impRec.err = "Apareció un conflicto de espacio mientras cargabas: resolvelo y confirmá de nuevo."; _impRecRender(); return; }
   _impRec.hecho = true;
-  var dest = _impRec.lineas.map(function (l) { return l.cantidad + (l.destino === "insumos" ? " u" : " cj") + " → " + _IMP_REC_DEST[l.destino] + (l.sector ? " " + l.sector : ""); }).join(" · ");
+  var dest = _impRec.lineas.map(function (l) { return l.cantidad + (_impRecU(l) ? " u" : " cj") + " → " + _IMP_REC_DEST[l.destino] + (l.sector ? " " + l.sector : ""); }).join(" · ");
   _impRecShell("📥 Recepción grabada", '<div class="irc-ok">✓ Recibidas <b>' + Number(r.unidades).toLocaleString("es-AR") + ' u</b> (' + r.cajas + ' cajas). ' + escapeHtml(dest) + '</div>' +
     '<div class="irc-muted" style="margin-top:8px">' + (r.repetida ? "(Ya estaba grabada: no se cargó dos veces.) " : "") +
     (r.estado === "llegado" ? "El pedido quedó RECIBIDO y ya no figura en viaje." + (Number(r.faltante) > 0 ? " Faltaron " + Number(r.faltante).toLocaleString("es-AR") + " u (anotadas)." : "") : "El pedido sigue en curso con lo que falta.") +
     (Number(r.sobra) > 0 ? ' Llegaron ' + Number(r.sobra).toLocaleString("es-AR") + ' u más de lo pedido: entraron al stock igual.' : '') + '</div>' +
+    (_impRec.lineas.some(function (l) { return l.destino === "cervantes"; }) ? '<div class="irc-ok" style="margin-top:8px">🏭 Lo que va a <b>Cervantes</b> no entró al stock de Virgilio: les aparece en la portada de GP2 para que lo confirmen y lo ubiquen.</div>' : '') +
     '<div style="margin-top:10px"><button class="irc-b pri" onclick="impRecCerrar()">Listo</button><button class="irc-b sec" onclick="impRecCerrar();openImpHistRecep()">Ver historial de recepción</button></div>');
 }
 /* Solapa 🚫 Discontinuos (v24.49, Thomas: "no deben aparecer en módulo importados, sino dentro de

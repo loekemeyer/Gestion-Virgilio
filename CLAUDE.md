@@ -6556,7 +6556,7 @@ de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (
 - **Insumo** = parte de `vista_importados_partes` cuyo propio código NO está entre los terminados que la usan
   (1000900, 505C, 523C, 587C, 1546903; **590E no**: se vende). `esInsumo` en `ocgFetchImportados`.
 - **Sin empresa**: `_impPlantaVista` y `_pedImpEmpFoto` devuelven vacío. En la base, `Importados.marca` y sus baches
-  son **`Mixto`** (v25.5, Luis: *"debería ser Mixto desde el vamos"*), igual que los movimientos de insumos. `Mixto` se lee
+  son **`Mixto`** (v25.9, Luis: *"debería ser Mixto desde el vamos"*), igual que los movimientos de insumos. `Mixto` se lee
   como LK en todo lector (no es CH). Centinela: `select * from public.gv_importados_insumo_con_empresa;` — vacía = todo bien.
   `sql/gv_importados_insumo_mixto_v2509.sql`.
 - **Objetivo = (meses del proveedor + 2) × proyección de los productos que lo usan** (`INSUMO_MESES_PRODUCTO`),
@@ -6567,3 +6567,14 @@ de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (
   **`gv_gp2_stock_componente`** (total por componente), sólo lectura. Al 30/09: 1.137 filas, 5 con stock.
   **No hay vínculo** entre el código importado (1000900) y el componente GP2 (D1 «Espiral Sacacorcho»?): no se adivina.
   `sql/gv_gp2_inventario_v2501.sql`, `tests/pedimp-insumo-12m.cjs`.
+
+## ⚠ REGLA (Luis, 2026-09-30, v25.13): RECIBIR un importado en CERVANTES — no entra al stock de Virgilio, avisa en GP2
+
+- En 📥 RECIBIR el destino **🏭 Cervantes** va **primero** de la lista. Para un insumo va en **unidades**.
+- `gv_imp_recibir` con destino `cervantes` **no escribe `Movimientos_Stock`**: inserta en **`"GP2".ingreso_virgilio`**
+  (estado `pendiente`), y la portada de GP2 (`GP2_MODULOS.html`) muestra el cartel **«VIRGILIO DICE QUE TE LLEGÓ ESTO…
+  CONFIRMALO Y UBICALO»**. Confirmar y ubicar del lado de GP2 **falta implementar** (columnas `confirmado_*`,
+  `ubicacion_id`, `componente_id` ya están).
+- **↩ Anular** pasa la fila a `anulado`, y **frena si Cervantes ya confirmó**.
+- ⚠ No hay vínculo código importado ↔ `GP2.componente`: no se adivina.
+- `sql/gv_imp_recibir_cervantes_v2511.sql`, `tests/imp-recibir-cervantes.cjs`.
