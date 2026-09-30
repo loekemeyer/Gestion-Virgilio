@@ -30896,6 +30896,24 @@ evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositiv
 - **Rollback:** volver a correr `sql/gv_gp2_espejo_v2517.sql` (la función sin el bloque 4) y
   `drop table "GP2".virgilio_articulo_stock;`. `sql/gv_gp2_espejo_articulo_v2539.sql`.
 
+## §3.v2540 — El secundario sin stock se cambia SOLO por el principal en la NP web (v25.40, 30/09/2026)
+
+- **Pedido (Thomas):** la NP web es de Gestión y el Excel de ISIS se arma al facturar, así que el cambio
+  secundario → principal lo hace el programa en vez del «✓ Ya lo cambié» del panel 🔀 Corregir códigos.
+- **Objetos nuevos:** tabla `GV_NP_Cambio_Codigo` (RLS, SELECT anon/authenticated, sin escritura), función
+  `gv_web_np_sec_auto(p_simular, p_por)` (SECURITY DEFINER, sin EXECUTE para anon), trigger
+  `trg_gv_ppp_web_base_np_cambio` (BEFORE INSERT/UPDATE sobre `PPP_Web_Base`, tabla nuestra), cron
+  `gv-np-sec-auto` (jobid **119**, `2-59/5 9-23 * * *`), interruptor `PPP_Web_Config.np_sec_auto_activo = 1`.
+- **Objeto tocado:** `gv_ppp_web_base_podar`, parche sobre la definición viva (marcador `v25.39-np-cambio`):
+  el principal cuenta como la línea del secundario en esa NP. **Edge Function** `gv-ppp-web-tandas-diarias` v44.
+- **Medido:** prueba en transacción abortada sobre LK 0278 — 64 líneas antes y después, 333 → 948E (1 caja);
+  un escritor crudo que vuelve a mandar el 333 no lo repone y el podado no saca el 948E. En vivo: la corrida de
+  las 18:22 del cron 119 hizo el cambio y la NP salió del panel. Edge v44 comparada byte a byte con el repo.
+- **Rollback:** `select cron.unschedule('gv-np-sec-auto');` · `update public."PPP_Web_Config" set valor = 0
+  where clave = 'np_sec_auto_activo';` · para deshacer UN cambio, borrar su fila de `GV_NP_Cambio_Codigo` (la
+  corrida siguiente de la Edge Function repone el secundario si la tanda no empezó). Redeploy de la v43:
+  `supabase/functions/gv-ppp-web-tandas-diarias/index.ts` de `a05dd51`. `sql/gv_np_secundario_auto_v2540.sql`.
+
 ## §3.v2541 — lo que Cervantes MANDA a Virgilio: aviso Sí / No (D4, v25.41, 30/09/2026)
 
 - **Pedido (Thomas, "D4 si"):** lo que la tablet de Cervantes envía a Virgilio llega a Gestión Virgilio como
@@ -30914,4 +30932,3 @@ evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositiv
 - ⚠ **Un `execute_sql` con varias sentencias es UNA transacción**: la primera aplicación se hizo junto con una
   prueba que terminaba en `raise exception` y se revirtió entera. Se reaplicó sola.
 - **Rollback:** los tres `drop function` y el `delete` del centinela, al pie de `sql/gv_envio_cervantes_v2540.sql`.
-
