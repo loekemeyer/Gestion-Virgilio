@@ -1055,6 +1055,8 @@ echo "== pedimp-ancho-tabla (v24.32: sin hueco muerto entre Descripcion y Proy u
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-ancho-tabla.cjs
 echo "== pedimp-camino-fob (v24.74: FOB en viaje = u$s de los pedidos en curso; En camino y A pedir separadas) =="
 node tests/pedimp-camino-fob.cjs
+echo "== pedimp-quiebre (v24.75: alerta del que quiebra antes de que llegue la importacion) =="
+node tests/pedimp-quiebre.cjs
 
 echo "== ppp-retira-badge (v22.40: un RETIRA no se lee como reparto 'Zona 6 · 🚚 CABA') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-retira-badge.cjs
