@@ -53,7 +53,12 @@
       "mcp__github__get_check_run",
       "Bash(git push:*)",
       "Bash(git merge:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(node scripts/bump-version.cjs *)",
+      "Bash(node tests/*)"
     ],
     "ask": [
       "Bash(curl:*)",
