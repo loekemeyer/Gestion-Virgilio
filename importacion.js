@@ -1243,8 +1243,21 @@ function _pedImpEnCaminoHtml(it, cls) {
   const f = _pedImpDdmm(it.reingresoEst);
   return u.toLocaleString("es-AR") + (f ? ' <span class="' + (cls || 'pedimp-camino-f') + '" style="color:#0369a1;font-weight:700;font-size:12px" title="Llega (reingreso estimado)">' + f + '</span>' : ' <span style="color:#b45309;font-size:11px" title="Sin fecha de reingreso cargada">s/f</span>');
 }
-/* v24.73 (Thomas) — FOB de lo que viene en camino = unidades en camino × FOB u$s/u. */
-function _pedImpCaminoUsd(it) { const u = Math.max(0, Number(it && it.enCurso) || 0), f = Number(it && it.fobUni) || 0; return u > 0 && f > 0 ? u * f : 0; }
+/* v24.74 (Thomas) — «FOB en viaje» = los u$s TOTALES de los pedidos en viaje, el mismo número
+   de 🚢 En curso (gv_importados_pedidos_curso, una fila por PI + proveedor). No es una estimación
+   unidades × FOB de hoy. Se lee aparte y, si falla, no se muestra (no se inventa un 0). */
+var _pedImpViaje = { st: "", porProv: {}, nPorProv: {} };
+function _pedImpViajeCargar() {
+  if (_pedImpViaje.st === "cargando" || _pedImpViaje.st === "ok") return;
+  _pedImpViaje.st = "cargando";
+  _pedImpRpc("gv_importados_pedidos_curso", {}).then(function (rows) {
+    const u = {}, n = {};
+    (rows || []).forEach(function (r) { const p = String(r.proveedor || "").trim() || "(sin proveedor)"; const v = Number(r.usd) || 0; if (v > 0) { u[p] = (u[p] || 0) + v; n[p] = (n[p] || 0) + 1; } });
+    _pedImpViaje = { st: "ok", porProv: u, nPorProv: n };
+    if (_stkPop && _stkPop.kind === "pedImp") _pedImpRender();
+  }).catch(function () { _pedImpViaje.st = "error"; });
+}
+function _pedImpViajeUsd(prov) { return _pedImpViaje.st === "ok" ? (Number(_pedImpViaje.porProv[prov]) || 0) : 0; }
 function _pedImpPrioCmp(a, b) {
   const ma = _pedImpMesesStock(a), mb = _pedImpMesesStock(b);
   if (ma == null && mb != null) return 1;
@@ -1369,8 +1382,9 @@ function _pedImpRender() {
     '<span style="font-size:16px;font-weight:800;color:#1e3a8a;white-space:nowrap" title="Volumen total' + (_buscando ? ' (filtrado)' : '') + '">' + (Math.round(_gM3 * 100) / 100).toLocaleString("es-AR") + ' m³</span>' +
     // v24.73 (Thomas) — FOB de lo que ya viene en camino
     (function () { const _src = provFiltro ? allItems.filter(function (it) { return (it.prov || "(sin proveedor)") === provFiltro; }) : allItems;
-      const _c = _src.reduce(function (s, it) { return s + _pedImpCaminoUsd(it); }, 0);
-      return _c > 0 ? '<span class="pedimp-camino-fob-tot" style="font-size:13px;font-weight:800;color:#0369a1;white-space:nowrap" title="FOB de lo que ya viene en camino (unidades en camino × FOB)">en camino ' + _usd0(_c) + '</span>' : ''; })() +
+      _pedImpViajeCargar(); void _src;
+      const _c = provFiltro ? _pedImpViajeUsd(provFiltro) : Object.keys(_pedImpViaje.porProv || {}).reduce(function (s, p) { return s + _pedImpViajeUsd(p); }, 0);
+      return _c > 0 ? '<span class="pedimp-camino-fob-tot" style="font-size:13px;font-weight:800;color:#0369a1;white-space:nowrap" title="u$s totales de los pedidos en viaje (los mismos de 🚢 En curso)">en viaje ' + _usd0(_c) + '</span>' : ''; })() +
     // v24.60 (Thomas) — consumo por mes de todo lo que se ve (proy × FOB), aunque hoy no pida nada
     (function () { const _src = provFiltro ? allItems.filter(function (it) { return (it.prov || "(sin proveedor)") === provFiltro; }) : allItems;
       const _c = _src.reduce(function (s, it) { return s + (it.proyUni > 0 && it.fobUni > 0 ? it.proyUni * it.fobUni : 0); }, 0);
@@ -1397,7 +1411,7 @@ function _pedImpRender() {
     const totU = arr.reduce(function (s, it) { return s + _pedImpUniOf(it); }, 0);
     const totM3 = arr.reduce(function (s, it) { return s + _pedImpM3Of(it); }, 0);
     const totUsd = arr.reduce(function (s, it) { return s + _pedImpUsdOf(it); }, 0);
-    const totCamUsd = arr.reduce(function (s, it) { return s + _pedImpCaminoUsd(it); }, 0);
+    const totCamUsd = _pedImpViajeUsd(prov), nCam = Number(_pedImpViaje.nPorProv[prov]) || 0;
     const provEnc = encodeURIComponent(prov);
     // v22.37 — proyección al mínimo (usa la demanda NATURAL, no el MC editado): FOB a pedir
     // hoy, consumo mensual (proy×fob) y techo (objetivo lleno×fob).
@@ -1415,7 +1429,7 @@ function _pedImpRender() {
     h += '<div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 13px;background:#f8fafc;border-bottom:1px solid #e2e8f0">' +
       '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + _pedImpAlertaBadge(_nBajo) + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span class="pedimp-fob" style="color:#065f46;font-size:16px;font-weight:800;white-space:nowrap" title="FOB del pedido de este proveedor">FOB u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') +
-        (totCamUsd > 0 ? ' · <span class="pedimp-camino-fob" style="color:#0369a1;font-weight:800;white-space:nowrap" title="FOB de lo que ya viene en camino (unidades en camino × FOB u$s/u)">en camino FOB ' + _usd0(totCamUsd) + '</span>' : '') +
+        (totCamUsd > 0 ? ' · <span class="pedimp-camino-fob" style="color:#0369a1;font-weight:800;white-space:nowrap" title="u$s totales de ' + nCam + ' pedido(s) en viaje de este proveedor (los mismos de 🚢 En curso)">en viaje FOB ' + _usd0(totCamUsd) + '</span>' : '') +
         // v24.59 (Thomas) — el consumo por mes (proyección × FOB) vuelve acá, sin el mínimo
         (_burnN > 0 ? ' · <span class="pedimp-consumo" style="color:#b45309;font-weight:700" title="Consumo por mes: proyección u/mes × FOB de cada artículo">consumo ' + _usd0(_burnN) + '/mes</span>' : '') + '</div></div>' +
       '<div style="display:flex;gap:7px;flex:1 1 auto;min-width:0;max-width:100%;flex-wrap:wrap;align-items:center;justify-content:flex-end">' +   // v24.54 (Thomas): en el celular los botones se cortaban (no se veían los PDF): ahora bajan de línea
@@ -1438,7 +1452,7 @@ function _pedImpRender() {
     _anchoMax = Math.max(_anchoMax, _ancho);
     h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide pedimp-tbl" style="min-width:' + _ancho + 'px">' +
       '<colgroup>' + _cols.map(function (w) { return '<col style="width:' + w + 'px">'; }).join('') + '</colgroup>' +
-      '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="Meses de stock = (stock disponible + en camino) ÷ proyección por mes. En rojo, menos de 4 meses. Sin proyección: —. La tabla se ordena por esta columna (menos meses primero).">Meses<small>stock</small></th><th class="num" title="En camino: unidades ya pedidas que no llegaron, con la fecha estimada de llegada (dd/mm). Abajo, su FOB (unidades × FOB u$s/u)">En camino<small>FOB u$s</small></th><th class="num" title="A pedir: unidades calculadas para llegar al objetivo">A pedir<small>u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
+      '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="Meses de stock = (stock disponible + en camino) ÷ proyección por mes. En rojo, menos de 4 meses. Sin proyección: —. La tabla se ordena por esta columna (menos meses primero).">Meses<small>stock</small></th><th class="num" title="En camino: unidades ya pedidas que no llegaron, con la fecha estimada de llegada (dd/mm)">En camino<small>u · llega</small></th><th class="num" title="A pedir: unidades calculadas para llegar al objetivo">A pedir<small>u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.forEach(function (it) {
       const badge = it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '';
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
@@ -1496,7 +1510,7 @@ function _pedImpRender() {
       // código volvió a ser texto. Tocar el código para ver una proyección no se adivina.
       const _proyCaj = (Number(it.uxc) > 0) ? (Number(it.proyUni) || 0) / Number(it.uxc) : 0;
       const _proyCell = '<td class="num imp2 pedimp-proy" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td>';
-      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td>' + _proyCell + '<td class="num">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num imp2">' + _pedImpEnCaminoHtml(it) + '<small class="pedimp-camino-usd">' + (_pedImpCaminoUsd(it) > 0 ? _usd0(_pedImpCaminoUsd(it)) : '—') + '</small></td><td class="num pedimp-apedir">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + '<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:8px">' + _reingWebSwitchHtml(it.cod, it) + '</div></td><td>' + actHtml + '</td></tr>';
+      h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span></td>' + _proyCell + '<td class="num">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num">' + _pedImpEnCaminoHtml(it) + '</td><td class="num pedimp-apedir">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + '<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:8px">' + _reingWebSwitchHtml(it.cod, it) + '</div></td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
   });
@@ -1791,6 +1805,7 @@ async function _pedImpRpc(fn, body) {
   try { return await r.json(); } catch (_e) { return null; }
 }
 async function pedImpReload() {
+  _pedImpViaje.st = "";   // v24.74 — releer el u$s en viaje (pudo entrar o llegar un pedido)
   try { var data = await ocgFetchImportados(); if (_stkPop && _stkPop.kind === "pedImp") { _stkPop.data = data; _pedImpRender(); } } catch (_e) {}
 }
 /* v10.05 — cargar/editar el VOLUMEN de la master caja de un importado. Pide las medidas en cm
