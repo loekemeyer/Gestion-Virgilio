@@ -6236,7 +6236,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.85"></script>
+<script type="module" src="recepcion.js?v=24.86"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10278,7 +10278,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.85";
+const APP_VERSION = "v24.86";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20734,28 +20734,59 @@ function _rvBloqueHtml(b) {
   // v21.28 — el cuadro entra entero: ancho por dato (table-layout:auto, sin width:100% que
   // estire), padding mínimo y tipografía compacta. El overflow-x queda sólo de red para el
   // celular; en el monitor no tiene que hacer falta tocarlo.
-  h += '<div style="overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:6px">' +
-    '<table style="border-collapse:collapse;table-layout:auto;font-size:14px;background:#fff">';
-  // fila de BANDAS: una celda por grupo, con colspan. Las que no tienen título van
-  // vacías a propósito (Operario y las tres de horas del día), igual que en la planilla.
-  h += '<thead><tr>' + RV_BANDAS.map(function (bn) {
-    return '<th colspan="' + bn.n + '" style="padding:5px 10px;text-align:center;vertical-align:middle;' +
-      'background:#fff;color:#0f172a;font-size:15px;font-weight:800;line-height:1.2;white-space:nowrap;' +
-      'border-bottom:1px solid #cbd5e1;' + (bn.h ? 'border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;' : '') +
-      '">' + bn.h + '</th>';
-  }).join("") + '</tr><tr>' + RV_COLS.map(function (c) {
+  // v24.86 — ISLAS, igual que el PDF (Elías, 29/09): cada banda es un bloque con borde
+  // grueso y un hueco entre bloque y bloque. El hueco es una columna vacía (.rv-gap) sin
+  // borde: con border-collapse, el borde grueso de la celda vecina gana la línea compartida.
+  // Operario y las tres de horas del día no tienen banda: su encabezado ocupa las DOS filas
+  // (rowspan), como la celda combinada de la planilla y del PDF.
+  const GRUESO = "2px solid #0f172a", FINO = "1px solid #e2e8f0";
+  const islas = [];
+  let _ix = 0;
+  RV_BANDAS.forEach(function (bn) { islas.push({ h: bn.h, cols: RV_COLS.slice(_ix, _ix + bn.n) }); _ix += bn.n; });
+  const gap = function (tag, rs) {
+    return '<' + tag + ' class="rv-gap"' + (rs ? ' rowspan="' + rs + '"' : '') +
+      ' style="width:6px;min-width:6px;padding:0;border:none;background:transparent"></' + tag + '>';
+  };
+  const lados = function (j, n) {
+    return 'border-left:' + (j === 0 ? GRUESO : FINO) + ';border-right:' + (j === n - 1 ? GRUESO : FINO) + ';';
+  };
+  const thCol = function (c, j, n, extra) {
     const al = c.name ? "left" : "center";
-    const sticky = c.name ? "position:sticky;left:0;z-index:3;background:#fff;" : "";
-    return '<th style="' + sticky + 'padding:6px 7px;text-align:' + al + ';vertical-align:middle;background:#fff;color:#0f172a;font-size:16px;font-weight:800;line-height:1.2;border-bottom:2px solid #cbd5e1;white-space:nowrap;">' + c.h + '</th>';
+    const sticky = c.name ? "position:sticky;left:0;z-index:3;" : "";
+    return '<th data-rvcol="' + c.k + '"' + extra.attr + ' style="' + sticky + 'padding:6px 7px;text-align:' + al +
+      ';vertical-align:middle;background:#fff;color:#0f172a;font-size:16px;font-weight:800;line-height:1.2;white-space:nowrap;' +
+      lados(j, n) + extra.css + '">' + c.h + '</th>';
+  };
+  h += '<div style="overflow-x:auto;margin-bottom:6px;padding:1px">' +
+    '<table style="border-collapse:collapse;table-layout:auto;font-size:14px">';
+  // fila 1: el título de cada banda; las islas sin banda ponen acá su encabezado entero
+  h += '<thead><tr>' + islas.map(function (isla, k) {
+    const pre = k ? gap("th", 2) : "";
+    if (isla.h) {
+      return pre + '<th data-rvbanda colspan="' + isla.cols.length + '" style="padding:5px 10px;text-align:center;vertical-align:middle;' +
+        'background:#fff;color:#0f172a;font-size:15px;font-weight:800;line-height:1.2;white-space:nowrap;' +
+        'border-top:' + GRUESO + ';border-left:' + GRUESO + ';border-right:' + GRUESO + ';border-bottom:' + FINO + ';">' + isla.h + '</th>';
+    }
+    return pre + isla.cols.map(function (c, j) {
+      return thCol(c, j, isla.cols.length, { attr: ' rowspan="2"', css: 'border-top:' + GRUESO + ';border-bottom:' + GRUESO + ';' });
+    }).join("");
+  }).join("") + '</tr><tr>' + islas.filter(function (isla) { return !!isla.h; }).map(function (isla) {
+    return isla.cols.map(function (c, j) {
+      return thCol(c, j, isla.cols.length, { attr: "", css: 'border-bottom:' + GRUESO + ';' });
+    }).join("");
   }).join("") + '</tr></thead><tbody>';
-  h += filas.map(function (f) {
-    return '<tr>' + RV_COLS.map(function (c) {
-      const v = (f[c.k] != null && f[c.k] !== "") ? String(f[c.k]) : "-";
-      if (c.name) {
-        return '<td style="position:sticky;left:0;z-index:1;background:#fff;padding:6px 10px;text-align:left;vertical-align:middle;font-size:14px;font-weight:700;color:#0f172a;white-space:nowrap;border-bottom:1px solid #eef2f6;box-shadow:1px 0 0 #e2e8f0;">' + escapeHtml(v) + '</td>';
-      }
-      const dim = (v === "-") ? "color:#cbd5e1;" : "color:#0f172a;";
-      return '<td style="padding:6px 10px;text-align:center;vertical-align:middle;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;border-bottom:1px solid #eef2f6;' + dim + '">' + escapeHtml(v) + '</td>';
+  h += filas.map(function (f, r) {
+    const abajo = (r === filas.length - 1) ? GRUESO : FINO;
+    return '<tr>' + islas.map(function (isla, k) {
+      return (k ? gap("td") : "") + isla.cols.map(function (c, j) {
+        const v = (f[c.k] != null && f[c.k] !== "") ? String(f[c.k]) : "-";
+        const bordes = lados(j, isla.cols.length) + 'border-bottom:' + abajo + ';';
+        if (c.name) {
+          return '<td data-rvcol="' + c.k + '" style="position:sticky;left:0;z-index:1;background:#fff;padding:6px 10px;text-align:left;vertical-align:middle;font-size:14px;font-weight:700;color:#0f172a;white-space:nowrap;' + bordes + '">' + escapeHtml(v) + '</td>';
+        }
+        const dim = (v === "-") ? "color:#cbd5e1;" : "color:#0f172a;";
+        return '<td data-rvcol="' + c.k + '" style="padding:6px 8px;text-align:center;vertical-align:middle;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;background:#fff;' + bordes + dim + '">' + escapeHtml(v) + '</td>';
+      }).join("");
     }).join("") + '</tr>';
   }).join("");
   h += '</tbody></table></div>';
@@ -57627,7 +57658,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=24.85"></script>
+<script src="importacion.js?v=24.86"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60387,7 +60418,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.85"></script>
+<script src="cobranzas.js?v=24.86"></script>
 
 </body>
 </html>

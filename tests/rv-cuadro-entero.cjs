@@ -1,4 +1,5 @@
-/* v21.28 — Reporte diario Virgilio: el CUADRO tiene que entrar ENTERO, arrancar en HOY y
+/* v24.86 — (k) ISLAS como el PDF: hueco entre bloques y borde grueso (Elias, 29/09).
+   v21.28 — Reporte diario Virgilio: el CUADRO tiene que entrar ENTERO, arrancar en HOY y
    dejar medir un LAPSO de horas.
    Luis, 22/09, con la captura del modal cortado: "tiene que mostrar todo el cuadro sinoptico
    y como se pide en el cuadro sinoptico" · "que siempre muestre el dia de hoy 1ro" ·
@@ -74,15 +75,43 @@ const BANDAS = [["",1],["Ritmo (m³ x Hs)",2],["Total x Día (m³)",2],["",3],
     }
     const filasEnc = tabla ? tabla.querySelectorAll("thead tr") : [];
     out.filasEnc = filasEnc.length;
-    const leer = (tr) => [...(tr ? tr.querySelectorAll("th") : [])]
-      .map((t) => t.textContent.replace(/\s+/g, " ").trim());
-    out.bandas = [...(filasEnc[0] ? filasEnc[0].querySelectorAll("th") : [])]
-      .map((t) => [t.textContent.replace(/\s+/g, " ").trim(), Number(t.getAttribute("colspan") || 1)]);
-    out.ths = leer(filasEnc[1]);
+    const txt = (t) => t.textContent.replace(/\s+/g, " ").trim();
+    // v24.85 — ISLAS: Operario y las tres de horas del dia llevan el encabezado en las DOS
+    // filas (rowspan), asi que las 16 columnas se leen por POSICION en pantalla, no por fila.
+    out.ths = [...(tabla ? tabla.querySelectorAll("thead th[data-rvcol]") : [])]
+      .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left).map(txt);
+    // las bandas se reconstruyen de la fila 1: una con titulo es [titulo, colspan]; las
+    // columnas sin banda que van juntas (hasta el hueco) son una banda sin titulo.
+    out.bandas = []; let _g = 0;
+    [...(filasEnc[0] ? filasEnc[0].children : [])].forEach((t) => {
+      if (t.classList.contains("rv-gap")) { if (_g) out.bandas.push(["", _g]); _g = 0; return; }
+      if (t.hasAttribute("data-rvbanda")) out.bandas.push([txt(t), Number(t.getAttribute("colspan") || 1)]);
+      else _g += 1;
+    });
+    if (_g) out.bandas.push(["", _g]);
+    out.sinBandaRowspan = [...(filasEnc[0] ? filasEnc[0].querySelectorAll("th[data-rvcol]") : [])]
+      .map((t) => t.getAttribute("rowspan"));
+    // los huecos entre islas: 5 en el encabezado y 5 en cada fila de datos
+    out.gapsEnc = filasEnc[0] ? filasEnc[0].querySelectorAll(".rv-gap").length : 0;
+    out.gapsFila = [...(tabla ? tabla.querySelectorAll("tbody tr") : [])].map((tr) => tr.querySelectorAll("td.rv-gap").length);
+    const g0 = tabla && tabla.querySelector("tbody td.rv-gap");
+    out.gapW = g0 ? g0.getBoundingClientRect().width : 0;
+    // borde grueso: la primera celda de cada isla a la izquierda y la ultima a la derecha
+    const tr0 = tabla && tabla.querySelector("tbody tr");
+    const celdas = tr0 ? [...tr0.children] : [];
+    out.bordes = [];
+    celdas.forEach((td, i) => {
+      if (td.classList.contains("rv-gap")) return;
+      const prevGap = i === 0 || celdas[i - 1].classList.contains("rv-gap");
+      const nextGap = i === celdas.length - 1 || celdas[i + 1].classList.contains("rv-gap");
+      const st = getComputedStyle(td);
+      if (prevGap) out.bordes.push(["izq " + td.dataset.rvcol, parseFloat(st.borderLeftWidth)]);
+      if (nextGap) out.bordes.push(["der " + td.dataset.rvcol, parseFloat(st.borderRightWidth)]);
+    });
 
     // formato de CUADRO SINOPTICO: contenido 14, titulos 16, centrado, sin color de relleno
-    const th0 = tabla && tabla.querySelector("thead tr:nth-child(2) th:nth-child(2)");
-    const td0 = tabla && tabla.querySelector("tbody tr td:nth-child(2)");
+    const th0 = tabla && tabla.querySelector('thead th[data-rvcol="arH"]');
+    const td0 = tabla && tabla.querySelector('tbody tr td[data-rvcol="pkH"]');
     const cs = (el) => (el ? getComputedStyle(el) : null);
     out.fsTh = th0 ? parseFloat(cs(th0).fontSize) : 0;
     out.fsTd = td0 ? parseFloat(cs(td0).fontSize) : 0;
@@ -128,6 +157,14 @@ const BANDAS = [["",1],["Ritmo (m³ x Hs)",2],["Total x Día (m³)",2],["",3],
   ok(bmal.length === 0, "(j) las bandas y sus colspan son los de la planilla", bmal.join(" | "));
   ok(r.bandas.reduce((a, b) => a + b[1], 0) === 16, "(j) las bandas cubren las 16 columnas",
      String(r.bandas.reduce((a, b) => a + b[1], 0)));
+  ok(r.sinBandaRowspan.length === 4 && r.sinBandaRowspan.every((x) => x === "2"),
+     "(k) Operario y las 3 de horas del dia ocupan las DOS filas del encabezado", JSON.stringify(r.sinBandaRowspan));
+  ok(r.gapsEnc === 5 && r.gapsFila.length === 3 && r.gapsFila.every((n) => n === 5),
+     "(k) hay un HUECO entre cada bloque (5 entre 6 islas)", r.gapsEnc + " / " + JSON.stringify(r.gapsFila));
+  ok(r.gapW >= 5, "(k) el hueco se ve", r.gapW + "px");
+  const flojos = r.bordes.filter((b) => !(b[1] >= 2));
+  ok(r.bordes.length === 12 && flojos.length === 0, "(k) cada isla lleva BORDE GRUESO a los dos lados",
+     r.bordes.length + " bordes; flojos: " + JSON.stringify(flojos));
   ok(r.fechaDefault === r.hoyEsperado, "(d) el selector arranca en HOY",
      r.fechaDefault + " vs " + r.hoyEsperado);
   ok(r.hayDesde && r.hayHasta, "(e) estan los campos Desde y Hasta");

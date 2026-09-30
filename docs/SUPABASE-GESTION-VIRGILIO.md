@@ -30127,6 +30127,11 @@ planilla. El margen se centra solo. Verificado con el 25/09 (200, mismos número
 **v23.92 (edge v26):** la banda de *Total x Día* lleva la unidad debajo, **(M3)**, igual que
 *Ritmo (M3 x Hs)* y que la pantalla. Verificado con el 25/09 (200, 3 operarios).
 
+**v24.86 (sólo front):** la **pantalla** (📈 Reporte diario Virgilio) va con las mismas islas que el PDF:
+hueco de 6 px entre bloque y bloque (columna vacía `.rv-gap`), borde grueso de 2 px alrededor de cada
+bloque y Operario + las tres de horas del día con el encabezado en las dos filas (`rowspan`). Lo sostiene
+el bloque (k) de `tests/rv-cuadro-entero.cjs`.
+
 **Luis, 2026-09-28**, con la planilla del 25/09: *"arma el pdf del modulo de arriba de esta forma"*
 · *"hs no prod deberian ser todas las tareas que no sean hs prod"*.
 
