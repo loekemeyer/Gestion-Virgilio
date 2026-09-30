@@ -6602,3 +6602,24 @@ de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (
   schema GP2 (así no rompe su Regla 0): `virgilio_insumo_stock`, `virgilio_insumo_ubicacion` y `virgilio_lugar`. Las
   llena `gv_gp2_espejo_sync()` (cron `gv-gp2-espejo-sync`, c/10 min, reescribe sólo si cambió el md5). Luis: *"que los
   dos tengan acceso a los datos y que puedan hablar"*; el vínculo de códigos (D3) va después. `sql/gv_gp2_espejo_v2517.sql`.
+
+## ⚠ REGLA (Luis, 2026-09-30, v25.18): «⟳ Refrescar ya» en Stocks — el SALDO ya es en vivo, lo que espera es lo DERIVADO
+
+**Luis:** *"pone un boton en la tabla de stocks que permita refrescarla «por la fuerza». 2 minutos es un monton"* ·
+*"esto no estaba en vivo entonces?"*.
+
+| dato de la tabla de Stocks | cuándo se actualiza |
+|---|---|
+| saldo por depósito (góndola, excedente, pickeados, a facturar…) | **en vivo**: `trigger_actualizar_saldo_stock` reescribe la fila de `stocks_carga_rapida` en cada movimiento y el realtime (`stkSubscribeRealtime`) la parchea en pantalla |
+| cajas pedidas, proyección, capacidad, FC s/salida, altas/bajas de códigos | **hasta 2 min** (cron 55 → `gv_refresh_stock_si_cambio`), porque salen de la matview |
+
+El botón adelanta lo segundo. El refresco completo tarda **~7,4 s** (matview 1,7 + carga_rapida 5,7) y
+`authenticated` corta a los **8 s**, así que **el navegador NO lo corre**: `gv_stock_refrescar_ya()` (supervisor)
+agenda un job de pg_cron de **un disparo** (`'2 seconds'`, corre como postgres sin timeout) que **se borra a sí
+mismo primero** y llama a `gv_refresh_stock_si_cambio(0, false)`; si el lock 5768 está tomado, espera y reescribe
+la derivada igual. La pantalla mira `gv_stock_refresco_ultimo()` cada 1,5 s y reabre Stocks **conservando solapa y
+búsqueda**. Medido: ~9 s del click a la tabla nueva. Doble click → `en_curso`, no agenda dos.
+
+⚠ Hacer TODO en vivo (lo derivado incluido) no es viable: cambia por pedidos, capacidad y proyección, que son otras
+tablas, y reescribir la derivada cuesta 7 s por cambio.
+`sql/gv_stock_refrescar_ya_v2518.sql`, `tests/stk-refrescar-ya.cjs`.
