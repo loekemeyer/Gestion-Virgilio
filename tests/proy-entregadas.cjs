@@ -82,7 +82,7 @@ catch (_e) {
       url = String(url); out.urls.push(url);
       if (url.indexOf("ventas_mensuales_cod") >= 0 && url.indexOf("clientes") < 0) return J(ventas);
       if (url.indexOf("gv_entregas_mensuales_cod") >= 0) return J(conEntregas ? entregas : []);
-      if (url.indexOf("gv_ventas_clientes_mes_cod") >= 0) return J([{ cliente: "Osa", cajas: 120 }, { cliente: "Otros", cajas: 80 }]);
+      if (url.indexOf("gv_ventas_clientes_mes_cod") >= 0) return J([{ cliente: "Osa", cajas: 120, codigos: "702E 7 · 702EN 113" }, { cliente: "Otros", cajas: 80 }]);
       if (url.indexOf("vista_historial_entregas") >= 0) {
         return J([{ fecha: meses[9] + "-04", cajas: 300, quien: "Carriero", remito: "R-9" },
                   { fecha: meses[9] + "-19", cajas: 200, quien: "Carriero", remito: "R-11" }]);
@@ -145,6 +145,8 @@ catch (_e) {
     out.abrioDet = !!det;
     const dt = det ? det.textContent : "";
     out.detTieneCliente = dt.indexOf("Osa") >= 0 && dt.indexOf("Otros") >= 0;
+    // v24.97 (Luis) — la familia entra al detalle: cada cliente dice de qué código salió
+    out.detTieneCodigos = dt.indexOf("702EN 113") >= 0 && dt.indexOf("702E 7") >= 0;
     out.detTieneRemito = dt.indexOf("R-9") >= 0 && dt.indexOf("Carriero") >= 0;
     out.detMarcado = body.querySelectorAll(".proyv-svg .hit.on").length === 1;
     // volver a tocarlo lo cierra
@@ -166,7 +168,7 @@ catch (_e) {
     r.sinFacturado && r.sinEntregado && r.sinArriba && r.asterisco && r.puntoHueco &&
     r.sinBarras && r.hits === 12 && r.filasMes === 7 && r.mesCursoMarcado && r.numerosAbren &&
     r.tablaAntesDelGrafico && r.tituloEstadMadre && r.columnas === "mes|vtas|entrega|delta" &&
-    r.abrioDet && r.detTieneCliente && r.detTieneRemito && r.detMarcado && r.cierraDet &&
+    r.abrioDet && r.detTieneCliente && r.detTieneCodigos && r.detTieneRemito && r.detMarcado && r.cierraDet &&
     r.sinColEnt &&
     errs.length === 0;
   const { urls, ...vis } = r;
