@@ -3810,6 +3810,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-dest{ display:inline-block; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa;
   border-radius:6px; padding:0 7px; font-size:12.5px; font-weight:800; margin-left:8px;
   vertical-align:1px; white-space:nowrap; }
+/* v24.76 (Luis): la DIRECCIÓN REAL de la sucursal en los pedidos por expreso (la zona es el galpón) */
+.pga-dreal, .apr-chip-dreal{ display:inline-block; background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe;
+  border-radius:6px; padding:0 7px; font-size:12.5px; font-weight:700; margin-left:6px;
+  vertical-align:1px; white-space:nowrap; max-width:340px; overflow:hidden; text-overflow:ellipsis; }
 /* v22.40 — RETIRA: lo viene a buscar el cliente al depósito, NO va en camión. Chip propio, y
    se esconden la zona de reparto y el 🚚 del expreso (que hacían leer "Zona 6 · 🚚 CABA"). */
 .pga-ret{ display:inline-block; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1;
@@ -6232,7 +6236,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=24.75"></script>
+<script type="module" src="recepcion.js?v=24.76"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10274,7 +10278,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v24.75";
+const APP_VERSION = "v24.76";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39282,6 +39286,21 @@ function _pgaObsHtml(np) {
   return '<div class="pga-nobs" title="Observación del pedido (la escribió quien lo cargó en la página)">💬 ' +
     escapeHtml(o) + '</div>';
 }
+/* v24.76 (Luis, 30/09): la DIRECCIÓN REAL de entrega de un pedido por expreso. En la ficha de la
+   página `direccion_entrega` es el GALPÓN del expreso; la sucursal del cliente vive en la ETIQUETA
+   ("Chacabuco 228- Mendoza", "Río Gall (25 de mayo)") + localidad y provincia. No repite la
+   localidad ni la provincia si la etiqueta ya las dice. Sin nada que mostrar devuelve "". */
+function _gvNorm(s) { return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim(); }
+function gvDirRealTxt(suc, loc, prov) {
+  let s = String(suc || "").trim();
+  const ix = s.lastIndexOf(" — "); if (ix >= 0) s = s.slice(ix + 3).trim();   // "Razón social — etiqueta"
+  if (/^retira$/i.test(s)) return "";
+  const ns = _gvNorm(s), extra = [];
+  const l = String(loc || "").trim(), pr = String(prov || "").trim();
+  if (l && ns.indexOf(_gvNorm(l)) < 0) extra.push(l);
+  if (pr && ns.indexOf(_gvNorm(pr)) < 0 && _gvNorm(pr) !== _gvNorm(l)) extra.push(pr);
+  return [s, extra.join(", ")].filter(Boolean).join(" · ");
+}
 function _pgaDestDe(r) {
   if (!_pgaDest) return null;
   const np = _pppNpNorm(r && r.np); if (!np) return null;
@@ -39635,6 +39654,10 @@ function _pgaCuerpoHtml(dias, opts) {
             ((_dst && _dst.expreso && _dst.destino_txt && !_esRet)
               ? '<span class="pga-dest" title="Destino del expreso. La zona de al lado es dónde lo deja el camión (el galón del expreso, en CABA); esto es dónde termina la mercadería.">🚚 ' +
                 escapeHtml(_dst.destino_txt) + '</span>' : '') +
+            // v24.76 (Luis): "que diga para los que se despachan en expreso la dirección de entrega real"
+            ((_dst && _dst.es_expreso && !_esRet && gvDirRealTxt(_dst.sucursal, _dst.localidad_destino, _dst.provincia))
+              ? '<span class="pga-dreal" title="Dirección REAL de entrega (la sucursal del cliente). La zona es el galpón del expreso.">📍 ' +
+                escapeHtml(gvDirRealTxt(_dst.sucursal, _dst.localidad_destino, _dst.provincia)) + '</span>' : '') +
             (_mis ? '<span class="pga-mis" title="Pedido a una provincia marcada (PPP_Web_Config.provincias_alerta).">' +
                 escapeHtml(String(_dst.provincia || "").toUpperCase()) + '</span>' : '') +
             (r.fecha_pedido ? '<span class="pga-ped" title="Fecha en que entró el pedido">ped. ' +
@@ -46091,6 +46114,14 @@ async function aprTraerPedidos(e) {
       // con el pedido: `provincia` del feed de LK y de la RPC de Chef, que ya la devolvía.
       provincia: String(n.provincia || "").trim(),
       expreso: String(n.nombre_expreso || "").trim(),
+      // v24.76 (Luis): la dirección REAL — `direccion` del feed es la ETIQUETA de la sucursal
+      // (el galpón viene aparte en `direccion_expreso`). Es expreso si trae galpón o nombre de
+      // expreso, o si la provincia no es CABA ni Buenos Aires.
+      dest_suc: String(n.direccion || "").trim(),
+      dest_loc: String(n.localidad || "").trim(),
+      dest_exp: !!(String(n.nombre_expreso || "").trim() || String(n.direccion_expreso || "").trim() ||
+        (String(n.provincia || "").trim() && !/^(caba|c\.a\.b\.a\.?|capital( federal)?|ciudad aut.*|buenos aires|bs\.? ?as\.?)$/i.test(String(n.provincia || "").trim()))) &&
+        !/^retira$/i.test(String(n.nombre_expreso || "").trim()),
       cond: (n.condicion_pago_code == null ? "" : String(n.condicion_pago_code)),  // v14.85: condición de pago (2% web condicional)
       // v19.10 — EL TURNO QUE PIDE LA OC. Es del PEDIDO, no del bloque: todos los bloques
       // de un pedido comparten la misma fecha y hora de entrega pactada.
@@ -47223,10 +47254,12 @@ function aprProvAlertaNeed() {
 /* El destino de un pedido de A Programar: de la página si vino de ahí, del backend si es de ISIS. */
 function aprDestino(p) {
   if (!p) return null;
-  if (p.provincia || p.expreso) return { provincia: p.provincia || "", expreso: p.expreso || "" };
+  if (p.provincia || p.expreso || p.dest_exp) return { provincia: p.provincia || "", expreso: p.expreso || "",
+    esExp: !!p.dest_exp, loc: p.dest_loc || "", suc: p.dest_suc || "" };
   const np = (typeof aprIsisNp === "function") ? aprIsisNp(p) : "";
   const d = np ? _pgaDestDe({ np: np }) : null;
-  return d ? { provincia: d.provincia || "", expreso: d.expreso || "" } : null;
+  return d ? { provincia: d.provincia || "", expreso: d.expreso || "",
+    esExp: !!d.es_expreso, loc: d.localidad_destino || "", suc: d.sucursal || "" } : null;
 }
 function aprEsProvMarcada(p) {
   const d = aprDestino(p);
@@ -47243,6 +47276,15 @@ function aprDestinoChip(p) {
   const txt = [d.expreso, d.provincia].filter(Boolean).join(" · ");
   return '<span class="apr-chip apr-chip-dest" title="Destino del expreso. La zona de al lado es dónde lo deja el camión (el galón del expreso, en CABA); esto es dónde termina la mercadería.">🚚 ' +
     escapeHtml(txt) + '</span>';
+}
+/* v24.76 (Luis): la dirección REAL de la sucursal, sólo en lo que sale por expreso. */
+function aprDirRealChip(p) {
+  const d = aprDestino(p);
+  if (!d || !d.esExp) return "";
+  if (String(d.expreso || "").trim().toLowerCase() === "retira") return "";
+  const t = gvDirRealTxt(d.suc, d.loc, d.provincia);
+  return t ? '<span class="apr-chip apr-chip-dreal" title="Dirección REAL de entrega (la sucursal del cliente). La zona es el galpón del expreso.">📍 ' +
+    escapeHtml(t) + '</span>' : "";
 }
 function aprMisBadge(p) {
   if (!aprEsProvMarcada(p)) return "";
@@ -47678,7 +47720,7 @@ function aprColPedidos() {
         aprDiferidoChip(p) + // v15.67: espera un reingreso
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' + aprSucBadge(p) +
         // v20.51 (Luis): el destino del expreso, y el badge si la provincia está marcada.
-        aprDestinoChip(p) + aprMisBadge(p) +
+        aprDestinoChip(p) + aprDirRealChip(p) + aprMisBadge(p) +
         // v16.03 — el pedido estuvo en una tanda y esa tanda YA se pickeó y se armó (la mercadería
         // está en un pallet). Va acá en rojo para que nadie lo mande a pickear de nuevo: al
         // programarlo vuelve a ESA tanda (gv_ppp_isis_programar reusa tanda_previa), no a una nueva.
@@ -54665,7 +54707,19 @@ async function _facXlsArmar(nps, opts) {
     // desempate por inclusión de los ítems de la NP (un pedido grande se parte en varias).
     const emp = _facXlsEmpresa(np);
     let suc = "";
-    const cands = (match || []).filter(function (m) {
+    // v24.76 (Luis, 30/09) — PRIMERO el pedido EXACTO. Una NP web sabe su order_id: la búsqueda
+    // por cliente + fecha + ítems es sólo para lo que no lo trae (ISIS). Caso LK 0179 (Multibazar,
+    // pedido 1506, Río Gallegos): su único código es el 607E, que estaba en los 4 pedidos del
+    // cliente de esa semana, así que el desempate por ítems empataba y el Excel salió con
+    // «Brc Onelli» (Bariloche, pedido 1496). Cuando empatan varios, NO se adivina: queda vacío.
+    const _ob = orderByNp[np];
+    if (_ob) {
+      const mx = (match || []).find(function (m) {
+        return String(m.empresa) === _ob.empresa && String(m.order_id) === String(_ob.order_id);
+      });
+      if (mx) suc = String(mx.sucursal_entrega || "");
+    }
+    const cands = suc ? [] : (match || []).filter(function (m) {
       if (String(m.cod_cliente) !== c.cod || String(m.empresa) !== emp) return false;
       const f = String(m.fecha_pedido || "").slice(0, 10);
       if (!f || !fecha) return false;
@@ -54675,11 +54729,13 @@ async function _facXlsArmar(nps, opts) {
     if (cands.length) {
       const items = lineas.map(function (l) { return l.art.replace(/^0+/, "") + "x"; });
       let best = null;
+      const sucsTop = new Set();
       cands.forEach(function (m) {
         const score = items.length && items.every(function (it) { return String(m.items_string || "").indexOf(it) >= 0; }) ? 1 : 0;
-        if (!best || score > best.score) best = { m: m, score: score };
+        if (!best || score > best.score) { best = { m: m, score: score }; sucsTop.clear(); }
+        if (score === best.score) sucsTop.add(String(m.sucursal_entrega || ""));
       });
-      suc = String(best.m.sucursal_entrega || "");
+      suc = sucsTop.size > 1 ? "" : String(best.m.sucursal_entrega || "");   // v24.76: empate con sucursales distintas → no se adivina
     }
     // v17.80 — Tierra del Fuego ya numerado como NP de Chef: el pedido vive en la página de
     // LK, así que en `lk_pedidos_match` está como ('lk', cod LK) y el filtro de arriba
@@ -57557,7 +57613,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=24.75"></script>
+<script src="importacion.js?v=24.76"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60317,7 +60373,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=24.75"></script>
+<script src="cobranzas.js?v=24.76"></script>
 
 </body>
 </html>

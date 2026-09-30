@@ -557,6 +557,8 @@ node tests/rest-tope-1000.cjs
 
 echo "== ppp-misiones (regresión: destino del expreso y el aviso de Misiones en la Programación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-misiones.cjs
+echo "== ppp-dir-real-expreso (v24.76: direccion real de la sucursal en pedidos por expreso + sucursal del Excel ISIS por order_id) =="
+node tests/ppp-dir-real-expreso.cjs
 
 echo "== ppp-obs-boton (v21.80: la observación del pedido se LEE — badge clickeable en NP, tanda y día, y dentro de la NP abierta) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-obs-boton.cjs
