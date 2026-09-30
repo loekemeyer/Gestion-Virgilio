@@ -37,7 +37,7 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (r.provs.join() !== "Fujian:true,Kangli:true") fail("el pop-up lista los proveedores tildados: " + r.provs);
   if (r.ths.join("|") !== "Cód.|Stk.|E.M.|Meses|m³|u$s|Pedido") fail("columnas: " + r.ths.join("|"));
   if (r.cods.join() !== "902E,903E,901E") fail("orden por urgencia (meses de stock): " + r.cods);
-  if (!/^⚠ 1,5$/.test(r.m902)) fail("meses < 4 con ⚠: " + r.m902);
+  if (!/^⚠ 0,5$/.test(r.m902)) fail("meses = stock real ÷ E.M., sin lo en camino, con ⚠: " + r.m902);
   if (!/100.*01\/11/.test(r.cam902)) fail("pedido en curso con unidades y fecha: " + r.cam902);
   if (r.usd901 !== "—" || r.cam901 !== "No") fail("sin pedido: u$s — y en curso No: " + r.usd901 + " " + r.cam901);
   if (r.solo !== 2) fail("«Sólo lo que genera pedido» deja 2: " + r.solo);

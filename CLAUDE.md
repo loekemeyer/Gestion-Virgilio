@@ -3982,8 +3982,8 @@ banda NO los lleve, que los dos chips abran el pop-up y que el contenido siga co
 
 Botón arriba a la derecha de la barra (`pedImpRepAbrir`): pop-up con los proveedores a tildar + «Sólo lo que
 genera pedido». El PDF (`_pedImpRepHtml`, Arial 15, A4 vertical) tiene una tabla por proveedor con **Cód. ·
-Stk. · E.M. (proyección u/mes) · Meses Stk. (⚠ si < 4) · m³ · u$s · Pedido en curso** (unidades + dd/mm, o «No»),
-ordenada con `_pedImpPrioCmp` (menos meses primero). **m³ y u$s son sólo de lo que genera pedido**; el total va
+Stk. · E.M. (proyección u/mes) · Meses Stk. (⚠ si < 4; = stock REAL disponible ÷ E.M., **sin** lo en camino — Luis v24.78) · m³ · u$s · Pedido en curso** (unidades + dd/mm, o «No»),
+ordenada por esos meses (menos primero), una tabla por proveedor. **m³ y u$s son sólo de lo que genera pedido**; el total va
 arriba de cada columna. `tests/pedimp-reporte-pdf.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-29, v24.32): la nacionalización por artículo es de 🚢 EN CURSO — y el proveedor la abre

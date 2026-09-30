@@ -1781,12 +1781,16 @@ function _pedImpRepHtml(provs, soloPed) {
     let arr = (data.items || []).filter(function (it) { return (it.prov || "(sin proveedor)") === prov; });
     if (soloPed) arr = arr.filter(function (it) { return _pedImpMcOf(it) > 0; });
     if (!arr.length) return;
-    arr = arr.slice().sort(_pedImpPrioCmp);
+    // v24.78 (Luis, D1): meses = stock REAL disponible (ya sin lo comprometido) ÷ E.M. — SIN lo en camino
+    const _mReal = function (it) { const p = Number(it.proyUni) || 0; return p > 0 ? Math.max(0, Number(it.stockUni) || 0) / p : null; };
+    arr = arr.slice().sort(function (a, b) { const ma = _mReal(a), mb = _mReal(b);
+      if (ma == null && mb != null) return 1; if (mb == null && ma != null) return -1;
+      return (ma != null && mb != null && ma !== mb) ? ma - mb : _pedImpPrioCmp(a, b); });
     n += arr.length;
     const tUsd = arr.reduce(function (s, it) { return s + _pedImpUsdOf(it); }, 0);
     const tM3 = arr.reduce(function (s, it) { return s + _pedImpM3Of(it); }, 0);
     const filas = arr.map(function (it) {
-      const m = _pedImpMesesStock(it), bajo = m != null && m < _PEDIMP_MESES_ALERTA;
+      const m = _mReal(it), bajo = m != null && m < _PEDIMP_MESES_ALERTA;
       const usd = _pedImpUsdOf(it), m3 = _pedImpM3Of(it), cam = Math.max(0, Number(it.enCurso) || 0);
       const f = _pedImpDdmm(it.reingresoEst);
       return '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</b></td>' +
