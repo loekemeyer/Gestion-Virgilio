@@ -2140,14 +2140,13 @@ async function _opPrefetchGond(cods) {
    Antes se miraba sólo la góndola (terminado) y el 066 decía "entra, 1 libre" con 425 cajas. */
 function opExcesoEntraTxt(d, recibo) {
   d = d || {};
-  if (d.cap == null || d.total == null) return "s/dato de capacidad";
-  const neto = d.total - (d.comp || 0);
-  const queda = neto + (Number(recibo) || 0);
-  const det = "stock " + d.total + " − " + (d.comp || 0) + " comprometidas (pickeados + a facturar) = " + neto +
-              ", + " + recibo + " que recibo = " + queda + " vs capacidad " + d.cap;
+  if (d.cap == null || d.total == null) return "s/dato cap.";
+  // v25.30 (Luis: "mucho texto") — la cuenta entera no va: stock − comprometidas + lo que recibo
+  // queda resumido en "ocupado/capacidad". El cálculo es el mismo de la v22.58.
+  const queda = d.total - (d.comp || 0) + (Number(recibo) || 0);
   return queda <= d.cap
-    ? ("entra en góndola (" + det + ", quedan " + (d.cap - queda) + " libres)")
-    : ("NO entra en góndola (" + det + ", sobran " + (queda - d.cap) + ")");
+    ? ("entra " + queda + "/" + d.cap)
+    : ("NO entra " + queda + "/" + d.cap + ", sobran " + (queda - d.cap));
 }
 /* v14.61 / v17.17 — WhatsApp a Thomas (dueño) con el resumen de TODO lo que entró de más. */
 function opWhatsExceso(exc) {
@@ -2157,36 +2156,24 @@ function opWhatsExceso(exc) {
   const hayAjena = (exc || []).some(function (i) { return !!i.ajena; });
   // v21.30 — y el caso de Luis: un código que NO está asignado a este proveedor.
   const hayNoAsig = (exc || []).some(function (i) { return !!i.noAsig && !i.ajena; });
+  // v25.30 (Luis: "mucho texto en esas notificaciones") — una línea de título, una de remito
+  // y una por código. Los cuatro casos se siguen distinguiendo (sin OC · se pasó · OC de otro ·
+  // no asignado); lo que se fue es la cuenta de góndola desarrollada.
+  const prov = (opState.tallNombre || "?");
   const L = [
-    hayAjena
-      ? "Hola Thomas, un proveedor entregó mercadería que no está en su orden de compra:"
-      : hayNoAsig
-      ? "Hola Thomas, un proveedor entregó un código que no está asignado a él:"
-      : "Hola Thomas, entró mercadería que la OC no habilita:",
-    "Proveedor: " + (opState.tallNombre || "?"),
-    "RTO/FC: " + (opState.remito || "s/remito") + " · " + (opState.linea || "") + " · " + fechaCorta(opState.fecha),
-    ""
+    (hayAjena ? "Thomas, código de otro proveedor (" : hayNoAsig ? "Thomas, código no asignado (" :
+      "Thomas, entró de más (") + prov + ")",
+    "RTO " + (opState.remito || "s/remito") + " · " + (opState.linea || "") + " · " + fechaCorta(opState.fecha)
   ];
   exc.forEach(function (i) {
     const d = g[_ocgNorm(i.cod)] || {};
     const entra = opExcesoEntraTxt(d, i.cajas);
-    // v17.99 — dos casos: sin OC generada (OC = 0, todo es excedente) o se pasó de la OC.
-    // v19.57 — y un tercero, que es el que pidió Thomas: el código NO es de este proveedor,
-    // la OC la tiene otro. "SIN OC generada" ahí era falso: la OC existe, sólo que no es suya.
-    L.push(i.ajena
-      ? ("• " + i.cod + ": recibo " + i.cajas + ", NO está en la OC de " +
-         (opState.tallNombre || "?") + " → la OC es de " + i.ajena.otros +
-         (i.ajena.pend > 0 ? " (" + i.ajena.pend + " pendientes)" : "") + " · " + entra)
-      : i.noAsig
-      ? ("• " + i.cod + ": recibo " + i.cajas + ", NO está asignado a " +
-         (opState.tallNombre || "?") + " ni tiene OC suya · " + entra)
-      : i.sinOc
-      ? ("• " + i.cod + ": recibo " + i.cajas + ", SIN OC generada (OC = 0) → las " + i.exced +
-         " son de más · " + entra)
-      : ("• " + i.cod + ": recibo " + i.cajas + ", por OC faltaban " + i.ref +
-         " (OC pedía " + ((i.oc && i.oc.ped) || i.ref) + ") → " + i.exced + " de más · " + entra));
+    L.push("• " + i.cod + ": " + i.cajas + (i.ajena
+      ? (", OC de " + i.ajena.otros + (i.ajena.pend > 0 ? " (" + i.ajena.pend + " pend.)" : ""))
+      : i.noAsig ? ", no asignado a " + prov
+      : i.sinOc ? " sin OC"
+      : (", OC " + i.ref + " → " + i.exced + " de más")) + " · " + entra);
   });
-  L.push("");
   L.push("¿Lo recibo?");
   const url = "https://wa.me/" + WA_THOMAS + "?text=" + encodeURIComponent(L.join("\n"));
   // v18.02 — si el navegador BLOQUEA el pop-up, `window.open` devuelve null sin tirar error:

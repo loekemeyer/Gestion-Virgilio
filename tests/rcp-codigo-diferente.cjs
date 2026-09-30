@@ -141,13 +141,13 @@ window.__rcp = { opState: opState,
     out.hayBotonWa = !!wa;
     wa.click();
     const url = decodeURIComponent(window.__wa[0] || "");
-    out.waTitulo = url.indexOf("no está asignado a él") > 0;
-    out.waLinea = url.indexOf("550: recibo 7, NO está asignado a Lucho") > 0;
+    out.waTitulo = url.indexOf("código no asignado (Lucho)") > 0;
+    out.waLinea = url.indexOf("550: 7, no asignado a Lucho") > 0;
     const c550 = url.indexOf("• 550"), c586 = url.indexOf("• 586");
     const tramo = c586 > c550 ? url.slice(c550, c586) : url.slice(c550);
-    out.noDiceSinOc = tramo.indexOf("SIN OC generada") < 0;
+    out.noDiceSinOc = tramo.indexOf("sin OC") < 0;
     // y el 586, que sí es suyo y no tiene OC, sigue saliendo como "SIN OC generada"
-    out.elSuyoSigueSinOc = url.indexOf("586: recibo 3, SIN OC generada") > 0;
+    out.elSuyoSigueSinOc = url.indexOf("586: 3 sin OC") > 0;
     // no impide la recepción: el botón de confirmar existe y se habilita al avisar
     const cb = document.getElementById("opConfirmar");
     out.puedeEnviar = !!cb && cb.disabled === false;

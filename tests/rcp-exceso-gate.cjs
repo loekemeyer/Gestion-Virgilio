@@ -134,8 +134,7 @@ if (!/window\.supabase/.test(src)) { console.error("rcp-exceso-gate: recepcion.j
     out.wa = url.indexOf("https://wa.me/") === 0 && url.indexOf("Lucho") > 0 &&
       url.indexOf("12345") > 0 && url.indexOf("586") > 0 && url.indexOf("50 de más") > 0;
     // el que no tenía OC sale con su propio texto, no como "por OC faltaban 0"
-    out.waSinOc = url.indexOf("999") > 0 && url.indexOf("SIN OC generada (OC = 0)") > 0 &&
-      url.indexOf("las 25 son de más") > 0;
+    out.waSinOc = url.indexOf("999") > 0 && url.indexOf("999: 25 sin OC") > 0;
     out.confHabilitado = conf().disabled === false;
     out.btnMarcado = wa().classList.contains("has") && wa().textContent.indexOf("enviado") >= 0;
     // y sigue habilitado al volver a entrar a la pantalla
