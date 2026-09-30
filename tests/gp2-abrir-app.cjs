@@ -23,7 +23,7 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
   });
   await b.close();
   const f = [];
-  if (!(r.web.length === 1 && /vercel\.app\/GP2_MODULOS\.html/.test(r.web[0]) && r.modoWeb === "web")) f.push("sin app -> navegador: " + JSON.stringify(r));
+  if (!(r.web.length === 1 && /loekemeyer\.github\.io\/Gestion-Productiva-2\.0\/GP2_MODULOS\.html/.test(r.web[0]) && r.modoWeb === "web")) f.push("sin app -> navegador: " + JSON.stringify(r));
   if (!r.noRepregunta) f.push("repregunta");
   if (!r.reset || !r.link) f.push("cambiar");
   if (!/var GP2_PROTO = "web\+gp2:modulos"/.test(require("fs").readFileSync(path.join(__dirname, "..", "index.html"), "latin1"))) f.push("protocolo");

@@ -6236,7 +6236,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.35"></script>
+<script type="module" src="recepcion.js?v=25.36"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10281,7 +10281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.35";
+const APP_VERSION = "v25.36";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -57823,7 +57823,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.35"></script>
+<script src="importacion.js?v=25.36"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -58236,7 +58236,7 @@ window.showCervAdmin = showCervAdmin;
 /* v25.19 (Luis, 30/09, D9): GP2 va por LINK DIRECTO a su publicación, no a la copia: la copia se
    quedaba atrás (el 30/09 estaba en v1.137 con la real en v1.211). Se abre en otra pestaña porque es
    otro sitio: ahí pide su propio login. El "entero" sigue siendo la copia de acá. */
-var GP2_URL = "https://gesti-n-productiva-2-0.vercel.app/GP2_MODULOS.html";
+var GP2_URL = "https://loekemeyer.github.io/Gestion-Productiva-2.0/GP2_MODULOS.html"; /* v25.36: GP2 vive en GitHub Pages (Luis), no en Vercel */
 /* v25.31 (Luis, 30/09): «que se abra la APP de GP2 que ya tengo instalada». Chrome en Windows NO manda un
    link a una app instalada salvo que eso se prenda a mano en la app, así que el link solo no alcanza. GP2
    declara el enlace propio web+gp2: (manifest protocol_handlers) y abrirlo lanza la app instalada. Si la app
@@ -60624,7 +60624,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.35"></script>
+<script src="cobranzas.js?v=25.36"></script>
 
 </body>
 </html>
