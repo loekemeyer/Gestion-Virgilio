@@ -311,16 +311,15 @@ function responder(url) {
      "deberían ser 4 de 7 terminadas (E31A, E34A, E37A y E38A): " + JSON.stringify(r.ult));
   ok(r.ult.enCurso === 2, "tienen que contarse 2 tandas en curso (E30A y E36A): " + JSON.stringify(r.ult));
 
-  /* ── v23.92 (Luis) — la tabla es TANDA · M³ · PROGRESO y nada más ─────────
-     Salieron el N° de pedido, el cliente, los días y la zona: en una pared lo que
-     se lee es el código y si está hecha. El candado es invertido: si alguna de esas
-     columnas vuelve, el test se pone en rojo. */
-  ok(/>Tanda</.test(r.tandas) && /M³/.test(r.tandas) && /Progreso/.test(r.tandas),
-     "faltan las tres columnas de la tabla de tandas");
-  ok(!/N° Pedido/.test(r.tandas) && !/Cliente/.test(r.tandas) && !/>Zona</.test(r.tandas)
-     && !/>Días</.test(r.tandas), "volvió una columna que Luis sacó de la tabla (v23.92)");
-  ok(!/98801/.test(r.tandas) && !/Bazar Mandarin/.test(r.tandas),
-     "la tabla no tiene que mostrar ni el N° de pedido ni el cliente");
+  /* ── v24.84 (Luis) — TANDA · M³ · CLIENTE · NP · PROGRESO ───────────────
+     La v23.92 había sacado el N° de pedido y el cliente; Luis los pidió de vuelta
+     (*"el cliente y detalle de NPs"*). La zona y los días siguen afuera. */
+  ok(/>Tanda</.test(r.tandas) && /M³/.test(r.tandas) && />Cliente</.test(r.tandas)
+     && />NP</.test(r.tandas) && /Progreso/.test(r.tandas),
+     "faltan las cinco columnas de la tabla de tandas");
+  ok(!/>Zona</.test(r.tandas) && !/>Días</.test(r.tandas), "volvió una columna que Luis sacó de la tabla (v23.92)");
+  ok(/98801/.test(r.tandas) && /Bazar Mandarin/.test(r.tandas),
+     "la tabla tiene que mostrar el cliente y las NP de la tanda");
   ok(!/Z3 CO/.test(r.tandas) && !/CABA/.test(r.tandas), "la zona salió de la tabla");
   ok((r.tandas.match(/E30A/g) || []).length === 1, "E30A aparece más de una vez: la tanda va en UNA fila");
   ok(/3,3/.test(r.tandas), "falta la columna de m³ (E30A = 2,5 de ISIS + 0,8 de la web)");
@@ -332,7 +331,7 @@ function responder(url) {
   ok(/s-no/.test(r.tandas), "el semáforo no marca lo que NO se empezó");
   /* El separador de día es lo único escrito que queda: sin él hoy y mañana se
      mezclan sin que se note (el título de la tarjeta se sacó). */
-  ok(/<tr class="dia"><td colspan="3">/.test(r.tandas), "falta el separador de día en la tabla de tandas");
+  ok(/<tr class="dia"><td colspan="5">/.test(r.tandas), "falta el separador de día en la tabla de tandas");
   ok(/Mié|Lun|Mar|Jue|Vie|Sáb|Dom/.test(r.tandas), "el separador no dice el día de la semana");
   ok((r.tandas.match(/<tr class="dia">/g) || []).length === 2,
      "tiene que haber UN separador por día de entrega (hoy y mañana)");

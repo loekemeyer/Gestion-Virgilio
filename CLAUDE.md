@@ -6479,3 +6479,12 @@ día. «Total por día» sacalo, que quede una vision estilo «dos columnas»"*.
 - La mudanza a dos columnas para pantallas < 1500 px se borró: ahora siempre son dos.
 - `monUnirCentroOeste` queda en el archivo sin llamador (≡ index.html).
 - **Chequeo:** `node tests/mon-tv.cjs` (verificado que falla contra la v24.69: 3 columnas, sin M³, con «Total por día»).
+
+### ⚠ v24.84 (Luis): la tabla de tandas de la TV vuelve a llevar CLIENTE y NP
+
+**Luis:** *"tiene que aparecer en la parte de la izquierda junto a las tandas y los m3: el cliente y detalle de NPs"*.
+Se retira el «tanda · m³ · progreso y nada más» de la v23.92. Columnas: **Tanda · M³ · Cliente · NP · Progreso**
+(la zona y los días siguen afuera). Cliente resumido (sin SRL/SA) y **«+N»** si la tanda lleva varios; las NP con el
+prefijo una vez por empresa (`LK 0101·0102 · 98615`), hasta 2 renglones; el `title` trae la lista completa. La
+columna izquierda pasó a **1,15fr** contra 1fr. `resumirCliente` / `clienteTanda` / `npsCortas` en `monitor/tv.html`.
+**Chequeo:** `node tests/mon-tv.cjs`.
