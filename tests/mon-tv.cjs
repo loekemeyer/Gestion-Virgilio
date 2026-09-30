@@ -285,7 +285,7 @@ function responder(url) {
   ok(!/E33A/.test(r.tandas + r.fc), "E33A está facturada Y despachada: no tiene que aparecer en ningún lado");
 
   // v23.64 (Luis) — "A facturar" pasó a ser el RESUMEN DE DÍAS de la PPP (%, neto por Salió)
-  ok(/Días/.test(r.fcTit), "el cuadro de la derecha tiene que ser el de días: " + r.fcTit);
+  ok(/^NPs por Día/.test(r.fcTit), "el cuadro tiene que titularse «NPs por Día» (v25.13): " + r.fcTit);
   ok(/Salió/.test(r.fc) && /Fact/.test(r.fc) && /Pend/.test(r.fc), "faltan las columnas de estado del resumen");
   /* v24.39 (Luis): *"olvidate del texto abajo de los dias … es al pedo eso"*. La fila del día
      es el día y sus cinco porcentajes, en UNA fila: el m³ / tandas / NP se fue. Candado

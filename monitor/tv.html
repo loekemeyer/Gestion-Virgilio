@@ -323,7 +323,7 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
            momento» agregandole los m3 por día. «Total por día» sacalo, que quede una vision
            estilo dos columnas"*. -->
       <div class="card" style="flex:0 0 auto">
-        <div class="card-t" id="fcTit">Días</div>
+        <div class="card-t" id="fcTit">NPs por Día</div>
         <div id="fcBox"></div>
       </div>
       <!-- v25.01 (Luis): *"agrega «Pendientes de hoy» que muestre cuantos y cuales pedidos
@@ -1443,11 +1443,11 @@ function pintar(d) {
 
   // ── Resumen de días (v23.64, reemplaza "A facturar") ≡ Programación de la PPP
   if (d.arbol === null) {
-    el("fcTit").innerHTML = "Días";
+    el("fcTit").innerHTML = "NPs por Día";
     el("fcBox").innerHTML = '<div class="vacio">No se pudo leer la programación</div>';
   } else {
     var rds = resumenDias(d.arbol, d.despachadas, 4);   /* v24.38 (Luis): un día más */
-    el("fcTit").innerHTML = "Días" +
+    el("fcTit").innerHTML = "NPs por Día" +
       (fcSalidas ? " <small>· <b class=\"fc-salio\">" + fcSalidas + (fcSalidas === 1 ? " salió" : " salieron") + " sin FC</b></small>" : "");
     var pc = function (nn, tot, cls) {
       var p = tot ? Math.round(100 * nn / tot) : 0;
