@@ -5,6 +5,8 @@
        badge «⚠ N con < 4 meses» (también la ficha del filtro).
    (C) «📄 PDF para Damián»: columnas Código · Descripción · Foto · Stock · Máximo (meses arriba) ·
        Pedido (MC) · FOB (total arriba) · m³ (total arriba) + el resumen de cómo se compone.
+   (E) v25.3 (Thomas): la hoja va VERTICAL (A4 portrait) y lleva la columna Marca (LK / CH / Loke)
+       en las 3 hojas, en lugar de la chapa de planta pegada al código.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -57,7 +59,7 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     const pdfTh = [...trs0[1].children].map((x) => x.textContent.trim());
     const pdfCods = [...h1.querySelectorAll("tbody tr")].map((tr) => tr.cells[0].textContent.trim());
     return { filas, camino, th4: ths[4].textContent.trim(), badges, top, pdfTh, pdfCods, hojas: d.querySelectorAll(".hoja").length, txt: d.textContent,
-      imgs: h1.querySelectorAll("tbody img").length, insumoFoto: ([...h1.querySelectorAll("tbody tr")].find((tr) => tr.cells[0].textContent.trim() === "GGG") || { cells: [0,0,{ textContent: "" }] }).cells[2].textContent };
+      imgs: h1.querySelectorAll("tbody img").length, insumoFoto: ([...h1.querySelectorAll("tbody tr")].find((tr) => tr.cells[0].textContent.trim() === "GGG") || { cells: [0,0,0,{ textContent: "" }] }).cells[3].textContent };
   }, items);
   const cods = r.filas.map((f) => f.cod).join(",");
   if (cods !== "BBB,DDD,FFF,AAA,GGG,CCC,EEE") fail("(A) orden por prioridad (stock + en camino): esperaba BBB,DDD,FFF,AAA,GGG,CCC,EEE y dio " + cods);
@@ -72,7 +74,7 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (!r.badges.some((x) => /^⚠2 2 con < 4 meses/.test(x))) fail("(B) badge ⚠ 2 con < 4 meses en Frontier: " + JSON.stringify(r.badges));
   if (r.badges.some((x) => /⚠1 /.test(x))) fail("(B) Kangli no tiene alerta: " + JSON.stringify(r.badges));
   // v24.55 (Thomas) — hoja 1: título + totales en su propia fila; columnas compactas y 2 separadores finitos.
-  const exp = ["Cód", "Descripción", "Foto", "", "Stock", "Llegan", "Máx", "FOB", "m³"];
+  const exp = ["Cód", "Marca", "Descripción", "Foto", "", "Stock", "Llegan", "Máx", "FOB", "m³"];
   exp.forEach((h, i) => { if (!(r.pdfTh[i] || "").startsWith(h) || (h === "" && r.pdfTh[i] !== "")) fail("(C) columna " + (i + 1) + " del PDF tiene que ser «" + h + "»: " + r.pdfTh[i]); });
   if (!/^Pedido Frontier \d{2}\/(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)$/.test(r.top[0])) fail("(C) título «Pedido <prov> dd/mmm»: " + r.top[0]);
   if (r.top[1] !== "10 m") fail("(C) los meses del máximo van arriba de Máx: " + r.top[1]);
@@ -102,6 +104,25 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (!/Sin pedir Zeta/.test(r2.hj[1] || "") || !/III/.test(r2.hj[1] || "") || !/< 80% MOQ/.test(r2.hj[1] || "")) fail("(D) hoja 2 con III y su motivo: " + r2.hj[1]);
   if (!/Discontinuos Zeta/.test(r2.hj[2] || "") || !/ZZ9/.test(r2.hj[2] || "")) fail("(D) hoja 3 con los discontinuos del proveedor: " + r2.hj[2]);
   if (!/↑ 80% MOQ/.test(r2.hj[0] || "")) fail("(D) el aviso del MOQ al lado del renglón estirado: " + r2.hj[0]);
+  // (E) v25.3 (Thomas) — hoja vertical y columna Marca con el dato del maestro (LK / CH / Loke).
+  const r3 = await p.evaluate(async () => {
+    _NAC_TASAS.moq = 0;
+    const mk = (cod, o) => Object.assign({ cod, prov: "Zeta", key: cod, desc: "Art " + cod, proyUni: 100, objetivoUni: 1000, stockUni: 0, enCurso: 0, meses: 10,
+      aPedirUni: 500, uniMaster: 100, aPedirCajas: 5, uxc: 10, fobUni: 1, m3Master: 0.05, det: [{ id: 1, curso: 0, marca: "LK" }] }, o || {});
+    const its = [mk("KKK", { det: [{ id: 2, marca: "Loke" }] }), mk("809E", { key: "809E|CH", planta: "CH", det: [{ id: 3, marca: "CH" }] }),
+      mk("LLL", { det: [{ id: 4, marca: "" }] }), mk("MMM", { aPedirUni: 0, aPedirCajas: 0, stockUni: 5000, det: [{ id: 5, marca: "Loke" }] })];
+    _stkPop = { kind: "pedImp", data: { items: its, meses: 10, minUsd: 25000, nac: { modo: "consolidada", valorM3: 110, tn: 0 } }, soloPedir: false, mcOverride: {} };
+    let html = ""; window._pedImpPrintConFotos = (h) => { html = h; };
+    await pedImpPdfDamian(encodeURIComponent("Zeta"));
+    const d = document.createElement("div"); d.innerHTML = html.replace(/^[\s\S]*<body>/, "").replace(/<\/body>[\s\S]*$/, "");
+    const filas = [...d.querySelectorAll(".hoja")].map((h) => [...h.querySelectorAll("tbody tr")].map((tr) => tr.cells[0].textContent.trim() + ":" + tr.cells[1].textContent.trim()));
+    return { css: (/<style>([\s\S]*?)<\/style>/.exec(html) || [])[1] || "", filas };
+  });
+  if (!/@page\{size:A4 portrait/.test(r3.css) || /landscape/.test(r3.css)) fail("(E) el PDF para Damián va en A4 VERTICAL: " + (r3.css.match(/@page\{[^}]*\}/) || [""])[0]);
+  const f0 = (r3.filas[0] || []).join(",");
+  if (!/KKK:Loke/.test(f0) || !/809E:CH/.test(f0) || !/LLL:—/.test(f0)) fail("(E) columna Marca en el pedido (Loke / CH / — sin dato; el código sin chapa): " + f0);
+  if (!/MMM:Loke/.test((r3.filas[1] || []).join(","))) fail("(E) columna Marca en «Sin pedir»: " + (r3.filas[1] || []).join(","));
+  if (!/ZZ9:LK/.test((r3.filas[2] || []).join(","))) fail("(E) columna Marca en «Discontinuos»: " + (r3.filas[2] || []).join(","));
   if (errs.length) fail("errores JS: " + errs.join(" | "));
   await b.close();
   if (!process.exitCode) console.log("✓ pedimp-prioridad-damian: orden por meses de stock, alerta < 4 y PDF para Damián");
