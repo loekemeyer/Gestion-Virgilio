@@ -6480,7 +6480,7 @@ día. «Total por día» sacalo, que quede una vision estilo «dos columnas»"*.
 - `monUnirCentroOeste` queda en el archivo sin llamador (≡ index.html).
 - **Chequeo:** `node tests/mon-tv.cjs` (verificado que falla contra la v24.69: 3 columnas, sin M³, con «Total por día»).
 
-### ⚠ v24.84 (Luis): la tabla de tandas de la TV vuelve a llevar CLIENTE y NP
+### ⚠ v24.88 (Luis): la tabla de tandas de la TV vuelve a llevar CLIENTE y NP
 
 **Luis:** *"tiene que aparecer en la parte de la izquierda junto a las tandas y los m3: el cliente y detalle de NPs"*.
 Se retira el «tanda · m³ · progreso y nada más» de la v23.92. Columnas: **Tanda · M³ · Cliente · NP · Progreso**

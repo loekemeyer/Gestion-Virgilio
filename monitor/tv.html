@@ -170,7 +170,7 @@ tr.dia td{background:#0e1830;color:#93c5fd;font-size:1.9vh;font-weight:900;
    Tres columnas de ancho fijo: sin `table-layout:fixed` el semáforo se corre de
    lugar de una fila a otra y la columna deja de leerse como columna. */
 table.tandas{table-layout:fixed}
-/* v24.84: cliente y NP, más chicos que el código de tanda (lo que se busca de lejos sigue siendo la tanda). */
+/* v24.88: cliente y NP, más chicos que el código de tanda (lo que se busca de lejos sigue siendo la tanda). */
 .t-cli{font-weight:800;font-size:2.3vh;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .t-np div{font-weight:700;font-size:1.8vh;color:#94a3b8;line-height:1.15;overflow:hidden;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
@@ -683,7 +683,7 @@ function sumarDestino(e, rs, zona, recep) {
 
 /* v23.92 (Luis) — la tabla de tandas quedó en tanda · m³ · progreso, así que se fueron con
    ella `zonaCorta`, `diasDemora` y `colorDemora`: nadie las llamaba más.
-   v24.84 (Luis): *"tiene que aparecer en la parte de la izquierda junto a las tandas y los m3:
+   v24.88 (Luis): *"tiene que aparecer en la parte de la izquierda junto a las tandas y los m3:
    el cliente y detalle de NPs"*. Vuelven cliente (resumido, «+N» si son varios) y las NP. */
 function resumirCliente(nombre) {
   var s = String(nombre || "").trim()

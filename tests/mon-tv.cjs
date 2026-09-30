@@ -311,7 +311,7 @@ function responder(url) {
      "deberían ser 4 de 7 terminadas (E31A, E34A, E37A y E38A): " + JSON.stringify(r.ult));
   ok(r.ult.enCurso === 2, "tienen que contarse 2 tandas en curso (E30A y E36A): " + JSON.stringify(r.ult));
 
-  /* ── v24.84 (Luis) — TANDA · M³ · CLIENTE · NP · PROGRESO ───────────────
+  /* ── v24.88 (Luis) — TANDA · M³ · CLIENTE · NP · PROGRESO ───────────────
      La v23.92 había sacado el N° de pedido y el cliente; Luis los pidió de vuelta
      (*"el cliente y detalle de NPs"*). La zona y los días siguen afuera. */
   ok(/>Tanda</.test(r.tandas) && /M³/.test(r.tandas) && />Cliente</.test(r.tandas)
