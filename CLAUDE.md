@@ -6550,7 +6550,10 @@ de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (
 
 - **Insumo** = parte de `vista_importados_partes` cuyo propio código NO está entre los terminados que la usan
   (1000900, 505C, 523C, 587C, 1546903; **590E no**: se vende). `esInsumo` en `ocgFetchImportados`.
-- **Sin empresa**: `_impPlantaVista` y `_pedImpEmpFoto` devuelven vacío. `Importados.marca` sigue en `LK` en la base.
+- **Sin empresa**: `_impPlantaVista` y `_pedImpEmpFoto` devuelven vacío. En la base, `Importados.marca` y sus baches
+  son **`Mixto`** (v25.5, Luis: *"debería ser Mixto desde el vamos"*), igual que los movimientos de insumos. `Mixto` se lee
+  como LK en todo lector (no es CH). Centinela: `select * from public.gv_importados_insumo_con_empresa;` — vacía = todo bien.
+  `sql/gv_importados_insumo_mixto_v2509.sql`.
 - **Objetivo = (meses del proveedor + 2) × proyección de los productos que lo usan** (`INSUMO_MESES_PRODUCTO`),
   también en el tope del MOQ. Chip **«12M»** al lado del código.
 - **Tocar Stock** abre el desglose (`pedImpStockDesglose`): propio · cada insumo (`gv_importados_stock_insumos`) ·
