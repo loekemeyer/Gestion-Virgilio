@@ -6671,4 +6671,6 @@ nadie la sesión abierta"*.
 - **No es el IMEI ni el serie** (el navegador no los da): borrar los datos de la app o reinstalar genera un ID nuevo.
 - Forward-facing: lo anterior queda NULL, no se desloguea a nadie; si el envío del ingreso falla, no pasa nada.
 - `anon` sólo INSERTA; se lee por el MCP: `select * from public.gv_dispositivos order by ultimo_ingreso desc;`
+- **Un mismo dispositivo con 2+ operarios en el día** (v25.26, Luis: *"que quede registrado"*):
+  `select * from public.gv_dispositivo_multi_operario order by dia desc;` — cruza ingresos y eventos.
 - `sql/gv_dispositivo_v2525.sql`, `tests/dispositivo-id.cjs`.
