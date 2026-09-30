@@ -145,7 +145,7 @@ catch (_e) {
     out.abrioDet = !!det;
     const dt = det ? det.textContent : "";
     out.detTieneCliente = dt.indexOf("Osa") >= 0 && dt.indexOf("Otros") >= 0;
-    // v25.01 (Luis) — la familia entra al detalle: cada cliente dice de qué código salió
+    // v25.4 (Luis) — la familia entra al detalle: cada cliente dice de qué código salió
     out.detTieneCodigos = dt.indexOf("702EN 113") >= 0 && dt.indexOf("702E 7") >= 0;
     out.detTieneRemito = dt.indexOf("R-9") >= 0 && dt.indexOf("Carriero") >= 0;
     out.detMarcado = body.querySelectorAll(".proyv-svg .hit.on").length === 1;

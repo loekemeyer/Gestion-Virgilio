@@ -6514,7 +6514,7 @@ nuevo **🚚 Pendientes de hoy** (`pendientesHoy`: lo de hoy sin CCN, por tanda 
 lo más atrasado primero). `activarTicker` es idempotente y se re-mide al cambiar el tamaño (la pestaña oculta del admin
 mide 0). Columnas 16/9/33/28 %. La TV pesa 99 KB contra el techo de 100 de `mon-tv`.
 
-## ⚠ REGLA (Luis, 2026-09-30, v25.01): el DESGLOSE por cliente del pop-up de proyección cuenta lo MISMO que el total
+## ⚠ REGLA (Luis, 2026-09-30, v25.4): el DESGLOSE por cliente del pop-up de proyección cuenta lo MISMO que el total
 
 Caso 702E julio: el total decía 1.644 u (137 cajas: 18 del 702E + 119 del **702EN**, su secundario) y el
 desglose «🧾 Facturado» 216 u. El total (`ventas_mensuales_cod`) suma la familia y lee `ventas_proy_lineas`
@@ -6523,7 +6523,7 @@ Hoy `gv_ventas_clientes_mes_cod` manda la familia a **`fn_ventas_clientes_mes_fa
 mismos tres criterios, y cada cliente dice de qué código salió (`702E 7 · 702EN 59`, columna `codigos`).
 `fn_ventas_clientes_mes_virgilio` (la vieja) queda sin llamador, de rollback. Centinela `Equivalencias_Familia`.
 **Al tocar un criterio del total mensual, tocar también el desglose.** Problema 640.
-`sql/gv_proy_desglose_familia_v2501.sql`, `sql/gv_proy_desglose_familia_v2501_LK.sql`, `tests/proy-entregadas.cjs`.
+`sql/gv_proy_desglose_familia_v254.sql`, `sql/gv_proy_desglose_familia_v254_LK.sql`, `tests/proy-entregadas.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-30): el pedido con importados sin stock va COMPLETO — ya no se parte
 

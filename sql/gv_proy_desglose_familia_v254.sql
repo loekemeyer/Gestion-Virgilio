@@ -19,7 +19,7 @@ begin
   if v_cod = '' or v_mes !~ '^[0-9]{4}-[0-9]{2}$' then return; end if;
   v_emp := case lower(btrim(coalesce(p_empresa, '')))
              when 'lk' then 'lk' when 'chef' then 'chef' when 'ch' then 'chef' else '' end;
-  -- v25.01 (Luis 30/09) la familia del principal, igual que ventas_mensuales_cod (Equivalencias_Familia)
+  -- v25.4 (Luis 30/09) la familia del principal, igual que ventas_mensuales_cod (Equivalencias_Familia)
   select string_agg(c, ',') into v_cods from (
     select v_cod c union
     select regexp_replace(upper(btrim(f.cod_secundario)), '[^A-Z0-9]', '', 'g')
@@ -45,7 +45,7 @@ grant execute on function public.gv_ventas_clientes_mes_cod(text,text,text) to a
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
 values ('gv_ventas_clientes_mes_cod', 'funcion', 'Equivalencias_Familia',
         'El desglose por cliente del pop-up de proyección suma la familia del principal (702EN en 702E), igual que el total mensual',
-        'Luis', 'v25.01');
+        'Luis', 'v25.4');
 
 /* ANTERIOR (rollback):
  returns table(cliente text, cajas numeric) — pedía sólo p_cod a fn_ventas_clientes_mes_virgilio
