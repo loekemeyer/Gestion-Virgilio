@@ -6236,7 +6236,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.15"></script>
+<script type="module" src="recepcion.js?v=25.16"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10278,7 +10278,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.15";
+const APP_VERSION = "v25.16";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -15232,12 +15232,54 @@ async function _stkGondolaSaldoVivo(cod) {
     return s;
   } catch (_e) { return null; }
 }
-function stockFlushPend() {
+/* v25.16 (Marianela, 30/09) — la cola se reintenta FILA POR FILA. Antes iba toda junta en un POST, y el
+   insert es una transacción: UNA fila que el server rechaza hacía fallar el lote entero en cada recarga y
+   todo lo que venía atrás quedaba trabado para siempre en ese celular. Caso: el del legajo 104 reintentaba
+   desde el 21/09 un guardado del 599E que ya había entrado (400 del candado de A guardar, ~20 veces por día)
+   y atrás quedó la salida a Cervantes del 328E (48 cj), que nunca llegó a la base.
+   Por fila: ok → sale · 409 duplicado (ya estaba en la base) → sale · 400/422 de datos → sale y queda
+   anotada en `vir_stock_rech` · red, 5xx o permisos → queda para el próximo intento. Si se corta la red,
+   se deja de mandar y queda todo lo que falta. Lo que stockMove encole mientras tanto no se pierde. */
+let _stockFlushing = false;
+function _stockFilaKey(r) { return (r && r.client_id) ? "c:" + r.client_id : "j:" + JSON.stringify(r); }
+async function stockFlushPend() {
+  if (_stockFlushing) return;
   let p = []; try { p = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); } catch (_e) {}
   if (!p.length) return;
-  fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal,resolution=ignore-duplicates" }, body: JSON.stringify(_stockNormRows(p)) })   // idea 5490: reintento idempotente por client_id
-    .then(function (r) { if (r.ok) { try { localStorage.removeItem("vir_stock_pend"); } catch (_e) {} } })
-    .catch(function () {});
+  _stockFlushing = true;
+  const headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal,resolution=ignore-duplicates" };   // idea 5490: reintento idempotente por client_id
+  const quedan = [], rech = [];
+  try {
+    for (let i = 0; i < p.length; i++) {
+      const row = p[i];
+      let r;
+      try { r = await fetch(SUPABASE_STOCK_ENDPOINT, { method: "POST", headers: headers, body: JSON.stringify(_stockNormRows([row])) }); }
+      catch (_e) { for (let j = i; j < p.length; j++) quedan.push(p[j]); break; }   // sin red: queda todo lo que falta
+      if (r && r.ok) continue;
+      let body = ""; try { body = (r && r.text) ? ((await r.text()) || "") : ""; } catch (_e) {}
+      const st = (r && r.status) || 0, bu = body.toUpperCase();
+      if (st === 409 && (bu.indexOf("23505") >= 0 || bu.indexOf("DUPLICATE KEY") >= 0)) continue;   // ya estaba en la base
+      const transitorio = st === 0 || st >= 500 || st === 401 || st === 403 || st === 408 || st === 409 || st === 429 ||
+        bu.indexOf("42501") >= 0 || bu.indexOf("PERMISSION DENIED") >= 0 || bu.indexOf("PGRST301") >= 0 || bu.indexOf("PGRST116") >= 0;
+      if (transitorio) { quedan.push(row); continue; }
+      rech.push({ row: row, status: st, motivo: _stockMotivo(body), ts: new Date().toISOString() });
+    }
+  } finally {
+    try {
+      const vistas = {}; p.forEach(function (x) { vistas[_stockFilaKey(x)] = true; });
+      let ahora = []; try { ahora = JSON.parse(localStorage.getItem("vir_stock_pend") || "[]"); } catch (_e) {}
+      const nuevas = ahora.filter(function (x) { return !vistas[_stockFilaKey(x)]; });   // las que encoló stockMove mientras tanto
+      const resto = quedan.concat(nuevas);
+      if (resto.length) localStorage.setItem("vir_stock_pend", JSON.stringify(resto.slice(-5000)));
+      else localStorage.removeItem("vir_stock_pend");
+      if (rech.length) {
+        let prev = []; try { prev = JSON.parse(localStorage.getItem("vir_stock_rech") || "[]"); } catch (_e) {}
+        localStorage.setItem("vir_stock_rech", JSON.stringify(prev.concat(rech).slice(-200)));
+        try { console.warn("stockFlushPend: " + rech.length + " fila(s) rechazadas por el server, sacadas de la cola (ver vir_stock_rech)", rech); } catch (_e) {}
+      }
+    } catch (_e) {}
+    _stockFlushing = false;
+  }
 }
 try { window.addEventListener("online", function () { try { stockFlushPend(); } catch (_e) {} }); stockFlushPend(); } catch (_e) {}
 /* v12.35 — BAJA DE RACKS ATÓMICA. La fila de Racks_Bajadas y los 2 movimientos de
@@ -24864,7 +24906,16 @@ async function stockFijar() {
   if (!cod) return;
   var comentario = ((document.getElementById("stkAjComent") || {}).value || "").trim();
   const sd = stockComputeSaldos(_stk.movs, _stk.cutoff)[cod], dep = _stkDep();
-  const actual = (sd && sd[dep]) || 0; const delta = fijar - actual;
+  // v25.16 (Marianela, 30/09) — el saldo actual sale del SERVIDOR, no de _stk.movs: el libro entero se carga
+  // en segundo plano (~100 páginas) y hasta que llega un «Fijar en 0» veía saldo 0, decía "ya es 0" y no
+  // grababa nada (566E). Sin lectura no se fija nada: "no pude leer" no es "hay 0".
+  let actual = (sd && sd[dep]) || 0;
+  if (dep === "insumos" && !(_stk.movs && _stk.movs.length)) { alert("Todavía se están cargando los movimientos de insumos. Esperá unos segundos y probá de nuevo."); return; }
+  if (dep !== "insumos") {
+    try { const _v = await gvSaldosDeClaves([cod]); actual = 0; (_v || []).forEach(function (r) { actual += Number(r[dep]) || 0; }); }
+    catch (_e) { alert("No pude leer el saldo actual de " + cod + ": no se fijó nada. Probá de nuevo."); return; }
+  }
+  const delta = fijar - actual;
   if (delta === 0) { alert("El stock de " + cod + " (" + dep + ") ya es " + fijar + "."); return; }
   var ref = "fijar en " + fijar + (comentario ? " | " + comentario : "");
   /* v11.76: insumos — ceroizar cada unidad por separado (misma lógica que
@@ -57642,7 +57693,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.15"></script>
+<script src="importacion.js?v=25.16"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60402,7 +60453,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.15"></script>
+<script src="cobranzas.js?v=25.16"></script>
 
 </body>
 </html>
