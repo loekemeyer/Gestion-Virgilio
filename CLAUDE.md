@@ -3978,6 +3978,14 @@ banda NO los lleve, que los dos chips abran el pop-up y que el contenido siga co
 **Chequeo:** `node tests/imp-hist-pedidos.cjs` · `node tests/pedimp-config-proveedor.cjs` ·
 `select * from public.gv_imp_pedidos_historial(400);`. `sql/gv_imp_pedidos_historial_v2391.sql`.
 
+## ⚠ REGLA (Luis, 2026-09-30, v24.75): 🖨 IMPRIMIR PDF de Pedidos Importación = reporte por proveedor
+
+Botón arriba a la derecha de la barra (`pedImpRepAbrir`): pop-up con los proveedores a tildar + «Sólo lo que
+genera pedido». El PDF (`_pedImpRepHtml`, Arial 15, A4 vertical) tiene una tabla por proveedor con **Cód. ·
+Stk. · E.M. (proyección u/mes) · Meses Stk. (⚠ si < 4) · m³ · u$s · Pedido en curso** (unidades + dd/mm, o «No»),
+ordenada con `_pedImpPrioCmp` (menos meses primero). **m³ y u$s son sólo de lo que genera pedido**; el total va
+arriba de cada columna. `tests/pedimp-reporte-pdf.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-29, v24.32): la nacionalización por artículo es de 🚢 EN CURSO — y el proveedor la abre
 
 **Luis, textual:** *"no me estás entendiendo. Es en la pestaña «en curso» que quería lo que te pedí.

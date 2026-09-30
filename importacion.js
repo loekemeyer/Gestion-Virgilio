@@ -1356,6 +1356,8 @@ function _pedImpRender() {
       '<details style="padding:4px 12px 6px"><summary style="cursor:pointer;font-size:13px;font-weight:700;color:#0f172a">ⓘ Cómo se usa</summary>' +
         '<div class="stkpop-hint" style="margin:6px 0 0;white-space:normal;max-width:300px">Índice <b>' + (data.meses || 10) + ' meses</b>. El pedido va en <b>master cajas redondas</b>: tocá la celda <b>MC</b> para ajustarlo (<b>0</b> = no pedir). <b>Unidades = MC × uni/master</b>. 🧩 = parte · ✏️ en curso · 📥 llegó · 🖨 PDF para que el chino cotice (sin FOB). En pantalla angosta la tabla se desliza al costado.</div></details>' +
       '</div></details>' +
+    // v24.73 (Luis) — reporte en PDF de los proveedores que se elijan, en el hueco de la derecha
+    '<button class="pedimp-rep-btn" onclick="pedImpRepAbrir()" title="Reporte PDF: Cód · Stock · E.M. · Meses stock · m³ y u$s de lo que genera pedido · Pedido en curso, por proveedor y del más urgente al menos urgente" style="width:auto;margin:0 0 0 auto;flex:0 0 auto;padding:6px 14px;border:1px solid #1e3a8a;border-radius:8px;background:#1e3a8a;color:#fff;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap">🖨 IMPRIMIR PDF</button>' +
     (_buscando ? '<span style="font-size:11.5px;color:#0f766e;font-weight:700;flex-basis:100%">' + items.length + ' ítem(s) · se busca en <b>todos</b> los proveedores, pidan o no</span>' : '') +
     '</div>';
   // Proveedores: UNA fila que se desliza; la alerta va como número (⚠N) con el detalle en el title.
@@ -1707,6 +1709,81 @@ async function pedImpPdfDamian(provEnc) {
     'tr{page-break-inside:avoid}thead{display:table-header-group}';
   const html = '<!doctype html><html><head><meta charset="utf-8"><title>Pedido ' + escapeHtml(prov) + ' — para Damián</title><style>' + css + '</style></head><body>' +
     hoja1 + hoja2 + hoja3 + '</body></html>';
+  _pedImpPrintConFotos(html);
+}
+/* v24.73 (Luis 30/09) — 🖨 IMPRIMIR PDF: reporte de los proveedores elegidos. Una tabla por
+   proveedor, del más urgente (menos meses de stock, con lo en camino) al menos urgente; sin
+   proyección, al final. m³ y u$s son SÓLO de lo que genera pedido. Arial 15, rótulos centrados en
+   2 líneas, ancho según el dato. */
+function pedImpRepAbrir() {
+  const data = (_stkPop && _stkPop.data) || { items: [] };
+  const provs = [];
+  (data.items || []).forEach(function (it) { const p = it.prov || "(sin proveedor)"; if (provs.indexOf(p) < 0) provs.push(p); });
+  provs.sort(function (a, b) { const ia = _IMPORTADOR_DE[a] || "zz", ib = _IMPORTADOR_DE[b] || "zz"; return String(ia).localeCompare(String(ib)) || String(a).localeCompare(String(b)); });
+  if (!provs.length) { try { alert("No hay proveedores cargados."); } catch (_e) {} return; }
+  const sel = (_stkPop && _stkPop.provFiltro) || "";
+  let ov = document.getElementById("impRepOv"); if (ov) ov.remove();
+  ov = document.createElement("div"); ov.id = "impRepOv";
+  ov.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:16px";
+  const lab = 'display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:#0f172a;padding:4px 2px;cursor:pointer';
+  const chk = 'width:18px;height:18px;margin:0;flex:0 0 auto';
+  ov.innerHTML = '<style>#impRepOv button{width:auto;margin-top:0}#impRepOv input{box-sizing:border-box}</style>' +
+    '<div style="background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:14px 16px;max-width:360px;width:100%;max-height:90vh;overflow:auto">' +
+    '<div style="font-size:16px;font-weight:800;color:#1e3a8a;margin-bottom:8px;text-align:center">🖨 Reporte PDF</div>' +
+    '<label style="' + lab + ';border-bottom:1px solid #e2e8f0;margin-bottom:4px"><input type="checkbox" id="impRepTodos" style="' + chk + '"' + (sel ? '' : ' checked') + ' onchange="Array.prototype.forEach.call(document.querySelectorAll(\'.imp-rep-prov\'),function(c){c.checked=this.checked}.bind(this))"> Todos</label>' +
+    provs.map(function (p) { return '<label style="' + lab + '"><input type="checkbox" class="imp-rep-prov" value="' + escapeHtml(p) + '" style="' + chk + '"' + (!sel || sel === p ? ' checked' : '') + '> ' + escapeHtml(p) + '</label>'; }).join('') +
+    '<label style="' + lab + ';border-top:1px solid #e2e8f0;margin-top:6px;padding-top:8px"><input type="checkbox" id="impRepSoloPed" style="' + chk + '"> Sólo lo que genera pedido</label>' +
+    '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px">' +
+    '<button onclick="document.getElementById(\'impRepOv\').remove()" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:14px;font-weight:700;cursor:pointer">Cancelar</button>' +
+    '<button class="imp-rep-ok" onclick="pedImpRepImprimir()" style="padding:7px 14px;border:1px solid #1e3a8a;border-radius:8px;background:#1e3a8a;color:#fff;font-size:14px;font-weight:800;cursor:pointer">🖨 Imprimir</button>' +
+    '</div></div>';
+  ov.addEventListener("click", function (e) { if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+function _pedImpRepHtml(provs, soloPed) {
+  const data = (_stkPop && _stkPop.data) || { items: [] };
+  const fmt = function (n, dec) { return Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 }); };
+  let n = 0, cuerpo = "";
+  provs.forEach(function (prov) {
+    let arr = (data.items || []).filter(function (it) { return (it.prov || "(sin proveedor)") === prov; });
+    if (soloPed) arr = arr.filter(function (it) { return _pedImpMcOf(it) > 0; });
+    if (!arr.length) return;
+    arr = arr.slice().sort(_pedImpPrioCmp);
+    n += arr.length;
+    const tUsd = arr.reduce(function (s, it) { return s + _pedImpUsdOf(it); }, 0);
+    const tM3 = arr.reduce(function (s, it) { return s + _pedImpM3Of(it); }, 0);
+    const filas = arr.map(function (it) {
+      const m = _pedImpMesesStock(it), bajo = m != null && m < _PEDIMP_MESES_ALERTA;
+      const usd = _pedImpUsdOf(it), m3 = _pedImpM3Of(it), cam = Math.max(0, Number(it.enCurso) || 0);
+      const f = _pedImpDdmm(it.reingresoEst);
+      return '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it)) + (_impPlantaVista(it) ? " " + _impPlantaVista(it) : "")) + '</b></td>' +
+        '<td>' + fmt(Math.max(0, Number(it.stockUni) || 0)) + '</td>' +
+        '<td>' + (Number(it.proyUni) > 0 ? fmt(it.proyUni) : '—') + '</td>' +
+        '<td' + (bajo ? ' class="al"' : '') + '>' + (m == null ? '—' : (bajo ? '⚠ ' : '') + _pedImpMesesFmt(m)) + '</td>' +
+        '<td>' + (m3 > 0 ? fmt(m3, 2) : '—') + '</td>' +
+        '<td>' + (usd > 0 ? fmt(usd) : '—') + '</td>' +
+        '<td>' + (cam > 0 ? fmt(cam) + '<small>' + (f || 's/f') + '</small>' : 'No') + '</td></tr>';
+    }).join("");
+    cuerpo += '<table><thead><tr><th colspan="4" class="tit">' + escapeHtml(prov) + '</th><th class="tot">' + fmt(tM3, 2) + '</th><th class="tot">' + fmt(tUsd) + '</th><th class="tit"></th></tr>' +
+      '<tr><th>Cód.</th><th>Stk.<small>u</small></th><th>E.M.<small>u/mes</small></th><th>Meses<small>Stk.</small></th><th>m³<small>pedido</small></th><th>u$s<small>pedido</small></th><th>Pedido<small>en curso</small></th></tr></thead><tbody>' + filas + '</tbody></table>';
+  });
+  if (!n) return null;
+  const hoy = (function () { try { const s = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); return s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(2, 4); } catch (_e) { return ""; } })();
+  const css = '@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;margin:0;font-size:15px}' +
+    'h1{font-size:17px;text-align:center;margin:0 0 6px}table{border-collapse:collapse;margin:0 auto 12px}' +
+    'th,td{border:1px solid #444;padding:2px 6px;text-align:center;vertical-align:middle;white-space:nowrap;line-height:1.15;font-size:15px}' +
+    'th{font-weight:800}th.tit{font-size:16px;border-left:0;border-right:0}th.tot{font-size:15px}td.al{font-weight:800}' +
+    'th small,td small{display:block;font-weight:400;color:#444;font-size:12px}tr{page-break-inside:avoid}thead{display:table-header-group}';
+  return '<!doctype html><html><head><meta charset="utf-8"><title>Reporte importados ' + hoy + '</title><style>' + css + '</style></head><body>' +
+    '<h1>Importados · ' + hoy + (soloPed ? ' · sólo lo que genera pedido' : '') + '</h1>' + cuerpo + '</body></html>';
+}
+function pedImpRepImprimir() {
+  const provs = Array.prototype.filter.call(document.querySelectorAll("#impRepOv .imp-rep-prov"), function (c) { return c.checked; }).map(function (c) { return c.value; });
+  if (!provs.length) { try { alert("Elegí al menos un proveedor."); } catch (_e) {} return; }
+  const sp = document.getElementById("impRepSoloPed");
+  const html = _pedImpRepHtml(provs, !!(sp && sp.checked));
+  if (!html) { try { alert("No hay artículos para imprimir con esa selección."); } catch (_e) {} return; }
+  const ov = document.getElementById("impRepOv"); if (ov) ov.remove();
   _pedImpPrintConFotos(html);
 }
 /* Imprime en un iframe oculto ESPERANDO las fotos (remitoPrintDoc imprime a los 400 ms y
