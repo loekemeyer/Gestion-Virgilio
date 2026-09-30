@@ -3799,10 +3799,15 @@ pedido en viaje cuya **fecha de reingreso ya pasó** sin recibirse corre solo a 
 cron `gv-importados-eta-vencida` 00:07 ART, log `GV_Importados_ETA_Log`): una sola fuente, `GV_Importados_Baches` →
 `Importados.reingreso_est` → módulo de Importados y cartel de las páginas.
 El cartel de un producto toma la fecha **más temprana** entre su pedido y el de sus partes (v24.91: 323E/838E → la del 323ES).
+**v25.12 (Luis, 30/09): el cartel llega a la página al toque.** Tocar «Cartel», la fecha de reingreso o la entrega
+global llama a **`sync_reingresos_cartel_virgilio`** de LK (sólo el cartel, ~1,6 s, anon la puede correr) en vez de
+esperar el cron 39 (≤ 5 min). La sync entera tarda ~11 s (8,4 s son los ocultos) y anon corta a los 3 s: por eso
+el switch «Web» sigue en ≤ 5 min. Si la llamada falla, el cron la rehace igual. `sql/lk_sync_reingresos_cartel_v2512_LK.sql`,
+`tests/pedimp-cartel-sync.cjs`.
 **v25.2 (Luis, 30/09): 323E y 838E NO se agrupan con 323ES** (*"no debería juntarlos así"*): se borraron sus filas de
 `GV_Importados_Alias` (backup `zz_backups."GV_Backup_ImpAlias_20260930"`; queda sólo 865ED→865E) y `gv_imp_recibir_contexto`
 ya no usa el alias: los pedidos de 323E/838E se reciben en cajas, sólo el de 323ES entra como insumo `323ES In`.
-**v25.7 (Luis, 30/09): el insumo se llama `323ES`, no `323ES In`** (*"323ES nunca fue un código de stock"*): renombrado en
+**v25.12 (Luis, 30/09): el insumo se llama `323ES`, no `323ES In`** (*"323ES nunca fue un código de stock"*): renombrado en
 `Insumos`, `Insumos_Factores`, `GV_Importados_Insumo_Map` e `Importados_Stock_Parte` (0 movimientos; backup `zz_backups."GV_Backup_323ESIn_20260930"`).
 
 **Desglose de la tarjeta del proveedor (Luis, v23.75):** los dos chips de la banda se expanden. Izq: consumo/mes =

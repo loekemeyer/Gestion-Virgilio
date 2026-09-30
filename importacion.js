@@ -2059,6 +2059,26 @@ async function pedImpEditFob(codEnc) {
     await pedImpReload();
   } catch (e) { try { alert("No se pudo guardar el FOB: " + (e.message || e)); } catch (_e) {} }
 }
+// v25.12 (Luis, 30/09): *"desmarqué «cartel» pero sigue apareciendo en la página"*. Las páginas leen
+// una copia (reingreso_cache de LK) que el cron 39 de LK rehace cada 5 min; tocar un switch
+// esperaba hasta esa corrida. Ahora cada cambio del cartel, de la fecha de reingreso o de la
+// entrega global le pide a LK que rehaga YA sólo el cartel (sync_reingresos_cartel_virgilio,
+// ~1,6 s; la sync entera tarda ~11 s y anon corta a los 3 s). El switch «Web» sigue en ≤ 5 min.
+// Si falla, el cron la rehace igual: no se avisa error, porque el dato ya quedó guardado.
+var _impSyncT = null;
+function _impSyncPaginas() {
+  try {
+    if (typeof PWEB_LK_URL === "undefined" || typeof PWEB_LK_ANON === "undefined") return;
+    clearTimeout(_impSyncT);
+    _impSyncT = setTimeout(function () {
+      fetch(PWEB_LK_URL + "/rest/v1/rpc/sync_reingresos_cartel_virgilio", {
+        method: "POST",
+        headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + PWEB_LK_ANON, "Content-Type": "application/json" },
+        body: "{}"
+      }).catch(function () {});
+    }, 800);
+  } catch (_e) {}
+}
 // v22.07 (Luis, 23/09) — switch "Cartel web" por importado: prende/apaga el badge de
 // reingreso de las páginas y el partido del pedido. OFF = fila en GV_Reingreso_Excluido
 // (la lee gv_reingresos_feed). Lectura anon (gv_reingreso_excluidos), escritura supervisor
@@ -2161,6 +2181,7 @@ async function pedImpReingresoWeb(codEnc, on) {
     if (!_reingExcl) _reingExcl = new Set();
     var k = _reingNorm(cod);
     if (on) _reingExcl.delete(k); else _reingExcl.add(k);
+    _impSyncPaginas();
   } catch (e) { alert("No se pudo cambiar el cartel web: " + (e.message || e)); }
   _pedImpRender();
 }
@@ -2174,6 +2195,7 @@ async function pedImpSetReingreso(codEnc, val) {
   try {
     await _impEscribir("Importados?" + _pedImpFiltroFilas(it0, cod), "PATCH",
       { reingreso_est: v || null, actualizado: new Date().toISOString() });
+    _impSyncPaginas();   // v25.12: la fecha del cartel llega a la página ya
     // reflejar en memoria sin recalcular todo el pedido
     try {
       var data = (_stkPop && _stkPop.data) || {};
@@ -2200,6 +2222,7 @@ async function pedImpSetEntregaGlobal(val) {
       });
     }
     if (_stkPop && _stkPop.data) _stkPop.data.entregaGlobal = v;
+    _impSyncPaginas();   // v25.12
   } catch (e) { try { alert("No se pudo guardar la fecha de entrega: " + (e.message || e)); } catch (_e) {} }
 }
 // dd/mm/aaaa (o dd/mm, dd-mm-aaaa, yyyy-mm-dd) → 'YYYY-MM-DD'. "" = borrar, null = inválido.
