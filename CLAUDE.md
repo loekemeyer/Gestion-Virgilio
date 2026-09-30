@@ -1570,6 +1570,15 @@ que suman 0 por código. Quedaron **21 a contar** y 7 códigos sin posición (50
 Insumos en racks (523C, 546V, 102E, 522S, 1000900) quedan «a contar» hasta el paso de alias de ubicación de insumos.
 Rollback: `sql/gv_racks_canon_v2277.sql`. Lo sostiene `tests/pmap-racks.cjs`.
 
+⚠⚠ **El CONTEO del Mapa no se SUMA a lo sin posición** (Marianela, 30/09, v25.15: *"el conteo está bien, lo que
+suma está mal"*). `gv_rack_posicion_guardar`, si lo contado es MAYOR a lo que tenía la posición, primero **traslada**
+lo sin posición del mismo código (es la misma mercadería) y sólo el resto entra como ajuste. Antes lo sumaba: 505I
+quedó en 2614 con 1475 contadas, 056E +84, 816E +120 (corregidos a mano ese día). Marcador `sinpos-mapa-3009`,
+centinela id 260, problema 648. `sql/gv_rack_posicion_guardar_sinpos_v2515.sql`.
+Y ese día se dieron de alta **O02** y **O05** (racks LK que no existían) y **Z07 pasó de góndola a rack** (su celda
+del 363E era falsa: la góndola del 363E es J04). Problema 646. Al contar en una posición que el Mapa no conoce,
+se da de alta en `GV_Lugar`, no se carga en otra.
+
 ### ⚠ INSUMOS: dónde está cada uno sale del Mapa (Luis, 25/09, v22.80)
 
 **Luis:** *"es un mismo depósito físico … son racks de insumos. Dejalos con el nomenclador que ya existe, no inventes
