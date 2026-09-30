@@ -1,4 +1,4 @@
--- v24.70 (Thomas, 30/09/2026, D4a) — BASE DE LK (kwkclwhmoygunqmlegrg).
+-- v24.70 (Thomas, 30/09/2026, D4a/D4b) — BASE DE LK (kwkclwhmoygunqmlegrg). APLICADO el 30/09 con el sí de Thomas.
 -- Un artículo NUEVO o que VOLVIÓ a venderse (primera venta después de 6+ meses sin vender) se
 -- proyecta con el PROMEDIO de lo vendido desde que volvió, si ya tiene 2 o más meses CERRADOS.
 -- La regla vieja (4.º mejor mes de 6) lo dejaba en 0 o muy abajo hasta juntar 4 meses con venta.

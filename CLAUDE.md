@@ -6398,3 +6398,7 @@ reingreso, celdas `.pedimp-tbl` con 4px de relleno. **64 → 45 px por artículo
 ## ⚠ REGLA (Thomas, 2026-09-30, v24.69): un insumo con MC SALE siempre en MC — el stock queda en unidades
 
 *"Lo mínimo que se le manda es 1 MC… no bajan uni sueltas. Siempre por MC."* En Entrega de insumos (a Cervantes o bajado de racks), un insumo con MC en `Insumos_Factores` abre fijo en MC (`_insSaleMC`). El movimiento se guarda en la unidad BASE y la descripción dice lo cargado (`· cargado 3 MC × 4000`). Lo sostiene también el trigger **`gv_insumo_unidad_base`** (BEFORE INSERT, deposito `insumos`), que convierte cualquier carga en MC que llegue sin convertir. Los movimientos viejos en MC no se tocaron: la pantalla de insumos ya los suma con el factor. `sql/gv_insumo_unidad_base_v2469.sql`, `tests/ins-sale-mc.cjs`.
+
+## ⚠ REGLA (Thomas, 2026-09-30, D4): lo NUEVO o REINCORPORADO se proyecta con el promedio desde que volvió
+
+En LK, `fn_proyeccion_oc_virgilio` (CTE `_vt_*`): un artículo cuya primera venta después de 6+ meses sin vender cae en los últimos 6 meses, y que ya tiene **2+ meses cerrados**, se proyecta con el **promedio desde que volvió** si da más que la regla del 4.º mejor mes (sólo sube). El mes en curso no cuenta. **Los códigos de 5 dígitos no entran**: se hacen contra pedido, no se stockean. Medido: suben 38 artículos (198E 35 → 70, 702EN 29,5 → 59). `sql/lk_proyeccion_reincorporados_v2470_LK.sql`.
