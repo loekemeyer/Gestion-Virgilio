@@ -6639,6 +6639,38 @@ de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (
   llena `gv_gp2_espejo_sync()` (cron `gv-gp2-espejo-sync`, c/10 min, reescribe sólo si cambió el md5). Luis: *"que los
   dos tengan acceso a los datos y que puedan hablar"*; el vínculo de códigos (D3) va después. `sql/gv_gp2_espejo_v2517.sql`.
 
+## 🔁 REGLA GENERAL (30/09): Cervantes (GP2) y Virgilio (GV) SE HABLAN — no es una excepción
+
+[usuario, 30/09] *"establecé esta regla como general porque no es una eventualidad, suele pasar que haya
+interacción entre Cervantes (GP2) y Virgilio"*. Toda mercadería o aviso que cruza de una planta a la otra sigue
+el mismo molde (el mismo bloque está en el `CLAUDE.md` de `loekemeyer/Gestion-Productiva-2.0`):
+
+| pieza | cómo |
+|---|---|
+| frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` |
+| códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.importado_virgilio_componente`** y **nunca se adivina** |
+| confirmar | el que recibe dice **Sí / No** donde trabaja, en la tarjeta del componente |
+| Sí | el MISMO camino que la carga manual (en GP2: `crear_recepcion_insumo` + control en kg pendiente) |
+| No | cada lado toca SÓLO su fila; la reacción la hace un trigger del otro lado y se ve **donde se cargó** |
+
+### v25.37: el «No» de Cervantes vuelve a poner el pedido EN VIAJE — chip «⛔ Denegado por Cervantes»
+
+- GP2 contesta con `GP2.resolver_ingreso_virgilio(id, acepta, motivo)`: **Sí** = recepción de insumo normal
+  (remito `Virgilio #<id>`); **No** = la fila pasa a `denegado`.
+- Del lado de GV, **`gv_ingreso_virgilio_denegado`** (trigger BEFORE UPDATE OF estado sobre `GP2.ingreso_virgilio`,
+  marcador `v25.31-cerv-no`) devuelve el bache a `en_curso` (resta las unidades), marca el destino en
+  `GV_Imp_Recepcion_Destino` (`denegado_*`), anota el ajuste en `Importados_Mov_Stock` y recalcula con
+  **`gv_importados_resync_calc`** (la cuenta de `gv_importados_resync` sin el guard de supervisor: el que dice No
+  es un operario de GP2). Si falla, queda en `virgilio_revertido_error` y lo muestra
+  `select * from public.gv_ingreso_cervantes_sin_revertir;` — vacía = todo bien.
+- La pantalla lee `gv_imp_cervantes_denegados()` (sesión de supervisor, va en `_PED_IMP_RPC_ESCRITURA`) y pinta el
+  chip en la fila del código, en 📦 Baches, en 📥 RECIBIR (con el motivo) y en 📜 Historial. Si la lectura falla,
+  no hay chips y nada más cambia.
+- ⚠ **Anular** una recepción con una parte denegada no vuelve a restar esas unidades (`gv_imp_recepcion_anular`).
+- ⚠ Las funciones dicen **v25.31** (la etiqueta con que se aplicaron): la llave de idempotencia, no cambiarla.
+- Centinelas en `GV_Reglas_Centinela` (4 filas). `sql/gv_ingreso_cervantes_denegado_v2537.sql`,
+  `tests/imp-cervantes-denegado.cjs`. Del lado GP2: `db/migracion_ingreso_virgilio_resolver.sql`, CONOCIMIENTO §4hf.
+
 ## ⚠ REGLA (Luis, 2026-09-30, v25.18): «⟳ Refrescar ya» en Stocks — el SALDO ya es en vivo, lo que espera es lo DERIVADO
 
 **Luis:** *"pone un boton en la tabla de stocks que permita refrescarla «por la fuerza». 2 minutos es un monton"* ·

@@ -30859,3 +30859,23 @@ clave_tv / legajo / sesion_guardada). Probado como `anon` en transacción aborta
 evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositivo_v2525.sql`, `tests/dispositivo-id.cjs`.
 - v25.26: vista `gv_dispositivo_multi_operario` (dispositivo + día con 2+ operarios; ingresos + eventos, sólo MCP).
 - v25.29: aviso por Telegram de un dispositivo con 2+ operarios en el día (cron 118 `gv-alerta-dispositivo-multi`, c/10 min, minutos impares). `sql/gv_dispositivo_multi_telegram_v2529.sql`.
+
+## §3.v2537 — El «No» de Cervantes devuelve el importado a EN VIAJE (v25.37, 30/09/2026)
+
+- **Tablas tocadas (agregado, nada reescrito):** `GV_Imp_Recepcion_Destino` + `denegado_en`, `denegado_por`,
+  `denegado_motivo`, `unidades` (nullable, sin default). Del lado GP2 (`"GP2".ingreso_virgilio`) las columnas nuevas
+  las agrega la migración de GP2.
+- **Funciones:** `gv_importados_resync_calc(bigint)` (la cuenta de `gv_importados_resync`, que ahora la llama tras su
+  guard de supervisor), `gv_ingreso_virgilio_unidades()` (BEFORE INSERT: unidades = cantidad, o × `uni_x_caja`),
+  `gv_ingreso_virgilio_denegado()` (BEFORE UPDATE OF estado, sólo `pendiente → denegado`, marcador `v25.31-cerv-no`),
+  `gv_imp_cervantes_denegados()` (lectura del front). Parchadas sobre la definición viva: `gv_imp_recepcion_historial`
+  (destinos con `denegado_*`) y `gv_imp_recepcion_anular` (no vuelve a restar lo denegado). Vista centinela
+  `gv_ingreso_cervantes_sin_revertir`. 4 filas en `GV_Reglas_Centinela`; `gv_reglas_perdidas` = 0.
+- **Medido en transacción abortada:** bache 134 (323ES, 3.000 u, `llegado`) → No → `en_curso`, llegadas 0,
+  pedido en curso 3.000, destino marcado, `gv_imp_cervantes_denegados` 1 fila. Sí → recepción GP2 «Virgilio #4»,
+  3.000 uni, `controlado = false`; un segundo intento da «Ese aviso ya se resolvió».
+- **Dato real (con el sí del usuario):** el aviso #4 (3.000 u de 323ES) ya se había cargado a mano en GP2
+  (recepción 17082, 13:38): se marcó `confirmado` vinculado a esa recepción, sin duplicar stock.
+- **Rollback:** `drop trigger gv_ingreso_virgilio_denegado on "GP2".ingreso_virgilio;` y
+  `drop trigger gv_ingreso_virgilio_unidades on "GP2".ingreso_virgilio;` (el resto es aditivo).
+  `sql/gv_ingreso_cervantes_denegado_v2537.sql`.

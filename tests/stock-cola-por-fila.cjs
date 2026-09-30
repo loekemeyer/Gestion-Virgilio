@@ -62,6 +62,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const posts = [];
     let leer = "ok";
     window.fetch = function (url, opts) {
+      // v25.28: «Fijar» pregunta primero si el código existe (566E existe)
+      if (/gv_stock_cod_conocido/.test(url)) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(true) });
       if (/gv_saldos_por_clave/.test(url)) {
         if (leer === "falla") return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) });
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([{ clave: "566E", terminado: "2.0", excedente: "0" }]) });
