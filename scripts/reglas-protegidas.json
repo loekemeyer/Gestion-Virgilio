@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-09-29 (v23.99 + centinela vista_ppp_programacion_pendiente)",
+  "_generado": "2026-09-30 (+ centinelas gv_conc_motor / gv_conc_resolver)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -74,6 +74,16 @@
     {
       "objeto": "gv_cod_stock_de_entrega",
       "regla": "gv_cod_stock_de_entrega devuelve SOLO el codigo (026L -> 026, 438EL -> 438E) y ADEMAS pela cualquier sufijo de empresa que le llegue pegado. \"438E LK\" NO es un ",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_conc_motor",
+      "regla": "El motor de conciliacion NO inventa el Nro de recibo: sólo lo toma de la fila apareada de la planilla (lo genera ISIS)",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_conc_resolver",
+      "regla": "El alias de pagador (CUIT -> cliente) sólo se escribe cuando la persona tilda «recordar este CUIT»; el motor nunca lo escribe",
       "quien": "Luis"
     },
     {
