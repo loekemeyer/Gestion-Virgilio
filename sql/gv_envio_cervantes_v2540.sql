@@ -20,18 +20,24 @@
 -- Las tres las ejecuta anon: los operarios de Virgilio entran con sesión anónima.
 -- =====================================================================================
 
+drop function if exists public.gv_envios_cervantes_pendientes();
 create or replace function public.gv_envios_cervantes_pendientes()
  returns table(id bigint, creado_en timestamptz, creado_por text, grupo text, cod_gp2 text, descripcion text,
                cantidad numeric, unidad text, cajas numeric, articulos_por_caja numeric,
-               cod_gv text, empresa text, cod_origen text)
+               cod_gv text, empresa text, cod_origen text, categoria_gv text, unidad_gv text)
  language sql stable security definer set search_path to 'public'
 as $function$
   select e.id, e.creado_en, e.creado_por, e.grupo, e.codigo, e.descripcion, e.cantidad, e.unidad,
          e.cajas, e.articulos_por_caja,
          case when e.grupo = 'terminado' then e.codigo else r.cod end,
          case when e.grupo = 'terminado' then public.gv_empresa_de_articulo(e.codigo) end,
-         case when e.grupo = 'terminado' then 'articulo' else r.origen end
+         case when e.grupo = 'terminado' then 'articulo' else r.origen end,
+         -- la categoria de public."Insumos" que le toca si entra como insumo nuevo (TMP-…)
+         case c.sector_id when 1 then 'partes_crudo' when 2 then 'parte_procesado' when 5 then 'fleje'
+                          when 6 then 'partes_plasticas' when 11 then 'cajas' end,
+         case when e.unidad = 'kg' then 'Kg' else 'Uni' end
     from "GP2".envio_virgilio e
+    join "GP2".componente c on c.id = e.componente_id
     left join lateral (
       select x.cod, x.origen from (
         (select p.gv_cod as cod, 'anterior'::text as origen, 1 as prio
