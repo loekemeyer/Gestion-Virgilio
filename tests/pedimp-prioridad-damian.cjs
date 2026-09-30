@@ -7,6 +7,7 @@
        Pedido (MC) · FOB (total arriba) · m³ (total arriba) + el resumen de cómo se compone.
    (E) v25.3 (Thomas): la hoja va VERTICAL (A4 portrait) y lleva la columna Marca (LK / CH / Loke)
        en las 3 hojas, en lugar de la chapa de planta pegada al código.
+   (F) v25.10 (Thomas): agrupado por tipo de producto + «INAL» debajo del código.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -123,6 +124,33 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (!/KKK:Loke/.test(f0) || !/809E:CH/.test(f0) || !/LLL:—/.test(f0)) fail("(E) columna Marca en el pedido (Loke / CH / — sin dato; el código sin chapa): " + f0);
   if (!/MMM:Loke/.test((r3.filas[1] || []).join(","))) fail("(E) columna Marca en «Sin pedir»: " + (r3.filas[1] || []).join(","));
   if (!/ZZ9:LK/.test((r3.filas[2] || []).join(","))) fail("(E) columna Marca en «Discontinuos»: " + (r3.filas[2] || []).join(","));
+  // (F) v25.10 (Thomas) — agrupado por TIPO DE PRODUCTO (GV_Producto_Tipo): las marcas del mismo producto
+  //     van juntas (LK · CH · Loke), el grupo va donde cae su artículo más urgente, raya gruesa al
+  //     empezar cada grupo; y «INAL» debajo del código del que tiene certificado.
+  const r4 = await p.evaluate(async () => {
+    _NAC_TASAS.moq = 0;
+    const mk = (cod, marca, stock) => ({ cod, prov: "Zeta", key: cod, desc: "Art " + cod, proyUni: 100, objetivoUni: 1000, stockUni: stock, enCurso: 0, meses: 10,
+      aPedirUni: 500, uniMaster: 100, aPedirCajas: 5, uxc: 10, fobUni: 1, m3Master: 0.05, det: [{ id: 1, curso: 0, marca: marca, cod: cod }] });
+    const its = [mk("AAA", "LK", 100), mk("BBB", "Loke", 900), mk("CCC", "CH", 500), mk("DDD", "LK", 300), mk("EEE", "LK", 200), mk("FFF", "CH", 800)];
+    _impExtra = { "AAA|LK": { tipo_producto: "Colador Ø 8 cm", inal: true, inal_certificado: "CE-1" }, "BBB|LOKE": { tipo_producto: "Colador Ø 8 cm" },
+      "CCC|CH": { tipo_producto: "Colador Ø 8 cm" }, "EEE|LK": { tipo_producto: "Rallador Mini" }, "FFF|CH": { tipo_producto: "Rallador Mini" } };
+    _impExtraOk = true;
+    _stkPop = { kind: "pedImp", data: { items: its, meses: 10, minUsd: 25000, nac: { modo: "consolidada", valorM3: 110, tn: 0 } }, soloPedir: false, mcOverride: {} };
+    let html = ""; window._pedImpPrintConFotos = (h) => { html = h; };
+    await pedImpPdfDamian(encodeURIComponent("Zeta"));
+    const d = document.createElement("div"); d.innerHTML = html.replace(/^[\s\S]*<body>/, "").replace(/<\/body>[\s\S]*$/, "");
+    const trs = [...d.querySelector(".hoja").querySelectorAll("tbody tr")];
+    const fob = _pedImpNacionalizar(3000, 1, { modo: "consolidada", fobInal: _impFobInal(its, _pedImpUsdOf) }).detalle.filter((x) => /^Autorización/.test(x[0]))[0];
+    _impExtra = {}; _impExtraOk = false;
+    return { cods: trs.map((tr) => tr.cells[0].querySelector("b").firstChild.textContent.trim()), g1: trs.filter((tr) => tr.classList.contains("g1")).map((tr) => tr.cells[0].querySelector("b").firstChild.textContent.trim()),
+      inal: trs.filter((tr) => /INAL/.test(tr.cells[0].textContent)).map((tr) => tr.cells[0].querySelector("b").firstChild.textContent.trim()),
+      css: /tr\.g1>td\{border-top:2px/.test(html), autInal: fob ? fob[2] : "" };
+  });
+  if (r4.cods.join(",") !== "AAA,CCC,BBB,EEE,FFF,DDD") fail("(F) agrupado por tipo (LK·CH·Loke, el grupo donde cae el más urgente): " + r4.cods.join(","));
+  if (r4.g1.join(",") !== "AAA,EEE,DDD") fail("(F) raya gruesa al empezar cada grupo: " + r4.g1.join(","));
+  if (!r4.css) fail("(F) falta el estilo tr.g1 (raya gruesa de grupo)");
+  if (r4.inal.join(",") !== "AAA") fail("(F) «INAL» sólo en el que tiene certificado: " + r4.inal.join(","));
+  if (!/FOB con INAL 500\b/.test(r4.autInal)) fail("(F) la Autorización de Impo va sobre el FOB con INAL (500): " + r4.autInal);
   if (errs.length) fail("errores JS: " + errs.join(" | "));
   await b.close();
   if (!process.exitCode) console.log("✓ pedimp-prioridad-damian: orden por meses de stock, alerta < 4 y PDF para Damián");

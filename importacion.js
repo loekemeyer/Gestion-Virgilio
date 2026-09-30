@@ -135,7 +135,8 @@ function _esProvNtl(prov) { return !!_NTL_PROVEEDORES[String(prov || "").trim()]
 let _NAC_TASAS = { estad_pct: 0.03, estad_fob_desde: 6000, estad_fob_hasta: 10000, estad_fijo: 180,
                    iva_pct: 0.21, iva_adic_pct: 0.20, gcias_pct: 0.06, iibb_pct: 0.0017,
                    derechos_pct: 0.18, ntl_pct: 0.05, valor_m3: 110, flete_full: 2000,
-                   meses_objetivo: 10, moq: 1000, moq_meses_max: 12, moq_pct: 0.8 };
+                   meses_objetivo: 10, moq: 1000, moq_meses_max: 12, moq_pct: 0.8,
+                   autoriz_impo_pct: 0.007 };   // v25.10 (Thomas): «Autorización de Impo», % del FOB con INAL
 function _nacPct(n) { return (Math.round(_nacNum(n, 0) * 10000) / 100).toLocaleString("es-AR"); }
 // v23.79 (Luis): estadística por tramo de FOB — hasta el piso paga su %; en el tramo del medio,
 // un fijo en u$s; arriba del techo, el % sin tope. Base del %: el CIF (como el resto).
@@ -237,14 +238,20 @@ function _pedImpNacionalizar(fob, m3, opts) {
   var _eC = _nacEstad(fob, cif), estad = _eC.v;   // v23.79: por tramo de FOB (Luis)
   var tasaFija = 180;                                // D19
   var sim = 10;                                      // D38
-  var libreCirc = 0.005 * fob;                       // D33
+  // v25.10 (Thomas): la «libre circulación» ahora se llama «Autorización de Impo» y la paga SÓLO lo que
+  // lleva INAL (GV_Articulo_INAL): % × FOB de esos artículos (Importados_Config.autoriz_impo_pct).
+  // Sin el dato INAL (opts.fobInal null) va sobre todo el FOB: es lo conservador.
+  var pAut = _nacNum(_NAC_TASAS.autoriz_impo_pct, 0.007);
+  var sinInal = (opts.fobInal == null);
+  var fobInal = sinInal ? fob : Math.min(fob, _nacNum(opts.fobInal, 0));
+  var libreCirc = pAut * fobInal;                    // D33
   var gastosVarios = 30 + 40;                        // F20 (flete depósito + bancarios)
   var despach = Math.max(300, fob * 0.01) + 120 + 0 + 30;   // F26 (honorarios 1% + gtos + digital.)
   var noRecup = fleteTot + derechos + estad + sim + gastosVarios + despach + tasaFija + ntl5 + libreCirc;
   det = [["Flete + dep. fiscal", fleteTot, "fijos 1.080 + 35 + 90 + " + (tn < 1 ? "4" : "4 × " + _nacF2(tn) + " TN") + " + (" + _nacF(valorM3) + " + 25) × " + _nacF2(m3) + " m³", "m3"],
     ["Derechos (" + pctDer + "% CIF)", derechos, pctDer + "% × CIF " + _nacF(cif) + (tasaDer === 0.18 ? " (base; cada artículo tiene su arancel)" : ""), "fob"],
     [_eC.lbl, estad, _eC.txt, "fob"],
-    ["Libre circulación (0,5%)", libreCirc, "0,5% × FOB " + _nacF(fob), "fob"],
+    ["Autorización de Impo (" + _nacPct(pAut) + "% FOB INAL)", libreCirc, _nacPct(pAut) + "% × FOB con INAL " + _nacF(fobInal) + (sinInal ? " (sin el dato INAL: sobre todo el FOB)" : ""), "inal"],
     ["Tasas (Sim + est.)", sim + tasaFija, "Sim 10 + tasa est. 180", "fob"],
     ["Gastos varios", gastosVarios, "flete a depósito 30 + bancarios 40", "fob"],
     ["Despachante", despach, "máx(300; 1% FOB) + 120 + 30", "fob"]];
@@ -278,15 +285,20 @@ function _pedImpNacionalizar(fob, m3, opts) {
 function _impNacReparto(res, items, crit) {
   crit = (crit === "m3" || crit === "fob") ? crit : "mixto";
   items = (items || []).map(function (it) {
-    return { m3: _nacNum(it && it.m3, 0), fob: _nacNum(it && it.fob, 0), uni: _nacNum(it && it.uni, 0) };
+    return { m3: _nacNum(it && it.m3, 0), fob: _nacNum(it && it.fob, 0), uni: _nacNum(it && it.uni, 0), inal: !!(it && it.inal) };
   });
   var n = items.length;
   var cero = items.map(function () { return 0; });
   if (!n || !res || !res.ok || !(_nacNum(res.noRecup, 0) > 0))
     return { crit: crit, items: cero, total: 0, porBase: { m3: 0, fob: 0 }, usadas: [], sumaM3: 0, sumaFob: 0, sumaUni: 0 };
-  var sM3 = 0, sFob = 0, sUni = 0;
-  items.forEach(function (it) { sM3 += it.m3; sFob += it.fob; sUni += it.uni; });
+  var sM3 = 0, sFob = 0, sUni = 0, sInal = 0;
+  items.forEach(function (it) { sM3 += it.m3; sFob += it.fob; sUni += it.uni; if (it.inal) sInal += it.fob; });
   function pesos(base) {
+    // v25.10 — la Autorización de Impo la pagan sólo los que llevan INAL, por su FOB
+    if (base === "inal") {
+      if (sInal > 0) return { usa: "fob", w: items.map(function (it) { return it.inal ? it.fob / sInal : 0; }) };
+      base = "fob";
+    }
     var usa = base, s = (base === "m3" ? sM3 : sFob);
     if (!(s > 0)) { usa = (base === "m3" ? "fob" : "m3"); s = (usa === "m3" ? sM3 : sFob); }
     if (!(s > 0)) { usa = "unidades"; s = sUni; }
@@ -296,8 +308,8 @@ function _impNacReparto(res, items, crit) {
   var acum = cero.slice(), porBase = { m3: 0, fob: 0 }, usadas = {};
   (res.detalle || []).forEach(function (d) {
     var imp = _nacNum(d && d[1], 0); if (!(imp > 0)) return;
-    var base = (crit === "mixto") ? (d[3] === "m3" ? "m3" : "fob") : crit;
-    porBase[base] += imp;
+    var base = (crit === "mixto") ? (d[3] === "m3" ? "m3" : d[3] === "inal" ? "inal" : "fob") : crit;
+    porBase[base === "inal" ? "fob" : base] += imp;
     var p = pesos(base); usadas[p.usa] = true;
     p.w.forEach(function (w, i) { acum[i] += imp * w; });
   });
@@ -407,14 +419,25 @@ function _pedImpBandaHtml(nac, totUsd, ext) {
    vuelve a escribir un número en este archivo. */
 let _impCfgProv = {};          // proveedor → fila de gv_imp_proveedor_cfg
 let _impCfgArt = {};           // cod_art  → { derechos_pct, prov } de gv_imp_articulo_cfg
+/* v25.10 (Thomas) — tipo de producto (GV_Producto_Tipo, el Excel de equivalencias LK/CH/Loke) y si
+   el artículo lleva INAL (GV_Articulo_INAL), resueltos por la vista gv_imp_articulo_extra.
+   Clave "COD|MARCA". _impExtraOk en false = no se pudo leer: no se agrupa y la Autorización de
+   Impo va sobre todo el FOB (lo conservador) en vez de adivinar quién lleva INAL. */
+let _impExtra = {}, _impExtraOk = false;
 async function _impCfgCargar() {
   try {
     const res = await Promise.all([
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_imp_proveedor_cfg", "select=*&order=orden.asc,proveedor.asc").catch(function () { return []; }),
       supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_imp_nac_config", "select=*").catch(function () { return []; }),
       // v23.90 (Luis) — los derechos pueden ser del ARTÍCULO (su partida arancelaria)
-      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_imp_articulo_cfg", "select=cod_art,derechos_pct,proveedor").catch(function () { return []; })
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_imp_articulo_cfg", "select=cod_art,derechos_pct,proveedor").catch(function () { return []; }),
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_imp_articulo_extra", "select=cod_art,marca,tipo_producto,familia,tipo_fila,inal,inal_certificado,inal_vence").catch(function () { return null; })
     ]);
+    if (Array.isArray(res[3]) && res[3].length) {
+      const ex = {};
+      res[3].forEach(function (r) { ex[String(r.cod_art || "").trim().toUpperCase() + "|" + String(r.marca || "").trim().toUpperCase()] = r; });
+      _impExtra = ex; _impExtraOk = true;
+    }
     const pr = res[0], nac = res[1];
     _impCfgArt = {};
     (res[2] || []).forEach(function (a) {
@@ -437,6 +460,23 @@ async function _impCfgCargar() {
       _PROV_IMP_LISTA = lista; _IMPORTADOR_DE = impDe; _NTL_PROVEEDORES = ntl; _DERECHOS_PROV = der;
     }
   } catch (_e) {}
+}
+/* v25.10 — tipo de producto e INAL de un artículo de la pantalla (sus filas del maestro, por marca). */
+function _impExtraRow(cod, marca) { return _impExtra[String(cod || "").trim().toUpperCase() + "|" + String(marca || "").trim().toUpperCase()] || null; }
+function _impExtraDe(it) {
+  const o = { tipo: null, familia: null, inal: false, cert: null, vence: null };
+  const dets = (it && it.det && it.det.length) ? it.det : [{ cod: it && it.cod, marca: _impPlantaVista(it) }];
+  dets.forEach(function (d) {
+    const r = _impExtraRow(d.cod || (it && it.cod), d.marca); if (!r) return;
+    if (!o.tipo && r.tipo_producto) { o.tipo = r.tipo_producto; o.familia = r.familia; }
+    if (r.inal) { o.inal = true; o.cert = o.cert || r.inal_certificado; o.vence = o.vence || r.inal_vence; }
+  });
+  return o;
+}
+/* El FOB de lo que lleva INAL (base de la Autorización de Impo). null si no se pudo leer el dato. */
+function _impFobInal(items, usdOf) {
+  if (!_impExtraOk) return null;
+  return (items || []).reduce(function (s, it) { return s + (_impExtraDe(it).inal ? (_nacNum(usdOf(it), 0)) : 0); }, 0);
 }
 /* Un número de ESTE proveedor, con el general de fallback (la vista ya resolvió el coalesce). */
 function _impProvNum(prov, campo, fb) {
@@ -719,6 +759,7 @@ function _impCfgRender() {
     h += campo("impCfgGMoq", "MOQ (unidades por código)", String(g.moq), "", "mínimo de la fábrica");
     h += campo("impCfgGMoqM", "MOQ: tope de cobertura (meses)", String(g.moq_meses_max), "", "hasta acá se estira");
     h += campo("impCfgGMoqP", "MOQ: mínimo a llegar (%)", _impCfgPctTxt(g.moq_pct != null ? g.moq_pct : 0.8), "", "si no se llega a este % del MOQ, no se pide");   // v24.56 (Thomas)
+    h += campo("impCfgGAut", "Autorización de Impo (%)", _impCfgPctTxt(g.autoriz_impo_pct != null ? g.autoriz_impo_pct : 0.007), "", "sobre el FOB de lo que lleva INAL");   // v25.10 (Thomas)
     h += '</div>';
     h += '<div style="margin-top:14px"><button onclick="pedImpCfgGuardarGral()" style="background:#0f766e;color:#fff;border:0;border-radius:9px;padding:9px 20px;font-weight:800;font-size:15px;cursor:pointer"' + (P.guardando ? ' disabled' : '') + '>' + (P.guardando ? "Guardando…" : "💾 Guardar generales") + '</button></div>';
   }
@@ -771,7 +812,8 @@ async function pedImpCfgGuardarGral() {
     estad_fob_desde: Number(_impCfgNum("impCfgGEstD")), estad_fob_hasta: Number(_impCfgNum("impCfgGEstH")),
     estad_fijo: Number(_impCfgNum("impCfgGEstF")), valor_m3: Number(_impCfgNum("impCfgGM3")),
     flete_full: Number(_impCfgNum("impCfgGFull")),
-    moq: Number(_impCfgNum("impCfgGMoq")), moq_meses_max: Number(_impCfgNum("impCfgGMoqM")), moq_pct: _impCfgPctVal("impCfgGMoqP") };
+    moq: Number(_impCfgNum("impCfgGMoq")), moq_meses_max: Number(_impCfgNum("impCfgGMoqM")), moq_pct: _impCfgPctVal("impCfgGMoqP"),
+    autoriz_impo_pct: _impCfgPctVal("impCfgGAut") };
   _impCfgPop.guardando = true; _impCfgPop.msg = ""; _impCfgRender();
   try {
     await _impCfgRpc("gv_imp_nac_config_guardar", { p: p });
@@ -1517,7 +1559,7 @@ function _pedImpRender() {
     // costo de nacionalización SOBRE EL PEDIDO ACTUAL (respeta el MC editado)
     // v23.90 — la tasa del embarque sale de sus artículos (cada uno puede tener la suya)
     const _derPed = _derechosPedido(arr, prov);
-    const _nacR = _pedImpNacionalizar(totUsd, totM3, { modo: _nac.modo, valorM3: _valorM3P, tn: _nac.tn, ntl: _isNtl, derechos: _derPed });
+    const _nacR = _pedImpNacionalizar(totUsd, totM3, { modo: _nac.modo, valorM3: _valorM3P, tn: _nac.tn, ntl: _isNtl, derechos: _derPed, fobInal: _impFobInal(arr, _pedImpUsdOf) });
     // v24.42 — orden por PRIORIDAD: primero lo que tiene menos meses de stock; sin proyección, al final.
     arr.sort(_pedImpPrioCmp);
     const _nBajo = arr.filter(function (it) { const m = _pedImpMesesStock(it); return m != null && m < _PEDIMP_MESES_ALERTA; }).length;
@@ -1721,12 +1763,36 @@ async function pedImpPdfDamian(provEnc) {
   const titulo = function (t) { return t + ' ' + escapeHtml(prov) + ' ' + hoyTxt; };
   const desc = function (it) { return escapeHtml(String(artNombre(it.cod, it.desc) || "").replace(/⌀/g, "Ø")).replace(/Ø /g, "Ø "); };   // el ⌀ no está en la fuente del PDF
   const foto = function (it) { return it.esParte ? '<span class="sf">insumo</span>' : _pedImpFotoHtml(codCanon(it.cod), _pedImpEmpFoto(it)); };   // v24.44: los insumos van sin foto
-  const codTxt = function (it) { return escapeHtml(codCanon(_impCodVista(it))); };
+  // v25.10 (Thomas) — debajo del código, «INAL» si el artículo tiene certificado (GV_Articulo_INAL).
+  const inalTag = function (x) { return x && x.inal ? '<small class="inal" title="' + escapeHtml("Certificado INAL " + (x.cert || "") + (x.vence ? " · vence " + x.vence : "")) + '">INAL</small>' : ''; };
+  const codTxt = function (it) { return escapeHtml(codCanon(_impCodVista(it))) + inalTag(_impExtraDe(it)); };
   // v25.3 (Thomas) — la MARCA del maestro Importados (LK / CH / Loke) en su propia columna. Reemplaza la
   // chapa de planta pegada al código (809E LK): sale del mismo dato. Sin marca cargada, la planta; sin nada, —.
-  const marcaTd = function (it) { const ms = [], ks = [];
+  const marcaDe = function (it) { const ms = [], ks = [];
     (it.det || []).forEach(function (x) { const m = String(x.marca || "").trim(); if (m && ks.indexOf(m.toUpperCase()) < 0) { ks.push(m.toUpperCase()); ms.push(m); } });
-    return '<td>' + escapeHtml(ms.length ? ms.join("/") : (_impPlantaVista(it) || "—")) + '</td>'; };
+    return ms.length ? ms.join("/") : (_impPlantaVista(it) || ""); };
+  const marcaTd = function (it) { return '<td>' + escapeHtml(marcaDe(it) || "—") + '</td>'; };
+  // v25.10 (Thomas): «agrupados por tipo de producto — ej. coladores 8 cm van las 3 marcas juntas».
+  // El tipo sale de GV_Producto_Tipo (su Excel de equivalencias). Un grupo va donde cae su artículo
+  // más URGENTE (la lista ya viene por prioridad) y adentro LK · CH · Loke. Sin tipo, el artículo es
+  // su propio grupo. La primera fila de cada grupo lleva la raya de arriba gruesa (tr.g1).
+  const _ordMarca = { LK: 0, CH: 1, LOKE: 2 };
+  const agrupar = function (lista) {
+    const gs = [], idx = {};
+    lista.forEach(function (it, i) {
+      const t = _impExtraDe(it).tipo, k = t ? "T|" + t : "C|" + (it.key || it.cod) + "|" + i;
+      if (idx[k] == null) { idx[k] = gs.length; gs.push([]); }
+      gs[idx[k]].push({ it: it, i: i });
+    });
+    const out = [];
+    gs.forEach(function (g) {
+      g.sort(function (a, b) { const ma = _ordMarca[marcaDe(a.it).toUpperCase()], mb = _ordMarca[marcaDe(b.it).toUpperCase()];
+        return ((ma == null ? 3 : ma) - (mb == null ? 3 : mb)) || (a.i - b.i); });
+      g.forEach(function (x, j) { out.push({ it: x.it, g1: j === 0 }); });
+    });
+    return out;
+  };
+  const trG = function (g1) { return g1 ? '<tr class="g1">' : '<tr>'; };
   const stockTd = function (it) { const m = _pedImpMesesStock(it), bajo = m != null && m < _PEDIMP_MESES_ALERTA;
     return '<td>' + fmt(Math.max(0, Number(it.stockUni) || 0)) + '<small>' + (bajo ? '⚠ ' : '') + (m == null ? 's/proy' : _pedImpMesesFmt(m) + ' m') + '</small></td>'; };
   // «Llegan» sólo si algo del set viene en camino; si todo llega el MISMO día, la fecha va una vez en el rótulo.
@@ -1746,9 +1812,9 @@ async function pedImpPdfDamian(provEnc) {
   if (arr.length) {
     const cm = camino(arr);
     const hayMoq = arr.some(function (it) { return !!_pedImpMoqPdf(it); });   // el aviso del 80 % del MOQ, A LA DERECHA
-    const filas = arr.map(function (it) {
-      const u = _pedImpUniOf(it), usd = _pedImpUsdOf(it), m3 = _pedImpM3Of(it);
-      return '<tr><td><b>' + codTxt(it) + '</b></td>' + marcaTd(it) + '<td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
+    const filas = agrupar(arr).map(function (x) {
+      const it = x.it, u = _pedImpUniOf(it), usd = _pedImpUsdOf(it), m3 = _pedImpM3Of(it);
+      return trG(x.g1) + '<td><b>' + codTxt(it) + '</b></td>' + marcaTd(it) + '<td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
         (cm.hay ? cm.td(it) : '') + maxTd(it) +
         '<td><b>' + fmt(u) + '</b></td><td class="sp"></td>' +   // el pedido SÓLO en unidades (sin MC ni inner)
         '<td>' + (usd > 0 ? fmt(usd) : '—') + '<small>' + (it.fobUni > 0 ? fmt(it.fobUni, 2) + '/u' : 's/FOB') + '</small></td>' +
@@ -1768,8 +1834,9 @@ async function pedImpPdfDamian(provEnc) {
       if (Number(it.aPedirCajas) > 0) { const q = _pedImpMoqCalc(it); return q.estado === "sinproy" ? "sin proyección" : "&lt; " + Math.round(q.pct * 100) + "% MOQ"; }
       return !(Number(it.proyUni) > 0) ? "sin proyección" : "alcanza";
     };
-    const filas = sinPedir.map(function (it) {
-      return '<tr><td><b>' + codTxt(it) + '</b></td>' + marcaTd(it) + '<td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
+    const filas = agrupar(sinPedir).map(function (x) {
+      const it = x.it;
+      return trG(x.g1) + '<td><b>' + codTxt(it) + '</b></td>' + marcaTd(it) + '<td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
         (cm.hay ? cm.td(it) : '') + maxTd(it) + '<td>' + motivo(it) + '</td></tr>';
     }).join("");
     hoja2 = '<div class="hoja"><table><thead><tr><th colspan="' + (cm.hay ? 9 : 8) + '" class="tit">' + titulo("Sin pedir") + '</th></tr>' +
@@ -1792,7 +1859,8 @@ async function pedImpPdfDamian(provEnc) {
     disc.sort(function (a, b) { return String(a.cod_art).localeCompare(String(b.cod_art), "es", { numeric: true }); });
     const filas = disc.map(function (r) {
       const c = String(r.cod_art || "").trim(), em = String(r.marca || "").trim().toUpperCase() === "CH" ? "CH" : "LK";
-      return '<tr><td><b>' + escapeHtml(c) + '</b></td><td>' + escapeHtml(String(r.marca || "").trim() || "—") + '</td><td class="dsc">' + escapeHtml(String(r.descripcion || "").replace(/⌀/g, "Ø")) + '</td><td class="ft">' + _pedImpFotoHtml(c, em) + '</td><td class="sp"></td>' +
+      const xr = _impExtraRow(c, r.marca);
+      return '<tr><td><b>' + escapeHtml(c) + inalTag(xr && xr.inal ? { inal: true, cert: xr.inal_certificado, vence: xr.inal_vence } : null) + '</b></td><td>' + escapeHtml(String(r.marca || "").trim() || "—") + '</td><td class="dsc">' + escapeHtml(String(r.descripcion || "").replace(/⌀/g, "Ø")) + '</td><td class="ft">' + _pedImpFotoHtml(c, em) + '</td><td class="sp"></td>' +
         '<td>' + fmt(Math.max(0, Number(r.stock_total) || 0)) + '</td><td class="dsc">' + escapeHtml(mot[c.toUpperCase()] || "—") + '</td></tr>';
     }).join("");
     hoja3 = '<div class="hoja"><table><thead><tr><th colspan="7" class="tit">' + titulo("Discontinuos") + '</th></tr>' +
@@ -1807,7 +1875,8 @@ async function pedImpPdfDamian(provEnc) {
     'th.tit,th.tot{font-size:16px;font-weight:800}.tit3{font-size:16px;font-weight:800;text-align:center}.nota{border:0;text-align:left;padding-left:4px}.moq{font-size:10px;font-weight:800}' +
     'th small,td small{display:block;font-weight:400;color:#555;font-size:10px}.dsc{white-space:normal;max-width:140px}' +
     '.ft{padding:0}.ft img{width:42px;height:42px;object-fit:contain;display:block;margin:0 auto}.sf{color:#999;font-size:9px}' +
-    'tr{page-break-inside:avoid}thead{display:table-header-group}';
+    'tr{page-break-inside:avoid}thead{display:table-header-group}' +
+    'tr.g1>td{border-top:2px solid #111}small.inal{color:#0f766e;font-weight:800;font-size:9px}';   // v25.10: raya gruesa = empieza otro tipo de producto
   const html = '<!doctype html><html><head><meta charset="utf-8"><title>Pedido ' + escapeHtml(prov) + ' — para Damián</title><style>' + css + '</style></head><body>' +
     hoja1 + hoja2 + hoja3 + '</body></html>';
   _pedImpPrintConFotos(html);
@@ -3899,10 +3968,13 @@ function _impCursoNac(r, ls) {
   if (!(fob > 0)) (ls || []).forEach(function (l) { fob += _nacNum(l.usd, 0); });
   if (!(m3 > 0)) (ls || []).forEach(function (l) { m3 += _nacNum(l.m3, 0); });
   const der = _impCursoDerechos(ls, prov);
+  // v25.10 — la Autorización de Impo va sobre el FOB de las líneas que llevan INAL
+  const _inalL = function (l) { const r = _impExtraRow(l.cod_art, l.marca); return !!(r && r.inal); };
+  const fobInal = _impExtraOk ? (ls || []).reduce(function (s, l) { return s + (_inalL(l) ? _nacNum(l.usd, 0) : 0); }, 0) : null;
   const res = _pedImpNacionalizar(fob, m3, { modo: nac.modo, valorM3: valorM3, tn: nac.tn,
-    ntl: _esProvNtl(prov), derechos: der });
+    ntl: _esProvNtl(prov), derechos: der, fobInal: fobInal });
   const rep = _impNacReparto(res, (ls || []).map(function (l) {
-    return { m3: l.m3, fob: l.usd, uni: l.pendiente };
+    return { m3: l.m3, fob: l.usd, uni: l.pendiente, inal: _inalL(l) };
   }), (_stkPop && _stkPop.nacCrit) || "mixto");
   return { res: res, rep: rep, fob: fob, m3: m3, valorM3: valorM3, prov: prov, modo: nac.modo };
 }

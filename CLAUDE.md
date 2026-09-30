@@ -6451,6 +6451,13 @@ lo que cambió es **dónde están esos dos divs**, no la lógica. `tests/tv-meta
 - **v25.3 (Thomas, 30/09): el PDF para Damián va en A4 VERTICAL y lleva la columna Marca** (LK / CH / Loke, de
   `Importados.marca`) en las 3 hojas; reemplaza la chapa de planta pegada al código. Medido: la hoja del pedido
   mide 708 px de 733 útiles con el aviso del MOQ (el renglón más ancho). No volver a ponerla horizontal.
+- **v25.10 (Thomas, 30/09): el PDF para Damián va AGRUPADO POR TIPO DE PRODUCTO** (las marcas del mismo producto
+  juntas: Colador Ø 8 cm = 026 LK · 824 CH · 110 Loke; el grupo va donde cae su artículo más urgente, adentro LK · CH ·
+  Loke, raya gruesa al empezar cada grupo) **y marca «INAL»** debajo del código. Fuentes: `GV_Producto_Tipo` (su Excel
+  de equivalencias) y `GV_Articulo_INAL` (certificados), resueltas por la vista `gv_imp_articulo_extra`.
+  **La «libre circulación» ahora es «Autorización de Impo»: `Importados_Config.autoriz_impo_pct` (0,007) × FOB de lo
+  que lleva INAL** (base «inal» en el reparto por artículo). Sin el dato INAL va sobre todo el FOB (lo conservador).
+  Sólo en consolidada, como antes. `sql/gv_imp_tipo_inal_v2510.sql` (⚠ **pendiente del «sí» de Thomas**).
 - Los tests de pantalla que no miden el MOQ lo ponen en 0 (`_NAC_TASAS.moq = 0`); la regla la miden
   `tests/pedimp-prioridad-damian.cjs` (D) y `tests/pedimp-moq-proy.cjs` (B).
 

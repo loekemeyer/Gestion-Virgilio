@@ -41,9 +41,11 @@ function near(a, b, tol, msg) { ok(Math.abs(a - b) <= (tol || 0.5), msg + "  (di
 var c = N._pedImpNacionalizar(33381.6, 31.53, { modo: "consolidada", valorM3: 110, tn: 10, ntl: true });
 // v23.77 (Luis): derechos 18% (no 35%). Excel: 22.147,73 con la tasa vieja; − 6.292,85 (35%→18% de CIF 37.016,81) = 15.854,88.
 // v23.79: FOB 33.381,6 > 10.000 → estadística 3% del CIF SIN tope (1.110,50).
-near(c.noRecup, 15854.88, 1, "Consolidada+NTL: no recuperable = 15.854,88 (derechos 18%, estadística 3% sin tope: FOB > 10.000)");
-near(c.factor, 15854.88 / 33381.6, 0.001, "Consolidada+NTL: factor = no recup / FOB");
-near(c.landed, 33381.6 + 15854.88, 1, "Consolidada+NTL: puesto en Arg = FOB + no recup");
+// v25.10 (Thomas): la libre circulación (0,5% × FOB) pasó a «Autorización de Impo» 0,7% × FOB con INAL; sin el
+// dato INAL va sobre todo el FOB → + 0,2% × 33.381,6 = + 66,76 → 15.921,64.
+near(c.noRecup, 15921.64, 1, "Consolidada+NTL: no recuperable = 15.921,64 (derechos 18%, estadística 3% sin tope, Autorización de Impo 0,7% sin dato INAL)");
+near(c.factor, 15921.64 / 33381.6, 0.001, "Consolidada+NTL: factor = no recup / FOB");
+near(c.landed, 33381.6 + 15921.64, 1, "Consolidada+NTL: puesto en Arg = FOB + no recup");
 near(c.ntl, 1669.08, 0.5, "Consolidada: línea NTL = 5% del FOB");
 
 // --- Consolidada SIN NTL: baja exactamente el 5% del FOB ---
@@ -107,7 +109,20 @@ near(d80[1], 0.05 * 33381.6, 0.01, "NTL = 5% del FOB (no del CIF)");
 ok(r80.cif > 33381.6 && Math.abs(d80[1] - 0.05 * r80.cif) > 1, "NTL no usa el CIF");
 var base80 = r80.cif + r80.detalle.filter(function (d) { return /^Derechos/.test(d[0]); })[0][1] + r80.detalle.filter(function (d) { return /^Estad/.test(d[0]); })[0][1];
 near(r80.recup, base80 * (0.21 + 0.20 + 0.06 + 0.0017), 0.01, "Recuperable = 47,17% de (CIF + derechos + estadística)");
-near(r80.noRecup, 15854.88, 1, "Lo recuperable NO se suma al no recuperable");
+near(r80.noRecup, 15921.64, 1, "Lo recuperable NO se suma al no recuperable");
+// v25.10 (Thomas): la Autorización de Impo la paga sólo el FOB de lo que lleva INAL, al 0,7%
+var aut = function (r) { return r.detalle.filter(function (d) { return /^Autorización de Impo/.test(d[0]); })[0]; };
+var ai = N._pedImpNacionalizar(33381.6, 31.53, { modo: "consolidada", valorM3: 110, tn: 10, ntl: true, fobInal: 10000 });
+ok(!!aut(ai) && !ai.detalle.some(function (d) { return /Libre circ/.test(d[0]); }), "El renglón se llama «Autorización de Impo» (ya no «Libre circulación»)");
+near(aut(ai)[1], 70, 0.01, "Autorización de Impo = 0,7% × FOB con INAL (10.000 → 70)");
+ok(/0,7% FOB INAL/.test(aut(ai)[0]) && aut(ai)[3] === "inal", "El rótulo dice la tasa y la base es «inal»");
+near(c.noRecup - ai.noRecup, 0.007 * (33381.6 - 10000), 0.01, "Lo que no lleva INAL no paga la Autorización");
+var a0 = N._pedImpNacionalizar(33381.6, 31.53, { modo: "consolidada", valorM3: 110, tn: 10, ntl: true, fobInal: 0 });
+near(aut(a0)[1], 0, 0.001, "Sin artículos con INAL, la Autorización de Impo es 0");
+ok(/sin el dato INAL/.test(aut(c)[2]), "Sin el dato INAL lo dice (y va sobre todo el FOB)");
+vm.runInContext("_NAC_TASAS.autoriz_impo_pct = 0.01", sandbox);   // `let` no cuelga del contexto: se toca adentro
+near(aut(N._pedImpNacionalizar(1000, 1, { modo: "consolidada", fobInal: 1000 }))[1], 10, 0.001, "La tasa sale de la config (Importados_Config.autoriz_impo_pct)");
+vm.runInContext("_NAC_TASAS.autoriz_impo_pct = 0.007", sandbox);
 var fu80 = N._pedImpNacionalizar(7282, 26, { modo: "full", fleteFull: 2000, ntl: true });
 ok(fu80.recup > 0 && fu80.detRecup.length === 4, "Contenedor también muestra lo recuperable");
 var av80 = N._pedImpNacionalizar(9324, 12.4, { modo: "avion", tn: 1 });
