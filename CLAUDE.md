@@ -6402,3 +6402,19 @@ reingreso, celdas `.pedimp-tbl` con 4px de relleno. **64 → 45 px por artículo
 ## ⚠ REGLA (Thomas, 2026-09-30, D4): lo NUEVO o REINCORPORADO se proyecta con el promedio desde que volvió
 
 En LK, `fn_proyeccion_oc_virgilio` (CTE `_vt_*`): un artículo cuya primera venta después de 6+ meses sin vender cae en los últimos 6 meses, y que ya tiene **2+ meses cerrados**, se proyecta con el **promedio desde que volvió** si da más que la regla del 4.º mejor mes (sólo sube). El mes en curso no cuenta. **Los códigos de 5 dígitos no entran**: se hacen contra pedido, no se stockean. Medido: suben 38 artículos (198E 35 → 70, 702EN 29,5 → 59). **Y los de 5 dígitos numéricos (`^[0-9]{5}$`) no tienen proyección en absoluto** (D25, filtro `v24.71-5dig` en el WHERE final): al 30/09 sólo el 55215. `sql/lk_proyeccion_reincorporados_v2470_LK.sql`.
+
+### ⚠ v24.70 (Luis): la TV son DOS columnas — «Días» va con Operarios y lleva el m³; «Total por día» NO existe más
+
+**Luis:** *"pone el bloque de «dias» junto con el de «operarios» y «en este momento» agregandole los m3 por
+día. «Total por día» sacalo, que quede una vision estilo «dos columnas»"*.
+
+| columna | qué lleva |
+|---|---|
+| izquierda | veredicto + avisos + tandas |
+| derecha | Operarios · **Días** (con columna **M³**) · En este momento (crece) |
+
+- El M³ del día es el **mismo** que daba «Total por día»: la suma de las tandas del día (`porDia`), con el m³ del
+  árbol de la PPP de respaldo. El desglose por camión se fue con la tarjeta; el camión sigue vivo en el veredicto.
+- La mudanza a dos columnas para pantallas < 1500 px se borró: ahora siempre son dos.
+- `monUnirCentroOeste` queda en el archivo sin llamador (≡ index.html).
+- **Chequeo:** `node tests/mon-tv.cjs` (verificado que falla contra la v24.69: 3 columnas, sin M³, con «Total por día»).

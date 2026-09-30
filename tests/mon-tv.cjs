@@ -235,6 +235,10 @@ function responder(url) {
       ops: t("opsBox"), opsTit: t("opsTit"), meta: t("metaBox"),
       act: t("actBox"), avisos: t("avisos"),
       dias: (document.getElementById("fcBox") || {}).innerHTML || "",
+      cols: document.querySelectorAll("main > .col").length,
+      diasEnMedio: !!(document.getElementById("fcBox") && document.getElementById("opsBox") &&
+        document.getElementById("fcBox").closest(".col") === document.getElementById("opsBox").closest(".col") &&
+        document.getElementById("actBox").closest(".col") === document.getElementById("opsBox").closest(".col")),
       ult: window.__tvUlt || {},
       clave: (document.getElementById("tvClave") || {}).textContent || "",
       estado: (document.getElementById("estado") || {}).textContent || "",
@@ -294,13 +298,12 @@ function responder(url) {
   ok(/AGREGADO/.test(r.avisos), "no canta el agregado de la PPP web (LK 0097 sobre el 0095)");
   ok(/E99Z/.test(r.avisos), "no avisa la tanda trabajada que no está en la PPP");
 
-  // m³ por día y camión: E30A (2,5 + 0,8 de la web) + E31A (1,5) + E34A (2,0) = 6,8 hoy
-  ok(/9,8/.test(r.tot), "el total de hoy debería ser 9,8 m³ (E30A 3,3 + E31A 1,5 + E34A 2,0 + E36A/E37A/E38A 1,0 c/u)");
-  /* v23.64: el camión es el GRUPO DE ZONAS, no el número de tanda. E31A + E34A + E36A (Z1) van
-     en UN camión «Capital Sur»; E30A (Z3) en «Capital Oeste». Antes contaba E30 / E31 / E34 / E36. */
-  ok(/Capital Sur/.test(r.tot), "no agrupa por grupo de zonas (falta «Capital Sur»)");
-  ok(/Capital Oeste/.test(r.tot), "no agrupa por grupo de zonas (falta «Capital Oeste»)");
-  ok(!/E31|E34|E36/.test(r.tot), "el cuadro por día sigue contando un camión por número de tanda");
+  /* v24.70 (Luis): «Total por día» salió; el m³ de cada día va como columna del cuadro de Días,
+     que ahora vive en la columna del medio con Operarios y «En este momento». Dos columnas. */
+  ok(/<td class="rd-m3">9,8<\/td>/.test(r.dias), "el m³ de hoy en Días debería ser 9,8 (E30A 3,3 + E31A 1,5 + E34A 2,0 + E36A/E37A/E38A 1,0 c/u)");
+  ok(!r.tot, "volvió «Total por día»: Luis lo mandó sacar");
+  ok(r.cols === 2, "la TV tiene que ser de DOS columnas (hay " + r.cols + ")");
+  ok(r.diasEnMedio, "el cuadro de Días tiene que estar en la columna de Operarios y «En este momento»");
 
   /* v23.92 (Luis) — la barra de avance y los conteos salieron del header (texto que de lejos no
      se lee), pero la CUENTA sigue viva: es la que decide qué tanda vale por terminada. */

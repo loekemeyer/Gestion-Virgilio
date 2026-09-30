@@ -95,7 +95,7 @@ html.embebido header{display:none}
    una TV 16:9 sobra ancho y falta alto, así que el panel que no entraba a lo
    alto se mueve a lo ancho. Abajo de 1500 px vuelve a dos columnas (la tercera
    se apila bajo la segunda): en una pantalla angosta tres tablas no se leen. */
-main{flex:1;display:grid;grid-template-columns:1fr 1.35fr 1.1fr;gap:.8vw;min-height:0}
+main{flex:1;display:grid;grid-template-columns:1fr 1.3fr;gap:.8vw;min-height:0}
 main.angosto{grid-template-columns:1fr 1.3fr}
 .col{display:flex;flex-direction:column;gap:1vh;min-height:0;min-width:0}
 .card{background:#111c2f;border:1px solid #1e293b;border-radius:1vh;
@@ -136,6 +136,7 @@ tr.salio-sinfc td{background:#2a1f45}
 .rd tr.hoy td.rd-fe{color:#93c5fd}
 .rd .sal{color:#a78bfa}.rd .fac{color:#60a5fa}.rd .arm{color:#4ade80}.rd .pro{color:#fbbf24}.rd .pen{color:#f87171}
 .rd .z{color:#334155}
+.rd td.rd-m3{color:#e2e8f0;font-variant-numeric:tabular-nums}
 .st-salio{font-size:2.1vh}
 .fc-salio{color:#c4b5fd}
 
@@ -300,24 +301,19 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
         <div class="card-t" id="opsTit">Operarios</div>
         <div id="opsBox"></div>
       </div>
+      <!-- v24.70 (Luis): *"pone el bloque de «dias» junto con el de «operarios» y «en este
+           momento» agregandole los m3 por día. «Total por día» sacalo, que quede una vision
+           estilo dos columnas"*. -->
+      <div class="card" style="flex:0 0 auto">
+        <div class="card-t" id="fcTit">Días</div>
+        <div id="fcBox"></div>
+      </div>
       <div class="card grow">
         <div class="card-t" id="actTit">En este momento</div>
         <div id="actBox"></div>
       </div>
     </div>
 
-    <!-- v23.92 (Luis): «¿Llegan?» dejó de ser una tarjeta aparte — el ritmo sólo se entiende
-         contra lo que hay programado, así que va arriba del resumen de días, en una banda. -->
-    <div class="col" id="col3">
-      <div class="card" style="flex:0 0 auto">
-        <div class="card-t" id="fcTit">Días</div>
-        <div id="fcBox"></div>
-      </div>
-      <div class="card grow">
-        <div class="card-t">Total por día</div>
-        <div class="grow" id="totBox"></div>
-      </div>
-    </div>
   </main>
 </div>
 
@@ -1351,60 +1347,19 @@ function pintar(d) {
       var p = tot ? Math.round(100 * nn / tot) : 0;
       return '<td class="' + cls + (nn ? '' : ' z') + '">' + p + '%<small>' + nn + '</small></td>';
     };
-    el("fcBox").innerHTML = rds.length ? '<table class="rd"><thead><tr><th></th>' +
+    /* v24.70: el m³ del día es el mismo que daba «Total por día» (las tandas del día). */
+    var m3Dia = function (x) { var g = porDia.get(x.key); return g ? g.total : x.m3; };
+    el("fcBox").innerHTML = rds.length ? '<table class="rd"><thead><tr><th></th><th>M³</th>' +
       '<th>Salió</th><th>Fact</th><th>Arm</th><th>Proc</th><th>Pend</th>' +
       '</tr></thead><tbody>' + rds.map(function (x) {
         var neto = function (k) { return x.est[k] - (x.estSal[k] || 0); };
         return '<tr' + (x.key === hoyKey() ? ' class="hoy"' : '') + '>' +
           '<td class="rd-fe">' + esc(diaEtiqueta(x.key)) + '</td>' +
+          '<td class="rd-m3">' + n1(m3Dia(x)) + '</td>' +
           pc(x.salio, x.nps, "sal") + pc(neto("facturado"), x.nps, "fac") + pc(neto("armado"), x.nps, "arm") +
           pc(neto("proceso"), x.nps, "pro") + pc(neto("pendiente"), x.nps, "pen") + '</tr>';
       }).join("") + '</tbody></table>'
       : '<div class="vacio">Nada programado</div>';
-  }
-
-  // ── Total por día / camión (v23.64: Retira no cuenta como camión)
-  function nCamiones(g) { var n = 0; g.camiones.forEach(function (c) { if (c.usa !== false) n++; }); return n; }
-  monUnirCentroOeste(porDia);
-  var dias = Array.from(porDia.entries()).sort(function (a, b) {
-    return String(a[0]).localeCompare(String(b[0]));
-  });
-  if (dias.length) {
-    /* Ningún día se parte al medio: un día cortado deja un total que no cierra
-       con los camiones que se ven, y en una pared eso se lee como un error de
-       cuentas. Si el desglose por camión no entra para TODOS los días, se
-       colapsa a una fila por día — el m³ de cada día es lo que no puede faltar;
-       qué camión lo lleva es el detalle. */
-    var topeTot = cabenFilas("totBox", true);
-    var conCamiones = dias.reduce(function (s, p) { return s + Math.max(1, p[1].camiones.size); }, 0);
-    var desglosar = conCamiones <= topeTot;
-    var totFilas = dias.map(function (par) {
-      var g = par[1];
-      if (!desglosar) {
-        return '<tr><td class="t-fe">' + esc(g.fecha) + '</td>' +
-          '<td class="cen" style="color:#64748b">' + nCamiones(g) + '</td>' +
-          '<td class="num"></td><td class="num t-tanda">' + n1(g.total) + '</td></tr>';
-      }
-      var cams = Array.from(g.camiones.entries()).sort(function (a, b) {
-        return String(a[0]).localeCompare(String(b[0]));
-      });
-      if (!cams.length) return '<tr><td>' + esc(g.fecha) + '</td><td></td><td class="num"></td><td class="num">' + n1(g.total) + '</td></tr>';
-      return cams.map(function (c, i) {
-        /* Color por avance del camión: sin armar / a medias / todo armado. */
-        var col = c[1].armadas === 0 ? "#f87171" : (c[1].armadas >= c[1].n ? "#4ade80" : "#fbbf24");
-        return '<tr>' +
-          (i === 0 ? '<td rowspan="' + cams.length + '" class="t-fe">' + esc(g.fecha) + '</td>' : "") +
-          '<td class="cen" style="color:' + col + ';font-weight:900">' + esc(c[0]) + '</td>' +
-          '<td class="num">' + n1(c[1].sum) + '</td>' +
-          (i === 0 ? '<td rowspan="' + cams.length + '" class="num t-tanda">' + n1(g.total) + '</td>' : "") +
-          '</tr>';
-      }).join("");
-    }).join("");
-    el("totBox").innerHTML = '<table><thead><tr><th class="cen">Fecha</th>' +
-      '<th class="cen">' + (desglosar ? "Camión" : "Camiones") + '</th>' +
-      '<th class="num">M³</th><th class="num">Total</th></tr></thead><tbody>' + totFilas + '</tbody></table>';
-  } else {
-    el("totBox").innerHTML = '<div class="vacio">—</div>';
   }
 
   // ── Operarios · horas de hoy (v21.17, Damián)
@@ -1714,19 +1669,6 @@ function reloj() {
      concluye que entra una sola fila. */
   el("app").classList.remove("hide");
 
-  /* Pantalla angosta (un box de 1280 o el de 979 px): tres tablas no se leen,
-     así que se vuelve a DOS columnas y las dos tarjetas de la tercera se mudan
-     abajo de la de operarios. Se MUEVEN, no se esconden: «a facturar» y «total
-     por día» no pueden desaparecer por el ancho del televisor. Se hace una sola
-     vez, al arrancar: una TV no cambia de tamaño. */
-  if (window.innerWidth < 1500) {
-    var main = document.querySelector("main"), c3 = el("col3"), c2 = el("col2");
-    if (main && c3 && c2) {
-      while (c3.firstElementChild) c2.appendChild(c3.firstElementChild);
-      c3.parentNode.removeChild(c3);
-      main.classList.add("angosto");
-    }
-  }
   reloj();
   setInterval(reloj, 10000);
   tvClave();

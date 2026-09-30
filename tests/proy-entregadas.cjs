@@ -132,7 +132,11 @@ catch (_e) {
     // el mes en curso: asterisco en el eje y punto hueco ambar
     const svgTxt = body.querySelector(".proyv-svg").textContent;
     out.asterisco = svgTxt.indexOf("*") >= 0;
-    out.puntoHueco = body.querySelectorAll('.proyv-svg circle[stroke="#d97706"]').length === 2;
+    /* v24.70: el punto que proyecta la subida sale SÓLO si a ese ritmo el mes llega más arriba.
+       El último día del mes lo que va es lo que hay (proy = cajas): hueco hay uno solo. Contando
+       siempre 2, el test fallaba un día por mes (30/09). */
+    const sube = body.querySelectorAll('.proyv-svg line[stroke="#d97706"]').length;
+    out.puntoHueco = body.querySelectorAll('.proyv-svg circle[stroke="#d97706"]').length === (sube ? 2 : 1);
 
     // tocar un mes abre el desglose, con las dos caras
     await stkProyMes(meses[9]);
