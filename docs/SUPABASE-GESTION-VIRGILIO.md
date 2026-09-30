@@ -30836,3 +30836,10 @@ alter table public."Control_Modo_OP" add column if not exists gv_no_recibido_at 
   `items_string` de pedidos LK de hasta 60 días antes del corte, si difiere. Primera corrida: 1450 y 1358.
 - Chef queda afuera (su vista tarda 4 s por fila). Backup `zz_backups."GV_Backup_LkPedMatch_items_20260930"`.
 - `sql/lk_pedidos_match_viejos_v2510_LK.sql` (rollback al final).
+
+### §3.v2511 — lk_pedidos_match: pedidos viejos también de Chef + barrido semanal de todo el historial (Luis, 30/09)
+
+`sync_pedidos_match_virgilio_viejos(p_dias, p_chef_remoto)` en LK corrige `items_string` y `match_string` de LK **y Chef**
+anteriores a la ventana de 14 días del cron 24. Cada hora (:37): 60 días, Chef desde `chef_orders_cache`. **Domingos 04:23 ART**
+(`gv-pedidos-match-viejos-todo`, `23 7 * * 0`): todo el historial, Chef por FDW (~3,5 s). Primera corrida: 4 `match_string` de LK,
+0 de Chef. Backup `zz_backups."GV_Backup_LkPedMatch_items_match_20260930b"`. Rollback en `sql/lk_pedidos_match_viejos_v2511_LK.sql`.
