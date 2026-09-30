@@ -6724,6 +6724,28 @@ tablas, y reescribir la derivada cuesta 7 s por cambio.
   `Registros_Produccion_Virgilio.created_at`.
 - `tests/stock-cola-por-fila.cjs` (verificado que falla contra la v25.15).
 
+## ⚠ REGLA (Thomas, 2026-09-30, v25.40): el SECUNDARIO sin stock se cambia SOLO por el principal en la NP web
+
+**Thomas:** *"los pedidos nuevos se manejan primero desde Gestión y recién al final llegan a ISIS: la corrección
+la puede hacer el programa, no una persona"*. Antes el panel 🔀 «Corregir códigos» pedía cambiar la NP en ISIS
+y tocar «✓ Ya lo cambié».
+
+- **`gv_web_np_sec_auto(p_simular)`** (cron `gv-np-sec-auto`, jobid 119, `2-59/5 9-23 * * *`) usa el criterio
+  del panel (`vista_correcciones_pedido_rich.sec_cubre = false`) y cambia la línea en `PPP_Web_Base`
+  (333 → 948E); si la NP ya trae el principal, suma. **No toca**: tanda EMPEZADA (sigue el panel), NP armada o
+  facturada, familia de otra empresa, **cajas que no dan enteras** (el UxB cambia: 332 de a 24 → 945E de a 12,
+  se convierte por unidades). **La L se conserva** (333L → 948EL).
+- El registro es **`GV_NP_Cambio_Codigo`**. La Edge Function `gv-ppp-web-tandas-diarias` (v44) lo aplica al
+  rearmar la NP cada 5 min — sin eso el pedido de la página devolvía el 333 y el podado sacaba el 948E. Si no
+  puede leer la tabla, NO escribe la foto.
+- Red en la base: el trigger `trg_gv_ppp_web_base_np_cambio` descarta el secundario ya cambiado (lo mandan
+  crudo `pppGuardarWeb` y `gv_ppp_web_tanda_programar`) y `gv_ppp_web_base_podar` sabe que el principal ES esa
+  línea. Sin eso, en una tanda empezada quedaban los dos códigos: doble picking.
+- Interruptor `PPP_Web_Config.np_sec_auto_activo` (0 = sólo simula). Rollback de UN cambio: borrar su fila.
+- ⚠ Los marcadores internos dicen `v25.39-…` (llave de idempotencia): no cambiarlos.
+- `select * from public.gv_web_np_sec_auto(true);` — qué cambiaría. `sql/gv_np_secundario_auto_v2540.sql`,
+  `tests/np-sec-auto.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-30, v25.25): cada celular/PC se IDENTIFICA — eventos e ingresos llevan `gv_dispositivo`
 
 **Luis:** *"¿puede el sistema identificar el dispositivo que se está logueando?"* · *"forward facing, no le cagues a

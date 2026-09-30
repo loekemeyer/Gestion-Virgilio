@@ -668,6 +668,24 @@ async function procesarEmpresa(
   const progRows = rProg.ok ? await rProg.json() as { order_id: number; np_idx: number }[] : [];
   const programadas = new Set(progRows.map((x) => `${x.order_id}|${x.np_idx}`));
 
+  // v25.39 (np-sec-auto): el cambio SECUNDARIO → PRINCIPAL que Gestión le hizo a la NP
+  // (`GV_NP_Cambio_Codigo`, lo escribe gv_web_np_sec_auto) se aplica al armar la foto. El
+  // pedido de la página sigue diciendo el secundario: sin esto cada corrida lo volvía a poner
+  // y el podado sacaba el principal. Si la tabla no se puede leer NO se escribe la foto
+  // ("no pude leer" no es "no hay cambios": escribirla igual deshace los cambios hechos).
+  const cambio = new Map<string, { dest: string; factor: number }>();
+  const rCam = await vg(`/rest/v1/GV_NP_Cambio_Codigo?select=order_id,np_idx,cod_origen,cod_destino,factor` +
+    `&empresa=eq.${emp}&limit=20000`);
+  if (rCam.ok) {
+    for (const c of await rCam.json() as { order_id: number; np_idx: number; cod_origen: string; cod_destino: string; factor: number }[]) {
+      cambio.set(`${c.order_id}|${c.np_idx}|${String(c.cod_origen ?? "").trim().toUpperCase()}`,
+        { dest: String(c.cod_destino ?? "").trim(), factor: Number(c.factor) || 1 });
+    }
+  } else if (rCam.status !== 404) {
+    throw new Error(`GV_NP_Cambio_Codigo: HTTP ${rCam.status} — no se reescribió la foto de picking ` +
+      `para no deshacer los cambios de código ya hechos.`);
+  }
+
   const lineas: Fila[] = [];
   for (const n of filas) {
     const k = `${n.order_id}|${n.np_idx}`;
@@ -676,9 +694,15 @@ async function procesarEmpresa(
     if (!num) continue;
     const porArt: Record<string, number> = {};
     for (const it of (n.items as { art: string; cajas: number }[] ?? [])) {
-      const a = String(it.art ?? "").trim();
+      let a = String(it.art ?? "").trim();
       if (!a) continue;
-      porArt[a] = (porArt[a] ?? 0) + (Number(it.cajas) || 0);
+      let cj = Number(it.cajas) || 0;
+      const up = a.toUpperCase();
+      // en Chef el trigger sin_l_chef guarda algunos códigos sin la L: se prueba también así
+      const cm = cambio.get(`${k}|${up}`) ??
+        (emp === "chef" ? cambio.get(`${k}|${up.replace(/([0-9E])L$/, "$1")}`) : undefined);
+      if (cm && cm.dest) { a = cm.dest; cj = cj * cm.factor; }
+      porArt[a] = (porArt[a] ?? 0) + cj;
     }
     for (const a of Object.keys(porArt).sort()) {
       lineas.push({
