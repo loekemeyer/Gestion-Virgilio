@@ -6507,3 +6507,18 @@ también el **cliente** · las luces **P/A quedan centradas** (quién la tiene y
 nuevo **🚚 Pendientes de hoy** (`pendientesHoy`: lo de hoy sin CCN, por tanda + cliente, con el estado del más atrasado,
 lo más atrasado primero). `activarTicker` es idempotente y se re-mide al cambiar el tamaño (la pestaña oculta del admin
 mide 0). Columnas 16/9/33/28 %. La TV pesa 99 KB contra el techo de 100 de `mon-tv`.
+
+## ⚠ REGLA (Luis, 2026-09-30): el pedido con importados sin stock va COMPLETO — ya no se parte
+
+**Luis:** *"que deje de partir el pedido… programá el pedido completo (como antes del cambio)"*.
+Se retira la regla del 11/09 (Thomas: `pedido_diferido` corta la NP) y la del 23/09 (Luis: la
+página crea 2 pedidos). Lo que no hay sale como faltante.
+
+| capa | qué cambió |
+|---|---|
+| páginas LK y Chef (`script.js`) | `PARTIR_POR_REINGRESO = false`: un solo pedido y la confirmación dice "listo antes del" |
+| base LK | `marcar_pedido_diferido` / `marcar_diferidos_chef_ids` ya no escriben `pedido_diferido`: anotan en **`pedido_sin_stock`** (empresa, pedido, artículo, cliente, cajas, unidades, fecha, reingreso estimado) — también el cliente nuevo |
+| Gestión | nada: los pases de diferido quedan sin trabajo nuevo |
+
+⚠ Lo ya diferido antes del cambio (16 pedidos) sigue partido: borrar esas filas cambiaría el corte
+de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (en `pagina-LK-copia`).
