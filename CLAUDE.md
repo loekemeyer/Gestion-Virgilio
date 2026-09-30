@@ -6513,6 +6513,10 @@ también el **cliente** · las luces **P/A quedan centradas** (quién la tiene y
 nuevo **🚚 Pendientes de hoy** (`pendientesHoy`: lo de hoy sin CCN, por tanda + cliente, con el estado del más atrasado,
 lo más atrasado primero). `activarTicker` es idempotente y se re-mide al cambiar el tamaño (la pestaña oculta del admin
 mide 0). Columnas 16/9/33/28 %. La TV pesa 99 KB contra el techo de 100 de `mon-tv`.
+**v25.6 (Luis, 30/09):** el cliente muestra **todos los nombres** (no «+N») y rota si no entra · el cartel va a **3/4** de
+velocidad (4,5 caracteres/s) · **nada de la columna derecha se corta**: «En este momento» muestra sólo lo que entra
+(se fue el mínimo de 6) y «Pendientes de hoy» toma a lo sumo la mitad del alto libre, con «+ N más» · las letras van en
+**`--u` = min(1vh, 0,5625vw)**, así en una pantalla más angosta que 16:9 achican con el ancho.
 
 ## ⚠ REGLA (Luis, 2026-09-30, v25.5): el DESGLOSE por cliente del pop-up de proyección cuenta lo MISMO que el total
 
