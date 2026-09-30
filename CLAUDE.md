@@ -3798,6 +3798,7 @@ Es POSIBILIDAD de armar: sólo apaga el cartel «Sin stock» de `gv_reingresos_f
 pedido en viaje cuya **fecha de reingreso ya pasó** sin recibirse corre solo a **hoy + 7** (`gv_importados_eta_vencida`,
 cron `gv-importados-eta-vencida` 00:07 ART, log `GV_Importados_ETA_Log`): una sola fuente, `GV_Importados_Baches` →
 `Importados.reingreso_est` → módulo de Importados y cartel de las páginas.
+El cartel de un producto toma la fecha **más temprana** entre su pedido y el de sus partes (v24.91: 323E/838E → la del 323ES).
 
 **Desglose de la tarjeta del proveedor (Luis, v23.75):** los dos chips de la banda se expanden. Izq: consumo/mes =
 Σ proy u/mes × FOB por artículo, y meses = (mínimo − a pedir hoy) ÷ consumo. Der: CIF y cada línea de lo no

@@ -39,3 +39,8 @@ insert into public."Importados_Stock_Parte" (terminado, parte, parte_x_caja) val
 --    -> 07/10 (GV_Importados_ETA_Log). La fecha vive en GV_Importados_Baches.fecha_reingreso -> Importados.reingreso_est
 --    (gv_importados_resync): de ahí leen el módulo de Importados y gv_reingresos_feed -> reingreso_cache de LK (cada 5 min).
 --    Rollback: select cron.unschedule('gv-importados-eta-vencida');
+
+-- ===== v24.91 (Luis, 30/09): APLICADO =====
+-- i) gv_reingresos_feed: la fecha del cartel = least(fecha del producto, fecha más temprana de sus partes)
+--    (CTE _rf_pfecha: la parte es un importado con ese código o un insumo vinculado por GV_Importados_Insumo_Map).
+--    323E y 838E pasan de 03/11 a 07/10 (la del 323ES). Centinela en GV_Reglas_Centinela (patrón least\(reingreso_est, ...).
