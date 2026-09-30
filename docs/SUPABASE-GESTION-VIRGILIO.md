@@ -30810,3 +30810,20 @@ alter table public."Control_Modo_OP" add column if not exists gv_no_recibido_at 
 - **Rollback, una línea:** `alter table public."Control_Modo_OP" drop column gv_no_recibido_at;`
   (antes, sacar la columna del `select` de `renderPendientes` en `recepcion.js`, o Pendientes da error).
 - Test: `tests/pend-no-recibido.cjs`.
+
+## §3.v258 — Conciliación de Facturación sin timeouts: neto en foto + RPC materializadas · Thomas, 30/09/2026
+
+- **Síntoma:** 72 timeouts de `gv_cruce_facturacion_totales` el 30/09 entre 08:56 y 09:28 ART.
+- **Medido:** la RPC tardaba **9,2 s** (timeout del rol: 8 s) mientras leer la vista entera tardaba 0,23 s:
+  con los parámetros el planner armaba otro plan. Y `gv_vista_cruce_facturacion` recalculaba el neto de
+  las 1.114 NP en cada lectura (1,4–1,7 s).
+- **Cambio:** `gv_facturacion_neto_mat` (foto del neto por NP, refresco `concurrently` cada 10 min en
+  minutos impares, cron `gv-facturacion-neto-mat`); la vista la lee y calcula EN VIVO sólo las NP que no
+  están en la foto (`= ANY(ARRAY(...))`, baja por el GROUP BY). `gv_cruce_facturacion_totales` y
+  `_resumen` leen la vista `MATERIALIZED`.
+- **Resultado (como `authenticated`):** totales 290 ms · resumen 271 ms. Salida idéntica (`EXCEPT ALL` 0/0).
+- **Costo aceptado:** una NP ya en la foto cuyo armado cambia (rearmado, Recuperar items) muestra el neto
+  viejo hasta 10 min.
+- Mismo día: el cruce de cobranzas (cron 103) pasa a correr sólo fuera de horario
+  (`49 0-10,21-23 * * *` UTC = 18:49 a 07:49 ART); rollback `cron.alter_job(103, schedule := '49 * * * *')`.
+- `sql/gv_facturacion_neto_mat_v258.sql` (rollback al final).
