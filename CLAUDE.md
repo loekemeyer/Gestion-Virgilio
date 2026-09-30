@@ -6502,3 +6502,8 @@ columna izquierda pasó a **1,15fr** contra 1fr. `resumirCliente` / `clienteTand
 **v24.92 (Luis): las NP van en UNA línea y, si no entran, ROTAN como cartel de Wall Street** (*"en caso de que haya
 más NPs de las que entran, que empiece a rotar"*). `activarTicker` duplica el texto sólo en la celda que se desborda
 (giro sin salto, ~6 caracteres por segundo); las que entran quedan quietas. Columnas 17/9/26/28 %. Candado en `mon-tv` (E32A con 9 NP rota, E30A no).
+**v24.95 (Luis, 30/09):** en **Días** el número de pedidos va grande y el % chiquito abajo, los dos en color · rota
+también el **cliente** · las luces **P/A quedan centradas** (quién la tiene y hace cuánto va ABAJO, `.semdet`) · cuadro
+nuevo **🚚 Pendientes de hoy** (`pendientesHoy`: lo de hoy sin CCN, por tanda + cliente, con el estado del más atrasado,
+lo más atrasado primero). `activarTicker` es idempotente y se re-mide al cambiar el tamaño (la pestaña oculta del admin
+mide 0). Columnas 16/9/33/28 %. La TV pesa 99 KB contra el techo de 100 de `mon-tv`.

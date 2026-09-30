@@ -132,7 +132,7 @@ tr.salio-sinfc td{background:#2a1f45}
 .rd td{text-align:center;font-weight:900;line-height:1.05;font-size:2.6vh;padding:.7vh .2vw}
 .rd td.rd-fe{text-align:left;color:#e2e8f0;white-space:nowrap;font-size:2.4vh}
 .rd tr+tr td{border-top:1px solid #16203a}
-.rd td small{display:block;font-size:.62em;font-weight:700;color:#64748b}
+.rd td small{display:block;font-size:.62em;font-weight:700;color:inherit;opacity:.85}
 .rd tr.hoy td.rd-fe{color:#93c5fd}
 .rd .sal{color:#a78bfa}.rd .fac{color:#60a5fa}.rd .arm{color:#4ade80}.rd .pro{color:#fbbf24}.rd .pen{color:#f87171}
 .rd .z{color:#334155}
@@ -171,12 +171,25 @@ tr.dia td{background:#0e1830;color:#93c5fd;font-size:1.9vh;font-weight:900;
    lugar de una fila a otra y la columna deja de leerse como columna. */
 table.tandas{table-layout:fixed}
 /* v24.88: cliente y NP, más chicos que el código de tanda (lo que se busca de lejos sigue siendo la tanda). */
-.t-cli{font-weight:800;font-size:2.3vh;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-cli{font-weight:800;font-size:2.3vh;color:#e2e8f0}
+.t-cli div{overflow:hidden;white-space:nowrap}
 /* v24.92 (Luis): las NP van en UNA línea; si no entran, ROTAN como cartel de Wall Street
    (el texto va duplicado y corre de derecha a izquierda sin salto). Si entran, quietas. */
 .t-np div{font-weight:700;font-size:1.8vh;color:#94a3b8;line-height:1.15;overflow:hidden;white-space:nowrap}
-.t-np .tk{display:inline-block}
-.t-np .tk.rota{animation:ticker linear infinite;will-change:transform}
+/* v24.95: rota también el cliente, y el cuadro «Pendientes de hoy». */
+.tk{display:inline-block}
+.tk.rota{animation:ticker linear infinite;will-change:transform}
+/* v24.95 (Luis): las luces P/A quedan SIEMPRE centradas; quién la tiene y hace cuánto va abajo. */
+.semdet{display:block;margin-top:.3vh;line-height:1}
+/* v24.95 (Luis): «Pendientes de hoy» — lo del día que todavía no salió en el camión. */
+table.pen{table-layout:fixed}
+table.pen td{text-align:center;padding:.5vh .3vw;font-weight:800;font-size:2.1vh;color:#e2e8f0}
+table.pen td.p-tanda{font-weight:900;font-size:2.4vh}
+table.pen td.p-np{color:#94a3b8;font-size:1.8vh}
+table.pen td div{overflow:hidden;white-space:nowrap}
+table.pen tr+tr td{border-top:1px solid #16203a}
+table.pen .sal{color:#a78bfa}table.pen .fac{color:#60a5fa}table.pen .arm{color:#4ade80}
+table.pen .pro{color:#fbbf24}table.pen .pen{color:#f87171}
 @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 table.tandas td,table.tandas th{text-align:center;padding:.85vh .4vw}
 /* Semáforo: dos luces con su letra — P de picking, A de armado. Rojo = no empezó ·
@@ -315,6 +328,12 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
       <div class="card" style="flex:0 0 auto">
         <div class="card-t" id="fcTit">Días</div>
         <div id="fcBox"></div>
+      </div>
+      <!-- v24.95 (Luis): *"agrega «Pendientes de hoy» que muestre cuantos y cuales pedidos
+           pendientes de entrega hay ese día"*. -->
+      <div class="card" style="flex:0 0 auto">
+        <div class="card-t" id="penTit">Pendientes de hoy</div>
+        <div id="penBox"></div>
       </div>
       <div class="card grow">
         <div class="card-t" id="actTit">En este momento</div>
@@ -707,13 +726,48 @@ function clienteTanda(v) {
    y la velocidad es pareja (~6 caracteres por segundo), sea larga o corta la lista. */
 function activarTicker(raiz) {
   if (!raiz) return;
-  raiz.querySelectorAll(".t-np .tk").forEach(function (tk) {
+  raiz.querySelectorAll(".tk").forEach(function (tk) {
     var caja = tk.parentNode;
-    if (!caja || tk.scrollWidth <= caja.clientWidth + 1) return;
-    var txt = tk.textContent, sep = "\u00a0\u00a0\u00a0·\u00a0\u00a0\u00a0";
+    /* Idempotente (v24.95): se vuelve a medir al cambiar el tamaño o al cargar la fuente, así
+       que siempre parte del texto original y quieto. Una celda sin ancho (pestaña oculta del
+       admin) no se evalúa: se mide cuando se vea. */
+    if (tk.getAttribute("data-txt") == null) tk.setAttribute("data-txt", tk.textContent);
+    var txt = tk.getAttribute("data-txt");
+    tk.classList.remove("rota"); tk.style.animationDuration = ""; tk.textContent = txt;
+    if (!caja || !caja.clientWidth || tk.scrollWidth <= caja.clientWidth + 1) return;
+    var sep = "\u00a0\u00a0\u00a0·\u00a0\u00a0\u00a0";
     tk.textContent = txt + sep + txt + sep;
     tk.classList.add("rota");
     tk.style.animationDuration = Math.max(6, Math.round((txt.length + 7) / 6)) + "s";
+  });
+}
+function tickersTodos() { ["tandasBox", "penBox"].forEach(function (id) { activarTicker(el(id)); }); }
+(function () {
+  var t = null;
+  window.addEventListener("resize", function () { clearTimeout(t); t = setTimeout(tickersTodos, 250); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(tickersTodos, function () {});
+})();
+/* v24.95 (Luis): lo de HOY que todavía no salió en el camión, agrupado por tanda y cliente,
+   con el estado del más atrasado. Misma fuente que el cuadro de Días (gv_ppp_prog_arbol) y el
+   mismo «salió» (CCN sin FSS posterior). */
+var PEN_ORDEN = { pendiente: 0, proceso: 1, armado: 2, facturado: 3 };
+var PEN_TXT = { pendiente: ["pen", "Pend"], proceso: ["pro", "Proc"], armado: ["arm", "Arm"], facturado: ["fac", "Fact"] };
+function pendientesHoy(filas, despachadas) {
+  var hoy = hoyKey(), g = new Map();
+  (filas || []).forEach(function (r) {
+    if (String(r.fecha || "").slice(0, 10) !== hoy) return;
+    var np = String(r.np || "").trim().replace(/\.0+$/, "");
+    if (!np || despachadas.has(np)) return;
+    var tanda = String(r.tanda || "").trim().toUpperCase() || "—";
+    var rs = resumirCliente(r.razon_social || "") || "—";
+    var k = tanda + "|" + rs, x = g.get(k);
+    if (!x) { x = { tanda: tanda, rs: rs, rsFull: r.razon_social || "", nps: [], m3: 0, est: "facturado" }; g.set(k, x); }
+    x.nps.push(np); x.m3 += Number(r.m3) || 0;
+    var e = PEN_ORDEN[r.estado] != null ? r.estado : "pendiente";
+    if (PEN_ORDEN[e] < PEN_ORDEN[x.est]) x.est = e;
+  });
+  return Array.from(g.values()).sort(function (a, b) {
+    return (PEN_ORDEN[a.est] - PEN_ORDEN[b.est]) || a.tanda.localeCompare(b.tanda);
   });
 }
 function npsCortas(nps) {
@@ -749,7 +803,7 @@ function semaforo(ev, nombres, horarios) {
   var det = "";
   if (ev.armado === "curso")       det = celdaEstado("curso", ev.armLegajo,  ev.armStart,  ev.armAband,  ev.armFj,  nombres, horarios);
   else if (ev.picking === "curso") det = celdaEstado("curso", ev.pickLegajo, ev.pickStart, ev.pickAband, ev.pickFj, nombres, horarios);
-  return s + (det ? " " + det : "");
+  return s + (det ? '<span class="semdet">' + det + '</span>' : "");
 }
 
 /* Estado de cada tanda. `gv_tanda_status` ya resuelve en el backend el último
@@ -1321,7 +1375,7 @@ function pintar(d) {
       '<td class="t-tanda">' + esc(v.tanda) +
         (salioT ? ' <span class="t-salio" title="Ya se registró la carga al camión (CCN)">🚚</span>' : '') + '</td>' +
       '<td class="num t-m3">' + n1(v.m3) + '</td>' +
-      '<td class="t-cli" title="' + esc((v.clientes || []).join(" · ")) + '">' + esc(clienteTanda(v)) + '</td>' +
+      '<td class="t-cli" title="' + esc((v.clientes || []).join(" · ")) + '"><div><span class="tk">' + esc(clienteTanda(v)) + '</span></div></td>' +
       '<td class="t-np" title="' + esc((v.nps || []).join(" · ")) + '"><div><span class="tk">' + esc(npsCortas(v.nps)) + '</span></div></td>' +
       '<td class="cen">' + semaforo(ev, nombres, horarios) + '</td>' +
       '</tr>');
@@ -1347,7 +1401,7 @@ function pintar(d) {
   var etiqueta = d.fechas.map(diaEtiqueta).join(" · ") || "—";
   var topeT = cabenFilas("tandasBox", true);
   el("tandasBox").innerHTML = filas.length
-    ? '<table class="tandas"><colgroup><col style="width:17%"><col style="width:9%"><col style="width:26%">' +
+    ? '<table class="tandas"><colgroup><col style="width:16%"><col style="width:9%"><col style="width:33%">' +
       '<col style="width:28%"><col></colgroup>' +
       '<thead><tr><th>Tanda</th><th class="num">M³</th><th>Cliente</th><th>NP</th><th class="cen">Progreso</th></tr></thead><tbody>' +
       filas.slice(0, topeT).join("") + '</tbody></table>' +
@@ -1355,7 +1409,6 @@ function pintar(d) {
     : '<div class="vacio">' + (tandas.length
         ? "Todo terminado para " + esc(etiqueta) + " ✅"
         : "Sin tandas programadas para las próximas fechas") + '</div>';
-  activarTicker(el("tandasBox"));
 
   /* v20.21 (Thomas): cuáles de las que faltan facturar YA SE FUERON en el camión. v20.20: la
      lista (no sólo el número) porque el cartel de arriba las nombra. */
@@ -1400,7 +1453,8 @@ function pintar(d) {
       (fcSalidas ? " <small>· <b class=\"fc-salio\">" + fcSalidas + (fcSalidas === 1 ? " salió" : " salieron") + " sin FC</b></small>" : "");
     var pc = function (nn, tot, cls) {
       var p = tot ? Math.round(100 * nn / tot) : 0;
-      return '<td class="' + cls + (nn ? '' : ' z') + '">' + p + '%<small>' + nn + '</small></td>';
+      /* v24.95 (Luis): el número de pedidos grande y el % chiquito abajo, los dos en color. */
+      return '<td class="' + cls + (nn ? '' : ' z') + '">' + nn + '<small>' + p + '%</small></td>';
     };
     /* v24.70: el m³ del día es el mismo que daba «Total por día» (las tandas del día). */
     var m3Dia = function (x) { var g = porDia.get(x.key); return g ? g.total : x.m3; };
@@ -1416,6 +1470,31 @@ function pintar(d) {
       }).join("") + '</tbody></table>'
       : '<div class="vacio">Nada programado</div>';
   }
+
+  // ── Pendientes de hoy (v24.95, Luis)
+  if (d.arbol === null) {
+    el("penTit").innerHTML = "Pendientes de hoy";
+    el("penBox").innerHTML = '<div class="vacio">No se pudo leer la programación</div>';
+  } else {
+    var pens = pendientesHoy(d.arbol, d.despachadas);
+    var penNp = pens.reduce(function (a, x) { return a + x.nps.length; }, 0);
+    var penM3 = pens.reduce(function (a, x) { return a + x.m3; }, 0);
+    el("penTit").innerHTML = "🚚 Pendientes de hoy" + (pens.length
+      ? " <small>· " + pens.length + (pens.length === 1 ? " pedido" : " pedidos") + " · " + penNp + " NP · " + n1(penM3) + " m³</small>" : "");
+    var PEN_MAX = 6;
+    el("penBox").innerHTML = pens.length
+      ? '<table class="pen"><colgroup><col style="width:16%"><col style="width:36%"><col style="width:32%"><col></colgroup><tbody>' +
+        pens.slice(0, PEN_MAX).map(function (x) {
+          var et = PEN_TXT[x.est] || PEN_TXT.pendiente;
+          return '<tr><td class="p-tanda">' + esc(x.tanda) + '</td>' +
+            '<td class="p-cli" title="' + esc(x.rsFull) + '"><div><span class="tk">' + esc(x.rs) + '</span></div></td>' +
+            '<td class="p-np" title="' + esc(x.nps.join(" · ")) + '"><div><span class="tk">' + esc(npsCortas(x.nps)) + '</span></div></td>' +
+            '<td class="' + et[0] + '">' + et[1] + '</td></tr>';
+        }).join("") + '</tbody></table>' +
+        (pens.length > PEN_MAX ? '<div class="mas">+ ' + (pens.length - PEN_MAX) + ' más</div>' : "")
+      : '<div class="vacio">✅ Salió todo lo de hoy</div>';
+  }
+  tickersTodos();
 
   // ── Operarios · horas de hoy (v21.17, Damián)
   pintarHoras(d.horas, d);
