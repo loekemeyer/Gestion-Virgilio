@@ -83,3 +83,9 @@ as $function$
   order by m.proy_cajas desc;
 $function$;
 -- Rollback: la definición anterior es la misma sin los CTE _vt_* (merged0 se llamaba merged).
+
+-- v24.71 (Thomas, 30/09, D25) — APLICADO: los códigos de 5 dígitos NUMÉRICOS no tienen proyección
+-- (se hacen contra pedido, no se stockean). Parche sobre la definición viva, en el WHERE final:
+--   where m.proy_cajas > 0
+--     and m.item !~ '^[0-9]{5}$'   -- v24.71-5dig
+-- Al 30/09 sólo afectaba al 55215 (34,67 cj/mes → sin proyección).
