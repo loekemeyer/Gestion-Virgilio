@@ -3788,6 +3788,12 @@ Centinelas ids 235-239. `sql/gv_imp_recibir_v2349.sql`.
 (`pedImpBachesDe`) elige de cuál. **Cada artículo recibe con SU código** (Luis: *"recibir 323ES es 323ES, no 323E"*).
 **La cantidad va en cajas o en UNIDADES**: en unidades se convierte con la UxB a la caja más cercana
 (3.000 u ÷ 144 → 21 cajas) y el popup dice la diferencia (+24 u). `tests/imp-recibir-codigo-unidades.cjs`.
+**v24.83-84 (Luis, 30/09): un importado que es INSUMO entra como insumo y su stock cuenta para el producto.**
+`323ES` (pedido) → insumo **`323ES In`** (`GV_Importados_Insumo_Map`), en su unidad (`Insumos_Factores`; el popup
+no pide UxB ni cajas). **`Importados_Stock_Parte`** = «el stock de esta parte cuenta como stock de este producto»,
+con **`parte_x_caja`** (u de la parte por caja; NULL = 1 por unidad): 12 u de `323ES In` = 1 caja de 323E **y** de 838E.
+Es POSIBILIDAD de armar: sólo apaga el cartel «Sin stock» de `gv_reingresos_feed` (sólo importados). Centinela 255.
+`sql/gv_insumo_cuenta_como_producto_v2484.sql`.
 
 **Desglose de la tarjeta del proveedor (Luis, v23.75):** los dos chips de la banda se expanden. Izq: consumo/mes =
 Σ proy u/mes × FOB por artículo, y meses = (mínimo − a pedir hoy) ÷ consumo. Der: CIF y cada línea de lo no
