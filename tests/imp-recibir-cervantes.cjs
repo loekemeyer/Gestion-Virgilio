@@ -16,4 +16,7 @@ ok(ctx._impRecU({ destino: "a_guardar" }) === false, "A guardar sigue en cajas")
 ctx._impRec.soloInsumo = false;
 ok(ctx._impRecU({ destino: "cervantes" }) === false, "Cervantes con un producto va en cajas");
 ok(/unidad: _impRecU\(l\) \? "Uni" : null/.test(src), "la línea le dice al backend su unidad");
+// v25.26 (Luis): los destinos van a la vista como BOTONES, no dentro de un <select> (ahí no se veía Cervantes)
+ok(/class="irc-b irc-dest /.test(src) && /data-dest="' \+ k \+ '"/.test(src), "los destinos son botones a la vista");
+ok(!/impRecLinea\(' \+ i \+ ',\\'destino\\',this\.value\)/.test(src), "el destino ya no es un <select>");
 process.exit(mal ? 1 : 0);

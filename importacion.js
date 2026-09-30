@@ -2643,8 +2643,10 @@ function _impRecRender() {
     (_impRec.lineas.some(function (l) { return !_impRecU(l); })
       ? '<div class="irc-row"><span class="irc-muted">Unidades por caja</span><input type="number" min="1" style="width:80px" value="' + (_impRec.uxc || "") + '" onchange="impRecSet(\'uxc\',this.value)"></div>' : '');
   _impRec.lineas.forEach(function (l, i) {
+    /* v25.26 (Luis, 30/09): «No aparece Cervantes» — estaba adentro de un menú que decía «Insumos», al lado del
+       menú de LUGARES (posiciones de rack), que es el que se mira. Los destinos van a la vista, como botones. */
     var opts = Object.keys(_IMP_REC_DEST).filter(function (k) { return k !== "insumos" || (c.insumos_cods || []).length; })
-      .map(function (k) { return '<option value="' + k + '"' + (l.destino === k ? ' selected' : '') + '>' + _IMP_REC_DEST[k] + '</option>'; }).join('');
+      .map(function (k) { return '<button type="button" class="irc-b irc-dest ' + (l.destino === k ? 'on' : 'sec') + '" data-dest="' + k + '" onclick="impRecLinea(' + i + ',\'destino\',\'' + k + '\')">' + (k === "cervantes" ? "🏭 " : "") + _IMP_REC_DEST[k] + '</button>'; }).join('');
     var lug = _impRecLugares(l);
     var lugHtml = '';
     if (l.destino === "gondola" && !lug.length) lugHtml = '<span class="irc-conf" style="margin:0">Este código no tiene celda de góndola en el Mapa' + (c.dual && _impRec.empresa ? ' para ' + _impRec.empresa : '') + '</span>';
@@ -2662,7 +2664,7 @@ function _impRecRender() {
     var uSel = _impRecU(l) ? '<span class="irc-muted" title="Unidad de medida del insumo ' + escapeHtml(l.cod_insumo || "") + '">' + escapeHtml(_insU === "Uni" ? "unidades" : _insU) + ' →</span>'
       : '<select title="Cargar en cajas o en unidades" onchange="impRecLinea(' + i + ',\'modo\',this.value)"><option value="cajas"' + (enU ? '' : ' selected') + '>cajas</option><option value="u"' + (enU ? ' selected' : '') + '>unidades</option></select><span class="irc-muted">→</span>';
     h += '<div class="irc-row">' + qIn + uSel +
-      '<select onchange="impRecLinea(' + i + ',\'destino\',this.value)">' + opts + '</select>' + lugHtml + insHtml +
+      '</div><div class="irc-row irc-dests">' + opts + '</div><div class="irc-row">' + lugHtml + insHtml +
       (_impRec.lineas.length > 1 ? '<button class="irc-b rm" onclick="impRecQuitar(' + i + ')">✕</button>' : '') + '</div>';
     if (enU && Number(l.uni) > 0) {
       var _uxcL = Number(_impRec.uxc) || 0;
