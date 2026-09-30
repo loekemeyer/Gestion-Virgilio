@@ -17099,6 +17099,7 @@ function ocgStartCountdown() { if (_ocgCdTimer) return; _ocgCdTimer = setInterva
    Se muestra como sección dentro de "Generar OCs", agrupado por PROVEEDOR CHINO. La fórmula fina
    (stock por todos los estadios, partes, etc.) se sigue afinando. */
 const SUPABASE_IMPORTADOS_OC_ENDPOINT = SUPABASE_URL + "/rest/v1/gv_importados_ordenes";
+const INSUMO_MESES_PRODUCTO = 2;   // v25.01 (Thomas) — insumo: meses del proveedor (10) + 2 meses de producto armado = 12M
 async function ocgFetchImportados() {
   let rows = [];
   try {
@@ -17198,6 +17199,11 @@ async function ocgFetchImportados() {
     const kk = String(o.cod).toUpperCase().trim();
     const pp = parteProy[kk];
     const esParte = !!pp;
+    /* v25.01 (Thomas, 30/09) — un INSUMO es la parte que NO se vende sola: su propio código no
+       figura entre los terminados que la usan (590E sí: es parte de su familia Y se vende). El
+       insumo no tiene empresa (no es LK ni CH) y su objetivo es 10 meses de insumo + 2 meses de
+       producto: los meses del proveedor + INSUMO_MESES_PRODUCTO. */
+    const esInsumo = esParte && !((pp.detalle || []).some(function (d) { return String(d.cod || "").toUpperCase().replace(/^0+/, "") === kk.replace(/^0+/, ""); }));
     const proyUni = esParte ? pp.proy : o.proyUni;
     const sp = stockParte[kk];
     const stockParteU = sp ? sp.u : 0;
@@ -17206,7 +17212,8 @@ async function ocgFetchImportados() {
     // considerar el stock de las partes" → 1546903 ve el 546 terminado, 505C las cuchillas ya armadas).
     const stockTermU = esParte ? (pp.stockTerm || 0) : 0;
     const stockTot = o.stockUni + stockParteU + stockTermU;   // el stock de la parte cuenta como stock del terminado, y el del terminado como stock de la parte
-    const mesesIt = (o.mesesArt > 0) ? o.mesesArt : meses;   // v23.90 — los de SU proveedor
+    const mesesProv = (o.mesesArt > 0) ? o.mesesArt : meses;   // v23.90 — los de SU proveedor
+    const mesesIt = mesesProv + (esInsumo ? INSUMO_MESES_PRODUCTO : 0);   // v25.01 — insumo: + 2 meses de producto
     const objetivoUni = Math.round(proyUni * mesesIt);
     const aPedirUni = Math.max(0, Math.ceil(objetivoUni - stockTot - o.enCurso));
     // v10.07 — MASTER CAJAS: el divisor correcto es uni_master (del Excel/Importados_Volumen), NO
@@ -17222,7 +17229,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, innerSuelto: !!(vm && vm.uiSuelto), cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
+    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, innerSuelto: !!(vm && vm.uiSuelto), cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, esInsumo: esInsumo, mesesProv: mesesProv, stockPropioModulo: Math.round(o.stockUni - o.stockIns), parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -19794,6 +19801,8 @@ var STK_POP_CSS =
   // v23.91 (Luis): la PROYECCIÓN se toca en su propia celda (el código dejó de ser un link)
   ".mva-tbl.wide td.pedimp-proy{cursor:pointer;background:#faf5ff;color:#6d28d9;}" +
   ".mva-tbl.wide td.pedimp-proy:hover{background:#f3e8ff;}" +
+  ".mva-tbl.wide td.pedimp-stk{cursor:pointer;}" +
+  ".mva-tbl.wide td.pedimp-stk:hover{background:#f0f9ff;}" +
   ".mva-tbl.wide td.pedimp-proy small{color:#a78bfa;}" +
   // el global button{width:100%;padding:16px;font-size:22px;margin-top:14px} estiraba cada botón
   // del pop-up ⚙ Configurar de punta a punta (Luis, 29/09: "botones largos horribles").

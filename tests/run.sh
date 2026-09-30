@@ -647,6 +647,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pedimp-moq-proy (v23.90: código → proyección · MOQ con margen hasta 12 meses · desglose en 2 columnas · derechos por artículo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-moq-proy.cjs
+node tests/pedimp-insumo-12m.cjs
 echo "== pedimp-pdf-inner (v24.40: el PDF del pedido lleva Inner Cajas) =="
 node tests/pedimp-pdf-inner.cjs
 echo "== pedimp-prioridad-damian (v24.42: orden por meses de stock · alerta < 4 · PDF para Damián) =="
