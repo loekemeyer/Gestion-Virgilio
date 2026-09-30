@@ -6686,4 +6686,7 @@ nadie la sesión abierta"*.
 - `anon` sólo INSERTA; se lee por el MCP: `select * from public.gv_dispositivos order by ultimo_ingreso desc;`
 - **Un mismo dispositivo con 2+ operarios en el día** (v25.26, Luis: *"que quede registrado"*):
   `select * from public.gv_dispositivo_multi_operario order by dia desc;` — cruza ingresos y eventos.
+- **Y avisa por Telegram** (v25.29, Luis): cron `gv-alerta-dispositivo-multi` (jobid 118, `5-59/10`) →
+  `gv_alerta_dispositivo_multi_operario_telegram()`, un mensaje por cada operario NUEVO en el mismo dispositivo en el
+  día (dedup por dispositivo + día + legajos). `sql/gv_dispositivo_multi_telegram_v2529.sql`.
 - `sql/gv_dispositivo_v2525.sql`, `tests/dispositivo-id.cjs`.

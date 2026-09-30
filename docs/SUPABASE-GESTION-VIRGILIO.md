@@ -30858,3 +30858,4 @@ y registra un ingreso por dispositivo + persona + día (`gvRegistrarIngreso` en 
 clave_tv / legajo / sesion_guardada). Probado como `anon` en transacción abortada: inserta 1, lectura denegada; el
 evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositivo_v2525.sql`, `tests/dispositivo-id.cjs`.
 - v25.26: vista `gv_dispositivo_multi_operario` (dispositivo + día con 2+ operarios; ingresos + eventos, sólo MCP).
+- v25.29: aviso por Telegram de un dispositivo con 2+ operarios en el día (cron 118 `gv-alerta-dispositivo-multi`, c/10 min, minutos impares). `sql/gv_dispositivo_multi_telegram_v2529.sql`.
