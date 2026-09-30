@@ -6659,3 +6659,16 @@ tablas, y reescribir la derivada cuesta 7 s por cambio.
   misma IP/celular; el `raise` del trigger está en `postgres_logs`, y el legajo sale cruzando la hora contra
   `Registros_Produccion_Virgilio.created_at`.
 - `tests/stock-cola-por-fila.cjs` (verificado que falla contra la v25.15).
+
+## ⚠ REGLA (Luis, 2026-09-30, v25.25): cada celular/PC se IDENTIFICA — eventos e ingresos llevan `gv_dispositivo`
+
+**Luis:** *"¿puede el sistema identificar el dispositivo que se está logueando?"* · *"forward facing, no le cagues a
+nadie la sesión abierta"*.
+
+- Cada navegador genera UNA vez un UUID (`localStorage.gv_dispositivo`, `gvDispositivoId()`) y lo manda con cada evento
+  (`Registros_Produccion_Virgilio.gv_dispositivo`) y con cada ingreso (`GV_Dispositivo_Login`: uno por dispositivo +
+  persona + día, con el método google / clave_tv / legajo / sesion_guardada y el user agent).
+- **No es el IMEI ni el serie** (el navegador no los da): borrar los datos de la app o reinstalar genera un ID nuevo.
+- Forward-facing: lo anterior queda NULL, no se desloguea a nadie; si el envío del ingreso falla, no pasa nada.
+- `anon` sólo INSERTA; se lee por el MCP: `select * from public.gv_dispositivos order by ultimo_ingreso desc;`
+- `sql/gv_dispositivo_v2525.sql`, `tests/dispositivo-id.cjs`.

@@ -30848,3 +30848,12 @@ alter table public."Control_Modo_OP" add column if not exists gv_no_recibido_at 
 anteriores a la ventana de 14 días del cron 24. Cada hora (:37): 60 días, Chef desde `chef_orders_cache`. **Domingos 04:23 ART**
 (`gv-pedidos-match-viejos-todo`, `23 7 * * 0`): todo el historial, Chef por FDW (~3,5 s). Primera corrida: 4 `match_string` de LK,
 0 de Chef. Backup `zz_backups."GV_Backup_LkPedMatch_items_match_20260930b"`. Rollback en `sql/lk_pedidos_match_viejos_v2511_LK.sql`.
+
+### §3.v2525 — ID de dispositivo en eventos e ingresos (v25.25, Luis 30/09)
+
+`Registros_Produccion_Virgilio.gv_dispositivo` (text, nullable, sin default: lo viejo y Producción quedan NULL) +
+tabla nueva `GV_Dispositivo_Login` (anon/authenticated sólo INSERT, RLS con policy de insert, sin lectura) + vista
+`gv_dispositivos` (security_invoker, revocada a anon). El front genera un UUID por celular (`localStorage.gv_dispositivo`)
+y registra un ingreso por dispositivo + persona + día (`gvRegistrarIngreso` en `_routeAfterAuth`, método google /
+clave_tv / legajo / sesion_guardada). Probado como `anon` en transacción abortada: inserta 1, lectura denegada; el
+evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositivo_v2525.sql`, `tests/dispositivo-id.cjs`.

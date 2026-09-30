@@ -73,6 +73,7 @@ node tests/checkhtml.cjs
 
 echo "== version-sync (APP_VERSION == SW_VERSION base — evita PWA cacheando app vieja) =="
 node tests/version-sync.cjs
+node tests/dispositivo-id.cjs
 echo "== js-parsea (problema 579: sw.js y los .js propios parsean, sin marcas de conflicto) =="
 node tests/js-parsea.cjs
 
