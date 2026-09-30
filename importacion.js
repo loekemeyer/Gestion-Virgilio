@@ -2475,7 +2475,9 @@ function _impRecRender() {
       (_impRec.empresaBache && _impRec.empresa !== _impRec.empresaBache ? '<div class="irc-conf">⚠ Este pedido se hizo para <b>' + escapeHtml(_impRec.empresaBache) + '</b> y estás recibiendo como <b>' + escapeHtml(_impRec.empresa) + '</b>. El stock va a la góndola / pila de ' + escapeHtml(_impRec.empresa) + '. Confirmá que es así.</div>' : '') + '</div>';
   }
   h += '<div class="irc-sec"><h4>¿Cuánto llegó y a dónde va?</h4>' +
-    '<div class="irc-row"><span class="irc-muted">Unidades por caja</span><input type="number" min="1" style="width:80px" value="' + (_impRec.uxc || "") + '" onchange="impRecSet(\'uxc\',this.value)"></div>';
+    // v24.83 — un insumo no lleva UxB: el renglón sólo aparece si algún destino va en cajas
+    (_impRec.lineas.some(function (l) { return l.destino !== "insumos"; })
+      ? '<div class="irc-row"><span class="irc-muted">Unidades por caja</span><input type="number" min="1" style="width:80px" value="' + (_impRec.uxc || "") + '" onchange="impRecSet(\'uxc\',this.value)"></div>' : '');
   _impRec.lineas.forEach(function (l, i) {
     var opts = Object.keys(_IMP_REC_DEST).filter(function (k) { return k !== "insumos" || (c.insumos_cods || []).length; })
       .map(function (k) { return '<option value="' + k + '"' + (l.destino === k ? ' selected' : '') + '>' + _IMP_REC_DEST[k] + '</option>'; }).join('');
@@ -2490,7 +2492,10 @@ function _impRecRender() {
        con la UxB (la recepción graba cajas enteras): se redondea a la caja más cercana y se dice la diferencia. */
     var enU = l.destino !== "insumos" && l.modo === "u";
     var qIn = '<input type="number" min="1" style="width:92px" value="' + ((enU ? l.uni : l.cantidad) || "") + '" onchange="impRecLinea(' + i + ',\'' + (enU ? 'uni' : 'cantidad') + '\',this.value)">';
-    var uSel = l.destino === "insumos" ? '<span class="irc-muted">u →</span>'
+    /* v24.83 (Luis, 30/09): un insumo NO se carga en cajas ni por UxB: se pregunta cuánto entra en SU unidad de
+       medida (la base de Insumos_Factores, que trae el contexto; sin dato = unidades). */
+    var _insU = l.destino === "insumos" ? ((c.insumos_unidad || {})[l.cod_insumo || ""] || "Uni") : "";
+    var uSel = l.destino === "insumos" ? '<span class="irc-muted" title="Unidad de medida del insumo ' + escapeHtml(l.cod_insumo || "") + '">' + escapeHtml(_insU === "Uni" ? "unidades" : _insU) + ' →</span>'
       : '<select title="Cargar en cajas o en unidades" onchange="impRecLinea(' + i + ',\'modo\',this.value)"><option value="cajas"' + (enU ? '' : ' selected') + '>cajas</option><option value="u"' + (enU ? ' selected' : '') + '>unidades</option></select><span class="irc-muted">→</span>';
     h += '<div class="irc-row">' + qIn + uSel +
       '<select onchange="impRecLinea(' + i + ',\'destino\',this.value)">' + opts + '</select>' + lugHtml + insHtml +

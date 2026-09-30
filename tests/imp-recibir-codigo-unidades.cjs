@@ -60,6 +60,15 @@ const ITEMS = [
     await impRecRevisar(); await impRecGrabar();
     const real = window.__calls.filter((c) => c.fn === "gv_imp_recibir" && c.body.p_simular === false)[0];
     out.mandado = real ? real.body.p_destinos.map((x) => x.destino + ":" + x.cantidad).join(",") + "|uxc" + real.body.p_uni_x_caja : null;
+    // D (v24.83): un importado que es INSUMO (323ES suelto) entra en la unidad del insumo, sin UxB ni cajas
+    CTX.uni_x_caja = null; CTX.insumos_cods = ["323ES"]; CTX.insumos_unidad = { "323ES": "Uni" };
+    CTX.insumos_pos = [{ sector: "R01AD", insumos: "" }];
+    await impRecibirBache(134);
+    out.insDest = _impRec.lineas[0].destino;
+    out.insCant = _impRec.lineas[0].cantidad;
+    out.insSinUxb = !/Unidades por caja/.test(ov().innerHTML);
+    out.insSinSelect = !ov().querySelector('select[title="Cargar en cajas o en unidades"]');
+    out.insLabel = /unidades →/.test(ov().innerHTML);
     return out;
   }, ITEMS);
   await b.close();
@@ -71,7 +80,9 @@ const ITEMS = [
   if (!r.avisaDif) fail.push("C: no avisa la diferencia");
   if (r.cajas100 !== 30 || !r.sinDif100) fail.push("C: con UxB 100 → " + r.cajas100);
   if (r.mandado !== "a_guardar:21|uxc144") fail.push("C: mandado " + r.mandado);
+  if (r.insDest !== "insumos" || r.insCant !== 3000) fail.push("D: insumo arranca en " + r.insDest + ":" + r.insCant);
+  if (!r.insSinUxb || !r.insSinSelect || !r.insLabel) fail.push("D: insumo con UxB/cajas " + JSON.stringify([r.insSinUxb, r.insSinSelect, r.insLabel]));
   if (errs.length) fail.push("pageerrors: " + errs.join(" | "));
   if (fail.length) { console.log("imp-recibir-codigo-unidades: ✗ " + fail.join(" · ")); process.exit(1); }
-  console.log("imp-recibir-codigo-unidades: OK — 1 📥 por código, selector de pedidos, carga en unidades → cajas");
+  console.log("imp-recibir-codigo-unidades: OK — 1 📥 por código, selector de pedidos, carga en unidades → cajas · insumo en su unidad");
 })();
