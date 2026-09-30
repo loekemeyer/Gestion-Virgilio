@@ -2417,9 +2417,14 @@ async function impRecibirCodigo(enc) {
   } catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">No se pudieron leer los pedidos: ' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
   if (!enc2.length) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">Este código no tiene pedidos en curso con unidades pendientes. Si llegó algo que no estaba pedido, cargalo primero como bache (📦 Baches).</div>'); return; }
   if (enc2.length === 1) return impRecibirBache(enc2[0].r.id);
+  // v24.92: si el pedido entra como INSUMO (323E/838E/323ES → 323ES In), el rótulo es el insumo, no el artículo.
+  try {
+    var ctxs = await Promise.all(enc2.map(function (x) { return _pedImpRpc("gv_imp_recibir_contexto", { p_bache_id: x.r.id }).catch(function () { return null; }); }));
+    ctxs.forEach(function (c, k) { if (c && c.es_insumo && (c.insumos_cods || []).length) enc2[k].ins = c.insumos_cods[0]; });
+  } catch (_e) {}
   var h = '<div class="irc-sec"><h4>¿Qué llegó?</h4>' + enc2.map(function (x) {
     var r = x.r;
-    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirBache(' + r.id + ')">📥 ' + _impDetLbl(x.d) + '</button><span class="irc-muted">' +
+    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirBache(' + r.id + ')">📥 ' + (x.ins ? escapeHtml(x.ins) + ' <span style="font-weight:600">(insumo)</span>' : _impDetLbl(x.d)) + '</button><span class="irc-muted">' +
       escapeHtml(r.pedido_ref || ("bache " + r.id)) + ' · ' + Number(r.pendiente).toLocaleString("es-AR") + ' u pendientes' + (r.fecha_reingreso ? ' · llega ' + escapeHtml(_isoToDdMmAa(String(r.fecha_reingreso).slice(0, 10))) : '') + '</span></div>';
   }).join('') + '</div>';
   _impRecShell("📥 Recibir importación", h);
@@ -2439,7 +2444,7 @@ async function impRecibirBache(bacheId) {
   try { ctx = await _pedImpRpc("gv_imp_recibir_contexto", { p_bache_id: bacheId }); }
   catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
   var uxc = Number(ctx.uni_x_caja) || 0;
-  var soloInsumo = !(ctx.gondola || []).length && (ctx.insumos_cods || []).length > 0 && !uxc;
+  var soloInsumo = !!ctx.es_insumo || (!(ctx.gondola || []).length && (ctx.insumos_cods || []).length > 0 && !uxc);
   var cajasDef = uxc > 0 ? Math.round((Number(ctx.pendiente) || 0) / uxc) : 0;
   _impRec = {
     ctx: ctx, empresa: ctx.empresa || "LK", empresaBache: ctx.empresa || "", uxc: uxc || "", nota: "", hecho: false, sim: null,
@@ -2466,7 +2471,7 @@ function _impRecRender() {
   if (!_impRec) return;
   var c = _impRec.ctx, uxc = Number(_impRec.uxc) || 0;
   var pend = Number(c.pendiente) || 0;
-  var h = '<div class="irc-sec"><div style="font-size:16px;font-weight:800">' + escapeHtml(codCanon(c.cod_stock || c.cod_art)) + ' <span style="font-weight:600;color:#475569">' + escapeHtml(c.descripcion || "") + '</span></div>' +
+  var h = '<div class="irc-sec"><div style="font-size:16px;font-weight:800">' + escapeHtml(c.es_insumo && (c.insumos_cods || []).length ? c.insumos_cods[0] : codCanon(c.cod_stock || c.cod_art)) + ' <span style="font-weight:600;color:#475569">' + escapeHtml(c.descripcion || "") + '</span></div>' +
     '<div class="irc-muted">' + escapeHtml(c.proveedor || "") + ' · pedido ' + escapeHtml(c.pedido_ref || "—") + ' · pendiente <b>' + pend.toLocaleString("es-AR") + ' u</b>' +
     (uxc > 0 ? ' (' + Math.round(pend / uxc).toLocaleString("es-AR") + ' cajas)' : '') + (Number(c.uni_master) > 0 ? ' · master de ' + c.uni_master + ' u' : '') + '</div></div>';
   if (c.dual) {
