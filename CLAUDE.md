@@ -5391,6 +5391,13 @@ consideramos dentro del descuento de contado … internamente Thomy les dice que
   planilla quedaron en 60). Fuente: planilla de Thomas del 28/09 (el `motivo` guarda el texto original).
 - **Alta / cambio:** es un `insert`/`update` en esa tabla (lo autoriza Thomas), no un deploy.
 - `tests/cbz-coronitas.cjs`.
+- ⚠⚠ **«30/60» NO es un plazo de 60 días** (Luis, 30/09): el cliente paga **la MITAD a los 30 días y la
+  otra mitad a los 60**, y mantiene el −25 %. Hoy esas coronitas (20 al 30/09, Solia incluida: CUIT
+  30540036353, LK 151 / CH 151, id 178) están cargadas como `dias = 60` y el agente (`gv_cobranza_imputar`,
+  `v_dias <= v_dias_contado`) les da el 25 % a **cualquier** pago hasta el día 60 — **también a quien paga todo
+  a los 60**, que por la regla no lo gana. **Está a propósito así hasta que Luis vea cómo se implementa**
+  (D27, 30/09: *"quiero ver cómo se implementa"*): no tocar el agente sin mostrarle antes la propuesta. La
+  forma de reconocerlas es el `motivo` con «30/60».
 
 ## ⚠ REGLA (Luis, 2026-09-30, v24.76): en lo que sale por EXPRESO se ve la DIRECCIÓN REAL — y la sucursal del Excel ISIS sale del PEDIDO
 
