@@ -176,12 +176,12 @@ table.tandas{table-layout:fixed}
 /* v24.92 (Luis): las NP van en UNA línea; si no entran, ROTAN como cartel de Wall Street
    (el texto va duplicado y corre de derecha a izquierda sin salto). Si entran, quietas. */
 .t-np div{font-weight:700;font-size:1.8vh;color:#94a3b8;line-height:1.15;overflow:hidden;white-space:nowrap}
-/* v24.95: rota también el cliente, y el cuadro «Pendientes de hoy». */
+/* v24.96: rota también el cliente, y el cuadro «Pendientes de hoy». */
 .tk{display:inline-block}
 .tk.rota{animation:ticker linear infinite;will-change:transform}
-/* v24.95 (Luis): las luces P/A quedan SIEMPRE centradas; quién la tiene y hace cuánto va abajo. */
+/* v24.96 (Luis): las luces P/A quedan SIEMPRE centradas; quién la tiene y hace cuánto va abajo. */
 .semdet{display:block;margin-top:.3vh;line-height:1}
-/* v24.95 (Luis): «Pendientes de hoy» — lo del día que todavía no salió en el camión. */
+/* v24.96 (Luis): «Pendientes de hoy» — lo del día que todavía no salió en el camión. */
 table.pen{table-layout:fixed}
 table.pen td{text-align:center;padding:.5vh .3vw;font-weight:800;font-size:2.1vh;color:#e2e8f0}
 table.pen td.p-tanda{font-weight:900;font-size:2.4vh}
@@ -329,7 +329,7 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
         <div class="card-t" id="fcTit">Días</div>
         <div id="fcBox"></div>
       </div>
-      <!-- v24.95 (Luis): *"agrega «Pendientes de hoy» que muestre cuantos y cuales pedidos
+      <!-- v24.96 (Luis): *"agrega «Pendientes de hoy» que muestre cuantos y cuales pedidos
            pendientes de entrega hay ese día"*. -->
       <div class="card" style="flex:0 0 auto">
         <div class="card-t" id="penTit">Pendientes de hoy</div>
@@ -728,7 +728,7 @@ function activarTicker(raiz) {
   if (!raiz) return;
   raiz.querySelectorAll(".tk").forEach(function (tk) {
     var caja = tk.parentNode;
-    /* Idempotente (v24.95): se vuelve a medir al cambiar el tamaño o al cargar la fuente, así
+    /* Idempotente (v24.96): se vuelve a medir al cambiar el tamaño o al cargar la fuente, así
        que siempre parte del texto original y quieto. Una celda sin ancho (pestaña oculta del
        admin) no se evalúa: se mide cuando se vea. */
     if (tk.getAttribute("data-txt") == null) tk.setAttribute("data-txt", tk.textContent);
@@ -747,7 +747,7 @@ function tickersTodos() { ["tandasBox", "penBox"].forEach(function (id) { activa
   window.addEventListener("resize", function () { clearTimeout(t); t = setTimeout(tickersTodos, 250); });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(tickersTodos, function () {});
 })();
-/* v24.95 (Luis): lo de HOY que todavía no salió en el camión, agrupado por tanda y cliente,
+/* v24.96 (Luis): lo de HOY que todavía no salió en el camión, agrupado por tanda y cliente,
    con el estado del más atrasado. Misma fuente que el cuadro de Días (gv_ppp_prog_arbol) y el
    mismo «salió» (CCN sin FSS posterior). */
 var PEN_ORDEN = { pendiente: 0, proceso: 1, armado: 2, facturado: 3 };
@@ -1453,7 +1453,7 @@ function pintar(d) {
       (fcSalidas ? " <small>· <b class=\"fc-salio\">" + fcSalidas + (fcSalidas === 1 ? " salió" : " salieron") + " sin FC</b></small>" : "");
     var pc = function (nn, tot, cls) {
       var p = tot ? Math.round(100 * nn / tot) : 0;
-      /* v24.95 (Luis): el número de pedidos grande y el % chiquito abajo, los dos en color. */
+      /* v24.96 (Luis): el número de pedidos grande y el % chiquito abajo, los dos en color. */
       return '<td class="' + cls + (nn ? '' : ' z') + '">' + nn + '<small>' + p + '%</small></td>';
     };
     /* v24.70: el m³ del día es el mismo que daba «Total por día» (las tandas del día). */
@@ -1471,7 +1471,7 @@ function pintar(d) {
       : '<div class="vacio">Nada programado</div>';
   }
 
-  // ── Pendientes de hoy (v24.95, Luis)
+  // ── Pendientes de hoy (v24.96, Luis)
   if (d.arbol === null) {
     el("penTit").innerHTML = "Pendientes de hoy";
     el("penBox").innerHTML = '<div class="vacio">No se pudo leer la programación</div>';

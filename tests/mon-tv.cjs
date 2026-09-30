@@ -292,16 +292,16 @@ function responder(url) {
      "la fila del día va sola, sin el subtexto de m³/tandas/NP: " + r.fc.slice(0, 300));
   ok((r.fc.match(/<tr[^>]*>/g) || []).length === 2,
      "un día = UNA fila (más la del encabezado): " + (r.fc.match(/<tr[^>]*>/g) || []).length);
-  /* v24.95 (Luis): el número de pedidos grande y el % chiquito abajo. */
+  /* v24.96 (Luis): el número de pedidos grande y el % chiquito abajo. */
   ok((r.fc.match(/>1<small>25%<\/small>/g) || []).length === 4, "98805 salió: 1 (25 %) en Salió, Fact, Proc y Pend, y 0 en Armado: " + r.fc.slice(0, 400));
   ok(/class="arm z">0<small>0%/.test(r.fc), "el armado que salió no se cuenta dos veces (neto)");
-  /* v24.95 (Luis): «Pendientes de hoy» — lo de hoy que no salió: E30A (98809 proc + 98810 pend)
+  /* v24.96 (Luis): «Pendientes de hoy» — lo de hoy que no salió: E30A (98809 proc + 98810 pend)
      y E31A (98802 facturada sin CCN). 98805 salió y no va. */
   ok(/2 pedidos · 3 NP/.test(r.penTit), "Pendientes de hoy tiene que decir 2 pedidos · 3 NP: " + r.penTit);
   ok(/E30A/.test(r.pen) && /E31A/.test(r.pen) && !/98805/.test(r.pen), "Pendientes de hoy lista mal los pedidos: " + r.pen);
   ok(/class="pen">Pend</.test(r.pen) && /class="fac">Fact</.test(r.pen), "cada pedido pendiente dice su estado (el más atrasado)");
   ok(r.pen.indexOf("E30A") < r.pen.indexOf("E31A"), "lo más atrasado va primero");
-  /* v24.95 (Luis): las luces P/A no se corren cuando alguien agarra la tanda. */
+  /* v24.96 (Luis): las luces P/A no se corren cuando alguien agarra la tanda. */
   const cliE32 = r.tkCli.find((x) => /^E32A/.test(x.tanda)), cliE30 = r.tkCli.find((x) => /^E30A/.test(x.tanda));
   ok(cliE32 && cliE32.rota && /\+1/.test(cliE32.txt), "el cliente de E32A no entra: tiene que rotar " + JSON.stringify(cliE32));
   ok(cliE30 && !cliE30.rota, "el cliente de E30A entra: tiene que quedar quieto " + JSON.stringify(cliE30));
