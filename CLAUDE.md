@@ -6583,7 +6583,7 @@ de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (
   **No hay vínculo** entre el código importado (1000900) y el componente GP2 (D1 «Espiral Sacacorcho»?): no se adivina.
   `sql/gv_gp2_inventario_v2501.sql`, `tests/pedimp-insumo-12m.cjs`.
 
-## ⚠ REGLA (Luis, 2026-09-30, v25.13): RECIBIR un importado en CERVANTES — no entra al stock de Virgilio, avisa en GP2
+## ⚠ REGLA (Luis, 2026-09-30, v25.14): RECIBIR un importado en CERVANTES — no entra al stock de Virgilio, avisa en GP2
 
 - En 📥 RECIBIR el destino **🏭 Cervantes** va **primero** de la lista. Para un insumo va en **unidades**.
 - `gv_imp_recibir` con destino `cervantes` **no escribe `Movimientos_Stock`**: inserta en **`"GP2".ingreso_virgilio`**
