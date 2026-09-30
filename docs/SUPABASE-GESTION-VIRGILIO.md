@@ -30827,3 +30827,12 @@ alter table public."Control_Modo_OP" add column if not exists gv_no_recibido_at 
 - Mismo día: el cruce de cobranzas (cron 103) pasa a correr sólo fuera de horario
   (`49 0-10,21-23 * * *` UTC = 18:49 a 07:49 ART); rollback `cron.alter_job(103, schedule := '49 * * * *')`.
 - `sql/gv_facturacion_neto_mat_v258.sql` (rollback al final).
+
+## §3.v2510 — `lk_pedidos_match` corrige los pedidos VIEJOS editados después · Luis, 30/09/2026
+
+- El sync de LK (cron 24) sólo recarga los últimos 14 días: un pedido más viejo corregido en la página
+  quedaba con los ítems viejos acá (LK 1450 · Matiz: 166,67 cajas en vez de 1.000/2.000).
+- LK: `sync_pedidos_match_virgilio_viejos()`, cron `gv-pedidos-match-viejos` (`37 * * * *`): corrige SÓLO
+  `items_string` de pedidos LK de hasta 60 días antes del corte, si difiere. Primera corrida: 1450 y 1358.
+- Chef queda afuera (su vista tarda 4 s por fila). Backup `zz_backups."GV_Backup_LkPedMatch_items_20260930"`.
+- `sql/lk_pedidos_match_viejos_v2510_LK.sql` (rollback al final).
