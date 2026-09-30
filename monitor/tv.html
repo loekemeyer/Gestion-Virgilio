@@ -173,12 +173,12 @@ table.tandas{table-layout:fixed}
 /* v24.92 (Luis): las NP van en UNA línea; si no entran, ROTAN como cartel de Wall Street
    (el texto va duplicado y corre de derecha a izquierda sin salto). Si entran, quietas. */
 .t-np div{font-weight:700;font-size:calc(1.8*var(--u));color:#94a3b8;line-height:1.15;overflow:hidden;white-space:nowrap}
-/* v25.01: rota también el cliente, y el cuadro «Pendientes de hoy». */
+/* v25.01: rota también el cliente, y el cuadro «Pendientes de salir hoy». */
 .tk{display:inline-block}
 .tk.rota{animation:ticker linear infinite;will-change:transform}
 /* v25.01 (Luis): las luces P/A quedan SIEMPRE centradas; quién la tiene y hace cuánto va abajo. */
 .semdet{display:block;margin-top:.3vh;line-height:1}
-/* v25.01 (Luis): «Pendientes de hoy» — lo del día que todavía no salió en el camión. */
+/* v25.01 (Luis): «Pendientes de salir hoy» — lo del día que todavía no salió en el camión. */
 table.pen{table-layout:fixed}
 table.pen td{text-align:center;padding:.5vh .3vw;font-weight:800;font-size:calc(2.1*var(--u));color:#e2e8f0}
 table.pen td.p-tanda{font-weight:900;font-size:calc(2.4*var(--u))}
@@ -326,10 +326,10 @@ tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
         <div class="card-t" id="fcTit">NPs por Día</div>
         <div id="fcBox"></div>
       </div>
-      <!-- v25.01 (Luis): *"agrega «Pendientes de hoy» que muestre cuantos y cuales pedidos
+      <!-- v25.01 (Luis): *"agrega «Pendientes de salir hoy» que muestre cuantos y cuales pedidos
            pendientes de entrega hay ese día"*. -->
       <div class="card" style="flex:0 0 auto">
-        <div class="card-t" id="penTit">Pendientes de hoy</div>
+        <div class="card-t" id="penTit">Pendientes de salir hoy</div>
         <div id="penBox"></div>
       </div>
       <div class="card grow">
@@ -1472,15 +1472,15 @@ function pintar(d) {
   // ── Operarios · horas de hoy (v21.17, Damián)
   pintarHoras(d.horas, d);
 
-  // ── Pendientes de hoy (v25.01, Luis)
+  // ── Pendientes de salir hoy (v25.01, Luis)
   if (d.arbol === null) {
-    el("penTit").innerHTML = "Pendientes de hoy";
+    el("penTit").innerHTML = "Pendientes de salir hoy";
     el("penBox").innerHTML = '<div class="vacio">No se pudo leer la programación</div>';
   } else {
     var pens = pendientesHoy(d.arbol, d.despachadas);
     var penNp = pens.reduce(function (a, x) { return a + x.nps.length; }, 0);
     var penM3 = pens.reduce(function (a, x) { return a + x.m3; }, 0);
-    el("penTit").innerHTML = "🚚 Pendientes de hoy" + (pens.length
+    el("penTit").innerHTML = "🚚 Pendientes de salir hoy" + (pens.length
       ? " <small>· " + pens.length + (pens.length === 1 ? " pedido" : " pedidos") + " · " + penNp + " NP · " + n1(penM3) + " m³</small>" : "");
     /* v25.6 (Luis): *"queda cortado En este momento"*. Pendientes toma a lo sumo la mitad de
        lo que queda libre; si no entran todos, la última fila es «+ N más». */
