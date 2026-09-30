@@ -100,6 +100,11 @@ const DATOS = {
       razon_social: "Perez Zarate S.R.L.", zona: "Zona 1 - CABA Sur", fecha_recep: HOY },
     { tanda: "E32A", np: "98803", m3: 3.0, fecha_entrega: MANANA,
       razon_social: "Simon Zeitune E Hijo S.A", zona: "Retira", fecha_recep: HOY },
+    /* v24.92: E32A lleva 8 NP más (m³ 0, no mueven ninguna cuenta) → no entran en la celda y
+       tienen que ROTAR; las de una sola NP quedan quietas. */
+    ...[98811, 98812, 98813, 98814, 98815, 98816, 98817, 98818].map((n) => ({
+      tanda: "E32A", np: String(n), m3: 0, fecha_entrega: MANANA,
+      razon_social: "Simon Zeitune E Hijo S.A", zona: "Retira", fecha_recep: HOY })),
     { tanda: "E33A", np: "98804", m3: 4.0, fecha_entrega: HOY,
       razon_social: "Gifel S.R.L.", zona: "Zona 6 - GBA Norte", fecha_recep: HOY },
     { tanda: "E34A", np: "98805", m3: 2.0, fecha_entrega: HOY,
@@ -240,6 +245,11 @@ function responder(url) {
         document.getElementById("fcBox").closest(".col") === document.getElementById("opsBox").closest(".col") &&
         document.getElementById("actBox").closest(".col") === document.getElementById("opsBox").closest(".col")),
       ult: window.__tvUlt || {},
+      ticker: [...document.querySelectorAll("#tandasBox tr")].filter((tr) => tr.querySelector(".t-np .tk"))
+        .map((tr) => { const tk = tr.querySelector(".t-np .tk"), caja = tk.parentNode;
+          return { tanda: tr.querySelector(".t-tanda").textContent.trim(), rota: tk.classList.contains("rota"),
+            anim: getComputedStyle(tk).animationName, lineas: Math.round(caja.clientHeight / parseFloat(getComputedStyle(caja).lineHeight)),
+            txt: tk.textContent, w: caja.clientWidth, sw: tk.scrollWidth }; }),
       clave: (document.getElementById("tvClave") || {}).textContent || "",
       estado: (document.getElementById("estado") || {}).textContent || "",
       // ¿sobresale algo del alto de la pantalla? En una TV no hay cómo scrollear.
@@ -320,6 +330,13 @@ function responder(url) {
   ok(!/>Zona</.test(r.tandas) && !/>Días</.test(r.tandas), "volvió una columna que Luis sacó de la tabla (v23.92)");
   ok(/98801/.test(r.tandas) && /Bazar Mandarin/.test(r.tandas),
      "la tabla tiene que mostrar el cliente y las NP de la tanda");
+  /* v24.92 (Luis): «si hay más NPs de las que entran, que rote estilo cartel de Wall Street». */
+  const tkE32 = r.ticker.find((x) => /^E32A/.test(x.tanda)), tkE31 = r.ticker.find((x) => /^E30A/.test(x.tanda));
+  ok(tkE32 && tkE32.rota && tkE32.anim === "ticker", "E32A tiene 9 NP y no entran: la celda tiene que rotar " + JSON.stringify(tkE32));
+  ok(tkE32 && /98818/.test(tkE32.txt) && (tkE32.txt.match(/98803/g) || []).length === 2,
+     "el cartel rotativo tiene que llevar TODAS las NP, duplicadas para girar sin salto " + JSON.stringify(tkE32));
+  ok(tkE31 && !tkE31.rota && tkE31.anim === "none", "E30A tiene pocas NP: tiene que quedar quieta " + JSON.stringify(tkE31));
+  ok(r.ticker.every((x) => x.lineas === 1), "las NP van en UNA línea: " + JSON.stringify(r.ticker.map((x) => x.lineas)));
   ok(!/Z3 CO/.test(r.tandas) && !/CABA/.test(r.tandas), "la zona salió de la tabla");
   ok((r.tandas.match(/E30A/g) || []).length === 1, "E30A aparece más de una vez: la tanda va en UNA fila");
   ok(/3,3/.test(r.tandas), "falta la columna de m³ (E30A = 2,5 de ISIS + 0,8 de la web)");

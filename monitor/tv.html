@@ -172,8 +172,12 @@ tr.dia td{background:#0e1830;color:#93c5fd;font-size:1.9vh;font-weight:900;
 table.tandas{table-layout:fixed}
 /* v24.88: cliente y NP, más chicos que el código de tanda (lo que se busca de lejos sigue siendo la tanda). */
 .t-cli{font-weight:800;font-size:2.3vh;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.t-np div{font-weight:700;font-size:1.8vh;color:#94a3b8;line-height:1.15;overflow:hidden;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+/* v24.92 (Luis): las NP van en UNA línea; si no entran, ROTAN como cartel de Wall Street
+   (el texto va duplicado y corre de derecha a izquierda sin salto). Si entran, quietas. */
+.t-np div{font-weight:700;font-size:1.8vh;color:#94a3b8;line-height:1.15;overflow:hidden;white-space:nowrap}
+.t-np .tk{display:inline-block}
+.t-np .tk.rota{animation:ticker linear infinite;will-change:transform}
+@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 table.tandas td,table.tandas th{text-align:center;padding:.85vh .4vw}
 /* Semáforo: dos luces con su letra — P de picking, A de armado. Rojo = no empezó ·
    ámbar = en curso · verde = terminado · violeta = abandonado (fichó salida sin
@@ -698,6 +702,20 @@ function clienteTanda(v) {
   return cs[0] + (cs.length > 1 ? " +" + (cs.length - 1) : "");
 }
 /* Las NP con el prefijo UNA vez por empresa: «LK 0101·0102 · 98615». */
+/* v24.92 (Luis): «si hay más NPs de las que entran, que rote estilo cartel de Wall Street».
+   Sólo la celda que se desborda rota; el texto se duplica para que el giro no tenga salto
+   y la velocidad es pareja (~6 caracteres por segundo), sea larga o corta la lista. */
+function activarTicker(raiz) {
+  if (!raiz) return;
+  raiz.querySelectorAll(".t-np .tk").forEach(function (tk) {
+    var caja = tk.parentNode;
+    if (!caja || tk.scrollWidth <= caja.clientWidth + 1) return;
+    var txt = tk.textContent, sep = "\u00a0\u00a0\u00a0·\u00a0\u00a0\u00a0";
+    tk.textContent = txt + sep + txt + sep;
+    tk.classList.add("rota");
+    tk.style.animationDuration = Math.max(6, Math.round((txt.length + 7) / 6)) + "s";
+  });
+}
 function npsCortas(nps) {
   var orden = [], grupos = {}, vistos = {};
   (nps || []).forEach(function (n) {
@@ -1290,9 +1308,9 @@ function pintar(d) {
        picking o el armado. Va pegado al código y no en una columna propia para no confundirse con
        «Salida», que es la fecha de entrega. */
     var salioT = tandaSalio(v, d.despachadas);
-    /* v23.92 (Luis) — TRES columnas: tanda · m³ · progreso. El N° de pedido, el cliente, los
-       días y la zona salieron de la tabla: en una pared lo que se lee es el código de la tanda
-       y si está hecha. Las tandas siguen ordenadas por camión (v23.86: ése es el orden de
+    /* v24.88 (Luis) — tanda · m³ · cliente · NP · progreso (retira las TRES columnas de la
+       v23.92). Los días y la zona siguen afuera: en una pared lo que se lee es el código de
+       la tanda y si está hecha. Las tandas siguen ordenadas por camión (v23.86: ése es el orden de
        armado), pero el rótulo del camión ya no se escribe. */
     if (v.fechaRaw !== diaEnCurso) {
       diaEnCurso = v.fechaRaw;
@@ -1304,7 +1322,7 @@ function pintar(d) {
         (salioT ? ' <span class="t-salio" title="Ya se registró la carga al camión (CCN)">🚚</span>' : '') + '</td>' +
       '<td class="num t-m3">' + n1(v.m3) + '</td>' +
       '<td class="t-cli" title="' + esc((v.clientes || []).join(" · ")) + '">' + esc(clienteTanda(v)) + '</td>' +
-      '<td class="t-np" title="' + esc((v.nps || []).join(" · ")) + '"><div>' + esc(npsCortas(v.nps)) + '</div></td>' +
+      '<td class="t-np" title="' + esc((v.nps || []).join(" · ")) + '"><div><span class="tk">' + esc(npsCortas(v.nps)) + '</span></div></td>' +
       '<td class="cen">' + semaforo(ev, nombres, horarios) + '</td>' +
       '</tr>');
   });
@@ -1329,14 +1347,15 @@ function pintar(d) {
   var etiqueta = d.fechas.map(diaEtiqueta).join(" · ") || "—";
   var topeT = cabenFilas("tandasBox", true);
   el("tandasBox").innerHTML = filas.length
-    ? '<table class="tandas"><colgroup><col style="width:17%"><col style="width:9%"><col style="width:32%">' +
-      '<col style="width:20%"><col></colgroup>' +
+    ? '<table class="tandas"><colgroup><col style="width:17%"><col style="width:9%"><col style="width:26%">' +
+      '<col style="width:28%"><col></colgroup>' +
       '<thead><tr><th>Tanda</th><th class="num">M³</th><th>Cliente</th><th>NP</th><th class="cen">Progreso</th></tr></thead><tbody>' +
       filas.slice(0, topeT).join("") + '</tbody></table>' +
       (filas.length > topeT ? '<div class="mas">+ ' + (filas.length - topeT) + ' más</div>' : "")
     : '<div class="vacio">' + (tandas.length
         ? "Todo terminado para " + esc(etiqueta) + " ✅"
         : "Sin tandas programadas para las próximas fechas") + '</div>';
+  activarTicker(el("tandasBox"));
 
   /* v20.21 (Thomas): cuáles de las que faltan facturar YA SE FUERON en el camión. v20.20: la
      lista (no sólo el número) porque el cartel de arriba las nombra. */

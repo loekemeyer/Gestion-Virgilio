@@ -6499,3 +6499,6 @@ Se retira el «tanda · m³ · progreso y nada más» de la v23.92. Columnas: **
 prefijo una vez por empresa (`LK 0101·0102 · 98615`), hasta 2 renglones; el `title` trae la lista completa. La
 columna izquierda pasó a **1,15fr** contra 1fr. `resumirCliente` / `clienteTanda` / `npsCortas` en `monitor/tv.html`.
 **Chequeo:** `node tests/mon-tv.cjs`.
+**v24.92 (Luis): las NP van en UNA línea y, si no entran, ROTAN como cartel de Wall Street** (*"en caso de que haya
+más NPs de las que entran, que empiece a rotar"*). `activarTicker` duplica el texto sólo en la celda que se desborda
+(giro sin salto, ~6 caracteres por segundo); las que entran quedan quietas. Columnas 17/9/26/28 %. Candado en `mon-tv` (E32A con 9 NP rota, E30A no).
