@@ -1802,18 +1802,21 @@ function _pedImpRepHtml(provs, soloPed) {
         '<td>' + (usd > 0 ? fmt(usd) : '—') + '</td>' +
         '<td>' + (cam > 0 ? fmt(cam) + '<small>' + (f || 's/f') + '</small>' : 'No') + '</td></tr>';
     }).join("");
-    cuerpo += '<table><thead><tr><th colspan="4" class="tit">' + escapeHtml(prov) + '</th><th class="tot">' + fmt(tM3, 2) + '</th><th class="tot">' + fmt(tUsd) + '</th><th class="tit"></th></tr>' +
-      '<tr><th>Cód.</th><th>Stk.<small>u</small></th><th>E.M.<small>u/mes</small></th><th>Meses<small>Stk.</small></th><th>m³<small>pedido</small></th><th>u$s<small>pedido</small></th><th>Pedido<small>en curso</small></th></tr></thead><tbody>' + filas + '</tbody></table>';
+    // v24.79 (Luis: «mínima la separación») — UNA tabla: cada proveedor es una fila-rótulo con sus totales
+    cuerpo += '<tbody><tr class="prov"><td colspan="4">' + escapeHtml(prov) + '</td><td>' + fmt(tM3, 2) + '</td><td>' + fmt(tUsd) + '</td><td></td></tr>' + filas + '</tbody>';
   });
   if (!n) return null;
   const hoy = (function () { try { const s = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); return s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(2, 4); } catch (_e) { return ""; } })();
   const css = '@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;margin:0;font-size:15px}' +
-    'h1{font-size:17px;text-align:center;margin:0 0 6px}table{border-collapse:collapse;margin:0 auto 12px}' +
+    'h1{font-size:17px;text-align:center;margin:0 0 4px}table{border-collapse:collapse;margin:0 auto}' +
+    'tr.prov td{font-weight:800;font-size:16px;background:#e5e7eb;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
     'th,td{border:1px solid #444;padding:2px 6px;text-align:center;vertical-align:middle;white-space:nowrap;line-height:1.15;font-size:15px}' +
     'th{font-weight:800}th.tit{font-size:16px;border-left:0;border-right:0}th.tot{font-size:15px}td.al{font-weight:800}' +
     'th small,td small{display:block;font-weight:400;color:#444;font-size:12px}tr{page-break-inside:avoid}thead{display:table-header-group}';
   return '<!doctype html><html><head><meta charset="utf-8"><title>Reporte importados ' + hoy + '</title><style>' + css + '</style></head><body>' +
-    '<h1>Importados · ' + hoy + (soloPed ? ' · sólo lo que genera pedido' : '') + '</h1>' + cuerpo + '</body></html>';
+    '<h1>Importados · ' + hoy + (soloPed ? ' · sólo lo que genera pedido' : '') + '</h1><table><thead>' +
+    '<tr><th>Cód.</th><th>Stk.<small>u</small></th><th>E.M.<small>u/mes</small></th><th>Meses<small>Stk.</small></th><th>m³<small>pedido</small></th><th>u$s<small>pedido</small></th><th>Pedido<small>en curso</small></th></tr></thead>' +
+    cuerpo + '</table></body></html>';
 }
 function pedImpRepImprimir() {
   const provs = Array.prototype.filter.call(document.querySelectorAll("#impRepOv .imp-rep-prov"), function (c) { return c.checked; }).map(function (c) { return c.value; });
@@ -1821,8 +1824,20 @@ function pedImpRepImprimir() {
   const sp = document.getElementById("impRepSoloPed");
   const html = _pedImpRepHtml(provs, !!(sp && sp.checked));
   if (!html) { try { alert("No hay artículos para imprimir con esa selección."); } catch (_e) {} return; }
-  const ov = document.getElementById("impRepOv"); if (ov) ov.remove();
-  _pedImpPrintConFotos(html);
+  pedImpRepVista(html);
+}
+/* v24.79 (Luis) — vista previa antes de imprimir: la misma hoja en un iframe, con «Imprimir» y «Volver». */
+function pedImpRepVista(html) {
+  const ov = document.getElementById("impRepOv"); if (!ov) return;
+  window._pedImpRepHtmlUlt = html;
+  ov.innerHTML = '<style>#impRepOv button{width:auto;margin-top:0}</style>' +
+    '<div class="imp-rep-vista" style="background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.3);padding:10px;display:flex;flex-direction:column;gap:8px;max-height:94vh;width:min(840px,100%)">' +
+    '<div style="display:flex;gap:8px;justify-content:center">' +
+    '<button onclick="pedImpRepAbrir()" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:14px;font-weight:700;cursor:pointer">← Volver</button>' +
+    '<button class="imp-rep-print" onclick="document.getElementById(\'impRepOv\').remove();_pedImpPrintConFotos(window._pedImpRepHtmlUlt)" style="padding:7px 14px;border:1px solid #1e3a8a;border-radius:8px;background:#1e3a8a;color:#fff;font-size:14px;font-weight:800;cursor:pointer">🖨 Imprimir</button>' +
+    '<button onclick="document.getElementById(\'impRepOv\').remove()" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:14px;font-weight:700;cursor:pointer">✕</button></div>' +
+    '<iframe class="imp-rep-prev" style="flex:1 1 auto;width:100%;height:80vh;border:1px solid #cbd5e1;border-radius:6px;background:#fff"></iframe></div>';
+  ov.querySelector("iframe.imp-rep-prev").srcdoc = html;
 }
 /* Imprime en un iframe oculto ESPERANDO las fotos (remitoPrintDoc imprime a los 400 ms y
    saldrían en blanco). Techo de 8 s: una foto que no contesta no traba la impresión. */
