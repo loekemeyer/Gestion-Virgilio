@@ -94,6 +94,10 @@ for (const p of html) {
     // la recepcion y la otra para la fecha del registro de produccion. Otras dos lo tenian como
     // envoltorio de GP2UI.hoyAR, que es una linea de mas. Ninguna de las dos formas va.
     [/function\s+hoy\s*\(/, 'function hoy() propia (usar var hoy = GP2UI.hoyAR)'],
+    // 2026-09-13 (idea 7265): dos pantallas tenian su fechaAR y la de EntregasAT imprimia el ano
+    // en 2 cifras (dd/mm/aa) contra el dd/mm/aaaa del resto. Para un "YYYY-MM-DD" ya resuelto va
+    // GP2UI.fechaAR; para un TIMESTAMP va GP2UI.fechaTsAR, que decide el dia en Argentina.
+    [/function\s+fechaAR\s*\(/, 'function fechaAR() propia (usar GP2UI.fechaAR / GP2UI.fechaTsAR)'],
   ];
   for (const [re, que] of COPIAS) {
     const m = re.exec(txt);

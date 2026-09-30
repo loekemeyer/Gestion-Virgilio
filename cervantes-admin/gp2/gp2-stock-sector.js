@@ -35,7 +35,7 @@
                  un valor de la fila del bundle tal cual (en_virgilio: lo que hay en el
                  deposito de Virgilio de ese sector, 2026-09-11; el detalle son los traslados)
      sin_csv     sin boton "Exportar CSV"
-     sin_min_max sin Maximo/Capacidad, sin KPI "Bajo minimo", sin filtro "Bajo el
+     sin_min_max sin Maximo, sin KPI "Bajo el maximo", sin filtro "Bajo el
                  maximo" y sin aviso de factores
      buscar      placeholder del buscador (si no es el generico)
      mostrar_fleje  columna "N° Fleje" (ninguna de estas la usa; Flejes tiene su
@@ -88,8 +88,8 @@ var SECTORES = {
   /* Sector Movimiento (3): las piezas intermedias entre matrices ("tras M#").
      Fabricado = entradas por produccion/fabricacion (la matriz que las hace).
      Consumido = salidas por produccion/fabricacion (la matriz siguiente).
-     No tienen minimo/maximo (son WIP transitorio, no algo que se repone): el
-     renderer oculta esas columnas, el KPI "Bajo minimo" y el aviso de factores
+     No tienen maximo (son WIP transitorio, no algo que se repone): el
+     renderer oculta esa columna, el KPI "Bajo el maximo" y el aviso de factores
      cuando sin_min_max esta prendido. [usuario 2026-08-31]. Sin CSV ni Recepción. */
   3: { titulo:"Stock en Movimiento", sector_nom:"Sector Movimiento",
        sin_min_max:true, sin_csv:true, links:[],
@@ -108,7 +108,7 @@ var SECTORES = {
   11: { titulo:"Cajas",            sector_nom:"Sector Caja",
         links:[LINK_RECEPCION, ["Control Cajas", "../StockFlejes/control-cajas.html", "destacado"]],
         columnas:COLS_INSUMO },
-  14: { titulo:"Materia Prima Plástica", sector_nom:"Sector Materia Prima Plástica (Virgilio)",
+  14: { titulo:"Bolsas Plásticas", sector_nom:"Sector Bolsas Plásticas (Virgilio)",
         links:[LINK_RECEPCION, ["Inyectores · Material", "../Compras/Inyectores_GP2.html", "destacado"]],
         columnas:COLS_MP }
 };
@@ -237,8 +237,10 @@ function filtradas(){
   });
   if (filtro === "con")  arr = arr.filter(function(x){ return Number(x.online||0) > 0; });
   if (filtro === "sin")  arr = arr.filter(function(x){ return !(Number(x.online||0) > 0); });
+  /* El minimo se borro de la base el 2026-09-14 [usuario: "todo lo que usaba el minimo
+     ahora que use el maximo. es la misma logica"]: "bajo" mide contra el MAXIMO. */
   if (filtro === "bajo") arr = arr.filter(function(x){
-    return x.minimo != null && Number(x.online||0) < Number(x.minimo); });
+    return x.maximo != null && Number(x.online||0) < Number(x.maximo); });
   if (filtro === "mov")  arr = arr.filter(function(x){
     return x.mov && Object.keys(x.mov).length > 0; });
   return arr;
@@ -255,7 +257,7 @@ function render(){
   arr.forEach(function(x){
     var kg = kgDe(x), caj = cajDe(x), uni = Number(x.online||0);
     tKg += (kg||0); tUni += uni;
-    var bajo = x.minimo != null && uni < Number(x.minimo);
+    var bajo = x.maximo != null && uni < Number(x.maximo);
     if (bajo) tBajo++;
     if (x.mov && Object.keys(x.mov).length) tConMov++;
 
@@ -282,7 +284,6 @@ function render(){
       '<td class="num sep">'+(x.kg_x_uni?fmt(x.kg_x_uni,6):"—")+'</td>'+
       '<td class="num">'+(x.uni_x_cajon?fmt(x.uni_x_cajon,0):"—")+'</td>'+
       (CFG.sin_min_max ? "" :
-        '<td class="num">'+(x.minimo!=null?fmt(x.minimo,0):"—")+'</td>'+
         '<td class="num">'+(x.maximo!=null?fmt(x.maximo,0):"—")+'</td>')+
       (CFG.mostrar_fleje ? '<td class="num">'+(x.n_fleje!=null?esc(x.n_fleje):"—")+'</td>' : "");
     tb.appendChild(tr);
@@ -293,7 +294,7 @@ function render(){
     '<div class="kpi"><div class="k">Total uni</div><div class="v">'+fmt(tUni,0)+'</div></div>'+
     '<div class="kpi"><div class="k">Total kg</div><div class="v">'+fmt(tKg,0)+'</div></div>'+
     (CFG.sin_min_max ? "" :
-      '<div class="kpi"><div class="k">Bajo mínimo</div><div class="v '+(tBajo?"neg":"cero")+'">'+tBajo+'</div></div>')+
+      '<div class="kpi"><div class="k">Bajo el máximo</div><div class="v '+(tBajo?"neg":"cero")+'">'+tBajo+'</div></div>')+
     '<div class="kpi"><div class="k">Con movimientos</div><div class="v">'+tConMov+'</div></div>';
 }
 
@@ -353,13 +354,13 @@ function exportarCSV(){
   if (!arr.length){ alert("No hay filas para exportar."); return; }
   var cols = ["Codigo","Descripcion","Kg","Caj","Uni"]
     .concat((CFG.columnas||[]).map(function(c){ return c.label; }))
-    .concat(["Kg x Uni","Uni x Cajon","Minimo","Maximo"]);
+    .concat(["Kg x Uni","Uni x Cajon","Maximo"]);
   if (CFG.mostrar_fleje) cols.push("N Fleje");
   var filas = [cols];
   arr.forEach(function(x){
     var f = [x.cod||"", x["desc"]||"", kgDe(x), cajDe(x), x.online]
       .concat((CFG.columnas||[]).map(function(c){ return valorCol(x,c); }))
-      .concat([x.kg_x_uni, x.uni_x_cajon, x.minimo, x.maximo]);
+      .concat([x.kg_x_uni, x.uni_x_cajon, x.maximo]);
     if (CFG.mostrar_fleje) f.push(x.n_fleje);
     filas.push(f);
   });
@@ -371,7 +372,7 @@ function exportarCSV(){
    depende de la config de cada pantalla. */
 function renderHead(){
   var cols = CFG.columnas || [];
-  var nInfo = (CFG.sin_min_max ? 2 : 4) + (CFG.mostrar_fleje ? 1 : 0);
+  var nInfo = (CFG.sin_min_max ? 2 : 3) + (CFG.mostrar_fleje ? 1 : 0);
   $("thead").innerHTML =
     '<tr>'+
       '<th colspan="2">Base</th>'+
@@ -386,13 +387,15 @@ function renderHead(){
         return '<th class="num'+(i===0?" sep":"")+'" title="Tocá una celda para ver el detalle">'+esc(c.label)+'</th>';
       }).join("")+
       '<th class="num sep">Kg × Uni</th><th class="num">Uni × Cajón</th>'+
-      /* "Máximo" = lo que TENDRIA QUE HABER en esta ubicacion segun la demanda
-         (consumo mensual x los meses de la ubicacion). Se llamaba "Mínimo"
-         [usuario 2026-09-03: "el minimo/maximo es lo que tendria que haber en
-         cada ubicacion/sector segun la demanda"] — no es un piso, es el nivel
-         objetivo. La de al lado es otra cosa: la CAPACIDAD FISICA del lugar
-         (5 cajones en crudo/procesado), por eso ya no se llama "Máximo". */
-      (CFG.sin_min_max ? "" : '<th class="num">Máximo</th><th class="num">Capacidad</th>')+
+      /* "Máximo" = lo que TENDRIA QUE HABER en esta ubicacion [usuario 2026-09-03:
+         "el minimo/maximo es lo que tendria que haber en cada ubicacion/sector segun
+         la demanda"] — no es un piso, es el nivel objetivo, y es contra el que se pide.
+         HASTA EL 2026-09-14 ACA HABIA DOS COLUMNAS y los nombres estaban cruzados:
+         "Máximo" mostraba inventario.minimo y "Capacidad" mostraba inventario.maximo.
+         El dueno borro el minimo ("la orden de compra tiene que disparar segun el
+         maximo"), asi que queda UN solo numero: inventario.maximo. De donde sale cada
+         valor (demanda, capacidad fisica de 5 cajones, etc.) lo dice maximo_origen. */
+      (CFG.sin_min_max ? "" : '<th class="num">Máximo</th>')+
       (CFG.mostrar_fleje ? '<th class="num">N° Fleje</th>' : "")+
     '</tr>';
 }

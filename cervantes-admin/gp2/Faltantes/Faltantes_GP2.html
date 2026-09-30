@@ -1,15 +1,22 @@
 <!doctype html>
 <html lang="es">
 <head>
-<!-- v1.0.0 — Faltantes automaticos por stock online (5 cajones por ubicacion) + marcas manuales persistidas -->
+<!-- v1.1.0 — Faltantes automaticos por stock online (faltante = stock menor al maximo; maximo = consumo x meses, tope 5 cajones) + marcas manuales persistidas -->
 <meta charset="utf-8"/>
+<script src="../auth-guard.js?v=20260929a"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<!-- Anti-cache: el JS/CSS de esta pantalla vive embebido y se navega directo desde el menu
+     (sin ?v= propio). Sin estos meta una copia cacheada del HTML deja la version vieja. Mismo
+     agujero que se tapo en GP2_MODULOS.html, envios-only.html y Programa/Programa.html. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Faltantes · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../supabase-config.js?v=20260905k"></script>
-<script src="../gp2-ui.js?v=20260912a"></script>
+<script src="../supabase-config.js?v=20260929a"></script>
+<script src="../gp2-ui.js?v=20260913e"></script>
 <script src="../gp2-numero.js?v=20260911o"></script>
-<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260912c"/>
 <link rel="icon" type="image/png" href="../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../GP2_favicon.png">
 <style>
@@ -82,7 +89,7 @@ table.t tr.r-marca td{background:#fffbeb}
           <th class="num">Stock</th>
           <th class="num">Consumo<br>/mes</th>
           <th class="num">Alcanza</th>
-          <th class="num sep">Máximo<br>(<span id="thMaxCaj">5</span> caj)</th>
+          <th class="num sep">Máximo</th>
           <th class="num">Llena<br>alcanza</th>
           <th>Marcas</th>
         </tr></thead>
@@ -126,7 +133,6 @@ async function cargar(){
   var r = await SB.rpc("faltantes_estado_bundle");
   if (r.error){ $("status").textContent = "Error: " + r.error.message; return; }
   D = r.data || D;
-  $("thMaxCaj").textContent = fmt(D.max_cajones, 0);
   render();
 }
 
@@ -176,8 +182,8 @@ function render(){
     var stockHtml = fmt(x.stock, 0) + " uni" +
       (x.caj_stock != null ? '<br><small class="sub">' + fmt(x.caj_stock, 2) + " caj</small>" : "");
     if (esFalt){
-      stockHtml += '<br><span class="pill-falt">menos de ' + fmt(D.umbral_cajones, 0) +
-        (Number(D.umbral_cajones) === 1 ? " cajón" : " cajones") + ": " + fmt(x.stock, 0) + " uni</span>";
+      stockHtml += '<br><span class="pill-falt">bajo el máximo: faltan ' +
+        fmt(Math.max(0, Number(x.maximo) - Number(x.stock)), 0) + " uni</span>";
     }
 
     var alcanzaHtml = (x.cob_dias == null)
@@ -185,7 +191,7 @@ function render(){
       : '<span class="dias' + (Number(x.cob_dias) < 30 ? " rojo" : " verde") + '">' + fmt(x.cob_dias, 1) + ' días</span>';
 
     var maxHtml = (x.maximo == null)
-      ? '—<br><small class="sub">sin uni×cajón</small>'
+      ? '—<br><small class="sub">sin consumo</small>'
       : fmt(x.maximo, 0) + ' uni';
 
     var llenaHtml = (x.cob_llena_dias == null) ? "—"
@@ -217,9 +223,9 @@ function render(){
   var pend = (D.pendientes_uxc||[]).filter(function(p){ return p.sector_id === tab; });
   $("avisoUxc").classList.toggle("hidden", !pend.length);
   if (pend.length){
-    $("avisoUxc").innerHTML = "<b>Sin uni×cajón (máximo pendiente):</b> " +
+    $("avisoUxc").innerHTML = "<b>Sin uni×cajón (el máximo no se puede topear a 5 cajones):</b> " +
       pend.map(function(p){ return "<code>" + esc(p.cod) + "</code> " + esc(p["desc"] || ""); }).join(" · ") +
-      " — cargar el dato para que entren al cálculo de 5 cajones.";
+      " — cargar el dato para que el tope aplique.";
   }
 }
 

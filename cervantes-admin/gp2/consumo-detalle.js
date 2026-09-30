@@ -1,9 +1,15 @@
 /* consumo-detalle.js — el sustento del consumo, tocable.
-   Donde una pantalla muestra un consumo mensual (Pintores, OC, Punto de Stock),
-   tocarlo abre este popup con el desglose POR ARTICULO: que articulos usan la
-   parte, cuanto proyecta la Est Madre de cada uno y cuanto le toca a la parte.
+   Donde una pantalla muestra un consumo mensual (Consumo x Componente, Pintores,
+   Orden de Produccion), tocarlo abre este popup con el desglose POR ARTICULO: que
+   articulos usan la parte, cuanto proyecta la Est Madre de cada uno y cuanto le
+   toca a la parte.
    Lee la RPC GP2.consumo_detalle(p_comp_id), que sale de v_consumo_demanda
    (la demanda atribuida articulo por articulo, no el total del primer nodo).
+
+   RESINA (2026-09-21): una resina no esta en ninguna receta, asi que por articulos
+   el popup quedaba mudo. Su sustento son las PIEZAS que se inyectan con ella
+   (base = 'piezas'), con el desperdicio ya sumado — la misma cuenta del maximo
+   de la O.C. (oc_maximo_desglose).
 
    Uso: GP2ConsumoDetalle.abrir(SB, compId)
    - SB: el cliente supabase de la pagina (creado con schema GP2).
@@ -48,29 +54,64 @@ window.GP2ConsumoDetalle = (function () {
     if (o) o.remove();
   }
 
+  /* Barra proporcional: el renglon mas grande manda. */
+  function barra(v, max) {
+    var ancho = max > 0 && v != null ? Math.max(2, Math.round(v / max * 100)) : 0;
+    return ancho ? "<div class='cd-bar' style='width:" + ancho + "%'></div>" : "";
+  }
+
+  /* Rama RESINA: el sustento son las piezas inyectadas con ella, no articulos. */
+  function cuerpoResina(d) {
+    var pzs = d.piezas || [];
+    var max = 0;
+    pzs.forEach(function (p) { if (p.kg_mes > max) max = p.kg_mes; });
+    if (!pzs.length) {
+      return "<div class='cd-vacio'>Ninguna pieza está declarada con esta resina como material: no hay consumo que sustentar.</div>";
+    }
+    var filas = pzs.map(function (p) {
+      return "<tr>" +
+        "<td><b>" + esc(p.codigo) + "</b> <span class='cd-via'>" + esc(p.descripcion || "") + "</span>" +
+          barra(p.kg_mes, max) + "</td>" +
+        "<td class='num'>" + fmt(p.uni_mes) + "</td>" +
+        "<td class='num'><b>" + fmt(p.kg_mes, 2) + " kg</b></td>" +
+      "</tr>";
+    }).join("");
+    return "<table><thead><tr><th>Pieza que se inyecta con ella</th>" +
+           "<th style='text-align:right'>Piezas<br>uni/mes</th>" +
+           "<th style='text-align:right'>Le pide<br>kg/mes</th></tr></thead><tbody>" + filas + "</tbody></table>";
+  }
+
   function render(d) {
     cerrar();
-    var esFleje = !!d.es_fleje;
+    var esFleje = !!d.es_fleje, esResina = !!d.es_resina;
     var arts = d.articulos || [];
     var max = 0;
     arts.forEach(function (a) { var v = esFleje ? a.kg_mes : a.uni_mes; if (v > max) max = v; });
 
     var filas = arts.map(function (a) {
       var v = esFleje ? a.kg_mes : a.uni_mes;
-      var ancho = max > 0 && v != null ? Math.max(2, Math.round(v / max * 100)) : 0;
       return "<tr>" +
         "<td><b>" + esc(a.articulo) + "</b> <span class='cd-via'>" + esc(a.familia || "") +
           (a.receta_directa ? " · en receta" : " · vía ruta") + "</span>" +
-          (ancho ? "<div class='cd-bar' style='width:" + ancho + "%'></div>" : "") + "</td>" +
+          barra(v, max) + "</td>" +
         "<td class='num'>" + fmt(a.proy_uni_mes) + "</td>" +
         "<td class='num'><b>" + (esFleje ? fmt(a.kg_mes, 1) + " kg" : fmt(a.uni_mes)) + "</b></td>" +
       "</tr>";
     }).join("");
 
-    var total = esFleje
+    var total = esResina
+      ? fmt(d.total_kg_mes, 2) + " kg/mes" +
+        (d.desperdicio_pct != null ? " (desperdicio " + fmt(d.desperdicio_pct, 0) + "% incluido)" : "")
+      : esFleje
       ? fmt(d.total_kg_mes, 1) + " kg/mes (" + fmt(d.total_uni_mes) + " piezas)"
       : fmt(d.total_uni_mes) + " uni/mes" +
         (d.uni_x_cajon ? " · " + fmt(d.total_uni_mes / d.uni_x_cajon, 1) + " cajones" : "");
+
+    var cuerpo = esResina
+      ? cuerpoResina(d)
+      : (arts.length
+          ? "<table><thead><tr><th>Artículo que lo usa</th><th style='text-align:right'>Proyección<br>art/mes</th><th style='text-align:right'>Le pide<br>" + (esFleje ? "kg" : "uni") + "/mes</th></tr></thead><tbody>" + filas + "</tbody></table>"
+          : "<div class='cd-vacio'>Ningún artículo de la Est Madre llega a esta parte por las rutas: no hay consumo que sustentar.</div>");
 
     var o = document.createElement("div");
     o.id = "cdOverlay";
@@ -79,9 +120,7 @@ window.GP2ConsumoDetalle = (function () {
         "<h3>" + esc(d.codigo || "—") + " — ¿de dónde sale el consumo?</h3>" +
         "<div class='cd-sub'>" + esc(d.descripcion || "") + " · " + esc(d.sector || "") + "</div>" +
         "<div class='cd-total'>Total: " + total + "</div>" +
-        (arts.length
-          ? "<table><thead><tr><th>Artículo que lo usa</th><th style='text-align:right'>Proyección<br>art/mes</th><th style='text-align:right'>Le pide<br>" + (esFleje ? "kg" : "uni") + "/mes</th></tr></thead><tbody>" + filas + "</tbody></table>"
-          : "<div class='cd-vacio'>Ningún artículo de la Est Madre llega a esta parte por las rutas: no hay consumo que sustentar.</div>") +
+        cuerpo +
         "<button type='button' class='cd-cerrar'>Cerrar</button>" +
       "</div>";
     o.addEventListener("click", function (e) { if (e.target === o) cerrar(); });

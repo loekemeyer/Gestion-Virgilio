@@ -1,8 +1,56 @@
 -- =====================================================================
 -- VISTAS del schema GP2 (pg_get_viewdef, exacto) — export automatico 2026-09-11 desde Supabase (hrxfctzncixxqmpfhskv)
 -- Respaldo/referencia. La fuente de verdad es la base; regenerar al cambiar el schema.
--- 18 vistas. Orden de creacion: las que dependen de otra van despues.
+-- 32 vistas (2026-09-26: + v_oc_virgilio_pendiente, v_oc_virgilio_partes, v_oc_virgilio_demanda, v_oc_virgilio_partes_tallerista; el orden de dependencia es pendiente -> demanda -> partes_tallerista). Orden de creacion: las que dependen de otra van despues.
 -- =====================================================================
+
+-- ---------- v_caj_contraparte ----------
+create or replace view "GP2".v_caj_contraparte as
+ WITH ing AS (
+         SELECT m.ubic_destino_id AS ubicacion_id,
+            m.comp_id AS componente_id,
+            sum(COALESCE(m._delta_dest, 0::numeric)) AS uni,
+            sum(m.cajones) AS cajones,
+            count(*) AS n_envios,
+            max(m.fecha) AS ultimo
+           FROM "GP2".movimiento m
+             JOIN "GP2".ubicacion u ON u.id = m.ubic_destino_id
+          WHERE (u.tipo = ANY (ARRAY['proveedor_servicio'::text, 'tallerista'::text])) AND m.comp_transformado_id IS NULL AND COALESCE(m.cajones, 0::numeric) > 0::numeric AND COALESCE(m._delta_dest, 0::numeric) > 0::numeric
+          GROUP BY m.ubic_destino_id, m.comp_id
+        )
+ SELECT ubicacion_id,
+    componente_id,
+    uni,
+    cajones,
+    n_envios,
+    ultimo,
+    uni / cajones AS uni_x_cajon_anotado
+   FROM ing;
+comment on view "GP2".v_caj_contraparte is 'CUANTO MIDE EL CAJON QUE ANOTO LOGISTICA, por (ubicacion de la contraparte, componente). uni_x_cajon_anotado = unidades enviadas / cajones anotados en movimiento.cajones, sobre los envios a esa contraparte de esa pieza. Sirve para decir el stock en poder del tercero EN LOS CAJONES QUE SE MANDARON y no en el cajon teorico de componente.uni_x_cajon [usuario 2026-09-21: "tiene que aparecer en su stock los cajones que escribe logistica, no los que se calcula a partir de los kg"]. Caso que lo motivo: CV1 a Guazzaroni, 1 cajon de 21 kg anotado contra un uni_x_cajon de 20 kg -> la recepcion decia 1,05 cajones. Solo mira movimientos con cajones anotados (> 0): donde nadie los anota (hoy los talleristas, que no tienen p_cajones) no hay fila y el que consulta cae al cajon del maestro.';
+
+-- ---------- v_carton_sustituto_saldo ----------
+create or replace view "GP2".v_carton_sustituto_saldo as
+ WITH mov AS (
+         SELECT COALESCE(m.ubic_destino_id, m.ubic_origen_id) AS ubicacion_id,
+            m.sustituye_comp_id AS oficial_id,
+            m.comp_id AS sustituto_id,
+                CASE
+                    WHEN m.tipo_mov = ANY (ARRAY['envio_prov_at'::text, 'envio_tallerista'::text]) THEN m.cantidad
+                    ELSE - m.cantidad
+                END AS q,
+            m.fecha
+           FROM "GP2".movimiento m
+          WHERE m.sustituye_comp_id IS NOT NULL
+        )
+ SELECT ubicacion_id,
+    oficial_id,
+    sustituto_id,
+    sum(q) AS saldo,
+    min(fecha) AS desde
+   FROM mov
+  GROUP BY ubicacion_id, oficial_id, sustituto_id
+ HAVING sum(q) > 0::numeric;
+comment on view "GP2".v_carton_sustituto_saldo is 'Cartones sustitutos con saldo sin consumir, por ubicacion de destino. Lo usa recepcion_virgilio: al recibir el articulo terminado gasta primero el sustituto y el resto el carton oficial. Sale del ledger (movimiento.sustituye_comp_id), no de una tabla aparte.';
 
 -- ---------- v_consumo_componente ----------
 create or replace view "GP2".v_consumo_componente as
@@ -23,10 +71,18 @@ comment on view "GP2".v_consumo_componente is 'Consumo uni/mes por componente, t
 create or replace view "GP2".v_consumo_demanda as
  WITH RECURSIVE dem AS (
          SELECT a.id AS art_id,
-            em.proy_uni_mes AS uni
+            sum(em.proy_uni_mes) AS uni
            FROM "GP2".articulo a
-             JOIN "GP2".est_madre em ON regexp_replace(em.cod, '^0+'::text, ''::text) = regexp_replace(a.codigo, '^0+'::text, ''::text)
-          WHERE em.proy_uni_mes IS NOT NULL AND NOT a.discontinuado
+             JOIN LATERAL ( SELECT regexp_replace(a.codigo, '^0+'::text, ''::text) AS k
+                UNION
+                 SELECT regexp_replace(f.cod_secundario, '^0+'::text, ''::text) AS regexp_replace
+                   FROM "GP2".articulo_familia f
+                  WHERE regexp_replace(f.cod_principal, '^0+'::text, ''::text) = regexp_replace(a.codigo, '^0+'::text, ''::text)) k ON true
+             JOIN "GP2".est_madre em ON regexp_replace(regexp_replace(em.cod, 'L$'::text, ''::text), '^0+'::text, ''::text) = k.k
+          WHERE em.proy_uni_mes IS NOT NULL AND NOT a.discontinuado AND NOT (EXISTS ( SELECT 1
+                   FROM "GP2".articulo_familia f2
+                  WHERE regexp_replace(f2.cod_secundario, '^0+'::text, ''::text) = regexp_replace(a.codigo, '^0+'::text, ''::text)))
+          GROUP BY a.id
         ), receta AS (
          SELECT ac.articulo_id AS art_id,
             ac.componente_id AS comp_id,
@@ -81,23 +137,77 @@ create or replace view "GP2".v_consumo_fleje_kg as
          SELECT DISTINCT r.articulo_id AS art_id,
             rp.comp_entrada_id AS fleje_id,
             rp.comp_salida_id AS sal,
-            m.partes_por_kilo_de_fleje AS ppk
+            m.partes_por_kilo_de_fleje AS ppk,
+            NULL::numeric AS kgxuni
            FROM "GP2".ruta_paso rp
              JOIN "GP2".ruta r ON r.id = rp.ruta_id
              JOIN "GP2".componente ce ON ce.id = rp.comp_entrada_id AND ce.sector_id = 5
              JOIN "GP2".matriz m ON m.id = rp.matriz_id
           WHERE r.articulo_id IS NOT NULL AND rp.comp_salida_id IS NOT NULL AND COALESCE(m.partes_por_kilo_de_fleje, 0::numeric) > 0::numeric
+        UNION ALL
+         SELECT DISTINCT r.articulo_id,
+            rp.comp_entrada_id,
+            rp.comp_salida_id,
+            NULL::numeric AS "numeric",
+                CASE
+                    WHEN ce.unidad_medida = 'kg'::text AND ce.kg_x_uni = 1::numeric AND COALESCE(cs.kg_x_uni, 0::numeric) > 0::numeric THEN cs.kg_x_uni
+                    ELSE ce.kg_x_uni
+                END AS kg_x_uni
+           FROM "GP2".ruta_paso rp
+             JOIN "GP2".ruta r ON r.id = rp.ruta_id
+             JOIN "GP2".componente ce ON ce.id = rp.comp_entrada_id AND ce.sector_id = 5
+             JOIN "GP2".componente cs ON cs.id = rp.comp_salida_id
+             LEFT JOIN "GP2".matriz m ON m.id = rp.matriz_id
+          WHERE r.articulo_id IS NOT NULL AND rp.comp_salida_id IS NOT NULL AND rp.comp_salida_id <> rp.comp_entrada_id AND rp.tipo_paso <> 'ingreso'::text AND COALESCE(m.partes_por_kilo_de_fleje, 0::numeric) = 0::numeric AND COALESCE(ce.kg_x_uni, 0::numeric) > 0::numeric
         )
  SELECT f.id AS componente_id,
     f.codigo,
     f.descripcion,
-    round(sum(d.uni_mes / p.ppk), 1) AS consumo_kg_mes,
+    round(sum(
+        CASE
+            WHEN p.ppk IS NOT NULL THEN d.uni_mes / p.ppk
+            ELSE d.uni_mes * p.kgxuni
+        END), 1) AS consumo_kg_mes,
     count(*) AS piezas
    FROM paso p
      JOIN "GP2".v_consumo_demanda d ON d.articulo_id = p.art_id AND d.componente_id = p.sal
      JOIN "GP2".componente f ON f.id = p.fleje_id
   GROUP BY f.id, f.codigo, f.descripcion;
 comment on view "GP2".v_consumo_fleje_kg is 'Kg/mes de fleje. Igual que v_consumo_fleje_kg pero tomando la demanda atribuida por articulo (v_consumo_demanda) en vez del consumo entero del primer nodo aguas abajo.';
+
+-- ---------- v_consumo_prov_at ----------
+create or replace view "GP2".v_consumo_prov_at as
+ SELECT re.proveedor_at_id,
+    ac.componente_id,
+    sum(d.uni_mes * re.pct / 100::numeric) AS uni_mes,
+    bool_or(re.es_supuesto) AS tiene_supuesto
+   FROM "GP2".v_reparto_at_efectivo re
+     JOIN "GP2".articulo_componente ac ON ac.articulo_id = re.articulo_id
+     JOIN "GP2".componente c ON c.id = ac.componente_id AND (c.sector_id = ANY (ARRAY[10::bigint, 11::bigint])) AND NOT COALESCE(c.discontinuado, false)
+     JOIN "GP2".v_consumo_demanda d ON d.articulo_id = re.articulo_id AND d.componente_id = ac.componente_id
+  GROUP BY re.proveedor_at_id, ac.componente_id;
+comment on view "GP2".v_consumo_prov_at is 'Consumo uni/mes de carton y caja por (prov AT, componente), con la demanda del articulo repartida por v_reparto_at_efectivo. El espejo de v_consumo_tallerista para el proveedor de articulo terminado.';
+
+-- ---------- v_consumo_tallerista ----------
+create or replace view "GP2".v_consumo_tallerista as
+ WITH pasos AS (
+         SELECT DISTINCT r.articulo_id,
+            rp.comp_entrada_id,
+            rp.comp_salida_id,
+            rp.tallerista_id
+           FROM "GP2".ruta_paso rp
+             JOIN "GP2".ruta r ON r.id = rp.ruta_id
+          WHERE rp.tallerista_id IS NOT NULL AND rp.comp_entrada_id IS NOT NULL AND r.articulo_id IS NOT NULL
+        )
+ SELECT p.tallerista_id,
+    p.comp_entrada_id AS componente_id,
+    sum(d.uni_mes * re.pct / 100::numeric) AS uni_mes,
+    bool_or(re.es_supuesto) AS tiene_supuesto
+   FROM pasos p
+     JOIN "GP2".v_consumo_demanda d ON d.articulo_id = p.articulo_id AND d.componente_id = p.comp_entrada_id
+     JOIN "GP2".v_reparto_efectivo re ON re.articulo_id = p.articulo_id AND re.comp_salida_id = p.comp_salida_id AND re.tallerista_id = p.tallerista_id
+  GROUP BY p.tallerista_id, p.comp_entrada_id;
+comment on view "GP2".v_consumo_tallerista is 'Consumo uni/mes por (tallerista, componente que recibe), con la demanda del articulo repartida por v_reparto_efectivo. El equivalente de v_consumo_componente pero del lado del tallerista.';
 
 -- ---------- v_contraparte_parte ----------
 create or replace view "GP2".v_contraparte_parte as
@@ -130,12 +240,37 @@ UNION
   WHERE rp.tipo_paso = 'tallerista'::text AND rp.tallerista_id IS NOT NULL AND rp.comp_salida_id IS NOT NULL;
 comment on view "GP2".v_contraparte_parte is 'Que componente ENTRA (lado=entrada: se le manda) y SALE (lado=salida: devuelve hecho) por cada contraparte (tipo + ref_id), derivado de ruta_paso. Unica definicion (2026-09-05).';
 
+-- ---------- v_componente_muerto ----------
+-- Un componente esta MUERTO cuando pertenece a algun articulo DISCONTINUADO (por ruta o receta)
+-- y NO pertenece a ningun articulo ACTIVO (ni por ruta ni por receta). Si se usa en un activo,
+-- no aparece aca y se conserva. [2026-09-24, dueno: la regla vale para insumo, prov AT, prov
+-- servicio y tallerista, envio y recepcion; del programa no se hace nada mas con estos componentes.]
+create or replace view "GP2".v_componente_muerto as
+ SELECT id AS comp_id
+   FROM "GP2".componente c
+  WHERE ((EXISTS ( SELECT 1
+           FROM "GP2".ruta_paso rp
+             JOIN "GP2".ruta r ON r.id = rp.ruta_id
+             JOIN "GP2".articulo a ON a.id = r.articulo_id
+          WHERE a.discontinuado AND (rp.comp_entrada_id = c.id OR rp.comp_salida_id = c.id))) OR (EXISTS ( SELECT 1
+           FROM "GP2".articulo_componente ac
+             JOIN "GP2".articulo a ON a.id = ac.articulo_id
+          WHERE a.discontinuado AND ac.componente_id = c.id))) AND NOT (EXISTS ( SELECT 1
+           FROM "GP2".ruta_paso rp
+             JOIN "GP2".ruta r ON r.id = rp.ruta_id
+             JOIN "GP2".articulo a ON a.id = r.articulo_id
+          WHERE NOT COALESCE(a.discontinuado, false) AND (rp.comp_entrada_id = c.id OR rp.comp_salida_id = c.id))) AND NOT (EXISTS ( SELECT 1
+           FROM "GP2".articulo_componente ac
+             JOIN "GP2".articulo a ON a.id = ac.articulo_id
+          WHERE NOT COALESCE(a.discontinuado, false) AND ac.componente_id = c.id));
+comment on view "GP2".v_componente_muerto is 'Componentes que solo pertenecen a articulos discontinuados (ni ruta ni receta de un activo los usa). Los bundles de envio/recepcion/OC (tallerista, PS, prov AT, insumos, tablet) los excluyen para que no se pueda operar con ellos. 2026-09-24.';
+
 -- ---------- v_control_pallet ----------
 create or replace view "GP2".v_control_pallet as
  WITH p AS (
          SELECT max(parametro.valor) FILTER (WHERE parametro.clave = 'tara_pallet_min'::text) AS tmin,
             max(parametro.valor) FILTER (WHERE parametro.clave = 'tara_pallet_max'::text) AS tmax,
-            max(parametro.valor) FILTER (WHERE parametro.clave = 'tol_ctrl_peso_pct'::text) AS tolpct
+            max(parametro.valor) FILTER (WHERE parametro.clave = 'tol_ctrl_pct'::text) AS tolpct
            FROM "GP2".parametro
         ), r AS (
          SELECT recepcion_control_rollo.control_id,
@@ -160,7 +295,7 @@ create or replace view "GP2".v_control_pallet as
         CASE
             WHEN COALESCE(pi.modo_control, 'ninguno'::text) = 'peso_total'::text THEN
             CASE
-                WHEN abs(ctl.peso_balanza - ri.cantidad) <= GREATEST(ri.cantidad * COALESCE(p.tolpct, 2::numeric) / 100.0, 0.5) THEN 'ok'::text
+                WHEN abs(ctl.peso_balanza - ri.cantidad) <= GREATEST(ri.cantidad * COALESCE(p.tolpct, 5::numeric) / 100.0, 0.5) THEN 'ok'::text
                 ELSE 'peso distinto al remito'::text
             END
             WHEN COALESCE(r.rollos, 0::bigint) = 0 THEN 'sin rollos cargados'::text
@@ -266,6 +401,21 @@ create or replace view "GP2".v_costo_componente as
             max(w.kg_ref) AS kg_ref
            FROM w
           GROUP BY w.comp_id, w.ent, w.sal, w.tipo_paso, w.matriz_id, w.proveedor_id
+        ), insumo_por_art AS (
+         SELECT x.art_id,
+            x.insumo_id,
+            max(x.cantidad) AS cantidad
+           FROM ( SELECT rp_ins.comp_entrada_id AS insumo_id,
+                    rp_ins.cantidad,
+                    ( SELECT rp2.comp_salida_id
+                           FROM "GP2".ruta_paso rp2
+                          WHERE rp2.ruta_id = rp_ins.ruta_id AND rp2.comp_salida_id IS NOT NULL AND rp2.tipo_paso <> 'virgilio'::text
+                          ORDER BY rp2.orden DESC
+                         LIMIT 1) AS art_id
+                   FROM "GP2".ruta_paso rp_ins
+                  WHERE rp_ins.tipo_paso = 'insumo'::text AND rp_ins.comp_entrada_id IS NOT NULL) x
+          WHERE x.art_id IS NOT NULL
+          GROUP BY x.art_id, x.insumo_id
         ), mat AS (
          SELECT x.comp_id,
             COALESCE(sum(x.val) FILTER (WHERE x.moneda = 'USD'::text), 0::numeric) AS usd,
@@ -277,11 +427,12 @@ create or replace view "GP2".v_costo_componente as
                     cb_1.moneda,
                         CASE
                             WHEN cb_1.sector_id = 5 THEN cb_1.precio * COALESCE(wd.kg_ref, 1::numeric / NULLIF(m.partes_por_kilo_de_fleje, 0::numeric))
-                            ELSE cb_1.precio
+                            ELSE cb_1.precio * LEAST(COALESCE(ipa.cantidad, 1::numeric), 1::numeric)
                         END AS val
                    FROM wd
                      JOIN comprado cb_1 ON cb_1.id = wd.ent
-                     LEFT JOIN "GP2".matriz m ON m.id = wd.matriz_id) x
+                     LEFT JOIN "GP2".matriz m ON m.id = wd.matriz_id
+                     LEFT JOIN insumo_por_art ipa ON ipa.art_id = wd.comp_id AND ipa.insumo_id = wd.ent) x
           GROUP BY x.comp_id
         ), lab AS (
          SELECT y.comp_id,
@@ -346,21 +497,6 @@ create or replace view "GP2".v_costo_componente as
                    FROM edges e
                   WHERE e.ent = b.componente_hijo_id AND e.sal = b.componente_padre_id))
           GROUP BY b.componente_padre_id
-        ), insumo_por_art AS (
-         SELECT x.art_id,
-            x.insumo_id,
-            max(x.cantidad) AS cantidad
-           FROM ( SELECT rp_ins.comp_entrada_id AS insumo_id,
-                    rp_ins.cantidad,
-                    ( SELECT rp2.comp_salida_id
-                           FROM "GP2".ruta_paso rp2
-                          WHERE rp2.ruta_id = rp_ins.ruta_id AND rp2.comp_salida_id IS NOT NULL AND rp2.tipo_paso <> 'virgilio'::text
-                          ORDER BY rp2.orden DESC
-                         LIMIT 1) AS art_id
-                   FROM "GP2".ruta_paso rp_ins
-                  WHERE rp_ins.tipo_paso = 'insumo'::text AND rp_ins.comp_entrada_id IS NOT NULL) x
-          WHERE x.art_id IS NOT NULL
-          GROUP BY x.art_id, x.insumo_id
         ), insumox AS (
          SELECT y.art_id AS comp_id,
             COALESCE(sum(
@@ -528,7 +664,7 @@ create or replace view "GP2".v_faltante_estado as
             WHEN COALESCE(cp.consumo_uni_mes, 0::numeric) > 0::numeric AND i.maximo IS NOT NULL THEN round(i.maximo / (cp.consumo_uni_mes / 30.0), 1)
             ELSE NULL::numeric
         END AS cobertura_llena_dias,
-    c.uni_x_cajon > 0::numeric AND i.cantidad < (u2.caj * c.uni_x_cajon) AS faltante_auto,
+    ((i.maximo IS NOT NULL) AND (i.cantidad < i.maximo)) AS faltante_auto,
     u2.caj AS umbral_cajones,
     COALESCE(cp.consumo_uni_mes, 0::numeric) > 0::numeric AND i.maximo IS NOT NULL AND (i.maximo / (cp.consumo_uni_mes / 30.0)) < 30::numeric AS ubicacion_corta
    FROM "GP2".componente c
@@ -537,6 +673,36 @@ create or replace view "GP2".v_faltante_estado as
      LEFT JOIN "GP2".v_consumo_componente cp ON cp.componente_id = c.id
      CROSS JOIN umbral u2
   WHERE c.sector_id = ANY (ARRAY[1::bigint, 2::bigint]);
+comment on view "GP2".v_faltante_estado is 'Faltantes de Crudo/Procesado. faltante_auto = stock < maximo (usuario 2026-09-29; antes < 1 cajon). ubicacion_corta = el maximo no cubre 30 dias de consumo (con el tope de 5 cajones pasa en las piezas de mucho consumo).';
+
+-- ---------- v_hace_articulo ----------
+create or replace view "GP2".v_hace_articulo as
+ SELECT DISTINCT r.articulo_id,
+    'proveedor_at'::text AS tipo,
+    rp.proveedor_at_id AS ref_id
+   FROM "GP2".ruta_paso rp
+     JOIN "GP2".ruta r ON r.id = rp.ruta_id
+  WHERE rp.tipo_paso = 'proveedor_at'::text AND rp.proveedor_at_id IS NOT NULL AND r.articulo_id IS NOT NULL AND (EXISTS ( SELECT 1
+           FROM "GP2".proveedor_at p
+          WHERE p.id = rp.proveedor_at_id AND COALESCE(p.activo, true)))
+UNION
+ SELECT DISTINCT a.id AS articulo_id,
+    'proveedor_at'::text AS tipo,
+    apa.proveedor_at_id AS ref_id
+   FROM "GP2".articulo_prov_at apa
+     JOIN "GP2".articulo a ON a.codigo = apa.cod_art
+  WHERE COALESCE(apa.activo, true) AND NOT COALESCE(a.discontinuado, false) AND (EXISTS ( SELECT 1
+           FROM "GP2".proveedor_at p
+          WHERE p.id = apa.proveedor_at_id AND COALESCE(p.activo, true)))
+UNION
+ SELECT DISTINCT r.articulo_id,
+    'tallerista'::text AS tipo,
+    rp.tallerista_id AS ref_id
+   FROM "GP2".ruta_paso rp
+     JOIN "GP2".ruta r ON r.id = rp.ruta_id
+     JOIN "GP2".componente c ON c.id = rp.comp_salida_id AND c.sector_id = 12
+  WHERE rp.tipo_paso = 'tallerista'::text AND rp.tallerista_id IS NOT NULL AND r.articulo_id IS NOT NULL;
+comment on view "GP2".v_hace_articulo is 'Quien produce o entrega el ARTICULO TERMINADO: prov AT (por su paso de ruta o por el padron articulo_prov_at) y tallerista (paso cuya salida es sector 12). Es el denominador del reparto: "mas de un prov AT o tallerista que haga un articulo" [usuario 2026-09-23].';
 
 -- ---------- v_material_inyector ----------
 create or replace view "GP2".v_material_inyector as
@@ -646,32 +812,254 @@ create or replace view "GP2".v_nivel_stock as
     c.sector_id,
     COALESCE(
         CASE
-            WHEN c.sector_id = 5 THEN fk.consumo_kg_mes
+            WHEN c.sector_id = 5 AND c.unidad_medida = 'kg'::text THEN fk.consumo_kg_mes
             ELSE cp.consumo_uni_mes
         END, 0::numeric) AS consumo_mes,
     u.meses_stock,
-    u.meses_minimo,
     round(COALESCE(
         CASE
-            WHEN c.sector_id = 5 THEN fk.consumo_kg_mes
+            WHEN c.sector_id = 5 AND c.unidad_medida = 'kg'::text THEN fk.consumo_kg_mes
             ELSE cp.consumo_uni_mes
         END, 0::numeric) * u.meses_stock) AS max_calc,
-    round(COALESCE(
-        CASE
-            WHEN c.sector_id = 5 THEN fk.consumo_kg_mes
-            ELSE cp.consumo_uni_mes
-        END, 0::numeric) * u.meses_minimo) AS min_calc,
     "GP2"._es_sector_insumo(u.ref_id) AS es_insumo,
     i.maximo,
-    i.maximo_origen,
-    i.minimo,
-    i.minimo_origen
+    i.maximo_origen
    FROM "GP2".inventario i
      JOIN "GP2".ubicacion u ON u.id = i.ubicacion_id AND u.tipo = 'sector'::text
      JOIN "GP2".componente c ON c.id = i.componente_id AND c.sector_id = u.ref_id
-     LEFT JOIN "GP2".v_consumo_fleje_kg fk ON fk.componente_id = c.id AND c.sector_id = 5
-     LEFT JOIN "GP2".v_consumo_componente cp ON cp.componente_id = c.id AND c.sector_id <> 5;
-comment on view "GP2".v_nivel_stock is 'Consumo mensual (Est Madre explotada) por fila de inventario de SECTOR y los niveles que salen de el: max_calc = consumo x meses_stock, min_calc = consumo x meses_minimo. Unica definicion (2026-09-05); la usan recalcular_maximos_insumos y recalcular_minimos.';
+     LEFT JOIN "GP2".v_consumo_fleje_kg fk ON fk.componente_id = c.id AND c.sector_id = 5 AND c.unidad_medida = 'kg'::text
+     LEFT JOIN "GP2".v_consumo_componente cp ON cp.componente_id = c.id AND NOT (c.sector_id = 5 AND c.unidad_medida = 'kg'::text);
+comment on view "GP2".v_nivel_stock is 'Consumo mensual (Est Madre explotada) por fila de inventario de SECTOR y el nivel que sale de el: max_calc = consumo x meses_stock. Unica definicion (2026-09-05); la usa recalcular_maximos_insumos. El 2026-09-14 se le sacaron meses_minimo, min_calc, minimo y minimo_origen: el minimo se borro de la base y recalcular_minimos con el.';
+
+-- ---------- v_nivel_stock_prov_at ----------
+create or replace view "GP2".v_nivel_stock_prov_at as
+ SELECT i.id AS inv_id,
+    i.componente_id,
+    i.ubicacion_id,
+    u.ref_id AS proveedor_at_id,
+    COALESCE(cp.uni_mes, 0::numeric) AS consumo_mes,
+    COALESCE(u.meses_stock, 1::numeric) AS meses_stock,
+    round(COALESCE(cp.uni_mes, 0::numeric) * COALESCE(u.meses_stock, 1::numeric)) AS max_calc,
+    COALESCE(cp.tiene_supuesto, false) AS tiene_supuesto,
+    i.maximo,
+    i.maximo_origen
+   FROM "GP2".inventario i
+     JOIN "GP2".ubicacion u ON u.id = i.ubicacion_id AND u.tipo = 'proveedor_at'::text
+     LEFT JOIN "GP2".v_consumo_prov_at cp ON cp.proveedor_at_id = u.ref_id AND cp.componente_id = i.componente_id;
+comment on view "GP2".v_nivel_stock_prov_at is 'max_calc = consumo repartido x meses_stock de la ubicacion del prov AT (default 1 mes). La usa recalcular_maximos_prov_at. Gemela de v_nivel_stock_tallerista. OJO 2026-09-23: las 12 ubicaciones de prov AT tienen meses_stock NULL y 0 filas de inventario, asi que hoy la vista sale vacia y el 1 mes lo pone el coalesce.';
+
+-- ---------- v_nivel_stock_tallerista ----------
+create or replace view "GP2".v_nivel_stock_tallerista as
+ SELECT i.id AS inv_id,
+    i.componente_id,
+    i.ubicacion_id,
+    u.ref_id AS tallerista_id,
+    COALESCE(ct.uni_mes, 0::numeric) AS consumo_mes,
+    u.meses_stock,
+    round(COALESCE(ct.uni_mes, 0::numeric) * u.meses_stock) AS max_calc,
+    COALESCE(ct.tiene_supuesto, false) AS tiene_supuesto,
+    i.maximo,
+    i.maximo_origen
+   FROM "GP2".inventario i
+     JOIN "GP2".ubicacion u ON u.id = i.ubicacion_id AND u.tipo = 'tallerista'::text
+     LEFT JOIN "GP2".v_consumo_tallerista ct ON ct.tallerista_id = u.ref_id AND ct.componente_id = i.componente_id;
+comment on view "GP2".v_nivel_stock_tallerista is 'max_calc = consumo repartido x meses_stock de la ubicacion del tallerista. La usa recalcular_maximos_talleristas.';
+
+-- ---------- v_oc_virgilio_pendiente ----------
+create or replace view "GP2".v_oc_virgilio_pendiente as
+ WITH oc AS (
+         SELECT o.id,
+            o.fecha,
+            o.proveedor,
+            o.codigo,
+            o.cantidad,
+            o.cantidad_recibida,
+            o.unidad,
+            o.estado,
+            o.oc_uni_caja,
+            regexp_replace(regexp_replace(upper(btrim(o.codigo)), '\s+(LK|CH)$'::text, ''::text), '^0+(?=.)'::text, ''::text) AS codb,
+            upper(btrim(o.proveedor)) AS provn
+           FROM "GP2".oc_virgilio o
+          WHERE o.fecha >= (CURRENT_DATE - 120) AND (lower(COALESCE(o.estado, ''::text)) <> ALL (ARRAY['cerrada'::text, 'anulada'::text])) AND NULLIF(btrim(o.codigo), ''::text) IS NOT NULL
+        ), res AS (
+         SELECT oc.id,
+            oc.fecha,
+            oc.proveedor,
+            oc.codigo,
+            oc.cantidad,
+            oc.cantidad_recibida,
+            oc.unidad,
+            oc.estado,
+            oc.oc_uni_caja,
+            oc.codb,
+            oc.provn,
+            ct.tipo,
+            ct.ref_id
+           FROM oc
+             LEFT JOIN LATERAL ( SELECT x.tipo,
+                    x.ref_id
+                   FROM ( SELECT 1 AS pri,
+                            'proveedor_at'::text AS tipo,
+                            p.id AS ref_id
+                           FROM "GP2".proveedor_at p
+                          WHERE COALESCE(p.activo, true) AND (upper(btrim(p.nombre)) = ANY (ARRAY[oc.provn, oc.provn || ' SA'::text]))
+                        UNION ALL
+                         SELECT 2,
+                            a_1.tipo,
+                            a_1.ref_id
+                           FROM "GP2".contraparte_alias a_1
+                          WHERE a_1.alias = oc.provn AND a_1.ref_id IS NOT NULL
+                        UNION ALL
+                         SELECT 3,
+                            'tallerista'::text,
+                            t.id
+                           FROM "GP2".tallerista t
+                          WHERE t.activo AND upper(btrim(t.nombre)) = oc.provn
+                        UNION ALL
+                         SELECT 4,
+                            'tallerista'::text,
+                            t.id
+                           FROM "GP2".tallerista t
+                          WHERE t.activo AND upper(btrim(t.nombre)) ~~ (oc.provn || '%'::text)) x
+                  ORDER BY x.pri, x.ref_id
+                 LIMIT 1) ct ON true
+        ), vig AS (
+         SELECT r.id,
+            r.fecha,
+            r.proveedor,
+            r.codigo,
+            r.cantidad,
+            r.cantidad_recibida,
+            r.unidad,
+            r.estado,
+            r.oc_uni_caja,
+            r.codb,
+            r.provn,
+            r.tipo,
+            r.ref_id,
+            max(r.fecha) OVER (PARTITION BY r.tipo, r.ref_id, r.codb) AS mf
+           FROM res r
+        )
+ SELECT v.tipo,
+    v.ref_id,
+    a.id AS articulo_id,
+    v.codb AS codigo,
+    v.fecha,
+    max(v.proveedor) AS proveedor_virgilio,
+    sum(v.cantidad) AS cajas_ped,
+    sum(COALESCE(v.cantidad_recibida, 0)) AS cajas_rec,
+    sum(v.cantidad - COALESCE(v.cantidad_recibida, 0)) AS cajas_pend,
+    sum((v.cantidad - COALESCE(v.cantidad_recibida, 0))::numeric *
+        CASE
+            WHEN lower(COALESCE(v.unidad, ''::text)) ~~ 'uni%'::text THEN 1::numeric
+            ELSE COALESCE(a.articulos_por_caja::numeric, v.oc_uni_caja, 1::numeric)
+        END) AS uni_pend,
+    string_agg(DISTINCT v.unidad, ','::text) AS unidad
+   FROM vig v
+     LEFT JOIN "GP2".articulo a ON regexp_replace(a.codigo, '^0+(?=.)'::text, ''::text) = v.codb
+  WHERE v.fecha = v.mf
+  GROUP BY v.tipo, v.ref_id, a.id, v.codb, v.fecha
+ HAVING sum(v.cantidad - COALESCE(v.cantidad_recibida, 0)) > 0;
+comment on view "GP2".v_oc_virgilio_pendiente is 'Lo que cada contraparte le debe a Gestión Virgilio según su O.C. vigente: por (contraparte, código) manda la O.C. de fecha MÁS NUEVA no cerrada/anulada de los últimos 120 días ("la nueva pisa la vieja", misma regla que oc_vigentes_por_proveedor allá); pendiente = cantidad − recibida. El proveedor de la O.C. se resuelve a contraparte GP2 ACTIVA, en este orden: nombre de proveedor_at (con o sin " SA"), contraparte_alias, nombre exacto de tallerista, nombre de tallerista que empieza así ("Martin C" → Martin Cornejo); tipo null = no se pudo resolver ("Carlos E", "Log/ Fabr"). uni_pend = cajas × articulos_por_caja del artículo GP2 (o la caja de la O.C.); si la O.C. está en Uni, ya son unidades. articulo_id null = el código no es un artículo GP2. 2026-09-26.';
+
+-- ---------- v_oc_virgilio_partes ----------
+create or replace view "GP2".v_oc_virgilio_partes as
+ SELECT p.tipo,
+    p.ref_id,
+    ac.componente_id,
+    sum(p.uni_pend * ac.cantidad) AS uni_requeridas,
+    count(DISTINCT p.articulo_id) AS articulos
+   FROM "GP2".v_oc_virgilio_pendiente p
+     JOIN "GP2".articulo_componente ac ON ac.articulo_id = p.articulo_id
+     JOIN "GP2".componente c ON c.id = ac.componente_id AND NOT COALESCE(c.discontinuado, false)
+  WHERE p.tipo = 'proveedor_at'::text AND (c.sector_id = ANY (ARRAY[10::bigint, 11::bigint]))
+  GROUP BY p.tipo, p.ref_id, ac.componente_id;
+comment on view "GP2".v_oc_virgilio_partes is 'Partes que hay que tener en poder del PROV. DE ART. TERMINADO para que cumpla su O.C. de Virgilio: uni_pend de cada artículo pendiente × receta (articulo_componente), solo cartón y caja (sectores 10 y 11), que es lo que GP2 le manda. Es el techo del Enviar de la Tablet para el prov AT (sugerido = techo − lo que ya tiene) [usuario 2026-09-26: "para los proveedores de artículo terminado solamente tenemos que mandarle partes para que puedan hacer lo que les pide su orden de compra"]. Sin O.C. vigente = 0, como antes.';
+
+-- ---------- v_oc_virgilio_demanda ----------
+create or replace view "GP2".v_oc_virgilio_demanda as
+ WITH RECURSIVE dem AS (
+         SELECT p.articulo_id AS art_id,
+            sum(p.uni_pend) AS uni
+           FROM "GP2".v_oc_virgilio_pendiente p
+          WHERE p.articulo_id IS NOT NULL
+          GROUP BY p.articulo_id
+        ), receta AS (
+         SELECT ac.articulo_id AS art_id,
+            ac.componente_id AS comp_id,
+            d.uni * ac.cantidad AS qty
+           FROM "GP2".articulo_componente ac
+             JOIN dem d ON d.art_id = ac.articulo_id
+        UNION ALL
+         SELECT r.art_id,
+            b.componente_hijo_id,
+            r.qty * b.cantidad
+           FROM receta r
+             JOIN "GP2".componente_bom b ON b.componente_padre_id = r.comp_id
+        ), seed AS (
+         SELECT receta.art_id,
+            receta.comp_id,
+            sum(receta.qty) AS qty
+           FROM receta
+          GROUP BY receta.art_id, receta.comp_id
+        ), arista AS (
+         SELECT DISTINCT r.articulo_id AS art_id,
+            rp.comp_salida_id AS sal,
+            rp.comp_entrada_id AS ent
+           FROM "GP2".ruta_paso rp
+             JOIN "GP2".ruta r ON r.id = rp.ruta_id
+          WHERE rp.comp_entrada_id IS NOT NULL AND rp.comp_salida_id IS NOT NULL AND r.articulo_id IS NOT NULL
+        ), walk AS (
+         SELECT seed.art_id,
+            seed.comp_id,
+            seed.comp_id AS seed
+           FROM seed
+        UNION
+         SELECT a.art_id,
+            a.ent,
+            w_1.seed
+           FROM walk w_1
+             JOIN arista a ON a.art_id = w_1.art_id AND a.sal = w_1.comp_id
+          WHERE NOT (EXISTS ( SELECT 1
+                   FROM seed s2
+                  WHERE s2.art_id = a.art_id AND s2.comp_id = a.ent))
+        )
+ SELECT w.art_id AS articulo_id,
+    w.comp_id AS componente_id,
+    sum(s.qty) AS uni
+   FROM walk w
+     JOIN seed s ON s.art_id = w.art_id AND s.comp_id = w.seed
+  GROUP BY w.art_id, w.comp_id;
+comment on view "GP2".v_oc_virgilio_demanda is 'La O.C. VIGENTE de Gestión Virgilio explotada por artículo y componente: lo que falta entregar de cada artículo (v_oc_virgilio_pendiente.uni_pend, sin importar a quién esté emitida) baja por la receta, el BOM y las rutas igual que v_consumo_demanda baja la Est. Madre. Es la demanda "por O.C." que usan los techos de la Tablet para la gente que trabaja contra orden (prov AT y talleristas O.C.; el Garage NO: va por O.C. de insumos, corrección del dueño del mismo día). 2026-09-26.';
+
+-- ---------- v_oc_virgilio_partes_tallerista ----------
+create or replace view "GP2".v_oc_virgilio_partes_tallerista as
+ WITH pasos AS (
+         SELECT DISTINCT r.articulo_id,
+            rp.tallerista_id,
+            rp.comp_entrada_id,
+            rp.comp_salida_id
+           FROM "GP2".ruta_paso rp
+             JOIN "GP2".ruta r ON r.id = rp.ruta_id
+          WHERE rp.tipo_paso = 'tallerista'::text AND rp.tallerista_id IS NOT NULL AND rp.comp_entrada_id IS NOT NULL AND r.articulo_id IS NOT NULL
+        ), sel AS (
+         SELECT p.articulo_id,
+            p.tallerista_id,
+            p.comp_entrada_id,
+            p.comp_salida_id
+           FROM pasos p
+             JOIN "GP2".tallerista t ON t.id = p.tallerista_id
+          WHERE t.pedido_por_oc_virgilio
+        )
+ SELECT s.tallerista_id,
+    s.comp_entrada_id AS componente_id,
+    sum(d.uni * COALESCE(re.pct, 100::numeric) / 100::numeric) AS uni_requeridas,
+    count(DISTINCT s.articulo_id) AS articulos
+   FROM sel s
+     JOIN "GP2".v_oc_virgilio_demanda d ON d.articulo_id = s.articulo_id AND d.componente_id = s.comp_entrada_id
+     LEFT JOIN "GP2".v_reparto_efectivo re ON re.articulo_id = s.articulo_id AND re.comp_salida_id = s.comp_salida_id AND re.tallerista_id = s.tallerista_id
+  GROUP BY s.tallerista_id, s.comp_entrada_id;
+comment on view "GP2".v_oc_virgilio_partes_tallerista is 'Partes que hay que tener en poder del TALLERISTA O.C. (tallerista.pedido_por_oc_virgilio: Carlos Aguirre, Blist-Pack) para cumplir la O.C. vigente de Virgilio: demanda por O.C. del artículo en esa entrada (v_oc_virgilio_demanda) × el % del tallerista (v_reparto_efectivo). Techo del Enviar de la Tablet para esas filas. OJO 2026-09-26: los pasos que entregan en Sector GARAGE (Cornejo GRJ5/GRJ6, Escalante GRJ10) estuvieron acá unas horas y el dueño lo corrigió: "los que llenan garage se tienen que llenar por orden de compra de INSUMOS, no por orden de compra de artículo terminado" — el garage no se rige por la O.C. de Virgilio.';
 
 -- ---------- v_planilla_costo ----------
 create or replace view "GP2".v_planilla_costo as
@@ -719,6 +1107,32 @@ create or replace view "GP2".v_planilla_precio as
    FROM "GP2".planilla_fila f
   WHERE hoja = 'Lista de Precios '::text AND (datos ->> 'B'::text) ~ '^[0-9]+$'::text AND datos ? 'K'::text;
 comment on view "GP2".v_planilla_precio is 'Lista de precios de la planilla madre, con el proveedor tomado del encabezado de su bloque.';
+
+-- ---------- v_preaviso_estado ----------
+create or replace view "GP2".v_preaviso_estado as
+ SELECT p.id,
+    p.tipo_contraparte,
+    p.contraparte_id,
+    COALESCE(t.nombre, ps.nombre, pa.nombre) AS contraparte,
+    p.comp_id,
+    c.codigo AS comp_cod,
+    c.descripcion AS comp_desc,
+    p.cantidad,
+    p.unidad,
+    p.fecha_promesa,
+    p.estado,
+    p.nota,
+    p.creado_en,
+    p.fecha_promesa - (now() AT TIME ZONE 'America/Argentina/Buenos_Aires'::text)::date AS dias,
+    COALESCE(( SELECT sum(m.cantidad) AS sum
+           FROM "GP2".movimiento m
+          WHERE m.comp_id = p.comp_id AND m.ubic_origen_id = "GP2".ubic_de(p.tipo_contraparte, p.contraparte_id) AND m.fecha >= p.creado_en), 0::numeric) AS entregado_desde
+   FROM "GP2".preaviso p
+     JOIN "GP2".componente c ON c.id = p.comp_id
+     LEFT JOIN "GP2".tallerista t ON p.tipo_contraparte = 'tallerista'::text AND t.id = p.contraparte_id
+     LEFT JOIN "GP2".proveedor_servicio ps ON p.tipo_contraparte = 'proveedor_servicio'::text AND ps.id = p.contraparte_id
+     LEFT JOIN "GP2".proveedor_at pa ON p.tipo_contraparte = 'proveedor_at'::text AND pa.id = p.contraparte_id;
+comment on view "GP2".v_preaviso_estado is 'Los preavisos con su contraparte, los dias que faltan (negativo = vencido) y cuanto de esa pieza entrego esa contraparte desde que lo prometio. Solo lectura.';
 
 -- ---------- v_recepcion_control ----------
 create or replace view "GP2".v_recepcion_control as
@@ -798,6 +1212,76 @@ UNION ALL
    FROM "GP2".entrega_prov_at ea
      LEFT JOIN "GP2".proveedor_at pa ON pa.id = ea.proveedor_at_id;
 
+-- ---------- v_reparto_at_efectivo ----------
+create or replace view "GP2".v_reparto_at_efectivo as
+ WITH hacen AS (
+         SELECT h_1.articulo_id,
+            h_1.tipo,
+            h_1.ref_id,
+            rp.pct
+           FROM "GP2".v_hace_articulo h_1
+             LEFT JOIN "GP2".reparto_prov_at rp ON h_1.tipo = 'proveedor_at'::text AND rp.articulo_id = h_1.articulo_id AND rp.proveedor_at_id = h_1.ref_id
+        ), n AS (
+         SELECT hacen.articulo_id,
+            count(*) AS n_hacen,
+            count(hacen.pct) AS n_con_pct,
+            COALESCE(sum(hacen.pct), 0::numeric) AS suma_pct
+           FROM hacen
+          GROUP BY hacen.articulo_id
+        )
+ SELECT h.articulo_id,
+    h.ref_id AS proveedor_at_id,
+    round(
+        CASE
+            WHEN n.n_con_pct = n.n_hacen OR n.suma_pct >= 100::numeric THEN h.pct * 100::numeric / NULLIF(n.suma_pct, 0::numeric)
+            WHEN h.pct IS NOT NULL THEN h.pct
+            ELSE (100::numeric - n.suma_pct) / (n.n_hacen - n.n_con_pct)::numeric
+        END, 4) AS pct,
+    h.pct IS NULL AND n.n_hacen > 1 AS es_supuesto,
+    n.n_hacen
+   FROM hacen h
+     JOIN n ON n.articulo_id = h.articulo_id
+  WHERE h.tipo = 'proveedor_at'::text;
+comment on view "GP2".v_reparto_at_efectivo is 'Porcentaje del volumen de un articulo que entrega cada prov AT. El % dictado en reparto_prov_at manda; el resto se reparte en partes iguales entre los que hacen el articulo (prov AT y talleristas del terminado), o sea 50/50 cuando son dos y nadie dicto nada [usuario 2026-09-23]. es_supuesto = ese default, no un dato.';
+
+-- ---------- v_reparto_efectivo ----------
+create or replace view "GP2".v_reparto_efectivo as
+ WITH pasos AS (
+         SELECT DISTINCT r.articulo_id,
+            rp.comp_salida_id,
+            rp.tallerista_id
+           FROM "GP2".ruta_paso rp
+             JOIN "GP2".ruta r ON r.id = rp.ruta_id
+          WHERE rp.tallerista_id IS NOT NULL AND rp.comp_salida_id IS NOT NULL AND r.articulo_id IS NOT NULL
+        ), con_pct AS (
+         SELECT p.articulo_id,
+            p.comp_salida_id,
+            p.tallerista_id,
+            rt.pct
+           FROM pasos p
+             LEFT JOIN "GP2".reparto_tallerista rt ON rt.articulo_id = p.articulo_id AND rt.comp_salida_id = p.comp_salida_id AND rt.tallerista_id = p.tallerista_id
+        ), n AS (
+         SELECT con_pct.articulo_id,
+            con_pct.comp_salida_id,
+            count(*) AS n_tall,
+            count(con_pct.pct) AS n_con_fila,
+            COALESCE(sum(con_pct.pct), 0::numeric) AS suma_pct
+           FROM con_pct
+          GROUP BY con_pct.articulo_id, con_pct.comp_salida_id
+        )
+ SELECT c.articulo_id,
+    c.comp_salida_id,
+    c.tallerista_id,
+        CASE
+            WHEN n.n_con_fila = n.n_tall AND n.suma_pct > 0::numeric THEN round(c.pct * 100::numeric / n.suma_pct, 4)
+            ELSE round(100.0 / n.n_tall::numeric, 4)
+        END AS pct,
+    n.n_con_fila <> n.n_tall AND n.n_tall > 1 AS es_supuesto,
+    n.n_tall
+   FROM con_pct c
+     JOIN n ON n.articulo_id = c.articulo_id AND n.comp_salida_id = c.comp_salida_id;
+comment on view "GP2".v_reparto_efectivo is 'Porcentaje del volumen de cada paso (articulo + comp_salida) que hace cada tallerista. Sale de reparto_tallerista, NORMALIZADO sobre los talleristas que siguen haciendo el paso (borrar una ruta no puede dejar al otro con la mitad). Si ninguno tiene fila, o solo algunos, va en partes iguales y lo marca es_supuesto: eso lo tiene que dictar el dueno.';
+
 -- ---------- v_reposicion ----------
 create or replace view "GP2".v_reposicion as
  SELECT DISTINCT ON (c.id) c.id AS componente_id,
@@ -805,13 +1289,13 @@ create or replace view "GP2".v_reposicion as
     iu.nombre AS ubic_nombre,
     iu.meses_stock,
     i.cantidad,
-    i.minimo,
     i.maximo,
     i.maximo_origen,
     GREATEST(0::numeric, round(COALESCE(i.maximo, 0::numeric) - COALESCE(i.cantidad, 0::numeric))) AS sugerido
    FROM "GP2".componente c
      JOIN "GP2".inventario i ON i.componente_id = c.id
      JOIN "GP2".ubicacion iu ON iu.id = i.ubicacion_id
+  WHERE NOT c.discontinuado
   ORDER BY c.id, (
         CASE
             WHEN iu.id = "GP2".ubic_de('sector'::text, c.sector_id) OR c.sector_id = 12 AND iu.id = "GP2".ubic_de('virgilio'::text) THEN 0
@@ -819,7 +1303,7 @@ create or replace view "GP2".v_reposicion as
             WHEN iu.tipo = 'proveedor_servicio'::text THEN 2
             ELSE 3
         END), i.cantidad DESC NULLS LAST, i.ubicacion_id;
-comment on view "GP2".v_reposicion is 'Donde se repone cada componente: la fila de inventario de su sector (o Virgilio para los terminados), con su stock, minimo, maximo y el sugerido = maximo - stock. Unica definicion: la leen oc_bundle y valorizacion_bundle (2026-09-11).';
+comment on view "GP2".v_reposicion is 'Que hay que reponer: sugerido = maximo - stock, por componente y su ubicacion principal. Excluye los componentes discontinuados (2026-09-13).';
 
 -- ---------- v_rollo_evolucion ----------
 create or replace view "GP2".v_rollo_evolucion as

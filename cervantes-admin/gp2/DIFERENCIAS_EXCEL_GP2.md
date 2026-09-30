@@ -31,10 +31,16 @@ Excel: `Conteo_Gral_FLEJES_y_Alambre_VACIO.xls`. GP2: 56 flejes, 48 completos.
      - Cuchara Inox 123x0,8 = **F6 / N°43**, pero *FLEJES* la llama **N°45**.
    - **✅ HECHO (2026-09-08):** cargada `medida_mm = '117 x 0,8'` en `GP2.fleje_detalle` (componente 199). La pantalla ya la muestra.
 
-3. **IE13 "Cremallera"** (proveedor GP2 = Importado) — GP2 **sin detalle**.
-   - Excel: "Cremallera Espumante", medida **74,5 x 1,25** (JL Metales / Materiales San Roque).
-   - Ojo: en el Excel el **fleje 80** se usa para DOS cosas — "C/Queso Alambre" (Ø4 x 380, Brawin) y "Cremallera Espumante" (74,5 x 1,25). Numeración pisada.
-   - **DUDA:** ¿la cremallera lleva N° de fleje y medida 74,5 x 1,25? ¿proveedor real (Importado / JL Metales / San Roque)?
+3. ~~**IE13 "Cremallera"** (proveedor GP2 = Importado) — GP2 **sin detalle**.~~
+   - **✅ CERRADO (2026-09-23): la pregunta estaba mal planteada — la cremallera del 523 NO es un
+     fleje.** `[usuario: "La cremallera IE13. Es E13 y está dentro de sector procesado. No fleje.
+     Lo vi en pettofrezza rafael"]`. Es `E13`, Sector Procesado, se **importa armada y se cuenta
+     por unidad** (USD 1,10 c/u). Nunca necesitó N° de fleje ni medida. Ver CONOCIMIENTO §4fp.
+   - La "Cremallera Espumante" 74,5 x 1,25 (JL Metales / San Roque) del Excel es **otra cosa**:
+     material en fleje para una cremallera que se fabricaba. Queda con el resto del bloque de
+     JL Metales (punto 7), no con E13.
+   - Lo que sí seguía siendo cierto del Excel: el **fleje 80** se usa para DOS cosas —
+     "C/Queso Alambre" (Ø4 x 380, Brawin) y "Cremallera Espumante" (74,5 x 1,25). Numeración pisada.
 
 ### Dato firme (listo para cargar cuando el usuario diga)
 

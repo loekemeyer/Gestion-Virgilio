@@ -12,7 +12,7 @@ const EXE = process.env.CHROMIUM_PATH || (fs.existsSync('/opt/pw-browsers/chromi
    generales (Atras del header y ← Volver del paso 2) tambien se ocultan. Al
    terminar (o al desmontar) todo vuelve a la normalidad. */
 const BUNDLE = {
-  tara: { tara_pallet: '20', tol_ctrl_peso_pct: '5', carton_uni_x_paquete: '250' },
+  tara: { tara_pallet: '20', tol_ctrl_pct: '5', carton_uni_x_paquete: '250' },
   sectores: [{ id: 5, nombre: 'Sector Fleje' }],
   proveedores: [{ nombre: 'Basconia', modo_control: 'rollos_remito', informa_rollos: true, factura_uni: false }],
   recepciones: [], pallets: [], rollos: [],

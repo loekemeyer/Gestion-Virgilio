@@ -85,6 +85,26 @@
   function autoMiles(el) {
     if (!el || el.dataset.milesOn === "1") return el;
     el.dataset.milesOn = "1";
+    /* EL PUNTO TIPEADO VALE COMO COMA [usuario 2026-09-18: "cuando voy a cargar quiero que me deje
+       poner . o , para poner decimales"]. Ojo con la tentacion de hacerlo en conMiles(): ahi no se
+       distingue el punto que acaba de tipear la persona del que puso el separador automatico, y
+       "1.000" + una tecla se convertiria en 1,0005. Aca se toca SOLO la tecla recien apretada:
+       en un campo con decimales el punto entra como coma (y si ya hay una, no se agrega otra);
+       en un campo de enteros no entra nada, que es lo que ya pasaba (conMiles lo descartaba). */
+    el.addEventListener("beforeinput", function (ev) {
+      if (ev.inputType !== "insertText" || (ev.data !== "." && ev.data !== ",")) return;
+      if (!admiteComa(el)) { ev.preventDefault(); return; }
+      if (ev.data === "," && el.value.indexOf(",") < 0) return;   // la coma normal sigue su camino
+      ev.preventDefault();
+      var ini = el.selectionStart, fin = el.selectionEnd, v = el.value;
+      if (ini == null) return;
+      var iComa = v.indexOf(",");
+      // ya hay una coma y no se la esta reemplazando: un segundo separador no aporta
+      if (iComa >= 0 && !(ini <= iComa && fin > iComa)) return;
+      el.value = v.slice(0, ini) + "," + v.slice(fin);
+      try { el.setSelectionRange(ini + 1, ini + 1); } catch (e) {}
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
     el.addEventListener("input", function () {
       var antes = el.value;
       var crudo = admiteComa(el) ? antes : antes.replace(/,/g, "");

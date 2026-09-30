@@ -6,6 +6,110 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<!-- v3.65.2 (2026-09-30) — LA LISTA "QUE RUBRO SE CONTROLA EN QUE PAGINA" (CONTROL_URL / CONTROL_URL_PROV)
+     SE MUDA A gp2-control-insumo.js (GP2CI), sin cambiar un solo destino: la usan tambien el Control de la
+     tablet y el contador de su boton, para que una recepcion que quedo sin controlar se pueda retomar
+     [Nazareno: "Cargue una recepcion ... y no hice el control. Ahora voy a control y no me aparece"].
+     v3.65.1 (2026-09-28) — pares de campos lado a lado (Altrak % Corto/% Largo y los otros 2 pares) alineados abajo:
+     si un rotulo pasa a 2 lineas el input ya no queda desnivelado [usuario: "Está desnivelados Corto y Largo"].
+     v3.65.0 (2026-09-28) — GARAGE, BOLSAS PLASTICAS E IMPORTADO TAMBIEN SE CONTROLAN EN KG [Thomas:
+     "Todos los proveedores que te di en este chat, el control luego de la recepcion es en kg" +
+     Importado: "Remito en unidades y control en kg"]. CONTROL_URL suma los sectores 9 (Garage) y 14
+     (Bolsas Plasticas), que hasta hoy no pedian control. Importado vive en el Sector Procesado (2),
+     que comparte con piezas que NO se controlan asi (Eclipse, Charcas), por eso entra por proveedor
+     (CONTROL_URL_PROV) y la pantalla de control abre filtrada con ?prov=. La unidad del remito sigue
+     la diciendo la pieza (componente.remito_unidad): 'uni' en Garage e Importado, 'kg' en bolsas. -->
+<!-- v3.64.0 (2026-09-25) — LA BOLSA DE CARTÓN TRAE LO QUE DICE EL CARTÓN [Thomas: "trae las unidades
+     que dice el uni x paquete x cartón que acabas de cargar" + "tendría que nada más decir el formato y
+     esa tabla fija por formato de uni por paquete, sacala"]. componente.entrega_uni_x (col "Uni x Paq"
+     de la planilla de conteo) es la ÚNICA fuente: el 222 viene de 2.500 = 10 paquetes de 250. Se sacó
+     la tabla fija UNI_X_BOLSA; el formato queda solo como nombre. Igual en guardar_control_cartones. -->
+<!-- v3.63.0 (2026-09-25) — SIN FILA "FORMATO" CUANDO EL PROVEEDOR NO TIENE FORMATOS. Las bolsas de
+     Envases Vihal y Papelera Nueve de Julio quedaron sin carton_formato (formato es solo de los
+     cartones de Graficos Pol) y la pantalla mostraba un chip suelto "Sin formato (1)". Si ningun
+     item de la marca tiene formato, pintarFormatoChips() esconde la fila y lista los items directo. -->
+<!-- v3.62.0 (2026-09-25) — EL REMITO PUEDE VENIR CONTADO EN EL ENVASE DE LA PIEZA (usuario, sobre el
+     C13 Corta Queso Bastidor c/Cilindro: "se recepciona en cajas de 144 uni y se le manda a lucho en
+     esas cajas" + "Sí" a que la recepción también sea en cajas). componente.remito_unidad acepta un
+     tercer valor, 'envase': el operario carga CAJAS y la pantalla guarda cajas x entrega_uni_x en
+     unidades (3 cajas = 432 uni). El envase es el MISMO dato que usa la Tablet para mandarlo a Lucho
+     (entrega_unidad='cajas', entrega_uni_x=144), así que el 144 vive en un solo lugar;
+     recepcion_bundle lo trae. Si la pieza dice 'envase' pero le falta el factor, remUnidad() no lo
+     reconoce y la pieza cae a su regla de siempre (importado -> unidades): nunca se multiplica por 0. -->
+<!-- v3.61.1 (2026-09-23) — EL BUJE MARIPOSA ES DE KOLLPLAST Y SU REMITO VIENE EN UNIDADES
+     [usuario: "Los dos bujes mariposa ahora se los compramos a Kollplast. Remito en uni control
+     en kg"]. PA8A/PA8B pasaron de Pat Bet a Kollplast en la base (componente.proveedor +
+     precio_proveedor $20,48, lista 19-08-26). CERO CODIGO NUEVO: la unidad del remito se dice con
+     componente.remito_unidad='uni', la rama que estrena la v3.61.0 de aca arriba. La primera
+     version de este cambio agregaba 'kollplast' a PLAST_UNI y se descarto en el merge: habria
+     dejado dos formas de decir lo mismo y, por ser por PROVEEDOR, se habria llevado puesto tambien
+     a PEST1. Lo unico que se toco es el guardian de test_recepcion_uni.js. -->
+<!-- v3.61.0 (2026-09-23) — LA UNIDAD DEL REMITO LA DICE LA PIEZA, Y LA TOLERANCIA ES 5 %
+     (usuario, textual: "CC galvanoquimica. plancha niquel en el remito viene en kg y se controla
+     en kg" + "acordate de la regla de que todo control no puede exceder el 5% de diferencia").
+     (1) LA PIEZA MANDA SOBRE EL RUBRO: si componente.remito_unidad dice 'kg' o 'uni', la rama
+     nueva de abrirPopup fuerza esa unidad y esconde el toggle Kg/Unidades. Va PRIMERO en el
+     if-chain a proposito: es el dato mas especifico que hay. Es la MISMA columna que ya usa la
+     Tablet para las entregas de talleristas, no un mecanismo nuevo — hasta hoy cada pantalla
+     tenia su lista (PLAST_UNI por proveedor, ENCAJAS, esFleje), y "este insumo viene pesado" no
+     se podia decir en un solo lugar.
+     POR QUE NO ALCANZABA CON EL TOGGLE: PCP2 (Plancha de Niquel, CC Galvanoquimica) estaba
+     declarada en UNIDADES y sin kg_x_uni, asi que elegir Kg reventaba en el RPC
+     ("to_canonical: sin kg_x_uni valido para kg->uni"): en kg no se podia recibir. Por eso el
+     cambio de verdad fue en la base — PCP2 pasa a unidad_medida='kg', como los flejes y las
+     bolsas plasticas — y esta rama es la que hace que el operario no tenga que elegir nada.
+     Nadie lo habia notado porque la pieza tiene stock 0 y ni un movimiento.
+     (2) UNA SOLA TOLERANCIA DE CONTROL EN TODA LA CASA, 5 %: el parametro tol_ctrl_peso_pct
+     (2 %, que solo miraba este pesaje) se renombro tol_ctrl_pct y vale 5. Lo leen tambien el
+     control de insumos (control-remaches.js / control-cajas.js, que tenian un 10 % escrito a
+     mano) y el control de entregas. Antes la misma diferencia pasaba o no segun por que puerta
+     entrara la mercaderia. El piso de 0,5 kg de tolKg() queda: el 5 % de un remito chico son
+     gramos y ninguna balanza afina tanto. -->
+<!-- v3.60.0 (2026-09-17) — UN INSUMO PUEDE TENER MAS DE UN PROVEEDOR: RECICOR ENTREGA LAS
+     MISMAS CAJAS QUE CORRUGADORA [usuario: "dentro de cajas, ademas de corrugadora del plata,
+     tenes que agregar al proveedor Recicor. Entrega las mismas cajas que corrugadora. El control
+     de remito es igual al de corrugadora"].
+     El problema de fondo: componente.proveedor es UN texto, y esta pantalla armaba los chips y
+     filtraba los items con i.proveedor===provSel. Con eso, para que Recicor entregara las mismas
+     11 cajas habia que duplicar los componentes -> dos stocks para la misma caja. No se hizo eso.
+     (1) BASE: proveedor_insumo gana 'Recicor' (rubro Sector Caja, modo_control 'ninguno' = el
+         mismo control de remito que Corrugadora, cod_prov ISIS 4370, el de su lista de precios);
+         es obligatorio porque recepcion_insumo.proveedor tiene FK a proveedor_insumo(nombre).
+         Tabla puente nueva GP2.componente_proveedor_alt (componente_id, proveedor) con RLS
+         prendida y sin politicas (solo la lee recepcion_bundle, que es SECURITY DEFINER), cargada
+         con las 11 cajas de sector 11 -> Recicor. componente.proveedor NO se toca: el principal
+         sigue siendo Corrugadora, asi que la OC y el costo quedan exactamente igual.
+         recepcion_bundle manda ahora 'proveedores_alt' por insumo.
+     (2) FRONT: provsDeInsumo(i) = principal + alternativos y esDelProv(i,p) reemplazan a las
+         cuatro comparaciones i.proveedor===provSel (chips de proveedor y su conteo, grilla de
+         items, chips de marca y de formato). Una caja aparece bajo los dos chips, una sola vez
+         en cada uno, con un solo stock.
+     OJO (dicho al usuario): el cruce contra O.C. (_aplicar_recepcion_a_oc) matchea por
+     COMPONENTE, no por proveedor, asi que un remito de Recicor descuenta igual una OC de
+     Corrugadora. Si Recicor tiene que tener sus propias OC, eso es otro cambio. -->
+<!-- v3.59.0 (2026-09-16) — IMPORTADOS: UN SOLO PROVEEDOR, SIN PASO "PROVEEDOR" [usuario:
+     "Unifícame todo a Importado (elimina Tierra Nativa) y que no diga el subtitulo de Proveedor"].
+     (1) BASE: el unico importado que colgaba de otro proveedor era D1 Espiral Sacacorcho
+     (componente id 163, proveedor 'Tierra Nativa SA') -> se reasigno a 'Importado' con un UPDATE
+     scopeado a estado_compra='importado'. Tierra Nativa SA NO se borro: sigue siendo el proveedor
+     real de 4 palos de amasar del Garage (GRJ17/22/23/24). 0 recepciones historicas con ese
+     proveedor, asi que sin impacto en cadena. (2) FRONT: como Importados queda con un solo
+     proveedor, se saltea el paso Proveedor (saltaProv): se auto-selecciona 'Importado', se oculta
+     provSection (subtitulo + chip) y va directo a Remito/articulos. Solo aplica a Importados con
+     provsRubro.length===1; el resto de los rubros no cambia. -->
+<!-- v3.58.0 (2026-09-14) — REVERTIDO: el rubro vuelve a ser "IMPORTADOS" (usuario: "me confundi,
+     dejalo como importado"). En v3.57.0 se habia renombrado a "Procesado" con recepcion por sector
+     (insumosDelRubro sin rama por estado_compra y esCorteDePS/PS_CORTE generalizado para excluir el
+     1686 de Eclipse). Todo eso se deshizo: el boton es "Importados" (data-sid=2, filtra por
+     estado_compra='importado'), esCorteDePS vuelve a mirar solo Charcas (sector 5) y RUBRO_UM sin
+     Procesado. NO se llego a tocar la base para ese cambio (era puro front), asi que el revert es
+     solo de codigo. SIGUE VIGENTE de v3.57.0: BANDITA (Palo de Amasar, LOEKE) con carton_formato=
+     'Bandita' -- esa la pidio aparte y no se revierte. Sin cambio de RPC. -->
+<!-- v3.56.0 (2026-09-14) — ESTA PANTALLA ES LA RECEPCIÓN DE INSUMOS DE LA TABLET [usuario
+     2026-09-14: "recibir, toca insumo y me aparece todo lo que está en recepción de insumos,
+     como ya lo modelamos"]. La Versión Tablet NO recarga este flujo: entra acá con
+     ?volver=tablet y lo único que cambia es que el "Atrás" devuelve a la tablet en vez de al
+     menú. Cero lógica duplicada. -->
 <!-- v3.55.0 (2026-09-11) — LOS FACTORES kg/uni SALEN DEL BUNDLE, NO DE UNA CONSULTA APARTE.
      La pantalla armaba KGXUNI y ENCAJAS con un from('componente') suelto, filtrando los sectores
      a mano (2,5,6,7,8,9,10,11,12) y con un reintento por si el schema-cache de la API todavia no
@@ -52,7 +156,7 @@
      trae la descripcion ("Caja N°1", "Fleje N° 45"); lo que no tiene N° (cartones) cae a
      codigo con orden numerico-aware. -->
 <!-- v3.49.0 (2026-09-04) — CHAPA 430 DE APERAM SE RECIBE ACA (misma forma que Altrak, jubila
-     el modulo Pagos Aperam->Eclipse). Al tocar el item CHAPA430 en Flejes se abre un panel
+     el modulo Pagos Aperam->Eclipse). Al tocar el item FLEJE_DESCORAZONADOR en Flejes se abre un panel
      propio stepChapa (kg + remito, sin %) que llama cargar_compra_mp('Aperam') -> suma la
      chapa al stock de Eclipse (ubic 48). Ruteo por ITEM (no por proveedor): Aperam vende 13
      flejes normales + la chapa. -->
@@ -64,7 +168,7 @@
      con los 2 campos %: deslizar o escribir cualquiera actualiza los otros dos y el desglose
      en kg (akSetCorto). Suman 100 siempre. -->
 <!-- v3.47.0 (2026-09-04) — ALTRAK EN EL RUBRO FLEJES (opcion B, usuario). Altrak entrega el
-     fleje bruto (FLEJE90_BRUTO, sector 13) que va a Charcas: aparece como proveedor en Flejes
+     fleje bruto (ALAMBRE, sector 13) que va a Charcas: aparece como proveedor en Flejes
      (inyectado a mano, no cae por sector) y al elegirlo abre un flujo propio irAltrak() con kg
      + % corto/largo (instruccion de corte a Charcas) que llama cargar_compra_mp('Altrak'). NO usa
      pesaje/pallets/buffer. Suma el bruto al stock de Charcas (ubic 13); el stock real de
@@ -177,14 +281,15 @@
      popup paq_charcas, no el de balanza+pallets+rollos de flejes normales.
      Ademas: cod_prov='3605' cargado en proveedor_insumo Resortes Charcas
      (usuario 2026-09-02, foto lista precios). v3.32.1 — 1686 VA EN SECTOR PROCESADO (SP, id 2), NO EN 14 (usuario 2026-09-01: "el insumo entregado es descorazonador, tiene sector es SP"). Se corrige: 1686 pasa a sector_id=2 con descripcion "Descorazonador 1686 (Eclipse desde chapa 430)". Se borra sector 14 y ubic 47 (Sector Cortados) que habia creado por error. _es_sector_insumo revertido a 5,6,7,8,9,10,11. recepcion_bundle y oc_bundle usan OR proveedor IN ('Resortes Charcas','Eclipse') para traer los procesados solo cuando corresponde. RPC cargar_recepcion_eclipse ahora resuelve la ubic destino via sector del componente (sector 2 -> ubic tipo=sector ref_id=2). Frontend: rubro "Cortados" cambia data-sid=14 -> data-sid=2, insumosDelRubro filtra por sector 2 + proveedor Eclipse. Nombre del rubro (Cortados) queda igual para el operario. v3.32.0 — ECLIPSE EN RECEPCION INSUMOS (Fases 1-4 modelo Aperam->Eclipse->Cervantes, usuario 2026-09-01: "con altrak y charcas .sucede lo mismo con aperam y Eclipse. Se le compra la chapa 430 (1250×2500×0.8) y se le envia a Eclipse para que lo corte y Eclipse lo entra cortado en caja"). Nuevo rubro "Cortados" (data-sid=14, sector nuevo Sector Cortados) que muestra SOLO componentes con proveedor='Eclipse' (hoy 1686, kg_x_uni=0.025823 = 19.625 kg chapa / 760 uni por chapa). El popup pide UNIDADES del remito con hint "1 uni = X kg producto · consume Y kg chapa"; unitSel='uni_eclipse' dispara RPC nueva cargar_recepcion_eclipse(comp_id, unidades, remito, fecha) que: (a) suma uni en Sector Cortados (ubic 47), (b) descuenta kg = uni × kg_x_uni × (1+desperdicio/100) de la chapa 430 en Eclipse (ubic 48). Success muestra consumo de chapa + stock antes/despues; warning si negativo. _es_sector_insumo se amplia a incluir sector 14. Aperam sigue apareciendo como proveedor de flejes (no se toca). v3.31.1 — FLEJES: TODOS SOLO KG TOTAL, EXCEPTO HERMAC (usuario 2026-09-01: "en todos los proveedores de fleje pedi solo KG total. exceptuando importado y hermac. importado tal y como esta y hermac añadir Paquetes"). fieldsFleje simplifica: Hermac -> {paquetes:true}, todos los demas (Basconia/Aperam/Brawin/Szapiro/JL Metales/Altrak/Importado/resto) -> {} (solo Kg total). Basconia pierde "Kg x Rollo" y Hermac cambia "Rollos totales" por "Paquetes". El input "kgPaquetes" es entero y se guarda en p_pallets (el paso 2 arma N bloques para pesar). pintarFieldsFleje ahora solo maneja flds.paquetes; el input handler tambien se acorto. v3.31.0 — CHARCAS EN RECEPCION INSUMOS (Fase 3 modelo Altrak->Charcas->Cervantes, usuario 2026-09-01). Nuevo rubro "Filtros" (data-sid=12, sector Terminado) que muestra SOLO los componentes con proveedor='Resortes Charcas' (hoy 031 y 034). El popup pide PAQUETES DE 10 KG con hint "1 paq = 10 kg producto = N uni · ~10.2 kg alambre"; unitSel='paq_charcas' marca este flujo especial. Al Confirmar llama RPC nueva GP2.cargar_recepcion_charcas(comp_id, paquetes, remito, fecha) que: (a) suma uni = paq × 10 / kg_x_uni en Virgilio (ubic 33), (b) descuenta kg = paq × 10 × (1 + desperdicio/100) del alambre en Charcas (ubic 13). Success muestra el consumo de alambre + stock antes/despues; si el stock queda negativo advierte "Pagos debe cargar la factura de Altrak". Bundle amplia el where a "sector insumo OR proveedor=Resortes Charcas" y agrega kg_x_uni al JSON. KGXUNI fetch suma sector 12. v3.30.0 — CARTONES: BOTONES RAPIDOS +N/+1 + RENOMBRE FORMATO BOMBILLA → PLIEGO + PLIEGOS RENOMBRADOS (usuario 2026-09-01: "en vez de que sea un pop up. que haya botones de +4 (para los que van de 1000) +1 por si mando mal el prov"; "Cambia el nombre bombilla x pliego. Ahi el +1 paq=100 pliegos"; "cambiemos los nombres para que este mas lindo solo a Pliego 557... Si te tenes que distinguir del ya adhesivado, Pliego Ad 557..."; "Las descripciones tambien, son muy largas. Aclara solo Sin adhesivar. lo mismo en el caso de adhesivadas"). Cambios: (a) DB: formato 'Bombilla' renombrado a 'Pliego' (20 componentes migrados) + paq_x_bolsa=1 en catalogo. 24 componentes pliego renombrados: crudos = "Pliego N" con descripcion "Sin adhesivar"; adhesivados = "Pliego Ad N" con descripcion "Adhesivado". (b) UNI_X_BOLSA saca Bombilla, agrega Pliego:100. (c) Tarjeta ahora es <div role=button> (para poder anidar los <button> +N/+1). Nuevos botones .qbtn / .qbtn-primary al pie de cada tarjeta de carton (sector 10) con N=paq_x_bolsa (C=4, Ocho=12, Huevo=8, LOKE=4) y +1. Para pliegos (paq_x_bolsa=1) solo se muestra +1. Nueva funcion cargarRapidoCarton(item,paq): llama cargar_recepcion directo, suma al REMITO, refresca. Click al cuerpo de la tarjeta (fuera de los botones) sigue abriendo popup como antes (fallback). (d) Formato "Pliego · Pliego" en tarjeta se colapsa a "Pliego". v3.29.1 — BUSCADOR MISMA ALTURA QUE CHIPS + BORDE NEGRITA (usuario 2026-09-01: "el buscador que tenga la misma altura y que este a la misma altura que el boton chef, a la derehcha, que ternga reborde negrita"). Se restructura marcaWrap: label MARCA arriba, luego una fila con align-items:center donde van los chips a la izq y el input a la der. El input pasa a height:44px (mismo touch target que los chips), border:2px solid #111 (negrita negro), font-weight:700. Antes estaba con align-items:flex-end y borde gris (los chips y el input quedaban a distintas alturas). v3.29.0 — CARTONES: BUSCADOR AL LADO DE MARCA + 'Bolsa' en CHEF + REBAUTIZAR AJ (usuario 2026-09-01: "el buscador no lo quiero ahi, lo quiero al lado de loeke y chef", "es formato bolsa, no sin formato", "que no aparezca la palabra termoactivos porque queda muy ancho"). (a) Cartones: se agrega searchInputCart dentro de marcaWrap (flex row: chips MARCA a la izquierda, buscador a la derecha) y se oculta la search-box de abajo (id searchBoxDefault). Los dos inputs se sincronizan (oninput copia el valor al searchInput original y llama filtrarItems). En otros rubros la search-box de abajo sigue como estaba. (b) FORMATOS_POR_MARCA de CHEF gana 'Bolsa' (antes G8C Cartón 836 aparecia como "Sin formato" al filtrar CHEF). (c) DB: proveedor "AJ- Adhesivos Termoactivos" renombrado a "AJ- Adhesivos" (10 componentes actualizados). v3.28.4 — ALERTA DE MULTIPLO EN VIVO (usuario 2026-09-01: "quiero que la alerta me aparezca cuando anoto el numero no cuando toco confirmar"). Antes salia como confirm nativo al apretar Confirmar; ahora aparece como aviso amarillo debajo del input mientras se tipea (nueva actualizarAvisoMultiplo() llamada desde updateConv en cada 'input'), con la cuenta "N paq = X bolsa(s) + Y paq sueltos, el proveedor entrega en bolsas de Z paq". El submit YA NO pregunta (el confirm se saco): guarda directo — el operario ya vio el warning. Nueva clase CSS .status.warn (fondo amarillo suave). No aplica a pliegos, cajas, remaches ni flejes. v3.28.3 — OCULTAR CHIPS EN 0 (usuario 2026-09-01: "todo lo que sea 0 no me aparezca como opcion"). pintarProvs: proveedores con 0 insumos se saltean. pintarMarcaChips: LOEKE/CHEF solo si tienen >0 (Sin marca ya se filtraba). pintarFormatoChips: solo los formatos con conteo >0 (Sin formato ya se filtraba). No cambia comportamiento cuando no hay ningun item — la lista queda vacia como antes. v3.28.2 — LABEL "CANTIDAD" ACLARA LA UNIDAD (usuario 2026-09-01: "donde dice cantidad, aclara cantidad paq"). En abrirPopup se sobrescribe segun el rubro: Carton = "Cantidad paq.", Pliego = "Cantidad pliegos", Caja = "Cantidad uni", Remache = "Cantidad kg", Fleje = "Cantidad kg" o "Cantidad uni" segun UM del componente. Otros insumos quedan como "Cantidad". Nuevo id kgValueLabel. v3.28.1 — LA TARJETA DE CARTON MUESTRA EL FORMATO DEBAJO (usuario 2026-09-01: "quiero que aparezca el formato debajo de cada carton"). En pintarItems, si sector_id===10 y carton_formato, se agrega una linea "C / Ocho / Huevo / LOKE / Bombilla / Bolsa" (los pliegos con prefijo "Pliego · " para diferenciarlos: A2B1/V3A/CART506 -> "Pliego · C"; PLIEGO*/CART_MATE -> "Pliego · Bombilla"). Sin cambios de datos ni backend. v3.28.0 — CARTONES: AVISO NO BLOQUEANTE cuando el remito no es MULTIPLO de la bolsa del formato (usuario 2026-09-01, textual: "siempre que me entreguen cartón c, tiene que venir en múltiplos de cuatro paquetes ... si del cartón del formato ocho me entrega tres mil quinientos unidades, quiero que lo deje recibirlo, pero que lo considere como con una alerta"). Multiplos: C=4 paq/bolsa (1000 uni), Huevo=8 (2000 uni), LOKE=4 (1000 uni), 8=12 (3000 uni). Nueva columna GP2.carton_formato.paq_x_bolsa; recepcion_bundle devuelve paq_x_bolsa + uni_x_bolsa_cat en cada insumo; paqXBolsaDelItem(it) prefiere it.paq_x_bolsa del catalogo antes que derivar. En guardar() de sector 10 (no pliego), si cantRaw % paq_x_bolsa != 0 -> confirm nativo con la cuenta (bolsas enteras + paquetes sueltos) + Aceptar/Cancelar. Cancelar deja editar; Aceptar guarda igual (recibe pero queda anotado). No aplica a pliegos ni a Bolsa/Pliego. v3.27.0 — CARTONES: "Pliego C" NO ES UN FORMATO APARTE (usuario 2026-09-01: "el pliego c es un pliego que iría dentro de c, dentro de c va a haber pliegos, cartones, entre otros"). Se saca el formato 'Pliego C' del catalogo y de FORMATOS_POR_MARCA. Los pliegos son PIEZAS DENTRO de C (500/506/CART506) o de Bombilla (557/558/654.../CART_MATE), marcadas con componente.es_pliego (bool nuevo). LOEKE = C, 8, Huevo, LOKE, Bombilla, Bolsa (bolsas Vihal 031/836); CHEF = LOKE, 8, Huevo, Bombilla. Frontend: esPliegoIt(it) = mira it.es_pliego (viene del bundle); uniXCtlItem(it) = 100 si es_pliego, sino UNI_X_BOLSA[formato]; paqXBolsaDelItem(it) solo aplica a cartones no-pliego. REMITO.push arrastra es_pliego para que el control lo tenga. Backend GP2.recepcion_bundle devuelve es_pliego en cada insumo; GP2.guardar_control_cartones fuerza uni_x_bolsa=100 cuando es_pliego. v3.26.1 — ROLLBACK DE DAMIAN USA RPC GP2.anular_recepcion (verificado en BD 2026-09-01). El DELETE crudo de v3.25.3 dejaba el stock afectado porque cargar_recepcion inserta un movimiento que aplica el delta a inventario; solo borrando recepcion_insumo el stock quedaba subido. La RPC nueva borra primero el movimiento (trigger AFTER DELETE trg_movimiento_aplicar revierte el inventario) y despues la recepcion (cascadea a recepcion_control + recepcion_control_rollo). Ahora Cancelar de Damian anula la carga y ademas devuelve el stock al estado previo. v3.26.0 — PLIEGOS: REMITO EN UNIDADES + CONTROL EN PAQUETES (100 pliegos c/u) (pedido usuario 2026-09-01, textual: "en el caso de los pliegos, el remito va a ser tambien en unidades. y el control va a ser en paquetes. cada paquete viene de cien pliegos. la clasificacion de los pliegos es, los pliegos pueden ser tipo formato c, que son el caso de el pliego del quinientos y el quinientos seis, y los pliegos formato bombilla"). Nuevos formatos en el catalogo GP2.carton_formato: 'Pliego C' (pliegos LOEKE 500/506 = A2B1/V3A que van a AJ para skin) y 'Pliego' (los 10 pliegos c/skin: 557/558/654/658/659/758/759/762/763/769). Ambos con uni_x_bolsa=100 (100 pliegos por paquete). Frontend: (1) FORMATOS_POR_MARCA gana 'Pliego C' + 'Pliego' (LOEKE) y 'Pliego' (CHEF). (2) UNI_X_BOLSA agrega 'Pliego C':100 y Bombilla:100; nueva esPliego(f). (3) abrirPopup para cartones (sector 10): si formato es pliego -> setUnit('uni'), placeholder "pliegos del remito"; sino sigue en paquetes de 250. (4) REMITO.push para pliegos guarda paquetes=cant (UNIDADES/pliegos declarados) en vez de cantRaw (paquetes). (5) montarControlCartones: header dice "N pliegos" y "N pliegos declarados" si todos son pliegos; sino "N cartones" y "N paquetes declarados". (6) pintarControlCartones + ctlLinea: label del input es "Paquetes controlados" (no "Bolsas") para pliegos, subH dice "1 paquete = 100 pliegos". Diff se calcula en UNIDADES (pliegos) para pliegos, en PAQUETES para cartones. (7) Backend GP2.guardar_control_cartones no cambia: acepta {bolsas} y resuelve uni_x_bolsa desde el catalogo -> multiplica por 100 para pliegos. v3.25.1 — AL NAVEGAR: BALANZA<REMITO PIDE CONFIRM CON LA CUENTA (usuario 2026-09-01: "y a parte deja seguir cuando es diferente a lo que dice el remito"). En v3.24.6 saque toda validacion de balanza<remito de la nav para no bloquear al operario que carga de a un pallet — pero eso dejaba pasar en silencio, sin aviso. Ahora, al pasar a otro item: sobrante negativo sigue siendo bloqueo duro (imposible); pero si balanza<remito aparece un confirm nativo con la cuenta (Remito X · Balanza Y · Dif Z) y el mensaje "¿Todavia te falta pesar pallets de este item? Aceptar = paso igual, vuelvo despues a completar. Cancelar = me quedo a terminar de cargar". En Guardar sigue siendo bloqueo duro (ahi ya no hay mas pallets por venir).v3.26.0 — PLIEGOS: REMITO EN UNIDADES + CONTROL EN PAQUETES (100 pliegos c/u) (pedido usuario 2026-09-01, textual: "en el caso de los pliegos, el remito va a ser tambien en unidades. y el control va a ser en paquetes. cada paquete viene de cien pliegos. la clasificacion de los pliegos es, los pliegos pueden ser tipo formato c, que son el caso de el pliego del quinientos y el quinientos seis, y los pliegos formato bombilla"). Nuevos formatos en el catalogo GP2.carton_formato: 'Pliego C' (pliegos LOEKE 500/506 = A2B1/V3A que van a AJ para skin) y 'Pliego' (los 10 pliegos c/skin: 557/558/654/658/659/758/759/762/763/769). Ambos con uni_x_bolsa=100 (100 pliegos por paquete). Frontend: (1) FORMATOS_POR_MARCA gana 'Pliego C' + 'Pliego' (LOEKE) y 'Pliego' (CHEF). (2) UNI_X_BOLSA agrega 'Pliego C':100 y Bombilla:100; nueva esPliego(f). (3) abrirPopup para cartones (sector 10): si formato es pliego -> setUnit('uni'), placeholder "pliegos del remito"; sino sigue en paquetes de 250. (4) REMITO.push para pliegos guarda paquetes=cant (UNIDADES/pliegos declarados) en vez de cantRaw (paquetes). (5) montarControlCartones: header dice "N pliegos" y "N pliegos declarados" si todos son pliegos; sino "N cartones" y "N paquetes declarados". (6) pintarControlCartones + ctlLinea: label del input es "Paquetes controlados" (no "Bolsas") para pliegos, subH dice "1 paquete = 100 pliegos". Diff se calcula en UNIDADES (pliegos) para pliegos, en PAQUETES para cartones. (7) Backend GP2.guardar_control_cartones no cambia: acepta {bolsas} y resuelve uni_x_bolsa desde el catalogo -> multiplica por 100 para pliegos. v3.25.1 — AL NAVEGAR: BALANZA<REMITO PIDE CONFIRM CON LA CUENTA (usuario 2026-09-01: "y a parte deja seguir cuando es diferente a lo que dice el remito"). En v3.24.6 saque toda validacion de balanza<remito de la nav para no bloquear al operario que carga de a un pallet — pero eso dejaba pasar en silencio, sin aviso. Ahora, al pasar a otro item: sobrante negativo sigue siendo bloqueo duro (imposible); pero si balanza<remito aparece un confirm nativo con la cuenta (Remito X · Balanza Y · Dif Z) y el mensaje "¿Todavia te falta pesar pallets de este item? Aceptar = paso igual, vuelvo despues a completar. Cancelar = me quedo a terminar de cargar". En Guardar sigue siendo bloqueo duro (ahi ya no hay mas pallets por venir).v3.25.3 — AVISAR A DAMIÁN CON OPCION DE CANCELAR TODO EL REMITO (usuario 2026-09-01: "y ahi un cancelar en caso que damian dijo que no, y se cancela toda la carga (de ese proveedor)"). El alert() de v3.25.2 pasa a confirm nativo: Aceptar = Damian autorizo, guarda todo; Cancelar = Damian NO autorizo, ANULA TODA la carga del remito. Doble confirm antes de destruir (no se puede deshacer). El rollback hace DELETE de recepcion_insumo con los recIds del PES.items (los pallets pesados caen por CASCADE si el schema lo tiene; si no, quedan huerfanos y se avisa que limpie un admin). REMITO local se vacia igual y se cierra el popup con statusMsg rojo. v3.25.2 — AVISAR A DAMIÁN CUANDO EXCEDENTE NETO > 20% DEL REMITO (usuario 2026-09-01: "solo hay regla de si supera el 20% excedente, que salte una alerta de Avisar a Damian"). El excedente se calcula sobre el NETO (balanza − pallets × tara), no sobre balanza cruda: sobre remitos chicos la balanza cruda siempre trae >20% por el pallet y disparaba falsa alerta. (1) En itemLinea del paso 2, cuando dif>0 y dif > 20% del remito, la linea muestra "⚠ +NN% — AVISAR A DAMIÁN" en rojo bold (reemplaza el warning generico "dio mas que el remito"). (2) En kgPesajeOk (submit) se junta la lista de items con excedente >20% y sale un alert() nativo con el detalle (codigo · remito · neto · +dif kg (X%)) antes de guardar. No bloquea — Damián queda avisado y el operario sigue. v3.25.1 — AL NAVEGAR: BALANZA<REMITO PIDE CONFIRM CON LA CUENTA (usuario 2026-09-01: "y a parte deja seguir cuando es diferente a lo que dice el remito"). En v3.24.6 saque toda validacion de balanza<remito de la nav para no bloquear al operario que carga de a un pallet — pero eso dejaba pasar en silencio, sin aviso. Ahora, al pasar a otro item: sobrante negativo sigue siendo bloqueo duro (imposible); pero si balanza<remito aparece un confirm nativo con la cuenta (Remito X · Balanza Y · Dif Z) y el mensaje "¿Todavia te falta pesar pallets de este item? Aceptar = paso igual, vuelvo despues a completar. Cancelar = me quedo a terminar de cargar". En Guardar sigue siendo bloqueo duro (ahi ya no hay mas pallets por venir).v3.25.0 — CONTROL DE CARTONES POR BOLSAS (pedido usuario 2026-09-01, textual: "quiero que el control sea de bolsas, no de paquetes. el remito si en paquetes. huevo, 2000. ocho, 3000. c, 1000. loke, 1000. uni por paquete todos 250"). El remito (fase 1) sigue en PAQUETES. El control (fase 2) pasa a BOLSAS para los formatos que van embolsados: Huevo=2000 uni/bolsa (8 paq), 8=3000 uni/bolsa (12 paq), C=1000 uni/bolsa (4 paq), LOKE=1000 uni/bolsa (4 paq). Pliego y Bolsa (formatos "nuevos" que no son carton formal) NO llevan bolsa: el control queda en paquetes como estaba. Frontend: montarControlCartones ahora arrastra carton_formato desde INS y calcula uni_x_bolsa con UNI_X_BOLSA (mapa js con fallback a paquetes). El input pasa a "Bolsas controladas" cuando aplica, con etiqueta "1 bolsa = N paq = M uni" y linea de calculo "declarado X paq · Y bolsas = Z paq = W uni · dif ±N paq" con colores (verde 0, ambar chico, rojo >10%). Al guardar se envia {bolsas:...} para los que tienen bolsa y {paquetes:...} para Pliego/Bolsa. Backend (GP2.guardar_control_cartones) acepta ambos y guarda uni_x_bolsa en rollos_json. Nueva columna GP2.carton_formato.uni_x_bolsa (Huevo=2000, 8=3000, C=1000, LOKE=1000, Pliego/Bolsa=NULL). v3.24.7 — CHIP EN ROJO CUANDO EL ITEM TIENE SOBRANTE NEGATIVO + DESTACAR EL PALLET CON EL ERROR (usuario 2026-09-01, con foto de item con Pallet 1 OK sob 1kg + Pallet 2 sob -0.2kg, chip ✓ verde y el mensaje "no se puede continuar: sobrante negativo": "algo no cuadra"). Antes el chip quedaba ✓ verde porque itemListo mira solo peso+rollos, no valida sobrante — contradiccion visual con el mensaje de bloqueo. Ahora: (a) nueva itemConErrorGrave(it) chequea sob<0 en algun pallet; el chip pasa a clase `err` (rojo con ⚠), sin done, aunque itemListo diga que si. (b) En el detalle del mensaje, cada palletLinea recibe clase `err` (rojo, ⚠) si el sobrante es negativo o `ok` (gris) si esta bien — asi se ve rapido cual es el pallet que no cuadra dentro de un item con varios. CSS nueva .pes-chip.err/.err.act y .err-plt.err/.ok. v3.24.6 — FIX UX: la nav entre items YA NO valida balanza<remito, solo sobrante negativo (usuario 2026-09-01, con foto: "esta bugeado, saque uno de los rollos y igualmente no me deja seguir"). El bloqueo balanza<remito al navegar era incorrecto: el operario carga los pallets de un item de a uno por vez, y con solo 1 pallet cargado la suma parcial casi siempre es menor que el remito TOTAL — ahi bloqueabamos el paso al siguiente item cuando el flujo esperado es "cargo lo que tengo, paso al proximo, vuelvo despues a completar". Ahora validarItemPesaje solo mira sobrante negativo (que es error puntual del pallet ya cargado, no del avance del flujo). En Guardar (kgPesajeOk) balanza<remito SIGUE siendo bloqueo duro — ahi ya no hay mas pallets por venir y el numero final tiene que dar bien. v3.24.5 — BOTON SIGUIENTE LEGIBLE + LAYOUT DE ERROR EN CARD (usuario 2026-09-01, con foto del bloqueo activo: "el mensaje del palet puede ser mejor y el boton no se ve bien. x mas que este bloqueado tiene que ser legible"). (1) .pes-nav .sig pasa de color:#fff sobre #e7eff8 (texto invisible cuando el pallet esta bloqueado o no) a azul oscuro sobre celeste — mismo bug que arreglamos en chips. (2) Los 3 mensajes (nav bloqueado, guardar sobrante negativo, guardar balanza<remito) comparten ahora un solo layout tipo card: fondo rojo suave, titulo destacado, sub-linea explicativa, un item-card blanco por fleje con codigo + descripcion + (opcional) remito vs balanza + pallets indentados con "Pallet N: c × kg = suma kg · balanza X · sobrante Y", y una linea de "que hacer" al pie. Nuevas helpers palletLinea / palletsDeItemHTML / itemErrBlock / itemsPorCodigo unifican la construccion; el confirm de sobrante fuera de rango >=0 sigue en texto plano (es alert nativo). v3.24.4 — VALIDAR AL NAVEGAR ENTRE ITEMS DEL PESAJE (usuario 2026-09-01, con foto de mensaje de bloqueo mostrando 2 items A4+A8 con sobrante negativo, y el pedido "cuando tenes 2 flejes en vez de guardar pasas al siguiente, que eso tambien te tire el mensaje de guardar, para que continuar si pusiste mal la informacion anterior"). Antes solo se validaba en el submit del Guardar pesaje (con TODOS los items juntos), asi que el operario podia pasar por chip o Siguiente a otro item con el actual mal cargado. Ahora los mismos bloqueos duros (sobrante negativo y balanza<=remito) tambien se disparan cuando se intenta cambiar de item — corta la nav y baja el scroll al mensaje. Retroceder al mismo item no valida. Nuevas helpers detallePalletsIt(it) y validarItemPesaje(it) reusan la misma logica de kgPesajeOk pero acotada a un item. v3.24.3 — BALANZA<REMITO BLOQUEA GUARDAR + DETALLE POR PALLET EN EL MENSAJE (usuario 2026-09-01, con foto del confirm A4/A8 con balanza menor al remito y el pedido "en el mensaje tambien tiene que mostrar el resumen de pallet (kg x rollo) y del fleje. no esta mostrando actualmente el kg x rollo de los rollos del palet y esta dejando apretar guardar pesaje cuando kg x rollo es menor a la balanza"). (1) El confirm de "la balanza dio MENOS (o igual) que el remito" pasa a BLOQUEO duro: no deja guardar, mismo trato que el sobrante negativo (que ya era hard block desde v3.24.2). Corresponde: con el pallet la balanza SIEMPRE tiene que dar mas que el remito. (2) Los dos mensajes (balanza<remito y sobrante negativo) muestran ahora el detalle por pallet: "Pallet N: c × kg_por_rollo = suma kg · balanza X kg · sobrante Y kg", con el codigo y descripcion del fleje arriba. El confirm de sobrante fuera de rango >=0 (bajo/alto tolerable) tambien muestra el mismo detalle. Nueva helper interna detallePallets(cod) arma la linea desde el arreglo listos. v3.24.2 — SOBRANTE NEGATIVO BLOQUEA GUARDAR + INPUTS NUMERICOS QUE RECHAZAN LETRAS Y NORMALIZAN COMA A PUNTO (usuario 2026-09-01, con foto del paso 2 con sobrante -1,5 kg pudiendo guardar y el pedido "sobrante negativo no debe poder permitirte guardar y los inputs que sean solo numericos con coma o punto que ambos pongan punto. actualmente puedo escribir letras"). (1) En kgPesajeOk se agrega chequeo pre-confirm: si algun pallet tiene calc.sob < 0 (los rollos pesan mas que la balanza) NO se puede guardar — mensaje rojo y corto, sin confirm. El operario tiene que corregir un rollo o el peso de balanza. El confirm de sobrante fuera de rango sigue pero solo para sobrante >= 0 (bajo/alto tolerable). (2) Nuevas utilidades JS sanDec / sanInt / sanInput que sanitizan los inputs numericos: dec permite un solo punto y digitos (coma tipeada se convierte a punto en pantalla), int solo digitos. Aplicadas a kgValue (paso 1), kgRollos y kgKgPorRollo (paso 1 dinamicos, delegacion en rolloPallRow) y a los inputs de peso/c/k del paso 2 (dentro del listener de pesajeWrap). (3) parseNum se hace tolerante: si el string tiene coma sigue siendo formato AR (miles con punto, decimal con coma), sin coma un solo punto es decimal y varios puntos son miles — asi el punto de los inputs saneados se lee bien y el formato AR viejo tambien. v3.24.1 — JL METALES CONFIRMADO SOLO KG + FUERA ESTAMETAL (usuario 2026-09-01: "KG totales jl metales" + "y saca EstaMetal"). JL Metales queda en el default (solo Kg total, sin campos extra) — se anota en el comentario del fieldsFleje. EstaMetal deja de aparecer en la seleccion de proveedores y sus insumos se ocultan del listado: nuevo ocultarProv(nom) filtra en insumosDelRubro. La data cruda del componente sigue en la BD para no perder historial; si el usuario decide purgarla pasa por gp2-cirujano. v3.24.0 — CAMPOS DE RECEPCION DE FLEJES POR PROVEEDOR + SACA X + FIX CHIPS (pedido usuario 2026-09-01, con fotos). (1) El popup de recepcion de flejes agrega los datos que informa cada proveedor aparte del KG total: Basconia → Kg x Rollo (no piden por cada rollo, un promedio), Altrak y Hermac → Rollos totales, Aperam / Brawin / Szapiro → solo KG total (sin extras), JL Metales → pendiente de definir (por ahora igual que Aperam). Nueva funcion fieldsFleje(prov) mapea proveedor → {rollos?, kgPorRollo?}, y pintarFieldsFleje construye la fila del popup en abrirPopup. En guardar(): si kgPorRollo, se computa rollos = round(kg_total / kg_por_rollo) y se guarda como p_rollos para que el pesaje del paso 2 tenga la cuenta; el input Pallets se saca del remito (default null → paso 2 arma 1 pallet, el operario suma con "+ pallet" si hace falta). (2) Se saca la X del popup: el usuario dijo "el funcionamiento de no poder salir esta bien pero saca la X no se va a usar" — quedaba pegada arriba a la derecha y no funcionaba en paso 2, ahora se sale por Cancelar (paso 1) o por Guardar (paso 2). (3) Fix chips del pesaje que mostraban letra blanca sobre fondo pastel (usuario: "sectores que no se ven, letra blanca?"): .pes-chip.act pasa a azul oscuro sobre celeste y .pes-chip.done.act a verde oscuro sobre verde palido — contraste real. v3.23.0 — LA TARJETA DEL ITEM MUESTRA LO QUE YA SE CARGO AL REMITO (pedido usuario 2026-09-01, con foto: "si cargue que entrega. ahi abajo que figure lo que estoy cargando"). Antes lo cargado solo aparecia en la barra "Remito en curso" arriba; ahora tambien en la propia tarjeta del listado abajo: borde y fondo verdes + pastilla "✓ cargado 360 kg (1 pallet)" o "✓ cargado 12 paq" segun sea fleje/cartón. Nueva CSS .item-btn.cargado + .item-btn .cargado-info, nueva funcion resumenCargadoRemito(cod) que suma por codigo desde REMITO, y renderRemitoBar dispara filtrarItems() en cada cambio para que la tarjeta se refresque sola cuando se agrega/borra un item del remito. v3.22.0 — NO SE PUEDE SALIR SIN CONTROLAR (pedido usuario 2026-08-31: "No se puede salir sin controlar de ningún modulo"). Se extiende a todos los rubros la barrera de salida que antes era solo Cajas/Remaches. Nueva syncExits() oculta Atrás del header (btnAtrasHeader) y ← Volver del paso 2 (btnVolver1) cuando REMITO.length>0 || PES || CTL. Se llama desde renderRemitoBar, montarPesaje, montarControlCartones y resetPiePopup. El boton "Salir sin pesar" (kgPesajeSalir) queda oculto (los classList.remove('hidden') pasaron a add('hidden')); la X y Escape durante PES/CTL ya no salen, muestran "Terminá el control para salir" en kgMsg (antes llamaban a salirDelPesaje). Click en el fondo ya estaba bloqueado durante PES/CTL. Se agrega window beforeunload que avisa si el operario intenta cerrar pestaña/navegar afuera con REMITO en curso o control activo. La funcion salirDelPesaje sigue definida pero no se llama desde ningun boton: queda para uso interno / debug. v3.21.0 — CARTONES EN 2 FASES (pedido del usuario, textual: "cuando voy a recepcionar cartones quiero primero cargar remito y despues hacer el control: como en flejes. pero en el caso de cartones: cuando voy a cargar el remito tengo que poner paquetes y despues en el control tambien paquetes" + aclaracion: "al igual que en cajas y flejes"). Ahora los cartones (sector_id=10) usan el mismo esqueleto que flejes: el popup de carga anota el remito en PAQUETES (los que dice el proveedor) y suma el ítem al REMITO; con "Terminé de pasar remito" arranca la fase 2 (montarControlCartones) — un ítem por vez, chips de progreso + Anterior/Siguiente + "Guardar control" recien en el ultimo. El control es UN SOLO input por ítem: "Paquetes controlados" (numerico, entero); total_uni = paquetes * carton_uni_x_paquete (250 por defecto). Diff vs declarado con color (verde 0, ámbar chico, rojo >10%). Al guardar llama RPC guardar_control_cartones que hace UPDATE cantidad (unidades reales) + rollos_json + sincroniza el movimiento (los triggers recalculan inventario). No se toca la RPC cargar_recepcion. v3.20.0 — LA TARJETA SOLO MUESTRA LA OC (pedido del usuario, con foto: "no quiero el stock, solo la OC. Si no hay OC, nada ahi abajo"). Se saca la linea verde de stock que habia entrado en v3.19.0: la tarjeta queda codigo + descripcion + medida + la OC abierta (si hay); sin OC no hay nada abajo de la medida. El bundle sigue mandando 'stock' y 'ultima' por si hacen falta, pero la tarjeta no pinta ninguno de los dos. v3.19.0 — LA TARJETA MUESTRA EL STOCK, NO LA ULTIMA CARGA (pedido del usuario, con foto: "esta mostrando lo ultimo que recibi, esta mal"). El numero verde de la tarjeta era la ULTIMA RECEPCION del insumo (A1 decia "280 kg" = lo recibido hoy) y sin etiqueta se leia como stock — y el stock real de A1 era ~959 kg. Ahora el verde es el STOCK ACTUAL del insumo (GP2.inventario en la ubicacion de su sector, lo trae recepcion_bundle en la clave nueva 'stock'); sin stock queda "sin stock" en gris. Tras confirmar una recepcion la tarjeta suma lo recibido al stock en el acto, sin recargar. La 'ultima' carga sigue viniendo en el bundle por si hace falta, pero ya no se muestra. v3.18.0 — EL CONTROL DEL REMITO DESCUENTA EL PALLET (pedido del usuario: "esto parece que lo muestra como mal pero esta bien si descontas el pallet"). La balanza pesa producto + pallet, asi que compararla CRUDA contra el remito siempre miente: con balanza 1.200 y remito 1.200 marcaba ROJO y decia "dio menos que el remito", que ademas de asustar al pesador es falso (0 no es menos). Ahora se descuenta la tara (la aprendida del proveedor, la misma que usa el auto-calculo del kg por rollo) y se compara el NETO contra el remito con la tolerancia que ya estaba configurada (tol_ctrl_peso_pct, 2%). La linea muestra la cuenta entera: "balanza 1.200 kg - 1 pallet (5 kg) = 1.195 kg - dif -5 kg". El aviso ahora distingue de menos y de mas. v3.17.0 — EL PALLET ENTRA EN UNA FILA (pedido del usuario: "toda esta info esta ancha al pedo, ponela en una fila sola de ancho"). Balanza y la primera linea de rollos dejan de ser dos bloques apilados y quedan en el MISMO renglon: "Balanza [450] kg   Rollos [- 5 +] x [88,5] kg". Los inputs dejan de ir con flex:1 (un numero de 3 digitos ocupaba 400px de ancho) y pasan a medir lo que tienen que medir: 96px la balanza, 84px el kg por rollo. Las lineas de OTRO peso (raras) siguen abajo. En celular la parte de rollos baja sola por flex-wrap. v3.16.0 — PENDIENTES DE PESAJE EN LA PORTADA (pedido del usuario: "si hay pendientes de pesaje, que aparezcan sin que tenga que entrar a un modulo"). La barra "N recepciones sin pesar + Pesar ahora" ahora tambien vive ARRIBA del selector de rubro, apenas se abre la pantalla, con el detalle de codigos y proveedores (hasta 4, despues "y N mas"); un toque abre el pesaje directo, sin pasar por rubro/proveedor. La barra del paso 2 sigue igual. v3.15.0 — LA TARA SE APRENDE DE LOS PESAJES REALES (pedido del usuario): el auto-calculo del kg por rollo descuenta, en orden de mejor dato, (1) el promedio real de los pallets ya pesados de ESE proveedor, (2) el promedio real global, (3) el punto medio 4-8 del parametro (solo mientras no hay datos). La BD lo calcula sola (v_tara_pallet_real = balanza - suma de rollos de cada pesaje guardado; recepcion_tara() lo agrega al bundle con n>=5 y taras sanas 1-15 kg): a medida que se pesa, el calculo mejora sin tocar nada. v3.14.0 — KG POR ROLLO AUTOMATICO (pedido del usuario): con el peso de balanza y la cantidad de rollos, el kg c/u se calcula solo = (balanza - tara media del pallet, los 4-8 kg configurados) / rollos, redondeado a 0,1. Se muestra en azul mientras es automatico; apenas el operario lo corrige a mano queda en negro y el auto no lo pisa mas. Solo aplica con UNA linea de rollos (con varias de distinto peso no hay forma de repartir). v3.13.0 — PESAJE COMPACTO (pedido del usuario: "tengo que scrollear mucho" + el numero del stepper descentrado). La etiqueta "Peso de balanza (kg)" deja de ser un bloque arriba del campo: fila inline "Balanza [450] kg". La linea de rollos entra en UNA fila "[- 5 +] rollos x [88,5] kg" (kg alineado a la derecha como la balanza); en celular el popup pierde el aire de 34px (18/12) y gana ancho util. El input del stepper queda con flex fijo y centrado real entre - y +. Cada pallet pasa de ~700px a ~230px de alto. v3.12.0 — PORTADA CON LA ESTETICA GP2 COMPARTIDA (panel de diseno, gana sobriedad): la pantalla era la UNICA de su familia con copia propia y desviada del esqueleto — ahora linkea gp2-modulo.css como OC/Pintores y queda identica al resto; los 6 rubros pasan de chips sueltos a baldosas parejas en grilla (3 col, 2 en celular, 56px); titulos de seccion en mayuscula chica; "Ver stock" AFUERA (sin referencias en JS ni tests, redundante con el menu); "Atras" queda con la pastilla estandar. Paso 2 y popup sin cambios. v3.11.0 — CARGA DE ROLLOS MAS CLARA (pedido del usuario): cada linea se lee como una frase "[- 3 +] rollos de [65] kg" — la cantidad tiene stepper -/+ (tocable con guantes, 44px) ademas de poder tipearse, el kg lleva su unidad al lado, la linea nace con 1 rollo, el boton pasa a decir "+ rollos de otro peso" y la cruz de borrar solo aparece cuando hay mas de una linea. La suma y el sobrante siguen en vivo abajo del pallet. v3.10.0 — PESAJE POR ETAPAS (pedido del usuario): el paso 2 deja de ser todos los items en un chorizo hacia abajo y pasa a UN ITEM POR VEZ (1ro -> 2do -> 3ro), con chips de progreso arriba (verde = completo, saltan al item) y Anterior/Siguiente abajo; "Guardar pesaje" aparece recien en el ultimo item. Con un solo item no hay chips ni navegacion, queda como antes. v3.9.1 — la tarjeta muestra la ultima carga sin la palabra "ult." (pedido del usuario): queda solo el numero en verde, ej. "360 kg". v3.9.0 — POPUP DE CARGA REORDENADO (pedido del usuario): Rollos y Pallets pasan a estar pegados debajo de Cantidad, que es el orden en que se lee el remito; el toggle Kg/Unidades deja de ser dos botonazos a todo el ancho y queda como dos pastillas discretas al pie (la unidad casi nunca se cambia, cada insumo trae la suya); y se saca el parrafo que explicaba que el proveedor informa rollos — la fila ya solo aparece cuando corresponde. El aviso al confirmar sin cargar rollos/pallets NO se toco. v3.8.0 — SALIDA DEL PESAJE: del paso 2 no se podia salir (Cancelar oculto + fondo bloqueado) y ademas el popup no scrolleaba hasta arriba, asi que quien lo abria por error quedaba encerrado. Ahora hay X pegada arriba, boton "Salir sin pesar" y Escape; salir no pierde nada (los items ya estan en la BD desde el paso 1) y la recepcion reaparece como "sin pesar". v3.7.2 — la OC lleva la unidad: "OC: 640 kg" (los flejes van en kg y los cartones en unidades; sin unidad el numero no dice de que habla). v3.7.1 — la OC se resume como lo que FALTA recibir, sin numero de OC. v3.7.0 — la tarjeta del insumo muestra la OC ABIERTA que lo espera y la ultima carga queda solo con los kg, sin fecha. v3.6.1 — fix: el mensaje del cruce con OC se mostraba nunca (itemSel null tras cerrar popup); aviso de pallets a medias al guardar pesaje. v3.6.0 — muestra el cruce con OC (recibido/completa/sin OC) devuelto por la BD. v3.5.0: cartones se cargan en PAQUETES de 250 (parametro carton_uni_x_paquete), guardados en unidades. v3.4.0: modo_control por proveedor: rollos_remito (Basconia/Aperam), pesaje (resto flejeros, remito solo kg), peso_total (Bella Vista). v3.3.0: Bella Vista: factura en uni (se anota convertido a kg) y control por PESO TOTAL contra el remito. v3.2.0: la balanza debe dar MAS que el remito (peso del pallet), aviso en vivo + confirm al guardar. v3.1.0: pesaje obligatorio (sin "Pesar después"): la carga no se termina hasta controlar. v3.0.0: remito multi-item: paso 1 todos los items, "Terminé de pasar remito", paso 2 pesaje de todo; modulo Control integrado aca -->
-<script src="../auth-guard.js?v=20260904t"></script>
-<script src="../gp2-ui.js?v=20260912a"></script>
+<script src="../auth-guard.js?v=20260929a"></script>
+<script src="../gp2-ui.js?v=20260913e"></script>
+<script src="../gp2-control-insumo.js?v=20260930a"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Recepción de Insumos · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../supabase-config.js?v=20260905k"></script>
-<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<script src="../supabase-config.js?v=20260929a"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260912c"/>
 <style>
 /* ============================================================
    Lo visual BASE (card blanca + header negro, chips .prov-btn,
@@ -433,6 +538,17 @@ input[type="text"]{width:200px}
     <h1>Recepción Insumos</h1>
     <div class="hbtns"><a id="btnAtrasHeader" href="../GP2_MODULOS.html">Atrás</a></div>
   </div>
+  <!-- Si se entró desde la Versión Tablet (Recibir -> Prov. de insumos), el "Atrás" devuelve
+       a la tablet en vez de al menú: para el operario del galpón la tablet es la casa. -->
+  <script>
+  (function(){
+    try {
+      if (new URLSearchParams(location.search).get("volver") !== "tablet") return;
+      var a = document.getElementById("btnAtrasHeader");
+      if (a) a.href = "../Tablet/Tablet_GP2.html?modo=recibir";
+    } catch(e){}
+  })();
+  </script>
 
   <div class="steps">
     <!-- Paso 1 -->
@@ -450,12 +566,14 @@ input[type="text"]{width:200px}
         <button class="prov-btn" data-rubro="Remaches"  data-sid="8">Remaches</button>
         <button class="prov-btn" data-rubro="Bombillas" data-sid="7">Bombillas</button>
         <button class="prov-btn" data-rubro="Garage"    data-sid="9">Garage</button>
-        <button class="prov-btn" data-rubro="MatPlastica" data-sid="14">Mat. Plástica</button>
+        <button class="prov-btn" data-rubro="MatPlastica" data-sid="14">Bolsas Plásticas</button>
         <!-- Importados (2026-09-11): piezas que se COMPRAN hechas y viven en Sector Procesado
              (C13 Corta Queso, D1 Espiral Sacacorcho, Z23A Cuch China, Z23B Cuchilla Laser).
-             Hasta hoy no se podian recepcionar por ningun lado — ni aparecian en la pantalla ni
-             las aceptaba la RPC — y 17 rutas de 16 articulos no podian ni arrancar. Se filtran
-             por estado_compra='importado', no por sector (el 1686 de Eclipse comparte sector). -->
+             Hasta hoy no se podian recepcionar por ningun lado - ni aparecian en la pantalla ni
+             las aceptaba la RPC - y 17 rutas de 16 articulos no podian ni arrancar. Se filtran
+             por estado_compra='importado', no por sector (el 1686 de Eclipse comparte sector).
+             (El 2026-09-14 se probo renombrarlo a "Procesado"/recepcion por sector y el usuario
+             dijo "me confundi, dejalo como importado": revertido, ver v3.58.0.) -->
         <button class="prov-btn" data-rubro="Importados" data-sid="2">Importados</button>
         <!-- Los rubros Filtros (Charcas) y Cortados (Eclipse) se sacaron en Fase B
              del rework 2026-09-02 (usuario): ahora los PS hibridos viven en su
@@ -502,11 +620,11 @@ input[type="text"]{width:200px}
         <div style="font-size:32px;font-weight:900;color:#0b3b73"><span id="akStock">0</span> <small style="font-size:18px;color:#0b5cad">kg</small></div>
       </div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0">
-        <div style="flex:1 1 150px;display:flex;flex-direction:column;gap:6px">
+        <div style="flex:1 1 150px;display:flex;flex-direction:column;justify-content:space-between;gap:6px">
           <label for="akFecha" style="font-size:16px;font-weight:700">Fecha</label>
           <input type="date" id="akFecha" style="height:48px;font-size:20px;padding:0 12px;border:2px solid #d0d7de;border-radius:10px">
         </div>
-        <div style="flex:1 1 150px;display:flex;flex-direction:column;gap:6px">
+        <div style="flex:1 1 150px;display:flex;flex-direction:column;justify-content:space-between;gap:6px">
           <label for="akRemito" style="font-size:16px;font-weight:700">N° remito (opcional)</label>
           <input type="text" id="akRemito" inputmode="text" placeholder="Opcional" style="height:48px;font-size:20px;padding:0 12px;border:2px solid #d0d7de;border-radius:10px">
         </div>
@@ -522,11 +640,11 @@ input[type="text"]{width:200px}
         <div id="akSliderLbl" style="text-align:center;font-size:18px;font-weight:800;color:#0b3b73">Definí el reparto</div>
       </div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 0">
-        <div style="flex:1 1 150px;display:flex;flex-direction:column;gap:6px">
+        <div style="flex:1 1 150px;display:flex;flex-direction:column;justify-content:space-between;gap:6px">
           <label for="akPctCorto" style="font-size:16px;font-weight:700">% Corto (IC3) → Cervantes</label>
           <input type="text" id="akPctCorto" inputmode="numeric" placeholder="70" style="height:48px;font-size:22px;font-weight:700;padding:0 14px;border:2px solid #d0d7de;border-radius:10px">
         </div>
-        <div style="flex:1 1 150px;display:flex;flex-direction:column;gap:6px">
+        <div style="flex:1 1 150px;display:flex;flex-direction:column;justify-content:space-between;gap:6px">
           <label for="akPctLargo" style="font-size:16px;font-weight:700">% Largo (IC3V) → Virgilio</label>
           <input type="text" id="akPctLargo" inputmode="numeric" placeholder="30" style="height:48px;font-size:22px;font-weight:700;padding:0 14px;border:2px solid #d0d7de;border-radius:10px">
         </div>
@@ -549,11 +667,11 @@ input[type="text"]{width:200px}
         <div style="font-size:32px;font-weight:900;color:#0b3b73"><span id="chStock">0</span> <small style="font-size:18px;color:#0b5cad">kg</small></div>
       </div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin:12px 0">
-        <div style="flex:1 1 150px;display:flex;flex-direction:column;gap:6px">
+        <div style="flex:1 1 150px;display:flex;flex-direction:column;justify-content:space-between;gap:6px">
           <label for="chFecha" style="font-size:16px;font-weight:700">Fecha</label>
           <input type="date" id="chFecha" style="height:48px;font-size:20px;padding:0 12px;border:2px solid #d0d7de;border-radius:10px">
         </div>
-        <div style="flex:1 1 150px;display:flex;flex-direction:column;gap:6px">
+        <div style="flex:1 1 150px;display:flex;flex-direction:column;justify-content:space-between;gap:6px">
           <label for="chRemito" style="font-size:16px;font-weight:700">N° remito (opcional)</label>
           <input type="text" id="chRemito" inputmode="text" placeholder="Opcional" style="height:48px;font-size:20px;padding:0 12px;border:2px solid #d0d7de;border-radius:10px">
         </div>
@@ -652,19 +770,15 @@ const SB=GP2_SB();
 var $ = GP2UI.$;
 
 /* Sectores cuya fase 2 (el control fisico) vive en OTRA pagina, y en cual.
-   Flejes y cartones NO estan aca: su fase 2 se abre en esta misma pantalla
-   (montarPesaje / montarControlCartones). Con bombillas adentro (2026-09-03) ya
-   NO queda ningun rubro sin control: los 6 terminan yendo a algun lado.
-   La pantalla de control por peso naciendo para remaches quedo generalizada por
-   sector, asi que plasticos entra a la misma con ?sector=6 en vez de tener una
-   copia propia [usuario 2026-09-03: "que sea control en kg" para plasticos].
-   Sumar un sector nuevo al control por peso es agregar una linea aca. */
-const CONTROL_URL = {
-  11: 'control-cajas.html',              // Cajas: base x pisos + sueltas
-  8:  'control-remaches.html',           // Remaches: pesar (8 es el default de esa pantalla)
-  6:  'control-remaches.html?sector=6',  // Plasticos: misma pantalla de peso, otro sector
-  7:  'control-remaches.html?sector=7'   // Bombillas: idem [usuario 2026-09-03]
-};
+   Flejes y cartones NO estan: su fase 2 se abre en esta misma pantalla
+   (montarPesaje / montarControlCartones). LA LISTA VIVE UNA SOLA VEZ en
+   gp2-control-insumo.js (GP2CI) desde el 2026-09-30: estaba escrita aca, solo
+   servia para la redireccion automatica al guardar, y si el operario salia del
+   control ninguna pantalla lo llevaba de vuelta [Nazareno: "Cargue una recepcion
+   en recepcion de insumos y no hice el control. Ahora voy a control y no me
+   aparece"]. Hoy la usan tambien el Control de la tablet y su contador. Sumar un
+   sector nuevo al control por peso es agregar una linea en ese archivo. */
+var ctrlUrlDe = GP2CI.urlDe;
 // Unidad default por rubro (kg / uni). Los flejes y remaches se compran en kg.
 const RUBRO_UM={Flejes:"kg",Remaches:"kg",Cajas:"uni",Plasticos:"uni",Cartones:"uni",Bombillas:"uni",Garage:"uni",MatPlastica:"kg"};
 
@@ -720,9 +834,31 @@ function fieldsFleje(nom){
    recibir. Cargados en uni entran derecho, con o sin peso por unidad.
    NO es el sector 6 entero: Trefilados Industriales tambien es un plastico
    (PCP3 Clavo 505) y ese SI se compra por kg — lo maneja recibe_en_cajas. Por
-   eso en plasticos la regla es por PROVEEDOR. */
+   eso en plasticos la regla es por PROVEEDOR.
+   KOLLPLAST entra el 2026-09-23 [usuario: "Los dos bujes mariposa ahora se los compramos
+   a Kollplast. Remito en uni control en kg"]: le pasaron los bujes PA8A/PA8B que eran de
+   Pat Bet. Al ser por proveedor, arrastra tambien a PEST1 (Insertos Mango de Madera), la
+   otra pieza que ya le comprabamos — mismo criterio: se cuentan, y los kg de abajo del
+   input son los que tiene que marcar la balanza en el control. */
 const PLAST_UNI = ['eduardo pintos','pat bet plast','pettofrezza rafael'];
 function provPlastUni(nom){ return PLAST_UNI.indexOf(String(nom||'').trim().toLowerCase())>=0; }
+/* En qué unidad viene el REMITO de esta pieza, cuando la pieza lo dice: 'kg' | 'uni' | "" si no
+   declara nada y decide el rubro. Es componente.remito_unidad, la misma columna que la Tablet usa
+   para las entregas de talleristas (2026-09-23) — una sola forma de decir "esta pieza se recibe
+   pesada" en toda la casa, en vez de una lista de proveedores por pantalla. */
+function remUnidad(it){
+  var r = String((it && it.remito_unidad) || '').toLowerCase();
+  if (r === 'envase') return envaseRemito(it) ? 'envase' : '';
+  return (r === 'kg' || r === 'uni') ? r : '';
+}
+/* El envase en el que viene contado el remito cuando remito_unidad='envase': {label, factor}, con
+   factor = unidades por envase (componente.entrega_uni_x). null si falta el dato. Hoy C13, cajas
+   de 144 [usuario 2026-09-25]. */
+function envaseRemito(it){
+  var f = Number(it && it.entrega_uni_x);
+  if (!(f > 0)) return null;
+  return { label: String((it && it.entrega_unidad) || 'envases'), factor: f };
+}
 function cargaEnUni(it){
   if (!it) return false;
   var sid = Number(it.sector_id);
@@ -741,7 +877,7 @@ function cargaEnUni(it){
 function ocultarProv(nom){
   var p = String(nom||'').trim().toLowerCase();
   // Altrak YA NO se oculta (2026-09-04, opcion B): aparece como proveedor en el rubro
-  // Flejes y su entrega (fleje bruto FLEJE90_BRUTO -> Charcas, kg + %) se carga con el
+  // Flejes y su entrega (fleje bruto ALAMBRE -> Charcas, kg + %) se carga con el
   // flujo propio irAltrak(), no con el de flejes normales. EstaMetal sigue oculto (fuera
   // de circulacion).
   return p==='estametal';
@@ -819,15 +955,23 @@ document.querySelectorAll('#rubroGrid .prov-btn').forEach(btn=>{
     document.querySelectorAll('#rubroGrid .prov-btn').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     // Proveedores REALES de GP2 para este rubro (los que figuran en las tablas)
-    provsRubro=[...new Set(insumosDelRubro().map(i=>i.proveedor).filter(Boolean))].sort();
-    // Altrak entrega el fleje bruto (FLEJE90_BRUTO, sector 13, va a Charcas): no cae por
+    // Principal + alternativos: una caja que entregan Corrugadora y Recicor tiene que
+    // dar los DOS chips (provsDeInsumo), no solo el proveedor de la ficha.
+    provsRubro=[...new Set([].concat(...insumosDelRubro().map(provsDeInsumo)).filter(Boolean))].sort();
+    // Altrak entrega el fleje bruto (ALAMBRE, sector 13, va a Charcas): no cae por
     // sector en el rubro Flejes (sector 5), asi que se inyecta a mano y abre irAltrak().
     if(rubroSel==='Flejes' && provsRubro.indexOf('Altrak')<0) provsRubro.push('Altrak');
-    if(provsRubro.length){ pintarProvs(); $('provSection').classList.remove('hidden'); }
+    // Importados tiene un solo proveedor ('Importado'): no se elige, se auto-selecciona
+    // y se saltea el paso Proveedor (sin subtitulo ni chip). Usuario 2026-09-16.
+    var saltaProv = (rubroSel==='Importados' && provsRubro.length===1);
+    if(saltaProv){
+      provSel=provsRubro[0];
+      $('provGrid').innerHTML=''; $('provSection').classList.add('hidden');
+    } else if(provsRubro.length){ pintarProvs(); $('provSection').classList.remove('hidden'); }
     else { $('provGrid').innerHTML=''; $('provSection').classList.add('hidden'); }
     $('remitoSection').classList.remove('hidden');
     $('btnContinuarRow').style.display='flex';
-    $('btnContinuar').textContent = provsRubro.length ? 'Cargar artículos' : 'Ver artículos';
+    $('btnContinuar').textContent = (provsRubro.length && !saltaProv) ? 'Cargar artículos' : 'Ver artículos';
     refreshContinuar();
   });
 });
@@ -836,7 +980,7 @@ function pintarProvs(){
   // Solo proveedores con al menos 1 insumo (usuario 2026-09-01: "todo lo que sea
   // 0 no me aparezca como opcion").
   provsRubro.forEach(p=>{
-    var n=(p==='Altrak')?1:insumosDelRubro().filter(i=>i.proveedor===p).length;
+    var n=(p==='Altrak')?1:insumosDelRubro().filter(i=>esDelProv(i,p)).length;
     if (n===0) return;
     var b=document.createElement('button'); b.className='prov-btn'; b.innerHTML=esc(p)+' <span style="opacity:.6;font-weight:600">('+n+')</span>';
     b.addEventListener('click',()=>{
@@ -862,6 +1006,24 @@ var PS_CORTE_FLEJE = ['resortes charcas'];
 function esCorteDePS(i){
   return Number(i.sector_id)===5 && PS_CORTE_FLEJE.indexOf(String(i.proveedor||'').trim().toLowerCase())>=0;
 }
+/* UN INSUMO PUEDE TENER MAS DE UN PROVEEDOR (2026-09-17, usuario: "dentro de cajas,
+   ademas de corrugadora del plata, tenes que agregar al proveedor Recicor. Entrega las
+   mismas cajas que corrugadora. El control de remito es igual al de corrugadora").
+   El componente sigue teniendo UN proveedor principal (componente.proveedor, el que manda
+   en la OC y en el costo); los que TAMBIEN lo entregan viven en GP2.componente_proveedor_alt
+   y llegan aca como i.proveedores_alt. Asi las 11 cajas no se duplican: aparecen bajo los dos
+   chips y el stock sigue siendo uno solo.
+   Todo filtro por proveedor de esta pantalla pasa por esDelProv(); comparar i.proveedor===provSel
+   a mano deja al proveedor alternativo sin items. */
+function provsDeInsumo(i){
+  if (!i) return [];
+  var l = i.proveedor ? [i.proveedor] : [];
+  (Array.isArray(i.proveedores_alt) ? i.proveedores_alt : []).forEach(function(p){
+    if (p && l.indexOf(p)<0) l.push(p);
+  });
+  return l;
+}
+function esDelProv(i, p){ return !p || provsDeInsumo(i).indexOf(p)>=0; }
 function insumosDelRubro(){
   // Importados: no se agrupan por sector (viven en Procesado, junto a piezas que se fabrican)
   // sino por estado_compra. El resto de los rubros sigue siendo su sector.
@@ -876,7 +1038,7 @@ function insumosDelRubro(){
 // dos stubs `return false` que habian quedado sin ningun llamador.
 function insumosVista(){
   var l=insumosDelRubro();
-  if(provSel) l=l.filter(i=>i.proveedor===provSel);
+  if(provSel) l=l.filter(i=>esDelProv(i,provSel));
   if (rubroSel==='Cartones') {
     if (marcaSel==='_sin') l=l.filter(i=>!i.marca);
     else if (marcaSel) l=l.filter(i=>i.marca===marcaSel);
@@ -944,7 +1106,7 @@ function irAltrak(){
 async function cargarStockAltrak(){
   try{
     var st = await SB.from('inventario').select('cantidad, componente:componente_id(codigo)').eq('ubicacion_id', 13);
-    var kg=0; (st.data||[]).forEach(function(r){ if(r.componente && r.componente.codigo==='FLEJE90_BRUTO') kg=Number(r.cantidad)||0; });
+    var kg=0; (st.data||[]).forEach(function(r){ if(r.componente && r.componente.codigo==='ALAMBRE') kg=Number(r.cantidad)||0; });
     $('akStock').textContent = fmt(kg);
   }catch(e){ $('akStock').textContent='—'; }
 }
@@ -1003,7 +1165,7 @@ if($('akKg')){
 }
 
 // ============ Recepcion de Aperam (chapa 430 -> Eclipse) 2026-09-04 ============
-// Se abre al tocar el item CHAPA430 en Flejes (Aperam vende 13 flejes + la chapa, asi que
+// Se abre al tocar el item FLEJE_DESCORAZONADOR en Flejes (Aperam vende 13 flejes + la chapa, asi que
 // el ruteo es por ITEM, no por proveedor como Altrak). Solo kg + remito (sin %). Llama
 // cargar_compra_mp('Aperam'), que suma la chapa al stock de Eclipse (ubic 48).
 function irChapa(){
@@ -1019,7 +1181,7 @@ function irChapa(){
 async function cargarStockChapa(){
   try{
     var st = await SB.from('inventario').select('cantidad, componente:componente_id(codigo)').eq('ubicacion_id', 48);
-    var kg=0; (st.data||[]).forEach(function(r){ if(r.componente && r.componente.codigo==='CHAPA430') kg=Number(r.cantidad)||0; });
+    var kg=0; (st.data||[]).forEach(function(r){ if(r.componente && r.componente.codigo==='FLEJE_DESCORAZONADOR') kg=Number(r.cantidad)||0; });
     $('chStock').textContent = fmt(kg);
   }catch(e){ $('chStock').textContent='—'; }
 }
@@ -1073,7 +1235,7 @@ function marcasDe(base){
 }
 function pintarMarcaChips(){
   var mg=$('marcaChips'); mg.innerHTML='';
-  var base=insumosDelRubro().filter(i=>!provSel||i.proveedor===provSel);
+  var base=insumosDelRubro().filter(i=>esDelProv(i,provSel));
   var sin  =base.filter(i=>!i.marca).length;
   function chip(val,label,n){
     var b=document.createElement('button'); b.className='prov-btn'; b.type='button';
@@ -1110,7 +1272,7 @@ var ORDEN_FORMATO = { LOEKE:['C','8','Huevo','LOKE','Pliego','Bolsa','Manga'], C
 function pintarFormatoChips(){
   var fw=$('formatoWrap'), fg=$('formatoChips');
   if (!marcaSel){ fw.classList.add('hidden'); fg.innerHTML=''; return; }
-  var base = insumosDelRubro().filter(function(i){ return !provSel || i.proveedor===provSel; })
+  var base = insumosDelRubro().filter(function(i){ return esDelProv(i,provSel); })
                               .filter(function(i){ return marcaSel==='_sin' ? !i.marca : i.marca===marcaSel; });
   // Los formatos que la marca REALMENTE tiene, ordenados: primero los conocidos en su orden
   // historico, despues cualquier formato nuevo que aparezca en los datos.
@@ -1119,6 +1281,11 @@ function pintarFormatoChips(){
   var orden = ORDEN_FORMATO[marcaSel] || [];
   var permitidos = orden.filter(function(f){ return enDatos.indexOf(f)>=0; })
                         .concat(enDatos.filter(function(f){ return orden.indexOf(f)<0; }));
+  // v3.63.0 — Proveedor SIN formatos (bolsas de Envases Vihal y Papelera Nueve de Julio): no hay
+  // nada que clasificar, asi que no va la fila FORMATO ni el chip "Sin formato"; se ven los
+  // items de la marca y listo [usuario 2026-09-25: "simplemente aparecen los cartones de cada
+  // marca sin clasificacion de formato"]. Formato es solo de los cartones de Graficos Pol.
+  if (!permitidos.length){ formatoSel=''; fw.classList.add('hidden'); fg.innerHTML=''; return; }
   var cont = {}; permitidos.forEach(function(f){ cont[f]=0; }); var sinF=0;
   base.forEach(function(i){ if(i.carton_formato && permitidos.indexOf(i.carton_formato)>=0) cont[i.carton_formato]++; else sinF++; });
   fg.innerHTML='';
@@ -1190,7 +1357,7 @@ function pintarItems(list){
     // "quiero que aparezca el formato debajo de cada carton"). Los pliegos
     // se rotulan como "Pliego · <formato>" para no confundirlos con cartones.
     var fmt = '';
-    if (i.sector_id===10 && i.carton_formato){
+    if (GP2UI.esCarton(i) && i.carton_formato){
       var lbl = i.carton_formato==='8' ? 'Ocho' : i.carton_formato;
       // No repetir "Pliego · Pliego" para los ex-bombilla (formato Pliego, es_pliego=true)
       var pref = (i.es_pliego && i.carton_formato!=='Pliego') ? 'Pliego · ' : '';
@@ -1205,8 +1372,9 @@ function pintarItems(list){
     // Pliego=1 = 1 paquete = 100 pliegos). +1 = 1 paquete (o 100 pliegos para es_pliego).
     // No aparece +N para formato Bolsa (sin bolsa definida) — solo +1.
     var quick = '';
-    if (i.sector_id===10){
-      var pxb = Number(i.paq_x_bolsa)||0;
+    if (GP2UI.esCarton(i)){
+      // con paquete propio del cartón (entrega_uni_x) el +N sale de ése: 2.500 = +10
+      var pxb = Number(cartonUxp(i) ? paqXBolsaDelItem(i) : i.paq_x_bolsa)||0;
       var qb = '';
       // Para pliegos formato "Pliego" (ex-Bombilla) el +N es +1 igual (1 paq=100 pliegos) — no tiene sentido duplicar.
       if (pxb>1) qb += '<button class="qbtn qbtn-primary" data-qn="'+pxb+'">+'+pxb+'</button>';
@@ -1223,7 +1391,7 @@ function pintarItems(list){
     var _pnd = PEND[String(i.comp_id)];
     if (_pnd){
       var _txt = '';
-      if (i.sector_id===10){
+      if (GP2UI.esCarton(i)){
         var _pq = Number(_pnd.paq) || Number(_pnd.cantRaw) || 0;  // +N/+1 usa paq, el popup cantRaw
         if (_pq>0) _txt = _pq+' paq';
       }
@@ -1232,7 +1400,7 @@ function pintarItems(list){
         quick += '<div class="qrow qrow-pend" style="justify-content:center">'+
                  '<span class="rb-pend-item">'+esc(_txt)+
                  ' <button class="qbtn" data-pend-edit="1" type="button" title="Modificar a mano">✏️</button>'+
-                 (i.sector_id===10 ? '' :
+                 (GP2UI.esCarton(i) ? '' :
                    ' <button class="qbtn qbtn-del" data-pend-del="'+esc(String(i.comp_id))+'" type="button" title="Eliminar del remito">🗑</button>')+
                  '</span></div>';
       }
@@ -1504,29 +1672,28 @@ function setUnit(u){
   updateConv();
 }
 function PAQ(){ return Number(TARA.carton_uni_x_paquete)||250; }
-/* Uni x bolsa por carton_formato (regla del negocio 2026-09-01).
-   Espejo del uni_x_bolsa que vive en GP2.carton_formato. Pliego y Bolsa
-   NO llevan bolsa (no son carton formal): quedan como null y el control
-   se hace en paquetes como antes. */
-/* Uni por "unidad de control" segun formato (regla usuario 2026-09-01):
-   - Cartones (Huevo/8/C/LOKE): control en BOLSAS con estas unidades por bolsa.
-   - Bombilla y Bolsa: NO tienen bolsa como carton; los items ADENTRO son pliegos (Bombilla)
-     o bolsas Vihal (Bolsa) -> el packaging lo decide el flag es_pliego del componente.
-   Los pliegos (componente.es_pliego=true, sean formato C o Bombilla) se controlan en
-   PAQUETES de 100 pliegos c/u ("el remito en unidades, el control en paquetes").
-   esPliegoIt(it) = flag del componente (es_pliego), sirve tanto para C-pliego como para Bombilla-pliego. */
-var UNI_X_BOLSA = { Huevo:2000, '8':3000, C:1000, LOKE:1000, Bolsa:null, Pliego:100 };
+/* Uni por "unidad de control" (bolsa de la gráfica o paquete de pliegos).
+   - Cartones: control en BOLSAS de las unidades que dice EL CARTÓN (componente.entrega_uni_x, la
+     col "Uni x Paq" de la planilla de conteo) [Thomas 2026-09-25: "trae las unidades que dice el uni
+     x paquete x cartón" + "tendría que nada más decir el formato y esa tabla fija por formato de uni
+     por paquete, sacala"]. El formato es solo el NOMBRE; la tabla fija por formato se sacó.
+   - Pliegos (componente.es_pliego): PAQUETES de 100 ("el remito en unidades, el control en paquetes").
+   - Bolsas Vihal/Papelera (sin formato): sin bolsa, control en paquetes como antes. */
 var UNI_X_PAQ_PLIEGO = 100;
 function esPliegoIt(it){ return !!(it && it.es_pliego); }
 function uniXCtlItem(it){
-  // Unidades por unidad de control (bolsa o paquete de pliegos)
   if (esPliegoIt(it)) return UNI_X_PAQ_PLIEGO;
-  var f = it && it.carton_formato;
-  if (!f) return null;
-  return UNI_X_BOLSA[f]==null ? null : UNI_X_BOLSA[f];
+  return cartonUxp(it);
+}
+function cartonUxp(it){
+  var f = Number(it && it.entrega_uni_x);
+  return (it && Number(it.sector_id)===10 && !esPliegoIt(it) && it.carton_formato && f>0) ? f : null;
 }
 function paqXBolsaDelItem(it){
   if (esPliegoIt(it)) return null;
+  // con paquete propio del cartón los paquetes de 250 salen de ESE número (2.500 = 10 paq)
+  var fc = cartonUxp(it);
+  if (fc) return Math.round(fc/PAQ());
   // Fuente de verdad: catalogo GP2.carton_formato.paq_x_bolsa (viene en el bundle).
   // Fallback: derivar de uni_x_bolsa / uni_x_paquete (valido cuando la bolsa es multiplo
   // exacto del paquete, ej C=4, Huevo=8, LOKE=4; el formato 8 va explicito en catalogo).
@@ -1539,6 +1706,9 @@ function updateConv(){
   var v=parseNum($('kgValue').value);
   if(unitSel==='paq'){
     d.textContent=v>0?('= '+fmt(v*PAQ())+' unidades'):'';
+  } else if(unitSel==='env'){
+    var evc=itemSel&&envaseRemito(itemSel);
+    d.textContent=(v>0&&evc)?('= '+fmt(v*evc.factor)+' unidades'):'';
   } else {
     var kx=itemSel&&KGXUNI[itemSel.comp_id];
     if(unitSel==='uni'&&kx){ d.textContent=v>0?('= '+fmtKgUni(v*kx)+' kg'):''; }
@@ -1561,13 +1731,13 @@ function actualizarAvisoMultiplo(){
     if (m.classList.contains('warn')){ m.className='status'; m.textContent=''; }
     return;
   }
-  var pxb = Number(itemSel.paq_x_bolsa)||0;
+  var pxb = Number(paqXBolsaDelItem(itemSel))||0;
   var v = parseNum($('kgValue').value);
   if (!(pxb>0) || !(v>0) || (v % pxb)===0){
     if (m.classList.contains('warn')){ m.className='status'; m.textContent=''; }
     return;
   }
-  var uxb = Number(itemSel.uni_x_bolsa_cat)||(pxb*PAQ());
+  var uxb = Number(uniXCtlItem(itemSel))||Number(itemSel.uni_x_bolsa_cat)||(pxb*PAQ());
   var fmtLbl = itemSel.carton_formato==='8' ? 'Ocho' : (itemSel.carton_formato||'?');
   var bolsas = Math.floor(v/pxb), sueltos = v - bolsas*pxb;
   m.className='status warn';
@@ -1579,7 +1749,7 @@ $('unitUni').addEventListener('click',()=>setUnit('uni'));
 function abrirPopup(i){
   // La chapa 430 (Aperam) no se recibe en el sector: es MP de Eclipse y va a su stock
   // (ubic 48) via cargar_compra_mp('Aperam'). Se rutea a su panel propio.
-  if(i && i.codigo==='CHAPA430'){ irChapa(); return; }
+  if(i && i.codigo==='FLEJE_DESCORAZONADOR'){ irChapa(); return; }
   itemSel=i;
   resetPiePopup();
   $('kgTitle').textContent='Recepción · '+rubroSel;
@@ -1590,13 +1760,33 @@ function abrirPopup(i){
   // Label "Cantidad" con la unidad que corresponde al rubro (usuario 2026-09-01:
   // "donde dice cantidad, aclara cantidad paq"). Se sobrescribe en cada rama.
   $('kgValueLabel').textContent='Cantidad';
+  // LA PIEZA MANDA SOBRE EL RUBRO: si el componente declara en qué unidad viene su remito
+  // (componente.remito_unidad, la misma columna que usa la Tablet), se respeta y el toggle
+  // Kg/Unidades se esconde — no hay nada que elegir. Hoy es la Plancha de Níquel PCP2 de CC
+  // Galvanoquímica [usuario 2026-09-23: "plancha niquel en el remito viene en kg y se controla
+  // en kg"], que vive en un sector donde todo lo demás se cuenta. Va PRIMERO a propósito: es el
+  // dato más específico que hay, más que la regla del rubro o la del proveedor.
+  if(remUnidad(i)){
+    $('unitRow').classList.add('hidden');
+    var uPieza=remUnidad(i);
+    if(uPieza==='envase'){
+      // el remito viene contado en el envase (C13: cajas de 144); se guarda en unidades
+      var ev=envaseRemito(i);
+      $('kgValue').placeholder = ev.label+' de '+fmt(ev.factor)+' uni';
+      $('kgValueLabel').textContent = 'Cantidad '+ev.label;
+      setUnit('env');
+    } else {
+      $('kgValue').placeholder = uPieza==='kg' ? 'kg del remito' : 'unidades del remito';
+      $('kgValueLabel').textContent = uPieza==='kg' ? 'Cantidad kg' : 'Cantidad uni';
+      setUnit(uPieza);
+    }
   // Cartones: el proveedor entrega PAQUETES (alturas de 250 unidades siempre).
   // Se carga en paquetes y se guarda convertido a unidades.
   // EXCEPCION pliegos (formato Pliego C / Bombilla): el remito viene en UNIDADES
   // (pliegos individuales); el control despues es en paquetes de 100 pliegos
   // (regla usuario 2026-09-01: "los pliegos ... el remito va a ser tambien en unidades.
   // el control va a ser en paquetes. cada paquete viene de cien pliegos").
-  if(i.sector_id===10){
+  } else if(GP2UI.esCarton(i)){
     $('unitRow').classList.add('hidden');
     if (esPliegoIt(i)){
       setUnit('uni');
@@ -1967,7 +2157,11 @@ function calcItem(it){
   });
   return { tot:tot, n:n };
 }
-function tolKg(kg){ return Math.max(kg*(Number(TARA.tol_ctrl_peso_pct)||2)/100, 0.5); }
+/* UNA SOLA TOLERANCIA DE CONTROL EN TODA LA CASA: 5 % [usuario 2026-09-23: "todo control no
+   puede exceder el 5% de diferencia"]. La clave tol_ctrl_peso_pct (2 %, sólo este pesaje) pasó
+   a llamarse tol_ctrl_pct y la leen también el control de insumos y el de entregas. El piso de
+   0,5 kg queda: con 3 kg de remito, el 5 % son 150 gramos y ninguna balanza afina tanto. */
+function tolKg(kg){ return Math.max(kg*(Number(TARA.tol_ctrl_pct)||5)/100, 0.5); }
 function itemLinea(it){
   if(!it.remitoKg) return '';
   var c=calcItem(it);
@@ -2711,10 +2905,14 @@ async function guardar(){
   var kx=KGXUNI[itemSel.comp_id];
   var cant=cantRaw, uReal=unitSel;
   if(unitSel==='paq'){ cant=cantRaw*PAQ(); uReal='uni'; }
+  // remito en el envase de la pieza (remito_unidad='envase'): cajas x uni por caja = unidades
+  else if(unitSel==='env'){ cant=cantRaw*envaseRemito(itemSel).factor; uReal='uni'; }
   // Los rubros de cargaEnUni (remaches, bombillas, plasticos de piezas) NO se
   // convierten: se guardan tal como los tipeo el operario, en unidades, que es
   // la unidad canonica del inventario de esos sectores.
-  else if(unitSel==='uni'&&kx&&!cargaEnUni(itemSel)){ cant=cantRaw*kx; uReal='kg'; }
+  // Tampoco se convierte lo que la PIEZA declara en unidades (componente.remito_unidad='uni'):
+  // decir "este remito viene contado" y despues guardarlo en kg es lo mismo que no decirlo.
+  else if(unitSel==='uni'&&kx&&!cargaEnUni(itemSel)&&remUnidad(itemSel)!=='uni'){ cant=cantRaw*kx; uReal='kg'; }
 
   // La validacion "cantRaw es multiplo de la bolsa" ahora es EN VIVO (actualizarAvisoMultiplo),
   // no confirm() al submit (regla usuario 2026-09-01: "quiero que la alerta me
@@ -2744,9 +2942,9 @@ async function guardar(){
     var esRemache = (itemSel.sector_id === 8);
     // El control externo ya no es una lista de booleanos: lo decide CONTROL_URL.
     // Asi sumar un sector (plasticos, 2026-09-03) no obliga a tocar el if-chain.
-    var ctrlUrl = CONTROL_URL[itemSel.sector_id] || null;
+    var ctrlUrl = ctrlUrlDe(itemSel);
     var pideControl = !!ctrlUrl;
-    var esCarton = (itemSel.sector_id === 10);
+    var esCarton = GP2UI.esCarton(itemSel);   /* el 10 vive en gp2-ui.js (idea 7334) */
     var pliegoIt = esPliegoIt(itemSel);
     var modoFinal, paquetesPend = null;
     if (esCarton){
@@ -2760,7 +2958,7 @@ async function guardar(){
     pushPend(itemSel, {
       modo: modoFinal,
       cant: cant, cantRaw: cantRaw,
-      unidad: uReal, unidadRaw: unitSel,
+      unidad: uReal, unidadRaw: (unitSel==='env' ? envaseRemito(itemSel).label : unitSel),
       rollos: rll, pallets: pll, paquetes: paquetesPend,
       pideControl: pideControl,
       esCarton: esCarton, esPliego: pliegoIt, esFleje: esFleje(itemSel),
@@ -2773,6 +2971,8 @@ async function guardar(){
     if (esCarton){
       var uniLbl = pliegoIt ? ('pliego'+(cantRaw===1?'':'s')) : ('paquete'+(cantRaw===1?'':'s'));
       lblCant = fmt(cantRaw)+' '+uniLbl;
+    } else if (unitSel==='env'){
+      lblCant = fmt(cantRaw)+' '+esc(envaseRemito(itemSel).label)+' (= '+fmt(cant)+' uni)';
     } else if (unitSel==='uni' && uReal==='kg'){
       // Se cargo en unidades y se guardo convertido a kg (remaches y cualquier
       // insumo con kg_x_uni): mostrar LO QUE TIPEO primero y el kg entre
@@ -2874,7 +3074,7 @@ function calcPallet(p){
 $('kgValue').addEventListener('input', function(){
   var esDec = (unitSel==='kg' || unitSel==='paq') ? true : (unitSel==='kg');
   // paq son enteros (paquetes), uni son enteros (unidades del remito), kg decimal.
-  var entero = (unitSel==='uni' || unitSel==='paq');
+  var entero = (unitSel==='uni' || unitSel==='paq' || unitSel==='env');
   sanInput($('kgValue'), entero ? sanInt : sanDec);
   updateConv();
 });

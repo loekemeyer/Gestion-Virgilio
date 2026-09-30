@@ -18,14 +18,19 @@ const PANTALLAS = [
   const browser = await chromium.launch(EXE ? { executablePath: EXE } : {});
   const ok = (c, m) => { console.log((c ? 'OK  ' : 'FAIL') + ' ' + m); if (!c) process.exitCode = 1; };
 
-  for (const p of PANTALLAS) {
+  /* v1.196.0: el menu normal muestra 2 grupos (Stocks + Herramientas) y ?todos=1 agrega los
+     10 ocultos. Se miden las dos vistas: la normal es la que usan, la completa sigue viva para
+     poder reponer grupos y ahi viven los chequeos de jerarquia de Insumos. */
+  for (const VISTA of ['', '?todos=1'])
+  for (const P0 of PANTALLAS) {
+    const p = Object.assign({}, P0, { nom: P0.nom + (VISTA ? ' ' + VISTA : '') });
     const ctx = await browser.newContext({ viewport: { width: p.w, height: p.h }, isMobile: true, hasTouch: true });
     const page = await ctx.newPage();
     page.on('pageerror', e => { console.log('PAGEERROR:', e.message); process.exitCode = 1; });
     // el login esta apagado y el service worker no hace falta para medir el layout
     await page.route('**/auth-guard.js*', r => r.fulfill({ contentType: 'application/javascript', body: 'window.GP2_AUTH_ON=false;' }));
     await page.route('**/pwa.js*', r => r.fulfill({ contentType: 'application/javascript', body: '' }));
-    await page.goto(ROOT + '/GP2_MODULOS.html');
+    await page.goto(ROOT + '/GP2_MODULOS.html' + VISTA);
     await page.waitForSelector('.card');
 
     const m = await page.evaluate(() => {
@@ -38,7 +43,8 @@ const PANTALLAS = [
         fuente_min: Math.min(...titles.map(t => parseFloat(getComputedStyle(t).fontSize))),
         horizontal: document.documentElement.scrollWidth > window.innerWidth,
         version: (document.getElementById('appVersion') || {}).textContent || '',
-        foot: getComputedStyle(document.querySelector('.foot')).display,
+        // el pie "schema propio" se saco (2026-09-15): si no existe, no ocupa lugar
+        foot: (document.querySelector('.foot') ? getComputedStyle(document.querySelector('.foot')).display : 'none'),
         sub: (document.querySelector('.header-sub') || {}).textContent || '',
       };
     });
@@ -57,7 +63,42 @@ const PANTALLAS = [
        ocupa el ancho entero: ahi 1 columna es lo correcto, no un boton a medias. */
     const grupos = await page.evaluate(() =>
       [...document.querySelectorAll('.card-head .title')].map(t => t.textContent.trim()));
+    // Pedido de Thomas 2026-09-28: el menu normal son DOS grupos y nada mas
+    if (!VISTA) ok(JSON.stringify(grupos) === JSON.stringify(['Stocks', 'Herramientas']),
+                   `${p.nom}: el menu normal muestra solo Stocks y Herramientas (${grupos})`);
     ok(grupos.length === m.grupos, `${p.nom}: se listan los ${m.grupos} rubros`);
+
+    /* v1.201.0 [Thomas 2026-09-28: "quiero los dos modulos abiertos ... No lo quiero poder
+       cerrar"]: en el menu normal los 2 grupos arrancan abiertos, sin chevron, y un toque en la
+       cabecera no los cierra. Los modulos van en baldosas de 2 columnas y todo entra sin scroll. */
+    if (!VISTA) {
+      await page.click('.card-head:has-text("Stocks")');
+      await page.waitForTimeout(150);
+      const f = await page.evaluate(() => {
+        const ops = [...document.querySelectorAll('.card .btns > *')].map(el => {
+          const r = el.getBoundingClientRect();
+          return { h: r.height, x: Math.round(r.x), fs: parseFloat(getComputedStyle(el).fontSize) };
+        });
+        return {
+          abiertos: [...document.querySelectorAll('.card')].every(c => c.classList.contains('open') &&
+                      !c.classList.contains('collapsed') && getComputedStyle(c.querySelector('.card-body')).display !== 'none'),
+          chevrons: document.querySelectorAll('.chevron').length,
+          alto: Math.min(...ops.map(o => o.h)), fuente: Math.min(...ops.map(o => o.fs)),
+          cols: new Set(ops.map(o => o.x)).size,
+          fondo: Math.max(...[...document.querySelectorAll('.card')].map(c => c.getBoundingClientRect().bottom)),
+          horizontal: document.documentElement.scrollWidth > window.innerWidth,
+        };
+      });
+      ok(f.abiertos, `${p.nom}: los 2 grupos abiertos y un toque no los cierra`);
+      ok(f.chevrons === 0, `${p.nom}: sin chevron de cerrar`);
+      ok(f.cols === 2, `${p.nom}: modulos en 2 columnas (mide ${f.cols})`);
+      ok(f.alto >= 44, `${p.nom}: baldosas tocables (${Math.round(f.alto)}px)`);
+      ok(f.fuente >= 15, `${p.nom}: texto legible (${f.fuente}px)`);
+      ok(!f.horizontal, `${p.nom}: sin scroll horizontal con los grupos abiertos`);
+      console.log(`INFO ${p.nom}: con los 2 abiertos termina en ${Math.round(f.fondo)} de ${p.h}`);
+      await ctx.close();
+      continue;
+    }
 
     for (const g of grupos) {
       await page.click(`.card-head:has-text("${g}")`);

@@ -79,7 +79,7 @@ window.supabase = { createClient: function(){ return {
 
   // fila J2 (faltante + ubicacion corta): pill roja + diagnostico
   const j2 = await page.$eval('#tbody tr:first-child', e => e.textContent);
-  ok(j2.includes('menos de 1 cajón: 0 uni'), 'pill faltante "menos de 1 cajon: 0 uni"');
+  ok(j2.includes('bajo el máximo: faltan 8.425 uni'), 'pill faltante "bajo el maximo: faltan 8.425 uni"');
   ok(j2.includes('la ubicación no alcanza') && j2.includes('20 días'), 'J2: llena alcanza 20 dias + ⚠ no alcanza');
   ok(await page.$eval('#tbody tr:first-child', e => e.classList.contains('r-falt')), 'fila J2 en rojo');
 

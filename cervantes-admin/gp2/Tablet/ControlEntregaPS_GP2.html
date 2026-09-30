@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- Anti-cache: la lógica de esta pantalla es JS INLINE, así que si la tablet se queda con el
+     HTML viejo se queda con la pantalla vieja (no hay ?v= que la salve). -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- v1.0.0 (2026-09-21) — EL CONTROL DE LO QUE ENTREGÓ UN PROVEEDOR DE SERVICIO, EN PANTALLA APARTE
+     (usuario, textual: "En recepcion de proveedores de servicio se tiene que seguir la lógica de
+     primero cargar lo que dice el remito y despues hacer el control (como en recepcion de insumos)
+     en el remito que sea en kg y despues controlar en kg y cajones (o unidad de medida
+     correspondiente segun la parte)" + "Despues de recepcionar tengo que ir al control").
+     EL MISMO CIRCUITO QUE INSUMOS, pieza por pieza: la Tablet registra lo que dice el REMITO y esa
+     entrega queda PENDIENTE DE CONTROL hasta que acá se carga lo que se contó de verdad. Al
+     confirmar, controlar_entrega_ps guarda lo declarado en GP2.entrega_ps_control y PISA la
+     cantidad del movimiento, así que el stock queda con lo CONTROLADO y no con lo que dijo el
+     papel — igual que controlar_recepcion_kg en la recepción de insumos.
+     LOS CAMPOS NO SE PRECARGAN con el remito a propósito: el control es un dato nuevo (se pesa y se
+     cuenta), no una confirmación. El remito queda a la vista arriba para comparar, y la diferencia
+     se calcula al tipear. Arriba de la tolerancia (parametro tol_ctrl_peso_pct, hoy 2 %) la tarjeta
+     se pinta y el confirmar pregunta.
+     LOS CAJONES SON EL DATO FÍSICO: acá se cuentan, no se derivan de los kg (misma regla que el
+     stock del proveedor, ver CONOCIMIENTO 4et). Si la pieza no tiene envase cargado, el campo no
+     se pide. -->
+<!-- v1.5.0 (2026-09-30) — TAMBIÉN LOS INSUMOS SIN CONTROLAR (Nazareno, textual: "Cargué una recepción
+     en recepción de insumos y no hice el control. Ahora voy a control y no me aparece" + "Me gustaría
+     que aparezca en el botón de control ... Tendrías que poner los de talleristas, p.s. y prov de
+     insumo"). El control de un insumo que se controla en OTRA página (control-remaches /
+     control-cajas: Importado, Garage, remaches, plásticos, bombillas, cajas, bolsas) sólo se abría con
+     la redirección automática al guardar la recepción: si el operario salía, quedaba sin controlar y
+     ninguna pantalla lo llevaba de vuelta. Ahora control_entrega_bundle manda `insumos_pend`
+     (agrupado por sector y proveedor) y acá hay una tarjeta por grupo con "Controlar →", que lleva a
+     la MISMA pantalla de control de siempre: el control de insumos NO se reescribe acá. A dónde lleva
+     cada grupo lo dice gp2-control-insumo.js (GP2CI), la misma lista que usa Recepción de Insumos; un
+     grupo sin pantalla de control (cartones) no se muestra. Los flejes sin pesar llevan a Recepción
+     de Insumos, que abre con "⚖ Pesar ahora". "← Recepción" vuelve a la tablet en Recibir, que es
+     el único modo donde está el botón Control. -->
+<!-- v1.4.0 (2026-09-29) — LA DIFERENCIA SALE SÓLO DE LOS KILOS Y LOS CAMPOS VAN COMPACTOS (usuario,
+     textual: "no quiero que me tire el calculo abajo si pongo paquetes, solo kg ... no quiero que
+     tomes paquetes xq es la uni de medida secundaria, importan los kg, aplica a cada caso").
+     Donde la pieza se pesa, canonDe() ya no convierte envases: con sólo paquetes/bolsas/cajones
+     tipeados no hay renglón de diferencia, y aparece recién con los kilos. Donde NO se pesa (pliegos
+     de AJ, bombillas) el envase sigue siendo lo único que hay y calcula como antes. Los campos pasan
+     de ocupar media tarjeta cada uno a un ancho fijo de 124px (entran dos en la tarjeta de 390px). -->
+<!-- v1.3.0 (2026-09-23) — EL CONTROL TAMBIÉN ES DE LOS TALLERISTAS (usuario, textual: "Hicimos todas
+     las recepciones de proveedores de servicio. Ahora seguimos con las recepciones de talleristas.
+     Lucho. Remito en unidades y control en kg y cajones (acordate de hacer el control por kg —
+     cajones es solo dato)").
+     La pantalla era sólo del P.S. porque su circuito miraba movimientos `entrega_ps`. Ahora la
+     misma lista trae los dos: `control_entrega_bundle` (antes `control_entrega_ps_bundle`) une las
+     entregas de P.S. y las de tallerista, y `controlar_entrega` (antes `controlar_entrega_ps`)
+     guarda las dos en `GP2.entrega_control` (antes `entrega_ps_control`).
+     QUÉ CAMBIA PARA EL TALLERISTA: el ENVASE lo dice la PIEZA —las bolsas de 120 de GRJ5 y GRJ6,
+     cajones en el resto— y viaja en las mismas claves que el P.S., así que acá no hay lógica nueva.
+     Y quién se pesa lo decide la BASE (clave `pesa`): una pieza de tallerista que declara su propio
+     envase se cuenta y NO se pesa (las bombillas), mientras que la cuchilla va en kg + cajones.
+     LO QUE PASA AL CONFIRMAR, y es la decisión del dueño: al corregir lo entregado, los consumos
+     del tallerista se escalan con el mismo factor ("entregó 98 de 100 → consumió 98"), para que el
+     1:1 y el BOM queden coherentes. Eso lo hace la base con `movimiento.mov_padre_id`, la columna
+     nueva que cuelga cada `consumo_tall` de su entrega. -->
+<!-- v1.2.0 (2026-09-23) — LO QUE COMPARA ES EL PESO; EL ENVASE ES UN DATO, Y LA TOLERANCIA ES 5 %
+     (usuario, textual: "en el control que las bolsas o los cajones sirvan nada más de dato. Vos lo
+     que tenés que comparar es los kilos con los kilos o los kilos con las unidades, en el caso de
+     que tengas que hacer el pasaje" + "espero que el cartel aparezca si hay más de un cinco por
+     ciento de diferencia, tanto en kilos como en unidades").
+     (1) DONDE LA PIEZA SE PESA, EL KILO ES OBLIGATORIO: es el número que se compara contra el
+     remito y el que pisa el stock. El envase se sigue anotando (va en controlar_entrega_ps.
+     p_cajones, que es el dato físico de bultos) pero ya no decide nada. Donde NO hay kg_x_uni —los
+     pliegos de AJ— el envase es lo único que hay y con eso alcanza [usuario 2026-09-23: "en AJ los
+     pliegos se controlan en paquetes, no en kilos"]. OJO PARA MÁS ADELANTE: quién pesa lo decide
+     `componente.kg_x_uni`, así que si alguna vez se le carga un peso al pliego, el control le va a
+     pedir los kilos. Si AJ tiene que quedar SIEMPRE en paquetes, eso hay que decirlo con un dato
+     del proveedor, no dejándole el peso vacío.
+     (2) LA TOLERANCIA PASA DE 2 % A 5 %, con clave propia: control_entrega_ps_bundle lee
+     parametro.tol_ctrl_ps_pct y, sin esa fila, vale 5. Antes compartía tol_ctrl_peso_pct con el
+     pesaje de insumos, que sigue en 2 % y no se tocó. -->
+<!-- v1.1.0 (2026-09-23) — EL CONTROL SE CUENTA EN EL ENVASE Y EN KILOS, NO EN UNIDADES (usuario,
+     textual: "Cuando voy a hacer el control de AJ adhesivos me aparece para marcar uni. Y yo te
+     dije solo paquetes" + "Lo mismo con Esther. El control lo hago en bolsas y kilos, no en
+     unibolsas. Me estás poniendo unidades cuando yo arriba te dije otra cosa").
+     LA TARJETA PIDE LO QUE SE CUENTA DE VERDAD: el ENVASE (paquetes de AJ, bolsas de Ester y
+     Maspoli, cajones de Julio y Jade, paquetes de Charcas) y, donde la pieza se pesa, los KILOS.
+     El campo "Contado (uni)" se fue: la unidad de la pieza dejó de ser algo que alguien tipea y
+     pasó a ser el RESULTADO, que se muestra abajo ("= 600 uni · Diferencia …") antes de confirmar,
+     porque es lo que se guarda y lo que pisa el stock.
+     CUÁL MANDA SI ESTÁN LOS DOS: el PESO, igual que en el control de la recepción de insumos, donde
+     los kg de la balanza son los que se guardan. Sin kg cargados (los pliegos de AJ, que no tienen
+     kg_x_uni) el control es sólo contar envases y el campo de kilos ni aparece.
+     SIN ENVASE NI PESO (un P.S. sin nada definido) queda el campo suelto en la unidad de la pieza:
+     es lo único que se le puede pedir, y no se inventa un envase.
+     CERO BASE: control_entrega_ps_bundle ya mandaba el factor (entrega_uni_x / envio_uni_x /
+     uni_x_cajon) y kg_x_uni, y controlar_entrega_ps sigue recibiendo la cantidad canónica y los
+     bultos en p_cajones. Lo que cambió es de dónde sale ese número. -->
+<!-- v1.0.1 (2026-09-22) — EL ENVASE COPIA LA UNIDAD DEL ENVÍO (usuario, sobre la tarjeta de PC1A de
+     Ester que pedía "Cajones": "La devolución de Ester es en bolsas como el envío. Fijate que
+     pusiste como genérico cajones"). La v1.0.0 miraba sólo proveedor_servicio.entrega_unidad y si
+     estaba vacía ponía "cajones" — Ester no tiene entrega_unidad porque la regla de la Tablet es
+     que la entrega COPIA el envío. Ahora envaseDe() sigue el mismo orden que la Tablet y
+     control_entrega_ps_bundle manda envio_unidad / envio_uni_x / sp_sector. -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Control de entregas · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260929a"></script>
+<!-- el CSS de la casa primero (tipografía y botones base, igual que la Tablet) y abajo lo propio -->
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260912c"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#f4f6f8;color:#111;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+       font-size:18px;-webkit-text-size-adjust:100%}
+  .wrap{max-width:1100px;margin:0 auto;padding:14px 16px 40px}
+  header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+         border-bottom:2px solid #d0d7de;padding-bottom:12px;margin-bottom:14px}
+  h1{font-size:23px;margin:0;font-weight:900;color:#0b3b73}
+  .hbtns{display:flex;gap:8px;flex-wrap:wrap}
+  .hlink{min-height:44px;padding:10px 14px;border:2px solid #d0d7de;border-radius:10px;background:#fff;
+         color:#0b3b73;font-size:16px;font-weight:800;text-decoration:none;font-family:inherit;cursor:pointer;
+         display:inline-flex;align-items:center}
+  h2{font-size:18px;margin:18px 0 10px;color:#475569;text-transform:uppercase;letter-spacing:.4px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+  .card{border:2px solid #d0d7de;border-radius:14px;background:#fff;padding:14px 16px;overflow-wrap:anywhere}
+  .card.desvio{border-color:#c2410c;background:#fff7ed}
+  .cod{font-size:21px;font-weight:900;color:#0b3b73}
+  .desc{font-size:17px;font-weight:700;margin-top:2px}
+  .meta{font-size:15px;color:#555;margin-top:4px}
+  .remito{margin:10px 0 4px;font-size:17px;font-weight:800;color:#0b5cad}
+  label{display:block;font-size:15px;font-weight:800;color:#475569;margin:10px 0 4px}
+  input{width:100%;min-height:48px;font-size:20px;font-weight:700;padding:8px 10px;border:2px solid #d0d7de;
+        border-radius:10px;background:#fff;color:#111;font-family:inherit;text-align:right}
+  /* v1.4.0: los campos van al ancho del número, no a lo ancho de la tarjeta [usuario 2026-09-29:
+     "quiero que los boxs de paquetes y kg estén más compactos"] */
+  .campos{display:flex;flex-wrap:wrap;gap:10px}
+  .campos > div{flex:0 0 124px}
+  /* sin diferencia cargada no hay renglón: un hueco en blanco arriba del botón es espacio muerto */
+  .diff{margin-top:8px;font-size:16px;font-weight:800;color:#166534}
+  .diff:empty{display:none}
+  .diff.mal{color:#c2410c}
+  .btn{width:100%;min-height:52px;margin-top:10px;border:0;border-radius:12px;background:#0b5cad;color:#fff;
+       font-size:18px;font-weight:900;font-family:inherit;cursor:pointer}
+  .btn[disabled]{background:#b6c2cf;cursor:default}
+  a.btn{display:flex;align-items:center;justify-content:center;text-decoration:none}
+  .empty{border:2px dashed #d0d7de;border-radius:14px;padding:22px;text-align:center;color:#555;font-size:17px}
+  .table-wrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:16px;background:#fff}
+  th,td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left;white-space:nowrap}
+  th{background:#eef4fb;color:#0b3b73;font-weight:800}
+  td.num{text-align:right}
+  .ok{color:#166534;font-weight:800}
+  .mal{color:#c2410c;font-weight:800}
+  #status{font-size:17px;color:#555;padding:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Control de entregas <span style="font-size:15px;font-weight:700;color:#475569">prov. de servicio, talleristas e insumos</span></h1>
+    <div class="hbtns">
+      <a class="hlink" href="Tablet_GP2.html?modo=recibir">← Recepción</a>
+      <a class="hlink" href="../GP2_MODULOS.html">Menú</a>
+    </div>
+  </header>
+
+  <div id="status">Cargando…</div>
+
+  <h2>Pendiente de controlar (<span id="nPend">0</span>)</h2>
+  <div class="cards" id="pend"></div>
+
+  <!-- prov. de insumos: se controlan en su propia pantalla; acá está la puerta (v1.5.0) -->
+  <div id="insBox" class="hidden">
+    <h2>Prov. de insumos sin controlar (<span id="nIns">0</span>)</h2>
+    <div class="cards" id="insPend"></div>
+  </div>
+
+  <h2>Controlado</h2>
+  <div class="table-wrap" id="hechosWrap"></div>
+</div>
+
+<script src="../auth-guard.js?v=20260929a"></script>
+<script src="../gp2-ui.js?v=20260913e"></script>
+<script src="../gp2-numero.js?v=20260911o"></script>
+<script src="../gp2-control-insumo.js?v=20260930a"></script>
+<script>
+"use strict";
+/* Cliente GP2 (schema GP2): nunca un createClient suelto, que cae en public. */
+var SB = GP2_SB();
+var $ = GP2UI.$, esc = GP2UI.esc, num = GP2N.num, fmt = GP2N.fmt;
+
+var D = { pend: [], hechos: [], ins: [], tol: 2 };
+
+function usuario() {
+  try { return localStorage.getItem("gp2_usuario") || null; } catch (e) { return null; }
+}
+
+/* Rótulo del envase de la pieza: LA MISMA REGLA que envaseDe() de la Tablet en Recibir
+   [usuario 2026-09-18: "si enviamos en bolsas recepcionamos en bolsas, si lo hacemos en cajones,
+   en cajones"; 2026-09-22: "La devolución de Ester es en bolsas como el envío"]:
+     1) el override del proveedor (proveedor_servicio.entrega_unidad: AJ paquetes, Maspoli bolsas);
+     2) si no, la unidad con la que SE LE ENVÍA (envio_unidad: Ester bolsas, Guazzaroni cajones);
+     3) envío por peso (Julio, envio_unidad 'kg'): el bulto lo pone el sector — plástico en
+        bolsas, el resto en cajones;
+     4) P.S. sin unidad definida: cajones, como hasta ahora.
+   Se pide SÓLO si la pieza tiene con qué contarlos (factor del proveedor o uni_x_cajon del SC o
+   del SP): sin envase cargado no se inventa un campo que nadie puede llenar. */
+function envaseDe(x) {
+  // el envase de la PIEZA, para cuando el proveedor no define un factor propio (Guazzaroni:
+  // "cajones" sin número; Julio: el bulto del sector). Primero el de la pieza que devuelve.
+  var fp = Number(x.sp_unixcaj || 0) > 0 ? Number(x.sp_unixcaj) : Number(x.sc_unixcaj || 0);
+  function con(lab, f) { return f > 0 ? { label: lab, factor: f } : null; }
+  if (x.entrega_unidad)
+    return con(String(x.entrega_unidad), Number(x.entrega_uni_x || 0) > 0 ? Number(x.entrega_uni_x) : fp);
+  var ev = String(x.envio_unidad || "");
+  if (ev.toLowerCase() === "kg")
+    return con(/pl[aá]stico/i.test(String(x.sp_sector || "")) ? "bolsas" : "cajones", fp);
+  if (ev) return con(ev, Number(x.envio_uni_x || 0) > 0 ? Number(x.envio_uni_x) : fp);
+  return con("cajones", fp);
+}
+
+/* ¿Esta pieza se puede PESAR? Con kg_x_uni cargado, sí: el control se hace con la balanza y el
+   peso es el que manda. Sin ese dato (los pliegos de AJ) el control es sólo contar envases. */
+function pesaDe(x) {
+  // LO DECIDE LA BASE (control_entrega_bundle manda `pesa`): con la pieza medida en kg siempre, y
+  // en un tallerista una pieza que declara su propio envase se CUENTA y no se pesa [usuario
+  // 2026-09-23: "El remito de las bombillas en uni. Control en bolsas"]. El fallback de abajo es
+  // para un bundle viejo, sin esa clave.
+  if (x.pesa != null) return !!x.pesa;
+  return String(x.unidad || "").toLowerCase() === "kg" || Number(x.sp_kgxuni || 0) > 0;
+}
+
+/* LO QUE SE GUARDA es la unidad canónica del movimiento (uni o kg), igual que antes: lo contado
+   pisa la cantidad del remito. Lo que cambia es de dónde sale ese número — del envase y del peso,
+   que son las dos cosas que el operario cuenta de verdad [usuario 2026-09-23]. Si están los dos,
+   MANDA EL PESO: es el mismo criterio que el control de la recepción de insumos, donde los kg de
+   la balanza son los que se guardan. */
+function canonDe(x, envases, kg) {
+  var esKg = String(x.unidad || "").toLowerCase() === "kg";
+  var kgu = Number(x.sp_kgxuni || 0);
+  var env = envaseDe(x);
+  // v1.4.0 — DONDE LA PIEZA SE PESA, SÓLO CUENTAN LOS KILOS [usuario 2026-09-29: "no quiero que me
+  // tire el cálculo abajo si pongo paquetes, solo kg ... paquetes es la unidad de medida secundaria,
+  // importan los kg, aplica a cada caso"]. El envase queda como dato (p_cajones) y no se convierte.
+  if (pesaDe(x)) {
+    if (!(kg > 0)) return 0;
+    return esKg ? kg : (kgu > 0 ? kg / kgu : 0);
+  }
+  if (esKg) {
+    if (kg > 0) return kg;
+    return (envases > 0 && env && kgu > 0) ? envases * env.factor * kgu : 0;
+  }
+  if (kg > 0 && kgu > 0) return kg / kgu;
+  return (envases > 0 && env) ? envases * env.factor : 0;
+}
+
+/* "1 paquetes" no se lee: el rótulo del renglón del remito va en singular. */
+var SINGULAR = { paquetes: "paquete", bolsas: "bolsa", cajones: "cajón" };
+function singular(lab) { return SINGULAR[String(lab).toLowerCase()] || lab; }
+
+/* La diferencia contra el remito, con su % — es para lo que existe el control. */
+function difTxt(decl, ctrl, uni) {
+  var d = ctrl - decl, pct = decl > 0 ? (d / decl) * 100 : 0;
+  var signo = d > 0 ? "+" : "";
+  return { txt: signo + fmt(d, 2) + " " + uni + " (" + signo + fmt(pct, 1) + " %)",
+           pct: pct, fuera: Math.abs(pct) > Number(D.tol || 2) };
+}
+
+/* Lo cargado en una tarjeta, ya llevado a la unidad canónica: {q, envases}. */
+function leerCard(card, x) {
+  function v(f) { var el = card.querySelector('input[data-f="' + f + '"]'); return el ? num(el.value) : 0; }
+  var envases = v("env"), kg = v("kg"), suelto = v("cant");
+  return { envases: envases, kg: kg,
+           q: (envaseDe(x) || pesaDe(x)) ? canonDe(x, envases, kg) : suelto };
+}
+
+function pintarDiff(card) {
+  var x = D.pend.filter(function (p) { return String(p.mov_id) === card.dataset.mov; })[0];
+  if (!x) return;
+  var l = leerCard(card, x);
+  var box = card.querySelector(".diff");
+  if (!(l.q > 0)) { box.textContent = ""; box.classList.remove("mal"); card.classList.remove("desvio"); return; }
+  var d = difTxt(Number(x.declarado), l.q, x.unidad);
+  // el número que se guarda va primero: se cuenta en paquetes o se pesa, pero el stock queda en la
+  // unidad de la pieza y el operario tiene que ver en qué se convirtió antes de confirmar.
+  box.textContent = "= " + fmt(l.q, String(x.unidad).toLowerCase() === "kg" ? 2 : 0) + " " + x.unidad +
+                    " · Diferencia " + d.txt;
+  box.classList.toggle("mal", d.fuera);
+  card.classList.toggle("desvio", d.fuera);
+}
+
+function render() {
+  var cont = $("pend");
+  cont.innerHTML = "";
+  $("nPend").textContent = D.pend.length;
+  if (!D.pend.length) {
+    cont.innerHTML = '<div class="empty">No hay entregas de P.S. ni talleristas pendientes de controlar.</div>';
+  }
+  D.pend.forEach(function (x) {
+    // EL CONTROL SE CUENTA COMO SE CUENTA EN LA PLANTA: el ENVASE (paquetes, bolsas, cajones) y,
+    // donde la pieza se pesa, los KILOS [usuario 2026-09-23: "cuando voy a controlar sí, marco
+    // paquetes"; "el control si lo hago en bolsas y kilos"]. La unidad de la pieza ya no es un
+    // campo: es el resultado, y se muestra abajo. Sin envase ni peso cargados (un P.S. sin nada
+    // definido) queda el campo suelto en la unidad de la pieza, que es lo único que se puede pedir.
+    var env = envaseDe(x), pesa = pesaDe(x);
+    var esKg = String(x.unidad || "").toLowerCase() === "kg";
+    var campos = "";
+    if (env) campos += "<div><label>" + esc(env.label.charAt(0).toUpperCase() + env.label.slice(1)) +
+                       "</label>" + '<input data-f="env" inputmode="numeric"></div>';
+    if (pesa) campos += "<div><label>Kilos</label>" + '<input data-f="kg" inputmode="decimal"></div>';
+    if (!env && !pesa)
+      campos += "<div><label>Contado (" + esc(x.unidad) + ")</label>" +
+                '<input data-f="cant" inputmode="' + (esKg ? "decimal" : "numeric") + '"></div>';
+    var card = document.createElement("div");
+    card.className = "card";
+    card.dataset.mov = String(x.mov_id);
+    card.innerHTML =
+      '<div class="cod">' + esc(x.sp_cod || "") + "</div>" +
+      '<div class="desc">' + esc(x.sp_desc || "") + "</div>" +
+      '<div class="meta">' + esc(x.cp_nombre || "") + (x.sc_cod ? " · consume " + esc(x.sc_cod) : "") +
+        " · " + esc(GP2UI.fechaAR(String(x.fecha).slice(0, 10))) + "</div>" +
+      '<div class="remito">Remito ' + fmt(Number(x.declarado), 2) + " " + esc(x.unidad) +
+        (env ? " · " + fmt(env.factor, 0) + " por " + esc(singular(env.label)) : "") + "</div>" +
+      '<div class="campos">' + campos + "</div>" +
+      '<div class="diff"></div>' +
+      '<button class="btn" type="button" data-a="ok">Confirmar control</button>';
+    cont.appendChild(card);
+  });
+
+  renderInsumos();
+
+  var t = $("hechosWrap");
+  if (!D.hechos.length) { t.innerHTML = '<div class="empty">Todavía no se controló ninguna entrega.</div>'; }
+  else {
+    t.innerHTML =
+      '<table><thead><tr><th>Parte</th><th>Proveedor</th><th class="num">Remito</th>' +
+      '<th class="num">Contado</th><th class="num">Dif.</th><th class="num">Bultos</th><th>Quién</th></tr></thead><tbody>' +
+      D.hechos.map(function (h) {
+        var d = Number(h.diff || 0);
+        return "<tr><td>" + esc(h.sp_cod || "") + "</td><td>" + esc(h.cp_nombre || "") + "</td>" +
+          '<td class="num">' + fmt(Number(h.declarado), 2) + " " + esc(h.unidad) + "</td>" +
+          '<td class="num">' + fmt(Number(h.controlado), 2) + " " + esc(h.unidad) + "</td>" +
+          '<td class="num ' + (Math.abs(d) < 0.0005 ? "ok" : "mal") + '">' +
+            (d > 0 ? "+" : "") + fmt(d, 2) + "</td>" +
+          '<td class="num">' + (h.cajones == null ? "—" : fmt(Number(h.cajones), 0)) + "</td>" +
+          "<td>" + esc(h.controlado_por || "—") + "</td></tr>";
+      }).join("") + "</tbody></table>";
+  }
+}
+
+/* Las recepciones de insumos que quedaron sin controlar, UNA tarjeta por pantalla de control
+   (sector + proveedor). El control se hace allá, con sus reglas (kg -> unidades, cajas, pallets):
+   acá sólo está la puerta, que antes no existía (v1.5.0). */
+function renderInsumos() {
+  var n = D.ins.reduce(function (a, g) { return a + Number(g.n || 0); }, 0);
+  $("nIns").textContent = n;
+  $("insBox").classList.toggle("hidden", !D.ins.length);
+  $("insPend").innerHTML = D.ins.map(function (g) {
+    var rubro = String(g.sector || "").replace(/^Sector\s+/i, "");
+    var cods = (g.codigos || []).join(", ") + ((g.codigos || []).length >= 8 ? " …" : "");
+    var href = "../StockFlejes/" + g.url + (g.via === "pesaje" ? "?volver=tablet" : "");
+    return '<div class="card">' +
+      '<div class="cod">' + esc(rubro) + "</div>" +
+      '<div class="desc">' + esc(g.proveedor || "—") + "</div>" +
+      '<div class="meta">' + fmt(Number(g.n), 0) + (Number(g.n) === 1 ? " recepción" : " recepciones") +
+        (g.via === "pesaje" ? " sin pesar" : "") + " · desde " + esc(GP2UI.fechaTsAR(g.desde)) + "</div>" +
+      '<div class="remito">' + esc(cods) + "</div>" +
+      '<a class="btn" href="' + esc(href) + '">Controlar →</a></div>';
+  }).join("");
+}
+
+async function cargar() {
+  $("status").textContent = "Cargando…";
+  var r = await SB.rpc("control_entrega_bundle");
+  if (r.error) { $("status").textContent = "Error: " + r.error.message; return; }
+  D.pend = (r.data && r.data.pend) || [];
+  D.hechos = (r.data && r.data.hechos) || [];
+  D.tol = Number((r.data && r.data.tol_pct) || 2);
+  D.ins = GP2CI.pendientes(r.data && r.data.insumos_pend);
+  $("status").textContent = D.pend.length
+    ? ("Tolerancia " + fmt(D.tol, 1) + " % — arriba de eso hay que confirmar.")
+    : D.ins.length ? "Quedan insumos sin controlar: tocá Controlar." : "Todo controlado.";
+  render();
+}
+
+async function confirmar(card) {
+  var mov = card.dataset.mov;
+  var x = D.pend.filter(function (p) { return String(p.mov_id) === mov; })[0];
+  if (!x) return;
+  var l = leerCard(card, x);
+  var q = l.q, caj = l.envases;
+  // EL NUMERO QUE SE COMPARA ES EL PESO [usuario 2026-09-23: "en el control que las bolsas o los
+  // cajones sirvan nada más de dato. Vos lo que tenés que comparar es los kilos con los kilos o los
+  // kilos con las unidades, en el caso de que tengas que hacer el pasaje"]. Por eso donde la pieza
+  // se pesa el kilo es obligatorio: sin él, lo que se guardaría sale del envase, que es el dato
+  // suelto. Donde no hay kg_x_uni (los pliegos de AJ) el envase es lo único que hay y alcanza.
+  if (pesaDe(x) && !(l.kg > 0)) {
+    alert("Falta el peso: los kilos son lo que se compara contra el remito. El envase es un dato.");
+    return;
+  }
+  if (!(q > 0)) {
+    var env0 = envaseDe(x);
+    alert("Falta lo contado" + (env0 ? " (" + env0.label + ")" : "") + ".");
+    return;
+  }
+
+  var d = difTxt(Number(x.declarado), q, x.unidad);
+  if (d.fuera && !confirm("El remito dice " + fmt(Number(x.declarado), 2) + " " + x.unidad +
+      " y contaste " + fmt(q, 2) + " " + x.unidad + " (" + d.txt + ").\n\n" +
+      "El stock va a quedar con lo CONTADO. ¿Confirmás?")) return;
+
+  var btn = card.querySelector('button[data-a="ok"]');
+  btn.disabled = true; btn.textContent = "Registrando…";
+  var r = await SB.rpc("controlar_entrega", {
+    p_mov_id: Number(mov), p_cantidad: q,
+    p_cajones: (caj > 0 ? caj : null), p_usuario: usuario()
+  });
+  if (r.error) {
+    alert("No se pudo registrar: " + r.error.message);
+    btn.disabled = false; btn.textContent = "Confirmar control";
+    return;
+  }
+  await cargar();
+}
+
+document.addEventListener("input", function (ev) {
+  var card = ev.target.closest && ev.target.closest(".card");
+  var f = ev.target.dataset && ev.target.dataset.f;
+  if (card && (f === "env" || f === "kg" || f === "cant")) pintarDiff(card);
+});
+document.addEventListener("click", function (ev) {
+  var btn = ev.target.closest && ev.target.closest('button[data-a="ok"]');
+  if (btn) confirmar(btn.closest(".card"));
+});
+
+cargar();
+</script>
+</body>
+</html>

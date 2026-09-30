@@ -4,7 +4,11 @@ const fs = require('fs');
 const ROOT = 'file://' + path.resolve(__dirname, '..', '..').replace(/\\/g, '/');
 const EXE = process.env.CHROMIUM_PATH || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined);
 
-/* LAS REGLAS DE OC TIENEN QUE DECIR LO MISMO EN LOS DOS LADOS.
+/* 2026-09-28: el multiplo de familia y el minimo por codigo ya no son error en ninguno de los dos
+   lados [Thomas: "Que esto no aparezca"]; queda solo el piso de la familia (pedido_minimo). Los
+   casos de multiplo esperan [] desde entonces.
+
+   LAS REGLAS DE OC TIENEN QUE DECIR LO MISMO EN LOS DOS LADOS.
    Hasta el 2026-09-11 vivian SOLO en Compras/OC_GP2.html: `crear_oc` tiene EXECUTE para
    anon y aceptaba cualquier cantidad, asi que el unico control estaba en el navegador.
    Ahora la base tiene "GP2"._oc_validar_carton(p_items) y
@@ -81,24 +85,17 @@ BUNDLE.insumos.push(mp(748, '2435', 'PE Polietileno Baja 7147', 'Beta Plásticos
 /* Cada caso: [nombre, {comp_id: cantidad}, errores que devolvio la BASE]. */
 const CASOS = [
   ['múltiplo justo: 6.000 + 6.000 = 12.000', { 719: 6000, 712: 6000 }, []],
-  ['el total no llega al múltiplo de familia', { 719: 6000, 712: 5000 },
-    ['Formato C CHEF: el total (11.000) debe ser múltiplo de 12.000.']],
-  ['dos códigos fuera del múltiplo de 1.000', { 719: 6500, 712: 5500 },
-    ['Formato C CHEF · O2D: 6.500 no es múltiplo de 1.000.',
-     'Formato C CHEF · S2A: 5.500 no es múltiplo de 1.000.']],
-  ['el múltiplo por código se chequea ANTES que el mínimo', { 719: 11500, 712: 500 },
-    ['Formato C CHEF · O2D: 11.500 no es múltiplo de 1.000.',
-     'Formato C CHEF · S2A: 500 no es múltiplo de 1.000.']],
+  ['el total no llega al múltiplo de familia', { 719: 6000, 712: 5000 }, []],
+  ['dos códigos fuera del múltiplo de 1.000', { 719: 6500, 712: 5500 }, []],
+  ['el múltiplo por código se chequea ANTES que el mínimo', { 719: 11500, 712: 500 }, []],
   ['el comodín completa la familia: 10.000 + 2.000', { 719: 10000, 894: 2000 }, []],
   ['el comodín solo, con su propio múltiplo', { 894: 12000 }, []],
-  ['el comodín solo y corto: no tiene a quién sumarse', { 894: 2000 },
-    ['Formato C CHEF · Sacacorchos: el total (2.000) debe ser múltiplo de 12.000.']],
+  ['el comodín solo y corto: no tiene a quién sumarse', { 894: 2000 }, []],
   ['la bolsa justo en su pedido mínimo', { 288: 20000 }, []],
   ['la bolsa por debajo del pedido mínimo', { 288: 19000 },
     ['Formato Bolsa LOEKE: el pedido mínimo es 20.000 y hay 19.000.']],
   ['el pliego se pide de a 100', { 306: 100 }, []],
-  ['el pliego suelto no vale', { 306: 150 },
-    ['Pliegos LOEKE: el total (150) debe ser múltiplo de 100.']],
+  ['el pliego suelto no vale', { 306: 150 }, []],
   ['dos pliegos de la misma marca son UNA familia', { 306: 100, 564: 100 }, []],
   ['una familia bien y otra corta: sólo se queja de la corta', { 719: 12000, 288: 19000 },
     ['Formato Bolsa LOEKE: el pedido mínimo es 20.000 y hay 19.000.']],

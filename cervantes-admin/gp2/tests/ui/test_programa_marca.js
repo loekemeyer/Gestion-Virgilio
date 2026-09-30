@@ -1,7 +1,9 @@
-// El selector de "¿Qué necesito para producir?" va en DOS PASOS: primero la marca
-// (Loeke / Loke / Chef / Todas) y despues el articulo. La lista agrupa por familia y
-// muestra la DESCRIPCION, no la familia repetida. El <select id="art"> sigue existiendo
-// oculto: es el modelo que lee el resto de la pantalla.
+// El selector de "¿Qué necesito para producir?" va en UN SOLO PASO: se abre en el buscador
+// con TODOS los articulos a la vista (usuario 2026-09-23: "no me hagas elegir por marca, que
+// el buscador aparezca en todas directamente"). La marca quedo como filtro opcional en chips
+// y arranca en "Todas" en cada apertura. La lista agrupa por familia y muestra la DESCRIPCION,
+// no la familia repetida. El <select id="art"> sigue existiendo oculto: es el modelo que lee
+// el resto de la pantalla.
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
@@ -48,49 +50,65 @@ window.supabase = { createClient: function(){ return {
     'el boton muestra el articulo elegido — ' + rotulo.trim());
   check(await page.isHidden('#pick'), 'el panel arranca cerrado');
 
-  // paso 1: al tocar Articulo aparecen las marcas, no los articulos
+  // UN SOLO PASO: al tocar Articulo estan el buscador y los articulos, sin pedir marca
   await page.click('#artBtn');
-  const marcas = await page.$$eval('#pickMarcas button', bs => bs.map(b => b.textContent.trim()));
-  check(JSON.stringify(marcas) === JSON.stringify(['Loeke', 'Loke', 'Chef', 'Todas']),
-    'paso 1: primero se elige la marca — ' + marcas.join(' / '));
-  check(await page.isHidden('#pickArts'), 'paso 1: los articulos todavia no se despliegan');
+  check(await page.isVisible('#buscar'), 'el buscador aparece apenas se abre el panel');
+  const primeros = await page.$$eval('#pickList button[data-id]', bs => bs.map(b => b.textContent.trim().split(' ')[0]));
+  // 4 y no 5: el fixture tiene 5 articulos y uno esta discontinuado
+  check(primeros.length === 4, 'abre en TODAS las marcas, sin elegir nada — ' + primeros.join(','));
+  check(await page.$('#pickBack') === null, 'ya no hay boton de volver: no hay paso previo');
+  const tit = await page.$eval('#pickTit', e => e.textContent);
+  check(/artículo/i.test(tit) && !/marca/i.test(tit), 'el titulo pide el articulo, no la marca — ' + tit.trim());
 
-  // helper: elegir marca y leer los codigos que quedan
-  const porMarca = async (mk) => {
-    if (await page.isHidden('#pickMarcas')) await page.click('#pickBack');
-    await page.click(`#pickMarcas button[data-mk="${mk}"]`);
-    return page.$$eval('#pickList button[data-id]', bs => bs.map(b => b.textContent.trim().split(' ')[0]));
-  };
+  // los chips de marca son un filtro opcional, arrancan en Todas y estan DENTRO del panel de articulos
+  const chips = await page.$$eval('#pickMarcas button', bs => bs.map(b => b.textContent.trim()));
+  check(JSON.stringify(chips) === JSON.stringify(['Todas', 'Loeke', 'Loke', 'Chef']),
+    'los chips de marca quedan como filtro — ' + chips.join(' / '));
+  const chipOn = await page.$$eval('#pickMarcas button.on', bs => bs.map(b => b.textContent.trim()));
+  check(JSON.stringify(chipOn) === JSON.stringify(['Todas']), 'arranca en Todas — ' + chipOn.join(','));
+  check(await page.$eval('#pickMarcas', e => e.closest('#pickArts') !== null),
+    'los chips viven adentro del panel de articulos, no en una pantalla aparte');
 
-  await porMarca('');
   const grupos = await page.$$eval('#pickList .fam', gs => gs.map(g => g.textContent));
-  check(JSON.stringify(grupos) === JSON.stringify(['Abrelatas', 'Cortadores', 'Peladores', 'Sacacorchos']),
-    'paso 2: la lista se agrupa por familia — ' + grupos.join(' / '));
+  check(JSON.stringify(grupos) === JSON.stringify(['Abrelatas', 'Peladores', 'Sacacorchos']),
+    'la lista se agrupa por familia — ' + grupos.join(' / '));
 
   const txt501 = await page.$eval('#pickList button[data-id="25"]', o => o.textContent);
   check(/Abrelatas A Manija/.test(txt501) && !/—\s*Abrelatas\s*$/.test(txt501),
     'la fila muestra la descripcion, no la familia — ' + txt501.trim());
 
-  const txt809 = await page.$eval('#pickList button[data-id="77"]', o => o.textContent);
-  check(/discontinuado/.test(txt809), 'el discontinuado se avisa en la fila — ' + txt809.trim());
+  // 2026-09-23 [usuario: "lo discontinuado no quiero seguir viendolo en el programa"]:
+  // el 809 del fixture es discontinuado, asi que su familia (Cortadores) tampoco aparece.
+  const hay809 = await page.$('#pickList button[data-id="77"]');
+  check(hay809 === null, 'el discontinuado NO aparece en la lista');
+  const opts = await page.$$eval('#art option', os => os.map(o => o.value));
+  check(!opts.includes('77'), 'el discontinuado tampoco esta en el select — ' + opts.join(','));
+  const rot = await page.$eval('#pickList', e => e.textContent);
+  check(!/discontinuado/i.test(rot), 'no queda el rotulo "(discontinuado)" en ninguna fila');
 
   // el boton lleva la flechita de desplegar
   const caret = await page.$eval('#artBtn .caret', e => e.textContent.trim());
-  check(caret === '\u25be', 'el boton tiene la flecha de desplegar — ' + caret);
+  check(caret === '▾', 'el boton tiene la flecha de desplegar — ' + caret);
 
+  // el chip filtra en el acto, sin cerrar ni cambiar de pantalla
+  const porMarca = async (mk) => {
+    await page.click(`#pickMarcas button[data-mk="${mk}"]`);
+    return page.$$eval('#pickList button[data-id]', bs => bs.map(b => b.textContent.trim().split(' ')[0]));
+  };
   const cods = await porMarca('CHEF');
-  check(JSON.stringify(cods) === JSON.stringify(['701']), 'eligiendo Chef queda solo el 701 — ' + cods.join(','));
-  const tit = await page.$eval('#pickTit', e => e.textContent);
-  check(/Chef/.test(tit), 'el panel dice que marca se eligio — ' + tit.trim());
+  check(JSON.stringify(cods) === JSON.stringify(['701']), 'el chip Chef deja solo el 701 — ' + cods.join(','));
+  check(await page.isVisible('#buscar'), 'con la marca filtrada el buscador sigue a la vista');
+  const onChip = await page.$$eval('#pickMarcas button.on', bs => bs.map(b => b.textContent.trim()));
+  check(JSON.stringify(onChip) === JSON.stringify(['Chef']), 'el chip elegido queda marcado — ' + onChip.join(','));
 
   const cods2 = await porMarca('LOEKE');
-  check(JSON.stringify(cods2) === JSON.stringify(['501', '520']), 'eligiendo Loeke quedan 501 y 520 — ' + cods2.join(','));
+  check(JSON.stringify(cods2) === JSON.stringify(['501', '520']), 'el chip Loeke deja 501 y 520 — ' + cods2.join(','));
 
   const cods3 = await porMarca('LOKE');
   check(JSON.stringify(cods3) === JSON.stringify(['108']), 'Loke es una marca propia, no se mezcla con Loeke — ' + cods3.join(','));
 
   const cods4 = await porMarca('');
-  check(cods4.length === 5, 'Todas vuelve a los 5 — ' + cods4.length);
+  check(cods4.length === 4, 'Todas vuelve a los 4 vivos — ' + cods4.length);
 
   // filtrar NO mueve el articulo elegido: nada resaltado salvo el que se eligio de verdad
   const onTodas = await page.$$eval('#pickList button.on', bs => bs.map(b => b.textContent.trim().split(' ')[0]));
@@ -117,14 +135,20 @@ window.supabase = { createClient: function(){ return {
   const b3 = await page.$$eval('#pickList button[data-id]', os => os.map(o => o.textContent.trim().split(' ')[0]));
   check(JSON.stringify(b3) === JSON.stringify(['701']), 'busca por codigo — ' + b3.join(','));
 
-  await page.click('#pickBack');
   await page.click('#pickMarcas button[data-mk="LOEKE"]');
-  await page.fill('#buscar', '70');
   const b4 = await page.$$eval('#pickList button[data-id]', os => os.length);
   const b4txt = await page.$eval('#pickList', e => e.textContent);
-  check(b4 === 0 && /ningún artículo/.test(b4txt), 'buscador y marca se combinan — ' + b4 + ' filas');
+  check(b4 === 0 && /ningún artículo/.test(b4txt),
+    'el chip no borra lo tipeado: buscador y marca se combinan — ' + b4 + ' filas');
 
-  await page.fill('#buscar', '');
+  // al reabrir, el filtro NO queda pegado: vuelve a Todas y con el buscador limpio
+  await page.click('#pickX');
+  await page.click('#artBtn');
+  const reabre = await page.$$eval('#pickList button[data-id]', bs => bs.length);
+  const buscado = await page.$eval('#buscar', e => e.value);
+  check(reabre === 4 && buscado === '',
+    'al reabrir vuelve a Todas y sin busqueda pegada — ' + reabre + ' filas, buscador="' + buscado + '"');
+
   await page.click('#pickList button[data-id="25"]');
   check(await page.isHidden('#pick'), 'al elegir el articulo el panel se cierra');
   const rotulo2 = await page.$eval('#artBtn', b => b.textContent);
@@ -132,6 +156,14 @@ window.supabase = { createClient: function(){ return {
   const hero = await page.$eval('.hero .fam', e => e.textContent);
   check(/Abrelatas A Manija/.test(hero) && /LOEKE/.test(hero),
     'el encabezado muestra descripcion, familia y marca — ' + hero.trim());
+
+  // los chips tienen que seguir siendo tocables en 390px y no empujar la pagina
+  const altoChip = await page.evaluate(() => {
+    document.getElementById('artBtn').click();
+    const b = document.querySelector('#pickMarcas button');
+    return b.getBoundingClientRect().height;
+  });
+  check(altoChip >= 44, 'los chips de marca son tocables (>=44px) — ' + Math.round(altoChip) + 'px');
 
   const ovf = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   check(ovf <= 0, 'sin scroll horizontal en 390px (overflow=' + ovf + ')');

@@ -88,7 +88,7 @@
       <div class="subtitle">Ingresá con tu cuenta de Google</div>
     </div>
     <div class="version">Versión <b id="appVersion">2.0</b></div>
-    <script src="version.js?v=20260912a"></script>
+    <script src="version.js?v=20260930d"></script>
 
     <button id="btnGoogle" class="btn-google" onclick="loginGoogle()">
       <svg viewBox="0 0 48 48">
@@ -109,7 +109,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=20260905k"></script>
+<script src="supabase-config.js?v=20260929a"></script>
   <script>
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -196,7 +196,12 @@
       sessionStorage.setItem("gp_auth", "ok");
       sessionStorage.setItem("gp_role", role);
       sessionStorage.setItem("gp_email", email);
-      window.location.href = (role === "envios") ? "envios-only.html" : "GP2_MODULOS.html";
+      // Volver a la pantalla que mando al login (?next=, lo pone auth-guard.js). Solo
+      // rutas propias: empieza con "/" y no con "//", sin "://" ni "\\" -> nada de
+      // redirigir a otro sitio. Si la pantalla no es para su rol, el guard la corrige.
+      var next = new URL(window.location.href).searchParams.get("next") || "";
+      var nextOk = /^\/(?!\/)/.test(next) && next.indexOf("://") === -1 && next.indexOf("\\") === -1;
+      window.location.href = nextOk ? next : ((role === "envios") ? "envios-only.html" : "GP2_MODULOS.html");
     }
 
     // Escuchar el evento SIGNED_IN — dispara cuando supabase-js termina de procesar

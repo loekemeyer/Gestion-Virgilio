@@ -1,14 +1,14 @@
 <!doctype html>
 <html lang="es">
 <head>
-<script src="../auth-guard.js?v=20260904t"></script>
-<script src="../gp2-ui.js?v=20260912a"></script>
+<script src="../auth-guard.js?v=20260929a"></script>
+<script src="../gp2-ui.js?v=20260913e"></script>
 <script src="../gp2-numero.js?v=20260911o"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Stock Flejes · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../supabase-config.js?v=20260905k"></script>
+<script src="../supabase-config.js?v=20260929a"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif;background:#f5f6f8;padding:12px;color:#111}
@@ -281,18 +281,20 @@ function render(){
   var q=($('q').value||'').trim().toLowerCase();
   var rows=FL.filter(f=>{
     if(provSel && provOf(f)!==provSel)return false;
-    var stock=Number(f.stock)||0, min=Number(f.minimo)||0;
+    var stock=Number(f.stock)||0, max=Number(f.maximo)||0;
     if(stSel==='con' && !(stock>0))return false;
     if(stSel==='sin' && stock>0)return false;
-    if(stSel==='bajo' && !(min>0 && stock<min))return false;
+    if(stSel==='bajo' && !(max>0 && stock<max))return false;
     if(q){var s=((f.n_fleje||'')+' '+(f.codigo||'')+' '+(f.descripcion||'')+' '+(f.parte||'')+' '+(f.medida||'')+' '+(f.cod_isis||'')).toLowerCase();if(s.indexOf(q)<0)return false;}
     return true;
   });
   var g=$('itemsGrid'); g.innerHTML='';
   $('itemsEmpty').style.display = rows.length? 'none':'block';
   rows.forEach(f=>{
-    var stock=Number(f.stock)||0, min=Number(f.minimo)||0, ped=Math.max(0,min-stock);
-    var cls=stock<=0?'zero':(min>0&&stock<min?'low':'ok');
+    /* El minimo se borro de la base el 2026-09-14: lo que falta se mide contra el MAXIMO
+       [usuario: "todo lo que usaba el minimo ahora que use el maximo. es la misma logica"]. */
+    var stock=Number(f.stock)||0, max=Number(f.maximo)||0, ped=Math.max(0,max-stock);
+    var cls=stock<=0?'zero':(max>0&&stock<max?'low':'ok');
     var b=document.createElement('button'); b.className='item-btn';
     b.innerHTML=
       '<span class="ed" title="editar" data-ed="'+f.comp_id+'">✎</span>'+
@@ -300,7 +302,7 @@ function render(){
       '<span class="desc">'+esc(f.parte||f.descripcion||'')+'</span>'+
       (f.medida?'<span class="med">'+esc(f.medida)+' mm</span>':'')+
       '<span class="stk '+cls+'">'+fmt(stock)+' kg</span>'+
-      '<span class="mn">'+(min?('mín '+fmt(min)):'sin mínimo')+(ped>0?(' · <span class="ped">pedir '+fmt(ped)+'</span>'):'')+'</span>';
+      '<span class="mn">'+(max?('máx '+fmt(max)):'sin máximo')+(ped>0?(' · <span class="ped">pedir '+fmt(ped)+'</span>'):'')+'</span>';
     b.addEventListener('click',(ev)=>{
       // ✎ = editar datos directo; el resto de la tarjeta abre el DETALLE
       if(ev.target && ev.target.getAttribute('data-ed')){ editar(f.comp_id); return; }

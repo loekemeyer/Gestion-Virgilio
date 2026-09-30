@@ -15,6 +15,8 @@
  *   GP2UI.hoyAR(-30)    hace 30 dias;  GP2UI.hoyAR(unDate) = ese instante, en fecha AR
  *   GP2UI.fechaAR(iso)  "2026-09-04" (o "2026-09-04T12:00") -> "04/09/2026"; lo que
  *                       no es ISO vuelve tal cual, y null/"" -> ""
+ *   GP2UI.esCarton(item)  true si la fila es de carton (sector 10). GP2UI.SECTOR_CARTON
+ *                       es ese 10, escrito UNA vez; acepta la fila o el sector_id suelto
  *   GP2UI.exportarCSV(nombre, filas)
  *                       baja un CSV que Excel es-AR abre en columnas: separador ";",
  *                       BOM + "sep=;", toda celda entre comillas, los numeros con
@@ -80,6 +82,18 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
 
+  /* El carton es el sector 10 y eso estaba escrito a mano en cinco lugares (dos pantallas):
+     el dia que el carton deje de ser el 10 hay que tocar UN lugar, no buscar cinco.
+     Es un PARCHE a proposito: lo que corresponde es que el bundle emita es_carton y la
+     pantalla no sepa de numeros de sector. Mientras tanto el numero vive aca. (idea 7334) */
+  var SECTOR_CARTON = 10;
+  function esCarton(x) {
+    if (x == null) return false;
+    var sid = (typeof x === "object") ? x.sector_id : x;
+    return Number(sid) === SECTOR_CARTON;
+  }
+
   global.GP2UI = { esc: esc, $: $, cls: cls, hoyAR: hoyAR, fechaAR: fechaAR,
-                   fechaTsAR: fechaTsAR, exportarCSV: exportarCSV };
+                   fechaTsAR: fechaTsAR, exportarCSV: exportarCSV,
+                   SECTOR_CARTON: SECTOR_CARTON, esCarton: esCarton };
 })(typeof window !== "undefined" ? window : this);

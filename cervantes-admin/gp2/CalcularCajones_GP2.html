@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.0.0 — reemplazo GP2 de calcular-cajones.html (programa viejo, schema public).
+     Lee GP2.calculadora_cajones_bundle(): la tara sale de GP2.cajon (migrada de
+     public.peso_cajones el 2026-09-12) y los kg por unidad de GP2.componente.kg_x_uni.
+     Guarda el bundle en localStorage: en el galpón la balanza se usa sin señal. -->
+<script src="auth-guard.js?v=20260929a"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Calcular Cajones · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=20260929a"></script>
+<link rel="stylesheet" href="gp2-modulo.css?v=20260912c"/>
+<link rel="icon" type="image/png" href="GP2_favicon.png">
+<link rel="apple-touch-icon" href="GP2_favicon.png">
+<style>
+  .card{max-width:560px}
+  .paso{margin:18px 0 8px;font-size:15px;font-weight:900;letter-spacing:.5px;color:#555;text-transform:uppercase}
+  .campo{margin:10px 0}
+  .campo label{display:block;font-size:17px;font-weight:800;margin-bottom:5px;color:#333}
+  .campo input, .campo select{width:100%;min-height:48px;padding:9px 10px;font-size:20px;
+    border:2px solid #d0d7de;border-radius:8px;background:#fff;color:#111}
+  .campo input:focus, .campo select:focus{outline:none;border-color:#111}
+  .dosCol{display:flex;gap:10px}
+  .dosCol .campo{flex:1;min-width:0}
+  .hint{font-size:15px;color:#666;margin-top:4px}
+  .res{background:#1a1a1a;color:#fff;border-radius:12px;padding:14px 16px;margin:12px 0}
+  .res .fila{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:5px 0}
+  .res .k{font-size:16px;color:#b9b9b9;font-weight:700}
+  .res .v{font-size:21px;font-weight:900;font-variant-numeric:tabular-nums}
+  .res .grande{font-size:30px;color:#34d399}
+  .res .uni{font-size:30px;color:#60a5fa}
+  .alerta{background:#fff4f4;border:2px solid #f3c2c2;color:#b42318;border-radius:10px;
+    padding:10px 12px;font-weight:800;font-size:17px;margin:10px 0}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Calcular Cajones</h1>
+    <div class="hbtns">
+      <a href="calculadora.html">← Volver</a>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <div class="paso">1 · Peso neto</div>
+
+    <div class="campo">
+      <label for="fBruto">Peso bruto de la balanza (kg)</label>
+      <input type="text" id="fBruto" inputmode="decimal" placeholder="0,00" autocomplete="off">
+    </div>
+
+    <div class="dosCol">
+      <div class="campo">
+        <label for="fCajon">Cajón N°</label>
+        <select id="fCajon"><option value="">— Elegir —</option></select>
+      </div>
+      <div class="campo">
+        <label for="fCant">Cantidad de cajones</label>
+        <input type="text" id="fCant" inputmode="numeric" value="1" autocomplete="off">
+      </div>
+    </div>
+    <div class="hint" id="hintCajon"></div>
+
+    <div class="res hidden" id="resNeto">
+      <div class="fila"><span class="k">Bruto</span><span class="v" id="rBruto">—</span></div>
+      <div class="fila"><span class="k" id="rTaraLbl">Tara del cajón</span><span class="v" id="rTara">—</span></div>
+      <div class="fila"><span class="k">Neto</span><span class="v grande" id="rNeto">—</span></div>
+    </div>
+
+    <div class="alerta hidden" id="alerta"></div>
+
+    <div class="paso">2 · Unidades <span style="font-weight:700;text-transform:none;color:#888">(opcional)</span></div>
+
+    <div class="campo">
+      <label for="fSector">Sector</label>
+      <select id="fSector"><option value="">— Elegir —</option></select>
+    </div>
+
+    <div class="campo">
+      <label for="fPieza">Pieza</label>
+      <select id="fPieza"><option value="">— Elegir sector primero —</option></select>
+      <div class="hint" id="hintPieza"></div>
+    </div>
+
+    <div class="res hidden" id="resUni">
+      <div class="fila"><span class="k">Kg por unidad</span><span class="v" id="rKgUni">—</span></div>
+      <div class="fila"><span class="k">Unidades</span><span class="v uni" id="rUni">—</span></div>
+      <div class="fila hidden" id="filaCajones"><span class="k">Equivale a</span><span class="v" id="rCajones">—</span></div>
+    </div>
+
+    <div id="status" class="status">Cargando…</div>
+  </div>
+</div>
+
+<script src="gp2-ui.js?v=20260913e"></script>
+<script src="gp2-numero.js?v=20260911o"></script>
+<script>
+"use strict";
+
+var $ = GP2UI.$, esc = GP2UI.esc;
+var SB = GP2_SB();
+var CACHE = "gp2_calc_cajones_bundle_v1";
+
+var D = { cajones: [], sectores: [], comps: [] };
+
+function kg(n, dec){ return GP2N.fmt(n, dec == null ? 2 : dec) + " kg"; }
+
+/* El bundle se guarda en el celular: la balanza del galpón queda lejos del wifi y
+   la calculadora tiene que abrir igual (el programa viejo ya hacía esto). */
+function guardarCache(d){ try { localStorage.setItem(CACHE, JSON.stringify(d)); } catch(e){} }
+function leerCache(){
+  try {
+    var raw = localStorage.getItem(CACHE);
+    if (!raw) return null;
+    var d = JSON.parse(raw);
+    return (d && d.cajones && d.comps) ? d : null;
+  } catch(e){ return null; }
+}
+
+async function cargar(){
+  var local = leerCache();
+  if (local){ D = local; pintarListas(); $("status").textContent = "Datos guardados en este teléfono."; }
+
+  try {
+    var res = await SB.rpc("calculadora_cajones_bundle");
+    if (res.error) throw res.error;
+    D = res.data || D;
+    guardarCache(D);
+    pintarListas();
+    $("status").textContent = D.cajones.length + " cajones y " + D.comps.length + " piezas con peso por unidad.";
+  } catch(e){
+    if (!local) $("status").textContent = "Sin conexión y sin datos guardados en este teléfono.";
+    else $("status").textContent = "Sin conexión: se usan los datos guardados en este teléfono.";
+  }
+}
+
+function pintarListas(){
+  var c = $("fCajon"), s = $("fSector");
+  var cajonSel = c.value, sectorSel = s.value;
+
+  c.innerHTML = '<option value="">— Elegir —</option>';
+  (D.cajones || []).forEach(function(x){
+    var o = document.createElement("option");
+    o.value = x.n;
+    o.textContent = "N° " + x.n + "  ·  " + GP2N.fmt(x.tara, 2) + " kg";
+    c.appendChild(o);
+  });
+  if (cajonSel) c.value = cajonSel;
+
+  s.innerHTML = '<option value="">— Elegir —</option>';
+  (D.sectores || []).forEach(function(x){
+    var o = document.createElement("option");
+    o.value = x.id;
+    o.textContent = x.nom + "  (" + x.n + ")";
+    s.appendChild(o);
+  });
+  if (sectorSel) s.value = sectorSel;
+
+  pintarPiezas();
+}
+
+function pintarPiezas(){
+  var sid = $("fSector").value, p = $("fPieza"), prev = p.value;
+  if (!sid){
+    p.innerHTML = '<option value="">— Elegir sector primero —</option>';
+    $("hintPieza").textContent = "";
+    calcular();
+    return;
+  }
+  var arr = (D.comps || []).filter(function(x){ return String(x.s) === String(sid); });
+  p.innerHTML = '<option value="">— Elegir —</option>';
+  arr.forEach(function(x){
+    var o = document.createElement("option");
+    o.value = x.id;
+    o.textContent = x.cod + "  ·  " + GP2N.fmt(x.kg, 4) + " kg/u" + (x.d ? "  —  " + x.d : "");
+    p.appendChild(o);
+  });
+  if (prev && arr.some(function(x){ return String(x.id) === String(prev); })) p.value = prev;
+  $("hintPieza").textContent = arr.length + " piezas con peso cargado en este sector.";
+  calcular();
+}
+
+function compSel(){
+  var id = $("fPieza").value;
+  if (!id) return null;
+  for (var i = 0; i < D.comps.length; i++) if (String(D.comps[i].id) === String(id)) return D.comps[i];
+  return null;
+}
+
+function taraSel(){
+  var n = $("fCajon").value;
+  if (!n) return null;
+  for (var i = 0; i < D.cajones.length; i++) if (String(D.cajones[i].n) === String(n)) return Number(D.cajones[i].tara);
+  return null;
+}
+
+function calcular(){
+  var bruto = GP2N.num($("fBruto").value);
+  var tara = taraSel();
+  var cant = GP2N.entero($("fCant").value);
+  if (!(cant > 0)) cant = 1;
+
+  $("hintCajon").textContent = tara != null
+    ? (cant > 1 ? cant + " cajones × " + kg(tara) + " = " + kg(tara * cant) + " de tara"
+                : "Cajón vacío: " + kg(tara))
+    : "";
+
+  if (!(bruto > 0) || tara == null){
+    $("resNeto").classList.add("hidden");
+    $("resUni").classList.add("hidden");
+    $("alerta").classList.add("hidden");
+    return;
+  }
+
+  var taraTotal = tara * cant, neto = bruto - taraTotal;
+  $("rBruto").textContent = kg(bruto);
+  $("rTaraLbl").textContent = cant > 1 ? ("Tara — " + cant + " cajones") : "Tara del cajón";
+  $("rTara").textContent = "− " + kg(taraTotal);
+  $("rNeto").textContent = kg(neto);
+  $("resNeto").classList.remove("hidden");
+
+  if (neto <= 0){
+    $("alerta").textContent = "⚠ El neto da " + kg(neto) + ": revisá el bruto, el cajón o la cantidad.";
+    $("alerta").classList.remove("hidden");
+    $("resUni").classList.add("hidden");
+    return;
+  }
+  $("alerta").classList.add("hidden");
+
+  var c = compSel();
+  if (!c || !(Number(c.kg) > 0)){ $("resUni").classList.add("hidden"); return; }
+
+  var uni = neto / Number(c.kg);
+  $("rKgUni").textContent = GP2N.fmt(c.kg, 4) + " kg  ·  " + c.cod;
+  $("rUni").textContent = GP2N.fmt(uni, 0) + " uni";
+  if (c.uxc > 0){
+    $("rCajones").textContent = GP2N.fmt(uni / Number(c.uxc), 2) + " cajones llenos (" + GP2N.fmt(c.uxc, 0) + " uni c/u)";
+    $("filaCajones").classList.remove("hidden");
+  } else {
+    $("filaCajones").classList.add("hidden");
+  }
+  $("resUni").classList.remove("hidden");
+}
+
+$("fBruto").addEventListener("input", calcular);
+$("fCant").addEventListener("input", calcular);
+$("fCajon").addEventListener("change", calcular);
+$("fSector").addEventListener("change", pintarPiezas);
+$("fPieza").addEventListener("change", calcular);
+
+cargar();
+</script>
+</body>
+</html>

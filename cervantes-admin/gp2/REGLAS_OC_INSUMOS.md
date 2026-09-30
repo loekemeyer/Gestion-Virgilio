@@ -24,12 +24,31 @@ Los cartones se **reciben en PAQUETES**: el proveedor siempre entrega alturas de
 **250 unidades** por paquete (`parametro.carton_uni_x_paquete`), sea cual sea el tipo
 (el C viene de a 1.000 = 4 paquetes de 250). La recepción carga paquetes y guarda unidades.
 
-| Formato | Pedido total múltiplo de | Por código múltiplo de | Mínimo por código |
-|---|---|---|---|
-| C | 12.000 | 1.000 | 1.000 por cada múltiplo de 12.000 |
-| LOKE | 16.000 | 1.000 | 1.000 por cada múltiplo de 16.000 |
-| 8 | 30.000 | 1.000 | 1.000 por cada múltiplo de 30.000 |
-| Huevo | 25.000 | 1.000 | **2.000** por cada múltiplo de 25.000 |
+| Formato | Marca | Pedido total múltiplo de | Por código múltiplo de | Mínimo por código |
+|---|---|---|---|---|
+| C | LK y CH | 12.000 | 1.000 | 1.000 |
+| LOKE | CH (y 8 LK) | 16.000 | 1.000 | 1.000 |
+| 8 (corbata LK) | LK | **12.000** | 1.000 | 1.000 |
+| Corbata (CH) | CH | 30.000 | 1.000 | 1.000 |
+| Huevo | CH | 25.000 | 1.000 | **2.000** |
+| Huevo LK | LK | **12.000** | 1.000 | 1.000 (sin confirmar) |
+| Huevo LK Tapon (F4A1/F4B1/F4C) | LK | 18.000 | 1.000 | 1.000 |
+| Huevo LK 25 (Q4B/K1A) | LK | 25.000 | 1.000 | 1.000 |
+| Rallador | LK/CH | 24.000 | 1.000 | 1.000 |
+| Manga | LK | 12.000 | 1.000 | 1.000 |
+
+**⚠ 2026-09-29, corrección del dueño: "En cartones los mínimos son por cartón, aunque estén agrupados
+por familia."** Los números de la tabla de arriba son el **mínimo de cada cartón** de esa familia
+(`componente.pedido_minimo_uni`, 129 cargados desde la planilla), no una tirada que la familia tenga que
+sumar. La O.C. lo muestra bajo Pedir y no frena (desde el 28/09 el múltiplo de familia tampoco frena);
+la tabla de cartones va separada por familia con un título por familia.
+
+**La tirada depende de la MARCA, no sólo de la geometría del pliego** `[Thomas 2026-09-28, planilla
+"Pedido Cartones VACIO": Huevo LK 12.000 / Huevo CH 25.000, Corb8 LK 12.000 / Corb8 CH 30.000;
+"manda la planilla"]`. Se resolvió sin tocar código: un formato por marca, como ya venía con
+`8` (corbata LK) y `Corbata` (CH). `Huevo LK` es nuevo (25 posiciones, igual que Huevo). Los tapones
+(18.000) y Q4B/K1A (25.000) van como familias aparte `[Thomas 2026-09-28: "Sí"]`, porque un formato
+tiene un solo múltiplo. Detalle del cruce: `MINIMOS_OC_2026-09-28_detalle.xlsx`.
 
 - **Las BOLSAS son de `Envases Vihal`, no de Pol**, y tienen **pedido mínimo de 20.000
   unidades** `[usuario 2026-09-03: "ponele veinte mil y mañana lo chequeo"]` — **SIN
@@ -272,6 +291,11 @@ Faltan proveedor: 8 plásticos (ver abajo), bombillas/resortes 8, remaches 8, fl
   OP Bolsas Plast»): **Indarnyl 400 kg**, Beta Plásticos 25, Santa Rosa 25, masterbatch 5. Viaja en
   `oc_bundle.proveedores[]`; la pantalla suma los kg de la OC por proveedor y **no deja crearla si no llega
   al piso** (dice cuántos kg faltan). No se infla sola: sumar kg es una decisión de compra.
+- **Pedido mínimo POR FAMILIA (plástico, 2026-09-29)**: las piezas de la misma matriz del inyector
+  (`componente.familia_pedido` → `GP2.familia_pedido.pedido_minimo_uni`) suman para el mínimo
+  `[Thomas: "entre todos los pirolos tengo que llegar a 36000"]`. La O.C. agrupa el plástico por familia
+  y muestra en el título el mínimo y lo pedido; no frena. Donde hay familia, el mínimo por pieza de
+  abajo no se muestra.
 - **Pedido mínimo POR PIEZA** (`componente.pedido_minimo_uni`, del Excel, hoja «Pedido 31-08», columna
   `Pedi Min Uni`): el inyector no hace una tirada de menos de N piezas (1 a 36.000 según el molde), **47
   componentes cargados**. Viaja en `oc_bundle.insumos[].pedido_minimo_uni`. **NO bloquea**: hoy 24 de los

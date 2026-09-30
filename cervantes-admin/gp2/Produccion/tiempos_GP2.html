@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <script src="../auth-guard.js?v=20260904t"></script>
-<script src="../gp2-ui.js?v=20260912a"></script>
+  <script src="../auth-guard.js?v=20260929a"></script>
+<script src="../gp2-ui.js?v=20260913e"></script>
 <script src="../gp2-numero.js?v=20260911o"></script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" href="../GP2_favicon.png">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../supabase-config.js?v=20260905k"></script>
+<script src="../supabase-config.js?v=20260929a"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Inter', sans-serif; background: #d9d9de; padding: 20px; min-height: 100vh; }
@@ -79,6 +79,7 @@
       <div class="ctrl-group"><label>Desde</label><input type="date" id="fDesde" class="ctrl-input"></div>
       <div class="ctrl-group"><label>Hasta</label><input type="date" id="fHasta" class="ctrl-input"></div>
       <div class="ctrl-group"><label>Operario</label><select id="fOperario" class="ctrl-select"><option value="">Todos</option></select></div>
+      <div class="ctrl-group"><label>Mostrar</label><select id="fVer" class="ctrl-select"><option value="">Todas</option><option value="sin">Sin tiempo cargado</option><option value="prod">Con producción</option></select></div>
       <input type="text" id="fBuscar" class="ctrl-input" placeholder="Buscar matriz o nombre..." style="min-width:220px">
       <button class="btn-act push" id="btnCargar">Cargar</button>
       <button class="btn-act ghost" id="btnCSV">Exportar CSV</button>
@@ -92,18 +93,19 @@
           <tr>
             <th data-k="matriz">Matriz</th>
             <th data-k="nombre">Nombre</th>
+            <th class="num" data-k="tiempo">Tiempo cargado</th>
+            <th class="num" data-k="uxg">Uni/golpe</th>
             <th class="num" data-k="prods">Prod.</th>
             <th class="num" data-k="uni">Unidades</th>
             <th class="num" data-k="segs">Seg. trabajados</th>
             <th class="num" data-k="segUni">Seg/uni real</th>
-            <th class="num" data-k="segUniHist">Seg/uni hist.</th>
             <th class="num" data-k="desvio">Desvío</th>
           </tr>
         </thead>
-        <tbody id="tbody"><tr><td colspan="8" class="msg">Elegí el rango y tocá Cargar.</td></tr></tbody>
+        <tbody id="tbody"><tr><td colspan="9" class="msg">Elegí el rango y tocá Cargar.</td></tr></tbody>
       </table>
     </div>
-    <div class="note">Lee <b>GP2.produccion</b> (filas con unidades &gt; 0, sin las marcadas como eliminadas). El seg/uni histórico sale de <code>segundos_historico</code>; el desvío es real contra histórico (negativo = más rápido que el histórico).</div>
+    <div class="note">Lista <b>todas</b> las matrices de <b>GP2.matriz</b> (las inactivas, marcadas). <b>Tiempo cargado</b> = <code>matriz.tiempo_historico</code>, en segundos por unidad (la 501, por kg): es el que usa el costo. Producción del rango: <b>GP2.produccion</b> (unidades &gt; 0, sin eliminadas). Desvío = real contra tiempo cargado (negativo = más rápido).</div>
   </div>
 </div>
 
@@ -113,7 +115,7 @@
   var sb = GP2_SB();
 
   var $ = GP2UI.$;
-  var ROWS = [], SORT = { k: 'uni', dir: -1 };
+  var ROWS = [], SORT = { k: 'matriz', dir: 1 }, MATRICES = null;
 
   var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
   function n2(v) { return GP2N.fmt(v, 2, '—'); }
@@ -137,9 +139,17 @@
 
   async function cargar() {
     var tb = $('tbody');
-    tb.innerHTML = '<tr><td colspan="8" class="msg">Cargando...</td></tr>';
+    tb.innerHTML = '<tr><td colspan="9" class="msg">Cargando...</td></tr>';
+    /* el maestro va primero: sin el, la pantalla solo mostraba las matrices que
+       produjeron en el rango (2026-09-22, "me aparecen solo 4 matrices") */
+    if (!MATRICES) {
+      var rm = await sb.from('matriz')
+        .select('n_matriz,descripcion,tiempo_historico,tiempo_unidad,uni_x_golpe,activa');
+      if (rm.error) { tb.innerHTML = '<tr><td colspan="9" class="msg err">Error: ' + esc(rm.error.message) + '</td></tr>'; return; }
+      MATRICES = rm.data || [];
+    }
     var q = sb.from('produccion')
-      .select('matriz_raw,nombre_matriz,uni,segundos_trabajados,segundos_historico,legajo,fecha,eliminar')
+      .select('matriz_raw,nombre_matriz,uni,segundos_trabajados,legajo,fecha,eliminar')
       .gt('uni', 0)
       .gte('fecha', $('fDesde').value + 'T00:00:00-03:00')
       .lte('fecha', $('fHasta').value + 'T23:59:59-03:00')
@@ -147,42 +157,55 @@
     if ($('fOperario').value) q = q.eq('legajo', $('fOperario').value);
 
     var r = await q;
-    if (r.error) { tb.innerHTML = '<tr><td colspan="8" class="msg err">Error: ' + esc(r.error.message) + '</td></tr>'; return; }
+    if (r.error) { tb.innerHTML = '<tr><td colspan="9" class="msg err">Error: ' + esc(r.error.message) + '</td></tr>'; return; }
 
     var acc = {};
+    function fila(k) {
+      if (!acc[k]) acc[k] = { matriz: k, nombre: '', tiempo: null, unidad: 'uni', uxg: null, activa: true, maestro: false, prods: 0, uni: 0, segs: 0 };
+      return acc[k];
+    }
+    MATRICES.forEach(function (m) {
+      var a = fila(String(m.n_matriz).trim());
+      a.maestro = true;
+      a.nombre = m.descripcion || '';
+      a.tiempo = Number(m.tiempo_historico) > 0 ? Number(m.tiempo_historico) : null;
+      a.unidad = m.tiempo_unidad || 'uni';
+      a.uxg = m.uni_x_golpe == null ? null : Number(m.uni_x_golpe);
+      a.activa = m.activa !== false;
+    });
     (r.data || []).forEach(function (p) {
       if (String(p.eliminar || '').toUpperCase() === 'S') return;
       var k = String(p.matriz_raw || '').trim();
       if (!k) return;
-      if (!acc[k]) acc[k] = { matriz: k, nombre: p.nombre_matriz || '', prods: 0, uni: 0, segs: 0, segsHist: 0 };
-      var a = acc[k];
+      var a = fila(k);
       a.prods++;
       a.uni += Number(p.uni) || 0;
       a.segs += Number(p.segundos_trabajados) || 0;
-      a.segsHist += Number(p.segundos_historico) || 0;
       if (!a.nombre && p.nombre_matriz) a.nombre = p.nombre_matriz;
     });
 
     ROWS = Object.keys(acc).map(function (k) {
       var a = acc[k];
       a.segUni = a.uni > 0 && a.segs > 0 ? a.segs / a.uni : null;
-      a.segUniHist = a.uni > 0 && a.segsHist > 0 ? a.segsHist / a.uni : null;
-      a.desvio = (a.segUni != null && a.segUniHist > 0) ? ((a.segUni - a.segUniHist) / a.segUniHist) * 100 : null;
+      /* la 501 va en seg/kg: no se compara contra seg/uni real */
+      a.desvio = (a.segUni != null && a.tiempo > 0 && a.unidad === 'uni') ? ((a.segUni - a.tiempo) / a.tiempo) * 100 : null;
       return a;
     });
     render();
   }
 
   function filtradas() {
-    var q = $('fBuscar').value.trim().toLowerCase();
-    var out = q ? ROWS.filter(function (r) {
-      return r.matriz.toLowerCase().indexOf(q) >= 0 || String(r.nombre).toLowerCase().indexOf(q) >= 0;
-    }) : ROWS.slice();
+    var q = $('fBuscar').value.trim().toLowerCase(), ver = $('fVer').value;
+    var out = ROWS.filter(function (r) {
+      if (ver === 'sin' && r.tiempo != null) return false;
+      if (ver === 'prod' && !r.prods) return false;
+      return !q || r.matriz.toLowerCase().indexOf(q) >= 0 || String(r.nombre).toLowerCase().indexOf(q) >= 0;
+    });
     out.sort(function (a, b) {
       var x = a[SORT.k], y = b[SORT.k];
       if (x == null) return 1;
       if (y == null) return -1;
-      if (typeof x === 'string') return x.localeCompare(y) * SORT.dir;
+      if (typeof x === 'string') return x.localeCompare(y, 'es', { numeric: true }) * SORT.dir;
       return (x - y) * SORT.dir;
     });
     return out;
@@ -190,33 +213,40 @@
 
   function render() {
     var rows = filtradas(), tb = $('tbody');
-    var tUni = 0, tSegs = 0, tProds = 0, conHist = 0, sumDesv = 0;
+    var tUni = 0, tSegs = 0, tProds = 0, conHist = 0, sumDesv = 0, sinT = 0;
     rows.forEach(function (r) {
       tUni += r.uni; tSegs += r.segs; tProds += r.prods;
+      if (r.tiempo == null) sinT++;
       if (r.desvio != null) { conHist++; sumDesv += r.desvio; }
     });
     var desvProm = conHist ? sumDesv / conHist : null;
 
     $('stats').innerHTML =
       card('Matrices', n0(rows.length)) +
+      card('Sin tiempo cargado', n0(sinT), sinT ? 'red' : 'green') +
       card('Producciones', n0(tProds)) +
       card('Unidades', n0(tUni), 'blue') +
       card('Horas trabajadas', n2(tSegs / 3600)) +
       card('Desvío promedio', desvProm == null ? '—' : (desvProm > 0 ? '+' : '') + n2(desvProm) + '%', desvProm == null ? '' : (desvProm > 0 ? 'red' : 'green'));
 
-    if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="msg">Sin datos en el rango elegido.</td></tr>'; return; }
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="9" class="msg">Sin matrices para ese filtro.</td></tr>'; return; }
 
     tb.innerHTML = rows.map(function (r) {
       var cls = r.desvio == null ? 'desv-na' : (r.desvio > 0 ? 'desv-bad' : 'desv-good');
       var txt = r.desvio == null ? '—' : (r.desvio > 0 ? '+' : '') + n2(r.desvio) + '%';
+      var tiempo = r.tiempo == null ? '<span class="desv-bad">sin tiempo</span>'
+        : n2(r.tiempo) + (r.unidad === 'kg' ? ' s/kg' : ' s');
+      var marca = !r.maestro ? ' <span class="desv-na">(no está en el maestro)</span>'
+        : (!r.activa ? ' <span class="desv-na">(inactiva)</span>' : '');
       return '<tr>' +
         '<td class="mz-tag">' + esc(r.matriz) + '</td>' +
-        '<td>' + esc(r.nombre) + '</td>' +
-        '<td class="num">' + n0(r.prods) + '</td>' +
-        '<td class="num">' + n0(r.uni) + '</td>' +
-        '<td class="num">' + n0(r.segs) + '</td>' +
+        '<td>' + esc(r.nombre) + marca + '</td>' +
+        '<td class="num">' + tiempo + '</td>' +
+        '<td class="num">' + n0(r.uxg) + '</td>' +
+        '<td class="num">' + (r.prods ? n0(r.prods) : '—') + '</td>' +
+        '<td class="num">' + (r.prods ? n0(r.uni) : '—') + '</td>' +
+        '<td class="num">' + (r.prods ? n0(r.segs) : '—') + '</td>' +
         '<td class="num">' + n2(r.segUni) + '</td>' +
-        '<td class="num">' + n2(r.segUniHist) + '</td>' +
         '<td class="num ' + cls + '">' + txt + '</td>' +
         '</tr>';
     }).join('');
@@ -228,11 +258,11 @@
 
   function csv() {
     /* el armado del CSV (;, BOM, coma decimal) es el de la casa: GP2UI.exportarCSV */
-    var filas = [['Matriz', 'Nombre', 'Producciones', 'Unidades', 'Seg trabajados', 'Seg/uni real', 'Seg/uni historico', 'Desvio %']];
+    var filas = [['Matriz', 'Nombre', 'Tiempo cargado', 'Unidad tiempo', 'Uni x golpe', 'Producciones', 'Unidades', 'Seg trabajados', 'Seg/uni real', 'Desvio %']];
     filtradas().forEach(function (r) {
-      filas.push([r.matriz, r.nombre, r.prods, r.uni, r.segs,
+      filas.push([r.matriz, r.nombre, r.tiempo == null ? '' : r.tiempo, r.unidad, r.uxg == null ? '' : r.uxg,
+        r.prods, r.uni, r.segs,
         r.segUni == null ? '' : Number(r.segUni.toFixed(3)),
-        r.segUniHist == null ? '' : Number(r.segUniHist.toFixed(3)),
         r.desvio == null ? '' : Number(r.desvio.toFixed(2))]);
     });
     GP2UI.exportarCSV('tiempos_matrices_GP2', filas);
@@ -244,6 +274,7 @@
     $('btnCargar').addEventListener('click', cargar);
     $('btnCSV').addEventListener('click', csv);
     $('fBuscar').addEventListener('input', render);
+    $('fVer').addEventListener('change', render);
     $('fOperario').addEventListener('change', cargar);
     document.querySelectorAll('thead th').forEach(function (th) {
       th.addEventListener('click', function () {

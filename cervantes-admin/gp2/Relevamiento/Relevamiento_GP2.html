@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="es">
 <head>
+<!-- v1.4.0 (2026-09-14) — ESTE ES EL "CONTEO" DE LA TABLET [usuario 2026-09-14: "dentro del
+     módulo conteo tendría que aparecer lo del módulo de relevamientos. Es esa lógica"]. La
+     Versión Tablet dejó de tener su propia tabla de conteo con CSV y abre esta pantalla con
+     ?volver=tablet; lo único que cambia acá es que el "Atrás" devuelve a la tablet. -->
 <!-- v1.3.0 (2026-09-04) — ELIMINAR VUELVE AFUERA, Y SIN FACTOR SE CUENTA SUELTO
      [usuario 2026-09-04]. (a) "que no me aparezca el eliminar cuando estoy haciendo el conteo
      adentro de la pagina ... porque no tiene sentido poder ir para atras, sino que me
@@ -49,15 +53,15 @@
 
      El total NO se calcula aca: lo calcula la base (GP2.relev_total_uni). El JS solo
      muestra. Los numeros se formatean con GP2N (gp2-numero.js), nunca a mano. -->
-<script src="../auth-guard.js?v=20260904t"></script>
-<script src="../gp2-ui.js?v=20260912a"></script>
+<script src="../auth-guard.js?v=20260929a"></script>
+<script src="../gp2-ui.js?v=20260913e"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Relevamiento · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../gp2-numero.js?v=20260911o"></script>
-<script src="../supabase-config.js?v=20260905k"></script>
-<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<script src="../supabase-config.js?v=20260929a"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260912c"/>
 <link rel="icon" type="image/png" href="../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../GP2_favicon.png">
 <style>
@@ -139,8 +143,19 @@
 <div class="card">
   <div class="header">
     <h1>📋 Relevamiento</h1>
-    <div class="hbtns"><a href="../GP2_MODULOS.html">Atrás</a></div>
+    <div class="hbtns"><a id="btnAtrasHeader" href="../GP2_MODULOS.html">Atrás</a></div>
   </div>
+  <!-- Si se entró desde la Versión Tablet (modo Conteo), el "Atrás" devuelve a la tablet
+       en vez de al menú: para el operario del galpón la tablet es la casa. -->
+  <script>
+  (function(){
+    try {
+      if (new URLSearchParams(location.search).get("volver") !== "tablet") return;
+      var a = document.getElementById("btnAtrasHeader");
+      if (a) a.href = "../Tablet/Tablet_GP2.html";
+    } catch(e){}
+  })();
+  </script>
 
   <div class="steps">
 

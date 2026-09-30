@@ -38,7 +38,7 @@ const BUNDLE = {
    a componente y por lo tanto una segunda lista que se podia desfasar de la que
    dibuja la pantalla. COMPS queda vacio a proposito (ver test_recepcion_uni). */
 const RECEP = {
-  tara: { tara_pallet: '20', tol_ctrl_peso_pct: '5', carton_uni_x_paquete: '250' },
+  tara: { tara_pallet: '20', tol_ctrl_pct: '5', carton_uni_x_paquete: '250' },
   sectores: [{ id: 6, nombre: 'Sector Plástico' }, { id: 7, nombre: 'Sector Bombilla' }],
   proveedores: [{ nombre: 'Trefilados Industriales', modo_control: null }],
   recepciones: [], pallets: [], rollos: [],
@@ -82,6 +82,13 @@ const STUB = 'window.supabase={createClient:function(){return{'
   ok(await page.isVisible('#cajasBox'), 'el clavo muestra cajas y kg por caja');
   await page.fill('#inCajas', '3');
   await page.fill('#inKgCaja', '8,4');
+  /* ESPERAR EL ESTADO, NO EL ORDEN DE LOS EVENTOS (idea 7266): con la maquina cargada el
+     handler del segundo campo todavia no habia corrido y los cuatro chequeos de abajo leian
+     "Falta uno de los dos datos". Se espera a que los kg esten calculados. */
+  await page.waitForFunction(() => {
+    var l = document.getElementById('lblCajas'), k = document.getElementById('inKg');
+    return l && /=/.test(l.textContent || '') && k && k.value !== '';
+  });
   const calc = (await page.textContent('#lblCajas')).replace(/\s+/g, ' ').trim();
   ok(/3 cajas x 8,4 kg = 25,2 kg/.test(calc), 'multiplica cajas x kg por caja — ' + calc);
   ok((await page.inputValue('#inKg')) === '25,2', 'los kg controlados se completan solos');
@@ -96,6 +103,10 @@ const STUB = 'window.supabase={createClient:function(){return{'
   ok(!(await page.isVisible('#cajasBox')), 'el insumo que no viene en cajas sigue con un solo campo');
   // ...pero si tiene kg por unidad, el control muestra el pasaje a unidades
   await page.fill('#inKg', '20');
+  await page.waitForFunction(() => {
+    var u = document.getElementById('lblUni');
+    return u && /unidades/.test(u.textContent || '');
+  });
   const uni = (await page.textContent('#lblUni')).replace(/\s+/g, ' ').trim();
   ok(/10\.000 unidades/.test(uni) && /0,002 kg/.test(uni), 'el control pasa los kg a unidades — ' + uni);
 

@@ -1,6 +1,218 @@
 <!doctype html>
 <html lang="es">
 <head>
+<!-- v1.48.0 (2026-09-30) — SIN PRECIOS EN GENERAR OC; EL ALTERNATIVO ES UNA FILA REPETIDA [Thomas: "No quiero que
+     me aparezcan los precios aca. Solo en el modulo de ordenes. Para poner a recicor repeti el item del
+     componente y ya"]. Se va el boton "o Recicor · $ 199" de v1.46.1: sin proveedor elegido, cada insumo
+     con alternativo sale dos veces (una por proveedor), la segunda sin campo Pedir; tocarla elige ese
+     proveedor. El precio sigue viajando a crear_oc y se ve en Ordenes y en la hoja impresa. -->
+<!-- v1.47.0 (2026-09-29) — ORDENES EN DOS CAJAS: VIGENTES E HISTORICAS [Thomas: "va a aparecer en vigente hasta
+     que se haga una nueva orden de compra a Maspoli... pasa la actual a historica y la nueva a vigente"].
+     Vigente = la OC de mayor numero de cada proveedor (sin contar anuladas). Es solo pantalla: no cambia
+     estado ni recibido. Historicas arranca cerrada. -->
+<!-- v1.46.1 (2026-09-29) — LA VENTANITA DEL MAXIMO SE FIJA CON UN CLIC [Thomas: "No me deja bajar a ver el resto
+     de los componentes, que si hago click me quede fijo y lo saco haciendo un click afuera"]. Pasar el mouse
+     sigue abriendola de vista previa; el clic la FIJA (.fija: pointer-events on), ya no se cierra al salir de
+     la celda, se scrollea adentro, y se cierra con clic afuera, Escape o clic de nuevo en el Maximo. El
+     scroll de la propia ventanita ya no la cierra.
+     (2) SIN BLANCO DE UN SOLO LADO [Thomas: "hay mas blanco de un lado que de otro"]: el piso de 720px de la
+     tarjeta (v1.40.0, pensado para cuando NO hay tabla) la dejaba mas ancha que la tabla y el sobrante caia
+     todo a la derecha. Con la lista a la vista el piso se apaga y la tarjeta abraza la tabla.
+     (3) EL PROVEEDOR ALTERNATIVO SE VE SIN ELEGIRLO [Thomas: "en sector caja, salvo que toque Recicor, no me
+     aparece. Que me aparezca la opcion de comprarselo a ellos"]: sin proveedor elegido, la columna
+     Proveedor muestra el principal y debajo un boton por cada alternativo (con su precio si cotiza);
+     tocarlo es lo mismo que elegir ese proveedor arriba. -->
+<!-- v1.46.0 (2026-09-29) — SEMAFORO DE RECEPCION EN CADA RENGLON DE LA OC [Thomas: "Marca en verde lo que ya se
+     haya recibido por completo, amarillo si se entrego parcial y rojo si no se entrego nada"]. Compara
+     recibido contra cantidad (misma unidad del renglon, la recepcion ya convierte kg/uni al cruzar).
+     Solo en OC enviada/recibida: una en borrador todavia no se pidio, pintarla de rojo mentiria. -->
+<!-- v1.45.0 (2026-09-29) — FLEJE, REMACHE, BOMBILLA, GARAGE, CAJA Y BOLSAS PLASTICAS: LA TABLA VA ORDENADA POR
+     PROVEEDOR (y codigo), SIN TITULOS [Thomas: "en la parte de todos los provs (cuando no filtro por prov)
+     igualmente este ordenado por prov sin encabezados solo ordenado"]. ordenadoPorProveedor(); carton y
+     plastico siguen con sus titulos. -->
+<!-- v1.44.2 (2026-09-29) — SIN EQUIVALENCIAS DEBAJO DE PEDIR [Thomas: "Estas aclaraciones no las quiero, solo el
+     min pedido"]: se van los "= 227 bolsas de 150" / "= 11.000 uni" / "= N paq" bajo el campo. Quedan el
+     "min. pedido" y el "ya pediste N (en camino)". -->
+<!-- v1.44.1 (2026-09-29) — "OTROS" DEL PLASTICO: UN SOLO TITULO, PIEZAS ORDENADAS POR PROVEEDOR [Thomas: "Que
+     los otros esten bajo un solo encabezado pero que esten ordenados por proveedor"]. Reemplaza el titulo por
+     proveedor de la v1.43.2. -->
+<!-- v1.44.0 (2026-09-29) — (1) EL MINIMO EN LA UNIDAD DE LA O.C. [Thomas: "el min es en kg en este caso... siempre
+     los min es la unidad de medida que aparece en el remito de recepcion y en la columna de la orden de
+     compra"]: "min. pedido 1.000,00 kg (= 153.139 uni)" para el Clavo 505, "48 paq 250 (= 12.000 uni)" para el
+     carton. En la base sigue en la unidad canonica; el Clavo 505 (planilla "Pedi Min KG" 1.000) paso de 1.000
+     a 153.139 uni. (2) ENCABEZADOS FIJOS al bajar [Thomas: "que me aparezcan los encabezados fijos"]: thead
+     sticky en la tabla de insumos y en la de O.C. emitidas, en escritorio (>700px). -->
+<!-- v1.43.2 (2026-09-29) — EL "OTROS" DEL PLASTICO VA POR PROVEEDOR [Thomas: "La seccion de otros solo en
+     plasticos y agrupamela por proveedor. Cartones esta bien asi"]: titulos "Otros · <proveedor> · N piezas",
+     al final. Base: los insertos son UNA familia (PB6, PB8B, PEST2 y PEST1 de Kollplast, min. 2.000); el
+     inserto canelon (PC7) queda aparte con 5.000 [Thomas]. -->
+<!-- v1.43.1 (2026-09-29) — "OTROS" Y "MIN. PEDIDO" [Thomas: "todos aquellos que no tengan una familia barra
+     formato, que me los metan en la familia o formato otros. Ademas quiero que me diga min. pedido en vez de
+     min. proveedor"]. Carton sin formato y plastico sin familia van bajo el titulo "Otros" (ultimo); la linea
+     bajo Pedir dice "min. pedido N uni". -->
+<!-- v1.43.0 (2026-09-29) — PLASTICO: FAMILIA DE PEDIDO CON MINIMO POR FAMILIA [Thomas: "el minimo va por
+     familia, no por parte. Es decir: entre todos los pirolos tengo que llegar a 36000. Separame por
+     familia al igual que los cartones"]. Base: tabla GP2.familia_pedido (30 familias = matrices del
+     inyector, de la planilla Pedido Plasticos VACIO) y componente.familia_pedido (49 piezas); oc_bundle
+     manda familia_pedido y familia_minimo. Pantalla: conTitulosDeFamiliaPlastico() agrupa el sector 6
+     por familia con un titulo "Pirolos · 3 piezas · min. familia 36.000 uni · pedido N uni" (rojo si
+     no llega); la linea "min. proveedor" por pieza no se muestra cuando hay familia. No frena. -->
+<!-- v1.42.1 (2026-09-29) — LA TABLA DE CARTONES SE AGRUPA SOLO POR FORMATO [Thomas: "Solo por formato, ni
+     por marca ni por familia de articulo"]: un titulo por carton_formato (C, LOKE, 8, Huevo, Huevo LK...),
+     mas "Pliegos" y "Sin formato". La familia de la regla de pedido (formato + marca + categoria) no cambia. -->
+<!-- v1.42.0 (2026-09-29) — CARTON: MINIMO POR CARTON Y LA TABLA SEPARADA POR FAMILIA [Thomas: "En cartones
+     los minimos son por carton, aunque esten agrupados por familia. Ademas quiero que en la o.c. me separes
+     por familia"]. (1) El minimo del carton es componente.pedido_minimo_uni (129 cartones cargados desde la
+     planilla Pedido Cartones VACIO, por articulo: 12.000 / 16.000 / 25.000 / 30.000 / 18.000 / 24.000) y se
+     muestra como en los demas sectores ("min. proveedor N uni"); se saca la linea "tirada min. por familia"
+     de la v1.41.0, que leia mal la planilla. (2) conTitulosDeFamilia(): los cartones van agrupados por
+     famKey (formato + marca + categoria) con un renglon de titulo (.fam-hdr) por familia; el resto de los
+     sectores como antes. -->
+<!-- v1.41.0 (2026-09-28) — EL MINIMO DEL CARTON TAMBIEN DEBAJO DE PEDIR [Thomas: "No me aparece el
+     minimo todavia", sobre una fila de carton]. El carton no tiene minimo por pieza: su minimo es la
+     tirada de la familia (carton_formato.pliegos_multiplo) y el paso por codigo (min_codigo_x_multiplo).
+     notaMinUni() lo muestra como "tirada min. 12.000 uni por familia Huevo LK · min. por codigo 1.000";
+     en rojo si lo pedido no llega al minimo por codigo. Y SE VA EL CARTEL ROJO del multiplo de familia
+     con su boton "Ajustar al multiplo" [Thomas: "Que esto no aparezca"]: el multiplo y el minimo por
+     codigo ya no frenan Crear OC; queda solo el piso de la familia (bolsa 20.000) y el piso en kg del
+     proveedor de resina. "Sugerir" sigue redondeando el carton a su familia. -->
+<!-- v1.40.1 (2026-09-28) — BOTONES, FILTROS, BUSCADOR Y CREAR OC A LA IZQUIERDA [Thomas: "todo esto alineacion
+     a la izquierda"]. La tarjeta sigue del ancho de la tabla y centrada en la pagina. -->
+<!-- v1.40.0 (2026-09-28) — TODO CENTRADO, SIN BLANCO A LOS COSTADOS [Thomas: "quiero que este todo centrado y sin
+     tanto blanco. Si es necesario pone proveedores sobrantes abajo"]. La tarjeta es del ancho de la tabla
+     (piso 720px) y la botonera de proveedores baja de renglon en vez de ensanchar la pagina. -->
+<!-- v1.39.0 (2026-09-28) — SIN HUECOS ENTRE COLUMNAS + MINIMO EN ROJO [Thomas: "entre columna y columna veo
+     espacios" + "si no cumple con el minimo que aparezca igual pero con color rojo y negrita"]. La
+     tabla seguia al 100%: table.t de gp2-modulo.css le ganaba a .t-insumos. Ahora table.t.t-insumos
+     y el .table-wrap abrazan el dato. "min. proveedor" en rojo y negrita cuando lo pedido queda corto. -->
+<!-- v1.38.0 (2026-09-28) — LA O.C. SE PIDE EN LA UNIDAD DEL REMITO + COLUMNA "UNI MEDIDA" [Thomas: "usa las
+     mismas unidades de medida para las ordenes de compra. Y al lado de pedir una columna Uni Medida...
+     los resortes batidor los pido en unidades"]. umRemito() replica la decision de Recepcion de
+     Insumos (remito_unidad de la pieza > carton paq > remaches/bombillas/cajas uni > plastico por
+     proveedor > fleje por proveedor/UM > recibe_en_cajas kg > UM). oc_bundle trae remito_unidad,
+     recibe_en_cajas, entrega_unidad, entrega_uni_x. Charcas en paquetes SOLO para sus flejes. -->
+<!-- v1.37.0 (2026-09-28) — SOLO QUEDA "CREAR OC", ABAJO DEL BUSCADOR [Thomas: "de todo esto quede el
+     boton de Crear O.C. nomas"]. Usar sugeridos, Limpiar, total, Entrega y Nota van a #barraOculta
+     (ocultos, la logica sigue: la fecha propuesta viaja igual a crear_oc). -->
+<!-- v1.36.0 (2026-09-28) — EL DESGLOSE DEL MAXIMO SE VE AL PASAR EL MOUSE, Y SOLO LA TABLA [Thomas: "quiero
+     que me aparezca esta ventanita cuando me pongo arriba de maximo, sin tener que clickear... solo
+     esos datos. El resto no lo quiero"]. El modal se reemplaza por una ventanita flotante (#dsgPop)
+     pegada a la celda: sin titulo, sin X, sin fila Maximo/Origen/Meses/Consumo y sin aviso; queda
+     solo Articulo (o Pieza) · Venta · Consume · kg/mes + Total. En tablet/celular, que no tienen
+     "pasar por arriba", un toque la abre y otro toque (o tocar afuera) la cierra. La RPC se pide una
+     vez por insumo y queda en memoria. -->
+<!-- v1.36.0-bis (2026-09-28, otra sesion) — EL MINIMO DEL PROVEEDOR, DEBAJO DEL CAMPO PEDIR [usuario: "cargá esos
+     mínimos y que me aparezca abajo del 2 que aparece en la columna pedir"]. notaMinUni(): una
+     linea "mín. proveedor N uni" (y "= N paq" para Charcas) bajo el input, en negrita cuando lo
+     pedido queda corto. Solo informa: NO frena la OC ni la infla (el recuadro amarillo del 14-09
+     no vuelve). Dato: componente.pedido_minimo_uni, ya en oc_bundle. Cargados hoy los 8 minimos
+     del sector Bombilla de la planilla de relevamiento (EP10/LLF8/BOM8 10.000, BOM10 5.000,
+     BOM12 1.760, Z22 1.200, Z25A/Z25B 1.000); quedan por cargar remaches y plastico. -->
+<!-- v1.35.0 (2026-09-28) — CUADRO SINOPTICO: FUERA LOS TEXTOS DE AYUDA [Thomas: "quiero que elimines
+     todos esos textos... optimizame todo como cuadro sinoptico, tanto la pagina principal como el
+     recuadro cuando tocas maximo"]. Fuera: el cartel "Elegi un proveedor", la leyenda de "Pedir", la
+     ayuda de la fecha y los dos cartelitos debajo de Pedir ("sugerido N · max − stock" y "hay que
+     pedir / no hace falta"). Queda solo "ya pediste N (en camino)", que es lo unico que explica una
+     fila vacia. La tabla y las barras abrazan su contenido (sin 100% de ancho ni anchos fijos) y las
+     dos barras son una. Modal del Maximo: los 4 recuadros pasan a UNA fila de tabla, el aviso sin
+     fondo de color, el desglose ordenado por consumo mayor → menor y el modal del ancho del dato. -->
+<!-- v1.34.0 (2026-09-21) — LA BOTONERA DE SECTOR SE CIERRA AL ELEGIR, Y SECTOR Y PROVEEDOR SE VEN
+     COMO DOS BLOQUES DISTINTOS [usuario: "quiero que cuando toco un sector me desaparezca el resto
+     de los sectores y ademas haya un boton que diga Todos" + "separame bien lo que es sector y
+     proveedor porque no se entiende bien la separacion"].
+     (1) pintarRubros() filtra la lista al sector elegido y agrega el chip "Todos" (#rubroTodos),
+         que suelta el sector y devuelve la botonera entera. El chip elegido se sigue pudiendo
+         soltar tocandolo, como antes. La botonera de PROVEEDOR no cambia: ahi se compara entre
+         proveedores del mismo sector y esconderlos obligaria a abrir y cerrar en cada comparacion.
+     (2) Cada filtro es ahora su propia caja (.filtros > .filtro) con la etiqueta adentro a la
+         izquierda. La caja abraza el contenido (inline-flex): con un sector elegido queda chica
+         en vez de una barra vacia a lo ancho.
+     Sin sector no hay lista (regla del 2026-09-04): "Todos" vuelve al cartel "Elegi un sector". -->
+<!-- v1.33.0 (2026-09-17) — UNA PIEZA SE LE PUEDE COMPRAR A MAS DE UN PROVEEDOR: RECICOR TAMBIEN
+     RECIBE O.C. DE CAJAS [usuario: "en las ordenes de compra tendrias que agregar a recicor tambien",
+     despues de sumarlo a Recepcion de Insumos el mismo dia].
+     componente.proveedor sigue siendo el PRINCIPAL (el que manda en el costo); los otros que entregan
+     lo mismo viven en GP2.componente_proveedor_alt y llegan en oc_bundle como i.proveedores_alt.
+     (1) provsDeInsumo(i)/esDelProv(i,p) reemplazan las comparaciones i.proveedor===provSel de la
+         botonera de proveedores, su conteo, filtradas(), itemsPedidos(), pintarProvInfo() y el
+         buscador. Recicor aparece en Sector Caja con las 11 cajas y se le puede armar la O.C.
+     (2) EL PRECIO SIGUE AL PROVEEDOR ELEGIDO. Recicor cotiza las mismas cajas ~19% mas barato: si la
+         O.C. saliera con el precio de Corrugadora, la hoja que se le manda diria un numero que no es
+         el suyo. oc_bundle trae ahora i.precios_prov = {proveedor: {precio, moneda}} (CTE pvx) y
+         precioDe()/monedaDe() usan el del proveedor elegido. i.precio (el VIGENTE, el que usa el
+         costo) NO cambia: pv desempata por cod_prov contra el proveedor asignado, asi que sigue
+         ganando Corrugadora. Verificado antes y despues: los 11 precios y los 11 costos, iguales.
+     (3) Si el proveedor elegido NO cotizo esa pieza, la fila queda SIN precio — no se le pone el del
+         otro, que seria inventar plata. Pasa hoy con las cajas N°15, N°16 y N°22, que Recicor no
+         cotiza. Para que el total no mienta por lo bajo en silencio, la barra avisa "⚠ N items sin
+         precio de <proveedor>".
+     (4) La columna Proveedor de la fila muestra a quien se le esta comprando (provDeFila), no el
+         principal de la ficha.
+     EN LA BASE (fuera de esta pantalla): los 8 precios de Recicor que matchean una caja de GP2 se
+     vincularon a su componente (estaban sueltos, con componente_id null), y
+     _aplicar_recepcion_a_oc pasa a mirar el proveedor del remito: la O.C. del que entrego se cruza
+     PRIMERO, y recien despues las demas. Antes cruzaba la mas vieja sin mirar quien trajo la
+     mercaderia, asi que un remito de Recicor le descontaba a la O.C. de Corrugadora.
+     Anti-cache no-store, sin ?v= ni bump global. -->
+<!-- v1.32.0 (2026-09-16) — WHATSAPP EN LUGAR DE "Marcar enviada"/"Marcar recibida" [usuario: "en vez de
+     marca enviada y marcar recibido, un box WhatsApp... que me mande al WhatsApp para mandar la O.C. al
+     proveedor"]. Cada OC borrador/enviada muestra 🖨 Imprimir · 🟢 WhatsApp · Anular. WhatsApp abre wa.me
+     (sin número por ahora — el operario elige el contacto; más adelante va el teléfono del proveedor) con
+     el texto formal de la OC (textoWhatsappOC) y, si estaba en borrador, la marca 'enviada' en el mismo
+     toque. Se quitó "Marcar recibida": la OC pasa a 'recibida' sola al cargar la recepción
+     (crear_recepcion_insumo, cruce FIFO). Anti-cache no-store, sin ?v= ni bump global. -->
+<!-- v1.31.0 (2026-09-16) — LAS ACCIONES VAN ARRIBA DE LA LISTA [usuario: "todo lo que aparece en la
+     foto que te mando (usa sugeridos, limpiar, crear oc, etc) aparezca arriba, no abajo"]. Las dos
+     .barra (Usar sugeridos / Limpiar / total, y Entrega estimada / Nota / Crear OC) pasan a la
+     CABECERA de #zonaLista, antes del buscador y la tabla; la tabla de insumos queda debajo. Con
+     esto se DESHACE la v1.29.0 (recap de chips): se fueron #recapPedido, su CSS, pintarRecap/irAFila
+     y la llamada en barra() — el usuario aclaro que no queria una lista nueva sino subir la barra
+     que ya existia. Front-only, sin tocar base. La leyenda ahora dice "el total... esta acá arriba".
+     v1.30.0 (2026-09-16) — LA PARTE PLASTICA SE PIDE POR BOLSA ENTERA [usuario: "cuando voy a hacer
+     la o.c. de partes plasticas quiero que me redondees en el sugerido (preestablecido en pedir)
+     segun la cantidad de uni que entran por bolsa, es decir si entran 250 por bolsa y segun maximo
+     tengo que pedir 960 -> sugerido -> 1000"]. El inyector entrega la pieza en bolsas de N uni, asi
+     que el sugerido (max - stock) se redondea PARA ARRIBA al multiplo de la bolsa. La bolsa es
+     componente.uni_x_cajon, que ahora viaja en oc_bundle (cambio aditivo en la RPC, no toca datos);
+     uniPorBolsa(i) SOLO la aplica al Sector Plástico (id 6) — en otros sectores uni_x_cajon es el
+     cajon de despacho, no la unidad de compra. valorSugerido() hace techo(sugerido, bolsa); al lado
+     del campo se muestra "= N bolsas de 250". Los 14 codigos de sector 6 sin uni_x_cajon cargado no
+     redondean (no se inventa la bolsa). Front + BASE (oc_bundle); db/funciones_GP2.sql sincronizado.
+     v1.29.0 (2026-09-16) — ⛔ REVERTIDA POR LA v1.31.0. RECAP ARRIBA DE LO QUE SE VA A PEDIR: chips
+     con los items pedidos arriba de la tabla. El usuario aclaro que no queria una lista nueva sino
+     SUBIR la barra de acciones que ya existia (ver v1.31.0), asi que se saco entera.
+     v1.28.0 (2026-09-14) — TOCAR EL MÁXIMO ABRE SU DESGLOSE [usuario: "al tocar en maximo, pueda
+     ver de que se compone... cuantos meses es el maximo definido y que articulos y que venta responde
+     a ese maximo... Primero en unidades para despues pasarse a kilos"]. La celda Máximo (cuando no es
+     "—") es clickable y abre un modal con: máximo + origen, meses de stock, consumo/mes y consumo×meses,
+     y la tabla que lo arma. Insumo por receta -> por ARTÍCULO (venta de est_madre + lo que consume del
+     insumo); resina (sector 14) -> por PIEZA (material_id). Siempre uni y, si hay kg_x_uni, tambien kg.
+     Sale de la RPC nueva oc_maximo_desglose(p_componente_id) (lectura pura). Cuando el máximo es
+     físico/migrado/master se aclara que no viene de la demanda y se muestra el consumo como referencia.
+     v1.27.0 (2026-09-14) — SE SACA EL RECUADRO AMARILLO "Pedido mínimo de la pieza" [usuario:
+     "eliminá este recuadro" / "el amarillo"]. Avisaba cuando el sugerido quedaba por debajo de la
+     tirada minima del inyector (pedido_minimo_uni) con un boton "Subir al mínimo". Se fueron el div
+     #avisoMinUni, el bloque en barra() y las funciones lineasBajoMinimoUni/subirAlMinimoUni; tambien
+     el test dedicado test_oc_minimo_uni.js. El dato pedido_minimo_uni sigue en oc_bundle por si se
+     lo vuelve a usar. El pie de la OC impresa pasa a "Bolsas plásticas" (rename del sector 14).
+     v1.26.0 (2026-09-14) — EL GATILLO VUELVE A SER EL MAXIMO, Y EL MINIMO SE BORRO DE LA BASE
+     [usuario 2026-09-14, textual: "lo de minimo borralo. la orden de compra tiene que disparar
+     segun el maximo. es algo que habiamos hecho mal" / "todo lo que usaba el minimo ahora que
+     use el maximo. es la misma logica"]. Se retira entera la v1.21.0 de abajo.
+     (a) estadoRepo(i) queda con dos estados: 'pedir' (stock < maximo) y 'lleno' (llego al
+         techo). 'sin-gatillo' (sin maximo o sin stock) se sigue cargando solo, mismo fail-safe.
+     (b) SE FUE "Aprovechar el viaje": era la valvula de escape del gatillo viejo. Con el maximo
+         como unico gatillo no queda nada afuera — lo que esta abajo del techo entra solo y lo
+         que llego tiene sugerido 0.
+     (c) El stock se pinta en ROJO cuando esta abajo del MAXIMO (antes, del minimo).
+     EN LA BASE: se borraron inventario.minimo, inventario.minimo_origen y ubicacion.meses_minimo,
+     y se fue la funcion recalcular_minimos(). Antes de borrar, las 299 filas que tenian minimo y
+     NO tenian maximo se migraron al maximo (maximo_origen='migrado_de_minimo'); las 456 que
+     tenian los dos quedaron con SU maximo, intactas. Idem ubicacion: 13 filas sin meses_stock
+     tomaron el meses_minimo; las 7 que tenian los dos distintos se quedaron con meses_stock.
+     LO QUE ESTO CUESTA, MEDIDO EL 14-09: el gatillo viejo frenaba 12 lineas por ARS 320.036
+     sobre una corrida de ~ARS 197 M. Es poco HOY porque casi todo el stock esta en 0; el numero
+     crece cuando el stock este cargado de verdad (STOCK_A_CONTAR_2026-09-08.md). -->
 <!-- v1.25.0 (2026-09-11) — EL PEDIDO MINIMO POR PIEZA (uni). Segunda mitad del motor de pedido que
      estaba en el Excel del usuario (hoja "Pedido 31-08", columna "Pedi Min Uni"): el inyector no hace
      una tirada de menos de N piezas. 47 componentes lo tienen cargado en componente.pedido_minimo_uni
@@ -33,7 +245,7 @@
      blanco para anotar las entregas. Se EMITE SOLA al generar la OC (se abre la hoja para imprimir/mandar).
      La OC va a UN solo proveedor, el mas barato del material (componente.proveedor lo elige la base), nunca
      repartida entre los tres [usuario 2026-09-11]. Las demas OC siguen con la hoja de siempre. -->
-<!-- v1.21.0 (2026-09-08) — EL GATILLO DE REPOSICION: EL MINIMO DISPARA, EL MAXIMO DIMENSIONA
+<!-- v1.21.0 (2026-09-08) — ⛔ RETIRADA POR LA v1.26.0. EL GATILLO DE REPOSICION: EL MINIMO DISPARA, EL MAXIMO DIMENSIONA
      (idea 7273). Hasta aca la pantalla proponia llenar el techo de TODO lo que estuviera un peso
      abajo del maximo: una corrida completa de sugeridos daban ~ARS 367,6 M en 201 lineas, con
      techos de 6 meses en carton y fleje que se reciben todas las semanas. El punto de pedido YA
@@ -82,9 +294,9 @@
          armar la OC (buscador, leyenda, tabla, barras y Crear OC) queda oculta detras de
          #zonaLista; en su lugar se ve #elegiSector. Efecto de fondo importante: la pantalla
          ya NO arranca con los ~600 insumos de la fabrica con cantidad puesta -- el sugerido
-         se carga recien cuando elegis donde estas comprando.
+         se carga recien cuando elegis donde estas comprando. -->
 
-     <!-- v1.18.0 (2026-09-04) — TAMBIEN SE VAN PRECIO Y SUBTOTAL, EL "MIN" DEBAJO DEL STOCK, Y LA
+<!-- v1.18.0 (2026-09-04) — TAMBIEN SE VAN PRECIO Y SUBTOTAL, EL "MIN" DEBAJO DEL STOCK, Y LA
      OC ANULADA DESAPARECE DE LA LISTA [usuario 2026-09-04: "precio se va y subtotal tambien"
      + "lo que dice abajo de stock actual... mínimo. Eso no lo quiero ver" + "si anula una
      orden de compra, no quiero que me siga apareciendo en ordenes"].
@@ -95,8 +307,8 @@
          de la barra, viaja a crear_oc y es el que sale impreso. Lo unico que se pierde es
          PISARLO desde esta pantalla (v1.8.0). Se fueron con la columna: celdaPrecio(), los
          handlers de .precio-in / .mon-btn y fmtPrecio/precioPisado/simboloMon.
-     (b) Se saco el "mín N" debajo del Stock actual. El minimo sigue en la base y sigue
-         pintando el stock en ROJO cuando esta abajo: lo que se fue es el numero.
+     (b) Se saco el "mín N" debajo del Stock actual. (Desde la v1.26.0 el que pinta el stock en
+         ROJO es el MAXIMO: el minimo ya no existe en la base.)
      (c) pintarOcs() filtra estado='anulada'. Se esconde de la PANTALLA nada mas: la fila
          sigue en GP2.orden_compra (historial, y explica una numeracion con huecos).
      (d) 390px: la columna Proveedor se esconde y el proveedor pasa a leerse debajo del
@@ -308,13 +520,17 @@
      v_consumo_componente / v_consumo_fleje_kg (atribucion por articulo; hasta el 2026-09-05 se llamaba _v2).
      v1.1.1 — fix: "Pedir" acepta decimales es-AR (12,5 ya no se convertía en 125) y la OC solo lleva los items del rubro/proveedor seleccionado. v1.1.0 — Ordenes de Compra de insumos: sugerido = consumo Est Madre x meses - stock - pendiente OC; imprimir OC -->
 <meta charset="utf-8"/>
+<script src="../auth-guard.js?v=20260929a"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Órdenes de Compra · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../gp2-numero.js?v=20260911o"></script>
-<script src="../supabase-config.js?v=20260905k"></script>
-<script src="../gp2-ui.js?v=20260912a"></script>
-<link rel="stylesheet" href="../gp2-modulo.css?v=20260903b"/>
+<script src="../supabase-config.js?v=20260929a"></script>
+<script src="../gp2-ui.js?v=20260913e"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260912c"/>
 <link rel="icon" type="image/png" href="../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../GP2_favicon.png">
 <style>
@@ -325,25 +541,50 @@
   .chip{padding:11px 16px;border-radius:22px;border:2px solid #d0d7de;background:#fff;font-weight:700;font-size:16px;cursor:pointer;color:#111;min-height:44px}
   .chip.active{background:#0b3b73;color:#fff;border-color:#0b3b73}
   td.num{text-align:right;font-variant-numeric:tabular-nums}
-  /* Sin Consumo/mes ni Sugerido, la tabla estirada al 100% dejaba huecos entre las
-     columnas de números. Van con ancho fijo y el sobrante se lo queda Insumo, que es
-     el que tiene texto largo: nada de espacio vacío solo para llenar la pantalla. */
-  .t-insumos th:nth-child(2),.t-insumos td:nth-child(2){width:170px}
-  .t-insumos th:nth-child(3),.t-insumos td:nth-child(3){width:120px}
-  .t-insumos th:nth-child(4),.t-insumos td:nth-child(4){width:110px}
-  .t-insumos th:nth-child(5),.t-insumos td:nth-child(5){width:230px}
+  /* v1.46.0: semaforo de recepcion por renglon (verde completo, amarillo parcial, rojo nada). */
+  /* v1.47.0: cajas Vigentes / Historicas */
+  .oc-box{border:2px solid #d0d7de;border-radius:12px;padding:8px 12px;margin:10px 0}
+  .oc-box>summary{font-weight:800;font-size:18px;cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px}
+  .oc-box>summary span{color:#777;font-weight:700}
+  #panOcs tr.rc-ok td{background:#dcfce7}
+  #panOcs tr.rc-par td{background:#fef3c7}
+  #panOcs tr.rc-no td{background:#fee2e2}
+  /* Cuadro sinoptico (v1.35.0): la tabla abraza el dato, sin 100% de ancho ni anchos fijos. */
+  /* table.t (gp2-modulo.css) pone width:100% y le ganaba a .t-insumos: por eso los huecos (v1.39.0). */
+  table.t.t-insumos{width:auto}
+  #panGen .table-wrap{width:fit-content;max-width:100%}
+  /* v1.44.0: ENCABEZADOS FIJOS al bajar [Thomas 2026-09-29: "quiero que en todas las o.c. me aparezcan los
+     encabezados fijos para que cuando baje siga leyendo los encabezados"]. Para que el sticky pegue contra
+     la pagina, el .table-wrap no puede ser un contenedor de scroll: en escritorio va overflow visible; en
+     el celular (<=700px) se queda con el scroll horizontal y sin sticky, porque ahi la tabla es mas ancha
+     que la pantalla y la regla de la casa es que la pagina nunca scrollee de costado. */
+  @media (min-width:701px){
+    #panGen .table-wrap, #panOcs .table-wrap{overflow:visible}
+    #panGen table.t thead th, #panOcs table.t thead th{position:sticky;top:0;z-index:3}
+  }
+  table.t.t-insumos th,table.t.t-insumos td{padding:6px 8px}
+  .t-insumos td small{white-space:normal}
   /* Pedir es el campo principal de la pantalla: llega con el sugerido puesto. */
   .pedir-in{width:120px;padding:10px 8px;font-size:20px;font-weight:700;text-align:right;border:2px solid #d0d7de;border-radius:8px}
   .pedir-in.err{border-color:#eacdcd;background:#ffebee}
   tr.con-pedido td{background:#eef7ee}
   .paq-eq{font-size:12px;color:#0b3b73;display:block}
+  .fam-hdr td{background:#eef2f7;color:#0b3b73;font-weight:700;font-size:13px;padding:6px 8px;text-align:left}
+  .fam-hdr.corto td{color:#b71c1c}
+  .min-uni{font-size:12px;color:#8a6d00;display:block}
+  /* no cumple el minimo: rojo y negrita [Thomas 2026-09-28] */
+  .min-uni.corto{font-weight:800;color:#b71c1c}
   /* El proveedor dentro de la celda del insumo: solo se ve en pantalla chica. */
   .prov-mini{display:none}
-  .barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0;padding:12px;background:#f6f8fa;border-radius:10px}
+  /* v1.48.0: el proveedor alternativo es una FILA REPETIDA del insumo (sin precio); tocarla elige ese proveedor. */
+  tr.fila-alt{cursor:pointer}
+  .barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:8px 10px;background:#f6f8fa;border-radius:10px;width:fit-content;max-width:100%;box-sizing:border-box}
   .barra .tot{font-size:17px;font-weight:800}
-  .barra input[type=text]{padding:10px;min-height:44px;font-size:18px;border:2px solid #d0d7de;border-radius:8px;flex:1;min-width:160px}
+  .barra input[type=text]{padding:10px;min-height:44px;font-size:18px;border:2px solid #d0d7de;border-radius:8px;width:200px}
   .btn-crear{padding:12px 22px;font-size:18px;font-weight:800;border-radius:8px;border:2px solid #111;background:#111;color:#fff;cursor:pointer}
   .btn-crear:disabled{opacity:.4;cursor:default}
+  .acc-crear{margin:0 0 10px}
+  td.um-cell{white-space:nowrap;font-weight:700;color:#333}
   .btn-sug{padding:11px 14px;min-height:44px;font-size:16px;font-weight:700;border-radius:8px;border:2px solid #ead9cd;background:#fff;color:#b45309;cursor:pointer}
   .btn-limpiar{padding:11px 14px;min-height:44px;font-size:16px;font-weight:700;border-radius:8px;border:2px solid #d0d7de;background:#fff;cursor:pointer}
   .regla-carton{border:2px solid #eae0cd;background:#fff8e1;color:#7a5b00;border-radius:10px;padding:8px 12px;font-size:14px;margin:8px 0}
@@ -358,33 +599,65 @@
   .badge.anulada{background:#ffebee;color:#b71c1c}
   .oc-acts{margin-left:auto;display:flex;gap:8px}
   .oc-acts button{padding:8px 12px;font-size:14px;font-weight:700;border-radius:8px;border:2px solid #d0d7de;background:#fff;cursor:pointer}
-  .oc-acts button.env{border-color:#cddaea;color:#0b3b73}
-  .oc-acts button.rec{border-color:#cdead6;color:#0a7a2f}
+  .oc-acts button.wpp{border-color:#25d366;color:#0a7a2f;background:#eafff1}
   .oc-acts button.anu{border-color:#eacdcd;color:#c62828}
-  /* Filtros: el proveedor es la eleccion principal (la OC sale con SUS insumos),
-     el rubro es un filtro de arriba. Etiqueta visible al lado de cada botonera. */
-  .filtro{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}
-  .filtro-lb{font-size:14px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.5px;min-width:86px}
-  .filtro .chips{margin:0;flex:1}
-  .prov-info{background:#f6f8fa;border:2px solid #e6ebf0;border-radius:10px;padding:9px 12px;font-size:15px;color:#333;margin:8px 0}
-  .leyenda{font-size:14px;color:#555;margin:8px 0 4px}
+  /* Filtros: DOS bloques separados, Sector arriba y Proveedor abajo. Cada uno es su propia
+     caja, con la etiqueta pegada adentro a la izquierda; antes las dos botoneras se leian
+     como una sola corrida [usuario 2026-09-21: "separame bien lo que es sector y proveedor
+     porque no se entiende bien la separacion"]. La caja ABRAZA su contenido (inline-flex):
+     con un sector elegido queda chica, sin barra vacia a lo ancho. */
+  .filtros{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin:10px 0 12px}
+  /* align-items:flex-start: con la botonera en dos renglones, la etiqueta queda arriba,
+     a la altura del primer chip, y no flotando en el medio. */
+  .filtro{display:inline-flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin:0;max-width:100%;
+          border:2px solid #dbe3ec;border-radius:14px;background:#f6f8fa;padding:8px 14px 8px 8px}
+  .filtro-lb{font-size:14px;font-weight:800;color:#0b3b73;text-transform:uppercase;letter-spacing:.5px;
+             background:#fff;border:2px solid #dbe3ec;border-radius:10px;padding:0 14px;
+             min-height:44px;display:inline-flex;align-items:center}
+  /* flex:1 para que los chips queden AL LADO de la etiqueta y envuelvan entre ellos: sin esto,
+     una botonera larga (11 proveedores) se va entera abajo y la etiqueta se come un renglon. */
+  .filtro .chips{margin:0;flex:1;min-width:0}
+  /* "Todos" NO es un sector: se distingue del que quedo elegido para que no se confundan. */
+  .chip.todos{background:#fff;border-style:dashed;border-color:#0b3b73;color:#0b3b73}
+  .prov-info{background:#f6f8fa;border:2px solid #e6ebf0;border-radius:10px;padding:9px 12px;font-size:15px;color:#333;margin:8px 0;width:fit-content;max-width:100%;box-sizing:border-box}
+  #panGen .search-box{width:fit-content;max-width:100%;box-sizing:border-box;padding:8px;margin:8px 0}
+  #panGen .search-box input{width:320px;max-width:100%}
   .sub-nota{display:block;font-size:12px;color:#777;font-weight:400}
-  .sug-calc{display:block;font-size:12px;color:#8a6d3b;font-weight:600;white-space:nowrap}
-  /* Debajo del campo: la palabra "sugerido" con el número, para que se entienda de
-     dónde salió lo que ya viene cargado (y siga estando si se pisa a mano). */
-  .sug-lb{color:#b45309;font-weight:800}
+  /* celda Maximo clickable: abre el desglose (de donde sale el maximo) */
+  td.max-cell{cursor:pointer;text-decoration:underline dotted #b9c6d8}
+  td.max-cell:hover{background:#eef4fb}
+  /* ventanita flotante del desglose (v1.36.0): se abre al pasar por el Maximo */
+  .dsg-pop{position:fixed;z-index:50;background:#fff;border:1px solid #d0d7de;border-radius:10px;
+           box-shadow:0 8px 28px rgba(0,0,0,.18);padding:6px 8px;max-width:calc(100vw - 16px);max-height:60vh;overflow:auto;pointer-events:none}
+  .dsg-pop.fija{pointer-events:auto;border-color:#0b3b73}
+  .dsg-pop[hidden]{display:none}
+  .dsg-pop table.dsg{margin:0}
+  .dsg-vacio{font-size:14px;color:#64748b;margin:4px}
+  table.dsg{border-collapse:collapse;width:auto;font-size:14px;margin:0 auto 10px}
+  table.dsg th,table.dsg td{border-bottom:1px solid #eef2f7;padding:5px 8px;text-align:center;vertical-align:middle}
+  table.dsg th{font-size:13px;color:#475569}
+  table.dsg td.l,table.dsg th.l{text-align:left}
+  table.dsg td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.dsg tfoot td{font-weight:700;border-top:2px solid #cbd5e1}
   .rep-tag{display:block;font-size:12px;font-weight:700;white-space:nowrap}
-  .rep-pedir{color:#b71c1c}
-  .rep-viaje{color:#2e7d32}
   .rep-pend{color:#0b3b73}
   td.bajo-min b, td.bajo-min{color:#b71c1c}
   .campo{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .campo label{font-size:16px;font-weight:800;color:#333}
-  .campo-nota{flex:1;min-width:230px}
-  .campo-nota input{flex:1;min-width:170px}
   .barra input[type=date]{padding:9px;font-size:19px;font-weight:700;min-height:44px;border:2px solid #d0d7de;border-radius:8px;color:#111;background:#fff}
-  .ayuda{font-size:13px;color:#0b3b73}
   .badge.entrega{background:#fff3e0;color:#8a4b00;border:1px solid #f0d9b5}
+  /* v1.40.0 — TODO CENTRADO Y LA TARJETA DEL ANCHO DEL DATO [Thomas 2026-09-28: "quiero que este todo
+     centrado y sin tanto blanco. Si es necesario pone proveedores sobrantes abajo"]. La tarjeta toma el
+     ancho de la TABLA (fit-content); los filtros y el cartel del proveedor no cuentan para ese ancho
+     (contain:inline-size) y sus chips bajan de renglon. Piso de 720px para que sin tabla (antes de
+     elegir sector, o en Ordenes) la botonera no quede angosta. */
+  .card{width:fit-content;min-width:min(100%,720px);max-width:100%}
+  .card:has(#zonaLista:not(.hidden)){min-width:0}   /* v1.45.1: con tabla, la tarjeta abraza la tabla */
+  .filtros,#reglaCarton,#panOcs,#elegiSector,#tblEmpty,#status{contain:inline-size}
+  /* v1.40.1: botones, filtros, buscador y Crear OC alineados a la IZQUIERDA [Thomas: "todo esto alineacion a la izquierda"] */
+  /* los chips se quedan pegados a la etiqueta y bajan de renglon (no se estiran a lo ancho) */
+  .filtro .chips{flex:0 1 auto}
+  .filtro{flex-wrap:nowrap}
   /* 390px: nada de scroll horizontal en la pagina (las tablas scrollean en .table-wrap) */
   @media(max-width:430px){
     /* En el celular los anchos fijos empujaban "Pedir" fuera de la pantalla, que es
@@ -396,10 +669,10 @@
     .t-insumos th:nth-child(2),.t-insumos td:nth-child(2){display:none}
     .prov-mini{display:inline}
     .pedir-in{width:84px;font-size:19px;padding:9px 5px}
-    .sug-calc{white-space:normal}
     .rep-tag{white-space:normal}
-    .filtro{flex-direction:column;align-items:flex-start;gap:4px}
-    .filtro-lb{min-width:0}
+    .filtro{flex-direction:column;align-items:flex-start;gap:6px;padding:8px}
+    .filtro-lb{min-width:0;min-height:38px;padding:0 12px}
+    .barra{width:auto}
     .campo,.campo-nota{width:100%}
     .campo-nota input,.barra input[type=date]{width:100%}
     .barra .btn-crear,.barra .btn-sug,.barra .btn-limpiar{flex:1;min-width:140px}
@@ -407,6 +680,9 @@
 </style>
 </head>
 <body>
+
+<!-- Desglose del Máximo (v1.36.0): ventanita flotante, se abre al pasar el mouse por la celda. -->
+<div class="dsg-pop" id="dsgPop" hidden></div>
 
 <div class="card">
   <div class="header">
@@ -421,49 +697,41 @@
     </div>
 
     <div id="panGen">
-      <div class="filtro"><span class="filtro-lb">Sector</span><div class="chips" id="rubros"></div></div>
-      <div class="filtro hidden" id="filtroProv"><span class="filtro-lb">Proveedor</span><div class="chips" id="provs"></div></div>
+      <div class="filtros">
+        <div class="filtro"><span class="filtro-lb">Sector</span><div class="chips" id="rubros"></div></div>
+        <div class="filtro hidden" id="filtroProv"><span class="filtro-lb">Proveedor</span><div class="chips" id="provs"></div></div>
+      </div>
       <div class="prov-info hidden" id="provInfo"></div>
       <div class="regla-carton hidden" id="reglaCarton"></div>
-      <!-- Aviso (no bloquea): lineas por debajo del pedido minimo de la pieza. -->
-      <div class="regla-carton hidden" id="avisoMinUni"></div>
       <!-- Sin sector ni proveedor elegido no se muestra NADA de la lista [usuario
            2026-09-04: "si no pongo el sector y no pongo el proveedor, que no me aparezca
            la lista"]: la pantalla arranca en los botones de sector y nada mas. -->
       <div id="zonaLista" class="hidden">
+      <!-- v1.37.0 [Thomas 2026-09-28: "de todo esto quede el boton de Crear O.C. nomas. Que aparezca
+           abajo de Buscar Insumo"]. Usar sugeridos, Limpiar, total, Entrega y Nota quedan OCULTOS, no
+           borrados: la fecha se sigue proponiendo sola (hoy + dias_entrega) y viaja a crear_oc, y el
+           total sigue calculandose por si se vuelve a pedir. -->
+      <div class="hidden" id="barraOculta">
+        <button type="button" class="btn-sug" id="btnSug">Usar sugeridos</button>
+        <button type="button" class="btn-limpiar" id="btnLimpiar">Limpiar</button>
+        <span class="tot" id="tot">0 ítems</span>
+        <input type="date" id="fechaEnt" aria-label="Entrega">
+        <input type="text" id="nota" aria-label="Nota">
+      </div>
+
       <div class="search-box"><input type="text" id="q" placeholder="Buscar insumo…"></div>
-      <div class="leyenda"><b>“Pedir” ya viene cargado con el sugerido</b> (<b>Máximo</b> − <b>Stock</b>): debajo de cada campo dice cuánto es el sugerido y de dónde sale. Cambiá la cantidad o <b>dejá el campo vacío</b> para no pedir ese insumo. Lo que quede en pantalla es lo que sale en la OC; <b>el total en plata está acá abajo</b>.</div>
+      <div class="acc-crear"><button type="button" class="btn-crear" id="btnCrear" disabled>Crear OC</button></div>
       <div class="table-wrap">
         <table class="t t-insumos">
           <thead><tr>
             <th>Insumo</th><th>Proveedor</th>
             <th class="num">Stock<br>actual</th><th class="num">Máximo</th>
-            <th class="num">Pedir</th>
+            <th class="num">Pedir</th><th>Uni<br>Medida</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
       <div id="tblEmpty" class="empty hidden">Sin insumos en este sector.</div>
-
-      <div class="barra">
-        <button type="button" class="btn-sug" id="btnSug">Usar sugeridos</button>
-        <button type="button" class="btn-sug hidden" id="btnViaje">Aprovechar el viaje</button>
-        <button type="button" class="btn-limpiar" id="btnLimpiar">Limpiar</button>
-        <span class="tot" id="tot">0 ítems</span>
-      </div>
-
-      <div class="barra">
-        <div class="campo">
-          <label for="fechaEnt">Entrega estimada</label>
-          <input type="date" id="fechaEnt">
-          <span class="ayuda" id="fechaAyuda"></span>
-        </div>
-        <div class="campo campo-nota">
-          <label for="nota">Nota</label>
-          <input type="text" id="nota" placeholder="Opcional: dónde entregar, contacto…">
-        </div>
-        <button type="button" class="btn-crear" id="btnCrear" disabled>Crear OC</button>
-      </div>
       </div>
       <div id="elegiSector" class="empty">Elegí un <b>sector</b> arriba para ver los insumos y armar la orden.</div>
     </div>
@@ -510,49 +778,25 @@ function vStock(i){ return i.stock!=null ? Number(i.stock) : (i.online!=null?Num
 function vConsumo(i){ return i.consumo_uni_mes!=null ? Number(i.consumo_uni_mes) : (i.consumo!=null?Number(i.consumo):null); }
 function vMaximo(i){ return i.maximo!=null ? Number(i.maximo) : null; }
 function vPend(i){ return Number(i.pendiente_oc)||0; }
-function vMinimo(i){ return i.minimo!=null ? Number(i.minimo) : null; }
-/* EL GATILLO DE REPOSICION: el MINIMO dispara, el MAXIMO dimensiona.
-   Hasta v1.20.1 la pantalla proponia llenar el techo de TODO lo que estuviera un peso
-   abajo del maximo: una corrida completa daban ~ARS 367 M en 201 lineas, con techos de
-   6 meses en carton y fleje que se reciben todas las semanas. El punto de pedido ya
-   existe en la base (inventario.minimo, cargado en 1.079 de 1.085 filas) y viaja en el
-   bundle; lo unico que faltaba era mirarlo. No se crea ningun campo nuevo.
-     'pedir'       stock <= minimo  -> hay que pedirlo, y se pide hasta el maximo.
-     'viaje'       stock  > minimo  -> todavia no hace falta. No se carga solo; se puede
-                                       sumar a mano o con "Aprovechar el viaje" (el carton
-                                       lo necesita para llegar al multiplo de la familia).
-     'sin-gatillo' no hay con que decidir (sin minimo, sin stock, o minimo >= maximo, que
-                   es config rota) -> se comporta como antes y se carga solo. Es a
-                   proposito: ante la duda, que NO se esconda algo que hace falta. */
+/* EL GATILLO DE REPOSICION ES EL MAXIMO [usuario 2026-09-14, textual: "lo de minimo
+   borralo. la orden de compra tiene que disparar segun el maximo. es algo que habiamos
+   hecho mal" / "todo lo que usaba el minimo ahora que use el maximo. es la misma logica"].
+   La v1.21.0 habia metido un punto de pedido aparte (inventario.minimo): el minimo
+   disparaba y el maximo dimensionaba. Esa columna se borro de la base el 14-09 y con ella
+   el estado intermedio. Ahora hay una sola pregunta y un solo numero:
+     'pedir'       stock < maximo  -> falta para llegar al techo, se carga solo.
+     'sin-gatillo' no hay maximo o no hay stock -> se carga solo igual. Es a proposito:
+                   ante la duda, que NO se esconda algo que hace falta.
+   Ya no existe el estado 'viaje': lo que esta abajo del maximo se pide. */
 function estadoRepo(i){
-  var st=vStock(i), mn=vMinimo(i), mx=vMaximo(i);
-  if(st==null || mn==null) return 'sin-gatillo';
-  if(mx!=null && mn>=mx) return 'sin-gatillo';
-  return st<=mn ? 'pedir' : 'viaje';
+  var st=vStock(i), mx=vMaximo(i);
+  if(st==null || mx==null) return 'sin-gatillo';
+  return st<mx ? 'pedir' : 'lleno';
 }
 // La OC guarda la fecha en orden_compra.fecha_entrega_estimada y asi la emite oc_bundle;
 // el payload que se MANDA a crear_oc la llama fecha_entrega. Se leen las dos: la fecha ya se
 // perdio una vez por esta diferencia de nombre (ver changelog v1.18.0) y no se pierde de nuevo.
 function vFechaEnt(o){ return o.fecha_entrega_estimada || o.fecha_entrega || ''; }
-// De donde viene el maximo (CONOCIMIENTO_GP2 §2e-bis): est_madre = derivado del consumo,
-// fisico / cinco_cajones = lo que entra fisicamente en el lugar.
-function tagOrigen(o){
-  o=String(o||'');
-  if(o==='est_madre') return 'EM';
-  if(o==='cinco_cajones') return '5 caj';
-  if(o==='fisico') return 'físico';
-  return o;
-}
-// La cuenta que explica el sugerido, debajo del numero: que nadie tenga que adivinarlo.
-function explicaSug(i){
-  // La columna "Pend. OC" se sacó de la pantalla [usuario 2026-09-04: "por ahora borralo"],
-  // así que la cuenta tampoco la menciona.
-  var mx=vMaximo(i), st=vStock(i);
-  if(mx!=null) return 'máx '+fmt(mx)+' − stock '+fmt(st==null?0:st);
-  var c=vConsumo(i);
-  if(c!=null && i.meses!=null) return 'cons '+fmt(c,1)+' × '+i.meses+' m − stock '+fmt(st==null?0:st);
-  return '';
-}
 
 var D={}, PAQ=250, PAQ_PLIEGO=100, rubroSel=null, provSel=null;
 var PEDIDO={}; // comp_id -> cantidad
@@ -570,8 +814,71 @@ var SIN_PEDIDO={}; // comp_id -> true
    pisarlo, se repone la celda y funciona. */
 var PRECIO={};   // comp_id -> precio pisado
 var MONEDA={};   // comp_id -> 'USD' | 'ARS' pisada
-function precioDe(i){ return PRECIO[i.comp_id]!=null ? PRECIO[i.comp_id] : (i.precio!=null?Number(i.precio):null); }
-function monedaDe(i){ return MONEDA[i.comp_id] || i.moneda || 'ARS'; }
+/* UN INSUMO PUEDE COMPRARSE A MAS DE UN PROVEEDOR (2026-09-17, usuario: "en las ordenes de
+   compra tendrias que agregar a recicor tambien"). componente.proveedor sigue siendo el
+   PRINCIPAL; los demas que entregan lo mismo viven en GP2.componente_proveedor_alt y llegan
+   en i.proveedores_alt. Todo filtro por proveedor de esta pantalla pasa por esDelProv():
+   comparar i.proveedor===provSel a mano deja al proveedor alternativo con la lista vacia. */
+function provsDeInsumo(i){
+  if(!i) return [];
+  var l = i.proveedor ? [i.proveedor] : [];
+  (Array.isArray(i.proveedores_alt) ? i.proveedores_alt : []).forEach(function(p){
+    if(p && l.indexOf(p)<0) l.push(p);
+  });
+  if(!l.length) l.push('(sin proveedor)');
+  return l;
+}
+function esDelProv(i, p){ return p==null || provsDeInsumo(i).indexOf(p)>=0; }
+/* El proveedor con el que se esta armando la OC (para mostrarlo en la fila): si hay uno
+   elegido y este insumo es suyo, ese; si no, el principal de la ficha. */
+function provDeFila(i){
+  if(provSel!=null && provSel!=='(sin proveedor)' && esDelProv(i, provSel)) return provSel;
+  return i.proveedor || '—';
+}
+/* Celda Proveedor: el nombre y nada mas. v1.48.0 [Thomas 2026-09-30: "No quiero que me aparezcan los
+   precios aca. Solo en el modulo de ordenes. Para poner a recicor repeti el item del componente y ya"]:
+   el alternativo ya no es un boton con precio debajo del principal; sin proveedor elegido, render()
+   repite la fila del insumo a nombre de cada alternativo (filasAlt). */
+function provCelda(i){ return esc(provDeFila(i)); }
+function filasAlt(i, st, mx, bajoMin, um){
+  if(provSel!=null) return '';
+  return provsDeInsumo(i).slice(1).map(function(p){
+    return '<tr class="fila-alt" data-alt-prov="'+esc(p)+'" title="Tocar para armar la OC a '+esc(p)+'">'+
+      '<td><b>'+esc(i.codigo||'—')+'</b><br><small style="color:#777">'+esc(i.descripcion||'')+
+        '<span class="prov-mini"> · '+esc(p)+'</span></small></td>'+
+      '<td>'+esc(p)+'</td>'+
+      '<td class="num'+(bajoMin?' bajo-min':'')+'">'+(st==null?'—':(fmt(st)+' '+esc(i.unidad)))+'</td>'+
+      '<td class="num">'+(mx==null?'—':fmt(mx))+'</td>'+
+      '<td class="num"></td>'+
+      '<td class="um-cell">'+esc(um.lbl)+'</td>'+
+    '</tr>';
+  }).join('');
+}
+/* PRECIO POR PROVEEDOR: la hoja que se le manda a cada uno tiene que salir con SU lista
+   (Recicor cotiza las cajas ~19% mas barato que Corrugadora). i.precios_prov trae el precio
+   de cada proveedor que cotiza el componente; i.precio sigue siendo el VIGENTE (el del
+   proveedor asignado), que es el que usa el costo. */
+function precioProvSel(i){
+  var m = i && i.precios_prov;
+  if(provSel!=null && m && m[provSel] && m[provSel].precio!=null) return m[provSel];
+  return null;
+}
+function precioDe(i){
+  if(PRECIO[i.comp_id]!=null) return PRECIO[i.comp_id];
+  var pp=precioProvSel(i);
+  if(pp) return Number(pp.precio);
+  // Se esta comprando a un proveedor que NO es el de la ficha y que no tiene lista propia
+  // para esta pieza: se deja sin precio. Ponerle el del otro seria inventar plata en la
+  // hoja que se le manda al proveedor.
+  if(provSel!=null && i.proveedor && provSel!==i.proveedor) return null;
+  return i.precio!=null?Number(i.precio):null;
+}
+function monedaDe(i){
+  if(MONEDA[i.comp_id]) return MONEDA[i.comp_id];
+  var pp=precioProvSel(i);
+  if(pp && pp.moneda) return pp.moneda;
+  return i.moneda || 'ARS';
+}
 // Fecha de entrega: se propone sola (hoy + dias_entrega del proveedor). Si el usuario la
 // pisa a mano, se respeta mientras siga en el mismo proveedor.
 var fechaTocada=false, fechaTocadaProv=null;
@@ -640,18 +947,31 @@ function rubrosDistintos(){
 
 function pintarRubros(){
   var g=$('rubros'); g.innerHTML='';
-  rubrosDistintos().forEach(function(rb){
+  function elegir(id){
+    rubroSel=id;
+    // El proveedor NO se limpia siempre: solo si ya no vende nada de este rubro. Asi se
+    // puede elegir primero el proveedor (que es como se arma la OC) y despues afinar.
+    if(provSel!=null && provsDistintos().indexOf(provSel)<0) provSel=null;
+    pintarRubros();
+    proponerFecha();
+  }
+  // CON UN SECTOR ELEGIDO SE VE SOLO ESE CHIP + "Todos" [usuario 2026-09-21: "cuando toco
+  // un sector me desaparezca el resto de los sectores y ademas haya un boton que diga
+  // Todos"]. Los 9 sectores ocupaban dos renglones incluso despues de elegir uno.
+  var lista=rubrosDistintos();
+  if(rubroSel!=null) lista=lista.filter(function(rb){ return rb.id===rubroSel; });
+  lista.forEach(function(rb){
     var b=document.createElement('button'); b.type='button'; b.className='chip'+(rubroSel===rb.id?' active':''); b.textContent=rb.nombre;
-    b.addEventListener('click',function(){
-      rubroSel=(rubroSel===rb.id?null:rb.id);
-      // El proveedor NO se limpia siempre: solo si ya no vende nada de este rubro. Asi se
-      // puede elegir primero el proveedor (que es como se arma la OC) y despues afinar.
-      if(provSel!=null && provsDistintos().indexOf(provSel)<0) provSel=null;
-      pintarRubros();
-      proponerFecha();
-    });
+    b.addEventListener('click',function(){ elegir(rubroSel===rb.id?null:rb.id); });
     g.appendChild(b);
   });
+  // "Todos" suelta el sector y devuelve la botonera entera. Sin sector no hay lista
+  // (regla del 2026-09-04), asi que vuelve a verse el cartel que pide elegir uno.
+  if(rubroSel!=null){
+    var t=document.createElement('button'); t.type='button'; t.className='chip todos'; t.id='rubroTodos'; t.textContent='Todos';
+    t.addEventListener('click',function(){ elegir(null); });
+    g.appendChild(t);
+  }
   pintarProvs();
   render();
 }
@@ -664,8 +984,8 @@ function provsDistintos(){
   (D.insumos||[]).forEach(function(i){
     if(ocultoRubro(i)) return;
     if(rubroSel!=null && rubroDe(i)!==rubroSel) return;
-    var p=i.proveedor||'(sin proveedor)';
-    if(!seen[p]){ seen[p]=true; out.push(p); }
+    // Principal + alternativos: una caja que entregan Corrugadora y Recicor da los DOS chips.
+    provsDeInsumo(i).forEach(function(p){ if(!seen[p]){ seen[p]=true; out.push(p); } });
   });
   out.sort(function(a,b){ return String(a).localeCompare(String(b),'es'); });
   return out;
@@ -716,12 +1036,11 @@ function diasEntregaProv(nom){
 function pintarProvInfo(){
   var el=$('provInfo');
   if(!el) return;
-  if(provSel==null){
-    el.innerHTML='<b>Elegí un proveedor</b> — la orden sale sólo con SUS insumos, y con las partes del sector que elegiste arriba.';
-    return;
-  }
+  // Sin proveedor no hay cartel [v1.35.0: "elimina todos esos textos"].
+  el.classList.toggle('hidden', provSel==null);
+  if(provSel==null){ el.innerHTML=''; return; }
   var xs=(D.insumos||[]).filter(function(i){
-    return (i.proveedor||'(sin proveedor)')===provSel && (rubroSel==null || i.sector_id===rubroSel);
+    return esDelProv(i, provSel) && (rubroSel==null || i.sector_id===rubroSel);
   });
   var conSug=xs.filter(function(i){ return i.sugerido>0; }).length;
   var d=diasEntregaProv(provSel);
@@ -739,16 +1058,6 @@ function proponerFecha(){
     inp.value = (d!=null) ? hoyMas(d) : '';
     fechaTocada=false; fechaTocadaProv=null;
   }
-  pintarAyudaFecha();
-}
-function pintarAyudaFecha(){
-  var ay=$('fechaAyuda');
-  if(!ay) return;
-  if(provSel==null){ ay.textContent='Elegí el proveedor y se propone sola.'; return; }
-  var d=diasEntregaProv(provSel);
-  if(fechaTocada) ay.textContent='Puesta a mano para '+provSel+'.';
-  else if(d!=null) ay.textContent='Hoy + '+d+' día'+(d===1?'':'s')+' ('+provSel+').';
-  else ay.textContent=provSel+' no tiene plazo cargado: ponela a mano.';
 }
 
 /* Sin sector NI proveedor elegido no hay lista [usuario 2026-09-04: "si no pongo el
@@ -762,8 +1071,8 @@ function filtradas(){
   return (D.insumos||[]).filter(function(i){
     if(ocultoRubro(i)) return false;
     if(rubroSel!=null && rubroDe(i)!==rubroSel) return false;
-    if(provSel!=null && (i.proveedor||'(sin proveedor)')!==provSel) return false;
-    if(q && !(((i.codigo||'')+' '+(i.descripcion||'')+' '+(i.proveedor||'')).toLowerCase().includes(q))) return false;
+    if(!esDelProv(i, provSel)) return false;
+    if(q && !(((i.codigo||'')+' '+(i.descripcion||'')+' '+provsDeInsumo(i).join(' ')).toLowerCase().includes(q))) return false;
     return true;
   });
 }
@@ -773,8 +1082,44 @@ function esCharcasIt(i){
   // de 10 kg. Antes filtraba tambien por sector_id=12; desde la migracion
   // f90_alambre_filtro_cafe_y_cod_prov_charcas_v2 (2026-09-02) los flejes F90/F90B
   // viven en sector 5 (Fleje). uniPorPaqCharcas() sigue valido: 10 / kg_x_uni.
-  return i && String(i.proveedor||'').trim().toLowerCase()==='resortes charcas';
+  // v1.38.0: SOLO sus flejes (sector 5). Los resortes que Charcas nos VENDE (EP10, LLF8, BOM10,
+  // sector 7) se reciben en UNIDADES y se piden en unidades [Thomas 2026-09-28: "los resortes
+  // batidor los pido en unidades"]; con el paquete, 3 paq de EP10 viajaban como 30 kg.
+  return i && String(i.proveedor||'').trim().toLowerCase()==='resortes charcas' && Number(i.sector_id)===5;
 }
+
+/* ═══ UNIDAD DEL REMITO (v1.38.0) ═══
+   La O.C. se pide en la MISMA unidad en que llega el remito [Thomas 2026-09-28: "te dije en todas
+   las recepciones con que unidad de medida va el remito. Usa las mismas para las ordenes de compra"].
+   Es la misma decision, en el mismo orden, que abrirPopup() de StockFlejes/RecepcionInsumos_GP2.html:
+   si se cambia alla, se cambia aca. Devuelve {lbl, k}: lo que se ve en "Pedir" = PEDIDO × k.
+   PEDIDO sigue guardado en la unidad del bundle (i.unidad) — asi el carton sigue validando sus
+   multiplos en unidades y a crear_oc viaja lo mismo que antes. */
+var PLAST_UNI=['eduardo pintos','pat bet plast','pettofrezza rafael'];   // = RecepcionInsumos
+function umRemito(i){
+  var canon = i.unidad==='kg' ? 'kg' : 'uni';
+  if(esCharcasIt(i)) return {lbl:'paq '+fmt(kgPorPaqCharcas())+' kg', k:1};   // PEDIDO ya va en paq
+  var kx=Number(i.kg_x_uni)||0, r=String(i.remito_unidad||'').toLowerCase(), u=null;
+  if(r==='envase' && Number(i.entrega_uni_x)>0 && canon==='uni')
+    return {lbl:String(i.entrega_unidad||'envases')+' '+fmt(i.entrega_uni_x), k:1/Number(i.entrega_uni_x)};
+  if(r==='kg' || r==='uni') u=r;
+  else if(GP2UI.esCarton(i)) u = i.es_pliego ? 'uni' : 'paq';
+  else if([7,8,11].indexOf(Number(i.sector_id))>=0) u='uni';
+  else if(Number(i.sector_id)===6 && PLAST_UNI.indexOf(String(provDeFila(i)||'').trim().toLowerCase())>=0) u='uni';
+  else if(Number(i.sector_id)===5){
+    var pv=String(provDeFila(i)||'').trim().toLowerCase();
+    u = (pv==='basconia'||pv==='altrak'||pv==='altrack') ? 'kg' : (String(i.um||'')==='unidad' ? 'uni' : 'kg');
+  }
+  else if(i.recibe_en_cajas) u='kg';
+  else u=canon;
+  if(u==='paq' && canon==='uni') return {lbl:'paq '+fmt(PAQ), k:1/PAQ};
+  if(u===canon) return {lbl:u, k:1};
+  // kg <-> uni: sin kg_x_uni no se puede convertir y queda la unidad del bundle (no se inventa)
+  if(!(kx>0)) return {lbl:canon, k:1};
+  return u==='kg' ? {lbl:'kg', k:kx} : {lbl:'uni', k:1/kx};
+}
+// numero para el campo: hasta 2 decimales, coma decimal
+function valCampo(n){ var r=Math.round(n*100)/100; return String(r).replace('.',','); }
 // Kg de producto por paquete de Charcas: vive en GP2.parametro (charcas_kg_x_paquete) y llega
 // en el bundle; el 10 de aca es solo el default por si el parametro no esta. crear_oc usa el
 // mismo parametro para guardar la OC en kg (la pantalla manda paquetes con unidad 'paq').
@@ -787,14 +1132,30 @@ function uniPorPaqCharcas(i){
   return u === null ? 0 : Math.round(u);
 }
 
+// Uni por bolsa de la parte plastica: el inyector entrega en bolsas de N uni y se pide
+// por bolsa entera [usuario 2026-09-16: "segun la cantidad de uni que entran por bolsa...
+// si entran 250 por bolsa y segun maximo tengo que pedir 960 -> sugerido -> 1000"]. El
+// dato es componente.uni_x_cajon (viaja en el bundle) y SOLO aplica a las partes
+// plasticas (Sector Plástico = 6): en otros sectores uni_x_cajon es otra cosa (el cajon
+// de despacho), no la unidad de compra, asi que ahi no se redondea. Los 14 codigos de
+// sector 6 sin uni_x_cajon cargado quedan sin redondear (no se inventa la bolsa).
+var SECTOR_PARTE_PLASTICA = 6;
+function uniPorBolsa(i){
+  if(!i || Number(i.sector_id)!==SECTOR_PARTE_PLASTICA) return 0;
+  var b=Number(i.uni_x_cajon)||0;
+  return b>0 ? b : 0;
+}
 // Cuanto se carga en "Pedir" cuando se toma el sugerido. Charcas viene en uni y se
 // pide en paquetes de 10 kg: se convierte y se redondea PARA ARRIBA (no quedar corto).
+// La parte plastica se redondea PARA ARRIBA al multiplo de la bolsa (uni_x_cajon).
 function valorSugerido(i){
   if(!(i && i.sugerido>0)) return 0;
   if(esCharcasIt(i)){
     var uxp=uniPorPaqCharcas(i);
     if(uxp>0) return Math.max(1, Math.ceil(i.sugerido/uxp));
   }
+  var b=uniPorBolsa(i);
+  if(b>0) return techo(i.sugerido, b);   // 960 con bolsa 250 -> 1000
   return i.sugerido;
 }
 
@@ -807,8 +1168,8 @@ function cargarSugeridos(){
   var toco=false;
   filtradas().forEach(function(i){
     if(PEDIDO[i.comp_id]!=null || SIN_PEDIDO[i.comp_id]) return;
-    // El gatillo (v1.21.0): lo que todavia esta arriba del minimo NO se carga solo.
-    if(estadoRepo(i)==='viaje') return;
+    // El gatillo (v1.26.0): lo que ya llego al maximo NO se carga solo.
+    if(estadoRepo(i)==='lleno') return;
     // Y lo que YA se pidio y viene en camino tampoco: se avisa en la fila y decide el
     // usuario. Es AVISO, no resta -- la resta se saco en v1.19.x porque rompia la cuenta
     // a la vista [usuario 2026-09-04: "por ahora borralo"].
@@ -821,70 +1182,177 @@ function cargarSugeridos(){
   if(toco) ajustarPedidoCarton();
 }
 
-/* El cartelito debajo del campo Pedir: DICE que ese numero es el sugerido y de donde
-   sale [usuario 2026-09-04: "que me aclare que es el sugerido"]. Se muestra siempre,
-   tambien si la cantidad se piso a mano — asi se ve contra que se esta cambiando. */
-function notaSugerido(i){
-  var v=valorSugerido(i);
-  if(!(v>0)) return '';
-  var calc=explicaSug(i);
-  return '<span class="sug-calc"><span class="sug-lb">sugerido '+fmt(v)+'</span>'+
-    (calc?(' · '+esc(calc)):'')+'</span>';
-}
-
-/* El cartelito de POR QUE esa fila esta (o no esta) cargada: el estado del gatillo y,
-   si corresponde, el aviso de lo que ya viene en camino. */
+/* Debajo de Pedir queda SOLO el aviso de lo que ya viene en camino: es lo unico que explica
+   por que una fila abajo del maximo llega vacia. Los cartelitos "sugerido N · max − stock" y
+   "hay que pedir / no hace falta" se sacaron en v1.35.0 [Thomas 2026-09-28: "elimina todos esos
+   textos"]: el stock en rojo ya dice que esta abajo del maximo. */
 function notaRepo(i){
-  var out='', e=estadoRepo(i), mn=vMinimo(i);
-  if(e==='pedir') out+='<span class="rep-tag rep-pedir">hay que pedir · stock ≤ mín '+fmt(mn)+'</span>';
-  else if(e==='viaje') out+='<span class="rep-tag rep-viaje">no hace falta · mín '+fmt(mn)+'</span>';
+  var out='';
   var pe=vPend(i);
   if(pe>0) out+='<span class="rep-tag rep-pend">ya pediste '+fmt(pe)+' '+esc(i.unidad||'')+' (en camino)</span>';
+  return out;
+}
+
+// El PEDIDO MINIMO POR PIEZA (componente.pedido_minimo_uni), debajo del campo Pedir [usuario
+// 2026-09-28: "cargá esos mínimos y que me aparezca abajo del 2 que aparece en la columna pedir"].
+// Es un dato a la vista, no un freno (el recuadro amarillo con "Subir al minimo" se saco el 14-09
+// y no vuelve): el comprador ve cuanto pide el proveedor como minimo y decide. Para Charcas, que se
+// pide en paquetes, se muestra tambien el equivalente en paquetes (round up). Se marca "corto"
+// cuando lo pedido queda por debajo del minimo.
+function notaMinUni(i, ped, esChar, uxpChar, um){
+  var m = Number(i.pedido_minimo_uni)||0;
+  // v1.42.0: en el CARTON el minimo tambien es POR CARTON (componente.pedido_minimo_uni, cargado
+  // desde la planilla: 12.000 / 16.000 / 25.000 / 30.000 / 18.000 / 24.000 segun el carton), aunque
+  // se agrupen por familia [Thomas 2026-09-29: "En cartones los minimos son por carton, aunque
+  // esten agrupados por familia"]. La v1.41.0 mostraba aca la tirada de la familia
+  // (pliegos_multiplo); era una lectura equivocada de la planilla y se saco.
+  // v1.43.0: si la pieza tiene familia de pedido, el minimo es de la familia y se lee en su titulo.
+  if(i.familia_pedido) return '';
+  if(m<=0) return '';
+  var pedUni = esChar ? (Number(ped)||0)*uxpChar : (Number(ped)||0);
+  var corto = pedUni>0 && pedUni<m;
+  // v1.44.0: el minimo se lee PRIMERO en la unidad de la O.C. (la del remito: kg, paq, cajas...) y
+  // entre parentesis en la unidad del stock [Thomas 2026-09-29: "el min es en kg en este caso, creo que
+  // siempre los min es la unidad de medida que aparece en el remito de recepcion y en la columna de la
+  // orden de compra"]. En la base sigue en la unidad canonica (uni o kg); la conversion es la misma
+  // que usa el campo Pedir (umRemito). Clavo 505: 1.000 kg (= 153.139 uni).
+  var canon = i.unidad==='kg' ? 'kg' : 'uni';
+  var txt;
+  if(esChar && uxpChar>0) txt = 'mín. pedido '+fmt(Math.ceil(m/uxpChar))+' paq (= '+fmt(m)+' uni)';
+  else if(um && um.k!==1) txt = 'mín. pedido '+fmt(m*um.k, um.lbl==='kg'?2:0)+' '+esc(um.lbl)+' (= '+fmt(m)+' '+canon+')';
+  else txt = 'mín. pedido '+fmt(m)+' '+canon;   // v1.43.1 [Thomas: 'que me diga min. pedido en vez de min. proveedor']
+  return '<span class="min-uni'+(corto?' corto':'')+'">'+txt+'</span>';
+}
+
+// v1.42.0: los CARTONES se listan SEPARADOS POR FAMILIA (formato + marca + categoria), con un
+// renglon de titulo por familia [Thomas 2026-09-29: "quiero que en la o.c. me separes por familia"].
+// El orden dentro de la familia es el que ya venia (el del bundle). Los demas sectores no cambian.
+// v1.43.0: el PLASTICO tambien va agrupado, por FAMILIA DE PEDIDO (componente.familia_pedido = las
+// piezas de la misma matriz del inyector) y el minimo del proveedor es de la familia, no de la pieza
+// [Thomas 2026-09-29: "el minimo va por familia, no por parte. Entre todos los pirolos tengo que
+// llegar a 36000"]. El titulo de la familia muestra el minimo y lo pedido entre todas sus piezas
+// (rojo si no llega); no frena. Las piezas sin familia van al final, sin titulo.
+function pedidoUniDe(i){
+  var ped=Number(PEDIDO[i.comp_id])||0;
+  if(esCharcasIt(i)) return ped*uniPorPaqCharcas(i);
+  return ped;
+}
+function conTitulosDeFamiliaPlastico(fs){
+  var plas=fs.filter(function(i){ return i.sector_id===6; });
+  if(!plas.length) return null;
+  var resto=fs.filter(function(i){ return i.sector_id!==6; });
+  var grupos={}, orden=[];
+  // v1.43.1: lo que no tiene familia va junto en "Otros" [Thomas 2026-09-29: "todos aquellos que
+  // no tengan una familia barra formato, que me los metan en la familia o formato otros"].
+  // v1.44.1: "Otros" es UN solo titulo, con las piezas ORDENADAS por proveedor adentro [Thomas
+  // 2026-09-29: "Que los otros esten bajo un solo encabezado pero que esten ordenados por proveedor"].
+  // (La v1.43.2 abria un titulo por proveedor; duro un rato.) Los cartones no cambian.
+  plas.forEach(function(i){
+    var k=i.familia_pedido ? String(i.familia_pedido) : 'Otros';
+    if(!grupos[k]){ grupos[k]=[]; orden.push(k); }
+    grupos[k].push(i);
+  });
+  if(grupos['Otros']) grupos['Otros'].sort(function(a,b){
+    var pa=String(provDeFila(a)||''), pb=String(provDeFila(b)||'');
+    return pa.localeCompare(pb,'es') || String(a.codigo||'').localeCompare(String(b.codigo||''),'es');
+  });
+  orden.sort(function(a,b){ if(a==='Otros') return 1; if(b==='Otros') return -1; return a.localeCompare(b,'es'); });
+  var out=[];
+  orden.forEach(function(k){
+    var xs=grupos[k], m=(k==='Otros')?0:(Number(xs[0].familia_minimo)||0);
+    var tot=xs.reduce(function(a,i){ return a+pedidoUniDe(i); },0);
+    var corto=m>0 && tot>0 && tot<m;
+    out.push({hdr:k+' · '+xs.length+(xs.length===1?' pieza':' piezas')+
+                  (m>0?(' · mín. familia '+fmt(m)+' uni · pedido '+fmt(tot)+' uni'):''), corto:corto});
+    xs.forEach(function(i){ out.push({it:i}); });
+  });
+  return out.concat(ordenadoPorProveedor(resto).map(function(i){ return {it:i}; }));
+}
+
+// v1.45.0: los DEMAS sectores (fleje, remache, bombilla, garage, caja, bolsas plasticas) van ORDENADOS
+// por proveedor y despues por codigo, sin titulos [Thomas 2026-09-29: "quiero que en la parte de todos
+// los provs (cuando no filtro por prov) igualmente este ordenado por prov sin encabezados, solo ordenado"].
+function ordenadoPorProveedor(fs){
+  return fs.slice().sort(function(a,b){
+    var pa=String(provDeFila(a)||''), pb=String(provDeFila(b)||'');
+    return pa.localeCompare(pb,'es') || String(a.codigo||'').localeCompare(String(b.codigo||''),'es');
+  });
+}
+
+function conTitulosDeFamilia(fs){
+  var carton=fs.filter(function(i){ return i.sector_id===10; });
+  if(!carton.length) return conTitulosDeFamiliaPlastico(fs) || ordenadoPorProveedor(fs).map(function(i){ return {it:i}; });
+  var otros=ordenadoPorProveedor(fs.filter(function(i){ return i.sector_id!==10; }));
+  var grupos={}, orden=[];
+  // v1.42.1: SOLO por formato [Thomas 2026-09-29: "Solo por formato, ni por marca ni por familia
+  // de articulo"]. famKey (formato + marca + categoria) sigue siendo la familia de la REGLA de
+  // pedido; aca es solo como se ordena la tabla.
+  function grupoDe(i){ return i.es_pliego ? 'Pliegos' : (i.carton_formato ? 'Formato '+String(i.carton_formato) : 'Otros'); }
+  carton.forEach(function(i){
+    var k=grupoDe(i);
+    if(!grupos[k]){ grupos[k]=[]; orden.push(k); }
+    grupos[k].push(i);
+  });
+  orden.sort(function(a,b){ if(a==='Otros') return 1; if(b==='Otros') return -1; return a.localeCompare(b,'es'); });
+  var out=otros.map(function(i){ return {it:i}; });
+  orden.forEach(function(k){
+    out.push({hdr:k+' · '+grupos[k].length+(grupos[k].length===1?' cartón':' cartones')});
+    grupos[k].forEach(function(i){ out.push({it:i}); });
+  });
   return out;
 }
 
 function render(){
   cargarSugeridos();
   var fs=filtradas();
-  $('tbody').innerHTML=fs.map(function(i){
+  $('tbody').innerHTML=conTitulosDeFamilia(fs).map(function(fila){
+    if(fila.hdr) return '<tr class="fam-hdr'+(fila.corto?' corto':'')+'"><td colspan="6">'+esc(fila.hdr)+'</td></tr>';
+    var i=fila.it;
     var ped=PEDIDO[i.comp_id]||'';
-    var esCarton=i.sector_id===10;
+    var esCarton=GP2UI.esCarton(i);   /* el 10 vive en gp2-ui.js (idea 7334) */
     var esChar=esCharcasIt(i);
     var uxpChar=esChar ? uniPorPaqCharcas(i) : 0;
+    var bolsa=uniPorBolsa(i);
     var st=vStock(i), mx=vMaximo(i), pe=vPend(i);
-    var bajoMin=(i.minimo!=null && st!=null && st<Number(i.minimo));
+    var bajoMin=(mx!=null && st!=null && st<Number(mx));
     // Charcas: input en PAQUETES; el sugerido se convierte a paq (round up).
-    // La equivalencia "= N uni" se muestra al lado del input.
-    var paqEq=(esCarton && ped>0)?('<span class="paq-eq">= '+fmt(ped/PAQ,1)+' paq de '+PAQ+'</span>')
-             :(esChar && ped>0 && uxpChar>0)?('<span class="paq-eq">= '+fmt(ped*uxpChar)+' uni</span>'):'';
+    // Parte plastica: se muestra en cuantas BOLSAS enteras cae lo pedido.
+    // La equivalencia se muestra al lado del input.
+    var um=umRemito(i);
+    // v1.44.2: SIN equivalencias debajo del campo ("= 227 bolsas de 150", "= 11.000 uni", "= N paq")
+    // [Thomas 2026-09-29: "Estas aclaraciones no las quiero, solo el min pedido"]. Queda la linea del
+    // minimo (notaMinUni) y el "ya pediste N (en camino)" (notaRepo). El campo ya va en la unidad del
+    // remito, asi que la equivalencia no agregaba nada.
+    var paqEq='';
     return '<tr data-id="'+i.comp_id+'"'+(ped>0?' class="con-pedido"':'')+'>'+
       '<td><b>'+esc(i.codigo||'—')+'</b><br><small style="color:#777">'+esc(i.descripcion||'')+
         (i.carton_formato?(' · Formato '+esc(i.carton_formato)):'')+
         // En el celular la columna Proveedor se esconde (no entraba y dejaba "Pedir"
         // fuera de pantalla) y el proveedor se lee acá mismo. Nada se pierde.
-        '<span class="prov-mini"> · '+esc(i.proveedor||'—')+'</span></small></td>'+
-      '<td>'+esc(i.proveedor||'—')+'</td>'+
+        '<span class="prov-mini"> · '+esc(provDeFila(i))+'</span></small></td>'+
+      '<td>'+provCelda(i)+'</td>'+
       // El "mín N" debajo del stock se saco [usuario 2026-09-04: "eso no lo quiero ver"].
-      // El minimo sigue vivo en la base y sigue pintando el stock en rojo cuando esta abajo.
+      // El stock se pinta en rojo cuando esta abajo del MAXIMO (el minimo se borro el 14-09).
       '<td class="num'+(bajoMin?' bajo-min':'')+'">'+(st==null?'—':(fmt(st)+' '+esc(i.unidad)))+'</td>'+
-      '<td class="num">'+(mx==null?'—':fmt(mx))+
-        (mx!=null&&i.maximo_origen?('<span class="sub-nota">'+esc(tagOrigen(i.maximo_origen))+'</span>'):'')+'</td>'+
-      '<td class="num"><input class="pedir-in" data-in="'+i.comp_id+'" inputmode="decimal" value="'+(ped?String(ped).replace('.',','):'')+'" placeholder="'+i.unidad+'">'+paqEq+
-        notaSugerido(i)+notaRepo(i)+'</td>'+
-    '</tr>';
+      // El origen del maximo (fisico / EM / migrado) NO se muestra en la fila
+      // [usuario 2026-09-16: "no quiero que me especifique de donde sale el maximo"].
+      // Sigue disponible en el desglose que se abre al tocar el Maximo.
+      '<td class="num'+(mx!=null?' max-cell" data-max="'+i.comp_id+'" title="Ver de qué se compone':'')+'">'+(mx==null?'—':fmt(mx))+'</td>'+
+      '<td class="num"><input class="pedir-in" data-in="'+i.comp_id+'" inputmode="decimal" value="'+(ped?valCampo(ped*um.k):'')+'" placeholder="'+esc(um.lbl)+'">'+
+        notaMinUni(i, ped, esChar, uxpChar, um)+paqEq+
+        notaRepo(i)+'</td>'+
+      '<td class="um-cell">'+esc(um.lbl)+'</td>'+
+    '</tr>'+filasAlt(i, st, mx, bajoMin, um);
   }).join('');
   // Toda la zona de armar la OC (buscador, leyenda, tabla y barras) aparece recien
   // cuando hay sector o proveedor elegido; hasta entonces solo se ve el cartel.
   $('zonaLista').classList.toggle('hidden', !haySeleccion());
   $('elegiSector').classList.toggle('hidden', haySeleccion());
   $('tblEmpty').classList.toggle('hidden', fs.length>0);
-  // "Aprovechar el viaje": los que todavia no hacen falta, para sumarlos a esta OC de
-  // una (el carton lo necesita para completar el multiplo de la familia). Aparece solo
-  // si hay alguno sin cargar.
-  var nViaje=fs.filter(function(i){ return estadoRepo(i)==='viaje' && PEDIDO[i.comp_id]==null && valorSugerido(i)>0; }).length;
-  var bv=$('btnViaje');
-  bv.classList.toggle('hidden', nViaje===0);
-  bv.textContent='Aprovechar el viaje ('+nViaje+')';
+  // "Aprovechar el viaje" se saco el 2026-09-14 junto con el minimo: era la valvula de
+  // escape del gatillo viejo (sumar a mano lo que estaba arriba del minimo). Con el
+  // maximo como unico gatillo no queda nada afuera que aprovechar — todo lo que esta
+  // abajo del techo ya entra solo, y lo que llego al techo tiene sugerido 0.
 
   document.querySelectorAll('.pedir-in').forEach(function(inp){
     inp.addEventListener('change',function(){
@@ -892,12 +1360,83 @@ function render(){
       var id=Number(inp.dataset.in);
       // Vaciar el campo = "este no lo pido": queda anotado en SIN_PEDIDO para que el
       // sugerido NO se vuelva a cargar solo en el proximo render.
+      // Lo tipeado esta en la unidad del remito; PEDIDO se guarda en la del bundle.
+      var itv=(D.insumos||[]).filter(function(x){ return x.comp_id===id; })[0];
+      var k=itv?umRemito(itv).k:1;
+      if(v>0 && k!==1){ v=v/k; if(itv.unidad!=='kg') v=Math.round(v); }
       if(v>0){ PEDIDO[id]=v; delete SIN_PEDIDO[id]; }
       else { delete PEDIDO[id]; SIN_PEDIDO[id]=true; }
       render(); barra();
     });
   });
+  // Fila repetida del proveedor alternativo: tocarla equivale a tocar su chip arriba.
+  document.querySelectorAll('tr.fila-alt').forEach(function(b){
+    b.addEventListener('click', function(){ provSel=b.dataset.altProv; pintarProvs(); proponerFecha(); render(); });
+  });
+  // Tocar el Máximo abre el desglose: de dónde sale ese número.
+  document.querySelectorAll('td.max-cell').forEach(function(td){
+    // Mouse: se abre al pasar por arriba y se cierra al salir. Solo pointerType 'mouse': un
+    // toque tambien dispara "enter" y abriria y cerraria en el mismo gesto.
+    td.addEventListener('pointerenter', function(e){ if(e.pointerType==='mouse'){ DSG_HOVER=true; abrirDesglose(Number(td.dataset.max), td); } });
+    td.addEventListener('pointerleave', function(e){ if(e.pointerType==='mouse'){ DSG_HOVER=false; if(!DSG_FIJA) cerrarDesglose(); } });
+    // Clic (mouse o toque): la FIJA para poder bajar por la lista [Thomas 2026-09-29]. Un segundo clic
+    // sobre la misma celda, un clic afuera o Escape la cierran.
+    td.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(DSG_FIJA && DSG_TD===td){ cerrarDesglose(); return; }
+      DSG_FIJA=true; $('dsgPop').classList.add('fija');
+      if(DSG_TD!==td || $('dsgPop').hidden) abrirDesglose(Number(td.dataset.max), td);
+    });
+  });
   barra();
+}
+
+/* ═══ Desglose del Máximo (RPC oc_maximo_desglose) ═══
+   Al tocar el Máximo se ve de qué se compone: cuántos meses, el consumo/mes y qué lo arma
+   — por ARTÍCULO (con su venta de est_madre y lo que consume del insumo) o, en la resina,
+   por PIEZA. Siempre en unidades y, si hay kg_x_uni, también en kg. [usuario 2026-09-14] */
+var DSG_CACHE={}, DSG_TD=null, DSG_HOVER=false, DSG_FIJA=false;
+async function abrirDesglose(compId, td){
+  DSG_TD=td;
+  var pop=$('dsgPop');
+  if(!DSG_CACHE[compId]){
+    pop.innerHTML='<p class="dsg-vacio">Cargando…</p>'; ubicarDesglose(); pop.hidden=false;
+    var r=await SB.rpc('oc_maximo_desglose',{p_componente_id:compId});
+    if(r.error){ if(DSG_TD===td){ pop.innerHTML='<p class="dsg-vacio">'+esc(r.error.message)+'</p>'; ubicarDesglose(); } return; }
+    DSG_CACHE[compId]=r.data||{};
+  }
+  if(DSG_TD!==td) return;   // el mouse ya se fue a otra celda (o afuera) mientras llegaba la RPC
+  pop.innerHTML=htmlDesglose(DSG_CACHE[compId]);
+  pop.hidden=false; ubicarDesglose();
+}
+/* SOLO la tabla por articulo (o por pieza en la resina) [Thomas 2026-09-28: "solo esos datos. El
+   resto no lo quiero"]: sin titulo, sin Maximo/Origen/Meses/Consumo y sin aviso. */
+function htmlDesglose(d){
+  var c=d.comp||{}, hayKg=c.es_resina||c.es_fleje||c.kg_x_uni!=null;
+  // Mayor → menor por lo que consume: lo que mas pesa en el maximo, arriba.
+  var filas=(d.filas||[]).slice().sort(function(a,b){ return (Number(b.aporte_uni_mes)||0)-(Number(a.aporte_uni_mes)||0); });
+  if(!filas.length) return '<p class="dsg-vacio">Sin demanda registrada.</p>';
+  var pz=d.base==='piezas', totUni=0, totKg=0;
+  var head='<tr><th class="l">'+(pz?'Pieza':'Artículo')+'</th>'+(pz?'':'<th>Venta<br>(uni/mes)</th>')+
+    '<th>Consume<br>(uni/mes)</th>'+(hayKg?'<th>kg/mes</th>':'')+'</tr>';
+  var rows=filas.map(function(f){ totUni+=Number(f.aporte_uni_mes)||0; totKg+=Number(f.aporte_kg)||0;
+    return '<tr><td class="l"><b>'+esc(f.cod)+'</b> '+esc(f.desc||'')+'</td>'+
+      (pz?'':'<td class="num">'+(f.venta_uni_mes==null?'—':fmt(f.venta_uni_mes))+'</td>')+
+      '<td class="num">'+fmt(f.aporte_uni_mes)+'</td>'+(hayKg?'<td class="num">'+fmt(f.aporte_kg,2)+'</td>':'')+'</tr>'; }).join('');
+  var foot='<tfoot><tr><td class="l">Total ('+filas.length+')</td>'+(pz?'':'<td></td>')+
+    '<td class="num">'+fmt(totUni)+'</td>'+(hayKg?'<td class="num">'+fmt(totKg,2)+'</td>':'')+'</tr></tfoot>';
+  return '<table class="dsg"><thead>'+head+'</thead><tbody>'+rows+'</tbody>'+foot+'</table>';
+}
+// Pegada a la celda: abajo si entra, si no arriba; nunca afuera de la pantalla.
+function ubicarDesglose(){
+  var pop=$('dsgPop'), td=DSG_TD;
+  if(!td) return;
+  var r=td.getBoundingClientRect(), vw=window.innerWidth, vh=window.innerHeight;
+  pop.style.left='0px'; pop.style.top='0px';
+  var w=pop.offsetWidth, h=pop.offsetHeight;
+  var x=Math.min(Math.max(8, r.right-w), vw-w-8);
+  var y=(r.bottom+6+h<=vh) ? r.bottom+6 : Math.max(8, r.top-6-h);
+  pop.style.left=x+'px'; pop.style.top=y+'px';
 }
 
 /* Solo los pedidos del rubro/proveedor seleccionado: lo cargado en otros chips
@@ -907,7 +1446,7 @@ function itemsPedidos(){
     if(!(PEDIDO[i.comp_id]>0)) return false;
     if(ocultoRubro(i)) return false;
     if(rubroSel!=null && rubroDe(i)!==rubroSel) return false;
-    if(provSel!=null && (i.proveedor||'(sin proveedor)')!==provSel) return false;
+    if(!esDelProv(i, provSel)) return false;
     return true;
   }).map(function(i){
     // Charcas: el PEDIDO viene ya en paquetes; unidad='paq' para la RPC
@@ -1027,20 +1566,12 @@ function validarCarton(items){
       errores.push(lbl+': el pedido mínimo es '+fmt(cf.pedido_minimo)+' y hay '+fmt(total)+'.');
       return;
     }
-    if(total % cf.pliegos_multiplo !== 0){
-      errores.push(lbl+': el total ('+fmt(total)+') debe ser múltiplo de '+fmt(cf.pliegos_multiplo)+'.');
-      return;
-    }
-    // El minimo por codigo es FIJO: es el PAQUETE en que viene el carton, no una cuota
-    // que crezca con el pedido [usuario 2026-09-03: "el paquete viene a mil, se puede
-    // recibir a mil"]. Ver el comentario de arriba: la doc vieja decia que escalaba.
-    var minCod=cf.min_codigo_x_multiplo;
-    xs.forEach(function(x){
-      if(x.cantidad % cf.codigo_multiplo !== 0)
-        errores.push(lbl+' · '+x.it.codigo+': '+fmt(x.cantidad)+' no es múltiplo de '+fmt(cf.codigo_multiplo)+'.');
-      else if(x.cantidad < minCod)
-        errores.push(lbl+' · '+x.it.codigo+': mínimo '+fmt(minCod)+' por código.');
-    });
+    // v1.41.0: el MULTIPLO de la familia y el minimo por codigo YA NO frenan ni avisan aca
+    // [Thomas 2026-09-28: "Que esto no aparezca", sobre el cartel rojo "Formato LOKE CHEF: el
+    // total (60.000) debe ser multiplo de 16.000 / Ajustar al multiplo"]. La tirada se lee en
+    // cada fila, debajo de Pedir (notaMinUni), y "Sugerir" sigue dejando el carton redondeado a
+    // su familia (ajustarPedidoCarton). Lo que el comprador escribe a mano es su decision.
+    // Solo queda el PISO de la familia (carton_formato.pedido_minimo: la bolsa de Vihal 20.000).
   });
   return errores;
 }
@@ -1115,7 +1646,7 @@ function validarMinimoProveedor(items){
   if(!mats.length) return [];
   var porProv={};
   mats.forEach(function(x){
-    var p=x.it.proveedor||'(sin proveedor)';
+    var p=provDeFila(x.it);
     porProv[p]=(porProv[p]||0)+(Number(x.cantidad)||0);
   });
   var errs=[];
@@ -1128,41 +1659,14 @@ function validarMinimoProveedor(items){
   return errs;
 }
 
-/* PEDIDO MINIMO POR PIEZA (componente.pedido_minimo_uni, del Excel del usuario hoja "Pedido 31-08",
-   columna `Pedi Min Uni`): el inyector no hace una tirada de menos de N piezas. NO bloquea la OC:
-   hoy 24 de los 47 sugeridos quedan por debajo del piso (el pirolo blanco sugiere 2.248 contra un
-   minimo de 36.000 = 64 meses de consumo), y bloquear volveria la OC imposible de crear. Es un aviso:
-   o se sube al piso (boton) o se saca la linea y se espera a juntar consumo. La decision de comprar
-   16 veces el consumo es del comprador. */
-function lineasBajoMinimoUni(items){
-  return items.filter(function(x){
-    var m=Number(x.it.pedido_minimo_uni)||0;
-    return m>0 && Number(x.cantidad)>0 && Number(x.cantidad)<m;
-  });
-}
-function subirAlMinimoUni(){
-  lineasBajoMinimoUni(itemsPedidos()).forEach(function(x){
-    PEDIDO[x.it.comp_id]=Number(x.it.pedido_minimo_uni);
-  });
-}
+/* El recuadro amarillo "Pedido mínimo de la pieza" se saco el 2026-09-14 [usuario: "eliminá
+   este recuadro" / "el amarillo"]. Avisaba cuando el sugerido quedaba por debajo de la tirada
+   minima del inyector (componente.pedido_minimo_uni) y ofrecia un boton "Subir al mínimo". El
+   dato pedido_minimo_uni sigue viajando en oc_bundle por si se lo vuelve a usar; lo que se fue
+   es el aviso y su boton. */
 
 function barra(){
   var items=itemsPedidos();
-  var bajos=lineasBajoMinimoUni(items);
-  var am=$('avisoMinUni');
-  if(bajos.length){
-    am.classList.remove('hidden');
-    am.innerHTML='<b>Pedido mínimo de la pieza</b> — '+bajos.length+
-      (bajos.length===1?' línea queda':' líneas quedan')+' por debajo de lo que el proveedor fabrica de una:<br>'+
-      bajos.map(function(x){
-        return esc(x.it.codigo+' '+x.it.descripcion)+': pedís '+fmt(x.cantidad)+
-               ' y el mínimo es '+fmt(Number(x.it.pedido_minimo_uni))+'.';
-      }).join('<br>')+
-      '<br><button type="button" id="btnSubirMinUni" class="btn-sug" style="margin-top:8px">Subir al mínimo</button>';
-    var bm=$('btnSubirMinUni');
-    if(bm) bm.addEventListener('click',function(){ subirAlMinimoUni(); render(); });
-  }
-  else am.classList.add('hidden');
   var errsCart=validarCarton(items);
   var errs=errsCart.concat(validarMinimoProveedor(items));
   var rc=$('reglaCarton');
@@ -1170,15 +1674,13 @@ function barra(){
     rc.classList.remove('hidden'); rc.classList.add('mal');
     // El boton de ajustar es del CARTON (redondea al multiplo de la familia): si lo que falla es el
     // piso en kg del proveedor de resina no hay nada que redondear, lo resuelve el comprador.
-    rc.innerHTML=errs.map(esc).join('<br>')+
-      (errsCart.length ? '<br><button type="button" id="btnAjustarCart" class="btn-sug" style="margin-top:8px">Ajustar al múltiplo</button>' : '');
-    var ba=$('btnAjustarCart');
-    if(ba) ba.addEventListener('click',function(){ ajustarPedidoCarton(); render(); });
+    // v1.41.0: se fue el boton "Ajustar al multiplo" junto con el aviso del multiplo (arriba).
+    rc.innerHTML=errs.map(esc).join('<br>');
   }
   else rc.classList.add('hidden');
-  var tUsd=0, tArs=0;
+  var tUsd=0, tArs=0, sinPrecio=0;
   items.forEach(function(x){
-    if(x.precio==null) return;
+    if(x.precio==null){ sinPrecio++; return; }
     if(x.moneda==='ARS') tArs+=x.cantidad*x.precio; else tUsd+=x.cantidad*x.precio;
   });
   var tot=items.length+' ítems';
@@ -1186,21 +1688,15 @@ function barra(){
     tot+=' · '+fmtTotalMon(tUsd,tArs);
     if(D.tc && tUsd>0) tot+=' (≈ $ '+fmt(tUsd*Number(D.tc)+tArs,0)+')';
   }
+  // Sin este aviso el total miente por lo bajo y nadie se entera: pasa cuando se le compra a
+  // un proveedor alternativo que no cotizo esa pieza (Recicor no cotiza las cajas N°15, 16 y
+  // 22). No se rellena con el precio del otro proveedor: eso seria inventar plata.
+  if(sinPrecio>0) tot+=' · ⚠ '+sinPrecio+(sinPrecio===1?' ítem sin precio':' ítems sin precio')+
+                        (provSel!=null?(' de '+provSel):'');
   $('tot').textContent=tot;
   $('btnCrear').disabled = items.length===0 || errs.length>0;
 }
 
-/* Suma los que el gatillo dejo afuera por no hacer falta todavia. Es la valvula de
-   escape del gatillo: si igual va el camion, se aprovecha. */
-$('btnViaje').addEventListener('click',function(){
-  filtradas().forEach(function(i){
-    if(estadoRepo(i)!=='viaje') return;
-    delete SIN_PEDIDO[i.comp_id];
-    var v=valorSugerido(i); if(v>0) PEDIDO[i.comp_id]=v;
-  });
-  ajustarPedidoCarton();
-  render();
-});
 // Vuelve a poner los sugeridos: borra las marcas de "este no lo pido" de lo que se ve.
 // Es la ORDEN EXPLICITA del usuario, asi que pisa el gatillo y el aviso de "en camino":
 // carga TODO lo visible que tenga sugerido.
@@ -1221,7 +1717,7 @@ $('btnLimpiar').addEventListener('click',function(){
   PEDIDO={}; PRECIO={}; MONEDA={}; render();
 });
 $('fechaEnt').addEventListener('change',function(){
-  fechaTocada=!!$('fechaEnt').value; fechaTocadaProv=provSel; pintarAyudaFecha();
+  fechaTocada=!!$('fechaEnt').value; fechaTocadaProv=provSel;
 });
 
 $('btnCrear').addEventListener('click', async function(){
@@ -1274,11 +1770,9 @@ function pintarOcs(){
   var ocs=(D.ocs||[]).filter(function(o){ return String(o.estado||'')!=='anulada'; });
   $('ocsN').textContent=ocs.length?('('+ocs.length+')'):'';
   $('ocsEmpty').classList.toggle('hidden', ocs.length>0);
-  $('ocsList').innerHTML=ocs.map(function(o){
+  var cardOC=function(o){
     var acts='<button type="button" class="imp" data-imp="'+o.id+'">🖨 Imprimir</button>';
-    if(o.estado==='borrador') acts+='<button type="button" class="env" data-oc="'+o.id+'" data-est="enviada">Marcar enviada</button>'+
-      '<button type="button" class="anu" data-oc="'+o.id+'" data-est="anulada">Anular</button>';
-    else if(o.estado==='enviada') acts+='<button type="button" class="rec" data-oc="'+o.id+'" data-est="recibida">Marcar recibida</button>'+
+    if(o.estado==='borrador'||o.estado==='enviada') acts+='<button type="button" class="wpp" data-oc="'+o.id+'">🟢 WhatsApp</button>'+
       '<button type="button" class="anu" data-oc="'+o.id+'" data-est="anulada">Anular</button>';
     return '<div class="oc-card">'+
       '<div class="oc-head"><span class="num-oc">OC N° '+o.numero+'</span>'+
@@ -1293,19 +1787,32 @@ function pintarOcs(){
       '<div class="table-wrap" style="margin-top:8px"><table class="t"><thead><tr>'+
       '<th>Insumo</th><th class="num">Pedido</th><th class="num">Precio</th><th class="num">Subtotal</th><th class="num">Recibido</th></tr></thead><tbody>'+
       (o.items||[]).map(function(it){
-        return '<tr><td><b>'+esc(it.codigo)+'</b> <small style="color:#777">'+esc(it.descripcion||'')+'</small></td>'+
+        var rc=Number(it.recibido)||0, pe=Number(it.cantidad)||0;
+        var sem=(o.estado==='enviada'||o.estado==='recibida')?
+          (rc<=0?' class="rc-no"':(rc>=pe?' class="rc-ok"':' class="rc-par"')):'';
+        return '<tr'+sem+'><td><b>'+esc(it.codigo)+'</b> <small style="color:#777">'+esc(it.descripcion||'')+'</small></td>'+
           '<td class="num">'+fmt(it.cantidad)+' '+esc(it.unidad)+'</td>'+
           '<td class="num">'+(it.precio_uni==null?'—':((it.moneda==='ARS'?'$ ':'US$ ')+fmt(it.precio_uni,2)))+'</td>'+
           '<td class="num">'+(it.subtotal==null?'—':((it.moneda==='ARS'?'$ ':'US$ ')+fmt(it.subtotal,2)))+'</td>'+
           '<td class="num">'+(it.recibido>0?fmt(it.recibido):'—')+'</td></tr>';
       }).join('')+
       '</tbody></table></div></div>';
-  }).join('');
+  };
+  /* v1.47.0: VIGENTES = la ultima OC (mayor numero) de cada proveedor; las anteriores de ese
+     proveedor pasan a HISTORICAS solas al emitir una nueva. Una OC sin proveedor queda vigente sola. */
+  var ult={};
+  ocs.forEach(function(o){ var k=o.proveedor||('#'+o.id); if(!ult[k]||Number(o.numero)>Number(ult[k].numero)) ult[k]=o; });
+  var vig=ocs.filter(function(o){ return ult[o.proveedor||('#'+o.id)]===o; });
+  var his=ocs.filter(function(o){ return ult[o.proveedor||('#'+o.id)]!==o; });
+  var abiertaHis=!!($('ocsHis')&&$('ocsHis').open);
+  $('ocsList').innerHTML=
+    '<details class="oc-box" open><summary>Vigentes <span>('+vig.length+')</span></summary>'+vig.map(cardOC).join('')+'</details>'+
+    (his.length?('<details class="oc-box" id="ocsHis"'+(abiertaHis?' open':'')+'><summary>Históricas <span>('+his.length+')</span></summary>'+his.map(cardOC).join('')+'</details>'):'');
 
   document.querySelectorAll('.oc-acts button.imp').forEach(function(b){
     b.addEventListener('click', function(){ imprimirOC(Number(b.dataset.imp)); });
   });
-  document.querySelectorAll('.oc-acts button:not(.imp)').forEach(function(b){
+  document.querySelectorAll('.oc-acts button.anu').forEach(function(b){
     b.addEventListener('click', async function(){
       var est=b.dataset.est;
       if(est==='anulada' && !confirm('¿Anular la OC?')) return;
@@ -1317,6 +1824,49 @@ function pintarOcs(){
       }catch(e){ $('status').className='status bad'; $('status').textContent='Error: '+(e.message||e); b.disabled=false; }
     });
   });
+  // WhatsApp: abre wa.me con el texto formal de la OC y, si estaba en borrador, la marca enviada.
+  document.querySelectorAll('.oc-acts button.wpp').forEach(function(b){
+    b.addEventListener('click', async function(){
+      var oc=(D.ocs||[]).find(function(x){ return String(x.id)===String(b.dataset.oc); });
+      if(!oc) return;
+      // el window.open va PRIMERO y sincronico: si esperamos el await, el navegador bloquea el popup.
+      window.open('https://wa.me/?text='+encodeURIComponent(textoWhatsappOC(oc)), '_blank');
+      if(oc.estado==='borrador'){
+        b.disabled=true;
+        try{
+          var r=await SB.rpc('oc_marcar',{ p_oc_id:Number(b.dataset.oc), p_estado:'enviada' });
+          if(r.error) throw r.error;
+          await boot(); mostrarTab('ocs');
+        }catch(e){ $('status').className='status bad'; $('status').textContent='Error: '+(e.message||e); b.disabled=false; }
+      }
+    });
+  });
+}
+
+// Texto formal de la OC para mandar por WhatsApp (wa.me). Sin número por ahora: el operario elige el
+// contacto; cuando cargue el teléfono del proveedor se le antepone y va directo.
+function textoWhatsappOC(o){
+  var L=[];
+  L.push('Estimados'+(o.proveedor?(' '+o.proveedor):'')+',');
+  L.push('');
+  L.push('Les enviamos la Orden de Compra N° '+o.numero+'.');
+  L.push('Fecha de emisión: '+new Date(o.creado_en).toLocaleDateString('es-AR'));
+  var fe=vFechaEnt(o); if(fe) L.push('Fecha de entrega solicitada: '+fmtFecha(fe));
+  L.push('');
+  L.push('Detalle del pedido:');
+  (o.items||[]).forEach(function(it){
+    var linea='• '+it.codigo+(it.descripcion?(' - '+it.descripcion):'')+': '+fmt(it.cantidad)+' '+(it.unidad||'');
+    if(it.precio_uni!=null) linea+=' — '+(it.moneda==='ARS'?'$ ':'US$ ')+fmt(it.precio_uni,2)+'/u';
+    L.push(linea);
+  });
+  if(Number(o.total_usd)>0||Number(o.total_ars)>0){
+    L.push('');
+    L.push('Total: '+fmtTotalMon(Number(o.total_usd)||0, Number(o.total_ars)||0));
+  }
+  L.push('');
+  L.push('Agradecemos confirmar la recepción y la fecha de entrega. Muchas gracias.');
+  L.push('Loekemeyer Hnos. S.R.L.');
+  return L.join('\n');
 }
 
 /* ── OC de MATERIA PRIMA PLASTICA: el formato del usuario (hojas "O.C." del workbook) ──
@@ -1382,7 +1932,7 @@ function hojaOCMaterial(o){
     '<th>Fecha Pos Ent</th><th>Fecha Ent</th><th>Kg Ent</th><th>Fecha Ent</th><th>Kg Ent</th><th>Fecha Ent</th><th>Kg Ent</th></tr></thead><tbody>'+
     (filas||'<tr><td colspan="14">Sin ítems.</td></tr>')+'</tbody></table>'+
     (o.nota?('<div style="margin-top:10px;font-size:12px"><b>Nota:</b> '+esc(o.nota)+'</div>'):'')+
-    '<div class="pie"><span>Loekemeyer · Gestión Productiva 2.0 · Materia prima plástica</span><span>Impreso el '+new Date().toLocaleDateString('es-AR')+'</span></div>'+
+    '<div class="pie"><span>Loekemeyer · Gestión Productiva 2.0 · Bolsas plásticas</span><span>Impreso el '+new Date().toLocaleDateString('es-AR')+'</span></div>'+
     '</div></body></html>';
 }
 
@@ -1482,6 +2032,13 @@ $('tabGen').addEventListener('click',function(){ mostrarTab('gen'); });
 $('tabOcs').addEventListener('click',function(){ mostrarTab('ocs'); });
 
 $('q').addEventListener('input', render);
+// Cerrar el desglose: la X, tocar el fondo, o Escape.
+function cerrarDesglose(){ DSG_TD=null; DSG_FIJA=false; var p=$('dsgPop'); p.hidden=true; p.classList.remove('fija'); }
+$('dsgPop').addEventListener('click', function(e){ e.stopPropagation(); });   // clic adentro no la cierra
+document.addEventListener('click', cerrarDesglose);          // tocar afuera la cierra
+// Si la PAGINA se mueve, la ventanita no queda flotando; el scroll de la propia ventanita no cuenta.
+window.addEventListener('scroll', function(e){ if(e.target!==$('dsgPop')) cerrarDesglose(); }, true);
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') cerrarDesglose(); });
 boot();
 </script>
 </body>

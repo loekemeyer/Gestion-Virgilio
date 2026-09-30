@@ -1,7 +1,14 @@
-/* EL GATILLO DE REPOSICION de la OC (idea 7273, v1.21.0): el MINIMO dispara y el MAXIMO
-   dimensiona, y la fila que ya tiene algo en camino avisa en vez de volver a pedirlo.
-   Fixture propio (no toca el de test_oc.js, que prueba las reglas de carton con el
-   contrato VIEJO -- sin minimo -- y por eso alli todo cae en 'sin-gatillo'). */
+/* EL GATILLO DE REPOSICION de la OC (v1.26.0): lo dispara el MAXIMO y nada mas
+   [usuario 2026-09-14, textual: "lo de minimo borralo. la orden de compra tiene que
+   disparar segun el maximo. es algo que habiamos hecho mal"]. La columna
+   inventario.minimo se borro de la base ese dia, junto con el estado intermedio
+   'viaje' y el boton "Aprovechar el viaje".
+     'pedir'       stock < maximo  -> se carga solo, hasta el maximo.
+     'lleno'       stock >= maximo -> no se carga solo (y el sugerido da 0).
+     'sin-gatillo' sin maximo o sin stock -> se carga solo igual (fail-safe).
+   Lo que NO cambio: la fila que ya tiene algo en camino avisa y no se carga sola, y
+   "Usar sugeridos" es la orden explicita que pisa las dos cosas.
+   Fixture propio (no toca el de test_oc.js, que prueba las reglas de carton). */
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
@@ -15,23 +22,24 @@ const base = { sector: 'Sector Fleje', sector_id: 5, proveedor: 'Basconia', um: 
 const BUNDLE = {
   paq: 250,
   insumos: [
-    // 1) BAJO MINIMO -> hay que pedir, y se pide hasta el maximo. Se carga solo.
-    Object.assign({ comp_id: 1, codigo: 'G1', descripcion: 'Bajo minimo',
-      stock: 50, minimo: 100, maximo: 1000, pendiente_oc: 0, sugerido: 950 }, base),
-    // 2) ARRIBA DEL MINIMO -> todavia no hace falta. NO se carga solo.
-    Object.assign({ comp_id: 2, codigo: 'G2', descripcion: 'Arriba del minimo',
-      stock: 500, minimo: 100, maximo: 1000, pendiente_oc: 0, sugerido: 500 }, base),
-    // 3) BAJO MINIMO PERO YA PEDIDO -> avisa lo que viene en camino y no se carga solo.
+    // 1) ABAJO DEL MAXIMO -> hay que pedir, hasta el maximo. Se carga solo.
+    Object.assign({ comp_id: 1, codigo: 'G1', descripcion: 'Abajo del maximo',
+      stock: 50, maximo: 1000, pendiente_oc: 0, sugerido: 950 }, base),
+    // 2) TAMBIEN ABAJO, PERO MENOS -> con la regla vieja era 'viaje' y quedaba afuera;
+    //    ahora entra igual, porque el unico gatillo es el maximo.
+    Object.assign({ comp_id: 2, codigo: 'G2', descripcion: 'Abajo por poco',
+      stock: 500, maximo: 1000, pendiente_oc: 0, sugerido: 500 }, base),
+    // 3) ABAJO DEL MAXIMO PERO YA PEDIDO -> avisa lo que viene en camino y no se carga solo.
     Object.assign({ comp_id: 3, codigo: 'G3', descripcion: 'Ya pedido',
-      stock: 50, minimo: 100, maximo: 1000, pendiente_oc: 400, sugerido: 950 }, base),
-    // 4) SIN MINIMO -> no hay con que decidir: se comporta como antes (se carga solo).
-    Object.assign({ comp_id: 4, codigo: 'G4', descripcion: 'Sin minimo',
-      stock: 0, minimo: null, maximo: 1000, pendiente_oc: 0, sugerido: 1000 }, base),
-    // 5) CONFIG ROTA (minimo >= maximo, hoy son 52 lineas reales) -> tambien como antes.
-    Object.assign({ comp_id: 5, codigo: 'G5', descripcion: 'Config rota',
-      stock: 500, minimo: 900, maximo: 800, pendiente_oc: 0, sugerido: 300 }, base),
+      stock: 50, maximo: 1000, pendiente_oc: 400, sugerido: 950 }, base),
+    // 4) SIN MAXIMO -> no hay con que decidir: fail-safe, se carga solo.
+    Object.assign({ comp_id: 4, codigo: 'G4', descripcion: 'Sin maximo',
+      stock: 0, maximo: null, pendiente_oc: 0, sugerido: 1000 }, base),
+    // 5) LLENO (stock >= maximo) -> no se carga solo. El sugerido real es 0.
+    Object.assign({ comp_id: 5, codigo: 'G5', descripcion: 'Lleno',
+      stock: 900, maximo: 800, pendiente_oc: 0, sugerido: 0 }, base),
   ],
-  ocs: [], pliego_uni_x_paquete: 100, tc: 1500, generado_en: '2026-09-08T10:00:00Z',
+  ocs: [], pliego_uni_x_paquete: 100, tc: 1500, generado_en: '2026-09-14T10:00:00Z',
 };
 
 const STUB = `
@@ -59,35 +67,31 @@ window.supabase = { createClient: function(){ return {
   await page.click('#rubros .chip:has-text("Fleje")');
   ok(await page.$$eval('#tbody tr', x => x.length) === 5, 'las 5 filas del fixture');
 
-  // EL GATILLO: solo se carga solo lo que hace falta.
-  ok(await val(1) === '950', 'bajo minimo: se carga solo, hasta el maximo (950)');
-  ok(await val(2) === '', 'arriba del minimo: NO se carga solo');
+  // EL GATILLO: se carga solo todo lo que esta abajo del maximo.
+  ok(await val(1) === '950', 'abajo del maximo: se carga solo, hasta el maximo (950)');
+  ok(await val(2) === '500', 'abajo por poco: TAMBIEN se carga solo (ya no hay estado intermedio)');
   ok(await val(3) === '', 'lo que ya viene en camino: NO se carga solo');
-  ok(await val(4) === '1000', 'sin minimo: se comporta como antes (fail-safe)');
-  ok(await val(5) === '300', 'config rota (min >= max): se comporta como antes (fail-safe)');
+  ok(await val(4) === '1000', 'sin maximo: fail-safe, se carga solo');
+  ok(await val(5) === '', 'lleno (stock >= maximo): NO se carga solo');
 
   // Y la fila DICE por que.
-  ok((await fila(1)).includes('hay que pedir'), 'la fila bajo minimo dice "hay que pedir"');
-  ok((await fila(2)).includes('no hace falta'), 'la fila arriba del minimo dice "no hace falta"');
+  // Los cartelitos "hay que pedir" / "no hace falta" se sacaron en v1.35.0 [Thomas
+  // 2026-09-28: "elimina todos esos textos"]: lo dice el stock en rojo.
+  const rojo = id => page.$('tr[data-id="' + id + '"] td.bajo-min').then(x => !!x);
+  ok(await rojo(1) && await rojo(2), 'abajo del maximo: stock en rojo');
   ok((await fila(3)).includes('ya pediste 400 kg'), 'la fila avisa lo que ya viene en camino');
-  ok(!(await fila(4)).includes('hay que pedir') && !(await fila(4)).includes('no hace falta'),
-     'sin minimo no inventa un estado de gatillo');
-  ok(!(await fila(5)).includes('no hace falta'), 'config rota no inventa un estado de gatillo');
+  ok(!(await rojo(4)), 'sin maximo no inventa un estado de gatillo');
+  ok(!(await rojo(5)) && !(await fila(5)).includes('hay que pedir'), 'la fila llena no se pinta ni dice nada');
 
-  // "Aprovechar el viaje": la valvula de escape. Solo cuenta el que no hace falta y esta vacio.
-  ok(!(await page.$eval('#btnViaje', x => x.classList.contains('hidden'))), 'aparece "Aprovechar el viaje"');
-  ok((await page.textContent('#btnViaje')).trim() === 'Aprovechar el viaje (1)', 'y cuenta 1');
-  await page.click('#btnViaje');
-  ok(await val(2) === '500', 'al aprovechar el viaje se carga el que no hacia falta');
-  ok(await page.$eval('#btnViaje', x => x.classList.contains('hidden')), 'y el boton se esconde: no queda ninguno');
-  ok(await val(3) === '', 'aprovechar el viaje NO toca lo que ya viene en camino');
+  // "Aprovechar el viaje" se fue con el minimo: no queda nada afuera que aprovechar.
+  ok(await page.$('#btnViaje') === null, 'ya no existe el boton "Aprovechar el viaje"');
 
-  // "Usar sugeridos" es la orden explicita: pisa el gatillo y el aviso.
-  await page.click('#btnLimpiar');
+  // "Usar sugeridos" sigue siendo la orden explicita: pisa el aviso de "en camino".
+  await page.$eval('#btnLimpiar', b => b.click())  /* oculto desde v1.37.0 */;
   ok(await val(1) === '' && await val(2) === '', 'limpiar deja todo en cero');
-  await page.click('#btnSug');
-  ok(await val(1) === '950' && await val(2) === '500' && await val(3) === '950' && await val(5) === '300',
-     '"Usar sugeridos" carga TODO lo visible, tambien lo que el gatillo dejo afuera');
+  await page.$eval('#btnSug', b => b.click())  /* oculto desde v1.37.0 */;
+  ok(await val(1) === '950' && await val(2) === '500' && await val(3) === '950',
+     '"Usar sugeridos" carga TODO lo visible, tambien lo que viene en camino');
 
   await browser.close();
   console.log(process.exitCode ? 'HAY FALLOS' : 'TODO OK');

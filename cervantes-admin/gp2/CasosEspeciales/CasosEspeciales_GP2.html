@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v2.0.1 (2026-09-28) — % Corto / % Largo desnivelados [usuario: "Está desnivelados Corto y
+     Largo"]: el rotulo de Corto pasa a 2 lineas en celular; los inputs se alinean abajo.
+     v2.0.0 (2026-09-17) — CASOS ESPECIALES: ENTREGA DIRECTA DE MATERIAL A CHARCAS Y ECLIPSE
+     (usuario Nazareno: "Hace un boton que sea casos especiales... A ambos se le envia solo desde
+     ese modulo y se registran los kg que se le mando de material. NO SE LE PUEDE ENVIAR NI A
+     CHARCAS NI A ECLIPSE DESDE LA TABLET DE LOGISTICA"; "Se lo entregan directo a ellos. Pero no
+     quiero que el stock de ellos aumente cuando haga la o.c. Para eso quiero el boton de casos
+     especiales (lo quiero fuera de ps - un modulo nuevo)").
+
+     Modulo PROPIO (fuera de PS). Es EL lugar para registrar la entrega directa de materia prima a
+     los PS hibridos: el proveedor (Altrak/Aperam) entrega directo al PS, y aca se cargan los kg que
+     ENTRARON. El stock del PS sube con esta carga (la recepcion), NO con la O.C. Reusa la RPC ya
+     existente cargar_compra_mp (misma que usaba Recepcion Insumos): resuelve el PS hibrido desde
+     componente.proveedor. Charcas -> Altrak (kg + % corto/largo = instruccion de corte IC3/IC3V);
+     Eclipse -> Aperam (solo kg, la chapa no se reparte). El % corto/largo se aplica solo cuando el
+     proveedor es el del alambre (mismo criterio que Recepcion Insumos; si aparece un tercer hibrido
+     con reparto, revisar aca). Version 1.0.0 anterior usaba una RPC propia enviar_material_ps_especial
+     que duplicaba stock -> borrada. -->
+<meta charset="utf-8"/>
+<script src="../auth-guard.js?v=20260929a"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Casos especiales · Charcas / Eclipse · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260929a"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260912c"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  .ce-wrap{max-width:560px}
+  .ce-dest{display:flex;flex-direction:column;gap:10px;margin:10px 0}
+  .ce-card{display:flex;flex-direction:column;gap:2px;text-align:left;background:#fff;border:2px solid #d0d7de;
+           border-radius:12px;padding:16px 18px;cursor:pointer;font-size:18px}
+  .ce-card:hover{border-color:#111}
+  .ce-card .n{font-size:22px;font-weight:900;color:#111}
+  .ce-card .m{font-size:16px;color:#555}
+  .ce-stock{background:#eef4fb;border:2px solid #cddaea;border-radius:12px;padding:14px 18px;margin:12px 0;text-align:center}
+  .ce-stock .lbl2{font-size:13px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.4px}
+  .ce-stock .big{font-size:32px;font-weight:900;color:#0b3b73}
+  .ce-field{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+  .ce-field label{font-size:18px;font-weight:800;color:#111}
+  .ce-field input{font-size:22px;padding:12px 14px;border:2px solid #cbd5e1;border-radius:10px;width:100%}
+  .ce-two{display:flex;gap:14px;flex-wrap:wrap}
+  .ce-two > div{flex:1 1 150px}
+  /* v2.0.1: si un rotulo ocupa 2 lineas y el vecino 1, los inputs quedaban desnivelados.
+     Las dos columnas ya miden lo mismo (stretch): el input va al piso de cada una. */
+  .ce-two > .ce-field{justify-content:space-between}
+  #ceSlider{width:100%;height:40px;margin-top:8px;accent-color:#0b3b73;cursor:pointer}
+  #ceSliderLbl{text-align:center;font-size:18px;font-weight:800;color:#0b3b73}
+  #ceSplit{font-size:14px;color:#666;font-weight:600;margin-top:6px}
+</style>
+</head>
+<body>
+
+<div class="card ce-wrap">
+  <div class="header">
+    <h1>Casos especiales</h1>
+    <div class="hbtns">
+      <button class="hlink hidden" id="btnVolver" type="button">← Cambiar destino</button>
+      <a href="../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <!-- FASE 0 — elegir destino -->
+    <div id="fase0">
+      <div class="row"><label class="lbl">Entrega directa de material a…</label></div>
+      <div class="ce-dest" id="destGrid"></div>
+      <div id="status" class="status">Cargando…</div>
+    </div>
+
+    <!-- FASE 1 — cargar kg -->
+    <div id="fase1" class="hidden">
+      <div class="ce-stock">
+        <div class="lbl2" id="stockLbl">Stock en el destino</div>
+        <div class="big"><span id="pStock">—</span> <small style="font-size:18px;color:#0b5cad">kg</small></div>
+      </div>
+
+      <div class="ce-two">
+        <div class="ce-field">
+          <label for="fFecha">Fecha</label>
+          <input type="date" id="fFecha">
+        </div>
+        <div class="ce-field">
+          <label for="fRemito">N° remito (opcional)</label>
+          <input type="text" id="fRemito" inputmode="text" placeholder="Opcional">
+        </div>
+      </div>
+
+      <div class="ce-field">
+        <label for="kg" id="kgLbl">Kg de material entregados</label>
+        <input type="text" id="kg" inputmode="decimal" autocomplete="off" placeholder="0">
+      </div>
+
+      <!-- reparto corto/largo (solo Charcas) -->
+      <div id="splitBox" class="hidden">
+        <label style="font-size:18px;font-weight:800;color:#111">Reparto corto / largo (deslizá o escribí)</label>
+        <input type="range" id="ceSlider" min="0" max="100" step="1" value="50">
+        <div id="ceSliderLbl">Definí el reparto</div>
+        <div class="ce-two" style="margin-top:8px">
+          <div class="ce-field">
+            <label for="pctCorto">% Corto (IC3) → Cervantes</label>
+            <input type="text" id="pctCorto" inputmode="numeric" placeholder="70">
+          </div>
+          <div class="ce-field">
+            <label for="pctLargo">% Largo (IC3V) → Virgilio</label>
+            <input type="text" id="pctLargo" inputmode="numeric" placeholder="30">
+          </div>
+        </div>
+        <div id="ceSplit">Definí cómo tiene que cortar este material (se completan solos a 100).</div>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-primary" id="btnEnviar" type="button" disabled style="width:100%">Registrar entrega</button>
+      </div>
+      <div id="msg1" class="status"></div>
+    </div>
+
+    <!-- FASE 2 — confirmación -->
+    <div id="fase2" class="hidden">
+      <div class="successBox">
+        <div class="title">✓ Entrega registrada</div>
+        <div id="okDetail" style="font-size:18px;color:#333"></div>
+      </div>
+      <div class="row" style="justify-content:center">
+        <button class="btn btn-primary" id="btnOtro" type="button">← Registrar otra</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../gp2-ui.js?v=20260913e"></script>
+<script src="../gp2-numero.js?v=20260911o"></script>
+<script>
+"use strict";
+
+var $ = GP2UI.$, esc = GP2UI.esc, hoyAR = GP2UI.hoyAR;
+var num = GP2N.num, fmt = GP2N.fmt;
+
+var SB = GP2_SB();
+
+var DEST = [];   // [{ps_id, nombre, mp_id, mp_cod, mp_desc, proveedor, split}]
+var sel = null;
+
+/* fecha -> timestamp: si es hoy, sella el instante real (como Recepcion Insumos); si no, mediodia. */
+function fechaHora(f){
+  if (f === hoyAR()) return new Date().toISOString();
+  return f + "T12:00:00";
+}
+
+/* ---------- carga ---------- */
+async function cargar(){
+  var r = await SB.from("proveedor_servicio")
+    .select("id,nombre,mp_componente_id,hibrido")
+    .eq("hibrido", true).order("id");
+  if (r.error){ $("status").textContent = "Error: " + r.error.message; return; }
+  var ps = (r.data || []).filter(function(p){ return p.mp_componente_id != null; });
+
+  var ids = ps.map(function(p){ return p.mp_componente_id; });
+  var mats = {};
+  if (ids.length){
+    var rc = await SB.from("componente").select("id,codigo,descripcion,proveedor").in("id", ids);
+    (rc && rc.data || []).forEach(function(c){ mats[c.id] = c; });
+  }
+
+  DEST = ps.map(function(p){
+    var m = mats[p.mp_componente_id] || {};
+    // El % corto/largo es la instruccion de corte del alambre (Charcas -> Altrak). La chapa
+    // (Eclipse -> Aperam) no se reparte. Mismo criterio que Recepcion Insumos.
+    return { ps_id:p.id, nombre:p.nombre,
+             mp_id:p.mp_componente_id, mp_cod:m.codigo || ("#"+p.mp_componente_id),
+             mp_desc:m.descripcion || "", proveedor:m.proveedor || null,
+             split: (m.proveedor === "Altrak") };
+  }).filter(function(d){ return d.proveedor; });   // sin proveedor no se puede cargar la compra
+
+  renderDest();
+  $("status").textContent = DEST.length ? (DEST.length + " destinos.") : "No hay destinos híbridos configurados.";
+}
+
+function renderDest(){
+  var cont = $("destGrid"); cont.innerHTML = "";
+  DEST.forEach(function(d){
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "ce-card";
+    b.innerHTML =
+      '<span class="n">'+esc(d.nombre)+'</span>'+
+      '<span class="m">Material: <b>'+esc(d.mp_cod)+'</b>'+(d.mp_desc? " · "+esc(d.mp_desc):"")+'</span>'+
+      '<span class="m">Vende: '+esc(d.proveedor)+(d.split? " · con reparto corto/largo":"")+'</span>';
+    b.addEventListener("click", function(){ elegir(d); });
+    cont.appendChild(b);
+  });
+}
+
+/* ---------- elegir destino ---------- */
+async function elegir(d){
+  sel = d;
+  $("kgLbl").textContent = "Kg de " + d.mp_cod + " entregados a " + d.nombre;
+  $("stockLbl").textContent = "Stock de " + d.mp_cod + " en " + d.nombre;
+  $("kg").value = ""; $("fRemito").value = "";
+  if (!$("fFecha").value) $("fFecha").value = hoyAR();
+  // reparto
+  $("splitBox").classList.toggle("hidden", !d.split);
+  if (d.split) resetSplit();
+  mostrarFase(1);
+  actualizarBtn();
+  $("pStock").textContent = "…";
+  var kg = await stockEnDestino(d);
+  $("pStock").textContent = (kg == null) ? "—" : fmt(kg, 2);
+}
+
+async function stockEnDestino(d){
+  try {
+    var ru = await SB.from("ubicacion").select("id")
+      .eq("tipo","proveedor_servicio").eq("ref_id", d.ps_id).maybeSingle();
+    var ubic = ru && ru.data && ru.data.id;
+    if (!ubic) return null;
+    var ri = await SB.from("inventario").select("cantidad")
+      .eq("componente_id", d.mp_id).eq("ubicacion_id", ubic).maybeSingle();
+    return (ri && ri.data) ? num(ri.data.cantidad) : 0;
+  } catch(e){ return null; }
+}
+
+function mostrarFase(n){
+  $("fase0").classList.toggle("hidden", n !== 0);
+  $("fase1").classList.toggle("hidden", n !== 1);
+  $("fase2").classList.toggle("hidden", n !== 2);
+  $("btnVolver").classList.toggle("hidden", n === 0);
+}
+
+function volver(){ sel = null; mostrarFase(0); renderDest(); }
+
+/* ---------- reparto corto/largo ---------- */
+function resetSplit(){
+  $("pctCorto").value = ""; $("pctLargo").value = "";
+  $("ceSlider").value = "50"; $("ceSliderLbl").textContent = "Definí el reparto";
+  $("ceSplit").textContent = "Definí cómo tiene que cortar este material (se completan solos a 100).";
+}
+function pctCortoVal(){ var raw = ($("pctCorto").value || "").trim(); return raw === "" ? NaN : GP2N.entero(raw); }
+function splitShow(){
+  var kg = num($("kg").value) || 0, c = pctCortoVal();
+  if (!(kg > 0) || isNaN(c) || c < 0 || c > 100){
+    $("ceSplit").textContent = "Definí cómo tiene que cortar este material (se completan solos a 100).";
+    return;
+  }
+  var kgC = Math.round(kg*c/100*100)/100, kgL = Math.round(kg*(100-c)/100*100)/100;
+  $("ceSplit").innerHTML = "Tiene que entregar: <b>"+fmt(kgC)+" kg corto</b> (IC3) · <b>"+fmt(kgL)+" kg largo</b> (IC3V).";
+}
+// fija el % en los 3 controles a la vez (salvo el que lo disparo). Suman 100.
+function setCorto(c, from){
+  if (isNaN(c)){ $("ceSliderLbl").textContent = "Definí el reparto"; splitShow(); actualizarBtn(); return; }
+  c = Math.max(0, Math.min(100, c));
+  if (from !== "corto")  $("pctCorto").value = String(c);
+  if (from !== "largo")  $("pctLargo").value = String(100-c);
+  if (from !== "slider") $("ceSlider").value = String(c);
+  $("ceSliderLbl").textContent = c + "% corto · " + (100-c) + "% largo";
+  splitShow(); actualizarBtn();
+}
+
+function actualizarBtn(){
+  var ok = sel && num($("kg").value) > 0;
+  if (sel && sel.split){ var c = pctCortoVal(); ok = ok && !isNaN(c) && c >= 0 && c <= 100; }
+  $("btnEnviar").disabled = !ok;
+}
+
+/* ---------- eventos ---------- */
+$("kg").addEventListener("input", function(){ splitShow(); actualizarBtn(); });
+$("pctCorto").addEventListener("input", function(){ var raw=(this.value||"").trim(); setCorto(raw===""?NaN:GP2N.entero(raw),"corto"); });
+$("pctLargo").addEventListener("input", function(){ var raw=(this.value||"").trim(); var l=raw===""?NaN:GP2N.entero(raw); setCorto(isNaN(l)?NaN:100-l,"largo"); });
+$("ceSlider").addEventListener("input", function(){ setCorto(GP2N.entero(this.value),"slider"); });
+$("btnVolver").addEventListener("click", volver);
+$("btnOtro").addEventListener("click", volver);
+
+$("btnEnviar").addEventListener("click", async function(){
+  if (!sel) return;
+  var kg = num($("kg").value);
+  if (!(kg > 0)){ actualizarBtn(); return; }
+  var fecha = $("fFecha").value || hoyAR();
+  var remito = $("fRemito").value.trim();
+
+  var params = { p_proveedor: sel.proveedor, p_kg: kg, p_remito: remito || null, p_fecha: fechaHora(fecha) };
+  var conf = "Registrar entrega a " + sel.nombre + ":\n\n" + fmt(kg,2) + " kg de " + sel.mp_cod;
+  if (sel.split){
+    var c = pctCortoVal();
+    var kgC = Math.round(kg*c/100*100)/100, kgL = Math.round(kg*(100-c)/100*100)/100;
+    params.p_pct_corto = c;
+    conf += "\nCorta: " + c + "% corto (" + fmt(kgC) + " kg) / " + (100-c) + "% largo (" + fmt(kgL) + " kg)";
+  }
+  conf += "\n\nSe suma al stock de " + sel.nombre + ".\n\n¿Confirmar?";
+  if (!confirm(conf)) return;
+
+  var btn = $("btnEnviar");
+  btn.disabled = true; btn.textContent = "Registrando…";
+  $("msg1").textContent = "";
+
+  var r = await SB.rpc("cargar_compra_mp", params);
+
+  btn.textContent = "Registrar entrega";
+
+  if (r.error){
+    btn.disabled = false;
+    $("msg1").innerHTML = '<span style="color:#b91c1c">Error: ' + esc(r.error.message || "no se pudo registrar") + '</span>';
+    return;
+  }
+
+  var d = r.data || {};
+  var extra = (sel.split && d.kg_corto_objetivo != null)
+    ? "<br>Debe entregar <b>"+fmt(num(d.kg_corto_objetivo),2)+" kg corto</b> / <b>"+fmt(num(d.kg_largo_objetivo),2)+" kg largo</b>."
+    : "";
+  $("okDetail").innerHTML =
+    "Se registraron <b>" + fmt(kg,2) + " kg</b> de " + esc(sel.mp_cod) +
+    " entregados a <b>" + esc(sel.nombre) + "</b> · " + esc(fecha) +
+    (d.stock_kg != null ? "<br>Stock en " + esc(sel.nombre) + ": <b>" + fmt(num(d.stock_kg),2) + " kg</b>" : "") + extra;
+  mostrarFase(2);
+});
+
+/* ---------- boot ---------- */
+$("fFecha").value = hoyAR();
+cargar().catch(function(e){ $("status").textContent = "Error: " + (e && e.message ? e.message : e); });
+</script>
+</body>
+</html>

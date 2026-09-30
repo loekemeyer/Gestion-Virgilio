@@ -613,6 +613,7 @@ recetas/BOM con cantidad inválida, 0 movimientos sin ubicación, 0 ubicaciones 
 huérfanas, 0 talleristas inactivos con stock. Lo que queda es de negocio y ya está en la
 pregunta 8 (PEP3/PA10 en Plástico, IE3/IC2 sin `kg_x_uni`, 574/119/615/809 discontinuados con
 demanda, 9 componentes discontinuados que siguen en rutas: A1C1, A9, BOM10, C12, GRJ13, I3B,
+[al 2026-09-13 son 6: A1C1, BOM10 y C12 se borraron con el 515/615 — CONOCIMIENTO §4cq]
 IZ19A, L4B1, V20).
 
 ### Estado tras el ciclo 2o

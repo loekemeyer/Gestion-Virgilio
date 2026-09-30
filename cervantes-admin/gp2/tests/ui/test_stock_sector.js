@@ -20,13 +20,13 @@ const PAGINA = 'StockSector/StockSector_GP2.html';
 /* Un mismo juego de filas para todos los sectores: A10 tiene movimientos de
    todos los tipos, asi cada columna de cada sector tiene algo que sumar. */
 const FILAS = [
-  { comp_id: 10, cod: 'A10', desc: 'Cpo Uña LK', online: 1200, kg_x_uni: 0.0331, uni_x_cajon: 1695, minimo: 2000, maximo: 5000,
+  { comp_id: 10, cod: 'A10', desc: 'Cpo Uña LK', online: 1200, kg_x_uni: 0.0331, uni_x_cajon: 1695, maximo: 5000,
     mov: { compra: { ent: 500, sal: 0 }, consumo_prod: { ent: 0, sal: 300 }, fabricacion: { ent: 800, sal: 100 },
            envio_ps: { ent: 0, sal: 200 }, entrega_ps: { ent: 150, sal: 0 }, envio_tallerista: { ent: 0, sal: 50 },
            envio_prov_at: { ent: 0, sal: 40 },
            recepcion_virgilio: { ent: 0, sal: 120 }, consumo_virgilio: { ent: 0, sal: 30 } } },
-  { comp_id: 11, cod: 'B5', desc: 'Parte be', online: 0, kg_x_uni: null, uni_x_cajon: null, minimo: null, maximo: null, mov: {} },
-  { comp_id: 12, cod: 'C7', desc: 'Pieza tras M12', online: 40, kg_x_uni: 0.01, uni_x_cajon: 500, minimo: null, maximo: null,
+  { comp_id: 11, cod: 'B5', desc: 'Parte be', online: 0, kg_x_uni: null, uni_x_cajon: null, maximo: null, mov: {} },
+  { comp_id: 12, cod: 'C7', desc: 'Pieza tras M12', online: 40, kg_x_uni: 0.01, uni_x_cajon: 500, maximo: null,
     mov: { fabricacion: { ent: 100, sal: 60 } } },
 ];
 const MOVS = [
@@ -75,14 +75,14 @@ const ESPERADO = {
   11: { titulo: 'Cajas', h1: 'Cajas · Sector Caja', botones: [CSV, REC, 'Control Cajas', ATRAS],
         destacado: 'Control Cajas', cols: COLS_INSUMO, a10: ['500', '430', '290'] },
   // materia prima plastica (2026-09-10): bolsas en Virgilio; entra por compra, sale en bolsas al inyector
-  14: { titulo: 'Materia Prima Plástica', h1: 'Materia Prima Plástica · Sector Materia Prima Plástica (Virgilio)',
+  14: { titulo: 'Bolsas Plásticas', h1: 'Bolsas Plásticas · Sector Bolsas Plásticas (Virgilio)',
         botones: [CSV, REC, 'Inyectores · Material', ATRAS], destacado: 'Inyectores · Material',
         cols: ['Compras', 'Envíos a inyector'], a10: ['500', '—'] },              // compra 500 | sin envio_inyector en el stub
 };
 // rotulo del menu -> sector (mismos rotulos y mismo orden que tenia el menu con los 9 links, + Materia Prima)
 const MENU_ESPERADO = [['Stock SP', 2], ['Stock SC', 1], ['Stock en Movimiento', 3],
   ['Cajas', 11], ['Cartones', 10], ['Partes Plásticas', 6], ['Remaches', 8], ['Bombillas', 7], ['Garage', 9],
-  ['Materia Prima Plástica', 14]];
+  ['Bolsas Plásticas', 14]];
 const VIEJOS = ['StockFlejes/Bombillas_GP2.html', 'StockFlejes/Cajas_GP2.html', 'StockFlejes/Cartones_GP2.html',
   'StockFlejes/Garage_GP2.html', 'StockFlejes/Plasticos_GP2.html', 'StockFlejes/Remaches_GP2.html',
   'StockSC/StockSC_GP2.html', 'StockSP/StockSP_GP2.html', 'StockMovimiento/StockMovimiento_GP2.html'];
@@ -149,7 +149,10 @@ const VIEJOS = ['StockFlejes/Bombillas_GP2.html', 'StockFlejes/Cajas_GP2.html', 
     ok(JSON.stringify(m.filtros) === JSON.stringify(filtrosEsp), tag + ': filtros ' + JSON.stringify(m.filtros));
     ok(m.ph === (e.ph || PH), tag + ': placeholder "' + m.ph + '"');
     const cabEsp = ['Código', 'Descripción', 'Kg', 'Caj', 'Uni'].concat(e.cols)
-      .concat(['Kg × Uni', 'Uni × Cajón']).concat(e.sin_min_max ? [] : ['Máximo', 'Capacidad']);
+      /* Desde el 2026-09-14 hay UNA sola columna de nivel: el minimo se borro de la base
+         y con el se fue la columna "Capacidad" (que era la que mostraba inventario.maximo
+         mientras "Máximo" mostraba inventario.minimo). */
+      .concat(['Kg × Uni', 'Uni × Cajón']).concat(e.sin_min_max ? [] : ['Máximo']);
     ok(JSON.stringify(m.cabeceras) === JSON.stringify(cabEsp), tag + ': columnas ' + JSON.stringify(m.cabeceras));
     ok(m.kpis === (e.sin_min_max ? 4 : 5), tag + ': ' + m.kpis + ' KPIs' + (e.sin_min_max ? ' (sin "Bajo mínimo")' : ''));
     ok(m.aviso === !e.sin_min_max, tag + ': aviso de factores ' + (e.sin_min_max ? 'ausente' : 'presente'));

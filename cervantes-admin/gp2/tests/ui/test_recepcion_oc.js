@@ -11,7 +11,7 @@ const EXE = process.env.CHROMIUM_PATH || (fs.existsSync('/opt/pw-browsers/chromi
    "OC: <lo que falta> <unidad>"; sin OC no hay NADA abajo de la medida. Ni la
    ultima carga ni el stock se muestran, aunque el bundle los siga mandando. */
 const BUNDLE = {
-  tara: { tara_pallet: '20', tol_ctrl_peso_pct: '5', carton_uni_x_paquete: '250' },
+  tara: { tara_pallet: '20', tol_ctrl_pct: '5', carton_uni_x_paquete: '250' },
   sectores: [{ id: 5, nombre: 'Sector Fleje' }],
   proveedores: [{ nombre: 'Basconia', modo_control: 'rollos_remito', informa_rollos: true, factura_uni: false }],
   recepciones: [], pallets: [], rollos: [],

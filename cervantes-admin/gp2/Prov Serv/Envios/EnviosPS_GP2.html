@@ -1,16 +1,131 @@
 <!doctype html>
 <html lang="es">
 <head>
-<!-- v1.2.0 — la marca F se persiste en GP2.faltante_marcado (marcar/resolver_faltante, best-effort) -->
+<!-- Anti-cache: la lógica de esta pantalla es JS INLINE, así que sin esto el navegador se puede
+     quedar con el HTML viejo y con la pantalla vieja (no hay ?v= que la salve). -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- v1.11.1 (2026-09-25) — GUAZZARONI: EL SUGERIDO EN CAJONES DEL CRUDO QUE SE MANDA [Thomas: "para
+     el envio a guazzaroni que aparezca en cajones el sugerido"]. Se mostraba en cajones del SP
+     (V1 = 5.714 uni) rotulado como cajón del SC (CV1 = 57.143): 12 "cajones" donde van 2. Ahora
+     con envase por pieza se calcula en unidades (maximo SP - online SP - en poder del PS) y se
+     divide por el uni_x_cajon del SC. Ester (factor fijo) no cambia. -->
+<!-- v1.11.0 (2026-09-21) —EL STOCK EN PODER DEL P.S. SE MIDE CON EL CAJÓN QUE ANOTÓ LOGÍSTICA
+     (usuario, textual: "tiene que aparecer en su stock los cajones que escribe logística, no los
+     que se calcula a partir de los kg"). El cajón de componente.uni_x_cajon es un promedio (CV1 =
+     57.143 uni = 20 kg justos) y el que sale del galpón pesa lo que pesa: se mandó 1 cajón de 21 kg
+     y la pantalla decía 1,05 cajones. Ahora el factor sale de GP2.v_caj_contraparte (unidades
+     enviadas / movimiento.cajones de los envíos a ESE proveedor de ESA pieza), que envios_ps_bundle
+     manda como sc_unixcaj_anot y lee GP2EE.uxcEnPoder(). Sin cajones anotados queda el del maestro,
+     o sea que nada cambia donde nadie los anota. Toca "En PS" y, con él, el SUGERIDO (el online del
+     P.S. se resta en cajones). Mismo criterio en Entrega PS y en la Tablet. -->
+<!-- v1.10.0 (2026-09-18) — LOS ENVASES SE VEN CON DECIMALES (se va el redondeo de la mañana)
+     [usuario 2026-09-18, textual: "no quiero que redondees las bolsas, cajones -> lo quiero ver con
+     decimales también"]. Da vuelta la regla de la v1.7.0 de HOY: el renglón de abajo del campo de
+     kg y el resumen del confirm muestran el número exacto con 2 decimales, sin "≈" y sin el "menos
+     de 1 bolsa" en palabras. Lo REGISTRADO acompaña: p_cajones vuelve a guardar el número con
+     decimales, para que lo anotado sea lo que se vio. El SUGERIDO no cambia: sigue con techo.
+     Misma regla que la Tablet (v1.22.0); las dos pantallas se tocan juntas. -->
+<!-- v1.9.0 (2026-09-18) — EL FASONERO APARECE SIEMPRE, CON SUGERIDO 0 [usuario 2026-09-18, textual:
+     "los inyectores por mas que no esta cargada la orden de compra aparecen igual con cero sugerido,
+     tendria que aparecer Maspoli con cero sugerido y cuando sale la orden de compra ahi sube el
+     sugerido de entrega de virolas"]. Corrige la v1.8.0, que lo ESCONDIA mientras no hubiera O.C.:
+     el operario abria Envio a P.S. y Maspoli no estaba, que es peor que verlo en 0 (no se distingue
+     "no hay que mandarle nada" de "se rompio algo"). Se fue conOC() y el filtro del boton del
+     proveedor; queda pendOC(), que es lo unico que hacia falta: el sugerido sale de la O.C. y sin
+     O.C. da 0. EN LA BASE: tablet_bundle deja de filtrar el fasonero en la CTE env por el mismo
+     motivo (el techo ya lo pone oc_ps en rep, que sin O.C. da 0). Mismo comportamiento que el
+     inyector desde siempre. -->
+<!-- v1.8.0 (2026-09-18) — AL FASONERO NO SE LE MANDA NADA HASTA QUE HAY ORDEN DE COMPRA
+     [usuario 2026-09-18, textual: "que el envio a Maspoli de virolas no surja hasta que se hace
+     una orden de compra... imaginate que se hizo una orden de compra por 10 mangos. Por esos 10
+     mangos hay que mandarle 10 virolas. Entonces en la cantidad sugerida tendria que aparecer el
+     equivalente a 10 unidades de virola"].
+     QUE ES UN FASONERO: un P.S. que ademas de laburo pone material propio y nos VENDE la pieza que
+     devuelve, asi que se le emite O.C. Maspoli recibe la virola D13 y devuelve el mango de madera
+     (PC12 / PEP7 / PEP8) con la virola adentro. La base lo marca con proveedor_servicio.pedido_por_oc
+     (no se deduce del nombre: "Maspoli SRL" y "Maspoli SRL" con tilde son la misma persona escrita
+     de dos formas). Mismo patron que ya tenia el inyector, que pide sus bolsas desde la O.C.
+     (1) envios_ps_bundle manda ps[].pedido_por_oc y, por cada salida, oc_pend = unidades que faltan
+         entregar de una O.C. ENVIADA (el borrador todavia no salio, no dispara envio).
+     (2) Con pedido_por_oc el SUGERIDO deja de ser (maximo del SP - online) y pasa a ser
+         suma(oc_pend de las salidas) - lo que ya tiene en su poder, EN UNIDADES de la pieza que se
+         le manda (1 a 1: una virola por mango), con los kg al lado porque a Maspoli la cantidad se
+         le carga en kg. 10 mangos pendientes = 10 virolas.
+     (3) Sin O.C. no hay nada que mandarle: la fila no se muestra y el proveedor no aparece en la
+         lista de ENVIO. En ENTREGA sigue apareciendo siempre (comparten bundle, pero el filtro es
+         de esta pantalla): si no, no habria donde registrar lo que todavia debe.
+     EN LA BASE (sincronizado en db/): columna proveedor_servicio.pedido_por_oc, oc_bundle deja las
+     3 piezas de Maspoli en la O.C. sin tocarles el estado_compra, y crear_entrega_ps descuenta la
+     O.C. al recibir el mango (si no, la orden quedaba abierta para siempre y el sugerido no bajaba).
+     Anti-cache no-store, sin ?v= ni bump global. -->
+<!-- v1.7.0 (2026-09-18) — UN ENVASE NO SE PARTE: EL EQUIVALENTE EN BULTOS VA SIEMPRE EN ENTERO
+     (usuario, sobre un "= 6,17 bolsas": "todo lo que sea envio de cajones y bolsas redondear. En
+     este caso, el pasaje serian 6 bolsas"). Antes mostraba 2 decimales cuando no daba entero.
+     Ahora: entero mas cercano (6,17 -> 6; 4,83 -> 5), "=" si da justo, "≈" si se redondeo, y
+     "menos de 1 bolsa" cuando no llega a uno. equivEnvase perdio el parametro `redondear`: es una
+     sola regla, la misma que la Tablet. Lo que se anota en p_cajones tambien pasa a ser ese entero.
+     El SUGERIDO no cambia: sigue con TECHO (es lo que falta, no lo que se manda). -->
+<!-- v1.6.2 (2026-09-18) — FIX DEL FIX: mismo comentario roto que la Tablet. El cierre de
+     comentario (guion guion mayor) que venia adentro del texto del pedido cerraba el comentario y
+     el resto del changelog se veia en pantalla; v1.6.1 lo arreglo ahi pero lo escribio literal en
+     su propia explicacion, asi que el cartel volvio. En estos comentarios el cierre se nombra, no
+     se escribe. Sin cambios de logica. -->
+<!-- v1.6.0 (2026-09-17) — GUAZZARONI PATRICIO: EL SUGERIDO EN CAJONES Y LA CANTIDAD EN KG
+     (usuario: "dentro del version tablet, y envio a ps. Siguiendo la logica del modulo Ester ->
+     en el modulo de guazzaroni patricio, el sugerido tendria que aparecer en cajones y en cantidad
+     pones kg y que te diga cuantos cajones son (redondeando)"). Es lo de Ester con el envase POR
+     PIEZA: envio_uni_x NULL ahora significa "el factor sale del uni_x_cajon de cada SC" en vez de
+     "sin unidad de envio" (proveedor_servicio 4 = cajones / NULL / kg). Aca el sugerido YA se
+     calculaba en cajones, asi que solo cambia el rotulo (techo sobre el cajon de esa pieza) y el
+     layout: se va la columna "Cajon envio", queda "Cantidad (KG Neto)" con "= N cajones" debajo,
+     REDONDEADO ("≈ N" si no da entero). Las tandas de la tabla pasan a ser solo de kg. Lo que se
+     registra no cambia: crear_envio_ps recibe el kg (p_unidad 'kg') y en p_cajones quedan anotados
+     los cajones que dan esos kg (informativo).
+     OJO: el layout de columnas ahora lo decide el PROVEEDOR (modoKgPS), no cada fila. Antes lo
+     decidia cargaEnKg por pieza y una pieza sin kg_x_uni dejaba esa fila con una celda de mas que
+     el resto; la conversion sigue siendo por pieza y si falta, esa fila no muestra equivalencia.
+     v1.5.0 (2026-09-17) — UNIDAD DE ENVIO POR PROVEEDOR: ESTER EN BOLSAS DE 1800, CANTIDAD EN KG
+     (usuario: "dentro del version tablet, y envio a ps... en el caso de Ester, el sugerido que
+     aparezca en bolsas (1800 uni por bolsa) redondeas por arriba y la cantidad pones kg y te
+     aparece al lado bolsas"). La unidad de envio la dice la base, no el codigo:
+     proveedor_servicio.envio_unidad / envio_uni_x / envio_carga_unidad (Ester = bolsas/1800/kg),
+     que envios_ps_bundle ahora devuelve en cada PS. Cuando el proveedor tiene esa unidad y se
+     carga en kg: (1) el Sugerido pasa de "caj / kg" a BOLSAS con techo (el sugerido se calcula
+     igual, en cajones, y se convierte: caj x uni_x_cajon / 1800 -> techo); (2) se va la columna
+     "Cajon envio" (para Ester el cajon no es la unidad con la que se manda y era ruido) y queda
+     un solo campo "Cantidad (kg)" con "= N bolsas" debajo, que se recalcula al tipear; (3) las
+     tandas de esa fila son solo de kg. Lo que se registra no cambia: crear_envio_ps ya recibia
+     el kg (p_unidad 'kg') y to_canonical lo pasa a mangos con kg_x_uni; en p_cajones quedan
+     anotadas las bolsas que dan esos kg (informativo). Los demas PS y los inyectores quedan
+     exactamente igual.
+     v1.4.0 (2026-09-17) — LA TABLA SOLO MUESTRA SUGERIDO + CANTIDAD A ENVIAR (usuario:
+     "borres de todos los p.s. la columna de maximo y stock ps. Solo quiero ver el sugerido...
+     tanto en kg como en cajones"). Se sacaron las columnas Online PS, Online SP y Maximo; queda
+     el Sugerido en cajones Y en kg (kg = sug_caj x uni_x_cajon x kg_x_uni del SC; sin factor no
+     se muestra kg). El calculo del sugerido no cambia, solo el render.
+     v1.3.0 (2026-09-15) — LOS INYECTORES APARECEN JUNTO A LOS PS PARA ENVIARLES BOLSAS (usuario:
+     "agregalo como lo agregaste en la tablet pero en el modulo que te digo"). Igual que en la
+     Version Tablet: los inyectores (Pat Bet Plast, Pettofrezza, Kollplast) NO son proveedor_servicio
+     -> se traen de tablet_bundle (tipo 'inyector') y se listan en la grilla de PS con proceso
+     "Inyeccion". Al elegir uno, la tabla muestra sus RESINAS (bolsas) con un solo campo kg; el envio
+     se rutea a enviar_material_inyector (no a crear_envio_ps). Front-only, sin tocar envios_ps_bundle.
+     v1.2.0 — la marca F se persiste en GP2.faltante_marcado (marcar/resolver_faltante, best-effort) -->
 <meta charset="utf-8"/>
+<script src="../../auth-guard.js?v=20260929a"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Envío a Proveedores de Servicios · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../../supabase-config.js?v=20260905k"></script>
-<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<script src="../../supabase-config.js?v=20260929a"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260912c"/>
 <link rel="stylesheet" href="../../tandas-popup.css?v=20260903b"/>
 <link rel="icon" type="image/png" href="../../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../../GP2_favicon.png">
+<style>
+  /* equivalencia en la unidad de envio del proveedor (Ester: se carga kg, debajo las bolsas) */
+  .env-eq{display:block;margin-top:4px;color:#0b4aa2;font-size:14px;font-weight:800;white-space:nowrap}
+</style>
 </head>
 <body>
 
@@ -51,17 +166,16 @@
 
       <div class="table-wrap">
         <table class="t">
-          <thead><tr>
+          <!-- el encabezado lo arma theadHTML(): un proveedor con unidad de envio propia
+               (Ester: bolsas) no tiene columna de cajón y su sugerido va en bolsas -->
+          <thead id="thead"><tr>
             <th>SC</th>
             <th class="num">Cajón<br>envío</th>
             <th class="num">Cajón envío<br>KG Neto</th>
             <th class="ctr" title="Cargar por tandas">T</th>
             <th class="ctr" title="Marcar faltante">F</th>
             <th class="sep">Parte</th>
-            <th class="num">Online PS<br>Cajón</th>
-            <th class="num">Online SP<br>Cajón</th>
-            <th class="num">Max<br>Cajón</th>
-            <th class="num" title="Máximo físico del Sector Procesado − online SP − online PS">Sugerido<br>Cajón</th>
+            <th class="num" title="Máximo físico del Sector Procesado − online SP − online PS. En kg y en cajones.">Sugerido<br>caj / kg</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
         </table>
@@ -87,9 +201,9 @@
 </div>
 
 <script src="../../tandas-popup.js?v=20260905i"></script>
-<script src="../../gp2-ui.js?v=20260912a"></script>
+<script src="../../gp2-ui.js?v=20260913e"></script>
 <script src="../../gp2-numero.js?v=20260911o"></script>
-<script src="../../gp2-envios-common.js?v=20260905c"></script>
+<script src="../../gp2-envios-common.js?v=20260924b"></script>
 <script>
 "use strict";
 
@@ -114,6 +228,84 @@ var BUF = E.buffer("gp2_enviosPS_buffer2", function(){ return { caj:"", kg:"", f
    los tres mangos devolvio (crear_entrega_ps si recibe p_comp_sp_id). */
 function keyDe(x){ return String(x.sc_id); }
 
+/* ---------- unidad de envío del proveedor (display) ----------
+   Un PS puede mandarse de a ENVASES en vez de por cajón: Ester va de a bolsas de 1800 mangos
+   [usuario 2026-09-17]. Lo dice la base (proveedor_servicio.envio_unidad / envio_uni_x /
+   envio_carga_unidad), no el código. Con envio_carga_unidad='kg' el sugerido se ve en bolsas
+   pero la cantidad se escribe en kg (es lo que pesan al cargar la bolsa) y debajo del campo se
+   muestra a cuántas bolsas equivale. Lo que viaja a crear_envio_ps sigue siendo el kg. */
+function pkPS(){
+  if (!selPS || selPS.inyector) return null;
+  var lab = String(selPS.envio_unidad || "");
+  // envio_unidad='kg' es el envío por peso de la Tablet (el bulto va aparte): acá no cambia nada
+  if (!lab || lab.toLowerCase() === "kg") return null;
+  var f = Number(selPS.envio_uni_x || 0);
+  var ckg = String(selPS.envio_carga_unidad || "").toLowerCase() === "kg";
+  // SIN factor del proveedor el envase es el CAJÓN de CADA pieza (Guazzaroni Patricio:
+  // sc_unixcaj), no uno solo para todo el proveedor como Ester.
+  if (!(f > 1)) return ckg ? { factor: 0, label: lab, cargaKg: true, porPieza: true } : null;
+  return { factor: f, label: lab, cargaKg: ckg, porPieza: false };
+}
+/* Unidades canónicas que entran en UN envase de ESTA pieza (Ester 1800 para todas; Guazzaroni el
+   uni_x_cajon del SC). 0 = no hay con qué convertir y la fila no se toca. */
+function factorEnvio(x, pk){
+  if (!pk) return 0;
+  return pk.porPieza ? Number((x && x.sc_unixcaj) || 0) : pk.factor;
+}
+/* KG que entran en UNA unidad de envío de esta pieza (Ester: 1800 × 0,0054 = 9,72 kg).
+   0 = no se puede saber (al SC le falta kg_x_uni) y entonces no se cambia nada de la fila. */
+function kgPorEnvase(x, pk){
+  var f = factorEnvio(x, pk);
+  if (!(f > 0)) return 0;
+  var k = Number(x.sc_kgxuni || 0);
+  return k > 0 ? f * k : 0;
+}
+function cargaEnKg(x, pk){ return !!(pk && pk.cargaKg && kgPorEnvase(x, pk) > 0); }
+/* El "= N bolsas" que va debajo del campo de kg. VA CON DECIMALES [usuario 2026-09-18, textual:
+   "no quiero que redondees las bolsas, cajones -> lo quiero ver con decimales también"], lo que da
+   vuelta la regla de redondeo de la mañana del mismo día: se muestra el número exacto con 2
+   decimales, sin "≈" y sin el "menos de 1 bolsa" en palabras. Misma regla que la Tablet
+   (textoEnvases). El SUGERIDO no entra acá: ése va para arriba. */
+function equivEnvase(kg, kgEnv, label){
+  if (!(Number(kg || 0) > 0)) return "";
+  var n = (kgEnv > 0) ? (Number(kg || 0) / kgEnv) : 0;
+  if (!(n > 0)) return "";
+  return "= " + fmt(n, 2) + " " + (Math.abs(n - 1) < 0.005
+    ? (label === "bolsas" ? "bolsa" : (label === "cajones" ? "cajón" : label)) : label);
+}
+/* lo que se ANOTA como bulto es el mismo número que se ve: 2 decimales, sin redondear a entero */
+function redEnvase(n){ return Math.round(Number(n || 0) * 100) / 100; }
+/* La TABLA entera pasa al modo "un solo campo en kg" cuando el proveedor se carga así; que una
+   pieza suelta no se pueda convertir no le saca la columna al resto (si no, la tabla quedaba con
+   filas de 6 y de 7 celdas). */
+function modoKgPS(){ var pk = pkPS(); return !!(pk && pk.cargaKg); }
+/* El encabezado depende del proveedor: con unidad de envío propia cargada en kg se va la columna
+   del cajón y el sugerido se rotula en esa unidad. */
+function theadHTML(){
+  var h = theadBase();
+  // FASONERO: la columna deja de rotularse por el maximo — el pedido surge de la O.C.
+  if (selPS && selPS.pedido_por_oc)
+    h = h.replace(/<th class="num"[^>]*>Sugerido<br>[^<]*<\/th>/,
+      '<th class="num" title="Lo que falta entregar de la O.C. enviada de las piezas que devuelve, '+
+      'menos lo que ya tiene en su poder. Sin O.C. la fila no aparece.">Sugerido<br>seg\u00fan O.C.</th>');
+  return h;
+}
+function theadBase(){
+  var pk = pkPS();
+  if (!(pk && pk.cargaKg))
+    return '<tr><th>SC</th><th class="num">Cajón<br>envío</th>'+
+           '<th class="num">Cajón envío<br>KG Neto</th>'+
+           '<th class="ctr" title="Cargar por tandas">T</th>'+
+           '<th class="ctr" title="Marcar faltante">F</th><th class="sep">Parte</th>'+
+           '<th class="num" title="Máximo físico del Sector Procesado − online SP − online PS. En kg y en cajones.">Sugerido<br>caj / kg</th></tr>';
+  return '<tr><th>SC</th><th class="num">Cantidad<br>KG Neto</th>'+
+         '<th class="ctr" title="Cargar por tandas">T</th>'+
+         '<th class="ctr" title="Marcar faltante">F</th><th class="sep">Parte</th>'+
+         '<th class="num" title="Máximo físico del Sector Procesado − online SP − online PS, pasado a '+
+         esc(pk.label)+(pk.porPieza ? ' (el cajón de cada pieza)' : ' de '+fmt(pk.factor,0))+
+         ' (redondeo para arriba).">Sugerido<br>'+esc(pk.label)+'</th></tr>';
+}
+
 function esCargada(it){ return num(it.caj)>0 || num(it.kg)>0; }
 function tieneAlgo(it){ return esCargada(it) || it.falt; }
 
@@ -122,9 +314,33 @@ async function cargar(){
   var r = await SB.rpc("envios_ps_bundle");
   if (r.error){ $("status").textContent = "Error: "+r.error.message; return; }
   D = r.data || { ps:[], partes:{} };
+  await cargarInyectores();   // los inyectores van JUNTO a los PS (best-effort)
   BUF.load();
   renderPS();
   $("status").textContent = (D.ps||[]).length + " proveedores con partes configuradas.";
+}
+
+/* Los INYECTORES aparecen junto a los PS para mandarles RESINA (bolsa) en kg [usuario 2026-09-15,
+   igual que en la Version Tablet]. No son proveedor_servicio: se traen de tablet_bundle (que ya los
+   devuelve como tipo 'inyector' con sus resinas) y el envio se rutea a enviar_material_inyector, no
+   a crear_envio_ps. Best-effort: si tablet_bundle falla, la pantalla sigue con los PS solos. */
+async function cargarInyectores(){
+  try {
+    var tb = await SB.rpc("tablet_bundle");
+    var d = tb && tb.data; if (!d) return;
+    (d.contrapartes||[]).filter(function(c){ return c.tipo==='inyector'; }).forEach(function(c){
+      var key = 'iny:'+c.nombre;
+      D.ps.push({ id:key, nombre:c.nombre, cod_prov:null, proceso:'Inyección', inyector:true });
+      D.partes[key] = (d.enviar||[])
+        .filter(function(x){ return x.tipo==='inyector' && String(x.ref)===String(c.ref); })
+        .map(function(x){
+          return { sc_id:x.comp_id, sc_cod:x.cod, sc_desc:x['desc'], sc_sector:x.sector,
+                   sc_um:'kg', sc_kgxuni:null, sc_unixcaj:null,
+                   online_sc:x.online_sector, online_ps:x.online_sector, online_sp:0,
+                   maximo:null, maximo_sp:null, sp_id:null };
+        });
+    });
+  } catch(e){ /* best-effort: sin inyectores si falla */ }
 }
 
 function renderPS(){
@@ -139,7 +355,7 @@ function renderPS(){
       // tabla; esto era lo que faltaba.
       var n = agruparPorSC((D.partes||{})[p.id]||[]).length;
       var cargado = E.cargadasDe(BUF.all[p.id], tieneAlgo).length;
-      return esc(p.proceso||"—") + " · " + n + " partes" + (cargado? " · "+cargado+" cargadas":"");
+      return esc(p.proceso||"—") + " · " + n + (p.inyector? " bolsas":" partes") + (cargado? " · "+cargado+" cargadas":"");
     },
     onPick: elegirPS
   });
@@ -151,6 +367,7 @@ function elegirPS(p){
   E.mostrarFase(1);
   if (!$("fFecha").value) $("fFecha").value = hoyISO();
   $("q").value = "";
+  $("thead").innerHTML = theadHTML();
   renderTabla();
 }
 
@@ -169,6 +386,16 @@ function partesFiltradas(){
   return agruparPorSC(arr);
 }
 
+/* FASONERO (pedido_por_oc): unidades que le faltan entregar de una O.C. ENVIADA, sumadas sobre las
+   salidas de esa pieza. Es lo que manda el sugerido. El proveedor y su fila se muestran SIEMPRE,
+   con o sin O.C. — sin orden el sugerido es 0 y sube cuando la orden sale, igual que el inyector
+   [usuario 2026-09-18]. */
+function pendOC(x){
+  var n = 0;
+  (x.salidas||[]).forEach(function(sp){ n += Number(sp.oc_pend||0); });
+  return n;
+}
+
 /* Junta en UNA fila las salidas de la misma pieza enviada. Lo que se manda es
    la pieza; que vuelva convertida en una cosa o en tres es asunto de la
    entrega. El sugerido se SUMA (hay que mandar para las tres salidas) y el
@@ -183,27 +410,57 @@ function agruparPorSC(arr){
     }
     if (x.sp_id != null) porSC[k].salidas.push({
       sp_id: x.sp_id, sp_cod: x.sp_cod, sp_desc: x.sp_desc,
-      sp_unixcaj: x.sp_unixcaj, online_sp: x.online_sp, maximo_sp: x.maximo_sp
+      sp_unixcaj: x.sp_unixcaj, online_sp: x.online_sp, maximo_sp: x.maximo_sp,
+      oc_pend: x.oc_pend
     });
   });
   return orden.map(function(k){ return porSC[k]; });
 }
 
+/* Tabla simple para un INYECTOR: cada RESINA (bolsa) con su kg a enviar. Las columnas del flujo
+   SC->PS->SP (Online SP, Max, Sugerido, Cajón) no aplican y van en "—". El envío es en kg. */
+function renderTablaInyector(){
+  var arr = partesFiltradas();
+  var tb = $("tbody"); tb.innerHTML = "";
+  $("tblEmpty").classList.toggle("hidden", arr.length>0);
+  arr.forEach(function(x){
+    var it = BUF.item(selPS.id, keyDe(x));
+    var tr = document.createElement("tr");
+    tr.dataset.k = keyDe(x);
+    tr.innerHTML =
+      '<td><span class="cod">'+esc(x.sc_cod)+'</span><br><small style="color:#777">'+esc(x.sc_desc||"")+'</small></td>'+
+      '<td class="num" style="color:#bbb">—</td>'+
+      E.tdInput("kg", it.kg, false, null, "decimal")+
+      '<td class="ctr">—</td>'+
+      '<td class="ctr">—</td>'+
+      '<td class="sep">bolsa · kg</td>'+
+      '<td class="num">—</td>';
+    tb.appendChild(tr);
+  });
+  actualizarEnviar();
+}
+
 function renderTabla(){
+  if (selPS && selPS.inyector) return renderTablaInyector();
   var arr = partesFiltradas();
   var tb = $("tbody");
   tb.innerHTML = "";
   $("tblEmpty").classList.toggle("hidden", arr.length>0);
 
+  var pk = pkPS();
   arr.forEach(function(x){
     var it = BUF.item(selPS.id, keyDe(x));
-    var t = E.tandaTotales(it, ["caj","kg"]);
+    // con unidad de envío propia cargada en kg (Ester, Guazzaroni) no hay cajón: un solo campo
+    // en kg y las tandas también. Es decisión del PROVEEDOR (columnas parejas para toda la tabla);
+    // la CONVERSIÓN a envases sí es por pieza y puede faltar (ckg).
+    var ckgT = modoKgPS();
+    var ckg = cargaEnKg(x, pk);
+    var t = E.tandaTotales(it, ckgT ? ["kg"] : ["caj","kg"]);
     var vCaj = t.hayT ? (t.tot.caj||"") : it.caj;
     var vKg  = t.hayT ? (t.tot.kg ||"") : it.kg;
 
-    var onPS  = aCajones(x.online_ps, x.sc_unixcaj);
+    var onPS  = aCajones(x.online_ps, E.uxcEnPoder(x));  // el cajón que anotó logística (2026-09-21)
     // maximo/maximo_sp llegan sin coalesce: null = dato faltante, no 0
-    var maxCaj= (x.maximo==null)    ? null : aCajones(x.maximo, x.sc_unixcaj);
 
     // Sugerido a enviar = maximo FISICO del Sector Procesado - online SP - online PS
     // (todo en cajones; regla usuario 2026-08-29). Sin maximo fisico cargado -> "—".
@@ -221,13 +478,57 @@ function renderTabla(){
     });
     if (faltaDato) { onSP = null; sug = null; }
 
+    // El sugerido va en kg Y en cajones [usuario 2026-09-17: "el sugerido quiero
+    // que me aparezca tanto en kg como en cajones"]. Se envia el SC, asi que
+    // kg = sugerido(caj) x uni_x_cajon x kg_x_uni del SC. Sin esos factores no se
+    // muestra kg (no se inventa), queda solo en cajones.
+    var fCaj = Number(x.sc_unixcaj||0), fKg = Number(x.sc_kgxuni||0);
+    var sugKg = (sug==null || !(fCaj>0) || !(fKg>0)) ? null : sug * fCaj * fKg;
+    var sugTxt = (sug==null) ? "—"
+        : (fmt(sug)+" caj" + (sugKg==null ? "" : "<br>"+fmt(sugKg,2)+" kg"));
+    // Ester mira el sugerido en BOLSAS: el cálculo sigue siendo en cajones y se convierte
+    // (caj × uni_x_cajon / 1800) con redondeo PARA ARRIBA. Sin uni_x_cajon no se inventa.
+    if (ckgT) {
+      var fEnv = factorEnvio(x, pk);
+      var sugEnv = (sug==null || !(fCaj>0) || !(fEnv>0)) ? null : Math.ceil(sug * fCaj / fEnv);
+      // Envase POR PIEZA (Guazzaroni): el sugerido va en cajones del SC que se MANDA, no del SP
+      // que vuelve. El de arriba está en cajones del SP (V1 = 5.714) y el del crudo es otro
+      // (CV1 = 57.143): se pasa a UNIDADES (entra 1, sale 1) y se divide por el cajón del SC.
+      if (pk.porPieza && sug != null && fEnv > 0) {
+        var sugU = 0;
+        sals.forEach(function(sp){
+          sugU += Math.max(0, Number(sp.maximo_sp||0) - Number(sp.online_sp||0) - Number(x.online_ps||0));
+        });
+        sugEnv = Math.ceil(sugU / fEnv - 1e-9);
+      }
+      sugTxt = (sugEnv==null) ? "—" : (fmt(sugEnv,0)+" "+esc(pk.label));
+      sug = sugEnv;
+    }
+
+    // FASONERO (pedido_por_oc): el sugerido NO sale del maximo sino de la O.C. de lo que el
+    // devuelve — 10 mangos pendientes = 10 virolas — menos lo que ya tiene en su poder. Va en
+    // UNIDADES de la pieza que se le manda, no en el envase del proveedor [usuario 2026-09-18:
+    // "en la cantidad sugerida tendria que aparecer el equivalente a 10 unidades de virola"], con
+    // los kg al lado porque a Maspoli la cantidad se le carga en kg. La relacion es 1 a 1: el paso
+    // de ruta transforma la pieza (una virola entra, un mango sale), que es el mismo supuesto con
+    // el que crear_entrega_ps descuenta el stock.
+    if (selPS.pedido_por_oc) {
+      var sugU = Math.max(0, pendOC(x) - Number(x.online_ps||0));
+      sug = sugU;
+      sugTxt = fmt(sugU,0)+" uni" + (fKg>0 ? "<br>"+fmt(sugU*fKg,3)+" kg" : "");
+    }
+
     var tr = document.createElement("tr");
     tr.dataset.k = keyDe(x);
     if (it.falt) tr.className = "falt";
+    var tdKg = E.tdInput("kg", vKg, t.hayT, null, "decimal");
+    if (ckg)
+      tdKg = tdKg.replace("</td>", '<small class="env-eq">'+
+               esc(equivEnvase(num(vKg), kgPorEnvase(x, pk), pk.label))+'</small></td>');
     tr.innerHTML =
       '<td><span class="cod">'+esc(x.sc_cod)+'</span><br><small style="color:#777">'+esc(x.sc_desc||"")+'</small></td>'+
-      E.tdInput("caj", vCaj, t.hayT)+
-      E.tdInput("kg",  vKg,  t.hayT, null, "decimal")+
+      (ckgT ? "" : E.tdInput("caj", vCaj, t.hayT))+
+      tdKg+
       E.tdTanda(it)+
       E.tdFalt(it)+
       '<td class="sep">'+((x.salidas||[]).length
@@ -235,10 +536,7 @@ function renderTabla(){
               return esc(sp.sp_cod)+'<br><small style="color:#777">'+esc(sp.sp_desc||"")+'</small>';
             }).join('<br>')
           : "—")+'</td>'+
-      '<td class="num">'+(onPS==null?"—":fmt(onPS))+'</td>'+
-      '<td class="num">'+(onSP==null?"—":fmt(onSP))+'</td>'+
-      '<td class="num">'+(maxCaj==null?"—":fmt(maxCaj))+'</td>'+
-      '<td class="num">'+(sug==null?"—":(sug>0?'<b style="color:#b42318">'+fmt(sug)+'</b>':fmt(sug)))+'</td>';
+      '<td class="num">'+(sug!=null&&sug>0?'<b style="color:#b42318">'+sugTxt+'</b>':sugTxt)+'</td>';
     tb.appendChild(tr);
   });
 
@@ -262,6 +560,12 @@ $("tbody").addEventListener("input", function(e){
   var d = itemDeFila(inp.closest("tr"));
   d.buf[inp.dataset.f] = inp.value;
   BUF.save();
+  // Ester: debajo del kg se ve a cuántas bolsas equivale lo tipeado
+  var eq = inp.closest("tr").querySelector(".env-eq");
+  if (eq && d.meta) {
+    var pk2 = pkPS();
+    eq.textContent = equivEnvase(num(inp.value), kgPorEnvase(d.meta, pk2), pk2 ? pk2.label : "");
+  }
   actualizarEnviar();
 });
 
@@ -285,7 +589,7 @@ $("tbody").addEventListener("click", function(e){
     E.abrirTandas({
       titulo: "Tandas — " + (d.meta ? d.meta.sc_cod : ""),
       buf: d.buf,
-      campos: ["caj","kg"],
+      campos: modoKgPS() ? ["kg"] : ["caj","kg"],
       onDone: function(){ BUF.save(); renderTabla(); }
     });
   }
@@ -313,19 +617,30 @@ $("btnEnviar").addEventListener("click", async function(){
   var metaPorK = {};
   arr.forEach(function(x){ metaPorK[keyDe(x)] = x; });
 
-  // el kg neto es obligatorio cuando se declararon cajones
-  var faltanKg = items.filter(function(o){ return num(o.it.caj)>0 && !(num(o.it.kg)>0); })
-                      .map(function(o){ return (metaPorK[o.k]||{}).sc_cod || o.k; });
-  if (faltanKg.length){
-    alert("Falta cargar Kg neto para: " + faltanKg.join(", "));
-    return;
+  // el kg neto es obligatorio cuando se declararon cajones (los inyectores van solo en kg)
+  if (!selPS.inyector){
+    var faltanKg = items.filter(function(o){ return num(o.it.caj)>0 && !(num(o.it.kg)>0); })
+                        .map(function(o){ return (metaPorK[o.k]||{}).sc_cod || o.k; });
+    if (faltanKg.length){
+      alert("Falta cargar Kg neto para: " + faltanKg.join(", "));
+      return;
+    }
   }
 
   var resumen = items.map(function(o){
     var m = metaPorK[o.k] || {};
-    return (m.sc_cod||o.k)+": "+fmt(num(o.it.caj),1)+" caj / "+fmt(num(o.it.kg),0)+" kg";
+    var pk3 = pkPS();
+    if (cargaEnKg(m, pk3))
+      return (m.sc_cod||o.k)+": "+fmt(num(o.it.kg),2)+" kg ("+
+             equivEnvase(num(o.it.kg), kgPorEnvase(m, pk3), pk3.label)
+               .replace("= ","")+")";
+    // sin columna de cajon (el proveedor se carga en kg) el resumen tampoco la nombra, aunque
+    // esta pieza puntual no se pueda convertir a envases
+    return (selPS.inyector || modoKgPS())
+      ? (m.sc_cod||o.k)+": "+fmt(num(o.it.kg),2)+" kg"
+      : (m.sc_cod||o.k)+": "+fmt(num(o.it.caj),1)+" caj / "+fmt(num(o.it.kg),0)+" kg";
   }).join("\n");
-  if (!confirm("Enviar a "+selPS.nombre+":\n\n"+resumen)) return;
+  if (!confirm((selPS.inyector?"Enviar bolsas a ":"Enviar a ")+selPS.nombre+":\n\n"+resumen)) return;
 
   var fecha = $("fFecha").value || hoyISO();
   var btn = $("btnEnviar");
@@ -335,13 +650,27 @@ $("btnEnviar").addEventListener("click", async function(){
   var res = await E.guardarItems(items, {
     rpc: function(o){
       var m = metaPorK[o.k] || {};
+      if (selPS.inyector){
+        // bolsas de resina a un inyector: se manda la resina (m.sc_id) en kg. Mismo RPC que
+        // Compras/Inyectores_GP2.html y que la Version Tablet.
+        return SB.rpc("enviar_material_inyector", {
+          p_proveedor: selPS.nombre,
+          p_comp_id: Number(m.sc_id),
+          p_kg: num(o.it.kg),
+          p_fecha: fecha
+        });
+      }
       return SB.rpc("crear_envio_ps", {
         p_ps_id: selPS.id,
         p_comp_sc_id: Number(m.sc_id != null ? m.sc_id : String(o.k).split(":")[0]),
         p_cantidad: num(o.it.kg),
         p_unidad: "kg",
         p_fecha: fecha,
-        p_cajones: num(o.it.caj) || null,
+        // el bulto queda anotado: los cajones que se declararon, o —si se carga en kg (Ester)—
+        // las bolsas que dan esos kg. Es informativo; el stock lo mueve p_cantidad.
+        // con decimales, misma regla que el renglon de abajo del campo (usuario 2026-09-18)
+        p_cajones: num(o.it.caj) || (cargaEnKg(m, pkPS())
+          ? redEnvase(num(o.it.kg) / kgPorEnvase(m, pkPS())) || null : null),
         p_faltante: !!o.it.falt
       });
     },
@@ -371,7 +700,7 @@ $("btnEnviar").addEventListener("click", async function(){
   if (!faltSolo) delete BUF.all[selPS.id];
   BUF.save();
 
-  E.mostrarExito(res.ok + " partes enviadas a " + selPS.nombre + " · " + fecha +
+  E.mostrarExito(res.ok + (selPS.inyector? " bolsas enviadas a ":" partes enviadas a ") + selPS.nombre + " · " + fecha +
     (faltSolo ? " · OJO: "+faltSolo+" marca(s) F sin cantidad NO se registran (siguen cargadas)" : ""));
 });
 

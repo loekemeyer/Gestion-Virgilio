@@ -1,15 +1,21 @@
 <!doctype html>
 <html lang="es">
 <head>
-<script src="../../auth-guard.js?v=20260904t"></script>
-<script src="../../gp2-ui.js?v=20260912a"></script>
+<script src="../../auth-guard.js?v=20260929a"></script>
+<script src="../../gp2-ui.js?v=20260913e"></script>
 <script src="../../gp2-numero.js?v=20260911o"></script>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<!-- Anti-cache: la lógica es JS INLINE; sin esto la tablet se queda con la versión vieja. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Control Stocks Prov. Art. Terminado · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../../supabase-config.js?v=20260905k"></script>
-<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<script src="../../supabase-config.js?v=20260929a"></script>
+<!-- GP2EE.rubroSector: el orden de partes por sector, el mismo de "Enviar a tallerista" [2026-09-24]. -->
+<script src="../../gp2-envios-common.js?v=20260924b"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260912c"/>
 <link rel="icon" type="image/png" href="../../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../../GP2_favicon.png">
 <style>
@@ -201,12 +207,13 @@ async function cargar(){
       todas(SB, "articulo_prov_at", "proveedor_at_id,cod_art,descripcion,activo,n_caja,marca"),
       todas(SB, "entrega_prov_at", "proveedor_at_id,cod_art,descripcion,cantidad_cajas,remito,fecha_rto,dia_mes"),
       todas(SB, "uni_x_articulo_x_caja", "cod_art,uni_x_caja,n_caja,empresa"),
-      todas(SB, "articulo", "codigo,marca")
+      todas(SB, "articulo", "codigo,marca"),
+      todas(SB, "sector", "id,nombre")
     ]);
 
     D = indexar({
       provs: res[0], ubics: res[1], comps: res[2], inv: res[3], movs: res[4],
-      artsProv: res[5], entregas: res[6], uxc: res[7], arts: res[8]
+      artsProv: res[5], entregas: res[6], uxc: res[7], arts: res[8], sectores: res[9]
     });
 
     renderGrid();
@@ -218,8 +225,16 @@ async function cargar(){
 }
 
 function indexar(r){
+  // Nombre de sector por id, para poder ordenar las partes por sector (GP2EE.rubroSector
+  // trabaja con el NOMBRE, "Sector Cartón" / "Sector Caja", no con el id).
+  var sectorNombre = new Map();
+  (r.sectores || []).forEach(function(s){ sectorNombre.set(s.id, s.nombre || ""); });
+
   var compPorId = new Map();
-  r.comps.forEach(function(c){ compPorId.set(c.id, c); });
+  r.comps.forEach(function(c){
+    c.sector = sectorNombre.get(c.sector_id) || "";
+    compPorId.set(c.id, c);
+  });
 
   // Una ubicacion por proveedor AT.
   var ubicPorProv = new Map();
@@ -384,11 +399,17 @@ function filasInsumos(prov){
     out.push({
       cod: c ? c.codigo : ("#" + compId),
       desc: c ? c.descripcion : "",
+      sector: c ? (c.sector || "") : "",
       enviado: D.enviado.get(k) || 0,
       saldo: D.saldo.get(k) || 0
     });
   });
-  return out.sort(function(a,b){ return String(a.cod).localeCompare(String(b.cod),"es",{numeric:true}); });
+  // Orden por SECTOR (el mismo de "Enviar a tallerista", GP2EE.rubroSector) y
+  // dentro del sector por código [usuario 2026-09-24].
+  return out.sort(function(a,b){
+    return (GP2EE.rubroSector(a.sector) - GP2EE.rubroSector(b.sector)) ||
+           String(a.cod).localeCompare(String(b.cod),"es",{numeric:true});
+  });
 }
 
 /* ===== RENDER ===== */

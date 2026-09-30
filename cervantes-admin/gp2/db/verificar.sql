@@ -54,7 +54,11 @@ select 'C_funciones_internas_con_execute_anon', count(*) from pg_proc p
                          -- no es el motor de la entrega de tallerista (ese es gp2-motor.js), idea 7316
                          'crear_entrega_tallerista',
                          -- puerta unica interna: la llaman recepcion_virgilio y movimientos_bundle, no una pantalla
-                         'comp_terminado_de'))
+                         'comp_terminado_de',
+                         -- carton sustituto (2026-09-21): las llaman crear_envio_* y recepcion_virgilio
+                         'chequear_sustituto', 'repartir_sustituto',
+                         -- el % de reparto se carga por SQL desde 2026-09-21 (Proporciones_GP2 es solo lectura)
+                         'reparto_guardar'))
 union all
 -- D) Toda tabla tiene RLS y una policy; ninguna policy es de escritura (la escritura va por RPC).
 select 'D_tablas_sin_rls_o_sin_policy', count(*) from pg_class c
@@ -95,8 +99,12 @@ select 'L_rutas_sin_pasos', count(*) from "GP2".ruta r where not exists (select 
 union all
 -- M) Las RPC de pantalla (todo lo que no es interno) tienen EXECUTE para anon: si falta, la
 --    pantalla muestra "permission denied" (pasó con «Desmarcar», ciclo 2l).
+--    (2026-09-29) Salvo las que desde la seguridad fase B (28/09) exigen usuario a propósito:
+--    EXECUTE para authenticated + _exigir_autorizado() / _exigir_operario(). Esas las vigila la AI.
 select 'M_rpc_de_pantalla_sin_execute_anon', count(*) from pg_proc p
  where p.pronamespace = '"GP2"'::regnamespace and not has_function_privilege('anon', p.oid, 'EXECUTE')
+   and not (has_function_privilege('authenticated', p.oid, 'EXECUTE')
+            and pg_get_functiondef(p.oid) ~ '_exigir_(autorizado\(\)|operario\()')
    and not (p.prorettype = 'trigger'::regtype or p.proname like '\_%' or p.proname like 'fn\_%'
         or p.proname like 'relev\_%' or p.proname like 'recalcular\_%'
         or p.proname in ('to_canonical', 'inv_delta', 'ubic_de', 'ubic_de_componente', 'recepcion_tara',
@@ -106,7 +114,13 @@ select 'M_rpc_de_pantalla_sin_execute_anon', count(*) from pg_proc p
                          -- no es el motor de la entrega de tallerista (ese es gp2-motor.js), idea 7316
                          'crear_entrega_tallerista',
                          -- puerta unica interna: la llaman recepcion_virgilio y movimientos_bundle, no una pantalla
-                         'comp_terminado_de'))
+                         'comp_terminado_de',
+                         -- carton sustituto (2026-09-21): las llaman crear_envio_* y recepcion_virgilio
+                         'chequear_sustituto', 'repartir_sustituto',
+                         -- el % de reparto se carga por SQL desde 2026-09-21 (Proporciones_GP2 es solo lectura)
+                         'reparto_guardar',
+                         -- solo servidor: la llama la Edge login-operario (2026-09-29)
+                         'operario_por_legajo'))
 union all
 -- N) Ninguna funcion GP2 resuelve nombres en public (search_path = GP2 solo), salvo las dos que
 --    lo necesitan a proposito (get_role_for_email delega en public; actualizar_dolar_oficial usa http).
@@ -155,16 +169,18 @@ union all
 select 'Z_parametro_que_lee_el_codigo_faltante', count(*) from unnest(array[
     'caja_uni_x_paquete', 'carton_uni_x_paquete', 'charcas_kg_x_paquete', 'costo_segundo_pesos',
     'faltante_cajones_umbral', 'max_cajones_x_ubicacion', 'pliego_uni_x_paquete', 'registro_en_golpes',
-    'tara_pallet_max', 'tara_pallet_min', 'tipo_cambio_usd_pesos', 'tol_ctrl_peso_pct',
-    'inyeccion_desperdicio_pct', 'material_plastico_kg_x_bolsa', 'oc_facturar_pct_loeke']) k
+    'tara_pallet_max', 'tara_pallet_min', 'tipo_cambio_usd_pesos', 'tol_ctrl_pct',
+    'inyeccion_desperdicio_pct', 'material_plastico_kg_x_bolsa', 'oc_facturar_pct_loeke',
+    'master_bach_pct', 'facturas_lecturas_x_dia']) k
  where not exists (select 1 from "GP2".parametro p where p.clave = k)
 union all
 select 'Z2_parametro_que_nadie_lee', count(*) from "GP2".parametro p
  where p.clave not in (
     'caja_uni_x_paquete', 'carton_uni_x_paquete', 'charcas_kg_x_paquete', 'costo_segundo_pesos',
     'faltante_cajones_umbral', 'max_cajones_x_ubicacion', 'pliego_uni_x_paquete', 'registro_en_golpes',
-    'tara_pallet_max', 'tara_pallet_min', 'tipo_cambio_usd_pesos', 'tol_ctrl_peso_pct',
-    'inyeccion_desperdicio_pct', 'material_plastico_kg_x_bolsa', 'oc_facturar_pct_loeke')
+    'tara_pallet_max', 'tara_pallet_min', 'tipo_cambio_usd_pesos', 'tol_ctrl_pct',
+    'inyeccion_desperdicio_pct', 'material_plastico_kg_x_bolsa', 'oc_facturar_pct_loeke',
+    'master_bach_pct', 'facturas_lecturas_x_dia')
 union all
 -- Z3) Un PS híbrido tiene una materia prima con proveedor de insumo: si no, crear_oc no puede
 --     armar la OC gemela (Charcas → Altrak, Eclipse → Aperam).
@@ -218,6 +234,48 @@ select 'AE_paso_virgilio_y_codigo_dan_distinto', count(*) from "GP2".articulo a
    is distinct from
        (select c.id from "GP2".componente c where c.sector_id = 12 and c.codigo = a.codigo
          order by c.id limit 1)
+union all
+-- AF) El % del Prov AT se carga a mano por SQL (no hay pantalla que lo escriba, misma decision que
+--     reparto_tallerista): una fila que apunta a un (articulo, prov AT) que NO entrega ese articulo
+--     no se aplica nunca y hace creer que el reparto esta dictado cuando en realidad sigue en el
+--     default de partes iguales. 2026-09-23.
+select 'AF_reparto_prov_at_que_no_entrega_el_articulo', count(*) from "GP2".reparto_prov_at rp
+ where not exists (select 1 from "GP2".v_hace_articulo h
+                    where h.tipo = 'proveedor_at' and h.articulo_id = rp.articulo_id
+                      and h.ref_id = rp.proveedor_at_id)
+union all
+-- AG) GP2.articulo_familia es copia interna de public."Equivalencias_Familia" (la mantiene Gestion
+--     Virgilio). Esta consulta es de AUDITORIA (no una funcion GP2), por eso puede mirar public:
+--     si un par falta o sobra, la demanda del principal en GP2 no coincide con la de Virgilio. 2026-09-26.
+select 'AG_articulo_familia_desfasada_de_virgilio', count(*) from (
+    select btrim(cod_secundario) s, btrim(cod_principal) p from public."Equivalencias_Familia"
+     where nullif(btrim(cod_secundario),'') is not null and nullif(btrim(cod_principal),'') is not null
+    except select cod_secundario, cod_principal from "GP2".articulo_familia
+    union all
+    (select cod_secundario, cod_principal from "GP2".articulo_familia
+     except select btrim(cod_secundario), btrim(cod_principal) from public."Equivalencias_Familia")) d
+union all
+-- AH) GP2.oc_virgilio es ESPEJO de public."Ordenes_Compra" (trigger fila a fila en public). Consulta
+--     de AUDITORIA, por eso mira public: una fila distinta = el trigger no corrio o fallo. 2026-09-26.
+select 'AH_oc_virgilio_desfasado_de_ordenes_compra', count(*) from public."Ordenes_Compra" o
+ where not exists (select 1 from "GP2".oc_virgilio m
+                    where m.id = o.id and m.cantidad is not distinct from o.cantidad
+                      and m.cantidad_recibida is not distinct from o.cantidad_recibida
+                      and m.estado is not distinct from o.estado)
+union all
+-- AI) Ninguna RPC de GP2 que ESCRIBE queda al alcance de la clave publica, y todas exigen un
+--     usuario habilitado. Seguridad punto 1 fase B (2026-09-28, SEGURIDAD_GP2_2026-09-28.md):
+--     una funcion nueva nace con EXECUTE para PUBLIC/anon por defecto; si escribe, tiene que
+--     llamar a "GP2"._exigir_autorizado() al empezar y no tener EXECUTE para anon.
+--     (2026-09-29) O a "GP2"._exigir_operario(legajo): sesion de operario (login por legajo desde la
+--     red de la empresa, Edge login-operario) para el registro de produccion; adentro llama a _autorizado().
+select 'AI_rpc_que_escribe_abierta_a_anon_o_sin_control', count(*) from pg_proc p
+ where p.pronamespace = '"GP2"'::regnamespace and p.prokind = 'f' and p.prosecdef
+   and p.proname not like '\_%'
+   and has_function_privilege('authenticated', p.oid, 'EXECUTE')
+   and pg_get_functiondef(p.oid) ~* '\m(insert|update|delete)\M'
+   and (has_function_privilege('anon', p.oid, 'EXECUTE')
+        or pg_get_functiondef(p.oid) !~ '_exigir_(autorizado\(\)|operario\()')
 ) chequeos
 order by regla;
 
@@ -250,7 +308,7 @@ order by regla;
 --   select ac.articulo_id, ac.componente_id from "GP2".articulo_componente ac join final f on f.aid = ac.articulo_id
 --    where not exists (select 1 from entregado e where e.aid=ac.articulo_id and e.cid=ac.componente_id
 --                        and e.tipo=f.tipo and e.ref=f.ref)) z
--- union all select 'hijo_de_bom_que_entra_solo_al_mismo_destino' que, count(*) n, '(idea 7298: se cobra dos veces, por la caminata y por la receta. Hoy 1 par, C12 <- BOM10 hacia 515 y 615, y BOM10 no tiene precio asi que no hay plata en juego)' ref from "GP2".componente_bom b join (select distinct rp.comp_entrada_id ent, rp.comp_salida_id sal from "GP2".ruta_paso rp where rp.comp_entrada_id is not null and rp.comp_salida_id is not null and rp.comp_entrada_id <> rp.comp_salida_id and rp.tipo_paso in ('matriz','proveedor_servicio','tallerista')) eh on eh.ent = b.componente_hijo_id join (select distinct rp.comp_entrada_id ent, rp.comp_salida_id sal from "GP2".ruta_paso rp where rp.comp_entrada_id is not null and rp.comp_salida_id is not null and rp.comp_entrada_id <> rp.comp_salida_id and rp.tipo_paso in ('matriz','proveedor_servicio','tallerista')) ep on ep.ent = b.componente_padre_id and ep.sal = eh.sal
+-- union all select 'hijo_de_bom_que_entra_solo_al_mismo_destino' que, count(*) n, '(idea 7298: se cobra dos veces, por la caminata y por la receta. 0 pares desde el 2026-09-13: el unico era C12 <- BOM10 hacia 515 y 615, y ese articulo se borro entero, ver CONOCIMIENTO 4cq)' ref from "GP2".componente_bom b join (select distinct rp.comp_entrada_id ent, rp.comp_salida_id sal from "GP2".ruta_paso rp where rp.comp_entrada_id is not null and rp.comp_salida_id is not null and rp.comp_entrada_id <> rp.comp_salida_id and rp.tipo_paso in ('matriz','proveedor_servicio','tallerista')) eh on eh.ent = b.componente_hijo_id join (select distinct rp.comp_entrada_id ent, rp.comp_salida_id sal from "GP2".ruta_paso rp where rp.comp_entrada_id is not null and rp.comp_salida_id is not null and rp.comp_entrada_id <> rp.comp_salida_id and rp.tipo_paso in ('matriz','proveedor_servicio','tallerista')) ep on ep.ent = b.componente_padre_id and ep.sal = eh.sal
 -- union all select 'proveedor_servicio_proceso_fuera_del_catalogo' que, count(*) n, '(14 de 15: la columna es un ROTULO libre en Title Case y la relacion real PS<->proceso, que es 1:N, vive en tarifa_servicio; pintores_bundle ya no depende de como este escrito)' ref from "GP2".proveedor_servicio ps where ps.proceso is not null and not exists (select 1 from "GP2".proceso p where p.nombre = ps.proceso)
 -- union all select 'uni_x_caja_LK_contradice_articulo' que, count(*) n, '(idea 7330: el 508 Sacafuentes Articulado dice 6 en articulo y 12 en uni_x_articulo_x_caja; lo tiene que decir el usuario)' ref from "GP2".uni_x_articulo_x_caja u join "GP2".articulo a on a.codigo = u.cod_art where u.empresa = 'LK' and a.articulos_por_caja is not null and a.articulos_por_caja <> u.uni_x_caja
 -- union all select 'catalogo_prov_at_sin_descripcion' que, count(*) n, '(1: el cod_art 193 de Kuffo no es un articulo de GP2 todavia)' ref from "GP2".articulo_prov_at where nullif(btrim(coalesce(descripcion,'')),'') is null

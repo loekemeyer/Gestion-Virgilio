@@ -1,371 +1,741 @@
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<script src="../auth-guard.js?v=20260904t"></script>
-<script src="../gp2-ui.js?v=20260912a"></script>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="../auth-guard.js?v=20260929a"></script>
+<script src="../gp2-ui.js?v=20260913e"></script>
 <script src="../gp2-numero.js?v=20260911o"></script>
-<title>Stock por ubicación · GP2</title>
-<!-- v1.1.3 (2026-09-10) - rotulos para los dos tipos nuevos del ledger: envio_inyector (bolsas de materia prima
-     plastica de Virgilio al inyector) y consumo_inyector (material descontado al recepcionar la pieza inyectada).
-     v1.1.2 (2026-09-04) - la tabla de rotulos de los ultimos movimientos pasa al vocabulario REAL del ledger
-     (envio_ps/entrega_ps/envio_tallerista/entrega_tallerista/fabricacion...): tenia los nombres del programa viejo y
-     casi todo salia con el codigo crudo (auditoria de arquitectura).
-     v1.1.1 - la pantalla hereda lo unico propio de Movimientos/Registrar_Movimiento.html
-     (borrada 2026-08-30, aprobado por el usuario): los flujos de Ajuste +/- y Armado en
-     fabrica (mismos modales y mismo payload de registrar_movimientos, ahora via
-     gp2-motor.js) y la vista de ultimos 50 movimientos. Las otras 7 tarjetas de esa
-     pantalla duplicaban pantallas dedicadas y escribian tipos de movimiento distintos. -->
+<title>Stock general · GP2</title>
+<!-- v2.2.0 (2026-09-28) - FUERA LO QUE NO ES STOCK DE GP2 [usuario: "Sigue apareciendo Gentile
+     Norberto y ya no es más tallerista" / "todo lo que es inventario de virgilio eliminalo (para
+     eso está gestión virgilio)"]. (a) no se listan las ubicaciones tipo virgilio/virgilio_sector
+     (Virgilio Distribución: 268 filas, todas en 0) y se saca la columna "En Virgilio" de SC/SP;
+     el sector Bolsas Plásticas (en Virgilio) QUEDA: es materia prima de GP2, ubicación tipo sector.
+     (b) tallerista inactivo (tallerista.activo=false, viene como 'act' en movimientos_bundle.tall)
+     con cantidad 0 no se lista; si tuviera stock != 0 se sigue viendo, porque eso es una anomalía.
+     v2.1.0 (2026-09-21) - BUSCAR SIN SABER EL RUBRO [usuario: "Que me deje buscar por fuera de
+     algún sector y por dentro. Porque hoy en día si no se a que sector pertenece el componente
+     tengo que entrar uno por uno"]. Dos cosas, y la segunda es la que ahorra los clicks:
+     (a) rubro "🔎 Todos los rubros" (mode:'global'): una sola tabla con TODO el inventario,
+         con columnas Rubro + Dónde, y la celda del rubro te lleva a esa pantalla con el texto
+         de búsqueda puesto. Sin columnas de movimiento (cada rubro tiene las suyas).
+     (b) estando DENTRO de un rubro, al tipear aparece el renglón "También en: …" con la cuenta
+         por rubro y el salto en un click. Antes, si el componente no estaba en el rubro abierto,
+         la tabla decía "Sin resultados" y no había forma de saber dónde estaba.
+     FUENTE: D.inv de movimientos_bundle (ya cargado), o sea CERO RPC nuevas; prov AT y tránsito
+     salen de extra_bundle como en sus rubros. Muestra también lo que NO tiene rubro propio en el
+     selector (inyectores y sectores sin botón: hoy Y1 "Cuchilla para Afilar", Sector
+     Afilado, era invisible en esta pantalla). Tope de 400 filas dibujadas cuando no hay búsqueda.
+     v2.0.1 (2026-09-15) - CORRECCIONES del dueño sobre el rubro Prov. Servicio: (a) SIN columna
+     Máximo (a un PS se le manda segun el maximo que necesita el SECTOR PROCESADO, el PS no tiene
+     maximo propio); (b) NO listar cajas/cartones ni otros insumos de empaque/consumo en un PS
+     ("a un PS no se le envian cajas") -- eran filas SEED en 0 sin movimiento (auditoria: 38 filas
+     de insumo en PS, 15 caja/carton todas en Pedernera, 0 con stock). Se filtran por sector
+     es_insumo cuando la cantidad es 0. NO se borra dato (el seed las re-sembraria).
+     v2.0.0 (2026-09-15) - REDISEÑO [usuario: "el diseño de los stocks como la primer foto... cuando
+     entro que aparezca como la segunda foto... en fleje no vas a poner cajones o uni x cajon...
+     que cada sector quede eficiente a los movimientos/info/stock que corresponde"].
+     Se reemplaza el árbol plano (Cód/Descripción/Cantidad/Máximo, con la cantidad SIN separar por
+     unidad) por el MISMO diseño de "Stock por Sector": arriba un SELECTOR DE RUBROS (grilla) y abajo
+     la tabla rica Base | Online (Kg/Caj/Uni) | Movimientos | Info (Kg×Uni/Uni×Cajón/Máximo), con las
+     columnas adaptadas a cada rubro (Flejes sin cajones ni Uni×Cajón + N° Fleje; En Movimiento sin
+     Máximo; los rubros que no son sector -PS, Talleristas, Prov AT, Tránsito- no llevan columnas de
+     movimiento porque son depósitos, no puestos que fabriquen/envíen).
+     FUENTES: los rubros que son SECTOR salen de stock_sector_bundle(sid) -la misma RPC de Stock por
+     Sector, así la tabla es idéntica-, cargada perezosa al tocar el rubro. Los rubros que NO son
+     sector salen de movimientos_bundle (inventario por ubicación + kg_x_uni/uni_x_cajon del
+     componente) y de stock_general_extra_bundle (Prov AT y Tránsito). El Ajuste +/- (heredado de la
+     vieja Registrar_Movimiento) y los Últimos movimientos se conservan al pie.
+     OJO: la config de columnas de cada sector es una copia de la de gp2-stock-sector.js (SECTORES):
+     mantenerlas en sync -si allá cambia una columna de movimiento, replicarla acá. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../supabase-config.js?v=20260905k"></script>
-<script src="../gp2-motor.js?v=20260905f"></script>
-<style>
- *{box-sizing:border-box}
- body{margin:0;background:#ebeff4;color:#385475;font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif}
- .logobar{background:#e8edf7;text-align:center;padding:6px 0;border-bottom:1px solid #d0dae7}
- .logobar img{height:40px;vertical-align:middle}
- .top{background:linear-gradient(90deg,#e7f0f8,#e7f0f8);padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
- .top h1{margin:0;font-size:18px}
- #status{font-size:12px;color:#1b5b92;margin-left:auto}
- .canvas{padding:16px 18px 60px;max-width:1000px;margin:0 auto}
- .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
- .toolbar input[type=text]{flex:1 1 260px;background:#eaeff6;color:#385475;border:1px solid #cddaea;border-radius:8px;padding:9px 12px;font-size:18px;font-family:inherit}
- .toolbar input:focus{outline:none;border-color:#cddeea}
- .chk{display:flex;align-items:center;gap:6px;font-size:13px;color:#2a5783;cursor:pointer;user-select:none}
- /* 44px = minimo tactil de la casa (2026-09-03). */
- .btn-sm{background:#eaeff6;border:1px solid #cfd9e8;color:#255588;border-radius:8px;padding:10px 14px;min-height:44px;font-size:17px;font-family:inherit;cursor:pointer}
- .btn-sm:hover{border-color:#cddbea}
- .grp{border:1px solid #d1dae6;border-radius:10px;margin-bottom:10px;background:#ebf0f5;overflow:hidden}
- .grp>.gh{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;user-select:none}
- .grp>.gh:hover{background:#eaeff6}
- .gh .arr{font-size:11px;color:#475569;transition:transform .2s;flex-shrink:0}
- .grp.open>.gh .arr{transform:rotate(90deg)}
- .gh .nm{font-weight:700;font-size:14px;color:#255588}
- .gh .badge{margin-left:auto;font-size:11px;color:#475569;background:#eaeff6;border:1px solid #d1dae6;border-radius:999px;padding:2px 9px}
- .gh .badge.hot{color:#2f7f54;border-color:#cde9d9}
- .gb{display:none;padding:0 6px 8px}
- .grp.open>.gb{display:block}
- /* sub-grupos (PS / talleristas) */
- .sub{border:1px solid #cfdae8;border-radius:8px;margin:6px;background:#eaf0f6}
- .sub>.sh{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;user-select:none}
- .sub>.sh:hover{background:#eaf0f6}
- .sh .arr{font-size:10px;color:#475569;transition:transform .2s}
- .sub.open>.sh .arr{transform:rotate(90deg)}
- .sh .nm{font-weight:600;font-size:13px;color:#295784}
- .sh .badge{margin-left:auto;font-size:11px;color:#475569}
- .sh .badge.hot{color:#2f7f54}
- .sb{display:none;padding:0 4px 6px}
- .sub.open>.sb{display:block}
- table{border-collapse:collapse;width:100%;font-size:13px}
- th,td{padding:6px 10px;text-align:left;border-bottom:1px solid #cfdae8}
- th{color:#475569;text-transform:uppercase;font-size:10px;letter-spacing:.4px;position:sticky;top:0}
- td.num{text-align:right;font-family:ui-monospace,SF Mono,monospace}
- td.cod{color:#2a5783;font-weight:600;white-space:nowrap}
- tr.zero td{color:#5c6b7e}
- tr.stock td.num{color:#2f7f54;font-weight:700}
- tr.neg td.num{color:#961818;font-weight:700}
- .empty{color:#6b7f93;padding:10px 12px;font-size:13px}
- .mini{font-size:11px;color:#475569}
- /* ── Ajuste / Armado en fabrica (flujos heredados de Registrar_Movimiento) ── */
- .btn-acc{background:#eaeff6;border:1px solid #cddbea;color:#255588;border-radius:8px;padding:10px 14px;font-size:17px;font-family:inherit;font-weight:700;cursor:pointer;min-height:44px}
- .btn-acc:hover{border-color:#cddeea}
- .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:100;padding:14px}
- .modal-bg.on{display:flex}
- .modal{background:#ebf0f5;border:1px solid #d1dbe5;border-radius:12px;padding:22px;max-width:600px;width:100%;max-height:94vh;overflow-y:auto}
- .modal h3{margin:0 0 14px;font-size:17px;color:#166398}
- .row{margin-bottom:12px}
- .row label{display:block;font-size:12px;text-transform:uppercase;color:#475569;letter-spacing:.4px;margin-bottom:4px}
- .row select,.row input{width:100%;background:#eaeff6;color:#385475;border:1px solid #cddaea;border-radius:6px;padding:10px 12px;font-size:18px;font-family:inherit}
- .row select:focus,.row input:focus{outline:none;border-color:#cddeea}
- .row .hint{font-size:12px;color:#475569;margin-top:3px;font-style:italic}
- .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;border-top:1px solid #d2d9e5;padding-top:14px}
- .btn-m{padding:12px 20px;border-radius:6px;border:1px solid;font-size:16px;font-family:inherit;cursor:pointer;font-weight:700;min-height:44px}
- .btn-m.primary{background:#e7eff8;border-color:#cddeea;color:#385475}
- .btn-m.primary[disabled]{opacity:.5;cursor:progress}
- .btn-m.cancel{background:transparent;border-color:#d5dbe2;color:#475569}
- #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#eaf5ef;border:1px solid #cdeada;color:#2f7f54;padding:10px 18px;border-radius:8px;font-size:14px;font-weight:600;z-index:200;opacity:0;transition:opacity .2s;pointer-events:none}
- #toast.on{opacity:1}
- #toast.err{background:#f4ebeb;border-color:#eacdcd;color:#961818}
- /* ── ultimos movimientos (vista heredada de Registrar_Movimiento) ── */
- .movs-wrap{overflow-x:auto;padding:0 6px 8px}
- .movs-wrap table{width:auto;min-width:100%;font-size:12px}
- .movs-wrap th,.movs-wrap td{white-space:nowrap}
- .tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase}
- .t-compra{background:#e9eff7;color:#165d98}
- .t-prod{background:#f5f0ea;color:#92611b}
- .t-envio{background:#efecf4;color:#4f1698}
- .t-recep{background:#eaf5ef;color:#258858}
- .t-virgilio{background:#f8eee7;color:#985716}
- .t-ajuste{background:#f4ebef;color:#981645}
-</style>
+<script src="../supabase-config.js?v=20260929a"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260912c">
 <link rel="icon" type="image/png" href="../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../GP2_favicon.png">
-<link rel="stylesheet" href="../gp2-claro.css?v=20260903b">
+<style>
+ /* grilla de rubros (foto 1): botones que no se estiran a todo el ancho */
+ .rubro-lbl{font-size:13px;font-weight:800;color:#666;text-transform:uppercase;letter-spacing:.5px;margin:4px 0 8px}
+ .rubro-grp{font-size:12px;font-weight:800;color:#999;text-transform:uppercase;margin:10px 0 6px}
+ .rubros{display:flex;flex-wrap:wrap;gap:8px}
+ .rubro-btn{padding:11px 16px;min-height:44px;border-radius:9px;border:2px solid #d0d7de;background:#fff;font-weight:700;cursor:pointer;font-size:17px;color:#111}
+ .rubro-btn:hover{border-color:#111}
+ .rubro-btn.active{background:#111;color:#fff;border-color:#111}
+ .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0}
+ .toolbar input[type=text]{flex:1 1 260px;min-width:200px;padding:10px 12px;font-size:18px;border:2px solid #d0d7de;border-radius:8px}
+ .chk{display:flex;align-items:center;gap:6px;font-size:16px;color:#333;cursor:pointer;user-select:none}
+ .chk input{width:20px;height:20px}
+ .flje-link{margin-left:auto;font-size:15px;font-weight:700;color:#0066cc;text-decoration:none}
+ /* "También en: …" — el componente aparece en otros rubros que el abierto */
+ .hint-otros{font-size:16px;color:#333;margin:-4px 0 10px;line-height:1.7}
+ .hint-otros b{color:#111}
+ .hint-otros a{color:#0066cc;font-weight:800;text-decoration:none;cursor:pointer;white-space:nowrap}
+ .hint-otros a:hover{text-decoration:underline}
+ .hint-otros .sin-link{font-weight:800;color:#555;white-space:nowrap}
+ .nota-tabla{font-size:15px;color:#666;margin:8px 0 0;font-style:italic}
+ table.t td.rub-cell{cursor:pointer;color:#0066cc;font-weight:800;text-decoration:underline dotted}
+ table.t td.rub-cell:hover{background:#eef4fb}
+ table.t td.mov-cell,table.t td.stk-cell{cursor:pointer;text-decoration:underline dotted}
+ table.t td.mov-cell:hover,table.t td.stk-cell:hover{background:#eef4fb}
+ table.t td.pos{color:#15803d;font-weight:800}
+ table.t td.neg{color:#b91c1c;font-weight:800}
+ table.t td.cero{color:#9aa4af}
+ table.t tr.stk td{font-weight:600}
+ /* popup detalle de movimiento (igual que Stock por Sector) */
+ .popup{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;padding:16px}
+ .popup.open{display:flex}
+ .pop-card{background:#fff;border-radius:14px;width:100%;max-width:880px;max-height:86vh;overflow:auto;padding:20px}
+ .pop-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+ .pop-head h3{font-size:20px;font-weight:800}
+ /* Ajuste (heredado de Registrar_Movimiento) */
+ .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:250;padding:14px}
+ .modal-bg.on{display:flex}
+ .modal{background:#fff;border-radius:12px;padding:22px;max-width:600px;width:100%;max-height:94vh;overflow-y:auto}
+ .modal h3{margin:0 0 14px;font-size:19px}
+ .frow{margin-bottom:12px}
+ .frow label{display:block;font-size:13px;text-transform:uppercase;color:#666;font-weight:700;margin-bottom:4px}
+ .frow select,.frow input{width:100%;border:2px solid #d0d7de;border-radius:8px;padding:10px 12px;font-size:18px}
+ .frow .hint{font-size:13px;color:#666;margin-top:3px;font-style:italic}
+ .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;border-top:1px solid #e5e9ee;padding-top:14px}
+ .btn-m{padding:12px 20px;border-radius:8px;border:2px solid;font-size:16px;font-weight:800;cursor:pointer;min-height:44px}
+ .btn-m.primary{background:#111;border-color:#111;color:#fff}
+ .btn-m.primary[disabled]{opacity:.5;cursor:progress}
+ .btn-m.cancel{background:#fff;border-color:#d0d7de;color:#111}
+ #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#dcfce7;border:1px solid #86efac;color:#15803d;padding:10px 18px;border-radius:8px;font-size:15px;font-weight:700;z-index:300;opacity:0;transition:opacity .2s;pointer-events:none}
+ #toast.on{opacity:1}
+ #toast.err{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
+ .movs-wrap{overflow-x:auto}
+ .tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:800;text-transform:uppercase;background:#eef2f7;color:#334}
+ details.movs{margin-top:18px;border:1px solid #e5e9ee;border-radius:10px;padding:0 12px}
+ details.movs>summary{cursor:pointer;font-weight:800;font-size:17px;padding:12px 0;list-style:none}
+ details.movs>summary::-webkit-details-marker{display:none}
+</style>
 </head>
 <body>
-<div class="logobar" style="position:relative"><a href="../GP2_MODULOS.html" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#385475;text-decoration:none;font-weight:700;font-size:15px;padding:5px 10px;border:1px solid #d1d9e5;border-radius:8px;background:#e9eef7">← Atrás</a><a href="../GP2_MODULOS.html"><img src="../GP2_logo.png" alt="GP2"></a></div>
-<div class="top">
-  <h1>▦ Stock por ubicación · GP2</h1>
-  <button class="btn-acc" onclick="openAjuste()">± Ajuste</button>
-  <button class="btn-acc" onclick="openArmado()" style="display:none">🔧 Armado en fábrica</button>
-  <span id="status">Cargando…</span>
-</div>
-<div class="canvas">
- <div class="toolbar">
-   <input type="text" id="q" placeholder="Buscar componente (código o descripción)…" oninput="render()">
-   <label class="chk"><input type="checkbox" id="soloStock" onchange="render()"> Solo con stock</label>
-   <button class="btn-sm" onclick="expandAll(true)">Expandir</button>
-   <button class="btn-sm" onclick="expandAll(false)">Colapsar</button>
-   <button class="btn-sm" onclick="reload()">↻ Actualizar</button>
- </div>
- <div id="tree"><p class="empty">Cargando stock…</p></div>
 
- <!-- ultimos movimientos (venia de Registrar_Movimiento; misma tabla, mismo select) -->
- <div class="grp" id="grpMovs">
-  <div class="gh" onclick="tog(this)"><span class="arr">▶</span><span class="nm">📜 Últimos movimientos</span><span class="badge" id="movsBadge"></span></div>
-  <div class="gb"><div class="movs-wrap">
-   <table id="tblMovs">
-    <thead><tr>
-     <th>fecha</th><th>tipo</th><th>componente</th><th>origen</th><th>destino</th>
-     <th class="num">cantidad</th><th>transformado</th><th class="num">cant. transf.</th>
-    </tr></thead>
-    <tbody id="tbodyMovs"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody>
-   </table>
-  </div></div>
- </div>
-</div>
-
-<div class="modal-bg" id="modalBg">
- <div class="modal">
-  <h3 id="modalTitle"></h3>
-  <div id="modalForm"></div>
-  <div class="actions">
-   <button class="btn-m cancel" onclick="closeModal()">Cancelar</button>
-   <button class="btn-m primary" id="btnSave" onclick="saveModal()">✔ Registrar</button>
+<div class="card">
+  <div class="header">
+    <h1>Stock general</h1>
+    <div class="hbtns">
+      <button class="hlink" onclick="openAjuste()">± Ajuste</button>
+      <a href="../GP2_MODULOS.html">Atrás</a>
+    </div>
   </div>
- </div>
+
+  <div class="steps">
+    <div class="rubro-lbl">Rubro</div>
+    <div id="rubros"></div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="toolbar">
+      <input type="text" id="q" placeholder="Buscar por código o descripción…">
+      <label class="chk"><input type="checkbox" id="soloStock"> Solo con stock</label>
+      <a id="fljeLink" class="flje-link" style="display:none" href="../StockFlejes/Flejes_GP2.html">Detalle de flejes / rollos →</a>
+    </div>
+
+    <div class="hint-otros hidden" id="hintOtros"></div>
+
+    <div class="table-wrap">
+      <table class="t">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div id="tblEmpty" class="empty hidden">Sin resultados.</div>
+    <div id="notaTabla" class="nota-tabla hidden"></div>
+    <div id="status" class="status">Cargando…</div>
+
+    <details class="movs" id="grpMovs">
+      <summary>📜 Últimos movimientos <span id="movsBadge"></span></summary>
+      <div class="movs-wrap">
+        <table class="t" id="tblMovs">
+          <thead><tr>
+            <th>Fecha</th><th>Tipo</th><th>Componente</th><th>Origen</th><th>Destino</th>
+            <th class="num">Cantidad</th><th>Transformado</th><th class="num">Cant. transf.</th>
+          </tr></thead>
+          <tbody id="tbodyMovs"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- popup detalle de un movimiento (rubros de sector) -->
+<div class="popup" id="popup">
+  <div class="pop-card">
+    <div class="pop-head"><h3 id="popTitle"></h3><button class="btn-m cancel" id="popClose" type="button">Cerrar</button></div>
+    <div id="popBody"></div>
+  </div>
+</div>
+
+<!-- Ajuste +/- (heredado de Registrar_Movimiento) -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle"></h3>
+    <div id="modalForm"></div>
+    <div class="actions">
+      <button class="btn-m cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-m primary" id="btnSave" onclick="saveModal()">✔ Registrar</button>
+    </div>
+  </div>
 </div>
 <div id="toast"></div>
 
+<script>window.SB_CLIENT = GP2_SB();</script>
+<script src="../gp2-composicion.js?v=20260911p"></script>
+<script src="../gp2-motor.js?v=20260905f"></script>
 <script>
-const SB=GP2_SB();
-var D=null;
-// orden de sectores pedido por el usuario (id de sector)
-const SECT_ORDER=[1,2,4,5,6,7,8,9,10,11,3]; // crudo,proc,afilado,fleje,plastico,bombilla,remache,garage,carton,caja,(transito al final)
-var $ = GP2UI.$;
-var esc = GP2UI.esc;   /* helper de la casa, gp2-ui.js (2026-09-05) */
-function unidad(c){return (c&&c.um==='kg')?'kg':'uni';}
-function fmt(n){ return GP2N.fmt(n, 2); }   /* la regla de numero de la casa (gp2-numero.js) */
+"use strict";
+const SB = window.SB_CLIENT;
+var $ = GP2UI.$, esc = GP2UI.esc, clsNum = GP2UI.cls;
+function fmt(n,d){ return GP2N.fmt(n, d==null?0:d); }
+var fmtFecha = GP2UI.fechaTsAR;
 
-// arma: por cada ubic id -> [{cid, cant, min}]
-function invPorUbic(){
- var m={};
- for(var k in D.inv){var p=k.split(':');var cid=+p[0],uid=+p[1];var v=D.inv[k];
-  (m[uid]=m[uid]||[]).push({cid:cid,cant:Number(v.cant)||0,min:Number(v.min)||0});}
- return m;
-}
-function filtRows(rows){
- var q=($('q').value||'').trim().toLowerCase();
- var solo=$('soloStock').checked;
- return rows.filter(r=>{
-  if(solo && !(r.cant>0 || r.cant<0))return false;
-  if(q){var c=D.comp[String(r.cid)]||{};var s=((c.cod||'')+' '+(c.d||'')).toLowerCase();if(s.indexOf(q)<0)return false;}
-  return true;
- }).sort((a,b)=>{var ca=D.comp[String(a.cid)]||{},cb=D.comp[String(b.cid)]||{};return (ca.cod||'').localeCompare(cb.cod||'');});
-}
-function tablaRows(rows){
- if(!rows.length)return '<p class="empty">— sin componentes —</p>';
- var h='<table><thead><tr><th>Cód</th><th>Descripción</th><th class="num">Cantidad</th><th class="num">Máximo</th></tr></thead><tbody>';
- rows.forEach(r=>{var c=D.comp[String(r.cid)]||{cod:'?',d:''};
-  var cls=r.cant>0?'stock':(r.cant<0?'neg':'zero');
-  h+='<tr class="'+cls+'"><td class="cod">'+esc(c.cod||'')+'</td><td>'+esc(c.d||'')+'</td>'+
-     '<td class="num">'+fmt(r.cant)+' <span class="mini">'+unidad(c)+'</span></td>'+
-     '<td class="num mini">'+(r.min?fmt(r.min):'')+'</td></tr>';
- });
- return h+'</tbody></table>';
-}
-function group(open, nm, rows, sub){
- var f=filtRows(rows);
- var conStock=f.filter(r=>r.cant>0||r.cant<0).length;
- var badge=conStock?('<span class="badge hot">'+conStock+' con stock</span>'):('<span class="badge">'+f.length+'</span>');
- return '<div class="grp'+(open?' open':'')+'"><div class="gh" onclick="tog(this)"><span class="arr">▶</span>'+
-   '<span class="nm">'+esc(nm)+'</span>'+badge+'</div><div class="gb">'+(sub||tablaRows(f))+'</div></div>';
-}
-function subgroup(nm, rows){
- var f=filtRows(rows);
- var conStock=f.filter(r=>r.cant>0||r.cant<0).length;
- var badge=conStock?('<span class="badge hot">'+conStock+'</span>'):('<span class="badge">'+f.length+'</span>');
- return '<div class="sub"><div class="sh" onclick="tog(this)"><span class="arr">▶</span><span class="nm">'+esc(nm)+'</span>'+badge+'</div><div class="sb">'+tablaRows(f)+'</div></div>';
-}
-function tog(el){el.parentElement.classList.toggle('open');}
-function expandAll(v){document.querySelectorAll('.grp,.sub').forEach(e=>e.classList.toggle('open',v));}
+/* ═══ config de columnas de movimiento por sector ═══
+   COPIA de gp2-stock-sector.js (SECTORES): mantener en sync, SALVO "En Virgilio", que acá no va
+   (v2.2.0: el inventario de Virgilio lo lleva Gestión Virgilio). */
+var COLS_INSUMO = [
+  { k:"compras", label:"Compras", tipos:["compra"], lado:"ent" },
+  { k:"consumo", label:"Consumo", tipos:["consumo_prod","consumo_tall","consumo_virgilio","consumo","fabricacion"], lado:"sal" },
+  { k:"envios",  label:"Envíos",  tipos:["envio_ps","envio_tallerista","envio_prov_at","envio_inyector"], lado:"sal" }
+];
+var COLS_MP = [
+  { k:"compras", label:"Compras",           tipos:["compra"],         lado:"ent" },
+  { k:"envios",  label:"Envíos a inyector", tipos:["envio_inyector"], lado:"sal" }
+];
+var COLS_SC = [
+  { k:"fabricacion", label:"Fabricación", tipos:["fabricacion","armado_fabrica"], lado:"neto" },
+  { k:"envios",      label:"Envíos",      tipos:["envio_ps","envio_prov_at","envio_tallerista"], lado:"sal"  },
+  { k:"a_virgilio",  label:"A Virgilio",  tipos:["recepcion_virgilio","consumo_virgilio"], lado:"sal" }
+];
+var COLS_SP = [
+  { k:"entregas_ps", label:"Entregas PS",      tipos:["entrega_ps"],                             lado:"ent"  },
+  { k:"fabricacion", label:"Fabricación",      tipos:["fabricacion","armado_fabrica"],           lado:"neto" },
+  { k:"envios_tall", label:"Envíos Tallerista", tipos:["envio_tallerista"],                      lado:"sal"  },
+  { k:"recep_tall",  label:"Recep. Tallerista", tipos:["entrega_tallerista"],                    lado:"ent"  },
+  { k:"a_virgilio",  label:"A Virgilio",        tipos:["recepcion_virgilio","consumo_virgilio"], lado:"sal"  }
+];
+var COLS_MOV3 = [
+  { k:"fabricado", label:"Fabricado", tipos:["fabricacion"], lado:"ent" },
+  { k:"consumido", label:"Consumido", tipos:["fabricacion","consumo_prod"], lado:"sal" }
+];
+/* Sectores de empaque/consumo (es_insumo): NUNCA se le mandan a un proveedor de servicio
+   [usuario 2026-09-15: "a un PS no se le envian cajas"]. Al PS se le manda la pieza a
+   cromar/niquelar/procesar (crudo/procesado/bombilla/garage), no el envase ni el insumo.
+   Auditoria 2026-09-15: las filas de caja/carton/etc en un PS eran SEED en 0 sin movimiento. */
+var SECT_CONSUMIBLE = { 5:1, 6:1, 8:1, 10:1, 11:1, 14:1 }; // fleje, plastico, remache, carton, caja, bolsas
 
+/* ═══ rubros ═══
+   Los de sector (mode:'sector') abren stock_sector_bundle(sid) con su config de columnas.
+   Los de 'otros' salen de movimientos_bundle / extra_bundle y NO llevan columnas de movimiento. */
+var RUBROS = [
+  // el buscador transversal: una sola tabla con TODO, para cuando no se sabe el rubro
+  { key:"all", grupo:"Buscar", nom:"🔎 Todos los rubros", mode:"global", mostrar_ubic:"Dónde", mostrar_rubro:true },
+  { key:"sc",  grupo:"Sectores", nom:"Stock SC",         mode:"sector", sid:1,  cols:COLS_SC },
+  { key:"sp",  grupo:"Sectores", nom:"Stock SP",         mode:"sector", sid:2,  cols:COLS_SP },
+  { key:"mov", grupo:"Sectores", nom:"En Movimiento",    mode:"sector", sid:3,  cols:COLS_MOV3, sin_max:true },
+  { key:"fle", grupo:"Sectores", nom:"Flejes",           mode:"sector", sid:5,  cols:COLS_INSUMO, sin_caj:true, mostrar_fleje:true, detalle:true },
+  { key:"pla", grupo:"Sectores", nom:"Plásticos",        mode:"sector", sid:6,  cols:COLS_INSUMO },
+  { key:"bom", grupo:"Sectores", nom:"Bombillas",        mode:"sector", sid:7,  cols:COLS_INSUMO },
+  { key:"rem", grupo:"Sectores", nom:"Remaches",         mode:"sector", sid:8,  cols:COLS_INSUMO },
+  { key:"gar", grupo:"Sectores", nom:"Garage",           mode:"sector", sid:9,  cols:COLS_INSUMO },
+  { key:"car", grupo:"Sectores", nom:"Cartones",         mode:"sector", sid:10, cols:COLS_INSUMO },
+  { key:"caj", grupo:"Sectores", nom:"Cajas",            mode:"sector", sid:11, cols:COLS_INSUMO },
+  { key:"bol", grupo:"Sectores", nom:"Bolsas Plásticas", mode:"sector", sid:14, cols:COLS_MP },
+  { key:"ps",  grupo:"Otros",    nom:"Prov. Servicio",   mode:"otros",  fuente:"ps",       mostrar_ubic:"Prov. Servicio", sin_max:true },
+  { key:"tal", grupo:"Otros",    nom:"Talleristas",      mode:"otros",  fuente:"tall",     mostrar_ubic:"Tallerista" },
+  { key:"pat", grupo:"Otros",    nom:"Prov. Art. Term.", mode:"otros",  fuente:"provat",   mostrar_ubic:"Proveedor" },
+  { key:"tra", grupo:"Otros",    nom:"Tránsito PS",      mode:"otros",  fuente:"transito", mostrar_ubic:"En tránsito", sin_max:true }
+];
+
+var D = null;                 // movimientos_bundle (para Ajuste y rubros 'otros')
+var EXTRA = { prov_at:[], transito:[] };
+var CACHE = {};               // sid -> stock_sector_bundle
+var GLOBAL = null;            // indice transversal (todas las ubicaciones), se arma una vez
+var TOPE_GLOBAL = 400;        // filas dibujadas sin busqueda (el inventario entero son ~1.330)
+var RUBRO = null;             // rubro activo
+var CUR = { filas:[], ubic_id:null };
+
+/* ---------- selector de rubros ---------- */
+function pintarRubros(){
+  var grupos = [], vistos = {};
+  RUBROS.forEach(function(r){ if(!vistos[r.grupo]){ vistos[r.grupo]=1; grupos.push(r.grupo); } });
+  $("rubros").innerHTML = grupos.map(function(g){
+    var btns = RUBROS.filter(function(r){ return r.grupo===g; }).map(function(r){
+      return '<button class="rubro-btn" data-k="'+r.key+'" type="button">'+esc(r.nom)+'</button>';
+    }).join("");
+    return '<div class="rubro-grp">'+esc(g)+'</div><div class="rubros">'+btns+'</div>';
+  }).join("");
+  document.querySelectorAll(".rubro-btn").forEach(function(b){
+    b.addEventListener("click", function(){ seleccionar(b.dataset.k); });
+  });
+}
+function marcarActivo(){
+  document.querySelectorAll(".rubro-btn").forEach(function(b){
+    b.classList.toggle("active", RUBRO && b.dataset.k===RUBRO.key);
+  });
+}
+
+/* ---------- conversiones (misma regla que Stock por Sector) ---------- */
+function kgDe(x){ return GP2N.aKg(x.kg_x_uni, x.online || 0); }
+function cajDe(x){ return x.uni_x_cajon ? Number(x.online||0)/Number(x.uni_x_cajon) : null; }
+function valorCol(x, col){
+  if (col.campo) return x[col.campo]==null ? null : Number(x[col.campo]);
+  var tot=0, hubo=false;
+  (col.tipos||[]).forEach(function(t){
+    var m=(x.mov||{})[t]; if(!m) return; hubo=true;
+    if (col.lado==="ent") tot += Number(m.ent||0);
+    else if (col.lado==="sal") tot += Number(m.sal||0);
+    else tot += Number(m.ent||0) - Number(m.sal||0);
+  });
+  return hubo ? tot : null;
+}
+
+/* inventario que Stock General NO muestra (v2.2.0): lo de Virgilio lo lleva Gestión Virgilio,
+   y un tallerista dado de baja (Gentile) sólo aparece si le quedó stock, que sería una anomalía. */
+function ocultarInv(u, v){
+  if (u.tipo==="virgilio" || u.tipo==="virgilio_sector") return true;
+  if (u.tipo==="tallerista" && ((D.tall||{})[String(u.ref)]||{}).act===false && Number(v.cant)===0) return true;
+  return false;
+}
+
+/* ---------- armar las filas del rubro activo ---------- */
+function compInfo(cid){
+  var c = (D && D.comp[String(cid)]) || {};
+  return { cod:c.cod||"?", desc:c.d||"", um:c.um, kg_x_uni:c.kg_x_uni, uni_x_cajon:c.uxc };
+}
+function filasDe(r){
+  if (r.mode==="global"){ CUR.ubic_id = null; return { filas: filasGlobales() }; }
+  if (r.mode==="sector"){
+    var b = CACHE[r.sid] || { filas:[], ubicacion_id:null };
+    CUR.ubic_id = b.ubicacion_id;
+    return { filas:(b.filas||[]).map(function(x){
+      return { cid:x.comp_id, cod:x.cod, desc:x.desc, um:x.um, kg_x_uni:x.kg_x_uni,
+               uni_x_cajon:x.uni_x_cajon, online:Number(x.online||0), maximo:x.maximo,
+               n_fleje:x.n_fleje, mov:x.mov, en_virgilio:x.en_virgilio, ubic_id:b.ubicacion_id };
+    }) };
+  }
+  // 'otros': no hay mov{}
+  var out = [];
+  if (r.fuente==="ps" || r.fuente==="tall"){
+    var tipo = r.fuente==="ps" ? "proveedor_servicio" : "tallerista";
+    var tabla = r.fuente==="ps" ? (D.prov_serv||{}) : (D.tall||{});
+    for (var k in (D.inv||{})){
+      var p=k.split(":"), cid=+p[0], uid=+p[1], u=D.ubic[String(uid)];
+      if (!u || u.tipo!==tipo) continue;
+      var v=D.inv[k];
+      if (ocultarInv(u, v)) continue;
+      // PS: ocultar el ruido de empaque/consumo sembrado en 0 (una fila !=0 seria anomalia a ver).
+      if (r.fuente==="ps" && SECT_CONSUMIBLE[(D.comp[String(cid)]||{}).s] && Number(v.cant)===0) continue;
+      var ci=compInfo(cid);
+      var nom = (tabla[String(u.ref)]||{}).nom || u.nom || "?";
+      out.push({ cid:cid, cod:ci.cod, desc:ci.desc, um:ci.um, kg_x_uni:ci.kg_x_uni,
+                 uni_x_cajon:ci.uni_x_cajon, online:Number(v.cant)||0, maximo:v.max,
+                 ubic_nom:nom, ubic_id:uid });
+    }
+  } else if (r.fuente==="provat"){
+    (EXTRA.prov_at||[]).forEach(function(p){
+      (p.filas||[]).forEach(function(f){
+        var ci=compInfo(f.cid);
+        out.push({ cid:f.cid, cod:ci.cod, desc:ci.desc, um:ci.um, kg_x_uni:ci.kg_x_uni,
+                   uni_x_cajon:ci.uni_x_cajon, online:Number(f.cant)||0, maximo:f.max,
+                   ubic_nom:p.nom, ubic_id:p.ubic });
+      });
+    });
+  } else if (r.fuente==="transito"){
+    (EXTRA.transito||[]).forEach(function(t){
+      var ci=compInfo(t.cid);
+      out.push({ cid:t.cid, cod:ci.cod, desc:ci.desc, um:ci.um, kg_x_uni:ci.kg_x_uni,
+                 uni_x_cajon:ci.uni_x_cajon, online:Number(t.cant)||0, maximo:null,
+                 ubic_nom:(t.ps1||"?")+" → "+(t.ps2||"?"), ubic_id:null });
+    });
+  }
+  CUR.ubic_id = null;
+  return { filas: out };
+}
+
+/* ═══ índice transversal (rubro "Todos" + renglón "También en: …") ═══
+   Sale de D.inv —el inventario entero, que movimientos_bundle YA trae— más los extras
+   de prov AT y tránsito: no cuesta ninguna RPC nueva. Incluye A PROPÓSITO las ubicaciones
+   que no tienen botón propio (inyectores, sectores sin rubro; Virgilio NO desde v2.2.0), porque justamente
+   ahí es donde un componente se volvía imposible de encontrar. */
+function rubroPorKey(k){ return RUBROS.filter(function(r){ return r.key===k; })[0] || null; }
+function rubroDeUbic(u){
+  if (!u) return null;
+  if (u.tipo==="sector") return RUBROS.filter(function(r){ return r.mode==="sector" && Number(r.sid)===Number(u.ref); })[0] || null;
+  if (u.tipo==="tallerista") return rubroPorKey("tal");
+  if (u.tipo==="proveedor_servicio") return rubroPorKey("ps");
+  return null;
+}
+var TIPO_UBIC = { virgilio:"Virgilio", virgilio_sector:"Virgilio", inyector:"Inyector", analisis:"Análisis" };
+function etiqSuelta(u){
+  if (u.tipo==="sector") return ((D.sect||{})[String(u.ref)]||{}).nom || u.nom || "Sector";
+  return TIPO_UBIC[u.tipo] || u.nom || u.tipo || "?";
+}
+function nomUbic(u){
+  var t = u.tipo==="tallerista" ? (D.tall||{}) : (u.tipo==="proveedor_servicio" ? (D.prov_serv||{}) : null);
+  return (t && (t[String(u.ref)]||{}).nom) || u.nom || "?";
+}
+function filasGlobales(){
+  if (GLOBAL) return GLOBAL;
+  var out = [];
+  for (var k in (D.inv||{})){
+    var p=k.split(":"), cid=+p[0], uid=+p[1], u=D.ubic[String(uid)];
+    if (!u) continue;
+    var v=D.inv[k], r=rubroDeUbic(u);
+    if (ocultarInv(u, v)) continue;
+    // mismo criterio que el rubro Prov. Servicio: no listar el empaque sembrado en 0
+    if (r && r.key==="ps" && SECT_CONSUMIBLE[(D.comp[String(cid)]||{}).s] && Number(v.cant)===0) continue;
+    var ci=compInfo(cid);
+    // el máximo se muestra SOLO donde el rubro lo muestra: a un P.S. (y al tránsito) no le
+    // corresponde uno propio [usuario 2026-09-15: "a un PS se le manda segun el maximo del
+    // SECTOR PROCESADO"], así que acá tampoco, ni cuenta en "bajo el máximo".
+    out.push({ cid:cid, cod:ci.cod, desc:ci.desc, um:ci.um, kg_x_uni:ci.kg_x_uni,
+               uni_x_cajon:ci.uni_x_cajon, online:Number(v.cant)||0,
+               maximo:(r && r.sin_max) ? null : v.max,
+               rubro_key:r?r.key:null, rubro_nom:r?r.nom:etiqSuelta(u),
+               ubic_nom:nomUbic(u), ubic_id:uid });
+  }
+  // prov AT y tránsito no viven en el inventario por ubicación del bundle
+  (EXTRA.prov_at||[]).forEach(function(pa){
+    (pa.filas||[]).forEach(function(f){
+      var ci=compInfo(f.cid);
+      out.push({ cid:f.cid, cod:ci.cod, desc:ci.desc, um:ci.um, kg_x_uni:ci.kg_x_uni,
+                 uni_x_cajon:ci.uni_x_cajon, online:Number(f.cant)||0, maximo:f.max,
+                 rubro_key:"pat", rubro_nom:(rubroPorKey("pat")||{}).nom, ubic_nom:pa.nom, ubic_id:pa.ubic });
+    });
+  });
+  (EXTRA.transito||[]).forEach(function(t){
+    var ci=compInfo(t.cid);
+    out.push({ cid:t.cid, cod:ci.cod, desc:ci.desc, um:ci.um, kg_x_uni:ci.kg_x_uni,
+               uni_x_cajon:ci.uni_x_cajon, online:Number(t.cant)||0, maximo:null,
+               rubro_key:"tra", rubro_nom:(rubroPorKey("tra")||{}).nom,
+               ubic_nom:(t.ps1||"?")+" → "+(t.ps2||"?"), ubic_id:null });
+  });
+  GLOBAL = out;
+  return out;
+}
+
+/* ---------- filtros ---------- */
+/* el texto buscable se calcula UNA vez por fila: el índice global son ~1.300 filas
+   y esto corre en cada tecla, tanto para la tabla como para el renglón "También en". */
+function texto(x){
+  return x._t || (x._t = ((x.cod||"")+" "+(x.desc||"")+" "+(x.ubic_nom||"")+" "+(x.rubro_nom||"")).toLowerCase());
+}
+function filtradas(){
+  var arr = (CUR.filas||[]).slice();
+  var q = String($("q").value||"").trim().toLowerCase();
+  if (q) arr = arr.filter(function(x){ return texto(x).indexOf(q)>=0; });
+  if ($("soloStock").checked) arr = arr.filter(function(x){ return Number(x.online||0)!==0; });
+  // en "Todos" manda el código, para que el mismo componente quede junto en un solo bloque
+  if (RUBRO && RUBRO.mode==="global") return arr.sort(function(a,b){
+    var c=String(a.cod||"").localeCompare(String(b.cod||"")); if(c) return c;
+    return (a.rubro_nom||"").localeCompare(b.rubro_nom||"");
+  });
+  return arr.sort(function(a,b){
+    var u=(a.ubic_nom||"").localeCompare(b.ubic_nom||""); if(u) return u;
+    return String(a.cod||"").localeCompare(String(b.cod||""));
+  });
+}
+/* los OTROS rubros donde cae lo que se está buscando (renglón "También en: …") */
+function otrosRubros(q){
+  if (!q || !D) return [];
+  var sin = $("soloStock").checked, act = RUBRO ? RUBRO.key : null, acum = {}, orden = [];
+  filasGlobales().forEach(function(x){
+    if (act && x.rubro_key===act) return;                 // el rubro abierto ya se ve en la tabla
+    if (sin && Number(x.online||0)===0) return;
+    if (texto(x).indexOf(q)<0) return;
+    var k = x.rubro_key || ("_"+x.rubro_nom);
+    if (!acum[k]){ acum[k] = { key:x.rubro_key, nom:x.rubro_nom, n:0 }; orden.push(k); }
+    acum[k].n++;
+  });
+  return orden.map(function(k){ return acum[k]; }).sort(function(a,b){ return b.n-a.n; });
+}
+function pintarHint(){
+  var el = $("hintOtros"), q = String($("q").value||"").trim().toLowerCase();
+  var otros = (RUBRO && RUBRO.mode==="global") ? [] : otrosRubros(q);
+  if (!otros.length){ el.className = "hint-otros hidden"; el.innerHTML = ""; return; }
+  var tot = otros.reduce(function(s,o){ return s+o.n; }, 0);
+  el.className = "hint-otros";
+  el.innerHTML = '<b>También en otros rubros ('+tot+'):</b> ' + otros.map(function(o){
+    return o.key ? '<a data-k="'+esc(o.key)+'">'+esc(o.nom)+' ('+o.n+')</a>'
+                 : '<span class="sin-link">'+esc(o.nom)+' ('+o.n+')</span>';
+  }).join(" · ") + ' · <a data-k="all">ver todo junto →</a>';
+}
+
+/* ---------- thead ---------- */
+function renderHead(){
+  var r = RUBRO, cols = (r.mode==="sector" ? r.cols : []) || [];
+  var nOnline = r.sin_caj ? 2 : 3;                       // Kg (Caj) Uni
+  var nInfo = 1 + (r.sin_caj?0:1) + (r.sin_max?0:1) + (r.mostrar_fleje?1:0); // Kg×Uni (Uni×Cajón) (Máximo) (N°Fleje)
+  var baseCols = 2 + (r.mostrar_rubro?1:0) + (r.mostrar_ubic?1:0);
+  var g = '<tr>'+
+    '<th colspan="'+baseCols+'">Base</th>'+
+    '<th colspan="'+nOnline+'" class="num sep">Online</th>'+
+    (cols.length ? '<th colspan="'+cols.length+'" class="num sep">Movimientos (Uni)</th>' : '')+
+    '<th colspan="'+nInfo+'" class="num sep">Info</th>'+
+  '</tr>';
+  var h = '<tr>'+
+    (r.mostrar_rubro ? '<th>Rubro</th>' : '')+
+    (r.mostrar_ubic ? '<th>'+esc(r.mostrar_ubic)+'</th>' : '')+
+    '<th>Código</th><th>Descripción</th>'+
+    '<th class="num sep">Kg</th>'+(r.sin_caj?'':'<th class="num">Caj</th>')+'<th class="num">Uni</th>'+
+    cols.map(function(c,i){ return '<th class="num'+(i===0?' sep':'')+'">'+esc(c.label)+'</th>'; }).join("")+
+    '<th class="num sep">Kg × Uni</th>'+
+    (r.sin_caj?'':'<th class="num">Uni × Cajón</th>')+
+    (r.sin_max?'':'<th class="num">Máximo</th>')+
+    (r.mostrar_fleje?'<th class="num">N° Fleje</th>':'')+
+  '</tr>';
+  $("thead").innerHTML = g + h;
+}
+
+/* ---------- tbody + kpis ---------- */
 function render(){
- if(!D){return;}
- var byU=invPorUbic();
- // agrupa ubicaciones por tipo
- var sectores={}, provs=[], talls=[], virg=null;
- for(var uid in D.ubic){var u=D.ubic[uid];var id=+uid;
-  if(u.tipo==='sector')sectores[u.ref]=id;
-  else if(u.tipo==='proveedor_servicio')provs.push({uid:id,ref:u.ref,nom:u.nom});
-  else if(u.tipo==='tallerista')talls.push({uid:id,ref:u.ref,nom:u.nom});
-  else if(u.tipo==='virgilio')virg=id;
- }
- var H='';
- // 1) sectores en orden pedido
- SECT_ORDER.forEach(sid=>{var uid=sectores[sid];if(!uid)return;var nom=(D.sect[String(sid)]||{nom:'Sector '+sid}).nom;H+=group(false,'▦ '+nom,byU[uid]||[]);});
- // 2) proveedores de servicio (subdividido)
- provs.sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
- var totProv=provs.reduce((n,p)=>n+filtRows(byU[p.uid]||[]).filter(r=>r.cant>0||r.cant<0).length,0);
- var subsP=provs.map(p=>subgroup((D.prov_serv[String(p.ref)]||{nom:p.nom}).nom||p.nom, byU[p.uid]||[])).join('');
- H+='<div class="grp"><div class="gh" onclick="tog(this)"><span class="arr">▶</span><span class="nm">☰ Proveedores de Servicio</span><span class="badge'+(totProv?' hot':'')+'">'+(totProv||provs.length+' PS')+(totProv?' con stock':'')+'</span></div><div class="gb">'+subsP+'</div></div>';
- // 3) talleristas (subdividido)
- talls.sort((a,b)=>(a.nom||'').localeCompare(b.nom||''));
- var totTall=talls.reduce((n,t)=>n+filtRows(byU[t.uid]||[]).filter(r=>r.cant>0||r.cant<0).length,0);
- var subsT=talls.map(t=>subgroup((D.tall[String(t.ref)]||{nom:t.nom}).nom||t.nom, byU[t.uid]||[])).join('');
- H+='<div class="grp"><div class="gh" onclick="tog(this)"><span class="arr">▶</span><span class="nm">🔧 Talleristas</span><span class="badge'+(totTall?' hot':'')+'">'+(totTall||talls.length+' tall')+(totTall?' con stock':'')+'</span></div><div class="gb">'+subsT+'</div></div>';
- // 4) virgilio
- if(virg)H+=group(false,'🚛 Virgilio (Distribución)',byU[virg]||[]);
- $('tree').innerHTML=H;
+  if (!RUBRO) return;
+  var r = RUBRO, cols = (r.mode==="sector" ? r.cols : []) || [];
+  var todas = filtradas(), tb = $("tbody");
+  tb.innerHTML = "";
+  $("tblEmpty").classList.toggle("hidden", todas.length>0);
+  pintarHint();
+
+  // "Todos" sin búsqueda son ~1.330 filas: se dibujan las primeras y se avisa.
+  var arr = todas, cortado = 0;
+  if (r.mode==="global" && todas.length>TOPE_GLOBAL){ arr = todas.slice(0,TOPE_GLOBAL); cortado = todas.length; }
+  var nota = $("notaTabla");
+  nota.classList.toggle("hidden", !cortado);
+  if (cortado) nota.textContent = "Mostrando las primeras "+fmt(TOPE_GLOBAL)+" de "+fmt(cortado)+" filas — escribí en el buscador para afinar.";
+
+  // los KPI cuentan TODO lo filtrado, aunque la tabla dibuje menos filas
+  var tKg=0, tUni=0, tBajo=0;
+  todas.forEach(function(x){
+    var uni=Number(x.online||0);
+    tKg += (kgDe(x)||0); tUni += uni;
+    if (!r.sin_max && x.maximo!=null && uni < Number(x.maximo)) tBajo++;
+  });
+
+  arr.forEach(function(x){
+    var kg=kgDe(x), caj=cajDe(x), uni=Number(x.online||0);
+    var bajo = !r.sin_max && x.maximo!=null && uni < Number(x.maximo);
+
+    var celdasMov = cols.map(function(col,i){
+      var sep = i===0 ? " sep" : "";
+      var v = valorCol(x, col);
+      if (v==null) return '<td class="num cero'+sep+'">—</td>';
+      var cls = col.lado==="neto" ? (" "+clsNum(v)) : (v<0?" neg":"");
+      return '<td class="num mov-cell'+cls+sep+'" data-cid="'+x.cid+'" data-col="'+esc(col.k)+'">'+fmt(v)+'</td>';
+    }).join("");
+
+    var clickable = x.ubic_id!=null && window.GP2Composicion;
+    var stkCls = clickable ? " stk-cell" : "";
+    var stkData = clickable ? ' data-cid="'+x.cid+'" data-uid="'+x.ubic_id+'"' : "";
+
+    var tr = document.createElement("tr");
+    if (bajo) tr.className = "falt";
+    else if (uni>0) tr.className = "stk";
+    tr.innerHTML =
+      (r.mostrar_rubro ? (x.rubro_key
+          ? '<td class="rub-cell" data-rub="'+esc(x.rubro_key)+'">'+esc(x.rubro_nom||"")+'</td>'
+          : '<td>'+esc(x.rubro_nom||"")+'</td>') : '')+
+      (r.mostrar_ubic ? '<td>'+esc(x.ubic_nom||"")+'</td>' : '')+
+      '<td><span class="cod">'+esc(x.cod)+'</span></td>'+
+      '<td>'+esc(x.desc||"")+'</td>'+
+      '<td class="num sep'+stkCls+'"'+stkData+'>'+(kg==null?"—":fmt(kg))+'</td>'+
+      (r.sin_caj?'':'<td class="num'+stkCls+'"'+stkData+'>'+(caj==null?"—":fmt(caj,1))+'</td>')+
+      '<td class="num'+stkCls+'"'+stkData+'><b>'+fmt(uni)+'</b></td>'+
+      celdasMov +
+      '<td class="num sep">'+(x.kg_x_uni?fmt(x.kg_x_uni,6):"—")+'</td>'+
+      (r.sin_caj?'':'<td class="num">'+(x.uni_x_cajon?fmt(x.uni_x_cajon):"—")+'</td>')+
+      (r.sin_max?'':'<td class="num">'+(x.maximo!=null?fmt(x.maximo):"—")+'</td>')+
+      (r.mostrar_fleje?'<td class="num">'+(x.n_fleje!=null?esc(x.n_fleje):"—")+'</td>':"");
+    tb.appendChild(tr);
+  });
+
+  $("kpis").innerHTML =
+    '<div class="kpi"><div class="k">'+(r.mode==="global"?"Filas":"Componentes")+'</div><div class="v">'+fmt(todas.length)+'</div></div>'+
+    '<div class="kpi"><div class="k">Total uni</div><div class="v">'+fmt(tUni)+'</div></div>'+
+    '<div class="kpi"><div class="k">Total kg</div><div class="v">'+fmt(tKg)+'</div></div>'+
+    (r.sin_max?'':'<div class="kpi"><div class="k">Bajo el máximo</div><div class="v '+(tBajo?"neg":"cero")+'">'+tBajo+'</div></div>');
 }
 
+/* ---------- seleccionar rubro (carga perezosa del sector) ---------- */
+async function seleccionar(key){
+  var r = RUBROS.filter(function(x){ return x.key===key; })[0];
+  if (!r) return;
+  RUBRO = r;
+  marcarActivo();
+  $("fljeLink").style.display = r.detalle ? "" : "none";
+  document.title = "Stock general · " + r.nom + " · GP2";
+  if (r.mode==="sector" && !CACHE[r.sid]){
+    $("status").textContent = "Cargando " + r.nom + "…";
+    var res = await SB.rpc("stock_sector_bundle", { p_sector_id: r.sid });
+    if (res.error){ $("status").textContent = "Error: " + res.error.message; return; }
+    CACHE[r.sid] = res.data || { filas:[], ubicacion_id:null };
+  }
+  var f = filasDe(r);
+  CUR.filas = f.filas;
+  renderHead();
+  render();
+  var con = CUR.filas.filter(function(x){ return Number(x.online||0)!==0; }).length;
+  $("status").textContent = r.mode==="global"
+    ? "Todos los rubros · " + fmt(CUR.filas.length) + " filas de inventario (sectores, talleristas, P.S., prov. AT y tránsito) · " + fmt(con) + " con stock."
+    : r.nom + " · " + CUR.filas.length + " componentes · " + con + " con stock.";
+}
+
+/* ---------- popup detalle de un movimiento (rubros de sector) ---------- */
+var DET_LIMIT = 500, DET_SEQ = 0;
+async function abrirDetalle(cid, colKey){
+  var miSeq = ++DET_SEQ;
+  var fila = (CUR.filas||[]).filter(function(x){ return String(x.cid)===String(cid); })[0] || {};
+  var col  = ((RUBRO&&RUBRO.cols)||[]).filter(function(c){ return c.k===colKey; })[0] || { label:"Movimientos", tipos:[] };
+  $("popTitle").innerHTML = '<span class="cod">'+esc(fila.cod||"")+'</span> — '+esc(fila.desc||"")+
+    '<br><small style="color:#666;font-weight:700">'+esc(col.label)+'</small>';
+  $("popBody").innerHTML = '<div class="empty">Cargando…</div>';
+  $("popup").classList.add("open");
+  var r = await SB.rpc("composicion_stock", { p_comp_id:Number(cid), p_ubic_id:Number(CUR.ubic_id), p_limit:DET_LIMIT });
+  if (miSeq!==DET_SEQ) return;
+  if (r.error){ $("popBody").innerHTML = '<div class="empty">Error: '+esc(r.error.message)+'</div>'; return; }
+  var movs = (r.data && r.data.movs) || [];
+  var rows = movs.filter(function(m){ return !col.tipos.length || col.tipos.indexOf(m.tipo)>=0; });
+  if (!rows.length){ $("popBody").innerHTML = '<div class="empty">Sin movimientos de este tipo.</div>'; return; }
+  var tot = rows.reduce(function(s,m){ return s + (m.signo==="ent"?Number(m.cantidad||0):-Number(m.cantidad||0)); }, 0);
+  $("popBody").innerHTML =
+    '<div class="table-wrap"><table class="t"><thead><tr><th>Fecha</th><th>Tipo</th><th>Contraparte</th><th class="num">Uni</th></tr></thead><tbody>'+
+    rows.map(function(m){
+      var signo = m.signo==="ent"?"+":"−";
+      return '<tr><td>'+esc(fmtFecha(m.fecha))+'</td><td>'+esc(m.tipo)+'</td><td>'+esc(m.contraparte||"—")+'</td>'+
+        '<td class="num '+(m.signo==="ent"?"pos":"neg")+'">'+signo+fmt(m.cantidad)+'</td></tr>';
+    }).join("")+
+    '</tbody><tfoot><tr><td colspan="3">'+rows.length+' movimientos</td><td class="num '+clsNum(tot)+'">'+fmt(tot)+'</td></tr></tfoot></table></div>';
+}
+
+/* ---------- carga inicial ---------- */
 async function reload(){
- $('status').textContent='Cargando…';
- try{
-  // mismo movimientos_bundle de siempre, pero via el motor compartido:
-  // asi los flujos de Ajuste/Armado usan LA MISMA data y lookups.
-  D=await GP2M.cargar(SB);
- }catch(e){
-  var msg=(e&&e.message)||e;
-  $('status').textContent='Error: '+msg;
-  $('tree').innerHTML='<p class="empty">No se pudo cargar: '+esc(msg)+'</p>';
-  return;
- }
- aplicarVocabulario();
- var n=Object.keys(D.inv||{}).length;
- var con=Object.values(D.inv||{}).filter(v=>Number(v.cant)!==0).length;
- $('status').textContent='GP2 · '+n+' posiciones · '+con+' con stock';
- render();
- renderMovs();
+  $("status").textContent = "Cargando…";
+  try{
+    D = await GP2M.cargar(SB);
+    try{ var rx = await SB.rpc("stock_general_extra_bundle");
+         EXTRA = (rx && !rx.error && rx.data) || { prov_at:[], transito:[] }; }
+    catch(_){ EXTRA = { prov_at:[], transito:[] }; }
+  }catch(e){
+    $("status").textContent = "Error: " + ((e&&e.message)||e);
+    return;
+  }
+  aplicarVocabulario();
+  CACHE = {}; GLOBAL = null;
+  await seleccionar(RUBRO ? RUBRO.key : "sc");
+  renderMovs();
 }
 
-/* ═══ Ajuste +/- y Armado en fabrica ═══
-   Mismos modales y mismo payload que tenia Registrar_Movimiento.html (borrada):
-   la construccion de filas vive en gp2-motor.js (GP2M.ajuste / GP2M.armadoFabrica)
-   y se escribe con GP2M.registrar -> RPC registrar_movimientos. */
-var MODAL_TIPO=null,_busy=false;
-function val(id){var el=$(id);return el?el.value:'';}
-function opt(v,t){return '<option value="'+esc(v)+'">'+esc(t)+'</option>';}
-function todayLocal(){var d=new Date(),z=n=>(n<10?'0':'')+n;return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
+/* ═══ Ajuste +/- (heredado de Registrar_Movimiento) ═══ */
+var MODAL_TIPO=null, _busy=false;
+function val(id){ var el=$(id); return el?el.value:""; }
+function opt(v,t){ return '<option value="'+esc(v)+'">'+esc(t)+'</option>'; }
+function todayLocal(){ var d=new Date(),z=function(n){return (n<10?"0":"")+n;}; return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate()); }
 function optsComps(ids){
- return ids.filter((v,i,a)=>a.indexOf(v)===i)
-  .sort((a,b)=>{var ca=D.comp[String(a)]||{},cb=D.comp[String(b)]||{};return (ca.cod||'').localeCompare(cb.cod||'');})
-  .map(id=>{var c=D.comp[String(id)]||{cod:'?',d:''};return opt(id,c.cod+' — '+(c.d||'').replace(/\n/g,' ').substring(0,50));}).join('');
+  return ids.filter(function(v,i,a){ return a.indexOf(v)===i; })
+    .sort(function(a,b){ var ca=D.comp[String(a)]||{},cb=D.comp[String(b)]||{}; return (ca.cod||"").localeCompare(cb.cod||""); })
+    .map(function(id){ var c=D.comp[String(id)]||{cod:"?",d:""}; return opt(id, c.cod+" — "+(c.d||"").replace(/\n/g," ").substring(0,50)); }).join("");
 }
 function openAjuste(){
- if(!D){toast('Datos todavía cargando…',true);return;}
- MODAL_TIPO='ajuste';
- $('modalTitle').textContent='✏️ Ajuste de inventario (+/-)';
- $('modalForm').innerHTML=
-  '<div class="row"><label>Fecha</label><input type="date" id="f_fecha" value="'+todayLocal()+'"></div>'+
-  '<div class="row"><label>Componente</label><select id="f_comp" onchange="onAjComp()"><option value="">— Elegí —</option>'+optsComps(Object.keys(D.comp).map(Number))+'</select></div>'+
-  '<div class="row"><label>Ubicación</label><select id="f_ubic"><option value="">Elegí componente primero</option></select></div>'+
-  '<div class="row"><label>Cantidad (+/-)</label><input inputmode="decimal" type="number" id="f_qty" step="0.01" placeholder="ej -5 o +12"><div class="hint">Positivo suma, negativo descuenta. Corrección manual del stock.</div></div>';
- $('modalBg').classList.add('on');
-}
-function openArmado(){
- if(!D){toast('Datos todavía cargando…',true);return;}
- MODAL_TIPO='armado_fabrica';
- $('modalTitle').textContent='🏭 Armado en fábrica';
- $('modalForm').innerHTML=
-  '<div class="row"><label>Fecha</label><input type="date" id="f_fecha" value="'+todayLocal()+'"></div>'+
-  '<div class="row"><label>Artículo a armar</label><select id="f_comp"><option value="">— Elegí —</option>'+optsComps(GP2M.artsFabricaDirecto())+'</select><div class="hint">Solo artículos que arma Cervantes (sin tallerista externo). Consume el BOM y crea el terminado en Fábrica.</div></div>'+
-  '<div class="row"><label>Unidades</label><input inputmode="numeric" type="number" id="f_qty" step="1" min="0"></div>';
- $('modalBg').classList.add('on');
+  if(!D){ toast("Datos todavía cargando…",true); return; }
+  MODAL_TIPO="ajuste";
+  $("modalTitle").textContent="✏️ Ajuste de inventario (+/-)";
+  $("modalForm").innerHTML=
+    '<div class="frow"><label>Fecha</label><input type="date" id="f_fecha" value="'+todayLocal()+'"></div>'+
+    '<div class="frow"><label>Componente</label><select id="f_comp" onchange="onAjComp()"><option value="">— Elegí —</option>'+optsComps(Object.keys(D.comp).map(Number))+'</select></div>'+
+    '<div class="frow"><label>Ubicación</label><select id="f_ubic"><option value="">Elegí componente primero</option></select></div>'+
+    '<div class="frow"><label>Cantidad (+/-)</label><input inputmode="decimal" type="number" id="f_qty" step="0.01" placeholder="ej -5 o +12"><div class="hint">Positivo suma, negativo descuenta. Corrección manual del stock.</div></div>';
+  $("modalBg").classList.add("on");
 }
 function onAjComp(){
- var cid=GP2N.entero(val('f_comp'));var sel=$('f_ubic');
- if(!cid){sel.innerHTML='<option value="">Elegí componente primero</option>';return;}
- var ubics=GP2M.ubicacionesDeComp(cid);
- if(!ubics.length){sel.innerHTML='<option value="">(sin ubicación)</option>';return;}
- if(ubics.length===1){sel.innerHTML=opt(ubics[0],D.ubic[String(ubics[0])].nom);return;}
- sel.innerHTML='<option value="">— Elegí —</option>'+ubics.map(u=>opt(u,D.ubic[String(u)].nom)).join('');
+  var cid=GP2N.entero(val("f_comp")), sel=$("f_ubic");
+  if(!cid){ sel.innerHTML='<option value="">Elegí componente primero</option>'; return; }
+  var ubics=GP2M.ubicacionesDeComp(cid);
+  if(!ubics.length){ sel.innerHTML='<option value="">(sin ubicación)</option>'; return; }
+  if(ubics.length===1){ sel.innerHTML=opt(ubics[0], D.ubic[String(ubics[0])].nom); return; }
+  sel.innerHTML='<option value="">— Elegí —</option>'+ubics.map(function(u){ return opt(u, D.ubic[String(u)].nom); }).join("");
 }
-function closeModal(){$('modalBg').classList.remove('on');MODAL_TIPO=null;}
-function setBusy(b){_busy=b;var btn=$('btnSave');if(btn){btn.disabled=b;btn.textContent=b?'Guardando…':'✔ Registrar';}}
+function closeModal(){ $("modalBg").classList.remove("on"); MODAL_TIPO=null; }
+function setBusy(b){ _busy=b; var btn=$("btnSave"); if(btn){ btn.disabled=b; btn.textContent=b?"Guardando…":"✔ Registrar"; } }
 var _toastT=null;
-function toast(msg,err){var el=$('toast');el.textContent=msg;el.className='on'+(err?' err':'');clearTimeout(_toastT);_toastT=setTimeout(()=>{el.className='';},err?5000:3000);}
+function toast(msg,err){ var el=$("toast"); el.textContent=msg; el.className="on"+(err?" err":""); clearTimeout(_toastT); _toastT=setTimeout(function(){ el.className=""; }, err?5000:3000); }
 async function saveModal(){
- if(_busy||!MODAL_TIPO)return;
- var r;
- try{
-  if(MODAL_TIPO==='ajuste')
-   r=GP2M.ajuste({comp_id:val('f_comp'),ubic_id:val('f_ubic'),cantidad:GP2N.num(val('f_qty')),fecha:val('f_fecha')});
-  else
-   r=GP2M.armadoFabrica({comp_id:val('f_comp'),cantidad:GP2N.num(val('f_qty')),fecha:val('f_fecha')});
- }catch(e){alert((e&&e.message)||e);return;}
- setBusy(true);
- try{
-  var res=await GP2M.registrar(SB,r.rows);
-  closeModal();
-  toast('✔ '+((res&&res.n)||r.rows.length)+' movimiento(s) registrado(s)');
-  await reload();
- }catch(e){
-  toast('Error: '+((e&&e.message)||e),true);
- }finally{setBusy(false);}
+  if(_busy||MODAL_TIPO!=="ajuste") return;
+  var r;
+  try{ r=GP2M.ajuste({ comp_id:val("f_comp"), ubic_id:val("f_ubic"), cantidad:GP2N.num(val("f_qty")), fecha:val("f_fecha") }); }
+  catch(e){ alert((e&&e.message)||e); return; }
+  setBusy(true);
+  try{
+    var res=await GP2M.registrar(SB, r.rows);
+    closeModal();
+    toast("✔ "+((res&&res.n)||r.rows.length)+" movimiento(s) registrado(s)");
+    await reload();
+  }catch(e){ toast("Error: "+((e&&e.message)||e), true); }
+  finally{ setBusy(false); }
 }
 
-/* ═══ Ultimos movimientos (misma tabla/labels que Registrar_Movimiento) ═══ */
-/* Vocabulario del ledger (GP2.movimiento.tipo_mov), el mismo que escriben las RPC y el motor:
-   antes esta tabla tenia los nombres del Registrar_Movimiento viejo (envio_prov, recepcion_tall...)
-   y la mayoria de los movimientos reales salian con el codigo crudo. */
+/* ═══ Últimos movimientos ═══ */
 var TIPOS={
- compra:{lbl:'Compra',cls:'t-compra'}, fabricacion:{lbl:'Fabricación',cls:'t-prod'},
- armado_fabrica:{lbl:'Armado fábrica',cls:'t-prod'}, consumo_prod:{lbl:'Consumo prod',cls:'t-prod'},
- envio_ps:{lbl:'Env prov serv',cls:'t-envio'}, entrega_ps:{lbl:'Entrega prov serv',cls:'t-recep'},
- consumo:{lbl:'Consumo prov serv',cls:'t-recep'},
- envio_tallerista:{lbl:'Env tall',cls:'t-envio'}, entrega_tallerista:{lbl:'Entrega tall',cls:'t-recep'},
- consumo_tall:{lbl:'Consumo tall',cls:'t-recep'}, devolucion_tallerista:{lbl:'Devolución tall',cls:'t-recep'},
- envio_prov_at:{lbl:'Env prov AT',cls:'t-envio'},
- recepcion_virgilio:{lbl:'Rec Virgilio',cls:'t-virgilio'}, consumo_virgilio:{lbl:'Consumo Virgilio',cls:'t-virgilio'},
- envio_inyector:{lbl:'Env inyector',cls:'t-envio'}, consumo_inyector:{lbl:'Consumo inyector',cls:'t-recep'},
- traslado:{lbl:'Traslado Virgilio',cls:'t-virgilio'},
- stock_inicial:{lbl:'Stock inicial',cls:'t-ajuste'}, ajuste:{lbl:'Ajuste',cls:'t-ajuste'}
+  compra:{lbl:"Compra"}, fabricacion:{lbl:"Fabricación"}, armado_fabrica:{lbl:"Armado fábrica"},
+  consumo_prod:{lbl:"Consumo prod"}, envio_ps:{lbl:"Env prov serv"}, entrega_ps:{lbl:"Entrega prov serv"},
+  consumo:{lbl:"Consumo prov serv"}, envio_tallerista:{lbl:"Env tall"}, entrega_tallerista:{lbl:"Entrega tall"},
+  consumo_tall:{lbl:"Consumo tall"}, devolucion_tallerista:{lbl:"Devolución tall"}, envio_prov_at:{lbl:"Env prov AT"},
+  recepcion_virgilio:{lbl:"Rec Virgilio"}, consumo_virgilio:{lbl:"Consumo Virgilio"},
+  envio_inyector:{lbl:"Env inyector"}, consumo_inyector:{lbl:"Consumo inyector"}, traslado:{lbl:"Traslado Virgilio"},
+  stock_inicial:{lbl:"Stock inicial"}, ajuste:{lbl:"Ajuste"}
 };
-/* La lista de arriba es el respaldo: la fuente real es GP2.tipo_movimiento, que movimientos_bundle
-   sirve en `tipos_mov`. Al cargar el bundle se pisa lo que la base diga, asi un tipo nuevo aparece
-   con su nombre sin tocar esta pantalla (2026-09-11). */
 function aplicarVocabulario(){
   var v = (D && D.tipos_mov) || null; if(!v) return;
-  Object.keys(v).forEach(function(k){ if(v[k] && v[k].lbl) TIPOS[k] = {lbl:v[k].lbl, cls:(v[k].cls||(TIPOS[k]&&TIPOS[k].cls)||'')}; });
+  Object.keys(v).forEach(function(k){ if(v[k]&&v[k].lbl) TIPOS[k]={lbl:v[k].lbl}; });
   if (window.GP2Composicion && GP2Composicion.setVocabulario) GP2Composicion.setVocabulario(v);
 }
-/* La regla de numero de la casa (gp2-numero.js), que esta pantalla YA carga. Antes habia dos
-   formateadores en el mismo archivo: fmt() con GP2N (linea 155) y este con toFixed, que ademas
-   no ponia separador de miles. */
-function fmtNum(n){ return GP2N.fmt(n, 2, ''); }
-/* Se decide en ARGENTINA, no en la zona del aparato (ver gp2-ui.js fechaTsAR). */
-var fmtFecha = GP2UI.fechaTsAR;
-function cNom(cid){var c=(D&&D.comp[String(cid)])||null;return c?c.cod:(cid==null?'':String(cid));}
-function uNom(uid){return uid?(((D&&D.ubic[String(uid)])||{nom:'?'}).nom):'';}
+function cNom(cid){ var c=(D&&D.comp[String(cid)])||null; return c?c.cod:(cid==null?"":String(cid)); }
+function uNom(uid){ return uid ? (((D&&D.ubic[String(uid)])||{nom:"?"}).nom) : ""; }
 async function renderMovs(){
- var tb=$('tbodyMovs');if(!tb)return;
- var res=await SB.from('movimiento').select('*').order('id',{ascending:false}).limit(50);
- if(res.error){tb.innerHTML='<tr><td colspan="8" class="empty">Error: '+esc(res.error.message)+'</td></tr>';return;}
- var movs=res.data||[];
- var bd=$('movsBadge');if(bd)bd.textContent=movs.length?String(movs.length):'0';
- if(!movs.length){tb.innerHTML='<tr><td colspan="8" class="empty">Sin movimientos todavía</td></tr>';return;}
- tb.innerHTML=movs.map(m=>{
-  var ti=TIPOS[m.tipo_mov]||{lbl:m.tipo_mov,cls:''};
-  return '<tr>'+
-   '<td>'+fmtFecha(m.fecha)+'</td>'+
-   '<td><span class="tag '+ti.cls+'">'+esc(ti.lbl)+'</span></td>'+
-   '<td>'+esc(cNom(m.comp_id))+'</td>'+
-   '<td>'+(esc(uNom(m.ubic_origen_id))||'—')+'</td>'+
-   '<td>'+(esc(uNom(m.ubic_destino_id))||'—')+'</td>'+
-   '<td class="num">'+fmtNum(m.cantidad)+' '+esc(m.unidad_origen||'')+'</td>'+
-   '<td>'+esc(m.comp_transformado_id?cNom(m.comp_transformado_id):'')+'</td>'+
-   '<td class="num">'+(m.cantidad_transformada!=null?fmtNum(m.cantidad_transformada)+' '+esc(m.unidad_destino||''):'')+'</td>'+
-  '</tr>';
- }).join('');
+  var tb=$("tbodyMovs"); if(!tb) return;
+  var res=await SB.from("movimiento").select("*").order("id",{ascending:false}).limit(50);
+  if(res.error){ tb.innerHTML='<tr><td colspan="8" class="empty">Error: '+esc(res.error.message)+'</td></tr>'; return; }
+  var movs=res.data||[], bd=$("movsBadge"); if(bd) bd.textContent=movs.length?("("+movs.length+")"):"";
+  if(!movs.length){ tb.innerHTML='<tr><td colspan="8" class="empty">Sin movimientos todavía</td></tr>'; return; }
+  tb.innerHTML=movs.map(function(m){
+    var ti=TIPOS[m.tipo_mov]||{lbl:m.tipo_mov};
+    return '<tr>'+
+      '<td>'+fmtFecha(m.fecha)+'</td>'+
+      '<td><span class="tag">'+esc(ti.lbl)+'</span></td>'+
+      '<td>'+esc(cNom(m.comp_id))+'</td>'+
+      '<td>'+(esc(uNom(m.ubic_origen_id))||"—")+'</td>'+
+      '<td>'+(esc(uNom(m.ubic_destino_id))||"—")+'</td>'+
+      '<td class="num">'+fmt(m.cantidad,2)+' '+esc(m.unidad_origen||"")+'</td>'+
+      '<td>'+esc(m.comp_transformado_id?cNom(m.comp_transformado_id):"")+'</td>'+
+      '<td class="num">'+(m.cantidad_transformada!=null?fmt(m.cantidad_transformada,2)+" "+esc(m.unidad_destino||""):"")+'</td>'+
+    '</tr>';
+  }).join("");
 }
+
+/* ---------- eventos ---------- */
+$("q").addEventListener("input", render);
+$("soloStock").addEventListener("change", render);
+$("hintOtros").addEventListener("click", function(e){
+  var a=e.target.closest("a[data-k]"); if(a) seleccionar(a.dataset.k);   // la búsqueda del input se conserva
+});
+$("tbody").addEventListener("click", function(e){
+  var rub=e.target.closest("td.rub-cell");
+  if(rub){ seleccionar(rub.dataset.rub); return; }
+  var mov=e.target.closest("td.mov-cell");
+  if(mov){ abrirDetalle(mov.dataset.cid, mov.dataset.col); return; }
+  var stk=e.target.closest("td.stk-cell");
+  if(stk && window.GP2Composicion){
+    var f=(CUR.filas||[]).filter(function(x){ return String(x.cid)===String(stk.dataset.cid); })[0]||{};
+    window.GP2Composicion.abrir({ SB:SB, comp_id:stk.dataset.cid, ubic_id:stk.dataset.uid,
+      cod:f.cod, desc:f.desc, kg_x_uni:f.kg_x_uni, uni_x_cajon:f.uni_x_cajon });
+  }
+});
+$("popClose").addEventListener("click", function(){ $("popup").classList.remove("open"); });
+$("popup").addEventListener("click", function(e){ if(e.target===$("popup")) $("popup").classList.remove("open"); });
+
+pintarRubros();
 reload();
 </script>
-</body></html>
+</body>
+</html>

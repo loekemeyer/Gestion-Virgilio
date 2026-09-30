@@ -1,0 +1,2453 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- Anti-cache: la lógica de esta pantalla es JS INLINE, así que si el navegador de la tablet
+     se queda con el HTML viejo se queda con la app vieja (no hay ?v= que la salve). -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- v1.39.0 (2026-09-30) — EL BOTÓN "CONTROL" CUENTA TAMBIÉN LOS INSUMOS Y SÓLO SE VE EN RECIBIR (Nazareno,
+     textual: "Me gustaría que aparezca en el botón de control que está a la izquierda del botón atrás.
+     Creo que hoy en día estás mandando los controles solo de p.s. hoy, Tendrías que poner los de
+     talleristas, p.s. y prov de insumo. Además quiero que este botón sea visible cuando estoy en el
+     módulo recibir (lo que traen): si estoy en enviar no quiero que aparezca"). El contador ya sumaba
+     P.S. y talleristas (control_entrega_bundle.pend trae los dos desde el 2026-09-23); le faltaban las
+     recepciones de insumos que quedaron sin controlar, que ahora vienen en insumos_pend y se filtran
+     con gp2-control-insumo.js (GP2CI): cuenta sólo lo que tiene pantalla de control a donde ir. El
+     link arranca OCULTO y lo prende setModo() sólo en Recibir: antes de que cargue el bundle no hay
+     modo, y un botón que aparece y se esconde al abrir es peor que uno que aparece tarde. -->
+<!-- v1.38.0 (2026-09-28) — ENVIAR: EL ORDEN POR SECTOR TAMBIÉN PARA P.S., PROV. DE ART. TERMINADO E INYECTOR (usuario: "Así como me ordenaste por sector el envío a talleristas quiero que me ordenes prov de art terminado, proveedores de servicio e inyectores"). agrupaPorRubro() pasa de solo 'tallerista' a los cuatro tipos de Enviar: mismo RUBRO_ORDEN de GP2EE (Garage · Fleje · Crudo · Procesado · Plásticas · Remaches · Cajas · Cartones · Bombilla · resto) y el mismo rótulo de sector arriba de cada bloque. El "➕ Otro cartón" del prov. AT pasa a cerrar el bloque de cartones, igual que en el tallerista. Recibir no se tocó. Cero base. -->
+<!-- v1.37.0 (2026-09-28) — "VER O.C." ARRIBA DEL BUSCADOR EN ENVIAR (usuario: "en el envío a prov de art terminado y talleristas o.c. … me aparezca arriba de 'buscar por código' una box que me diga ver o.c. y pueda ver la o.c. de gestión virgilio"). Sólo en Enviar y sólo para las contrapartes cuyo sugerido sale de la O.C. de Virgilio (c.oc o proveedor_at, el mismo criterio del título "· O.C. Virgilio"). El botón abre/cierra una tabla con lo PENDIENTE de esa O.C.: lee "GP2".v_oc_virgilio_pendiente (espejo GP2 de public.Ordenes_Compra; "la nueva pisa la vieja", sin cerradas/anuladas, últimos 120 días) filtrada por tipo+ref_id, y la descripción de "GP2".articulo. Nada de public (REGLA 0). Se lee al abrir, no con el bundle: el 99 % de los envíos no la mira. -->
+<!-- v1.36.2 (2026-09-25) — SE SACA EL CARTEL "⚠ N alerta(s) de recepción sin revisar" de la pantalla de tipos/contrapartes (Thomas: "Que no aparezcan más alertas"). Las alertas se siguen generando y viven en Alertas/alertas_GP2.html. -->
+<!-- v1.36.1 (2026-09-24) — SINGULAR DE "cajas" EN EL SUGERIDO DEL ENVIAR (usuario, sobre el Z31/Descorazonador a Alex Escalante: "el sugerido aparece una cajas y es una caja. Sin S"). El mapa SINGULAR tenía cajones/paquetes/bolsas pero NO cajas, y el Z31 quedó con env_unidad='cajas' (v1.35.x, 2026-09-24) → unidadTxt("cajas",1) devolvía "cajas". Se agregó cajas→caja y singularEnvase() ahora lee el MISMO mapa (una sola fuente: antes solo cubría bolsas/cajones, le faltaban paquetes y cajas en el renglón "= 1 …"). Tablet no-cache, sin ?v= que bumpear. -->
+<!-- v1.36.0 (2026-09-24) — EL PROV. DE ART. TERMINADO VA IGUAL QUE "TALLERISTAS O.C.": SUGERIDO 0
+     (usuario, textual: "En el envío a proveedor de artículo terminado, al igual que talleristas
+     orden de compra, no tienen un máximo de inventario allá ellos, de un mes, como los talleristas,
+     porque proveedor de artículo terminado y talleristas OC es gente que no tenemos la misma
+     confianza que con los talleristas. Tenés que modelarlo al igual que talleristas OC, que no
+     tienen un máximo allá, por lo tanto no tiene que haber un sugerido de qué mandarle, sino que
+     tiene que aparecer en cero. ¿Cuándo va a aparecer? Cuando salga orden de compra de Virgilio,
+     que todavía no lo modelamos, porque lo hace otro sistema ahora").
+     DA VUELTA la v1.29.0 de AYER (2026-09-23), que le había puesto sugerido = consumo de su
+     cartón/caja × un mes, repartido — el mismo trato que el tallerista a façon. Hoy el dueño lo
+     reagrupa con la gente de menos confianza (talleristas O.C.): sin máximo nuestro allá, sugerido
+     0, y el número real va a salir de una O.C. de Gestión Virgilio que GP2 todavía NO lee.
+     DÓNDE ESTÁ EL 0: en la base. tablet_bundle, CTE rep, case del techo: `when e.tipo =
+     'proveedor_at' then 0` (mismo criterio que el fasonero sin O.C. y el tallerista O.C.). Medido:
+     los 47 renglones de prov AT del Enviar pasaron de 33 con sugerido (28.905 uni) a 0; talleristas
+     normales (316), talleristas O.C. (0) y P.S. (108) intactos. La máquina de ayer (reparto_prov_at,
+     v_consumo_prov_at, recalcular_maximos_prov_at) queda DORMIDA: nunca escribió un maximo
+     (inventario de prov AT = 0 filas), así que no hay nada que revertir; si el dueño vuelve a
+     querer el máximo de la casa, ese `then 0` es lo único que se cambia.
+     ACÁ SON DOS LÍNEAS: el título de la carga agrega "· O.C. Virgilio" también para el prov AT (como
+     el tallerista O.C.), porque un 0 pelado se lee como "no hay que mandarle nada". El resto ya lo
+     hacía la base: envConSugerido() muestra el renglón con 0. El "➕ Otro cartón" (sust_de) sigue
+     cayendo a "Online sector", que es correcto (no es consumo de ese proveedor). -->
+<!-- v1.35.2 (2026-09-24) — ENVIAR: EL FLEJE NO DICE "sin cajón cargado" (usuario: "cuando es sector fleje no quiero esa aclaración, no tienen uni x cajón, se manda en kilos"). faltaEnvase() ahora no avisa para la pieza medida en kg: se manda pesada y el sugerido ya sale en kg. El aviso queda para la pieza que SE CUENTA (uni) y caería a unidades sin el factor. -->
+<!-- v1.35.1 (2026-09-24) — "Talleristas O.C." pasa al FINAL del grupo Enviar [usuario: "Talleristas O.C. que aparezca al final"]. Solo reorden de la baldosa dentro de TIPOS.enviar (queda después de "Prov. de art. terminado"); nada más cambia. -->
+<!-- v1.35.0 (2026-09-23) — TALLERISTAS O.C.: BLIST-PACK Y CARLOS AGUIRRE SALEN DE "TALLERISTAS"
+     (usuario, con la foto de la Tablet: "a Blist-Pack SA y Carlos Aguirre quiero que me los saques
+     afuera de talleristas y me los pongas en un módulo nuevo de talleristas o.c."; y al preguntar
+     qué cambia además del lugar: "No es o.c. de insumos. Es orden de compra que se hace desde
+     Gestión Virgilio que hoy no está modelado acá. Por ahora sugerí 0").
+     QUÉ SE HIZO: una baldosa más en ENVIAR, "🧾 Talleristas O.C.", al lado de Talleristas. Los dos
+     siguen siendo talleristas en la base (32 pasos de ruta Aguirre, 38 Blist-Pack): lo que los
+     parte es el flag nuevo GP2.tallerista.pedido_por_oc_virgilio, que tablet_bundle manda como `oc`
+     en cada contraparte. Sacarlos de la tabla `tallerista` habría volteado rutas, inventario,
+     reparto y costeo — se separa la vitrina, no el modelo.
+     SUGERIDO 0, Y DICHO: lo que hay que mandarles sale de una O.C. de Gestión Virgilio que GP2 no
+     lee, así que el techo de esas filas es 0 en tablet_bundle (mismo criterio que el fasonero sin
+     O.C.) y el título de la carga agrega "· O.C. Virgilio", porque un 0 sin explicación se lee como
+     "no hay que mandarle nada".
+     SOLO EN ENVIAR [usuario: "Solo en la versión tablet dentro del módulo enviar"]: en RECIBIR los
+     dos siguen adentro de Talleristas, que es donde se registra lo que traen.
+     CÓMO SE PARTE UNA BALDOSA: TIPOS ahora acepta `clave` (el data-tipo del botón, para que dos
+     baldosas del mismo tipo no compartan selector) y `oc` (el lado del flag). Una baldosa sin `oc`
+     no filtra nada, así que Recibir y el resto de los tipos quedaron igual. selTipo pasó a guardar
+     la BALDOSA entera: con dos baldosas 'tallerista' el string ya no alcanza para volver. -->
+<!-- v1.34.0 (2026-09-23) — ENVIAR A UN TALLERISTA: LAS PIEZAS VAN POR RUBRO, NO POR CÓDIGO (usuario,
+     textual: "quiero que me ordenes no alfanuméricamente, sino que primero me pongas todo lo que se
+     le manda de sector crudo, después todo lo de sector procesado, después todo los remaches,
+     después todo lo de partes plásticas, después todo lo de cajas y después todo lo de cartones" +
+     "me refiero dentro de cada tallerista").
+     POR QUÉ: el envío se arma caminando el galpón y el abecedario obliga a ir y volver — A10
+     (crudo), BANDITA (cartón), C10 (cartón), CJ7 (caja), F7 (fleje) son cuatro lugares distintos en
+     cinco tarjetas. Por rubro, cada bloque es una parada.
+     LO QUE SE AGREGÓ ADEMÁS DEL ORDEN: un rótulo de sector arriba de cada bloque (.pc-rubro, ancho
+     entero de la grilla). Sin él el orden nuevo se lee como un desorden, porque el código ya no
+     viene en secuencia y nada explica por qué.
+     LOS TRES SECTORES QUE FALTABAN TIENEN SU LUGAR: el pedido nombró seis rubros, pero medido en la
+     base al tallerista también se le manda Fleje (6 filas / 3 talleristas), Bombilla (15 / 5) y
+     Garage (11 / 4) — 32 de las 350 filas. Con eso a la vista el usuario cerró el orden completo
+     ["Garage ponelo primero, fleje segundo y bombilla último"], así que la secuencia definitiva es
+     GARAGE · FLEJE · CRUDO · PROCESADO · REMACHES · PLÁSTICAS · CAJAS · CARTONES · BOMBILLA. Un
+     sector que no esté en esa lista cae al fondo, detrás de Bombilla: hoy no hay ninguno acá, y si
+     aparece, el lugar honesto para algo sin clasificar es abajo y a la vista.
+     Y EL "➕ OTRO CARTÓN" CIERRA EL BLOQUE DE CARTONES, no la grilla [usuario: "el módulo de otro
+     cartón no lo dejes al final de todo, ponelo a lo último de los cartones"]: es un cartón más, y
+     con los bloques dejaba de estar al lado de los cartones. Sin bloques (prov. AT) sigue al final.
+     SOLO EL TALLERISTA: P.S., prov. de art. terminado e inyector siguen alfabéticos, y Recibir no
+     se tocó. CERO BASE: el sector ya viajaba en cada fila de tablet_bundle.enviar. -->
+<!-- v1.32.0 (2026-09-23) — EL REMITO DEL TALLERISTA TAMBIÉN VA EN UNIDADES (usuario, textual:
+     "Hicimos todas las recepciones de proveedores de servicio. Ahora seguimos con las recepciones
+     de talleristas. Lucho. Remito en unidades y control en kg y cajones (acordate de hacer el
+     control por kg — cajones es solo dato)").
+     Misma regla que el P.S. (v1.30.0) y por el mismo motivo: acá se carga EL PAPEL, y el kilo y el
+     cajón se cuentan en el control. La rama de recibir de envaseDe() devuelve null también para el
+     tallerista, así que la tarjeta dice el stock en unidades de la pieza, el campo va en esa misma
+     unidad y se van el renglón "≈ N cajones" y la doble carga cajón+kg.
+     DA VUELTA la v1.19.0 ("de talleristas, todos se entregan en cajones… en recibido va a ser en
+     kilos", 18/09), escrita cuando lo que se cargaba acá era lo contado.
+     LO QUE NO SE TOCA: componente.entrega_unidad / entrega_uni_x (las bolsas de 120 de GRJ5 y
+     GRJ6) siguen vivas — son el envase con el que se cuenta en el control — y el aviso del 5 % al
+     recibir de un tallerista SIGUE, porque el control de talleristas todavía no existe como
+     pantalla: el día que exista, esa comparación se va de acá igual que la del P.S. -->
+<!-- v1.31.0 (2026-09-23) — LA DIFERENCIA SE JUZGA EN EL CONTROL, Y RECIÉN ARRIBA DEL 5 % (usuario,
+     textual: "espero que el cartel aparezca si hay más de un cinco por ciento de diferencia, tanto
+     en kilos como en unidades. Pero este cartel, esta alerta, me tiene que aparecer no a la hora de
+     recibir, sino a la hora de hacer el control. Porque puede haber 1.800 unidades de stock de
+     proveedor de servicio… y capaz recibo menos").
+     DOS CAMBIOS, LOS DOS EN exceso():
+     (1) EN RECIBIR DE UN P.S. NO SE COMPARA NADA. Lo que se carga es el REMITO, y el stock que el
+     proveedor tiene en su poder no es lo que va a traer: una entrega parcial es lo normal. La
+     comparación vive en ControlEntregaPS, contra el remito, que es lo que sí se puede contrastar.
+     (2) EN LOS DEMÁS DESTINOS (tallerista, prov. AT, Virgilio) el aviso queda, pero recién arriba
+     del 5 %, el mismo umbral que pidió para el control. Sigue valiendo el piso de media unidad
+     (5 gramos en kg) de v1.30.1, que es el que cubre el caso de esperado 0.
+     LA BASE ACOMPAÑA: GP2.tablet_registrar deja de anotar la alerta de un P.S. y usa el mismo 5 %
+     para el resto. Sin eso el cartel se iba de la pantalla y la fila se seguía escribiendo igual. -->
+<!-- v1.30.1 (2026-09-23) — LA ALERTA DE "RECIBÍ DE MÁS" NO SALTA POR UN DECIMAL (usuario, con 1.852
+     uni de PC1A contra 1.852 esperadas: "¿Por qué salta la alerta? Es exactamente la misma
+     cantidad"; el cartel decía "⚠ 0 de más", que es la firma del problema).
+     EL SALDO DEL TERCERO TIENE DECIMALES: a Esther se le mandaron 10 kg de mangos y eso son
+     1.851,8518… unidades (10 / 0,0054), así que su stock queda con ese 0,8518 colgando — medido en
+     la base, PC2 en Esther está hoy en −0,1481. Comparar crudo (recibido > esperado) convierte cada
+     redondeo de conversión en una alerta y en una fila de GP2.alerta_recepcion.
+     LA TOLERANCIA ES MEDIA UNIDAD (5 gramos si la pieza se mide en kg), en las DOS puntas: exceso()
+     acá y el `if v_comparable > v_esp` de GP2.tablet_registrar, que es el que escribe la alerta. Sin
+     tocar la base el cartel se iba pero la alerta se seguía anotando igual. -->
+<!-- v1.30.0 (2026-09-23) — RECIBIR DE UN P.S. SE CARGA EN UNIDADES: EL ENVASE ES DEL CONTROL
+     (usuario, sobre cinco proveedores distintos y el mismo día: "cuando voy a recibir de AJ
+     adhesivos el remito marca en unidades de pliego y después cuando voy a controlar sí, marco
+     paquetes"; "cuando voy a recibir en la versión tablet del proveedor de servicio Ester, en el
+     remito aparece en unidades y después el control si lo hago en bolsas y kilos"; ídem Hernández
+     Julio —"me aparece en unidades y el control sí en cajones y kilos"—, Jade y Maspoli).
+     LO QUE SE CARGA ACÁ ES EL REMITO, y el remito del proveedor viene en unidades de la pieza. El
+     envase (bolsas de Ester, paquetes de 200 de AJ, cajones de Jade y Julio, bolsas de Maspoli) y
+     los kilos son del CONTROL, o sea de ControlEntregaPS_GP2.html, que es la pantalla a la que la
+     tablet manda derecho después de registrar desde la v1.28.0.
+     DA VUELTA la regla de v1.20.0 ("la entrega copia la unidad del envío"), que se escribió el
+     18/09, CUANDO TODAVÍA NO EXISTÍA la pantalla de control (nació el 21/09): entonces lo que se
+     cargaba acá era lo contado y el envase tenía sentido. Ahora son dos momentos distintos y cada
+     uno tiene su unidad.
+     ES UNA LÍNEA: la rama de recibir de envaseDe() devuelve null para el P.S. Con eso la tarjeta
+     dice el stock en unidades, el campo va en unidades (teclado numérico), desaparecen el renglón
+     "≈ N bolsas" y la doble carga envase+kg, y lo que viaja a tablet_registrar queda en la unidad
+     canónica de la pieza. CERO base: proveedor_servicio.entrega_unidad / entrega_uni_x siguen
+     igual porque las usa el Control, que es su lugar.
+     EL TALLERISTA NO SE TOCA: ahí no hay pantalla de control y el esperado en cajones + la cantidad
+     en kg los pidió el usuario el 18/09 (v1.19.0). -->
+<!-- v1.29.0 (2026-09-23) — EL PROV. DE ART. TERMINADO YA TIENE SUGERIDO (usuario, textual: "En el
+     módulo prov de art terminado, cuando voy a enviar: me aparece 0 sugerido para enviar. El
+     inventario máximo de los prov de art terminado tiene que ser al igual que los talleristas de un
+     mes de consumo. Si hay más de un prov de art terminado o tallerista que haga un artículo tenés
+     que dividir según la proporción. Si no está la proporción → por default 50% cada uno").
+     DA VUELTA la nota de v1.18.0 ("el prov. AT no tiene sugerido, va el Online sector"): ahora lo
+     tiene, con la misma cuenta que el tallerista — consumo de cartón/caja × 1 mes − lo que ya tiene
+     en su poder — y el consumo sale repartido cuando el artículo lo hacen dos.
+     LO DE FONDO NO ESTABA ACÁ: el 0 salía de la base. La CTE rep de GP2.tablet_bundle sólo cubría
+     'proveedor_servicio' y 'tallerista', así que la fila del prov AT viajaba con maximo/sugerido en
+     NULL. El reparto y el consumo nuevos son DDL y viven en db/migracion_maximo_prov_at.sql.
+     ACÁ SON DOS LÍNEAS: envConSugerido() suma el prov AT, y faltaEnvase() también, para que una
+     pieza sin paquetón cargado lo diga en vez de mostrar un número en unidades como si fueran
+     paquetes. EL FALLBACK QUEDA VIVO A PROPÓSITO: si la fila viene sin sugerido (base sin la
+     migración, o un cartón de otro artículo que no es consumo de este proveedor), la tarjeta vuelve
+     a mostrar "Online sector" — un 0 que no es un dato es peor que no mostrarlo. -->
+<!-- v1.28.1 (2026-09-21) — "LISTO" SE HABILITA TAMBIÉN CUANDO LA PARTE LLEVA UNA SOLA UNIDAD
+     (usuario, con 40 kg ya escritos en la tarjeta de V12 de Guazzaroni: "No me deja cargar la
+     recepción"). REGRESIÓN DE v1.23.0: ahí se agregó que "Listo" espere a que estén las DOS
+     unidades, y el repintado del botón quedó adentro del if (ed) del handler de input. ed sale de
+     envaseDoble(), que devuelve null si el modo no es enviar → en TODO Recibir la tarjeta se
+     dibujaba con el botón gris (campo vacío) y no se volvía a habilitar nunca, por más cantidad que
+     se escribiera. El equivalente en cajones sí se actualizaba, y por eso parecía que la pantalla
+     estaba viva. Ahora el botón se repinta siempre, con una unidad o con dos; lo único que sigue
+     colgado de ed es el renglón "Falta anotar…", que sólo existe con las dos. El número NO se
+     perdía: el botón de abajo ya contaba la fila (decía "Recibir (1)"), pero adentro de una parte
+     ese botón está oculto a propósito desde v1.21.0, así que no había salida visible. -->
+<!-- v1.28.0 (2026-09-21) — RECEPCIONAR UN P.S. TERMINA EN EL CONTROL (usuario, textual: "Después de
+     recepcionar tengo que ir al control"; y antes: "En recepcion de proveedores de servicio se
+     tiene que seguir la lógica de primero cargar lo que dice el remito y despues hacer el control
+     (como en recepcion de insumos)"). Lo que se registra acá es EL REMITO; lo contado de verdad va
+     en ControlEntregaPS_GP2.html (pantalla nueva), que guarda lo declarado en GP2.entrega_ps_control
+     y pisa la cantidad del movimiento — el stock queda con lo controlado, igual que
+     controlar_recepcion_kg en insumos. Al registrar se va DIRECTO al control, sin cartel intermedio
+     [mismo criterio que el usuario pidió para insumos el 2026-09-03: "me gusta que me mande
+     directo"]. La ÚNICA excepción es la alerta de "recibí de más": ahí la fase 3 se muestra igual
+     —el operario tiene que leerla— y el paso al control va con un botón. Sólo aplica a Recibir de
+     un P.S.: tallerista, prov. AT, insumos y Virgilio quedan como estaban. -->
+<!-- v1.27.0 (2026-09-21) — RECIBIR: EL STOCK DE LA CONTRAPARTE SE CUENTA EN EL CAJÓN QUE ANOTÓ
+     LOGÍSTICA (usuario, textual: "tiene que aparecer en su stock los cajones que escribe logística,
+     no los que se calcula a partir de los kg"). Se le mandó a Guazzaroni 1 cajón de CV1 con 21 kg y
+     la tarjeta de Recibir decía "Stock prov. de servicio: 1,05 cajones", porque dividía los 60.000
+     remaches por el cajón TEÓRICO de la pieza (componente.uni_x_cajon 57.143 = 20 kg justos). El
+     cajón del maestro es un promedio; el que salió del galpón pesó 21. Ahora el factor sale de lo
+     anotado: GP2.v_caj_contraparte = unidades enviadas / movimiento.cajones por (contraparte,
+     pieza), que tablet_bundle manda como ent_uxc_anot y uxcRef() prefiere sobre ent_uxc. Va SOLO
+     donde ya iba ent_uxc (P.S. + sector Remache, la regla del 18/09 de los remaches que vuelven en
+     el mismo cajón) y sólo si hay cajones anotados: sin eso queda todo como estaba —los talleristas
+     no anotan cajones (crear_envio_tallerista no tiene p_cajones) y no cambian.
+     Se concilia solo contra el kg: si el proveedor devuelve la mitad, el stock dice medio cajón, y
+     si devuelve todo, cero. NO es un segundo libro de cajones que pueda quedar desfasado.
+     Mismo criterio en Envío PS (v1.11.0) y Entrega PS (v1.7.0). -->
+<!-- v1.26.1 (2026-09-21) — el cartón sale de CERVANTES, no "del galpón" (usuario, sobre el texto de
+     "➕ Otro cartón": "En vez de galpón, Cervantes"). Un renglón de texto, cero lógica. -->
+<!-- v1.26.0 (2026-09-21) — OTRO CARTÓN: MANDAR EL CARTÓN DE OTRO ARTÍCULO EN LUGAR DEL QUE
+     CORRESPONDE (usuario: "puede pasar de que no haya stock del cartón que quiero mandar y le mande
+     el cartón de otro artículo y se le pegue la etiqueta del artículo correspondiente. Entonces lo
+     tengo que modelar para que baje el stock del cartón que le mando realmente"). En Enviar a un
+     TALLERISTA o a un PROV. DE ART. TERMINADO, al final de las tarjetas aparece "➕ Otro cartón":
+     abre el catálogo entero (los que ese destino NO usa) y, elegido uno, pregunta EN REEMPLAZO DE
+     CUÁL de los suyos va. La fila entra como una tarjeta más, marcada "en lugar de XXX", y se carga
+     igual que el resto (paquetes del paquetón de SU formato).
+     LO QUE SE MODELA NO ES EL ENVÍO —ese ya bajaba el cartón real— SINO EL CONSUMO: al entregar el
+     artículo terminado, recepcion_virgilio consumía el cartón DE LA RECETA, que en el proveedor no
+     está, y lo dejaba negativo mientras el sustituto quedaba clavado para siempre. Ahora el envío
+     anota a quién reemplaza (movimiento.sustituye_comp_id, sin tabla nueva: el saldo sale del
+     ledger) y el consumo gasta PRIMERO el sustituto hasta agotarlo y el resto el oficial. -->
+<!-- v1.25.1 (2026-09-21) — SIN STOCK SE DICE "0 cajones", NO SE DEJA EN BLANCO (usuario: "pero que
+     me diga 0 si no tiene stock"). Era el agujero que dejaba el rótulo nuevo a la vista: cuando la
+     contraparte no tiene nada nuestro, la base manda 0 (coalesce en tablet_bundle: para el
+     tallerista y el P.S. el esperado NUNCA es null) pero textoEnvases() devuelve "" con el cero
+     —correcto para el renglón de equivalencia de abajo del campo, que no tiene que escribir nada
+     con el campo vacío— y la tarjeta quedaba diciendo "Stock tallerista" y ningún número, que se
+     lee como "no sé". Ahora el cero se escribe. Sigue distinguido del "—  sin referencia", que es
+     el esperado NULL de verdad (otro dato: ahí la base no sabe). -->
+<!-- v1.25.0 (2026-09-21) — EN RECIBIR EL NÚMERO DE REFERENCIA SE LLAMA POR LO QUE ES: EL STOCK DE
+     LA CONTRAPARTE (usuario, textual: "en versión tablet, cuando voy a recibir, en vez de esperado
+     quiero que diga Stock tallerista o stock proveedor de servicio según corresponda"). Solo el
+     rótulo, cero lógica: el número, su unidad y la alerta de "recibí de más" son los mismos. Un
+     único rotuloRef() decide el texto por el tipo de contraparte y lo usan los tres lugares donde
+     se leía "Esperado" (la tarjeta, la vista de la parte y el encabezado de la tabla), así no
+     quedan tres textos que se puedan separar. Virgilio sigue diciendo "Esperado": ahí el número es
+     su online y no estaba en el pedido.
+     Y DE PASO, porque el rótulo nuevo es largo: en la tarjeta pasa a su propio renglón, chico y
+     gris (.pc-rot), con el número solo en los 21px naranja. Con "Stock prov. de servicio" en
+     negrita grande la tarjeta se comía tres renglones y el número —lo que el operario lee de
+     lejos— quedaba mezclado con la etiqueta. Vale también para "Sugerido" y "Online sector". -->
+<!-- v1.24.0 (2026-09-18) — RECIBIR REMACHES: EL ESPERADO VA EN EL CAJÓN CON EL QUE SE MANDÓ
+     (usuario: "Mandé 5 cajones de cv11 y el esperado de recepcion de v11 es 50 cajones. ¿Por qué?" →
+     "Guazzaroni nos entrega los remaches niquelados en los mismos cajones que se lo enviamos… si
+     envío 2 cajones lo esperado es recibir 2 cajones aprox (el peso niquelado es un poquito más —
+     muy ínfima la diferencia)"). El esperado de un P.S. se cuenta en unidades de la pieza que le
+     MANDAMOS (CV11), pero se mostraba dividido por el cajón de la que DEVUELVE (V11 = 2.729 uni =
+     2 kg, que no es un cajón: es la bolsa en la que se fracciona después con la matriz de
+     embolsado) → 100 kg / 2 kg = 50 cajones donde habían salido 5. Ahora, cuando la fila trae
+     ent_uxc / ent_kgu desde tablet_bundle, el envase es el de la pieza enviada. LA BASE ES LA QUE
+     DECIDE DÓNDE APLICA, no el front: hoy manda esas dos claves SOLO para el sector Remache
+     (usuario: "no aplica para todos los casos… te lo estoy diciendo en el caso de los remaches"),
+     así que los otros 105 pares de P.S. quedan igual que antes. Toca los tres lugares que mira el
+     envase de una fila de Recibir (packEnvio por pieza, bultoDe del envío por peso y el override
+     del proveedor), el equivalente "= N cajones" de abajo del campo, la comparación del "recibí de
+     más" y el esperado que viaja en el payload. -->
+<!-- v1.23.1 (2026-09-18) — LOS DOS CAMPOS, UNO AL LADO DEL OTRO (usuario: "que sea una al lado de
+     la otra. No una abajo de la otra (queda muy ancho)"). Solo layout: .det-dos son dos columnas
+     que se achican en vez de envolver — a 390px siguen entrando — y el cruce de los dos numeros
+     pasa a ir debajo, cruzando las dos. La vista de la parte queda 100px mas corta. -->
+<!-- v1.23.0 (2026-09-18) — LO QUE SE MANDA PESADO SE ANOTA EN LAS DOS UNIDADES: PRIMERO EL ENVASE,
+     DESPUES LOS KG (usuario, textual: "en cantidad a enviar tengo que poder poner cajones primero y
+     despues los kg. Lo mismo con lo que se envia en bolsas. Si despues de cargar cajones/bolsas y kg
+     y no coinciden por mucho… que me salte alerta pero que me deje poner listo igual. Si no coincide
+     por poco… que no salte ninguna alerta. Que no pueda poner listo hasta que haya cargado en las
+     dos unidades de medida").
+     DA VUELTA v1.15.2, que habia sacado el segundo campo de Hernandez Julio para que el bulto fuera
+     un renglon calculado. Ahora los dos numeros se DECLARAN: el envase es el que el operario cuenta
+     mientras carga y el kg es el que marca la balanza; si uno se calculaba, el error de carga
+     quedaba invisible. Vale para toda fila de ENVIAR con envase + kg: Julio (bulto por sector),
+     Ester, los del cajon por pieza y los talleristas. Las filas que se escriben SOLO en el envase
+     (AJ, carton, cajas) y TODO Recibir no cambian.
+     EL CRUCE: el renglon chico de abajo pasa a ser el chequeo. Tolerancia = el envase entero de
+     arriba y el de abajo (si los kg dan 2,5 bolsas, 2 o 3 estan bien; si dan 2 justas, 3 ya no).
+     Se eligio asi y no "media unidad" pelada porque el kg por envase casi nunca da redondo: con
+     media unidad, 4 cajones contra 3,49999 avisaba por una millonesima. Cuando hay desvio el
+     renglon se pone naranja y lo dice, pero NO frena: Listo sigue habilitado.
+     LO QUE SI FRENA es que falte una de las dos: "Listo" queda deshabilitado, la vista dice cual
+     falta y la tarjeta se pinta naranja con "falta anotar…". Una fila a medias tampoco entra en el
+     conteo del boton Registrar ni viaja en el payload.
+     AL REGISTRAR viaja el envase ANOTADO (antes iba el calculado desde los kg) en movimiento.cajones.
+     Y ADEMAS, en gp2-numero.js: EL PUNTO TIPEADO VALE COMO COMA [usuario: "cuando voy a cargar
+     quiero que me deje poner . o , para poner decimales"]. Se hace en beforeinput, sobre la tecla
+     recien apretada, y NO en conMiles(): ahi no se distingue el punto que tipeo la persona del que
+     puso el separador automatico, y "1.000" + una tecla se volveria 1,0005. En los campos de
+     enteros (cajones, bolsas) el punto sigue sin entrar. -->
+<!-- v1.22.0 (2026-09-18) — LOS ENVASES SE VEN CON DECIMALES (se va el redondeo de la mañana)
+     (usuario, textual: "Que pueda anotar decimales a la hora de poner la cantidad de kg. Además,
+     no quiero que redondees las bolsas, cajones -> lo quiero ver con decimales también").
+     DA VUELTA la regla de v1.16.0 de HOY MISMO ("6,17 serían 6 bolsas"): el renglón de abajo del
+     campo, el "Esperado" en envases y el resumen del confirm muestran el número exacto con 2
+     decimales; se fueron el "≈" y el "menos de 1 bolsa" en palabras (ahora dice "= 0,69 bolsas").
+     Lo REGISTRADO acompaña: movimiento.cajones vuelve a guardar el número con decimales, así lo
+     anotado y lo que se vio son lo mismo — con el entero, 0,4 bolsas se guardaban como nada.
+     El SUGERIDO no cambia: sigue con techo (Math.ceil), que es otra regla y el usuario la fijó
+     aparte ("pedir menos de lo que falta no llena el lugar", 2026-09-17).
+     La cantidad en kg YA aceptaba decimales con COMA (inputmode="decimal" + GP2N): se verificó
+     tipeando "12,5" en Ester. Lo que NO acepta es el PUNTO, que para la regla de la casa es el
+     separador de miles ("1.5" se lee 15) — si el teclado de la tablet escribe punto, hay que
+     decidirlo aparte porque la regla de número es única para todas las pantallas. -->
+<!-- v1.21.0 (2026-09-18) — ADENTRO DE UNA PARTE NO HAY FECHA NI BOTON DE REGISTRAR
+     (usuario, textual: "en version tablet, envios y recepciones. Cuando estas dentro de una parte,
+     en este caso pliego. Que no aparezca ni el boton de fecha ni de enviar").
+     La vista de UNA parte es para cargar esa parte, no para cerrar la carga: la fila de acciones
+     (Fecha, Remito y "Registrar / Enviar (N)") se esconde con la grilla y vuelve al tocar
+     "← Partes". Vale para Enviar y para Recibir, que comparten la misma vista. -->
+<!-- v1.20.0 (2026-09-18) — RECIBIR DE UN P.S.: TARJETAS, Y LA ENTREGA COPIA LA UNIDAD DEL ENVIO
+     (usuario, textual: "AJ adhesivos entrega en paquetes de 200. El resto copia la logica del
+     envio: si enviamos en bolsas recepcionamos en bolsas, si lo hacemos en cajones, en cajones.
+     Charcas cajones").
+     LA REGLA SE ESCRIBE UNA VEZ: por defecto la ENTREGA de un P.S. usa la MISMA unidad con la que
+     se le envia (packEnvio / pesoEnvio, que ya estaban), asi que no hizo falta cargar un dato por
+     proveedor. Para los que difieren hay dos columnas nuevas en GP2.proveedor_servicio:
+     entrega_unidad / entrega_uni_x. Hoy son dos:
+       · AJ Adhesivos: envia en paquetes de 100 y ENTREGA en paquetes de 200 (se escribe en paquetes);
+       · Resortes Charcas: 'cajones' SIN factor = el cajon de CADA PIEZA, y se escribe en kg
+         (Charcas no esta en Enviar por hibrido, asi que no tenia unidad de la cual copiar).
+     Las dos columnas viajan con la contraparte en tablet_bundle, al lado de las de envio.
+     Lo demas ya estaba hecho para el tallerista: esperado en el envase, campo en kg con el renglon
+     "≈ N cajones", el exceso comparado en unidad canonica y el esperado viajando en la misma unidad
+     que la cantidad. Un P.S. sin unidad definida (Blist-Pack, Rec Color, Daniel…) sigue como
+     estaba: esperado y cantidad en la unidad de la pieza. -->
+<!-- v1.19.0 (2026-09-18) — RECIBIR DE TALLERISTAS: TARJETAS, ESPERADO EN CAJONES Y CANTIDAD EN KG
+     (usuario, textual: "de talleristas, todos se entregan en cajones… tanto en esperado como en
+     recibido, tenés que poner la unidad de medida. En esperado va a ser en cajones… y en recibido
+     va a ser en kilos. Y pones en chiquito cuántos cajones equivalen. La única excepción que no es
+     en cajones sino en bolsas son las bombillas GRJ5 y GRJ6. Entregan bolsas de 120 unidades…
+     quiero que también aparezcan las partes en box… en vez de sugerido y cantidad, va a ser
+     esperado y cantidad").
+     (1) COMO ENTREGA cada pieza es un dato de la PIEZA, igual que el envase de envio: columnas
+     nuevas GP2.componente.entrega_unidad / entrega_uni_x, con default cajones + uni_x_cajon. Solo
+     GRJ5 y GRJ6 las tienen cargadas (bolsas / 120). tablet_bundle las manda en cada fila de
+     'recibir' de un tallerista como env_unidad / env_factor / env_carga, que son las mismas claves
+     que ya usaba Enviar: el front no aprendio un modelo nuevo.
+     (2) LA TARJETA dice ESPERADO (en cajones o bolsas) y, abajo, lo que se va a recibir. La vista
+     de la parte dice "Esperado" y "Cantidad" (el usuario pidio que no se llame mas "Recibido"), con
+     el campo en KG y el renglon chico "≈ N cajones" debajo, el mismo de siempre.
+     (3) EL EXCESO SE COMPARA EN LA UNIDAD CANONICA (canonDe): el esperado viene en unidades y ahora
+     se escriben kg, asi que sin convertir se comparaba peras con manzanas. Y al registrar, el
+     esperado VIAJA EN LA MISMA UNIDAD que la cantidad (1.000 uni x 0,01 = 10 kg), porque
+     tablet_registrar los compara crudos para levantar la alerta de "recibi de mas".
+     (4) La tarjeta con exceso se pinta naranja y lo dice, como la fila de la tabla.
+     OJO: en Recibir la tablet SI se acuerda de lo tipeado (envSinMemoria es solo de Enviar). Lo que
+     cambio aca es como se ve, no la memoria. Los cajones NO se registran: crear_entrega_tallerista
+     no tiene donde anotarlos (a diferencia de crear_envio_ps); el kg es lo que mueve el stock. -->
+<!-- v1.18.0 (2026-09-18) — Y EL PROV. DE ART. TERMINADO, IGUAL (usuario: "seguís de la misma manera
+     con prov de art terminado"). Era el ultimo destino de Enviar que quedaba con tabla: ahora va en
+     tarjetas y con la vista por parte, como los otros tres.
+     UNIDAD: el prov. AT recibe SOLO cartones y cajas (sector 10 y 11), o sea justo las dos cosas que
+     van en PAQUETES, asi que hereda tal cual el envase por pieza del tallerista — el paqueton del
+     formato para el carton y los 25 de parametro.caja_uni_x_paquete para la caja. En tablet_bundle
+     es un cambio de una linea: el case de env_unidad/env_factor/env_carga pasa de "tipo =
+     'tallerista'" a "tipo in ('tallerista','proveedor_at')".
+     LA REFERENCIA NO ES EL SUGERIDO: el prov. AT no tiene (envConSugerido() es false), asi que la
+     tarjeta y la vista muestran el ONLINE DEL SECTOR — lo que hay en Cervantes para mandarle — con
+     ese rotulo. Sale de refInfo(), que devuelve lo mismo para los dos casos para que la tarjeta no
+     tenga que saber cual es cual. El online se muestra en la unidad de la PIEZA (988 uni), no en
+     paquetes: es un stock, no algo que se manda.
+     CON ESTO EN ENVIAR YA NO QUEDA TABLA NI MEMORIA EN NINGUN DESTINO: envSinMemoria() son los
+     cuatro. La tabla sigue viva solo en Recibir, que no se toco. -->
+<!-- v1.17.0 (2026-09-18) — LOS TALLERISTAS TAMBIEN EN TARJETAS, Y CON UNIDAD DE ENVIO POR PIEZA
+     (usuario, textual: "quiero que copies la misma logica para los talleristas. Lo que si no esta
+     modelado la unidad de medida ni de sugerido ni de cantidad… Carton segun el formato se le manda
+     segun como viene el paqueton… o mil unidades o dos mil. Y las cajas en paquetes de 25. Entonces
+     el sugerido y la cantidad va para ambos en paquetes, cartones y cajas. En cambio para el resto
+     el sugerido va en cajones y la cantidad va en kilos… y abajo chiquito te pone a cuantos cajones
+     equivale. Ademas, tendria que aparecer en formato box").
+     (1) LA UNIDAD LA PONE LA PIEZA, NO EL DESTINO. Hasta hoy la unidad de envio era del PROVEEDOR
+     (proveedor_servicio.envio_*). Un tallerista recibe de todo, asi que la unidad no puede ser una
+     sola: la dice cada pieza y la manda la base. tablet_bundle agrega env_unidad / env_factor /
+     env_carga a cada fila de tallerista: Sector Carton (10) -> paquetes, y el paqueton es el del
+     FORMATO (carton_formato.uni_x_bolsa: 1.000 el C y el LOKE, 2.000 el Huevo, 3.000 el 8, 100 el
+     Pliego); Sector Caja (11) -> paquetes de parametro.caja_uni_x_paquete (25); el resto -> sugerido
+     en CAJONES (componente.uni_x_cajon) y cantidad en KG, con la equivalencia redondeada en el
+     renglon chico de abajo del campo. Sin el dato NO se inventa el envase: esa pieza queda en
+     unidades y la tarjeta lo dice ("sin paquete cargado" / "sin cajon cargado").
+     (2) EN EL FRONT eso es envaseDe(x), que unifica las dos formas que conviven: el envase del
+     PROVEEDOR (packEnvio, con el caso por pieza de Guazzaroni, Jade y los otros) y el de la PIEZA
+     (tallerista). Todo lo demas — sugerido, campo, eqFila, payload, resumen del confirm — ya
+     colgaba de ahi; se fue factorEnvio(), que era el pedazo que solo sabia de proveedores.
+     (3) Y NO SE PRECARGA MAS NADA: el tallerista era el ultimo que arrancaba con la cantidad escrita
+     y con memoria; el usuario eligio "igual que P.S.: vacio y sin memoria". Con eso se fueron
+     precargaCantidad(), sugeridoEnCarga() y la firma qAuto: ya no hay valor derivado guardado en
+     localStorage que pueda quedar viejo. La tabla sigue viva solo para el prov. de art. terminado
+     y para TODO Recibir.
+     (4) De paso, "1 cajones" pasa a "1 cajon" (unidadTxt): con uno va el singular. Es el mismo criterio
+     que singularEnvase() de v1.16.0, pero para el SUGERIDO: aquella dice el envase de un renglon de
+     equivalencia, esta la unidad del sugerido y de lo cargado en la tarjeta.
+     SIN cambios de datos: mismo payload (el inventario sigue viendo uni o kg, nunca paquetes ni
+     cajones) y misma RPC de registro. -->
+<!-- v1.16.0 (2026-09-18) — UN ENVASE NO SE PARTE: BOLSAS Y CAJONES, SIEMPRE EN ENTERO (usuario,
+     sobre un "= 6,17 bolsas" de Ester: "acordate que todo lo que sea envio de cajones y bolsas
+     redondear. En este caso, el pasaje serian 6 bolsas"). Hasta ahora habia DOS criterios: los
+     envases del proveedor (Ester) mostraban 2 decimales cuando no daba entero, y los de la forma
+     del cajon por pieza se redondeaban. Ahora es UNO SOLO para todos, en la Tablet y en Envio a PS:
+     el equivalente en bultos va siempre al entero MAS CERCANO (6,17 -> 6; 4,83 -> 5, que son los
+     dos ejemplos que dio el usuario), con "=" cuando da justo y "≈" cuando se redondeo. Si no llega
+     a un envase se dice con palabras ("menos de 1 bolsa"), porque un "≈ 0 bolsas" no sirve.
+     Vive en textoEnvases()/singularEnvase(); equivEnvase perdio el parametro `redondear`.
+     TAMBIEN LO QUE SE REGISTRA: movimiento.cajones era el numero crudo con 2 decimales (3,5
+     cajones) y ahora es el mismo entero que se ve (3). Si redondeando da cero no se anota bulto.
+     LO QUE NO CAMBIA: el SUGERIDO sigue yendo PARA ARRIBA (techo). Es "lo que falta", y pedir
+     menos de lo que falta no llena el lugar [usuario 2026-09-17, sobre Ester: "redondeas por
+     arriba"]. Son dos cosas distintas: lo que falta se pide entero para arriba, lo que se manda se
+     describe con el envase mas cercano. -->
+<!-- v1.15.4 (2026-09-18) — EL SUGERIDO DE LA TARJETA, MÁS GRANDE Y EN NARANJA (usuario, textual:
+     "Quiero que en todos los box me aparezca el sugerido más grande y de otro color más llamativo").
+     Sólo CSS de .pc-sug (15px gris #777 → 21px negrita naranja #c2410c) y la aclaración de al lado
+     ("· sin cajón cargado") envuelta en .pc-nota para que quede chica y gris: si crecía con el
+     número, la línea se comía la tarjeta a 230px. El naranja se eligió para no pisar el verde de
+     "✓ envía N" ni el negro del código. La tabla (talleristas, recibir) y la vista de la parte no
+     se tocaron: sólo las tarjetas de Enviar → Prov. de servicio / Inyectores. -->
+<!-- v1.15.3 (2026-09-18) — EL SUBTÍTULO DEL BOTÓN "Inyectores" DICE "bolsas plásticas"
+     (usuario, textual: "En versión tablet, en vez de bolsas de resina, bolsas plásticas poné").
+     Cambio de TEXTO de una sola línea en TIPOS.enviar: no se tocó nada de la lógica del inyector
+     (sigue mandando kg de resina por enviar_material_inyector, con su sugerido desde la O.C.).
+     Los comentarios que explican el módulo siguen hablando de resina porque eso es lo que viaja;
+     lo que cambia es cómo lo nombra el operario en la pantalla.
+     Y DE PASO, del mismo screenshot: EN LA TARJETA DE LA PARTE EL TEXTO QUEDABA CORTADO contra
+     el borde (usuario: "ojo que por ejemplo, en guazzaroni, aparece así" — se veía "Sugerido
+     13.272 uni · sin cajón cargad"). Lo comía el white-space:nowrap de .pc-sug: en la tablet
+     real la grilla arma columnas de 230px y esa línea no entra en una sola. Ahora .pc-sug baja
+     de renglón y la tarjeta entera lleva overflow-wrap:anywhere (un código o una descripción
+     larga tampoco se puede ir afuera). Se ve a 1.280px, no a 390 — ahí la tarjeta es de ancho
+     completo y entraba; por eso el test nuevo mide a 1.280. -->
+<!-- v1.15.2 (2026-09-18) — TODOS IGUALES: EL BULTO ES UN RENGLON CHICO DEBAJO DE LOS KG, TAMBIEN
+     EN HERNANDEZ JULIO (usuario: "esta bien que me lo ponga chiquito abajo, pero modifica hernandez
+     julio asi quedan todos asi"). Julio era el unico con el bulto en una COLUMNA aparte, con su
+     propio campo editable; ahora sus bolsas/cajones salen abajo del campo de kg, igual que las de
+     Ester y que los cajones de los 7 P.S. que van por el cajon de cada pieza. La tabla de Julio
+     pasa de 4 columnas a 3 (Pieza | Sugerido | Cantidad (kg)).
+     Lo que se pierde a proposito: el bulto ya no se puede corregir a mano. Se calcula desde los kg
+     tipeados, con TECHO (un bulto no se parte), y es lo que viaja a movimiento.cajones; el stock lo
+     sigue moviendo la cantidad en kg, asi que el bulto es informativo. El campo "c" del buffer y su
+     autocompletado se fueron enteros.
+     Un solo helper para las dos formas: eqFila(x, q) decide si la fila lleva renglon y con que
+     texto (bulto por SECTOR en el envio por peso; envase del proveedor en el resto). Sin factor no
+     hay renglon: no se inventa.
+     BASE (sin codigo): entran a la forma "cajon de cada pieza" Laboratorio FAAT (2), Mabra
+     Metalurgica (3), Pedernera Ilario (6), Scorrano Mario (7) y Maspoli SRL (15). Con Guazzaroni y
+     Jade son 7, y ya no queda ningun P.S. con piezas sin unidad de envio definida. -->
+<!-- v1.15.1 (2026-09-18) — SE VA EL BOTON "USAR EL SUGERIDO" DE LA VISTA DE LA PARTE (usuario,
+     textual: "no quiero que aparezca la opcion de enviar sugerido"). v1.15.0 lo habia puesto como
+     atajo; la linea de la casa es mas simple y ya estaba escrita en 4ee: el sugerido es REFERENCIA,
+     la cantidad la escribe la persona. Sin atajo no hay forma de mandar el calculo sin mirar. Queda
+     el boton "Listo", que solo cierra la parte. sugeridoEnCarga() sigue viva: la usa la precarga del
+     tallerista, que NO se toco. -->
+<!-- v1.15.0 (2026-09-18) — ENVIAR A PROV. DE SERVICIO: LAS PARTES EN TARJETAS, Y LA CARGA EN UNA
+     VISTA APARTE (usuario, textual: "quiero modificar la forma en que se seleccionan las partes.
+     Actualmente se muestran en formato de listado. Quiero reemplazar ese listado por boxes o
+     tarjetas individuales… Al seleccionar una parte, debe abrirse una vista donde se muestre la
+     cantidad sugerida y un campo para indicar la cantidad efectiva que se va a enviar").
+     ALCANCE: Enviar a Prov. de servicio y a los Inyectores, que v1.14.0 saco a un boton propio pero
+     se cargan igual (la vista cuelga de envSinMemoria, que incluye a los dos). Talleristas, prov. de art.
+     terminado y TODO Recibir siguen con la tabla: ahi hay esperado, exceso y remito, y el operario
+     los lee de corrido.
+     LA TARJETA muestra codigo (con su unidad), descripcion, el sugerido de referencia y, abajo, lo
+     que hoy se va a mandar ("sin cargar" en gris / "envia N" en verde, con el borde verde). LA
+     VISTA DE LA PARTE muestra el sugerido grande y el campo de la cantidad efectiva, con las MISMAS
+     unidades y equivalencias que tenia la fila: paquetes (AJ), kg con "= N bolsas" (Ester), kg con
+     el redondeo a cajones (Guazzaroni), y por peso (Julio) los dos campos, kg y bultos enteros, con
+     SIN CAMBIOS DE DATOS: mismo buffer, mismo payload, mismas RPC. La cuenta del sugerido se
+     unifico en sugeridoInfo() / sugeridoEnCarga(), que ahora usan la tabla, la tarjeta, la vista de
+     la parte y la precarga del tallerista: una sola cuenta, no cuatro copias. -->
+<!-- v1.14.0 (2026-09-18) — LOS INYECTORES SALEN DE "PROV. DE SERVICIO" Y TIENEN SU PROPIO BOTON
+     (usuario: "en la version tablet, en envio a proveedores de servicio, quiero que a JL Matricera,
+     Kollplast, Pat Bet Plas y Pettofrezza Rafael los pongas aparte como inyectores, no adentro de
+     proveedores de servicio"). Da vuelta la decision de v1.3.0 (que los habia metido adentro de
+     "Prov. de servicio" porque el operario los mandaba al mismo lugar mental): ahora Enviar tiene un
+     cuarto tipo, "Inyectores" (icono 💉), con los 4 que hoy devuelve tablet_bundle como tipo
+     'inyector' (JL Matriceria, Kollplast, Pat Bet Plast, Pettofrezza Rafael) y sus bolsas de resina.
+     SOLO CAMBIA DONDE SE ELIGEN: adentro la pantalla es la misma (sugerido de kg desde la O.C.,
+     columna "O.C." en vez de "Maximo", cantidad vacia y sin memoria, registro por
+     enviar_material_inyector). Front-only: un item mas en TIPOS.enviar y cpsDelTipo deja de mezclar.
+     Ninguno de los 4 es proveedor_servicio en la base (verificado), asi que ninguno queda duplicado
+     ni desaparece de la otra lista. -->
+<!-- v1.13.0 (2026-09-18) — Y TAMPOCO SE GUARDA LO QUE SE TIPEA: EN P.S. LA TABLA ARRANCA SIEMPRE
+     VACIA (usuario: "hay algunos que siguen anotados. Si cargue algo yo, cuando salgo quiero que
+     desaparezca, no que se guarde, por lo tanto todas las cantidades deben estar vacias"). v1.12.0
+     dejo de PRESCRIBIR el numero pero el buffer de la tablet seguía guardando lo tipeado a mano, así
+     que al volver a entrar aparecían cantidades viejas — el mismo problema con otro origen. Ahora,
+     en Enviar a P.S. e inyector, el buffer de esa contraparte se borra al ENTRAR, al SALIR (← Cambiar,
+     Cambiar tipo) y al cerrar o recargar la pantalla (pagehide). El buffer se sigue usando mientras
+     la contraparte esta abierta: es de donde sale lo que se registra. Al tallerista no se le toca
+     (ahi la precarga del sugerido sigue viva). Ver envSinMemoria() / olvidarCargado(). -->
+<!-- v1.12.2 (2026-09-18) — FIX DEL FIX: el changelog de v1.11.0 se cortaba solo porque adentro
+     del texto del pedido del usuario iba un cierre de comentario (guion guion mayor), que para el
+     navegador CIERRA el comentario: desde ahi y hasta el siguiente cierre el HTML se pintaba como
+     texto arriba de los modulos de la tablet. v1.12.1 lo reemplazo por una flecha simple (->) en el
+     changelog viejo, pero lo escribio LITERAL tres veces en su propio texto para explicarlo, asi
+     que el mismo cartel volvio a aparecer. Regla, entonces: en estos comentarios el cierre NUNCA se
+     escribe, se nombra. Nada de logica: solo el delimitador. Mismo fix en EnviosPS_GP2.html. -->
+<!-- v1.12.0 (2026-09-17) — A LOS PROVEEDORES DE SERVICIO NO SE LES PRECARGA LA CANTIDAD (usuario:
+     "en el caso de envío a proveedores de servicio en la versión tablet, no me preescribas lo que
+     voy a enviar la cantidad que voy a enviar sino que lo voy a escribir yo porque puede generar
+     confusiones"). El campo Cantidad arranca VACÍO en P.S. e inyector (que en la tablet se eligen
+     dentro de "Prov. de servicio"); el Sugerido se sigue mostrando en su columna, con la unidad de
+     cada proveedor (paquetes de AJ, bultos de Julio, bolsas de Ester, cajones de Guazzaroni), porque es la referencia — lo que
+     se fue es el número metido en el campo. A los TALLERISTAS se les sigue precargando (no se pidió
+     para ellos). Dos consecuencias buscadas: el botón "Enviar (N)" vuelve a contar lo que la persona
+     realmente cargó, y al abrir una contraparte se LIMPIA del buffer de la tablet el valor que dejó
+     la precarga de versiones anteriores (solo si es exactamente ese, una edición a mano no se toca).
+     Ver precargaCantidad(). -->
+<!-- v1.11.0 (2026-09-17) — GUAZZARONI PATRICIO: EL SUGERIDO EN CAJONES Y LA CANTIDAD EN KG
+     (usuario: "dentro del version tablet, y envio a ps. Siguiendo la logica del modulo Ester ->
+     en el modulo de guazzaroni patricio, el sugerido tendria que aparecer en cajones y en cantidad
+     pones kg y que te diga cuantos cajones son (redondeando)"). Es la forma de Ester con UNA
+     diferencia: el envase NO es uno solo para todo el proveedor. El cajon lo pone CADA PIEZA
+     (componente.uni_x_cajon), como el bulto de Hernandez Julio. Lo dice la base:
+     proveedor_servicio 4 = envio_unidad 'cajones' / envio_uni_x NULL / envio_carga_unidad 'kg';
+     la regla nueva es que envio_uni_x NULL significa "el factor sale de la pieza". Con eso:
+     encabezados "Sugerido (cajones)" / "Cantidad (kg)", el sugerido en cajones con TECHO
+     (34.992 remaches / 57.143 por cajon -> 1 cajon), la cantidad precargada con el peso de esos
+     cajones y debajo del campo "= N cajones" REDONDEADO ("≈ N" cuando no da entero, que es lo que
+     pidio el usuario). Al registrar viaja el KG y to_canonical lo pasa a unidades con kg_x_uni: el
+     inventario nunca ve cajones; los cajones quedan anotados en movimiento.cajones (informativo).
+     Las 5 piezas de Guazzaroni sin uni_x_cajon (CV12, CV18D, CV6, CV9, W1B) NO se convierten: esa
+     fila cae a unidades y la celda lo dice ("sin cajon cargado"), en vez de inventar el factor.
+     FIX del mismo dia (bug, no feature): la Cantidad precargada quedaba VIEJA. El buffer vive en
+     localStorage y sobrevive dias, y la precarga solo tocaba campos vacios, asi que cuando cambiaba
+     el sugerido se veia el Sugerido nuevo con la Cantidad de otro dia [usuario: "fijate que hoy
+     aparece el sugerido y la cantidad preescrita distinta en guazzaroni"]. Ahora la precarga queda
+     firmada en it.qAuto: mientras el operario no la haya tocado se refresca sola; si la edito, no
+     se le pisa nunca. Vale para TODOS los proveedores (antes la migracion solo corria para los que
+     tienen unidad de envio propia). -->
+<!-- v1.10.0 (2026-09-17) — JULIO: EL SUGERIDO EN BULTOS, LAS DOS CANTIDADES CON LA MISMA CARA
+     (usuario: "no le pongas kilos a enviar, sino ponele cantidad y entre paréntesis kilos. Lo mismo
+     con bolsas cajones… no quiero que el formato de las bolsas sea distinto al de los cajones,
+     quiero que las dos sean como el resto de los box… en el sugerido no quiero ver los kilos, sino
+     los cajones, y acordate que los cajones y las bolsas siempre van redondeadas, no puedes poner
+     4,83, sino que pones 5"). Tres cosas sobre v1.7.0, ningún cambio de base:
+       · encabezados como el resto de las pantallas: "Cantidad (kg)" y "Cantidad (bolsas / cajones)"
+         en vez de "Kg a enviar" y "Bolsas / cajones";
+       · las BOLSAS dejan de ser un texto calculado y pasan a ser un campo igual al de los cajones
+         (mismo box, teclado numérico), que se autocompleta desde los kg mientras no se lo toque;
+       · el SUGERIDO se muestra en bultos ENTEROS (techo), no en kilos, y la Cantidad (kg) se
+         precarga con el peso de esos bultos completos (2 cajones de 750 a 0,04 kg = 60 kg, no los
+         40 kg pelados del sugerido). Todo bulto —bolsa o cajón— va redondeado para arriba, en el
+         sugerido, en el autocompletado y en lo que se registra: un bulto no se parte.
+     Lo que se guarda no cambió: viajan los kg (unidad 'kg') y el bulto a movimiento.cajones. -->
+<!-- v1.9.0 (2026-09-17) — COLUMNAS SIN BLANCO MUERTO (usuario, sobre el screenshot de AJ Adhesivos:
+     "optimizame todos los espacios en blanco que hay entre las columnas en todas las pantallas de
+     envío a ps en la versión tablet"). table.t hereda width:100% de gp2-modulo.css: con 3 o 4
+     columnas el navegador repartía todo el ancho sobrante de la tablet entre ellas y dejaba media
+     pantalla de blanco entre la pieza y su número. Ahora el bloque de carga (buscador + cartel +
+     tabla) encoge con la tabla: cada columna mide lo que necesita su contenido, el buscador mide
+     exactamente lo que miden las columnas, y el aire que queda va ADENTRO de cada celda (padding
+     8→12px) en vez de entre columnas. Vale para todas las vistas de la tabla (PS con paquetes, PS
+     con bolsas+kg, PS por peso, PS/tallerista/inyector común y Recibir), que son un solo render. En el celular (≤640px)
+     no hay blanco que recortar: la tabla vuelve a ocupar todo el ancho, como antes. Solo CSS +
+     un div contenedor: ningún cálculo, payload ni encabezado cambió. -->
+<!-- v1.8.0 (2026-09-17) — ESTER: EL SUGERIDO EN BOLSAS DE 1800 Y LA CANTIDAD EN KG (usuario:
+     "en el caso de Ester, el sugerido que aparezca en bolsas (1800 uni por bolsa) redondeas por
+     arriba y la cantidad pones kg y te aparece al lado bolsas"). TERCERA forma de enviar, y no es
+     ninguna de las dos que ya habia: AJ escribe el envase (paquetes) y Hernandez Julio (v1.7.0)
+     escribe kg con el bulto que le pone el SECTOR de cada pieza. Ester mira BOLSAS —una sola
+     medida para todo el proveedor, como AJ— pero PESA lo que carga, como Julio. Lo dice la base:
+     proveedor_servicio.envio_carga_unidad = 'kg' (Ester = bolsas/1800/kg; AJ sigue con null y
+     Julio con envio_unidad='kg' sin factor, y ninguno de los dos cambia). Con eso: encabezados
+     "Sugerido (bolsas)" y "Cantidad (kg)", el sugerido en bolsas con TECHO (112.432 mangos ->
+     63 bolsas), la cantidad precargada en los kg de esas bolsas (63 x 1800 x 0,0054 = 612,36 kg)
+     y debajo del campo "= 63 bolsas", que se recalcula mientras se tipea. Al registrar viaja el KG
+     tal cual y to_canonical lo pasa a mangos con kg_x_uni: el inventario nunca ve bolsas. Si a la
+     pieza le falta kg_x_uni no hay forma de pasar de bolsas a kg, asi que esa fila cae al modo de
+     AJ (se carga en bolsas) en vez de inventar.
+     OJO: bolsa != cajon. uni_x_cajon de PC2 es 1852 y de PC3B 1800, pero la bolsa es 1800 para las
+     dos; por eso el factor de Ester vive en el proveedor y no se saca del componente (al contrario
+     de Julio, donde el bulto SI sale de componente.uni_x_cajon). Las bolsas quedan anotadas en
+     movimiento.cajones (mismo criterio que las bolsas calculadas de Julio): es informativo, el
+     stock lo mueve la cantidad en kg. -->
+<!-- v1.7.0 (2026-09-17) — ENVIO A HERNANDEZ JULIO: SE MANDA POR PESO, CON EL BULTO AL LADO
+     (usuario: "para lo que son partes plásticas, que empieza con la letra P, el envío sugerido tiene
+     que estar nominado en bolsas… cuántos kilos le están mandando y cuántas bolsas eso significa.
+     Después, para A1, B12, B4B y C2, el sugerido en kilos y en cajones a enviar, y anotar cuántos
+     kilos y cuántos cajones le están mandando").
+     UNIDAD DE ENVIO 'kg' POR PROVEEDOR (proveedor_servicio.envio_unidad='kg', sin envio_uni_x). A
+     diferencia de AJ Adhesivos —una sola unidad para todo el proveedor— acá el BULTO cambia por
+     pieza, así que sale del SECTOR de cada una: Sector Plástico → bolsas, el resto → cajones (en
+     los plásticos componente.uni_x_cajon ES el tamaño de la bolsa). La tabla pasa a 4 columnas:
+     Pieza | Sugerido (kg y "= N bolsas/cajones") | Kg a enviar | Bolsas/cajones.
+     Los KG son lo que se tipea (manda la balanza) y lo que se registra (unidad 'kg'; la base los
+     pasa a unidades con kg_x_uni). El bulto de los plásticos es CALCULADO (display, se repinta al
+     tipear); el de las metálicas es un campo EDITABLE que se autocompleta desde los kg mientras el
+     operario no lo toque, y viaja como movimiento.cajones (crear_envio_ps ya tenía p_cajones;
+     tablet_registrar ahora lo pasa). Sin kg_x_uni la fila NO se convierte: se carga en unidades
+     como siempre, no se inventa el factor. -->
+<!-- v1.6.1 (2026-09-17) — LA CANTIDAD TAMBIEN SE PRECARGA EN PAQUETES + MIGRACION DE BUFFER VIEJO
+     (usuario: "quiero que la cantidad me la preestablezcas en paquetes tambien"). La cantidad ya se
+     precargaba en paquetes cuando el campo estaba vacio; lo que faltaba: si en el buffer de la tablet
+     quedo guardado el sugerido VIEJO en unidades (de una version anterior), la precarga no lo pisaba
+     (solo tocaba campos vacios) y se veia la cantidad en unidades. Ahora, si el valor guardado es
+     EXACTAMENTE esa precarga vieja, se reemplaza por el valor en paquetes; una edicion real del
+     operario (cualquier otro valor) NO se toca. Solo aplica a proveedores con unidad de envio propia.
+     v1.6.0 (2026-09-17) — UNIDAD DE ENVIO POR PROVEEDOR: AJ ADHESIVOS EN PAQUETES DE 100 (usuario:
+     "arrancamos con AJ Adhesivos... el sugerido en paquetes de 100... en ambos casos (sugerido y
+     cantidad) me aclares la unidad de medida... paquetes"). El proveedor_servicio puede definir una
+     unidad de envio propia (GP2.proveedor_servicio.envio_unidad / envio_uni_x, hoy AJ = 'paquetes'/100,
+     lo trae tablet_bundle en cada contraparte). Cuando existe: los encabezados dicen "Sugerido
+     (paquetes)" y "Cantidad (paquetes)", el sugerido se muestra y precarga en paquetes (techo:
+     250 pliegos -> 3), y al registrar se multiplica x100 para guardar en pliegos (uni) — el
+     inventario NUNCA ve paquetes. Sin unidad propia, todo sigue igual (uni/kg). Front helper
+     packEnvio(); base: tablet_bundle + 2 columnas nuevas en proveedor_servicio.
+     v1.5.0 (2026-09-17) — ENVIAR CON SUGERIDO: SOLO PIEZA · SUGERIDO · CANTIDAD (usuario: "quiero ver
+     solo la columna de pieza, sugerido y cantidad. Primero empeza haciendo esto en todos los envios
+     de ps y despues seguimos"). Se sacaron del render las columnas Stock PS/Stock Tall. (saldo_dest)
+     y Máximo/O.C. (maximo) en la vista Enviar con sugerido (PS, tallerista e inyector). El sugerido
+     se sigue precargando en Cantidad y su cálculo no cambia, solo el render. PENDIENTE (usuario):
+     las unidades de sugerido y cantidad se van a definir caso por caso por proveedor.
+     v1.4.6 (2026-09-16) — EL ENCABEZADO STOCK ACLARA QUE ES DEL TERCERO (usuario: "aclara que ese stock
+     es stock P.S."). En Enviar con sugerido, la columna Stock pasa a "Stock PS" (PS/inyector) o
+     "Stock Tall." (tallerista): es el saldo en poder del tercero (enviado − entregado), no el nuestro.
+     La recepción de partes plásticas ya descuenta la resina del inyector (crear_recepcion_insumo:
+     consumo_inyector = cantidad × kg_x_uni × (1 + inyeccion_desperdicio_pct/100), hoy 4%). -->
+<!-- v1.4.5 (2026-09-16) — LA COLUMNA "STOCK" MUESTRA EL SALDO EN PODER DEL TERCERO (usuario: "en stock
+     me gustaría saber lo que le enviamos nosotros − lo entregado por ellos, que sería el saldo en ps").
+     Stock pasa de online_sector a saldo_dest = inventario de lo que le mandamos (pieza/resina) en la
+     ubicación del destino = enviado − entregado. Vale para PS, tallerista e inyector. tablet_bundle
+     devuelve 'saldo_dest'. -->
+<!-- v1.4.4 (2026-09-16) — LA COLUMNA "STOCK" MUESTRA LO NUESTRO PARA MANDAR (usuario: "que la columna
+     stock muestre lo que tenemos nosotros de lo que le vamos a mandar: bolsas... pero aplica para todo").
+     En Enviar con sugerido, Stock deja de mostrar el stock de la pieza que devuelven (stock_dest) y
+     pasa a mostrar online_sector = lo que tenemos de la pieza que ENVIAMOS (resina/bolsa para el
+     inyector, chapa/pliego crudo para PS/tallerista). Vale para los 3 tipos. (Backend: inyector ahora
+     saca O.C./sugerido de la O.C. de partes ENVIADA — 0 si no hay OC.) -->
+<!-- v1.4.3 (2026-09-16) — INYECTOR: LA COLUMNA DEL MEDIO SE LLAMA "O.C." (usuario: "si el pedido surge
+     de o.c quiero que en vez de max me aparezca o.c"). Para inyectores el pedido surge de la O.C. de
+     partes plásticas, así que el encabezado pasa de "Máximo" a "O.C." (mismo valor). PS/talleristas
+     siguen con "Máximo". Solo el rótulo del thead cuando selCP.tipo==='inyector'. -->
+<!-- v1.4.2 (2026-09-16) — SUGERIDO DE BOLSAS PARA INYECTORES EN ENVIAR (usuario: "según el máximo
+     de partes plásticas − stock de partes plásticas = O.C., mandarle la cantidad de bolsas según esa
+     OC"). Al elegir un inyector (Pat Bet Plast, Pettofrezza, Kollplast, JL Matriceria), cada resina
+     muestra Stock/Máximo/Sugerido en KG y precarga el sugerido: Σ sobre las partes plásticas que usan
+     esa resina de (máximo_parte − stock_parte) × kg_x_uni. tablet_bundle: CTE rep_iny; el envío de la
+     bolsa se sigue ruteando a enviar_material_inyector (kg). Sólo cambió envConSugerido (suma inyector). -->
+<!-- v1.4.1 (2026-09-16) — SE SACA "N sin registrar" DE LAS BALDOSAS DE TIPO EN ENVIAR (usuario:
+     "me aparece 3 sin registrar/1 sin registrar"). Desde la precarga de v1.4.0, abrir una
+     contraparte PS/tallerista ya llena el buffer con el sugerido, así que el cartelito contaba
+     como "sin registrar" destinos que el operario ni tocó. Se elimina el badge de pintarTipos
+     (queda sólo el número de contrapartes). El chip por contraparte sigue mostrando "N cargadas". -->
+<!-- v1.4.0 (2026-09-16) — ENVIAR MUESTRA CUÁNTO MANDAR (usuario: "máximo de pliegos adhesivados −
+     stock de pliegos adhesivados = lo que debería mandarle", "precarga en el campo cantidad").
+     En Enviar a PROV. DE SERVICIO y TALLERISTA cada fila trae ahora Stock | Máximo | Sugerido de la
+     pieza PROCESADA/ARMADA (la salida), y el Sugerido se PRECARGA en el campo Cantidad (editable).
+     sugerido = Σ salidas max(0, máximo_salida − stock_salida − lo que ya está en el destino)·ratio
+     − lo que ya se le mandó de esa entrada y no volvió. Sale de tablet_bundle (CTE rep, ruta_paso
+     entrada→salida). Prov. AT / inyector siguen mostrando "Online sector" (sin sugerido). El
+     precargado se hace UNA vez al elegir la contraparte: si borrás un campo, no se vuelve a llenar. -->
+<!-- v1.3.1 (2026-09-15) — FIX: en Enviar → Prov. de art. terminado, cada proveedor ve SOLO los
+     cartones/cajas que la receta de sus articulos usa (Cabral 39, Paternal Goma 1…), no los 191
+     de todo el sector 10/11. tablet_bundle: el prov AT deja de ir con ref '*' (recibe todo) y pasa
+     por el cruce articulo_prov_at→articulo→articulo_componente; n_env por proveedor; piezasDe filtra
+     por ref para todos. Kuffo/Manfer quedan en 0 (sin cartones en receta) y no aparecen en Enviar. -->
+<!-- v1.3.0 (2026-09-15) — LOS INYECTORES APARECEN DENTRO DE "PROV. DE SERVICIO" PARA ENVIARLES
+     BOLSAS (usuario: "Tendria que aparecer en prov. de servicio para enviar las bolsas plasticas").
+     No son proveedor_servicio en la base (son proveedor_insumo/inyector con material_id), asi que
+     NO se creo un modelo PS falso: tablet_bundle ahora devuelve los inyectores como contraparte
+     tipo 'inyector' con sus RESINAS (sector 14) como envio, y cpsDelTipo los agrupa bajo el tipo
+     "Prov. de servicio". El envio de bolsas lo rutea tablet_registrar a enviar_material_inyector
+     (un solo RPC, sin duplicar la logica de Compras/Inyectores_GP2.html). El operario elige el
+     inyector, tipea kg de cada resina y listo. Migracion tablet_enviar_bolsas_a_inyector. -->
+<!-- v1.2.1 (2026-09-14) — SE SACA EL BOTON "INYECTORES" que v1.2.0 habia agregado en Enviar
+     [usuario: "saca el boton de inyectores y arranca la cirugia"]. Era un tipo-link a
+     Compras/Inyectores_GP2.html como atajo sin cirugia, pero el usuario quiere a los 3 inyectores
+     DENTRO de "Prov. de servicio", no en un boton aparte. Eso se logra convirtiendolos en
+     proveedor_servicio de verdad con su ruta de inyeccion (cirugia en la base), y ahi salen solos
+     en la lista de PS del Tablet (que se arma desde la base). Enviar vuelve a 3 tipos. -->
+<!-- v1.1.1 (2026-09-14) — el operario no ve la palabra "contraparte" [usuario 2026-09-14: "no
+     quiero que diga contraparte"]. El buscador dice "Buscar por nombre…", la baldosa del tipo
+     muestra sólo el número (el título ya dice qué son) y el pie dice "N para elegir". -->
+<!-- v1.1.0 (2026-09-14) — PRIMERO EL TIPO, Y LO QUE YA ESTÁ MODELADO NO SE COPIA
+     [usuario 2026-09-14]. Tres cambios, uno por modo:
+       · ENVIAR: antes tiraba las 33 contrapartes juntas. Ahora pregunta primero el TIPO
+         (tallerista / prov. de servicio / prov. de art. terminado) y recién adentro muestra
+         todas las de ese tipo. Si un tipo tiene una sola contraparte se entra derecho.
+       · RECIBIR: sale el PROV. DE ART. TERMINADO — entrega en Virgilio, y esta tablet es de
+         Cervantes. Entra PROV. DE INSUMOS, que NO se recarga acá: abre Recepción de Insumos
+         (rubros, pesaje de pallets, cruce contra OC), que ya hace ese trabajo. Una sola copia.
+         Con el prov. AT se fue la única carga en CAJAS: acá ya no se recibe nada por caja
+         (el `por_caja` del payload y el esperado en cajas quedan en el historial de git).
+       · CONTEO: deja de ser una tabla propia con CSV y abre el módulo de Relevamientos
+         (cronograma por sector, envases + sueltas, y el ajuste lo decide el operador del
+         sistema en Validación de Stock). No se guarda como modo: al volver, la tablet abre
+         en Enviar/Recibir y no rebota.
+     Los dos saltos son <a href> con ?volver=tablet, y esas dos pantallas devuelven el "Atrás"
+     acá en vez de al menú. El backend NO cambió: tablet_bundle sigue trayendo lo mismo. -->
+<!-- v1.0.0 (2026-09-13) — Versión Tablet del operario (ideas 7342/7343). UNA pantalla con tres
+     modos — Enviar / Recibir / Conteo — para la tablet del galpón, en vez de abrir la pantalla
+     de cada contraparte. El backend ya vive en la base: "GP2".tablet_bundle() (qué puede enviar
+     y qué puede recibir cada contraparte, con el ESPERADO: la OC si trae un proveedor, el stock
+     online si trae un tallerista / PS / Virgilio) y "GP2".tablet_registrar(p) (reusa las RPC de
+     siempre — crear_envio_*, crear_entrega_*, crear_recepcion_insumo — y NO inventa movimientos).
+     La alerta de "recibí de más" AVISA pero NO FRENA: el operario registra igual y la alerta queda
+     en GP2.alerta_recepcion para que la revisen en Alertas.
+     Dos trampas de unidad (las anotó la sesión que armó el backend):
+       · el proveedor de artículo terminado entrega CAJAS: se carga en cajas y el esperado de la
+         OC está en unidades (por_caja las cruza);
+       · una pieza cuya unidad es kg se manda y se recibe en kg (teclado con coma).
+     El Conteo no escribe nada: es la ayuda para contar contra el online; el ajuste de stock va
+     por Relevamientos → Validación de Stock (el operario cuenta, el operador del sistema decide). -->
+<script src="../auth-guard.js?v=20260929a"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Versión Tablet · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../supabase-config.js?v=20260929a"></script>
+<link rel="stylesheet" href="../gp2-modulo.css?v=20260912c"/>
+<link rel="icon" type="image/png" href="../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../GP2_favicon.png">
+<style>
+  /* los tres modos: baldosas grandes, el activo en negro (mismo lenguaje que .seg-btn).
+     Conteo es un <a>: se va al módulo de Relevamientos, así que nunca queda "activo". */
+  .modos{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0}
+  .modo-btn{min-height:60px;border-radius:12px;border:2px solid #d0d7de;background:#fff;
+    font-weight:900;font-size:20px;cursor:pointer;color:#111;text-decoration:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  .modo-btn.active{background:#111;color:#fff;border-color:#111}
+  .modo-btn small{display:block;font-size:13px;font-weight:700;color:#777;margin-top:2px}
+  .modo-btn.active small{color:#cfcfcf}
+  /* Primero el TIPO y recién después la contraparte: 33 botones juntos no se leen en la
+     tablet. No se estiran a todo el ancho (máximo 320px cada uno) para no dejar baldosas
+     enormes con dos palabras adentro. */
+  .tipos{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,320px));gap:10px;
+    margin:8px 0;justify-content:start}
+  .tipo-btn{min-height:78px;border-radius:12px;border:2px solid #d0d7de;background:#fff;color:#111;
+    padding:12px 16px;text-align:left;cursor:pointer;text-decoration:none;display:block}
+  .tipo-btn:hover{border-color:#111}
+  .tipo-btn .ti{display:block;font-size:21px;font-weight:900}
+  .tipo-btn small{display:block;font-size:14px;font-weight:700;color:#777;margin-top:4px;line-height:1.3}
+  .tipo-btn small b{color:#c2410c}
+  .cp-tipo{font-size:14px;color:#777;font-weight:700}
+  /* fila con exceso: se ve, no frena */
+  table.t tr.demas td{background:#fff4e5}
+  .demas-tag{display:inline-block;margin-top:4px;background:#c2410c;color:#fff;border-radius:999px;
+    padding:3px 10px;font-size:14px;font-weight:800;white-space:nowrap}
+  .esp{font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .esp small{display:block;color:#777;font-size:13px;font-weight:700}
+  .uni-tag{display:inline-block;background:#eef2f6;border-radius:6px;padding:2px 7px;font-size:13px;
+    font-weight:800;color:#333;margin-left:4px;white-space:nowrap}
+  .uni-tag.kg{background:#e6f0ff;color:#0b4aa2}
+  .cell-in.big{font-size:20px;width:110px}
+  /* equivalencia en la unidad de envio del proveedor (Ester: se carga kg, al lado las bolsas) */
+  .env-eq{display:block;margin-top:4px;color:#0b4aa2;font-size:14px;font-weight:800;white-space:nowrap}
+  .alerta-box{margin:10px 0;border:2px solid #f4c08c;background:#fff4e5;border-radius:12px;padding:12px 14px;
+    font-size:17px;color:#5c2d00;line-height:1.4}
+  .alerta-box b{color:#8a3b00}
+  input#fRemito{height:44px;border:2px solid #d0d7de;border-radius:8px;padding:0 10px;font-size:19px;width:150px}
+  /* COLUMNAS SIN BLANCO MUERTO EN LA TABLET [usuario 2026-09-17: "optimizame todos los espacios en
+     blanco que hay entre las columnas en todas las pantallas de envio a ps en la version tablet"].
+     table.t viene a width:100% de gp2-modulo.css: con 3 o 4 columnas el navegador repartia el ancho
+     sobrante y dejaba un desierto entre la pieza y su numero (el ojo tenia que cruzar media pantalla
+     para leer una fila). Aca #tblBox (buscador + cartel + tabla) es inline-block: encoge hasta el
+     ancho de la tabla, y la tabla al de su propio contenido. El .table-wrap sigue con su scroll
+     propio para cuando no entra (celular, o muchas columnas). */
+  #tblBox{display:inline-block;max-width:100%;vertical-align:top}
+  .table-wrap{display:block;max-width:100%}
+  table.t{width:100%}   /* 100% de #tblBox, que ya mide lo que mide el contenido */
+  /* un poco mas de aire ADENTRO de cada columna, que es el unico blanco que suma: separa los
+     numeros del borde sin volver a abrir el hueco entre columnas. */
+  table.t th,table.t td{padding-left:12px;padding-right:12px}
+  table.t td.num,table.t th.num{white-space:nowrap}
+  /* la de Pieza es la unica que puede crecer: con techo, para que una descripcion larga no reabra
+     el hueco; abajo del techo la descripcion envuelve en dos lineas. */
+  table.t th:first-child,table.t td:first-child{max-width:340px}
+  table.t td:first-child .sub{white-space:normal}
+  /* ---- TARJETAS DE PARTE — Enviar → Prov. de servicio [usuario 2026-09-18: "quiero reemplazar
+     ese listado por boxes o tarjetas individuales… al seleccionar una parte, debe abrirse una vista
+     donde se muestre la cantidad sugerida y un campo para la cantidad efectiva"]. Solo esa vista:
+     talleristas, prov. de art. terminado y TODO Recibir siguen con la tabla de siempre. ---- */
+  #tblBox.cards{display:block;width:100%}          /* la grilla usa el ancho entero, no el de la tabla */
+  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:10px}
+  .parte-card{display:flex;flex-direction:column;gap:3px;min-height:132px;text-align:left;cursor:pointer;
+    border:2px solid #d0d7de;border-radius:14px;background:#fff;color:#111;padding:14px 16px;font-family:inherit;
+    /* nada de la tarjeta se puede cortar: el texto largo baja de renglon en vez de irse afuera
+       (pasaba con "Sugerido 13.272 uni · sin cajón cargado", que quedaba comido por el borde) */
+    overflow-wrap:anywhere}
+  .parte-card:hover{border-color:#111}
+  .parte-card.cargada{border-color:#15803d;background:#f4fbf6}
+  /* recibi de mas: avisa, no frena (mismo criterio que la fila de la tabla) */
+  .parte-card.demas{border-color:#c2410c;background:#fff4e5}
+  .parte-card.demas .pc-estado{color:#c2410c}
+  .pc-demas{display:block;font-size:15px;font-weight:800;color:#c2410c}
+  .pc-cod{font-size:23px;font-weight:900;line-height:1.1}
+  .pc-desc{font-size:16px;font-weight:700;color:#444;line-height:1.25}
+  /* el sugerido es EL dato de la tarjeta: grande y en naranja fuerte [usuario 2026-09-18:
+     "quiero que en todos los box me aparezca el sugerido mas grande y de otro color mas
+     llamativo"]. La aclaracion de al lado ("sin cajon cargado") queda chica y gris para que
+     el numero no compita con ella; el naranja no choca con el verde del estado "envia N". */
+  .pc-sug{font-size:21px;font-weight:900;color:#c2410c;line-height:1.2}
+  /* EL ROTULO va en su propio renglon, chico y gris (2026-09-21): en Recibir pasó a ser "Stock
+     prov. de servicio", y en 21px negrita se comia tres renglones de la tarjeta y le robaba la
+     jerarquia al numero, que es lo que el operario tiene que leer de lejos. */
+  .pc-sug .pc-rot{display:block;font-size:14px;font-weight:800;color:#777;letter-spacing:.4px}
+  .pc-sug .pc-nota{font-size:14px;font-weight:700;color:#777}
+  .pc-estado{margin-top:auto;padding-top:6px;font-size:17px;font-weight:800;color:#15803d}
+  .parte-card:not(.cargada) .pc-estado{color:#9aa1a8}
+  /* EL RÓTULO DEL RUBRO: parte la grilla del tallerista en bloques (crudo, procesado, remaches,
+     plásticas, cajas, cartones). Ocupa el ancho entero de la grilla, así que en 390px —donde la
+     grilla es de una sola columna— se ve igual, arriba de su primera tarjeta. */
+  .pc-rubro{grid-column:1/-1;font-size:18px;font-weight:900;color:#0b4aa2;letter-spacing:.4px;
+    text-transform:uppercase;padding:10px 2px 0;border-top:2px solid #e3e8ee;margin-top:4px}
+  .pc-rubro.primero{border-top:0;padding-top:0;margin-top:0}
+  /* Ver O.C. (v1.37.0): arriba del buscador, sólo Enviar a talleristas O.C. / prov. AT */
+  .oc-box{margin:12px 0 0;padding:10px 12px;background:#fff8e6;border:2px solid #f0c36d;border-radius:8px}
+  .oc-box .btn{min-height:44px;font-size:18px}
+  .oc-box .oc-msg{margin-top:8px;font-size:16px;color:#57606a}
+  .oc-box .table-wrap{width:fit-content;max-width:100%}
+  .oc-box table.t{margin-top:8px;width:auto}
+  .oc-box td.num,.oc-box th.num{text-align:right;white-space:nowrap}
+  /* la vista de UNA parte: el sugerido bien grande y un solo campo para la cantidad que se manda */
+  #detBox{max-width:560px}
+  .det-card{border:2px solid #d0d7de;border-radius:16px;background:#fff;padding:18px 20px;margin-top:10px}
+  .det-cod{font-size:30px;font-weight:900;line-height:1.1}
+  .det-desc{font-size:19px;font-weight:700;color:#444;margin-top:4px;line-height:1.3}
+  .det-sector{font-size:15px;font-weight:700;color:#777;margin-top:2px}
+  .det-lbl{font-size:15px;font-weight:800;color:#777;letter-spacing:.6px;text-transform:uppercase;margin-top:18px}
+  .det-sug{font-size:34px;font-weight:900;color:#0b4aa2;line-height:1.1;margin-top:2px}
+  .det-sug small{display:block;font-size:16px;font-weight:800;color:#0b4aa2;margin-top:2px}
+  .det-in{font-size:30px;font-weight:900;height:64px;width:100%;max-width:300px;text-align:right;
+    border:2px solid #111;border-radius:12px;padding:0 14px;font-family:inherit;margin-top:4px}
+  .det-uni{font-size:20px;font-weight:800;color:#333;margin-left:8px}
+  .det-eq{display:block;margin-top:6px;font-size:16px;font-weight:800;color:#0b4aa2}
+  /* las dos unidades, en dos columnas: apiladas la vista queda larguisima y el campo, ancho al
+     pedo [usuario 2026-09-18]. No envuelven: se achican, que a 390px sigue entrando. */
+  .det-dos{display:flex;gap:12px;align-items:flex-end}
+  .det-col{flex:1 1 0;min-width:0}
+  .det-campo{display:flex;align-items:center;gap:6px}
+  .det-dos .det-in{width:100%;max-width:none;min-width:0;font-size:26px;padding:0 10px}
+  .det-dos .det-uni{margin-left:0;white-space:nowrap}
+  /* lo anotado no coincide con lo que dicen los kg: avisa, no frena */
+  .det-eq.mal{color:#c2410c}
+  .det-falta{align-self:center;font-size:16px;font-weight:800;color:#c2410c}
+  .parte-card.incompleta{border-color:#c2410c;background:#fff9f3}
+  /* "➕ Otro cartón" y las filas que entran por ahí: se distinguen de las piezas propias del
+     destino, que son las que salen de su receta/ruta [2026-09-21]. */
+  .parte-card.otro{border-style:dashed;justify-content:center;align-items:center;text-align:center;color:#0b4aa2}
+  .parte-card.otro .pc-cod{font-size:21px}
+  .parte-card.otro .pc-desc{font-size:15px;color:#555}
+  .parte-card.sust{border-color:#0b4aa2;background:#f5f9ff}
+  .pc-sust,.det-sust{font-size:15px;font-weight:800;color:#0b4aa2}
+  .det-sust{margin-top:6px;font-size:17px}
+  /* el catálogo del reemplazo, adentro de la vista de la parte */
+  .sust-lista{max-height:52vh;overflow:auto;margin-top:8px;-webkit-overflow-scrolling:touch}
+  .sust-item{display:block;width:100%;text-align:left;border:2px solid #d0d7de;border-radius:12px;
+    background:#fff;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit}
+  .sust-item:hover{border-color:#111}
+  .sust-item .si-cod{font-size:21px;font-weight:900;display:block}
+  .sust-item .si-desc{font-size:15px;font-weight:700;color:#444;display:block;line-height:1.25}
+  .sust-item .si-stk{font-size:15px;font-weight:800;color:#15803d;display:block;margin-top:2px}
+  .sust-item .si-stk.cero{color:#c2410c}
+  #sustQ{font-size:19px;width:100%;padding:12px;border:2px solid #d0d7de;border-radius:10px;
+    font-family:inherit;margin-top:6px}
+  .det-acc{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+  .det-acc .btn{min-height:52px;font-size:19px}
+  @media (max-width:640px){
+    .modo-btn{font-size:17px;min-height:56px}
+    .modo-btn small{display:none}
+    /* en el celular no hay blanco que recortar: el bloque ocupa todo el ancho */
+    #tblBox{display:block;width:100%}
+    table.t th,table.t td{padding-left:8px;padding-right:8px}
+    .cards-grid{grid-template-columns:1fr}
+    .det-in{max-width:100%}
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>📱 Tablet</h1>
+    <div class="hbtns">
+      <button class="hlink hidden" id="btnVolver" type="button">← Cambiar</button>
+      <!-- lo que se recepcionó y todavía nadie contó: se entra solo al registrar un remito de P.S.,
+           pero también desde acá, para retomar lo que quedó pendiente (2026-09-21). Sólo en Recibir
+           y cuenta P.S. + talleristas + prov. de insumos (v1.39.0) -->
+      <a href="ControlEntregaPS_GP2.html" id="lnkControl" class="hidden">Control</a>
+      <a href="../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <div class="modos" id="modos">
+      <button type="button" class="modo-btn" data-modo="enviar">📤 Enviar<small>a tallerista / PS / prov. AT</small></button>
+      <button type="button" class="modo-btn" data-modo="recibir">📥 Recibir<small>lo que traen</small></button>
+      <a class="modo-btn" id="modoConteo" href="../Relevamiento/Relevamiento_GP2.html?volver=tablet">🔢 Conteo<small>contar por sector (Relevamientos)</small></a>
+    </div>
+
+    <!-- FASE 0 — primero el TIPO de contraparte, después la contraparte de ese tipo -->
+    <div id="fase0">
+      <div class="row" style="justify-content:space-between">
+        <label class="lbl" id="fase0Title">¿A quién?</label>
+        <button class="btn btn-secondary hidden" id="btnVolverTipo" type="button">← Cambiar tipo</button>
+      </div>
+      <div class="tipos" id="tipoGrid"></div>
+      <div id="cpBox" class="hidden">
+        <div class="search-box"><input type="text" id="q0" placeholder="Buscar por nombre…"></div>
+        <div class="provs-grid" id="cpGrid"></div>
+      </div>
+      <div id="status" class="status">Cargando…</div>
+    </div>
+
+    <!-- FASE 1 — cargar cantidades -->
+    <div id="fase1" class="hidden">
+      <div class="row" style="justify-content:space-between">
+        <div class="row" style="margin:0"><label class="lbl" id="fase1Title">—</label></div>
+        <div class="row" id="accBox" style="margin:0">
+          <label class="lbl" style="font-size:16px" for="fFecha">Fecha</label>
+          <input type="date" id="fFecha">
+          <label class="lbl hidden" style="font-size:16px" for="fRemito" id="lblRemito">Remito</label>
+          <input type="text" id="fRemito" class="hidden" placeholder="remito (opcional)">
+          <button class="btn btn-primary" id="btnEnviar" type="button" disabled>Registrar</button>
+        </div>
+      </div>
+
+      <!-- el buscador, el cartel y la tabla van en un bloque que ENCOGE con la tabla, así el
+           buscador mide exactamente lo que miden las columnas y no queda una caja ancha arriba
+           de una tabla angosta [usuario 2026-09-17: optimizar los blancos entre columnas]. -->
+      <div id="tblBox">
+        <div id="ocBox" class="oc-box hidden">
+          <button class="btn" id="btnVerOC" type="button">📄 Ver O.C.</button>
+          <div id="ocBody" class="hidden"></div>
+        </div>
+        <div class="search-box"><input type="text" id="q" placeholder="Buscar por código o descripción…"></div>
+
+        <div id="alertaBox" class="alerta-box hidden"></div>
+
+        <div class="table-wrap" id="tblWrap">
+          <table class="t">
+            <thead><tr id="thead"></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Enviar → Prov. de servicio: las partes en tarjetas en vez del listado. Comparte el
+             buscador y el buffer con la tabla; lo que cambia es cómo se elige y dónde se carga. -->
+        <div class="cards-grid hidden" id="cardsGrid"></div>
+      </div>
+
+      <!-- la parte elegida: sugerido arriba, cantidad efectiva abajo -->
+      <div id="detBox" class="hidden">
+        <div class="row" style="margin:0">
+          <button class="btn btn-secondary" id="btnVolverPartes" type="button">← Partes</button>
+        </div>
+        <div class="det-card" id="detCard"></div>
+      </div>
+
+      <div id="tblEmpty" class="empty hidden"></div>
+      <div id="msg1" class="status"></div>
+    </div>
+
+    <!-- FASE 3 — listo -->
+    <div id="fase3" class="hidden">
+      <div class="successBox">
+        <div class="title" id="successTitle">✓ Registrado</div>
+        <div>Tu código:</div>
+        <div class="code" id="successCode">—</div>
+        <div id="successDetail" style="font-size:17px;color:#444"></div>
+      </div>
+      <div id="successAlertas"></div>
+      <div class="row" style="justify-content:center">
+        <button class="btn btn-primary" id="btnOtro" type="button">← Cargar otra</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../gp2-ui.js?v=20260913e"></script>
+<script src="../gp2-numero.js?v=20260911o"></script>
+<script src="../gp2-envios-common.js?v=20260924b"></script>
+<script src="../gp2-control-insumo.js?v=20260930a"></script>
+<script>
+"use strict";
+
+var E = GP2EE;
+var $ = GP2UI.$, esc = GP2UI.esc, num = GP2N.num, fmt = GP2N.fmt, hoyISO = E.hoyISO;
+var SB = GP2_SB();
+
+var D = { contrapartes: [], enviar: [], recibir: [], alertas_abiertas: 0 };
+var MODO = null;        // enviar | recibir  (Conteo no es un modo: es el salto a Relevamientos)
+var selTipo = null;     // la baldosa elegida (objeto de TIPOS), no el string del tipo
+var selCP = null;       // { tipo, ref, nombre, id }
+var detK = null;        // la parte abierta en la vista de carga (solo vista de tarjetas)
+var BUF = E.buffer("gp2_tablet_buffer", function(){ return { q: "" }; });
+
+/* ---------- CARTÓN SUSTITUTO (2026-09-21) ----------
+   Cuando no hay stock del cartón que le toca a un artículo se le manda el de OTRO y se le pega
+   encima la etiqueta del que corresponde. La fila del cartón mandado NO sale del bundle (no es una
+   pieza de ese destino): se agrega acá, en memoria, y viaja con `sust_de` = el cartón oficial al
+   que reemplaza. No se guarda en localStorage a propósito: igual que la cantidad, si el operario
+   se va sin registrar, el reemplazo desaparece [misma regla que envSinMemoria]. */
+var SUST = {};          // contraparte (c.id) -> filas agregadas a mano en esta sesión
+var CATS = {};          // contraparte (c.id) -> { oficiales:[], otros:[] } de cartones_para_reemplazo
+var sustSel = null;     // mientras se elige: null | { paso:1|2, x:<fila elegida> }
+
+/* Los TIPOS de contraparte de cada modo, en el orden en que el operario los busca. El que trae
+   `link` no se carga acá: abre la pantalla que ya hace ese trabajo, para no tener dos copias de
+   la misma lógica.
+   `clave` es el nombre del BOTÓN (data-tipo) cuando dos baldosas comparten el mismo tipo de la
+   base, y `oc` parte esas dos por GP2.tallerista.pedido_por_oc_virgilio: sin `oc` la baldosa
+   muestra a todas las contrapartes del tipo (así queda Recibir, que no se partió). */
+var TIPOS = {
+  enviar: [
+    { tipo: "tallerista",         icono: "👷", titulo: "Talleristas",            sub: "lo que arman afuera", oc: false },
+    { tipo: "proveedor_servicio", icono: "🏭", titulo: "Prov. de servicio",      sub: "pintan, niquelan, cortan" },
+    { tipo: "inyector",           icono: "💉", titulo: "Inyectores",             sub: "bolsas plásticas" },
+    { tipo: "proveedor_at",       icono: "📦", titulo: "Prov. de art. terminado", sub: "cartones y cajas" },
+    /* ---------- TALLERISTAS O.C. (2026-09-23) — AL FINAL DEL GRUPO [usuario 2026-09-24: "Talleristas O.C. que aparezca al final"] ----------
+       [usuario, con la foto de la Tablet: "a Blist-Pack SA y Carlos Aguirre quiero que me los
+       saques afuera de talleristas y me los pongas en un módulo nuevo de talleristas o.c." + "No
+       es o.c. de insumos. Es orden de compra que se hace desde Gestión Virgilio que hoy no está
+       modelado acá. Por ahora sugerí 0"]. A estos dos no se les manda contra el máximo de la casa:
+       lo que tienen que hacer sale de una O.C. que emite Gestión Virgilio, que GP2 todavía no lee.
+       Por eso la base les manda el sugerido en 0 (mismo criterio que el fasonero sin O.C.) y acá se
+       los separa para que nadie los confunda con un tallerista a façon. SOLO EN ENVIAR: en Recibir
+       siguen adentro de Talleristas, que es donde se les registra lo que traen. */
+    { tipo: "tallerista", clave: "tallerista_oc", oc: true,
+      icono: "🧾", titulo: "Talleristas O.C.", sub: "la O.C. la hace Virgilio" }
+  ],
+  recibir: [
+    { tipo: "tallerista",         icono: "👷", titulo: "Talleristas",       sub: "lo que traen armado" },
+    { tipo: "proveedor_servicio", icono: "🏭", titulo: "Prov. de servicio", sub: "lo que devuelven procesado" },
+    { tipo: "proveedor_insumo",   icono: "🧰", titulo: "Prov. de insumos",  sub: "flejes, cartones, plásticos, garage",
+      link: "../StockFlejes/RecepcionInsumos_GP2.html?volver=tablet" },
+    { tipo: "virgilio",           icono: "🚚", titulo: "Virgilio",          sub: "lo que vuelve a Cervantes" }
+  ]
+};
+
+/* La unidad con la que se CARGA cada fila. El contrato de tablet_registrar acepta 'uni' o 'kg';
+   componente.unidad_medida dice 'kg' o 'unidad'. Desde que el prov. de art. terminado salió de
+   Recibir (entrega en Virgilio, no acá) no queda nada que se cargue en CAJAS. */
+function unidadDe(x){
+  return String(x.um || "").toLowerCase() === "kg" ? "kg" : "uni";
+}
+
+/* ---------- LA UNIDAD DEL REMITO LA DICE LA PIEZA ----------
+   [usuario 2026-09-23, textual: "Martin Cornejo. El remito de las bombillas en uni. Control en
+   bolsas. El remito de la cuchilla en kg y control kg y cajones (cajones dato)"]. Dos piezas del
+   MISMO tallerista vienen en unidades distintas: las bombillas se cuentan y la cuchilla se pesa.
+   No lo dice ni el destino ni el sector: lo dice la pieza, en componente.remito_unidad ('uni' |
+   'kg'), que tablet_bundle manda en cada fila de Recibir. Sin ese dato vale la unidad canónica
+   (unidad_medida), que hoy es "unidad" en casi todo.
+   Sólo manda al RECIBIR: es la unidad del PAPEL. Al enviar no cambia nada. */
+function uniRemito(x){
+  var r = String((x && x.remito_unidad) || "").toLowerCase();
+  return (r === "kg" || r === "uni") ? r : unidadDe(x);
+}
+function inputmodeDe(u){ return u === "kg" ? "decimal" : "numeric"; }
+
+/* ---------- EL CAJÓN DE REFERENCIA DE UNA FILA DE RECIBIR ----------
+   En Recibir de un P.S. el "Esperado" NO es la pieza de la fila: es lo que el proveedor tiene en su
+   poder, o sea la pieza que le MANDAMOS, contada en unidades de ESA pieza. Donde vuelve en el mismo
+   cajón en el que salió, el envase con el que se mira tiene que ser el de la pieza enviada
+   [usuario 2026-09-18, remaches de Guazzaroni: "si envío 2 cajones lo esperado es recibir 2 cajones
+   aprox"]. QUIÉN ENTRA EN ESA REGLA LO DECIDE LA BASE: tablet_bundle manda ent_uxc / ent_kgu solo
+   en esas filas (hoy el sector Remache) y acá alcanza con preferirlas cuando vienen. Sin ellas
+   (todo el resto) queda el cajón de la pieza devuelta, que es como estaba.
+   Y EL CAJÓN QUE MANDA ES EL QUE ANOTÓ LOGÍSTICA (ent_uxc_anot, 2026-09-21): el cajón teórico del
+   maestro es un promedio, el que salió del galpón pesó lo que pesó. CV1 salió como 1 cajón de 21 kg
+   contra un uni_x_cajon de 20 kg y la tarjeta decía 1,05 cajones [usuario: "tiene que aparecer en
+   su stock los cajones que escribe logística, no los que se calcula a partir de los kg"]. */
+function uxcRef(x){
+  var a = Number((x && x.ent_uxc_anot) || 0);
+  if (MODO === "recibir" && a > 0) return a;
+  var e = Number((x && x.ent_uxc) || 0);
+  return (MODO === "recibir" && e > 0) ? e : Number((x && x.uxc) || 0);
+}
+function kguRef(x){
+  var e = Number((x && x.ent_kgu) || 0);
+  return (MODO === "recibir" && e > 0) ? e : Number((x && x.kg_x_uni) || 0);
+}
+function uniTag(u){ return '<span class="uni-tag ' + u + '">' + u + "</span>"; }
+
+/* clave de fila: en recibir una pieza puede aparecer dos veces (dos entradas distintas del PS), y
+   en enviar un mismo cartón puede ir como reemplazo de dos oficiales distintos (sust_de). */
+function claveDe(x){
+  return String(x.comp_id || "") + ":" + String(x.comp_entrada_id || "") + ":" + String(x.cod_art || "") +
+         (x.sust_de ? ":s" + x.sust_de : "");
+}
+function claveCP(c){ return MODO + ":" + c.tipo + ":" + c.ref; }
+
+/* En Enviar tienen sugerido: PS y talleristas (máximo − stock − lo que ya está en el destino) y los
+   INYECTORES (bolsas de resina en kg = Σ deficit de las partes plásticas × kg_x_uni). El PROV. DE
+   ART. TERMINADO también muestra el renglón, pero su sugerido es SIEMPRE 0: igual que el tallerista
+   con O.C. de Virgilio, lo que hay que mandarle no sale del máximo de la casa sino de una O.C. que
+   emite Gestión Virgilio y que GP2 no lee [usuario 2026-09-24: "no tienen un máximo allá... tiene
+   que aparecer en cero... cuando salga orden de compra de Virgilio"]. DA VUELTA el 2026-09-23, que
+   le había puesto consumo × meses (esa CTE queda dormida en la base).
+   POR QUÉ EL PROV. AT PREGUNTA POR LA FILA y los otros no: el cartón de OTRO artículo que se manda
+   como reemplazo (sust_de) viene con sugerido null y ahí la tarjeta vuelve a "Online sector" — un 0
+   que no es un dato se lee como "no hay que mandarle nada". La fila normal del prov AT trae 0. */
+function envConSugerido(x){
+  if (MODO !== "enviar" || !selCP) return false;
+  if (selCP.tipo === "proveedor_at") return !x || x.sugerido != null;
+  return selCP.tipo === "proveedor_servicio" || selCP.tipo === "tallerista" || selCP.tipo === "inyector";
+}
+
+/* La tablet NO se acuerda de lo tipeado en Enviar a P.S. / inyector: si se sale sin registrar, la
+   cantidad desaparece [usuario 2026-09-18, textual: "si cargue algo yo, cuando salgo quiero que
+   desaparezca, no que se guarde, por lo tanto todas las cantidades deben estar vacias"]. El buffer
+   de localStorage se sigue usando mientras la contraparte esta abierta (es de donde sale lo que se
+   registra y lo que sobrevive a un toque de mas), pero se borra al ENTRAR y al SALIR: nunca queda
+   un numero de ayer esperando que alguien lo registre sin mirar. Desde el 2026-09-18 vale TAMBIEN
+   para los TALLERISTAS `[usuario, elegido entre tres opciones: "igual que P.S.: vacio y sin
+   memoria"]`: con eso ya no queda nadie con la cantidad precargada. */
+function envSinMemoria(c){
+  // los cuatro destinos de Enviar: P.S., inyector, tallerista y prov. de art. terminado. O sea que
+  // en Enviar ya no queda tabla ni memoria en ningun lado [usuario 2026-09-18].
+  return MODO === "enviar" && !!c &&
+    (c.tipo === "proveedor_servicio" || c.tipo === "inyector" ||
+     c.tipo === "tallerista" || c.tipo === "proveedor_at");
+}
+function olvidarCargado(c){
+  if (envSinMemoria(c)) { BUF.borrar(c.id); delete SUST[c.id]; }
+}
+
+/* Unidad de ENVIO del proveedor (display), p.ej. AJ Adhesivos manda de a PAQUETES de 100 pliegos
+   [usuario 2026-09-17]. Solo presentacion: sugerido y cantidad se MUESTRAN/CARGAN divididos por
+   factor y rotulados con label, pero al registrar se multiplica de nuevo y se guarda en la unidad
+   canonica (uni/kg). Devuelve {factor,label} si el proveedor lo definio (envio_uni_x>1), o null. */
+function packEnvio(){
+  if (!selCP) return null;   // es del PROVEEDOR: en Recibir la entrega copia esta misma unidad
+  var lab = String(selCP.envio_unidad || "");
+  // envio_unidad='kg' es el envío POR PESO (Hernandez Julio), que tiene su propio camino
+  // (pesoEnvio/bultoDe): ahí el bulto va en una columna aparte, no es la unidad del sugerido.
+  if (!lab || lab.toLowerCase() === "kg") return null;
+  var f = Number(selCP.envio_uni_x || 0);
+  // cargaKg: el sugerido se MIRA en el envase pero la cantidad se ESCRIBE en kg (Ester,
+  // Guazzaroni). Sin esto (AJ Adhesivos) el campo va en la misma unidad que el sugerido.
+  var ckg = String(selCP.envio_carga_unidad || "").toLowerCase() === "kg";
+  // SIN factor del proveedor el envase es el CAJÓN de CADA PIEZA (Guazzaroni Patricio): el factor
+  // sale de componente.uni_x_cajon fila por fila, igual que el bulto de Julio. Solo tiene sentido
+  // cargando en kg (si no, no habría con qué pasar del cajón a lo que se escribe).
+  if (!(f > 1)) return ckg ? { factor: 0, label: lab, cargaKg: true, porPieza: true } : null;
+  return { factor: f, label: lab, cargaKg: ckg, porPieza: false };
+}
+
+/* ---------- EL ENVASE DE UNA PIEZA ----------
+   Con qué se manda ESA pieza a ESTE destino: {factor, label, cargaKg, redondea} o null (= va en
+   unidades, no se inventa un envase). Junta las dos formas que conviven:
+     · P.S.: lo dice el PROVEEDOR (packEnvio). Con envase por pieza (Guazzaroni, Jade y los otros
+       que van por el cajón de cada pieza) el factor sale de componente.uni_x_cajon fila por fila.
+     · TALLERISTA y PROV. DE ART. TERMINADO: lo dice la PIEZA, y lo manda la base en cada fila del
+       bundle [usuario 2026-09-18]: cartón y caja en PAQUETES (el paquetón del formato / los 25 de
+       la caja) y el resto con el sugerido en CAJONES y la cantidad en KG. Ver env_unidad /
+       env_factor / env_carga en tablet_bundle.
+   El redondeo del renglon de equivalencia NO vive aca: es uno solo para todos (textoEnvases). */
+function envaseDe(x){
+  if (!selCP || !x) return null;
+  if (MODO === "recibir") {
+    // ENTREGA DE UN TALLERISTA: el remito va en la unidad de la PIEZA, igual que el del P.S.
+    // [usuario 2026-09-23: "Ahora seguimos con las recepciones de talleristas. Lucho. Remito en
+    // unidades y control en kg y cajones"]. Lo que se carga acá es lo que dice el papel; el kilo y
+    // el cajón se cuentan en el control. Da vuelta la v1.19.0 (esperado en cajones, cantidad en kg)
+    // por el mismo motivo que la del P.S.: esa regla es de antes de que el control fuera un paso
+    // aparte. componente.entrega_unidad / entrega_uni_x (las bolsas de 120 de GRJ5 y GRJ6) no se
+    // borran: son el envase con el que se va a contar en el control.
+    if (selCP.tipo === "tallerista") return null;
+    // ENTREGA de un P.S.: VA EN UNIDADES, SIN ENVASE. Lo que se carga acá es EL REMITO, y el remito
+    // del proveedor viene contado en unidades de la pieza; el envase (bolsas, paquetes, cajones) y
+    // los kilos son del CONTROL, que es la pantalla siguiente [usuario 2026-09-23, dicho sobre cinco
+    // proveedores distintos: "cuando voy a recibir de AJ adhesivos el remito marca en unidades de
+    // pliego y después cuando voy a controlar sí, marco paquetes"; lo mismo con Ester ("en el remito
+    // aparece en unidades y después el control si lo hago en bolsas y kilos"), Hernández Julio, Jade
+    // y Maspoli]. DA VUELTA la regla de v1.20.0, que hacía que la entrega copiara la unidad del
+    // envío: esa regla es de ANTES de que el control fuera una pantalla aparte (v1.28.0), cuando lo
+    // que se cargaba acá era lo contado. Las columnas proveedor_servicio.entrega_unidad /
+    // entrega_uni_x NO se tocaron: las sigue usando ControlEntregaPS_GP2.html, que es su lugar.
+    // El TALLERISTA queda como estaba (arriba): ahí no hay pantalla de control y el usuario pidió
+    // expresamente cajones + kg el 2026-09-18.
+    return null;
+  }
+  if (MODO !== "enviar") return null;
+  // tallerista y prov. de art. terminado: la unidad la trae la PIEZA en el bundle. El prov. AT
+  // recibe solo cartones y cajas, asi que para el siempre son PAQUETES.
+  if (selCP.tipo === "tallerista" || selCP.tipo === "proveedor_at") {
+    var ft = Number(x.env_factor || 0);
+    if (!x.env_unidad || !(ft > 0)) return null;   // pieza sin paquete / sin cajón cargado
+    return { factor: ft, label: String(x.env_unidad),
+             cargaKg: String(x.env_carga || "") === "kg" };
+  }
+  var pk = packEnvio();
+  if (!pk) return null;
+  var f = pk.porPieza ? Number(x.uxc || 0) : pk.factor;
+  if (!(f > 0)) return null;
+  return { factor: f, label: pk.label, cargaKg: pk.cargaKg };
+}
+
+/* Cuantos KG entran en UN envase de esta pieza. Si la pieza se cuenta en unidades, el envase son
+   factor x kg_x_uni (Ester: 1800 x 0,0054 = 9,72 kg); si la pieza ya se mide en kg, el factor YA
+   esta en kg. 0 = no se puede saber (a la pieza le falta kg_x_uni). */
+function kgPorEnvase(x){
+  var ev = envaseDe(x);
+  if (!ev) return 0;
+  if (unidadDe(x) === "kg") return ev.factor;
+  var k = kguRef(x);
+  return k > 0 ? ev.factor * k : 0;
+}
+/* true si la CANTIDAD de esta pieza se escribe en kg. Pide las dos cosas: que el envase lo diga y
+   que la pieza permita pasar del envase a kg. Si no, cae al modo de AJ (se escribe en el envase) o
+   a unidades, en vez de mostrar un kg inventado. */
+function cargaEnKg(x){
+  // al RECIBIR lo dice la pieza (remito_unidad): la cuchilla de Martín viene pesada y la bombilla
+  // contada. Sin kg_x_uni no se puede pasar de kg a unidades, así que ahí no se escribe en kg.
+  if (MODO === "recibir")
+    return uniRemito(x) === "kg" && unidadDe(x) !== "kg" && kguRef(x) > 0;
+  var ev = envaseDe(x);
+  return !!(ev && ev.cargaKg && kgPorEnvase(x) > 0);
+}
+/* El "= N bolsas" que va debajo del campo cuando la cantidad se carga en kg. El número va tal
+   cual, con decimales (textoEnvases): el envase se parte. */
+function equivEnvase(kg, kgEnv, label){
+  // campo vacío = nada que equivaler: un "= 0 cajones" debajo de un campo en blanco es ruido
+  // (desde que la cantidad no se precarga, el campo arranca vacío en todos los P.S.).
+  if (!(Number(kg || 0) > 0)) return "";
+  return textoEnvases((kgEnv > 0) ? (Number(kg || 0) / kgEnv) : 0, label);
+}
+
+/* EL EQUIVALENTE EN ENVASES VA CON DECIMALES [usuario 2026-09-18, textual: "no quiero que
+   redondees las bolsas, cajones -> lo quiero ver con decimales también"]. Esto DA VUELTA la regla
+   de la mañana del mismo día ("todo lo que sea envio de cajones y bolsas redondear… 6,17 serían 6
+   bolsas"): lo que se muestra ahora es el número exacto, 2 decimales, sin "≈" y sin el "menos de 1
+   bolsa" en palabras (un "0,69 bolsas" dice más que la frase).
+   OJO: esto es para lo que SE ENVÍA. El SUGERIDO sigue yendo para arriba (techo) — es "lo que
+   falta", y pedir menos de lo que falta no llena el lugar [usuario 2026-09-17, Ester]. */
+function textoEnvases(n, label){
+  if (!(n > 0)) return "";
+  var et = (Math.abs(n - 1) < 0.005) ? singularEnvase(label) : label;   // "= 1 cajon", no "= 1 cajones"
+  return "= " + fmt(n, 2) + " " + et;
+}
+function singularEnvase(label){ return SINGULAR[label] || label; }
+
+/* Envio POR PESO: el proveedor recibe pesado (hoy Hernandez Julio). Se marca con
+   proveedor_servicio.envio_unidad='kg' SIN envio_uni_x, porque acá el bulto no es uno solo para
+   todo el proveedor como en AJ: cambia por pieza (ver bultoDe). */
+function pesoEnvio(){
+  if (!selCP) return false;
+  return String(selCP.envio_unidad || "").toLowerCase() === "kg" && !(Number(selCP.envio_uni_x) > 1);
+}
+
+/* El BULTO de una pieza cuando se manda por peso: las partes plásticas van en BOLSAS y el resto en
+   CAJONES. El tamaño del bulto es componente.uni_x_cajon en los dos casos (en los plásticos esa
+   columna ES el tamaño de la bolsa). Sin kg_x_uni no hay conversión: devuelve null y la fila se
+   carga como siempre, en unidades. */
+function bultoDe(x){
+  var kgu = kguRef(x), uxc = uxcRef(x);
+  if (!(kgu > 0)) return null;
+  var plast = /pl[aá]stico/i.test(String((x && x.sector) || ""));
+  return { kgu: kgu, uxc: uxc > 0 ? uxc : 0, label: plast ? "bolsas" : "cajones" };
+}
+/* Lo que se ANOTA en movimiento.cajones es el mismo número que se ve abajo del campo: con
+   decimales [usuario 2026-09-18]. Se redondea a 2 decimales y nada más, para no guardar un
+   0,6899999. Media bolsa deja de perderse: antes, con el entero, 0,4 bolsas se anotaban como 0
+   (o sea null) y 1,4 como 1. */
+function bultosDeKg(b, kg){
+  return (b && b.uxc > 0 && kg > 0) ? redEnvase(kg / b.kgu / b.uxc) : null;
+}
+function redEnvase(n){ return Math.round(Number(n || 0) * 100) / 100; }
+/* los envases crudos (con decimales) de esos kg, para el texto del renglón */
+function envasesDeKg(b, kg){
+  return (b && b.uxc > 0 && kg > 0) ? (kg / b.kgu / b.uxc) : null;
+}
+/* el sugerido de la pieza (que viene en unidades) llevado a bultos enteros */
+function bultosSugeridos(b, sugUni){
+  return (b && b.uxc > 0 && sugUni > 0) ? Math.ceil(sugUni / b.uxc) : null;
+}
+
+/* ---------- la vista de TARJETAS (Enviar → Prov. de servicio) ----------
+   [usuario 2026-09-18: "quiero reemplazar ese listado por boxes o tarjetas individuales… al
+   seleccionar una parte, debe abrirse una vista donde se muestre la cantidad sugerida y un campo
+   para indicar la cantidad efectiva que se va a enviar"]. Vale para P.S. e inyector (que se elige
+   adentro del mismo botón "Prov. de servicio"), que es justo el conjunto que ya no se acuerda de
+   lo tipeado: la misma cuenta de envSinMemoria. Talleristas, prov. de art. terminado y TODO
+   Recibir siguen con la tabla — ahí hay esperado, exceso y remito, y se leen de corrido. */
+function vistaTarjetas(){
+  // en Enviar, los cuatro destinos; en Recibir, el tallerista y el P.S. [usuario 2026-09-18:
+  // "quiero que tambien aparezcan las partes en box... en vez de sugerido y cantidad, va a ser
+  // esperado y cantidad"]. Ojo: en Recibir la tablet SI se acuerda de lo tipeado (envSinMemoria
+  // es solo de Enviar): lo que cambia aca es como se ve, no la memoria.
+  return envSinMemoria(selCP) ||
+    (MODO === "recibir" && !!selCP &&
+     (selCP.tipo === "tallerista" || selCP.tipo === "proveedor_servicio"));
+}
+
+/* El SUGERIDO de una pieza tal como se muestra, en la unidad de envío del proveedor. Lo usan la
+   tabla y la tarjeta, así no hay dos cuentas que se puedan separar:
+     txt   el número ya formateado          uni   su unidad (paquetes, bolsas, cajones, kg, uni)
+     nota  la aclaración cuando no se puede  small lo que la TABLA pinta en su <small> */
+function sugeridoInfo(x){
+  var b = (MODO === "enviar" && pesoEnvio()) ? bultoDe(x) : null;
+  var u = unidadDe(x);
+  if (b) {
+    // por peso el sugerido se mira EN BULTOS enteros, no en kilos [usuario 2026-09-17]
+    var sugB = bultosSugeridos(b, Number(x.sugerido));
+    var faltaB = "sin " + (b.label === "bolsas" ? "bolsa" : "cajón") + " cargado";
+    return { txt: fmt(sugB, 0, "—"), num: sugB, uni: sugB != null ? b.label : "",
+             nota: sugB != null ? "" : faltaB, small: sugB != null ? b.label : faltaB };
+  }
+  var ev = envaseDe(x);
+  var sug = x.sugerido;
+  if (ev && x.sugerido != null) sug = Math.ceil(Number(x.sugerido) / ev.factor);
+  // el destino manda por envase pero ESTA pieza no lo tiene cargado: no se inventa el factor, la
+  // fila queda en unidades (sugerido y campo) y se avisa para que no se lea como cajones.
+  var falta = faltaEnvase(x);
+  return { txt: fmt(sug, (!ev && u === "kg") ? 2 : 0, "—"),
+           num: sug,
+           uni: ev ? ev.label : u,
+           nota: falta,
+           small: falta ? (u + " · " + falta) : "" };
+}
+
+/* El aviso cuando el destino manda por envase y a la pieza le falta el dato para convertir:
+   sin uni_x_cajon no hay cajón, sin el paquetón del formato no hay paquete. Vacío = no aplica. */
+function faltaEnvase(x){
+  if (MODO !== "enviar" || !selCP || !x || envaseDe(x)) return "";
+  // La pieza que se mide en kg (el fleje) SE MANDA PESADA, no hay cajón que le falte: el sugerido
+  // ya sale en kg, así que "sin cajón cargado" era mentira [usuario 2026-09-24, sobre el envío en
+  // la tablet: "cuando es sector fleje no quiero esa aclaración, no tienen uni x cajón, se manda en
+  // kilos"]. El aviso queda para la pieza que SE CUENTA y caería a unidades sin el factor.
+  if (unidadDe(x) === "kg") return "";
+  // el prov. AT va con el mismo aviso que el tallerista: los dos reciben la pieza con el envase que
+  // dice la PIEZA (paquetón del cartón / los 25 de la caja), no con uno del proveedor [2026-09-23].
+  if (selCP.tipo === "tallerista" || selCP.tipo === "proveedor_at")
+    return x.env_unidad
+      ? ("sin " + (String(x.env_unidad) === "paquetes" ? "paquete" : "cajón") + " cargado")
+      : "";
+  var pk = packEnvio();
+  return (pk && pk.porPieza) ? "sin cajón cargado" : "";
+}
+
+/* COMO SE LLAMA EL NUMERO DE REFERENCIA DE RECIBIR. No es "lo que calculamos que va a traer":
+   es EL STOCK QUE LA CONTRAPARTE TIENE EN SU PODER, y asi se lee mejor en la tablet
+   [usuario 2026-09-21, textual: "en vez de esperado quiero que diga Stock tallerista o stock
+   proveedor de servicio segun corresponda"]. El que no es ninguno de los dos (Virgilio) sigue
+   diciendo "Esperado": ahi el numero es el online de Virgilio y nadie pidio cambiarlo. */
+function rotuloRef(){
+  if (!selCP) return "Esperado";
+  if (selCP.tipo === "tallerista") return "Stock tallerista";
+  if (selCP.tipo === "proveedor_servicio") return "Stock prov. de servicio";
+  return "Esperado";
+}
+
+/* EL NUMERO DE REFERENCIA de la tarjeta y de la vista de la parte: el SUGERIDO donde lo hay (P.S.,
+   tallerista, inyector y —desde el 2026-09-23— el prov. de art. terminado) y el ONLINE DEL SECTOR
+   cuando la fila no trae sugerido: el cartón de otro artículo que se manda como reemplazo, o una
+   base todavía sin la migración del consumo del prov AT. Ahí la referencia es lo que hay en
+   Cervantes para mandarle. Devuelve el mismo {rotulo, txt, num, uni, nota} para los dos, así la
+   tarjeta no sabe de la diferencia. */
+function refInfo(x){
+  if (MODO === "recibir") {
+    // ESPERADO: lo que la base cree que el tallerista tiene para entregar, mirado en CAJONES (o en
+    // las bolsas de 120 de GRJ5/GRJ6). Se dice con el mismo criterio que el resto de los envases:
+    // el numero exacto, con decimales. [usuario 2026-09-18]
+    var ev = envaseDe(x), u = unidadDe(x), rot = rotuloRef();
+    if (x.esperado == null)
+      return { rotulo: rot, txt: "—", num: null, uni: "", nota: "sin referencia", small: "" };
+    var e = Number(x.esperado);
+    if (ev) {
+      // SIN STOCK SE DICE "0", no se deja en blanco [usuario 2026-09-21: "pero que me diga 0 si no
+      // tiene stock"]. textoEnvases() devuelve "" cuando el numero no es > 0 — y eso esta BIEN
+      // donde se usa para el renglon de equivalencia de abajo del campo (con el campo vacio no se
+      // escribe nada), pero aca dejaba la tarjeta diciendo "Stock tallerista" y ningun numero, que
+      // se lee como "no se". Para el tallerista y el P.S. el cero es un dato de verdad: la base lo
+      // manda con coalesce(...,0), o sea que 0 significa "no tiene nada nuestro en su poder".
+      var env = e / ev.factor;
+      return { rotulo: rot,
+               txt: env > 0 ? textoEnvases(env, ev.label).replace("= ", "")
+                            : ("0 " + ev.label),
+               num: null, uni: "", nota: "", small: "" };
+    }
+    // el stock del tercero se muestra EN LA UNIDAD DEL REMITO: si esa pieza viene pesada (la
+    // cuchilla de Martín), el saldo en unidades no se puede comparar con lo que dice el papel.
+    var uR = uniRemito(x), eR = cargaEnKg(x) ? e * kguRef(x) : e;
+    return { rotulo: rot, txt: fmt(eR, uR === "kg" ? 2 : 0), num: eR, uni: uR,
+             nota: faltaEnvase(x), small: "" };
+  }
+  // el cartón de OTRO artículo no tiene sugerido (no es una pieza de este destino, no hay consumo
+  // suyo que lo pida): la referencia útil es lo que hay en Cervantes para mandarle.
+  if (envConSugerido(x) && !x.sust_de) {
+    var si = sugeridoInfo(x);
+    si.rotulo = "Sugerido";
+    return si;
+  }
+  var u = unidadDe(x);
+  return { rotulo: "Online sector", txt: fmt(x.online_sector, u === "kg" ? 2 : 0, "—"),
+           num: Number(x.online_sector), uni: u, nota: faltaEnvase(x), small: "" };
+}
+
+/* La unidad con la que se ESCRIBE la cantidad de esa pieza (la del campo, no la de la pieza). */
+function uniCarga(x){
+  if ((pesoEnvio() && bultoDe(x)) || cargaEnKg(x)) return "kg";   // pesoEnvio ya exige Enviar
+  var ev = envaseDe(x);
+  if (ev) return ev.label;
+  return MODO === "recibir" ? uniRemito(x) : unidadDe(x);
+}
+function decDe(x){ return uniCarga(x) === "kg" ? 2 : 0; }
+
+/* "1 cajones" no se lee: con uno va el singular. Solo toca las etiquetas que usamos. */
+var SINGULAR = { cajones: "cajón", paquetes: "paquete", bolsas: "bolsa", cajas: "caja" };
+function unidadTxt(n, label){
+  return (Number(n) === 1 && SINGULAR[label]) ? SINGULAR[label] : label;
+}
+
+/* ---------- LAS DOS UNIDADES DE UNA FILA QUE SE MANDA PESADA ----------
+   [usuario 2026-09-18, textual: "en cantidad a enviar tengo que poder poner cajones primero y
+   despues los kg. Lo mismo con lo que se envía en bolsas… que no pueda poner listo hasta que haya
+   cargado en las dos unidades de medida"]. Vale para toda fila de ENVIAR que tenga envase Y se
+   escriba en kg: el bulto por sector (Hernandez Julio) y el envase del proveedor o de la pieza
+   (Ester, los del cajón por pieza, los talleristas). Devuelve {label, kgEnv} — cuántos kg entra
+   UN envase — o null si la fila no lleva las dos.
+   Por qué se anotan las dos y no se calcula una: el envase que sale por la puerta es el que el
+   operario cuenta, y el peso es el que pesa la balanza. Si se calculaba uno de los dos, el error
+   de carga quedaba invisible; ahora los dos se declaran y la pantalla los cruza. */
+function envaseDoble(x){
+  if (MODO !== "enviar" || !x) return null;
+  var b = pesoEnvio() ? bultoDe(x) : null;
+  if (b) return (b.uxc > 0 && b.kgu > 0) ? { label: b.label, kgEnv: b.uxc * b.kgu } : null;
+  if (!cargaEnKg(x)) return null;
+  var k = kgPorEnvase(x), ev = envaseDe(x);
+  return (k > 0 && ev) ? { label: ev.label, kgEnv: k } : null;
+}
+
+/* ¿Lo anotado en envases se pelea con lo que dicen los kg? LA TOLERANCIA ES EL ENVASE ENTERO de
+   arriba y el de abajo: si los kg dan 2,5 bolsas, anotar 2 o 3 esta bien; si dan 2 justas, anotar 3
+   ya no. Cierra con los dos ejemplos del usuario [2026-09-18: "si tengo 10k que equivalen a 2
+   bolsas y puse 3 que me salte alerta… si 10kg eran 2 bolsas y media y puse 2, que no salte"] y no
+   se rompe en el borde: con "media unidad" pelada, 3,49999 contra 4 (un caso real, porque el kg por
+   envase casi nunca da redondo) avisaba por una millonesima. null = no hay desvío. */
+function desvioEnvase(x, it){
+  var ed = envaseDoble(x);
+  if (!ed) return null;
+  var c = num(it.c), q = num(it.q);
+  if (!(c > 0) || !(q > 0)) return null;
+  var calc = q / ed.kgEnv;
+  var min = Math.floor(calc + 1e-9), max = Math.ceil(calc - 1e-9);
+  return (c < min || c > max) ? { label: ed.label, anotado: c, calc: calc } : null;
+}
+
+/* Una fila esta LISTA cuando tiene cantidad y, si lleva las dos unidades, las dos. */
+function filaCompleta(x, it){
+  if (!x || !it || !(num(it.q) > 0)) return false;
+  return !envaseDoble(x) || num(it.c) > 0;
+}
+
+/* El renglon chico de abajo del campo de kg cuando se anotan las dos unidades. */
+function chequeoDoble(x, it){
+  var ed = envaseDoble(x);
+  if (!ed) return { txt: "", mal: false };
+  var q = num(it.q);
+  if (!(q > 0)) return { txt: "", mal: false };
+  var eqtxt = textoEnvases(q / ed.kgEnv, ed.label);
+  var d = desvioEnvase(x, it);
+  if (!d) return { txt: eqtxt, mal: false };
+  return { mal: true, txt: "\u26a0 " + fmt(q, 2) + " kg son " + eqtxt.replace("= ", "") +
+           " y anotaste " + fmt(d.anotado, 0) + " " + unidadTxt(d.anotado, ed.label) };
+}
+
+/* la pieza abierta en la vista de una parte */
+function piezaDe(k){
+  var arr = piezasDe(selCP);
+  for (var i = 0; i < arr.length; i++) if (claveDe(arr[i]) === k) return arr[i];
+  return null;
+}
+
+
+/* EL RENGLÓN CHICO DE DEBAJO DEL CAMPO DE KG: a cuántos envases equivale lo tipeado. Es UNO SOLO
+   para las dos formas que se cargan en kg, así el operario ve siempre lo mismo [usuario 2026-09-18,
+   textual: "esta bien que me lo ponga chiquito abajo, pero modifica hernandez julio asi quedan
+   todos asi"]:
+     · envase del PROVEEDOR — Ester (bolsas de 1800) y los que van por el cajón de cada pieza
+       (Guazzaroni, Jade, FAAT, Mabra, Maspoli, Pedernera, Scorrano);
+     · envío POR PESO — Hernandez Julio, donde el bulto lo pone el SECTOR de la pieza (plásticos
+       bolsas, el resto cajones) y va con TECHO: un bulto no se parte.
+   null = esta fila no lleva renglón (no hay con qué convertir y no se inventa el factor). */
+function eqFila(x, q){
+  var b = (MODO === "enviar" && pesoEnvio()) ? bultoDe(x) : null;
+  if (b) {
+    var n = envasesDeKg(b, q);
+    return n != null ? textoEnvases(n, b.label) : "";
+  }
+  var ev = envaseDe(x);
+  return cargaEnKg(x) ? equivEnvase(q, kgPorEnvase(x), ev.label) : null;
+}
+
+/* ---------- carga ---------- */
+async function cargar(){
+  try {
+    var r = await SB.rpc("tablet_bundle");
+    if (r.error) throw r.error;
+    D = r.data || D;
+    BUF.load();
+    var m = new URLSearchParams(location.search).get("modo");
+    var guardado = null;
+    try { guardado = localStorage.getItem("gp2_tablet_modo"); } catch(e){}
+    setModo(m || guardado || "enviar");
+  } catch(e){
+    $("status").innerHTML = '<span style="color:#b91c1c">Error: ' + esc(e.message || e) + "</span>";
+  }
+}
+
+function setModo(m){
+  if (m !== "enviar" && m !== "recibir") m = "enviar";
+  olvidarCargado(selCP);   // antes de cambiar MODO: despues envSinMemoria ya mira el modo nuevo
+  MODO = m;
+  try { localStorage.setItem("gp2_tablet_modo", m); } catch(e){}
+  var bs = document.querySelectorAll("#modos .modo-btn");
+  for (var i = 0; i < bs.length; i++) bs[i].classList.toggle("active", bs[i].dataset.modo === m);
+  // el Control es de lo que TRAEN: en Enviar no hay nada que controlar (v1.39.0)
+  var lc = $("lnkControl"); if (lc) lc.classList.toggle("hidden", m !== "recibir");
+  mostrarTipos();
+}
+
+/* contrapartes que aplican al modo. En enviar, sólo a quien se le manda desde Cervantes.
+   En recibir queda afuera el prov. de art. terminado (entrega en Virgilio) y el prov. de
+   insumos, que tiene su propia pantalla con rubros, pesaje y cruce contra OC. */
+function cpsDelModo(){
+  return (D.contrapartes || []).filter(function(c){
+    if (MODO === "enviar") return c.tipo !== "virgilio" && c.tipo !== "proveedor_insumo" && Number(c.n_env) > 0;
+    return c.tipo !== "proveedor_at" && c.tipo !== "proveedor_insumo" && Number(c.n_rec) > 0;
+  });
+}
+/* Las contrapartes de UNA baldosa (el objeto de TIPOS, no el string): el tipo de la base y, cuando
+   la baldosa lo define, el lado del flag `oc` (tallerista con O.C. de Virgilio o sin ella). */
+function cpsDelTipo(t){
+  // Los INYECTORES tienen su propio boton, NO van adentro de "Prov. de servicio" [usuario
+  // 2026-09-18]. En la base son proveedor_insumo/inyector (no proveedor_servicio) y el envio de
+  // bolsas lo sigue ruteando tablet_registrar a enviar_material_inyector: lo unico que cambio es
+  // donde se los elige.
+  return cpsDelModo().filter(function(c){
+    if (c.tipo !== t.tipo) return false;
+    // una baldosa sin `oc` no parte nada: se queda con todas las del tipo (Recibir, P.S., etc.)
+    return t.oc === undefined || !!c.oc === t.oc;
+  });
+}
+/* la contraparte como la espera el resto de la pantalla (id = clave del buffer) */
+function cpItem(c){
+  return { id: claveCP(c), tipo: c.tipo, ref: c.ref, nombre: c.nombre, oc: !!c.oc,
+           envio_unidad: c.envio_unidad, envio_uni_x: c.envio_uni_x,
+           envio_carga_unidad: c.envio_carga_unidad,
+           entrega_unidad: c.entrega_unidad, entrega_uni_x: c.entrega_uni_x,
+           n: MODO === "enviar" ? c.n_env : c.n_rec };
+}
+function cargadasDeCP(c){
+  return E.cargadasDe(BUF.all[claveCP(c)], function(it){ return num(it.q) > 0; }).length;
+}
+/* El contador "⚠ N alertas de recepción sin revisar" se SACÓ de la Tablet [Thomas 2026-09-25:
+   "Que no aparezcan más alertas"]. Las alertas se siguen generando y se revisan en
+   Alertas/alertas_GP2.html; el aviso "recibí de más" al cargar una recepción sigue igual. */
+function avisoAlertas(){ return ""; }
+
+/* ---------- paso 1: el tipo ---------- */
+function mostrarTipos(){
+  olvidarCargado(selCP);
+  cerrarDetalle();
+  selTipo = null; selCP = null;
+  E.mostrarFase(0);
+  $("tipoGrid").classList.remove("hidden");
+  $("cpBox").classList.add("hidden");
+  $("btnVolverTipo").classList.add("hidden");
+  $("fase0Title").textContent = MODO === "enviar" ? "¿A quién le enviás?" : "¿Quién trae?";
+  pintarTipos();
+}
+
+function pintarTipos(){
+  var g = $("tipoGrid");
+  g.innerHTML = "";
+  (TIPOS[MODO] || []).forEach(function(t){
+    var lista = t.link ? null : cpsDelTipo(t);
+    if (lista && !lista.length) return;   // un tipo sin contrapartes no se dibuja: no lleva a nada
+    var b = document.createElement(t.link ? "a" : "button");
+    if (t.link) b.href = t.link; else b.type = "button";
+    b.className = "tipo-btn";
+    b.dataset.tipo = t.clave || t.tipo;   // dos baldosas del mismo tipo (Talleristas / O.C.) no comparten el data-tipo
+    // el número sin la palabra "contraparte": el título del tipo ya dice qué son. NO se muestra
+    // "N sin registrar" [usuario 2026-09-16]: desde que Enviar precarga el sugerido, abrir una
+    // contraparte ya llenaba el buffer y el cartelito contaba destinos sin trabajo real.
+    b.innerHTML = '<span class="ti">' + t.icono + " " + esc(t.titulo) + "</span><small>" + esc(t.sub) +
+      (lista ? " · " + lista.length : "") + "</small>";
+    if (!t.link) b.addEventListener("click", function(){ elegirTipo(t); });
+    g.appendChild(b);
+  });
+  $("status").textContent = avisoAlertas();
+}
+
+/* ---------- paso 2: la contraparte de ese tipo ---------- */
+function elegirTipo(t){
+  selTipo = t;                      // la BALDOSA entera: el tipo solo ya no alcanza para volver
+  var lista = cpsDelTipo(t);
+  if (lista.length === 1) { elegir(cpItem(lista[0])); return; }  // un solo destino: no se elige entre uno
+  $("tipoGrid").classList.add("hidden");
+  $("cpBox").classList.remove("hidden");
+  $("btnVolverTipo").classList.remove("hidden");
+  $("fase0Title").textContent = t.titulo;
+  $("q0").value = "";
+  pintarCPS();
+}
+
+function pintarCPS(){
+  var lista = E.filtrar(cpsDelTipo(selTipo), $("q0").value, function(c){ return c.nombre; });
+  E.gridContrapartes("cpGrid", lista.map(cpItem), {
+    vacio: "No hay a quién en este modo.",
+    meta: function(c){
+      // el tipo no se repite en cada chip: ya lo dice el título de arriba
+      var cargado = E.cargadasDe(BUF.all[c.id], function(it){ return num(it.q) > 0; }).length;
+      return c.n + " pieza" + (c.n === 1 ? "" : "s") +
+        (cargado ? (" · <b>" + cargado + " cargadas</b>") : "");
+    },
+    onPick: elegir
+  });
+  var av = avisoAlertas();
+  $("status").textContent = lista.length + " para elegir" + (av ? " · " + av : "");
+}
+
+/* ---------- EL ORDEN DE LAS PIEZAS DE UN TALLERISTA ES POR RUBRO, NO ALFABÉTICO ----------
+   [usuario 2026-09-23, textual: "en el módulo de envío a talleristas dentro de la versión tablet,
+   quiero que me ordenes no alfanuméricamente, sino que primero me pongas todo lo que se le manda de
+   sector crudo, después todo lo de sector procesado, después todo los remaches, después todo lo de
+   partes plásticas, después todo lo de cajas y después todo lo de cartones" + "me refiero dentro de
+   cada tallerista"]. El envío se arma caminando el galpón, y el abecedario obliga a ir y volver:
+   A10 (crudo), BANDITA (cartón), C10 (cartón), CJ7 (caja), F7 (fleje) son cuatro lugares distintos
+   en cinco tarjetas. Por rubro, cada bloque es una parada.
+   LOS TRES SECTORES QUE FALTABAN TIENEN SU LUGAR, no van "al final" por descarte: el primer pedido
+   nombró seis rubros, pero medido en la base el 2026-09-23 al tallerista también se le manda Fleje
+   (6 filas en 3 talleristas), Bombilla (15 en 5) y Garage (11 en 4) — 32 de las 350 filas. Con eso a
+   la vista el usuario cerró el orden completo [usuario 2026-09-23: "Garage ponelo primero, fleje
+   segundo y bombilla último"], que es el de RUBRO_ORDEN de acá abajo.
+   UN SECTOR QUE NO ESTÉ EN LA LISTA cae al fondo, DESPUÉS de Bombilla: hoy no hay ninguno en Enviar a
+   tallerista (Movimiento, Terminado y Bolsas Plásticas no llegan acá), y si mañana aparece uno, el
+   lugar honesto para algo que nadie clasificó es abajo, a la vista, no colado en el medio.
+   Desde v1.38.0 (2026-09-28) vale para los cuatro destinos de Enviar (tallerista, P.S., prov. de
+   art. terminado, inyector); Recibir sigue alfabético. */
+/* La lista vive UNA vez en gp2-envios-common.js (GP2EE), así el Control de partes la
+   comparte sin copiarla [2026-09-24]. rubroDe delega en GP2EE.rubroSector (incluye el
+   carve-out de "Sector Bolsas Plásticas" = resina del inyector, que va al final). */
+var RUBRO_ORDEN = GP2EE.RUBRO_ORDEN;
+function rubroDe(x){ return GP2EE.rubroSector(x && x.sector); }
+/* El índice del bloque de CARTONES, calculado y no escrito a mano: ahí termina el "➕ Otro cartón".
+   Si mañana cambia el orden de RUBRO_ORDEN, el botón sigue cayendo donde está el cartón. */
+var RUBRO_CARTON = rubroDe({ sector: "Sector Cartón" });
+/* ¿esta contraparte se muestra en bloques por rubro? Lo consultan el orden y el rótulo de la grilla,
+   así no hay dos criterios que se puedan separar. */
+/* v1.38.0 (2026-09-28): los CUATRO destinos de Enviar van por rubro, no solo el tallerista
+   [usuario: "Así como me ordenaste por sector el envío a talleristas quiero que me ordenes prov de
+   art terminado, proveedores de servicio e inyectores"]. Mismo RUBRO_ORDEN, mismo rótulo. */
+var TIPOS_POR_RUBRO = { tallerista: 1, proveedor_servicio: 1, proveedor_at: 1, inyector: 1 };
+function agrupaPorRubro(c){ return MODO === "enviar" && !!c && !!TIPOS_POR_RUBRO[c.tipo]; }
+
+/* ---------- piezas de la contraparte elegida ---------- */
+function piezasDe(c){
+  var arr;
+  if (MODO === "enviar") {
+    // Cada contraparte ve SOLO sus piezas (para prov. AT, los cartones/cajas que la receta de
+    // sus articulos usa; antes iba con ref '*' y mostraba los 191 a todos, bug 2026-09-15).
+    arr = (D.enviar || []).filter(function(x){
+      return x.tipo === c.tipo && String(x.ref) === String(c.ref);
+    });
+    // los cartones de otro artículo agregados a mano en esta sesión (➕ Otro cartón)
+    arr = arr.concat(SUST[c.id] || []);
+  } else {
+    arr = (D.recibir || []).filter(function(x){ return x.tipo === c.tipo && String(x.ref) === String(c.ref); });
+  }
+  var porRubro = agrupaPorRubro(c);
+  return arr.sort(function(a,b){
+    if (porRubro) {
+      var ra = rubroDe(a), rb = rubroDe(b);
+      if (ra !== rb) return ra - rb;
+      // dentro del bloque "lo que no nombró el usuario" los sectores no se mezclan entre sí
+      if (ra === RUBRO_ORDEN.length) {
+        var sa = String(a.sector || ""), sb = String(b.sector || "");
+        if (sa !== sb) return sa.localeCompare(sb);
+      }
+    }
+    return String(a.cod).localeCompare(String(b.cod));   // adentro del rubro, por código
+  });
+}
+
+function elegir(c){
+  // lo que se hubiera tipeado antes en este P.S. no sobrevive: la tabla arranca vacia
+  olvidarCargado(c);
+  selCP = c;
+  cerrarDetalle();                 // se entra por la grilla, nunca con una parte abierta
+  // el tallerista con O.C. de Virgilio Y el prov. de art. terminado lo dicen en el título: su
+  // sugerido es 0 porque el pedido no sale del máximo de la casa sino de una O.C. de Gestión
+  // Virgilio que GP2 no lee, y sin ese renglón un 0 se lee como "no hay que mandarle nada"
+  // [usuario 2026-09-24: el prov. AT va igual que talleristas O.C.].
+  $("fase1Title").textContent = c.nombre + (MODO === "enviar" && (c.oc || c.tipo === "proveedor_at") ? " · O.C. Virgilio" : "");
+  ocPrepararBox(c);
+  E.mostrarFase(1);
+  var esRec = MODO === "recibir";
+  $("lblRemito").classList.toggle("hidden", !esRec);
+  $("fRemito").classList.toggle("hidden", !esRec);
+  if (!$("fFecha").value) $("fFecha").value = hoyISO();
+  $("q").value = "";
+  // Enviar con sugerido: la tabla muestra SOLO Pieza · Sugerido · Cantidad [usuario 2026-09-17:
+  // "quiero ver solo la columna de pieza, sugerido y cantidad"]. Se sacaron Stock PS/Stock Tall.
+  // (saldo_dest) y Máximo/O.C. (maximo); el cálculo del sugerido no cambia, solo el render.
+  // Si el proveedor tiene unidad de envío propia (paquetes, etc.) se aclara en ambos encabezados.
+  var _pk = packEnvio();
+  var _u = _pk ? " (" + esc(_pk.label) + ")" : "";
+  // Ester mira el sugerido en bolsas pero PESA lo que manda: ahí la Cantidad va en kg.
+  var _uq = (_pk && _pk.cargaKg) ? " (kg)" : _u;
+  // Envío por peso (Julio): 4 columnas — el sugerido EN BULTOS (enteros) y las dos cantidades, con
+  // la unidad entre paréntesis como en el resto de las pantallas [usuario 2026-09-17].
+  $("thead").innerHTML = pesoEnvio()
+    ? "<th>Pieza</th><th class=\"num\">Sugerido</th><th class=\"num sep\">Cantidad (kg)</th>"
+    : MODO === "enviar"
+    ? (envConSugerido()
+        ? "<th>Pieza</th><th class=\"num\">Sugerido" + _u + "</th><th class=\"num sep\">Cantidad" + _uq + "</th>"
+        : "<th>Pieza</th><th class=\"num\">Online sector</th><th class=\"num sep\">Cantidad</th>")
+    : "<th>Pieza</th><th class=\"num\">" + esc(rotuloRef()) + "</th><th class=\"num sep\">Recibido</th>";
+  // NO se precarga NADA: desde el 2026-09-18 ningún destino de Enviar arranca con la cantidad
+  // escrita (P.S. e inyector desde el 17, el tallerista desde el 18, elegido por el usuario). El
+  // Sugerido se sigue mostrando: es la referencia, no la orden. Ver envSinMemoria().
+  render();
+}
+
+/* ---------- Ver O.C. de Gestión Virgilio (v1.37.0) ----------
+   La box sólo existe donde el sugerido sale de la O.C. de Virgilio (mismo criterio que el título).
+   Se lee al abrirla: v_oc_virgilio_pendiente (espejo GP2, nada de public) + la descripción. */
+function ocAplica(c){ return MODO === "enviar" && !!c && (c.oc || c.tipo === "proveedor_at"); }
+function ocPrepararBox(c){
+  var box = $("ocBox"); if (!box) return;
+  box.classList.toggle("hidden", !ocAplica(c));
+  $("ocBody").classList.add("hidden");
+  $("ocBody").innerHTML = "";
+  $("btnVerOC").textContent = "📄 Ver O.C.";
+}
+async function ocToggle(){
+  var body = $("ocBody");
+  if (!body.classList.contains("hidden")) {
+    body.classList.add("hidden");
+    $("btnVerOC").textContent = "📄 Ver O.C.";
+    return;
+  }
+  var c = selCP; if (!ocAplica(c)) return;
+  body.classList.remove("hidden");
+  $("btnVerOC").textContent = "✕ Cerrar O.C.";
+  body.innerHTML = '<div class="oc-msg">Cargando la O.C. de Gestión Virgilio…</div>';
+  try {
+    if (typeof SB.from !== "function") throw new Error("sin conexión a la base");
+    var r = await SB.from("v_oc_virgilio_pendiente")
+      .select("articulo_id,codigo,fecha,cajas_ped,cajas_rec,cajas_pend,unidad")
+      .eq("tipo", c.tipo).eq("ref_id", Number(c.ref));
+    if (r.error) throw r.error;
+    if (selCP !== c) return;   // cambió de contraparte mientras cargaba
+    var filas = r.data || [];
+    if (!filas.length) { body.innerHTML = '<div class="oc-msg">No hay O.C. pendiente de Gestión Virgilio para ' + esc(c.nombre) + '.</div>'; return; }
+    var ids = filas.map(function(f){ return f.articulo_id; }).filter(function(x){ return x != null; });
+    var desc = {};
+    if (ids.length) {
+      var ra = await SB.from("articulo").select("id,descripcion").in("id", ids);
+      if (!ra.error) (ra.data || []).forEach(function(a){ desc[a.id] = a.descripcion || ""; });
+    }
+    if (selCP !== c) return;
+    filas.sort(function(a,b){ return String(a.codigo).localeCompare(String(b.codigo), "es", { numeric: true }); });
+    var tot = 0;
+    var h = '<div class="table-wrap"><table class="t"><thead><tr><th>Artículo</th><th>O.C. del</th>' +
+            '<th class="num">Pedido</th><th class="num">Recibido</th><th class="num">Pendiente</th></tr></thead><tbody>';
+    filas.forEach(function(f){
+      var u = /^uni/i.test(f.unidad || "") ? "uni" : "cajas";
+      tot += Number(f.cajas_pend) || 0;
+      h += "<tr><td><b>" + esc(f.codigo) + "</b> " + esc(desc[f.articulo_id] || "") + "</td>" +
+           "<td>" + esc(GP2UI.fechaAR(f.fecha)) + "</td>" +
+           '<td class="num">' + fmt(Number(f.cajas_ped), 0) + "</td>" +
+           '<td class="num">' + fmt(Number(f.cajas_rec), 0) + "</td>" +
+           '<td class="num"><b>' + fmt(Number(f.cajas_pend), 0) + "</b> " + u + "</td></tr>";
+    });
+    h += "</tbody></table></div>" +
+         '<div class="oc-msg">' + filas.length + " artículo" + (filas.length === 1 ? "" : "s") +
+         " pendientes · " + fmt(tot, 0) + " en total. Es lo que Gestión Virgilio le pidió y todavía no entregó.</div>";
+    body.innerHTML = h;
+  } catch (e) {
+    if (selCP !== c) return;
+    body.innerHTML = '<div class="oc-msg">No se pudo leer la O.C.: ' + esc(e.message || String(e)) + "</div>";
+  }
+}
+
+/* El "← Cambiar" vuelve un paso, no al principio: a la lista de contrapartes del tipo, y
+   si ese tipo tenía una sola (Virgilio) directamente a los tipos. */
+function volver(){
+  olvidarCargado(selCP);
+  cerrarDetalle();
+  selCP = null;
+  if (!selTipo || cpsDelTipo(selTipo).length <= 1) { mostrarTipos(); return; }
+  E.mostrarFase(0);
+  $("tipoGrid").classList.add("hidden");
+  $("cpBox").classList.remove("hidden");
+  $("btnVolverTipo").classList.remove("hidden");
+  pintarCPS();
+}
+
+/* esperado en la unidad con la que se carga */
+function esperadoTxt(x){
+  if (x.esperado == null) return '<span class="esp">—<small>sin referencia</small></span>';
+  var u = unidadDe(x);
+  var e = Number(x.esperado);
+  var origen = { oc: "según OC", online_tall: "stock que tiene", online_ps: "stock que tiene",
+                 online_virgilio: "online Virgilio" }[x.esperado_origen] || x.esperado_origen || "";
+  return '<span class="esp">' + fmt(e, u === "kg" ? 2 : 0) + " " + u + "<small>" + esc(origen) + "</small></span>";
+}
+
+/* Lo tipeado llevado a la unidad CANONICA de la pieza (uni, o kg si la pieza se mide en kg), que
+   es la del esperado y la del stock. Sin esto, escribir kg contra un esperado en unidades
+   comparaba peras con manzanas. */
+function canonDe(x, q){
+  if (!(q > 0)) return 0;
+  if (cargaEnKg(x) && unidadDe(x) !== "kg") {
+    var k = kguRef(x);
+    return k > 0 ? q / k : q;
+  }
+  var ev = envaseDe(x);
+  return (ev && !ev.cargaKg) ? q * ev.factor : q;
+}
+
+/* "RECIBÍ DE MÁS" NO SE DISPARA POR UN DECIMAL [usuario 2026-09-23, con 1.852 uni de PC1A contra
+   1.852 esperadas: "¿por qué salta la alerta? Es exactamente la misma cantidad" — y el cartel decía
+   "0 de más", que es la firma del problema]. El stock que la contraparte tiene en su poder arrastra
+   decimales de las conversiones kg↔uni (a Esther se le mandaron 10 kg = 1.851,8518 mangos, y ese
+   0,8518 queda en el saldo), así que comparar crudo convierte cada redondeo en una alerta. La
+   tolerancia es MEDIA UNIDAD, o 5 gramos si la pieza se mide en kg: nadie entrega 0,15 mangos. */
+function tolExceso(x){ return unidadDe(x) === "kg" ? 0.005 : 0.5; }
+/* Y NO SE COMPARA CONTRA EL STOCK DEL P.S. [usuario 2026-09-23: "esta alerta me tiene que aparecer
+   no a la hora de recibir, sino a la hora de hacer el control... porque puede haber 1.800 unidades
+   de stock de proveedor de servicio y capaz recibo menos"]. Lo que se carga acá es el REMITO: que
+   traiga menos —o más— de lo que el proveedor tiene en su poder es normal (entregas parciales), no
+   una anomalía. El juicio va en ControlEntregaPS, contra el remito. En los demás destinos el aviso
+   sigue, con el MISMO 5 % que pidió para el control: una diferencia chica no es un exceso. */
+var EXCESO_PCT = 5;
+function exceso(x, q){
+  if (MODO !== "recibir" || x.esperado == null || !(q > 0)) return 0;
+  // el P.S. y el TALLERISTA tienen su pantalla de control: ahí se compara lo contado contra el
+  // remito, que es lo que sí se puede contrastar [usuario 2026-09-23]. Acá no se juzga el papel.
+  if (selCP && (selCP.tipo === "proveedor_servicio" || selCP.tipo === "tallerista")) return 0;
+  var esp = Number(x.esperado);
+  var d = canonDe(x, q) - esp;
+  return d > Math.max(tolExceso(x), esp * EXCESO_PCT / 100) ? d : 0;
+}
+
+function filtradas(){
+  return E.filtrar(piezasDe(selCP), $("q").value, function(x){
+    return String(x.cod || "") + " " + String(x.desc || "") + " " + String(x.ent_cod || "") + " " + String(x.sector || "");
+  });
+}
+
+/* Un solo punto de entrada: según la contraparte, tarjetas (P.S. / inyector) o tabla. */
+function render(){
+  var tarj = vistaTarjetas();
+  $("tblBox").classList.toggle("cards", tarj);
+  $("tblWrap").classList.toggle("hidden", tarj);
+  $("cardsGrid").classList.toggle("hidden", !tarj);
+  if (tarj) renderCards(); else renderTabla();
+}
+
+/* ---------- las partes como TARJETAS ----------
+   Código y descripción (lo mínimo que pidió el usuario), el sugerido de referencia y, abajo, lo
+   que hoy se va a mandar: así se ve de un vistazo qué quedó cargado y qué no. */
+function renderCards(){
+  var arr = filtradas();
+  var g = $("cardsGrid");
+  g.innerHTML = "";
+  $("tblEmpty").classList.toggle("hidden", arr.length > 0);
+  if (!arr.length) $("tblEmpty").textContent = "Sin resultados para ese filtro.";
+  // Los BLOQUES POR RUBRO del tallerista: un rótulo cada vez que cambia el sector. Sin él el orden
+  // nuevo se lee como un desorden (el código ya no viene en orden y no se ve por qué).
+  var enBloques = agrupaPorRubro(selCP), ultRubro = null, ultCarton = null;
+  arr.forEach(function(x){
+    if (enBloques) {
+      var srub = String(x.sector || "Sin sector");
+      if (srub !== ultRubro) {
+        var h = document.createElement("div");
+        h.className = "pc-rubro" + (ultRubro === null ? " primero" : "");
+        h.textContent = srub;
+        g.appendChild(h);
+        ultRubro = srub;
+      }
+    }
+    var k = claveDe(x), it = BUF.item(selCP.id, k), q = num(it.q);
+    var si = refInfo(x), uc = uniCarga(x), ex = exceso(x, q);
+    var ed = envaseDoble(x), c = num(it.c), completa = filaCompleta(x, it);
+    var aMedias = !!ed && !completa && (q > 0 || c > 0);
+    var desv = desvioEnvase(x, it);
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "parte-card" + (completa ? " cargada" : "") + (ex > 0 ? " demas" : "") +
+                  (aMedias ? " incompleta" : "") + (x.sust_de ? " sust" : "");
+    b.dataset.k = k;
+    b.innerHTML =
+      '<span class="pc-cod">' + esc(x.cod) + uniTag(uc) + "</span>" +
+      '<span class="pc-desc">' + esc(x.desc || "") +
+        // en Recibir importa QUE pieza consume lo que traen (la fila de la tabla ya lo decia)
+        (MODO === "recibir" && x.ent_cod ? ' <span class="pc-nota">· consume ' + esc(x.ent_cod) + "</span>" : "") +
+        "</span>" +
+      // el cartón de otro artículo: lo primero que hay que ver es a cuál reemplaza
+      (x.sust_de ? '<span class="pc-sust">↔ en lugar de ' + esc(x.sust_cod) + "</span>" : "") +
+      '<span class="pc-sug"><span class="pc-rot">' + esc(si.rotulo) + "</span> " + si.txt +
+        (si.uni ? " " + esc(unidadTxt(si.num, si.uni)) : "") +
+        (si.nota ? '<span class="pc-nota"> · ' + esc(si.nota) + "</span>" : "") + "</span>" +
+      '<span class="pc-estado">' + (aMedias
+        ? '<span class="pc-demas">⚠ falta anotar ' + esc(q > 0 ? ed.label : "los kg") + "</span>"
+        : completa
+        ? (MODO === "recibir" ? "✓ recibe <b>" : "✓ envía <b>") +
+          fmt(q, decDe(x)) + " " + esc(unidadTxt(q, uc)) + "</b>" +
+          (ed ? " (" + fmt(c, 0) + " " + esc(unidadTxt(c, ed.label)) + ")" : "") +
+          (desv ? '<span class="pc-demas">⚠ no coincide con los kg</span>' : "") +
+          (ex > 0 ? '<span class="pc-demas">⚠ ' + fmt(ex, unidadDe(x) === "kg" ? 2 : 0) + " de más</span>" : "")
+        : "sin cargar") + "</span>";
+    g.appendChild(b);
+    if (enBloques && rubroDe(x) === RUBRO_CARTON) ultCarton = b;   // dónde termina el cartón
+  });
+  // ➕ Otro cartón: al final de las suyas, porque es la excepción y no la regla [usuario 2026-09-21]
+  if (puedeSustituir()) {
+    var bo = document.createElement("button");
+    bo.type = "button";
+    bo.className = "parte-card otro";
+    bo.dataset.otro = "1";
+    bo.innerHTML = '<span class="pc-cod">➕ Otro cartón</span>' +
+      '<span class="pc-desc">sin stock del que va: mandá el de otro artículo y pegale la etiqueta</span>';
+    // CIERRA EL BLOQUE DE CARTONES, no la grilla [usuario 2026-09-23: "el módulo de otro cartón no
+    // lo dejes al final de todo, ponelo a lo último de los cartones"]: es un cartón más, y el que
+    // está cargando cartones lo tiene que tener ahí mismo, no dos bloques más abajo. Si no hay
+    // ningún cartón en la lista, sigue al final.
+    if (ultCarton) g.insertBefore(bo, ultCarton.nextSibling); else g.appendChild(bo);
+  }
+  actualizar();
+}
+
+function renderTabla(){
+  var arr = filtradas();
+  var tb = $("tbody");
+  tb.innerHTML = "";
+  $("tblEmpty").classList.toggle("hidden", arr.length > 0);
+  if (!arr.length) $("tblEmpty").textContent = "Sin resultados para ese filtro.";
+
+  arr.forEach(function(x){
+    var k = claveDe(x);
+    var it = BUF.item(selCP.id, k);
+    var u = unidadDe(x);
+    var q = num(it.q);
+    var tr = document.createElement("tr");
+    tr.dataset.k = k;
+    var sub = esc(x.desc || "");
+    if (MODO === "recibir" && x.ent_cod) sub += ' · <span class="proc">consume ' + esc(x.ent_cod) + "</span>";
+    var ex = exceso(x, q);
+    // Ester / Guazzaroni: el sugerido queda en el envase (bolsas, cajones) pero la cantidad se
+    // escribe en kg, así que debajo del campo va a cuántos envases equivale lo tipeado (se
+    // recalcula en el evento input).
+    var cargaKgFila = cargaEnKg(x);
+    // el cartelito de unidad dice con qué se carga la fila: por peso siempre kg, aunque la pieza
+    // sea de unidades (a Julio se le manda pesado; a Ester y Guazzaroni también).
+    var uCarga = (MODO === "enviar" && ((pesoEnvio() && bultoDe(x)) || cargaKgFila)) ? "kg" : u;
+    var pieza = '<td><span class="cod">' + esc(x.cod) + "</span>" + uniTag(uCarga) +
+      '<br><small class="sub">' + sub + "</small>" +
+      (ex > 0 ? '<br><span class="demas-tag">⚠ ' + fmt(ex, u === "kg" ? 2 : 0) + " de más</span>" : "") + "</td>";
+    var mitad;
+    // el bulto de la pieza cuando el proveedor recibe por peso (null = se carga en unidades)
+    var b = (MODO === "enviar" && pesoEnvio()) ? bultoDe(x) : null;
+    if (MODO === "enviar") {
+      // Solo el Sugerido (se sacaron Stock y Máximo) [usuario 2026-09-17]. Si el proveedor recibe
+      // por peso, el sugerido va en kg con la equivalencia en bultos abajo; si manda por paquetes,
+      // en paquetes (techo); si no, en su unidad. Se MUESTRA siempre; en P.S. e inyector ya no se
+      // precarga en la carga (v1.12.0), y lo tipeado ahí no se guarda al salir (v1.13.0). El
+      // cálculo del sugerido no cambió, solo el render.
+      // el sugerido sale de sugeridoInfo(), la misma cuenta que usa la tarjeta
+      var si = sugeridoInfo(x);
+      if (b) {
+        mitad = '<td class="num esp"><b>' + si.txt + "</b><small>" + esc(si.small) + "</small></td>";
+      } else {
+        mitad = envConSugerido(x)
+          ? ('<td class="num esp"><b>' + si.txt + "</b>" +
+             (si.small ? "<small>" + esc(si.small) + "</small>" : "") + "</td>")
+          : ('<td class="num esp">' + fmt(x.online_sector, u === "kg" ? 2 : 0) + " " + u + "</td>");
+      }
+    } else {
+      mitad = '<td class="num">' + esperadoTxt(x) + "</td>";
+    }
+    var carga = E.tdInput("q", it.q, false, "sep", (b || cargaKgFila) ? "decimal" : inputmodeDe(u))
+                 .replace('class="cell-in', 'class="cell-in big');
+    // el bulto (bolsas/cajones) va SIEMPRE como renglón chico debajo del campo de kg, en las dos
+    // formas: dejó de ser una columna aparte para Julio el 2026-09-18, a pedido del usuario.
+    var eqTxt = eqFila(x, q);
+    if (eqTxt != null)
+      carga = carga.replace("</td>", '<small class="env-eq">' + esc(eqTxt) + "</small></td>");
+    tr.innerHTML = pieza + mitad + carga;
+    if (ex > 0) tr.classList.add("demas");
+    tb.appendChild(tr);
+  });
+  actualizar();
+}
+
+/* ---------- ➕ OTRO CARTÓN ----------
+   Sólo al ENVIAR a un tallerista o a un prov. de art. terminado: son los dos que reciben cartón
+   [usuario 2026-09-21]. El catálogo lo trae la base al tocar el botón y no en el bundle: son ~190
+   filas que el 99% de los envíos no mira. Se cachea por contraparte mientras dure la pantalla. */
+function puedeSustituir(){
+  return MODO === "enviar" && !!selCP &&
+    (selCP.tipo === "tallerista" || selCP.tipo === "proveedor_at");
+}
+
+async function abrirOtroCarton(){
+  if (!puedeSustituir()) return;
+  sustSel = { paso: 1, x: null, q: "" };
+  detK = null;
+  $("tblBox").classList.add("hidden");
+  $("detBox").classList.remove("hidden");
+  $("tblEmpty").classList.add("hidden");
+  $("accBox").classList.add("hidden");
+  if (!CATS[selCP.id]) {
+    $("detCard").innerHTML = '<div class="det-lbl">Otro cartón</div>' +
+      '<div class="det-desc">Buscando el catálogo…</div>';
+    try {
+      var r = await SB.rpc("cartones_para_reemplazo", { p_tipo: selCP.tipo, p_ref: Number(selCP.ref) });
+      if (r.error) throw r.error;
+      CATS[selCP.id] = r.data || { oficiales: [], otros: [] };
+    } catch (err) {
+      $("detCard").innerHTML = '<div class="det-lbl">Otro cartón</div>' +
+        '<div class="det-desc" style="color:#b91c1c">No se pudo traer el catálogo: ' +
+        esc(err.message || err) + "</div>" +
+        '<div class="det-acc"><button class="btn btn-secondary" type="button" data-a="sust-cancel">← Partes</button></div>';
+      return;
+    }
+  }
+  pintarSust();
+}
+
+/* la lista del paso: los cartones que NO usa (paso 1) o los suyos (paso 2). Se repinta sola al
+   filtrar, sin tocar el resto de la tarjeta, así el buscador no pierde el foco. */
+function sustItemsHTML(){
+  var cat = CATS[selCP.id] || { oficiales: [], otros: [] };
+  var paso2 = !!(sustSel && sustSel.paso === 2);
+  var q = String((sustSel && sustSel.q) || "").trim().toLowerCase();
+  // en el paso 2 la lista ya viene acotada al sector del cartón elegido (sustSel.oficiales)
+  var base = paso2 ? ((sustSel && sustSel.oficiales) || cat.oficiales || []) : (cat.otros || []);
+  var lista = base.filter(function(o){
+    return !q || ((o.cod || "") + " " + (o["desc"] || "")).toLowerCase().indexOf(q) >= 0;
+  });
+  if (!lista.length)
+    return '<div class="empty">' + (base.length ? "Sin resultados para ese filtro."
+      : paso2 ? "Este destino no tiene ningún cartón propio: no hay a cuál reemplazar."
+              : "No queda ningún otro cartón en el catálogo.") + "</div>";
+  return lista.map(function(o){
+    var stk = Number(o.online_sector || 0);
+    return '<button type="button" class="sust-item" data-a="' + (paso2 ? "sust-of" : "sust-pick") +
+      '" data-c="' + esc(String(o.comp_id)) + '">' +
+      '<span class="si-cod">' + esc(o.cod || "") + "</span>" +
+      '<span class="si-desc">' + esc(o["desc"] || "") + "</span>" +
+      (paso2 ? "" : '<span class="si-stk' + (stk > 0 ? "" : " cero") + '">Stock en el sector: ' +
+        fmt(stk, 0) + " uni</span>") + "</button>";
+  }).join("");
+}
+
+function pintarSust(){
+  var paso2 = !!(sustSel && sustSel.paso === 2);
+  $("detCard").innerHTML =
+    '<div class="det-cod">' + (paso2 ? "¿En lugar de cuál?" : "➕ Otro cartón") + "</div>" +
+    '<div class="det-desc">' + (paso2
+      ? "El cartón del artículo que le corresponde: ese es el que se va a dejar de consumir cuando entregue el terminado."
+      : "Los que " + esc(selCP.nombre) + " no usa. El stock que baja es el de este cartón, el que sale de verdad de Cervantes.") +
+    "</div>" +
+    (paso2 ? '<div class="det-sust">Le mandás <b>' + esc(sustSel.x.cod) + "</b></div>" : "") +
+    '<input id="sustQ" inputmode="search" placeholder="Buscar por código o descripción…" value="' +
+      esc((sustSel && sustSel.q) || "") + '">' +
+    '<div class="sust-lista">' + sustItemsHTML() + "</div>" +
+    '<div class="det-acc"><button class="btn btn-secondary" type="button" data-a="sust-cancel">← Partes</button></div>';
+}
+
+/* elegido el cartón que sale y el que reemplaza, entra como una fila más de la contraparte */
+function agregarSustituto(of){
+  var x = sustSel.x;
+  var fila = {
+    tipo: selCP.tipo, ref: String(selCP.ref), comp_id: Number(x.comp_id),
+    cod: x.cod, "desc": x["desc"], sector: x.sector, um: "unidad",
+    uxc: null, kg_x_uni: null,
+    // mismo contrato que una fila del bundle: el cartón va en PAQUETES, con el paquetón de SU
+    // formato (sin formato cargado queda en unidades y la tarjeta avisa, como cualquier otra).
+    env_unidad: "paquetes", env_factor: x.factor, env_carga: "envase",
+    online_sector: x.online_sector, saldo_dest: 0,
+    maximo: null, stock_dest: null, sugerido: null,
+    sust_de: Number(of.comp_id), sust_cod: of.cod
+  };
+  var arr = SUST[selCP.id] || (SUST[selCP.id] = []);
+  var k = claveDe(fila);
+  if (!arr.some(function(f){ return claveDe(f) === k; })) arr.push(fila);
+  sustSel = null;
+  abrirParte(k);
+}
+
+/* ---------- la vista de UNA parte ----------
+   Se abre al tocar la tarjeta: arriba el sugerido (grande, de referencia) y abajo el campo con la
+   cantidad efectiva que se va a enviar. Es la MISMA carga de siempre — escribe en el mismo buffer,
+   con las mismas unidades y las mismas equivalencias que la tabla —, solo que de a una pieza. */
+function abrirParte(k){
+  if (!piezaDe(k)) return;
+  detK = k;
+  $("tblBox").classList.add("hidden");
+  $("detBox").classList.remove("hidden");
+  $("tblEmpty").classList.add("hidden");
+  // adentro de una parte no se cierra la carga: la Fecha y el boton Registrar se van con la grilla
+  // [usuario 2026-09-18: "cuando estas dentro de una parte... que no aparezca ni el boton de fecha
+  // ni de enviar"]. Vuelven al tocar "← Partes".
+  $("accBox").classList.add("hidden");
+  pintarDetalle();
+  var inp = $("detCard").querySelector('input[data-f="q"]');
+  if (inp) inp.focus();
+}
+
+function cerrarDetalle(){
+  detK = null;
+  sustSel = null;            // si estaba eligiendo "otro cartón", se cancela
+  $("detBox").classList.add("hidden");
+  $("tblBox").classList.remove("hidden");
+  $("accBox").classList.remove("hidden");
+}
+
+/* volver a la grilla: la tarjeta se repinta con lo que quedó cargado */
+function volverAPartes(){
+  cerrarDetalle();
+  render();
+}
+
+function pintarDetalle(){
+  var x = piezaDe(detK);
+  if (!x) { volverAPartes(); return; }
+  var it = BUF.item(selCP.id, detK), q = num(it.q);
+  var si = refInfo(x), uc = uniCarga(x);
+  var ckg = cargaEnKg(x);
+  var b = (MODO === "enviar" && pesoEnvio()) ? bultoDe(x) : null;
+  var ed = envaseDoble(x), chk = chequeoDoble(x, it);
+  var h =
+    '<div class="det-cod">' + esc(x.cod) + uniTag(uc) + "</div>" +
+    '<div class="det-desc">' + esc(x.desc || "") + "</div>" +
+    (x.sector ? '<div class="det-sector">' + esc(x.sector) + "</div>" : "") +
+    // cartón de otro artículo: a cuál reemplaza es lo que hay que leer antes de cargar la cantidad
+    (x.sust_de ? '<div class="det-sust">↔ en lugar de <b>' + esc(x.sust_cod) +
+                 "</b> · pegale la etiqueta del artículo que corresponde</div>" : "") +
+    // en Recibir el rotulo lo decide rotuloRef() (stock del tallerista / del P.S.), asi que se
+    // usa el que ya vino en refInfo en vez de escribirlo otra vez aca.
+    '<div class="det-lbl">' + (si.rotulo === "Sugerido" ? "Sugerido a enviar"
+                              : MODO === "recibir" ? si.rotulo : "Online en el sector") + "</div>" +
+    '<div class="det-sug">' + si.txt + (si.uni ? " " + esc(unidadTxt(si.num, si.uni)) : "") +
+      (si.nota ? "<small>" + esc(si.nota) + "</small>" : "") + "</div>" +
+    // con envase Y kg se anotan las DOS, y primero el envase: es lo que el operario cuenta
+    // mientras carga el camion [usuario 2026-09-18].
+    (ed
+      // las dos, UNA AL LADO DE LA OTRA [usuario 2026-09-18: "que sea una al lado de la otra, no
+      // una abajo de la otra (queda muy ancho)"]. El cruce va debajo, cruzando las dos columnas.
+      ? '<div class="det-dos">' +
+          '<div class="det-col"><div class="det-lbl">Cantidad (' + esc(ed.label) + ")</div>" +
+            '<div class="det-campo"><input class="det-in" data-f="c" inputmode="numeric" value="' +
+              esc(it.c || "") + '"><span class="det-uni">' + esc(ed.label) + "</span></div></div>" +
+          '<div class="det-col"><div class="det-lbl">Cantidad (kg)</div>' +
+            '<div class="det-campo"><input class="det-in" data-f="q" inputmode="decimal" value="' +
+              esc(it.q || "") + '"><span class="det-uni">kg</span></div></div>' +
+        "</div>" +
+        '<small class="det-eq' + (chk.mal ? " mal" : "") + '">' + esc(chk.txt) + "</small>"
+      : '<div class="det-lbl">' + (MODO === "recibir" ? "Cantidad" : "Cantidad a enviar") + "</div>" +
+        '<div><input class="det-in" data-f="q" inputmode="' +
+          ((b || ckg) ? "decimal" : inputmodeDe(unidadDe(x))) + '" value="' + esc(it.q || "") + '">' +
+          '<span class="det-uni">' + esc(uc) + "</span>" +
+          '<small class="det-eq">' + esc(eqFila(x, q) || "") + "</small></div>");
+  // NO hay atajo para copiar el sugerido al campo [usuario 2026-09-18: "no quiero que aparezca la
+  // opcion de enviar sugerido"]: la cantidad la escribe la persona, siempre. El sugerido de arriba
+  // es referencia y nada mas (misma linea que 4ee).
+  // "Listo" no se habilita hasta que esten las DOS unidades [usuario 2026-09-18]. El desvio, en
+  // cambio, avisa pero NO frena: "que me salte alerta pero que me deje poner listo igual".
+  h += '<div class="det-acc"><button class="btn btn-primary" type="button" data-a="listo"' +
+       (filaCompleta(x, it) ? "" : " disabled") + ">Listo</button>" +
+       (ed ? '<span class="det-falta">' +
+               (filaCompleta(x, it) ? ""
+                 : (num(it.q) > 0 ? "Falta anotar " + esc(ed.label) : "Falta anotar los kg")) +
+             "</span>" : "") + "</div>";
+  $("detCard").innerHTML = h;
+}
+
+/* Lo que se va a registrar: las filas con cantidad y, si llevan las dos unidades, con las dos.
+   Una fila a medias no viaja — la tarjeta lo dice y el botón Listo no deja cerrarla. */
+function cargadas(){
+  var meta = {}; piezasDe(selCP).forEach(function(x){ meta[claveDe(x)] = x; });
+  return E.cargadasDe(BUF.de(selCP.id), function(it){ return num(it.q) > 0; })
+          .filter(function(o){ return filaCompleta(meta[o.k], o.it); });
+}
+
+function actualizar(){
+  var n = cargadas().length;
+  E.actualizarEnviar(n, MODO === "enviar" ? "Enviar" : "Recibir");
+  // el aviso de exceso: informa, no frena (el botón sigue habilitado)
+  var meta = {}; piezasDe(selCP).forEach(function(x){ meta[claveDe(x)] = x; });
+  var conExceso = cargadas().filter(function(o){ return meta[o.k] && exceso(meta[o.k], num(o.it.q)) > 0; });
+  var box = $("alertaBox");
+  box.classList.toggle("hidden", conExceso.length === 0);
+  if (conExceso.length) {
+    box.innerHTML = "⚠ <b>Estás recibiendo más de lo esperado</b> en " + conExceso.length + " pieza" +
+      (conExceso.length === 1 ? "" : "s") + " (" + conExceso.map(function(o){ return esc(meta[o.k].cod); }).join(", ") +
+      "). <b>Podés registrar igual</b>: queda una alerta para que la revisen en Alertas.";
+  }
+}
+
+/* ---------- eventos ---------- */
+$("tbody").addEventListener("input", function(e){
+  var inp = e.target.closest("input.cell-in");
+  if (!inp) return;
+  var tr = inp.closest("tr");
+  BUF.item(selCP.id, tr.dataset.k)[inp.dataset.f] = inp.value;
+  BUF.save();
+  // repintar sólo lo que cambia de esa fila (el aviso de exceso), sin perder el foco
+  var meta = {}; piezasDe(selCP).forEach(function(x){ meta[claveDe(x)] = x; });
+  var x = meta[tr.dataset.k];
+  if (x) {
+    var q = num(inp.value), u = unidadDe(x), ex = exceso(x, q);
+    // la cantidad se escribe en kg y debajo se ve a cuántos bultos equivale (los dos modos)
+    var eq = tr.querySelector(".env-eq");
+    if (eq) eq.textContent = eqFila(x, q) || "";
+    tr.classList.toggle("demas", ex > 0);
+    var old = tr.querySelector(".demas-tag"); if (old) { old.previousSibling && old.previousSibling.nodeName === "BR" && old.previousSibling.remove(); old.remove(); }
+    if (ex > 0) tr.firstElementChild.insertAdjacentHTML("beforeend", '<br><span class="demas-tag">⚠ ' + fmt(ex, u === "kg" ? 2 : 0) + " de más</span>");
+  }
+  actualizar();
+});
+
+// cerrar la pestana, recargar o irse a otra pantalla cuenta como salir: lo tipeado en un P.S. no
+// queda guardado para la proxima [usuario 2026-09-18].
+window.addEventListener("pagehide", function(){ olvidarCargado(selCP); });
+
+/* ---- eventos de la vista de tarjetas ---- */
+$("cardsGrid").addEventListener("click", function(e){
+  if (e.target.closest(".parte-card.otro")) { abrirOtroCarton(); return; }
+  var c = e.target.closest(".parte-card");
+  if (c) abrirParte(c.dataset.k);
+});
+$("btnVolverPartes").addEventListener("click", volverAPartes);
+$("detBox").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-a]");
+  if (!b) return;
+  if (b.dataset.a === "listo") { volverAPartes(); return; }
+  if (b.dataset.a === "sust-cancel") { sustSel = null; volverAPartes(); return; }
+  if (!sustSel) return;
+  var cat = CATS[selCP.id] || { oficiales: [], otros: [] };
+  var cid = Number(b.dataset.c);
+  if (b.dataset.a === "sust-pick") {
+    var elegido = (cat.otros || []).filter(function(o){ return Number(o.comp_id) === cid; })[0];
+    if (!elegido) return;
+    sustSel.x = elegido;
+    // los suyos del MISMO sector: un cartón reemplaza un cartón, una caja una caja (la base lo
+    // valida igual, pero mostrar lo que va a ser rechazado no sirve de nada)
+    var posibles = (cat.oficiales || []).filter(function(o){
+      return Number(o.sec_id) === Number(elegido.sec_id);
+    });
+    if (!posibles.length) {
+      alert("No hay ningún cartón de " + selCP.nombre + " del mismo tipo para reemplazar.");
+      return;
+    }
+    if (posibles.length === 1) { agregarSustituto(posibles[0]); return; }   // uno solo: no se elige
+    // el filtrado por sector vive en la elección, NO en el caché: pisarlo dejaría la lista corta
+    // para el próximo cartón que se elija.
+    sustSel.paso = 2; sustSel.q = ""; sustSel.oficiales = posibles;
+    pintarSust();
+    return;
+  }
+  if (b.dataset.a === "sust-of") {
+    var of = (sustSel.oficiales || cat.oficiales || []).filter(function(o){ return Number(o.comp_id) === cid; })[0];
+    if (of) agregarSustituto(of);
+  }
+});
+$("detBox").addEventListener("input", function(e){
+  // el buscador del catálogo de "otro cartón": se repinta SOLO la lista, si no se pierde el foco
+  if (e.target.id === "sustQ") {
+    if (sustSel) {
+      sustSel.q = e.target.value;
+      var lb = $("detCard").querySelector(".sust-lista");
+      if (lb) lb.innerHTML = sustItemsHTML();
+    }
+    return;
+  }
+  var inp = e.target.closest("input.det-in");
+  if (!inp || !detK) return;
+  var x = piezaDe(detK);
+  if (!x) return;
+  var it = BUF.item(selCP.id, detK);
+  it[inp.dataset.f] = inp.value;
+  BUF.save();
+  var q = num($("detCard").querySelector('input[data-f="q"]').value);
+  var eq = $("detCard").querySelector(".det-eq");
+  var ed = envaseDoble(x);
+  if (ed) {
+    // las dos unidades: el renglón de abajo cruza lo anotado contra lo que dicen los kg.
+    var chk = chequeoDoble(x, it);
+    if (eq) { eq.textContent = chk.txt; eq.classList.toggle("mal", chk.mal); }
+  } else if (eq) {
+    // el equivalente en bultos de lo tipeado: el mismo renglón chico del resto de las formas
+    eq.textContent = eqFila(x, q) || "";
+  }
+  // EL BOTON SE REPINTA SIEMPRE, lleve la parte una unidad o dos. La tarjeta se dibuja con el
+  // campo vacío (o sea con "Listo" deshabilitado) y acá es el único lugar donde se vuelve a
+  // habilitar: mientras esto vivió adentro del if (ed), en TODO Recibir —envaseDoble() devuelve
+  // null si el modo no es enviar— el botón quedaba gris con la cantidad escrita. Se repinta a
+  // mano, sin redibujar la tarjeta, para no perder el foco del campo.
+  var btn = $("detCard").querySelector('button[data-a="listo"]');
+  var completa = filaCompleta(x, it);
+  if (btn) btn.disabled = !completa;
+  var falta = $("detCard").querySelector(".det-falta");   // solo existe con las dos unidades
+  if (falta) falta.textContent = completa ? ""
+    : (num(it.q) > 0 ? "Falta anotar " + ed.label : "Falta anotar los kg");
+  actualizar();
+});
+
+$("q").addEventListener("input", render);
+$("btnVerOC").addEventListener("click", ocToggle);
+$("q0").addEventListener("input", pintarCPS);
+$("btnVolver").addEventListener("click", volver);
+$("btnOtro").addEventListener("click", function(){ location.reload(); });
+$("btnVolverTipo").addEventListener("click", mostrarTipos);
+$("modos").addEventListener("click", function(e){
+  var b = e.target.closest("button.modo-btn");   // Conteo es un <a>: se va solo a Relevamientos
+  if (b) setModo(b.dataset.modo);
+});
+
+$("btnEnviar").addEventListener("click", async function(){
+  if (!selCP) return;
+  var items = cargadas();
+  if (!items.length) return;
+  var meta = {}; piezasDe(selCP).forEach(function(x){ meta[claveDe(x)] = x; });
+
+  var fecha = $("fFecha").value || hoyISO();
+  // si el proveedor manda por paquetes, la cantidad se carga EN paquetes: se multiplica por el factor
+  // para guardar en la unidad canonica (pliegos/uni). El inventario nunca ve "paquetes".
+  // Si en cambio la cantidad se carga en KG (Ester) o el proveedor recibe pesado (Julio), el kg
+  // viaja tal cual con unidad 'kg' y to_canonical lo pasa a mangos con kg_x_uni: tampoco ve bolsas.
+  var _peso = pesoEnvio();
+  var payload = {
+    modo: MODO, tipo: selCP.tipo, ref: String(selCP.ref),
+    fecha: fecha + "T12:00:00",
+    remito: MODO === "recibir" ? ($("fRemito").value.trim() || null) : null,
+    items: items.map(function(o){
+      var x = meta[o.k] || {};
+      var u = unidadDe(x);
+      var ckg = cargaEnKg(x);
+      var ev = envaseDe(x);
+      // por peso: lo que viaja son los KG (la base los pasa a unidades con kg_x_uni) y el bulto va
+      // aparte, en movimiento.cajones — los cajones tal como los anotó el operario, las bolsas
+      // calculadas desde los kg.
+      var b = _peso ? bultoDe(x) : null;
+      var q = num(o.it.q);
+      // con las dos unidades viaja el envase que ANOTO el operario, no el que sale de los kg: es
+      // el que conto al cargar [usuario 2026-09-18]. Sin las dos, se sigue calculando.
+      var caj = envaseDoble(x) ? num(o.it.c) : (b ? bultosDeKg(b, q) : null);
+      if (caj == null && ckg && kgPorEnvase(x) > 0) caj = redEnvase(q / kgPorEnvase(x));
+      return {
+        comp_id: x.comp_id != null ? Number(x.comp_id) : null,
+        comp_entrada_id: x.comp_entrada_id != null ? Number(x.comp_entrada_id) : null,
+        cod_art: x.cod_art || null,
+        // sin cargar en kg, lo tipeado está en envases: se multiplica por el factor de ESA pieza
+        // para guardar en la unidad canónica. Factor 0 (envase por pieza sin cajón cargado) = la
+        // fila se cargó en unidades y viaja tal cual.
+        cantidad: (ckg || b) ? q : (ev ? q * ev.factor : q),
+        unidad: (ckg || b || u === "kg") ? "kg" : "uni",
+        cajones: (caj != null && caj > 0) ? caj : null,
+        // el esperado viaja en la MISMA unidad que la cantidad: la base los compara crudos para
+        // levantar la alerta de "recibi de mas", y un esperado en unidades contra kg no compara.
+        esperado: (MODO === "recibir" && x.esperado != null)
+          ? ((ckg && u !== "kg") ? Number(x.esperado) * kguRef(x) : Number(x.esperado))
+          : null,
+        esperado_origen: x.esperado_origen || null,
+        // el cartón OFICIAL al que reemplaza lo que sale de verdad: la base lo guarda en el mismo
+        // movimiento y el consumo del terminado lo gasta primero a él [usuario 2026-09-21]
+        sustituye_comp_id: x.sust_de || null
+      };
+    })
+  };
+  var nEx = items.filter(function(o){ return meta[o.k] && exceso(meta[o.k], num(o.it.q)) > 0; }).length;
+  function lineaResumen(o){
+    var x = meta[o.k] || {};
+    var ev = envaseDe(x);
+    var ed = envaseDoble(x);
+    if (ed)
+      return (x.cod || o.k) + ": " + fmt(num(o.it.q), 2) + " kg (" +
+             fmt(num(o.it.c), 0) + " " + unidadTxt(num(o.it.c), ed.label) + ")" +
+             (desvioEnvase(x, o.it) ? " ⚠ no coincide" : "");
+    if (cargaEnKg(x))
+      return (x.cod || o.k) + ": " + fmt(num(o.it.q), 2) + " kg (" +
+             equivEnvase(num(o.it.q), kgPorEnvase(x), ev.label)
+               .replace("= ", "") + ")";
+    var b = _peso ? bultoDe(x) : null;
+    if (b) {
+      var q2 = num(o.it.q);
+      var cb = bultosDeKg(b, q2);
+      return (x.cod || o.k) + ": " + fmt(q2, 2) + " kg" + (cb ? " (" + fmt(cb, 2) + " " + b.label + ")" : "");
+    }
+    return ev
+      ? (x.cod || o.k) + ": " + fmt(num(o.it.q), 0) + " " + ev.label
+      : (x.cod || o.k) + ": " + fmt(num(o.it.q), unidadDe(x) === "kg" ? 2 : 0) + " " + unidadDe(x);
+  }
+  // el reemplazo se dice en el confirm: es lo único que el operario no puede deshacer después
+  var resumen = items.map(function(o){
+    var xs = meta[o.k] || {};
+    return lineaResumen(o) + (xs.sust_de ? "  ↔ EN LUGAR DE " + xs.sust_cod : "");
+  });
+  var verbo = MODO === "enviar" ? "Enviar a " : "Recibir de ";
+  if (!confirm(verbo + selCP.nombre + " (" + fecha + "):\n\n" + resumen.join("\n") +
+      (nEx ? "\n\n⚠ " + nEx + " pieza" + (nEx === 1 ? "" : "s") + " con más de lo esperado: se registra igual y queda la alerta." : ""))) return;
+
+  var btn = $("btnEnviar");
+  btn.disabled = true; btn.textContent = "Registrando…";
+  $("msg1").textContent = "";
+  try {
+    var r = await SB.rpc("tablet_registrar", { p: payload });
+    if (r.error) throw r.error;
+    BUF.borrar(selCP.id);
+    delete SUST[selCP.id];          // los "otro cartón" ya registrados no siguen en la grilla
+    var res = r.data || {};
+    var al = res.alertas || [];
+    $("successTitle").textContent = MODO === "enviar" ? "✓ Enviado" : "✓ Recibido";
+    $("successAlertas").innerHTML = al.length
+      ? '<div class="alerta-box">⚠ <b>Quedó anotado para revisar</b>: ' + al.map(function(a){
+          return esc(a.cod) + " (" + fmt(a.recibido, 0) + " contra " + fmt(a.esperado, 0) + " esperados)";
+        }).join(", ") + ". La recepción se registró igual.</div>"
+      : "";
+    E.mostrarExito((res.n || items.length) + " pieza" + ((res.n || items.length) === 1 ? "" : "s") + " · " +
+      (MODO === "enviar" ? "enviadas a " : "recibidas de ") + (res.contraparte || selCP.nombre) + " · " + fecha);
+    // DESPUÉS DEL REMITO VIENE EL CONTROL [usuario 2026-09-21: "Después de recepcionar tengo que ir
+    // al control"]. Lo que se acaba de registrar es lo que dice el remito; lo que se contó de verdad
+    // se carga en ControlEntregaPS_GP2.html, que es la que pisa la cantidad. Se va DIRECTO, sin
+    // cartel intermedio, igual que la recepción de insumos [usuario 2026-09-03: "me gusta que me
+    // mande directo como en el caso de flejes"]. ÚNICA excepción: si quedó una alerta de "recibí de
+    // más" no se salta la pantalla — ahí el operario tiene que leerla, y va con un botón.
+    if (MODO === "recibir" && (selCP.tipo === "proveedor_servicio" || selCP.tipo === "tallerista")) {
+      if (!al.length) { window.location.href = "ControlEntregaPS_GP2.html"; return; }
+      $("successAlertas").innerHTML +=
+        '<div class="row" style="justify-content:center;margin-top:10px">' +
+        '<a class="btn btn-primary" href="ControlEntregaPS_GP2.html"' +
+        ' style="display:inline-flex;align-items:center;text-decoration:none">Ir al control →</a></div>';
+    }
+    try { var r2 = await SB.rpc("tablet_bundle"); if (!r2.error && r2.data) D = r2.data; } catch(e2){}
+  } catch(err){
+    $("msg1").innerHTML = '<span style="color:#b91c1c">Error: ' + esc(err.message || err) + "</span>";
+    btn.disabled = false; actualizar();
+  }
+});
+
+$("fFecha").value = hoyISO();
+cargar();
+
+/* CUÁNTO QUEDÓ SIN CONTROLAR (2026-09-21; insumos desde v1.39.0). El circuito es remito → control,
+   y lo que hace que no quede nada colgado es verlo en la puerta: si hay pendientes, el link del
+   encabezado los cuenta — entregas de P.S. y talleristas (pend) más recepciones de insumos que
+   tienen pantalla de control (insumos_pend, filtradas por GP2CI). Es BEST EFFORT y nunca bloquea
+   la pantalla: si la RPC falla, el link queda diciendo "Control" y la tablet funciona igual. */
+(async function () {
+  try {
+    var r = await SB.rpc("control_entrega_bundle");
+    var d = (r && r.data) || {};
+    var n = (d.pend || []).length +
+            GP2CI.pendientes(d.insumos_pend).reduce(function (a, g) { return a + Number(g.n || 0); }, 0);
+    var a = $("lnkControl");
+    if (a && n) a.textContent = "Control (" + n + ")";
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>

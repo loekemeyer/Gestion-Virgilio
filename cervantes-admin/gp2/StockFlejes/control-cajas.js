@@ -13,6 +13,11 @@
      - marca controlado=true + controlado_en + controlado_por
      - pisa la cantidad con el total real
      - ajusta el movimiento asociado (los triggers recalculan inventario)
+
+   v1.2.0 (2026-09-23) — LA TOLERANCIA ES 5 % Y SALE DE LA BASE [usuario: "acordate de la regla
+   de que todo control no puede exceder el 5% de diferencia"]. Aca habia un 10 % escrito a mano;
+   ahora hay UNA clave para toda la casa, parametro.tol_ctrl_pct (5), que control_recepcion_bundle
+   manda en tol_pct y leen tambien el control por peso y el de entregas.
    ============================================================ */
 
 // URL y clave anon salen de supabase-config.js (un solo lugar; ver ese archivo).
@@ -37,6 +42,10 @@ const UPP_DEFAULT = 25;
 
 let recepciones = [];  // filas del bundle
 let selected = null;
+/* Tolerancia del control, en %: la misma para toda la casa (5 %, parametro.tol_ctrl_pct, lo
+   manda control_recepcion_bundle) [usuario 2026-09-23: "todo control no puede exceder el 5% de
+   diferencia"]. Antes acá había un 10 % escrito a mano. */
+let TOL_PCT = 5;
 
 function fmtFechaCorta(iso) {
   if (!iso) return "—";
@@ -51,6 +60,7 @@ async function cargar() {
     const { data, error } = await SB.rpc("control_recepcion_bundle", { p_sector_id: 11 });
     if (error) throw error;
     recepciones = (data && data.recepciones) || [];
+    TOL_PCT = Number(data && data.tol_pct) || 5;
     poblarProveedores();
     render();
     statusMsg.textContent = "";
@@ -230,9 +240,9 @@ async function confirmar() {
   if (decl > 0) {
     const dif = total - decl;
     const pct = Math.abs(dif) / decl;
-    if (pct > 0.10) {
+    if (pct * 100 > TOL_PCT) {
       const txt = dif > 0 ? `sobran ${fmt(dif)}` : `faltan ${fmt(-dif)}`;
-      if (!confirm(`Difiere ±${(pct*100).toFixed(1)}% de lo declarado.\nDeclarado: ${fmt(decl)} · Contado: ${fmt(total)} (${txt}).\n¿Confirmar de todos modos?`)) return;
+      if (!confirm(`Difiere ±${(pct*100).toFixed(1)}% de lo declarado (tolerancia ${fmt(TOL_PCT)} %).\nDeclarado: ${fmt(decl)} · Contado: ${fmt(total)} (${txt}).\n¿Confirmar de todos modos?`)) return;
     }
   }
 

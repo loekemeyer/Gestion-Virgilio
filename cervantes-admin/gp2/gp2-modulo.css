@@ -30,7 +30,7 @@ body{font-family:Arial,sans-serif;background:#f5f6f8;padding:12px;color:#111}
 .steps{padding:14px 18px}
 .row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;align-items:center}
 label.lbl{font-weight:800;font-size:20px}
-input[type="date"]{height:40px;border:2px solid #d0d7de;border-radius:8px;padding:0 10px;font-size:20px}
+input[type="date"]{height:44px;border:2px solid #d0d7de;border-radius:8px;padding:0 10px;font-size:20px}
 
 /* ---- botones ---- */
 .btn{padding:10px 16px;min-height:44px;border-radius:8px;border:none;font-weight:800;cursor:pointer;font-size:20px}
@@ -74,7 +74,10 @@ table.t tfoot td{font-weight:900;background:#f6f8fa;border-top:2px solid #e5e9ee
 .seg-btn.active{background:#111;color:#fff;border-color:#111}
 
 /* ---- celdas editables ---- */
-.cell-in{width:96px;padding:7px 8px;font-size:18px;border:2px solid #d0d7de;border-radius:6px;text-align:right;font-variant-numeric:tabular-nums}
+/* min-height 44px = minimo tactil de la casa (idea 7337, 2026-09-12): median 39 en
+   TODAS las pantallas de envios/entregas/recepcion. El ancho es fijo, asi que crecer
+   a lo alto no mueve la columna. */
+.cell-in{width:96px;min-height:44px;padding:7px 8px;font-size:18px;border:2px solid #d0d7de;border-radius:6px;text-align:right;font-variant-numeric:tabular-nums}
 .cell-in:focus{outline:none;border-color:#111}
 .cell-in.ro{background:#f6f8fa;color:#555}
 /* 44px = minimo tactil de la casa. Median 34 y son los botones de TODA la carga

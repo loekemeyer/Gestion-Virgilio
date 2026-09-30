@@ -69,6 +69,8 @@ const RE_HELPER = /(GP2UI|GP2N|GP2EE|GP2M|GP2ConsumoDetalle|GP2Composicion|GP2St
     await page.route('**/*', r => {
       const u = r.request().url();
       if (/@supabase\/supabase-js/.test(u)) return r.fulfill({ contentType: 'application/javascript', body: STUB });
+      // El login (auth-guard) se prueba en test_login_flow; aca se apaga para abrir cada pantalla.
+      if (/auth-guard\.js/.test(u)) return r.fulfill({ contentType: 'application/javascript', body: 'window.GP2_AUTH_ON=false;' });
       if (u.startsWith('file://')) return r.continue();
       return r.abort();              // sin red: fuentes, CDNs, imagenes externas
     });

@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- v1.0.0 — reemplazo GP2 de "Recepcion Virgilio.html" (programa viejo, schema public).
+     Todo lo que lee y escribe esta pantalla sale del schema GP2: el bundle
+     GP2.movimientos_bundle() y el RPC GP2.recepcion_virgilio(jsonb). -->
+<meta charset="utf-8"/>
+<script src="../../auth-guard.js?v=20260929a"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Recepción Virgilio · GP2</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../../supabase-config.js?v=20260929a"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260912c"/>
+<link rel="icon" type="image/png" href="../../GP2_favicon.png">
+<link rel="apple-touch-icon" href="../../GP2_favicon.png">
+<style>
+  .sub{color:#555}
+  .disc{color:#b42318;font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Recepción Virgilio</h1>
+    <div class="hbtns">
+      <button class="hlink hidden" id="btnVolver" type="button">← Cambiar quién entrega</button>
+      <a href="EntregasTalleristas_GP2.html">Recepción Tall.</a>
+      <a href="../../GP2_MODULOS.html">Atrás</a>
+    </div>
+  </div>
+
+  <div class="steps">
+
+    <!-- FASE 0 — elegir quién entrega -->
+    <div id="fase0">
+      <div class="row"><label class="lbl">¿Quién entrega?</label></div>
+      <div class="provs-grid" id="cpGrid"></div>
+      <div class="aviso">
+        Acá entra el <b>artículo terminado</b> que llega al centro logístico de Virgilio, venga
+        de un tallerista o de un proveedor de artículo terminado. Lo que un tallerista devuelve
+        <b>a un sector</b> (partes, semi-elaborados) va por <b>Recepción de Tallerista</b>.
+      </div>
+      <div id="status" class="status">Cargando…</div>
+    </div>
+
+    <!-- FASE 1 — cargar lo entregado -->
+    <div id="fase1" class="hidden">
+      <div class="row" style="justify-content:space-between">
+        <div class="row" style="margin:0"><label class="lbl" id="fase1Title">—</label></div>
+        <div class="row" style="margin:0">
+          <label class="lbl" style="font-size:16px">Fecha</label>
+          <input type="date" id="fFecha">
+          <button class="btn btn-secondary" id="btnLimpiar" type="button" title="Vaciar todo lo cargado">🗑 Limpiar</button>
+          <button class="btn btn-primary" id="btnEnviar" type="button" disabled>Registrar</button>
+        </div>
+      </div>
+
+      <div class="search-box"><input type="text" id="q" placeholder="Buscar por código o descripción…"></div>
+
+      <div class="table-wrap">
+        <table class="t">
+          <thead><tr>
+            <th>Artículo</th>
+            <th class="num">Uni x<br>caja</th>
+            <th class="num">En poder<br>de quien entrega</th>
+            <th class="num sep">Cajas</th>
+            <th class="num">Uni</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="tblEmpty" class="empty hidden"></div>
+      <div id="msg1" class="status"></div>
+    </div>
+
+    <!-- FASE 3 — confirmación -->
+    <div id="fase3" class="hidden">
+      <div class="successBox">
+        <div class="title">✓ Recepción registrada</div>
+        <div>Tu código de recepción:</div>
+        <div class="code" id="successCode">—</div>
+        <div id="successDetail" style="font-size:17px;color:#444"></div>
+      </div>
+      <div class="row" style="justify-content:center">
+        <button class="btn btn-primary" id="btnVolverTall" type="button">← Cambiar quién entrega</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="../../gp2-motor.js?v=20260905f"></script>
+<script src="../../gp2-ui.js?v=20260913e"></script>
+<script src="../../gp2-numero.js?v=20260911o"></script>
+<script src="../../gp2-envios-common.js?v=20260924b"></script>
+<script>
+"use strict";
+
+var E = GP2EE;
+var $ = GP2UI.$, esc = GP2UI.esc, fmt = E.fmt, num = E.num, hoyISO = E.hoyISO;
+
+var SB = E.sb();
+var D = null;            // bundle de GP2.movimientos_bundle()
+var CPS = [];            // contrapartes que entregan terminados en Virgilio
+var selCP = null;
+var BUF = E.buffer("gp2_recepcionVirgilio_buffer", function(){ return { caj:"", uni:"" }; });
+
+function esCargada(it){ return num(it.uni) > 0; }
+
+/* La ubicacion de una contraparte, leida del bundle (el motor solo expone
+   sector/prov_serv/tallerista; Virgilio recibe tambien de proveedor_at). */
+function ubicDe(tipo, ref){
+  if (tipo === "tallerista") return GP2M.ubicTall(ref);
+  for (var uid in D.ubic){
+    var u = D.ubic[uid];
+    if (u.tipo === tipo && String(u.ref) === String(ref)) return parseInt(uid);
+  }
+  return null;
+}
+
+function nombreDe(tipo, ref){
+  var t = (tipo === "tallerista" ? D.tall : D.prov_at) || {};
+  var x = t[String(ref)];
+  return (x && x.nom) || ("#" + ref);
+}
+
+/* Quién entrega cada artículo: el último paso con contraparte ANTES del paso
+   virgilio de la ruta. La ruta es la fuente: no hay tabla de "artículos por
+   tallerista" en GP2 y no hace falta — el paso ya lo dice. */
+function armarContrapartes(){
+  var map = {};
+  for (var rid in D.rp){
+    var ps = D.rp[rid], iv = -1, i, j;
+    for (i = 0; i < ps.length; i++) if (ps[i].tipo === "virgilio"){ iv = i; break; }
+    if (iv < 0 || !ps[iv].art) continue;
+
+    var o = null;
+    for (j = iv - 1; j >= 0; j--){
+      if (ps[j].tipo === "tallerista" && ps[j].tall){ o = { tipo:"tallerista", ref:ps[j].tall }; break; }
+      if (ps[j].tipo === "proveedor_at" && ps[j].pat){ o = { tipo:"proveedor_at", ref:ps[j].pat }; break; }
+    }
+    if (!o) continue;
+
+    var k = o.tipo + ":" + o.ref;
+    if (!map[k]) map[k] = { id:k, tipo:o.tipo, ref:o.ref, nombre:nombreDe(o.tipo, o.ref), arts:{} };
+    // el comp de entrada del paso virgilio es el terminado que se recibe
+    map[k].arts[ps[iv].art] = ps[iv].ce || null;
+  }
+  return Object.keys(map).map(function(k){ return map[k]; })
+    .sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+}
+
+/* Los artículos de una contraparte, con su terminado y su caja. */
+function artsDe(cp){
+  return Object.keys(cp.arts).map(function(aid){
+    var a = D.art[String(aid)] || {};
+    return {
+      art_id: parseInt(aid),
+      cod: a.cod || ("#" + aid),
+      desc: a.desc || "",
+      por: a.por || null,          // articulos_por_caja
+      disc: !!a.disc,
+      comp_id: cp.arts[aid]
+    };
+  }).filter(function(x){ return !x.disc; })
+    .sort(function(a,b){ return String(a.cod).localeCompare(String(b.cod)); });
+}
+
+async function cargar(){
+  try {
+    D = await GP2M.cargar(SB);
+  } catch(e){
+    $("status").textContent = "Error: " + (e && e.message ? e.message : e);
+    return;
+  }
+  CPS = armarContrapartes();
+  BUF.load();
+  renderCPS();
+  var t = CPS.filter(function(c){ return c.tipo === "tallerista"; }).length;
+  $("status").textContent = CPS.length + " entregan terminados en Virgilio (" + t +
+    " talleristas y " + (CPS.length - t) + " proveedores de artículo terminado).";
+}
+
+function renderCPS(){
+  E.gridContrapartes("cpGrid", CPS, {
+    vacio: "Ninguna ruta termina en Virgilio.",
+    meta: function(c){
+      var n = artsDe(c).length;
+      var cargado = E.cargadasDe(BUF.all[c.id], esCargada).length;
+      return n + " artículo" + (n===1?"":"s") +
+        (c.tipo === "proveedor_at" ? " · prov. AT" : "") +
+        (cargado ? (" · " + cargado + " cargados") : "");
+    },
+    onPick: elegir
+  });
+}
+
+function elegir(c){
+  selCP = c;
+  $("fase1Title").textContent = c.nombre;
+  E.mostrarFase(1);
+  if (!$("fFecha").value) $("fFecha").value = hoyISO();
+  $("q").value = "";
+  render();
+}
+
+function volver(){ selCP = null; E.mostrarFase(0); renderCPS(); }
+
+function filtradas(){
+  return E.filtrar(artsDe(selCP), $("q").value, function(x){
+    return String(x.cod||"") + " " + String(x.desc||"");
+  });
+}
+
+function render(){
+  var arr = filtradas(), tb = $("tbody");
+  tb.innerHTML = "";
+  $("tblEmpty").classList.toggle("hidden", arr.length > 0);
+  if (!arr.length) $("tblEmpty").textContent = "Sin resultados para ese filtro.";
+
+  var ubic = ubicDe(selCP.tipo, selCP.ref);
+
+  arr.forEach(function(x){
+    var it = BUF.item(selCP.id, x.art_id);
+    var enCP = x.comp_id && ubic ? GP2M.stock(x.comp_id, ubic) : 0;
+    var tr = document.createElement("tr");
+    tr.dataset.aid = x.art_id;
+    tr.innerHTML =
+      '<td><span class="cod">' + esc(x.cod) + '</span><br><small class="sub">' + esc(x.desc) + '</small></td>' +
+      '<td class="num">' + (x.por ? fmt(x.por, 0) : "—") + '</td>' +
+      '<td class="num">' + fmt(enCP, 0) + '</td>' +
+      E.tdInput("caj", it.caj, false, "sep") +
+      E.tdInput("uni", it.uni, false);
+    tb.appendChild(tr);
+  });
+  actualizarEnviar();
+}
+
+function itemDeFila(tr){
+  var aid = tr.dataset.aid;
+  return { aid: aid, meta: E.buscarMeta(artsDe(selCP), aid, function(x){ return x.art_id; }),
+           buf: BUF.item(selCP.id, aid) };
+}
+
+function cargadas(){ return E.cargadasDe(BUF.de(selCP.id), esCargada); }
+function actualizarEnviar(){ E.actualizarEnviar(cargadas().length, "Registrar"); }
+
+/* Cajas -> unidades: la caja es del artículo (articulos_por_caja), asi que la
+   conversion se hace sola y el operario no tiene que multiplicar. Uni queda
+   editable: si lo pisa a mano, manda lo que escribio. */
+$("tbody").addEventListener("input", function(e){
+  var inp = e.target.closest("input.cell-in");
+  if (!inp) return;
+  var tr = inp.closest("tr"), d = itemDeFila(tr);
+  d.buf[inp.dataset.f] = inp.value;
+  if (inp.dataset.f === "caj" && d.meta && d.meta.por){
+    var caj = num(inp.value);
+    d.buf.uni = caj > 0 ? String(Math.round(caj * d.meta.por)) : "";
+    var uniIn = tr.querySelector('input[data-f="uni"]');
+    if (uniIn) uniIn.value = d.buf.uni;
+  }
+  BUF.save(); actualizarEnviar();
+});
+
+$("q").addEventListener("input", render);
+$("btnVolver").addEventListener("click", volver);
+$("btnVolverTall").addEventListener("click", volver);
+
+$("btnLimpiar").addEventListener("click", function(){
+  if (!selCP) return;
+  if (!confirm("¿Vaciar todo lo cargado para " + selCP.nombre + "?")) return;
+  BUF.borrar(selCP.id);
+  render();
+});
+
+$("btnEnviar").addEventListener("click", async function(){
+  if (!selCP) return;
+  var items = cargadas();
+  if (!items.length) return;
+
+  var metaPor = {};
+  artsDe(selCP).forEach(function(x){ metaPor[x.art_id] = x; });
+
+  var fecha = $("fFecha").value || hoyISO();
+  var payloadItems = [], resumen = [];
+  items.forEach(function(o){
+    var m = metaPor[o.k] || {};
+    var uni = num(o.it.uni);
+    payloadItems.push({ articulo_id: Number(o.k), cantidad: uni });
+    resumen.push((m.cod || o.k) + ": " + fmt(uni, 0) + " uni");
+  });
+
+  if (!confirm("Registrar entrega de " + selCP.nombre + " en Virgilio:\n\n" + resumen.join("\n"))) return;
+
+  var btn = $("btnEnviar");
+  btn.disabled = true; btn.textContent = "Registrando…";
+  $("msg1").textContent = "";
+
+  var p = { origen_tipo: selCP.tipo, origen_id: selCP.ref, fecha: fecha, items: payloadItems };
+
+  try {
+    // ensayo primero: el RPC arma todos los movimientos sin escribir nada y
+    // avisa si a un articulo le falta receta o terminado. Si eso pasa, no se
+    // registra NADA (antes de este chequeo el error saltaba a mitad de camino).
+    var pru = await SB.rpc("recepcion_virgilio", { p: Object.assign({ dry_run: true }, p) });
+    if (pru.error) throw pru.error;
+
+    var res = await SB.rpc("recepcion_virgilio", { p: p });
+    if (res.error) throw res.error;
+
+    BUF.borrar(selCP.id);
+    try { await GP2M.cargar(SB); } catch(e2){ /* ya quedo registrado; solo fallo la recarga */ }
+    var n = (res.data && res.data.movimientos) || 0;
+    E.mostrarExito(items.length + " artículos recibidos de " + selCP.nombre + " · " + fecha +
+      " · " + n + " movimientos (incluye los consumos de la receta)");
+  } catch(e){
+    $("msg1").innerHTML = '<span style="color:#b91c1c">Error: ' + esc(e.message || e) + '</span>';
+  } finally {
+    btn.disabled = false; actualizarEnviar();
+  }
+});
+
+$("fFecha").value = hoyISO();
+cargar();
+</script>
+</body>
+</html>

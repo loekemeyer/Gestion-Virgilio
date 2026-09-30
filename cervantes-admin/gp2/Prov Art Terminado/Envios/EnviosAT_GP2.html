@@ -1,15 +1,24 @@
 <!doctype html>
 <html lang="es">
 <head>
-<!-- v1.0.1 — Envio de carton y cajas a los Prov de Articulo Terminado (cartones en paquetes de 250) -->
+<!-- v1.0.2 (2026-09-15) — cada Prov AT ve SOLO los cartones/cajas que la receta de sus articulos
+     usa (via prov_insumos del bundle), no el catalogo entero de sector 10/11 [bug: mostraba 191 a
+     todos]. + anti-cache meta. v1.0.1 — Envio de carton y cajas a los Prov de Articulo Terminado
+     (cartones en paquetes de 250) -->
 <meta charset="utf-8"/>
+<script src="../../auth-guard.js?v=20260929a"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<!-- Anti-cache: la pantalla se navega directa (sin ?v= propio); sin esto el navegador
+     podia servir la copia vieja del HTML tras un fix. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Envío Cartón/Cajas · Prov AT · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../../supabase-config.js?v=20260905k"></script>
-<script src="../../gp2-ui.js?v=20260912a"></script>
+<script src="../../supabase-config.js?v=20260929a"></script>
+<script src="../../gp2-ui.js?v=20260913e"></script>
 <script src="../../gp2-numero.js?v=20260911o"></script>
-<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260912c"/>
 <link rel="icon" type="image/png" href="../../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../../GP2_favicon.png">
 <style>
@@ -116,11 +125,26 @@ function onlineDe(provId, compId){
 function pintarItems(){
   var q=($('q').value||'').trim().toLowerCase();
   var g=$('items'); g.innerHTML='';
-  (D.insumos||[]).filter(function(i){
+  // A un Prov AT solo se le muestran los cartones/cajas que la receta de SUS articulos usa
+  // (D.prov_insumos, mapa proveedor->comp_id). Antes se listaba el catalogo entero de sector
+  // 10/11 (191 items) para todos [bug 2026-09-15]. Si el bundle es viejo (sin prov_insumos),
+  // no filtra: cae al comportamiento anterior en vez de mostrar vacio.
+  var permitidos = (D.prov_insumos && provSel) ? (D.prov_insumos[provSel.id] || []) : null;
+  var setP = null;
+  if (permitidos){ setP = {}; permitidos.forEach(function(c){ setP[c]=1; }); }
+  var lista = (D.insumos||[]).filter(function(i){
+    if (setP && !setP[i.comp_id]) return false;
     return !q || ((i.codigo||'')+' '+(i.descripcion||'')).toLowerCase().includes(q);
-  }).forEach(function(i){
+  });
+  if (!lista.length){
+    g.innerHTML = '<div class="empty">'+(setP && !q
+      ? esc(provSel.nombre)+' no tiene cartones ni cajas en la receta de sus artículos.'
+      : 'Sin resultados.')+'</div>';
+    return;
+  }
+  lista.forEach(function(i){
     var b=document.createElement('button'); b.type='button'; b.className='item-btn';
-    var esCarton = i.sector_id===10;
+    var esCarton = GP2UI.esCarton(i);   /* el 10 vive en gp2-ui.js (idea 7334) */
     b.innerHTML='<span class="code">'+esc(i.codigo||'—')+'</span>'+
       '<span class="desc">'+esc(i.descripcion||'')+'</span>'+
       '<span class="stk">Stock: '+fmt(i.online)+' uni'+(esCarton?(' ('+fmt((i.online||0)/PAQ,2)+' paq)'):'')+'</span>'+
@@ -132,7 +156,7 @@ function pintarItems(){
 
 function abrirPopup(i){
   itemSel=i;
-  var esCarton=i.sector_id===10;
+  var esCarton=GP2UI.esCarton(i);
   $('popTitle').textContent=(i.codigo||'')+' — '+(i.descripcion||'');
   $('popInfo').innerHTML='Para <b>'+esc(provSel.nombre)+'</b> · stock en '+esc(i.sector)+': <b>'+fmt(i.online)+' uni</b>'+
     (esCarton?(' · los cartones van en <b>paquetes de '+PAQ+'</b>'):'');
@@ -144,7 +168,7 @@ function abrirPopup(i){
 
 $('popQty').addEventListener('input', function(){
   var v=GP2N.entero($('popQty').value);
-  var esCarton=itemSel&&itemSel.sector_id===10;
+  var esCarton=GP2UI.esCarton(itemSel);
   $('popConv').textContent = (esCarton&&v>0) ? ('= '+fmt(v*PAQ)+' unidades') : '';
 });
 $('popCancel').addEventListener('click', function(){ $('popup').classList.remove('open'); });
@@ -154,7 +178,7 @@ $('popOk').addEventListener('click', async function(){
   var m=$('popMsg');
   var v=GP2N.entero($('popQty').value);
   if(v<=0){ m.className='status bad'; m.textContent='Ingresá una cantidad (> 0).'; return; }
-  var esCarton=itemSel.sector_id===10;
+  var esCarton=GP2UI.esCarton(itemSel);
   var uni = esCarton ? v*PAQ : v;
   $('popOk').disabled=true;
   try{

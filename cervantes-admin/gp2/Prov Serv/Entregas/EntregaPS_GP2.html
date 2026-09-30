@@ -1,7 +1,14 @@
 <!doctype html>
 <html lang="es">
 <head>
-<!-- v1.6.2 (2026-09-08) — ECLIPSE: el desperdicio se expresa como % DE LA CHAPA (usuario: "usar el 40
+<!-- v1.7.0 (2026-09-21) — LA COLUMNA "EN PS / CAJÓN" SE MIDE CON EL CAJÓN QUE ANOTÓ LOGÍSTICA
+     (usuario, textual: "tiene que aparecer en su stock los cajones que escribe logística, no los
+     que se calcula a partir de los kg"). Se mandó 1 cajón de 21 kg de CV1 a Guazzaroni y la
+     columna decía 1,05 porque dividía por componente.uni_x_cajon (57.143 uni = 20 kg justos). El
+     factor pasa a salir de GP2.v_caj_contraparte (unidades enviadas / movimiento.cajones), que
+     envios_ps_bundle manda como sc_unixcaj_anot y lee GP2EE.uxcEnPoder(). Sin cajones anotados
+     queda el cajón del maestro. Mismo criterio en Envío PS y en la Tablet.
+     v1.6.2 (2026-09-08) — ECLIPSE: el desperdicio se expresa como % DE LA CHAPA (usuario: "usar el 40
      porque lo que usamos son los KG"). proveedor_servicio.desperdicio_pct pasa de 67,46 (sobre producto)
      a 40,28 (sobre chapa); la formula del RPC se invierte: chapa = kg_entrega / (1 - desp/100). Da lo
      mismo (29,85 / (1-0,4028) = 49,98) pero el numero guardado es el 40% que se razona en KG.
@@ -34,11 +41,12 @@
      balanza (verificacion 5%), via cargar_recepcion_charcas. NO usa la tabla SC->SP normal.
      Pendiente: Eclipse igual + jubilar CharcasEclipse. v1.1.0 — refactor: helpers/fases/buffer/tandas compartidos en gp2-envios-common.js; CSS a gp2-modulo.css -->
 <meta charset="utf-8"/>
+<script src="../../auth-guard.js?v=20260929a"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Entrega de Proveedores de Servicios · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../../supabase-config.js?v=20260905k"></script>
-<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<script src="../../supabase-config.js?v=20260929a"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260912c"/>
 <link rel="stylesheet" href="../../tandas-popup.css?v=20260903b"/>
 <link rel="icon" type="image/png" href="../../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../../GP2_favicon.png">
@@ -197,9 +205,9 @@
 </div>
 
 <script src="../../tandas-popup.js?v=20260905i"></script>
-<script src="../../gp2-ui.js?v=20260912a"></script>
+<script src="../../gp2-ui.js?v=20260913e"></script>
 <script src="../../gp2-numero.js?v=20260911o"></script>
-<script src="../../gp2-envios-common.js?v=20260905c"></script>
+<script src="../../gp2-envios-common.js?v=20260924b"></script>
 <script>
 "use strict";
 
@@ -296,7 +304,7 @@ function chProdSel(){ return CH_PROD.find(function(p){ return String(p.id)===Str
 async function chStock(){
   try{
     var st = await SB.from("inventario").select("cantidad, componente:componente_id(codigo)").eq("ubicacion_id",13);
-    var kg=0; (st.data||[]).forEach(function(r){ if(r.componente && r.componente.codigo==="FLEJE90_BRUTO") kg=Number(r.cantidad)||0; });
+    var kg=0; (st.data||[]).forEach(function(r){ if(r.componente && r.componente.codigo==="ALAMBRE") kg=Number(r.cantidad)||0; });
     $("chStock").textContent = fmt(kg);
   }catch(e){ $("chStock").textContent="—"; }
 }
@@ -376,7 +384,7 @@ function ecProdSel(){ return EC_PROD.find(function(p){ return String(p.id)===Str
 async function ecStock(){
   try{
     var st = await SB.from("inventario").select("cantidad, componente:componente_id(codigo)").eq("ubicacion_id",48);
-    var kg=0; (st.data||[]).forEach(function(r){ if(r.componente && r.componente.codigo==="CHAPA430") kg=Number(r.cantidad)||0; });
+    var kg=0; (st.data||[]).forEach(function(r){ if(r.componente && r.componente.codigo==="FLEJE_DESCORAZONADOR") kg=Number(r.cantidad)||0; });
     $("ecStock").textContent = fmt(kg);
   }catch(e){ $("ecStock").textContent="—"; }
 }
@@ -467,7 +475,7 @@ function renderTabla(){
     var t = E.tandaTotales(it, ["caj","kg"]);
     var vCaj = t.hayT ? (t.tot.caj||"") : it.caj;
     var vKg  = t.hayT ? (t.tot.kg ||"") : it.kg;
-    var enPS = aCajones(x.online_ps, x.sc_unixcaj);
+    var enPS = aCajones(x.online_ps, E.uxcEnPoder(x));   // el cajón que anotó logística (2026-09-21)
 
     var tr = document.createElement("tr");
     tr.dataset.k = k;

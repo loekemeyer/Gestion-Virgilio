@@ -11,7 +11,11 @@ const BUNDLE = {
   partes: { '5': [
     { sc_id: 1, sp_id: 2, sc_cod: 'J2C', sc_desc: 'Cuchilla cruda', sp_cod: 'J2', sp_desc: 'Cuchilla pintada',
       proceso: 'Pintado', online_ps: 1500, online_sp: 50, maximo: 4000, maximo_sp: 500,
-      sc_unixcaj: 1000, sp_unixcaj: 100 },
+      // el cajon TEORICO son 1.000 uni (1.500 en poder del PS = 1,5 cajones), pero logistica anoto
+      // que esas 1.500 salieron en UN cajon (sc_unixcaj_anot, de GP2.v_caj_contraparte): la columna
+      // "En PS" tiene que decir 1 [usuario 2026-09-21: "tiene que aparecer en su stock los cajones
+      // que escribe logistica, no los que se calcula a partir de los kg"].
+      sc_unixcaj: 1000, sc_unixcaj_anot: 1500, sp_unixcaj: 100 },
     { sc_id: 9, sp_id: null, sc_cod: 'X1', sc_desc: 'Sin salida', sp_cod: null, sp_desc: null,
       proceso: 'Pintado', online_ps: 0, online_sp: 0, maximo: null, maximo_sp: null,
       sc_unixcaj: null, sp_unixcaj: null },
@@ -55,8 +59,9 @@ window.supabase = { createClient: function(){ return {
   const rows = await page.$$eval('#tbody tr', xs => xs.map(x => x.textContent));
   ok(rows.length === 1 && rows[0].includes('J2') && !rows.join(' ').includes('X1'),
      'solo la fila con SP: ' + rows.length);
-  // En PS Cajon = 1500/1000 = 1,5
-  ok(rows[0].includes('1,5'), 'En PS 1,5 cajones');
+  // En PS Cajon: 1.500 uni con el cajon ANOTADO (1.500) = 1 cajon, no los 1,5 que da el teorico
+  const enPS = await page.$eval('#tbody tr:first-child td:last-child', e => e.textContent.trim());
+  ok(enPS === '1', 'En PS se cuenta con el cajón anotado por logística: 1 (no 1,5) — ' + enPS);
 
   // tandas: cargar dos tandas suma y deja los inputs readonly
   await page.click('#tbody tr:first-child .tanda-btn');

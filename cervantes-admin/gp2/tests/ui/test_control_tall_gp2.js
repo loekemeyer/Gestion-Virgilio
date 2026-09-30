@@ -71,10 +71,13 @@ window.supabase = { createClient: function(){ return {
      'fila Martin kg/caj/uni + movimientos: ' + rows[0].replace(/\s+/g, ' '));
   ok(await page.$eval('#colTall', e => e.classList.contains('hidden')), 'columna Tallerista oculta en modo individual');
 
-  // KPIs
-  const kpis = await page.$eval('#kpis', e => e.textContent);
-  ok(kpis.includes('Partes') && kpis.includes('800') && kpis.includes('200') && kpis.includes('500'),
-     'KPIs enviado/entregado/saldo: ' + kpis.replace(/\s+/g, ' '));
+  // los KPIs y el aviso de "ledger parcial" ya no existen [usuario 2026-09-18]: los totales
+  // viven en la fila de totales de la tabla, que es la que se chequea
+  ok((await page.$$eval('#kpis, .aviso', xs => xs.length)) === 0,
+     'sin fila de KPIs ni aviso de datos parciales');
+  const tot = (await page.$eval('#tfoot', e => e.textContent)).replace(/\s+/g, ' ');
+  ok(tot.includes('1 partes') && tot.includes('800') && tot.includes('200') && tot.includes('500'),
+     'los totales de enviado/entregado/saldo siguen en la fila de totales: ' + tot);
 
   // modo Todos: columna tallerista visible, filas de ambos, saldo negativo con clase neg
   await page.click('#btnVolver');

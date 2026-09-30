@@ -13,6 +13,16 @@ consultar este archivo antes de preguntar. Cada entrada confirmada por el usuari
 | Z3B | Z3A | Pza Gde Sacaf. Articu. CH | 708 |
 | E3 (Arandela Grande Afila) | F7 | Arandela Gde Afila Zinc. | F7, Toch |
 
+⚠ **OJO con `E3`: el mismo código apunta a dos arandelas distintas según de dónde venga.**
+- **En el Excel viejo**, `E3` era la **grande** → en GP2 es **F7** "Arandela Gde Afila Zinc." (fila de arriba).
+- **En GP2, desde el 2026-09-21**, `E3` es la **chica**: `[usuario 2026-09-21, textual]` *"La arandela
+  chica afila inox dice sector K9 pero es sector procesado E3"*. Era el componente **K9** "Arandela
+  Chica Afila Inox" (id 39) en Sector **Crudo**; pasó a **codigo `E3` + Sector Procesado**. Cierra con
+  la estructura: sale de matriz desde el fleje `IF2` y va derecho al tallerista en las 3 rutas de los
+  afiladores (097, 114, 504), sin zincado ni cromado, así que Crudo estaba mal.
+- Por eso, ante una lista que diga `E3`: si habla de la **grande**, es F7; si habla de la **chica
+  inox**, es el E3 de GP2 (id 39). Mirar la descripción, no el código.
+
 ## Partes Plasticas (codigos cambiaron — guiarse por descripcion)
 
 | Codigo viejo (Excel) | Sector BD actual | Descripcion BD | Cods asociados |

@@ -3,11 +3,12 @@
 <head>
 <!-- v1.2.0 — la marca F se persiste en GP2.faltante_marcado (marcar/resolver_faltante, best-effort) -->
 <meta charset="utf-8"/>
+<script src="../../auth-guard.js?v=20260929a"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Envíos por Tallerista · GP2</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../../supabase-config.js?v=20260905k"></script>
-<link rel="stylesheet" href="../../gp2-modulo.css?v=20260903b"/>
+<script src="../../supabase-config.js?v=20260929a"></script>
+<link rel="stylesheet" href="../../gp2-modulo.css?v=20260912c"/>
 <link rel="stylesheet" href="../../tandas-popup.css?v=20260903b"/>
 <link rel="icon" type="image/png" href="../../GP2_favicon.png">
 <link rel="apple-touch-icon" href="../../GP2_favicon.png">
@@ -53,9 +54,9 @@
           <thead><tr>
             <th>Sec</th>
             <th>Descripción</th>
-            <th class="num">Cjn<br>a Env.</th>
+            <th class="num">A<br>Env.</th>
             <th class="ctr" title="Marcar faltante">Falt</th>
-            <th class="num sep">Caj</th>
+            <th class="num sep">Cant.</th>
             <th class="num">KG<br>Neto</th>
             <th class="ctr" title="Cargar por tandas">T</th>
             <th class="num">Uni</th>
@@ -81,7 +82,7 @@
         <table class="t">
           <thead><tr>
             <th>Sec</th><th>Descripción</th>
-            <th class="num">Caj</th><th class="num">Kg</th><th class="num">Uni</th>
+            <th class="num">Cant.</th><th class="num">Kg</th><th class="num">Uni</th>
           </tr></thead>
           <tbody id="tbodyPrint"></tbody>
           <tfoot id="tfootPrint"></tfoot>
@@ -98,9 +99,9 @@
 </div>
 
 <script src="../../tandas-popup.js?v=20260905i"></script>
-<script src="../../gp2-ui.js?v=20260912a"></script>
+<script src="../../gp2-ui.js?v=20260913e"></script>
 <script src="../../gp2-numero.js?v=20260911o"></script>
-<script src="../../gp2-envios-common.js?v=20260905c"></script>
+<script src="../../gp2-envios-common.js?v=20260924b"></script>
 <script>
 "use strict";
 
@@ -131,6 +132,17 @@ function uniDe(x, it){
   // regla de la casa (GP2N.aUni): sin kg_x_uni no hay conversion posible
   var uni = GP2N.aUni(x.kg_x_uni, kg);
   return uni === null ? 0 : uni;
+}
+
+/* El ENVASE con el que se manda cada pieza [usuario 2026-09-24: "sector plastico se manda en
+   bolsas, no en cajones"]. La verdad vive en la BASE (componente.entrega_unidad/entrega_uni_x, lo
+   mismo que honra la Tablet); si no viene, cae a cajon con factor uni_x_cajon. El plastico quedo
+   con entrega_unidad='bolsas' salvo los que NO son bolsa (clavos, plancha, cinta). */
+function envase(x){
+  var f = Number((x&&x.entrega_uni_x)||0); if(!(f>0)) f = Number((x&&x.uni_x_cajon)||0);
+  var u = (x&&x.entrega_unidad) || "cajones";
+  var sing = u==="bolsas"?"bolsa":u==="cajones"?"cajón":u==="cajas"?"caja":u.replace(/s$/,"");
+  return { factor: f>0?f:null, plural:u, singular:sing };
 }
 
 async function cargar(){
@@ -185,8 +197,9 @@ function render(){
     var vCaj=t.hayT?(t.tot.caj||""):it.caj;
     var vKg =t.hayT?(t.tot.kg ||""):it.kg;
 
-    // "Cjn a Env." = lo disponible en el sector, expresado en cajones
-    var cjnAEnv = x.uni_x_cajon ? Number(x.online_sector||0)/Number(x.uni_x_cajon) : null;
+    // "A Env." = lo disponible en el sector, expresado en el ENVASE de la pieza (cajón/bolsa)
+    var ev = envase(x);
+    var cjnAEnv = ev.factor ? Number(x.online_sector||0)/ev.factor : null;
     var uni = uniDe(x, { kg: vKg });
 
     var tr=document.createElement("tr");
@@ -195,7 +208,7 @@ function render(){
     tr.innerHTML=
       '<td>'+esc(x.sector||"—")+'</td>'+
       '<td><span class="cod">'+esc(x.cod)+'</span><br><small class="sub">'+esc(x["desc"]||"")+'</small></td>'+
-      '<td class="num">'+(cjnAEnv==null?"—":fmt(cjnAEnv,2))+'</td>'+
+      '<td class="num">'+(cjnAEnv==null?"—":fmt(cjnAEnv,2)+'<small class="sub"> '+esc(ev.plural)+'</small>')+'</td>'+
       E.tdFalt(it)+
       E.tdInput("caj", vCaj, t.hayT, "sep")+
       E.tdInput("kg",  vKg,  t.hayT, null, "decimal")+
@@ -275,7 +288,7 @@ $("btnEnviar").addEventListener("click", async function(){
 
   var resumen=items.map(function(o){
     var m=metaPor[o.k]||{};
-    return (m.cod||o.k)+": "+fmt(num(o.it.caj),1)+" caj / "+fmt(num(o.it.kg),0)+" kg";
+    return (m.cod||o.k)+": "+fmt(num(o.it.caj),1)+" "+envase(m).plural+" / "+fmt(num(o.it.kg),0)+" kg";
   }).join("\n");
   if(!confirm("Enviar a "+selT.nombre+":\n\n"+resumen)) return;
 
@@ -332,7 +345,7 @@ $("btnEnviar").addEventListener("click", async function(){
     tCaj+=e.caj; tKg+=e.kg; tUni+=e.uni;
     return '<tr><td>'+esc(e.m.sector||"—")+'</td>'+
       '<td><span class="cod">'+esc(e.m.cod||"")+'</span> '+esc(e.m["desc"]||"")+'</td>'+
-      '<td class="num">'+fmt(e.caj,1)+'</td><td class="num">'+fmt(e.kg,0)+'</td>'+
+      '<td class="num">'+fmt(e.caj,1)+' '+esc(envase(e.m).plural)+'</td><td class="num">'+fmt(e.kg,0)+'</td>'+
       '<td class="num">'+fmt(e.uni,0)+'</td></tr>';
   }).join("");
   $("tfootPrint").innerHTML='<tr><td colspan="2">'+enviados.length+' partes</td>'+

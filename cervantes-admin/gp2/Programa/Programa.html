@@ -1,4 +1,6 @@
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<script src="../auth-guard.js?v=20260929a"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- Anti-cache: TODO el CSS y el JS de esta pantalla viven embebidos en este HTML y la pantalla
      se navega directo desde el menu (sin ?v= propio). Sin estos meta, una copia cacheada del
      HTML deja al usuario con la version vieja para siempre. Mismo agujero que se tapo el
@@ -51,9 +53,11 @@
  .top select#art{max-width:min(620px,78vw)}
  .top select#marca,.top select#tallAlt{max-width:78vw}
  [hidden]{display:none!important}
- /* ---- selector de articulo en DOS PASOS: primero la marca, despues el articulo
-    (pedido del usuario 2026-09-11). El <select id="art"> sigue existiendo OCULTO: es el
-    modelo que lee el resto de la pantalla. ---- */
+ /* ---- selector de articulo en UN PASO: se abre en el buscador con TODOS los articulos
+    (usuario 2026-09-23: "no me hagas elegir por marca, que el buscador aparezca en todas
+    directamente"). La marca quedo como filtro opcional en chips, arriba del buscador; antes
+    era un paso obligatorio previo (2026-09-11). El <select id="art"> sigue existiendo
+    OCULTO: es el modelo que lee el resto de la pantalla. ---- */
  .top .artbtn{background:#0d151d;color:var(--tx);border:1px solid var(--line2);border-radius:8px;
    padding:8px 12px;font-size:19px;font-family:inherit;font-weight:700;text-align:left;cursor:pointer;
    min-height:46px;min-width:260px;max-width:min(620px,78vw);text-transform:none;letter-spacing:0;
@@ -70,10 +74,11 @@
  .pickhead b{flex:1;font-weight:800}
  .pickhead button{background:var(--card);border:1px solid var(--line2);border-radius:9px;color:var(--tx);
    font-size:19px;min-width:46px;min-height:46px;cursor:pointer;font-family:inherit}
- .marcas{display:flex;flex-direction:column;gap:10px;padding:14px}
- .marcas button{background:var(--card);border:1px solid var(--line2);border-radius:11px;color:var(--tx);
-   font-size:22px;font-weight:800;min-height:56px;cursor:pointer;font-family:inherit}
+ .marcas{display:flex;flex-wrap:wrap;gap:8px}
+ .marcas button{background:var(--card);border:1px solid var(--line2);border-radius:999px;color:var(--tx2);
+   font-size:18px;font-weight:700;min-height:44px;padding:0 16px;cursor:pointer;font-family:inherit}
  .marcas button:hover{border-color:var(--amb);color:var(--amb)}
+ .marcas button.on{border-color:var(--amb);color:var(--amb);font-weight:800}
  #pickArts{display:flex;flex-direction:column;min-height:0;padding:14px;gap:10px}
  #pickArts input{background:#0d151d;color:var(--tx);border:1px solid var(--line2);border-radius:8px;
    padding:11px 12px;font-size:19px;font-family:inherit;width:100%}
@@ -214,7 +219,7 @@
   <span class="fld">Artículo <button type="button" id="artBtn" class="artbtn"><span id="artBtnTxt">—</span><span class="caret">▾</span></button></span>
   <select id="marca" hidden><option value="">Todas</option><option value="LOEKE">Loeke</option><option value="LOKE">Loke</option><option value="CHEF">Chef</option></select>
   <select id="art" hidden></select>
-  <span class="fld">Unidades <input inputmode="numeric" id="uni" type="number" value="1000" min="1"></span>
+  <span class="fld">Unidades <input inputmode="numeric" id="uni" type="text" value="1"></span>
   <span class="fld" id="tallAltBox" style="display:none">Tallerista <select id="tallAlt"></select></span>
  </div>
 </div>
@@ -223,25 +228,24 @@
 <div id="pick" class="pick" hidden>
  <div class="pickbox">
   <div class="pickhead">
-   <button type="button" id="pickBack" hidden>←</button>
-   <b id="pickTit">Elegí la marca</b>
+   <b id="pickTit">Elegí el artículo</b>
    <button type="button" id="pickX">✕</button>
   </div>
-  <div id="pickMarcas" class="marcas">
-   <button type="button" data-mk="LOEKE">Loeke</button>
-   <button type="button" data-mk="LOKE">Loke</button>
-   <button type="button" data-mk="CHEF">Chef</button>
-   <button type="button" data-mk="">Todas</button>
-  </div>
-  <div id="pickArts" hidden>
+  <div id="pickArts">
    <input id="buscar" type="search" placeholder="código o nombre" autocomplete="off">
+   <div id="pickMarcas" class="marcas">
+    <button type="button" data-mk="" class="on">Todas</button>
+    <button type="button" data-mk="LOEKE">Loeke</button>
+    <button type="button" data-mk="LOKE">Loke</button>
+    <button type="button" data-mk="CHEF">Chef</button>
+   </div>
    <div id="pickList" class="picklist"></div>
   </div>
  </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../supabase-config.js?v=20260905k"></script>
-<script src="../gp2-ui.js?v=20260912a"></script>
+<script src="../supabase-config.js?v=20260929a"></script>
+<script src="../gp2-ui.js?v=20260913e"></script>
 <script src="../gp2-numero.js?v=20260911o"></script>
 <script>var D={};
 
@@ -253,6 +257,9 @@ var SECT2CLS={"crudo":"crudo","procesado":"proc","movimiento":"tr","afilado":"af
 function sCls(sid){return SECT2CLS[sName(sid)]||"crudo"}
 function cById(cid){return D.comp[String(cid)]||{cod:"?",d:"",s:null}}
 function fmt(n){if(n==null||isNaN(n))return "?";n=Number(n);return GP2N.fmt(n, n>=100?0:n>=10?1:n>=1?2:3, null, true);}   /* la regla de numero de la casa; decimales segun magnitud */
+/* el rendimiento de la matriz se imprimia crudo ("27.95 uni/kg", punto de JS): dos decimales
+   con la regla de la casa y sin ceros de relleno, o sea "27,95" y "28". (idea 7291) */
+function unikg(r){return GP2N.fmt(r, 2)+" uni/kg";}
 
 // Defensive: ordenar rp por 'orden' aunque en Excel esté fuera de orden físico
 for(var _rid in D.rp)D.rp[_rid].sort(function(a,b){return a.o-b.o;});
@@ -261,9 +268,7 @@ var selMarca=document.getElementById("marca");
 var inpBuscar=document.getElementById("buscar");
 var artBtn=document.getElementById("artBtn"),pick=document.getElementById("pick"),
     pickMarcas=document.getElementById("pickMarcas"),pickArts=document.getElementById("pickArts"),
-    pickList=document.getElementById("pickList"),pickTit=document.getElementById("pickTit"),
-    pickBack=document.getElementById("pickBack");
-var MKLBL={LOEKE:"Loeke",LOKE:"Loke",CHEF:"Chef","":"Todas"};
+    pickList=document.getElementById("pickList"),pickTit=document.getElementById("pickTit");
 /* el articulo realmente elegido: solo cambia al tocar una fila, nunca al filtrar */
 var elegido=null;
 /* busca por codigo o por descripcion, sin acentos ni mayusculas */
@@ -274,6 +279,10 @@ function norm(t){return (t||"").toString().toLowerCase().normalize("NFD").replac
 function llenarArticulos(){
  var mk=selMarca.value, prev=sel.value, q=norm(inpBuscar.value).trim();
  var arts=D.art.filter(function(a){
+     /* 2026-09-23 [usuario: "lo discontinuado no quiero seguir viendolo en el programa"]:
+        un articulo discontinuado no se ofrece. programa_bundle sigue mandandolos TODOS con
+        el flag disc -- el bundle no cambia, el que decide que se ve es esta pantalla. */
+     if(a.disc)return false;
      if(mk&&a.mk!==mk)return false;
      if(!q)return true;
      return norm(a.cod).indexOf(q)>=0||norm(a.d).indexOf(q)>=0||norm(a.fam).indexOf(q)>=0;
@@ -289,7 +298,7 @@ function llenarArticulos(){
   if(a.fam!==famAct){famAct=a.fam;grupo=document.createElement("optgroup");grupo.label=famAct||"Sin familia";sel.appendChild(grupo);}
   var o=document.createElement("option");
   o.value=a.id;
-  o.textContent=a.cod+"  —  "+(a.d||a.fam||"")+(a.disc?"  (discontinuado)":"");
+  o.textContent=a.cod+"  —  "+(a.d||a.fam||"");
   grupo.appendChild(o);
  });
  if(!arts.length)sel.innerHTML='<option value="">(ningún artículo con ese filtro)</option>';
@@ -306,7 +315,7 @@ function llenarArticulos(){
  pintarLista(arts);
  return arts.length>0;
 }
-/* La lista del paso 2 del selector: mismas familias y mismo texto que el <select> oculto. */
+/* La lista del selector: mismas familias y mismo texto que el <select> oculto. */
 function pintarLista(arts){
  pickList.innerHTML="";
  if(!arts.length){pickList.innerHTML='<div class="fam">(ningún artículo con ese filtro)</div>';return;}
@@ -314,7 +323,7 @@ function pintarLista(arts){
  arts.forEach(function(a){
   if(a.fam!==famAct){famAct=a.fam;var h=document.createElement("div");h.className="fam";h.textContent=famAct||"Sin familia";pickList.appendChild(h);}
   var b=document.createElement("button");b.type="button";b.setAttribute("data-id",a.id);
-  b.textContent=a.cod+"  —  "+(a.d||a.fam||"")+(a.disc?"  (discontinuado)":"");
+  b.textContent=a.cod+"  —  "+(a.d||a.fam||"");
   if(elegido!=null&&String(a.id)===String(elegido))b.className="on";
   pickList.appendChild(b);
  });
@@ -406,7 +415,7 @@ function destDePaso(p,pNext){
 function pasoNode(p,need,uni,pNext){
  var tp="",cls="",nm="",ex="",extra="";
  var ce=cById(p.ce), cs=cById(p.cs);
- if(p.tp==="matriz"){var mx=D.mat[String(p.m)]||{};tp="MATRIZ N°"+mx.n;cls="matriz";nm=cs.cod||"?";ex=(cs.d||mx.d||"");if(mx.r)extra="⚙️ "+mx.r+" uni/kg";}
+ if(p.tp==="matriz"){var mx=D.mat[String(p.m)]||{};tp="MATRIZ N°"+mx.n;cls="matriz";nm=cs.cod||"?";ex=(cs.d||mx.d||"");if(mx.r)extra="⚙️ "+unikg(mx.r);}
  else if(p.tp==="proveedor_servicio"){var px=D.prov[String(p.pr)]||{};tp="PROV "+(px.n||"?");cls="prov";nm=cs.cod||ce.cod||"?";ex=(px.p||"")+(cs.cod?(" · "+cs.cod):"");}
  else if(p.tp==="tallerista"){var tx=D.tall[String(p.ta)]||"(sin asignar)";tp="TALLERISTA";cls="tall";nm=tx.trim();ex=(ce.cod||"")+" → "+(cs.cod||"?");}
  else if(p.tp==="afilado"){tp="AFILADO";cls="afil";nm="Afilar";ex=(ce.cod||"")+" → "+(cs.cod||"?");}
@@ -439,7 +448,7 @@ function renderStandaloneLane(r,pasos,fl,need,uni,flejesTotal){
  var H='<div class="lane"><div class="head"><b>'+esc((flComp.cod||"?")+' · '+(flComp.d||"")+cs_desc)+'</b>'+
     (kg?'<span class="fkg">'+fmt(kg)+' kg fleje</span>':(qty?'<span style="color:#7d92a5">sin rendimiento</span>':""))+
     '</div><div class="flow">';
- H+=node("INSUMO","fleje",flComp.cod||"?",flComp.d||"",rend?rend+" uni/kg":"",null,kg||null,"");
+ H+=node("INSUMO","fleje",flComp.cod||"?",flComp.d||"",rend?unikg(rend):"",null,kg||null,"");
  pasos.forEach(function(p,i,arr){
   if((p.tp==="fleje"||p.tp==="ingreso"))return;
   H+='<span class="arr">→</span>'+pasoNode(p,need,uni,arr[i+1]);
@@ -519,7 +528,7 @@ function renderConvergenceLane(padre_id,ruta_list,need,uni,flejesTotal,aid,insum
    } else {
     H+='<div class="branch-lbl"><span class="r">Rama '+brN+'</span> — '+esc((flComp2.cod||"?")+' produce '+hc.cod)+(kg?' · '+fmt(kg)+' kg fleje':'')+'</div>';
     H+='<div class="flow branch">';
-    H+=node("INSUMO",matchRuta.f?"fleje":sCls(flComp2.s),flComp2.cod||"?",flComp2.d||"",rend?rend+" uni/kg":"",matchRuta.f?null:qty_hijo,kg||null,"");
+    H+=node("INSUMO",matchRuta.f?"fleje":sCls(flComp2.s),flComp2.cod||"?",flComp2.d||"",rend?unikg(rend):"",matchRuta.f?null:qty_hijo,kg||null,"");
     pasosNoFleje.forEach(function(p,i,arr){
      H+='<span class="arr">→</span>'+pasoNode(p,mergedNeed,uni,arr[i+1]);
     });
@@ -546,7 +555,7 @@ function renderConvergenceLane(padre_id,ruta_list,need,uni,flejesTotal,aid,insum
  H+='<div class="flow">';
  // convergencia node muestra padre como resultado
  var mx=D.mat[String(convPaso.m)]||{};
- var extra=mx.r?"⚙️ "+mx.r+" uni/kg":"";
+ var extra=mx.r?"⚙️ "+unikg(mx.r):"";
  var convTp,convCls,convNm,convEx;
  if(convPaso.tp==="matriz"){convTp="MATRIZ N°"+mx.n;convCls="matriz";convNm=pc.cod;convEx=pc.d||"";}
  else if(convPaso.tp==="tallerista"){var _tn=D.tall[String(convPaso.ta)]||"(sin asignar)";convTp="TALLERISTA";convCls="tall";convNm=(typeof _tn==='string'?_tn.trim():_tn.n||"?");convEx=pc.cod+" · "+(pc.d||"");}
@@ -832,21 +841,27 @@ var _rsz;
 window.addEventListener("resize",function(){clearTimeout(_rsz);_rsz=setTimeout(ajustarFilas,120);});
 
 sel.addEventListener("change",function(){elegido=sel.value;document.getElementById('tallAlt').dataset.aid='';pintarBoton();render();});
-/* El articulo se elige en DOS PASOS: primero la marca, despues el articulo. Filtrar
-   (cambiar de marca o escribir en el buscador) NO cambia el articulo elegido: eso pasa
-   solo al tocar una fila de la lista. */
-function pasoMarca(){pickMarcas.hidden=false;pickArts.hidden=true;pickBack.hidden=true;pickTit.textContent="Elegí la marca";}
-function pasoArts(){pickMarcas.hidden=true;pickArts.hidden=false;pickBack.hidden=false;
- pickTit.textContent=MKLBL[selMarca.value]+" · elegí el artículo";llenarArticulos();}
+/* El selector abre DIRECTO en el buscador con todos los articulos (usuario 2026-09-23:
+   "no me hagas elegir por marca"). La marca es un filtro opcional -- los chips de arriba --
+   y se resetea a "Todas" en cada apertura, para que nadie se coma un filtro que dejo puesto
+   la vez anterior. Filtrar (chip o buscador) NO cambia el articulo elegido: eso pasa solo
+   al tocar una fila de la lista. */
+function pintarChips(){
+ var v=selMarca.value;
+ Array.prototype.forEach.call(pickMarcas.querySelectorAll("button[data-mk]"),function(b){
+  b.classList.toggle("on",b.getAttribute("data-mk")===v);});}
+function abrirPicker(){
+ pick.hidden=false;selMarca.value="";inpBuscar.value="";pintarChips();llenarArticulos();
+ /* foco solo en pantalla grande: en el celular el teclado taparia la lista recien abierta */
+ if(window.innerWidth>560)inpBuscar.focus();}
 function cerrarPicker(){pick.hidden=true;}
-artBtn.addEventListener("click",function(){pick.hidden=false;pasoMarca();});
+artBtn.addEventListener("click",abrirPicker);
 document.getElementById("pickX").addEventListener("click",cerrarPicker);
-pickBack.addEventListener("click",pasoMarca);
 pick.addEventListener("click",function(e){if(e.target===pick)cerrarPicker();});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!pick.hidden)cerrarPicker();});
 pickMarcas.addEventListener("click",function(e){
  var b=e.target.closest("button[data-mk]");if(!b)return;
- selMarca.value=b.getAttribute("data-mk");inpBuscar.value="";pasoArts();});
+ selMarca.value=b.getAttribute("data-mk");pintarChips();llenarArticulos();});
 pickList.addEventListener("click",function(e){
  var b=e.target.closest("button[data-id]");if(!b)return;
  elegido=b.getAttribute("data-id");sel.value=elegido;document.getElementById('tallAlt').dataset.aid='';

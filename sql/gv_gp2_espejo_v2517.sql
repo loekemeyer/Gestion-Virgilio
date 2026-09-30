@@ -1,0 +1,11 @@
+-- v25.17 (Luis, 30/09, D5): GP2 ve el stock de insumos y el Mapa de Virgilio en tablas de SOLO LECTURA.
+-- Tres tablas en el schema GP2 (RLS + policy de SELECT para anon/authenticated; sin escritura):
+--   "GP2".virgilio_insumo_stock      (cod, unidad) -> saldo de Movimientos_Stock deposito insumos (164 al 30/09)
+--   "GP2".virgilio_insumo_ubicacion  id -> gv_insumo_ubicacion (149)
+--   "GP2".virgilio_lugar             sector -> GV_Lugar + los códigos de gv_lugar_articulo (943)
+-- Las llena public.gv_gp2_espejo_sync() (SECURITY DEFINER, sólo postgres): compara el md5 del contenido y
+-- reescribe una tabla SÓLO si cambió. Devuelve qué tablas tocó o 'sin cambios'.
+-- Cron: gv-gp2-espejo-sync '5-59/10 * * * *'.
+-- Definición vigente: select pg_get_functiondef('public.gv_gp2_espejo_sync()'::regprocedure);
+-- Rollback: select cron.unschedule('gv-gp2-espejo-sync'); drop function public.gv_gp2_espejo_sync();
+--           drop table "GP2".virgilio_insumo_stock, "GP2".virgilio_insumo_ubicacion, "GP2".virgilio_lugar;

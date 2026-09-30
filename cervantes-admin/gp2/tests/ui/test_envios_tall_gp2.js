@@ -12,6 +12,7 @@ const BUNDLE = {
   partes: { '6': { entrada: [
     { comp_id: 70, cod: 'A10', desc: 'Cpo Una', sector: 'D1', uni_x_cajon: 1000, online_sector: 2500, kg_x_uni: 0.02 },
     { comp_id: 71, cod: 'C10', desc: 'Cpo Sacacorcho', sector: 'D2', uni_x_cajon: null, online_sector: 0, kg_x_uni: null },
+    { comp_id: 72, cod: 'PA1', desc: 'Plaquita 3 en 1', sector: 'Sector Plástico', uni_x_cajon: 500, entrega_unidad: 'bolsas', online_sector: 2500, kg_x_uni: 0.03 },
   ], salida: [] } },
 };
 
@@ -48,16 +49,20 @@ window.supabase = { createClient: function(){ return {
   const ok = (c, msg) => { console.log((c ? 'OK  ' : 'FAIL') + ' ' + msg); if (!c) process.exitCode = 1; };
 
   const btnTxt = await page.$eval('#tallGrid .prov-btn', b => b.textContent);
-  ok(btnTxt.includes('Martin') && btnTxt.includes('44') && btnTxt.includes('2 partes'),
-     'fase0: boton Martin con cod y 2 partes — ' + btnTxt.trim());
+  ok(btnTxt.includes('Martin') && btnTxt.includes('44') && btnTxt.includes('3 partes'),
+     'fase0: boton Martin con cod y 3 partes — ' + btnTxt.trim());
 
   await page.click('#tallGrid .prov-btn');
   ok((await page.$eval('#fase1Title', e => e.textContent)) === 'Martin · cod 44', 'titulo Martin · cod 44');
 
-  // fila 1: Cjn a Env = 2500/1000 = 2,5 ; fila 2 sin uni_x_cajon = em-dash
+  // fila 1: A Env = 2500/1000 = 2,5 cajones ; fila 2 sin factor = em-dash ; fila 3 plastico = bolsas
   let rows = await page.$$eval('#tbody tr', xs => xs.map(x => x.textContent));
-  ok(rows.length === 2 && rows[0].includes('2,5'), 'Cjn a Env 2,5: ' + rows[0].replace(/\s+/g, ' '));
-  ok(rows[1].includes('—'), 'fila sin uni_x_cajon muestra —');
+  ok(rows.length === 3 && rows[0].includes('2,5') && rows[0].includes('cajones'),
+     'A Env 2,5 cajones (D1): ' + rows[0].replace(/\s+/g, ' '));
+  ok(rows[1].includes('—'), 'fila sin factor muestra —');
+  // sector plastico -> el envase es BOLSA, no cajon (entrega_unidad='bolsas'): 2500/500 = 5 bolsas
+  ok(rows[2].includes('5') && rows[2].includes('bolsa') && !rows[2].includes('cajones'),
+     'A Env plastico en bolsas (5): ' + rows[2].replace(/\s+/g, ' '));
 
   // cargar kg -> la col Uni se recalcula en vivo (10 kg / 0.02 = 500)
   await page.fill('#tbody tr:first-child input[data-f="kg"]', '10');
