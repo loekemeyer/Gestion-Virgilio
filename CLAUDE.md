@@ -6647,9 +6647,9 @@ el mismo molde (el mismo bloque está en el `CLAUDE.md` de `loekemeyer/Gestion-P
 
 | pieza | cómo |
 |---|---|
-| frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` / `virgilio_articulo_stock` (v25.39) |
+| frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.envio_virgilio` (GP2 → GV, v25.41), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` / `virgilio_articulo_stock` (v25.39) |
 | códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.importado_virgilio_componente`** y **nunca se adivina** |
-| confirmar | el que recibe dice **Sí / No** donde trabaja — en GP2, la **Tablet → Recibir → Virgilio** |
+| confirmar | el que recibe dice **Sí / No** donde trabaja — en GP2, la **Tablet → Recibir → Virgilio**; en GV, **Recepción → Log/ Fabr** (terminados) y **Recibir Insumos → «🏭 Cervantes te mandó»** (insumos, SC, SP) |
 | Sí | el MISMO camino que la carga manual (en GP2: `crear_recepcion_insumo` + control en kg pendiente) |
 | No | cada lado toca SÓLO su fila; la reacción la hace un trigger del otro lado y se ve **donde se cargó** |
 
@@ -6661,9 +6661,33 @@ el mismo molde (el mismo bloque está en el `CLAUDE.md` de `loekemeyer/Gestion-P
 - Del lado de GV sólo cambió el espejo: bloque 4 de `gv_gp2_espejo_sync` → `"GP2".virgilio_articulo_stock`
   (stock de artículos en CAJAS, para la caja «Virgilio > Art. Terminado» de Stock General de GP2).
   `sql/gv_gp2_espejo_articulo_v2539.sql`, §3.v2539.
-- ⚠ **Lo que Cervantes MANDA a Virgilio todavía no llega a GV como aviso Sí/No** (la regla general lo pide del lado
-  que recibe). GV lo puede leer de `"GP2".movimiento` (`recepcion_virgilio` y `traslado` a un `virgilio_sector`)
-  cuando se decida.
+- ~~Lo que Cervantes MANDA a Virgilio todavía no llega a GV como aviso Sí/No~~ → hecho en la **v25.41** (abajo).
+
+### v25.41 (Thomas, 30/09, D4): lo que CERVANTES manda a Virgilio llega como aviso Sí / No donde se recibe
+
+- **Frontera `"GP2".envio_virgilio`**: la tablet de Cervantes (Enviar → Virgilio) escribe una fila por pieza al
+  mover el stock (allá ya salió). Acá la leen **`gv_envios_cervantes_pendientes()`** y la contestan
+  **`gv_envio_cervantes_confirmar(ids, ref, cods, por)`** / **`gv_envio_cervantes_denegar(id, motivo, por)`**
+  (las tres las ejecuta anon: el operario entra con sesión anónima).
+- **Terminados de Fábrica → Recepción de Mercadería → Log/ Fabr**: arriba de los códigos, *«🏭 Cervantes mandó»*,
+  sólo los de la **línea elegida** (la empresa sale de `gv_empresa_de_articulo`). **✓ Llegó** suma las cajas a la
+  carga (agrega el código si no estaba) · **↩ Deshacer** · **✕ No llegó** (motivo opcional) deniega en el acto.
+- **Insumos, SC y SP → Recibir Insumos**: en *«¿De dónde recibís?»*, el botón **«🏭 Cervantes te mandó N piezas»**
+  abre la lista con ✓ / ✕ por pieza. Lo que llegó sigue a la recepción de SIEMPRE (origen **"Cervantes"**, la
+  documentación, cantidades precargadas); lo que no llegó se deniega.
+- **El Sí se cierra DESPUÉS de grabar** (mismo camino que la carga manual: foto, remito, OC, a guardar), por una
+  **cola persistente** `rcp_cerv_conf_v1` (`rcpCervEncolar`, igual que la de OC: reintenta hasta que entre). Sólo
+  de lo que quedó cargado. **El No** sólo pasa la fila a `denegado`: el stock se lo devuelve a Cervantes un
+  trigger de GP2 (`fn_envio_virgilio_denegado`) y allá la tablet dice *«⛔ Denegado por Virgilio»*.
+- **El código de acá no se adivina**: terminado = el mismo código (058, 718, 941E: 41 de 41 cruzan); insumo / SC /
+  SP = el que se usó la **última vez** para esa pieza (`envio_virgilio.gv_cod`, si sigue en `Insumos`) o el
+  vínculo de `GP2.importado_virgilio_componente`; si no hay ninguno, entra como **insumo nuevo `TMP-…`** con la
+  categoría de acá (SC → `partes_crudo`, SP → `parte_procesado`, fleje, plástico → `partes_plasticas`, caja →
+  `cajas`) y ese código queda anotado para el próximo envío. El TMP lo acepta el admin como cualquier otro
+  (`GP2.aceptado_virgilio`).
+- `sql/gv_envio_cervantes_v2540.sql` (**el nombre y las marcas internas dicen v25.40: se aplicó como v25.41**, la
+  v25.40 la tomó otra sesión) · `tests/cerv-envio-aviso.cjs` · §3.v2541 · GP2: `db/migracion_envio_virgilio.sql`,
+  CONOCIMIENTO §4hj.
 
 ### v25.37: el «No» de Cervantes vuelve a poner el pedido EN VIAJE — chip «⛔ Denegado por Cervantes»
 

@@ -6236,7 +6236,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.40"></script>
+<script type="module" src="recepcion.js?v=25.41"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10281,7 +10281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.40";
+const APP_VERSION = "v25.41";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -25870,6 +25870,7 @@ function askInsUbicacion(mode, sub) {
     '<div style="font-size:13px;color:#64748b;margin-bottom:16px;">' + (soloIny ? "¿A qué inyector lo envías?" : titulo) + '</div>' +
     // v14.95 — bolsas plásticas: los inyectores (EI) / las OC de material de GP2 (RI) como botones,
     // arriba del texto libre. Se llenan async; si GP2 no responde queda el texto libre de siempre.
+    (isIn ? '<div id="insUbicCerv"></div>' : '') +   // v25.40 (D4): lo que mandó Cervantes, arriba de todo
     '<div id="insUbicGp2">' + (soloIny ? '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">Cargando inyectores…</div>' : '') + '</div>' +
     '<div id="insUbicLibre"' + (soloIny ? ' style="display:none;"' : '') + '>' +
     '<input type="text" id="insUbicInput" placeholder="' + hint + ' (ej: Cervantes, Centro, Proveedor X)" ' +
@@ -25883,6 +25884,7 @@ function askInsUbicacion(mode, sub) {
   ov.style.display = "flex";
   window._insGp2 = null;
   if (!soloOtros) _insGp2Opciones(mode, soloIny);
+  if (isIn) _insCervOpciones();
 
   // Auto-focus en el input
   setTimeout(() => {
@@ -25897,7 +25899,7 @@ function insUbicCancel() {
 function insUbicOk(mode, _gp2) {
   let ubicacion = "";
   if (_gp2) {
-    ubicacion = _gp2.modo === "EI" ? _gp2.inyector : (_gp2.oc.proveedor || ("OC " + _gp2.oc.numero));
+    ubicacion = _gp2.modo === "EI" ? _gp2.inyector : _gp2.modo === "CERV" ? "Cervantes" : (_gp2.oc.proveedor || ("OC " + _gp2.oc.numero));
     window._insGp2 = _gp2;
   } else {
     const inp = document.getElementById("insUbicInput");
@@ -26082,6 +26084,138 @@ function insUbicGp2Ok(mode, i) {
     insUbicOk("EI", { modo: "EI", inyector: nom, mv: mv });
   }
 }
+/* ===== v25.40 (Thomas, 30/09, D4) — lo que CERVANTES mandó a Virgilio: aviso Sí / No =====
+   *"lo que manda Cervantes llega a Gestión Virgilio como aviso Sí/No donde recibe"*. La tablet de
+   Cervantes escribe una fila por pieza en "GP2".envio_virgilio (allá el stock ya salió). Acá:
+     · la lista sale de public.gv_envios_cervantes_pendientes (insumos, SC y SP; los terminados de
+       Fábrica van por Recepción de Mercadería → Log/ Fabr);
+     · No  -> gv_envio_cervantes_denegar: el stock vuelve a Cervantes (lo hace un trigger de GP2);
+     · Sí  -> es la recepción de insumos de SIEMPRE (origen "Cervantes", documentación, cantidades
+       precargadas) y el aviso se cierra DESPUÉS de grabar (window.rcpCervEncolar, cola persistente).
+   El código de acá no se adivina: el que se usó la última vez para esa pieza, o el vínculo de
+   GP2.importado_virgilio_componente; si no hay ninguno entra como insumo nuevo (TMP-…) y ese
+   código queda anotado para el próximo envío. */
+async function _insCervRpc(name, args) {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(args || {})
+  });
+  const t = await r.text();
+  let j = null;
+  try { j = t ? JSON.parse(t) : null; } catch (_e) { j = t; }
+  if (!r.ok) throw new Error((j && j.message) || ("HTTP " + r.status));
+  return j;
+}
+async function _insCervOpciones() {
+  const box = document.getElementById("insUbicCerv");
+  if (!box) return;
+  let lista = [];
+  try { lista = ((await _insCervRpc("gv_envios_cervantes_pendientes", {})) || []).filter(function (e) { return e.grupo !== "terminado"; }); }
+  catch (_e) { return; /* sin respuesta: queda el flujo de siempre */ }
+  window._insCervLista = lista;
+  if (!lista.length || !document.getElementById("insUbicCerv")) return;
+  box.innerHTML = '<button id="insCervBtn" onclick="insCervAbrir()" style="width:100%;margin-bottom:12px;padding:14px;border:2px solid #d97706;border-radius:12px;background:#fef3c7;color:#78350f;font-size:16px;font-weight:900;cursor:pointer;text-align:center;">' +
+    '🏭 Cervantes te mandó ' + lista.length + (lista.length === 1 ? ' pieza' : ' piezas') + ' — ¿llegaron?' +
+    '<span style="display:block;font-size:12.5px;font-weight:700;margin-top:3px;">' +
+    escapeHtml(lista.slice(0, 4).map(function (e) { return e.cod_gp2 + " " + _insNum(Number(e.cantidad) || 0) + " " + (e.unidad_gv || ""); }).join(" · ") + (lista.length > 4 ? " …" : "")) +
+    '</span></button>';
+}
+function insCervAbrir() {
+  const lista = window._insCervLista || [];
+  if (!lista.length) return;
+  window._insCervDec = {};
+  let ov = document.getElementById("insCervModal");
+  if (!ov) { ov = document.createElement("div"); ov.id = "insCervModal"; ov.style.cssText = "position:fixed;inset:0;z-index:1299;background:rgba(2,6,23,.78);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto;"; document.body.appendChild(ov); }
+  ov.style.display = "flex";
+  _insCervPintar();
+}
+function _insCervPintar() {
+  const ov = document.getElementById("insCervModal"); if (!ov) return;
+  const lista = window._insCervLista || [], dec = window._insCervDec || {};
+  const bt = "min-height:46px;padding:0 14px;border-radius:11px;font-size:15px;font-weight:900;cursor:pointer;border:2px solid ";
+  const filas = lista.map(function (e) {
+    const d = dec[e.id] || "";
+    let cuando = "";
+    try { cuando = new Date(e.creado_en).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) {}
+    return '<div style="padding:10px 0;border-top:1px dashed #f59e0b;text-align:center;">' +
+      '<div style="font-size:15px;"><b style="font-size:17px;">' + escapeHtml(e.cod_gp2 || "") + '</b> ' + escapeHtml(e.descripcion || "") + '</div>' +
+      '<div style="font-size:13px;color:#92400e;margin:2px 0 7px;">' + _insNum(Number(e.cantidad) || 0) + ' ' + escapeHtml(e.unidad_gv || "") +
+        (e.cod_gv ? ' · entra como <b>' + escapeHtml(e.cod_gv) + '</b>' : ' · entra como insumo nuevo') + (cuando ? ' · mandado ' + escapeHtml(cuando) : '') + '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:center;">' +
+        '<button onclick="insCervMarcar(' + e.id + ',\'si\')" style="' + bt + (d === "si" ? '#15803d;background:#16a34a;color:#fff;' : '#16a34a;background:#fff;color:#166534;') + '">✓ Llegó</button>' +
+        '<button onclick="insCervMarcar(' + e.id + ',\'no\')" style="' + bt + (d === "no" ? '#991b1b;background:#b91c1c;color:#fff;' : '#b91c1c;background:#fff;color:#b91c1c;') + '">✕ No llegó</button>' +
+      '</div>' +
+      (d === "no" ? '<input id="insCervMot' + e.id + '" type="text" placeholder="¿Qué pasó? (opcional)" style="margin-top:8px;width:100%;box-sizing:border-box;height:46px;font-size:16px;border:2px solid #fca5a5;border-radius:10px;padding:0 10px;">' : '') +
+      '</div>';
+  }).join("");
+  const nSi = lista.filter(function (e) { return dec[e.id] === "si"; }).length, nNo = lista.filter(function (e) { return dec[e.id] === "no"; }).length;
+  ov.innerHTML = '<div style="background:#fffbeb;max-width:460px;width:100%;border-radius:16px;padding:16px;box-shadow:0 24px 70px rgba(0,0,0,.5);box-sizing:border-box;">' +
+    '<div style="font-size:18px;font-weight:900;text-align:center;color:#78350f;">🏭 Lo que mandó Cervantes</div>' +
+    '<div style="font-size:12.5px;color:#92400e;text-align:center;margin:3px 0 8px;">Lo que no marques queda esperando. Lo que NO llegó vuelve al stock de Cervantes.</div>' +
+    filas +
+    '<div style="display:flex;gap:10px;margin-top:12px;">' +
+      '<button onclick="insCervCerrar()" style="flex:1;padding:14px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:800;font-size:16px;cursor:pointer;">Cancelar</button>' +
+      '<button id="insCervOk" onclick="insCervContinuar()"' + (nSi + nNo ? '' : ' disabled') + ' style="flex:1;padding:14px;border:none;border-radius:10px;background:' + (nSi + nNo ? '#4f46e5' : '#cbd5e1') + ';color:#fff;font-weight:800;font-size:16px;cursor:pointer;">' +
+        (nSi ? 'Recibir ' + nSi : 'Continuar') + '</button>' +
+    '</div></div>';
+}
+function insCervMarcar(id, d) {
+  const dec = window._insCervDec || (window._insCervDec = {});
+  const mot = document.getElementById("insCervMot" + id);
+  dec[id] = dec[id] === d ? "" : d;
+  _insCervPintar();
+  if (dec[id] === "no") { const m = document.getElementById("insCervMot" + id); if (m && mot) m.value = mot.value; }
+}
+function insCervCerrar() { const ov = document.getElementById("insCervModal"); if (ov) ov.style.display = "none"; }
+async function insCervContinuar() {
+  const lista = window._insCervLista || [], dec = window._insCervDec || {};
+  const btn = document.getElementById("insCervOk"); if (btn) { btn.disabled = true; btn.textContent = "Un momento…"; }
+  const nos = lista.filter(function (e) { return dec[e.id] === "no"; });
+  const fallos = [];
+  for (let i = 0; i < nos.length; i++) {
+    const e = nos[i], m = document.getElementById("insCervMot" + e.id);
+    try {
+      const r = await _insCervRpc("gv_envio_cervantes_denegar", { p_id: e.id, p_motivo: (m && m.value.trim()) || null, p_por: "legajo " + ((typeof legajoInput !== "undefined" && legajoInput && String(legajoInput.value || "").trim()) || "?") });
+      if (!r || r.ok === false) fallos.push(e.cod_gp2);
+    } catch (_e) { fallos.push(e.cod_gp2); }
+  }
+  const sis = lista.filter(function (e) { return dec[e.id] === "si"; });
+  window._insCervLista = lista.filter(function (e) { return dec[e.id] !== "no" || fallos.indexOf(e.cod_gp2) >= 0; });
+  insCervCerrar();
+  if (fallos.length) { try { alert("⚠ No se pudo avisar a Cervantes que NO llegó: " + fallos.join(", ") + ".\n\nQuedan esperando; probá de nuevo."); } catch (_e) {} }
+  else if (nos.length) { try { alert("⛔ Avisado a Cervantes: " + nos.length + " pieza(s) NO llegaron. El stock vuelve allá."); } catch (_e) {} }
+  if (sis.length) { insUbicOk("RI", { modo: "CERV", envios: sis }); return; }
+  _insCervOpciones();   // repinta el botón con lo que quedó
+}
+/* Precarga en la recepción lo que dijeron que llegó: por el código que da la RPC, o como insumo
+   nuevo (TMP-…) con la descripción de Cervantes. Cada ítem recuerda sus envíos (_cervIds). */
+function _insCervPrecargar(gp2, items) {
+  (gp2.envios || []).forEach(function (e) {
+    const q = Number(e.cantidad) || 0; if (!(q > 0)) return;
+    let it = e.cod_gv ? items.filter(function (x) { return _insK(x.cod) === _insK(e.cod_gv); })[0] : null;
+    if (!it) {
+      const det = String(e.descripcion || e.cod_gp2 || "").trim() + " · Cervantes " + (e.cod_gp2 || "");
+      it = items.filter(function (x) { return !x.cod && x._cervDet === det; })[0];
+      if (!it) {
+        it = { cod: e.cod_gv || "", nombre: det, sector: "", ubic: "", cat: e.categoria_gv || "", noCode: !e.cod_gv, tmp: !e.cod_gv, stock: 0, stockByUni: null, qty: 0, unidad: e.unidad_gv || "", _cervDet: det };
+        items.push(it);
+        if (!e.cod_gv) insCrearTmp(it, det, it.cat).then(function () { _ins && insRender(); });
+      }
+    }
+    it.qty = (Number(it.qty) || 0) + q;
+    it.unidad = e.unidad_gv || it.unidad;
+    (it._cervIds || (it._cervIds = [])).push(e.id);
+  });
+}
+/* Después de grabar: cierra los avisos de lo que efectivamente entró (qty > 0). */
+function _insCervConfirmar(sel, ref, legajo) {
+  const ids = [], cods = {};
+  (sel || []).forEach(function (it) { (it._cervIds || []).forEach(function (id) { ids.push(id); cods[id] = it.cod; }); });
+  if (!ids.length) return;
+  if (typeof window.rcpCervEncolar === "function") { window.rcpCervEncolar(ids, ref, cods, "legajo " + (legajo || "?")); return; }
+  _insCervRpc("gv_envio_cervantes_confirmar", { p_ids: ids, p_ref: ref, p_cods: cods, p_por: "legajo " + (legajo || "?") }).catch(function () {});
+}
 /* Material GP2 (del bundle) del insumo, por codigo_virgilio == cod de Virgilio. null si no es bolsa. */
 function _insGp2Mat(gp2, it) {
   if (!gp2 || !it || !it.cod) return null;
@@ -26099,6 +26233,7 @@ function _insGp2Falta(it) {
 }
 function _insGp2Banner() {
   const gp2 = _ins && _ins.gp2; if (!gp2) return "";
+  if (gp2.modo === "CERV") return '<div class="ins-depw" style="background:#fef3c7;border-color:#f59e0b;color:#78350f;">🏭 Lo que mandó <b>Cervantes</b> ya está cargado: revisá las cantidades y confirmá. El aviso se cierra al confirmar.</div>';
   return '<div class="ins-depw" style="background:#f0fdfa;border-color:#5eead4;color:#115e59;">' +
     (gp2.modo === "EI" ? '🏭 Entrega a <b>' + escapeHtml(gp2.inyector) + '</b>: las bolsas plásticas se descuentan también en Gestión Productiva.'
                         : '📦 Recepción de la <b>OC N° ' + escapeHtml(String(gp2.oc.numero)) + '</b> (' + escapeHtml(gp2.oc.proveedor || "") + '): las bolsas se reciben contra esa OC en Gestión Productiva.') +
@@ -26114,6 +26249,7 @@ function _insGp2Bolsas(gp2, it) {
 }
 /* Avisa a GP2. Devuelve {ok, msg} — nunca tira: el llamador decide qué hacer con el fallo. */
 async function _insGp2Enviar(gp2, sel, legajo, remito) {
+  if (gp2 && gp2.modo === "CERV") return { ok: true, msg: "" };   // v25.40: el Sí va DESPUÉS de grabar (_insCervConfirmar)
   const rows = sel.map(function (it) { const m = _insGp2Mat(gp2, it); if (!m) return null; const b = _insGp2Bolsas(gp2, it); return { it: it, cod: m.codigo_virgilio || m.cod_virgilio, bolsas: b }; }).filter(Boolean);
   if (!rows.length) return { ok: true, msg: "" };
   const sinUni = rows.filter(function (r) { return r.bolsas == null || !(r.bolsas > 0); });
@@ -26188,7 +26324,8 @@ async function showInsumoModal(mode, legajo, _resume) {
           if (b > 0) { it.qty = b; it.unidad = "Bolsas"; }
         });
       }
-      if (items.some(function (x) { return insCatOf(x) === "plastico"; })) _ins.cat = "plastico";
+      if (gp2.modo === "CERV") _insCervPrecargar(gp2, items);
+      else if (items.some(function (x) { return insCatOf(x) === "plastico"; })) _ins.cat = "plastico";
     }
     insRender();
   } catch (e) { const b = document.getElementById("insBody"); if (b) b.innerHTML = '<div class="ins-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -26645,9 +26782,11 @@ async function insConfirmar() {
     } else if (g.msg) gp2Msg = "\n" + g.msg;
   }
   try { opDraftClear(_ins && _ins.legajo); } catch (_e) {}
+  const _cervGp2 = (_ins.gp2 && _ins.gp2.modo === "CERV") ? _ins.gp2 : null, _cervLeg = _ins.legajo;
   closeIns();
   window._insUbicacion = null;  // limpiar
   stockMove(rows);   // offline-safe (vir_stock_pend)
+  if (_cervGp2) _insCervConfirmar(sel, (window._insDocState && window._insDocState.nroRemito) || null, _cervLeg);   // v25.40 (D4)
   try { window._insDocState = null; } catch (_e) {}
 
   try { alert("✓ " + (isIn ? "Entrada" : "Salida") + " registrada: " + sel.length + " insumo(s)." + (ubic ? "\n" + (isIn ? "Origen" : "Destino") + ": " + ubic : "") + gp2Msg); } catch (_e) {}
@@ -57835,7 +57974,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.40"></script>
+<script src="importacion.js?v=25.41"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60636,7 +60775,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.40"></script>
+<script src="cobranzas.js?v=25.41"></script>
 
 </body>
 </html>

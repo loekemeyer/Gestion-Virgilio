@@ -30895,3 +30895,23 @@ evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositiv
   cruzan por código normalizado; el 718 no tiene fila en `stocks_carga_rapida`.
 - **Rollback:** volver a correr `sql/gv_gp2_espejo_v2517.sql` (la función sin el bloque 4) y
   `drop table "GP2".virgilio_articulo_stock;`. `sql/gv_gp2_espejo_articulo_v2539.sql`.
+
+## §3.v2541 — lo que Cervantes MANDA a Virgilio: aviso Sí / No (D4, v25.41, 30/09/2026)
+
+- **Pedido (Thomas, "D4 si"):** lo que la tablet de Cervantes envía a Virgilio llega a Gestión Virgilio como
+  aviso Sí / No donde se recibe. Regla general GP2 ↔ GV, al revés de la v25.37.
+- **Frontera (la crea GP2):** `"GP2".envio_virgilio` (una fila por pieza; `grupo` terminado / insumo / sc / sp;
+  `cantidad` en uni o kg; `gv_cod` = con qué código se recibió). La escribe `GP2.enviar_a_virgilio`.
+  `db/migracion_envio_virgilio.sql` de gestion-productiva-2.0.
+- **Objetos nuevos acá (sin tocar nada existente):** `public.gv_envios_cervantes_pendientes()`,
+  `public.gv_envio_cervantes_confirmar(bigint[], text, jsonb, text)`, `public.gv_envio_cervantes_denegar(bigint,
+  text, text)`, SECURITY DEFINER, EXECUTE a anon/authenticated. 2 filas en `GV_Reglas_Centinela` (el Sí y el No
+  sólo tocan lo `pendiente`).
+- **Probado como `anon`, en transacción abortada:** Fábrica produce 48 del 718 → manda 24 y 12 + 5 del PC12 →
+  pendientes devuelve los 3 (718 con empresa CH y 1 caja; PC12 sin código → insumo nuevo, categoría
+  `partes_plasticas`, `Uni`) → confirmar(24, PC12) deja `gv_cod` 718 / TMP-9999, ref y legajo → denegar(12) revierte
+  (stock de Art. Terminado vuelve a 24) → denegar un confirmado devuelve `ok:false, ya:true` y no toca nada.
+- ⚠ **Un `execute_sql` con varias sentencias es UNA transacción**: la primera aplicación se hizo junto con una
+  prueba que terminaba en `raise exception` y se revirtió entera. Se reaplicó sola.
+- **Rollback:** los tres `drop function` y el `delete` del centinela, al pie de `sql/gv_envio_cervantes_v2540.sql`.
+

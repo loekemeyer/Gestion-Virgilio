@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-09-30 (+ centinela gv_rack_posicion_guardar sin posición)",
+  "_generado": "2026-09-30 (+ centinelas gv_envio_cervantes_confirmar / _denegar, v25.41)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -155,6 +155,16 @@
       "objeto": "gv_empresa_de_entrega",
       "regla": "La empresa de un codigo con L es LOEKEMEYER: la da la L, NUNCA la NP. Y en un codigo NO dual la da el ARTICULO (gv_empresa_de_articulo), no el pedido (regla v19",
       "quien": "Luis"
+    },
+    {
+      "objeto": "gv_envio_cervantes_confirmar",
+      "regla": "D4: el Sí de Virgilio sólo confirma lo pendiente (un reintento no pisa un denegado)",
+      "quien": "Thomas"
+    },
+    {
+      "objeto": "gv_envio_cervantes_denegar",
+      "regla": "D4: el No de Virgilio sólo deniega lo pendiente (lo confirmado ya entró al stock de acá)",
+      "quien": "Thomas"
     },
     {
       "objeto": "gv_equivalencia_facturar_pendiente",

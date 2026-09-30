@@ -1,3 +1,19 @@
+## Nota v25.41 (2026-09-30) — Lo que manda Cervantes llega como aviso Sí / No (D4)
+
+Pedido de Thomas. Lo que la tablet de Cervantes manda a Virgilio (Enviar → Virgilio) queda en
+`"GP2".envio_virgilio` y se contesta **donde se recibe**:
+- **Terminados de Fábrica** → **Recepción → Log/ Fabr**: arriba de los códigos, *«🏭 Cervantes mandó»* con
+  **✓ Llegó** (suma las cajas a la carga), **↩ Deshacer** y **✕ No llegó** (motivo opcional). Sólo los de la línea
+  elegida.
+- **Insumos, SC y SP** → **Recibir Insumos**: en *«¿De dónde recibís?»*, **«🏭 Cervantes te mandó N piezas»** → ✓ / ✕
+  por pieza; lo que llegó sigue a la recepción de siempre con origen **Cervantes** y la cantidad precargada (sin
+  código conocido entra como insumo nuevo `TMP-…`).
+- El **Sí** se cierra al grabar la recepción (cola `rcp_cerv_conf_v1`, reintenta sola). El **No** devuelve el
+  stock a Cervantes (lo hace GP2) y allá la tablet dice *«⛔ Denegado por Virgilio»*.
+RPC `gv_envios_cervantes_pendientes` / `gv_envio_cervantes_confirmar` / `gv_envio_cervantes_denegar`.
+`recepcion.js` (`rcpCerv*`), `index.html` (`_insCerv*`, `insCerv*`), `tests/cerv-envio-aviso.cjs`,
+`docs/SUPABASE-GESTION-VIRGILIO.md` §3.v2541.
+
 ## Nota v24.89 (2026-09-30) — Pendientes de Recepción: botón «No recibido» con WhatsApp a Marian
 
 Pedido de Mel. En cada tarjeta de **Recepción → Pendientes**, a la derecha de **Recibido**, está el
