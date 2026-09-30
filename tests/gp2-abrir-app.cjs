@@ -27,6 +27,9 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); } cat
   if (!r.noRepregunta) f.push("repregunta");
   if (!r.reset || !r.link) f.push("cambiar");
   if (!/var GP2_PROTO = "web\+gp2:modulos"/.test(require("fs").readFileSync(path.join(__dirname, "..", "index.html"), "latin1"))) f.push("protocolo");
+  const src = require("fs").readFileSync(path.join(__dirname, "..", "index.html"), "latin1");
+  if (!/function _gp2App\(\)[\s\S]{0,900}setTimeout\([\s\S]{0,300}if \(fue\) return;\s*_gp2Web\(\)/.test(src)) f.push("sin fallback al navegador si la app no abre");
+  if (!/modo === "app"\) \{ _gp2App\(\)/.test(src)) f.push("el modo app no pasa por _gp2App");
   if (f.length) { console.error("gp2-abrir-app: FALLA " + f.join(" · ")); process.exit(1); }
   console.log("gp2-abrir-app: OK — pregunta una vez, navegador o app por web+gp2:, y se puede cambiar");
 })();
