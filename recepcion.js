@@ -89,8 +89,7 @@ function rcpDraftSave() {
       linea: opState.linea, fecha: opState.fecha, remito: opState.remito,
       articulos: opState.articulos, cargas: cargas,
       altaNuevos: opState.altaNuevos || {},
-      artExtra: opState.artExtra || {},
-      cervSi: opState.cervSi || {}         // v25.40: los "Sí" a Cervantes viajan con el borrador
+      artExtra: opState.artExtra || {}
     }));
   } catch (_e) { /* localStorage lleno / modo privado: no rompe la carga */ }
   rcpDraftNotify();
@@ -183,19 +182,6 @@ const RCP_CSS = `
 #rcpRoot .opCodeOtro{ width:100%; margin-top:14px; padding:18px; font-size:18px; font-weight:900;
   border:2px dashed var(--ok); border-radius:14px; background:#f6fff8; color:var(--ok); cursor:pointer; }
 #rcpRoot .opCodeOtroHint{ margin-top:6px; text-align:center; font-size:13px; color:#6b7280; }
-/* v25.40 (D4) — lo que Cervantes mandó a Virgilio: aviso Sí / No arriba de los códigos */
-#rcpRoot .opCerv{ margin:0 0 14px; padding:10px; border:2px solid #d97706; border-radius:14px; background:#fef3c7; color:#78350f; }
-#rcpRoot .opCervT{ text-align:center; font-size:17px; font-weight:900; margin-bottom:6px; }
-#rcpRoot .opCervRow{ display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; padding:8px 0; border-top:1px dashed #f59e0b; text-align:center; }
-#rcpRoot .opCervRow:first-of-type{ border-top:none; }
-#rcpRoot .opCervTx{ flex:1 1 220px; font-size:15px; }
-#rcpRoot .opCervTx b{ font-size:18px; }
-#rcpRoot .opCervTx small{ display:block; font-size:12.5px; color:#92400e; }
-#rcpRoot .opCervRow button{ min-height:48px; padding:0 16px; font-size:16px; font-weight:900; border-radius:12px; border:2px solid; cursor:pointer; }
-#rcpRoot .opCervSi{ background:#16a34a; border-color:#15803d !important; color:#fff; }
-#rcpRoot .opCervNo{ background:#fff; border-color:#b91c1c !important; color:#b91c1c; }
-#rcpRoot .opCervOk{ font-size:14px; font-weight:900; color:#166534; }
-#rcpRoot .opCervUndo{ min-height:40px !important; background:#fff; border-color:#d0d7de !important; color:#475569; font-size:14px !important; }
 #rcpRoot .opLineRow{ display:flex; gap:14px; margin-top:14px; }
 #rcpRoot .opLineBtn{ flex:1; height:90px; font-size:24px; font-weight:900; border-radius:14px; border:2px solid var(--border); background:#fff; cursor:pointer; }
 #rcpRoot .opLineBtn.active{ background:#111; color:#fff; border-color:#111; }
@@ -475,11 +461,8 @@ const opState = {
   ocPorCod: null,    // v7.07: OCs vigentes del proveedor { codNorm: {ped,rec,pend,fecha} } (null = sin cargar)
   ocOk: false,       // v17.99: true sólo si la RPC de OCs contestó (sin eso no se exige el aviso)
   ocAjena: null,     // v19.57: códigos que NO están en SU OC pero sí en la de otro { codNorm: {otros,pend,...} }
-  artExtra: null,    // v21.30: { codNorm: true } de los códigos que el operario agregó a mano
+  artExtra: null     // v21.30: { codNorm: true } de los códigos que el operario agregó a mano
                      //          con "Introducir código diferente" (NO estaban asignados a este proveedor)
-  cerv: null,        // v25.40 (D4): lo que Cervantes mandó y espera el Sí (null = sin pedir)
-  cervLinea: null,   //          la línea con que se pidió (LK / CH)
-  cervSi: {}         //          { envio_id: {cod, cajas} } los que el operario dijo que llegaron
 };
 
 /* v3.81-fix: usar TZ Argentina (igual que getTodayKey() en index.html) en
@@ -546,7 +529,6 @@ function opResetState() {
   opState.remito = ""; opState.articulos = null; opState.cargas = {};
   opState.altaNuevos = {};      // v15.36: altas del "+" esperando el OK de Thomas
   opState.artExtra = {};        // v21.30: códigos agregados a mano en esta recepción
-  opState.cerv = null; opState.cervLinea = null; opState.cervSi = {};   // v25.40 (D4)
   opState.ocPorCod = null; opState.ocOk = false; opState.ocAjena = null;   // v19.57
   opState.excesoAvisado = null; opState.excesoGond = null; opState.excesoGondFirma = null;   // v18.02
   opState.fotoFile = null;
@@ -584,7 +566,6 @@ window.reanudarRecepcionOp = function (legajo, dayKey) {
   opState.cargas = d.cargas || {};
   opState.altaNuevos = d.altaNuevos || {};   // v15.36: altas pendientes de OK
   opState.artExtra = d.artExtra || {};       // v21.30: códigos agregados a mano
-  opState.cervSi = d.cervSi || {};           // v25.40: los "Sí" a Cervantes
   if (Object.keys(opState.altaNuevos).some(function (c) { return opState.altaNuevos[c].estado === "pendiente"; })) altaPollStart();
   opPage.classList.remove("pendWide");
   opPage.classList.add("open");
@@ -851,7 +832,7 @@ function renderLinea() {
     if (!tieneCod) { b.style.opacity = ".35"; b.style.cursor = "not-allowed"; b.title = "Este tallerista no trabaja para " + nom; }
     b.onclick = () => {
       if (!tieneCod) return;
-      if (opState.linea !== lineCode) { opState.articulos = null; opState.cargas = {}; opState.cervSi = {}; opState.cerv = null; }
+      if (opState.linea !== lineCode) { opState.articulos = null; opState.cargas = {}; }
       opState.linea = lineCode;
       if (opState.tipo === 'tallerista') opState.tallCod = cods[lineCode];
       renderTipoDoc();
@@ -1318,12 +1299,6 @@ async function renderArticulos() {
 
 function drawArticulosGrid() {
   opBody.innerHTML = "";
-  // v25.40 (D4) — Log/ Fabr: lo que Cervantes mandó va ARRIBA, con Sí / No
-  if (arEsLogFabr()) {
-    rcpCervCargar();
-    const cb = rcpCervBanner();
-    if (cb) opBody.appendChild(cb);
-  }
   const hayArts = opState.articulos && opState.articulos.length > 0;
   /* v19.57 — las AJENAS se piden una vez, con todos los códigos de la lista del proveedor, y
      cuando llegan se repinta (igual que las OC vigentes). Va acá y no en renderArticulos
@@ -1406,106 +1381,6 @@ function drawArticulosGrid() {
    Log/Fabr → queda fijo y compartido entre dispositivos, SIN tablas extra. */
 function arEsLogFabr() {
   return opState.tipo === 'tallerista' && claveTall(opState.tallNombre || "") === claveTall("Log/Fabr");
-}
-/* ====== v25.40 (Thomas, 30/09, D4) — lo que CERVANTES mandó a Virgilio: aviso Sí / No ======
-   *"lo que manda Cervantes llega a Gestión Virgilio como aviso Sí/No donde recibe"*. Es la regla
-   general GP2 <-> GV al revés de la v25.37: la tablet de Cervantes escribe una fila por pieza en
-   "GP2".envio_virgilio (el stock de allá ya salió) y acá el operario dice si llegó.
-   · Sí  -> suma las cajas a la carga de Log/ Fabr (el MISMO camino que la carga manual: foto,
-            remito, OC, a guardar). El aviso se cierra recién al ENVIAR (rcpCervEncolar).
-   · No  -> gv_envio_cervantes_denegar: el stock vuelve a Cervantes (lo hace un trigger de GP2) y
-            allá la tablet dice "⛔ Denegado por Virgilio".
-   Los terminados de Fábrica traen el mismo código que acá (058, 718, 941E…) y su empresa, así que
-   sólo se muestran los de la línea elegida. */
-function _rcpCervK(c) { return String(c == null ? "" : c).toUpperCase().trim().replace(/^0+(?=.)/, ""); }
-function rcpCervCajas(e) {
-  const cj = Number(e && e.cajas);
-  return cj > 0 ? Math.max(1, Math.round(cj)) : null;
-}
-function rcpCervCargar() {
-  if (opState.cerv !== null && opState.cervLinea === opState.linea) return;
-  opState.cerv = []; opState.cervLinea = opState.linea;   // marca "pedido": no dispara dos veces
-  const lin = String(opState.linea || "").toUpperCase();
-  supabase.rpc("gv_envios_cervantes_pendientes").then(function (r) {
-    if (r && r.error) throw r.error;
-    opState.cerv = ((r && r.data) || []).filter(function (e) {
-      return e.grupo === "terminado" && (!e.empresa || String(e.empresa).toUpperCase() === lin);
-    });
-    if (opState.step === "articulos" && opState.cerv.length) drawArticulosGrid();
-  }).catch(function (err) { console.warn("gv_envios_cervantes_pendientes:", err); });
-}
-function rcpCervBanner() {
-  const lista = opState.cerv || [];
-  if (!lista.length) return null;
-  const nf = function (n) { return Number(n || 0).toLocaleString("es-AR", { maximumFractionDigits: 2 }); };
-  const box = document.createElement("div");
-  box.className = "opCerv";
-  let h = '<div class="opCervT">🏭 Cervantes mandó (' + lista.length + ') — ¿llegó?</div>';
-  lista.forEach(function (e) {
-    const si = (opState.cervSi || {})[e.id];
-    const cj = rcpCervCajas(e);
-    const cant = cj ? (cj + (cj === 1 ? " caja" : " cajas") + " · " + nf(e.cantidad) + " u") : (nf(e.cantidad) + " u");
-    let cuando = "";
-    try { cuando = new Date(e.creado_en).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" }); } catch (_e) {}
-    h += '<div class="opCervRow" data-id="' + escapeHtmlRcp(String(e.id)) + '">' +
-      '<div class="opCervTx"><b>' + escapeHtmlRcp(e.cod_gv || e.cod_gp2 || "") + '</b> ' + escapeHtmlRcp(e.descripcion || "") +
-        '<small>' + escapeHtmlRcp(cant) + (cuando ? " · mandado " + escapeHtmlRcp(cuando) : "") + '</small></div>' +
-      (si ? '<span class="opCervOk">✓ en la carga · se confirma al Enviar</span><button type="button" class="opCervUndo" data-a="undo">↩ Deshacer</button>'
-          : '<button type="button" class="opCervSi" data-a="si">✓ Llegó</button><button type="button" class="opCervNo" data-a="no">✕ No llegó</button>') +
-      '</div>';
-  });
-  box.innerHTML = h;
-  box.onclick = function (ev) {
-    const b = ev.target && ev.target.closest ? ev.target.closest("button[data-a]") : null;
-    if (!b) return;
-    const row = b.closest("[data-id]");
-    const id = row ? Number(row.getAttribute("data-id")) : NaN;
-    const e = (opState.cerv || []).filter(function (x) { return Number(x.id) === id; })[0];
-    if (!e) return;
-    const a = b.getAttribute("data-a");
-    if (a === "si") rcpCervSi(e);
-    else if (a === "no") rcpCervNo(e, b);
-    else rcpCervDeshacer(e);
-  };
-  return box;
-}
-function rcpCervSi(e) {
-  const cod = String(e.cod_gv || e.cod_gp2 || "").trim();
-  if (!cod) return;
-  if (!opState.articulos) opState.articulos = [];
-  let art = opState.articulos.filter(function (a) { return _rcpCervK(a.Cod_Art) === _rcpCervK(cod); })[0];
-  if (!art) { art = { Cod_Art: cod, Desc: e.descripcion || "" }; opState.articulos.push(art); }
-  const k = art.Cod_Art, cj = rcpCervCajas(e);
-  if (!opState.cervSi) opState.cervSi = {};
-  opState.cervSi[e.id] = { cod: k, cajas: cj || 0 };
-  if (cj) opState.cargas[k] = (Number(opState.cargas[k]) || 0) + cj;
-  drawArticulosGrid();
-  if (!cj) openCajas(k);   // sin cajas calculables: que las cuente
-}
-function rcpCervDeshacer(e) {
-  const s = (opState.cervSi || {})[e.id];
-  if (!s) return;
-  if (s.cajas) opState.cargas[s.cod] = Math.max(0, (Number(opState.cargas[s.cod]) || 0) - s.cajas);
-  delete opState.cervSi[e.id];
-  drawArticulosGrid();
-}
-async function rcpCervNo(e, btn) {
-  const cod = e.cod_gv || e.cod_gp2 || "";
-  const mot = prompt("¿Qué pasó con " + cod + "? (opcional)\n\nAl decir que NO llegó, el stock vuelve a Cervantes y allá lo ven en la tablet.");
-  if (mot === null) return;
-  if (btn) btn.disabled = true;
-  let r = null, err = null;
-  try { r = await supabase.rpc("gv_envio_cervantes_denegar", { p_id: e.id, p_motivo: mot || null, p_por: "legajo " + (RECP.legajo || "?") }); }
-  catch (x) { err = x; }
-  if (err || !r || r.error) {
-    if (btn) btn.disabled = false;
-    alert("No se pudo avisar a Cervantes (" + (((r && r.error) || err || {}).message || "sin respuesta") + ").\n\nNo se cambió nada. Probá de nuevo.");
-    return;
-  }
-  opState.cerv = (opState.cerv || []).filter(function (x) { return x.id !== e.id; });
-  if (opState.cervSi) delete opState.cervSi[e.id];
-  drawArticulosGrid();
-  alert("⛔ Avisado a Cervantes: " + cod + " NO llegó.\nEl stock vuelve allá.");
 }
 /* ====== v21.30 — "Introducir código diferente", para TODOS los proveedores ==========
    Pedido de Luis (2026-09-22): *"cuando se elige al tallerista deberían aparecer los
@@ -2671,17 +2546,6 @@ async function opEnviar() {
   // primera (0,16 s); el 24/09 11:49 falló porque la base estaba saturada. Red extra en el
   // backend: cron gv-oc-recepcion-red recalcula lo recibido en las últimas 36 h.
   try { rcpOcEncolar(opState.tallNombre, items.map(function (i) { return { cod: i.cod, cajas: i.cajas }; })); } catch (_e) {}
-  // v25.40 (D4): los avisos de Cervantes que el operario dijo que LLEGARON se cierran recién
-  // ahora, con la entrega ya grabada (mismo camino que la carga manual). Cola persistente,
-  // igual que la OC: si la base no contesta, se reintenta hasta que entre.
-  try {
-    const _cs = opState.cervSi || {};
-    const _ids = Object.keys(_cs).filter(function (id) { return (Number(opState.cargas[_cs[id].cod]) || 0) > 0; });
-    if (_ids.length) {
-      const _cods = {}; _ids.forEach(function (id) { _cods[id] = _cs[id].cod; });
-      rcpCervEncolar(_ids.map(Number), opState.remito || null, _cods, "legajo " + (RECP.legajo || "?"));
-    }
-  } catch (_e) {}
   // v11.98: cierra el toggle RT automáticamente (el operario ya no tiene que volver
   // a la botonera para terminar el inicio→fin de Recepción Mercadería).
   try { if (typeof window.autoCloseRT === "function") window.autoCloseRT(RECP.legajo, { inicioMs: opState.t0, cajas: totalCajas }); } catch (_e) {}
@@ -4064,59 +3928,5 @@ try {
   if (typeof window !== "undefined") {
     window.addEventListener("online", function () { rcpOcDrain(); });
     setTimeout(function () { rcpOcDrain(); }, 3000);
-  }
-} catch (_e) {}
-
-/* ── v25.40 (D4): cola persistente del "Sí" a Cervantes (gv_envio_cervantes_confirmar) ────────
-   Mismo patrón que la de OC: el aviso se cierra DESPUÉS de grabar la recepción, y si la base no
-   contesta se reintenta hasta que entre. Confirmar dos veces no hace nada (sólo toca lo
-   pendiente). La usa también Recibir Insumos (index.html) por window.rcpCervEncolar. */
-var RCP_CERV_KEY = "rcp_cerv_conf_v1";
-var _rcpCervTimer = null, _rcpCervCorriendo = false;
-function rcpCervLeer() {
-  try { var a = JSON.parse(localStorage.getItem(RCP_CERV_KEY) || "[]"); return Array.isArray(a) ? a : []; }
-  catch (_e) { return []; }
-}
-function rcpCervGuardar(a) { try { localStorage.setItem(RCP_CERV_KEY, JSON.stringify(a)); } catch (_e) {} }
-function rcpCervEncolar(ids, ref, cods, por) {
-  if (!ids || !ids.length) return;
-  var a = rcpCervLeer();
-  a.push({ id: Date.now() + "_" + Math.random().toString(36).slice(2, 8), ids: ids, ref: ref || null, cods: cods || null, por: por || null, intentos: 0, ts: Date.now() });
-  rcpCervGuardar(a);
-  rcpCervDrain();
-}
-function rcpCervProgramar(intentos) {
-  var pasos = [5000, 15000, 30000, 60000, 120000];
-  if (_rcpCervTimer) clearTimeout(_rcpCervTimer);
-  _rcpCervTimer = setTimeout(function () { _rcpCervTimer = null; rcpCervDrain(); }, pasos[Math.min(intentos, pasos.length - 1)]);
-}
-async function rcpCervDrain() {
-  if (_rcpCervCorriendo) return;
-  var cola = rcpCervLeer();
-  if (!cola.length) return;
-  if (typeof supabase === "undefined" || !supabase || typeof supabase.rpc !== "function") { rcpCervProgramar(0); return; }
-  _rcpCervCorriendo = true;
-  var maxIntentos = 0;
-  try {
-    for (var k = 0; k < cola.length; k++) {
-      var e = cola[k], ok = false;
-      try {
-        var r = await supabase.rpc("gv_envio_cervantes_confirmar", { p_ids: e.ids, p_ref: e.ref, p_cods: e.cods, p_por: e.por });
-        ok = !!r && !r.error;
-      } catch (_e) { ok = false; }
-      var a = rcpCervLeer();
-      if (ok) a = a.filter(function (x) { return x.id !== e.id; });
-      else a.forEach(function (x) { if (x.id === e.id) { x.intentos = (x.intentos || 0) + 1; maxIntentos = Math.max(maxIntentos, x.intentos); } });
-      rcpCervGuardar(a);
-      if (!ok) break;
-    }
-  } finally { _rcpCervCorriendo = false; }
-  if (rcpCervLeer().length) rcpCervProgramar(maxIntentos);
-}
-try {
-  if (typeof window !== "undefined") {
-    window.rcpCervEncolar = rcpCervEncolar;
-    window.addEventListener("online", function () { rcpCervDrain(); });
-    setTimeout(function () { rcpCervDrain(); }, 3500);
   }
 } catch (_e) {}

@@ -30932,3 +30932,14 @@ evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositiv
 - ⚠ **Un `execute_sql` con varias sentencias es UNA transacción**: la primera aplicación se hizo junto con una
   prueba que terminaba en `raise exception` y se revirtió entera. Se reaplicó sola.
 - **Rollback:** los tres `drop function` y el `delete` del centinela, al pie de `sql/gv_envio_cervantes_v2540.sql`.
+
+### §3.v2542 — REVERSO de v25.39 y v25.41 (Luis, 01/10) junto con GP2 v1.219.0/1.220.0
+
+- `gv_gp2_espejo_sync`: se le sacó el bloque 4 sobre la definición VIVA (quedan los bloques 1-3 de la v25.17);
+  `GP2.virgilio_articulo_stock` borrada (backup `zz_backups."GV_Backup_GP2_virgilio_articulo_stock_20261001"`).
+- `drop function` de `gv_envios_cervantes_pendientes`, `gv_envio_cervantes_confirmar`, `gv_envio_cervantes_denegar`;
+  centinelas 265 y 266 borrados. `GP2.envio_virgilio` borrada en GP2 (tenía 0 filas).
+- Front: revert de 2e6940b (index.html, recepcion.js, test cerv-envio-aviso) y a05dd51.
+- Medido después: `gv_reglas_perdidas` = 0 · `gv_gp2_espejo_sync()` = 'sin cambios' · el aviso de importados
+  (`GP2.ingreso_virgilio`, `resolver_ingreso_virgilio`, `gv_ingreso_virgilio_denegado`) intacto.
+
