@@ -5316,7 +5316,7 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
   operario se queda ahí después de enviar y el banner en la pantalla del legajo no lo veía nadie.
 - La alerta de **un dispositivo con 2+ operarios** ya es por DÍA (`gv_dispositivo_multi_operario` agrupa por
   dispositivo + día AR; el Telegram mira sólo hoy): otro operario mañana en el mismo celular no avisa.
-- **v25.69**: sin fila en la vista (legajo de prueba, que se excluye, u operario sin eventos) el contador acumula EN EL
+- **v25.70**: sin fila en la vista (legajo de prueba, que se excluye, u operario sin eventos) el contador acumula EN EL
   CELULAR por legajo y día (`gv_tm_loc::<día>::<legajo>`) — antes volvía a 0 en cada lectura y entre tareas. El 📅
   flotante (`#btnHistDias`) no se muestra en la botonera (tapaba «Terminar Día»): los días anteriores se abren desde
   el pop-up del historial.
