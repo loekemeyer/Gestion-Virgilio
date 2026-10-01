@@ -206,6 +206,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== racks-propuesta (regresión: MG 'De los racks' propone para aprobar, no mueve stock) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/racks-propuesta.cjs
+echo "== rkb-orden-urgencia (v25.89: Bajar de Racks ordena por la góndola más vacía) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rkb-orden-urgencia.cjs
 echo "== ins-sale-mc (v24.69: insumo con MC sale sólo en MC, stock en base) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-sale-mc.cjs
 

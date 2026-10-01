@@ -232,6 +232,7 @@ tr.op-grp th{text-align:center;color:#93c5fd;font-size:calc(1.5*var(--u));border
 .op-mov{color:#93c5fd}
 .op-no{color:#fbbf24}
 .op-tot{color:#f8fafc;font-weight:900}
+table.ops td.op-ah{font-size:calc(2*var(--u));color:#cbd5e1;font-weight:700;text-align:left;white-space:nowrap;max-width:22vw;overflow:hidden;text-overflow:ellipsis}
 tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
 
 /* ── Panel "En este momento" ──────────────────────────────────────────── */
@@ -368,13 +369,10 @@ td.act-dur{font-weight:900;text-align:center;font-size:calc(2.1*var(--u))}
       </div>
       <!-- v25.01 (Luis): *"agrega «Pendientes de salir hoy» que muestre cuantos y cuales pedidos
            pendientes de entrega hay ese día"*. -->
-      <div class="card" style="flex:0 0 auto">
-        <div class="card-t" id="penTit">Pendientes de salir hoy</div>
-        <div id="penBox"></div>
-      </div>
+      <!-- v25.89 (Luis): «En este momento» se mudó a la tabla de Operarios (columna «Ahora»). -->
       <div class="card grow">
-        <div class="card-t" id="actTit">En este momento</div>
-        <div class="grow" id="actBox"></div>
+        <div class="card-t" id="penTit">Pendientes de salir hoy</div>
+        <div class="grow" id="penBox"></div>
       </div>
     </div>
 
@@ -1529,7 +1527,7 @@ function pintar(d) {
     /* v25.6 (Luis): *"queda cortado En este momento"*. Pendientes toma a lo sumo la mitad de
        lo que queda libre; si no entran todos, la última fila es «+ N más». */
     el("penBox").innerHTML = "";
-    var PEN_MAX = Math.max(1, Math.min(6, Math.ceil((cabenFilas("actBox", false) - 2) / 2)));
+    var PEN_MAX = Math.max(1, cabenFilas("penBox", false));
     if (pens.length > PEN_MAX) PEN_MAX = Math.max(1, PEN_MAX - 1);
     el("penBox").innerHTML = pens.length
       ? '<table class="pen"><tbody>' +
@@ -1546,32 +1544,6 @@ function pintar(d) {
   }
   tickersTodos();
 
-  // ── En este momento
-  var MAX_ACT = cabenFilas("actBox", false);   // v25.6: lo que entra (el mínimo de 6 lo cortaba)
-  var trabajando = d.actividad.filter(function (r) { return !r.idle; }).length;
-  el("actTit").innerHTML = "🟢 En este momento <small>· " + trabajando + " trabajando" +
-    (d.actividad.length > trabajando ? " · " + (d.actividad.length - trabajando) + " libre(s)" : "") + "</small>";
-  el("actBox").innerHTML = d.actividad.length
-    ? '<table class="act-t"><tbody>' + d.actividad.slice(0, MAX_ACT).map(function (r) {
-        var nom = nombres.get(String(r.legajo)) || "";
-        var sig = iniciales(nom, r.legajo) || ("#" + r.legajo);
-        var quien = nom ? String(nom).trim().split(/\s+/)[0] : ("Leg " + r.legajo);
-        var min = Math.round((Date.now() - r.desde) / 60000);
-        var col = min >= 120 ? "#f87171" : (min >= 60 ? "#fbbf24" : "#64748b");
-        var qHace;
-        if (r.idle) {
-          qHace = (r.arranco === false) ? "🕐 fichó · sin arrancar" : "💤 libre · sin tarea abierta";
-        } else {
-          var info = ACT_INFO[r.kind] || { ic: "•", tx: r.kind };
-          qHace = (info.ic || "•") + " " + (info.vb ? (info.vb + " " + esc(r.tanda)) : info.tx);
-        }
-        return '<tr class="act' + (r.idle ? " act-idle" : "") + '">' +
-          '<td class="act-who"><b>' + esc(sig) + '</b>' + esc(quien) + '</td>' +
-          '<td class="act-what">' + qHace + '</td>' +
-          '<td class="act-dur" style="color:' + col + '">' + esc(fmtMin(min)) + '</td></tr>';
-      }).join("") + '</tbody></table>' +
-      (d.actividad.length > MAX_ACT ? '<div class="mas">+ ' + (d.actividad.length - MAX_ACT) + ' más</div>' : "")
-    : '<div class="vacio">Nadie fichado todavía</div>';
   tickersTodos();   // v25.51: la columna derecha va al ancho del dato; recién acá queda fijo el ancho de la izquierda
   if (window.__MA_INSTR) window.__MA_INSTR();
 
@@ -1603,12 +1575,11 @@ function pintarHoras(filas, d) {
      · RITMO (índice, decimal): m³/h de picking y de armado = m³ de las tandas que ese operario
        cerró HOY (TP / TAP, cada tanda una vez) ÷ sus horas de picking / armado (`hs_pick` / `hs_arm`
        de la vista, lo cerrado). Reemplaza al «h/tanda», que no servía: una tanda no mide nada fijo.
-     · HORAS (H:MM): Prod = picking + armado + carga + remitos + MOVIMIENTO (guardado, racks,
-       recepción: es trabajo); No prod = baño, comida, timbre, limpieza, conteo, permiso; Total = jornada. */
+     · HORAS (H:MM): v25.89 — Prod = picking + armado; No prod = el resto de la jornada. */
   filas = filas || [];
-  if (!filas.length) {
+  if (!filas.length && !((d && d.actividad) || []).length) {
     el("opsTit").innerHTML = "Operarios";
-    el("opsBox").innerHTML = '<div class="vacio">Todavía nadie cerró una tarea</div>';
+    el("opsBox").innerHTML = '<div class="vacio">Nadie fichado todavía</div>';
     return;
   }
   var m3 = {};                                   // legajo -> { pick: {tanda:m3}, arm: {...} }
@@ -1624,34 +1595,56 @@ function pintarHoras(filas, d) {
   window.__MA_M3 = m3;
   var suma = function (o) { var s2 = 0; for (var k in o) s2 += o[k]; return s2; };
   var ritmo = function (m, h) { h = Number(h) || 0; return (h > 0.05 && m > 0) ? n1(m / h) : "—"; };
-  var tPm = 0, tPh = 0, tAm = 0, tAh = 0, tProd = 0, tNo = 0, tTot = 0;
-  var cuerpo = filas.map(function (o) {
-    var mm = m3[String(o.legajo)] || { pick: {}, arm: {} };
+  /* v25.89 (Luis, 01/10) — REGLA GENERAL: Prod = SOLAMENTE picking + armado. Todo lo demás es No
+     prod (movimiento, carga, remitos, baño, comida… y el tiempo muerto) = jornada − prod. La columna
+     Total se fue: en su lugar «Ahora» dice qué está haciendo cada uno (era «En este momento»). */
+  var nombres = (d && d.empleados && d.empleados.nombres) || new Map();
+  var act = {}; ((d && d.actividad) || []).forEach(function (r) { act[String(r.legajo)] = r; });
+  var ahora = function (leg) {
+    var r = act[leg]; if (!r) return '<td class="op-ah act-idle">—</td>';
+    var min = Math.round((Date.now() - r.desde) / 60000);
+    var col = min >= 120 ? "#f87171" : (min >= 60 ? "#fbbf24" : "#64748b");
+    var q;
+    if (r.idle) q = (r.arranco === false) ? "🕐 sin arrancar" : "💤 libre";
+    else { var info = ACT_INFO[r.kind] || { ic: "•", tx: r.kind }; q = (info.ic || "•") + " " + (info.vb ? (info.vb + " " + esc(r.tanda)) : info.tx); }
+    return '<td class="op-ah' + (r.idle ? " act-idle" : "") + '">' + q + ' <b style="color:' + col + '">' + esc(fmtMin(min)) + '</b></td>';
+  };
+  var tPm = 0, tPh = 0, tAm = 0, tAh = 0, tProd = 0, tNo = 0, vistos = {};
+  var fila = function (o) {
+    var leg = String(o.legajo); vistos[leg] = 1;
+    var mm = m3[leg] || { pick: {}, arm: {} };
     var mp = suma(mm.pick), ma = suma(mm.arm);
-    var prod = (Number(o.hs_prod) || 0) + (Number(o.hs_mov) || 0);
+    var prod = (Number(o.hs_pick) || 0) + (Number(o.hs_arm) || 0);
+    var no = Math.max(0, (Number(o.hs_total) || 0) - prod);
     tPm += mp; tPh += Number(o.hs_pick) || 0; tAm += ma; tAh += Number(o.hs_arm) || 0;
-    tProd += prod; tNo += Number(o.hs_noprod) || 0; tTot += Number(o.hs_total) || 0;
+    tProd += prod; tNo += no;
     return '<tr><td title="' + esc(o.nombre) + '">' + esc(nombreCorto(o.nombre, o.legajo)) +
       (o.en_jornada ? "" : ' <span style="color:#475569;font-weight:800">✓</span>') + '</td>' +
       '<td class="op-rit">' + ritmo(mp, o.hs_pick) + '</td>' +
       '<td class="op-rit op-sep">' + ritmo(ma, o.hs_arm) + '</td>' +
       '<td class="op-prod">' + nH(prod) + '</td>' +
-      '<td class="op-no">' + nH(o.hs_noprod) + '</td>' +
-      '<td class="op-tot">' + nH(o.hs_total) + '</td></tr>';
-  }).join("");
+      '<td class="op-no op-sep">' + nH(no) + '</td>' + ahora(leg) + '</tr>';
+  };
+  var cuerpo = filas.map(fila).join("");
+  /* el que fichó y todavía no cerró nada también sale, con su «Ahora» */
+  ((d && d.actividad) || []).forEach(function (r) {
+    var leg = String(r.legajo); if (vistos[leg]) return;
+    var nom = nombres.get(leg) || "";
+    cuerpo += '<tr><td>' + esc(nombreCorto(nom, leg)) + '</td><td class="op-rit">—</td><td class="op-rit op-sep">—</td>' +
+      '<td class="op-prod">—</td><td class="op-no op-sep">—</td>' + ahora(leg) + '</tr>';
+  });
   var total = '<tr class="op-tot-row"><td>Total</td>' +
     '<td class="op-rit">' + ritmo(tPm, tPh) + '</td><td class="op-rit op-sep">' + ritmo(tAm, tAh) + '</td>' +
-    '<td class="op-prod">' + nH(tProd) + '</td><td class="op-no">' + nH(tNo) + '</td>' +
-    '<td class="op-tot">' + nH(tTot) + '</td></tr>';
+    '<td class="op-prod">' + nH(tProd) + '</td><td class="op-no op-sep">' + nH(tNo) + '</td><td></td></tr>';
   el("opsTit").innerHTML = "Operarios";
   el("opsBox").innerHTML = '<table class="ops"><thead>' +
-    '<tr class="op-grp"><th></th><th colspan="2" class="op-sep">Ritmo</th><th colspan="3">Horas</th></tr>' +
+    '<tr class="op-grp"><th></th><th colspan="2" class="op-sep">Ritmo</th><th colspan="2" class="op-sep">Horas</th><th></th></tr>' +
     '<tr><th>Operario</th>' +
     '<th title="m³ pickeados hoy ÷ horas de picking">m³/h<br>picking</th>' +
     '<th class="op-sep" title="m³ armados hoy ÷ horas de armado">m³/h<br>armado</th>' +
-    '<th title="Picking, armado, carga, remitos y movimiento (guardado, racks, recepción)">Prod</th>' +
-    '<th title="Baño, comida, timbre, limpieza, conteo, permiso">No prod</th>' +
-    '<th>Total</th></tr></thead><tbody>' + cuerpo + total + '</tbody></table>';
+    '<th title="Sólo picking y armado">Prod</th>' +
+    '<th class="op-sep" title="Todo lo demás: movimiento, carga, remitos, baño, comida y tiempo muerto">No prod</th>' +
+    '<th>Ahora</th></tr></thead><tbody>' + cuerpo + total + '</tbody></table>';
 }
 
 /* v20.21 (Thomas) — ¿esta tanda YA SALIÓ? Es la misma pregunta que contesta la
@@ -1904,13 +1897,27 @@ function popRitmo(leg, sub) {
   return head + popTablaTandas(pares);
 }
 function popHoras(leg) {
+  /* v25.89 (Luis): dos columnas. Prod = SÓLO picking y armado; todo lo demás es No prod, tiempo muerto incluido. */
   var D = window.__MA_D || {};
   var o = (D.horas || []).filter(function (x) { return String(x.legajo) === String(leg); })[0] || {};
-  var filas = [["Picking", o.hs_pick], ["Armado", o.hs_arm], ["Movimiento (guardado · racks · recepción)", o.hs_mov],
-    ["Productivas (total)", o.hs_prod], ["No productivas", o.hs_noprod], ["Jornada (total)", o.hs_total]];
-  var body = filas.map(function (f) { return '<tr><td>' + esc(f[0]) + '</td><td class="num">' + nH(f[1]) + '</td></tr>'; }).join("");
-  return '<div class="pop-sub">' + esc(nombreCorto(o.nombre, leg)) + (o.en_jornada ? '' : ' · ✓ ya cerró la jornada') + '</div>' +
-    '<table><thead><tr><th>Concepto</th><th class="num">H:MM</th></tr></thead><tbody>' + body + '</tbody></table>';
+  var N = function (x) { return Number(x) || 0; };
+  var pick = N(o.hs_pick), arm = N(o.hs_arm), mov = N(o.hs_mov), dec = N(o.hs_noprod), tot = N(o.hs_total);
+  var otros = Math.max(0, N(o.hs_prod) - pick - arm);
+  var muerto = Math.max(0, tot - N(o.hs_prod) - mov - dec);
+  var noTot = Math.max(0, tot - pick - arm);
+  var P = [["Picking", pick], ["Armado", arm]];
+  var Q = [["Movimiento (guardado · racks · recepción)", mov], ["Carga camión · remitos", otros],
+    ["Baño · comida · timbre · limpieza · conteo · permiso · cancelaciones", dec], ["Tiempo muerto", muerto]];
+  var n = Math.max(P.length, Q.length), body = "";
+  for (var i = 0; i < n; i++) {
+    var a = P[i], b = Q[i];
+    body += '<tr>' + (a ? '<td>' + esc(a[0]) + '</td><td class="num">' + nH(a[1]) + '</td>' : '<td></td><td></td>') +
+      '<td style="border-left:2px solid #334155">' + esc(b[0]) + '</td><td class="num">' + nH(b[1]) + '</td></tr>';
+  }
+  body += '<tr class="pop-tot"><td>Total prod</td><td class="num">' + nH(pick + arm) + '</td>' +
+    '<td style="border-left:2px solid #334155">Total no prod</td><td class="num">' + nH(noTot) + '</td></tr>';
+  return '<div class="pop-sub">' + esc(nombreCorto(o.nombre, leg)) + ' · jornada ' + nH(tot) + ' h' + (o.en_jornada ? '' : ' · ✓ ya cerró la jornada') + '</div>' +
+    '<table><thead><tr><th colspan="2" style="color:#4ade80">Prod</th><th colspan="2" style="color:#fbbf24;border-left:2px solid #334155">No prod</th></tr></thead><tbody>' + body + '</tbody></table>';
 }
 var POP_EST = { salio: "Salió", facturado: "Facturado", armado: "Armado", proceso: "En proceso", pendiente: "Pendiente" };
 function popDiaBucket(dia, sub) {
@@ -1992,7 +1999,7 @@ function instrumentar() {
     function marca(i, pop, sub) { if (!td[i]) return;
       td[i].className += " cx"; td[i].setAttribute("data-pop", pop); td[i].setAttribute("data-leg", leg);
       if (sub) td[i].setAttribute("data-sub", sub); }
-    marca(1, "rit", "pick"); marca(2, "rit", "arm"); marca(3, "hs"); marca(4, "hs"); marca(5, "hs");
+    marca(1, "rit", "pick"); marca(2, "rit", "arm"); marca(3, "hs"); marca(4, "hs");
   });
   var RDS = resumenDias(D.arbol || [], D.despachadas || new Set(), 4), ri = 0;
   var SUBS = ["salio", "facturado", "armado", "proceso", "pendiente"];

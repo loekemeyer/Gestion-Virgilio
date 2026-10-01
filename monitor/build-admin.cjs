@@ -109,13 +109,27 @@ function popRitmo(leg, sub) {
   return head + popTablaTandas(pares);
 }
 function popHoras(leg) {
+  /* v25.89 (Luis): dos columnas. Prod = SÓLO picking y armado; todo lo demás es No prod, tiempo muerto incluido. */
   var D = window.__MA_D || {};
   var o = (D.horas || []).filter(function (x) { return String(x.legajo) === String(leg); })[0] || {};
-  var filas = [["Picking", o.hs_pick], ["Armado", o.hs_arm], ["Movimiento (guardado · racks · recepción)", o.hs_mov],
-    ["Productivas (total)", o.hs_prod], ["No productivas", o.hs_noprod], ["Jornada (total)", o.hs_total]];
-  var body = filas.map(function (f) { return '<tr><td>' + esc(f[0]) + '</td><td class="num">' + nH(f[1]) + '</td></tr>'; }).join("");
-  return '<div class="pop-sub">' + esc(nombreCorto(o.nombre, leg)) + (o.en_jornada ? '' : ' · ✓ ya cerró la jornada') + '</div>' +
-    '<table><thead><tr><th>Concepto</th><th class="num">H:MM</th></tr></thead><tbody>' + body + '</tbody></table>';
+  var N = function (x) { return Number(x) || 0; };
+  var pick = N(o.hs_pick), arm = N(o.hs_arm), mov = N(o.hs_mov), dec = N(o.hs_noprod), tot = N(o.hs_total);
+  var otros = Math.max(0, N(o.hs_prod) - pick - arm);
+  var muerto = Math.max(0, tot - N(o.hs_prod) - mov - dec);
+  var noTot = Math.max(0, tot - pick - arm);
+  var P = [["Picking", pick], ["Armado", arm]];
+  var Q = [["Movimiento (guardado · racks · recepción)", mov], ["Carga camión · remitos", otros],
+    ["Baño · comida · timbre · limpieza · conteo · permiso · cancelaciones", dec], ["Tiempo muerto", muerto]];
+  var n = Math.max(P.length, Q.length), body = "";
+  for (var i = 0; i < n; i++) {
+    var a = P[i], b = Q[i];
+    body += '<tr>' + (a ? '<td>' + esc(a[0]) + '</td><td class="num">' + nH(a[1]) + '</td>' : '<td></td><td></td>') +
+      '<td style="border-left:2px solid #334155">' + esc(b[0]) + '</td><td class="num">' + nH(b[1]) + '</td></tr>';
+  }
+  body += '<tr class="pop-tot"><td>Total prod</td><td class="num">' + nH(pick + arm) + '</td>' +
+    '<td style="border-left:2px solid #334155">Total no prod</td><td class="num">' + nH(noTot) + '</td></tr>';
+  return '<div class="pop-sub">' + esc(nombreCorto(o.nombre, leg)) + ' · jornada ' + nH(tot) + ' h' + (o.en_jornada ? '' : ' · ✓ ya cerró la jornada') + '</div>' +
+    '<table><thead><tr><th colspan="2" style="color:#4ade80">Prod</th><th colspan="2" style="color:#fbbf24;border-left:2px solid #334155">No prod</th></tr></thead><tbody>' + body + '</tbody></table>';
 }
 var POP_EST = { salio: "Salió", facturado: "Facturado", armado: "Armado", proceso: "En proceso", pendiente: "Pendiente" };
 function popDiaBucket(dia, sub) {
@@ -197,7 +211,7 @@ function instrumentar() {
     function marca(i, pop, sub) { if (!td[i]) return;
       td[i].className += " cx"; td[i].setAttribute("data-pop", pop); td[i].setAttribute("data-leg", leg);
       if (sub) td[i].setAttribute("data-sub", sub); }
-    marca(1, "rit", "pick"); marca(2, "rit", "arm"); marca(3, "hs"); marca(4, "hs"); marca(5, "hs");
+    marca(1, "rit", "pick"); marca(2, "rit", "arm"); marca(3, "hs"); marca(4, "hs");
   });
   var RDS = resumenDias(D.arbol || [], D.despachadas || new Set(), 4), ri = 0;
   var SUBS = ["salio", "facturado", "armado", "proceso", "pendiente"];

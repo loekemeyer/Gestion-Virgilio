@@ -6269,7 +6269,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.88"></script>
+<script type="module" src="recepcion.js?v=25.89"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10462,7 +10462,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.88";
+const APP_VERSION = "v25.89";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27875,10 +27875,11 @@ async function showRacksBajarModal(legajo, _resume) {
   ov.innerHTML = '<div class="rkb-card"><div class="rkb-head"><span class="rkb-title">🏗 Bajar de racks a A guardar</span><button class="rkb-close" onclick="rkbAskClose()">Cerrar</button></div><div class="rkb-body" id="rkbBody"><div class="rkb-empty">Cargando racks…</div></div></div>';
   if (_resume) { _rkb = _resume; _rkb._cerrado = false; _rkb.tsInicio = Date.now(); try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {} rkbRender(); return; }   // v23.66: tramo nuevo
   try {
-    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), ocgFetchCapacidad().catch(function () { return {}; })]);
+    const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), ocgFetchCapacidad().catch(function () { return {}; }),
+      (async function () { try { return await ocgDemanda(true); } catch (_e) { return {}; } })()]);   // v25.89: demanda, para la prioridad
     const saldos = res[0] || {};
     const plani = res[2] || {};
-    const cxmMap = plani.cxm || {}, locsMap = plani.locs || {}, _facRkb = res[3] || {}, capMap = res[4] || {};
+    const cxmMap = plani.cxm || {}, locsMap = plani.locs || {}, _facRkb = res[3] || {}, capMap = res[4] || {}, demRkb = res[5] || {};
     const sN = {}; Object.keys(saldos).forEach(function (k) { sN[_cpNorm(k)] = saldos[k]; });
     const items = Object.keys(saldos).map(function (k) { return saldos[k]; }).filter(function (a) { return (a.racks || 0) > 0; })
       .sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); })
@@ -27888,8 +27889,16 @@ async function showRacksBajarModal(legajo, _resume) {
         var _cxmR = cxmMap[kN] || 0;
         if (!_cxmR) { var _fR = _facRkb[String(a.cod).toUpperCase()]; if (_fR && _fR.cajasXMaster > 0) _cxmR = _fR.cajasXMaster; }
         // sec preseleccionada = la ubicación con más stock (planimetría viva, v5.22)
+        /* v25.89 (Luis, 01/10): primero lo más URGENTE — la góndola que, contando lo que ya está
+           en A guardar y restando lo pedido, queda más vacía (≡ prioridad de Guardado a Góndola). */
+        const _capR = Number(capMap[_ocgNorm(a.cod)]) || 0, _gonR = Math.round(Number(a.terminado) || 0);
+        const _agR = Math.max(0, Number(a.a_guardar) || 0), _pedR = Number(demRkb[_ocgNorm(a.cod)]) || 0;
         return { cod: a.cod, desc: artNombre(a.cod, a.desc), racks: Math.round(a.racks), cxm: _cxmR, locs: locs, sec: (locs[0] ? locs[0].sector : ""), baja: 0, manual: false,
-                 cap: Number(capMap[_ocgNorm(a.cod)]) || 0, gon: Math.round(Number(a.terminado) || 0) };   // v24.68: capacidad y lo que hay en góndola
+                 cap: _capR, gon: _gonR, aGuardar: _agR, ped: _pedR,
+                 prio: _capR > 0 ? (_gonR + _agR - _pedR) / _capR : Infinity };   // v24.68: capacidad y lo que hay en góndola
+      }).sort(function (x, y) {
+        if (x.prio !== y.prio) return x.prio - y.prio;
+        return (parseInt(x.cod, 10) || 0) - (parseInt(y.cod, 10) || 0);
       });
     _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, capMap: capMap, filtro: "", tsInicio: Date.now() };
     try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {}   // v23.66
@@ -27898,7 +27907,7 @@ async function showRacksBajarModal(legajo, _resume) {
 }
 function rkbRender() {
   if (!_rkb) return; const body = document.getElementById("rkbBody"); if (!body) return;
-  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por código</b>. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). Al registrar, <b>el stock pasa a A guardar al instante</b>: después se guarda en góndola con «Guardado a Góndola».</div>';
+  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por urgencia</b>: primero la góndola más vacía contando lo que ya está en A guardar y lo pedido. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). Al registrar, <b>el stock pasa a A guardar al instante</b>: después se guarda en góndola con «Guardado a Góndola».</div>';
   h += '<input id="rkbSearch" class="rkb-search" type="search" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_rkb.filtro || "") + '" oninput="rkbSearchInput(this.value)">';
   const fq = String(_rkb.filtro || "").trim(), fUp = fq.toUpperCase();
   const shown = fq ? _rkb.items.filter(function (it) { return codEmpiezaCon(it.cod, fq); }) : _rkb.items;   // v21.43
@@ -58540,7 +58549,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.88"></script>
+<script src="importacion.js?v=25.89"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61341,7 +61350,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.88"></script>
+<script src="cobranzas.js?v=25.89"></script>
 
 </body>
 </html>

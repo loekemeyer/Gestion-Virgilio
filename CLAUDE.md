@@ -5384,6 +5384,23 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
   murió adentro.
 - `sql/gv_alerta_inactivo_v2579.sql`, `tests/alerta-inactivo.cjs`.
 
+## ⚠⚠ REGLA GENERAL (Luis, 2026-10-01, v25.89): PROD es SÓLO picking y armado — todo lo demás es NO PROD
+
+**Luis:** *"prod es SOLAMENTE armado y pickeo, todo lo demas es no prod (incluye tiempo muerto) esto es regla general de
+como se considera el tiempo"*. Se retira el «Prod incluye movimiento/racks, carga y remitos» de la v23.70.
+
+- **TV y Mon. Admin**: Prod = `hs_pick + hs_arm`; No prod = `hs_total − Prod` (movimiento, carga, remitos, baño, comida,
+  cancelaciones y tiempo muerto). Se resuelve en el front: la vista `gv_monitor_horas_operario_dia` NO se tocó (sus
+  baldes siguen igual, con su huella).
+- **Mon. Admin → clic en Prod / No prod**: pop-up de DOS columnas (Prod: picking · armado | No prod: movimiento · carga
+  y remitos · declaradas · tiempo muerto), con sus totales.
+- **«En este momento» se mudó a Operarios**: la columna Total se fue y en su lugar va **«Ahora»** (qué hace y hace cuánto).
+  El que fichó sin cerrar nada sale igual, con «—» en las horas. Pendientes de salir hoy toma el alto que dejó.
+- ⚠ El monitor viejo de `index.html` (Mts3 x Hora) todavía separa «Otros prod» y «Movimientos» como antes.
+- **Bajar de Racks ordena por urgencia**: `(góndola + A guardar − pedido) ÷ capacidad`, de menor a mayor; sin capacidad
+  al final (≡ Guardado a Góndola, que ya ordenaba por `(góndola − pedido) ÷ capacidad`).
+- `tests/mon-tv.cjs`, `tests/mon-admin.cjs`, `tests/rkb-orden-urgencia.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.78): antes de optimizar, medir — y leer lo que se usa, no el universo
 
 **Luis, con la captura del `canceling statement due to statement timeout` en A Programar:**

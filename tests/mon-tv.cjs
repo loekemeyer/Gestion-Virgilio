@@ -184,10 +184,10 @@ const DATOS = {
      La TV NO recalcula nada de esto: si la vista cambia, cambia acá. */
   horas: [
     { legajo: "8", nombre: "Farias Juan Hilario", tandas_pick: 3, prom_hs_pick: 0.84,
-      tandas_arm: 1, prom_hs_arm: 1.95, hs_prod: 4.5, hs_mov: 0.8, hs_noprod: 0.6,
+      tandas_arm: 1, prom_hs_arm: 1.95, hs_pick: 2.5, hs_arm: 2, hs_prod: 4.5, hs_mov: 0.8, hs_noprod: 0.6,
       hs_total: 6.2, en_jornada: true },
     { legajo: "12", nombre: "Ortiz Franco", tandas_pick: 0, prom_hs_pick: 0,
-      tandas_arm: 2, prom_hs_arm: 1.2, hs_prod: 2.4, hs_mov: 2.1, hs_noprod: 0.5,
+      tandas_arm: 2, prom_hs_arm: 1.2, hs_pick: 0, hs_arm: 2.4, hs_prod: 2.4, hs_mov: 2.1, hs_noprod: 0.5,
       hs_total: 5.4, en_jornada: false }
   ]
 };
@@ -238,12 +238,12 @@ function responder(url) {
       arranco: document.getElementById("splash").classList.contains("hide"),
       tandas: t("tandasBox"), fc: t("fcBox"), fcTit: t("fcTit"), tot: t("totBox"),
       ops: t("opsBox"), opsTit: t("opsTit"), meta: t("metaBox"),
-      act: t("actBox"), avisos: t("avisos"),
+      act: t("opsBox"), avisos: t("avisos"),
       dias: (document.getElementById("fcBox") || {}).innerHTML || "",
       cols: document.querySelectorAll("main > .col").length,
       diasEnMedio: !!(document.getElementById("fcBox") && document.getElementById("opsBox") &&
-        document.getElementById("fcBox").closest(".col") === document.getElementById("opsBox").closest(".col") &&
-        document.getElementById("actBox").closest(".col") === document.getElementById("opsBox").closest(".col")),
+        document.getElementById("fcBox").closest(".col") === document.getElementById("opsBox").closest(".col")),
+      actCard: !!document.getElementById("actBox"),
       ult: window.__tvUlt || {},
       pen: (document.getElementById("penBox") || {}).innerHTML || "",
       penTit: (document.getElementById("penTit") || {}).innerHTML || "",
@@ -259,7 +259,7 @@ function responder(url) {
           return { tanda: tr.querySelector(".t-tanda").textContent.trim(), rota: tk.classList.contains("rota"),
             anim: getComputedStyle(tk).animationName, lineas: Math.round(caja.clientHeight / parseFloat(getComputedStyle(caja).lineHeight)),
             txt: tk.textContent, w: caja.clientWidth, sw: tk.scrollWidth }; }),
-      desb: ["actBox", "penBox", "col2"].map((id) => { const e = document.getElementById(id); return e ? e.scrollHeight - e.clientHeight : -1; }),
+      desb: ["opsBox", "penBox", "col2"].map((id) => { const e = document.getElementById(id); return e ? e.scrollHeight - e.clientHeight : -1; }),
       clave: (document.getElementById("tvClave") || {}).textContent || "",
       estado: (document.getElementById("estado") || {}).textContent || "",
       // ¿sobresale algo del alto de la pantalla? En una TV no hay cómo scrollear.
@@ -398,8 +398,12 @@ function responder(url) {
      "faltan las columnas Ritmo (m³/h picking/armado) y Horas (Prod, No prod, Total)");
   ok(/Ritmo/.test(r.ops) && /Horas/.test(r.ops), "falta el encabezado agrupado Ritmo / Horas");
   ok(!/\d,\d h/.test(r.ops), "las horas tienen que ir en H:MM, no en decimal");
-  ok(/9:48/.test(r.ops) && /11:36/.test(r.ops),
-     "la fila de Total no suma bien (prod 5:18+4:30=9:48 · total 6:12+5:24=11:36): " + r.ops.replace(/<[^>]*>/g, " "));
+  /* v25.89 (Luis): Prod = SÓLO picking + armado; No prod = jornada − prod (tiempo muerto incluido).
+     Total se fue: la última columna es «Ahora» (lo que era «En este momento»). */
+  ok(/6:54/.test(r.ops) && /4:42/.test(r.ops),
+     "la fila de Total no suma bien (prod 4:30+2:24=6:54 · no prod 1:42+3:00=4:42): " + r.ops.replace(/<[^>]*>/g, " "));
+  ok(/>Ahora</.test(r.ops) && !/<th>Total<\/th>/.test(r.ops), "la columna Total tiene que ser «Ahora»");
+  ok(!r.actCard, "volvió la tarjeta «En este momento»: Luis la mudó a Operarios");
   /* El % va sobre el tiempo MEDIDO (prod + no prod), no sobre la jornada. */
   /* v23.92 (Luis): «Operarios» va solo y centrado — sin el conteo ni el % al lado. */
   ok(r.opsTit.trim() === "Operarios", "el título de operarios tiene que decir sólo «Operarios»: " + r.opsTit);
