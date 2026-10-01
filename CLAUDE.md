@@ -4286,6 +4286,9 @@ Al verificar setea un password temporal aleatorio en el user y el front hace
   acción `bridge` de la Edge Fn `admin-login-otp`. Si al re-sincronizar se pisa
   alguno, buscar por `LK_ADMIN_EMAIL`, `LK_OTP_FN_URL`, `_lkOtpFn`, `lkTryBridge`,
   `lk_bridge_vjwt`, `lkLoginBox`, o `grep -r "/mayorista"` (no debe haber ninguno).
+  (i) **modo Est. Madre de Gestión sin código** (v25.72): `GV_EM_EMBED`, `_gvEmFetch`, `GV_EM_PERMITIDAS`
+  y `window.supabaseClient = sb` al principio de admin.js, y el corte de `checkAuth()` y del init. Si se pisa,
+  la pestaña EST. MADRE vuelve a pedir el OTP: buscar `gv_em` y correr `tests/stk-est-madre-sin-codigo.cjs`.
 
 ### Convenciones operativas
 
@@ -6844,7 +6847,27 @@ nadie la sesión abierta"*.
   sumada y la L como LK, igual que vtas. Un mes sin pedidos web registrados (antes de abr/26 LK, jul/26 Chef) o una
   lectura caída dice **s/d**, nunca 0.
 - **«📈 Est. Madre»** (primera solapa) **no es una copia**: es `admin/admin.html#estadistica-madre` en un iframe que
-  vive fuera de `#stkBody` (los re-render no lo recargan) y entra con el puente `lk_bridge_vjwt`. Cambiar la Est.
-  Madre = cambiarla en `pagina-LK-copia` y re-copiar el espejo `admin/`; acá no se toca nada. Si el mail no es el
-  admin de LK, el iframe pide el OTP (mismo comportamiento que «🌐 Panel Web LK»).
+  vive fuera de `#stkBody` (los re-render no lo recargan). Cambiar la Est. Madre = cambiarla en `pagina-LK-copia` y
+  re-copiar el espejo `admin/`. ~~Entra con el puente `lk_bridge_vjwt` y pide el OTP si el mail no es el admin~~ →
+  **desde la v25.72 entra SIN código** (ver la regla de abajo).
 - `tests/proy-entregadas.cjs` · `tests/stk-est-madre-tab.cjs` · `sql/gv_pedidos_mensuales_cod_v2565.sql`.
+
+## ⚠ REGLA (Tomás Beviglia, 2026-10-01, v25.72): la Est. Madre de Gestión entra SIN CÓDIGO — la página LK queda igual
+
+**Tomás:** *"me pide código para ver la Est. Madre, que no me lo pida en Gestión Virgilio. La página LK dejala como
+está"*. El iframe pedía el OTP cuando el puente fallaba (01/10 12:14: Gestión dio 521) o cuando el supervisor entra
+con un mail que no es el admin de LK (`loekemeyer.logistica@` nunca podía).
+
+| pieza | qué hace |
+|---|---|
+| iframe | `admin/admin.html?gv_em=1#estadistica-madre`; ya no deja `lk_bridge_vjwt` |
+| `admin/admin.js` (sólo el espejo) | con `?gv_em=1` **dentro del iframe de Gestión** (`window.parent.sbAuth`): no busca sesión de LK, no muestra login, sólo abre la Est. Madre. El cliente de Supabase va con `fetch` propio (`_gvEmFetch`) y `window.supabaseClient = sb` |
+| Edge Function **`gv-est-madre`** (proyecto LK, verify_jwt off) | recibe el JWT de **Gestión**, pregunta a `es_supervisor_virgilio()` y devuelve con service_role **sólo** products, loke_products, sales_item_remap, sales_excluded_items, la caché de la Est. Madre y el detalle de una celda. Todo lo demás 403. Fuente `admin/supabase/gv-est-madre/index.ts` |
+
+- **No se crea ninguna sesión de admin de LK**: el Panel Web LK y la página LK siguen con su puente u OTP.
+- `get_estadistica_madre_cache()` exige `admins` + `auth.uid()`: la función lee la tabla `estadistica_madre_cache`
+  con la misma selección y orden.
+- ⚠ **`analisis-venta-cliente.js` vuelve a declarar `var sb`** y pisa el cliente de admin.js; reusa
+  `window.supabaseClient` si existe. Sin esa línea las lecturas salían directo a LK sin sesión (lo cazó el test).
+- Abierto suelto (fuera del iframe de Gestión) el modo no se activa aunque traiga `?gv_em=1`.
+- `tests/stk-est-madre-sin-codigo.cjs` (corre el admin real en el iframe), `tests/stk-est-madre-tab.cjs`.

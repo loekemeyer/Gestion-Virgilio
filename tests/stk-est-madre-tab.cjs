@@ -6,8 +6,9 @@
    #estadistica-madre) en un iframe. Chequea, sirviendo la app por HTTP (file:// no deja tocar el
    documento del iframe) y con el admin reemplazado por un stub:
    1) que la pestaña sea la PRIMERA,
-   2) que al abrirla #stkBody se oculte y el iframe apunte a admin/admin.html#estadistica-madre,
-   3) que deje el puente de sesión (lk_bridge_vjwt) ANTES de cargar el admin,
+   2) que al abrirla #stkBody se oculte y el iframe apunte a admin/admin.html?gv_em=1#estadistica-madre,
+   3) v25.68: que NO deje el puente de sesión del admin de LK (lk_bridge_vjwt): la Est. Madre de
+      Gestión entra sin código, por la Edge Function gv-est-madre (tests/stk-est-madre-sin-codigo.cjs),
    4) que adentro del iframe se oculte el menú lateral del admin,
    5) que un re-render (realtime, filtros) NO recargue el iframe,
    6) que al ir a otra pestaña vuelva #stkBody y al volver sea el MISMO iframe, sin recargar.
@@ -29,7 +30,7 @@ const STUB_ADMIN = '<!doctype html><html><head><meta charset="utf-8"></head><bod
   '<div class="app-shell"><aside class="sidebar" id="sb">menu</aside>' +
   '<main class="main-content"><section class="page active" id="estadistica-madre">EM</section></main></div>' +
   '<script>parent.__emLoads = (parent.__emLoads || 0) + 1;' +
-  'parent.__emHash = location.hash; parent.__emTok = sessionStorage.getItem("lk_bridge_vjwt");</script>' +
+  'parent.__emHash = location.hash; parent.__emSearch = location.search; parent.__emTok = sessionStorage.getItem("lk_bridge_vjwt");</script>' +
   '</body></html>';
 
 (async () => {
@@ -81,6 +82,7 @@ const STUB_ADMIN = '<!doctype html><html><head><meta charset="utf-8"></head><bod
     await espera(() => window.__emLoads >= 1 && fr.contentDocument && fr.contentDocument.getElementById("stkEmCss"), 8000);
     out.src = fr ? fr.getAttribute("src") : null;
     out.hash = window.__emHash;
+    out.search = window.__emSearch;
     out.tokAntes = window.__emTok;
     out.sinMenu = !!fr.contentDocument && fr.contentWindow.getComputedStyle(fr.contentDocument.getElementById("sb")).display === "none";
     out.cargando = !document.getElementById("stkEmCarga");
@@ -104,8 +106,8 @@ const STUB_ADMIN = '<!doctype html><html><head><meta charset="utf-8"></head><bod
   });
 
   const pass = /Est\. Madre/.test(r.primera || "") && r.marcada && r.bodyOculto &&
-    r.src === "admin/admin.html#estadistica-madre" && r.hash === "#estadistica-madre" &&
-    r.tokAntes === "tok-vir" && r.sinMenu && r.cargando &&
+    r.src === "admin/admin.html?gv_em=1#estadistica-madre" && r.hash === "#estadistica-madre" &&
+    r.search === "?gv_em=1" && r.tokAntes === null && r.sinMenu && r.cargando &&
     r.mismoTrasRender && r.otraTabBody && r.otraTabHost && r.vuelveMismo && errs.length === 0;
   console.log("stk-est-madre-tab:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await browser.close();

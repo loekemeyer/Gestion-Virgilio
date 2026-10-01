@@ -1097,4 +1097,6 @@ node tests/claude-reglas-guard.cjs
 node tests/proy-det-unidades.cjs
 echo "== stk-est-madre-tab (v25.65: pestaña Est. Madre = el admin en iframe, primera, no se recarga) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-tab.cjs
+echo "== stk-est-madre-sin-codigo (v25.71: la Est. Madre de Gestión entra sin código, por gv-est-madre) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-sin-codigo.cjs
 _resumen

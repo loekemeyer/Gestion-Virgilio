@@ -9,11 +9,67 @@ var TABLE_ADDRESSES = "customer_delivery_addresses";
 var PPP_ADMIN_CUIT = "30515842450";
 var isPPPAdmin = false;
 
-var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ---- v25.68 (AJUSTE PROPIO DEL ESPEJO de Gestión, no viene de LK): Est. Madre SIN código ----
+// Tomás Beviglia, 01/10/2026: "me pide código para ver la Est. Madre, que no me lo pida en
+// Gestión. La página LK dejala como está". La pestaña EST. MADRE de Stock y Compras abre este
+// archivo como admin.html?gv_em=1 dentro de un iframe. En ese modo NO hay sesión de admin de LK:
+// cada lectura va a la Edge Function gv-est-madre (proyecto LK, fuente en
+// admin/supabase/gv-est-madre/index.ts) con el JWT del supervisor en GESTIÓN, que lo valida contra
+// es_supervisor_virgilio() y devuelve sólo lo que lee la Est. Madre. Fuera del iframe de Gestión
+// (Panel Web LK, la página LK) todo sigue igual: puente u OTP.
+var GV_EM_FN_URL = SUPABASE_URL + "/functions/v1/gv-est-madre";
+var GV_EM_EMBED = (function () {
+  try {
+    return /(?:^|&)gv_em=1(?:&|$)/.test(location.search.slice(1)) &&
+      window.parent !== window && !!(window.parent.sbAuth && window.parent.sbAuth.getAccessToken);
+  } catch (_e) { return false; }
+})();
+window.GV_EM_EMBED = GV_EM_EMBED;
+// Lo único que lee la Est. Madre (cargarEstadisticaMadre + mostrarDetalleVentaMadre). Lo demás
+// se corta acá sin salir a la red; la Edge Function aplica la misma lista del lado del servidor.
+var GV_EM_PERMITIDAS = {
+  "products": 1, "loke_products": 1, "sales_item_remap": 1, "sales_excluded_items": 1,
+  "rpc/get_estadistica_madre_cache": 1, "rpc/get_estadistica_madre_detail": 1,
+};
+function _gvEmRespuesta(status, msg) {
+  return new Response(JSON.stringify({ message: msg }), { status: status, headers: { "Content-Type": "application/json" } });
+}
+async function _gvEmFetch(input, init) {
+  var url = typeof input === "string" ? input : (input && input.url) || String(input);
+  var base = SUPABASE_URL + "/rest/v1/";
+  var path = url.indexOf(base) === 0 ? url.slice(base.length).split("?")[0] : "";
+  if (!path || !GV_EM_PERMITIDAS[path]) return _gvEmRespuesta(403, "La Est. Madre de Gestión no lee " + (path || "eso"));
+  var tok = null;
+  try { tok = await window.parent.sbAuth.getAccessToken(); } catch (_e) {}
+  if (!tok) return _gvEmRespuesta(401, "Sin sesión de Gestión: volvé a entrar a Gestión Virgilio.");
+  var args = null;
+  if (path.indexOf("rpc/") === 0 && init && typeof init.body === "string") { try { args = JSON.parse(init.body); } catch (_e) {} }
+  return fetch(GV_EM_FN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
+    body: JSON.stringify({ path: path, args: args }),
+  });
+}
+
+var sb = GV_EM_EMBED
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "gv-em-sin-sesion" },
+      global: { fetch: _gvEmFetch },
+    })
+  : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// analisis-venta-cliente.js carga después y vuelve a declarar `var sb`, reusando
+// window.supabaseClient si existe: sin esto pisa el cliente de la Est. Madre de Gestión
+// y las lecturas salen directo a LK sin sesión (lo cazó tests/stk-est-madre-sin-codigo.cjs).
+if (GV_EM_EMBED) window.supabaseClient = sb;
 
 // ---- AUTH: usar sesion existente de Supabase ----
 async function checkAuth() {
   var statusEl = document.getElementById("authStatus");
+  if (GV_EM_EMBED) {   // v25.68: Est. Madre de Gestión — sin sesión de LK, sin código
+    var lsEm = document.getElementById("loadingScreen"); if (lsEm) lsEm.style.display = "none";
+    var shEm = document.getElementById("appShell"); if (shEm) shEm.style.display = "flex";
+    return true;
+  }
 
   var result = await sb.auth.getSession();
   if (result.error || !result.data || !result.data.session) {
@@ -6480,6 +6536,11 @@ function renderCondicionesDb() {
 // ---- INIT ----
 document.addEventListener("DOMContentLoaded", async function () {
   var ok = await checkAuth();
+  if (ok && GV_EM_EMBED) {   // v25.68: sólo la Est. Madre; nada de clientes, cotizador ni badges
+    var emBtn = document.querySelector('.nav-item[data-page="estadistica-madre"]');
+    if (emBtn) emBtn.click();
+    return;
+  }
   if (ok) {
     watchSession();
     loadClientes();

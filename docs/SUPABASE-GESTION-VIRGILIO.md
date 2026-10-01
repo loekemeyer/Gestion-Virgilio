@@ -30968,3 +30968,18 @@ evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositiv
   `#stkBody`, con el puente `lk_bridge_vjwt` de «🌐 Panel Web LK». Lee el proyecto **LK**, no éste.
 - **Rollback:** `drop function if exists public.gv_pedidos_mensuales_cod(text, integer, text);` (el front cae solo
   a s/d). `sql/gv_pedidos_mensuales_cod_v2565.sql`, `tests/proy-entregadas.cjs`, `tests/stk-est-madre-tab.cjs`.
+
+## §3.v2572 — Est. Madre de Gestión sin código: Edge Function `gv-est-madre` en LK (v25.72, 01/10/2026)
+
+- **Pedido de Tomás Beviglia:** *"me pide código para ver la Est. Madre, que no me lo pida en Gestión Virgilio. La
+  página LK dejala como está"*.
+- **Objeto nuevo (proyecto LK `kwkclwhmoygunqmlegrg`):** Edge Function `gv-est-madre`, verify_jwt **off** (la
+  identidad es el JWT de Gestión: lo valida `es_supervisor_virgilio()` de ESTA base, cache 2 min por token). Sólo
+  POST desde `loekemeyer.github.io` / `gestion-virgilio.vercel.app`. Lista cerrada: `products`, `loke_products`,
+  `sales_item_remap`, `sales_excluded_items` (consulta fija, paginada de a 1000), `rpc/get_estadistica_madre_cache`
+  (→ tabla `estadistica_madre_cache`, misma selección y orden) y `rpc/get_estadistica_madre_detail` (args validados).
+- **Medido el 01/10:** las 6 lecturas con la clave de servicio dan 200 (266 · 24 · 7 · 23 · 586 filas; detalle del
+  505 en 2026-09: 125 clientes). Sin origen 403, path fuera de lista 403, sin token 401, token inválido 403.
+- **Nada de la base de Gestión cambió.** El front: `index.html` (`_stkEmCargar`) y el espejo `admin/admin.js`.
+- **Rollback:** volver `_stkEmCargar` a `admin/admin.html#estadistica-madre` con el puente (git revert del commit) y
+  borrar la función desde el dashboard de LK. `admin/supabase/gv-est-madre/index.ts`, `tests/stk-est-madre-sin-codigo.cjs`.
