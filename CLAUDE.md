@@ -6694,6 +6694,9 @@ negativo para usos prácticos de importación"*.
 - Al 01/10: 22 códigos en negativo (583E −210, 969E −204…); 505C +21.605, 587C +20.377, 323E +600 (444 neto).
 - ⚠ GRJ31 cuenta en 323ES (100 %) **y** en 323E/838E (20/80), a propósito (Luis, 01/10, D13: *"323ES es la pieza para fabricar los otros dos, así que la evaluación de esa es particular"*). No es doble conteo: no volver a proponer sacarlo.
 - Centinelas 269 y 270. `sql/gv_importados_equiv_gp2_v2561.sql`, `tests/pedimp-equiv-gp2.cjs`.
+- **v25.71 (Luis, 01/10):** el pop-up «📦 Stock — <cód>» es más grande y dice el **código del componente** de Cervantes
+  (fila «🏭 Cervantes (GP2) · GRJ31» y chip en el encabezado; con factor ≠ 1, «le toca el 20 % de 4.000 u»). Lee
+  `GV_Importados_Equiv_GP2`; si falla, se ve como antes. `tests/pedimp-stock-desg-gp2.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-30, v25.14): RECIBIR un importado en CERVANTES — no entra al stock de Virgilio, avisa en GP2
 

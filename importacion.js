@@ -867,19 +867,29 @@ async function pedImpStockDesglose(keyEnc, foco) {
     ov.addEventListener("click", function (ev) { if (ev.target === ov) pedImpStockDesgCerrar(); });
     document.body.appendChild(ov);
   }
+  /* v25.71 (Luis, 01/10): más grande y con el CÓDIGO del componente de Cervantes (GRJ31), que sale de
+     GV_Importados_Equiv_GP2. Sin esa fila se ve como antes. */
+  let equiv = null, insDetG = null, insErrG = false;
   const pintar = function (insDet, insErr) {
-    const tr = function (a, b, c) { return '<tr><td style="text-align:left">' + a + '</td><td class="num">' + b + '</td><td style="text-align:left;color:#64748b;font-size:12px">' + (c || "") + '</td></tr>'; };
+    if (insDet !== undefined) { insDetG = insDet; insErrG = !!insErr; } else { insDet = insDetG; insErr = insErrG; }
+    const tr = function (a, b, c) { return '<tr><td style="text-align:left;padding:8px 10px">' + a + '</td><td class="num" style="padding:8px 10px;font-weight:700">' + b + '</td><td style="text-align:left;color:#475569;font-size:14px;padding:8px 10px">' + (c || "") + '</td></tr>'; };
     let h = '';
     if (foco !== "proy") {
-      h += '<table class="mva-tbl" style="width:100%"><thead><tr><th style="text-align:left">Qué cuenta</th><th class="num">u</th><th style="text-align:left">De dónde</th></tr></thead><tbody>';
+      h += '<table class="mva-tbl imp-stk-desg" style="width:100%;font-size:16px"><thead><tr><th style="text-align:left;font-size:13px">Qué cuenta</th><th class="num" style="font-size:13px">u</th><th style="text-align:left;font-size:13px">De dónde</th></tr></thead><tbody>';
       h += tr('Stock propio del artículo', f(it.stockPropioModulo), 'depósitos de Virgilio' + (it.uniPedidas > 0 ? ', ya descontadas ' + f(it.uniPedidas) + ' u de pedidos abiertos' : ''));
       if (insErr) h += tr('Depósito insumos', f(it.stockInsU), '<span style="color:#b91c1c">no se pudo leer el detalle</span>');
       else if (insDet && insDet.length) insDet.forEach(function (d) { if (Number(d.saldo) || Number(d.uni)) h += tr('🧰 Insumo ' + escapeHtml(d.insumo), f(d.uni), escapeHtml(f(d.saldo) + ' ' + (d.unidad || '') + (Number(d.factor) > 1 ? ' × ' + f(d.factor) : ''))); });
       else h += tr('Depósito insumos', f(it.stockInsU), '');
       if (it.stockTermU > 0) h += tr('🧩 Productos ya armados', f(it.stockTermU), 'stock de los terminados que usan ' + (it.esInsumo ? 'este insumo' : 'esta parte') + ' (detalle abajo)');
-      if (it.stockGp2U > 0) h += tr('🏭 Cervantes (GP2)', f(it.stockGp2U), 'componente equivalente en GP2: sector, talleristas y PS');
+      if (it.stockGp2U > 0 || equiv) {
+        const fac = equiv ? Number(equiv.factor) || 1 : 1;
+        const comp = equiv ? escapeHtml(equiv.componente_codigo) : '';
+        h += tr('🏭 Cervantes (GP2)' + (comp ? ' · <b class="imp-gp2-cod" style="font-size:17px;color:#b45309">' + comp + '</b>' : ''), f(it.stockGp2U),
+          (comp ? 'stock de <b>' + comp + '</b> en Cervantes (sector, talleristas y PS)' : 'componente equivalente en GP2: sector, talleristas y PS') +
+          (fac !== 1 && it.stockGp2U > 0 ? ' · le toca el <b>' + Math.round(fac * 100) + ' %</b> de ' + f(it.stockGp2U / fac) + ' u' : ''));
+      }
       if (it.stockParteU > 0) h += tr('🔧 Parte ' + escapeHtml(it.stockParteCods || ''), f(it.stockParteU), 'el stock de la parte cuenta como stock de este artículo');
-      h += '</tbody><tfoot><tr><th style="text-align:left">Total</th><th class="num">' + f(it.stockUni) + '</th><th></th></tr></tfoot></table>';
+      h += '</tbody><tfoot><tr><th style="text-align:left;padding:8px 10px;font-size:16px">Total</th><th class="num" style="padding:8px 10px;font-size:18px">' + f(it.stockUni) + '</th><th></th></tr></tfoot></table>';
     }
     const det = it.parteDet || [];
     if (det.length) {
@@ -893,13 +903,19 @@ async function pedImpStockDesglose(keyEnc, foco) {
       h += '</tbody><tfoot><tr><th style="text-align:left">Total</th><th class="num">' + f(tp) + '</th><th class="num">' + f(ts) + '</th></tr></tfoot></table>';
       if (it.esInsumo) h += '<div style="margin-top:8px;color:#475569;font-size:13px">Objetivo = ' + f(it.proyUni) + ' u/mes × ' + it.meses + ' meses (' + it.mesesProv + ' de insumo + ' + (it.meses - it.mesesProv) + ' de producto) = <b>' + f(it.objetivoUni) + ' u</b>.</div>';
     }
-    ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:620px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#0369a1;color:#fff">' +
-      '<div style="font-size:15px;font-weight:800">' + (foco === "proy" ? '📈 Estadística Madre — ' : '📦 Stock — ') + escapeHtml(codCanon(_impCodVista(it))) + (it.esInsumo ? ' · insumo' : '') + '</div>' +
+    ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#0369a1;color:#fff">' +
+      '<div style="font-size:19px;font-weight:800">' + (foco === "proy" ? '📈 Estadística Madre — ' : '📦 Stock — ') + escapeHtml(codCanon(_impCodVista(it))) + (it.esInsumo ? ' · insumo' : '') +
+        (equiv ? ' <span class="imp-gp2-hdr" style="font-size:15px;font-weight:700;background:#fff;color:#b45309;border-radius:8px;padding:2px 8px;margin-left:6px">🏭 ' + escapeHtml(equiv.componente_codigo) + ' en Cervantes</span>' : '') + '</div>' +
       '<button onclick="pedImpStockDesgCerrar()" style="width:auto;margin-top:0;background:#fff;color:#0369a1;border:0;border-radius:8px;padding:4px 11px;font-size:14px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
       '<div style="padding:10px 14px 14px">' + h + '</div></div>';
   };
   pintar(null, false);
+  if (foco !== "proy") {
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Importados_Equiv_GP2", "select=componente_codigo,factor&importado_cod=eq." + encodeURIComponent(it.cod))
+      .then(function (r) { if (r && r[0] && document.getElementById("impStkDesgOv")) { equiv = r[0]; pintar(); } })
+      .catch(function () { /* sin el código se ve como antes */ });
+  }
   if (foco === "proy" || !(it.stockInsU > 0)) return;
   try {
     const r = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_importados_stock_insumos", "select=detalle&cod=eq." + encodeURIComponent(it.cod));
