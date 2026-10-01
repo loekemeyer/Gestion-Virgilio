@@ -50,6 +50,7 @@ echo "== prueba-oculta-operario (v21.63: los pedidos de clientes de PRUEBA no le
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/prueba-oculta-operario.cjs
 node tests/ccr-fss-recontrol.cjs
 node tests/toggle-anular.cjs
+node tests/botonera-tm-historial.cjs
 
 _resumen() {
   echo ""

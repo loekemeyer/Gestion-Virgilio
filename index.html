@@ -519,6 +519,18 @@ button {
 }
 
 /* Banner "Deshacer último mensaje" — visible 60s después de send() */
+/* v25.65 — tiempo muerto + historial en la botonera (mobile primero) */
+.tm-bar{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:8px;margin:4px 0 8px}
+.tm-muerto{flex:1 1 auto;text-align:center;padding:6px 8px;border-radius:10px;background:#f1f5f9;border:2px solid #cbd5e1;font-size:15px;white-space:nowrap;font-weight:700;color:#334155}
+.tm-muerto b{font-size:18px;font-variant-numeric:tabular-nums;margin-left:4px}
+.tm-muerto.tm-alto{background:#fef2f2;border-color:#ef4444;color:#b91c1c}
+#optionsScreen .tm-hist-btn{width:auto;flex:0 1 auto;margin:0;padding:8px 10px;font-size:14px;line-height:1.15;border-radius:10px;background:#1e3a8a;color:#fff;border:0;font-weight:700}
+.hist-ov{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:12px}
+.hist-ov.hidden{display:none}
+.hist-ov-card{background:#fff;border-radius:12px;width:100%;max-width:640px;max-height:calc(100vh - 24px);display:flex;flex-direction:column}
+.hist-ov-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:17px}
+.hist-ov .hist-ov-x{width:auto;margin:0;padding:6px 12px;font-size:18px;background:#e2e8f0;color:#0f172a;border:0;border-radius:8px}
+.hist-ov-body{overflow:auto;padding:10px}
 #undoBanner{
   display: flex;
   align-items: center;
@@ -6238,7 +6250,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.66"></script>
+<script type="module" src="recepcion.js?v=25.67"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6739,12 +6751,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     </div>
   </div>
 
-  <!-- Deshacer último mensaje — visible 60s después de enviar -->
-  <div id="undoBanner" class="hidden">
-    <div id="undoBannerText"></div>
-    <button id="undoBtn" class="undo-btn" onclick="undoLastSent()">Deshacer</button>
-  </div>
-
   <!-- 👇 espacio para historial -->
   <div id="legajoHistorySpace">
     <div class="history-title">Resumen de hoy</div>
@@ -6758,6 +6764,15 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 <!-- Aviso global: hay reportes sin enviar (banner fijo, visible en toda pantalla; tap = reintentar) -->
 <div id="pendingIndicator" onclick="flushQueue()"></div>
 
+<!-- v25.65: historial de tareas del día, desde la botonera -->
+<div id="histTareasOv" class="hist-ov hidden" onclick="if(event.target===this)histTareasCerrar()">
+  <div class="hist-ov-card">
+    <div class="hist-ov-head"><b>📋 Historial de tareas de hoy</b>
+      <button type="button" class="hist-ov-x" onclick="histTareasCerrar()">✕</button></div>
+    <div id="histTareasBody" class="hist-ov-body"></div>
+  </div>
+</div>
+
 <!-- ================= OPCIONES ================= -->
 <div id="optionsScreen" class="hidden">
 
@@ -6765,6 +6780,18 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="back-top" onclick="backToLegajo()">←</div>
     <button id="btnTerminarDia" onclick="terminarDia()">Terminar Día</button>
   </div>
+  <!-- v25.65 (Luis): el operario no vuelve a la pantalla del legajo → el tiempo muerto, el
+       historial y el Deshacer viven en la botonera. -->
+  <div id="tmBar" class="tm-bar">
+    <div id="tmMuerto" class="tm-muerto" title="Tiempo del día sin ninguna tarea registrada">⏱ Tiempo muerto <b id="tmMuertoVal">—</b></div>
+    <button id="btnHistTareas" type="button" class="tm-hist-btn" onclick="histTareasAbrir()">📋 Historial<br>de tareas</button>
+  </div>
+  <!-- Deshacer último mensaje — visible 60s después de enviar -->
+  <div id="undoBanner" class="hidden">
+    <div id="undoBannerText"></div>
+    <button id="undoBtn" class="undo-btn" onclick="undoLastSent()">Deshacer</button>
+  </div>
+
 
   <div class="botonera-grp">🛒 Picking</div>
   <div class="row row-2 row-core" id="row1"></div>
@@ -8314,6 +8341,7 @@ async function confirmarTerminarDia() {
   optionsScreen.classList.add("hidden");
   legajoScreen.classList.remove("hidden");
   document.getElementById("btnHistDias").classList.remove("hidden");
+  try { tmStop(); histTareasCerrar(); } catch (_e) {}   // v25.65
   renderLegajoHistory(legajoInput.value);
   updateCoreButtonsState();
   renderPendingSuggestion();
@@ -9113,6 +9141,7 @@ function goToOptions() {
   legajoScreen.classList.add("hidden");
   optionsScreen.classList.remove("hidden");
   document.getElementById("btnHistDias").classList.add("hidden");
+  try { tmStart(legajoInput.value); } catch (_e) {}   // v25.65
   renderPendingSuggestion();
   updateCoreButtonsState();
   // Racks → góndola: si hay una orden de bajada pendiente, mostrar la alarma
@@ -9136,10 +9165,92 @@ function goToOptions() {
   } catch (_e) {}
 }
 
+/* v25.65 (Luis, 01/10) — TIEMPO MUERTO en la botonera: cuánto lleva HOY el operario sin
+   ninguna tarea registrada. Sale de la MISMA cuenta que la TV (`gv_monitor_horas_operario`):
+   jornada − productivas − movimiento − no productivas. Se relee cada 60 s y, entre lecturas,
+   corre solo cuando el celular no tiene ninguna tarea abierta (sin picking, armado ni toggle).
+   Sin lectura muestra "—": "no pude leer" no es "cero". */
+var _tm = { leg: null, baseSeg: null, leidoMs: 0, tick: null, poll: null };
+function _tmFmt(seg) {
+  seg = Math.max(0, Math.round(seg || 0));
+  var h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg % 60;
+  return h + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+}
+function _tmLibre(leg) {
+  try {
+    var st = getLegajoState(leg) || {};
+    if (st.picking && st.picking.active) return false;
+    if (st.armado && st.armado.active) return false;
+    if (getAnyToggleActive(leg)) return false;
+    if (getActiveDeadTime(leg)) return false;
+  } catch (_e) { return false; }
+  return true;
+}
+function _tmPintar() {
+  var el = document.getElementById("tmMuertoVal"), box = document.getElementById("tmMuerto");
+  if (!el || !box) return;
+  if (_tm.baseSeg == null) { el.textContent = "—"; box.classList.remove("tm-alto"); return; }
+  var seg = _tm.baseSeg;
+  if (_tmLibre(_tm.leg)) seg += (Date.now() - _tm.leidoMs) / 1000;
+  el.textContent = _tmFmt(seg);
+  box.classList.toggle("tm-alto", seg >= 30 * 60);
+}
+async function tmLeer() {
+  var leg = _tm.leg; if (!leg) return;
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/gv_monitor_horas_operario?select=hs_prod,hs_mov,hs_noprod,hs_total&legajo=eq." +
+      encodeURIComponent(leg), { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    var f = (await r.json())[0];
+    if (leg !== _tm.leg) return;
+    if (!f) _tm.baseSeg = 0;   // todavía sin eventos hoy: no hay jornada que contar
+    else {
+      var h = (Number(f.hs_total) || 0) - (Number(f.hs_prod) || 0) - (Number(f.hs_mov) || 0) - (Number(f.hs_noprod) || 0);
+      _tm.baseSeg = Math.max(0, h) * 3600;
+    }
+    _tm.leidoMs = Date.now();
+  } catch (_e) { if (leg === _tm.leg) _tm.baseSeg = null; }
+  _tmPintar();
+}
+function tmStart(leg) {
+  tmStop();
+  _tm.leg = String(leg || ""); _tm.baseSeg = null;
+  _tmPintar();
+  if (!_tm.leg) return;
+  tmLeer();
+  _tm.poll = setInterval(tmLeer, 60 * 1000);
+  _tm.tick = setInterval(_tmPintar, 1000);
+}
+function tmStop() {
+  if (_tm.poll) clearInterval(_tm.poll);
+  if (_tm.tick) clearInterval(_tm.tick);
+  _tm.poll = _tm.tick = null;
+}
+
+/* v25.65 — HISTORIAL DE TAREAS desde la botonera. Es el mismo «Resumen de hoy» de la pantalla
+   del legajo (renderLegajoHistory): el nodo se muda al pop-up mientras está abierto y vuelve a
+   su lugar al cerrar, así no hay dos listas que se desfasen. */
+var _histHogar = null;
+function histTareasAbrir() {
+  var ov = document.getElementById("histTareasOv"), body = document.getElementById("histTareasBody");
+  var cont = document.getElementById("legajoHistoryContent");
+  if (!ov || !body || !cont) return;
+  if (!_histHogar) _histHogar = cont.parentNode;
+  body.appendChild(cont);
+  ov.classList.remove("hidden");
+  try { renderLegajoHistory(legajoInput.value); } catch (_e) {}
+}
+function histTareasCerrar() {
+  var ov = document.getElementById("histTareasOv"), cont = document.getElementById("legajoHistoryContent");
+  if (ov) ov.classList.add("hidden");
+  if (cont && _histHogar && cont.parentNode !== _histHogar) _histHogar.appendChild(cont);
+}
+
 function backToLegajo() {
   optionsScreen.classList.add("hidden");
   legajoScreen.classList.remove("hidden");
   document.getElementById("btnHistDias").classList.remove("hidden");
+  try { tmStop(); histTareasCerrar(); } catch (_e) {}   // v25.65
   renderLegajoHistory(legajoInput.value);
 }
 
@@ -10268,7 +10379,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.66";
+const APP_VERSION = "v25.67";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -58130,7 +58241,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.66"></script>
+<script src="importacion.js?v=25.67"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60931,7 +61042,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.66"></script>
+<script src="cobranzas.js?v=25.67"></script>
 
 </body>
 </html>

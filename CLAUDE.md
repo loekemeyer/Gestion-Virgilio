@@ -5299,6 +5299,20 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
   `ANULADO_NOPROD_CODES`). El de picking/armado anulado (EPX/APX) sigue sin contar.
 - `tests/toggle-anular.cjs`, `tests/anular-sesion.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-01, v25.67): la BOTONERA muestra el TIEMPO MUERTO y el HISTORIAL — el operario no vuelve atrás
+
+- **⏱ Tiempo muerto** arriba de la botonera: lo que lleva HOY sin ninguna tarea registrada =
+  `hs_total − hs_prod − hs_mov − hs_noprod` de `gv_monitor_horas_operario` (la misma cuenta que la TV). Se relee
+  cada 60 s y entre lecturas corre sólo si no hay tarea abierta (picking, armado, toggle, baño/comida). Sin
+  lectura dice «—». Rojo desde 30 min. `tmStart` / `tmLeer`.
+- **📋 Historial de tareas**: pop-up con el MISMO «Resumen de hoy» (`renderLegajoHistory`); el nodo
+  `#legajoHistoryContent` se muda al pop-up y vuelve al cerrar — una sola lista.
+- **El Deshacer (60 s) vive en la botonera** (`#undoBanner` dentro de `#optionsScreen`): desde la v23.87 el
+  operario se queda ahí después de enviar y el banner en la pantalla del legajo no lo veía nadie.
+- La alerta de **un dispositivo con 2+ operarios** ya es por DÍA (`gv_dispositivo_multi_operario` agrupa por
+  dispositivo + día AR; el Telegram mira sólo hoy): otro operario mañana en el mismo celular no avisa.
+- `tests/botonera-tm-historial.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.78): antes de optimizar, medir — y leer lo que se usa, no el universo
 
 **Luis, con la captura del `canceling statement due to statement timeout` en A Programar:**
