@@ -119,7 +119,8 @@ const CFG_NAC = [{ meses_objetivo: 10, derechos_pct: 0.18, ntl_pct: 0.05, iva_pc
     modulo: (document.querySelector("#stkPopModal .stkpop-title") || {}).textContent || "",
     filas: document.querySelectorAll("#stkPopModal .mva-tbl.wide tbody tr").length
   }));
-  if (!/Proyección/.test(proy.titulo)) fail("(A) no se abrió el pop-up de proyección: " + proy.titulo);
+  if (!/Estadística Madre/.test(proy.titulo))   // v25.56: Proyección → Estadística Madre
+    fail("(A) no se abrió el pop-up de proyección: " + proy.titulo);
   if (!/Pedidos Importación/.test(proy.modulo) || proy.filas !== items.length)
     fail("(A) el pop-up se comió la pantalla de importación: " + JSON.stringify(proy));
 

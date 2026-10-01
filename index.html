@@ -16460,10 +16460,10 @@ function ocBodyDetail() {
   const _detCh = _ocDetChangedN();
   h += '<div class="oc-tools" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:8px 10px">' +
     '<span style="font-size:13px;font-weight:700;color:#065f46">⛽ Llenar góndola:</span>' +
-    '<span style="font-size:13px">hasta</span> <input id="ocDetMeses" class="oc-inp" style="width:64px" type="number" min="0.5" step="0.5" value="' + (Number(_oc.detMeses) || 6) + '" oninput="ocDetMeses(this.value)"> <span style="font-size:13px">meses de proyección</span>' +
+    '<span style="font-size:13px">hasta</span> <input id="ocDetMeses" class="oc-inp" style="width:64px" type="number" min="0.5" step="0.5" value="' + (Number(_oc.detMeses) || 6) + '" oninput="ocDetMeses(this.value)"> <span style="font-size:13px">meses de Estadística Madre</span>' +
     '<button class="oc-btn" onclick="ocDetFillAll()" title="Recalcula la cantidad de TODAS las líneas con góndola a MENOR(capacidad, proy×meses) − stock">⛽ Aplicar a todas</button>' +
     '<button id="ocDetSaveBtn" class="oc-btn ok" onclick="ocDetSave()"' + (_detCh ? '' : ' style="display:none"') + '>💾 Guardar cantidades' + (_detCh ? ' (' + _detCh + ')' : '') + '</button>' +
-    '<span style="flex-basis:100%;font-size:11.5px;color:#475569">Cambia solo esta OC. Objetivo = MENOR(capacidad de góndola, proyección × meses). Editá la cantidad a mano o usá ⛽ por línea.</span>' +
+    '<span style="flex-basis:100%;font-size:11.5px;color:#475569">Cambia solo esta OC. Objetivo = MENOR(capacidad de góndola, Estadística Madre × meses). Editá la cantidad a mano o usá ⛽ por línea.</span>' +
     '</div>';
   h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Recibido <b class="oc-ok">' + st.rec + '</b> · Falta <b class="' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : 0) + '</b> · Recepción <b style="color:' + _ocPctCol(_ocPct(st.rec, st.ped)) + '">' + _ocPct(st.rec, st.ped) + '%</b></div>';
   h += '<div class="oc-note" style="margin-top:0;margin-bottom:8px"><b>Recibido</b> = lo que registró la Recepción de Mercadería para este tallerista y código, <b>dentro del período de esta OC</b> (no acumula entregas anteriores ni de otra OC). Se alimenta solo.</div>';
@@ -16482,17 +16482,17 @@ function ocBodyDetail() {
   const _pm = (_oc.proyHoy && typeof _oc.proyHoy === "object") ? _oc.proyHoy : null;
   const _proyCell = function (r) {
     if (r.oc_proy != null && r.oc_proy !== "") return '<td class="num oc-xtra">' + Math.round(Number(r.oc_proy) || 0) + '</td>';
-    if (_pm) { const v = _pm[_ocgNorm(r.codigo)]; if (v != null && v > 0) return '<td class="num oc-xtra" style="opacity:.72;font-style:italic;" title="Proyección de HOY (esta OC es previa a guardar la proyección al generarla)">~' + Math.round(v) + '</td>'; }
+    if (_pm) { const v = _pm[_ocgNorm(r.codigo)]; if (v != null && v > 0) return '<td class="num oc-xtra" style="opacity:.72;font-style:italic;" title="Estadística Madre de HOY (esta OC es previa a guardar la Estadística Madre al generarla)">~' + Math.round(v) + '</td>'; }
     return '<td class="num oc-xtra">' + (_pm ? '—' : '…') + '</td>';
   };
-  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th></th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Stock al generar la OC">Stock</th><th class="num oc-xtra" title="Máximo al generar la OC">Máximo</th><th class="num oc-xtra" title="Capacidad de góndola (Capacidad_Sector, hoy)">Cap gónd.</th><th class="num oc-xtra" title="Pedidos pendientes (demanda) al generar la OC">Pedidos</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = proyección de hoy)">Proyección</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th></th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Stock al generar la OC">Stock</th><th class="num oc-xtra" title="Máximo al generar la OC">Máximo</th><th class="num oc-xtra" title="Capacidad de góndola (Capacidad_Sector, hoy)">Cap gónd.</th><th class="num oc-xtra" title="Pedidos pendientes (demanda) al generar la OC">Pedidos</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = Estadística Madre de hoy)">Estadística Madre</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
     const ped = _ocDetCantEff(r), rec = ocRecEff(r), falt = ped - rec;
     const ch = (_oc.detEdit && _oc.detEdit[r.id] != null && Number(_oc.detEdit[r.id]) !== (Number(r.cantidad) || 0));
     const codn = _ocgNorm(r.codigo);
     const cap = (_oc.capMap && _oc.capMap[codn] != null) ? Math.round(_oc.capMap[codn]) : null;
     const sug = ocDetTarget(r);   // null si no se puede calcular (sin capacidad / sin datos)
-    const fillBtn = (sug == null) ? '<span title="No aplica: sin capacidad de góndola cargada o sin proyección" style="opacity:.4">⛽</span>'
+    const fillBtn = (sug == null) ? '<span title="No aplica: sin capacidad de góndola cargada o sin Estadística Madre" style="opacity:.4">⛽</span>'
       : '<button class="oc-fillbtn" title="Llenar a ' + (Number(_oc.detMeses) || 6) + ' meses: cantidad = MENOR(cap ' + cap + ', proy×meses) − stock = ' + sug + '" onclick="ocDetFill(' + r.id + ')">⛽</button>';
     h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td class="oc-desc">' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td>' +
       '<td class="num"><input class="oc-rinp" style="width:64px' + (ch ? ';background:#fef3c7' : '') + '" type="number" min="0" inputmode="numeric" value="' + ped + '" oninput="ocDetEditCant(' + r.id + ',this.value)"></td>' +
@@ -16502,7 +16502,7 @@ function ocBodyDetail() {
       '<td class="num oc-xtra">' + (cap == null ? "…" : (cap || "—")) + '</td>' +
       _gv(r, "oc_pedidos", "") + _proyCell(r) + '</tr>';
   });
-  return h + '</tbody></table></div><div class="oc-note" style="margin-top:8px">Las columnas <b style="color:#6d28d9">Stock · Máximo · Pedidos · Proyección</b> son del <b>momento en que se generó la OC</b> (no de hoy) — así se ve por qué se pidió lo que se pidió (a pedir ≈ Máximo − Stock − Pedidos). En OC viejas (previas a guardar el dato) la <b>Proyección</b> muestra la de <b>hoy</b> con «<b>~</b>»; Stock/Máximo/Pedidos viejos quedan en «—». <b>Cap gónd.</b> es la capacidad de HOY (Capacidad_Sector).</div>';
+  return h + '</tbody></table></div><div class="oc-note" style="margin-top:8px">Las columnas <b style="color:#6d28d9">Stock · Máximo · Pedidos · Estadística Madre</b> son del <b>momento en que se generó la OC</b> (no de hoy) — así se ve por qué se pidió lo que se pidió (a pedir ≈ Máximo − Stock − Pedidos). En OC viejas (previas a guardar el dato) la <b>Estadística Madre</b> muestra la de <b>hoy</b> con «<b>~</b>»; Stock/Máximo/Pedidos viejos quedan en «—». <b>Cap gónd.</b> es la capacidad de HOY (Capacidad_Sector).</div>';
 }
 /* v11.82 — ajuste de cantidades en la OC puntual ("llenar góndola a N meses").
    Objetivo = MENOR(capacidad de góndola, proyección × meses); cantidad a pedir =
@@ -17433,7 +17433,7 @@ function ocBodyGen() {
   h += '<div class="oc-viewtoggle" style="display:flex;gap:6px;margin:2px 0 8px">' +
     '<button class="oc-btn' + (mode === "art" ? " ok" : "") + '" onclick="ocgSetMode(\'art\')">📦 Por artículo</button>' +
     '<button class="oc-btn' + (mode === "tall" ? " ok" : "") + '" onclick="ocgSetMode(\'tall\')">👷 Por tallerista</button></div>';
-  if (!gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + proyección × índice)…</div>';
+  if (!gen) return h + '<div class="oc-loading">Calculando (stock + demanda PPP + Estadística Madre × índice)…</div>';
   if (gen.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(gen.error) + '</div>';
   return h + (mode === "tall" ? ocBodyGenTall() : ocBodyGenArt());
 }
@@ -17470,10 +17470,10 @@ function ocBodyGenArt() {
   let h = '<div class="oc-meta">Fecha <b>' + escapeHtml(gen.fecha) + '</b> · <b>' + conPedido.length + '</b> artículo(s) a pedir · <b>' + totCajas + '</b> cajas'
     + (sinN ? ' · <b style="color:#b45309">' + sinN + '</b> sin proveedor' : '')
     + (enCero ? ' · <b style="color:#64748b" title="Están en o sobre el máximo: hoy no se piden. Se muestran al final.">' + enCero + '</b> en 0' : '') + '.</div>';
-  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Tallerista</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num" title="De la OC VIGENTE de este código: cajas recibidas / cajas pedidas.">Recib.</th><th class="num">A pedir</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Tallerista</th><th class="num">E.M.</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num" title="De la OC VIGENTE de este código: cajas recibidas / cajas pedidas.">Recib.</th><th class="num">A pedir</th></tr></thead><tbody>';
   const _recMap = _ocgRecibMap();
   fgrupos.forEach(function (g) {
-    const proyTxt = (g.fuente === "proy") ? (Math.round(g.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0) → el Máximo sale de la capacidad de góndola">0</span>';
+    const proyTxt = (g.fuente === "proy") ? (Math.round(g.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (Estadística Madre 0) → el Máximo sale de la capacidad de góndola">0</span>';
     // v21.08 - el que queda en 0 se ve atenuado y al final: esta para mirarlo, no se pide.
     const cero = !(g.falta > 0);
     const trAttr = cero ? ' style="opacity:.55" title="En o sobre el maximo: hoy no se pide"' : '';
@@ -17557,10 +17557,10 @@ function ocBodyGenTall() {
     const fTotU = fitems.reduce(function (s, it) { return s + (_ocU(it) ? it.falta : 0); }, 0);
     const nPedir = fitems.filter(function (it) { return it.falta > 0; }).length;
     h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + fitems.length + ' artículo(s) · <b>' + nPedir + '</b> a pedir · ' + fTotal + ' cajas' + (fTotU ? ' + ' + fTotU.toLocaleString("es-AR") + ' u' : '') + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en ⚙ Configuraciones</span>' : '') + '</div>';
-    h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num" title="De la OC VIGENTE de este código: cajas recibidas / cajas pedidas.">Recib.</th><th class="num">A pedir</th></tr></thead><tbody>';
+    h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">E.M.</th><th class="num">Índice</th><th class="num">Máx</th><th class="num">Pedidos</th><th class="num">Stock</th><th class="num" title="De la OC VIGENTE de este código: cajas recibidas / cajas pedidas.">Recib.</th><th class="num">A pedir</th></tr></thead><tbody>';
     const _recMapT = _ocgRecibMap();
     fitems.forEach(function (it) {
-      const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (proyección 0)">0</span>';
+      const proyTxt = (it.fuente === "proy") ? (Math.round(it.proy) + "") : '<span style="color:#94a3b8" title="Sin ventas (Estadística Madre 0)">0</span>';
       const faltCls = it.falta > 0 ? " oc-falt" : "";
       const faltTxt = it.falta > 0 ? it.falta : '<span style="color:#cbd5e1">0</span>';
       h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(it.cod)) + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + proyTxt + '</td><td class="num">' + it.indice + '</td><td class="num">' + it.max + '</td><td class="num">' + it.demanda + '</td><td class="num">' + it.stock + '</td>' + _ocgRecibCell(it.cod, _recMapT) + '<td class="num' + faltCls + '">' + faltTxt + '</td></tr>';
@@ -17579,7 +17579,7 @@ function ocBodyGenImportados() {
   if (!gen.imp) return '<div class="oc-meta" style="margin-top:16px;color:#94a3b8">🌎 Importados: calculando…</div>';
   const items = (gen.imp.items || []).filter(function (it) { return it.aPedirUni > 0; });
   const gf = (_oc.genFiltro || "").toLowerCase().trim();
-  let h = '<div class="oc-meta" style="margin-top:18px;border-top:2px solid #e2e8f0;padding-top:12px"><b>🌎 Importados — OC por proveedor chino</b> · índice <b>' + (gen.imp.meses || 10) + ' meses</b> · <small style="color:#94a3b8">stock y proyección en unidades (motor <code>gv_importados_ordenes</code>, stock real del depósito). Vista previa — la emisión se afina con más análisis.</small></div>';
+  let h = '<div class="oc-meta" style="margin-top:18px;border-top:2px solid #e2e8f0;padding-top:12px"><b>🌎 Importados — OC por proveedor chino</b> · índice <b>' + (gen.imp.meses || 10) + ' meses</b> · <small style="color:#94a3b8">stock y Estadística Madre en unidades (motor <code>gv_importados_ordenes</code>, stock real del depósito). Vista previa — la emisión se afina con más análisis.</small></div>';
   if (!items.length) { h += '<div class="oc-empty" style="margin-top:6px">No hay importados para pedir (todo en o sobre el objetivo).</div>'; return h; }
   const g = {};
   items.forEach(function (it) { const k = it.prov || "(sin proveedor)"; if (!g[k]) g[k] = []; g[k].push(it); });
@@ -17591,14 +17591,14 @@ function ocBodyGenImportados() {
     if (gf && !arr.length) return;
     const totCaj = arr.reduce(function (s, it) { return s + (it.aPedirCajas || 0); }, 0);
     h += '<div class="oc-meta" style="margin-top:12px;margin-bottom:4px' + (sinP ? ';color:#b45309' : '') + '"><b>' + escapeHtml(k) + '</b> · ' + arr.length + ' ítem(s) · ' + totCaj + ' cajas' + (sinP ? ' &nbsp;<span style="font-weight:800">⚠ asigná proveedor en 🏭 Proveedor de importación</span>' : '') + '</div>';
-    h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Proy u/mes</th><th class="num">Meses</th><th class="num">Objetivo u</th><th class="num">Stock u</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th></tr></thead><tbody>';
+    h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th class="num">E.M. u/mes</th><th class="num">Meses</th><th class="num">Objetivo u</th><th class="num">Stock u</th><th class="num">En curso</th><th class="num">A pedir u</th><th class="num">Cajas</th></tr></thead><tbody>';
     arr.sort(function (a, b) { return b.aPedirUni - a.aPedirUni; }).forEach(function (it) {
       const cajTxt = (it.aPedirCajas == null) ? '<span style="color:#94a3b8" title="Sin uni×caja cargado">—</span>' : String(it.aPedirCajas);
       var parteBadge = "";
       if (it.esParte) {
         var detTxt = "";
         try { if (it.parteDet && it.parteDet.length) detTxt = it.parteDet.map(function (d) { return d.cod + ": " + d.proy + (d.stock_uni != null ? " (stock " + d.stock_uni + " u)" : ""); }).join("  ·  "); } catch (_e) {}
-        parteBadge = ' <span style="color:#7c3aed;font-weight:800;cursor:help" title="Parte: la proyección es la SUMA de los terminados que la usan, y su stock terminado (' + (it.stockTermU || 0) + ' u) cuenta como stock de la parte → ' + escapeHtml(detTxt) + '">🧩</span>';
+        parteBadge = ' <span style="color:#7c3aed;font-weight:800;cursor:help" title="Parte: la Estadística Madre es la SUMA de los terminados que la usan, y su stock terminado (' + (it.stockTermU || 0) + ' u) cuenta como stock de la parte → ' + escapeHtml(detTxt) + '">🧩</span>';
       }
       h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(_impCodVista(it))) + _impPlantaChip(it) + parteBadge + '</td><td>' + escapeHtml(artNombre(it.cod, it.desc)) + '</td><td class="num">' + it.proyUni + '</td><td class="num">' + it.meses + '</td><td class="num">' + it.objetivoUni + '</td><td class="num">' + it.stockUni + '</td><td class="num">' + it.enCurso + '</td><td class="num oc-falt">' + it.aPedirUni + '</td><td class="num">' + cajTxt + '</td></tr>';
     });
@@ -17802,15 +17802,15 @@ function _ocProvOptions(current, provs, emptyLabel) {
    en la sincronizacion diaria (06:20): el cambio se ve en la proxima corrida. Guarda por la RPC
    gv_proy_config_guardar (solo supervisor). */
 var _OC_PROY_PARAMS = [
-  { k: "proy_meses_ventana", t: "Ventana (meses)", h: "Meses cerrados que promedia la proyección", step: 1, def: 6 },
-  { k: "proy_piso_mejor_mes", t: "Piso: N.º mejor mes", h: "La proyección nunca queda por debajo del N.º mejor mes de la ventana", step: 1, def: 4 },
+  { k: "proy_meses_ventana", t: "Ventana (meses)", h: "Meses cerrados que promedia la Estadística Madre", step: 1, def: 6 },
+  { k: "proy_piso_mejor_mes", t: "Piso: N.º mejor mes", h: "La Estadística Madre nunca queda por debajo del N.º mejor mes de la ventana", step: 1, def: 4 },
   { k: "proy_meses_fallback", t: "Respaldo (meses)", h: "Si la ventana da 0, se promedian estos meses", step: 1, def: 12 },
-  { k: "proy_indice_default", t: "Índice por defecto", h: "Máximo = proyección × índice, para los artículos sin índice propio", step: 0.1, def: 1.5 },
-  { k: "meses_objetivo_importados", t: "Meses objetivo importados", h: "Importados pide proyección × estos meses", step: 1, def: 10 }
+  { k: "proy_indice_default", t: "Índice por defecto", h: "Máximo = Estadística Madre × índice, para los artículos sin índice propio", step: 0.1, def: 1.5 },
+  { k: "meses_objetivo_importados", t: "Meses objetivo importados", h: "Importados pide Estadística Madre × estos meses", step: 1, def: 10 }
 ];
 function _ocCfgParamsHtml() {
   const P = (_oc && _oc.cfg && _oc.cfg.params) || {};
-  let h = '<div class="oc-meta" style="margin-top:8px"><b>📐 Parámetros de la proyección</b> — valen para Stock, el generador de OC e Importados. El cambio se ve en la próxima sincronización (06:20).</div><div class="oc-tools" style="flex-wrap:wrap;gap:10px">';
+  let h = '<div class="oc-meta" style="margin-top:8px"><b>📐 Parámetros de la Estadística Madre</b> — valen para Stock, el generador de OC e Importados. El cambio se ve en la próxima sincronización (06:20).</div><div class="oc-tools" style="flex-wrap:wrap;gap:10px">';
   _OC_PROY_PARAMS.forEach(function (x) {
     const v = (P[x.k] != null && P[x.k] !== "") ? P[x.k] : x.def;
     h += '<label style="font-size:13px" title="' + escapeHtml(x.h) + '">' + escapeHtml(x.t) + ' <input id="ocp_' + x.k + '" class="oc-inp" style="width:70px" type="number" min="0" step="' + x.step + '" value="' + escapeHtml(String(v)) + '"></label>';
@@ -17843,7 +17843,7 @@ async function ocCfgParamsSave() {
 function _ocCfgChangedN() { return (_oc && _oc.cfg) ? Object.keys(_oc.cfg.changed).length : 0; }
 function ocBodyCfg() {
   let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocgEnter()">← Volver al generador</button><button class="oc-btn ok" onclick="ocCfgProvOpen()">➕ Agregar proveedor</button></div>';
-  h += '<div class="oc-meta">Config del generador de OCs. La lista sale <b>sola de stock</b> (todos los productos terminados) — no se cargan a mano. Acá asignás <b>Proveedor 1/2</b> + <b>% Prov 1/2</b> (a qué tallerista(s) y en qué proporción al generar; los dos % suman <b>100</b>; un solo proveedor = 100% al Prov 1), el <b>Índice</b> (meses de stock objetivo, Máximo = proyección × índice, default 1,5) y si está <b>Activo</b>. Tildá <b>Llenar góndola</b> para que el Máximo de ese artículo sea la <b>capacidad de góndola</b> (llena la góndola, ignora proyección×índice) — útil cuando la proyección es baja y las órdenes salen chicas. Los <b style="color:#b45309">"(sin proveedor)"</b> aparecen arriba para que les asignes uno. <b>Uni×Caja</b> es solo lectura (sale del maestro del artículo).</div>';
+  h += '<div class="oc-meta">Config del generador de OCs. La lista sale <b>sola de stock</b> (todos los productos terminados) — no se cargan a mano. Acá asignás <b>Proveedor 1/2</b> + <b>% Prov 1/2</b> (a qué tallerista(s) y en qué proporción al generar; los dos % suman <b>100</b>; un solo proveedor = 100% al Prov 1), el <b>Índice</b> (meses de stock objetivo, Máximo = Estadística Madre × índice, default 1,5) y si está <b>Activo</b>. Tildá <b>Llenar góndola</b> para que el Máximo de ese artículo sea la <b>capacidad de góndola</b> (llena la góndola, ignora Estadística Madre×índice) — útil cuando la Estadística Madre es baja y las órdenes salen chicas. Los <b style="color:#b45309">"(sin proveedor)"</b> aparecen arriba para que les asignes uno. <b>Uni×Caja</b> es solo lectura (sale del maestro del artículo).</div>';
   if (!_oc.cfg || !_oc.cfg.rows) return h + '<div class="oc-loading">Cargando config…</div>';
   if (_oc.cfg.error) return h + '<div class="oc-empty" style="color:#b91c1c">Error: ' + escapeHtml(_oc.cfg.error) + '</div>';
   if (_oc.cfg.altaProv) h += _ocCfgProvForm();
@@ -17854,7 +17854,7 @@ function ocBodyCfg() {
   const provs = _oc.cfg.provs || [];
   const f = (_oc.cfg.filtro || "").toLowerCase().trim();
   const shown = f ? _oc.cfg.rows.filter(function (a) { return stkMatchBusq(f, a.cod, a.descripcion + " " + a.proveedor + " " + a.proveedor2, false); }) : _oc.cfg.rows;   // v21.43
-  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor 1</th><th class="num">% P1</th><th>Proveedor 2</th><th class="num">% P2</th><th class="num">Uni×Caja</th><th class="num" title="Capacidad de góndola (Capacidad_Sector)">Cap gónd.</th><th class="num" title="Si está tildado, el máximo = capacidad de góndola (llena la góndola), ignora proyección×índice">Llenar<br>góndola</th><th class="num">Índice</th><th>Activo</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl"><thead><tr><th>Código</th><th>Descripción</th><th>Proveedor 1</th><th class="num">% P1</th><th>Proveedor 2</th><th class="num">% P2</th><th class="num">Uni×Caja</th><th class="num" title="Capacidad de góndola (Capacidad_Sector)">Cap gónd.</th><th class="num" title="Si está tildado, el máximo = capacidad de góndola (llena la góndola), ignora Estadística Madre×índice">Llenar<br>góndola</th><th class="num">Índice</th><th>Activo</th></tr></thead><tbody>';
   if (!shown.length) h += '<tr><td colspan="11" class="oc-empty">Sin resultados.</td></tr>';
   shown.forEach(function (a) {
     const i = _oc.cfg.rows.indexOf(a);
@@ -17870,7 +17870,7 @@ function ocBodyCfg() {
       '<td class="num"><input class="oc-rinp" style="width:56px"' + pctStyle + ' type="number" min="0" max="100" step="1" value="' + a.prop_prov2 + '" oninput="ocCfgEdit(' + i + ',&quot;prop_prov2&quot;,this.value)"' + ((a.proveedor2 || "").trim() ? '' : ' disabled title="Sin Proveedor 2"') + '></td>' +
       '<td class="num" title="Uni×Caja sale del maestro del artículo (packaging) — no se edita acá">' + (a.uni_x_caja || "—") + '</td>' +
       '<td class="num" title="Capacidad de góndola (Capacidad_Sector)">' + (a.cap ? Math.round(a.cap) : "—") + '</td>' +
-      '<td style="text-align:center"><input type="checkbox" ' + (a.llenar_gondola ? 'checked' : '') + (a.cap ? '' : ' disabled title="Sin capacidad de góndola cargada"') + ' onchange="ocCfgEdit(' + i + ',&quot;llenar_gondola&quot;,this.checked)" title="Máximo = capacidad de góndola (ignora proyección×índice)"></td>' +
+      '<td style="text-align:center"><input type="checkbox" ' + (a.llenar_gondola ? 'checked' : '') + (a.cap ? '' : ' disabled title="Sin capacidad de góndola cargada"') + ' onchange="ocCfgEdit(' + i + ',&quot;llenar_gondola&quot;,this.checked)" title="Máximo = capacidad de góndola (ignora Estadística Madre×índice)"></td>' +
       '<td class="num"><input class="oc-rinp" type="number" min="0" step="0.1" value="' + a.indice + '"' + (a.llenar_gondola ? ' disabled title="No aplica: el máximo lo fija la capacidad de góndola"' : '') + ' oninput="ocCfgEdit(' + i + ',&quot;indice&quot;,this.value)"></td>' +
       '<td style="text-align:center"><input type="checkbox" ' + (a.activo ? 'checked' : '') + ' onchange="ocCfgEdit(' + i + ',&quot;activo&quot;,this.checked)"></td></tr>';
   });
@@ -18145,12 +18145,12 @@ async function agLoad() {
 function stkBodyAuditGon() {
   var items = (_stk && _stk.agData) || [];
   var n = items.length;
-  var h = '<div class="ag-bar"><div class="ag-title">🔍 Góndola &lt; 25% de la proyección · <b>' + n + '</b> ítem(s)</div>' +
+  var h = '<div class="ag-bar"><div class="ag-title">🔍 Góndola &lt; 25% de la Estadística Madre · <b>' + n + '</b> ítem(s)</div>' +
     '<div class="ag-btns"><button class="ag-btn xls" onclick="agExportExcel()">📥 Excel</button><button class="ag-btn pdf" onclick="agExportPdf()">🖨 PDF</button></div></div>';
-  h += '<div class="ag-note">Ocupación = (stock total de <b>todos los estadios</b> − <b>pedidos</b>) ÷ <b>proyección</b>. Ordenado por <b>tallerista</b> y, dentro, por <b>% Ocup Virgilio de menor a mayor</b> (el peor primero). Los <b>discontinuos</b> (activo=false o marcados a mano) no se muestran.</div>';
+  h += '<div class="ag-note">Ocupación = (stock total de <b>todos los estadios</b> − <b>pedidos</b>) ÷ <b>Estadística Madre</b>. Ordenado por <b>tallerista</b> y, dentro, por <b>% Ocup Virgilio de menor a mayor</b> (el peor primero). Los <b>discontinuos</b> (activo=false o marcados a mano) no se muestran.</div>';
   if (!n) { h += '<div class="stk-loading">No hay ítems por debajo del 25%. 👍</div>'; return h; }
   h += '<div class="ag-wrap"><table class="ag-tbl"><thead><tr>' +
-    '<th>Código</th><th>Descripción</th><th class="num">% Ocup Virgilio</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th>' +
+    '<th>Código</th><th>Descripción</th><th class="num">% Ocup Virgilio</th><th class="num">Stock total</th><th class="num">Estadística Madre</th><th class="num">Pedidos</th><th>Familia</th>' +
     '</tr></thead><tbody>';
   var lastTall = null;
   items.forEach(function (it) {
@@ -18173,7 +18173,7 @@ function stkBodyAuditGon() {
 function agExportExcel() {
   var items = (_stk && _stk.agData) || []; if (!items.length) { try { alert("No hay datos para exportar."); } catch (_e) {} return; }
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (m) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]; }); };
-  var html = '<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>Tallerista</th><th>Codigo</th><th>Descripcion</th><th>% Ocup Virgilio</th><th>Stock total</th><th>Proyeccion</th><th>Pedidos</th><th>Familia</th></tr>';
+  var html = '<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>Tallerista</th><th>Codigo</th><th>Descripcion</th><th>% Ocup Virgilio</th><th>Stock total</th><th>Estadística Madre</th><th>Pedidos</th><th>Familia</th></tr>';
   items.forEach(function (it) {
     html += '<tr><td>' + esc(it.tall) + '</td><td>' + esc(codCanon(it.cod)) + '</td><td>' + esc(it.desc) + '</td><td>' + Math.round(it.pct * 100) + '%</td><td>' + (Math.round(it.stock * 10) / 10) + '</td><td>' + (Math.round(it.proy * 10) / 10) + '</td><td>' + Math.round(it.pedidos) + '</td><td>' + esc(it.fam) + '</td></tr>';
   });
@@ -18194,8 +18194,8 @@ function agExportPdf() {
   });
   var w = window.open("", "_blank"); if (!w) { try { alert("Habilitá los pop-ups para generar el PDF."); } catch (_e) {} return; }
   w.document.write('<html><head><meta charset="utf-8"><title>Gondola menor a 25%</title><style>body{font-family:Arial;margin:14px;color:#0f172a}h1{font-size:20px;margin:0 0 10px}table{width:100%;border-collapse:collapse;font-size:15px}th{background:#1e3a8a;color:#fff;padding:8px;text-align:left}th.num{text-align:right}td{padding:6px 8px;border-bottom:1px solid #ccc}td.num{text-align:right}.grp td{background:#dbeafe;color:#1e3a8a;font-weight:800;font-size:16px}</style></head><body>' +
-    '<h1>Góndola &lt; 25% de la proyección · ' + items.length + ' ítems</h1>' +
-    '<table><thead><tr><th>Código</th><th>Descripción</th><th class="num">% Ocup Virgilio</th><th class="num">Stock total</th><th class="num">Proyección</th><th class="num">Pedidos</th><th>Familia</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>');
+    '<h1>Góndola &lt; 25% de la Estadística Madre · ' + items.length + ' ítems</h1>' +
+    '<table><thead><tr><th>Código</th><th>Descripción</th><th class="num">% Ocup Virgilio</th><th class="num">Stock total</th><th class="num">Estadística Madre</th><th class="num">Pedidos</th><th>Familia</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>');
   w.document.close(); w.focus();
   setTimeout(function () { try { w.print(); } catch (_e) {} }, 400);
 }
@@ -19615,7 +19615,7 @@ function stkBodyStocks() {
     // v25.6 (Luis) — forzar el refresco de lo que NO es saldo (pedidas, proyección, capacidad,
     // FC s/salida, altas y bajas de códigos). Los saldos ya llegan en vivo por el trigger +
     // realtime; esto adelanta el cron de 2 min. Ver stkRefrescarYa.
-    '<button type="button" id="stkRefYaBtn" onclick="stkRefrescarYa()" title="Recalcula ya pedidas, proyección, capacidad y FC s/salida (sin esperar los 2 min del ciclo automático). Los saldos por depósito ya se ven en vivo." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;color:#1e3a8a;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">⟳ Refrescar ya</button>' +
+    '<button type="button" id="stkRefYaBtn" onclick="stkRefrescarYa()" title="Recalcula ya pedidas, Estadística Madre, capacidad y FC s/salida (sin esperar los 2 min del ciclo automático). Los saldos por depósito ya se ven en vivo." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;color:#1e3a8a;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">⟳ Refrescar ya</button>' +
     '</div>';
   // v10.44 — aviso "histórico" (cuando se mira stock a una fecha pasada), debajo de la barra única.
   if (_stk.asOf) h += '<div style="margin:0 0 10px;font-size:12.5px;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:5px 9px;">📅 Stock al <b>' + escapeHtml(stockFmtTs(_stk.asOf)) + '</b> hs (histórico, no el actual)</div>';
@@ -19638,7 +19638,7 @@ function stkBodyStocks() {
     return '<th class="num" onclick="stkToggleFilCol(\'' + key + '\')" title="' + (title || "Filtrar") + ' — tocá para mostrar solo los que tienen &gt; 0" style="cursor:pointer;' + st + '">' + label + (on ? " ✓" : " <span style=\"opacity:.4;font-weight:400\">⌵</span>") + '</th>';
   };
   let th = '<th>Código</th><th style="text-align:center;padding:7px 5px;font-size:10px;">LK/<br>CH</th><th>Descripción</th>' +
-    _thNum("_proy", "Proy.<br>caj/mes", "background:#f5f3ff;color:#6d28d9;", "Proyección de venta (cajas/mes) — el valor antes del índice que se usa en las OCs") +
+    _thNum("_proy", "Est. Madre<br>caj/mes", "background:#f5f3ff;color:#6d28d9;", "Estadística Madre (cajas/mes) — el valor antes del índice que se usa en las OCs") +
     _thNum("_tot", "Total<br>Stock", "background:#eef2ff;color:#1e3a8a;", "Stock total") +
     _thNum("_ped", "Cajas<br>Pedidas", "background:#fef3c7;color:#92400e;", "Cajas pedidas — TODAS las NP (programadas o no) que todavía no se facturaron") +
     _thNum("_cap", "Capacidad<br>góndola", "background:#dcfce7;color:#166534;", "Capacidad de góndola");
@@ -19719,20 +19719,8 @@ function stkBodyStocks() {
       tds += '<td class="num" style="background:#eef2ff"></td>';
     }
     const _pinned = _pinSet.has(String(a.cod).trim().toUpperCase());
-    tds += '<td class="stk-caret" style="white-space:nowrap;"><span onclick="event.stopPropagation();stkTogglePin(\'' + encodeURIComponent(a.cod) + '\')" title="' + (_pinned ? "Soltar" : "Fijar") + ' este código (se guarda)" style="cursor:pointer;margin-right:7px;' + (_pinned ? "" : "opacity:.28;") + '">📌</span>' + (_stk.openArt === a.cod ? "▾" : "✚") + '</td>';
-    h += '<tr class="stk-row" data-stk-cod="' + escapeHtml(String(a.cod).toUpperCase()) + '" onclick="stockToggleArt(\'' + encodeURIComponent(a.cod) + '\')">' + tds + '</tr>';
-    if (_stk.openArt === a.cod) {
-      const _lim = _stk.asOf ? new Date(_stk.asOf).getTime() : 0;
-      // v20.02 — el detalle matcheaba el código CRUDO (`mv.cod_art === a.cod`), y las dos puntas
-      // no se escriben igual: la fila viene de la vista SIN el cero adelante ("55", "35E") o CON
-      // sufijo de empresa ("809E LK"), y Movimientos_Stock guarda "055" / "035E" / "809E" + la
-      // columna `empresa`. Así 31 de las 367 filas abrían diciendo "sin movimientos contados"
-      // teniendo stock (830 cajas el 031, 349 el 809E LK). Es el mismo bug que la v14.58 arregló
-      // en los pop-ups con _stkMovMatch y que acá había quedado suelto.
-      const _detCodN = _stkNormCod(codBase(a.cod)), _detEmp = _stkEmpDe(a.cod);
-      const det = _stk.movs.filter(function (mv) { return _stkMovMatch(mv, _detCodN, _detEmp) && !(_stk.cutoff && new Date(mv.ts).getTime() < new Date(_stk.cutoff).getTime()) && !(_lim && new Date(mv.ts).getTime() > _lim); });
-      h += '<tr class="stk-detrow"><td colspan="' + ncol + '"><div class="stk-det">' + (det.length ? det.map(stkMvRow).join("") : '<div class="stk-mv">sin movimientos contados</div>') + '</div></td></tr>';
-    }
+    tds += '<td class="stk-caret" style="white-space:nowrap;"><span onclick="event.stopPropagation();stkTogglePin(\'' + encodeURIComponent(a.cod) + '\')" title="' + (_pinned ? "Soltar" : "Fijar") + ' este código (se guarda)" style="cursor:pointer;margin-right:7px;' + (_pinned ? "" : "opacity:.28;") + '">📌</span></td>';   // v25.56 (Luis): la fila ya no se expande; el detalle está en los pop-ups de cada celda
+    h += '<tr class="stk-row" style="cursor:default" data-stk-cod="' + escapeHtml(String(a.cod).toUpperCase()) + '">' + tds + '</tr>';
   });
   h += "</tbody></table></div>";
 
@@ -19922,7 +19910,7 @@ var STK_POP_CSS =
   ".mva-tbl.wide th.num,.mva-tbl.wide td.num{width:auto;}" +   // manda el <colgroup>, no el 15% genérico
   ".mva-tbl.wide th,.mva-tbl.wide td{vertical-align:middle;overflow:hidden;}" +
   ".mva-tbl.wide thead th{text-overflow:ellipsis;}" +   // solo header y Descripción cortan con «…»
-  ".mva-tbl.wide thead th{white-space:normal;line-height:1.25;font-size:12px;}" +   // 'Proy u/mes' entra en 2 renglones
+  ".mva-tbl.wide thead th{white-space:normal;line-height:1.25;font-size:12px;}" +   // 'E.M. u/mes' entra en 2 renglones
   // v23.91 (Luis): la PROYECCIÓN se toca en su propia celda (el código dejó de ser un link)
   ".mva-tbl.wide td.pedimp-proy{cursor:pointer;background:#faf5ff;color:#6d28d9;}" +
   ".mva-tbl.wide td.pedimp-proy:hover{background:#f3e8ff;}" +
@@ -19943,7 +19931,7 @@ var STK_POP_CSS =
   // aunque sobrara pantalla (dueño: "hay espacio, no pongas barras de scroll"). Ahora el popup
   // usa el ancho disponible; el scroll horizontal queda sólo para pantallas angostas.
   ".stkpop-card.wide{max-width:min(1760px,98vw);}" +
-  ".stkpop-card.mid{max-width:min(880px,96vw);}" +   // v18.32/34 — Proyección: dos columnas sin scroll
+  ".stkpop-card.mid{max-width:min(880px,96vw);}" +   // v18.32/34 — Estadística Madre: dos columnas sin scroll
   ".mva-tbl .mva-pos{color:#15803d;}.mva-tbl .mva-neg{color:#b91c1c;}" +
   // v6.68 — celda MOVIMIENTO como flex: slot fijo para el toggle (vacío en guardado) →
   // 'recepcion' y 'guardado' arrancan alineados; cuerpo con chips que fluyen prolijo.
@@ -20098,7 +20086,7 @@ function stkPopClose() { const ov = document.getElementById("stkPopModal"); if (
    la marca vertical de la proyección y el pie dice cuántos meses quedan por encima.
    v12.47 — criterio ÚNICO (propuesta 2496): proyección = promedio simple de los 6 meses con piso en el
    4.º mejor mes, así nunca queda por debajo de 4 de los 6. Vive en LK (`_fn_proy_window`); acá sólo
-   se dibuja. La línea gris "promedio 6m" sólo se muestra si difiere de la proyección (o sea, cuando
+   se dibuja. La línea gris "promedio 6m" sólo se muestra si difiere de la Estadística Madre (o sea, cuando
    actuó el piso). */
 var _STK_MES_ABR = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 function _stkFmtMes(ym) {
@@ -20150,7 +20138,7 @@ function _stkProyTrendSvg(rows, proyN, prom) {
   // la banda marca la ventana que usa el MOTOR (6 meses cerrados), no "los ultimos 6".
   var w0 = (S.winIni != null && S.winIni >= 0) ? S.winIni : Math.max(0, n - 6);
   var wFin = iPar >= 0 ? n - 2 : n - 1;
-  var s = '<svg class="proyv-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Tendencia de ventas y proyección">';
+  var s = '<svg class="proyv-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Tendencia de ventas y Estadística Madre">';
   if (wFin > w0) {
     s += '<rect x="' + f1(xs(w0)) + '" y="' + T + '" width="' + f1(xs(wFin) - xs(w0)) + '" height="' + ih + '" rx="3" fill="#ddd6fe" opacity=".45"/>';
     s += '<text x="' + f1(xs(w0) + 4) + '" y="' + (T + ih - 6) + '" font-size="11" font-weight="800" fill="#6d28d9">ventana ' + (wFin - w0 + 1) + 'm</text>';
@@ -20205,7 +20193,7 @@ function _stkProyTrendSvg(rows, proyN, prom) {
   s += '</svg>';
   s += '<div class="proyv-leg">' +
        '<span><i style="background:#6d28d9"></i>venta mensual</span>' +
-       '<span><i class="dash"></i>proyección</span>' +
+       '<span><i class="dash"></i>Estadística Madre</span>' +
        (yM !== null ? '<span><i class="dot"></i>promedio 6m</span>' : '') +
        '<span><i style="background:#dc2626;width:9px;height:9px;border-radius:50%"></i>mes por debajo</span>' +
        (iPar >= 0 ? '<span><i style="background:#fff;border:2px solid #d97706;width:9px;height:9px;border-radius:50%"></i>mes en curso (*): va a ese ritmo</span>' : '') + '</div>';
@@ -20221,7 +20209,7 @@ async function stkShowProyVentas(codEnc, proy) {
   var sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
   var emp = sfx ? sfx[1].toUpperCase().replace("LOKE", "LK") : "";
   var empTag = emp ? ' <span style="font-size:14px;font-weight:800;color:' + (emp === "LK" ? "#b91c1c" : "#1e40af") + ';">' + emp + '</span>' : '';
-  var body = _stkPopShell("📈 Proyección — " + escapeHtml(codCanon(codB)) + empTag, "stkPopBody", "mid");   // v18.32
+  var body = _stkPopShell("📈 Estadística Madre — " + escapeHtml(codCanon(codB)) + empTag, "stkPopBody", "mid");   // v18.32
   if (!body) return;
   var nombre = artNombre(cod, "") || "";
   var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
@@ -20556,7 +20544,7 @@ function _stkProyChartHtml() {
   h += '<div class="stkpop-grp"><div class="proyv-kpis">';
   if (S.proyN > 0.05) {
     // v18.33 — la etiqueta sigue al switch: "8.164 proy. caj/mes" sería mentira.
-    h += '<div class="proyv-kpi proy"><b>' + fc(S.proyN) + '</b><span>proy. ' + (S.uni && S.uxb > 0 ? 'un' : 'caj') + '/mes</span>' +
+    h += '<div class="proyv-kpi proy"><b>' + fc(S.proyN) + '</b><span>E.M. ' + (S.uni && S.uxb > 0 ? 'un' : 'caj') + '/mes</span>' +
          (piso ? '<small>piso: ' + (S.pisoN || 4) + '.º mejor mes</small>' : '') + _stkProyFamHtml() + '</div>';
   }
   // v18.58 — VUELVE la ficha del mes en curso («<mes> a este ritmo», v18.24, pedido de Thomas).
@@ -21881,8 +21869,8 @@ function _stkMovsBlock() {
     const _chTag = (_stkPop.kind === "racksArt" && mv.deposito === "racks_ch") ? '<span style="display:inline-block;background:#dbeafe;color:#1e40af;font-size:10px;font-weight:800;padding:1px 5px;border-radius:4px;margin-left:4px">CH</span>' : '';
     const movBody = '<span class="mva-movtipo">' + escapeHtml(String(mv.tipo || "")) + '</span>' + (mv.ref ? '<span class="mva-ref">' + escapeHtml(String(mv.ref)) + '</span>' : '') + npTxt + _chTag + _stkQuienChip(mv);
     return '<tr><td class="mva-ts">' + escapeHtml(stockFmtTs(mv.ts)) + '</td><td class="mva-mov"><div class="mva-movrow">' + plus + '<span class="mva-movbody">' + movBody + '</span></div></td><td class="mva-cant">' + cant + '</td><td class="mva-sal">' + round1(saldo) + '</td></tr>' + detrow;
-  }).join("");
-  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(codBase(_stkPop.cod)) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, por fecha. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
+  }).reverse().join("");   // v25.56 (Luis): el saldo se calcula ASC; se muestra del más reciente (arriba) al más antiguo
+  let h = '<div class="stkpop-hint">Movimientos de <b>' + escapeHtml(codBase(_stkPop.cod)) + '</b> en <b>' + escapeHtml(_stkPop.titulo) + '</b>, del más reciente (arriba) al más antiguo. Entró <b style="color:#15803d">+' + round1(totIn) + '</b> · salió <b style="color:#b91c1c">' + round1(totOut) + '</b> · <b>saldo ' + round1(saldo) + '</b>.<br><small style="color:#94a3b8">👤 = siglas y legajo del que lo hizo (en <b>recepcion</b>, del que recibió). En <span class="mva-qui aprox">ámbar ~</span> va el deducido por la sesión de RT (recepciones viejas, sin legajo guardado).</small></div>';
   h += '<div class="mva-daterow">Desde <input type="date" min="2025-01-01" class="mva-date" value="' + escapeHtml(_stkPop.desde) + '" onchange="stkMovsArtDate(\'desde\',this.value)"> hasta <input type="date" min="2025-01-01" class="mva-date" value="' + escapeHtml(_stkPop.hasta) + '" onchange="stkMovsArtDate(\'hasta\',this.value)">' + ((_stkPop.desde || _stkPop.hasta) ? ' <button class="mva-clear" onclick="stkMovsArtDate(\'clear\')">✕</button>' : '') + '</div>';
   h += list.length
     ? '<div class="mva-tblwrap"><table class="mva-tbl"><thead><tr><th>Fecha</th><th>Movimiento</th><th class="num">Cant.</th><th class="num">Saldo</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
@@ -23244,7 +23232,7 @@ function stkBodyCapacidad() {
   const justo = conProy.filter(function (r) { return r.meses >= 1 && r.meses < 2; });
   const sobra = conProy.filter(function (r) { return r.meses >= 2; });
   h += '<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:11px;padding:10px 12px;margin:0 0 10px;color:#3730a3;font-size:12.5px;line-height:1.45;">' +
-    '<b>📉 Meses de capacidad</b> = capacidad de góndola ÷ venta mensual proyectada. Es <b>cuántos meses de venta aguanta la góndola llena</b>. <b>Menos de 1 mes</b> = la ubicación <b>no le alcanza</b> a la proyección (se vacía antes del mes). Ordenado de menor a mayor (los que no alcanzan, primero).</div>';
+    '<b>📉 Meses de capacidad</b> = capacidad de góndola ÷ Estadística Madre (venta mensual). Es <b>cuántos meses de venta aguanta la góndola llena</b>. <b>Menos de 1 mes</b> = la ubicación <b>no le alcanza</b> a la Estadística Madre (se vacía antes del mes). Ordenado de menor a mayor (los que no alcanzan, primero).</div>';
   h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px;align-items:center;">' +
     '<span style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:6px 10px;font-size:12px;color:#991b1b;">🔴 <b>' + noAlc.length + '</b> no alcanzan (&lt;1 mes)</span>' +
     '<span style="background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:6px 10px;font-size:12px;color:#854d0e;">🟡 <b>' + justo.length + '</b> justos (1–2 meses)</span>' +
@@ -23260,7 +23248,7 @@ function stkBodyCapacidad() {
   if (revisar.length) {
     const sugE = function (cod) { const k = _ocgNorm(cod); return maxByCod[k + "E"] ? (cod + "E") : null; };
     h += '<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:11px;padding:10px 12px;margin:0 0 12px;color:#991b1b;font-size:12.5px;line-height:1.4;">' +
-      '<b>⚠ ' + revisar.length + ' con lugar en góndola pero SIN proyección/máximo — revisar.</b> Un artículo no debería tener lugar en góndola si no tiene proyección de ventas: suele ser el <b>código mal escrito</b> (le falta la E, un cero, etc.).' +
+      '<b>⚠ ' + revisar.length + ' con lugar en góndola pero SIN Estadística Madre/máximo — revisar.</b> Un artículo no debería tener lugar en góndola si no tiene Estadística Madre: suele ser el <b>código mal escrito</b> (le falta la E, un cero, etc.).' +
       '<div style="margin-top:7px;">' + revisar.map(function (r) {
         const s = sugE(r.cod);
         return '<span style="display:inline-block;background:#fff;border:1px solid #fecaca;border-radius:8px;padding:3px 8px;margin:0 4px 4px 0;font-family:Consolas,Menlo,monospace;"><b>' + escapeHtml(r.cod) + '</b> <span style="color:#64748b;font-family:system-ui;">(' + r.capacidad + ' cj)</span>' + (s ? ' <b style="color:#166534;">→ ¿' + escapeHtml(s) + '?</b>' : '') + '</span>';
@@ -60456,7 +60444,7 @@ function bancosRender() {
     th('Fecha') + th('Banco') + th('Operación') + th('Detalle') + th('Entrada', 'right') + th('Salida', 'right') + th('Recibo') + th('OP') + th('Cliente') + th('E-cheq') + th('ISIS') + th('Obs.') + '</tr></thead><tbody>';
   h += rows.map(function (m) {
     var bk = m.banco + '_' + (m.empresa === 'chef' ? 'ch' : 'lk');
-    var st = m.tipo === 'a_depositar' ? 'background:#fffbeb;' : (m.tipo === 'proyeccion' ? 'color:#94a3b8;' : '');
+    var st = m.tipo === 'a_depositar' ? 'background:#fffbeb;' : (m.tipo === 'Estadística Madre' ? 'color:#94a3b8;' : '');
     return '<tr class="bk-row" style="' + st + '">' + td(_fmtFecha(m.fecha), 'left', 'white-space:nowrap;') + td(_BK_BANCO[bk] || bk) +
       td(escapeHtml(m.operacion || '') + (m.tipo === 'a_depositar' ? ' <span style="color:#b45309;font-size:11px;">(a depositar)</span>' : '')) +
       td(escapeHtml(m.detalle || '') + (m.nota ? ' <span style="color:#94a3b8;">· ' + escapeHtml(m.nota) + '</span>' : '')) +
