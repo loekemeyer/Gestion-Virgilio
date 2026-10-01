@@ -1,4 +1,4 @@
-// v25.50 (Luis) — HOJA DE PICKING por tanda (modelo planilla «Limpio»): orden del recorrido,
+// v25.51 (Luis) — HOJA DE PICKING por tanda (modelo planilla «Limpio»): orden del recorrido,
 // Pickeo ✓ / número, NP con m³, m³/hora neto (descuenta otras tareas del legajo en la ventana),
 // y sale sola por la estación (TP) y por la Cola de impresión.
 const fs = require("fs");

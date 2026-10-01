@@ -625,7 +625,7 @@ echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también 
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs
 echo "== remito-armado-picking (v25.43: la hoja de armado trae el detalle del picking) =="
 node tests/remito-armado-picking.cjs
-echo "== pk-hoja-picking (v25.50: hoja de picking por tanda al terminar el picking) =="
+echo "== pk-hoja-picking (v25.51: hoja de picking por tanda al terminar el picking) =="
 node tests/pk-hoja-picking.cjs
 
 echo "== proy-entregadas (v15.52: popup Proyección — cajas ENTREGADAS por el proveedor entre el mes y la barra; s/d si ese mes no había registro) =="
