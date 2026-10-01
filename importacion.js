@@ -633,7 +633,7 @@ function _pedImpMoqChip(it) {
     const mesesTxt = (Math.round(m.mesesNec * 10) / 10).toLocaleString("es-AR");
     return ' <span style="font-size:10px;font-weight:800;color:#92400e;background:#fef3c7;border-radius:999px;padding:1px 6px" title="Lo calculado (' + baseTxt + ' MC) no llega al ' + pctTxt + ' del MOQ (' + pisoTxt + ' u). Se sube a ' + m.mc + ' MC: la cobertura queda en ' + mesesTxt + ' meses (tope ' + m.topeMeses + ').">🟡 MOQ ' + mesesTxt + 'm</span>';
   }
-  return ' <span style="font-size:10px;font-weight:800;color:#fff;background:#b91c1c;border-radius:999px;padding:1px 6px" title="' + (m.estado === "sinproy" ? "Sin proyección de venta no se puede estirar la cobertura" : "Llegar al " + pctTxt + " del MOQ (" + pisoTxt + " u) dejaría " + (Math.round(m.mesesNec * 10) / 10).toLocaleString("es-AR") + " meses de cobertura, más que el tope de " + m.topeMeses) + ': NO se pide (eran ' + baseTxt + ' MC).">🔴 MOQ · no se pide</span>';
+  return ' <span style="font-size:10px;font-weight:800;color:#fff;background:#b91c1c;border-radius:999px;padding:1px 6px" title="' + (m.estado === "sinproy" ? "Sin Estadística Madre no se puede estirar la cobertura" : "Llegar al " + pctTxt + " del MOQ (" + pisoTxt + " u) dejaría " + (Math.round(m.mesesNec * 10) / 10).toLocaleString("es-AR") + " meses de cobertura, más que el tope de " + m.topeMeses) + ': NO se pide (eran ' + baseTxt + ' MC).">🔴 MOQ · no se pide</span>';
 }
 
 /* ── El pop-up ⚙ Configurar parámetros, al lado del nombre del proveedor ────────────── */
@@ -852,7 +852,7 @@ function pedImpDesgPop(provEnc, lado) {
 /* v25.01 (Thomas, 30/09) — «12M»: el insumo se pide para 10 meses de insumo + 2 de producto. */
 function _pedImpInsumoChip(it) {
   const mi = Number(it.meses) || 0, mp = Number(it.mesesProv) || 0;
-  return ' <span class="pedimp-12m" style="font-size:10.5px;font-weight:800;color:#fff;background:#0369a1;border-radius:999px;padding:1px 6px" title="INSUMO (no es de ninguna empresa): se pide para ' + mp + ' meses de insumo + ' + (mi - mp) + ' meses de producto armado = ' + mi + ' meses de la proyección de los productos que lo usan">' + mi + 'M</span>';
+  return ' <span class="pedimp-12m" style="font-size:10.5px;font-weight:800;color:#fff;background:#0369a1;border-radius:999px;padding:1px 6px" title="INSUMO (no es de ninguna empresa): se pide para ' + mp + ' meses de insumo + ' + (mi - mp) + ' meses de producto armado = ' + mi + ' meses de la Estadística Madre de los productos que lo usan">' + mi + 'M</span>';
 }
 /* v25.01 (Thomas, 30/09: "si aprieto en stock se abra el desglose de qué es lo que está contando") —
    el número de la columna Stock suma hasta cuatro fuentes; acá se ven una por una, con el detalle
@@ -884,7 +884,7 @@ async function pedImpStockDesglose(keyEnc, foco) {
     if (det.length) {
       let tp = 0, ts = 0;
       h += '<div style="margin-top:12px;font-weight:800">' + (it.esInsumo ? '🧩 Productos armados con este insumo' : '🧩 Terminados que usan esta parte') + '</div>';
-      h += '<table class="mva-tbl" style="width:100%"><thead><tr><th style="text-align:left">Producto</th><th class="num">Proy u/mes</th><th class="num">Stock u</th></tr></thead><tbody>';
+      h += '<table class="mva-tbl" style="width:100%"><thead><tr><th style="text-align:left">Producto</th><th class="num">E.M. u/mes</th><th class="num">Stock u</th></tr></thead><tbody>';
       det.slice().sort(function (a, b) { return (Number(b.proy) || 0) - (Number(a.proy) || 0); }).forEach(function (d) {
         tp += Number(d.proy) || 0; ts += Number(d.stock_uni) || 0;
         h += '<tr><td style="text-align:left">' + escapeHtml(codCanon(d.cod)) + ' <span style="color:#64748b">' + escapeHtml(artNombre(d.cod, "")) + '</span></td><td class="num">' + f(d.proy) + '</td><td class="num">' + f(d.stock_uni) + '</td></tr>';
@@ -894,7 +894,7 @@ async function pedImpStockDesglose(keyEnc, foco) {
     }
     ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:620px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#0369a1;color:#fff">' +
-      '<div style="font-size:15px;font-weight:800">' + (foco === "proy" ? '📈 Proyección — ' : '📦 Stock — ') + escapeHtml(codCanon(_impCodVista(it))) + (it.esInsumo ? ' · insumo' : '') + '</div>' +
+      '<div style="font-size:15px;font-weight:800">' + (foco === "proy" ? '📈 Estadística Madre — ' : '📦 Stock — ') + escapeHtml(codCanon(_impCodVista(it))) + (it.esInsumo ? ' · insumo' : '') + '</div>' +
       '<button onclick="pedImpStockDesgCerrar()" style="width:auto;margin-top:0;background:#fff;color:#0369a1;border:0;border-radius:8px;padding:4px 11px;font-size:14px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
       '<div style="padding:10px 14px 14px">' + h + '</div></div>';
   };
@@ -1373,7 +1373,7 @@ function _pedImpPrioCmp(a, b) {
 function _pedImpMesesFmt(m) { return m == null ? "—" : (Math.round(m * 10) / 10).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
 function _pedImpMesesCell(it) {
   const m = _pedImpMesesStock(it);
-  if (m == null) return '<td class="num" style="color:#cbd5e1" title="Sin proyección de venta: no hay meses de stock">—</td>';
+  if (m == null) return '<td class="num" style="color:#cbd5e1" title="Sin Estadística Madre: no hay meses de stock">—</td>';
   const proy = Number(it.proyUni) || 0;
   const stk = Math.max(0, Number(it.stockUni) || 0), cam = Math.max(0, Number(it.enCurso) || 0);
   const bajo = m < _PEDIMP_MESES_ALERTA;
@@ -1528,7 +1528,7 @@ function _pedImpRender() {
     // v24.60 (Thomas) — consumo por mes de todo lo que se ve (proy × FOB), aunque hoy no pida nada
     (function () { const _src = provFiltro ? allItems.filter(function (it) { return (it.prov || "(sin proveedor)") === provFiltro; }) : allItems;
       const _c = _src.reduce(function (s, it) { return s + (it.proyUni > 0 && it.fobUni > 0 ? it.proyUni * it.fobUni : 0); }, 0);
-      return _c > 0 ? '<span class="pedimp-consumo-tot" style="font-size:13px;font-weight:800;color:#b45309;white-space:nowrap" title="Consumo por mes: proyección u/mes × FOB, sumado sobre ' + (provFiltro ? escapeHtml(provFiltro) : 'todos los proveedores') + '">consumo ' + _usd0(_c) + '/mes</span>' : ''; })() +
+      return _c > 0 ? '<span class="pedimp-consumo-tot" style="font-size:13px;font-weight:800;color:#b45309;white-space:nowrap" title="Consumo por mes: Estadística Madre u/mes × FOB, sumado sobre ' + (provFiltro ? escapeHtml(provFiltro) : 'todos los proveedores') + '">consumo ' + _usd0(_c) + '/mes</span>' : ''; })() +
     (_nSinFob || _nSinVol ? '<span style="font-size:11px;color:#b45309;font-weight:700">⚠ ' + [_nSinFob ? _nSinFob + ' sin FOB' : '', _nSinVol ? _nSinVol + ' sin volumen' : ''].filter(Boolean).join(' · ') + '</span>' : '') +
     '<span style="flex:1 1 0;min-width:0"></span>' +
     '<label style="' + _lbl + '" title="Cómo viaja el pedido. El costo NO recuperable (derechos, flete, tasas, despachante' + (Object.keys(_NTL_PROVEEDORES).length ? ' y 5% NTL en los proveedores que facturan por NTL' : '') + ') queda pegado al costo del artículo. Cada proveedor se calcula como su propio embarque.">🚢 <select class="pedimp-modo" onchange="pedImpSetNacCfg(\'impo_nac_modo\',this.value)" style="width:auto;margin:0;height:28px;border:1px solid #c4b5fd;border-radius:7px;padding:0 4px;font-size:12.5px;font-weight:700;color:#6b21a8;background:#fff">' +
@@ -1571,7 +1571,7 @@ function _pedImpRender() {
       '<div style="min-width:0"><span style="font-size:16px;font-weight:800;color:#0f172a">🏭 ' + escapeHtml(prov) + '</span> <span style="font-size:11px;color:#94a3b8;font-weight:700">· ' + escapeHtml(imp) + '</span>' + _pedImpAlertaBadge(_nBajo) + _pedImpQuiebreBadge(arr.filter(function (it) { return _pedImpQuiebre(it); }).length) + (_isNtl ? ' <span style="font-size:10.5px;font-weight:800;color:#fff;background:#7c3aed;border-radius:999px;padding:1px 7px" title="Factura vía NTL (5% dentro del costo de nacionalización)">NTL</span>' : '') + '<div style="font-size:12px;color:#475569;margin-top:2px">' + arr.length + ' ítem(s) · <b>' + totMC + '</b> master cajas · <b>' + totU.toLocaleString("es-AR") + '</b> u' + (totUsd > 0 ? ' · <span class="pedimp-fob" style="color:#065f46;font-size:16px;font-weight:800;white-space:nowrap" title="FOB del pedido de este proveedor">FOB u$s ' + Math.round(totUsd).toLocaleString("es-AR") + '</span>' : '') + (totM3 > 0 ? ' · <span style="color:#0369a1">' + (Math.round(totM3 * 100) / 100) + ' m³</span>' : '') +
         (totCamUsd > 0 ? ' · <span class="pedimp-camino-fob" style="color:#0369a1;font-weight:800;white-space:nowrap" title="u$s totales de ' + nCam + ' pedido(s) en viaje de este proveedor (los mismos de 🚢 En curso)">en viaje FOB ' + _usd0(totCamUsd) + '</span>' : '') +
         // v24.59 (Thomas) — el consumo por mes (proyección × FOB) vuelve acá, sin el mínimo
-        (_burnN > 0 ? ' · <span class="pedimp-consumo" style="color:#b45309;font-weight:700" title="Consumo por mes: proyección u/mes × FOB de cada artículo">consumo ' + _usd0(_burnN) + '/mes</span>' : '') + '</div></div>' +
+        (_burnN > 0 ? ' · <span class="pedimp-consumo" style="color:#b45309;font-weight:700" title="Consumo por mes: Estadística Madre u/mes × FOB de cada artículo">consumo ' + _usd0(_burnN) + '/mes</span>' : '') + '</div></div>' +
       '<div style="display:flex;gap:7px;flex:1 1 auto;min-width:0;max-width:100%;flex-wrap:wrap;align-items:center;justify-content:flex-end">' +   // v24.54 (Thomas): en el celular los botones se cortaban (no se veían los PDF): ahora bajan de línea
       // v23.95 (Luis) — los meses objetivo, a un toque: cambian el objetivo y el «a pedir» de
       // TODOS los códigos de este proveedor (GV_Imp_Proveedor.meses_objetivo).
@@ -1592,7 +1592,7 @@ function _pedImpRender() {
     _anchoMax = Math.max(_anchoMax, _ancho);
     h += '<div class="mva-tblwrap wide"><table class="mva-tbl wide pedimp-tbl" style="min-width:' + _ancho + 'px">' +
       '<colgroup>' + _cols.map(function (w) { return '<col style="width:' + w + 'px">'; }).join('') + '</colgroup>' +
-      '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Proyección de venta por mes (unidades) y objetivo (unidades a tener)">Proy u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="Meses de stock = (stock disponible + en camino) ÷ proyección por mes. En rojo, menos de 4 meses. Sin proyección: —. La tabla se ordena por esta columna (menos meses primero).">Meses<small>stock</small></th><th class="num" title="En camino: unidades ya pedidas que no llegaron, con la fecha estimada de llegada (dd/mm)">En camino<small>u · llega</small></th><th class="num" title="A pedir: unidades calculadas para llegar al objetivo">A pedir<small>u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
+      '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Estadística Madre por mes (unidades) y objetivo (unidades a tener)">E.M. u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="Meses de stock = (stock disponible + en camino) ÷ Estadística Madre por mes. En rojo, menos de 4 meses. Sin Estadística Madre: —. La tabla se ordena por esta columna (menos meses primero).">Meses<small>stock</small></th><th class="num" title="En camino: unidades ya pedidas que no llegaron, con la fecha estimada de llegada (dd/mm)">En camino<small>u · llega</small></th><th class="num" title="A pedir: unidades calculadas para llegar al objetivo">A pedir<small>u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.forEach(function (it) {
       const badge = it.esInsumo ? _pedImpInsumoChip(it) : (it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '');
       const _stkShow = Math.max(0, Number(it.stockUni) || 0);
@@ -1651,7 +1651,7 @@ function _pedImpRender() {
       // v23.91 (Luis) — lo que se toca es la CELDA de la proyección, igual que en Stocks; el
       // código volvió a ser texto. Tocar el código para ver una proyección no se adivina.
       const _proyCaj = (Number(it.uxc) > 0) ? (Number(it.proyUni) || 0) / Number(it.uxc) : 0;
-      const _proyCell = '<td class="num imp2 pedimp-proy" title="Tocá para ver de dónde sale la proyección (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td>';
+      const _proyCell = '<td class="num imp2 pedimp-proy" title="Tocá para ver de dónde sale la Estadística Madre (ventas facturadas de los últimos 12 meses)" onclick="event.stopPropagation();pedImpProyAbrir(\'' + _codEncV + '\',' + (Math.round(_proyCaj * 100) / 100) + ')">' + it.proyUni + '<small>' + it.objetivoUni + '</small></td>';
       h += '<tr><td><b>' + escapeHtml(codCanon(_impCodVista(it))) + '</b>' + _impPlantaChip(it) + badge + '</td><td title="' + escapeHtml(it.desc || "") + '"><span class="imp-desc">' + escapeHtml(artNombre(it.cod, it.desc)) + '</span>' + _pedImpQuiebreChip(it) + '</td>' + _proyCell + '<td class="num pedimp-stk" title="Tocá para ver qué está contando este stock" onclick="event.stopPropagation();pedImpStockDesglose(\'' + _keyEncV + '\')">' + stockTxt + '</td>' + _pedImpMesesCell(it) + '<td class="num">' + _pedImpEnCaminoHtml(it) + '</td><td class="num pedimp-apedir">' + it.aPedirUni + '</td><td class="num">' + umTxt + '</td><td class="num">' + mcInput + '</td><td class="num imp2">' + uniTxt + _pedImpMoqChip(it) + '<small>' + fobTxt + '</small></td><td class="num imp2">' + usdTxt + '<small>' + m3Txt + '</small></td><td class="num">' + rgInput + '<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:8px">' + _reingWebSwitchHtml(it.cod, it) + '</div></td><td>' + actHtml + '</td></tr>';
     });
     h += '</tbody></table></div></div>';
@@ -1841,8 +1841,8 @@ async function _pedImpDamianHojas(prov, opt) {
   if (sinPedir.length && !opt.soloPed) {
     const cm = camino(sinPedir);
     const motivo = function (it) {
-      if (Number(it.aPedirCajas) > 0) { const q = _pedImpMoqCalc(it); return q.estado === "sinproy" ? "sin proyección" : "&lt; " + Math.round(q.pct * 100) + "% MOQ"; }
-      return !(Number(it.proyUni) > 0) ? "sin proyección" : "alcanza";
+      if (Number(it.aPedirCajas) > 0) { const q = _pedImpMoqCalc(it); return q.estado === "sinproy" ? "sin Estadística Madre" : "&lt; " + Math.round(q.pct * 100) + "% MOQ"; }
+      return !(Number(it.proyUni) > 0) ? "sin Estadística Madre" : "alcanza";
     };
     const filas = agrupar(sinPedir).map(function (x) {
       const it = x.it;
@@ -2022,7 +2022,7 @@ function pedImpExportExcel() {
   });
   var html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>td,th{border:1px solid #ccc;padding:3px 7px;font-family:Calibri,Arial,sans-serif;} th{background:#166534;color:#fff;text-align:left;}</style></head><body>';
   html += '<h3>Pedidos Importación — Producción Virgilio (' + esc(fecha) + ', índice ' + (data.meses || 10) + ' meses)' + (_q.length ? ' — búsqueda: ' + esc(_q.join(" ")) : '') + '</h3>';
-  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>Proy u/mes</th><th>Objetivo</th><th>Stock</th><th>Meses (stock+camino)</th><th>En camino</th><th>Llega</th><th>A pedir u</th><th>Master cjs</th><th>FOB u$s/u</th><th>u$s pedido</th><th>m3/master</th><th>m3 pedido</th></tr>';
+  html += '<table><tr><th>Importador</th><th>Proveedor</th><th>Codigo</th><th>Descripcion</th><th>E.M. u/mes</th><th>Objetivo</th><th>Stock</th><th>Meses (stock+camino)</th><th>En camino</th><th>Llega</th><th>A pedir u</th><th>Master cjs</th><th>FOB u$s/u</th><th>u$s pedido</th><th>m3/master</th><th>m3 pedido</th></tr>';
   var _totM3 = 0, _totUsd = 0;
   items.forEach(function (it) {
     var imp = _IMPORTADOR_DE[it.prov || ""] || "(sin importador)";

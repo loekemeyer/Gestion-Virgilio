@@ -785,8 +785,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== horas-activas (v19.23: solo se cuentan horas ACTIVAS, la noche no cuenta) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/horas-activas.cjs
 
-echo "== stk-detalle-cero-adelante (v20.02: el detalle de una fila de Stocks encuentra los movimientos con cero adelante y los duales) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-detalle-cero-adelante.cjs
+echo "== stk-fila-sin-detalle (v25.56: la fila de Stocks no se expande y los movimientos van del más reciente al más viejo) =="
+node tests/stk-fila-sin-detalle.cjs
 
 echo "== cuar-com-limpia (v20.34: el cuadro de comentarios queda vacio al mandar, al cerrar y al reabrir) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cuar-com-limpia.cjs

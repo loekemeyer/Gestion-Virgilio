@@ -107,7 +107,7 @@ catch (_e) {
     // v18.34 — Luis mando sacar promedio, ritmo, facturado, entregado y meses arriba.
     // v18.58 — VUELVE la del mes en curso ("a este ritmo", la de Thomas v18.24; Luis: "restituilo
     // si no rompe nada"). Quedan DOS fichas: proyeccion + mes en curso. Las otras tres no vuelven.
-    out.fichaProy = /proy\. caj\/mes=367\.2/.test(k);
+    out.fichaProy = /E\.M\. caj\/mes=367\.2/.test(k);   // v25.56: "proy." → "E.M." (Estadística Madre)
     out.dosFichas = body.querySelectorAll(".proyv-kpi").length === 2;
     out.sinPromedio = k.indexOf("promedio") < 0;
     out.conRitmo = !!body.querySelector(".proyv-kpi.curso") && k.indexOf("a este ritmo") >= 0;
