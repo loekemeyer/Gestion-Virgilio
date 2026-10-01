@@ -1,4 +1,4 @@
--- v25.94 (2026-10-01) — Recepción Remitos: el reloj de las 30 hs arranca en la carga ACTUAL.
+-- v25.95 (2026-10-01) — Recepción Remitos: el reloj de las 30 hs arranca en la carga ACTUAL.
 --
 -- Caso: LK 0122 (Inc) y LK 0177 (Multi Bazar) salieron, volvieron (↩ s/salida = FSS) y se
 -- recargaron el 01/10. `first_load` era min(CCN) de los 7 días, o sea la carga ANTERIOR a la
@@ -25,7 +25,7 @@ CREATE OR REPLACE VIEW public.vista_control_remitos AS
           WHERE "Registros_Produccion_Virgilio".opcion = 'CCN'::text AND "Registros_Produccion_Virgilio".ts_cliente >= (( SELECT since.ts
                    FROM since))
         ), fss_prev AS (
-         -- v25.94: la última vuelta al depósito (FSS) ANTERIOR a la última carga
+         -- v25.95: la última vuelta al depósito (FSS) ANTERIOR a la última carga
          SELECT f.np,
             max(f.ts_cliente) AS fss_prev
            FROM ( SELECT regexp_replace(TRIM(BOTH FROM split_part(r.texto, '|'::text, 1)), '\.0+$'::text, ''::text) AS np,
@@ -45,7 +45,7 @@ CREATE OR REPLACE VIEW public.vista_control_remitos AS
                     WHEN ccn_raw.tanda <> ''::text AND ccn_raw.tanda <> '—'::text THEN ccn_raw.tanda
                     ELSE NULL::text
                 END) AS tanda,
-            -- v25.94-ciclo: la carga vigente es la primera DESPUÉS de la última vuelta (FSS)
+            -- v25.95-ciclo: la carga vigente es la primera DESPUÉS de la última vuelta (FSS)
             min(ccn_raw.ts_cliente) FILTER (WHERE ccn_raw.ts_cliente > COALESCE(fp.fss_prev, '-infinity'::timestamp with time zone)) AS first_load,
             max(ccn_raw.ts_cliente) AS last_ccn
            FROM ccn_raw

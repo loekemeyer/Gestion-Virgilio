@@ -1988,8 +1988,8 @@ select sum(total) from public.vista_generador_oc where activo;
   No tocan Producción.
 - Rollback: `drop view public.gv_mapa_stock_sin_lugar; drop function public.gv_insumo_posicion_guardar(text,text,numeric,boolean,text,bigint);`
 
-## 2026-10-01 · v25.94 · `vista_control_remitos`: plazo de control por ciclo de carga
+## 2026-10-01 · v25.95 · `vista_control_remitos`: plazo de control por ciclo de carga
 - Objeto compartido con Producción (`vista_control_remitos`). Mismas columnas; sólo cambia `first_load`
   (y por arrastre `vencido` y el orden) cuando el pedido volvió (FSS) y se recargó. Medido: 2 de 70 NP.
-- Rollback: en `sql/vista_control_remitos_ciclo_v2594.sql`, sacar el CTE `fss_prev` y volver a
+- Rollback: en `sql/vista_control_remitos_ciclo_v2595.sql`, sacar el CTE `fss_prev` y volver a
   `min(ccn_raw.ts_cliente) AS first_load` sin el `LEFT JOIN fss_prev`; reponer `security_invoker = true`.

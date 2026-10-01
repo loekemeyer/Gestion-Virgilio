@@ -687,6 +687,8 @@ node tests/pedimp-meses-proveedor.cjs
 
 echo "== imp-hist-pedidos (v23.91: 📜 Historial = pedidos + recepciones) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-hist-pedidos.cjs
+echo "== imp-pi-editar (v25.94: ✏️ Editar PI = quién → cantidades → antes/después → guardar con registro) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-pi-editar.cjs
 
 echo "== imp-encurso (v15.72: solapa 🚢 En curso — un renglón por pedido, embarque + llegada, días que faltan) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-encurso.cjs
@@ -1010,7 +1012,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== rr-sin-remitos-cierra (Regresión v21) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rr-sin-remitos-cierra.cjs
 
-echo "== rr-volvio-ciclo (v25.94 — lo que volvió y se recarga arranca el plazo de control de nuevo; badge VOLVIÓ) =="
+echo "== rr-volvio-ciclo (v25.95 — lo que volvió y se recarga arranca el plazo de control de nuevo; badge VOLVIÓ) =="
 node tests/rr-volvio-ciclo.cjs
 
 echo "== rr-supervisor-legajo (v21.42 (Luis, 2026-09-23) — la Recepción de Remitos que abre el SUPERVISOR desde el panel no) =="

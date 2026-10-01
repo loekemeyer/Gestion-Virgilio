@@ -4077,6 +4077,21 @@ lo que genera pedido», sólo la hoja del pedido. Las dos puertas usan `_pedImpD
 `_pedImpDamianDoc`; los discontinuos se leen una sola vez (`_pedImpDamianDisc`). **Se retira el reporte de una
 tabla** (`_pedImpRepHtml`, Cód · Stk · E.M. · Meses…): no volver a ponerlo.
 
+## ⚠ REGLA (2026-10-01, v25.94): ✏️ EDITAR PI — quién corrige, qué día y a qué hora
+
+En 🚢 En curso, el **✏️ Editar PI** de cada pedido (reemplaza al viejo «✏️ PI», que sólo renombraba) abre
+un pop-up de tres pasos: **1) ¿Quién corrige?** (botones de `GV_Imp_PI_Editor` + **Otro**, que deja el
+nombre como editor nuevo si se guarda algo) · **2)** cantidad nueva por ítem y N° de PI · **3)** antes →
+después **simulado en la base** (`gv_imp_pi_editar(..., p_simular=true)`, no escribe) y recién ahí «Guardar».
+
+- Cada cambio queda en **`GV_Imp_PI_Edicion`**: editor elegido, usuario logueado, `ts`, ítem, antes y después
+  (un guardado = un `lote`). Se ve en «📜 Ediciones anteriores» del mismo pop-up (`gv_imp_pi_ediciones`).
+- La cantidad no puede quedar por debajo de lo ya llegado; **0 = el ítem sale de la PI** (`estado='anulado'`,
+  `unidades` queda como estaba porque la tabla exige > 0; el log dice 0). Después corre `gv_importados_resync`.
+- El front manda el `antes` que VIO: si la línea cambió mientras se editaba, la RPC frena y no pisa.
+- Las tres RPC son sólo supervisor (`authenticated`) y están en `_PED_IMP_RPC_ESCRITURA`.
+- `sql/gv_imp_pi_editar_v2594.sql`, `tests/imp-pi-editar.cjs`. Centinela: 2 filas de `gv_imp_pi_editar`.
+
 ## ⚠ REGLA (Luis, 2026-09-29, v24.32): la nacionalización por artículo es de 🚢 EN CURSO — y el proveedor la abre
 
 **Luis, textual:** *"no me estás entendiendo. Es en la pestaña «en curso» que quería lo que te pedí.
@@ -5345,7 +5360,7 @@ otro era `crMarkSinSalida`: al marcar «↩ s/salida» el último remito caía e
 correr la pantalla: `node tests/rr-sin-remitos-cierra.cjs` (verificado que falla contra el código
 anterior). Al agregar un módulo con toggle + lista, agregarle su caso vacío a ese test.
 
-## ⚠ REGLA (2026-10-01, v25.94): lo que VOLVIÓ y se recarga arranca el plazo de control DE NUEVO
+## ⚠ REGLA (2026-10-01, v25.95): lo que VOLVIÓ y se recarga arranca el plazo de control DE NUEVO
 
 - Un pedido que salió, volvió (↩ s/salida en RR = **FSS**) y se recargó (CCN nuevo) cuenta las 30 hs de
   Recepción Remitos desde la **primera carga posterior a la vuelta**, no desde la primera de todas.
@@ -5353,7 +5368,7 @@ anterior). Al agregar un módulo con toggle + lista, agregarle su caso vacío a 
   Caso: LK 0122 / LK 0177 salían VENCIDOS recién recargados el 01/10.
 - Lo que volvió y **no** se recargó lleva el badge **↩ VOLVIÓ** en la Programación / Pedidos atrasados
   (`_pgaVolvio`) y lo vuelve a ofrecer Carga Camión (ya lo hacía, v6.66).
-- `sql/vista_control_remitos_ciclo_v2594.sql`, `tests/rr-volvio-ciclo.cjs`.
+- `sql/vista_control_remitos_ciclo_v2595.sql`, `tests/rr-volvio-ciclo.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-01, v25.63): todo módulo que abre tarea tiene ⛔ ANULAR — y la anulación QUEDA REGISTRADA
 

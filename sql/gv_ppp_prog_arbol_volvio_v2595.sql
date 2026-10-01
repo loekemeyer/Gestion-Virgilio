@@ -1,4 +1,4 @@
--- v25.94 — PENDIENTE DEL «SÍ» (gv_ppp_prog_arbol está en GV_Reglas_Centinela).
+-- v25.95 — PENDIENTE DEL «SÍ» (gv_ppp_prog_arbol está en GV_Reglas_Centinela).
 -- Pedido: "hacer que aparezca en la PPP cuando vuelve ... y vuelva a estar en la Programación
 -- como Facturado pero con el badge de VOLVIÓ".
 --
@@ -26,7 +26,7 @@ declare
    where (case when u.en_espera then public.gv_ppp_espera_fecha() else u.fe end) between p_desde and p_hasta
 ),$o$;
   v_new_dia text := $n$_vu_volvio as (
-  -- v25.94-volvio: salió, el cliente no la recibió (↩ s/salida = FSS) y no se volvió a cargar.
+  -- v25.95-volvio: salió, el cliente no la recibió (↩ s/salida = FSS) y no se volvió a cargar.
   -- Vuelve a la Programación en el día de HOY (o en el que le pongan después, si es más tarde).
   select x.np
     from (select regexp_replace(upper(btrim(split_part(r.texto, '|', 1))), '\.0+$', '') as np,
@@ -57,7 +57,7 @@ dia as (
                else u.fe end) between p_desde and p_hasta
 ),$n$;
 begin
-  if v_def like '%v25.94-volvio%' then raise notice 'ya aplicado'; return; end if;
+  if v_def like '%v25.95-volvio%' then raise notice 'ya aplicado'; return; end if;
   if position(v_old_dia in v_def) = 0 then raise exception 'gv_ppp_prog_arbol: el CTE dia no matchea (otra sesión la cambió): no se aplica'; end if;
   v_new := replace(v_def, v_old_dia, v_new_dia);
   execute v_new;

@@ -31044,7 +31044,7 @@ Jumbo (`cencosud`) 50 ítems, 31 importados, los 50 con L (se pela para clasific
 Impacto: ninguno sobre objetos existentes. Rollback: `drop function` de las dos (`sql/gv_hotsale_super_items_v2593.sql`).
 
 
-## §3.v2594 — Recepción Remitos: el plazo de 30 hs arranca en la carga ACTUAL (v25.94, 01/10/2026)
+## §3.v2595 — Recepción Remitos: el plazo de 30 hs arranca en la carga ACTUAL (v25.95, 01/10/2026)
 
 - **Caso:** LK 0122 (carga 29/09, ↩ s/salida 30/09, recargado 01/10 11:53) y LK 0177 (carga 28/09,
   ↩ 29/09, recargado 01/10 08:59) salían VENCIDOS en RR recién recargados, y la PPP mandó la alarma
@@ -31056,6 +31056,17 @@ Impacto: ninguno sobre objetos existentes. Rollback: `drop function` de las dos 
   cambian **2** (exactamente esas); `anon` ve 23 filas, 0 vencidas. `security_invoker` repuesto.
 - **Badge ↩ VOLVIÓ** en la fila de NP de la Programación / Pedidos atrasados (`_pgaVolvio`, mismo
   mapa CCN + FSS que el 🚚 de Salió). Carga Camión ya re-ofrecía lo que vuelve (v6.66).
-- **Pendiente del «sí»:** `sql/gv_ppp_prog_arbol_volvio_v2594.sql` lleva lo vuelto al día de HOY de la
+- **Pendiente del «sí»:** `sql/gv_ppp_prog_arbol_volvio_v2595.sql` lleva lo vuelto al día de HOY de la
   Programación (hoy cae en Pedidos atrasados). `gv_ppp_prog_arbol` está en `GV_Reglas_Centinela`.
-- `sql/vista_control_remitos_ciclo_v2594.sql`, `tests/rr-volvio-ciclo.cjs`.
+- `sql/vista_control_remitos_ciclo_v2595.sql`, `tests/rr-volvio-ciclo.cjs`.
+## §3.v2594 — Editar PI: `GV_Imp_PI_Editor`, `GV_Imp_PI_Edicion`, `gv_imp_pi_editar` (01/10/2026)
+
+Corregir las cantidades de cada ítem de una PI en curso con registro de quién, qué día y a qué hora.
+Objetos nuevos: `GV_Imp_PI_Editor` (5 de semilla: Thomas, Tomás, Vivi, Luis, Gastón; «Otro» suma filas),
+`GV_Imp_PI_Edicion` (log, RLS sin policy), `gv_imp_pi_editores()`, `gv_imp_pi_editar(ref, prov, editor,
+cambios jsonb, nuevo_ref, simular)` y `gv_imp_pi_ediciones(ref, prov, limite)`, las tres SECURITY DEFINER con
+guard de supervisor y execute sólo `authenticated`. Escribe `GV_Importados_Baches` (unidades / estado /
+pedido_ref) y llama `gv_importados_resync`. Probado en transacción abortada: 2 cambios + rename R1→R2 →
+3 filas de log, editor nuevo, `pedido_curso` 438E=2520 / 035E=0, y un `antes` viejo frena.
+Impacto sobre objetos existentes: ninguno (no se tocó `gv_importado_bache_editar` ni `gv_importado_pedido_ref`).
+Rollback: los `drop` de la cabecera de `sql/gv_imp_pi_editar_v2594.sql`.

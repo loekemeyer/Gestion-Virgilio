@@ -1,4 +1,4 @@
-/* v25.94 — un pedido que SALIÓ y VOLVIÓ (↩ s/salida = FSS) y se recarga arranca el plazo de
+/* v25.95 — un pedido que SALIÓ y VOLVIÓ (↩ s/salida = FSS) y se recarga arranca el plazo de
    control de nuevo. Caso del 01/10: LK 0122 (carga 29/09, volvió 30/09, recargado 01/10) y
    LK 0177 (carga 28/09, volvió 29/09, recargado 01/10) salían VENCIDOS en Recepción Remitos
    y la PPP mandó la alarma CRA falsa, porque el reloj tomaba la PRIMERA carga de todas.
@@ -9,7 +9,7 @@
    E) la vista de RR (sql del repo) calcula first_load por ciclo. */
 const fs = require("fs"), path = require("path");
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "latin1");
-const sql = fs.readFileSync(path.join(__dirname, "..", "sql", "vista_control_remitos_ciclo_v2594.sql"), "utf8");
+const sql = fs.readFileSync(path.join(__dirname, "..", "sql", "vista_control_remitos_ciclo_v2595.sql"), "utf8");
 const mal = [];
 function tomar(src, inicio, fin) {
   const i = src.indexOf(inicio); if (i < 0) throw new Error("no está: " + inicio);

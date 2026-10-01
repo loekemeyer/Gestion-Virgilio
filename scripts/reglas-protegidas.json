@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-01 (+ cuarentena deuda < 5 dias)",
+  "_generado": "2026-10-01 (+ cuarentena deuda < 5 dias, + centinela gv_imp_pi_editar)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -225,6 +225,11 @@
       "objeto": "gv_imp_pago_cargas_set",
       "regla": "Importación: esta RPC escribe y sólo la puede usar un supervisor logueado (o el servicio); sin esto cualquiera con la clave pública carga o borra giros, baches,",
       "quien": "Thomas"
+    },
+    {
+      "objeto": "gv_imp_pi_editar",
+      "regla": "Editar una PI deja registrado QUIÉN (editor elegido en el lápiz), QUÉ DÍA y A QUÉ HORA cada cantidad cambiada (GV_Imp_PI_Edicion)",
+      "quien": "(a confirmar)"
     },
     {
       "objeto": "gv_imp_prov_alias_set",
