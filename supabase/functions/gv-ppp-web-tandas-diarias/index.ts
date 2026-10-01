@@ -127,6 +127,24 @@ async function lk(path: string, init: RequestInit = {}): Promise<Response> {
 
 type Fila = Record<string, unknown>;
 
+/** v25.77 (Luis, 2026-10-01) — GÓNDOLA DE PICKEO de la NP, para que el armador no mezcle en una
+ *  tanda lo que sale de góndola LK con lo que sale de góndola CH (regla "una tanda pickea todo de
+ *  una sola góndola"). No es la empresa de la NP: la L del artículo manda a góndola Loeke.
+ *    · empresa LK                    → LK (con o sin L, las dos de góndola LK)
+ *    · empresa CH, algún art con L    → LK (Cencosud, TdF: pickea de Loeke)
+ *    · empresa CH, ningún art con L   → CH (Dorinka, normal)
+ *    · empresa CH, con L y sin L       → MIX (toca las dos; el armador la deja sola)
+ *  Mismo criterio que pkEmpresaArt/pkResolveArt del front (`/[0-9E]L$/`). Viaja en p_filas y lo
+ *  lee ppp_web_armar_tandas; si falta, el armador defaultea por empresa (comportamiento previo). */
+function gondolaDe(emp: string, items: { art?: string }[] | undefined): string {
+  if (String(emp).toLowerCase() !== "chef") return "LK";
+  const arts = (items ?? []).map((it) => String(it?.art ?? "").trim()).filter(Boolean);
+  if (!arts.length) return "CH";
+  const conL = arts.some((a) => /[0-9E]L$/i.test(a));
+  const sinL = arts.some((a) => !/[0-9E]L$/i.test(a));
+  return conL && sinL ? "MIX" : conL ? "LK" : "CH";
+}
+
 /** v17.80 — TIERRA DEL FUEGO: el pedido entra por la página de LK pero ES DE CHEF.
  *
  *  Dueño (14/09): *"esos pedidos se pasen como pedidos de CH y se facturen como CH … se
@@ -644,6 +662,7 @@ async function procesarEmpresa(
     order_id: n.order_id, np_idx: n.np_idx,
     np: numDe.get(`${n.order_id}|${n.np_idx}`) ?? null,
     zona: zonas[i] || "",
+    gondola: gondolaDe(emp, n.items as { art?: string }[] | undefined),   // v25.77: góndola de pickeo
     cod: n.cod ?? null, razon_social: n.razon_social ?? null,
     direccion: direccionDe(n) || null, barrio: barrioCrudo(n).barrio || null,
     // La antigüedad es con lo que se ordena la cola cuando no entra todo.
