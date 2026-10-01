@@ -3835,6 +3835,13 @@ ya no usa el alias: los pedidos de 323E/838E se reciben en cajas, sólo el de 32
 **v25.12 (Luis, 30/09): el insumo se llama `323ES`, no `323ES In`** (*"323ES nunca fue un código de stock"*): renombrado en
 `Insumos`, `Insumos_Factores`, `GV_Importados_Insumo_Map` e `Importados_Stock_Parte` (0 movimientos; backup `zz_backups."GV_Backup_323ESIn_20260930"`).
 
+**v25.66 (Luis, 01/10): se puede RECIBIR un importado SIN PEDIDO registrado.** El 📥 está siempre; sin pedido en viaje,
+el pop-up alerta *«No hay pedido registrado… queda como recepción SIN PEDIDO»*. `gv_imp_recibir_sin_pedido(importado, …)`
+crea en la MISMA transacción un bache `sin_pedido = true`, `pedido_ref 'SIN PEDIDO'`, con unidades = lo recibido: nada queda
+en viaje y **el pedido en curso nunca baja de cero** (Luis: *"si recibo 100 de algo sin pedido no debería bajar el pedido a −100"*).
+Simular no deja bache (subtransacción que se revierte). Anular la recepción o el «No» de Cervantes pasan ese bache a `anulado`.
+La recepción PARCIAL de un pedido sigue igual: desmarcando «Dar el pedido por recibido» lo que falta queda en viaje (4.464 − 64 = 4.400).
+`sql/gv_imp_recibir_sin_pedido_v2566.sql`, `tests/imp-recibir-sin-pedido.cjs`.
 **Desglose de la tarjeta del proveedor (Luis, v23.75):** los dos chips de la banda se expanden. Izq: consumo/mes =
 Σ proy u/mes × FOB por artículo, y meses = (mínimo − a pedir hoy) ÷ consumo. Der: CIF y cada línea de lo no
 recuperable con su fórmula (salen de `_pedImpNacionalizar().detalle[i][2]`, la suma = `noRecup`). El abierto queda en

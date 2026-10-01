@@ -1627,7 +1627,8 @@ function _pedImpRender() {
       const _cervDen = _dets.map(function (d) { return _impCervDen.porImp[d.id]; }).filter(Boolean)[0];   // v25.37
       const actHtml = !_dets.length ? '' : '<div style="margin:1px 0"><span style="white-space:nowrap">' +
           '<button class="stk-btn" style="padding:3px 8px;font-size:14px" title="📦 Baches: cada pedido en curso con su propia fecha de reingreso. Alta, edición y llegadas (total o parcial). El En curso y el Reingreso salen de acá (la fecha más cercana)." onclick="_pedImpAccionConfirmar(\'baches\',\'' + _codEncV + '\',function(){pedImpBachesDe(\'' + _detsEnc + '\',\'' + _codEncV + '\')})">📦</button>' +
-          (_hayCurso ? ' <button class="stk-btn" style="padding:3px 8px;font-size:14px;background:#0f766e;color:#fff;border-color:#0f766e;font-weight:800" title="📥 RECIBIR: recibir lo que llegó de este código: cuánto, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Queda en el Historial de recepción." onclick="_pedImpAccionConfirmar(\'recibir\',\'' + _codEncV + '\',function(){impRecibirCodigo(\'' + _detsEnc + '\')})">📥</button>' : '') + _impCervDenChip(_cervDen, true) + '</span></div>';
+          /* v25.66 (Luis, 01/10): el 📥 está SIEMPRE — sin pedido en viaje el pop-up avisa que no hay pedido registrado */
+          ' <button class="stk-btn" style="padding:3px 8px;font-size:14px;' + (_hayCurso ? 'background:#0f766e;color:#fff;border-color:#0f766e;' : 'background:#fff;color:#0f766e;border-color:#0f766e;') + 'font-weight:800" title="📥 RECIBIR: recibir lo que llegó de este código: cuánto, de qué empresa y a dónde va (A guardar, góndola, rack, excedente o insumos). Queda en el Historial de recepción.' + (_hayCurso ? '' : ' Este código NO tiene pedido en viaje: se puede recibir igual (queda como SIN PEDIDO).') + '" onclick="_pedImpAccionConfirmar(\'recibir\',\'' + _codEncV + '\',function(){impRecibirCodigo(\'' + _detsEnc + '\')})">📥</button>' + _impCervDenChip(_cervDen, true) + '</span></div>';
       const _m3m = Number(it.m3Master) || 0;
       const _dimTip = it.m3Dims && it.m3Dims.l ? (it.m3Dims.l + '×' + it.m3Dims.a + '×' + it.m3Dims.h + ' cm') : '';
       // v14.97 — uni/master NO se edita desde la tabla (dueño: "al pedo editarlo desde ahí").
@@ -2056,7 +2057,7 @@ const _PED_IMP_RPC_ESCRITURA = ["gv_imp_carga_pedido_set", "gv_imp_cc_deuda_add"
   "gv_imp_pago_cargas_set", "gv_imp_prov_alias_set", "gv_importado_bache_add", "gv_importado_bache_borrar",
   "gv_importado_bache_editar", "gv_importado_bache_embarque", "gv_importado_bache_llego", "gv_importado_pedido_fechas",
   "gv_importado_pedido_ref", "gv_importados_resync", "importados_marcar_llegada", "importados_set_curso",
-  "gv_imp_recibir", "gv_imp_recibir_contexto", "gv_imp_recepcion_historial", "gv_imp_recepcion_anular",   // v23.45 — sólo authenticated (supervisor)
+  "gv_imp_recibir", "gv_imp_recibir_contexto", "gv_imp_recibir_sin_pedido", "gv_imp_recibir_contexto_sin_pedido", "gv_imp_recepcion_historial", "gv_imp_recepcion_anular",   // v23.45 — sólo authenticated (supervisor)
   "gv_imp_cervantes_denegados"];   // v25.37
 async function _pedImpRpc(fn, body) {
   var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
@@ -2585,14 +2586,14 @@ function _impRecShell(titulo, inner) {
   ov.innerHTML = '<div class="irc-card"><div class="irc-head"><b>' + titulo + '</b><button class="irc-x" onclick="impRecCerrar()">✕ Cerrar</button></div><div class="irc-body">' + inner + '</div></div>';
 }
 // Desde la tabla: un Importados.id puede tener varios baches en curso → se elige cuál llegó.
-async function impRecibirAbrir(importadoId) {
+async function impRecibirAbrir(importadoId, det) {
   _impRecShell("📥 Recibir importación", '<div class="irc-muted">Cargando pedidos en curso…</div>');
   var rows;
   try { rows = (await _pedImpRpc("gv_importado_baches", { p_importado_id: importadoId })) || []; }
   catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">No se pudieron leer los pedidos: ' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
   var enc = rows.filter(function (r) { return r.estado === "en_curso" && Number(r.pendiente) > 0; });
   await _impCervDenCargar();   // v25.37
-  if (!enc.length) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">Este código no tiene pedidos en curso con unidades pendientes. Si llegó algo que no estaba pedido, cargalo primero como bache (📦 Baches).</div>'); return; }
+  if (!enc.length) return _impRecSinPedidoAviso([det || { id: importadoId, cod: (rows[0] && rows[0].cod_art) || "" }]);   // v25.66
   if (enc.length === 1) return impRecibirBache(enc[0].id);
   var h = '<div class="irc-sec"><h4>¿Qué pedido llegó?</h4>' + enc.map(function (r) {
     return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirBache(' + r.id + ')">📥 ' + escapeHtml(r.pedido_ref || ("bache " + r.id)) + '</button><span class="irc-muted">' +
@@ -2605,7 +2606,7 @@ function _impDetsDe(enc) { try { return JSON.parse(decodeURIComponent(enc)) || [
 function _impDetLbl(d) { return escapeHtml(codCanon(d.cod || "")) + (d.marca ? ' ' + escapeHtml(d.marca) : ''); }
 async function impRecibirCodigo(enc) {
   var dets = _impDetsDe(enc);
-  if (dets.length === 1) return impRecibirAbrir(dets[0].id);
+  if (dets.length === 1) return impRecibirAbrir(dets[0].id, dets[0]);
   _impRecShell("📥 Recibir importación", '<div class="irc-muted">Cargando pedidos en curso…</div>');
   var enc2 = [];
   try {
@@ -2613,7 +2614,7 @@ async function impRecibirCodigo(enc) {
     res.forEach(function (rows, k) { (rows || []).forEach(function (r) { if (r.estado === "en_curso" && Number(r.pendiente) > 0) enc2.push({ r: r, d: dets[k] }); }); });
   } catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">No se pudieron leer los pedidos: ' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
   await _impCervDenCargar();   // v25.37
-  if (!enc2.length) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">Este código no tiene pedidos en curso con unidades pendientes. Si llegó algo que no estaba pedido, cargalo primero como bache (📦 Baches).</div>'); return; }
+  if (!enc2.length) return _impRecSinPedidoAviso(dets);   // v25.66
   if (enc2.length === 1) return impRecibirBache(enc2[0].r.id);
   // v24.92: si el pedido entra como INSUMO (323E/838E/323ES → 323ES), el rótulo es el insumo, no el artículo.
   try {
@@ -2641,12 +2642,36 @@ async function impRecibirBache(bacheId) {
   var ctx;
   try { ctx = await _pedImpRpc("gv_imp_recibir_contexto", { p_bache_id: bacheId }); }
   catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
+  _impRecIniciar(ctx, "imprec-" + bacheId);
+}
+/* v25.66 (Luis, 01/10): «que de la posibilidad de recibir algo por más que no haya pedido … que el pop-up alerte».
+   El backend crea el pedido «SIN PEDIDO» en la MISMA operación, con unidades = lo que llegó: no queda nada en
+   viaje y el pedido en curso nunca baja de cero. Anular la recepción anula ese pedido. */
+function _impRecSinPedidoAlerta() {
+  return '<div class="irc-conf" style="font-size:15px;line-height:1.4;border-width:2px">⚠ <b>No hay pedido registrado</b> de este código. ' +
+    'Estás por recibir algo que no estaba pedido: entra al stock igual y queda anotado como recepción <b>SIN PEDIDO</b>. ' +
+    'No descuenta ningún pedido en viaje.</div>';
+}
+function _impRecSinPedidoAviso(dets) {
+  var h = _impRecSinPedidoAlerta() + '<div class="irc-sec"><h4>¿Recibir igual?</h4>' + (dets || []).map(function (d) {
+    return '<div class="irc-row"><button class="irc-b pri" onclick="impRecibirSinPedido(' + Number(d.id) + ')">📥 Recibir sin pedido ' + _impDetLbl(d) + '</button></div>';
+  }).join('') + '<div class="irc-row"><button class="irc-b sec" onclick="impRecCerrar()">Cancelar</button></div></div>';
+  _impRecShell("📥 Recibir importación", h);
+}
+async function impRecibirSinPedido(importadoId) {
+  _impRecShell("📥 Recibir importación", '<div class="irc-muted">Cargando lugares del Mapa…</div>');
+  var ctx;
+  try { ctx = await _pedImpRpc("gv_imp_recibir_contexto_sin_pedido", { p_importado_id: importadoId }); }
+  catch (e) { _impRecShell("📥 Recibir importación", '<div class="irc-conf">' + escapeHtml(_impRecErr(e)) + '</div>'); return; }
+  _impRecIniciar(ctx, "imprec-sp" + importadoId);
+}
+function _impRecIniciar(ctx, cidBase) {
   var uxc = Number(ctx.uni_x_caja) || 0;
   var soloInsumo = !!ctx.es_insumo || (!(ctx.gondola || []).length && (ctx.insumos_cods || []).length > 0 && !uxc);
   var cajasDef = uxc > 0 ? Math.round((Number(ctx.pendiente) || 0) / uxc) : 0;
   _impRec = {
     ctx: ctx, soloInsumo: soloInsumo, empresa: ctx.empresa || "LK", empresaBache: ctx.empresa || "", uxc: uxc || "", nota: "", hecho: false, sim: null,
-    cerrar: true, cid: "imprec-" + bacheId + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+    cerrar: true, cid: cidBase + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
     lineas: [soloInsumo
       ? { destino: "insumos", sector: "", cantidad: Number(ctx.pendiente) || "", cod_insumo: (ctx.insumos_cods || [])[0] || ctx.cod_stock, resolucion: "" }
       : { destino: "a_guardar", sector: "", cantidad: cajasDef || "", resolucion: "" }]
@@ -2671,10 +2696,11 @@ function _impRecRender() {
   var c = _impRec.ctx, uxc = Number(_impRec.uxc) || 0;
   var pend = Number(c.pendiente) || 0;
   var h = '<div class="irc-sec"><div style="font-size:16px;font-weight:800">' + escapeHtml(c.es_insumo && (c.insumos_cods || []).length ? c.insumos_cods[0] : codCanon(c.cod_stock || c.cod_art)) + ' <span style="font-weight:600;color:#475569">' + escapeHtml(c.descripcion || "") + '</span></div>' +
-    '<div class="irc-muted">' + escapeHtml(c.proveedor || "") + ' · pedido ' + escapeHtml(c.pedido_ref || "—") + ' · pendiente <b>' + pend.toLocaleString("es-AR") + ' u</b>' +
-    (uxc > 0 ? ' (' + Math.round(pend / uxc).toLocaleString("es-AR") + ' cajas)' : '') + (Number(c.uni_master) > 0 ? ' · master de ' + c.uni_master + ' u' : '') + '</div>' +
+    '<div class="irc-muted">' + escapeHtml(c.proveedor || "") + (c.sin_pedido ? ' · <b style="color:#b91c1c">sin pedido registrado</b>' : ' · pedido ' + escapeHtml(c.pedido_ref || "—") + ' · pendiente <b>' + pend.toLocaleString("es-AR") + ' u</b>' +
+    (uxc > 0 ? ' (' + Math.round(pend / uxc).toLocaleString("es-AR") + ' cajas)' : '')) + (Number(c.uni_master) > 0 ? ' · master de ' + c.uni_master + ' u' : '') + '</div>' +
     (_impCervDen.porBache[c.bache_id] ? '<div class="irc-conf" style="margin-top:6px">' + _impCervDenChip(_impCervDen.porBache[c.bache_id]) + ' Cervantes dijo que esto no le llegó' +
       (_impCervDen.porBache[c.bache_id].motivo ? ' (' + escapeHtml(_impCervDen.porBache[c.bache_id].motivo) + ')' : '') + ': recibilo de nuevo a donde corresponda.</div>' : '') + '</div>';
+  if (c.sin_pedido) h += _impRecSinPedidoAlerta();   // v25.66
   if (c.dual) {
     h += '<div class="irc-sec"><h4>¿De qué empresa es? (código dual: son productos distintos)</h4><div class="irc-row">' +
       ["LK", "CH"].map(function (e) { return '<button class="irc-b ' + (_impRec.empresa === e ? 'on' : 'sec') + '" onclick="impRecSet(\'empresa\',\'' + e + '\')">' + (e === "LK" ? "Loekemeyer (LK)" : "Chef (CH)") + '</button>'; }).join('') + '</div>' +
@@ -2724,8 +2750,8 @@ function _impRecRender() {
   var tot = _impRecTotales();
   h += '<button class="irc-b sec" onclick="impRecAgregar()">＋ Otro destino (partir la carga)</button>' +
     '<div class="irc-muted" style="margin-top:6px">Total: <b>' + tot.cajas + ' cajas</b>' + (tot.insU ? ' + <b>' + tot.insU.toLocaleString("es-AR") + ' u</b> de insumo' : '') +
-    ' = <b>' + tot.uni.toLocaleString("es-AR") + ' u</b> de ' + pend.toLocaleString("es-AR") + ' pendientes' +
-    (tot.uni > pend ? ' · <span style="color:#b45309;font-weight:800">llegan ' + (tot.uni - pend).toLocaleString("es-AR") + ' u más de lo pedido: entran todas al stock y el pedido queda recibido (lo de más no descuenta otros pedidos en viaje)</span>' : '') + '</div>' +
+    ' = <b>' + tot.uni.toLocaleString("es-AR") + ' u</b>' + (c.sin_pedido ? ' · sin pedido: entra todo al stock' : ' de ' + pend.toLocaleString("es-AR") + ' pendientes') +
+    (!c.sin_pedido && tot.uni > pend ? ' · <span style="color:#b45309;font-weight:800">llegan ' + (tot.uni - pend).toLocaleString("es-AR") + ' u más de lo pedido: entran todas al stock y el pedido queda recibido (lo de más no descuenta otros pedidos en viaje)</span>' : '') + '</div>' +
     (tot.uni > 0 && tot.uni < pend
       ? '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:13.5px;cursor:pointer"><input type="checkbox" style="width:18px;height:18px;margin:2px 0 0" ' + (_impRec.cerrar ? 'checked' : '') + ' onchange="impRecSet(\'cerrar\',this.checked)"><span>' +
         (_impRec.cerrar ? '<b>Dar el pedido por recibido.</b> Las ' + (pend - tot.uni).toLocaleString("es-AR") + ' u que faltan NO siguen en viaje (quedan anotadas como faltante).'
@@ -2810,7 +2836,15 @@ function _impRecValidar() {
   }
   return "";
 }
+function _impRecFn() { return _impRec.ctx.sin_pedido ? "gv_imp_recibir_sin_pedido" : "gv_imp_recibir"; }   // v25.66
 function _impRecBody(simular) {
+  if (_impRec.ctx.sin_pedido) {
+    var b = _impRecBodyBache(simular); delete b.p_bache_id; delete b.p_cerrar;
+    b.p_importado_id = _impRec.ctx.importado_id; return b;
+  }
+  return _impRecBodyBache(simular);
+}
+function _impRecBodyBache(simular) {
   return { p_bache_id: _impRec.ctx.bache_id, p_empresa: _impRec.empresa || null, p_uni_x_caja: Number(_impRec.uxc) || null,
     p_destinos: _impRec.lineas.map(function (l) { return { destino: l.destino, sector: l.sector || null, cantidad: Number(l.cantidad), cod_insumo: l.cod_insumo || null, resolucion: l.resolucion || null, unidad: _impRecU(l) ? "Uni" : null }; }),
     p_nota: _impRec.nota || null, p_simular: !!simular, p_cerrar: _impRec.cerrar !== false, p_client_id: _impRec.cid };
@@ -2818,7 +2852,7 @@ function _impRecBody(simular) {
 async function impRecRevisar() {
   if (!_impRec) return;
   var v = _impRecValidar(); if (v) { _impRec.err = v; _impRecRender(); return; }
-  try { _impRec.sim = await _pedImpRpc("gv_imp_recibir", _impRecBody(true)); _impRec.err = ""; }
+  try { _impRec.sim = await _pedImpRpc(_impRecFn(), _impRecBody(true)); _impRec.err = ""; }
   catch (e) { _impRec.sim = null; _impRec.err = _impRecErr(e); }
   _impRecRender();
 }
@@ -2829,13 +2863,14 @@ async function impRecGrabar() {
   var resumen = "Recibir " + tot.uni.toLocaleString("es-AR") + " u de " + (_impRec.ctx.cod_stock || _impRec.ctx.cod_art) +
     (_impRec.ctx.dual ? " (" + _impRec.empresa + ")" : "") + ":\n" +
     _impRec.lineas.map(function (l) { return "  · " + l.cantidad + (_impRecU(l) ? " u" : " cajas") + " → " + _IMP_REC_DEST[l.destino] + (l.sector ? " " + l.sector : ""); }).join("\n") +
-    "\n\n" + (tot.uni >= pend ? "El pedido queda RECIBIDO" + (tot.uni > pend ? " (llegan " + (tot.uni - pend) + " u de más)." : ".")
+    "\n\n" + (_impRec.ctx.sin_pedido ? "⚠ NO HAY PEDIDO REGISTRADO de este código: entra todo al stock y queda anotado como recepción SIN PEDIDO. No descuenta ningún pedido en viaje."
+      : tot.uni >= pend ? "El pedido queda RECIBIDO" + (tot.uni > pend ? " (llegan " + (tot.uni - pend) + " u de más)." : ".")
       : (_impRec.cerrar ? "El pedido queda RECIBIDO: las " + (pend - tot.uni) + " u que faltan dejan de figurar en viaje." : "Siguen en viaje " + (pend - tot.uni) + " u.")) +
     "\n\n¿Confirmás?";
   if (!confirm(resumen)) return;
   _impRec.grabando = true;
   var r;
-  try { r = await _pedImpRpc("gv_imp_recibir", _impRecBody(false)); }
+  try { r = await _pedImpRpc(_impRecFn(), _impRecBody(false)); }
   catch (e) { _impRec.grabando = false; _impRec.err = _impRecErr(e) + " — No se grabó nada. Si fue un corte de red, volvé a tocar Confirmar: no se graba dos veces."; _impRecRender(); return; }
   _impRec.grabando = false;
   if (!r || !r.ok) { _impRec.sim = r; _impRec.err = "Apareció un conflicto de espacio mientras cargabas: resolvelo y confirmá de nuevo."; _impRecRender(); return; }
@@ -2843,8 +2878,8 @@ async function impRecGrabar() {
   var dest = _impRec.lineas.map(function (l) { return l.cantidad + (_impRecU(l) ? " u" : " cj") + " → " + _IMP_REC_DEST[l.destino] + (l.sector ? " " + l.sector : ""); }).join(" · ");
   _impRecShell("📥 Recepción grabada", '<div class="irc-ok">✓ Recibidas <b>' + Number(r.unidades).toLocaleString("es-AR") + ' u</b> (' + r.cajas + ' cajas). ' + escapeHtml(dest) + '</div>' +
     '<div class="irc-muted" style="margin-top:8px">' + (r.repetida ? "(Ya estaba grabada: no se cargó dos veces.) " : "") +
-    (r.estado === "llegado" ? "El pedido quedó RECIBIDO y ya no figura en viaje." + (Number(r.faltante) > 0 ? " Faltaron " + Number(r.faltante).toLocaleString("es-AR") + " u (anotadas)." : "") : "El pedido sigue en curso con lo que falta.") +
-    (Number(r.sobra) > 0 ? ' Llegaron ' + Number(r.sobra).toLocaleString("es-AR") + ' u más de lo pedido: entraron al stock igual.' : '') + '</div>' +
+    (r.sin_pedido ? "Quedó anotada como recepción SIN PEDIDO (no había pedido en viaje). " : r.estado === "llegado" ? "El pedido quedó RECIBIDO y ya no figura en viaje." + (Number(r.faltante) > 0 ? " Faltaron " + Number(r.faltante).toLocaleString("es-AR") + " u (anotadas)." : "") : "El pedido sigue en curso con lo que falta.") +
+    (!r.sin_pedido && Number(r.sobra) > 0 ? ' Llegaron ' + Number(r.sobra).toLocaleString("es-AR") + ' u más de lo pedido: entraron al stock igual.' : '') + '</div>' +
     (_impRec.lineas.some(function (l) { return l.destino === "cervantes"; }) ? '<div class="irc-ok" style="margin-top:8px">🏭 Lo que va a <b>Cervantes</b> no entró al stock de Virgilio: les aparece en <b>Recepción de Insumos → Importados</b> de GP2 para que digan <b>Sí</b> o <b>No</b>. Si dicen No, el pedido vuelve a estar en viaje con «Denegado por Cervantes».</div>' : '') +
     '<div style="margin-top:10px"><button class="irc-b pri" onclick="impRecCerrar()">Listo</button><button class="irc-b sec" onclick="impRecCerrar();openImpHistRecep()">Ver historial de recepción</button></div>');
 }

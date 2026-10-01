@@ -1,6 +1,6 @@
 /* v23.45 (Luis, 28/09) — 📥 RECIBIR una importación desde el panel.
    Corre el flujo de verdad en el navegador, con _pedImpRpc falso (sin red):
-   A. la tabla muestra 📥 RECIBIR sólo en la línea con pedido en curso;
+   A. la tabla muestra 📥 RECIBIR en TODAS las líneas (v25.66: sin pedido también; lo mide imp-recibir-sin-pedido);
    B. dual: sin elegir empresa no deja revisar (ni llama a gv_imp_recibir);
    C. góndola llena → avisa y ofrece cómo resolver; «Poner N en góndola y el resto a A guardar»
       parte la carga en 2 destinos y vuelve a revisar;
@@ -104,7 +104,7 @@ const ITEMS = [
     out.anulo = window.__calls.some((c) => c.fn === "gv_imp_recepcion_anular" && c.body.p_id === 1 && c.body.p_motivo === "prueba");
     return out;
   }, ITEMS);
-  if (JSON.stringify(r.botones) !== '["026=false","438E=true"]') fail.push("A botón RECIBIR: " + JSON.stringify(r.botones));
+  if (JSON.stringify(r.botones) !== '["026=true","438E=true"]') fail.push("A botón RECIBIR: " + JSON.stringify(r.botones));
   if (!r.pideEmpresa || !r.sinEmpresaBloquea || r.empDefault !== "CH" || !r.avisaOtraEmpresa) fail.push("B empresa dual: " + JSON.stringify([r.empDefault, r.avisaOtraEmpresa, r.sinEmpresaBloquea]));
   if (JSON.stringify(r.celdas) !== '["L05"]') fail.push("B celdas por empresa: " + JSON.stringify(r.celdas));
   if (!r.avisaConflicto || !r.hayPartir) fail.push("C conflicto góndola");
@@ -115,5 +115,5 @@ const ITEMS = [
   if (errs.length) fail.push("pageerror: " + errs.join(" | "));
   await b.close();
   if (fail.length) { console.log("imp-recibir: ✗ " + fail.join(" · ")); process.exit(1); }
-  console.log("imp-recibir: OK — botón sólo con pedido en curso · dual pide empresa · góndola llena avisa y parte · graba 2 destinos · historial");
+  console.log("imp-recibir: OK — botón en todas las líneas · dual pide empresa · góndola llena avisa y parte · graba 2 destinos · historial");
 })();

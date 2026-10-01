@@ -349,6 +349,7 @@ echo "== imp-tabla (v11.70: la tabla de Pedidos Importación no se pisa ni corta
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-tabla.cjs
 echo "== imp-recibir (v23.45: 📥 RECIBIR importación guiado, conflicto de espacio e historial) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-recibir.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-recibir-sin-pedido.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-recibir-codigo-unidades.cjs
 
 echo "== npf-prog-sin-base (v12.05: el módulo Pedidos sin cargar en PPP ve la NP programada sin base) =="
