@@ -6237,7 +6237,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.55"></script>
+<script type="module" src="recepcion.js?v=25.56"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10282,7 +10282,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.55";
+const APP_VERSION = "v25.56";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36945,7 +36945,7 @@ async function colaImprimirTodas() {
   _colaImpBusy = true;
   try {
     // v25.51 — primero las hojas de picking (una por tanda), después los remitos de armado.
-    if (pkh0.length) { colaImpStatus("Imprimiendo " + pkh0.length + " hoja(s) de picking…"); await pkHojaImprimir(pkh0); if (items0.length) await new Promise(function (r) { setTimeout(r, 2600 * pkh0.length); }); }
+    if (pkh0.length) { colaImpStatus("Imprimiendo " + pkh0.length + " hoja(s) de picking…"); await pkHojaImprimir(pkh0, true, "cola"); if (items0.length) await new Promise(function (r) { setTimeout(r, 2600 * pkh0.length); }); }
     if (!items0.length) { colaImpStatus("🖨️ Mandé a imprimir " + pkh0.length + " hoja(s) de picking.", true); setTimeout(function () { openColaImpresion(true); }, 1600); return; }
     colaImpStatus("Preparando " + items0.length + " remito(s)…");
     var items = items0.map(function (x) { return { np: x.np, tanda: (x.tanda === "—" ? "" : x.tanda), resumen: x.resumen, armadorLeg: x.armador_leg || "", artsFallback: Array.isArray(x.arts_fallback) ? x.arts_fallback : [], faltantesFallback: Array.isArray(x.faltantes_fallback) ? x.faltantes_fallback : [] }; });
@@ -36954,17 +36954,18 @@ async function colaImprimirTodas() {
     var k = 0;
     var next = function () { if (k >= ds.length) return; try { remitoPrintDoc(armadoRemitoInnerHtml(ds[k])); } catch (_e) {} k++; if (k < ds.length) setTimeout(next, 2600); };
     next();
-    colaImpMarcarImpresas(items.map(function (it) { return it.np; }));
+    colaImpMarcarImpresas(items.map(function (it) { return it.np; }), "cola");
     colaImpStatus("🖨️ Mandé a imprimir " + ds.length + " remito(s) de armado.", true);
     setTimeout(function () { colaImpLoadBadge(); openColaImpresion(true); }, 1600);
   } catch (e) { colaImpStatus("Error: " + (e && e.message ? e.message : e), false); }
   finally { _colaImpBusy = false; }
 }
 /* Marca en Impresion_NP las NP que se mandaron a imprimir (idempotente, PK np). */
-function colaImpMarcarImpresas(nps) {
+function colaImpMarcarImpresas(nps, origen) {
   if (!nps || !nps.length) return;
   var leg = (typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) ? legajoInput.value : null;
-  var rows = nps.map(function (np) { return { np: String(np), legajo: leg }; });
+  // v25.56 (Luis, D5): gv_origen dice por dónde salió la hoja — "estacion" (sola al TP/TAL) o "cola".
+  var rows = nps.map(function (np) { return { np: String(np), legajo: leg, gv_origen: origen || null }; });
   try {
     fetch(SUPABASE_URL + "/rest/v1/Impresion_NP?on_conflict=np", {
       method: "POST",
@@ -53892,12 +53893,12 @@ async function pkHojaDatos(tandas){
     return pkHojaArmar(t, tp, pkcBy[t] || [], lug || [], npBy[t] || [], otrasBy[t] || [], nom);
   });
 }
-async function pkHojaImprimir(tandas, marcar){
+async function pkHojaImprimir(tandas, marcar, origen){
   var ds = await pkHojaDatos(tandas);
   var k = 0;
   var next = function (){ if (k >= ds.length) return; try { remitoPrintDoc(pkHojaHtml(ds[k])); } catch (_e){} k++; if (k < ds.length) setTimeout(next, 2600); };
   next();
-  if (marcar !== false) { try { colaImpMarcarImpresas(ds.map(function (d){ return PK_HOJA_PREFIJO + d.tanda; })); } catch (_e){} }
+  if (marcar !== false) { try { colaImpMarcarImpresas(ds.map(function (d){ return PK_HOJA_PREFIJO + d.tanda; }), origen || "cola"); } catch (_e){} }
   return ds.length;
 }
 /* Picking terminados (TP de las últimas 48 h, legajo real) cuya hoja no se imprimió. */
@@ -54072,7 +54073,7 @@ async function psPoll(force){
       if (tps.length) {
         const printed = psGetPrinted(); const nuevas = [];
         tps.forEach(function (ev){ _ps.lastSeenTp = String(ev.ts_cliente); const t = String(ev.texto || "").trim().toUpperCase(); const k = PK_HOJA_PREFIJO + t; if (t && !printed.has(k) && nuevas.indexOf(t) < 0) { psMarkPrinted(k); nuevas.push(t); } });
-        if (nuevas.length) await pkHojaImprimir(nuevas);
+        if (nuevas.length) await pkHojaImprimir(nuevas, true, "estacion");
       }
     } catch (_e2) {}
   } catch (_e){ _ps.lastErr = "sin conexión con Supabase"; }
@@ -54145,7 +54146,7 @@ async function psPrintBatch(items){
   });
   // v12.08 — también marcar en Impresion_NP (server): si no, la Cola de impresión y su
   // badge seguían acusando "sin imprimir" NPs que la estación ya imprimió sola.
-  try { colaImpMarcarImpresas(ds.map(function (d){ return String(d.np); })); } catch (_e) {}
+  try { colaImpMarcarImpresas(ds.map(function (d){ return String(d.np); }), "estacion"); } catch (_e) {}
   setTimeout(function (){ try { colaImpLoadBadge(); } catch (_e) {} }, 1600);   // refresca el badge cuando el insert ya pegó
 }
 function psEnqueuePrint(d){ _psEnsure(); _ps.queue.push(d); psDrain(); }
@@ -58035,7 +58036,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.55"></script>
+<script src="importacion.js?v=25.56"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60836,7 +60837,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.55"></script>
+<script src="cobranzas.js?v=25.56"></script>
 
 </body>
 </html>
