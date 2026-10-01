@@ -868,7 +868,8 @@ async function pedImpStockDesglose(keyEnc, foco) {
     document.body.appendChild(ov);
   }
   /* v25.71 (Luis, 01/10): más grande y con el CÓDIGO del componente de Cervantes (GRJ31), que sale de
-     GV_Importados_Equiv_GP2. Sin esa fila se ve como antes. */
+     GV_Importados_Equiv_GP2. Sin esa fila se ve como antes. v26.00: un importado puede tener VARIOS
+     componentes (942E = Z47 + Z47-M505D + 942E) y se listan todos. */
   let equiv = null, insDetG = null, insErrG = false;
   const pintar = function (insDet, insErr) {
     if (insDet !== undefined) { insDetG = insDet; insErrG = !!insErr; } else { insDet = insDetG; insErr = insErrG; }
@@ -882,8 +883,8 @@ async function pedImpStockDesglose(keyEnc, foco) {
       else h += tr('Depósito insumos', f(it.stockInsU), '');
       if (it.stockTermU > 0) h += tr('🧩 Productos ya armados', f(it.stockTermU), 'stock de los terminados que usan ' + (it.esInsumo ? 'este insumo' : 'esta parte') + ' (detalle abajo)');
       if (it.stockGp2U > 0 || equiv) {
-        const fac = equiv ? Number(equiv.factor) || 1 : 1;
-        const comp = equiv ? escapeHtml(equiv.componente_codigo) : '';
+        const fac = equiv && equiv.length === 1 ? Number(equiv[0].factor) || 1 : 1;
+        const comp = equiv ? equiv.map(function (e) { return escapeHtml(e.componente_codigo); }).join(' + ') : '';
         h += tr('🏭 Cervantes (GP2)' + (comp ? ' · <b class="imp-gp2-cod" style="font-size:17px;color:#b45309">' + comp + '</b>' : ''), f(it.stockGp2U),
           (comp ? 'stock de <b>' + comp + '</b> en Cervantes (sector, talleristas y PS)' : 'componente equivalente en GP2: sector, talleristas y PS') +
           (fac !== 1 && it.stockGp2U > 0 ? ' · le toca el <b>' + Math.round(fac * 100) + ' %</b> de ' + f(it.stockGp2U / fac) + ' u' : ''));
@@ -906,14 +907,14 @@ async function pedImpStockDesglose(keyEnc, foco) {
     ov.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:760px;width:100%;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#0369a1;color:#fff">' +
       '<div style="font-size:19px;font-weight:800">' + (foco === "proy" ? '📈 Estadística Madre — ' : '📦 Stock — ') + escapeHtml(codCanon(_impCodVista(it))) + (it.esInsumo ? ' · insumo' : '') +
-        (equiv ? ' <span class="imp-gp2-hdr" style="font-size:15px;font-weight:700;background:#fff;color:#b45309;border-radius:8px;padding:2px 8px;margin-left:6px">🏭 ' + escapeHtml(equiv.componente_codigo) + ' en Cervantes</span>' : '') + '</div>' +
+        (equiv ? ' <span class="imp-gp2-hdr" style="font-size:15px;font-weight:700;background:#fff;color:#b45309;border-radius:8px;padding:2px 8px;margin-left:6px">🏭 ' + equiv.map(function (e) { return escapeHtml(e.componente_codigo); }).join(' + ') + ' en Cervantes</span>' : '') + '</div>' +
       '<button onclick="pedImpStockDesgCerrar()" style="width:auto;margin-top:0;background:#fff;color:#0369a1;border:0;border-radius:8px;padding:4px 11px;font-size:14px;font-weight:800;cursor:pointer">Cerrar</button></div>' +
       '<div style="padding:10px 14px 14px">' + h + '</div></div>';
   };
   pintar(null, false);
   if (foco !== "proy") {
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Importados_Equiv_GP2", "select=componente_codigo,factor&importado_cod=eq." + encodeURIComponent(it.cod))
-      .then(function (r) { if (r && r[0] && document.getElementById("impStkDesgOv")) { equiv = r[0]; pintar(); } })
+      .then(function (r) { if (r && r.length && document.getElementById("impStkDesgOv")) { equiv = r; pintar(); } })
       .catch(function () { /* sin el código se ve como antes */ });
   }
   if (foco === "proy" || !(it.stockInsU > 0)) return;

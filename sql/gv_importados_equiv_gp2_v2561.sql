@@ -64,3 +64,14 @@ values ('gv_importados_ordenes','vista','GV_Importados_Equiv_GP2',
         'el stock de importados suma el stock GP2 del componente equivalente (x factor)','Luis','v25.61'),
        ('gv_importados_ordenes','vista','stock_total_neto',
         'stock de importacion sin piso en 0: lo comprometido de mas da stock negativo','Luis','v25.61');
+
+-- v26.00 (Luis, 01/10, D19): más equivalencias. Varias no existen TODAVÍA en GP2: el cruce es por
+-- upper(código), así que cuentan solas el día que GP2 las cree (hasta ahí suman 0). Factor 1 c/u, se suman.
+insert into public."GV_Importados_Equiv_GP2"(importado_cod, componente_codigo, factor, nota, creado_por) values
+('942E','Z47',1,'Luis 01/10','Luis'),('942E','Z47-M505D',1,'Luis 01/10','Luis'),('942E','942E',1,'Luis 01/10','Luis'),
+('943E','Z44',1,'Luis 01/10','Luis'),('943E','Z44-M505C',1,'Luis 01/10','Luis'),('943E','943E',1,'Luis 01/10','Luis'),
+('944E','Z48',1,'Luis 01/10','Luis'),('944E','Z48-M505',1,'Luis 01/10','Luis'),('944E','944E',1,'Luis 01/10','Luis'),
+('945E','Z49',1,'Luis 01/10','Luis'),('945E','Z49-M505F',1,'Luis 01/10','Luis'),('945E','945E',1,'Luis 01/10','Luis'),
+('948E','Z45',1,'Luis 01/10','Luis'),('948E','Z45-M505B',1,'Luis 01/10','Luis'),('948E','948E',1,'Luis 01/10','Luis'),
+('522ES','GRJ33',1,'Luis 01/10','Luis')
+on conflict do nothing;
