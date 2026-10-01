@@ -207,11 +207,12 @@ table.tandas td,table.tandas th{text-align:center;padding:.85vh .4vw}
 /* ── Horas por operario (v21.17, Damián) ─────────────────────────────────
    Las columnas salen de `gv_monitor_horas_operario`: la clasificación de qué
    hora es productiva vive en el BACKEND, no acá. */
-table.ops th{font-size:calc(1.4*var(--u));letter-spacing:0;padding:.3vh .3vw;line-height:1.15;
-  white-space:normal;text-align:right}
-table.ops th:first-child{text-align:left}
-table.ops td{font-size:calc(2.25*var(--u));padding:.65vh .25vw;text-align:right}
-table.ops td:first-child{text-align:left;font-weight:900;color:#f8fafc;
+table.ops th{font-size:calc(1.6*var(--u));letter-spacing:0;padding:.3vh .7vw;line-height:1.15;
+  white-space:normal;text-align:center}
+/* v25.47 (Luis): todo centrado y el ancho repartido; el nombre ya no se queda con el sobrante. */
+table.ops{width:auto;margin:0 auto}
+table.ops td{font-size:calc(2.7*var(--u));padding:.65vh .7vw;text-align:center}
+table.ops td:first-child{text-align:center;font-weight:900;color:#f8fafc;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .op-prod{color:#4ade80}
 .op-rit{color:#e2e8f0;font-weight:900}
