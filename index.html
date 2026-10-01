@@ -6269,7 +6269,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.81"></script>
+<script type="module" src="recepcion.js?v=25.82"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -8578,6 +8578,7 @@ function updateCoreButtonsState(){
     if ((code === "EP" || code === "TP") && pickingActive) pending = true;
     else if ((code === "AP" || code === "TAP") && armadoActive) pending = true;
     else if (TOGGLE_CODES.includes(code) && st && st.toggles && st.toggles[code]) pending = true;
+    else if (code === "BR" && st && st.racks && st.racks.active) pending = true;     // v25.79 (el título del botón RKBM)
     b.classList.toggle("pending", pending);
   });
 }
@@ -9207,6 +9208,9 @@ function _tmLibre(leg) {
     var st = getLegajoState(leg) || {};
     if (st.picking && st.picking.active) return false;
     if (st.armado && st.armado.active) return false;
+    var _12h = 12 * 3600 * 1000;   // v25.79: Bajar / Ingreso a racks abierto (con tope, por si el celular murió adentro)
+    if (st.racks && st.racks.active && Date.now() - (st.racks.ts || 0) < _12h) return false;
+    if (st.ir && st.ir.active && Date.now() - (st.ir.ts || 0) < _12h) return false;
     if (getAnyToggleActive(leg)) return false;
     if (getActiveDeadTime(leg)) return false;
   } catch (_e) { return false; }
@@ -9218,6 +9222,7 @@ function tmMarcarEvento(leg, ms) {
   leg = String(leg || "").trim(); if (!leg) return;
   ms = Number(ms) || Date.now();
   try { if (ms > _tmUltGet(leg)) localStorage.setItem(_tmUltKey(leg), String(ms)); } catch (_e) {}
+  _tmAlertaCerrar(leg);   // v25.79: registró algo → se va el cartel de los monitores
   if (leg === _tm.leg) _tmPintar();
 }
 function _tmPintar() {
@@ -9227,9 +9232,39 @@ function _tmPintar() {
   if (!_tm.leg) { el.textContent = "—"; box.classList.remove("tm-alto"); return; }
   if (!_tmLibre(_tm.leg)) { _tm.ocupadoMs = ahora; el.textContent = _tmFmt(0); box.classList.remove("tm-alto"); return; }
   var ref = Math.max(_tmUltGet(_tm.leg), _tm.srvMs || 0, _tm.ocupadoMs || 0) || _tm.iniMs || ahora;
+  _tm.alertaRef = Math.round(ref / 1000);
   var seg = Math.max(0, (ahora - Math.min(ref, ahora)) / 1000);
   el.textContent = _tmFmt(seg);
   box.classList.toggle("tm-alto", seg >= 30 * 60);
+  if (seg >= TM_ALERTA_SEG) _tmAlertaAbrir(_tm.leg);
+}
+/* v25.79 (Luis, 01/10) — a los 5 min de tiempo muerto el celular avisa a los MONITORES
+   (gv_alerta_inactivo_abrir → GV_Alerta_Inactivo; la TV lo lee y saca el pop-up con alarma).
+   Al registrar la próxima tarea (tmMarcarEvento) la cierra y el cartel se va solo. La marca de
+   "ya avisé" queda en localStorage para cerrarla aunque el celular se haya recargado. El legajo
+   de prueba no avisa: no es la operación. */
+var TM_ALERTA_SEG = 5 * 60;
+function _tmAlertaKey(leg) { return "gv_tm_alerta::" + leg; }
+function _tmAlertaRpc(fn, body) {
+  return fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+}
+function _tmAlertaAbrir(leg) {
+  if (!leg || _tm.alertaPend) return;
+  try { if (localStorage.getItem(_tmAlertaKey(leg)) === getTodayKey() + "|" + _tm.alertaRef) return; } catch (_e) {}
+  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
+  _tm.alertaPend = true;
+  var marca = getTodayKey() + "|" + _tm.alertaRef;
+  _tmAlertaRpc("gv_alerta_inactivo_abrir", { p_legajo: leg, p_dispositivo: (typeof gvDispositivoId === "function" ? gvDispositivoId() : null) })
+    .then(function (r) { if (r.ok) { try { localStorage.setItem(_tmAlertaKey(leg), marca); } catch (_e) {} } })
+    .catch(function () {}).then(function () { _tm.alertaPend = false; });
+}
+function _tmAlertaCerrar(leg) {
+  var k = _tmAlertaKey(leg), hay = false;
+  try { hay = !!localStorage.getItem(k); localStorage.removeItem(k); } catch (_e) {}
+  if (!hay) return;
+  _tmAlertaRpc("gv_alerta_inactivo_cerrar", { p_legajo: leg }).catch(function () {});
 }
 async function tmLeer() {
   var leg = _tm.leg; if (!leg) return;
@@ -10416,7 +10451,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.81";
+const APP_VERSION = "v25.82";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -28010,9 +28045,25 @@ async function rkbConfirmar() {
    de gv_monitor_horas_operario_dia). Legajo 0 (supervisor desde Stock) no emite. */
 function gvRacksTramo(op, legajo, iniMs, texto) {
   const leg = String(legajo || "").trim(); if (!leg || leg === "0" || leg === "1") return;
-  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
   const nowMs = Date.now();
   const DESC = { RKI: "Bajar de racks (abre)", RKB: "Bajar de racks", IRI: "Ingreso a racks (abre)", IRT: "Ingreso a racks" };
+  /* v25.79 (Luis, 01/10: "Bajar de racks tiene que registrar tiempo… enviar la tarea y marcar cuando
+     terminaste") — el módulo es una TAREA ABIERTA en el celular mientras está adentro: el botón BR
+     queda en rojo, el tiempo muerto marca 0, y al terminar (registrar o cerrar) la tarea entra al
+     Historial con su duración. Vale también para el Ingreso a racks (IRI/IRT). */
+  try {
+    const st = getLegajoState(leg) || {}; const k = (op === "RKI" || op === "RKB") ? "racks" : "ir";
+    if (op === "RKI" || op === "IRI") st[k] = { active: true, ts: nowMs };
+    else {
+      const ini = (st[k] && st[k].ts) || iniMs || nowMs; st[k] = { active: false };
+      pushHistoryForLegajo(leg, { ts: nowMs, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""),
+        id: "h_" + op.toLowerCase() + "_" + nowMs.toString(36), status: "queued", ts_inicio_iso: new Date(ini).toISOString() });
+    }
+    setLegajoState(leg, st);
+    tmMarcarEvento(leg, nowMs);
+    if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
+  } catch (_e) {}
+  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
   const payload = { legajo: leg, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""), ts: nowMs,
     id: (op.toLowerCase() + "_" + leg + "_" + nowMs.toString(36)).replace(/[^a-zA-Z0-9_\-]/g, ""),
     ts_inicio_iso: (iniMs && iniMs < nowMs) ? new Date(iniMs).toISOString() : null };
@@ -58434,7 +58485,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.81"></script>
+<script src="importacion.js?v=25.82"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61235,7 +61286,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.81"></script>
+<script src="cobranzas.js?v=25.82"></script>
 
 </body>
 </html>
