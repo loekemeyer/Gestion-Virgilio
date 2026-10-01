@@ -51,6 +51,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 node tests/ccr-fss-recontrol.cjs
 node tests/toggle-anular.cjs
 node tests/botonera-tm-historial.cjs
+node tests/alerta-inactivo.cjs
 node tests/noprod-cancelacion.cjs
 
 _resumen() {
@@ -121,6 +122,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== mon-tv (monitor liviano de TV: solo lectura, mismas fuentes que el monitor grande) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-tv.cjs
+echo "== mon-admin (Mon. Admin: generado desde tv.html, tablero interactivo con pop-ups) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-admin.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/gp2-abrir-app.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tv-meta-camion.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tandas-orden-camion.cjs
@@ -1099,4 +1102,6 @@ echo "== stk-est-madre-tab (v25.65: pestaña Est. Madre = el admin en iframe, pr
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-tab.cjs
 echo "== stk-est-madre-sin-codigo (v25.71: la Est. Madre de Gestión entra sin código, por gv-est-madre) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-sin-codigo.cjs
+echo "== est-madre-unica (v25.78: la Est. Madre es UN cuadro — est-madre.js, mismo cargador en LK y Gestión) =="
+node tests/est-madre-unica.cjs
 _resumen

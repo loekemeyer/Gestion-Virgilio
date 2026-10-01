@@ -1847,6 +1847,29 @@ armador** (con `p_filas` de prueba dentro de una transacción abortada, no leyen
 **Chequeo:** `select * from public.gv_ppp_tanda_camion_mezclado;` — vacía = todo bien.
 `sql/gv_ppp_web_tanda_por_camion_v1887.sql`, §3.ib.
 
+## ⚠ REGLA (Luis, 2026-10-01, v25.81): una TANDA no mezcla empresas LK/CH
+
+**Luis, por la tanda F21C** (8 NPs de LK + 2 de Chef, todas Zona 1 - CABA Sur). El armador nunca
+mezcla empresas (corre por empresa) y la **fusión automática filtra por empresa**, así que la
+mezcla la arma una persona desde el panel (fusión manual de una tanda de Chef dentro de una de LK,
+vía renombre). No saltaba ninguna alarma porque **los 4 centinelas de tanda cortan por CAMIÓN, no
+por empresa**: como ambas son Zona 1 = camión Capital Sur, la mezcla de empresas pasaba invisible.
+
+| capa | qué hace desde v25.81 |
+|---|---|
+| guard | **`gv_ppp_tanda_empresa_guard(tanda, empresas[])`** frena cualquier asignación manual que dejaría una tanda con las dos empresas. Llamado desde los 4 RPC de asignación a mano: `gv_ppp_nps_mover_a` (fusión / cambiar de día), `gv_ppp_web_tanda_programar`, `gv_ppp_web_tanda_reusar`, `gv_ppp_tanda_renombrar`. El error `EMPRESA_MEZCLA: …` lo muestra el pop-up (igual que CUARENTENA, vía `aprMsgErr`) |
+| centinela | `gv_ppp_tanda_empresa_mezclada` — tandas web que ya mezclan empresas |
+
+⚠ **El armador NO se toca**: nunca produce la mezcla, así que el guard jamás le salta. La fusión
+automática (`gv_ppp_web_fusionar_tandas`) corre por `p_empresa` y queda igual.
+
+⚠ **F21C se deja como está** (Luis, 01/10: *"dejala, no la toques"*): ya pickeada y en armado. El
+centinela la lista a propósito, para que quede a la vista.
+
+**Chequeo:** `select * from public.gv_ppp_tanda_empresa_mezclada;` (al 01/10 sólo F21C) ·
+`select * from public.gv_reglas_perdidas;` (vacía = los 4 guards puestos).
+`sql/gv_tanda_empresa_guard_v2574.sql`. Problema 664.
+
 ## ⚠ Una tanda NO puede salir en dos días (v18.92, problema 338)
 
 Un mismo código de tanda en dos fechas cae en **dos camiones distintos** y rompe todo lo que
@@ -4289,6 +4312,9 @@ Al verificar setea un password temporal aleatorio en el user y el front hace
   (i) **modo Est. Madre de Gestión sin código** (v25.72): `GV_EM_EMBED`, `_gvEmFetch`, `GV_EM_PERMITIDAS`
   y `window.supabaseClient = sb` al principio de admin.js, y el corte de `checkAuth()` y del init. Si se pisa,
   la pestaña EST. MADRE vuelve a pedir el OTP: buscar `gv_em` y correr `tests/stk-est-madre-sin-codigo.cjs`.
+  (j) **la Est. Madre NO se re-copia de LK** (v25.79): vive SÓLO en `admin/est-madre.js` de este repo y los
+  dos `admin.js` traen el mismo cargador `abrirEstadisticaMadre` (huella md5 en `tests/est-madre-unica.cjs` de
+  los dos repos). Al re-sincronizar, no volver a traer la Est. Madre de `pagina-LK-copia`: allá ya no está.
 
 ### Convenciones operativas
 
@@ -5319,11 +5345,40 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
   operario se queda ahí después de enviar y el banner en la pantalla del legajo no lo veía nadie.
 - La alerta de **un dispositivo con 2+ operarios** ya es por DÍA (`gv_dispositivo_multi_operario` agrupa por
   dispositivo + día AR; el Telegram mira sólo hoy): otro operario mañana en el mismo celular no avisa.
+- ⚠⚠ **v25.78 (Luis, 01/10): el contador NO es el acumulado del día** (*"se tiene que reiniciar cuando el operario
+  empieza/termina una tarea"*): es el tiempo desde el ÚLTIMO evento del legajo (`enqueueReport` lo sella con
+  `tmMarcarEvento`; la base aporta el último `ts_cliente` de hoy), y con una tarea abierta marca 0:00:00. Se retiran
+  la cuenta de `gv_monitor_horas_operario` y el acumulado local de la v25.70 (bullet de abajo, histórico).
 - **v25.70**: sin fila en la vista (legajo de prueba, que se excluye, u operario sin eventos) el contador acumula EN EL
   CELULAR por legajo y día (`gv_tm_loc::<día>::<legajo>`) — antes volvía a 0 en cada lectura y entre tareas. El 📅
   flotante (`#btnHistDias`) no se muestra en la botonera (tapaba «Terminar Día»): los días anteriores se abren desde
   el pop-up del historial.
 - `tests/botonera-tm-historial.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-01, v25.82): 5 MIN DE TIEMPO MUERTO → CARTEL CON ALARMA EN LOS MONITORES — y Bajar de racks es una tarea abierta
+
+- **El celular** del operario, al llegar a **5 min** de tiempo muerto en la botonera, llama `gv_alerta_inactivo_abrir(legajo)`
+  (una sola alerta viva por legajo; la marca queda en `localStorage gv_tm_alerta::<legajo>`). Al registrar la próxima tarea
+  (`tmMarcarEvento`, desde `enqueueReport`) llama `gv_alerta_inactivo_cerrar`. Tabla `GV_Alerta_Inactivo` (RLS cerrada, sólo RPC).
+- **v25.87 (Luis, D10): la alarma está en la TV de pared, «Vista TV» y «Mon. Admin»** — el `<script>` va en `tv.html` y
+  `admin.html` lo hereda del build. El legajo de prueba (0/1) también avisa (sale «PRUEBA (legajo 1)»).
+- **El monitor** (`monitor/alerta-inactivo.js`)
+  leen `gv_alertas_inactivo_vivas()` cada 4 s: cartel centrado del **70 %**, rojo titilando, *«[Nombre] lleva más de 5 minutos
+  inactivo»*, con **sirena** Web Audio. Se va a los **15 s** o apenas la alerta se cierra. Un iframe escondido no suena.
+- ⚠ **El navegador no deja sonar sin un toque previo**: si el kiosko no arranca con `--autoplay-policy=no-user-gesture-required`,
+  el cartel dice «🔇 tocá la pantalla una vez» y desde ese toque suena.
+- ⚠ **Sólo avisa con la botonera ABIERTA** en el celular: si el operario cerró la app, el contador no corre y no hay aviso. El
+  legajo de prueba no avisa.
+- ⚠⚠ **v25.86 (Luis: *"se tiene que seleccionar bajar de racks y que ahí tengas que apretar enviar para que lleve el
+  tracking. lo mismo guardado a góndola"*): MG y BR funcionan como RR.** El primer toque SELECCIONA (área con «Enviar»),
+  «Enviar» EMPIEZA la tarea (`gvModTareaAbrir` / RKI) y abre el módulo; abierta, el botón queda rojo y tocarlo RE-ABRE el
+  módulo; salir del módulo la TERMINA (`gvModTareaFin` → Historial con duración). En MG la tarea cierra recién cuando no
+  queda abierta ninguna de sus pantallas (chooser, qué bajar primero, lo que llegó, excedente). Las horas siguen saliendo
+  de los MG por código y del RKI→RKB: no se agregó ningún evento. `tests/mg-reentrada.cjs`, `tests/alerta-inactivo.cjs`.
+- **Bajar / Ingreso a racks = tarea abierta** en el celular (`st.racks` / `st.ir`, desde `gvRacksTramo`): BR en rojo, tiempo muerto
+  en 0, y al terminar va al Historial de tareas con su duración (además del tramo RKI→RKB de siempre). Tope 12 h por si el celular
+  murió adentro.
+- `sql/gv_alerta_inactivo_v2579.sql`, `tests/alerta-inactivo.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-21, v20.78): antes de optimizar, medir — y leer lo que se usa, no el universo
 
@@ -6594,6 +6649,7 @@ reingreso, celdas `.pedimp-tbl` con 4px de relleno. **64 → 45 px por artículo
   `destino: 'a_guardar'` a `registrar_baja_racks` (marcador `v25.74-aguardar`): racks − / **a_guardar** +, sin excedente
   ni conteo de góndola (el conteo a ciegas del rack sigue). Sin el campo (celulares viejos, supervisor) va a terminado
   como antes. Después se guarda con MG → «Lo que llegó». `sql/gv_baja_racks_a_guardar_v2574.sql`, `tests/racks-propuesta.cjs`.
+  **v25.78 (Luis): el botón es «BR» (sin emoji, data-code `RKBM`), chico en las secundarias junto a CR/RR/RC/IR.**
 
 ## ⚠ REGLA (Thomas, 2026-09-30, v24.69): un insumo con MC SALE siempre en MC — el stock queda en unidades
 
@@ -6868,7 +6924,7 @@ con un mail que no es el admin de LK (`loekemeyer.logistica@` nunca podía).
 |---|---|
 | iframe | `admin/admin.html?gv_em=1#estadistica-madre`; ya no deja `lk_bridge_vjwt` |
 | `admin/admin.js` (sólo el espejo) | con `?gv_em=1` **dentro del iframe de Gestión** (`window.parent.sbAuth`): no busca sesión de LK, no muestra login, sólo abre la Est. Madre. El cliente de Supabase va con `fetch` propio (`_gvEmFetch`) y `window.supabaseClient = sb` |
-| Edge Function **`gv-est-madre`** (proyecto LK, verify_jwt off) | recibe el JWT de **Gestión**, pregunta a `es_supervisor_virgilio()` y devuelve con service_role **sólo** products, loke_products, sales_item_remap, sales_excluded_items, la caché de la Est. Madre y el detalle de una celda. Todo lo demás 403. Fuente `admin/supabase/gv-est-madre/index.ts` |
+| Edge Function **`gv-est-madre`** (proyecto LK, verify_jwt off) | recibe el JWT de **Gestión**, pregunta a `es_supervisor_virgilio()` y devuelve con service_role **sólo** products, loke_products, las ventas por mes (`get_estadistica_madre_mensual`, v25.79; antes el caché, remaps y excluidos) y el detalle de una celda. Todo lo demás 403. Fuente `admin/supabase/gv-est-madre/index.ts` |
 
 - **No se crea ninguna sesión de admin de LK**: el Panel Web LK y la página LK siguen con su puente u OTP.
 - `get_estadistica_madre_cache()` exige `admins` + `auth.uid()`: la función lee la tabla `estadistica_madre_cache`
@@ -6877,3 +6933,40 @@ con un mail que no es el admin de LK (`loekemeyer.logistica@` nunca podía).
   `window.supabaseClient` si existe. Sin esa línea las lecturas salían directo a LK sin sesión (lo cazó el test).
 - Abierto suelto (fuera del iframe de Gestión) el modo no se activa aunque traiga `?gv_em=1`.
 - `tests/stk-est-madre-sin-codigo.cjs` (corre el admin real en el iframe), `tests/stk-est-madre-tab.cjs`.
+
+## ⚠⚠ REGLA (Tomás Beviglia, 2026-10-01, v25.79): la ESTADÍSTICA MADRE es UN SOLO CUADRO — LK y Gestión
+
+**Tomás:** *"cambiá la palabra proyección por Est Madre en toda la pestaña · los artículos correctos son los que están
+en la parte de Stock de Gestión Virgilio, el resto de artículos no · la idea es que si actualizo una de las est madres
+se actualice la otra, es un solo cuadro que se imprime en dos lados distintos. NUNCA puede un cuadro de est madre quedar
+más actualizado que otro. Si alguien quiere cambiar uno solo NO se puede hacer"*.
+
+> ## **La Est. Madre es UN archivo: `admin/est-madre.js` de este repo, publicado por GitHub Pages.**
+> La página LK (`loekemeyer.com/admin.html`) y el espejo de Gestión (Panel Web LK y la pestaña EST. MADRE) lo bajan
+> de la **misma URL** (`https://loekemeyer.github.io/Gestion-Virgilio/admin/est-madre.js?t=<ahora>`). El HTML de la
+> página, el CSS y la lógica viven ahí; cada `admin.js` sólo trae el cargador `abrirEstadisticaMadre`, idéntico.
+
+| qué | de dónde |
+|---|---|
+| **filas** | `stocks_carga_rapida` de Gestión (clave pública), las mismas de Stocks: sin las ocultas vacías (`visible_en_stock = false` y sin stock ni pedidos). Al 01/10: **353** (antes 586, con `026L`, `CARTONERIA`, `DTOXERROR`…) |
+| **Est Madre** (caj/mes) | `proy_cajas_mes` de esa misma tabla = la columna de Stocks: cajas enteras, el principal suma a sus secundarios, el secundario muestra «→ principal» y no rankea; los duales son dos filas (LK / CH) |
+| **meses** | cajas facturadas por mes y empresa: **`get_estadistica_madre_mensual()`** (LK, solo lectura, en vivo, 1,7 s), mismo criterio que el motor de la Est Madre (regla L, sin interco, remaps, sin administrativos). Cada fila = lo que vendió ESE código (en un dual, esa empresa) |
+| detalle por celda / disruptivas | igual que antes (movidos tal cual). Disruptivas lee `order_items` de LK: desde Gestión no anda (ya no andaba) |
+
+- **Ninguna fila dice «Proyección»**: es «Est Madre».
+- **Una lectura que falla NO se reemplaza** por el caché viejo ni por ceros: se dice que falló. El caché
+  `estadistica_madre_cache` sigue (lo lee el portal), pero esta pantalla ya no.
+- ⚠ **La página LK de producción es manual (SolidCP)**: hasta subir `admin.html` + `admin.js` + `css/admin.css` de
+  `pagina-LK-copia`, loekemeyer.com muestra la tabla vieja. Desde esa subida, todo cambio de `est-madre.js` llega
+  a los dos con el push a `main` de este repo (GitHub Pages).
+- ⚠ **El cargador es el mismo en los dos repos**: `tests/est-madre-unica.cjs` (acá y en `pagina-LK-copia`) tiene su
+  huella md5 y falla si alguno vuelve a tener una Est. Madre propia. Cambiar el cargador = cambiarlo en los dos y
+  actualizar la huella en los dos tests, en el mismo pedido.
+- **Gestión entera lee la Est. Madre única** (v25.84): el último lector de la cruda `proyeccion_madre` era el aviso de
+  rotación de `recepcion.js`; ahora lee `gv_proyeccion_articulo` y un secundario rota lo de su principal. La cruda sólo la leen
+  `gv_proyeccion_articulo` y la copia `GP2.est_madre` (trigger `fn_est_madre_sync`; pasarla a la única es decisión de GP2).
+- **Switch Cajas / Unidades** (v25.81, Tomás): unidades = cajas × uxb de `vista_uxb_articulo` de Gestión (la de Stocks); sin uxb
+  dice «s/uxb» y no suma al total (al 01/10: 4 de 353 — 1546903, 581T, 633E, 637E). Si el uxb no se puede leer, el modo unidades
+  queda apagado. El Excel sigue el switch y lleva siempre la columna UxB. El ranking es siempre el de cajas (el de Stocks).
+- `sql/get_estadistica_madre_mensual.sql` (en `pagina-LK-copia`), `tests/stk-est-madre-sin-codigo.cjs`.
+

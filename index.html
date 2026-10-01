@@ -16,6 +16,7 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hid
 html { overflow-x: hidden; }
 .hidden { display: none; }
 #tvContent:not(.hidden) { display: flex; }   /* v23.64: pestaña Vista TV del monitor */
+#admContent:not(.hidden) { display: flex; }   /* v25.77: pestaña Mon. Admin (tablero interactivo) */
 
 /* Números bien centrados: saca las flechitas (spinner) de TODOS los input[type=number]
    de la app — la app usa steppers –/+, las flechas nativas sólo desfasan el número. */
@@ -5832,6 +5833,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
              kiosko/pared (openMonitor lo esconde si __tvKioskMode). -->
         <div class="mod-switch" id="monTabSwitch">
           <button class="mod-tab on" id="monTabTv" onclick="setMonitorTab('tv')" title="El tablero de planta, el mismo que ve la TV">📺 Monitor</button>
+          <button class="mod-tab" id="monTabAdm" onclick="setMonitorTab('admin')" title="El mismo tablero de la TV pero clickeable: cada celda abre su desglose">🛠️ Mon. Admin</button>
           <button class="mod-tab" id="monTabAn" onclick="setMonitorTab('incons')" title="Productividad e inconsistencias">📊 Análisis</button>
         </div>
         <!-- El título, la meta, la barra de avance y el buscador eran del monitor viejo, que ya
@@ -5879,6 +5881,12 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
          al abrir la pestaña y se descarga al salir (la TV se refresca sola y ocupa RAM). -->
     <div id="tvContent" class="hidden" style="flex:1;min-height:0">
       <iframe id="monTvFrame" title="Monitor TV" style="flex:1;width:100%;min-height:78vh;border:0;border-radius:8px;background:#0b1220"></iframe>
+    </div>
+    <!-- v25.77 (Luis): Mon. Admin — el MISMO tablero (monitor/admin.html, generado desde tv.html)
+         pero clickeable: cada celda abre el desglose en un pop-up. Iframe aparte para que la pared
+         (tv.html) siga liviana y de solo lectura. -->
+    <div id="admContent" class="hidden" style="flex:1;min-height:0">
+      <iframe id="monAdmFrame" title="Mon. Admin" style="flex:1;width:100%;min-height:78vh;border:0;border-radius:8px;background:#0b1220"></iframe>
     </div>
   </div>
 </div>
@@ -6261,7 +6269,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.76"></script>
+<script type="module" src="recepcion.js?v=25.87"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6957,7 +6965,7 @@ const filas = {
   row1: ["EP","AP"],                                   // Picking + Armado starters (grande, azul/verde) — v7.75: TP/TAP removed (finalize inline)
   row2: [],                                            // (was Armado finish, now unused)
   row3: ["RT","MG","CC"],                              // Depósito y carga (mediano)
-  row4: ["CR","RR","INS","CP","RC","IR"],              // secundarias (chico) + 🔀 Mover al final. v7.49: RI+EI+SC unificados en INS (chooser). v9.15: EA removido (no se usa)
+  row4: ["CR","RR","INS","CP","RC","IR","RKBM"],              // v25.77: RKBM = «BR» Bajar de Racks · secundarias (chico) + 🔀 Mover al final. v7.49: RI+EI+SC unificados en INS (chooser). v9.15: EA removido (no se usa)
   row5: ["AT","PB","Limp","Perm","PC","CT"]            // tiempos / pausas (chico)
 };
 // Rediseño v5.92 (pedido del dueño): más peso a los botones más usados. Primarias
@@ -8570,6 +8578,8 @@ function updateCoreButtonsState(){
     if ((code === "EP" || code === "TP") && pickingActive) pending = true;
     else if ((code === "AP" || code === "TAP") && armadoActive) pending = true;
     else if (TOGGLE_CODES.includes(code) && st && st.toggles && st.toggles[code]) pending = true;
+    else if (code === "BR" && st && st.racks && st.racks.active) pending = true;
+    else if (code === "MG" && st && st.mg && st.mg.active) pending = true;   // v25.86     // v25.79 (el título del botón RKBM)
     b.classList.toggle("pending", pending);
   });
 }
@@ -8582,7 +8592,7 @@ function ensurePendingSuggestionContainer(){
   if (!box) {
     box = document.createElement("div");
     box.id = "pendingSuggestion";
-    const row3El = document.getElementById("row3b") || document.getElementById("row3");   // v25.74: debajo del botón chico de racks
+    const row3El = document.getElementById("row3");
     if (row3El && row3El.parentNode) row3El.parentNode.insertBefore(box, row3El.nextSibling);
   }
   return box;
@@ -8778,7 +8788,7 @@ Object.keys(filas).forEach(rowId => {
     d.className = sec ? "box box-sm" : "box";
     d.setAttribute("data-code", code);
     d.innerHTML = `
-      <div class="box-title">${code === "INS" ? "📦" : code}</div>
+      <div class="box-title">${code === "INS" ? "📦" : (code === "RKBM" ? "BR" : code)}</div>
       <div class="box-desc">${desc[code]}</div>
     `;
     // v7.49: "INS" es un botón UI unificado (no un opcode): abre el chooser Recibir/Entregar/Nuevo.
@@ -8786,18 +8796,6 @@ Object.keys(filas).forEach(rowId => {
     document.getElementById(rowId).appendChild(d);
   });
 });
-// v25.74 (Luis, 01/10): «Bajar de Racks» — botón CHICO debajo de Guardado a Góndola (columna del medio
-// de row3). Antes era la opción «De los racks» adentro del chooser de MG; ahora baja a A GUARDAR.
-try {
-  const r3 = document.getElementById("row3");
-  if (r3 && r3.parentNode) {
-    const fila = document.createElement("div");
-    fila.className = "row row-3"; fila.id = "row3b"; fila.style.marginTop = "4px";
-    fila.innerHTML = '<div></div><div class="box box-sm" data-code="RKBM"><div class="box-title" style="font-size:15px">🏗</div><div class="box-desc">Bajar de Racks</div></div><div></div>';
-    fila.querySelector('[data-code="RKBM"]').onclick = () => selectOption("RKBM");
-    r3.parentNode.insertBefore(fila, r3.nextSibling);
-  }
-} catch (_e) { /* no-op */ }
 // v5.92: 🔀 Mover mercadería de racks — secundario (casi no se usa) → box CHICO al
 // final de las secundarias, en vez del botón ancho aparte de antes.
 try {
@@ -9194,7 +9192,13 @@ function goToOptions() {
    jornada − productivas − movimiento − no productivas. Se relee cada 60 s y, entre lecturas,
    corre solo cuando el celular no tiene ninguna tarea abierta (sin picking, armado ni toggle).
    Sin lectura muestra "—": "no pude leer" no es "cero". */
-var _tm = { leg: null, baseSeg: null, leidoMs: 0, tick: null, poll: null };
+var _tm = { leg: null, refMs: null, srvMs: 0, iniMs: 0, tick: null, poll: null };
+/* v25.77 (Luis, 01/10: "se tiene que reiniciar cuando el operario empieza/termina una tarea, no
+   sumar durante el día") — el contador ya NO es el acumulado del día: es el tiempo desde el ÚLTIMO
+   evento del legajo (empezó o terminó una tarea). Con una tarea abierta marca 0:00:00. El último
+   evento sale de lo que manda ESTE celular (enqueueReport lo sella al toque) y de la base
+   (último ts_cliente de hoy, por si trabajó en otro celular). Sin ningún evento hoy cuenta desde
+   que abrió la botonera. Retira el acumulado de la v25.65/v25.70. */
 function _tmFmt(seg) {
   seg = Math.max(0, Math.round(seg || 0));
   var h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg % 60;
@@ -9205,56 +9209,83 @@ function _tmLibre(leg) {
     var st = getLegajoState(leg) || {};
     if (st.picking && st.picking.active) return false;
     if (st.armado && st.armado.active) return false;
+    var _12h = 12 * 3600 * 1000;   // v25.79: Bajar / Ingreso a racks abierto (con tope, por si el celular murió adentro)
+    if (st.racks && st.racks.active && Date.now() - (st.racks.ts || 0) < _12h) return false;
+    if (st.ir && st.ir.active && Date.now() - (st.ir.ts || 0) < _12h) return false;
+    if (st.mg && st.mg.active && Date.now() - (st.mg.ts || 0) < _12h) return false;   // v25.86: guardado abierto
     if (getAnyToggleActive(leg)) return false;
     if (getActiveDeadTime(leg)) return false;
   } catch (_e) { return false; }
   return true;
 }
-/* v25.69 (Luis: "se resetea entre tarea y tarea") — cuando la base no trae fila para el legajo
-   (legajo de prueba, que la vista excluye, o el operario sin eventos todavía) el contador volvía a
-   0 en cada lectura y en cada tarea. Ahora ese caso acumula EN EL CELULAR, por legajo y día
-   (localStorage), y sigue sumando entre tareas. Con fila de la base manda la base. */
-function _tmLocKey(leg) { return "gv_tm_loc::" + getTodayKey() + "::" + leg; }
-function _tmLocGet(leg) { try { return Number(localStorage.getItem(_tmLocKey(leg))) || 0; } catch (_e) { return 0; } }
-function _tmLocSet(leg, s) { try { localStorage.setItem(_tmLocKey(leg), String(Math.round(s))); } catch (_e) {} }
+function _tmUltKey(leg) { return "gv_tm_ult::" + getTodayKey() + "::" + leg; }
+function _tmUltGet(leg) { try { return Number(localStorage.getItem(_tmUltKey(leg))) || 0; } catch (_e) { return 0; } }
+function tmMarcarEvento(leg, ms) {
+  leg = String(leg || "").trim(); if (!leg) return;
+  ms = Number(ms) || Date.now();
+  try { if (ms > _tmUltGet(leg)) localStorage.setItem(_tmUltKey(leg), String(ms)); } catch (_e) {}
+  _tmAlertaCerrar(leg);   // v25.79: registró algo → se va el cartel de los monitores
+  if (leg === _tm.leg) _tmPintar();
+}
 function _tmPintar() {
   var el = document.getElementById("tmMuertoVal"), box = document.getElementById("tmMuerto");
   if (!el || !box) return;
-  var libre = _tmLibre(_tm.leg), ahora = Date.now();
-  if (_tm.leg && _tm.sinFila) {   // acumulado local del día
-    var acc = _tmLocGet(_tm.leg);
-    if (libre && _tm.ultTick) acc += Math.min(5, (ahora - _tm.ultTick) / 1000);
-    _tm.ultTick = ahora; _tmLocSet(_tm.leg, acc);
-    el.textContent = _tmFmt(acc); box.classList.toggle("tm-alto", acc >= 30 * 60); return;
-  }
-  _tm.ultTick = ahora;
-  if (_tm.baseSeg == null) { el.textContent = "—"; box.classList.remove("tm-alto"); return; }
-  var seg = _tm.baseSeg;
-  if (libre) seg += (ahora - _tm.leidoMs) / 1000;
+  var ahora = Date.now();
+  if (!_tm.leg) { el.textContent = "—"; box.classList.remove("tm-alto"); return; }
+  if (!_tmLibre(_tm.leg)) { _tm.ocupadoMs = ahora; el.textContent = _tmFmt(0); box.classList.remove("tm-alto"); return; }
+  var ref = Math.max(_tmUltGet(_tm.leg), _tm.srvMs || 0, _tm.ocupadoMs || 0) || _tm.iniMs || ahora;
+  _tm.alertaRef = Math.round(ref / 1000);
+  var seg = Math.max(0, (ahora - Math.min(ref, ahora)) / 1000);
   el.textContent = _tmFmt(seg);
   box.classList.toggle("tm-alto", seg >= 30 * 60);
+  if (seg >= TM_ALERTA_SEG) _tmAlertaAbrir(_tm.leg);
+}
+/* v25.79 (Luis, 01/10) — a los 5 min de tiempo muerto el celular avisa a los MONITORES
+   (gv_alerta_inactivo_abrir → GV_Alerta_Inactivo; la TV lo lee y saca el pop-up con alarma).
+   Al registrar la próxima tarea (tmMarcarEvento) la cierra y el cartel se va solo. La marca de
+   "ya avisé" queda en localStorage para cerrarla aunque el celular se haya recargado. El legajo
+   de prueba no avisa: no es la operación. */
+var TM_ALERTA_SEG = 5 * 60;
+function _tmAlertaKey(leg) { return "gv_tm_alerta::" + leg; }
+function _tmAlertaRpc(fn, body) {
+  return fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+}
+function _tmAlertaAbrir(leg) {
+  if (!leg || _tm.alertaPend) return;
+  try { if (localStorage.getItem(_tmAlertaKey(leg)) === getTodayKey() + "|" + _tm.alertaRef) return; } catch (_e) {}
+  /* v25.83: el legajo de prueba también avisa — la alarma está sólo en Mon. Admin, no en la TV de pared */
+  _tm.alertaPend = true;
+  var marca = getTodayKey() + "|" + _tm.alertaRef;
+  _tmAlertaRpc("gv_alerta_inactivo_abrir", { p_legajo: leg, p_dispositivo: (typeof gvDispositivoId === "function" ? gvDispositivoId() : null) })
+    .then(function (r) { if (r.ok) { try { localStorage.setItem(_tmAlertaKey(leg), marca); } catch (_e) {} } })
+    .catch(function () {}).then(function () { _tm.alertaPend = false; });
+}
+function _tmAlertaCerrar(leg) {
+  var k = _tmAlertaKey(leg), hay = false;
+  try { hay = !!localStorage.getItem(k); localStorage.removeItem(k); } catch (_e) {}
+  if (!hay) return;
+  _tmAlertaRpc("gv_alerta_inactivo_cerrar", { p_legajo: leg }).catch(function () {});
 }
 async function tmLeer() {
   var leg = _tm.leg; if (!leg) return;
   try {
-    var r = await fetch(SUPABASE_URL + "/rest/v1/gv_monitor_horas_operario?select=hs_prod,hs_mov,hs_noprod,hs_total&legajo=eq." +
-      encodeURIComponent(leg), { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } });
+    var desde = new Date(getTodayKey() + "T00:00:00-03:00").toISOString();
+    var r = await fetch(SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio?select=ts_cliente&legajo=eq." +
+      encodeURIComponent(leg) + "&ts_cliente=gte." + encodeURIComponent(desde) + "&order=ts_cliente.desc&limit=1",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } });
     if (!r.ok) throw new Error("HTTP " + r.status);
     var f = (await r.json())[0];
     if (leg !== _tm.leg) return;
-    _tm.sinFila = !f;
-    if (!f) _tm.baseSeg = 0;   // sin fila en la base: cuenta el acumulado local (_tmPintar)
-    else {
-      var h = (Number(f.hs_total) || 0) - (Number(f.hs_prod) || 0) - (Number(f.hs_mov) || 0) - (Number(f.hs_noprod) || 0);
-      _tm.baseSeg = Math.max(0, h) * 3600;
-    }
-    _tm.leidoMs = Date.now();
-  } catch (_e) { if (leg === _tm.leg) { _tm.baseSeg = null; _tm.sinFila = false; } }
+    var ms = f && f.ts_cliente ? Date.parse(f.ts_cliente) : 0;
+    _tm.srvMs = isFinite(ms) ? ms : 0;
+  } catch (_e) { /* sin lectura queda lo local: el contador sigue desde el último evento de este celular */ }
   _tmPintar();
 }
 function tmStart(leg) {
   tmStop();
-  _tm.leg = String(leg || ""); _tm.baseSeg = null; _tm.sinFila = false; _tm.ultTick = 0;
+  _tm.leg = String(leg || ""); _tm.srvMs = 0; _tm.ocupadoMs = 0; _tm.iniMs = Date.now();
   _tmPintar();
   if (!_tm.leg) return;
   tmLeer();
@@ -9819,9 +9850,18 @@ function selectOption(code) {
   // un apretón por error se deshace con Cancelar/Cerrar (botón vuelve a normal, nada
   // registrado). El evento MG (con su DURACIÓN, para Rendimiento/Monitor) lo emite el
   // modal al CONFIRMAR el guardado (mgConfirmar → mgEmitGuardado), una sola vez.
-  if (code === "MG") { showMGChooser(legajoStr); return; }
-  // v25.74 (Luis, 01/10): «Bajar de Racks» es su propio módulo (botón chico abajo de MG) y baja a A GUARDAR.
-  if (code === "RKBM") { showRacksBajarModal(legajoStr); return; }
+  /* v25.86 (Luis, 01/10: "se tiene que seleccionar bajar de racks y que ahí tengas que apretar enviar
+     para que lleve el tracking. lo mismo guardado a góndola") — MG y BR funcionan como RR: el primer
+     toque los SELECCIONA y se arranca con «Enviar» (ahí empieza el tiempo); mientras están abiertos el
+     botón queda en rojo y tocarlo RE-ABRE el módulo; la tarea termina al cerrarlo («Terminé»). */
+  if (code === "MG" || code === "RKBM") {
+    const stMod = getLegajoState(legajoStr) || {};
+    const kMod = code === "MG" ? "mg" : "racks";
+    if (stMod[kMod] && stMod[kMod].active && Date.now() - (stMod[kMod].ts || 0) < 12 * 3600 * 1000) {
+      if (code === "MG") showMGChooser(legajoStr); else showRacksBajarModal(legajoStr);
+      return;
+    }
+  }
 
   // v5.49: Pasar cajas a un pedido urgente — sacale cajas a un pedido que sale
   // después (armado o pickeado) y dáselas a uno urgente que sale antes. Abre el
@@ -9858,7 +9898,7 @@ function selectOption(code) {
   selected = code;
   selectedArea.classList.remove("hidden");
 
-  selectedBox.innerText = code;
+  selectedBox.innerText = code === "RKBM" ? "BR" : code;
   selectedDesc.innerText = desc[code];
 
   // reset input
@@ -10105,6 +10145,7 @@ function _enqueueReportRaw(payload) {
 
 }
 function enqueueReport(payload) {
+  try { if (payload && payload.legajo) tmMarcarEvento(payload.legajo, Date.now()); } catch (_e) {}   // v25.77: reinicia el tiempo muerto
   if (esOperadorPrueba()) { try { console.warn("[PRUEBA] evento NO persistido (legajo de prueba):", payload && payload.opcion); } catch (_e) {} return; }
   _enqueueReportRaw(payload);
 }
@@ -10421,7 +10462,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.76";
+const APP_VERSION = "v25.87";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10879,6 +10920,13 @@ async function send() {
 
   if (!legajoStr) { alert("Falta el número de legajo"); return; }
   if (!opcion)    { alert("Falta seleccionar una opción"); return; }
+  // v25.86: «Enviar» en MG / BR = EMPEZÓ la tarea (el tiempo corre desde acá) y abre el módulo.
+  if (opcion === "MG" || opcion === "RKBM") {
+    resetSelection();
+    if (opcion === "MG") { gvModTareaAbrir(legajoStr, "mg"); showMGChooser(legajoStr); }
+    else showRacksBajarModal(legajoStr);   // gvRacksTramo("RKI") abre la tarea
+    return;
+  }
 
   // v5.26: AP sobre una tanda que YA tiene armado abierto (mismo código) → NO generamos
   // un 2º evento AP (doble arranque, ensucia los tiempos): reabrimos el asistente donde
@@ -17005,7 +17053,6 @@ async function ocgFetchMaximos() {
 }
 /* v4.17: máximo del generador = proyección por tendencia (PaginaLK) × 1,5. La proyección se
    sincroniza mensual a la tabla proyeccion_madre (cod normalizado sin ceros a la izquierda). */
-const SUPABASE_PROY_ENDPOINT = SUPABASE_URL + "/rest/v1/proyeccion_madre";
 const OCG_FACTOR_MAXIMO = 1.5;
 function _ocgNorm(c) { return String(c || "").toUpperCase().trim().replace(/^0+(?=.)/, ""); }
 /* v19.91 (problema 427) - un codigo con SUFIJO DE EMPRESA no cae nunca al codigo base.
@@ -27442,6 +27489,7 @@ function closeMG() {
   // v23.63: salió sin confirmar (el confirmar marca _enviando y emite MG): cierra el MGI del monitor.
   try { if (_mg && _mg._mgi && !_mg._enviando) mgEmitMarca("MGC", _mg.legajo); } catch (_e) {}
   _mg = null;
+  _mgTareaQuizasFin();   // v25.86
 }
 /* v23.63 — MG sólo emitía al CONFIRMAR (v7.68), así que un operario guardando figuraba
    "libre · sin tarea abierta" en el monitor y su jornada arrancaba en el primer guardado
@@ -27542,7 +27590,7 @@ function excConfirmar() {
   stockMove(rows);
   try { alert("✓ Bajaste " + n + " caja(s) del excedente a góndola."); } catch (_e) {}
 }
-function closeExc() { const ov = document.getElementById("excModal"); if (ov) ov.classList.remove("show"); _exc = null; }
+function closeExc() { const ov = document.getElementById("excModal"); if (ov) ov.classList.remove("show"); _exc = null; _mgTareaQuizasFin(); }
 function excHasProgress() { return !!(_exc && _exc.items && _exc.items.some(function (it) { return (it.bajar > 0); })); }
 function excAskClose() { opAskClose(excHasProgress(), "EXC", _exc && _exc.legajo, "Bajar excedente a góndola", _exc, closeExc); }
 
@@ -27563,7 +27611,43 @@ function showMGChooser(legajo) {
     '</div>';
   ov.style.display = "flex";
 }
-function closeMGChooser() { const ov = document.getElementById("mgChooserModal"); if (ov) ov.style.display = "none"; }
+function closeMGChooser() { const ov = document.getElementById("mgChooserModal"); if (ov) ov.style.display = "none"; _mgTareaQuizasFin(); }
+/* v25.86 — Guardado a Góndola como TAREA ABIERTA (igual que RR): la abre «Enviar», la cierra salir
+   del módulo. El chooser, «¿qué bajar primero?», «lo que llegó» y «excedente» son pantallas de la
+   MISMA tarea: termina recién cuando no queda ninguna abierta. El tiempo de cada código lo siguen
+   llevando los MG del confirmar (v23.76); esto es el estado del celular y el Historial. */
+function gvModTareaAbrir(leg, k) {
+  leg = String(leg || "").trim(); if (!leg) return;
+  try {
+    const st = getLegajoState(leg) || {};
+    if (!(st[k] && st[k].active)) { st[k] = { active: true, ts: Date.now() }; setLegajoState(leg, st); }
+    tmMarcarEvento(leg, Date.now());
+    if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
+  } catch (_e) {}
+}
+function gvModTareaFin(leg, k, op, descr, texto) {
+  leg = String(leg || "").trim(); if (!leg) return;
+  try {
+    const st = getLegajoState(leg) || {};
+    if (!(st[k] && st[k].active)) return;
+    const ini = st[k].ts || Date.now(), nowMs = Date.now();
+    st[k] = { active: false }; setLegajoState(leg, st);
+    pushHistoryForLegajo(leg, { ts: nowMs, opcion: op, descripcion: descr, texto: String(texto || ""),
+      id: "h_" + op.toLowerCase() + "_" + nowMs.toString(36), status: "queued", ts_inicio_iso: new Date(ini).toISOString() });
+    tmMarcarEvento(leg, nowMs);
+    if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
+    if (typeof renderLegajoHistory === "function") renderLegajoHistory(leg);
+  } catch (_e) {}
+}
+function _mgTareaQuizasFin() {
+  const leg = String(_mgChooserLegajo || (legajoInput && legajoInput.value) || "").trim();
+  setTimeout(function () {
+    const vis = function (id, porClase) { const e = document.getElementById(id); if (!e) return false;
+      return porClase ? e.classList.contains("show") : (e.style.display && e.style.display !== "none"); };
+    if (vis("mgChooserModal") || vis("gordenModal") || vis("mgModal", true) || vis("excModal", true)) return;
+    gvModTareaFin(leg, "mg", "MG", "Guardado a Góndola");
+  }, 400);
+}
 function mgChooserGo(which) { closeMGChooser(); if (which === "orden") showGuardarOrden(_mgChooserLegajo); else if (which === "racks") showRacksBajarModal(_mgChooserLegajo); else if (which === "excedente") showExcModal(_mgChooserLegajo); else showMGModal(_mgChooserLegajo); }
 
 /* v8.45 — OPERARIA: "¿Qué bajar primero?" Overview de solo-lectura que junta las 3 fuentes de
@@ -27721,7 +27805,7 @@ function renderGuardarOrden() {
 }
 function gordenFiltro(f) { if (!_gorden) return; _gorden.filtro = f; renderGuardarOrden(); }
 function gordenVerTodo() { if (!_gorden) return; _gorden.verTodo = !_gorden.verTodo; renderGuardarOrden(); }
-function closeGuardarOrden() { const ov = document.getElementById("gordenModal"); if (ov) ov.style.display = "none"; }
+function closeGuardarOrden() { const ov = document.getElementById("gordenModal"); if (ov) ov.style.display = "none"; _mgTareaQuizasFin(); }
 function gordenPrint() {
   if (!_gorden) return;
   const F = _gorden.filtro, rows = _gordenRows();
@@ -28014,10 +28098,27 @@ async function rkbConfirmar() {
    El baño o la comida en el medio se restan igual que en el resto de las tareas (muerto_open_s
    de gv_monitor_horas_operario_dia). Legajo 0 (supervisor desde Stock) no emite. */
 function gvRacksTramo(op, legajo, iniMs, texto) {
-  const leg = String(legajo || "").trim(); if (!leg || leg === "0" || leg === "1") return;
-  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
+  const leg = String(legajo || "").trim(); if (!leg) return;
   const nowMs = Date.now();
   const DESC = { RKI: "Bajar de racks (abre)", RKB: "Bajar de racks", IRI: "Ingreso a racks (abre)", IRT: "Ingreso a racks" };
+  /* v25.79 (Luis, 01/10: "Bajar de racks tiene que registrar tiempo… enviar la tarea y marcar cuando
+     terminaste") — el módulo es una TAREA ABIERTA en el celular mientras está adentro: el botón BR
+     queda en rojo, el tiempo muerto marca 0, y al terminar (registrar o cerrar) la tarea entra al
+     Historial con su duración. Vale también para el Ingreso a racks (IRI/IRT). */
+  try {
+    const st = getLegajoState(leg) || {}; const k = (op === "RKI" || op === "RKB") ? "racks" : "ir";
+    if (op === "RKI" || op === "IRI") st[k] = { active: true, ts: nowMs };
+    else {
+      const ini = (st[k] && st[k].ts) || iniMs || nowMs; st[k] = { active: false };
+      pushHistoryForLegajo(leg, { ts: nowMs, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""),
+        id: "h_" + op.toLowerCase() + "_" + nowMs.toString(36), status: "queued", ts_inicio_iso: new Date(ini).toISOString() });
+    }
+    setLegajoState(leg, st);
+    tmMarcarEvento(leg, nowMs);
+    if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
+  } catch (_e) {}
+  if (leg === "0" || leg === "1") return;   // prueba: la tarea vive en el celular, el evento no se manda
+  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
   const payload = { legajo: leg, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""), ts: nowMs,
     id: (op.toLowerCase() + "_" + leg + "_" + nowMs.toString(36)).replace(/[^a-zA-Z0-9_\-]/g, ""),
     ts_inicio_iso: (iniMs && iniMs < nowMs) ? new Date(iniMs).toISOString() : null };
@@ -32675,6 +32776,7 @@ function openInconsistencias() {
 function closeMonitor() {
   const m = document.getElementById("monitorModal");
   try { const _tvf = document.getElementById("monTvFrame"); if (_tvf) _tvf.removeAttribute("src"); } catch (_e) {}   // v23.64
+  try { const _admf = document.getElementById("monAdmFrame"); if (_admf) _admf.removeAttribute("src"); } catch (_e) {}   // v25.77
   m.classList.remove("show");
   m.classList.remove("tv");
   m.classList.remove("vp-narrow", "vp-medium", "vp-wide", "vp-xwide");
@@ -53472,24 +53574,34 @@ function setMonitorTab(tab) {
   const cont = document.getElementById("monitorContent");
   const inc  = document.getElementById("inconsContent");
   const tvc  = document.getElementById("tvContent"), tvf = document.getElementById("monTvFrame");
+  const admc = document.getElementById("admContent"), admf = document.getElementById("monAdmFrame");   // v25.77
   _inconsActive = (tab === "incons");
   const tvOn = (tab === "tv");   // v23.64: la vista del monitor de pared
-  if (cont) cont.classList.toggle("hidden", _inconsActive || tvOn);
+  const admOn = (tab === "admin");   // v25.77: Mon. Admin (el mismo tablero, clickeable)
+  if (cont) cont.classList.toggle("hidden", _inconsActive || tvOn || admOn);
   if (inc)  inc.classList.toggle("hidden", !_inconsActive);
   if (tvc)  tvc.classList.toggle("hidden", !tvOn);
+  if (admc) admc.classList.toggle("hidden", !admOn);
   if (tvf) {
     if (tvOn && !tvf.getAttribute("src")) tvf.setAttribute("src", "monitor/tv.html?key=tv");
     if (!tvOn && tvf.getAttribute("src")) tvf.removeAttribute("src");
   }
+  if (admf) {
+    if (admOn && !admf.getAttribute("src")) admf.setAttribute("src", "monitor/admin.html?key=tv");
+    if (!admOn && admf.getAttribute("src")) admf.removeAttribute("src");
+  }
   /* v23.92 (Luis) — dos pestañas: 📺 Monitor (la vista de la TV) y 📊 Análisis, que abre las
-     subpestañas Productividad / Inconsistencias. `monTabMon` y `monTabInc` ya no existen. */
+     subpestañas Productividad / Inconsistencias. `monTabMon` y `monTabInc` ya no existen.
+     v25.77: se sumó 🛠️ Mon. Admin (monTabAdm). */
   const swAn = document.getElementById("monTabAn"), swTv = document.getElementById("monTabTv");
+  const swAdm = document.getElementById("monTabAdm");
   if (swTv) swTv.classList.toggle("on", tvOn);
+  if (swAdm) swAdm.classList.toggle("on", admOn);
   if (swAn) swAn.classList.toggle("on", _inconsActive);
   const subBar = document.getElementById("anSubBar");
   if (subBar) subBar.classList.toggle("hidden", !_inconsActive);
   const titleEl = document.getElementById("monitorTitleText");
-  if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : (tvOn ? "Vista TV" : "Monitor Virgilio");
+  if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : (admOn ? "Mon. Admin" : (tvOn ? "Vista TV" : "Monitor Virgilio"));
   if (_inconsActive) refreshInconsistencias();
 }
 
@@ -54138,7 +54250,7 @@ function _pkHojaMinOtras(ev, ini, fin){
 }
 /* Arma los datos (puro): tp = {legajo, ts_inicio, ts_cliente}; pkc = [{texto}]; lug =
    [{cod, empresa, sector, orden}]; nps = [{np, rs, m3, fecha}]; otras = eventos del legajo. */
-function pkHojaArmar(tanda, tp, pkc, lug, nps, otras, nombre){
+function pkHojaArmar(tanda, tp, pkc, lug, nps, otras, nombre, base){
   var porCod = {};
   (lug || []).forEach(function (x){
     var c = String(x.cod || "").trim().toUpperCase(), e = String(x.empresa || "").toUpperCase();
@@ -54161,6 +54273,20 @@ function pkHojaArmar(tanda, tp, pkc, lug, nps, otras, nombre){
     arts[raw] = { cod: cod, esp: parseInt(p[2], 10) || 0, real: parseInt(p[3], 10) || 0,
       lug: porCod[cod + "|" + emp] || porCod[cod + "|"] || porCod[cod.replace(/^0+(?=.)/, "") + "|"] || null };
   });
+  // v25.76 (Luis): tanda SIN picking → igual se ve la lista de códigos a pickear, todo en 0.
+  // Se arma desde la base (PPP_Web_Base) con real = null = "todavía no se pickeó" (NO es 0 pickeado):
+  // la celda muestra el número a pickear sin tilde, sin diagonal y sin tachar.
+  var pendiente = !Object.keys(arts).length;
+  if (pendiente) {
+    (base || []).forEach(function (b){
+      var raw = String(b.articulo || "").trim().toUpperCase(); if (!raw) return;
+      var emp = /[0-9E]L$/.test(raw) ? "LK" : String(b.empresa || "").toUpperCase();
+      var cod = raw.replace(/([0-9E])L$/, "$1");
+      var a = arts[cod] || (arts[cod] = { cod: cod, esp: 0, real: null,
+        lug: porCod[cod + "|" + emp] || porCod[cod + "|"] || porCod[cod.replace(/^0+(?=.)/, "") + "|"] || null });
+      a.esp += parseInt(b.cajas, 10) || 0;
+    });
+  }
   var lineas = Object.keys(arts).map(function (k){ return arts[k]; });
   lineas.sort(function (x, y){
     var ox = (x.lug && x.lug.orden != null) ? x.lug.orden : 1e9, oy = (y.lug && y.lug.orden != null) ? y.lug.orden : 1e9;
@@ -54175,9 +54301,9 @@ function pkHojaArmar(tanda, tp, pkc, lug, nps, otras, nombre){
   var m3 = npl.reduce(function (s, x){ return s + (Number(x.m3) || 0); }, 0);
   var fechas = npl.map(function (x){ return String(x.fecha || "").slice(0, 10); }).filter(Boolean).sort();
   return { tanda: tanda, sale: fechas[0] || "", legajo: tp ? String(tp.legajo || "") : "", nombre: nombre || "",
-    ini: ini || null, fin: fin || null, minBruto: minBruto, minOtras: minOtras, minNeto: minNeto,
+    ini: ini || null, fin: fin || null, minBruto: minBruto, minOtras: minOtras, minNeto: minNeto, pendiente: pendiente,
     lineas: lineas, nps: npl, m3: m3, m3h: (minNeto > 0 && m3 > 0) ? m3 / (minNeto / 60) : null,
-    cajas: lineas.reduce(function (s, x){ return s + x.esp; }, 0), falt: lineas.reduce(function (s, x){ return s + Math.max(0, x.esp - x.real); }, 0) };
+    cajas: lineas.reduce(function (s, x){ return s + x.esp; }, 0), falt: lineas.reduce(function (s, x){ return s + (x.real == null ? 0 : Math.max(0, x.esp - x.real)); }, 0) };
 }
 function pkHojaHtml(d){
   var css = '<style>.pkh{font-family:Arial,Helvetica,sans-serif;color:#111;}' +
@@ -54207,7 +54333,7 @@ function pkHojaHtml(d){
     if (!rows.length) return '';
     return '<table><thead><tr><th>Cod</th><th>Sector</th><th>Total<br>cajas</th></tr></thead><tbody>' +
       rows.map(function (x){
-        var cls = (x.esp > 0 && x.real <= 0) ? 'pkh-no' : ((x.real < x.esp) ? 'pkh-f' : '');
+        var cls = (x.real === 0 && x.esp > 0) ? 'pkh-no' : ((x.real != null && x.real < x.esp) ? 'pkh-f' : '');
         return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="pkh-cod">' + escapeHtml(x.cod) + '</td><td>' + escapeHtml((x.lug && x.lug.sector) || '—') + '</td><td>' + celdaTot(x) + '</td></tr>';
       }).join('') + '</tbody></table>';
   };
@@ -54218,7 +54344,7 @@ function pkHojaHtml(d){
   return css + '<div class="pkh">' +
     '<div class="pkh-top"><div><div class="pkh-t">Tanda ' + escapeHtml(d.tanda) + (d.sale ? ' (Sale ' + escapeHtml(_pkHojaDia(d.sale)) + ')' : '') + '</div>' +
       '<div class="pkh-s">' + escapeHtml(d.legajo ? ('Leg ' + d.legajo + ' ' + (d.nombre && d.nombre !== ('Leg ' + d.legajo) ? d.nombre : '')) : '—') + '</div></div>' +
-      '<div class="pkh-r">' + escapeHtml(cuando) + '<br>' + d.cajas + ' cajas' + (d.falt ? ' · <b>faltaron ' + d.falt + '</b>' : ' · sin faltantes') + '</div></div>' +
+      '<div class="pkh-r">' + escapeHtml(cuando) + '<br>' + d.cajas + ' cajas' + (d.pendiente ? ' · <b>a pickear (sin empezar)</b>' : (d.falt ? ' · <b>faltaron ' + d.falt + '</b>' : ' · sin faltantes')) + '</div></div>' +
     '<div class="pkh-body">' + tabla(d.lineas.slice(0, mitad)) + tabla(d.lineas.slice(mitad)) +
       '<div><table class="pkh-np"><thead><tr><th>NP</th><th>Razón social</th><th>m³</th></tr></thead><tbody>' + npRows + '</tbody></table>' +
       '<div class="pkh-tot">Total m³ ' + _pkHojaNum(d.m3, 2) + '</div>' +
@@ -54246,6 +54372,21 @@ async function pkHojaDatos(tandas){
   var addNp = function (t, np, rs, m3, f){ t = String(t || "").trim().toUpperCase(); np = String(np || "").trim().replace(/\.0+$/, ""); if (!t || !np || vistos[t + "|" + np]) return; vistos[t + "|" + np] = 1; (npBy[t] = npBy[t] || []).push({ np: np, rs: String(rs || "").trim(), m3: (m3 != null && m3 !== "" ? Number(m3) : null), fecha: f || "" }); };
   (res[2] || []).forEach(function (x){ addNp(x.tanda, x.np, x.razon_social, x.m3, x.fecha_entrega); });
   (res[3] || []).forEach(function (x){ addNp(x.tanda, x.np_label, x.razon_social, x.m3, x.fecha_entrega); });
+  // v25.76 (Luis): para las tandas SIN picking (pendientes), traer la lista a pickear de la
+  // base web (PPP_Web_Base) para mostrarla igual, todo en 0. Sólo NP web (las que tienen " ").
+  var baseBy = {};
+  var pendT = tandas.filter(function (t){ return !(pkcBy[t] && pkcBy[t].length); });
+  var labToT = {}; pendT.forEach(function (t){ (npBy[t] || []).forEach(function (n){ if (/\s/.test(n.np)) labToT[n.np] = t; }); });
+  var pendLabels = Object.keys(labToT);
+  if (pendLabels.length) {
+    var baseRows = await j(SUPABASE_URL + "/rest/v1/PPP_Web_Base?select=np_label,articulo,cajas,empresa&np_label=in.(" + pendLabels.map(function (l){ return encodeURIComponent('"' + l + '"'); }).join(",") + ")&limit=20000");
+    (baseRows || []).forEach(function (b){
+      var t = labToT[String(b.np_label || "").trim()]; if (!t) return;
+      (baseBy[t] = baseBy[t] || []).push(b);
+      var c = String(b.articulo || "").trim().toUpperCase().replace(/([0-9E])L$/, "$1");
+      if (c) { cods[c] = 1; cods[c.replace(/^0+(?=.)/, "")] = 1; }
+    });
+  }
   var codList = Object.keys(cods);
   var lug = codList.length ? await j(SUPABASE_URL + "/rest/v1/gv_lugar_articulo?select=cod,empresa,sector,orden&tipo=eq.gondola&cod=in.(" + codList.map(function (c){ return encodeURIComponent('"' + c + '"'); }).join(",") + ")&limit=5000") : [];
   // Otras tareas del picker dentro de la ventana del picking (para el descuento de tiempo).
@@ -54258,7 +54399,7 @@ async function pkHojaDatos(tandas){
   return tandas.map(function (t){
     var tp = tpBy[t] || null;
     var nom = (tp && typeof npcNombre === "function") ? npcNombre(tp.legajo) : "";
-    return pkHojaArmar(t, tp, pkcBy[t] || [], lug || [], npBy[t] || [], otrasBy[t] || [], nom);
+    return pkHojaArmar(t, tp, pkcBy[t] || [], lug || [], npBy[t] || [], otrasBy[t] || [], nom, baseBy[t] || []);
   });
 }
 async function pkHojaImprimir(tandas, marcar, origen){
@@ -58485,7 +58626,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.76"></script>
+<script src="importacion.js?v=25.87"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61286,7 +61427,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.76"></script>
+<script src="cobranzas.js?v=25.87"></script>
 
 </body>
 </html>

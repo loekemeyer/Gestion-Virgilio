@@ -30983,3 +30983,50 @@ evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositiv
 - **Nada de la base de Gestión cambió.** El front: `index.html` (`_stkEmCargar`) y el espejo `admin/admin.js`.
 - **Rollback:** volver `_stkEmCargar` a `admin/admin.html#estadistica-madre` con el puente (git revert del commit) y
   borrar la función desde el dashboard de LK. `admin/supabase/gv-est-madre/index.ts`, `tests/stk-est-madre-sin-codigo.cjs`.
+
+## §3.v2579 — Est. Madre: UN SOLO CUADRO para LK y Gestión (v25.79, 01/10/2026)
+
+**Pedido de Tomás Beviglia:** renombrar «Proyección» → «Est Madre», que los artículos sean los de Stocks de Gestión y
+que la tabla de LK y la de Gestión sean la misma (nunca una más actualizada que la otra).
+
+**Objeto nuevo (LK `kwkclwhmoygunqmlegrg`):** `public.get_estadistica_madre_mensual()` → `(item, empresa, meses jsonb)`,
+cajas por mes sobre `ventas_proy_lineas` + `sales_item_remap` − `sales_excluded_items` (el criterio de
+`_fn_proy_window_split`). STABLE, SECURITY DEFINER, `work_mem 32MB`. Sólo admins de LK o `service_role`;
+EXECUTE revocado a PUBLIC/anon. **No escribe nada** (sin tabla ni cron).
+
+Medido el 01/10/2026: 611 filas en 1.722 ms como service_role. `anon` → *permission denied*; un `authenticated`
+que no es admin → *no autorizado*. Muestra: 26/lk Ago 120 · Sep 166; 437E/lk 30 · 28; 437E/chef 1 · 12.
+
+**Edge Function `gv-est-madre`:** deja pasar `rpc/get_estadistica_madre_mensual` (GET a la función con
+service_role) y saca `rpc/get_estadistica_madre_cache`, `sales_item_remap` y `sales_excluded_items`.
+
+**Lista de artículos:** el módulo lee `stocks_carga_rapida` de Gestión con la clave pública (medido: `anon` ve 353
+filas visibles). En Gestión no se tocó nada de la base.
+
+**Rollback:** `drop function if exists public.get_estadistica_madre_mensual();` en LK, y volver los dos `admin.js`,
+`admin.html` y `css/admin.css` al commit anterior (la página LK de producción además hay que re-subirla).
+
+## §3.v2574 — una TANDA no mezcla empresas LK/CH (guard + centinela)
+
+**Luis, 2026-10-01 (problema 664, caso F21C).** F21C quedó con 8 NPs de LK + 2 de Chef (Zona 1 -
+CABA Sur, 05/10). Auditoría: `creado_por='sistema'` en las 10 (el armador programó cada NP en su
+día), pero la tanda es **renombrada** (`GV_Tandas_Codigos_Usados.fuente='renombrada'`) y el
+armador de esa mañana programó 0 NPs → la mezcla la armó una persona desde el panel (fusión manual
+de una tanda de Chef dentro de la de LK). Sin daño de stock (sin negativos, NPs no duplicadas).
+No saltó alarma: los 4 centinelas de tanda cortan por **camión**, y ambas empresas son Zona 1 =
+Capital Sur.
+
+**Fix:**
+- `gv_ppp_tanda_empresa_guard(tanda, empresas[])` — frena la asignación manual que dejaría una
+  tanda con las dos empresas. Llamado desde `gv_ppp_nps_mover_a`, `gv_ppp_web_tanda_programar`,
+  `gv_ppp_web_tanda_reusar` y `gv_ppp_tanda_renombrar`. Error `EMPRESA_MEZCLA: …` (P0001), lo
+  muestra el pop-up vía `aprMsgErr`.
+- `gv_ppp_tanda_empresa_mezclada` — centinela de tandas web ya mezcladas.
+- 4 filas en `GV_Reglas_Centinela` (patrón `gv_ppp_tanda_empresa_guard`).
+
+El armador y la fusión automática (per-empresa) NO se tocaron. F21C se deja como está (decisión de
+Luis). Probado en transacción abortada: fusionar CH (F21B) en LK (E08A) → FRENA; código nuevo
+mismo-empresa → PASA.
+
+**Chequeo:** `select * from public.gv_ppp_tanda_empresa_mezclada;` · `select * from
+public.gv_reglas_perdidas;`. `sql/gv_tanda_empresa_guard_v2574.sql`.

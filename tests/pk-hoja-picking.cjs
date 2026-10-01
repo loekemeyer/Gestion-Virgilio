@@ -28,4 +28,13 @@ ok(/<span class="pkh-diag">4<\/span><span class="pkh-got">2<\/span>/.test(h), "p
 ok(/<tr class="pkh-no"><td class="pkh-cod">809E<\/td>/.test(h) && /<tr class="pkh-no"><td class="pkh-cod">809E<\/td><td>J13<\/td><td>1<\/td><\/tr>/.test(h), "sin pickear nada (809E): fila entera tachada, se ve lo que había (1)");
 ok(h.indexOf("LK 0001") < h.indexOf("LK 0002") && /Total m³ 1,00/.test(h) && /0,50 m³\/hora/.test(h), "NP, total m³ y m³/hora");
 ok(s.indexOf("await pkHojaImprimir(nuevas, true, \"estacion\")") > 0 && s.indexOf("gv_origen: origen") > 0 && s.indexOf("pkHojaPendientes()") > 0, "sale sola por la estación (TP) y por la Cola de impresión");
+// v25.76 (Luis) — tanda SIN picking: la lista sale igual, todo en 0, sin tachar ni tilde
+const baseP = [{ articulo: "501", cajas: 4, empresa: "lk" }, { articulo: "809EL", cajas: 2, empresa: "chef" }, { articulo: "066", cajas: 1, empresa: "lk" }];
+const lugP = [{ cod: "501", empresa: "LK", sector: "A11", orden: 21 }, { cod: "809E", empresa: "LK", sector: "J13", orden: 354 }, { cod: "66", empresa: "LK", sector: "A05", orden: 5 }];
+const dp = A("E99Z", null, [], lugP, nps, [], "", baseP);
+ok(dp.pendiente === true && dp.lineas.length === 3 && dp.cajas === 7 && dp.falt === 0, "pendiente: lista desde la base — 3 códigos, 7 cajas, 0 faltantes");
+ok(dp.lineas.every(x => x.real === null), "pendiente: real = null (no es 0 pickeado)");
+const hp = H(dp);
+ok(/a pickear \(sin empezar\)/.test(hp) && !/class="pkh-no"/.test(hp) && !/class="pkh-ok"/.test(hp) && !/class="pkh-diag"/.test(hp), "pendiente: dice «a pickear», sin tilde/diagonal/tachado");
+ok(/809E/.test(hp) && !/809EL/.test(hp) && /<td>2<\/td>/.test(hp), "pendiente: 809EL se muestra pelado (809E) y el número sin decorar");
 process.exit(bad ? 1 : 0);

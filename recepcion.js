@@ -1122,7 +1122,8 @@ function ocPctExceso(cod, cajas) {
    (proyección < 50 caj/mes). El operario tiene que pedir confirmación de que no se devuelve.
    Best-effort: si no hay capacidad cargada para el código, NO avisa (evita falsos positivos).
    Datos: Capacidad_Sector (góndola máx), vista_saldos_stock.terminado (góndola actual),
-   proyeccion_madre.proy_cajas_mes (rotación), opState.ocPorCod (lo pedido en la OC). */
+   gv_proyeccion_articulo.proy_cajas_mes (rotación: la Est. Madre ÚNICA, la misma de Stocks — v25.82;
+   antes leía la cruda `proyeccion_madre`, sin la familia), opState.ocPorCod (lo pedido en la OC). */
 const GOND_EXCESO_FACTOR = 1.20;   // "por mucho" = 20% arriba de la capacidad de góndola
 const GOND_BAJA_ROT = 50;          // baja rotación = menos de 50 cajas/mes de proyección
 /* v16.30 (tramo 4) — saldo de góndola por código, PURA y testeable (tests/gond-exceso-dual.cjs).
@@ -1197,7 +1198,7 @@ async function gondReturnCheck(items) {
     const res = await Promise.all([
       supabase.from("Capacidad_Sector").select("cod,cajas_max,empresa"),
       supabase.from("vista_saldos_stock").select("cod_art,clave,empresa,terminado").in("cod_art", cods),
-      supabase.from("proyeccion_madre").select("cod,proy_cajas_mes")
+      supabase.from("gv_proyeccion_articulo").select("cod,proy_cajas_mes,es_secundario,principal")
     ]);
     const cap = {}, gond = {}, proy = {};
     const _saldoRows = (res[1] && res[1].data) || [];
@@ -1217,7 +1218,14 @@ async function gondReturnCheck(items) {
     //   · código dual  → sólo la fila cuya `empresa` es la línea que eligió el operario
     //   · código común → todas las filas sumadas, igual que antes (conducta idéntica)
     Object.assign(gond, gondAcumPorCod(_saldoRows, opState.linea, _ocgNorm));
-    ((res[2] && res[2].data) || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) proy[k] = Number(r.proy_cajas_mes) || 0; });
+    // v25.82 — la rotación es la Est. Madre ÚNICA (gv_proyeccion_articulo). Un SECUNDARIO va en 0
+    // ahí (su venta está en el principal), así que rota lo que rota su PRINCIPAL: es el mismo producto.
+    const _pRows = (res[2] && res[2].data) || [], _pPpal = {};
+    _pRows.forEach(function (r) { if (r.es_secundario) return; const k = _ocgNorm(r.cod); if (k) _pPpal[k] = Number(r.proy_cajas_mes) || 0; });
+    _pRows.forEach(function (r) {
+      const k = _ocgNorm(r.cod); if (!k) return;
+      proy[k] = r.es_secundario ? (_pPpal[_ocgNorm(r.principal)] || 0) : (Number(r.proy_cajas_mes) || 0);
+    });
     const flag = [];
     (items || []).forEach(function (it) {
       const k = _ocgNorm(it.cod);
