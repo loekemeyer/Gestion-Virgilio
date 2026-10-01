@@ -305,6 +305,8 @@ td.act-dur{font-weight:900;text-align:center;font-size:calc(2.1*var(--u))}
   border-bottom:1px solid #1e293b;text-transform:uppercase;letter-spacing:.03em}
 .pop-bd td{font-size:calc(2*var(--u));padding:.4vh .7vw;border-bottom:1px solid #16203a;font-weight:700}
 .pop-bd td.num,.pop-bd th.num{text-align:right;font-variant-numeric:tabular-nums}
+.pop-bd table.pop-cmp{width:auto;margin:.4vh auto}
+.pop-bd table.pop-cmp th,.pop-bd table.pop-cmp td{padding:.4vh 1vw;text-align:center}
 .pop-tot td{border-top:2px solid #334155;font-weight:900;color:#f8fafc}
 .pop-sub{color:#94a3b8;font-size:calc(1.85*var(--u));margin:.2vh 0 1vh;line-height:1.4}
 .pop-k{color:#f8fafc;font-weight:900}
@@ -1894,7 +1896,22 @@ function popRitmo(leg, sub) {
     ' · <span class="pop-k">' + n1(tot) + ' m³ ÷ ' + nH(hs) + ' h = ' + res + '</span></div>';
   if (!pares.length) return head + '<div class="pop-empty">No cerró ninguna tanda de ' + lab + ' hoy' +
     (hs > 0.05 ? ' (tiene ' + nH(hs) + ' h cargadas)' : '') + '</div>';
-  return head + popTablaTandas(pares);
+  /* v25.92 (Luis): por tanda, Tanda · m³ · Min trab · Ritmo, y Total. Min trab = cierre (TP/TAP) − su apertura. */
+  var op = sub === "pick" ? "TP" : "TAP", mins = {};
+  (D.eventos || []).forEach(function (ev) {
+    if (ev.opcion !== op || String(ev.legajo == null ? "" : ev.legajo).trim() !== String(leg)) return;
+    if (!ev.ts_inicio || dayKey(ev.ts_cliente) !== hoyKey()) return;
+    var t = String(ev.texto || "").trim().toUpperCase();
+    var m = (new Date(ev.ts_cliente).getTime() - new Date(ev.ts_inicio).getTime()) / 60000;
+    if (t && isFinite(m) && m > 0) mins[t] = (mins[t] || 0) + m;
+  });
+  var rit = function (m3, mi) { return (mi > 0.5 && m3 > 0) ? n1(m3 / (mi / 60)) : "—"; };
+  var tm = 0, body = pares.map(function (p) { var mi = mins[p[0]] || 0; tm += mi;
+    return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + '</td><td>' +
+      (mi > 0 ? Math.round(mi) : "—") + '</td><td>' + rit(Number(p[1]) || 0, mi) + '</td></tr>'; }).join("");
+  return head + '<table class="pop-cmp"><thead><tr><th>Tanda</th><th>m³</th><th>Min trab</th><th>Ritmo m³/h</th></tr></thead><tbody>' +
+    body + '<tr class="pop-tot"><td>Total</td><td>' + n1(tot) + '</td><td>' + (tm > 0 ? Math.round(tm) : "—") +
+    '</td><td>' + rit(tot, tm) + '</td></tr></tbody></table>';
 }
 function popHoras(leg) {
   /* v25.89 (Luis): dos columnas. Prod = SÓLO picking y armado; todo lo demás es No prod, tiempo muerto incluido. */

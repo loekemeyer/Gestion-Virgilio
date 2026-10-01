@@ -196,6 +196,7 @@ function responder(url) {
   ok(t1 !== null, "el pop-up de m³/h no se abrió");
   ok(t1 && /E31A/.test(t1), "el desglose de m³/h no lista la tanda que cerró el operario (E31A): " + (t1 || "").slice(0, 160));
   ok(t1 && /m³\/h/.test(t1), "el desglose de m³/h no muestra el cociente");
+  ok(t1 && /Min trab/i.test(t1) && /Ritmo/i.test(t1) && /Total/.test(t1), "v25.92: el desglose de m³/h no trae Min trab · Ritmo · Total: " + (t1 || "").slice(0, 200));
 
   // cierre con ✕
   await p.click("#popX");
