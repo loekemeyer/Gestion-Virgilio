@@ -119,15 +119,14 @@ tr.fact td{background:#14311f}
    violeta (el mismo color que la columna SALIÓ de la PPP) y no verde. */
 tr.salio-sinfc td{background:#2a1f45}
 /* v23.64 — Resumen de días (≡ Programación de la PPP): colores de sus columnas */
-/* v24.39 (Luis): *"ahi tenes el viernes cortado … olvidate del texto abajo de los dias …
-   la tabla asi es horriblemente ineficiente"*. UNA fila por dia: el dia a la izquierda y
-   sus cinco porcentajes al lado. Antes eran DOS filas (el dia a colspan=5 con su m3/tandas/NP
-   y los numeros abajo), o sea el doble de alto para la misma informacion: por eso el 4.º dia
-   quedaba cortado en la pared. */
+/* v24.39 (Luis): UNA fila por día (eran dos: el 4.º día quedaba cortado). */
 .rd th{text-align:center;font-size:calc(1.6*var(--u));font-weight:800;color:#64748b;letter-spacing:.05em;
   padding:.2vh .2vw;text-transform:uppercase}
 .rd td{text-align:center;font-weight:900;line-height:1.05;font-size:calc(2.6*var(--u));padding:.7vh .2vw}
-.rd td.rd-fe{text-align:left;color:#e2e8f0;white-space:nowrap;font-size:calc(2.4*var(--u))}
+/* v25.49 (Luis): como Operarios — la tabla mide lo que el dato, centrada, sin espacio muerto. */
+table.rd{width:auto;margin:0 auto}
+.rd th,.rd td{padding-left:.7vw;padding-right:.7vw}
+.rd td.rd-fe{text-align:center;color:#e2e8f0;white-space:nowrap;font-size:calc(2.4*var(--u))}
 .rd tr+tr td{border-top:1px solid #16203a}
 .rd td small{display:block;font-size:.62em;font-weight:700;color:inherit;opacity:.85}
 .rd tr.hoy td.rd-fe{color:#93c5fd}
@@ -179,8 +178,9 @@ table.tandas{table-layout:fixed}
 /* v25.01 (Luis): las luces P/A quedan SIEMPRE centradas; quién la tiene y hace cuánto va abajo. */
 .semdet{display:block;margin-top:.3vh;line-height:1}
 /* v25.01 (Luis): «Pendientes de salir hoy» — lo del día que todavía no salió en el camión. */
-table.pen{table-layout:fixed}
-table.pen td{text-align:center;padding:.5vh .3vw;font-weight:800;font-size:calc(2.1*var(--u));color:#e2e8f0}
+table.pen{width:auto;margin:0 auto}
+table.pen td.p-cli div{max-width:17vw}table.pen td.p-np div{max-width:12vw}
+table.pen td{text-align:center;padding:.5vh .7vw;font-weight:800;font-size:calc(2.1*var(--u));color:#e2e8f0}
 table.pen td.p-tanda{font-weight:900;font-size:calc(2.4*var(--u))}
 table.pen td.p-zona{color:#7dd3fc;font-size:calc(2*var(--u))}
 table.pen td.p-np{color:#94a3b8;font-size:calc(1.8*var(--u))}
@@ -224,13 +224,15 @@ tr.op-grp th{text-align:center;color:#93c5fd;font-size:calc(1.5*var(--u));border
 tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
 
 /* ── Panel "En este momento" ──────────────────────────────────────────── */
-.act{display:flex;align-items:center;gap:.7vw;padding:.8vh .2vw;
-  border-bottom:1px solid #16203a;font-size:calc(2.4*var(--u))}
+/* v25.49 (Luis): al ancho del dato, centrada. */
+table.act-t{width:auto;margin:0 auto}
+table.act-t td{padding:.8vh .7vw;font-size:calc(2.4*var(--u));text-align:left;white-space:nowrap}
+table.act-t tr+tr td{border-top:1px solid #16203a}
 .act-idle{opacity:.55}
-.act-who{font-weight:900;color:#e2e8f0;white-space:nowrap;min-width:7vw}
+.act-who{font-weight:900;color:#e2e8f0}
 .act-who b{color:#60a5fa;margin-right:.35vw}
-.act-what{flex:1;color:#cbd5e1;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.act-dur{font-weight:900;white-space:nowrap;font-size:calc(2.1*var(--u))}
+td.act-what{color:#cbd5e1;font-weight:700;max-width:24vw;overflow:hidden;text-overflow:ellipsis}
+td.act-dur{font-weight:900;text-align:center;font-size:calc(2.1*var(--u))}
 
 /* v23.86 (Luis) — ¿LLEGAN? La meta del día es ARMAR lo que sale en 2 días hábiles (armado → factura →
    salida). A las 15:00 se corta: si al ritmo de hoy no llegan, se corrige la PPP ese mismo día.
@@ -1493,7 +1495,7 @@ function pintar(d) {
     var PEN_MAX = Math.max(1, Math.min(6, Math.ceil((cabenFilas("actBox", false) - 2) / 2)));
     if (pens.length > PEN_MAX) PEN_MAX = Math.max(1, PEN_MAX - 1);
     el("penBox").innerHTML = pens.length
-      ? '<table class="pen"><colgroup><col style="width:14%"><col style="width:12%"><col style="width:32%"><col style="width:27%"><col></colgroup><tbody>' +
+      ? '<table class="pen"><tbody>' +
         pens.slice(0, PEN_MAX).map(function (x) {
           var et = PEN_TXT[x.est] || PEN_TXT.pendiente;
           return '<tr><td class="p-tanda">' + esc(x.tanda) + '</td>' +
@@ -1513,7 +1515,7 @@ function pintar(d) {
   el("actTit").innerHTML = "🟢 En este momento <small>· " + trabajando + " trabajando" +
     (d.actividad.length > trabajando ? " · " + (d.actividad.length - trabajando) + " libre(s)" : "") + "</small>";
   el("actBox").innerHTML = d.actividad.length
-    ? d.actividad.slice(0, MAX_ACT).map(function (r) {
+    ? '<table class="act-t"><tbody>' + d.actividad.slice(0, MAX_ACT).map(function (r) {
         var nom = nombres.get(String(r.legajo)) || "";
         var sig = iniciales(nom, r.legajo) || ("#" + r.legajo);
         var quien = nom ? String(nom).trim().split(/\s+/)[0] : ("Leg " + r.legajo);
@@ -1526,11 +1528,11 @@ function pintar(d) {
           var info = ACT_INFO[r.kind] || { ic: "•", tx: r.kind };
           qHace = (info.ic || "•") + " " + (info.vb ? (info.vb + " " + esc(r.tanda)) : info.tx);
         }
-        return '<div class="act' + (r.idle ? " act-idle" : "") + '">' +
-          '<span class="act-who"><b>' + esc(sig) + '</b>' + esc(quien) + '</span>' +
-          '<span class="act-what">' + qHace + '</span>' +
-          '<span class="act-dur" style="color:' + col + '">' + esc(fmtMin(min)) + '</span></div>';
-      }).join("") +
+        return '<tr class="act' + (r.idle ? " act-idle" : "") + '">' +
+          '<td class="act-who"><b>' + esc(sig) + '</b>' + esc(quien) + '</td>' +
+          '<td class="act-what">' + qHace + '</td>' +
+          '<td class="act-dur" style="color:' + col + '">' + esc(fmtMin(min)) + '</td></tr>';
+      }).join("") + '</tbody></table>' +
       (d.actividad.length > MAX_ACT ? '<div class="mas">+ ' + (d.actividad.length - MAX_ACT) + ' más</div>' : "")
     : '<div class="vacio">Nadie fichado todavía</div>';
 
