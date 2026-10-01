@@ -37,7 +37,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.boton = !!btn;
     if (btn) { btn.click(); await new Promise((res) => setTimeout(res, 80)); }
     const h = ov().innerHTML;
-    out.form = /No hay pedido registrado/.test(h) && /sin pedido registrado/.test(h) && !/pendiente <b>/.test(h) && !/Dar el pedido por recibido/.test(h);
+    out.form = /No hay pedido registrado/.test(h) && /sin pedido registrado/.test(h) && !/pendiente <b>/.test(h) && !/Cerrar el pedido completo/.test(h);
     impRecLinea(0, "cantidad", 10);
     await impRecRevisar();
     window.__confirm = ""; window.confirm = (m) => { window.__confirm = m; return true; };

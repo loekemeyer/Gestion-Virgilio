@@ -3799,7 +3799,9 @@ o «ponerlo igual» (`resolucion='forzar'`, queda en el historial).
 
 ⚠ `recepcion_imp` y no `recepcion`: ésta dispara el Telegram de «recepción rara» (mediana de talleristas).
 ⚠⚠ **Al recibir, el pedido deja de estar en viaje** (Luis, v23.49): `p_cerrar` default true → bache `llegado`
-aunque llegue menos (el faltante queda anotado) o más. **Lo de más entra ENTERO al stock y NO descuenta otros
+aunque llegue menos (el faltante queda anotado) o más. **v25.69 (Luis, D16, 01/10): al recibir MENOS de lo pedido la casilla viene DESMARCADA** — recepción
+parcial, lo que falta sigue pedido (4.464 − 64 = 4.400). Marcarla dice en rojo *«Se CIERRA EL PEDIDO COMPLETO»* y
+recién ahí lo que falta pasa a faltante. Si llega todo o más, se cierra solo (`p_cerrar` va true). **Lo de más entra ENTERO al stock y NO descuenta otros
 pedidos en viaje del mismo código** (*"no queda extra cancelado"*). Desmarcando «Dar el pedido por recibido»
 el resto sigue en viaje. Doble click / reintento: `p_client_id` único → no graba dos veces. **↩ Anular** en el
 historial (sólo la última del pedido): movimientos inversos, frena si lo recibido ya se movió.

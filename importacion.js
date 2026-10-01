@@ -2671,7 +2671,7 @@ function _impRecIniciar(ctx, cidBase) {
   var cajasDef = uxc > 0 ? Math.round((Number(ctx.pendiente) || 0) / uxc) : 0;
   _impRec = {
     ctx: ctx, soloInsumo: soloInsumo, empresa: ctx.empresa || "LK", empresaBache: ctx.empresa || "", uxc: uxc || "", nota: "", hecho: false, sim: null,
-    cerrar: true, cid: cidBase + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+    cerrar: false, cid: cidBase + "-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
     lineas: [soloInsumo
       ? { destino: "insumos", sector: "", cantidad: Number(ctx.pendiente) || "", cod_insumo: (ctx.insumos_cods || [])[0] || ctx.cod_stock, resolucion: "" }
       : { destino: "a_guardar", sector: "", cantidad: cajasDef || "", resolucion: "" }]
@@ -2753,9 +2753,12 @@ function _impRecRender() {
     ' = <b>' + tot.uni.toLocaleString("es-AR") + ' u</b>' + (c.sin_pedido ? ' · sin pedido: entra todo al stock' : ' de ' + pend.toLocaleString("es-AR") + ' pendientes') +
     (!c.sin_pedido && tot.uni > pend ? ' · <span style="color:#b45309;font-weight:800">llegan ' + (tot.uni - pend).toLocaleString("es-AR") + ' u más de lo pedido: entran todas al stock y el pedido queda recibido (lo de más no descuenta otros pedidos en viaje)</span>' : '') + '</div>' +
     (tot.uni > 0 && tot.uni < pend
-      ? '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:13.5px;cursor:pointer"><input type="checkbox" style="width:18px;height:18px;margin:2px 0 0" ' + (_impRec.cerrar ? 'checked' : '') + ' onchange="impRecSet(\'cerrar\',this.checked)"><span>' +
-        (_impRec.cerrar ? '<b>Dar el pedido por recibido.</b> Las ' + (pend - tot.uni).toLocaleString("es-AR") + ' u que faltan NO siguen en viaje (quedan anotadas como faltante).'
-                        : '<b>El resto sigue en viaje:</b> ' + (pend - tot.uni).toLocaleString("es-AR") + ' u quedan en curso (llega otro envío).') + '</span></label>' : '') + '</div>';
+      /* v25.69 (Luis, D16): la casilla viene DESMARCADA (recepción parcial: lo que falta sigue pedido) y,
+         marcada, dice sin vueltas que se cierra el PEDIDO TOTAL */
+      ? '<div class="irc-muted" style="margin-top:8px;font-size:14px">📦 Recepción <b>parcial</b>: siguen pedidas <b>' + (pend - tot.uni).toLocaleString("es-AR") + ' u</b> de ' + pend.toLocaleString("es-AR") + '.</div>' +
+        '<label class="irc-cerrar" style="display:flex;gap:8px;align-items:flex-start;margin-top:6px;font-size:13.5px;cursor:pointer;padding:6px 8px;border-radius:8px;border:1.5px solid ' + (_impRec.cerrar ? '#b91c1c;background:#fef2f2' : '#cbd5e1') + '"><input type="checkbox" style="width:18px;height:18px;margin:2px 0 0" ' + (_impRec.cerrar ? 'checked' : '') + ' onchange="impRecSet(\'cerrar\',this.checked)"><span>' +
+        (_impRec.cerrar ? '<b style="color:#b91c1c">⛔ Se CIERRA EL PEDIDO COMPLETO.</b> Se da por recibido TODO el pedido: las ' + (pend - tot.uni).toLocaleString("es-AR") + ' u que faltan dejan de estar pedidas y quedan anotadas como faltante.'
+                        : '<b>Cerrar el pedido completo</b> (marcalo sólo si no va a llegar nada más: las ' + (pend - tot.uni).toLocaleString("es-AR") + ' u que faltan dejan de estar pedidas).') + '</span></label>' : '') + '</div>';
   h += '<div class="irc-sec"><h4>Nota (opcional)</h4><input type="text" style="width:100%;height:36px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 8px;margin:0" placeholder="contenedor, remito, observaciones…" value="' + escapeHtml(_impRec.nota || "") + '" onchange="impRecSet(\'nota\',this.value)"></div>';
   if (_impRec.err) h += '<div class="irc-conf">' + escapeHtml(_impRec.err) + '</div>';
   if (_impRec.sim && _impRec.sim.ok) h += '<div class="irc-ok">✓ Revisado: no hay conflictos de espacio. Tocá <b>Confirmar recepción</b> para grabarla.</div>';
@@ -2847,7 +2850,7 @@ function _impRecBody(simular) {
 function _impRecBodyBache(simular) {
   return { p_bache_id: _impRec.ctx.bache_id, p_empresa: _impRec.empresa || null, p_uni_x_caja: Number(_impRec.uxc) || null,
     p_destinos: _impRec.lineas.map(function (l) { return { destino: l.destino, sector: l.sector || null, cantidad: Number(l.cantidad), cod_insumo: l.cod_insumo || null, resolucion: l.resolucion || null, unidad: _impRecU(l) ? "Uni" : null }; }),
-    p_nota: _impRec.nota || null, p_simular: !!simular, p_cerrar: _impRec.cerrar !== false, p_client_id: _impRec.cid };
+    p_nota: _impRec.nota || null, p_simular: !!simular, p_cerrar: _impRec.cerrar === true || _impRecTotales().uni >= (Number(_impRec.ctx.pendiente) || 0), p_client_id: _impRec.cid };
 }
 async function impRecRevisar() {
   if (!_impRec) return;
@@ -2865,7 +2868,7 @@ async function impRecGrabar() {
     _impRec.lineas.map(function (l) { return "  · " + l.cantidad + (_impRecU(l) ? " u" : " cajas") + " → " + _IMP_REC_DEST[l.destino] + (l.sector ? " " + l.sector : ""); }).join("\n") +
     "\n\n" + (_impRec.ctx.sin_pedido ? "⚠ NO HAY PEDIDO REGISTRADO de este código: entra todo al stock y queda anotado como recepción SIN PEDIDO. No descuenta ningún pedido en viaje."
       : tot.uni >= pend ? "El pedido queda RECIBIDO" + (tot.uni > pend ? " (llegan " + (tot.uni - pend) + " u de más)." : ".")
-      : (_impRec.cerrar ? "El pedido queda RECIBIDO: las " + (pend - tot.uni) + " u que faltan dejan de figurar en viaje." : "Siguen en viaje " + (pend - tot.uni) + " u.")) +
+      : (_impRec.cerrar ? "⛔ SE CIERRA EL PEDIDO COMPLETO: las " + (pend - tot.uni) + " u que faltan dejan de estar pedidas (quedan como faltante)." : "Recepción parcial: siguen pedidas " + (pend - tot.uni) + " u.")) +
     "\n\n¿Confirmás?";
   if (!confirm(resumen)) return;
   _impRec.grabando = true;

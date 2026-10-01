@@ -86,12 +86,20 @@ const ITEMS = [
     // parcial: aparece la casilla «dar por recibido» (marcada) y al desmarcarla manda p_cerrar=false
     await impRecibirBache(77);
     impRecSet("empresa", "CH"); impRecLinea(0, "cantidad", 10);
-    out.casilla = /Dar el pedido por recibido/.test(ov().innerHTML);
-    impRecSet("cerrar", false);
-    out.sigueEnViaje = /El resto sigue en viaje/.test(ov().innerHTML);
+    // v25.69 (Luis, D16): la casilla viene DESMARCADA → recepción parcial, el resto sigue pedido (p_cerrar=false)
+    const cb = ov().querySelector("label.irc-cerrar input[type=checkbox]");
+    out.casilla = !!cb && !cb.checked && /Recepción <b>parcial<\/b>/.test(ov().innerHTML) && /Cerrar el pedido completo/.test(ov().innerHTML);
     await impRecRevisar(); await impRecGrabar();
     const parcial = window.__calls.filter((c) => c.fn === "gv_imp_recibir" && c.body.p_simular === false).pop();
     out.parcialCerrar = parcial ? parcial.body.p_cerrar : null;
+    // marcada: dice que se cierra el PEDIDO COMPLETO y manda p_cerrar=true
+    await impRecibirBache(77);
+    impRecSet("empresa", "CH"); impRecLinea(0, "cantidad", 10); impRecSet("cerrar", true);
+    out.sigueEnViaje = /Se CIERRA EL PEDIDO COMPLETO/.test(ov().innerHTML);
+    await impRecRevisar(); await impRecGrabar();
+    out.cierraConfirm = /CIERRA EL PEDIDO COMPLETO/.test(window.__confirm);
+    const cerrado = window.__calls.filter((c) => c.fn === "gv_imp_recibir" && c.body.p_simular === false).pop();
+    out.cerradoCerrar = cerrado ? cerrado.body.p_cerrar : null;
     out.grabada = /Recepción grabada/.test(ov().innerHTML);
     impRecCerrar();
     await openImpHistRecep();
@@ -110,7 +118,7 @@ const ITEMS = [
   if (!r.avisaConflicto || !r.hayPartir) fail.push("C conflicto góndola");
   if (JSON.stringify(r.lineas) !== '["gondola:L05:5","a_guardar::46"]' || !r.revisadoOk) fail.push("C partir: " + JSON.stringify(r.lineas));
   if (!r.real || r.real.emp !== "CH" || JSON.stringify(r.real.dest) !== '["gondola:L05:5","a_guardar::46"]' || !r.grabada || r.real.cerrar !== true || !r.real.cid || !r.confirmo) fail.push("D grabar: " + JSON.stringify(r.real));
-  if (!r.casilla || !r.sigueEnViaje || r.parcialCerrar !== false) fail.push("D2 parcial: " + JSON.stringify([r.casilla, r.sigueEnViaje, r.parcialCerrar]));
+  if (!r.casilla || !r.sigueEnViaje || r.parcialCerrar !== false || !r.cierraConfirm || r.cerradoCerrar !== true) fail.push("D2 parcial: " + JSON.stringify([r.casilla, r.sigueEnViaje, r.parcialCerrar, r.cierraConfirm, r.cerradoCerrar]));
   if (!r.hist || !r.anulo) fail.push("E historial/anular: " + JSON.stringify([r.hist, r.anulo]));
   if (errs.length) fail.push("pageerror: " + errs.join(" | "));
   await b.close();
