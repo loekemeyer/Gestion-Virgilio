@@ -1919,7 +1919,8 @@ const _PED_IMP_RPC_ESCRITURA = ["gv_imp_carga_pedido_set", "gv_imp_cc_deuda_add"
   "gv_imp_pago_cargas_set", "gv_imp_prov_alias_set", "gv_importado_bache_add", "gv_importado_bache_borrar",
   "gv_importado_bache_editar", "gv_importado_bache_embarque", "gv_importado_bache_llego", "gv_importado_pedido_fechas",
   "gv_importado_pedido_ref", "gv_importados_resync", "importados_marcar_llegada", "importados_set_curso",
-  "gv_imp_recibir", "gv_imp_recibir_contexto", "gv_imp_recepcion_historial", "gv_imp_recepcion_anular"];   // v23.45 — sólo authenticated (supervisor)
+  "gv_imp_recibir", "gv_imp_recibir_contexto", "gv_imp_recepcion_historial", "gv_imp_recepcion_anular",   // v23.45 — sólo authenticated (supervisor)
+  "gv_imp_pi_editar", "gv_imp_pi_editores", "gv_imp_pi_ediciones"];   // v24.99 — editar una PI (quién, cuándo): sólo supervisor
 async function _pedImpRpc(fn, body) {
   var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   if (_PED_IMP_RPC_ESCRITURA.indexOf(fn) >= 0) {
@@ -3262,7 +3263,7 @@ function _impCursoRender() {
       // MISMO detalle que el PI (impCursoToggle), con el costo de nacionalización por artículo.
       '<td class="imcu-provtd" onclick="impCursoToggle(\'' + refEnc + '\',\'' + provEnc + '\')" title="Ver los artículos de este pedido con el costo de nacionalización de cada uno"><span class="imcu-prov">' + (abierto ? '▾ ' : '▸ ') + escapeHtml(r.proveedor) + '</span>' + (imp ? '<div class="imcu-imp">' + escapeHtml(imp) + '</div>' : '') + '</td>' +
       '<td><span class="imcu-pi" onclick="impCursoToggle(\'' + refEnc + '\',\'' + provEnc + '\')" title="Ver los artículos de este pedido">' + (abierto ? '▾ ' : '▸ ') + escapeHtml(r.pedido_ref) + '</span>' +
-        '<div class="imcu-sub"><span class="imcu-b" onclick="impCursoSetRef(\'' + refEnc + '\')" title="Ver SÓLO este pedido (y cuánta plata es)">🔎 solo éste</span> <span class="imcu-b" onclick="impCursoRenombrar(\'' + refEnc + '\',\'' + provEnc + '\')" title="Cambiar el número de PI de este pedido">✏️ PI</span></div></td>' +
+        '<div class="imcu-sub"><span class="imcu-b" onclick="impCursoSetRef(\'' + refEnc + '\')" title="Ver SÓLO este pedido (y cuánta plata es)">🔎 solo éste</span> <span class="imcu-b" onclick="impPiEditar(\'' + refEnc + '\',\'' + provEnc + '\')" title="Corregir las cantidades de cada ítem y el número de PI. Pregunta quién corrige y queda registrado el día y la hora.">✏️ Editar PI</span></div></td>' +
       '<td class="num">' + r.n_lineas + '</td>' +
       '<td class="num"><b>' + _impCursoNum(r.pendiente) + '</b></td>' +
       '<td class="num" style="color:#065f46;font-weight:700">' + (Number(r.usd) > 0 ? _impCursoNum(Math.round(r.usd)) : '—') + '</td>' +
@@ -3950,4 +3951,269 @@ async function impCursoRenombrar(refEnc, provEnc) {
   catch (e) { try { alert("No se pudo renombrar: " + (e.message || e)); } catch (_e) {} return; }
   if (_stkPop && _stkPop.kind === "impCurso") { _stkPop.abierto = ""; _stkPop.lineas = {}; }
   await impCursoReload();
+}
+/* v24.99 — ✏️ EDITAR PI: corregir las cantidades de cada ítem (y el número de PI), con registro de
+   QUIÉN, QUÉ DÍA y A QUÉ HORA. Pedido: "cuando toco el lápiz, me pregunte quién es la persona que
+   va a corregir la PI… Tomás, Vivi, Luis, Tomás, Gastón, y un cuadradito Otro para poner el nombre,
+   y ya se registre como un nuevo editor de pedidos".
+   Tres pasos: 1) ¿quién corrige? · 2) cantidades nuevas · 3) antes → después (simulado en la base,
+   no escribe) y recién ahí «Guardar». Todo lo decide la RPC gv_imp_pi_editar: la cantidad no puede
+   quedar por debajo de lo ya llegado, 0 saca el ítem de la PI, y si la línea cambió mientras se
+   editaba no pisa (manda lo que se VIO en `antes`). El log vive en GV_Imp_PI_Edicion. */
+let _impPiEd = null;
+const _IMP_PI_EDITORES_FALLBACK = ["Thomas", "Tomás", "Vivi", "Luis", "Gastón"];
+function _impPiEdCss() {
+  if (document.getElementById("impPiEdCss")) return;
+  const st = document.createElement("style"); st.id = "impPiEdCss";
+  st.textContent =
+    "#impPiEdOv{display:none;position:fixed;inset:0;z-index:1330;background:rgba(2,6,23,.78);overflow:auto;padding:14px}" +
+    "#impPiEdOv.show{display:block}" +
+    "#impPiEdOv button{width:auto;margin-top:0}" +
+    "#impPiEdOv input{box-sizing:border-box;margin:0}" +
+    ".ipe-card{background:#f8fafc;width:max-content;max-width:96vw;margin:0 auto;border-radius:14px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.55)}" +
+    ".ipe-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:linear-gradient(90deg,#1e3a8a,#2563eb);color:#fff}" +
+    ".ipe-head b{font-size:15px;font-weight:800}" +
+    ".ipe-x{background:rgba(255,255,255,.22);color:#fff;border:none;border-radius:8px;padding:5px 11px;font-size:13px;font-weight:800;cursor:pointer}" +
+    ".ipe-body{padding:12px 14px;text-align:center}" +
+    ".ipe-q{font-size:15px;font-weight:800;color:#0f172a;margin-bottom:10px}" +
+    ".ipe-eds{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:460px;margin:0 auto}" +
+    ".ipe-ed{border:1.5px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;border-radius:10px;padding:9px 16px;font-size:15px;font-weight:800;cursor:pointer}" +
+    ".ipe-ed:hover{background:#dbeafe}" +
+    ".ipe-otro{display:flex;gap:6px;justify-content:center;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed #cbd5e1}" +
+    ".ipe-otro input{width:180px;padding:7px 9px;border:1.5px solid #cbd5e1;border-radius:9px;font-size:14px}" +
+    ".ipe-b{border:0;border-radius:9px;padding:7px 14px;font-size:13.5px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#0f172a}" +
+    ".ipe-b.pri{background:#1d4ed8;color:#fff}.ipe-b.ok{background:#166534;color:#fff}.ipe-b:disabled{opacity:.5;cursor:default}" +
+    ".ipe-quien{display:inline-flex;gap:8px;align-items:center;font-size:13px;color:#334155;margin-bottom:8px}" +
+    ".ipe-quien b{color:#1e3a8a}" +
+    ".ipe-ref{display:flex;gap:6px;justify-content:center;align-items:center;margin-bottom:10px;font-size:12.5px;font-weight:800;color:#475569}" +
+    ".ipe-ref input{width:190px;padding:6px 8px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13.5px;font-weight:800;font-family:Consolas,Menlo,monospace;text-align:center}" +
+    ".ipe-tbl{border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin:0 auto}" +
+    ".ipe-tbl th{font-size:10.5px;text-transform:uppercase;color:#64748b;font-weight:800;padding:6px 8px;border-bottom:2px solid #e2e8f0;text-align:center;line-height:1.15}" +
+    ".ipe-tbl td{padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:13.5px;color:#0f172a;text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap}" +
+    ".ipe-tbl td.cod{font-weight:800;font-family:Consolas,Menlo,monospace}" +
+    ".ipe-tbl td.cod small{font-family:inherit;font-size:10px;color:#64748b;font-weight:700;margin-left:3px}" +
+    ".ipe-tbl tr.cambia td{background:#fefce8}" +
+    ".ipe-tbl tr.tot td{background:#f8fafc;font-weight:800;border-top:2px solid #e2e8f0}" +
+    ".ipe-in{width:92px;padding:4px 6px;border:1.5px solid #cbd5e1;border-radius:7px;font-size:13.5px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}" +
+    ".ipe-in:focus{border-color:#2563eb;outline:none}" +
+    ".ipe-mas{color:#166534;font-weight:800}.ipe-men{color:#b91c1c;font-weight:800}" +
+    ".ipe-foot{display:flex;gap:8px;justify-content:center;margin-top:12px}" +
+    ".ipe-msg{margin:8px auto 0;max-width:520px;font-size:12.5px;font-weight:700;border-radius:9px;padding:7px 10px}" +
+    ".ipe-msg.err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}" +
+    ".ipe-msg.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}" +
+    ".ipe-msg.info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}" +
+    ".ipe-hist{margin-top:12px;padding-top:8px;border-top:1px dashed #cbd5e1}" +
+    ".ipe-hist summary{cursor:pointer;font-size:12.5px;font-weight:800;color:#475569}" +
+    ".ipe-hist .ipe-tbl td{font-size:12.5px}";
+  document.head.appendChild(st);
+}
+function _impPiEdNum(n) { return Number(n || 0).toLocaleString("es-AR"); }
+function _impPiEdDelta(d) {
+  d = Number(d) || 0;
+  if (!d) return '<span style="color:#94a3b8">—</span>';
+  return '<span class="' + (d > 0 ? "ipe-mas" : "ipe-men") + '">' + (d > 0 ? "+" : "−") + _impPiEdNum(Math.abs(d)) + '</span>';
+}
+function _impPiEdFecha(iso) {
+  try {
+    return new Date(iso).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+  } catch (_e) { return String(iso || ""); }
+}
+async function impPiEditar(refEnc, provEnc) {
+  _impPiEdCss();
+  const ref = decodeURIComponent(refEnc || ""), prov = decodeURIComponent(provEnc || "");
+  _impPiEd = { ref: ref, prov: prov, paso: "quien", editor: "", editores: null, edErr: "", lineas: null, linErr: "",
+    nuevos: {}, refNuevo: ref, preview: null, msg: "", msgTipo: "", hist: null, guardando: false, guardado: null };
+  let ov = document.getElementById("impPiEdOv");
+  if (!ov) { ov = document.createElement("div"); ov.id = "impPiEdOv"; document.body.appendChild(ov); }
+  ov.classList.add("show");
+  _impPiEdRender();
+  // editores y líneas en paralelo: mientras la persona elige quién es, las cantidades ya llegan
+  const st = _impPiEd;
+  _pedImpRpc("gv_imp_pi_editores", {}).then(function (rs) {
+    if (_impPiEd !== st) return;
+    st.editores = (rs || []).map(function (x) { return x.nombre; }).filter(Boolean);
+    if (!st.editores.length) st.editores = _IMP_PI_EDITORES_FALLBACK.slice();
+    _impPiEdRender();
+  }).catch(function (e) {
+    if (_impPiEd !== st) return;
+    st.editores = _IMP_PI_EDITORES_FALLBACK.slice(); st.edErr = String(e.message || e); _impPiEdRender();
+  });
+  _pedImpRpc("gv_importado_pedido_lineas", { p_pedido_ref: ref, p_proveedor: prov }).then(function (ls) {
+    if (_impPiEd !== st) return;
+    st.lineas = ls || []; _impPiEdRender();
+  }).catch(function (e) {
+    if (_impPiEd !== st) return;
+    st.lineas = null; st.linErr = String(e.message || e); _impPiEdRender();
+  });
+  _pedImpRpc("gv_imp_pi_ediciones", { p_pedido_ref: ref, p_proveedor: prov, p_limite: 200 }).then(function (hs) {
+    if (_impPiEd !== st) return;
+    st.hist = hs || []; _impPiEdRender();
+  }).catch(function () { if (_impPiEd === st) { st.hist = []; _impPiEdRender(); } });
+}
+function impPiEdCerrar() {
+  const ov = document.getElementById("impPiEdOv"); if (ov) ov.classList.remove("show");
+  const g = _impPiEd && _impPiEd.guardado; _impPiEd = null;
+  if (g && _stkPop && _stkPop.kind === "impCurso") {
+    _stkPop.lineas = {};
+    if (g.ref_nuevo && _stkPop.refFiltro === g.pedido_ref) _stkPop.refFiltro = g.ref_nuevo;
+    _stkPop.abierto = "";
+    try { impCursoReload(); } catch (_e) {}
+  }
+}
+function impPiEdQuien(nomEnc) {
+  if (!_impPiEd) return;
+  const n = String(decodeURIComponent(nomEnc || "")).trim(); if (!n) return;
+  _impPiEd.editor = n; _impPiEd.paso = "editar"; _impPiEd.msg = ""; _impPiEdRender();
+}
+function impPiEdOtro() {
+  if (!_impPiEd) return;
+  const inp = document.getElementById("impPiEdOtroIn");
+  const n = String((inp && inp.value) || "").replace(/\s+/g, " ").trim();
+  if (!n) { _impPiEd.msg = "Escribí el nombre de quien corrige."; _impPiEd.msgTipo = "err"; _impPiEdRender(); return; }
+  if (n.length > 60) { _impPiEd.msg = "El nombre es demasiado largo."; _impPiEd.msgTipo = "err"; _impPiEdRender(); return; }
+  impPiEdQuien(encodeURIComponent(n));
+}
+function impPiEdCambiarQuien() { if (_impPiEd) { _impPiEd.paso = "quien"; _impPiEd.preview = null; _impPiEd.msg = ""; _impPiEdRender(); } }
+function impPiEdSetCant(bacheId, v) {
+  if (!_impPiEd) return;
+  // type=number: el valor llega sin separador de miles ("2520"); una coma decimal se toma como punto
+  const s = String(v == null ? "" : v).replace(",", ".").trim();
+  if (s === "") delete _impPiEd.nuevos[bacheId];
+  else { const n = Math.round(Number(s)); if (isFinite(n)) _impPiEd.nuevos[bacheId] = n; }
+  _impPiEd.preview = null;
+  _impPiEdPintarTotales();
+}
+function impPiEdSetRef(v) { if (_impPiEd) { _impPiEd.refNuevo = String(v || "").trim(); _impPiEd.preview = null; } }
+/* Sólo repinta Δ y totales, sin rearmar la tabla: si no, el input pierde el foco en cada tecla. */
+function _impPiEdPintarTotales() {
+  const st = _impPiEd; if (!st || !st.lineas) return;
+  let tA = 0, tN = 0;
+  st.lineas.forEach(function (l) {
+    const a = Number(l.unidades) || 0, n = (l.bache_id in st.nuevos) ? st.nuevos[l.bache_id] : a;
+    tA += a; tN += n;
+    const d = document.getElementById("ipeD" + l.bache_id); if (d) d.innerHTML = _impPiEdDelta(n - a);
+    const tr = document.getElementById("ipeR" + l.bache_id); if (tr) tr.className = (n !== a) ? "cambia" : "";
+  });
+  const t = document.getElementById("ipeTotN"); if (t) t.textContent = _impPiEdNum(tN);
+  const td = document.getElementById("ipeTotD"); if (td) td.innerHTML = _impPiEdDelta(tN - tA);
+}
+function _impPiEdCambios() {
+  const st = _impPiEd; const out = [];
+  (st.lineas || []).forEach(function (l) {
+    if (!(l.bache_id in st.nuevos)) return;
+    const n = st.nuevos[l.bache_id], a = Number(l.unidades) || 0;
+    if (n !== a) out.push({ bache_id: l.bache_id, unidades: n, antes: a });
+  });
+  return out;
+}
+async function impPiEdRevisar() {
+  const st = _impPiEd; if (!st || st.guardando) return;
+  const cambios = _impPiEdCambios();
+  const refN = (st.refNuevo && st.refNuevo !== st.ref) ? st.refNuevo : null;
+  if (!cambios.length && !refN) { st.msg = "No cambiaste ninguna cantidad ni el número de PI."; st.msgTipo = "info"; _impPiEdRender(); return; }
+  const neg = cambios.filter(function (c) { return c.unidades < 0; });
+  if (neg.length) { st.msg = "Una cantidad no puede ser negativa."; st.msgTipo = "err"; _impPiEdRender(); return; }
+  st.guardando = true; st.msg = ""; _impPiEdRender();
+  try {
+    st.preview = await _pedImpRpc("gv_imp_pi_editar", { p_pedido_ref: st.ref, p_proveedor: st.prov, p_editor: st.editor,
+      p_cambios: cambios, p_nuevo_ref: refN, p_simular: true });
+    st.paso = "revisar";
+  } catch (e) { st.msg = "No se pudo revisar: " + (e.message || e); st.msgTipo = "err"; }
+  st.guardando = false; _impPiEdRender();
+}
+function impPiEdVolver() { if (_impPiEd) { _impPiEd.paso = "editar"; _impPiEd.msg = ""; _impPiEdRender(); } }
+async function impPiEdGuardar() {
+  const st = _impPiEd; if (!st || st.guardando || !st.preview) return;
+  const cambios = _impPiEdCambios();
+  const refN = (st.refNuevo && st.refNuevo !== st.ref) ? st.refNuevo : null;
+  st.guardando = true; _impPiEdRender();
+  try {
+    st.guardado = await _pedImpRpc("gv_imp_pi_editar", { p_pedido_ref: st.ref, p_proveedor: st.prov, p_editor: st.editor,
+      p_cambios: cambios, p_nuevo_ref: refN, p_simular: false });
+    st.paso = "listo";
+  } catch (e) { st.msg = "No se guardó nada: " + (e.message || e); st.msgTipo = "err"; }
+  st.guardando = false; _impPiEdRender();
+}
+function _impPiEdTablaDiff(p) {
+  let h = '<table class="ipe-tbl"><thead><tr><th>Código</th><th>Antes<br>u</th><th>Después<br>u</th><th>Dif.<br>u</th></tr></thead><tbody>';
+  (p.filas || []).forEach(function (f) {
+    h += '<tr class="cambia"><td class="cod">' + escapeHtml(codCanon(f.cod_art)) + (f.marca ? '<small>' + escapeHtml(f.marca) + '</small>' : '') + '</td>' +
+      '<td>' + _impPiEdNum(f.antes) + '</td><td><b>' + (f.sale ? '0 <span class="ipe-men" style="font-size:11px">sale de la PI</span>' : _impPiEdNum(f.despues)) + '</b></td>' +
+      '<td>' + _impPiEdDelta(f.delta) + '</td></tr>';
+  });
+  h += '<tr class="tot"><td>Total PI</td><td>' + _impPiEdNum(p.total_antes) + '</td><td>' + _impPiEdNum(p.total_despues) + '</td><td>' + _impPiEdDelta((p.total_despues || 0) - (p.total_antes || 0)) + '</td></tr>';
+  return h + '</tbody></table>';
+}
+function _impPiEdHistHtml() {
+  const hs = (_impPiEd && _impPiEd.hist) || [];
+  if (!hs.length) return '';
+  let h = '<details class="ipe-hist"><summary>📜 Ediciones anteriores (' + hs.length + ')</summary>' +
+    '<table class="ipe-tbl" style="margin-top:6px"><thead><tr><th>Día y hora</th><th>Quién</th><th>Qué</th><th>Antes</th><th>Después</th></tr></thead><tbody>';
+  hs.forEach(function (x) {
+    const que = x.campo === "pedido_ref" ? "N° de PI" : (escapeHtml(codCanon(x.cod_art || "")) + (x.marca ? ' <small style="color:#64748b">' + escapeHtml(x.marca) + '</small>' : ''));
+    const a = x.campo === "pedido_ref" ? escapeHtml(x.antes_ref || "") : _impPiEdNum(x.antes_u);
+    const d = x.campo === "pedido_ref" ? escapeHtml(x.despues_ref || "") : _impPiEdNum(x.despues_u);
+    h += '<tr><td>' + escapeHtml(_impPiEdFecha(x.ts)) + '</td><td title="' + escapeHtml(x.usuario || "") + '"><b>' + escapeHtml(x.editor || "") + '</b></td><td>' + que + '</td><td>' + a + '</td><td>' + d + '</td></tr>';
+  });
+  return h + '</tbody></table></details>';
+}
+function _impPiEdRender() {
+  const ov = document.getElementById("impPiEdOv"); const st = _impPiEd; if (!ov || !st) return;
+  let h = '<div class="ipe-card"><div class="ipe-head"><b>✏️ Editar ' + escapeHtml(st.ref) + ' · ' + escapeHtml(st.prov) + '</b>' +
+    '<button class="ipe-x" onclick="impPiEdCerrar()">✕ Cerrar</button></div><div class="ipe-body">';
+  const msg = st.msg ? '<div class="ipe-msg ' + (st.msgTipo || "info") + '">' + escapeHtml(st.msg) + '</div>' : '';
+  if (st.paso === "quien") {
+    h += '<div class="ipe-q">¿Quién corrige esta PI?</div>';
+    if (!st.editores) h += '<div style="color:#64748b;font-size:13px">Cargando…</div>';
+    else {
+      h += '<div class="ipe-eds">' + st.editores.map(function (n) {
+        return '<button class="ipe-ed" onclick="impPiEdQuien(\'' + _impCursoEnc(n) + '\')">' + escapeHtml(n) + '</button>';
+      }).join("") + '</div>';
+      h += '<div class="ipe-otro"><b style="font-size:13px;color:#475569">Otro:</b><input id="impPiEdOtroIn" placeholder="Nombre" maxlength="60" onkeydown="if(event.key===\'Enter\')impPiEdOtro()"><button class="ipe-b pri" onclick="impPiEdOtro()">Seguir</button></div>';
+      h += '<div style="font-size:11.5px;color:#64748b;margin-top:6px">Un nombre nuevo queda como editor de pedidos para la próxima vez.</div>';
+      if (st.edErr) h += '<div class="ipe-msg err">No se pudo leer la lista de editores (' + escapeHtml(st.edErr) + '). Se muestra la lista base.</div>';
+    }
+    h += msg + _impPiEdHistHtml();
+  } else if (st.paso === "editar") {
+    h += '<div class="ipe-quien">Corrige: <b>' + escapeHtml(st.editor) + '</b> <button class="ipe-b" style="padding:3px 9px;font-size:12px" onclick="impPiEdCambiarQuien()">cambiar</button></div>';
+    h += '<div class="ipe-ref">N° de PI <input value="' + escapeHtml(st.refNuevo) + '" oninput="impPiEdSetRef(this.value)"></div>';
+    if (st.linErr) h += '<div class="ipe-msg err">No se pudieron leer los ítems: ' + escapeHtml(st.linErr) + '</div>';
+    else if (!st.lineas) h += '<div style="color:#64748b;font-size:13px">Cargando ítems…</div>';
+    else if (!st.lineas.length) h += '<div style="color:#64748b;font-size:13px">Esta PI no tiene ítems en curso.</div>';
+    else {
+      let tA = 0, tN = 0;
+      h += '<table class="ipe-tbl"><thead><tr><th>Código</th><th>Llegó<br>u</th><th>Actual<br>u</th><th>Nueva<br>u</th><th>Dif.<br>u</th></tr></thead><tbody>';
+      st.lineas.forEach(function (l) {
+        const a = Number(l.unidades) || 0, lleg = Math.max(0, a - (Number(l.pendiente) || 0));
+        const tiene = l.bache_id in st.nuevos, n = tiene ? st.nuevos[l.bache_id] : a;
+        tA += a; tN += n;
+        h += '<tr id="ipeR' + l.bache_id + '"' + (n !== a ? ' class="cambia"' : '') + '><td class="cod" title="' + escapeHtml(artNombre(l.cod_art, l.descripcion) || "") + '">' + escapeHtml(codCanon(l.cod_art)) + (l.marca ? '<small>' + escapeHtml(l.marca) + '</small>' : '') + '</td>' +
+          '<td>' + (lleg ? _impPiEdNum(lleg) : '—') + '</td>' +
+          '<td>' + _impPiEdNum(a) + '</td>' +
+          '<td><input class="ipe-in" type="number" inputmode="numeric" min="' + lleg + '" step="1" value="' + (tiene ? n : "") + '" placeholder="' + a + '" oninput="impPiEdSetCant(' + l.bache_id + ',this.value)"></td>' +
+          '<td id="ipeD' + l.bache_id + '">' + _impPiEdDelta(n - a) + '</td></tr>';
+      });
+      h += '<tr class="tot"><td>Total</td><td></td><td>' + _impPiEdNum(tA) + '</td><td id="ipeTotN">' + _impPiEdNum(tN) + '</td><td id="ipeTotD">' + _impPiEdDelta(tN - tA) + '</td></tr></tbody></table>';
+      h += '<div style="font-size:11.5px;color:#64748b;margin-top:6px">Vacío = queda igual · 0 = sale de la PI · no puede quedar por debajo de lo que ya llegó.</div>';
+    }
+    h += msg + '<div class="ipe-foot"><button class="ipe-b" onclick="impPiEdCerrar()">Cancelar</button>' +
+      '<button class="ipe-b pri" ' + (st.guardando || !st.lineas ? 'disabled' : '') + ' onclick="impPiEdRevisar()">' + (st.guardando ? 'Revisando…' : 'Ver cambios →') + '</button></div>';
+    h += _impPiEdHistHtml();
+  } else if (st.paso === "revisar") {
+    const p = st.preview || {};
+    h += '<div class="ipe-q">Esto es lo que cambia</div>';
+    h += '<div class="ipe-quien">Corrige <b>' + escapeHtml(p.editor || st.editor) + '</b>' + (p.editor_nuevo ? ' <span style="font-size:11.5px;color:#b45309;font-weight:800">(queda como editor nuevo)</span>' : '') + '</div>';
+    if (p.ref_nuevo) h += '<div class="ipe-msg info">N° de PI: <b>' + escapeHtml(p.pedido_ref) + '</b> → <b>' + escapeHtml(p.ref_nuevo) + '</b></div>';
+    if ((p.filas || []).length) h += '<div style="margin-top:8px">' + _impPiEdTablaDiff(p) + '</div>';
+    h += msg + '<div class="ipe-foot"><button class="ipe-b" onclick="impPiEdVolver()">← Volver</button>' +
+      '<button class="ipe-b ok" ' + (st.guardando ? 'disabled' : '') + ' onclick="impPiEdGuardar()">' + (st.guardando ? 'Guardando…' : '✔ Guardar') + '</button></div>';
+  } else if (st.paso === "listo") {
+    const g = st.guardado || {};
+    h += '<div class="ipe-msg ok" style="font-size:14px">✔ Guardado · <b>' + escapeHtml(g.editor || st.editor) + '</b> · ' + escapeHtml(_impPiEdFecha(g.ts)) + '</div>';
+    if (g.ref_nuevo) h += '<div class="ipe-msg info">N° de PI: <b>' + escapeHtml(g.pedido_ref) + '</b> → <b>' + escapeHtml(g.ref_nuevo) + '</b></div>';
+    if ((g.filas || []).length) h += '<div style="margin-top:8px">' + _impPiEdTablaDiff(g) + '</div>';
+    h += '<div class="ipe-foot"><button class="ipe-b pri" onclick="impPiEdCerrar()">Listo</button></div>';
+  }
+  ov.innerHTML = h + '</div></div>';
+  if (st.paso === "quien" && st.editores) { const i = document.getElementById("impPiEdOtroIn"); if (i && !i.value && st.msgTipo === "err") try { i.focus(); } catch (_e) {} }
 }

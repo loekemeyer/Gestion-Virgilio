@@ -666,6 +666,8 @@ node tests/pedimp-meses-proveedor.cjs
 
 echo "== imp-hist-pedidos (v23.91: 📜 Historial = pedidos + recepciones) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-hist-pedidos.cjs
+echo "== imp-pi-editar (v24.99: ✏️ Editar PI = quién → cantidades → antes/después → guardar con registro) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-pi-editar.cjs
 
 echo "== imp-encurso (v15.72: solapa 🚢 En curso — un renglón por pedido, embarque + llegada, días que faltan) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-encurso.cjs
