@@ -236,6 +236,10 @@ function build(src) {
   out = rep(out, "\n</style>", CSS.replace(/<\/style>$/, "") + "\n</style>");
   // 3) overlay del pop-up en el body
   out = rep(out, "\n</body>", '\n<div id="pop" class="hide"></div>\n</body>');
+  // 3b) v25.83 (Luis, 01/10: "ponelo solo en el monitor admin así lo testeo"): la alarma de
+  //     operario inactivo 5 min va SÓLO en Mon. Admin; la TV de pared no la carga todavía.
+  out = rep(out, '<script src="../supabase-config.js?v=1202"></script>\n',
+    '<script src="../supabase-config.js?v=1202"></script>\n<script src="alerta-inactivo.js?v=2"></script>   <!-- v25.83: alarma operario inactivo 5 min (sólo Mon. Admin) -->\n');
   // 4) en pintar(): stash de `d` para que la capa admin lo lea
   out = rep(out,
     "function pintar(d) {\n  var nombres = d.empleados.nombres, horarios = d.empleados.horarios;",

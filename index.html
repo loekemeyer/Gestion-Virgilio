@@ -6269,7 +6269,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.84"></script>
+<script type="module" src="recepcion.js?v=25.85"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -9253,7 +9253,7 @@ function _tmAlertaRpc(fn, body) {
 function _tmAlertaAbrir(leg) {
   if (!leg || _tm.alertaPend) return;
   try { if (localStorage.getItem(_tmAlertaKey(leg)) === getTodayKey() + "|" + _tm.alertaRef) return; } catch (_e) {}
-  if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
+  /* v25.83: el legajo de prueba también avisa — la alarma está sólo en Mon. Admin, no en la TV de pared */
   _tm.alertaPend = true;
   var marca = getTodayKey() + "|" + _tm.alertaRef;
   _tmAlertaRpc("gv_alerta_inactivo_abrir", { p_legajo: leg, p_dispositivo: (typeof gvDispositivoId === "function" ? gvDispositivoId() : null) })
@@ -10451,7 +10451,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.84";
+const APP_VERSION = "v25.85";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -58484,7 +58484,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.84"></script>
+<script src="importacion.js?v=25.85"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61285,7 +61285,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.84"></script>
+<script src="cobranzas.js?v=25.85"></script>
 
 </body>
 </html>
