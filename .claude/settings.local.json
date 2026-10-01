@@ -120,7 +120,10 @@
       "Bash(sed -i 's/## ⚠ REGLA \\(Luis, 2026-10-01, v25.48\\): en CUARENTENA/## ⚠ REGLA \\(Luis, 2026-10-01, v25.49\\): en CUARENTENA/' CLAUDE.md)",
       "Bash(BUMP_FORZAR=0 node scripts/bump-version.cjs 25.49)",
       "Bash(sed -i 's/v25\\\\.48 \\(Luis, 01\\\\/10\\) — HOJA DE PICKING/v25.50 \\(Luis, 01\\\\/10\\) — HOJA DE PICKING/; s/\\\\/\\\\/ v25\\\\.48 — HOJA DE PICKING al terminar/\\\\/\\\\/ v25.50 — HOJA DE PICKING al terminar/; s/\\\\/\\\\/ v25\\\\.48 — hojas de PICKING/\\\\/\\\\/ v25.50 — hojas de PICKING/; s/\\\\/\\\\/ v25\\\\.48 — primero las hojas/\\\\/\\\\/ v25.50 — primero las hojas/' index.html)",
-      "Bash(sed -i 's/v25\\\\.48/v25.50/' tests/pk-hoja-picking.cjs tests/run.sh)"
+      "Bash(sed -i 's/v25\\\\.48/v25.50/' tests/pk-hoja-picking.cjs tests/run.sh)",
+      "Bash(sed -i '50a node tests/ccr-fss-recontrol.cjs' tests/run.sh)",
+      "Bash(sed -i 's/  \\\\/\\\\/ v25.59 — un CR ANTERIOR/  \\\\/\\\\/ v25.60 — un CR ANTERIOR/' index.html)",
+      "Bash(sed -i 's/^\\\\/\\\\/ v25.59 — Control Remitos/\\\\/\\\\/ v25.60 — Control Remitos/' tests/ccr-fss-recontrol.cjs)"
     ]
   }
 }
