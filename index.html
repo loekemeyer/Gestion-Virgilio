@@ -6237,7 +6237,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.51"></script>
+<script type="module" src="recepcion.js?v=25.52"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10282,7 +10282,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.51";
+const APP_VERSION = "v25.52";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -53818,14 +53818,22 @@ function pkHojaArmar(tanda, tp, pkc, lug, nps, otras, nombre){
   (lug || []).forEach(function (x){
     var c = String(x.cod || "").trim().toUpperCase(), e = String(x.empresa || "").toUpperCase();
     var o = (x.orden != null ? Number(x.orden) : null);
-    [c + "|" + e, c + "|"].forEach(function (k){ var p = porCod[k]; if (!p || (o != null && (p.orden == null || o < p.orden))) porCod[k] = { sector: String(x.sector || ""), orden: o }; });
+    var s = String(x.sector || "");
+    // Sector a mostrar = el PRIMERO del código por nombre (A01 de A01..A04; D01 del 505, aunque su
+    // orden de recorrido más chico sea D18). El orden para ordenar la hoja sigue siendo el menor.
+    [c + "|" + e, c + "|"].forEach(function (k){
+      var p = porCod[k] || (porCod[k] = { sector: s, orden: o });
+      if (s && (!p.sector || s.localeCompare(p.sector, "es", { numeric: true }) < 0)) p.sector = s;
+      if (o != null && (p.orden == null || o < p.orden)) p.orden = o;
+    });
   });
   var arts = {};
   (pkc || []).forEach(function (r){
     var p = String(r.texto || "").split("|"); if (p.length < 4) return;
     var raw = String(p[1] || "").trim().toUpperCase(); if (!raw) return;
     var m = raw.match(/^(.*?)\s+(LK|CH)$/), cod = m ? m[1] : raw, emp = m ? m[2] : String(p[5] || "").trim().toUpperCase();
-    arts[raw] = { cod: raw, esp: parseInt(p[2], 10) || 0, real: parseInt(p[3], 10) || 0,
+    // El código va pelado: «809E LK» es como lo ve el operario en el picking, no un código (v25.52).
+    arts[raw] = { cod: cod, esp: parseInt(p[2], 10) || 0, real: parseInt(p[3], 10) || 0,
       lug: porCod[cod + "|" + emp] || porCod[cod + "|"] || porCod[cod.replace(/^0+(?=.)/, "") + "|"] || null };
   });
   var lineas = Object.keys(arts).map(function (k){ return arts[k]; });
@@ -53836,7 +53844,8 @@ function pkHojaArmar(tanda, tp, pkc, lug, nps, otras, nombre){
   var ini = tp && tp.ts_inicio, fin = tp && tp.ts_cliente;
   var minBruto = (ini && fin) ? Math.max(0, Math.round((new Date(fin) - new Date(ini)) / 60000)) : 0;
   var minOtras = (ini && fin) ? _pkHojaMinOtras(otras, ini, fin) : 0;
-  var minNeto = Math.max(0, minBruto - minOtras);
+  // v25.52 (Luis): las otras tareas se MUESTRAN pero NO se descuentan del m³/hora.
+  var minNeto = minBruto;
   var npl = (nps || []).slice().sort(function (x, y){ return String(x.np).localeCompare(String(y.np)); });
   var m3 = npl.reduce(function (s, x){ return s + (Number(x.m3) || 0); }, 0);
   var fechas = npl.map(function (x){ return String(x.fecha || "").slice(0, 10); }).filter(Boolean).sort();
@@ -53851,23 +53860,23 @@ function pkHojaHtml(d){
     '.pkh-t{font-size:1.55em;font-weight:800;line-height:1.15;}.pkh-s{font-size:1.25em;}.pkh-r{font-size:1.1em;text-align:right;line-height:1.35;}' +
     '.pkh-body{display:flex;gap:.7em;align-items:flex-start;}' +
     '.pkh table{border-collapse:collapse;}.pkh th,.pkh td{border:1px solid #888;padding:.12em .35em;text-align:center;white-space:nowrap;}' +
-    '.pkh th{font-size:.85em;line-height:1.1;background:#eee;}.pkh-cod{font-family:Consolas,Menlo,monospace;font-weight:800;}' +
+    '.pkh th{font-size:.85em;line-height:1.1;}.pkh-cod{font-family:Consolas,Menlo,monospace;font-weight:800;}' +
     '.pkh-f td{font-weight:800;}.pkh-np td{text-align:left;}.pkh-np td.n{text-align:center;}' +
-    '.pkh-tot{font-size:1.15em;font-weight:800;margin-top:.35em;}.pkh-m3h{font-size:1.3em;font-weight:800;margin-top:.25em;}</style>';
+    '.pkh-tot{font-size:1.15em;font-weight:800;margin-top:.35em;text-align:center;}.pkh-m3h{font-size:1.3em;font-weight:800;margin-top:.25em;text-align:center;}</style>';
   var mitad = Math.ceil(d.lineas.length / 2);
   var tabla = function (rows){
     if (!rows.length) return '';
-    return '<table><thead><tr><th>Cod</th><th>Sector</th><th>Orden</th><th>Total<br>cajas</th><th>Pickeo</th></tr></thead><tbody>' +
+    return '<table><thead><tr><th>Cod</th><th>Sector</th><th>Total<br>cajas</th><th>Pickeo</th></tr></thead><tbody>' +
       rows.map(function (x){
         var f = x.esp - x.real;
         var pk = (x.real >= x.esp) ? '✓' : String(x.real);
-        return '<tr' + (f > 0 ? ' class="pkh-f"' : '') + '><td class="pkh-cod">' + escapeHtml(x.cod) + '</td><td>' + escapeHtml((x.lug && x.lug.sector) || '—') + '</td><td>' + ((x.lug && x.lug.orden != null) ? x.lug.orden : '—') + '</td><td>' + x.esp + '</td><td>' + pk + '</td></tr>';
+        return '<tr' + (f > 0 ? ' class="pkh-f"' : '') + '><td class="pkh-cod">' + escapeHtml(x.cod) + '</td><td>' + escapeHtml((x.lug && x.lug.sector) || '—') + '</td><td>' + x.esp + '</td><td>' + pk + '</td></tr>';
       }).join('') + '</tbody></table>';
   };
   var npRows = d.nps.length ? d.nps.map(function (x){
     return '<tr><td class="pkh-cod">' + escapeHtml(x.np) + '</td><td>' + escapeHtml(x.rs || '—') + '</td><td class="n">' + (x.m3 != null ? _pkHojaNum(x.m3, 2) : '—') + '</td></tr>';
   }).join('') : '<tr><td colspan="3">—</td></tr>';
-  var cuando = d.ini ? ('Pickeado ' + _pkHojaDm(d.ini) + ' · ' + _pkHojaHm(d.ini) + ' a ' + _pkHojaHm(d.fin) + ' hs' + (d.minOtras ? ' (−' + d.minOtras + ' min otras tareas)' : '')) : 'Pickeado —';
+  var cuando = d.ini ? ('Pickeado ' + _pkHojaDm(d.ini) + ' · ' + _pkHojaHm(d.ini) + ' a ' + _pkHojaHm(d.fin) + ' hs' + (d.minOtras ? ' (' + d.minOtras + ' min en otras tareas)' : '')) : 'Pickeado —';
   return css + '<div class="pkh">' +
     '<div class="pkh-top"><div><div class="pkh-t">Tanda ' + escapeHtml(d.tanda) + (d.sale ? ' (Sale ' + escapeHtml(_pkHojaDia(d.sale)) + ')' : '') + '</div>' +
       '<div class="pkh-s">' + escapeHtml(d.legajo ? ('Leg ' + d.legajo + ' ' + (d.nombre && d.nombre !== ('Leg ' + d.legajo) ? d.nombre : '')) : '—') + '</div></div>' +
@@ -58064,7 +58073,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.51"></script>
+<script src="importacion.js?v=25.52"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60865,7 +60874,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.51"></script>
+<script src="cobranzas.js?v=25.52"></script>
 
 </body>
 </html>
