@@ -7677,24 +7677,9 @@ window.anularRecepcionSesion = async function (legajo) {
     if (ya > 0 && !confirm("⚠ En esta sesión ya mandaste " + ya + " caja(s) y esas quedan registradas.\n\n" +
         "Anular sólo cierra el RT (la tarea), no borra la mercadería recibida.\n\n¿Anular igual?")) return false;
   } catch (_e) { /* no-op */ }
-  // sacar de la cola el RT de apertura (si todavía no se sincronizó)
-  try {
-    readQueue().filter(function (it) {
-      return String(it.legajo || "") === leg && it.opcion === "RT" && !it.ts_inicio_iso;
-    }).forEach(function (it) { removeFromQueue(it.id); });
-  } catch (_e) { /* no-op */ }
-  try {
-    await fetch(SUPABASE_URL + "/rest/v1/rpc/anular_toggle_virgilio", {
-      method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_legajo: leg, p_opcion: "RT" })
-    });
-  } catch (_e) { /* sin red: se limpia local igual */ }
-  try { const st = getLegajoState(leg); if (st && st.toggles && st.toggles.RT) toggleStartOrEnd(leg, "RT"); } catch (_e) {}
-  try {
-    const f = getTodayKey();
-    writeDayHist(f, leg, readDayHist(f, leg).filter(function (h) { return !(h.opcion === "RT" && !h.texto); }));
-  } catch (_e) { /* no-op */ }
+  // v25.61 (Luis): la anulación se REGISTRA (cierre del RT con texto ANULADO) en vez de borrar la
+  // apertura con anular_toggle_virgilio: queda que apretó para empezar y que la anuló.
+  try { gvToggleAnular(leg, "RT"); } catch (_e) {}
   try { recepcionResetCajas(leg); } catch (_e) {}
   try {
     renderLegajoHistory(leg);
@@ -26653,46 +26638,21 @@ async function insAnular() {
   const qué = mode === "EI" ? "entrega" : "recepción";
   const nSel = (_ins.items || []).filter(function (it) { return it.qty > 0; }).length;
   if (!confirm("¿ANULAR esta " + qué + " de insumos?\n\n" +
-      (nSel ? "Se descartan los " + nSel + " insumo(s) que cargaste y se " : "Se ") +
-      "borra el " + mode + ".\n\nNo se puede deshacer.")) return;
-
-  // sacar de la cola local el RI/EI de apertura (si todavía no se sincronizó)
-  try {
-    readQueue().filter(function (it) {
-      return String(it.legajo || "") === legajo && it.opcion === mode && !it.ts_inicio_iso;
-    }).forEach(function (it) { removeFromQueue(it.id); });
-  } catch (_e) { /* no-op */ }
-
-  let r = null;
-  try {
-    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/anular_toggle_virgilio", {
-      method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_legajo: legajo, p_opcion: mode })
-    });
-    if (res.ok) r = await res.json();
-  } catch (_e) { /* sin red: se limpia local igual */ }
-
-  // historial del día: sacar la apertura anulada
-  try {
-    const f = getTodayKey();
-    writeDayHist(f, legajo, readDayHist(f, legajo).filter(function (h) {
-      return !(h.opcion === mode && !h.texto);
-    }));
-  } catch (_e) { /* no-op */ }
-
+      (nSel ? "Se descartan los " + nSel + " insumo(s) que cargaste. " : "") +
+      "Queda anotado que entraste y la anulaste.\n\nNo se puede deshacer.")) return;
+  // v25.61 (Luis): la anulación se REGISTRA (cierre del RI/EI con texto ANULADO), ya no se borra
+  // la apertura con anular_toggle_virgilio.
+  const ok = gvToggleAnular(legajo, mode);
   try { opDraftClear(legajo); } catch (_e) {}   // el borrador ya no vale
-  closeIns(true);                                // cierra el modal y el toggle RI/EI, SIN
-                                                 // emitir cierre: la apertura ya se borró
+  closeIns(true);                                // cierra el modal; el toggle ya lo cerró gvToggleAnular
   try {
     renderLegajoHistory(legajo);
     updateCoreButtonsState();
     renderPendingSuggestion();
     updatePendingIndicator();
   } catch (_e) { /* no-op */ }
-  alert(r === "ya_cerrado"
-    ? "Esa sesión ya estaba cerrada: no había nada que anular.\nLa saqué de la pantalla igual."
-    : "✕ " + qué.charAt(0).toUpperCase() + qué.slice(1) + " de insumos anulada.");
+  alert(ok ? "✕ " + qué.charAt(0).toUpperCase() + qué.slice(1) + " de insumos anulada."
+           : "Esa sesión ya estaba cerrada: no había nada que anular.\nLa saqué de la pantalla igual.");
 }
 function insAskClose() { opAskClose(insHasProgress(), "INS", _ins && _ins.legajo, (_ins && _ins.mode === "EI" ? "Entrega de insumos" : "Recepción de insumos"), _ins, closeIns); }
 /* v19.02 — EMITIR el cierre de RI/EI al terminar la recepción/entrega (pedido de Luis,
@@ -30064,7 +30024,8 @@ function ccRenderChooser(leg) {
     // botón, así que un "Cerrar" que sólo MINIMIZA deja CC en rojo trabando EP/AP. Acá todavía
     // no se sabe si hay reparto, así que van los dos: el que cierra de verdad y el que minimiza.
     `<button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Cerrar Carga Camión (sin cargar por app)</button>` +
-    `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
+    `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>` +
+    `<button class="pk-btn pk-anular" onclick="ccAnular('${leg}')">⛔ ANULAR CARGA CAMIÓN</button>`;   // v25.61
 }
 
 function ccRender() {
@@ -30118,7 +30079,8 @@ function ccRender() {
   }
   html += `<button class="pk-btn pk-ok" onclick="ccFinish()">${esRetira ? "🚶 Terminé Retira" : "🚛 Terminé Carga Camión"} (${_cc.checked.size} ${esRetira ? "entregados" : "cargadas"})</button>` +
           `<button class="pk-btn pk-cancel" onclick="showCargaCamion('${_cc.legajo}')">← Volver (retira/camión)</button>` +
-          `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>`;
+          `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>` +
+          `<button class="pk-btn pk-anular" onclick="ccAnular('${escapeHtml(String(_cc.legajo || ""))}')">⛔ ANULAR CARGA CAMIÓN</button>`;   // v25.61
   m.querySelector(".tanda-modal-body").innerHTML = html;
 }
 
@@ -30462,7 +30424,8 @@ function crRender() {
           `<th class="cr-th-c">Líos</th><th class="cr-th-c">Controlado</th><th class="cr-th-c">Volvió</th>` +
           `</tr></thead><tbody>${rows}</tbody></table></div>`;
   html += `<button class="pk-btn pk-ok" onclick="crFinish()">✓ Terminé (${_cr.checked.size} controladas)</button>` +
-          `<button class="pk-btn pk-cancel" onclick="crClose()">Cerrar (sigo después)</button>`;
+          `<button class="pk-btn pk-cancel" onclick="crClose()">Cerrar (sigo después)</button>` +
+          (_cr.admin ? "" : `<button class="pk-btn pk-anular" onclick="crAnular('${escapeHtml(String(_cr.legajo || ""))}')">⛔ ANULAR RECEPCIÓN REMITOS</button>`);   // v25.61
   m.querySelector(".tanda-modal-body").innerHTML = html;
 }
 
@@ -30557,6 +30520,57 @@ function crSendClose(legajo) {
   try { pushHistoryForLegajo(legajo, { ts: nowMs, opcion: "RR", descripcion: "Recepción Remitos", texto: "", id: payload.id, ts_inicio_iso: openIso, status: "queued" }); } catch (_e) {}
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
   try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
+}
+
+/* v25.61 (Luis, 01/10: "si entrás al módulo y no hacés nada, no podés salir… que puedan salir
+   anulando la tarea completamente · que se registre que apretaron para empezar y que la anularon").
+   ANULAR = cerrar el toggle con su MISMO código, el inicio de la apertura y texto "ANULADO".
+   Queda en el log la apertura (cuándo apretó) y el cierre anulado (cuándo salió); el tramo se
+   ve en el horario con su duración, marcado ANULADO. NO se borra la apertura (antes RT/RI/EI
+   la borraban con anular_toggle_virgilio y no quedaba rastro). Devuelve false si no estaba abierto. */
+function gvToggleAnular(legajo, code) {
+  const leg = String(legajo || "").trim(); if (!leg || !code) return false;
+  const st = getLegajoState(leg);
+  const cur = st && st.toggles ? st.toggles[code] : null;
+  if (!cur) return false;
+  const nowMs = Date.now();
+  let openIso = (typeof cur === "string") ? cur : null;
+  if (!openIso || !isFinite(Date.parse(openIso)) || Date.parse(openIso) >= nowMs) openIso = new Date(nowMs - 1000).toISOString();   // sin inicio = parecería una apertura
+  try { toggleStartOrEnd(leg, code); } catch (_e) {}
+  const d = (desc[code] || code) + " — ANULADO";
+  const payload = { legajo: leg, opcion: code, descripcion: d, texto: "ANULADO", ts: nowMs,
+    id: (code.toLowerCase() + "anu_" + leg + "_" + nowMs.toString(36)).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: openIso };
+  try { pushHistoryForLegajo(leg, { ts: nowMs, opcion: code, descripcion: d, texto: "ANULADO", id: payload.id, ts_inicio_iso: openIso, status: "queued" }); } catch (_e) {}
+  try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(r => { if (r && r.ok) removeFromQueue(payload.id); }).catch(() => {}); } catch (_e) {}
+  try { renderLegajoHistory(leg); } catch (_e) {}
+  try { updatePendingIndicator(); updateCoreButtonsState(); renderPendingSuggestion(); } catch (_e) {}
+  return true;
+}
+/* RR con remitos en la lista: el único botón que salía era «Cerrar (sigo después)», que
+   minimiza y deja RR abierto trabando EP/AP. */
+function crAnular(legajo) {
+  const leg = String(legajo || (_cr && _cr.legajo) || "").trim();
+  try { if (!confirm("¿ANULAR Recepción Remitos?\nNo se registra ningún remito. Queda anotado que entraste y la anulaste.")) return; } catch (_e) {}
+  const ok = gvToggleAnular(leg, "RR");
+  try { crClearChecked(leg); } catch (_e) {}
+  _cr = null; crReleaseWakeLock(); closeTandaModal();
+  try { alert(ok ? "⛔ Recepción Remitos anulada." : "📋 Recepción Remitos cerrada."); } catch (_e) {}
+}
+function ccAnular(legajo) {
+  const leg = String(legajo || (_cc && _cc.legajo) || "").trim();
+  try { if (!confirm("¿ANULAR Carga Camión?\nNo se registra ninguna NP cargada. Queda anotado que entraste y la anulaste.")) return; } catch (_e) {}
+  const ok = gvToggleAnular(leg, "CC");
+  try { ccClearChecked(leg); } catch (_e) {}
+  _cc = null; ccReleaseWakeLock(); closeTandaModal();
+  try { alert(ok ? "⛔ Carga Camión anulada." : "🚛 Carga Camión cerrada."); } catch (_e) {}
+}
+function ccrAnular(legajo) {
+  const leg = String(legajo || (_ccr && _ccr.legajo) || "").trim();
+  try { if (!confirm("¿ANULAR Control Remitos?\nNo se registra ningún remito controlado. Queda anotado que entraste y lo anulaste.")) return; } catch (_e) {}
+  const ok = gvToggleAnular(leg, "CR");
+  try { ccrClearChecked(leg); } catch (_e) {}
+  _ccr = null; ccrReleaseWakeLock(); closeTandaModal();
+  try { alert(ok ? "⛔ Control Remitos anulado." : "📋 Control Remitos cerrado."); } catch (_e) {}
 }
 
 /* v6.66 — "Facturado sin salida": el operario cargó la NP al camión (CCN) pero el
@@ -30738,7 +30752,7 @@ function ccrRender() {
   html += `<button class="pk-btn pk-ok" onclick="ccrFinish()">✓ Terminé Control (${_ccr.checked.size} controlados)</button>` +
           `<button class="pk-btn pk-cancel" onclick="ccrClose()">Cerrar (sigo después)</button>` +
           // v25.58 (Luis, 01/10): sin tildar nada el operario quedaba trabado en CR (EP/AP bloqueados).
-          `<button class="pk-btn pk-anular" onclick="ccrEndWithout('${escapeHtml(String(_ccr.legajo || ""))}')">⛔ ANULAR CONTROL REMITOS</button>`;
+          `<button class="pk-btn pk-anular" onclick="ccrAnular('${escapeHtml(String(_ccr.legajo || ""))}')">⛔ ANULAR CONTROL REMITOS</button>`;
   m.querySelector(".tanda-modal-body").innerHTML = html;
 }
 

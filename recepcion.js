@@ -490,7 +490,8 @@ function opTodayStr() {
    "✕ Salir" sólo cierra la pantalla: el toggle RT sigue ABIERTO en Supabase (y el
    operario, al volver a tocar RT, cae en el cierre "Indicar Cantidad"). Esto la anula
    de verdad: tira el borrador y le pide a Producción que cierre el RT y borre el
-   evento de apertura (window.anularRecepcionSesion → RPC anular_toggle_virgilio).
+   apertura (window.anularRecepcionSesion). v25.61: ya no se borra la apertura: se registra el
+   cierre del RT con texto ANULADO.
    La barra vive fuera de #opBody/#opActions, así queda en TODOS los pasos del
    operario; el supervisor (menú de Administración) no la ve. */
 function opAnularBarRender(mostrar) {

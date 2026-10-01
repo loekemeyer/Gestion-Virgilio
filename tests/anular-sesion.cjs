@@ -140,8 +140,13 @@ catch (_e) {
     out.botonInsumos = !!btnI && btnI.innerText.indexOf("Anular recepción de insumos") >= 0;
 
     await insAnular();
-    const rpcIns = window.__rpc.filter((x) => x.url.indexOf("/rpc/anular_toggle_virgilio") >= 0);
-    out.insRpc = rpcIns.length === 1 && rpcIns[0].body && rpcIns[0].body.p_legajo === LEG && rpcIns[0].body.p_opcion === "RI";
+    // v25.61 (Luis): la anulación se REGISTRA — cierre del RI con texto ANULADO e inicio = apertura;
+    // ya no se borra la apertura con anular_toggle_virgilio.
+    const anuEnviado = (op) => window.__rpc.concat(readQueue().map((q) => ({ url: "", body: q }))).some((x) => {
+      const t = JSON.stringify(x.body || ""); return t.indexOf('"ANULADO"') >= 0 && t.indexOf('"' + op + '"') >= 0;
+    });
+    out.insRpc = window.__rpc.filter((x) => x.url.indexOf("/rpc/anular_toggle_virgilio") >= 0).length === 0 &&
+      anuEnviado("RI") && readDayHist(getTodayKey(), LEG).some((h) => h.opcion === "RI" && h.texto === "ANULADO" && !!h.ts_inicio_iso);
     out.insToggleCerrado = !getLegajoState(LEG).toggles.RI;
     out.insBorrador = opDraftLoad(LEG) === null;
     out.insCierra = !document.getElementById("insModal").classList.contains("show");
@@ -156,11 +161,12 @@ catch (_e) {
     writeQueue([{ id: "rt1", legajo: LEG, opcion: "RT", texto: "" }]);
     localStorage.setItem("vir_recepcion_cajas_" + LEG + "_" + getTodayKey(), "0");
     out.rcpHook = (await window.anularRecepcionSesion(LEG)) === true;
-    const rpcRt = window.__rpc.filter((x) => x.url.indexOf("/rpc/anular_toggle_virgilio") >= 0);
-    out.rcpRpc = rpcRt.length === 1 && rpcRt[0].body && rpcRt[0].body.p_legajo === LEG && rpcRt[0].body.p_opcion === "RT";
+    out.rcpRpc = window.__rpc.filter((x) => x.url.indexOf("/rpc/anular_toggle_virgilio") >= 0).length === 0 && anuEnviado("RT");
     out.rcpToggle = !getLegajoState(LEG).toggles.RT;
-    out.rcpCola = readQueue().length === 0;
-    out.rcpHist = readDayHist(getTodayKey(), LEG).length === 0;
+    // la apertura NO se saca: queda que apretó para empezar (v25.61)
+    out.rcpCola = !readQueue().some((q) => q.opcion === "RT" && q.texto === "ANULADO" && !q.ts_inicio_iso);
+    const hR = readDayHist(getTodayKey(), LEG);
+    out.rcpHist = hR.some((h) => h.id === "rt1") && hR.some((h) => h.opcion === "RT" && h.texto === "ANULADO" && !!h.ts_inicio_iso);
     out.rcpCajas = recepcionCajasDelDia(LEG) === 0;
 
     // con cajas ya enviadas pide 2ª confirmación; si dice que no, NO anula
