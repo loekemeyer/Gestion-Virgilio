@@ -2528,7 +2528,7 @@ entran más NP de ISIS nuevas (Luis, 24/09), así que no se extiende.
 **Chequeo:** `select * from public.gv_reglas_perdidas;` · `node tests/apr-cuar-freno-manual.cjs` ·
 `node tests/apr-fit.cjs`. `sql/gv_cuarentena_freno_manual_v2217.sql`.
 
-## ⚠ REGLA (Luis, 2026-10-01, v25.47): en CUARENTENA, la factura de MENOS DE 5 DÍAS corridos no es deuda
+## ⚠ REGLA (Luis, 2026-10-01, v25.48): en CUARENTENA, la factura de MENOS DE 5 DÍAS corridos no es deuda
 
 Vale para todos los clientes, en la retención (`gv_cuarentena_deuda_pedido` → `gv_cuarentena_marcar_calc`, y el
 armador la hereda) y en la alerta de lo ya programado (`gv_cuarentena_ya_programado`, CTE `_rec5`). Se mide por la
