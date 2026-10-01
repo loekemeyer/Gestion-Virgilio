@@ -4719,7 +4719,11 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   suma 8 columnas al final (`importador`, `precio_usd_lk`, `precio_usd_nota`, `venta_unit`, `venta_fecha`, `uxb`,
   `ref_chef_usd`, `ref_chef_fecha`). ⚠ **El `drop function` se cuelga en el MCP** (3 veces, 60 s, sin lock ni
   timeout de Postgres): la función nueva se creó con otro nombre y se **renombró**; la vieja quedó como
-  `gv_hotsale_items_super_v2593` (rollback). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
+  `gv_hotsale_items_super_v2593` (rollback). [Probable] No es la base: el mismo cuelgue le pasó a un `UPDATE` de
+  primer nivel sobre `planify.tasks` y **el mismo `UPDATE` envuelto en `with u as (update … returning …) select * from u`
+  entró en el acto** — es la capa de permisos de la sesión (Auto) frenando la sentencia de escritura de primer nivel y
+  esperando un «sí» que nadie contesta, no Postgres (ni `lock_timeout` ni `statement_timeout` saltan porque la sentencia
+  nunca llega). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
   `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
 ## Git

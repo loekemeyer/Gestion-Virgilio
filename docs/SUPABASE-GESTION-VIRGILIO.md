@@ -31091,7 +31091,11 @@ en dólares a LK y mostrar la rent. de LK hoy, en las semanas de hot sale y pond
 
 ⚠ **El `drop function` se colgó en el MCP** tres veces (60 s sin respuesta; `lock_timeout = 5s` y
 `statement_timeout = 15s` no saltaron; `pg_stat_activity` sin nadie trabado ni esperando; el drop de una función recién
-creada y sin uso se colgaba igual). `create function` y `alter function … rename` anduvieron en el acto. Se aplicó así:
+creada y sin uso se colgaba igual). `create function` y `alter function … rename` anduvieron en el acto. [Probable]
+**No es Postgres: es la capa de permisos de la sesión.** El mismo cuelgue le pasó después a un `UPDATE` de primer nivel
+sobre `planify.tasks`, y el mismo `UPDATE` envuelto en `with u as (update … returning …) select * from u` entró en el
+acto: la sentencia de escritura de primer nivel queda esperando un «sí» que en una sesión sin nadie mirando no llega,
+y por eso ningún timeout de Postgres salta (la sentencia nunca llega a la base). Se aplicó así:
 la nueva se creó como `gv_hotsale_items_super_lk`, la vieja se renombró a **`gv_hotsale_items_super_v2593`** (sin
 execute para anon/authenticated, queda de rollback) y la nueva tomó el nombre. Medido: Jumbo (`cencosud`) 50 ítems,
 31 importados (26 Tierra Nativa, 5 Chef), 5 con referencia Chef → LK, 45 ms. Las dos tablas nuevas vacías al 01/10.
