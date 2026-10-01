@@ -6261,7 +6261,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.75"></script>
+<script type="module" src="recepcion.js?v=25.76"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6970,7 +6970,7 @@ const desc = {
   EP:"Empecé Picking", TP:"Fin Picking", AP:"Empecé Armado Pedido",
   TAP:"Terminé Armado Pedido", CR:"Control Remitos", CC:"Inicio/Fin Carga Camión",
   RR:"Recepción Remitos",
-  RT:"Recepción Mercadería", MG:"Guardado a Góndola",
+  RT:"Recepción Mercadería", MG:"Guardado a Góndola", RKBM:"Bajar de Racks",
   RI:"Recepción Insumos", EI:"Entrega Insumos", INS:"📦 Insumos y Productos Movimiento",
   CP:"Completar Pedido", RC:"Pasar a urgente", IR:"Ingreso a Racks",
   AT:"Atendí Timbre", PB:"Paré Baño", Limp:"Limpieza",
@@ -8582,7 +8582,7 @@ function ensurePendingSuggestionContainer(){
   if (!box) {
     box = document.createElement("div");
     box.id = "pendingSuggestion";
-    const row3El = document.getElementById("row3");
+    const row3El = document.getElementById("row3b") || document.getElementById("row3");   // v25.74: debajo del botón chico de racks
     if (row3El && row3El.parentNode) row3El.parentNode.insertBefore(box, row3El.nextSibling);
   }
   return box;
@@ -8786,6 +8786,18 @@ Object.keys(filas).forEach(rowId => {
     document.getElementById(rowId).appendChild(d);
   });
 });
+// v25.74 (Luis, 01/10): «Bajar de Racks» — botón CHICO debajo de Guardado a Góndola (columna del medio
+// de row3). Antes era la opción «De los racks» adentro del chooser de MG; ahora baja a A GUARDAR.
+try {
+  const r3 = document.getElementById("row3");
+  if (r3 && r3.parentNode) {
+    const fila = document.createElement("div");
+    fila.className = "row row-3"; fila.id = "row3b"; fila.style.marginTop = "4px";
+    fila.innerHTML = '<div></div><div class="box box-sm" data-code="RKBM"><div class="box-title" style="font-size:15px">🏗</div><div class="box-desc">Bajar de Racks</div></div><div></div>';
+    fila.querySelector('[data-code="RKBM"]').onclick = () => selectOption("RKBM");
+    r3.parentNode.insertBefore(fila, r3.nextSibling);
+  }
+} catch (_e) { /* no-op */ }
 // v5.92: 🔀 Mover mercadería de racks — secundario (casi no se usa) → box CHICO al
 // final de las secundarias, en vez del botón ancho aparte de antes.
 try {
@@ -9808,6 +9820,8 @@ function selectOption(code) {
   // registrado). El evento MG (con su DURACIÓN, para Rendimiento/Monitor) lo emite el
   // modal al CONFIRMAR el guardado (mgConfirmar → mgEmitGuardado), una sola vez.
   if (code === "MG") { showMGChooser(legajoStr); return; }
+  // v25.74 (Luis, 01/10): «Bajar de Racks» es su propio módulo (botón chico abajo de MG) y baja a A GUARDAR.
+  if (code === "RKBM") { showRacksBajarModal(legajoStr); return; }
 
   // v5.49: Pasar cajas a un pedido urgente — sacale cajas a un pedido que sale
   // después (armado o pickeado) y dáselas a uno urgente que sale antes. Abre el
@@ -10407,7 +10421,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.75";
+const APP_VERSION = "v25.76";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27545,7 +27559,6 @@ function showMGChooser(legajo) {
     '<button onclick="mgChooserGo(\'orden\')" style="width:100%;margin-bottom:14px;padding:14px;border:2px solid #1e6bd6;border-radius:12px;background:#eff6ff;color:#1e40af;font-size:15px;font-weight:800;cursor:pointer;">📋 ¿Qué conviene bajar primero? <span style="display:block;font-weight:600;opacity:.85;font-size:12px;margin-top:2px;">Orden por góndola más vacía (racks + a guardar + excedente)</span></button>' +
     '<button onclick="mgChooserGo(\'guardar\')" style="width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:16px;font-weight:800;cursor:pointer;">📦 Lo que llegó <span style="font-weight:600;opacity:.85;">(a guardar)</span></button>' +
     '<button onclick="mgChooserGo(\'excedente\')" style="width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;background:#d97706;color:#fff;font-size:16px;font-weight:800;cursor:pointer;">📦 Del excedente <span style="font-weight:600;opacity:.85;">(lo que no entró)</span></button>' +
-    '<button onclick="mgChooserGo(\'racks\')" style="width:100%;margin-bottom:10px;padding:16px;border:none;border-radius:12px;background:#1e6bd6;color:#fff;font-size:16px;font-weight:800;cursor:pointer;">🏗 De los racks</button>' +
     '<button onclick="closeMGChooser()" style="width:100%;padding:11px;border:none;border-radius:10px;background:#e2e8f0;color:#475569;font-weight:700;cursor:pointer;">Cancelar</button>' +
     '</div>';
   ov.style.display = "flex";
@@ -27775,7 +27788,7 @@ async function showRacksBajarModal(legajo, _resume) {
   let ov = document.getElementById("rkbModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "rkbModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="rkb-card"><div class="rkb-head"><span class="rkb-title">🏗 Bajar de racks a góndola</span><button class="rkb-close" onclick="rkbAskClose()">Cerrar</button></div><div class="rkb-body" id="rkbBody"><div class="rkb-empty">Cargando racks…</div></div></div>';
+  ov.innerHTML = '<div class="rkb-card"><div class="rkb-head"><span class="rkb-title">🏗 Bajar de racks a A guardar</span><button class="rkb-close" onclick="rkbAskClose()">Cerrar</button></div><div class="rkb-body" id="rkbBody"><div class="rkb-empty">Cargando racks…</div></div></div>';
   if (_resume) { _rkb = _resume; _rkb._cerrado = false; _rkb.tsInicio = Date.now(); try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {} rkbRender(); return; }   // v23.66: tramo nuevo
   try {
     const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), ocgFetchCapacidad().catch(function () { return {}; })]);
@@ -27801,7 +27814,7 @@ async function showRacksBajarModal(legajo, _resume) {
 }
 function rkbRender() {
   if (!_rkb) return; const body = document.getElementById("rkbBody"); if (!body) return;
-  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por código</b>. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). Al registrar, <b>el stock pasa a góndola al instante</b> (no espera aprobación).</div>';
+  let h = '<div class="rkb-hint">Bajás en <b>master cajas</b> (lo que físicamente movés del rack). Aparece <b>ordenado por código</b>. Los que dicen <b>“cajas”</b> todavía no tienen el master cargado. Si algo que tenés físicamente <b>no figura</b>, buscalo y tocá <b>➕</b> (avisa por Telegram). Al registrar, <b>el stock pasa a A guardar al instante</b>: después se guarda en góndola con «Guardado a Góndola».</div>';
   h += '<input id="rkbSearch" class="rkb-search" type="search" autocomplete="off" placeholder="🔎 Buscar código…" value="' + escapeHtml(_rkb.filtro || "") + '" oninput="rkbSearchInput(this.value)">';
   const fq = String(_rkb.filtro || "").trim(), fUp = fq.toUpperCase();
   const shown = fq ? _rkb.items.filter(function (it) { return codEmpiezaCon(it.cod, fq); }) : _rkb.items;   // v21.43
@@ -27841,7 +27854,7 @@ function rkbRender() {
     else if (!it.sec) locsHtml += '<div class="rkb-sug" style="color:#dc2626">⚠ Tocá de qué posición bajás.</div>';
     const room = rkbRoom(it);
     let gonHtml = "";
-    if (it.cap > 0) gonHtml = '<div class="rkb-gon">Góndola: hay <b>' + it.gon + '</b> cj · entran <b>' + room + '</b> cj' + (room > 0 && !it.manual ? ' <button class="rkb-usar" onclick="rkbUsarRoom(' + i + ')">Bajar lo que entra</button>' : '') + '</div>';
+    if (RKB_DESTINO !== "a_guardar" && it.cap > 0) gonHtml = '<div class="rkb-gon">Góndola: hay <b>' + it.gon + '</b> cj · entran <b>' + room + '</b> cj' + (room > 0 && !it.manual ? ' <button class="rkb-usar" onclick="rkbUsarRoom(' + i + ')">Bajar lo que entra</button>' : '') + '</div>';
     const exc = rkbExc(it);
     if (exc > 0) gonHtml += '<div class="rkb-sug" style="color:#b45309">⚠ No entran ' + exc + ' cj en góndola: van a EXCEDENTE. Mejor bajar sólo lo que entra.</div>';
     return '<div class="rkb-row"><div class="rkb-info"><span class="rkb-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="rkb-desc">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span><div>' + head + '</div>' + locsHtml + gonHtml + '</div>' +
@@ -27861,7 +27874,10 @@ function rkbSetSec(i, sec) { if (!_rkb) return; const it = _rkb.items[i]; if (!i
    coincide con el sistema queda pendiente en GV_Rack_Conteo y lo aprueba un supervisor. */
 function _rkbInner(it) { return (it.cxm > 0 && !it.manual) ? (it.baja * it.cxm) : it.baja; }
 function rkbRoom(it) { return it.cap > 0 ? Math.max(0, it.cap - Math.max(0, it.gon || 0)) : 0; }
-function rkbExc(it) { return (it.cap > 0 && it.baja > 0) ? Math.max(0, _rkbInner(it) - rkbRoom(it)) : 0; }
+/* v25.74 (Luis, 01/10): lo bajado va a A GUARDAR (registrar_baja_racks con destino 'a_guardar'):
+   no hay lugar de góndola que medir ni excedente, y el conteo a ciegas es sólo del rack. */
+const RKB_DESTINO = "a_guardar";
+function rkbExc(it) { if (RKB_DESTINO === "a_guardar") return 0; return (it.cap > 0 && it.baja > 0) ? Math.max(0, _rkbInner(it) - rkbRoom(it)) : 0; }
 function rkbSetPos(i, v) { if (!_rkb) return; const it = _rkb.items[i]; if (!it) return; it.sec = String(v || "").toUpperCase().replace(/\s+/g, ""); rkbRender(); }
 function rkbUsarRoom(i) {
   if (!_rkb) return; const it = _rkb.items[i]; if (!it) return;
@@ -27885,8 +27901,9 @@ function rkbConteoPedir(sel) {
         '<div style="font-weight:800;font-family:Consolas,Menlo,monospace;">' + escapeHtml(codCanonSuf(it.cod)) + ' <span style="font-family:inherit;font-weight:600;color:#475569;font-size:12px;">' + escapeHtml(artNombre(it.cod, it.desc) || "") + '</span></div>' +
         '<label style="display:block;font-size:13px;margin-top:6px;">¿Cuántos <b>' + (usaM ? "master" : "cajas") + '</b> quedaron en <b>' + escapeHtml(it.sec) + '</b>?' +
         '<input id="rkcR' + k + '" type="number" min="0" inputmode="numeric" style="width:100%;height:42px;font-size:18px;font-weight:800;text-align:center;border:2px solid #cbd5e1;border-radius:9px;margin-top:3px;box-sizing:border-box;"></label>' +
+        (RKB_DESTINO === "a_guardar" ? '' :
         '<label style="display:block;font-size:13px;margin-top:6px;">Ya acomodado: ¿cuántas <b>cajas</b> hay ahora en la góndola?' +
-        '<input id="rkcG' + k + '" type="number" min="0" inputmode="numeric" style="width:100%;height:42px;font-size:18px;font-weight:800;text-align:center;border:2px solid #cbd5e1;border-radius:9px;margin-top:3px;box-sizing:border-box;"></label></div>';
+        '<input id="rkcG' + k + '" type="number" min="0" inputmode="numeric" style="width:100%;height:42px;font-size:18px;font-weight:800;text-align:center;border:2px solid #cbd5e1;border-radius:9px;margin-top:3px;box-sizing:border-box;"></label>') + '</div>';
     });
     h += '<div id="rkcErr" style="color:#dc2626;font-weight:700;font-size:13px;min-height:16px;"></div>' +
       '<button id="rkcOk" style="width:100%;padding:13px;border:none;border-radius:11px;background:#1e6bd6;color:#fff;font-size:16px;font-weight:800;">✓ Confirmar conteo</button></div>';
@@ -27895,10 +27912,11 @@ function rkbConteoPedir(sel) {
     document.getElementById("rkcOk").onclick = function () {
       const out = [];
       for (let k = 0; k < sel.length; k++) {
-        const r = document.getElementById("rkcR" + k).value, g = document.getElementById("rkcG" + k).value;
+        const gEl = document.getElementById("rkcG" + k);
+        const r = document.getElementById("rkcR" + k).value, g = gEl ? gEl.value : "0";
         if (r === "" || g === "" || Number(r) < 0 || Number(g) < 0) { document.getElementById("rkcErr").textContent = "Completá los dos conteos de cada código."; return; }
         const it = sel[k], usaM = it.cxm > 0 && !it.manual;
-        out.push({ rack: usaM ? Number(r) * it.cxm : Number(r), gondola: Number(g) });
+        out.push({ rack: usaM ? Number(r) * it.cxm : Number(r), gondola: gEl ? Number(g) : null });
       }
       ov.remove(); resolve(out);
     };
@@ -27961,7 +27979,7 @@ async function rkbConfirmar() {
   const items = sel.map(function (it, k) {
     const inner = (it.cxm > 0 && !it.manual) ? (it.baja * it.cxm) : it.baja;
     return { cod_art: it.cod, descripcion: it.desc || null, cajas: inner, sector: it.sec || null, orden_id: null, legajo: String(_rkb.legajo || "0"), ref: "rack " + (it.sec || "s/sector"),
-             excedente: rkbExc(it), conteo_rack: conteos[k].rack, conteo_gondola: conteos[k].gondola };
+             excedente: rkbExc(it), conteo_rack: conteos[k].rack, conteo_gondola: conteos[k].gondola, destino: RKB_DESTINO };
   });
   // Planimetría viva (v5.22): descontar de la UBICACIÓN elegida. Best-effort:
   // si la RPC todavía no existe en Supabase, falla silencioso (queda el ledger).
@@ -27983,7 +28001,7 @@ async function rkbConfirmar() {
   try { gvRacksTramo("RKB", _rkb.legajo, _rkb.tsInicio, String(totInner)); _rkb._cerrado = true; } catch (_e) {}   // v23.66: el tramo con inicio y fin
   closeRkb();
   postBajaRacks(items);   // v12.35 — fila de bajada + movimientos racks→góndola en UNA transacción (offline-safe)
-  try { alert("✓ Bajaste " + totInner + " caja(s) de racks — el stock ya pasó a góndola."); } catch (_e) {}
+  try { alert("✓ Bajaste " + totInner + " caja(s) de racks — el stock ya pasó a A guardar."); } catch (_e) {}
 }
 /* v23.66 (Luis, 28/09: *"ingreso a racks y guardado a góndola, todo eso es trabajo en racks y
    debería contar tiempo"*) — Bajar de racks (RKB) e Ingreso a racks (IR) no dejaban el TIEMPO en
@@ -58381,7 +58399,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.75"></script>
+<script src="importacion.js?v=25.76"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61182,7 +61200,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.75"></script>
+<script src="cobranzas.js?v=25.76"></script>
 
 </body>
 </html>

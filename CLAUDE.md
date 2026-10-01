@@ -6589,6 +6589,12 @@ reingreso, celdas `.pedimp-tbl` con 4px de relleno. **64 → 45 px por artículo
 - **Conteo a ciegas** después del código: cuántas quedaron en la posición y cuántas hay en la góndola ya acomodada (`conteo_rack` en cajas, `conteo_gondola`). Se guarda en **`GV_Rack_Conteo`**; si no coincide con el sistema queda **pendiente** + Telegram, y **no mueve stock hasta que lo apruebe un supervisor** (Stock → Racks → «🔎 Conteos a aprobar», `gv_rack_conteo_resolver`: ajuste por la diferencia contada; rechazar no toca nada).
 - `sql/gv_rack_conteo_v2468.sql`, `tests/racks-propuesta.cjs`.
 
+- **v25.76 (Luis, 01/10): «Bajar de Racks» es su PROPIO módulo y baja a A GUARDAR.** Salió del chooser de Guardado a
+  Góndola («De los racks» ya no está) y es un botón chico debajo de MG (`#row3b`, `selectOption("RKBM")`). Manda
+  `destino: 'a_guardar'` a `registrar_baja_racks` (marcador `v25.74-aguardar`): racks − / **a_guardar** +, sin excedente
+  ni conteo de góndola (el conteo a ciegas del rack sigue). Sin el campo (celulares viejos, supervisor) va a terminado
+  como antes. Después se guarda con MG → «Lo que llegó». `sql/gv_baja_racks_a_guardar_v2574.sql`, `tests/racks-propuesta.cjs`.
+
 ## ⚠ REGLA (Thomas, 2026-09-30, v24.69): un insumo con MC SALE siempre en MC — el stock queda en unidades
 
 *"Lo mínimo que se le manda es 1 MC… no bajan uni sueltas. Siempre por MC."* En Entrega de insumos (a Cervantes o bajado de racks), un insumo con MC en `Insumos_Factores` abre fijo en MC (`_insSaleMC`). El movimiento se guarda en la unidad BASE y la descripción dice lo cargado (`· cargado 3 MC × 4000`). Lo sostiene también el trigger **`gv_insumo_unidad_base`** (BEFORE INSERT, deposito `insumos`), que convierte cualquier carga en MC que llegue sin convertir. Los movimientos viejos en MC no se tocaron: la pantalla de insumos ya los suma con el factor. `sql/gv_insumo_unidad_base_v2469.sql`, `tests/ins-sale-mc.cjs`.

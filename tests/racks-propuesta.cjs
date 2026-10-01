@@ -13,7 +13,9 @@
    medias — bajada 'aprobada' sin descuento de racks era el descuadre que motivó el cambio.)
    v24.68 (Thomas, D23/D24): sin POSICIÓN no se registra; lo que no entra en góndola va a
    EXCEDENTE (campo `excedente`), y después del código se pide el CONTEO A CIEGAS del rack y de la
-   góndola (`conteo_rack` en inner, `conteo_gondola` en cajas). */
+   góndola (`conteo_rack` en inner, `conteo_gondola` en cajas).
+   v25.74 (Luis, 01/10): «Bajar de Racks» es su propio módulo (botón chico #row3b debajo de MG, ya no
+   está en el chooser) y baja a A GUARDAR (`destino: 'a_guardar'`): sin excedente ni conteo de góndola. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -61,8 +63,9 @@ catch (_e) {
     okBtn.click();
     await new Promise(function (res) { setTimeout(res, 30); });
     const r0 = document.getElementById("rkcR0"), g0 = document.getElementById("rkcG0");
-    if (!r0 || !g0) return { err: "no pidió el conteo a ciegas" };
-    r0.value = "5"; g0.value = "30";
+    if (!r0) return { err: "no pidió el conteo a ciegas del rack" };
+    if (g0) return { err: "v25.74: va a A guardar, no tiene que pedir el conteo de góndola" };
+    r0.value = "5";
     document.getElementById("rkcOk").click();
     await done;
     await new Promise(function (res) { setTimeout(res, 10); });
@@ -70,16 +73,23 @@ catch (_e) {
     let parsed = null; try { parsed = rpcCall ? JSON.parse(rpcCall.body) : null; } catch (_e) {}
     const item = (parsed && parsed.p_items && parsed.p_items[0]) || null;
     const directBaj = fetches.find(function (f) { return f.url.indexOf("/Racks_Bajadas") >= 0; });
-    return { stockMoveCalled: stockMoveCalled, rpcCalled: !!rpcCall, directBajPost: !!directBaj, item: item };
+    // v25.74: el chooser de MG ya no tiene «De los racks» y la botonera tiene el botón chico propio
+    showMGChooser("237");
+    const ch = document.getElementById("mgChooserModal");
+    const sinRacks = !!ch && ch.innerHTML.indexOf("De los racks") < 0 && ch.innerHTML.indexOf("mgChooserGo('racks')") < 0;
+    closeMGChooser();
+    const btn = document.querySelector('#row3b [data-code="RKBM"]');
+    return { stockMoveCalled: stockMoveCalled, rpcCalled: !!rpcCall, directBajPost: !!directBaj, item: item, sinRacks: sinRacks, btn: !!btn };
   });
   if (r.err) { console.log("racks-propuesta:", JSON.stringify(r), "· ✗ FAIL"); await b.close(); process.exit(1); }
   const item = r.item || {};
   const pass = r.stockMoveCalled === 0 && r.rpcCalled === true && r.directBajPost === false &&
     String(item.cod_art) === "590E" && Number(item.cajas) === 24 &&
     (item.orden_id === null || item.orden_id === undefined) && errs.length === 0 &&
-    String(item.sector) === "AD05" && Number(item.excedente) === 4 &&
-    Number(item.conteo_rack) === 60 && Number(item.conteo_gondola) === 30;
-  console.log("racks-propuesta:", JSON.stringify({ stockMoveCalled: r.stockMoveCalled, rpcCalled: r.rpcCalled, directBajPost: r.directBajPost, item: item }), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
+    String(item.sector) === "AD05" && Number(item.excedente) === 0 &&
+    Number(item.conteo_rack) === 60 && item.conteo_gondola === null && item.destino === "a_guardar" &&
+    r.sinRacks === true && r.btn === true;
+  console.log("racks-propuesta:", JSON.stringify({ stockMoveCalled: r.stockMoveCalled, rpcCalled: r.rpcCalled, directBajPost: r.directBajPost, item: item, sinRacks: r.sinRacks, btn: r.btn }), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close();
   process.exit(pass ? 0 : 1);
 })();
