@@ -4676,7 +4676,7 @@ teléfono) · 👤 confirmado · ⚪ no identificado. **📋 Copiar para la plan
 `sql/gv_cobranza_resumen_conc_v2441.sql`, §3.v2441 · `tests/cbz-ficha-cliente.cjs` (h, i) ·
 `tests/cbz-conciliacion.cjs` · `tests/cbz-conc-extracto.cjs`.
 
-## ⚠ REGLA (Thomas, 2026-10-01, v25.91 · v25.93): HOT SALE — la rentabilidad ponderada vive en `hotsale.js`
+## ⚠ REGLA (Thomas, 2026-10-01, v25.91 · v25.93 · v25.98): HOT SALE — la rentabilidad ponderada vive en `hotsale.js`
 
 Los súper piden un **aporte de hot sale** (un % sobre el precio) dos o tres veces al año. El módulo
 **🏷️ Hot Sale — rent. ponderada** (botones secundarios del panel supervisor, `openHotSale()`) pide los
@@ -4706,6 +4706,21 @@ sale— y devuelve el % que queda en el período, **por separado para importados
 - El bloque de datos va **al ancho del dato** (máx. 470 px, dos filas de tres): Thomas, *"está muy ancho lo de arriba"*.
 - No escribe la base: los datos quedan en `localStorage` del navegador. `hotsale.js` está en
   `SIGUEN_APP_VERSION` (bump y `tests/version-tokens.cjs`). Candado: `tests/hotsale-rent.cjs`.
+- **v25.98 (Thomas): lo importado por TIERRA NATIVA o CHEF no puede quedar a pérdida en LK.** Se registra UNA
+  vez el **u$s por unidad** que el importador le cobra a LK (`GV_Importado_Precio_LK`, por código base, vale para
+  todos los súpers; `gv_hotsale_precio_lk_guardar`) y el **dólar** (`GV_HotSale_Param` clave `dolar`,
+  `gv_hotsale_param_guardar`; se lee con `gv_hotsale_params()`). **Rent. LK hoy = (lo que LK le factura al súper,
+  $/u de la última factura de ISIS) ÷ (u$s × dólar) − 1**, y con eso la rent. LK en las semanas de hot sale y la
+  ponderada, por ítem (⚠ en lo que queda a pérdida) y por importador en el resumen (ponderado por cajas, con cuántos
+  ítems quedan a pérdida hoy / en HS / pond.). Para lo de **Chef** hay referencia: la última factura Chef → LK
+  (`isis_ch`, cliente 1434 = Loekemeyer Hnos; el parser la marca «Pesos» pero el precio unitario es u$s) viene como
+  `ref_chef_usd` y el botón «usar» la carga; para **Tierra Nativa** no hay fuente parseada: se tipea. El u$s y el
+  dólar viven en la **base** (son de todos); las rent. tipeadas siguen en `localStorage`. `gv_hotsale_items_super`
+  suma 8 columnas al final (`importador`, `precio_usd_lk`, `precio_usd_nota`, `venta_unit`, `venta_fecha`, `uxb`,
+  `ref_chef_usd`, `ref_chef_fecha`). ⚠ **El `drop function` se cuelga en el MCP** (3 veces, 60 s, sin lock ni
+  timeout de Postgres): la función nueva se creó con otro nombre y se **renombró**; la vieja quedó como
+  `gv_hotsale_items_super_v2593` (rollback). `sql/gv_hotsale_precio_lk_v2598.sql`. El importador sale de
+  `Importados.proveedor → GV_Imp_Proveedor.importador`; un importado sin importador no lleva las columnas de LK.
 
 ## Git
 

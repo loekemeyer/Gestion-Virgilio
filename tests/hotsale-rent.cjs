@@ -1,4 +1,4 @@
-/* v25.91 · v25.93 — Hot Sale: rentabilidad ponderada del período (Thomas, 01/10/2026).
+/* v25.91 · v25.93 · v25.98 — Hot Sale: rentabilidad ponderada del período (Thomas, 01/10/2026).
    Corre la pantalla de verdad (hotsale.js dentro de index.html) y mide:
      (a) el botón está en los secundarios del panel supervisor y abre el overlay con los 6 datos
          de la planilla de Thomas (HotSale %, Semanas HotSale, Rent c/AP, Rent Pta Pta, Semanas a
@@ -17,7 +17,13 @@
          por última compra (dd/mm/yy), y al cargar la rent. de cada ítem da el promedio por FAMILIA
          (imp/nac, ponderado por cajas) y por RUBRO, con su hot sale y su ponderada;
      (k) las rent. tipeadas quedan guardadas por súper (localStorage) y vuelven al reabrir;
-     (l) una lista de súpers vacía NO se dibuja como «no hay súpers»: dice que falta la sesión.
+     (l) una lista de súpers vacía NO se dibuja como «no hay súpers»: dice que falta la sesión;
+     (m) lo importado por TIERRA NATIVA o CHEF trae las columnas de LK: importador, u$s → LK por
+         unidad (guardado en la base por gv_hotsale_precio_lk_guardar; para Chef el botón «usar»
+         carga la última factura Chef → LK), lo que LK le factura al súper y la rent. de LK hoy /
+         en HS / ponderada con ⚠ en lo que queda a pérdida; un nacional no lleva esas celdas; el
+         dólar se guarda por gv_hotsale_param_guardar y al cambiarlo se recalcula; y el resumen
+         suma una fila por importador con cuántos ítems quedan a pérdida.
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -29,9 +35,11 @@ const SUPERS = [
   { super_key: "cencosud", nombre: "Jumbo", codigos: [{ empresa: "chef", cod: "2444" }], ultima_compra: "2026-09-16" }
 ];
 const ITEMS = [
-  { empresa: "lk", cod: "026", cod_base: "26", descripcion: "Colador 8 cm", es_importado: true, rubro: "Coladores", tipo: "Colador Ø 8 cm", ultima_compra: "2026-09-30", cajas: 100, unidades: 1200, lineas: 10 },
+  { empresa: "lk", cod: "026", cod_base: "26", descripcion: "Colador 8 cm", es_importado: true, rubro: "Coladores", tipo: "Colador Ø 8 cm", ultima_compra: "2026-09-30", cajas: 100, unidades: 1200, lineas: 10,
+    importador: "Tierra Nativa", precio_usd_lk: 0.5, precio_usd_nota: null, venta_unit: 1000, venta_fecha: "2026-09-30", uxb: 12, ref_chef_usd: null, ref_chef_fecha: null },
   { empresa: "lk", cod: "501", cod_base: "501", descripcion: "Cuchillo de untar", es_importado: false, rubro: "Utensilios", tipo: null, ultima_compra: "2026-09-30", cajas: 200, unidades: 4800, lineas: 20 },
-  { empresa: "chef", cod: "702EL", cod_base: "702E", descripcion: "Sacacorchos de dos tiempos", es_importado: true, rubro: "Sacacorchos", tipo: null, ultima_compra: "2026-08-12", cajas: 300, unidades: 3600, lineas: 7 },
+  { empresa: "chef", cod: "702EL", cod_base: "702E", descripcion: "Sacacorchos de dos tiempos", es_importado: true, rubro: "Sacacorchos", tipo: null, ultima_compra: "2026-08-12", cajas: 300, unidades: 3600, lineas: 7,
+    importador: "Chef", precio_usd_lk: null, precio_usd_nota: null, venta_unit: 1200, venta_fecha: "2026-08-12", uxb: 12, ref_chef_usd: 0.9, ref_chef_fecha: "2026-01-28" },
   { empresa: "lk", cod: "513", cod_base: "513", descripcion: "Pelapapas", es_importado: false, rubro: "Utensilios", tipo: null, ultima_compra: "2026-05-02", cajas: 50, unidades: 600, lineas: 2 }
 ];
 
@@ -72,7 +80,15 @@ const ITEMS = [
     out.calc = [c1.pond, c2.pond, c3.pond, c1.mHS];
     /* (j) modo por súper */
     const llamadas = [];
-    window.sb = { rpc: async (name, args) => { llamadas.push([name, args]); if (name === "gv_hotsale_supers") return { data: SUPERS }; if (name === "gv_hotsale_items_super") return { data: args && args.p_super_key === "inc" ? ITEMS : [] }; return { data: [] }; } };
+    window.sb = { rpc: async (name, args) => {
+      llamadas.push([name, args]);
+      if (name === "gv_hotsale_supers") return { data: SUPERS };
+      if (name === "gv_hotsale_items_super") return { data: args && args.p_super_key === "inc" ? ITEMS.map((i) => Object.assign({}, i)) : [] };
+      if (name === "gv_hotsale_params") return { data: { dolar: { valor: 1450, actualizado_at: "2026-10-01T12:00:00Z", por: "x" } } };
+      if (name === "gv_hotsale_param_guardar") return { data: { clave: args.p_clave, valor: args.p_valor } };
+      if (name === "gv_hotsale_precio_lk_guardar") return { data: { cod: args.p_cod, precio_usd: args.p_precio_usd } };
+      return { data: [] };
+    } };
     window.hsModo("super");
     await espera(150);
     out.lblOcultas = document.getElementById("hsLblMI").hidden && document.getElementById("hsLblMN").hidden;
@@ -87,6 +103,31 @@ const ITEMS = [
     const filas = [...document.querySelectorAll("#hsT tbody tr")].filter((tr) => !tr.classList.contains("grp")).map((tr) => [...tr.children].map((td) => td.textContent.trim()));
     out.resumen = filas;
     out.faltan = document.querySelectorAll("#hsItems tr.falta").length;
+    /* (m) rent. de LK en lo importado por TN / Chef (A 20 · H 2 · P 12 · K 2) */
+    out.lkHeads = [...document.querySelectorAll("#hsItems thead th.lkh")].map((t) => t.innerHTML.replace(/<br>/g, " ").replace(/\s+/g, " "));
+    const filaIt = (k) => document.querySelector('#hsItems tr[data-k="' + k + '"]');
+    const celdas = (k) => [...(filaIt(k) ? filaIt(k).children : [])].map((td) => td.textContent.trim());
+    out.lk026 = celdas("lk|026");
+    out.itemsAncho = document.getElementById("hsItems").getBoundingClientRect().width; out.wrapAncho = document.getElementById("hsItemsWrap").clientWidth;
+    out.lk702 = celdas("chef|702EL");
+    out.lk501 = filaIt("lk|501").children.length;
+    out.na501 = filaIt("lk|501").lastElementChild.getAttribute("colspan");
+    out.dolarVal = (document.getElementById("hsDolar") || {}).value;
+    const ref = filaIt("chef|702EL") && filaIt("chef|702EL").querySelector("button.ref");
+    out.refTxt = ref ? ref.textContent : null;
+    if (ref) ref.click();
+    await espera(120);
+    out.rpcUsd = llamadas.find((l) => l[0] === "gv_hotsale_precio_lk_guardar");
+    out.lk702b = celdas("chef|702EL");
+    out.refSigue = !!(filaIt("chef|702EL") && filaIt("chef|702EL").querySelector("button.ref"));
+    const resumen2 = [...document.querySelectorAll("#hsT tbody tr")].filter((tr) => !tr.classList.contains("grp")).map((tr) => [...tr.children].map((td) => td.textContent.trim()));
+    out.resLK = resumen2.filter((f) => /^(Tierra Nativa|Chef)/.test(f[0]));
+    out.grpLK = [...document.querySelectorAll("#hsT tr.grp td")].map((t) => t.textContent).find((t) => /Rent\. de LK/.test(t));
+    const dol = document.getElementById("hsDolar"); if (dol) { dol.value = "2000"; dol.dispatchEvent(new Event("change")); }
+    await espera(120);
+    out.rpcDolar = llamadas.find((l) => l[0] === "gv_hotsale_param_guardar");
+    out.lk026b = celdas("lk|026");
+    out.dolarInfo = (document.getElementById("hsDolarInfo") || {}).textContent || "";
     /* (k) persiste y vuelve */
     window.hsClose(); window.openHotSale(); await espera(200);
     out.modoVuelve = _hs.modo;
@@ -111,7 +152,7 @@ const ITEMS = [
   const pm = await (await b.newContext({ viewport: { width: 390, height: 800 }, serviceWorkers: "block" })).newPage();
   await pm.route("**/rest/v1/**", (x) => x.abort());
   await pm.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
-  const m = await pm.evaluate(async () => {
+  const m = await pm.evaluate(async ({ SUPERS, ITEMS }) => {
     const espera = (ms) => new Promise((res) => setTimeout(res, ms));
     for (let i = 0; i < 50 && typeof window.openHotSale !== "function"; i++) await espera(100);
     window.requireSupervisor = () => true;
@@ -120,10 +161,15 @@ const ITEMS = [
     const t = document.getElementById("hsT").getBoundingClientRect();
     const f = document.getElementById("hsForm").getBoundingClientRect();
     const body = document.querySelector(".hs-body");
-    return { right: Math.max(t.right, f.right), w: innerWidth, scroll: body.scrollWidth <= body.clientWidth };
-  });
+    const prom = { right: Math.max(t.right, f.right), w: innerWidth, scroll: body.scrollWidth <= body.clientWidth };
+    window.sb = { rpc: async (n, a) => n === "gv_hotsale_supers" ? { data: SUPERS } : n === "gv_hotsale_items_super" ? { data: ITEMS } : n === "gv_hotsale_params" ? { data: { dolar: { valor: 1450, actualizado_at: "2026-10-01" } } } : { data: {} } };
+    window.hsModo("super"); await espera(150); window.hsSuperElegir("inc"); await espera(150);
+    const f2 = document.getElementById("hsForm").getBoundingClientRect(), s2 = document.getElementById("hsSel").getBoundingClientRect();
+    return Object.assign(prom, { superScroll: body.scrollWidth <= body.clientWidth, superRight: Math.max(f2.right, s2.right), filas: document.querySelectorAll("#hsItems tbody tr").length });
+  }, { SUPERS, ITEMS });
   const fails = [];
   if (!(m.right <= m.w && m.scroll)) fails.push("(h) a 390 px llega a " + m.right + " px de " + m.w);
+  if (!(m.superScroll && m.superRight <= m.w && m.filas === 4)) fails.push("(h) a 390 px en modo súper la pantalla se va a la derecha: scroll=" + m.superScroll + " right=" + m.superRight + " filas=" + m.filas);
   if (!r.boton) fails.push("(a) falta el botón en los secundarios");
   if (!r.visible || r.inputs !== 6) fails.push("(a) overlay/inputs " + r.visible + " " + r.inputs);
   if (r.p4[0] !== "73 %") fails.push("(b) 4 semanas: " + r.p4[0]);
@@ -149,6 +195,20 @@ const ITEMS = [
   if (r.faltan !== 1) fails.push("(j) ítems sin cargar marcados: " + r.faltan);
   if (r.modoVuelve !== "super" || r.rentVuelve !== "80") fails.push("(k) no vuelve: modo " + r.modoVuelve + " rent " + r.rentVuelve);
   if (!/sesión de supervisor/.test(r.vacia) || r.selVacia) fails.push("(l) lista vacía: '" + r.vacia + "' select=" + r.selVacia);
+  if (r.lkHeads.join("|") !== "u$s → LK por u|Venta LK $/u|Rent. LK hoy|Rent. LK en HS|Rent. LK pond.") fails.push("(m) encabezados LK: " + r.lkHeads.join("|"));
+  if (r.dolarVal !== "1450") fails.push("(m) el dólar de la base no se ve: " + r.dolarVal);
+  if (!(r.lk026[4] === "Imp·TN" && /^\$ 1\.000/.test(r.lk026[8]) && r.lk026[9] === "38 %" && r.lk026[10] === "10 %" && r.lk026[11] === "30 %")) fails.push("(m) 026 por TN: " + JSON.stringify(r.lk026.slice(7)));
+  if (!(r.lk702[4] === "Imp·Chef" && r.refTxt === "usar 0,9" && r.lk702[9] === "—" && r.lk702[11] === "—")) fails.push("(m) 702EL sin u$s: " + JSON.stringify(r.lk702.slice(7)) + " ref=" + r.refTxt);
+  if (!(r.lk501 === 8 && r.na501 === "5")) fails.push("(m) el nacional lleva " + r.lk501 + " celdas, colspan " + r.na501);
+  if (!r.rpcUsd || r.rpcUsd[1].p_cod !== "702E" || Math.abs(r.rpcUsd[1].p_precio_usd - 0.9) > 1e-9) fails.push("(m) RPC del u$s: " + JSON.stringify(r.rpcUsd));
+  if (!(r.lk702b[9] === "⚠ -8 %" && r.lk702b[10] === "⚠ -26 %" && r.lk702b[11] === "⚠ -13 %" && !r.refSigue)) fails.push("(m) 702EL con la ref cargada: " + JSON.stringify(r.lk702b.slice(7)) + " refSigue=" + r.refSigue);
+  const tn = r.resLK.find((f) => /^Tierra Nativa/.test(f[0])), ch = r.resLK.find((f) => /^Chef/.test(f[0]));
+  if (!tn || !/ninguno a pérdida/.test(tn[0]) || tn[1] !== "1 / 1" || tn[2] !== "100" || tn[3] !== "38 %" || tn[4] !== "10 %" || tn[5] !== "30 %") fails.push("(m) resumen TN: " + JSON.stringify(tn));
+  if (!ch || !/a pérdida: 1 hoy · 1 en HS · 1 pond\./.test(ch[0]) || ch[1] !== "1 / 1" || ch[2] !== "300" || ch[3] !== "-8 %" || ch[4] !== "-26 %" || ch[5] !== "-13 %") fails.push("(m) resumen Chef: " + JSON.stringify(ch));
+  if (!r.grpLK || !/dólar \$ 1\.450/.test(r.grpLK)) fails.push("(m) el grupo de LK no dice el dólar: " + r.grpLK);
+  if (!r.rpcDolar || r.rpcDolar[1].p_clave !== "dolar" || r.rpcDolar[1].p_valor !== 2000) fails.push("(m) RPC del dólar: " + JSON.stringify(r.rpcDolar));
+  if (!(r.lk026b[9] === "0 %" && /guardado/.test(r.dolarInfo))) fails.push("(m) con dólar 2000 el 026 da " + r.lk026b[10] + " · " + r.dolarInfo);
+  if (!(r.itemsAncho > 0 && r.itemsAncho <= r.wrapAncho + 1)) fails.push("(m) a 1400 px la tabla de ítems (" + r.itemsAncho + " px) no entra en su marco (" + r.wrapAncho + "): columnas cortadas");
   if (!r.lblVuelven) fails.push("(j) al volver a promedio no vuelven las rent. generales");
   if (!r.selOculto) fails.push("(j) en modo promedio sigue viéndose «¿Qué súper?»");
   if (!(r.inputAncho > 0 && r.inputAncho <= 100)) fails.push("(i) el input mide " + r.inputAncho + " px: el width:auto global le gana al del módulo");

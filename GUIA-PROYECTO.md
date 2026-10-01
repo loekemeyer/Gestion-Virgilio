@@ -16132,3 +16132,12 @@ período por separado para cada familia: rentHS = (1 + rent) × (1 − aporte) �
 `gv_hotsale_supers()` y `gv_hotsale_items_super(p_super_key, p_meses)` (lectura, guard de supervisor) traen lo que
 compró el súper en 12 meses por última compra; el promedio por familia (imp/nac) y por rubro va ponderado por cajas.
 Test: `tests/hotsale-rent.cjs`. SQL: `sql/gv_hotsale_super_items_v2593.sql`.
+
+**v25.98 — rent. de LK en lo importado por Tierra Nativa / Chef.** En el modo por súper, cada ítem importado por TN o
+Chef lleva además: el **u$s → LK por unidad** (lo que el importador le cobra a LK; se carga una vez por código y queda en
+`GV_Importado_Precio_LK`, para Chef con el botón «usar» que trae la última factura Chef → LK), lo que **LK le facturó al
+súper** ($/u, última factura de ISIS) y la **rent. de LK hoy / en HS / ponderada** = venta ÷ (u$s × dólar) − 1, con ⚠ en lo
+que queda a pérdida. El **dólar** se carga al lado del súper y queda en `GV_HotSale_Param`. El resumen agrega una fila por
+importador (promedio ponderado por cajas y cuántos ítems quedan a pérdida). RPC de escritura (supervisor):
+`gv_hotsale_precio_lk_guardar(p_cod, p_precio_usd, p_nota)` (null borra) y `gv_hotsale_param_guardar('dolar', valor)`;
+lectura `gv_hotsale_params()`. SQL: `sql/gv_hotsale_precio_lk_v2598.sql`.

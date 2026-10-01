@@ -31071,3 +31071,29 @@ pedido_ref) y llama `gv_importados_resync`. Probado en transacción abortada: 2 
 3 filas de log, editor nuevo, `pedido_curso` 438E=2520 / 035E=0, y un `antes` viejo frena.
 Impacto sobre objetos existentes: ninguno (no se tocó `gv_importado_bache_editar` ni `gv_importado_pedido_ref`).
 Rollback: los `drop` de la cabecera de `sql/gv_imp_pi_editar_v2594.sql`.
+
+## §3.v2598 — Hot Sale: u$s del importador a LK y dólar (`GV_Importado_Precio_LK`, `GV_HotSale_Param`) (01/10/2026)
+
+Thomas: lo que importan **Tierra Nativa o Chef** no puede quedar a pérdida en LK; registrar una vez a cuánto se lo venden
+en dólares a LK y mostrar la rent. de LK hoy, en las semanas de hot sale y ponderada. Objetos **nuevos**:
+- `GV_Importado_Precio_LK` (`cod` pk = código base sin ceros ni L, `importador`, `precio_usd` ≥ 0 por UNIDAD, `nota`,
+  `actualizado_por`, `actualizado_at`) y `GV_HotSale_Param` (`clave` pk, `valor`): RLS prendida, sin grants a anon ni
+  authenticated; se escriben sólo por RPC SECURITY DEFINER con guard de supervisor (`raise 'SOLO_SUPERVISOR'`).
+- `gv_hotsale_precio_lk_guardar(p_cod, p_precio_usd, p_nota)` (upsert; `null` borra; el importador lo busca en
+  `Importados` → `GV_Imp_Proveedor`), `gv_hotsale_param_guardar(p_clave, p_valor)` (sólo `'dolar'`, > 0),
+  `gv_hotsale_params()` (jsonb `{dolar:{valor, actualizado_at, por}}`; `null` sin supervisor), `gv_hotsale_quien()`.
+- `gv_hotsale_items_super(p_super_key, p_meses)` suma 8 columnas AL FINAL: `importador` (`GV_Imp_Proveedor.importador`
+  del proveedor del importado), `precio_usd_lk` / `precio_usd_nota` (la tabla nueva), `venta_unit` / `venta_fecha`
+  (precio unitario y fecha de la última factura al súper, LK o Chef), `uxb` (de la factura, o `vista_uxb_articulo`),
+  `ref_chef_usd` / `ref_chef_fecha` (última factura **Chef → LK**, `isis_ch` cliente 1434, 24 meses; el parser la marca
+  «Pesos» pero el unitario es u$s: 0,79 / 0,98 / 1,05 / 1,50 / 1,64 el 28/01/26). Para Tierra Nativa **no hay fuente**
+  (una sola factura de compra parseada): se tipea.
+
+⚠ **El `drop function` se colgó en el MCP** tres veces (60 s sin respuesta; `lock_timeout = 5s` y
+`statement_timeout = 15s` no saltaron; `pg_stat_activity` sin nadie trabado ni esperando; el drop de una función recién
+creada y sin uso se colgaba igual). `create function` y `alter function … rename` anduvieron en el acto. Se aplicó así:
+la nueva se creó como `gv_hotsale_items_super_lk`, la vieja se renombró a **`gv_hotsale_items_super_v2593`** (sin
+execute para anon/authenticated, queda de rollback) y la nueva tomó el nombre. Medido: Jumbo (`cencosud`) 50 ítems,
+31 importados (26 Tierra Nativa, 5 Chef), 5 con referencia Chef → LK, 45 ms. Las dos tablas nuevas vacías al 01/10.
+Impacto sobre objetos existentes: ninguno. Rollback en la cabecera de `sql/gv_hotsale_precio_lk_v2598.sql`.
+

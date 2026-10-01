@@ -1,5 +1,5 @@
 /* ============================================================================
-   HOT SALE — rentabilidad ponderada (v25.91 · v25.93, pedido de Thomas 01/10/2026)
+   HOT SALE — rentabilidad ponderada (v25.91 · v25.93 · v25.98, pedido de Thomas 01/10/2026)
    ----------------------------------------------------------------------------
    Los súper piden un APORTE de hot sale (un % sobre el precio) dos o tres veces
    al año. Thomas quiere saber qué rentabilidad le queda en el período completo
@@ -20,6 +20,24 @@
        la ponderada del período. El promedio va PONDERADO por cajas vendidas en
        esos 12 meses (si ningún ítem cargado tiene cajas, promedio simple). Las
        rent. tipeadas quedan en localStorage por súper (gv_hotsale_rent::<key>).
+
+   LO IMPORTADO POR TIERRA NATIVA O CHEF NO PUEDE QUEDAR A PÉRDIDA EN LK (v25.98):
+     Thomas: "los artículos que importan Tierra Nativa o Chef, es importante que no
+     queden a pérdida en LK… registrá a cuánto lo venden en dólares TN o Chef a LK,
+     para definir cuál es la rentabilidad de LK y cuál le queda post hot sale
+     inclusive, y en las semanas del hot sale también". Se carga UNA vez el u$s por
+     unidad que el importador le cobra a LK (GV_Importado_Precio_LK, por código
+     base, lo guarda gv_hotsale_precio_lk_guardar) y el dólar (GV_HotSale_Param,
+     clave 'dolar', gv_hotsale_param_guardar). La pantalla saca por ítem:
+       rent. LK hoy = (lo que LK le factura al súper, $/u de la última factura de
+                       ISIS) ÷ (u$s × dólar) − 1
+     y con eso la rent. LK en las semanas de hot sale y la ponderada, con ⚠ en lo
+     que queda a pérdida, más el promedio por importador (ponderado por cajas) y
+     cuántos ítems quedan a pérdida hoy / en HS / ponderado. Para lo que importa
+     CHEF hay referencia: la última factura Chef → LK (isis_ch, cliente 1434) viene
+     como ref_chef_usd y un botón «usar» la carga; para TIERRA NATIVA no hay
+     fuente parseada, se tipea. Sin dólar cargado las columnas dicen «—».
+     El u$s y el dólar viven en la BASE (son de todos, no de este navegador).
 
    Los dos % de rentabilidad del modo promedio NO se calculan acá.
    Los datos de hot sale son los de arriba de su planilla: HotSale % · Semanas
@@ -42,8 +60,9 @@
    ⚠ POR QUÉ VIVE EN SU PROPIO ARCHIVO: regla v23.98 (cobranzas.js). Se carga con
    ?v= atado a APP_VERSION — está en SIGUEN_APP_VERSION de scripts/bump-version.cjs
    y tests/version-tokens.cjs. Usa window.sb (el mismo cliente del index) sólo para
-   las dos RPC de lectura; no escribe la base. Candado: tests/hotsale-rent.cjs.
-   SQL: sql/gv_hotsale_super_items_v2593.sql.
+   las RPC de lectura y las dos de escritura de arriba (u$s por ítem y dólar).
+   Candado: tests/hotsale-rent.cjs. SQL: sql/gv_hotsale_super_items_v2593.sql,
+   sql/gv_hotsale_precio_lk_v2598.sql.
    ============================================================================ */
 
 var _HS_KEY = "gv_hotsale_params_v2";
@@ -55,7 +74,7 @@ var _HS_ROT = {
   H: "Semanas HotSale", P: "Semanas a Ponderar", K: "cuánto más vendo en hot sale"
 };
 var _HS_MESES = 12;
-var _hs = { modo: "prom", supers: null, supersErr: "", superKey: "", items: null, itemsErr: "", cargando: false };
+var _hs = { modo: "prom", supers: null, supersErr: "", superKey: "", items: null, itemsErr: "", cargando: false, params: null, paramsErr: "" };
 
 /* m: rentabilidad base (tanto por uno) · a: aporte hot sale (tanto por uno) ·
    P: semanas a ponderar · H: semanas de hot sale · k: cuánto más se vende (× lo normal) */
@@ -76,6 +95,24 @@ function hsPromedio(items) {
   if (wSum > 0) return acc / wSum;
   return conRent.reduce(function (s, i) { return s + i.rent; }, 0) / conRent.length;
 }
+
+/* rentabilidad de LK sobre un importado por TN / Chef: lo que LK le factura al súper ($/u)
+   contra lo que le paga al importador (u$s por unidad × dólar). Sin alguno de los tres, NaN. */
+function hsRentLK(ventaUnit, usd, dolar) {
+  var v = Number(ventaUnit), u = Number(usd), d = Number(dolar);
+  if (!(v > 0) || !(u > 0) || !(d > 0)) return NaN;
+  return v / (u * d) - 1;
+}
+function _hsDolar() { var p = _hs.params && _hs.params.dolar; var n = p ? Number(p.valor) : NaN; return n > 0 ? n : NaN; }
+function _hsUsd(it) { var n = Number(it && it.precio_usd_lk); return n > 0 ? n : NaN; }
+/* o = los datos de hot sale validados (o null): devuelve {rent, mHS, pond} de LK para el ítem */
+function _hsLK(it, o) {
+  var rent = hsRentLK(it.venta_unit, _hsUsd(it), _hsDolar());
+  if (!isFinite(rent) || !o) return { rent: rent, mHS: NaN, pond: NaN };
+  var c = hsCalc(rent, o.A / 100, o.P, o.H, o.K);
+  return { rent: rent, mHS: c.mHS, pond: c.pond };
+}
+function _hsHoyIso() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 
 function _hsNum(v, dec) {
   var n = Number(v);
@@ -114,7 +151,8 @@ function _hsCss() {
     ".hs-top span{font-size:12.5px;opacity:.9;flex:1 1 320px;min-width:0;}",
     ".hs-x{order:2;margin-left:auto;background:#fff;color:#7f1d1d;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer;}",
     ".hs-body{flex:1;min-height:0;overflow:auto;padding:14px 16px;}",
-    ".hs-wrap{max-width:980px;margin:0 auto;display:grid;gap:12px;justify-items:center;}",
+    ".hs-wrap{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:minmax(0,100%);gap:12px;justify-items:center;}",
+    ".hs-wrap>*{max-width:100%;min-width:0;}",
     ".hs-modo{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;}",
     ".hs-modo button{border:1px solid #cbd5e1;border-radius:999px;background:#fff;color:#334155;font-weight:700;cursor:pointer;padding:6px 14px;}",
     ".hs-modo button.on{background:#b91c1c;border-color:#b91c1c;color:#fff;}",
@@ -156,6 +194,19 @@ function _hsCss() {
     ".hs-it td.nac{color:#166534;font-weight:700;}",
     "#hsOv .hs-it input{width:62px;padding:3px 4px;font-size:13px;}",
     ".hs-it tr.falta input{border-color:#f59e0b;background:#fffbeb;}",
+    /* rent. de LK en lo importado por TN / Chef (v25.98) */
+    ".hs-it th.lkh{background:#eff6ff;color:#1e3a8a;}",
+    ".hs-it td.na{color:#cbd5e1;}",
+    ".hs-it td small{display:block;color:#64748b;font-size:10.5px;font-weight:500;}",
+    "#hsOv .hs-it input.usd{width:66px;}",
+    "#hsOv .hs-it input.usd.err{border-color:#b91c1c;background:#fef2f2;}",
+    "#hsOv .hs-it button.ref{padding:1px 6px;font-size:11px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;color:#1e3a8a;cursor:pointer;margin-left:3px;}",
+    ".hs-it td.lk{font-weight:700;}",
+    ".hs-it td.lk.neg{color:#b91c1c;background:#fef2f2;}",
+    ".hs-dol{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;}",
+    "#hsOv .hs-dol input{width:80px;}",
+    ".hs-dol small{font-weight:500;color:#64748b;font-size:11.5px;}",
+    ".hs-t tr.lk td.c small{color:#b91c1c;}",
     ".hs-det{font-size:13px;color:#475569;max-width:70ch;}",
     ".hs-det summary{cursor:pointer;color:#0f172a;font-weight:700;}",
     ".hs-det p{margin:6px 0;}",
@@ -204,6 +255,7 @@ function openHotSale() {
         '<p><b>Rentabilidad en hot sale</b> = (1 + rent.) × (1 − HotSale %) − 1. Con 100 % y 20 %: 2 × 0,8 − 1 = 60 %. Vale también en negativo: recibo 922 con costo 986 (−6 %) queda en −25 %.</p>' +
         '<p><b>Ponderada</b> = promedio de las rentabilidades pesado por lo que se vende cada semana: una semana normal pesa 1 y una de hot sale pesa lo que se vende de más (× 2 = pesa doble). Con 4 semanas, 2 de hot sale y venta doble: (2 × 100 % + 4 × 60 %) ÷ 6 = 73 %. Es la misma cuenta que la planilla, (recibo − costo) ÷ costo: el costo unitario se cancela y por eso no se pide.</p>' +
         '<p><b>Por súper</b>: los ítems son lo que ese súper compró en los últimos ' + _HS_MESES + ' meses (facturas de ISIS, LK y Chef juntos), ordenados por última compra. El promedio por familia y por rubro va ponderado por cajas vendidas en ese período; los ítems sin rent. cargada no entran. Las rent. que escribís quedan guardadas en este navegador, por súper.</p>' +
+        '<p><b>Rent. de LK en lo importado por Tierra Nativa o Chef</b> = (lo que LK le factura al súper, $ por unidad de la última factura de ISIS) ÷ (u$s por unidad que le cobra el importador × dólar) − 1. El u$s se carga una vez por código y queda en la base (para lo de Chef hay referencia: la última factura Chef → LK); el dólar también. Con eso salen la rent. de LK hoy, en las semanas de hot sale y la ponderada: ⚠ es lo que queda a pérdida.</p>' +
       '</details>' +
     '</div></div>';
   _hsLoad();
@@ -242,7 +294,15 @@ function _hsModoPintar() {
 }
 
 /* ----------------------------- modo por súper ----------------------------- */
+function _hsParamsCargar(cb) {
+  _hsRpc("gv_hotsale_params").then(function (r) {
+    if (!r || r.error || r.data === null || typeof r.data !== "object") { _hs.paramsErr = "No pude leer el dólar" + (r && r.error && r.error.message ? " (" + r.error.message + ")" : " (falta la sesión de supervisor)") + "."; _hs.params = null; }
+    else { _hs.params = r.data; _hs.paramsErr = ""; }
+    if (cb) cb();
+  });
+}
 function _hsSuperInit() {
+  if (!_hs.params && !_hs.paramsErr) _hsParamsCargar(function () { _hsSelPintar(); _hsSuperRender(); });
   if (_hs.supers) { _hsSelPintar(); if (_hs.superKey && !_hs.items) hsSuperElegir(_hs.superKey); else _hsSuperRender(); return; }
   _hs.cargando = true; _hs.supersErr = ""; _hsSelPintar();
   _hsRpc("gv_hotsale_supers").then(function (r) {
@@ -264,8 +324,41 @@ function _hsSelPintar() {
     var cods = (s.codigos || []).map(function (c) { return (c.empresa === "chef" ? "CH " : "LK ") + c.cod; }).join(" + ");
     opts += '<option value="' + _hsEsc(s.super_key) + '"' + (s.super_key === _hs.superKey ? " selected" : "") + '>' + _hsEsc(s.nombre) + " · últ. compra " + _hsFecha(s.ultima_compra) + " · " + _hsEsc(cods) + "</option>";
   });
-  el.innerHTML = '¿Qué súper? <select id="hsSuper" onchange="hsSuperElegir(this.value)">' + opts + "</select>";
+  var dol = _hs.params && _hs.params.dolar, info;
+  if (_hs.paramsErr) info = '<span style="color:#b91c1c">' + _hsEsc(_hs.paramsErr) + '</span> <button type="button" onclick="_hs.params=null;_hs.paramsErr=\'\';_hsSuperInit()">Reintentar</button>';
+  else if (dol && Number(dol.valor) > 0) info = "guardado " + _hsFecha(dol.actualizado_at);
+  else info = "cargalo para ver la rent. de LK en lo importado por TN / Chef";
+  el.innerHTML = '¿Qué súper? <select id="hsSuper" onchange="hsSuperElegir(this.value)">' + opts + "</select>" +
+    ' <span class="hs-dol">· Dólar $ <input id="hsDolar" type="number" min="1" step="1" placeholder="$ / u$s" value="' + (dol && Number(dol.valor) > 0 ? String(Number(dol.valor)) : "") + '" onchange="hsDolarSet(this.value)" title="pesos por dólar: con esto se pasa a $ lo que el importador le cobra a LK en u$s. Queda guardado en la base."> <small id="hsDolarInfo">' + info + '</small></span>';
 }
+function hsDolarSet(val) {
+  var n = parseFloat(val), info = document.getElementById("hsDolarInfo");
+  if (!(n > 0)) { if (info) info.innerHTML = '<span style="color:#b91c1c">el dólar tiene que ser mayor a 0</span>'; return; }
+  if (info) info.textContent = "guardando…";
+  _hsRpc("gv_hotsale_param_guardar", { p_clave: "dolar", p_valor: n }).then(function (r) {
+    if (!r || r.error) { if (info) info.innerHTML = '<span style="color:#b91c1c">No se guardó' + (r && r.error && r.error.message ? " (" + _hsEsc(r.error.message) + ")" : "") + '</span>'; return; }
+    _hs.params = Object.assign({}, _hs.params || {}, { dolar: { valor: n, actualizado_at: _hsHoyIso(), por: "" } });
+    if (info) info.textContent = "guardado " + _hsFecha(_hsHoyIso());
+    _hsSuperRender();
+  });
+}
+/* u$s por unidad que el importador le cobra a LK: se guarda en la base por código base (vale para todos los súpers) */
+function hsUsdSet(cod, val) {
+  var n = parseFloat(val), nuevo = isFinite(n) && n >= 0 ? n : null;
+  var inputs = document.querySelectorAll('#hsItems input.usd[data-cod="' + String(cod).replace(/"/g, '\\"') + '"]');
+  inputs.forEach(function (i) { i.classList.remove("err"); i.disabled = true; });
+  _hsRpc("gv_hotsale_precio_lk_guardar", { p_cod: cod, p_precio_usd: nuevo }).then(function (r) {
+    if (!r || r.error) {
+      var m = "No se guardó el u$s del " + cod + (r && r.error && r.error.message ? " (" + r.error.message + ")" : "") + ".";
+      inputs.forEach(function (i) { i.disabled = false; i.classList.add("err"); i.title = m; });
+      var msg = document.getElementById("hsMsg"); if (msg) msg.innerHTML = '<span class="err">' + _hsEsc(m) + '</span>';
+      return;
+    }
+    (_hs.items || []).forEach(function (it) { if (it.cod_base === cod) it.precio_usd_lk = nuevo; });
+    _hsSuperRender();
+  });
+}
+function hsUsdRef(cod, usd) { hsUsdSet(cod, usd); }
 function hsSuperElegir(key) {
   _hs.superKey = key || ""; _hs.items = null; _hs.itemsErr = "";
   var sel = document.getElementById("hsSuper"); if (sel && sel.value !== _hs.superKey) sel.value = _hs.superKey;
@@ -325,7 +418,13 @@ function _hsSuperRender() {
   if (_hs.itemsErr) { t.innerHTML = '<tbody><tr><td style="color:#b91c1c">' + _hsEsc(_hs.itemsErr) + ' <button type="button" onclick="hsSuperElegir(_hs.superKey)">Reintentar</button></td></tr></tbody>'; res.innerHTML = ""; return; }
   if (!_hs.items || !_hs.items.length) { t.innerHTML = '<tbody><tr><td>Este súper no tiene facturas en los últimos ' + _HS_MESES + ' meses.</td></tr></tbody>'; res.innerHTML = ""; return; }
   var rows = _hsItemsConRent();
-  var h = '<thead><tr><th>Últ.<br>compra</th><th>Cód.</th><th>Descripción</th><th>Rubro</th><th>Fam.</th><th>Cajas<br>' + _HS_MESES + ' m</th><th>Rent.<br>hoy %</th></tr></thead><tbody>';
+  var o = _hsRead(), oOk = _hsValida(o) ? o : null;
+  /* las columnas de LK sólo si el súper compra algo importado por TN / Chef */
+  var conLK = (_hs.items || []).some(function (it) { return it.es_importado && it.importador; });
+  var h = '<thead><tr><th>Últ.<br>compra</th><th>Cód.</th><th>Descripción</th><th>Rubro</th><th>Fam.</th><th>Cajas<br>' + _HS_MESES + ' m</th><th>Rent.<br>hoy %</th>' +
+          (conLK ? '<th class="lkh">u$s → LK<br>por u</th><th class="lkh">Venta LK<br>$/u</th><th class="lkh">Rent. LK<br>hoy</th><th class="lkh">Rent. LK<br>en HS</th><th class="lkh">Rent. LK<br>pond.</th>' : '') +
+          '</tr></thead><tbody>';
+  function lkCell(v) { return '<td class="lk' + (v < 0 ? ' neg' : '') + '">' + (isFinite(v) ? (v < 0 ? '⚠ ' : '') + _hsPct(v) : '—') + '</td>'; }
   rows.forEach(function (x) {
     var it = x.it;
     h += '<tr data-k="' + _hsEsc(x.k) + '"' + (isFinite(x.rent) ? "" : ' class="falta"') + '>' +
@@ -333,10 +432,22 @@ function _hsSuperRender() {
          '<td title="' + _hsEsc(it.empresa === "chef" ? "Chef" : "LK") + '"><b>' + _hsEsc(it.cod) + '</b></td>' +
          '<td class="d" title="' + _hsEsc(it.descripcion) + '">' + _hsEsc(_hsAbrev(it.descripcion, 30)) + '</td>' +
          '<td>' + _hsEsc(it.rubro || "Sin rubro") + '</td>' +
-         '<td class="' + (it.es_importado ? "imp" : "nac") + '">' + (it.es_importado ? "Imp" : "Nac") + '</td>' +
+         '<td class="' + (it.es_importado ? "imp" : "nac") + '"' + (it.es_importado && it.importador ? ' title="importado por ' + _hsEsc(it.importador) + '"' : '') + '>' + (it.es_importado ? "Imp" + (it.importador ? "·" + (it.importador === "Tierra Nativa" ? "TN" : _hsEsc(it.importador)) : "") : "Nac") + '</td>' +
          '<td>' + _hsNum(it.cajas, 0) + '</td>' +
-         '<td><input type="number" step="1" value="' + (isFinite(x.rent) ? _hsS(Math.round(x.rent * 10000) / 100).replace(",", ".") : "") + '" data-k="' + _hsEsc(x.k) + '" oninput="hsRentSet(this.getAttribute(\'data-k\'),this.value)"></td>' +
-         '</tr>';
+         '<td><input type="number" step="1" value="' + (isFinite(x.rent) ? _hsS(Math.round(x.rent * 10000) / 100).replace(",", ".") : "") + '" data-k="' + _hsEsc(x.k) + '" oninput="hsRentSet(this.getAttribute(\'data-k\'),this.value)"></td>';
+    if (conLK) {
+      var imp = it.es_importado && it.importador ? String(it.importador) : "";
+      if (imp) {
+        var lk = _hsLK(it, oOk), usd = _hsUsd(it), ref = Number(it.ref_chef_usd);
+        h += '<td><input class="usd" type="number" min="0" step="0.01" value="' + (isFinite(usd) ? String(usd) : "") + '" placeholder="' + (ref > 0 ? _hsS(ref) : "u$s") + '" data-cod="' + _hsEsc(it.cod_base) + '" onchange="hsUsdSet(this.getAttribute(\'data-cod\'),this.value)" title="u$s por unidad que ' + _hsEsc(imp) + ' le cobra a LK. Queda guardado en la base.' + (ref > 0 ? ' Ref.: última factura Chef → LK ' + _hsFecha(it.ref_chef_fecha) + ' a u$s ' + _hsS(ref) : '') + '">' +
+             (!isFinite(usd) && ref > 0 ? '<button type="button" class="ref" data-cod="' + _hsEsc(it.cod_base) + '" data-usd="' + ref + '" onclick="hsUsdRef(this.getAttribute(\'data-cod\'),this.getAttribute(\'data-usd\'))" title="última factura Chef → LK, ' + _hsFecha(it.ref_chef_fecha) + '">usar ' + _hsS(ref) + '</button>' : '') + '</td>' +
+             '<td title="última factura al súper, ' + _hsFecha(it.venta_fecha) + '">' + (Number(it.venta_unit) > 0 ? '$ ' + _hsNum(it.venta_unit, 0) + '<small>' + _hsFecha(it.venta_fecha) + '</small>' : '—') + '</td>' +
+             lkCell(lk.rent) + lkCell(lk.mHS) + lkCell(lk.pond);
+      } else {
+        h += '<td colspan="5" class="na">—</td>';
+      }
+    }
+    h += '</tr>';
   });
   h += '</tbody>';
   t.innerHTML = h;
@@ -353,7 +464,7 @@ function _hsResumenPintar() {
   var h = '<thead><tr><th></th><th>Ítems<small>cargados / total</small></th><th>Cajas<small>' + _HS_MESES + ' m</small></th><th>Rent. hoy<small>prom. pond.</small></th><th class="hs">En hot sale<small>' + _hsS(o.A) + ' % · ' + _hsS(o.H) + ' sem · ×' + _hsS(o.K) + '</small></th><th>Ponderada<small>' + _hsS(o.P) + ' semanas</small></th></tr></thead><tbody>';
   function fila(gr, cls) {
     var c = isFinite(gr.rent) ? hsCalc(gr.rent, a, o.P, o.H, o.K) : { mHS: NaN, pond: NaN };
-    return '<tr class="' + cls + '"><td class="c">' + _hsEsc(gr.label) + '</td><td>' + gr.nCarg + ' / ' + gr.n + '</td><td>' + _hsNum(gr.cajas, 0) + '</td>' +
+    return '<tr class="' + cls + '"><td class="c">' + _hsEsc(gr.label) + (gr.sub || "") + '</td><td>' + gr.nCarg + ' / ' + gr.n + '</td><td>' + _hsNum(gr.cajas, 0) + '</td>' +
            '<td class="v' + (gr.rent < 0 ? " neg" : "") + '">' + _hsPct(gr.rent) + '</td><td class="v' + (c.mHS < 0 ? " neg" : "") + '" style="background:#fef2f2">' + _hsPct(c.mHS) + '</td>' +
            '<td class="v pond' + (c.pond < 0 ? " neg" : "") + '">' + _hsPct(c.pond) + '</td></tr>';
   }
@@ -361,6 +472,24 @@ function _hsResumenPintar() {
   g.fam.forEach(function (gr) { h += fila(gr, "fam"); });
   h += '<tr class="grp"><td colspan="6">Por rubro</td></tr>';
   g.rub.forEach(function (gr) { h += fila(gr, "rub"); });
+  /* la rent. de LK en lo importado por TN / Chef: lo que no puede quedar a pérdida (v25.98) */
+  var conImp = rows.filter(function (x) { return x.it.es_importado && x.it.importador; });
+  if (conImp.length) {
+    var d = _hsDolar();
+    h += '<tr class="grp"><td colspan="6">Rent. de LK en lo importado por Tierra Nativa / Chef · ítems con u$s cargado' +
+         (isFinite(d) ? ' · dólar $ ' + _hsNum(d, 0) : ' · <span style="color:#b91c1c;text-transform:none">falta cargar el dólar</span>') + '</td></tr>';
+    ["Tierra Nativa", "Chef"].forEach(function (imp) {
+      var its = conImp.filter(function (x) { return x.it.importador === imp; });
+      if (!its.length) return;
+      var lks = its.map(function (x) { return { rent: _hsLK(x.it, null).rent, cajas: x.cajas }; });
+      var perd = { hoy: 0, hs: 0, pond: 0 }, nC = 0;
+      its.forEach(function (x) { var l = _hsLK(x.it, o); if (isFinite(l.rent)) nC++; if (l.rent < 0) perd.hoy++; if (l.mHS < 0) perd.hs++; if (l.pond < 0) perd.pond++; });
+      var sub = !nC ? '' : (perd.hoy || perd.hs || perd.pond)
+        ? '<small>⚠ a pérdida: ' + perd.hoy + ' hoy · ' + perd.hs + ' en HS · ' + perd.pond + ' pond.</small>'
+        : '<small style="color:#166534">ninguno a pérdida</small>';
+      h += fila({ label: imp, sub: sub, n: its.length, nCarg: nC, cajas: its.reduce(function (s, x) { return s + x.cajas; }, 0), rent: hsPromedio(lks) }, "fam lk");
+    });
+  }
   h += '</tbody>';
   res.innerHTML = h;
 }
