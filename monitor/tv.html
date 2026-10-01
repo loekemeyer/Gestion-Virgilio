@@ -1269,7 +1269,7 @@ function pintarMeta(d, m3PickHoy, m3ArmHoy) {
   else if (M.hora >= JORNADA_FIN) { ver = "⛔ Terminó la jornada: faltan " + n1(M.falta) + " m³"; cls = "mt-no"; }
   else if (M.llegan == null) { ver = "Falta " + n1(M.falta) + " m³ · ritmo desde las 8:45"; cls = "mt-gris"; }
   else if (M.llegan) { ver = "✅ Llegan · faltan " + n1(M.falta) + " m³"; cls = "mt-ok"; }
-  else { ver = (corte ? "⛔ NO LLEGAN" : "⚠ Van justos") + " · faltan " + n1(M.falta) + " m³"; cls = corte ? "mt-no" : "mt-duda"; }
+  else { ver = (corte ? "⛔ NO LLEGAN" : "⚠ Van atrasados") + " · faltan " + n1(M.falta) + " m³"; cls = corte ? "mt-no" : "mt-duda"; }
   var noLlegan = M.cams.filter(function (c) { return c.llega === false; });
   /* v24.38 (Luis): *"saca todo ese texto que es al pedo y pone otro dia mas en ese cuadro"*.
      De la banda quedan las DOS líneas que se leen de lejos y sobre las que se hace algo: el
