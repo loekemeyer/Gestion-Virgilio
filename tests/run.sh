@@ -51,6 +51,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 node tests/ccr-fss-recontrol.cjs
 node tests/toggle-anular.cjs
 node tests/botonera-tm-historial.cjs
+node tests/alerta-inactivo.cjs
 node tests/noprod-cancelacion.cjs
 
 _resumen() {

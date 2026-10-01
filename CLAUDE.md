@@ -5355,6 +5355,23 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
   el pop-up del historial.
 - `tests/botonera-tm-historial.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-01, v25.82): 5 MIN DE TIEMPO MUERTO → CARTEL CON ALARMA EN LOS MONITORES — y Bajar de racks es una tarea abierta
+
+- **El celular** del operario, al llegar a **5 min** de tiempo muerto en la botonera, llama `gv_alerta_inactivo_abrir(legajo)`
+  (una sola alerta viva por legajo; la marca queda en `localStorage gv_tm_alerta::<legajo>`). Al registrar la próxima tarea
+  (`tmMarcarEvento`, desde `enqueueReport`) llama `gv_alerta_inactivo_cerrar`. Tabla `GV_Alerta_Inactivo` (RLS cerrada, sólo RPC).
+- **Los monitores** (`monitor/alerta-inactivo.js`, lo cargan `tv.html` y `admin.html` → TV de pared, «Vista TV» y «Mon. Admin»)
+  leen `gv_alertas_inactivo_vivas()` cada 4 s: cartel centrado del **70 %**, rojo titilando, *«[Nombre] lleva más de 5 minutos
+  inactivo»*, con **sirena** Web Audio. Se va a los **15 s** o apenas la alerta se cierra. Un iframe escondido no suena.
+- ⚠ **El navegador no deja sonar sin un toque previo**: si el kiosko no arranca con `--autoplay-policy=no-user-gesture-required`,
+  el cartel dice «🔇 tocá la pantalla una vez» y desde ese toque suena.
+- ⚠ **Sólo avisa con la botonera ABIERTA** en el celular: si el operario cerró la app, el contador no corre y no hay aviso. El
+  legajo de prueba no avisa.
+- **Bajar / Ingreso a racks = tarea abierta** en el celular (`st.racks` / `st.ir`, desde `gvRacksTramo`): BR en rojo, tiempo muerto
+  en 0, y al terminar va al Historial de tareas con su duración (además del tramo RKI→RKB de siempre). Tope 12 h por si el celular
+  murió adentro.
+- `sql/gv_alerta_inactivo_v2579.sql`, `tests/alerta-inactivo.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.78): antes de optimizar, medir — y leer lo que se usa, no el universo
 
 **Luis, con la captura del `canceling statement due to statement timeout` en A Programar:**
@@ -6937,5 +6954,8 @@ más actualizado que otro. Si alguien quiere cambiar uno solo NO se puede hacer"
 - ⚠ **El cargador es el mismo en los dos repos**: `tests/est-madre-unica.cjs` (acá y en `pagina-LK-copia`) tiene su
   huella md5 y falla si alguno vuelve a tener una Est. Madre propia. Cambiar el cargador = cambiarlo en los dos y
   actualizar la huella en los dos tests, en el mismo pedido.
+- **Switch Cajas / Unidades** (v25.81, Tomás): unidades = cajas × uxb de `vista_uxb_articulo` de Gestión (la de Stocks); sin uxb
+  dice «s/uxb» y no suma al total (al 01/10: 4 de 353 — 1546903, 581T, 633E, 637E). Si el uxb no se puede leer, el modo unidades
+  queda apagado. El Excel sigue el switch y lleva siempre la columna UxB. El ranking es siempre el de cajas (el de Stocks).
 - `sql/get_estadistica_madre_mensual.sql` (en `pagina-LK-copia`), `tests/stk-est-madre-sin-codigo.cjs`.
 
