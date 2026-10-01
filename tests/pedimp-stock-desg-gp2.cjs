@@ -20,12 +20,14 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     let falla = false;
     supaFetchAllSafe = async function (url, q) {
       if (/GV_Importados_Equiv_GP2/.test(url)) { if (falla) throw new Error("caida"); const m = /importado_cod=eq\.([^&]+)/.exec(q); const c = decodeURIComponent(m ? m[1] : ""); return EQ[c] ? (Array.isArray(EQ[c]) ? EQ[c] : [EQ[c]]) : []; }
+      if (/GV_Importados_Equiv_Virgilio/.test(url)) { if (falla) throw new Error("caida"); return /importado_cod=eq\.702E/.test(q) ? [{ cod_art: "102E", empresa: "LK" }, { cod_art: "702", empresa: "LK" }] : []; }
       return [];
     };
     const items = {
       "323ES": { cod: "323ES", stockPropioModulo: 0, stockInsU: 0, stockGp2U: 4000, stockUni: 4000, esInsumo: true, meses: 12, mesesProv: 10 },
       "323E": { cod: "323E", stockPropioModulo: 0, stockInsU: 0, stockGp2U: 800, stockUni: 644, uniPedidas: 156 },
       "942E": { cod: "942E", stockPropioModulo: 5, stockInsU: 0, stockGp2U: 30, stockUni: 35 },
+      "702E": { cod: "702E", stockPropioModulo: 100, stockInsU: 0, stockGp2U: 0, stockConvU: 480, stockUni: 580 },
       "999X": { cod: "999X", stockPropioModulo: 10, stockInsU: 0, stockGp2U: 50, stockUni: 60 }
     };
     _pedImpItemPorClave = function (k) { return items[k]; };
@@ -39,6 +41,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.b = /GRJ31/.test(ov.innerHTML) && /20 %<\/b> de 4\.000 u/.test(ov.innerHTML);
     ov = await abrir("942E");
     out.e = /942E \+ Z47 \+ Z47-M505D/.test(ov.querySelector(".imp-gp2-cod").textContent) && /Z47-M505D en Cervantes/.test(ov.querySelector(".imp-gp2-hdr").textContent) && !/ %<\/b> de/.test(ov.innerHTML);
+    ov = await abrir("702E");
+    out.f = !!ov.querySelector(".imp-conv-cod") && /102E LK \+ 702 LK/.test(ov.querySelector(".imp-conv-cod").textContent) && /480/.test(ov.innerHTML);
     ov = await abrir("999X");
     out.c1 = !ov.querySelector(".imp-gp2-cod") && /Cervantes \(GP2\)/.test(ov.innerHTML);
     falla = true; ov = await abrir("323ES");
@@ -49,5 +53,5 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   if (errs.length) fail.push("pageerror: " + errs.join(" | "));
   await b.close();
   if (fail.length) { console.log("pedimp-stock-desg-gp2: ✗ " + fail.join(" · ") + " " + JSON.stringify(r)); process.exit(1); }
-  console.log("pedimp-stock-desg-gp2: OK — GRJ31 en la fila y el encabezado · 20 % del 323E · 942E con 3 componentes · sin equivalencia como antes · letra grande");
+  console.log("pedimp-stock-desg-gp2: OK — GRJ31 en la fila y el encabezado · 20 % del 323E · 942E con 3 componentes · 702E con stock convertible · sin equivalencia como antes · letra grande");
 })();

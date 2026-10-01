@@ -870,7 +870,7 @@ async function pedImpStockDesglose(keyEnc, foco) {
   /* v25.71 (Luis, 01/10): más grande y con el CÓDIGO del componente de Cervantes (GRJ31), que sale de
      GV_Importados_Equiv_GP2. Sin esa fila se ve como antes. v26.00: un importado puede tener VARIOS
      componentes (942E = Z47 + Z47-M505D + 942E) y se listan todos. */
-  let equiv = null, insDetG = null, insErrG = false;
+  let equiv = null, conv = null, insDetG = null, insErrG = false;
   const pintar = function (insDet, insErr) {
     if (insDet !== undefined) { insDetG = insDet; insErrG = !!insErr; } else { insDet = insDetG; insErr = insErrG; }
     const tr = function (a, b, c) { return '<tr><td style="text-align:left;padding:8px 10px">' + a + '</td><td class="num" style="padding:8px 10px;font-weight:700">' + b + '</td><td style="text-align:left;color:#475569;font-size:14px;padding:8px 10px">' + (c || "") + '</td></tr>'; };
@@ -888,6 +888,11 @@ async function pedImpStockDesglose(keyEnc, foco) {
         h += tr('🏭 Cervantes (GP2)' + (comp ? ' · <b class="imp-gp2-cod" style="font-size:17px;color:#b45309">' + comp + '</b>' : ''), f(it.stockGp2U),
           (comp ? 'stock de <b>' + comp + '</b> en Cervantes (sector, talleristas y PS)' : 'componente equivalente en GP2: sector, talleristas y PS') +
           (fac !== 1 && it.stockGp2U > 0 ? ' · le toca el <b>' + Math.round(fac * 100) + ' %</b> de ' + f(it.stockGp2U / fac) + ' u' : ''));
+      }
+      if (it.stockConvU > 0 || conv) {
+        const cc = conv ? conv.map(function (e) { return escapeHtml(e.cod_art + ' ' + e.empresa); }).join(' + ') : '';
+        h += tr('🔁 Se convierte' + (cc ? ' · <b class="imp-conv-cod" style="font-size:17px;color:#7c3aed">' + cc + '</b>' : ''), f(it.stockConvU || 0),
+          'stock disponible en Virgilio de ' + (cc ? '<b>' + cc + '</b>' : 'otro código') + ', que se puede convertir en este');
       }
       if (it.stockParteU > 0) h += tr('🔧 Parte ' + escapeHtml(it.stockParteCods || ''), f(it.stockParteU), 'el stock de la parte cuenta como stock de este artículo');
       h += '</tbody><tfoot><tr><th style="text-align:left;padding:8px 10px;font-size:16px">Total</th><th class="num" style="padding:8px 10px;font-size:18px">' + f(it.stockUni) + '</th><th></th></tr></tfoot></table>';
@@ -915,6 +920,10 @@ async function pedImpStockDesglose(keyEnc, foco) {
   if (foco !== "proy") {
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Importados_Equiv_GP2", "select=componente_codigo,factor&importado_cod=eq." + encodeURIComponent(it.cod))
       .then(function (r) { if (r && r.length && document.getElementById("impStkDesgOv")) { equiv = r; pintar(); } })
+      .catch(function () { /* sin el código se ve como antes */ });
+    // v26.03 (Luis, D23) — stock de OTRO código de Virgilio que se convierte en éste (102E LK → 702E)
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Importados_Equiv_Virgilio", "select=cod_art,empresa&importado_cod=eq." + encodeURIComponent(it.cod))
+      .then(function (r) { if (r && r.length && document.getElementById("impStkDesgOv")) { conv = r; pintar(); } })
       .catch(function () { /* sin el código se ve como antes */ });
   }
   if (foco === "proy" || !(it.stockInsU > 0)) return;
@@ -1631,6 +1640,7 @@ function _pedImpRender() {
       // v15.27 — depósito insumos (parte suelta o importado sin reenvasar), convertido a unidades
       // v25.61 — stock en Cervantes (GP2) del componente equivalente, ya sumado al número
       if (it.stockGp2U > 0) stockTxt += ' <span style="color:#b45309;font-weight:700;font-size:12px" title="Incluye ' + it.stockGp2U + ' u del stock de GP2 (Cervantes) del componente equivalente">🏭+' + it.stockGp2U + '</span>';
+      if (it.stockConvU > 0) stockTxt += ' <span style="color:#7c3aed;font-weight:700;font-size:12px" title="Incluye ' + it.stockConvU + ' u de stock de otro código de Virgilio que se convierte en éste">🔁+' + it.stockConvU + '</span>';
       if (it.stockInsU > 0) stockTxt += ' <span style="color:#0369a1;font-weight:700;font-size:12px" title="Incluye ' + it.stockInsU + ' u del depósito insumos (Movimientos_Stock, convertido con Insumos_Factores). En una parte, este stock reemplaza al seed del Excel.">🧰' + it.stockInsU + '</span>';
       // v16.08 — lo que se muestra ya es el DISPONIBLE: stock de hoy menos lo pedido, con piso en 0.
       const _codEncV = encodeURIComponent(it.cod);
