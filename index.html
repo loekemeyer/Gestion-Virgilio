@@ -6237,7 +6237,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.46"></script>
+<script type="module" src="recepcion.js?v=25.47"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10282,7 +10282,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.46";
+const APP_VERSION = "v25.47";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -53734,6 +53734,38 @@ function armadoRemitoData(row){
   faltantes = (faltantes || []).slice().sort(function(a,b){ return _remitoCodKey(a.cod) - _remitoCodKey(b.cod); });
   return { np: row.np, cod: row.cod || "", rs: row.rs || "", fecha: row.salePpp || row.fecha || "", tanda: row.tanda || "", total: total, nLios: lios.length, arts: arts, lios: liosOut, pickName: pickName, armName: armName, faltantes: faltantes };
 }
+/* v25.43 (Luis, 01/10) — detalle de PICKING en la hoja de armado: inicio y fin (evento TP:
+   ts_inicio / ts_cliente) y, por cada código de ESTA NP, lo que el picking marcó como
+   pickeado y como faltante. El picking es de la TANDA: las cantidades son las de la tanda
+   entera (si la tanda lleva varias NP, suman todas) y la hoja lo dice. El código del PKC va
+   sin L y con sufijo de empresa en los duales: se compara pelado (pkStripL, sin " LK"/" CH",
+   sin ceros a la izquierda). Sin PKC (picking fuera del flujo guiado) → la sección lo dice. */
+function _remitoPkKey(c){ var s = String(c || "").toUpperCase().replace(/\s+(LK|CH)$/, "").trim(); s = s.replace(/([0-9E])L$/, "$1"); return s.replace(/^0+(?=\w)/, ""); }
+function _remitoPickingDe(d, pkc, ts){
+  if (!pkc && !ts) return null;
+  var keys = {};
+  (d.arts || []).forEach(function (a){ keys[_remitoPkKey(a.cod)] = 1; });
+  (d.faltantes || []).forEach(function (f){ keys[_remitoPkKey(f.cod)] = 1; });
+  var lineas = [];
+  Object.keys(pkc || {}).forEach(function (k){ var x = pkc[k]; if (keys[_remitoPkKey(x.cod)]) lineas.push(x); });
+  lineas.sort(function (a, b){ return _remitoCodKey(a.cod) - _remitoCodKey(b.cod) || String(a.cod).localeCompare(String(b.cod)); });
+  return { ini: ts && ts.ini, fin: ts && ts.fin, lineas: lineas, hayPkc: !!pkc };
+}
+function _remitoHm(ts, soloHora){ if (!ts) return "—"; try { var o = { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ_AR }; if (!soloHora) { o.day = "2-digit"; o.month = "2-digit"; } return new Date(ts).toLocaleString("es-AR", o); } catch (_e){ return "—"; } }
+function _remitoPickingHtml(pk){
+  if (!pk) return "";
+  var dur = "";
+  if (pk.ini && pk.fin){ var m = Math.round((new Date(pk.fin) - new Date(pk.ini)) / 60000); if (m >= 0) dur = " · " + Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0") + " h"; }
+  var h = '<div class="rmt-sec">Picking</div>' +
+    '<div class="rmt-kv"><b>Inicio</b> ' + escapeHtml(_remitoHm(pk.ini)) + ' &nbsp; <b>Fin</b> ' + escapeHtml(_remitoHm(pk.fin)) + escapeHtml(dur) + '</div>';
+  if (!pk.lineas.length){ return h + '<div class="rmt-empty">' + (pk.hayPkc ? '— sin detalle de estos códigos —' : '— sin detalle por artículo (picking fuera del flujo guiado) —') + '</div>'; }
+  var rows = pk.lineas.map(function (x){
+    var f = Math.max(0, x.esp - x.real);
+    return '<tr' + (f ? ' style="font-weight:800;"' : '') + '><td class="rmt-cc rmt-cod">' + escapeHtml(x.cod) + '</td><td>' + x.esp + '</td><td>' + x.real + '</td><td>' + (f || '—') + '</td><td>' + escapeHtml(_remitoHm(x.ts, true)) + '</td></tr>';
+  }).join("");
+  return h + '<table class="rmt-table"><thead><tr><th class="rmt-cc">Cod</th><th>Pedido</th><th>Pick.</th><th>Falta</th><th>Hora</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div class="rmt-empty">Cantidades de la tanda entera (suma todas sus NP).</div>';
+}
 function armadoRemitoInnerHtml(d, tipo){
   tipo = (tipo === "FACTURADO") ? "FACTURADO" : "ARMADO";
   const artRows = d.arts.length ? d.arts.map(function(a){
@@ -53767,6 +53799,7 @@ function armadoRemitoInnerHtml(d, tipo){
       '<div class="rmt-col-r">' +
         '<div class="rmt-sec">Líos</div>' +
         '<table class="rmt-table"><thead><tr><th class="rmt-cc">Lío</th><th>Composición</th></tr></thead><tbody>' + lioRows + '</tbody></table>' +
+        _remitoPickingHtml(d.picking) +
       '</div>' +
     '</div>';
 }
@@ -53911,14 +53944,14 @@ async function _armadoRemitoDataForItems(items){
   const npInQ = items.map(function (x){ return encodeURIComponent('"' + String(x.np).replace(/"/g, "") + '"'); }).join(",");
   const tandas = items.map(function (x){ return String(x.tanda || "").toUpperCase(); }).filter(function (t, i, a){ return t && a.indexOf(t) === i; });
   const tIn = tandas.map(function (t){ return encodeURIComponent(t); }).join(",");
-  const ppMap = {}, faltMap = {}, pickByTanda = {};
+  const ppMap = {}, faltMap = {}, pickByTanda = {}, pickTsByTanda = {}, pkcByTanda = {};
   try {
     // v6.31 — además de la PPP (cliente/fecha), traemos faltantes (Entregas), el picker
     // por tanda (evento TP) y los nombres, para el remito ARMADO nuevo.
     const res = await Promise.all([
       fetch(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&np=in.(" + npIn + ")&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
       supaFetchAllSafe(SUPABASE_ENTREGAS_ENDPOINT, "select=np,cod_art,cajas_falto&np=in.(" + npIn + ")&cajas_falto=gt.0&order=id.asc"),
-      (tIn ? fetch(SUPABASE_TABLE_ENDPOINT + "?select=texto,legajo&opcion=eq.TP&texto=in.(" + tIn + ")&order=ts_cliente.desc&limit=2000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }) : Promise.resolve([])),
+      (tIn ? fetch(SUPABASE_TABLE_ENDPOINT + "?select=texto,legajo,ts_inicio,ts_cliente&opcion=eq.TP&texto=in.(" + tIn + ")&order=ts_cliente.desc&limit=2000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }) : Promise.resolve([])),
       (typeof getEmpleadosNombres === "function" ? getEmpleadosNombres().catch(function(){ return null; }) : Promise.resolve(null)),
       // v15.46 — el REMITO IMPRESO de una NP de la página salía con "Cliente —" y "Fecha Entrega —"
       // (caso real: NP CH 0005, tanda E12B, impreso el 11/09 11:18). Acá la cabecera se resolvía
@@ -53927,12 +53960,15 @@ async function _armadoRemitoDataForItems(items){
       // Recepción Remitos y en la lista de la Cola de impresión — faltaba la HOJA que se imprime,
       // que es la que mira el operario. Las web salen de gv_ppp_web_estado (np_label + cod_cliente
       // + razón social + fecha de entrega), la misma fuente que usan las otras dos pantallas.
-      fetch(SUPABASE_URL + "/rest/v1/gv_ppp_web_estado?select=np_label,cod_cliente,razon_social,fecha_entrega,tanda&np_label=in.(" + npInQ + ")&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; })
+      fetch(SUPABASE_URL + "/rest/v1/gv_ppp_web_estado?select=np_label,cod_cliente,razon_social,fecha_entrega,tanda&np_label=in.(" + npInQ + ")&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }),
+      // v25.43 (Luis) — detalle del PICKING en la hoja: los PKC de la tanda (tanda|cod|esperadas|reales|exc|emp).
+      (tandas.length ? fetch(SUPABASE_TABLE_ENDPOINT + "?select=texto,legajo,ts_cliente&opcion=eq.PKC&or=(" + tandas.map(function (t){ return "texto.like." + encodeURIComponent(t + "|*"); }).join(",") + ")&order=ts_cliente.asc&limit=5000", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function(){ return []; }) : Promise.resolve([]))
     ]);
     (res[0] || []).forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !ppMap[np]) ppMap[np] = { cod: String(x.cod || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10), tanda: String(x.tanda || "").trim().toUpperCase() }; });
     (res[4] || []).forEach(function (x){ const np = String(x.np_label || "").trim(); if (np && !ppMap[np]) ppMap[np] = { cod: String(x.cod_cliente || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10), tanda: String(x.tanda || "").trim().toUpperCase() }; });
     (res[1] || []).forEach(function (x){ const np = String(x.np || "").trim().replace(/\.0+$/, ""); const fl = Number(x.cajas_falto) || 0; if (np && fl > 0){ (faltMap[np] = faltMap[np] || []).push({ cod: String(x.cod_art || "").trim(), cajas: fl }); } });
-    (res[2] || []).forEach(function (x){ const t = String(x.texto || "").trim().toUpperCase(); if (t && !pickByTanda[t]) pickByTanda[t] = String(x.legajo || ""); });   // order desc → el último TP gana
+    (res[2] || []).forEach(function (x){ const t = String(x.texto || "").trim().toUpperCase(); if (t && !pickByTanda[t]) { pickByTanda[t] = String(x.legajo || ""); pickTsByTanda[t] = { ini: x.ts_inicio || null, fin: x.ts_cliente || null }; } });   // order desc → el último TP gana
+    (res[5] || []).forEach(function (x){ const pp = String(x.texto || "").split("|"); if (pp.length < 4) return; const t = String(pp[0] || "").trim().toUpperCase(); const cod = String(pp[1] || "").trim().toUpperCase(); if (!t || !cod) return; (pkcByTanda[t] = pkcByTanda[t] || {})[cod] = { cod: cod, esp: parseInt(pp[2], 10) || 0, real: parseInt(pp[3], 10) || 0, ts: x.ts_cliente || null }; });
   } catch (_e){}
   return items.map(function (it){
     const pd = ppMap[it.np] || {};
@@ -53947,7 +53983,10 @@ async function _armadoRemitoDataForItems(items){
       armadorLeg: it.armadorLeg || "", pickerLeg: pickByTanda[String(tanda).toUpperCase()] || "",
       faltantes: faltPref,
       artsFallback: Array.isArray(it.artsFallback) ? it.artsFallback : [] };   // v12.24 — Entregas_Virgilio como fuente cuando el TAL vino sin resumen
-    return armadoRemitoData(row);
+    const d = armadoRemitoData(row);
+    const tk = String(tanda).toUpperCase();
+    d.picking = _remitoPickingDe(d, pkcByTanda[tk] || null, pickTsByTanda[tk] || null);
+    return d;
   });
 }
 async function psPrintBatch(items){
@@ -57849,7 +57888,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.46"></script>
+<script src="importacion.js?v=25.47"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60650,7 +60689,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.46"></script>
+<script src="cobranzas.js?v=25.47"></script>
 
 </body>
 </html>
