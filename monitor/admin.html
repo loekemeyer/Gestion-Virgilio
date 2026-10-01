@@ -1896,7 +1896,7 @@ function popRitmo(leg, sub) {
     (hs > 0.05 ? ' (tiene ' + nH(hs) + ' h cargadas)' : '') + '</div>';
   /* v25.93 (Luis): Tanda · m³ · Min trab · Ritmo, y Total. Min trab = de punta a punta (apertura → cierre
      TP/TAP); las pausas adentro (baño, comida, limpieza, conteo, timbre, permiso) van entre paréntesis
-     «60 (-2)» y el ritmo se mide sobre lo trabajado neto. */
+     «60 (-2)» y el ritmo es el real, de punta a punta (Luis, v25.97). */
   var op = sub === "pick" ? "TP" : "TAP", PAUSA = { AT: 1, PB: 1, Limp: 1, PC: 1, CT: 1, Perm: 1 };
   var ms = function (x) { return new Date(x).getTime(); };
   var evs = (D.eventos || []).filter(function (ev) {
@@ -1915,10 +1915,10 @@ function popRitmo(leg, sub) {
     return Math.round(mi) + (r > 0 ? ' <span style="color:#fca5a5">(-' + r + ')</span>' : ''); };
   var tm = 0, tp = 0, body = pares.map(function (p) { var mi = mins[p[0]] || 0, pa = pmin[p[0]] || 0; tm += mi; tp += pa;
     return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + '</td><td>' + fm(mi, pa) + '</td><td>' +
-      rit(Number(p[1]) || 0, mi - pa) + '</td></tr>'; }).join("");
+      rit(Number(p[1]) || 0, mi) + '</td></tr>'; }).join("");
   return head + '<table class="pop-cmp"><thead><tr><th>Tanda</th><th>m³</th><th>Min trab</th><th>Ritmo m³/h</th></tr></thead><tbody>' +
     body + '<tr class="pop-tot"><td>Total</td><td>' + n1(tot) + '</td><td>' + fm(tm, tp) +
-    '</td><td>' + rit(tot, tm - tp) + '</td></tr></tbody></table>';
+    '</td><td>' + rit(tot, tm) + '</td></tr></tbody></table>';
 }
 function popHoras(leg) {
   /* v25.89 (Luis): dos columnas. Prod = SÓLO picking y armado; todo lo demás es No prod, tiempo muerto incluido. */
