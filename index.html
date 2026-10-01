@@ -3867,6 +3867,12 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
    a la izquierda para que no se toque sin querer al apuntarle al ↩ de al lado. */
 .pga-acc-b.cancel{ background:#fee2e2; color:#b91c1c; border-color:#fca5a5; margin-left:6px; }
 .pga-acc-b.cancel:hover{ background:#fecaca; }
+/* v25.71 (Luis) — Ver Picking / Armado de la tanda. Gris neutro para no confundir con el azul
+   de «Cambiar de día»; van después de ese grupo (y a la derecha si el grupo de supervisor no está). */
+.pga-acc-ver{ flex:0 0 auto; margin-left:8px; white-space:nowrap; }
+.pga-ninfo + .pga-acc-ver{ margin-left:auto; }
+.pga-acc-b.ver{ background:#f1f5f9; color:#334155; border-color:#cbd5e1; font-size:12.5px; padding:2px 9px; margin-left:6px; }
+.pga-acc-b.ver:hover{ background:#e2e8f0; }
 /* v18.40 (Luis) — el pop-up de «Enviar a programar»: qué NP se llevan, en qué estado están y
    qué tanda queda vacía. No es el de ATENCIÓN rojo (eso es Desarmar, que sí es permanente):
    acá el pedido no se pierde, se mueve. Azul, informativo, todas o ninguna. */
@@ -4073,7 +4079,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
      sueltas. Con la tanda CERRADA no existe esa fila, así que la columna vuelve a los 78 px y las
      9 columnas entran — que es cuando hace falta ver el desglose de la tanda. Abierta la tanda, la
      tabla scrollea a lo ancho y lo que se está mirando es la NP. */
-  .pga-cli, .pga-loc, .pga-ped, .pga-sub, .pga-acc{ white-space:normal; }
+  .pga-cli, .pga-loc, .pga-ped, .pga-sub, .pga-acc, .pga-acc-ver{ white-space:normal; }
   .pga-cli{ max-width:42vw; }
   .pga-acc-t{ display:none; }
   /* las pastillas de estado y el chip 🚚 son los pedacitos más anchos de esa columna: en el
@@ -4088,6 +4094,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
      encontrarlas. Van pegadas al texto y la fila puede cortar. */
   .pga-nrow, .pga-trow{ flex-wrap:wrap; }   /* v20.10: la fila de la tanda también envuelve */
   .pga-acc{ margin-left:0; padding-left:10px; }
+  .pga-acc-ver, .pga-ninfo + .pga-acc-ver{ margin-left:0; padding-left:10px; }
   .pga-its{ grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); }
   .pga th:first-child, .pga td:first-child{ position:sticky; left:0; z-index:1;
     box-shadow:inset -1px 0 0 #e2e8f0; }
@@ -6254,7 +6261,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.72"></script>
+<script type="module" src="recepcion.js?v=25.73"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10400,7 +10407,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.72";
+const APP_VERSION = "v25.73";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -40033,6 +40040,14 @@ function _pgaCuerpoHtml(dias, opts) {
                   + ' onclick="event.stopPropagation();pgaPruebaEliminar(\'' + escapeHtml(t.key) + '\')">🗑<span class="pga-acc-t"> Eliminar</span></button>'
                 : '') + '</span>'
             : '') +
+          // v25.71 (Luis): Ver las hojas de proceso de la tanda (picking y armado), como se
+          // imprimen; en blanco si todavía no pasó por esa etapa. Es sólo VER — van siempre.
+          '<span class="pga-acc-ver">' +
+            '<button class="pga-acc-b ver" title="Ver la hoja de PICKING de la tanda ' + escapeHtml(t.tanda) + ' — la misma que se imprime. En blanco si todavía no se pickeó."'
+              + ' onclick="event.stopPropagation();pgaVerPicking(\'' + escapeHtml(t.tanda) + '\')">📦<span class="pga-acc-t"> Picking</span></button>' +
+            '<button class="pga-acc-b ver" title="Ver el remito de ARMADO de la tanda ' + escapeHtml(t.tanda) + ' (uno por pedido) — el mismo que se imprime. En blanco si todavía no se armó."'
+              + ' onclick="event.stopPropagation();pgaVerArmado(\'' + escapeHtml(t.tanda) + '\')">🧰<span class="pga-acc-t"> Armado</span></button>' +
+          '</span>' +
         '</div></td>' +
         '<td>' + _pppFmtM3(t.m3) + '</td><td></td><td>' + t.nps + '</td>' +
         _pgaPctFila(t.est, t.nps, t.salio, t.estSal) + '</tr>';
@@ -53988,8 +54003,10 @@ function armadoRemitoData(row){
    OTRAS tareas del mismo legajo en esa ventana: se muestran, NO se descuentan) · legajo y nombre.
    Cuerpo: los códigos (pelados: 809E, no «809E LK») en el ORDEN DEL RECORRIDO, en dos columnas,
    con Sector (el primero del código por nombre; «—» si no tiene celda, como lo ve el operario) ·
-   Total cajas · Pickeo (✓ si salió todo, si no lo pickeado). Al costado: NP · Razón social · m³,
-   Total m³ y m³/hora. Es una hoja APARTE de la de armado por NP, que no se tocó.
+   Total cajas, que YA trae el resultado del picking (v25.71, Luis): ✓ si salió todo; si salió a
+   medias, el total tachado con una diagonal fina + lo pickeado al lado; si no salió nada, la fila
+   entera tachada (se ve lo que había). La columna «Pickeo» aparte desapareció. Al costado:
+   NP · Razón social · m³, Total m³ y m³/hora. Es una hoja APARTE de la de armado por NP.
    Fuente del detalle: los PKC (tanda|cod|esperadas|reales|exc|emp). La marca de "impresa"
    va a Impresion_NP con la clave "PK <tanda>" (no choca con ninguna NP real). */
 var PK_HOJA_PREFIJO = "PK ";
@@ -54066,15 +54083,28 @@ function pkHojaHtml(d){
     '.pkh table{border-collapse:collapse;}.pkh th,.pkh td{border:1px solid #888;padding:.12em .35em;text-align:center;white-space:nowrap;}' +
     '.pkh th{font-size:.85em;line-height:1.1;}.pkh-cod{font-family:Consolas,Menlo,monospace;font-weight:800;}' +
     '.pkh-f td{font-weight:800;}.pkh-np td{text-align:left;}.pkh-np td.n{text-align:center;}' +
-    '.pkh-tot{font-size:1.15em;font-weight:800;margin-top:.35em;text-align:center;}.pkh-m3h{font-size:1.3em;font-weight:800;margin-top:.25em;text-align:center;}</style>';
+    '.pkh-tot{font-size:1.15em;font-weight:800;margin-top:.35em;text-align:center;}.pkh-m3h{font-size:1.3em;font-weight:800;margin-top:.25em;text-align:center;}' +
+    '.pkh-ok{font-weight:800;font-size:1.15em;}' +
+    '.pkh-diag{position:relative;display:inline-block;padding:0 .18em;}' +
+    '.pkh-diag::after{content:"";position:absolute;left:0;right:0;top:0;bottom:0;background:linear-gradient(to top right,transparent calc(50% - .55px),#111 calc(50% - .55px),#111 calc(50% + .55px),transparent calc(50% + .55px));-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+    '.pkh-got{font-weight:800;margin-left:.35em;}' +
+    '.pkh-no td{color:#777;text-decoration:line-through;text-decoration-thickness:.6px;}.pkh-no .pkh-cod{color:#777;}</style>';
   var mitad = Math.ceil(d.lineas.length / 2);
+  // v25.71 (Luis): la columna «Pickeo» desaparece; el resultado va en «Total cajas».
+  //  · se pickeó todo → ✓   · a medias → total tachado (diagonal fina) + lo pickeado al lado
+  //  · no se pickeó nada (real 0 con esp>0) → la fila entera tachada, se ve lo que había.
+  var celdaTot = function (x){
+    if (x.esp <= 0) return String(x.esp);
+    if (x.real >= x.esp) return '<span class="pkh-ok">✓</span>';
+    if (x.real > 0) return '<span class="pkh-diag">' + x.esp + '</span><span class="pkh-got">' + x.real + '</span>';
+    return String(x.esp);
+  };
   var tabla = function (rows){
     if (!rows.length) return '';
-    return '<table><thead><tr><th>Cod</th><th>Sector</th><th>Total<br>cajas</th><th>Pickeo</th></tr></thead><tbody>' +
+    return '<table><thead><tr><th>Cod</th><th>Sector</th><th>Total<br>cajas</th></tr></thead><tbody>' +
       rows.map(function (x){
-        var f = x.esp - x.real;
-        var pk = (x.real >= x.esp) ? '✓' : String(x.real);
-        return '<tr' + (f > 0 ? ' class="pkh-f"' : '') + '><td class="pkh-cod">' + escapeHtml(x.cod) + '</td><td>' + escapeHtml((x.lug && x.lug.sector) || '—') + '</td><td>' + x.esp + '</td><td>' + pk + '</td></tr>';
+        var cls = (x.esp > 0 && x.real <= 0) ? 'pkh-no' : ((x.real < x.esp) ? 'pkh-f' : '');
+        return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="pkh-cod">' + escapeHtml(x.cod) + '</td><td>' + escapeHtml((x.lug && x.lug.sector) || '—') + '</td><td>' + celdaTot(x) + '</td></tr>';
       }).join('') + '</tbody></table>';
   };
   var npRows = d.nps.length ? d.nps.map(function (x){
@@ -54145,6 +54175,87 @@ async function pkHojaPendientes(){
   var imp = await j(SUPABASE_URL + "/rest/v1/Impresion_NP?select=np&np=in.(" + ts.map(function (t){ return encodeURIComponent('"' + PK_HOJA_PREFIJO + t + '"'); }).join(",") + ")");
   var ya = {}; (imp || []).forEach(function (x){ ya[String(x.np)] = 1; });
   return ts.filter(function (t){ return !ya[PK_HOJA_PREFIJO + t]; }).map(function (t){ return { tanda: t, legajo: String(by[t].legajo || ""), ts: by[t].ts_cliente }; });
+}
+/* ===== v25.71 (Luis, 01/10) — VER las hojas de proceso de una tanda desde Programación.
+   Al lado de «Cambiar de día», botones Picking y Armado: muestran la MISMA hoja que se
+   imprime (hoja de picking / remito de armado por NP). En blanco / sin datos completos si
+   la tanda todavía no pasó por esa etapa; como se imprimió cuando ya está hecha. Es sólo
+   VER: no toca nada. Reusa pkHojaDatos/pkHojaHtml y armadoRemitoData/armadoRemitoInnerHtml. */
+var _gvHojaPrint = null;
+function gvHojaClose(){ var ov = document.getElementById("gvHojaOv"); if (ov) ov.classList.remove("show"); }
+function gvHojaDoPrint(){ try { if (typeof _gvHojaPrint === "function") _gvHojaPrint(); } catch (_e){} }
+function gvHojaPreview(inner, printFn){
+  _gvHojaPrint = printFn || null;
+  if (!document.getElementById("gvHojaCss")){
+    var st = document.createElement("style"); st.id = "gvHojaCss";
+    st.textContent =
+      "#gvHojaOv{position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.6);display:none;overflow:auto;padding:14px;box-sizing:border-box;}" +
+      "#gvHojaOv.show{display:block;}" +
+      "#gvHojaOv .gvh-bar{position:sticky;top:0;z-index:2;display:flex;gap:8px;justify-content:flex-end;max-width:840px;margin:0 auto 10px;}" +
+      "#gvHojaOv .gvh-bar button{font:inherit;font-weight:800;cursor:pointer;border:1px solid #cbd5e1;border-radius:8px;padding:8px 14px;background:#fff;}" +
+      "#gvHojaOv .gvh-bar button.pr{background:#2563eb;color:#fff;border-color:#2563eb;}" +
+      "#gvHojaOv .gvh-sheet{background:#fff;max-width:840px;margin:0 auto;padding:18px 20px;border-radius:10px;box-shadow:0 12px 44px rgba(0,0,0,.35);}" +
+      REMITO_SHEET_CSS;
+    document.head.appendChild(st);
+  }
+  var ov = document.getElementById("gvHojaOv");
+  if (!ov){ ov = document.createElement("div"); ov.id = "gvHojaOv"; document.body.appendChild(ov); }
+  ov.innerHTML = '<div class="gvh-bar">' +
+    (printFn ? '<button class="pr" onclick="gvHojaDoPrint()">🖨️ Imprimir</button>' : '') +
+    '<button onclick="gvHojaClose()">Cerrar</button></div>' +
+    '<div class="gvh-sheet">' + inner + '</div>';
+  ov.classList.add("show");
+}
+async function pgaVerPicking(tanda){
+  tanda = String(tanda || "").trim().toUpperCase(); if (!tanda) return;
+  gvHojaPreview('<div style="padding:28px;text-align:center;color:#64748b;font:inherit;">Cargando picking de ' + escapeHtml(tanda) + '…</div>', null);
+  var d = null;
+  try { var ds = await pkHojaDatos([tanda]); d = ds && ds[0]; } catch (_e){}
+  if (!d){ gvHojaPreview('<div style="padding:28px;color:#64748b;">No pude traer el picking de ' + escapeHtml(tanda) + '. Probá de nuevo.</div>', null); return; }
+  gvHojaPreview(pkHojaHtml(d), function (){ try { remitoPrintDoc(pkHojaHtml(d)); } catch (_e){} });
+}
+/* Datos de armado por TANDA: una fila por NP (ISIS + web), con el resumen del TAL si ya se
+   armó. Sin TAL el remito sale en blanco (sólo cabecera), que es lo que se pidió. */
+async function pgaArmadoDatos(tanda){
+  tanda = String(tanda || "").trim().toUpperCase(); if (!tanda) return [];
+  var j = function (u){ return fetch(u, { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function (){ return []; }); };
+  var tE = encodeURIComponent(tanda);
+  var res = await Promise.all([
+    j(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,cod,razon_social,fecha_entrega,tanda&tanda=eq." + tE + "&limit=5000"),
+    j(SUPABASE_URL + "/rest/v1/gv_ppp_web_estado?select=np_label,cod_cliente,razon_social,fecha_entrega,tanda&tanda=eq." + tE + "&limit=5000"),
+    j(SUPABASE_TABLE_ENDPOINT + "?select=legajo,ts_cliente&opcion=eq.TP&texto=eq." + tE + "&order=ts_cliente.desc&limit=5")
+  ]);
+  var npMap = {};
+  (res[0] || []).forEach(function (x){ var np = String(x.np || "").trim().replace(/\.0+$/, ""); if (np && !npMap[np]) npMap[np] = { np: np, cod: String(x.cod || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10) }; });
+  (res[1] || []).forEach(function (x){ var np = String(x.np_label || "").trim(); if (np && !npMap[np]) npMap[np] = { np: np, cod: String(x.cod_cliente || "").trim(), rs: String(x.razon_social || "").trim(), fecha: String(x.fecha_entrega || "").slice(0, 10) }; });
+  var nps = Object.keys(npMap); if (!nps.length) return [];
+  var pickerLeg = (res[2] && res[2][0]) ? String(res[2][0].legajo || "") : "";
+  // TAL por NP (texto = np|lios|tanda|resumen|clase). El NP es el prefijo del texto.
+  var tal = {};
+  var orParts = nps.map(function (np){ return "texto.like." + encodeURIComponent(np + "|*"); });
+  for (var i = 0; i < orParts.length; i += 40){
+    var chunk = orParts.slice(i, i + 40);
+    var rows = await j(SUPABASE_TABLE_ENDPOINT + "?select=texto,legajo,ts_cliente&opcion=eq.TAL&or=(" + chunk.join(",") + ")&order=ts_cliente.desc&limit=5000");
+    (rows || []).forEach(function (ev){ var p = String(ev.texto || "").split("|"); var np = String(p[0] || "").trim().replace(/\.0+$/, ""); if (np && npMap[np] && !tal[np]) tal[np] = { lios: parseInt(p[1], 10) || 0, resumen: p[3] || "", clase: (p[4] || "").trim(), legajo: ev.legajo }; });
+  }
+  try { if (typeof getEmpleadosNombres === "function") await getEmpleadosNombres(); } catch (_e){}
+  return nps.sort(function (a, b){ return a.localeCompare(b); }).map(function (np){
+    var m = npMap[np], t = tal[np] || {};
+    return { np: np, cod: m.cod, rs: m.rs, tanda: tanda, fecha: m.fecha, salePpp: m.fecha,
+      resumen: t.resumen || "", clase: t.clase || "", lios: t.lios || 0,
+      armadorLeg: String(t.legajo || ""), pickerLeg: pickerLeg };
+  });
+}
+async function pgaVerArmado(tanda){
+  tanda = String(tanda || "").trim().toUpperCase(); if (!tanda) return;
+  gvHojaPreview('<div style="padding:28px;text-align:center;color:#64748b;font:inherit;">Cargando armado de ' + escapeHtml(tanda) + '…</div>', null);
+  var rows = [];
+  try { rows = await pgaArmadoDatos(tanda); } catch (_e){}
+  if (!rows.length){ gvHojaPreview('<div style="padding:28px;color:#64748b;">La tanda ' + escapeHtml(tanda) + ' no tiene pedidos para mostrar.</div>', null); return; }
+  if (!document.getElementById("rmtSheetCss")){ var st = document.createElement("style"); st.id = "rmtSheetCss"; st.textContent = REMITO_SHEET_CSS; document.head.appendChild(st); }
+  var inners = rows.map(function (r){ return armadoRemitoInnerHtml(armadoRemitoData(r)); });
+  var html = inners.map(function (h){ return '<div class="rmt-sheet" style="margin:0 auto 16px;">' + h + '</div>'; }).join('');
+  gvHojaPreview(html, function (){ var k = 0; var next = function (){ if (k >= inners.length) return; try { remitoPrintDoc(inners[k]); } catch (_e){} k++; if (k < inners.length) setTimeout(next, 2400); }; next(); });
 }
 function armadoRemitoInnerHtml(d, tipo){
   tipo = (tipo === "FACTURADO") ? "FACTURADO" : "ARMADO";
@@ -58270,7 +58381,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.72"></script>
+<script src="importacion.js?v=25.73"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61071,7 +61182,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.72"></script>
+<script src="cobranzas.js?v=25.73"></script>
 
 </body>
 </html>
