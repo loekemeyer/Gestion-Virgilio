@@ -28,16 +28,16 @@ const VIRGILIO_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
 const LK_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SRV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-// Lo que lee la Est. Madre en admin.js (cargarEstadisticaMadre). Consulta fija por nombre.
+// Lo que lee de LK la Est. Madre (est-madre.js, el módulo ÚNICO de LK y Gestión, v25.79).
+// Consulta fija por nombre. La lista de artículos y la Est Madre no pasan por acá: salen de
+// stocks_carga_rapida de Gestión, que el módulo lee con la clave pública de Gestión.
 const TABLAS: Record<string, string> = {
   "products": "products?select=cod,description,uxb,active,category&order=cod.asc",
   "loke_products": "loke_products?select=cod,description,uxb&order=cod.asc",
-  "sales_item_remap": "sales_item_remap?select=from_code,to_code&order=from_code.asc",
-  "sales_excluded_items": "sales_excluded_items?select=item_code&order=item_code.asc",
-  // get_estadistica_madre_cache() exige una fila en admins con auth.uid(): con service_role
-  // devolvería 0 filas. Se lee la tabla con la MISMA selección y el mismo orden que la función.
-  "rpc/get_estadistica_madre_cache":
-    "estadistica_madre_cache?select=cod,descripcion,familia,uxb,proy_uni_mes,proy_cajas_mes,total_unidades,meses,calculado_at&order=proy_uni_mes.desc.nullslast,cod.asc",
+  // Ventas por mes en cajas, por (artículo, empresa). La función deja pasar a service_role
+  // (además de los admins de LK): esta puerta ya validó que el JWT es de un supervisor.
+  "rpc/get_estadistica_madre_mensual":
+    "rpc/get_estadistica_madre_mensual?select=item,empresa,meses&order=item.asc,empresa.asc",
 };
 // El detalle de una celda (mostrarDetalleVentaMadre): no tiene chequeo de admins adentro.
 const RPC_DETALLE = "rpc/get_estadistica_madre_detail";
@@ -58,7 +58,7 @@ function json(body: unknown, status: number, origin: string | null): Response {
   });
 }
 
-// token -> vence (ms). Una carga de la Est. Madre son 5 pedidos: sin esto, 5 viajes a Gestión.
+// token -> vence (ms). Una carga de la Est. Madre son 3 pedidos: sin esto, 3 viajes a Gestión.
 const vistos = new Map<string, number>();
 
 // true = supervisor · false = no lo es / token vencido · null = Gestión no contestó.
