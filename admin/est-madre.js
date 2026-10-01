@@ -25,7 +25,7 @@
        empresa): los totales por mes no cuentan dos veces.
    Una lectura que falla NO se reemplaza por otra fuente ni por ceros: se dice que falló.
    ===================================================================================== */
-var EST_MADRE_VERSION = "v25.79";
+var EST_MADRE_VERSION = "v25.81";
 var EM_GV_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 // Clave pública de Gestión (es la misma que usa el front de Gestión para leer Stocks).
 var EM_GV_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -39,6 +39,11 @@ var _estMadreLoadedAt = null;
 var _estMadreCargando = false;
 // col: 'rank' | 'cod' | 'marca' | 'familia'. Default: mejor ranking (mayor Est Madre) primero.
 var _estMadreSort = { col: "rank", dir: "asc" };
+// v25.81 — switch Cajas / Unidades (Tomás Beviglia, 01/10/2026: "un switch de cajas a unidades para tener
+// ambos valores"). Unidades = cajas × uxb de Gestión (vista_uxb_articulo, la misma de Stocks). Un artículo
+// sin uxb NO se inventa: dice "s/uxb" y no suma al total en unidades. Se recuerda por navegador.
+var _estMadreUnidad = (function () { try { return localStorage.getItem("em_unidad") === "uni" ? "uni" : "caj"; } catch (e) { return "caj"; } })();
+var _estMadreUxbErr = null;   // si la lectura del uxb falló, el modo unidades queda apagado (no se muestra un 0)
 
 var EM_CSS = `
 /* =========================================================
@@ -472,12 +477,20 @@ var EM_CSS = `
 .est-madre-table td.est-madre-sec { color: #1e40af; font-weight: 700; font-size: 11px; white-space: nowrap; }
 .est-madre-table tr.est-madre-fila-sec td.est-madre-td-cod,
 .est-madre-table tr.est-madre-fila-sec td.est-madre-td-desc { color: #64748b; }
+/* v25.81 — switch Cajas / Unidades */
+.em-unidad-sw { display: inline-flex; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
+.em-unidad-sw button { width: auto; margin: 0; padding: 10px 14px; border: 0; background: #f9fafb; color: #374151;
+  font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
+.em-unidad-sw button + button { border-left: 1px solid #e5e7eb; }
+.em-unidad-sw button.on { background: #111; color: #fff; }
+.em-unidad-sw button:disabled { opacity: .45; cursor: not-allowed; }
+.est-madre-table td.em-sin-uxb { color: #b45309; font-size: 11px; font-weight: 700; }
 `;
 
 var EM_HTML =
   '<div class="page-header"><div>' +
     '<h1>Estadística Madre</h1>' +
-    '<p class="page-sub">Cajas vendidas por mes de cada artículo de <b>Stocks</b> de Gestión Virgilio. ' +
+    '<p class="page-sub">Cajas (o unidades, con el switch) vendidas por mes de cada artículo de <b>Stocks</b> de Gestión Virgilio. ' +
     '<b>Est Madre</b> es la misma columna «Est. Madre caj/mes» de Stocks: el principal suma a sus secundarios. ' +
     'Es un solo cuadro: el panel de LK y Gestión muestran este mismo.</p>' +
   '</div></div>' +
@@ -494,6 +507,13 @@ var EM_HTML =
         '<option value="36">Últimos 36 meses</option>' +
         '<option value="0">Todo el historial</option>' +
       '</select>' +
+    '</div>' +
+    '<div class="est-madre-range-wrap" style="min-width:auto">' +
+      '<label>Ver en</label>' +
+      '<div class="em-unidad-sw" id="estMadreUnidadSw">' +
+        '<button type="button" data-u="caj" onclick="setEstMadreUnidad(\'caj\')" title="Cajas, como Stocks">Cajas</button>' +
+        '<button type="button" data-u="uni" onclick="setEstMadreUnidad(\'uni\')" title="Unidades = cajas × unidades por caja (uxb de Gestión)">Unidades</button>' +
+      '</div>' +
     '</div>' +
     '<div class="est-madre-range-wrap" style="min-width:auto">' +
       '<label for="estMadreDisruptivasMonth">Mes a descargar</label>' +
@@ -568,6 +588,20 @@ async function _emLeerStocks() {
   }
   return out;
 }
+// Unidades por caja de Gestión (vista_uxb_articulo, la misma de Stocks). Mapa por código normalizado.
+async function _emLeerUxb() {
+  var out = {};
+  for (var off = 0; off < 20000; off += EM_PAGINA) {
+    var u = EM_GV_URL + "/rest/v1/vista_uxb_articulo?select=cod,uxb&order=cod.asc&limit=" + EM_PAGINA + "&offset=" + off;
+    var r = await fetch(u, { headers: { apikey: EM_GV_KEY, Authorization: "Bearer " + EM_GV_KEY }, cache: "no-store" });
+    if (!r.ok) throw new Error("uxb de Gestión respondió " + r.status);
+    var page = await r.json();
+    if (!Array.isArray(page)) throw new Error("uxb de Gestión no devolvió una lista");
+    page.forEach(function (x) { var k = _emNorm(x.cod), n = Number(x.uxb) || 0; if (k && n > 0 && !out[k]) out[k] = n; });
+    if (page.length < EM_PAGINA) break;
+  }
+  return out;
+}
 // Ventas por mes (LK). Se deduplica por (artículo, empresa): en Gestión la Edge Function
 // devuelve todo de una vez y no entiende el rango de la página.
 async function _emLeerMensual() {
@@ -599,7 +633,7 @@ async function _emLeerTabla(nombre, cols) {
 }
 
 // Arma las filas: UNA por fila visible de Stocks. Exportada para el test.
-function _emArmarFilas(stocks, mensual, prods, lokes) {
+function _emArmarFilas(stocks, mensual, prods, lokes, uxbMap) {
   var porItem = {};
   (mensual || []).forEach(function (r) {
     var k = _emNorm(r.item);
@@ -649,6 +683,7 @@ function _emArmarFilas(stocks, mensual, prods, lokes) {
       principal: r.familia_principal ? _emPad(_emBase(r.familia_principal)) : "",
       byYm: byYm,
       total: total,
+      uxb: (uxbMap && uxbMap[k] > 0) ? uxbMap[k] : null,
     });
   });
   // Ranking por Est Madre (1 = la mayor). El secundario no rankea: su venta está en el principal.
@@ -662,6 +697,7 @@ function _emArmarFilas(stocks, mensual, prods, lokes) {
 async function cargarEstadisticaMadre(forzar) {
   _emInyectarCss();
   if (!_emPintarPagina()) return;
+  _emPintarSwitch();
   if (_estMadreCargando) return;
   if (!forzar && _estMadreRows) { aplicarRangoEstadisticaMadre(); return; }
   _estMadreCargando = true;
@@ -676,9 +712,13 @@ async function cargarEstadisticaMadre(forzar) {
       _emLeerMensual(),
       _emLeerTabla("products", "cod,description,category"),
       _emLeerTabla("loke_products", "cod,description"),
+      _emLeerUxb().then(function (m) { _estMadreUxbErr = null; return m; },
+        function (e) { _estMadreUxbErr = (e && e.message) || String(e); console.error("[estMadre] uxb", e); return null; }),
     ]);
     if (!res[0].length) throw new Error("Stocks de Gestión vino vacío: no hay lista de artículos");
-    _estMadreRows = _emArmarFilas(res[0], res[1], res[2], res[3]);
+    _estMadreRows = _emArmarFilas(res[0], res[1], res[2], res[3], res[4]);
+    if (_estMadreUxbErr && _estMadreUnidad === "uni") _estMadreUnidad = "caj";
+    _emPintarSwitch();
     var ymSet = {};
     _estMadreRows.forEach(function (f) { Object.keys(f.byYm).forEach(function (ym) { ymSet[ym] = 1; }); });
     _estMadreAllYms = Object.keys(ymSet).sort();
@@ -713,7 +753,10 @@ function aplicarRangoEstadisticaMadre() {
   var status = document.getElementById("estMadreStatus");
   if (status) {
     var when = _estMadreLoadedAt ? _estMadreLoadedAt.toLocaleTimeString("es-AR") : "";
-    status.textContent = items.length + " artículos de Stocks · " + yms.length + " meses · leído " + when;
+    var sinUxb = items.filter(function (f) { return !f.uxb; }).length;
+    status.textContent = items.length + " artículos de Stocks · " + yms.length + " meses · leído " + when +
+      (_estMadreUnidad === "uni" ? " · en UNIDADES (cajas × uxb de Gestión" + (sinUxb ? "; " + sinUxb + " sin uxb no suman" : "") + ")" : "") +
+      (_estMadreUxbErr ? " · no se pudo leer el uxb: el modo unidades está apagado" : "");
     status.className = "cliente-lookup-status";
     status.style.display = "";
   }
@@ -767,6 +810,33 @@ function _emMesFmt(ym) {
   return meses[Number(m[2]) - 1] + " " + m[1].slice(2);
 }
 function _emNum(v) { var n = Math.round(Number(v) || 0); return n === 0 ? "—" : n.toLocaleString("es-AR"); }
+// Cajas -> lo que se muestra. En unidades, sin uxb devuelve null (nunca un 0 inventado).
+function _emV(it, cajas) {
+  var c = Number(cajas) || 0;
+  if (_estMadreUnidad !== "uni") return c;
+  return it.uxb ? c * it.uxb : null;
+}
+function _emPintarSwitch() {
+  var sw = document.getElementById("estMadreUnidadSw");
+  if (!sw) return;
+  Array.prototype.forEach.call(sw.querySelectorAll("button"), function (b) {
+    b.classList.toggle("on", b.dataset.u === _estMadreUnidad);
+    if (b.dataset.u === "uni") {
+      b.disabled = !!_estMadreUxbErr;
+      b.title = _estMadreUxbErr ? "No se pudo leer el uxb de Gestión: " + _estMadreUxbErr
+        : "Unidades = cajas × unidades por caja (uxb de Gestión)";
+    }
+  });
+}
+function setEstMadreUnidad(u) {
+  u = u === "uni" ? "uni" : "caj";
+  if (u === "uni" && _estMadreUxbErr) { _emPintarSwitch(); return; }
+  _estMadreUnidad = u;
+  try { localStorage.setItem("em_unidad", u); } catch (e) {}
+  _emPintarSwitch();
+  if (_estMadreRows) aplicarRangoEstadisticaMadre();
+}
+window.setEstMadreUnidad = setEstMadreUnidad;
 
 function _renderEstMadreTable(items, yms) {
   var table = document.getElementById("estMadreTable");
@@ -776,9 +846,10 @@ function _renderEstMadreTable(items, yms) {
   var totalsByYm = {};
   yms.forEach(function (ym) { totalsByYm[ym] = 0; });
   var totalEst = 0;
+  var uni = _estMadreUnidad === "uni";
   items.forEach(function (it) {
-    totalEst += Number(it.est || 0);
-    yms.forEach(function (ym) { totalsByYm[ym] += Number(it.byYm[ym] || 0); });
+    totalEst += _emV(it, it.est) || 0;
+    yms.forEach(function (ym) { totalsByYm[ym] += _emV(it, it.byYm[ym]) || 0; });
   });
   function flecha(col) {
     if (_estMadreSort.col !== col) return ' <span class="est-madre-sort-idle">↕</span>';
@@ -792,7 +863,8 @@ function _renderEstMadreTable(items, yms) {
     '<th class="est-madre-th-desc">Descripción</th>' +
     '<th class="est-madre-th-marca est-madre-sort-th' + cls("marca") + '" onclick="setEstMadreSort(\'marca\')" title="Ordenar por marca">Marca' + flecha("marca") + '</th>' +
     '<th class="est-madre-th-familia est-madre-sort-th' + cls("familia") + '" onclick="setEstMadreSort(\'familia\')" title="Ordenar por familia">Familia' + flecha("familia") + '</th>' +
-    '<th class="est-madre-th-em" title="Est Madre: cajas por mes, la misma columna de Stocks">Est Madre<br><small>caj/mes</small></th>';
+    (uni ? '<th class="est-madre-th-em" title="Est Madre en unidades: la columna de Stocks × unidades por caja">Est Madre<br><small>u/mes</small></th>'
+         : '<th class="est-madre-th-em" title="Est Madre: cajas por mes, la misma columna de Stocks">Est Madre<br><small>caj/mes</small></th>');
   yms.forEach(function (ym) {
     var y = ym.slice(0, 4);
     fila1 += '<th class="' + ((prevY && y !== prevY) ? "year-start" : "") + '">' + _emMesFmt(ym) + "</th>";
@@ -801,7 +873,7 @@ function _renderEstMadreTable(items, yms) {
   fila1 += "</tr>";
   var fila2 = '<tr class="est-madre-totals-row">' +
     '<th class="est-madre-th-rank"></th><th class="est-madre-th-cod"></th>' +
-    '<th class="est-madre-th-desc">Total por mes (cajas) →</th><th class="est-madre-th-marca"></th><th class="est-madre-th-familia"></th>' +
+    '<th class="est-madre-th-desc">Total por mes (' + (uni ? "unidades" : "cajas") + ') →</th><th class="est-madre-th-marca"></th><th class="est-madre-th-familia"></th>' +
     '<th class="est-madre-th-em">' + _emNum(totalEst) + "</th>";
   prevY = null;
   yms.forEach(function (ym) {
@@ -820,18 +892,23 @@ function _renderEstMadreTable(items, yms) {
     var pY = null;
     var codEsc = _escH(it.codLk), descEsc = _escH(it.desc);
     var celdas = yms.map(function (ym) {
-      var v = Math.round(it.byYm[ym] || 0);
+      var cj = Math.round(it.byYm[ym] || 0);
+      var vv = _emV(it, cj);
+      var v = vv == null ? null : Math.round(vv);
       var y = ym.slice(0, 4);
       var ys = (pY && y !== pY) ? " year-start" : "";
       pY = y;
-      if (v === 0) return '<td class="' + (ys + " zero").trim() + '">—</td>';
+      if (cj === 0) return '<td class="' + (ys + " zero").trim() + '">—</td>';
+      if (v == null) return '<td class="' + (ys + " em-sin-uxb").trim() + '" title="Sin unidades por caja en Gestión: ' + cj + ' cajas">s/uxb</td>';
       return '<td class="' + (ys + " est-madre-clickable").trim() + '" data-cod="' + codEsc + '" data-ym="' + ym +
         '" data-desc="' + descEsc + '" onclick="mostrarDetalleVentaMadre(this)" title="Click para ver detalle por cliente y provincia">' +
         v.toLocaleString("es-AR") + "</td>";
     }).join("");
     var em = it.secundario
       ? '<td class="est-madre-td-em est-madre-sec" title="Secundario: su venta se suma a la Est Madre de ' + _escH(it.principal) + '">→ ' + _escH(it.principal) + "</td>"
-      : '<td class="est-madre-td-em">' + _emNum(it.est) + "</td>";
+      : (_emV(it, it.est) == null && it.est
+        ? '<td class="est-madre-td-em em-sin-uxb" title="Sin unidades por caja en Gestión: ' + Math.round(it.est) + ' cajas">s/uxb</td>'
+        : '<td class="est-madre-td-em"' + (it.uxb ? ' title="' + it.uxb + ' u/caja"' : "") + '>' + _emNum(_emV(it, it.est)) + "</td>");
     return '<tr' + (it.secundario ? ' class="est-madre-fila-sec"' : "") + ">" +
       '<td class="est-madre-td-rank">' + (it._rank || "—") + "</td>" +
       '<td class="est-madre-td-cod">' + _escH(it.cod) + "</td>" +
@@ -874,18 +951,21 @@ function descargarEstadisticaMadreExcel() {
     var sortGuard = _estMadreSort; _estMadreSort = { col: "rank", dir: "asc" };
     _applyEstMadreSort(items);
     _estMadreSort = sortGuard;
-    var enc = ["Ranking", "Código", "Descripción", "Marca", "Familia", "Est Madre (caj/mes)"].concat(yms.map(function (ym) { return _emMesFmt(ym); }));
+    var uni = _estMadreUnidad === "uni";
+    var xv = function (it, c) { var v = _emV(it, c); return v == null ? (Number(c) ? "s/uxb" : 0) : Math.round(v); };
+    var enc = ["Ranking", "Código", "Descripción", "Marca", "Familia", "UxB", uni ? "Est Madre (u/mes)" : "Est Madre (caj/mes)"]
+      .concat(yms.map(function (ym) { return _emMesFmt(ym); }));
     var aoa = [enc];
     var totEst = 0, tot = {};
     yms.forEach(function (ym) { tot[ym] = 0; });
-    items.forEach(function (it) { totEst += it.est; yms.forEach(function (ym) { tot[ym] += Number(it.byYm[ym] || 0); }); });
-    aoa.push(["", "", "TOTAL POR MES (cajas)", "", "", Math.round(totEst)].concat(yms.map(function (ym) { return Math.round(tot[ym]); })));
+    items.forEach(function (it) { totEst += _emV(it, it.est) || 0; yms.forEach(function (ym) { tot[ym] += _emV(it, it.byYm[ym]) || 0; }); });
+    aoa.push(["", "", uni ? "TOTAL POR MES (unidades)" : "TOTAL POR MES (cajas)", "", "", "", Math.round(totEst)].concat(yms.map(function (ym) { return Math.round(tot[ym]); })));
     items.forEach(function (it) {
-      aoa.push([it._rank || "", it.cod, it.desc, it.marca || "", it.familia || "",
-        it.secundario ? "→ " + it.principal : Math.round(it.est)].concat(yms.map(function (ym) { return Math.round(Number(it.byYm[ym]) || 0); })));
+      aoa.push([it._rank || "", it.cod, it.desc, it.marca || "", it.familia || "", it.uxb || "",
+        it.secundario ? "→ " + it.principal : xv(it, it.est)].concat(yms.map(function (ym) { return xv(it, it.byYm[ym]); })));
     });
     var ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 8 }, { wch: 9 }, { wch: 34 }, { wch: 7 }, { wch: 16 }, { wch: 11 }].concat(yms.map(function () { return { wch: 8 }; }));
+    ws["!cols"] = [{ wch: 8 }, { wch: 9 }, { wch: 34 }, { wch: 7 }, { wch: 16 }, { wch: 5 }, { wch: 11 }].concat(yms.map(function () { return { wch: uni ? 9 : 8 }; }));
     ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: enc.length - 1 } }) };
     for (var f = 1; f < aoa.length; f++) {
       for (var c = 0; c < enc.length; c++) {
@@ -896,7 +976,7 @@ function descargarEstadisticaMadreExcel() {
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Estadistica Madre");
     var h = new Date();
-    XLSX.writeFile(wb, "estadistica_madre_" + h.getFullYear() + String(h.getMonth() + 1).padStart(2, "0") + String(h.getDate()).padStart(2, "0") + ".xlsx");
+    XLSX.writeFile(wb, "estadistica_madre_" + (uni ? "unidades_" : "") + h.getFullYear() + String(h.getMonth() + 1).padStart(2, "0") + String(h.getDate()).padStart(2, "0") + ".xlsx");
     restaurar();
   } catch (err) {
     console.error("descargarEstadisticaMadreExcel", err);

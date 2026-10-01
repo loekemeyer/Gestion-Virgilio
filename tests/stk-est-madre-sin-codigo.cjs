@@ -13,6 +13,9 @@
       archivo de al lado), y que las filas sean las de Stocks de Gestión (stocks_carga_rapida,
       sin las ocultas vacías), con «Est Madre» en el encabezado y ninguna «Proyección»;
       el dual en dos filas (LK / CH) y el secundario con «→ principal».
+   H) v25.81 (switch Cajas / Unidades): en Unidades cada valor es cajas × uxb de Gestión
+      (vista_uxb_articulo, clave pública); un artículo sin uxb dice «s/uxb» y no suma al total
+      (nunca un 0 inventado), y al volver a Cajas vuelven los números de Stocks.
    Sale 1 si falla. */
 const path = require("path");
 const fs = require("fs");
@@ -54,6 +57,8 @@ const DATOS = {
     { cod_cliente: "4188", business_name: "Orfali Alfredo Luciano", provincia: "Buenos Aires", boxes: 150, unidades: 1800,
       avg_monthly_units: 1120, ratio: 1.61, origen: "loke" }],
 };
+// Unidades por caja de Gestión: el 501 queda SIN uxb a propósito (tiene que decir «s/uxb»).
+const UXB = [{ cod: "505", uxb: 12 }, { cod: "437E", uxb: 24 }, { cod: "029", uxb: 12 }];
 // La lista de artículos y la Est Madre: Stocks de Gestión (con la clave pública de Gestión).
 const GV = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const STOCKS = [
@@ -110,6 +115,11 @@ const STOCKS = [
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(STOCKS),
         headers: { "Access-Control-Allow-Origin": "*" } });
     }
+    if (u.startsWith(GV + "/rest/v1/vista_uxb_articulo")) {
+      gvLecturas.push({ key: req.headers()["apikey"] || "" });
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(UXB),
+        headers: { "Access-Control-Allow-Origin": "*" } });
+    }
     if (u.startsWith(LK)) { fugas.push(req.method() + " " + u.replace(LK, "")); return route.abort(); }
     return route.abort();
   });
@@ -154,6 +164,27 @@ const STOCKS = [
     out.modulo = !!window.EstMadre && !!document.getElementById("estMadreCss");
     const st = document.getElementById("estMadreStatus");
     out.status = st ? st.textContent : null;
+    // H) switch Cajas / Unidades
+    const leer = () => Array.prototype.map.call(document.querySelectorAll("#estMadreTable tbody tr"), (tr) =>
+      Array.prototype.map.call(tr.children, (td) => td.textContent.trim()));
+    const fila = (fs, cod, marca) => fs.find((f) => f[1] === cod && (!marca || f[3] === marca));
+    const btnU = document.querySelector('#estMadreUnidadSw button[data-u="uni"]');
+    const btnC = document.querySelector('#estMadreUnidadSw button[data-u="caj"]');
+    out.switchCajasOn = !!btnC && btnC.classList.contains("on") && !!btnU && !btnU.disabled;
+    if (btnU) btnU.click();
+    const fu = leer();
+    const thU = document.querySelector("#estMadreTable thead").textContent;
+    const u505 = fila(fu, "505"), u437 = fila(fu, "437E", "LK"), u501 = fila(fu, "501");
+    out.uni = {
+      est505: u505 && u505[5], sep505: u505 && u505[6], est437: u437 && u437[5], est501: u501 && u501[5], sep501: u501 && u501[6],
+      enc: /u\/mes/.test(thU) && /unidades/.test(thU), on: !!btnU && btnU.classList.contains("on"),
+      totEst: (document.querySelector("#estMadreTable thead tr.est-madre-totals-row th.est-madre-th-em") || {}).textContent,
+      status: (document.getElementById("estMadreStatus") || {}).textContent || "",
+    };
+    if (btnC) btnC.click();
+    const fc = leer();
+    const c437 = fila(fc, "437E", "LK");
+    out.vuelveCajas = !!c437 && c437[5] === "36" && /caj\/mes/.test(document.querySelector("#estMadreTable thead").textContent);
     const d = await window.sb.rpc("get_estadistica_madre_detail", { p_item_code: "505", p_ym: "2026-09" });
     out.detalleFilas = d.data ? d.data.length : -1;
     out.detalleErr = d.error ? d.error.message : null;
@@ -185,7 +216,9 @@ const STOCKS = [
   const pass = r.embed && r.loadingOculto && r.loginOculto && r.shell && r.paginaActiva && r.tabla505 && r.tabla501 &&
     r.detalleFilas === 1 && !r.detalleErr && !!r.customersErr && !r.customersLlego &&
     r.cargaCompleta && r.soloLista && r.todasConToken && r.detalleArgs && r.fugasEmbed === 0 && r.sueltoEmbed === false &&
-    r.nFilas === 5 && r.dual && r.secundario && r.encabEstMadre && r.sinProyeccion && r.sinCarton && r.modulo && r.gvLeido && r.moduloUnico;
+    r.nFilas === 5 && r.dual && r.secundario && r.encabEstMadre && r.sinProyeccion && r.sinCarton && r.modulo && r.gvLeido && r.moduloUnico &&
+    r.switchCajasOn && r.uni.on && r.uni.enc && r.uni.est505 === "26.436" && r.uni.sep505 === "27.000" && r.uni.est437 === "864" &&
+    r.uni.est501 === "s/uxb" && r.uni.sep501 === "s/uxb" && r.uni.totEst === "27.444" && /1 sin uxb/.test(r.uni.status) && r.vuelveCajas;
   console.log("stk-est-madre-sin-codigo:", JSON.stringify(r), "· llamadas:", pathsLlamados.join(","),
     "· fugas a LK (iframe):", fugasEmbed.length ? fugasEmbed.join(" | ") : "ninguna",
     "· pageerrors:", errs.length ? errs.join("|").slice(0, 300) : "none", "·", pass ? "✓ OK" : "✗ FAIL");
