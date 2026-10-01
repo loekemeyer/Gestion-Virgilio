@@ -5357,6 +5357,10 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
 
 ## ⚠ REGLA (Luis, 2026-10-01, v25.82): 5 MIN DE TIEMPO MUERTO → CARTEL CON ALARMA EN LOS MONITORES — y Bajar de racks es una tarea abierta
 
+> ## ⛔ **v25.88 (Luis, 01/10: *"urgente, saca la alarma"*): LA ALARMA ESTÁ APAGADA.** `gv_alertas_inactivo_vivas()` devuelve vacío
+> (`where false`), ningún monitor carga `alerta-inactivo.js` y el celular no llama `gv_alerta_inactivo_abrir`. El archivo, la tabla
+> y las RPC quedan para volver. **No reponerla sin que Luis la pida.** `tests/alerta-inactivo.cjs` es candado invertido.
+
 - **El celular** del operario, al llegar a **5 min** de tiempo muerto en la botonera, llama `gv_alerta_inactivo_abrir(legajo)`
   (una sola alerta viva por legajo; la marca queda en `localStorage gv_tm_alerta::<legajo>`). Al registrar la próxima tarea
   (`tmMarcarEvento`, desde `enqueueReport`) llama `gv_alerta_inactivo_cerrar`. Tabla `GV_Alerta_Inactivo` (RLS cerrada, sólo RPC).

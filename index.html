@@ -6269,7 +6269,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.87"></script>
+<script type="module" src="recepcion.js?v=25.88"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -9238,7 +9238,7 @@ function _tmPintar() {
   var seg = Math.max(0, (ahora - Math.min(ref, ahora)) / 1000);
   el.textContent = _tmFmt(seg);
   box.classList.toggle("tm-alto", seg >= 30 * 60);
-  if (seg >= TM_ALERTA_SEG) _tmAlertaAbrir(_tm.leg);
+  /* v25.88 (Luis, 01/10: "saca la alarma"): la alarma de 5 min está APAGADA. */
 }
 /* v25.79 (Luis, 01/10) — a los 5 min de tiempo muerto el celular avisa a los MONITORES
    (gv_alerta_inactivo_abrir → GV_Alerta_Inactivo; la TV lo lee y saca el pop-up con alarma).
@@ -10462,7 +10462,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.87";
+const APP_VERSION = "v25.88";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -58540,7 +58540,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.87"></script>
+<script src="importacion.js?v=25.88"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61341,7 +61341,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.87"></script>
+<script src="cobranzas.js?v=25.88"></script>
 
 </body>
 </html>
