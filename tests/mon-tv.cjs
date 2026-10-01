@@ -358,13 +358,10 @@ function responder(url) {
   ok(!/>Zona</.test(r.tandas) && !/>Días</.test(r.tandas), "volvió una columna que Luis sacó de la tabla (v23.92)");
   ok(/98801/.test(r.tandas) && /Bazar Mandarin/.test(r.tandas),
      "la tabla tiene que mostrar el cliente y las NP de la tanda");
-  /* v24.92 (Luis): «si hay más NPs de las que entran, que rote estilo cartel de Wall Street». */
-  const tkE32 = r.ticker.find((x) => /^E32A/.test(x.tanda)), tkE31 = r.ticker.find((x) => /^E30A/.test(x.tanda));
-  ok(tkE32 && tkE32.rota && tkE32.anim === "ticker", "E32A tiene 9 NP y no entran: la celda tiene que rotar " + JSON.stringify(tkE32));
-  ok(tkE32 && /98818/.test(tkE32.txt) && (tkE32.txt.match(/98803/g) || []).length === 2,
-     "el cartel rotativo tiene que llevar TODAS las NP, duplicadas para girar sin salto " + JSON.stringify(tkE32));
-  ok(tkE31 && !tkE31.rota && tkE31.anim === "none", "E30A tiene pocas NP: tiene que quedar quieta " + JSON.stringify(tkE31));
-  ok(r.ticker.every((x) => x.lineas === 1), "las NP van en UNA línea: " + JSON.stringify(r.ticker.map((x) => x.lineas)));
+  /* v25.54 (Luis): la columna NP dice CUÁNTAS NP lleva la tanda (la lista va en el title). */
+  ok(/<td class="num t-np" title="[^"]*98818[^"]*">9</.test(r.tandas),
+     "E32A tiene 9 NP: la columna NP tiene que decir 9 (y la lista en el title)");
+  ok(!/class="t-np"[^>]*><div>/.test(r.tandas), "la columna NP volvió a ser la lista rotativa");
   ok(!/Z3 CO/.test(r.tandas) && !/CABA/.test(r.tandas), "la zona salió de la tabla");
   ok((r.tandas.match(/E30A/g) || []).length === 1, "E30A aparece más de una vez: la tanda va en UNA fila");
   ok(/3,3/.test(r.tandas), "falta la columna de m³ (E30A = 2,5 de ISIS + 0,8 de la web)");
