@@ -112,7 +112,9 @@
       "Bash(sed -i 's/v25\\\\.21 \\(Luis: \"mucho texto/v25.30 \\(Luis: \"mucho texto/' recepcion.js)",
       "Bash(node scripts/bump-version.cjs 25.30)",
       "Bash(node scripts/bump-version.cjs 25.33)",
-      "Bash(node tests/mon-tv.cjs)"
+      "Bash(node tests/mon-tv.cjs)",
+      "Bash(sed -i 's/v25\\\\.36 \\(Luis\\)/v25.43 \\(Luis\\)/; s/v25\\\\.36: el chip/v25.43: el chip/' index.html tests/run.sh tests/pipe-sin-respuesta-filtra.cjs)",
+      "Bash(sed -i 's/^\\\\/\\\\/ v25\\\\.36/\\\\/\\\\/ v25.43/' tests/pipe-sin-respuesta-filtra.cjs)"
     ]
   }
 }

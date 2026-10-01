@@ -930,7 +930,8 @@ button {
 .pipe-vinc{ display:block; margin-top:3px; font-size:11px; color:#0f766e; font-weight:700; }
 .pipe-vencido{ color:#b91c1c !important; font-weight:800; }
 .pipe-badge-venc{ margin-left:10px; padding:3px 9px; border-radius:999px; background:#fee2e2;
-  color:#991b1b; font-size:12px; font-weight:800; }
+  color:#991b1b; font-size:12px; font-weight:800; cursor:pointer; }
+.pipe-badge-venc.on{ background:#b91c1c; color:#fff; }
 .pipe-cerrado{ font-size:12px; color:#166534; font-weight:700; }
 .pipe-cerrado-no{ color:#9f1239; }
 
@@ -6236,7 +6237,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.42"></script>
+<script type="module" src="recepcion.js?v=25.43"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10281,7 +10282,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.42";
+const APP_VERSION = "v25.43";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -48087,6 +48088,11 @@ function aprColAvisosVend() {
   else h += '<div class="avv-lista">' + abiertos.concat(todos.filter(function (a) { return a.resuelto_at; })).map(avVendFila).join('') + '</div>';
   return h + '</div>';
 }
+function pipeSoloVencToggle() {
+  _apr.pipeSoloVenc = !_apr.pipeSoloVenc;
+  if (_apr.pipeSoloVenc && aprColapsado("vir_cli_colapsado")) aprSetColapsado("vir_cli_colapsado", false);
+  aprRender();
+}
 function aprCliColapsar() { aprSetColapsado("vir_cli_colapsado", !aprColapsado("vir_cli_colapsado")); aprRender(); }
 /* 3 badges separados (suspendido/deuda/límite), sólo los que aplican. */
 /* v15.04 (dueño: "que diga ahí el motivo de la cuarentena: ej deuda $10000") — los
@@ -50258,14 +50264,22 @@ function pipeHtml() {
       'pago se programa). Acá cae el pedido cuyo único motivo de retención es ser cliente nuevo: si además ' +
       'tiene deuda o está suspendido, primero pasa por Cuarentena.">ⓘ</span>';
   const venc = cargando ? 0 : pipeVencidos();
-  if (venc) h += '<span class="pipe-badge-venc" title="Pedidos que pasaron el tope de espera de su etapa. ' +
-    'NO se cancelan solos: hay que mirarlos.">⏰ ' + venc + ' sin respuesta</span>';
+  // v25.43 (Luis): el chip estaba ADENTRO del título plegable, así que tocarlo plegaba el cuadro y
+  // los pedidos no aparecían. Ahora filtra la tabla a los vencidos (y despliega si estaba plegado).
+  if (venc) h += '<span class="pipe-badge-venc' + (_apr.pipeSoloVenc ? ' on' : '') +
+    '" onclick="event.stopPropagation();pipeSoloVencToggle()" title="' +
+    (_apr.pipeSoloVenc ? 'Mostrando sólo los vencidos. Tocá para ver todos.' :
+      'Pedidos que pasaron el tope de espera de su etapa. NO se cancelan solos: tocá para verlos.') +
+    '">⏰ ' + venc + ' sin respuesta' + (_apr.pipeSoloVenc ? ' ✕' : '') + '</span>';
+  if (!venc && _apr.pipeSoloVenc) _apr.pipeSoloVenc = false;
   h += '</div>';
   if (_cliCol) return h + '</div>' + pipeFirmaHtml() + pipeVincHtml();
 
   if (!_apr.listo) return h + '<div class="apr-cargando apr-cargando-cuar"><span class="apr-cargando-ic">⏳</span><b>Cargando…</b></div></div>' + pipeFirmaHtml() + pipeVincHtml();
 
-  const lista = pipeLista();
+  const lista = _apr.pipeSoloVenc
+    ? pipeLista().filter(function (p) { const e = pipeEst(p); return e && e.vencido; })
+    : pipeLista();
   pipeNeed(); pipeCfgNeed(); clinNuevosValorNeed(); clinDtoPagoNeed(); clinCuitNeed(); clinWppNeed(); cuarComNeed(); clinTickStart();
   cuarPartidosNeed();   // v23.06 (Luis, 28/09): el pedido partido va en UNA fila, como en Cuarentena
 
@@ -57835,7 +57849,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.42"></script>
+<script src="importacion.js?v=25.43"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60636,7 +60650,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.42"></script>
+<script src="cobranzas.js?v=25.43"></script>
 
 </body>
 </html>
