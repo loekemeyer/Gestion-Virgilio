@@ -1,4 +1,4 @@
-// v25.59 — Control Remitos: un CR ANTERIOR a un FSS no cuenta (la NP volvió y se re-entrega). Caso LK 0122.
+// v25.60 — Control Remitos: un CR ANTERIOR a un FSS no cuenta (la NP volvió y se re-entrega). Caso LK 0122.
 const fs = require("fs");
 const src = fs.readFileSync(__dirname + "/../index.html", "latin1");
 const i = src.indexOf("async function fetchCCRData()"); const j = src.indexOf("\nfunction _liosCajasCell", i);
