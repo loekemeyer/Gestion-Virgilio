@@ -133,11 +133,20 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
     await esperar(() => document.getElementById("pppMovOverlay") && document.getElementById("pppMovOverlay").classList.contains("show"));
     out.npsDespues = document.querySelectorAll("#pppPreview tr.pga-n").length;
 
-    // (b) el pop-up, con los datos del árbol
+    // v25.77: el botón de la fila abre «Modificar tanda» (submenu: Cambiar de día / Partir tanda).
+    await esperar(() => !!document.querySelector("#pppMovBody .mv-esp-b.nueva"));
+    out.modificarCambiar = [...document.querySelectorAll("#pppMovBody .mv-esp-b")].some((x) => /Cambiar de d/.test(x.textContent));
+    out.modificarPartir = [...document.querySelectorAll("#pppMovBody .mv-esp-b")].some((x) => /Partir tanda/.test(x.textContent));
+    for (let i = 0; i < 3; i++) {
+      const bc = [...document.querySelectorAll("#pppMovBody .mv-esp-b")].find((x) => /Cambiar de d/.test(x.textContent));
+      if (bc) bc.click();
+      if (await esperar(() => (document.querySelectorAll("#pppMovBody .mv-d") || []).length > 0, 8000)) break;
+    }
+
+    // (b) el pop-up de días, con los datos del árbol
     const ov = document.getElementById("pppMovOverlay");
     out.popupAbierto = !!ov && ov.classList.contains("show");
     out.titulo = (document.getElementById("pppMovTitle") || {}).textContent || "";
-    await esperar(() => (document.querySelectorAll("#pppMovBody .mv-d") || []).length > 0);
     out.sub = (document.querySelector("#pppMovBody .mv-sub") || {}).textContent || "";
     out.pidioCalendario = rpc.some((x) => x.fn === "gv_ppp_web_calendario");
 
@@ -245,7 +254,12 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
     const ovAbierto = () => { const o = document.getElementById("pppMovOverlay"); return !!o && o.classList.contains("show"); };
     for (let i = 0; i < 3; i++) { bta.click(); if (await esperar(ovAbierto, 8000)) break; }
     out.tituloAtr = (document.getElementById("pppMovTitle") || {}).textContent || "";
-    await esperar(() => (document.querySelector("#pppMovBody .mv-sub") || {}).textContent);
+    // v25.77: pasar por «Cambiar de día» del submenu Modificar para llegar al pop-up de días
+    for (let i = 0; i < 3; i++) {
+      const bc = [...document.querySelectorAll("#pppMovBody .mv-esp-b")].find((x) => /Cambiar de d/.test(x.textContent));
+      if (bc) bc.click();
+      if (await esperar(() => /0,8|0\.8/.test((document.querySelector("#pppMovBody .mv-sub") || {}).textContent || ""), 8000)) break;
+    }
     out.subAtr = (document.querySelector("#pppMovBody .mv-sub") || {}).textContent || "";
 
     out.errs = [];
@@ -258,8 +272,9 @@ F.hoyC = F.hoy.replace(/-/g, ""); F.d1C = F.d1.replace(/-/g, ""); F.d2C = F.d2.r
   if (!r.hayBoton) console.log("DUMP:", (r.dump||"").slice(0,1200));
   ok(r.hayFilaTanda, "la tabla dibuja la fila de la tanda");
   ok(r.hayBoton, "(a) cada tanda trae el botón");
-  ok(/Cambiar de d[ií]a/.test(r.textoBoton), "(a) y dice «Cambiar de día»", JSON.stringify(r.textoBoton));
-  ok(/TODA la tanda/.test(r.titleBoton), "(a) el tooltip avisa que mueve la tanda entera");
+  ok(/Modificar tanda/.test(r.textoBoton), "(a) y dice «Modificar tanda»", JSON.stringify(r.textoBoton));
+  ok(/PARTIRLA|Modificar la tanda/.test(r.titleBoton), "(a) el tooltip menciona cambiar de día o partir");
+  ok(r.modificarCambiar && r.modificarPartir, "(a) el pop-up Modificar ofrece «Cambiar de día» y «Partir tanda»");
   ok(r.npsAntes === 0 && r.npsDespues === 0, "(a) tocarlo NO despliega la tanda", r.npsAntes + "→" + r.npsDespues);
   ok(r.popupAbierto, "(b) abre el pop-up de días");
   ok(/Cambiar de d[ií]a/.test(r.titulo) && /E01A/.test(r.titulo), "(b) con la tanda en el título", JSON.stringify(r.titulo));

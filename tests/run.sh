@@ -578,6 +578,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== ppp-tanda-cambiar-dia (v19.11: el botón 📅 Cambiar de día en cada tanda, en Programación y en Pedidos atrasados) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-tanda-cambiar-dia.cjs
+echo "== ppp-partir-tanda (v25.77: «Modificar tanda» → «Partir tanda», sacar NP a una tanda nueva) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-partir-tanda.cjs
 
 echo "== ppp-armados-espera (v19.29: el día «⏸ Armados en espera», lo armado a propósito sin fecha de entrega) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-armados-espera.cjs
