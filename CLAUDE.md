@@ -6954,6 +6954,9 @@ más actualizado que otro. Si alguien quiere cambiar uno solo NO se puede hacer"
 - ⚠ **El cargador es el mismo en los dos repos**: `tests/est-madre-unica.cjs` (acá y en `pagina-LK-copia`) tiene su
   huella md5 y falla si alguno vuelve a tener una Est. Madre propia. Cambiar el cargador = cambiarlo en los dos y
   actualizar la huella en los dos tests, en el mismo pedido.
+- **Gestión entera lee la Est. Madre única** (v25.84): el último lector de la cruda `proyeccion_madre` era el aviso de
+  rotación de `recepcion.js`; ahora lee `gv_proyeccion_articulo` y un secundario rota lo de su principal. La cruda sólo la leen
+  `gv_proyeccion_articulo` y la copia `GP2.est_madre` (trigger `fn_est_madre_sync`; pasarla a la única es decisión de GP2).
 - **Switch Cajas / Unidades** (v25.81, Tomás): unidades = cajas × uxb de `vista_uxb_articulo` de Gestión (la de Stocks); sin uxb
   dice «s/uxb» y no suma al total (al 01/10: 4 de 353 — 1546903, 581T, 633E, 637E). Si el uxb no se puede leer, el modo unidades
   queda apagado. El Excel sigue el switch y lleva siempre la columna UxB. El ranking es siempre el de cajas (el de Stocks).
