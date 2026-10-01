@@ -118,7 +118,9 @@
       "Bash(sed -i 's/\"⚠ Van justos\"\\) + \" · faltan \"/\"⚠ Van atrasados\"\\) + \" · faltan \"/' monitor/tv.html && grep -c \"Van atrasados\" monitor/tv.html && node tests/mon-tv.cjs | tail -1 && node tests/tv-meta-camion.cjs | tail -1 && node scripts/bump-version.cjs --patch | tail -1 && git add -A && git commit -qm \"$\\(grep -o 'APP_VERSION *= *\"[^\"]*\"' index.html | grep -o '[0-9.]*'\\): TV — «Van atrasados» en vez de «Van justos» *)",
       "Bash(sed -i 's/v25\\\\.48 \\(Luis\\): en Cuarentena/v25.49 \\(Luis\\): en Cuarentena/' sql/gv_cuarentena_deuda_5dias_v2545.sql)",
       "Bash(sed -i 's/## ⚠ REGLA \\(Luis, 2026-10-01, v25.48\\): en CUARENTENA/## ⚠ REGLA \\(Luis, 2026-10-01, v25.49\\): en CUARENTENA/' CLAUDE.md)",
-      "Bash(BUMP_FORZAR=0 node scripts/bump-version.cjs 25.49)"
+      "Bash(BUMP_FORZAR=0 node scripts/bump-version.cjs 25.49)",
+      "Bash(sed -i 's/v25\\\\.48 \\(Luis, 01\\\\/10\\) — HOJA DE PICKING/v25.50 \\(Luis, 01\\\\/10\\) — HOJA DE PICKING/; s/\\\\/\\\\/ v25\\\\.48 — HOJA DE PICKING al terminar/\\\\/\\\\/ v25.50 — HOJA DE PICKING al terminar/; s/\\\\/\\\\/ v25\\\\.48 — hojas de PICKING/\\\\/\\\\/ v25.50 — hojas de PICKING/; s/\\\\/\\\\/ v25\\\\.48 — primero las hojas/\\\\/\\\\/ v25.50 — primero las hojas/' index.html)",
+      "Bash(sed -i 's/v25\\\\.48/v25.50/' tests/pk-hoja-picking.cjs tests/run.sh)"
     ]
   }
 }

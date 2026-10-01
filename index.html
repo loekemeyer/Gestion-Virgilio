@@ -36885,20 +36885,28 @@ async function openColaImpresion(keepOpen) {
   try {
     var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     var rows = await fetch(SUPABASE_URL + "/rest/v1/gv_vista_cola_impresion?select=np,tanda,razon_social,armado_ts,vencido,resumen,armador_leg,arts_fallback,faltantes_fallback&order=armado_ts.asc&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
-    _colaImp = { items: rows || [] };
+    var pkh = []; try { pkh = await pkHojaPendientes(); } catch (_e) {}
+    _colaImp = { items: rows || [], pkh: pkh || [] };
     colaImpRender();
   } catch (e) { if (body) body.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
 function colaImpRender() {
   var body = document.getElementById("colaImpBody"); if (!body || !_colaImp) return;
   var items = _colaImp.items || [];
+  var pkh = _colaImp.pkh || [];
   var venc = items.filter(function (x) { return x.vencido; }).length;
   var h = '';
+  // v25.50 — hojas de PICKING (una por tanda) que todavía no salieron.
+  var pkhHtml = '<div style="font-weight:800;color:#0f172a;margin:4px 0 6px;">📋 Hojas de picking pendientes (' + pkh.length + ')</div>' +
+    (pkh.length ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">' + pkh.map(function (x) {
+      return '<button onclick="pkHojaImprimir([\'' + escapeHtml(x.tanda) + '\']).then(function(){ setTimeout(function(){ openColaImpresion(true); }, 1500); })" style="width:auto;margin:0;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;font-weight:800;cursor:pointer;font-size:13px;">🖨️ ' + escapeHtml(x.tanda) + ' <span style="color:#64748b;font-weight:600;">· ' + escapeHtml(npcNombre(x.legajo)) + ' · ' + _colaImpHace(x.ts) + '</span></button>';
+    }).join('') + '</div>' : '<div style="color:#94a3b8;font-size:13px;margin-bottom:12px;">Ninguna.</div>');
   h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">' +
-    '<button onclick="colaImprimirTodas()" style="background:#1e40af;color:#fff;border:none;border-radius:9px;padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;width:auto;">🖨️ Imprimir todas (' + items.length + ')</button>' +
+    '<button onclick="colaImprimirTodas()" style="background:#1e40af;color:#fff;border:none;border-radius:9px;padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;width:auto;">🖨️ Imprimir todas (' + (items.length + pkh.length) + ')</button>' +
     '<button onclick="openColaImpresion()" style="background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:9px 13px;font-weight:800;cursor:pointer;width:auto;">↻ Actualizar</button></div>';
   h += '<div style="font-size:12px;color:#64748b;margin-bottom:8px;">Imprime el <b>remito de armado</b> de cada NP (se genera en la app desde lo armado — no usa la carpeta de PDF). Con Chrome en modo <b>--kiosk-printing</b> salen solas a la impresora predeterminada; si no, un diálogo por hoja.</div>';
   h += '<div id="colaImpStatus" style="font-size:12.5px;color:#334155;margin-bottom:8px;min-height:16px;"></div>';
+  h += pkhHtml;
   if (venc) h += '<div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:9px;padding:9px 12px;font-weight:800;margin-bottom:10px;">⚠ ' + venc + ' nota(s) de pedido hace +24 h sin imprimir.</div>';
   if (!items.length) { body.innerHTML = h + '<div style="padding:20px;text-align:center;color:#94a3b8;">No hay notas de pedido pendientes de imprimir. 👍</div>'; return; }
   var thc = 'text-align:left;padding:7px 9px;background:#f1f5f9;color:#475569;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;';
@@ -36932,9 +36940,13 @@ async function colaImprimirTodas() {
     var ff = Array.isArray(x.faltantes_fallback) ? x.faltantes_fallback : [];
     return af.length > 0 || ff.length > 0;
   });
-  if (!items0.length) { alert("No hay notas de pedido con armado (resumen o entregas) para imprimir."); return; }
+  var pkh0 = (_colaImp && _colaImp.pkh) ? _colaImp.pkh.map(function (x) { return x.tanda; }) : [];
+  if (!items0.length && !pkh0.length) { alert("No hay notas de pedido ni hojas de picking para imprimir."); return; }
   _colaImpBusy = true;
   try {
+    // v25.50 — primero las hojas de picking (una por tanda), después los remitos de armado.
+    if (pkh0.length) { colaImpStatus("Imprimiendo " + pkh0.length + " hoja(s) de picking…"); await pkHojaImprimir(pkh0); if (items0.length) await new Promise(function (r) { setTimeout(r, 2600 * pkh0.length); }); }
+    if (!items0.length) { colaImpStatus("🖨️ Mandé a imprimir " + pkh0.length + " hoja(s) de picking.", true); setTimeout(function () { openColaImpresion(true); }, 1600); return; }
     colaImpStatus("Preparando " + items0.length + " remito(s)…");
     var items = items0.map(function (x) { return { np: x.np, tanda: (x.tanda === "—" ? "" : x.tanda), resumen: x.resumen, armadorLeg: x.armador_leg || "", artsFallback: Array.isArray(x.arts_fallback) ? x.arts_fallback : [], faltantesFallback: Array.isArray(x.faltantes_fallback) ? x.faltantes_fallback : [] }; });
     var ds = await _armadoRemitoDataForItems(items);
@@ -53766,6 +53778,161 @@ function _remitoPickingHtml(pk){
   return h + '<table class="rmt-table"><thead><tr><th class="rmt-cc">Cod</th><th>Pedido</th><th>Pick.</th><th>Falta</th><th>Hora</th></tr></thead><tbody>' + rows + '</tbody></table>' +
     '<div class="rmt-empty">Cantidades de la tanda entera (suma todas sus NP).</div>';
 }
+/* ===== v25.50 (Luis, 01/10) — HOJA DE PICKING (una por TANDA), modelo de la planilla
+   "Picking LK-CH Madre", hoja «Limpio». Se imprime al TERMINAR el picking (TP): la estación
+   de auto-impresión la manda sola y la Cola de impresión NP la lista para «Imprimir todas».
+   Cabecera: Tanda + día que sale · cuándo se pickeó (inicio a fin, menos el tiempo en OTRAS
+   tareas o pausas del mismo legajo dentro de esa ventana) · quién. Cuerpo: los códigos en el
+   ORDEN DEL RECORRIDO (gv_lugar_articulo), partidos en dos columnas, con Sector · Orden ·
+   Total cajas (lo pedido a la tanda) · Pickeo (✓ si salió todo, si no el número pickeado,
+   0 = no había). Al costado: NP · Razón social · m³, Total m³ y m³ por hora neta.
+   Fuente del detalle: los PKC (tanda|cod|esperadas|reales|exc|emp). La marca de "impresa"
+   va a Impresion_NP con la clave "PK <tanda>" (no choca con ninguna NP real). */
+var PK_HOJA_PREFIJO = "PK ";
+function _pkHojaDia(f){ if (!f) return ""; try { var d = new Date(String(f).slice(0, 10) + "T12:00:00-03:00"); return ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"][d.getDay()] + " " + d.getDate() + "/" + (d.getMonth() + 1); } catch (_e){ return ""; } }
+function _pkHojaHm(ts){ if (!ts) return "—"; try { return new Date(ts).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ_AR }); } catch (_e){ return "—"; } }
+function _pkHojaDm(ts){ if (!ts) return ""; try { return new Date(ts).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: TZ_AR }); } catch (_e){ return ""; } }
+function _pkHojaNum(n, dec){ var r = Number(n) || 0; return r.toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+/* Minutos de OTRAS tareas cerradas del mismo legajo dentro de [ini, fin] (ventana del picking).
+   ev = [{opcion, ts_inicio, ts_cliente}]. Recorta cada tramo a la ventana y une los que se
+   pisan, para no descontar dos veces el mismo minuto. */
+function _pkHojaMinOtras(ev, ini, fin){
+  var a = new Date(ini).getTime(), b = new Date(fin).getTime(); if (!(b > a)) return 0;
+  var tr = [];
+  (ev || []).forEach(function (e){
+    var op = String(e.opcion || "").toUpperCase();
+    if (!e.ts_inicio || !e.ts_cliente || op === "TP" || op === "PKC" || op === "EP") return;
+    var s = Math.max(a, new Date(e.ts_inicio).getTime()), t = Math.min(b, new Date(e.ts_cliente).getTime());
+    if (t > s) tr.push([s, t]);
+  });
+  tr.sort(function (x, y){ return x[0] - y[0]; });
+  var tot = 0, cs = null, ce = null;
+  tr.forEach(function (x){ if (cs == null || x[0] > ce){ if (cs != null) tot += ce - cs; cs = x[0]; ce = x[1]; } else if (x[1] > ce) ce = x[1]; });
+  if (cs != null) tot += ce - cs;
+  return Math.round(tot / 60000);
+}
+/* Arma los datos (puro): tp = {legajo, ts_inicio, ts_cliente}; pkc = [{texto}]; lug =
+   [{cod, empresa, sector, orden}]; nps = [{np, rs, m3, fecha}]; otras = eventos del legajo. */
+function pkHojaArmar(tanda, tp, pkc, lug, nps, otras, nombre){
+  var porCod = {};
+  (lug || []).forEach(function (x){
+    var c = String(x.cod || "").trim().toUpperCase(), e = String(x.empresa || "").toUpperCase();
+    var o = (x.orden != null ? Number(x.orden) : null);
+    [c + "|" + e, c + "|"].forEach(function (k){ var p = porCod[k]; if (!p || (o != null && (p.orden == null || o < p.orden))) porCod[k] = { sector: String(x.sector || ""), orden: o }; });
+  });
+  var arts = {};
+  (pkc || []).forEach(function (r){
+    var p = String(r.texto || "").split("|"); if (p.length < 4) return;
+    var raw = String(p[1] || "").trim().toUpperCase(); if (!raw) return;
+    var m = raw.match(/^(.*?)\s+(LK|CH)$/), cod = m ? m[1] : raw, emp = m ? m[2] : String(p[5] || "").trim().toUpperCase();
+    arts[raw] = { cod: raw, esp: parseInt(p[2], 10) || 0, real: parseInt(p[3], 10) || 0,
+      lug: porCod[cod + "|" + emp] || porCod[cod + "|"] || porCod[cod.replace(/^0+(?=.)/, "") + "|"] || null };
+  });
+  var lineas = Object.keys(arts).map(function (k){ return arts[k]; });
+  lineas.sort(function (x, y){
+    var ox = (x.lug && x.lug.orden != null) ? x.lug.orden : 1e9, oy = (y.lug && y.lug.orden != null) ? y.lug.orden : 1e9;
+    return (ox - oy) || String(x.cod).localeCompare(String(y.cod));
+  });
+  var ini = tp && tp.ts_inicio, fin = tp && tp.ts_cliente;
+  var minBruto = (ini && fin) ? Math.max(0, Math.round((new Date(fin) - new Date(ini)) / 60000)) : 0;
+  var minOtras = (ini && fin) ? _pkHojaMinOtras(otras, ini, fin) : 0;
+  var minNeto = Math.max(0, minBruto - minOtras);
+  var npl = (nps || []).slice().sort(function (x, y){ return String(x.np).localeCompare(String(y.np)); });
+  var m3 = npl.reduce(function (s, x){ return s + (Number(x.m3) || 0); }, 0);
+  var fechas = npl.map(function (x){ return String(x.fecha || "").slice(0, 10); }).filter(Boolean).sort();
+  return { tanda: tanda, sale: fechas[0] || "", legajo: tp ? String(tp.legajo || "") : "", nombre: nombre || "",
+    ini: ini || null, fin: fin || null, minBruto: minBruto, minOtras: minOtras, minNeto: minNeto,
+    lineas: lineas, nps: npl, m3: m3, m3h: (minNeto > 0 && m3 > 0) ? m3 / (minNeto / 60) : null,
+    cajas: lineas.reduce(function (s, x){ return s + x.esp; }, 0), falt: lineas.reduce(function (s, x){ return s + Math.max(0, x.esp - x.real); }, 0) };
+}
+function pkHojaHtml(d){
+  var css = '<style>.pkh{font-family:Arial,Helvetica,sans-serif;color:#111;}' +
+    '.pkh-top{display:flex;justify-content:space-between;align-items:flex-start;gap:1em;border-bottom:.12em solid #111;padding-bottom:.35em;margin-bottom:.4em;}' +
+    '.pkh-t{font-size:1.55em;font-weight:800;line-height:1.15;}.pkh-s{font-size:1.25em;}.pkh-r{font-size:1.1em;text-align:right;line-height:1.35;}' +
+    '.pkh-body{display:flex;gap:.7em;align-items:flex-start;}' +
+    '.pkh table{border-collapse:collapse;}.pkh th,.pkh td{border:1px solid #888;padding:.12em .35em;text-align:center;white-space:nowrap;}' +
+    '.pkh th{font-size:.85em;line-height:1.1;background:#eee;}.pkh-cod{font-family:Consolas,Menlo,monospace;font-weight:800;}' +
+    '.pkh-f td{font-weight:800;}.pkh-np td{text-align:left;}.pkh-np td.n{text-align:center;}' +
+    '.pkh-tot{font-size:1.15em;font-weight:800;margin-top:.35em;}.pkh-m3h{font-size:1.3em;font-weight:800;margin-top:.25em;}</style>';
+  var mitad = Math.ceil(d.lineas.length / 2);
+  var tabla = function (rows){
+    if (!rows.length) return '';
+    return '<table><thead><tr><th>Cod</th><th>Sector</th><th>Orden</th><th>Total<br>cajas</th><th>Pickeo</th></tr></thead><tbody>' +
+      rows.map(function (x){
+        var f = x.esp - x.real;
+        var pk = (x.real >= x.esp) ? '✓' : String(x.real);
+        return '<tr' + (f > 0 ? ' class="pkh-f"' : '') + '><td class="pkh-cod">' + escapeHtml(x.cod) + '</td><td>' + escapeHtml((x.lug && x.lug.sector) || '—') + '</td><td>' + ((x.lug && x.lug.orden != null) ? x.lug.orden : '—') + '</td><td>' + x.esp + '</td><td>' + pk + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  };
+  var npRows = d.nps.length ? d.nps.map(function (x){
+    return '<tr><td class="pkh-cod">' + escapeHtml(x.np) + '</td><td>' + escapeHtml(x.rs || '—') + '</td><td class="n">' + (x.m3 != null ? _pkHojaNum(x.m3, 2) : '—') + '</td></tr>';
+  }).join('') : '<tr><td colspan="3">—</td></tr>';
+  var cuando = d.ini ? ('Pickeado ' + _pkHojaDm(d.ini) + ' · ' + _pkHojaHm(d.ini) + ' a ' + _pkHojaHm(d.fin) + ' hs' + (d.minOtras ? ' (−' + d.minOtras + ' min otras tareas)' : '')) : 'Pickeado —';
+  return css + '<div class="pkh">' +
+    '<div class="pkh-top"><div><div class="pkh-t">Tanda ' + escapeHtml(d.tanda) + (d.sale ? ' (Sale ' + escapeHtml(_pkHojaDia(d.sale)) + ')' : '') + '</div>' +
+      '<div class="pkh-s">' + escapeHtml(d.legajo ? ('Leg ' + d.legajo + ' ' + (d.nombre && d.nombre !== ('Leg ' + d.legajo) ? d.nombre : '')) : '—') + '</div></div>' +
+      '<div class="pkh-r">' + escapeHtml(cuando) + '<br>' + d.cajas + ' cajas' + (d.falt ? ' · <b>faltaron ' + d.falt + '</b>' : ' · sin faltantes') + '</div></div>' +
+    '<div class="pkh-body">' + tabla(d.lineas.slice(0, mitad)) + tabla(d.lineas.slice(mitad)) +
+      '<div><table class="pkh-np"><thead><tr><th>NP</th><th>Razón social</th><th>m³</th></tr></thead><tbody>' + npRows + '</tbody></table>' +
+      '<div class="pkh-tot">Total m³ ' + _pkHojaNum(d.m3, 2) + '</div>' +
+      '<div class="pkh-m3h">' + (d.m3h != null ? _pkHojaNum(d.m3h, 2) + ' m³/hora' : '— m³/hora') + '</div>' +
+      (d.lineas.length ? '' : '<div>— sin detalle por artículo (picking fuera del flujo guiado) —</div>') + '</div></div></div>';
+}
+/* Trae todo lo de una o más tandas y devuelve [d] (pkHojaArmar). */
+async function pkHojaDatos(tandas){
+  tandas = (tandas || []).map(function (t){ return String(t || "").trim().toUpperCase(); }).filter(function (t, i, a){ return t && a.indexOf(t) === i; });
+  if (!tandas.length) return [];
+  var j = function (u){ return fetch(u, { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function (){ return []; }); };
+  var tIn = tandas.map(encodeURIComponent).join(",");
+  var tInQ = tandas.map(function (t){ return encodeURIComponent('"' + t + '"'); }).join(",");
+  var res = await Promise.all([
+    j(SUPABASE_TABLE_ENDPOINT + "?select=texto,legajo,ts_inicio,ts_cliente&opcion=eq.TP&texto=in.(" + tIn + ")&order=ts_cliente.desc&limit=500"),
+    j(SUPABASE_TABLE_ENDPOINT + "?select=texto&opcion=eq.PKC&or=(" + tandas.map(function (t){ return "texto.like." + encodeURIComponent(t + "|*"); }).join(",") + ")&limit=5000"),
+    j(SUPABASE_PPP_PROG_ENDPOINT + "?select=np,tanda,razon_social,m3,fecha_entrega&tanda=in.(" + tInQ + ")&limit=5000"),
+    j(SUPABASE_URL + "/rest/v1/gv_ppp_web_estado?select=np_label,tanda,razon_social,m3,fecha_entrega&tanda=in.(" + tInQ + ")&limit=5000"),
+    (typeof getEmpleadosNombres === "function" ? getEmpleadosNombres().catch(function (){ return null; }) : Promise.resolve(null))
+  ]);
+  var tpBy = {}; (res[0] || []).forEach(function (x){ var t = String(x.texto || "").trim().toUpperCase(); if (!tpBy[t]) tpBy[t] = x; });
+  var pkcBy = {}, cods = {};
+  (res[1] || []).forEach(function (x){ var p = String(x.texto || "").split("|"); var t = String(p[0] || "").trim().toUpperCase(); (pkcBy[t] = pkcBy[t] || []).push(x); var c = String(p[1] || "").trim().toUpperCase().replace(/\s+(LK|CH)$/, ""); if (c) { cods[c] = 1; cods[c.replace(/^0+(?=.)/, "")] = 1; } });
+  var npBy = {}, vistos = {};
+  var addNp = function (t, np, rs, m3, f){ t = String(t || "").trim().toUpperCase(); np = String(np || "").trim().replace(/\.0+$/, ""); if (!t || !np || vistos[t + "|" + np]) return; vistos[t + "|" + np] = 1; (npBy[t] = npBy[t] || []).push({ np: np, rs: String(rs || "").trim(), m3: (m3 != null && m3 !== "" ? Number(m3) : null), fecha: f || "" }); };
+  (res[2] || []).forEach(function (x){ addNp(x.tanda, x.np, x.razon_social, x.m3, x.fecha_entrega); });
+  (res[3] || []).forEach(function (x){ addNp(x.tanda, x.np_label, x.razon_social, x.m3, x.fecha_entrega); });
+  var codList = Object.keys(cods);
+  var lug = codList.length ? await j(SUPABASE_URL + "/rest/v1/gv_lugar_articulo?select=cod,empresa,sector,orden&tipo=eq.gondola&cod=in.(" + codList.map(function (c){ return encodeURIComponent('"' + c + '"'); }).join(",") + ")&limit=5000") : [];
+  // Otras tareas del picker dentro de la ventana del picking (para el descuento de tiempo).
+  var otrasBy = {};
+  await Promise.all(tandas.map(async function (t){
+    var tp = tpBy[t]; if (!tp || !tp.ts_inicio || !tp.legajo) return;
+    otrasBy[t] = await j(SUPABASE_TABLE_ENDPOINT + "?select=opcion,ts_inicio,ts_cliente&legajo=eq." + encodeURIComponent(tp.legajo) +
+      "&ts_cliente=gt." + encodeURIComponent(tp.ts_inicio) + "&ts_inicio=lt." + encodeURIComponent(tp.ts_cliente) + "&ts_inicio=not.is.null&limit=500");
+  }));
+  return tandas.map(function (t){
+    var tp = tpBy[t] || null;
+    var nom = (tp && typeof npcNombre === "function") ? npcNombre(tp.legajo) : "";
+    return pkHojaArmar(t, tp, pkcBy[t] || [], lug || [], npBy[t] || [], otrasBy[t] || [], nom);
+  });
+}
+async function pkHojaImprimir(tandas, marcar){
+  var ds = await pkHojaDatos(tandas);
+  var k = 0;
+  var next = function (){ if (k >= ds.length) return; try { remitoPrintDoc(pkHojaHtml(ds[k])); } catch (_e){} k++; if (k < ds.length) setTimeout(next, 2600); };
+  next();
+  if (marcar !== false) { try { colaImpMarcarImpresas(ds.map(function (d){ return PK_HOJA_PREFIJO + d.tanda; })); } catch (_e){} }
+  return ds.length;
+}
+/* Picking terminados (TP de las últimas 48 h, legajo real) cuya hoja no se imprimió. */
+async function pkHojaPendientes(){
+  var j = function (u){ return fetch(u, { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; }).catch(function (){ return []; }); };
+  var desde = new Date(Date.now() - 48 * 3600000).toISOString();
+  var tps = await j(SUPABASE_TABLE_ENDPOINT + "?select=texto,legajo,ts_cliente&opcion=eq.TP&ts_cliente=gt." + encodeURIComponent(desde) + "&legajo=not.in.(0,1)&order=ts_cliente.asc&limit=2000");
+  var by = {}; (tps || []).forEach(function (x){ var t = String(x.texto || "").trim().toUpperCase(); if (t) by[t] = x; });
+  var ts = Object.keys(by); if (!ts.length) return [];
+  var imp = await j(SUPABASE_URL + "/rest/v1/Impresion_NP?select=np&np=in.(" + ts.map(function (t){ return encodeURIComponent('"' + PK_HOJA_PREFIJO + t + '"'); }).join(",") + ")");
+  var ya = {}; (imp || []).forEach(function (x){ ya[String(x.np)] = 1; });
+  return ts.filter(function (t){ return !ya[PK_HOJA_PREFIJO + t]; }).map(function (t){ return { tanda: t, legajo: String(by[t].legajo || ""), ts: by[t].ts_cliente }; });
+}
 function armadoRemitoInnerHtml(d, tipo){
   tipo = (tipo === "FACTURADO") ? "FACTURADO" : "ARMADO";
   const artRows = d.arts.length ? d.arts.map(function(a){
@@ -53922,6 +54089,15 @@ async function psPoll(force){
       _ps.lastSeen = maxTs; try { localStorage.setItem(PS_LASTSEEN_KEY, maxTs); } catch (_e) {}
       if (fresh.length) await psPrintBatch(fresh);
     }
+    // v25.50 — HOJA DE PICKING al terminar el picking (TP): una por tanda, sale sola.
+    try {
+      const tps = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TP&ts_cliente=gt." + encodeURIComponent(_ps.lastSeenTp || since) + "&legajo=not.in.(0,1)&select=texto,ts_cliente&order=ts_cliente.asc&limit=500", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; });
+      if (tps.length) {
+        const printed = psGetPrinted(); const nuevas = [];
+        tps.forEach(function (ev){ _ps.lastSeenTp = String(ev.ts_cliente); const t = String(ev.texto || "").trim().toUpperCase(); const k = PK_HOJA_PREFIJO + t; if (t && !printed.has(k) && nuevas.indexOf(t) < 0) { psMarkPrinted(k); nuevas.push(t); } });
+        if (nuevas.length) await pkHojaImprimir(nuevas);
+      }
+    } catch (_e2) {}
   } catch (_e){ _ps.lastErr = "sin conexión con Supabase"; }
   _psUpdatePollInfo();
 }
