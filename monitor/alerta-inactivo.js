@@ -19,6 +19,8 @@
   "use strict";
   var URL_ = window.VIR_SUPABASE_URL, KEY = window.VIR_SUPABASE_KEY;
   if (!URL_ || !KEY) return;
+  /* v25.90 (Luis, 01/10): sólo en el monitor del DEPÓSITO. Dentro de un iframe (📺 Vista TV del admin) no corre. */
+  try { if (window.self !== window.top) return; } catch (_e) { return; }
   var DURA_MS = 15000, CADA_MS = 4000;
   var vistas = {};          // id → ms en que se mostró por primera vez
   var abiertas = {};        // id → alerta viva en pantalla

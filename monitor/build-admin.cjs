@@ -250,7 +250,8 @@ function build(src) {
   out = rep(out, "\n</style>", CSS.replace(/<\/style>$/, "") + "\n</style>");
   // 3) overlay del pop-up en el body
   out = rep(out, "\n</body>", '\n<div id="pop" class="hide"></div>\n</body>');
-  // (v25.87, D10: la alarma de operario inactivo ya la carga tv.html, así que admin.html la hereda)
+  // v25.90 (Luis): la alarma de operario inactivo es SÓLO de la TV del depósito: Mon. Admin no la carga
+  out = rep(out, '<script src="alerta-inactivo.js?v=3"></script>\n', "");
   // 4) en pintar(): stash de `d` para que la capa admin lo lea
   out = rep(out,
     "function pintar(d) {\n  var nombres = d.empleados.nombres, horarios = d.empleados.horarios;",

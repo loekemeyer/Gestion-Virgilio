@@ -5357,9 +5357,12 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
 
 ## ⚠ REGLA (Luis, 2026-10-01, v25.82): 5 MIN DE TIEMPO MUERTO → CARTEL CON ALARMA EN LOS MONITORES — y Bajar de racks es una tarea abierta
 
-> ## ⛔ **v25.88 (Luis, 01/10: *"urgente, saca la alarma"*): LA ALARMA ESTÁ APAGADA.** `gv_alertas_inactivo_vivas()` devuelve vacío
-> (`where false`), ningún monitor carga `alerta-inactivo.js` y el celular no llama `gv_alerta_inactivo_abrir`. El archivo, la tabla
-> y las RPC quedan para volver. **No reponerla sin que Luis la pida.** `tests/alerta-inactivo.cjs` es candado invertido.
+> ## ✅ **v25.90 (Luis, 01/10: *"activa la alarma, ahora sí"*): VOLVIÓ, sólo en el monitor del DEPÓSITO y sólo por operarios reales.**
+> La cargan `monitor/tv.html` (abierto suelto) y el kiosko `/monitor` (`index.html?monitor=tv`); **NO** Mon. Admin (`build-admin.cjs`
+> saca el `<script>`) ni la 📺 Vista TV del admin (no corre dentro de un iframe). **No avisan** el legajo de prueba (0/1) ni el
+> supervisor en la vista de operario: lo frenan el celular (`_tmAlertaAbrir`) y la base (`gv_alerta_inactivo_abrir` devuelve null;
+> `gv_alertas_inactivo_vivas` saca 0/1). Retira lo de la v25.83/25.87 (prueba avisa, alarma en Mon. Admin) y el apagado de la v25.88.
+> `sql/gv_alerta_inactivo_solo_operarios_v2590.sql`.
 
 - **El celular** del operario, al llegar a **5 min** de tiempo muerto en la botonera, llama `gv_alerta_inactivo_abrir(legajo)`
   (una sola alerta viva por legajo; la marca queda en `localStorage gv_tm_alerta::<legajo>`). Al registrar la próxima tarea
@@ -5396,7 +5399,8 @@ como se considera el tiempo"*. Se retira el «Prod incluye movimiento/racks, car
   y remitos · declaradas · tiempo muerto), con sus totales.
 - **«En este momento» se mudó a Operarios**: la columna Total se fue y en su lugar va **«Ahora»** (qué hace y hace cuánto).
   El que fichó sin cerrar nada sale igual, con «—» en las horas. Pendientes de salir hoy toma el alto que dejó.
-- ⚠ El monitor viejo de `index.html` (Mts3 x Hora) todavía separa «Otros prod» y «Movimientos» como antes.
+- **Monitor viejo de `index.html` (Mts3 x Hora, v25.90, D11)**: filas nuevas **Prod** (picking + armado + en curso) y **No prod**
+  (CC/CR/RR + movimiento + pausas); la fila «No prod.» se llama **Pausas**. `prodH` interno no se tocó (≡ vista, `mon-vs-vista`).
 - **Bajar de Racks ordena por urgencia**: `(góndola + A guardar − pedido) ÷ capacidad`, de menor a mayor; sin capacidad
   al final (≡ Guardado a Góndola, que ya ordenaba por `(góndola − pedido) ÷ capacidad`).
 - `tests/mon-tv.cjs`, `tests/mon-admin.cjs`, `tests/rkb-orden-urgencia.cjs`.

@@ -6269,7 +6269,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.89"></script>
+<script type="module" src="recepcion.js?v=25.90"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -9238,7 +9238,7 @@ function _tmPintar() {
   var seg = Math.max(0, (ahora - Math.min(ref, ahora)) / 1000);
   el.textContent = _tmFmt(seg);
   box.classList.toggle("tm-alto", seg >= 30 * 60);
-  /* v25.88 (Luis, 01/10: "saca la alarma"): la alarma de 5 min está APAGADA. */
+  if (seg >= TM_ALERTA_SEG) _tmAlertaAbrir(_tm.leg);   // v25.90: vuelve la alarma (sólo operarios reales)
 }
 /* v25.79 (Luis, 01/10) — a los 5 min de tiempo muerto el celular avisa a los MONITORES
    (gv_alerta_inactivo_abrir → GV_Alerta_Inactivo; la TV lo lee y saca el pop-up con alarma).
@@ -9255,7 +9255,10 @@ function _tmAlertaRpc(fn, body) {
 function _tmAlertaAbrir(leg) {
   if (!leg || _tm.alertaPend) return;
   try { if (localStorage.getItem(_tmAlertaKey(leg)) === getTodayKey() + "|" + _tm.alertaRef) return; } catch (_e) {}
-  /* v25.83: el legajo de prueba también avisa — la alarma está sólo en Mon. Admin, no en la TV de pared */
+  /* v25.90 (Luis, 01/10): sólo avisa un OPERARIO de verdad. El legajo de prueba (0/1) y el supervisor
+     mirando la vista de operario desde el admin no hacen saltar la alarma (el backend también los frena). */
+  if (esLegajoPrueba(leg)) return;
+  try { if (typeof __identity !== "undefined" && __identity && __identity.type === "supervisor") return; } catch (_e) {}
   _tm.alertaPend = true;
   var marca = getTodayKey() + "|" + _tm.alertaRef;
   _tmAlertaRpc("gv_alerta_inactivo_abrir", { p_legajo: leg, p_dispositivo: (typeof gvDispositivoId === "function" ? gvDispositivoId() : null) })
@@ -10462,7 +10465,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.89";
+const APP_VERSION = "v25.90";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -32549,6 +32552,10 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   return data;
 }
 
+/* v25.90 (Luis, 01/10) — REGLA GENERAL del tiempo: Prod = SÓLO picking + armado. */
+function _mtsProdH(o) { return (o.pickH || 0) + (o.armH || 0) + (o.abiertoH || 0); }
+function _mtsNoProdH(o) { return (o.otrosProdH || 0) + (o.movMin || 0) / 60 + (o.noprodMin || 0) / 60; }
+
 /* Copia el email del data-attribute al clipboard y da feedback visual.
    Usado en el banner ⚠ Sin legajo del modal de rendimiento — el supervisor
    clickea el email y lo pega en Supabase Studio (tabla Empleados).
@@ -32772,6 +32779,11 @@ function openMonitor() {
   // kiosko (pantalla de pared) queda como estaba.
   setMonitorTab(window.__tvKioskMode ? "monitor" : "tv");
   monClaveStart();
+  /* v25.90 (Luis, 01/10): la alarma de operario inactivo corre SÓLO en el monitor del depósito (kiosko
+     /monitor y monitor/tv.html suelto), nunca en el monitor que abre el supervisor. */
+  if (window.__tvKioskMode && !document.getElementById("gvAlertaInactivoJs")) {
+    try { const _s = document.createElement("script"); _s.id = "gvAlertaInactivoJs"; _s.src = "monitor/alerta-inactivo.js?v=3"; document.body.appendChild(_s); } catch (_e) {}
+  }
   startInconsAutoRefresh();
 }
 
@@ -53149,10 +53161,15 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
   // Cache para los popups (al hacer click en una celda de Mts3xHora).
   _monitorLiveStats = { todayKey, today: todayStats, yesterdayKey, yesterday: yesterdayStats };
   const operariosHoy = (todayStats && todayStats.perOperario) || [];
-  const emptyTot = { pickM3:0, pickM3h:0, sepM3:0, sepM3h:0, ccM3:0, ccM3h:0,
-                     otrosProdMin:0, movMin:0, noprodMin:0 };
-  const totHoy  = (todayStats     && todayStats.totals)     || emptyTot;
-  const totAyer = (yesterdayStats && yesterdayStats.totals) || emptyTot;
+  const emptyTot = () => ({ pickM3:0, pickM3h:0, sepM3:0, sepM3h:0, ccM3:0, ccM3h:0,
+                     otrosProdMin:0, movMin:0, noprodMin:0 });
+  const totHoy  = (todayStats     && todayStats.totals)     || emptyTot();
+  const totAyer = (yesterdayStats && yesterdayStats.totals) || emptyTot();
+  /* v25.90 (Luis): Prod = SÓLO picking + armado (+ lo en curso); No prod = CC/CR/RR + movimiento + pausas. */
+  const _mtsTotPN = (st, t) => { const ops = (st && st.perOperario) || [];
+    t._prodH = ops.reduce((s, o) => s + _mtsProdH(o), 0); t._noProdH = ops.reduce((s, o) => s + _mtsNoProdH(o), 0);
+    t._abiertoH = ops.reduce((s, o) => s + (o.abiertoH || 0), 0); };
+  _mtsTotPN(todayStats, totHoy); _mtsTotPN(yesterdayStats, totAyer);
   // Cada celda clickeable abre el popup con el desglose por tanda. El
   // atributo onclick lo bindeamos solo cuando el operario tocó esa actividad
   // (no tiene sentido abrirlo en celdas "—").
@@ -53208,8 +53225,16 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
             ${operariosHoy.map(o => cellMin(o.movMin, o.didMov, o.legajo, "mov")).join("")}
           </tr>
           <tr>
-            <th class="row-label" title="Timbre, baño, limpieza, comida, conteo y permiso de salida. Hasta la v21.17 se sumaban adentro de Movim.">No prod.<br><span class="row-unit">(h)</span></th>
+            <th class="row-label" title="Timbre, baño, limpieza, comida, conteo, permiso de salida y cancelaciones. Hasta la v21.17 se sumaban adentro de Movim.">Pausas<br><span class="row-unit">(h)</span></th>
             ${operariosHoy.map(o => cellMin(o.noprodMin, o.didNoprod, o.legajo, "noprod")).join("")}
+          </tr>
+          <tr class="mts-tot-prod">
+            <th class="row-label" title="v25.90 (Luis) — REGLA GENERAL: Prod es SOLAMENTE picking y armado (incluye lo que está en curso).">Prod<br><span class="row-unit">(h)</span></th>
+            ${operariosHoy.map(o => `<td class="num" style="font-weight:800;color:#15803d">${fmt1(_mtsProdH(o))}</td>`).join("")}
+          </tr>
+          <tr class="mts-tot-noprod">
+            <th class="row-label" title="v25.90 (Luis) — todo lo que no es picking ni armado: CC, CR, RR, movimiento y pausas (el tiempo muerto se ve en la TV).">No prod<br><span class="row-unit">(h)</span></th>
+            ${operariosHoy.map(o => `<td class="num" style="font-weight:800;color:#b45309">${fmt1(_mtsNoProdH(o))}</td>`).join("")}
           </tr>
         </tbody>
       </table>
@@ -53245,8 +53270,11 @@ function renderMonitor(sheetMap, statusMap, alertasOffSheet, targetDates, emplea
           <tr><td class="num">${fmt1(t.sepM3)}</td><td class="num">${prodVal(t.sepM3h)}</td></tr>
           <tr><td class="num">${fmt1(t.ccM3)}</td><td class="num">${prodVal(t.ccM3h)}</td></tr>
           <tr><td class="num" colspan="2">${fmt1((t.otrosProdMin || 0) / 60)} h</td></tr>
+          <tr><td class="num" colspan="2">${fmt1(t._abiertoH || 0)} h</td></tr>
           <tr><td class="num" colspan="2">${fmt1((t.movMin || 0) / 60)} h</td></tr>
           <tr><td class="num" colspan="2">${fmt1((t.noprodMin || 0) / 60)} h</td></tr>
+          <tr><td class="num" colspan="2" style="font-weight:800;color:#15803d">${fmt1(t._prodH || 0)} h</td></tr>
+          <tr><td class="num" colspan="2" style="font-weight:800;color:#b45309">${fmt1(t._noProdH || 0)} h</td></tr>
         </tbody>
       </table>
     </div>`;
@@ -58549,7 +58577,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.89"></script>
+<script src="importacion.js?v=25.90"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61350,7 +61378,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.89"></script>
+<script src="cobranzas.js?v=25.90"></script>
 
 </body>
 </html>
