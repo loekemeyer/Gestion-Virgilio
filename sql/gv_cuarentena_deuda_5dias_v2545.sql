@@ -1,5 +1,5 @@
 -- REGLA_CONFIRMADA_POR_USUARIO (Luis, 01/10/2026: "5 corridos · de momento vamos con eso")
--- v25.48 (Luis): en Cuarentena, la FACTURA con menos de 5 días corridos (fecha del comprobante,
+-- v25.49 (Luis): en Cuarentena, la FACTURA con menos de 5 días corridos (fecha del comprobante,
 -- la del reporte de deuda o la que tomó el parser de ISIS) NO cuenta como deuda. La deuda más
 -- vieja del mismo cliente sigue reteniendo. Vale para todos los clientes, para la retención
 -- (gv_cuarentena_marcar_calc -> gv_cuarentena_deuda_pedido; el armador la hereda) y para la

@@ -115,7 +115,10 @@
       "Bash(node tests/mon-tv.cjs)",
       "Bash(sed -i 's/v25\\\\.36 \\(Luis\\)/v25.43 \\(Luis\\)/; s/v25\\\\.36: el chip/v25.43: el chip/' index.html tests/run.sh tests/pipe-sin-respuesta-filtra.cjs)",
       "Bash(sed -i 's/^\\\\/\\\\/ v25\\\\.36/\\\\/\\\\/ v25.43/' tests/pipe-sin-respuesta-filtra.cjs)",
-      "Bash(sed -i 's/\"⚠ Van justos\"\\) + \" · faltan \"/\"⚠ Van atrasados\"\\) + \" · faltan \"/' monitor/tv.html && grep -c \"Van atrasados\" monitor/tv.html && node tests/mon-tv.cjs | tail -1 && node tests/tv-meta-camion.cjs | tail -1 && node scripts/bump-version.cjs --patch | tail -1 && git add -A && git commit -qm \"$\\(grep -o 'APP_VERSION *= *\"[^\"]*\"' index.html | grep -o '[0-9.]*'\\): TV — «Van atrasados» en vez de «Van justos» *)"
+      "Bash(sed -i 's/\"⚠ Van justos\"\\) + \" · faltan \"/\"⚠ Van atrasados\"\\) + \" · faltan \"/' monitor/tv.html && grep -c \"Van atrasados\" monitor/tv.html && node tests/mon-tv.cjs | tail -1 && node tests/tv-meta-camion.cjs | tail -1 && node scripts/bump-version.cjs --patch | tail -1 && git add -A && git commit -qm \"$\\(grep -o 'APP_VERSION *= *\"[^\"]*\"' index.html | grep -o '[0-9.]*'\\): TV — «Van atrasados» en vez de «Van justos» *)",
+      "Bash(sed -i 's/v25\\\\.48 \\(Luis\\): en Cuarentena/v25.49 \\(Luis\\): en Cuarentena/' sql/gv_cuarentena_deuda_5dias_v2545.sql)",
+      "Bash(sed -i 's/## ⚠ REGLA \\(Luis, 2026-10-01, v25.48\\): en CUARENTENA/## ⚠ REGLA \\(Luis, 2026-10-01, v25.49\\): en CUARENTENA/' CLAUDE.md)",
+      "Bash(BUMP_FORZAR=0 node scripts/bump-version.cjs 25.49)"
     ]
   }
 }
