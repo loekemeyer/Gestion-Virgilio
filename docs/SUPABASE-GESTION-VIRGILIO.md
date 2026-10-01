@@ -31005,3 +31005,28 @@ filas visibles). En Gestión no se tocó nada de la base.
 
 **Rollback:** `drop function if exists public.get_estadistica_madre_mensual();` en LK, y volver los dos `admin.js`,
 `admin.html` y `css/admin.css` al commit anterior (la página LK de producción además hay que re-subirla).
+
+## §3.v2574 — una TANDA no mezcla empresas LK/CH (guard + centinela)
+
+**Luis, 2026-10-01 (problema 664, caso F21C).** F21C quedó con 8 NPs de LK + 2 de Chef (Zona 1 -
+CABA Sur, 05/10). Auditoría: `creado_por='sistema'` en las 10 (el armador programó cada NP en su
+día), pero la tanda es **renombrada** (`GV_Tandas_Codigos_Usados.fuente='renombrada'`) y el
+armador de esa mañana programó 0 NPs → la mezcla la armó una persona desde el panel (fusión manual
+de una tanda de Chef dentro de la de LK). Sin daño de stock (sin negativos, NPs no duplicadas).
+No saltó alarma: los 4 centinelas de tanda cortan por **camión**, y ambas empresas son Zona 1 =
+Capital Sur.
+
+**Fix:**
+- `gv_ppp_tanda_empresa_guard(tanda, empresas[])` — frena la asignación manual que dejaría una
+  tanda con las dos empresas. Llamado desde `gv_ppp_nps_mover_a`, `gv_ppp_web_tanda_programar`,
+  `gv_ppp_web_tanda_reusar` y `gv_ppp_tanda_renombrar`. Error `EMPRESA_MEZCLA: …` (P0001), lo
+  muestra el pop-up vía `aprMsgErr`.
+- `gv_ppp_tanda_empresa_mezclada` — centinela de tandas web ya mezcladas.
+- 4 filas en `GV_Reglas_Centinela` (patrón `gv_ppp_tanda_empresa_guard`).
+
+El armador y la fusión automática (per-empresa) NO se tocaron. F21C se deja como está (decisión de
+Luis). Probado en transacción abortada: fusionar CH (F21B) en LK (E08A) → FRENA; código nuevo
+mismo-empresa → PASA.
+
+**Chequeo:** `select * from public.gv_ppp_tanda_empresa_mezclada;` · `select * from
+public.gv_reglas_perdidas;`. `sql/gv_tanda_empresa_guard_v2574.sql`.

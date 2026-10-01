@@ -1847,6 +1847,29 @@ armador** (con `p_filas` de prueba dentro de una transacción abortada, no leyen
 **Chequeo:** `select * from public.gv_ppp_tanda_camion_mezclado;` — vacía = todo bien.
 `sql/gv_ppp_web_tanda_por_camion_v1887.sql`, §3.ib.
 
+## ⚠ REGLA (Luis, 2026-10-01, v25.81): una TANDA no mezcla empresas LK/CH
+
+**Luis, por la tanda F21C** (8 NPs de LK + 2 de Chef, todas Zona 1 - CABA Sur). El armador nunca
+mezcla empresas (corre por empresa) y la **fusión automática filtra por empresa**, así que la
+mezcla la arma una persona desde el panel (fusión manual de una tanda de Chef dentro de una de LK,
+vía renombre). No saltaba ninguna alarma porque **los 4 centinelas de tanda cortan por CAMIÓN, no
+por empresa**: como ambas son Zona 1 = camión Capital Sur, la mezcla de empresas pasaba invisible.
+
+| capa | qué hace desde v25.81 |
+|---|---|
+| guard | **`gv_ppp_tanda_empresa_guard(tanda, empresas[])`** frena cualquier asignación manual que dejaría una tanda con las dos empresas. Llamado desde los 4 RPC de asignación a mano: `gv_ppp_nps_mover_a` (fusión / cambiar de día), `gv_ppp_web_tanda_programar`, `gv_ppp_web_tanda_reusar`, `gv_ppp_tanda_renombrar`. El error `EMPRESA_MEZCLA: …` lo muestra el pop-up (igual que CUARENTENA, vía `aprMsgErr`) |
+| centinela | `gv_ppp_tanda_empresa_mezclada` — tandas web que ya mezclan empresas |
+
+⚠ **El armador NO se toca**: nunca produce la mezcla, así que el guard jamás le salta. La fusión
+automática (`gv_ppp_web_fusionar_tandas`) corre por `p_empresa` y queda igual.
+
+⚠ **F21C se deja como está** (Luis, 01/10: *"dejala, no la toques"*): ya pickeada y en armado. El
+centinela la lista a propósito, para que quede a la vista.
+
+**Chequeo:** `select * from public.gv_ppp_tanda_empresa_mezclada;` (al 01/10 sólo F21C) ·
+`select * from public.gv_reglas_perdidas;` (vacía = los 4 guards puestos).
+`sql/gv_tanda_empresa_guard_v2574.sql`. Problema 664.
+
 ## ⚠ Una tanda NO puede salir en dos días (v18.92, problema 338)
 
 Un mismo código de tanda en dos fechas cae en **dos camiones distintos** y rompe todo lo que
