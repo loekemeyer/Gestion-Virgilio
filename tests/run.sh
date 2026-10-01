@@ -48,6 +48,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== prueba-oculta-operario (v21.63: los pedidos de clientes de PRUEBA no le figuran al operario) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/prueba-oculta-operario.cjs
+node tests/ccr-fss-recontrol.cjs
 
 _resumen() {
   echo ""
