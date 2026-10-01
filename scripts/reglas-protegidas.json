@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-01 (+ centinela gv_imp_pi_editar)",
+  "_generado": "2026-10-01 (+ cuarentena deuda < 5 dias, + centinela gv_imp_pi_editar)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -527,6 +527,11 @@
       "quien": "Thomas (problema 433)"
     },
     {
+      "objeto": "gv_rack_posicion_guardar",
+      "regla": "El conteo del Mapa de racks, si cuenta DE MAS, primero traslada lo SIN POSICION del mismo codigo (es la misma mercaderia); si no, el total de racks se duplica (",
+      "quien": "Marianela"
+    },
+    {
       "objeto": "gv_refrescar_articulo_empresa",
       "regla": "Idem: la fuente de racks es la tabla viva",
       "quien": "v19.27"
@@ -680,6 +685,11 @@
       "objeto": "vista_stock_procesada",
       "regla": "La demanda de un codigo DUAL (437E/438E/439E/809E) se keyea CON la empresa: el de Loeke y el de Chef son dos productos en dos gondolas distintas. Si este patron",
       "quien": "Luis, Thomas"
+    },
+    {
+      "objeto": "gv_cuarentena_deuda_pedido",
+      "regla": "La factura de menos de 5 dias corridos no cuenta como deuda para retener (v25.45)",
+      "quien": "Luis"
     }
   ]
 }

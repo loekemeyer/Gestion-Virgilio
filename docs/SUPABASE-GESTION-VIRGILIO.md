@@ -30127,6 +30127,11 @@ planilla. El margen se centra solo. Verificado con el 25/09 (200, mismos número
 **v23.92 (edge v26):** la banda de *Total x Día* lleva la unidad debajo, **(M3)**, igual que
 *Ritmo (M3 x Hs)* y que la pantalla. Verificado con el 25/09 (200, 3 operarios).
 
+**v25.23 (sólo front):** la **pantalla** (📈 Reporte diario Virgilio) va con las mismas islas que el PDF:
+hueco de 6 px entre bloque y bloque (columna vacía `.rv-gap`), borde grueso de 2 px alrededor de cada
+bloque y Operario + las tres de horas del día con el encabezado en las dos filas (`rowspan`). Lo sostiene
+el bloque (k) de `tests/rv-cuadro-entero.cjs`.
+
 **Luis, 2026-09-28**, con la planilla del 25/09: *"arma el pdf del modulo de arriba de esta forma"*
 · *"hs no prod deberian ser todas las tareas que no sean hs prod"*.
 
@@ -30810,3 +30815,242 @@ alter table public."Control_Modo_OP" add column if not exists gv_no_recibido_at 
 - **Rollback, una línea:** `alter table public."Control_Modo_OP" drop column gv_no_recibido_at;`
   (antes, sacar la columna del `select` de `renderPendientes` en `recepcion.js`, o Pendientes da error).
 - Test: `tests/pend-no-recibido.cjs`.
+
+## §3.v258 — Conciliación de Facturación sin timeouts: neto en foto + RPC materializadas · Thomas, 30/09/2026
+
+- **Síntoma:** 72 timeouts de `gv_cruce_facturacion_totales` el 30/09 entre 08:56 y 09:28 ART.
+- **Medido:** la RPC tardaba **9,2 s** (timeout del rol: 8 s) mientras leer la vista entera tardaba 0,23 s:
+  con los parámetros el planner armaba otro plan. Y `gv_vista_cruce_facturacion` recalculaba el neto de
+  las 1.114 NP en cada lectura (1,4–1,7 s).
+- **Cambio:** `gv_facturacion_neto_mat` (foto del neto por NP, refresco `concurrently` cada 10 min en
+  minutos impares, cron `gv-facturacion-neto-mat`); la vista la lee y calcula EN VIVO sólo las NP que no
+  están en la foto (`= ANY(ARRAY(...))`, baja por el GROUP BY). `gv_cruce_facturacion_totales` y
+  `_resumen` leen la vista `MATERIALIZED`.
+- **Resultado (como `authenticated`):** totales 290 ms · resumen 271 ms. Salida idéntica (`EXCEPT ALL` 0/0).
+- **Costo aceptado:** una NP ya en la foto cuyo armado cambia (rearmado, Recuperar items) muestra el neto
+  viejo hasta 10 min.
+- Mismo día: el cruce de cobranzas (cron 103) pasa a correr sólo fuera de horario
+  (`49 0-10,21-23 * * *` UTC = 18:49 a 07:49 ART); rollback `cron.alter_job(103, schedule := '49 * * * *')`.
+- `sql/gv_facturacion_neto_mat_v258.sql` (rollback al final).
+
+## §3.v2510 — `lk_pedidos_match` corrige los pedidos VIEJOS editados después · Luis, 30/09/2026
+
+- El sync de LK (cron 24) sólo recarga los últimos 14 días: un pedido más viejo corregido en la página
+  quedaba con los ítems viejos acá (LK 1450 · Matiz: 166,67 cajas en vez de 1.000/2.000).
+- LK: `sync_pedidos_match_virgilio_viejos()`, cron `gv-pedidos-match-viejos` (`37 * * * *`): corrige SÓLO
+  `items_string` de pedidos LK de hasta 60 días antes del corte, si difiere. Primera corrida: 1450 y 1358.
+- Chef queda afuera (su vista tarda 4 s por fila). Backup `zz_backups."GV_Backup_LkPedMatch_items_20260930"`.
+- `sql/lk_pedidos_match_viejos_v2510_LK.sql` (rollback al final).
+
+### §3.v2511 — lk_pedidos_match: pedidos viejos también de Chef + barrido semanal de todo el historial (Luis, 30/09)
+
+`sync_pedidos_match_virgilio_viejos(p_dias, p_chef_remoto)` en LK corrige `items_string` y `match_string` de LK **y Chef**
+anteriores a la ventana de 14 días del cron 24. Cada hora (:37): 60 días, Chef desde `chef_orders_cache`. **Domingos 04:23 ART**
+(`gv-pedidos-match-viejos-todo`, `23 7 * * 0`): todo el historial, Chef por FDW (~3,5 s). Primera corrida: 4 `match_string` de LK,
+0 de Chef. Backup `zz_backups."GV_Backup_LkPedMatch_items_match_20260930b"`. Rollback en `sql/lk_pedidos_match_viejos_v2511_LK.sql`.
+
+### §3.v2525 — ID de dispositivo en eventos e ingresos (v25.25, Luis 30/09)
+
+`Registros_Produccion_Virgilio.gv_dispositivo` (text, nullable, sin default: lo viejo y Producción quedan NULL) +
+tabla nueva `GV_Dispositivo_Login` (anon/authenticated sólo INSERT, RLS con policy de insert, sin lectura) + vista
+`gv_dispositivos` (security_invoker, revocada a anon). El front genera un UUID por celular (`localStorage.gv_dispositivo`)
+y registra un ingreso por dispositivo + persona + día (`gvRegistrarIngreso` en `_routeAfterAuth`, método google /
+clave_tv / legajo / sesion_guardada). Probado como `anon` en transacción abortada: inserta 1, lectura denegada; el
+evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositivo_v2525.sql`, `tests/dispositivo-id.cjs`.
+- v25.26: vista `gv_dispositivo_multi_operario` (dispositivo + día con 2+ operarios; ingresos + eventos, sólo MCP).
+- v25.29: aviso por Telegram de un dispositivo con 2+ operarios en el día (cron 118 `gv-alerta-dispositivo-multi`, c/10 min, minutos impares). `sql/gv_dispositivo_multi_telegram_v2529.sql`.
+
+## §3.v2537 — El «No» de Cervantes devuelve el importado a EN VIAJE (v25.37, 30/09/2026)
+
+- **Tablas tocadas (agregado, nada reescrito):** `GV_Imp_Recepcion_Destino` + `denegado_en`, `denegado_por`,
+  `denegado_motivo`, `unidades` (nullable, sin default). Del lado GP2 (`"GP2".ingreso_virgilio`) las columnas nuevas
+  las agrega la migración de GP2.
+- **Funciones:** `gv_importados_resync_calc(bigint)` (la cuenta de `gv_importados_resync`, que ahora la llama tras su
+  guard de supervisor), `gv_ingreso_virgilio_unidades()` (BEFORE INSERT: unidades = cantidad, o × `uni_x_caja`),
+  `gv_ingreso_virgilio_denegado()` (BEFORE UPDATE OF estado, sólo `pendiente → denegado`, marcador `v25.31-cerv-no`),
+  `gv_imp_cervantes_denegados()` (lectura del front). Parchadas sobre la definición viva: `gv_imp_recepcion_historial`
+  (destinos con `denegado_*`) y `gv_imp_recepcion_anular` (no vuelve a restar lo denegado). Vista centinela
+  `gv_ingreso_cervantes_sin_revertir`. 4 filas en `GV_Reglas_Centinela`; `gv_reglas_perdidas` = 0.
+- **Medido en transacción abortada:** bache 134 (323ES, 3.000 u, `llegado`) → No → `en_curso`, llegadas 0,
+  pedido en curso 3.000, destino marcado, `gv_imp_cervantes_denegados` 1 fila. Sí → recepción GP2 «Virgilio #4»,
+  3.000 uni, `controlado = false`; un segundo intento da «Ese aviso ya se resolvió».
+- **Dato real (con el sí del usuario):** el aviso #4 (3.000 u de 323ES) ya se había cargado a mano en GP2
+  (recepción 17082, 13:38): se marcó `confirmado` vinculado a esa recepción, sin duplicar stock.
+- **Rollback:** `drop trigger gv_ingreso_virgilio_denegado on "GP2".ingreso_virgilio;` y
+  `drop trigger gv_ingreso_virgilio_unidades on "GP2".ingreso_virgilio;` (el resto es aditivo).
+  `sql/gv_ingreso_cervantes_denegado_v2537.sql`.
+
+## §3.v2539 — GP2 ve el stock de ARTÍCULOS de Virgilio (espejo, v25.39, 30/09/2026)
+
+- **Pedido (GP2, Stock General en 3 cajas):** la caja «Virgilio > Art. Terminado» muestra el stock real de
+  Virgilio de los artículos que arma Fábrica. GP2 no lee `public` (Regla 0), así que va por espejo, mismo molde
+  que la v25.17.
+- **Función tocada (sólo se agregó el bloque 4):** `public.gv_gp2_espejo_sync()` reescribe
+  `"GP2".virgilio_articulo_stock` desde `stocks_carga_rapida` (sin insumos, 375 filas, en CAJAS) **sólo si cambió
+  el md5**. Los bloques 1-3 se copiaron de la definición viva: md5 de la versión sin el bloque 4 =
+  `2643e3cf…` = el de la base antes de tocarla. Mismo cron 112 (`gv-gp2-espejo-sync`, `5-59/10`).
+- **La tabla la crea GP2** (`db/migracion_tablet_virgilio.sql` de gestion-productiva-2.0): RLS + policy de
+  SELECT a anon/authenticated, sin escritura.
+- **Medido:** primera corrida `articulo` (375 filas), la segunda `sin cambios`. 40 de los 41 artículos de Fábrica
+  cruzan por código normalizado; el 718 no tiene fila en `stocks_carga_rapida`.
+- **Rollback:** volver a correr `sql/gv_gp2_espejo_v2517.sql` (la función sin el bloque 4) y
+  `drop table "GP2".virgilio_articulo_stock;`. `sql/gv_gp2_espejo_articulo_v2539.sql`.
+
+## §3.v2540 — El secundario sin stock se cambia SOLO por el principal en la NP web (v25.40, 30/09/2026)
+
+- **Pedido (Thomas):** la NP web es de Gestión y el Excel de ISIS se arma al facturar, así que el cambio
+  secundario → principal lo hace el programa en vez del «✓ Ya lo cambié» del panel 🔀 Corregir códigos.
+- **Objetos nuevos:** tabla `GV_NP_Cambio_Codigo` (RLS, SELECT anon/authenticated, sin escritura), función
+  `gv_web_np_sec_auto(p_simular, p_por)` (SECURITY DEFINER, sin EXECUTE para anon), trigger
+  `trg_gv_ppp_web_base_np_cambio` (BEFORE INSERT/UPDATE sobre `PPP_Web_Base`, tabla nuestra), cron
+  `gv-np-sec-auto` (jobid **119**, `2-59/5 9-23 * * *`), interruptor `PPP_Web_Config.np_sec_auto_activo = 1`.
+- **Objeto tocado:** `gv_ppp_web_base_podar`, parche sobre la definición viva (marcador `v25.39-np-cambio`):
+  el principal cuenta como la línea del secundario en esa NP. **Edge Function** `gv-ppp-web-tandas-diarias` v44.
+- **Medido:** prueba en transacción abortada sobre LK 0278 — 64 líneas antes y después, 333 → 948E (1 caja);
+  un escritor crudo que vuelve a mandar el 333 no lo repone y el podado no saca el 948E. En vivo: la corrida de
+  las 18:22 del cron 119 hizo el cambio y la NP salió del panel. Edge v44 comparada byte a byte con el repo.
+- **Rollback:** `select cron.unschedule('gv-np-sec-auto');` · `update public."PPP_Web_Config" set valor = 0
+  where clave = 'np_sec_auto_activo';` · para deshacer UN cambio, borrar su fila de `GV_NP_Cambio_Codigo` (la
+  corrida siguiente de la Edge Function repone el secundario si la tanda no empezó). Redeploy de la v43:
+  `supabase/functions/gv-ppp-web-tandas-diarias/index.ts` de `a05dd51`. `sql/gv_np_secundario_auto_v2540.sql`.
+
+## §3.v2541 — lo que Cervantes MANDA a Virgilio: aviso Sí / No (D4, v25.41, 30/09/2026)
+
+- **Pedido (Thomas, "D4 si"):** lo que la tablet de Cervantes envía a Virgilio llega a Gestión Virgilio como
+  aviso Sí / No donde se recibe. Regla general GP2 ↔ GV, al revés de la v25.37.
+- **Frontera (la crea GP2):** `"GP2".envio_virgilio` (una fila por pieza; `grupo` terminado / insumo / sc / sp;
+  `cantidad` en uni o kg; `gv_cod` = con qué código se recibió). La escribe `GP2.enviar_a_virgilio`.
+  `db/migracion_envio_virgilio.sql` de gestion-productiva-2.0.
+- **Objetos nuevos acá (sin tocar nada existente):** `public.gv_envios_cervantes_pendientes()`,
+  `public.gv_envio_cervantes_confirmar(bigint[], text, jsonb, text)`, `public.gv_envio_cervantes_denegar(bigint,
+  text, text)`, SECURITY DEFINER, EXECUTE a anon/authenticated. 2 filas en `GV_Reglas_Centinela` (el Sí y el No
+  sólo tocan lo `pendiente`).
+- **Probado como `anon`, en transacción abortada:** Fábrica produce 48 del 718 → manda 24 y 12 + 5 del PC12 →
+  pendientes devuelve los 3 (718 con empresa CH y 1 caja; PC12 sin código → insumo nuevo, categoría
+  `partes_plasticas`, `Uni`) → confirmar(24, PC12) deja `gv_cod` 718 / TMP-9999, ref y legajo → denegar(12) revierte
+  (stock de Art. Terminado vuelve a 24) → denegar un confirmado devuelve `ok:false, ya:true` y no toca nada.
+- ⚠ **Un `execute_sql` con varias sentencias es UNA transacción**: la primera aplicación se hizo junto con una
+  prueba que terminaba en `raise exception` y se revirtió entera. Se reaplicó sola.
+- **Rollback:** los tres `drop function` y el `delete` del centinela, al pie de `sql/gv_envio_cervantes_v2540.sql`.
+
+### §3.v2542 — REVERSO de v25.39 y v25.41 (Luis, 01/10) junto con GP2 v1.219.0/1.220.0
+
+- `gv_gp2_espejo_sync`: se le sacó el bloque 4 sobre la definición VIVA (quedan los bloques 1-3 de la v25.17);
+  `GP2.virgilio_articulo_stock` borrada (backup `zz_backups."GV_Backup_GP2_virgilio_articulo_stock_20261001"`).
+- `drop function` de `gv_envios_cervantes_pendientes`, `gv_envio_cervantes_confirmar`, `gv_envio_cervantes_denegar`;
+  centinelas 265 y 266 borrados. `GP2.envio_virgilio` borrada en GP2 (tenía 0 filas).
+- Front: revert de 2e6940b (index.html, recepcion.js, test cerv-envio-aviso) y a05dd51.
+- Medido después: `gv_reglas_perdidas` = 0 · `gv_gp2_espejo_sync()` = 'sin cambios' · el aviso de importados
+  (`GP2.ingreso_virgilio`, `resolver_ingreso_virgilio`, `gv_ingreso_virgilio_denegado`) intacto.
+
+
+
+### §3.v2561 — equivalencias importado ↔ componente GP2 y stock neto (01/10, Luis)
+- Tabla nueva `GV_Importados_Equiv_GP2` (RLS, SELECT anon/authenticated, sin escritura). 8 filas.
+- `gv_importados_ordenes`: + `stock_gp2`, + `stock_total_neto` al final (parche sobre la viva, idempotente).
+  Medido: `stock_total` idéntico antes/después en las 156 filas (backup `zz_backups."GV_Backup_ImpOrdenes_antes_20261001"`).
+- Rollback: recrear con `zz_backups."GV_Backup_ImpOrdenes_def_20261001".def` (drop + create no hace falta: quitar
+  columnas exige drop; dependientes transitivos: medir antes) y `drop table public."GV_Importados_Equiv_GP2"`.
+
+## §3.v2565 — Stock y Compras: columna PEDIDOS en Proyección y pestaña EST. MADRE (v25.65, 01/10/2026)
+
+- **Pedido del usuario:** *"entre Vtas y Entregas quiero que esté la columna de PEDIDOS"* y *"una pestaña en Stock
+  y Compras que se llame EST. MADRE y vaya primera… que sean exactamente iguales [a la de pagina-LK-copia]"*.
+- **Objeto nuevo:** `public.gv_pedidos_mensuales_cod(p_cod, p_meses, p_empresa)` → `(mes, cajas, cubierto)`,
+  SECURITY DEFINER, EXECUTE anon/authenticated. Cajas PEDIDAS por clientes por mes (fecha del pedido), de
+  `lk_pedidos_match` (local, web LK + Chef). Mismos criterios que `ventas_mensuales_cod`: suma la familia
+  (`Equivalencias_Familia`) y la L es LK. `cubierto=false` = ese mes no había pedidos web registrados → la
+  pantalla dice **s/d**, no 0 (LK desde 2026-04, Chef desde 2026-07; un código que se pide en las dos toma la
+  más tardía). La normalización del código va escrita adentro (no `gv_cod_stock` por fila): 874 → 590 ms como anon.
+- **Medido:** 505 → abr 2.047 · may 1.992 · jun 1.244 · jul 2.021 · ago 2.212 · sep 1.639 cajas; mar sale s/d.
+- **Est. Madre:** no hay objeto de base nuevo. Es la pantalla del admin espejo (`admin/admin.html#estadistica-madre`,
+  idéntica a `pagina-LK-copia`: JS desde `cargarEstadisticaMadre` y la sección HTML, diff 0) en un iframe fuera de
+  `#stkBody`, con el puente `lk_bridge_vjwt` de «🌐 Panel Web LK». Lee el proyecto **LK**, no éste.
+- **Rollback:** `drop function if exists public.gv_pedidos_mensuales_cod(text, integer, text);` (el front cae solo
+  a s/d). `sql/gv_pedidos_mensuales_cod_v2565.sql`, `tests/proy-entregadas.cjs`, `tests/stk-est-madre-tab.cjs`.
+
+## §3.v2572 — Est. Madre de Gestión sin código: Edge Function `gv-est-madre` en LK (v25.72, 01/10/2026)
+
+- **Pedido de Tomás Beviglia:** *"me pide código para ver la Est. Madre, que no me lo pida en Gestión Virgilio. La
+  página LK dejala como está"*.
+- **Objeto nuevo (proyecto LK `kwkclwhmoygunqmlegrg`):** Edge Function `gv-est-madre`, verify_jwt **off** (la
+  identidad es el JWT de Gestión: lo valida `es_supervisor_virgilio()` de ESTA base, cache 2 min por token). Sólo
+  POST desde `loekemeyer.github.io` / `gestion-virgilio.vercel.app`. Lista cerrada: `products`, `loke_products`,
+  `sales_item_remap`, `sales_excluded_items` (consulta fija, paginada de a 1000), `rpc/get_estadistica_madre_cache`
+  (→ tabla `estadistica_madre_cache`, misma selección y orden) y `rpc/get_estadistica_madre_detail` (args validados).
+- **Medido el 01/10:** las 6 lecturas con la clave de servicio dan 200 (266 · 24 · 7 · 23 · 586 filas; detalle del
+  505 en 2026-09: 125 clientes). Sin origen 403, path fuera de lista 403, sin token 401, token inválido 403.
+- **Nada de la base de Gestión cambió.** El front: `index.html` (`_stkEmCargar`) y el espejo `admin/admin.js`.
+- **Rollback:** volver `_stkEmCargar` a `admin/admin.html#estadistica-madre` con el puente (git revert del commit) y
+  borrar la función desde el dashboard de LK. `admin/supabase/gv-est-madre/index.ts`, `tests/stk-est-madre-sin-codigo.cjs`.
+
+## §3.v2579 — Est. Madre: UN SOLO CUADRO para LK y Gestión (v25.79, 01/10/2026)
+
+**Pedido de Tomás Beviglia:** renombrar «Proyección» → «Est Madre», que los artículos sean los de Stocks de Gestión y
+que la tabla de LK y la de Gestión sean la misma (nunca una más actualizada que la otra).
+
+**Objeto nuevo (LK `kwkclwhmoygunqmlegrg`):** `public.get_estadistica_madre_mensual()` → `(item, empresa, meses jsonb)`,
+cajas por mes sobre `ventas_proy_lineas` + `sales_item_remap` − `sales_excluded_items` (el criterio de
+`_fn_proy_window_split`). STABLE, SECURITY DEFINER, `work_mem 32MB`. Sólo admins de LK o `service_role`;
+EXECUTE revocado a PUBLIC/anon. **No escribe nada** (sin tabla ni cron).
+
+Medido el 01/10/2026: 611 filas en 1.722 ms como service_role. `anon` → *permission denied*; un `authenticated`
+que no es admin → *no autorizado*. Muestra: 26/lk Ago 120 · Sep 166; 437E/lk 30 · 28; 437E/chef 1 · 12.
+
+**Edge Function `gv-est-madre`:** deja pasar `rpc/get_estadistica_madre_mensual` (GET a la función con
+service_role) y saca `rpc/get_estadistica_madre_cache`, `sales_item_remap` y `sales_excluded_items`.
+
+**Lista de artículos:** el módulo lee `stocks_carga_rapida` de Gestión con la clave pública (medido: `anon` ve 353
+filas visibles). En Gestión no se tocó nada de la base.
+
+**Rollback:** `drop function if exists public.get_estadistica_madre_mensual();` en LK, y volver los dos `admin.js`,
+`admin.html` y `css/admin.css` al commit anterior (la página LK de producción además hay que re-subirla).
+
+## §3.v2574 — una TANDA no mezcla empresas LK/CH (guard + centinela)
+
+**Luis, 2026-10-01 (problema 664, caso F21C).** F21C quedó con 8 NPs de LK + 2 de Chef (Zona 1 -
+CABA Sur, 05/10). Auditoría: `creado_por='sistema'` en las 10 (el armador programó cada NP en su
+día), pero la tanda es **renombrada** (`GV_Tandas_Codigos_Usados.fuente='renombrada'`) y el
+armador de esa mañana programó 0 NPs → la mezcla la armó una persona desde el panel (fusión manual
+de una tanda de Chef dentro de la de LK). Sin daño de stock (sin negativos, NPs no duplicadas).
+No saltó alarma: los 4 centinelas de tanda cortan por **camión**, y ambas empresas son Zona 1 =
+Capital Sur.
+
+**Fix:**
+- `gv_ppp_tanda_empresa_guard(tanda, empresas[])` — frena la asignación manual que dejaría una
+  tanda con las dos empresas. Llamado desde `gv_ppp_nps_mover_a`, `gv_ppp_web_tanda_programar`,
+  `gv_ppp_web_tanda_reusar` y `gv_ppp_tanda_renombrar`. Error `EMPRESA_MEZCLA: …` (P0001), lo
+  muestra el pop-up vía `aprMsgErr`.
+- `gv_ppp_tanda_empresa_mezclada` — centinela de tandas web ya mezcladas.
+- 4 filas en `GV_Reglas_Centinela` (patrón `gv_ppp_tanda_empresa_guard`).
+
+El armador y la fusión automática (per-empresa) NO se tocaron. F21C se deja como está (decisión de
+Luis). Probado en transacción abortada: fusionar CH (F21B) en LK (E08A) → FRENA; código nuevo
+mismo-empresa → PASA.
+
+**Chequeo:** `select * from public.gv_ppp_tanda_empresa_mezclada;` · `select * from
+public.gv_reglas_perdidas;`. `sql/gv_tanda_empresa_guard_v2574.sql`.
+
+## §3.v2593 — Hot Sale por súper: `gv_hotsale_supers()` y `gv_hotsale_items_super()` (01/10/2026)
+
+Dos funciones **nuevas, sólo lectura**, SECURITY DEFINER con guard `es_supervisor_virgilio() or
+gv_es_supervisor_o_servicio()` (leen `isis_lk` / `isis_ch`, que `anon` no ve; sin sesión devuelven 0 filas).
+`gv_hotsale_supers()`: un renglón por `super_key` de `GV_Supers` (activos) con sus códigos LK/Chef y la última factura.
+`gv_hotsale_items_super(p_super_key, p_meses default 12)`: lo que ese súper compró en esos meses, por código facturado
+(`cod`), con `cod_base` (sin ceros a la izquierda y sin la L), descripción de la última factura, `es_importado`
+(`Importados.cod_art`), `rubro` (`GV_Producto_Tipo.familia`, «Sin rubro» si falta), última compra, cajas (`cantidad_caja`),
+unidades y líneas; ordenado por última compra. Medido el 01/10: Carrefour (`inc`) 17 ítems, 0 importados, 12 rubros;
+Jumbo (`cencosud`) 50 ítems, 31 importados, los 50 con L (se pela para clasificar). Las usa `hotsale.js` (v25.93).
+Impacto: ninguno sobre objetos existentes. Rollback: `drop function` de las dos (`sql/gv_hotsale_super_items_v2593.sql`).
+
+## §3.v2594 — Editar PI: `GV_Imp_PI_Editor`, `GV_Imp_PI_Edicion`, `gv_imp_pi_editar` (01/10/2026)
+
+Corregir las cantidades de cada ítem de una PI en curso con registro de quién, qué día y a qué hora.
+Objetos nuevos: `GV_Imp_PI_Editor` (5 de semilla: Thomas, Tomás, Vivi, Luis, Gastón; «Otro» suma filas),
+`GV_Imp_PI_Edicion` (log, RLS sin policy), `gv_imp_pi_editores()`, `gv_imp_pi_editar(ref, prov, editor,
+cambios jsonb, nuevo_ref, simular)` y `gv_imp_pi_ediciones(ref, prov, limite)`, las tres SECURITY DEFINER con
+guard de supervisor y execute sólo `authenticated`. Escribe `GV_Importados_Baches` (unidades / estado /
+pedido_ref) y llama `gv_importados_resync`. Probado en transacción abortada: 2 cambios + rename R1→R2 →
+3 filas de log, editor nuevo, `pedido_curso` 438E=2520 / 035E=0, y un `antes` viejo frena.
+Impacto sobre objetos existentes: ninguno (no se tocó `gv_importado_bache_editar` ni `gv_importado_pedido_ref`).
+Rollback: los `drop` de la cabecera de `sql/gv_imp_pi_editar_v2594.sql`.

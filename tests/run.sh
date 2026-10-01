@@ -48,6 +48,11 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== prueba-oculta-operario (v21.63: los pedidos de clientes de PRUEBA no le figuran al operario) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/prueba-oculta-operario.cjs
+node tests/ccr-fss-recontrol.cjs
+node tests/toggle-anular.cjs
+node tests/botonera-tm-historial.cjs
+node tests/alerta-inactivo.cjs
+node tests/noprod-cancelacion.cjs
 
 _resumen() {
   echo ""
@@ -73,6 +78,7 @@ node tests/checkhtml.cjs
 
 echo "== version-sync (APP_VERSION == SW_VERSION base — evita PWA cacheando app vieja) =="
 node tests/version-sync.cjs
+node tests/dispositivo-id.cjs
 echo "== js-parsea (problema 579: sw.js y los .js propios parsean, sin marcas de conflicto) =="
 node tests/js-parsea.cjs
 
@@ -93,6 +99,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== stock-idempotent (regresión: stockMove con client_id + ignore-duplicates; reintento no duplica) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stock-idempotent.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stock-cola-por-fila.cjs
 
 echo "== ppp-atrasados-modulo (submodulo Pedidos atrasados: el criterio lo pone el backend) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-atrasados-modulo.cjs
@@ -115,6 +122,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== mon-tv (monitor liviano de TV: solo lectura, mismas fuentes que el monitor grande) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-tv.cjs
+echo "== mon-admin (Mon. Admin: generado desde tv.html, tablero interactivo con pop-ups) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-admin.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/gp2-abrir-app.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tv-meta-camion.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tandas-orden-camion.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/operario-queda-botonera.cjs
@@ -196,6 +206,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== racks-propuesta (regresión: MG 'De los racks' propone para aprobar, no mueve stock) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/racks-propuesta.cjs
+echo "== rkb-orden-urgencia (v25.89: Bajar de Racks ordena por la góndola más vacía) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rkb-orden-urgencia.cjs
 echo "== ins-sale-mc (v24.69: insumo con MC sale sólo en MC, stock en base) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ins-sale-mc.cjs
 
@@ -344,6 +356,7 @@ echo "== imp-tabla (v11.70: la tabla de Pedidos Importación no se pisa ni corta
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-tabla.cjs
 echo "== imp-recibir (v23.45: 📥 RECIBIR importación guiado, conflicto de espacio e historial) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-recibir.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-recibir-sin-pedido.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-recibir-codigo-unidades.cjs
 
 echo "== npf-prog-sin-base (v12.05: el módulo Pedidos sin cargar en PPP ve la NP programada sin base) =="
@@ -620,6 +633,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también en las NP de la página) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs
+echo "== pk-hoja-picking (v25.51: hoja de picking por tanda al terminar el picking) =="
+node tests/pk-hoja-picking.cjs
 
 echo "== proy-entregadas (v15.52: popup Proyección — cajas ENTREGADAS por el proveedor entre el mes y la barra; s/d si ese mes no había registro) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/proy-entregadas.cjs
@@ -647,6 +662,11 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pedimp-moq-proy (v23.90: código → proyección · MOQ con margen hasta 12 meses · desglose en 2 columnas · derechos por artículo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-moq-proy.cjs
+node tests/pedimp-insumo-12m.cjs
+node tests/pedimp-equiv-gp2.cjs
+node tests/pedimp-stock-desg-gp2.cjs
+node tests/imp-recibir-cervantes.cjs
+node tests/imp-cervantes-denegado.cjs
 echo "== pedimp-pdf-inner (v24.40: el PDF del pedido lleva Inner Cajas) =="
 node tests/pedimp-pdf-inner.cjs
 echo "== pedimp-prioridad-damian (v24.42: orden por meses de stock · alerta < 4 · PDF para Damián) =="
@@ -660,13 +680,14 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== pedimp-botones-celular (v24.54: los PDF del proveedor entran en el celular) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-botones-celular.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-cabecera-compacta.cjs
+node tests/pedimp-cartel-sync.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-reporte-pdf.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-acciones-confirmar.cjs
 node tests/pedimp-meses-proveedor.cjs
 
 echo "== imp-hist-pedidos (v23.91: 📜 Historial = pedidos + recepciones) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-hist-pedidos.cjs
-echo "== imp-pi-editar (v24.99: ✏️ Editar PI = quién → cantidades → antes/después → guardar con registro) =="
+echo "== imp-pi-editar (v25.94: ✏️ Editar PI = quién → cantidades → antes/después → guardar con registro) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-pi-editar.cjs
 
 echo "== imp-encurso (v15.72: solapa 🚢 En curso — un renglón por pedido, embarque + llegada, días que faltan) =="
@@ -778,8 +799,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== horas-activas (v19.23: solo se cuentan horas ACTIVAS, la noche no cuenta) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/horas-activas.cjs
 
-echo "== stk-detalle-cero-adelante (v20.02: el detalle de una fila de Stocks encuentra los movimientos con cero adelante y los duales) =="
-PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-detalle-cero-adelante.cjs
+echo "== stk-fila-sin-detalle (v25.56: la fila de Stocks no se expande y los movimientos van del más reciente al más viejo) =="
+node tests/stk-fila-sin-detalle.cjs
 
 echo "== cuar-com-limpia (v20.34: el cuadro de comentarios queda vacio al mandar, al cerrar y al reabrir) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cuar-com-limpia.cjs
@@ -797,6 +818,8 @@ echo "== pipe-clientes-nuevos (v20.86: el pipeline reemplazo al submodulo viejo,
 node tests/pipe-clientes-nuevos.cjs
 echo "== pipe-en-a-programar (v20.86: cuarentena primero, zona, dos estados y colapsable — corrido, no leido) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-en-a-programar.cjs
+echo "== pipe-sin-respuesta-filtra (v25.43: el chip ⏰ filtra los vencidos, no pliega) =="
+node tests/pipe-sin-respuesta-filtra.cjs
 echo "== pipe-imprimir-excel (v24.32: el boton de cliente de prueba es Imprimir, con la columna Comentarios) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-imprimir-excel.cjs
 
@@ -830,6 +853,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== stk-codigo-inexistente (v21.76: un codigo que NO existe no se dibuja en Stocks, ni buscandolo) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-codigo-inexistente.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-ajuste-cod-inexistente.cjs
 
 echo "== rv-cuadro-entero (v21.29: el Reporte diario entra entero, arranca en hoy y mide lapsos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rv-cuadro-entero.cjs
@@ -849,6 +873,10 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== apr-cuar-chef-tarde (Regresión v21) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-chef-tarde.cjs
+echo "== apr-cuar-liberacion-parcial (Regresión v25.38) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-liberacion-parcial.cjs
+echo "== np-sec-auto (v25.40) =="
+node tests/np-sec-auto.cjs
 echo "== apr-cuar-pedido-partido (v22.47: pedido partido = un item en Cuarentena) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuar-pedido-partido.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-pedido-partido.cjs
@@ -997,6 +1025,8 @@ echo "== stk-buscar-cero (Regresion v20) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-buscar-cero.cjs
 echo "== stk-pedidas-neto (Regresion v24.04) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-pedidas-neto.cjs
+echo "== stk-refrescar-ya (v25.18) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-refrescar-ya.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-busca-secundarios.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-proy-sin-doble-familia.cjs
 
@@ -1072,4 +1102,12 @@ node tests/imp-excel-igual-pantalla.cjs
 node tests/apr-oc-super.cjs
 node tests/claude-reglas-guard.cjs
 node tests/proy-det-unidades.cjs
+echo "== stk-est-madre-tab (v25.65: pestaña Est. Madre = el admin en iframe, primera, no se recarga) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-tab.cjs
+echo "== stk-est-madre-sin-codigo (v25.71: la Est. Madre de Gestión entra sin código, por gv-est-madre) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-sin-codigo.cjs
+echo "== est-madre-unica (v25.78: la Est. Madre es UN cuadro — est-madre.js, mismo cargador en LK y Gestión) =="
+node tests/est-madre-unica.cjs
+echo "== hotsale-rent (v25.91: Hot Sale — rent. ponderada del período, importados y nacionales por separado; hotsale.js) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/hotsale-rent.cjs
 _resumen

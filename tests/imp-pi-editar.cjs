@@ -1,4 +1,4 @@
-/* v24.99 — ✏️ EDITAR PI en 🚢 En curso: corregir las cantidades de cada ítem con registro de QUIÉN,
+/* v25.94 — ✏️ EDITAR PI en 🚢 En curso: corregir las cantidades de cada ítem con registro de QUIÉN,
    QUÉ DÍA y A QUÉ HORA. Pedido: "cuando toco el lápiz, me pregunte quién es la persona que va a
    corregir la PI… y un cuadradito Otro para poner el nombre".
    Se corre la pantalla de verdad con la base mockeada:

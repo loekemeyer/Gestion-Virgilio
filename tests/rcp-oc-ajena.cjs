@@ -138,13 +138,12 @@ window.__rcp = { opState: opState,
     R.renderResumen();
     document.getElementById("opExcWa").click();
     const url = decodeURIComponent(window.__wa[0] || "");
-    out.waTitulo = url.indexOf("no está en su orden de compra") > 0;
-    out.waLinea550 = url.indexOf("550: recibo 11, NO está en la OC de Garcia") > 0
-      && url.indexOf("la OC es de Poly (155 pendientes)") > 0;
+    out.waTitulo = url.indexOf("código de otro proveedor (Garcia)") > 0;
+    out.waLinea550 = url.indexOf("550: 11, OC de Poly (155 pend.)") > 0;
     // el 550 ya NO sale como "SIN OC generada"; el 999, que de verdad no tiene OC, sí
     const antes = url.indexOf("• 550"), corte = url.indexOf("• 999");
-    out.no550SinOc = url.slice(antes, corte).indexOf("SIN OC generada") < 0;
-    out.si999SinOc = url.slice(corte).indexOf("SIN OC generada (OC = 0)") >= 0;
+    out.no550SinOc = url.slice(antes, corte).indexOf("sin OC") < 0;
+    out.si999SinOc = url.slice(corte).indexOf("sin OC") >= 0;
 
     // ---- 5) la RPC se llamó con el proveedor y los códigos ----
     const c = window.__rpcCalls.filter(function (x) { return x.fn === "gv_oc_entrega_ajena"; })[0];

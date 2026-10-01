@@ -42,6 +42,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     _stk = { movs: movs, cutoff: 0 };
     let posted = null;
     window.stkInsertMov = function (rows) { posted = rows; return Promise.resolve(); };
+    // v25.28 pregunta a la base si el código existe antes de ajustar: acá se mide el depósito, no eso.
+    window._stkCodExisteConfirmar = function () { return Promise.resolve(true); };
+    try { _stkCodExisteConfirmar = window._stkCodExisteConfirmar; } catch (_e) {}
     await stockAjustar();
     out.postDep = posted && posted[0] && posted[0].deposito === "para_envasar";
     out.postDelta = posted && posted[0] && posted[0].delta === 5;

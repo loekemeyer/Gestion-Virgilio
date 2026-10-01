@@ -490,7 +490,8 @@ function opTodayStr() {
    "✕ Salir" sólo cierra la pantalla: el toggle RT sigue ABIERTO en Supabase (y el
    operario, al volver a tocar RT, cae en el cierre "Indicar Cantidad"). Esto la anula
    de verdad: tira el borrador y le pide a Producción que cierre el RT y borre el
-   evento de apertura (window.anularRecepcionSesion → RPC anular_toggle_virgilio).
+   apertura (window.anularRecepcionSesion). v25.63: ya no se borra la apertura: se registra el
+   cierre del RT con texto ANULADO.
    La barra vive fuera de #opBody/#opActions, así queda en TODOS los pasos del
    operario; el supervisor (menú de Administración) no la ve. */
 function opAnularBarRender(mostrar) {
@@ -1121,7 +1122,8 @@ function ocPctExceso(cod, cajas) {
    (proyección < 50 caj/mes). El operario tiene que pedir confirmación de que no se devuelve.
    Best-effort: si no hay capacidad cargada para el código, NO avisa (evita falsos positivos).
    Datos: Capacidad_Sector (góndola máx), vista_saldos_stock.terminado (góndola actual),
-   proyeccion_madre.proy_cajas_mes (rotación), opState.ocPorCod (lo pedido en la OC). */
+   gv_proyeccion_articulo.proy_cajas_mes (rotación: la Est. Madre ÚNICA, la misma de Stocks — v25.82;
+   antes leía la cruda `proyeccion_madre`, sin la familia), opState.ocPorCod (lo pedido en la OC). */
 const GOND_EXCESO_FACTOR = 1.20;   // "por mucho" = 20% arriba de la capacidad de góndola
 const GOND_BAJA_ROT = 50;          // baja rotación = menos de 50 cajas/mes de proyección
 /* v16.30 (tramo 4) — saldo de góndola por código, PURA y testeable (tests/gond-exceso-dual.cjs).
@@ -1196,7 +1198,7 @@ async function gondReturnCheck(items) {
     const res = await Promise.all([
       supabase.from("Capacidad_Sector").select("cod,cajas_max,empresa"),
       supabase.from("vista_saldos_stock").select("cod_art,clave,empresa,terminado").in("cod_art", cods),
-      supabase.from("proyeccion_madre").select("cod,proy_cajas_mes")
+      supabase.from("gv_proyeccion_articulo").select("cod,proy_cajas_mes,es_secundario,principal")
     ]);
     const cap = {}, gond = {}, proy = {};
     const _saldoRows = (res[1] && res[1].data) || [];
@@ -1216,7 +1218,14 @@ async function gondReturnCheck(items) {
     //   · código dual  → sólo la fila cuya `empresa` es la línea que eligió el operario
     //   · código común → todas las filas sumadas, igual que antes (conducta idéntica)
     Object.assign(gond, gondAcumPorCod(_saldoRows, opState.linea, _ocgNorm));
-    ((res[2] && res[2].data) || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (k) proy[k] = Number(r.proy_cajas_mes) || 0; });
+    // v25.82 — la rotación es la Est. Madre ÚNICA (gv_proyeccion_articulo). Un SECUNDARIO va en 0
+    // ahí (su venta está en el principal), así que rota lo que rota su PRINCIPAL: es el mismo producto.
+    const _pRows = (res[2] && res[2].data) || [], _pPpal = {};
+    _pRows.forEach(function (r) { if (r.es_secundario) return; const k = _ocgNorm(r.cod); if (k) _pPpal[k] = Number(r.proy_cajas_mes) || 0; });
+    _pRows.forEach(function (r) {
+      const k = _ocgNorm(r.cod); if (!k) return;
+      proy[k] = r.es_secundario ? (_pPpal[_ocgNorm(r.principal)] || 0) : (Number(r.proy_cajas_mes) || 0);
+    });
     const flag = [];
     (items || []).forEach(function (it) {
       const k = _ocgNorm(it.cod);
@@ -2140,14 +2149,13 @@ async function _opPrefetchGond(cods) {
    Antes se miraba sólo la góndola (terminado) y el 066 decía "entra, 1 libre" con 425 cajas. */
 function opExcesoEntraTxt(d, recibo) {
   d = d || {};
-  if (d.cap == null || d.total == null) return "s/dato de capacidad";
-  const neto = d.total - (d.comp || 0);
-  const queda = neto + (Number(recibo) || 0);
-  const det = "stock " + d.total + " − " + (d.comp || 0) + " comprometidas (pickeados + a facturar) = " + neto +
-              ", + " + recibo + " que recibo = " + queda + " vs capacidad " + d.cap;
+  if (d.cap == null || d.total == null) return "s/dato cap.";
+  // v25.30 (Luis: "mucho texto") — la cuenta entera no va: stock − comprometidas + lo que recibo
+  // queda resumido en "ocupado/capacidad". El cálculo es el mismo de la v22.58.
+  const queda = d.total - (d.comp || 0) + (Number(recibo) || 0);
   return queda <= d.cap
-    ? ("entra en góndola (" + det + ", quedan " + (d.cap - queda) + " libres)")
-    : ("NO entra en góndola (" + det + ", sobran " + (queda - d.cap) + ")");
+    ? ("entra " + queda + "/" + d.cap)
+    : ("NO entra " + queda + "/" + d.cap + ", sobran " + (queda - d.cap));
 }
 /* v14.61 / v17.17 — WhatsApp a Thomas (dueño) con el resumen de TODO lo que entró de más. */
 function opWhatsExceso(exc) {
@@ -2157,36 +2165,24 @@ function opWhatsExceso(exc) {
   const hayAjena = (exc || []).some(function (i) { return !!i.ajena; });
   // v21.30 — y el caso de Luis: un código que NO está asignado a este proveedor.
   const hayNoAsig = (exc || []).some(function (i) { return !!i.noAsig && !i.ajena; });
+  // v25.30 (Luis: "mucho texto en esas notificaciones") — una línea de título, una de remito
+  // y una por código. Los cuatro casos se siguen distinguiendo (sin OC · se pasó · OC de otro ·
+  // no asignado); lo que se fue es la cuenta de góndola desarrollada.
+  const prov = (opState.tallNombre || "?");
   const L = [
-    hayAjena
-      ? "Hola Thomas, un proveedor entregó mercadería que no está en su orden de compra:"
-      : hayNoAsig
-      ? "Hola Thomas, un proveedor entregó un código que no está asignado a él:"
-      : "Hola Thomas, entró mercadería que la OC no habilita:",
-    "Proveedor: " + (opState.tallNombre || "?"),
-    "RTO/FC: " + (opState.remito || "s/remito") + " · " + (opState.linea || "") + " · " + fechaCorta(opState.fecha),
-    ""
+    (hayAjena ? "Thomas, código de otro proveedor (" : hayNoAsig ? "Thomas, código no asignado (" :
+      "Thomas, entró de más (") + prov + ")",
+    "RTO " + (opState.remito || "s/remito") + " · " + (opState.linea || "") + " · " + fechaCorta(opState.fecha)
   ];
   exc.forEach(function (i) {
     const d = g[_ocgNorm(i.cod)] || {};
     const entra = opExcesoEntraTxt(d, i.cajas);
-    // v17.99 — dos casos: sin OC generada (OC = 0, todo es excedente) o se pasó de la OC.
-    // v19.57 — y un tercero, que es el que pidió Thomas: el código NO es de este proveedor,
-    // la OC la tiene otro. "SIN OC generada" ahí era falso: la OC existe, sólo que no es suya.
-    L.push(i.ajena
-      ? ("• " + i.cod + ": recibo " + i.cajas + ", NO está en la OC de " +
-         (opState.tallNombre || "?") + " → la OC es de " + i.ajena.otros +
-         (i.ajena.pend > 0 ? " (" + i.ajena.pend + " pendientes)" : "") + " · " + entra)
-      : i.noAsig
-      ? ("• " + i.cod + ": recibo " + i.cajas + ", NO está asignado a " +
-         (opState.tallNombre || "?") + " ni tiene OC suya · " + entra)
-      : i.sinOc
-      ? ("• " + i.cod + ": recibo " + i.cajas + ", SIN OC generada (OC = 0) → las " + i.exced +
-         " son de más · " + entra)
-      : ("• " + i.cod + ": recibo " + i.cajas + ", por OC faltaban " + i.ref +
-         " (OC pedía " + ((i.oc && i.oc.ped) || i.ref) + ") → " + i.exced + " de más · " + entra));
+    L.push("• " + i.cod + ": " + i.cajas + (i.ajena
+      ? (", OC de " + i.ajena.otros + (i.ajena.pend > 0 ? " (" + i.ajena.pend + " pend.)" : ""))
+      : i.noAsig ? ", no asignado a " + prov
+      : i.sinOc ? " sin OC"
+      : (", OC " + i.ref + " → " + i.exced + " de más")) + " · " + entra);
   });
-  L.push("");
   L.push("¿Lo recibo?");
   const url = "https://wa.me/" + WA_THOMAS + "?text=" + encodeURIComponent(L.join("\n"));
   // v18.02 — si el navegador BLOQUEA el pop-up, `window.open` devuelve null sin tirar error:

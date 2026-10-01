@@ -1,6 +1,6 @@
 /* v23.45 (Luis, 28/09) — 📥 RECIBIR una importación desde el panel.
    Corre el flujo de verdad en el navegador, con _pedImpRpc falso (sin red):
-   A. la tabla muestra 📥 RECIBIR sólo en la línea con pedido en curso;
+   A. la tabla muestra 📥 RECIBIR en TODAS las líneas (v25.66: sin pedido también; lo mide imp-recibir-sin-pedido);
    B. dual: sin elegir empresa no deja revisar (ni llama a gv_imp_recibir);
    C. góndola llena → avisa y ofrece cómo resolver; «Poner N en góndola y el resto a A guardar»
       parte la carga en 2 destinos y vuelve a revisar;
@@ -86,12 +86,20 @@ const ITEMS = [
     // parcial: aparece la casilla «dar por recibido» (marcada) y al desmarcarla manda p_cerrar=false
     await impRecibirBache(77);
     impRecSet("empresa", "CH"); impRecLinea(0, "cantidad", 10);
-    out.casilla = /Dar el pedido por recibido/.test(ov().innerHTML);
-    impRecSet("cerrar", false);
-    out.sigueEnViaje = /El resto sigue en viaje/.test(ov().innerHTML);
+    // v25.69 (Luis, D16): la casilla viene DESMARCADA → recepción parcial, el resto sigue pedido (p_cerrar=false)
+    const cb = ov().querySelector("label.irc-cerrar input[type=checkbox]");
+    out.casilla = !!cb && !cb.checked && /Recepción <b>parcial<\/b>/.test(ov().innerHTML) && /Cerrar el pedido completo/.test(ov().innerHTML);
     await impRecRevisar(); await impRecGrabar();
     const parcial = window.__calls.filter((c) => c.fn === "gv_imp_recibir" && c.body.p_simular === false).pop();
     out.parcialCerrar = parcial ? parcial.body.p_cerrar : null;
+    // marcada: dice que se cierra el PEDIDO COMPLETO y manda p_cerrar=true
+    await impRecibirBache(77);
+    impRecSet("empresa", "CH"); impRecLinea(0, "cantidad", 10); impRecSet("cerrar", true);
+    out.sigueEnViaje = /Se CIERRA EL PEDIDO COMPLETO/.test(ov().innerHTML);
+    await impRecRevisar(); await impRecGrabar();
+    out.cierraConfirm = /CIERRA EL PEDIDO COMPLETO/.test(window.__confirm);
+    const cerrado = window.__calls.filter((c) => c.fn === "gv_imp_recibir" && c.body.p_simular === false).pop();
+    out.cerradoCerrar = cerrado ? cerrado.body.p_cerrar : null;
     out.grabada = /Recepción grabada/.test(ov().innerHTML);
     impRecCerrar();
     await openImpHistRecep();
@@ -104,16 +112,16 @@ const ITEMS = [
     out.anulo = window.__calls.some((c) => c.fn === "gv_imp_recepcion_anular" && c.body.p_id === 1 && c.body.p_motivo === "prueba");
     return out;
   }, ITEMS);
-  if (JSON.stringify(r.botones) !== '["026=false","438E=true"]') fail.push("A botón RECIBIR: " + JSON.stringify(r.botones));
+  if (JSON.stringify(r.botones) !== '["026=true","438E=true"]') fail.push("A botón RECIBIR: " + JSON.stringify(r.botones));
   if (!r.pideEmpresa || !r.sinEmpresaBloquea || r.empDefault !== "CH" || !r.avisaOtraEmpresa) fail.push("B empresa dual: " + JSON.stringify([r.empDefault, r.avisaOtraEmpresa, r.sinEmpresaBloquea]));
   if (JSON.stringify(r.celdas) !== '["L05"]') fail.push("B celdas por empresa: " + JSON.stringify(r.celdas));
   if (!r.avisaConflicto || !r.hayPartir) fail.push("C conflicto góndola");
   if (JSON.stringify(r.lineas) !== '["gondola:L05:5","a_guardar::46"]' || !r.revisadoOk) fail.push("C partir: " + JSON.stringify(r.lineas));
   if (!r.real || r.real.emp !== "CH" || JSON.stringify(r.real.dest) !== '["gondola:L05:5","a_guardar::46"]' || !r.grabada || r.real.cerrar !== true || !r.real.cid || !r.confirmo) fail.push("D grabar: " + JSON.stringify(r.real));
-  if (!r.casilla || !r.sigueEnViaje || r.parcialCerrar !== false) fail.push("D2 parcial: " + JSON.stringify([r.casilla, r.sigueEnViaje, r.parcialCerrar]));
+  if (!r.casilla || !r.sigueEnViaje || r.parcialCerrar !== false || !r.cierraConfirm || r.cerradoCerrar !== true) fail.push("D2 parcial: " + JSON.stringify([r.casilla, r.sigueEnViaje, r.parcialCerrar, r.cierraConfirm, r.cerradoCerrar]));
   if (!r.hist || !r.anulo) fail.push("E historial/anular: " + JSON.stringify([r.hist, r.anulo]));
   if (errs.length) fail.push("pageerror: " + errs.join(" | "));
   await b.close();
   if (fail.length) { console.log("imp-recibir: ✗ " + fail.join(" · ")); process.exit(1); }
-  console.log("imp-recibir: OK — botón sólo con pedido en curso · dual pide empresa · góndola llena avisa y parte · graba 2 destinos · historial");
+  console.log("imp-recibir: OK — botón en todas las líneas · dual pide empresa · góndola llena avisa y parte · graba 2 destinos · historial");
 })();

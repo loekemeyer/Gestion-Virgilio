@@ -29,3 +29,17 @@ end $$;
 -- c) gv_insumo_unidad_base había PERDIDO la regla Mixto de la v24.89 (otra sesión la
 --    recreó desde la copia de la v24.69). Repuesta (marcador v24.89-mixto): antes del
 --    return por unidad nula, new.empresa := 'Mixto'. Probado: LK entra Mixto.
+
+-- v25.2 (Luis 30/09: "no debería juntarlos así"): 323E y 838E NO se agrupan con 323ES.
+--   backup: zz_backups."GV_Backup_ImpAlias_20260930" (3 filas)
+--   delete from public."GV_Importados_Alias" where cod in ('323E','838E');   -- queda 865ED>865E
+--   gv_imp_recibir_contexto: se sacaron las dos búsquedas por alias de la v24.92 (insumos_cods y es_insumo
+--   sólo por el propio código). Verificado: bache 96 (838E) y 97 (323E) es_insumo false, uxc 12;
+--   bache 134 (323ES) es_insumo true, cods ['323ES In'].
+--   Rollback: insert into public."GV_Importados_Alias" select * from zz_backups."GV_Backup_ImpAlias_20260930"
+--             where cod in ('323E','838E');
+
+-- v25.7 (Luis 30/09: "323ES nunca fue un código de stock... usá 323ES para el insumo"): '323ES In' -> '323ES'
+--   en Insumos, Insumos_Factores, GV_Importados_Insumo_Map (insumo_cod) e Importados_Stock_Parte (parte).
+--   0 movimientos con ese código. Backup: zz_backups."GV_Backup_323ESIn_20260930" (5 filas, to_jsonb).
+--   Verificado: gv_imp_recibir_contexto(134) -> insumos_cods ['323ES'], es_insumo true.

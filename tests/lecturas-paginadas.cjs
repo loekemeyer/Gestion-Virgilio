@@ -82,6 +82,7 @@ const ACOTADAS = [
   /limit=1\b/,                       // "¿existe?" — una fila
   /order=[^&"]*\.desc[^"]*limit=[1-9]\d{0,2}\b/,   // "los últimos N" con N<1000: el corte no lo toca
   /texto=ilike\.[^&"]*\|/,          // los eventos de UNA tanda (prefijo "<tanda>|")
+  /ts_cliente=gt\.[\s\S]{0,200}?order=ts_cliente\.asc&limit=[1-9]\d{0,2}\b/,   // v25.56 — lectura INCREMENTAL con cursor (sólo lo posterior al último visto, que avanza con cada fila): el corte de 1000 no la toca (hoja de picking, v25.51)
   /method:\s*"(POST|PATCH|DELETE|PUT)"/,
 ];
 

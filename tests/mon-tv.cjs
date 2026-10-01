@@ -104,7 +104,7 @@ const DATOS = {
        tienen que ROTAR; las de una sola NP quedan quietas. */
     ...[98811, 98812, 98813, 98814, 98815, 98816, 98817, 98818].map((n) => ({
       tanda: "E32A", np: String(n), m3: 0, fecha_entrega: MANANA,
-      razon_social: "Simon Zeitune E Hijo S.A", zona: "Retira", fecha_recep: HOY })),
+      razon_social: "Cortopassi Horacio Saturnino Distribuciones Mayoristas S.A", zona: "Retira", fecha_recep: HOY })),
     { tanda: "E33A", np: "98804", m3: 4.0, fecha_entrega: HOY,
       razon_social: "Gifel S.R.L.", zona: "Zona 6 - GBA Norte", fecha_recep: HOY },
     { tanda: "E34A", np: "98805", m3: 2.0, fecha_entrega: HOY,
@@ -175,19 +175,19 @@ const DATOS = {
   /* v23.64 — el resumen de días de la PPP (gv_ppp_prog_arbol). 98805 tiene CCN → cuenta en
      SALIÓ y se descuenta de Armado (neto, como la PPP). */
   arbol: [
-    { fecha: HOY, tanda: "E31A", np: "98802", m3: 1.5, estado: "facturado" },
-    { fecha: HOY, tanda: "E34A", np: "98805", m3: 2.0, estado: "armado" },
-    { fecha: HOY, tanda: "E30A", np: "98809", m3: 1.0, estado: "proceso" },
-    { fecha: HOY, tanda: "E30A", np: "98810", m3: 0.5, estado: "pendiente" }
+    { fecha: HOY, tanda: "E31A", np: "98802", m3: 1.5, estado: "facturado", razon_social: "Perez Zarate S.R.L." },
+    { fecha: HOY, tanda: "E34A", np: "98805", m3: 2.0, estado: "armado", razon_social: "Nexxo S.R.L." },
+    { fecha: HOY, tanda: "E30A", np: "98809", m3: 1.0, estado: "proceso", razon_social: "Bazar Mandarin S.R.L." },
+    { fecha: HOY, tanda: "E30A", np: "98810", m3: 0.5, estado: "pendiente", razon_social: "Bazar Mandarin S.R.L." }
   ],
   /* v21.17 — horas por operario, ya clasificadas por `gv_monitor_horas_operario`.
      La TV NO recalcula nada de esto: si la vista cambia, cambia acá. */
   horas: [
     { legajo: "8", nombre: "Farias Juan Hilario", tandas_pick: 3, prom_hs_pick: 0.84,
-      tandas_arm: 1, prom_hs_arm: 1.95, hs_prod: 4.5, hs_mov: 0.8, hs_noprod: 0.6,
+      tandas_arm: 1, prom_hs_arm: 1.95, hs_pick: 2.5, hs_arm: 2, hs_prod: 4.5, hs_mov: 0.8, hs_noprod: 0.6,
       hs_total: 6.2, en_jornada: true },
     { legajo: "12", nombre: "Ortiz Franco", tandas_pick: 0, prom_hs_pick: 0,
-      tandas_arm: 2, prom_hs_arm: 1.2, hs_prod: 2.4, hs_mov: 2.1, hs_noprod: 0.5,
+      tandas_arm: 2, prom_hs_arm: 1.2, hs_pick: 0, hs_arm: 2.4, hs_prod: 2.4, hs_mov: 2.1, hs_noprod: 0.5,
       hs_total: 5.4, en_jornada: false }
   ]
 };
@@ -238,18 +238,28 @@ function responder(url) {
       arranco: document.getElementById("splash").classList.contains("hide"),
       tandas: t("tandasBox"), fc: t("fcBox"), fcTit: t("fcTit"), tot: t("totBox"),
       ops: t("opsBox"), opsTit: t("opsTit"), meta: t("metaBox"),
-      act: t("actBox"), avisos: t("avisos"),
+      act: t("opsBox"), avisos: t("avisos"),
       dias: (document.getElementById("fcBox") || {}).innerHTML || "",
       cols: document.querySelectorAll("main > .col").length,
       diasEnMedio: !!(document.getElementById("fcBox") && document.getElementById("opsBox") &&
-        document.getElementById("fcBox").closest(".col") === document.getElementById("opsBox").closest(".col") &&
-        document.getElementById("actBox").closest(".col") === document.getElementById("opsBox").closest(".col")),
+        document.getElementById("fcBox").closest(".col") === document.getElementById("opsBox").closest(".col")),
+      actCard: !!document.getElementById("actBox"),
       ult: window.__tvUlt || {},
+      pen: (document.getElementById("penBox") || {}).innerHTML || "",
+      penTit: (document.getElementById("penTit") || {}).innerHTML || "",
+      semCentro: [...document.querySelectorAll("#tandasBox td .sem")].map((s) => {
+        const a = s.getBoundingClientRect(), c = s.closest("td").getBoundingClientRect();
+        return Math.round(Math.abs((a.left + a.width / 2) - (c.left + c.width / 2))); }),
+      tkCli: [...document.querySelectorAll("#tandasBox tr")].filter((tr) => tr.querySelector(".t-cli .tk"))
+        .map((tr) => ({ tanda: tr.querySelector(".t-tanda").textContent.trim(),
+          rota: tr.querySelector(".t-cli .tk").classList.contains("rota"), txt: tr.querySelector(".t-cli .tk").textContent,
+          dur: tr.querySelector(".t-cli .tk").style.animationDuration, orig: tr.querySelector(".t-cli .tk").getAttribute("data-txt") || "" })),
       ticker: [...document.querySelectorAll("#tandasBox tr")].filter((tr) => tr.querySelector(".t-np .tk"))
         .map((tr) => { const tk = tr.querySelector(".t-np .tk"), caja = tk.parentNode;
           return { tanda: tr.querySelector(".t-tanda").textContent.trim(), rota: tk.classList.contains("rota"),
             anim: getComputedStyle(tk).animationName, lineas: Math.round(caja.clientHeight / parseFloat(getComputedStyle(caja).lineHeight)),
             txt: tk.textContent, w: caja.clientWidth, sw: tk.scrollWidth }; }),
+      desb: ["opsBox", "penBox", "col2"].map((id) => { const e = document.getElementById(id); return e ? e.scrollHeight - e.clientHeight : -1; }),
       clave: (document.getElementById("tvClave") || {}).textContent || "",
       estado: (document.getElementById("estado") || {}).textContent || "",
       // ¿sobresale algo del alto de la pantalla? En una TV no hay cómo scrollear.
@@ -275,7 +285,7 @@ function responder(url) {
   ok(!/E33A/.test(r.tandas + r.fc), "E33A está facturada Y despachada: no tiene que aparecer en ningún lado");
 
   // v23.64 (Luis) — "A facturar" pasó a ser el RESUMEN DE DÍAS de la PPP (%, neto por Salió)
-  ok(/Días/.test(r.fcTit), "el cuadro de la derecha tiene que ser el de días: " + r.fcTit);
+  ok(/^NPs por Día/.test(r.fcTit), "el cuadro tiene que titularse «NPs por Día» (v25.13): " + r.fcTit);
   ok(/Salió/.test(r.fc) && /Fact/.test(r.fc) && /Pend/.test(r.fc), "faltan las columnas de estado del resumen");
   /* v24.39 (Luis): *"olvidate del texto abajo de los dias … es al pedo eso"*. La fila del día
      es el día y sus cinco porcentajes, en UNA fila: el m³ / tandas / NP se fue. Candado
@@ -284,8 +294,26 @@ function responder(url) {
      "la fila del día va sola, sin el subtexto de m³/tandas/NP: " + r.fc.slice(0, 300));
   ok((r.fc.match(/<tr[^>]*>/g) || []).length === 2,
      "un día = UNA fila (más la del encabezado): " + (r.fc.match(/<tr[^>]*>/g) || []).length);
-  ok((r.fc.match(/25%<small>1<\/small>/g) || []).length === 4, "98805 salió: 25 % en Salió, Fact, Proc y Pend, y 0 en Armado");
-  ok(/class="arm z">0%/.test(r.fc), "el armado que salió no se cuenta dos veces (neto)");
+  /* v25.01 (Luis): el número de pedidos grande y el % chiquito abajo. */
+  ok((r.fc.match(/>1<small>25%<\/small>/g) || []).length === 4, "98805 salió: 1 (25 %) en Salió, Fact, Proc y Pend, y 0 en Armado: " + r.fc.slice(0, 400));
+  ok(/class="arm z">0<small>0%/.test(r.fc), "el armado que salió no se cuenta dos veces (neto)");
+  /* v25.01 (Luis): «Pendientes de hoy» — lo de hoy que no salió: E30A (98809 proc + 98810 pend)
+     y E31A (98802 facturada sin CCN). 98805 salió y no va. */
+  ok(/2 pedidos · 3 NP/.test(r.penTit), "Pendientes de hoy tiene que decir 2 pedidos · 3 NP: " + r.penTit);
+  ok(/E30A/.test(r.pen) && /E31A/.test(r.pen) && !/98805/.test(r.pen), "Pendientes de hoy lista mal los pedidos: " + r.pen);
+  ok(/class="pen">Pend</.test(r.pen) && /class="fac">Fact</.test(r.pen), "cada pedido pendiente dice su estado (el más atrasado)");
+  ok(r.pen.indexOf("E30A") < r.pen.indexOf("E31A"), "lo más atrasado va primero");
+  /* v25.01 (Luis): las luces P/A no se corren cuando alguien agarra la tanda. */
+  const cliE32 = r.tkCli.find((x) => /^E32A/.test(x.tanda)), cliE30 = r.tkCli.find((x) => /^E30A/.test(x.tanda));
+  ok(cliE32 && cliE32.rota && /Simon Zeitune E Hijo · Cortopassi/.test(cliE32.txt) && !/\+\d/.test(cliE32.txt), "el cliente de E32A no entra: tiene que rotar " + JSON.stringify(cliE32));
+  /* v25.6 (Luis): los «+N» muestran los nombres, y el cartel va a 3/4 de la velocidad (4,5 caracteres/s). */
+  ok(cliE32 && cliE32.dur === Math.max(8, Math.round((cliE32.orig.length + 7) / 4.5)) + "s", "el cartel tiene que ir a 4,5 caracteres por segundo (3/4 de la v24.92)");
+  ok(cliE30 && /Bazar Mandarin · Casa Pepe/.test(cliE30.orig), "E30A tiene 2 clientes: tienen que ir los dos nombres " + JSON.stringify(cliE30));
+  const cliSolo = r.tkCli.filter((x) => x.orig && x.orig.indexOf("·") < 0 && x.orig.length < 18);
+  ok(cliSolo.length && cliSolo.every((x) => !x.rota), "un cliente solo y corto entra: tiene que quedar quieto " + JSON.stringify(cliSolo));
+  /* v25.6 (Luis): *"queda cortado En este momento"*. Nada de la columna derecha se pasa de su alto. */
+  ok(r.desb.every((x) => x >= 0 && x <= 1), "la columna derecha se corta (En este momento / Pendientes): " + JSON.stringify(r.desb));
+  ok(r.semCentro.length && r.semCentro.every((x) => x <= 3), "las luces P/A tienen que quedar centradas en su celda: " + JSON.stringify(r.semCentro));
   ok(/3 salieron sin FC/.test(r.fcTit), "el título no avisa cuántas se fueron sin factura: " + r.fcTit);
   // v20.21 (Thomas) — el 🚚 también en la tabla principal, y el cartel a partir de 3
   ok(/E36A/.test(r.tandas), "E36A está en curso: tiene que estar en la tabla principal");
@@ -330,13 +358,10 @@ function responder(url) {
   ok(!/>Zona</.test(r.tandas) && !/>Días</.test(r.tandas), "volvió una columna que Luis sacó de la tabla (v23.92)");
   ok(/98801/.test(r.tandas) && /Bazar Mandarin/.test(r.tandas),
      "la tabla tiene que mostrar el cliente y las NP de la tanda");
-  /* v24.92 (Luis): «si hay más NPs de las que entran, que rote estilo cartel de Wall Street». */
-  const tkE32 = r.ticker.find((x) => /^E32A/.test(x.tanda)), tkE31 = r.ticker.find((x) => /^E30A/.test(x.tanda));
-  ok(tkE32 && tkE32.rota && tkE32.anim === "ticker", "E32A tiene 9 NP y no entran: la celda tiene que rotar " + JSON.stringify(tkE32));
-  ok(tkE32 && /98818/.test(tkE32.txt) && (tkE32.txt.match(/98803/g) || []).length === 2,
-     "el cartel rotativo tiene que llevar TODAS las NP, duplicadas para girar sin salto " + JSON.stringify(tkE32));
-  ok(tkE31 && !tkE31.rota && tkE31.anim === "none", "E30A tiene pocas NP: tiene que quedar quieta " + JSON.stringify(tkE31));
-  ok(r.ticker.every((x) => x.lineas === 1), "las NP van en UNA línea: " + JSON.stringify(r.ticker.map((x) => x.lineas)));
+  /* v25.54 (Luis): la columna NP dice CUÁNTAS NP lleva la tanda (la lista va en el title). */
+  ok(/<td class="num t-np" title="[^"]*98818[^"]*">9</.test(r.tandas),
+     "E32A tiene 9 NP: la columna NP tiene que decir 9 (y la lista en el title)");
+  ok(!/class="t-np"[^>]*><div>/.test(r.tandas), "la columna NP volvió a ser la lista rotativa");
   ok(!/Z3 CO/.test(r.tandas) && !/CABA/.test(r.tandas), "la zona salió de la tabla");
   ok((r.tandas.match(/E30A/g) || []).length === 1, "E30A aparece más de una vez: la tanda va en UNA fila");
   ok(/3,3/.test(r.tandas), "falta la columna de m³ (E30A = 2,5 de ISIS + 0,8 de la web)");
@@ -373,8 +398,12 @@ function responder(url) {
      "faltan las columnas Ritmo (m³/h picking/armado) y Horas (Prod, No prod, Total)");
   ok(/Ritmo/.test(r.ops) && /Horas/.test(r.ops), "falta el encabezado agrupado Ritmo / Horas");
   ok(!/\d,\d h/.test(r.ops), "las horas tienen que ir en H:MM, no en decimal");
-  ok(/9:48/.test(r.ops) && /11:36/.test(r.ops),
-     "la fila de Total no suma bien (prod 5:18+4:30=9:48 · total 6:12+5:24=11:36): " + r.ops.replace(/<[^>]*>/g, " "));
+  /* v25.89 (Luis): Prod = SÓLO picking + armado; No prod = jornada − prod (tiempo muerto incluido).
+     Total se fue: la última columna es «Ahora» (lo que era «En este momento»). */
+  ok(/6:54/.test(r.ops) && /4:42/.test(r.ops),
+     "la fila de Total no suma bien (prod 4:30+2:24=6:54 · no prod 1:42+3:00=4:42): " + r.ops.replace(/<[^>]*>/g, " "));
+  ok(/>Ahora</.test(r.ops) && !/<th>Total<\/th>/.test(r.ops), "la columna Total tiene que ser «Ahora»");
+  ok(!r.actCard, "volvió la tarjeta «En este momento»: Luis la mudó a Operarios");
   /* El % va sobre el tiempo MEDIDO (prod + no prod), no sobre la jornada. */
   /* v23.92 (Luis): «Operarios» va solo y centrado — sin el conteo ni el % al lado. */
   ok(r.opsTit.trim() === "Operarios", "el título de operarios tiene que decir sólo «Operarios»: " + r.opsTit);
