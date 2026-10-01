@@ -1,0 +1,2028 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Mon. Admin · Virgilio</title>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     Mon. Admin — ESPEJO INTERACTIVO del monitor de pared.
+     ⚠ ARCHIVO GENERADO desde monitor/tv.html por monitor/build-admin.cjs.
+        NO EDITAR A MANO. Todo cambio del tablero se hace en tv.html y se regenera
+        con `node monitor/build-admin.cjs`. Lo sostiene tests/mon-admin.cjs (falla
+        si admin.html quedó desincronizado de tv.html).
+     Qué agrega sobre tv.html: celdas clickeables (m³/h picking · armado, las de
+     «NPs por Día» y las tandas) que abren un pop-up con el desglose, armado con lo
+     que el tablero YA tiene en memoria. Es la pestaña «🛠️ Mon. Admin» del monitor
+     del admin; la TV de pared sigue usando tv.html, liviano y de solo lectura.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<!-- ============================================================================
+     MONITOR TV — versión LIVIANA y de SOLO LECTURA del monitor de planta.
+
+     Por qué existe (pedido de Luis, 2026-09-16): la TV de pared cargaba el
+     `index.html` entero para mostrar el tablero. Eso son ~4,97 MB (3,63 MB de
+     index + jsPDF + Chart + supabase-js + recepcion.js), de los cuales el
+     monitor usa el 8,9%. En el SoC de una TV eso se traduce en un arranque
+     lento y en que la pestaña se quede sin RAM: por eso el modo kiosko se
+     recarga sola cada 7 minutos (v6.35), o sea que baja y parsea esos ~5 MB
+     ocho veces por hora. Esta página pesa ~40 KB y no necesita ese parche.
+
+     Qué NO tiene, a propósito:
+       · nada clickeable (una TV colgada no tiene puntero: los detalles de
+         tanda, los mensajes y las inconsistencias del monitor grande son
+         inalcanzables desde la pared);
+       · ni supabase-js, ni Chart.js, ni jsPDF, ni service worker. Lee la API
+         REST con `fetch` pelado, que es lo que el monitor grande ya hacía;
+       · la tabla "Mts3 x Hora" por operario, que depende de `computeClosureDur`
+         (la parte más pesada y más delicada del cálculo). En su lugar van los
+         m³ de picking y de armado terminados hoy, que es el número que se lee
+         de lejos.
+
+     Qué SÍ tiene, igual que el monitor grande y con las MISMAS fuentes:
+       · tandas de la ventana de entrega con picking / armado en vivo;
+       · quién está trabajando en qué AHORA;
+       · tandas a facturar (con el ✅ de facturada);
+       · m³ por día y por camión;
+       · el aviso de agregados y el de tandas trabajadas que no están en la PPP.
+
+     ⚠ Esta página NO reemplaza al monitor grande: es una segunda vista de los
+     mismos datos. Si cambia una regla del tablero (qué entra en la ventana,
+     cuándo una tanda sale del monitor), hay que tocar los dos lados. Los
+     puntos donde eso aplica están marcados con «≡ index.html».
+
+     URL:  <repo>/monitor/tv.html?key=tv   (la primera vez; después queda
+           enrolada en localStorage y entra con /monitor/tv.html pelado, igual
+           que el modo kiosko del monitor grande).
+     ========================================================================= -->
+<style>
+/* ── Base ─────────────────────────────────────────────────────────────────
+   Pensada para una TV de 50" mirada desde 3-5 m: fondo oscuro (menos brillo
+   en planta), texto grande y contraste alto. Nada de hover ni de cursor. */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0b1220;color:#e2e8f0;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;cursor:none;user-select:none}
+html.embebido body{cursor:default}
+/* La TV recorta los bordes (overscan). 1,6% de colchón para que no se coma
+   ni el reloj ni la última columna. */
+#app{height:100%;display:flex;flex-direction:column;padding:1.6vh 1.6vw;gap:1vh}
+.hide{display:none!important}
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+/* v24.38 (Luis): TRES columnas —vacia | codigo | reloj+estado— para que el codigo
+   quede centrado en la PANTALLA, no en el hueco que dejan los vecinos. Sigue en el
+   flujo, asi que el alto del header lo da la rueda y nada se corta. */
+header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1.4vw;flex:0 0 auto}
+.h-der{display:flex;align-items:center;justify-content:flex-end;gap:1.4vw;min-width:0}
+.h-sp{flex:1}
+.h-reloj{font-size:calc(3.1*var(--u));font-weight:900;color:#f8fafc;font-variant-numeric:tabular-nums}
+.h-est{font-size:calc(1.6*var(--u));font-weight:800;color:#4ade80;white-space:nowrap}
+.h-est.stale{color:#fbbf24}
+.h-est.err{color:#f87171}
+/* v23.92 (Luis) — CÓDIGO DE LOGIN: grande y con la rueda que se vacía en el minuto que dura.
+   Reemplaza al QR de fichada (se ficha entrando con este código) y a la barra de avance del
+   header, que era texto que nadie leía de lejos. */
+/* v24.38 (Luis): CENTRADO y en UNA linea — «CODIGO DE INGRESO: 4145» — con su
+   rueda al lado. ≡ index.html (.mon-clave). Sale del flujo con position:absolute:
+   quedandose en la fila habria que equilibrar a mano contra el reloj + estado. */
+.clv{display:flex;align-items:center;gap:1.1vw;flex:0 0 auto;justify-self:center}
+.clv-anillo{width:8.6vh;height:8.6vh;flex:0 0 auto;transform:rotate(-90deg)}
+.clv-anillo circle{fill:none;stroke-width:3.2}
+.clv-pista{stroke:#1e293b}
+.clv-arco{stroke:#38bdf8;stroke-linecap:round;
+  stroke-dasharray:100.53;transition:stroke-dashoffset .9s linear,stroke .3s}
+.clv-arco.poco{stroke:#fbbf24}
+.clv-txt{display:flex;align-items:baseline;gap:.9vw;white-space:nowrap}
+.clv-lab{font-size:calc(2.4*var(--u));font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;line-height:1}
+.h-clave{font-size:calc(7.4*var(--u));font-weight:900;color:#f8fafc;line-height:1;
+  font-variant-numeric:tabular-nums;letter-spacing:.16em}
+/* Dentro del admin (iframe) el header lo pone el modal: acá sería el segundo reloj y el
+   segundo código en la misma pantalla. */
+html.embebido header{display:none}
+
+/* ── Grilla principal ─────────────────────────────────────────────────── */
+/* v25.6 (Luis): *"que se adapte a la resolución"*. Las letras van en --u = el menor entre
+   1vh y el alto que tendría una 16:9 de ese ancho: en una pantalla más angosta achican. */
+:root{--u:min(1vh,.5625vw)}
+main{flex:1;display:grid;grid-template-columns:1fr auto;gap:.8vw;min-height:0}
+.col{display:flex;flex-direction:column;gap:1vh;min-height:0;min-width:0}
+.card{background:#111c2f;border:1px solid #1e293b;border-radius:1vh;
+  padding:.9vh 1vw;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+/* v24.39 (Luis): *"Headers centrados"*. Todos los titulos de tarjeta van centrados; la
+   clase .izq-t queda por si algun dia hay que dejar uno a la izquierda. */
+.card-t{font-size:calc(2.1*var(--u));font-weight:900;color:#93c5fd;letter-spacing:.04em;text-align:center;
+  margin-bottom:.7vh;flex:0 0 auto;overflow:hidden;line-height:1.2}
+.card-t small{color:#64748b;font-weight:700}
+.card-t.izq-t{text-align:left}
+.grow{flex:1;min-height:0;overflow:hidden}
+
+/* ── Tablas ───────────────────────────────────────────────────────────── */
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{font-size:calc(1.6*var(--u));font-weight:800;color:#64748b;text-align:left;
+  padding:.4vh .5vw;border-bottom:.2vh solid #1e293b;text-transform:uppercase;letter-spacing:.04em}
+td{padding:.6vh .5vw;border-bottom:1px solid #16203a;font-size:calc(2.4*var(--u));font-weight:700}
+.num{text-align:right}
+.cen{text-align:center}
+tr.curso td{background:#1c2a12}
+tr.fact td{background:#14311f}
+/* v20.19 — YA SALIÓ y todavía SIN FACTURA: la mercadería está en la calle sin
+   papel. Es lo único de esta tabla que hay que resolver hoy, así que se pinta
+   violeta (el mismo color que la columna SALIÓ de la PPP) y no verde. */
+tr.salio-sinfc td{background:#2a1f45}
+/* v23.64 — Resumen de días (≡ Programación de la PPP): colores de sus columnas */
+/* v24.39 (Luis): UNA fila por día (eran dos: el 4.º día quedaba cortado). */
+.rd th{text-align:center;font-size:calc(1.6*var(--u));font-weight:800;color:#64748b;letter-spacing:.05em;
+  padding:.2vh .2vw;text-transform:uppercase}
+.rd td{text-align:center;font-weight:900;line-height:1.05;font-size:calc(2.6*var(--u));padding:.7vh .2vw}
+/* v25.49 (Luis): como Operarios — la tabla mide lo que el dato, centrada, sin espacio muerto. */
+table.rd{width:auto;margin:0 auto}
+.rd th,.rd td{padding-left:.7vw;padding-right:.7vw}
+.rd td.rd-fe{text-align:center;color:#e2e8f0;white-space:nowrap;font-size:calc(2.4*var(--u))}
+.rd tr+tr td{border-top:1px solid #16203a}
+.rd td small{display:block;font-size:.62em;font-weight:700;color:inherit;opacity:.85}
+.rd tr.hoy td.rd-fe{color:#93c5fd}
+.rd .sal{color:#a78bfa}.rd .fac{color:#60a5fa}.rd .arm{color:#4ade80}.rd .pro{color:#fbbf24}.rd .pen{color:#f87171}
+.rd .z{color:#334155}
+.rd td.rd-m3{color:#e2e8f0;font-variant-numeric:tabular-nums}
+.st-salio{font-size:calc(2.1*var(--u))}
+.fc-salio{color:#c4b5fd}
+
+/* Separador de día. Reemplaza a la columna «Salida», que salió de la tabla
+   cuando entraron cliente, zona y demora: el boceto de Damián encabeza la
+   tabla con el día ("Miercoles 23/09") y la ventana son 2-3 días, así que cada
+   bloque lleva el suyo. */
+tr.dia td{background:#0e1830;color:#93c5fd;font-size:calc(1.9*var(--u));font-weight:900;
+  letter-spacing:.07em;text-transform:uppercase;padding:.5vh .5vw;
+  border-bottom:.2vh solid #1e293b}
+
+/* Tabla de tandas: el código de tanda es lo que se busca de lejos. */
+.t-tanda{font-weight:900;font-size:calc(3.3*var(--u));color:#f8fafc;letter-spacing:.03em;white-space:nowrap}
+.t-m3{font-weight:900;font-size:calc(3.1*var(--u));color:#e2e8f0}
+.t-fe{color:#94a3b8;font-weight:800}
+/* Celda de estado: ✅ terminado · ◍ girando en curso · vacío sin actividad. */
+.st{display:inline-flex;align-items:center;gap:.35vw;justify-content:center;white-space:nowrap}
+.st-done{color:#4ade80;font-size:calc(2.1*var(--u));font-weight:900}
+.spin{display:inline-block;width:1.5vh;height:1.5vh;border:.3vh solid #fbbf24;
+  border-top-color:transparent;border-radius:50%;animation:sp 1.1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* Fase abandonada (fichó salida sin cerrarla): quieta, nunca girando. Cuadrado
+   y no un emoji de "eject": los emoji los dibuja la fuente del televisor y
+   cambian de un modelo a otro; un carácter geométrico se ve igual en todos. */
+.st-aband{color:#a78bfa;font-size:calc(1.9*var(--u));font-weight:900}
+.ini{background:#1e293b;color:#cbd5e1;border-radius:.5vh;padding:.1vh .5vh;
+  font-size:calc(1.5*var(--u));font-weight:900;letter-spacing:.03em}
+.dur{font-size:calc(1.4*var(--u));font-weight:800;white-space:nowrap}
+
+/* ── Tabla de tandas (v23.92, Luis): tanda · m³ · progreso, todo centrado ──
+   Tres columnas de ancho fijo: sin `table-layout:fixed` el semáforo se corre de
+   lugar de una fila a otra y la columna deja de leerse como columna. */
+table.tandas{table-layout:fixed}
+/* v24.88: cliente y NP, más chicos que el código de tanda (lo que se busca de lejos sigue siendo la tanda). */
+.t-cli{font-weight:800;font-size:calc(2.3*var(--u));color:#e2e8f0}
+.t-cli div{overflow:hidden;white-space:nowrap}
+/* v24.92 (Luis): las NP van en UNA línea; si no entran, ROTAN como cartel de Wall Street
+   (el texto va duplicado y corre de derecha a izquierda sin salto). Si entran, quietas. */
+td.t-np{font-weight:900;font-size:calc(2.6*var(--u));color:#cbd5e1}
+/* v25.01: rota también el cliente, y el cuadro «Pendientes de salir hoy». */
+.tk{display:inline-block}
+.tk.rota{animation:ticker linear infinite;will-change:transform}
+/* v25.01 (Luis): las luces P/A quedan SIEMPRE centradas; quién la tiene y hace cuánto va abajo. */
+.semdet{display:block;margin-top:.3vh;line-height:1}
+/* v25.01 (Luis): «Pendientes de salir hoy» — lo del día que todavía no salió en el camión. */
+table.pen{width:auto;margin:0 auto}
+table.pen td.p-cli div{max-width:17vw}table.pen td.p-np div{max-width:12vw}
+table.pen td{text-align:center;padding:.5vh .7vw;font-weight:800;font-size:calc(2.1*var(--u));color:#e2e8f0}
+table.pen td.p-tanda{font-weight:900;font-size:calc(2.4*var(--u))}
+table.pen td.p-zona{color:#7dd3fc;font-size:calc(2*var(--u))}
+table.pen td.p-np{color:#94a3b8;font-size:calc(1.8*var(--u))}
+table.pen td div{overflow:hidden;white-space:nowrap}
+table.pen tr+tr td{border-top:1px solid #16203a}
+table.pen .sal{color:#a78bfa}table.pen .fac{color:#60a5fa}table.pen .arm{color:#4ade80}
+table.pen .pro{color:#fbbf24}table.pen .pen{color:#f87171}
+@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+table.tandas td,table.tandas th{text-align:center;padding:.85vh .4vw}
+/* Semáforo: dos luces con su letra — P de picking, A de armado. Rojo = no empezó ·
+   ámbar = en curso · verde = terminado · violeta = abandonado (fichó salida sin
+   cerrar). Son círculos dibujados con CSS, NO emoji: los emoji los pinta la fuente
+   del televisor y cambian de un modelo a otro. */
+.sem{display:inline-flex;gap:.6vw;align-items:center;justify-content:center;white-space:nowrap}
+.sem i{width:4.8vh;height:4.8vh;border-radius:50%;display:inline-flex;align-items:center;
+  justify-content:center;font-style:normal;flex:0 0 auto;font-size:calc(2.6*var(--u));font-weight:900;
+  letter-spacing:0;color:#fff;line-height:1}
+.sem .s-no{background:#7f1d1d;box-shadow:inset 0 0 0 .25vh #dc2626;color:#fca5a5}
+.sem .s-curso{background:#f59e0b;color:#3b2200;animation:pulso 1.4s ease-in-out infinite}
+.sem .s-ok{background:#16a34a}
+.sem .s-aband{background:#6d28d9;box-shadow:inset 0 0 0 .25vh #a78bfa}
+@keyframes pulso{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── Horas por operario (v21.17, Damián) ─────────────────────────────────
+   Las columnas salen de `gv_monitor_horas_operario`: la clasificación de qué
+   hora es productiva vive en el BACKEND, no acá. */
+table.ops th{font-size:calc(1.6*var(--u));letter-spacing:0;padding:.3vh .7vw;line-height:1.15;
+  white-space:normal;text-align:center}
+/* v25.47 (Luis): todo centrado y el ancho repartido; el nombre ya no se queda con el sobrante. */
+table.ops{width:auto;margin:0 auto}
+table.ops td{font-size:calc(2.7*var(--u));padding:.65vh .7vw;text-align:center}
+table.ops td:first-child{text-align:center;font-weight:900;color:#f8fafc;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.op-prod{color:#4ade80}
+.op-rit{color:#e2e8f0;font-weight:900}
+.op-sep{border-right:.2vh solid #1e293b}
+tr.op-grp th{text-align:center;color:#93c5fd;font-size:calc(1.5*var(--u));border-bottom:0;padding-bottom:0}
+.op-mov{color:#93c5fd}
+.op-no{color:#fbbf24}
+.op-tot{color:#f8fafc;font-weight:900}
+tr.op-tot-row td{border-top:.2vh solid #1e293b;background:#0e1830}
+
+/* ── Panel "En este momento" ──────────────────────────────────────────── */
+/* v25.49 (Luis): al ancho del dato, centrada. */
+table.act-t{width:auto;margin:0 auto}
+table.act-t td{padding:.8vh .7vw;font-size:calc(2.4*var(--u));text-align:left;white-space:nowrap}
+table.act-t tr+tr td{border-top:1px solid #16203a}
+.act-idle{opacity:.55}
+.act-who{font-weight:900;color:#e2e8f0}
+.act-who b{color:#60a5fa;margin-right:.35vw}
+td.act-what{color:#cbd5e1;font-weight:700;max-width:24vw;overflow:hidden;text-overflow:ellipsis}
+td.act-dur{font-weight:900;text-align:center;font-size:calc(2.1*var(--u))}
+
+/* v23.86 (Luis) — ¿LLEGAN? La meta del día es ARMAR lo que sale en 2 días hábiles (armado → factura →
+   salida). A las 15:00 se corta: si al ritmo de hoy no llegan, se corrige la PPP ese mismo día.
+   v23.92 — dejó de ser una tarjeta: es la banda que encabeza el resumen de días. */
+.mt-ver{font-size:calc(2.6*var(--u));font-weight:900;line-height:1.15;margin:.1vh 0 .5vh;text-align:center;
+  text-wrap:balance}   /* que no deje el «m³» solo en el segundo renglon */
+.mt-ok{color:#4ade80}.mt-no{color:#f87171}.mt-duda{color:#fbbf24}.mt-gris{color:#94a3b8}
+.mt-bar{height:1.1vh;border-radius:999px;background:#1e293b;overflow:hidden;margin:.3vh 0 .6vh}
+.mt-bar i{display:block;height:100%;background:#16a34a}
+.mt-lin{font-size:calc(1.9*var(--u));font-weight:800;color:#cbd5e1;line-height:1.4;text-align:center}
+.mt-lin b{color:#f8fafc}
+.mt-hoy{color:#64748b;border-top:1px solid #16203a;margin-top:.5vh;padding-top:.5vh}
+.mt-corte{background:#450a0a;color:#fecaca;border:2px solid #ef4444;animation:bordeCorte 1.4s ease-in-out infinite}
+@keyframes bordeCorte{0%,100%{border-color:#ef4444}50%{border-color:#450a0a}}
+.m3box{flex:1;background:#111c2f;border:1px solid #1e293b;border-radius:1vh;
+  padding:.9vh 1vw;text-align:center}
+.m3lab{font-size:calc(1.7*var(--u));font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+.m3val{font-size:calc(5.2*var(--u));font-weight:900;color:#f8fafc;line-height:1.05;font-variant-numeric:tabular-nums}
+.m3val small{font-size:calc(1.8*var(--u));color:#64748b;font-weight:800}
+
+/* ── Avisos ───────────────────────────────────────────────────────────── */
+.avisos{flex:0 0 auto;display:flex;flex-direction:column;gap:.6vh}
+.aviso{border-radius:.8vh;padding:.7vh 1vw;font-size:calc(2*var(--u));font-weight:800;line-height:1.3}
+.aviso-agr{background:#422006;color:#fde68a;border:1px solid #92400e}
+.aviso-err{background:#450a0a;color:#fecaca;border:1px solid #991b1b}
+/* v20.20 — salió y sin factura: violeta, el mismo color que la columna Salió */
+.aviso-salio{background:#2e1065;color:#ddd6fe;border:1px solid #6d28d9}
+.t-salio{font-size:calc(1.5*var(--u));margin-left:.2vw}
+.vacio{color:#475569;font-size:calc(1.9*var(--u));font-weight:700;padding:1.5vh .5vw;text-align:center}
+.mas{color:#64748b;font-size:calc(1.5*var(--u));font-weight:800;padding:.5vh;text-align:center}
+
+/* Cartel de arranque / de caída total */
+#splash{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:2vh;background:#0b1220;z-index:9;text-align:center;padding:4vw}
+#splash .s1{font-size:calc(3*var(--u));font-weight:900;color:#93c5fd}
+#splash .s2{font-size:calc(2*var(--u));font-weight:700;color:#64748b;max-width:60vw;line-height:1.5}
+
+/* Banner de "sin actualizar" — arriba de todo, imposible de no ver. */
+#offline{flex:0 0 auto;background:#7f1d1d;color:#fff;border-radius:.8vh;
+  padding:.8vh 1vw;font-size:calc(2*var(--u));font-weight:900;text-align:center}
+/* ── Capa admin (sólo admin.html, inyectada por build-admin.cjs) ──────────── */
+.cx{cursor:pointer}
+.cx:hover{outline:2px solid #38bdf8;outline-offset:-2px;background:#0e1830}
+#pop{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+  background:rgba(2,6,23,.74);padding:3vh 3vw}
+#pop.hide{display:none!important}
+.pop-card{background:#0f1a2e;border:1px solid #334155;border-radius:1vh;min-width:min(78vw,360px);
+  max-width:min(92vw,920px);max-height:88vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.pop-hd{display:flex;align-items:center;justify-content:space-between;gap:1vw;padding:1.1vh 1.3vw;
+  border-bottom:1px solid #1e293b;position:sticky;top:0;background:#0f1a2e;z-index:1}
+.pop-hd h3{font-size:calc(2.4*var(--u));color:#f8fafc;font-weight:900;margin:0;line-height:1.2}
+.pop-x{cursor:pointer;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:.6vh;
+  font-size:calc(2.2*var(--u));font-weight:900;padding:.2vh 1vw;line-height:1.3;flex:0 0 auto}
+.pop-x:hover{background:#334155}
+.pop-bd{padding:1.1vh 1.3vw;font-size:calc(2.1*var(--u));color:#e2e8f0}
+.pop-bd table{width:100%;border-collapse:collapse;margin:.4vh 0}
+.pop-bd th{font-size:calc(1.7*var(--u));color:#93c5fd;text-align:left;padding:.4vh .7vw;
+  border-bottom:1px solid #1e293b;text-transform:uppercase;letter-spacing:.03em}
+.pop-bd td{font-size:calc(2*var(--u));padding:.4vh .7vw;border-bottom:1px solid #16203a;font-weight:700}
+.pop-bd td.num,.pop-bd th.num{text-align:right;font-variant-numeric:tabular-nums}
+.pop-tot td{border-top:2px solid #334155;font-weight:900;color:#f8fafc}
+.pop-sub{color:#94a3b8;font-size:calc(1.85*var(--u));margin:.2vh 0 1vh;line-height:1.4}
+.pop-k{color:#f8fafc;font-weight:900}
+.pop-empty{color:#64748b;padding:1.5vh;text-align:center;font-weight:700}
+
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <div class="s1">Monitor Virgilio</div>
+  <div class="s2" id="splashMsg">Cargando el tablero…</div>
+</div>
+
+<div id="app" class="hide">
+  <div id="offline" class="hide"></div>
+  <header>
+    <div></div>
+    <div class="clv">
+      <svg class="clv-anillo" viewBox="0 0 36 36" aria-hidden="true">
+        <circle class="clv-pista" cx="18" cy="18" r="16"></circle>
+        <circle class="clv-arco" id="clvArco" cx="18" cy="18" r="16" stroke-dashoffset="0"></circle>
+      </svg>
+      <div class="clv-txt">
+        <span class="clv-lab">Código de ingreso:</span>
+        <span class="h-clave" id="tvClave">----</span>
+      </div>
+    </div>
+    <div class="h-der">
+      <div class="h-reloj" id="reloj">--:--</div>
+      <div class="h-est" id="estado">● conectando</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- v24.39 (Luis): *"eso de TERMINO LA JORNADA podes ponerlo arriba de la tabla de la
+         izquierda y usar ese realstate para poner los carteles de aviso"*. La banda del
+         veredicto y los carteles pasan a encabezar la columna de tandas; el cuadro de Días
+         se queda sólo con la tabla, que es lo que tiene que entrar entero en la pared. -->
+    <div class="col">
+      <div id="metaBox"></div>
+      <div class="avisos" id="avisos" style="flex:0 0 auto"></div>
+      <div class="card grow">
+        <div class="grow" id="tandasBox"></div>
+      </div>
+    </div>
+
+    <!-- v23.70 (Luis): sin espacio muerto. Medio: Operarios (Ritmo + Horas) y «En este momento»
+         toman el alto de su contenido (≤ 4 operarios); los avisos usan el resto. Derecha: m³ del día,
+         Resumen de días al alto de su contenido y Total por día el resto. -->
+    <div class="col" id="col2">
+      <div class="card" style="flex:0 0 auto">
+        <div class="card-t" id="opsTit">Operarios</div>
+        <div id="opsBox"></div>
+      </div>
+      <!-- v24.70 (Luis): *"pone el bloque de «dias» junto con el de «operarios» y «en este
+           momento» agregandole los m3 por día. «Total por día» sacalo, que quede una vision
+           estilo dos columnas"*. -->
+      <div class="card" style="flex:0 0 auto">
+        <div class="card-t" id="fcTit">NPs por Día</div>
+        <div id="fcBox"></div>
+      </div>
+      <!-- v25.01 (Luis): *"agrega «Pendientes de salir hoy» que muestre cuantos y cuales pedidos
+           pendientes de entrega hay ese día"*. -->
+      <div class="card" style="flex:0 0 auto">
+        <div class="card-t" id="penTit">Pendientes de salir hoy</div>
+        <div id="penBox"></div>
+      </div>
+      <div class="card grow">
+        <div class="card-t" id="actTit">En este momento</div>
+        <div class="grow" id="actBox"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="../supabase-config.js?v=1202"></script>
+<script>
+/* v23.70 (Luis): dentro del admin (📺 Vista TV, en un iframe) el mouse se tiene que ver.
+   En la TV de pared sigue oculto. */
+try { if (window.self !== window.top) document.documentElement.classList.add("embebido"); } catch (_e) { document.documentElement.classList.add("embebido"); }
+</script>
+<script>
+(function () {
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   0 · CONFIG
+   La URL y la key salen de supabase-config.js — único lugar del repo donde
+   viven (v11.101). No copiarlas acá: rotar la key tiene que seguir siendo
+   tocar un solo archivo.
+   ═══════════════════════════════════════════════════════════════════════════ */
+var SB_URL = window.VIR_SUPABASE_URL;
+var SB_KEY = window.VIR_SUPABASE_KEY;
+var H = { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY };
+var TZ = "America/Argentina/Buenos_Aires";
+
+var REFRESH_MS      = 15000;            // ciclo del tablero
+var EMPLEADOS_TTL   = 60 * 60 * 1000;   // nombres y horarios: cambian una vez al año
+var PROG_TTL        = 60 * 1000;        // la programación no cambia cada 15 s
+var FAC_TTL         = 30 * 1000;
+var DESPACHO_TTL    = 120 * 1000;       // la consulta más cara de todas
+var DESHECHAS_TTL   = 60 * 1000;
+var HORAS_TTL       = 60 * 1000;        // horas por operario: se mueven de a cierres
+var FETCH_TIMEOUT   = 20000;            // ≡ index.html SUPA_FETCH_TIMEOUT_MS
+var WATCHDOG_MS     = 10 * 60 * 1000;   // ≡ index.html MON_RELOAD_MS
+var RELOAD_CADA_MS  = 6 * 60 * 60 * 1000; // higiene: reload cada 6 h de madrugada
+var VENTANA_DIAS    = 3;                // ≡ index.html targetDeliveryDates(sheetMap, 3)
+var MAX_SIN_ACT     = 6;                // ≡ index.html MAX_PLANNED_NO_ACT
+/* A partir de cuántas tandas salidas y sin factura sale el cartel. Arrancó en 3 (v20.21) y
+   Thomas lo bajó a **1** el mismo día: una tanda en la calle sin papel ya es algo que alguien
+   tiene que resolver hoy, no un umbral estadístico. */
+var AVISO_SALIO_SIN_FC = 1;
+var CC_DESDE_ISO    = "2026-06-22T00:00:00-03:00";  // ≡ index.html CC_REPARTO_DESDE_ISO
+
+/* Enrolamiento, igual que el modo kiosko del monitor grande: la primera vez
+   se abre con ?key=tv, queda marcada en localStorage y la clave se borra de
+   la URL para que no quede a la vista en la barra del televisor. */
+var TV_KEY = "tv";
+var KIOSK_FLAG = "vir_tv_kiosk";
+
+/* Feriados: para no contar como trabajadas las horas de un feriado cuando una
+   tanda quedó abierta de un día para otro.
+   ⚠ v21.47 — ESTO ES EL FALLBACK. La CANÓNICA es `public."GV_Feriados"`, y la baja
+   `cargarFeriados()` en cada ciclo. Estaba escrita a mano acá, en `index.html` y
+   adentro de `gv_monitor_horas_operario_dia`, y las tres terminaban el 25/12/2026.
+   No borrar la lista: si el fetch falla, el tablero prefiere la de 2026 a ninguna. */
+var FERIADOS = { "2026-01-01":1,"2026-02-16":1,"2026-02-17":1,"2026-03-24":1,
+  "2026-04-02":1,"2026-04-03":1,"2026-05-01":1,"2026-05-25":1,"2026-06-15":1,
+  "2026-06-20":1,"2026-07-09":1,"2026-08-17":1,"2026-10-12":1,"2026-11-23":1,
+  "2026-12-08":1,"2026-12-25":1 };
+
+/* ≡ index.html _MON_ACT_INFO / _MON_ACT_TOGGLES */
+var ACT_TOGGLES = { CR:1, RR:1, CC:1, RT:1, MG:1, RI:1, EI:1, AT:1, PB:1, Limp:1, PC:1, Perm:1, CT:1, RKB:1, IRT:1 };
+var ACT_INFO = {
+  pick:{ ic:"🛒", vb:"Pickeando" }, arm:{ ic:"🔨", vb:"Armando" },
+  CC:{ ic:"🚛", tx:"Cargando camión" },   RT:{ ic:"🏭", tx:"Recibiendo mercadería" },
+  MG:{ ic:"📥", tx:"Guardando" },         RI:{ ic:"📥", tx:"Recibiendo insumos" },
+  EI:{ ic:"📤", tx:"Entregando insumos" },CR:{ ic:"📋", tx:"Controlando remitos" },
+  RR:{ ic:"🚚", tx:"Recepción de remitos" }, AT:{ ic:"🔔", tx:"Atendiendo timbre" },
+  PB:{ ic:"🚽", tx:"En el baño" },        Limp:{ ic:"🧹", tx:"Limpiando" },
+  PC:{ ic:"🍽", tx:"Comiendo" },          Perm:{ ic:"🚪", tx:"Permiso de salida" },
+  CT:{ ic:"🔢", tx:"Conteo" },
+  RKB:{ ic:"🏗", tx:"Bajando racks" },  IRT:{ ic:"🏗", tx:"Ingresando a racks" },
+  GST:{ ic:"📥", tx:"Guardando (bajada de racks)" }   /* v23.64 ≡ index.html */
+};
+var GST_VIVO_MIN = 45;   /* ≡ index.html MON_GST_VIVO_MIN */
+/* Iniciales custom por legajo — ≡ index.html INITIALS_OVERRIDE_BY_LEGAJO */
+var INICIALES_OVERRIDE = { "8": "JF" };
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1 · UTILIDADES
+   ═══════════════════════════════════════════════════════════════════════════ */
+function esc(s) {
+  if (s == null) return "";
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function el(id) { return document.getElementById(id); }
+function n1(x) { return (Math.round((Number(x) || 0) * 10) / 10).toFixed(1).replace(".", ","); }
+/* Horas con UNA decimal y coma, como el resto de los números de la casa. El 0
+   se escribe "—": en una pared un cero y un "no hizo nada" se leen igual, y el
+   guion no se confunde con un dato. */
+function nH(x) {
+  /* v23.70 (Luis): TODA hora va en H:MM (horas:minutos); los índices (m³/h) en decimal. */
+  var v = Number(x) || 0;
+  if (!(v > 0.0083)) return "—";                       // menos de medio minuto = nada
+  var m = Math.round(v * 60);
+  return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0");
+}
+/* Nombre para la tabla de operarios: nombre de pila + inicial del apellido.
+   "Farias Juan Hilario" → "Farias J." — el apellido va primero porque así
+   están cargados en `Empleados`. */
+function nombreCorto(nombre, legajo) {
+  /* Se saltean los pedazos sin letras: un nombre como "Entrevista / Prueba"
+     salía "Entrevista /." — la inicial era la barra. */
+  var p = String(nombre || "").trim().split(/\s+/)
+            .filter(function (x) { return /[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(x); });
+  if (!p.length) return "Leg " + legajo;
+  if (p.length === 1) return p[0];
+  return p[0] + " " + p[1].charAt(0).toUpperCase() + ".";
+}
+
+/* Día YYYY-MM-DD en hora de Buenos Aires, salga de donde salga el reloj de la
+   TV. ≡ index.html isoToDayKey. Argentina no usa horario de verano: UTC-3 fijo. */
+function dayKey(isoOrMs) {
+  var ts = typeof isoOrMs === "number" ? isoOrMs : new Date(isoOrMs).getTime();
+  var d = new Date(new Date(ts).toLocaleString("en-US", { timeZone: TZ }));
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
+         "-" + String(d.getDate()).padStart(2, "0");
+}
+function hoyKey() { return dayKey(Date.now()); }
+
+/* ≡ index.html monitorFmtFecha / monitorRawFecha */
+function fmtFecha(s) {
+  if (!s) return "";
+  var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[3] + "/" + m[2];
+  var m2 = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m2) return m2[1].padStart(2, "0") + "/" + m2[2].padStart(2, "0");
+  var m3 = String(s).match(/^(\d{1,2})\/(\d{1,2})\s*$/);
+  if (m3) return m3[1].padStart(2, "0") + "/" + m3[2].padStart(2, "0");
+  return String(s).slice(0, 10);
+}
+function rawFecha(s) {
+  if (!s) return "";
+  var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + "-" + m[2] + "-" + m[3];
+  var m2 = String(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m2) { var y = m2[3]; if (y.length === 2) y = "20" + y;
+            return y + "-" + m2[2].padStart(2, "0") + "-" + m2[1].padStart(2, "0"); }
+  var m3 = String(s).match(/^(\d{1,2})\/(\d{1,2})\s*$/);
+  if (m3) return (new Date().getFullYear()) + "-" + m3[2].padStart(2, "0") + "-" + m3[1].padStart(2, "0");
+  return "";
+}
+/* ≡ index.html tandaCamion — letra + número: D60A, E60A y F60A son camiones
+   DISTINTOS aunque compartan el 60 (idea 7828). */
+function tandaCamion(code) {
+  var s = String(code || "").trim().toUpperCase();
+  var m = /^([A-Z]+)-?(\d+)[A-Z]*$/.exec(s);
+  if (m) return m[1] + m[2];
+  var d = s.match(/\d+/);
+  return d ? d[0] : s;
+}
+/* ≡ index.html monCamionDeTanda / monUnirCentroOeste (v23.64) */
+var MON_CAMION_ZONA = { 1: "Capital Sur", 2: "Capital Centro", 3: "Capital Oeste", 4: "GBA Sur", 5: "GBA Oeste", 6: "GBA Norte", 7: "GBA Norte" };
+function monCamionDeTanda(v) {
+  /* primero la base (gv_monitor_tanda_camion, ve el súper con zona numérica); lo de abajo es respaldo */
+  var b = CAMION_DE.get(String((v && v.tanda) || "").trim().toUpperCase());
+  if (b && b.camion) return b.camion;
+  var z = String((v && v.zonas && v.zonas[0]) || "").trim();
+  if (/super/i.test(z)) return "Súper · " + (String((v.clientes && v.clientes[0]) || "").trim() || v.tanda);
+  if (/retira/i.test(z)) return "Retira";
+  var m = /Zona\s*(\d+)/i.exec(z);
+  if (m && MON_CAMION_ZONA[+m[1]]) return MON_CAMION_ZONA[+m[1]];
+  return z || tandaCamion(v && v.tanda);
+}
+function monUnirCentroOeste(porDia) {
+  porDia.forEach(function (g) {
+    var C = g.camiones.get("Capital Centro"), O = g.camiones.get("Capital Oeste");
+    if (!C || !O || !(C.sum < 1 && O.sum < 1)) return;
+    g.camiones.delete("Capital Centro"); g.camiones.delete("Capital Oeste");
+    g.camiones.set("Capital Centro-Oeste", { sum: C.sum + O.sum, n: C.n + O.n, armadas: C.armadas + O.armadas });
+  });
+}
+/* ≡ index.html pwebNpLabel */
+function npLabel(empresa, np) {
+  var n = String(np);
+  var e = String(empresa || "").trim().toLowerCase();
+  return ((e === "chef" || e === "ch") ? "CH" : "LK") + " " + (n.length >= 4 ? n : n.padStart(4, "0"));
+}
+/* ≡ index.html initialsFromName */
+function iniciales(nombre, legajo) {
+  var leg = legajo != null ? String(legajo).trim() : "";
+  if (leg && INICIALES_OVERRIDE[leg]) return INICIALES_OVERRIDE[leg];
+  if (!nombre) return "";
+  var p = String(nombre).trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return "";
+  if (p.length === 1) return p[0].charAt(0).toUpperCase();
+  return p[0].charAt(0).toUpperCase() + p[1].charAt(0).toUpperCase();
+}
+function fmtMin(min) {
+  if (!(min >= 0)) return "";
+  return Math.floor(min / 60) + ":" + String(min % 60).padStart(2, "0");   // v23.70: H:MM
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2 · RED
+   PostgREST corta en 1000 filas (db-max-rows) y devuelve 200 sin avisar, así
+   que todo lo que puede crecer se pagina con Range. Y todo lleva timeout: un
+   fetch colgado (la TV suspendida, un corte de un segundo) deja la promesa
+   pendiente para siempre y el tablero se congela sin decir nada.
+   ≡ index.html supaFetchAll.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function conTimeout(promesa, ctrl, queSoy) {
+  var tmo;
+  var corte = new Promise(function (_res, rej) {
+    tmo = setTimeout(function () {
+      try { if (ctrl) ctrl.abort(); } catch (_e) {}
+      rej(new Error(queSoy + " sin respuesta en " + Math.round(FETCH_TIMEOUT / 1000) + " s"));
+    }, FETCH_TIMEOUT);
+  });
+  return Promise.race([promesa, corte]).finally(function () { clearTimeout(tmo); });
+}
+
+/* Una sola página (para tablas chicas y acotadas). */
+function get(path, query) {
+  var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  var url = SB_URL + "/rest/v1/" + path + "?" + query;
+  return conTimeout(fetch(url, {
+    cache: "no-store", signal: ctrl ? ctrl.signal : undefined, headers: H
+  }), ctrl, path).then(function (r) {
+    if (!r.ok) throw new Error(path + " HTTP " + r.status);
+    return r.json();
+  });
+}
+
+/* Paginado completo con Range + count=exact. */
+function getAll(path, query) {
+  var out = [];
+  function pagina(desde) {
+    var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    var h = { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY,
+              "Range-Unit": "items", Range: desde + "-" + (desde + 999), Prefer: "count=exact" };
+    return conTimeout(fetch(SB_URL + "/rest/v1/" + path + "?" + query, {
+      cache: "no-store", signal: ctrl ? ctrl.signal : undefined, headers: h
+    }), ctrl, path).then(function (r) {
+      if (!r.ok && r.status !== 206) throw new Error(path + " HTTP " + r.status);
+      var rango = r.headers.get("content-range") || "";
+      return r.json().then(function (chunk) {
+        chunk = chunk || [];
+        for (var i = 0; i < chunk.length; i++) out.push(chunk[i]);
+        /* "0-999/4312" → el total va después de la barra. Sin total (o con "*")
+           cortamos cuando la página vino incompleta. */
+        var total = Number(String(rango.split("/")[1] || "").trim());
+        var hayMas = isFinite(total) ? (desde + chunk.length < total) : (chunk.length === 1000);
+        if (hayMas && chunk.length) return pagina(desde + chunk.length);
+        return out;
+      });
+    });
+  }
+  return pagina(0);
+}
+
+/* Caché con vencimiento: envuelve un cargador y evita repetir la consulta
+   antes de tiempo. Si la recarga falla, devuelve lo último bueno — el tablero
+   prefiere un dato de hace un minuto a un hueco. */
+function cache(ttl, cargar) {
+  var val = null, ts = 0, enVuelo = null;
+  return function () {
+    var ahora = Date.now();
+    if (val !== null && (ahora - ts) < ttl) return Promise.resolve(val);
+    if (enVuelo) return enVuelo;
+    enVuelo = cargar().then(function (v) {
+      val = v; ts = Date.now(); enVuelo = null; return v;
+    }).catch(function (e) {
+      enVuelo = null;
+      if (val !== null) { console.warn("[tv] recarga fallida, sigo con lo viejo:", e.message); return val; }
+      throw e;
+    });
+    return enVuelo;
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3 · FUENTES DE DATOS
+   Las mismas vistas y tablas que usa el monitor grande.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Programación: ISIS (gv_ppp_programacion_diaria) + web (PPP_Web_Programacion),
+   sumadas en UN mapa por código de tanda. ≡ index.html fetchMonitorFromSupabase
+   + mergeMonitorPppWeb. */
+var cargarProgramacion = cache(PROG_TTL, function () {
+  return Promise.all([
+    getAll("gv_ppp_programacion_diaria",
+      "select=tanda,np,m3,fecha_entrega,razon_social,zona,fecha_recep&order=tanda.asc,np.asc"),
+    getAll("PPP_Web_Programacion",
+      "select=empresa,np,tanda,fecha_entrega,razon_social,zona,fecha_recep,m3,es_agregado,agregado_a_np,cod_cliente" +
+      "&tanda=not.is.null&order=tanda.asc,np.asc").catch(function (e) {
+        /* Aditivo: si la PPP web falla, las tandas de ISIS se muestran igual.
+           ≡ index.html, que envuelve mergeMonitorPppWeb en try/catch. */
+        console.warn("[tv] PPP web:", e.message); return [];
+      }),
+    /* v21.63 — clientes de PRUEBA: la tele es de los operarios y no los muestra.
+       ≡ index.html gvSinPrueba (tanda PRUEBAn o cliente de GV_Clientes_Prueba). */
+    getAll("GV_Clientes_Prueba", "select=empresa,cod&order=cod.asc").catch(function () { return []; })
+  ]).then(function (par) {
+    var acc = new Map();
+    var isis = par[0] || [], web = par[1] || [];
+    var prueba = {};
+    (par[2] || []).forEach(function (c) { prueba[String(c.empresa || "").toLowerCase() + "|" + String(c.cod || "").trim()] = 1; });
+    var esTandaPrueba = function (t) { return /^PRUEBA\d+$/i.test(String(t == null ? "" : t).trim()); };
+
+    for (var i = 0; i < isis.length; i++) {
+      var r = isis[i];
+      var np = (r.np == null ? "" : String(r.np)).trim();
+      if (!/\d/.test(np)) continue;                 // sólo filas con N° de NP real
+      var tanda = (r.tanda == null ? "" : String(r.tanda)).trim();
+      if (esTandaPrueba(tanda)) continue;            // v21.63
+      var fe = (r.fecha_entrega == null ? "" : String(r.fecha_entrega)).trim();
+      var feRaw = rawFecha(fe);
+      var display, key;
+      if (tanda) { display = tanda; key = tanda.toUpperCase(); }
+      else if (feRaw) { display = "S/Tanda"; key = "S/TANDA__" + feRaw; }
+      else continue;
+      if (!acc.has(key)) acc.set(key, nuevaTanda(display, key, fe));
+      var e1 = acc.get(key);
+      e1.m3 += Number(r.m3) || 0;
+      e1.nps.push(np);
+      sumarDestino(e1, r.razon_social, r.zona, r.fecha_recep);
+    }
+
+    for (var j = 0; j < web.length; j++) {
+      var x = web[j];
+      var t = String(x.tanda || "").trim();
+      if (!t || !x.np) continue;
+      if (esTandaPrueba(t) || prueba[String(x.empresa || "").toLowerCase() + "|" + String(x.cod_cliente || "").trim()]) continue;   // v21.63
+      var k2 = t.toUpperCase();
+      var fe2 = String(x.fecha_entrega || "").trim();
+      if (!acc.has(k2)) acc.set(k2, nuevaTanda(t, k2, fe2));
+      var e2 = acc.get(k2);
+      e2.m3 += Number(x.m3) || 0;
+      e2.nps.push(npLabel(x.empresa, x.np));
+      sumarDestino(e2, x.razon_social, x.zona, x.fecha_recep);
+      /* Un AGREGADO es un pedido que el cliente sumó cuando su tanda ya estaba
+         en la mesa. Si nadie lo ve, el camión sale sin eso: por eso se canta
+         fuerte. ≡ index.html pwebAgregadoAviso. */
+      if (x.es_agregado) e2.agregados.push({
+        np: npLabel(x.empresa, x.np),
+        aNp: x.agregado_a_np == null ? "" : npLabel(x.empresa, x.agregado_a_np),
+        rs: String(x.razon_social || "").trim()
+      });
+    }
+    return acc;
+  });
+});
+
+/* Una tanda del tablero. `clientes` y `zonas` son listas SIN repetidos: una
+   tanda puede llevar varios pedidos de varios clientes (E12R tenía 6 NP de 4
+   clientes el 22/09) y en la pared va UNA fila — pedido de Damián: "si hay
+   varias NP que aparezca en una sola fila y con el nombre resumido".
+   `recep` es la fecha del pedido MÁS VIEJO de la tanda: la demora de una tanda
+   es la del pedido que más esperó, no el promedio. */
+function nuevaTanda(display, key, fe) {
+  return { tanda: display, key: key, m3: 0, fecha: fmtFecha(fe), fechaRaw: rawFecha(fe),
+           nps: [], agregados: [], clientes: [], zonas: [], recep: "" };
+}
+function sumarDestino(e, rs, zona, recep) {
+  var c = String(rs == null ? "" : rs).trim();
+  if (c && e.clientes.indexOf(c) < 0) e.clientes.push(c);
+  var z = String(zona == null ? "" : zona).trim();
+  if (z && e.zonas.indexOf(z) < 0) e.zonas.push(z);
+  var r = rawFecha(recep);
+  if (r && (!e.recep || r < e.recep)) e.recep = r;
+}
+
+/* v23.92 (Luis) — la tabla de tandas quedó en tanda · m³ · progreso, así que se fueron con
+   ella `zonaCorta`, `diasDemora` y `colorDemora`: nadie las llamaba más.
+   v24.88 (Luis): *"tiene que aparecer en la parte de la izquierda junto a las tandas y los m3:
+   el cliente y detalle de NPs"*. Vuelven cliente (resumido, «+N» si son varios) y las NP. */
+function resumirCliente(nombre) {
+  var s = String(nombre || "").trim()
+    .replace(/\s*\((?:[^()]*)\)\s*$/, "")
+    .replace(/[\s,.-]*\b(S\.?\s?R\.?\s?L\.?|S\.?\s?A\.?\s?S?\.?|SACIFI?A?|SRL|SA)\b\.?\s*$/i, "")
+    .replace(/\s{2,}/g, " ").trim();
+  return s;
+}
+function clienteTanda(v) {
+  var cs = (v.clientes || []).map(resumirCliente).filter(Boolean);
+  /* v25.6 (Luis): todos los nombres, no «+N»; si no entran, la celda rota. */
+  return cs.length ? cs.join(" · ") : "—";
+}
+/* Las NP con el prefijo UNA vez por empresa: «LK 0101·0102 · 98615». */
+/* v24.92 (Luis): «si hay más NPs de las que entran, que rote estilo cartel de Wall Street».
+   Sólo la celda que se desborda rota; el texto se duplica para que el giro no tenga salto
+   y la velocidad es pareja (~6 caracteres por segundo), sea larga o corta la lista. */
+function activarTicker(raiz) {
+  if (!raiz) return;
+  raiz.querySelectorAll(".tk").forEach(function (tk) {
+    var caja = tk.parentNode;
+    /* Idempotente (v25.01): se vuelve a medir al cambiar el tamaño o al cargar la fuente, así
+       que siempre parte del texto original y quieto. Una celda sin ancho (pestaña oculta del
+       admin) no se evalúa: se mide cuando se vea. */
+    if (tk.getAttribute("data-txt") == null) tk.setAttribute("data-txt", tk.textContent);
+    var txt = tk.getAttribute("data-txt");
+    tk.classList.remove("rota"); tk.style.animationDuration = ""; tk.textContent = txt;
+    if (!caja || !caja.clientWidth || tk.scrollWidth <= caja.clientWidth + 1) return;
+    var sep = "\u00a0\u00a0\u00a0·\u00a0\u00a0\u00a0";
+    tk.textContent = txt + sep + txt + sep;
+    tk.classList.add("rota");
+    /* v25.6 (Luis): a 3/4 de la velocidad de la v24.92 (6 → 4,5 caracteres por segundo). */
+    tk.style.animationDuration = Math.max(8, Math.round((txt.length + 7) / 4.5)) + "s";
+  });
+}
+function tickersTodos() { ["tandasBox", "penBox"].forEach(function (id) { activarTicker(el(id)); }); }
+(function () {
+  var t = null;
+  window.addEventListener("resize", function () { clearTimeout(t); t = setTimeout(tickersTodos, 250); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(tickersTodos, function () {});
+})();
+/* v25.01 (Luis): lo de HOY que todavía no salió en el camión, agrupado por tanda y cliente,
+   con el estado del más atrasado. Misma fuente que el cuadro de Días (gv_ppp_prog_arbol) y el
+   mismo «salió» (CCN sin FSS posterior). */
+var PEN_ORDEN = { pendiente: 0, proceso: 1, armado: 2, facturado: 3 };
+var PEN_TXT = { pendiente: ["pen", "Pend"], proceso: ["pro", "Proc"], armado: ["arm", "Arm"], facturado: ["fac", "Fact"] };
+function pendientesHoy(filas, despachadas) {
+  var hoy = hoyKey(), g = new Map();
+  (filas || []).forEach(function (r) {
+    if (String(r.fecha || "").slice(0, 10) !== hoy) return;
+    var np = String(r.np || "").trim().replace(/\.0+$/, "");
+    if (!np || despachadas.has(np)) return;
+    var tanda = String(r.tanda || "").trim().toUpperCase() || "—";
+    var rs = resumirCliente(r.razon_social || "") || "—";
+    var k = tanda + "|" + rs, x = g.get(k);
+    if (!x) { x = { tanda: tanda, rs: rs, rsFull: r.razon_social || "", nps: [], m3: 0, est: "facturado", zonas: [] }; g.set(k, x); }
+    /* v25.43 (Luis): la zona de cada pendiente, corta (Z4 · Súper · Retira). */
+    var zc = String(r.zona_corta || r.zona || "").trim().replace(/^zona\s*(\d+).*$/i, "Z$1");
+    if (zc && x.zonas.indexOf(zc) < 0) x.zonas.push(zc);
+    x.nps.push(np); x.m3 += Number(r.m3) || 0;
+    var e = PEN_ORDEN[r.estado] != null ? r.estado : "pendiente";
+    if (PEN_ORDEN[e] < PEN_ORDEN[x.est]) x.est = e;
+  });
+  return Array.from(g.values()).sort(function (a, b) {
+    return (PEN_ORDEN[a.est] - PEN_ORDEN[b.est]) || a.tanda.localeCompare(b.tanda);
+  });
+}
+function npsCortas(nps) {
+  var orden = [], grupos = {}, vistos = {};
+  (nps || []).forEach(function (n) {
+    var t = String(n || "").trim();
+    if (!t || vistos[t]) return;
+    vistos[t] = 1;
+    var m = /^(LK|CH)\s+(\S+)$/i.exec(t);
+    var pre = m ? m[1].toUpperCase() : "", num = m ? m[2] : t;
+    if (!grupos[pre]) { grupos[pre] = []; orden.push(pre); }
+    grupos[pre].push(num);
+  });
+  return orden.map(function (pre) {
+    return (pre ? pre + "\u00a0" : "") + grupos[pre].join("·");
+  }).join(" · ") || "—";
+}
+
+/* Semáforo de la tanda: dos luces, picking y armado. Pedido de Damián: "lo
+   quiere ver como semáforo". No reemplaza el detalle — al lado siguen las
+   iniciales de quién la tiene y hace cuánto, que es lo que se acciona. */
+/* v23.92 (Luis): la luz lleva la letra de su etapa adentro — P de picking, A de armado. */
+function luz(estado, aband, letra) {
+  var c = aband ? "s-aband" : (estado === "done" ? "s-ok" : (estado === "curso" ? "s-curso" : "s-no"));
+  var t = aband ? "Abandonada" : (estado === "done" ? "Terminado" : (estado === "curso" ? "En curso" : "Sin empezar"));
+  return '<i class="' + c + '" title="' + (letra === "P" ? "Picking" : "Armado") + ': ' + t + '">' + letra + '</i>';
+}
+function semaforo(ev, nombres, horarios) {
+  var s = '<span class="sem">' +
+    luz(ev.picking, ev.pickAband, "P") + luz(ev.armado, ev.armAband, "A") + '</span>';
+  /* El detalle es de la fase que está EN CURSO; si las dos están quietas no
+     hay nada que agregar. El armado va primero: es la fase más tardía. */
+  var det = "";
+  if (ev.armado === "curso")       det = celdaEstado("curso", ev.armLegajo,  ev.armStart,  ev.armAband,  ev.armFj,  nombres, horarios);
+  else if (ev.picking === "curso") det = celdaEstado("curso", ev.pickLegajo, ev.pickStart, ev.pickAband, ev.pickFj, nombres, horarios);
+  return s + (det ? '<span class="semdet">' + det + '</span>' : "");
+}
+
+/* Estado de cada tanda. `gv_tanda_status` ya resuelve en el backend el último
+   EP/TP y AP/TAP, el legajo, el arranque y si la fase quedó ABANDONADA (el
+   operario fichó salida sin cerrarla, v18.71). La lista de tandas va troceada:
+   un `in.(…)` con 400 códigos arma una URL que algunos proxies rechazan. */
+function cargarStatus(keys) {
+  var lotes = [], i;
+  for (i = 0; i < keys.length; i += 120) lotes.push(keys.slice(i, i + 120));
+  if (!lotes.length) return Promise.resolve(new Map());
+  return Promise.all(lotes.map(function (lote) {
+    return getAll("gv_tanda_status",
+      "tanda=in.(" + lote.map(encodeURIComponent).join(",") + ")" +
+      "&select=tanda,last_pick_op,pick_legajo,pick_start_ts,last_arm_op,arm_legajo," +
+      "arm_start_ts,pick_abandonado,arm_abandonado,pick_fj_ts,arm_fj_ts");
+  })).then(function (partes) {
+    var m = new Map();
+    partes.forEach(function (filas) {
+      (filas || []).forEach(function (row) {
+        var t = String(row.tanda || "").trim().toUpperCase();
+        if (!t) return;
+        m.set(t, {
+          picking:  !row.last_pick_op ? null : (row.last_pick_op === "TP"  ? "done" : "curso"),
+          armado:   !row.last_arm_op  ? null : (row.last_arm_op  === "TAP" ? "done" : "curso"),
+          doneHoyP: false, doneHoyA: false,
+          pickLegajo: row.pick_legajo || null, armLegajo: row.arm_legajo || null,
+          pickStart: row.pick_start_ts || null, armStart: row.arm_start_ts || null,
+          pickAband: !!row.pick_abandonado,     armAband: !!row.arm_abandonado,
+          pickFj: row.pick_fj_ts || null,       armFj: row.arm_fj_ts || null
+        });
+      });
+    });
+    return m;
+  });
+}
+
+/* Todos los eventos de HOY, en UNA sola consulta: alcanza para el TP/TAP del
+   día, para las alertas de tandas fuera de la PPP y para el panel "En este
+   momento". El monitor grande hace dos queries de 10 días porque además pinta
+   los días anteriores; acá no hacen falta. */
+function cargarEventosHoy() {
+  var desde = hoyKey() + "T00:00:00-03:00";
+  return getAll("Registros_Produccion_Virgilio",
+    "ts_cliente=gte." + encodeURIComponent(desde) +
+    "&select=legajo,opcion,texto,ts_cliente,ts_inicio&order=ts_cliente.asc");
+}
+/* v23.64 (Luis: "está guardando") — la bajada de racks y el guardado viven en
+   Movimientos_Stock, no en los eventos: entran como eventos `GST` sólo para
+   "En este momento". Si falla, nada. ≡ index.html monGuardadoHoy. */
+function cargarGuardadoHoy() {
+  var desde = hoyKey() + "T00:00:00-03:00";
+  return getAll("Movimientos_Stock",
+    "tipo=in.(baja_racks,guardado,guardado_fuera_lista)&deposito=eq.terminado&ts=gte." + encodeURIComponent(desde) +
+    "&select=legajo,ts&order=ts.asc")
+    .then(function (filas) {
+      return (filas || []).filter(function (f) { return f && f.legajo && f.ts; }).map(function (f) {
+        return { legajo: String(f.legajo).trim(), ts_cliente: f.ts, opcion: "GST", texto: "", ts_inicio: null };
+      });
+    })
+    .catch(function (e) { console.warn("[tv] guardado:", e.message); return []; });
+}
+
+/* La canónica de feriados. Pisa el fallback de arriba SOLO si vino algo: una
+   respuesta vacía dejaría al tablero sin ningún feriado, que es peor. ≡ index.html
+   `ensureFeriadosAR`. */
+var cargarFeriados = cache(EMPLEADOS_TTL, function () {
+  return get("GV_Feriados", "select=fecha&tipo=eq.feriado&order=fecha.asc&limit=2000")
+    .then(function (filas) {
+      if (!filas || !filas.length) return FERIADOS;
+      var m = {};
+      filas.forEach(function (f) { if (f && f.fecha) m[String(f.fecha).slice(0, 10)] = 1; });
+      FERIADOS = m;
+      return m;
+    })
+    .catch(function () { return FERIADOS; });
+});
+
+/* Fichadas de ingreso de hoy: los que marcaron pero todavía no tocaron ningún
+   botón salen como "fichó · sin arrancar". Best-effort. */
+function cargarFichadasHoy() {
+  var desde = hoyKey() + "T00:00:00-03:00";
+  var hasta = dayKey(Date.now() + 86400000) + "T00:00:00-03:00";
+  return get("Fichadas_Virgilio",
+    "ts_cliente=gte." + encodeURIComponent(desde) +
+    "&ts_cliente=lt." + encodeURIComponent(hasta) +
+    "&tipo=eq.ingreso&select=legajo,ts_cliente&limit=2000").catch(function () { return []; });
+}
+
+var cargarEmpleados = cache(EMPLEADOS_TTL, function () {
+  return get("Empleados", "select=Legajo,Empleado,hora_entrada,hora_salida&limit=5000")
+    .then(function (filas) {
+      var nom = new Map(), hor = new Map();
+      (filas || []).forEach(function (e) {
+        var leg = String(e.Legajo || "").trim();
+        var n = (e.Empleado || "").trim();
+        if (leg && n) nom.set(leg, n);
+        if (leg && (e.hora_entrada || e.hora_salida)) hor.set(leg, { entrada: e.hora_entrada, salida: e.hora_salida });
+      });
+      return { nombres: nom, horarios: hor };
+    });
+});
+
+/* Tandas que deshicimos a propósito (desarme o anulación). No son el error de
+   nadie, así que no entran al cartel de "alguien se equivocó" (v18.58). */
+var cargarDeshechas = cache(DESHECHAS_TTL, function () {
+  return getAll("gv_tandas_deshechas", "select=tanda&order=tanda.asc").then(function (filas) {
+    var s = new Set();
+    (filas || []).forEach(function (f) {
+      var t = String((f && f.tanda) || "").trim().toUpperCase();
+      if (t) s.add(t);
+    });
+    return s;
+  }).catch(function (e) { console.warn("[tv] deshechas:", e.message); return new Set(); });
+});
+
+/* Horas de hoy por operario, ya clasificadas por el backend
+   (`gv_monitor_horas_operario`, v21.17 — pedido de Damián). ⚠ La regla de qué
+   hora es productiva NO se duplica acá: si cambia, cambia en la vista y esta
+   pantalla y el monitor grande la heredan juntos. Best-effort: si falla, el
+   resto del tablero se dibuja igual. */
+/* v23.64 (Luis): el CAMIÓN de cada tanda = su GRUPO DE ZONAS, no la letra+número del código
+   (E37A/E37E/E37F no son "el camión E37"). Lo resuelve la base, `gv_monitor_tanda_camion`
+   (≡ index.html PPP_RES_CAMIONES): Capital Sur/Centro/Oeste (Z2+Z3 juntas si cada una < 1 m³),
+   GBA Sur/Oeste/Norte, un camión por súper, Retira sin camión. Si falla, cae a tandaCamion. */
+var CAMION_DE = new Map();
+var cargarCamiones = cache(PROG_TTL, function () {
+  return getAll("gv_monitor_tanda_camion", "select=tanda,fecha,camion,usa_camion,orden_camion,m3_camion&order=tanda.asc")
+    .then(function (filas) {
+      var m = new Map();
+      (filas || []).forEach(function (f) { m.set(String(f.tanda || "").trim().toUpperCase(), { camion: f.camion, usa: f.usa_camion !== false, orden: Number(f.orden_camion) || 99 }); });
+      return m;
+    })
+    .catch(function (e) { console.warn("[tv] camiones:", e.message); return new Map(); });
+});
+/* v23.64 (Luis, 28/09) — "A facturar" pasa a ser el RESUMEN DE LOS 3 DÍAS de la Programación
+   de la PPP: m³, tandas, NP y los cinco estados en % (Salió · Facturado · Armado · En proceso ·
+   Pendiente), excluyentes y netos como allá. ≡ index.html _pgaArbol / _pgaPctFila.
+   Misma fuente: `gv_ppp_prog_arbol`. SALIÓ = CCN sin FSS posterior (`cargarDespachadas`),
+   que es el criterio v20.12 de la PPP ("sólo salió si se cargó a camión"). */
+var cargarArbol = cache(PROG_TTL, function () {
+  var hoy = hoyKey();
+  var hasta = new Date(new Date(hoy + "T12:00:00-03:00").getTime() + 30 * 86400000).toISOString().slice(0, 10);
+  var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  return conTimeout(fetch(SB_URL + "/rest/v1/rpc/gv_ppp_prog_arbol", {
+    method: "POST", cache: "no-store", signal: ctrl ? ctrl.signal : undefined,
+    headers: Object.assign({ "Content-Type": "application/json" }, H),
+    body: JSON.stringify({ p_desde: hoy, p_hasta: hasta })
+  }), ctrl, "gv_ppp_prog_arbol").then(function (r) {
+    if (!r.ok) throw new Error("gv_ppp_prog_arbol HTTP " + r.status);
+    return r.json();
+  }).catch(function (e) { console.warn("[tv] arbol:", e.message); return null; });
+});
+var RD_EST = ["facturado", "armado", "proceso", "pendiente"];
+function resumenDias(filas, despachadas, n) {
+  var dias = new Map(), hoy = hoyKey();
+  (filas || []).forEach(function (r) {
+    var k = String(r.fecha || "").slice(0, 10);
+    if (!k || k < hoy || k >= "9999") return;
+    var d = dias.get(k);
+    if (!d) { d = { key: k, m3: 0, nps: 0, tandas: new Set(), est: {}, estSal: {}, salio: 0 }; RD_EST.forEach(function (e) { d.est[e] = 0; d.estSal[e] = 0; }); dias.set(k, d); }
+    var est = RD_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
+    var np = String(r.np || "").trim().replace(/\.0+$/, "");
+    var sal = despachadas.has(np) ? 1 : 0;
+    d.m3 += Number(r.m3) || 0; d.nps++; d.est[est]++; d.salio += sal; if (sal) d.estSal[est]++;
+    if (r.tanda) d.tandas.add(String(r.tanda).toUpperCase());
+  });
+  return Array.from(dias.values()).sort(function (a, b) { return a.key.localeCompare(b.key); }).slice(0, n);
+}
+var cargarHoras = cache(HORAS_TTL, function () {
+  return getAll("gv_monitor_horas_operario",
+    "select=legajo,nombre,tandas_pick,prom_hs_pick,tandas_arm,prom_hs_arm," +
+    "hs_pick,hs_arm,hs_prod,hs_mov,hs_noprod,hs_total,en_jornada")
+    .catch(function (e) { console.warn("[tv] horas:", e.message); return []; });
+});
+
+/* NP facturadas (con o sin cierre): el ✅ del panel de facturación. */
+var cargarFacturadas = cache(FAC_TTL, function () {
+  return getAll("Facturacion_NP", "select=np&order=np.asc").then(function (filas) {
+    var s = new Set();
+    (filas || []).forEach(function (f) { if (f && f.np != null) s.add(String(f.np)); });
+    return s;
+  }).catch(function (e) { console.warn("[tv] facturadas:", e.message); return new Set(); });
+});
+
+/* NP despachadas: último CCN posterior al último FSS ("↩ sin salida" devuelve
+   la NP al depósito y deja de estar despachada). ≡ index.html
+   fetchDespachadosTodos + fetchSinSalidaMap. Es la consulta más cara del
+   tablero, por eso va con el TTL más largo. */
+var cargarDespachadas = cache(DESPACHO_TTL, function () {
+  return getAll("Registros_Produccion_Virgilio",
+    "opcion=in.(CCN,FSS)&ts_cliente=gte." + encodeURIComponent(CC_DESDE_ISO) +
+    "&select=opcion,texto,ts_cliente&order=ts_cliente.asc").then(function (filas) {
+      var ccn = {}, fss = {};
+      (filas || []).forEach(function (ev) {
+        var np = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, "");
+        if (!np) return;
+        var ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0;
+        var d = (ev.opcion === "FSS") ? fss : ccn;
+        if (ms > (d[np] || 0)) d[np] = ms;
+      });
+      var s = new Set();
+      Object.keys(ccn).forEach(function (np) {
+        if (!(fss[np] && fss[np] > ccn[np])) s.add(np);
+      });
+      return s;
+    }).catch(function (e) { console.warn("[tv] despachadas:", e.message); return new Set(); });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4 · CÁLCULO
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Fechas a mostrar: TODAS las pasadas o de hoy que todavía tienen tandas
+   (están atrasadas pero siguen en cola) + las próximas N con tandas. Los días
+   sin tandas — feriados, fines de semana — no consumen lugar.
+   ≡ index.html targetDeliveryDates. */
+function fechasVentana(prog, n) {
+  var hoy = hoyKey(), todas = new Set();
+  prog.forEach(function (v) { if (v.fechaRaw) todas.add(v.fechaRaw); });
+  var arr = Array.from(todas).sort();
+  var pasadas = arr.filter(function (x) { return x <= hoy; });
+  var futuras = arr.filter(function (x) { return x > hoy; }).slice(0, n);
+  return pasadas.concat(futuras);
+}
+
+/* Duración de una fase abierta, en horas LABORALES: un EP que quedó abierto el
+   viernes a la tarde no debe marcar 66 h el lunes. Dentro del mismo día es la
+   resta directa; si cruzó días, sólo cuentan las horas entre entrada y salida
+   de ese operario (fallback 08-17) y se saltean sábados, domingos y feriados.
+   ≡ index.html businessDurSinceMs (idea 2865). */
+function durLaboralMs(desdeMs, legajo, horarios) {
+  var ahora = Date.now();
+  if (!(ahora > desdeMs)) return 0;
+  var dIni = dayKey(desdeMs), dHoy = dayKey(ahora);
+  if (dIni === dHoy) return ahora - desdeMs;
+  var h = (horarios && horarios.get) ? (horarios.get(String(legajo)) || {}) : {};
+  var hEnt = hhmm(h.entrada); if (hEnt == null) hEnt = 8;
+  var hSal = hhmm(h.salida);  if (hSal == null) hSal = 17;
+  var horasDia = Math.max(0, hSal - hEnt);
+  var libre = function (k) {
+    var wd = new Date(k + "T00:00:00-03:00").getUTCDay();
+    return wd === 0 || wd === 6 || !!FERIADOS[k];
+  };
+  var enHora = function (k, hs) {
+    var hh = Math.floor(hs), mm = Math.floor((hs - hh) * 60);
+    return new Date(k + "T" + String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0") + ":00-03:00").getTime();
+  };
+  var trozoIni = Math.max(0, enHora(dIni, hSal) - desdeMs);
+  var arranqueHoy = Math.max(enHora(dHoy, hEnt), desdeMs);
+  var trozoHoy = libre(dHoy) ? 0 : Math.max(0, ahora - arranqueHoy);
+  var medio = 0;
+  var ms = new Date(dIni + "T00:00:00-03:00").getTime();
+  var fin = new Date(dHoy + "T00:00:00-03:00").getTime();
+  for (var t = ms + 86400000; t < fin - 1000; t += 86400000) {
+    if (!libre(new Date(t).toISOString().slice(0, 10))) medio++;
+  }
+  return trozoIni + medio * horasDia * 3600000 + trozoHoy;
+}
+function hhmm(s) {
+  if (!s) return null;
+  var m = String(s).match(/^(\d{1,2}):(\d{1,2})/);
+  return m ? (Number(m[1]) + Number(m[2]) / 60) : null;
+}
+
+/* Qué está haciendo AHORA cada operario: replay de los eventos de hoy por
+   legajo buscando la acción ABIERTA más reciente (EP sin TP, AP sin TAP, o un
+   toggle abierto — el cierre lleva ts_inicio, la apertura no).
+   ≡ index.html _monActividadActual. */
+function actividadActual(eventos, hoy, fjHoy, fichados) {
+  var porLeg = {}, i;
+  for (i = 0; i < eventos.length; i++) {
+    var ev = eventos[i], leg = String(ev.legajo == null ? "" : ev.legajo).trim();
+    if (!leg || leg === "0" || leg === "1") continue;      // legajos de prueba/basura
+    if (dayKey(ev.ts_cliente) !== hoy) continue;
+    (porLeg[leg] || (porLeg[leg] = [])).push({
+      op: ev.opcion, tx: String(ev.texto || "").trim().toUpperCase(),
+      ini: ev.ts_inicio, ts: new Date(ev.ts_cliente).getTime()
+    });
+  }
+  var out = [], vistos = {};
+  for (var leg2 in porLeg) {
+    if (fjHoy.has(leg2)) { vistos[leg2] = 1; continue; }   // ya cerró jornada
+    var evs = porLeg[leg2].sort(function (a, b) { return a.ts - b.ts; });
+    var pick = null, pickTs = 0, arm = null, armTs = 0, tog = null, togTs = 0, ultTs = 0, gstIni = 0, gstUlt = 0;
+    for (var k = 0; k < evs.length; k++) {
+      var e = evs[k];
+      if (e.ts > ultTs) ultTs = e.ts;
+      if (e.op === "GST") { if (!gstIni) gstIni = e.ts; gstUlt = e.ts; continue; }   /* v23.64 */
+      gstIni = 0; gstUlt = 0;
+      if (e.op === "EP") { pick = e.tx; pickTs = e.ts; }
+      else if (e.op === "TP")  { if (!e.tx || pick === e.tx) pick = null; }
+      else if (e.op === "AP")  { arm = e.tx; armTs = e.ts; }
+      else if (e.op === "TAP") { if (!e.tx || arm === e.tx) arm = null; }
+      else if (e.op === "MGI") { tog = "MG"; togTs = e.ts; }                       /* ≡ index.html v23.63 */
+      else if (e.op === "MGC") { if (tog === "MG") tog = null; }
+      else if (e.op === "RKI") { tog = "RKB"; togTs = e.ts; }                      /* v23.66: bajando racks */
+      else if (e.op === "IRI") { tog = "IRT"; togTs = e.ts; }                      /* v23.66: ingresando a racks */
+      else if (e.op === "MG" && e.ini) { if (tog === "MG") tog = null; }
+      else if (ACT_TOGGLES[e.op]) { if (!e.ini) { tog = e.op; togTs = e.ts; } else if (tog === e.op) { tog = null; } }
+    }
+    var cands = [];
+    if (pick) cands.push({ k: "pick", ts: pickTs, tanda: pick });
+    if (arm)  cands.push({ k: "arm",  ts: armTs,  tanda: arm });
+    if (tog)  cands.push({ k: tog,    ts: togTs });
+    if (!cands.length && gstUlt && (Date.now() - gstUlt) <= GST_VIVO_MIN * 60000) cands.push({ k: "GST", ts: gstIni });
+    cands.sort(function (a, b) { return b.ts - a.ts; });
+    out.push({ legajo: leg2, idle: !cands.length, desde: cands.length ? cands[0].ts : ultTs,
+               kind: cands.length ? cands[0].k : null,
+               tanda: cands.length ? (cands[0].tanda || "") : "", arranco: true });
+    vistos[leg2] = 1;
+  }
+  fichados.forEach(function (ts, leg3) {
+    leg3 = String(leg3);
+    if (leg3 === "0" || leg3 === "1" || vistos[leg3] || fjHoy.has(leg3)) return;
+    out.push({ legajo: leg3, idle: true, desde: ts, kind: null, tanda: "", arranco: false });
+  });
+  // trabajando primero; dentro de cada grupo, el que arrancó hace más rato arriba
+  out.sort(function (a, b) { return (a.idle - b.idle) || (a.desde - b.desde); });
+  return out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5 · RENDER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Cuántas filas entran en un panel. La TV no puede scrollear, así que lo que
+   no entra no existe: en vez de cortar por un número fijo —que depende de la
+   resolución— se mide el alto real del contenedor. Como todas las medidas de
+   la hoja están en `vh`, el alto de fila es proporcional a la pantalla y la
+   cuenta sale igual en 1080p que en 720p. */
+function cabenFilas(id, conEncabezado) {
+  var box = el(id);
+  var alto = box ? box.clientHeight : 0;
+  var fila = Math.max(12, window.innerHeight * 0.041);   // ≈ padding + texto de una fila (v23.69: fuentes más grandes)
+  var libre = alto - (conEncabezado ? fila : 0);
+  return Math.max(1, Math.floor(libre / fila));
+}
+
+function celdaEstado(estado, legajo, inicio, aband, fjTs, nombres, horarios) {
+  if (estado == null) return "";
+  /* Una fase abandonada NO lleva el reloj girando: el operario fichó salida y
+     se fue, así que mostrarla "en movimiento" es exactamente el malentendido
+     que la v18.71 vino a arreglar. Lleva ⏏ y color propio. */
+  var icono = estado === "done"
+    ? '<span class="st-done">✅</span>'
+    : (aband ? '<span class="st-aband">■</span>' : '<span class="spin"></span>');
+  var tag = "";
+  if (legajo != null) {
+    var nom = nombres.get(String(legajo)) || "";
+    tag = '<span class="ini">' + esc(nom ? iniciales(nom, legajo) : String(legajo)) + '</span>';
+  }
+  var dur = "";
+  if (estado === "curso" && inicio) {
+    var iniMs = new Date(inicio).getTime();
+    /* Si fichó salida sin cerrar, esto no está en curso: está ABANDONADO. La
+       duración se congela en el FJ en vez de seguir corriendo — si no, el
+       tablero muestra «17h54» de alguien que se fue ayer a las 17 (v18.71). */
+    var ms = (aband && fjTs) ? Math.max(0, new Date(fjTs).getTime() - iniMs)
+                             : durLaboralMs(iniMs, legajo, horarios);
+    var min = Math.round(ms / 60000);
+    var col = aband ? "#a78bfa" : (min >= 120 ? "#f87171" : (min >= 60 ? "#fbbf24" : "#64748b"));
+    dur = '<span class="dur" style="color:' + col + '">' + esc(fmtMin(min)) + '</span>';
+  }
+  return '<span class="st">' + icono + tag + dur + '</span>';
+}
+
+/* v23.86 (Luis) — orden de ARMADO por camión: 1° el camión con más m³ (si no llegan, se patea el más
+   chico y sale la mayor cantidad de mercadería), Retira al final. Lo calcula la base
+   (gv_monitor_tanda_camion.orden_camion). Sin ese dato: 99 → orden alfabético de siempre. */
+function camionOrden(v) {
+  var b = CAMION_DE.get(String((v && v.tanda) || "").trim().toUpperCase());
+  return (b && b.orden) || 99;
+}
+var JORNADA_INI = 8, JORNADA_FIN = 17, CORTE_HORA = 15;   // horas AR
+function sumarHabiles(key, n) {
+  var t = new Date(key + "T12:00:00-03:00").getTime(), k = key;
+  while (n > 0) {
+    t += 86400000; k = new Date(t).toISOString().slice(0, 10);
+    var wd = new Date(k + "T12:00:00-03:00").getUTCDay();
+    if (wd === 0 || wd === 6 || FERIADOS[k]) continue;
+    n--;
+  }
+  return k;
+}
+function horaAR(ms) { var d = new Date(ms - 3 * 3600000); return d.getUTCHours() + d.getUTCMinutes() / 60; }
+/* ¿LLEGAN? Trabajo = m³ × (½ picking + ½ armado): una tanda pickeada y sin armar está a la mitad.
+   Pendiente = todo lo que sale hasta la fecha meta y no está armado (lo atrasado primero, después la
+   fecha meta camión por camión, en su orden). Ritmo = lo terminado hoy ÷ horas desde las 8. */
+function calcularMeta(d) {
+  var hoy = hoyKey(), ahora = Date.now();
+  var wdHoy = new Date(hoy + "T12:00:00-03:00").getUTCDay();
+  var habil = !(wdHoy === 0 || wdHoy === 6 || FERIADOS[hoy]);
+  var meta = sumarHabiles(hoy, 2);
+  // si ese día no tiene nada programado (sin reparto), la meta es el próximo con tandas
+  var conTandas = [];
+  d.prog.forEach(function (v) { if (v.fechaRaw && v.fechaRaw >= meta) conTandas.push(v.fechaRaw); });
+  conTandas.sort();
+  if (conTandas.length && conTandas[0] !== meta) meta = conTandas[0];
+  var cams = new Map(), atr = { m3: 0, trab: 0, sinPick: 0, sinArm: 0, n: 0 };
+  var tot = 0, arm = 0, sinPick = 0, sinArm = 0;
+  d.prog.forEach(function (v, k) {
+    if (!v.fechaRaw || v.fechaRaw > meta) return;
+    if (tandaSalio(v, d.despachadas)) return;
+    var ev = d.status.get(k) || {};
+    var pk = ev.picking === "done", ar = ev.armado === "done";
+    var trab = (pk ? 0 : v.m3 / 2) + (ar ? 0 : v.m3 / 2);
+    if (v.fechaRaw < meta) {
+      if (ar) return;                    // lo de antes ya armado no es trabajo de hoy
+      atr.m3 += v.m3; atr.trab += trab; atr.n++;
+      if (!pk) atr.sinPick += v.m3; else atr.sinArm += v.m3;
+      return;
+    }
+    var cam = monCamionDeTanda(v), o = camionOrden(v);
+    if (!cams.has(cam)) cams.set(cam, { cam: cam, orden: o, m3: 0, arm: 0, trab: 0 });
+    var c = cams.get(cam);
+    c.m3 += v.m3; c.trab += trab; if (ar) c.arm += v.m3;
+    if (o < c.orden) c.orden = o;
+    tot += v.m3; if (ar) arm += v.m3;
+    if (!pk) sinPick += v.m3; else if (!ar) sinArm += v.m3;
+  });
+  // lo terminado HOY (una vez por tanda y etapa)
+  var hecho = 0, visto = {};
+  (d.eventos || []).forEach(function (ev) {
+    if (ev.opcion !== "TP" && ev.opcion !== "TAP") return;
+    if (!ev.ts_inicio || dayKey(ev.ts_cliente) !== hoy) return;
+    var t = String(ev.texto || "").trim().toUpperCase(), kk = ev.opcion + "|" + t;
+    if (!t || visto[kk]) return; visto[kk] = 1;
+    var v = d.prog.get(t); if (v) hecho += (Number(v.m3) || 0) / 2;
+  });
+  var h = horaAR(ahora);
+  var trans = Math.max(0, Math.min(h, JORNADA_FIN) - JORNADA_INI);
+  var resta = Math.max(0, JORNADA_FIN - Math.max(h, JORNADA_INI));
+  var ritmo = trans >= 0.75 ? hecho / trans : null;
+  var capacidad = ritmo == null ? null : ritmo * resta;
+  var lista = Array.from(cams.values()).sort(function (a, b) { return (a.orden - b.orden) || (b.m3 - a.m3); });
+  // la capacidad se gasta en orden: primero lo atrasado, después camión por camión
+  var falta = atr.trab + lista.reduce(function (s2, c) { return s2 + c.trab; }, 0);
+  /* Se arma en orden (1°, 2°…). Si no alcanza, se pasan a otro día los ÚLTIMOS camiones del orden
+     hasta que lo que queda entre en lo que hacen hasta las 17: así se patea un camión entero y no
+     dos a medias. Lo atrasado de antes no se mueve (ya está vencido). */
+  var sobra = capacidad == null ? null : falta - capacidad;
+  for (var i = lista.length - 1; i >= 0; i--) {
+    var c = lista[i];
+    if (c.trab <= 0.0001) { c.llega = true; continue; }
+    if (sobra == null) { c.llega = null; continue; }
+    if (sobra > 0.0001) { c.llega = false; sobra -= c.trab; } else c.llega = true;
+  }
+  return { hoy: hoy, habil: habil, meta: meta, tot: tot, arm: arm, sinPick: sinPick, sinArm: sinArm,
+           atr: atr, cams: lista, falta: falta, hecho: hecho, ritmo: ritmo, capacidad: capacidad,
+           hora: h, llegan: capacidad == null ? null : capacidad >= falta - 0.0001 };
+}
+/* v23.92 (Luis) — la banda que va ARRIBA del resumen de días: el ritmo no dice nada solo, dice
+   algo contra lo que hay programado. Mínimo texto: veredicto, barra, la meta, el ritmo y, si algo
+   no llega, qué camión se pasa de día. */
+function pintarMeta(d, m3PickHoy, m3ArmHoy) {
+  var M = calcularMeta(d);
+  var ver, cls;
+  var corte = M.hora >= CORTE_HORA;
+  if (!M.habil) { ver = "Hoy no se trabaja"; cls = "mt-gris"; }
+  else if (M.falta <= 0.0001) { ver = "✅ Listo: " + esc(diaEtiqueta(M.meta)) + " armado"; cls = "mt-ok"; }
+  else if (M.hora >= JORNADA_FIN) { ver = "⛔ Terminó la jornada: faltan " + n1(M.falta) + " m³"; cls = "mt-no"; }
+  else if (M.llegan == null) { ver = "Falta " + n1(M.falta) + " m³ · ritmo desde las 8:45"; cls = "mt-gris"; }
+  else if (M.llegan) { ver = "✅ Llegan · faltan " + n1(M.falta) + " m³"; cls = "mt-ok"; }
+  else { ver = (corte ? "⛔ NO LLEGAN" : "⚠ Van atrasados") + " · faltan " + n1(M.falta) + " m³"; cls = corte ? "mt-no" : "mt-duda"; }
+  var noLlegan = M.cams.filter(function (c) { return c.llega === false; });
+  /* v24.38 (Luis): *"saca todo ese texto que es al pedo y pone otro dia mas en ese cuadro"*.
+     De la banda quedan las DOS líneas que se leen de lejos y sobre las que se hace algo: el
+     veredicto y, si algo no llega, qué camión se pasa de día. Se van la barra de avance, la
+     línea de la meta, la del ritmo y la de «Hoy … pickeado · … armado»: son el detalle de la
+     misma cuenta que el veredicto ya resume, y en una pared nadie los lee. El espacio que
+     dejan es el día 4.º del resumen. */
+  var h = '<div class="mt-ver ' + cls + '">' + ver + '</div>';
+  if (noLlegan.length)
+    h += '<div class="mt-lin mt-no">Pasar de día: <b>' +
+         noLlegan.map(function (c) { return esc(c.cam); }).join(" · ") + '</b></div>';
+  el("metaBox").innerHTML = h;
+  /* el corte: a partir de las 15:00, si al ritmo de hoy no llegan, el cartel de arriba dice qué camión
+     hay que pasar a otro día en la PPP (el último en el orden que no llega). */
+  if (M.habil && corte && M.hora < JORNADA_FIN && M.llegan === false && noLlegan.length)
+    return '<div class="aviso mt-corte">⛔ CORTE 15:00 — NO LLEGAN con el ' + esc(diaEtiqueta(M.meta)) +
+      '. Corregir la PPP: pasar a otro día ' +
+      noLlegan.map(function (c) { return '<b>' + esc(c.cam) + '</b>'; }).join(" · ") +
+      ' y terminar el resto en orden.</div>';
+  return "";
+}
+
+/* para tests/tv-meta-camion.cjs (la cuenta vive adentro del IIFE) */
+window.__tvMeta = { calcular: calcularMeta, pintar: pintarMeta, camiones: function (m) { CAMION_DE = m; } };
+
+function pintar(d) {
+  window.__MA_D = d;
+  var nombres = d.empleados.nombres, horarios = d.empleados.horarios;
+
+  /* ── Filtro de la tabla principal ────────────────────────────────────────
+     Entra toda tanda cuya fecha de entrega caiga en la ventana y que no esté
+     ya facturada Y despachada. ≡ index.html renderMonitor. */
+  var ventana = new Set(d.fechas);
+  var tandas = [];
+  d.prog.forEach(function (v, k) {
+    if (!ventana.has(v.fechaRaw)) return;
+    if (despachadaYFacturada(v, d.facturadas, d.despachadas)) return;
+    var ev = d.status.get(k) || { picking: null, armado: null, doneHoyP: false, doneHoyA: false };
+    tandas.push({ v: v, ev: ev });
+  });
+  /* Orden: fecha de entrega más cercana primero; dentro del día, lo que está
+     en curso arriba y lo terminado abajo. ≡ index.html rankRow. */
+  var rank = function (ev) {
+    if (ev.picking === "curso" || ev.armado === "curso") return 0;
+    if (ev.picking === "done" && ev.armado === "done") return 3;
+    if (ev.picking === null && ev.armado === null) return 2;
+    return 1;
+  };
+  tandas.sort(function (a, b) {
+    return String(a.v.fechaRaw).localeCompare(String(b.v.fechaRaw)) ||
+           (camionOrden(a.v) - camionOrden(b.v)) ||          /* v23.86: por camión, en su orden */
+           (rank(a.ev) - rank(b.ev)) ||
+           String(a.v.tanda).localeCompare(String(b.v.tanda));
+  });
+  var m3Pick = 0, m3Arm = 0;
+  var fc = [], porDia = new Map(), agregados = [];
+  var filas = [], sinAct = 0, enVentana = 0, terminadas = 0, diaEnCurso = "";
+
+  tandas.forEach(function (t) {
+    var v = t.v, ev = t.ev;
+    if (ev.doneHoyP) m3Pick += v.m3;
+    if (ev.doneHoyA) m3Arm  += v.m3;
+
+    // m³ por día, desglosado por camión
+    var dk = v.fechaRaw || "_";
+    if (!porDia.has(dk)) porDia.set(dk, { fecha: v.fecha, total: 0, camiones: new Map() });
+    var g = porDia.get(dk);
+    g.total += v.m3;
+    var cam = monCamionDeTanda(v);   /* ≡ index.html v23.64: grupo de zonas, no el número de tanda */
+    if (!g.camiones.has(cam)) g.camiones.set(cam, { sum: 0, n: 0, armadas: 0, usa: cam !== "Retira" });
+    var c = g.camiones.get(cam);
+    c.sum += v.m3; c.n++;
+    if (ev.armado === "done") c.armadas++;
+
+    enVentana++;
+    if (ev.picking === "done" && ev.armado === "done") {
+      fc.push({ v: v, ev: ev });
+      terminadas++;
+      return;                       // las terminadas salen de la tabla y van a "a facturar"
+    }
+    if (v.agregados.length) agregados.push(v);
+
+    var hayAlgo = (ev.picking !== null || ev.armado !== null);
+    if (!hayAlgo) {
+      /* De las planificadas sin tocar mostramos sólo las primeras, para
+         anticipar lo que viene sin llenar la pantalla. ≡ MAX_PLANNED_NO_ACT. */
+      if (sinAct >= MAX_SIN_ACT) return;
+      sinAct++;
+    }
+    var enCurso = (ev.picking === "curso" || ev.armado === "curso");
+    /* v20.21 (Thomas) — el 🚚 también acá. En esta tabla están las que NO terminaron, así que una
+       tanda con carga al camión registrada es una anomalía que conviene ver: salió sin cerrar el
+       picking o el armado. Va pegado al código y no en una columna propia para no confundirse con
+       «Salida», que es la fecha de entrega. */
+    var salioT = tandaSalio(v, d.despachadas);
+    /* v24.88 (Luis) — tanda · m³ · cliente · NP · progreso (retira las TRES columnas de la
+       v23.92). Los días y la zona siguen afuera: en una pared lo que se lee es el código de
+       la tanda y si está hecha. Las tandas siguen ordenadas por camión (v23.86: ése es el orden de
+       armado), pero el rótulo del camión ya no se escribe. */
+    if (v.fechaRaw !== diaEnCurso) {
+      diaEnCurso = v.fechaRaw;
+      filas.push('<tr class="dia"><td colspan="5">' +
+        esc(diaEtiqueta(v.fechaRaw) || "Sin fecha") + '</td></tr>');
+    }
+    filas.push('<tr' + (enCurso ? ' class="curso"' : (salioT ? ' class="salio-sinfc"' : '')) + '>' +
+      '<td class="t-tanda">' + esc(v.tanda) +
+        (salioT ? ' <span class="t-salio" title="Ya se registró la carga al camión (CCN)">🚚</span>' : '') + '</td>' +
+      '<td class="num t-m3">' + n1(v.m3) + '</td>' +
+      '<td class="t-cli" title="' + esc((v.clientes || []).join(" · ")) + '"><div><span class="tk">' + esc(clienteTanda(v)) + '</span></div></td>' +
+      '<td class="num t-np" title="' + esc((v.nps || []).join(" · ")) + '">' + ((v.nps || []).length || "—") + '</td>' +   // v25.54: cuántas NP
+      '<td class="cen">' + semaforo(ev, nombres, horarios) + '</td>' +
+      '</tr>');
+  });
+
+  /* "A facturar" muestra TODAS las terminadas, también las de fuera de la
+     ventana — pedido del dueño: "las tandas a facturar tienen que aparecer
+     todas" (v5.99). */
+  var yaFc = new Set(fc.map(function (x) { return x.v.key; }));
+  d.prog.forEach(function (v, k) {
+    if (yaFc.has(v.key)) return;
+    var ev = d.status.get(k);
+    if (!ev || ev.picking !== "done" || ev.armado !== "done") return;
+    if (despachadaYFacturada(v, d.facturadas, d.despachadas)) return;
+    fc.push({ v: v, ev: ev }); yaFc.add(v.key);
+  });
+  fc.sort(function (a, b) {
+    return String(a.v.fechaRaw || "").localeCompare(String(b.v.fechaRaw || "")) ||
+           String(a.v.tanda || "").localeCompare(String(b.v.tanda || ""));
+  });
+
+  // ── Tabla de tandas (v23.92: sin título — el separador de día ya dice de qué día es cada bloque)
+  var etiqueta = d.fechas.map(diaEtiqueta).join(" · ") || "—";
+  var topeT = cabenFilas("tandasBox", true);
+  el("tandasBox").innerHTML = filas.length
+    ? '<table class="tandas"><colgroup><col style="width:14%"><col style="width:9%"><col style="width:49%">' +
+      '<col style="width:7%"><col></colgroup>' +
+      '<thead><tr><th>Tanda</th><th class="num">M³</th><th>Cliente</th><th>NP</th><th class="cen">Progreso</th></tr></thead><tbody>' +
+      filas.slice(0, topeT).join("") + '</tbody></table>' +
+      (filas.length > topeT ? '<div class="mas">+ ' + (filas.length - topeT) + ' más</div>' : "")
+    : '<div class="vacio">' + (tandas.length
+        ? "Todo terminado para " + esc(etiqueta) + " ✅"
+        : "Sin tandas programadas para las próximas fechas") + '</div>';
+
+  /* v20.21 (Thomas): cuáles de las que faltan facturar YA SE FUERON en el camión. v20.20: la
+     lista (no sólo el número) porque el cartel de arriba las nombra. */
+  var fcSinFc = fc.filter(function (x) {
+    return tandaSalio(x.v, d.despachadas) && !tandaFacturada(x.v, d.facturadas);
+  });
+  var fcSalidas = fcSinFc.length;
+
+  // ── Avisos: agregados primero (son los que hacen salir un camión incompleto)
+  var avisos = pintarMeta(d, m3Pick, m3Arm);   /* v23.86: el corte de las 15:00 va arriba de todo */
+  agregados.slice(0, 2).forEach(function (v) {
+    v.agregados.slice(0, 2).forEach(function (a) {
+      avisos += '<div class="aviso aviso-agr">⚠ ' + esc(a.np || "(sin numerar)") +
+        ' ES UN AGREGADO AL PEDIDO ' + esc(a.aNp || "?") + ' Y SALEN JUNTOS — ARMENLO YA' +
+        (a.rs ? " · " + esc(a.rs) : "") + '</div>';
+    });
+  });
+  /* v20.21 (Thomas) — el cartel de lo que se fue sin papel. La lista va completa: son las que
+     alguien tiene que facturar hoy, y en una pared un "+3 más" no sirve para nada. */
+  if (fcSinFc.length >= AVISO_SALIO_SIN_FC) {
+    /* v20.23 (Thomas): cada tanda con sus m³, y el total adelante. En una pared el volumen es lo
+       que dice si lo que está afuera sin papel es un pedido chico o medio camión. */
+    var m3SinFc = fcSinFc.reduce(function (s, x) { return s + (x.v.m3 || 0); }, 0);
+    avisos += '<div class="aviso aviso-salio">🚚 ' + fcSinFc.length +
+      (fcSinFc.length === 1 ? ' TANDA YA SALIÓ Y NO ESTÁ FACTURADA' : ' TANDAS YA SALIERON Y NO ESTÁN FACTURADAS') +
+      ' (' + n1(m3SinFc) + ' m³): ' +
+      fcSinFc.map(function (x) { return esc(x.v.tanda) + ' <b>' + n1(x.v.m3) + '</b>'; }).join(" · ") + '</div>';
+  }
+  if (d.alertas.length) {
+    avisos += '<div class="aviso aviso-err">⚠ Tandas trabajadas que NO están en la PPP: ' +
+      d.alertas.slice(0, 8).map(esc).join(" · ") + '</div>';
+  }
+  el("avisos").innerHTML = avisos;
+
+  // ── Resumen de días (v23.64, reemplaza "A facturar") ≡ Programación de la PPP
+  if (d.arbol === null) {
+    el("fcTit").innerHTML = "NPs por Día";
+    el("fcBox").innerHTML = '<div class="vacio">No se pudo leer la programación</div>';
+  } else {
+    var rds = resumenDias(d.arbol, d.despachadas, 4);   /* v24.38 (Luis): un día más */
+    el("fcTit").innerHTML = "NPs por Día" +
+      (fcSalidas ? " <small>· <b class=\"fc-salio\">" + fcSalidas + (fcSalidas === 1 ? " salió" : " salieron") + " sin FC</b></small>" : "");
+    var pc = function (nn, tot, cls) {
+      var p = tot ? Math.round(100 * nn / tot) : 0;
+      /* v25.01 (Luis): el número de pedidos grande y el % chiquito abajo, los dos en color. */
+      return '<td class="' + cls + (nn ? '' : ' z') + '">' + nn + '<small>' + p + '%</small></td>';
+    };
+    /* v24.70: el m³ del día es el mismo que daba «Total por día» (las tandas del día). */
+    var m3Dia = function (x) { var g = porDia.get(x.key); return g ? g.total : x.m3; };
+    el("fcBox").innerHTML = rds.length ? '<table class="rd"><thead><tr><th></th><th>M³</th>' +
+      '<th>Salió</th><th>Fact</th><th>Arm</th><th>Proc</th><th>Pend</th>' +
+      '</tr></thead><tbody>' + rds.map(function (x) {
+        var neto = function (k) { return x.est[k] - (x.estSal[k] || 0); };
+        return '<tr' + (x.key === hoyKey() ? ' class="hoy"' : '') + '>' +
+          '<td class="rd-fe">' + esc(diaEtiqueta(x.key)) + '</td>' +
+          '<td class="rd-m3">' + n1(m3Dia(x)) + '</td>' +
+          pc(x.salio, x.nps, "sal") + pc(neto("facturado"), x.nps, "fac") + pc(neto("armado"), x.nps, "arm") +
+          pc(neto("proceso"), x.nps, "pro") + pc(neto("pendiente"), x.nps, "pen") + '</tr>';
+      }).join("") + '</tbody></table>'
+      : '<div class="vacio">Nada programado</div>';
+  }
+
+  // ── Operarios · horas de hoy (v21.17, Damián)
+  pintarHoras(d.horas, d);
+
+  // ── Pendientes de salir hoy (v25.01, Luis)
+  if (d.arbol === null) {
+    el("penTit").innerHTML = "Pendientes de salir hoy";
+    el("penBox").innerHTML = '<div class="vacio">No se pudo leer la programación</div>';
+  } else {
+    var pens = pendientesHoy(d.arbol, d.despachadas);
+    var penNp = pens.reduce(function (a, x) { return a + x.nps.length; }, 0);
+    var penM3 = pens.reduce(function (a, x) { return a + x.m3; }, 0);
+    el("penTit").innerHTML = "🚚 Pendientes de salir hoy" + (pens.length
+      ? " <small>· " + pens.length + (pens.length === 1 ? " pedido" : " pedidos") + " · " + penNp + " NP · " + n1(penM3) + " m³</small>" : "");
+    /* v25.6 (Luis): *"queda cortado En este momento"*. Pendientes toma a lo sumo la mitad de
+       lo que queda libre; si no entran todos, la última fila es «+ N más». */
+    el("penBox").innerHTML = "";
+    var PEN_MAX = Math.max(1, Math.min(6, Math.ceil((cabenFilas("actBox", false) - 2) / 2)));
+    if (pens.length > PEN_MAX) PEN_MAX = Math.max(1, PEN_MAX - 1);
+    el("penBox").innerHTML = pens.length
+      ? '<table class="pen"><tbody>' +
+        pens.slice(0, PEN_MAX).map(function (x) {
+          var et = PEN_TXT[x.est] || PEN_TXT.pendiente;
+          return '<tr><td class="p-tanda">' + esc(x.tanda) + '</td>' +
+            '<td class="p-zona">' + esc(x.zonas.join("·") || "—") + '</td>' +
+            '<td class="p-cli" title="' + esc(x.rsFull) + '"><div><span class="tk">' + esc(x.rs) + '</span></div></td>' +
+            '<td class="p-np" title="' + esc(x.nps.join(" · ")) + '"><div><span class="tk">' + esc(npsCortas(x.nps)) + '</span></div></td>' +
+            '<td class="' + et[0] + '">' + et[1] + '</td></tr>';
+        }).join("") + '</tbody></table>' +
+        (pens.length > PEN_MAX ? '<div class="mas">+ ' + (pens.length - PEN_MAX) + ' más</div>' : "")
+      : '<div class="vacio">✅ Salió todo lo de hoy</div>';
+  }
+  tickersTodos();
+
+  // ── En este momento
+  var MAX_ACT = cabenFilas("actBox", false);   // v25.6: lo que entra (el mínimo de 6 lo cortaba)
+  var trabajando = d.actividad.filter(function (r) { return !r.idle; }).length;
+  el("actTit").innerHTML = "🟢 En este momento <small>· " + trabajando + " trabajando" +
+    (d.actividad.length > trabajando ? " · " + (d.actividad.length - trabajando) + " libre(s)" : "") + "</small>";
+  el("actBox").innerHTML = d.actividad.length
+    ? '<table class="act-t"><tbody>' + d.actividad.slice(0, MAX_ACT).map(function (r) {
+        var nom = nombres.get(String(r.legajo)) || "";
+        var sig = iniciales(nom, r.legajo) || ("#" + r.legajo);
+        var quien = nom ? String(nom).trim().split(/\s+/)[0] : ("Leg " + r.legajo);
+        var min = Math.round((Date.now() - r.desde) / 60000);
+        var col = min >= 120 ? "#f87171" : (min >= 60 ? "#fbbf24" : "#64748b");
+        var qHace;
+        if (r.idle) {
+          qHace = (r.arranco === false) ? "🕐 fichó · sin arrancar" : "💤 libre · sin tarea abierta";
+        } else {
+          var info = ACT_INFO[r.kind] || { ic: "•", tx: r.kind };
+          qHace = (info.ic || "•") + " " + (info.vb ? (info.vb + " " + esc(r.tanda)) : info.tx);
+        }
+        return '<tr class="act' + (r.idle ? " act-idle" : "") + '">' +
+          '<td class="act-who"><b>' + esc(sig) + '</b>' + esc(quien) + '</td>' +
+          '<td class="act-what">' + qHace + '</td>' +
+          '<td class="act-dur" style="color:' + col + '">' + esc(fmtMin(min)) + '</td></tr>';
+      }).join("") + '</tbody></table>' +
+      (d.actividad.length > MAX_ACT ? '<div class="mas">+ ' + (d.actividad.length - MAX_ACT) + ' más</div>' : "")
+    : '<div class="vacio">Nadie fichado todavía</div>';
+  tickersTodos();   // v25.51: la columna derecha va al ancho del dato; recién acá queda fijo el ancho de la izquierda
+  if (window.__MA_INSTR) window.__MA_INSTR();
+
+  /* v23.92 (Luis): la barra de avance y los conteos salieron del header (texto que de lejos no
+     se lee). La cuenta se conserva acá porque es la que dice qué tanda vale por terminada, y
+     `tests/mon-tv.cjs` la mira. */
+  window.__tvUlt = {
+    terminadas: terminadas, enVentana: enVentana, aFc: fc.length, programadas: d.prog.size,
+    enCurso: tandas.filter(function (t) {
+      return t.ev.picking === "curso" || t.ev.armado === "curso";
+    }).length
+  };
+}
+
+/* "2026-09-23" → "Mié 23/09". Los nombres van a mano y no por `toLocaleDateString`:
+   el televisor puede no tener el locale es-AR y devolver "Wed". */
+var DIA_NOMBRE = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+function diaEtiqueta(raw) {
+  if (!raw) return "";
+  var wd = new Date(raw + "T00:00:00-03:00").getUTCDay();
+  return DIA_NOMBRE[wd] + " " + raw.slice(8, 10) + "/" + raw.slice(5, 7);
+}
+
+/* Horas de hoy por operario. Las cuatro columnas de la derecha son la pregunta
+   de Damián: cuánto tardó en promedio cada tanda, y en qué se fue el resto del
+   día. El criterio de qué es productivo está en `gv_monitor_horas_operario`. */
+function pintarHoras(filas, d) {
+  /* v23.70 (Luis) — dos bloques:
+     · RITMO (índice, decimal): m³/h de picking y de armado = m³ de las tandas que ese operario
+       cerró HOY (TP / TAP, cada tanda una vez) ÷ sus horas de picking / armado (`hs_pick` / `hs_arm`
+       de la vista, lo cerrado). Reemplaza al «h/tanda», que no servía: una tanda no mide nada fijo.
+     · HORAS (H:MM): Prod = picking + armado + carga + remitos + MOVIMIENTO (guardado, racks,
+       recepción: es trabajo); No prod = baño, comida, timbre, limpieza, conteo, permiso; Total = jornada. */
+  filas = filas || [];
+  if (!filas.length) {
+    el("opsTit").innerHTML = "Operarios";
+    el("opsBox").innerHTML = '<div class="vacio">Todavía nadie cerró una tarea</div>';
+    return;
+  }
+  var m3 = {};                                   // legajo -> { pick: {tanda:m3}, arm: {...} }
+  ((d && d.eventos) || []).forEach(function (ev) {
+    if (ev.opcion !== "TP" && ev.opcion !== "TAP") return;
+    if (!ev.ts_inicio || dayKey(ev.ts_cliente) !== hoyKey()) return;
+    var leg = String(ev.legajo == null ? "" : ev.legajo).trim(), t = String(ev.texto || "").trim().toUpperCase();
+    if (!leg || !t) return;
+    var v = d.prog && d.prog.get(t); if (!v) return;
+    var k = ev.opcion === "TP" ? "pick" : "arm";
+    (m3[leg] = m3[leg] || { pick: {}, arm: {} })[k][t] = Number(v.m3) || 0;
+  });
+  window.__MA_M3 = m3;
+  var suma = function (o) { var s2 = 0; for (var k in o) s2 += o[k]; return s2; };
+  var ritmo = function (m, h) { h = Number(h) || 0; return (h > 0.05 && m > 0) ? n1(m / h) : "—"; };
+  var tPm = 0, tPh = 0, tAm = 0, tAh = 0, tProd = 0, tNo = 0, tTot = 0;
+  var cuerpo = filas.map(function (o) {
+    var mm = m3[String(o.legajo)] || { pick: {}, arm: {} };
+    var mp = suma(mm.pick), ma = suma(mm.arm);
+    var prod = (Number(o.hs_prod) || 0) + (Number(o.hs_mov) || 0);
+    tPm += mp; tPh += Number(o.hs_pick) || 0; tAm += ma; tAh += Number(o.hs_arm) || 0;
+    tProd += prod; tNo += Number(o.hs_noprod) || 0; tTot += Number(o.hs_total) || 0;
+    return '<tr><td title="' + esc(o.nombre) + '">' + esc(nombreCorto(o.nombre, o.legajo)) +
+      (o.en_jornada ? "" : ' <span style="color:#475569;font-weight:800">✓</span>') + '</td>' +
+      '<td class="op-rit">' + ritmo(mp, o.hs_pick) + '</td>' +
+      '<td class="op-rit op-sep">' + ritmo(ma, o.hs_arm) + '</td>' +
+      '<td class="op-prod">' + nH(prod) + '</td>' +
+      '<td class="op-no">' + nH(o.hs_noprod) + '</td>' +
+      '<td class="op-tot">' + nH(o.hs_total) + '</td></tr>';
+  }).join("");
+  var total = '<tr class="op-tot-row"><td>Total</td>' +
+    '<td class="op-rit">' + ritmo(tPm, tPh) + '</td><td class="op-rit op-sep">' + ritmo(tAm, tAh) + '</td>' +
+    '<td class="op-prod">' + nH(tProd) + '</td><td class="op-no">' + nH(tNo) + '</td>' +
+    '<td class="op-tot">' + nH(tTot) + '</td></tr>';
+  el("opsTit").innerHTML = "Operarios";
+  el("opsBox").innerHTML = '<table class="ops"><thead>' +
+    '<tr class="op-grp"><th></th><th colspan="2" class="op-sep">Ritmo</th><th colspan="3">Horas</th></tr>' +
+    '<tr><th>Operario</th>' +
+    '<th title="m³ pickeados hoy ÷ horas de picking">m³/h<br>picking</th>' +
+    '<th class="op-sep" title="m³ armados hoy ÷ horas de armado">m³/h<br>armado</th>' +
+    '<th title="Picking, armado, carga, remitos y movimiento (guardado, racks, recepción)">Prod</th>' +
+    '<th title="Baño, comida, timbre, limpieza, conteo, permiso">No prod</th>' +
+    '<th>Total</th></tr></thead><tbody>' + cuerpo + total + '</tbody></table>';
+}
+
+/* v20.21 (Thomas) — ¿esta tanda YA SALIÓ? Es la misma pregunta que contesta la
+   columna SALIÓ de la PPP (≡ index.html _pgaSalio) y la misma respuesta:
+   **sólo cuenta la carga al camión registrada** (evento CCN, ya descontado el
+   FSS posterior en `cargarDespachadas`). Una tanda "dada por salida a mano" o
+   "presunta" NO cuenta acá tampoco. */
+function tandaSalio(v, despachadas) {
+  if (!v.nps.length) return false;
+  for (var i = 0; i < v.nps.length; i++) {
+    if (!despachadas.has(String(v.nps[i]).trim().replace(/\.0+$/, ""))) return false;
+  }
+  return true;
+}
+function tandaFacturada(v, facturadas) {
+  if (!v.nps.length) return false;
+  for (var i = 0; i < v.nps.length; i++) {
+    var np = String(v.nps[i]).trim();
+    if (!(facturadas.has(np) || facturadas.has(np.replace(/\.0+$/, "")))) return false;
+  }
+  return true;
+}
+/* Una tanda sale del tablero cuando TODAS sus NP están facturadas y cargadas
+   al camión: ya no hay nada que hacer con ella. ≡ index.html _tandaDespachada. */
+function despachadaYFacturada(v, facturadas, despachadas) {
+  return tandaFacturada(v, facturadas) && tandaSalio(v, despachadas);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6 · CICLO
+   ═══════════════════════════════════════════════════════════════════════════ */
+var ultimoOk = 0, fallos = 0, arrancado = false;
+
+function ciclo() {
+  return Promise.all([
+    cargarProgramacion(), cargarEventosHoy(), cargarEmpleados(),
+    cargarFichadasHoy(), cargarDeshechas(), cargarFacturadas(), cargarDespachadas(),
+    cargarHoras(), cargarFeriados(), cargarCamiones(), cargarGuardadoHoy(), cargarArbol()
+  ]).then(function (r) {
+    var arbol = r[11];
+    if (r[9] && r[9].size) CAMION_DE = r[9];
+    var prog = r[0], eventos = r[1], guardado = r[10] || [], empleados = r[2], fichadas = r[3],
+        deshechas = r[4], facturadas = r[5], despachadas = r[6], horas = r[7];
+    var hoy = hoyKey();
+    var fechas = fechasVentana(prog, VENTANA_DIAS);
+
+    /* El estado se pide para una ventana ANCHA (7 días): "a facturar" muestra
+       tandas de fuera de la ventana visible y necesita su estado. */
+    var anchas = new Set(fechasVentana(prog, 7));
+    var keys = [];
+    prog.forEach(function (v, k) { if (anchas.has(v.fechaRaw)) keys.push(k); });
+
+    return cargarStatus(keys).then(function (status) {
+      // TP/TAP de hoy + tandas trabajadas que no figuran en la programación
+      var alertas = new Set(), fjHoy = new Set(), fichados = new Map();
+      eventos.forEach(function (ev) {
+        var op = ev.opcion;
+        var leg = String(ev.legajo == null ? "" : ev.legajo).trim();
+        if (op === "FJ" && leg && leg !== "0" && leg !== "1") fjHoy.add(leg);
+        if (op !== "EP" && op !== "TP" && op !== "AP" && op !== "TAP") return;
+        var t = String(ev.texto || "").trim().toUpperCase();
+        if (!t) return;
+        if (!prog.has(t)) {
+          if (!deshechas.has(t)) alertas.add(t);
+          return;
+        }
+        var s = status.get(t);
+        if (!s) return;
+        if (op === "TP")  s.doneHoyP = true;
+        if (op === "TAP") s.doneHoyA = true;
+      });
+      (fichadas || []).forEach(function (f) {
+        var leg = f.legajo ? String(f.legajo) : null;
+        if (!leg || leg === "0" || leg === "1") return;
+        var ts = new Date(f.ts_cliente).getTime();
+        if (!fichados.has(leg) || ts < fichados.get(leg)) fichados.set(leg, ts);
+      });
+
+      pintar({
+        prog: prog, status: status, fechas: fechas,
+        actividad: actividadActual(guardado.length ? eventos.concat(guardado) : eventos, hoy, fjHoy, fichados),
+        alertas: Array.from(alertas).sort(),
+        empleados: empleados, facturadas: facturadas, despachadas: despachadas,
+        horas: horas, arbol: arbol, eventos: eventos
+      });
+
+      ultimoOk = Date.now(); fallos = 0;
+      if (!arrancado) { arrancado = true; el("splash").classList.add("hide"); }
+      el("estado").className = "h-est";
+      el("estado").textContent = "● en vivo";
+      el("offline").classList.add("hide");
+    });
+  }).catch(function (e) {
+    fallos++;
+    console.warn("[tv] ciclo:", e.message);
+    if (!arrancado) {
+      el("splashMsg").textContent = "No se pudo cargar: " + e.message + " · reintentando…";
+      return;
+    }
+    var seg = ultimoOk ? Math.round((Date.now() - ultimoOk) / 1000) : -1;
+    el("estado").className = "h-est " + (fallos >= 4 ? "err" : "stale");
+    el("estado").textContent = "● desactualizado (" + seg + "s)";
+    /* El cartel grande recién después de varios ciclos seguidos fallando: un
+       hipo de wifi no tiene que tapar el tablero, que sigue mostrando datos
+       viejos pero útiles. ≡ index.html MON_FALLOS_P_CARTEL. */
+    if (fallos >= 4 && ultimoOk) {
+      var d = new Date(ultimoOk);
+      el("offline").textContent = "⚠ Sin actualizar desde las " +
+        String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") +
+        " (" + Math.round((Date.now() - ultimoOk) / 60000) + " min) — reintentando";
+      el("offline").classList.remove("hide");
+    }
+    /* Watchdog: si pasaron 10 minutos sin un solo refresco bueno, no es la red
+       — algo se colgó. La TV se recarga sola. Necesita un refresco bueno
+       previo, así un arranque sin red no entra en loop de recargas. */
+    if (ultimoOk && (Date.now() - ultimoOk) > WATCHDOG_MS) {
+      try { location.reload(); } catch (_e) {}
+    }
+  });
+}
+
+/* v23.82 (Luis): clave de 4 dígitos para que el operario entre desde el celular estando en el
+   depósito. v23.92: dura UN MINUTO y la rueda que la rodea se vacía a medida que pasa.
+   ⚠ El que manda es el backend: `cambia_en_s` de gv_tv_clave_actual sincroniza la rueda con el
+   tramo real, así que el dibujo no se puede desfasar del código que la base valida. */
+var CLV_CICLO = 60;       /* ≡ gv_tv_clave_actual: tramo de 60 s */
+var CLV_LARGO = 100.53;   /* 2πr con r = 16, el largo del arco */
+var _clvQueda = 0;
+function clvAnillo() {
+  var a = el("clvArco"); if (!a) return;
+  var f = Math.max(0, Math.min(1, _clvQueda / CLV_CICLO));
+  a.setAttribute("stroke-dashoffset", (CLV_LARGO * (1 - f)).toFixed(1));
+  a.setAttribute("class", "clv-arco" + (_clvQueda <= 10 ? " poco" : ""));
+}
+function tvClave() {
+  try {
+    fetch(SB_URL + "/rest/v1/rpc/gv_tv_clave_actual", { method: "POST", cache: "no-store",
+      headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" }, body: "{}" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !j.clave) return;
+        var e = el("tvClave"); if (e) e.textContent = j.clave;
+        _clvQueda = Math.max(1, Math.min(CLV_CICLO, Number(j.cambia_en_s) || CLV_CICLO));
+        clvAnillo();
+      })
+      .catch(function () {});
+  } catch (_e) {}
+}
+/* Un tick por segundo: vacía la rueda y, al llegar a cero, pide el código nuevo. */
+function clvTick() {
+  if (_clvQueda <= 0) return;
+  _clvQueda--; clvAnillo();
+  if (_clvQueda <= 0) tvClave();
+}
+
+function reloj() {
+  try {
+    /* hour12:false o el navegador escribe "09:25 a. m.", que ocupa el doble y
+       se lee peor de lejos. */
+    el("reloj").textContent = new Date().toLocaleTimeString("es-AR",
+      { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ });
+  } catch (_e) {
+    var d = new Date();
+    el("reloj").textContent = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7 · ARRANQUE
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  if (!SB_URL || !SB_KEY) {
+    el("splashMsg").textContent = "Falta supabase-config.js — no se puede leer nada.";
+    return;
+  }
+  // Enrolamiento (mismo criterio que el kiosko del monitor grande).
+  var params = new URLSearchParams(location.search);
+  var enrolada = false;
+  try { enrolada = localStorage.getItem(KIOSK_FLAG) === "1"; } catch (_e) {}
+  if (params.get("key") === TV_KEY) {
+    try { localStorage.setItem(KIOSK_FLAG, "1"); } catch (_e) {}
+    enrolada = true;
+    try {
+      var u = new URL(location.href);
+      u.searchParams.delete("key");
+      u.searchParams.delete("v");   // cache-buster que se tipea desde el control remoto
+      u.searchParams.delete("cb");
+      history.replaceState(null, "", u.pathname + u.search + u.hash);
+    } catch (_e) {}
+  }
+  if (!enrolada) {
+    el("splashMsg").innerHTML = "Esta pantalla se habilita una sola vez por televisor.<br>" +
+      "Abrila con <b>?key=" + esc(TV_KEY) + "</b> al final de la dirección.";
+    return;
+  }
+
+  /* El layout se muestra ANTES del primer render, tapado por el splash: si
+     los paneles arrancan en `display:none` miden 0 de alto y `cabenFilas`
+     concluye que entra una sola fila. */
+  el("app").classList.remove("hide");
+
+  reloj();
+  setInterval(reloj, 10000);
+  tvClave();
+  setInterval(clvTick, 1000);
+  setInterval(tvClave, 60000);   /* red: si un tick se pierde (pestaña dormida), se resincroniza */
+  ciclo();
+  setInterval(ciclo, REFRESH_MS);
+
+  /* Higiene: una recarga cada 6 h. Esta página no arrastra el monolito, así
+     que no necesita el reload cada 7 minutos que sí necesita el kiosko del
+     monitor grande para no quedarse sin memoria. */
+  setTimeout(function () { try { location.reload(); } catch (_e) {} }, RELOAD_CADA_MS);
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CAPA ADMIN — inyectada por monitor/build-admin.cjs (sólo en admin.html).
+   Clickear una celda abre el desglose con datos que el tablero ya tiene en memoria.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function abrirPop(titulo, html) {
+  var p = el("pop"); if (!p) return;
+  p.innerHTML = '<div class="pop-card"><div class="pop-hd"><h3>' + titulo + '</h3>' +
+    '<span class="pop-x" id="popX" title="Cerrar (Esc)">✕ Cerrar</span></div>' +
+    '<div class="pop-bd">' + html + '</div></div>';
+  p.classList.remove("hide");
+}
+function cerrarPop() { var p = el("pop"); if (p) { p.classList.add("hide"); p.innerHTML = ""; } }
+function popNum(x) { return '<td class="num">' + n1(x) + '</td>'; }
+function popTablaTandas(pares) {   // [[tanda, m3], …]
+  if (!pares.length) return '<div class="pop-empty">Sin tandas</div>';
+  var tot = 0;
+  var body = pares.map(function (p) { tot += Number(p[1]) || 0;
+    return '<tr><td class="pop-k">' + esc(p[0]) + '</td>' + popNum(p[1]) + '</tr>'; }).join("");
+  return '<table><thead><tr><th>Tanda</th><th class="num">m³</th></tr></thead><tbody>' +
+    body + '<tr class="pop-tot"><td>Total</td>' + popNum(tot) + '</tr></tbody></table>';
+}
+function popRitmo(leg, sub) {
+  var D = window.__MA_D || {}, M = window.__MA_M3 || {};
+  var row = (D.horas || []).filter(function (o) { return String(o.legajo) === String(leg); })[0] || {};
+  var det = (M[leg] || { pick: {}, arm: {} })[sub] || {};
+  var pares = Object.keys(det).map(function (t) { return [t, det[t]]; }).sort(function (a, b) { return b[1] - a[1]; });
+  var tot = pares.reduce(function (s, p) { return s + (Number(p[1]) || 0); }, 0);
+  var hs = Number(sub === "pick" ? row.hs_pick : row.hs_arm) || 0;
+  var lab = sub === "pick" ? "picking" : "armado";
+  var res = (hs > 0.05 && tot > 0) ? n1(tot / hs) + " m³/h" : "—";
+  var head = '<div class="pop-sub">' + esc(nombreCorto(row.nombre, leg)) + ' · ' + lab +
+    ' · <span class="pop-k">' + n1(tot) + ' m³ ÷ ' + nH(hs) + ' h = ' + res + '</span></div>';
+  if (!pares.length) return head + '<div class="pop-empty">No cerró ninguna tanda de ' + lab + ' hoy' +
+    (hs > 0.05 ? ' (tiene ' + nH(hs) + ' h cargadas)' : '') + '</div>';
+  return head + popTablaTandas(pares);
+}
+function popHoras(leg) {
+  var D = window.__MA_D || {};
+  var o = (D.horas || []).filter(function (x) { return String(x.legajo) === String(leg); })[0] || {};
+  var filas = [["Picking", o.hs_pick], ["Armado", o.hs_arm], ["Movimiento (guardado · racks · recepción)", o.hs_mov],
+    ["Productivas (total)", o.hs_prod], ["No productivas", o.hs_noprod], ["Jornada (total)", o.hs_total]];
+  var body = filas.map(function (f) { return '<tr><td>' + esc(f[0]) + '</td><td class="num">' + nH(f[1]) + '</td></tr>'; }).join("");
+  return '<div class="pop-sub">' + esc(nombreCorto(o.nombre, leg)) + (o.en_jornada ? '' : ' · ✓ ya cerró la jornada') + '</div>' +
+    '<table><thead><tr><th>Concepto</th><th class="num">H:MM</th></tr></thead><tbody>' + body + '</tbody></table>';
+}
+var POP_EST = { salio: "Salió", facturado: "Facturado", armado: "Armado", proceso: "En proceso", pendiente: "Pendiente" };
+function popDiaBucket(dia, sub) {
+  var D = window.__MA_D || {}, desp = D.despachadas || new Set();
+  var filas = (D.arbol || []).filter(function (r) {
+    if (String(r.fecha || "").slice(0, 10) !== dia) return false;
+    var np = String(r.np || "").trim().replace(/\.0+$/, "");
+    var sal = desp.has(np);
+    if (sub === "salio") return sal;
+    var est = RD_EST.indexOf(r.estado) >= 0 ? r.estado : "pendiente";
+    return est === sub && !sal;
+  });
+  var head = '<div class="pop-sub">' + esc(diaEtiqueta(dia)) + ' · ' + (POP_EST[sub] || sub) + ' · ' + filas.length + ' NP</div>';
+  if (!filas.length) return head + '<div class="pop-empty">Ninguna NP en este estado</div>';
+  var tot = 0;
+  var body = filas.map(function (r) {
+    tot += Number(r.m3) || 0;
+    return '<tr><td class="pop-k">' + esc(npLabel(r.empresa, r.np)) + '</td>' +
+      '<td>' + esc(resumirCliente(r.razon_social || r.cliente || "") || "—") + '</td>' +
+      '<td>' + esc(String(r.tanda || "—").toUpperCase()) + '</td>' + popNum(r.m3) + '</tr>';
+  }).join("");
+  return head + '<table><thead><tr><th>NP</th><th>Cliente</th><th>Tanda</th><th class="num">m³</th></tr></thead><tbody>' +
+    body + '<tr class="pop-tot"><td colspan="3">Total</td>' + popNum(tot) + '</tr></tbody></table>';
+}
+function popDiaM3(dia) {
+  var D = window.__MA_D || {}, pares = [];
+  (D.prog || new Map()).forEach(function (v) { if (v.fechaRaw === dia) pares.push([v.tanda, v.m3]); });
+  pares.sort(function (a, b) { return b[1] - a[1]; });
+  return '<div class="pop-sub">' + esc(diaEtiqueta(dia)) + ' · m³ por tanda</div>' + popTablaTandas(pares);
+}
+function popTanda(code) {
+  var D = window.__MA_D || {};
+  var v = (D.prog && D.prog.get) ? D.prog.get(code) : null;
+  if (!v) return '<div class="pop-empty">Sin datos de la tanda ' + esc(code) + '</div>';
+  var ev = (D.status && D.status.get) ? (D.status.get(code) || {}) : {};
+  var est = function (s) { return s === "done" ? "✅ terminado" : (s === "curso" ? "◍ en curso" : "— sin empezar"); };
+  var nombres = (D.empleados && D.empleados.nombres) || new Map();
+  var act = (D.actividad || []).filter(function (r) { return !r.idle && String(r.tanda || "").toUpperCase() === code; });
+  var quien = act.map(function (r) {
+    var nom = nombres.get(String(r.legajo)) || ("Leg " + r.legajo);
+    var min = Math.round((Date.now() - r.desde) / 60000);
+    var q = r.kind === "pick" ? "picking" : (r.kind === "arm" ? "armado" : r.kind);
+    return esc(String(nom).trim().split(/\s+/)[0]) + " (" + q + ", " + fmtMin(min) + ")";
+  }).join(" · ");
+  var rows = [
+    ["Día", esc(diaEtiqueta(v.fechaRaw) || v.fecha || "—")],
+    ["m³", n1(v.m3)],
+    ["Zona", esc((v.zonas || []).join(" · ") || "—")],
+    ["Camión", esc(monCamionDeTanda(v))],
+    ["Picking", est(ev.picking)],
+    ["Armado", est(ev.armado)],
+    ["Trabajando ahora", quien || "—"],
+    ["Clientes", esc((v.clientes || []).join(" · ") || "—")]
+  ];
+  var tabla = '<table><tbody>' + rows.map(function (r) {
+    return '<tr><td class="pop-k">' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join("") + '</tbody></table>';
+  var nps = '<div class="pop-sub" style="margin-top:1vh">NP (' + (v.nps || []).length + '): ' +
+    esc((v.nps || []).join(" · ") || "—") + '</div>';
+  var agr = (v.agregados && v.agregados.length) ? '<div class="pop-sub" style="color:#fbbf24">⚠ Agregados: ' +
+    v.agregados.map(function (a) { return esc(a.np) + " → " + esc(a.aNp); }).join(" · ") + '</div>' : "";
+  return tabla + nps + agr;
+}
+function abrirDesglose(pop, t) {
+  if (pop === "rit")   return abrirPop("m³/h " + (t.getAttribute("data-sub") === "pick" ? "picking" : "armado"), popRitmo(t.getAttribute("data-leg"), t.getAttribute("data-sub")));
+  if (pop === "hs")    return abrirPop("Horas del operario", popHoras(t.getAttribute("data-leg")));
+  if (pop === "dia")   return abrirPop("NPs · " + (POP_EST[t.getAttribute("data-sub")] || ""), popDiaBucket(t.getAttribute("data-dia"), t.getAttribute("data-sub")));
+  if (pop === "diam3") return abrirPop("m³ del día", popDiaM3(t.getAttribute("data-dia")));
+  if (pop === "tanda") return abrirPop("Tanda " + t.getAttribute("data-k"), popTanda(t.getAttribute("data-k")));
+}
+/* Marca las celdas clickeables después de cada render (los nodos son nuevos en cada pintada,
+   así que no se acumula). Zip por posición: el orden del DOM es el de los datos. */
+function instrumentar() {
+  var D = window.__MA_D || {};
+  var H = D.horas || [], hi = 0;
+  document.querySelectorAll("#opsBox table.ops tbody tr").forEach(function (tr) {
+    if (tr.classList.contains("op-tot-row")) return;
+    var o = H[hi++]; if (!o) return;
+    var td = tr.children, leg = String(o.legajo);
+    function marca(i, pop, sub) { if (!td[i]) return;
+      td[i].className += " cx"; td[i].setAttribute("data-pop", pop); td[i].setAttribute("data-leg", leg);
+      if (sub) td[i].setAttribute("data-sub", sub); }
+    marca(1, "rit", "pick"); marca(2, "rit", "arm"); marca(3, "hs"); marca(4, "hs"); marca(5, "hs");
+  });
+  var RDS = resumenDias(D.arbol || [], D.despachadas || new Set(), 4), ri = 0;
+  var SUBS = ["salio", "facturado", "armado", "proceso", "pendiente"];
+  document.querySelectorAll("#fcBox table.rd tbody tr").forEach(function (tr) {
+    var x = RDS[ri++]; if (!x) return;
+    var td = tr.children;
+    if (td[1]) { td[1].className += " cx"; td[1].setAttribute("data-pop", "diam3"); td[1].setAttribute("data-dia", x.key); }
+    for (var i = 0; i < 5; i++) { var c = td[2 + i]; if (!c) continue;
+      c.className += " cx"; c.setAttribute("data-pop", "dia"); c.setAttribute("data-dia", x.key); c.setAttribute("data-sub", SUBS[i]); }
+  });
+  document.querySelectorAll("#tandasBox table.tandas tbody tr").forEach(function (tr) {
+    if (tr.classList.contains("dia")) return;
+    var c = tr.querySelector(".t-tanda"); if (!c) return;
+    var code = String(c.textContent || "").replace(/[^A-Za-z0-9].*$/, "").trim().toUpperCase();
+    if (!code) return;
+    tr.className += " cx"; tr.setAttribute("data-pop", "tanda"); tr.setAttribute("data-k", code);
+  });
+}
+window.__MA_INSTR = instrumentar;
+document.addEventListener("click", function (e) {
+  if (e.target && e.target.id === "popX") { cerrarPop(); return; }
+  var p = el("pop");
+  if (p && !p.classList.contains("hide") && e.target === p) { cerrarPop(); return; }
+  var t = (e.target && e.target.closest) ? e.target.closest(".cx") : null;
+  if (t) abrirDesglose(t.getAttribute("data-pop"), t);
+});
+document.addEventListener("keydown", function (e) { if (e.key === "Escape") cerrarPop(); });
+
+})();
+</script>
+<div id="pop" class="hide"></div>
+</body>
+</html>

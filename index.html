@@ -16,6 +16,7 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hid
 html { overflow-x: hidden; }
 .hidden { display: none; }
 #tvContent:not(.hidden) { display: flex; }   /* v23.64: pestaña Vista TV del monitor */
+#admContent:not(.hidden) { display: flex; }   /* v25.77: pestaña Mon. Admin (tablero interactivo) */
 
 /* Números bien centrados: saca las flechitas (spinner) de TODOS los input[type=number]
    de la app — la app usa steppers –/+, las flechas nativas sólo desfasan el número. */
@@ -5832,6 +5833,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
              kiosko/pared (openMonitor lo esconde si __tvKioskMode). -->
         <div class="mod-switch" id="monTabSwitch">
           <button class="mod-tab on" id="monTabTv" onclick="setMonitorTab('tv')" title="El tablero de planta, el mismo que ve la TV">📺 Monitor</button>
+          <button class="mod-tab" id="monTabAdm" onclick="setMonitorTab('admin')" title="El mismo tablero de la TV pero clickeable: cada celda abre su desglose">🛠️ Mon. Admin</button>
           <button class="mod-tab" id="monTabAn" onclick="setMonitorTab('incons')" title="Productividad e inconsistencias">📊 Análisis</button>
         </div>
         <!-- El título, la meta, la barra de avance y el buscador eran del monitor viejo, que ya
@@ -5879,6 +5881,12 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
          al abrir la pestaña y se descarga al salir (la TV se refresca sola y ocupa RAM). -->
     <div id="tvContent" class="hidden" style="flex:1;min-height:0">
       <iframe id="monTvFrame" title="Monitor TV" style="flex:1;width:100%;min-height:78vh;border:0;border-radius:8px;background:#0b1220"></iframe>
+    </div>
+    <!-- v25.77 (Luis): Mon. Admin — el MISMO tablero (monitor/admin.html, generado desde tv.html)
+         pero clickeable: cada celda abre el desglose en un pop-up. Iframe aparte para que la pared
+         (tv.html) siga liviana y de solo lectura. -->
+    <div id="admContent" class="hidden" style="flex:1;min-height:0">
+      <iframe id="monAdmFrame" title="Mon. Admin" style="flex:1;width:100%;min-height:78vh;border:0;border-radius:8px;background:#0b1220"></iframe>
     </div>
   </div>
 </div>
@@ -6261,7 +6269,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.76"></script>
+<script type="module" src="recepcion.js?v=25.77"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10421,7 +10429,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.76";
+const APP_VERSION = "v25.77";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -32675,6 +32683,7 @@ function openInconsistencias() {
 function closeMonitor() {
   const m = document.getElementById("monitorModal");
   try { const _tvf = document.getElementById("monTvFrame"); if (_tvf) _tvf.removeAttribute("src"); } catch (_e) {}   // v23.64
+  try { const _admf = document.getElementById("monAdmFrame"); if (_admf) _admf.removeAttribute("src"); } catch (_e) {}   // v25.77
   m.classList.remove("show");
   m.classList.remove("tv");
   m.classList.remove("vp-narrow", "vp-medium", "vp-wide", "vp-xwide");
@@ -53386,24 +53395,34 @@ function setMonitorTab(tab) {
   const cont = document.getElementById("monitorContent");
   const inc  = document.getElementById("inconsContent");
   const tvc  = document.getElementById("tvContent"), tvf = document.getElementById("monTvFrame");
+  const admc = document.getElementById("admContent"), admf = document.getElementById("monAdmFrame");   // v25.77
   _inconsActive = (tab === "incons");
   const tvOn = (tab === "tv");   // v23.64: la vista del monitor de pared
-  if (cont) cont.classList.toggle("hidden", _inconsActive || tvOn);
+  const admOn = (tab === "admin");   // v25.77: Mon. Admin (el mismo tablero, clickeable)
+  if (cont) cont.classList.toggle("hidden", _inconsActive || tvOn || admOn);
   if (inc)  inc.classList.toggle("hidden", !_inconsActive);
   if (tvc)  tvc.classList.toggle("hidden", !tvOn);
+  if (admc) admc.classList.toggle("hidden", !admOn);
   if (tvf) {
     if (tvOn && !tvf.getAttribute("src")) tvf.setAttribute("src", "monitor/tv.html?key=tv");
     if (!tvOn && tvf.getAttribute("src")) tvf.removeAttribute("src");
   }
+  if (admf) {
+    if (admOn && !admf.getAttribute("src")) admf.setAttribute("src", "monitor/admin.html?key=tv");
+    if (!admOn && admf.getAttribute("src")) admf.removeAttribute("src");
+  }
   /* v23.92 (Luis) — dos pestañas: 📺 Monitor (la vista de la TV) y 📊 Análisis, que abre las
-     subpestañas Productividad / Inconsistencias. `monTabMon` y `monTabInc` ya no existen. */
+     subpestañas Productividad / Inconsistencias. `monTabMon` y `monTabInc` ya no existen.
+     v25.77: se sumó 🛠️ Mon. Admin (monTabAdm). */
   const swAn = document.getElementById("monTabAn"), swTv = document.getElementById("monTabTv");
+  const swAdm = document.getElementById("monTabAdm");
   if (swTv) swTv.classList.toggle("on", tvOn);
+  if (swAdm) swAdm.classList.toggle("on", admOn);
   if (swAn) swAn.classList.toggle("on", _inconsActive);
   const subBar = document.getElementById("anSubBar");
   if (subBar) subBar.classList.toggle("hidden", !_inconsActive);
   const titleEl = document.getElementById("monitorTitleText");
-  if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : (tvOn ? "Vista TV" : "Monitor Virgilio");
+  if (titleEl) titleEl.textContent = _inconsActive ? "Inconsistencias" : (admOn ? "Mon. Admin" : (tvOn ? "Vista TV" : "Monitor Virgilio"));
   if (_inconsActive) refreshInconsistencias();
 }
 
@@ -58399,7 +58418,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.76"></script>
+<script src="importacion.js?v=25.77"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61200,7 +61219,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.76"></script>
+<script src="cobranzas.js?v=25.77"></script>
 
 </body>
 </html>

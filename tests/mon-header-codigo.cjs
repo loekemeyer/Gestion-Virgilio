@@ -6,7 +6,7 @@
 
    Se chequea corriendo la pantalla (las RPC mockeadas):
      (a) el QR de fichada NO EXISTE más — ni el cajón, ni el canvas, ni qrcode.js, ni el TOTP;
-     (b) el header tiene DOS pestañas (Monitor y Análisis) y ninguna del monitor viejo ni «Vista TV»;
+     (b) el header tiene TRES pestañas (Monitor, Mon. Admin y Análisis) y ninguna del monitor viejo ni «Vista TV»;
      (c) el título, la meta, la barra de avance y el buscador no se ven;
      (d) el código de login sale en 4 dígitos y la rueda se dibuja con el `cambia_en_s` del backend
          (42 de 60 → el arco queda al 70 %), no con un reloj propio del front;
@@ -94,8 +94,9 @@ catch (_e) {
   });
 
   ok(!r.qr, "(a) el cajón del QR no está en el DOM");
-  ok(r.tabs.length === 2 && /Monitor/.test(r.tabs[0]) && /Análisis/.test(r.tabs[1]),
-     "(b) el header tiene dos pestañas, Monitor y Análisis: " + JSON.stringify(r.tabs));
+  /* v25.74: se sumó la pestaña «🛠️ Mon. Admin» (el tablero clickeable) entre Monitor y Análisis. */
+  ok(r.tabs.length === 3 && /Monitor/.test(r.tabs[0]) && /Mon\. Admin/.test(r.tabs[1]) && /Análisis/.test(r.tabs[2]),
+     "(b) el header tiene tres pestañas: Monitor, Mon. Admin y Análisis: " + JSON.stringify(r.tabs));
   ok(!r.tabs.some((t) => /Vista TV|Inconsist/.test(t)),
      "(b) no volvieron «Vista TV» ni «Inconsist.» como pestañas sueltas: " + JSON.stringify(r.tabs));
   ok(!r.verTitulo && !r.verMeta && !r.verFiltro,
