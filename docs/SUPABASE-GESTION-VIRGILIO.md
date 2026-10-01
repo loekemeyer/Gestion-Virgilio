@@ -31030,3 +31030,16 @@ mismo-empresa → PASA.
 
 **Chequeo:** `select * from public.gv_ppp_tanda_empresa_mezclada;` · `select * from
 public.gv_reglas_perdidas;`. `sql/gv_tanda_empresa_guard_v2574.sql`.
+
+## §3.v2593 — Hot Sale por súper: `gv_hotsale_supers()` y `gv_hotsale_items_super()` (01/10/2026)
+
+Dos funciones **nuevas, sólo lectura**, SECURITY DEFINER con guard `es_supervisor_virgilio() or
+gv_es_supervisor_o_servicio()` (leen `isis_lk` / `isis_ch`, que `anon` no ve; sin sesión devuelven 0 filas).
+`gv_hotsale_supers()`: un renglón por `super_key` de `GV_Supers` (activos) con sus códigos LK/Chef y la última factura.
+`gv_hotsale_items_super(p_super_key, p_meses default 12)`: lo que ese súper compró en esos meses, por código facturado
+(`cod`), con `cod_base` (sin ceros a la izquierda y sin la L), descripción de la última factura, `es_importado`
+(`Importados.cod_art`), `rubro` (`GV_Producto_Tipo.familia`, «Sin rubro» si falta), última compra, cajas (`cantidad_caja`),
+unidades y líneas; ordenado por última compra. Medido el 01/10: Carrefour (`inc`) 17 ítems, 0 importados, 12 rubros;
+Jumbo (`cencosud`) 50 ítems, 31 importados, los 50 con L (se pela para clasificar). Las usa `hotsale.js` (v25.93).
+Impacto: ninguno sobre objetos existentes. Rollback: `drop function` de las dos (`sql/gv_hotsale_super_items_v2593.sql`).
+

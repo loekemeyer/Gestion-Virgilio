@@ -4661,7 +4661,7 @@ teléfono) · 👤 confirmado · ⚪ no identificado. **📋 Copiar para la plan
 `sql/gv_cobranza_resumen_conc_v2441.sql`, §3.v2441 · `tests/cbz-ficha-cliente.cjs` (h, i) ·
 `tests/cbz-conciliacion.cjs` · `tests/cbz-conc-extracto.cjs`.
 
-## ⚠ REGLA (Thomas, 2026-10-01, v25.91): HOT SALE — la rentabilidad ponderada vive en `hotsale.js`
+## ⚠ REGLA (Thomas, 2026-10-01, v25.91 · v25.93): HOT SALE — la rentabilidad ponderada vive en `hotsale.js`
 
 Los súper piden un **aporte de hot sale** (un % sobre el precio) dos o tres veces al año. El módulo
 **🏷️ Hot Sale — rent. ponderada** (botones secundarios del panel supervisor, `openHotSale()`) pide los
@@ -4676,7 +4676,20 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   ponderada = (N·rent + H·k·rentHS) ÷ (N + H·k). El costo unitario se cancela, por eso no se pide.
   Verificado contra su planilla: 100 % / 20 % / 4 sem / 2 HS / ×2 → **73,33 %**; el ítem real a 12
   semanas → **−11,83 %** (él redondea −12 %).
-- No lee ni escribe la base: los datos quedan en `localStorage` del navegador. `hotsale.js` está en
+- **Los porcentajes van SIN decimales** (Thomas, 01/10: *"no quiero decimales en los porcentuales"*): 73 %, −12 %.
+- **v25.93 — segundo modo, POR SÚPER, ÍTEM POR ÍTEM** (Thomas: *"dejame cargar rent promedio … o item por item que le
+  vendo a cada super … ordenado por la última fecha de compra (dd/mm/yy) … ver la rent promedio por fam y por rubro"*).
+  Elige el súper (`GV_Supers` por `super_key`: Carrefour es UNO aunque tenga código en LK y en Chef), la pantalla trae
+  lo que ese súper compró en **12 meses** (facturas de ISIS, `isis_lk` + `isis_ch`) ordenado por última compra, él
+  tipea la rent. de cada ítem y sale el **promedio por familia** (importado = está en `Importados`; el resto nacional)
+  **y por rubro** (`GV_Producto_Tipo.familia`; sin fila = «Sin rubro»), cada uno con su rent. en hot sale y su
+  ponderada. **El promedio va ponderado por cajas vendidas** en esos 12 meses (si ningún ítem cargado tiene cajas,
+  simple); los ítems sin rent. cargada no entran y la fila dice «cargados / total». Las rent. quedan en `localStorage`
+  por súper. RPC nuevas, sólo lectura, SECURITY DEFINER con guard de supervisor: `gv_hotsale_supers()` y
+  `gv_hotsale_items_super(p_super_key, p_meses)` (`sql/gv_hotsale_super_items_v2593.sql`). ⚠ Sin sesión de supervisor
+  devuelven **0 filas, no error**: la pantalla lo dice (*"hace falta la sesión de supervisor"*), no dibuja una lista vacía.
+- El bloque de datos va **al ancho del dato** (máx. 470 px, dos filas de tres): Thomas, *"está muy ancho lo de arriba"*.
+- No escribe la base: los datos quedan en `localStorage` del navegador. `hotsale.js` está en
   `SIGUEN_APP_VERSION` (bump y `tests/version-tokens.cjs`). Candado: `tests/hotsale-rent.cjs`.
 
 ## Git

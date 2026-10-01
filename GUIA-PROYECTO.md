@@ -16128,4 +16128,7 @@ Módulo del panel supervisor (botones secundarios, `openHotSale()`, archivo `hot
 punta a punta de los importados, la rent. c/aportes de los nacionales, el % de hot sale, las semanas de
 oferta, las semanas a ponderar y cuánto más se vende en hot sale, calcula la rentabilidad ponderada del
 período por separado para cada familia: rentHS = (1 + rent) × (1 − aporte) − 1 y ponderada =
-(N·rent + H·k·rentHS) ÷ (N + H·k). No toca Supabase. Test: `tests/hotsale-rent.cjs`.
+(N·rent + H·k·rentHS) ÷ (N + H·k). Porcentajes sin decimales. Segundo modo (v25.93): por súper, ítem por ítem —
+`gv_hotsale_supers()` y `gv_hotsale_items_super(p_super_key, p_meses)` (lectura, guard de supervisor) traen lo que
+compró el súper en 12 meses por última compra; el promedio por familia (imp/nac) y por rubro va ponderado por cajas.
+Test: `tests/hotsale-rent.cjs`. SQL: `sql/gv_hotsale_super_items_v2593.sql`.
