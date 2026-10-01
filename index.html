@@ -17425,7 +17425,7 @@ async function ocgFetchImportados() {
   try {
     // v15.27 — stock_total = stock del módulo + depósito insumos (gv_importados_stock_insumos: partes y
     // reenvasados, convertido con Insumos_Factores); para una PARTE el insumo REEMPLAZA al seed del Excel.
-    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,stock_cajas,stock_cajas_bruto,cajas_pedidas,unidades_pedidas,stock_insumos,stock_total,stock_gp2,stock_total_neto,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
+    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,stock_cajas,stock_cajas_bruto,cajas_pedidas,unidades_pedidas,stock_insumos,stock_total,stock_gp2,stock_conv,stock_total_neto,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
   } catch (_e) { return { items: [], meses: 10 }; }
   // v10.38 — alias de códigos que se piden JUNTOS (misma master caja / mismo pedido al chino):
   // 865ED se suma dentro de 865E (pedido del usuario). Agregar acá futuros pares si hacen falta.
@@ -17456,7 +17456,7 @@ async function ocgFetchImportados() {
     const k = cod.toUpperCase() + (_pl ? "|" + _pl : "");
     // v23.90 — `mesesArt`: desde la v23.89 los meses objetivo se pisan POR PROVEEDOR, así que
     // ya no hay UN número para toda la pantalla. El global `meses` queda para el encabezado.
-    if (!by[k]) by[k] = { cod: cod, key: k, planta: _pl, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, stockGp2: 0, uniPed: 0, enCurso: 0, mesesArt: 0, det: [] };
+    if (!by[k]) by[k] = { cod: cod, key: k, planta: _pl, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, stockGp2: 0, stockConv: 0, uniPed: 0, enCurso: 0, mesesArt: 0, det: [] };
     const o = by[k];
     if (codRaw.toUpperCase() === cod.toUpperCase() && r.descripcion) o.desc = r.descripcion;   // la fila canónica manda la descripción
     o.proyUni += Number(r.est_madre_eff) || 0;
@@ -17464,6 +17464,7 @@ async function ocgFetchImportados() {
     // stock GP2 del componente equivalente (GV_Importados_Equiv_GP2). Sin la columna, el de siempre.
     o.stockUni += (r.stock_total_neto != null) ? (Number(r.stock_total_neto) || 0) : (r.stock_total != null) ? (Number(r.stock_total) || 0) : (Number(r.stock_actual) || 0);   // v15.27: incluye insumos
     o.stockGp2 += Number(r.stock_gp2) || 0;
+    o.stockConv += Number(r.stock_conv) || 0;   // v26.03 (Luis, D23): stock de OTRO código de Virgilio que se convierte en éste
     o.stockIns += Number(r.stock_insumos) || 0;
     o.uniPed += Number(r.unidades_pedidas) || 0;   // v16.08 — lo ya pedido, que YA está descontado del stock
     o.enCurso += Number(r.pedido_curso) || 0;
@@ -17552,7 +17553,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), stockGp2U: Math.round(o.stockGp2), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, innerSuelto: !!(vm && vm.uiSuelto), cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, esInsumo: esInsumo, mesesProv: mesesProv, stockPropioModulo: Math.round(o.stockUni - o.stockIns - o.stockGp2), parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
+    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), stockGp2U: Math.round(o.stockGp2), stockConvU: Math.round(o.stockConv || 0), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, innerSuelto: !!(vm && vm.uiSuelto), cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, esInsumo: esInsumo, mesesProv: mesesProv, stockPropioModulo: Math.round(o.stockUni - o.stockIns - o.stockGp2 - (o.stockConv || 0)), parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }

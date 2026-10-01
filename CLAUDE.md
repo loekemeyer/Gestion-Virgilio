@@ -6854,6 +6854,7 @@ negativo para usos prácticos de importación"*.
 | 323E / 838E | GRJ31 | 0,2 / 0,8 |
 | 942E · 943E · 944E · 945E · 948E | Z47 + Z47-M505D + 942E · Z44 + Z44-M505C + 943E · Z48 + Z48-M505 + 944E · Z49 + Z49-M505F + 945E · Z45 + Z45-M505B + 948E | 1 c/u, se suman (v26.00) |
 | 522ES | GRJ33 | 1 |
+| 702E · 106E | 702 + 702E + 102E · 723 + 106E | 1 c/u (v26.03) |
 
 - Vive en **`GV_Importados_Equiv_GP2`** (agregar uno = un `insert`). Unidad por unidad; cuenta **todo** el stock GP2 del
   componente (sector + talleristas + PS, `gv_gp2_stock_componente`) y se SUMA al depósito de insumos de Virgilio.
@@ -6863,6 +6864,12 @@ negativo para usos prácticos de importación"*.
 - Al 01/10: 22 códigos en negativo (583E −210, 969E −204…); 505C +21.605, 587C +20.377, 323E +600 (444 neto).
 - ⚠ GRJ31 cuenta en 323ES (100 %) **y** en 323E/838E (20/80), a propósito (Luis, 01/10, D13: *"323ES es la pieza para fabricar los otros dos, así que la evaluación de esa es particular"*). No es doble conteo: no volver a proponer sacarlo.
 - **v26.00 (Luis, D19):** un importado puede tener VARIOS componentes y se suman; los que GP2 todavía no tiene (Z47, Z44-M505C, GRJ33…) cuentan solos cuando se creen (cruce por `upper`). El pop-up los lista todos. ⚠ Si el terminado de GP2 (942E…) se manda a Virgilio, tiene que salir del inventario de GP2 o cuenta dos veces.
+- **v26.03 (Luis, 01/10, D23): también suma STOCK DE VIRGILIO de otro código que se convierte en el importado**
+  (*"si tengo de eso, no tengo que salir corriendo a comprar"*): tabla **`GV_Importados_Equiv_Virgilio`** (importado,
+  código, empresa, factor) → CTE `conv` de `gv_importados_ordenes` → columna **`stock_conv`** (dentro de
+  `stock_total_neto`). Cuenta el disponible (bruto − pedido, piso 0) × UxB del código de origen. Hoy: 702E ← 102E LK +
+  702 LK; 106E ← 723 CH. Celda **🔁+N** y fila «🔁 Se convierte» en el pop-up. Puede contar también en la fila propia del
+  origen (102E), a propósito. Y el insumo 522ES cuenta para el importado 522ES (además del 522E). `sql/gv_importados_equiv_virgilio_v2603.sql`.
 - Centinelas 269 y 270. `sql/gv_importados_equiv_gp2_v2561.sql`, `tests/pedimp-equiv-gp2.cjs`.
 - **v25.71 (Luis, 01/10):** el pop-up «📦 Stock — <cód>» es más grande y dice el **código del componente** de Cervantes
   (fila «🏭 Cervantes (GP2) · GRJ31» y chip en el encabezado; con factor ≠ 1, «le toca el 20 % de 4.000 u»). Lee
