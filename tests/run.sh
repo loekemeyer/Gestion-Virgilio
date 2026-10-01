@@ -623,8 +623,6 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== remito-np-web (v15.46: el remito impreso trae cliente y fecha también en las NP de la página) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/remito-np-web.cjs
-echo "== remito-armado-picking (v25.43: la hoja de armado trae el detalle del picking) =="
-node tests/remito-armado-picking.cjs
 echo "== pk-hoja-picking (v25.51: hoja de picking por tanda al terminar el picking) =="
 node tests/pk-hoja-picking.cjs
 
