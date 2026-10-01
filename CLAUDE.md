@@ -2528,6 +2528,15 @@ entran más NP de ISIS nuevas (Luis, 24/09), así que no se extiende.
 **Chequeo:** `select * from public.gv_reglas_perdidas;` · `node tests/apr-cuar-freno-manual.cjs` ·
 `node tests/apr-fit.cjs`. `sql/gv_cuarentena_freno_manual_v2217.sql`.
 
+## ⚠ REGLA (Luis, 2026-10-01, v25.47): en CUARENTENA, la factura de MENOS DE 5 DÍAS corridos no es deuda
+
+Vale para todos los clientes, en la retención (`gv_cuarentena_deuda_pedido` → `gv_cuarentena_marcar_calc`, y el
+armador la hereda) y en la alerta de lo ya programado (`gv_cuarentena_ya_programado`, CTE `_rec5`). Se mide por la
+**fecha de cada comprobante** (la del reporte de deuda o, si no, la que tomó el parser de ISIS): la deuda más vieja
+del mismo cliente **sigue reteniendo**. Un comprobante sin fecha cuenta (retiene). Medido el 01/10: la alerta de
+programados pasó de 10 a 0 (Jazquel y Bazar y Cia, toda su deuda del 30/09); Oriental Party (deuda del 08/09) sigue.
+`sql/gv_cuarentena_deuda_5dias_v2545.sql` (backup de las definiciones en `zz_backups."GV_Backup_CuarDeuda5_defs_20261001"`).
+
 ## ⚠ REGLA (Luis, 2026-09-25, v22.46): el PEDIDO PARTIDO por importados es UNO — cuarentena y cliente nuevo
 
 **Luis:** *"si bien se parte en dos pedidos para poder programarse, realmente surge de un mismo pedido
