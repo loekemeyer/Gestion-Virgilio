@@ -9,6 +9,10 @@
    D) que el detalle de una celda (rpc/get_estadistica_madre_detail) viaje con sus argumentos;
    E) que una lectura fuera de la lista (customers) se corte sin salir a la red;
    F) que abierto SUELTO (fuera del iframe de Gestión) el modo no se active: ahí manda el login de siempre.
+   G) v25.79 (un solo cuadro): que el módulo se baje de la URL ÚNICA de GitHub Pages (no el
+      archivo de al lado), y que las filas sean las de Stocks de Gestión (stocks_carga_rapida,
+      sin las ocultas vacías), con «Est Madre» en el encabezado y ninguna «Proyección»;
+      el dual en dos filas (LK / CH) y el secundario con «→ principal».
    Sale 1 si falla. */
 const path = require("path");
 const fs = require("fs");
@@ -36,19 +40,30 @@ const VENDOR = [
 ];
 const DATOS = {
   "products": [{ cod: "505", description: "Pelador Mgo Plástico", uxb: 12, active: true, category: "Peladores" },
-               { cod: "501", description: "Pelador Papa", uxb: 12, active: true, category: "Peladores" }],
+               { cod: "501", description: "Pelador Papa", uxb: 12, active: true, category: "Peladores" },
+               { cod: "029", description: "Colador Fideos", uxb: 12, active: true, category: "Coladores" }],
   "loke_products": [{ cod: "101", description: "Abrelatas A Manija", uxb: 6 }],
-  "sales_item_remap": [{ from_code: "702", to_code: "702E" }],
-  "sales_excluded_items": [{ item_code: "COTIZ-2%" }],
-  "rpc/get_estadistica_madre_cache": [
-    { cod: "505", descripcion: "Pelador Mgo Plástico", familia: "Peladores", uxb: 12, proy_uni_mes: 26434, proy_cajas_mes: 2202.83,
-      total_unidades: 52000, meses: { "2026-08": 25000, "2026-09": 27000 }, calculado_at: "2026-10-01T10:00:00Z" },
-    { cod: "501", descripcion: "Pelador Papa", familia: "Peladores", uxb: 12, proy_uni_mes: 1200, proy_cajas_mes: 100,
-      total_unidades: 2400, meses: { "2026-08": 1100, "2026-09": 1300 }, calculado_at: "2026-10-01T10:00:00Z" }],
+  "rpc/get_estadistica_madre_mensual": [
+    { item: "505", empresa: "lk", meses: { "2026-08": 2100, "2026-09": 2250 } },
+    { item: "501", empresa: "lk", meses: { "2026-08": 90, "2026-09": 110 } },
+    { item: "437E", empresa: "lk", meses: { "2026-09": 30 } },
+    { item: "437E", empresa: "chef", meses: { "2026-09": 12 } },
+    { item: "29", empresa: "lk", meses: { "2026-09": 11 } },
+    { item: "CARTONERIA", empresa: "lk", meses: { "2026-09": 5 } }],
   "rpc/get_estadistica_madre_detail": [
     { cod_cliente: "4188", business_name: "Orfali Alfredo Luciano", provincia: "Buenos Aires", boxes: 150, unidades: 1800,
       avg_monthly_units: 1120, ratio: 1.61, origen: "loke" }],
 };
+// La lista de artículos y la Est Madre: Stocks de Gestión (con la clave pública de Gestión).
+const GV = "https://hrxfctzncixxqmpfhskv.supabase.co";
+const STOCKS = [
+  { cod: "505", cod_base: "505", descripcion: "Pelador Mango Plástico", linea: "LK", familia_principal: "505", es_secundario: false, proy_cajas_mes: 2203, visible_en_stock: true, stock_total: 3654, cajas_pedidas: 599 },
+  { cod: "501", cod_base: "501", descripcion: "Pelador Papa", linea: "LK", familia_principal: "501", es_secundario: false, proy_cajas_mes: 1084, visible_en_stock: true, stock_total: 929, cajas_pedidas: 254 },
+  { cod: "437E LK", cod_base: "437E", descripcion: "Colador Pasta", linea: "LK", familia_principal: "437E LK", es_secundario: false, proy_cajas_mes: 36, visible_en_stock: true, stock_total: 314, cajas_pedidas: 16 },
+  { cod: "437E CH", cod_base: "437E", descripcion: "Colador Pasta", linea: "CH", familia_principal: "437E CH", es_secundario: false, proy_cajas_mes: 6, visible_en_stock: true, stock_total: 14, cajas_pedidas: 1 },
+  { cod: "29", cod_base: "29", descripcion: "Colador Fideos", linea: "LK", familia_principal: "437E", es_secundario: true, proy_cajas_mes: 0, visible_en_stock: true, stock_total: 0, cajas_pedidas: 0 },
+  { cod: "VASTIDOR", cod_base: "VASTIDOR", descripcion: "", linea: "", familia_principal: "VASTIDOR", es_secundario: false, proy_cajas_mes: 0, visible_en_stock: false, stock_total: 0, cajas_pedidas: 0 },
+];
 
 (async () => {
   const server = http.createServer((req, res) => {
@@ -66,6 +81,8 @@ const DATOS = {
   const ctx = await browser.newContext({ serviceWorkers: "block" });
   const llamadas = [];   // a gv-est-madre
   const fugas = [];      // directo a LK (rest, auth, admin-login-otp)
+  const gvLecturas = []; // a Stocks de Gestión (la lista de artículos)
+  const moduloPedido = []; // est-madre.js desde la URL única
   await ctx.route("**/*", async (route) => {
     const req = route.request();
     const u = req.url();
@@ -75,6 +92,11 @@ const DATOS = {
         return route.fulfill({ status: 200, contentType: "text/javascript", body: fs.readFileSync(path.join(RAIZ, local)) });
       }
     }
+    // El módulo único se baja SIEMPRE de GitHub Pages (también desde el espejo): acá se sirve el del repo.
+    if (u.split("?")[0] === "https://loekemeyer.github.io/Gestion-Virgilio/admin/est-madre.js") {
+      moduloPedido.push(u);
+      return route.fulfill({ status: 200, contentType: "text/javascript", body: fs.readFileSync(path.join(RAIZ, "admin/est-madre.js")) });
+    }
     if (u === FN) {
       if (req.method() === "OPTIONS") return route.fulfill({ status: 200, body: "ok" });
       let b = {}; try { b = JSON.parse(req.postData() || "{}"); } catch (_e) {}
@@ -82,6 +104,11 @@ const DATOS = {
       const d = DATOS[b.path];
       if (!d) return route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ message: "no" }) });
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d) });
+    }
+    if (u.startsWith(GV + "/rest/v1/stocks_carga_rapida")) {
+      gvLecturas.push({ key: req.headers()["apikey"] || "" });
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(STOCKS),
+        headers: { "Access-Control-Allow-Origin": "*" } });
     }
     if (u.startsWith(LK)) { fugas.push(req.method() + " " + u.replace(LK, "")); return route.abort(); }
     return route.abort();
@@ -111,6 +138,20 @@ const DATOS = {
     const t = document.getElementById("estMadreTable");
     out.tabla505 = !!t && t.textContent.indexOf("505") >= 0;
     out.tabla501 = !!t && t.textContent.indexOf("501") >= 0;
+    const filas = Array.prototype.map.call(document.querySelectorAll("#estMadreTable tbody tr"), (tr) =>
+      Array.prototype.map.call(tr.children, (td) => td.textContent.trim()));
+    out.nFilas = filas.length;
+    out.cods = filas.map((f) => f[1] + "/" + f[3]).sort().join(",");
+    const f437lk = filas.find((f) => f[1] === "437E" && f[3] === "LK");
+    const f437ch = filas.find((f) => f[1] === "437E" && f[3] === "CH");
+    const f29 = filas.find((f) => f[1] === "029");
+    out.dual = !!f437lk && !!f437ch && f437lk[5] === "36" && f437ch[5] === "6";
+    out.secundario = !!f29 && /→\s*437E/.test(f29[5]);
+    const th = document.querySelector("#estMadreTable thead").textContent;
+    out.encabEstMadre = /Est Madre/.test(th);
+    out.sinProyeccion = !/royecci/i.test(document.getElementById("estadistica-madre").textContent);
+    out.sinCarton = !/CARTONERIA|VASTIDOR/.test(document.getElementById("estMadreTable").textContent);
+    out.modulo = !!window.EstMadre && !!document.getElementById("estMadreCss");
     const st = document.getElementById("estMadreStatus");
     out.status = st ? st.textContent : null;
     const d = await window.sb.rpc("get_estadistica_madre_detail", { p_item_code: "505", p_ym: "2026-09" });
@@ -129,7 +170,7 @@ const DATOS = {
   await suelta.waitForFunction(() => typeof window.GV_EM_EMBED !== "undefined", null, { timeout: 30000 });
   r.sueltoEmbed = await suelta.evaluate(() => window.GV_EM_EMBED);
 
-  const CARGA = ["products", "loke_products", "sales_item_remap", "sales_excluded_items", "rpc/get_estadistica_madre_cache"];
+  const CARGA = ["products", "loke_products", "rpc/get_estadistica_madre_mensual"];
   const pathsLlamados = llamadas.map((l) => l.path);
   r.cargaCompleta = CARGA.every((p) => pathsLlamados.indexOf(p) >= 0);
   r.soloLista = pathsLlamados.every((p) => CARGA.indexOf(p) >= 0 || p === "rpc/get_estadistica_madre_detail");
@@ -138,10 +179,13 @@ const DATOS = {
   r.detalleArgs = !!det && det.args && det.args.p_item_code === "505" && det.args.p_ym === "2026-09";
   r.customersLlego = pathsLlamados.indexOf("customers") >= 0;
   r.fugasEmbed = fugasEmbed.length;
+  r.moduloUnico = moduloPedido.length > 0 && moduloPedido.every((u) => /\?t=\d+$/.test(u));
+  r.gvLeido = gvLecturas.length > 0 && gvLecturas.every((l) => /^sb_publishable_/.test(l.key));
 
   const pass = r.embed && r.loadingOculto && r.loginOculto && r.shell && r.paginaActiva && r.tabla505 && r.tabla501 &&
     r.detalleFilas === 1 && !r.detalleErr && !!r.customersErr && !r.customersLlego &&
-    r.cargaCompleta && r.soloLista && r.todasConToken && r.detalleArgs && r.fugasEmbed === 0 && r.sueltoEmbed === false;
+    r.cargaCompleta && r.soloLista && r.todasConToken && r.detalleArgs && r.fugasEmbed === 0 && r.sueltoEmbed === false &&
+    r.nFilas === 5 && r.dual && r.secundario && r.encabEstMadre && r.sinProyeccion && r.sinCarton && r.modulo && r.gvLeido && r.moduloUnico;
   console.log("stk-est-madre-sin-codigo:", JSON.stringify(r), "· llamadas:", pathsLlamados.join(","),
     "· fugas a LK (iframe):", fugasEmbed.length ? fugasEmbed.join(" | ") : "ninguna",
     "· pageerrors:", errs.length ? errs.join("|").slice(0, 300) : "none", "·", pass ? "✓ OK" : "✗ FAIL");

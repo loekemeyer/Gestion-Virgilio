@@ -4289,6 +4289,9 @@ Al verificar setea un password temporal aleatorio en el user y el front hace
   (i) **modo Est. Madre de Gestión sin código** (v25.72): `GV_EM_EMBED`, `_gvEmFetch`, `GV_EM_PERMITIDAS`
   y `window.supabaseClient = sb` al principio de admin.js, y el corte de `checkAuth()` y del init. Si se pisa,
   la pestaña EST. MADRE vuelve a pedir el OTP: buscar `gv_em` y correr `tests/stk-est-madre-sin-codigo.cjs`.
+  (j) **la Est. Madre NO se re-copia de LK** (v25.79): vive SÓLO en `admin/est-madre.js` de este repo y los
+  dos `admin.js` traen el mismo cargador `abrirEstadisticaMadre` (huella md5 en `tests/est-madre-unica.cjs` de
+  los dos repos). Al re-sincronizar, no volver a traer la Est. Madre de `pagina-LK-copia`: allá ya no está.
 
 ### Convenciones operativas
 
@@ -6873,7 +6876,7 @@ con un mail que no es el admin de LK (`loekemeyer.logistica@` nunca podía).
 |---|---|
 | iframe | `admin/admin.html?gv_em=1#estadistica-madre`; ya no deja `lk_bridge_vjwt` |
 | `admin/admin.js` (sólo el espejo) | con `?gv_em=1` **dentro del iframe de Gestión** (`window.parent.sbAuth`): no busca sesión de LK, no muestra login, sólo abre la Est. Madre. El cliente de Supabase va con `fetch` propio (`_gvEmFetch`) y `window.supabaseClient = sb` |
-| Edge Function **`gv-est-madre`** (proyecto LK, verify_jwt off) | recibe el JWT de **Gestión**, pregunta a `es_supervisor_virgilio()` y devuelve con service_role **sólo** products, loke_products, sales_item_remap, sales_excluded_items, la caché de la Est. Madre y el detalle de una celda. Todo lo demás 403. Fuente `admin/supabase/gv-est-madre/index.ts` |
+| Edge Function **`gv-est-madre`** (proyecto LK, verify_jwt off) | recibe el JWT de **Gestión**, pregunta a `es_supervisor_virgilio()` y devuelve con service_role **sólo** products, loke_products, las ventas por mes (`get_estadistica_madre_mensual`, v25.79; antes el caché, remaps y excluidos) y el detalle de una celda. Todo lo demás 403. Fuente `admin/supabase/gv-est-madre/index.ts` |
 
 - **No se crea ninguna sesión de admin de LK**: el Panel Web LK y la página LK siguen con su puente u OTP.
 - `get_estadistica_madre_cache()` exige `admins` + `auth.uid()`: la función lee la tabla `estadistica_madre_cache`
@@ -6882,3 +6885,34 @@ con un mail que no es el admin de LK (`loekemeyer.logistica@` nunca podía).
   `window.supabaseClient` si existe. Sin esa línea las lecturas salían directo a LK sin sesión (lo cazó el test).
 - Abierto suelto (fuera del iframe de Gestión) el modo no se activa aunque traiga `?gv_em=1`.
 - `tests/stk-est-madre-sin-codigo.cjs` (corre el admin real en el iframe), `tests/stk-est-madre-tab.cjs`.
+
+## ⚠⚠ REGLA (Tomás Beviglia, 2026-10-01, v25.79): la ESTADÍSTICA MADRE es UN SOLO CUADRO — LK y Gestión
+
+**Tomás:** *"cambiá la palabra proyección por Est Madre en toda la pestaña · los artículos correctos son los que están
+en la parte de Stock de Gestión Virgilio, el resto de artículos no · la idea es que si actualizo una de las est madres
+se actualice la otra, es un solo cuadro que se imprime en dos lados distintos. NUNCA puede un cuadro de est madre quedar
+más actualizado que otro. Si alguien quiere cambiar uno solo NO se puede hacer"*.
+
+> ## **La Est. Madre es UN archivo: `admin/est-madre.js` de este repo, publicado por GitHub Pages.**
+> La página LK (`loekemeyer.com/admin.html`) y el espejo de Gestión (Panel Web LK y la pestaña EST. MADRE) lo bajan
+> de la **misma URL** (`https://loekemeyer.github.io/Gestion-Virgilio/admin/est-madre.js?t=<ahora>`). El HTML de la
+> página, el CSS y la lógica viven ahí; cada `admin.js` sólo trae el cargador `abrirEstadisticaMadre`, idéntico.
+
+| qué | de dónde |
+|---|---|
+| **filas** | `stocks_carga_rapida` de Gestión (clave pública), las mismas de Stocks: sin las ocultas vacías (`visible_en_stock = false` y sin stock ni pedidos). Al 01/10: **353** (antes 586, con `026L`, `CARTONERIA`, `DTOXERROR`…) |
+| **Est Madre** (caj/mes) | `proy_cajas_mes` de esa misma tabla = la columna de Stocks: cajas enteras, el principal suma a sus secundarios, el secundario muestra «→ principal» y no rankea; los duales son dos filas (LK / CH) |
+| **meses** | cajas facturadas por mes y empresa: **`get_estadistica_madre_mensual()`** (LK, solo lectura, en vivo, 1,7 s), mismo criterio que el motor de la Est Madre (regla L, sin interco, remaps, sin administrativos). Cada fila = lo que vendió ESE código (en un dual, esa empresa) |
+| detalle por celda / disruptivas | igual que antes (movidos tal cual). Disruptivas lee `order_items` de LK: desde Gestión no anda (ya no andaba) |
+
+- **Ninguna fila dice «Proyección»**: es «Est Madre».
+- **Una lectura que falla NO se reemplaza** por el caché viejo ni por ceros: se dice que falló. El caché
+  `estadistica_madre_cache` sigue (lo lee el portal), pero esta pantalla ya no.
+- ⚠ **La página LK de producción es manual (SolidCP)**: hasta subir `admin.html` + `admin.js` + `css/admin.css` de
+  `pagina-LK-copia`, loekemeyer.com muestra la tabla vieja. Desde esa subida, todo cambio de `est-madre.js` llega
+  a los dos con el push a `main` de este repo (GitHub Pages).
+- ⚠ **El cargador es el mismo en los dos repos**: `tests/est-madre-unica.cjs` (acá y en `pagina-LK-copia`) tiene su
+  huella md5 y falla si alguno vuelve a tener una Est. Madre propia. Cambiar el cargador = cambiarlo en los dos y
+  actualizar la huella en los dos tests, en el mismo pedido.
+- `sql/get_estadistica_madre_mensual.sql` (en `pagina-LK-copia`), `tests/stk-est-madre-sin-codigo.cjs`.
+

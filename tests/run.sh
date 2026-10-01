@@ -1101,4 +1101,6 @@ echo "== stk-est-madre-tab (v25.65: pestaña Est. Madre = el admin en iframe, pr
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-tab.cjs
 echo "== stk-est-madre-sin-codigo (v25.71: la Est. Madre de Gestión entra sin código, por gv-est-madre) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-sin-codigo.cjs
+echo "== est-madre-unica (v25.78: la Est. Madre es UN cuadro — est-madre.js, mismo cargador en LK y Gestión) =="
+node tests/est-madre-unica.cjs
 _resumen
