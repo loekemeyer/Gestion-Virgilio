@@ -123,7 +123,8 @@
       "Bash(sed -i 's/v25\\\\.48/v25.50/' tests/pk-hoja-picking.cjs tests/run.sh)",
       "Bash(sed -i '50a node tests/ccr-fss-recontrol.cjs' tests/run.sh)",
       "Bash(sed -i 's/  \\\\/\\\\/ v25.59 — un CR ANTERIOR/  \\\\/\\\\/ v25.60 — un CR ANTERIOR/' index.html)",
-      "Bash(sed -i 's/^\\\\/\\\\/ v25.59 — Control Remitos/\\\\/\\\\/ v25.60 — Control Remitos/' tests/ccr-fss-recontrol.cjs)"
+      "Bash(sed -i 's/^\\\\/\\\\/ v25.59 — Control Remitos/\\\\/\\\\/ v25.60 — Control Remitos/' tests/ccr-fss-recontrol.cjs)",
+      "Bash(python3 - *)"
     ]
   }
 }

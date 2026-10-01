@@ -5297,6 +5297,9 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
 - **v25.64 (Luis, 01/10: *"se cuenta, es tiempo muerto. forward facing"*): el tramo ANULADO de CC/CR/RR/RT/RI/EI va a
   NO PRODUCTIVAS** (`gv_monitor_horas_operario_dia`, marcador `v25.64-anulado` ≡ `fetchMonitorDayStats`,
   `ANULADO_NOPROD_CODES`). El de picking/armado anulado (EPX/APX) sigue sin contar.
+- **v25.68 (Luis, 01/10): NO es tiempo muerto.** Queda en no productivas, **discriminada como «❌ Cancelación de tarea»**
+  con su tiempo (el pop-up de No productivas del monitor la rotula y suma aparte). El contador «Tiempo muerto» de la
+  botonera NO la suma. `tests/noprod-cancelacion.cjs`.
 - `tests/toggle-anular.cjs`, `tests/anular-sesion.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-01, v25.67): la BOTONERA muestra el TIEMPO MUERTO y el HISTORIAL — el operario no vuelve atrás

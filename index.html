@@ -6250,7 +6250,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.67"></script>
+<script type="module" src="recepcion.js?v=25.68"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10379,7 +10379,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.67";
+const APP_VERSION = "v25.68";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31168,7 +31168,9 @@ function showOperarioActivityDetail(legajo, activity) {
       .slice().sort((a,b) => new Date(a.ts_inicio) - new Date(b.ts_inicio))
       .map(d => `
       <tr>
-        <td><b>${escapeHtml(d.opcion)}</b> <span style="color:#666;font-size:11px">${escapeHtml(movLabel[d.opcion] || "")}</span>${d.texto ? ` <span style="color:#1e6bd6;font-size:11px">${escapeHtml(d.texto)}</span>` : ''}</td>
+        <td>${d.texto === "ANULADO"
+          ? `<b style="color:#b91c1c">❌ Cancelación de tarea</b> <span style="color:#666;font-size:11px">${escapeHtml(d.opcion)} · ${escapeHtml(movLabel[d.opcion] || "")}</span>`
+          : `<b>${escapeHtml(d.opcion)}</b> <span style="color:#666;font-size:11px">${escapeHtml(movLabel[d.opcion] || "")}</span>${d.texto ? ` <span style="color:#1e6bd6;font-size:11px">${escapeHtml(d.texto)}</span>` : ''}`}</td>
         <td>${fmtTime(d.ts_inicio)}</td>
         <td>${fmtTime(d.ts_cliente)}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${fmtMin(d.durMs)}</b>${
@@ -31178,7 +31180,11 @@ function showOperarioActivityDetail(legajo, activity) {
       </tr>`).join("");
     m.querySelector(".tanda-modal-body").innerHTML = `
       <div style="font-size:14px; margin-bottom:10px;">
-        <b>Total:</b> ${fmtN(totalH,1)} h <span style="color:#666">(${totalMin} min · ${movArr.length} eventos)</span>
+        <b>Total:</b> ${fmtN(totalH,1)} h <span style="color:#666">(${totalMin} min · ${movArr.length} eventos)</span>${(() => {
+          /* v25.68 (Luis): la tarea ANULADA es no productiva, discriminada como cancelación */
+          const an = movArr.filter(d => d.texto === "ANULADO");
+          return an.length ? `<div style="color:#b91c1c;font-weight:700;margin-top:4px">❌ Cancelación de tarea: ${fmtMin(an.reduce((s, d) => s + (d.durMs || 0), 0))} · ${an.length} ${an.length === 1 ? "tarea" : "tareas"}</div>` : "";
+        })()}
       </div>
       <table class="tanda-modal-table">
         <thead><tr>
@@ -58241,7 +58247,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.67"></script>
+<script src="importacion.js?v=25.68"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61042,7 +61048,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.67"></script>
+<script src="cobranzas.js?v=25.68"></script>
 
 </body>
 </html>
