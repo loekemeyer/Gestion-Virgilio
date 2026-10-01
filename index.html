@@ -610,6 +610,10 @@ button {
   text-align: left;
 }
 
+/* v25.69 — en la botonera el 📅 flotante tapaba «Terminar Día»: ahí se oculta y los días
+   anteriores se abren desde «📋 Historial de tareas». */
+body:has(#optionsScreen:not(.hidden)) #btnHistDias{ display:none !important; }
+.hist-ov-dias{display:block;width:100%;margin:10px 0 0;padding:10px;font-size:15px;font-weight:700;border-radius:10px;border:2px solid #cbd5e1;background:#f8fafc;color:#0f172a}
 /* Botón flotante 📅 (historial de días anteriores) */
 #btnHistDias{
   position: fixed;
@@ -6769,7 +6773,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
   <div class="hist-ov-card">
     <div class="hist-ov-head"><b>📋 Historial de tareas de hoy</b>
       <button type="button" class="hist-ov-x" onclick="histTareasCerrar()">✕</button></div>
-    <div id="histTareasBody" class="hist-ov-body"></div>
+    <div class="hist-ov-body"><div id="histTareasBody"></div>
+      <button type="button" class="hist-ov-dias" onclick="histTareasCerrar();openHistoryModal()">📅 Días anteriores</button></div>
   </div>
 </div>
 
@@ -9186,12 +9191,27 @@ function _tmLibre(leg) {
   } catch (_e) { return false; }
   return true;
 }
+/* v25.69 (Luis: "se resetea entre tarea y tarea") — cuando la base no trae fila para el legajo
+   (legajo de prueba, que la vista excluye, o el operario sin eventos todavía) el contador volvía a
+   0 en cada lectura y en cada tarea. Ahora ese caso acumula EN EL CELULAR, por legajo y día
+   (localStorage), y sigue sumando entre tareas. Con fila de la base manda la base. */
+function _tmLocKey(leg) { return "gv_tm_loc::" + getTodayKey() + "::" + leg; }
+function _tmLocGet(leg) { try { return Number(localStorage.getItem(_tmLocKey(leg))) || 0; } catch (_e) { return 0; } }
+function _tmLocSet(leg, s) { try { localStorage.setItem(_tmLocKey(leg), String(Math.round(s))); } catch (_e) {} }
 function _tmPintar() {
   var el = document.getElementById("tmMuertoVal"), box = document.getElementById("tmMuerto");
   if (!el || !box) return;
+  var libre = _tmLibre(_tm.leg), ahora = Date.now();
+  if (_tm.leg && _tm.sinFila) {   // acumulado local del día
+    var acc = _tmLocGet(_tm.leg);
+    if (libre && _tm.ultTick) acc += Math.min(5, (ahora - _tm.ultTick) / 1000);
+    _tm.ultTick = ahora; _tmLocSet(_tm.leg, acc);
+    el.textContent = _tmFmt(acc); box.classList.toggle("tm-alto", acc >= 30 * 60); return;
+  }
+  _tm.ultTick = ahora;
   if (_tm.baseSeg == null) { el.textContent = "—"; box.classList.remove("tm-alto"); return; }
   var seg = _tm.baseSeg;
-  if (_tmLibre(_tm.leg)) seg += (Date.now() - _tm.leidoMs) / 1000;
+  if (libre) seg += (ahora - _tm.leidoMs) / 1000;
   el.textContent = _tmFmt(seg);
   box.classList.toggle("tm-alto", seg >= 30 * 60);
 }
@@ -9203,18 +9223,19 @@ async function tmLeer() {
     if (!r.ok) throw new Error("HTTP " + r.status);
     var f = (await r.json())[0];
     if (leg !== _tm.leg) return;
-    if (!f) _tm.baseSeg = 0;   // todavía sin eventos hoy: no hay jornada que contar
+    _tm.sinFila = !f;
+    if (!f) _tm.baseSeg = 0;   // sin fila en la base: cuenta el acumulado local (_tmPintar)
     else {
       var h = (Number(f.hs_total) || 0) - (Number(f.hs_prod) || 0) - (Number(f.hs_mov) || 0) - (Number(f.hs_noprod) || 0);
       _tm.baseSeg = Math.max(0, h) * 3600;
     }
     _tm.leidoMs = Date.now();
-  } catch (_e) { if (leg === _tm.leg) _tm.baseSeg = null; }
+  } catch (_e) { if (leg === _tm.leg) { _tm.baseSeg = null; _tm.sinFila = false; } }
   _tmPintar();
 }
 function tmStart(leg) {
   tmStop();
-  _tm.leg = String(leg || ""); _tm.baseSeg = null;
+  _tm.leg = String(leg || ""); _tm.baseSeg = null; _tm.sinFila = false; _tm.ultTick = 0;
   _tmPintar();
   if (!_tm.leg) return;
   tmLeer();

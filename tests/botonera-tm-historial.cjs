@@ -9,11 +9,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 (async () => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 390, height: 800 } }); const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
-  let falla = false;
+  let falla = false, vacio = false;
   await p.route("**/*.supabase.co/**", (r) => {
     const u = r.request().url();
     if (u.includes("gv_monitor_horas_operario?")) {
       if (falla) return r.fulfill({ status: 500, body: "{}" });
+      if (vacio) return r.fulfill({ status: 200, contentType: "application/json", body: "[]" });
       return r.fulfill({ status: 200, contentType: "application/json",
         body: JSON.stringify([{ hs_prod: "2.00", hs_mov: "0.50", hs_noprod: "0.50", hs_total: "4.00" }]) });
     }
@@ -48,6 +49,15 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       document.getElementById("histTareasOv").classList.contains("hidden");
     return out;
   });
+  // v25.69: sin fila en la base (legajo de prueba) acumula en el celular y NO vuelve a 0 al re-leer ni entre tareas
+  vacio = true;
+  r.sinFilaAcumula = await p.evaluate(async () => {
+    const sl = ms => new Promise(res => setTimeout(res, ms)); const v = () => document.getElementById("tmMuertoVal").textContent;
+    localStorage.removeItem(_tmLocKey("999")); tmStart("999"); await sl(2300);
+    const a = v(); await tmLeer(); tmStart("999"); await sl(300); const b2 = v();
+    return a !== "0:00:00" && b2 >= a;
+  });
+  r.calendarioOculto = await p.evaluate(() => getComputedStyle(document.getElementById("btnHistDias")).display === "none");
   falla = true;
   r.lecturaRotaGuion = await p.evaluate(async () => { await tmLeer(); return document.getElementById("tmMuertoVal").textContent === "—"; });
   const pass = Object.values(r).every(Boolean) && errs.length === 0;
