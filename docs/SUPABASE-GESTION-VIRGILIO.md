@@ -30943,3 +30943,11 @@ evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositiv
 - Medido después: `gv_reglas_perdidas` = 0 · `gv_gp2_espejo_sync()` = 'sin cambios' · el aviso de importados
   (`GP2.ingreso_virgilio`, `resolver_ingreso_virgilio`, `gv_ingreso_virgilio_denegado`) intacto.
 
+
+
+### §3.v2561 — equivalencias importado ↔ componente GP2 y stock neto (01/10, Luis)
+- Tabla nueva `GV_Importados_Equiv_GP2` (RLS, SELECT anon/authenticated, sin escritura). 8 filas.
+- `gv_importados_ordenes`: + `stock_gp2`, + `stock_total_neto` al final (parche sobre la viva, idempotente).
+  Medido: `stock_total` idéntico antes/después en las 156 filas (backup `zz_backups."GV_Backup_ImpOrdenes_antes_20261001"`).
+- Rollback: recrear con `zz_backups."GV_Backup_ImpOrdenes_def_20261001".def` (drop + create no hace falta: quitar
+  columnas exige drop; dependientes transitivos: medir antes) y `drop table public."GV_Importados_Equiv_GP2"`.

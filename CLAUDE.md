@@ -6628,6 +6628,27 @@ de NP ya programadas. `sql/pedido_sin_partir_y_demanda_sin_stock_20260930.sql` (
   **No hay vínculo** entre el código importado (1000900) y el componente GP2 (D1 «Espiral Sacacorcho»?): no se adivina.
   `sql/gv_gp2_inventario_v2501.sql`, `tests/pedimp-insumo-12m.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-01, v25.61): el stock de un importado SUMA el stock GP2 de su componente — y puede ser NEGATIVO
+
+**Luis:** *"para elaborar ciertos artículos importamos partes … tenemos que considerar partes que tenemos en stock
+(insumo) que se van a registrar en GP2"* · D12: *"si tenemos más unidades comprometidas de lo que hay en stock, stock
+negativo para usos prácticos de importación"*.
+
+| importado | componente GP2 | factor |
+|---|---|---|
+| 587C · 505C · 1546903 · 523C · 1000900 | Z23B · Z23A · C13 · E13 · D1 | 1 |
+| 323ES | GRJ31 | 1 |
+| 323E / 838E | GRJ31 | 0,2 / 0,8 |
+
+- Vive en **`GV_Importados_Equiv_GP2`** (agregar uno = un `insert`). Unidad por unidad; cuenta **todo** el stock GP2 del
+  componente (sector + talleristas + PS, `gv_gp2_stock_componente`) y se SUMA al depósito de insumos de Virgilio.
+- `gv_importados_ordenes` suma dos columnas AL FINAL: **`stock_gp2`** y **`stock_total_neto`** (sin el `greatest(…,0)`
+  + GP2). `stock_total` / `stock_actual` / `stock_cajas` **no se tocaron** (los leen otros). El módulo de importación
+  lee el neto: la cuenta de «a pedir», los meses y la pantalla muestran el negativo; la celda Stock lleva **🏭+N**.
+- Al 01/10: 22 códigos en negativo (583E −210, 969E −204…); 505C +21.605, 587C +20.377, 323E +600 (444 neto).
+- ⚠ GRJ31 cuenta en 323ES (100 %) **y** en 323E/838E (20/80), a propósito (Luis, 01/10, D13: *"323ES es la pieza para fabricar los otros dos, así que la evaluación de esa es particular"*). No es doble conteo: no volver a proponer sacarlo.
+- Centinelas 269 y 270. `sql/gv_importados_equiv_gp2_v2561.sql`, `tests/pedimp-equiv-gp2.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-30, v25.14): RECIBIR un importado en CERVANTES — no entra al stock de Virgilio, avisa en GP2
 
 - En 📥 RECIBIR el destino **🏭 Cervantes** va **primero** de la lista. Para un insumo va en **unidades**.

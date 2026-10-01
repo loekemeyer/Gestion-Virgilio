@@ -6238,7 +6238,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.60"></script>
+<script type="module" src="recepcion.js?v=25.62"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10268,7 +10268,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.60";
+const APP_VERSION = "v25.62";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17211,7 +17211,7 @@ async function ocgFetchImportados() {
   try {
     // v15.27 — stock_total = stock del módulo + depósito insumos (gv_importados_stock_insumos: partes y
     // reenvasados, convertido con Insumos_Factores); para una PARTE el insumo REEMPLAZA al seed del Excel.
-    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,stock_cajas,stock_cajas_bruto,cajas_pedidas,unidades_pedidas,stock_insumos,stock_total,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
+    rows = await supaFetchAllSafe(SUPABASE_IMPORTADOS_OC_ENDPOINT, "select=id,cod_art,marca,proveedor,descripcion,uni_x_caja,fob_uni,est_madre_eff,meses_objetivo,stock_actual,stock_cajas,stock_cajas_bruto,cajas_pedidas,unidades_pedidas,stock_insumos,stock_total,stock_gp2,stock_total_neto,pedido_curso,principal,activo&principal=eq.true&activo=eq.true");
   } catch (_e) { return { items: [], meses: 10 }; }
   // v10.38 — alias de códigos que se piden JUNTOS (misma master caja / mismo pedido al chino):
   // 865ED se suma dentro de 865E (pedido del usuario). Agregar acá futuros pares si hacen falta.
@@ -17242,11 +17242,14 @@ async function ocgFetchImportados() {
     const k = cod.toUpperCase() + (_pl ? "|" + _pl : "");
     // v23.90 — `mesesArt`: desde la v23.89 los meses objetivo se pisan POR PROVEEDOR, así que
     // ya no hay UN número para toda la pantalla. El global `meses` queda para el encabezado.
-    if (!by[k]) by[k] = { cod: cod, key: k, planta: _pl, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, uniPed: 0, enCurso: 0, mesesArt: 0, det: [] };
+    if (!by[k]) by[k] = { cod: cod, key: k, planta: _pl, desc: r.descripcion || "", prov: String(r.proveedor || "").trim() || "(sin proveedor)", uxc: 0, fob: 0, proyUni: 0, stockUni: 0, stockIns: 0, stockGp2: 0, uniPed: 0, enCurso: 0, mesesArt: 0, det: [] };
     const o = by[k];
     if (codRaw.toUpperCase() === cod.toUpperCase() && r.descripcion) o.desc = r.descripcion;   // la fila canónica manda la descripción
     o.proyUni += Number(r.est_madre_eff) || 0;
-    o.stockUni += (r.stock_total != null) ? (Number(r.stock_total) || 0) : (Number(r.stock_actual) || 0);   // v15.27: incluye insumos
+    // v25.61 (Luis, D12) — stock_total_neto: SIN piso en 0 (lo comprometido de más da negativo) y con el
+    // stock GP2 del componente equivalente (GV_Importados_Equiv_GP2). Sin la columna, el de siempre.
+    o.stockUni += (r.stock_total_neto != null) ? (Number(r.stock_total_neto) || 0) : (r.stock_total != null) ? (Number(r.stock_total) || 0) : (Number(r.stock_actual) || 0);   // v15.27: incluye insumos
+    o.stockGp2 += Number(r.stock_gp2) || 0;
     o.stockIns += Number(r.stock_insumos) || 0;
     o.uniPed += Number(r.unidades_pedidas) || 0;   // v16.08 — lo ya pedido, que YA está descontado del stock
     o.enCurso += Number(r.pedido_curso) || 0;
@@ -17335,7 +17338,7 @@ async function ocgFetchImportados() {
     // v10.06 — cotización USD = unidades a pedir × FOB unitario (por ítem; el total se suma en el render)
     const fobUni = o.fob || 0;
     const usdTotal = (fobUni > 0) ? (aPedirUni * fobUni) : 0;
-    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, innerSuelto: !!(vm && vm.uiSuelto), cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, esInsumo: esInsumo, mesesProv: mesesProv, stockPropioModulo: Math.round(o.stockUni - o.stockIns), parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
+    items.push({ cod: o.cod, key: o.key, planta: o.planta, plantaVista: o.plantaVista || "", desc: o.desc, prov: o.prov, proyUni: Math.round(proyUni), meses: mesesIt, objetivoUni: objetivoUni, stockUni: Math.round(stockTot), stockPropio: Math.round(o.stockUni), stockParteU: Math.round(stockParteU), stockParteCods: (sp ? sp.partes : ""), stockTermU: Math.round(stockTermU), stockInsU: Math.round(o.stockIns), stockGp2U: Math.round(o.stockGp2), uniPedidas: Math.round(o.uniPed), enCurso: Math.round(o.enCurso), aPedirUni: aPedirUni, uxc: o.uxc, uniMaster: uniMaster, uniInner: (vm && vm.ui > 0) ? vm.ui : 0, innerSuelto: !!(vm && vm.uiSuelto), cajasEsMaster: cajasEsMaster, aPedirCajas: aPedirCajas, fobUni: fobUni, usdTotal: usdTotal, m3Master: m3Master, m3Dims: vm ? { l: vm.l, a: vm.a, h: vm.h } : null, m3Total: m3Total, esParte: esParte, esInsumo: esInsumo, mesesProv: mesesProv, stockPropioModulo: Math.round(o.stockUni - o.stockIns - o.stockGp2), parteDet: (pp ? pp.detalle : null), reingresoEst: (reingresoEst[o.key] || reingresoEst[kk] || ""), det: o.det || [] });
   });
   return { items: items, meses: meses };
 }
@@ -58048,7 +58051,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.60"></script>
+<script src="importacion.js?v=25.62"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60849,7 +60852,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.60"></script>
+<script src="cobranzas.js?v=25.62"></script>
 
 </body>
 </html>

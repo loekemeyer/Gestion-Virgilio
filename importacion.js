@@ -616,7 +616,7 @@ function _pedImpMoqCalc(it) {
   const proy = Number(it.proyUni) || 0;
   if (!(proy > 0) || !(div > 0)) { out.estado = "sinproy"; out.mc = 0; return out; }   // sin venta no se estira: no se pide
   const mcMin = Math.ceil(piso / div);
-  const stock = Math.max(0, Number(it.stockUni) || 0), curso = Math.max(0, Number(it.enCurso) || 0);
+  const stock = (Number(it.stockUni) || 0), curso = Math.max(0, Number(it.enCurso) || 0);
   out.mesesNec = (mcMin * div + stock + curso) / proy;
   if (out.mesesNec <= topeMeses) { out.estado = "estira"; out.mc = mcMin; out.uni = mcMin * div; }
   else { out.estado = "fuera"; out.mc = 0; out.uni = 0; }
@@ -877,6 +877,7 @@ async function pedImpStockDesglose(keyEnc, foco) {
       else if (insDet && insDet.length) insDet.forEach(function (d) { if (Number(d.saldo) || Number(d.uni)) h += tr('🧰 Insumo ' + escapeHtml(d.insumo), f(d.uni), escapeHtml(f(d.saldo) + ' ' + (d.unidad || '') + (Number(d.factor) > 1 ? ' × ' + f(d.factor) : ''))); });
       else h += tr('Depósito insumos', f(it.stockInsU), '');
       if (it.stockTermU > 0) h += tr('🧩 Productos ya armados', f(it.stockTermU), 'stock de los terminados que usan ' + (it.esInsumo ? 'este insumo' : 'esta parte') + ' (detalle abajo)');
+      if (it.stockGp2U > 0) h += tr('🏭 Cervantes (GP2)', f(it.stockGp2U), 'componente equivalente en GP2: sector, talleristas y PS');
       if (it.stockParteU > 0) h += tr('🔧 Parte ' + escapeHtml(it.stockParteCods || ''), f(it.stockParteU), 'el stock de la parte cuenta como stock de este artículo');
       h += '</tbody><tfoot><tr><th style="text-align:left">Total</th><th class="num">' + f(it.stockUni) + '</th><th></th></tr></tfoot></table>';
     }
@@ -1339,7 +1340,7 @@ function pedImpSetMC(codEnc, val) {
 const _PEDIMP_MESES_ALERTA = 4;
 function _pedImpMesesStock(it) {
   const proy = Number(it && it.proyUni) || 0; if (!(proy > 0)) return null;
-  return (Math.max(0, Number(it.stockUni) || 0) + Math.max(0, Number(it.enCurso) || 0)) / proy;
+  return ((Number(it.stockUni) || 0) + Math.max(0, Number(it.enCurso) || 0)) / proy;
 }
 function _pedImpDdmm(f) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(f || "")); return m ? m[3] + "/" + m[2] : ""; }
 function _pedImpEnCaminoHtml(it, cls) {
@@ -1375,7 +1376,7 @@ function _pedImpMesesCell(it) {
   const m = _pedImpMesesStock(it);
   if (m == null) return '<td class="num" style="color:#cbd5e1" title="Sin Estadística Madre: no hay meses de stock">—</td>';
   const proy = Number(it.proyUni) || 0;
-  const stk = Math.max(0, Number(it.stockUni) || 0), cam = Math.max(0, Number(it.enCurso) || 0);
+  const stk = (Number(it.stockUni) || 0), cam = Math.max(0, Number(it.enCurso) || 0);
   const bajo = m < _PEDIMP_MESES_ALERTA;
   return '<td class="num pedimp-meses" title="(' + stk + ' u stock + ' + cam + ' u en camino) ÷ ' + proy + ' u/mes' + (cam > 0 ? ' · sólo stock: ' + _pedImpMesesFmt(stk / proy) + ' meses' : '') + '"' + (bajo ? ' style="color:#b91c1c;font-weight:800;background:#fef2f2"' : '') + '>' + (bajo ? '⚠ ' : '') + _pedImpMesesFmt(m) + '</td>';
 }
@@ -1386,7 +1387,7 @@ function _pedImpMesesCell(it) {
    Devuelve { quiebra: 'aaaa-mm-dd', llega: 'aaaa-mm-dd'|'' , dias: días sin stock | null }. */
 function _pedImpQuiebre(it, hoyMs) {
   const proy = Number(it && it.proyUni) || 0; if (!(proy > 0)) return null;
-  const stk = Math.max(0, Number(it.stockUni) || 0);
+  const stk = (Number(it.stockUni) || 0);
   const mesesReal = stk / proy;
   if (!(mesesReal < _PEDIMP_MESES_ALERTA)) return null;
   const hoy = hoyMs != null ? hoyMs : (Date.now() - 3 * 3600000);
@@ -1405,7 +1406,7 @@ function _pedImpQuiebreChip(it) {
   const q = _pedImpQuiebre(it); if (!q) return "";
   const fq = _pedImpDdmm(q.quiebra);
   const txt = q.llega ? ('⛔ quiebra ' + fq + ' · llega ' + _pedImpDdmm(q.llega)) : ('⛔ quiebra ' + fq + (q.sinCamino ? ' · nada en camino' : ' · llegada s/f'));
-  const tip = 'Con el stock real de hoy (' + Math.max(0, Number(it.stockUni) || 0) + ' u ÷ ' + it.proyUni + ' u/mes) se termina el ' + fq +
+  const tip = 'Con el stock real de hoy (' + (Number(it.stockUni) || 0) + ' u ÷ ' + it.proyUni + ' u/mes) se termina el ' + fq +
     (q.llega ? ' y la importación llega el ' + _pedImpDdmm(q.llega) + ': ' + q.dias + ' días sin stock.' : (q.sinCamino ? ' y no hay importación en camino.' : ' y la importación en camino no tiene fecha de llegada.')) + ' Ver si se puede hacer algo (adelantar, avión, reemplazo).';
   return '<div class="pedimp-quiebre" style="margin-top:2px"><span style="display:inline-block;font-size:10.5px;font-weight:800;color:#fff;background:#dc2626;border-radius:6px;padding:1px 5px;line-height:1.25" title="' + escapeHtml(tip) + '">' + txt + (q.dias ? ' · ' + q.dias + 'd' : '') + '</span></div>';
 }
@@ -1595,11 +1596,11 @@ function _pedImpRender() {
       '<thead><tr><th>Código</th><th>Descripción</th><th class="num" title="Estadística Madre por mes (unidades) y objetivo (unidades a tener)">E.M. u/mes<small>Objetivo</small></th><th class="num" title="Stock de hoy EN VIVO del depósito (los mismos depósitos que la pantalla de Stock) MENOS los pedidos abiertos, más el depósito insumos. Nunca negativo: si hay más pedidos que stock, muestra 0.">Stock</th><th class="num" title="Meses de stock = (stock disponible + en camino) ÷ Estadística Madre por mes. En rojo, menos de 4 meses. Sin Estadística Madre: —. La tabla se ordena por esta columna (menos meses primero).">Meses<small>stock</small></th><th class="num" title="En camino: unidades ya pedidas que no llegaron, con la fecha estimada de llegada (dd/mm)">En camino<small>u · llega</small></th><th class="num" title="A pedir: unidades calculadas para llegar al objetivo">A pedir<small>u</small></th><th class="num" title="Unidades por master caja (del Excel de quiebres / Importados_Volumen).">uni/ master</th><th class="num" title="Master cajas a pedir (editable). Poné 0 para no pedir. Vacío = vuelve al calculado.">MC pedido</th><th class="num" title="Unidades = MC × uni/master · FOB unitario (USD)">Unidades<small>FOB u$s/u</small></th><th class="num" title="u$s = unidades × FOB · m³ = MC × m³/master">u$s<small>m³</small></th><th class="num" title="Fecha estimada de reingreso del importado. Se muestra en el portal LK (Reingreso Est dd/mm) cuando el artículo está sin stock. Vacío = no se muestra.">Reingreso</th><th>Acciones</th></tr></thead><tbody>';
     arr.forEach(function (it) {
       const badge = it.esInsumo ? _pedImpInsumoChip(it) : (it.esParte ? ' <span style="color:#7c3aed" title="Parte">🧩</span>' : '');
-      const _stkShow = Math.max(0, Number(it.stockUni) || 0);
+      const _stkShow = (Number(it.stockUni) || 0);
       // v23.91 (Luis) — el número YA es el DISPONIBLE (v16.08): lo comprometido se lee en el
       // tooltip, no como un «−N» al lado, que hacía leer dos veces la misma resta.
       const _stkNum = (it.uniPedidas > 0)
-        ? '<span title="Disponible: ya descontadas ' + it.uniPedidas + ' u de pedidos abiertos. Si los pedidos superan al stock, muestra 0, no un negativo.">' + _stkShow + '</span>'
+        ? '<span title="Disponible: ya descontadas ' + it.uniPedidas + ' u de pedidos abiertos. Si los pedidos superan al stock, da NEGATIVO (v25.61).">' + _stkShow + '</span>'
         : String(_stkShow);
       var stockTxt = (it.stockParteU > 0)
         ? _stkNum + ' <span style="color:#7c3aed;font-weight:700;font-size:12px" title="Incluye ' + it.stockParteU + ' u de la parte ' + escapeHtml(it.stockParteCods || '') + '">🔧+' + it.stockParteU + '</span>'
@@ -1611,6 +1612,8 @@ function _pedImpRender() {
         stockTxt += ' <span style="color:#7c3aed;font-weight:700;font-size:12px" title="Incluye ' + it.stockTermU + ' u de terminados armados con esta parte → ' + escapeHtml(_termDet) + '">🧩+' + it.stockTermU + '</span>';
       }
       // v15.27 — depósito insumos (parte suelta o importado sin reenvasar), convertido a unidades
+      // v25.61 — stock en Cervantes (GP2) del componente equivalente, ya sumado al número
+      if (it.stockGp2U > 0) stockTxt += ' <span style="color:#b45309;font-weight:700;font-size:12px" title="Incluye ' + it.stockGp2U + ' u del stock de GP2 (Cervantes) del componente equivalente">🏭+' + it.stockGp2U + '</span>';
       if (it.stockInsU > 0) stockTxt += ' <span style="color:#0369a1;font-weight:700;font-size:12px" title="Incluye ' + it.stockInsU + ' u del depósito insumos (Movimientos_Stock, convertido con Insumos_Factores). En una parte, este stock reemplaza al seed del Excel.">🧰' + it.stockInsU + '</span>';
       // v16.08 — lo que se muestra ya es el DISPONIBLE: stock de hoy menos lo pedido, con piso en 0.
       const _codEncV = encodeURIComponent(it.cod);
@@ -1804,7 +1807,7 @@ async function _pedImpDamianHojas(prov, opt) {
   };
   const trG = function (g1) { return g1 ? '<tr class="g1">' : '<tr>'; };
   const stockTd = function (it) { const m = _pedImpMesesStock(it), bajo = m != null && m < _PEDIMP_MESES_ALERTA;
-    return '<td>' + fmt(Math.max(0, Number(it.stockUni) || 0)) + '<small>' + (bajo ? '⚠ ' : '') + (m == null ? 's/proy' : _pedImpMesesFmt(m) + ' m') + '</small></td>'; };
+    return '<td>' + fmt((Number(it.stockUni) || 0)) + '<small>' + (bajo ? '⚠ ' : '') + (m == null ? 's/proy' : _pedImpMesesFmt(m) + ' m') + '</small></td>'; };
   // «Llegan» sólo si algo del set viene en camino; si todo llega el MISMO día, la fecha va una vez en el rótulo.
   const camino = function (lista) {
     const con = lista.filter(function (it) { return (Number(it.enCurso) || 0) > 0; });
@@ -2026,7 +2029,7 @@ function pedImpExportExcel() {
   var _totM3 = 0, _totUsd = 0;
   items.forEach(function (it) {
     var imp = _IMPORTADOR_DE[it.prov || ""] || "(sin importador)";
-    var stk = Math.max(0, Number(it.stockUni) || 0);   // negativo → 0 (igual que pantalla)
+    var stk = (Number(it.stockUni) || 0);   // v25.61 — puede ser negativo (D12)
     var caj = _pedImpMcOf(it);
     var m3m = Number(it.m3Master) || 0, m3t = _pedImpM3Of(it); _totM3 += m3t;
     var fob = Number(it.fobUni) || 0, usd = _pedImpUsdOf(it); _totUsd += usd;
