@@ -6261,7 +6261,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.73"></script>
+<script type="module" src="recepcion.js?v=25.74"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10407,7 +10407,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.73";
+const APP_VERSION = "v25.74";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -54091,11 +54091,11 @@ function pkHojaHtml(d){
     '.pkh-no td{color:#777;text-decoration:line-through;text-decoration-thickness:.6px;}.pkh-no .pkh-cod{color:#777;}</style>';
   var mitad = Math.ceil(d.lineas.length / 2);
   // v25.71 (Luis): la columna «Pickeo» desaparece; el resultado va en «Total cajas».
-  //  · se pickeó todo → ✓   · a medias → total tachado (diagonal fina) + lo pickeado al lado
+  //  · se pickeó todo → el número + ✓   · a medias → total tachado (diagonal fina) + lo pickeado al lado
   //  · no se pickeó nada (real 0 con esp>0) → la fila entera tachada, se ve lo que había.
   var celdaTot = function (x){
     if (x.esp <= 0) return String(x.esp);
-    if (x.real >= x.esp) return '<span class="pkh-ok">✓</span>';
+    if (x.real >= x.esp) return x.esp + ' <span class="pkh-ok">✓</span>';
     if (x.real > 0) return '<span class="pkh-diag">' + x.esp + '</span><span class="pkh-got">' + x.real + '</span>';
     return String(x.esp);
   };
@@ -58381,7 +58381,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.73"></script>
+<script src="importacion.js?v=25.74"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61182,7 +61182,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.73"></script>
+<script src="cobranzas.js?v=25.74"></script>
 
 </body>
 </html>

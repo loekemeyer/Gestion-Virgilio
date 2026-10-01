@@ -23,7 +23,7 @@ const h = H(d);
 ok(/Tanda E70F \(Sale Lun 5\/10\)/.test(h) && /Leg 94 Juan Farias/.test(h), "cabecera como la planilla");
 ok(/08:00 a 10:00 hs \(30 min en otras tareas\)/.test(h), "horario con descuento");
 ok(!/<th>Pickeo<\/th>/.test(h), "la columna Pickeo aparte desapareció (v25.71)");
-ok(/<span class="pkh-ok">✓<\/span>/.test(h), "pickeó todo (505, 066) → ✓ en Total cajas");
+ok(/<td>5 <span class="pkh-ok">✓<\/span><\/td>/.test(h) && /<td>1 <span class="pkh-ok">✓<\/span><\/td>/.test(h), "pickeó todo (505→«5 ✓», 066→«1 ✓»): número + tilde en Total cajas");
 ok(/<span class="pkh-diag">4<\/span><span class="pkh-got">2<\/span>/.test(h), "parcial (501): total 4 tachado con diagonal + lo pickeado (2) al lado");
 ok(/<tr class="pkh-no"><td class="pkh-cod">809E<\/td>/.test(h) && /<tr class="pkh-no"><td class="pkh-cod">809E<\/td><td>J13<\/td><td>1<\/td><\/tr>/.test(h), "sin pickear nada (809E): fila entera tachada, se ve lo que había (1)");
 ok(h.indexOf("LK 0001") < h.indexOf("LK 0002") && /Total m³ 1,00/.test(h) && /0,50 m³\/hora/.test(h), "NP, total m³ y m³/hora");
