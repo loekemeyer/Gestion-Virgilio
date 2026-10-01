@@ -5360,9 +5360,8 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
 - **El celular** del operario, al llegar a **5 min** de tiempo muerto en la botonera, llama `gv_alerta_inactivo_abrir(legajo)`
   (una sola alerta viva por legajo; la marca queda en `localStorage gv_tm_alerta::<legajo>`). Al registrar la próxima tarea
   (`tmMarcarEvento`, desde `enqueueReport`) llama `gv_alerta_inactivo_cerrar`. Tabla `GV_Alerta_Inactivo` (RLS cerrada, sólo RPC).
-- ⚠ **v25.83 (Luis: *"ponelo solo en el monitor admin así lo testeo"*): la alarma está SÓLO en «Mon. Admin»** — la inyecta
-  `monitor/build-admin.cjs`; `tv.html` (TV de pared y «Vista TV») NO la carga, y el legajo de prueba (0/1) también avisa
-  (sale «PRUEBA (legajo 0)»). Para pasarla a la TV: el `<script>` va en `tv.html`.
+- **v25.87 (Luis, D10): la alarma está en la TV de pared, «Vista TV» y «Mon. Admin»** — el `<script>` va en `tv.html` y
+  `admin.html` lo hereda del build. El legajo de prueba (0/1) también avisa (sale «PRUEBA (legajo 1)»).
 - **El monitor** (`monitor/alerta-inactivo.js`)
   leen `gv_alertas_inactivo_vivas()` cada 4 s: cartel centrado del **70 %**, rojo titilando, *«[Nombre] lleva más de 5 minutos
   inactivo»*, con **sirena** Web Audio. Se va a los **15 s** o apenas la alerta se cierra. Un iframe escondido no suena.

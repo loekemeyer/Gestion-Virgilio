@@ -20,9 +20,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         body: JSON.stringify([{ id: 7, legajo: "104", nombre: "Jhonny Moncayo Pérez", abierta_en: new Date().toISOString(), cerrada: cerrada }]) });
     return rt.abort();
   });
-  // v25.83: la alarma vive SÓLO en Mon. Admin (admin.html); la TV de pared no la carga
+  // v25.87 (D10): la alarma va en la TV de pared (tv.html) y Mon. Admin la hereda — una sola vez en cada uno
   const fs = require("fs");
-  if (fs.readFileSync(path.join(__dirname, "..", "monitor", "tv.html"), "utf8").indexOf("alerta-inactivo.js") >= 0) errs.push("tv.html carga la alarma");
+  for (const f of ["tv.html", "admin.html"]) {
+    const n = fs.readFileSync(path.join(__dirname, "..", "monitor", f), "utf8").split("alerta-inactivo.js").length - 1;
+    if (n !== 1) errs.push(f + " carga la alarma " + n + " veces");
+  }
   await tv.goto("file://" + path.join(__dirname, "..", "monitor", "admin.html"), { waitUntil: "domcontentloaded" });
   await tv.waitForFunction(() => { const o = document.getElementById("aiOv"); return o && o.classList.contains("on"); }, null, { timeout: 8000 }).catch(() => {});
   const a = await tv.evaluate(() => {
