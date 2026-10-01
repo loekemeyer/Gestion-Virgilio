@@ -103,27 +103,34 @@ function popRitmo(leg, sub) {
   var tot = pares.reduce(function (s, p) { return s + (Number(p[1]) || 0); }, 0);
   var hs = Number(sub === "pick" ? row.hs_pick : row.hs_arm) || 0;
   var lab = sub === "pick" ? "picking" : "armado";
-  var res = (hs > 0.05 && tot > 0) ? n1(tot / hs) + " m³/h" : "—";
-  var head = '<div class="pop-sub">' + esc(nombreCorto(row.nombre, leg)) + ' · ' + lab +
-    ' · <span class="pop-k">' + n1(tot) + ' m³ ÷ ' + nH(hs) + ' h = ' + res + '</span></div>';
+  var head = '<div class="pop-sub" style="text-align:center"><span class="pop-k">' + esc(nombreCorto(row.nombre, leg)) + '</span></div>';
   if (!pares.length) return head + '<div class="pop-empty">No cerró ninguna tanda de ' + lab + ' hoy' +
     (hs > 0.05 ? ' (tiene ' + nH(hs) + ' h cargadas)' : '') + '</div>';
-  /* v25.92 (Luis): por tanda, Tanda · m³ · Min trab · Ritmo, y Total. Min trab = cierre (TP/TAP) − su apertura. */
-  var op = sub === "pick" ? "TP" : "TAP", mins = {};
-  (D.eventos || []).forEach(function (ev) {
-    if (ev.opcion !== op || String(ev.legajo == null ? "" : ev.legajo).trim() !== String(leg)) return;
-    if (!ev.ts_inicio || dayKey(ev.ts_cliente) !== hoyKey()) return;
-    var t = String(ev.texto || "").trim().toUpperCase();
-    var m = (new Date(ev.ts_cliente).getTime() - new Date(ev.ts_inicio).getTime()) / 60000;
-    if (t && isFinite(m) && m > 0) mins[t] = (mins[t] || 0) + m;
+  /* v25.93 (Luis): Tanda · m³ · Min trab · Ritmo, y Total. Min trab = de punta a punta (apertura → cierre
+     TP/TAP); las pausas adentro (baño, comida, limpieza, conteo, timbre, permiso) van entre paréntesis
+     «60 (-2)» y el ritmo se mide sobre lo trabajado neto. */
+  var op = sub === "pick" ? "TP" : "TAP", PAUSA = { AT: 1, PB: 1, Limp: 1, PC: 1, CT: 1, Perm: 1 };
+  var ms = function (x) { return new Date(x).getTime(); };
+  var evs = (D.eventos || []).filter(function (ev) {
+    return String(ev.legajo == null ? "" : ev.legajo).trim() === String(leg) && ev.ts_inicio && dayKey(ev.ts_cliente) === hoyKey(); });
+  var pausas = evs.filter(function (ev) { return PAUSA[ev.opcion]; }).map(function (ev) { return [ms(ev.ts_inicio), ms(ev.ts_cliente)]; });
+  var mins = {}, pmin = {};
+  evs.forEach(function (ev) {
+    if (ev.opcion !== op) return;
+    var t = String(ev.texto || "").trim().toUpperCase(), i = ms(ev.ts_inicio), f = ms(ev.ts_cliente);
+    if (!t || !isFinite(i) || !isFinite(f) || f <= i) return;
+    var p = 0; pausas.forEach(function (q) { var o = Math.min(f, q[1]) - Math.max(i, q[0]); if (o > 0) p += o; });
+    mins[t] = (mins[t] || 0) + (f - i) / 60000; pmin[t] = (pmin[t] || 0) + p / 60000;
   });
   var rit = function (m3, mi) { return (mi > 0.5 && m3 > 0) ? n1(m3 / (mi / 60)) : "—"; };
-  var tm = 0, body = pares.map(function (p) { var mi = mins[p[0]] || 0; tm += mi;
-    return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + '</td><td>' +
-      (mi > 0 ? Math.round(mi) : "—") + '</td><td>' + rit(Number(p[1]) || 0, mi) + '</td></tr>'; }).join("");
+  var fm = function (mi, pa) { if (!(mi > 0)) return "—"; var r = Math.round(pa);
+    return Math.round(mi) + (r > 0 ? ' <span style="color:#fca5a5">(-' + r + ')</span>' : ''); };
+  var tm = 0, tp = 0, body = pares.map(function (p) { var mi = mins[p[0]] || 0, pa = pmin[p[0]] || 0; tm += mi; tp += pa;
+    return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + '</td><td>' + fm(mi, pa) + '</td><td>' +
+      rit(Number(p[1]) || 0, mi - pa) + '</td></tr>'; }).join("");
   return head + '<table class="pop-cmp"><thead><tr><th>Tanda</th><th>m³</th><th>Min trab</th><th>Ritmo m³/h</th></tr></thead><tbody>' +
-    body + '<tr class="pop-tot"><td>Total</td><td>' + n1(tot) + '</td><td>' + (tm > 0 ? Math.round(tm) : "—") +
-    '</td><td>' + rit(tot, tm) + '</td></tr></tbody></table>';
+    body + '<tr class="pop-tot"><td>Total</td><td>' + n1(tot) + '</td><td>' + fm(tm, tp) +
+    '</td><td>' + rit(tot, tm - tp) + '</td></tr></tbody></table>';
 }
 function popHoras(leg) {
   /* v25.89 (Luis): dos columnas. Prod = SÓLO picking y armado; todo lo demás es No prod, tiempo muerto incluido. */

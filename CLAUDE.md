@@ -5459,7 +5459,7 @@ como se considera el tiempo"*. Se retira el «Prod incluye movimiento/racks, car
   (CC/CR/RR + movimiento + pausas); la fila «No prod.» se llama **Pausas**. `prodH` interno no se tocó (≡ vista, `mon-vs-vista`).
 - **Bajar de Racks ordena por urgencia**: `(góndola + A guardar − pedido) ÷ capacidad`, de menor a mayor; sin capacidad
   al final (≡ Guardado a Góndola, que ya ordenaba por `(góndola − pedido) ÷ capacidad`).
-- **v25.92 (Luis): el pop-up de m³/h picking / armado** (Mon. Admin) es una tabla angosta **Tanda · m³ · Min trab · Ritmo m³/h** + fila Total. Min trab = cierre TP/TAP − su apertura (bruto, sin descontar pausas: puede no cerrar exacto con las horas del encabezado).
+- **v25.92 (Luis): el pop-up de m³/h picking / armado** (Mon. Admin) es una tabla angosta **Tanda · m³ · Min trab · Ritmo m³/h** + fila Total. Min trab = de punta a punta (apertura → cierre TP/TAP); las pausas adentro (baño, comida, limpieza, conteo, timbre, permiso) van «60 (-2)» y el Ritmo se mide sobre lo neto. Arriba va sólo el nombre, centrado (v25.96).
 - `tests/mon-tv.cjs`, `tests/mon-admin.cjs`, `tests/rkb-orden-urgencia.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-21, v20.78): antes de optimizar, medir — y leer lo que se usa, no el universo
