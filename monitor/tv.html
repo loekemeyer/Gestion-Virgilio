@@ -93,7 +93,7 @@ html.embebido header{display:none}
 /* v25.6 (Luis): *"que se adapte a la resolución"*. Las letras van en --u = el menor entre
    1vh y el alto que tendría una 16:9 de ese ancho: en una pantalla más angosta achican. */
 :root{--u:min(1vh,.5625vw)}
-main{flex:1;display:grid;grid-template-columns:1.15fr 1fr;gap:.8vw;min-height:0}
+main{flex:1;display:grid;grid-template-columns:1fr auto;gap:.8vw;min-height:0}
 .col{display:flex;flex-direction:column;gap:1vh;min-height:0;min-width:0}
 .card{background:#111c2f;border:1px solid #1e293b;border-radius:1vh;
   padding:.9vh 1vw;min-height:0;display:flex;flex-direction:column;overflow:hidden}
@@ -1535,6 +1535,7 @@ function pintar(d) {
       }).join("") + '</tbody></table>' +
       (d.actividad.length > MAX_ACT ? '<div class="mas">+ ' + (d.actividad.length - MAX_ACT) + ' más</div>' : "")
     : '<div class="vacio">Nadie fichado todavía</div>';
+  tickersTodos();   // v25.51: la columna derecha va al ancho del dato; recién acá queda fijo el ancho de la izquierda
 
   /* v23.92 (Luis): la barra de avance y los conteos salieron del header (texto que de lejos no
      se lee). La cuenta se conserva acá porque es la que dice qué tanda vale por terminada, y
