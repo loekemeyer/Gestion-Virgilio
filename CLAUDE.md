@@ -5287,8 +5287,9 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
   **texto `ANULADO`**. En el log quedan la apertura (cuándo apretó) y el cierre anulado; el tramo sale en el horario.
 - **RT, RI y EI ya no BORRAN la apertura** (`anular_toggle_virgilio` queda sin llamador): registran igual el cierre ANULADO.
 - Picking y armado ya lo registraban (EP→EPX, AP→APX). MG/racks/IR/CP/RC cierran con su X y dejan su marca (MGC, RKB «sin bajar»).
-- ⚠ Hoy el tiempo anulado de RR/CC/CR/RT/RI/EI **cuenta** en el horario (igual que el «cerrar sin cargar por app»);
-  el de picking/armado anulado no. Pendiente de Luis si se descuenta.
+- **v25.64 (Luis, 01/10: *"se cuenta, es tiempo muerto. forward facing"*): el tramo ANULADO de CC/CR/RR/RT/RI/EI va a
+  NO PRODUCTIVAS** (`gv_monitor_horas_operario_dia`, marcador `v25.64-anulado` ≡ `fetchMonitorDayStats`,
+  `ANULADO_NOPROD_CODES`). El de picking/armado anulado (EPX/APX) sigue sin contar.
 - `tests/toggle-anular.cjs`, `tests/anular-sesion.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-21, v20.78): antes de optimizar, medir — y leer lo que se usa, no el universo

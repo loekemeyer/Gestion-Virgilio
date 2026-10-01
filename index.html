@@ -6238,7 +6238,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.63"></script>
+<script type="module" src="recepcion.js?v=25.64"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10268,7 +10268,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.63";
+const APP_VERSION = "v25.64";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31814,6 +31814,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     }
     return tot;
   };
+  const ANULADO_NOPROD_CODES = new Set(["CC","CR","RR","RT","RI","EI"]);
   const computeClosureDur = (leg, tsInicioMs, tsClienteMs, outBreakdown) => {
     const dayOpen = isoToDayKey(tsInicioMs);
     const dayClose = isoToDayKey(tsClienteMs);
@@ -31919,6 +31920,18 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const p = perLegajo.get(leg);
     p.lastTs = ev.ts_cliente;
     const tanda = (ev.texto || "").trim().toUpperCase();
+    /* v25.64-anulado (Luis 01/10: *"se cuenta, es tiempo muerto"*) ≡ gv_monitor_horas_operario_dia:
+       una tarea ANULADA (cierre con texto ANULADO, gvToggleAnular) va a NO PRODUCTIVAS. */
+    if (tanda === "ANULADO" && ev.ts_inicio && ANULADO_NOPROD_CODES.has(ev.opcion)) {
+      const _brA = {};
+      const durA = computeClosureDur(leg, new Date(ev.ts_inicio).getTime(), new Date(ev.ts_cliente).getTime(), _brA);
+      if (durA > 0 && durA < 24 * 3600 * 1000) {
+        p.noprodMs += durA;
+        p.noprodDetail.push({ opcion: ev.opcion, texto: "ANULADO", ts_inicio: ev.ts_inicio, ts_cliente: ev.ts_cliente,
+                              durMs: durA, brutoMs: _brA.brutoMs || durA, muertoMs: _brA.muertoMs || 0 });
+      }
+      continue;
+    }
     if (tanda && ev.ts_inicio) {
       // Duración real (ms) + breakdown (cómo se calculó) usando el helper.
       const _br = {};
@@ -58051,7 +58064,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.63"></script>
+<script src="importacion.js?v=25.64"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60852,7 +60865,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.63"></script>
+<script src="cobranzas.js?v=25.64"></script>
 
 </body>
 </html>
