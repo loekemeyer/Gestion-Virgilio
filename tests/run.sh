@@ -1091,4 +1091,6 @@ node tests/imp-excel-igual-pantalla.cjs
 node tests/apr-oc-super.cjs
 node tests/claude-reglas-guard.cjs
 node tests/proy-det-unidades.cjs
+echo "== stk-est-madre-tab (v25.65: pestaña Est. Madre = el admin en iframe, primera, no se recarga) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-tab.cjs
 _resumen

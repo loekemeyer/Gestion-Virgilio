@@ -6803,3 +6803,15 @@ nadie la sesión abierta"*.
   `gv_alerta_dispositivo_multi_operario_telegram()`, un mensaje por cada operario NUEVO en el mismo dispositivo en el
   día (dedup por dispositivo + día + legajos). `sql/gv_dispositivo_multi_telegram_v2529.sql`.
 - `sql/gv_dispositivo_v2525.sql`, `tests/dispositivo-id.cjs`.
+
+## ⚠ REGLA (2026-10-01, v25.65): STOCK Y COMPRAS — PEDIDOS en la Proyección y la pestaña EST. MADRE es el admin
+
+- **Columna «pedidos»** del pop-up de Proyección (entre vtas y entrega) = cajas que **pidieron los clientes** en el
+  mes, por fecha del pedido: `gv_pedidos_mensuales_cod` sobre `lk_pedidos_match` (web LK + Chef), con la familia
+  sumada y la L como LK, igual que vtas. Un mes sin pedidos web registrados (antes de abr/26 LK, jul/26 Chef) o una
+  lectura caída dice **s/d**, nunca 0.
+- **«📈 Est. Madre»** (primera solapa) **no es una copia**: es `admin/admin.html#estadistica-madre` en un iframe que
+  vive fuera de `#stkBody` (los re-render no lo recargan) y entra con el puente `lk_bridge_vjwt`. Cambiar la Est.
+  Madre = cambiarla en `pagina-LK-copia` y re-copiar el espejo `admin/`; acá no se toca nada. Si el mail no es el
+  admin de LK, el iframe pide el OTP (mismo comportamiento que «🌐 Panel Web LK»).
+- `tests/proy-entregadas.cjs` · `tests/stk-est-madre-tab.cjs` · `sql/gv_pedidos_mensuales_cod_v2565.sql`.

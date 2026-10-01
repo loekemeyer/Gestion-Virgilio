@@ -31,6 +31,10 @@
    titulada «Estad. Madre», con columnas mes / vtas / entrega, y el gráfico al final ("abajo
    de eso, el gráfico, que ni uso tiene").
 
+   v25.65 — columna PEDIDOS entre vtas y entrega (pedido del usuario, 01/10): cajas que pidieron
+   los clientes en el mes (gv_pedidos_mensuales_cod). Un mes sin pedidos web registrados sale
+   «s/d», nunca 0; y si la RPC falla, TODOS los meses dicen s/d.
+
    ⚠ Este test estuvo en ROJO en main desde la v18.11 sin que nadie lo notara: esa versión
    cambió el orden de las columnas (pedido del dueño) y nadie lo actualizó. Se reescribió el
    15/09 contra lo que la pantalla hace hoy.
@@ -77,9 +81,16 @@ catch (_e) {
       const cub = i >= 6;
       return { mes: v.mes, cajas: cub ? 500 : 0, cubierto: cub };
     });
+    // pedidos de clientes: registrados recién desde el índice 8 → 5, 6 y 7 salen s/d
+    const pedidos = ventas.map(function (v, i) { return { mes: v.mes, cajas: i >= 8 ? 400 + i : 0, cubierto: i >= 8 }; });
     let conEntregas = true;
-    window.fetch = function (url) {
+    out.pedBody = null;
+    window.fetch = function (url, opts) {
       url = String(url); out.urls.push(url);
+      if (url.indexOf("gv_pedidos_mensuales_cod") >= 0) {
+        out.pedBody = opts && opts.body ? String(opts.body) : null;
+        return J(conEntregas ? pedidos : []);
+      }
       if (url.indexOf("ventas_mensuales_cod") >= 0 && url.indexOf("clientes") < 0) return J(ventas);
       if (url.indexOf("gv_entregas_mensuales_cod") >= 0) return J(conEntregas ? entregas : []);
       if (url.indexOf("gv_ventas_clientes_mes_cod") >= 0) return J([{ cliente: "Osa", cajas: 120, codigos: "702E 7 · 702EN 113" }, { cliente: "Otros", cajas: 80 }]);
@@ -129,6 +140,12 @@ catch (_e) {
     out.tituloEstadMadre = /Estad\. Madre/.test(body.textContent);
     const ths = Array.prototype.map.call(body.querySelectorAll(".proyv-tab th"), function (t) { return t.textContent.trim(); });
     out.columnas = ths.join("|");
+    // v25.65 — PEDIDOS: pide la RPC con el código base, números en los meses cubiertos, s/d en los otros
+    out.pidioPedidos = !!out.pedBody && JSON.parse(out.pedBody).p_cod === "321";
+    out.pedSd = body.querySelectorAll(".proyv-tab td.p.sd").length === 3;
+    const pedNums = Array.prototype.map.call(body.querySelectorAll(".proyv-tab td.p:not(.sd)"), function (t) { return t.textContent.trim(); });
+    out.pedNums = pedNums.join(",");
+    out.pedOk = pedNums.length === 4 && pedNums[0].indexOf("408") >= 0 && pedNums[3].indexOf("411") >= 0;
     // el mes en curso: asterisco en el eje y punto hueco ambar
     const svgTxt = body.querySelector(".proyv-svg").textContent;
     out.asterisco = svgTxt.indexOf("*") >= 0;
@@ -159,7 +176,10 @@ catch (_e) {
     body = document.getElementById("stkPopBody");
     out.sinColEnt = Array.prototype.map.call(body.querySelectorAll(".proyv-tab th"), function (t) {
       return t.textContent.trim();
-    }).join("|") === "mes|vtas";
+    }).join("|") === "mes|vtas|pedidos";
+    // la RPC de pedidos no trajo nada → todos los meses s/d, ningún 0 inventado
+    out.pedCaidoSd = body.querySelectorAll(".proyv-tab td.p.sd").length === 7 &&
+      body.querySelectorAll(".proyv-tab td.p:not(.sd)").length === 0;
     return out;
   });
 
@@ -167,7 +187,8 @@ catch (_e) {
     r.pidioEntregas && r.fichaProy && r.dosFichas && r.sinPromedio && r.conRitmo &&
     r.sinFacturado && r.sinEntregado && r.sinArriba && r.asterisco && r.puntoHueco &&
     r.sinBarras && r.hits === 12 && r.filasMes === 7 && r.mesCursoMarcado && r.numerosAbren &&
-    r.tablaAntesDelGrafico && r.tituloEstadMadre && r.columnas === "mes|vtas|entrega|delta" &&
+    r.tablaAntesDelGrafico && r.tituloEstadMadre && r.columnas === "mes|vtas|pedidos|entrega|delta" &&
+    r.pidioPedidos && r.pedSd && r.pedOk && r.pedCaidoSd &&
     r.abrioDet && r.detTieneCliente && r.detTieneCodigos && r.detTieneRemito && r.detMarcado && r.cierraDet &&
     r.sinColEnt &&
     errs.length === 0;

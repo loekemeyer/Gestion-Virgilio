@@ -30951,3 +30951,20 @@ evento con `gv_dispositivo` entra. No toca sesiones abiertas. `sql/gv_dispositiv
   Medido: `stock_total` idéntico antes/después en las 156 filas (backup `zz_backups."GV_Backup_ImpOrdenes_antes_20261001"`).
 - Rollback: recrear con `zz_backups."GV_Backup_ImpOrdenes_def_20261001".def` (drop + create no hace falta: quitar
   columnas exige drop; dependientes transitivos: medir antes) y `drop table public."GV_Importados_Equiv_GP2"`.
+
+## §3.v2565 — Stock y Compras: columna PEDIDOS en Proyección y pestaña EST. MADRE (v25.65, 01/10/2026)
+
+- **Pedido del usuario:** *"entre Vtas y Entregas quiero que esté la columna de PEDIDOS"* y *"una pestaña en Stock
+  y Compras que se llame EST. MADRE y vaya primera… que sean exactamente iguales [a la de pagina-LK-copia]"*.
+- **Objeto nuevo:** `public.gv_pedidos_mensuales_cod(p_cod, p_meses, p_empresa)` → `(mes, cajas, cubierto)`,
+  SECURITY DEFINER, EXECUTE anon/authenticated. Cajas PEDIDAS por clientes por mes (fecha del pedido), de
+  `lk_pedidos_match` (local, web LK + Chef). Mismos criterios que `ventas_mensuales_cod`: suma la familia
+  (`Equivalencias_Familia`) y la L es LK. `cubierto=false` = ese mes no había pedidos web registrados → la
+  pantalla dice **s/d**, no 0 (LK desde 2026-04, Chef desde 2026-07; un código que se pide en las dos toma la
+  más tardía). La normalización del código va escrita adentro (no `gv_cod_stock` por fila): 874 → 590 ms como anon.
+- **Medido:** 505 → abr 2.047 · may 1.992 · jun 1.244 · jul 2.021 · ago 2.212 · sep 1.639 cajas; mar sale s/d.
+- **Est. Madre:** no hay objeto de base nuevo. Es la pantalla del admin espejo (`admin/admin.html#estadistica-madre`,
+  idéntica a `pagina-LK-copia`: JS desde `cargarEstadisticaMadre` y la sección HTML, diff 0) en un iframe fuera de
+  `#stkBody`, con el puente `lk_bridge_vjwt` de «🌐 Panel Web LK». Lee el proyecto **LK**, no éste.
+- **Rollback:** `drop function if exists public.gv_pedidos_mensuales_cod(text, integer, text);` (el front cae solo
+  a s/d). `sql/gv_pedidos_mensuales_cod_v2565.sql`, `tests/proy-entregadas.cjs`, `tests/stk-est-madre-tab.cjs`.

@@ -6238,7 +6238,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.64"></script>
+<script type="module" src="recepcion.js?v=25.65"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10268,7 +10268,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.64";
+const APP_VERSION = "v25.65";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18055,13 +18055,57 @@ function stkRender() {
     const body0 = document.getElementById("stkBody"); if (body0) _renderKeepFocus(body0, stkBodyConteo());
     return;
   }
-  const tabs = [["stocks", "📊 Stocks"], ["auditgon", "🔍 Góndola <25%"], ["faltante", "📉 Faltantes x día"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
+  const tabs = [["estmadre", "📈 Est. Madre"], ["stocks", "📊 Stocks"], ["auditgon", "🔍 Góndola <25%"], ["faltante", "📉 Faltantes x día"], ["racks", "🏗 Racks"], ["conteo", "📋 Conteo"], ["capacidad", "📐 Capacidad"], ["insumos", "🧰 Insumos"], ["ajustes", "⚙ Ajustes"], ["compras", "📑 Compras (OCs)"]];
   const tb = document.getElementById("stkTabs");
   if (tb) tb.innerHTML = tabs.map(function (t) { return '<button class="stk-tab' + (_stk.tab === t[0] ? " on" : "") + '" onclick="stkTab(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join("");
+  if (_stkEmMostrar(_stk.tab === "estmadre")) { updateStkBadge(); return; }   // v25.65: Est. Madre = iframe del admin, fuera de #stkBody
   const body = document.getElementById("stkBody"); if (!body) return;
   _renderKeepFocus(body, _stk.tab === "faltante" ? stkBodyFaltante() : _stk.tab === "auditgon" ? stkBodyAuditGon() : _stk.tab === "proceso" ? stkBodyProceso() : _stk.tab === "conteo" ? stkBodyConteo() : _stk.tab === "capacidad" ? stkBodyCapacidad() : _stk.tab === "racks" ? stkBodyRacks() : _stk.tab === "insumos" ? stkBodyInsumos() : _stk.tab === "ajustes" ? stkBodyAjustes() : stkBodyStocksTab());
   _stkInsCatPopupRefresh();   // v9.32: refresca popup de categoría si está abierto
   updateStkBadge();   // v10.32: actualiza badge de negativos en botón Stock y Compras
+}
+/* ===== v25.65 — EST. MADRE dentro de Stock y Compras (pedido del usuario, 01/10/2026:
+   "quiero que sean exactamente iguales") =====
+   Es la MISMA pantalla del panel admin de LK — admin/admin.html#estadistica-madre, el espejo
+   de pagina-LK-copia — embebida en un iframe. No es una copia del código: lo que cambie en la
+   Est. Madre del admin se ve acá solo, y no hay dos versiones que se desfasen.
+   El iframe vive FUERA de #stkBody: stkRender re-dibuja el body en cada cambio (realtime,
+   filtros) y si el iframe estuviera adentro se recargaría. Se muestra/oculta por solapa.
+   Entra con el mismo puente de sesión que «🌐 Panel Web LK» (lk_bridge_vjwt): si el
+   mail no es el admin de LK, el iframe pide el código OTP adentro, igual que allá. */
+function _stkEmMostrar(on) {
+  var body = document.getElementById("stkBody");
+  var host = document.getElementById("stkEmHost");
+  if (!on) {
+    if (host) host.style.display = "none";
+    if (body) body.style.display = "";
+    return false;
+  }
+  if (body) body.style.display = "none";
+  if (!host) {
+    var card = body && body.parentNode; if (!card) return true;
+    host = document.createElement("div"); host.id = "stkEmHost";
+    host.innerHTML = '<div class="stk-loading" id="stkEmCarga">Cargando Estadística Madre…</div>' +
+      '<iframe id="stkEmFrame" title="Estadística Madre" style="display:block;width:100%;height:calc(100vh - 140px);min-height:520px;border:0"></iframe>';
+    card.appendChild(host);
+    _stkEmCargar();
+  }
+  host.style.display = "";
+  return true;
+}
+async function _stkEmCargar() {
+  var fr = document.getElementById("stkEmFrame"); if (!fr) return;
+  try { var tok = window.sbAuth && (await window.sbAuth.getAccessToken()); if (tok) sessionStorage.setItem("lk_bridge_vjwt", tok); } catch (_e) {}
+  fr.onload = function () {
+    var c = document.getElementById("stkEmCarga"); if (c) c.remove();
+    try {   // mismo origen: se le saca el menú lateral del admin, que acá no lleva a ningún lado
+      var d = fr.contentDocument; if (!d || d.getElementById("stkEmCss")) return;
+      var s = d.createElement("style"); s.id = "stkEmCss";
+      s.textContent = ".sidebar{display:none!important}.app-shell,.main-content{min-height:0!important}.page{padding:14px 18px!important;max-width:none!important}";
+      (d.head || d.documentElement).appendChild(s);
+    } catch (_e) {}
+  };
+  fr.src = "admin/admin.html#estadistica-madre";
 }
 /* ===== v10.18 — AUDITORÍA "Góndola < 25% de la proyección" =====================
    Hoja para auditar artículos con MUY POCA góndola respecto a lo que se proyecta vender.
@@ -19999,11 +20043,13 @@ var STK_POP_CSS =
   ".proyv-tab td.v.bajo{color:#b91c1c;}" +
   ".proyv-tab td.e{font-size:21px;font-weight:900;color:#047857;}" +
   ".proyv-tab td.e.sd{font-size:14px;font-weight:700;color:#cbd5e1;}" +
+  ".proyv-tab td.p{font-size:21px;font-weight:900;color:#0e7490;}" +   // v25.65: pedidos de clientes del mes
+  ".proyv-tab td.p.sd{font-size:14px;font-weight:700;color:#cbd5e1;}" +
   ".proyv-tab td.d{font-size:17px;font-weight:800;color:#64748b;}" +
   ".proyv-tab td.d.pos{color:#b45309;}" +
   ".proyv-tab td.d.neg{color:#1d4ed8;}" +
   ".proyv-tab td.d.sd{font-size:14px;font-weight:700;color:#cbd5e1;}" +
-  "@media(max-width:400px){.proyv-tab th,.proyv-tab td{padding-left:7px;padding-right:7px;}.proyv-tab th:first-child,.proyv-tab td:first-child{padding-left:0;padding-right:10px;}.proyv-tab td.v,.proyv-tab td.e{font-size:19px;}.proyv-tab td.d{font-size:16px;}}" +
+  "@media(max-width:400px){.proyv-tab th,.proyv-tab td{padding-left:7px;padding-right:7px;}.proyv-tab th:first-child,.proyv-tab td:first-child{padding-left:0;padding-right:10px;}.proyv-tab td.v,.proyv-tab td.e,.proyv-tab td.p{font-size:19px;}.proyv-tab td.d{font-size:16px;}}" +
   ".proyv-tab tr.curso td:first-child{color:#b45309;}" +
   ".proyv-tab tr.curso td.v{color:#b45309;}" +
   ".proyv-tab tr.on td{background:#f5f3ff;}" +
@@ -20202,7 +20248,7 @@ async function stkShowProyVentas(codEnc, proy) {
   var nombre = artNombre(cod, "") || "";
   var fc = function (n) { n = Number(n) || 0; return String(Math.round(n * 10) / 10); };
   body.innerHTML = '<div class="stkpop-empty">Cargando ventas facturadas de los últimos 12 meses' + (emp ? ' (' + emp + ')' : ' (LK + Chef)') + '…</div>';
-  var rows = [], ent = {}, entDet = [];
+  var rows = [], ent = {}, entDet = [], ped = {};
   var _cn = _ocgNorm(codB);
   var _H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   try {
@@ -20236,7 +20282,14 @@ async function stkShowProyVentas(codEnc, proy) {
             encodeURIComponent(codCanon(codB)), { headers: _H, cache: "no-store" })
         .then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
       fetch(SUPABASE_URL + "/rest/v1/Stock_Config?select=valor&clave=eq.proy_piso_mejor_mes", { headers: _H, cache: "no-store" })
-        .then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; })
+        .then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }),
+      // v25.65 — lo PEDIDO por los clientes en cada mes (fecha del pedido), con los mismos criterios
+      // que vtas: suma la familia, la L va a LK, filtro por la empresa de la fila. `cubierto` = ese mes
+      // ya había pedidos web registrados; si no, s/d (antes de eso los pedidos se tipeaban en ISIS).
+      fetch(SUPABASE_URL + "/rest/v1/rpc/gv_pedidos_mensuales_cod", {
+        method: "POST", headers: _H,
+        body: JSON.stringify({ p_cod: codB, p_meses: 12, p_empresa: (emp === "CH" ? "chef" : (emp === "LK" ? "lk" : null)) }), cache: "no-store"
+      }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
     ]);
     rows = _par[0];
     _stkProyFam = (Array.isArray(_par[4]) && _par[4][0]) || null;
@@ -20249,6 +20302,10 @@ async function stkShowProyVentas(codEnc, proy) {
     // la recepción de proveedores AT arranca en 06/2026 y la de talleristas en 12/2025.
     (Array.isArray(_par[1]) ? _par[1] : []).forEach(function (x) {
       ent[String(x.mes || "")] = { cajas: Number(x.cajas) || 0, cub: x.cubierto !== false };
+    });
+    // v25.65 — si la lectura falló (null) no hay mapa: la columna dice s/d en todos los meses, nunca 0.
+    if (Array.isArray(_par[6])) _par[6].forEach(function (x) {
+      ped[String(x.mes || "")] = { cajas: Number(x.cajas) || 0, cub: x.cubierto === true };
     });
   } catch (_e) {}
   rows = (Array.isArray(rows) ? rows : []).map(function (x) { return { mes: String(x.mes || ""), cajas: Number(x.cajas) || 0 }; });
@@ -20282,7 +20339,7 @@ async function stkShowProyVentas(codEnc, proy) {
   // v18.21: `rows` (los 12 meses) también, porque el gráfico pasó a dibujarse desde acá.
   _stkProy = {
     codB: codB, emp: emp, empParam: (emp === "CH" ? "chef" : (emp === "LK" ? "lk" : null)),
-    rows: rows, win: win, ent: ent, entDet: entDet, proyN: proyN, hayEnt: hayEnt,
+    rows: rows, win: win, ent: ent, ped: ped, entDet: entDet, proyN: proyN, hayEnt: hayEnt,
     tot: tot, prom: prom, arriba: arriba,
     parcial: parcial, winIni: rows.length - (parcial ? 1 : 0) - win.length,
     totEnt: win.reduce(function (s, x) { var e = ent[x.mes]; return s + (e && e.cub ? e.cajas : 0); }, 0),
@@ -20465,7 +20522,9 @@ function _stkProyMesesHtml() {
   var lista = S.win.slice();
   if (S.parcial) lista = lista.concat([S.parcial]);
   var h = '<div class="stkpop-grp"><div style="font-size:16px;font-weight:900;color:#334155;margin-bottom:6px;">📊 Estad. Madre</div>' +
-          '<table class="proyv-tab"><tr><th>mes</th><th>vtas</th>' + (S.hayEnt ? '<th>entrega</th><th title="vtas − entrega">delta</th>' : '') + '</tr>';
+          '<table class="proyv-tab"><tr><th>mes</th><th>vtas</th>' +
+          '<th title="Cajas que pidieron los clientes en el mes (fecha del pedido, web LK + Chef)">pedidos</th>' +
+          (S.hayEnt ? '<th>entrega</th><th title="vtas − entrega">delta</th>' : '') + '</tr>';
   lista.forEach(function (x) {
     var curso = S.parcial && x.mes === S.parcial.mes;
     var bajo = !curso && S.proyN > 0.05 && x.cajas < S.proyN;
@@ -20475,6 +20534,13 @@ function _stkProyMesesHtml() {
          '<td class="v' + (bajo ? ' bajo' : '') + '"><button type="button" class="proyv-lnk"' +
            ' onclick="stkProyMes(&quot;' + x.mes + '&quot;)"' +
            ' title="Ver a qué clientes se les facturó y cuándo se entregó">' + fc(x.cajas) + '</button></td>' +
+         // v25.65: pedidos del mes. Sin registro de pedidos web ese mes → s/d (no es un cero).
+         (function () {
+           var pd = S.ped && S.ped[x.mes];
+           return (pd && pd.cub)
+             ? '<td class="p" title="Cajas pedidas por clientes en ' + esc(_stkFmtMes(x.mes)) + '">' + fc(pd.cajas) + '</td>'
+             : '<td class="p sd" title="Ese mes los pedidos no quedaron registrados (entraban tipeados en ISIS) — no es un cero">s/d</td>';
+         })() +
          (S.hayEnt ? (e && e.cub
             ? '<td class="e"><button type="button" class="proyv-lnk" onclick="stkProyMes(&quot;' + x.mes + '&quot;)"' +
               ' title="Ver el detalle del mes">' + fc(e.cajas) + '</button></td>'
@@ -58064,7 +58130,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.64"></script>
+<script src="importacion.js?v=25.65"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60865,7 +60931,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.64"></script>
+<script src="cobranzas.js?v=25.65"></script>
 
 </body>
 </html>
