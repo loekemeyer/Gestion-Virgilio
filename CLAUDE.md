@@ -5366,8 +5366,9 @@ anterior). Al agregar un módulo con toggle + lista, agregarle su caso vacío a 
   Recepción Remitos desde la **primera carga posterior a la vuelta**, no desde la primera de todas.
   Lo resuelven `vista_control_remitos.first_load` (CTE `fss_prev`) y `_pppCargasCiclo` (PPP, alarma CRA).
   Caso: LK 0122 / LK 0177 salían VENCIDOS recién recargados el 01/10.
-- Lo que volvió y **no** se recargó lleva el badge **↩ VOLVIÓ** en la Programación / Pedidos atrasados
-  (`_pgaVolvio`) y lo vuelve a ofrecer Carga Camión (ya lo hacía, v6.66).
+- Lo que volvió y **no** se recargó **se queda en «Pedidos atrasados»** con el badge **↩ VOLVIÓ** (`_pgaVolvio`,
+  mismo cuerpo de tabla que la Programación) y lo vuelve a ofrecer Carga Camión (ya lo hacía, v6.66). Luis, 01/10:
+  *"está bien que se quede en atrasados, pero que esté con el badge"* — **no** pasarlo al día de hoy de la Programación.
 - `sql/vista_control_remitos_ciclo_v2595.sql`, `tests/rr-volvio-ciclo.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-01, v25.63): todo módulo que abre tarea tiene ⛔ ANULAR — y la anulación QUEDA REGISTRADA

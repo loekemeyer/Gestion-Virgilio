@@ -31056,8 +31056,9 @@ Impacto: ninguno sobre objetos existentes. Rollback: `drop function` de las dos 
   cambian **2** (exactamente esas); `anon` ve 23 filas, 0 vencidas. `security_invoker` repuesto.
 - **Badge ↩ VOLVIÓ** en la fila de NP de la Programación / Pedidos atrasados (`_pgaVolvio`, mismo
   mapa CCN + FSS que el 🚚 de Salió). Carga Camión ya re-ofrecía lo que vuelve (v6.66).
-- **Pendiente del «sí»:** `sql/gv_ppp_prog_arbol_volvio_v2595.sql` lleva lo vuelto al día de HOY de la
-  Programación (hoy cae en Pedidos atrasados). `gv_ppp_prog_arbol` está en `GV_Reglas_Centinela`.
+- **Lo que volvió se queda en «Pedidos atrasados»** (Luis, 01/10: *"está bien que se quede en atrasados, pero que
+  esté con el badge"*). Se propuso pasarlo al día de hoy de la Programación (`gv_ppp_prog_arbol`) y se descartó:
+  la función no se tocó. Problema de auditoría 668.
 - `sql/vista_control_remitos_ciclo_v2595.sql`, `tests/rr-volvio-ciclo.cjs`.
 ## §3.v2594 — Editar PI: `GV_Imp_PI_Editor`, `GV_Imp_PI_Edicion`, `gv_imp_pi_editar` (01/10/2026)
 

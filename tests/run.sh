@@ -1013,7 +1013,7 @@ echo "== rr-sin-remitos-cierra (Regresión v21) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rr-sin-remitos-cierra.cjs
 
 echo "== rr-volvio-ciclo (v25.95 — lo que volvió y se recarga arranca el plazo de control de nuevo; badge VOLVIÓ) =="
-node tests/rr-volvio-ciclo.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rr-volvio-ciclo.cjs
 
 echo "== rr-supervisor-legajo (v21.42 (Luis, 2026-09-23) — la Recepción de Remitos que abre el SUPERVISOR desde el panel no) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/rr-supervisor-legajo.cjs

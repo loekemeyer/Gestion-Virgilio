@@ -6,7 +6,9 @@
    B) el que volvió y no se recargó: fuera de «cargados» y dentro de «volvió» (badge).
    C) sin vuelta: igual que antes (la primera carga).
    D) la fila de NP de la Programación dibuja el badge ↩ VOLVIÓ.
-   E) la vista de RR (sql del repo) calcula first_load por ciclo. */
+   E) la vista de RR (sql del repo) calcula first_load por ciclo.
+   F) en vivo: en «Pedidos atrasados» (Luis, 01/10: *"está bien que se quede en atrasados, pero
+      que esté con el badge"*) la NP que volvió lleva ↩ VOLVIÓ y la de al lado no. */
 const fs = require("fs"), path = require("path");
 const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "latin1");
 const sql = fs.readFileSync(path.join(__dirname, "..", "sql", "vista_control_remitos_ciclo_v2595.sql"), "utf8");
@@ -55,5 +57,51 @@ if (!/min\(ccn_raw\.ts_cliente\) FILTER \(WHERE ccn_raw\.ts_cliente > COALESCE\(
   mal.push("E: first_load tiene que ser la primera carga POSTERIOR a la última vuelta");
 if (!/security_invoker = true/.test(sinCom)) mal.push("E: la vista tiene que conservar security_invoker");
 
-if (mal.length) { console.error("✗ rr-volvio-ciclo:\n  " + mal.join("\n  ")); process.exit(1); }
-console.log("✓ rr-volvio-ciclo: el reloj de RR arranca en la carga nueva y la PPP marca ↩ VOLVIÓ");
+function fin() {
+  if (mal.length) { console.error("✗ rr-volvio-ciclo:\n  " + mal.join("\n  ")); process.exit(1); }
+  console.log("✓ rr-volvio-ciclo: el reloj de RR arranca en la carga nueva y la PPP marca ↩ VOLVIÓ (también en atrasados)");
+}
+
+// F) en vivo
+let chromium;
+try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
+catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { chromium = null; } }
+if (!chromium) { fin(); }
+else (async () => {
+  const b = await chromium.launch();
+  try {
+    const ctx = await b.newContext({ timezoneId: "America/Argentina/Buenos_Aires" });
+    const p = await ctx.newPage();
+    await p.route("**/rest/v1/**", (rt) => rt.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: "[]" }));
+    await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
+    const o = await p.evaluate(() => {
+      const hoy = _pppHoyKey();
+      const d = _pppKeyDate(hoy); d.setDate(d.getDate() - 2);
+      const f = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      const fila = (np) => ({ fecha: f, tanda: "F28A", np: np, np_num: null, cod: "4042", razon_social: "Cliente " + np,
+        localidad: "Soldati", zona: "Zona 1 - CABA Sur", zona_corta: "Zona 1", empresa: "LK", origen: "web", m3: 0.3,
+        estado: "facturado", estado_orden: 4, clave: np, pide_horario: false, horario_fecha: null, horario_franja: null,
+        horario_origen: null, barrio: "Soldati", fecha_pedido: null });
+      _pppSearch = ""; _pgaOpenD = {}; _pgaOpenT = {}; _pgaOpenN = {};
+      try { localStorage.removeItem("vir_patr_colapsado"); } catch (_e) {}
+      _patrRows = [fila("LK 0177"), fila("LK 0050")];
+      _pppVolvio = new Map([["LK 0177", Date.now() - 86400000]]);
+      const k = f.replace(/-/g, "");
+      _pgaOpenD[k] = true; _pgaOpenT[k + "|F28A"] = true;
+      const h = _patrHtml();
+      // una fila de NP por trozo: así el badge de una no se cuenta para la otra
+      const filas = h.split('<div class="pga-nrow">').slice(1);
+      const de = (np) => filas.filter((x) => x.indexOf('<span class="pga-np">' + np + '</span>') >= 0)[0];
+      const r177 = de("LK 0177"), r050 = de("LK 0050");
+      return { hay177: !!r177, hay050: !!r050, filas: filas.length,
+        badge177: !!r177 && /pga-volvio/.test(r177), badge050: !!r050 && /pga-volvio/.test(r050) };
+    });
+    if (!o.hay177 || !o.hay050) mal.push("F: las dos NP tienen que verse en Pedidos atrasados con el día y la tanda abiertos (filas: " + o.filas + ")");
+    else {
+      if (!o.badge177) mal.push("F: LK 0177 volvió y en Pedidos atrasados no lleva el badge ↩ VOLVIÓ");
+      if (o.badge050) mal.push("F: LK 0050 no volvió y lleva el badge ↩ VOLVIÓ");
+    }
+  } catch (e) { mal.push("F: " + (e && e.message || e)); }
+  finally { await b.close(); }
+  fin();
+})();
