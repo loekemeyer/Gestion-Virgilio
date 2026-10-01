@@ -6269,7 +6269,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.77"></script>
+<script type="module" src="recepcion.js?v=25.78"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6965,7 +6965,7 @@ const filas = {
   row1: ["EP","AP"],                                   // Picking + Armado starters (grande, azul/verde) — v7.75: TP/TAP removed (finalize inline)
   row2: [],                                            // (was Armado finish, now unused)
   row3: ["RT","MG","CC"],                              // Depósito y carga (mediano)
-  row4: ["CR","RR","INS","CP","RC","IR"],              // secundarias (chico) + 🔀 Mover al final. v7.49: RI+EI+SC unificados en INS (chooser). v9.15: EA removido (no se usa)
+  row4: ["CR","RR","INS","CP","RC","IR","RKBM"],              // v25.77: RKBM = «BR» Bajar de Racks · secundarias (chico) + 🔀 Mover al final. v7.49: RI+EI+SC unificados en INS (chooser). v9.15: EA removido (no se usa)
   row5: ["AT","PB","Limp","Perm","PC","CT"]            // tiempos / pausas (chico)
 };
 // Rediseño v5.92 (pedido del dueño): más peso a los botones más usados. Primarias
@@ -8590,7 +8590,7 @@ function ensurePendingSuggestionContainer(){
   if (!box) {
     box = document.createElement("div");
     box.id = "pendingSuggestion";
-    const row3El = document.getElementById("row3b") || document.getElementById("row3");   // v25.74: debajo del botón chico de racks
+    const row3El = document.getElementById("row3");
     if (row3El && row3El.parentNode) row3El.parentNode.insertBefore(box, row3El.nextSibling);
   }
   return box;
@@ -8786,7 +8786,7 @@ Object.keys(filas).forEach(rowId => {
     d.className = sec ? "box box-sm" : "box";
     d.setAttribute("data-code", code);
     d.innerHTML = `
-      <div class="box-title">${code === "INS" ? "📦" : code}</div>
+      <div class="box-title">${code === "INS" ? "📦" : (code === "RKBM" ? "BR" : code)}</div>
       <div class="box-desc">${desc[code]}</div>
     `;
     // v7.49: "INS" es un botón UI unificado (no un opcode): abre el chooser Recibir/Entregar/Nuevo.
@@ -8794,18 +8794,6 @@ Object.keys(filas).forEach(rowId => {
     document.getElementById(rowId).appendChild(d);
   });
 });
-// v25.74 (Luis, 01/10): «Bajar de Racks» — botón CHICO debajo de Guardado a Góndola (columna del medio
-// de row3). Antes era la opción «De los racks» adentro del chooser de MG; ahora baja a A GUARDAR.
-try {
-  const r3 = document.getElementById("row3");
-  if (r3 && r3.parentNode) {
-    const fila = document.createElement("div");
-    fila.className = "row row-3"; fila.id = "row3b"; fila.style.marginTop = "4px";
-    fila.innerHTML = '<div></div><div class="box box-sm" data-code="RKBM"><div class="box-title" style="font-size:15px">🏗</div><div class="box-desc">Bajar de Racks</div></div><div></div>';
-    fila.querySelector('[data-code="RKBM"]').onclick = () => selectOption("RKBM");
-    r3.parentNode.insertBefore(fila, r3.nextSibling);
-  }
-} catch (_e) { /* no-op */ }
 // v5.92: 🔀 Mover mercadería de racks — secundario (casi no se usa) → box CHICO al
 // final de las secundarias, en vez del botón ancho aparte de antes.
 try {
@@ -9202,7 +9190,13 @@ function goToOptions() {
    jornada − productivas − movimiento − no productivas. Se relee cada 60 s y, entre lecturas,
    corre solo cuando el celular no tiene ninguna tarea abierta (sin picking, armado ni toggle).
    Sin lectura muestra "—": "no pude leer" no es "cero". */
-var _tm = { leg: null, baseSeg: null, leidoMs: 0, tick: null, poll: null };
+var _tm = { leg: null, refMs: null, srvMs: 0, iniMs: 0, tick: null, poll: null };
+/* v25.77 (Luis, 01/10: "se tiene que reiniciar cuando el operario empieza/termina una tarea, no
+   sumar durante el día") — el contador ya NO es el acumulado del día: es el tiempo desde el ÚLTIMO
+   evento del legajo (empezó o terminó una tarea). Con una tarea abierta marca 0:00:00. El último
+   evento sale de lo que manda ESTE celular (enqueueReport lo sella al toque) y de la base
+   (último ts_cliente de hoy, por si trabajó en otro celular). Sin ningún evento hoy cuenta desde
+   que abrió la botonera. Retira el acumulado de la v25.65/v25.70. */
 function _tmFmt(seg) {
   seg = Math.max(0, Math.round(seg || 0));
   var h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg % 60;
@@ -9218,51 +9212,43 @@ function _tmLibre(leg) {
   } catch (_e) { return false; }
   return true;
 }
-/* v25.69 (Luis: "se resetea entre tarea y tarea") — cuando la base no trae fila para el legajo
-   (legajo de prueba, que la vista excluye, o el operario sin eventos todavía) el contador volvía a
-   0 en cada lectura y en cada tarea. Ahora ese caso acumula EN EL CELULAR, por legajo y día
-   (localStorage), y sigue sumando entre tareas. Con fila de la base manda la base. */
-function _tmLocKey(leg) { return "gv_tm_loc::" + getTodayKey() + "::" + leg; }
-function _tmLocGet(leg) { try { return Number(localStorage.getItem(_tmLocKey(leg))) || 0; } catch (_e) { return 0; } }
-function _tmLocSet(leg, s) { try { localStorage.setItem(_tmLocKey(leg), String(Math.round(s))); } catch (_e) {} }
+function _tmUltKey(leg) { return "gv_tm_ult::" + getTodayKey() + "::" + leg; }
+function _tmUltGet(leg) { try { return Number(localStorage.getItem(_tmUltKey(leg))) || 0; } catch (_e) { return 0; } }
+function tmMarcarEvento(leg, ms) {
+  leg = String(leg || "").trim(); if (!leg) return;
+  ms = Number(ms) || Date.now();
+  try { if (ms > _tmUltGet(leg)) localStorage.setItem(_tmUltKey(leg), String(ms)); } catch (_e) {}
+  if (leg === _tm.leg) _tmPintar();
+}
 function _tmPintar() {
   var el = document.getElementById("tmMuertoVal"), box = document.getElementById("tmMuerto");
   if (!el || !box) return;
-  var libre = _tmLibre(_tm.leg), ahora = Date.now();
-  if (_tm.leg && _tm.sinFila) {   // acumulado local del día
-    var acc = _tmLocGet(_tm.leg);
-    if (libre && _tm.ultTick) acc += Math.min(5, (ahora - _tm.ultTick) / 1000);
-    _tm.ultTick = ahora; _tmLocSet(_tm.leg, acc);
-    el.textContent = _tmFmt(acc); box.classList.toggle("tm-alto", acc >= 30 * 60); return;
-  }
-  _tm.ultTick = ahora;
-  if (_tm.baseSeg == null) { el.textContent = "—"; box.classList.remove("tm-alto"); return; }
-  var seg = _tm.baseSeg;
-  if (libre) seg += (ahora - _tm.leidoMs) / 1000;
+  var ahora = Date.now();
+  if (!_tm.leg) { el.textContent = "—"; box.classList.remove("tm-alto"); return; }
+  if (!_tmLibre(_tm.leg)) { _tm.ocupadoMs = ahora; el.textContent = _tmFmt(0); box.classList.remove("tm-alto"); return; }
+  var ref = Math.max(_tmUltGet(_tm.leg), _tm.srvMs || 0, _tm.ocupadoMs || 0) || _tm.iniMs || ahora;
+  var seg = Math.max(0, (ahora - Math.min(ref, ahora)) / 1000);
   el.textContent = _tmFmt(seg);
   box.classList.toggle("tm-alto", seg >= 30 * 60);
 }
 async function tmLeer() {
   var leg = _tm.leg; if (!leg) return;
   try {
-    var r = await fetch(SUPABASE_URL + "/rest/v1/gv_monitor_horas_operario?select=hs_prod,hs_mov,hs_noprod,hs_total&legajo=eq." +
-      encodeURIComponent(leg), { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } });
+    var desde = new Date(getTodayKey() + "T00:00:00-03:00").toISOString();
+    var r = await fetch(SUPABASE_URL + "/rest/v1/Registros_Produccion_Virgilio?select=ts_cliente&legajo=eq." +
+      encodeURIComponent(leg) + "&ts_cliente=gte." + encodeURIComponent(desde) + "&order=ts_cliente.desc&limit=1",
+      { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } });
     if (!r.ok) throw new Error("HTTP " + r.status);
     var f = (await r.json())[0];
     if (leg !== _tm.leg) return;
-    _tm.sinFila = !f;
-    if (!f) _tm.baseSeg = 0;   // sin fila en la base: cuenta el acumulado local (_tmPintar)
-    else {
-      var h = (Number(f.hs_total) || 0) - (Number(f.hs_prod) || 0) - (Number(f.hs_mov) || 0) - (Number(f.hs_noprod) || 0);
-      _tm.baseSeg = Math.max(0, h) * 3600;
-    }
-    _tm.leidoMs = Date.now();
-  } catch (_e) { if (leg === _tm.leg) { _tm.baseSeg = null; _tm.sinFila = false; } }
+    var ms = f && f.ts_cliente ? Date.parse(f.ts_cliente) : 0;
+    _tm.srvMs = isFinite(ms) ? ms : 0;
+  } catch (_e) { /* sin lectura queda lo local: el contador sigue desde el último evento de este celular */ }
   _tmPintar();
 }
 function tmStart(leg) {
   tmStop();
-  _tm.leg = String(leg || ""); _tm.baseSeg = null; _tm.sinFila = false; _tm.ultTick = 0;
+  _tm.leg = String(leg || ""); _tm.srvMs = 0; _tm.ocupadoMs = 0; _tm.iniMs = Date.now();
   _tmPintar();
   if (!_tm.leg) return;
   tmLeer();
@@ -10113,6 +10099,7 @@ function _enqueueReportRaw(payload) {
 
 }
 function enqueueReport(payload) {
+  try { if (payload && payload.legajo) tmMarcarEvento(payload.legajo, Date.now()); } catch (_e) {}   // v25.77: reinicia el tiempo muerto
   if (esOperadorPrueba()) { try { console.warn("[PRUEBA] evento NO persistido (legajo de prueba):", payload && payload.opcion); } catch (_e) {} return; }
   _enqueueReportRaw(payload);
 }
@@ -10429,7 +10416,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.77";
+const APP_VERSION = "v25.78";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -58418,7 +58405,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.77"></script>
+<script src="importacion.js?v=25.78"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61219,7 +61206,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.77"></script>
+<script src="cobranzas.js?v=25.78"></script>
 
 </body>
 </html>

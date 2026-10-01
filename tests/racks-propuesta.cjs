@@ -78,7 +78,8 @@ catch (_e) {
     const ch = document.getElementById("mgChooserModal");
     const sinRacks = !!ch && ch.innerHTML.indexOf("De los racks") < 0 && ch.innerHTML.indexOf("mgChooserGo('racks')") < 0;
     closeMGChooser();
-    const btn = document.querySelector('#row3b [data-code="RKBM"]');
+    const bx = document.querySelector('#row4 [data-code="RKBM"]');   // v25.77: «BR» chico con las secundarias
+    const btn = bx && bx.querySelector(".box-title").textContent.trim() === "BR" && bx.classList.contains("box-sm") && !document.getElementById("row3b");
     return { stockMoveCalled: stockMoveCalled, rpcCalled: !!rpcCall, directBajPost: !!directBaj, item: item, sinRacks: sinRacks, btn: !!btn };
   });
   if (r.err) { console.log("racks-propuesta:", JSON.stringify(r), "· ✗ FAIL"); await b.close(); process.exit(1); }

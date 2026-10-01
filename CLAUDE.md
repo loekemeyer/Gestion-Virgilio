@@ -5319,6 +5319,10 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
   operario se queda ahí después de enviar y el banner en la pantalla del legajo no lo veía nadie.
 - La alerta de **un dispositivo con 2+ operarios** ya es por DÍA (`gv_dispositivo_multi_operario` agrupa por
   dispositivo + día AR; el Telegram mira sólo hoy): otro operario mañana en el mismo celular no avisa.
+- ⚠⚠ **v25.78 (Luis, 01/10): el contador NO es el acumulado del día** (*"se tiene que reiniciar cuando el operario
+  empieza/termina una tarea"*): es el tiempo desde el ÚLTIMO evento del legajo (`enqueueReport` lo sella con
+  `tmMarcarEvento`; la base aporta el último `ts_cliente` de hoy), y con una tarea abierta marca 0:00:00. Se retiran
+  la cuenta de `gv_monitor_horas_operario` y el acumulado local de la v25.70 (bullet de abajo, histórico).
 - **v25.70**: sin fila en la vista (legajo de prueba, que se excluye, u operario sin eventos) el contador acumula EN EL
   CELULAR por legajo y día (`gv_tm_loc::<día>::<legajo>`) — antes volvía a 0 en cada lectura y entre tareas. El 📅
   flotante (`#btnHistDias`) no se muestra en la botonera (tapaba «Terminar Día»): los días anteriores se abren desde
@@ -6594,6 +6598,7 @@ reingreso, celdas `.pedimp-tbl` con 4px de relleno. **64 → 45 px por artículo
   `destino: 'a_guardar'` a `registrar_baja_racks` (marcador `v25.74-aguardar`): racks − / **a_guardar** +, sin excedente
   ni conteo de góndola (el conteo a ciegas del rack sigue). Sin el campo (celulares viejos, supervisor) va a terminado
   como antes. Después se guarda con MG → «Lo que llegó». `sql/gv_baja_racks_a_guardar_v2574.sql`, `tests/racks-propuesta.cjs`.
+  **v25.78 (Luis): el botón es «BR» (sin emoji, data-code `RKBM`), chico en las secundarias junto a CR/RR/RC/IR.**
 
 ## ⚠ REGLA (Thomas, 2026-09-30, v24.69): un insumo con MC SALE siempre en MC — el stock queda en unidades
 
