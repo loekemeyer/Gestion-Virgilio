@@ -36933,7 +36933,7 @@ async function colaImprimirTodas() {
   _colaImpBusy = true;
   try {
     // v25.51 — primero las hojas de picking (una por tanda), después los remitos de armado.
-    if (pkh0.length) { colaImpStatus("Imprimiendo " + pkh0.length + " hoja(s) de picking…"); await pkHojaImprimir(pkh0); if (items0.length) await new Promise(function (r) { setTimeout(r, 2600 * pkh0.length); }); }
+    if (pkh0.length) { colaImpStatus("Imprimiendo " + pkh0.length + " hoja(s) de picking…"); await pkHojaImprimir(pkh0, true, "cola"); if (items0.length) await new Promise(function (r) { setTimeout(r, 2600 * pkh0.length); }); }
     if (!items0.length) { colaImpStatus("🖨️ Mandé a imprimir " + pkh0.length + " hoja(s) de picking.", true); setTimeout(function () { openColaImpresion(true); }, 1600); return; }
     colaImpStatus("Preparando " + items0.length + " remito(s)…");
     var items = items0.map(function (x) { return { np: x.np, tanda: (x.tanda === "—" ? "" : x.tanda), resumen: x.resumen, armadorLeg: x.armador_leg || "", artsFallback: Array.isArray(x.arts_fallback) ? x.arts_fallback : [], faltantesFallback: Array.isArray(x.faltantes_fallback) ? x.faltantes_fallback : [] }; });
@@ -36942,17 +36942,18 @@ async function colaImprimirTodas() {
     var k = 0;
     var next = function () { if (k >= ds.length) return; try { remitoPrintDoc(armadoRemitoInnerHtml(ds[k])); } catch (_e) {} k++; if (k < ds.length) setTimeout(next, 2600); };
     next();
-    colaImpMarcarImpresas(items.map(function (it) { return it.np; }));
+    colaImpMarcarImpresas(items.map(function (it) { return it.np; }), "cola");
     colaImpStatus("🖨️ Mandé a imprimir " + ds.length + " remito(s) de armado.", true);
     setTimeout(function () { colaImpLoadBadge(); openColaImpresion(true); }, 1600);
   } catch (e) { colaImpStatus("Error: " + (e && e.message ? e.message : e), false); }
   finally { _colaImpBusy = false; }
 }
 /* Marca en Impresion_NP las NP que se mandaron a imprimir (idempotente, PK np). */
-function colaImpMarcarImpresas(nps) {
+function colaImpMarcarImpresas(nps, origen) {
   if (!nps || !nps.length) return;
   var leg = (typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) ? legajoInput.value : null;
-  var rows = nps.map(function (np) { return { np: String(np), legajo: leg }; });
+  // v25.56 (Luis, D5): gv_origen dice por dónde salió la hoja — "estacion" (sola al TP/TAL) o "cola".
+  var rows = nps.map(function (np) { return { np: String(np), legajo: leg, gv_origen: origen || null }; });
   try {
     fetch(SUPABASE_URL + "/rest/v1/Impresion_NP?on_conflict=np", {
       method: "POST",
@@ -53880,12 +53881,12 @@ async function pkHojaDatos(tandas){
     return pkHojaArmar(t, tp, pkcBy[t] || [], lug || [], npBy[t] || [], otrasBy[t] || [], nom);
   });
 }
-async function pkHojaImprimir(tandas, marcar){
+async function pkHojaImprimir(tandas, marcar, origen){
   var ds = await pkHojaDatos(tandas);
   var k = 0;
   var next = function (){ if (k >= ds.length) return; try { remitoPrintDoc(pkHojaHtml(ds[k])); } catch (_e){} k++; if (k < ds.length) setTimeout(next, 2600); };
   next();
-  if (marcar !== false) { try { colaImpMarcarImpresas(ds.map(function (d){ return PK_HOJA_PREFIJO + d.tanda; })); } catch (_e){} }
+  if (marcar !== false) { try { colaImpMarcarImpresas(ds.map(function (d){ return PK_HOJA_PREFIJO + d.tanda; }), origen || "cola"); } catch (_e){} }
   return ds.length;
 }
 /* Picking terminados (TP de las últimas 48 h, legajo real) cuya hoja no se imprimió. */
@@ -54060,7 +54061,7 @@ async function psPoll(force){
       if (tps.length) {
         const printed = psGetPrinted(); const nuevas = [];
         tps.forEach(function (ev){ _ps.lastSeenTp = String(ev.ts_cliente); const t = String(ev.texto || "").trim().toUpperCase(); const k = PK_HOJA_PREFIJO + t; if (t && !printed.has(k) && nuevas.indexOf(t) < 0) { psMarkPrinted(k); nuevas.push(t); } });
-        if (nuevas.length) await pkHojaImprimir(nuevas);
+        if (nuevas.length) await pkHojaImprimir(nuevas, true, "estacion");
       }
     } catch (_e2) {}
   } catch (_e){ _ps.lastErr = "sin conexión con Supabase"; }
@@ -54133,7 +54134,7 @@ async function psPrintBatch(items){
   });
   // v12.08 — también marcar en Impresion_NP (server): si no, la Cola de impresión y su
   // badge seguían acusando "sin imprimir" NPs que la estación ya imprimió sola.
-  try { colaImpMarcarImpresas(ds.map(function (d){ return String(d.np); })); } catch (_e) {}
+  try { colaImpMarcarImpresas(ds.map(function (d){ return String(d.np); }), "estacion"); } catch (_e) {}
   setTimeout(function (){ try { colaImpLoadBadge(); } catch (_e) {} }, 1600);   // refresca el badge cuando el insert ya pegó
 }
 function psEnqueuePrint(d){ _psEnsure(); _ps.queue.push(d); psDrain(); }

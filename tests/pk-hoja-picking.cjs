@@ -24,5 +24,5 @@ ok(/Tanda E70F \(Sale Lun 5\/10\)/.test(h) && /Leg 94 Juan Farias/.test(h), "cab
 ok(/08:00 a 10:00 hs \(30 min en otras tareas\)/.test(h), "horario con descuento");
 ok(/<td>4<\/td><td>2<\/td>/.test(h) && /<td>5<\/td><td>✓<\/td>/.test(h), "Pickeo: ✓ si salió todo, si no el número");
 ok(h.indexOf("LK 0001") < h.indexOf("LK 0002") && /Total m³ 1,00/.test(h) && /0,50 m³\/hora/.test(h), "NP, total m³ y m³/hora");
-ok(s.indexOf("await pkHojaImprimir(nuevas)") > 0 && s.indexOf("pkHojaPendientes()") > 0, "sale sola por la estación (TP) y por la Cola de impresión");
+ok(s.indexOf("await pkHojaImprimir(nuevas, true, \"estacion\")") > 0 && s.indexOf("gv_origen: origen") > 0 && s.indexOf("pkHojaPendientes()") > 0, "sale sola por la estación (TP) y por la Cola de impresión");
 process.exit(bad ? 1 : 0);
