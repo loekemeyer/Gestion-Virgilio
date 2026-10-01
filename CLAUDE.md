@@ -4661,6 +4661,24 @@ teléfono) · 👤 confirmado · ⚪ no identificado. **📋 Copiar para la plan
 `sql/gv_cobranza_resumen_conc_v2441.sql`, §3.v2441 · `tests/cbz-ficha-cliente.cjs` (h, i) ·
 `tests/cbz-conciliacion.cjs` · `tests/cbz-conc-extracto.cjs`.
 
+## ⚠ REGLA (Thomas, 2026-10-01, v25.91): HOT SALE — la rentabilidad ponderada vive en `hotsale.js`
+
+Los súper piden un **aporte de hot sale** (un % sobre el precio) dos o tres veces al año. El módulo
+**🏷️ Hot Sale — rent. ponderada** (botones secundarios del panel supervisor, `openHotSale()`) pide los
+datos de arriba de la planilla de Thomas —**HotSale %**, **Semanas HotSale**, **Rent c/AP** (nacionales),
+**Rent Pta Pta** (importados, sin hot sale), **Semanas a Ponderar** y **cuánto más se vende** en hot
+sale— y devuelve el % que queda en el período, **por separado para importados y nacionales**.
+
+- **Las dos rentabilidades las carga él**; Gestión no las calcula (*"en función de mi markup sé cuál es
+  mi costo: 100 % punta a punta = recibo 1.000, me cuesta 500"*). **Pueden ser negativas** (ítem real:
+  recibo 922, costo 986 = −6,49 %).
+- **Se pondera por unidades, no por semanas**: rent. en hot sale = (1 + rent) × (1 − aporte) − 1 y
+  ponderada = (N·rent + H·k·rentHS) ÷ (N + H·k). El costo unitario se cancela, por eso no se pide.
+  Verificado contra su planilla: 100 % / 20 % / 4 sem / 2 HS / ×2 → **73,33 %**; el ítem real a 12
+  semanas → **−11,83 %** (él redondea −12 %).
+- No lee ni escribe la base: los datos quedan en `localStorage` del navegador. `hotsale.js` está en
+  `SIGUEN_APP_VERSION` (bump y `tests/version-tokens.cjs`). Candado: `tests/hotsale-rent.cjs`.
+
 ## Git
 
 - **Trabajar SIEMPRE directo en `main`**: commitear y pushear ahí sin preguntar.

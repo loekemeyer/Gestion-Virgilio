@@ -16121,3 +16121,11 @@ distinta, empresa distinta.
 > Las tandas **no** hubo que tocarlas: E26D y E43A son de Retira puras, y la única mezclada (E01D)
 > es del 08/09, ya pasada. Chequeo: `select * from gv_retira_sin_etiqueta;` — vacía = todo bien.
 > `sql/gv_ppp_web_zona_retira_v1988.sql` · §3.js de `docs/SUPABASE-GESTION-VIRGILIO.md`.
+
+## Hot Sale — rentabilidad ponderada (v25.91, Thomas 01/10/2026)
+
+Módulo del panel supervisor (botones secundarios, `openHotSale()`, archivo `hotsale.js`). Con la rent.
+punta a punta de los importados, la rent. c/aportes de los nacionales, el % de hot sale, las semanas de
+oferta, las semanas a ponderar y cuánto más se vende en hot sale, calcula la rentabilidad ponderada del
+período por separado para cada familia: rentHS = (1 + rent) × (1 − aporte) − 1 y ponderada =
+(N·rent + H·k·rentHS) ÷ (N + H·k). No toca Supabase. Test: `tests/hotsale-rent.cjs`.

@@ -1106,4 +1106,6 @@ echo "== stk-est-madre-sin-codigo (v25.71: la Est. Madre de Gestión entra sin c
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-sin-codigo.cjs
 echo "== est-madre-unica (v25.78: la Est. Madre es UN cuadro — est-madre.js, mismo cargador en LK y Gestión) =="
 node tests/est-madre-unica.cjs
+echo "== hotsale-rent (v25.91: Hot Sale — rent. ponderada del período, importados y nacionales por separado; hotsale.js) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/hotsale-rent.cjs
 _resumen
