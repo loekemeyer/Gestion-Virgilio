@@ -6646,7 +6646,7 @@ negativo para usos prácticos de importación"*.
   + GP2). `stock_total` / `stock_actual` / `stock_cajas` **no se tocaron** (los leen otros). El módulo de importación
   lee el neto: la cuenta de «a pedir», los meses y la pantalla muestran el negativo; la celda Stock lleva **🏭+N**.
 - Al 01/10: 22 códigos en negativo (583E −210, 969E −204…); 505C +21.605, 587C +20.377, 323E +600 (444 neto).
-- ⚠ GRJ31 cuenta en 323ES (100 %) **y** en 323E/838E (20/80): es lo que dictó Luis.
+- ⚠ GRJ31 cuenta en 323ES (100 %) **y** en 323E/838E (20/80), a propósito (Luis, 01/10, D13: *"323ES es la pieza para fabricar los otros dos, así que la evaluación de esa es particular"*). No es doble conteo: no volver a proponer sacarlo.
 - Centinelas 269 y 270. `sql/gv_importados_equiv_gp2_v2561.sql`, `tests/pedimp-equiv-gp2.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-30, v25.14): RECIBIR un importado en CERVANTES — no entra al stock de Virgilio, avisa en GP2
