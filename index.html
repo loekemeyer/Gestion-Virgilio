@@ -6238,7 +6238,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.62"></script>
+<script type="module" src="recepcion.js?v=25.63"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -7677,7 +7677,7 @@ window.anularRecepcionSesion = async function (legajo) {
     if (ya > 0 && !confirm("⚠ En esta sesión ya mandaste " + ya + " caja(s) y esas quedan registradas.\n\n" +
         "Anular sólo cierra el RT (la tarea), no borra la mercadería recibida.\n\n¿Anular igual?")) return false;
   } catch (_e) { /* no-op */ }
-  // v25.61 (Luis): la anulación se REGISTRA (cierre del RT con texto ANULADO) en vez de borrar la
+  // v25.63 (Luis): la anulación se REGISTRA (cierre del RT con texto ANULADO) en vez de borrar la
   // apertura con anular_toggle_virgilio: queda que apretó para empezar y que la anuló.
   try { gvToggleAnular(leg, "RT"); } catch (_e) {}
   try { recepcionResetCajas(leg); } catch (_e) {}
@@ -10268,7 +10268,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.62";
+const APP_VERSION = "v25.63";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -26643,7 +26643,7 @@ async function insAnular() {
   if (!confirm("¿ANULAR esta " + qué + " de insumos?\n\n" +
       (nSel ? "Se descartan los " + nSel + " insumo(s) que cargaste. " : "") +
       "Queda anotado que entraste y la anulaste.\n\nNo se puede deshacer.")) return;
-  // v25.61 (Luis): la anulación se REGISTRA (cierre del RI/EI con texto ANULADO), ya no se borra
+  // v25.63 (Luis): la anulación se REGISTRA (cierre del RI/EI con texto ANULADO), ya no se borra
   // la apertura con anular_toggle_virgilio.
   const ok = gvToggleAnular(legajo, mode);
   try { opDraftClear(legajo); } catch (_e) {}   // el borrador ya no vale
@@ -30028,7 +30028,7 @@ function ccRenderChooser(leg) {
     // no se sabe si hay reparto, así que van los dos: el que cierra de verdad y el que minimiza.
     `<button class="pk-btn pk-ok" onclick="ccEndWithoutLoading('${leg}')">✓ Cerrar Carga Camión (sin cargar por app)</button>` +
     `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>` +
-    `<button class="pk-btn pk-anular" onclick="ccAnular('${leg}')">⛔ ANULAR CARGA CAMIÓN</button>`;   // v25.61
+    `<button class="pk-btn pk-anular" onclick="ccAnular('${leg}')">⛔ ANULAR CARGA CAMIÓN</button>`;   // v25.63
 }
 
 function ccRender() {
@@ -30083,7 +30083,7 @@ function ccRender() {
   html += `<button class="pk-btn pk-ok" onclick="ccFinish()">${esRetira ? "🚶 Terminé Retira" : "🚛 Terminé Carga Camión"} (${_cc.checked.size} ${esRetira ? "entregados" : "cargadas"})</button>` +
           `<button class="pk-btn pk-cancel" onclick="showCargaCamion('${_cc.legajo}')">← Volver (retira/camión)</button>` +
           `<button class="pk-btn pk-cancel" onclick="ccClose()">Cerrar (sigo después)</button>` +
-          `<button class="pk-btn pk-anular" onclick="ccAnular('${escapeHtml(String(_cc.legajo || ""))}')">⛔ ANULAR CARGA CAMIÓN</button>`;   // v25.61
+          `<button class="pk-btn pk-anular" onclick="ccAnular('${escapeHtml(String(_cc.legajo || ""))}')">⛔ ANULAR CARGA CAMIÓN</button>`;   // v25.63
   m.querySelector(".tanda-modal-body").innerHTML = html;
 }
 
@@ -30428,7 +30428,7 @@ function crRender() {
           `</tr></thead><tbody>${rows}</tbody></table></div>`;
   html += `<button class="pk-btn pk-ok" onclick="crFinish()">✓ Terminé (${_cr.checked.size} controladas)</button>` +
           `<button class="pk-btn pk-cancel" onclick="crClose()">Cerrar (sigo después)</button>` +
-          (_cr.admin ? "" : `<button class="pk-btn pk-anular" onclick="crAnular('${escapeHtml(String(_cr.legajo || ""))}')">⛔ ANULAR RECEPCIÓN REMITOS</button>`);   // v25.61
+          (_cr.admin ? "" : `<button class="pk-btn pk-anular" onclick="crAnular('${escapeHtml(String(_cr.legajo || ""))}')">⛔ ANULAR RECEPCIÓN REMITOS</button>`);   // v25.63
   m.querySelector(".tanda-modal-body").innerHTML = html;
 }
 
@@ -30525,7 +30525,7 @@ function crSendClose(legajo) {
   try { updatePendingIndicator(); updateCoreButtonsState(); } catch (_e) {}
 }
 
-/* v25.61 (Luis, 01/10: "si entrás al módulo y no hacés nada, no podés salir… que puedan salir
+/* v25.63 (Luis, 01/10: "si entrás al módulo y no hacés nada, no podés salir… que puedan salir
    anulando la tarea completamente · que se registre que apretaron para empezar y que la anularon").
    ANULAR = cerrar el toggle con su MISMO código, el inicio de la apertura y texto "ANULADO".
    Queda en el log la apertura (cuándo apretó) y el cierre anulado (cuándo salió); el tramo se
@@ -58051,7 +58051,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.62"></script>
+<script src="importacion.js?v=25.63"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -60852,7 +60852,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.62"></script>
+<script src="cobranzas.js?v=25.63"></script>
 
 </body>
 </html>

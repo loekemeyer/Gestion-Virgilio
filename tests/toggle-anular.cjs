@@ -1,4 +1,4 @@
-/* v25.61 (Luis, 01/10): "RR tampoco tiene botón de anular, así que si entrás al módulo y no hacés
+/* v25.63 (Luis, 01/10): "RR tampoco tiene botón de anular, así que si entrás al módulo y no hacés
    nada, no podés salir · que puedan salir anulando la tarea completamente · que se registre que
    apretaron para empezar y que la anularon".
    Para RR, CC (lista y chooser) y CR CON items en la lista: tiene que estar el ⛔ ANULAR, y al

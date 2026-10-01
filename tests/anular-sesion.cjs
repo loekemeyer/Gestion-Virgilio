@@ -140,7 +140,7 @@ catch (_e) {
     out.botonInsumos = !!btnI && btnI.innerText.indexOf("Anular recepción de insumos") >= 0;
 
     await insAnular();
-    // v25.61 (Luis): la anulación se REGISTRA — cierre del RI con texto ANULADO e inicio = apertura;
+    // v25.63 (Luis): la anulación se REGISTRA — cierre del RI con texto ANULADO e inicio = apertura;
     // ya no se borra la apertura con anular_toggle_virgilio.
     const anuEnviado = (op) => window.__rpc.concat(readQueue().map((q) => ({ url: "", body: q }))).some((x) => {
       const t = JSON.stringify(x.body || ""); return t.indexOf('"ANULADO"') >= 0 && t.indexOf('"' + op + '"') >= 0;

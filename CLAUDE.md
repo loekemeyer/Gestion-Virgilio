@@ -5276,6 +5276,21 @@ otro era `crMarkSinSalida`: al marcar «↩ s/salida» el último remito caía e
 correr la pantalla: `node tests/rr-sin-remitos-cierra.cjs` (verificado que falla contra el código
 anterior). Al agregar un módulo con toggle + lista, agregarle su caso vacío a ese test.
 
+## ⚠ REGLA (Luis, 2026-10-01, v25.63): todo módulo que abre tarea tiene ⛔ ANULAR — y la anulación QUEDA REGISTRADA
+
+**Luis:** *"RR tampoco tiene botón de anular, así que si entrás al módulo y no hacés nada, no podés salir · que
+puedan salir anulando la tarea completamente · que se registre que apretaron para empezar a hacer algo y que la anularon"*.
+
+- **RR, CC (chooser y lista) y CR** tienen **⛔ ANULAR** con la lista cargada (antes sólo había «Cerrar (sigo
+  después)», que minimiza y deja el toggle abierto trabando EP/AP). El admin de RR no lo lleva (no tiene toggle).
+- **ANULAR = `gvToggleAnular(legajo, code)`**: cierra el toggle con su MISMO código, `ts_inicio` = la apertura y
+  **texto `ANULADO`**. En el log quedan la apertura (cuándo apretó) y el cierre anulado; el tramo sale en el horario.
+- **RT, RI y EI ya no BORRAN la apertura** (`anular_toggle_virgilio` queda sin llamador): registran igual el cierre ANULADO.
+- Picking y armado ya lo registraban (EP→EPX, AP→APX). MG/racks/IR/CP/RC cierran con su X y dejan su marca (MGC, RKB «sin bajar»).
+- ⚠ Hoy el tiempo anulado de RR/CC/CR/RT/RI/EI **cuenta** en el horario (igual que el «cerrar sin cargar por app»);
+  el de picking/armado anulado no. Pendiente de Luis si se descuenta.
+- `tests/toggle-anular.cjs`, `tests/anular-sesion.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-09-21, v20.78): antes de optimizar, medir — y leer lo que se usa, no el universo
 
 **Luis, con la captura del `canceling statement due to statement timeout` en A Programar:**
