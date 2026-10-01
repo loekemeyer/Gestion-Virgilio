@@ -6269,7 +6269,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.85"></script>
+<script type="module" src="recepcion.js?v=25.86"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -8578,7 +8578,8 @@ function updateCoreButtonsState(){
     if ((code === "EP" || code === "TP") && pickingActive) pending = true;
     else if ((code === "AP" || code === "TAP") && armadoActive) pending = true;
     else if (TOGGLE_CODES.includes(code) && st && st.toggles && st.toggles[code]) pending = true;
-    else if (code === "BR" && st && st.racks && st.racks.active) pending = true;     // v25.79 (el título del botón RKBM)
+    else if (code === "BR" && st && st.racks && st.racks.active) pending = true;
+    else if (code === "MG" && st && st.mg && st.mg.active) pending = true;   // v25.86     // v25.79 (el título del botón RKBM)
     b.classList.toggle("pending", pending);
   });
 }
@@ -9211,6 +9212,7 @@ function _tmLibre(leg) {
     var _12h = 12 * 3600 * 1000;   // v25.79: Bajar / Ingreso a racks abierto (con tope, por si el celular murió adentro)
     if (st.racks && st.racks.active && Date.now() - (st.racks.ts || 0) < _12h) return false;
     if (st.ir && st.ir.active && Date.now() - (st.ir.ts || 0) < _12h) return false;
+    if (st.mg && st.mg.active && Date.now() - (st.mg.ts || 0) < _12h) return false;   // v25.86: guardado abierto
     if (getAnyToggleActive(leg)) return false;
     if (getActiveDeadTime(leg)) return false;
   } catch (_e) { return false; }
@@ -9848,9 +9850,18 @@ function selectOption(code) {
   // un apretón por error se deshace con Cancelar/Cerrar (botón vuelve a normal, nada
   // registrado). El evento MG (con su DURACIÓN, para Rendimiento/Monitor) lo emite el
   // modal al CONFIRMAR el guardado (mgConfirmar → mgEmitGuardado), una sola vez.
-  if (code === "MG") { showMGChooser(legajoStr); return; }
-  // v25.74 (Luis, 01/10): «Bajar de Racks» es su propio módulo (botón chico abajo de MG) y baja a A GUARDAR.
-  if (code === "RKBM") { showRacksBajarModal(legajoStr); return; }
+  /* v25.86 (Luis, 01/10: "se tiene que seleccionar bajar de racks y que ahí tengas que apretar enviar
+     para que lleve el tracking. lo mismo guardado a góndola") — MG y BR funcionan como RR: el primer
+     toque los SELECCIONA y se arranca con «Enviar» (ahí empieza el tiempo); mientras están abiertos el
+     botón queda en rojo y tocarlo RE-ABRE el módulo; la tarea termina al cerrarlo («Terminé»). */
+  if (code === "MG" || code === "RKBM") {
+    const stMod = getLegajoState(legajoStr) || {};
+    const kMod = code === "MG" ? "mg" : "racks";
+    if (stMod[kMod] && stMod[kMod].active && Date.now() - (stMod[kMod].ts || 0) < 12 * 3600 * 1000) {
+      if (code === "MG") showMGChooser(legajoStr); else showRacksBajarModal(legajoStr);
+      return;
+    }
+  }
 
   // v5.49: Pasar cajas a un pedido urgente — sacale cajas a un pedido que sale
   // después (armado o pickeado) y dáselas a uno urgente que sale antes. Abre el
@@ -9887,7 +9898,7 @@ function selectOption(code) {
   selected = code;
   selectedArea.classList.remove("hidden");
 
-  selectedBox.innerText = code;
+  selectedBox.innerText = code === "RKBM" ? "BR" : code;
   selectedDesc.innerText = desc[code];
 
   // reset input
@@ -10451,7 +10462,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.85";
+const APP_VERSION = "v25.86";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10909,6 +10920,13 @@ async function send() {
 
   if (!legajoStr) { alert("Falta el número de legajo"); return; }
   if (!opcion)    { alert("Falta seleccionar una opción"); return; }
+  // v25.86: «Enviar» en MG / BR = EMPEZÓ la tarea (el tiempo corre desde acá) y abre el módulo.
+  if (opcion === "MG" || opcion === "RKBM") {
+    resetSelection();
+    if (opcion === "MG") { gvModTareaAbrir(legajoStr, "mg"); showMGChooser(legajoStr); }
+    else showRacksBajarModal(legajoStr);   // gvRacksTramo("RKI") abre la tarea
+    return;
+  }
 
   // v5.26: AP sobre una tanda que YA tiene armado abierto (mismo código) → NO generamos
   // un 2º evento AP (doble arranque, ensucia los tiempos): reabrimos el asistente donde
@@ -27471,6 +27489,7 @@ function closeMG() {
   // v23.63: salió sin confirmar (el confirmar marca _enviando y emite MG): cierra el MGI del monitor.
   try { if (_mg && _mg._mgi && !_mg._enviando) mgEmitMarca("MGC", _mg.legajo); } catch (_e) {}
   _mg = null;
+  _mgTareaQuizasFin();   // v25.86
 }
 /* v23.63 — MG sólo emitía al CONFIRMAR (v7.68), así que un operario guardando figuraba
    "libre · sin tarea abierta" en el monitor y su jornada arrancaba en el primer guardado
@@ -27571,7 +27590,7 @@ function excConfirmar() {
   stockMove(rows);
   try { alert("✓ Bajaste " + n + " caja(s) del excedente a góndola."); } catch (_e) {}
 }
-function closeExc() { const ov = document.getElementById("excModal"); if (ov) ov.classList.remove("show"); _exc = null; }
+function closeExc() { const ov = document.getElementById("excModal"); if (ov) ov.classList.remove("show"); _exc = null; _mgTareaQuizasFin(); }
 function excHasProgress() { return !!(_exc && _exc.items && _exc.items.some(function (it) { return (it.bajar > 0); })); }
 function excAskClose() { opAskClose(excHasProgress(), "EXC", _exc && _exc.legajo, "Bajar excedente a góndola", _exc, closeExc); }
 
@@ -27592,7 +27611,43 @@ function showMGChooser(legajo) {
     '</div>';
   ov.style.display = "flex";
 }
-function closeMGChooser() { const ov = document.getElementById("mgChooserModal"); if (ov) ov.style.display = "none"; }
+function closeMGChooser() { const ov = document.getElementById("mgChooserModal"); if (ov) ov.style.display = "none"; _mgTareaQuizasFin(); }
+/* v25.86 — Guardado a Góndola como TAREA ABIERTA (igual que RR): la abre «Enviar», la cierra salir
+   del módulo. El chooser, «¿qué bajar primero?», «lo que llegó» y «excedente» son pantallas de la
+   MISMA tarea: termina recién cuando no queda ninguna abierta. El tiempo de cada código lo siguen
+   llevando los MG del confirmar (v23.76); esto es el estado del celular y el Historial. */
+function gvModTareaAbrir(leg, k) {
+  leg = String(leg || "").trim(); if (!leg) return;
+  try {
+    const st = getLegajoState(leg) || {};
+    if (!(st[k] && st[k].active)) { st[k] = { active: true, ts: Date.now() }; setLegajoState(leg, st); }
+    tmMarcarEvento(leg, Date.now());
+    if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
+  } catch (_e) {}
+}
+function gvModTareaFin(leg, k, op, descr, texto) {
+  leg = String(leg || "").trim(); if (!leg) return;
+  try {
+    const st = getLegajoState(leg) || {};
+    if (!(st[k] && st[k].active)) return;
+    const ini = st[k].ts || Date.now(), nowMs = Date.now();
+    st[k] = { active: false }; setLegajoState(leg, st);
+    pushHistoryForLegajo(leg, { ts: nowMs, opcion: op, descripcion: descr, texto: String(texto || ""),
+      id: "h_" + op.toLowerCase() + "_" + nowMs.toString(36), status: "queued", ts_inicio_iso: new Date(ini).toISOString() });
+    tmMarcarEvento(leg, nowMs);
+    if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
+    if (typeof renderLegajoHistory === "function") renderLegajoHistory(leg);
+  } catch (_e) {}
+}
+function _mgTareaQuizasFin() {
+  const leg = String(_mgChooserLegajo || (legajoInput && legajoInput.value) || "").trim();
+  setTimeout(function () {
+    const vis = function (id, porClase) { const e = document.getElementById(id); if (!e) return false;
+      return porClase ? e.classList.contains("show") : (e.style.display && e.style.display !== "none"); };
+    if (vis("mgChooserModal") || vis("gordenModal") || vis("mgModal", true) || vis("excModal", true)) return;
+    gvModTareaFin(leg, "mg", "MG", "Guardado a Góndola");
+  }, 400);
+}
 function mgChooserGo(which) { closeMGChooser(); if (which === "orden") showGuardarOrden(_mgChooserLegajo); else if (which === "racks") showRacksBajarModal(_mgChooserLegajo); else if (which === "excedente") showExcModal(_mgChooserLegajo); else showMGModal(_mgChooserLegajo); }
 
 /* v8.45 — OPERARIA: "¿Qué bajar primero?" Overview de solo-lectura que junta las 3 fuentes de
@@ -27750,7 +27805,7 @@ function renderGuardarOrden() {
 }
 function gordenFiltro(f) { if (!_gorden) return; _gorden.filtro = f; renderGuardarOrden(); }
 function gordenVerTodo() { if (!_gorden) return; _gorden.verTodo = !_gorden.verTodo; renderGuardarOrden(); }
-function closeGuardarOrden() { const ov = document.getElementById("gordenModal"); if (ov) ov.style.display = "none"; }
+function closeGuardarOrden() { const ov = document.getElementById("gordenModal"); if (ov) ov.style.display = "none"; _mgTareaQuizasFin(); }
 function gordenPrint() {
   if (!_gorden) return;
   const F = _gorden.filtro, rows = _gordenRows();
@@ -28043,7 +28098,7 @@ async function rkbConfirmar() {
    El baño o la comida en el medio se restan igual que en el resto de las tareas (muerto_open_s
    de gv_monitor_horas_operario_dia). Legajo 0 (supervisor desde Stock) no emite. */
 function gvRacksTramo(op, legajo, iniMs, texto) {
-  const leg = String(legajo || "").trim(); if (!leg || leg === "0" || leg === "1") return;
+  const leg = String(legajo || "").trim(); if (!leg) return;
   const nowMs = Date.now();
   const DESC = { RKI: "Bajar de racks (abre)", RKB: "Bajar de racks", IRI: "Ingreso a racks (abre)", IRT: "Ingreso a racks" };
   /* v25.79 (Luis, 01/10: "Bajar de racks tiene que registrar tiempo… enviar la tarea y marcar cuando
@@ -28062,6 +28117,7 @@ function gvRacksTramo(op, legajo, iniMs, texto) {
     tmMarcarEvento(leg, nowMs);
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
   } catch (_e) {}
+  if (leg === "0" || leg === "1") return;   // prueba: la tarea vive en el celular, el evento no se manda
   if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
   const payload = { legajo: leg, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""), ts: nowMs,
     id: (op.toLowerCase() + "_" + leg + "_" + nowMs.toString(36)).replace(/[^a-zA-Z0-9_\-]/g, ""),
@@ -58484,7 +58540,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.85"></script>
+<script src="importacion.js?v=25.86"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61285,7 +61341,7 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.85"></script>
+<script src="cobranzas.js?v=25.86"></script>
 
 </body>
 </html>

@@ -5370,6 +5370,12 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
   el cartel dice «🔇 tocá la pantalla una vez» y desde ese toque suena.
 - ⚠ **Sólo avisa con la botonera ABIERTA** en el celular: si el operario cerró la app, el contador no corre y no hay aviso. El
   legajo de prueba no avisa.
+- ⚠⚠ **v25.86 (Luis: *"se tiene que seleccionar bajar de racks y que ahí tengas que apretar enviar para que lleve el
+  tracking. lo mismo guardado a góndola"*): MG y BR funcionan como RR.** El primer toque SELECCIONA (área con «Enviar»),
+  «Enviar» EMPIEZA la tarea (`gvModTareaAbrir` / RKI) y abre el módulo; abierta, el botón queda rojo y tocarlo RE-ABRE el
+  módulo; salir del módulo la TERMINA (`gvModTareaFin` → Historial con duración). En MG la tarea cierra recién cuando no
+  queda abierta ninguna de sus pantallas (chooser, qué bajar primero, lo que llegó, excedente). Las horas siguen saliendo
+  de los MG por código y del RKI→RKB: no se agregó ningún evento. `tests/mg-reentrada.cjs`, `tests/alerta-inactivo.cjs`.
 - **Bajar / Ingreso a racks = tarea abierta** en el celular (`st.racks` / `st.ir`, desde `gvRacksTramo`): BR en rojo, tiempo muerto
   en 0, y al terminar va al Historial de tareas con su duración (además del tramo RKI→RKB de siempre). Tope 12 h por si el celular
   murió adentro.

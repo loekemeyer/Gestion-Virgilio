@@ -61,7 +61,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
   await p.evaluate(async () => {
     window.alert = function () {}; window.confirm = function () { return true; };
-    window.esOperadorPrueba = function () { return false; };
+    window.__esOpOrig = window.esOperadorPrueba; window.esOperadorPrueba = function () { return false; };
     window._enqueueReportRaw = function () {};
     localStorage.removeItem("gv_tm_alerta::777");
     legajoInput.value = "777"; goToOptions(); await new Promise(res => setTimeout(res, 1500));
@@ -87,6 +87,21 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     return { abierta, cerrada: !(st2.racks && st2.racks.active) && _tmLibre("777"),
       enHist: hist.indexOf('"RKB"') >= 0 };
   });
+  // D) v25.86: BR se SELECCIONA y arranca con «Enviar» (como RR)
+  r.brEnviar = await p.evaluate(async () => {
+    closeRkb(); selectOption("RKBM");
+    const sel = document.getElementById("selectedBox").textContent === "BR" && !document.getElementById("rkbModal").classList.contains("show");
+    await send(); await new Promise(res => setTimeout(res, 300));
+    const ok = sel && document.getElementById("rkbModal").classList.contains("show") && getLegajoState("777").racks.active;
+    closeRkb(); return ok;
+  });
+  // E) el legajo de prueba 1 TAMBIÉN hace saltar la alarma (v25.83)
+  rpcs.length = 0;
+  await p.evaluate(async () => {
+    window.esOperadorPrueba = window.__esOpOrig; localStorage.removeItem("gv_tm_alerta::1");
+    tmStop(); legajoInput.value = "1"; goToOptions(); await new Promise(res => setTimeout(res, 1500));
+  });
+  r.prueba1Avisa = rpcs.some((x) => x.startsWith("gv_alerta_inactivo_abrir") && x.includes('"p_legajo":"1"'));
   r.brAbierta = c.abierta; r.brCerrada = c.cerrada; r.brHistorial = c.enHist;
   const pass = Object.values(r).every(Boolean) && errs.length === 0;
   console.log("alerta-inactivo:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
