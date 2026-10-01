@@ -5345,6 +5345,16 @@ otro era `crMarkSinSalida`: al marcar «↩ s/salida» el último remito caía e
 correr la pantalla: `node tests/rr-sin-remitos-cierra.cjs` (verificado que falla contra el código
 anterior). Al agregar un módulo con toggle + lista, agregarle su caso vacío a ese test.
 
+## ⚠ REGLA (2026-10-01, v25.94): lo que VOLVIÓ y se recarga arranca el plazo de control DE NUEVO
+
+- Un pedido que salió, volvió (↩ s/salida en RR = **FSS**) y se recargó (CCN nuevo) cuenta las 30 hs de
+  Recepción Remitos desde la **primera carga posterior a la vuelta**, no desde la primera de todas.
+  Lo resuelven `vista_control_remitos.first_load` (CTE `fss_prev`) y `_pppCargasCiclo` (PPP, alarma CRA).
+  Caso: LK 0122 / LK 0177 salían VENCIDOS recién recargados el 01/10.
+- Lo que volvió y **no** se recargó lleva el badge **↩ VOLVIÓ** en la Programación / Pedidos atrasados
+  (`_pgaVolvio`) y lo vuelve a ofrecer Carga Camión (ya lo hacía, v6.66).
+- `sql/vista_control_remitos_ciclo_v2594.sql`, `tests/rr-volvio-ciclo.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-01, v25.63): todo módulo que abre tarea tiene ⛔ ANULAR — y la anulación QUEDA REGISTRADA
 
 **Luis:** *"RR tampoco tiene botón de anular, así que si entrás al módulo y no hacés nada, no podés salir · que

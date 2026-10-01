@@ -31043,3 +31043,19 @@ unidades y líneas; ordenado por última compra. Medido el 01/10: Carrefour (`in
 Jumbo (`cencosud`) 50 ítems, 31 importados, los 50 con L (se pela para clasificar). Las usa `hotsale.js` (v25.93).
 Impacto: ninguno sobre objetos existentes. Rollback: `drop function` de las dos (`sql/gv_hotsale_super_items_v2593.sql`).
 
+
+## §3.v2594 — Recepción Remitos: el plazo de 30 hs arranca en la carga ACTUAL (v25.94, 01/10/2026)
+
+- **Caso:** LK 0122 (carga 29/09, ↩ s/salida 30/09, recargado 01/10 11:53) y LK 0177 (carga 28/09,
+  ↩ 29/09, recargado 01/10 08:59) salían VENCIDOS en RR recién recargados, y la PPP mandó la alarma
+  CRA "carga sin control" falsa de los dos (01/10 16:38).
+- **Causa:** `vista_control_remitos.first_load = min(CCN)` de los 7 días, sin mirar la vuelta (FSS)
+  del medio. El front (`pppRefreshEntregado` → `_pppLoadMs`) tenía el mismo criterio.
+- **Arreglo:** CTE `fss_prev` (última FSS anterior a la última CCN) y `first_load = min(CCN) FILTER
+  (ts > fss_prev)`. Front: `_pppCargasCiclo`. Medido antes de aplicar: de 70 NP con CCN en 7 días
+  cambian **2** (exactamente esas); `anon` ve 23 filas, 0 vencidas. `security_invoker` repuesto.
+- **Badge ↩ VOLVIÓ** en la fila de NP de la Programación / Pedidos atrasados (`_pgaVolvio`, mismo
+  mapa CCN + FSS que el 🚚 de Salió). Carga Camión ya re-ofrecía lo que vuelve (v6.66).
+- **Pendiente del «sí»:** `sql/gv_ppp_prog_arbol_volvio_v2594.sql` lleva lo vuelto al día de HOY de la
+  Programación (hoy cae en Pedidos atrasados). `gv_ppp_prog_arbol` está en `GV_Reglas_Centinela`.
+- `sql/vista_control_remitos_ciclo_v2594.sql`, `tests/rr-volvio-ciclo.cjs`.

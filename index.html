@@ -3927,6 +3927,10 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-aviso-i{ display:inline-block; background:#fff; border:1px solid #ddd6fe; border-radius:999px;
   padding:2px 10px; margin:3px 6px 0 0; font-weight:700; white-space:nowrap; }
 .pga-aviso-i i{ font-style:normal; font-weight:900; color:#6d28d9; }
+/* v25.94 — salió y VOLVIÓ al depósito (↩ s/salida): se recarga por Carga Camión */
+.pga-volvio{ display:inline-block; font-size:11px; font-weight:800; border-radius:999px; padding:0 6px;
+  background:#fef3c7; color:#92400e; border:1px solid #f59e0b; margin-left:6px; vertical-align:1px;
+  white-space:nowrap; line-height:1.5; }
 /* v20.10 — el «salió» de UNA NP, al lado de su pastilla de estado */
 .pga-salio{ display:inline-block; font-size:11px; font-weight:700; border-radius:999px; padding:0 5px;
   background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; margin-left:6px; vertical-align:1px;
@@ -6269,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=25.93"></script>
+<script type="module" src="recepcion.js?v=25.94"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10466,7 +10470,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v25.93";
+const APP_VERSION = "v25.94";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34296,7 +34300,8 @@ async function pppRefreshArmado() {
   catch (_e) { if (!_pppArmadoDone) _pppArmadoDone = new Set(); if (!_pppArmadoStarted) _pppArmadoStarted = new Set(); if (!_pppPickDone) _pppPickDone = new Set(); if (!_pppPickStarted) _pppPickStarted = new Set(); }
 }
 let _pppEntregadoCC = null;
-let _pppLoadMs = null;   // NP -> ms de la PRIMERA carga (CCN), para el plazo de control
+let _pppLoadMs = null;   // NP -> ms de la PRIMERA carga (CCN) del ciclo vigente, para el plazo de control
+let _pppVolvio = null;   // v25.94 — NP -> ms del ↩ s/salida (FSS) que la devolvió al depósito y todavía no se recargó
 /* v13.02 (idea 4459) — Regla del dueño: "si hay pedidos que ya se cargaron a un camión, tienen
    que salir de la Programación y pasar a En Salida, y no verse más en Programación". La fuente
    durable es la vista gv_ppp_en_salida (sql/gv_ppp_en_salida.sql): toda NP con CCN, sin CRN y
@@ -34319,6 +34324,24 @@ async function pppRefreshEnSalida() {
     if (typeof pppRenderProg === "function") pppRenderProg();
   } catch (_e) { if (!_pppEnSalida) _pppEnSalida = new Map(); }
 }
+/* v25.94 — Plazo de control por CICLO de carga. Si un pedido salió, volvió (↩ s/salida = FSS)
+   y se volvió a cargar, el reloj de las 30 hs arranca en la PRIMERA carga posterior a esa
+   vuelta, no en la primera de todas (LK 0122 / LK 0177, 01/10: recargados ese día y marcados
+   VENCIDOS desde la carga anterior, con alarma CRA a Telegram). ≡ vista_control_remitos.first_load.
+   FSS posterior a la última carga → no está entregado (sale del set). */
+function _pppCargasCiclo(data, fssMap, maxCcn) {
+  const set = new Set(); const loadMs = new Map(); const volvio = new Map();
+  for (const ev of data || []) {
+    const t = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!t) continue;
+    const fss = fssMap.get(t) || 0;
+    if (fss && fss > (maxCcn.get(t) || 0)) { volvio.set(t, fss); continue; }   // volvió al depósito → no entregada
+    set.add(t);
+    const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0;
+    if (!ms || (fss && ms <= fss)) continue;            // carga ANTERIOR a la vuelta: no es el ciclo vigente
+    if (!loadMs.has(t) || ms < loadMs.get(t)) loadMs.set(t, ms);
+  }
+  return { set: set, loadMs: loadMs, volvio: volvio };
+}
 async function pppRefreshEntregado() {
   try {
     const since = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
@@ -34331,16 +34354,9 @@ async function pppRefreshEntregado() {
     // NO cuenta como entregada ni dispara la alarma de "cargado sin controlar". v6.66.
     const maxCcn = new Map();
     for (const ev of data) { const t = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!t) continue; const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0; if (!maxCcn.has(t) || ms > maxCcn.get(t)) maxCcn.set(t, ms); }
-    const set = new Set(); const loadMs = new Map();
-    for (const ev of data) {
-      const t = String(ev.texto || "").split("|")[0].trim().replace(/\.0+$/, ""); if (!t) continue;
-      const fss = fssMap.get(t) || 0;
-      if (fss && fss > (maxCcn.get(t) || 0)) continue;   // volvió al depósito → no entregada
-      set.add(t);
-      const ms = ev.ts_cliente ? new Date(ev.ts_cliente).getTime() : 0;
-      if (ms && (!loadMs.has(t) || ms < loadMs.get(t))) loadMs.set(t, ms);
-    }
-    _pppEntregadoCC = set; _pppLoadMs = loadMs; pppRenderProg();
+    const _cic = _pppCargasCiclo(data, fssMap, maxCcn);
+    const set = _cic.set; const loadMs = _cic.loadMs;
+    _pppEntregadoCC = set; _pppLoadMs = loadMs; _pppVolvio = _cic.volvio; pppRenderProg();
     try { pppCheckCargaVencida(); } catch (_e) {}   // si CRN ya estaba cargado, chequea acá (orden async)
   } catch (_e) { if (!_pppEntregadoCC) _pppEntregadoCC = new Set(); if (!_pppLoadMs) _pppLoadMs = new Map(); }
 }
@@ -39990,6 +40006,14 @@ function _pgaEstCero() { return { facturado: 0, armado: 0, proceso: 0, pendiente
    función que usan varias pantallas. */
 const PGA_SALIO_EST = ["cargada"];   // v20.12: sólo el CCN. Ver el ⚠ de arriba.
 function _pgaSalioListo() { return !!(_pppEnSalida || _pppLoadMs); }
+/* v25.94 — ¿la NP salió y VOLVIÓ al depósito (FSS posterior a su última carga)? Sale del mismo
+   mapa de CCN + FSS que `_pgaSalio`, así que las dos marcas no pueden contradecirse. */
+function _pgaVolvio(r) { const np = _pppNpNorm(r && r.np); return !!(np && _pppVolvio && _pppVolvio.has(np)); }
+function _pgaVolvioTitle(r) {
+  const ms = _pppVolvio && _pppVolvio.get(_pppNpNorm(r && r.np));
+  return "Salió en el camión y VOLVIÓ al depósito" + (ms ? " (↩ s/salida " + crFmtCC(ms) + ")" : "") +
+    ": está facturada y hay que volver a cargarla por Carga Camión. El plazo de control arranca de nuevo con la carga nueva.";
+}
 function _pgaSalio(r) {
   const np = _pppNpNorm(r && r.np); if (!np) return false;
   if (_pppEnSalida) {
@@ -40230,6 +40254,10 @@ function _pgaCuerpoHtml(dias, opts) {
             // v20.12 (Thomas: *"que sea finito"*) — el chip queda en el ícono solo: la palabra la
             // dice la columna SALIÓ, que está en la misma fila. El `title` cuenta el resto.
             (_pgaSalio(r) ? '<span class="pga-salio" title="Ya salió: se registró la carga al camión (CCN)">🚚</span>' : '') +
+            // v25.94 (pedido: "que aparezca en la PPP cuando vuelve y que tenga el badge de VOLVIÓ"):
+            // salió, el cliente no la recibió (↩ s/salida en Recepción Remitos) y está otra vez en el
+            // depósito, facturada. Se vuelve a cargar por Carga Camión; al recargarse el badge se va solo.
+            (_pgaVolvio(r) ? '<span class="pga-volvio" title="' + escapeHtml(_pgaVolvioTitle(r)) + '">↩ VOLVIÓ</span>' : '') +
             // v17.74 (Luis): el horario viaja con el pedido. v21.67 (Luis, 23/09): y SE EDITA ACÁ también —
             // mismo pop-up y misma RPC que A Programar (gv_pedido_horario_set). Lo manual manda; si no hay
             // manual se ve lo que eligió el cliente.
@@ -58578,7 +58606,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=25.93"></script>
+<script src="importacion.js?v=25.94"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61379,8 +61407,8 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=25.93"></script>
-<script src="hotsale.js?v=25.93"></script>
+<script src="cobranzas.js?v=25.94"></script>
+<script src="hotsale.js?v=25.94"></script>
 
 </body>
 </html>
