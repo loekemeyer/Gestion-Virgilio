@@ -182,6 +182,7 @@ table.tandas{table-layout:fixed}
 table.pen{table-layout:fixed}
 table.pen td{text-align:center;padding:.5vh .3vw;font-weight:800;font-size:calc(2.1*var(--u));color:#e2e8f0}
 table.pen td.p-tanda{font-weight:900;font-size:calc(2.4*var(--u))}
+table.pen td.p-zona{color:#7dd3fc;font-size:calc(2*var(--u))}
 table.pen td.p-np{color:#94a3b8;font-size:calc(1.8*var(--u))}
 table.pen td div{overflow:hidden;white-space:nowrap}
 table.pen tr+tr td{border-top:1px solid #16203a}
@@ -759,7 +760,10 @@ function pendientesHoy(filas, despachadas) {
     var tanda = String(r.tanda || "").trim().toUpperCase() || "—";
     var rs = resumirCliente(r.razon_social || "") || "—";
     var k = tanda + "|" + rs, x = g.get(k);
-    if (!x) { x = { tanda: tanda, rs: rs, rsFull: r.razon_social || "", nps: [], m3: 0, est: "facturado" }; g.set(k, x); }
+    if (!x) { x = { tanda: tanda, rs: rs, rsFull: r.razon_social || "", nps: [], m3: 0, est: "facturado", zonas: [] }; g.set(k, x); }
+    /* v25.43 (Luis): la zona de cada pendiente, corta (Z4 · Súper · Retira). */
+    var zc = String(r.zona_corta || r.zona || "").trim().replace(/^zona\s*(\d+).*$/i, "Z$1");
+    if (zc && x.zonas.indexOf(zc) < 0) x.zonas.push(zc);
     x.nps.push(np); x.m3 += Number(r.m3) || 0;
     var e = PEN_ORDEN[r.estado] != null ? r.estado : "pendiente";
     if (PEN_ORDEN[e] < PEN_ORDEN[x.est]) x.est = e;
@@ -1488,10 +1492,11 @@ function pintar(d) {
     var PEN_MAX = Math.max(1, Math.min(6, Math.ceil((cabenFilas("actBox", false) - 2) / 2)));
     if (pens.length > PEN_MAX) PEN_MAX = Math.max(1, PEN_MAX - 1);
     el("penBox").innerHTML = pens.length
-      ? '<table class="pen"><colgroup><col style="width:16%"><col style="width:36%"><col style="width:32%"><col></colgroup><tbody>' +
+      ? '<table class="pen"><colgroup><col style="width:14%"><col style="width:12%"><col style="width:32%"><col style="width:27%"><col></colgroup><tbody>' +
         pens.slice(0, PEN_MAX).map(function (x) {
           var et = PEN_TXT[x.est] || PEN_TXT.pendiente;
           return '<tr><td class="p-tanda">' + esc(x.tanda) + '</td>' +
+            '<td class="p-zona">' + esc(x.zonas.join("·") || "—") + '</td>' +
             '<td class="p-cli" title="' + esc(x.rsFull) + '"><div><span class="tk">' + esc(x.rs) + '</span></div></td>' +
             '<td class="p-np" title="' + esc(x.nps.join(" · ")) + '"><div><span class="tk">' + esc(npsCortas(x.nps)) + '</span></div></td>' +
             '<td class="' + et[0] + '">' + et[1] + '</td></tr>';
