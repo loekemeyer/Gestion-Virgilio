@@ -19,9 +19,17 @@
   "use strict";
   var URL_ = window.VIR_SUPABASE_URL, KEY = window.VIR_SUPABASE_KEY;
   if (!URL_ || !KEY) return;
+  /* v26.02 PRUEBA TEMPORAL (01/10, vence 18:40 ART): Mon. Admin carga este archivo con
+     window.GV_ALERTA_MODO = "prueba" → lee gv_alertas_prueba_vivas (legajo 1 en el baño) y el cartel
+     queda prendido hasta que el baño se cierra (sin el corte de 15 s). La TV no se entera: sin el modo
+     todo sigue igual. Pasada la hora deja de leer. sql/gv_alerta_prueba_bano_v2602.sql */
+  var PRUEBA = window.GV_ALERTA_MODO === "prueba";
+  var PRUEBA_HASTA = Date.parse("2026-10-01T18:40:00-03:00");
+  if (PRUEBA && Date.now() >= PRUEBA_HASTA) return;
   /* v25.90 (Luis, 01/10): sólo en el monitor del DEPÓSITO. Dentro de un iframe (📺 Vista TV del admin) no corre. */
-  try { if (window.self !== window.top) return; } catch (_e) { return; }
-  var DURA_MS = 15000, CADA_MS = 4000;
+  try { if (!PRUEBA && window.self !== window.top) return; } catch (_e) { return; }
+  var DURA_MS = PRUEBA ? Infinity : 15000, CADA_MS = PRUEBA ? 3000 : 4000;
+  var RPC = PRUEBA ? "gv_alertas_prueba_vivas" : "gv_alertas_inactivo_vivas";
   var vistas = {};          // id → ms en que se mostró por primera vez
   var abiertas = {};        // id → alerta viva en pantalla
   var ctx = null, sirena = null;
@@ -97,7 +105,7 @@
     });
     var ov = caja();
     if (!vivas.length) { ov.classList.remove("on"); callar(); return; }
-    var nombres = vivas.map(function (a) { return "<b>" + esc(nombreCorto(a.nombre)) + "</b>"; }).join("");
+    var nombres = vivas.map(function (a) { return "<b>" + esc(PRUEBA ? a.nombre : nombreCorto(a.nombre)) + "</b>"; }).join("");
     document.getElementById("aiBox").innerHTML =
       '<div class="ai-ic">⏰</div><div class="ai-tx">' + nombres +
       (vivas.length > 1 ? "llevan" : "lleva") + " más de 5 minutos inactivo" + (vivas.length > 1 ? "s" : "") + "</div>" +
@@ -109,12 +117,17 @@
   function leer() {
     /* un iframe escondido (la otra pestaña del monitor) no suena ni muestra: mide 0 */
     if (!window.innerWidth || !window.innerHeight) return;
-    fetch(URL_ + "/rest/v1/rpc/gv_alertas_inactivo_vivas", {
+    if (PRUEBA && Date.now() >= PRUEBA_HASTA) { Object.keys(abiertas).forEach(function (k) { delete abiertas[k]; }); pintar(); return; }
+    fetch(URL_ + "/rest/v1/rpc/" + RPC, {
       method: "POST", cache: "no-store",
       headers: { apikey: KEY, Authorization: "Bearer " + KEY, "Content-Type": "application/json" }, body: "{}"
     }).then(function (r) { return r.ok ? r.json() : null; }).then(function (rows) {
       if (!Array.isArray(rows)) return;
       var ahora = Date.now();
+      if (PRUEBA) {   /* sin el corte de 15 s: lo que ya no viene de la base se apaga */
+        var hay = {}; rows.forEach(function (a) { hay[String(a.id)] = 1; });
+        Object.keys(abiertas).forEach(function (k) { if (!hay[k]) delete abiertas[k]; });
+      }
       rows.forEach(function (a) {
         var id = String(a.id);
         if (a.cerrada) { delete abiertas[id]; return; }            // registró una tarea → se va solo

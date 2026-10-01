@@ -31101,3 +31101,19 @@ execute para anon/authenticated, queda de rollback) y la nueva tomó el nombre. 
 31 importados (26 Tierra Nativa, 5 Chef), 5 con referencia Chef → LK, 45 ms. Las dos tablas nuevas vacías al 01/10.
 Impacto sobre objetos existentes: ninguno. Rollback en la cabecera de `sql/gv_hotsale_precio_lk_v2598.sql`.
 
+
+## §3.v2602 — PRUEBA TEMPORAL: legajo 1 en el baño → alarma en Mon. Admin (01/10/2026, vence 18:40 ART)
+
+Pedido: *"cuando el legajo de prueba va al baño, que salte el mensaje de alarma en la pantalla; cuando deje
+de ir al baño que se apague; que dure 1 hora"* · *"legajo de prueba es 1 · que salte en el monitor admin nada más"*.
+
+- `gv_alerta_prueba_bano(p_abierto)`: el celular del legajo 1 la llama al abrir / cerrar PB
+  (`toggleStartOrEnd`; los eventos del legajo de prueba no se persisten, por eso avisa directo). Abrir no hace
+  nada desde las 18:35; cerrar anda siempre. Escribe en `GV_Alerta_Inactivo` con `dispositivo = 'prueba-bano'`.
+- `gv_alertas_prueba_vivas()`: la lee Mon. Admin (`alerta-inactivo.js` con `GV_ALERTA_MODO = "prueba"`); el
+  cartel queda prendido mientras el baño siga abierto (sin el corte de 15 s). Vacía desde las 18:40.
+- **La alarma real no se tocó**: `gv_alerta_inactivo_abrir` sigue rechazando 0/1 y `gv_alertas_inactivo_vivas`
+  sigue excluyéndolos → la TV del depósito no ve la prueba. Probado como `anon` en transacción abortada:
+  abre id, vivas 1, TV 0, cierra 1, cerrada = true.
+- Rollback: `drop function public.gv_alerta_prueba_bano(boolean); drop function public.gv_alertas_prueba_vivas();`
+  `sql/gv_alerta_prueba_bano_v2602.sql`, `tests/alerta-inactivo.cjs` (G, H).

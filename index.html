@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.01"></script>
+<script type="module" src="recepcion.js?v=26.02"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -8450,6 +8450,12 @@ function toggleStartOrEnd(legajo, code){
     st.toggles[code] = new Date().toISOString();
   }
   setLegajoState(legajo, st);
+  /* v26.02 PRUEBA TEMPORAL (01/10, vence 18:40 ART): el legajo de prueba (1) abre / cierra el baño (PB)
+     → cartel de alarma SÓLO en Mon. Admin (gv_alerta_prueba_bano → gv_alertas_prueba_vivas). La alarma
+     real no se toca. Los eventos del legajo de prueba no se persisten: por eso avisa el celular directo. */
+  if (code === "PB" && String(legajo).trim() === "1" && Date.now() < Date.parse("2026-10-01T18:40:00-03:00")) {
+    try { _tmAlertaRpc("gv_alerta_prueba_bano", { p_abierto: !wasActive }).catch(function () {}); } catch (_e) {}
+  }
   return { started: !wasActive, ended: wasActive };
 }
 
@@ -10470,7 +10476,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.01";
+const APP_VERSION = "v26.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -32787,7 +32793,7 @@ function openMonitor() {
   /* v25.90 (Luis, 01/10): la alarma de operario inactivo corre SÓLO en el monitor del depósito (kiosko
      /monitor y monitor/tv.html suelto), nunca en el monitor que abre el supervisor. */
   if (window.__tvKioskMode && !document.getElementById("gvAlertaInactivoJs")) {
-    try { const _s = document.createElement("script"); _s.id = "gvAlertaInactivoJs"; _s.src = "monitor/alerta-inactivo.js?v=3"; document.body.appendChild(_s); } catch (_e) {}
+    try { const _s = document.createElement("script"); _s.id = "gvAlertaInactivoJs"; _s.src = "monitor/alerta-inactivo.js?v=4"; document.body.appendChild(_s); } catch (_e) {}
   }
   startInconsAutoRefresh();
 }
@@ -58606,7 +58612,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.01"></script>
+<script src="importacion.js?v=26.02"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61407,8 +61413,8 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.01"></script>
-<script src="hotsale.js?v=26.01"></script>
+<script src="cobranzas.js?v=26.02"></script>
+<script src="hotsale.js?v=26.02"></script>
 
 </body>
 </html>

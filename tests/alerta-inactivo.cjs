@@ -26,7 +26,10 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const fs = require("fs");
   const nCarga = (f) => fs.readFileSync(path.join(__dirname, "..", "monitor", f), "utf8").split("alerta-inactivo.js").length - 1;
   if (nCarga("tv.html") !== 1) errs.push("tv.html tiene que cargar la alarma una vez");
-  if (nCarga("admin.html") !== 0) errs.push("Mon. Admin (admin.html) no tiene que cargar la alarma");
+  // v26.02 PRUEBA TEMPORAL: Mon. Admin la carga UNA vez y SÓLO en modo "prueba" (legajo 1 en el baño)
+  const admSrc = fs.readFileSync(path.join(__dirname, "..", "monitor", "admin.html"), "utf8");
+  if (nCarga("admin.html") !== 1 || !/window\.GV_ALERTA_MODO = "prueba";<\/script>\n<script src="alerta-inactivo\.js/.test(admSrc))
+    errs.push("Mon. Admin (admin.html) sólo puede cargar la alarma en modo prueba");
   if (!/window\.self !== window\.top\) return/.test(fs.readFileSync(path.join(__dirname, "..", "monitor", "alerta-inactivo.js"), "utf8")))
     errs.push("la alarma no puede correr dentro de un iframe (📺 Vista TV del admin)");
   await tv.goto("file://" + path.join(__dirname, "..", "monitor", "tv.html") + "?key=tv", { waitUntil: "domcontentloaded" });
@@ -61,7 +64,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const u = rt.request().url();
     if (u.includes("Registros_Produccion_Virgilio?select=ts_cliente"))
       return rt.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ ts_cliente: new Date(Date.now() - 6 * 60000).toISOString() }]) });
-    if (u.includes("rpc/gv_alerta_inactivo_")) { rpcs.push(u.split("rpc/")[1] + " " + (rt.request().postData() || "")); return rt.fulfill({ status: 200, contentType: "application/json", body: "1" }); }
+    if (u.includes("rpc/gv_alerta_inactivo_") || u.includes("rpc/gv_alerta_prueba_bano")) { rpcs.push(u.split("rpc/")[1] + " " + (rt.request().postData() || "")); return rt.fulfill({ status: 200, contentType: "application/json", body: "1" }); }
     return rt.abort();
   });
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
@@ -115,6 +118,42 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     localStorage.removeItem("gv_tm_alerta::778"); tmStop(); legajoInput.value = "778"; goToOptions();
     await new Promise(res => setTimeout(res, 1500)); return true;
   }) && !rpcs.some((x) => x.startsWith("gv_alerta_inactivo_abrir"));
+  // G) v26.02 PRUEBA TEMPORAL (vence 18:40 ART del 01/10): legajo 1 abre / cierra el baño → avisa a Mon. Admin
+  const VIGENTE = Date.now() < Date.parse("2026-10-01T18:40:00-03:00");
+  rpcs.length = 0;
+  await p.evaluate(async () => { try { __identity = null; } catch (_e) {} toggleStartOrEnd("1", "PB"); toggleStartOrEnd("1", "PB");
+    toggleStartOrEnd("777", "PB"); toggleStartOrEnd("777", "PB"); await new Promise(res => setTimeout(res, 400)); });
+  const pb = rpcs.filter((x) => x.startsWith("gv_alerta_prueba_bano"));
+  r.pruebaBanoCel = VIGENTE ? (pb.length === 2 && pb[0].includes('"p_abierto":true') && pb[1].includes('"p_abierto":false')) : pb.length === 0;
+  // H) Mon. Admin en modo prueba: prendido mientras el baño sigue abierto (sin el corte de 15 s), se apaga al cerrar
+  const adm = await b.newPage({ viewport: { width: 1600, height: 900 } });
+  adm.on("pageerror", (e) => errs.push("adm: " + e.message));
+  let banoCerrado = false, pidioReal = false;
+  await adm.route("**/*.supabase.co/**", (rt) => {
+    const u = rt.request().url();
+    if (u.includes("rpc/gv_alertas_inactivo_vivas")) { pidioReal = true; return rt.fulfill({ status: 200, contentType: "application/json", body: "[]" }); }
+    if (u.includes("rpc/gv_alertas_prueba_vivas"))
+      return rt.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify([{ id: 31, legajo: "1", nombre: "PRUEBA (legajo 1)", abierta_en: new Date().toISOString(), cerrada: banoCerrado }]) });
+    return rt.abort();
+  });
+  await adm.goto("file://" + path.join(__dirname, "..", "monitor", "admin.html") + "?key=tv", { waitUntil: "domcontentloaded" });
+  if (VIGENTE) {
+    await adm.waitForFunction(() => { const o = document.getElementById("aiOv"); return o && o.classList.contains("on"); }, null, { timeout: 8000 }).catch(() => {});
+    const h = await adm.evaluate(() => {
+      const o = document.getElementById("aiOv"); if (!o || !o.classList.contains("on")) return { on: false };
+      const A = gvAlertaInactivo; A._vistas["31"] = Date.now() - 60000; A.pintar();
+      return { on: true, txt: document.getElementById("aiBox").textContent, sigue: o.classList.contains("on") };
+    });
+    r.admPruebaMuestra = h.on && /PRUEBA \(legajo 1\)/.test(h.txt || "") && h.sigue;
+    banoCerrado = true;
+    await adm.evaluate(() => gvAlertaInactivo.leer()); await adm.waitForTimeout(400);
+    r.admPruebaSeApaga = await adm.evaluate(() => !document.getElementById("aiOv").classList.contains("on"));
+  } else {
+    await adm.waitForTimeout(1500);
+    r.admPruebaVencida = await adm.evaluate(() => { const o = document.getElementById("aiOv"); return !o || !o.classList.contains("on"); });
+  }
+  r.admNoLeeAlarmaReal = !pidioReal;
   r.brAbierta = c.abierta; r.brCerrada = c.cerrada; r.brHistorial = c.enHist;
   const pass = Object.values(r).every(Boolean) && errs.length === 0;
   console.log("alerta-inactivo:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
