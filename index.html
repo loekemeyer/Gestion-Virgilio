@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.02"></script>
+<script type="module" src="recepcion.js?v=26.03"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10476,7 +10476,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.02";
+const APP_VERSION = "v26.03";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36737,6 +36737,93 @@ function pgaTandaMoverAbrir(key) {
 }
 window.pgaTandaMoverAbrir = pgaTandaMoverAbrir;
 
+/* v25.77 (Luis, 2026-10-01) — «Modificar tanda»: el botón de la fila de la tanda ya no va directo a
+   «Cambiar de día», abre un pop-up con DOS opciones:
+     · 📅 Cambiar de día   → el flujo de siempre (pgaTandaMoverAbrir): mueve la tanda ENTERA.
+     · ✂ Partir tanda      → sacar ALGUNAS NP a una tanda NUEVA, ese mismo día o a otro.
+   Partir usa gv_ppp_nps_mover_a con un código de tanda NUEVO (gv_ppp_web_tanda_codigo_nuevo): el
+   backend ya frena mover NP de una tanda pickeada (gv_np_mover_guard) y mezclar LK/CH en una tanda
+   (gv_ppp_tanda_empresa_guard, v25.74). El resto de las NP queda en la tanda original; el contenido
+   no se vuelve a pickear. */
+let _pppModKey = null, _pppPartir = null;
+function pgaTandaModificarAbrir(key) {
+  const t = _pgaTandaDe(key);
+  if (!t || !t.tanda || t.tanda === "—") { pppSetStatus("Esa fila no tiene código de tanda: no se puede modificar desde acá.", false); return; }
+  _pppModKey = key;
+  pppMovOverlay("🔧 Modificar tanda " + t.tanda);
+  const body = document.getElementById("pppMovBody");
+  body.innerHTML = '<div class="mv-note">¿Qué querés hacer con <b>' + escapeHtml(t.tanda) + '</b>?</div>' +
+    '<button class="mv-esp-b nueva" onclick="pgaModCambiarDia()"><b>📅 Cambiar de día</b>' +
+      '<span>Mueve TODA la tanda a otra fecha (o la junta con otra). El contenido no cambia, no hay que volver a pickear.</span></button>' +
+    '<button class="mv-esp-b nueva" onclick="pgaModPartir()"><b>✂ Partir tanda</b>' +
+      '<span>Sacás algunas NP a una tanda NUEVA, ese mismo día o a otro. El resto queda en ' + escapeHtml(t.tanda) + '.</span></button>';
+}
+function pgaModCambiarDia() { const k = _pppModKey; pppMovCerrar(); pgaTandaMoverAbrir(k); }
+function pgaModPartir() { pgaTandaPartirAbrir(_pppModKey); }
+
+function pgaTandaPartirAbrir(key) {
+  const t = _pgaTandaDe(key);
+  if (!t || !t.tanda || t.tanda === "—") return;
+  const filas = (t.filas || []).filter(function (r) { return String(r.np || "").trim(); });
+  if (filas.length < 2) { pppSetStatus("La tanda " + (t.tanda || "") + " tiene una sola NP: no hay nada que partir (usá «Cambiar de día»).", false); return; }
+  const empezada = filas.some(function (r) { return r.estado && r.estado !== "pendiente"; });
+  _pppPartir = { tanda: t.tanda, dia: t.dia, iso: _pppKeyISO(t.dia), filas: filas, empezada: empezada, sel: {} };
+  pppMovOverlay("✂ Partir tanda " + t.tanda);
+  pgaPartirRender();
+}
+function pgaPartirTick(np) { if (_pppPartir) _pppPartir.sel[np] = !_pppPartir.sel[np]; }
+function pgaPartirRender() {
+  const P = _pppPartir; if (!P) return;
+  const body = document.getElementById("pppMovBody");
+  let h = '<div class="mv-note">Tildá las NP que SALEN de <b>' + escapeHtml(P.tanda) + '</b> a una tanda NUEVA. ' +
+    'El resto queda en ' + escapeHtml(P.tanda) + '; el contenido no se vuelve a pickear.</div>';
+  if (P.empezada) h += '<div class="mv-note" style="color:#b45309">⚠ ' + escapeHtml(P.tanda) + ' ya está en picking o armado: partirla puede frenarse (los operarios trabajan por el pallet de esa tanda).</div>';
+  h += '<div style="display:flex;flex-direction:column;gap:4px;margin:8px 0">';
+  for (const r of P.filas) {
+    const np = String(r.np || "");
+    h += '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;cursor:pointer">' +
+      '<input type="checkbox" ' + (P.sel[np] ? "checked" : "") + ' onchange="pgaPartirTick(\'' + escapeHtml(np) + '\')">' +
+      '<b>' + escapeHtml(np) + '</b><span style="flex:1;text-align:left">' + escapeHtml(r.razon_social || r.cod || "") + '</span>' +
+      '<span>' + _pppFmtM3(Number(r.m3) || 0) + ' m³</span></label>';
+  }
+  h += '</div>';
+  h += '<div class="mv-note">Día de la tanda nueva: <input type="date" id="pgaPartirDia" value="' + escapeHtml(P.iso) + '" ' +
+    'style="padding:4px 6px;border:1px solid #d1d5db;border-radius:6px"> <span style="color:#6b7280">(el mismo día de la tanda, o cambialo)</span></div>';
+  h += '<button class="mv-esp-b nueva" onclick="pgaPartirConfirmar()"><b>✂ Partir a tanda nueva</b>' +
+    '<span>Las NP tildadas salen a un código nuevo del día elegido.</span></button>';
+  body.innerHTML = h;
+}
+async function pgaPartirConfirmar() {
+  const P = _pppPartir; if (!P) return;
+  const nps = P.filas.map(function (r) { return String(r.np || ""); }).filter(function (n) { return P.sel[n]; });
+  if (!nps.length) { try { alert("Tildá al menos una NP para sacar."); } catch (_e) {} return; }
+  if (nps.length >= P.filas.length) { try { alert("No podés sacar TODAS las NP: dejá al menos una en " + P.tanda + ", o usá «Cambiar de día» para mover la tanda entera."); } catch (_e) {} return; }
+  const iso = (document.getElementById("pgaPartirDia") || {}).value || P.iso;
+  if (!iso) return;
+  if (!confirm("¿Sacar " + nps.length + " NP de " + P.tanda + " a una tanda NUEVA el " + iso + "?\n\n" + nps.join(", ") +
+    "\n\nEl resto queda en " + P.tanda + ". Lo ven todos, también el operario.")) return;
+  pppSetStatus("Partiendo " + P.tanda + "…", true);
+  try {
+    const cod = await aprRpc("gv_ppp_web_tanda_codigo_nuevo", {});
+    const nuevo = (typeof cod === "string") ? cod
+      : (cod && cod[0] && (cod[0].gv_ppp_web_tanda_codigo_nuevo || cod[0].codigo)) || String(cod || "");
+    if (!nuevo) throw new Error("No se pudo generar un código de tanda nuevo.");
+    const r = await aprRpc("gv_ppp_nps_mover_a", { p_nps: nps, p_tanda: nuevo, p_fecha: iso, p_nota: "Partir tanda " + P.tanda });
+    const movidas = (typeof r === "number") ? r : (r && r[0] && (r[0].gv_ppp_nps_mover_a != null ? r[0].gv_ppp_nps_mover_a : r[0])) || nps.length;
+    pppMovCerrar();
+    pppSetStatus("✂ " + movidas + " NP salieron de " + P.tanda + " → " + nuevo + " el " + iso + ".", true);
+    await pppLoadProgFromSupabase();
+    pgaRecargar();
+  } catch (e) {
+    const m = (e && e.message) ? e.message : String(e);
+    pppSetStatus("⚠ No se pudo partir: " + m, false);
+    try { alert("No se pudo partir " + P.tanda + ":\n\n" + m); } catch (_e) {}
+  }
+}
+window.pgaTandaModificarAbrir = pgaTandaModificarAbrir; window.pgaModCambiarDia = pgaModCambiarDia;
+window.pgaModPartir = pgaModPartir; window.pgaTandaPartirAbrir = pgaTandaPartirAbrir;
+window.pgaPartirTick = pgaPartirTick; window.pgaPartirConfirmar = pgaPartirConfirmar;
+
 /* v21.63 (Luis, 23/09) — «Eliminar» de una tanda PRUEBAn. No es un borrado nuevo: por cada NP llama
    a `gv_ppp_pedido_cancelar` con alcance TODO EL PEDIDO, o sea exactamente lo que hace «Cancelar
    pedido» (sale de la PPP, no vuelve a entrar, lo armado va a «A guardar», el pedido queda en la
@@ -40200,11 +40287,10 @@ function _pgaCuerpoHtml(dias, opts) {
           // asignarla en un día diferente". Va en la fila de la TANDA y acá lo heredan las dos tablas
           // — Programación de entregas y Pedidos atrasados—, que comparten este cuerpo.
           ((window.__isSupervisor || !PPP_READONLY)
-            ? '<span class="pga-acc"><button class="pga-acc-b dia" title="Cambiar de día — mueve TODA la tanda '
-              + escapeHtml(t.tanda) + ' a otra fecha. Se abre el calendario con los m³ que ya tiene cada día y el cupo,'
-              + ' y arriba el botón para dejarla en ⏸ Armados en espera (armada, sin fecha de entrega).'
+            ? '<span class="pga-acc"><button class="pga-acc-b dia" title="Modificar la tanda '
+              + escapeHtml(t.tanda) + ': cambiarla de día (toda junta) o PARTIRLA (sacar algunas NP a una tanda nueva, ese mismo día o a otro).'
               + ' El contenido no cambia: no hay que volver a pickear. Se guarda en el servidor, lo ven todos."'
-              + ' onclick="event.stopPropagation();pgaTandaMoverAbrir(\'' + escapeHtml(t.key) + '\')">📅<span class="pga-acc-t"> Cambiar de día</span></button>'
+              + ' onclick="event.stopPropagation();pgaTandaModificarAbrir(\'' + escapeHtml(t.key) + '\')">🔧<span class="pga-acc-t"> Modificar tanda</span></button>'
               // v21.63 (Luis): una tanda de CLIENTE DE PRUEBA se elimina de un toque — cancela sus pedidos
               // con el mismo backend que «Cancelar pedido» (gv_ppp_pedido_cancelar, alcance: todo el pedido).
               + (gvEsTandaPrueba(t.tanda)
@@ -58612,7 +58698,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.02"></script>
+<script src="importacion.js?v=26.03"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61413,8 +61499,8 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.02"></script>
-<script src="hotsale.js?v=26.02"></script>
+<script src="cobranzas.js?v=26.03"></script>
+<script src="hotsale.js?v=26.03"></script>
 
 </body>
 </html>
