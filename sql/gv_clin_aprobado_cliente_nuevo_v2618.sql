@@ -1,4 +1,6 @@
--- v26.15 (Luis, 02/10/2026): «si está aprobado, ¿por qué sigue apareciendo ahí?»
+-- v26.18 (Luis, 02/10/2026): «si está aprobado, ¿por qué sigue apareciendo ahí?»
+-- ⚠ Se aplicó con el número v26.15 y renumeró a v26.18 (otra sesión usó 26.15-26.17 en main). Los marcadores
+--   internos v26.15-clin-aprob / v26.15-clin-aprob-48h son la llave de idempotencia: NO cambiarlos.
 --
 -- El pipeline de Clientes nuevos decía «✅ Aprobado — ya está en «Pedidos a programar»» con
 -- CUALQUIER fila de GV_Cuarentena_Liberados, sin mirar QUÉ motivo levantó esa liberación.

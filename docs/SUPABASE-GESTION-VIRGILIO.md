@@ -31214,3 +31214,29 @@ de GV `gv_imp_config` (anon/auth; la clave sólo a supervisor), y sólo `authent
 
 `sql/gv_rep_gerencia_conc_cargas_v2613.sql`, `sql/notificar_outbox_salud_v2613.sql` (rollback en la cola de cada uno)
 · LK: `pagina-LK-copia/sql/reporte_gerencia_v2.sql`.
+
+## §3.v2616 — Estadísticas ISIS por artículo: `gv_isis_estad_ventas` / `gv_isis_estad_pedidos` (Luis, 02/10/2026)
+
+Se aplicó como migraciones `gv_isis_estadisticas_v2613` y `gv_isis_estadisticas_v2613_desc`; la app salió como
+**v26.16** porque otras sesiones publicaron la v26.13, la v26.14 y la v26.15 en el medio. El archivo es `sql/gv_isis_estadisticas_v2616.sql`.
+
+Dos funciones **nuevas**, sólo lectura, SECURITY DEFINER con guard de supervisor; `EXECUTE` revocado a
+`public`/`anon`, dado a `authenticated` y `service_role`. Ningún objeto existente se tocó. Las usa
+`estadisticas.js` (panel supervisor → 📑 Estadísticas ISIS) para bajar los .xls de los manuales 29 y 31.
+
+- **Ventas** (`isis_lk` / `isis_ch.documentos` + `documento_items`, facturas y NC): unidades netas, precio por
+  línea con los descuentos (dto1·dto2, el factor que ya trae el importe en las facturas E, el descuento del
+  documento) y el **tipo de cambio de las facturas en dólares** («Son Dolar» + «Tipo de Cambio: N», Chef → LK),
+  redondeado a 2 decimales; total por la unidad de la línea (caja o unidad). **Medido contra los Excel de ISIS de
+  sept/26: CH 163/163 artículos idénticos en las 5 columnas ($245.911.849,42); LK 183/184, total
+  $457.686.221,84 exacto.** Única diferencia: ISIS separa 55219 / 55219ZZ y la factura impresa dice 55219.
+- **Pedidos** (`lk_pedidos_match` por `fecha_pedido`, sin `GV_Clientes_Prueba`): cajas, unidades = cajas × UxB
+  (sin UxB queda vacío: sept/26, 838 y 838L de Chef), importe = unidades × lista. Migración extra `gv_isis_estadisticas_v2614_sin_uxb`. **No es el reporte de ISIS**: ese sólo tiene lo cargado en ISIS al facturar, por la
+  empresa del ISIS, y no está en la base (sept/26 LK: ISIS 11.068 cajas, página 26.297).
+- **v26.16 — sólo el PIPELINE** (migración `gv_isis_estadisticas_v2615_pipeline`, Luis: *"solo va a ser para los pedidos
+  web de nuestro pipeline"*): `gv_isis_estad_pedidos` filtra `fecha_pedido >= gestion_desde` (03/09) y saca
+  `GV_Web_Cancelados` y `GV_Pedidos_Anulados`. Sept/26: LK 206 → 201 códigos, 26.291 → 23.367 cajas
+  ($530.677.934 → $443.285.210); CH 96 → 95, 2.725 → 2.655 cajas. Lo pendiente en A Programar / Cuarentena
+  (8 pedidos LK) sigue contando. `anon` sigue sin EXECUTE.
+- Costo (postgres, sept/26): ventas LK 234 ms, CH 63 ms; pedidos LK 652 ms, CH 164 ms. `anon` no la ejecuta.
+- Rollback: `drop function public.gv_isis_estad_ventas(text,date,date); drop function public.gv_isis_estad_pedidos(text,date,date);`

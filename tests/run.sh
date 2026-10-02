@@ -1123,4 +1123,6 @@ echo "== est-madre-unica (v25.78: la Est. Madre es UN cuadro — est-madre.js, m
 node tests/est-madre-unica.cjs
 echo "== hotsale-rent (v25.91: Hot Sale — rent. ponderada del período, importados y nacionales por separado; hotsale.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/hotsale-rent.cjs
+echo "== isis-estadisticas (v26.14: Estadísticas ISIS — ventas y pedidos por artículo con el layout del export de ISIS; estadisticas.js) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/isis-estadisticas.cjs
 _resumen

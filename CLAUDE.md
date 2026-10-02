@@ -2718,7 +2718,7 @@ programa **forzado** en uno de los **2 días con reparto** siguientes a la aprob
 cupo. Si no encaja por zona sale igual. El botón de Equifax abre la landing
 (`https://www.equifax.com.ar/`), decidido por Luis. `sql/gv_clin_aprobado_48h_v2167.sql`.
 
-### ⚠ «Aprobado» = la liberación que levanta `cliente_nuevo`, no cualquier fila (Luis, 02/10, v26.15)
+### ⚠ «Aprobado» = la liberación que levanta `cliente_nuevo`, no cualquier fila (Luis, 02/10, v26.18)
 
 **Luis:** *"si está aprobado, ¿por qué sigue apareciendo ahí?"*. **LK 1576** (Hsu Ya Wen) se liberó en
 Cuarentena **sólo por límite de crédito** (30/09) y el pipeline lo pintó *«Aprobado — ya está en Pedidos a
@@ -2731,7 +2731,7 @@ programar»*, **sin botones**, mientras el armado lo seguía reteniendo por clie
 | pase **(a0e)** de 48 h del armador | lo mismo — antes exigía `cliente_nuevo` explícito y el ✅ del pipeline graba **NULL**: LK 1548/1549, aprobados el 01/10, salían el 14/10 |
 
 ⚠ **Al leer `GV_Cuarentena_Liberados` para decidir algo de cliente nuevo, mirar `motivos`**: una fila puede ser la
-liberación de OTRO motivo. Centinelas 282-284. `sql/gv_clin_aprobado_cliente_nuevo_v2615.sql`.
+liberación de OTRO motivo. Centinelas 282-284. `sql/gv_clin_aprobado_cliente_nuevo_v2618.sql` (marcador interno `v26.15-clin-aprob`: no cambiarlo).
 
 ### Los 3 pedidos NO se cuentan acá: ya los corta LK
 
@@ -7196,3 +7196,27 @@ puede abrir el kiosco.
   `check` de las dos tablas y a `GV_IMP_TIPOS`.
 
 `sql/gv_impresion_programa_v2611.sql`, `tests/imp-programa.cjs`, `tests/imp-agente-ps.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-02, v26.16): 📑 ESTADÍSTICAS ISIS — ventas y pedidos por artículo sin entrar a ISIS
+
+Panel supervisor → **📑 Estadísticas ISIS — ventas y pedidos** (`openEstadisticasIsis`, `estadisticas.js`): mes o
+rango, y baja los 4 .xls de los manuales **29** (ventas por artículo → costos) y **31** (pedidos por artículo →
+Estadística Madre), LK y CH, con el **layout crudo del export de ISIS** (Excel 97, Arial 10, ventas A..P con los
+blancos C/D/F, «Total General» corrido una columna, pie «Impreso por»). Así los pasos de los manuales no cambian.
+
+| reporte | fuente | ¿igual a ISIS? |
+|---|---|---|
+| Ventas | `gv_isis_estad_ventas` = facturas + NC de ISIS ya parseadas (`isis_lk` / `isis_ch`) | **Sí**: sept/26 CH 163/163 y LK 183/184, totales exactos. Única diferencia: ISIS separa 55219 / 55219ZZ y la factura impresa dice 55219 |
+| Pedidos | `gv_isis_estad_pedidos` = **sólo los pedidos web del PIPELINE de Gestión** (`lk_pedidos_match`) por fecha del pedido | **No**: ISIS sólo tiene lo cargado al facturar y no está en la base (sept/26 LK: ISIS 11.068 cajas, pipeline 23.367) |
+
+- Precio de ventas = línea × (1−dto1)(1−dto2) × factor del importe (facturas E traen el 2 % adentro) × (1 − descuento
+  del documento) × **tipo de cambio si la factura es «Son Dolar»** (Chef → LK), redondeado a 2. Una línea cargada por
+  CAJA (982E, 123L) suma por caja. Líneas con cantidad 0 (Pago-25%, DtoSuper…) afuera; un artículo que neto da 0 sale.
+- Pedidos: unidades = cajas × UxB; **sin UxB la celda queda vacía**, nunca las cajas disfrazadas de unidades (838 / 838L).
+- **Pipeline** (Luis, 02/10: *"solo va a ser para los pedidos web de nuestro pipeline"*): pedido desde
+  `PPP_Web_Config.gestion_desde` (03/09; lo de antes se cargó en ISIS por el mail), sin `GV_Web_Cancelados` ni
+  `GV_Pedidos_Anulados`, sin clientes de prueba. Lo que espera en A Programar o Cuarentena **cuenta** (el cliente lo
+  pidió). Sept/26: LK 26.291 → 23.367 cajas (14 pedidos del 01-02/09 + 4 anulados), CH 2.725 → 2.655.
+- ⚠ **Una RPC vacía o con error NO baja nada** (sin sesión el guard devuelve 0 filas: un Excel vacío pegado en Costos
+  diría que el mes no vendió). Lo dice en la tabla.
+- `sql/gv_isis_estadisticas_v2616.sql`, `tests/isis-estadisticas.cjs` (layout celda por celda + pantalla + descarga).
