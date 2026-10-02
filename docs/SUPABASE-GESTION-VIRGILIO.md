@@ -31193,3 +31193,22 @@ de GV `gv_imp_config` (anon/auth; la clave sólo a supervisor), y sólo `authent
   `programa` → clave mala `CLAVE_INVALIDA`. Como `anon`: tomar con clave mala `CLAVE_INVALIDA`, encolar
   `permission denied`. Después: 0 PCs, 0 reglas, 0 trabajos, 1 clave.
 - Rollback: los `drop` de la cabecera de `sql/gv_impresion_programa_v2611.sql`.
+
+## §3.v2613 — Reportes de gerencia: cobrado del último día completo + alerta del outbox sin las fallas viejas (02/10/2026)
+
+**Luis:** *"se sigue mandando a las 8 con lo que haya y se avisa de lo cobrado el último plazo completo"* · D2:
+*"dale, arreglá"*.
+
+1. **`gv_rep_gerencia_conc_cargas`** (nueva, LK la lee por el FDW): una fila por subida de la conciliación
+   (`"GV_Conc_Cargas"`: banco, empresa, cuándo; 120 días). Mismo patrón que la v26.11: función SECURITY DEFINER +
+   vista `security_invoker`, sólo `lk_ppp_reader`. `gv_rep_gerencia_conc_al` suma `ultima_carga` al final, por una
+   función nueva (`gv_rep_gerencia_conc_estado_fn`; la de la v26.11 queda de rollback).
+   - Con eso LK sabe hasta qué día está **completo** lo cobrado: las cuatro cuentas tienen una subida posterior a
+     ese día (el extracto de ayer se sube hoy). El reporte informa lo que se completó **desde el reporte anterior**,
+     así que un día que a las 08:00 nadie subió va en el reporte siguiente: no se pierde ni se repite.
+   - Medido: las subidas caen entre las 06:52 y las 09:49. El 02/10 las cuatro fueron después de las 08:00.
+2. **`notificar_outbox_salud()`** (cron 12, 10:00 ART) cuenta sólo las fallas de las **últimas 48 h**. Contaba las 52
+   fallas viejas (01/08 al 08/09, ninguna después) y avisaba todos los días. Los 52 mensajes no se tocaron.
+
+`sql/gv_rep_gerencia_conc_cargas_v2613.sql`, `sql/notificar_outbox_salud_v2613.sql` (rollback en la cola de cada uno)
+· LK: `pagina-LK-copia/sql/reporte_gerencia_v2.sql`.
