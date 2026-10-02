@@ -4146,6 +4146,16 @@ lo que genera pedido», sólo la hoja del pedido. Las dos puertas usan `_pedImpD
 `_pedImpDamianDoc`; los discontinuos se leen una sola vez (`_pedImpDamianDisc`). **Se retira el reporte de una
 tabla** (`_pedImpRepHtml`, Cód · Stk · E.M. · Meses…): no volver a ponerlo.
 
+⚠⚠ **v26.31 (Luis, 02/10): con VARIOS proveedores tildados, el PDF va POR HOJA, no por proveedor** (*"agrupar en
+con pedido (todos los proveedores discriminando), sin pedido (…), discontinuo (…)"*). Salen **3 hojas**: Pedido ·
+Sin pedir · Discontinuos, cada una **una sola tabla** con todos los proveedores y un **renglón-rótulo por proveedor**
+(`tr.prov`, con sus meses, FOB y m³ en las mismas columnas; el total general va arriba). Con UN proveedor, igual que
+antes (el nombre en el título). Lo arma `_pedImpDamianPartes(provs, opt)` → `{ped, sin, disc}`.
+**Y «optimización horizontal absoluta»**: 1 px de aire por lado (eran 3), separadores de 2 px (eran 5), Descripción
+104 px partida en renglones que entran en el alto de la foto, «Por qué» partido, el aviso del MOQ en 2 renglones,
+totales en 14 y rótulo **«Mca»**. Medido con 3 proveedores: la tabla del pedido pasó de **580 a 501 px**.
+`tests/pedimp-reporte-pdf.cjs`.
+
 ## ⚠ REGLA (2026-10-01, v25.94): ✏️ EDITAR PI — quién corrige, qué día y a qué hora
 
 En 🚢 En curso, el **✏️ Editar PI** de cada pedido (reemplaza al viejo «✏️ PI», que sólo renombraba) abre

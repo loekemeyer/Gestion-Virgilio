@@ -1773,36 +1773,54 @@ function _pedImpDamianData(prov) {
   return { arr: arr, tot: tot, meses: meses, mesesGral: Number(data.meses) || 10 };
 }
 /* v24.55 — en el PDF para Damián, al costado del renglón que la regla del 80 % del MOQ ESTIRÓ:
-   «↑ 80% MOQ · N m» (los meses de cobertura que quedan). Lo que no se pide va a la hoja «Sin pedir». */
+   «↑ 80% MOQ» y abajo «N m» (los meses de cobertura que quedan). Lo que no se pide va a la hoja «Sin pedir». */
 function _pedImpMoqPdf(it) {
   const ov = (_stkPop && _stkPop.mcOverride) ? _stkPop.mcOverride[it.key || it.cod] : undefined;
   if (ov != null) return "";
   const m = _pedImpMoqCalc(it); if (m.estado !== "estira") return "";
-  return '<span class="moq">↑ ' + Math.round(m.pct * 100) + '% MOQ · ' + (Math.round(m.mesesNec * 10) / 10).toLocaleString("es-AR") + ' m</span>';
+  // v26.31 (Luis: "optimización horizontal absoluta") — en 2 renglones: la columna queda la mitad de ancha.
+  return '<span class="moq">↑ ' + Math.round(m.pct * 100) + '% MOQ<br>' + (Math.round(m.mesesNec * 10) / 10).toLocaleString("es-AR") + ' m</span>';
 }
 /* v25.13 (Thomas) — las HOJAS del PDF para Damián de UN proveedor (pedido · sin pedir · discontinuos).
-   Las usan 📄 PDF para Damián (un proveedor) y 🖨 IMPRIMIR PDF de arriba (los proveedores tildados,
-   una tanda de hojas atrás de otra). opt.soloPed → sólo la hoja del pedido. opt.discAll → los
-   discontinuos ya leídos para todos (_pedImpDamianDisc; null = no se pudieron leer). Devuelve null
-   si el proveedor no tiene ningún ítem, "" si con opt.soloPed no pide nada. */
+   La usa 📄 PDF para Damián (un proveedor) y 🖨 IMPRIMIR PDF con un solo proveedor tildado.
+   opt.soloPed → sólo la hoja del pedido. Devuelve null si el proveedor no tiene ningún ítem,
+   "" si con opt.soloPed no pide nada. Las hojas las arma _pedImpDamianPartes. */
 async function _pedImpDamianHojas(prov, opt) {
+  const p = await _pedImpDamianPartes([prov], opt);
+  return p == null ? null : p.ped + p.sin + p.disc;
+}
+/* v26.31 (Luis, 02/10): «cuando se imprime el PDF y se eligen múltiples proveedores debería agrupar en
+   con pedido (todos los proveedores discriminando), sin pedido (todos los proveedores discriminando),
+   discontinuo (todos los proveedores discriminando)». Devuelve las TRES hojas por separado
+   ({ ped, sin, disc }, "" la que no tiene nada), cada una con TODOS los proveedores pedidos:
+   - con UN proveedor, igual que siempre: el nombre va en el título («Pedido Fujian 02/oct»);
+   - con VARIOS, una sola tabla por hoja («Pedido 02/oct», con el total general arriba) y cada
+     proveedor en su renglón-rótulo (tr.prov) con SUS totales en las mismas columnas. Una sola
+     tabla = las columnas alineadas entre proveedores y el ancho lo da el dato más ancho de todos.
+   opt.soloPed → sólo la hoja del pedido. opt.discAll → los discontinuos ya leídos
+   (_pedImpDamianDisc; null = no se pudieron leer). null si ningún proveedor tiene ítems. */
+async function _pedImpDamianPartes(provs, opt) {
   opt = opt || {};
-  const d = _pedImpDamianData(prov), arr = d.arr, tot = d.tot;
   const data = (_stkPop && _stkPop.data) || { items: [] };
-  // v24.55 (Thomas): 3 hojas — 1) pedido · 2) lo que NO se pide, por meses de stock · 3) discontinuos.
-  const sinPedir = (data.items || []).filter(function (it) { return (it.prov || "(sin proveedor)") === prov && !(_pedImpMcOf(it) > 0); }).sort(_pedImpPrioCmp);
-  if (!arr.length && !sinPedir.length) return null;
-  if (opt.soloPed && !arr.length) return "";
+  const G = provs.map(function (prov) {
+    const d = _pedImpDamianData(prov);
+    // v24.55 (Thomas): 3 hojas — 1) pedido · 2) lo que NO se pide, por meses de stock · 3) discontinuos.
+    const sinPedir = (data.items || []).filter(function (it) { return (it.prov || "(sin proveedor)") === prov && !(_pedImpMcOf(it) > 0); }).sort(_pedImpPrioCmp);
+    return { prov: prov, arr: d.arr, tot: d.tot, sinPedir: sinPedir, mesesTxt: d.meses.length ? d.meses.join(" / ") : String(d.mesesGral) };
+  }).filter(function (g) { return g.arr.length || g.sinPedir.length; });
+  if (!G.length) return null;
+  const multi = G.length > 1;
   const fmt = function (n, dec) { return Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 }); };
-  const mesesTxt = d.meses.length ? d.meses.join(" / ") : String(d.mesesGral);
   // v24.55 (Thomas: "optimizá las columnas al máximo") — cuadro sinóptico: ancho según el dato,
   // rótulos de 2 líneas con la unidad UNA vez arriba, todo centrado, sin relleno ni color.
   const ddmm = function (f) { return _pedImpDdmm(f); };
   // el título lleva la fecha de HOY como dd/mmm (29/sep), hora de Buenos Aires.
   const hoyTxt = (function () { try { const s = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });   // AAAA-MM-DD
     return s.slice(8, 10) + "/" + ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"][Number(s.slice(5, 7)) - 1]; } catch (_e) { return ""; } })();
-  const titulo = function (t) { return t + ' ' + escapeHtml(prov) + ' ' + hoyTxt; };
-  const desc = function (it) { return escapeHtml(String(artNombre(it.cod, it.desc) || "").replace(/⌀/g, "Ø")).replace(/Ø /g, "Ø "); };   // el ⌀ no está en la fuente del PDF
+  // con varios proveedores el nombre NO va en el título: va en el renglón-rótulo de cada uno.
+  const titulo = function (t, gs) { return t + (multi ? '' : ' ' + escapeHtml(gs[0].prov)) + ' ' + hoyTxt; };
+  const banda = function (g, n, resto) { return '<tr class="prov"><td colspan="' + n + '">' + escapeHtml(g.prov) + '</td>' + (resto || '') + '</tr>'; };
+  const desc = function (it) { return escapeHtml(String(artNombre(it.cod, it.desc) || "").replace(/⌀/g, "Ø")).replace(/Ø /g, "Ø "); };   // el ⌀ no está en la fuente del PDF
   const foto = function (it) { return it.esParte ? '<span class="sf">insumo</span>' : _pedImpFotoHtml(codCanon(it.cod), _pedImpEmpFoto(it)); };   // v24.44: los insumos van sin foto
   // v25.13 (Thomas) — debajo del código, «INAL» si el artículo tiene certificado (GV_Articulo_INAL).
   const inalTag = function (x) { return x && x.inal ? '<small class="inal" title="' + escapeHtml("Certificado INAL " + (x.cert || "") + (x.vence ? " · vence " + x.vence : "")) + '">INAL</small>' : ''; };
@@ -1847,62 +1865,76 @@ async function _pedImpDamianHojas(prov, opt) {
         return '<td>' + (cam > 0 ? fmt(cam) + (una ? '' : '<small>' + (f || 's/f') + '</small>') : '—') + '</td>'; } };
   };
   const maxTd = function (it) { return '<td>' + fmt(it.objetivoUni) + '<small>' + fmt(it.proyUni) + '/mes</small></td>'; };
+  const todos = function (gs, k) { return [].concat.apply([], gs.map(function (g) { return g[k]; })); };
+  const out = { ped: "", sin: "", disc: "" };
 
   // ── Hoja 1: el pedido ──
-  let hoja1 = "";
-  if (arr.length) {
-    const cm = camino(arr);
-    const hayMoq = arr.some(function (it) { return !!_pedImpMoqPdf(it); });   // el aviso del 80 % del MOQ, A LA DERECHA
-    const filas = agrupar(arr).map(function (x) {
-      const it = x.it, u = _pedImpUniOf(it), usd = _pedImpUsdOf(it), m3 = _pedImpM3Of(it);
-      return trG(x.g1) + '<td><b>' + codTxt(it) + '</b></td>' + marcaTd(it) + '<td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
-        (cm.hay ? cm.td(it) : '') + maxTd(it) +
-        '<td><b>' + fmt(u) + '</b></td><td class="sp"></td>' +   // el pedido SÓLO en unidades (sin MC ni inner)
-        '<td>' + (usd > 0 ? fmt(usd) : '—') + '<small>' + (it.fobUni > 0 ? fmt(it.fobUni, 2) + '/u' : 's/FOB') + '</small></td>' +
-        '<td>' + (m3 > 0 ? fmt(m3, 1) : '—') + '</td>' + (hayMoq ? '<td class="nota">' + _pedImpMoqPdf(it) + '</td>' : '') + '</tr>';
+  const GP = G.filter(function (g) { return g.arr.length; });
+  if (GP.length) {
+    const lista = todos(GP, "arr");
+    const cm = camino(lista), nL = cm.hay ? 7 : 6;
+    const hayMoq = lista.some(function (it) { return !!_pedImpMoqPdf(it); });   // el aviso del 80 % del MOQ, A LA DERECHA
+    const nota = hayMoq ? '<td class="nota"></td>' : '';
+    const T = GP.reduce(function (s, g) { s.usd += g.tot.usd; s.m3 += g.tot.m3; return s; }, { usd: 0, m3: 0 });
+    // los meses del máximo arriba de Máx: con varios proveedores, una vez si todos piden a los mismos meses.
+    const mesesH = GP.every(function (g) { return g.mesesTxt === GP[0].mesesTxt; }) ? GP[0].mesesTxt + ' m' : '';
+    const filas = GP.map(function (g) {
+      return (multi ? banda(g, nL, '<td class="tot">' + g.mesesTxt + ' m</td><td></td><td class="sp"></td><td class="tot">' + fmt(g.tot.usd) + '</td><td class="tot">' + fmt(g.tot.m3, 1) + '</td>' + nota) : '') +
+        agrupar(g.arr).map(function (x) {
+          const it = x.it, u = _pedImpUniOf(it), usd = _pedImpUsdOf(it), m3 = _pedImpM3Of(it);
+          return trG(x.g1) + '<td><b>' + codTxt(it) + '</b></td>' + marcaTd(it) + '<td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
+            (cm.hay ? cm.td(it) : '') + maxTd(it) +
+            '<td><b>' + fmt(u) + '</b></td><td class="sp"></td>' +   // el pedido SÓLO en unidades (sin MC ni inner)
+            '<td>' + (usd > 0 ? fmt(usd) : '—') + '<small>' + (it.fobUni > 0 ? fmt(it.fobUni, 2) + '/u' : 's/FOB') + '</small></td>' +
+            '<td>' + (m3 > 0 ? fmt(m3, 1) : '—') + '</td>' + (hayMoq ? '<td class="nota">' + _pedImpMoqPdf(it) + '</td>' : '') + '</tr>';
+        }).join("");
     }).join("");
     // los totales en su PROPIA fila, arriba del rótulo (meses del máximo, FOB, m³ — sin total de unidades); a la izquierda, el título.
-    const head = '<tr><th colspan="' + (cm.hay ? 7 : 6) + '" class="tit">' + titulo("Pedido") + '</th><th class="tot">' + mesesTxt + ' m</th><th rowspan="2">Pedido<small>u</small></th><th class="sp" rowspan="2"></th><th class="tot">' + fmt(tot.usd) + '</th><th class="tot">' + fmt(tot.m3, 1) + '</th>' + (hayMoq ? '<th class="nota"></th>' : '') + '</tr>' +
-      '<tr><th>Cód</th><th>Marca</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u · m</small></th>' + (cm.hay ? cm.th : '') + '<th>Máx<small>u</small></th><th>FOB<small>u$s</small></th><th>m³</th>' + (hayMoq ? '<th class="nota"></th>' : '') + '</tr>';
-    hoja1 = '<div class="hoja"><table><thead>' + head + '</thead><tbody>' + filas + '</tbody></table></div>';
+    const head = '<tr><th colspan="' + nL + '" class="tit">' + titulo("Pedido", GP) + '</th><th class="tot">' + mesesH + '</th><th rowspan="2">Pedido<small>u</small></th><th class="sp" rowspan="2"></th><th class="tot">' + fmt(T.usd) + '</th><th class="tot">' + fmt(T.m3, 1) + '</th>' + (hayMoq ? '<th class="nota"></th>' : '') + '</tr>' +
+      '<tr><th>Cód</th><th>Mca</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u · m</small></th>' + (cm.hay ? cm.th : '') + '<th>Máx<small>u</small></th><th>FOB<small>u$s</small></th><th>m³</th>' + (hayMoq ? '<th class="nota"></th>' : '') + '</tr>';
+    out.ped = '<div class="hoja"><table><thead>' + head + '</thead><tbody>' + filas + '</tbody></table></div>';
   }
 
   // ── Hoja 2: lo que NO se pide, ordenado por meses de stock ──
-  let hoja2 = "";
-  if (sinPedir.length && !opt.soloPed) {
-    const cm = camino(sinPedir);
+  const GS = opt.soloPed ? [] : G.filter(function (g) { return g.sinPedir.length; });
+  if (GS.length) {
+    const cm = camino(todos(GS, "sinPedir")), nL = cm.hay ? 7 : 6;
     const motivo = function (it) {
-      if (Number(it.aPedirCajas) > 0) { const q = _pedImpMoqCalc(it); return q.estado === "sinproy" ? "sin Estadística Madre" : "&lt; " + Math.round(q.pct * 100) + "% MOQ"; }
-      return !(Number(it.proyUni) > 0) ? "sin Estadística Madre" : "alcanza";
+      if (Number(it.aPedirCajas) > 0) { const q = _pedImpMoqCalc(it); return q.estado === "sinproy" ? "sin Est. Madre" : "&lt; " + Math.round(q.pct * 100) + "% MOQ"; }
+      return !(Number(it.proyUni) > 0) ? "sin Est. Madre" : "alcanza";
     };
-    const filas = agrupar(sinPedir).map(function (x) {
-      const it = x.it;
-      return trG(x.g1) + '<td><b>' + codTxt(it) + '</b></td>' + marcaTd(it) + '<td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
-        (cm.hay ? cm.td(it) : '') + maxTd(it) + '<td>' + motivo(it) + '</td></tr>';
+    const filas = GS.map(function (g) {
+      return (multi ? banda(g, nL, '<td class="tot">' + g.mesesTxt + ' m</td><td></td>') : '') +
+        agrupar(g.sinPedir).map(function (x) {
+          const it = x.it;
+          return trG(x.g1) + '<td><b>' + codTxt(it) + '</b></td>' + marcaTd(it) + '<td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
+            (cm.hay ? cm.td(it) : '') + maxTd(it) + '<td class="pq">' + motivo(it) + '</td></tr>';
+        }).join("");
     }).join("");
-    hoja2 = '<div class="hoja"><table><thead><tr><th colspan="' + (cm.hay ? 9 : 8) + '" class="tit">' + titulo("Sin pedir") + '</th></tr>' +
-      '<tr><th>Cód</th><th>Marca</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u · m</small></th>' + (cm.hay ? cm.th : '') + '<th>Máx<small>u · ' + mesesTxt + ' m</small></th><th>Por qué</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
+    out.sin = '<div class="hoja"><table><thead><tr><th colspan="' + (nL + 2) + '" class="tit">' + titulo("Sin pedir", GS) + '</th></tr>' +
+      '<tr><th>Cód</th><th>Mca</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u · m</small></th>' + (cm.hay ? cm.th : '') + '<th>Máx<small>u' + (multi ? '' : ' · ' + GS[0].mesesTxt + ' m') + '</small></th><th>Por qué</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
   }
 
-  // ── Hoja 3: los discontinuados de ese proveedor (Importados.activo = false) ──
-  let hoja3 = "";
-  if (opt.soloPed) return hoja1;
-  const da = ("discAll" in opt) ? opt.discAll : await _pedImpDamianDisc([prov]);
-  const disc = da ? (da.porProv[prov] || []) : null, mot = da ? da.mot : {};
-  if (disc === null) hoja3 = '<div class="hoja"><div class="tit3">' + titulo("Discontinuos") + '</div><div style="text-align:center">No se pudo leer la lista de discontinuos.</div></div>';   // no leer no es «no hay»
-  else if (disc.length) {
-    disc.sort(function (a, b) { return String(a.cod_art).localeCompare(String(b.cod_art), "es", { numeric: true }); });
-    const filas = disc.map(function (r) {
-      const c = String(r.cod_art || "").trim(), em = String(r.marca || "").trim().toUpperCase() === "CH" ? "CH" : "LK";
-      const xr = _impExtraRow(c, r.marca);
-      return '<tr><td><b>' + escapeHtml(c) + inalTag(xr && xr.inal ? { inal: true, cert: xr.inal_certificado, vence: xr.inal_vence } : null) + '</b></td><td>' + escapeHtml(String(r.marca || "").trim() || "—") + '</td><td class="dsc">' + escapeHtml(String(r.descripcion || "").replace(/⌀/g, "Ø")) + '</td><td class="ft">' + _pedImpFotoHtml(c, em) + '</td><td class="sp"></td>' +
-        '<td>' + fmt(Math.max(0, Number(r.stock_total) || 0)) + '</td><td class="dsc">' + escapeHtml(mot[c.toUpperCase()] || "—") + '</td></tr>';
+  // ── Hoja 3: los discontinuados de esos proveedores (Importados.activo = false) ──
+  if (opt.soloPed) return out;
+  const da = ("discAll" in opt) ? opt.discAll : await _pedImpDamianDisc(G.map(function (g) { return g.prov; }));
+  if (da === null) { out.disc = '<div class="hoja"><div class="tit3">' + titulo("Discontinuos", G) + '</div><div style="text-align:center">No se pudo leer la lista de discontinuos.</div></div>'; return out; }   // no leer no es «no hay»
+  const GD = G.map(function (g) { return { prov: g.prov, disc: (da.porProv[g.prov] || []).slice() }; }).filter(function (g) { return g.disc.length; });
+  if (GD.length) {
+    const mot = da.mot || {};
+    const filas = GD.map(function (g) {
+      g.disc.sort(function (a, b) { return String(a.cod_art).localeCompare(String(b.cod_art), "es", { numeric: true }); });
+      return (multi ? banda(g, 7) : '') + g.disc.map(function (r) {
+        const c = String(r.cod_art || "").trim(), em = String(r.marca || "").trim().toUpperCase() === "CH" ? "CH" : "LK";
+        const xr = _impExtraRow(c, r.marca);
+        return '<tr><td><b>' + escapeHtml(c) + inalTag(xr && xr.inal ? { inal: true, cert: xr.inal_certificado, vence: xr.inal_vence } : null) + '</b></td><td>' + escapeHtml(String(r.marca || "").trim() || "—") + '</td><td class="dsc">' + escapeHtml(String(r.descripcion || "").replace(/⌀/g, "Ø")) + '</td><td class="ft">' + _pedImpFotoHtml(c, em) + '</td><td class="sp"></td>' +
+          '<td>' + fmt(Math.max(0, Number(r.stock_total) || 0)) + '</td><td class="dsc">' + escapeHtml(mot[c.toUpperCase()] || "—") + '</td></tr>';
+      }).join("");
     }).join("");
-    hoja3 = '<div class="hoja"><table><thead><tr><th colspan="7" class="tit">' + titulo("Discontinuos") + '</th></tr>' +
-      '<tr><th>Cód</th><th>Marca</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u</small></th><th>Motivo</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
+    out.disc = '<div class="hoja"><table><thead><tr><th colspan="7" class="tit">' + titulo("Discontinuos", GD) + '</th></tr>' +
+      '<tr><th>Cód</th><th>Mca</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u</small></th><th>Motivo</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
   }
-
-  return hoja1 + hoja2 + hoja3;
+  return out;
 }
 /* v25.13 — los discontinuados (Importados.activo = false) de los proveedores pedidos, en UNA lectura,
    agrupados por proveedor, con su motivo. null = no se pudieron leer (no leer no es «no hay»). */
@@ -1923,14 +1955,18 @@ async function _pedImpDamianDisc(provs) {
 /* v25.13 — el documento imprimible con las hojas (de uno o de varios proveedores). */
 function _pedImpDamianDoc(titulo, hojas) {
   // v25.3 (Thomas): la hoja va VERTICAL (A4 portrait); la tabla entra en los 194 mm útiles.
+  // v26.31 (Luis: "lo más pegadas unas a las otras posibles, optimización horizontal absoluta"):
+  // 1 px de aire a cada lado (eran 3), separadores de 2 px (eran 5), Descripción y «Por qué» parten en
+  // renglones (entran en el alto de la foto), y los totales en 14 (el título sigue en 16).
   const css = '@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;margin:0;font-size:14px}' +
     '.hoja+.hoja{page-break-before:always;break-before:page}' +
-    'th.sp,td.sp{width:5px;min-width:5px;padding:0;border-top:0;border-bottom:0}' +   // v24.55 (Thomas): columna vacía finita que separa bloques
-    'table{border-collapse:collapse;margin:0 auto}th,td{border:1px solid #444;padding:1px 3px;vertical-align:middle;text-align:center;white-space:nowrap;line-height:1.1}th{font-size:14px}' +
-    'th.tit,th.tot{font-size:16px;font-weight:800}.tit3{font-size:16px;font-weight:800;text-align:center}.nota{border:0;text-align:left;padding-left:4px}.moq{font-size:10px;font-weight:800}' +
-    'th small,td small{display:block;font-weight:400;color:#555;font-size:10px}.dsc{white-space:normal;max-width:140px}' +
+    'th.sp,td.sp{width:2px;min-width:2px;padding:0;border-top:0;border-bottom:0}' +   // v24.55 (Thomas): columna vacía finita que separa bloques
+    'table{border-collapse:collapse;margin:0 auto}th,td{border:1px solid #444;padding:1px;vertical-align:middle;text-align:center;white-space:nowrap;line-height:1.1}th{font-size:14px}' +
+    'th.tit{font-size:16px;font-weight:800;white-space:normal}.tot{font-weight:800}.tit3{font-size:16px;font-weight:800;text-align:center}.nota{border:0;text-align:left;padding-left:2px}.moq{font-size:10px;font-weight:800;display:block;line-height:1.05}' +
+    'th small,td small{display:block;font-weight:400;color:#555;font-size:10px}.dsc{white-space:normal;max-width:104px;line-height:1}td.pq{white-space:normal;max-width:52px;font-size:12px}' +
     '.ft{padding:0}.ft img{width:42px;height:42px;object-fit:contain;display:block;margin:0 auto}.sf{color:#999;font-size:9px}' +
     'tr{page-break-inside:avoid}thead{display:table-header-group}' +
+    'tr.prov>td{font-size:16px;font-weight:800;white-space:normal;border-top:3px solid #111;page-break-after:avoid;break-after:avoid}tr.prov>td.tot{font-size:14px}tr.prov>td.sp{border-top:0}tr.prov>td.nota{border:0}' +   // v26.31: un renglón-rótulo por proveedor
     'tr.g1>td{border-top:2px solid #111}small.inal{color:#0f766e;font-weight:800;font-size:9px}';   // v25.13: raya gruesa = empieza otro tipo de producto
   return '<!doctype html><html><head><meta charset="utf-8"><title>' + escapeHtml(titulo) + '</title><style>' + css + '</style></head><body>' +
     hojas + '</body></html>';
@@ -1972,9 +2008,10 @@ function pedImpRepAbrir() {
 }
 /* v25.13 (Thomas, 30/09): «el de arriba de todo tiene la misma funcionalidad de hoy, que te muestre
    todos, pero con la lógica del PDF de Damián». Mismo pop-up (proveedores tildados + «Sólo lo que
-   genera pedido») y vista previa; la salida son las hojas de Damián de cada proveedor tildado, una
-   tanda atrás de otra (pedido · sin pedir · discontinuos; con «sólo lo que genera pedido», sólo la
-   hoja del pedido). Retira el reporte de una tabla de la v24.76-79 (_pedImpRepHtml). */
+   genera pedido») y vista previa; la salida son las hojas de Damián (pedido · sin pedir · discontinuos;
+   con «sólo lo que genera pedido», sólo la hoja del pedido). Retira el reporte de una tabla de la
+   v24.76-79 (_pedImpRepHtml). v26.31 (Luis): con varios proveedores, una hoja de cada tipo con todos
+   adentro (_pedImpDamianPartes), no una tanda de hojas por proveedor. */
 async function pedImpRepImprimir() {
   const provs = Array.prototype.filter.call(document.querySelectorAll("#impRepOv .imp-rep-prov"), function (c) { return c.checked; }).map(function (c) { return c.value; });
   if (!provs.length) { try { alert("Elegí al menos un proveedor."); } catch (_e) {} return; }
@@ -1983,9 +2020,12 @@ async function pedImpRepImprimir() {
   if (btn) { btn.disabled = true; btn.textContent = "Armando…"; }
   let hojas = "";
   try {
+    // v26.31 (Luis): con varios proveedores, UNA hoja de cada tipo (pedido · sin pedir · discontinuos)
+    // con todos los proveedores adentro, cada uno en su renglón-rótulo — no una tanda por proveedor.
     const opt = { soloPed: soloPed };
     if (!soloPed) opt.discAll = await _pedImpDamianDisc(provs);
-    for (let i = 0; i < provs.length; i++) { const h = await _pedImpDamianHojas(provs[i], opt); if (h) hojas += h; }
+    const pt = await _pedImpDamianPartes(provs, opt);
+    if (pt) hojas = pt.ped + pt.sin + pt.disc;
   } finally { if (btn) { btn.disabled = false; btn.textContent = txt; } }
   if (!hojas) { try { alert("No hay artículos para imprimir con esa selección."); } catch (_e) {} return; }
   const hoy = (function () { try { const t = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); return t.slice(8, 10) + "/" + t.slice(5, 7) + "/" + t.slice(2, 4); } catch (_e) { return ""; } })();

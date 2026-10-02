@@ -75,7 +75,7 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (!r.badges.some((x) => /^⚠2 2 con < 4 meses/.test(x))) fail("(B) badge ⚠ 2 con < 4 meses en Frontier: " + JSON.stringify(r.badges));
   if (r.badges.some((x) => /⚠1 /.test(x))) fail("(B) Kangli no tiene alerta: " + JSON.stringify(r.badges));
   // v24.55 (Thomas) — hoja 1: título + totales en su propia fila; columnas compactas y 2 separadores finitos.
-  const exp = ["Cód", "Marca", "Descripción", "Foto", "", "Stock", "Llegan", "Máx", "FOB", "m³"];
+  const exp = ["Cód", "Mca", "Descripción", "Foto", "", "Stock", "Llegan", "Máx", "FOB", "m³"];   // v26.31: «Mca» (rótulo abreviado)
   exp.forEach((h, i) => { if (!(r.pdfTh[i] || "").startsWith(h) || (h === "" && r.pdfTh[i] !== "")) fail("(C) columna " + (i + 1) + " del PDF tiene que ser «" + h + "»: " + r.pdfTh[i]); });
   if (!/^Pedido Frontier \d{2}\/(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)$/.test(r.top[0])) fail("(C) título «Pedido <prov> dd/mmm»: " + r.top[0]);
   if (r.top[1] !== "10 m") fail("(C) los meses del máximo van arriba de Máx: " + r.top[1]);
