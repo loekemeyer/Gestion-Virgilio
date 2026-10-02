@@ -6862,8 +6862,17 @@ negativo para usos prácticos de importación"*.
 | 522ES | GRJ33 | 1 |
 | 702E · 106E | 702 + 702E + 102E · 723 + 106E | 1 c/u (v26.03) |
 
-- Vive en **`GV_Importados_Equiv_GP2`** (agregar uno = un `insert`). Unidad por unidad; cuenta **todo** el stock GP2 del
+- Vive en **`GV_Importados_Equiv_GP2`** (agregar uno = un `insert`). Unidad por unidad; cuenta el stock GP2 del
   componente (sector + talleristas + PS, `gv_gp2_stock_componente`) y se SUMA al depósito de insumos de Virgilio.
+- ⚠ **v26.05 (Luis, 02/10): sólo la PARTE CERVANTES de GP2** (*"tiene que sumar lo que está en GP2 pero sólo en la
+  parte de Cervantes"*). Desde GP2 v1.224.0 GP2 tiene depósitos propios EN Virgilio (`virgilio_sector`, «Virgilio
+  (Distribución)», Bolsas Plásticas «en Virgilio»): eso ya está en Virgilio y no se suma. `gv_gp2_inventario.parte`
+  = cervantes / terceros / virgilio; `gv_gp2_stock_componente` saca `virgilio` (terceros sigue contando). Impacto al
+  02/10: 0. `sql/gv_gp2_stock_solo_cervantes_v2605.sql`.
+- ⚠ **Hay DOS tablas de vínculo y NO son lo mismo:** `GV_Importados_Equiv_GP2` (GV, para SUMAR stock: varios
+  componentes y factor) y `GP2.importado_virgilio_componente` (GP2, para el AVISO de recepción: un componente por
+  código). Al 02/10 difieren en códigos (599E/599ES→GRJ32, 522E→GRJ33, 590ES→PINCEL590 sólo en la de GP2; 94xP vs
+  94xE). Unificarlas queda para después (Luis, 02/10).
 - `gv_importados_ordenes` suma dos columnas AL FINAL: **`stock_gp2`** y **`stock_total_neto`** (sin el `greatest(…,0)`
   + GP2). `stock_total` / `stock_actual` / `stock_cajas` **no se tocaron** (los leen otros). El módulo de importación
   lee el neto: la cuenta de «a pedir», los meses y la pantalla muestran el negativo; la celda Stock lleva **🏭+N**.
@@ -6911,7 +6920,7 @@ el mismo molde (el mismo bloque está en el `CLAUDE.md` de `loekemeyer/Gestion-P
 |---|---|
 | frontera | una tabla en el schema **`GP2`** (GP2 nunca lee `public`). GV escribe ahí con una `public.gv_*` SECURITY DEFINER: `GP2.ingreso_virgilio` (GV → GP2), `GP2.aceptado_virgilio`, y los espejos de solo lectura `GP2.virgilio_insumo_stock` / `_ubicacion` / `virgilio_lugar` |
 | códigos | GV habla en código de ARTÍCULO (323ES), GP2 en COMPONENTE (GRJ31). El vínculo vive en **`GP2.importado_virgilio_componente`** y **nunca se adivina** |
-| confirmar | el que recibe dice **Sí / No** donde trabaja, en la tarjeta del componente |
+| confirmar | el que recibe dice **Sí / No** donde trabaja, en la tarjeta del componente. ⚠ **Hoy avisa sólo lo que RECIBE CERVANTES** (Luis, 02/10: *"lo que recibe Cervantes avisa"*): lo que GP2 manda a Virgilio (`enviar_a_virgilio`, tablet y botón «→ Virgilio») no pide Sí/No en GV |
 | Sí | el MISMO camino que la carga manual (en GP2: `crear_recepcion_insumo` + control en kg pendiente) |
 | No | cada lado toca SÓLO su fila; la reacción la hace un trigger del otro lado y se ve **donde se cargó** |
 
