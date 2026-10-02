@@ -31151,3 +31151,21 @@ despachados, m³ pendientes, unidades vendidas y $ facturado. Los reportes viven
 - LK también importó `"GV_Web_Cancelados"` (pedidos cancelados desde A Programar, para no contarlos pendientes).
 
 `sql/gv_rep_gerencia_np_v2608.sql` (rollback en la cola) · LK: `pagina-LK-copia/sql/reporte_gerencia_v2.sql`.
+
+## §3.v2611 — Reportes de gerencia: lo COBRADO por día desde la conciliación (02/10/2026)
+
+**Luis:** *"sumale lo cobrado por día (sacado el dato de la conciliación)"*. LK lo lee por el FDW como
+`virgilio.gv_rep_gerencia_cobrado` y `virgilio.gv_rep_gerencia_conc_al`.
+
+- **Cobrado = lo acreditado en el banco, IVA incluido**: filas `ingreso` / `a_depositar` de `gv_conciliacion_bancaria`
+  **arriba de la línea amarilla** de cada cuenta (`gv_conc_linea`; lo de abajo es cartera/proyección). det `D` y `3` =
+  cliente; det `1` (No identificado) = `sin_identificar`. Fuera: TB, Vta Cheq/VTACH, INV, DEV, CHRECH, TFRECH, G y un
+  No identificado que nombra a Loekemeyer o a Chef. Los clientes internos los saca LK (`ventas_clientes_internos`).
+- `lk_ppp_reader` **no** lee las tablas `GV_Conc_*` (RLS sólo supervisores, son todos los movimientos de banco) y no se le
+  abren: sale por `gv_rep_gerencia_cobrado_fn()` (SECURITY DEFINER, agregado por día · empresa · banco · clase · cliente)
+  con una vista `security_invoker` encima. EXECUTE / SELECT sólo para `lk_ppp_reader`.
+- `gv_rep_gerencia_conc_al` dice hasta qué día está conciliada cada cuenta: el reporte avisa la que no llega al fin del
+  período (al 02/10: Santander LK, al 01/09).
+- Medido: sep LK $ 413,4 M · Chef $ 109,9 M ($ 21,6 M son Loekemeyer Hnos → el reporte dice Chef $ 88,3 M).
+
+`sql/gv_rep_gerencia_cobrado_v2611.sql` (rollback en la cola) · LK: `pagina-LK-copia/sql/reporte_gerencia_v2.sql`.
