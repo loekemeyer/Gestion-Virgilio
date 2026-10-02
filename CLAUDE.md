@@ -1154,7 +1154,7 @@ con L. **Nunca** recodificar 7xx→5xx ni "pasar a LK" un pedido de Chef. Inform
 como Loeke (con una L al final) y después va a ISIS de CH, no de LK"*** — un pedido de la página LK con sucursal de entrega en
 Tierra del Fuego sigue siendo NP **LK** (se pickea de la góndola Loeke), pero cada artículo lleva **L** (505L) y el Excel ISIS va
 al de **Chef** con el código de cliente de Chef del mismo CUIT (vista `v_pedidos_web` de LK: `isis_empresa`, `cod_isis`;
-`_facXlsArmar`). Los 10 clientes LK de TdF ya cruzan por CUIT. **Excepción: La Anónima (771) se vende por LK** (`gv_isis_override` en LK, por CUIT). **Cencosud (Chef 2444) es el caso inverso: NP de Chef con artículos de Loeke sin L** → entra al checklist de ajustes ISIS (`gv_fac_ajustes_isis` v2, v13.79). Ser cliente de las dos empresas, solo, no es problema; **el cod
+`_facXlsArmar`). Los 10 clientes LK de TdF ya cruzan por CUIT. **Excepción: La Anónima (771) se vende por LK** (`gv_isis_override` en LK, por CUIT). ~~**Cencosud (Chef 2444) es el caso inverso: NP de Chef con artículos de Loeke sin L**~~ → **RETIRADO**: Cencosud lleva **L** (v21.09, y Tomás Gonzalez 02/10/2026, ver «LA L ES DE CENCOSUD Y DE TIERRA DEL FUEGO»); igual entra al checklist de ajustes ISIS (`gv_fac_ajustes_isis` v2, v13.79), que lo detecta por la L. Ser cliente de las dos empresas, solo, no es problema; **el cod
 cliente no significa nada, sólo el CUIT vale** (v13.76). La regla v13.75/76 ("cliente con FC en LK → no se programa",
 `cliente_fc_lk`) fue un malentendido y está **apagada** (`doble_lk_dias = 0`); **también la de v13.72 ("mismo cliente por CUIT, mismo día en ISIS LK", `en_produccion_lk`; `doble_lk_mismo_dia = 0`, v13.82)**: *"ya expliqué que eso no corresponde"*. §3.az, §3.ba y §3.bb.
 **⚠ Y la CUARENTENA de esos pedidos se evalúa con el cliente de CHEF (v17.75, dueño 14/09: *"se marcan y se evalúan
@@ -1167,7 +1167,7 @@ por esta regla y NO hay que darlo de alta** (dueño, 14/09: *"Cencosud sube pedi
 subió pedidos por CH. No lo voy a dar de alta."*): no carga por la página, sus OC entran por **Krikos** y la Bandeja
 las manda directo al portal de **Chef** (`precios_super.cadena`: `cencosud` → `empresa='chef'`, `cod_cliente_chef=2444`,
 `cod_cliente_lk` nulo). Medido: 4.452 líneas del 2444 en `sales_lines` marcadas `chef` desde 2021-05-27, ninguna en LK.
-Su caso propio —NP de Chef con artículos de Loeke **sin** L— ya lo cubre `gv_fac_ajustes_isis` (v13.79): es el caso
+~~Su caso propio —NP de Chef con artículos de Loeke **sin** L—~~ (**retirado**: desde feb/2026 ISIS Chef le factura con L —031L, 816EL— y el pedido nace con L, ver v21.09) ya lo cubre `gv_fac_ajustes_isis` (v13.79): es el caso
 **inverso** al de Tierra del Fuego. `sql/gv_cliente_isis_v1775.sql`, §3.fp.
 
 ## ⚠ REGLA (Luis, 2026-09-22, v21.09): la L es de CENCOSUD y de TIERRA DEL FUEGO — de nadie más
@@ -1202,6 +1202,17 @@ ninguno: 769 → 0, 798E → 0, 840 → 0, 865E → 0. Todo el stock está en Ch
 ⚠ **Esto NO contradice la regla de abajo: la L sigue sin sacarse nunca de un pedido.** Lo que
 cambia es **quién se la pone al armarlo**. Si un pedido ya tiene la L, viaja y rutea como
 siempre; lo que no puede es nacer con una L que no le corresponde.
+
+⚠⚠ **La CONVERSIÓN de un pedido de Cencosud en Gestión: es de CHEF y cada código lleva L al final**
+(Tomás Gonzalez, 02/10/2026: *"al hacer la conversión en Gestión-Virgilio, el pedido debe pasar a ser de
+Chef, y los códigos de los artículos se le agregan una L al final"*). Las OC de Cencosud se cargan en el
+**PDF Krikos del admin de LK** (en el de Chef están bloqueadas: matcheaba contra el catálogo de Chef y entraba
+un renglón solo, 816L); LK crea el pedido en **Chef** con `cod_art` + **L** y el feed `gv_pedidos_web_np_chef`
+la conserva (`usa_productos_chef = false`). Acá queda **NP CH**, el picking va a la góndola **LK** y el Excel
+ISIS al ISIS de **Chef con la L** — que es como ISIS Chef le factura a Cencosud desde feb/2026 (031L, 102EL,
+816EL…; en enero todavía iba sin L). Medido el 02/10: **todos** los códigos que Cencosud compró en 12 meses
+terminan en dígito o `E` antes de la L, así que `pkStripL` (`/[0-9E]L$/`) los pela a todos. Lo sostienen
+`tests/regla-L-super.cjs` acá y el bloque F de `tests/cencosud-cliente-chef.cjs` en `pagina-LK-copia`.
 
 ⚠ **Y Tierra del Fuego va por otro camino** (v13.77): ahí la L no la pone el cotizador de
 súper sino el pedido de la página de LK con sucursal de entrega en TdF. Son dos orígenes
