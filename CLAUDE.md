@@ -4164,6 +4164,15 @@ ese momento). 🚢 En curso, el detalle del PI, 📜 Historial y la columna «Ll
 `coalesce(FOB del bache, FOB del maestro)`; el PDF lo lee por `gv_importados_curso_fob()` (sólo supervisor; sin
 lectura, FOB de hoy). Los 89 baches en curso al 02/10 no tienen FOB guardado (backfill pendiente del «sí»). La fecha
 de llegada va al **mismo tamaño que las unidades** (PDF `.fl` 14 px y pantalla). `sql/gv_importados_bache_fob_v2637.sql`.
+**v26.39 (Luis: *"primero un resumen … después las cinco hojitas de lo que tengo que pedir, después las de lo que no
+estoy pidiendo y después las de discontinuos. No que esté por proveedor"*): con 2+ proveedores el PDF arranca con la
+HOJA RESUMEN** (`_pedImpResumenHoja`: Proveedor · En curso u$s (la de 🚢 En curso) · A pedir FOB u$s · % nacionalización
+no recuperable del pedido · Urgencia, con su total) **y sigue UNA hoja por proveedor en cada tanda**: todos los pedidos,
+después todos los sin pedir, después todos los discontinuos, en el orden de urgencia del resumen. Se retira la tabla
+única con renglones-rótulo de la v26.31 (`_pedImpDamianPartes` con varios queda sin llamador). Con un proveedor, sin resumen.
+**Urgencia** (`_pedImpUrgencia`) = meses que le faltan a la línea para tener **8** meses de stock (stock + en camino),
+ponderado por consumo u$s/mes: ≥ 3 URGENTE · ≥ 2 ALTA · ≥ 1 MEDIA · > 0 BAJA · 0 = ningún artículo < 8 m. Al 02/10:
+Zhixin 2,8 · Kangli 2,8 · Hugo Wong 1,3 · Fujian 1,2 · Becky 1,1 · Ownland 0,9.
 `tests/pedimp-reporte-pdf.cjs`.
 
 ## ⚠ REGLA (2026-10-01, v25.94): ✏️ EDITAR PI — quién corrige, qué día y a qué hora

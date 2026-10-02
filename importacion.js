@@ -1368,6 +1368,40 @@ function _pedImpMesesStock(it) {
   const proy = Number(it && it.proyUni) || 0; if (!(proy > 0)) return null;
   return ((Number(it.stockUni) || 0) + Math.max(0, Number(it.enCurso) || 0)) / proy;
 }
+/* v26.39 — el u$s de lo que viene EN CAMINO de un artículo: con el FOB GUARDADO de cada pedido
+   (gv_importados_curso_fob, v26.37, por artículo del maestro = it.det[].id); lo que esa lectura no
+   cubre —o si no se pudo leer (fobCur null)— va con el FOB de hoy. */
+function _pedImpUsdCamino(it, fobCur) {
+  const cam = Math.max(0, Number(it && it.enCurso) || 0); if (!(cam > 0)) return 0;
+  const fobHoy = it.fobUni > 0 ? it.fobUni : 0;
+  if (fobCur && (it.det || []).length) {
+    let u = 0, cub = 0;
+    it.det.forEach(function (d) { const x = fobCur[String(d.id)]; if (x) { u += Number(x.usd) || 0; cub += Number(x.pend) || 0; } });
+    if (cub > 0) return u + Math.max(0, cam - cub) * fobHoy;
+  }
+  return cam * fobHoy;
+}
+/* v26.39 (Luis, 02/10: "definí cuáles son los pedidos más urgentes … si no hay ningún ítem por debajo de
+   los 8 meses no es tan urgente como si todos están alrededor de 3 o 4 meses") — la URGENCIA de un
+   proveedor = cuántos meses le faltan, en promedio, a su línea para tener 8 meses de stock:
+     Σ consumo u$s/mes × máx(0; 8 − meses de stock) ÷ Σ consumo u$s/mes
+   con los meses de _pedImpMesesStock (stock + en camino ÷ Est. Madre). Ponderado por PLATA: un artículo
+   que casi no se vende no define la urgencia del proveedor. Ningún artículo debajo de 8 meses → 0;
+   todos en 3-4 meses → 4 a 5. Stock negativo cuenta como 0 meses. Sin FOB cargado, promedio simple. */
+const _PEDIMP_URG_MESES = 8;
+function _pedImpUrgencia(items) {
+  const m8 = _PEDIMP_URG_MESES;
+  let n = 0, c4 = 0, c8 = 0, q = 0, sw = 0, sd = 0, sdS = 0;
+  (items || []).forEach(function (it) {
+    const m0 = _pedImpMesesStock(it); if (m0 == null) return;
+    const m = Math.max(0, m0), w = (Number(it.proyUni) || 0) * (it.fobUni > 0 ? it.fobUni : 0), d = Math.max(0, m8 - m);
+    n++; if (m < _PEDIMP_MESES_ALERTA) c4++; if (m < m8) c8++; if (_pedImpQuiebre(it)) q++;
+    sw += w; sd += w * d; sdS += d;
+  });
+  const idx = sw > 0 ? sd / sw : (n ? sdS / n : 0);
+  const nivel = !n ? 5 : idx >= 3 ? 1 : idx >= 2 ? 2 : idx >= 1 ? 3 : idx > 0 ? 4 : 5;
+  return { idx: idx, nivel: nivel, etiqueta: ["", "URGENTE", "ALTA", "MEDIA", "BAJA", n ? "SIN URGENCIA" : "SIN Est. Madre"][nivel], n: n, c4: c4, c8: c8, quiebran: q };
+}
 function _pedImpDdmm(f) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(f || "")); return m ? m[3] + "/" + m[2] : ""; }
 function _pedImpEnCaminoHtml(it, cls) {
   const u = Math.max(0, Number(it.enCurso) || 0);
@@ -1383,11 +1417,20 @@ function _pedImpViajeCargar() {
   if (_pedImpViaje.st === "cargando" || _pedImpViaje.st === "ok") return;
   _pedImpViaje.st = "cargando";
   _pedImpRpc("gv_importados_pedidos_curso", {}).then(function (rows) {
-    const u = {}, n = {};
-    (rows || []).forEach(function (r) { const p = String(r.proveedor || "").trim() || "(sin proveedor)"; const v = Number(r.usd) || 0; if (v > 0) { u[p] = (u[p] || 0) + v; n[p] = (n[p] || 0) + 1; } });
-    _pedImpViaje = { st: "ok", porProv: u, nPorProv: n };
+    _pedImpViaje = _pedImpViajeAgrupar(rows);
     if (_stkPop && _stkPop.kind === "pedImp") _pedImpRender();
   }).catch(function () { _pedImpViaje.st = "error"; });
+}
+function _pedImpViajeAgrupar(rows) {
+  const u = {}, n = {};
+  (rows || []).forEach(function (r) { const p = String(r.proveedor || "").trim() || "(sin proveedor)"; const v = Number(r.usd) || 0; if (v > 0) { u[p] = (u[p] || 0) + v; n[p] = (n[p] || 0) + 1; } });
+  return { st: "ok", porProv: u, nPorProv: n };
+}
+/* v26.39 — lo mismo, esperándolo (la hoja resumen del PDF lo necesita ya). null = no se pudo leer. */
+async function _pedImpViajeAsegurar() {
+  if (_pedImpViaje.st === "ok") return _pedImpViaje.porProv;
+  try { _pedImpViaje = _pedImpViajeAgrupar(await _pedImpRpc("gv_importados_pedidos_curso", {})); return _pedImpViaje.porProv; }
+  catch (_e) { return null; }
 }
 function _pedImpViajeUsd(prov) { return _pedImpViaje.st === "ok" ? (Number(_pedImpViaje.porProv[prov]) || 0) : 0; }
 function _pedImpPrioCmp(a, b) {
@@ -1797,6 +1840,8 @@ async function _pedImpDamianHojas(prov, opt) {
    - con VARIOS, una sola tabla por hoja («Pedido 02/oct», con el total general arriba) y cada
      proveedor en su renglón-rótulo (tr.prov) con SUS totales en las mismas columnas. Una sola
      tabla = las columnas alineadas entre proveedores y el ancho lo da el dato más ancho de todos.
+   ⚠ v26.39: 🖨 IMPRIMIR PDF ya no la llama con varios proveedores (va una por proveedor, ver
+   pedImpRepImprimir); el modo de varios queda sin llamador.
    opt.soloPed → sólo la hoja del pedido. opt.discAll → los discontinuos ya leídos
    (_pedImpDamianDisc; null = no se pudieron leer). null si ningún proveedor tiene ítems. */
 async function _pedImpDamianPartes(provs, opt) {
@@ -1862,15 +1907,7 @@ async function _pedImpDamianPartes(provs, opt) {
   // (GV_Importados_Baches.fob_uni); lo que viene se valoriza con ESE precio (gv_importados_curso_fob, por
   // artículo del maestro = it.det[].id). Lo que esa lectura no cubre —o si falla— va con el FOB de hoy.
   const fobCur = ("cursoFob" in opt) ? opt.cursoFob : await _pedImpCursoFob();
-  const usdCam = function (it) {
-    const cam = Math.max(0, Number(it.enCurso) || 0); if (!(cam > 0)) return 0;
-    const fobHoy = it.fobUni > 0 ? it.fobUni : 0;
-    if (fobCur && (it.det || []).length) {
-      let u = 0, cub = 0;
-      it.det.forEach(function (d) { const x = fobCur[String(d.id)]; if (x) { u += Number(x.usd) || 0; cub += Number(x.pend) || 0; } });
-      if (cub > 0) return u + Math.max(0, cam - cub) * fobHoy;
-    }
-    return cam * fobHoy; };
+  const usdCam = function (it) { return _pedImpUsdCamino(it, fobCur); };
   const camino = function (lista, conFob) {
     const con = lista.filter(function (it) { return (Number(it.enCurso) || 0) > 0; });
     const fs = con.map(function (it) { return ddmm(it.reingresoEst) || "s/f"; }).filter(function (x, k, a) { return a.indexOf(x) === k; });
@@ -1986,6 +2023,58 @@ async function _pedImpCursoFob() {
     return m;
   } catch (_e) { return null; }
 }
+/* v26.39 (Luis, 02/10) — la HOJA RESUMEN del paquete: por proveedor, lo que tiene en curso (u$s), lo que
+   se va a pedir (FOB u$s), el % de nacionalización de ESE pedido (no recuperable sobre FOB, la misma cuenta
+   de la banda de la pantalla) y la urgencia (_pedImpUrgencia), ordenado del más urgente al menos.
+   En curso = los u$s de 🚢 En curso (gv_importados_pedidos_curso); si no se pudo leer, la suma de lo que
+   viene en camino de sus artículos. Devuelve { html, orden } (orden = los proveedores por urgencia) o null. */
+async function _pedImpResumenHoja(provs, opt) {
+  opt = opt || {};
+  const data = (_stkPop && _stkPop.data) || { items: [] };
+  const nac = data.nac || { modo: "consolidada", valorM3: 110, tn: 0 };
+  const viaje = await _pedImpViajeAsegurar();
+  const fobCur = ("cursoFob" in opt) ? opt.cursoFob : await _pedImpCursoFob();
+  const fmt = function (n, dec) { return Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 }); };
+  const F = provs.map(function (prov) {
+    const items = (data.items || []).filter(function (it) { return (it.prov || "(sin proveedor)") === prov; });
+    if (!items.length) return null;
+    const ped = items.filter(function (it) { return _pedImpMcOf(it) > 0; });
+    const usd = ped.reduce(function (s, it) { return s + _pedImpUsdOf(it); }, 0);
+    const m3 = ped.reduce(function (s, it) { return s + _pedImpM3Of(it); }, 0);
+    const curso = viaje ? (Number(viaje[prov]) || 0) : items.reduce(function (s, it) { return s + _pedImpUsdCamino(it, fobCur); }, 0);
+    const nr = usd > 0 ? _pedImpNacionalizar(usd, m3, { modo: nac.modo, valorM3: _impProvNum(prov, "valor_m3", nac.valorM3), tn: nac.tn,
+      ntl: _esProvNtl(prov), derechos: _derechosPedido(ped, prov), fobInal: _impFobInal(ped, _pedImpUsdOf) }) : null;
+    return { prov: prov, curso: curso, usd: usd, m3: m3, nac: nr, urg: _pedImpUrgencia(items) };
+  }).filter(Boolean);
+  if (!F.length) return null;
+  F.sort(function (a, b) { return (a.urg.nivel - b.urg.nivel) || (b.urg.idx - a.urg.idx) || (b.usd - a.usd); });
+  const hoyTxt = (function () { try { const t = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
+    return t.slice(8, 10) + "/" + ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"][Number(t.slice(5, 7)) - 1]; } catch (_e) { return ""; } })();
+  const nacTd = function (r) {
+    if (!r) return '<td>—</td>';
+    if (r.sinPeso) return '<td>s/peso<small>avión</small></td>';
+    return '<td><b>' + Math.round(r.factor * 100) + ' %</b><small>u$s ' + fmt(r.noRecup) + '</small></td>';
+  };
+  const urgTd = function (u) {
+    if (!u.n) return '<td>SIN Est. Madre</td>';
+    return '<td><b>' + u.etiqueta + ' · ' + fmt(u.idx, 1) + '</b><small>' + u.c4 + ' &lt; ' + _PEDIMP_MESES_ALERTA + ' m · ' + u.c8 + ' &lt; ' + _PEDIMP_URG_MESES + ' m de ' + u.n +
+      (u.quiebran ? ' · ' + u.quiebran + ' quiebra' + (u.quiebran > 1 ? 'n' : '') : '') + '</small></td>';
+  };
+  const filas = F.map(function (f) {
+    return '<tr><td><b>' + escapeHtml(f.prov) + '</b></td><td>' + (f.curso > 0 ? fmt(f.curso) : '—') + '</td>' +
+      '<td>' + (f.usd > 0 ? '<b>' + fmt(f.usd) + '</b><small>' + fmt(f.m3, 1) + ' m³</small>' : '—') + '</td>' + nacTd(f.nac) + urgTd(f.urg) + '</tr>';
+  }).join("");
+  const T = F.reduce(function (s, f) { s.curso += f.curso; s.usd += f.usd; if (f.nac && f.nac.ok) { s.fob += f.usd; s.nr += f.nac.noRecup; } return s; }, { curso: 0, usd: 0, fob: 0, nr: 0 });
+  const cuenta = {}; F.forEach(function (f) { cuenta[f.urg.etiqueta] = (cuenta[f.urg.etiqueta] || 0) + 1; });
+  const urgTot = ["URGENTE", "ALTA", "MEDIA", "BAJA", "SIN URGENCIA", "SIN Est. Madre"].filter(function (k) { return cuenta[k]; }).map(function (k) { return cuenta[k] + ' ' + k; }).join(' · ');
+  const tot = '<tr class="tt"><td>Total</td><td>' + (T.curso > 0 ? fmt(T.curso) : '—') + '</td><td>' + (T.usd > 0 ? fmt(T.usd) : '—') + '</td>' +
+    '<td>' + (T.fob > 0 ? Math.round(T.nr / T.fob * 100) + ' %<small>u$s ' + fmt(T.nr) + '</small>' : '—') + '</td><td>' + urgTot + '</td></tr>';
+  const html = '<div class="hoja res"><table><thead><tr><th colspan="5" class="tit">Resumen ' + hoyTxt + '</th></tr>' +
+    '<tr><th>Proveedor</th><th>En curso<small>u$s</small></th><th>A pedir<small>FOB u$s</small></th><th>Nac.<small>no recup.</small></th><th>Urgencia<small>meses que faltan a ' + _PEDIMP_URG_MESES + '</small></th></tr></thead>' +
+    '<tbody>' + filas + tot + '</tbody></table>' +
+    '<div class="ley">Urgencia = meses que le faltan a la línea para tener ' + _PEDIMP_URG_MESES + ' meses de stock (stock + en camino), ponderado por consumo u$s/mes · ≥ 3 URGENTE · ≥ 2 ALTA · ≥ 1 MEDIA · &gt; 0 BAJA · 0 = ningún artículo debajo de ' + _PEDIMP_URG_MESES + ' meses</div></div>';
+  return { html: html, orden: F.map(function (f) { return f.prov; }) };
+}
 /* v25.13 — el documento imprimible con las hojas (de uno o de varios proveedores). */
 function _pedImpDamianDoc(titulo, hojas) {
   // v25.3 (Thomas): la hoja va VERTICAL (A4 portrait); la tabla entra en los 194 mm útiles.
@@ -2004,7 +2093,8 @@ function _pedImpDamianDoc(titulo, hojas) {
     '.ft{padding:0}.ft img{width:42px;height:42px;object-fit:contain;display:block;margin:0 auto}.sf{color:#999;font-size:9px}' +
     'tr{page-break-inside:avoid}thead{display:table-header-group}' +
     'tr.prov>td{font-size:16px;font-weight:800;white-space:normal;border-top:3px solid #111;page-break-after:avoid;break-after:avoid}tr.prov>td.tot{font-size:14px}tr.prov>td.sp{border-top:0}tr.prov>td.nota{border:0}' +   // v26.31: un renglón-rótulo por proveedor
-    'tr.g1>td{border-top:2px solid #111}small.inal{color:#0f766e;font-weight:800;font-size:9px}';   // v25.13: raya gruesa = empieza otro tipo de producto
+    'tr.g1>td{border-top:2px solid #111}small.inal{color:#0f766e;font-weight:800;font-size:9px}' +
+    '.res td,.res th{padding:3px 8px}.res tr.tt>td{font-weight:800;border-top:3px solid #111}.ley{font-size:11px;color:#555;text-align:center;margin-top:6px;max-width:560px;margin-left:auto;margin-right:auto}';   // v26.39: la hoja resumen   // v25.13: raya gruesa = empieza otro tipo de producto
   return '<!doctype html><html><head><meta charset="utf-8"><title>' + escapeHtml(titulo) + '</title><style>' + css + '</style></head><body>' +
     hojas + '</body></html>';
 }
@@ -2047,8 +2137,13 @@ function pedImpRepAbrir() {
    todos, pero con la lógica del PDF de Damián». Mismo pop-up (proveedores tildados + «Sólo lo que
    genera pedido») y vista previa; la salida son las hojas de Damián (pedido · sin pedir · discontinuos;
    con «sólo lo que genera pedido», sólo la hoja del pedido). Retira el reporte de una tabla de la
-   v24.76-79 (_pedImpRepHtml). v26.31 (Luis): con varios proveedores, una hoja de cada tipo con todos
-   adentro (_pedImpDamianPartes), no una tanda de hojas por proveedor. */
+   v24.76-79 (_pedImpRepHtml).
+   v26.39 (Luis, 02/10): «primero un resumen … después las cinco hojitas de lo que tengo que pedir, después
+   las cinco de lo que no estoy pidiendo y después las cinco de discontinuos. No que esté por proveedor».
+   Con 2+ proveedores: 1) la hoja RESUMEN (_pedImpResumenHoja), 2) una hoja de PEDIDO por proveedor,
+   3) una de SIN PEDIR por proveedor, 4) una de DISCONTINUOS por proveedor; cada proveedor en su propia
+   hoja (con su nombre en el título) y en el orden de urgencia del resumen. Retira la tabla única con
+   renglones-rótulo de la v26.31. Con un solo proveedor, sus hojas como siempre (sin resumen). */
 async function pedImpRepImprimir() {
   const provs = Array.prototype.filter.call(document.querySelectorAll("#impRepOv .imp-rep-prov"), function (c) { return c.checked; }).map(function (c) { return c.value; });
   if (!provs.length) { try { alert("Elegí al menos un proveedor."); } catch (_e) {} return; }
@@ -2057,12 +2152,28 @@ async function pedImpRepImprimir() {
   if (btn) { btn.disabled = true; btn.textContent = "Armando…"; }
   let hojas = "";
   try {
-    // v26.31 (Luis): con varios proveedores, UNA hoja de cada tipo (pedido · sin pedir · discontinuos)
-    // con todos los proveedores adentro, cada uno en su renglón-rótulo — no una tanda por proveedor.
-    const opt = { soloPed: soloPed };
-    if (!soloPed) opt.discAll = await _pedImpDamianDisc(provs);
-    const pt = await _pedImpDamianPartes(provs, opt);
-    if (pt) hojas = pt.ped + pt.sin + pt.disc;
+    // v26.39 (Luis): resumen → pedidos → sin pedir → discontinuos, una hoja por proveedor en cada tanda.
+    const cursoFob = await _pedImpCursoFob();
+    const discAll = soloPed ? null : await _pedImpDamianDisc(provs);
+    let orden = provs.slice(), resumen = "";
+    if (provs.length > 1) {
+      const r = await _pedImpResumenHoja(provs, { cursoFob: cursoFob, soloPed: soloPed });
+      if (r) { resumen = r.html; orden = r.orden; }
+    }
+    const ped = [], sin = [], disc = [];
+    for (let i = 0; i < orden.length; i++) {
+      const o = { soloPed: soloPed, cursoFob: cursoFob };
+      // los discontinuos se leen UNA vez; si no se pudieron leer, va UNA hoja que lo dice (no una por proveedor)
+      if (!soloPed) o.discAll = discAll || { porProv: {}, mot: {} };
+      const pt = await _pedImpDamianPartes([orden[i]], o);
+      if (!pt) continue;
+      if (pt.ped) ped.push(pt.ped);
+      if (pt.sin) sin.push(pt.sin);
+      if (pt.disc) disc.push(pt.disc);
+    }
+    if (!soloPed && discAll === null) disc.push('<div class="hoja"><div class="tit3">Discontinuos</div><div style="text-align:center">No se pudo leer la lista de discontinuos.</div></div>');
+    const paquete = ped.join("") + sin.join("") + disc.join("");
+    if (paquete) hojas = resumen + paquete;
   } finally { if (btn) { btn.disabled = false; btn.textContent = txt; } }
   if (!hojas) { try { alert("No hay artículos para imprimir con esa selección."); } catch (_e) {} return; }
   const hoy = (function () { try { const t = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }); return t.slice(8, 10) + "/" + t.slice(5, 7) + "/" + t.slice(2, 4); } catch (_e) { return ""; } })();
