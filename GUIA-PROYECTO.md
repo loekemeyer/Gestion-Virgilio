@@ -1,3 +1,9 @@
+## Nota v26.38 (2026-10-02) — Picking: escalera desde la 3.ª altura en TODAS las góndolas de 4 alturas (B a Ñ)
+
+Sólo documentación (CLAUDE.md). D16, Luis: las góndolas de la C en adelante llevan escalera desde la 3.ª altura,
+igual que B; A y P desde la 4.ª. En 60 días son 2.610 de 7.795 líneas de góndola con escalera (33 %). La usa el
+recálculo del tiempo estimado de la tanda (D13, 09/10). No cambia ninguna pantalla.
+
 ## Nota v26.36 (2026-10-02) — Picking: la regla de ESCALERA es A desde la 4.ª altura y B desde la 3.ª
 
 Sólo documentación (CLAUDE.md, bloque de métricas del picking por paso). Luis corrigió la regla de la v26.25: con la
