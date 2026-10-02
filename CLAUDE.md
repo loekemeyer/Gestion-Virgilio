@@ -7325,7 +7325,14 @@ con su propia cola (`gv_pkm_q_v1`, tope 800) y todo en try/catch: **si falla, el
   `gv_picking_interrupcion`.
 - Hallazgos que la motivaron (02/10, 30 días): el 24 a 29 % del tiempo de picking son huecos de más de 5 min sin
   confirmar nada; 5,4 % de los artículos se confirman en ráfaga; 3 % reconfirmados (la 1.ª hora se perdía).
-- Escalera: en A y P la celda múltiplo de 5 (A5, A10…), en el resto la múltiplo de 4 (B4, B8…). Parada: el módulo
-  k de A más el módulo k de B (A1–A5 + B1–B4); los otros pasillos todavía no están confirmados.
+- **Escalera (Luis, 02/10, v26.36 — reemplaza la de la v26.25):** la altura dentro del módulo es
+  `((celda − 1) mód alto) + 1`, con la 1 abajo (A y P tienen 5 alturas, el resto 4). Va con escalera **A desde la
+  4.ª altura** (A4, A5, A9, A10…) y **B desde la 3.ª** (B3, B4, B7, B8…). En A *"los múltiplos de cuatro"* no cae en
+  una misma altura (A8 es la 3.ª, A12 la 2.ª): se tomó la 4.ª y la 5.ª. P se toma como A (la dijo igual a A el 02/10).
+  El resto de las góndolas sigue sólo con la 4.ª, hasta que Luis diga otra cosa.
+  Medido en 60 días (segundos entre confirmaciones, mediana): A 23 s en las alturas 2 y 3 · 50 s en la 4.ª · 64 s en
+  la 5.ª; B 22 s en la 2.ª y en la 3.ª (73 líneas) · 47 s en la 4.ª (7). **En B la 3.ª no tarda más que la 2.ª**:
+  la regla vale igual (es de Luis); el registro por paso lo va a medir sin la caminata.
+- Parada: el módulo k de A más el módulo k de B (A1–A5 + B1–B4); los otros pasillos todavía no están confirmados.
 
 `sql/gv_picking_paso_evento_v2625.sql`, `tests/pk-metricas-paso.cjs`.

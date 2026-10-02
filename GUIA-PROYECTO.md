@@ -1,3 +1,10 @@
+## Nota v26.36 (2026-10-02) — Picking: la regla de ESCALERA es A desde la 4.ª altura y B desde la 3.ª
+
+Sólo documentación (CLAUDE.md, bloque de métricas del picking por paso). Luis corrigió la regla de la v26.25: con la
+altura `((celda − 1) mód alto) + 1` (1 = abajo; A y P de 5, el resto de 4), va con escalera **A desde la 4.ª**
+(A4, A5, A9, A10…) y **B desde la 3.ª** (B3, B4, B7, B8…); P como A; el resto, sólo la 4.ª. La usa el recálculo del
+tiempo estimado de la tanda (D13, 09/10). No cambia ninguna pantalla.
+
 ## Nota v26.35 (2026-10-02) — Mon. Admin: la tanda muestra también la HORA del ARMADO (D15)
 
 Luis, D15 «sí»: el pop-up de la tanda completa la fila **Armado** igual que la de Picking (v26.33): cada ciclo
