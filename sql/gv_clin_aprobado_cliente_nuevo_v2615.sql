@@ -86,18 +86,43 @@ begin
 end
 $patch_vistas$;
 
--- Centinela (patrón del CÓDIGO, no del comentario: el comentario no dice 'cliente_nuevo' = any):
--- insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version) values
---  ('gv_clin_pipeline_lote','funcion','''cliente_nuevo'' = any \(lb\.motivos\)',
---   'Aprobado en el pipeline = liberacion que levanta cliente_nuevo, no cualquier fila de Liberados (LK 1576: liberado por limite quedo sin botones).',
---   'Luis','v26.15'),
---  ('gv_clin_evento','funcion','''cliente_nuevo'' = any \(lb\.motivos\)',
---   'Aprobado en el pipeline = liberacion que levanta cliente_nuevo, no cualquier fila de Liberados (LK 1576).',
---   'Luis','v26.15');
+-- 4) (a0e) del armador — D3 de Luis (02/10): el pase de 48 h del cliente nuevo aprobado sólo
+--    reconocía motivos con 'cliente_nuevo' explícito, pero el ✅ y el «Enviar a programar» del
+--    pipeline graban motivos NULL (cuarLiberarConfirmar saca cliente_nuevo y, si no queda nada,
+--    manda null = libera todo). Resultado: LK 1548 y 1549, aprobados el 01/10 10:40, salieron
+--    programados para el 14/10. Probado corriendo el armador en transacción abortada con un pedido
+--    de prueba aprobado con NULL: sin el cambio F54A 14/10, con el cambio E97C 05/10 (el día que
+--    da gv_clin_dia_aprobado). Lo ya programado no se mueve (lo saca (a000)).
+do $patch_48h$
+declare v_def text; v_new text;
+begin
+  v_def := pg_get_functiondef('public.gv_ppp_web_armar_pendientes(text,date,jsonb,jsonb)'::regprocedure);
+  if position('v26.15-clin-aprob-48h' in v_def) = 0 then
+    v_new := regexp_replace(v_def,
+      'where ''cliente_nuevo'' = any\(l\.motivos\)',
+      E'-- v26.15-clin-aprob-48h (Luis, 02/10): mismo criterio que la Cuarentena y el pipeline\n'
+      || E'     where (l.motivos is null or coalesce(array_length(l.motivos, 1), 0) = 0\n'
+      || E'            or ''cliente_nuevo'' = any(l.motivos))');
+    if v_new = v_def then raise exception 'armador: el texto de (a0e) no matchea, no se aplica nada'; end if;
+    execute v_new;
+  end if;
+end
+$patch_48h$;
+
+-- Centinela (APLICADO el 02/10, ids 282, 283, 284). Patrón del CÓDIGO, no del comentario.
+insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version) values
+ ('gv_clin_pipeline_lote','funcion','''cliente_nuevo'' = any \(lb\.motivos\)',
+  'Aprobado en el pipeline = liberacion que levanta cliente_nuevo, no cualquier fila de Liberados (LK 1576: liberado por limite quedo sin botones).',
+  'Luis','v26.15'),
+ ('gv_clin_evento','funcion','''cliente_nuevo'' = any \(lb\.motivos\)',
+  'Aprobado en el pipeline = liberacion que levanta cliente_nuevo, no cualquier fila de Liberados (LK 1576).',
+  'Luis','v26.15'),
+ ('gv_ppp_web_armar_pendientes','funcion','or ''cliente_nuevo'' = any\(l\.motivos\)',
+  'Pase (a0e) 48 h: el cliente nuevo aprobado desde el pipeline (motivos NULL o vacio) tambien sale en 48 h, no solo el que trae cliente_nuevo explicito (LK 1548/1549 salian 13 dias despues).',
+  'Luis','v26.15');
 
 -- Chequeo: LK 1576 tiene que salir en 'no_referenciado' (recurrente, 2 pedidos previos), no 'aprobado'.
 -- select etapa, aprobado from public.gv_clin_pipeline_lote('[{"empresa":"lk","order_id":"1576","cod":"4172"}]'::jsonb);
 -- select * from public.gv_reglas_perdidas;   -- vacía = todo bien
 
--- Rollback: volver a correr el bloque sacando la línea `and (lb.motivos ...)` (o pg_get_functiondef y
--- quitar las tres líneas con el marcador v26.15-clin-aprob).
+-- Rollback: en cada objeto, pg_get_functiondef / pg_get_viewdef y sacar la condición `lb.motivos is null or … 'cliente_nuevo'`

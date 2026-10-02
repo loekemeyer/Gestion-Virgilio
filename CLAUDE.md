@@ -2718,6 +2718,21 @@ programa **forzado** en uno de los **2 días con reparto** siguientes a la aprob
 cupo. Si no encaja por zona sale igual. El botón de Equifax abre la landing
 (`https://www.equifax.com.ar/`), decidido por Luis. `sql/gv_clin_aprobado_48h_v2167.sql`.
 
+### ⚠ «Aprobado» = la liberación que levanta `cliente_nuevo`, no cualquier fila (Luis, 02/10, v26.15)
+
+**Luis:** *"si está aprobado, ¿por qué sigue apareciendo ahí?"*. **LK 1576** (Hsu Ya Wen) se liberó en
+Cuarentena **sólo por límite de crédito** (30/09) y el pipeline lo pintó *«Aprobado — ya está en Pedidos a
+programar»*, **sin botones**, mientras el armado lo seguía reteniendo por cliente nuevo: 2 días parado.
+
+| dónde | criterio de «aprobado» |
+|---|---|
+| `gv_cuarentena_marcar_calc` (retiene) | motivos NULL / vacío (libera todo) **o** incluye el motivo |
+| `gv_clin_pipeline_lote`, `gv_clin_evento`, `gv_clin_vencidos`, `gv_clin_prioritarios` | lo mismo, con `cliente_nuevo` |
+| pase **(a0e)** de 48 h del armador | lo mismo — antes exigía `cliente_nuevo` explícito y el ✅ del pipeline graba **NULL**: LK 1548/1549, aprobados el 01/10, salían el 14/10 |
+
+⚠ **Al leer `GV_Cuarentena_Liberados` para decidir algo de cliente nuevo, mirar `motivos`**: una fila puede ser la
+liberación de OTRO motivo. Centinelas 282-284. `sql/gv_clin_aprobado_cliente_nuevo_v2615.sql`.
+
 ### Los 3 pedidos NO se cuentan acá: ya los corta LK
 
 *"Después de que pasan 3 pedidos bien pagando por adelantado ya se considera un cliente normal."*
