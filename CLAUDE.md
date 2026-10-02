@@ -26,6 +26,49 @@ El detalle de dónde viaja la L y dónde no (picking sin L, factura con L cruda,
 está más abajo, en **"LA «L» NO ES UN CÓDIGO — ES UNA DENOTACIÓN"**. Lo sostiene
 `tests/regla-L.cjs`.
 
+## 🟥🟥🟥 ARMADO AUTOMÁTICO: MÁXIMO 5 NP POR TANDA · UNA SOLA GÓNDOLA (LK o CH) · FORWARD-FACING
+
+> ## **<mark>EL ARMADO AUTOMÁTICO NO ARMA UNA TANDA CON MÁS DE 5 NP.</mark>**
+> ## **<mark>UNA TANDA PICKEA TODO DE UNA SOLA GÓNDOLA: TODO LK O TODO CH, NUNCA MEZCLADO.</mark>**
+> ## **<mark>UN CLIENTE O PEDIDO CON MÁS DE 5 NP VA ENTERO: NO SE PARTE.</mark>**
+> ## **<mark>ES FORWARD-FACING: LO YA ARMADO QUEDA COMO ESTÁ. NO SE PARTE NI SE REPORTA.</mark>**
+
+**Luis, 2026-10-01** (v26.03): *"SOLO PICKEAN COSAS DE LK. no puede haber una tanda que pickee cosas
+de LK y de CH"*. **Luis, 2026-10-02**: el cliente con más de 5 NP *"va entero"*, y sobre las tandas
+viejas *"dejala, queda todo como está, es forward-facing para el armado automático la regla"*.
+
+**La góndola de pickeo NO es la empresa de la NP: es de dónde sale la caja.**
+
+| NP | góndola |
+|---|---|
+| empresa LK (con o sin L, incluido Tierra del Fuego) | **LK** |
+| empresa CH con artículos con **L** (Cencosud, TdF de Chef) | **LK** |
+| empresa CH sin L (Dorinka, cliente común) | **CH** |
+| empresa CH con L **y** sin L a la vez | **MIX**: va sola, no se junta con nadie |
+
+| qué | dónde |
+|---|---|
+| tope 5 NP | `PPP_Web_Config.tanda_max_nps` (cambiarlo es un `update`, no un deploy) |
+| armado | `ppp_web_armar_tandas` (marcador `v25.77-tope5gondola`) |
+| fusión de tandas | `gv_ppp_web_fusionar_tandas`: tampoco junta góndolas distintas ni pasa el tope |
+| góndola de cada NP nueva | Edge Function `gv-ppp-web-tandas-diarias`, `gondolaDe()` (v45) |
+| que no se pierda | 3 filas `v25.77` en `GV_Reglas_Centinela` → `select * from public.gv_reglas_perdidas;` vacía |
+
+- **A MANO se puede pasar de 5.** El tope es del armado automático, no del supervisor.
+- **El cliente o pedido con más de 5 NP va ENTERO a una tanda** (D1, Luis 02/10). Mismo criterio que el
+  tope de m³: un cliente que ya pesa más que el tope va en tanda propia. **No proponer partirlo.**
+- **Lo armado antes del 01/10 NO se toca y NO se reporta** (D2, Luis 02/10). Al 02/10 eran 6 tandas con
+  más de 5 NP (E18B, E18C, E48I, F18B, F21C, F47B), 2 de ellas con góndola mezclada (E18B, F21C).
+  `gv_ppp_tanda_mas_5_np` y `gv_ppp_tanda_gondola_mezclada` las listan: **son historia, no alarma**.
+- El pase **(a1)** (pedido nuevo del mismo cliente a su tanda abierta) respeta el tope pero no mira la
+  góndola. Riesgo bajo: mismo cliente y misma empresa casi siempre es misma góndola.
+- **«📅 Cambiar de día» de la tanda ahora es «🔧 Modificar tanda»** con dos opciones: **📅 Cambiar de día**
+  (la tanda entera) y **✂ Partir tanda** (algunas NP a una tanda NUEVA, ese día u otro, vía
+  `gv_ppp_nps_mover_a`; el backend sigue frenando NP pickeadas y mezcla de empresas).
+
+`sql/gv_armado_tope5_gondola_v2577.sql`. Lo sostienen `tests/ppp-partir-tanda.cjs`,
+`tests/ppp-tanda-cambiar-dia.cjs` y `tests/regla-armado-tope5.cjs` (este bloque no se puede borrar).
+
 ## ⚠ CÓMO RESPONDER (vale para TODOS los repos — copiar este bloque entero al `CLAUDE.md` del repo nuevo)
 
 Pedido de Elías, 28/09/2026. Son las preferencias del dueño, escritas acá para que valgan

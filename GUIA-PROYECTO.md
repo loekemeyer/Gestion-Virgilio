@@ -1,3 +1,18 @@
+## Nota v26.11 (2026-10-02) — 🟥 ARMADO AUTOMÁTICO: **máximo 5 NP por tanda · una sola góndola · forward-facing**
+
+> **<mark>El armado automático no arma una tanda con más de 5 NP, y una tanda pickea todo de UNA góndola
+> (todo LK o todo CH). Un cliente o pedido con más de 5 NP va ENTERO. Lo ya armado queda como está.</mark>**
+
+Regla de Luis (v26.03, 01/10; cerrada el 02/10). La góndola de pickeo la da de dónde sale la caja, no la
+empresa: NP de LK → LK; NP de Chef con **L** (Cencosud, TdF de Chef) → LK; NP de Chef sin L → CH; con L y
+sin L a la vez → MIX, va sola. Tope en `PPP_Web_Config.tanda_max_nps` (5); a mano se puede pasar.
+`ppp_web_armar_tandas` y `gv_ppp_web_fusionar_tandas` la respetan; la góndola de cada NP la manda la Edge
+`gv-ppp-web-tandas-diarias` (`gondolaDe`). **Forward-facing:** las 6 tandas viejas de más de 5 NP (E18B,
+E18C, E48I, F18B, F21C, F47B) no se parten ni se reportan; `gv_ppp_tanda_mas_5_np` y
+`gv_ppp_tanda_gondola_mezclada` son historia. El botón de la tanda en la Programación es **🔧 Modificar
+tanda** → **📅 Cambiar de día** / **✂ Partir tanda**. Detalle en el bloque de arriba de `CLAUDE.md`;
+`sql/gv_armado_tope5_gondola_v2577.sql`, `tests/regla-armado-tope5.cjs`, `tests/ppp-partir-tanda.cjs`.
+
 ## Nota v24.89 (2026-09-30) — Pendientes de Recepción: botón «No recibido» con WhatsApp a Marian
 
 Pedido de Mel. En cada tarjeta de **Recepción → Pendientes**, a la derecha de **Recibido**, está el
