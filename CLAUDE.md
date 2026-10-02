@@ -7238,6 +7238,10 @@ facturación hasta que tengamos 12 meses de data de pedidos"*.
   ANTERIORES de ese cliente para ese artículo en los 12 meses previos (ventana por pedido, no por mes). Disruptivo =
   `|pedido / promedio − 1| > 0,5`; **sin pedidos previos = INCORPORACIÓN**. Piso de 10 cajas (el pedido o su promedio),
   el mismo de las Disruptivas de la Est. Madre.
+- **Decidido por Luis (02/10), no volver a proponer**: la **incorporación se marca** en rojo con su comentario, porque lo
+  pide el manual 31 (*"pintarlo de rojo el número, ponerle negrita e insertar un comentario … que cantidad de unidades
+  fueron pedidas como incorporación y … que cliente"*). Se marca **sólo** el ±50 % y la incorporación, con el **piso de 10
+  cajas tal cual**: no subirlo aunque marque 26-37 % de los artículos (*"solo marca lo que te dije"*).
 - **Historia**: pedidos web desde que existen (LK 30/03/2026, Chef 29/06/2026) y, antes de eso, las **facturas de ISIS**
   (una factura = un pedido; no el día, que junta sucursales). Cuando la web tenga 12 meses (~marzo 2027 LK) las facturas
   salen solas de la ventana. Web y facturas no se mezclan en el mismo tramo (contaría dos veces).
