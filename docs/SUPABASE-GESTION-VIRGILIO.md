@@ -31172,6 +31172,9 @@ despachados, m³ pendientes, unidades vendidas y $ facturado. Los reportes viven
 
 ## §3.v2612 — Impresión por programa en la PC: `GV_Impresion_*` + `gv_imp_*` (Luis, 02/10/2026)
 
+> **v26.28 (02/10):** Luis dijo «sí» al drop (D4). Desde la sesión no entró (el MCP se colgó a los 60 s sin llegar a
+> Postgres): el SQL con backup de la clave y verificación está en `sql/gv_impresion_programa_drop_v2628.sql`.
+
 > ⛔ **RETIRADO en la v26.26** (Luis, 02/10: *"me quedo con mi helper, sacá lo otro"*). El front ya no llama a ninguna
 > de estas RPC. Los objetos quedan **sin uso** (0 PC, 0 reglas, 0 trabajos, 1 clave) hasta que Luis diga «sí» al drop de
 > la cabecera de `sql/gv_impresion_programa_v2611.sql`. La impresión sin cuadro es el helper local (`127.0.0.1`), que no toca la base.

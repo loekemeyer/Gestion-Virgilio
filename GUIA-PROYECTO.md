@@ -1,3 +1,17 @@
+## Nota v26.28 (2026-10-02) — El helper de impresión es UN botón en ⚙️ Configuración
+
+Luis: *"lo único que tiene que haber en Gestión Virgilio es un botón en configuración que sea «Helper de impresión» que
+permita conectar con el helper para cuando sale a imprimir algo"*.
+
+- **⚙️ Configuración → 🖨️ Helper de impresión** abre un pop-up: estado (⚪ desconectado / 🟢 conectado / 🔴 no
+  contesta), puerto y **Conectar / Desconectar**. Conectar busca el helper en `127.0.0.1:<puerto>` y **sólo queda
+  prendido si contesta**. Por navegador (`localStorage gv_helper_imp_v1`).
+- Se fueron la tarjeta de la v26.26 (hojas de prueba, log, avisos) y el bloque del helper de la 🖨️ Cola de impresión.
+  El camino de impresión no cambió: con el helper conectado, picking / armado / facturado van en PDF al helper; si no
+  contesta, por el navegador.
+- D4 (borrar `GV_Impresion_*` y las `gv_imp_*` de impresión): Luis dijo sí; desde la sesión no entró (el MCP se colgó
+  sin llegar a la base). SQL: `sql/gv_impresion_programa_drop_v2628.sql`.
+
 ## Nota v26.26 (2026-10-02) — Se SACA el programa de impresión de la v26.12; queda sólo el helper local
 
 Luis: *"me quedo con mi helper, sacá lo otro"* · *"poneme la configuración de eso en el módulo configuración"*.

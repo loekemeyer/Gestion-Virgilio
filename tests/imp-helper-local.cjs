@@ -14,8 +14,9 @@
      I. La estación (psPoll) manda el armado al helper; pkHojaImprimir manda picking;
         facMaybePrintFacturado manda facturado.
      J. Sin respuesta en el tiempo de espera → NO se repite por el navegador (puede haber salido).
-     K. ⚙️ Configuración dibuja la tarjeta del helper (🟢, puerto, pruebas) y la Prueba llega con su tipo;
-        el switch de la tarjeta prende y apaga el helper de este navegador.
+     K. v26.28 — en ⚙️ Configuración hay UN botón «Helper de impresión» (y nada más del helper): abre
+        el pop-up con el estado (🟢) y el puerto; Desconectar lo apaga; Conectar a un puerto muerto NO
+        lo prende; Conectar al puerto vivo lo prende. La Cola de impresión no habla del helper.
      L. gvHelperVigilar arranca la estación sola con helper + auto de la estación.
      M. v26.26 — el programa de la v26.12 se sacó: ni 🧩 Impresoras, ni cola en la base, ni gv_imp_encolar.
    Sale 1 si algo falla. */
@@ -152,7 +153,7 @@ const helper = http.createServer((req, res) => {
   out.G_cerrado = await p.evaluate(async (args) => {
     gvHelperGuardar({ puerto: args.muerto }); window.__S.nav.length = 0;
     remitoPrintDoc(args.h, "armado", "98012"); await _gvHelper.cadena;
-    const r = window.__S.nav.length === 1 && _gvHelper.vivo === false && /no disponible/.test(_gvHelper.log[0].motivo) && /no contesta/.test(_gvHelperEstadoTxt());
+    const r = window.__S.nav.length === 1 && _gvHelper.vivo === false && /no disponible/.test(_gvHelper.log[0].motivo) && /no contesta/i.test(_gvHelperEstadoTxt());
     gvHelperGuardar({ puerto: args.vivo }); return r;
   }, { muerto: PUERTO_MUERTO, vivo: PUERTO, h: HOJA });
 
@@ -189,23 +190,46 @@ const helper = http.createServer((req, res) => {
   }, HOJA);
   await ctl("demora", 0); await p.waitForTimeout(1300);
 
-  // ---- K. ⚙️ Configuración: tarjeta del helper + Prueba
+  // ---- K. ⚙️ Configuración: UN botón «Helper de impresión» → pop-up para conectar
   H.reqs.length = 0;
-  out.K_tarjeta = await p.evaluate(async () => {
+  out.K_boton = await p.evaluate(async () => {
     window.__isSupervisor = true; window.requireSupervisor = function () { return true; }; openConfiguracion();
-    await window.__espera(function () { var c = document.getElementById("gvHelperCard"); return c && /🟢/.test(c.textContent); }, 6000);
-    const c = document.getElementById("gvHelperCard");
-    return !!c && /🟢/.test(c.textContent) && !!c.querySelector('input[type="number"]') && /Picking/.test(c.textContent) && /Facturado/.test(c.textContent);
+    const cfg = document.getElementById("configOverlay");
+    const btns = Array.from(cfg.querySelectorAll("button")).filter(function (x) { return /Helper de impresi/.test(x.textContent); });
+    const sinTarjeta = !document.getElementById("gvHelperCfgRow") && cfg.innerHTML.indexOf("127.0.0.1") < 0;
+    if (btns.length !== 1 || !sinTarjeta) return false;
+    btns[0].click();
+    await window.__espera(function () { var o = document.getElementById("gvHelperOv"); return o && o.classList.contains("show") && /🟢/.test(o.textContent); }, 6000);
+    const o = document.getElementById("gvHelperOv");
+    return !!o && o.classList.contains("show") && /🟢/.test(o.textContent) && !!o.querySelector("#gvHelperPuerto") &&
+      !document.getElementById("configOverlay").classList.contains("show");
   });
-  out.K_prueba = await p.evaluate(async () => { await gvHelperPrueba("facturado"); const m = document.getElementById("gvHelperMsg"); return !!m && /✓/.test(m.textContent); }) && (H.reqs[0] || {}).tipo === "facturado";
-  out.K_switch = await p.evaluate(async () => {
-    const sw = document.getElementById("gvHelperSw"); if (!sw) return false;
-    sw.click(); await window.__espera(function () { return !gvHelperActivo(); }, 2000);
-    const apagado = !gvHelperActivo() && !document.getElementById("gvHelperSw").classList.contains("on");
-    document.getElementById("gvHelperSw").click(); await window.__espera(function () { return gvHelperActivo(); }, 2000);
-    return apagado && gvHelperActivo() && document.getElementById("gvHelperSw").classList.contains("on");
+  out.K_desconectar = await p.evaluate(async () => {
+    const b = document.getElementById("gvHelperDesconectar"); if (!b) return false;
+    b.click(); await window.__espera(function () { return !gvHelperActivo(); }, 2000);
+    return !gvHelperActivo() && /Desconectado/.test(document.getElementById("gvHelperEst").textContent) && !document.getElementById("gvHelperDesconectar");
   });
-  await p.evaluate(() => closeConfiguracion());
+  out.K_conectarMuerto = await p.evaluate(async (pt) => {
+    document.getElementById("gvHelperPuerto").value = String(pt);
+    await gvHelperConectar();
+    return !gvHelperActivo() && /✗/.test(document.getElementById("gvHelperMsg").textContent);
+  }, PUERTO_MUERTO);
+  out.K_conectar = await p.evaluate(async (pt) => {
+    document.getElementById("gvHelperPuerto").value = String(pt);
+    document.getElementById("gvHelperConectar").click();
+    await window.__espera(function () { return gvHelperActivo() && /🟢/.test((document.getElementById("gvHelperEst") || {}).textContent || ""); }, 4000);
+    const ok = gvHelperActivo() && gvHelperCfg().puerto === pt && /✓/.test(document.getElementById("gvHelperMsg").textContent);
+    closeHelperImpresion();
+    return ok && !document.getElementById("gvHelperOv").classList.contains("show");
+  }, PUERTO);
+  out.K_colaSinHelper = await p.evaluate(async () => {
+    try { openPrintStation(); } catch (_e) {}
+    await new Promise(function (ok) { setTimeout(ok, 300); });
+    const body = document.getElementById("psBody"); const txt = body ? body.innerHTML : "";
+    if (_ps && _ps.timer) { clearInterval(_ps.timer); _ps.timer = null; }
+    closePrintStation();
+    return !!txt && !/helper/i.test(txt);
+  });
 
   // ---- L. la estación arranca sola con helper + auto
   out.L_vigilar = await p.evaluate(async () => {
@@ -224,7 +248,7 @@ const helper = http.createServer((req, res) => {
     const cfg = document.getElementById("configOverlay");
     return typeof window.openImpresoras === "undefined" && typeof window.gvImpEncolar === "undefined" &&
       typeof window.gvImpModo === "undefined" && !!cfg && cfg.innerHTML.indexOf("openImpresoras") < 0 &&
-      !!document.getElementById("gvHelperCfgRow");
+      typeof window.gvHelperPrueba === "undefined" && typeof window.gvHelperCardHtml === "undefined";
   });
   out.M_sinRpcPrograma = !require("fs").readFileSync(require("path").join(__dirname, "..", "index.html"), "latin1").match(/gv_imp_(encolar|config|regla_guardar|trabajos|agente)/);
 

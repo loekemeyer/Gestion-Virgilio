@@ -7182,8 +7182,9 @@ más actualizado que otro. Si alguien quiere cambiar uno solo NO se puede hacer"
 pantalla 🧩 Impresoras (PC + impresora + automático por hoja), `tools/impresion/` (GV-Impresion.ps1) y sus tests
 (`imp-programa`, `imp-agente-ps`). **La impresión sin cuadro es SÓLO el helper local de abajo.** No volver a poner
 una cola de impresión en la base ni un programa que lea de ella. Los objetos de la base (`GV_Impresion_*`, `gv_imp_*`
-de impresión) quedan hasta que Luis diga «sí» al drop (SQL en la cabecera de `sql/gv_impresion_programa_v2611.sql`);
-al 02/10 tenían 0 PC, 0 reglas y 0 hojas.
+de impresión): Luis dijo «sí» al drop (D4, 02/10) pero **desde la sesión no entró** — `execute_sql` y
+`apply_migration` se colgaron a los 60 s sin llegar a Postgres (ni lock ni consulta viva). Queda en
+`sql/gv_impresion_programa_drop_v2628.sql` para correr en el SQL Editor de Supabase. Tenían 0 PC, 0 reglas y 0 hojas.
 
 ## ⚠ REGLA (Luis, 2026-10-02, v26.24): el HELPER LOCAL de impresión (127.0.0.1:17777) — por dispositivo, en PDF
 
@@ -7191,18 +7192,21 @@ Luis tiene un helper en la PC del depósito (servidor HTTP en `127.0.0.1:17777`,
 tipo → impresora configuradas EN EL HELPER). Contrato: `GET /` → «Impresion Virgilio OK»; `POST /print?tipo=<picking|
 armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`.
 
-- Se prende en **⚙️ Configuración → tarjeta «🖨️ Impresión sin cuadro — helper local en esta PC»** (v26.26: switch,
-  puerto, estado, hoja de prueba por tipo y las últimas hojas). Es **por dispositivo** (`localStorage gv_helper_imp_v1`): sin el switch el navegador NUNCA le pega a 127.0.0.1 (en un
+- Se conecta en **⚙️ Configuración → botón «🖨️ Helper de impresión»** (v26.28, Luis: *"lo único que tiene que haber
+  en Gestión es un botón en configuración «Helper de impresión» que permita conectar con el helper"*): pop-up con el
+  estado, el puerto y **Conectar / Desconectar**; Conectar **sólo prende si el helper contesta**. **No va nada más del
+  helper en la página**: ni tarjeta, ni hojas de prueba, ni log, ni cartel en la Cola de impresión (`openHelperImpresion`).
+  Es **por dispositivo** (`localStorage gv_helper_imp_v1`): desconectado, el navegador NUNCA le pega a 127.0.0.1 (en un
   celular Chrome pediría permiso de red local para nada).
 - Entra por **`remitoPrintDoc(inner, tipo, ref)`**: al agregar un camino que imprima una de esas hojas, pasarle el
   `tipo`, o sale por el cuadro aunque el helper esté prendido. Sin tipo = navegador (`_remitoPrintNavegador`).
 - El PDF lo arma el navegador: la hoja en un iframe (mismo CSS y `_rmtAutofit`) → `vendor/html2canvas.min.js` (a
   demanda) → jsPDF A4, márgenes 12 mm, varias páginas si hace falta. En FILA, una hoja por vez.
 - **Helper que no contesta o que no imprimió nada → la hoja sale por el navegador** (una hoja que no salió no se pierde
-  callada). **Más de 60 s sin respuesta → NO se repite** (puede haber salido); queda «sin confirmar» en la tarjeta.
+  callada). **Más de 60 s sin respuesta → NO se repite** (puede haber salido).
 - **Orden: helper > navegador.** (El programa de la v26.12 se sacó en la v26.26.) Qué sale SOLO lo siguen decidiendo los
-  switches de 🖨️ Cola de impresión (auto-imprimir remitos = armado y picking; FACTURADO global); la tarjeta avisa si falta uno.
-- Con el helper + el auto de la estación prendidos, la estación arranca sola al abrir GV (`gvImpVigilar`).
+  switches de 🖨️ Cola de impresión (auto-imprimir remitos = armado y picking; FACTURADO global).
+- Con el helper conectado + el auto de la estación prendidos, la estación arranca sola al abrir GV (`gvHelperVigilar`).
 - ⚠ El facturado sale en el equipo que tilda: otra PC sin helper → cuadro; un celular → no sale.
 
 `tests/imp-helper-local.cjs` (helper falso en 127.0.0.1: mide el PDF que le llega, el orden, el fallback y el timeout).

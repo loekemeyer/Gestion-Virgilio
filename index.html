@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.27"></script>
+<script type="module" src="recepcion.js?v=26.28"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6659,6 +6659,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="planim-body">
       <div class="sup-actions sup-secondary cfg-actions">
         <button class="sup-action-btn" onclick="cfgGo(openPrintStation)"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
+        <!-- v26.28 (Luis, 02/10): conectar esta PC con el helper local de impresión -->
+        <button class="sup-action-btn" onclick="cfgGo(openHelperImpresion)" title="Conectar esta PC con el helper local: picking, armado y facturado salen sin el cuadro de impresión"><span class="sup-ico">🖨️</span><span>Helper de impresión</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openLugarEditor)"><span class="sup-ico">📍</span><span>Lugares del depósito</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openPlanimMapa)" title="Ver el depósito dibujado: cada góndola con sus celdas, el código que va en cada una y cuántas cajas entran"><span class="sup-ico">🗺️</span><span>Mapa de góndolas</span></button>
@@ -6681,10 +6683,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
           <span class="sup-sw" id="ssgSw" onclick="toggleSsgAlert()" role="switch"><span class="sup-sw-k"></span></span>
         </div>
         <div class="sup-cfg-hint" id="ssgSwHint">Cargando…</div>
-      </div>
-      <!-- v26.26 (Luis, 02/10): el helper local de impresión (127.0.0.1) se configura acá, por dispositivo -->
-      <div class="sup-cfg" id="gvHelperCfgRow" style="max-width:none;margin:16px auto 0;">
-        <div id="gvHelperCfgBody">Cargando…</div>
       </div>
     </div>
   </div>
@@ -10480,7 +10478,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.27";
+const APP_VERSION = "v26.28";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -43494,7 +43492,6 @@ function openConfiguracion() {
   if (ov) ov.classList.add("show");
   try { loadSsgSwitch(); } catch (_e) {}
   try { loadPwebCfg(); } catch (_e) {}   // idea 5162
-  try { gvHelperRender(true); } catch (_e) {}   // v26.26 — helper local de impresión
 }
 /* idea 5162 — los interruptores del pipeline web, visibles en Configuración. Sólo lectura: cambiarlos
    es una decisión del dueño y se hace por SQL (PPP_Web_Config), acá se ve qué quedó prendido. */
@@ -54985,98 +54982,79 @@ async function _gvHelperImprimirHoja(tipo, inner, ref){
   }
   return r;
 }
-/* v26.26 (Luis, 02/10: "me quedo con mi helper, sacá lo otro") — la configuración del helper vive
-   en ⚙️ Configuración, como tarjeta propia (#gvHelperCfgRow). Es de ESTE navegador. */
-var GV_HELPER_HOJAS = [
-  ["picking",   "📋 Picking",   "al terminar el picking"],
-  ["armado",    "📦 Armado",    "al terminar el armado de cada NP"],
-  ["facturado", "🧾 Facturado", "al tildar la NP facturada"]
-];
+/* v26.28 (Luis, 02/10: "lo único que tiene que haber es un botón en configuración «Helper de
+   impresión» que permita conectar con el helper") — ⚙️ Configuración → 🖨️ Helper de impresión abre
+   este pop-up: estado, puerto y Conectar / Desconectar. Vale para ESTE navegador. */
 var GV_HELPER_CSS =
-  "#gvHelperCfgRow .gh-tbl{border-collapse:collapse;margin:8px auto 0;font-size:13px;}" +
-  "#gvHelperCfgRow .gh-tbl th{font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.03em;padding:3px 7px;text-align:center;border-bottom:1px solid #e2e8f0;}" +
-  "#gvHelperCfgRow .gh-tbl td{padding:5px 7px;text-align:center;border-bottom:1px solid #f1f5f9;vertical-align:middle;}" +
-  "#gvHelperCfgRow button{width:auto;margin:0;padding:5px 10px;font-size:12.5px;font-weight:700;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;cursor:pointer;white-space:nowrap;}" +
-  "#gvHelperCfgRow button:disabled{opacity:.45;cursor:default;}" +
-  "#gvHelperCfgRow input{width:74px;font:inherit;font-size:13px;padding:4px;border:1px solid #cbd5e1;border-radius:7px;text-align:center;box-sizing:border-box;}" +
-  "#gvHelperCfgRow .gh-msg{font-size:12.5px;font-weight:700;color:#1e40af;margin-top:6px;text-align:center;}#gvHelperCfgRow .gh-msg:empty{display:none;}" +
-  "#gvHelperCfgRow .gh-av{font-size:12.5px;color:#9a3412;margin-top:6px;text-align:center;}" +
-  "#gvHelperCfgRow .gh-sub{display:block;font-size:11px;color:#64748b;}" +
-  "#gvHelperCfgRow .gh-err{display:block;font-size:11px;color:#b91c1c;max-width:300px;margin:0 auto;}" +
-  "#gvHelperCfgRow .gh-est{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11.5px;font-weight:800;}" +
-  "#gvHelperCfgRow .gh-est.ok{background:#dcfce7;color:#166534;}#gvHelperCfgRow .gh-est.mal{background:#fee2e2;color:#991b1b;}";
+  "#gvHelperOv{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:10050;padding:16px;}" +
+  "#gvHelperOv.show{display:flex;}" +
+  "#gvHelperOv .gh-box{background:#fff;border-radius:14px;padding:16px 18px;max-width:340px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.25);text-align:center;}" +
+  "#gvHelperOv .gh-t{font-size:17px;font-weight:800;color:#0f172a;}" +
+  "#gvHelperOv .gh-est{font-size:15px;font-weight:800;margin:10px 0;}" +
+  "#gvHelperOv .gh-row{display:flex;gap:8px;align-items:center;justify-content:center;font-size:13px;color:#475569;}" +
+  "#gvHelperOv input{width:84px;font:inherit;font-size:14px;padding:5px;border:1px solid #cbd5e1;border-radius:8px;text-align:center;box-sizing:border-box;}" +
+  "#gvHelperOv button{width:auto;margin:0;padding:8px 14px;font-size:14px;font-weight:800;border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#334155;cursor:pointer;}" +
+  "#gvHelperOv button.gh-pri{background:#2563eb;border-color:#2563eb;color:#fff;}" +
+  "#gvHelperOv .gh-acc{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px;}" +
+  "#gvHelperOv .gh-msg{font-size:12.5px;font-weight:700;color:#1e40af;margin-top:8px;}#gvHelperOv .gh-msg:empty{display:none;}";
 function _gvHelperMsg(m){ _gvHelper.msg = m || ""; const el = document.getElementById("gvHelperMsg"); if (el) el.textContent = _gvHelper.msg; }
-/* Prueba desde Configuración: hoja de prueba al helper, sin caer al navegador. */
-async function gvHelperPrueba(tipo){
-  const lab = (GV_HELPER_HOJAS.filter(function (t){ return t[0] === tipo; })[0] || [tipo, tipo])[1];
-  const row = { np: "PRUEBA", tanda: "TEST", cod: "0000", rs: "Hoja de prueba — " + lab + " → helper local", salePpp: cpTodayAR(), fecha: cpTodayAR(), resumen: "A=999X1;B=999X1" };
-  let inner = ""; try { inner = armadoRemitoInnerHtml(armadoRemitoData(row), tipo === "facturado" ? "FACTURADO" : undefined); } catch (_e) {}
-  if (!inner) { _gvHelperMsg("No pude armar la hoja de prueba."); return; }
-  _gvHelperMsg("Armando el PDF de prueba…");
-  let r, pdf = null;
-  try { pdf = await gvHojaPdf(inner); } catch (e) { _gvHelperMsg("No pude armar el PDF: " + String((e && e.message) || e)); return; }
-  _gvHelperMsg("Mandando la prueba al helper…");
-  r = await imprimirLocal(tipo, pdf);
-  _gvHelperLogAdd({ tipo: tipo, ref: "PRUEBA", ok: !!r.ok, impreso: r.impreso || [], errores: r.errores || [], motivo: r.motivo || "", alNavegador: false, kb: Math.round(pdf.size / 1024) });
-  if (r.ok) _gvHelperMsg("✓ Prueba de " + lab + " impresa en " + (r.impreso.length ? r.impreso.join(", ") : "el helper"));
-  else _gvHelperMsg("✗ " + lab + ": " + (r.motivo || (r.errores || []).join(" · ") || "no se imprimió"));
+function _gvHelperEstadoTxt(){
+  const dir = "127.0.0.1:" + gvHelperCfg().puerto;
+  if (!gvHelperActivo()) return "⚪ Desconectado";
+  if (_gvHelper.vivo === true) return "🟢 Conectado · " + dir;
+  if (_gvHelper.vivo === false) return "🔴 No contesta · " + dir;
+  return "… buscando " + dir;
 }
-async function gvHelperCambiar(campo, valor){
-  if (campo === "on") gvHelperGuardar({ on: !!valor });
-  else if (campo === "puerto") {
-    const p = parseInt(valor, 10);
-    if (!(p >= 1 && p <= 65535)) { _gvHelperMsg("Puerto inválido: va de 1 a 65535."); gvHelperRender(false); return; }
-    gvHelperGuardar({ puerto: p });
+function gvHelperHtml(){
+  const c = gvHelperCfg();
+  return '<div class="gh-box"><div class="gh-t">🖨️ Helper de impresión</div>' +
+    '<div class="gh-est" id="gvHelperEst">' + escapeHtml(_gvHelperEstadoTxt()) + '</div>' +
+    '<div class="gh-row">Puerto <input id="gvHelperPuerto" type="number" min="1" max="65535" value="' + c.puerto + '"></div>' +
+    '<div class="gh-msg" id="gvHelperMsg">' + escapeHtml(_gvHelper.msg || "") + '</div>' +
+    '<div class="gh-acc">' +
+      '<button class="gh-pri" id="gvHelperConectar" onclick="gvHelperConectar()">' + (c.on ? "Reconectar" : "Conectar") + '</button>' +
+      (c.on ? '<button id="gvHelperDesconectar" onclick="gvHelperDesconectar()">Desconectar</button>' : '') +
+      '<button onclick="closeHelperImpresion()">Cerrar</button></div></div>';
+}
+/* Redibuja el pop-up si está abierto (y, con ping, vuelve a buscar el helper si hace rato que no se lo mira). */
+function gvHelperRender(ping){
+  const ov = document.getElementById("gvHelperOv"); if (!ov || !ov.classList.contains("show")) return;
+  ov.innerHTML = gvHelperHtml();
+  if (ping && gvHelperActivo() && Date.now() - _gvHelper.pingTs > 3000) helperVivo().then(function (){ gvHelperRender(false); });
+}
+function openHelperImpresion(){
+  if (!requireSupervisor()) return;
+  if (!document.getElementById("gvHelperCss")) { const st = document.createElement("style"); st.id = "gvHelperCss"; st.textContent = GV_HELPER_CSS; document.head.appendChild(st); }
+  let ov = document.getElementById("gvHelperOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "gvHelperOv";
+    ov.addEventListener("click", function (e){ if (e.target === ov) closeHelperImpresion(); });
+    document.body.appendChild(ov);
   }
-  gvHelperRender(false);
-  if (gvHelperActivo()) { _gvHelperMsg("Buscando el helper…"); await helperVivo(); _gvHelperMsg(_gvHelper.vivo ? "✓ Helper encontrado en " + gvHelperUrl("") : "⚠ No contesta " + gvHelperUrl("") + ": ¿está abierto en esta PC? ¿es ese el puerto?"); }
-  else _gvHelperMsg("Helper apagado en esta PC: las hojas salen por el navegador.");
+  _gvHelper.msg = "";
+  ov.classList.add("show");
+  gvHelperRender(true);
+}
+function closeHelperImpresion(){ const ov = document.getElementById("gvHelperOv"); if (ov) ov.classList.remove("show"); }
+/* Conectar = buscar el helper en ese puerto. Si contesta queda prendido en esta PC; si no, no se prende. */
+async function gvHelperConectar(){
+  const inp = document.getElementById("gvHelperPuerto");
+  const p = parseInt(inp ? inp.value : gvHelperCfg().puerto, 10);
+  if (!(p >= 1 && p <= 65535)) { _gvHelperMsg("Puerto inválido: va de 1 a 65535."); return; }
+  gvHelperGuardar({ puerto: p });
+  _gvHelperMsg("Buscando el helper en 127.0.0.1:" + p + "…");
+  const vivo = await helperVivo();
+  if (vivo) {
+    gvHelperGuardar({ on: true }); _gvHelper.vivo = true; _gvHelper.pingTs = Date.now();
+    _gvHelper.msg = "✓ Conectado: picking, armado y facturado salen por el helper.";
+  } else _gvHelper.msg = "✗ No contesta 127.0.0.1:" + p + ". Abrí el helper en esta PC y probá de nuevo.";
   gvHelperRender(false);
   try { gvHelperVigilar(); } catch (_e) {}
 }
-function _gvHelperEstadoTxt(){
-  if (!gvHelperActivo()) return "⚪ apagado en esta PC";
-  const dir = "127.0.0.1:" + gvHelperCfg().puerto;
-  if (_gvHelper.vivo === true) return "🟢 abierto en " + dir;
-  if (_gvHelper.vivo === false) return "🔴 no contesta " + dir;
-  return "… buscando " + dir;
-}
-/* La tarjeta de ⚙️ Configuración (por dispositivo). */
-function gvHelperCardHtml(){
-  const c = gvHelperCfg();
-  let h = '<div id="gvHelperCard"><div class="sup-cfg-top"><span class="sup-cfg-t">🖨️ Impresión sin cuadro — helper local en esta PC</span>' +
-    '<span class="sup-sw' + (c.on ? " on" : "") + '" id="gvHelperSw" onclick="gvHelperCambiar(\'on\',' + (c.on ? "false" : "true") + ')" role="switch"><span class="sup-sw-k"></span></span></div>' +
-    '<div class="sup-cfg-hint">Picking, armado y facturado van en PDF al helper de esta PC (<b>127.0.0.1</b>), que imprime con SumatraPDF en la impresora que tiene elegida cada hoja <b>en el helper</b>. Vale sólo para <b>este navegador</b>. Si el helper no contesta, la hoja sale con el cuadro de impresión.</div>' +
-    '<table class="gh-tbl"><tr><th>Puerto</th><th>Estado</th><th>Hoja de prueba</th></tr><tr>' +
-    '<td><input type="number" min="1" max="65535" value="' + c.puerto + '" onchange="gvHelperCambiar(\'puerto\',this.value)"></td>' +
-    '<td>' + escapeHtml(_gvHelperEstadoTxt()) + (c.on ? ' <button onclick="gvHelperCambiar(\'ping\')" title="Volver a buscar el helper">↻</button>' : '') + '</td><td>' +
-    GV_HELPER_HOJAS.map(function (t){ return '<button ' + (c.on ? "" : "disabled ") + 'onclick="gvHelperPrueba(\'' + t[0] + '\')" title="' + escapeHtml(t[2]) + '">' + t[1] + '</button>'; }).join(" ") + '</td></tr></table>' +
-    '<div class="gh-msg" id="gvHelperMsg">' + escapeHtml(_gvHelper.msg || "") + '</div>';
-  if (c.on) {
-    const faltan = [];
-    if (!psIsAuto()) faltan.push("«Auto-imprimir remitos al terminar armado» (armado y picking)");
-    if (!facPrintIsOn()) faltan.push("«Auto-imprimir remito FACTURADO»");
-    if (faltan.length) h += '<div class="gh-av">Para que salgan SOLAS falta prender ' + escapeHtml(faltan.join(" y ")) +
-      ' en <button onclick="cfgGo(openPrintStation)">🖨️ Cola de impresión</button>. Sin eso el helper sólo imprime lo que se manda a mano.</div>';
-    const log = _gvHelper.log.slice(0, 8);
-    if (log.length) {
-      h += '<table class="gh-tbl"><tr><th>Hora</th><th>Hoja</th><th>NP /<br>tanda</th><th>Resultado</th></tr>';
-      log.forEach(function (e){
-        const est = e.ok ? '<span class="gh-est ok">impreso</span><span class="gh-sub">' + escapeHtml((e.impreso || []).join(", ")) + '</span>'
-          : '<span class="gh-est mal">' + (e.alNavegador ? "→ navegador" : "sin confirmar") + '</span><span class="gh-err">' + escapeHtml(e.motivo || (e.errores || []).join(" · ")) + '</span>';
-        h += '<tr><td>' + escapeHtml(e.hora || "") + '</td><td>' + escapeHtml(e.tipo) + '</td><td><b>' + escapeHtml(String(e.ref || "—")) + '</b></td><td>' + est + '</td></tr>';
-      });
-      h += '</table>';
-    }
-  }
-  return h + '</div>';
-}
-/* Dibuja la tarjeta (y, con ping, vuelve a buscar el helper si hace rato que no se lo mira). */
-function gvHelperRender(ping){
-  const box = document.getElementById("gvHelperCfgBody"); if (!box) return;
-  if (!document.getElementById("gvHelperCss")) { const st = document.createElement("style"); st.id = "gvHelperCss"; st.textContent = GV_HELPER_CSS; document.head.appendChild(st); }
-  box.innerHTML = gvHelperCardHtml();
-  if (ping && gvHelperActivo() && Date.now() - _gvHelper.pingTs > 3000) helperVivo().then(function (){ gvHelperRender(false); });
+function gvHelperDesconectar(){
+  gvHelperGuardar({ on: false });
+  _gvHelper.msg = "Desconectado: las hojas salen con el cuadro de impresión.";
+  gvHelperRender(false);
 }
 /* Cada minuto, en un GV de supervisor en una PC: con el helper y el auto de la estación
    prendidos, la estación arranca sola (antes había que abrir la Cola de impresión). */
@@ -55299,7 +55277,6 @@ function openPrintStation(){
   ov.classList.add("show");
   try { etlLoadGlobal(); } catch (_e) {}   // sincroniza el switch GLOBAL de etiquetas de lío antes de mostrarlo
   try { facPrintCfgLoad().then(function(){ if (document.getElementById("psBody")) psRender(); }); } catch (_e) {}   // v10.21 — trae el switch FACTURADO global (Supabase) y re-renderiza
-  if (gvHelperActivo()) { try { helperVivo().then(function(){ if (document.getElementById("psBody")) psRender(); }); } catch (_e) {} }   // v26.26 — estado del helper de esta PC
   if (psIsAuto()) psStart(); else psRender();
 }
 function closePrintStation(){ const ov = document.getElementById("printStationModal"); if (ov) ov.classList.remove("show"); }
@@ -55307,11 +55284,6 @@ function psRender(){
   const body = document.getElementById("psBody"); if (!body) return;
   const on = psIsAuto(); const running = !!(_ps && _ps.timer);
   let h = "";
-  // v26.26 — el helper local de esta PC (se configura en ⚙️ Configuración). Los interruptores de abajo
-  // deciden QUÉ sale solo; el helper decide POR DÓNDE (sin cuadro).
-  h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🖥️ Helper local de impresión (esta PC)</span>' +
-    '<button class="ps-test" style="width:auto;padding:6px 12px;font-size:12px;" onclick="closePrintStation();openConfiguracion()">Configurar</button></div>' +
-    '<div class="ps-help" style="margin:8px 0 0;">' + escapeHtml(_gvHelperEstadoTxt()) + (gvHelperActivo() ? ' · picking, armado y facturado salen SIN cuadro por el helper; si no contesta, por el navegador.' : ' · las hojas salen por el navegador (cuadro de impresión).') + '</div></div>';
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🖨️ Auto-imprimir remitos al terminar armado</span>' +
     '<span class="sup-sw' + (on ? " on" : "") + '" onclick="psToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
     '<div class="ps-status ' + (on ? "on" : "") + '">' + (on ? (running ? "🟢 Activo — escuchando pedidos terminados (cada 12 s)" : "🟢 Activo") : "⚪ Apagado — los remitos no se imprimen solos") + '</div>' +
@@ -55331,7 +55303,7 @@ function psRender(){
     '<div style="display:flex;gap:8px;margin:8px 0;"><input id="etlLegInp" type="text" inputmode="numeric" placeholder="legajo" onkeydown="if(event.key===\'Enter\')etlLegAgregar()" style="width:100px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;">' +
     '<button onclick="etlLegAgregar()" style="padding:8px 14px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;">+ Agregar</button></div>' +
     '<div id="etlLegList"><div class="ps-help">Cargando…</div></div></div>';
-  if (!gvHelperActivo()) h += '<div class="ps-help">Dejá <b>esta pantalla abierta</b> en la PC que está al lado de la impresora. Para que salga <b>sin diálogo</b>: prendé el <b>helper local</b> en <a href="#" onclick="event.preventDefault();closePrintStation();openConfiguracion()">⚙️ Configuración</a>, o abrí la app en <b>Chrome con <code>--kiosk-printing</code></b> y poné esa impresora como <b>predeterminada de Windows</b>. Probá con el botón de abajo antes de prender el automático.</div>';
+  h += '<div class="ps-help">Dejá <b>esta pantalla abierta</b> en la PC que está al lado de la impresora. Para que salga <b>sin diálogo</b>: abrí la app en <b>Chrome con <code>--kiosk-printing</code></b> y poné esa impresora como <b>predeterminada de Windows</b>. Probá con el botón de abajo antes de prender el automático.</div>';
   h += '<div class="ps-actions"><button class="ps-test" onclick="psTestPrint()">🖨️ Imprimir hoja de prueba</button></div>';
   const log = (_ps && _ps.log) || [];
   h += '<div class="ps-log-t">Impresos en esta sesión (' + log.length + ')</div>';
@@ -59142,7 +59114,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.27"></script>
+<script src="importacion.js?v=26.28"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61965,9 +61937,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.27"></script>
-<script src="hotsale.js?v=26.27"></script>
-<script src="estadisticas.js?v=26.27"></script>
+<script src="cobranzas.js?v=26.28"></script>
+<script src="hotsale.js?v=26.28"></script>
+<script src="estadisticas.js?v=26.28"></script>
 
 </body>
 </html>
