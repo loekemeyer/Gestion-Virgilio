@@ -75,6 +75,9 @@ const MANANA = (function () {
 const H = 3600 * 1000;
 const iso = (ms) => new Date(ms).toISOString();
 const RECEP_VIEJA = key(Date.now() - 28 * 86400000);
+const T0 = Date.now();
+const hmAR = (ms) => { const k = key(ms); const h = new Date(ms).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Argentina/Buenos_Aires" });
+  return k === HOY ? h : null; };
 
 /* Un día de planta chico pero con todo lo que los pop-ups necesitan: un operario que cerró
    picking (m³/h con desglose), NP en varios estados (celda de «NPs por Día») y una tanda en
@@ -101,6 +104,13 @@ const DATOS = {
     { legajo: 8,  opcion: "EP",  texto: "E30A", ts_cliente: iso(Date.now() - 1.5 * H), ts_inicio: null },
     { legajo: 8,  opcion: "TP",  texto: "E31A", ts_cliente: iso(Date.now() - 2.5 * H), ts_inicio: iso(Date.now() - 3 * H) },
     { legajo: 12, opcion: "TAP", texto: "E31A", ts_cliente: iso(Date.now() - 1 * H),  ts_inicio: iso(Date.now() - 2 * H) }
+  ],
+  /* v26.33: EP/TP de E30A — un ciclo cerrado (4 h → 3,5 h atrás), un EP de prueba (legajo 1,
+     no cuenta) y el EP abierto de hace 1,5 h (en curso). */
+  pickHs: [
+    { legajo: 8, opcion: "TP", texto: "E30A", ts_cliente: iso(T0 - 3.5 * H), ts_inicio: iso(T0 - 4 * H) },
+    { legajo: 1, opcion: "EP", texto: "E30A", ts_cliente: iso(T0 - 2 * H), ts_inicio: null },
+    { legajo: 8, opcion: "EP", texto: "e30a", ts_cliente: iso(T0 - 1.5 * H), ts_inicio: null }
   ],
   fichadas: [{ legajo: 12, ts_cliente: iso(Date.now() - 4 * H) }],
   empleados: [
@@ -138,6 +148,7 @@ function responder(url) {
   if (q.includes("/Empleados"))                  return DATOS.empleados;
   if (q.includes("/rpc/gv_tv_clave_actual"))     return { clave: "1234", cambia_en_s: 60 };
   if (q.includes("/Registros_Produccion_Virgilio")) {
+    if (q.includes("opcion=in.(EP,TP)")) return DATOS.pickHs;   // v26.33: hora del picking de la tanda
     return q.includes("opcion=in.(CCN,FSS)") ? DATOS.ccn : DATOS.eventos;
   }
   return [];
@@ -223,8 +234,19 @@ function responder(url) {
   ok(t3 && /Casa Pepe/.test(t3), "el desglose de la tanda no muestra sus clientes (Casa Pepe): " + (t3 || "").slice(0, 200));
   ok(t3 && /Clientes/.test(t3), "el desglose de la tanda no tiene la fila de Clientes");
 
+  // v26.33 (Luis): la hora de inicio y fin del picking, si las tiene (llega en una consulta aparte)
+  await p.waitForFunction(() => { const n = document.getElementById("popPickHs"); return n && n.textContent.trim().length > 0; },
+    null, { timeout: 5000 }).catch(() => {});
+  const hs = await p.evaluate(() => (document.getElementById("popPickHs") || {}).textContent || "");
+  const i1 = hmAR(T0 - 4 * H), f1 = hmAR(T0 - 3.5 * H), i2 = hmAR(T0 - 1.5 * H), iPrueba = hmAR(T0 - 2 * H);
+  if (i1 && f1 && i2) {   // las tres de hoy (si la corrida cae justo después de medianoche, el día va delante)
+    ok(hs.includes(i1 + " → " + f1 + " (0:30)"), "v26.33: no muestra el picking cerrado " + i1 + " → " + f1 + " (0:30): «" + hs + "»");
+    ok(hs.includes("desde " + i2), "v26.33: no muestra el picking en curso «desde " + i2 + "»: «" + hs + "»");
+    ok(!iPrueba || iPrueba === i1 || iPrueba === f1 || iPrueba === i2 || !hs.includes(iPrueba), "v26.33: contó el EP del legajo de prueba (" + iPrueba + "): «" + hs + "»");
+  } else ok(/→/.test(hs) && /desde/.test(hs), "v26.33: no muestra la hora del picking: «" + hs + "»");
+
   await b.close();
 
   if (mal.length) { console.log("mon-admin: ✗ FAIL\n  - " + mal.join("\n  - ")); process.exit(1); }
-  console.log("mon-admin: ✓ OK (frescura + tablero + 3 pop-ups)");
+  console.log("mon-admin: ✓ OK (frescura + tablero + 3 pop-ups + hora del picking)");
 })().catch((e) => { console.log("mon-admin: ✗ ERROR " + e.message); process.exit(1); });

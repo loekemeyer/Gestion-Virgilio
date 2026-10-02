@@ -1,3 +1,12 @@
+## Nota v26.33 (2026-10-02) — Mon. Admin: la tanda muestra la HORA de inicio y fin del picking
+
+Luis: *"que en el monitor admin muestre la hora de inicio y fin de picking si las tiene"*. El pop-up de la
+tanda (Mon. Admin) completa la fila **Picking** con cada ciclo EP → TP: `13:59 → 14:30 (0:31)`; un EP sin TP
+es el picking en curso (`desde 15:10`); si no es de hoy, el día va delante. Legajos 0 y 1 no cuentan. Es la
+única consulta propia de la capa admin (EP/TP de esa tanda en 45 días, por `opcion + ts_cliente`, ~1 ms); si
+falla, el pop-up queda como estaba. Sólo en `monitor/build-admin.cjs` (la TV de pared no cambia).
+`tests/mon-admin.cjs`.
+
 ## Nota v26.32 (2026-10-02) — El FACTURADO sale en la PC del helper, no en la que factura
 
 - La estación de la PC con el helper conectado lee `Facturacion_NP.facturado_at` y manda el remito FACTURADO al helper

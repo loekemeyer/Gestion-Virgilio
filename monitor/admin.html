@@ -1993,7 +1993,7 @@ function popTanda(code) {
     ["m³", n1(v.m3)],
     ["Zona", esc((v.zonas || []).join(" · ") || "—")],
     ["Camión", esc(monCamionDeTanda(v))],
-    ["Picking", est(ev.picking)],
+    ["Picking", est(ev.picking) + (ev.picking ? ' <span id="popPickHs" data-k="' + esc(code) + '" style="color:#93c5fd"></span>' : "")],
     ["Armado", est(ev.armado)],
     ["Trabajando ahora", quien || "—"],
     ["Clientes", esc((v.clientes || []).join(" · ") || "—")]
@@ -2006,12 +2006,53 @@ function popTanda(code) {
     v.agregados.map(function (a) { return esc(a.np) + " → " + esc(a.aNp); }).join(" · ") + '</div>' : "";
   return tabla + nps + agr;
 }
+/* v26.33 (Luis): hora de inicio y fin del picking de la tanda, si las tiene. Ciclos EP → TP
+   (el TP trae la apertura en ts_inicio); un EP sin TP es el picking en curso. Legajos 0 y 1
+   son prueba. Hora AR, con el día delante si no es hoy; la duración en H:MM. */
+function popHmAR(ts) {
+  var h = new Date(ts).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ });
+  var dk = dayKey(ts);
+  return (dk === hoyKey() ? "" : diaEtiqueta(dk) + " ") + h;
+}
+function popPickCiclos(evs, code) {
+  var out = [], abierto = null;
+  (evs || []).forEach(function (e) {
+    if (String(e.texto || "").trim().toUpperCase() !== code) return;
+    var leg = String(e.legajo == null ? "" : e.legajo).trim();
+    if (!leg || leg === "0" || leg === "1") return;
+    if (e.opcion === "EP") abierto = { ini: e.ts_cliente, fin: null };
+    else if (e.opcion === "TP") { out.push({ ini: e.ts_inicio || (abierto && abierto.ini) || null, fin: e.ts_cliente }); abierto = null; }
+  });
+  if (abierto) out.push(abierto);
+  return out;
+}
+function popPickHorasTxt(c) {
+  return c.map(function (x) {
+    if (!x.fin) return "desde " + popHmAR(x.ini);
+    if (!x.ini) return "terminó " + popHmAR(x.fin);
+    var min = Math.round((new Date(x.fin).getTime() - new Date(x.ini).getTime()) / 60000);
+    return popHmAR(x.ini) + " → " + popHmAR(x.fin) + (min >= 0 ? " (" + fmtMin(min) + ")" : "");
+  }).join(" · ");
+}
+function popPickHoras(code) {
+  if (!el("popPickHs")) return;
+  var desde = new Date(Date.now() - 45 * 86400000).toISOString();
+  get("Registros_Produccion_Virgilio", "opcion=in.(EP,TP)&texto=ilike." + encodeURIComponent(code) +
+      "&ts_cliente=gte." + encodeURIComponent(desde) +
+      "&select=opcion,legajo,texto,ts_cliente,ts_inicio&order=ts_cliente.asc&limit=200")
+    .then(function (evs) {
+      var n = el("popPickHs"); if (!n || n.getAttribute("data-k") !== code) return;
+      var c = popPickCiclos(evs, code);
+      n.textContent = c.length ? "· " + popPickHorasTxt(c) : "";
+    })
+    .catch(function () { /* sin la hora el pop-up queda como estaba */ });
+}
 function abrirDesglose(pop, t) {
   if (pop === "rit")   return abrirPop("m³/h " + (t.getAttribute("data-sub") === "pick" ? "picking" : "armado"), popRitmo(t.getAttribute("data-leg"), t.getAttribute("data-sub")));
   if (pop === "hs")    return abrirPop("Horas del operario", popHoras(t.getAttribute("data-leg")));
   if (pop === "dia")   return abrirPop("NPs · " + (POP_EST[t.getAttribute("data-sub")] || ""), popDiaBucket(t.getAttribute("data-dia"), t.getAttribute("data-sub")));
   if (pop === "diam3") return abrirPop("m³ del día", popDiaM3(t.getAttribute("data-dia")));
-  if (pop === "tanda") return abrirPop("Tanda " + t.getAttribute("data-k"), popTanda(t.getAttribute("data-k")));
+  if (pop === "tanda") { abrirPop("Tanda " + t.getAttribute("data-k"), popTanda(t.getAttribute("data-k"))); popPickHoras(t.getAttribute("data-k")); return; }
 }
 /* Marca las celdas clickeables después de cada render (los nodos son nuevos en cada pintada,
    así que no se acumula). Zip por posición: el orden del DOM es el de los datos. */
