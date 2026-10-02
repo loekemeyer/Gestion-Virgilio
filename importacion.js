@@ -1914,10 +1914,12 @@ async function _pedImpDamianPartes(provs, opt) {
     const una = fs.length === 1 ? fs[0] : "";
     return { hay: con.length > 0, una: una,
       // v26.37 (Luis: "que la fecha de llegada se vea un poquito más grande, al mismo tamaño de en curso") — .fl
-      th: '<th>Llegan' + (una ? '<span class="fl">' + una + '</span>' : '<small>u · dd/mm</small>') + (conFob ? '<small>FOB u$s</small>' : '') + '</th>',
+      // v26.40 (Luis: "que figure el monto del pedido en usd arriba de en curso") — con conFob el u$s de lo que
+      // viene va ARRIBA de las unidades (.fobl), después las unidades y abajo la fecha.
+      th: '<th>Llegan<small>' + (conFob ? 'u$s · u' : 'u') + (una ? '' : ' · dd/mm') + '</small>' + (una ? '<span class="fl">' + una + '</span>' : '') + '</th>',
       td: function (it) { const cam = Math.max(0, Number(it.enCurso) || 0), f = ddmm(it.reingresoEst), u = usdCam(it);
-        return '<td>' + (cam > 0 ? fmt(cam) + (una ? '' : '<span class="fl">' + (f || 's/f') + '</span>') +
-          (conFob ? '<small class="fobl">' + (u > 0 ? fmt(u) : 's/FOB') + '</small>' : '') : '—') + '</td>'; } };
+        return '<td>' + (cam > 0 ? (conFob ? '<span class="fobl">' + (u > 0 ? fmt(u) : 's/FOB') + '</span>' : '') + fmt(cam) +
+          (una ? '' : '<span class="fl">' + (f || 's/f') + '</span>') : '—') + '</td>'; } };
   };
   const maxTd = function (it) { return '<td>' + fmt(it.objetivoUni) + '<small>' + fmt(it.proyUni) + '/mes</small></td>'; };
   const todos = function (gs, k) { return [].concat.apply([], gs.map(function (g) { return g[k]; })); };
@@ -2089,7 +2091,7 @@ function _pedImpDamianDoc(titulo, hojas) {
     'th.sp,td.sp{width:2px;min-width:2px;padding:0;border-top:0;border-bottom:0}' +   // v24.55 (Thomas): columna vacía finita que separa bloques
     'table{border-collapse:collapse;margin:0 auto}th,td{border:1px solid #444;padding:1px 4px;vertical-align:middle;text-align:center;white-space:nowrap;line-height:1.1}th{font-size:14px}' +
     'th.tit{font-size:16px;font-weight:800;white-space:normal}.tot{font-weight:800}.tit3{font-size:16px;font-weight:800;text-align:center}.nota{border:0;text-align:left;padding-left:2px}.moq{font-size:10px;font-weight:800;display:block;line-height:1.05}' +
-    'th small,td small{display:block;font-weight:400;color:#555;font-size:10px}.fl{display:block;font-size:14px;font-weight:400;color:#111}.dsc{white-space:normal;max-width:112px;line-height:1}td.pq{white-space:normal;max-width:60px;font-size:12px}' +
+    'th small,td small{display:block;font-weight:400;color:#555;font-size:10px}.fl{display:block;font-size:14px;font-weight:400;color:#111}.fobl{display:block;font-size:13px;font-weight:800;color:#111}.dsc{white-space:normal;max-width:112px;line-height:1}td.pq{white-space:normal;max-width:60px;font-size:12px}' +
     '.ft{padding:0}.ft img{width:42px;height:42px;object-fit:contain;display:block;margin:0 auto}.sf{color:#999;font-size:9px}' +
     'tr{page-break-inside:avoid}thead{display:table-header-group}' +
     'tr.prov>td{font-size:16px;font-weight:800;white-space:normal;border-top:3px solid #111;page-break-after:avoid;break-after:avoid}tr.prov>td.tot{font-size:14px}tr.prov>td.sp{border-top:0}tr.prov>td.nota{border:0}' +   // v26.31: un renglón-rótulo por proveedor

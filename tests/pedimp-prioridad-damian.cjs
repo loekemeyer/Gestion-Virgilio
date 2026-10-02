@@ -59,9 +59,9 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     const top = [...trs0[0].children].map((x) => x.textContent.trim());
     const pdfTh = [...trs0[1].children].map((x) => x.textContent.trim());
     const pdfCods = [...h1.querySelectorAll("tbody tr")].map((tr) => tr.cells[0].textContent.trim());
-    // v26.34 — la celda «Llegan» de FFF (500 u en camino × u$s 1) lleva el FOB abajo
+    // v26.40 — la celda «Llegan» de FFF (500 u en camino × u$s 1): el u$s ARRIBA, después las unidades
     const trFFF = [...h1.querySelectorAll("tbody tr")].find((tr) => tr.cells[0].textContent.trim() === "FFF");
-    const llegaFFF = trFFF ? [...trFFF.cells[6].querySelectorAll("small")].map((x) => x.className + ":" + x.textContent).join("|") : "";
+    const llegaFFF = trFFF ? [...trFFF.cells[6].childNodes].map((x) => (x.className || "u") + ":" + x.textContent).join("|") : "";
     return { filas, camino, th4: ths[4].textContent.trim(), badges, top, pdfTh, pdfCods, llegaFFF, hojas: d.querySelectorAll(".hoja").length, txt: d.textContent,
       imgs: h1.querySelectorAll("tbody img").length, insumoFoto: ([...h1.querySelectorAll("tbody tr")].find((tr) => tr.cells[0].textContent.trim() === "GGG") || { cells: [0,0,0,{ textContent: "" }] }).cells[3].textContent };
   }, items);
@@ -83,8 +83,8 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (!/^Pedido Frontier \d{2}\/(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)$/.test(r.top[0])) fail("(C) título «Pedido <prov> dd/mmm»: " + r.top[0]);
   // v26.34 (Luis) — arriba de «Llegan» va el FOB de lo que viene (500 u × u$s 1), para compararlo con el del pedido
   if (r.top[1] !== "500") fail("(C) arriba de Llegan, el FOB u$s de lo que viene (500): " + r.top[1]);
-  if (!/FOB u\$s/.test(r.pdfTh[6] || "")) fail("(C) el rótulo de Llegan dice FOB u$s: " + r.pdfTh[6]);
-  if (r.llegaFFF !== "fobl:500") fail("(C) la celda Llegan de FFF lleva su FOB abajo (fobl:500): " + r.llegaFFF);
+  if (!/u\$s · u/.test(r.pdfTh[6] || "")) fail("(C) el rótulo de Llegan dice u$s · u: " + r.pdfTh[6]);
+  if (r.llegaFFF !== "fobl:500|u:500") fail("(C) la celda Llegan de FFF lleva el u$s ARRIBA de las unidades (fobl:500|u:500): " + r.llegaFFF);
   if (r.top[2] !== "10 m") fail("(C) los meses del máximo van arriba de Máx: " + r.top[2]);
   if (!/^Pedido/.test(r.top[3]) || r.top[4] !== "") fail("(C) Pedido (2 filas) y el separador: " + r.top.join(" | "));
   if (r.top[5] !== "2.400") fail("(C) FOB lleva el total arriba (2.400): " + r.top[5]);
