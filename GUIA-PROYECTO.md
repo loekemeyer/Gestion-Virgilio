@@ -1,3 +1,49 @@
+## Nota v26.12 (2026-10-02) — Cada hoja en su impresora, sin el kiosco de Chrome: el programa de impresión de la PC
+
+Luis: *"elegir diferentes impresoras conectadas a la máquina para elegir dónde se imprime cada cosa (ajeno a la
+configuración predeterminada de Chrome) … y activar la impresión automática"*. La PC del depósito no puede abrir
+Chrome en kiosco, y sin kiosco cada hoja abría el cuadro de impresión.
+
+**Chrome no deja que una página vea ni elija impresoras.** Lo hace un programa que corre en la PC desde la carpeta
+compartida (`tools/impresion/`, mismo esquema que el de etiquetas de lío): le pasa a la base sus impresoras, toma
+las hojas que GV le manda y las imprime por NOMBRE, sin cuadro.
+
+| hoja | la arma | cuándo |
+|---|---|---|
+| picking | cualquier GV de supervisor abierto en una PC (`psPoll`) | al TP |
+| armado | ídem | al TAL de cada NP |
+| facturado | el equipo que exporta el Excel ISIS o tilda (también un celular) | al marcar facturada |
+
+- Se configura en **Configuración → 🧩 Impresoras**: por hoja, PC + impresora + Automático + copias, con 🖨️ Prueba
+  y la lista de las últimas hojas (estado y error; las que fallaron se reintentan desde ahí).
+- **Una hoja sin PC sigue como hoy** (estación del navegador / `fac_print_facturado`): el cambio no mueve nada hasta
+  que alguien la configure.
+- La base no deja que la misma hoja salga dos veces (`clave_unica` = tipo:ref). Un envío que falla queda en el equipo
+  (`gv_imp_pend_v1`) y se reintenta solo; lo pendiente de más de 12 h se vence.
+- **«Impreso» lo dice el programa al confirmar**, no GV al mandar: recién ahí se marca `Impresion_NP` (origen
+  `programa`). Lo que marcaba la estación del navegador era «se mandó», aunque el cuadro quedara abierto.
+- El programa necesita la **clave** que muestra la pantalla (la pide la 1.ª vez y la guarda en `clave.txt`, que no va
+  al repo): sin ella, cualquiera con la clave pública podría registrar PCs o tomar hojas.
+- Dibuja la hoja con el Chrome/Edge de la PC en modo invisible (703 px de ancho = A4 − 12 mm, a 2×) y la imprime con
+  .NET a lo ancho del área útil, en las páginas que hagan falta. Compatible con PowerShell 2.0 / Windows 7.
+
+`sql/gv_impresion_programa_v2611.sql` (rollback en la cabecera), `tools/impresion/LEEME.md`,
+`tests/imp-programa.cjs` (corre el desvío y la pantalla), `tests/imp-agente-ps.cjs` (candado del programa).
+## Nota v26.11 (2026-10-02) — 🟥 ARMADO AUTOMÁTICO: **máximo 5 NP por tanda · una sola góndola · forward-facing**
+
+> **<mark>El armado automático no arma una tanda con más de 5 NP, y una tanda pickea todo de UNA góndola
+> (todo LK o todo CH). Un cliente o pedido con más de 5 NP va ENTERO. Lo ya armado queda como está.</mark>**
+
+Regla de Luis (v26.03, 01/10; cerrada el 02/10). La góndola de pickeo la da de dónde sale la caja, no la
+empresa: NP de LK → LK; NP de Chef con **L** (Cencosud, TdF de Chef) → LK; NP de Chef sin L → CH; con L y
+sin L a la vez → MIX, va sola. Tope en `PPP_Web_Config.tanda_max_nps` (5); a mano se puede pasar.
+`ppp_web_armar_tandas` y `gv_ppp_web_fusionar_tandas` la respetan; la góndola de cada NP la manda la Edge
+`gv-ppp-web-tandas-diarias` (`gondolaDe`). **Forward-facing:** las 6 tandas viejas de más de 5 NP (E18B,
+E18C, E48I, F18B, F21C, F47B) no se parten ni se reportan; `gv_ppp_tanda_mas_5_np` y
+`gv_ppp_tanda_gondola_mezclada` son historia. El botón de la tanda en la Programación es **🔧 Modificar
+tanda** → **📅 Cambiar de día** / **✂ Partir tanda**. Detalle en el bloque de arriba de `CLAUDE.md`;
+`sql/gv_armado_tope5_gondola_v2577.sql`, `tests/regla-armado-tope5.cjs`, `tests/ppp-partir-tanda.cjs`.
+
 ## Nota v24.89 (2026-09-30) — Pendientes de Recepción: botón «No recibido» con WhatsApp a Marian
 
 Pedido de Mel. En cada tarjeta de **Recepción → Pendientes**, a la derecha de **Recibido**, está el

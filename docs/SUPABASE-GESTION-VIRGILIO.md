@@ -31169,3 +31169,27 @@ despachados, m³ pendientes, unidades vendidas y $ facturado. Los reportes viven
 - Medido: sep LK $ 413,4 M · Chef $ 109,9 M ($ 21,6 M son Loekemeyer Hnos → el reporte dice Chef $ 88,3 M).
 
 `sql/gv_rep_gerencia_cobrado_v2611.sql` (rollback en la cola) · LK: `pagina-LK-copia/sql/reporte_gerencia_v2.sql`.
+
+## §3.v2612 — Impresión por programa en la PC: `GV_Impresion_*` + `gv_imp_*` (Luis, 02/10/2026)
+
+Se aplicó como migración `gv_impresion_programa_v2611` y los comentarios de las funciones dicen **v26.11**:
+la app salió como **v26.12** porque otra sesión publicó la v26.11 en el medio. No cambiar esa etiqueta.
+
+Objetos **nuevos**; ninguno existente se tocó. Tablas con RLS y sin grants (sólo se usan por RPC):
+- `GV_Impresion_PC` (pc, impresoras jsonb, version, chrome, ultimo_latido) — la llena el programa.
+- `GV_Impresion_Regla` (tipo picking/armado/facturado → pc, impresora, auto, copias) — la llena la pantalla.
+- `GV_Impresion_Trabajo` (cola: tipo, ref, pc, impresora, html, estado, intentos, error, `clave_unica` tipo:ref).
+- `GV_Impresion_Clave` (1 fila, generada al crear) — la clave que el programa pone en `clave.txt`.
+
+RPC: del programa (anon + clave) `gv_imp_agente_latido`, `gv_imp_agente_tomar` (SKIP LOCKED, vence > 12 h, se
+traba 3 veces → error), `gv_imp_agente_resultado` (al confirmar marca `Impresion_NP` con `gv_origen='programa'`);
+de GV `gv_imp_config` (anon/auth; la clave sólo a supervisor), y sólo `authenticated` + supervisor adentro:
+`gv_imp_regla_guardar`, `gv_imp_encolar`, `gv_imp_trabajos`, `gv_imp_trabajo_reintentar`.
+
+- **Impacto medido: 0.** Sin filas en `GV_Impresion_Regla`, `gv_imp_encolar` devuelve `sin_regla` y GV imprime como
+  hoy. La única escritura sobre una tabla vieja es el insert en `Impresion_NP` cuando el programa confirma.
+- **Probado en transacción abortada** (02/10): latido → regla → encolar `encolado`, mismo NP `duplicado`,
+  facturado sin regla `sin_regla`, prueba manual `encolado` → tomar 2 → resultado `impreso` → `Impresion_NP` 1 fila
+  `programa` → clave mala `CLAVE_INVALIDA`. Como `anon`: tomar con clave mala `CLAVE_INVALIDA`, encolar
+  `permission denied`. Después: 0 PCs, 0 reglas, 0 trabajos, 1 clave.
+- Rollback: los `drop` de la cabecera de `sql/gv_impresion_programa_v2611.sql`.
