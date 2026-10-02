@@ -12,7 +12,8 @@ let activeTab = "sugerencias"; // o "novedades"
 // Endpoint /render/image/public/ requiere image transformations (no habilitado en el tenant).
 // /object/public/ sirve la imagen directo. Las fotos ya están en 400x400 WebP.
 const BASE_IMG = `${SUPABASE_URL}/storage/v1/object/public/products-images/`;
-const IMG_PARAMS = ``;
+// Cache-buster de imágenes: mantener el MISMO valor que script.js / historial.js.
+const IMG_PARAMS = `?v=20260916`;
 
 function imgUrlByCod(cod) {
   const c = String(cod || "").trim();
@@ -47,7 +48,9 @@ function setStatus(msg) {
 }
 
 function showTable(show) {
-  $("tablaSug").style.display = show ? "table" : "none";
+  // Al mostrar, limpiamos el display inline para que mande el CSS
+  // (tabla en desktop, tarjetas apiladas en móvil vía media query).
+  $("tablaSug").style.display = show ? "" : "none";
 }
 
 function pick(obj, keys, fallback = "") {
@@ -140,6 +143,12 @@ function renderSug() {
   const thead = $("theadSug");
   const tbody = $("tbodySug");
 
+  // Anchos en PORCENTAJE, no en px. Con table-layout:fixed los px son
+  // absolutos: las seis columnas fijas sumaban 930px y, en cuanto la pantalla
+  // bajaba de ~1100px de ancho (una tablet vertical, o una All-in-One con el
+  // escalado de Windows alto), no quedaba nada para Descripción y el nombre
+  // del producto se veía en 31px o directamente en 0. En % reparten siempre
+  // proporcionalmente y la tabla nunca pasa el ancho del dispositivo.
   thead.innerHTML = `
     <tr>
       <th style="width:9%">Img</th>
@@ -176,7 +185,7 @@ function renderSug() {
 
     tbody.innerHTML += `
       <tr>
-        <td class="imgcell">
+        <td class="imgcell" data-label="">
           <img
             class="sug-img"
             src="${imgUrlByCod(cod)}"
@@ -187,17 +196,17 @@ function renderSug() {
             onerror="this.onerror=null;this.src='img/no-image.jpg'"
           />
         </td>
-        <td>${cod}</td>
-        <td class="desc">${desc}</td>
-        <td class="uxb-cell">${uxb}</td>
-        <td class="price-cell">
+        <td class="cod-cell" data-label="Cod">${cod}</td>
+        <td class="desc" data-label="Descripción">${desc}</td>
+        <td class="uxb-cell" data-label="UxB">${uxb}</td>
+        <td class="price-cell" data-label="Tu precio contado">
   $${tuPrecioContado.toLocaleString("es-AR", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })}
-</td>       
-        <td class="msg">${msg}</td>
-        <td>
+</td>
+        <td class="msg" data-label="Motivo">${msg}</td>
+        <td data-label="Pedido">
           <div class="sug-action">
             <div class="sug-stepper">
               <button type="button" class="sug-step-btn" onclick="sugDec('${pid}')">−</button>
@@ -276,10 +285,23 @@ async function fetchCustomerFull(customerId) {
   }
 }
 
-function renderClienteSelectorSug(linked, currentCod, onChangeClient) {
+function renderClienteSelectorSug(linked, currentCod, onChangeClient, currentName) {
   const old = document.getElementById("sug-cliente-selector");
   if (old) old.remove();
-  if (!linked || !linked.length) return;
+
+  // EXPO / admin: el cliente elegido puede NO estar entre los vinculados (se
+  // eligió del padrón completo). Si falta, lo inyectamos para que el selector
+  // muestre al cliente real y no caiga al primer vinculado (bug "otra razón
+  // social"). El nombre sale del que se persistió al elegirlo.
+  const opciones = Array.isArray(linked) ? linked.slice() : [];
+  const yaEsta = opciones.some((c) => String(c.cod_cliente) === String(currentCod));
+  if (currentCod && !yaEsta) {
+    opciones.unshift({
+      cod_cliente: currentCod,
+      business_name: currentName || "(cliente elegido)",
+    });
+  }
+  if (!opciones.length) return;
 
   const wrap = document.createElement("div");
   wrap.id = "sug-cliente-selector";
@@ -294,7 +316,7 @@ function renderClienteSelectorSug(linked, currentCod, onChangeClient) {
   sel.id = "sugClienteSelect";
   sel.className = "sug-cliente-select";
 
-  linked.forEach((c) => {
+  opciones.forEach((c) => {
     const opt = document.createElement("option");
     opt.value = String(c.cod_cliente);
     opt.textContent = `${c.business_name} (${c.cod_cliente})`;
@@ -303,7 +325,7 @@ function renderClienteSelectorSug(linked, currentCod, onChangeClient) {
   });
 
   sel.addEventListener("change", () => {
-    const match = linked.find((c) => String(c.cod_cliente) === sel.value);
+    const match = opciones.find((c) => String(c.cod_cliente) === sel.value);
     if (!match) return;
     onChangeClient(match);
   });
@@ -515,7 +537,7 @@ async function init() {
         `Cliente: ${cliente.business_name} (${cliente.cod_cliente})`;
       sugMostrados = 5;
       await loadSugerencias(cliente.cod_cliente);
-    });
+    }, cliente.business_name);
   } catch (e) {
     console.error("Init crash:", e);
     setStatus("Error inesperado. Ver consola.");

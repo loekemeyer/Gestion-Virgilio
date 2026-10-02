@@ -109,17 +109,20 @@
 }
 
 .prod-head h1 {
-  font-size: 34px;
-  margin: 0 0 12px;
-  letter-spacing: -0.5px;
+  font-size: clamp(28px, 3.2vw, 42px);
+  line-height: 1.12;
+  margin: 0 0 14px;
+  letter-spacing: -0.6px;
 }
 
+/* Bajada: 18 px contra los 13-15 de la ficha de cada artículo. La jerarquía
+   la marca el tamaño, no el color gris. */
 .prod-intro {
-  color: var(--muted);
-  font-size: 15px;
+  color: #444;
+  font-size: 18px;
   line-height: 1.6;
   margin: 0;
-  max-width: 72ch;
+  max-width: 62ch;
 }
 
 /* ================= SUBNAV (Utensilios) ================= */
@@ -170,151 +173,218 @@
   padding: 3px 10px;
 }
 
-/* ================= GRILLA PRODUCTOS ================= */
+/* ================= DOS FORMATOS, A PROPÓSITO =================
+
+   productos/index.html        -> MOSAICO DE LÍNEA (.cat-grid / .cat-card)
+     Cada cuadro muestra hasta cuatro artículos de la línea, con "+N" en el
+     cuarto. Una sola foto no representaba a la línea —el primer pelador no
+     habla por los nueve—; cuatro sí son una muestra.
+
+   productos/<línea>.html      -> MOSAICO (.prod-grid / .prod-card)
+     Adentro de una línea la foto sí es distinta artículo por artículo, y
+     el comercio reconoce el modelo mirándola.
+
+   En los dos casos, sin cromo de tienda: esta página no tiene precio, ni
+   carrito, ni checkout. El modelo es el catálogo impreso.
+   ============================================================== */
+
+/* ---------- tipografía común a los dos formatos ---------- */
+/* En un catálogo manda la referencia: es lo que el comercio escribe en el
+   pedido. Va arriba del nombre, en versalita roja. */
+.prod-cod {
+  font-size: 11.5px;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+  color: var(--accent);
+  margin: 0 0 5px;
+}
+
+.prod-name {
+  font-size: 15px;
+  line-height: 1.35;
+  margin: 0 0 4px;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+}
+
+.prod-meta {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* El link es secundario a propósito: en rojo y en negrita parecía un
+   "agregar al carrito" que esta página no tiene. */
+.prod-cta {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  transition: color 0.2s ease;
+}
+
+.prod-cta:hover {
+  color: var(--accent);
+}
+
+/* ---------- MOSAICO: páginas de línea ---------- */
+/* Tres columnas y no cuatro, medido sobre las 19 líneas reales: con tres
+   quedan 14 huecos en las últimas filas de todo el catálogo, con cuatro 25. */
 .prod-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 22px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 34px;
+  row-gap: 46px;
 }
 
 .prod-card {
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  overflow: hidden;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
   scroll-margin-top: 90px;
-}
-
-.prod-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.1);
 }
 
 .prod-thumb {
   position: relative;
-  background: #f7f7f8;
   aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .prod-thumb img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 12px;
+  transition: transform 0.25s ease;
 }
 
-/* ================= BADGES ================= */
-.prod-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.8px;
-  color: #fff;
-  border-radius: 40px;
-  padding: 5px 12px;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+.prod-card:hover .prod-thumb img {
+  transform: scale(1.04);
 }
 
-.prod-badge--nuevo {
-  background: #8b1e1e;
-}
-
-.prod-badge--prox {
-  background: #2f343a;
-}
-
-/* ================= BODY CARD ================= */
 .prod-body {
   display: flex;
   flex-direction: column;
   flex: 1;
-  padding: 16px 16px 14px;
+  padding: 12px 0 0;
+  border-top: 1px solid #1c1c1c;   /* la regla del catálogo impreso */
 }
 
-.prod-name {
-  font-size: 15px;
-  line-height: 1.35;
-  margin: 0 0 10px;
-  font-weight: 700;
+.prod-card .prod-cta {
+  margin-top: auto;                /* empuja el link al pie de la ficha */
+  padding-top: 10px;
 }
 
-.prod-meta {
-  font-size: 12.5px;
-  color: var(--muted);
-  margin: 0 0 3px;
-}
-
-.prod-cta {
-  margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid #f1f1f1;
-  margin-top: 14px;
-  font-size: 13px;
-  font-weight: 900;
-  color: #8b1e1e;
-  transition: color 0.2s ease;
-}
-
-.prod-cta:hover {
-  color: #6f1717;
-}
-
-/* ================= GRILLA CATEGORIAS (index) ================= */
+/* ---------- MOSAICO DE LÍNEA: índice ----------
+   Cada cuadro muestra hasta cuatro artículos de la línea, al estilo de
+   WhatsApp, y el cuarto lleva el "+N" con los que faltan. Antes era la foto
+   del artículo que quedó primero, que no representaba a la línea: el primer
+   pelador no habla por los nueve. */
 .cat-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 22px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 34px;
+  row-gap: 46px;
 }
 
 .cat-card {
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 14px;
+}
+
+.cat-mosaico {
+  aspect-ratio: 1 / 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+}
+
+/* Una sola foto: ocupa el cuadro entero. */
+.cat-mosaico--1 {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+/* Dos: una al lado de la otra. */
+.cat-mosaico--2 {
+  grid-template-rows: 1fr;
+}
+
+/* Tres: una grande a la izquierda y dos apiladas a la derecha. */
+.cat-mosaico--3 .cat-celda:first-child {
+  grid-row: span 2;
+}
+
+.cat-celda {
+  position: relative;
   overflow: hidden;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
 }
 
-.cat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.12);
-}
-
-.cat-thumb {
-  background: #f7f7f8;
-  aspect-ratio: 4 / 3;
-}
-
-.cat-thumb img {
+.cat-celda img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 14px;
+  transition: transform 0.25s ease;
+}
+
+.cat-card:hover .cat-celda img {
+  transform: scale(1.04);
+}
+
+.cat-mas {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(28, 28, 28, 0.55);
+  color: #fff;
+  font-size: clamp(20px, 2.2vw, 30px);
+  font-weight: 900;
+  letter-spacing: -0.5px;
 }
 
 .cat-body {
-  padding: 16px;
-  border-top: 1px solid var(--border);
+  padding: 12px 0 0;
+  border-top: 1px solid #1c1c1c;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .cat-name {
-  font-size: 17px;
-  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.1px;
+  margin: 0;
+}
+
+.cat-card:hover .cat-name {
+  color: var(--accent);
 }
 
 .cat-count {
   font-size: 12.5px;
   color: var(--muted);
+  white-space: nowrap;
+  margin: 0;
+}
+
+/* ================= MARCA "NUEVO" =================
+   Era una pastilla roja redondeada arriba de la foto: vocabulario de oferta
+   de tienda. Ahora es una marca del catálogo, al lado de la referencia. */
+.prod-nuevo {
+  color: #1c1c1c;
+  background: #ffe9a8;
+  padding: 1px 6px;
+  border-radius: 3px;
+  letter-spacing: 1px;
+  margin-left: 6px;
 }
 
 /* ================= CTA BLOCK ================= */
@@ -338,13 +408,6 @@
 }
 
 /* ================= RESPONSIVE ================= */
-@media (max-width: 1024px) {
-  .prod-grid,
-  .cat-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 760px) {
   .prod-grid,
   .cat-grid {

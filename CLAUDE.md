@@ -4384,6 +4384,16 @@ Al verificar setea un password temporal aleatorio en el user y el front hace
   (j) **la Est. Madre NO se re-copia de LK** (v25.79): vive SÓLO en `admin/est-madre.js` de este repo y los
   dos `admin.js` traen el mismo cargador `abrirEstadisticaMadre` (huella md5 en `tests/est-madre-unica.cjs` de
   los dos repos). Al re-sincronizar, no volver a traer la Est. Madre de `pagina-LK-copia`: allá ya no está.
+  (k) el ítem **«Análisis de Cobranzas»** del menú lateral de admin.html es propio de la copia (LK nunca lo tuvo).
+  (l) el encabezado **`pscThCant`** de Pedidos sin cot y su texto «…cargan en unidades» los **perdió LK** el 23/09
+  (commit `27ddd39`, una copia vieja pisó admin.html); la copia los conserva hasta que LK los recupere.
+
+  ⚠ **Re-sincronizada entera el 02/10/2026 (v26.13) contra LK v2.3.508**: estaba con el pie en 2.3.187 y
+  `admin.js` con 3.648 líneas de diferencia (le faltaban, entre otros, el mapa por vendedor, la escala y el
+  acuerdo de expo y el alta de clientes por Edge Function). **Cómo se hizo, para repetirlo**: se parte del
+  archivo de LK y se le vuelven a aplicar SÓLO los bloques de (a)–(l) (`diff` LK → copia, hunk por hunk);
+  nunca se copia la copia vieja encima. Lo sostienen `est-madre-unica`, `stk-est-madre-sin-codigo`,
+  `stk-est-madre-tab`, `krikos-parsers`, `regla-L-super` y los `pweb-*`.
 
 ### Convenciones operativas
 

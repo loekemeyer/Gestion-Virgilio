@@ -10,16 +10,17 @@
     <meta name="robots" content="noindex,nofollow" />
     <title>Admin - Loekemeyer</title>
     <link rel="icon" type="image/jpeg" href="img/favicon.jpg?v=2" />
-    <link rel="stylesheet" href="css/analisis-venta-cliente.css?v=23176" />
-    <link rel="stylesheet" href="css/admin.css?v=25790" />
+    <link rel="stylesheet" href="css/analisis-venta-cliente.css?v=23508" />
+    <link rel="stylesheet" href="css/admin.css?v=23508" />
     <link
       href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap"
       rel="stylesheet"
     />
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0"></script>
     <!-- xlsx-js-style: fork de SheetJS con soporte para estilos (colores, bordes, bold) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   </head>
   <body>
@@ -557,6 +558,47 @@
             </span>
             <span>Gerente de ventas</span>
           </button>
+          <button class="nav-item" data-page="escala-expo">
+            <span class="nav-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+              >
+                <path d="M4 20V10M10 20V4M16 20v-6M20 20H2" />
+              </svg>
+            </span>
+            <span>Escala Expo</span>
+          </button>
+          <button class="nav-item" data-page="acuerdo-vendedores">
+            <span class="nav-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+              >
+                <path d="M3 3v18h18" />
+                <path d="M7 14l3-4 3 3 4-6" />
+              </svg>
+            </span>
+            <span>Acuerdo x Vendedor</span>
+          </button>
+          <button class="nav-item" data-page="clientes-pendientes">
+            <span class="nav-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+              >
+                <path d="M9 11l3 3L22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+            </span>
+            <span>Clientes Expo pend.</span>
+          </button>
         </nav>
         <div class="sidebar-footer">
           <a class="config-btn" href="../">
@@ -668,6 +710,21 @@
                         min="0"
                         max="100"
                       />
+                      <label
+                        style="
+                          display: flex;
+                          align-items: center;
+                          gap: 6px;
+                          margin-top: 6px;
+                          font-size: 12px;
+                          color: #4b5563;
+                          cursor: pointer;
+                          user-select: none;
+                        "
+                      >
+                        <input type="checkbox" id="manualEscalaActiva" />
+                        <span>Escala activa (dto por 1ª compra)</span>
+                      </label>
                     </td>
                     <td>
                       <input
@@ -2389,6 +2446,7 @@
               </div>
             </div>
           </div>
+
           <!-- 5. Cliente real: la tabla CANONICA clientes_vinculados (23/09) -->
           <div class="card" style="margin-bottom: 18px">
             <div class="est-card-head collapsed" onclick="toggleEstCard('cvBody', this)">
@@ -2564,6 +2622,76 @@
                 <span><span class="gv-dot gv-dot-fri"></span>Zona fría (pocos puntos por habitante)</span>
                 <span><span class="gv-dot gv-dot-sin"></span>Sin población cargada</span>
                 <span class="gv-leyenda-nota">El tamaño del círculo es la cantidad de sucursales. Hacé clic en una provincia para acercarte.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3.b Mapa por vendedor -->
+          <div class="card" style="margin-bottom: 18px">
+            <div class="est-card-head" onclick="toggleEstCard('gvVendMapaBody', this)">
+              <span class="est-card-caret">▸</span>
+              <h2 style="margin: 0; font-size: 21px">Zona de cada vendedor</h2>
+              <span style="color: #666; font-size: 13px" id="gvVendResumen"></span>
+            </div>
+            <div class="est-card-body" id="gvVendMapaBody" style="display: none">
+              <p class="gv-ayuda">
+                Dónde están los clientes de cada vendedor. El <strong>índice de zona</strong>
+                es el % de clientes en sus 2 provincias principales: cuanto más alto, más
+                claramente atiende una zona. <em>(sin asignar)</em> son los clientes sin
+                vendedor cargado en comisiones.
+              </p>
+              <div class="gv-agenda-tools">
+                <select id="gvVendSel" class="gv-fecha" onchange="gvVendRender()">
+                  <option value="">Todos los vendedores</option>
+                </select>
+                <span class="gv-vend-zona" id="gvVendZona"></span>
+              </div>
+              <div class="gv-mapa-wrap">
+                <div id="gvVendMapaSlot" class="gv-mapa-slot">Cargando mapa…</div>
+                <div id="gvVendMapaTip" class="gv-mapa-tip" style="display: none"></div>
+              </div>
+              <div class="gv-mapa-leyenda">
+                <span><span class="gv-dot gv-dot-cal"></span>Mayoría activos</span>
+                <span><span class="gv-dot gv-dot-med"></span>Mezcla</span>
+                <span><span class="gv-dot gv-dot-fri"></span>Mayoría inactivos</span>
+                <span class="gv-leyenda-nota">El tamaño del círculo es la cantidad de clientes. Clic en una provincia para acercarte.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3.c Cobertura de distribuidores -->
+          <div class="card" style="margin-bottom: 18px">
+            <div class="est-card-head" onclick="toggleEstCard('gvCobBody', this)">
+              <span class="est-card-caret">▸</span>
+              <h2 style="margin: 0; font-size: 21px">Cobertura de distribuidores</h2>
+              <span style="color: #666; font-size: 13px" id="gvCobResumen"></span>
+            </div>
+            <div class="est-card-body" id="gvCobBody" style="display: none">
+              <p class="gv-ayuda">
+                Un distribuidor factura en una provincia pero <strong>revende a otras</strong>.
+                Cargá acá a qué provincias llega cada uno: el mapa las pinta
+                (<span style="color:#10b981;font-weight:600">verde = confirmado</span>,
+                <span style="color:#d97706;font-weight:600">ámbar = a confirmar</span>). Así una
+                provincia "débil" que en realidad cubre un mayorista de otra deja de verse vacía.
+              </p>
+              <div class="gv-agenda-tools">
+                <select id="gvCobSel" class="gv-fecha" onchange="gvCobSeleccionar(this.value)">
+                  <option value="">— Elegí un distribuidor —</option>
+                </select>
+                <input id="gvCobBuscar" class="gv-fecha" placeholder="…o buscá un cliente por nombre/código" style="min-width: 220px" />
+                <button type="button" class="btn-secondary" onclick="gvCobBuscarCliente()">Buscar</button>
+                <select id="gvCobResultados" class="gv-fecha" style="display: none" onchange="gvCobUsarResultado()"></select>
+              </div>
+              <div class="gv-mapa-wrap">
+                <div id="gvCobMapaSlot" class="gv-mapa-slot">Cargando…</div>
+              </div>
+              <div id="gvCobChips" class="gv-cob-chips"></div>
+              <div id="gvCobAddBox" class="gv-agenda-tools" style="display: none">
+                <select id="gvCobProv" class="gv-fecha"></select>
+                <label style="font-size: 13px; display: flex; align-items: center; gap: 4px">
+                  <input type="checkbox" id="gvCobConf" /> confirmado
+                </label>
+                <button type="button" class="btn-secondary" onclick="gvCobAgregar()">Agregar provincia</button>
               </div>
             </div>
           </div>
@@ -2934,18 +3062,212 @@
         <section class="page" id="osa-entregas"></section>
         <section class="page" id="osa-ventas"></section>
 
+        <!-- PAGE: ESCALA EXPO -->
+        <section class="page" id="escala-expo">
+          <div class="page-header">
+            <h1>Escala de descuento — Expo</h1>
+            <p>
+              Dto por volumen que se aplica a los clientes <strong>nuevos de
+              expo</strong>, según el monto de <strong>lista</strong> del pedido
+              (antes del descuento). Se recalcula en vivo mientras cargan el
+              pedido. No afecta a los clientes existentes.
+            </p>
+          </div>
+          <div class="card" style="max-width: 560px">
+            <table class="escala-expo-table" id="escalaExpoTable">
+              <thead>
+                <tr>
+                  <th>Desde (monto lista $)</th>
+                  <th>Dto %</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="escalaExpoBody"></tbody>
+            </table>
+            <div
+              style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap"
+            >
+              <button class="btn-ghost" type="button" id="escalaExpoAddRow">
+                + Agregar tramo
+              </button>
+              <button class="btn-primary" type="button" id="escalaExpoSave">
+                Guardar escala
+              </button>
+            </div>
+            <div
+              id="escalaExpoStatus"
+              style="margin-top: 10px; font-size: 13px; color: #6b7280"
+            ></div>
+          </div>
+        </section>
+
+        <section class="page" id="acuerdo-vendedores">
+          <div class="page-header">
+            <h1>Acuerdo por vendedor</h1>
+            <p>
+              Cuánto <strong>queda de cada $151 facturado</strong> después de
+              descuentos, comisión y flete, ponderado <strong>en plata</strong>
+              (venta a precio de lista) por vendedor. Objetivo:
+              <strong>netear 100</strong> (el markup 1,51 = lista 151 para
+              ingresar 100). Cadena: lista × (1−dto vol) × (1−25% contado) ×
+              (1−2% web) × (1−comisión) × (1−1% flete). Si el
+              <strong>factor necesario supera 1,51</strong>, facturar a 151 no
+              alcanza y el <strong>acuerdo queda negativo</strong>.
+            </p>
+          </div>
+          <div class="acv-toolbar">
+            <label for="acvMeses">Período:</label>
+            <select id="acvMeses">
+              <option value="3">Últimos 3 meses</option>
+              <option value="6">Últimos 6 meses</option>
+              <option value="12" selected>Últimos 12 meses</option>
+              <option value="24">Últimos 24 meses</option>
+              <option value="0">Todo el histórico</option>
+            </select>
+            <button class="btn-ghost" type="button" id="acvReload">
+              Actualizar
+            </button>
+            <span id="acvStatus" class="acv-status"></span>
+          </div>
+          <div class="card acv-card">
+            <div class="acv-table-wrap">
+              <table class="acv-table" id="acvTable">
+                <thead>
+                  <tr>
+                    <th>Vendedor</th>
+                    <th class="acv-num">Clientes</th>
+                    <th class="acv-num">Venta ($)</th>
+                    <th class="acv-num">Dto vol⌀</th>
+                    <th class="acv-num">Comisión⌀</th>
+                    <th class="acv-num">Factor nec.</th>
+                    <th class="acv-num">Neto @151</th>
+                    <th class="acv-num">Acuerdo</th>
+                  </tr>
+                </thead>
+                <tbody id="acvBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="clientes-pendientes">
+          <div class="page-header">
+            <h1>Clientes nuevos de Expo — pendientes de ERP</h1>
+            <p>
+              Clientes dados de alta durante la expo. Ya existen en la web (para
+              tomarles el pedido y darles PIN), pero <strong>faltan cargarse en
+              ISIS</strong>. Cuando el equipo los sube al ERP, marcalos como
+              <strong>Cargado ERP</strong>. Podés exportar la lista a Excel.
+            </p>
+          </div>
+          <div class="expo-stats" id="cliPendStats">
+            <div class="expo-stat">
+              <div class="expo-stat-num" id="statCliTotal">—</div>
+              <div class="expo-stat-lbl">Clientes nuevos</div>
+            </div>
+            <div class="expo-stat">
+              <div class="expo-stat-num expo-stat-wait" id="statCliPend">—</div>
+              <div class="expo-stat-lbl">Pendientes ERP</div>
+            </div>
+            <div class="expo-stat">
+              <div class="expo-stat-num expo-stat-ok" id="statCliCarg">—</div>
+              <div class="expo-stat-lbl">Cargados ERP</div>
+            </div>
+            <div class="expo-stat">
+              <div class="expo-stat-num" id="statPedCount">—</div>
+              <div class="expo-stat-lbl">Pedidos de expo</div>
+            </div>
+            <div class="expo-stat">
+              <div class="expo-stat-num" id="statPedMonto">—</div>
+              <div class="expo-stat-lbl">Monto pedidos</div>
+            </div>
+          </div>
+          <div class="card">
+            <div
+              style="
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                flex-wrap: wrap;
+                margin-bottom: 12px;
+              "
+            >
+              <select id="cliPendFiltro" class="field-input" style="max-width: 200px">
+                <option value="pendiente">Pendientes</option>
+                <option value="cargado_erp">Cargados en ERP</option>
+                <option value="todos">Todos</option>
+              </select>
+              <button class="btn-ghost" type="button" id="cliPendReload">
+                Actualizar
+              </button>
+              <button class="btn-primary" type="button" id="cliPendExport">
+                Exportar Excel
+              </button>
+              <span
+                id="cliPendCount"
+                style="margin-left: auto; font-size: 13px; color: #6b7280"
+              ></span>
+            </div>
+            <div class="table-wrap" style="overflow-x: auto">
+              <table class="data-table" id="cliPendTable">
+                <thead>
+                  <tr>
+                    <th>Cód</th>
+                    <th>Razón social</th>
+                    <th>CUIT</th>
+                    <th>Cond. IVA</th>
+                    <th>Localidad</th>
+                    <th>Prov.</th>
+                    <th>Tel / WhatsApp</th>
+                    <th>Vend</th>
+                    <th>Dto</th>
+                    <th>Dir. entrega</th>
+                    <th>Cargado</th>
+                    <th>Estado</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="cliPendBody"></tbody>
+              </table>
+            </div>
+            <div
+              id="cliPendStatus"
+              style="margin-top: 10px; font-size: 13px; color: #6b7280"
+            ></div>
+          </div>
+        </section>
+
       </main>
     </div>
 
     <!-- EDIT CLIENTE MODAL -->
     <div class="modal-overlay" id="editClienteModal" style="display: none">
-      <div class="modal-box" style="max-width: 600px">
+      <div class="modal-box" style="max-width: 800px">
         <div class="modal-header">
           <h3 id="editModalTitle">Editar Cliente</h3>
           <button class="modal-close" id="closeEditModal">&times;</button>
         </div>
-        <div class="modal-body">
+        <!-- Tabs — solo visibles al crear un cliente nuevo -->
+        <div class="modal-tabs" id="editClienteTabs" style="display: none">
+          <button class="modal-tab active" id="editTabDatos">Datos del cliente</button>
+          <button class="modal-tab" id="editTabPedido">Cargar pedido</button>
+        </div>
+        <!-- Panel: Datos del cliente -->
+        <div class="modal-body" id="editPanelDatos">
           <input type="hidden" id="editClienteId" />
+          <!-- Contraseña generada — solo en nuevo cliente -->
+          <div class="form-field" id="editPasswordRow" style="display: none">
+            <label class="field-label">Contraseña generada (30 caracteres)</label>
+            <div class="edit-pwd-row">
+              <input
+                class="field-input"
+                id="editPassword"
+                readonly
+                placeholder=""
+              />
+              <button class="btn-ghost" id="copyPasswordBtn" type="button">Copiar</button>
+            </div>
+          </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px">
             <div class="form-field">
               <label class="field-label">COD Cliente</label
@@ -2989,6 +3311,21 @@
                 min="0"
                 max="100"
               />
+              <label
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  margin-top: 6px;
+                  font-size: 12px;
+                  color: #4b5563;
+                  cursor: pointer;
+                  user-select: none;
+                "
+              >
+                <input type="checkbox" id="editEscalaActiva" />
+                <span>Escala activa (dto por 1ª compra)</span>
+              </label>
             </div>
             <div class="form-field">
               <label class="field-label">Usuario (login)</label
@@ -2997,6 +3334,15 @@
                 id="editUsername"
                 placeholder="Ej: juan123"
               />
+            </div>
+          </div>
+        </div>
+        <!-- Panel: Cargar pedido -->
+        <div class="modal-body" id="editPanelPedido" style="display: none">
+          <div class="edit-pedido-panel" id="editPedidoContenido">
+            <div class="expo-cargar-hint">
+              <p>Completá los datos del cliente y hacé clic en <strong>Cargar</strong> para continuar.</p>
+              <button class="btn-primary" id="btnExpoCargar" onclick="expoCargar()">Cargar</button>
             </div>
           </div>
         </div>
@@ -3073,15 +3419,15 @@
       </div>
     </div>
 
-    <script src="./version.js?v=23187"></script>
+    <script src="./version.js?v=23508"></script>
     <script src="excel-parser-smart.js"></script>
-    <script src="argentina-map-data.js?v=23176"></script>
-    <script src="admin.js?v=25790"></script>
-    <script src="admin-supercot.js?v=23504"></script>
-    <script src="admin-excel-krikos.js?v=23495"></script>
-    <script src="analisis-venta-cliente.js?v=23176"></script>
+    <script src="argentina-map-data.js?v=23508"></script>
+    <script src="admin.js?v=23508"></script>
+    <script src="admin-supercot.js?v=23508"></script>
+    <script src="admin-excel-krikos.js?v=23508"></script>
+    <script src="analisis-venta-cliente.js?v=23508"></script>
     <!-- OSA: reusa la capa de datos del Formato OSA (parsers + escritura a Supabase) -->
-    <script src="osa/js/store.js?v=23176"></script>
-    <script src="admin-osa.js?v=23176"></script>
+    <script src="osa/js/store.js?v=23508"></script>
+    <script src="admin-osa.js?v=23508"></script>
   </body>
 </html>

@@ -441,6 +441,21 @@ function generatePin() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+// Genera contraseña aleatoria de 30 caracteres alfanuméricos.
+// Excluye 0, O, 1, I, l para evitar confusiones al leer.
+function generatePassword30() {
+  var chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  var result = "";
+  for (var i = 0; i < 30; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+// Estado del modal expo — persiste mientras el modal está abierto para un nuevo cliente
+var _expoCard = null;          // card cotizador inline (idx=99)
+var _expoSavedCustomer = null; // { id, cod_cliente, business_name, dto_vol, vend }
+
 // Genera CUIT sintetico para vendedores: '99' + 9 digitos random.
 // Verifica unicidad contra customers.cuit con reintentos.
 async function generateSyntheticVendorCuit() {
@@ -467,58 +482,57 @@ async function generateSyntheticVendorCuit() {
 
 // Crea usuario en Supabase Auth y devuelve el auth_user_id.
 // Usa un cliente separado para no perder la sesion del admin.
-async function createAuthUser(cuit, pin) {
+async function createAuthUser(cuit, pin, sincronizar) {
   if (!cuit) return null;
   var digits = cuit.replace(/[^0-9]/g, "");
   if (!digits) return null;
-  var email = digits + "@cuit.loekemeyer";
-  var tmpClient = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
-    {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    },
-  );
-  var result = await tmpClient.auth.signUp({ email: email, password: pin });
-  if (result.error) {
-    // Si el usuario ya existe, intentar login para obtener su id
-    if (result.error.message.toLowerCase().includes("already registered")) {
-      var loginResult = await tmpClient.auth.signInWithPassword({
-        email: email,
-        password: pin,
-      });
-      if (!loginResult.error && loginResult.data.user) {
-        return loginResult.data.user.id;
-      }
-      // Si no puede loguearse (pin distinto), avisar pero no bloquear
-      console.warn(
-        "Usuario auth ya existe para " + digits + " pero con PIN distinto",
-      );
-      toast(
-        "Aviso: ya existe usuario auth para este CUIT con otro PIN",
-        "warning",
-      );
+  // El alta del usuario auth va por la Edge Function crear-cliente-auth
+  // (service_role -> auth.admin.createUser), NO por signUp: Supabase rechaza el
+  // dominio sintético @cuit.loekemeyer en signUp ("Email address is invalid").
+  try {
+    var sess = await sb.auth.getSession();
+    var token =
+      sess && sess.data && sess.data.session
+        ? sess.data.session.access_token
+        : null;
+    if (!token) {
+      toast("Aviso: cliente se creará sin acceso login (sin sesión)", "warning");
       return null;
     }
-    console.warn(
-      "No se pudo crear usuario auth para " +
-        digits +
-        ": " +
-        result.error.message,
-    );
-    toast(
-      "Aviso: cliente se creará sin acceso login (" +
-        result.error.message +
-        ")",
-      "warning",
-    );
+    var res = await fetch(SUPABASE_URL + "/functions/v1/crear-cliente-auth", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: "Bearer " + token,
+      },
+      body: JSON.stringify({ cuit: digits, pin: pin, sincronizar: sincronizar === true }),
+    });
+    var data = await res.json().catch(function () {
+      return {};
+    });
+    // 24/09: el CUIT ya tiene login -> NO se crea el cliente (antes se le reseteaba el PIN).
+    if (res.status === 409 || data.error === "cuit_ya_registrado") {
+      throw new Error("Ese CUIT ya tiene usuario en la página: no se creó el cliente");
+    }
+    if (!res.ok || !data.id) {
+      var em = data.error || "http_" + res.status;
+      console.warn("createAuthUser crear-cliente-auth:", em);
+      // Rate limit: lanzar error especial para que el caller reintente
+      if (res.status === 429 || (em && em.toLowerCase().indexOf("rate limit") >= 0)) {
+        throw new Error("RATE_LIMIT");
+      }
+      toast("Aviso: cliente se creará sin acceso login (" + em + ")", "warning");
+      return null;
+    }
+    return data.id;
+  } catch (e) {
+    // 24/09: estos dos NO son "error de red": el que llama los tiene que ver.
+    if (e && (e.message === "RATE_LIMIT" || /ya tiene usuario/.test(e.message || ""))) throw e;
+    console.warn("createAuthUser error:", e);
+    toast("Aviso: cliente se creará sin acceso login (red)", "warning");
     return null;
   }
-  return result.data.user ? result.data.user.id : null;
 }
 
 function toast(msg, type) {
@@ -745,6 +759,24 @@ document.querySelectorAll(".nav-item").forEach(function (btn) {
     ) {
       cargarGerenteVentas();
     }
+    if (
+      btn.dataset.page === "escala-expo" &&
+      typeof cargarEscalaExpo === "function"
+    ) {
+      cargarEscalaExpo();
+    }
+    if (
+      btn.dataset.page === "acuerdo-vendedores" &&
+      typeof cargarAcuerdoVendedores === "function"
+    ) {
+      cargarAcuerdoVendedores();
+    }
+    if (
+      btn.dataset.page === "clientes-pendientes" &&
+      typeof cargarClientesPendientes === "function"
+    ) {
+      cargarClientesPendientes();
+    }
     if (btn.dataset.page === "estadistica-madre") {
       abrirEstadisticaMadre();   // est-madre.js: un solo cuadro para LK y Gestión
     }
@@ -938,14 +970,17 @@ document
           document.getElementById("manualCuit").value,
         );
       }
+      var escalaChk = document.getElementById("manualEscalaActiva");
+      var escalaOn = escalaChk && escalaChk.checked;
       var payload = {
         cod_cliente: cod,
         business_name: razon,
         cuit: cuitForPayload,
         vend: document.getElementById("manualVend").value.trim(),
-        dto_vol: isNaN(dto) ? null : dto / 100,
+        dto_vol: escalaOn ? 0 : (isNaN(dto) ? null : dto / 100),
         mail: document.getElementById("manualMail").value.trim(),
         pin: generatePin(),
+        escala_activa: !!escalaOn,
       };
       if (usernameVal) payload.username = usernameVal;
       var authId = await createAuthUser(payload.cuit, payload.pin);
@@ -973,6 +1008,8 @@ document
         chkReset.checked = false;
         chkReset.dispatchEvent(new Event("change"));
       }
+      var escalaReset = document.getElementById("manualEscalaActiva");
+      if (escalaReset) escalaReset.checked = false;
     } catch (err) {
       toast("Error: " + err.message, "error");
     } finally {
@@ -1086,13 +1123,22 @@ document
   .getElementById("importBtn")
   .addEventListener("click", async function () {
     if (!importData.length) return;
-    this.disabled = true;
+    var importBtn = this;
+    importBtn.disabled = true;
     try {
       for (var i = 0; i < importData.length; i++) {
         var row = importData[i];
-        var authId = await createAuthUser(row.cuit, row.pin);
-        if (authId) row.auth_user_id = authId;
+        importBtn.textContent = "Creando auth " + (i + 1) + "/" + importData.length + "...";
+        try {
+          var authId = await _createAuthWithRetry(row.cuit, row.pin);
+          if (authId) row.auth_user_id = authId;
+        } catch (e) {
+          toast("Auth falló para " + row.cod_cliente + ": " + e.message, "warning");
+        }
+        // Pausa entre llamadas para evitar rate limit
+        if (i < importData.length - 1) await _repairDelay(REPAIR_DELAY_MS);
       }
+      importBtn.textContent = "Guardando...";
       var insertedRows = await sbInsert(TABLE_CUSTOMERS, importData);
       // Vincular cada cliente importado a su vendedor
       for (var j = 0; j < insertedRows.length; j++) {
@@ -1107,7 +1153,8 @@ document
     } catch (err) {
       toast("Error: " + err.message, "error");
     } finally {
-      this.disabled = false;
+      importBtn.disabled = false;
+      importBtn.textContent = "Importar";
     }
   });
 
@@ -1497,6 +1544,12 @@ window.openEditModal = function (clienteId) {
   document.getElementById("editClienteId").value = c.id;
   document.getElementById("editModalTitle").textContent =
     c.business_name || "Editar Cliente";
+  // En modo edición: ocultar tabs y contraseña
+  document.getElementById("editClienteTabs").style.display = "none";
+  document.getElementById("editPasswordRow").style.display = "none";
+  document.getElementById("editPanelDatos").style.display = "";
+  document.getElementById("editPanelPedido").style.display = "none";
+  document.getElementById("saveEditCliente").textContent = "Guardar Cambios";
   document.getElementById("editCod").value = c.cod_cliente || "";
   document.getElementById("editCuit").value = c.cuit || "";
   document.getElementById("editRazon").value = c.business_name || "";
@@ -1504,6 +1557,8 @@ window.openEditModal = function (clienteId) {
   document.getElementById("editVend").value = c.vend || "";
   document.getElementById("editDto").value =
     c.dto_vol != null ? (c.dto_vol * 100).toFixed(0) : "";
+  var editEscChk = document.getElementById("editEscalaActiva");
+  if (editEscChk) editEscChk.checked = !!c.escala_activa;
   document.getElementById("editUsername").value = c.username || "";
   document.getElementById("editClienteModal").style.display = "flex";
 };
@@ -1523,14 +1578,17 @@ document
       .getElementById("editUsername")
       .value.trim()
       .toLowerCase();
+    var editEscChk = document.getElementById("editEscalaActiva");
+    var editEscalaOn = editEscChk && editEscChk.checked;
     var payload = {
       cod_cliente: document.getElementById("editCod").value.trim(),
       cuit: cleanCuit(document.getElementById("editCuit").value),
       business_name: document.getElementById("editRazon").value.trim(),
       mail: document.getElementById("editMail").value.trim(),
       vend: document.getElementById("editVend").value.trim(),
-      dto_vol: isNaN(dto) ? null : dto / 100,
+      dto_vol: editEscalaOn ? 0 : (isNaN(dto) ? null : dto / 100),
       username: editUsernameVal || null,
+      escala_activa: !!editEscalaOn,
     };
     if (!payload.cod_cliente) {
       toast("Ingresa un codigo", "warning");
@@ -1554,15 +1612,45 @@ document
           await linkCustomerToVendor(payload.vend, id);
         }
         toast("Cliente actualizado");
+        // Modo expo: si hay cliente expo activo, actualizar estado y mostrar pedido
+        if (_expoSavedCustomer) {
+          _expoSavedCustomer = Object.assign(_expoSavedCustomer, {
+            cod_cliente: payload.cod_cliente,
+            business_name: payload.business_name,
+            dto_vol: parseFloat(payload.dto_vol) || 0,
+            vend: payload.vend || "",
+          });
+          _editClienteActivarTab("pedido");
+          _expoInitCard();
+          loadClientes();
+          return; // no cerrar modal en modo expo
+        }
       } else {
-        payload.pin = generatePin();
+        // Nuevo cliente — modo expo: crear y quedar en el modal
+        var pwd30El = document.getElementById("editPassword");
+        payload.pin = (pwd30El && pwd30El.value.length >= 20)
+          ? pwd30El.value
+          : generatePassword30();
         var authId = await createAuthUser(payload.cuit, payload.pin);
         if (authId) payload.auth_user_id = authId;
         var insertedEdit = await sbInsert(TABLE_CUSTOMERS, payload);
-        if (payload.vend && insertedEdit.length) {
+        if (!insertedEdit.length) throw new Error("No se pudo crear el cliente");
+        if (payload.vend) {
           await linkCustomerToVendor(payload.vend, insertedEdit[0].id);
         }
+        document.getElementById("editClienteId").value = insertedEdit[0].id;
+        _expoSavedCustomer = {
+          id: insertedEdit[0].id,
+          cod_cliente: payload.cod_cliente,
+          business_name: payload.business_name,
+          dto_vol: parseFloat(payload.dto_vol) || 0,
+          vend: payload.vend || "",
+        };
         toast("Cliente creado");
+        _editClienteActivarTab("pedido");
+        _expoInitCard();
+        loadClientes();
+        return; // no cerrar el modal
       }
       document.getElementById("editClienteModal").style.display = "none";
       loadClientes();
@@ -1573,36 +1661,120 @@ document
     }
   });
 
-// ---- REPARAR AUTH (clientes sin auth_user_id) ----
+// ---- REPARAR AUTH (clientes sin auth_user_id O con PIN desincronizado) ----
+// Cubre DOS casos:
+//   1. Sin auth_user_id → crea el user en auth.users y vincula
+//   2. Con auth_user_id pero PIN desincronizado → re-llama a la Edge Function
+//      que hace updateUserById con el PIN de customers
+// Delay entre llamadas para no gatillar el rate limit de Supabase Edge Functions.
+// Si falla por rate limit, reintenta con backoff exponencial (hasta 3 veces).
+function _repairDelay(ms) {
+  return new Promise(function (r) { setTimeout(r, ms); });
+}
+
+var REPAIR_DELAY_MS = 1500; // pausa entre clientes
+var REPAIR_MAX_RETRIES = 3; // reintentos por rate limit
+
+async function _createAuthWithRetry(cuit, pin, sincronizar) {
+  for (var attempt = 0; attempt <= REPAIR_MAX_RETRIES; attempt++) {
+    try {
+      var authId = await createAuthUser(cuit, pin, sincronizar);
+      return authId; // null = error no-retriable, string = éxito
+    } catch (e) {
+      if (e.message === "RATE_LIMIT" && attempt < REPAIR_MAX_RETRIES) {
+        var wait = Math.pow(2, attempt + 1) * 1000; // 2s, 4s, 8s
+        toast("Rate limit, reintentando en " + (wait / 1000) + "s...", "warning");
+        await _repairDelay(wait);
+      } else {
+        throw e; // error no-retriable o ya agotó reintentos
+      }
+    }
+  }
+  return null;
+}
+
+// Verifica si el PIN guardado puede abrir la sesión del cliente.
+// Devuelve "ok", "fail" o "rate".
+async function _repairTestPin(cuit, pin) {
+  var tmpClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  var email = cleanCuit(cuit) + "@cuit.loekemeyer";
+  try {
+    var res = await tmpClient.auth.signInWithPassword({ email: email, password: String(pin) });
+    if (res.error) {
+      var msg = (res.error.message || "").toLowerCase();
+      if (msg.indexOf("rate") !== -1 || msg.indexOf("too many") !== -1 || res.error.status === 429) return "rate";
+      return "fail";
+    }
+    try { await tmpClient.auth.signOut(); } catch (_) {}
+    return "ok";
+  } catch (e) {
+    var m = (e && e.message ? e.message : "").toLowerCase();
+    if (m.indexOf("rate") !== -1 || m.indexOf("too many") !== -1) return "rate";
+    return "fail";
+  }
+}
+
 document
   .getElementById("repairAuthBtn")
   .addEventListener("click", async function () {
     var btn = this;
     btn.disabled = true;
-    btn.textContent = "Reparando...";
+    btn.textContent = "Analizando...";
     try {
+      // Fase 1: clientes sin auth_user_id
       var sinAuth = allClientes.filter(function (c) {
         return !c.auth_user_id && c.cuit && c.pin;
       });
-      if (!sinAuth.length) {
-        toast("Todos los clientes ya tienen auth_user_id", "success");
+
+      // Fase 2: clientes CON auth_user_id — detectar PINes rotos
+      var conAuth = allClientes.filter(function (c) {
+        return c.auth_user_id && c.cuit && c.pin && cleanCuit(c.cuit).length >= 10;
+      });
+      var pinRotos = [];
+      for (var k = 0; k < conAuth.length; k++) {
+        btn.textContent = "Verificando PINes " + (k + 1) + "/" + conAuth.length + "...";
+        var estado = await _repairTestPin(conAuth[k].cuit, conAuth[k].pin);
+        if (estado === "fail") {
+          pinRotos.push(conAuth[k]);
+        } else if (estado === "rate") {
+          // si pega rate limit en el test, esperar y reintentar una vez
+          await _repairDelay(3000);
+          estado = await _repairTestPin(conAuth[k].cuit, conAuth[k].pin);
+          if (estado === "fail") pinRotos.push(conAuth[k]);
+        }
+        // pausa corta entre verificaciones (120ms como en Verificar PINes)
+        if (k < conAuth.length - 1) await _repairDelay(120);
+      }
+
+      var totalArreglar = sinAuth.length + pinRotos.length;
+      if (!totalArreglar) {
+        toast("Todos los clientes tienen auth_user_id y PINes sincronizados", "success");
         return;
       }
+
       var reparados = 0,
         errores = 0;
-      for (var i = 0; i < sinAuth.length; i++) {
-        var c = sinAuth[i];
+      var lista = sinAuth.concat(pinRotos);
+      var total = lista.length;
+
+      for (var i = 0; i < total; i++) {
+        var c = lista[i];
+        var esSinAuth = !c.auth_user_id;
+        btn.textContent = "Reparando " + (i + 1) + "/" + total + "...";
         try {
-          var authId = await createAuthUser(c.cuit, String(c.pin));
+          var authId = await _createAuthWithRetry(c.cuit, String(c.pin), true);   // «Reparar» (admin): sincroniza el PIN
           if (authId) {
-            await sbUpdate(TABLE_CUSTOMERS, c.id, "id", {
-              auth_user_id: authId,
-            });
+            if (esSinAuth) {
+              await sbUpdate(TABLE_CUSTOMERS, c.id, "id", {
+                auth_user_id: authId,
+              });
+              toast("Auth creado para " + c.cod_cliente + " (" + c.cuit + ")", "success");
+            } else {
+              toast("PIN sincronizado para " + c.cod_cliente + " (" + c.cuit + ")", "success");
+            }
             reparados++;
-            toast(
-              "Auth creado para " + c.cod_cliente + " (" + c.cuit + ")",
-              "success",
-            );
           } else {
             errores++;
           }
@@ -1610,9 +1782,15 @@ document
           errores++;
           toast("Error en " + c.cod_cliente + ": " + err.message, "error");
         }
+        // Pausa entre clientes para no saturar el rate limit
+        if (i < total - 1) {
+          await _repairDelay(REPAIR_DELAY_MS);
+        }
       }
       toast(
-        "Reparacion completa: " + reparados + " OK, " + errores + " errores",
+        "Reparacion completa: " + reparados + " OK, " + errores + " errores" +
+        (sinAuth.length ? " (" + sinAuth.length + " sin auth" : "(") +
+        (pinRotos.length ? (sinAuth.length ? ", " : "") + pinRotos.length + " PINes rotos)" : ")"),
         reparados ? "success" : "warning",
       );
       loadClientes();
@@ -1857,8 +2035,205 @@ document
     }
   });
 
+// ---- MODAL CLIENTE: helpers de tabs ----
+function _editClienteActivarTab(tab) {
+  var isDatos = tab === "datos";
+  document.getElementById("editPanelDatos").style.display = isDatos ? "" : "none";
+  document.getElementById("editPanelPedido").style.display = isDatos ? "none" : "";
+  document.getElementById("editTabDatos").classList.toggle("active", isDatos);
+  document.getElementById("editTabPedido").classList.toggle("active", !isDatos);
+  // Cambiar texto del botón guardar según el tab activo
+  var saveBtn = document.getElementById("saveEditCliente");
+  if (isDatos) {
+    saveBtn.style.display = "";
+  } else {
+    // En el tab Pedido el cliente ya fue creado; no tiene sentido "Guardar"
+    saveBtn.style.display = "none";
+  }
+}
+
+document.getElementById("editTabDatos").addEventListener("click", function () {
+  _editClienteActivarTab("datos");
+});
+document.getElementById("editTabPedido").addEventListener("click", function () {
+  _editClienteActivarTab("pedido");
+  // Si ya tiene cliente guardado, mostrar cotizador directo
+  if (_expoSavedCustomer) _expoInitCard();
+});
+
+// ---- EXPO: auto-guardar nuevo cliente silenciosamente al cambiar al tab Pedido ----
+async function _expoAutoSave() {
+  var cuit = document.getElementById("editCuit").value.trim();
+  var razon = document.getElementById("editRazon").value.trim();
+  if (!cuit || !razon) {
+    toast("Ingresá la razón social y el CUIT primero", "warning");
+    return false;
+  }
+  var cod = document.getElementById("editCod").value.trim();
+  var id = document.getElementById("editClienteId").value;
+  if (id && _expoSavedCustomer) {
+    // Ya guardado: actualizar silenciosamente
+    var updatePayload = {
+      cod_cliente: cod ? parseInt(cod, 10) : null,
+      business_name: razon,
+      cuit: cuit || null,
+      vend: document.getElementById("editVend").value.trim() || null,
+      dto_vol: parseFloat(document.getElementById("editDto").value) || 0,
+      username: document.getElementById("editUsername").value.trim() || null,
+    };
+    try {
+      await sbUpdate(TABLE_CUSTOMERS, id, "id", updatePayload);
+      _expoSavedCustomer = Object.assign(_expoSavedCustomer, {
+        cod_cliente: cod,
+        business_name: razon,
+        dto_vol: parseFloat(updatePayload.dto_vol) || 0,
+        vend: updatePayload.vend || "",
+      });
+    } catch (e) { /* silencioso — el usuario puede seguir cargando el pedido */ }
+    return true;
+  }
+  // Buscar si ya existe un cliente con ese CUIT
+  try {
+    var existing = await sb.from(TABLE_CUSTOMERS).select("id,cod_cliente,business_name,dto_vol,vend").eq("cuit", cuit).maybeSingle();
+    if (existing.data) {
+      var ex = existing.data;
+      document.getElementById("editClienteId").value = ex.id;
+      _expoSavedCustomer = {
+        id: ex.id,
+        cod_cliente: ex.cod_cliente,
+        business_name: ex.business_name || razon,
+        dto_vol: ex.dto_vol || 0,
+        vend: ex.vend || "",
+      };
+      toast("Cliente ya existente vinculado", "info");
+      return true;
+    }
+  } catch (e) { /* ignorar, seguir con INSERT */ }
+
+  // Primer guardado: INSERT
+  var pwd30El = document.getElementById("editPassword");
+  var pin = (pwd30El && pwd30El.value.length >= 20) ? pwd30El.value : generatePassword30();
+  document.getElementById("editPassword").value = pin;
+  var payload = {
+    cod_cliente: cod ? parseInt(cod, 10) : null,
+    business_name: razon,
+    cuit: cuit || null,
+    vend: document.getElementById("editVend").value.trim() || null,
+    dto_vol: parseFloat(document.getElementById("editDto").value) || 0,
+    username: document.getElementById("editUsername").value.trim() || null,
+    pin: pin,
+  };
+  try {
+    var authId = await createAuthUser(cuit, pin);
+    if (authId) payload.auth_user_id = authId;
+    var inserted = await sbInsert(TABLE_CUSTOMERS, payload);
+    if (!inserted.length) throw new Error("insert vacío");
+    document.getElementById("editClienteId").value = inserted[0].id;
+    _expoSavedCustomer = {
+      id: inserted[0].id,
+      cod_cliente: cod ? parseInt(cod, 10) : null,
+      business_name: razon,
+      dto_vol: parseFloat(payload.dto_vol) || 0,
+      vend: payload.vend || "",
+    };
+    if (payload.vend) await linkCustomerToVendor(payload.vend, inserted[0].id);
+    loadClientes();
+    return true;
+  } catch (e) {
+    toast("Error al guardar: " + e.message, "error");
+    return false;
+  }
+}
+
+// ---- EXPO: botón "Cargar" en panel Pedido ----
+window.expoCargar = async function () {
+  var btn = document.getElementById("btnExpoCargar");
+  if (btn) { btn.disabled = true; btn.textContent = "Cargando..."; }
+  var saved = await _expoAutoSave();
+  if (!saved) {
+    if (btn) { btn.disabled = false; btn.textContent = "Cargar"; }
+    return;
+  }
+  _expoInitCard();
+};
+
+// ---- EXPO: inicializar card cotizador inline en panel Pedido ----
+function _expoInitCard() {
+  if (!_expoSavedCustomer) return;
+  // Si ya hay card para el mismo cliente, no reinicializar (preservar carrito)
+  if (
+    _expoCard &&
+    _expoCard.customer &&
+    _expoCard.customer.id === _expoSavedCustomer.id
+  ) return;
+  var contenido = document.getElementById("editPedidoContenido");
+  contenido.innerHTML = "";
+  var root = document.createElement("div");
+  root.className = "cp-card cp-card-expo";
+  root.dataset.idx = "99";
+  root.innerHTML = cpBuildCardHTML(99);
+  contenido.appendChild(root);
+  _expoCard = {
+    idx: 99,
+    root: root,
+    customer: null,
+    history: { web: [], sales: [] },
+    pendingFileData: null,
+    pendingFileIsPdf: false,
+    parsed: [],
+    invalid: [],
+    payment: null,
+    delivery: "",
+    flyers: [],
+    upsellMsg: "",
+    submitted: false,
+    orderId: null,
+    historyLoading: false,
+    historyMode: false,
+    deliveryAddresses: [],
+    deliveryLoading: false,
+    selectedDeliveryIdx: null,
+    finalDelivery: "",
+    pdfPaymentRaw: "",
+    searchCod: root.querySelector(".cp-search-cod"),
+    searchBtn: root.querySelector(".cp-search-btn"),
+    suggestEl: root.querySelector(".cp-suggest"),
+    suggestTimer: null,
+    customerWrap: root.querySelector(".cp-card-customer-wrap"),
+    dropZone: root.querySelector(".cp-dropzone"),
+    fileInput: root.querySelector(".cp-file-input"),
+    resetBtn: root.querySelector(".cp-card-reset"),
+    status: root.querySelector(".cp-card-status"),
+    summaryWrap: root.querySelector(".cp-card-summary-wrap"),
+    msgWrap: root.querySelector(".cp-card-msg-wrap"),
+    flyersWrap: root.querySelector(".cp-card-flyers-wrap"),
+    actionsWrap: root.querySelector(".cp-card-actions-wrap"),
+  };
+  cpWireCard(_expoCard);
+  cpCardSelectCustomer(_expoCard, _expoSavedCustomer);
+}
+
+// Botón copiar contraseña
+document.getElementById("copyPasswordBtn").addEventListener("click", function () {
+  var pwd = document.getElementById("editPassword").value;
+  if (!pwd) return;
+  (navigator.clipboard && navigator.clipboard.writeText
+    ? navigator.clipboard.writeText(pwd)
+    : Promise.reject(new Error("no-clipboard"))
+  ).then(function () {
+    toast("Contraseña copiada");
+  }).catch(function () {
+    // Fallback selección manual
+    document.getElementById("editPassword").select();
+    toast("Seleccioná y copiá la contraseña manualmente", "warning");
+  });
+});
+
 // ---- NUEVO CLIENTE ----
 document.getElementById("newClienteBtn").addEventListener("click", function () {
+  // Resetear estado expo
+  _expoCard = null;
+  _expoSavedCustomer = null;
   document.getElementById("editClienteId").value = "";
   document.getElementById("editModalTitle").textContent = "Nuevo Cliente";
   [
@@ -1872,6 +2247,20 @@ document.getElementById("newClienteBtn").addEventListener("click", function () {
   ].forEach(function (id) {
     document.getElementById(id).value = "";
   });
+  // Generar contraseña de 30 caracteres y mostrarla
+  var pwd = generatePassword30();
+  document.getElementById("editPassword").value = pwd;
+  document.getElementById("editPasswordRow").style.display = "block";
+  // Mostrar tabs y resetear al panel Datos
+  document.getElementById("editClienteTabs").style.display = "flex";
+  _editClienteActivarTab("datos");
+  // Resetear panel Pedido: mostrar botón Cargar
+  document.getElementById("editPedidoContenido").innerHTML =
+    '<div class="expo-cargar-hint">' +
+    '<p>Completá los datos del cliente y hacé clic en <strong>Cargar</strong> para continuar.</p>' +
+    '<button class="btn-primary" id="btnExpoCargar" onclick="expoCargar()">Cargar</button>' +
+    '</div>';
+  document.getElementById("saveEditCliente").textContent = "Guardar Cambios";
   document.getElementById("editClienteModal").style.display = "flex";
 });
 
@@ -2528,6 +2917,8 @@ document.addEventListener("click", function (e) {
 document
   .getElementById("trackingUploadBtn")
   .addEventListener("click", async function () {
+    // 25/09 (Luis): desactivada. order_tracking la alimenta Gestión (y la RLS ya no deja escribir).
+    toast("La carga manual de la PPP está desactivada: el tracking de pedidos lo alimenta Gestión Virgilio automáticamente (GestOpClientes sql/069 y 071)."); return;
     if (!trackingData.length) return;
     this.disabled = true;
     showLoader("Subiendo tracking a Supabase...");
@@ -2703,6 +3094,8 @@ document
 document
   .getElementById("trackingDeleteAllBtn")
   .addEventListener("click", async function () {
+    // 25/09 (Luis): desactivada, mismo motivo que la carga.
+    toast("La carga manual de la PPP está desactivada: el tracking de pedidos lo alimenta Gestión Virgilio automáticamente (GestOpClientes sql/069 y 071)."); return;
     if (
       !confirm(
         "¿Eliminar TODAS las filas de order_tracking? Los clientes dejarán de ver el estado de sus pedidos hasta que subas una PPP nueva.",
@@ -6453,7 +6846,7 @@ async function loadCondicionesDb() {
   var body = document.getElementById("condicionesDbBody");
   var count = document.getElementById("condicionesDbCount");
   body.innerHTML =
-    '<tr><td colspan="5"><span class="spinner"></span> Cargando...</td></tr>';
+    '<tr><td colspan="4"><span class="spinner"></span> Cargando...</td></tr>';
   try {
     var data = await sbSelectAll(TABLE_CUSTOMERS, "order=cod_cliente.asc");
     condicionesDbAll = data || [];
@@ -6461,7 +6854,7 @@ async function loadCondicionesDb() {
     renderCondicionesDb();
   } catch (err) {
     body.innerHTML =
-      '<tr><td colspan="5">Error: ' + escapeHtml(err.message) + "</td></tr>";
+      '<tr><td colspan="4">Error: ' + escapeHtml(err.message) + "</td></tr>";
   }
 }
 
@@ -7591,7 +7984,8 @@ async function cargarGruposClientes() {
     _renderGruposArmados(res[0].data || []);
     _renderGruposSugeridos(res[1].data || []);
     _renderClientesLkCh(res[2].data || []);
-    // 23/09: la tabla canonica va en su PROPIA llamada con su propio catch.
+    // 23/09: la tabla canonica va en su PROPIA llamada con su propio catch: si falla,
+    // no se lleva puestas las otras tres tablas del modulo.
     cargarClientesVinculados();
 
     if (statusEl) statusEl.innerHTML = "";
@@ -10396,6 +10790,8 @@ function toggleEstCard(bodyId, headEl) {
   // cobertura por localidad son consultas caras que no hacen falta si nadie
   // despliega la tarjeta.
   if (estabaOculto && bodyId === "gvMapaBody") cargarMapaGerente();
+  if (estabaOculto && bodyId === "gvVendMapaBody") cargarMapaVendedores();
+  if (estabaOculto && bodyId === "gvCobBody") cargarCobDistribuidores();
   if (estabaOculto && bodyId === "gvRatioBody") cargarRatioGerente();
   if (estabaOculto && bodyId === "gvRindeBody") cargarRindeGerente();
   if (estabaOculto && bodyId === "gvSenalesBody") cargarSenalesGerente();
@@ -11385,7 +11781,7 @@ function cargarRatioGerente() {
   if (!tabla) return;
   var thead = tabla.querySelector("thead");
   var tbody = tabla.querySelector("tbody");
-  tbody.innerHTML = '<tr><td colspan="7" class="gv-cargando">Cargando…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" class="gv-cargando">Cargando…</td></tr>';
 
   _gvPedirCobertura(_gvNivel)
     .then(function (filas) {
@@ -11403,7 +11799,9 @@ function cargarRatioGerente() {
         "<tr>" +
         (esProv ? "<th>PROVINCIA</th>" : "<th>LOCALIDAD</th><th>PROVINCIA</th>") +
         "<th>SUCURSALES</th><th>CLIENTES</th><th>ACTIVOS 12M</th>" +
-        "<th>POBLACIÓN</th><th>HAB. POR PUNTO</th><th>VS MEDIANA</th>" +
+        "<th>POBLACIÓN</th><th>HAB. POR PUNTO</th>" +
+        (esProv ? "<th>VENTA</th><th>$/HAB</th>" : "") +
+        "<th>VS MEDIANA</th>" +
         "</tr>";
 
       // Ordena de más frío a más caliente: lo primero que hay que mirar es
@@ -11435,6 +11833,10 @@ function cargarRatioGerente() {
             "<td>" + _gvNum(f.activos) + "</td>" +
             "<td>" + (f.poblacion == null ? "—" : _gvNum(f.poblacion)) + "</td>" +
             "<td>" + (ratio == null ? "—" : _gvNum(ratio)) + "</td>" +
+            (esProv
+              ? "<td>" + (Number(f.venta) ? "$" + _gvNum(Math.round(Number(f.venta) / 1e6)) + " M" : "—") + "</td>" +
+                "<td>" + (f.venta_per_capita == null ? "—" : "$" + _gvNum(f.venta_per_capita)) + "</td>"
+              : "") +
             "<td>" + relTxt + "</td>" +
             "</tr>"
           );
@@ -11450,7 +11852,7 @@ function cargarRatioGerente() {
     })
     .catch(function (err) {
       tbody.innerHTML =
-        '<tr><td colspan="8" class="gv-cargando">Error: ' + escHtml(err.message) + "</td></tr>";
+        '<tr><td colspan="9" class="gv-cargando">Error: ' + escHtml(err.message) + "</td></tr>";
     });
 }
 window.cargarRatioGerente = cargarRatioGerente;
@@ -11695,6 +12097,465 @@ function gvZoomProvincia(prov) {
   });
 }
 window.gvZoomProvincia = gvZoomProvincia;
+
+// ---- MAPA POR VENDEDOR --------------------------------------------------
+//
+// Misma base que el mapa de cobertura (SVG de argentina-map-data + arMapProject),
+// pero los puntos salen de gv_mapa_vendedores, que abre la cartera por vendedor.
+// Elegís un vendedor y se pintan SOLO sus clientes, para ver a qué zona atiende.
+// Tiene su propio tooltip y su propio zoom para no pisar el mapa de al lado, que
+// usa IDs fijos (gvMapaSlot/gvMapaTip/gvZoomProv).
+
+var _gvVendData = null; // filas crudas de la RPC, se cachean
+var _gvVendVB = null; // viewBox del país, para volver del zoom
+var _gvVendProv = ""; // provincia acercada
+
+function cargarMapaVendedores() {
+  var slot = document.getElementById("gvVendMapaSlot");
+  if (!slot) return;
+  slot.textContent = "Cargando mapa…";
+
+  var pedirDatos = _gvVendData
+    ? Promise.resolve(_gvVendData)
+    : sb.rpc("gv_mapa_vendedores", { p_meses: 12 }).then(function (resp) {
+        if (resp.error) throw resp.error;
+        _gvVendData = resp.data || [];
+        return _gvVendData;
+      });
+
+  Promise.all([loadArgentinaMapSvg(), pedirDatos])
+    .then(function (res) {
+      slot.innerHTML = res[0];
+      _gvVendLlenarSelect(res[1]);
+      gvVendRender();
+    })
+    .catch(function (err) {
+      slot.innerHTML =
+        '<div class="gv-cargando">No se pudo cargar el mapa: ' + escHtml(err.message) + "</div>";
+    });
+}
+window.cargarMapaVendedores = cargarMapaVendedores;
+
+function _gvVendLlenarSelect(filas) {
+  var sel = document.getElementById("gvVendSel");
+  if (!sel || sel.options.length > 1) return;
+  // Total de clientes por vendedor, para ordenarlos de mayor a menor cartera.
+  var tot = {};
+  filas.forEach(function (f) {
+    tot[f.vendor] = (tot[f.vendor] || 0) + Number(f.clientes || 0);
+  });
+  Object.keys(tot)
+    .sort(function (a, b) {
+      return tot[b] - tot[a];
+    })
+    .forEach(function (v) {
+      var o = document.createElement("option");
+      o.value = v;
+      o.textContent = (RANK_VEND_ALIAS[v] || v) + " (" + tot[v] + ")";
+      sel.appendChild(o);
+    });
+}
+
+function gvVendRender() {
+  var slot = document.getElementById("gvVendMapaSlot");
+  var svgEl = slot && slot.querySelector(".ar-map-svg");
+  if (!svgEl || !_gvVendData) return;
+
+  var vend = (document.getElementById("gvVendSel") || {}).value || "";
+  var filas = vend
+    ? _gvVendData.filter(function (f) {
+        return f.vendor === vend;
+      })
+    : _gvVendData;
+
+  // Se rearma el mapa desde cero para no acumular pines de la selección anterior.
+  var vieja = svgEl.querySelector("g.gv-pines");
+  if (vieja) vieja.remove();
+
+  // Vuelve al encuadre de país en cada cambio de vendedor: si no, los pines
+  // nuevos se dibujan a tamaño base sobre un viewBox acercado y quedan enormes.
+  if (!_gvVendVB) _gvVendVB = svgEl.getAttribute("viewBox");
+  else svgEl.setAttribute("viewBox", _gvVendVB);
+  _gvVendProv = "";
+  svgEl.querySelectorAll("[data-prov]:not(.gv-pin)").forEach(function (p) {
+    p.classList.remove("gv-prov-on", "gv-prov-off");
+  });
+
+  var resumen = document.getElementById("gvVendResumen");
+  var zonaEl = document.getElementById("gvVendZona");
+
+  if (typeof ARGENTINA_MAP_PROJECTION === "undefined" || !ARGENTINA_MAP_PROJECTION) {
+    if (resumen) resumen.textContent = "mapa de respaldo, sin pines (no cargó el contorno real)";
+    return;
+  }
+
+  var conCoord = filas.filter(function (f) {
+    return f.lat != null && f.lon != null;
+  });
+  var maxCli = Math.max.apply(
+    null,
+    conCoord
+      .map(function (f) {
+        return Number(f.clientes) || 1;
+      })
+      .concat([1]),
+  );
+
+  var ns = "http://www.w3.org/2000/svg";
+  var g = document.createElementNS(ns, "g");
+  g.setAttribute("class", "gv-pines");
+
+  conCoord.forEach(function (f) {
+    var p = arMapProject(Number(f.lon), Number(f.lat));
+    if (!p) return;
+    // Rojo = mayoría inactivos, verde = mayoría activos. Mismo criterio de color
+    // que el otro mapa, pero acá el eje es la salud de la cartera del vendedor.
+    var relAct = f.clientes ? 1 - Number(f.activos) / Number(f.clientes) : null;
+    var cls = _gvClaseTemp(relAct == null ? null : relAct / 0.5);
+    var r = 1.2 + 4.5 * Math.sqrt((Number(f.clientes) || 1) / maxCli);
+    var c = document.createElementNS(ns, "circle");
+    c.setAttribute("cx", p.x.toFixed(2));
+    c.setAttribute("cy", p.y.toFixed(2));
+    c.setAttribute("r", r.toFixed(2));
+    c.dataset.r = r.toFixed(3);
+    c.setAttribute("class", "gv-pin " + (cls || "gv-sin"));
+    c.dataset.loc = f.localidad;
+    c.dataset.pprov = f.provincia;
+    c.dataset.cli = f.clientes;
+    c.dataset.act = f.activos;
+    g.appendChild(c);
+  });
+  svgEl.appendChild(g);
+  _gvVendWireTip(svgEl);
+  _gvVendWireZoom(svgEl);
+
+  // Índice de zona: reparto de clientes por provincia del vendedor elegido.
+  if (zonaEl) {
+    if (!vend) {
+      zonaEl.textContent = "";
+    } else {
+      var porProv = {};
+      filas.forEach(function (f) {
+        porProv[f.provincia] = (porProv[f.provincia] || 0) + Number(f.clientes || 0);
+      });
+      var arr = Object.keys(porProv)
+        .map(function (k) {
+          return { prov: k, cli: porProv[k] };
+        })
+        .sort(function (a, b) {
+          return b.cli - a.cli;
+        });
+      var totCli = arr.reduce(function (s, x) {
+        return s + x.cli;
+      }, 0);
+      var top2 = arr.slice(0, 2).reduce(function (s, x) {
+        return s + x.cli;
+      }, 0);
+      var pct = totCli ? Math.round((100 * top2) / totCli) : 0;
+      var etiqueta = pct >= 75 ? "zona clara" : pct >= 50 ? "zona difusa" : "sin zona (itinerante)";
+      var topTxt = arr
+        .slice(0, 2)
+        .map(function (x) {
+          return x.prov + " " + x.cli;
+        })
+        .join(", ");
+      zonaEl.textContent =
+        "Índice de zona " + pct + "% en top-2 (" + topTxt + ") · " + arr.length +
+        " provincias · " + etiqueta;
+    }
+  }
+
+  if (resumen) {
+    resumen.textContent = conCoord.length + " localidades ubicadas";
+  }
+}
+window.gvVendRender = gvVendRender;
+
+function _gvVendWireTip(svgEl) {
+  var tip = document.getElementById("gvVendMapaTip");
+  var wrap = svgEl.closest(".gv-mapa-wrap");
+  if (!tip || !wrap) return;
+  svgEl.querySelectorAll(".gv-pin").forEach(function (c) {
+    c.addEventListener("mouseenter", function () {
+      var html =
+        "<strong>" + escHtml(c.dataset.loc) + "</strong>" +
+        escHtml(c.dataset.pprov) + "<br>" +
+        c.dataset.cli + " clientes · " + c.dataset.act + " activos";
+      tip.innerHTML = html;
+      tip.style.display = "block";
+    });
+    c.addEventListener("mousemove", function (ev) {
+      var r = wrap.getBoundingClientRect();
+      tip.style.left = ev.clientX - r.left + 14 + "px";
+      tip.style.top = ev.clientY - r.top + 14 + "px";
+    });
+    c.addEventListener("mouseleave", function () {
+      tip.style.display = "none";
+    });
+  });
+}
+
+function _gvVendWireZoom(svgEl) {
+  if (!_gvVendVB) _gvVendVB = svgEl.getAttribute("viewBox");
+  svgEl.querySelectorAll("[data-prov]:not(.gv-pin)").forEach(function (p) {
+    if (p._gvVendWired) return;
+    p._gvVendWired = true;
+    p.style.cursor = "pointer";
+    p.addEventListener("click", function () {
+      var prov = p.getAttribute("data-prov");
+      _gvVendZoom(svgEl, prov === _gvVendProv ? "" : prov);
+    });
+  });
+}
+
+function _gvVendZoom(svgEl, prov) {
+  if (!_gvVendVB) return;
+  _gvVendProv = prov || "";
+  var base = _gvVendVB.split(/\s+/).map(Number);
+  var vb = base;
+  if (prov) {
+    var path = svgEl.querySelector('[data-prov="' + prov.replace(/"/g, '\\"') + '"]');
+    if (path) {
+      var b = path.getBBox();
+      var m = Math.max(b.width, b.height) * 0.08;
+      vb = [b.x - m, b.y - m, b.width + 2 * m, b.height + 2 * m];
+    }
+  }
+  svgEl.setAttribute("viewBox", vb.join(" "));
+  var escala = base[2] / vb[2];
+  svgEl.querySelectorAll(".gv-pin").forEach(function (c) {
+    var r = parseFloat(c.dataset.r || "2");
+    c.setAttribute("r", (r / escala).toFixed(3));
+    c.style.strokeWidth = (0.35 / escala).toFixed(3);
+  });
+  svgEl.querySelectorAll("[data-prov]:not(.gv-pin)").forEach(function (p) {
+    var esta = p.getAttribute("data-prov") === prov;
+    p.classList.toggle("gv-prov-on", !!prov && esta);
+    p.classList.toggle("gv-prov-off", !!prov && !esta);
+  });
+}
+
+// ---- COBERTURA DE DISTRIBUIDORES ----------------------------------------
+//
+// Un distribuidor factura en una provincia pero REVENDE a otras. Ese dato no
+// está en la base (las direcciones de entrega dicen dónde recibe, no dónde
+// vende), así que se carga a mano acá y se guarda en gv_distribuidor_cobertura.
+// El mapa pinta las provincias que cubre el distribuidor elegido: verde =
+// confirmado, ámbar = a confirmar. Reusa el mismo SVG, sin pines.
+
+var _gvCobData = null; // filas de gv_distribuidores_cobertura
+var _gvCobActivo = null; // {cod, name} distribuidor en foco
+
+function cargarCobDistribuidores() {
+  var slot = document.getElementById("gvCobMapaSlot");
+  if (!slot) return;
+  slot.textContent = "Cargando…";
+
+  // El menú de provincias sale de ARGENTINA_PROVINCIAS, la misma lista con la
+  // que se etiquetan los path del SVG, así lo que se guarda matchea al pintar.
+  var provSel = document.getElementById("gvCobProv");
+  if (provSel && provSel.options.length === 0 && typeof ARGENTINA_PROVINCIAS !== "undefined") {
+    ARGENTINA_PROVINCIAS.slice()
+      .sort()
+      .forEach(function (p) {
+        var o = document.createElement("option");
+        o.value = p;
+        o.textContent = p;
+        provSel.appendChild(o);
+      });
+  }
+
+  Promise.all([loadArgentinaMapSvg(), sb.rpc("gv_distribuidores_cobertura")])
+    .then(function (res) {
+      if (res[1].error) throw res[1].error;
+      _gvCobData = res[1].data || [];
+      slot.innerHTML = res[0];
+      _gvCobLlenarSelect();
+      _gvCobRender();
+    })
+    .catch(function (err) {
+      slot.innerHTML = '<div class="gv-cargando">Error: ' + escHtml(err.message) + "</div>";
+    });
+}
+window.cargarCobDistribuidores = cargarCobDistribuidores;
+
+function _gvCobDistribuidores() {
+  var m = {};
+  (_gvCobData || []).forEach(function (f) {
+    m[f.cod_cliente] = f.business_name || "Cod " + f.cod_cliente;
+  });
+  return Object.keys(m)
+    .map(function (k) {
+      return { cod: Number(k), name: m[k] };
+    })
+    .sort(function (a, b) {
+      return (a.name || "").localeCompare(b.name || "");
+    });
+}
+
+function _gvCobLlenarSelect() {
+  var sel = document.getElementById("gvCobSel");
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Elegí un distribuidor —</option>';
+  _gvCobDistribuidores().forEach(function (d) {
+    var o = document.createElement("option");
+    o.value = String(d.cod);
+    o.textContent = d.name + " (" + d.cod + ")";
+    sel.appendChild(o);
+  });
+  if (_gvCobActivo) sel.value = String(_gvCobActivo.cod);
+  var res = document.getElementById("gvCobResumen");
+  if (res) res.textContent = _gvCobDistribuidores().length + " distribuidores con cobertura";
+}
+
+function gvCobSeleccionar(cod) {
+  if (!cod) {
+    _gvCobActivo = null;
+  } else {
+    var d = _gvCobDistribuidores().find(function (x) {
+      return x.cod === Number(cod);
+    });
+    _gvCobActivo = d || { cod: Number(cod), name: "Cod " + cod };
+  }
+  _gvCobRender();
+}
+window.gvCobSeleccionar = gvCobSeleccionar;
+
+function _gvCobRender() {
+  var slot = document.getElementById("gvCobMapaSlot");
+  var svgEl = slot && slot.querySelector(".ar-map-svg");
+  if (svgEl) {
+    svgEl.querySelectorAll("[data-prov]").forEach(function (p) {
+      p.classList.remove("gv-cob-conf", "gv-cob-noconf");
+    });
+  }
+  var chips = document.getElementById("gvCobChips");
+  var addBox = document.getElementById("gvCobAddBox");
+  if (chips) chips.innerHTML = "";
+  if (!_gvCobActivo) {
+    if (addBox) addBox.style.display = "none";
+    return;
+  }
+  if (addBox) addBox.style.display = "";
+
+  var filas = (_gvCobData || []).filter(function (f) {
+    return Number(f.cod_cliente) === _gvCobActivo.cod;
+  });
+
+  if (svgEl) {
+    filas.forEach(function (f) {
+      var path = svgEl.querySelector('[data-prov="' + String(f.provincia).replace(/"/g, '\\"') + '"]');
+      if (path) path.classList.add(f.confirmado ? "gv-cob-conf" : "gv-cob-noconf");
+    });
+  }
+
+  if (chips) {
+    if (!filas.length) {
+      chips.innerHTML = '<span class="gv-sin-dato">Sin provincias cargadas todavía.</span>';
+    } else {
+      filas.forEach(function (f) {
+        var s = document.createElement("span");
+        s.className = "gv-cob-chip " + (f.confirmado ? "conf" : "noconf");
+        s.innerHTML =
+          escHtml(f.provincia) + (f.confirmado ? " ✓" : " ?") +
+          ' <b data-cod="' + _gvCobActivo.cod + '" data-prov="' + escHtml(f.provincia) + '">✕</b>';
+        chips.appendChild(s);
+      });
+      chips.querySelectorAll("b[data-prov]").forEach(function (b) {
+        b.style.cursor = "pointer";
+        b.addEventListener("click", function () {
+          gvCobQuitar(Number(b.dataset.cod), b.dataset.prov);
+        });
+      });
+    }
+  }
+}
+
+function gvCobAgregar() {
+  if (!_gvCobActivo) return;
+  var provSel = document.getElementById("gvCobProv");
+  var conf = document.getElementById("gvCobConf");
+  var prov = provSel && provSel.value;
+  if (!prov) return;
+  sb.rpc("gv_set_distribuidor_cobertura", {
+    p_cod: _gvCobActivo.cod,
+    p_provincia: prov,
+    p_confirmado: !!(conf && conf.checked),
+    p_fuente: "panel",
+  })
+    .then(function (r) {
+      if (r.error) throw r.error;
+      return sb.rpc("gv_distribuidores_cobertura");
+    })
+    .then(function (r) {
+      if (r.error) throw r.error;
+      _gvCobData = r.data || [];
+      _gvCobLlenarSelect();
+      _gvCobRender();
+    })
+    .catch(function (err) {
+      alert("No se pudo guardar: " + err.message);
+    });
+}
+window.gvCobAgregar = gvCobAgregar;
+
+function gvCobQuitar(cod, prov) {
+  sb.rpc("gv_del_distribuidor_cobertura", { p_cod: cod, p_provincia: prov })
+    .then(function (r) {
+      if (r.error) throw r.error;
+      return sb.rpc("gv_distribuidores_cobertura");
+    })
+    .then(function (r) {
+      if (r.error) throw r.error;
+      _gvCobData = r.data || [];
+      _gvCobLlenarSelect();
+      _gvCobRender();
+    })
+    .catch(function (err) {
+      alert("No se pudo quitar: " + err.message);
+    });
+}
+window.gvCobQuitar = gvCobQuitar;
+
+function gvCobBuscarCliente() {
+  var inp = document.getElementById("gvCobBuscar");
+  var res = document.getElementById("gvCobResultados");
+  var q = inp && inp.value.trim();
+  if (!q || !res) return;
+  res.style.display = "";
+  res.innerHTML = "<option>Buscando…</option>";
+  sb.rpc("gv_buscar_cliente", { p_q: q })
+    .then(function (r) {
+      if (r.error) throw r.error;
+      var arr = r.data || [];
+      res.innerHTML = "";
+      if (!arr.length) {
+        res.innerHTML = '<option value="">sin resultados</option>';
+        return;
+      }
+      res.appendChild(new Option("— Elegí para usar como distribuidor —", ""));
+      arr.forEach(function (c) {
+        var o = document.createElement("option");
+        o.value = String(c.cod_cliente);
+        o.textContent = (c.business_name || "(sin nombre)") + " (" + c.cod_cliente + ")";
+        res.appendChild(o);
+      });
+    })
+    .catch(function (err) {
+      res.innerHTML = '<option value="">error: ' + escHtml(err.message) + "</option>";
+    });
+}
+window.gvCobBuscarCliente = gvCobBuscarCliente;
+
+function gvCobUsarResultado() {
+  var res = document.getElementById("gvCobResultados");
+  var cod = res && res.value;
+  if (!cod) return;
+  var name = res.options[res.selectedIndex].textContent.replace(/\s*\(\d+\)\s*$/, "");
+  _gvCobActivo = { cod: Number(cod), name: name };
+  _gvCobRender();
+}
+window.gvCobUsarResultado = gvCobUsarResultado;
 
 // ---- GEOCODIFICACIÓN ----------------------------------------------------
 //
@@ -12721,6 +13582,1803 @@ function _gvQ(v) {
   return "'" + String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;") + "'";
 }
 
+/* ============================================================================
+   Ranking Clientes (ACTIVOS)
+   Espeja el Ranking Inactivos pero al revés: muestra a los clientes que
+   compraron en el período y los ordena por facturación neta. Consume la
+   RPC get_ranking_clientes.
+   Pedido explícito del user (2026-08-11): "otra cosa que hay que desarrollar
+   en paginalk es un modulo de ranking de clientes".
+   ============================================================================ */
+var _rcState = { page: 1, pageSize: 25, total: 0, loaded: false, rows: [] };
+
+function _rcFmt(n) {
+  var v = Number(n) || 0;
+  return v.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+}
+function _rcEsc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+
+async function cargarRankingClientes(page) {
+  _rcState.page = Math.max(1, Number(page) || 1);
+  var meses = Number(document.getElementById("rcPeriodo").value) || 12;
+  var minMonto = Number(document.getElementById("rcMinMonto").value) || 0;
+  var q = (document.getElementById("rcBuscar").value || "").trim() || null;
+  var cont = document.getElementById("rcTabla");
+  var res  = document.getElementById("rcResumen");
+  var pgr  = document.getElementById("rcPager");
+  cont.innerHTML = '<div style="padding:16px;color:#64748b;">Cargando…</div>';
+  res.textContent = "";
+  pgr.innerHTML = "";
+  var offset = (_rcState.page - 1) * _rcState.pageSize;
+  var r = await sb.rpc("get_ranking_clientes", {
+    p_meses: meses,
+    p_empresa: "lk",
+    p_limit: _rcState.pageSize,
+    p_offset: offset,
+    p_q: q,
+    p_vendedores: null,
+    p_min_monto: minMonto,
+  });
+  if (r.error) {
+    cont.innerHTML = '<div style="padding:16px;color:#b91c1c;">Error: ' + _rcEsc(r.error.message) + '</div>';
+    return;
+  }
+  _rcState.rows = r.data || [];
+  _rcState.total = _rcState.rows.length ? Number(_rcState.rows[0].total_filas) || 0 : 0;
+  _rcState.loaded = true;
+  _rcRender();
+}
+
+function _rcRender() {
+  var cont = document.getElementById("rcTabla");
+  var res  = document.getElementById("rcResumen");
+  var pgr  = document.getElementById("rcPager");
+  var rows = _rcState.rows;
+  var tot  = _rcState.total;
+  var totFact = 0;
+  for (var i = 0; i < rows.length; i++) totFact += Number(rows[i].total_historico) || 0;
+  res.innerHTML = "<b>" + tot.toLocaleString("es-AR") + "</b> cliente(s) en el período · Página muestra <b>" + rows.length + "</b> · Facturado (esta página) <b>" + _rcFmt(totFact) + "</b>";
+  if (!rows.length) {
+    cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin clientes que cumplan los filtros.</div>';
+    return;
+  }
+  var h = '<div style="overflow-x:auto;"><table class="est-table" style="width:100%;border-collapse:collapse;font-size:13.5px;">' +
+    '<thead><tr>' +
+      '<th style="padding:8px;">Puesto</th>' +
+      '<th style="padding:8px;">Código</th>' +
+      '<th style="padding:8px;">Razón social</th>' +
+      '<th style="padding:8px;">CUIT</th>' +
+      '<th style="padding:8px;">Vendedor</th>' +
+      '<th style="padding:8px;text-align:right;">Facturado</th>' +
+      '<th style="padding:8px;text-align:right;">Pedidos</th>' +
+      '<th style="padding:8px;text-align:right;">Arts. dist.</th>' +
+      '<th style="padding:8px;">Últ. compra</th>' +
+    '</tr></thead><tbody>';
+  h += rows.map(function (r) {
+    return '<tr>' +
+      '<td style="padding:6px 8px;text-align:center;font-weight:bold;">' + r.ranking + '</td>' +
+      '<td style="padding:6px 8px;"><b>' + _rcEsc(r.cod_cliente) + '</b></td>' +
+      '<td style="padding:6px 8px;">' + _rcEsc(r.business_name || "—") + '</td>' +
+      '<td style="padding:6px 8px;font-size:12px;color:#64748b;"' +
+        (r.cuit ? ' data-copiable="' + _rcEsc(r.cuit) + '"' : "") + ">" +
+        _rcEsc(r.cuit || "—") + '</td>' +
+      '<td style="padding:6px 8px;font-size:12px;">' + _rcEsc(r.vendedor_nombre || r.vendedor || "—") + '</td>' +
+      '<td style="padding:6px 8px;text-align:right;font-weight:bold;">' + _rcFmt(r.total_historico) + '</td>' +
+      '<td style="padding:6px 8px;text-align:right;">' + (r.total_pedidos || 0) + '</td>' +
+      '<td style="padding:6px 8px;text-align:right;">' + (r.articulos_distintos || 0) + '</td>' +
+      '<td style="padding:6px 8px;font-size:12px;color:#64748b;">' + _rcEsc(r.last_date || "—") + '</td>' +
+    '</tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  cont.innerHTML = h;
+  // Pager
+  var pages = Math.max(1, Math.ceil(tot / _rcState.pageSize));
+  var cur = _rcState.page;
+  var pg = '';
+  pg += '<button ' + (cur <= 1 ? 'disabled' : '') + ' onclick="cargarRankingClientes(' + (cur - 1) + ')" style="padding:6px 12px;">‹ Anterior</button>';
+  pg += '<span style="margin:0 8px;">Página <b>' + cur + '</b> de ' + pages + '</span>';
+  pg += '<button ' + (cur >= pages ? 'disabled' : '') + ' onclick="cargarRankingClientes(' + (cur + 1) + ')" style="padding:6px 12px;">Siguiente ›</button>';
+  pgr.innerHTML = pg;
+}
+
+async function descargarRankingClientesExcel() {
+  // Trae todo el ranking del período (sin paginado) llamando a la RPC con
+  // p_limit grande. Formato mínimo — el user ya conoce el pattern del
+  // Ranking Inactivos.
+  var meses = Number(document.getElementById("rcPeriodo").value) || 12;
+  var minMonto = Number(document.getElementById("rcMinMonto").value) || 0;
+  var q = (document.getElementById("rcBuscar").value || "").trim() || null;
+  var btn = document.getElementById("rcBtnExcel");
+  var txt0 = btn.textContent; btn.disabled = true; btn.textContent = "Generando…";
+  try {
+    var r = await sb.rpc("get_ranking_clientes", {
+      p_meses: meses, p_empresa: "lk",
+      p_limit: 10000, p_offset: 0, p_q: q,
+      p_vendedores: null, p_min_monto: minMonto,
+    });
+    if (r.error) { alert("Error: " + r.error.message); return; }
+    var rows = (r.data || []).map(function (x) {
+      return {
+        Puesto: x.ranking,
+        Codigo: x.cod_cliente,
+        RazonSocial: x.business_name || "",
+        CUIT: x.cuit || "",
+        Vendedor: x.vendedor_nombre || x.vendedor || "",
+        Facturado: Number(x.total_historico) || 0,
+        Pedidos: x.total_pedidos || 0,
+        ArticulosDistintos: x.articulos_distintos || 0,
+        UltimaCompra: x.last_date || "",
+      };
+    });
+    if (!rows.length) { alert("Nada para exportar."); return; }
+    var ws = XLSX.utils.json_to_sheet(rows);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ranking " + meses + "m");
+    var fname = "ranking_clientes_" + meses + "m_" + new Date().toISOString().slice(0, 10) + ".xlsx";
+    XLSX.writeFile(wb, fname);
+  } catch (e) {
+    alert("Falló el Excel: " + (e.message || e));
+  } finally {
+    btn.disabled = false; btn.textContent = txt0;
+  }
+}
+
+// Wiring del module (se llama en inicRankingClientes al abrir la pestaña)
+function inicRankingClientes() {
+  var btn = document.getElementById("rcBtnCargar");
+  var btnX = document.getElementById("rcBtnExcel");
+  var inpQ = document.getElementById("rcBuscar");
+  if (btn && !btn._wired) {
+    btn._wired = true;
+    btn.addEventListener("click", function () { cargarRankingClientes(1); });
+  }
+  if (btnX && !btnX._wired) {
+    btnX._wired = true;
+    btnX.addEventListener("click", function () { descargarRankingClientesExcel(); });
+  }
+  if (inpQ && !inpQ._wired) {
+    inpQ._wired = true;
+    inpQ.addEventListener("keydown", function (e) { if (e.key === "Enter") cargarRankingClientes(1); });
+  }
+  if (!_rcState.loaded) cargarRankingClientes(1);
+}
+
+window.cargarRankingClientes = cargarRankingClientes;
+window.descargarRankingClientesExcel = descargarRankingClientesExcel;
+window.inicRankingClientes = inicRankingClientes;
+
+/* ============================================================================
+   Panel Top-50 seguimiento clientes (dentro de Gerente de ventas)
+   Dos rankings paralelos (histórico total / pedido máximo individual) para las
+   dos empresas (LK y Chef). Debajo de cada fila, matriz de seguimiento mensual
+   con celdas coloreadas (verde = compró, gris = no compró, rojo = alerta) más
+   un badge de frecuencia habitual y meses sin comprar.
+   Backend: get_top_clientes_hist, get_top_clientes_max_pedido, get_seguimiento_mensual.
+   Pedido explícito 2026-08-11: "no perder pisada de si me están comprando".
+   ============================================================================ */
+var _gvTop = {
+  tab: "hist",       // "hist" | "max"
+  emp: "lk",         // "lk" | "chef"
+  loadedFor: null,   // "tab-emp-mesesAct-mesesSeg" key para no re-pegar sin cambios
+  rows: [],
+  seguimiento: {},   // { cod: {meses[], frecuencia_meses, meses_sin_comprar, alerta} }
+};
+
+function _gvfPlata(n) {
+  var v = Number(n) || 0;
+  if (v >= 1e9) return "$" + (v / 1e9).toFixed(2) + " MM";
+  if (v >= 1e6) return "$" + (v / 1e6).toFixed(1) + " M";
+  if (v >= 1e3) return "$" + (v / 1e3).toFixed(0) + " k";
+  return "$" + Math.round(v).toLocaleString("es-AR");
+}
+function _gvfEsc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+
+function gvTopSetTab(t) {
+  if (t !== "hist" && t !== "max") return;
+  _gvTop.tab = t;
+  var bH = document.getElementById("gvTopTabHist");
+  var bM = document.getElementById("gvTopTabMax");
+  if (bH && bM) {
+    bH.style.background = t === "hist" ? "#111" : "transparent";
+    bH.style.color = t === "hist" ? "#fff" : "#333";
+    bM.style.background = t === "max"  ? "#111" : "transparent";
+    bM.style.color = t === "max"  ? "#fff" : "#333";
+  }
+  gvTopCargar();
+}
+function gvTopSetEmp(e) {
+  if (e !== "lk" && e !== "chef") return;
+  _gvTop.emp = e;
+  var bL = document.getElementById("gvTopEmpLk");
+  var bC = document.getElementById("gvTopEmpCh");
+  if (bL && bC) {
+    bL.style.background = e === "lk"   ? "#1e6bd6" : "transparent";
+    bL.style.color      = e === "lk"   ? "#fff"    : "#333";
+    bC.style.background = e === "chef" ? "#1e6bd6" : "transparent";
+    bC.style.color      = e === "chef" ? "#fff"    : "#333";
+  }
+  gvTopCargar();
+}
+window.gvTopSetTab = gvTopSetTab;
+window.gvTopSetEmp = gvTopSetEmp;
+
+async function gvTopCargar() {
+  var st = document.getElementById("gvTopStatus");
+  var cont = document.getElementById("gvTopTabla");
+  if (!cont) return;
+  var mesesSeg = Number(document.getElementById("gvTopMeses").value) || 12;
+  var minActRaw = document.getElementById("gvTopMinAct").value;
+  var minAct = minActRaw ? Number(minActRaw) : null;
+  var key = _gvTop.tab + "-" + _gvTop.emp + "-" + (minAct||"") + "-" + mesesSeg;
+  st.textContent = "Cargando…";
+  cont.innerHTML = "";
+  try {
+    var fn = _gvTop.tab === "max" ? "get_top_clientes_max_pedido" : "get_top_clientes_hist";
+    var rr = await sb.rpc(fn, { p_empresa: _gvTop.emp, p_limit: 50, p_min_periodo_meses: minAct });
+    if (rr.error) throw rr.error;
+    _gvTop.rows = rr.data || [];
+    if (!_gvTop.rows.length) {
+      st.textContent = "";
+      cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin datos para ' + _gvTop.emp + '.</div>';
+      _gvTop.loadedFor = key;
+      return;
+    }
+    // Traigo el seguimiento de los 50
+    var cods = _gvTop.rows.map(function (r) { return r.cod_cliente; });
+    var sg = await sb.rpc("get_seguimiento_mensual", { p_cods: cods, p_empresa: _gvTop.emp, p_meses: mesesSeg });
+    if (sg.error) throw sg.error;
+    var m = {};
+    (sg.data || []).forEach(function (x) { m[x.cod_cliente] = x; });
+    _gvTop.seguimiento = m;
+    _gvTop.loadedFor = key;
+    _gvTopRender();
+    var aFrec = (sg.data || []).filter(function (x) { return x.alerta_frecuencia; }).length;
+    var aVol  = (sg.data || []).filter(function (x) { return x.alerta_volumen; }).length;
+    var aAny  = (sg.data || []).filter(function (x) { return x.alerta_frecuencia || x.alerta_volumen; }).length;
+    var partes = [];
+    if (aFrec) partes.push('<span style="color:#b91c1c;font-weight:bold;">🕑 ' + aFrec + ' sin comprar</span>');
+    if (aVol)  partes.push('<span style="color:#b91c1c;font-weight:bold;">📉 ' + aVol + ' menos cajas</span>');
+    if (!partes.length) partes.push('<span style="color:#059669;">✓ todos al día</span>');
+    st.innerHTML = '<b>' + _gvTop.rows.length + '</b> clientes · ' + partes.join(' · ') +
+      (aAny ? ' · <b>' + aAny + ' con alguna alerta</b>' : '') +
+      ' · empresa <b>' + (_gvTop.emp === "lk" ? "Loekemeyer" : "Chef") + '</b> · orden por <b>' + (_gvTop.tab === "hist" ? "histórico total" : "pedido máximo") + '</b>';
+  } catch (e) {
+    st.innerHTML = '<span style="color:#b91c1c;">Error: ' + _gvfEsc(e.message || e) + '</span>';
+  }
+}
+window.gvTopCargar = gvTopCargar;
+
+function _gvTopRender() {
+  var cont = document.getElementById("gvTopTabla");
+  if (!cont) return;
+  var rows = _gvTop.rows;
+  var seg  = _gvTop.seguimiento;
+  var mesesSeg = Number(document.getElementById("gvTopMeses").value) || 12;
+  // Header de meses (mismo orden que devuelve el seguimiento: desc)
+  var mesesHdr = [];
+  if (rows.length) {
+    var s0 = seg[rows[0].cod_cliente];
+    if (s0 && Array.isArray(s0.meses)) mesesHdr = s0.meses.map(function (x) { return x.mes; });
+  }
+  var h = '<div style="overflow-x:auto;"><table class="est-table" style="width:100%;border-collapse:collapse;font-size:12.5px;">' +
+    '<thead><tr>' +
+      '<th style="padding:6px 8px;text-align:center;">#</th>' +
+      '<th style="padding:6px 8px;text-align:left;">Cliente</th>' +
+      '<th style="padding:6px 8px;text-align:right;">' + (_gvTop.tab === "max" ? "Pedido máx" : "Histórico") + '</th>' +
+      '<th style="padding:6px 8px;text-align:right;">' + (_gvTop.tab === "max" ? "Histórico" : "Pedido máx") + '</th>' +
+      '<th style="padding:6px 8px;text-align:center;">Freq</th>' +
+      '<th style="padding:6px 8px;text-align:center;">Sin comprar</th>' +
+      '<th style="padding:6px 8px;text-align:center;" title="Mediana de cajas por pedido histórico vs promedio de los últimos 3">Cajas hist→rec</th>' +
+      '<th style="padding:6px 8px;text-align:center;">Alerta</th>' +
+      mesesHdr.map(function (m) {
+        return '<th style="padding:4px 3px;text-align:center;font-size:10px;color:#64748b;font-weight:normal;transform:rotate(-45deg);white-space:nowrap;min-width:24px;">' + m.slice(2) + '</th>';
+      }).join("") +
+    '</tr></thead><tbody>';
+  h += rows.map(function (r) {
+    var s = seg[r.cod_cliente] || {};
+    var mesesArr = Array.isArray(s.meses) ? s.meses : [];
+    var maxMonto = 0;
+    mesesArr.forEach(function (m) { if (Number(m.monto) > maxMonto) maxMonto = Number(m.monto); });
+    var cellsHtml = mesesArr.map(function (m) {
+      var mm = Number(m.monto) || 0;
+      var pct = maxMonto > 0 ? mm / maxMonto : 0;
+      var bg = "#f1f5f9", color = "#94a3b8", txt = "·";
+      if (mm > 0) {
+        var g = 220 - Math.round(pct * 130);
+        bg = "rgb(" + g + "," + Math.min(255, g+30) + "," + g + ")";
+        color = "#065f46"; txt = _gvfPlata(mm).replace("$","");
+      }
+      return '<td title="' + m.mes + ' · ' + _gvfPlata(mm) + ' · ' + m.pedidos + ' pedido(s)" style="padding:2px 3px;text-align:center;background:' + bg + ';color:' + color + ';font-weight:' + (mm > 0 ? 'bold' : 'normal') + ';font-size:10px;">' + txt + '</td>';
+    }).join("");
+    var freq = s.frecuencia_meses != null ? Number(s.frecuencia_meses).toFixed(1) : "—";
+    var sin  = s.meses_sin_comprar != null && s.meses_sin_comprar < 999 ? s.meses_sin_comprar + "m" : "—";
+    // Cajas histórico vs reciente: si cayeron a la mitad o más se pinta rojo.
+    var cajasHist = s.cajas_hist_median != null ? Math.round(s.cajas_hist_median) : null;
+    var cajasRec  = s.cajas_recientes_avg != null ? Math.round(s.cajas_recientes_avg) : null;
+    var cajasTxt = "—";
+    var cajasColor = "#64748b";
+    if (cajasHist != null && cajasRec != null) {
+      cajasTxt = cajasHist + " → " + cajasRec;
+      if (s.alerta_volumen) cajasColor = "#b91c1c";
+      else if (cajasRec >= cajasHist) cajasColor = "#059669";
+    }
+    // Badge de alerta compuesto: 🕑 frecuencia, 📉 volumen, ambos.
+    var alertaBadges = [];
+    if (s.alerta_frecuencia) alertaBadges.push('<span title="Se pasó de su ciclo habitual de compra" style="background:#fee2e2;color:#b91c1c;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;">🕑 sin comprar</span>');
+    if (s.alerta_volumen)    alertaBadges.push('<span title="Cajas por pedido cayeron a menos de la mitad" style="background:#fee2e2;color:#b91c1c;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;">📉 menos cajas</span>');
+    var alertaHtml = alertaBadges.length ? alertaBadges.join(' ') : '<span style="color:#059669;font-size:11px;">✓ OK</span>';
+    var rowBg = (s.alerta_frecuencia || s.alerta_volumen) ? 'background:#fef2f2;' : '';
+    return '<tr' + (rowBg ? ' style="' + rowBg + '"' : '') + '>' +
+      '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:#64748b;">' + r.ranking + '</td>' +
+      '<td style="padding:6px 8px;"><b>' + _gvfEsc(r.cod_cliente) + '</b> <span style="color:#64748b;">' + _gvfEsc((r.business_name || "—").slice(0, 30)) + '</span>' + (r.vendedor_nombre ? '<br><span style="font-size:10px;color:#94a3b8;">' + _gvfEsc(r.vendedor_nombre) + '</span>' : '') + '</td>' +
+      '<td style="padding:6px 8px;text-align:right;font-weight:bold;">' + _gvfPlata(_gvTop.tab === "max" ? r.max_pedido_monto : r.total_historico) + '</td>' +
+      '<td style="padding:6px 8px;text-align:right;color:#64748b;">' + _gvfPlata(_gvTop.tab === "max" ? r.total_historico : r.max_pedido_monto) + '</td>' +
+      '<td style="padding:6px 8px;text-align:center;font-size:11px;color:#64748b;">' + freq + 'm</td>' +
+      '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:' + (s.alerta_frecuencia ? '#b91c1c' : '#64748b') + ';">' + sin + '</td>' +
+      '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:' + cajasColor + ';font-size:11px;">' + cajasTxt + '</td>' +
+      '<td style="padding:6px 8px;text-align:center;white-space:nowrap;">' + alertaHtml + '</td>' +
+      cellsHtml +
+    '</tr>';
+  }).join("");
+  h += '</tbody></table></div>';
+  h += '<div style="margin-top:10px;font-size:11px;color:#94a3b8;">Meses de más reciente a más viejo. Celda verde = compró (intensidad = monto). <b>🕑 sin comprar</b>: pasó su ciclo habitual (compra cada N meses y ya lleva N meses sin comprar). <b>📉 menos cajas</b>: promedio de los últimos 3 pedidos cayó a menos de la mitad de las cajas del pedido típico histórico.</div>';
+  cont.innerHTML = h;
+}
+
+async function gvTopExcel() {
+  if (!_gvTop.rows.length) { alert("Cargá primero el ranking."); return; }
+  var rows = _gvTop.rows;
+  var seg  = _gvTop.seguimiento;
+  var mesesHdr = [];
+  if (rows.length) {
+    var s0 = seg[rows[0].cod_cliente];
+    if (s0 && Array.isArray(s0.meses)) mesesHdr = s0.meses.map(function (x) { return x.mes; });
+  }
+  var data = rows.map(function (r) {
+    var s = seg[r.cod_cliente] || { meses: [] };
+    var base = {
+      Puesto: r.ranking,
+      Codigo: r.cod_cliente,
+      RazonSocial: r.business_name || "",
+      Vendedor: r.vendedor_nombre || r.vendedor || "",
+      HistoricoTotal: Number(r.total_historico) || 0,
+      PedidoMaximo: Number(r.max_pedido_monto) || 0,
+      FechaPedidoMax: r.max_pedido_fecha || "",
+      UltimaCompra: r.ultima_compra || "",
+      TotalPedidos: r.total_pedidos || 0,
+      FrecuenciaMeses: s.frecuencia_meses != null ? Number(s.frecuencia_meses) : "",
+      MesesSinComprar: s.meses_sin_comprar != null && s.meses_sin_comprar < 999 ? s.meses_sin_comprar : "",
+      CajasHistMedian: s.cajas_hist_median != null ? Math.round(s.cajas_hist_median) : "",
+      CajasRecientesAvg: s.cajas_recientes_avg != null ? Math.round(s.cajas_recientes_avg) : "",
+      AlertaFrecuencia: s.alerta_frecuencia ? "SI" : "no",
+      AlertaVolumen: s.alerta_volumen ? "SI" : "no",
+      Alerta: s.alerta ? "SI" : "no",
+    };
+    (s.meses || []).forEach(function (m) { base["M " + m.mes] = Number(m.monto) || 0; });
+    return base;
+  });
+  var ws = XLSX.utils.json_to_sheet(data);
+  var wb = XLSX.utils.book_new();
+  var sheetName = "Top50 " + _gvTop.emp.toUpperCase() + " " + (_gvTop.tab === "max" ? "MaxPed" : "Hist");
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  var fname = "top50_" + _gvTop.emp + "_" + _gvTop.tab + "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
+  XLSX.writeFile(wb, fname);
+}
+window.gvTopExcel = gvTopExcel;
+
+// Hook: cuando se abre la card por primera vez, cargar
+function _gvTopInit() {
+  if (_gvTop.loadedFor) return;
+  gvTopCargar();
+}
+
+// Sobreescribo toggleEstCard para disparar la carga al abrir la card del Top-50
+// solo si es la primera vez. No re-carga en cada toggle.
+(function () {
+  var _origToggle = typeof window.toggleEstCard === "function" ? window.toggleEstCard : null;
+  if (!_origToggle) return;
+  window.toggleEstCard = function (id, headEl) {
+    var r = _origToggle(id, headEl);
+    if (id === "gvTopBody") {
+      var body = document.getElementById("gvTopBody");
+      if (body && body.style.display !== "none") _gvTopInit();
+    }
+    return r;
+  };
+})();
+
+// ===== ESCALA EXPO — editor de la escala de descuento por volumen =====
+// Aplica solo a clientes NUEVOS de expo (tabla expo_dto_escala, RLS admin).
+var _escalaExpoWired = false;
+
+var _acvWired = false;
+function _acvWireOnce() {
+  if (_acvWired) return;
+  _acvWired = true;
+  var sel = document.getElementById("acvMeses");
+  var btn = document.getElementById("acvReload");
+  if (sel) sel.addEventListener("change", cargarAcuerdoVendedores);
+  if (btn) btn.addEventListener("click", cargarAcuerdoVendedores);
+}
+
+function _acvMoney(n) {
+  var v = Number(n) || 0;
+  if (Math.abs(v) >= 1e9) return "$" + (v / 1e9).toFixed(2) + " MM";
+  if (Math.abs(v) >= 1e6) return "$" + (v / 1e6).toFixed(1) + " M";
+  if (Math.abs(v) >= 1e3) return "$" + Math.round(v / 1e3) + " k";
+  return "$" + Math.round(v);
+}
+
+async function cargarAcuerdoVendedores() {
+  var body = document.getElementById("acvBody");
+  if (!body) return;
+  _acvWireOnce();
+  var st = document.getElementById("acvStatus");
+  var selEl = document.getElementById("acvMeses");
+  var meses = selEl ? Number(selEl.value) : 12;
+  // p_meses null = todo el histórico (el <option> "0")
+  var pMeses = meses === 0 ? null : meses;
+  if (st) st.textContent = "Cargando…";
+  body.innerHTML = "";
+
+  var r = await sb.rpc("get_acuerdo_vendedores", { p_meses: pMeses });
+  if (r.error) {
+    if (st) st.textContent = "Error: " + r.error.message;
+    return;
+  }
+  var rows = r.data || [];
+  if (!rows.length) {
+    if (st) st.textContent = "Sin datos en el período.";
+    return;
+  }
+
+  var perdedores = 0;
+  rows.forEach(function (v) {
+    var acuerdo = Number(v.acuerdo);
+    var factor = Number(v.factor_nec);
+    var pierde = factor > 1.51;
+    if (pierde && !v.es_nosotros) perdedores++;
+    var cls = acuerdo < 0 ? "acv-neg" : "acv-pos";
+    var badge = v.es_nosotros
+      ? ' <span class="acv-badge">nosotros</span>'
+      : "";
+    var tr = document.createElement("tr");
+    if (v.es_nosotros) tr.className = "acv-row-nosotros";
+    tr.innerHTML =
+      "<td>" + (v.nombre || v.vend) + badge + "</td>" +
+      '<td class="acv-num">' + (v.clientes != null ? v.clientes : "—") + "</td>" +
+      '<td class="acv-num">' + _acvMoney(v.plata) + "</td>" +
+      '<td class="acv-num">' + Number(v.dto_pond).toFixed(2) + "%</td>" +
+      '<td class="acv-num">' + Number(v.com_pond).toFixed(2) + "%</td>" +
+      '<td class="acv-num ' + (pierde ? "acv-neg" : "") + '">' +
+      Number(v.factor_nec).toFixed(3) + "</td>" +
+      '<td class="acv-num">' + Number(v.neto_151).toFixed(1) + "</td>" +
+      '<td class="acv-num acv-acuerdo ' + cls + '">' +
+      (acuerdo > 0 ? "+" : "") + acuerdo.toFixed(1) + "</td>";
+    body.appendChild(tr);
+  });
+
+  if (st) {
+    st.textContent =
+      rows.length + " vendedores · " + perdedores +
+      " con factor > 1,51 (facturando a 151 no netean 100)";
+  }
+}
+
+async function cargarEscalaExpo() {
+  var body = document.getElementById("escalaExpoBody");
+  if (!body) return;
+  _escalaExpoWireOnce();
+  body.innerHTML = "";
+  var r = await sb
+    .from("expo_dto_escala")
+    .select("desde,dto")
+    .order("desde", { ascending: true });
+  if (r.error) {
+    _escalaExpoStatus("Error al cargar: " + r.error.message, true);
+    return;
+  }
+  (r.data || []).forEach(function (t) {
+    _escalaExpoAddRow(Number(t.desde), Number(t.dto) * 100);
+  });
+  if (!(r.data || []).length) _escalaExpoAddRow(0, 0);
+  _escalaExpoStatus("");
+}
+
+function _escalaExpoAddRow(desde, dtoPct) {
+  var body = document.getElementById("escalaExpoBody");
+  if (!body) return;
+  var tr = document.createElement("tr");
+  tr.innerHTML =
+    '<td><input type="number" class="field-input esc-desde" min="0" step="1000" value="' +
+    (desde != null ? desde : "") +
+    '"/></td>' +
+    '<td><input type="number" class="field-input esc-dto" min="0" max="100" step="0.5" value="' +
+    (dtoPct != null ? dtoPct : "") +
+    '"/></td>' +
+    '<td><button type="button" class="btn-ghost esc-del">Quitar</button></td>';
+  tr.querySelector(".esc-del").addEventListener("click", function () {
+    tr.remove();
+    if (!document.querySelectorAll("#escalaExpoBody tr").length)
+      _escalaExpoAddRow(0, 0);
+  });
+  body.appendChild(tr);
+}
+
+function _escalaExpoStatus(msg, isErr) {
+  var el = document.getElementById("escalaExpoStatus");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.style.color = isErr ? "#b91c1c" : "#166534";
+}
+
+async function guardarEscalaExpo() {
+  var rows = [];
+  var bad = false;
+  document.querySelectorAll("#escalaExpoBody tr").forEach(function (tr) {
+    var d = parseFloat(tr.querySelector(".esc-desde").value);
+    var p = parseFloat(tr.querySelector(".esc-dto").value);
+    if (isNaN(d) || isNaN(p)) {
+      bad = true;
+      return;
+    }
+    rows.push({ desde: d, dto: p / 100 });
+  });
+  if (bad || !rows.length) {
+    _escalaExpoStatus(
+      "Revisá los valores: cada tramo necesita monto y dto.",
+      true,
+    );
+    return;
+  }
+  rows.sort(function (a, b) {
+    return a.desde - b.desde;
+  });
+  _escalaExpoStatus("Guardando…");
+  try {
+    var del = await sb.from("expo_dto_escala").delete().gte("desde", 0);
+    if (del.error) throw del.error;
+    var ins = await sb.from("expo_dto_escala").insert(rows);
+    if (ins.error) throw ins.error;
+    _escalaExpoStatus(
+      "Escala guardada. Se aplica a los próximos clientes nuevos de expo.",
+    );
+    if (typeof toast === "function") toast("Escala guardada");
+    cargarEscalaExpo();
+  } catch (e) {
+    _escalaExpoStatus("Error: " + (e.message || e), true);
+  }
+}
+
+function _escalaExpoWireOnce() {
+  if (_escalaExpoWired) return;
+  _escalaExpoWired = true;
+  var add = document.getElementById("escalaExpoAddRow");
+  var save = document.getElementById("escalaExpoSave");
+  if (add)
+    add.addEventListener("click", function () {
+      _escalaExpoAddRow(0, 0);
+    });
+  if (save) save.addEventListener("click", guardarEscalaExpo);
+}
+
+// ============================================================================
+// Clientes Expo pendientes de ERP
+// ============================================================================
+var _cliPendWired = false;
+var _cliPendRows = [];
+
+function _cliPendStatus(msg, isErr) {
+  var el = document.getElementById("cliPendStatus");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.style.color = isErr ? "#b91c1c" : "#166534";
+}
+
+async function cargarClientesPendientes() {
+  var body = document.getElementById("cliPendBody");
+  if (!body) return;
+  _cliPendWireOnce();
+  var filtro = (document.getElementById("cliPendFiltro") || {}).value || "pendiente";
+  body.innerHTML =
+    '<tr><td colspan="13" style="text-align:center;color:#6b7280">Cargando…</td></tr>';
+  var q = sb
+    .from("expo_clientes_pendientes")
+    .select(
+      "id,customer_id,cod_cliente,business_name,cuit,condicion_iva,direccion,numero,cp,localidad,provincia,telefono,whatsapp,mail,vend,dto_vol,pin,direcciones_entrega,estado,creado_at,actualizado_at",
+    )
+    .order("actualizado_at", { ascending: false });
+  if (filtro !== "todos") q = q.eq("estado", filtro);
+  var r = await q;
+  if (r.error) {
+    body.innerHTML =
+      '<tr><td colspan="13" style="text-align:center;color:#b91c1c">Error: ' +
+      escapeHtml(r.error.message) +
+      "</td></tr>";
+    return;
+  }
+  _cliPendRows = r.data || [];
+  _cliPendRender(_cliPendRows);
+  var cnt = document.getElementById("cliPendCount");
+  if (cnt) cnt.textContent = _cliPendRows.length + " cliente(s)";
+  _cliPendStatus("");
+  _cliPendCargarStats();
+}
+
+async function _cliPendCargarStats() {
+  var d = await sb.rpc("expo_dashboard");
+  if (d.error || !d.data) return;
+  var s = d.data;
+  function set(id, v) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = v;
+  }
+  set("statCliTotal", s.clientes_total != null ? s.clientes_total : "—");
+  set("statCliPend", s.clientes_pendientes != null ? s.clientes_pendientes : "—");
+  set("statCliCarg", s.clientes_cargados != null ? s.clientes_cargados : "—");
+  set("statPedCount", s.pedidos_count != null ? s.pedidos_count : "—");
+  var monto = Number(s.pedidos_monto || 0);
+  set(
+    "statPedMonto",
+    "$" + monto.toLocaleString("es-AR", { maximumFractionDigits: 0 }),
+  );
+}
+
+function _cliPendDirResumen(dirs) {
+  if (!Array.isArray(dirs) || !dirs.length) return "—";
+  var tit = dirs
+    .map(function (d) {
+      return d.titulo || d.direccion || "";
+    })
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    '<span title="' + escapeHtml(tit) + '">' + dirs.length + " dir.</span>"
+  );
+}
+
+function _cliPendRender(rows) {
+  var body = document.getElementById("cliPendBody");
+  if (!body) return;
+  if (!rows.length) {
+    body.innerHTML =
+      '<tr><td colspan="13" style="text-align:center;color:#6b7280">No hay clientes en este estado.</td></tr>';
+    return;
+  }
+  var html = "";
+  rows.forEach(function (c) {
+    var cargado = c.estado === "cargado_erp";
+    var tel = [c.telefono, c.whatsapp].filter(Boolean).join(" / ") || "—";
+    var dto = c.dto_vol != null ? Math.round(Number(c.dto_vol) * 100) + "%" : "—";
+    html +=
+      "<tr>" +
+      "<td>" + escapeHtml(c.cod_cliente || "—") + "</td>" +
+      "<td>" + escapeHtml(c.business_name || "(sin razón social)") + "</td>" +
+      (c.cuit
+        ? '<td data-copiable="' + escapeHtml(c.cuit) + '">' + escapeHtml(c.cuit) + "</td>"
+        : "<td>—</td>") +
+      "<td>" + escapeHtml(c.condicion_iva || "—") + "</td>" +
+      "<td>" + escapeHtml(c.localidad || "—") + "</td>" +
+      "<td>" + escapeHtml(c.provincia || "—") + "</td>" +
+      "<td>" + escapeHtml(tel) + "</td>" +
+      "<td>" + escapeHtml(c.vend || "—") + "</td>" +
+      "<td>" + dto + "</td>" +
+      "<td>" + _cliPendDirResumen(c.direcciones_entrega) + "</td>" +
+      '<td style="text-align:center">' +
+      '<input type="checkbox" class="cli-pend-chk" data-id="' +
+      escapeHtml(c.id) +
+      '" ' +
+      (cargado ? "checked" : "") +
+      " /></td>" +
+      "<td>" +
+      '<span class="cli-pend-badge ' +
+      (cargado ? "ok" : "wait") +
+      '">' +
+      (cargado ? "Cargado ERP" : "Pendiente") +
+      "</span></td>" +
+      "<td>" +
+      '<button type="button" class="btn-ghost cli-pend-del" data-id="' +
+      escapeHtml(c.id) +
+      '">Eliminar</button></td>' +
+      "</tr>";
+  });
+  body.innerHTML = html;
+  body.querySelectorAll(".cli-pend-chk").forEach(function (chk) {
+    chk.addEventListener("change", function () {
+      _cliPendSetEstado(chk.dataset.id, chk.checked ? "cargado_erp" : "pendiente");
+    });
+  });
+  body.querySelectorAll(".cli-pend-del").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      _cliPendDelete(btn.dataset.id);
+    });
+  });
+}
+
+async function _cliPendSetEstado(id, estado) {
+  _cliPendStatus("Guardando…");
+  var upd = await sb
+    .from("expo_clientes_pendientes")
+    .update({ estado: estado, actualizado_at: new Date().toISOString() })
+    .eq("id", id);
+  if (upd.error) {
+    _cliPendStatus("Error: " + upd.error.message, true);
+    return;
+  }
+  _cliPendStatus(estado === "cargado_erp" ? "Marcado como cargado en ERP." : "Vuelto a pendiente.");
+  cargarClientesPendientes();
+}
+
+async function _cliPendDelete(id) {
+  var row = _cliPendRows.find(function (x) {
+    return String(x.id) === String(id);
+  });
+  var nombre = row ? row.business_name || "este cliente" : "este cliente";
+  if (
+    !confirm(
+      "¿Quitar “" +
+        nombre +
+        "” de la lista de pendientes?\n\nSolo se borra el registro de staging; el cliente sigue en la web (customers) para su pedido/PIN.",
+    )
+  )
+    return;
+  _cliPendStatus("Eliminando…");
+  var del = await sb.from("expo_clientes_pendientes").delete().eq("id", id);
+  if (del.error) {
+    _cliPendStatus("Error: " + del.error.message, true);
+    return;
+  }
+  _cliPendStatus("Registro eliminado.");
+  if (typeof toast === "function") toast("Eliminado de pendientes");
+  cargarClientesPendientes();
+}
+
+function exportarClientesPendientes() {
+  if (!_cliPendRows.length) {
+    _cliPendStatus("No hay filas para exportar.", true);
+    return;
+  }
+  var encabezados = [
+    "Cod cliente", "Razon social", "CUIT", "Condicion IVA",
+    "Direccion fiscal", "Numero", "CP", "Localidad", "Provincia",
+    "Telefono", "WhatsApp", "Mail", "Vendedor", "Dto vol %", "PIN",
+    "Direcciones de entrega", "Estado", "Creado",
+  ];
+  var aoa = [encabezados];
+  _cliPendRows.forEach(function (c) {
+    var dirs = Array.isArray(c.direcciones_entrega) ? c.direcciones_entrega : [];
+    var dirTxt = dirs
+      .map(function (d) {
+        return (
+          (d.titulo || d.direccion || "") +
+          (d.localidad ? " (" + d.localidad + ")" : "") +
+          (d.provincia ? ", " + d.provincia : "") +
+          (d.expreso ? " [Expreso: " + d.expreso + "]" : "")
+        );
+      })
+      .join(" | ");
+    aoa.push([
+      c.cod_cliente || "",
+      c.business_name || "",
+      c.cuit || "",
+      c.condicion_iva || "",
+      c.direccion || "",
+      c.numero || "",
+      c.cp || "",
+      c.localidad || "",
+      c.provincia || "",
+      c.telefono || "",
+      c.whatsapp || "",
+      c.mail || "",
+      c.vend || "",
+      c.dto_vol != null ? Math.round(Number(c.dto_vol) * 100) : "",
+      c.pin || "",
+      dirTxt,
+      c.estado === "cargado_erp" ? "Cargado ERP" : "Pendiente",
+      (c.creado_at || "").slice(0, 10),
+    ]);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [
+    { wch: 10 }, { wch: 32 }, { wch: 14 }, { wch: 20 },
+    { wch: 26 }, { wch: 8 }, { wch: 8 }, { wch: 18 }, { wch: 14 },
+    { wch: 16 }, { wch: 16 }, { wch: 24 }, { wch: 8 }, { wch: 9 }, { wch: 32 },
+    { wch: 50 }, { wch: 12 }, { wch: 12 },
+  ];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Clientes Expo");
+  XLSX.writeFile(wb, "clientes-expo-pendientes.xlsx");
+  _cliPendStatus("Excel generado (" + _cliPendRows.length + " filas).");
+}
+
+function _cliPendWireOnce() {
+  if (_cliPendWired) return;
+  _cliPendWired = true;
+  var filtro = document.getElementById("cliPendFiltro");
+  var reload = document.getElementById("cliPendReload");
+  var exp = document.getElementById("cliPendExport");
+  if (filtro) filtro.addEventListener("change", cargarClientesPendientes);
+  if (reload) reload.addEventListener("click", cargarClientesPendientes);
+  if (exp) exp.addEventListener("click", exportarClientesPendientes);
+}
+
+
+// =====================================================
+// ---- PEDIDOS SIN COTIZADOR --------------------------
+// Carga manual de un pedido (cliente + cod/cajas). Se envia por el MISMO
+// pipeline que el Cotizador (submit_order_fast + sheets-proxy + entregas-proxy).
+// Condicion de pago FIJA: "Sin Cotizador" (condicion_pago_code = 1).
+// Precio: SOLO LISTA (list_price x uxb, sin dto_vol ni web_discount).
+// PSC_LSUFFIX = true -> sugiere ademas el codigo con "L" al final (regla Chef).
+// =====================================================
+var PSC_DEFAULT_ROWS = 10;
+var PSC_LSUFFIX = false;
+// ⚠ ARTICULOS DE REENVASE — SOLO SE VEN EN ESTE MODULO (Tomas Gonzalez, 23/09/2026).
+// Son codigos de Loekemeyer reenvasados para UN cliente puntual (Matiz SA, LK 4263):
+// mismo producto que el articulo base, otro codigo y otro precio.
+// Viven en `products` con `active = false` A PROPOSITO, y eso no es un olvido:
+//   - el catalogo del portal (`script.js`) y el catalogo publico de `/productos/`
+//     (`scripts/exportar-catalogo.py`) filtran `active = true`, asi que un codigo de
+//     reenvase no se le ofrece a ningun otro cliente ni sale indexado en Google;
+//   - si alguien lo mete al carrito de un cliente por cualquiera de los ~10 caminos
+//     que no pasan por `agregarAlCarrito`, el guard SIN STOCK del backend lo frena
+//     (`pedido_items_sin_stock`, que bloquea tambien `active = false`);
+//   - aca entran igual porque ese guard NO aplica al admin (`submit_order_fast` y
+//     `edit_order_fast` lo saltean con `IF NOT v_es_admin`), y porque ninguna vista
+//     que alimenta a Gestion Virgilio filtra `active` (verificado el 23/09 sobre
+//     `v_pedidos_web`, `gv_pedidos_web_np_lk`, `ppp_valor_linea`, `v_item_precio`):
+//     el pedido se programa y se valoriza igual que cualquier otro.
+// NO se agregan a `cpAllProducts`: esa lista la comparten el Cotizador, el generador
+// de flyers y el match de OC de supermercados, donde un codigo de reenvase no tiene
+// nada que hacer (una OC de Coto que diga "prensa matambre" no debe matchear aca).
+// ⚠ HOY LA LISTA VA VACIA: Tomas Gonzalez cargo el pedido de Matiz el 23/09/2026
+// (pedidos 1533 y 1534) y pidio dejar los dos codigos deshabilitados. Se vacia la
+// lista en vez de borrar el mecanismo, porque el reenvase se repite: para volver a
+// habilitarlos alcanza con poner los codigos aca de nuevo (`["55219", "55289"]`),
+// bumpear el `?v=` y replicar al espejo. Los articulos siguen en `products` con
+// `active = false`, o sea que no se le ofrecen a nadie mientras esten fuera de aca.
+var PSC_CODS_EXTRA = [];
+// ⚠ CLIENTES QUE PIDEN POR UNIDAD, NO POR CAJA CERRADA (Tomas Gonzalez, 23/09/2026).
+// Matiz SA (4263) compra reenvase suelto. Sus articulos llevan `uxb = 1`, asi que
+// "una caja" ES una unidad y el pipeline no cambia en nada: lo que cambia es la
+// ETIQUETA de la columna, para que nadie escriba cajas donde van unidades.
+// Por que NO se hace con `uxb = 6` dividiendo unidades/uxb: ya se probo y salio mal.
+// El pedido 1450 (15/09) viajo al Sheet con **166,6667 cajas** — un numero de cajas
+// que no existe — y `order_items.cajas` es `integer`, asi que la base guardo 166 y
+// el ERP recibio 166,6667: 4 unidades de diferencia entre lo pedido y lo registrado.
+// Si el cliente compra unidades sueltas, la unidad de venta ES la unidad; el "6 u/caja"
+// es embalaje de origen y vive en el m3 de Gestion, no en `uxb`.
+var PSC_CLIENTES_UNIDADES = ["4263"];
+var pscState = {
+  customer: null,
+  deliveryAddresses: [],
+  rows: [], // { product: <obj|null>, cajas: <number|null>, codText: <string> }
+  extraProducts: [], // PSC_CODS_EXTRA resueltos contra `products` (incluye inactivos)
+  submitting: false,
+  wired: false,
+};
+
+// El cliente elegido carga en UNIDADES en vez de cajas.
+function pscEsUnidades() {
+  if (!pscState.customer) return false;
+  return (
+    PSC_CLIENTES_UNIDADES.indexOf(String(pscState.customer.cod_cliente)) >= 0
+  );
+}
+
+function pscUnitLabel(plural) {
+  if (pscEsUnidades()) return plural ? "Unidades" : "Unidad";
+  return plural ? "Cajas" : "Caja";
+}
+
+// Catalogo del modulo: el del panel MAS los codigos de reenvase (que estan inactivos
+// y por eso no vienen en `cpAllProducts`).
+function pscCatalogo() {
+  var base = cpAllProducts || [];
+  if (!pscState.extraProducts.length) return base;
+  // Si alguno de los extra llegara a estar activo tambien viene en `cpAllProducts`:
+  // se saca de ahi para no mostrarlo dos veces en el buscador.
+  var extraCods = pscState.extraProducts.map(function (p) {
+    return String(p.cod || "").trim().toUpperCase();
+  });
+  return pscState.extraProducts.concat(
+    base.filter(function (p) {
+      return extraCods.indexOf(String(p.cod || "").trim().toUpperCase()) < 0;
+    }),
+  );
+}
+
+function pscFindProduct(cod) {
+  var c = String(cod || "").trim().toUpperCase();
+  var extra = pscState.extraProducts.find(function (p) {
+    return String(p.cod || "").trim().toUpperCase() === c;
+  });
+  return extra || cpFindProduct(cod);
+}
+
+async function pscLoadExtraProducts() {
+  if (!PSC_CODS_EXTRA.length) {
+    pscState.extraProducts = [];
+    return;
+  }
+  try {
+    var r = await sb
+      .from("products")
+      .select("id,cod,description,category,list_price,uxb,active,ranking")
+      .in("cod", PSC_CODS_EXTRA);
+    if (r.error) throw new Error(r.error.message);
+    // Si alguno ya esta activo viene tambien en `cpAllProducts`; se deja solo aca
+    // para no duplicarlo en el buscador.
+    pscState.extraProducts = r.data || [];
+  } catch (e) {
+    console.error("psc extra products:", e);
+    pscState.extraProducts = [];
+  }
+}
+
+async function cargarPedidosSinCot() {
+  if (!cpAllProducts || !cpAllProducts.length) {
+    try {
+      await cpLoadProducts();
+    } catch (e) {
+      console.error("psc load products:", e);
+      toast("No se pudieron cargar los artículos", "error");
+    }
+  }
+  if (!pscState.extraProducts.length) await pscLoadExtraProducts();
+  if (!pscState.wired) {
+    pscWire();
+    pscState.wired = true;
+  }
+  if (!pscState.rows.length) pscReset();
+}
+
+function pscReset() {
+  pscState.customer = null;
+  pscState.deliveryAddresses = [];
+  pscState.rows = [];
+  for (var i = 0; i < PSC_DEFAULT_ROWS; i++)
+    pscState.rows.push({ product: null, cajas: null, codText: "" });
+  var search = document.getElementById("pscSearch");
+  if (search) search.value = "";
+  pscHideSuggest();
+  var cust = document.getElementById("pscCustomer");
+  if (cust) {
+    cust.style.display = "none";
+    cust.innerHTML = "";
+  }
+  var delF = document.getElementById("pscDeliveryField");
+  if (delF) {
+    delF.style.display = "none";
+    delF.innerHTML = "";
+  }
+  var itemsW = document.getElementById("pscItemsWrap");
+  if (itemsW) itemsW.style.display = "none";
+  pscRenderRows();
+  pscUpdateTotal();
+  pscUpdateSubmitState();
+}
+
+var _pscCustTimer = null;
+function pscWire() {
+  var search = document.getElementById("pscSearch");
+  if (search) {
+    search.addEventListener("input", function () {
+      var q = search.value;
+      clearTimeout(_pscCustTimer);
+      _pscCustTimer = setTimeout(function () {
+        pscSuggestCustomers(q);
+      }, 180);
+    });
+    search.addEventListener("blur", function () {
+      setTimeout(pscHideSuggest, 150);
+    });
+  }
+  var addBtn = document.getElementById("pscAddRow");
+  if (addBtn)
+    addBtn.addEventListener("click", function () {
+      pscState.rows.push({ product: null, cajas: null, codText: "" });
+      pscRenderRows();
+    });
+  var submitBtn = document.getElementById("pscSubmit");
+  if (submitBtn) submitBtn.addEventListener("click", pscSubmit);
+}
+
+function pscHideSuggest() {
+  var box = document.getElementById("pscSuggest");
+  if (box) {
+    box.style.display = "none";
+    box.innerHTML = "";
+  }
+}
+
+async function pscSuggestCustomers(q) {
+  q = String(q || "").trim();
+  var box = document.getElementById("pscSuggest");
+  if (!box) return;
+  if (q.length < 2) {
+    pscHideSuggest();
+    return;
+  }
+  var isNum = /^\d+$/.test(q);
+  try {
+    var promises = [
+      sb
+        .from("customers")
+        .select(
+          "id,cod_cliente,business_name,dto_vol,vend,debt,payment_term,credit_limit",
+        )
+        .ilike("business_name", "%" + q + "%")
+        .order("business_name", { ascending: true })
+        .limit(8),
+    ];
+    if (isNum) {
+      promises.push(
+        sb
+          .from("customers")
+          .select(
+            "id,cod_cliente,business_name,dto_vol,vend,debt,payment_term,credit_limit",
+          )
+          .eq("cod_cliente", q)
+          .limit(3),
+      );
+    }
+    var results = await Promise.all(promises);
+    var seen = {},
+      merged = [];
+    results.forEach(function (r) {
+      if (r.error || !r.data) return;
+      r.data.forEach(function (c) {
+        if (seen[c.id]) return;
+        seen[c.id] = true;
+        merged.push(c);
+      });
+    });
+    if (isNum) {
+      merged.sort(function (a, b) {
+        return (
+          (String(a.cod_cliente) === q ? 0 : 1) -
+          (String(b.cod_cliente) === q ? 0 : 1)
+        );
+      });
+    }
+    if (!merged.length) {
+      box.innerHTML = '<div class="cp-suggest-empty">Sin resultados</div>';
+      box.style.display = "block";
+      return;
+    }
+    box.innerHTML = merged
+      .slice(0, 10)
+      .map(function (c) {
+        return (
+          '<div class="cp-suggest-row" data-id="' +
+          c.id +
+          '"><span class="cp-suggest-cod">' +
+          cpEscHTML(c.cod_cliente || "") +
+          '</span><span class="cp-suggest-name">' +
+          cpEscHTML(c.business_name || "") +
+          "</span></div>"
+        );
+      })
+      .join("");
+    box.style.display = "block";
+    box.querySelectorAll(".cp-suggest-row").forEach(function (row) {
+      row.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        var c = merged.find(function (x) {
+          return String(x.id) === row.dataset.id;
+        });
+        if (c) pscSelectCustomer(c);
+      });
+    });
+  } catch (e) {
+    console.error("psc suggest customers:", e);
+  }
+}
+
+async function pscSelectCustomer(c) {
+  pscState.customer = c;
+  var search = document.getElementById("pscSearch");
+  if (search)
+    search.value = (c.cod_cliente || "") + " — " + (c.business_name || "");
+  pscHideSuggest();
+  var cust = document.getElementById("pscCustomer");
+  if (cust) {
+    cust.innerHTML =
+      '<div class="psc-c-name">' +
+      cpEscHTML(c.cod_cliente || "") +
+      " — " +
+      cpEscHTML(c.business_name || "") +
+      "</div>";
+    cust.style.display = "block";
+  }
+  // Sucursales de entrega
+  var addrs = [];
+  try {
+    var r = await sb
+      .from("customer_delivery_addresses")
+      .select("slot,label,direccion_entrega,zona_expreso")
+      .eq("customer_id", c.id)
+      .order("slot", { ascending: true });
+    if (!r.error) addrs = r.data || [];
+  } catch (e) {
+    console.error("psc delivery addrs:", e);
+  }
+  pscState.deliveryAddresses = addrs;
+  pscRenderDelivery(addrs.length ? 0 : null);
+  var itemsW = document.getElementById("pscItemsWrap");
+  if (itemsW) itemsW.style.display = "";
+  pscRenderRows();
+  pscUpdateSubmitState();
+}
+
+// Muestra las sucursales YA cargadas del cliente; si no tiene (o no es la
+// deseada) permite crear una nueva (label + direccion + zona) en el momento.
+function pscRenderDelivery(selIdx) {
+  var delF = document.getElementById("pscDeliveryField");
+  if (!delF) return;
+  var addrs = pscState.deliveryAddresses || [];
+  var hasAddrs = addrs.length > 0;
+  var optsHtml = addrs
+    .map(function (a, i) {
+      var lbl =
+        a.label ||
+        a.direccion_entrega ||
+        "Sucursal " + (a.slot != null ? a.slot : i + 1);
+      return (
+        '<option value="' +
+        i +
+        '"' +
+        (selIdx === i ? " selected" : "") +
+        ">" +
+        cpEscHTML(lbl) +
+        "</option>"
+      );
+    })
+    .join("");
+  delF.innerHTML =
+    '<label class="field-label">Sucursal de entrega</label>' +
+    (hasAddrs
+      ? '<select id="pscDeliverySelect" class="field-input">' +
+        optsHtml +
+        "</select>"
+      : '<div class="psc-suc-none">Este cliente no tiene sucursales cargadas. Creá una para continuar.</div>') +
+    '<button type="button" id="pscNewSucToggle" class="psc-newsuc-toggle">+ Nueva sucursal</button>' +
+    '<div id="pscNewSucForm" class="psc-newsuc-form" style="display:none">' +
+    '<input type="text" id="pscNewSucLabel" class="field-input" placeholder="Nombre / label (ej: Sucursal Centro)" />' +
+    '<input type="text" id="pscNewSucDir" class="field-input" placeholder="Dirección real de entrega" />' +
+    '<input type="text" id="pscNewSucZona" class="field-input" placeholder="Zona expreso" />' +
+    '<div class="psc-newsuc-actions">' +
+    '<button type="button" id="pscNewSucCancel" class="btn-ghost">Cancelar</button>' +
+    '<button type="button" id="pscNewSucSave" class="btn-primary">Guardar sucursal</button>' +
+    "</div>" +
+    '<div id="pscNewSucErr" class="psc-newsuc-err" style="display:none"></div>' +
+    "</div>";
+  delF.style.display = "";
+  var sel = document.getElementById("pscDeliverySelect");
+  if (sel) sel.addEventListener("change", pscUpdateSubmitState);
+  var tog = document.getElementById("pscNewSucToggle");
+  if (tog) tog.addEventListener("click", function () { pscShowNewSuc(true); });
+  var can = document.getElementById("pscNewSucCancel");
+  if (can) can.addEventListener("click", function () { pscShowNewSuc(false); });
+  var sav = document.getElementById("pscNewSucSave");
+  if (sav) sav.addEventListener("click", pscSaveNewSuc);
+  // Sin sucursales: abrir el form directamente.
+  if (!hasAddrs) pscShowNewSuc(true);
+}
+
+function pscShowNewSuc(show) {
+  var form = document.getElementById("pscNewSucForm");
+  var tog = document.getElementById("pscNewSucToggle");
+  if (!form) return;
+  form.style.display = show ? "" : "none";
+  if (tog) tog.style.display = show ? "none" : "";
+  if (show) {
+    var l = document.getElementById("pscNewSucLabel");
+    if (l) l.focus();
+  } else {
+    ["pscNewSucLabel", "pscNewSucDir", "pscNewSucZona"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+    var err = document.getElementById("pscNewSucErr");
+    if (err) err.style.display = "none";
+  }
+}
+
+async function pscSaveNewSuc() {
+  if (!pscState.customer) return;
+  var err = document.getElementById("pscNewSucErr");
+  function showErr(msg) {
+    if (err) {
+      err.textContent = msg;
+      err.style.display = "block";
+    }
+  }
+  var label = (document.getElementById("pscNewSucLabel") || {}).value || "";
+  var dir = (document.getElementById("pscNewSucDir") || {}).value || "";
+  var zona = (document.getElementById("pscNewSucZona") || {}).value || "";
+  label = label.trim();
+  dir = dir.trim();
+  zona = zona.trim();
+  if (err) err.style.display = "none";
+  if (!label) return showErr("Ingresá el nombre / label.");
+  if (!dir) return showErr("Ingresá la dirección real de entrega.");
+  if (!zona) return showErr("Ingresá la zona expreso.");
+  var existing = pscState.deliveryAddresses || [];
+  var dupNorm = label.toLowerCase();
+  if (
+    existing.some(function (d) {
+      return String(d.label || "").trim().toLowerCase() === dupNorm;
+    })
+  )
+    return showErr("Ya existe una sucursal con ese label.");
+  var nextSlot =
+    existing.reduce(function (m, d) {
+      return Math.max(m, Number(d.slot || 0));
+    }, 0) + 1;
+  var saveBtn = document.getElementById("pscNewSucSave");
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Guardando...";
+  }
+  try {
+    var r = await sb
+      .from("customer_delivery_addresses")
+      .insert({
+        customer_id: pscState.customer.id,
+        slot: nextSlot,
+        label: label,
+        direccion_entrega: dir,
+        zona_expreso: zona,
+      })
+      .select()
+      .single();
+    if (r.error) throw new Error(r.error.message || "Error al insertar sucursal");
+    pscState.deliveryAddresses = existing
+      .concat([r.data])
+      .sort(function (a, b) {
+        return Number(a.slot) - Number(b.slot);
+      });
+    var newIdx = pscState.deliveryAddresses.findIndex(function (d) {
+      return d.slot === r.data.slot;
+    });
+    pscRenderDelivery(newIdx >= 0 ? newIdx : 0);
+    toast("Sucursal creada", "success");
+    pscUpdateSubmitState();
+  } catch (e) {
+    console.error("psc save sucursal:", e);
+    showErr("Error: " + (e.message || e));
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Guardar sucursal";
+    }
+  }
+}
+
+function pscSelectedAddr() {
+  var sel = document.getElementById("pscDeliverySelect");
+  if (!sel || sel.value === "") return null;
+  return pscState.deliveryAddresses[Number(sel.value)] || null;
+}
+
+function pscRenderRows() {
+  var tbody = document.getElementById("pscTableBody");
+  if (!tbody) return;
+  tbody.innerHTML = pscState.rows
+    .map(function (row, i) {
+      var p = row.product;
+      var codVal = p ? cpEscHTML(p.cod || "") : cpEscHTML(row.codText || "");
+      var desc = p ? cpEscHTML(p.description || "") : "";
+      var cajas = row.cajas != null ? row.cajas : "";
+      return (
+        '<tr data-i="' +
+        i +
+        '">' +
+        '<td class="psc-td-cod"><input type="text" class="field-input psc-cod" data-i="' +
+        i +
+        '" autocomplete="off" value="' +
+        codVal +
+        '" placeholder="Cód" /><div class="cp-suggest psc-prod-suggest" data-i="' +
+        i +
+        '" style="display:none"></div></td>' +
+        '<td class="psc-td-desc' +
+        (p ? "" : " psc-desc-empty") +
+        '">' +
+        (desc || "—") +
+        "</td>" +
+        '<td class="psc-td-cajas"><input type="number" min="1" step="1" class="field-input psc-cajas" data-i="' +
+        i +
+        '" value="' +
+        cajas +
+        '" ' +
+        (p ? "" : "disabled") +
+        ' placeholder="' +
+        pscUnitLabel(true) +
+        '" /></td>' +
+        '<td class="psc-td-x"><button type="button" class="psc-row-x" data-i="' +
+        i +
+        '" title="Quitar fila">×</button></td>' +
+        "</tr>"
+      );
+    })
+    .join("");
+  // El encabezado dice CAJAS o UNIDADES segun el cliente: es lo unico que ve el
+  // que carga, y escribir unidades en una columna que dice "Cajas" es el error
+  // que produjo el pedido 1450 (166,6667 cajas).
+  var th = document.getElementById("pscThCant");
+  if (th) th.textContent = pscUnitLabel(true);
+  pscWireRows();
+}
+
+var _pscProdTimer = null;
+function pscWireRows() {
+  var tbody = document.getElementById("pscTableBody");
+  if (!tbody) return;
+  tbody.querySelectorAll(".psc-cod").forEach(function (inp) {
+    inp.addEventListener("input", function () {
+      var i = Number(inp.dataset.i);
+      pscState.rows[i].product = null;
+      pscState.rows[i].codText = inp.value;
+      var caj = tbody.querySelector('.psc-cajas[data-i="' + i + '"]');
+      if (caj) caj.disabled = true;
+      var tr = inp.closest("tr");
+      var descTd = tr ? tr.querySelector(".psc-td-desc") : null;
+      if (descTd) {
+        descTd.textContent = "—";
+        descTd.classList.add("psc-desc-empty");
+      }
+      clearTimeout(_pscProdTimer);
+      _pscProdTimer = setTimeout(function () {
+        pscSuggestProducts(i, inp.value);
+      }, 120);
+      pscUpdateTotal();
+      pscUpdateSubmitState();
+    });
+    inp.addEventListener("blur", function () {
+      var i = Number(inp.dataset.i);
+      setTimeout(function () {
+        pscHideProdSuggest(i);
+        pscFinalizeCod(i, inp.value);
+      }, 150);
+    });
+  });
+  tbody.querySelectorAll(".psc-cajas").forEach(function (inp) {
+    inp.addEventListener("input", function () {
+      var i = Number(inp.dataset.i);
+      var v = parseInt(inp.value, 10);
+      pscState.rows[i].cajas = isNaN(v) || v <= 0 ? null : v;
+      pscUpdateTotal();
+      pscUpdateSubmitState();
+    });
+  });
+  tbody.querySelectorAll(".psc-row-x").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var i = Number(btn.dataset.i);
+      pscState.rows.splice(i, 1);
+      if (!pscState.rows.length)
+        pscState.rows.push({ product: null, cajas: null, codText: "" });
+      pscRenderRows();
+      pscUpdateTotal();
+      pscUpdateSubmitState();
+    });
+  });
+}
+
+function pscSuggestProducts(i, q) {
+  q = String(q || "")
+    .trim()
+    .toUpperCase();
+  var box = document.querySelector('.psc-prod-suggest[data-i="' + i + '"]');
+  if (!box) return;
+  if (q.length < 1) {
+    box.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+  var matches = [];
+  var catalogo = pscCatalogo();
+  for (var k = 0; k < catalogo.length; k++) {
+    var p = catalogo[k];
+    var cod = String(p.cod || "").toUpperCase();
+    var desc = String(p.description || "").toUpperCase();
+    if (cod.indexOf(q) > -1 || desc.indexOf(q) > -1) matches.push(p);
+    if (matches.length >= 40) break;
+  }
+  matches.sort(function (a, b) {
+    var ac = String(a.cod || "").toUpperCase().indexOf(q) === 0 ? 0 : 1;
+    var bc = String(b.cod || "").toUpperCase().indexOf(q) === 0 ? 0 : 1;
+    return ac - bc;
+  });
+  if (!matches.length) {
+    box.innerHTML = '<div class="cp-suggest-empty">Sin artículos</div>';
+    box.style.display = "block";
+    return;
+  }
+  // Cada artículo puede rendir 1 fila (base) o 2 (base + "L") si PSC_LSUFFIX.
+  var rowsHtml = [];
+  matches.slice(0, 12).forEach(function (p) {
+    var base = String(p.cod || "");
+    rowsHtml.push(
+      '<div class="cp-suggest-row" data-cod="' +
+        cpEscHTML(base) +
+        '" data-l="0"><span class="cp-suggest-cod">' +
+        cpEscHTML(base) +
+        '</span><span class="cp-suggest-name">' +
+        cpEscHTML(p.description || "") +
+        "</span></div>",
+    );
+    if (PSC_LSUFFIX) {
+      rowsHtml.push(
+        '<div class="cp-suggest-row" data-cod="' +
+          cpEscHTML(base) +
+          '" data-l="1"><span class="cp-suggest-cod">' +
+          cpEscHTML(base + "L") +
+          '</span><span class="cp-suggest-name">' +
+          cpEscHTML(p.description || "") +
+          " · art. Loeke por Chef</span></div>",
+      );
+    }
+  });
+  box.innerHTML = rowsHtml.join("");
+  box.style.display = "block";
+  box.querySelectorAll(".cp-suggest-row").forEach(function (row) {
+    row.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      pscChooseProduct(i, row.dataset.cod, row.dataset.l === "1");
+    });
+  });
+}
+
+function pscHideProdSuggest(i) {
+  var box = document.querySelector('.psc-prod-suggest[data-i="' + i + '"]');
+  if (box) {
+    box.style.display = "none";
+    box.innerHTML = "";
+  }
+}
+
+function pscChooseProduct(i, cod, isL) {
+  var base = pscFindProduct(cod);
+  if (!base) return;
+  var effCod = isL ? String(base.cod) + "L" : String(base.cod);
+  var chosen = isL
+    ? { id: base.id, cod: effCod, description: base.description, list_price: base.list_price, uxb: base.uxb, _isL: true }
+    : base;
+  var dup = pscState.rows.some(function (r, idx) {
+    return idx !== i && r.product && String(r.product.cod) === String(effCod);
+  });
+  if (dup) toast("El artículo " + effCod + " ya está en otra fila", "warning");
+  pscState.rows[i].product = chosen;
+  pscState.rows[i].codText = effCod;
+  pscHideProdSuggest(i);
+  pscRenderRows();
+  var caj = document.querySelector('.psc-cajas[data-i="' + i + '"]');
+  if (caj) caj.focus();
+  pscUpdateTotal();
+  pscUpdateSubmitState();
+}
+
+function pscFinalizeCod(i, value) {
+  value = String(value || "").trim();
+  if (!value) return;
+  if (pscState.rows[i] && pscState.rows[i].product) return;
+  var p = pscFindProduct(value);
+  if (p) {
+    pscChooseProduct(i, p.cod, false);
+    return;
+  }
+  // PSC_LSUFFIX: si tipearon "438EL" y "438E" es válido, tomarlo como variante L.
+  if (PSC_LSUFFIX && /L$/i.test(value)) {
+    var base = value.slice(0, -1);
+    if (pscFindProduct(base)) {
+      pscChooseProduct(i, base, true);
+      return;
+    }
+  }
+  pscUpdateSubmitState();
+}
+
+function pscUpdateTotal() {
+  var total = 0,
+    n = 0,
+    unidades = 0;
+  pscState.rows.forEach(function (r) {
+    if (r.product && r.cajas > 0) {
+      total +=
+        Number(r.product.list_price || 0) *
+        Number(r.product.uxb || 0) *
+        Number(r.cajas);
+      unidades += Number(r.product.uxb || 0) * Number(r.cajas);
+      n++;
+    }
+  });
+  var el = document.getElementById("pscTotal");
+  if (el)
+    el.textContent = n
+      ? n +
+        " artículo" +
+        (n !== 1 ? "s" : "") +
+        " · " +
+        formatMoney(unidades) +
+        " unidades · Total lista: $" +
+        formatMoney(total)
+      : "";
+}
+
+function pscUpdateSubmitState() {
+  var btn = document.getElementById("pscSubmit");
+  if (!btn) return;
+  var hasLine = pscState.rows.some(function (r) {
+    return r.product && r.cajas > 0;
+  });
+  btn.disabled = !(
+    pscState.customer &&
+    hasLine &&
+    pscSelectedAddr() &&
+    !pscState.submitting
+  );
+}
+
+async function pscSubmit() {
+  if (pscState.submitting) return;
+  if (!pscState.customer) {
+    toast("Elegí un cliente", "warning");
+    return;
+  }
+  var lines = pscState.rows.filter(function (r) {
+    return r.product && r.cajas > 0;
+  });
+  if (!lines.length) {
+    toast(
+      "Agregá al menos un artículo con " + pscUnitLabel(true).toLowerCase(),
+      "warning",
+    );
+    return;
+  }
+  // ⚠ GUARD DEL MODO UNIDADES. Lo que se escribe en la columna viaja como `cajas`,
+  // asi que en un cliente que carga por unidad el articulo TIENE que estar en
+  // 1 u/caja: con uxb = 6, escribir 2.000 mandaria 2.000 cajas = 12.000 unidades.
+  // Es el mismo pozo del pedido 1450, visto desde el otro lado.
+  if (pscEsUnidades()) {
+    var malUxb = lines
+      .filter(function (r) {
+        return Number(r.product.uxb || 0) !== 1;
+      })
+      .map(function (r) {
+        return r.product.cod + " (" + r.product.uxb + " u/caja)";
+      });
+    if (malUxb.length) {
+      showErr(
+        "Este cliente carga el pedido en UNIDADES, y estos artículos están en caja cerrada: " +
+          malUxb.join(", ") +
+          ". Ponelos en 1 unidad por bulto en ABM Artículos, o cargalos por cajas en otro cliente.",
+      );
+      return;
+    }
+  }
+  // Los codigos de reenvase son de un cliente puntual: si aparecen en otro, se avisa.
+  var extraEnOtroCliente = lines
+    .filter(function (r) {
+      return PSC_CODS_EXTRA.indexOf(String(r.product.cod)) >= 0;
+    })
+    .map(function (r) {
+      return r.product.cod;
+    });
+  if (extraEnOtroCliente.length && !pscEsUnidades()) {
+    if (
+      !confirm(
+        "Ojo: " +
+          extraEnOtroCliente.join(", ") +
+          " son códigos de reenvase de un cliente puntual y este no es ese cliente.\n¿Seguís igual?",
+      )
+    )
+      return;
+  }
+  var addr = pscSelectedAddr();
+  if (!addr) {
+    toast("Elegí o creá una sucursal de entrega", "warning");
+    return;
+  }
+  var finalDelivery = addr.label || addr.direccion_entrega || "";
+  var finalDelDir = addr.direccion_entrega || "";
+  var finalDelZona = addr.zona_expreso || "";
+
+  var confirmMsg =
+    "Enviar pedido de " +
+    pscState.customer.cod_cliente +
+    " — " +
+    pscState.customer.business_name +
+    "\n" +
+    lines.length +
+    " artículo(s) → " +
+    finalDelivery +
+    "\nCantidades en " +
+    pscUnitLabel(true).toUpperCase() +
+    ": " +
+    lines
+      .map(function (r) {
+        return r.product.cod + " x " + r.cajas;
+      })
+      .join(", ") +
+    "\nCondición de pago: Sin Cotizador";
+  if (!confirm(confirmMsg)) return;
+
+  pscState.submitting = true;
+  pscUpdateSubmitState();
+  var btn = document.getElementById("pscSubmit");
+  var oldTxt = btn ? btn.textContent : "Enviar Pedido";
+  if (btn) btn.textContent = "Enviando...";
+
+  try {
+    var sessRes = await sb.auth.getSession();
+    if (sessRes.error || !sessRes.data || !sessRes.data.session)
+      throw new Error("Sesión expirada. Recargá la página.");
+    var session = sessRes.data.session;
+    var token = session.access_token;
+
+    var itemsPayload = lines
+      .map(function (r) {
+        var p = r.product;
+        var uxb = Number(p.uxb || 0);
+        var cajas = Number(r.cajas || 0);
+        var unidades = cajas * uxb;
+        var unitPrice = Number(p.list_price || 0); // SOLO LISTA
+        return {
+          product_id: p.id,
+          cod_art: String(p.cod || "").trim(),
+          cajas: cajas,
+          uxb: uxb,
+          unidades: unidades,
+          unit_price: unitPrice,
+          list_price: Number(p.list_price || 0),
+          description: String(p.description || ""),
+          is_loke: false,
+        };
+      })
+      .sort(function (a, b) {
+        return String(a.cod_art || "").localeCompare(
+          String(b.cod_art || ""),
+          undefined,
+          { numeric: true },
+        );
+      });
+
+    var subtotal = 0;
+    itemsPayload.forEach(function (it) {
+      subtotal += Number(it.unit_price || 0) * Number(it.unidades || 0);
+    });
+    var finalTotal = subtotal; // sin descuentos
+
+    var rpcItems = itemsPayload.map(function (it) {
+      return {
+        product_id: it.product_id,
+        cajas: it.cajas,
+        uxb: it.uxb,
+        is_loke: false,
+      };
+    });
+
+    var rpcResult = await cpWithTimeout(
+      sb.rpc("submit_order_fast", {
+        p_auth_user_id: session.user.id,
+        p_customer_id: pscState.customer.id,
+        p_status: "pendiente",
+        p_payment_method: "Sin Cotizador",
+        p_payment_discount: 0,
+        p_web_discount: 0,
+        p_subtotal: subtotal,
+        p_total: finalTotal,
+        p_items: rpcItems,
+      }),
+      15000,
+      "submit_order_fast",
+    );
+    if (rpcResult.error || !rpcResult.data)
+      throw new Error(
+        (rpcResult.error &&
+          (rpcResult.error.message || rpcResult.error.details)) ||
+          "RPC falló",
+      );
+    var orderId = rpcResult.data;
+
+    var sheetsPayload = {
+      order_number: String(orderId || "").trim(),
+      cod_cliente: String(pscState.customer.cod_cliente || "").trim(),
+      vend: String(pscState.customer.vend || "").trim(),
+      condicion_pago: "Sin Cotizador",
+      condicion_pago_code: 1,
+      sucursal_entrega: finalDelivery || "",
+      cliente_nuevo: "",
+      is_promo: false,
+      is_chef: false,
+      target_sheet: "Pedidos Web",
+      empresa: "LK",
+      extra_discount: 0,
+      deuda: Number(pscState.customer.debt || 0),
+      payment_term:
+        pscState.customer.payment_term == null
+          ? null
+          : Number(pscState.customer.payment_term),
+      credit_limit:
+        pscState.customer.credit_limit == null
+          ? null
+          : Number(pscState.customer.credit_limit),
+      source: "Sin Cotizador",
+      items: itemsPayload.map(function (it) {
+        return {
+          cod_art: it.cod_art,
+          cod_original: null,
+          cajas: it.cajas,
+          uxb: it.uxb,
+        };
+      }),
+    };
+
+    sb.from("orders")
+      .update({
+        sheets_payload: sheetsPayload,
+        is_promo: false,
+        extra_discount: 0,
+        placed_by_auth_user_id: session.user.id,
+      })
+      .eq("id", orderId)
+      .then(function () {});
+
+    cpSendToSheetsWithRetry(sheetsPayload, token, 3)
+      .then(function () {
+        sb.from("orders")
+          .update({ sheets_sent: true })
+          .eq("id", orderId)
+          .then(function () {});
+      })
+      .catch(function (e) {
+        console.warn("psc sheets error (order " + orderId + "):", e);
+      });
+
+    var entregasPayload = {
+      order_number: orderId,
+      fecha: new Date().toLocaleDateString("es-AR"),
+      cod_cliente: pscState.customer.cod_cliente,
+      cliente: pscState.customer.business_name,
+      vendedor: pscState.customer.vend || "",
+      direccion_entrega: finalDelDir || finalDelivery || "",
+      barrio_entrega: finalDelZona || "",
+      empresa: "LK",
+      is_promo: false,
+      extra_discount: 0,
+      items: itemsPayload.map(function (it) {
+        return {
+          cod_art: it.cod_art,
+          description: it.description || "",
+          cajas: it.cajas,
+          uxb: it.uxb,
+        };
+      }),
+    };
+    cpSendToEntregas(entregasPayload, token);
+
+    toast("Pedido " + orderId + " enviado (Sin Cotizador)", "success");
+    pscReset();
+  } catch (e) {
+    console.error("psc submit error:", e);
+    toast("Error enviando pedido: " + (e.message || e), "error");
+    if (btn) btn.textContent = oldTxt;
+  } finally {
+    pscState.submitting = false;
+    pscUpdateSubmitState();
+    var b = document.getElementById("pscSubmit");
+    if (b && b.textContent === "Enviando...") b.textContent = "Enviar Pedido";
+  }
+}
 // =====================================================================
 // FICHA DE CLIENTE (vista 360) — data-page="ficha-cliente"
 // Buscador -> buscar_cliente_ficha ; ficha completa -> get_ficha_cliente.
@@ -13703,6 +16361,100 @@ async function fcDescargarExcel() {
 window.initFichaCliente = initFichaCliente;
 window.cargarFichaCliente = cargarFichaCliente;
 window.fcToggleMeses = fcToggleMeses;
+window.fcDescargarExcel = fcDescargarExcel;
+
+/* ============================================================================
+   CLIC PARA COPIAR — solo CUIT y PIN
+   ----------------------------------------------------------------------------
+   Pedido de Tomas: que se copien SOLO esos dos y nada mas. Son los que se
+   tipean a mano todo el dia y los unicos donde equivocarse un digito rompe algo
+   (el CUIT identifica al cliente en ARCA y en el ERP; el PIN es la contrasena
+   con la que entra al portal).
+
+   El alcance es explicito, no heuristico: copia lo que lleve el atributo
+   data-copiable, y ese atributo se pone a mano donde se pinta un CUIT o un PIN.
+   Un selector generico por celda haria copiable cualquier cosa que alguien
+   agregue manana sin querer.
+
+   El valor sale del ATRIBUTO, no del texto: la celda del ranking dice
+   "CUIT 30-59036076-3" y lo que tiene que viajar al portapapeles es el numero
+   solo, sin la etiqueta.
+
+   Dos cuidados:
+   - Si el clic cae en un boton, un link o un input que este DENTRO del elemento
+     marcado, se deja pasar: ese clic no es para copiar.
+   - Si hay texto seleccionado no se interfiere: alguien que arrastro para
+     marcar un pedazo quiere ese pedazo.
+
+   El CUIT del ABM no esta marcado a proposito: ya tiene su propio boton de
+   copiar con el iconito (copiarCuit, mas arriba en este archivo).
+
+   Donde esta marcado hoy: PIN en la card del ABM; CUIT en Clientes agrupados,
+   Estado de actividad, Ranking Inactivos, Ranking de clientes, el listado de
+   clientes y la Ficha de Cliente. Para sumar otro campo alcanza con ponerle
+   data-copiable="<valor>" donde se pinta.
+   ========================================================================== */
+(function () {
+  var INTERACTIVO =
+    "button,a,input,select,textarea,label,svg,[contenteditable]";
+
+  function copiar(texto, el) {
+    function listo() {
+      if (el) {
+        el.classList.add("lk-copiado");
+        setTimeout(function () {
+          el.classList.remove("lk-copiado");
+        }, 900);
+      }
+      if (typeof toast === "function") toast("Copiado: " + texto, "success");
+    }
+    // navigator.clipboard necesita contexto seguro; si el navegador lo niega
+    // queda el textarea invisible de toda la vida.
+    function aMano() {
+      try {
+        var ta = document.createElement("textarea");
+        ta.value = texto;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch (e) {
+        /* noop */
+      }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(texto).then(listo, function () {
+        aMano();
+        listo();
+      });
+    } else {
+      aMano();
+      listo();
+    }
+  }
+
+  document.addEventListener("click", function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+
+    var dato = t.closest("[data-copiable]");
+    if (!dato) return;
+
+    var control = t.closest(INTERACTIVO);
+    if (control && dato.contains(control)) return;
+
+    var seleccion = window.getSelection ? String(window.getSelection()) : "";
+    if (seleccion && seleccion.length > 1) return;
+
+    var texto = String(dato.getAttribute("data-copiable") || "").trim();
+    if (!texto) return;
+
+    ev.preventDefault();
+    copiar(texto, dato);
+  });
+})();
 
 // ===== Login por OTP (código de 6 dígitos al mail) — agregado para servir el
 // admin desde Producción Virgilio, donde no venimos con sesión de mayorista.html.
@@ -13868,1474 +16620,3 @@ function lkResetOtp() {
 window.lkSendOtp   = lkSendOtp;
 window.lkVerifyOtp = lkVerifyOtp;
 window.lkResetOtp  = lkResetOtp;
-/* ============================================================================
-   Ranking Clientes (ACTIVOS)
-   Espeja el Ranking Inactivos pero al revés: muestra a los clientes que
-   compraron en el período y los ordena por facturación neta. Consume la
-   RPC get_ranking_clientes.
-   Pedido explícito del user (2026-08-11): "otra cosa que hay que desarrollar
-   en paginalk es un modulo de ranking de clientes".
-   ============================================================================ */
-var _rcState = { page: 1, pageSize: 25, total: 0, loaded: false, rows: [] };
-
-function _rcFmt(n) {
-  var v = Number(n) || 0;
-  return v.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
-}
-function _rcEsc(s) {
-  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
-    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-  });
-}
-
-async function cargarRankingClientes(page) {
-  _rcState.page = Math.max(1, Number(page) || 1);
-  var meses = Number(document.getElementById("rcPeriodo").value) || 12;
-  var minMonto = Number(document.getElementById("rcMinMonto").value) || 0;
-  var q = (document.getElementById("rcBuscar").value || "").trim() || null;
-  var cont = document.getElementById("rcTabla");
-  var res  = document.getElementById("rcResumen");
-  var pgr  = document.getElementById("rcPager");
-  cont.innerHTML = '<div style="padding:16px;color:#64748b;">Cargando…</div>';
-  res.textContent = "";
-  pgr.innerHTML = "";
-  var offset = (_rcState.page - 1) * _rcState.pageSize;
-  var r = await sb.rpc("get_ranking_clientes", {
-    p_meses: meses,
-    p_empresa: "lk",
-    p_limit: _rcState.pageSize,
-    p_offset: offset,
-    p_q: q,
-    p_vendedores: null,
-    p_min_monto: minMonto,
-  });
-  if (r.error) {
-    cont.innerHTML = '<div style="padding:16px;color:#b91c1c;">Error: ' + _rcEsc(r.error.message) + '</div>';
-    return;
-  }
-  _rcState.rows = r.data || [];
-  _rcState.total = _rcState.rows.length ? Number(_rcState.rows[0].total_filas) || 0 : 0;
-  _rcState.loaded = true;
-  _rcRender();
-}
-
-function _rcRender() {
-  var cont = document.getElementById("rcTabla");
-  var res  = document.getElementById("rcResumen");
-  var pgr  = document.getElementById("rcPager");
-  var rows = _rcState.rows;
-  var tot  = _rcState.total;
-  var totFact = 0;
-  for (var i = 0; i < rows.length; i++) totFact += Number(rows[i].total_historico) || 0;
-  res.innerHTML = "<b>" + tot.toLocaleString("es-AR") + "</b> cliente(s) en el período · Página muestra <b>" + rows.length + "</b> · Facturado (esta página) <b>" + _rcFmt(totFact) + "</b>";
-  if (!rows.length) {
-    cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin clientes que cumplan los filtros.</div>';
-    return;
-  }
-  var h = '<div style="overflow-x:auto;"><table class="est-table" style="width:100%;border-collapse:collapse;font-size:13.5px;">' +
-    '<thead><tr>' +
-      '<th style="padding:8px;">Puesto</th>' +
-      '<th style="padding:8px;">Código</th>' +
-      '<th style="padding:8px;">Razón social</th>' +
-      '<th style="padding:8px;">CUIT</th>' +
-      '<th style="padding:8px;">Vendedor</th>' +
-      '<th style="padding:8px;text-align:right;">Facturado</th>' +
-      '<th style="padding:8px;text-align:right;">Pedidos</th>' +
-      '<th style="padding:8px;text-align:right;">Arts. dist.</th>' +
-      '<th style="padding:8px;">Últ. compra</th>' +
-    '</tr></thead><tbody>';
-  h += rows.map(function (r) {
-    return '<tr>' +
-      '<td style="padding:6px 8px;text-align:center;font-weight:bold;">' + r.ranking + '</td>' +
-      '<td style="padding:6px 8px;"><b>' + _rcEsc(r.cod_cliente) + '</b></td>' +
-      '<td style="padding:6px 8px;">' + _rcEsc(r.business_name || "—") + '</td>' +
-      '<td style="padding:6px 8px;font-size:12px;color:#64748b;"' +
-        (r.cuit ? ' data-copiable="' + _rcEsc(r.cuit) + '"' : "") + ">" +
-        _rcEsc(r.cuit || "—") + '</td>' +
-      '<td style="padding:6px 8px;font-size:12px;">' + _rcEsc(r.vendedor_nombre || r.vendedor || "—") + '</td>' +
-      '<td style="padding:6px 8px;text-align:right;font-weight:bold;">' + _rcFmt(r.total_historico) + '</td>' +
-      '<td style="padding:6px 8px;text-align:right;">' + (r.total_pedidos || 0) + '</td>' +
-      '<td style="padding:6px 8px;text-align:right;">' + (r.articulos_distintos || 0) + '</td>' +
-      '<td style="padding:6px 8px;font-size:12px;color:#64748b;">' + _rcEsc(r.last_date || "—") + '</td>' +
-    '</tr>';
-  }).join("");
-  h += '</tbody></table></div>';
-  cont.innerHTML = h;
-  // Pager
-  var pages = Math.max(1, Math.ceil(tot / _rcState.pageSize));
-  var cur = _rcState.page;
-  var pg = '';
-  pg += '<button ' + (cur <= 1 ? 'disabled' : '') + ' onclick="cargarRankingClientes(' + (cur - 1) + ')" style="padding:6px 12px;">‹ Anterior</button>';
-  pg += '<span style="margin:0 8px;">Página <b>' + cur + '</b> de ' + pages + '</span>';
-  pg += '<button ' + (cur >= pages ? 'disabled' : '') + ' onclick="cargarRankingClientes(' + (cur + 1) + ')" style="padding:6px 12px;">Siguiente ›</button>';
-  pgr.innerHTML = pg;
-}
-
-async function descargarRankingClientesExcel() {
-  // Trae todo el ranking del período (sin paginado) llamando a la RPC con
-  // p_limit grande. Formato mínimo — el user ya conoce el pattern del
-  // Ranking Inactivos.
-  var meses = Number(document.getElementById("rcPeriodo").value) || 12;
-  var minMonto = Number(document.getElementById("rcMinMonto").value) || 0;
-  var q = (document.getElementById("rcBuscar").value || "").trim() || null;
-  var btn = document.getElementById("rcBtnExcel");
-  var txt0 = btn.textContent; btn.disabled = true; btn.textContent = "Generando…";
-  try {
-    var r = await sb.rpc("get_ranking_clientes", {
-      p_meses: meses, p_empresa: "lk",
-      p_limit: 10000, p_offset: 0, p_q: q,
-      p_vendedores: null, p_min_monto: minMonto,
-    });
-    if (r.error) { alert("Error: " + r.error.message); return; }
-    var rows = (r.data || []).map(function (x) {
-      return {
-        Puesto: x.ranking,
-        Codigo: x.cod_cliente,
-        RazonSocial: x.business_name || "",
-        CUIT: x.cuit || "",
-        Vendedor: x.vendedor_nombre || x.vendedor || "",
-        Facturado: Number(x.total_historico) || 0,
-        Pedidos: x.total_pedidos || 0,
-        ArticulosDistintos: x.articulos_distintos || 0,
-        UltimaCompra: x.last_date || "",
-      };
-    });
-    if (!rows.length) { alert("Nada para exportar."); return; }
-    var ws = XLSX.utils.json_to_sheet(rows);
-    var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Ranking " + meses + "m");
-    var fname = "ranking_clientes_" + meses + "m_" + new Date().toISOString().slice(0, 10) + ".xlsx";
-    XLSX.writeFile(wb, fname);
-  } catch (e) {
-    alert("Falló el Excel: " + (e.message || e));
-  } finally {
-    btn.disabled = false; btn.textContent = txt0;
-  }
-}
-
-// Wiring del module (se llama en inicRankingClientes al abrir la pestaña)
-function inicRankingClientes() {
-  var btn = document.getElementById("rcBtnCargar");
-  var btnX = document.getElementById("rcBtnExcel");
-  var inpQ = document.getElementById("rcBuscar");
-  if (btn && !btn._wired) {
-    btn._wired = true;
-    btn.addEventListener("click", function () { cargarRankingClientes(1); });
-  }
-  if (btnX && !btnX._wired) {
-    btnX._wired = true;
-    btnX.addEventListener("click", function () { descargarRankingClientesExcel(); });
-  }
-  if (inpQ && !inpQ._wired) {
-    inpQ._wired = true;
-    inpQ.addEventListener("keydown", function (e) { if (e.key === "Enter") cargarRankingClientes(1); });
-  }
-  if (!_rcState.loaded) cargarRankingClientes(1);
-}
-
-window.cargarRankingClientes = cargarRankingClientes;
-window.descargarRankingClientesExcel = descargarRankingClientesExcel;
-window.inicRankingClientes = inicRankingClientes;
-/* ============================================================================
-   Panel Top-50 seguimiento clientes (dentro de Gerente de ventas)
-   Dos rankings paralelos (histórico total / pedido máximo individual) para las
-   dos empresas (LK y Chef). Debajo de cada fila, matriz de seguimiento mensual
-   con celdas coloreadas (verde = compró, gris = no compró, rojo = alerta) más
-   un badge de frecuencia habitual y meses sin comprar.
-   Backend: get_top_clientes_hist, get_top_clientes_max_pedido, get_seguimiento_mensual.
-   Pedido explícito 2026-08-11: "no perder pisada de si me están comprando".
-   ============================================================================ */
-var _gvTop = {
-  tab: "hist",       // "hist" | "max"
-  emp: "lk",         // "lk" | "chef"
-  loadedFor: null,   // "tab-emp-mesesAct-mesesSeg" key para no re-pegar sin cambios
-  rows: [],
-  seguimiento: {},   // { cod: {meses[], frecuencia_meses, meses_sin_comprar, alerta} }
-};
-
-function _gvfPlata(n) {
-  var v = Number(n) || 0;
-  if (v >= 1e9) return "$" + (v / 1e9).toFixed(2) + " MM";
-  if (v >= 1e6) return "$" + (v / 1e6).toFixed(1) + " M";
-  if (v >= 1e3) return "$" + (v / 1e3).toFixed(0) + " k";
-  return "$" + Math.round(v).toLocaleString("es-AR");
-}
-function _gvfEsc(s) {
-  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
-    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-  });
-}
-
-function gvTopSetTab(t) {
-  if (t !== "hist" && t !== "max") return;
-  _gvTop.tab = t;
-  var bH = document.getElementById("gvTopTabHist");
-  var bM = document.getElementById("gvTopTabMax");
-  if (bH && bM) {
-    bH.style.background = t === "hist" ? "#111" : "transparent";
-    bH.style.color = t === "hist" ? "#fff" : "#333";
-    bM.style.background = t === "max"  ? "#111" : "transparent";
-    bM.style.color = t === "max"  ? "#fff" : "#333";
-  }
-  gvTopCargar();
-}
-function gvTopSetEmp(e) {
-  if (e !== "lk" && e !== "chef") return;
-  _gvTop.emp = e;
-  var bL = document.getElementById("gvTopEmpLk");
-  var bC = document.getElementById("gvTopEmpCh");
-  if (bL && bC) {
-    bL.style.background = e === "lk"   ? "#1e6bd6" : "transparent";
-    bL.style.color      = e === "lk"   ? "#fff"    : "#333";
-    bC.style.background = e === "chef" ? "#1e6bd6" : "transparent";
-    bC.style.color      = e === "chef" ? "#fff"    : "#333";
-  }
-  gvTopCargar();
-}
-window.gvTopSetTab = gvTopSetTab;
-window.gvTopSetEmp = gvTopSetEmp;
-
-async function gvTopCargar() {
-  var st = document.getElementById("gvTopStatus");
-  var cont = document.getElementById("gvTopTabla");
-  if (!cont) return;
-  var mesesSeg = Number(document.getElementById("gvTopMeses").value) || 12;
-  var minActRaw = document.getElementById("gvTopMinAct").value;
-  var minAct = minActRaw ? Number(minActRaw) : null;
-  var key = _gvTop.tab + "-" + _gvTop.emp + "-" + (minAct||"") + "-" + mesesSeg;
-  st.textContent = "Cargando…";
-  cont.innerHTML = "";
-  try {
-    var fn = _gvTop.tab === "max" ? "get_top_clientes_max_pedido" : "get_top_clientes_hist";
-    var rr = await sb.rpc(fn, { p_empresa: _gvTop.emp, p_limit: 50, p_min_periodo_meses: minAct });
-    if (rr.error) throw rr.error;
-    _gvTop.rows = rr.data || [];
-    if (!_gvTop.rows.length) {
-      st.textContent = "";
-      cont.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;">Sin datos para ' + _gvTop.emp + '.</div>';
-      _gvTop.loadedFor = key;
-      return;
-    }
-    // Traigo el seguimiento de los 50
-    var cods = _gvTop.rows.map(function (r) { return r.cod_cliente; });
-    var sg = await sb.rpc("get_seguimiento_mensual", { p_cods: cods, p_empresa: _gvTop.emp, p_meses: mesesSeg });
-    if (sg.error) throw sg.error;
-    var m = {};
-    (sg.data || []).forEach(function (x) { m[x.cod_cliente] = x; });
-    _gvTop.seguimiento = m;
-    _gvTop.loadedFor = key;
-    _gvTopRender();
-    var aFrec = (sg.data || []).filter(function (x) { return x.alerta_frecuencia; }).length;
-    var aVol  = (sg.data || []).filter(function (x) { return x.alerta_volumen; }).length;
-    var aAny  = (sg.data || []).filter(function (x) { return x.alerta_frecuencia || x.alerta_volumen; }).length;
-    var partes = [];
-    if (aFrec) partes.push('<span style="color:#b91c1c;font-weight:bold;">🕑 ' + aFrec + ' sin comprar</span>');
-    if (aVol)  partes.push('<span style="color:#b91c1c;font-weight:bold;">📉 ' + aVol + ' menos cajas</span>');
-    if (!partes.length) partes.push('<span style="color:#059669;">✓ todos al día</span>');
-    st.innerHTML = '<b>' + _gvTop.rows.length + '</b> clientes · ' + partes.join(' · ') +
-      (aAny ? ' · <b>' + aAny + ' con alguna alerta</b>' : '') +
-      ' · empresa <b>' + (_gvTop.emp === "lk" ? "Loekemeyer" : "Chef") + '</b> · orden por <b>' + (_gvTop.tab === "hist" ? "histórico total" : "pedido máximo") + '</b>';
-  } catch (e) {
-    st.innerHTML = '<span style="color:#b91c1c;">Error: ' + _gvfEsc(e.message || e) + '</span>';
-  }
-}
-window.gvTopCargar = gvTopCargar;
-
-function _gvTopRender() {
-  var cont = document.getElementById("gvTopTabla");
-  if (!cont) return;
-  var rows = _gvTop.rows;
-  var seg  = _gvTop.seguimiento;
-  var mesesSeg = Number(document.getElementById("gvTopMeses").value) || 12;
-  // Header de meses (mismo orden que devuelve el seguimiento: desc)
-  var mesesHdr = [];
-  if (rows.length) {
-    var s0 = seg[rows[0].cod_cliente];
-    if (s0 && Array.isArray(s0.meses)) mesesHdr = s0.meses.map(function (x) { return x.mes; });
-  }
-  var h = '<div style="overflow-x:auto;"><table class="est-table" style="width:100%;border-collapse:collapse;font-size:12.5px;">' +
-    '<thead><tr>' +
-      '<th style="padding:6px 8px;text-align:center;">#</th>' +
-      '<th style="padding:6px 8px;text-align:left;">Cliente</th>' +
-      '<th style="padding:6px 8px;text-align:right;">' + (_gvTop.tab === "max" ? "Pedido máx" : "Histórico") + '</th>' +
-      '<th style="padding:6px 8px;text-align:right;">' + (_gvTop.tab === "max" ? "Histórico" : "Pedido máx") + '</th>' +
-      '<th style="padding:6px 8px;text-align:center;">Freq</th>' +
-      '<th style="padding:6px 8px;text-align:center;">Sin comprar</th>' +
-      '<th style="padding:6px 8px;text-align:center;" title="Mediana de cajas por pedido histórico vs promedio de los últimos 3">Cajas hist→rec</th>' +
-      '<th style="padding:6px 8px;text-align:center;">Alerta</th>' +
-      mesesHdr.map(function (m) {
-        return '<th style="padding:4px 3px;text-align:center;font-size:10px;color:#64748b;font-weight:normal;transform:rotate(-45deg);white-space:nowrap;min-width:24px;">' + m.slice(2) + '</th>';
-      }).join("") +
-    '</tr></thead><tbody>';
-  h += rows.map(function (r) {
-    var s = seg[r.cod_cliente] || {};
-    var mesesArr = Array.isArray(s.meses) ? s.meses : [];
-    var maxMonto = 0;
-    mesesArr.forEach(function (m) { if (Number(m.monto) > maxMonto) maxMonto = Number(m.monto); });
-    var cellsHtml = mesesArr.map(function (m) {
-      var mm = Number(m.monto) || 0;
-      var pct = maxMonto > 0 ? mm / maxMonto : 0;
-      var bg = "#f1f5f9", color = "#94a3b8", txt = "·";
-      if (mm > 0) {
-        var g = 220 - Math.round(pct * 130);
-        bg = "rgb(" + g + "," + Math.min(255, g+30) + "," + g + ")";
-        color = "#065f46"; txt = _gvfPlata(mm).replace("$","");
-      }
-      return '<td title="' + m.mes + ' · ' + _gvfPlata(mm) + ' · ' + m.pedidos + ' pedido(s)" style="padding:2px 3px;text-align:center;background:' + bg + ';color:' + color + ';font-weight:' + (mm > 0 ? 'bold' : 'normal') + ';font-size:10px;">' + txt + '</td>';
-    }).join("");
-    var freq = s.frecuencia_meses != null ? Number(s.frecuencia_meses).toFixed(1) : "—";
-    var sin  = s.meses_sin_comprar != null && s.meses_sin_comprar < 999 ? s.meses_sin_comprar + "m" : "—";
-    var cajasHist = s.cajas_hist_median != null ? Math.round(s.cajas_hist_median) : null;
-    var cajasRec  = s.cajas_recientes_avg != null ? Math.round(s.cajas_recientes_avg) : null;
-    var cajasTxt = "—";
-    var cajasColor = "#64748b";
-    if (cajasHist != null && cajasRec != null) {
-      cajasTxt = cajasHist + " → " + cajasRec;
-      if (s.alerta_volumen) cajasColor = "#b91c1c";
-      else if (cajasRec >= cajasHist) cajasColor = "#059669";
-    }
-    var alertaBadges = [];
-    if (s.alerta_frecuencia) alertaBadges.push('<span title="Se pasó de su ciclo habitual de compra" style="background:#fee2e2;color:#b91c1c;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;">🕑 sin comprar</span>');
-    if (s.alerta_volumen)    alertaBadges.push('<span title="Cajas por pedido cayeron a menos de la mitad" style="background:#fee2e2;color:#b91c1c;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold;">📉 menos cajas</span>');
-    var alertaHtml = alertaBadges.length ? alertaBadges.join(' ') : '<span style="color:#059669;font-size:11px;">✓ OK</span>';
-    var rowBg = (s.alerta_frecuencia || s.alerta_volumen) ? 'background:#fef2f2;' : '';
-    return '<tr' + (rowBg ? ' style="' + rowBg + '"' : '') + '>' +
-      '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:#64748b;">' + r.ranking + '</td>' +
-      '<td style="padding:6px 8px;"><b>' + _gvfEsc(r.cod_cliente) + '</b> <span style="color:#64748b;">' + _gvfEsc((r.business_name || "—").slice(0, 30)) + '</span>' + (r.vendedor_nombre ? '<br><span style="font-size:10px;color:#94a3b8;">' + _gvfEsc(r.vendedor_nombre) + '</span>' : '') + '</td>' +
-      '<td style="padding:6px 8px;text-align:right;font-weight:bold;">' + _gvfPlata(_gvTop.tab === "max" ? r.max_pedido_monto : r.total_historico) + '</td>' +
-      '<td style="padding:6px 8px;text-align:right;color:#64748b;">' + _gvfPlata(_gvTop.tab === "max" ? r.total_historico : r.max_pedido_monto) + '</td>' +
-      '<td style="padding:6px 8px;text-align:center;font-size:11px;color:#64748b;">' + freq + 'm</td>' +
-      '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:' + (s.alerta_frecuencia ? '#b91c1c' : '#64748b') + ';">' + sin + '</td>' +
-      '<td style="padding:6px 8px;text-align:center;font-weight:bold;color:' + cajasColor + ';font-size:11px;">' + cajasTxt + '</td>' +
-      '<td style="padding:6px 8px;text-align:center;white-space:nowrap;">' + alertaHtml + '</td>' +
-      cellsHtml +
-    '</tr>';
-  }).join("");
-  h += '</tbody></table></div>';
-  h += '<div style="margin-top:10px;font-size:11px;color:#94a3b8;">Meses de más reciente a más viejo. Celda verde = compró (intensidad = monto). <b>🕑 sin comprar</b>: pasó su ciclo habitual (compra cada N meses y ya lleva N meses sin comprar). <b>📉 menos cajas</b>: promedio de los últimos 3 pedidos cayó a menos de la mitad de las cajas del pedido típico histórico.</div>';
-  cont.innerHTML = h;
-}
-
-async function gvTopExcel() {
-  if (!_gvTop.rows.length) { alert("Cargá primero el ranking."); return; }
-  var rows = _gvTop.rows;
-  var seg  = _gvTop.seguimiento;
-  var mesesHdr = [];
-  if (rows.length) {
-    var s0 = seg[rows[0].cod_cliente];
-    if (s0 && Array.isArray(s0.meses)) mesesHdr = s0.meses.map(function (x) { return x.mes; });
-  }
-  var data = rows.map(function (r) {
-    var s = seg[r.cod_cliente] || { meses: [] };
-    var base = {
-      Puesto: r.ranking,
-      Codigo: r.cod_cliente,
-      RazonSocial: r.business_name || "",
-      Vendedor: r.vendedor_nombre || r.vendedor || "",
-      HistoricoTotal: Number(r.total_historico) || 0,
-      PedidoMaximo: Number(r.max_pedido_monto) || 0,
-      FechaPedidoMax: r.max_pedido_fecha || "",
-      UltimaCompra: r.ultima_compra || "",
-      TotalPedidos: r.total_pedidos || 0,
-      FrecuenciaMeses: s.frecuencia_meses != null ? Number(s.frecuencia_meses) : "",
-      MesesSinComprar: s.meses_sin_comprar != null && s.meses_sin_comprar < 999 ? s.meses_sin_comprar : "",
-      CajasHistMedian: s.cajas_hist_median != null ? Math.round(s.cajas_hist_median) : "",
-      CajasRecientesAvg: s.cajas_recientes_avg != null ? Math.round(s.cajas_recientes_avg) : "",
-      AlertaFrecuencia: s.alerta_frecuencia ? "SI" : "no",
-      AlertaVolumen: s.alerta_volumen ? "SI" : "no",
-      Alerta: s.alerta ? "SI" : "no",
-    };
-    (s.meses || []).forEach(function (m) { base["M " + m.mes] = Number(m.monto) || 0; });
-    return base;
-  });
-  var ws = XLSX.utils.json_to_sheet(data);
-  var wb = XLSX.utils.book_new();
-  var sheetName = "Top50 " + _gvTop.emp.toUpperCase() + " " + (_gvTop.tab === "max" ? "MaxPed" : "Hist");
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  var fname = "top50_" + _gvTop.emp + "_" + _gvTop.tab + "_" + new Date().toISOString().slice(0, 10) + ".xlsx";
-  XLSX.writeFile(wb, fname);
-}
-window.gvTopExcel = gvTopExcel;
-
-// Hook: cuando se abre la card por primera vez, cargar
-function _gvTopInit() {
-  if (_gvTop.loadedFor) return;
-  gvTopCargar();
-}
-
-// Sobreescribo toggleEstCard para disparar la carga al abrir la card del Top-50
-// solo si es la primera vez. No re-carga en cada toggle.
-(function () {
-  var _origToggle = typeof window.toggleEstCard === "function" ? window.toggleEstCard : null;
-  if (!_origToggle) return;
-  window.toggleEstCard = function (id, headEl) {
-    var r = _origToggle(id, headEl);
-    if (id === "gvTopBody") {
-      var body = document.getElementById("gvTopBody");
-      if (body && body.style.display !== "none") _gvTopInit();
-    }
-    return r;
-  };
-})();
-
-// =====================================================
-// ---- PEDIDOS SIN COTIZADOR --------------------------
-// Carga manual de un pedido (cliente + cod/cajas). Se envia por el MISMO
-// pipeline que el Cotizador (submit_order_fast + sheets-proxy + entregas-proxy).
-// Condicion de pago FIJA: "Sin Cotizador" (condicion_pago_code = 1).
-// Precio: SOLO LISTA (list_price x uxb, sin dto_vol ni web_discount).
-// PSC_LSUFFIX = true -> sugiere ademas el codigo con "L" al final (regla Chef).
-// =====================================================
-var PSC_DEFAULT_ROWS = 10;
-var PSC_LSUFFIX = false;
-// ⚠ ARTICULOS DE REENVASE — SOLO SE VEN EN ESTE MODULO (Tomas Gonzalez, 23/09/2026).
-// Son codigos de Loekemeyer reenvasados para UN cliente puntual (Matiz SA, LK 4263):
-// mismo producto que el articulo base, otro codigo y otro precio.
-// Viven en `products` con `active = false` A PROPOSITO, y eso no es un olvido:
-//   - el catalogo del portal (`script.js`) y el catalogo publico de `/productos/`
-//     (`scripts/exportar-catalogo.py`) filtran `active = true`, asi que un codigo de
-//     reenvase no se le ofrece a ningun otro cliente ni sale indexado en Google;
-//   - si alguien lo mete al carrito de un cliente por cualquiera de los ~10 caminos
-//     que no pasan por `agregarAlCarrito`, el guard SIN STOCK del backend lo frena
-//     (`pedido_items_sin_stock`, que bloquea tambien `active = false`);
-//   - aca entran igual porque ese guard NO aplica al admin (`submit_order_fast` y
-//     `edit_order_fast` lo saltean con `IF NOT v_es_admin`), y porque ninguna vista
-//     que alimenta a Gestion Virgilio filtra `active` (verificado el 23/09 sobre
-//     `v_pedidos_web`, `gv_pedidos_web_np_lk`, `ppp_valor_linea`, `v_item_precio`):
-//     el pedido se programa y se valoriza igual que cualquier otro.
-// NO se agregan a `cpAllProducts`: esa lista la comparten el Cotizador, el generador
-// de flyers y el match de OC de supermercados, donde un codigo de reenvase no tiene
-// nada que hacer (una OC de Coto que diga "prensa matambre" no debe matchear aca).
-// ⚠ HOY LA LISTA VA VACIA: Tomas Gonzalez cargo el pedido de Matiz el 23/09/2026
-// (pedidos 1533 y 1534) y pidio dejar los dos codigos deshabilitados. Se vacia la
-// lista en vez de borrar el mecanismo, porque el reenvase se repite: para volver a
-// habilitarlos alcanza con poner los codigos aca de nuevo (`["55219", "55289"]`),
-// bumpear el `?v=` y replicar al espejo. Los articulos siguen en `products` con
-// `active = false`, o sea que no se le ofrecen a nadie mientras esten fuera de aca.
-var PSC_CODS_EXTRA = [];
-// ⚠ CLIENTES QUE PIDEN POR UNIDAD, NO POR CAJA CERRADA (Tomas Gonzalez, 23/09/2026).
-// Matiz SA (4263) compra reenvase suelto. Sus articulos llevan `uxb = 1`, asi que
-// "una caja" ES una unidad y el pipeline no cambia en nada: lo que cambia es la
-// ETIQUETA de la columna, para que nadie escriba cajas donde van unidades.
-// Por que NO se hace con `uxb = 6` dividiendo unidades/uxb: ya se probo y salio mal.
-// El pedido 1450 (15/09) viajo al Sheet con **166,6667 cajas** — un numero de cajas
-// que no existe — y `order_items.cajas` es `integer`, asi que la base guardo 166 y
-// el ERP recibio 166,6667: 4 unidades de diferencia entre lo pedido y lo registrado.
-// Si el cliente compra unidades sueltas, la unidad de venta ES la unidad; el "6 u/caja"
-// es embalaje de origen y vive en el m3 de Gestion, no en `uxb`.
-var PSC_CLIENTES_UNIDADES = ["4263"];
-var pscState = {
-  customer: null,
-  deliveryAddresses: [],
-  rows: [], // { product: <obj|null>, cajas: <number|null>, codText: <string> }
-  extraProducts: [], // PSC_CODS_EXTRA resueltos contra `products` (incluye inactivos)
-  submitting: false,
-  wired: false,
-};
-
-// El cliente elegido carga en UNIDADES en vez de cajas.
-function pscEsUnidades() {
-  if (!pscState.customer) return false;
-  return (
-    PSC_CLIENTES_UNIDADES.indexOf(String(pscState.customer.cod_cliente)) >= 0
-  );
-}
-
-function pscUnitLabel(plural) {
-  if (pscEsUnidades()) return plural ? "Unidades" : "Unidad";
-  return plural ? "Cajas" : "Caja";
-}
-
-// Catalogo del modulo: el del panel MAS los codigos de reenvase (que estan inactivos
-// y por eso no vienen en `cpAllProducts`).
-function pscCatalogo() {
-  var base = cpAllProducts || [];
-  if (!pscState.extraProducts.length) return base;
-  // Si alguno de los extra llegara a estar activo tambien viene en `cpAllProducts`:
-  // se saca de ahi para no mostrarlo dos veces en el buscador.
-  var extraCods = pscState.extraProducts.map(function (p) {
-    return String(p.cod || "").trim().toUpperCase();
-  });
-  return pscState.extraProducts.concat(
-    base.filter(function (p) {
-      return extraCods.indexOf(String(p.cod || "").trim().toUpperCase()) < 0;
-    }),
-  );
-}
-
-function pscFindProduct(cod) {
-  var c = String(cod || "").trim().toUpperCase();
-  var extra = pscState.extraProducts.find(function (p) {
-    return String(p.cod || "").trim().toUpperCase() === c;
-  });
-  return extra || cpFindProduct(cod);
-}
-
-async function pscLoadExtraProducts() {
-  if (!PSC_CODS_EXTRA.length) {
-    pscState.extraProducts = [];
-    return;
-  }
-  try {
-    var r = await sb
-      .from("products")
-      .select("id,cod,description,category,list_price,uxb,active,ranking")
-      .in("cod", PSC_CODS_EXTRA);
-    if (r.error) throw new Error(r.error.message);
-    // Si alguno ya esta activo viene tambien en `cpAllProducts`; se deja solo aca
-    // para no duplicarlo en el buscador.
-    pscState.extraProducts = r.data || [];
-  } catch (e) {
-    console.error("psc extra products:", e);
-    pscState.extraProducts = [];
-  }
-}
-
-async function cargarPedidosSinCot() {
-  if (!cpAllProducts || !cpAllProducts.length) {
-    try {
-      await cpLoadProducts();
-    } catch (e) {
-      console.error("psc load products:", e);
-      toast("No se pudieron cargar los artículos", "error");
-    }
-  }
-  if (!pscState.extraProducts.length) await pscLoadExtraProducts();
-  if (!pscState.wired) {
-    pscWire();
-    pscState.wired = true;
-  }
-  if (!pscState.rows.length) pscReset();
-}
-
-function pscReset() {
-  pscState.customer = null;
-  pscState.deliveryAddresses = [];
-  pscState.rows = [];
-  for (var i = 0; i < PSC_DEFAULT_ROWS; i++)
-    pscState.rows.push({ product: null, cajas: null, codText: "" });
-  var search = document.getElementById("pscSearch");
-  if (search) search.value = "";
-  pscHideSuggest();
-  var cust = document.getElementById("pscCustomer");
-  if (cust) {
-    cust.style.display = "none";
-    cust.innerHTML = "";
-  }
-  var delF = document.getElementById("pscDeliveryField");
-  if (delF) {
-    delF.style.display = "none";
-    delF.innerHTML = "";
-  }
-  var itemsW = document.getElementById("pscItemsWrap");
-  if (itemsW) itemsW.style.display = "none";
-  pscRenderRows();
-  pscUpdateTotal();
-  pscUpdateSubmitState();
-}
-
-var _pscCustTimer = null;
-function pscWire() {
-  var search = document.getElementById("pscSearch");
-  if (search) {
-    search.addEventListener("input", function () {
-      var q = search.value;
-      clearTimeout(_pscCustTimer);
-      _pscCustTimer = setTimeout(function () {
-        pscSuggestCustomers(q);
-      }, 180);
-    });
-    search.addEventListener("blur", function () {
-      setTimeout(pscHideSuggest, 150);
-    });
-  }
-  var addBtn = document.getElementById("pscAddRow");
-  if (addBtn)
-    addBtn.addEventListener("click", function () {
-      pscState.rows.push({ product: null, cajas: null, codText: "" });
-      pscRenderRows();
-    });
-  var submitBtn = document.getElementById("pscSubmit");
-  if (submitBtn) submitBtn.addEventListener("click", pscSubmit);
-}
-
-function pscHideSuggest() {
-  var box = document.getElementById("pscSuggest");
-  if (box) {
-    box.style.display = "none";
-    box.innerHTML = "";
-  }
-}
-
-async function pscSuggestCustomers(q) {
-  q = String(q || "").trim();
-  var box = document.getElementById("pscSuggest");
-  if (!box) return;
-  if (q.length < 2) {
-    pscHideSuggest();
-    return;
-  }
-  var isNum = /^\d+$/.test(q);
-  try {
-    var promises = [
-      sb
-        .from("customers")
-        .select(
-          "id,cod_cliente,business_name,dto_vol,vend,debt,payment_term,credit_limit",
-        )
-        .ilike("business_name", "%" + q + "%")
-        .order("business_name", { ascending: true })
-        .limit(8),
-    ];
-    if (isNum) {
-      promises.push(
-        sb
-          .from("customers")
-          .select(
-            "id,cod_cliente,business_name,dto_vol,vend,debt,payment_term,credit_limit",
-          )
-          .eq("cod_cliente", q)
-          .limit(3),
-      );
-    }
-    var results = await Promise.all(promises);
-    var seen = {},
-      merged = [];
-    results.forEach(function (r) {
-      if (r.error || !r.data) return;
-      r.data.forEach(function (c) {
-        if (seen[c.id]) return;
-        seen[c.id] = true;
-        merged.push(c);
-      });
-    });
-    if (isNum) {
-      merged.sort(function (a, b) {
-        return (
-          (String(a.cod_cliente) === q ? 0 : 1) -
-          (String(b.cod_cliente) === q ? 0 : 1)
-        );
-      });
-    }
-    if (!merged.length) {
-      box.innerHTML = '<div class="cp-suggest-empty">Sin resultados</div>';
-      box.style.display = "block";
-      return;
-    }
-    box.innerHTML = merged
-      .slice(0, 10)
-      .map(function (c) {
-        return (
-          '<div class="cp-suggest-row" data-id="' +
-          c.id +
-          '"><span class="cp-suggest-cod">' +
-          cpEscHTML(c.cod_cliente || "") +
-          '</span><span class="cp-suggest-name">' +
-          cpEscHTML(c.business_name || "") +
-          "</span></div>"
-        );
-      })
-      .join("");
-    box.style.display = "block";
-    box.querySelectorAll(".cp-suggest-row").forEach(function (row) {
-      row.addEventListener("mousedown", function (e) {
-        e.preventDefault();
-        var c = merged.find(function (x) {
-          return String(x.id) === row.dataset.id;
-        });
-        if (c) pscSelectCustomer(c);
-      });
-    });
-  } catch (e) {
-    console.error("psc suggest customers:", e);
-  }
-}
-
-async function pscSelectCustomer(c) {
-  pscState.customer = c;
-  var search = document.getElementById("pscSearch");
-  if (search)
-    search.value = (c.cod_cliente || "") + " — " + (c.business_name || "");
-  pscHideSuggest();
-  var cust = document.getElementById("pscCustomer");
-  if (cust) {
-    cust.innerHTML =
-      '<div class="psc-c-name">' +
-      cpEscHTML(c.cod_cliente || "") +
-      " — " +
-      cpEscHTML(c.business_name || "") +
-      "</div>";
-    cust.style.display = "block";
-  }
-  // Sucursales de entrega
-  var addrs = [];
-  try {
-    var r = await sb
-      .from("customer_delivery_addresses")
-      .select("slot,label,direccion_entrega,zona_expreso")
-      .eq("customer_id", c.id)
-      .order("slot", { ascending: true });
-    if (!r.error) addrs = r.data || [];
-  } catch (e) {
-    console.error("psc delivery addrs:", e);
-  }
-  pscState.deliveryAddresses = addrs;
-  pscRenderDelivery(addrs.length ? 0 : null);
-  var itemsW = document.getElementById("pscItemsWrap");
-  if (itemsW) itemsW.style.display = "";
-  pscRenderRows();
-  pscUpdateSubmitState();
-}
-
-// Muestra las sucursales YA cargadas del cliente; si no tiene (o no es la
-// deseada) permite crear una nueva (label + direccion + zona) en el momento.
-function pscRenderDelivery(selIdx) {
-  var delF = document.getElementById("pscDeliveryField");
-  if (!delF) return;
-  var addrs = pscState.deliveryAddresses || [];
-  var hasAddrs = addrs.length > 0;
-  var optsHtml = addrs
-    .map(function (a, i) {
-      var lbl =
-        a.label ||
-        a.direccion_entrega ||
-        "Sucursal " + (a.slot != null ? a.slot : i + 1);
-      return (
-        '<option value="' +
-        i +
-        '"' +
-        (selIdx === i ? " selected" : "") +
-        ">" +
-        cpEscHTML(lbl) +
-        "</option>"
-      );
-    })
-    .join("");
-  delF.innerHTML =
-    '<label class="field-label">Sucursal de entrega</label>' +
-    (hasAddrs
-      ? '<select id="pscDeliverySelect" class="field-input">' +
-        optsHtml +
-        "</select>"
-      : '<div class="psc-suc-none">Este cliente no tiene sucursales cargadas. Creá una para continuar.</div>') +
-    '<button type="button" id="pscNewSucToggle" class="psc-newsuc-toggle">+ Nueva sucursal</button>' +
-    '<div id="pscNewSucForm" class="psc-newsuc-form" style="display:none">' +
-    '<input type="text" id="pscNewSucLabel" class="field-input" placeholder="Nombre / label (ej: Sucursal Centro)" />' +
-    '<input type="text" id="pscNewSucDir" class="field-input" placeholder="Dirección real de entrega" />' +
-    '<input type="text" id="pscNewSucZona" class="field-input" placeholder="Zona expreso" />' +
-    '<div class="psc-newsuc-actions">' +
-    '<button type="button" id="pscNewSucCancel" class="btn-ghost">Cancelar</button>' +
-    '<button type="button" id="pscNewSucSave" class="btn-primary">Guardar sucursal</button>' +
-    "</div>" +
-    '<div id="pscNewSucErr" class="psc-newsuc-err" style="display:none"></div>' +
-    "</div>";
-  delF.style.display = "";
-  var sel = document.getElementById("pscDeliverySelect");
-  if (sel) sel.addEventListener("change", pscUpdateSubmitState);
-  var tog = document.getElementById("pscNewSucToggle");
-  if (tog) tog.addEventListener("click", function () { pscShowNewSuc(true); });
-  var can = document.getElementById("pscNewSucCancel");
-  if (can) can.addEventListener("click", function () { pscShowNewSuc(false); });
-  var sav = document.getElementById("pscNewSucSave");
-  if (sav) sav.addEventListener("click", pscSaveNewSuc);
-  // Sin sucursales: abrir el form directamente.
-  if (!hasAddrs) pscShowNewSuc(true);
-}
-
-function pscShowNewSuc(show) {
-  var form = document.getElementById("pscNewSucForm");
-  var tog = document.getElementById("pscNewSucToggle");
-  if (!form) return;
-  form.style.display = show ? "" : "none";
-  if (tog) tog.style.display = show ? "none" : "";
-  if (show) {
-    var l = document.getElementById("pscNewSucLabel");
-    if (l) l.focus();
-  } else {
-    ["pscNewSucLabel", "pscNewSucDir", "pscNewSucZona"].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.value = "";
-    });
-    var err = document.getElementById("pscNewSucErr");
-    if (err) err.style.display = "none";
-  }
-}
-
-async function pscSaveNewSuc() {
-  if (!pscState.customer) return;
-  var err = document.getElementById("pscNewSucErr");
-  function showErr(msg) {
-    if (err) {
-      err.textContent = msg;
-      err.style.display = "block";
-    }
-  }
-  var label = (document.getElementById("pscNewSucLabel") || {}).value || "";
-  var dir = (document.getElementById("pscNewSucDir") || {}).value || "";
-  var zona = (document.getElementById("pscNewSucZona") || {}).value || "";
-  label = label.trim();
-  dir = dir.trim();
-  zona = zona.trim();
-  if (err) err.style.display = "none";
-  if (!label) return showErr("Ingresá el nombre / label.");
-  if (!dir) return showErr("Ingresá la dirección real de entrega.");
-  if (!zona) return showErr("Ingresá la zona expreso.");
-  var existing = pscState.deliveryAddresses || [];
-  var dupNorm = label.toLowerCase();
-  if (
-    existing.some(function (d) {
-      return String(d.label || "").trim().toLowerCase() === dupNorm;
-    })
-  )
-    return showErr("Ya existe una sucursal con ese label.");
-  var nextSlot =
-    existing.reduce(function (m, d) {
-      return Math.max(m, Number(d.slot || 0));
-    }, 0) + 1;
-  var saveBtn = document.getElementById("pscNewSucSave");
-  if (saveBtn) {
-    saveBtn.disabled = true;
-    saveBtn.textContent = "Guardando...";
-  }
-  try {
-    var r = await sb
-      .from("customer_delivery_addresses")
-      .insert({
-        customer_id: pscState.customer.id,
-        slot: nextSlot,
-        label: label,
-        direccion_entrega: dir,
-        zona_expreso: zona,
-      })
-      .select()
-      .single();
-    if (r.error) throw new Error(r.error.message || "Error al insertar sucursal");
-    pscState.deliveryAddresses = existing
-      .concat([r.data])
-      .sort(function (a, b) {
-        return Number(a.slot) - Number(b.slot);
-      });
-    var newIdx = pscState.deliveryAddresses.findIndex(function (d) {
-      return d.slot === r.data.slot;
-    });
-    pscRenderDelivery(newIdx >= 0 ? newIdx : 0);
-    toast("Sucursal creada", "success");
-    pscUpdateSubmitState();
-  } catch (e) {
-    console.error("psc save sucursal:", e);
-    showErr("Error: " + (e.message || e));
-    if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.textContent = "Guardar sucursal";
-    }
-  }
-}
-
-function pscSelectedAddr() {
-  var sel = document.getElementById("pscDeliverySelect");
-  if (!sel || sel.value === "") return null;
-  return pscState.deliveryAddresses[Number(sel.value)] || null;
-}
-
-function pscRenderRows() {
-  var tbody = document.getElementById("pscTableBody");
-  if (!tbody) return;
-  tbody.innerHTML = pscState.rows
-    .map(function (row, i) {
-      var p = row.product;
-      var codVal = p ? cpEscHTML(p.cod || "") : cpEscHTML(row.codText || "");
-      var desc = p ? cpEscHTML(p.description || "") : "";
-      var cajas = row.cajas != null ? row.cajas : "";
-      return (
-        '<tr data-i="' +
-        i +
-        '">' +
-        '<td class="psc-td-cod"><input type="text" class="field-input psc-cod" data-i="' +
-        i +
-        '" autocomplete="off" value="' +
-        codVal +
-        '" placeholder="Cód" /><div class="cp-suggest psc-prod-suggest" data-i="' +
-        i +
-        '" style="display:none"></div></td>' +
-        '<td class="psc-td-desc' +
-        (p ? "" : " psc-desc-empty") +
-        '">' +
-        (desc || "—") +
-        "</td>" +
-        '<td class="psc-td-cajas"><input type="number" min="1" step="1" class="field-input psc-cajas" data-i="' +
-        i +
-        '" value="' +
-        cajas +
-        '" ' +
-        (p ? "" : "disabled") +
-        ' placeholder="' +
-        pscUnitLabel(true) +
-        '" /></td>' +
-        '<td class="psc-td-x"><button type="button" class="psc-row-x" data-i="' +
-        i +
-        '" title="Quitar fila">×</button></td>' +
-        "</tr>"
-      );
-    })
-    .join("");
-  // El encabezado dice CAJAS o UNIDADES segun el cliente: es lo unico que ve el
-  // que carga, y escribir unidades en una columna que dice "Cajas" es el error
-  // que produjo el pedido 1450 (166,6667 cajas).
-  var th = document.getElementById("pscThCant");
-  if (th) th.textContent = pscUnitLabel(true);
-  pscWireRows();
-}
-
-var _pscProdTimer = null;
-function pscWireRows() {
-  var tbody = document.getElementById("pscTableBody");
-  if (!tbody) return;
-  tbody.querySelectorAll(".psc-cod").forEach(function (inp) {
-    inp.addEventListener("input", function () {
-      var i = Number(inp.dataset.i);
-      pscState.rows[i].product = null;
-      pscState.rows[i].codText = inp.value;
-      var caj = tbody.querySelector('.psc-cajas[data-i="' + i + '"]');
-      if (caj) caj.disabled = true;
-      var tr = inp.closest("tr");
-      var descTd = tr ? tr.querySelector(".psc-td-desc") : null;
-      if (descTd) {
-        descTd.textContent = "—";
-        descTd.classList.add("psc-desc-empty");
-      }
-      clearTimeout(_pscProdTimer);
-      _pscProdTimer = setTimeout(function () {
-        pscSuggestProducts(i, inp.value);
-      }, 120);
-      pscUpdateTotal();
-      pscUpdateSubmitState();
-    });
-    inp.addEventListener("blur", function () {
-      var i = Number(inp.dataset.i);
-      setTimeout(function () {
-        pscHideProdSuggest(i);
-        pscFinalizeCod(i, inp.value);
-      }, 150);
-    });
-  });
-  tbody.querySelectorAll(".psc-cajas").forEach(function (inp) {
-    inp.addEventListener("input", function () {
-      var i = Number(inp.dataset.i);
-      var v = parseInt(inp.value, 10);
-      pscState.rows[i].cajas = isNaN(v) || v <= 0 ? null : v;
-      pscUpdateTotal();
-      pscUpdateSubmitState();
-    });
-  });
-  tbody.querySelectorAll(".psc-row-x").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var i = Number(btn.dataset.i);
-      pscState.rows.splice(i, 1);
-      if (!pscState.rows.length)
-        pscState.rows.push({ product: null, cajas: null, codText: "" });
-      pscRenderRows();
-      pscUpdateTotal();
-      pscUpdateSubmitState();
-    });
-  });
-}
-
-function pscSuggestProducts(i, q) {
-  q = String(q || "")
-    .trim()
-    .toUpperCase();
-  var box = document.querySelector('.psc-prod-suggest[data-i="' + i + '"]');
-  if (!box) return;
-  if (q.length < 1) {
-    box.style.display = "none";
-    box.innerHTML = "";
-    return;
-  }
-  var matches = [];
-  var catalogo = pscCatalogo();
-  for (var k = 0; k < catalogo.length; k++) {
-    var p = catalogo[k];
-    var cod = String(p.cod || "").toUpperCase();
-    var desc = String(p.description || "").toUpperCase();
-    if (cod.indexOf(q) > -1 || desc.indexOf(q) > -1) matches.push(p);
-    if (matches.length >= 40) break;
-  }
-  matches.sort(function (a, b) {
-    var ac = String(a.cod || "").toUpperCase().indexOf(q) === 0 ? 0 : 1;
-    var bc = String(b.cod || "").toUpperCase().indexOf(q) === 0 ? 0 : 1;
-    return ac - bc;
-  });
-  if (!matches.length) {
-    box.innerHTML = '<div class="cp-suggest-empty">Sin artículos</div>';
-    box.style.display = "block";
-    return;
-  }
-  // Cada artículo puede rendir 1 fila (base) o 2 (base + "L") si PSC_LSUFFIX.
-  var rowsHtml = [];
-  matches.slice(0, 12).forEach(function (p) {
-    var base = String(p.cod || "");
-    rowsHtml.push(
-      '<div class="cp-suggest-row" data-cod="' +
-        cpEscHTML(base) +
-        '" data-l="0"><span class="cp-suggest-cod">' +
-        cpEscHTML(base) +
-        '</span><span class="cp-suggest-name">' +
-        cpEscHTML(p.description || "") +
-        "</span></div>",
-    );
-    if (PSC_LSUFFIX) {
-      rowsHtml.push(
-        '<div class="cp-suggest-row" data-cod="' +
-          cpEscHTML(base) +
-          '" data-l="1"><span class="cp-suggest-cod">' +
-          cpEscHTML(base + "L") +
-          '</span><span class="cp-suggest-name">' +
-          cpEscHTML(p.description || "") +
-          " · art. Loeke por Chef</span></div>",
-      );
-    }
-  });
-  box.innerHTML = rowsHtml.join("");
-  box.style.display = "block";
-  box.querySelectorAll(".cp-suggest-row").forEach(function (row) {
-    row.addEventListener("mousedown", function (e) {
-      e.preventDefault();
-      pscChooseProduct(i, row.dataset.cod, row.dataset.l === "1");
-    });
-  });
-}
-
-function pscHideProdSuggest(i) {
-  var box = document.querySelector('.psc-prod-suggest[data-i="' + i + '"]');
-  if (box) {
-    box.style.display = "none";
-    box.innerHTML = "";
-  }
-}
-
-function pscChooseProduct(i, cod, isL) {
-  var base = pscFindProduct(cod);
-  if (!base) return;
-  var effCod = isL ? String(base.cod) + "L" : String(base.cod);
-  var chosen = isL
-    ? { id: base.id, cod: effCod, description: base.description, list_price: base.list_price, uxb: base.uxb, _isL: true }
-    : base;
-  var dup = pscState.rows.some(function (r, idx) {
-    return idx !== i && r.product && String(r.product.cod) === String(effCod);
-  });
-  if (dup) toast("El artículo " + effCod + " ya está en otra fila", "warning");
-  pscState.rows[i].product = chosen;
-  pscState.rows[i].codText = effCod;
-  pscHideProdSuggest(i);
-  pscRenderRows();
-  var caj = document.querySelector('.psc-cajas[data-i="' + i + '"]');
-  if (caj) caj.focus();
-  pscUpdateTotal();
-  pscUpdateSubmitState();
-}
-
-function pscFinalizeCod(i, value) {
-  value = String(value || "").trim();
-  if (!value) return;
-  if (pscState.rows[i] && pscState.rows[i].product) return;
-  var p = pscFindProduct(value);
-  if (p) {
-    pscChooseProduct(i, p.cod, false);
-    return;
-  }
-  // PSC_LSUFFIX: si tipearon "438EL" y "438E" es válido, tomarlo como variante L.
-  if (PSC_LSUFFIX && /L$/i.test(value)) {
-    var base = value.slice(0, -1);
-    if (pscFindProduct(base)) {
-      pscChooseProduct(i, base, true);
-      return;
-    }
-  }
-  pscUpdateSubmitState();
-}
-
-function pscUpdateTotal() {
-  var total = 0,
-    n = 0,
-    unidades = 0;
-  pscState.rows.forEach(function (r) {
-    if (r.product && r.cajas > 0) {
-      total +=
-        Number(r.product.list_price || 0) *
-        Number(r.product.uxb || 0) *
-        Number(r.cajas);
-      unidades += Number(r.product.uxb || 0) * Number(r.cajas);
-      n++;
-    }
-  });
-  var el = document.getElementById("pscTotal");
-  if (el)
-    el.textContent = n
-      ? n +
-        " artículo" +
-        (n !== 1 ? "s" : "") +
-        " · " +
-        formatMoney(unidades) +
-        " unidades · Total lista: $" +
-        formatMoney(total)
-      : "";
-}
-
-function pscUpdateSubmitState() {
-  var btn = document.getElementById("pscSubmit");
-  if (!btn) return;
-  var hasLine = pscState.rows.some(function (r) {
-    return r.product && r.cajas > 0;
-  });
-  btn.disabled = !(
-    pscState.customer &&
-    hasLine &&
-    pscSelectedAddr() &&
-    !pscState.submitting
-  );
-}
-
-async function pscSubmit() {
-  if (pscState.submitting) return;
-  if (!pscState.customer) {
-    toast("Elegí un cliente", "warning");
-    return;
-  }
-  var lines = pscState.rows.filter(function (r) {
-    return r.product && r.cajas > 0;
-  });
-  if (!lines.length) {
-    toast(
-      "Agregá al menos un artículo con " + pscUnitLabel(true).toLowerCase(),
-      "warning",
-    );
-    return;
-  }
-  // ⚠ GUARD DEL MODO UNIDADES. Lo que se escribe en la columna viaja como `cajas`,
-  // asi que en un cliente que carga por unidad el articulo TIENE que estar en
-  // 1 u/caja: con uxb = 6, escribir 2.000 mandaria 2.000 cajas = 12.000 unidades.
-  // Es el mismo pozo del pedido 1450, visto desde el otro lado.
-  if (pscEsUnidades()) {
-    var malUxb = lines
-      .filter(function (r) {
-        return Number(r.product.uxb || 0) !== 1;
-      })
-      .map(function (r) {
-        return r.product.cod + " (" + r.product.uxb + " u/caja)";
-      });
-    if (malUxb.length) {
-      showErr(
-        "Este cliente carga el pedido en UNIDADES, y estos artículos están en caja cerrada: " +
-          malUxb.join(", ") +
-          ". Ponelos en 1 unidad por bulto en ABM Artículos, o cargalos por cajas en otro cliente.",
-      );
-      return;
-    }
-  }
-  // Los codigos de reenvase son de un cliente puntual: si aparecen en otro, se avisa.
-  var extraEnOtroCliente = lines
-    .filter(function (r) {
-      return PSC_CODS_EXTRA.indexOf(String(r.product.cod)) >= 0;
-    })
-    .map(function (r) {
-      return r.product.cod;
-    });
-  if (extraEnOtroCliente.length && !pscEsUnidades()) {
-    if (
-      !confirm(
-        "Ojo: " +
-          extraEnOtroCliente.join(", ") +
-          " son códigos de reenvase de un cliente puntual y este no es ese cliente.\n¿Seguís igual?",
-      )
-    )
-      return;
-  }
-  var addr = pscSelectedAddr();
-  if (!addr) {
-    toast("Elegí o creá una sucursal de entrega", "warning");
-    return;
-  }
-  var finalDelivery = addr.label || addr.direccion_entrega || "";
-  var finalDelDir = addr.direccion_entrega || "";
-  var finalDelZona = addr.zona_expreso || "";
-
-  var confirmMsg =
-    "Enviar pedido de " +
-    pscState.customer.cod_cliente +
-    " — " +
-    pscState.customer.business_name +
-    "\n" +
-    lines.length +
-    " artículo(s) → " +
-    finalDelivery +
-    "\nCantidades en " +
-    pscUnitLabel(true).toUpperCase() +
-    ": " +
-    lines
-      .map(function (r) {
-        return r.product.cod + " x " + r.cajas;
-      })
-      .join(", ") +
-    "\nCondición de pago: Sin Cotizador";
-  if (!confirm(confirmMsg)) return;
-
-  pscState.submitting = true;
-  pscUpdateSubmitState();
-  var btn = document.getElementById("pscSubmit");
-  var oldTxt = btn ? btn.textContent : "Enviar Pedido";
-  if (btn) btn.textContent = "Enviando...";
-
-  try {
-    var sessRes = await sb.auth.getSession();
-    if (sessRes.error || !sessRes.data || !sessRes.data.session)
-      throw new Error("Sesión expirada. Recargá la página.");
-    var session = sessRes.data.session;
-    var token = session.access_token;
-
-    var itemsPayload = lines
-      .map(function (r) {
-        var p = r.product;
-        var uxb = Number(p.uxb || 0);
-        var cajas = Number(r.cajas || 0);
-        var unidades = cajas * uxb;
-        var unitPrice = Number(p.list_price || 0); // SOLO LISTA
-        return {
-          product_id: p.id,
-          cod_art: String(p.cod || "").trim(),
-          cajas: cajas,
-          uxb: uxb,
-          unidades: unidades,
-          unit_price: unitPrice,
-          list_price: Number(p.list_price || 0),
-          description: String(p.description || ""),
-          is_loke: false,
-        };
-      })
-      .sort(function (a, b) {
-        return String(a.cod_art || "").localeCompare(
-          String(b.cod_art || ""),
-          undefined,
-          { numeric: true },
-        );
-      });
-
-    var subtotal = 0;
-    itemsPayload.forEach(function (it) {
-      subtotal += Number(it.unit_price || 0) * Number(it.unidades || 0);
-    });
-    var finalTotal = subtotal; // sin descuentos
-
-    var rpcItems = itemsPayload.map(function (it) {
-      return {
-        product_id: it.product_id,
-        cajas: it.cajas,
-        uxb: it.uxb,
-        is_loke: false,
-      };
-    });
-
-    var rpcResult = await cpWithTimeout(
-      sb.rpc("submit_order_fast", {
-        p_auth_user_id: session.user.id,
-        p_customer_id: pscState.customer.id,
-        p_status: "pendiente",
-        p_payment_method: "Sin Cotizador",
-        p_payment_discount: 0,
-        p_web_discount: 0,
-        p_subtotal: subtotal,
-        p_total: finalTotal,
-        p_items: rpcItems,
-      }),
-      15000,
-      "submit_order_fast",
-    );
-    if (rpcResult.error || !rpcResult.data)
-      throw new Error(
-        (rpcResult.error &&
-          (rpcResult.error.message || rpcResult.error.details)) ||
-          "RPC falló",
-      );
-    var orderId = rpcResult.data;
-
-    var sheetsPayload = {
-      order_number: String(orderId || "").trim(),
-      cod_cliente: String(pscState.customer.cod_cliente || "").trim(),
-      vend: String(pscState.customer.vend || "").trim(),
-      condicion_pago: "Sin Cotizador",
-      condicion_pago_code: 1,
-      sucursal_entrega: finalDelivery || "",
-      cliente_nuevo: "",
-      is_promo: false,
-      is_chef: false,
-      target_sheet: "Pedidos Web",
-      empresa: "LK",
-      extra_discount: 0,
-      deuda: Number(pscState.customer.debt || 0),
-      payment_term:
-        pscState.customer.payment_term == null
-          ? null
-          : Number(pscState.customer.payment_term),
-      credit_limit:
-        pscState.customer.credit_limit == null
-          ? null
-          : Number(pscState.customer.credit_limit),
-      source: "Sin Cotizador",
-      items: itemsPayload.map(function (it) {
-        return {
-          cod_art: it.cod_art,
-          cod_original: null,
-          cajas: it.cajas,
-          uxb: it.uxb,
-        };
-      }),
-    };
-
-    sb.from("orders")
-      .update({
-        sheets_payload: sheetsPayload,
-        is_promo: false,
-        extra_discount: 0,
-        placed_by_auth_user_id: session.user.id,
-      })
-      .eq("id", orderId)
-      .then(function () {});
-
-    cpSendToSheetsWithRetry(sheetsPayload, token, 3)
-      .then(function () {
-        sb.from("orders")
-          .update({ sheets_sent: true })
-          .eq("id", orderId)
-          .then(function () {});
-      })
-      .catch(function (e) {
-        console.warn("psc sheets error (order " + orderId + "):", e);
-      });
-
-    var entregasPayload = {
-      order_number: orderId,
-      fecha: new Date().toLocaleDateString("es-AR"),
-      cod_cliente: pscState.customer.cod_cliente,
-      cliente: pscState.customer.business_name,
-      vendedor: pscState.customer.vend || "",
-      direccion_entrega: finalDelDir || finalDelivery || "",
-      barrio_entrega: finalDelZona || "",
-      empresa: "LK",
-      is_promo: false,
-      extra_discount: 0,
-      items: itemsPayload.map(function (it) {
-        return {
-          cod_art: it.cod_art,
-          description: it.description || "",
-          cajas: it.cajas,
-          uxb: it.uxb,
-        };
-      }),
-    };
-    cpSendToEntregas(entregasPayload, token);
-
-    toast("Pedido " + orderId + " enviado (Sin Cotizador)", "success");
-    pscReset();
-  } catch (e) {
-    console.error("psc submit error:", e);
-    toast("Error enviando pedido: " + (e.message || e), "error");
-    if (btn) btn.textContent = oldTxt;
-  } finally {
-    pscState.submitting = false;
-    pscUpdateSubmitState();
-    var b = document.getElementById("pscSubmit");
-    if (b && b.textContent === "Enviando...") b.textContent = "Enviar Pedido";
-  }
-}
-
-/* ============================================================================
-   CLIC PARA COPIAR — solo CUIT y PIN
-   ----------------------------------------------------------------------------
-   Pedido de Tomas: que se copien SOLO esos dos y nada mas. Son los que se
-   tipean a mano todo el dia y los unicos donde equivocarse un digito rompe algo
-   (el CUIT identifica al cliente en ARCA y en el ERP; el PIN es la contrasena
-   con la que entra al portal).
-
-   El alcance es explicito, no heuristico: copia lo que lleve el atributo
-   data-copiable, y ese atributo se pone a mano donde se pinta un CUIT o un PIN.
-   Un selector generico por celda haria copiable cualquier cosa que alguien
-   agregue manana sin querer.
-
-   El valor sale del ATRIBUTO, no del texto: la celda del ranking dice
-   "CUIT 30-59036076-3" y lo que tiene que viajar al portapapeles es el numero
-   solo, sin la etiqueta.
-
-   Dos cuidados:
-   - Si el clic cae en un boton, un link o un input que este DENTRO del elemento
-     marcado, se deja pasar: ese clic no es para copiar.
-   - Si hay texto seleccionado no se interfiere: alguien que arrastro para
-     marcar un pedazo quiere ese pedazo.
-
-   El CUIT del ABM no esta marcado a proposito: ya tiene su propio boton de
-   copiar con el iconito (copiarCuit, mas arriba en este archivo).
-
-   Donde esta marcado hoy: PIN en la card del ABM; CUIT en Clientes agrupados,
-   Estado de actividad, Ranking Inactivos, Ranking de clientes, el listado de
-   clientes y la Ficha de Cliente. Para sumar otro campo alcanza con ponerle
-   data-copiable="<valor>" donde se pinta.
-   ========================================================================== */
-(function () {
-  var INTERACTIVO =
-    "button,a,input,select,textarea,label,svg,[contenteditable]";
-
-  function copiar(texto, el) {
-    function listo() {
-      if (el) {
-        el.classList.add("lk-copiado");
-        setTimeout(function () {
-          el.classList.remove("lk-copiado");
-        }, 900);
-      }
-      if (typeof toast === "function") toast("Copiado: " + texto, "success");
-    }
-    // navigator.clipboard necesita contexto seguro; si el navegador lo niega
-    // queda el textarea invisible de toda la vida.
-    function aMano() {
-      try {
-        var ta = document.createElement("textarea");
-        ta.value = texto;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      } catch (e) {
-        /* noop */
-      }
-    }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(texto).then(listo, function () {
-        aMano();
-        listo();
-      });
-    } else {
-      aMano();
-      listo();
-    }
-  }
-
-  document.addEventListener("click", function (ev) {
-    var t = ev.target;
-    if (!t || !t.closest) return;
-
-    var dato = t.closest("[data-copiable]");
-    if (!dato) return;
-
-    var control = t.closest(INTERACTIVO);
-    if (control && dato.contains(control)) return;
-
-    var seleccion = window.getSelection ? String(window.getSelection()) : "";
-    if (seleccion && seleccion.length > 1) return;
-
-    var texto = String(dato.getAttribute("data-copiable") || "").trim();
-    if (!texto) return;
-
-    ev.preventDefault();
-    copiar(texto, dato);
-  });
-})();
