@@ -31135,3 +31135,19 @@ Edge Function nueva **`gv-reporte-horas-xlsx`** (verify_jwt). Reemplazará al PD
 - Prueba: 01/10, 3 operarios, enviado OK al número de pruebas.
 - Rollback: borrar la función (Dashboard) y `drop function public.gv_horas_operario_detalle_v2(date),
   public.gv_horas_operario_tandas_v2(date);` — la v1 `gv_horas_operario_detalle(date)` quedó sin uso.
+
+## §3.v2608 — Reportes de gerencia: `gv_rep_gerencia_np` (NP → pedido + salida por CCN) (02/10/2026)
+
+**Luis:** reportes diario / semanal / mensual al chat privado de gerencia con pedidos que entraron, pedidos
+despachados, m³ pendientes, unidades vendidas y $ facturado. Los reportes viven en LK (`rep_ger_*`, bot
+@Lk_gerencia_bot); de acá sale sólo esta vista, que LK lee por el FDW como `virgilio.gv_rep_gerencia_np`.
+
+- Una fila por NP: `pedido_key` (web = `empresa:order_id`; ISIS = `empresa:cod:tanda`), m³, `salio_el` =
+  **primera CCN** (lo que Gestión llama "Salió"), `facturado_el`, `cancelado`.
+- Objeto NUEVO, `security_invoker = true`, SELECT sólo para `lk_ppp_reader` (revocado a anon/authenticated).
+  No toca nada existente.
+- Medido: todas las NP con CCN desde julio están en la vista (jul 300 · ago 409 · sep 347); el 100 % de las NP
+  web ya entregadas tiene CCN (164, Retira incluidos); septiembre: 347 NP = **220 pedidos**.
+- LK también importó `"GV_Web_Cancelados"` (pedidos cancelados desde A Programar, para no contarlos pendientes).
+
+`sql/gv_rep_gerencia_np_v2608.sql` (rollback en la cola) · LK: `pagina-LK-copia/sql/reporte_gerencia_v2.sql`.
