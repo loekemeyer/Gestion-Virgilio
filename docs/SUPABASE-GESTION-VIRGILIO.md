@@ -31136,6 +31136,40 @@ Edge Function nueva **`gv-reporte-horas-xlsx`** (verify_jwt). Reemplazará al PD
 - Rollback: borrar la función (Dashboard) y `drop function public.gv_horas_operario_detalle_v2(date),
   public.gv_horas_operario_tandas_v2(date);` — la v1 `gv_horas_operario_detalle(date)` quedó sin uso.
 
+## §3.v2608 — Reportes de gerencia: `gv_rep_gerencia_np` (NP → pedido + salida por CCN) (02/10/2026)
+
+**Luis:** reportes diario / semanal / mensual al chat privado de gerencia con pedidos que entraron, pedidos
+despachados, m³ pendientes, unidades vendidas y $ facturado. Los reportes viven en LK (`rep_ger_*`, bot
+@Lk_gerencia_bot); de acá sale sólo esta vista, que LK lee por el FDW como `virgilio.gv_rep_gerencia_np`.
+
+- Una fila por NP: `pedido_key` (web = `empresa:order_id`; ISIS = `empresa:cod:tanda`), m³, `salio_el` =
+  **primera CCN** (lo que Gestión llama "Salió"), `facturado_el`, `cancelado`.
+- Objeto NUEVO, `security_invoker = true`, SELECT sólo para `lk_ppp_reader` (revocado a anon/authenticated).
+  No toca nada existente.
+- Medido: todas las NP con CCN desde julio están en la vista (jul 300 · ago 409 · sep 347); el 100 % de las NP
+  web ya entregadas tiene CCN (164, Retira incluidos); septiembre: 347 NP = **220 pedidos**.
+- LK también importó `"GV_Web_Cancelados"` (pedidos cancelados desde A Programar, para no contarlos pendientes).
+
+`sql/gv_rep_gerencia_np_v2608.sql` (rollback en la cola) · LK: `pagina-LK-copia/sql/reporte_gerencia_v2.sql`.
+
+## §3.v2611 — Reportes de gerencia: lo COBRADO por día desde la conciliación (02/10/2026)
+
+**Luis:** *"sumale lo cobrado por día (sacado el dato de la conciliación)"*. LK lo lee por el FDW como
+`virgilio.gv_rep_gerencia_cobrado` y `virgilio.gv_rep_gerencia_conc_al`.
+
+- **Cobrado = lo acreditado en el banco, IVA incluido**: filas `ingreso` / `a_depositar` de `gv_conciliacion_bancaria`
+  **arriba de la línea amarilla** de cada cuenta (`gv_conc_linea`; lo de abajo es cartera/proyección). det `D` y `3` =
+  cliente; det `1` (No identificado) = `sin_identificar`. Fuera: TB, Vta Cheq/VTACH, INV, DEV, CHRECH, TFRECH, G y un
+  No identificado que nombra a Loekemeyer o a Chef. Los clientes internos los saca LK (`ventas_clientes_internos`).
+- `lk_ppp_reader` **no** lee las tablas `GV_Conc_*` (RLS sólo supervisores, son todos los movimientos de banco) y no se le
+  abren: sale por `gv_rep_gerencia_cobrado_fn()` (SECURITY DEFINER, agregado por día · empresa · banco · clase · cliente)
+  con una vista `security_invoker` encima. EXECUTE / SELECT sólo para `lk_ppp_reader`.
+- `gv_rep_gerencia_conc_al` dice hasta qué día está conciliada cada cuenta: el reporte avisa la que no llega al fin del
+  período (al 02/10: Santander LK, al 01/09).
+- Medido: sep LK $ 413,4 M · Chef $ 109,9 M ($ 21,6 M son Loekemeyer Hnos → el reporte dice Chef $ 88,3 M).
+
+`sql/gv_rep_gerencia_cobrado_v2611.sql` (rollback en la cola) · LK: `pagina-LK-copia/sql/reporte_gerencia_v2.sql`.
+
 ## §3.v2612 — Impresión por programa en la PC: `GV_Impresion_*` + `gv_imp_*` (Luis, 02/10/2026)
 
 Se aplicó como migración `gv_impresion_programa_v2611` y los comentarios de las funciones dicen **v26.11**:
@@ -31159,3 +31193,24 @@ de GV `gv_imp_config` (anon/auth; la clave sólo a supervisor), y sólo `authent
   `programa` → clave mala `CLAVE_INVALIDA`. Como `anon`: tomar con clave mala `CLAVE_INVALIDA`, encolar
   `permission denied`. Después: 0 PCs, 0 reglas, 0 trabajos, 1 clave.
 - Rollback: los `drop` de la cabecera de `sql/gv_impresion_programa_v2611.sql`.
+
+## §3.v2613 — Reportes de gerencia: cobrado del último día completo + alerta del outbox sin las fallas viejas (02/10/2026)
+
+> Llegó a `main` como **v26.14** (la v26.13 de `main` es la re-sincronización del admin de LK). Los archivos `sql/*_v2613.sql` conservan el nombre con que se aplicaron.
+
+**Luis:** *"se sigue mandando a las 8 con lo que haya y se avisa de lo cobrado el último plazo completo"* · D2:
+*"dale, arreglá"*.
+
+1. **`gv_rep_gerencia_conc_cargas`** (nueva, LK la lee por el FDW): una fila por subida de la conciliación
+   (`"GV_Conc_Cargas"`: banco, empresa, cuándo; 120 días). Mismo patrón que la v26.11: función SECURITY DEFINER +
+   vista `security_invoker`, sólo `lk_ppp_reader`. `gv_rep_gerencia_conc_al` suma `ultima_carga` al final, por una
+   función nueva (`gv_rep_gerencia_conc_estado_fn`; la de la v26.11 queda de rollback).
+   - Con eso LK sabe hasta qué día está **completo** lo cobrado: las cuatro cuentas tienen una subida posterior a
+     ese día (el extracto de ayer se sube hoy). El reporte informa lo que se completó **desde el reporte anterior**,
+     así que un día que a las 08:00 nadie subió va en el reporte siguiente: no se pierde ni se repite.
+   - Medido: las subidas caen entre las 06:52 y las 09:49. El 02/10 las cuatro fueron después de las 08:00.
+2. **`notificar_outbox_salud()`** (cron 12, 10:00 ART) cuenta sólo las fallas de las **últimas 48 h**. Contaba las 52
+   fallas viejas (01/08 al 08/09, ninguna después) y avisaba todos los días. Los 52 mensajes no se tocaron.
+
+`sql/gv_rep_gerencia_conc_cargas_v2613.sql`, `sql/notificar_outbox_salud_v2613.sql` (rollback en la cola de cada uno)
+· LK: `pagina-LK-copia/sql/reporte_gerencia_v2.sql`.
