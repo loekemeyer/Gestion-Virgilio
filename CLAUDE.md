@@ -6684,6 +6684,31 @@ de LK viejas del 14/09, ninguna con NP programada). `sql/gv_ppp_web_base_podar_v
 - **Lo abierto lo suman la vista (TV) y la tabla Mts3 x Hora del admin (v23.67)**: fila «En curso (h)» para picking/armado abierto; lo demás a su fila. **No entra al m³/h** (la tanda no cerró).
 - Huella re-congelada (md5 `fcab722b…`), centinela 96 actualizado y fila nueva `ab_ag`. `sql/gv_monitor_horas_abiertas_v2366.sql`.
 
+## ⚠⚠ REGLA (Luis, 2026-10-02, v26.43): la COLA sin registro después del TP/TAP es PICKING/ARMADO
+
+**Luis, textual:** *"si hay tiempos sin registros, luego de que estén haciendo picking o armado, hasta que
+inicien la nueva tarea, esos tiempos quiero que se registren dentro de picking o armado … si vos pusiste
+terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que realmente no terminaste"*.
+
+- **Qué cuenta:** desde el cierre (TP/TAP) hasta el **inicio de la próxima tarea registrada** del legajo
+  (`coalesce(ts_inicio, ts_cliente)` de cualquier evento que no sea automático: PUB, AUB, PKC, ENT, RSP, ROC,
+  RAG, FGU, FSS, IMPT, TAL, GST, MGR, PKM, SSG, PSP, NPD, PKAX ni los `*X`), o el **fin de jornada**
+  (`max(último evento, hora de salida)`; el FJ es un evento y la corta solo), o la primera **bajada de racks
+  sin tramo** (ese tramo ya cuenta como racks). Un tramo que **ya estaba abierto** al cerrar deja la cola en
+  0; un 2.º TP/TAP de la **misma** tanda no la corta. Se suma a la tanda: `pick/arm = max(dur_s) + cola`.
+- **Dónde:** `gv_monitor_horas_operario_dia` (CTE `cola`) y su copia verbatim `gv_horas_operario_detalle_v2`
+  (xlsx de Elías); `index.html` `fetchMonitorDayStats` (`colaMsDe`, ≡ vista) y el pop-up por tanda dice
+  «incl. N de cola hasta la próxima tarea». TV y Mon. Admin la heredan de la vista. **No entra** en «Min trab»
+  del pop-up m³/h por tanda del Mon. Admin (apertura → cierre, v25.92).
+- **Medido:** 15/09 → 277 picking 6,37 → 7,77 h · 237 armado 5,60 → 6,63 · 8 armado 6,75 → 8,76. 60 días, por
+  tanda: mediana 1,7 min · p90 9,7 (TP) / 16,4 (TAP) · 4 colas > 60 min, la mayor **518 min** (TP a la mañana y
+  ningún evento hasta la hora de salida). Es a propósito: la regla pide que eso cuente, y queda a la vista.
+- La calibración de dificultad (D17) usa **`neto_cola`** como tiempo real de la tanda.
+- `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
+  v26.43 adentro). `tests/tools/vista-15.json` re-congelado con la cola; `tests/mon-vs-vista.cjs`;
+  `tests/muerto-neteado.cjs` (la siguiente tarea arranca 1 s después del cierre y el día termina con FJ, para
+  que la cola quede en 0 y siga midiendo sólo el neteo).
+
 ## ⚠ REGLA (Luis, 2026-09-28, v23.68): el trabajo en racks sin tramo se INFIERE — y el admin abre en la Vista TV
 
 - Bajadas de racks (`Movimientos_Stock` baja_racks) e ingresos (IR) **sin tramo RKB/IRT** (celular viejo o anteriores a

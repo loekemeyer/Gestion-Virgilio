@@ -10,7 +10,8 @@
     "v23.68 (28/09): re-congelada con el trabajo en racks INFERIDO de las bajadas sin tramo (rk_ag): 94 hs_mov 2,63 -> 6,33 y 104 1,08 -> 1,15. El resto idéntico.",
     "v23.70 (28/09): sin tope de tramo en racks inferido: 94 hs_mov 6,33 -> 7,97.",
     "v23.72 (28/09): lo abierto que cruza de día suma a SU día hasta el FJ; en el día de cierre sólo el tramo desde la entrada: 8 hs_arm 7,40 -> 6,75, hs_prod 10,73 -> 10,09.",
-    "v23.72-sig: la tarea abierta termina donde empieza la siguiente del legajo: 104 hs_mov 1,15 -> 1,83 (EI abierto 13:08 hasta el RT de 13:49)."
+    "v23.72-sig: la tarea abierta termina donde empieza la siguiente del legajo: 104 hs_mov 1,15 -> 1,83 (EI abierto 13:08 hasta el RT de 13:49).",
+    "v26.43-cola (02/10): re-congelada con la COLA sin registro despues del TP/TAP sumada a picking/armado (Luis): 277 hs_pick 6,37 -> 7,77 · 237 hs_arm 5,60 -> 6,63 · 8 hs_arm 6,75 -> 8,76 (hs_prod 10,09 -> 12,10). 104 y 94 identicos."
   ],
   "dia": "2026-09-15",
   "operarios": [
@@ -19,12 +20,12 @@
       "tandas_pick": 1,
       "prom_hs_pick": 0.01,
       "tandas_arm": 3,
-      "prom_hs_arm": 2.25,
+      "prom_hs_arm": 2.92,
       "hs_pick": 0.01,
-      "hs_arm": 6.75,
+      "hs_arm": 8.76,
       "hs_mov": 0.0,
       "hs_noprod": 0.89,
-      "hs_prod": 10.09
+      "hs_prod": 12.1
     },
     {
       "legajo": "94",
@@ -55,24 +56,24 @@
       "tandas_pick": 0,
       "prom_hs_pick": 0,
       "tandas_arm": 12,
-      "prom_hs_arm": 0.47,
+      "prom_hs_arm": 0.55,
       "hs_pick": 0.0,
-      "hs_arm": 5.6,
+      "hs_arm": 6.63,
       "hs_mov": 0.0,
       "hs_noprod": 2.4,
-      "hs_prod": 5.6
+      "hs_prod": 6.63
     },
     {
       "legajo": "277",
       "tandas_pick": 14,
-      "prom_hs_pick": 0.46,
+      "prom_hs_pick": 0.56,
       "tandas_arm": 0,
       "prom_hs_arm": 0,
-      "hs_pick": 6.37,
+      "hs_pick": 7.77,
       "hs_arm": 0.0,
       "hs_mov": 0.96,
       "hs_noprod": 1.7,
-      "hs_prod": 6.37
+      "hs_prod": 7.77
     }
   ]
 }

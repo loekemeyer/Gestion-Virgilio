@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.42"></script>
+<script type="module" src="recepcion.js?v=26.43"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10478,7 +10478,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.42";
+const APP_VERSION = "v26.43";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31558,8 +31558,9 @@ function showOperarioActivityDetail(legajo, activity) {
     const openTxt = `<b>${fmtTimeHm(d.ts_inicio)} → ${fmtTimeHm(new Date(b.fjOpenMs).toISOString())}</b> <span style="color:#666">(${fjLabel} día anterior)</span> = ${openMin} min`;
     const closeTxt = `<b>${fmtTimeHm(new Date(b.closeStartMs).toISOString())} → ${fmtTimeHm(d.ts_cliente)}</b> <span style="color:#666">(${ingLabel} día cierre)</span> = ${closeMin} min`;
     const interTxt = interMin > 0 ? ` + ${interMin} min (días intermedios completos)` : "";
+    const colaTxt = d.colaMs > 0 ? ` + ${Math.round(d.colaMs / 60000)} min (cola hasta la próxima tarea, v26.43)` : "";
     return `<div style="font-size:11px; color:#444; padding:3px 6px; background:#fffbeb; line-height:1.4;">
-      ${openTxt} <b>+</b> ${closeTxt}${interTxt} = <b>${totMin} min</b>
+      ${openTxt} <b>+</b> ${closeTxt}${interTxt}${colaTxt} = <b>${totMin} min</b>
     </div>`;
   };
   const rows = detailArr.map(d => {
@@ -31573,7 +31574,10 @@ function showOperarioActivityDetail(legajo, activity) {
         <td style="text-align:right;font-variant-numeric:tabular-nums">${m3Txt}</td>
         <td>${inicio}${crossDay ? ' <span style="color:#9a3412;font-size:11px">(día anterior)</span>' : ''}</td>
         <td>${cierre}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${fmtDur(d.durMs)}</b></td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums"><b>${fmtDur(d.durMs)}</b>${
+          d.colaMs > 0
+            ? `<div style="font-size:11px;color:#1e6bd6">incl. ${fmtMin(d.colaMs)} de cola hasta la próxima tarea</div>`
+            : ""}</td>
       </tr>${cuentaHtml ? `<tr><td colspan="5" style="padding:0">${cuentaHtml}</td></tr>` : ''}`;
   }).join("");
 
@@ -32405,6 +32409,48 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     }
     return Math.max(0, openPortion + intermediatePortion + closePortion - muerto);
   };
+  /* v26.43-cola (Luis, 02/10: *"si hay tiempos sin registros, luego de que esten haciendo picking o armado,
+     hasta que inicien la nueva tarea, esos tiempos quiero que se registren dentro de picking o armado"*)
+     ≡ gv_monitor_horas_operario_dia, CTE `cola`: lo que sigue a un TP/TAP SIN registro, hasta que el legajo
+     empieza su proxima tarea registrada (o el fin de jornada: max(ultimo evento, hora de salida)), se suma al
+     picking/armado de ESA tanda. Un evento automatico (PKC, ENT, TAL, GST, MGR, *X...) no corta la cola; un
+     tramo que ya estaba abierto al cerrar (ts_inicio antes del TP/TAP) la deja en 0; una bajada de racks sin
+     tramo la corta (ese tramo ya cuenta como racks); un segundo TP/TAP de la MISMA tanda no la corta. */
+  const COLA_AUTO = new Set(["PUB","AUB","PKC","ENT","RSP","ROC","RAG","FGU","FSS","IMPT","TAL","GST","MGR","PKM","SSG","PSP","NPD","PKAX"]);
+  const _colaEvs = new Map(), _colaRk = new Map();
+  for (const ev of events) {
+    const leg = String(ev.legajo || "").trim();
+    if (!leg || leg === "0" || leg === "1" || ev.opcion === "LT") continue;
+    if (isoToDayKey(ev.ts_cliente) !== dayKey) continue;
+    if (!_colaEvs.has(leg)) _colaEvs.set(leg, []);
+    _colaEvs.get(leg).push(ev);
+  }
+  for (const m of (Array.isArray(rkMov) ? rkMov : [])) {
+    const leg = String(m.legajo == null ? "" : m.legajo).trim();
+    if (!leg || leg === "0" || leg === "1" || isoToDayKey(m.ts) !== dayKey) continue;
+    if (!_colaRk.has(leg)) _colaRk.set(leg, []);
+    _colaRk.get(leg).push(new Date(m.ts).getTime());
+  }
+  const colaMsDe = (leg, ev) => {
+    const evs = _colaEvs.get(leg) || [];
+    if (!evs.length) return 0;
+    const ini = new Date(ev.ts_cliente).getTime(), tx = String(ev.texto || "").trim().toUpperCase();
+    let ult = 0;
+    for (const s of evs) { const t = new Date(s.ts_cliente).getTime(); if (t > ult) ult = t; }
+    const _hsC = parseHHMMtoHours((horariosMap.get(String(leg)) || {}).salida);
+    let fin = Math.min(Date.now(), Math.max(ult, tsOfHourOnDay(dayKey, _hsC == null ? 17 : _hsC)));
+    for (const s of evs) {
+      if (s === ev) continue;
+      const sc = new Date(s.ts_cliente).getTime();
+      if (!(sc > ini) || COLA_AUTO.has(s.opcion) || /X$/.test(String(s.opcion || ""))) continue;
+      if (s.opcion === ev.opcion && String(s.texto || "").trim().toUpperCase() === tx) continue;
+      const si = s.ts_inicio ? new Date(s.ts_inicio).getTime() : null;
+      const cand = si == null ? sc : (si <= ini ? ini : si);
+      if (cand < fin) fin = cand;
+    }
+    for (const t of (_colaRk.get(leg) || [])) if (t > ini && t < fin) fin = t;
+    return Math.max(0, fin - ini);
+  };
   const perLegajo = new Map();
   for (const ev of events) {
     const leg = String(ev.legajo || "").trim();
@@ -32444,8 +32490,11 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       // v12.97 (idea 8818) — el TIEMPO se acredita UNA vez por tanda, igual que el m³:
       // si una tanda tiene dos TP/TAP (se cerró dos veces por error), antes el m³ se
       // contaba una vez pero las horas dos → el m³/h de Premios salía a la mitad.
-      if (ev.opcion === "TP"  && durOK) { if (!p.pickedTandas.has(tanda)) p.pickMs += dur; p.pickedTandas.add(tanda); p.pickedDetail.push(detail); }
-      if (ev.opcion === "TAP" && durOK) { if (!p.armedTandas.has(tanda))  p.armMs  += dur; p.armedTandas.add(tanda);  p.armedDetail.push(detail);  }
+      // v26.43-cola: la cola sin registro despues del TP/TAP va adentro de la tanda (detail.durMs la incluye; colaMs la muestra aparte)
+      const colaMs = (ev.opcion === "TP" || ev.opcion === "TAP") && durOK ? colaMsDe(leg, ev) : 0;
+      if (colaMs > 0) { detail.colaMs = colaMs; detail.durMs = dur + colaMs; }
+      if (ev.opcion === "TP"  && durOK) { if (!p.pickedTandas.has(tanda)) p.pickMs += dur + colaMs; p.pickedTandas.add(tanda); p.pickedDetail.push(detail); }
+      if (ev.opcion === "TAP" && durOK) { if (!p.armedTandas.has(tanda))  p.armMs  += dur + colaMs; p.armedTandas.add(tanda);  p.armedDetail.push(detail);  }
       if (ev.opcion === "CC"  && durOK) { if (!p.ccTandas.has(tanda))     p.ccMs   += dur; p.ccTandas.add(tanda);     p.ccDetail.push(detail);     }
     }
     /* v21.47 — CC + CR + RR por duración, con el MISMO `computeClosureDur` que
@@ -59177,7 +59226,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.42"></script>
+<script src="importacion.js?v=26.43"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62000,9 +62049,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.42"></script>
-<script src="hotsale.js?v=26.42"></script>
-<script src="estadisticas.js?v=26.42"></script>
+<script src="cobranzas.js?v=26.43"></script>
+<script src="hotsale.js?v=26.43"></script>
+<script src="estadisticas.js?v=26.43"></script>
 
 </body>
 </html>

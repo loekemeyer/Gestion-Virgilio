@@ -26,8 +26,12 @@ const EVENTOS = [
   { opcion: "PB",  texto: "",     legajo: "700", ts_cliente: iso("10:10:00"), ts_inicio: iso("10:00:00") },
   { opcion: "TAP", texto: "Z01A", legajo: "700", ts_cliente: iso("11:00:00"), ts_inicio: iso("09:00:00") },
   // control: otro armado del mismo día SIN nada adentro → no se le toca un minuto
-  { opcion: "AP",  texto: "Z01B", legajo: "700", ts_cliente: iso("11:05:00"), ts_inicio: null },
-  { opcion: "TAP", texto: "Z01B", legajo: "700", ts_cliente: iso("12:05:00"), ts_inicio: iso("11:05:00") },
+  /* v26.43-cola (Luis, 02/10): lo que sigue a un TAP sin registro hasta la próxima tarea es armado.
+     Para que este test siga midiendo SÓLO el neteo del tiempo muerto, la siguiente tarea arranca
+     1 s después del cierre y el día termina con FJ: la cola queda en 0 (antes 5 min + hasta las 17:00). */
+  { opcion: "AP",  texto: "Z01B", legajo: "700", ts_cliente: iso("11:00:01"), ts_inicio: null },
+  { opcion: "TAP", texto: "Z01B", legajo: "700", ts_cliente: iso("12:00:01"), ts_inicio: iso("11:00:01") },
+  { opcion: "FJ",  texto: "",     legajo: "700", ts_cliente: iso("12:00:02"), ts_inicio: null },
   /* (C) v21.20 — el mismo caso pero contra un MOVIMIENTO, en otro legajo para que
      el tiempo muerto no se cruce con el armado de arriba. Una recepción de 2 h con
      un baño de 10 min adentro: `PB` está en ALWAYS_ALLOWED_CODES, así que se puede

@@ -571,6 +571,15 @@ dice, abajo de cada duración, cuánto se descontó.
 `select * from esa función con el día de hoy`. **Sin eso, `tests/tools/monitor-vs-vista.cjs` no
 podía comparar nada**: sus fixtures son del 15/09 y la vista sólo sabía de hoy.
 
+### 2 bis. v26.43 (Luis, 02/10): la COLA sin registro después del TP/TAP se suma a la tanda
+
+Lo que sigue al cierre del picking o del armado sin ningún registro —hasta que el legajo empieza su
+próxima tarea registrada, o el fin de jornada, o una bajada de racks sin tramo— es picking/armado de
+esa tanda (CTE `cola` de `gv_monitor_horas_operario_dia`; `pick/arm = max(dur_s) + cola`; en
+`fetchMonitorDayStats`, `colaMsDe`). Un evento automático (PKC, ENT, TAL, GST, MGR, `*X`…) no la corta;
+un tramo ya abierto al cerrar la deja en 0. Medido el 15/09: 277 picking 6,37 → 7,77 h, 8 armado
+6,75 → 8,76. Detalle y rollback: `sql/gv_monitor_horas_cola_v2643.sql`; la regla entera en `CLAUDE.md`.
+
 ### 3. El comparador quedó arreglado — y lo primero que muestra es que NO coinciden
 
 `tests/tools/monitor-vs-vista.cjs` ahora imprime los números del monitor grande **en el
