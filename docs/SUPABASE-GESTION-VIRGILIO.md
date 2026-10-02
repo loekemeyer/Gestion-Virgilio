@@ -31117,3 +31117,21 @@ de ir al baño que se apague; que dure 1 hora"* · *"legajo de prueba es 1 · qu
   abre id, vivas 1, TV 0, cierra 1, cerrada = true.
 - Rollback: `drop function public.gv_alerta_prueba_bano(boolean); drop function public.gv_alertas_prueba_vivas();`
   `sql/gv_alerta_prueba_bano_v2602.sql`, `tests/alerta-inactivo.cjs` (G, H).
+
+## §3.v2607 — Reporte diario de horas por operario en PDF: `gv-reporte-horas-xlsx` (Elías, 01/10/2026)
+
+Edge Function nueva **`gv-reporte-horas-xlsx`** (verify_jwt). Reemplazará al PDF de `gv-reporte-diario-virgilio`
+(cron 98, a Juan); **todavía NO** — convive, y por defecto manda sólo al número de pruebas (5491156517686).
+- **Resumen por operario**: Pking x Hs · Arma x Hs (m³/h) · Hs Prod (sólo picking + armado) · T Muerto (jornada sin
+  tarea; aparte, NO suma) · una columna por tarea no productiva (las sin datos ese día se omiten; Anulado = v25.64) ·
+  Hs no Prod · Hs Total = Prod + no Prod · Fecha. Horas en H:MM, ceros en blanco. Sin bloque «Pendientes».
+- **Detalle por tanda** (≡ pop-up m³/h del Mon. Admin, v25.92) con minutos **NETOS** (pausas descontadas, D15 = B):
+  cierra con el resumen. Lo que el resumen cuenta y no está en ninguna tanda cerrada sale como fila **«Abierto»** (D18).
+- Por WhatsApp va el **PDF** (plantilla `informe_produccion_virgilio` aprobada con PDF); el Excel queda en el bucket
+  `reportes` y su link vuelve en la respuesta.
+- Datos: `gv_horas_operario_detalle_v2(p_dia)` y `gv_horas_operario_tandas_v2(p_dia)` (nuevas, sólo lectura,
+  sólo service_role; copia de la lógica de `gv_monitor_horas_operario_dia` con la regla anulado). Barrido md5 de
+  desfase al pie de `sql/gv_horas_operario_detalle_v2550.sql`.
+- Prueba: 01/10, 3 operarios, enviado OK al número de pruebas.
+- Rollback: borrar la función (Dashboard) y `drop function public.gv_horas_operario_detalle_v2(date),
+  public.gv_horas_operario_tandas_v2(date);` — la v1 `gv_horas_operario_detalle(date)` quedó sin uso.
