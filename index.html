@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.31"></script>
+<script type="module" src="recepcion.js?v=26.32"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10478,7 +10478,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.31";
+const APP_VERSION = "v26.32";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -55049,7 +55049,7 @@ async function gvHelperConectar(){
     // v26.30 — conectar = ESTA PC imprime sola (Luis, 02/10: "en la compu que lo tenga abierto … mandar a
     // imprimir las 3 hojas cuando se generan"): prende la estación (picking al TP, armado al terminar cada NP).
     if (!_facIsMobile()) { try { psSetAuto(true); } catch (_e) {} }
-    _gvHelper.msg = "✓ Conectado: esta PC imprime sola el picking (al TP) y el armado (al terminar cada NP); el facturado, al tildar o bajar el Excel acá.";
+    _gvHelper.msg = "✓ Conectado: esta PC imprime sola el picking (al TP), el armado (al terminar cada NP) y el facturado (cuando se factura en cualquier PC).";
   } else _gvHelper.msg = "✗ No contesta 127.0.0.1:" + p + ". Abrí el helper en esta PC y probá de nuevo.";
   gvHelperRender(false);
   try { gvHelperVigilar(); } catch (_e) {}
@@ -55090,6 +55090,7 @@ setInterval(gvHelperVigilar, 60000);
 var PS_POLL_MS = 12000;
 var PS_AUTO_KEY = "ps_auto_virgilio";
 var PS_LASTSEEN_KEY = "ps_lastseen_virgilio";
+var PS_LASTSEEN_FAC_KEY = "ps_lastseen_fac_virgilio";   // v26.32 — último facturado_at visto por la estación
 var _ps = null;
 function psPrintedKey(){ return "ps_printed_virgilio_" + cpTodayAR(); }
 function psGetPrinted(){ try { return new Set(JSON.parse(localStorage.getItem(psPrintedKey()) || "[]")); } catch (_e) { return new Set(); } }
@@ -55176,10 +55177,37 @@ async function psPoll(force){
           });
         }
       } catch (_e3) {}
+      // v26.32 — FACTURADO: lo imprime la PC del HELPER, no la que factura (Luis, 02/10: "el excel de
+      // facturación no se va a bajar en la pc que corre el helper"). Lee Facturacion_NP.facturado_at (lo
+      // pone la base al tildar o al bajar el Excel, en cualquier PC). Sólo lo de HOY: una PC que estuvo
+      // apagada no vuelca días viejos. La primera vez arranca desde ahora. Respeta el switch global.
+      try {
+        if (_facPrintGlobal === null) { try { await facPrintCfgLoad(); } catch (_e) {} }
+        if (facPrintIsOn()) {
+          let desde = _ps.lastSeenFac || ""; if (!desde) { try { desde = localStorage.getItem(PS_LASTSEEN_FAC_KEY) || ""; } catch (_e) {} }
+          if (!desde) { _psSetLastFac(new Date().toISOString()); }
+          else {
+            const hoy0 = Date.parse(cpTodayAR() + "T00:00:00-03:00");
+            if (!(Date.parse(desde) >= hoy0)) desde = new Date(hoy0).toISOString();
+            const fs = await fetch(SUPABASE_FACTURACION_NP_ENDPOINT + "?facturado_at=gt." + encodeURIComponent(desde) + "&select=np,tanda,facturado_at&order=facturado_at.asc&limit=200", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : null; });
+            if (fs && fs.length) {
+              const printed = psGetPrinted(); const nuevas = [];
+              fs.forEach(function (x){
+                _psSetLastFac(String(x.facturado_at));
+                const np = String(x.np || "").trim(); const k = "FAC|" + np;
+                if (!np || printed.has(k) || nuevas.some(function (y){ return y.np === np; })) return;
+                psMarkPrinted(k); nuevas.push({ np: np, tanda: String(x.tanda || "").trim().toUpperCase() });
+              });
+              for (const f of nuevas) { try { await facPrintFacturado(f.np, f.tanda); } catch (_e) {} }
+            }
+          }
+        }
+      } catch (_e4) {}
     }
   } catch (_e){ _ps.lastErr = "sin conexión con Supabase"; }
   _psUpdatePollInfo();
 }
+function _psSetLastFac(ts){ _psEnsure(); _ps.lastSeenFac = ts; try { localStorage.setItem(PS_LASTSEEN_FAC_KEY, ts); } catch (_e) {} }
 /* v26.30 — la hoja de la señal de prueba: sólo el texto, grande y centrado. */
 function _psHojaPrueba(txt){
   return '<div style="display:flex;align-items:center;justify-content:center;min-height:880px;font-size:64px;font-weight:800;text-align:center;">' + escapeHtml(String(txt || "")) + '</div>';
@@ -55322,9 +55350,9 @@ function psRender(){
     '<div class="ps-help" id="psPollInfo" style="color:' + ((_ps && _ps.lastErr) ? "#b91c1c" : "#64748b") + ';">' + escapeHtml(_psPollInfoText()) + '</div>' +
     '<div style="margin-top:6px;"><button class="ps-test" style="padding:6px 12px;font-size:12px;" onclick="psPoll(true)">🔄 Revisar ahora</button></div></div>';
   const fon = facPrintIsOn();
-  h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🧾 Auto-imprimir remito FACTURADO al tildar Facturación</span>' +
+  h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🧾 Auto-imprimir remito FACTURADO</span>' +
     '<span class="sup-sw' + (fon ? " on" : "") + '" onclick="facPrintToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
-    '<div class="ps-status ' + (fon ? "on" : "") + '">' + (fon ? "🟢 Activo — imprime el FACTURADO al tildar (ajuste guardado; los celulares nunca imprimen)" : "⚪ Apagado — no imprime el facturado") + '</div></div>';
+    '<div class="ps-status ' + (fon ? "on" : "") + '">' + (fon ? "🟢 Activo — imprime el FACTURADO cuando se factura (ajuste guardado)" : "⚪ Apagado — no imprime el facturado") + '</div></div>';
   const elon = (typeof etlOn === "function") && etlOn();
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🏷️ Etiqueta de lío automática (PILOTO)</span>' +
     '<span class="sup-sw' + (elon ? " on" : "") + '" onclick="etlToggleGlobal()" role="switch"><span class="sup-sw-k"></span></span></div>' +
@@ -55433,6 +55461,9 @@ async function facFacturadoInner(np, tanda){
 /* Se llama en facTickNP tras marcar la NP facturada. En el 1er tic de una PC pregunta
    UNA vez si querés que imprima ahí (y guarda la respuesta); después imprime solo. */
 async function facMaybePrintFacturado(np, tanda){
+  // v26.32 — el FACTURADO lo imprime la estación de la PC del helper (psPoll lee Facturacion_NP), no la PC
+  // que tilda o baja el Excel: así sale una sola vez y en la impresora de su regla. Lo de abajo queda sin uso.
+  return;
   if (_facIsMobile()) return;                      // v10.21 — celulares NUNCA imprimen
   if (_facPrintGlobal === null) { try { await facPrintCfgLoad(); } catch(_e){} }   // asegurar el cache global
   const pref = facPrintPref();
@@ -59146,7 +59177,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.31"></script>
+<script src="importacion.js?v=26.32"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61969,9 +62000,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.31"></script>
-<script src="hotsale.js?v=26.31"></script>
-<script src="estadisticas.js?v=26.31"></script>
+<script src="cobranzas.js?v=26.32"></script>
+<script src="hotsale.js?v=26.32"></script>
+<script src="estadisticas.js?v=26.32"></script>
 
 </body>
 </html>

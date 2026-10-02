@@ -1,3 +1,10 @@
+## Nota v26.32 (2026-10-02) — El FACTURADO sale en la PC del helper, no en la que factura
+
+- La estación de la PC con el helper conectado lee `Facturacion_NP.facturado_at` y manda el remito FACTURADO al helper
+  cuando se tilda o se baja el Excel **en cualquier PC**. La PC que factura ya no imprime ni abre el cuadro.
+- Sólo lo facturado HOY; la primera vez que corre arranca desde ese momento; una vez por NP y día. Respeta el switch
+  global «Auto-imprimir remito FACTURADO» de 🖨️ Cola de impresión.
+
 ## Nota v26.30 (2026-10-02) — Conectar el helper = esta PC imprime sola · señal de prueba IMPT
 
 - ⚙️ Configuración → 🖨️ Helper de impresión → **Conectar** prende la estación de esa PC: imprime sola el picking al

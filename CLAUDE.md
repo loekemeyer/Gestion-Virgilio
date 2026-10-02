@@ -7220,8 +7220,13 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
 - Con el helper conectado + el auto de la estación prendidos, la estación arranca sola al abrir GV (`gvHelperVigilar`).
 - **Conectar = ESTA PC imprime sola** (v26.30, Luis: *"en la compu que lo tenga abierto … las 3 hojas cuando se
   generan"*): «Conectar» prende la estación (`psSetAuto(true)`: picking al **TP**, armado al terminar cada NP = **TAL**)
-  y «Desconectar» la apaga. Un helper conectado antes, sin el switch tocado nunca, la prende solo al abrir GV. El
-  facturado sigue saliendo en la PC donde se tilda o se baja el Excel (D3 pendiente).
+  y «Desconectar» la apaga. Un helper conectado antes, sin el switch tocado nunca, la prende solo al abrir GV.
+- **El FACTURADO lo imprime la PC del helper, NO la que factura** (v26.32, Luis D3: *"el excel de facturación no se va
+  a bajar en la pc que corre el helper"*): la estación lee `Facturacion_NP.facturado_at` (lo pone la base al tildar o
+  bajar el Excel en cualquier PC) y lo manda al helper. Sólo lo de HOY; la primera vez arranca desde ahora
+  (`ps_lastseen_fac_virgilio`); una vez por NP y día. `facMaybePrintFacturado` (la PC que factura) **ya no imprime ni abre
+  el cuadro**. Respeta el switch global FACTURADO de 🖨️ Cola de impresión. Sin la PC del helper abierta no sale; al
+  abrirla, sale lo facturado ese día mientras estuvo cerrada.
 - **Señal de prueba `IMPT`** (v26.30): un evento en `Registros_Produccion_Virgilio` con `opcion = 'IMPT'`,
   `texto` = picking | armado | facturado y `descripcion` = lo que dice la hoja llega por el MISMO sondeo de la estación
   (cada 12 s) y sale por `remitoPrintDoc` → helper con ese tipo. Sólo en una PC con el helper conectado (una estación
@@ -7232,7 +7237,6 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
   values ('0','IMPT','picking','test picking', now(), 'impt-'||gen_random_uuid(), 'gestion');   -- lo escribe quien tenga el «sí»
   delete from public."Registros_Produccion_Virgilio" where opcion = 'IMPT';                        -- después de imprimir
   ```
-- ⚠ El facturado sale en el equipo que tilda: otra PC sin helper → cuadro; un celular → no sale.
 
 - **El FUENTE del helper vive en `tools/helper-impresion/`** (v26.29): C# WinForms, un `.exe` sin instalar ni admin
   (`TcpListener` en loopback), v1.0.0. `compilar.bat` lo compila con el `csc.exe` de .NET Framework 4 que trae

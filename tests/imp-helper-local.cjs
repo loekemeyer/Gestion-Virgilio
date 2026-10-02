@@ -74,12 +74,13 @@ const helper = http.createServer((req, res) => {
   // red: lo de 127.0.0.1 va de verdad al helper falso; Supabase stubbeado
   await p.evaluate(() => {
     const real = window.fetch.bind(window);
-    window.__S = { talRows: [], tpRows: [], imptRows: [], nav: [], imgs: [] };
+    window.__S = { talRows: [], tpRows: [], imptRows: [], facRows: [], nav: [], imgs: [] };
     window.fetch = function (url, opts) {
       const u = String(url);
       if (u.indexOf("http://127.0.0.1:") === 0) return real(url, opts);
       const ok = function (j) { return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(j); } }); };
       if (u.indexOf("opcion=eq.IMPT") >= 0) return ok(window.__S.imptRows);
+      if (u.indexOf("/Facturacion_NP?") >= 0) return ok(window.__S.facRows);
       if (u.indexOf("opcion=eq.TAL") >= 0) return ok(window.__S.talRows);
       if (u.indexOf("opcion=eq.TP") >= 0) return ok(window.__S.tpRows);
       return ok([]);
@@ -178,9 +179,28 @@ const helper = http.createServer((req, res) => {
   out.I_facturado = await p.evaluate(async () => {
     window.facFacturadoInner = async function (np) { return '<div class="rmt-sec">FACTURADO ' + np + '</div>'; };
     window._facIsMobile = function () { return false; }; _facPrintGlobal = "1";
-    await facMaybePrintFacturado("LK 0400", "E52A"); await _gvHelper.cadena;
-    return _gvHelper.log[0].ref === "LK 0400" && _gvHelper.log[0].tipo === "facturado" && _gvHelper.log[0].ok === true;
-  }) && H.reqs.some((x) => x.tipo === "facturado");
+    // v26.32 — la PC que factura NO imprime: el facturado lo saca la estación de la PC del helper
+    const antes = _gvHelper.log.length; window.__S.nav.length = 0;
+    await facMaybePrintFacturado("LK 0399", "E52A"); await _gvHelper.cadena;
+    const noImprimeQuienFactura = _gvHelper.log.length === antes && window.__S.nav.length === 0;
+    // primera vez en la PC: arranca desde ahora, no vuelca lo facturado antes
+    localStorage.removeItem("ps_lastseen_fac_virgilio"); _ps.lastSeenFac = "";
+    const ya = new Date(Date.now() - 60000).toISOString(), ahora = new Date(Date.now() + 1000).toISOString();
+    window.__S.facRows = [{ np: "LK 0398", tanda: "E52A", facturado_at: ya }];
+    await psPoll(true); await new Promise(function (ok) { setTimeout(ok, 300); }); await _gvHelper.cadena;
+    const sinVolcar = _gvHelper.log.length === antes && !!localStorage.getItem("ps_lastseen_fac_virgilio");
+    // después: lo nuevo sale por el helper como facturado, una sola vez
+    _psSetLastFac(ya);
+    window.__S.facRows = [{ np: "LK 0400", tanda: "E52A", facturado_at: ahora }, { np: "LK 0400", tanda: "E52A", facturado_at: ahora }];
+    await psPoll(true);
+    await window.__espera(function () { return _gvHelper.log.some(function (e) { return e.ref === "LK 0400"; }); }, 8000); await _gvHelper.cadena;
+    const n400 = _gvHelper.log.filter(function (e) { return e.ref === "LK 0400"; });
+    await psPoll(true); await new Promise(function (ok) { setTimeout(ok, 300); }); await _gvHelper.cadena;
+    const r = noImprimeQuienFactura && sinVolcar && n400.length === 1 && n400[0].tipo === "facturado" && n400[0].ok === true &&
+      _gvHelper.log.filter(function (e) { return e.ref === "LK 0400"; }).length === 1;
+    window.__S.facRows = [];
+    return r;
+  }) && H.reqs.filter((x) => x.tipo === "facturado").length === 1;
 
   // ---- J. sin respuesta a tiempo → no se repite
   await ctl("demora", 1500);
