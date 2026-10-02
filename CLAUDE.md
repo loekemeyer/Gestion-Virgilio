@@ -7176,26 +7176,14 @@ más actualizado que otro. Si alguien quiere cambiar uno solo NO se puede hacer"
   queda apagado. El Excel sigue el switch y lleva siempre la columna UxB. El ranking es siempre el de cajas (el de Stocks).
 - `sql/get_estadistica_madre_mensual.sql` (en `pagina-LK-copia`), `tests/stk-est-madre-sin-codigo.cjs`.
 
-## ⚠ REGLA (Luis, 2026-10-02, v26.12): cada hoja en SU impresora — el programa de impresión de la PC (sin kiosco)
+## ⛔ RETIRADO (Luis, 2026-10-02, v26.26): el PROGRAMA de impresión de la v26.12 ya NO existe
 
-**Luis:** *"elegir diferentes impresoras conectadas a la máquina … ajeno a la configuración predeterminada de Chrome …
-y activar la impresión automática"*. Chrome no deja que una página vea ni elija impresoras, y la PC del depósito no
-puede abrir el kiosco.
-
-- **Configuración → 🧩 Impresoras**: por hoja (picking · armado · facturado) PC + impresora + Automático + copias,
-  con 🖨️ Prueba y las últimas hojas mandadas. Tabla `GV_Impresion_Regla`.
-- El **programa** (`tools/impresion/`, se copia a la carpeta compartida; doble clic en `Iniciar GV-Impresion.bat`)
-  informa sus impresoras, toma lo suyo de `GV_Impresion_Trabajo`, lo dibuja con el Chrome/Edge de la PC en modo
-  invisible y lo imprime por nombre. Pide la **clave** de la pantalla y la guarda en `clave.txt` (fuera del repo).
-- **Sin PC configurada para una hoja, todo sigue como antes** (estación del navegador / `fac_print_facturado`).
-- Picking y armado los arma cualquier GV de supervisor abierto en una PC; el facturado, el que exporta el Excel ISIS
-  (también desde un celular). La base no deja que una hoja salga dos veces (`clave_unica` tipo:ref).
-- **«Impreso» lo confirma el programa** (marca `Impresion_NP` con origen `programa`); sin la config de impresión,
-  `psPoll` no avanza: una lectura rota no es un «no se imprime».
-- ⚠ **Al agregar una hoja que se imprima sola, pasarla por `gvImpModo(tipo)` + `gvImpEncolar`** y sumar el tipo al
-  `check` de las dos tablas y a `GV_IMP_TIPOS`.
-
-`sql/gv_impresion_programa_v2611.sql`, `tests/imp-programa.cjs`, `tests/imp-agente-ps.cjs`.
+**Luis:** *"me quedo con mi helper, sacá lo otro"*. Se sacaron del front la cola en la base (`gv_imp_encolar`), la
+pantalla 🧩 Impresoras (PC + impresora + automático por hoja), `tools/impresion/` (GV-Impresion.ps1) y sus tests
+(`imp-programa`, `imp-agente-ps`). **La impresión sin cuadro es SÓLO el helper local de abajo.** No volver a poner
+una cola de impresión en la base ni un programa que lea de ella. Los objetos de la base (`GV_Impresion_*`, `gv_imp_*`
+de impresión) quedan hasta que Luis diga «sí» al drop (SQL en la cabecera de `sql/gv_impresion_programa_v2611.sql`);
+al 02/10 tenían 0 PC, 0 reglas y 0 hojas.
 
 ## ⚠ REGLA (Luis, 2026-10-02, v26.24): el HELPER LOCAL de impresión (127.0.0.1:17777) — por dispositivo, en PDF
 
@@ -7203,8 +7191,8 @@ Luis tiene un helper en la PC del depósito (servidor HTTP en `127.0.0.1:17777`,
 tipo → impresora configuradas EN EL HELPER). Contrato: `GET /` → «Impresion Virgilio OK»; `POST /print?tipo=<picking|
 armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`.
 
-- Se prende en **Configuración → 🧩 Impresoras → 🖥️ Helper local en ESTA PC** (switch, puerto, estado, Prueba). Es
-  **por dispositivo** (`localStorage gv_helper_imp_v1`): sin el switch el navegador NUNCA le pega a 127.0.0.1 (en un
+- Se prende en **⚙️ Configuración → tarjeta «🖨️ Impresión sin cuadro — helper local en esta PC»** (v26.26: switch,
+  puerto, estado, hoja de prueba por tipo y las últimas hojas). Es **por dispositivo** (`localStorage gv_helper_imp_v1`): sin el switch el navegador NUNCA le pega a 127.0.0.1 (en un
   celular Chrome pediría permiso de red local para nada).
 - Entra por **`remitoPrintDoc(inner, tipo, ref)`**: al agregar un camino que imprima una de esas hojas, pasarle el
   `tipo`, o sale por el cuadro aunque el helper esté prendido. Sin tipo = navegador (`_remitoPrintNavegador`).
@@ -7212,7 +7200,8 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
   demanda) → jsPDF A4, márgenes 12 mm, varias páginas si hace falta. En FILA, una hoja por vez.
 - **Helper que no contesta o que no imprimió nada → la hoja sale por el navegador** (una hoja que no salió no se pierde
   callada). **Más de 60 s sin respuesta → NO se repite** (puede haber salido); queda «sin confirmar» en la tarjeta.
-- **Orden: programa v26.12 (GV_Impresion_Regla con PC) > helper > navegador.** En modo programa el navegador no imprime.
+- **Orden: helper > navegador.** (El programa de la v26.12 se sacó en la v26.26.) Qué sale SOLO lo siguen decidiendo los
+  switches de 🖨️ Cola de impresión (auto-imprimir remitos = armado y picking; FACTURADO global); la tarjeta avisa si falta uno.
 - Con el helper + el auto de la estación prendidos, la estación arranca sola al abrir GV (`gvImpVigilar`).
 - ⚠ El facturado sale en el equipo que tilda: otra PC sin helper → cuadro; un celular → no sale.
 

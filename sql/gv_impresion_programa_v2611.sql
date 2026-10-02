@@ -1,3 +1,6 @@
+-- ⛔ RETIRADO EN LA v26.26 (Luis, 02/10/2026: "me quedo con mi helper, sacá lo otro").
+-- El front ya no usa nada de esto. Los objetos se borran con el ROLLBACK de abajo cuando Luis diga «sí».
+-- Al 02/10: GV_Impresion_PC 0 filas · _Regla 0 · _Trabajo 0 · _Clave 1 (la clave del programa) · 0 crons · 0 centinelas.
 -- =====================================================================
 -- v26.11 (Luis, 02/10/2026) — IMPRESIÓN POR PROGRAMA EN LA PC (sin kiosco de Chrome)
 -- (La app salió como v26.12: otra sesión publicó la v26.11 en el medio. En la base las funciones

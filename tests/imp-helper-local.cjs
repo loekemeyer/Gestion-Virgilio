@@ -14,8 +14,10 @@
      I. La estación (psPoll) manda el armado al helper; pkHojaImprimir manda picking;
         facMaybePrintFacturado manda facturado.
      J. Sin respuesta en el tiempo de espera → NO se repite por el navegador (puede haber salido).
-     K. Configuración → Impresoras dibuja la tarjeta del helper (🟢) y la Prueba llega con su tipo.
-     L. gvImpVigilar arranca la estación sola con helper + auto de la estación.
+     K. ⚙️ Configuración dibuja la tarjeta del helper (🟢, puerto, pruebas) y la Prueba llega con su tipo;
+        el switch de la tarjeta prende y apaga el helper de este navegador.
+     L. gvHelperVigilar arranca la estación sola con helper + auto de la estación.
+     M. v26.26 — el programa de la v26.12 se sacó: ni 🧩 Impresoras, ni cola en la base, ni gv_imp_encolar.
    Sale 1 si algo falla. */
 const path = require("path");
 const http = require("http");
@@ -76,7 +78,6 @@ const helper = http.createServer((req, res) => {
       const u = String(url);
       if (u.indexOf("http://127.0.0.1:") === 0) return real(url, opts);
       const ok = function (j) { return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(j); } }); };
-      if (u.indexOf("rpc/gv_imp_config") >= 0) return ok({ pcs: [], reglas: [], clave: null });
       if (u.indexOf("opcion=eq.TAL") >= 0) return ok(window.__S.talRows);
       if (u.indexOf("opcion=eq.TP") >= 0) return ok(window.__S.tpRows);
       return ok([]);
@@ -188,28 +189,44 @@ const helper = http.createServer((req, res) => {
   }, HOJA);
   await ctl("demora", 0); await p.waitForTimeout(1300);
 
-  // ---- K. pantalla Impresoras + Prueba
+  // ---- K. ⚙️ Configuración: tarjeta del helper + Prueba
   H.reqs.length = 0;
   out.K_tarjeta = await p.evaluate(async () => {
-    window.__isSupervisor = true; openImpresoras();
+    window.__isSupervisor = true; window.requireSupervisor = function () { return true; }; openConfiguracion();
     await window.__espera(function () { var c = document.getElementById("gvHelperCard"); return c && /🟢/.test(c.textContent); }, 6000);
     const c = document.getElementById("gvHelperCard");
     return !!c && /🟢/.test(c.textContent) && !!c.querySelector('input[type="number"]') && /Picking/.test(c.textContent) && /Facturado/.test(c.textContent);
   });
-  out.K_prueba = await p.evaluate(async () => { await gvHelperPrueba("facturado"); return /✓/.test(document.getElementById("gvImpMsg").textContent); }) && (H.reqs[0] || {}).tipo === "facturado";
-  await p.evaluate(() => closeImpresoras());
+  out.K_prueba = await p.evaluate(async () => { await gvHelperPrueba("facturado"); const m = document.getElementById("gvHelperMsg"); return !!m && /✓/.test(m.textContent); }) && (H.reqs[0] || {}).tipo === "facturado";
+  out.K_switch = await p.evaluate(async () => {
+    const sw = document.getElementById("gvHelperSw"); if (!sw) return false;
+    sw.click(); await window.__espera(function () { return !gvHelperActivo(); }, 2000);
+    const apagado = !gvHelperActivo() && !document.getElementById("gvHelperSw").classList.contains("on");
+    document.getElementById("gvHelperSw").click(); await window.__espera(function () { return gvHelperActivo(); }, 2000);
+    return apagado && gvHelperActivo() && document.getElementById("gvHelperSw").classList.contains("on");
+  });
+  await p.evaluate(() => closeConfiguracion());
 
   // ---- L. la estación arranca sola con helper + auto
   out.L_vigilar = await p.evaluate(async () => {
     if (_ps && _ps.timer) { clearInterval(_ps.timer); _ps.timer = null; }
     window.__isSupervisor = true; window.__tvKioskMode = false; localStorage.setItem("ps_auto_virgilio", "1");
-    await gvImpVigilar(); await window.__espera(function () { return !!(_ps && _ps.timer); }, 3000);   // psStart es async
+    await gvHelperVigilar(); await window.__espera(function () { return !!(_ps && _ps.timer); }, 3000);   // psStart es async
     const r = !!(_ps && _ps.timer);
     if (_ps && _ps.timer) { clearInterval(_ps.timer); _ps.timer = null; }
-    gvHelperGuardar({ on: false }); await gvImpVigilar(); await new Promise(function (ok) { setTimeout(ok, 600); });
+    gvHelperGuardar({ on: false }); await gvHelperVigilar(); await new Promise(function (ok) { setTimeout(ok, 600); });
     const apagado = !(_ps && _ps.timer);
     return r && apagado;
   });
+
+  // ---- M. el programa de la v26.12 no volvió (Luis, 02/10: "me quedo con mi helper, sacá lo otro")
+  out.M_sinPrograma = await p.evaluate(() => {
+    const cfg = document.getElementById("configOverlay");
+    return typeof window.openImpresoras === "undefined" && typeof window.gvImpEncolar === "undefined" &&
+      typeof window.gvImpModo === "undefined" && !!cfg && cfg.innerHTML.indexOf("openImpresoras") < 0 &&
+      !!document.getElementById("gvHelperCfgRow");
+  });
+  out.M_sinRpcPrograma = !require("fs").readFileSync(require("path").join(__dirname, "..", "index.html"), "latin1").match(/gv_imp_(encolar|config|regla_guardar|trabajos|agente)/);
 
   await b.close(); helper.close();
   const fallas = Object.keys(out).filter((k) => out[k] !== true);

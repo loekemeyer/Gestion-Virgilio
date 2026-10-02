@@ -31172,6 +31172,10 @@ despachados, m³ pendientes, unidades vendidas y $ facturado. Los reportes viven
 
 ## §3.v2612 — Impresión por programa en la PC: `GV_Impresion_*` + `gv_imp_*` (Luis, 02/10/2026)
 
+> ⛔ **RETIRADO en la v26.26** (Luis, 02/10: *"me quedo con mi helper, sacá lo otro"*). El front ya no llama a ninguna
+> de estas RPC. Los objetos quedan **sin uso** (0 PC, 0 reglas, 0 trabajos, 1 clave) hasta que Luis diga «sí» al drop de
+> la cabecera de `sql/gv_impresion_programa_v2611.sql`. La impresión sin cuadro es el helper local (`127.0.0.1`), que no toca la base.
+
 Se aplicó como migración `gv_impresion_programa_v2611` y los comentarios de las funciones dicen **v26.11**:
 la app salió como **v26.12** porque otra sesión publicó la v26.11 en el medio. No cambiar esa etiqueta.
 

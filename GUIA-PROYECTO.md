@@ -1,3 +1,17 @@
+## Nota v26.26 (2026-10-02) — Se SACA el programa de impresión de la v26.12; queda sólo el helper local
+
+Luis: *"me quedo con mi helper, sacá lo otro"* · *"poneme la configuración de eso en el módulo configuración"*.
+
+- **⚙️ Configuración** tiene la tarjeta **«🖨️ Impresión sin cuadro — helper local en esta PC»**: switch, puerto,
+  estado (🟢 abierto / 🔴 no contesta), hoja de prueba por tipo, aviso si falta prender el auto-imprimir de la Cola de
+  impresión, y las últimas 8 hojas con su resultado. Es por navegador (`localStorage gv_helper_imp_v1`).
+- Se fueron: la pantalla 🧩 Impresoras, la cola en la base (`gv_imp_encolar` y compañía), los reintentos
+  `gv_imp_pend_v1`, `tools/impresion/` y los tests `imp-programa` / `imp-agente-ps`. `psPoll` y el facturado vuelven a
+  lo de la v26.11: el navegador imprime (con el helper prendido, por el helper).
+- La base todavía tiene `GV_Impresion_PC/_Regla/_Trabajo/_Clave` y las `gv_imp_*` de impresión, sin uso (0 filas salvo
+  la clave): se borran con el «sí» de Luis.
+
+`tests/imp-helper-local.cjs` (bloques K y M: la tarjeta en Configuración y que el programa no vuelva).
 ## Nota v26.25 (2026-10-02) — Métricas del picking POR PASO (D12), aparte del PKC
 
 Para armar el «tiempo estimado de la tanda» y evaluar al operario. El PKC guarda sólo la hora de la **última**
@@ -46,6 +60,8 @@ SumatraPDF, con reglas tipo → impresora configuradas **en el helper**. GV ahor
 `tests/imp-helper-local.cjs` (helper falso en 127.0.0.1, mide el PDF que le llega).
 
 ## Nota v26.12 (2026-10-02) — Cada hoja en su impresora, sin el kiosco de Chrome: el programa de impresión de la PC
+
+> ⛔ **RETIRADO en la v26.26** (Luis: *"me quedo con mi helper"*): queda como historia. Lo vigente es el helper local (v26.24 / v26.26).
 
 Luis: *"elegir diferentes impresoras conectadas a la máquina para elegir dónde se imprime cada cosa (ajeno a la
 configuración predeterminada de Chrome) … y activar la impresión automática"*. La PC del depósito no puede abrir
