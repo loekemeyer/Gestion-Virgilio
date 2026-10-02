@@ -74,11 +74,12 @@ const helper = http.createServer((req, res) => {
   // red: lo de 127.0.0.1 va de verdad al helper falso; Supabase stubbeado
   await p.evaluate(() => {
     const real = window.fetch.bind(window);
-    window.__S = { talRows: [], tpRows: [], nav: [], imgs: [] };
+    window.__S = { talRows: [], tpRows: [], imptRows: [], nav: [], imgs: [] };
     window.fetch = function (url, opts) {
       const u = String(url);
       if (u.indexOf("http://127.0.0.1:") === 0) return real(url, opts);
       const ok = function (j) { return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(j); } }); };
+      if (u.indexOf("opcion=eq.IMPT") >= 0) return ok(window.__S.imptRows);
       if (u.indexOf("opcion=eq.TAL") >= 0) return ok(window.__S.talRows);
       if (u.indexOf("opcion=eq.TP") >= 0) return ok(window.__S.tpRows);
       return ok([]);
@@ -207,7 +208,7 @@ const helper = http.createServer((req, res) => {
   out.K_desconectar = await p.evaluate(async () => {
     const b = document.getElementById("gvHelperDesconectar"); if (!b) return false;
     b.click(); await window.__espera(function () { return !gvHelperActivo(); }, 2000);
-    return !gvHelperActivo() && /Desconectado/.test(document.getElementById("gvHelperEst").textContent) && !document.getElementById("gvHelperDesconectar");
+    return !gvHelperActivo() && !psIsAuto() && /Desconectado/.test(document.getElementById("gvHelperEst").textContent) && !document.getElementById("gvHelperDesconectar");
   });
   out.K_conectarMuerto = await p.evaluate(async (pt) => {
     document.getElementById("gvHelperPuerto").value = String(pt);
@@ -218,7 +219,7 @@ const helper = http.createServer((req, res) => {
     document.getElementById("gvHelperPuerto").value = String(pt);
     document.getElementById("gvHelperConectar").click();
     await window.__espera(function () { return gvHelperActivo() && /🟢/.test((document.getElementById("gvHelperEst") || {}).textContent || ""); }, 4000);
-    const ok = gvHelperActivo() && gvHelperCfg().puerto === pt && /✓/.test(document.getElementById("gvHelperMsg").textContent);
+    const ok = gvHelperActivo() && psIsAuto() && gvHelperCfg().puerto === pt && /✓/.test(document.getElementById("gvHelperMsg").textContent);   // v26.30: conectar = imprime sola
     closeHelperImpresion();
     return ok && !document.getElementById("gvHelperOv").classList.contains("show");
   }, PUERTO);
@@ -241,6 +242,33 @@ const helper = http.createServer((req, res) => {
     gvHelperGuardar({ on: false }); await gvHelperVigilar(); await new Promise(function (ok) { setTimeout(ok, 600); });
     const apagado = !(_ps && _ps.timer);
     return r && apagado;
+  });
+
+  // ---- N. v26.30 — señal de prueba IMPT: llega por el sondeo de la estación y sale por el helper con su tipo
+  H.reqs.length = 0;
+  out.N_senalPrueba = await p.evaluate(async () => {
+    if (_ps && _ps.timer) { clearInterval(_ps.timer); _ps.timer = null; }
+    gvHelperGuardar({ on: true }); localStorage.setItem("ps_auto_virgilio", "1"); _gvHelper.log.length = 0;
+    window.__S.talRows = []; window.__S.tpRows = [];
+    window.__S.imptRows = [
+      { id: "a1", texto: "picking", descripcion: "test picking", ts_cliente: "2099-01-02T10:00:00-03:00" },
+      { id: "a2", texto: "armado", descripcion: "test armado", ts_cliente: "2099-01-02T10:00:01-03:00" },
+      { id: "a3", texto: "facturado", descripcion: "test factura", ts_cliente: "2099-01-02T10:00:02-03:00" },
+      { id: "a4", texto: "cualquiera", descripcion: "no va", ts_cliente: "2099-01-02T10:00:03-03:00" }];
+    await psPoll(true);
+    await window.__espera(function () { return _gvHelper.log.length >= 3; }, 15000); await _gvHelper.cadena;
+    const tipos = _gvHelper.log.map(function (e) { return e.tipo; }).sort().join(",");
+    const antes = _gvHelper.log.length;
+    _ps.lastSeenImpt = "";   // vuelve a leer las mismas: no se repiten (dedup por id)
+    await psPoll(true); await new Promise(function (ok) { setTimeout(ok, 400); }); await _gvHelper.cadena;
+    return tipos === "armado,facturado,picking" && _gvHelper.log.length === antes &&
+      /test factura/.test(_psHojaPrueba("test factura"));
+  }) && ["picking", "armado", "facturado"].every((t) => H.reqs.filter((x) => x.tipo === t).length === 1);
+  out.N_sinHelperNoImprime = await p.evaluate(async () => {
+    gvHelperGuardar({ on: false }); _gvHelper.log.length = 0; window.__S.nav.length = 0;
+    window.__S.imptRows = [{ id: "b1", texto: "armado", descripcion: "test armado", ts_cliente: "2099-01-03T10:00:00-03:00" }];
+    _ps.lastSeenImpt = ""; await psPoll(true); await new Promise(function (ok) { setTimeout(ok, 400); });
+    return _gvHelper.log.length === 0 && window.__S.nav.length === 0;
   });
 
   // ---- M. el programa de la v26.12 no volvió (Luis, 02/10: "me quedo con mi helper, sacá lo otro")

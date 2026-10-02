@@ -1,3 +1,11 @@
+## Nota v26.30 (2026-10-02) — Conectar el helper = esta PC imprime sola · señal de prueba IMPT
+
+- ⚙️ Configuración → 🖨️ Helper de impresión → **Conectar** prende la estación de esa PC: imprime sola el picking al
+  TP y el armado al terminar cada NP (TAL), por el helper. **Desconectar** la apaga.
+- Evento **`IMPT`** (texto = picking | armado | facturado, descripcion = el texto de la hoja): la estación de una PC con
+  helper lo toma en su sondeo y manda una hoja que sólo dice ese texto. Sirve para probar las reglas del helper "como
+  si fuera por trigger". Nadie más lee `IMPT`; se borra después de la prueba.
+
 ## Nota v26.29 (2026-10-02) — El fuente del helper de impresión vive en `tools/helper-impresion/`
 
 - C# WinForms (v1.0.0), un `.exe` sin instalar ni admin; `compilar.bat` lo arma con el `csc.exe` de Windows.

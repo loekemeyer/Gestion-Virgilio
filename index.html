@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.29"></script>
+<script type="module" src="recepcion.js?v=26.30"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10478,7 +10478,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.29";
+const APP_VERSION = "v26.30";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -55046,13 +55046,17 @@ async function gvHelperConectar(){
   const vivo = await helperVivo();
   if (vivo) {
     gvHelperGuardar({ on: true }); _gvHelper.vivo = true; _gvHelper.pingTs = Date.now();
-    _gvHelper.msg = "✓ Conectado: picking, armado y facturado salen por el helper.";
+    // v26.30 — conectar = ESTA PC imprime sola (Luis, 02/10: "en la compu que lo tenga abierto … mandar a
+    // imprimir las 3 hojas cuando se generan"): prende la estación (picking al TP, armado al terminar cada NP).
+    if (!_facIsMobile()) { try { psSetAuto(true); } catch (_e) {} }
+    _gvHelper.msg = "✓ Conectado: esta PC imprime sola el picking (al TP) y el armado (al terminar cada NP); el facturado, al tildar o bajar el Excel acá.";
   } else _gvHelper.msg = "✗ No contesta 127.0.0.1:" + p + ". Abrí el helper en esta PC y probá de nuevo.";
   gvHelperRender(false);
   try { gvHelperVigilar(); } catch (_e) {}
 }
 function gvHelperDesconectar(){
   gvHelperGuardar({ on: false });
+  try { psSetAuto(false); } catch (_e) {}   // v26.30 — sin helper, esta PC deja de imprimir sola
   _gvHelper.msg = "Desconectado: las hojas salen con el cuadro de impresión.";
   gvHelperRender(false);
 }
@@ -55061,6 +55065,10 @@ function gvHelperDesconectar(){
 async function gvHelperVigilar(){
   try {
     if (!window.__isSupervisor || window.__tvKioskMode) return;
+    if (!_facIsMobile() && gvHelperActivo()) {
+      let nunca = false; try { nunca = localStorage.getItem(PS_AUTO_KEY) === null; } catch (_e) {}
+      if (nunca) { try { localStorage.setItem(PS_AUTO_KEY, "1"); } catch (_e) {} }   // v26.30: conectado = imprime solo
+    }
     if (!_facIsMobile() && gvHelperActivo() && psIsAuto() && !(_ps && _ps.timer)) psStart();
   } catch (_e) {}
 }
@@ -55149,8 +55157,32 @@ async function psPoll(force){
         if (nuevas.length) await pkHojaImprimir(nuevas, true, "estacion");
       }
     } catch (_e2) {}
+    // v26.30 — SEÑAL DE PRUEBA (Luis, 02/10: "testearlo como si fuera por trigger"): un evento IMPT
+    // (texto = picking | armado | facturado, descripcion = lo que dice la hoja) llega por el mismo
+    // sondeo que el TP y el TAL y sale por el mismo camino (remitoPrintDoc → helper). Sólo en una PC con
+    // el helper conectado: una estación sin helper no abre el cuadro por una prueba. Ningún otro lector
+    // mira IMPT (todos filtran opcion por igualdad) y no dispara triggers.
+    if (gvHelperActivo()) {
+      try {
+        const evs = await fetch(SUPABASE_TABLE_ENDPOINT + "?opcion=eq.IMPT&ts_cliente=gt." + encodeURIComponent(_ps.lastSeenImpt || since) + "&select=id,texto,descripcion,ts_cliente&order=ts_cliente.asc&limit=20", { headers: psH(), cache: "no-store" }).then(function (r){ return r.ok ? r.json() : []; });
+        if (evs.length) {
+          const printed = psGetPrinted();
+          evs.forEach(function (ev){
+            _ps.lastSeenImpt = String(ev.ts_cliente);
+            const tipo = String(ev.texto || "").trim().toLowerCase(); const k = "IMPT|" + ev.id;
+            if (!GV_HELPER_TIPOS[tipo] || printed.has(k)) return;
+            psMarkPrinted(k);
+            remitoPrintDoc(_psHojaPrueba(ev.descripcion || ("test " + tipo)), tipo, "PRUEBA");
+          });
+        }
+      } catch (_e3) {}
+    }
   } catch (_e){ _ps.lastErr = "sin conexión con Supabase"; }
   _psUpdatePollInfo();
+}
+/* v26.30 — la hoja de la señal de prueba: sólo el texto, grande y centrado. */
+function _psHojaPrueba(txt){
+  return '<div style="display:flex;align-items:center;justify-content:center;min-height:880px;font-size:64px;font-weight:800;text-align:center;">' + escapeHtml(String(txt || "")) + '</div>';
 }
 function _psHhmm(ts){ try { return new Date(ts).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); } catch (_e) { return ""; } }
 function _psPollInfoText(){
@@ -59114,7 +59146,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.29"></script>
+<script src="importacion.js?v=26.30"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61937,9 +61969,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.29"></script>
-<script src="hotsale.js?v=26.29"></script>
-<script src="estadisticas.js?v=26.29"></script>
+<script src="cobranzas.js?v=26.30"></script>
+<script src="hotsale.js?v=26.30"></script>
+<script src="estadisticas.js?v=26.30"></script>
 
 </body>
 </html>
