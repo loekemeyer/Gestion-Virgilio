@@ -1,3 +1,27 @@
+## Nota v26.24 (2026-10-02) — Helper local de impresión (127.0.0.1:17777, SumatraPDF)
+
+Luis tiene un helper en la PC del depósito que abre `http://127.0.0.1:17777` e imprime PDF en silencio con
+SumatraPDF, con reglas tipo → impresora configuradas **en el helper**. GV ahora le manda las hojas.
+
+| qué | cómo |
+|---|---|
+| dónde se prende | **Configuración → 🧩 Impresoras → 🖥️ Helper local en ESTA PC**: switch + puerto (17777 por defecto) + estado 🟢/🔴 + 🖨️ Prueba por hoja. Es **por dispositivo** (`localStorage gv_helper_imp_v1`) |
+| qué entra | todo lo que pasa por `remitoPrintDoc(inner, tipo, ref)` con tipo `picking` / `armado` / `facturado`: estación (psPoll), Cola de impresión, «Ver picking/armado» de la PPP, remito de armado, facturado al tildar |
+| el PDF | la misma hoja (mismo CSS y auto-ajuste) dibujada en un iframe → `html2canvas` (vendor, a demanda) → jsPDF A4 con márgenes de 12 mm; hojas largas en varias páginas, cortadas en la fila con menos tinta |
+| orden | en fila, una hoja por vez (`_gvHelper.cadena`) |
+| si el helper no contesta o no imprime nada | la hoja sale por el **navegador** (cuadro) y queda en la tarjeta «→ navegador» |
+| si tarda más de 60 s | **no** se repite (puede haber salido): queda «sin confirmar» |
+| arranque | con el helper + el auto de la estación prendidos, la estación arranca sola al abrir GV (`gvImpVigilar`) |
+
+- Precedencia: **programa v26.12 (GV_Impresion_Regla con PC) > helper > navegador.**
+- Un celular o una PC sin el switch **nunca** le pega a 127.0.0.1.
+- Para que salgan SOLAS siguen haciendo falta los switches de siempre en 🖨️ Cola de impresión (auto-imprimir
+  remitos = armado y picking; FACTURADO global). La tarjeta avisa cuál falta.
+- ⚠ El facturado se imprime en el equipo que tilda: si se factura desde otra PC, esa PC necesita su propio helper,
+  si no sale por el cuadro (y en un celular no sale).
+
+`tests/imp-helper-local.cjs` (helper falso en 127.0.0.1, mide el PDF que le llega).
+
 ## Nota v26.12 (2026-10-02) — Cada hoja en su impresora, sin el kiosco de Chrome: el programa de impresión de la PC
 
 Luis: *"elegir diferentes impresoras conectadas a la máquina para elegir dónde se imprime cada cosa (ajeno a la

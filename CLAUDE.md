@@ -7197,6 +7197,27 @@ puede abrir el kiosco.
 
 `sql/gv_impresion_programa_v2611.sql`, `tests/imp-programa.cjs`, `tests/imp-agente-ps.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-02, v26.24): el HELPER LOCAL de impresión (127.0.0.1:17777) — por dispositivo, en PDF
+
+Luis tiene un helper en la PC del depósito (servidor HTTP en `127.0.0.1:17777`, imprime PDF con SumatraPDF, reglas
+tipo → impresora configuradas EN EL HELPER). Contrato: `GET /` → «Impresion Virgilio OK»; `POST /print?tipo=<picking|
+armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`.
+
+- Se prende en **Configuración → 🧩 Impresoras → 🖥️ Helper local en ESTA PC** (switch, puerto, estado, Prueba). Es
+  **por dispositivo** (`localStorage gv_helper_imp_v1`): sin el switch el navegador NUNCA le pega a 127.0.0.1 (en un
+  celular Chrome pediría permiso de red local para nada).
+- Entra por **`remitoPrintDoc(inner, tipo, ref)`**: al agregar un camino que imprima una de esas hojas, pasarle el
+  `tipo`, o sale por el cuadro aunque el helper esté prendido. Sin tipo = navegador (`_remitoPrintNavegador`).
+- El PDF lo arma el navegador: la hoja en un iframe (mismo CSS y `_rmtAutofit`) → `vendor/html2canvas.min.js` (a
+  demanda) → jsPDF A4, márgenes 12 mm, varias páginas si hace falta. En FILA, una hoja por vez.
+- **Helper que no contesta o que no imprimió nada → la hoja sale por el navegador** (una hoja que no salió no se pierde
+  callada). **Más de 60 s sin respuesta → NO se repite** (puede haber salido); queda «sin confirmar» en la tarjeta.
+- **Orden: programa v26.12 (GV_Impresion_Regla con PC) > helper > navegador.** En modo programa el navegador no imprime.
+- Con el helper + el auto de la estación prendidos, la estación arranca sola al abrir GV (`gvImpVigilar`).
+- ⚠ El facturado sale en el equipo que tilda: otra PC sin helper → cuadro; un celular → no sale.
+
+`tests/imp-helper-local.cjs` (helper falso en 127.0.0.1: mide el PDF que le llega, el orden, el fallback y el timeout).
+
 ## ⚠ REGLA (Luis, 2026-10-02, v26.16 · v26.20): 📑 ESTADÍSTICAS ISIS — ventas y pedidos por artículo sin entrar a ISIS
 
 Panel supervisor → **📑 Estadísticas ISIS — ventas y pedidos** (`openEstadisticasIsis`, `estadisticas.js`): mes o

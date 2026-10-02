@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.23"></script>
+<script type="module" src="recepcion.js?v=26.24"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10478,7 +10478,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.23";
+const APP_VERSION = "v26.24";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37447,7 +37447,7 @@ async function colaImprimirTodas() {
     var ds = await _armadoRemitoDataForItems(items);
     // imprimir serializado (1 hoja cada ~2.6 s, como la estación); con kiosk salen solas.
     var k = 0;
-    var next = function () { if (k >= ds.length) return; try { remitoPrintDoc(armadoRemitoInnerHtml(ds[k])); } catch (_e) {} k++; if (k < ds.length) setTimeout(next, 2600); };
+    var next = function () { if (k >= ds.length) return; try { remitoPrintDoc(armadoRemitoInnerHtml(ds[k]), "armado", ds[k].np); } catch (_e) {} k++; if (k < ds.length) setTimeout(next, 2600); };
     next();
     colaImpMarcarImpresas(items.map(function (it) { return it.np; }), "cola");
     colaImpStatus("🖨️ Mandé a imprimir " + ds.length + " remito(s) de armado.", true);
@@ -54480,7 +54480,7 @@ async function pkHojaDatos(tandas){
 async function pkHojaImprimir(tandas, marcar, origen){
   var ds = await pkHojaDatos(tandas);
   var k = 0;
-  var next = function (){ if (k >= ds.length) return; try { remitoPrintDoc(pkHojaHtml(ds[k])); } catch (_e){} k++; if (k < ds.length) setTimeout(next, 2600); };
+  var next = function (){ if (k >= ds.length) return; try { remitoPrintDoc(pkHojaHtml(ds[k]), "picking", ds[k].tanda); } catch (_e){} k++; if (k < ds.length) setTimeout(next, 2600); };
   next();
   if (marcar !== false) { try { colaImpMarcarImpresas(ds.map(function (d){ return PK_HOJA_PREFIJO + d.tanda; }), origen || "cola"); } catch (_e){} }
   return ds.length;
@@ -54532,7 +54532,7 @@ async function pgaVerPicking(tanda){
   var d = null;
   try { var ds = await pkHojaDatos([tanda]); d = ds && ds[0]; } catch (_e){}
   if (!d){ gvHojaPreview('<div style="padding:28px;color:#64748b;">No pude traer el picking de ' + escapeHtml(tanda) + '. Probá de nuevo.</div>', null); return; }
-  gvHojaPreview(pkHojaHtml(d), function (){ try { remitoPrintDoc(pkHojaHtml(d)); } catch (_e){} });
+  gvHojaPreview(pkHojaHtml(d), function (){ try { remitoPrintDoc(pkHojaHtml(d), "picking", d.tanda); } catch (_e){} });
 }
 /* Datos de armado por TANDA: una fila por NP (ISIS + web), con el resumen del TAL si ya se
    armó. Sin TAL el remito sale en blanco (sólo cabecera), que es lo que se pidió. */
@@ -54575,7 +54575,7 @@ async function pgaVerArmado(tanda){
   if (!document.getElementById("rmtSheetCss")){ var st = document.createElement("style"); st.id = "rmtSheetCss"; st.textContent = REMITO_SHEET_CSS; document.head.appendChild(st); }
   var inners = rows.map(function (r){ return armadoRemitoInnerHtml(armadoRemitoData(r)); });
   var html = inners.map(function (h){ return '<div class="rmt-sheet" style="margin:0 auto 16px;">' + h + '</div>'; }).join('');
-  gvHojaPreview(html, function (){ var k = 0; var next = function (){ if (k >= inners.length) return; try { remitoPrintDoc(inners[k]); } catch (_e){} k++; if (k < inners.length) setTimeout(next, 2400); }; next(); });
+  gvHojaPreview(html, function (){ var k = 0; var next = function (){ if (k >= inners.length) return; try { remitoPrintDoc(inners[k], "armado", rows[k].np); } catch (_e){} k++; if (k < inners.length) setTimeout(next, 2400); }; next(); });
 }
 function armadoRemitoInnerHtml(d, tipo){
   tipo = (tipo === "FACTURADO") ? "FACTURADO" : "ARMADO";
@@ -54630,10 +54630,28 @@ function showRemitoArmado(np){
   ov.classList.add("show");
 }
 function closeRemito(){ const ov = document.getElementById("remitoPrint"); if (ov) ov.classList.remove("show"); }
-function remitoDoPrint(){ remitoPrintDoc(_remitoInner); }
+function remitoDoPrint(){ remitoPrintDoc(_remitoInner, "armado"); }
 /* Imprime SOLO el remito en un iframe aislado (sin popup, sin páginas en blanco del
-   resto de la página). Reusable para el auto-print del TAP más adelante. */
-function remitoPrintDoc(inner){
+   resto de la página). Reusable para el auto-print del TAP más adelante.
+   v26.24 — con `tipo` (picking / armado / facturado) y el HELPER LOCAL prendido en esta PC,
+   la hoja va al helper en PDF (gvHelperEncolar); si no, sale por el navegador como siempre. */
+function remitoPrintDoc(inner, tipo, ref){
+  if (!inner) return;
+  if (tipo && GV_HELPER_TIPOS[tipo] && gvHelperActivo()) { gvHelperEncolar(tipo, inner, ref); return; }
+  _remitoPrintNavegador(inner);
+}
+/* El auto-ajuste de letra de la hoja: alto útil A4 ≈ 1010 px; TOPE 16 px para que un remito
+   con POCO contenido (ej. hoja de prueba) NO agrande la letra al absurdo (v6.40). Lo usan el
+   navegador y el PDF del helper, así las dos salidas son la misma hoja. */
+function _rmtAutofit(el){
+  try {
+    if (!el) return;
+    const TARGET = 1010; let lo = 11, hi = 16, best = 15;
+    for (let i = 0; i < 18; i++){ const mid = (lo + hi) / 2; el.style.fontSize = mid + "px"; if (el.scrollHeight <= TARGET){ best = mid; lo = mid; } else { hi = mid; } }
+    el.style.fontSize = best + "px";
+  } catch (_e) {}
+}
+function _remitoPrintNavegador(inner){
   if (!inner) return;
   const ifr = document.createElement("iframe");
   ifr.setAttribute("aria-hidden", "true");
@@ -54645,18 +54663,242 @@ function remitoPrintDoc(inner){
   doc.open();
   doc.write('<!doctype html><html><head><meta charset="utf-8"><title>Remito</title><style>' + REMITO_PRINT_CSS + '</style></head><body><div class="rmt-sheet" id="rmtFit">' + inner + '</div></body></html>');
   doc.close();
-  function autofit(){
-    try {
-      const el = doc.getElementById("rmtFit"); if (!el) return;
-      const TARGET = 1010; let lo = 11, hi = 16, best = 15;   // alto útil A4 ≈ 1010px; TOPE 16px para que un remito con POCO contenido (ej. hoja de prueba) NO agrande la letra al absurdo (v6.40)
-      for (let i = 0; i < 18; i++){ const mid = (lo + hi) / 2; el.style.fontSize = mid + "px"; if (el.scrollHeight <= TARGET){ best = mid; lo = mid; } else { hi = mid; } }
-      el.style.fontSize = best + "px";
-    } catch (_e) {}
-  }
   let fired = false;
-  const fire = function(){ if (fired) return; fired = true; setTimeout(function(){ try { autofit(); w.focus(); w.print(); } catch (_e) {} setTimeout(function(){ try { document.body.removeChild(ifr); } catch (_e2) {} }, 1500); }, 150); };
+  const fire = function(){ if (fired) return; fired = true; setTimeout(function(){ try { _rmtAutofit(doc.getElementById("rmtFit")); w.focus(); w.print(); } catch (_e) {} setTimeout(function(){ try { document.body.removeChild(ifr); } catch (_e2) {} }, 1500); }, 150); };
   ifr.onload = fire;
   setTimeout(fire, 400);   // fallback: doc.write no siempre dispara onload
+}
+
+/* =========================================================
+   v26.24 (Luis, 02/10) — HELPER LOCAL DE IMPRESIÓN (http://127.0.0.1:17777).
+   Un programa en la PC del depósito imprime en silencio (SumatraPDF), con reglas
+   tipo → impresora que se eligen EN ESE PROGRAMA. Reemplaza el kiosco de Chrome.
+   - POR DISPOSITIVO (localStorage gv_helper_imp_v1 = {on, puerto}): 127.0.0.1 es la PC
+     donde corre ESTE navegador. Se prende en Configuración → 🧩 Impresoras. Sin el tilde
+     este navegador NUNCA le pega a 127.0.0.1 (en un celular o en otra PC Chrome pediría
+     el permiso de red local para nada).
+   - Entra por remitoPrintDoc(inner, tipo, ref): la hoja se dibuja en un iframe igual que
+     para el navegador (mismo CSS, mismo auto-ajuste), se pasa a PDF A4 con márgenes de
+     12 mm (html2canvas + jsPDF, vendor/) y va a POST /print?tipo=<picking|armado|facturado>.
+     Las hojas salen en FILA, una por vez y en orden.
+   - Si el helper NO contesta (cerrado, otro puerto, permiso de red local negado) o contesta
+     que no imprimió nada, la hoja sale por el NAVEGADOR como antes (cuadro): una hoja que
+     no salió no se pierde callada. Si tarda más de 60 s NO se repite (puede haber salido).
+   - Lo que va al PROGRAMA de la v26.12 (GV_Impresion_Regla con PC) no pasa por acá: en ese
+     modo el navegador no imprime. Orden: programa > helper > navegador.
+   Test: tests/imp-helper-local.cjs.
+   ========================================================= */
+var GV_HELPER_KEY = "gv_helper_imp_v1";
+var GV_HELPER_PUERTO = 17777;
+var GV_HELPER_TIPOS = { picking: 1, armado: 1, facturado: 1 };
+var GV_HELPER_ESPERA_MS = 60000;
+var _gvHelper = { vivo: null, pingTs: 0, cadena: Promise.resolve(), log: [], libs: null, enFila: 0 };
+function gvHelperCfg(){
+  let c = {}; try { c = JSON.parse(localStorage.getItem(GV_HELPER_KEY) || "{}") || {}; } catch (_e) {}
+  const p = parseInt(c.puerto, 10);
+  return { on: c.on === true, puerto: (p >= 1 && p <= 65535) ? p : GV_HELPER_PUERTO };
+}
+function gvHelperGuardar(cambios){
+  const c = Object.assign(gvHelperCfg(), cambios || {});
+  try { localStorage.setItem(GV_HELPER_KEY, JSON.stringify({ on: !!c.on, puerto: c.puerto })); } catch (_e) {}
+  _gvHelper.vivo = null;
+  return gvHelperCfg();
+}
+function gvHelperActivo(){ return gvHelperCfg().on; }
+function gvHelperUrl(path){ return "http://127.0.0.1:" + gvHelperCfg().puerto + (path || "/"); }
+function _gvHelperFetch(url, opt, ms){
+  const ac = (typeof AbortController === "function") ? new AbortController() : null;
+  const t = ac ? setTimeout(function (){ try { ac.abort(); } catch (_e) {} }, ms) : null;
+  return fetch(url, Object.assign({ cache: "no-store" }, opt || {}, ac ? { signal: ac.signal } : {}))
+    .finally(function (){ if (t) clearTimeout(t); });
+}
+/* GET / → 200 "Impresion Virgilio OK": ¿el helper está abierto en esta PC? */
+async function helperVivo(){
+  let ok = false;
+  try { const r = await _gvHelperFetch(gvHelperUrl("/"), {}, 2500); ok = r.ok; } catch (_e) {}
+  _gvHelper.vivo = ok; _gvHelper.pingTs = Date.now();
+  return ok;
+}
+/* POST /print?tipo= con el PDF crudo. Devuelve lo que contestó el helper
+   ({ ok, tipo, impreso:[...], errores:[...], motivo }) o un { ok:false } propio:
+   sin_helper = no llegó (se puede imprimir por otro lado) · timeout = llegó y no contestó. */
+async function imprimirLocal(tipo, pdfBlob){
+  const url = gvHelperUrl("/print?tipo=" + encodeURIComponent(tipo));
+  let resp;
+  try {
+    resp = await _gvHelperFetch(url, { method: "POST", headers: { "Content-Type": "application/pdf" }, body: pdfBlob }, GV_HELPER_ESPERA_MS);
+  } catch (e) {
+    if (e && e.name === "AbortError") return { ok: false, timeout: true, impreso: [], errores: [], motivo: "el helper no contestó en " + Math.round(GV_HELPER_ESPERA_MS / 1000) + " s (puede haber salido)" };
+    _gvHelper.vivo = false; _gvHelper.pingTs = Date.now();
+    console.warn("Helper de impresión no disponible:", e);
+    return { ok: false, sin_helper: true, impreso: [], errores: [], motivo: "helper no disponible en " + gvHelperUrl("") };
+  }
+  _gvHelper.vivo = true; _gvHelper.pingTs = Date.now();
+  let r = null; try { r = await resp.json(); } catch (_e) {}
+  if (!r || typeof r !== "object") return { ok: false, impreso: [], errores: [], motivo: "el helper contestó algo que no es JSON (HTTP " + resp.status + ")" };
+  if (!Array.isArray(r.impreso)) r.impreso = [];
+  if (!Array.isArray(r.errores)) r.errores = [];
+  if (!r.ok) console.warn("No se imprimió:", r.motivo || r.errores);
+  return r;
+}
+/* html2canvas se carga A DEMANDA (≈ 200 KB): sólo en la PC con el helper prendido. jsPDF ya está. */
+function _gvHelperLibs(){
+  if (window.html2canvas && window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+  if (!(window.jspdf && window.jspdf.jsPDF)) return Promise.reject(new Error("jsPDF no cargó"));
+  if (_gvHelper.libs) return _gvHelper.libs;
+  _gvHelper.libs = new Promise(function (ok, mal){
+    const s = document.createElement("script"); s.src = "vendor/html2canvas.min.js";
+    s.onload = function (){ if (window.html2canvas) ok(); else mal(new Error("html2canvas no cargó")); };
+    s.onerror = function (){ mal(new Error("no pude cargar vendor/html2canvas.min.js")); };
+    document.head.appendChild(s);
+  }).catch(function (e){ _gvHelper.libs = null; throw e; });
+  return _gvHelper.libs;
+}
+/* Corte de página que no parte un renglón: entre `corte` y 40 mm más arriba, la fila de
+   píxeles con MENOS tinta (la más cercana al corte si empatan). */
+function _gvCorteLimpio(canvas, desde, corte, pxPorMm){
+  try {
+    const ventana = Math.min(Math.floor(40 * pxPorMm), Math.floor((corte - desde) / 2));
+    if (ventana < 2) return corte;
+    const top = corte - ventana, w = canvas.width;
+    const data = canvas.getContext("2d").getImageData(0, top, w, ventana).data;
+    let mejor = corte, mejorN = Infinity;
+    for (let row = ventana - 1; row >= 0; row--) {
+      let n = 0; const base = row * w * 4;
+      for (let x = 0; x < w; x += 3) { const i = base + x * 4; if (data[i] + data[i + 1] + data[i + 2] < 600) n++; }
+      if (n < mejorN) { mejorN = n; mejor = top + row; if (n === 0) break; }
+    }
+    return mejor;
+  } catch (_e) { return corte; }
+}
+/* La hoja (el mismo `inner` que va al navegador) → PDF A4, márgenes 12 mm, en Blob. */
+async function gvHojaPdf(inner){
+  await _gvHelperLibs();
+  const ifr = document.createElement("iframe");
+  ifr.setAttribute("aria-hidden", "true");
+  ifr.style.cssText = "position:fixed;left:-10000px;top:0;width:703px;height:1123px;border:0;";
+  document.body.appendChild(ifr);
+  try {
+    const doc = ifr.contentWindow.document;
+    doc.open();
+    doc.write('<!doctype html><html><head><meta charset="utf-8"><title>GV</title><style>' + REMITO_PRINT_CSS + 'html,body{background:#fff;}</style></head><body><div class="rmt-sheet" id="rmtFit">' + inner + '</div></body></html>');
+    doc.close();
+    const el = doc.getElementById("rmtFit");
+    _rmtAutofit(el);
+    const alto = Math.max(1123, Math.ceil(el.scrollHeight) + 8);
+    ifr.style.height = alto + "px";
+    const canvas = await window.html2canvas(el, { scale: 3, backgroundColor: "#ffffff", logging: false, windowWidth: 703, windowHeight: alto });
+    const J = window.jspdf.jsPDF;
+    const pdf = new J({ orientation: "p", unit: "mm", format: "a4", compress: true });
+    const MARGEN = 12, ANCHO = 186, ALTO = 273;           // A4 − 2·12 mm
+    const pxPorMm = canvas.width / ANCHO;
+    const altoPag = Math.floor(ALTO * pxPorMm);
+    let y = 0, pag = 0;
+    while (y < canvas.height && (pag === 0 || canvas.height - y > 2 * pxPorMm)) {
+      let corte = Math.min(canvas.height, y + altoPag);
+      if (corte < canvas.height) corte = _gvCorteLimpio(canvas, y, corte, pxPorMm);
+      const h = corte - y;
+      const c = document.createElement("canvas"); c.width = canvas.width; c.height = h;
+      const cx = c.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, c.width, h);
+      cx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+      if (pag > 0) pdf.addPage("a4", "p");
+      pdf.addImage(c.toDataURL("image/jpeg", 0.92), "JPEG", MARGEN, MARGEN, ANCHO, h / pxPorMm);
+      y = corte; pag++;
+    }
+    return pdf.output("blob");
+  } finally { try { document.body.removeChild(ifr); } catch (_e) {} }
+}
+function _gvHelperLogAdd(e){
+  let hora = ""; try { hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: TZ_AR }); } catch (_e) {}
+  e.hora = hora;
+  _gvHelper.log.unshift(e);
+  if (_gvHelper.log.length > 30) _gvHelper.log.length = 30;
+  try { if (document.getElementById("gvHelperCard")) gvImpRender(false); } catch (_e) {}
+}
+/* En fila: cada hoja espera a que el helper conteste la anterior. */
+function gvHelperEncolar(tipo, inner, ref){
+  _gvHelper.enFila++;
+  const paso = function (){ return _gvHelperImprimirHoja(tipo, inner, ref).finally(function (){ _gvHelper.enFila = Math.max(0, _gvHelper.enFila - 1); }); };
+  _gvHelper.cadena = _gvHelper.cadena.then(paso, paso);
+  return _gvHelper.cadena;
+}
+async function _gvHelperImprimirHoja(tipo, inner, ref){
+  let r, pdf = null;
+  try { pdf = await gvHojaPdf(inner); }
+  catch (e) { r = { ok: false, sin_pdf: true, impreso: [], errores: [], motivo: "no pude armar el PDF (" + String((e && e.message) || e) + ")" }; }
+  if (pdf) r = await imprimirLocal(tipo, pdf);
+  // Al navegador SÓLO si el helper no imprimió nada y no hay duda de que no salió.
+  const alNavegador = !r.ok && !r.timeout && !(r.impreso && r.impreso.length);
+  _gvHelperLogAdd({ tipo: tipo, ref: ref || "", ok: !!r.ok, impreso: r.impreso || [], errores: r.errores || [],
+    motivo: r.motivo || "", alNavegador: alNavegador, kb: pdf ? Math.round(pdf.size / 1024) : 0 });
+  if (alNavegador) {
+    _remitoPrintNavegador(inner);
+    await new Promise(function (ok){ setTimeout(ok, 2600); });   // como la estación: 1 cuadro cada ~2,6 s
+  }
+  return r;
+}
+/* Prueba desde Configuración → Impresoras: hoja de prueba al helper, sin caer al navegador. */
+async function gvHelperPrueba(tipo){
+  const lab = (GV_IMP_TIPOS.filter(function (t){ return t[0] === tipo; })[0] || [tipo, tipo])[1];
+  const row = { np: "PRUEBA", tanda: "TEST", cod: "0000", rs: "Hoja de prueba — " + lab + " → helper local", salePpp: cpTodayAR(), fecha: cpTodayAR(), resumen: "A=999X1;B=999X1" };
+  let inner = ""; try { inner = armadoRemitoInnerHtml(armadoRemitoData(row), tipo === "facturado" ? "FACTURADO" : undefined); } catch (_e) {}
+  if (!inner) { _gvImpMsg("No pude armar la hoja de prueba."); return; }
+  _gvImpMsg("Armando el PDF de prueba…");
+  let r, pdf = null;
+  try { pdf = await gvHojaPdf(inner); } catch (e) { _gvImpMsg("No pude armar el PDF: " + String((e && e.message) || e)); return; }
+  _gvImpMsg("Mandando la prueba al helper…");
+  r = await imprimirLocal(tipo, pdf);
+  _gvHelperLogAdd({ tipo: tipo, ref: "PRUEBA", ok: !!r.ok, impreso: r.impreso || [], errores: r.errores || [], motivo: r.motivo || "", alNavegador: false, kb: Math.round(pdf.size / 1024) });
+  if (r.ok) _gvImpMsg("✓ Prueba de " + lab + " impresa en " + (r.impreso.length ? r.impreso.join(", ") : "el helper"));
+  else _gvImpMsg("✗ " + lab + ": " + (r.motivo || (r.errores || []).join(" · ") || "no se imprimió"));
+}
+async function gvHelperCambiar(campo, valor){
+  if (campo === "on") gvHelperGuardar({ on: !!valor });
+  else if (campo === "puerto") {
+    const p = parseInt(valor, 10);
+    if (!(p >= 1 && p <= 65535)) { _gvImpMsg("Puerto inválido: va de 1 a 65535."); gvImpRender(false); return; }
+    gvHelperGuardar({ puerto: p });
+  }
+  if (gvHelperActivo()) { _gvImpMsg("Buscando el helper…"); await helperVivo(); _gvImpMsg(_gvHelper.vivo ? "✓ Helper encontrado en " + gvHelperUrl("") : "⚠ No contesta " + gvHelperUrl("") + ": ¿está abierto en esta PC? ¿es ese el puerto?"); }
+  else _gvImpMsg("Helper apagado en esta PC: las hojas salen por el navegador.");
+  gvImpRender(false);
+  try { gvImpVigilar(); } catch (_e) {}
+}
+function _gvHelperEstadoTxt(){
+  if (!gvHelperActivo()) return "⚪ apagado en esta PC";
+  if (_gvHelper.vivo === true) return "🟢 abierto en " + gvHelperUrl("");
+  if (_gvHelper.vivo === false) return "🔴 no contesta " + gvHelperUrl("");
+  return "… buscando " + gvHelperUrl("");
+}
+/* La tarjeta de Configuración → Impresoras (por dispositivo). */
+function gvHelperCardHtml(){
+  const c = gvHelperCfg();
+  let h = '<div class="gi-card" id="gvHelperCard"><div class="gi-t">🖥️ Helper local en ESTA PC (127.0.0.1)</div>' +
+    '<div class="gi-help" style="margin-bottom:6px;">Imprime sin cuadro con SumatraPDF, en la impresora que elegiste <b>en el helper</b> para cada hoja. Vale sólo para <b>este navegador</b>: prendelo en la PC donde está abierto el helper.</div>' +
+    '<table class="gi-tbl"><tr><th>Usar</th><th>Puerto</th><th>Estado</th><th>Prueba</th></tr><tr>' +
+    '<td><span class="sup-sw' + (c.on ? " on" : "") + '" onclick="gvHelperCambiar(\'on\',' + (c.on ? "false" : "true") + ')" role="switch"><span class="sup-sw-k"></span></span></td>' +
+    '<td><input type="number" min="1" max="65535" value="' + c.puerto + '" style="width:74px;font:inherit;font-size:13px;padding:4px;border:1px solid #cbd5e1;border-radius:7px;text-align:center;" onchange="gvHelperCambiar(\'puerto\',this.value)"></td>' +
+    '<td>' + escapeHtml(_gvHelperEstadoTxt()) + (c.on ? ' <button onclick="gvHelperCambiar(\'ping\')">↻</button>' : '') + '</td><td>' +
+    GV_IMP_TIPOS.map(function (t){ return '<button ' + (c.on ? "" : "disabled ") + 'onclick="gvHelperPrueba(\'' + t[0] + '\')">' + t[1] + '</button>'; }).join(" ") + '</td></tr></table>';
+  if (c.on) {
+    const modos = GV_IMP_TIPOS.filter(function (t){ return gvImpModo(t[0]) === "programa"; }).map(function (t){ return t[1]; });
+    if (modos.length) h += '<div class="gi-help" style="color:#9a3412;margin-top:6px;">⚠ ' + escapeHtml(modos.join(", ")) + ' está mandado al programa de la tabla de abajo: eso NO pasa por el helper.</div>';
+    let faltan = [];
+    if (!psIsAuto()) faltan.push("«Auto-imprimir remitos al terminar armado» (armado y picking)");
+    if (!facPrintIsOn()) faltan.push("«Auto-imprimir remito FACTURADO»");
+    if (faltan.length) h += '<div class="gi-help" style="color:#9a3412;margin-top:6px;">Para que salgan SOLAS falta prender, en 🖨️ Cola de impresión: ' + escapeHtml(faltan.join(" y ")) + '. Sin eso el helper sólo imprime lo que se manda a mano.</div>';
+    const log = _gvHelper.log.slice(0, 8);
+    if (log.length) {
+      h += '<table class="gi-tbl" style="margin-top:8px;"><tr><th>Hora</th><th>Hoja</th><th>NP /<br>tanda</th><th>Resultado</th></tr>';
+      log.forEach(function (e){
+        const est = e.ok ? '<span class="gi-est impreso">impreso</span><span class="gi-sub">' + escapeHtml((e.impreso || []).join(", ")) + '</span>'
+          : '<span class="gi-est error">' + (e.alNavegador ? "→ navegador" : "sin confirmar") + '</span><span class="gi-err">' + escapeHtml(e.motivo || (e.errores || []).join(" · ")) + '</span>';
+        h += '<tr><td>' + escapeHtml(e.hora || "") + '</td><td>' + escapeHtml(e.tipo) + '</td><td><b>' + escapeHtml(String(e.ref || "—")) + '</b></td><td>' + est + '</td></tr>';
+      });
+      h += '</table>';
+    }
+  }
+  return h + '</div>';
 }
 
 /* =========================================================
@@ -54834,7 +55076,7 @@ function psEnqueuePrint(d){ _psEnsure(); _ps.queue.push(d); psDrain(); }
 function psDrain(){
   if (!_ps || _ps.printing || !_ps.queue.length) return;
   _ps.printing = true; const d = _ps.queue.shift();
-  try { remitoPrintDoc(armadoRemitoInnerHtml(d)); } catch (_e){}
+  try { remitoPrintDoc(armadoRemitoInnerHtml(d), "armado", d.np); } catch (_e){}
   setTimeout(function (){ if (_ps){ _ps.printing = false; psDrain(); } }, 2600);   // serializado: 1 hoja cada ~2.6 s
 }
 function psLog(d, nota){
@@ -54844,10 +55086,10 @@ function psLog(d, nota){
   if (_ps.log.length > 60) _ps.log.length = 60;
   psRender();
 }
-function psReprint(i){ if (!_ps) return; const e = _ps.log[i]; if (e && e.d){ try { remitoPrintDoc(armadoRemitoInnerHtml(e.d)); } catch (_ex){} } }
+function psReprint(i){ if (!_ps) return; const e = _ps.log[i]; if (e && e.d){ try { remitoPrintDoc(armadoRemitoInnerHtml(e.d), "armado", e.d.np); } catch (_ex){} } }
 function psTestPrint(){
   const row = { np: "PRUEBA", tanda: "TEST", cod: "0000", rs: "Hoja de prueba — estación de impresión", salePpp: cpTodayAR(), fecha: cpTodayAR(), resumen: "A=999X1;B=999X1" };
-  try { remitoPrintDoc(armadoRemitoInnerHtml(armadoRemitoData(row))); } catch (_e){}
+  try { remitoPrintDoc(armadoRemitoInnerHtml(armadoRemitoData(row)), "armado", "PRUEBA"); } catch (_e){}
 }
 var PS_CSS =
   "#printStationModal{display:none;position:fixed;inset:0;background:#f1f5f9;z-index:210;overflow:auto;padding:14px;}" +
@@ -54916,7 +55158,8 @@ function psRender(){
     '<div style="display:flex;gap:8px;margin:8px 0;"><input id="etlLegInp" type="text" inputmode="numeric" placeholder="legajo" onkeydown="if(event.key===\'Enter\')etlLegAgregar()" style="width:100px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;">' +
     '<button onclick="etlLegAgregar()" style="padding:8px 14px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;">+ Agregar</button></div>' +
     '<div id="etlLegList"><div class="ps-help">Cargando…</div></div></div>';
-  h += '<div class="ps-help">Dejá <b>esta pantalla abierta</b> en la PC que está al lado de la impresora. Para que salga <b>sin diálogo</b>: abrí la app en <b>Chrome con <code>--kiosk-printing</code></b> y poné esa impresora como <b>predeterminada de Windows</b>. Probá con el botón de abajo antes de prender el automático.</div>';
+  if (gvHelperActivo()) h += '<div class="ps-help">🖥️ <b>Helper local prendido en esta PC</b> (' + escapeHtml(_gvHelperEstadoTxt()) + '): picking, armado y facturado salen <b>sin cuadro</b> por el helper, en la impresora que tiene elegida cada hoja. No hace falta el kiosco. Si el helper no contesta, la hoja sale por el navegador. Se configura en <a href="#" onclick="event.preventDefault();closePrintStation();openImpresoras()">🧩 Impresoras</a>.</div>';
+  else h += '<div class="ps-help">Dejá <b>esta pantalla abierta</b> en la PC que está al lado de la impresora. Para que salga <b>sin diálogo</b>: prendé el <b>helper local</b> en <a href="#" onclick="event.preventDefault();closePrintStation();openImpresoras()">🧩 Impresoras</a>, o abrí la app en <b>Chrome con <code>--kiosk-printing</code></b> y poné esa impresora como <b>predeterminada de Windows</b>. Probá con el botón de abajo antes de prender el automático.</div>';
   h += '<div class="ps-actions"><button class="ps-test" onclick="psTestPrint()">🖨️ Imprimir hoja de prueba</button></div>';
   const log = (_ps && _ps.log) || [];
   h += '<div class="ps-log-t">Impresos en esta sesión (' + log.length + ')</div>';
@@ -54963,7 +55206,7 @@ async function facPrintSetPref(v){
 function facPrintToggle(){ facPrintSetPref(facPrintIsOn() ? "0" : "1").then(function(){ psRender(); }); }
 async function facPrintFacturado(np, tanda){
   const inner = await facFacturadoInner(np, tanda);
-  if (inner) remitoPrintDoc(inner);
+  if (inner) remitoPrintDoc(inner, "facturado", np);
 }
 /* v26.12 — arma la hoja FACTURADO (sin imprimir) para que la use el navegador
    (facPrintFacturado) o el programa de impresión de la PC (gvImpEncolar). null = no hay hoja. */
@@ -55180,7 +55423,9 @@ async function gvImpVigilar(){
     if (!window.__isSupervisor || window.__tvKioskMode) return;
     await gvImpCfgCargar();
     await gvImpReintentarPendientes();
-    if (!_facIsMobile() && gvImpAlgunAuto() && !(_ps && _ps.timer)) psStart();
+    // v26.24 — en la PC con el helper local + el auto de la estación, la estación arranca sola
+    // al cargar GV (antes había que abrir la Cola de impresión): sin eso no sale ninguna hoja.
+    if (!_facIsMobile() && (gvImpAlgunAuto() || (gvHelperActivo() && psIsAuto())) && !(_ps && _ps.timer)) psStart();
   } catch (_e) {}
 }
 setTimeout(gvImpVigilar, 8000);
@@ -55257,12 +55502,14 @@ function _gvImpHora(ts){
   } catch (_e) { return "—"; }
 }
 async function gvImpRender(cargar){
-  if (cargar) { await Promise.all([gvImpCfgCargar(true), gvImpTrabajosCargar()]); }
+  if (cargar) { await Promise.all([gvImpCfgCargar(true), gvImpTrabajosCargar(), facPrintCfgLoad().catch(function (){})]); }
   const body = document.getElementById("gvImpBody"); if (!body) return;
+  // v26.24 — el helper local es de ESTE navegador: se ve aunque la base no conteste.
+  if (gvHelperActivo() && Date.now() - _gvHelper.pingTs > 8000) helperVivo().then(function (){ if (document.getElementById("gvHelperCard")) gvImpRender(false); });
   const c = _gvImp.cfg;
-  if (!c) { body.innerHTML = '<div class="gi-card gi-help" style="color:#b91c1c;">No pude leer la configuración de impresión' + (_gvImp.err ? " (" + escapeHtml(_gvImp.err) + ")" : "") + '. Probá «Actualizar».</div>'; return; }
+  if (!c) { body.innerHTML = gvHelperCardHtml() + '<div class="gi-card gi-help" style="color:#b91c1c;">No pude leer la configuración de impresión' + (_gvImp.err ? " (" + escapeHtml(_gvImp.err) + ")" : "") + '. Probá «Actualizar».</div>'; return; }
   const pcs = Array.isArray(c.pcs) ? c.pcs : [];
-  let h = "";
+  let h = gvHelperCardHtml();
   h += '<div class="gi-card gi-help">El <b>programa de impresión</b> tiene que estar abierto en la PC de la impresora (carpeta compartida → <b>Iniciar GV-Impresion.bat</b>). GV le manda cada hoja y la imprime <b>sin cuadro</b>, en la impresora elegida. ' +
        'Un tipo <b>sin PC</b> sigue como hoy (navegador). Picking y armado los arma GV abierto en alguna PC de supervisor; el facturado, el equipo que exporta el Excel ISIS.</div>';
   // clave del programa
@@ -59090,7 +59337,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.23"></script>
+<script src="importacion.js?v=26.24"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61913,9 +62160,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.23"></script>
-<script src="hotsale.js?v=26.23"></script>
-<script src="estadisticas.js?v=26.23"></script>
+<script src="cobranzas.js?v=26.24"></script>
+<script src="hotsale.js?v=26.24"></script>
+<script src="estadisticas.js?v=26.24"></script>
 
 </body>
 </html>

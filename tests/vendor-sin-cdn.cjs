@@ -23,6 +23,7 @@ const ESPERADOS = [
   "vendor/leaflet.min.js",
   "vendor/leaflet.min.css",
   "vendor/supabase.umd.js",
+  "vendor/html2canvas.min.js",          // v26.24 — PDF para el helper local de impresión (a demanda)
   "vendor/images/marker-icon.png",
 ];
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript",

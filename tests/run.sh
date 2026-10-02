@@ -373,6 +373,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== imp-programa (v26.12: picking/armado/facturado al programa de impresión de la PC, sin kiosco) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-programa.cjs
+echo "== imp-helper-local (v26.24: picking/armado/facturado en PDF al helper local 127.0.0.1:17777) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-helper-local.cjs
 node tests/imp-agente-ps.cjs
 
 echo "== mg-prioridad (idea 4926: Guardar a Góndola — prioridad con demanda + hint de MCs) =="

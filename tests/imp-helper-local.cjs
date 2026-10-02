@@ -1,0 +1,221 @@
+/* v26.24 (Luis, 02/10) — HELPER LOCAL DE IMPRESIÓN (http://127.0.0.1:17777, SumatraPDF).
+   Levanta un helper FALSO en 127.0.0.1 (mismo contrato: GET / y POST /print?tipo=, CORS con
+   Access-Control-Allow-Private-Network) y corre index.html de verdad: lo que mide es el PDF que
+   le LLEGA al helper, no el texto del código.
+     A. Helper apagado (default) → la hoja sale por el navegador y el helper no recibe nada.
+     B. Helper prendido → POST /print?tipo=armado con Content-Type application/pdf y un PDF A4
+        real (%PDF, 1 página, la imagen NO está en blanco); el navegador no imprime.
+     C. Tres hojas seguidas → llegan EN ORDEN y de a una (nunca 2 a la vez).
+     D. Una hoja larga → el PDF tiene 2+ páginas.
+     E. El helper contesta ok:false sin imprimir nada → la hoja sale por el navegador.
+     F. El helper imprimió una parte (impreso con algo) → NO se repite por el navegador.
+     G. Helper cerrado (nadie escucha el puerto) → sale por el navegador y queda «no contesta».
+     H. El puerto es configurable; uno inválido vuelve al 17777.
+     I. La estación (psPoll) manda el armado al helper; pkHojaImprimir manda picking;
+        facMaybePrintFacturado manda facturado.
+     J. Sin respuesta en el tiempo de espera → NO se repite por el navegador (puede haber salido).
+     K. Configuración → Impresoras dibuja la tarjeta del helper (🟢) y la Prueba llega con su tipo.
+     L. gvImpVigilar arranca la estación sola con helper + auto de la estación.
+   Sale 1 si algo falla. */
+const path = require("path");
+const http = require("http");
+let chromium;
+try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
+catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { console.error("no playwright"); process.exit(2); } }
+
+const H = { reqs: [], modo: "ok", demora: 0, activos: 0, maxActivos: 0 };
+const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Private-Network": "true" };
+const helper = http.createServer((req, res) => {
+  if (req.method === "OPTIONS") { res.writeHead(204, cors); return res.end(); }
+  if (req.method === "GET" && req.url === "/") { res.writeHead(200, Object.assign({ "Content-Type": "text/plain" }, cors)); return res.end("Impresion Virgilio OK"); }
+  if (req.method === "POST" && req.url.indexOf("/print?") === 0) {
+    const chunks = [];
+    H.activos++; H.maxActivos = Math.max(H.maxActivos, H.activos);
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => {
+      const buf = Buffer.concat(chunks);
+      const tipo = new URL(req.url, "http://x").searchParams.get("tipo");
+      const txt = buf.toString("latin1");
+      H.reqs.push({ tipo, ct: req.headers["content-type"], pdf: txt.indexOf("%PDF-") === 0, paginas: (txt.match(/\/Type \/Page[^s]/g) || []).length,
+        a4: /\/MediaBox \[0 0 595\.2\d* 841\.8\d*\]/.test(txt), kb: Math.round(buf.length / 1024) });
+      const modo = H.modo;
+      setTimeout(() => {
+        H.activos--;
+        let j = { ok: true, tipo, impreso: ["HP Deposito"], errores: [], motivo: "" };
+        if (modo === "sinregla") j = { ok: false, tipo, impreso: [], errores: [], motivo: "sin regla para " + tipo };
+        if (modo === "parcial") j = { ok: false, tipo, impreso: ["HP Deposito"], errores: ["Brother: offline"], motivo: "1 de 2" };
+        res.writeHead(200, Object.assign({ "Content-Type": "application/json" }, cors)); res.end(JSON.stringify(j));
+      }, H.demora);
+    });
+    return;
+  }
+  res.writeHead(404, cors); res.end("no");
+});
+
+(async () => {
+  await new Promise((r) => helper.listen(0, "127.0.0.1", r));
+  const PUERTO = helper.address().port;
+  const muerto = http.createServer(); await new Promise((r) => muerto.listen(0, "127.0.0.1", r));
+  const PUERTO_MUERTO = muerto.address().port; await new Promise((r) => muerto.close(r));   // nadie escucha ahí
+
+  const b = await chromium.launch(); const p = await b.newPage();
+  const errs = []; p.on("pageerror", (e) => errs.push(e.message));
+  await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
+  await p.waitForFunction(() => !!(window.jspdf && window.jspdf.jsPDF), null, { timeout: 15000 });
+
+  const ctl = async (k, v) => { H[k] = v; };
+  const n = () => H.reqs.length;
+  const out = {};
+
+  // red: lo de 127.0.0.1 va de verdad al helper falso; Supabase stubbeado
+  await p.evaluate(() => {
+    const real = window.fetch.bind(window);
+    window.__S = { talRows: [], tpRows: [], nav: [], imgs: [] };
+    window.fetch = function (url, opts) {
+      const u = String(url);
+      if (u.indexOf("http://127.0.0.1:") === 0) return real(url, opts);
+      const ok = function (j) { return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(j); } }); };
+      if (u.indexOf("rpc/gv_imp_config") >= 0) return ok({ pcs: [], reglas: [], clave: null });
+      if (u.indexOf("opcion=eq.TAL") >= 0) return ok(window.__S.talRows);
+      if (u.indexOf("opcion=eq.TP") >= 0) return ok(window.__S.tpRows);
+      return ok([]);
+    };
+    window.facAuthWriteHeaders = async function () { return { apikey: "k", Authorization: "Bearer jwt", "Content-Type": "application/json" }; };
+    window._remitoPrintNavegador = function (inner) { window.__S.nav.push(String(inner)); };
+    window.colaImpLoadBadge = function () {}; window.colaImpMarcarImpresas = function () {}; window.facShowToast = function () {};
+    // captura lo que se pega en el PDF para medir que la hoja NO salga en blanco
+    // los métodos de jsPDF viven en jsPDF.API (se copian a cada instancia), no en el prototype
+    const J = window.jspdf.jsPDF.API; const add = J.addImage;
+    J.addImage = function (data) { if (typeof data === "string") window.__S.imgs.push(data); return add.apply(this, arguments); };
+    window.__tinta = async function (dataUrl) {
+      const img = new Image(); await new Promise(function (ok, mal) { img.onload = ok; img.onerror = mal; img.src = dataUrl; });
+      const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+      const cx = c.getContext("2d"); cx.drawImage(img, 0, 0); const d = cx.getImageData(0, 0, c.width, c.height).data;
+      let t = 0; for (let i = 0; i < d.length; i += 16) if (d[i] + d[i + 1] + d[i + 2] < 300) t++;
+      return t;
+    };
+    window.__espera = function (cond, ms) { return new Promise(function (ok) { const t0 = Date.now(); (function v() { if (cond() || Date.now() - t0 > ms) ok(); else setTimeout(v, 40); })(); }); };
+  });
+  const HOJA = '<div class="rmt-sec">HOJA DE PRUEBA</div><table class="rmt-table"><tr><td class="rmt-cc">501</td><td>12</td></tr><tr><td class="rmt-cc">438E</td><td>4</td></tr></table>';
+
+  // ---- A. apagado (default)
+  out.A_apagadoDefault = await p.evaluate(() => gvHelperActivo() === false && gvHelperCfg().puerto === 17777);
+  await p.evaluate((h) => { window.__S.nav.length = 0; remitoPrintDoc(h, "armado", "98010"); }, HOJA);
+  await p.waitForTimeout(300);
+  out.A_navegador = (await p.evaluate(() => window.__S.nav.length)) === 1 && n() === 0;
+
+  // ---- H. puerto configurable
+  out.H_puerto = await p.evaluate((pt) => {
+    gvHelperGuardar({ on: true, puerto: 70000 }); const inval = gvHelperCfg().puerto === 17777;
+    gvHelperGuardar({ puerto: pt }); return inval && gvHelperCfg().puerto === pt && gvHelperUrl("/x") === "http://127.0.0.1:" + pt + "/x";
+  }, PUERTO);
+  out.H_ping = await p.evaluate(() => helperVivo());
+
+  // ---- B. prendido → PDF real al helper
+  await p.evaluate((h) => { window.__S.nav.length = 0; window.__S.imgs.length = 0; return gvHelperEncolar("armado", h, "98010"); }, HOJA);
+  const rb = H.reqs[0] || {};
+  const tintaB = await p.evaluate(() => window.__S.imgs.length ? window.__tinta(window.__S.imgs[0]) : 0);
+  out.B_pdf = n() === 1 && rb.tipo === "armado" && rb.ct === "application/pdf" && rb.pdf && rb.paginas === 1 && rb.a4;
+  out.B_noBlanco = tintaB > 200;
+  out.B_sinNavegador = (await p.evaluate(() => window.__S.nav.length)) === 0;
+  out.B_viaRemitoPrintDoc = await p.evaluate(async (h) => { remitoPrintDoc(h, "picking", "E50A"); await _gvHelper.cadena; return true; }, HOJA) && H.reqs[1] && H.reqs[1].tipo === "picking";
+
+  // ---- C. tres en fila, en orden
+  H.reqs.length = 0; H.maxActivos = 0; await ctl("demora", 250);
+  await p.evaluate(async (h) => { remitoPrintDoc(h, "picking", "1"); remitoPrintDoc(h, "armado", "2"); remitoPrintDoc(h, "facturado", "3"); await _gvHelper.cadena; }, HOJA);
+  out.C_orden = H.reqs.map((x) => x.tipo).join(",") === "picking,armado,facturado";
+  out.C_deAUna = H.maxActivos === 1;
+  await ctl("demora", 0);
+
+  // ---- D. hoja larga → 2+ páginas
+  H.reqs.length = 0;
+  await p.evaluate(async () => {
+    let filas = ""; for (let i = 0; i < 160; i++) filas += '<tr><td class="rmt-cc">' + (500 + i) + '</td><td>' + i + '</td><td>Lío ' + i + '</td></tr>';
+    remitoPrintDoc('<div class="rmt-sec">LARGA</div><table class="rmt-table">' + filas + '</table>', "picking", "LARGA"); await _gvHelper.cadena;
+  });
+  out.D_variasPaginas = (H.reqs[0] || {}).paginas >= 2;
+
+  // ---- E. ok:false sin imprimir → navegador
+  H.reqs.length = 0; await ctl("modo", "sinregla");
+  await p.evaluate(async (h) => { window.__S.nav.length = 0; remitoPrintDoc(h, "facturado", "LK 0300"); await _gvHelper.cadena; }, HOJA);
+  out.E_alNavegador = n() === 1 && (await p.evaluate(() => window.__S.nav.length === 1 && _gvHelper.log[0].alNavegador === true && /sin regla/.test(_gvHelper.log[0].motivo)));
+
+  // ---- F. parcial → no se repite
+  await ctl("modo", "parcial");
+  await p.evaluate(async (h) => { window.__S.nav.length = 0; remitoPrintDoc(h, "armado", "98011"); await _gvHelper.cadena; }, HOJA);
+  out.F_parcialNoRepite = await p.evaluate(() => window.__S.nav.length === 0 && _gvHelper.log[0].alNavegador === false);
+  await ctl("modo", "ok");
+
+  // ---- G. helper cerrado → navegador
+  out.G_cerrado = await p.evaluate(async (args) => {
+    gvHelperGuardar({ puerto: args.muerto }); window.__S.nav.length = 0;
+    remitoPrintDoc(args.h, "armado", "98012"); await _gvHelper.cadena;
+    const r = window.__S.nav.length === 1 && _gvHelper.vivo === false && /no disponible/.test(_gvHelper.log[0].motivo) && /no contesta/.test(_gvHelperEstadoTxt());
+    gvHelperGuardar({ puerto: args.vivo }); return r;
+  }, { muerto: PUERTO_MUERTO, vivo: PUERTO, h: HOJA });
+
+  // ---- I. los caminos del pipeline
+  H.reqs.length = 0;
+  out.I_estacionArmado = await p.evaluate(async () => {
+    localStorage.setItem("ps_auto_virgilio", "1"); _ps = null;
+    window._armadoRemitoDataForItems = async function (items) { return items.map(function (x) { return armadoRemitoData({ np: x.np, tanda: x.tanda, cod: "1", rs: "Cliente", salePpp: "2026-10-02", fecha: "2026-10-02", resumen: x.resumen }); }); };
+    window.__S.talRows = [{ texto: "98020|1|E50A|C=3X2|L1", ts_cliente: "2099-01-01T12:00:00-03:00", legajo: "104" }];
+    window.__S.tpRows = [];
+    await psPoll(true);
+    await window.__espera(function () { return _gvHelper.log.some(function (e) { return e.ref === "98020"; }); }, 8000);
+    await _gvHelper.cadena; return true;
+  }) && H.reqs.some((x) => x.tipo === "armado");
+  out.I_picking = await p.evaluate(async () => {
+    window.pkHojaDatos = async function (ts) { return ts.map(function (t) { return { tanda: t }; }); };
+    window.pkHojaHtml = function (d) { return '<div class="rmt-sec">PICKING ' + d.tanda + '</div>'; };
+    await pkHojaImprimir(["E51A"], false); await _gvHelper.cadena;
+    return _gvHelper.log[0].ref === "E51A" && _gvHelper.log[0].tipo === "picking";
+  }) && H.reqs.some((x) => x.tipo === "picking");
+  out.I_facturado = await p.evaluate(async () => {
+    window.facFacturadoInner = async function (np) { return '<div class="rmt-sec">FACTURADO ' + np + '</div>'; };
+    window._facIsMobile = function () { return false; }; _facPrintGlobal = "1";
+    await facMaybePrintFacturado("LK 0400", "E52A"); await _gvHelper.cadena;
+    return _gvHelper.log[0].ref === "LK 0400" && _gvHelper.log[0].tipo === "facturado" && _gvHelper.log[0].ok === true;
+  }) && H.reqs.some((x) => x.tipo === "facturado");
+
+  // ---- J. sin respuesta a tiempo → no se repite
+  await ctl("demora", 1500);
+  out.J_timeoutNoRepite = await p.evaluate(async (h) => {
+    GV_HELPER_ESPERA_MS = 400; window.__S.nav.length = 0;
+    remitoPrintDoc(h, "armado", "98030"); await _gvHelper.cadena; GV_HELPER_ESPERA_MS = 60000;
+    return window.__S.nav.length === 0 && /no contestó/.test(_gvHelper.log[0].motivo) && _gvHelper.log[0].alNavegador === false;
+  }, HOJA);
+  await ctl("demora", 0); await p.waitForTimeout(1300);
+
+  // ---- K. pantalla Impresoras + Prueba
+  H.reqs.length = 0;
+  out.K_tarjeta = await p.evaluate(async () => {
+    window.__isSupervisor = true; openImpresoras();
+    await window.__espera(function () { var c = document.getElementById("gvHelperCard"); return c && /🟢/.test(c.textContent); }, 6000);
+    const c = document.getElementById("gvHelperCard");
+    return !!c && /🟢/.test(c.textContent) && !!c.querySelector('input[type="number"]') && /Picking/.test(c.textContent) && /Facturado/.test(c.textContent);
+  });
+  out.K_prueba = await p.evaluate(async () => { await gvHelperPrueba("facturado"); return /✓/.test(document.getElementById("gvImpMsg").textContent); }) && (H.reqs[0] || {}).tipo === "facturado";
+  await p.evaluate(() => closeImpresoras());
+
+  // ---- L. la estación arranca sola con helper + auto
+  out.L_vigilar = await p.evaluate(async () => {
+    if (_ps && _ps.timer) { clearInterval(_ps.timer); _ps.timer = null; }
+    window.__isSupervisor = true; window.__tvKioskMode = false; localStorage.setItem("ps_auto_virgilio", "1");
+    await gvImpVigilar(); await window.__espera(function () { return !!(_ps && _ps.timer); }, 3000);   // psStart es async
+    const r = !!(_ps && _ps.timer);
+    if (_ps && _ps.timer) { clearInterval(_ps.timer); _ps.timer = null; }
+    gvHelperGuardar({ on: false }); await gvImpVigilar(); await new Promise(function (ok) { setTimeout(ok, 600); });
+    const apagado = !(_ps && _ps.timer);
+    return r && apagado;
+  });
+
+  await b.close(); helper.close();
+  const fallas = Object.keys(out).filter((k) => out[k] !== true);
+  const errReales = errs.filter((e) => !/Failed to fetch|NetworkError|AbortError|ERR_/.test(e));
+  console.log(JSON.stringify(out, null, 1));
+  if (errReales.length) console.log("pageerror:", errReales.slice(0, 5));
+  if (fallas.length || errReales.length) { console.log("✗ imp-helper-local: " + fallas.join(", ")); process.exit(1); }
+  console.log("✓ imp-helper-local (" + Object.keys(out).length + " chequeos)");
+})().catch((e) => { console.error(e); process.exit(1); });
