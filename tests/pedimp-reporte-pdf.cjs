@@ -7,7 +7,9 @@
    los proveedores discriminando), sin pedido (…), discontinuo (…)"* → con varios tildados, UNA hoja de
    cada tipo con todos adentro y un renglón-rótulo (tr.prov) por proveedor; con uno solo, como antes.
    Y *"optimización horizontal absoluta"*: separadores de 2 px, rótulo «Mca»; v26.34: 4 px de aire por lado
-   («el ancho de las columnas como la de la foto 1») y el FOB u$s de lo que llega en «Llegan». */
+   («el ancho de las columnas como la de la foto 1») y el FOB u$s de lo que llega en «Llegan».
+   v26.37 (Luis): *"que guarde el FOB del pedido en curso"* → «Llegan» se valoriza con el FOB GUARDADO de
+   cada pedido (gv_importados_curso_fob); y la fecha de llegada al mismo tamaño que las unidades. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -17,8 +19,14 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1600, height: 900 } });
   // los discontinuos (Importados.activo = false): uno de Fujian y uno de Kangli; lo demás vacío.
-  await p.route("**/rest/v1/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: /activo=eq\.false/.test(r.request().url())
-    ? JSON.stringify([{ cod_art: "ZZ1E", marca: "LK", descripcion: "Viejo 1", stock_total: 3, proveedor: "Fujian" }, { cod_art: "ZZ2E", marca: "CH", descripcion: "Viejo 2", stock_total: 0, proveedor: "Kangli" }]) : "[]" }));
+  // v26.37: gv_importados_curso_fob = el FOB GUARDADO de lo que viene (902E: 100 u pedidas a u$s 3,50 = 350;
+  // el maestro hoy dice u$s 2). Sólo responde si la request lleva sesión (sin sesión, el PDF usa el FOB de hoy).
+  let fobLeido = 0;
+  await p.route("**/rest/v1/**", (r) => {
+    const u = r.request().url();
+    if (/rpc\/gv_importados_curso_fob/.test(u)) { fobLeido++; return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ importado_id: "902E", pendiente: 100, usd: 350, uni_con_fob: 100 }]) }); }
+    return r.fulfill({ status: 200, contentType: "application/json", body: /activo=eq\.false/.test(u)
+    ? JSON.stringify([{ cod_art: "ZZ1E", marca: "LK", descripcion: "Viejo 1", stock_total: 3, proveedor: "Fujian" }, { cod_art: "ZZ2E", marca: "CH", descripcion: "Viejo 2", stock_total: 0, proveedor: "Kangli" }]) : "[]" }); });
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
   await p.waitForFunction(() => typeof pedImpRepImprimir === "function" && typeof _pedImpDamianHojas === "function", null, { timeout: 20000 });
   const r = await p.evaluate(async () => {
@@ -50,14 +58,19 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
       const css = (/<style>([\s\S]*?)<\/style>/.exec(html) || [])[1] || "";
       return { ok, tits, ths, cods, bandas, tot, hojas: d.querySelectorAll(".hoja").length, portrait: /size:A4 portrait/.test(html), marca: /<th>Mca<\/th>/.test(html),
         pegado: /th,td\{[^}]*padding:1px 4px;/.test(css) && /th\.sp,td\.sp\{width:2px/.test(css),
-        topLlega: (d.querySelector(".hoja thead tr").children[1] || {}).textContent };
+        topLlega: (d.querySelector(".hoja thead tr").children[1] || {}).textContent,
+        // v26.37: la fecha de llegada al mismo tamaño que las unidades (14 px, .fl), no en letra chica
+        fecha: [...d.querySelectorAll(".hoja .fl")].map((x) => x.textContent).join(","), flCss: /\.fl\{display:block;font-size:14px/.test(css) };
     };
     btn[0].click();
     const provs = [...document.querySelectorAll("#impRepOv .imp-rep-prov")].map((c) => c.value + ":" + c.checked);
     const todos = await vista(false, false);
     const solo = await vista(true, false);
     const uno = await vista(false, true);
-    return { provs, todos, solo, uno, sinViejo: typeof _pedImpRepHtml === "undefined" };
+    // con sesión de supervisor: «Llegan» se valoriza con el FOB guardado del pedido, no con el de hoy
+    window.sbAuth = Object.assign(window.sbAuth || {}, { getAccessToken: async () => "tok-prueba" });
+    const guardado = await vista(true, false);
+    return { provs, todos, solo, uno, guardado, sinViejo: typeof _pedImpRepHtml === "undefined" };
   });
   if (r.err) { fail(r.err); await b.close(); return; }
   if (r.provs.join() !== "Fujian:true,Kangli:true") fail("el pop-up lista los proveedores tildados: " + r.provs);
@@ -75,6 +88,9 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (r.uno.tits.join("|") !== "Pedido Fujian|Sin pedir Fujian|Discontinuos Fujian" || r.uno.bandas.join("") !== "") fail("un proveedor tildado: sus hojas con el nombre en el título y sin rótulos: " + r.uno.tits.join("|") + " · " + r.uno.bandas.join("|"));
   if (r.uno.cods[2] !== "ZZ1E") fail("un proveedor: sólo SUS discontinuos: " + r.uno.cods[2]);
   if (!r.sinViejo) fail("el reporte de una tabla (v24.76-79) no vuelve");
+  if (r.guardado.topLlega !== "350" || !/^Fujian\|350\|/.test(r.guardado.tot[0] || "")) fail("con el FOB guardado del pedido, lo que llega vale 350 (100 u × u$s 3,50), no 200 con el FOB de hoy: " + r.guardado.topLlega + " · " + r.guardado.tot[0]);
+  if (!fobLeido) fail("el PDF tiene que leer gv_importados_curso_fob con la sesión");
+  if (r.todos.fecha !== "01/11" || !r.todos.flCss) fail("la fecha de llegada al mismo tamaño que las unidades (.fl 14 px): " + r.todos.fecha + " · " + r.todos.flCss);
   await b.close();
   if (!process.exitCode) console.log("✓ pedimp-reporte-pdf");
 })();

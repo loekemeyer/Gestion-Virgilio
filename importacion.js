@@ -1373,7 +1373,7 @@ function _pedImpEnCaminoHtml(it, cls) {
   const u = Math.max(0, Number(it.enCurso) || 0);
   if (!(u > 0)) return '<span style="color:#cbd5e1">0</span>';
   const f = _pedImpDdmm(it.reingresoEst);
-  return u.toLocaleString("es-AR") + (f ? ' <span class="' + (cls || 'pedimp-camino-f') + '" style="color:#0369a1;font-weight:700;font-size:12px" title="Llega (reingreso estimado)">' + f + '</span>' : ' <span style="color:#b45309;font-size:11px" title="Sin fecha de reingreso cargada">s/f</span>');
+  return u.toLocaleString("es-AR") + (f ? ' <span class="' + (cls || 'pedimp-camino-f') + '" style="color:#0369a1;font-weight:700" title="Llega (reingreso estimado)">' + f + '</span>' : ' <span style="color:#b45309;font-size:11px" title="Sin fecha de reingreso cargada">s/f</span>');
 }
 /* v24.74 (Thomas) — «FOB en viaje» = los u$s TOTALES de los pedidos en viaje, el mismo número
    de 🚢 En curso (gv_importados_pedidos_curso, una fila por PI + proveedor). No es una estimación
@@ -1858,15 +1858,28 @@ async function _pedImpDamianPartes(provs, opt) {
   // v26.34 (Luis: "tiene que figurar el FOB de lo que llegó para comparar con el pedido") — con conFob, abajo
   // de las unidades va el FOB u$s de lo que viene (unidades en camino × FOB unitario: la MISMA cuenta que la
   // solapa 🚢 En curso, gv_imp_pedidos_historial), así se lee al lado del FOB del pedido nuevo.
-  const usdCam = function (it) { const cam = Math.max(0, Number(it.enCurso) || 0); return cam > 0 && it.fobUni > 0 ? cam * it.fobUni : 0; };
+  // v26.37 (Luis: "que guarde el FOB del pedido en curso") — cada bache guarda el FOB con que se pidió
+  // (GV_Importados_Baches.fob_uni); lo que viene se valoriza con ESE precio (gv_importados_curso_fob, por
+  // artículo del maestro = it.det[].id). Lo que esa lectura no cubre —o si falla— va con el FOB de hoy.
+  const fobCur = ("cursoFob" in opt) ? opt.cursoFob : await _pedImpCursoFob();
+  const usdCam = function (it) {
+    const cam = Math.max(0, Number(it.enCurso) || 0); if (!(cam > 0)) return 0;
+    const fobHoy = it.fobUni > 0 ? it.fobUni : 0;
+    if (fobCur && (it.det || []).length) {
+      let u = 0, cub = 0;
+      it.det.forEach(function (d) { const x = fobCur[String(d.id)]; if (x) { u += Number(x.usd) || 0; cub += Number(x.pend) || 0; } });
+      if (cub > 0) return u + Math.max(0, cam - cub) * fobHoy;
+    }
+    return cam * fobHoy; };
   const camino = function (lista, conFob) {
     const con = lista.filter(function (it) { return (Number(it.enCurso) || 0) > 0; });
     const fs = con.map(function (it) { return ddmm(it.reingresoEst) || "s/f"; }).filter(function (x, k, a) { return a.indexOf(x) === k; });
     const una = fs.length === 1 ? fs[0] : "";
     return { hay: con.length > 0, una: una,
-      th: '<th>Llegan<small>' + (una || 'u · dd/mm') + '</small>' + (conFob ? '<small>FOB u$s</small>' : '') + '</th>',
+      // v26.37 (Luis: "que la fecha de llegada se vea un poquito más grande, al mismo tamaño de en curso") — .fl
+      th: '<th>Llegan' + (una ? '<span class="fl">' + una + '</span>' : '<small>u · dd/mm</small>') + (conFob ? '<small>FOB u$s</small>' : '') + '</th>',
       td: function (it) { const cam = Math.max(0, Number(it.enCurso) || 0), f = ddmm(it.reingresoEst), u = usdCam(it);
-        return '<td>' + (cam > 0 ? fmt(cam) + (una ? '' : '<small>' + (f || 's/f') + '</small>') +
+        return '<td>' + (cam > 0 ? fmt(cam) + (una ? '' : '<span class="fl">' + (f || 's/f') + '</span>') +
           (conFob ? '<small class="fobl">' + (u > 0 ? fmt(u) : 's/FOB') + '</small>' : '') : '—') + '</td>'; } };
   };
   const maxTd = function (it) { return '<td>' + fmt(it.objetivoUni) + '<small>' + fmt(it.proyUni) + '/mes</small></td>'; };
@@ -1960,6 +1973,19 @@ async function _pedImpDamianDisc(provs) {
     return { porProv: porProv, mot: mot };
   } catch (_e) { return null; }
 }
+/* v26.37 (Luis) — el FOB GUARDADO de lo que viene en camino, por artículo del maestro (Importados.id):
+   { "<id>": { pend, usd } }. La valoriza con el FOB de cada pedido (el del maestro si el bache es anterior
+   a la v26.37). null si no se pudo leer o no devolvió nada (sin sesión de supervisor): entonces el PDF usa
+   el FOB de hoy, como antes — "no pude leer" no es "u$s 0". */
+async function _pedImpCursoFob() {
+  try {
+    const rows = await _pedImpRpc("gv_importados_curso_fob", {});
+    if (!Array.isArray(rows) || !rows.length) return null;
+    const m = {};
+    rows.forEach(function (r) { if (r && r.importado_id != null) m[String(r.importado_id)] = { pend: Number(r.pendiente) || 0, usd: Number(r.usd) || 0 }; });
+    return m;
+  } catch (_e) { return null; }
+}
 /* v25.13 — el documento imprimible con las hojas (de uno o de varios proveedores). */
 function _pedImpDamianDoc(titulo, hojas) {
   // v25.3 (Thomas): la hoja va VERTICAL (A4 portrait); la tabla entra en los 194 mm útiles.
@@ -1974,7 +2000,7 @@ function _pedImpDamianDoc(titulo, hojas) {
     'th.sp,td.sp{width:2px;min-width:2px;padding:0;border-top:0;border-bottom:0}' +   // v24.55 (Thomas): columna vacía finita que separa bloques
     'table{border-collapse:collapse;margin:0 auto}th,td{border:1px solid #444;padding:1px 4px;vertical-align:middle;text-align:center;white-space:nowrap;line-height:1.1}th{font-size:14px}' +
     'th.tit{font-size:16px;font-weight:800;white-space:normal}.tot{font-weight:800}.tit3{font-size:16px;font-weight:800;text-align:center}.nota{border:0;text-align:left;padding-left:2px}.moq{font-size:10px;font-weight:800;display:block;line-height:1.05}' +
-    'th small,td small{display:block;font-weight:400;color:#555;font-size:10px}.dsc{white-space:normal;max-width:112px;line-height:1}td.pq{white-space:normal;max-width:60px;font-size:12px}' +
+    'th small,td small{display:block;font-weight:400;color:#555;font-size:10px}.fl{display:block;font-size:14px;font-weight:400;color:#111}.dsc{white-space:normal;max-width:112px;line-height:1}td.pq{white-space:normal;max-width:60px;font-size:12px}' +
     '.ft{padding:0}.ft img{width:42px;height:42px;object-fit:contain;display:block;margin:0 auto}.sf{color:#999;font-size:9px}' +
     'tr{page-break-inside:avoid}thead{display:table-header-group}' +
     'tr.prov>td{font-size:16px;font-weight:800;white-space:normal;border-top:3px solid #111;page-break-after:avoid;break-after:avoid}tr.prov>td.tot{font-size:14px}tr.prov>td.sp{border-top:0}tr.prov>td.nota{border:0}' +   // v26.31: un renglón-rótulo por proveedor
@@ -2137,7 +2163,8 @@ const _PED_IMP_RPC_ESCRITURA = ["gv_imp_carga_pedido_set", "gv_imp_cc_deuda_add"
   "gv_importado_pedido_ref", "gv_importados_resync", "importados_marcar_llegada", "importados_set_curso",
   "gv_imp_recibir", "gv_imp_recibir_contexto", "gv_imp_recibir_sin_pedido", "gv_imp_recibir_contexto_sin_pedido", "gv_imp_recepcion_historial", "gv_imp_recepcion_anular",   // v23.45 — sólo authenticated (supervisor)
   "gv_imp_cervantes_denegados",   // v25.37
-  "gv_imp_pi_editar", "gv_imp_pi_editores", "gv_imp_pi_ediciones"];   // v25.94 — editar una PI (quién, cuándo): sólo supervisor
+  "gv_imp_pi_editar", "gv_imp_pi_editores", "gv_imp_pi_ediciones",   // v25.94 — editar una PI (quién, cuándo): sólo supervisor
+  "gv_importados_curso_fob"];   // v26.37 — el FOB guardado en cada pedido en curso (lectura, sólo supervisor)
 async function _pedImpRpc(fn, body) {
   var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   if (_PED_IMP_RPC_ESCRITURA.indexOf(fn) >= 0) {

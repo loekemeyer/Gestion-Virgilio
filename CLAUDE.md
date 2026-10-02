@@ -4158,6 +4158,12 @@ totales en 14 y rótulo **«Mca»**. Medido con 3 proveedores: la tabla del pedi
 lado** (con 1 px «Stock» y «Llegan» se pegaban al borde): 557 px. **Y «Llegan» lleva el FOB u$s de lo que viene**
 (unidades en camino × FOB unitario, la misma cuenta de 🚢 En curso), en la celda y sumado arriba y en el rótulo de
 cada proveedor, para compararlo con el FOB del pedido. Sólo en la hoja del pedido.
+**v26.37 (Luis: *"que guarde el FOB del pedido en curso"*): cada bache GUARDA el FOB con que se pidió**
+(`GV_Importados_Baches.fob_uni`, lo pone el trigger `gv_importados_bache_fob` al insertar, con el FOB del maestro de
+ese momento). 🚢 En curso, el detalle del PI, 📜 Historial y la columna «Llegan» valorizan con
+`coalesce(FOB del bache, FOB del maestro)`; el PDF lo lee por `gv_importados_curso_fob()` (sólo supervisor; sin
+lectura, FOB de hoy). Los 89 baches en curso al 02/10 no tienen FOB guardado (backfill pendiente del «sí»). La fecha
+de llegada va al **mismo tamaño que las unidades** (PDF `.fl` 14 px y pantalla). `sql/gv_importados_bache_fob_v2637.sql`.
 `tests/pedimp-reporte-pdf.cjs`.
 
 ## ⚠ REGLA (2026-10-01, v25.94): ✏️ EDITAR PI — quién corrige, qué día y a qué hora
