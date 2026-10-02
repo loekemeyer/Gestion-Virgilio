@@ -110,7 +110,11 @@ const DATOS = {
   pickHs: [
     { legajo: 8, opcion: "TP", texto: "E30A", ts_cliente: iso(T0 - 3.5 * H), ts_inicio: iso(T0 - 4 * H) },
     { legajo: 1, opcion: "EP", texto: "E30A", ts_cliente: iso(T0 - 2 * H), ts_inicio: null },
-    { legajo: 8, opcion: "EP", texto: "e30a", ts_cliente: iso(T0 - 1.5 * H), ts_inicio: null }
+    { legajo: 8, opcion: "EP", texto: "e30a", ts_cliente: iso(T0 - 1.5 * H), ts_inicio: null },
+    /* v26.35 (D15): E31A pickeada (3 h → 2,5 h) y armada (2 h → 1 h); un APX anulado no cuenta. */
+    { legajo: 8,  opcion: "TP",  texto: "E31A", ts_cliente: iso(T0 - 2.5 * H), ts_inicio: iso(T0 - 3 * H) },
+    { legajo: 12, opcion: "APX", texto: "E31A", ts_cliente: iso(T0 - 2.2 * H), ts_inicio: null },
+    { legajo: 12, opcion: "TAP", texto: "E31A", ts_cliente: iso(T0 - 1 * H),   ts_inicio: iso(T0 - 2 * H) }
   ],
   fichadas: [{ legajo: 12, ts_cliente: iso(Date.now() - 4 * H) }],
   empleados: [
@@ -148,7 +152,7 @@ function responder(url) {
   if (q.includes("/Empleados"))                  return DATOS.empleados;
   if (q.includes("/rpc/gv_tv_clave_actual"))     return { clave: "1234", cambia_en_s: 60 };
   if (q.includes("/Registros_Produccion_Virgilio")) {
-    if (q.includes("opcion=in.(EP,TP)")) return DATOS.pickHs;   // v26.33: hora del picking de la tanda
+    if (q.includes("opcion=in.(EP,TP,AP,TAP)")) return DATOS.pickHs;   // v26.35: picking y armado   // v26.33: hora del picking de la tanda
     return q.includes("opcion=in.(CCN,FSS)") ? DATOS.ccn : DATOS.eventos;
   }
   return [];
@@ -245,8 +249,32 @@ function responder(url) {
     ok(!iPrueba || iPrueba === i1 || iPrueba === f1 || iPrueba === i2 || !hs.includes(iPrueba), "v26.33: contó el EP del legajo de prueba (" + iPrueba + "): «" + hs + "»");
   } else ok(/→/.test(hs) && /desde/.test(hs), "v26.33: no muestra la hora del picking: «" + hs + "»");
 
+  // v26.35 (D15): la tanda armada muestra también la hora de inicio y fin del ARMADO
+  await p.keyboard.press("Escape");
+  /* E31A ya está terminada y la tabla de la pared no la dibuja: se abre su pop-up por el mismo
+     resolvedor de clicks (.cx + data-pop), que es lo que hace la fila. */
+  const hayE31 = await p.evaluate(() => {
+    const d = document.createElement("div");
+    d.className = "cx"; d.setAttribute("data-pop", "tanda"); d.setAttribute("data-k", "E31A");
+    document.body.appendChild(d); d.click(); d.remove();
+    const pop = document.getElementById("pop");
+    return !!(pop && !pop.classList.contains("hide") && /Tanda E31A/.test(pop.textContent || ""));
+  });
+  if (hayE31) {
+    await p.waitForFunction(() => { const n = document.getElementById("popArmHs"); return n && n.textContent.trim().length > 0; },
+      null, { timeout: 5000 }).catch(() => {});
+    const r31 = await p.evaluate(() => ({ arm: (document.getElementById("popArmHs") || {}).textContent || "",
+      pick: (document.getElementById("popPickHs") || {}).textContent || "" }));
+    const ai = hmAR(T0 - 2 * H), af = hmAR(T0 - 1 * H), pi = hmAR(T0 - 3 * H), pf = hmAR(T0 - 2.5 * H);
+    if (ai && af && pi && pf) {
+      ok(r31.arm.includes(ai + " → " + af + " (1:00)"), "v26.35: no muestra el armado " + ai + " → " + af + " (1:00): «" + r31.arm + "»");
+      ok(!/desde/.test(r31.arm), "v26.35: el APX anulado contó como armado en curso: «" + r31.arm + "»");
+      ok(r31.pick.includes(pi + " → " + pf + " (0:30)"), "v26.35: E31A no muestra su picking " + pi + " → " + pf + ": «" + r31.pick + "»");
+    } else ok(/→/.test(r31.arm), "v26.35: no muestra la hora del armado: «" + r31.arm + "»");
+  } else ok(false, "v26.35: no se abrió el pop-up de la tanda E31A");
+
   await b.close();
 
   if (mal.length) { console.log("mon-admin: ✗ FAIL\n  - " + mal.join("\n  - ")); process.exit(1); }
-  console.log("mon-admin: ✓ OK (frescura + tablero + 3 pop-ups + hora del picking)");
+  console.log("mon-admin: ✓ OK (frescura + tablero + 3 pop-ups + hora del picking y del armado)");
 })().catch((e) => { console.log("mon-admin: ✗ ERROR " + e.message); process.exit(1); });

@@ -1,3 +1,11 @@
+## Nota v26.35 (2026-10-02) — Mon. Admin: la tanda muestra también la HORA del ARMADO (D15)
+
+Luis, D15 «sí»: el pop-up de la tanda completa la fila **Armado** igual que la de Picking (v26.33): cada ciclo
+AP → TAP `14:40 → 15:40 (1:00)`, un AP sin TAP es `desde HH:MM`, el día delante si no es de hoy. Los ciclos se
+arman **por legajo** (dos armadores en paralelo no se pisan) y los anulados (EPX / APX) no entran. Sigue siendo UNA
+sola consulta al abrir la tanda (EP/TP/AP/TAP en 45 días, por `opcion + ts_cliente`); si falla, el pop-up queda
+igual. Sólo `monitor/build-admin.cjs`. `tests/mon-admin.cjs`.
+
 ## Nota v26.33 (2026-10-02) — Mon. Admin: la tanda muestra la HORA de inicio y fin del picking
 
 Luis: *"que en el monitor admin muestre la hora de inicio y fin de picking si las tiene"*. El pop-up de la
