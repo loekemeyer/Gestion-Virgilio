@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.11"></script>
+<script type="module" src="recepcion.js?v=26.12"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6658,6 +6658,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="planim-body">
       <div class="sup-actions sup-secondary cfg-actions">
         <button class="sup-action-btn" onclick="cfgGo(openPrintStation)"><span class="sup-ico">🖨️</span><span>Cola de impresión</span></button>
+        <!-- v26.12 (Luis, 02/10): qué hoja sale en qué impresora, por el programa de la PC (sin kiosco) -->
+        <button class="sup-action-btn" onclick="cfgGo(openImpresoras)" title="Elegir la impresora de cada hoja (picking, armado, facturado) y prender la impresión automática, con el programa de impresión de la PC"><span class="sup-ico">🧩</span><span>Impresoras</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openMailsEditor)"><span class="sup-ico">✉️</span><span>Mails autorizados</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openLugarEditor)"><span class="sup-ico">📍</span><span>Lugares del depósito</span></button>
         <button class="sup-action-btn" onclick="cfgGo(openPlanimMapa)" title="Ver el depósito dibujado: cada góndola con sus celdas, el código que va en cada una y cuántas cajas entran"><span class="sup-ico">🗺️</span><span>Mapa de góndolas</span></button>
@@ -10475,7 +10477,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.11";
+const APP_VERSION = "v26.12";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -54709,8 +54711,15 @@ function psToggle(){ psSetAuto(!psIsAuto()); }
 /* v8.59 — psPoll(force): con force=true revisa aunque el auto esté apagado ("Revisar ahora").
    Registra última revisión OK y errores de conexión para mostrarlos (visibilidad de si está vivo). */
 async function psPoll(force){
-  if (!force && !psIsAuto()) return;
+  // v26.12 — además de la estación del navegador (psIsAuto, por dispositivo), revisa si
+  // picking o armado están mandados al PROGRAMA de impresión de la PC (GV_Impresion_Regla).
+  try { await gvImpCfgCargar(); } catch (_e) {}
+  if (!force && !psIsAuto() && !gvImpAlgunAuto()) return;
   _psEnsure();
+  // Sin la configuración de impresión NO se avanza: no se sabe si va al programa, al
+  // navegador o a ningún lado. Se reintenta en la próxima vuelta (una lectura rota no es un "no").
+  if (!_gvImp.cfg) { _ps.lastErr = "no pude leer la configuración de impresión"; _psUpdatePollInfo(); return; }
+  try { await gvImpReintentarPendientes(); } catch (_e) {}
   const since = _ps.lastSeen || new Date(Date.now() - 3600000).toISOString();
   try {
     const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gt." + encodeURIComponent(since) + "&select=texto,ts_cliente,legajo&order=ts_cliente.asc&limit=2000";
@@ -54727,7 +54736,12 @@ async function psPoll(force){
         fresh.push({ np: np, tanda: String(p[2] || "").trim().toUpperCase(), resumen: resumen, armadorLeg: String(ev.legajo || "") });
       });
       _ps.lastSeen = maxTs; try { localStorage.setItem(PS_LASTSEEN_KEY, maxTs); } catch (_e) {}
-      if (fresh.length) await psPrintBatch(fresh);
+      if (fresh.length) {
+        const mArm = gvImpModo("armado");
+        if (mArm === "programa") await psEncolarBatch(fresh);                 // v26.12 — a la impresora elegida
+        else if (mArm === "navegador" && (force || psIsAuto())) await psPrintBatch(fresh); // como siempre
+        else fresh.forEach(function (x){ psMarkPrinted(x.np); });               // apagado: no se imprime
+      }
     }
     // v25.51 — HOJA DE PICKING al terminar el picking (TP): una por tanda, sale sola.
     try {
@@ -54735,7 +54749,11 @@ async function psPoll(force){
       if (tps.length) {
         const printed = psGetPrinted(); const nuevas = [];
         tps.forEach(function (ev){ _ps.lastSeenTp = String(ev.ts_cliente); const t = String(ev.texto || "").trim().toUpperCase(); const k = PK_HOJA_PREFIJO + t; if (t && !printed.has(k) && nuevas.indexOf(t) < 0) { psMarkPrinted(k); nuevas.push(t); } });
-        if (nuevas.length) await pkHojaImprimir(nuevas, true, "estacion");
+        if (nuevas.length) {
+          const mPk = gvImpModo("picking");
+          if (mPk === "programa") await pkHojaEncolar(nuevas);                                  // v26.12
+          else if (mPk === "navegador" && (force || psIsAuto())) await pkHojaImprimir(nuevas, true, "estacion");
+        }
       }
     } catch (_e2) {}
   } catch (_e){ _ps.lastErr = "sin conexión con Supabase"; }
@@ -54818,10 +54836,10 @@ function psDrain(){
   try { remitoPrintDoc(armadoRemitoInnerHtml(d)); } catch (_e){}
   setTimeout(function (){ if (_ps){ _ps.printing = false; psDrain(); } }, 2600);   // serializado: 1 hoja cada ~2.6 s
 }
-function psLog(d){
+function psLog(d, nota){
   _psEnsure();
   let hora = ""; try { hora = new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: TZ_AR }); } catch (_e) {}
-  _ps.log.unshift({ d: d, hora: hora });
+  _ps.log.unshift({ d: d, hora: hora, nota: nota || "" });
   if (_ps.log.length > 60) _ps.log.length = 60;
   psRender();
 }
@@ -54866,6 +54884,7 @@ function openPrintStation(){
   ov.classList.add("show");
   try { etlLoadGlobal(); } catch (_e) {}   // sincroniza el switch GLOBAL de etiquetas de lío antes de mostrarlo
   try { facPrintCfgLoad().then(function(){ if (document.getElementById("psBody")) psRender(); }); } catch (_e) {}   // v10.21 — trae el switch FACTURADO global (Supabase) y re-renderiza
+  try { gvImpCfgCargar(true).then(function(){ if (document.getElementById("psBody")) psRender(); }); } catch (_e) {}   // v26.12 — qué va al programa de impresión
   if (psIsAuto()) psStart(); else psRender();
 }
 function closePrintStation(){ const ov = document.getElementById("printStationModal"); if (ov) ov.classList.remove("show"); }
@@ -54873,6 +54892,10 @@ function psRender(){
   const body = document.getElementById("psBody"); if (!body) return;
   const on = psIsAuto(); const running = !!(_ps && _ps.timer);
   let h = "";
+  // v26.12 — el programa de impresión en la PC (sin kiosco). Lo que va al programa NO usa los interruptores de abajo.
+  h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🧩 Programa de impresión en la PC (sin kiosco)</span>' +
+    '<button class="ps-test" style="width:auto;padding:6px 12px;font-size:12px;" onclick="closePrintStation();openImpresoras()">Configurar impresoras</button></div>' +
+    '<div class="ps-help" style="margin:8px 0 0;">' + escapeHtml(gvImpResumenTexto()) + '. Lo que va al programa sale en la impresora elegida, sin cuadro; los interruptores de abajo quedan para lo que sigue en «navegador».</div></div>';
   h += '<div class="ps-toggle-card"><div class="ps-tc-top"><span class="ps-tc-t">🖨️ Auto-imprimir remitos al terminar armado</span>' +
     '<span class="sup-sw' + (on ? " on" : "") + '" onclick="psToggle()" role="switch"><span class="sup-sw-k"></span></span></div>' +
     '<div class="ps-status ' + (on ? "on" : "") + '">' + (on ? (running ? "🟢 Activo — escuchando pedidos terminados (cada 12 s)" : "🟢 Activo") : "⚪ Apagado — los remitos no se imprimen solos") + '</div>' +
@@ -54899,7 +54922,7 @@ function psRender(){
   if (!log.length) h += '<div class="ps-empty">Todavía no se imprimió nada.</div>';
   else h += '<div class="ps-log">' + log.map(function (e, i){
     const d = e.d;
-    return '<div class="ps-row"><div class="ps-row-main"><span class="ps-np">NP ' + escapeHtml(String(d.np)) + '</span> <span class="ps-row-sub">' + escapeHtml(d.rs || "—") + ' · ' + d.total + ' cajas · ' + d.nLios + ' líos</span></div><div class="ps-row-right"><span class="ps-hora">' + escapeHtml(e.hora) + '</span><button class="ps-reprint" onclick="psReprint(' + i + ')">Re-imprimir</button></div></div>';
+    return '<div class="ps-row"><div class="ps-row-main"><span class="ps-np">NP ' + escapeHtml(String(d.np)) + '</span> <span class="ps-row-sub">' + escapeHtml(d.rs || "—") + ' · ' + d.total + ' cajas · ' + d.nLios + ' líos' + (e.nota ? ' · ' + escapeHtml(e.nota) : '') + '</span></div><div class="ps-row-right"><span class="ps-hora">' + escapeHtml(e.hora) + '</span><button class="ps-reprint" onclick="psReprint(' + i + ')">Re-imprimir</button></div></div>';
   }).join("") + '</div>';
   body.innerHTML = h;
   try { etlLegRenderList(); } catch (_e) {}   // llena #etlLegList (fetch async, placeholder ya en el DOM)
@@ -54938,6 +54961,12 @@ async function facPrintSetPref(v){
 }
 function facPrintToggle(){ facPrintSetPref(facPrintIsOn() ? "0" : "1").then(function(){ psRender(); }); }
 async function facPrintFacturado(np, tanda){
+  const inner = await facFacturadoInner(np, tanda);
+  if (inner) remitoPrintDoc(inner);
+}
+/* v26.12 — arma la hoja FACTURADO (sin imprimir) para que la use el navegador
+   (facPrintFacturado) o el programa de impresión de la PC (gvImpEncolar). null = no hay hoja. */
+async function facFacturadoInner(np, tanda){
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const npE = encodeURIComponent(String(np));
@@ -54959,7 +54988,7 @@ async function facPrintFacturado(np, tanda){
     const tal = (parts[0] || [])[0] || {};
     const seg = String(tal.texto || "").split("|");
     const resumen = seg[3] || "";
-    if (!resumen){ facShowToast("NP " + np + ": sin armado (TAL) → no hay remito para imprimir"); return; }
+    if (!resumen){ facShowToast("NP " + np + ": sin armado (TAL) → no hay remito para imprimir"); return null; }
     const tandaU = String(tanda || seg[2] || "").trim().toUpperCase();
     let pickerLeg = "";
     if (tandaU){
@@ -54979,12 +55008,28 @@ async function facPrintFacturado(np, tanda){
       faltantes: (parts[2] || []).map(function(x){ return { cod: String(x.cod_art || "").trim(), cajas: Number(x.cajas_falto) || 0 }; })
     };
     const d = armadoRemitoData(row);
-    remitoPrintDoc(armadoRemitoInnerHtml(d, "FACTURADO"));
-  } catch(_e){}
+    return armadoRemitoInnerHtml(d, "FACTURADO");
+  } catch(_e){ return null; }
 }
 /* Se llama en facTickNP tras marcar la NP facturada. En el 1er tic de una PC pregunta
    UNA vez si querés que imprima ahí (y guarda la respuesta); después imprime solo. */
 async function facMaybePrintFacturado(np, tanda){
+  // v26.12 (Luis) — con el FACTURADO mandado al programa de impresión de una PC, la hoja va
+  // a SU impresora: sale aunque se exporte el Excel desde otra PC o desde un celular, y sin
+  // cuadro de impresión. Sin regla para FACTURADO, todo sigue como siempre (abajo).
+  try { await gvImpCfgCargar(); } catch (_e) {}
+  const modo = gvImpModo("facturado");
+  if (modo === "apagado") return;
+  if (modo === "programa") {
+    const inner = await facFacturadoInner(np, tanda);
+    if (!inner) return;
+    const res = await gvImpEncolar("facturado", np, inner, "facturacion");
+    if (res.estado !== "encolado" && res.estado !== "duplicado") {
+      gvImpGuardarPendiente("facturado", np, inner, "facturacion", res);
+      facShowToast("NP " + np + ": el FACTURADO no llegó al programa de impresión (" + (res.error || res.estado) + ") — se reintenta solo");
+    }
+    return;
+  }
   if (_facIsMobile()) return;                      // v10.21 — celulares NUNCA imprimen
   if (_facPrintGlobal === null) { try { await facPrintCfgLoad(); } catch(_e){} }   // asegurar el cache global
   const pref = facPrintPref();
@@ -54999,6 +55044,352 @@ async function facMaybePrintFacturado(np, tanda){
     if (!ok) return;
   }
   await facPrintFacturado(np, tanda);
+}
+
+/* =========================================================
+   v26.12 (Luis, 02/10) — IMPRESIÓN POR PROGRAMA EN LA PC (sin kiosco de Chrome).
+   Luis: "elegir diferentes impresoras conectadas a la máquina para elegir dónde se imprime
+   cada cosa (ajeno a la configuración predeterminada de Chrome) … y activar la impresión
+   automática". La PC del depósito no puede abrir Chrome en kiosco.
+
+   Chrome no deja que una página vea ni elija impresoras. Lo hace un PROGRAMA en la PC
+   (tools/impresion/GV-Impresion.ps1, desde la carpeta compartida): le pasa a la base sus
+   impresoras, toma las hojas que GV le manda y las imprime en la elegida, sin cuadro.
+
+   Por tipo (GV_Impresion_Regla, se elige en Configuración → Impresoras):
+     sin PC  → "navegador": TODO COMO HOY (estación del navegador / fac_print_facturado)
+     PC+auto → "programa":  GV arma la hoja y la manda (gv_imp_encolar); la imprime el programa
+     PC, auto apagado → "apagado": no sale sola
+   Picking y armado los arma cualquier GV de supervisor abierto en una PC (psPoll); la base
+   no deja que la misma hoja salga dos veces (clave tipo:ref). El facturado lo arma la
+   PC/celular que exporta el Excel ISIS. Si el envío falla, queda en gv_imp_pend_v1 y se
+   reintenta solo. SQL: sql/gv_impresion_programa_v2611.sql. Test: tests/imp-programa.cjs.
+   ========================================================= */
+var _gvImp = { cfg: null, ts: 0, cargando: null, err: "", trabajos: null, trabErr: "", timer: null, msg: "" };
+var GV_IMP_TIPOS = [
+  ["picking",   "📋 Picking",   "al terminar el picking"],
+  ["armado",    "📦 Armado",    "al terminar el armado de cada NP"],
+  ["facturado", "🧾 Facturado", "al exportar el Excel ISIS o tildar la NP"]
+];
+var GV_IMP_PEND_KEY = "gv_imp_pend_v1";
+/* El documento completo que imprime el programa: el mismo que remitoPrintDoc (CSS de
+   impresión + hoja), con el auto-ajuste de letra adentro (≡ autofit de remitoPrintDoc:
+   ancho 703 px = A4 − 2·12 mm, alto útil 1010 px, letra de 11 a 16 px). */
+function remitoDocHtml(inner){
+  return '<!doctype html><html><head><meta charset="utf-8"><title>GV</title><style>' + REMITO_PRINT_CSS +
+    'html,body{background:#fff;}body{width:703px;}</style></head><body><div class="rmt-sheet" id="rmtFit">' + inner + '</div>' +
+    '<script>(function(){try{var el=document.getElementById("rmtFit");var lo=11,hi=16,best=15;' +
+    'for(var i=0;i<18;i++){var mid=(lo+hi)/2;el.style.fontSize=mid+"px";if(el.scrollHeight<=1010){best=mid;lo=mid;}else{hi=mid;}}' +
+    'el.style.fontSize=best+"px";}catch(e){}})();<\/script></body></html>';
+}
+function _gvImpH(h){ return h || { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" }; }
+async function gvImpCfgCargar(forzar){
+  if (!forzar && _gvImp.cfg && Date.now() - _gvImp.ts < 60000) return _gvImp.cfg;
+  if (_gvImp.cargando) return _gvImp.cargando;
+  _gvImp.cargando = (async function(){
+    try {
+      let h = null; try { h = await facAuthWriteHeaders(); } catch (_e) {}
+      let r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_imp_config", { method: "POST", headers: _gvImpH(h), body: "{}", cache: "no-store" });
+      if (!r.ok && h) r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_imp_config", { method: "POST", headers: _gvImpH(null), body: "{}", cache: "no-store" });   // sesión vencida: igual sirve con la pública
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      _gvImp.cfg = await r.json(); _gvImp.ts = Date.now(); _gvImp.err = "";
+    } catch (e) { _gvImp.err = String((e && e.message) || e); }
+    finally { _gvImp.cargando = null; }
+    return _gvImp.cfg;
+  })();
+  return _gvImp.cargando;
+}
+function gvImpRegla(tipo){
+  const c = _gvImp.cfg; if (!c || !Array.isArray(c.reglas)) return null;
+  for (let i = 0; i < c.reglas.length; i++) if (c.reglas[i].tipo === tipo) return c.reglas[i];
+  return null;
+}
+function gvImpPc(pc){
+  const c = _gvImp.cfg; if (!c || !Array.isArray(c.pcs) || !pc) return null;
+  for (let i = 0; i < c.pcs.length; i++) if (c.pcs[i].pc === pc) return c.pcs[i];
+  return null;
+}
+/* "programa" · "apagado" · "navegador" (sin regla = como hoy) · null (no se pudo leer) */
+function gvImpModo(tipo){
+  if (!_gvImp.cfg) return null;
+  const r = gvImpRegla(tipo);
+  if (!r || !r.pc || !r.impresora) return "navegador";
+  return r.auto ? "programa" : "apagado";
+}
+function gvImpAlgunAuto(){ return gvImpModo("picking") === "programa" || gvImpModo("armado") === "programa"; }
+async function gvImpEncolar(tipo, ref, inner, origen, pc, impresora){
+  let h = null; try { h = await facAuthWriteHeaders(); } catch (_e) {}
+  if (!h) return { estado: "sin_sesion", error: "sin sesión de supervisor" };
+  const body = { p_tipo: tipo, p_ref: String(ref), p_html: remitoDocHtml(inner), p_origen: origen || null };
+  if (pc) { body.p_pc = pc; body.p_impresora = impresora || ""; }
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_imp_encolar", { method: "POST", headers: h, body: JSON.stringify(body) });
+    if (!r.ok) { let m = ""; try { m = (await r.json()).message || ""; } catch (_e) {} return { estado: "error", error: m || ("HTTP " + r.status) }; }
+    return await r.json();
+  } catch (e) { return { estado: "error", error: String((e && e.message) || e) }; }
+}
+/* Un envío que no llegó (sin red, sin sesión) NO se pierde: queda en este equipo y se
+   reintenta en cada vuelta (psPoll y gvImpVigilar). Lo de más de 12 h se descarta, igual
+   que en la base. */
+function _gvImpPendLeer(){ try { return JSON.parse(localStorage.getItem(GV_IMP_PEND_KEY) || "[]") || []; } catch (_e) { return []; } }
+function _gvImpPendGuardar(a){ try { localStorage.setItem(GV_IMP_PEND_KEY, JSON.stringify(a.slice(-40))); } catch (_e) {} }
+function gvImpGuardarPendiente(tipo, ref, inner, origen, res){
+  const a = _gvImpPendLeer().filter(function (x){ return !(x.tipo === tipo && x.ref === String(ref)); });
+  a.push({ tipo: tipo, ref: String(ref), inner: inner, origen: origen || "", ts: Date.now(), err: (res && (res.error || res.estado)) || "" });
+  _gvImpPendGuardar(a);
+}
+async function gvImpReintentarPendientes(){
+  const a = _gvImpPendLeer(); if (!a.length) return 0;
+  const quedan = []; let ok = 0;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    if (!x || Date.now() - (Number(x.ts) || 0) > 12 * 3600000) continue;
+    const res = await gvImpEncolar(x.tipo, x.ref, x.inner, x.origen);
+    if (res.estado === "error" || res.estado === "sin_sesion") { x.err = res.error || res.estado; quedan.push(x); }
+    else ok++;
+  }
+  _gvImpPendGuardar(quedan);
+  return ok;
+}
+async function psEncolarBatch(items){
+  const ds = await _armadoRemitoDataForItems(items);
+  for (let k = 0; k < ds.length; k++) {
+    const d = ds[k];
+    psMarkPrinted(d.np);
+    const inner = armadoRemitoInnerHtml(d);
+    const res = await gvImpEncolar("armado", d.np, inner, "estacion");
+    if (res.estado === "encolado" || res.estado === "duplicado") psLog(d, "→ " + (res.impresora || "programa") + (res.estado === "duplicado" ? " (ya estaba)" : ""));
+    else if (res.estado === "error" || res.estado === "sin_sesion") { gvImpGuardarPendiente("armado", d.np, inner, "estacion", res); psLog(d, "⚠ no llegó al programa (" + (res.error || res.estado) + "), se reintenta"); }
+    else psLog(d, "no se imprime (" + res.estado + ")");
+  }
+}
+async function pkHojaEncolar(tandas){
+  const ds = await pkHojaDatos(tandas);
+  for (let k = 0; k < ds.length; k++) {
+    const inner = pkHojaHtml(ds[k]);
+    const res = await gvImpEncolar("picking", ds[k].tanda, inner, "estacion");
+    if (res.estado === "error" || res.estado === "sin_sesion") gvImpGuardarPendiente("picking", ds[k].tanda, inner, "estacion", res);
+  }
+  return ds.length;
+}
+/* Cada minuto, en un GV de supervisor: refresca la config, reintenta lo que no llegó y,
+   en una PC (no en el celular), arranca la vuelta de picking/armado si alguno va al programa. */
+async function gvImpVigilar(){
+  try {
+    if (!window.__isSupervisor || window.__tvKioskMode) return;
+    await gvImpCfgCargar();
+    await gvImpReintentarPendientes();
+    if (!_facIsMobile() && gvImpAlgunAuto() && !(_ps && _ps.timer)) psStart();
+  } catch (_e) {}
+}
+setTimeout(gvImpVigilar, 8000);
+setInterval(gvImpVigilar, 60000);
+
+/* ---------- Configuración → Impresoras ---------- */
+var GV_IMP_CSS =
+  "#gvImpOv{display:none;position:fixed;inset:0;background:#f1f5f9;z-index:1250;overflow:auto;padding:14px;}" +
+  "#gvImpOv.show{display:block;}" +
+  "#gvImpOv .gi-wrap{max-width:880px;margin:0 auto;}" +
+  "#gvImpOv .gi-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}" +
+  "#gvImpOv .gi-title{font-size:18px;font-weight:800;color:#0f172a;}" +
+  "#gvImpOv button{width:auto;margin:0;padding:6px 11px;font-size:13px;font-weight:700;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;cursor:pointer;white-space:nowrap;}" +
+  "#gvImpOv button:disabled{opacity:.45;cursor:default;}" +
+  "#gvImpOv select{font:inherit;font-size:13px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;max-width:230px;}" +
+  "#gvImpOv .gi-card{background:#fff;border:1px solid #e2e8f0;border-radius:11px;padding:10px 12px;margin-bottom:10px;}" +
+  "#gvImpOv .gi-t{font-size:13px;font-weight:800;color:#0f172a;margin-bottom:6px;}" +
+  "#gvImpOv .gi-help{font-size:12.5px;line-height:1.45;color:#475569;}" +
+  "#gvImpOv .gi-tbl{border-collapse:collapse;margin:0 auto;font-size:13px;}" +
+  "#gvImpOv .gi-tbl th{font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.03em;padding:4px 7px;text-align:center;border-bottom:1px solid #e2e8f0;}" +
+  "#gvImpOv .gi-tbl td{padding:5px 7px;text-align:center;border-bottom:1px solid #f1f5f9;vertical-align:middle;}" +
+  "#gvImpOv .gi-sub{display:block;font-size:11px;color:#64748b;}" +
+  "#gvImpOv .gi-clave{font-family:Consolas,Menlo,monospace;font-size:16px;font-weight:800;letter-spacing:.06em;background:#f1f5f9;border-radius:7px;padding:4px 9px;}" +
+  "#gvImpOv .gi-est{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11.5px;font-weight:800;}" +
+  "#gvImpOv .gi-est.impreso{background:#dcfce7;color:#166534;}#gvImpOv .gi-est.pendiente{background:#f1f5f9;color:#475569;}" +
+  "#gvImpOv .gi-est.imprimiendo{background:#dbeafe;color:#1e40af;}#gvImpOv .gi-est.error{background:#fee2e2;color:#991b1b;}" +
+  "#gvImpOv .gi-est.vencido,#gvImpOv .gi-est.cancelado{background:#ffedd5;color:#9a3412;}" +
+  "#gvImpOv .gi-err{display:block;font-size:11px;color:#b91c1c;max-width:280px;margin:0 auto;}" +
+  "#gvImpOv .gi-msg{font-size:12.5px;font-weight:700;color:#1e40af;min-height:16px;margin:4px 0 8px;text-align:center;}";
+function openImpresoras(){
+  if (!requireSupervisor()) return;
+  if (!document.getElementById("gvImpCss")) { const st = document.createElement("style"); st.id = "gvImpCss"; st.textContent = GV_IMP_CSS; document.head.appendChild(st); }
+  let ov = document.getElementById("gvImpOv");
+  if (!ov) { ov = document.createElement("div"); ov.id = "gvImpOv"; document.body.appendChild(ov); }
+  ov.innerHTML = '<div class="gi-wrap"><div class="gi-head"><span class="gi-title">🖨️ Impresoras · programa en la PC</span>' +
+    '<span><button onclick="gvImpRender(true)">↻ Actualizar</button> <button onclick="closeImpresoras()">Cerrar</button></span></div>' +
+    '<div class="gi-msg" id="gvImpMsg"></div><div id="gvImpBody"><div class="gi-help" style="text-align:center;">Cargando…</div></div></div>';
+  ov.classList.add("show");
+  _gvImp.msg = "";
+  gvImpRender(true);
+  if (_gvImp.timer) clearInterval(_gvImp.timer);
+  _gvImp.timer = setInterval(function (){ if (document.getElementById("gvImpOv") && document.getElementById("gvImpOv").classList.contains("show")) gvImpRender(true); }, 10000);
+}
+function closeImpresoras(){
+  const ov = document.getElementById("gvImpOv"); if (ov) ov.classList.remove("show");
+  if (_gvImp.timer) { clearInterval(_gvImp.timer); _gvImp.timer = null; }
+}
+function _gvImpMsg(m){ _gvImp.msg = m || ""; const el = document.getElementById("gvImpMsg"); if (el) el.textContent = _gvImp.msg; }
+async function gvImpTrabajosCargar(){
+  let h = null; try { h = await facAuthWriteHeaders(); } catch (_e) {}
+  if (!h) { _gvImp.trabajos = null; _gvImp.trabErr = "iniciá sesión de supervisor para ver los trabajos"; return; }
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_imp_trabajos", { method: "POST", headers: h, body: JSON.stringify({ p_limite: 30 }), cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    _gvImp.trabajos = await r.json(); _gvImp.trabErr = "";
+  } catch (e) { _gvImp.trabErr = "no pude leer los trabajos (" + String((e && e.message) || e) + ")"; }
+}
+function _gvImpHace(ts){
+  if (!ts) return "nunca";
+  const s = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 1000));
+  if (s < 90) return "hace " + s + " s";
+  if (s < 5400) return "hace " + Math.round(s / 60) + " min";
+  if (s < 172800) return "hace " + Math.round(s / 3600) + " h";
+  return "hace " + Math.round(s / 86400) + " días";
+}
+function _gvImpHora(ts){
+  if (!ts) return "—";
+  try {
+    const d = new Date(ts), hoy = new Date();
+    const hm = d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TZ_AR });
+    const dm = d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: TZ_AR });
+    const dmHoy = hoy.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", timeZone: TZ_AR });
+    return dm === dmHoy ? hm : dm + " " + hm;
+  } catch (_e) { return "—"; }
+}
+async function gvImpRender(cargar){
+  if (cargar) { await Promise.all([gvImpCfgCargar(true), gvImpTrabajosCargar()]); }
+  const body = document.getElementById("gvImpBody"); if (!body) return;
+  const c = _gvImp.cfg;
+  if (!c) { body.innerHTML = '<div class="gi-card gi-help" style="color:#b91c1c;">No pude leer la configuración de impresión' + (_gvImp.err ? " (" + escapeHtml(_gvImp.err) + ")" : "") + '. Probá «Actualizar».</div>'; return; }
+  const pcs = Array.isArray(c.pcs) ? c.pcs : [];
+  let h = "";
+  h += '<div class="gi-card gi-help">El <b>programa de impresión</b> tiene que estar abierto en la PC de la impresora (carpeta compartida → <b>Iniciar GV-Impresion.bat</b>). GV le manda cada hoja y la imprime <b>sin cuadro</b>, en la impresora elegida. ' +
+       'Un tipo <b>sin PC</b> sigue como hoy (navegador). Picking y armado los arma GV abierto en alguna PC de supervisor; el facturado, el equipo que exporta el Excel ISIS.</div>';
+  // clave del programa
+  h += '<div class="gi-card"><div class="gi-t">🔑 Clave del programa</div>';
+  if (c.clave) h += '<span class="gi-clave" id="gvImpClave">' + escapeHtml(c.clave) + '</span> <button onclick="gvImpCopiarClave()">📋 Copiar</button><span class="gi-help" style="margin-left:8px;">El programa la pide la primera vez y la guarda en <b>clave.txt</b> de su carpeta.</span>';
+  else h += '<span class="gi-help">Iniciá sesión de supervisor (Google) para ver la clave.</span>';
+  h += '</div>';
+  // PCs
+  h += '<div class="gi-card"><div class="gi-t">💻 PCs con el programa</div>';
+  if (!pcs.length) h += '<div class="gi-help">Todavía no se conectó ninguna. Abrí el programa en la PC de la impresora y en menos de un minuto aparece acá.</div>';
+  else {
+    h += '<table class="gi-tbl"><tr><th>PC</th><th>Estado</th><th>Impre-<br>soras</th><th>Pen-<br>dientes</th><th>Versión</th></tr>';
+    pcs.forEach(function (p){
+      const imps = Array.isArray(p.impresoras) ? p.impresoras : [];
+      h += '<tr><td><b>' + escapeHtml(p.pc) + '</b></td>' +
+        '<td>' + (p.vivo ? '🟢 conectada' : '🔴 sin señal') + '<span class="gi-sub">' + escapeHtml(_gvImpHace(p.ultimo_latido)) + '</span>' +
+        (p.chrome ? '' : '<span class="gi-err">⚠ no encontró Chrome ni Edge: no puede dibujar las hojas</span>') + '</td>' +
+        '<td title="' + escapeHtml(imps.map(function (x){ return x.nombre; }).join("\n")) + '">' + imps.length + '</td>' +
+        '<td>' + (Number(p.pendientes) || 0) + '</td><td>' + escapeHtml(p.version || "—") + '</td></tr>';
+    });
+    h += '</table>';
+  }
+  h += '</div>';
+  // reglas
+  h += '<div class="gi-card"><div class="gi-t">🧾 Qué se imprime dónde</div><table class="gi-tbl"><tr><th>Hoja</th><th>PC</th><th>Impresora</th><th>Auto-<br>mático</th><th>Co-<br>pias</th><th></th></tr>';
+  GV_IMP_TIPOS.forEach(function (t){
+    const r = gvImpRegla(t[0]) || {};
+    const pcSel = r.pc || "";
+    const pcObj = gvImpPc(pcSel);
+    const imps = pcObj && Array.isArray(pcObj.impresoras) ? pcObj.impresoras : [];
+    let selPc = '<select onchange="gvImpCambiar(\'' + t[0] + '\',\'pc\',this.value)"><option value="">— navegador (como hoy) —</option>';
+    pcs.forEach(function (p){ selPc += '<option value="' + escapeHtml(p.pc) + '"' + (p.pc === pcSel ? " selected" : "") + '>' + (p.vivo ? "🟢 " : "🔴 ") + escapeHtml(p.pc) + '</option>'; });
+    if (pcSel && !pcObj) selPc += '<option value="' + escapeHtml(pcSel) + '" selected>⚠ ' + escapeHtml(pcSel) + '</option>';
+    selPc += '</select>';
+    let selImp = '<select ' + (pcSel ? "" : "disabled ") + 'onchange="gvImpCambiar(\'' + t[0] + '\',\'impresora\',this.value)">';
+    if (!pcSel) selImp += '<option>—</option>';
+    imps.forEach(function (x){ selImp += '<option value="' + escapeHtml(x.nombre) + '"' + (x.nombre === r.impresora ? " selected" : "") + '>' + (x.predeterminada ? "★ " : "") + escapeHtml(x.nombre) + '</option>'; });
+    if (pcSel && r.impresora && !imps.some(function (x){ return x.nombre === r.impresora; })) selImp += '<option selected>⚠ ' + escapeHtml(r.impresora) + ' (ya no está)</option>';
+    selImp += '</select>';
+    const on = !!r.auto && !!pcSel;
+    const sw = '<span class="sup-sw' + (on ? " on" : "") + '" onclick="gvImpCambiar(\'' + t[0] + '\',\'auto\',' + (on ? "false" : "true") + ')" role="switch" title="' + (pcSel ? "" : "Elegí primero la PC y la impresora") + '"><span class="sup-sw-k"></span></span>';
+    let selCop = '<select ' + (pcSel ? "" : "disabled ") + 'onchange="gvImpCambiar(\'' + t[0] + '\',\'copias\',this.value)">';
+    [1, 2, 3].forEach(function (n){ selCop += '<option' + ((Number(r.copias) || 1) === n ? " selected" : "") + '>' + n + '</option>'; });
+    selCop += '</select>';
+    h += '<tr><td><b>' + t[1] + '</b><span class="gi-sub">' + escapeHtml(t[2]) + '</span></td><td>' + selPc + '</td><td>' + selImp + '</td><td>' + sw + '</td><td>' + selCop + '</td>' +
+      '<td><button ' + (pcSel && r.impresora ? "" : "disabled ") + 'onclick="gvImpPrueba(\'' + t[0] + '\')">🖨️ Prueba</button></td></tr>';
+  });
+  h += '</table></div>';
+  // trabajos
+  h += '<div class="gi-card"><div class="gi-t">🕘 Últimas hojas mandadas</div>';
+  if (_gvImp.trabErr) h += '<div class="gi-help">' + escapeHtml(_gvImp.trabErr) + '</div>';
+  else if (!_gvImp.trabajos || !_gvImp.trabajos.length) h += '<div class="gi-help">Todavía no se mandó ninguna.</div>';
+  else {
+    h += '<table class="gi-tbl"><tr><th>Hora</th><th>Hoja</th><th>NP /<br>tanda</th><th>Impresora</th><th>Estado</th><th></th></tr>';
+    _gvImp.trabajos.forEach(function (j){
+      const est = String(j.estado || "");
+      h += '<tr><td>' + escapeHtml(_gvImpHora(j.creado_en)) + '</td><td>' + escapeHtml(j.tipo) + '</td><td><b>' + escapeHtml(j.ref) + '</b></td>' +
+        '<td>' + escapeHtml(j.impresora) + '<span class="gi-sub">' + escapeHtml(j.pc) + '</span></td>' +
+        '<td><span class="gi-est ' + escapeHtml(est) + '">' + escapeHtml(est) + '</span>' + (est === "impreso" ? '<span class="gi-sub">' + escapeHtml(_gvImpHora(j.impreso_en)) + '</span>' : '') +
+        (j.error && est !== "impreso" ? '<span class="gi-err">' + escapeHtml(j.error) + '</span>' : '') + '</td>' +
+        '<td>' + ((est === "error" || est === "vencido") ? '<button onclick="gvImpReintentar(' + Number(j.id) + ')">↻ Reintentar</button>' : '') + '</td></tr>';
+    });
+    h += '</table>';
+  }
+  h += '</div>';
+  body.innerHTML = h;
+  _gvImpMsg(_gvImp.msg);
+}
+async function gvImpCambiar(tipo, campo, valor){
+  const r = Object.assign({ pc: "", impresora: "", auto: false, copias: 1 }, gvImpRegla(tipo) || {});
+  if (campo === "pc") {
+    r.pc = valor || "";
+    const p = gvImpPc(r.pc); const imps = p && Array.isArray(p.impresoras) ? p.impresoras : [];
+    const pred = imps.filter(function (x){ return x.predeterminada; })[0] || imps[0];
+    r.impresora = r.pc ? (pred ? pred.nombre : "") : "";
+    if (!r.pc) r.auto = false;
+    if (r.pc && !r.impresora) { _gvImpMsg("La PC " + r.pc + " no informó impresoras."); return; }
+  } else if (campo === "impresora") r.impresora = valor;
+  else if (campo === "auto") {
+    if (!r.pc || !r.impresora) { _gvImpMsg("Elegí primero la PC y la impresora."); return; }
+    r.auto = !!valor;
+  } else if (campo === "copias") r.copias = Number(valor) || 1;
+  let h = null; try { h = await facAuthWriteHeaders(); } catch (_e) {}
+  if (!h) { _gvImpMsg("Iniciá sesión de supervisor (Google) para cambiar la configuración."); return; }
+  _gvImpMsg("Guardando…");
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_imp_regla_guardar", { method: "POST", headers: h,
+      body: JSON.stringify({ p_tipo: tipo, p_pc: r.pc || null, p_impresora: r.impresora || null, p_auto: !!r.auto, p_copias: Number(r.copias) || 1 }) });
+    if (!res.ok) { let m = ""; try { m = (await res.json()).message || ""; } catch (_e) {} throw new Error(m || ("HTTP " + res.status)); }
+    _gvImpMsg("✓ Guardado");
+  } catch (e) { _gvImpMsg("No se guardó: " + String((e && e.message) || e)); }
+  await gvImpRender(true);
+  try { gvImpVigilar(); } catch (_e) {}
+}
+async function gvImpPrueba(tipo){
+  const r = gvImpRegla(tipo); if (!r || !r.pc || !r.impresora) return;
+  const lab = (GV_IMP_TIPOS.filter(function (t){ return t[0] === tipo; })[0] || [tipo, tipo])[1];
+  const row = { np: "PRUEBA", tanda: "TEST", cod: "0000", rs: "Hoja de prueba — " + lab + " → " + r.impresora, salePpp: cpTodayAR(), fecha: cpTodayAR(), resumen: "A=999X1;B=999X1" };
+  let inner = ""; try { inner = armadoRemitoInnerHtml(armadoRemitoData(row), tipo === "facturado" ? "FACTURADO" : undefined); } catch (_e) {}
+  if (!inner) { _gvImpMsg("No pude armar la hoja de prueba."); return; }
+  _gvImpMsg("Mandando la prueba…");
+  const res = await gvImpEncolar("prueba", "PRUEBA " + tipo.toUpperCase(), inner, "prueba", r.pc, r.impresora);
+  if (res.estado === "encolado") _gvImpMsg("✓ Prueba mandada a " + r.impresora + (res.pc_viva ? ": sale en unos segundos." : ". ⚠ El programa de " + r.pc + " no está conectado: sale cuando se abra."));
+  else _gvImpMsg("No se mandó la prueba: " + (res.error || res.estado));
+  await gvImpRender(true);
+}
+async function gvImpReintentar(id){
+  let h = null; try { h = await facAuthWriteHeaders(); } catch (_e) {}
+  if (!h) { _gvImpMsg("Iniciá sesión de supervisor."); return; }
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_imp_trabajo_reintentar", { method: "POST", headers: h, body: JSON.stringify({ p_id: id }) });
+    const j = r.ok ? await r.json() : null;
+    _gvImpMsg(j && j.ok ? "✓ Se vuelve a mandar" : "No se pudo reintentar (la hoja ya no está guardada: tiene más de 7 días)");
+  } catch (e) { _gvImpMsg("No se pudo reintentar: " + String((e && e.message) || e)); }
+  await gvImpRender(true);
+}
+function gvImpCopiarClave(){
+  const c = _gvImp.cfg && _gvImp.cfg.clave; if (!c) return;
+  try { navigator.clipboard.writeText(c).then(function (){ _gvImpMsg("✓ Clave copiada"); }, function (){ _gvImpMsg("Copiala a mano: " + c); }); }
+  catch (_e) { _gvImpMsg("Copiala a mano: " + c); }
+}
+/* Una línea para la Cola de impresión: qué hace hoy cada tipo. */
+function gvImpResumenTexto(){
+  if (!_gvImp.cfg) return "no pude leer la configuración";
+  return GV_IMP_TIPOS.map(function (t){
+    const m = gvImpModo(t[0]); const r = gvImpRegla(t[0]) || {};
+    return t[1].replace(/^\S+\s/, "") + ": " + (m === "programa" ? "→ " + r.impresora + " (" + r.pc + ")" : m === "apagado" ? "apagado" : "navegador");
+  }).join(" · ");
 }
 
 /* ============================================================================
@@ -58698,7 +59089,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.11"></script>
+<script src="importacion.js?v=26.12"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61521,8 +61912,8 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.11"></script>
-<script src="hotsale.js?v=26.11"></script>
+<script src="cobranzas.js?v=26.12"></script>
+<script src="hotsale.js?v=26.12"></script>
 
 </body>
 </html>

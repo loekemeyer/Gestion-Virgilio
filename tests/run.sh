@@ -371,6 +371,10 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== print-station (idea 5044: estación de impresión — seed, poll, dedup, drain, Impresion_NP) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/print-station.cjs
 
+echo "== imp-programa (v26.12: picking/armado/facturado al programa de impresión de la PC, sin kiosco) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-programa.cjs
+node tests/imp-agente-ps.cjs
+
 echo "== mg-prioridad (idea 4926: Guardar a Góndola — prioridad con demanda + hint de MCs) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-prioridad.cjs
 

@@ -7151,3 +7151,23 @@ más actualizado que otro. Si alguien quiere cambiar uno solo NO se puede hacer"
   queda apagado. El Excel sigue el switch y lleva siempre la columna UxB. El ranking es siempre el de cajas (el de Stocks).
 - `sql/get_estadistica_madre_mensual.sql` (en `pagina-LK-copia`), `tests/stk-est-madre-sin-codigo.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-02, v26.12): cada hoja en SU impresora — el programa de impresión de la PC (sin kiosco)
+
+**Luis:** *"elegir diferentes impresoras conectadas a la máquina … ajeno a la configuración predeterminada de Chrome …
+y activar la impresión automática"*. Chrome no deja que una página vea ni elija impresoras, y la PC del depósito no
+puede abrir el kiosco.
+
+- **Configuración → 🧩 Impresoras**: por hoja (picking · armado · facturado) PC + impresora + Automático + copias,
+  con 🖨️ Prueba y las últimas hojas mandadas. Tabla `GV_Impresion_Regla`.
+- El **programa** (`tools/impresion/`, se copia a la carpeta compartida; doble clic en `Iniciar GV-Impresion.bat`)
+  informa sus impresoras, toma lo suyo de `GV_Impresion_Trabajo`, lo dibuja con el Chrome/Edge de la PC en modo
+  invisible y lo imprime por nombre. Pide la **clave** de la pantalla y la guarda en `clave.txt` (fuera del repo).
+- **Sin PC configurada para una hoja, todo sigue como antes** (estación del navegador / `fac_print_facturado`).
+- Picking y armado los arma cualquier GV de supervisor abierto en una PC; el facturado, el que exporta el Excel ISIS
+  (también desde un celular). La base no deja que una hoja salga dos veces (`clave_unica` tipo:ref).
+- **«Impreso» lo confirma el programa** (marca `Impresion_NP` con origen `programa`); sin la config de impresión,
+  `psPoll` no avanza: una lectura rota no es un «no se imprime».
+- ⚠ **Al agregar una hoja que se imprima sola, pasarla por `gvImpModo(tipo)` + `gvImpEncolar`** y sumar el tipo al
+  `check` de las dos tablas y a `GV_IMP_TIPOS`.
+
+`sql/gv_impresion_programa_v2611.sql`, `tests/imp-programa.cjs`, `tests/imp-agente-ps.cjs`.
