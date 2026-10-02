@@ -1,4 +1,4 @@
-/* v26.15 · Estadísticas ISIS por artículo (Luis, 02/10/2026) — candado del layout.
+/* v26.16 · Estadísticas ISIS por artículo (Luis, 02/10/2026) — candado del layout.
    Arma los dos .xls con estadisticas.js + SheetJS de verdad, los vuelve a leer y compara
    celda por celda contra el export crudo de ISIS (valores sacados de los Excel de sept/26:
    esta_vtaarticutot1corte_vtas_sept_ch.xls y vta_pedidoporarticulotot_pedidos_lk_sep_26.xls).
@@ -106,7 +106,7 @@ ok(/onclick="openEstadisticasIsis\(\)"/.test(idx), "index: botón del panel supe
 ok(/<script src="estadisticas\.js\?v=/.test(idx), "index: carga estadisticas.js con ?v=");
 ok(/if \(!rows\.length\)[^\n]*No se bajó nada/.test(src), "una RPC vacía NO baja un Excel vacío");
 ok(/if \(q\.error\)[^\n]*No se bajó nada/.test(src), "una RPC con error NO baja nada");
-const sqlE = fs.readFileSync(path.join(__dirname, "..", "sql", "gv_isis_estadisticas_v2615.sql"), "utf8");
+const sqlE = fs.readFileSync(path.join(__dirname, "..", "sql", "gv_isis_estadisticas_v2616.sql"), "utf8");
 const sqlPed = sqlE.slice(sqlE.indexOf("function public.gv_isis_estad_pedidos"));
 ok(/clave = 'gestion_desde'/.test(sqlPed) && /x\.fecha_pedido >= par\.gdesde/.test(sqlPed), "pedidos: sólo el pipeline (desde gestion_desde)");
 ok(/"GV_Web_Cancelados"/.test(sqlPed) && /"GV_Pedidos_Anulados"/.test(sqlPed), "pedidos: sin cancelados ni anulados");

@@ -7182,7 +7182,7 @@ puede abrir el kiosco.
 
 `sql/gv_impresion_programa_v2611.sql`, `tests/imp-programa.cjs`, `tests/imp-agente-ps.cjs`.
 
-## ⚠ REGLA (Luis, 2026-10-02, v26.15): 📑 ESTADÍSTICAS ISIS — ventas y pedidos por artículo sin entrar a ISIS
+## ⚠ REGLA (Luis, 2026-10-02, v26.16): 📑 ESTADÍSTICAS ISIS — ventas y pedidos por artículo sin entrar a ISIS
 
 Panel supervisor → **📑 Estadísticas ISIS — ventas y pedidos** (`openEstadisticasIsis`, `estadisticas.js`): mes o
 rango, y baja los 4 .xls de los manuales **29** (ventas por artículo → costos) y **31** (pedidos por artículo →
@@ -7204,4 +7204,4 @@ blancos C/D/F, «Total General» corrido una columna, pie «Impreso por»). Así
   pidió). Sept/26: LK 26.291 → 23.367 cajas (14 pedidos del 01-02/09 + 4 anulados), CH 2.725 → 2.655.
 - ⚠ **Una RPC vacía o con error NO baja nada** (sin sesión el guard devuelve 0 filas: un Excel vacío pegado en Costos
   diría que el mes no vendió). Lo dice en la tabla.
-- `sql/gv_isis_estadisticas_v2615.sql`, `tests/isis-estadisticas.cjs` (layout celda por celda + pantalla + descarga).
+- `sql/gv_isis_estadisticas_v2616.sql`, `tests/isis-estadisticas.cjs` (layout celda por celda + pantalla + descarga).

@@ -1,4 +1,4 @@
--- v26.15 · Estadísticas de ISIS por artículo, descargables desde Gestión (Luis, 02/10/2026).
+-- v26.16 · Estadísticas de ISIS por artículo, descargables desde Gestión (Luis, 02/10/2026).
 -- Reemplaza la bajada a mano de ISIS de los manuales 29 (ventas por artículo → costos) y
 -- 31 (pedidos por artículo → Estadística Madre). Objetos NUEVOS, sólo lectura, SECURITY
 -- DEFINER con guard de supervisor (leen isis_lk / isis_ch, que anon no ve). Los usa
@@ -24,12 +24,13 @@
 --   y no está en la base. Medido sept/26: ISIS LK 11.068 cajas, página LK 26.297.
 --   unidades = cajas × UxB (vista_uxb_articulo; sin UxB, vacío) · importe = unidades × precio de lista
 --   (precios_venta / precios_venta_chef; un código con L va a la lista LK). Sin clientes de prueba.
---   SÓLO EL PIPELINE DE GESTIÓN (v26.15, Luis 02/10: "solo va a ser para los pedidos web de nuestro
+--   SÓLO EL PIPELINE DE GESTIÓN (v26.16, Luis 02/10: "solo va a ser para los pedidos web de nuestro
 --   pipeline"): pedido desde PPP_Web_Config.gestion_desde (03/09; lo anterior se cargó en ISIS por el
 --   mail), sin cancelados (GV_Web_Cancelados) ni anulados (GV_Pedidos_Anulados). Lo que espera en
 --   A Programar / Cuarentena SÍ cuenta: el cliente lo pidió. Medido sept/26: LK 26.291 → 23.367 cajas
 --   (14 pedidos del 01-02/09 y 4 anulados), CH 2.725 → 2.655 (3 pedidos del 02/09). Migración
---   gv_isis_estadisticas_v2615_pipeline.
+--   gv_isis_estadisticas_v2615_pipeline (el marcador interno de la
+--   función dice "v26.15-pipeline": así se aplicó en la base; la versión de la app es la v26.16).
 --
 -- Rollback: drop function public.gv_isis_estad_ventas(text,date,date);
 --           drop function public.gv_isis_estad_pedidos(text,date,date);

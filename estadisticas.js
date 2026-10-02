@@ -1,5 +1,5 @@
 /* ============================================================================
-   ESTADÍSTICAS ISIS — ventas y pedidos por artículo (v26.15, pedido de Luis 02/10/2026)
+   ESTADÍSTICAS ISIS — ventas y pedidos por artículo (v26.16, pedido de Luis 02/10/2026)
    ----------------------------------------------------------------------------
    Reemplaza la bajada a mano de ISIS de dos reportes mensuales, con el MISMO
    archivo que da ISIS («Microsoft Excel 97-2000 Sólo datos», formato Típico):
@@ -32,7 +32,7 @@
 
    Vive en su propio archivo (regla v23.98). ?v= atado a APP_VERSION: está en
    SIGUEN_APP_VERSION de scripts/bump-version.cjs y tests/version-tokens.cjs.
-   SQL: sql/gv_isis_estadisticas_v2615.sql. Candado: tests/isis-estadisticas.cjs.
+   SQL: sql/gv_isis_estadisticas_v2616.sql. Candado: tests/isis-estadisticas.cjs.
    ============================================================================ */
 
 var _EI_MES3 = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
