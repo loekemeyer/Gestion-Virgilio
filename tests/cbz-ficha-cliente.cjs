@@ -5,7 +5,7 @@
    a la ficha".
 
    Corre la pantalla de verdad (no es un candado de texto) y mide:
-     (a) openCobranzas abre, 4 pestañas, arranca en Clientes y pide la lista;
+     (a) openCobranzas abre, 10 pestañas (v26.04: + las 7 de «Deuda a cobrar»), arranca en Clientes y pide la lista;
      (b) la lista sale ordenada por deuda, mayor → menor;
      (c) el MISMO cliente con código en LK y en CH aparece UNA vez, consolidado por CUIT;
      (d) busca por código, por nombre y por CUIT;
@@ -218,7 +218,9 @@ catch (_e) {
   const q = (c, m) => { if (!c) fallas.push(m); };
 
   q(r.abre, "(a) openCobranzas no abrió el overlay");
-  q(r.pestanas && r.pestanas.length === 5, "(a) esperaba 5 pestañas, hay " + JSON.stringify(r.pestanas));
+  // v26.04: las 3 propias primero (Clientes y Conciliación son lo principal) y las 7 de «Deuda a cobrar» después
+  q(r.pestanas && r.pestanas.length === 10 && /Clientes/.test(r.pestanas[0]) && /Conciliaci/.test(r.pestanas[1]) && /Cuenta corriente/.test(r.pestanas[3]),
+    "(a) esperaba 10 pestañas (Clientes, Conciliación, Escala y las 7 viejas), hay " + JSON.stringify(r.pestanas));
   q(/Clientes/.test(r.tabActiva || ""), "(a) no arranca en la pestaña Clientes (arrancó en " + r.tabActiva + ")");
   q((r.pidio || []).indexOf("gv_cobranza_clientes") >= 0, "(a) no pidió gv_cobranza_clientes");
 

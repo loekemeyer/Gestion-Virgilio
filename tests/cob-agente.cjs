@@ -69,8 +69,9 @@ catch (_e) {
     // (a) botonera
     await openCobros("agente");
     await sleep(150);
-    out.tabAgente = !!document.getElementById("cobrosTabAgente");
-    out.tabBanco = (document.getElementById("cobrosTabBanco") || {}).textContent || "";
+    // v26.04: la botonera es la de 💳 Cobranzas (cobranzas.js); las pestañas viejas llevan data-tab
+    out.tabAgente = !!document.querySelector('#cbzTabs .cbz-tab[data-tab="agente"]');
+    out.tabBanco = (document.querySelector('#cbzTabs .cbz-tab[data-tab="banco"]') || {}).textContent || "";
     out.sinExtracto = !/Extracto banco/.test(out.tabBanco);
 
     // (b) Agente

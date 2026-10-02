@@ -12,12 +12,14 @@
    Se carga con ?v= atado a APP_VERSION — está en SIGUEN_APP_VERSION de
    scripts/bump-version.cjs y tests/version-tokens.cjs.
 
-   ⚠ CONVIVENCIA CON LA PANTALLA VIEJA (openCobros, 7 pestañas)
-   NO la reemplaza todavía. Son dos puertas distintas a propósito mientras esto
-   se arma; cuando Luis lo dé por bueno, la pestaña "📒 Cuenta corriente" de
-   openCobros se retira y queda ésta. Dos módulos que hacen lo mismo para
-   siempre es el pozo de Matricería (1.0.67 → 1.0.71): esto es un paso, no un
-   estado final.
+   ⚠ UNA SOLA PANTALLA CON LA VIEJA (v26.04, 02/10)
+   «Deuda a cobrar / Cobranzas» (openCobros, 7 pestañas) ya no tiene botón
+   propio: sus pestañas viven ACÁ, después de las de este módulo (pedido:
+   "las de Cobranzas son lo principal, agregale las del otro pero ponelas
+   después"). Las marcadas `vieja: true` en _CBZ_TABS las sigue DIBUJANDO
+   index.html (cobrosRenderTab) adentro de #cobrosBody; openCobros(tab) abre
+   esta pantalla en esa pestaña. Se fueron los dos lugares vacíos «A reclamar»
+   (eso es 🕵 Agente, que ahora está al lado) y «Recibos».
 
    ⚠ DATOS
    Lee lo que YA existe en la base (nada nuevo se creó para esto):
@@ -106,13 +108,17 @@ function _cbzCss() {
     "#cbzOv input{width:auto;margin-top:0;}",
     ".cbz-top{display:flex;align-items:center;gap:14px;padding:10px 16px;background:linear-gradient(90deg,#0f766e,#083344);color:#fff;flex:0 0 auto;flex-wrap:wrap;}",
     ".cbz-top b{font-size:17px;letter-spacing:.2px;}",
-    ".cbz-tabs{display:flex;gap:4px;}",
+    ".cbz-tabs{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}",
+    ".cbz-tsep{width:1px;align-self:stretch;background:rgba(255,255,255,.35);margin:3px 5px;}",
     ".cbz-tab{padding:6px 13px;border-radius:999px;border:none;font-weight:700;font-size:13px;cursor:pointer;background:rgba(255,255,255,.14);color:#e2e8f0;}",
     ".cbz-tab:hover{background:rgba(255,255,255,.26);}",
     ".cbz-tab.on{background:#fff;color:#0f766e;}",
     ".cbz-x{margin-left:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer;}",
     ".cbz-body{flex:1;min-height:0;overflow:auto;padding:16px;}",
     ".cbz-wrap{max-width:1180px;margin:0 auto;}",
+    /* v26.04: las pestañas viejas se diseñaron a todo el ancho (tablas de muchas columnas): sin tope */
+    ".cbz-wrap.cbz-vieja{max-width:none;}",
+    ".cbz-viejabody{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;box-shadow:0 1px 2px rgba(15,23,42,.06);}",
     /* buscador */
     ".cbz-buscar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;box-shadow:0 1px 2px rgba(15,23,42,.06);}",
     ".cbz-inp{flex:1;min-width:220px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 12px;font-size:15px;outline:none;}",
@@ -268,12 +274,21 @@ function _cbzCss() {
 
 /* ------------------------------- pantalla -------------------------------- */
 var _CBZ_TABS = [
-  { id: "clientes",  t: "👤 Clientes" },
-  { id: "conc",      t: "🏦 Conciliación" },
-  { id: "reclamos",  t: "⚠ A reclamar" },
-  { id: "recibos",   t: "🧾 Recibos" },
-  { id: "escalones", t: "📐 Escala" }
+  { id: "clientes",   t: "👤 Clientes" },
+  { id: "conc",       t: "🏦 Conciliación" },
+  { id: "escalones",  t: "📐 Escala" },
+  /* v26.04: las de la pantalla vieja «Deuda a cobrar / Cobranzas», DESPUÉS. Las dibuja index.html
+     (cobrosRenderTab); el id es el mismo que usa openCobros(tab), así Facturación sigue abriendo 'cruce'. */
+  { id: "cc",         t: "📒 Cuenta corriente",   vieja: true },
+  { id: "deuda",      t: "🗂 Facturas ISIS",      vieja: true },
+  { id: "cob",        t: "💵 Valor por NP",       vieja: true },
+  { id: "cruce",      t: "🔍 Facturación vs ISIS", vieja: true },
+  { id: "anticipado", t: "📦 Facturable ya",      vieja: true },
+  { id: "agente",     t: "🕵 Agente",             vieja: true },
+  { id: "banco",      t: "🏦 Bancos",             vieja: true }
 ];
+function _cbzTabOk(id) { return _CBZ_TABS.some(function (x) { return x.id === id; }); }
+function _cbzEsVieja(id) { return _CBZ_TABS.some(function (x) { return x.id === id && x.vieja; }); }
 
 async function openCobranzas(tab) {
   try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
@@ -288,7 +303,7 @@ async function openCobranzas(tab) {
       '<button class="cbz-x" onclick="cbzClose()">Cerrar</button>' +
     '</div>' +
     '<div class="cbz-body"><div class="cbz-wrap" id="cbzWrap"></div></div>';
-  _cbz.tab = _CBZ_TABS.some(function (x) { return x.id === tab; }) ? tab : "clientes";
+  _cbz.tab = _cbzTabOk(tab) ? tab : "clientes";
   _cbz.sel = null; _cbz.abierta = null;
   cbzRender();
   if (!_cbz.rows.length) cbzCargarClientes();
@@ -296,32 +311,40 @@ async function openCobranzas(tab) {
 }
 function cbzClose() { var ov = document.getElementById("cbzOv"); if (ov) ov.style.display = "none"; }
 /* v24.41 (Luis): cambiar de pestaña NO cierra el cliente abierto: al volver a «Clientes» sigue ahí */
-function cbzSetTab(t) { _cbz.tab = t; cbzRender(); if (t === "escalones") { cbzCargarEscalones(); cbzCargarCoronitas(); } }
+function cbzSetTab(t) { _cbz.tab = _cbzTabOk(t) ? t : "clientes"; cbzRender(); if (t === "escalones") { cbzCargarEscalones(); cbzCargarCoronitas(); } }
 
 /* el badge rojo de «Conciliación» = movimientos del extracto que esperan a una persona (v24.41) */
 function cbzTabsPintar() {
   var tabs = document.getElementById("cbzTabs"); if (!tabs) return;
   var n = (typeof cbzConcPendN === "function") ? cbzConcPendN() : 0;
-  tabs.innerHTML = _CBZ_TABS.map(function (x) {
-    return '<button class="cbz-tab' + (_cbz.tab === x.id ? " on" : "") + '" onclick="cbzSetTab(\'' + x.id + '\')">' + x.t +
+  tabs.innerHTML = _CBZ_TABS.map(function (x, i) {
+    // una rayita separa las de este módulo de las de la pantalla vieja (v26.04)
+    var sep = (x.vieja && !(_CBZ_TABS[i - 1] || {}).vieja) ? '<span class="cbz-tsep"></span>' : "";
+    return sep + '<button class="cbz-tab' + (_cbz.tab === x.id ? " on" : "") + '" data-tab="' + x.id + '" onclick="cbzSetTab(\'' + x.id + '\')">' + x.t +
       (x.id === "conc" && n ? ' <span class="cbz-badge" id="cbzConcBadge">' + n + "</span>" : "") + "</button>";
   }).join("");
 }
 function cbzRender() {
   cbzTabsPintar();
   var w = document.getElementById("cbzWrap"); if (!w) return;
+  if (_cbzEsVieja(_cbz.tab)) { cbzViejaPintar(w); return; }
+  w.classList.remove("cbz-vieja"); _cbz.viejaTab = null;
   if (_cbz.tab === "clientes")  { w.innerHTML = _cbz.sel ? cbzFichaHtml() : cbzBuscadorHtml(); if (_cbz.sel) cbzFichaCargar(); return; }
   if (_cbz.tab === "conc")      { w.innerHTML = cbzConcHtml(); cbzConcCargar(); return; }
   if (_cbz.tab === "escalones") { w.innerHTML = cbzEscalonesHtml(); return; }
-  w.innerHTML = cbzPendienteHtml(_cbz.tab);
 }
 
-function cbzPendienteHtml(t) {
-  var txt = t === "reclamos"
-    ? "Los descuentos mal tomados que hay que reclamar, uno por cliente, con el recibo y el importe. Hoy eso vive en la pestaña 🕵 Agente de la pantalla vieja."
-    : "Los recibos cargados, con qué facturas cancela cada uno y qué quedó suelto.";
-  return '<div class="cbz-panel"><div class="cbz-pend"><h3>Pendiente de armar</h3><div>' + _cbzEsc(txt) +
-    '</div><div style="margin-top:10px;font-size:12px;color:#94a3b8;">Se arma cuando definamos qué va en cada pestaña.</div></div></div>';
+/* Pestaña de la pantalla vieja (v26.04). ⚠ Si ya está dibujada NO se rehace: cbzCargarClientes y otros
+   llaman a cbzRender cuando terminan de leer, y rehacerla le borraría al supervisor los filtros que
+   puso y volvería a pedir todo a la base. Se rehace al entrar de otra pestaña o al reabrir la pantalla. */
+function cbzViejaPintar(w) {
+  w.classList.add("cbz-vieja");
+  if (_cbz.viejaTab === _cbz.tab && document.getElementById("cobrosBody")) return;
+  _cbz.viejaTab = _cbz.tab;
+  w.innerHTML = '<div id="cobrosBody" class="cbz-viejabody"></div>';
+  if (typeof window.cobrosRenderTab === "function") { window.cobrosRenderTab(_cbz.tab); return; }
+  document.getElementById("cobrosBody").innerHTML = '<div class="cbz-pend"><h3>No se pudo dibujar esta pestaña</h3>' +
+    '<div>Falta la parte que vive en index.html. Recargá la página (Ctrl+F5).</div></div>';
 }
 
 /* ----------------------------- 1) buscador ------------------------------- */

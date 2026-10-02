@@ -4605,9 +4605,15 @@ objeto —no hay segundo cliente ni segunda sesión—. Cualquier módulo que sa
 sin `#cbzOv button{width:auto;margin-top:0;…}` el botón Cerrar sale de una pantalla de ancho. Es el mismo
 pozo que el pop-up de Importados (v23.93).
 
-⚠ **NO reemplaza a `openCobros`** (la pantalla vieja de 7 pestañas) todavía: son dos puertas a propósito
-mientras esto se arma. Cuando Luis lo dé por bueno, la pestaña «📒 Cuenta corriente» de `openCobros` se
-retira y queda ésta. **Dos módulos que hacen lo mismo para siempre es el pozo de Matricería.**
+⚠⚠ **v26.04 (02/10): «Deuda a cobrar / Cobranzas» y «Cobranzas (nuevo)» son UNA pantalla, 💳 Cobranzas.**
+*"Las dos pestañas de Cobranzas son lo principal, agregale las del otro pero ponelas después"*. Botonera:
+**👤 Clientes · 🏦 Conciliación · 📐 Escala │ 📒 Cuenta corriente · 🗂 Facturas ISIS · 💵 Valor por NP · 🔍
+Facturación vs ISIS · 📦 Facturable ya · 🕵 Agente · 🏦 Bancos**. Las 7 viejas (`vieja: true` en `_CBZ_TABS`)
+las sigue dibujando index.html (`cobrosRenderTab`) adentro de `#cobrosBody`, y **un `cbzRender` posterior no
+las rehace** (borraría el filtro tipeado). `openCobros(tab)` abre la unificada en esa pestaña (Facturación →
+«🔍 Cruce con ISIS» sigue abriendo `cruce`); sin cobranzas.js cae a la pantalla vieja (`_openCobrosViejo`).
+Se fueron las pestañas vacías «A reclamar» (= 🕵 Agente) y «Recibos». Lo que se solapa (📒 Cuenta corriente
+vs la ficha del cliente, 🏦 Bancos vs Conciliación) queda a decisión de Luis. `tests/cbz-integra-cobros.cjs`.
 
 ⚠ Si la base no contesta, la pantalla muestra datos **DEMO** con un chip rojo que lo dice, en vez de
 ceros — regla *"una lectura ROTA no es un CERO"*.

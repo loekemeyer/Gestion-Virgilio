@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.03"></script>
+<script type="module" src="recepcion.js?v=26.04"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6386,8 +6386,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
     <div class="sup-sec-label">Reportes y configuración</div>
     <!-- CHICOS: uso ocasional. -->
     <div class="sup-actions sup-secondary">
-      <button class="sup-action-btn" onclick="openCobros()"><span class="sup-ico">💰</span><span>Deuda a cobrar / Cobranzas</span></button>
-      <button class="sup-action-btn" onclick="openCobranzas()"><span class="sup-ico">💳</span><span>Cobranzas (nuevo)</span></button>
+      <button class="sup-action-btn" onclick="openCobranzas()"><span class="sup-ico">💳</span><span>Cobranzas</span></button>
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpHoras" style="display:none;font-size:12px;font-weight:800;background:rgba(255,255,255,.18);padding:2px 9px;border-radius:8px;line-height:1.15;white-space:nowrap;" title="Horas de guardado pendientes (lo que entra ahora a góndola ÷ cajas/h)"></span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
@@ -10476,7 +10475,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.03";
+const APP_VERSION = "v26.04";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -58699,7 +58698,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.03"></script>
+<script src="importacion.js?v=26.04"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61313,11 +61312,33 @@ window.ccPagoManualGuardar = ccPagoManualGuardar;
    pestaña "Deuda" = deudaRefresh/deudaRender; pestaña "Valor por NP" = cobLoad/cobRender.
    No duplica render: solo aporta el shell con las pestañas y los contenedores que cada
    render espera (#deudaResumen/#deudaTabla y #cobBody). */
+/* v26.04 (02/10): «Deuda a cobrar / Cobranzas» y «Cobranzas (nuevo)» son UNA pantalla: 💳 Cobranzas
+   (cobranzas.js). Sus pestañas propias van primero (Clientes · Conciliación · Escala) y estas 7 DESPUÉS,
+   en la misma botonera. Lo de acá queda como la puerta vieja y como el dibujo de cada pestaña vieja:
+     · openCobros(tab)      → abre la pantalla unificada en esa pestaña (Facturación → «🔍 Cruce con ISIS» = 'cruce')
+     · cobrosRenderTab(tab) → dibuja la pestaña vieja adentro de #cobrosBody (lo pone cbzRender en su área)
+     · cobrosSetTab(tab)    → cambia de pestaña en la unificada si está abierta
+   Si cobranzas.js no cargó, cae a la pantalla vieja de siempre (_openCobrosViejo): que no cargue un
+   archivo no puede dejar al supervisor sin cobranzas. */
+var _COBROS_TABS = ["cc", "deuda", "cob", "cruce", "anticipado", "agente", "banco"];
+function _cobrosTabNorm(tab) { return _COBROS_TABS.indexOf(tab) >= 0 ? tab : "cc"; }
 var _cobrosTab = "deuda";
 function cobrosClose() { var ov = document.getElementById("cobrosOverlay"); if (ov) ov.style.display = "none"; }
 window.cobrosClose = cobrosClose;
 function _cobrosTabCss(on) { return "padding:6px 14px;border-radius:999px;border:none;font-weight:800;cursor:pointer;font-size:13px;" + (on ? "background:#fff;color:#065f46;" : "background:rgba(255,255,255,.18);color:#fff;"); }
 async function openCobros(tab) {
+  if (typeof window.cbzSetTab === "function" && typeof window.openCobranzas === "function") return window.openCobranzas(_cobrosTabNorm(tab));
+  return _openCobrosViejo(tab);
+}
+window.openCobros = openCobros;
+function cobrosSetTab(tab) {
+  var ov = document.getElementById("cbzOv");
+  if (ov && ov.style.display !== "none" && typeof window.cbzSetTab === "function") return window.cbzSetTab(_cobrosTabNorm(tab));
+  if (document.getElementById("cobrosBody")) return cobrosRenderTab(tab);
+  return openCobros(tab);
+}
+window.cobrosSetTab = cobrosSetTab;
+async function _openCobrosViejo(tab) {
   try { if (typeof requireSupervisor === "function" && !requireSupervisor()) return; } catch (_e) {}
   _cobEnsureCss();
   var ov = document.getElementById("cobrosOverlay");
@@ -61327,22 +61348,22 @@ async function openCobros(tab) {
     '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:linear-gradient(90deg,#065f46,#022c22);color:#fff;flex:0 0 auto;flex-wrap:wrap;">' +
       '<b style="font-size:17px;">💰 Deuda / Cobranzas</b>' +
       '<div style="display:flex;gap:6px;margin-left:4px;">' +
-        '<button id="cobrosTabCC" onclick="cobrosSetTab(\'cc\')">📒 Cuenta corriente</button>' +
-        '<button id="cobrosTabDeuda" onclick="cobrosSetTab(\'deuda\')">🗂 Facturas ISIS</button>' +
-        '<button id="cobrosTabCob" onclick="cobrosSetTab(\'cob\')">💵 Valor por NP</button>' +
-        '<button id="cobrosTabCruce" onclick="cobrosSetTab(\'cruce\')">🔍 Facturación vs ISIS</button>' +
-        '<button id="cobrosTabAnticipado" onclick="cobrosSetTab(\'anticipado\')">📦 Facturable ya</button>' +
-        '<button id="cobrosTabAgente" onclick="cobrosSetTab(\'agente\')">🕵 Agente</button>' +
-        '<button id="cobrosTabBanco" onclick="cobrosSetTab(\'banco\')">🏦 Bancos</button>' +
+        '<button id="cobrosTabCC" onclick="cobrosRenderTab(\'cc\')">📒 Cuenta corriente</button>' +
+        '<button id="cobrosTabDeuda" onclick="cobrosRenderTab(\'deuda\')">🗂 Facturas ISIS</button>' +
+        '<button id="cobrosTabCob" onclick="cobrosRenderTab(\'cob\')">💵 Valor por NP</button>' +
+        '<button id="cobrosTabCruce" onclick="cobrosRenderTab(\'cruce\')">🔍 Facturación vs ISIS</button>' +
+        '<button id="cobrosTabAnticipado" onclick="cobrosRenderTab(\'anticipado\')">📦 Facturable ya</button>' +
+        '<button id="cobrosTabAgente" onclick="cobrosRenderTab(\'agente\')">🕵 Agente</button>' +
+        '<button id="cobrosTabBanco" onclick="cobrosRenderTab(\'banco\')">🏦 Bancos</button>' +
       '</div>' +
       '<button onclick="cobrosClose()" style="margin-left:auto;background:#dc2626;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer;">Cerrar</button>' +
     '</div>' +
     '<div id="cobrosBody" style="flex:1;overflow:auto;padding:14px 16px;min-height:0;"></div>';
   // v13.73: se puede abrir directo en cualquier pestaña (Facturación abre "cruce")
-  cobrosSetTab(["cob", "cruce", "anticipado", "banco", "deuda", "agente"].indexOf(tab) >= 0 ? tab : "cc");
+  cobrosRenderTab(_cobrosTabNorm(tab));
 }
-window.openCobros = openCobros;
-function cobrosSetTab(tab) {
+function cobrosRenderTab(tab) {
+  _cobEnsureCss();   // v26.04: la pestaña "Valor por NP" usa las clases .cob-* (antes las cargaba openCobros)
   _cobrosTab = (tab === "cob") ? "cob" : (tab === "cruce") ? "cruce" : (tab === "anticipado") ? "anticipado" : (tab === "banco") ? "banco" : (tab === "agente") ? "agente" : (tab === "deuda") ? "deuda" : "cc";
   var bd = document.getElementById("cobrosBody"); if (!bd) return;
   var td = document.getElementById("cobrosTabDeuda"), tc = document.getElementById("cobrosTabCob"), tx = document.getElementById("cobrosTabCruce"), ta = document.getElementById("cobrosTabAnticipado"), tbk = document.getElementById("cobrosTabBanco"), tag = document.getElementById("cobrosTabAgente");
@@ -61487,7 +61508,7 @@ function cobrosSetTab(tab) {
     cobLoad();
   }
 }
-window.cobrosSetTab = cobrosSetTab;
+window.cobrosRenderTab = cobrosRenderTab;
 /* ============================================================================ */
 
 })();
@@ -61500,8 +61521,8 @@ window.cobrosSetTab = cobrosSetTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.03"></script>
-<script src="hotsale.js?v=26.03"></script>
+<script src="cobranzas.js?v=26.04"></script>
+<script src="hotsale.js?v=26.04"></script>
 
 </body>
 </html>
