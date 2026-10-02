@@ -2077,7 +2077,11 @@ async function _pedImpResumenHoja(provs, opt) {
     '<tr><th>Proveedor</th><th>En curso<small>u$s</small></th><th>A pedir<small>FOB u$s</small></th><th>Nac.<small>no recup.</small></th><th>Prioridad<small>1 = más urgente</small></th></tr></thead>' +
     '<tbody>' + filas + tot + '</tbody></table>' +
     '<div class="ley">Prioridad según los meses que le faltan a la línea para tener ' + _PEDIMP_URG_MESES + ' meses de stock (stock + en camino), ponderado por consumo u$s/mes: 1 = faltan 3 o más · 2 = 2 a 3 · 3 = 1 a 2 · 4 = menos de 1</div></div>';
-  return { html: html, orden: F.map(function (f) { return f.prov; }) };
+  // v26.42 — los mismos números van en el mensaje de WhatsApp del reporte quincenal (scripts/reporte-quincenal):
+  // se devuelven acá para no volver a sacarlos del HTML.
+  const datos = { total: { curso: T.curso, usd: T.usd, nr: T.nr, fob: T.fob },
+    filas: F.map(function (f) { return { prov: f.prov, curso: f.curso, usd: f.usd, m3: f.m3, nivel: f.urg.nivel, etiqueta: f.urg.etiqueta }; }) };
+  return { html: html, orden: F.map(function (f) { return f.prov; }), datos: datos };
 }
 /* v25.13 — el documento imprimible con las hojas (de uno o de varios proveedores). */
 function _pedImpDamianDoc(titulo, hojas) {

@@ -4180,6 +4180,25 @@ ARRIBA de las unidades** (`.fobl`, 13 px negrita), después las unidades y abajo
 hoy; valoriza los pedidos nuevos con su precio) y **no se hace el backfill de los 89 pedidos viejos** (Luis, D4).
 `tests/pedimp-reporte-pdf.cjs`, `tests/pedimp-prioridad-damian.cjs`.
 
+### ⚠ v26.42 (Luis, 02/10): el mismo PDF sale SOLO por WhatsApp cada quincena — «Reporte quincenal a pedir»
+
+- **n8n ya no existe** (cuenta gratuita vencida, GestOpClientes `docs/ESTADO.md`): el número «N8N Loekemeyer» se
+  usa desde las Edge Functions de GestOpClientes (proyecto LK), detrás del corte **wa-guard** (llave
+  `wa_envio_automatico`: en `prueba` sólo sale a la lista blanca `wa_envio_contactos`).
+- **Quién arma el PDF**: el workflow `.github/workflows/reporte-quincenal-importacion.yml` (días **1 y 16**, 08:41 ART)
+  corre la pantalla sin pantalla con `scripts/reporte-quincenal/enviar.cjs` — el MISMO PDF de «🖨 IMPRIMIR PDF» con
+  todos los proveedores. **No hay una segunda copia del reporte**: si cambia el PDF en `importacion.js`, cambia el
+  que se manda. Las 5 variables del mensaje salen de `datos` de `_pedImpResumenHoja` (fecha · a pedir FOB · proveedores
+  con pedido · en curso · más urgentes).
+- **Quién lo manda**: `lk_reporte-quincenal` (repo `loekemeyer/gestopclientes`): `subir` (URL firmada al bucket privado
+  `gv-reportes`) → `enviar` (plantilla `reporte_quincenal_a_pedir`, PDF en el encabezado). Destinatarios = las filas de
+  `wa_envio_contactos` cuyo `label` arranca con `app_settings.reporte_quincenal_destinos` (default «Thomy,Damián», D6).
+- **Sin secretos**: la función reconoce al workflow por su token **OIDC** de GitHub (repo + `main` + ese archivo).
+  Renombrar el workflow = cambiar `WORKFLOW_GH` en la función.
+- Una quincena no sale dos veces (marca `enviado.json` en el bucket); para repetir: Actions → correrlo a mano con
+  «forzar». «solo_pdf» lo arma sin mandar (queda como artifact). Si la plantilla no está APPROVED en Meta, no manda y el
+  run queda en rojo. `tests/reporte-quincenal-params.cjs`.
+
 ## ⚠ REGLA (2026-10-01, v25.94): ✏️ EDITAR PI — quién corrige, qué día y a qué hora
 
 En 🚢 En curso, el **✏️ Editar PI** de cada pedido (reemplaza al viejo «✏️ PI», que sólo renombraba) abre

@@ -1,0 +1,61 @@
+name: Reporte quincenal a pedir (WhatsApp)
+
+# v26.42 (Luis, 02/10/2026 — D6 a Thomy y Damián · D7 cada quincena · D8 «Reporte quincenal a pedir»).
+# Arma el PDF de Pedidos Importación (el mismo de «🖨 IMPRIMIR PDF» con todos los proveedores) corriendo
+# la pantalla sin pantalla, y lo manda por WhatsApp con la plantilla `reporte_quincenal_a_pedir` desde el
+# número de Meta de GestOpClientes (Edge Function lk_reporte-quincenal, proyecto LK, detrás de wa-guard).
+#
+# SIN SECRETOS: la función reconoce este workflow por el token OIDC de GitHub (repo + main + este archivo).
+# Si se renombra o se mueve este archivo, hay que cambiar WORKFLOW_GH en la función o deja de mandar.
+# Una quincena no sale dos veces (la función deja una marca); para repetir, correrlo a mano con «forzar».
+on:
+  schedule:
+    - cron: "41 11 1,16 * *"   # días 1 y 16 a las 08:41 ART (UTC-3)
+  workflow_dispatch:
+    inputs:
+      forzar:
+        description: "Mandar aunque esta quincena ya haya salido"
+        type: boolean
+        default: false
+      solo_pdf:
+        description: "Sólo armar el PDF (queda como artifact), sin mandar"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write   # el token OIDC que presenta ante lk_reporte-quincenal
+
+concurrency:
+  group: reporte-quincenal
+  cancel-in-progress: false
+
+jobs:
+  reporte:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar Playwright + Chromium
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Armar el PDF y mandarlo
+        run: >
+          node scripts/reporte-quincenal/enviar.cjs --out reporte-quincenal.pdf
+          ${{ inputs.forzar && '--forzar' || '' }}
+          ${{ inputs.solo_pdf && '--solo-pdf' || '' }}
+      - name: Guardar el PDF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-quincenal-a-pedir
+          path: reporte-quincenal.pdf
+          if-no-files-found: ignore
+          retention-days: 30
