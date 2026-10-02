@@ -6,12 +6,12 @@
 // tarea). "T Muerto" = jornada sin ninguna tarea cargada: es un error de carga, se muestra aparte
 // y NO suma en Hs no Prod. Hs Total = Hs Prod + Hs no Prod. Sin bloque de "Pendientes".
 // Los números salen de la RPC public.gv_horas_operario_detalle_v2(p_dia) (misma lógica que la TV).
-// Por WhatsApp se manda en PDF (la plantilla de Meta está aprobada con un PDF); el Excel queda
-// guardado en el bucket y su link vuelve en la respuesta.
+// Por WhatsApp van 2 PDF (la plantilla de Meta está aprobada con un PDF): el del día con el detalle
+// por tanda, y el de ese día + los 3 anteriores con datos. El Excel queda en el bucket.
 //
 //   { "fecha": "2026-09-30", "wa_token": "..." }                  -> prueba, al número de pruebas
-//   { "fecha": "..", "solo_xlsx": true }                           -> arma Excel y PDF, no manda WhatsApp
-//   { "fecha": "..", "test": false, "wa_token": "..." }            -> a JUAN
+//   { "fecha": "..", "solo_xlsx": true }                           -> arma Excel y PDFs, no manda WhatsApp
+//   { "fecha": "..", "test": false, "wa_token": "..." }            -> a Juan y Fabián
 //   { "fecha": "..", "destinatarios": ["549..."], "wa_token": ".."} -> a esos números
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -25,7 +25,7 @@ const WA_PHONE_ID = Deno.env.get("WA_PHONE_ID") || "918089688061759";
 const WA_TEMPLATE = Deno.env.get("WA_TEMPLATE") || "informe_produccion_virgilio";
 const WA_IDIOMA = "es_AR";
 const DEST_PRUEBA = ["5491156517686"];
-const DEST_PROD = ["5491126161913"]; // Juan
+const DEST_PROD = ["5491126161913", "5491131181186"]; // Juan (cron 98) + Fabián (Elías, 02/10)
 const BUCKET = "reportes";
 const TZ = "America/Argentina/Buenos_Aires";
 const MIN_H = 1 / 60; // menos de 1 minuto se deja en blanco
@@ -62,10 +62,10 @@ const FS: Record<string, number> = {
   "Arma\nx Hs": 14, "T\nMuerto": 12, "Anulado": 12, "Recep\nRemi": 14, "Entrg\nInsum": 14,
 };
 
-function calcular(filas: any[]) {
+function calcular(filas: any[], multi = false) {
   const num = (v: unknown) => Number(v) || 0;
   const rows = filas.map((f) => {
-    const d: any = { legajo: String(f.legajo), nombre: nombreCorto(f.legajo, f.nombre) };
+    const d: any = { legajo: String(f.legajo), nombre: nombreCorto(f.legajo, f.nombre), dia: String(f.dia || "") };
     for (const k of ["jor", "pick", "arm", "cr", "rg", "limp", "rk", "pc", "cc", "rr", "pb", "ei", "at", "ct", "ri", "perm", "anu", "m3p", "m3a"]) d[k] = num(f[k]);
     d.prod = d.pick + d.arm;
     d.reg = DET.reduce((s, c) => s + d[c.k], 0);
@@ -73,18 +73,27 @@ function calcular(filas: any[]) {
     d.noprod = d.reg;
     d.total = d.prod + d.noprod;
     return d;
-  }).sort((a, b) => b.noprod - a.noprod);
+  });
+  if (!multi) rows.sort((a, b) => b.noprod - a.noprod);
+  else {
+    // varios días: agrupado por operario (el que más no prod acumula primero), dentro por fecha
+    const tot: Record<string, number> = {};
+    for (const r of rows) tot[r.legajo] = (tot[r.legajo] || 0) + r.noprod;
+    rows.sort((a, b) => (tot[b.legajo] - tot[a.legajo]) || a.legajo.localeCompare(b.legajo) || a.dia.localeCompare(b.dia));
+  }
   const det = DET.filter((c) => rows.some((r) => r[c.k] > MIN_H)); // sin datos ese día -> se omite
   const haySin = rows.some((r) => r.sin > MIN_H);
   const head = ["Nombre", "Pking\nx Hs", "Arma\nx Hs", "Hs\nProd"]
     .concat(haySin ? ["T\nMuerto"] : [])
-    .concat(det.map((c) => c.h)).concat(["Hs no\nProd", "Hs\nTotal", "Fecha"]);
+    .concat(det.map((c) => c.h)).concat(["Hs No\nProd", "Hs\nTotal"]);
   return { rows, det, haySin, head };
 }
 const ritmo = (m3: number, hs: number) => (hs > 0.05 && m3 > 0 ? Math.round((m3 / hs) * 100) / 100 : "—");
 
 async function construirXlsx(filas: any[], fecha: string): Promise<Uint8Array> {
-  const { rows, det, haySin, head } = calcular(filas);
+  const c0 = calcular(filas);
+  const { rows, det, haySin } = c0;
+  const head = c0.head.concat(["Fecha"]);
   const hr = (h: number) => (h > MIN_H ? h / 24 : null);
 
   const wb = new ExcelJS.Workbook();
@@ -147,16 +156,18 @@ async function traerTandas(sb: any, fecha: string): Promise<Record<string, DetOp
   return out;
 }
 
-// Mismo cuadro en PDF, formato cuadro sinóptico: ancho de columna según el dato, todo centrado,
-// sin relleno ni color. Abajo, el detalle por tanda de picking y armado de cada operario.
-function construirPdf(filas: any[], fecha: string, tandas: Record<string, DetOp>): Uint8Array {
-  const { rows, det, haySin, head } = calcular(filas);
+// Cuadro en PDF, formato cuadro sinóptico: ancho de columna según el dato, todo centrado, sin relleno
+// ni color. Fecha primero. Dos usos (Elías 02/10): el del DÍA, con el detalle por tanda abajo; y el de
+// ese día + los 3 anteriores con datos, sin detalle (no entra), agrupado por operario.
+function construirPdf(filas: any[], fecha: string, tandas: Record<string, DetOp> | null, multi = false): Uint8Array {
+  const { rows, det, haySin, head: head0 } = calcular(filas, multi);
   const hm = (h: number) => {
     if (!(h > MIN_H)) return "";
     const t = Math.round(h * 60);
     return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
   };
   const dec = (v: unknown) => (typeof v === "number" ? v.toFixed(2).replace(".", ",") : String(v));
+  const ddmm = (iso: string) => { const p = (iso || fecha).split("-"); return `${p[2]}/${p[1]}`; };
   const [y, m, d] = fecha.split("-");
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight();
@@ -187,12 +198,21 @@ function construirPdf(filas: any[], fecha: string, tandas: Record<string, DetOp>
     doc.text(t, pageW / 2, yy, { align: "center" });
   };
 
-  // 1) resumen por operario
-  const body1: string[][] = rows.map((r) =>
-    [r.nombre, dec(ritmo(r.m3p, r.pick)), dec(ritmo(r.m3a, r.arm)), hm(r.prod)]
-      .concat(haySin ? [hm(r.sin)] : [])
-      .concat(det.map((c) => hm(r[c.k]))).concat([hm(r.noprod), hm(r.total), `${d}/${m}`]),
-  );
+  // 1) resumen por operario. 3 bloques separados por 10 px (Elías 02/10):
+  //    [Fecha · Nombre · Pking · Arma] [Hs Prod · Hs No Prod · Hs Total] [el resto]
+  const B2 = ["Hs\nProd", "Hs No\nProd", "Hs\nTotal"];
+  const resto = head0.filter((h, i) => i > 2 && !B2.includes(h));
+  const head = ["Fecha", "Nombre", "Pking\nx Hs", "Arma\nx Hs", ...B2, ...resto];
+  const body1: string[][] = rows.map((r) => {
+    const v: Record<string, string> = {
+      "Fecha": ddmm(r.dia), "Nombre": r.nombre, "Pking\nx Hs": dec(ritmo(r.m3p, r.pick)), "Arma\nx Hs": dec(ritmo(r.m3a, r.arm)),
+      "Hs\nProd": hm(r.prod), "Hs No\nProd": hm(r.noprod), "Hs\nTotal": hm(r.total), "T\nMuerto": hm(r.sin),
+    };
+    for (const c of det) v[c.h] = hm(r[c.k]);
+    return head.map((h) => v[h] ?? "");
+  });
+  const GAP = 7.5; // 10 px
+  const gapAntes = (i: number) => (i === 4 || i === 7 ? GAP : 0);
   const hdr1 = head.map((h) => h.split("\n"));
   // encabezado: la letra más grande (≤ HSZ, ≥ 7) que entra en el ancho del dato; si no, la proporción del Excel
   const hs1 = head.map((h, i) => {
@@ -206,19 +226,30 @@ function construirPdf(filas: any[], fecha: string, tandas: Record<string, DetOp>
     return Math.min(hsz(h), 7);
   });
   let w1 = anchos(hdr1, body1, hs1);
-  const k = Math.min(1, (pageW - 40) / w1.reduce((a, b) => a + b, 0));
+  const k = Math.min(1, (pageW - 40 - 2 * GAP) / w1.reduce((a, b) => a + b, 0));
   w1 = w1.map((w) => w * k);
-  let x0 = (pageW - w1.reduce((a, b) => a + b, 0)) / 2;
-  titulo(`Horas por operario — ${d}/${m}/${y}`, 36);
+  let x0 = (pageW - w1.reduce((a, b) => a + b, 0) - 2 * GAP) / 2;
+  const xs: number[] = []; { let x = x0; head.forEach((_, i) => { x += gapAntes(i); xs.push(x); x += w1[i]; }); }
+  const fechas = [...new Set(rows.map((r) => r.dia))].sort();
+  titulo(multi
+    ? `Horas por operario — ${ddmm(fechas[0])} al ${d}/${m}/${y}`
+    : `Horas por operario — ${d}/${m}/${y}`, 36);
   let yy = 48;
   const hH = 14 * Math.max(...hdr1.map((l) => l.length)) + 6;
-  const fila1 = (cells: string[][], h: number, bold: boolean, size: number | number[]) => {
-    let x = x0;
-    cells.forEach((lines, i) => { celda(x, yy, w1[i], h, lines, bold, Array.isArray(size) ? size[i] : size); x += w1[i]; });
-    yy += h;
-  };
-  fila1(hdr1, hH, true, hs1);
-  for (const row of body1) fila1(row.map((c) => [c]), rH, false, FSZ);
+  hdr1.forEach((l, i) => celda(xs[i], yy, w1[i], hH, l, true, hs1[i]));
+  yy += hH;
+  // Fecha y Nombre: un valor que se repite en filas seguidas va en UNA celda (no se repite el dato)
+  const span = (col: number, r0: number) => { let r1 = r0; while (r1 + 1 < body1.length && body1[r1 + 1][col] === body1[r0][col]) r1++; return r1; };
+  for (const col of [0, 1]) {
+    for (let r = 0; r < body1.length;) {
+      const r1 = span(col, r);
+      celda(xs[col], yy + r * rH, w1[col], (r1 - r + 1) * rH, [body1[r][col]], col === 1, FSZ);
+      r = r1 + 1;
+    }
+  }
+  body1.forEach((row, r) => row.forEach((c, i) => { if (i > 1) celda(xs[i], yy + r * rH, w1[i], rH, [c], false, FSZ); }));
+  yy += body1.length * rH;
+  if (!tandas) return new Uint8Array(doc.output("arraybuffer") as ArrayBuffer);
 
   // 2) detalle por tanda (≡ pop-up m³/h del Mon. Admin): Nombre · Tarea · Tanda · m³ · Min trab · Ritmo
   type L = { nombre: string; tarea: string; tanda: string; m3: string; mi: string; rit: string; tot: boolean };
@@ -313,22 +344,37 @@ Deno.serve(async (req: Request) => {
     const xlsxBytes = await construirXlsx(filas, fecha);
     const tandas = await traerTandas(sb, fecha);
     const pdfBytes = construirPdf(filas, fecha, tandas);
+    // 2.º PDF: ese día + los 3 días anteriores CON datos (salta fines de semana y feriados), sin detalle por tanda
+    const dias: string[] = [fecha];
+    let multi: any[] = filas.map((f: any) => ({ ...f, dia: fecha }));
+    for (let i = 1; i <= 14 && dias.length < 4; i++) {
+      const dd = new Date(Date.parse(fecha + "T12:00:00Z") - i * 86400000).toISOString().slice(0, 10);
+      const { data: fx, error: ex } = await sb.rpc("gv_horas_operario_detalle_v2", { p_dia: dd });
+      if (ex) throw new Error(`gv_horas_operario_detalle_v2 (${dd}): ` + ex.message);
+      if (fx && fx.length) { dias.push(dd); multi = multi.concat(fx.map((f: any) => ({ ...f, dia: dd }))); }
+    }
+    const pdf4Bytes = construirPdf(multi, fecha, null, true);
     const xlsxUrl = await subir(`horas_${fecha}_${stamp}.xlsx`, xlsxBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     const pdfUrl = await subir(`horas_${fecha}_${stamp}.pdf`, pdfBytes, "application/pdf");
+    const pdf4Url = await subir(`horas_${fecha}_4dias_${stamp}.pdf`, pdf4Bytes, "application/pdf");
 
-    if (body?.solo_xlsx === true) return responder({ solo_xlsx: true, fecha, operarios: filas.length, xlsxUrl, pdfUrl, bytesXlsx: xlsxBytes.length, bytesPdf: pdfBytes.length });
+    if (body?.solo_xlsx === true) return responder({ solo_xlsx: true, fecha, dias, operarios: filas.length, xlsxUrl, pdfUrl, pdf4Url, bytesPdf: pdfBytes.length, bytesPdf4: pdf4Bytes.length });
 
     const destPedidos = Array.isArray(body?.destinatarios)
       ? body.destinatarios.map((x: any) => String(x).replace(/\D/g, "")).filter(Boolean) : [];
     const numeros = destPedidos.length ? destPedidos : (esTest ? DEST_PRUEBA : DEST_PROD);
     const waToken = Deno.env.get("WA_TOKEN") || String(body?.wa_token || "");
-    if (!waToken) return responder({ error: "falta el token de Meta (body.wa_token o secret WA_TOKEN)", xlsxUrl, pdfUrl }, 500);
+    if (!waToken) return responder({ error: "falta el token de Meta (body.wa_token o secret WA_TOKEN)", xlsxUrl, pdfUrl, pdf4Url }, 500);
 
     const waUrl = `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`;
     const fechaLinda = fecha.split("-").reverse().join("/");
     const resultados: any[] = [];
-    for (const numero of numeros) {
-      let ultimo: any = { numero, ok: false, error: "sin intentos" };
+    const docs = [
+      { link: pdfUrl, filename: `Virgilio_${fecha}.pdf` },
+      { link: pdf4Url, filename: `Virgilio_${fecha}_4dias.pdf` },
+    ];
+    for (const numero of numeros) for (const docu of docs) {
+      let ultimo: any = { numero, archivo: docu.filename, ok: false, error: "sin intentos" };
       for (let intento = 1; intento <= 3; intento++) {
         try {
           const res = await fetch(waUrl, {
@@ -339,17 +385,17 @@ Deno.serve(async (req: Request) => {
               template: {
                 name: WA_TEMPLATE, language: { code: WA_IDIOMA },
                 components: [
-                  { type: "header", parameters: [{ type: "document", document: { link: pdfUrl, filename: `Virgilio_${fecha}.pdf` } }] },
+                  { type: "header", parameters: [{ type: "document", document: docu }] },
                   { type: "body", parameters: [{ type: "text", text: fechaLinda }] },
                 ],
               },
             }),
           });
           const data = await res.json();
-          ultimo = { numero, ok: res.ok, intentos: intento, error: res.ok ? undefined : data?.error?.message, codigo: res.ok ? undefined : data?.error?.code };
+          ultimo = { numero, archivo: docu.filename, ok: res.ok, intentos: intento, error: res.ok ? undefined : data?.error?.message, codigo: res.ok ? undefined : data?.error?.code };
           if (res.ok) break;
         } catch (err) {
-          ultimo = { numero, ok: false, intentos: intento, error: String(err) };
+          ultimo = { numero, archivo: docu.filename, ok: false, intentos: intento, error: String(err) };
         }
         if (intento < 3) await sleep(5000);
       }
@@ -357,7 +403,7 @@ Deno.serve(async (req: Request) => {
     }
     return responder({
       test: esTest, fecha, plantilla: WA_TEMPLATE, destinatarios: numeros, operarios: filas.length,
-      enviados: resultados.filter((x) => x.ok).length, total: numeros.length, xlsxUrl, pdfUrl, resultados,
+      enviados: resultados.filter((x) => x.ok).length, total: numeros.length * docs.length, dias, xlsxUrl, pdfUrl, pdf4Url, resultados,
     });
   } catch (err) {
     console.error(err);
