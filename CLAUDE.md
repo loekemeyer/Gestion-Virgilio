@@ -4171,8 +4171,9 @@ no recuperable del pedido · Urgencia, con su total) **y sigue UNA hoja por prov
 después todos los sin pedir, después todos los discontinuos, en el orden de urgencia del resumen. Se retira la tabla
 única con renglones-rótulo de la v26.31 (`_pedImpDamianPartes` con varios queda sin llamador). Con un proveedor, sin resumen.
 **Urgencia** (`_pedImpUrgencia`) = meses que le faltan a la línea para tener **8** meses de stock (stock + en camino),
-ponderado por consumo u$s/mes: ≥ 3 URGENTE · ≥ 2 ALTA · ≥ 1 MEDIA · > 0 BAJA · 0 = ningún artículo < 8 m. Al 02/10:
-Zhixin 2,8 · Kangli 2,8 · Hugo Wong 1,3 · Fujian 1,2 · Becky 1,1 · Ownland 0,9.
+ponderado por consumo u$s/mes. **Va como PRIORIDAD 1 a 4** (v26.41, Luis: *"prefiero prioridad 1, 2, 3, 4"*):
+1 = faltan 3 o más · 2 = 2 a 3 · 3 = 1 a 2 · 4 = menos de 1 (incluye 0 = ningún artículo < 8 m); cortes confirmados
+por Luis (D5, 02/10). Al 02/10: Zhixin 2,8 · Kangli 2,8 · Hugo Wong 1,3 · Fujian 1,2 · Becky 1,1 · Ownland 0,9.
 **v26.40 (Luis: *"que figure el monto del pedido en usd arriba de en curso"*): en «Llegan» el u$s de lo que viene va
 ARRIBA de las unidades** (`.fobl`, 13 px negrita), después las unidades y abajo la fecha; rótulo «u$s · u». ⚠ El
 «guarde el FOB» de la v26.37 era «figure» (dictado): el FOB guardado por pedido quedó igual (no cambia ningún número

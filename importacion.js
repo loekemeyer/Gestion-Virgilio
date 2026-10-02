@@ -1387,7 +1387,9 @@ function _pedImpUsdCamino(it, fobCur) {
      Σ consumo u$s/mes × máx(0; 8 − meses de stock) ÷ Σ consumo u$s/mes
    con los meses de _pedImpMesesStock (stock + en camino ÷ Est. Madre). Ponderado por PLATA: un artículo
    que casi no se vende no define la urgencia del proveedor. Ningún artículo debajo de 8 meses → 0;
-   todos en 3-4 meses → 4 a 5. Stock negativo cuenta como 0 meses. Sin FOB cargado, promedio simple. */
+   todos en 3-4 meses → 4 a 5. Stock negativo cuenta como 0 meses. Sin FOB cargado, promedio simple.
+   v26.41 (Luis: "prefiero prioridad 1, 2, 3, 4"): PRIORIDAD 1 = faltan 3 o más · 2 = 2 a 3 · 3 = 1 a 2 ·
+   4 = menos de 1 (incluye 0: ningún artículo debajo de 8 meses). Sin Est. Madre no tiene prioridad (va al final). */
 const _PEDIMP_URG_MESES = 8;
 function _pedImpUrgencia(items) {
   const m8 = _PEDIMP_URG_MESES;
@@ -1399,8 +1401,8 @@ function _pedImpUrgencia(items) {
     sw += w; sd += w * d; sdS += d;
   });
   const idx = sw > 0 ? sd / sw : (n ? sdS / n : 0);
-  const nivel = !n ? 5 : idx >= 3 ? 1 : idx >= 2 ? 2 : idx >= 1 ? 3 : idx > 0 ? 4 : 5;
-  return { idx: idx, nivel: nivel, etiqueta: ["", "URGENTE", "ALTA", "MEDIA", "BAJA", n ? "SIN URGENCIA" : "SIN Est. Madre"][nivel], n: n, c4: c4, c8: c8, quiebran: q };
+  const nivel = !n ? 5 : idx >= 3 ? 1 : idx >= 2 ? 2 : idx >= 1 ? 3 : 4;
+  return { idx: idx, nivel: nivel, etiqueta: nivel < 5 ? String(nivel) : "SIN Est. Madre", n: n, c4: c4, c8: c8, quiebran: q };
 }
 function _pedImpDdmm(f) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(f || "")); return m ? m[3] + "/" + m[2] : ""; }
 function _pedImpEnCaminoHtml(it, cls) {
@@ -2059,7 +2061,7 @@ async function _pedImpResumenHoja(provs, opt) {
   };
   const urgTd = function (u) {
     if (!u.n) return '<td>SIN Est. Madre</td>';
-    return '<td><b>' + u.etiqueta + ' · ' + fmt(u.idx, 1) + '</b><small>' + u.c4 + ' &lt; ' + _PEDIMP_MESES_ALERTA + ' m · ' + u.c8 + ' &lt; ' + _PEDIMP_URG_MESES + ' m de ' + u.n +
+    return '<td><b>' + u.etiqueta + '</b><small>faltan ' + fmt(u.idx, 1) + ' m · ' + u.c4 + ' &lt; ' + _PEDIMP_MESES_ALERTA + ' m · ' + u.c8 + ' &lt; ' + _PEDIMP_URG_MESES + ' m de ' + u.n +
       (u.quiebran ? ' · ' + u.quiebran + ' quiebra' + (u.quiebran > 1 ? 'n' : '') : '') + '</small></td>';
   };
   const filas = F.map(function (f) {
@@ -2068,13 +2070,13 @@ async function _pedImpResumenHoja(provs, opt) {
   }).join("");
   const T = F.reduce(function (s, f) { s.curso += f.curso; s.usd += f.usd; if (f.nac && f.nac.ok) { s.fob += f.usd; s.nr += f.nac.noRecup; } return s; }, { curso: 0, usd: 0, fob: 0, nr: 0 });
   const cuenta = {}; F.forEach(function (f) { cuenta[f.urg.etiqueta] = (cuenta[f.urg.etiqueta] || 0) + 1; });
-  const urgTot = ["URGENTE", "ALTA", "MEDIA", "BAJA", "SIN URGENCIA", "SIN Est. Madre"].filter(function (k) { return cuenta[k]; }).map(function (k) { return cuenta[k] + ' ' + k; }).join(' · ');
+  const urgTot = ["1", "2", "3", "4", "SIN Est. Madre"].filter(function (k) { return cuenta[k]; }).map(function (k) { return (k.length === 1 ? 'P' + k : k) + ': ' + cuenta[k]; }).join(' · ');
   const tot = '<tr class="tt"><td>Total</td><td>' + (T.curso > 0 ? fmt(T.curso) : '—') + '</td><td>' + (T.usd > 0 ? fmt(T.usd) : '—') + '</td>' +
     '<td>' + (T.fob > 0 ? Math.round(T.nr / T.fob * 100) + ' %<small>u$s ' + fmt(T.nr) + '</small>' : '—') + '</td><td>' + urgTot + '</td></tr>';
   const html = '<div class="hoja res"><table><thead><tr><th colspan="5" class="tit">Resumen ' + hoyTxt + '</th></tr>' +
-    '<tr><th>Proveedor</th><th>En curso<small>u$s</small></th><th>A pedir<small>FOB u$s</small></th><th>Nac.<small>no recup.</small></th><th>Urgencia<small>meses que faltan a ' + _PEDIMP_URG_MESES + '</small></th></tr></thead>' +
+    '<tr><th>Proveedor</th><th>En curso<small>u$s</small></th><th>A pedir<small>FOB u$s</small></th><th>Nac.<small>no recup.</small></th><th>Prioridad<small>1 = más urgente</small></th></tr></thead>' +
     '<tbody>' + filas + tot + '</tbody></table>' +
-    '<div class="ley">Urgencia = meses que le faltan a la línea para tener ' + _PEDIMP_URG_MESES + ' meses de stock (stock + en camino), ponderado por consumo u$s/mes · ≥ 3 URGENTE · ≥ 2 ALTA · ≥ 1 MEDIA · &gt; 0 BAJA · 0 = ningún artículo debajo de ' + _PEDIMP_URG_MESES + ' meses</div></div>';
+    '<div class="ley">Prioridad según los meses que le faltan a la línea para tener ' + _PEDIMP_URG_MESES + ' meses de stock (stock + en camino), ponderado por consumo u$s/mes: 1 = faltan 3 o más · 2 = 2 a 3 · 3 = 1 a 2 · 4 = menos de 1</div></div>';
   return { html: html, orden: F.map(function (f) { return f.prov; }) };
 }
 /* v25.13 — el documento imprimible con las hojas (de uno o de varios proveedores). */

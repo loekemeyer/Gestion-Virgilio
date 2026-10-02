@@ -69,6 +69,7 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
         // v26.39: la hoja resumen (la primera) — sus filas y su encabezado
         res: [...d.querySelectorAll(".hoja.res tbody tr")].map((tr) => [...tr.cells].map((c) => c.childNodes[0] ? c.childNodes[0].textContent : "").join("|")),
         resTh: [...d.querySelectorAll(".hoja.res thead tr:last-child th")].map((x) => x.childNodes[0].textContent).join("|"),
+        resPrio: [...d.querySelectorAll(".hoja.res tbody tr")].map((tr) => tr.cells[4] ? tr.cells[4].textContent : ""),
         resPrimera: !!d.querySelector(".hoja:first-child.res"),
         // v26.37: la fecha de llegada al mismo tamaño que las unidades (14 px, .fl), no en letra chica
         fecha: [...d.querySelectorAll(".hoja .fl")].map((x) => x.textContent).join(","), flCss: /\.fl\{display:block;font-size:14px/.test(css) };
@@ -99,12 +100,14 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     fail("varios proveedores: resumen, después una hoja de PEDIDO por proveedor, después las de SIN PEDIR y las de DISCONTINUOS: " + r.todos.tits.join("|"));
   if (!r.todos.resPrimera) fail("la hoja resumen va PRIMERA");
   if (r.todos.bandas.join("") !== "") fail("ya no hay renglones-rótulo: cada proveedor va en su propia hoja: " + r.todos.bandas.join(" / "));
-  if (r.todos.resTh !== "Proveedor|En curso|A pedir|Nac.|Urgencia") fail("columnas del resumen: " + r.todos.resTh);
-  // Fujian: 3 artículos a 8 · 1,5 · 3 meses → faltan 0 · 6,5 · 5 → 3,8 (URGENTE); Kangli: 0,1 y 9 → 7,9 y 0 → 4,0 (URGENTE)
+  if (r.todos.resTh !== "Proveedor|En curso|A pedir|Nac.|Prioridad") fail("columnas del resumen: " + r.todos.resTh);
+  // Fujian: 3 artículos a 8 · 1,5 · 3 meses → faltan 0 · 6,5 · 5 → 3,8 (prioridad 1); Kangli: 0,1 y 9 → 7,9 y 0 → 4,0 (prioridad 1)
   // → Kangli primero. En curso de Fujian = 260 de 🚢 En curso (no los 200 de sus artículos).
   const r0 = r.todos.res;
-  if (!/^Kangli\|—\|1\.900\|\d+ %\|URGENTE · 4,0$/.test(r0[0] || "") || !/^Fujian\|260\|3\.800\|\d+ %\|URGENTE · 3,8$/.test(r0[1] || "") || !/^Total\|260\|5\.700\|\d+ %\|2 URGENTE$/.test(r0[2] || ""))
-    fail("resumen: proveedor · en curso · a pedir · % nacionalización · urgencia, del más urgente al menos, con su total: " + r0.join(" / "));
+  if (!/^Kangli\|—\|1\.900\|\d+ %\|1$/.test(r0[0] || "") || !/^Fujian\|260\|3\.800\|\d+ %\|1$/.test(r0[1] || "") || !/^Total\|260\|5\.700\|\d+ %\|P1: 2$/.test(r0[2] || ""))
+    fail("resumen: proveedor · en curso · a pedir · % nacionalización · prioridad, de la 1 a la 4, con su total: " + r0.join(" / "));
+  if (!/^1faltan 4,0 m · 1 < 4 m · 1 < 8 m de 2/.test(r.todos.resPrio[0] || "") || !/^1faltan 3,8 m/.test(r.todos.resPrio[1] || ""))
+    fail("la prioridad dice cuántos meses faltan (Kangli 4,0 · Fujian 3,8): " + r.todos.resPrio.join(" / "));
   if (!/^Cód\|Mca\|Descripción\|Foto\|/.test(r.todos.ths)) fail("columnas del PDF de Damián: " + r.todos.ths);
   if (!r.todos.portrait || !r.todos.marca) fail("A4 vertical y columna Marca (rótulo «Mca»), como el de Damián");
   if (!r.todos.pegado) fail("separadores de 2 px y 4 px de aire por lado en cada columna (v26.34, foto de Máx)");
@@ -118,10 +121,10 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (r.todos.llega["Pedido Fujian"] !== "200" || r.uno.llega["Pedido Fujian"] !== "200") fail("arriba de «Llegan» (Fujian), el FOB de lo que viene (100 u × u$s 2): " + JSON.stringify(r.todos.llega) + " · " + JSON.stringify(r.uno.llega));
   if (r.guardado.llega["Pedido Fujian"] !== "350") fail("con el FOB guardado del pedido, lo que llega de Fujian vale 350 (100 u × u$s 3,50), no 200 con el FOB de hoy: " + JSON.stringify(r.guardado.llega));
   const U = r.urg;
-  if (!(U.baja0.idx === 0 && U.baja0.etiqueta === "SIN URGENCIA")) fail("ningún artículo debajo de 8 meses → sin urgencia: " + JSON.stringify(U.baja0));
-  if (!(Math.abs(U.todos34.idx - 4.5) < 1e-9 && U.todos34.etiqueta === "URGENTE" && U.todos34.c4 === 1 && U.todos34.c8 === 2)) fail("todos en 3-4 meses → URGENTE (faltan 4,5): " + JSON.stringify(U.todos34));
-  if (!(Math.abs(U.mitad.idx - 3) < 1e-9 && U.mitad.nivel === 1)) fail("uno en 2 y otro en 12 meses → 3: " + JSON.stringify(U.mitad));
-  if (!(U.barato.idx < 0.01 && U.barato.etiqueta === "BAJA")) fail("el artículo que casi no pesa en u$s no define la urgencia: " + JSON.stringify(U.barato));
+  if (!(U.baja0.idx === 0 && U.baja0.etiqueta === "4")) fail("ningún artículo debajo de 8 meses → prioridad 4: " + JSON.stringify(U.baja0));
+  if (!(Math.abs(U.todos34.idx - 4.5) < 1e-9 && U.todos34.etiqueta === "1" && U.todos34.c4 === 1 && U.todos34.c8 === 2)) fail("todos en 3-4 meses → prioridad 1 (faltan 4,5): " + JSON.stringify(U.todos34));
+  if (!(Math.abs(U.mitad.idx - 3) < 1e-9 && U.mitad.nivel === 1)) fail("uno en 2 y otro en 12 meses → 3, prioridad 1: " + JSON.stringify(U.mitad));
+  if (!(U.barato.idx < 0.01 && U.barato.etiqueta === "4")) fail("el artículo que casi no pesa en u$s no define la prioridad: " + JSON.stringify(U.barato));
   if (U.sinProy.etiqueta !== "SIN Est. Madre") fail("sin Est. Madre no hay urgencia que medir: " + JSON.stringify(U.sinProy));
   if (r.todos.fecha !== "01/11" || !r.todos.flCss) fail("la fecha de llegada al mismo tamaño que las unidades (.fl 14 px): " + r.todos.fecha + " · " + r.todos.flCss);
   await b.close();
