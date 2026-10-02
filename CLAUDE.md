@@ -7197,12 +7197,17 @@ puede abrir el kiosco.
 
 `sql/gv_impresion_programa_v2611.sql`, `tests/imp-programa.cjs`, `tests/imp-agente-ps.cjs`.
 
-## ⚠ REGLA (Luis, 2026-10-02, v26.16): 📑 ESTADÍSTICAS ISIS — ventas y pedidos por artículo sin entrar a ISIS
+## ⚠ REGLA (Luis, 2026-10-02, v26.16 · v26.20): 📑 ESTADÍSTICAS ISIS — ventas y pedidos por artículo sin entrar a ISIS
 
 Panel supervisor → **📑 Estadísticas ISIS — ventas y pedidos** (`openEstadisticasIsis`, `estadisticas.js`): mes o
 rango, y baja los 4 .xls de los manuales **29** (ventas por artículo → costos) y **31** (pedidos por artículo →
-Estadística Madre), LK y CH, con el **layout crudo del export de ISIS** (Excel 97, Arial 10, ventas A..P con los
-blancos C/D/F, «Total General» corrido una columna, pie «Impreso por»). Así los pasos de los manuales no cambian.
+Estadística Madre), LK y CH, **ya configurados como dicen los manuales** (v26.20, Luis: *"que las configures de la
+forma que indica el word"*): Excel 97, Arial 10, código todo dígitos como NÚMERO (026 → 26; 026L queda texto).
+
+| archivo | cómo sale | qué se hace después |
+|---|---|---|
+| Ventas (manual 29) | sin las columnas F, D y C de ISIS ni «Total General» ni pie: A..I = Artículo · Descripción · Bonificación · Cantidad · Máx · Prom · Mín · Total · % | se copia **A2:D** a Costos (paso 22) |
+| Pedidos (manual 31) | sin I, J y K: A..H = Div · Artículo · Desc · Med · Cajas · Bonif · Med · Unidades; hoja **«LK Sep-26»** | la Est. Madre hace BUSCARV sobre B:H (col 7 = unidades, col 4 = cajas) |
 
 | reporte | fuente | ¿igual a ISIS? |
 |---|---|---|
@@ -7219,4 +7224,30 @@ blancos C/D/F, «Total General» corrido una columna, pie «Impreso por»). Así
   pidió). Sept/26: LK 26.291 → 23.367 cajas (14 pedidos del 01-02/09 + 4 anulados), CH 2.725 → 2.655.
 - ⚠ **Una RPC vacía o con error NO baja nada** (sin sesión el guard devuelve 0 filas: un Excel vacío pegado en Costos
   diría que el mes no vendió). Lo dice en la tabla.
-- `sql/gv_isis_estadisticas_v2616.sql`, `tests/isis-estadisticas.cjs` (layout celda por celda + pantalla + descarga).
+- `sql/gv_isis_estadisticas_v2616.sql`, `tests/isis-estadisticas.cjs` (layout configurado celda por celda, el rojo leído del BIFF, pantalla y descarga).
+- Decidido por Luis (02/10), no volver a proponer: lo que espera en A Programar / Cuarentena **cuenta**; el 55219 va en
+  **una** fila; los pedidos de ISIS **no se importan** (ISIS sólo los tiene al facturar: siempre van desfasados).
+
+### Pedidos DISRUPTIVOS (v26.20): la fila va en ROJO y NEGRITA, con el detalle en la columna I
+
+**Luis:** *"un pedido disruptivo es cuando el pedido de un cliente difiere en un ±50 % al promedio de los pedidos de
+ese cliente en los últimos 12 meses. No es promedio de los 12 meses"* · *"toma el dato de facturación y contempla
+facturación hasta que tengamos 12 meses de data de pedidos"*.
+
+- **`gv_isis_estad_pedidos_disruptivos(emp, desde, hasta)`**: por cada pedido del período, el promedio de los pedidos
+  ANTERIORES de ese cliente para ese artículo en los 12 meses previos (ventana por pedido, no por mes). Disruptivo =
+  `|pedido / promedio − 1| > 0,5`; **sin pedidos previos = INCORPORACIÓN**. Piso de 10 cajas (el pedido o su promedio),
+  el mismo de las Disruptivas de la Est. Madre.
+- **Historia**: pedidos web desde que existen (LK 30/03/2026, Chef 29/06/2026) y, antes de eso, las **facturas de ISIS**
+  (una factura = un pedido; no el día, que junta sucursales). Cuando la web tenga 12 meses (~marzo 2027 LK) las facturas
+  salen solas de la ventana. Web y facturas no se mezclan en el mismo tramo (contaría dos veces).
+- **Columna I** (después de la última): `★ Incorporación: Coto (LK 801) pidió 240 u (20 cj) el 10/09` · `▲ +499%: Matiz SA
+  (LK 4263) pidió 1.000 u (1.000 cj) el 23/09 · prom. 167 u (167 cj) en 3 ped. (2 por factura ISIS) desde 02/10/25`;
+  incorporaciones primero, hasta 5 por artículo y «+N más».
+- **El rojo NO lo escribe SheetJS** (community no escribe estilos): `eiXlsBytes` parchea el stream «Workbook» del BIFF —
+  marca las celdas con formatos marcadores, agrega un FONT rojo y negrita y corre el puntero de BOUNDSHEET. ⚠ **Para un
+  stream de más de 4 KB, CFB devuelve el contenido como Array, no Uint8Array**: sin normalizarlo el parche fallaba en
+  silencio y la hoja salía sin rojo (lo cazó el caso de 400 artículos del test).
+- ⚠ **Si los disruptivos no se pueden leer, el archivo de pedidos NO se baja**: saldría sin marcar y nadie sabría que faltan.
+- Medido sept/26: LK 143 pedidos → **53 de 201** artículos en rojo (108 promedian con facturas); CH 44 → **35 de 95**.
+- `sql/gv_isis_estad_disruptivos_v2620.sql` (rollback a la versión sólo-web, `_v2617`, en la cabecera).

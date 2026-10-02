@@ -31240,3 +31240,22 @@ Dos funciones **nuevas**, sólo lectura, SECURITY DEFINER con guard de superviso
   (8 pedidos LK) sigue contando. `anon` sigue sin EXECUTE.
 - Costo (postgres, sept/26): ventas LK 234 ms, CH 63 ms; pedidos LK 652 ms, CH 164 ms. `anon` no la ejecuta.
 - Rollback: `drop function public.gv_isis_estad_ventas(text,date,date); drop function public.gv_isis_estad_pedidos(text,date,date);`
+
+## §3.v2620 — Pedidos DISRUPTIVOS del reporte de pedidos por artículo: `gv_isis_estad_pedidos_disruptivos` (Luis, 02/10/2026)
+
+Función **nueva**, sólo lectura, SECURITY DEFINER con guard de supervisor; `EXECUTE` sólo `authenticated` y
+`service_role` (anon: false, verificado). La usa `estadisticas.js` al bajar Pedidos LK/CH: el artículo con un pedido
+disruptivo va en rojo y negrita y la columna I lleva el detalle. El archivo es `sql/gv_isis_estad_disruptivos_v2620.sql`.
+
+- **Regla** (Luis): un pedido es disruptivo si se aparta más de ±50 % del **promedio de los pedidos anteriores** de ese
+  cliente para ese artículo en los 12 meses previos (ventana por pedido, no promedio mensual). Sin pedidos previos =
+  incorporación. Piso 10 cajas (el pedido o su promedio), el de las Disruptivas de la Est. Madre.
+- **Historia**: `lk_pedidos_match` desde el primer pedido web de la empresa (LK 30/03/2026, Chef 29/06/2026) y, antes,
+  las facturas de `isis_lk` / `isis_ch` (una factura = un pedido). Columna `hist_fc` = cuántos del promedio son facturas.
+  Se marcan sólo los pedidos del período desde `gestion_desde`, sin cancelados, anulados ni clientes de prueba.
+- **Cómo se aplicó**: hubo una primera versión el mismo día (sólo web, sin `hist_fc`); el `DROP` para cambiarle las
+  columnas se colgaba en el MCP, así que la vieja se renombró `gv_isis_estad_pedidos_disruptivos_v2617` (EXECUTE sólo
+  service_role, de rollback) y la nueva se creó como `_n` y se renombró. md5(prosrc) vivo: `511a83928e615d2f43b78ca72f90c218`.
+- **Medido sept/26** (1,5 s como postgres): LK 143 pedidos (13 incorporaciones · 69 alzas · 61 bajas) → 53 de 201
+  artículos en rojo, 108 promedian con facturas; CH 44 (17 · 9 · 18) → 35 de 95, 25 con facturas.
+- **Rollback**: en la cabecera del archivo (renombrar las dos y devolver el `grant` a `authenticated`).
