@@ -31174,6 +31174,9 @@ despachados, m³ pendientes, unidades vendidas y $ facturado. Los reportes viven
 
 > **v26.28 (02/10):** Luis dijo «sí» al drop (D4). Desde la sesión no entró (el MCP se colgó a los 60 s sin llegar a
 > Postgres): el SQL con backup de la clave y verificación está en `sql/gv_impresion_programa_drop_v2628.sql`.
+> **v26.29 (02/10): APLICADO** — lo corrió Luis en el SQL Editor. Verificado desde la sesión: 0 funciones `gv_imp_*` de
+> impresión, 0 tablas `GV_Impresion_*`, backup `zz_backups."GV_Backup_Impresion_Clave_20261002"` (1 fila, RLS prendida).
+> Rollback: el CREATE completo sigue en `sql/gv_impresion_programa_v2611.sql`.
 
 > ⛔ **RETIRADO en la v26.26** (Luis, 02/10: *"me quedo con mi helper, sacá lo otro"*). El front ya no llama a ninguna
 > de estas RPC. Los objetos quedan **sin uso** (0 PC, 0 reglas, 0 trabajos, 1 clave) hasta que Luis diga «sí» al drop de

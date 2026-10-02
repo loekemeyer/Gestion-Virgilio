@@ -1,0 +1,11 @@
+{
+  "pc": "NOMBRE-DE-LA-PC",
+  "actualizado": "2026-10-02 12:00:00 por usuario",
+  "puerto": 17777,
+  "ajuste": "fit",
+  "reglas": [
+    { "tipo": "picking",   "impresora": "Impresora Deposito 1", "copias": 1, "papel": "A4", "activa": true },
+    { "tipo": "armado",    "impresora": "Impresora Deposito 1", "copias": 1, "papel": "A4", "activa": true },
+    { "tipo": "facturado", "impresora": "Impresora Mostrador",  "copias": 2, "papel": "A4", "activa": true }
+  ]
+}

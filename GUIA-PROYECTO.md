@@ -1,3 +1,10 @@
+## Nota v26.29 (2026-10-02) — El fuente del helper de impresión vive en `tools/helper-impresion/`
+
+- C# WinForms (v1.0.0), un `.exe` sin instalar ni admin; `compilar.bat` lo arma con el `csc.exe` de Windows.
+  `README.md` (desarrollo) y `LEEME.txt` (instalación). No van al repo: `SumatraPDF.exe`, el `.exe`, la config de cada
+  PC (`virgilio-impresion-<PC>.json`) ni el log — lo frena el `.gitignore` de la carpeta.
+- El drop de `GV_Impresion_*` / `gv_imp_*` (D4) lo corrió Luis en el SQL Editor; verificado 0 funciones, 0 tablas.
+
 ## Nota v26.28 (2026-10-02) — El helper de impresión es UN botón en ⚙️ Configuración
 
 Luis: *"lo único que tiene que haber en Gestión Virgilio es un botón en configuración que sea «Helper de impresión» que

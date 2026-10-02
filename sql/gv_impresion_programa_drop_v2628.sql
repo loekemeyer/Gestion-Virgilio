@@ -4,6 +4,7 @@
 -- lo único que nombra estas tablas son estas mismas 9 funciones.
 -- ⚠ Desde la sesión de Claude NO entró: execute_sql y apply_migration se colgaron a los 60 s sin llegar a
 -- Postgres. Correr en Supabase → SQL Editor (proyecto hrxfctzncixxqmpfhskv).
+-- ✅ APLICADO el 02/10/2026 por Luis en el SQL Editor (v26.29). Verificado: 0 funciones, 0 tablas, backup 1 fila con RLS.
 -- Rollback: el CREATE completo está en sql/gv_impresion_programa_v2611.sql; la clave queda en zz_backups.
 
 create table if not exists zz_backups."GV_Backup_Impresion_Clave_20261002" as select * from public."GV_Impresion_Clave";

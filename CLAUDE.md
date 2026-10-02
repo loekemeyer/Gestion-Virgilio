@@ -7182,9 +7182,10 @@ más actualizado que otro. Si alguien quiere cambiar uno solo NO se puede hacer"
 pantalla 🧩 Impresoras (PC + impresora + automático por hoja), `tools/impresion/` (GV-Impresion.ps1) y sus tests
 (`imp-programa`, `imp-agente-ps`). **La impresión sin cuadro es SÓLO el helper local de abajo.** No volver a poner
 una cola de impresión en la base ni un programa que lea de ella. Los objetos de la base (`GV_Impresion_*`, `gv_imp_*`
-de impresión): Luis dijo «sí» al drop (D4, 02/10) pero **desde la sesión no entró** — `execute_sql` y
-`apply_migration` se colgaron a los 60 s sin llegar a Postgres (ni lock ni consulta viva). Queda en
-`sql/gv_impresion_programa_drop_v2628.sql` para correr en el SQL Editor de Supabase. Tenían 0 PC, 0 reglas y 0 hojas.
+de impresión) **ya no existen**: Luis dijo «sí» al drop (D4, 02/10); desde la sesión no entró (`execute_sql` y
+`apply_migration` se colgaron a los 60 s sin llegar a Postgres) y **lo corrió él en el SQL Editor** el 02/10
+(`sql/gv_impresion_programa_drop_v2628.sql`; verificado: 0 funciones, 0 tablas, la clave en
+`zz_backups."GV_Backup_Impresion_Clave_20261002"` con RLS). Tenían 0 PC, 0 reglas y 0 hojas.
 
 ## ⚠ REGLA (Luis, 2026-10-02, v26.24): el HELPER LOCAL de impresión (127.0.0.1:17777) — por dispositivo, en PDF
 
@@ -7208,6 +7209,14 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
   switches de 🖨️ Cola de impresión (auto-imprimir remitos = armado y picking; FACTURADO global).
 - Con el helper conectado + el auto de la estación prendidos, la estación arranca sola al abrir GV (`gvHelperVigilar`).
 - ⚠ El facturado sale en el equipo que tilda: otra PC sin helper → cuadro; un celular → no sale.
+
+- **El FUENTE del helper vive en `tools/helper-impresion/`** (v26.29): C# WinForms, un `.exe` sin instalar ni admin
+  (`TcpListener` en loopback), v1.0.0. `compilar.bat` lo compila con el `csc.exe` de .NET Framework 4 que trae
+  Windows; `README.md` es el de desarrollo y `LEEME.txt` el de quien lo instala. **No se versionan**: `SumatraPDF.exe`
+  (3.6.1 portable 64-bit, ~20 MB, se baja aparte), el `.exe` compilado, la config de cada PC
+  (`virgilio-impresion-<PC>.json`: nombres reales de impresoras y PC, el repo es público) ni el log. Cambiar el helper
+  = editar ahí, compilar y reemplazar el `.exe` en la PC (la config queda). Las reglas tipo → impresora son de cada PC:
+  una PC sin regla para un tipo contesta `ok:false` y esa hoja sale por el cuadro.
 
 `tests/imp-helper-local.cjs` (helper falso en 127.0.0.1: mide el PDF que le llega, el orden, el fallback y el timeout).
 

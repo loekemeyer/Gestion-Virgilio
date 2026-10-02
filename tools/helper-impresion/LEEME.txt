@@ -1,0 +1,120 @@
+===========================================================================
+ IMPRESION VIRGILIO  -  helper local de impresion de hojas del pipeline
+===========================================================================
+
+QUE ES
+------
+Un programa chico que corre en la PC de deposito y imprime SOLAS las hojas de
+picking, armado y facturado que genera Gestion Virgilio, cada una en la impresora
+que vos le asignes, sin el cuadro de impresion y sin tocar la impresora
+predeterminada de Windows. Reemplaza el "modo kiosco" de Chrome: no hay que
+configurar nada en el navegador.
+
+No se instala y no pide permisos de administrador. Se copia y se abre.
+
+
+INSTALAR (copiar) EN UNA PC
+---------------------------
+1. Copiar la carpeta entera (el ZIP descomprimido) a la PC de deposito, por
+   ejemplo a C:\Impresion Virgilio\. Puede ir en el Escritorio tambien.
+   La carpeta tiene:
+       Impresion Virgilio.exe
+       SumatraPDF.exe
+       LEEME.txt  (este archivo)
+2. Doble clic en "Impresion Virgilio.exe". Se abre la ventana.
+   Windows puede mostrar un aviso de "editor desconocido": Mas informacion ->
+   Ejecutar de todas formas.
+3. (Opcional) Tildar "Iniciar con Windows" para que arranque solo al prender la PC.
+
+
+CONFIGURAR LAS IMPRESORAS
+-------------------------
+1. En la lista "Impresoras de esta PC" se ven las impresoras conectadas.
+   Si conectaste una recien, tocar "Actualizar".
+2. "Agregar regla" y elegir:
+       Tipo de hoja : Picking / Armado / Facturado
+       Impresora    : una de las de esta PC
+       Copias       : 1 a 5
+       Papel        : A4 (por defecto), A5, A3, Carta, Legal, o "El del PDF"
+       Activa       : tildada
+   Se pueden mandar VARIOS tipos a la MISMA impresora (una regla por tipo).
+3. "Guardar". Los cambios valen al instante, sin reiniciar.
+4. "Probar..." manda un PDF que elijas a mano a la impresora de la regla marcada,
+   para comprobar que sale bien antes de usarlo en serio.
+
+Las reglas quedan en  virgilio-impresion-<NOMBRE DE LA PC>.json  junto al .exe.
+Cada PC tiene su propio archivo (los nombres de impresora son de cada maquina).
+
+
+COMO FUNCIONA (para quien toca Gestion Virgilio)
+------------------------------------------------
+El helper abre un servidor HTTP local:
+
+    http://127.0.0.1:17777/print          (el puerto se ve/cambia en la ventana)
+
+La pagina de Virgilio, en vez de window.print(), le manda la hoja por fetch.
+
+Contrato:
+  GET  /                      -> 200 "Impresion Virgilio OK"   (saber si corre)
+  OPTIONS /print              -> 204  (preflight del navegador, lo responde solo)
+  POST /print?tipo=picking    -> body = el PDF de la hoja.
+        - El PDF puede ir CRUDO (empezando con %PDF) o en BASE64 (texto).
+        - "tipo" = picking | armado | facturado (tambien por header X-Virgilio-Tipo).
+        - Respuesta 200 JSON:
+              { "ok": true, "tipo": "picking",
+                "impreso": ["HP LaserJet ..."], "errores": [], "motivo": "" }
+          Si no hay regla para ese tipo en esa PC: ok=false, motivo="sin regla...".
+
+Funciona desde una pagina https:// de la nube porque:
+  - 127.0.0.1 no cuenta como "contenido mixto" (el navegador no lo bloquea).
+  - el helper responde CORS y Access-Control-Allow-Private-Network.
+
+
+SNIPPET PARA EL REPO DE VIRGILIO (nube)
+---------------------------------------
+Reemplazar el disparo de impresion de cada hoja por esto. "pdfBlob" es el PDF de
+la hoja (lo ideal es el PDF que ya genera el server; si hoy es HTML, generar el PDF
+en el cliente con html2pdf/jsPDF antes de llamar).
+
+    // tipo: "picking" | "armado" | "facturado"
+    async function imprimirLocal(tipo, pdfBlob) {
+      const url = "http://127.0.0.1:17777/print?tipo=" + encodeURIComponent(tipo);
+      try {
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/pdf" },
+          body: pdfBlob            // Blob/ArrayBuffer con el PDF
+        });
+        const r = await resp.json();
+        if (!r.ok) console.warn("No se imprimio:", r.motivo || r.errores);
+        return r;
+      } catch (e) {
+        // el helper no esta abierto en esa PC
+        console.warn("Helper de impresion no disponible:", e);
+        return { ok: false, motivo: "helper no disponible" };
+      }
+    }
+
+    // saber si el helper esta corriendo (para mostrar un cartel en la UI)
+    async function helperVivo() {
+      try { const r = await fetch("http://127.0.0.1:17777/"); return r.ok; }
+      catch { return false; }
+    }
+
+Si por CORS preferis evitar el preflight, mandar el PDF en base64 como texto plano:
+
+        await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: base64DelPdf      // string base64 (con o sin prefijo data:)
+        });
+
+
+PROBLEMAS COMUNES
+-----------------
+- "NO se pudo abrir el puerto": otro programa usa ese puerto. Cambialo en la ventana
+  (y actualiza el puerto en el snippet de Virgilio) y "Reiniciar servidor".
+- "Sumatra salio con codigo 1": la impresora de la regla no existe en esa PC.
+  Elegir otra y Guardar.
+- La pagina no imprime: confirmar que la ventana diga "ESCUCHANDO" y que helperVivo()
+  de true. Revisar el log de abajo y el archivo virgilio-impresion.log.

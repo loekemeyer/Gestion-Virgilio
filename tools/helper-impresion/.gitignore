@@ -1,0 +1,7 @@
+# Binario externo (bajar de sumatrapdfreader.org, ~20 MB) y el exe compilado
+SumatraPDF.exe
+Impresion Virgilio.exe
+# Config por PC y log (se generan en cada maquina)
+virgilio-impresion-*.json
+!virgilio-impresion-EJEMPLO.json
+virgilio-impresion.log

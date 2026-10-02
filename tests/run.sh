@@ -1128,4 +1128,6 @@ echo "== isis-estadisticas (v26.20: Estadísticas ISIS — ventas y pedidos conf
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/isis-estadisticas.cjs
 echo "== reparar-auth-cuit-compartido (v26.27: Reparar Auth del Panel Web LK no toca un CUIT que ya entra con otro código) =="
 node tests/reparar-auth-cuit-compartido.cjs
+echo "== helper-impresion-fuente (v26.29: fuente del helper en tools/helper-impresion; config de PC y binarios fuera del repo) =="
+node tests/helper-impresion-fuente.cjs
 _resumen
