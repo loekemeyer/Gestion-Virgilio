@@ -59,7 +59,10 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
     const top = [...trs0[0].children].map((x) => x.textContent.trim());
     const pdfTh = [...trs0[1].children].map((x) => x.textContent.trim());
     const pdfCods = [...h1.querySelectorAll("tbody tr")].map((tr) => tr.cells[0].textContent.trim());
-    return { filas, camino, th4: ths[4].textContent.trim(), badges, top, pdfTh, pdfCods, hojas: d.querySelectorAll(".hoja").length, txt: d.textContent,
+    // v26.34 — la celda «Llegan» de FFF (500 u en camino × u$s 1) lleva el FOB abajo
+    const trFFF = [...h1.querySelectorAll("tbody tr")].find((tr) => tr.cells[0].textContent.trim() === "FFF");
+    const llegaFFF = trFFF ? [...trFFF.cells[6].querySelectorAll("small")].map((x) => x.className + ":" + x.textContent).join("|") : "";
+    return { filas, camino, th4: ths[4].textContent.trim(), badges, top, pdfTh, pdfCods, llegaFFF, hojas: d.querySelectorAll(".hoja").length, txt: d.textContent,
       imgs: h1.querySelectorAll("tbody img").length, insumoFoto: ([...h1.querySelectorAll("tbody tr")].find((tr) => tr.cells[0].textContent.trim() === "GGG") || { cells: [0,0,0,{ textContent: "" }] }).cells[3].textContent };
   }, items);
   const cods = r.filas.map((f) => f.cod).join(",");
@@ -78,10 +81,14 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   const exp = ["Cód", "Mca", "Descripción", "Foto", "", "Stock", "Llegan", "Máx", "FOB", "m³"];   // v26.31: «Mca» (rótulo abreviado)
   exp.forEach((h, i) => { if (!(r.pdfTh[i] || "").startsWith(h) || (h === "" && r.pdfTh[i] !== "")) fail("(C) columna " + (i + 1) + " del PDF tiene que ser «" + h + "»: " + r.pdfTh[i]); });
   if (!/^Pedido Frontier \d{2}\/(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)$/.test(r.top[0])) fail("(C) título «Pedido <prov> dd/mmm»: " + r.top[0]);
-  if (r.top[1] !== "10 m") fail("(C) los meses del máximo van arriba de Máx: " + r.top[1]);
-  if (!/^Pedido/.test(r.top[2]) || r.top[3] !== "") fail("(C) Pedido (2 filas) y el separador: " + r.top.join(" | "));
-  if (r.top[4] !== "2.400") fail("(C) FOB lleva el total arriba (2.400): " + r.top[4]);
-  if (r.top[5] !== "1,2") fail("(C) m³ lleva el total arriba con 1 decimal (1,2): " + r.top[5]);
+  // v26.34 (Luis) — arriba de «Llegan» va el FOB de lo que viene (500 u × u$s 1), para compararlo con el del pedido
+  if (r.top[1] !== "500") fail("(C) arriba de Llegan, el FOB u$s de lo que viene (500): " + r.top[1]);
+  if (!/FOB u\$s/.test(r.pdfTh[6] || "")) fail("(C) el rótulo de Llegan dice FOB u$s: " + r.pdfTh[6]);
+  if (r.llegaFFF !== "fobl:500") fail("(C) la celda Llegan de FFF lleva su FOB abajo (fobl:500): " + r.llegaFFF);
+  if (r.top[2] !== "10 m") fail("(C) los meses del máximo van arriba de Máx: " + r.top[2]);
+  if (!/^Pedido/.test(r.top[3]) || r.top[4] !== "") fail("(C) Pedido (2 filas) y el separador: " + r.top.join(" | "));
+  if (r.top[5] !== "2.400") fail("(C) FOB lleva el total arriba (2.400): " + r.top[5]);
+  if (r.top[6] !== "1,2") fail("(C) m³ lleva el total arriba con 1 decimal (1,2): " + r.top[6]);
   if (/Cómo se compone|Para Damián|master cajas/.test(r.txt)) fail("(C) sin textos de explicación ni MC en el PDF");
   if (r.pdfCods.join(",") !== "BBB,DDD,FFF,AAA,GGG,CCC") fail("(C) PDF por prioridad y sólo Frontier: " + r.pdfCods.join(","));
   if (r.imgs !== 5 || !/insumo/.test(r.insumoFoto)) fail("(C) una foto por artículo: " + r.imgs);

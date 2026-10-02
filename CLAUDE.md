@@ -4154,6 +4154,10 @@ antes (el nombre en el título). Lo arma `_pedImpDamianPartes(provs, opt)` → `
 **Y «optimización horizontal absoluta»**: 1 px de aire por lado (eran 3), separadores de 2 px (eran 5), Descripción
 104 px partida en renglones que entran en el alto de la foto, «Por qué» partido, el aviso del MOQ en 2 renglones,
 totales en 14 y rótulo **«Mca»**. Medido con 3 proveedores: la tabla del pedido pasó de **580 a 501 px**.
+**v26.34 (Luis, con la foto de la columna Máx): los separadores quedan en 2 px y cada columna lleva 4 px de aire por
+lado** (con 1 px «Stock» y «Llegan» se pegaban al borde): 557 px. **Y «Llegan» lleva el FOB u$s de lo que viene**
+(unidades en camino × FOB unitario, la misma cuenta de 🚢 En curso), en la celda y sumado arriba y en el rótulo de
+cada proveedor, para compararlo con el FOB del pedido. Sólo en la hoja del pedido.
 `tests/pedimp-reporte-pdf.cjs`.
 
 ## ⚠ REGLA (2026-10-01, v25.94): ✏️ EDITAR PI — quién corrige, qué día y a qué hora

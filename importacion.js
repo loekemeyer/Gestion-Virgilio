@@ -1855,14 +1855,19 @@ async function _pedImpDamianPartes(provs, opt) {
   const stockTd = function (it) { const m = _pedImpMesesStock(it), bajo = m != null && m < _PEDIMP_MESES_ALERTA;
     return '<td>' + fmt((Number(it.stockUni) || 0)) + '<small>' + (bajo ? '⚠ ' : '') + (m == null ? 's/proy' : _pedImpMesesFmt(m) + ' m') + '</small></td>'; };
   // «Llegan» sólo si algo del set viene en camino; si todo llega el MISMO día, la fecha va una vez en el rótulo.
-  const camino = function (lista) {
+  // v26.34 (Luis: "tiene que figurar el FOB de lo que llegó para comparar con el pedido") — con conFob, abajo
+  // de las unidades va el FOB u$s de lo que viene (unidades en camino × FOB unitario: la MISMA cuenta que la
+  // solapa 🚢 En curso, gv_imp_pedidos_historial), así se lee al lado del FOB del pedido nuevo.
+  const usdCam = function (it) { const cam = Math.max(0, Number(it.enCurso) || 0); return cam > 0 && it.fobUni > 0 ? cam * it.fobUni : 0; };
+  const camino = function (lista, conFob) {
     const con = lista.filter(function (it) { return (Number(it.enCurso) || 0) > 0; });
     const fs = con.map(function (it) { return ddmm(it.reingresoEst) || "s/f"; }).filter(function (x, k, a) { return a.indexOf(x) === k; });
     const una = fs.length === 1 ? fs[0] : "";
     return { hay: con.length > 0, una: una,
-      th: '<th>Llegan<small>' + (una || 'u · dd/mm') + '</small></th>',
-      td: function (it) { const cam = Math.max(0, Number(it.enCurso) || 0), f = ddmm(it.reingresoEst);
-        return '<td>' + (cam > 0 ? fmt(cam) + (una ? '' : '<small>' + (f || 's/f') + '</small>') : '—') + '</td>'; } };
+      th: '<th>Llegan<small>' + (una || 'u · dd/mm') + '</small>' + (conFob ? '<small>FOB u$s</small>' : '') + '</th>',
+      td: function (it) { const cam = Math.max(0, Number(it.enCurso) || 0), f = ddmm(it.reingresoEst), u = usdCam(it);
+        return '<td>' + (cam > 0 ? fmt(cam) + (una ? '' : '<small>' + (f || 's/f') + '</small>') +
+          (conFob ? '<small class="fobl">' + (u > 0 ? fmt(u) : 's/FOB') + '</small>' : '') : '—') + '</td>'; } };
   };
   const maxTd = function (it) { return '<td>' + fmt(it.objetivoUni) + '<small>' + fmt(it.proyUni) + '/mes</small></td>'; };
   const todos = function (gs, k) { return [].concat.apply([], gs.map(function (g) { return g[k]; })); };
@@ -1872,14 +1877,17 @@ async function _pedImpDamianPartes(provs, opt) {
   const GP = G.filter(function (g) { return g.arr.length; });
   if (GP.length) {
     const lista = todos(GP, "arr");
-    const cm = camino(lista), nL = cm.hay ? 7 : 6;
+    const cm = camino(lista, true), nL = cm.hay ? 7 : 6;
     const hayMoq = lista.some(function (it) { return !!_pedImpMoqPdf(it); });   // el aviso del 80 % del MOQ, A LA DERECHA
     const nota = hayMoq ? '<td class="nota"></td>' : '';
     const T = GP.reduce(function (s, g) { s.usd += g.tot.usd; s.m3 += g.tot.m3; return s; }, { usd: 0, m3: 0 });
+    // el FOB de lo que llega, sumado: arriba de «Llegan» (el general) y en el rótulo de cada proveedor
+    const usdCamDe = function (arr) { return arr.reduce(function (s, it) { return s + usdCam(it); }, 0); };
+    const camTot = function (arr) { const u = usdCamDe(arr); return u > 0 ? fmt(u) : '—'; };
     // los meses del máximo arriba de Máx: con varios proveedores, una vez si todos piden a los mismos meses.
     const mesesH = GP.every(function (g) { return g.mesesTxt === GP[0].mesesTxt; }) ? GP[0].mesesTxt + ' m' : '';
     const filas = GP.map(function (g) {
-      return (multi ? banda(g, nL, '<td class="tot">' + g.mesesTxt + ' m</td><td></td><td class="sp"></td><td class="tot">' + fmt(g.tot.usd) + '</td><td class="tot">' + fmt(g.tot.m3, 1) + '</td>' + nota) : '') +
+      return (multi ? banda(g, 6, (cm.hay ? '<td class="tot">' + camTot(g.arr) + '</td>' : '') + '<td class="tot">' + g.mesesTxt + ' m</td><td></td><td class="sp"></td><td class="tot">' + fmt(g.tot.usd) + '</td><td class="tot">' + fmt(g.tot.m3, 1) + '</td>' + nota) : '') +
         agrupar(g.arr).map(function (x) {
           const it = x.it, u = _pedImpUniOf(it), usd = _pedImpUsdOf(it), m3 = _pedImpM3Of(it);
           return trG(x.g1) + '<td><b>' + codTxt(it) + '</b></td>' + marcaTd(it) + '<td class="dsc">' + desc(it) + '</td><td class="ft">' + foto(it) + '</td><td class="sp"></td>' + stockTd(it) +
@@ -1890,7 +1898,7 @@ async function _pedImpDamianPartes(provs, opt) {
         }).join("");
     }).join("");
     // los totales en su PROPIA fila, arriba del rótulo (meses del máximo, FOB, m³ — sin total de unidades); a la izquierda, el título.
-    const head = '<tr><th colspan="' + nL + '" class="tit">' + titulo("Pedido", GP) + '</th><th class="tot">' + mesesH + '</th><th rowspan="2">Pedido<small>u</small></th><th class="sp" rowspan="2"></th><th class="tot">' + fmt(T.usd) + '</th><th class="tot">' + fmt(T.m3, 1) + '</th>' + (hayMoq ? '<th class="nota"></th>' : '') + '</tr>' +
+    const head = '<tr><th colspan="6" class="tit">' + titulo("Pedido", GP) + '</th>' + (cm.hay ? '<th class="tot">' + camTot(lista) + '</th>' : '') + '<th class="tot">' + mesesH + '</th><th rowspan="2">Pedido<small>u</small></th><th class="sp" rowspan="2"></th><th class="tot">' + fmt(T.usd) + '</th><th class="tot">' + fmt(T.m3, 1) + '</th>' + (hayMoq ? '<th class="nota"></th>' : '') + '</tr>' +
       '<tr><th>Cód</th><th>Mca</th><th>Descripción</th><th>Foto</th><th class="sp"></th><th>Stock<small>u · m</small></th>' + (cm.hay ? cm.th : '') + '<th>Máx<small>u</small></th><th>FOB<small>u$s</small></th><th>m³</th>' + (hayMoq ? '<th class="nota"></th>' : '') + '</tr>';
     out.ped = '<div class="hoja"><table><thead>' + head + '</thead><tbody>' + filas + '</tbody></table></div>';
   }
@@ -1956,14 +1964,17 @@ async function _pedImpDamianDisc(provs) {
 function _pedImpDamianDoc(titulo, hojas) {
   // v25.3 (Thomas): la hoja va VERTICAL (A4 portrait); la tabla entra en los 194 mm útiles.
   // v26.31 (Luis: "lo más pegadas unas a las otras posibles, optimización horizontal absoluta"):
-  // 1 px de aire a cada lado (eran 3), separadores de 2 px (eran 5), Descripción y «Por qué» parten en
-  // renglones (entran en el alto de la foto), y los totales en 14 (el título sigue en 16).
+  // separadores de 2 px (eran 5), Descripción y «Por qué» parten en renglones (entran en el alto de
+  // la foto), y los totales en 14 (el título sigue en 16).
+  // v26.34 (Luis, con la foto de la columna Máx: "dejalas al mínimo y el ancho de las columnas en sí
+  // como la de la foto 1"): los separadores quedan en 2 px y cada columna lleva 4 px de aire por lado
+  // (con 1 px «Stock» y «Llegan» se pegaban al borde, foto 2).
   const css = '@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;margin:0;font-size:14px}' +
     '.hoja+.hoja{page-break-before:always;break-before:page}' +
     'th.sp,td.sp{width:2px;min-width:2px;padding:0;border-top:0;border-bottom:0}' +   // v24.55 (Thomas): columna vacía finita que separa bloques
-    'table{border-collapse:collapse;margin:0 auto}th,td{border:1px solid #444;padding:1px;vertical-align:middle;text-align:center;white-space:nowrap;line-height:1.1}th{font-size:14px}' +
+    'table{border-collapse:collapse;margin:0 auto}th,td{border:1px solid #444;padding:1px 4px;vertical-align:middle;text-align:center;white-space:nowrap;line-height:1.1}th{font-size:14px}' +
     'th.tit{font-size:16px;font-weight:800;white-space:normal}.tot{font-weight:800}.tit3{font-size:16px;font-weight:800;text-align:center}.nota{border:0;text-align:left;padding-left:2px}.moq{font-size:10px;font-weight:800;display:block;line-height:1.05}' +
-    'th small,td small{display:block;font-weight:400;color:#555;font-size:10px}.dsc{white-space:normal;max-width:104px;line-height:1}td.pq{white-space:normal;max-width:52px;font-size:12px}' +
+    'th small,td small{display:block;font-weight:400;color:#555;font-size:10px}.dsc{white-space:normal;max-width:112px;line-height:1}td.pq{white-space:normal;max-width:60px;font-size:12px}' +
     '.ft{padding:0}.ft img{width:42px;height:42px;object-fit:contain;display:block;margin:0 auto}.sf{color:#999;font-size:9px}' +
     'tr{page-break-inside:avoid}thead{display:table-header-group}' +
     'tr.prov>td{font-size:16px;font-weight:800;white-space:normal;border-top:3px solid #111;page-break-after:avoid;break-after:avoid}tr.prov>td.tot{font-size:14px}tr.prov>td.sp{border-top:0}tr.prov>td.nota{border:0}' +   // v26.31: un renglón-rótulo por proveedor

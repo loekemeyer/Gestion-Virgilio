@@ -6,7 +6,8 @@
    v26.31 (Luis, 02/10): *"cuando se eligen múltiples proveedores debería agrupar en con pedido (todos
    los proveedores discriminando), sin pedido (…), discontinuo (…)"* → con varios tildados, UNA hoja de
    cada tipo con todos adentro y un renglón-rótulo (tr.prov) por proveedor; con uno solo, como antes.
-   Y *"optimización horizontal absoluta"*: 1 px de aire por lado, separadores de 2 px, rótulo «Mca». */
+   Y *"optimización horizontal absoluta"*: separadores de 2 px, rótulo «Mca»; v26.34: 4 px de aire por lado
+   («el ancho de las columnas como la de la foto 1») y el FOB u$s de lo que llega en «Llegan». */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -48,7 +49,8 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
       const tot = [...d.querySelectorAll(".hoja")].slice(0, 1).map((h) => [...h.querySelectorAll("tbody tr.prov")].map((tr) => [...tr.cells].map((c) => c.textContent).join("|")))[0] || [];
       const css = (/<style>([\s\S]*?)<\/style>/.exec(html) || [])[1] || "";
       return { ok, tits, ths, cods, bandas, tot, hojas: d.querySelectorAll(".hoja").length, portrait: /size:A4 portrait/.test(html), marca: /<th>Mca<\/th>/.test(html),
-        pegado: /th,td\{[^}]*padding:1px;/.test(css) && /th\.sp,td\.sp\{width:2px/.test(css) };
+        pegado: /th,td\{[^}]*padding:1px 4px;/.test(css) && /th\.sp,td\.sp\{width:2px/.test(css),
+        topLlega: (d.querySelector(".hoja thead tr").children[1] || {}).textContent };
     };
     btn[0].click();
     const provs = [...document.querySelectorAll("#impRepOv .imp-rep-prov")].map((c) => c.value + ":" + c.checked);
@@ -63,10 +65,11 @@ const fail = (m) => { console.error("✗ " + m); process.exitCode = 1; };
   if (r.todos.tits.join("|") !== "Pedido|Sin pedir|Discontinuos")
     fail("varios proveedores: UNA hoja de cada tipo (pedido · sin pedir · discontinuos), no una tanda por proveedor: " + r.todos.tits.join("|"));
   if (r.todos.bandas.join(" / ") !== "Fujian,Kangli / Fujian,Kangli / Fujian,Kangli") fail("cada hoja discrimina a los proveedores con su renglón-rótulo: " + r.todos.bandas.join(" / "));
-  if (r.todos.tot.join(" / ") !== "Fujian|10 m|||3.800|3,8 / Kangli|10 m|||1.900|1,9") fail("el rótulo del proveedor lleva SUS totales (meses · FOB · m³): " + r.todos.tot.join(" / "));
+  if (r.todos.tot.join(" / ") !== "Fujian|200|10 m|||3.800|3,8 / Kangli|—|10 m|||1.900|1,9") fail("el rótulo del proveedor lleva SUS totales (FOB de lo que llega · meses · FOB · m³): " + r.todos.tot.join(" / "));
   if (!/^Cód\|Mca\|Descripción\|Foto\|/.test(r.todos.ths)) fail("columnas del PDF de Damián: " + r.todos.ths);
   if (!r.todos.portrait || !r.todos.marca) fail("A4 vertical y columna Marca (rótulo «Mca»), como el de Damián");
-  if (!r.todos.pegado) fail("optimización horizontal: 1 px de aire por lado y separadores de 2 px");
+  if (!r.todos.pegado) fail("separadores de 2 px y 4 px de aire por lado en cada columna (v26.34, foto de Máx)");
+  if (r.todos.topLlega !== "200") fail("arriba de «Llegan», el FOB general de lo que viene (100 u × u$s 2): " + r.todos.topLlega);
   if (r.todos.cods.join(" / ") !== "902E,903E,904E / 901E,905E / ZZ1E,ZZ2E") fail("cada hoja con los artículos de todos, por proveedor y por urgencia: " + r.todos.cods.join(" / "));
   if (r.solo.tits.join("|") !== "Pedido" || r.solo.bandas.join() !== "Fujian,Kangli") fail("«Sólo lo que genera pedido» deja sólo la hoja del pedido, con los dos: " + r.solo.tits.join("|") + " · " + r.solo.bandas.join());
   if (r.uno.tits.join("|") !== "Pedido Fujian|Sin pedir Fujian|Discontinuos Fujian" || r.uno.bandas.join("") !== "") fail("un proveedor tildado: sus hojas con el nombre en el título y sin rótulos: " + r.uno.tits.join("|") + " · " + r.uno.bandas.join("|"));
