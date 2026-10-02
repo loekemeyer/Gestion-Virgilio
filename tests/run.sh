@@ -1126,4 +1126,6 @@ echo "== hotsale-rent (v25.91: Hot Sale — rent. ponderada del período, import
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/hotsale-rent.cjs
 echo "== isis-estadisticas (v26.20: Estadísticas ISIS — ventas y pedidos configurados como los manuales 29 y 31, disruptivos en rojo; estadisticas.js) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/isis-estadisticas.cjs
+echo "== reparar-auth-cuit-compartido (v26.27: Reparar Auth del Panel Web LK no toca un CUIT que ya entra con otro código) =="
+node tests/reparar-auth-cuit-compartido.cjs
 _resumen
