@@ -317,7 +317,7 @@ grant execute on function public.gv_horas_operario_tandas_v2(date) to service_ro
 
 -- v26.21 (Elías, 02/10): el cron 98 (gv-reporte-diario-virgilio-18hs, 18:00 ART) pasa a llamar a
 -- gv-reporte-horas-xlsx con test:false -> 2 PDF (el día con detalle por tanda + ese día y 3 anteriores)
--- a Juan (5491126161913) y Fabián (5491131181186). timeout de pg_net 120 s.
+-- a Juan (5491126161913) y Marianela (5491131181186). timeout de pg_net 120 s.
 -- Rollback: volver la url del cron a .../functions/v1/gv-reporte-diario-virgilio (la función del PDF viejo
 -- quedó intacta): select cron.alter_job(98, command := replace(command,'gv-reporte-horas-xlsx','gv-reporte-diario-virgilio'))
 --   from cron.job where jobid = 98;

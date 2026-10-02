@@ -31264,7 +31264,7 @@ disruptivo va en rojo y negrita y la columna I lleva el detalle. El archivo es `
 
 - **Cron 98** (`gv-reporte-diario-virgilio-18hs`, 18:00 ART) llama ahora a **`gv-reporte-horas-xlsx`** (`test:false`,
   `timeout_milliseconds` 120 s) en vez de `gv-reporte-diario-virgilio` (que queda intacta, para volver).
-- Manda **2 PDF** a **Juan (5491126161913) y Fabián (5491131181186)**: el del día (Fecha primero, 3 bloques
+- Manda **2 PDF** a **Juan (5491126161913) y Marianela (5491131181186)**: el del día (Fecha primero, 3 bloques
   separados por 10 px, detalle por tanda de picking y armado con minutos netos y fila «Abierto») y el de ese día +
   los 3 anteriores con datos (agrupado por operario, sin detalle). Sin bloque «Pendientes».
 - Datos: `gv_horas_operario_detalle_v2` + `gv_horas_operario_tandas_v2` (sólo lectura, sólo service_role).

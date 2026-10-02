@@ -11,7 +11,7 @@
 //
 //   { "fecha": "2026-09-30", "wa_token": "..." }                  -> prueba, al número de pruebas
 //   { "fecha": "..", "solo_xlsx": true }                           -> arma Excel y PDFs, no manda WhatsApp
-//   { "fecha": "..", "test": false, "wa_token": "..." }            -> a Juan y Fabián
+//   { "fecha": "..", "test": false, "wa_token": "..." }            -> a Juan y Marianela
 //   { "fecha": "..", "destinatarios": ["549..."], "wa_token": ".."} -> a esos números
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -25,7 +25,7 @@ const WA_PHONE_ID = Deno.env.get("WA_PHONE_ID") || "918089688061759";
 const WA_TEMPLATE = Deno.env.get("WA_TEMPLATE") || "informe_produccion_virgilio";
 const WA_IDIOMA = "es_AR";
 const DEST_PRUEBA = ["5491156517686"];
-const DEST_PROD = ["5491126161913", "5491131181186"]; // Juan (cron 98) + Fabián (Elías, 02/10)
+const DEST_PROD = ["5491126161913", "5491131181186"]; // Juan (cron 98) + Marianela (Elías, 02/10)
 const BUCKET = "reportes";
 const TZ = "America/Argentina/Buenos_Aires";
 const MIN_H = 1 / 60; // menos de 1 minuto se deja en blanco
