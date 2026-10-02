@@ -11,7 +11,8 @@
 --       - el inicio de la proxima tarea registrada del legajo ese dia: coalesce(ts_inicio, ts_cliente) de todo
 --         evento que no sea automatico (PUB, AUB, PKC, ENT, RSP, ROC, RAG, FGU, FSS, IMPT, TAL, GST, MGR, PKM,
 --         SSG, PSP, NPD, PKAX ni los *X). Un tramo que YA estaba abierto al cerrar (ts_inicio <= TP) deja la
---         cola en 0. Un segundo TP/TAP de la MISMA tanda no la corta (se toma el max por tanda).
+--         cola en 0. Un segundo TP/TAP de la MISMA tanda no la corta, y la cola que se suma es la del PRIMER cierre
+--         (= index.html, que la suma en el primer TP/TAP de la tanda y deduplica como el m³, v12.97).
 --       - la primera bajada de racks sin tramo (Movimientos_Stock baja_racks) del legajo: ese tramo ya cuenta
 --         como racks en rk_ag, no se cuenta dos veces.
 --       - el tope de jornada: least(now(), greatest(ultimo evento del legajo, p_dia + hora_salida)). El FJ es un
@@ -45,8 +46,8 @@ begin
   v_cola := $c$
 cola as (   -- v26.43-cola (Luis, 02/10): lo que sigue a un TP/TAP SIN registro, hasta que el legajo empieza su
             -- proxima tarea registrada (o el fin de jornada), es picking/armado de esa tanda.
-  select c.legajo, c.opcion, c.tanda,
-         max(greatest(0, extract(epoch from (
+  select distinct on (c.legajo, c.opcion, c.tanda) c.legajo, c.opcion, c.tanda,
+         greatest(0, extract(epoch from (
            least(coalesce((select min(case when s.ts_inicio is not null and s.ts_inicio <= c.ts_cliente then c.ts_cliente
                                           else coalesce(s.ts_inicio, s.ts_cliente) end)
                              from base s
@@ -61,10 +62,10 @@ cola as (   -- v26.43-cola (Luis, 02/10): lo que sigue a un TP/TAP SIN registro,
                  least(now(), greatest((select max(u.ts_cliente) from base u where u.legajo = c.legajo),
                        (p_dia + coalesce((select e.h_sal from emp e where e.legajo = c.legajo), time '17:00'))
                          at time zone 'America/Argentina/Buenos_Aires')))
-           - c.ts_cliente)))) as s
+           - c.ts_cliente))) as s
     from base c
    where c.opcion in ('TP','TAP') and c.tanda <> '' and c.tanda <> 'ANULADO'
-   group by 1, 2, 3
+   order by c.legajo, c.opcion, c.tanda, c.ts_cliente   -- la cola es la del PRIMER cierre de la tanda (= index.html)
 ),$c$;
   foreach v_obj in array array['public.gv_monitor_horas_operario_dia(date)', 'public.gv_horas_operario_detalle_v2(date)'] loop
     v_def := pg_get_functiondef(v_obj::regprocedure);
@@ -113,8 +114,8 @@ begin
     if v_def not like '%v26.43-cola%' then continue; end if;
     v_ini := position($x$
 cola as (   -- v26.43-cola$x$ in v_def);
-    v_fin := position($x$   group by 1, 2, 3
-),$x$ in v_def) + length($x$   group by 1, 2, 3
+    v_fin := position($x$   order by c.legajo, c.opcion, c.tanda, c.ts_cliente   -- la cola es la del PRIMER cierre de la tanda (= index.html)
+),$x$ in v_def) + length($x$   order by c.legajo, c.opcion, c.tanda, c.ts_cliente   -- la cola es la del PRIMER cierre de la tanda (= index.html)
 ),$x$);
     v_new := left(v_def, v_ini - 1) || substr(v_def, v_fin);
     v_new := replace(v_new, 'max(e.dur_s) + coalesce(max(k.s), 0) as dur_s', 'max(e.dur_s) as dur_s');

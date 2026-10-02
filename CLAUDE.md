@@ -6695,7 +6695,8 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   RAG, FGU, FSS, IMPT, TAL, GST, MGR, PKM, SSG, PSP, NPD, PKAX ni los `*X`), o el **fin de jornada**
   (`max(último evento, hora de salida)`; el FJ es un evento y la corta solo), o la primera **bajada de racks
   sin tramo** (ese tramo ya cuenta como racks). Un tramo que **ya estaba abierto** al cerrar deja la cola en
-  0; un 2.º TP/TAP de la **misma** tanda no la corta. Se suma a la tanda: `pick/arm = max(dur_s) + cola`.
+  0; un 2.º TP/TAP de la **misma** tanda no la corta y la cola que se suma es la del **primer** cierre (como
+  el m³, v12.97). Se suma a la tanda: `pick/arm = max(dur_s) + cola`.
 - **Dónde:** `gv_monitor_horas_operario_dia` (CTE `cola`) y su copia verbatim `gv_horas_operario_detalle_v2`
   (xlsx de Elías); `index.html` `fetchMonitorDayStats` (`colaMsDe`, ≡ vista) y el pop-up por tanda dice
   «incl. N de cola hasta la próxima tarea». TV y Mon. Admin la heredan de la vista. **No entra** en «Min trab»
@@ -6703,11 +6704,14 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
 - **Medido:** 15/09 → 277 picking 6,37 → 7,77 h · 237 armado 5,60 → 6,63 · 8 armado 6,75 → 8,76. 60 días, por
   tanda: mediana 1,7 min · p90 9,7 (TP) / 16,4 (TAP) · 4 colas > 60 min, la mayor **518 min** (TP a la mañana y
   ningún evento hasta la hora de salida). Es a propósito: la regla pide que eso cuente, y queda a la vista.
-- La calibración de dificultad (D17) usa **`neto_cola`** como tiempo real de la tanda.
+- La calibración de dificultad (D17, `docs/PICKING-DIFICULTAD-D17.md`) mide el tiempo real como picking puro **más la
+  cola topeada a 30 min** (dos tandas con cola «cap» de 5 y 8 h quedaron afuera): la cola cayó 55 % en un fijo por
+  tanda (2,4 min) y 32 % en la parada; las alturas no se movieron. Tope y «cap» en la regla de la base: decisión de Luis.
 - `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
   v26.43 adentro). `tests/tools/vista-15.json` re-congelado con la cola; `tests/mon-vs-vista.cjs`;
-  `tests/muerto-neteado.cjs` (la siguiente tarea arranca 1 s después del cierre y el día termina con FJ, para
-  que la cola quede en 0 y siga midiendo sólo el neteo).
+  `tests/muerto-neteado.cjs` y `tests/mejoras-v1297.cjs` (la siguiente tarea arranca 1 s después del cierre y el
+  día termina con FJ, para que la cola quede en 0 y sigan midiendo lo suyo). CI 1698 cayó por el segundo: regla
+  v21.53, se arregló en el mismo pedido.
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.68): el trabajo en racks sin tramo se INFIERE — y el admin abre en la Vista TV
 

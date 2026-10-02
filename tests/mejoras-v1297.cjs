@@ -39,8 +39,13 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const iso = (ms) => new Date(ms).toISOString();
     const evs = [
       { legajo: "55", opcion: "TP",  texto: "A1", ts_inicio: iso(T0),               ts_cliente: iso(T0 + 3600000) },
+      /* v26.43-cola (Luis, 02/10): lo que sigue a un TP/TAP sin registro hasta la próxima tarea es picking/armado.
+         Para que este test siga midiendo SÓLO la deduplicación por tanda, la siguiente tarea arranca 1 s después
+         del primer TP (un AP abierto) y el día termina con FJ 1 s después del TAP: la cola queda en 0. */
+      { legajo: "55", opcion: "AP",  texto: "A2", ts_inicio: null,                  ts_cliente: iso(T0 + 3600000 + 1000) },
       { legajo: "55", opcion: "TP",  texto: "A1", ts_inicio: iso(T0 + 2 * 3600000), ts_cliente: iso(T0 + 3 * 3600000) },   // la misma tanda cerrada dos veces
-      { legajo: "55", opcion: "TAP", texto: "A2", ts_inicio: iso(T0 + 4 * 3600000), ts_cliente: iso(T0 + 5 * 3600000) }
+      { legajo: "55", opcion: "TAP", texto: "A2", ts_inicio: iso(T0 + 4 * 3600000), ts_cliente: iso(T0 + 5 * 3600000) },
+      { legajo: "55", opcion: "FJ",  texto: "",   ts_inicio: null,                  ts_cliente: iso(T0 + 5 * 3600000 + 1000) }
     ];
     window.fetch = (url) => {
       const u = String(url);
