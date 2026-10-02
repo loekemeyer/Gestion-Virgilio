@@ -721,6 +721,8 @@ echo "== imp-stock-real (v16.04: el stock del módulo de importados sale del dep
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-stock-real.cjs
 echo "== pk-deposito-pkc (v15.41: el PKC dice de qué depósito salió cada caja; un evento por (tanda,art)) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-deposito-pkc.cjs
+echo "== pk-metricas-paso (v26.25: métricas del picking por paso, aparte del PKC; no afecta la operación) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-metricas-paso.cjs
 
 echo "== lugar-editor (v15.76: editor de LUGARES — GV_Lugar/GV_Lugar_Item, un código en varios lugares) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/lugar-editor.cjs

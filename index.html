@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.24"></script>
+<script type="module" src="recepcion.js?v=26.25"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10478,7 +10478,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.24";
+const APP_VERSION = "v26.25";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -13010,6 +13010,7 @@ function pkEsUnidad(cod) {
 function pkRender() {
   const m = document.getElementById("tandaModal");
   if (!m || !_pk) return;
+  try { pkmMostrado(); } catch (_e) {}   // v26.25 — métricas por paso (no toca el picking)
   pkSave();   // persistir el estado en CADA cambio (anti pérdida por bloqueo de pantalla)
   pkFootRender(m);   // v7.13: pie con "Anular picking" (siempre visible en la sesión)
   const body = m.querySelector(".tanda-modal-body");
@@ -13314,8 +13315,8 @@ function pkGoFirstPending() {
 }
 
 function pkAdvance() { if (_pk) { _pk.idx = Math.min(_pk.idx + 1, _pk.items.length); _pk.mode = "item"; pkRender(); } }
-function pkPrev() { if (_pk) { _pk.idx = Math.max(_pk.idx - 1, 0); _pk.mode = "item"; pkRender(); } }
-function pkNext() { if (_pk) { _pk.idx = Math.min(_pk.idx + 1, _pk.items.length); _pk.mode = "item"; pkRender(); } }
+function pkPrev() { if (_pk) { try { pkmEvento("atras"); } catch (_e) {} _pk.idx = Math.max(_pk.idx - 1, 0); _pk.mode = "item"; pkRender(); } }
+function pkNext() { if (_pk) { try { pkmEvento("adelante"); } catch (_e) {} _pk.idx = Math.min(_pk.idx + 1, _pk.items.length); _pk.mode = "item"; pkRender(); } }
 
 function pkOk() {
   if (!_pk || _pk.idx >= _pk.items.length) return;
@@ -13323,6 +13324,7 @@ function pkOk() {
   const rec = (it.dual && it.pick) ? it.pick : it.art;   // par Nacional/Importado: registra el elegido
   _pk.results[it.key] = it.esp;
   pkSendDetail(rec, it.esp, it.esp);
+  try { pkmConf("ok", it, it.esp); } catch (_e) {}
   pkAdvance();
 }
 /* Sin stock: no había NADA de este código → registra 0 y avanza (faltante completo,
@@ -13333,6 +13335,7 @@ function pkSinStock() {
   const rec = (it.dual && it.pick) ? it.pick : it.art;
   _pk.results[it.key] = 0;
   pkSendDetail(rec, it.esp, 0);
+  try { pkmConf("sin_stock", it, 0); } catch (_e) {}
   pkAdvance();
 }
 function pkF() { if (_pk) { _pk.mode = "fInput"; pkRender(); } }
@@ -13455,6 +13458,7 @@ function pkConfirmF() {
   const rec = (it.dual && it.pick) ? it.pick : it.art;   // par Nacional/Importado: registra el elegido
   _pk.results[it.key] = real;
   pkSendDetail(rec, it.esp, real);
+  try { pkmConf("faltan", it, real); } catch (_e) {}
   pkAdvance();
 }
 function pkClose() { _pk = null; closeTandaModal(); }
@@ -13589,6 +13593,147 @@ function pkTotalesArt(rec) {
   }
   return { esp: esp, real: real, exc: exc, emp: (empOk && emp) ? emp : "" };
 }
+
+/* ===== v26.25 — MÉTRICAS DEL PICKING POR PASO (D12, 02/10/2026) =====
+   Para armar el «tiempo estimado de la tanda» y evaluar al operario hace falta saber qué
+   pasó en cada paso, y el PKC no lo dice: guarda sólo la hora de la ÚLTIMA confirmación
+   (reconfirmar pisa la primera), junta góndola y excedente en una fila y no registra la
+   celda que se mostró, los saltos con Adelante/Atrás ni cuándo se bloqueó el celular.
+   Esto lo anota APARTE, en `GV_Picking_Paso_Evento`, con su propia cola local:
+     · mostrado            — el operario llega a un paso (o vuelve a él, o retoma)
+     · ok / faltan / sin_stock — cada confirmación, con la hora REAL de cada una
+     · adelante / atras    — los botones de navegación
+     · oculta / visible    — celular bloqueado o app en 2.º plano (visible lleva dur_seg)
+   ⚠ QUE NO AFECTE LA OPERACIÓN (pedido explícito): no toca el PKC, no toca
+   Registros_Produccion_Virgilio (lo leen el monitor, el Resumen de hoy, Telegram y el
+   contador de tiempo muerto), todo va en try/catch y la cola tiene tope (PKM_MAX) para no
+   llenar el localStorage que usa el guardado del picking (pkSave).
+   Se lee en la base: gv_picking_paso (un renglón por paso) y gv_picking_interrupcion.
+   sql/gv_picking_paso_evento_v2625.sql, tests/pk-metricas-paso.cjs. */
+const PKM_Q = "gv_pkm_q_v1";
+const PKM_OCULTA = "gv_pkm_oculta_v1";
+const PKM_MAX = 800;
+let _pkmUltimo = "", _pkmOcultaTs = 0, _pkmEnvio = false, _pkmTimer = null, _pkmDeA1 = false, _pkmSeq = 0;
+function pkmQLeer() {
+  try { const a = JSON.parse(localStorage.getItem(PKM_Q) || "[]"); return Array.isArray(a) ? a : []; }
+  catch (_e) { return []; }
+}
+function pkmQGuardar(a) {
+  try { localStorage.setItem(PKM_Q, JSON.stringify(a.length > PKM_MAX ? a.slice(a.length - PKM_MAX) : a)); }
+  catch (_e) { /* sin lugar: se pierden métricas, nunca el picking */ }
+}
+/* Arma y encola un evento. `it` = el paso (por defecto el actual); `extra` pisa campos. */
+function pkmEvento(evento, it, extra) {
+  try {
+    if (!_pk || !_pk.tanda) return;
+    const N = (_pk.items || []).length;
+    if (it === undefined) it = (_pk.idx < N) ? _pk.items[_pk.idx] : null;
+    const ts = Date.now();
+    const leg = String(_pk.legajo || "").trim();
+    const row = {
+      client_id: ("pkm_" + leg + "_" + _pk.tanda + "_" + evento + "_" + ts + "_" + (++_pkmSeq)).replace(/[^a-zA-Z0-9_\-]/g, "").slice(0, 150),
+      legajo: leg, tanda: String(_pk.tanda).toUpperCase(), evento: evento,
+      paso: it ? String(it.key || it.art || "") : null,
+      art: it ? String((it.dual && it.pick) ? it.pick : (it.art || "")).toUpperCase() : null,
+      sector: it ? (String(it.isExc ? (it.excUbic || it.sector || "") : (it.sector || "")).replace(/-/g, "").slice(0, 120) || null) : null,
+      es_exc: it ? !!it.isExc : null,
+      nota: it ? (it.skip ? "salteado" : (it.forcedGond ? "forzado" : null)) : null,
+      idx: (typeof _pk.idx === "number") ? _pk.idx : null, total: N,
+      esp: it && it.esp != null ? Number(it.esp) : null, real: null, dur_seg: null,
+      ts_cliente: new Date(ts).toISOString(),
+      dispositivo: (typeof gvDispositivoId === "function") ? gvDispositivoId() : null,
+      app_version: (typeof APP_VERSION !== "undefined") ? APP_VERSION : null
+    };
+    if (extra) Object.keys(extra).forEach(function (k) { row[k] = extra[k]; });
+    const q = pkmQLeer(); q.push(row); pkmQGuardar(q);
+    pkmProgramar(1500);
+  } catch (_e) { /* best-effort */ }
+}
+/* Lo llama pkRender en CADA dibujo: sólo anota cuando cambia el paso (o al retomar). */
+function pkmMostrado() {
+  try {
+    if (!_pk) return;
+    const N = (_pk.items || []).length;
+    const it = (_pk.idx < N) ? _pk.items[_pk.idx] : null;
+    const clave = _pk.tanda + "|" + _pk.legajo + "|" + _pk.idx + "|" + (it ? it.key : "R");
+    if (clave === _pkmUltimo) return;
+    const primeraVez = !_pkmUltimo || _pkmUltimo.indexOf(_pk.tanda + "|" + _pk.legajo + "|") !== 0;
+    _pkmUltimo = clave;
+    // La app se cerró con el celular bloqueado: el 'visible' se anota al retomar.
+    if (primeraVez && !_pkmOcultaTs) {
+      try {
+        const o = JSON.parse(localStorage.getItem(PKM_OCULTA) || "null");
+        if (o && o.tanda === _pk.tanda && o.legajo === String(_pk.legajo) && Date.now() - o.ts < 12 * 3600e3) {
+          pkmEvento("visible", undefined, { dur_seg: Math.round((Date.now() - o.ts) / 1000), nota: "retomado" });
+        }
+        localStorage.removeItem(PKM_OCULTA);
+      } catch (_e) {}
+    }
+    pkmEvento("mostrado", it, it ? null : { nota: "resumen" });
+  } catch (_e) {}
+}
+function pkmConf(evento, it, real) {
+  try { if (it) pkmEvento(evento, it, { real: (real == null || isNaN(Number(real))) ? null : Number(real) }); } catch (_e) {}
+}
+function pkmProgramar(ms) {
+  try {
+    if (_pkmTimer) return;
+    _pkmTimer = setTimeout(function () { _pkmTimer = null; pkmFlush(false); }, ms || 1500);
+  } catch (_e) {}
+}
+/* Manda la cola. 200/201 = entró → sale. 409 (ya estaba: el client_id es único) o 400/422
+   (un renglón que la base rechaza): el lote entero se cae, así que se reintenta DE A UNO y
+   sólo se descarta el que choca, para que no trabe al resto (la lección de la cola de
+   stock, v25.20). Red caída, 5xx o tabla inexistente: queda.
+   ⚠ Sin on_conflict a propósito: el `ON CONFLICT` exige permiso de SELECT y la RLS lo
+   rechaza para anon (medido 02/10); anon sólo puede INSERTAR. */
+function pkmFlush(keepalive) {
+  try {
+    if (_pkmEnvio || typeof fetch !== "function") return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    const q = pkmQLeer(); if (!q.length) return;
+    const lote = q.slice(0, _pkmDeA1 ? 1 : 100);
+    const body = JSON.stringify(lote);
+    _pkmEnvio = true;
+    fetch(SUPABASE_URL + "/rest/v1/GV_Picking_Paso_Evento", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json",
+                 Prefer: "return=minimal" },
+      body: body, keepalive: !!keepalive && body.length < 60000
+    }).then(function (r) {
+      const st = r ? r.status : 0;
+      let sacar = false;
+      if (r && r.ok) { sacar = true; _pkmDeA1 = false; }
+      else if (st === 409 || st === 400 || st === 422) { if (lote.length > 1) _pkmDeA1 = true; else sacar = true; }
+      if (sacar) {
+        const ids = {}; lote.forEach(function (x) { ids[x.client_id] = 1; });
+        const resto = pkmQLeer().filter(function (x) { return !ids[x.client_id]; });
+        pkmQGuardar(resto);
+        if (resto.length) pkmProgramar(400);
+      } else if (_pkmDeA1) pkmProgramar(400);
+    }).catch(function () {}).then(function () { _pkmEnvio = false; });
+  } catch (_e) { _pkmEnvio = false; }
+}
+try {
+  document.addEventListener("visibilitychange", function () {
+    try {
+      if (!_pk || !_pk.tanda) { if (document.visibilityState !== "hidden") _pkmOcultaTs = 0; return; }
+      if (document.visibilityState === "hidden") {
+        _pkmOcultaTs = Date.now();
+        try { localStorage.setItem(PKM_OCULTA, JSON.stringify({ tanda: _pk.tanda, legajo: String(_pk.legajo), ts: _pkmOcultaTs })); } catch (_e) {}
+        pkmEvento("oculta");
+        pkmFlush(true);
+      } else if (_pkmOcultaTs) {
+        const d = Math.round((Date.now() - _pkmOcultaTs) / 1000);
+        _pkmOcultaTs = 0;
+        try { localStorage.removeItem(PKM_OCULTA); } catch (_e) {}
+        pkmEvento("visible", undefined, { dur_seg: d });
+      }
+    } catch (_e) {}
+  });
+  window.addEventListener("online", function () { pkmFlush(false); });
+  setTimeout(function () { pkmFlush(false); }, 8000);
+} catch (_e) {}
 
 /* Emite el evento PKC (detalle de picking de un artículo) por la cola offline.
    Un evento por artículo confirmado; el SW lo reenvía si no hay red.
@@ -59337,7 +59482,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.24"></script>
+<script src="importacion.js?v=26.25"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62160,9 +62305,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.24"></script>
-<script src="hotsale.js?v=26.24"></script>
-<script src="estadisticas.js?v=26.24"></script>
+<script src="cobranzas.js?v=26.25"></script>
+<script src="hotsale.js?v=26.25"></script>
+<script src="estadisticas.js?v=26.25"></script>
 
 </body>
 </html>

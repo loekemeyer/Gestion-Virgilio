@@ -1,3 +1,26 @@
+## Nota v26.25 (2026-10-02) — Métricas del picking POR PASO (D12), aparte del PKC
+
+Para armar el «tiempo estimado de la tanda» y evaluar al operario. El PKC guarda sólo la hora de la **última**
+confirmación (reconfirmar pisa la primera), junta góndola y excedente en una fila y no dice qué celda se mostró,
+los saltos con Adelante/Atrás ni cuándo se bloqueó el celular. Medido en 30 días (3.778 PKC): 205 en ráfaga
+(< 3 s del anterior), 113 reconfirmados, 59 con excedente, 34 fuera del EP–TP.
+
+| evento | cuándo |
+|---|---|
+| `mostrado` | el operario llega a un paso, vuelve a él o retoma (un re-dibujo del mismo paso no cuenta) |
+| `ok` / `faltan` / `sin_stock` | cada confirmación, con su hora real, `esp` y `real` |
+| `adelante` / `atras` | los botones de navegación |
+| `oculta` / `visible` | celular bloqueado o app en 2.º plano; `visible` lleva `dur_seg` (si la app se cerró, se anota al retomar) |
+
+- Tabla **`GV_Picking_Paso_Evento`** (anon sólo INSERTA). Lectura: **`gv_picking_paso`** (un renglón por paso:
+  visitas, primera y última confirmación, `seg_desde_anterior`, `seg_oculto`, `medible` = no fue ráfaga) y
+  **`gv_picking_interrupcion`** (por tanda).
+- **No afecta la operación**: no toca el PKC ni `Registros_Produccion_Virgilio` (monitor, Resumen de hoy, Telegram,
+  tiempo muerto). Cola propia `gv_pkm_q_v1` con tope de 800 eventos (no le come lugar a `pkSave`), todo en try/catch.
+  Si la base rechaza un renglón (400/409) se reintenta de a uno y se descarta sólo ese.
+- `pkmEvento`, `pkmMostrado`, `pkmConf`, `pkmFlush` (index.html, antes de `pkSendDetail`).
+  `sql/gv_picking_paso_evento_v2625.sql`, `tests/pk-metricas-paso.cjs`.
+
 ## Nota v26.24 (2026-10-02) — Helper local de impresión (127.0.0.1:17777, SumatraPDF)
 
 Luis tiene un helper en la PC del depósito que abre `http://127.0.0.1:17777` e imprime PDF en silencio con

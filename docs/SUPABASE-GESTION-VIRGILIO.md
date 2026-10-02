@@ -31270,3 +31270,18 @@ disruptivo va en rojo y negrita y la columna I lleva el detalle. El archivo es `
 - Datos: `gv_horas_operario_detalle_v2` + `gv_horas_operario_tandas_v2` (sólo lectura, sólo service_role).
 - Prueba 02/10 15:34 con el 01/10: 2 de 2 enviados al número de pruebas.
 - Rollback: `sql/gv_horas_operario_detalle_v2550.sql` (al pie).
+
+## §3.v2625 — Métricas del picking por paso: `GV_Picking_Paso_Evento` (D12, 02/10/2026)
+
+- **Qué**: tabla nueva, insert-only para anon/authenticated (RLS + policy de INSERT; sin SELECT/UPDATE/DELETE), y
+  dos vistas `security_invoker` revocadas para anon: `gv_picking_paso` y `gv_picking_interrupcion`. La escribe el
+  picking de la app (`pkmFlush`), aparte del PKC.
+- **Impacto**: ninguno sobre lo existente: objeto nuevo, ningún trigger, no toca `Registros_Produccion_Virgilio`.
+  Volumen esperado ~2 eventos por artículo (~8.000 filas/mes).
+- **Cómo se aplicó**: la migración entera se colgaba en el permiso del MCP; se aplicó statement por statement. Hubo
+  unos minutos con la tabla creada sin RLS (vacía); se cerró en el acto. Verificado: RLS on, 1 policy, anon sólo INSERT.
+- **Sin `ON CONFLICT`**: exige SELECT y la RLS lo rechaza para anon (42501). Un reenvío choca 23505 → 409 y la app
+  lo descarta. Probado como anon en transacción abortada (inserta 1 · duplicado 23505 · no lee/borra/modifica).
+- **Vista probada** en transacción abortada: el reconfirmado conserva la 1.ª hora, la ráfaga sale `medible=false`
+  y un bloqueo de 60 s se descuenta en `seg_oculto`.
+- **Rollback**: al pie de `sql/gv_picking_paso_evento_v2625.sql` (sacar antes el envío del front).

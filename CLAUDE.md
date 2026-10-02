@@ -7276,3 +7276,22 @@ facturación hasta que tengamos 12 meses de data de pedidos"*.
 - ⚠ **Si los disruptivos no se pueden leer, el archivo de pedidos NO se baja**: saldría sin marcar y nadie sabría que faltan.
 - Medido sept/26: LK 143 pedidos → **53 de 201** artículos en rojo (108 promedian con facturas); CH 44 → **35 de 95**.
 - `sql/gv_isis_estad_disruptivos_v2620.sql` (rollback a la versión sólo-web, `_v2617`, en la cabecera).
+
+## ⚠ REGLA (D12, 2026-10-02, v26.25): las MÉTRICAS DEL PICKING POR PASO van aparte — no se mezclan con el PKC
+
+Para el «tiempo estimado de la tanda» (evaluar al operario). El picking anota cada paso en
+**`GV_Picking_Paso_Evento`** (`mostrado` · `ok` · `faltan` · `sin_stock` · `adelante` · `atras` · `oculta` · `visible`),
+con su propia cola (`gv_pkm_q_v1`, tope 800) y todo en try/catch: **si falla, el picking sigue igual**.
+
+- **No se mezcla con el PKC** (mueve el stock; un evento por tanda+artículo con upsert) **ni con
+  `Registros_Produccion_Virgilio`** (lo leen el monitor, el Resumen de hoy, Telegram y el tiempo muerto). Un evento
+  nuevo de picking va a esta tabla, no como `opcion` nueva.
+- **anon sólo INSERTA.** Sin `ON CONFLICT` (exige SELECT): el duplicado da 409 y la app lo descarta de a uno.
+- Lectura: `gv_picking_paso` (un renglón por paso; `medible = false` si se confirmó en ráfaga, < 3 s) y
+  `gv_picking_interrupcion`.
+- Hallazgos que la motivaron (02/10, 30 días): el 24 a 29 % del tiempo de picking son huecos de más de 5 min sin
+  confirmar nada; 5,4 % de los artículos se confirman en ráfaga; 3 % reconfirmados (la 1.ª hora se perdía).
+- Escalera: en A y P la celda múltiplo de 5 (A5, A10…), en el resto la múltiplo de 4 (B4, B8…). Parada: el módulo
+  k de A más el módulo k de B (A1–A5 + B1–B4); los otros pasillos todavía no están confirmados.
+
+`sql/gv_picking_paso_evento_v2625.sql`, `tests/pk-metricas-paso.cjs`.
