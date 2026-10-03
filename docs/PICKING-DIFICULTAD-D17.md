@@ -142,3 +142,26 @@ El registro por paso que arranca el lunes 05/10 (`GV_Picking_Paso_Evento`: mostr
 - **D19 — dificultad por caja:** se mide por caja (min/caja sin el arranque), que es como se lee en el depósito; la alternativa por línea queda calculada en (b) por si hace falta.
 - **D20 — registrar la celda en la app:** no por ahora. Primero el registro por paso del 05/10; si la altura inferida (c) no alcanza, se agrega la celda al picking y al guardado.
 - **D22 — niveles (Luis, 03/10: *"cambié el término pajosa por dificultad alta; definilo en cuatro niveles… decime lo que te parezca mejor"*):** «pajosa» se retira. Los cuatro niveles son **Baja · Media · Alta · Muy alta** (no «moderado» y «mediano», que son sinónimos y no se ordenan solos), y van atados al **grado 1-10** que ya llevaba cada tanda (su decil de min/caja): Baja = grado 1-2 · Media = 3-5 · Alta = 6-8 · Muy alta = 9-10. Con cuartiles puros (25 % cada uno) el grado 3 y el grado 8 quedaban partidos en dos niveles; así nivel y grado nunca se contradicen. El multiplicador del m³/h sigue siendo 1 + 0,1 × (grado − 5). Sobre las 338 tandas ajustadas: 68 / 101 / 100 / 69.
+
+## (j) Puntaje 1-10 por operario (Luis, 03/10: *"un calculador... objetivo y en función de los datos"*)
+
+**Puntaje = 5,5 + 10 × (índice − 1)**, redondeado y acotado a 1..10, con **índice = Σ tamaños esperados ÷ Σ tiempos reales** (picking puro + cola topeada) de sus tandas. Un punto es un 10 % de velocidad; 5 y 6 son el promedio del depósito en estos 60 días; 10 es un 45 % más rápido que el promedio y 1 un 45 % más lento. Se mira sobre las **últimas 20 tandas** (lo que hace hoy) y sobre el período entero. Con menos de 10 tandas el puntaje es provisorio. Lo calcula `puntaje_operario.py` (sólo lectura) y queda en `d17_puntaje_operario.json`.
+
+| legajo | nombre | tandas | cajas | últimas 20: índice → puntaje | período: índice → puntaje | ± puntos (90 %) con 5 / 10 / 20 tandas | índice por tramo de 10 tandas |
+|---|---|---|---|---|---|---|---|
+| 104 | J. Moncayo «J. Colombia» | 85 | 12.707 | 1,65 → **10** | 1,39 → 9 | 4,0 / 2,8 / 1,8 | 1,14 · 1,48 · 1,31 · 1,34 · 1,35 · 1,36 · 1,39 · 1,81 · 1,45 |
+| 122 | Villalba | 98 | 12.075 | 1,08 → **6** | 1,02 → 6 | 2,6 / 1,8 / 1,3 | 0,99 · 0,91 · 0,98 · 1,04 · 0,98 · 1,05 · 1,31 · 0,90 · 1,15 · 1,06 |
+| 237 | F. Ortiz | 8 | 1.057 | 0,96 → **5** (provisorio) | 0,96 → 5 (provisorio) | 2,4 / — / — | 0,96 |
+| 8 | Farias | 3 | 721 | 0,94 → **5** (provisorio) | 0,94 → 5 (provisorio) | — / — / — | 0,94 |
+| 277 | J. Cartaya «Jhonny» | 81 | 10.020 | 0,93 → **5** | 1,05 → 6 | 2,5 / 1,7 / 1,2 | 1,35 · 1,08 · 1,02 · 1,02 · 1,02 · 1,17 · 0,97 · 0,85 · 0,90 |
+| 504 | Latronico | 51 | 5.384 | 0,81 → **4** | 0,75 → 3 | 2,0 / 1,5 / 1,1 | 0,65 · 0,73 · 0,79 · 0,86 · 0,73 · 1,55 |
+| 600 | (Entrevista) | 5 | 441 | 0,69 → **2** (provisorio) | 0,69 → 2 (provisorio) | 1,3 / — / — | 0,69 |
+| 94 | Tevez | 7 | 1.306 | 0,56 → **1** (provisorio) | 0,56 → 1 (provisorio) | 1,3 / — / — | 0,56 |
+
+Lo que hay que saber para leerlo:
+
+- **El margen es grande con pocas tandas.** Con 10 tandas el puntaje de un operario se mueve ±1,5 a ±2,8 puntos; con 20, ±1,1 a ±1,8. Un 7 y un 5 con 10 tandas pueden ser el mismo operario; un 9 y un 3 no. El margen es de cada uno: el que es parejo (122, 504) se lee con menos tandas que el que alterna (104).
+- **El nuevo arranca más lento y sube.** 104: 1,14 → 1,48 → 1,31 · 122: 0,99 → 0,91 → 0,98 · 277: 1,35 → 1,08 → 1,02 · 504: 0,65 → 0,73 → 0,79. Por eso se publican las últimas 20 y la curva por tramo, no sólo el acumulado: con un nuevo, lo que importa es si el tramo 3 es mejor que el 1.
+- **Es velocidad, no calidad.** Cajas de menos, faltantes mal declarados y artículos salteados no entran acá (están medidos aparte en `docs/PICKING-HUECOS-Y-CAJAS-DE-MENOS-D9.md`). Un 9 que deja cajas no es un 9.
+- **La escala se ancla al promedio de la calibración (60 días, 338 tandas).** Si el depósito entero se vuelve más rápido, todos suben de puntaje; se recalibra el esquema (y con él el 5,5) cuando se recalibre el tamaño, no antes.
+- **El índice del período es Σ ÷ Σ, no el promedio de los cocientes**: la mediana por tanda (columna `mediana_por_tanda` del json) sale más alta porque las tandas chicas, que son muchas, se hacen rápido; el Σ ÷ Σ pesa cada tanda por sus minutos.

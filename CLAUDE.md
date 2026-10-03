@@ -6718,6 +6718,10 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   1-10 (decil de min/caja sobre las 338 tandas): Baja = grado 1-2 · Media = 3-5 · Alta = 6-8 · Muy alta = 9-10, así nivel y grado no se
   contradicen. El multiplicador del m³/h es 1 + 0,1 × (grado − 5), de ×0,6 a ×1,5, topeado a propósito: una tanda de cajas sueltas
   (Manig F54A: 19 artículos, 19 cajas, 0,102 m³, 10 líneas con escalera → grado 10) se evalúa por índice tamaño ÷ real, no por m³/h.**
+  **Puntaje 1-10 del operario de picking (Luis, 03/10, v26.49: *"objetivo y en función de los datos, para el empleado nuevo"*):
+  puntaje = 5,5 + 10 × (índice − 1), con índice = Σ tamaños esperados ÷ Σ tiempos reales de sus ÚLTIMAS 20 tandas (y el período
+  aparte); 1 punto = 10 % de velocidad, 5-6 = el promedio del depósito. Con 10 tandas el margen es ±2 a ±3 puntos: menos de 10
+  es provisorio. Mide velocidad, no calidad. `docs/picking-d17/puntaje_operario.py`, sección (j) de `docs/PICKING-DIFICULTAD-D17.md`.**
 - `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
   v26.43 adentro). **Aplicado el 03/10 con el sí de Luis** (v26.45): el 15/09 dio idéntico a la foto, `gv_huellas_cambiadas`
   y `gv_reglas_perdidas` vacías. ⚠ **La huella se compara por `md5(prosrc)`, NO por `md5(pg_get_functiondef(...))`**:
