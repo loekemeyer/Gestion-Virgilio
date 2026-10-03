@@ -2,6 +2,24 @@
  "target": "neto_cola",
  "target_detalle": "neto_cola = neto_sh + cola, con la cola TOPEADA a 30 min por tanda al ajustar (neto_sh = EP->TP menos pausas declaradas menos huecos > 5 min entre confirmaciones; cola = minutos sin registro entre el TP y la proxima tarea registrada o el fin de jornada)",
  "coef_min": {
+  "cfijo": 2.3325,
+  "arranque": 5.866,
+  "parada": 0.3091,
+  "caja": 0.0623,
+  "A1": 0.2333,
+  "A2": 0.35,
+  "A3": 0.35,
+  "A4": 0.5833,
+  "A5": 0.7,
+  "R1": 0.2333,
+  "R2": 0.35,
+  "R3": 0.4667,
+  "R4": 0.5833,
+  "MX": 1.1667,
+  "F": 0.5833
+ },
+ "escala_alturas": "DECIDIDA por Luis (03/10/2026), por altura fisica: piso 1 · 2.ª 1,5 · 3.ª 2 · 4.ª 2,5 · 5.ª de A 3 (A4 2,5 entre la 3.ª y la 4.ª de B); MX 5 · F 2,5; 1 punto = 14 s. Fijo, arranque, parada y caja reajustados con las alturas fijas.",
+ "coef_medido_alturas_libres_min": {
   "cfijo": 2.3739,
   "arranque": 5.6821,
   "parada": 0.3208,
@@ -18,24 +36,26 @@
   "MX": 1.1651,
   "F": 0.5826
  },
+ "r2_alturas_libres": 0.5383,
+ "cv_rmse_alturas_libres": 13.496,
  "puntos": {
-  "arranque_por_linea": 5.5,
-  "arranque_fijo": 11.0,
+  "arranque_por_linea": 5.0,
+  "arranque_fijo": 10.0,
   "parada": 1.5,
-  "caja_x10": 3.0,
-  "A1": 1.5,
+  "caja_x10": 2.5,
+  "A1": 1.0,
   "A2": 1.5,
   "A3": 1.5,
-  "A4": 4.0,
-  "A5": 5.5,
+  "A4": 2.5,
+  "A5": 3.0,
   "R1": 1.0,
   "R2": 1.5,
-  "R3": 1.5,
+  "R3": 2.0,
   "R4": 2.5,
-  "MX": 5.5,
+  "MX": 5.0,
   "F": 2.5
  },
- "punto_en_min": 0.213,
+ "punto_en_min": 0.2333,
  "tope_cajas_por_linea": 30,
  "arranque_hasta_lineas": 5,
  "tope_cola_min": 30.0,
@@ -53,21 +73,21 @@
  },
  "mx_f_atadas": "MX = 2 x R4, F = 1 x R4 (sin prior propio son ruido; promedio con criterio de lo recomendado por los dos jueces)",
  "umbrales": {
-  "facil": 0.1806,
-  "pajosa": 0.3478
+  "facil": 0.1755,
+  "pajosa": 0.3494
  },
  "validacion": {
-  "r2": 0.538,
-  "rmse": 13.24,
-  "cv_rmse": 13.5,
-  "cv_r2": 0.52,
-  "loo_operario_rmse": 14.45,
-  "mae": 9.08,
+  "r2": 0.532,
+  "rmse": 13.34,
+  "cv_rmse": 13.56,
+  "cv_r2": 0.516,
+  "loo_operario_rmse": 14.49,
+  "mae": 9.14,
   "cv_sin_alturas": 13.55,
   "contra_neto_cola_crudo": {
-   "r2": 0.423,
-   "rmse": 17.72,
-   "cv_rmse": 17.91
+   "r2": 0.42,
+   "rmse": 17.76,
+   "cv_rmse": 17.92
   },
   "corrida_neto_sh_v3": {
    "r2": 0.585,
@@ -95,96 +115,96 @@
   "neto_sh + fijo (media cola topeada)": 17.94
  },
  "cola_absorbida_min": {
-  "cfijo": 738.9,
-  "arranque": 90.0,
-  "parada": 424.2,
-  "caja": 91.7,
-  "A1": -1.2,
-  "A2": -0.6,
-  "A3": -0.1,
-  "A4": -1.0,
-  "A5": -6.3,
-  "R1": -4.7,
-  "R2": 41.4,
-  "R3": -7.8,
-  "R4": -14.5,
-  "MX": -3.7,
-  "F": -9.7
+  "cfijo": 736.0,
+  "arranque": 94.8,
+  "parada": 414.4,
+  "caja": 91.5,
+  "A1": 0.0,
+  "A2": 0.0,
+  "A3": 0.0,
+  "A4": 0.0,
+  "A5": 0.0,
+  "R1": 0.0,
+  "R2": 0.0,
+  "R3": 0.0,
+  "R4": 0.0,
+  "MX": 0.0,
+  "F": 0.0
  },
  "coef_neto_sh_misma_estructura": {
-  "cfijo": 0.1879,
-  "arranque": 5.4002,
-  "parada": 0.2447,
-  "caja": 0.0599,
-  "A1": 0.3055,
-  "A2": 0.3055,
-  "A3": 0.3055,
-  "A4": 0.857,
-  "A5": 1.2255,
-  "R1": 0.2154,
-  "R2": 0.325,
-  "R3": 0.3584,
-  "R4": 0.5966,
-  "MX": 1.1932,
-  "F": 0.5966
+  "cfijo": 0.155,
+  "arranque": 5.5689,
+  "parada": 0.2348,
+  "caja": 0.0598,
+  "A1": 0.2333,
+  "A2": 0.35,
+  "A3": 0.35,
+  "A4": 0.5833,
+  "A5": 0.7,
+  "R1": 0.2333,
+  "R2": 0.35,
+  "R3": 0.4667,
+  "R4": 0.5833,
+  "MX": 1.1667,
+  "F": 0.5833
  },
  "sensibilidad": {
   "tope_60": {
-   "cfijo": 2.427,
-   "arranque": 5.3792,
-   "parada": 0.3534,
-   "caja": 0.0631,
-   "A1": 0.3062,
-   "A2": 0.3062,
-   "A3": 0.3062,
-   "A4": 0.8635,
-   "A5": 1.1719,
-   "R1": 0.2097,
-   "R2": 0.3474,
-   "R3": 0.3559,
-   "R4": 0.5753,
-   "MX": 1.1505,
-   "F": 0.5753
+   "cfijo": 2.3808,
+   "arranque": 5.5789,
+   "parada": 0.3364,
+   "caja": 0.063,
+   "A1": 0.2333,
+   "A2": 0.35,
+   "A3": 0.35,
+   "A4": 0.5833,
+   "A5": 0.7,
+   "R1": 0.2333,
+   "R2": 0.35,
+   "R3": 0.4667,
+   "R4": 0.5833,
+   "MX": 1.1667,
+   "F": 0.5833
   },
   "sin_colas_sig_mayores_60": {
-   "cfijo": 2.3446,
-   "arranque": 5.8407,
-   "parada": 0.3099,
-   "caja": 0.0617,
-   "A1": 0.3022,
-   "A2": 0.3022,
-   "A3": 0.3022,
-   "A4": 0.8354,
-   "A5": 1.2124,
-   "R1": 0.2137,
-   "R2": 0.3505,
-   "R3": 0.3505,
-   "R4": 0.5896,
-   "MX": 1.1792,
-   "F": 0.5896
+   "cfijo": 2.3102,
+   "arranque": 6.0007,
+   "parada": 0.3023,
+   "caja": 0.0614,
+   "A1": 0.2333,
+   "A2": 0.35,
+   "A3": 0.35,
+   "A4": 0.5833,
+   "A5": 0.7,
+   "R1": 0.2333,
+   "R2": 0.35,
+   "R3": 0.4667,
+   "R4": 0.5833,
+   "MX": 1.1667,
+   "F": 0.5833
   },
   "con_outliers_cola_cruda": {
-   "r2": 0.133,
+   "r2": 0.131,
    "rmse": 37.8
   },
   "con_outliers_cola_topeada": {
-   "r2": 0.53,
-   "rmse": 13.6
+   "r2": 0.522,
+   "rmse": 13.7
   },
   "mx_f_libres": {
    "MX": 2.0883,
    "F": 0.3633
   },
   "cv_por_lambda": {
-   "0": 13.57,
-   "3": 13.49,
-   "10": 13.5,
-   "30": 13.51,
-   "100": 13.52
+   "0": 13.56,
+   "3": 13.56,
+   "10": 13.56,
+   "30": 13.56,
+   "100": 13.56
   }
  },
- "formula_tamano": "tamano_min = 2.3739 + 5.6821*min(lineas,5)/5 + 0.3208*paradas + 0.0625*cajas_tope30 + 0.3034*n_A1 + 0.3034*n_A2 + 0.3034*n_A3 + 0.8485*n_A4 + 1.2018*n_A5 + 0.213*n_R1 + 0.3494*n_R2 + 0.3532*n_R3 + 0.5826*n_R4 + 1.1651*n_MX + 0.5826*n_F  (cajas_tope30 = suma por linea de min(cajas,30); paradas = modulos distintos, el par enfrentado cuenta uno; n_A1..A5 lineas en gondolas A y P por altura, 1 = piso; n_R1..R4 idem en B a N~; MX = codigo con stock 0 en gondola al empezar; F = sin sector de gondola). El fijo y el arranque ya incluyen la cola (acomodar en la mesa): ritmo = tamano / (neto_sh + min(cola,30)).",
- "formula_dificultad": "dificultad_min_por_caja = (tamano_min - (2.3739 + 5.6821*min(lineas,5)/5)) / cajas_reales; nivel: Facil <= 0.181, Normal <= 0.348, Pajosa > 0.348 (terciles sobre 338 tandas; sin cajas = Pajosa)",
+ "formula_tamano": "tamano_min = 2.3325 + 5.866*min(lineas,5)/5 + 0.3091*paradas + 0.0623*cajas_tope30 + 0.2333*n_A1 + 0.35*n_A2 + 0.35*n_A3 + 0.5833*n_A4 + 0.7*n_A5 + 0.2333*n_R1 + 0.35*n_R2 + 0.4667*n_R3 + 0.5833*n_R4 + 1.1667*n_MX + 0.5833*n_F  (cajas_tope30 = suma por linea de min(cajas,30); paradas = modulos distintos, el par enfrentado cuenta uno; n_A1..A5 lineas en gondolas A y P por altura, 1 = piso; n_R1..R4 idem en B a N~; MX = codigo con stock 0 en gondola al empezar; F = sin sector de gondola). El fijo y el arranque ya incluyen la cola (acomodar en la mesa): ritmo = tamano / (neto_sh + min(cola,30)).",
+ "formula_dificultad": "dificultad_min_por_caja = (tamano_min - (2.3325 + 5.866*min(lineas,5)/5)) / cajas_reales; nivel: Facil <= 0.176, Normal <= 0.349, Pajosa > 0.349 (terciles sobre 338 tandas; sin cajas = Pajosa)",
  "regla_altura_inferida": "altura dentro del modulo = ((celda-1) mod alto) + 1, 1 = piso; A y P 5 alturas, B..N~ 4. Codigo con celdas en una sola altura: esa. Codigo con celdas en varias alturas: se toma el stock de gondola al abrir el picking (EP) y la capacidad (cajas) de cada celda; se apila el stock de la altura mas alta hacia abajo y se asigna la altura MAS BAJA que seguro tiene stock (stock > suma de capacidades de las alturas de arriba). Stock mayor que la capacidad total = piso. Stock 0 o sin dato = clase MX. Es una cota a favor del operario.",
  "regla_cola": "cola = minutos sin registro desde el TP hasta la proxima tarea registrada del legajo ('sig') o el fin de jornada ('cap'); 0 si al cerrar ya habia otro tramo abierto ('cubierta'). Es picking de esa tanda (Luis 02/10). Para el esquema entra TOPEADA a 30 min por tanda y se absorbe en el fijo/arranque (no en la parada ni en la altura); las dos 'cap' de horas (D40F, D67D) quedan fuera del ajuste. Recomendacion para la base: aplicar el mismo tope (30 min) y no dejar correr 'cap' hasta la hora de salida.",
  "indice_operario": "indice = suma(tamano) / suma(neto_sh + min(cola,30)) sobre sus tandas; > 1 mas rapido que el promedio, < 1 mas lento. Publicable con >= 10 tandas.",
@@ -195,71 +215,71 @@
  "fecha_datos": "60 días al 02/10/2026",
  "n_tandas": 338,
  "n_tandas_total": 340,
- "k_inferidas_s": -7.65,
+ "k_inferidas_s": -9.66,
  "k_inferidas_boot_s": [
-  -38.5,
-  22.54
+  -40.37,
+  19.88
  ],
  "bootstrap_p5_p95": {
   "cfijo": [
    0.0,
-   5.1825
+   5.2251
   ],
   "arranque": [
-   1.0666,
-   9.4929
+   1.1899,
+   9.7562
   ],
   "parada": [
-   0.1808,
-   0.4747
+   0.1655,
+   0.4885
   ],
   "caja": [
-   0.0427,
-   0.0846
+   0.0429,
+   0.0841
   ],
   "A1": [
-   0.2481,
-   0.3552
+   0.2333,
+   0.2333
   ],
   "A2": [
-   0.2515,
-   0.3743
+   0.35,
+   0.35
   ],
   "A3": [
-   0.2516,
-   0.4034
+   0.35,
+   0.35
   ],
   "A4": [
-   0.6518,
-   1.0549
+   0.5833,
+   0.5833
   ],
   "A5": [
-   1.0798,
-   1.3125
+   0.7,
+   0.7
   ],
   "R1": [
-   0.1739,
-   0.2579
+   0.2333,
+   0.2333
   ],
   "R2": [
-   0.2851,
-   0.3882
+   0.35,
+   0.35
   ],
   "R3": [
-   0.3211,
-   0.4068
+   0.4667,
+   0.4667
   ],
   "R4": [
-   0.4996,
-   0.6728
+   0.5833,
+   0.5833
   ],
   "MX": [
-   0.9992,
-   1.3457
+   1.1667,
+   1.1667
   ],
   "F": [
-   0.4996,
-   0.6728
+   0.5833,
+   0.5833
   ]
  },
  "indice_por_operario": [
@@ -269,14 +289,14 @@
    "apodo": "",
    "tandas": 3,
    "cajas": 721.33,
-   "indice": 0.938,
-   "indice_cola_cruda": 0.774,
-   "indice_neto_sh": 1.531,
+   "indice": 0.944,
+   "indice_cola_cruda": 0.778,
+   "indice_neto_sh": 1.543,
    "indice_10_40_lineas": null,
    "tandas_10_40": 0,
    "cola_pct_neto_sh": 138.5,
    "m3_por_hora": 12.244,
-   "loo_rmse": 8.8,
+   "loo_rmse": 8.6,
    "publicable": false
   },
   {
@@ -285,14 +305,14 @@
    "apodo": "",
    "tandas": 7,
    "cajas": 1306.0,
-   "indice": 0.554,
-   "indice_cola_cruda": 0.553,
+   "indice": 0.555,
+   "indice_cola_cruda": 0.554,
    "indice_neto_sh": 0.59,
-   "indice_10_40_lineas": 0.444,
+   "indice_10_40_lineas": 0.445,
    "tandas_10_40": 3,
    "cola_pct_neto_sh": 20.4,
    "m3_por_hora": 0.522,
-   "loo_rmse": 38.9,
+   "loo_rmse": 38.8,
    "publicable": false
   },
   {
@@ -301,10 +321,10 @@
    "apodo": "«J. Colombia»",
    "tandas": 85,
    "cajas": 12707.0,
-   "indice": 1.388,
-   "indice_cola_cruda": 1.388,
-   "indice_neto_sh": 1.389,
-   "indice_10_40_lineas": 1.327,
+   "indice": 1.392,
+   "indice_cola_cruda": 1.392,
+   "indice_neto_sh": 1.393,
+   "indice_10_40_lineas": 1.329,
    "tandas_10_40": 44,
    "cola_pct_neto_sh": 16.2,
    "m3_por_hora": 2.369,
@@ -317,14 +337,14 @@
    "apodo": "",
    "tandas": 98,
    "cajas": 12075.0,
-   "indice": 1.024,
-   "indice_cola_cruda": 1.024,
-   "indice_neto_sh": 0.956,
-   "indice_10_40_lineas": 1.016,
+   "indice": 1.02,
+   "indice_cola_cruda": 1.02,
+   "indice_neto_sh": 0.952,
+   "indice_10_40_lineas": 1.011,
    "tandas_10_40": 74,
    "cola_pct_neto_sh": 7.8,
    "m3_por_hora": 1.366,
-   "loo_rmse": 10.5,
+   "loo_rmse": 10.6,
    "publicable": true
   },
   {
@@ -333,14 +353,14 @@
    "apodo": "",
    "tandas": 8,
    "cajas": 1057.0,
-   "indice": 0.963,
-   "indice_cola_cruda": 0.903,
-   "indice_neto_sh": 0.997,
-   "indice_10_40_lineas": 0.742,
+   "indice": 0.96,
+   "indice_cola_cruda": 0.9,
+   "indice_neto_sh": 0.993,
+   "indice_10_40_lineas": 0.73,
    "tandas_10_40": 4,
    "cola_pct_neto_sh": 27.0,
    "m3_por_hora": 1.65,
-   "loo_rmse": 10.7,
+   "loo_rmse": 10.9,
    "publicable": false
   },
   {
@@ -349,14 +369,14 @@
    "apodo": "«Jhonny»",
    "tandas": 81,
    "cajas": 10020.0,
-   "indice": 1.043,
-   "indice_cola_cruda": 0.973,
-   "indice_neto_sh": 1.065,
-   "indice_10_40_lineas": 1.035,
+   "indice": 1.046,
+   "indice_cola_cruda": 0.975,
+   "indice_neto_sh": 1.068,
+   "indice_10_40_lineas": 1.037,
    "tandas_10_40": 41,
    "cola_pct_neto_sh": 26.0,
    "m3_por_hora": 1.332,
-   "loo_rmse": 9.1,
+   "loo_rmse": 9.2,
    "publicable": true
   },
   {
@@ -365,10 +385,10 @@
    "apodo": "",
    "tandas": 51,
    "cajas": 5384.0,
-   "indice": 0.755,
-   "indice_cola_cruda": 0.724,
+   "indice": 0.754,
+   "indice_cola_cruda": 0.723,
    "indice_neto_sh": 0.8,
-   "indice_10_40_lineas": 0.69,
+   "indice_10_40_lineas": 0.687,
    "tandas_10_40": 29,
    "cola_pct_neto_sh": 27.2,
    "m3_por_hora": 0.869,
@@ -381,14 +401,14 @@
    "apodo": "",
    "tandas": 5,
    "cajas": 441.0,
-   "indice": 0.698,
-   "indice_cola_cruda": 0.698,
-   "indice_neto_sh": 0.641,
-   "indice_10_40_lineas": 0.645,
+   "indice": 0.69,
+   "indice_cola_cruda": 0.69,
+   "indice_neto_sh": 0.631,
+   "indice_10_40_lineas": 0.637,
    "tandas_10_40": 4,
    "cola_pct_neto_sh": 5.9,
    "m3_por_hora": 0.781,
-   "loo_rmse": 15.5,
+   "loo_rmse": 15.9,
    "publicable": false
   }
  ]

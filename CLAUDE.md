@@ -6706,7 +6706,10 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   ningún evento hasta la hora de salida). Es a propósito: la regla pide que eso cuente, y queda a la vista.
 - La calibración de dificultad (D17, `docs/PICKING-DIFICULTAD-D17.md`) mide el tiempo real como picking puro **más la
   cola topeada a 30 min** (dos tandas con cola «cap» de 5 y 8 h quedaron afuera): la cola cayó 55 % en un fijo por
-  tanda (2,4 min) y 32 % en la parada; las alturas no se movieron. Tope y «cap» en la regla de la base: decisión de Luis.
+  tanda (2,4 min) y 32 % en la parada; las alturas no se movieron. **03/10, Luis delegó (*"aplicá lo que te parezca"*): sin tope en la
+  base; 30 min sólo en la calibración (D18) · dificultad por caja (D19) · la app no registra la celda por ahora (D20) · escala de altura
+  FÍSICA de Luis (D21: piso 1 · 2.ª 1,5 · 3.ª 2 · 4.ª 2,5 · 5.ª de A 3; la 5.ª de A «es medio que lo mismo» que la 4.ª de B). Lo medido con
+  alturas libres (A5 72 s, el doble de B4) queda de referencia en `d17_esquema.json`; el registro por paso del 05/10 dirá si era el artículo.**
 - `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
   v26.43 adentro). **Aplicado el 03/10 con el sí de Luis** (v26.45): el 15/09 dio idéntico a la foto, `gv_huellas_cambiadas`
   y `gv_reglas_perdidas` vacías. ⚠ **La huella se compara por `md5(prosrc)`, NO por `md5(pg_get_functiondef(...))`**:

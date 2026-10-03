@@ -158,6 +158,30 @@ P(f"  contra el neto_cola CRUDO: R2 {f(r2(ycr,pred),3)} · RMSE {f(rmse(ycr,pred
 Xs = np.column_stack([np.ones(N), np.minimum(n, KARR)/KARR, par, caj30]); bs = nnls(Xs, y)
 cv_sin, _ = cv10(fitter=lambda tr, te: Xs[te] @ nnls(Xs[tr], y[tr]))
 P(f"  (referencia) SIN alturas, solo arranque + parada + caja: R2 {f(r2(y, Xs@bs),3)} · CV {f(cv_sin,2)}")
+
+# ------------------------------------------------------------------ ESCALA DE ALTURAS DECIDIDA (Luis, 03/10/2026)
+# Luis, 03/10: "las estanterias de la A y de la P son un poquito mas altas, pero tampoco mucho: agarrar de la 5.ª altura
+# de la A no es mucho mas complicado que de la 4.ª de la B, es medio que lo mismo" · "de la 3.ª de la B a veces se agarra
+# sin escalera si es chiquito: ponele un grado de dificultad, pero tampoco tan alto" · "aplica lo que te parezca".
+# La escala va por ALTURA FISICA, 1 punto = linea de piso = 14 s: piso 1 · 2.ª 1,5 · 3.ª 2 · 4.ª 2,5 · 5.ª de A 3;
+# A4 = 2,5 (queda entre la 3.ª y la 4.ª de B); MX = 2 x R4 = 5 · F = R4 = 2,5. Las alturas se FIJAN y se reajustan fijo,
+# arranque, parada y caja con ellas puestas. Lo medido con alturas libres (arriba) queda de referencia en el JSON.
+PT_ALT = {"A1":1.0,"A2":1.5,"A3":1.5,"A4":2.5,"A5":3.0,"R1":1.0,"R2":1.5,"R3":2.0,"R4":2.5,"MX":5.0,"F":2.5}; SEG_PT = 14.0
+c_med = dict(c); r2_med = r2(y, pred); cv_med, _ = cv10()
+PFIX = np.array([PT_ALT["A1"], PT_ALT["A2"]-PT_ALT["A1"], PT_ALT["A3"]-PT_ALT["A2"], PT_ALT["A4"]-PT_ALT["A3"], PT_ALT["A5"]-PT_ALT["A4"],
+                 PT_ALT["R1"], PT_ALT["R2"]-PT_ALT["R1"], PT_ALT["R3"]-PT_ALT["R2"], PT_ALT["R4"]-PT_ALT["R3"], PT_ALT["MX"], PT_ALT["F"]]) * SEG_PT/60
+def fit_fix(idx, yy=None, lam=LAM, extra=(), atar=True, cj=None, arrK=KARR):
+    """alturas FIJAS en la escala decidida; NNLS solo sobre fijo, arranque, parada y caja (+ columnas extra)."""
+    yy = y if yy is None else yy; X = design(idx, cj, arrK, extra)
+    resto = yy[idx] - X[:, 4:15] @ PFIX; Xf = np.column_stack([X[:, :4]] + ([X[:, 15:]] if X.shape[1] > 15 else []))
+    q = nnls(Xf, resto); return np.concatenate([q[:4], PFIX, q[4:]])
+fit = fit_fix
+p = fit(ALL); c = costs(p); pred = predict(p, ALL); res = y - pred
+P(f"\nESCALA DECIDIDA (Luis 03/10; alturas fijas por altura fisica, 1 punto = {f(SEG_PT,0)} s), minutos:")
+P(f"  cfijo {f(c['cfijo'],2)} · arranque {f(c['arranque'],2)} (x min(n,{KARR})/{KARR}) · parada {f(c['parada'],3)} ({f(c['parada']*60,0)} s) · caja {f(c['caja'],4)} ({f(c['caja']*60,1)} s)")
+P("  por linea (s): " + " · ".join(f"{h} {f(c[h]*60,0)}" for h in CL) + "   (medido con alturas libres: " + " · ".join(f"{h} {f(c_med[h]*60,0)}" for h in CL) + ")")
+P(f"  R2 {f(r2(y,pred),3)} (libre {f(r2_med,3)}) · RMSE {f(rmse(y,pred),2)} · MAE {f(np.mean(np.abs(res)),2)} min · sum tamano / sum real {f(pred.sum()/y.sum(),3)}")
+P("  real/esperado por tramo de lineas: " + " · ".join(f"{a} ({k}) {f(v,2)}" for a, k, v in tramos(pred, n, TL)))
 p_l0 = fit(ALL, lam=0); c_l0 = costs(p_l0)
 P(f"  (referencia) NNLS sin prior (lambda 0): R2 {f(r2(y, predict(p_l0, ALL)),3)} · parada {f(c_l0['parada']*60,0)} s · " + " · ".join(f"{h} {f(c_l0[h]*60,0)}" for h in CL))
 
@@ -336,6 +360,9 @@ esquema = {
     "target": "neto_cola",
     "target_detalle": f"neto_cola = neto_sh + cola, con la cola TOPEADA a {int(TOPE_COLA)} min por tanda al ajustar (neto_sh = EP->TP menos pausas declaradas menos huecos > 5 min entre confirmaciones; cola = minutos sin registro entre el TP y la proxima tarea registrada o el fin de jornada)",
     "coef_min": coef,
+    "escala_alturas": "DECIDIDA por Luis (03/10/2026), por altura fisica: piso 1 · 2.ª 1,5 · 3.ª 2 · 4.ª 2,5 · 5.ª de A 3 (A4 2,5 entre la 3.ª y la 4.ª de B); MX 5 · F 2,5; 1 punto = 14 s. Fijo, arranque, parada y caja reajustados con las alturas fijas.",
+    "coef_medido_alturas_libres_min": {k: round(float(v), 4) for k, v in c_med.items()},
+    "r2_alturas_libres": round(float(r2_med), 4), "cv_rmse_alturas_libres": round(float(cv_med), 3),
     "puntos": {k: float(v) for k, v in pts.items()},
     "punto_en_min": round(float(base), 4),
     "tope_cajas_por_linea": TOPE, "arranque_hasta_lineas": KARR, "tope_cola_min": TOPE_COLA, "lambda_prior": LAM, "prior_min": PRIOR,

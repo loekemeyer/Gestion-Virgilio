@@ -6,30 +6,34 @@ Qué cambió contra el esquema anterior (sobre el picking puro, `d17_v3_netosh/`
 
 ## (a) Puntos por altura
 
-1 punto = una línea de piso en las góndolas B a Ñ = 13 segundos. Lo que cuesta cada línea es por SACAR UNA CAJA de ahí; las cajas de más se cobran aparte.
+**v2 (03/10, Luis):** la escala de altura ya no sale del ajuste: la dictó Luis por la altura FÍSICA de las estanterías (*"las de A y P son un poquito más altas, pero la 5.ª de A no es mucho más complicada que la 4.ª de B"* · *"de la 3.ª de B a veces se agarra sin escalera si es chiquito: un grado de dificultad, pero no tan alto"*). Las alturas se fijan y se reajustan el fijo, el arranque, la parada y la caja con ellas puestas. Cuesta nada en predicción (R² 0,532 contra 0,538 con alturas libres; validación 13,56 contra 13,55 min) y el índice por operario no se mueve.
+
+1 punto = una línea de piso = 14 segundos. Lo que cuesta cada línea es por SACAR UNA CAJA de ahí; las cajas de más se cobran aparte.
 
 | de dónde sale | A y P (5 alturas) | B a Ñ (4 alturas) |
 |---|---|---|
-| piso (1.ª) | 1,5 pts · 18 s | 1,0 pt · 13 s |
-| 2.ª | 1,5 pts · 18 s | 1,5 pts · 21 s |
-| 3.ª | 1,5 pts · 18 s | 1,5 pts · 21 s (escalera) |
-| 4.ª | 4,0 pts · 51 s (escalera) | 2,5 pts · 35 s (escalera) |
-| 5.ª | 5,5 pts · 72 s (escalera) | — |
+| piso (1.ª) | 1,0 pt · 14 s | 1,0 pt · 14 s |
+| 2.ª | 1,5 pts · 21 s | 1,5 pts · 21 s |
+| 3.ª | 1,5 pts · 21 s | 2,0 pts · 28 s (escalera a veces) |
+| 4.ª | 2,5 pts · 35 s (escalera) | 2,5 pts · 35 s (escalera) |
+| 5.ª | 3,0 pts · 42 s (escalera) | — |
 
 | qué más se cobra | puntos | segundos |
 |---|---|---|
-| código con stock 0 en góndola al empezar (va, no encuentra; 111 de 130 líneas vuelven cortas) | 5,5 | 70 |
+| código con stock 0 en góndola al empezar (va, no encuentra; 111 de 130 líneas vuelven cortas) | 5,0 | 70 |
 | línea fuera de góndola (racks, excedente, sin sector) | 2,5 | 35 |
 | cada parada (módulo; el par enfrentado A-B, G-E, F-D, H-J, L-M es UNA) | 1,5 | 19 |
-| cada 10 cajas (una línea cuenta hasta 30 cajas: el pallet entero no se pickea de a una) | 3,0 | 38 |
-| arranque de la tanda: 5,5 pts por línea hasta 5 líneas | hasta 27,5 | hasta 341 |
-| fijo por tanda (cerrar, acomodar en la mesa, pasar a lo siguiente: es la cola) | 11,0 | 142 |
+| cada 10 cajas (una línea cuenta hasta 30 cajas: el pallet entero no se pickea de a una) | 2,5 | 37 |
+| arranque de la tanda: 5,0 pts por línea hasta 5 líneas | hasta 25,0 | hasta 352 |
+| fijo por tanda (cerrar, acomodar en la mesa, pasar a lo siguiente: es la cola) | 10,0 | 140 |
 
-Leído como Blackjack: una parada vale como 1,5 líneas de piso, una línea de la 5.ª de A como 5,5, una de la 4.ª de B a Ñ como 2,5; 10 cajas valen 3,0; cerrar la tanda vale 11,0. En minutos: puntos × 0,213. El esquema redondeado reproduce los minutos del ajuste con el mismo R² (0,538).
+Leído como Blackjack: una parada vale como 1,5 líneas de piso, una línea de la 5.ª de A como 3, una de la 4.ª (A o B a Ñ) como 2,5, una de la 3.ª de B a Ñ como 2; 10 cajas valen 2,5; cerrar la tanda vale 10. En minutos: puntos × 0,233. El esquema redondeado reproduce los minutos del ajuste con el mismo R² (0,531).
+
+Lo que el dato decía con las alturas libres, para que quede: A4 51 s y A5 72 s por línea contra R4 35 s, o sea el doble que la 4.ª de B. Como la A5 es siempre celda conocida de pocos códigos, lo más probable es que eso sea el artículo y no la altura; el registro por paso que arranca el 05/10 lo separa. Si confirma que la 5.ª de A cuesta el doble, se vuelve a esta tabla con dato propio.
 
 Tres cosas que hay que saber de esta tabla:
 
-- Los costos de piso, 2.ª y 3.ª no los midieron las 340 tandas: paradas y líneas van casi juntas (correlación 0,965) y sin un ancla el ajuste pone todas las líneas bajas en 0 y carga todo en la parada (sin ancla: parada 33 s, piso 0, A5 175 s). El ancla son las medianas de segundos entre confirmaciones medidas en 60 días (piso 16 s, 2.ª 20-23, 3.ª 26, 4.ª 37-50, 5.ª 64). El dato sólo mueve de ahí lo que puede: A5 sube a 72 s, A2-A3 bajan a 18 (iguales al piso de A), R2 y R3 quedan en 21 y 21. Es una decisión explícita, no una medición; sin alturas el modelo predice igual (en (e)).
+- (Vale para lo medido con alturas libres, que queda de referencia en `d17_esquema.json`.) Los costos de piso, 2.ª y 3.ª no los midieron las 340 tandas: paradas y líneas van casi juntas (correlación 0,965) y sin un ancla el ajuste pone todas las líneas bajas en 0 y carga todo en la parada (sin ancla: parada 33 s, piso 0, A5 175 s). El ancla son las medianas de segundos entre confirmaciones medidas en 60 días (piso 16 s, 2.ª 20-23, 3.ª 26, 4.ª 37-50, 5.ª 64). El dato sólo mueve de ahí lo que puede: A5 sube a 72 s, A2-A3 bajan a 18 (iguales al piso de A), R2 y R3 quedan en 21 y 21. Es una decisión explícita, no una medición; sin alturas el modelo predice igual (en (e)).
 - La 3.ª de B a Ñ lleva escalera por regla y acá cuesta lo mismo que la 2.ª (21 s): el dato no ve la escalera de la 3.ª. Lo mismo A1 (18 s) por encima de R1 (13).
 - «Sin dato de stock» (MX) y «fuera de góndola» (F) no tienen ancla y sueltos salen con intervalo bootstrap desde 0 (en las corridas anteriores MX fue de 50 a 102 s según el target). Los dos revisores pidieron atarlos: MX = 2 veces la 4.ª de B a Ñ (70 s: ir, buscar, no encontrar, volver) y F = la 4.ª de B a Ñ (35 s); es el promedio de lo que recomendó cada uno (MX 1,2 y 1,0 min; F 0,5 y 0,6). Atarlos cuesta 0,8 milésimas de R².
 
@@ -111,15 +115,15 @@ Contra el tiempo con la cola cruda, cualquiera de las variantes predice con ±18
 | legajo | nombre | tandas | cajas | cola | m³/h | índice | picking puro | 10-40 líneas |
 |---|---|---|---|---|---|---|---|---|
 | 104 | J. Moncayo «J. Colombia» | 85 | 12.707 | 16 % | 2,37 | 1,39 | 1,39 | 1,33 |
-| 277 | J. Cartaya «Jhonny» | 81 | 10.020 | 26 % | 1,33 | 1,04 | 1,06 | 1,03 |
-| 122 | Villalba | 98 | 12.075 | 8 % | 1,37 | 1,02 | 0,96 | 1,02 |
-| 504 | Latronico | 51 | 5.384 | 27 % | 0,87 | 0,76 | 0,80 | 0,69 |
-| 237 | F. Ortiz | 8 | 1.057 | 27 % | 1,65 | 0,96 (no vale: 8 tandas) | 1,00 | 0,74 |
-| 8 | Farias | 3 | 721 | 138 % | 12,24 | 0,94 (no vale: 3 tandas) | 1,53 | — |
-| 600 | (Entrevista) | 5 | 441 | 6 % | 0,78 | 0,70 (no vale: 5 tandas) | 0,64 | 0,65 |
-| 94 | Tevez | 7 | 1.306 | 20 % | 0,52 | 0,55 (no vale: 7 tandas) | 0,59 | 0,44 |
+| 277 | J. Cartaya «Jhonny» | 81 | 10.020 | 26 % | 1,33 | 1,05 | 1,07 | 1,04 |
+| 122 | Villalba | 98 | 12.075 | 8 % | 1,37 | 1,02 | 0,95 | 1,01 |
+| 504 | Latronico | 51 | 5.384 | 27 % | 0,87 | 0,75 | 0,80 | 0,69 |
+| 237 | F. Ortiz | 8 | 1.057 | 27 % | 1,65 | 0,96 (no vale: 8 tandas) | 0,99 | 0,73 |
+| 8 | Farias | 3 | 721 | 138 % | 12,24 | 0,94 (no vale: 3 tandas) | 1,54 | — |
+| 600 | (Entrevista) | 5 | 441 | 6 % | 0,78 | 0,69 (no vale: 5 tandas) | 0,63 | 0,64 |
+| 94 | Tevez | 7 | 1.306 | 20 % | 0,52 | 0,56 (no vale: 7 tandas) | 0,59 | 0,45 |
 
-(La consigna decía «104 Cartaya»; el padrón que se usó acá dice 104 J. Moncayo «J. Colombia» y 277 J. Cartaya «Jhonny».) La cola mueve el índice como pide la regla: 122, que cierra el TP con la tanda acomodada (cola 8 %), sube de 0,96 a 1,02; 277 y 504, con cola de un cuarto de su picking, bajan. Sacando cada operario del ajuste y prediciéndolo con los demás, los lentos siguen saliendo lentos y 104 rápido: el índice mide al operario, no el mix de tandas. 237 y 600 tienen una tanda menos que en la corrida anterior (los dos outliers).
+(La consigna decía «104 Cartaya»; el padrón que se usó acá dice 104 J. Moncayo «J. Colombia» y 277 J. Cartaya «Jhonny».) La cola mueve el índice como pide la regla: 122, que cierra el TP con la tanda acomodada (cola 8 %), sube de 0,96 a 1,02; 277 y 504, con cola de un cuarto de su picking, bajan. Con la escala de altura de Luis (v2, 03/10) los cuatro publicables quedan igual: 1,39 · 1,05 · 1,02 · 0,75. Sacando cada operario del ajuste y prediciéndolo con los demás, los lentos siguen saliendo lentos y 104 rápido: el índice mide al operario, no el mix de tandas. 237 y 600 tienen una tanda menos que en la corrida anterior (los dos outliers).
 
 ## (g) Riesgos
 
@@ -130,3 +134,10 @@ Contra el tiempo con la cola cruda, cualquiera de las variantes predice con ±18
 ## (h) Lo que falta medir
 
 El registro por paso que arranca el lunes 05/10 (`GV_Picking_Paso_Evento`: mostrado, ok, faltan, sin stock, adelante, atrás) da el tiempo de cada línea por separado, y con eso se mide de verdad lo que acá está anclado: cuánto cuesta la parada contra la línea, el piso contra la 2.ª y la escalera de la 3.ª en B a Ñ, cuánto tarda un código con stock 0 (MX) y uno fuera de góndola (F), si la altura inferida cuesta lo mismo que la conocida por clase, y cuánto de la cola es acomodar en la mesa y cuánto es no registrar. Para que eso se pueda medir sin inferir hace falta cambiar la app en dos lugares: que el picking registre la CELDA de la que se sacó la caja (hoy sólo el código) y que el guardado a góndola registre en qué celda se puso; con los dos la altura deja de ser una cota y los costos por altura se recalculan con dato propio. Mientras tanto, el tope de 30 cajas por línea, el arranque hasta 5 líneas y el tope de la cola conviene fijarlos también en la app, que es donde se va a calcular el tamaño.
+
+## (i) Decisiones tomadas el 03/10 (Luis delegó: *"aplicá lo que te parezca"*)
+
+- **D21 — altura:** escala por altura física de Luis (tabla de (a)). Aplicada en `esquema_final_cola.py`, `d17_esquema.json` y `d17_tandas_dificultad.json`.
+- **D18 — tope de la cola:** en la base (`gv_monitor_horas_operario_dia`) la cola corre SIN tope hasta la próxima tarea o la hora de salida, como dice la regla de Luis del 02/10; el tope de 30 min queda sólo en esta calibración, para que dos tandas con 5 y 8 horas sin registro no manden el ajuste. Si el monitor muestra colas de horas que no son picking, el tope en la base es una línea.
+- **D19 — dificultad por caja:** se mide por caja (min/caja sin el arranque), que es como se lee en el depósito; la alternativa por línea queda calculada en (b) por si hace falta.
+- **D20 — registrar la celda en la app:** no por ahora. Primero el registro por paso del 05/10; si la altura inferida (c) no alcanza, se agrega la celda al picking y al guardado.

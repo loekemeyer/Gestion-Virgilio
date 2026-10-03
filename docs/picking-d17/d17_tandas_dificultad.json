@@ -12,10 +12,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 28.6,
 "target": 28.6,
-"tamano": 36.69,
-"dificultad": 0.179,
-"nivel": "Fácil",
-"indice": 1.283,
+"tamano": 36.41,
+"dificultad": 0.1763,
+"nivel": "Normal",
+"indice": 1.273,
 "outlier": false
 },
 {
@@ -31,10 +31,10 @@
 "cola_sig": "sig",
 "neto_cola": 41.0,
 "target": 41.0,
-"tamano": 27.98,
-"dificultad": 0.1633,
+"tamano": 27.21,
+"dificultad": 0.1559,
 "nivel": "Fácil",
-"indice": 0.682,
+"indice": 0.664,
 "outlier": false
 },
 {
@@ -50,10 +50,10 @@
 "cola_sig": "sig",
 "neto_cola": 33.05,
 "target": 33.05,
-"tamano": 31.13,
-"dificultad": 0.1442,
+"tamano": 30.88,
+"dificultad": 0.1418,
 "nivel": "Fácil",
-"indice": 0.942,
+"indice": 0.934,
 "outlier": false
 },
 {
@@ -69,10 +69,10 @@
 "cola_sig": "sig",
 "neto_cola": 37.52,
 "target": 37.52,
-"tamano": 29.57,
-"dificultad": 0.1921,
+"tamano": 28.14,
+"dificultad": 0.1781,
 "nivel": "Normal",
-"indice": 0.788,
+"indice": 0.75,
 "outlier": false
 },
 {
@@ -88,10 +88,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 25.5,
 "target": 25.5,
-"tamano": 31.12,
-"dificultad": 0.1635,
+"tamano": 30.41,
+"dificultad": 0.1575,
 "nivel": "Fácil",
-"indice": 1.22,
+"indice": 1.192,
 "outlier": false
 },
 {
@@ -107,10 +107,10 @@
 "cola_sig": "sig",
 "neto_cola": 37.04,
 "target": 37.04,
-"tamano": 32.07,
-"dificultad": 0.1861,
+"tamano": 31.88,
+"dificultad": 0.1836,
 "nivel": "Normal",
-"indice": 0.866,
+"indice": 0.861,
 "outlier": false
 },
 {
@@ -126,10 +126,10 @@
 "cola_sig": "sig",
 "neto_cola": 11.21,
 "target": 11.21,
-"tamano": 16.52,
-"dificultad": 0.2351,
+"tamano": 16.42,
+"dificultad": 0.2282,
 "nivel": "Normal",
-"indice": 1.474,
+"indice": 1.464,
 "outlier": false
 },
 {
@@ -145,10 +145,10 @@
 "cola_sig": "sig",
 "neto_cola": 8.88,
 "target": 8.88,
-"tamano": 19.25,
-"dificultad": 0.1554,
+"tamano": 19.32,
+"dificultad": 0.1544,
 "nivel": "Fácil",
-"indice": 2.168,
+"indice": 2.175,
 "outlier": false
 },
 {
@@ -164,10 +164,10 @@
 "cola_sig": "sig",
 "neto_cola": 6.23,
 "target": 6.23,
-"tamano": 11.21,
-"dificultad": 0.1429,
+"tamano": 11.41,
+"dificultad": 0.1463,
 "nivel": "Fácil",
-"indice": 1.799,
+"indice": 1.832,
 "outlier": false
 },
 {
@@ -183,10 +183,10 @@
 "cola_sig": "sig",
 "neto_cola": 20.37,
 "target": 20.37,
-"tamano": 19.87,
-"dificultad": 0.0582,
+"tamano": 19.98,
+"dificultad": 0.0581,
 "nivel": "Fácil",
-"indice": 0.975,
+"indice": 0.981,
 "outlier": false
 },
 {
@@ -202,10 +202,10 @@
 "cola_sig": "sig",
 "neto_cola": 56.29,
 "target": 56.29,
-"tamano": 47.94,
-"dificultad": 0.0663,
+"tamano": 47.36,
+"dificultad": 0.065,
 "nivel": "Fácil",
-"indice": 0.852,
+"indice": 0.841,
 "outlier": false
 },
 {
@@ -221,10 +221,10 @@
 "cola_sig": "sig",
 "neto_cola": 38.06,
 "target": 38.06,
-"tamano": 35.43,
-"dificultad": 0.0878,
+"tamano": 36.04,
+"dificultad": 0.0892,
 "nivel": "Fácil",
-"indice": 0.931,
+"indice": 0.947,
 "outlier": false
 },
 {
@@ -240,10 +240,10 @@
 "cola_sig": "sig",
 "neto_cola": 20.3,
 "target": 20.3,
-"tamano": 18.36,
-"dificultad": 0.1411,
+"tamano": 18.69,
+"dificultad": 0.1437,
 "nivel": "Fácil",
-"indice": 0.904,
+"indice": 0.921,
 "outlier": false
 },
 {
@@ -259,10 +259,10 @@
 "cola_sig": "sig",
 "neto_cola": 26.87,
 "target": 26.87,
-"tamano": 39.71,
-"dificultad": 0.2776,
+"tamano": 39.83,
+"dificultad": 0.2774,
 "nivel": "Normal",
-"indice": 1.478,
+"indice": 1.482,
 "outlier": false
 },
 {
@@ -278,10 +278,10 @@
 "cola_sig": "sig",
 "neto_cola": 34.17,
 "target": 34.17,
-"tamano": 25.78,
-"dificultad": 0.1865,
-"nivel": "Normal",
-"indice": 0.754,
+"tamano": 24.87,
+"dificultad": 0.1755,
+"nivel": "Fácil",
+"indice": 0.728,
 "outlier": false
 },
 {
@@ -297,10 +297,10 @@
 "cola_sig": "sig",
 "neto_cola": 28.17,
 "target": 28.17,
-"tamano": 25.12,
-"dificultad": 0.2008,
+"tamano": 24.13,
+"dificultad": 0.1874,
 "nivel": "Normal",
-"indice": 0.892,
+"indice": 0.857,
 "outlier": false
 },
 {
@@ -316,10 +316,10 @@
 "cola_sig": "sig",
 "neto_cola": 34.79,
 "target": 34.79,
-"tamano": 31.37,
-"dificultad": 0.1835,
-"nivel": "Normal",
-"indice": 0.902,
+"tamano": 30.05,
+"dificultad": 0.1721,
+"nivel": "Fácil",
+"indice": 0.864,
 "outlier": false
 },
 {
@@ -335,10 +335,10 @@
 "cola_sig": "sig",
 "neto_cola": 49.54,
 "target": 49.54,
-"tamano": 39.72,
-"dificultad": 0.2111,
+"tamano": 38.56,
+"dificultad": 0.2024,
 "nivel": "Normal",
-"indice": 0.802,
+"indice": 0.778,
 "outlier": false
 },
 {
@@ -354,10 +354,10 @@
 "cola_sig": "sig",
 "neto_cola": 38.82,
 "target": 38.82,
-"tamano": 39.16,
-"dificultad": 0.066,
+"tamano": 38.03,
+"dificultad": 0.0633,
 "nivel": "Fácil",
-"indice": 1.009,
+"indice": 0.98,
 "outlier": false
 },
 {
@@ -373,10 +373,10 @@
 "cola_sig": "sig",
 "neto_cola": 35.94,
 "target": 35.94,
-"tamano": 30.8,
-"dificultad": 0.5289,
+"tamano": 30.28,
+"dificultad": 0.5135,
 "nivel": "Pajosa",
-"indice": 0.857,
+"indice": 0.843,
 "outlier": false
 },
 {
@@ -392,10 +392,10 @@
 "cola_sig": "sig",
 "neto_cola": 31.75,
 "target": 31.75,
-"tamano": 30.92,
-"dificultad": 0.1329,
+"tamano": 30.4,
+"dificultad": 0.1291,
 "nivel": "Fácil",
-"indice": 0.974,
+"indice": 0.957,
 "outlier": false
 },
 {
@@ -411,10 +411,10 @@
 "cola_sig": "sig",
 "neto_cola": 49.1,
 "target": 49.1,
-"tamano": 43.89,
-"dificultad": 0.4842,
+"tamano": 42.62,
+"dificultad": 0.4651,
 "nivel": "Pajosa",
-"indice": 0.894,
+"indice": 0.868,
 "outlier": false
 },
 {
@@ -430,10 +430,10 @@
 "cola_sig": "sig",
 "neto_cola": 29.54,
 "target": 29.54,
-"tamano": 25.12,
-"dificultad": 0.3219,
+"tamano": 25.5,
+"dificultad": 0.3265,
 "nivel": "Normal",
-"indice": 0.85,
+"indice": 0.863,
 "outlier": false
 },
 {
@@ -449,10 +449,10 @@
 "cola_sig": "sig",
 "neto_cola": 22.84,
 "target": 22.84,
-"tamano": 35.26,
-"dificultad": 0.0426,
+"tamano": 35.67,
+"dificultad": 0.0431,
 "nivel": "Fácil",
-"indice": 1.544,
+"indice": 1.562,
 "outlier": false
 },
 {
@@ -468,10 +468,10 @@
 "cola_sig": "sig",
 "neto_cola": 27.31,
 "target": 27.31,
-"tamano": 38.38,
-"dificultad": 0.0613,
+"tamano": 38.08,
+"dificultad": 0.0604,
 "nivel": "Fácil",
-"indice": 1.405,
+"indice": 1.394,
 "outlier": false
 },
 {
@@ -487,10 +487,10 @@
 "cola_sig": "sig",
 "neto_cola": 27.13,
 "target": 27.13,
-"tamano": 26.4,
-"dificultad": 0.131,
+"tamano": 26.9,
+"dificultad": 0.1336,
 "nivel": "Fácil",
-"indice": 0.973,
+"indice": 0.991,
 "outlier": false
 },
 {
@@ -506,10 +506,10 @@
 "cola_sig": "sig",
 "neto_cola": 19.47,
 "target": 19.47,
-"tamano": 25.79,
-"dificultad": 0.2533,
+"tamano": 24.93,
+"dificultad": 0.2391,
 "nivel": "Normal",
-"indice": 1.324,
+"indice": 1.281,
 "outlier": false
 },
 {
@@ -525,10 +525,10 @@
 "cola_sig": "sig",
 "neto_cola": 31.55,
 "target": 31.55,
-"tamano": 33.69,
-"dificultad": 0.2101,
+"tamano": 33.92,
+"dificultad": 0.2108,
 "nivel": "Normal",
-"indice": 1.068,
+"indice": 1.075,
 "outlier": false
 },
 {
@@ -544,10 +544,10 @@
 "cola_sig": "sig",
 "neto_cola": 16.99,
 "target": 16.99,
-"tamano": 15.9,
-"dificultad": 0.1508,
+"tamano": 16.05,
+"dificultad": 0.1511,
 "nivel": "Fácil",
-"indice": 0.936,
+"indice": 0.945,
 "outlier": false
 },
 {
@@ -563,10 +563,10 @@
 "cola_sig": "sig",
 "neto_cola": 34.23,
 "target": 34.23,
-"tamano": 41.47,
-"dificultad": 0.0596,
+"tamano": 41.44,
+"dificultad": 0.0593,
 "nivel": "Fácil",
-"indice": 1.212,
+"indice": 1.211,
 "outlier": false
 },
 {
@@ -582,8 +582,8 @@
 "cola_sig": "sig",
 "neto_cola": 42.28,
 "target": 42.28,
-"tamano": 27.95,
-"dificultad": 0.226,
+"tamano": 27.96,
+"dificultad": 0.2245,
 "nivel": "Normal",
 "indice": 0.661,
 "outlier": false
@@ -601,10 +601,10 @@
 "cola_sig": "sig",
 "neto_cola": 24.8,
 "target": 24.8,
-"tamano": 20.27,
-"dificultad": 0.1259,
+"tamano": 20.61,
+"dificultad": 0.1279,
 "nivel": "Fácil",
-"indice": 0.817,
+"indice": 0.831,
 "outlier": false
 },
 {
@@ -620,10 +620,10 @@
 "cola_sig": "sig",
 "neto_cola": 20.36,
 "target": 20.36,
-"tamano": 21.16,
-"dificultad": 0.312,
+"tamano": 21.64,
+"dificultad": 0.32,
 "nivel": "Normal",
-"indice": 1.039,
+"indice": 1.063,
 "outlier": false
 },
 {
@@ -639,10 +639,10 @@
 "cola_sig": "sig",
 "neto_cola": 30.25,
 "target": 30.25,
-"tamano": 21.77,
-"dificultad": 0.0802,
+"tamano": 21.36,
+"dificultad": 0.077,
 "nivel": "Fácil",
-"indice": 0.72,
+"indice": 0.706,
 "outlier": false
 },
 {
@@ -658,10 +658,10 @@
 "cola_sig": "sig",
 "neto_cola": 46.51,
 "target": 46.51,
-"tamano": 48.1,
-"dificultad": 0.1094,
+"tamano": 48.0,
+"dificultad": 0.1088,
 "nivel": "Fácil",
-"indice": 1.034,
+"indice": 1.032,
 "outlier": false
 },
 {
@@ -677,10 +677,10 @@
 "cola_sig": "sig",
 "neto_cola": 21.56,
 "target": 21.56,
-"tamano": 25.45,
-"dificultad": 0.4142,
+"tamano": 25.71,
+"dificultad": 0.417,
 "nivel": "Pajosa",
-"indice": 1.18,
+"indice": 1.193,
 "outlier": false
 },
 {
@@ -696,10 +696,10 @@
 "cola_sig": "sig",
 "neto_cola": 31.01,
 "target": 31.01,
-"tamano": 37.43,
-"dificultad": 0.1204,
+"tamano": 36.52,
+"dificultad": 0.1161,
 "nivel": "Fácil",
-"indice": 1.207,
+"indice": 1.178,
 "outlier": false
 },
 {
@@ -715,10 +715,10 @@
 "cola_sig": "sig",
 "neto_cola": 9.47,
 "target": 9.47,
-"tamano": 6.47,
-"dificultad": 0.4559,
+"tamano": 6.48,
+"dificultad": 0.4502,
 "nivel": "Pajosa",
-"indice": 0.683,
+"indice": 0.684,
 "outlier": false
 },
 {
@@ -734,10 +734,10 @@
 "cola_sig": "sig",
 "neto_cola": 22.65,
 "target": 22.65,
-"tamano": 27.85,
-"dificultad": 0.3598,
-"nivel": "Pajosa",
-"indice": 1.229,
+"tamano": 27.11,
+"dificultad": 0.3438,
+"nivel": "Normal",
+"indice": 1.197,
 "outlier": false
 },
 {
@@ -753,10 +753,10 @@
 "cola_sig": "sig",
 "neto_cola": 29.71,
 "target": 29.71,
-"tamano": 24.39,
-"dificultad": 0.0972,
+"tamano": 24.81,
+"dificultad": 0.0989,
 "nivel": "Fácil",
-"indice": 0.821,
+"indice": 0.835,
 "outlier": false
 },
 {
@@ -772,10 +772,10 @@
 "cola_sig": "sig",
 "neto_cola": 25.34,
 "target": 25.34,
-"tamano": 27.12,
-"dificultad": 0.4144,
+"tamano": 26.05,
+"dificultad": 0.388,
 "nivel": "Pajosa",
-"indice": 1.07,
+"indice": 1.028,
 "outlier": false
 },
 {
@@ -791,10 +791,10 @@
 "cola_sig": "sig",
 "neto_cola": 38.62,
 "target": 38.62,
-"tamano": 39.97,
-"dificultad": 0.2682,
+"tamano": 39.55,
+"dificultad": 0.2635,
 "nivel": "Normal",
-"indice": 1.035,
+"indice": 1.024,
 "outlier": false
 },
 {
@@ -810,10 +810,10 @@
 "cola_sig": "sig",
 "neto_cola": 42.97,
 "target": 42.97,
-"tamano": 30.99,
-"dificultad": 0.0816,
+"tamano": 30.51,
+"dificultad": 0.0794,
 "nivel": "Fácil",
-"indice": 0.721,
+"indice": 0.71,
 "outlier": false
 },
 {
@@ -829,10 +829,10 @@
 "cola_sig": "sig",
 "neto_cola": 7.53,
 "target": 7.53,
-"tamano": 13.63,
-"dificultad": 0.1507,
+"tamano": 13.8,
+"dificultad": 0.1514,
 "nivel": "Fácil",
-"indice": 1.81,
+"indice": 1.833,
 "outlier": false
 },
 {
@@ -848,10 +848,10 @@
 "cola_sig": "sig",
 "neto_cola": 27.53,
 "target": 27.53,
-"tamano": 22.79,
-"dificultad": 0.0666,
+"tamano": 22.83,
+"dificultad": 0.0662,
 "nivel": "Fácil",
-"indice": 0.828,
+"indice": 0.829,
 "outlier": false
 },
 {
@@ -867,10 +867,10 @@
 "cola_sig": "sig",
 "neto_cola": 38.82,
 "target": 38.82,
-"tamano": 32.65,
-"dificultad": 0.12,
+"tamano": 33.28,
+"dificultad": 0.1223,
 "nivel": "Fácil",
-"indice": 0.841,
+"indice": 0.857,
 "outlier": false
 },
 {
@@ -886,10 +886,10 @@
 "cola_sig": "sig",
 "neto_cola": 14.81,
 "target": 14.81,
-"tamano": 23.21,
-"dificultad": 0.5051,
+"tamano": 22.91,
+"dificultad": 0.4905,
 "nivel": "Pajosa",
-"indice": 1.567,
+"indice": 1.547,
 "outlier": false
 },
 {
@@ -905,10 +905,10 @@
 "cola_sig": "sig",
 "neto_cola": 31.29,
 "target": 31.29,
-"tamano": 42.24,
-"dificultad": 0.308,
+"tamano": 41.7,
+"dificultad": 0.3019,
 "nivel": "Normal",
-"indice": 1.35,
+"indice": 1.333,
 "outlier": false
 },
 {
@@ -924,10 +924,10 @@
 "cola_sig": "sig",
 "neto_cola": 29.94,
 "target": 29.94,
-"tamano": 33.43,
-"dificultad": 0.3212,
+"tamano": 32.56,
+"dificultad": 0.3084,
 "nivel": "Normal",
-"indice": 1.116,
+"indice": 1.088,
 "outlier": false
 },
 {
@@ -944,9 +944,9 @@
 "neto_cola": 6.01,
 "target": 6.01,
 "tamano": 4.11,
-"dificultad": 0.5963,
+"dificultad": 0.6048,
 "nivel": "Pajosa",
-"indice": 0.683,
+"indice": 0.684,
 "outlier": false
 },
 {
@@ -962,10 +962,10 @@
 "cola_sig": "sig",
 "neto_cola": 45.37,
 "target": 45.37,
-"tamano": 48.56,
-"dificultad": 0.191,
+"tamano": 47.61,
+"dificultad": 0.1859,
 "nivel": "Normal",
-"indice": 1.07,
+"indice": 1.049,
 "outlier": false
 },
 {
@@ -981,10 +981,10 @@
 "cola_sig": "sig",
 "neto_cola": 89.57,
 "target": 89.57,
-"tamano": 35.35,
-"dificultad": 0.1208,
+"tamano": 35.02,
+"dificultad": 0.1187,
 "nivel": "Fácil",
-"indice": 0.395,
+"indice": 0.391,
 "outlier": false
 },
 {
@@ -1000,10 +1000,10 @@
 "cola_sig": "sig",
 "neto_cola": 29.77,
 "target": 29.77,
-"tamano": 32.91,
-"dificultad": 0.2673,
+"tamano": 33.24,
+"dificultad": 0.2693,
 "nivel": "Normal",
-"indice": 1.106,
+"indice": 1.117,
 "outlier": false
 },
 {
@@ -1019,10 +1019,10 @@
 "cola_sig": "sig",
 "neto_cola": 21.74,
 "target": 21.74,
-"tamano": 17.58,
-"dificultad": 0.2644,
+"tamano": 17.93,
+"dificultad": 0.2704,
 "nivel": "Normal",
-"indice": 0.808,
+"indice": 0.825,
 "outlier": false
 },
 {
@@ -1038,10 +1038,10 @@
 "cola_sig": "sig",
 "neto_cola": 31.73,
 "target": 31.73,
-"tamano": 35.28,
-"dificultad": 0.3404,
+"tamano": 34.22,
+"dificultad": 0.3253,
 "nivel": "Normal",
-"indice": 1.112,
+"indice": 1.078,
 "outlier": false
 },
 {
@@ -1057,10 +1057,10 @@
 "cola_sig": "sig",
 "neto_cola": 15.47,
 "target": 15.47,
-"tamano": 22.02,
-"dificultad": 0.3991,
+"tamano": 22.33,
+"dificultad": 0.4038,
 "nivel": "Pajosa",
-"indice": 1.424,
+"indice": 1.444,
 "outlier": false
 },
 {
@@ -1076,10 +1076,10 @@
 "cola_sig": "sig",
 "neto_cola": 28.29,
 "target": 28.29,
-"tamano": 42.63,
-"dificultad": 0.4736,
+"tamano": 43.6,
+"dificultad": 0.485,
 "nivel": "Pajosa",
-"indice": 1.507,
+"indice": 1.541,
 "outlier": false
 },
 {
@@ -1095,10 +1095,10 @@
 "cola_sig": "sig",
 "neto_cola": 18.47,
 "target": 18.47,
-"tamano": 20.68,
-"dificultad": 0.1661,
+"tamano": 20.77,
+"dificultad": 0.1654,
 "nivel": "Fácil",
-"indice": 1.12,
+"indice": 1.124,
 "outlier": false
 },
 {
@@ -1114,10 +1114,10 @@
 "cola_sig": "sig",
 "neto_cola": 27.81,
 "target": 27.81,
-"tamano": 44.71,
-"dificultad": 0.4214,
+"tamano": 45.41,
+"dificultad": 0.4277,
 "nivel": "Pajosa",
-"indice": 1.608,
+"indice": 1.633,
 "outlier": false
 },
 {
@@ -1133,10 +1133,10 @@
 "cola_sig": "sig",
 "neto_cola": 35.74,
 "target": 35.74,
-"tamano": 32.22,
-"dificultad": 0.2101,
+"tamano": 31.66,
+"dificultad": 0.204,
 "nivel": "Normal",
-"indice": 0.901,
+"indice": 0.886,
 "outlier": false
 },
 {
@@ -1152,10 +1152,10 @@
 "cola_sig": "sig",
 "neto_cola": 52.13,
 "target": 52.13,
-"tamano": 57.95,
-"dificultad": 0.3642,
+"tamano": 58.08,
+"dificultad": 0.3641,
 "nivel": "Pajosa",
-"indice": 1.112,
+"indice": 1.114,
 "outlier": false
 },
 {
@@ -1171,10 +1171,10 @@
 "cola_sig": "sig",
 "neto_cola": 30.92,
 "target": 30.92,
-"tamano": 37.38,
-"dificultad": 0.0671,
+"tamano": 36.78,
+"dificultad": 0.0654,
 "nivel": "Fácil",
-"indice": 1.209,
+"indice": 1.189,
 "outlier": false
 },
 {
@@ -1190,10 +1190,10 @@
 "cola_sig": "sig",
 "neto_cola": 42.63,
 "target": 42.63,
-"tamano": 22.7,
-"dificultad": 0.1343,
+"tamano": 23.06,
+"dificultad": 0.1364,
 "nivel": "Fácil",
-"indice": 0.532,
+"indice": 0.541,
 "outlier": false
 },
 {
@@ -1209,10 +1209,10 @@
 "cola_sig": "sig",
 "neto_cola": 16.42,
 "target": 16.42,
-"tamano": 20.56,
-"dificultad": 0.4167,
+"tamano": 20.5,
+"dificultad": 0.4102,
 "nivel": "Pajosa",
-"indice": 1.252,
+"indice": 1.249,
 "outlier": false
 },
 {
@@ -1228,10 +1228,10 @@
 "cola_sig": "sig",
 "neto_cola": 15.04,
 "target": 15.04,
-"tamano": 18.82,
-"dificultad": 0.1561,
+"tamano": 19.01,
+"dificultad": 0.1568,
 "nivel": "Fácil",
-"indice": 1.252,
+"indice": 1.264,
 "outlier": false
 },
 {
@@ -1247,10 +1247,10 @@
 "cola_sig": "sig",
 "neto_cola": 23.1,
 "target": 23.1,
-"tamano": 25.44,
-"dificultad": 0.4043,
+"tamano": 26.17,
+"dificultad": 0.418,
 "nivel": "Pajosa",
-"indice": 1.101,
+"indice": 1.133,
 "outlier": false
 },
 {
@@ -1266,10 +1266,10 @@
 "cola_sig": "sig",
 "neto_cola": 35.88,
 "target": 35.88,
-"tamano": 39.22,
-"dificultad": 0.0885,
+"tamano": 38.74,
+"dificultad": 0.0868,
 "nivel": "Fácil",
-"indice": 1.093,
+"indice": 1.08,
 "outlier": false
 },
 {
@@ -1285,10 +1285,10 @@
 "cola_sig": "sig",
 "neto_cola": 33.3,
 "target": 33.3,
-"tamano": 34.7,
-"dificultad": 0.3701,
+"tamano": 34.37,
+"dificultad": 0.3635,
 "nivel": "Pajosa",
-"indice": 1.042,
+"indice": 1.032,
 "outlier": false
 },
 {
@@ -1304,10 +1304,10 @@
 "cola_sig": "sig",
 "neto_cola": 33.14,
 "target": 33.14,
-"tamano": 31.5,
-"dificultad": 0.3844,
+"tamano": 31.71,
+"dificultad": 0.3854,
 "nivel": "Pajosa",
-"indice": 0.951,
+"indice": 0.957,
 "outlier": false
 },
 {
@@ -1323,10 +1323,10 @@
 "cola_sig": "sig",
 "neto_cola": 13.76,
 "target": 13.76,
-"tamano": 22.97,
-"dificultad": 0.6213,
+"tamano": 22.26,
+"dificultad": 0.5861,
 "nivel": "Pajosa",
-"indice": 1.669,
+"indice": 1.618,
 "outlier": false
 },
 {
@@ -1342,10 +1342,10 @@
 "cola_sig": "sig",
 "neto_cola": 5.74,
 "target": 5.74,
-"tamano": 10.36,
-"dificultad": 0.1041,
+"tamano": 10.46,
+"dificultad": 0.1046,
 "nivel": "Fácil",
-"indice": 1.805,
+"indice": 1.821,
 "outlier": false
 },
 {
@@ -1361,10 +1361,10 @@
 "cola_sig": "sig",
 "neto_cola": 32.72,
 "target": 32.72,
-"tamano": 31.06,
-"dificultad": 0.2556,
+"tamano": 31.82,
+"dificultad": 0.2625,
 "nivel": "Normal",
-"indice": 0.949,
+"indice": 0.973,
 "outlier": false
 },
 {
@@ -1380,10 +1380,10 @@
 "cola_sig": "sig",
 "neto_cola": 21.12,
 "target": 21.12,
-"tamano": 28.45,
-"dificultad": 0.3456,
-"nivel": "Normal",
-"indice": 1.347,
+"tamano": 29.11,
+"dificultad": 0.3545,
+"nivel": "Pajosa",
+"indice": 1.378,
 "outlier": false
 },
 {
@@ -1399,10 +1399,10 @@
 "cola_sig": "sig",
 "neto_cola": 12.03,
 "target": 12.03,
-"tamano": 22.92,
-"dificultad": 0.4505,
+"tamano": 23.33,
+"dificultad": 0.4586,
 "nivel": "Pajosa",
-"indice": 1.905,
+"indice": 1.94,
 "outlier": false
 },
 {
@@ -1418,10 +1418,10 @@
 "cola_sig": "sig",
 "neto_cola": 32.87,
 "target": 32.87,
-"tamano": 42.51,
-"dificultad": 0.3104,
+"tamano": 42.82,
+"dificultad": 0.3119,
 "nivel": "Normal",
-"indice": 1.293,
+"indice": 1.303,
 "outlier": false
 },
 {
@@ -1437,10 +1437,10 @@
 "cola_sig": "sig",
 "neto_cola": 25.61,
 "target": 25.61,
-"tamano": 48.55,
-"dificultad": 0.1816,
+"tamano": 48.01,
+"dificultad": 0.1785,
 "nivel": "Normal",
-"indice": 1.896,
+"indice": 1.875,
 "outlier": false
 },
 {
@@ -1456,10 +1456,10 @@
 "cola_sig": "sig",
 "neto_cola": 29.3,
 "target": 29.3,
-"tamano": 29.38,
-"dificultad": 0.4181,
+"tamano": 29.61,
+"dificultad": 0.4199,
 "nivel": "Pajosa",
-"indice": 1.003,
+"indice": 1.011,
 "outlier": false
 },
 {
@@ -1475,10 +1475,10 @@
 "cola_sig": "sig",
 "neto_cola": 11.72,
 "target": 11.72,
-"tamano": 15.8,
-"dificultad": 0.5956,
+"tamano": 14.98,
+"dificultad": 0.5218,
 "nivel": "Pajosa",
-"indice": 1.348,
+"indice": 1.278,
 "outlier": false
 },
 {
@@ -1494,10 +1494,10 @@
 "cola_sig": "sig",
 "neto_cola": 15.06,
 "target": 15.06,
-"tamano": 10.52,
+"tamano": 10.59,
 "dificultad": 0.1355,
 "nivel": "Fácil",
-"indice": 0.699,
+"indice": 0.703,
 "outlier": false
 },
 {
@@ -1513,10 +1513,10 @@
 "cola_sig": "sig",
 "neto_cola": 10.06,
 "target": 10.06,
-"tamano": 14.35,
-"dificultad": 0.2519,
+"tamano": 13.94,
+"dificultad": 0.2299,
 "nivel": "Normal",
-"indice": 1.427,
+"indice": 1.386,
 "outlier": false
 },
 {
@@ -1532,10 +1532,10 @@
 "cola_sig": "sig",
 "neto_cola": 23.33,
 "target": 23.33,
-"tamano": 35.63,
-"dificultad": 0.0785,
+"tamano": 36.14,
+"dificultad": 0.0796,
 "nivel": "Fácil",
-"indice": 1.527,
+"indice": 1.549,
 "outlier": false
 },
 {
@@ -1551,10 +1551,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 104.9,
 "target": 104.9,
-"tamano": 52.77,
-"dificultad": 0.3521,
-"nivel": "Pajosa",
-"indice": 0.503,
+"tamano": 51.39,
+"dificultad": 0.3401,
+"nivel": "Normal",
+"indice": 0.49,
 "outlier": false
 },
 {
@@ -1570,10 +1570,10 @@
 "cola_sig": "sig",
 "neto_cola": 24.14,
 "target": 24.14,
-"tamano": 27.22,
-"dificultad": 0.3616,
+"tamano": 27.83,
+"dificultad": 0.3705,
 "nivel": "Pajosa",
-"indice": 1.128,
+"indice": 1.153,
 "outlier": false
 },
 {
@@ -1589,10 +1589,10 @@
 "cola_sig": "sig",
 "neto_cola": 7.5,
 "target": 7.5,
-"tamano": 16.38,
-"dificultad": 0.1172,
+"tamano": 16.35,
+"dificultad": 0.1147,
 "nivel": "Fácil",
-"indice": 2.184,
+"indice": 2.179,
 "outlier": false
 },
 {
@@ -1608,8 +1608,8 @@
 "cola_sig": "sig",
 "neto_cola": 34.91,
 "target": 34.91,
-"tamano": 44.92,
-"dificultad": 0.2814,
+"tamano": 44.93,
+"dificultad": 0.2804,
 "nivel": "Normal",
 "indice": 1.287,
 "outlier": false
@@ -1627,10 +1627,10 @@
 "cola_sig": "sig",
 "neto_cola": 40.36,
 "target": 40.36,
-"tamano": 36.44,
-"dificultad": 0.498,
+"tamano": 35.81,
+"dificultad": 0.4845,
 "nivel": "Pajosa",
-"indice": 0.903,
+"indice": 0.887,
 "outlier": false
 },
 {
@@ -1646,10 +1646,10 @@
 "cola_sig": "sig",
 "neto_cola": 24.08,
 "target": 24.08,
-"tamano": 24.13,
-"dificultad": 0.1174,
+"tamano": 24.23,
+"dificultad": 0.117,
 "nivel": "Fácil",
-"indice": 1.002,
+"indice": 1.006,
 "outlier": false
 },
 {
@@ -1665,10 +1665,10 @@
 "cola_sig": "sig",
 "neto_cola": 25.94,
 "target": 25.94,
-"tamano": 23.47,
-"dificultad": 0.1117,
+"tamano": 24.3,
+"dificultad": 0.1167,
 "nivel": "Fácil",
-"indice": 0.905,
+"indice": 0.937,
 "outlier": false
 },
 {
@@ -1684,10 +1684,10 @@
 "cola_sig": "sig",
 "neto_cola": 20.85,
 "target": 20.85,
-"tamano": 24.28,
-"dificultad": 0.5232,
+"tamano": 24.81,
+"dificultad": 0.5358,
 "nivel": "Pajosa",
-"indice": 1.164,
+"indice": 1.19,
 "outlier": false
 },
 {
@@ -1703,10 +1703,10 @@
 "cola_sig": "sig",
 "neto_cola": 37.33,
 "target": 37.33,
-"tamano": 33.2,
-"dificultad": 0.131,
+"tamano": 32.7,
+"dificultad": 0.1276,
 "nivel": "Fácil",
-"indice": 0.889,
+"indice": 0.876,
 "outlier": false
 },
 {
@@ -1722,10 +1722,10 @@
 "cola_sig": "sig",
 "neto_cola": 32.25,
 "target": 32.25,
-"tamano": 32.51,
-"dificultad": 0.1609,
+"tamano": 33.12,
+"dificultad": 0.164,
 "nivel": "Fácil",
-"indice": 1.008,
+"indice": 1.027,
 "outlier": false
 },
 {
@@ -1741,10 +1741,10 @@
 "cola_sig": "sig",
 "neto_cola": 39.59,
 "target": 39.59,
-"tamano": 30.45,
-"dificultad": 0.0811,
+"tamano": 30.66,
+"dificultad": 0.0814,
 "nivel": "Fácil",
-"indice": 0.769,
+"indice": 0.774,
 "outlier": false
 },
 {
@@ -1760,10 +1760,10 @@
 "cola_sig": "sig",
 "neto_cola": 47.28,
 "target": 47.28,
-"tamano": 49.93,
-"dificultad": 0.6754,
+"tamano": 50.31,
+"dificultad": 0.6791,
 "nivel": "Pajosa",
-"indice": 1.056,
+"indice": 1.064,
 "outlier": false
 },
 {
@@ -1779,10 +1779,10 @@
 "cola_sig": "sig",
 "neto_cola": 14.66,
 "target": 14.66,
-"tamano": 23.8,
-"dificultad": 0.2763,
+"tamano": 23.43,
+"dificultad": 0.2672,
 "nivel": "Normal",
-"indice": 1.624,
+"indice": 1.598,
 "outlier": false
 },
 {
@@ -1798,10 +1798,10 @@
 "cola_sig": "sig",
 "neto_cola": 23.03,
 "target": 23.03,
-"tamano": 23.73,
-"dificultad": 0.1306,
+"tamano": 24.31,
+"dificultad": 0.1343,
 "nivel": "Fácil",
-"indice": 1.03,
+"indice": 1.056,
 "outlier": false
 },
 {
@@ -1817,10 +1817,10 @@
 "cola_sig": "sig",
 "neto_cola": 12.46,
 "target": 12.46,
-"tamano": 16.6,
-"dificultad": 0.4747,
+"tamano": 16.89,
+"dificultad": 0.4826,
 "nivel": "Pajosa",
-"indice": 1.332,
+"indice": 1.355,
 "outlier": false
 },
 {
@@ -1836,10 +1836,10 @@
 "cola_sig": "sig",
 "neto_cola": 25.32,
 "target": 25.32,
-"tamano": 26.94,
-"dificultad": 0.3934,
+"tamano": 27.46,
+"dificultad": 0.4013,
 "nivel": "Pajosa",
-"indice": 1.064,
+"indice": 1.084,
 "outlier": false
 },
 {
@@ -1855,10 +1855,10 @@
 "cola_sig": "sig",
 "neto_cola": 32.67,
 "target": 32.67,
-"tamano": 43.01,
-"dificultad": 0.6723,
+"tamano": 43.26,
+"dificultad": 0.6742,
 "nivel": "Pajosa",
-"indice": 1.317,
+"indice": 1.324,
 "outlier": false
 },
 {
@@ -1874,10 +1874,10 @@
 "cola_sig": "sig",
 "neto_cola": 32.3,
 "target": 32.3,
-"tamano": 38.18,
-"dificultad": 0.1982,
+"tamano": 37.99,
+"dificultad": 0.196,
 "nivel": "Normal",
-"indice": 1.182,
+"indice": 1.176,
 "outlier": false
 },
 {
@@ -1893,10 +1893,10 @@
 "cola_sig": "sig",
 "neto_cola": 18.13,
 "target": 18.13,
-"tamano": 17.08,
-"dificultad": 0.3758,
+"tamano": 16.95,
+"dificultad": 0.3647,
 "nivel": "Pajosa",
-"indice": 0.942,
+"indice": 0.935,
 "outlier": false
 },
 {
@@ -1912,10 +1912,10 @@
 "cola_sig": "sig",
 "neto_cola": 12.89,
 "target": 12.89,
-"tamano": 24.56,
-"dificultad": 0.0994,
+"tamano": 24.87,
+"dificultad": 0.1004,
 "nivel": "Fácil",
-"indice": 1.905,
+"indice": 1.929,
 "outlier": false
 },
 {
@@ -1931,10 +1931,10 @@
 "cola_sig": "sig",
 "neto_cola": 23.31,
 "target": 23.31,
-"tamano": 21.06,
-"dificultad": 0.115,
+"tamano": 21.38,
+"dificultad": 0.1166,
 "nivel": "Fácil",
-"indice": 0.903,
+"indice": 0.917,
 "outlier": false
 },
 {
@@ -1950,10 +1950,10 @@
 "cola_sig": "sig",
 "neto_cola": 38.74,
 "target": 38.74,
-"tamano": 34.08,
-"dificultad": 0.3469,
-"nivel": "Normal",
-"indice": 0.88,
+"tamano": 34.53,
+"dificultad": 0.351,
+"nivel": "Pajosa",
+"indice": 0.891,
 "outlier": false
 },
 {
@@ -1969,10 +1969,10 @@
 "cola_sig": "sig",
 "neto_cola": 19.83,
 "target": 19.83,
-"tamano": 29.91,
-"dificultad": 0.4967,
+"tamano": 28.91,
+"dificultad": 0.4706,
 "nivel": "Pajosa",
-"indice": 1.508,
+"indice": 1.458,
 "outlier": false
 },
 {
@@ -1988,10 +1988,10 @@
 "cola_sig": "sig",
 "neto_cola": 22.65,
 "target": 22.65,
-"tamano": 22.44,
-"dificultad": 0.0609,
+"tamano": 22.34,
+"dificultad": 0.0599,
 "nivel": "Fácil",
-"indice": 0.991,
+"indice": 0.986,
 "outlier": false
 },
 {
@@ -2007,10 +2007,10 @@
 "cola_sig": "sig",
 "neto_cola": 36.39,
 "target": 36.39,
-"tamano": 29.88,
-"dificultad": 0.1149,
+"tamano": 30.01,
+"dificultad": 0.1148,
 "nivel": "Fácil",
-"indice": 0.821,
+"indice": 0.825,
 "outlier": false
 },
 {
@@ -2026,10 +2026,10 @@
 "cola_sig": "sig",
 "neto_cola": 45.27,
 "target": 45.27,
-"tamano": 51.66,
-"dificultad": 0.2009,
+"tamano": 52.51,
+"dificultad": 0.2042,
 "nivel": "Normal",
-"indice": 1.141,
+"indice": 1.16,
 "outlier": false
 },
 {
@@ -2045,10 +2045,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 29.9,
 "target": 29.9,
-"tamano": 26.43,
-"dificultad": 0.6336,
+"tamano": 26.3,
+"dificultad": 0.6243,
 "nivel": "Pajosa",
-"indice": 0.884,
+"indice": 0.88,
 "outlier": false
 },
 {
@@ -2064,10 +2064,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 55.5,
 "target": 55.5,
-"tamano": 35.32,
-"dificultad": 0.2931,
+"tamano": 34.6,
+"dificultad": 0.2839,
 "nivel": "Normal",
-"indice": 0.636,
+"indice": 0.623,
 "outlier": false
 },
 {
@@ -2083,10 +2083,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 74.0,
 "target": 74.0,
-"tamano": 27.75,
-"dificultad": 0.6354,
+"tamano": 27.55,
+"dificultad": 0.6244,
 "nivel": "Pajosa",
-"indice": 0.375,
+"indice": 0.372,
 "outlier": false
 },
 {
@@ -2102,10 +2102,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 20.3,
 "target": 20.3,
-"tamano": 20.15,
-"dificultad": 0.1052,
+"tamano": 19.94,
+"dificultad": 0.1021,
 "nivel": "Fácil",
-"indice": 0.993,
+"indice": 0.982,
 "outlier": false
 },
 {
@@ -2121,10 +2121,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 30.4,
 "target": 30.4,
-"tamano": 28.72,
-"dificultad": 0.1589,
+"tamano": 29.22,
+"dificultad": 0.1617,
 "nivel": "Fácil",
-"indice": 0.945,
+"indice": 0.961,
 "outlier": false
 },
 {
@@ -2140,10 +2140,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 70.8,
 "target": 70.8,
-"tamano": 46.71,
+"tamano": 46.84,
 "dificultad": 0.1972,
 "nivel": "Normal",
-"indice": 0.66,
+"indice": 0.662,
 "outlier": false
 },
 {
@@ -2160,7 +2160,7 @@
 "neto_cola": 25.29,
 "target": 25.29,
 "tamano": 21.15,
-"dificultad": 0.2568,
+"dificultad": 0.254,
 "nivel": "Normal",
 "indice": 0.836,
 "outlier": false
@@ -2178,10 +2178,10 @@
 "cola_sig": "sig",
 "neto_cola": 47.14,
 "target": 47.14,
-"tamano": 31.52,
-"dificultad": 0.1228,
+"tamano": 32.02,
+"dificultad": 0.1247,
 "nivel": "Fácil",
-"indice": 0.669,
+"indice": 0.679,
 "outlier": false
 },
 {
@@ -2197,10 +2197,10 @@
 "cola_sig": "sig",
 "neto_cola": 26.98,
 "target": 26.98,
-"tamano": 23.88,
-"dificultad": 0.5273,
+"tamano": 24.16,
+"dificultad": 0.5321,
 "nivel": "Pajosa",
-"indice": 0.885,
+"indice": 0.896,
 "outlier": false
 },
 {
@@ -2216,10 +2216,10 @@
 "cola_sig": "sig",
 "neto_cola": 80.19,
 "target": 80.19,
-"tamano": 40.24,
-"dificultad": 0.2076,
+"tamano": 39.4,
+"dificultad": 0.2013,
 "nivel": "Normal",
-"indice": 0.502,
+"indice": 0.491,
 "outlier": false
 },
 {
@@ -2235,10 +2235,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 24.4,
 "target": 24.4,
-"tamano": 38.5,
-"dificultad": 0.4478,
+"tamano": 37.51,
+"dificultad": 0.431,
 "nivel": "Pajosa",
-"indice": 1.578,
+"indice": 1.537,
 "outlier": false
 },
 {
@@ -2254,10 +2254,10 @@
 "cola_sig": "sig",
 "neto_cola": 33.18,
 "target": 33.18,
-"tamano": 27.9,
-"dificultad": 0.2255,
+"tamano": 27.42,
+"dificultad": 0.2184,
 "nivel": "Normal",
-"indice": 0.841,
+"indice": 0.826,
 "outlier": false
 },
 {
@@ -2273,10 +2273,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 12.1,
 "target": 12.1,
-"tamano": 21.41,
-"dificultad": 0.7417,
+"tamano": 21.9,
+"dificultad": 0.761,
 "nivel": "Pajosa",
-"indice": 1.769,
+"indice": 1.81,
 "outlier": false
 },
 {
@@ -2292,10 +2292,10 @@
 "cola_sig": "sig",
 "neto_cola": 60.4,
 "target": 60.4,
-"tamano": 38.1,
-"dificultad": 0.2462,
+"tamano": 37.5,
+"dificultad": 0.2401,
 "nivel": "Normal",
-"indice": 0.631,
+"indice": 0.621,
 "outlier": false
 },
 {
@@ -2311,10 +2311,10 @@
 "cola_sig": "sig",
 "neto_cola": 51.56,
 "target": 51.56,
-"tamano": 38.72,
-"dificultad": 0.2255,
+"tamano": 39.3,
+"dificultad": 0.2287,
 "nivel": "Normal",
-"indice": 0.751,
+"indice": 0.762,
 "outlier": false
 },
 {
@@ -2330,10 +2330,10 @@
 "cola_sig": "sig",
 "neto_cola": 47.78,
 "target": 47.78,
-"tamano": 34.58,
-"dificultad": 0.4144,
+"tamano": 34.65,
+"dificultad": 0.4133,
 "nivel": "Pajosa",
-"indice": 0.724,
+"indice": 0.725,
 "outlier": false
 },
 {
@@ -2349,10 +2349,10 @@
 "cola_sig": "sig",
 "neto_cola": 72.03,
 "target": 70.7,
-"tamano": 38.54,
-"dificultad": 0.7436,
+"tamano": 37.45,
+"dificultad": 0.7135,
 "nivel": "Pajosa",
-"indice": 0.545,
+"indice": 0.53,
 "outlier": false
 },
 {
@@ -2368,10 +2368,10 @@
 "cola_sig": "sig",
 "neto_cola": 73.69,
 "target": 60.3,
-"tamano": 47.09,
-"dificultad": 0.2169,
+"tamano": 47.46,
+"dificultad": 0.2181,
 "nivel": "Normal",
-"indice": 0.781,
+"indice": 0.787,
 "outlier": false
 },
 {
@@ -2387,10 +2387,10 @@
 "cola_sig": "sig",
 "neto_cola": 57.24,
 "target": 57.24,
-"tamano": 48.25,
-"dificultad": 0.2351,
+"tamano": 47.92,
+"dificultad": 0.2323,
 "nivel": "Normal",
-"indice": 0.843,
+"indice": 0.837,
 "outlier": false
 },
 {
@@ -2406,10 +2406,10 @@
 "cola_sig": "cap",
 "neto_cola": 528.36,
 "target": 39.7,
-"tamano": 12.93,
-"dificultad": 0.1742,
+"tamano": 13.01,
+"dificultad": 0.1717,
 "nivel": "Fácil",
-"indice": 0.326,
+"indice": 0.328,
 "outlier": true
 },
 {
@@ -2425,10 +2425,10 @@
 "cola_sig": "sig",
 "neto_cola": 30.34,
 "target": 30.34,
-"tamano": 34.37,
-"dificultad": 0.2269,
+"tamano": 34.01,
+"dificultad": 0.2225,
 "nivel": "Normal",
-"indice": 1.133,
+"indice": 1.121,
 "outlier": false
 },
 {
@@ -2444,10 +2444,10 @@
 "cola_sig": "sig",
 "neto_cola": 24.71,
 "target": 24.71,
-"tamano": 19.53,
-"dificultad": 0.2294,
+"tamano": 19.66,
+"dificultad": 0.2292,
 "nivel": "Normal",
-"indice": 0.79,
+"indice": 0.795,
 "outlier": false
 },
 {
@@ -2463,10 +2463,10 @@
 "cola_sig": "sig",
 "neto_cola": 8.82,
 "target": 8.82,
-"tamano": 4.31,
-"dificultad": 0.3995,
+"tamano": 4.41,
+"dificultad": 0.4502,
 "nivel": "Pajosa",
-"indice": 0.489,
+"indice": 0.5,
 "outlier": false
 },
 {
@@ -2482,10 +2482,10 @@
 "cola_sig": "sig",
 "neto_cola": 18.66,
 "target": 18.66,
-"tamano": 24.3,
-"dificultad": 0.1376,
+"tamano": 24.52,
+"dificultad": 0.1383,
 "nivel": "Fácil",
-"indice": 1.302,
+"indice": 1.314,
 "outlier": false
 },
 {
@@ -2501,10 +2501,10 @@
 "cola_sig": "sig",
 "neto_cola": 40.7,
 "target": 40.7,
-"tamano": 38.58,
-"dificultad": 0.7445,
+"tamano": 38.39,
+"dificultad": 0.7363,
 "nivel": "Pajosa",
-"indice": 0.948,
+"indice": 0.943,
 "outlier": false
 },
 {
@@ -2520,10 +2520,10 @@
 "cola_sig": "sig",
 "neto_cola": 55.75,
 "target": 55.75,
-"tamano": 37.42,
-"dificultad": 0.3814,
+"tamano": 36.48,
+"dificultad": 0.3672,
 "nivel": "Pajosa",
-"indice": 0.671,
+"indice": 0.654,
 "outlier": false
 },
 {
@@ -2539,10 +2539,10 @@
 "cola_sig": "sig",
 "neto_cola": 9.83,
 "target": 9.83,
-"tamano": 12.24,
-"dificultad": 0.1238,
+"tamano": 12.23,
+"dificultad": 0.1209,
 "nivel": "Fácil",
-"indice": 1.245,
+"indice": 1.244,
 "outlier": false
 },
 {
@@ -2558,10 +2558,10 @@
 "cola_sig": "sig",
 "neto_cola": 16.96,
 "target": 16.96,
-"tamano": 18.38,
-"dificultad": 0.279,
+"tamano": 17.84,
+"dificultad": 0.2605,
 "nivel": "Normal",
-"indice": 1.084,
+"indice": 1.052,
 "outlier": false
 },
 {
@@ -2577,10 +2577,10 @@
 "cola_sig": "sig",
 "neto_cola": 70.68,
 "target": 70.68,
-"tamano": 59.58,
-"dificultad": 0.339,
+"tamano": 59.44,
+"dificultad": 0.3371,
 "nivel": "Normal",
-"indice": 0.843,
+"indice": 0.841,
 "outlier": false
 },
 {
@@ -2596,10 +2596,10 @@
 "cola_sig": "sig",
 "neto_cola": 39.74,
 "target": 39.74,
-"tamano": 30.87,
-"dificultad": 0.1113,
+"tamano": 30.98,
+"dificultad": 0.1111,
 "nivel": "Fácil",
-"indice": 0.777,
+"indice": 0.78,
 "outlier": false
 },
 {
@@ -2615,10 +2615,10 @@
 "cola_sig": "sig",
 "neto_cola": 47.95,
 "target": 47.95,
-"tamano": 41.08,
-"dificultad": 0.2309,
+"tamano": 41.28,
+"dificultad": 0.2314,
 "nivel": "Normal",
-"indice": 0.857,
+"indice": 0.861,
 "outlier": false
 },
 {
@@ -2634,10 +2634,10 @@
 "cola_sig": "sig",
 "neto_cola": 37.47,
 "target": 37.47,
-"tamano": 20.97,
-"dificultad": 0.8073,
+"tamano": 20.76,
+"dificultad": 0.7849,
 "nivel": "Pajosa",
-"indice": 0.56,
+"indice": 0.554,
 "outlier": false
 },
 {
@@ -2653,10 +2653,10 @@
 "cola_sig": "sig",
 "neto_cola": 32.31,
 "target": 32.31,
-"tamano": 26.16,
-"dificultad": 0.6962,
+"tamano": 25.77,
+"dificultad": 0.6757,
 "nivel": "Pajosa",
-"indice": 0.81,
+"indice": 0.797,
 "outlier": false
 },
 {
@@ -2672,10 +2672,10 @@
 "cola_sig": "sig",
 "neto_cola": 27.97,
 "target": 27.97,
-"tamano": 24.91,
-"dificultad": 0.2056,
+"tamano": 25.18,
+"dificultad": 0.2071,
 "nivel": "Normal",
-"indice": 0.891,
+"indice": 0.9,
 "outlier": false
 },
 {
@@ -2691,10 +2691,10 @@
 "cola_sig": "sig",
 "neto_cola": 44.7,
 "target": 44.7,
-"tamano": 43.28,
-"dificultad": 0.2202,
+"tamano": 42.9,
+"dificultad": 0.2169,
 "nivel": "Normal",
-"indice": 0.968,
+"indice": 0.96,
 "outlier": false
 },
 {
@@ -2710,10 +2710,10 @@
 "cola_sig": "sig",
 "neto_cola": 76.95,
 "target": 76.95,
-"tamano": 48.34,
-"dificultad": 0.1271,
+"tamano": 48.59,
+"dificultad": 0.1274,
 "nivel": "Fácil",
-"indice": 0.628,
+"indice": 0.631,
 "outlier": false
 },
 {
@@ -2729,10 +2729,10 @@
 "cola_sig": "sig",
 "neto_cola": 5.74,
 "target": 5.74,
-"tamano": 9.73,
-"dificultad": 0.5619,
+"tamano": 9.51,
+"dificultad": 0.4963,
 "nivel": "Pajosa",
-"indice": 1.695,
+"indice": 1.656,
 "outlier": false
 },
 {
@@ -2748,10 +2748,10 @@
 "cola_sig": "sig",
 "neto_cola": 61.74,
 "target": 61.74,
-"tamano": 48.72,
-"dificultad": 0.607,
+"tamano": 48.9,
+"dificultad": 0.6075,
 "nivel": "Pajosa",
-"indice": 0.789,
+"indice": 0.792,
 "outlier": false
 },
 {
@@ -2767,10 +2767,10 @@
 "cola_sig": "sig",
 "neto_cola": 7.0,
 "target": 7.0,
-"tamano": 4.68,
-"dificultad": 0.1468,
+"tamano": 4.78,
+"dificultad": 0.1593,
 "nivel": "Fácil",
-"indice": 0.669,
+"indice": 0.683,
 "outlier": false
 },
 {
@@ -2786,10 +2786,10 @@
 "cola_sig": "sig",
 "neto_cola": 120.97,
 "target": 120.97,
-"tamano": 53.33,
-"dificultad": 0.0886,
+"tamano": 53.05,
+"dificultad": 0.0878,
 "nivel": "Fácil",
-"indice": 0.441,
+"indice": 0.439,
 "outlier": false
 },
 {
@@ -2805,10 +2805,10 @@
 "cola_sig": "sig",
 "neto_cola": 47.03,
 "target": 47.03,
-"tamano": 36.0,
-"dificultad": 0.3828,
+"tamano": 36.66,
+"dificultad": 0.3899,
 "nivel": "Pajosa",
-"indice": 0.765,
+"indice": 0.779,
 "outlier": false
 },
 {
@@ -2824,10 +2824,10 @@
 "cola_sig": "sig",
 "neto_cola": 47.81,
 "target": 47.81,
-"tamano": 47.45,
-"dificultad": 0.3367,
+"tamano": 47.2,
+"dificultad": 0.3333,
 "nivel": "Normal",
-"indice": 0.993,
+"indice": 0.987,
 "outlier": false
 },
 {
@@ -2843,10 +2843,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 31.4,
 "target": 31.4,
-"tamano": 73.2,
-"dificultad": 0.2832,
+"tamano": 73.7,
+"dificultad": 0.2848,
 "nivel": "Normal",
-"indice": 2.331,
+"indice": 2.347,
 "outlier": false
 },
 {
@@ -2862,10 +2862,10 @@
 "cola_sig": "sig",
 "neto_cola": 56.87,
 "target": 56.87,
-"tamano": 49.1,
-"dificultad": 0.311,
+"tamano": 49.18,
+"dificultad": 0.3105,
 "nivel": "Normal",
-"indice": 0.863,
+"indice": 0.865,
 "outlier": false
 },
 {
@@ -2881,10 +2881,10 @@
 "cola_sig": "sig",
 "neto_cola": 1.86,
 "target": 1.86,
-"tamano": 5.97,
+"tamano": 5.96,
 "dificultad": 0.0118,
 "nivel": "Fácil",
-"indice": 3.209,
+"indice": 3.204,
 "outlier": false
 },
 {
@@ -2900,10 +2900,10 @@
 "cola_sig": "sig",
 "neto_cola": 30.55,
 "target": 30.55,
-"tamano": 30.23,
-"dificultad": 0.2217,
+"tamano": 30.76,
+"dificultad": 0.2257,
 "nivel": "Normal",
-"indice": 0.989,
+"indice": 1.007,
 "outlier": false
 },
 {
@@ -2919,10 +2919,10 @@
 "cola_sig": "sig",
 "neto_cola": 14.94,
 "target": 14.94,
-"tamano": 16.0,
-"dificultad": 0.2148,
+"tamano": 16.24,
+"dificultad": 0.2175,
 "nivel": "Normal",
-"indice": 1.071,
+"indice": 1.087,
 "outlier": false
 },
 {
@@ -2938,10 +2938,10 @@
 "cola_sig": "sig",
 "neto_cola": 14.09,
 "target": 14.09,
-"tamano": 6.1,
-"dificultad": 0.3645,
+"tamano": 6.25,
+"dificultad": 0.3919,
 "nivel": "Pajosa",
-"indice": 0.433,
+"indice": 0.443,
 "outlier": false
 },
 {
@@ -2957,10 +2957,10 @@
 "cola_sig": "sig",
 "neto_cola": 19.73,
 "target": 19.73,
-"tamano": 19.08,
-"dificultad": 0.5513,
+"tamano": 18.1,
+"dificultad": 0.4949,
 "nivel": "Pajosa",
-"indice": 0.967,
+"indice": 0.917,
 "outlier": false
 },
 {
@@ -2976,8 +2976,8 @@
 "cola_sig": "sig",
 "neto_cola": 9.92,
 "target": 9.92,
-"tamano": 4.23,
-"dificultad": 0.2404,
+"tamano": 4.24,
+"dificultad": 0.2432,
 "nivel": "Normal",
 "indice": 0.427,
 "outlier": false
@@ -2995,10 +2995,10 @@
 "cola_sig": "sig",
 "neto_cola": 15.25,
 "target": 15.25,
-"tamano": 16.14,
-"dificultad": 0.3674,
+"tamano": 16.04,
+"dificultad": 0.3566,
 "nivel": "Pajosa",
-"indice": 1.058,
+"indice": 1.052,
 "outlier": false
 },
 {
@@ -3014,10 +3014,10 @@
 "cola_sig": "sig",
 "neto_cola": 67.22,
 "target": 67.22,
-"tamano": 36.56,
-"dificultad": 0.1314,
+"tamano": 37.02,
+"dificultad": 0.1328,
 "nivel": "Fácil",
-"indice": 0.544,
+"indice": 0.551,
 "outlier": false
 },
 {
@@ -3033,10 +3033,10 @@
 "cola_sig": "sig",
 "neto_cola": 16.11,
 "target": 16.11,
-"tamano": 17.69,
-"dificultad": 0.1632,
+"tamano": 17.81,
+"dificultad": 0.163,
 "nivel": "Fácil",
-"indice": 1.098,
+"indice": 1.106,
 "outlier": false
 },
 {
@@ -3052,10 +3052,10 @@
 "cola_sig": "sig",
 "neto_cola": 12.29,
 "target": 12.29,
-"tamano": 12.14,
-"dificultad": 0.2267,
+"tamano": 12.39,
+"dificultad": 0.2328,
 "nivel": "Normal",
-"indice": 0.988,
+"indice": 1.008,
 "outlier": false
 },
 {
@@ -3071,10 +3071,10 @@
 "cola_sig": "sig",
 "neto_cola": 144.37,
 "target": 55.3,
-"tamano": 36.23,
-"dificultad": 0.0621,
+"tamano": 35.75,
+"dificultad": 0.0607,
 "nivel": "Fácil",
-"indice": 0.655,
+"indice": 0.646,
 "outlier": false
 },
 {
@@ -3090,10 +3090,10 @@
 "cola_sig": "sig",
 "neto_cola": 15.26,
 "target": 15.26,
-"tamano": 16.59,
-"dificultad": 0.5017,
+"tamano": 15.97,
+"dificultad": 0.4569,
 "nivel": "Pajosa",
-"indice": 1.087,
+"indice": 1.046,
 "outlier": false
 },
 {
@@ -3109,10 +3109,10 @@
 "cola_sig": "sig",
 "neto_cola": 10.25,
 "target": 10.25,
-"tamano": 12.91,
-"dificultad": 0.4047,
+"tamano": 13.06,
+"dificultad": 0.405,
 "nivel": "Pajosa",
-"indice": 1.26,
+"indice": 1.274,
 "outlier": false
 },
 {
@@ -3128,10 +3128,10 @@
 "cola_sig": "sig",
 "neto_cola": 44.24,
 "target": 44.24,
-"tamano": 29.57,
-"dificultad": 0.2109,
+"tamano": 30.04,
+"dificultad": 0.2142,
 "nivel": "Normal",
-"indice": 0.668,
+"indice": 0.679,
 "outlier": false
 },
 {
@@ -3147,10 +3147,10 @@
 "cola_sig": "sig",
 "neto_cola": 52.27,
 "target": 52.27,
-"tamano": 43.81,
-"dificultad": 0.2352,
+"tamano": 44.03,
+"dificultad": 0.2357,
 "nivel": "Normal",
-"indice": 0.838,
+"indice": 0.842,
 "outlier": false
 },
 {
@@ -3166,10 +3166,10 @@
 "cola_sig": "sig",
 "neto_cola": 76.26,
 "target": 76.26,
-"tamano": 52.92,
-"dificultad": 0.3478,
-"nivel": "Normal",
-"indice": 0.694,
+"tamano": 53.38,
+"dificultad": 0.3503,
+"nivel": "Pajosa",
+"indice": 0.7,
 "outlier": false
 },
 {
@@ -3185,10 +3185,10 @@
 "cola_sig": "sig",
 "neto_cola": 37.5,
 "target": 37.5,
-"tamano": 48.32,
-"dificultad": 0.3834,
+"tamano": 49.48,
+"dificultad": 0.3932,
 "nivel": "Pajosa",
-"indice": 1.288,
+"indice": 1.319,
 "outlier": false
 },
 {
@@ -3204,10 +3204,10 @@
 "cola_sig": "sig",
 "neto_cola": 20.71,
 "target": 20.71,
-"tamano": 23.01,
-"dificultad": 0.2991,
+"tamano": 23.62,
+"dificultad": 0.3084,
 "nivel": "Normal",
-"indice": 1.111,
+"indice": 1.14,
 "outlier": false
 },
 {
@@ -3223,10 +3223,10 @@
 "cola_sig": "sig",
 "neto_cola": 19.22,
 "target": 19.22,
-"tamano": 36.2,
-"dificultad": 0.1955,
+"tamano": 36.77,
+"dificultad": 0.1984,
 "nivel": "Normal",
-"indice": 1.884,
+"indice": 1.913,
 "outlier": false
 },
 {
@@ -3242,10 +3242,10 @@
 "cola_sig": "sig",
 "neto_cola": 23.03,
 "target": 23.03,
-"tamano": 29.48,
-"dificultad": 0.2975,
+"tamano": 28.85,
+"dificultad": 0.2869,
 "nivel": "Normal",
-"indice": 1.28,
+"indice": 1.253,
 "outlier": false
 },
 {
@@ -3261,10 +3261,10 @@
 "cola_sig": "sig",
 "neto_cola": 8.48,
 "target": 8.48,
-"tamano": 12.81,
-"dificultad": 0.4322,
+"tamano": 13.15,
+"dificultad": 0.4505,
 "nivel": "Pajosa",
-"indice": 1.511,
+"indice": 1.551,
 "outlier": false
 },
 {
@@ -3280,10 +3280,10 @@
 "cola_sig": "sig",
 "neto_cola": 25.96,
 "target": 25.96,
-"tamano": 37.46,
-"dificultad": 0.2178,
+"tamano": 37.92,
+"dificultad": 0.2201,
 "nivel": "Normal",
-"indice": 1.443,
+"indice": 1.461,
 "outlier": false
 },
 {
@@ -3299,8 +3299,8 @@
 "cola_sig": "sig",
 "neto_cola": 39.61,
 "target": 39.61,
-"tamano": 69.01,
-"dificultad": 0.5861,
+"tamano": 68.99,
+"dificultad": 0.5846,
 "nivel": "Pajosa",
 "indice": 1.742,
 "outlier": false
@@ -3318,10 +3318,10 @@
 "cola_sig": "sig",
 "neto_cola": 41.24,
 "target": 41.24,
-"tamano": 55.52,
-"dificultad": 0.0727,
+"tamano": 56.12,
+"dificultad": 0.0734,
 "nivel": "Fácil",
-"indice": 1.346,
+"indice": 1.361,
 "outlier": false
 },
 {
@@ -3337,10 +3337,10 @@
 "cola_sig": "sig",
 "neto_cola": 3.59,
 "target": 3.59,
-"tamano": 7.33,
-"dificultad": 0.8958,
+"tamano": 7.36,
+"dificultad": 0.8938,
 "nivel": "Pajosa",
-"indice": 2.043,
+"indice": 2.05,
 "outlier": false
 },
 {
@@ -3356,10 +3356,10 @@
 "cola_sig": "sig",
 "neto_cola": 0.95,
 "target": 0.95,
-"tamano": 6.27,
-"dificultad": 0.5416,
+"tamano": 6.3,
+"dificultad": 0.5406,
 "nivel": "Pajosa",
-"indice": 6.601,
+"indice": 6.632,
 "outlier": false
 },
 {
@@ -3375,10 +3375,10 @@
 "cola_sig": "sig",
 "neto_cola": 3.35,
 "target": 3.35,
-"tamano": 8.36,
-"dificultad": 0.2149,
+"tamano": 8.34,
+"dificultad": 0.2077,
 "nivel": "Normal",
-"indice": 2.496,
+"indice": 2.491,
 "outlier": false
 },
 {
@@ -3394,10 +3394,10 @@
 "cola_sig": "sig",
 "neto_cola": 10.76,
 "target": 10.76,
-"tamano": 15.39,
-"dificultad": 0.5645,
+"tamano": 16.03,
+"dificultad": 0.6026,
 "nivel": "Pajosa",
-"indice": 1.431,
+"indice": 1.49,
 "outlier": false
 },
 {
@@ -3413,10 +3413,10 @@
 "cola_sig": "sig",
 "neto_cola": 40.45,
 "target": 40.45,
-"tamano": 41.64,
-"dificultad": 0.2871,
+"tamano": 40.67,
+"dificultad": 0.2776,
 "nivel": "Normal",
-"indice": 1.029,
+"indice": 1.005,
 "outlier": false
 },
 {
@@ -3432,10 +3432,10 @@
 "cola_sig": "sig",
 "neto_cola": 23.15,
 "target": 23.15,
-"tamano": 25.22,
-"dificultad": 0.4086,
+"tamano": 25.84,
+"dificultad": 0.42,
 "nivel": "Pajosa",
-"indice": 1.089,
+"indice": 1.116,
 "outlier": false
 },
 {
@@ -3451,10 +3451,10 @@
 "cola_sig": "sig",
 "neto_cola": 29.42,
 "target": 29.42,
-"tamano": 40.86,
-"dificultad": 0.1773,
-"nivel": "Fácil",
-"indice": 1.389,
+"tamano": 40.78,
+"dificultad": 0.1761,
+"nivel": "Normal",
+"indice": 1.386,
 "outlier": false
 },
 {
@@ -3470,10 +3470,10 @@
 "cola_sig": "sig",
 "neto_cola": 44.45,
 "target": 44.45,
-"tamano": 52.7,
-"dificultad": 0.3571,
+"tamano": 52.63,
+"dificultad": 0.3554,
 "nivel": "Pajosa",
-"indice": 1.186,
+"indice": 1.184,
 "outlier": false
 },
 {
@@ -3489,10 +3489,10 @@
 "cola_sig": "sig",
 "neto_cola": 26.06,
 "target": 26.06,
-"tamano": 30.24,
-"dificultad": 0.4185,
+"tamano": 30.17,
+"dificultad": 0.4145,
 "nivel": "Pajosa",
-"indice": 1.16,
+"indice": 1.158,
 "outlier": false
 },
 {
@@ -3508,10 +3508,10 @@
 "cola_sig": "sig",
 "neto_cola": 45.27,
 "target": 45.27,
-"tamano": 49.99,
-"dificultad": 0.3812,
+"tamano": 49.91,
+"dificultad": 0.3792,
 "nivel": "Pajosa",
-"indice": 1.104,
+"indice": 1.103,
 "outlier": false
 },
 {
@@ -3527,10 +3527,10 @@
 "cola_sig": "sig",
 "neto_cola": 39.07,
 "target": 39.07,
-"tamano": 48.89,
-"dificultad": 0.5672,
+"tamano": 49.93,
+"dificultad": 0.5795,
 "nivel": "Pajosa",
-"indice": 1.251,
+"indice": 1.278,
 "outlier": false
 },
 {
@@ -3546,10 +3546,10 @@
 "cola_sig": "sig",
 "neto_cola": 13.69,
 "target": 13.69,
-"tamano": 17.35,
-"dificultad": 0.3576,
+"tamano": 17.85,
+"dificultad": 0.3713,
 "nivel": "Pajosa",
-"indice": 1.268,
+"indice": 1.304,
 "outlier": false
 },
 {
@@ -3565,10 +3565,10 @@
 "cola_sig": "sig",
 "neto_cola": 32.73,
 "target": 32.73,
-"tamano": 28.61,
-"dificultad": 0.1202,
+"tamano": 29.18,
+"dificultad": 0.1227,
 "nivel": "Fácil",
-"indice": 0.874,
+"indice": 0.891,
 "outlier": false
 },
 {
@@ -3584,10 +3584,10 @@
 "cola_sig": "sig",
 "neto_cola": 88.2,
 "target": 88.2,
-"tamano": 40.86,
-"dificultad": 0.0433,
+"tamano": 40.91,
+"dificultad": 0.0432,
 "nivel": "Fácil",
-"indice": 0.463,
+"indice": 0.464,
 "outlier": false
 },
 {
@@ -3603,10 +3603,10 @@
 "cola_sig": "sig",
 "neto_cola": 33.42,
 "target": 33.42,
-"tamano": 43.42,
-"dificultad": 0.053,
+"tamano": 43.65,
+"dificultad": 0.0532,
 "nivel": "Fácil",
-"indice": 1.299,
+"indice": 1.306,
 "outlier": false
 },
 {
@@ -3622,10 +3622,10 @@
 "cola_sig": "sig",
 "neto_cola": 17.15,
 "target": 17.15,
-"tamano": 22.3,
-"dificultad": 0.2638,
+"tamano": 22.38,
+"dificultad": 0.2627,
 "nivel": "Normal",
-"indice": 1.3,
+"indice": 1.305,
 "outlier": false
 },
 {
@@ -3641,10 +3641,10 @@
 "cola_sig": "sig",
 "neto_cola": 42.3,
 "target": 42.3,
-"tamano": 31.57,
-"dificultad": 0.2475,
+"tamano": 31.65,
+"dificultad": 0.2469,
 "nivel": "Normal",
-"indice": 0.746,
+"indice": 0.748,
 "outlier": false
 },
 {
@@ -3660,10 +3660,10 @@
 "cola_sig": "sig",
 "neto_cola": 45.22,
 "target": 45.22,
-"tamano": 36.54,
-"dificultad": 0.2095,
+"tamano": 36.04,
+"dificultad": 0.2047,
 "nivel": "Normal",
-"indice": 0.808,
+"indice": 0.797,
 "outlier": false
 },
 {
@@ -3679,10 +3679,10 @@
 "cola_sig": "sig",
 "neto_cola": 18.52,
 "target": 18.52,
-"tamano": 28.01,
-"dificultad": 0.232,
+"tamano": 28.3,
+"dificultad": 0.2338,
 "nivel": "Normal",
-"indice": 1.512,
+"indice": 1.528,
 "outlier": false
 },
 {
@@ -3698,10 +3698,10 @@
 "cola_sig": "sig",
 "neto_cola": 41.37,
 "target": 41.37,
-"tamano": 37.27,
-"dificultad": 0.0515,
+"tamano": 36.75,
+"dificultad": 0.0503,
 "nivel": "Fácil",
-"indice": 0.901,
+"indice": 0.888,
 "outlier": false
 },
 {
@@ -3717,10 +3717,10 @@
 "cola_sig": "sig",
 "neto_cola": 21.72,
 "target": 21.72,
-"tamano": 14.16,
-"dificultad": 0.2262,
+"tamano": 14.19,
+"dificultad": 0.2218,
 "nivel": "Normal",
-"indice": 0.652,
+"indice": 0.653,
 "outlier": false
 },
 {
@@ -3736,10 +3736,10 @@
 "cola_sig": "sig",
 "neto_cola": 38.08,
 "target": 38.08,
-"tamano": 41.68,
-"dificultad": 0.4311,
+"tamano": 42.05,
+"dificultad": 0.434,
 "nivel": "Pajosa",
-"indice": 1.095,
+"indice": 1.104,
 "outlier": false
 },
 {
@@ -3755,10 +3755,10 @@
 "cola_sig": "sig",
 "neto_cola": 6.19,
 "target": 6.19,
-"tamano": 8.12,
-"dificultad": 0.3899,
+"tamano": 8.09,
+"dificultad": 0.3725,
 "nivel": "Pajosa",
-"indice": 1.312,
+"indice": 1.306,
 "outlier": false
 },
 {
@@ -3774,10 +3774,10 @@
 "cola_sig": "sig",
 "neto_cola": 24.16,
 "target": 24.16,
-"tamano": 31.39,
-"dificultad": 0.1085,
+"tamano": 30.9,
+"dificultad": 0.1056,
 "nivel": "Fácil",
-"indice": 1.299,
+"indice": 1.279,
 "outlier": false
 },
 {
@@ -3793,10 +3793,10 @@
 "cola_sig": "sig",
 "neto_cola": 48.48,
 "target": 48.48,
-"tamano": 42.84,
-"dificultad": 0.0306,
+"tamano": 42.05,
+"dificultad": 0.0297,
 "nivel": "Fácil",
-"indice": 0.884,
+"indice": 0.867,
 "outlier": false
 },
 {
@@ -3812,10 +3812,10 @@
 "cola_sig": "sig",
 "neto_cola": 36.06,
 "target": 36.06,
-"tamano": 30.65,
-"dificultad": 0.1476,
+"tamano": 30.42,
+"dificultad": 0.1453,
 "nivel": "Fácil",
-"indice": 0.85,
+"indice": 0.844,
 "outlier": false
 },
 {
@@ -3831,10 +3831,10 @@
 "cola_sig": "sig",
 "neto_cola": 10.98,
 "target": 10.98,
-"tamano": 13.68,
-"dificultad": 0.3748,
+"tamano": 13.79,
+"dificultad": 0.3726,
 "nivel": "Pajosa",
-"indice": 1.246,
+"indice": 1.256,
 "outlier": false
 },
 {
@@ -3850,10 +3850,10 @@
 "cola_sig": "sig",
 "neto_cola": 61.99,
 "target": 45.7,
-"tamano": 28.02,
-"dificultad": 0.5703,
+"tamano": 28.19,
+"dificultad": 0.5713,
 "nivel": "Pajosa",
-"indice": 0.613,
+"indice": 0.617,
 "outlier": false
 },
 {
@@ -3869,10 +3869,10 @@
 "cola_sig": "sig",
 "neto_cola": 23.44,
 "target": 23.44,
-"tamano": 28.4,
-"dificultad": 0.0676,
+"tamano": 28.28,
+"dificultad": 0.0667,
 "nivel": "Fácil",
-"indice": 1.211,
+"indice": 1.207,
 "outlier": false
 },
 {
@@ -3888,10 +3888,10 @@
 "cola_sig": "sig",
 "neto_cola": 43.39,
 "target": 43.39,
-"tamano": 47.81,
-"dificultad": 0.1893,
+"tamano": 48.46,
+"dificultad": 0.1917,
 "nivel": "Normal",
-"indice": 1.102,
+"indice": 1.117,
 "outlier": false
 },
 {
@@ -3907,10 +3907,10 @@
 "cola_sig": "sig",
 "neto_cola": 44.15,
 "target": 44.15,
-"tamano": 51.42,
-"dificultad": 0.3285,
+"tamano": 49.58,
+"dificultad": 0.3135,
 "nivel": "Normal",
-"indice": 1.165,
+"indice": 1.123,
 "outlier": false
 },
 {
@@ -3926,10 +3926,10 @@
 "cola_sig": "sig",
 "neto_cola": 28.25,
 "target": 28.25,
-"tamano": 32.55,
-"dificultad": 0.2248,
+"tamano": 32.88,
+"dificultad": 0.2264,
 "nivel": "Normal",
-"indice": 1.152,
+"indice": 1.164,
 "outlier": false
 },
 {
@@ -3945,10 +3945,10 @@
 "cola_sig": "sig",
 "neto_cola": 31.83,
 "target": 31.83,
-"tamano": 51.97,
-"dificultad": 0.083,
+"tamano": 52.48,
+"dificultad": 0.0837,
 "nivel": "Fácil",
-"indice": 1.633,
+"indice": 1.649,
 "outlier": false
 },
 {
@@ -3964,10 +3964,10 @@
 "cola_sig": "sig",
 "neto_cola": 49.5,
 "target": 49.5,
-"tamano": 29.95,
-"dificultad": 0.041,
+"tamano": 30.25,
+"dificultad": 0.0413,
 "nivel": "Fácil",
-"indice": 0.605,
+"indice": 0.611,
 "outlier": false
 },
 {
@@ -3983,10 +3983,10 @@
 "cola_sig": "sig",
 "neto_cola": 59.94,
 "target": 59.94,
-"tamano": 40.2,
-"dificultad": 0.2022,
+"tamano": 39.58,
+"dificultad": 0.1974,
 "nivel": "Normal",
-"indice": 0.671,
+"indice": 0.66,
 "outlier": false
 },
 {
@@ -4002,10 +4002,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 35.9,
 "target": 35.9,
-"tamano": 48.33,
-"dificultad": 0.4109,
+"tamano": 48.26,
+"dificultad": 0.4088,
 "nivel": "Pajosa",
-"indice": 1.346,
+"indice": 1.344,
 "outlier": false
 },
 {
@@ -4021,10 +4021,10 @@
 "cola_sig": "sig",
 "neto_cola": 7.6,
 "target": 7.6,
-"tamano": 14.26,
-"dificultad": 0.1678,
+"tamano": 14.69,
+"dificultad": 0.1755,
 "nivel": "Fácil",
-"indice": 1.877,
+"indice": 1.933,
 "outlier": false
 },
 {
@@ -4040,10 +4040,10 @@
 "cola_sig": "sig",
 "neto_cola": 56.74,
 "target": 56.74,
-"tamano": 46.79,
-"dificultad": 0.2869,
+"tamano": 47.39,
+"dificultad": 0.2903,
 "nivel": "Normal",
-"indice": 0.825,
+"indice": 0.835,
 "outlier": false
 },
 {
@@ -4059,10 +4059,10 @@
 "cola_sig": "cap",
 "neto_cola": 391.16,
 "target": 100.7,
-"tamano": 46.92,
-"dificultad": 0.1424,
+"tamano": 46.4,
+"dificultad": 0.1399,
 "nivel": "Fácil",
-"indice": 0.466,
+"indice": 0.461,
 "outlier": true
 },
 {
@@ -4078,10 +4078,10 @@
 "cola_sig": "sig",
 "neto_cola": 36.09,
 "target": 36.09,
-"tamano": 39.31,
-"dificultad": 0.3765,
+"tamano": 38.52,
+"dificultad": 0.3653,
 "nivel": "Pajosa",
-"indice": 1.089,
+"indice": 1.067,
 "outlier": false
 },
 {
@@ -4097,10 +4097,10 @@
 "cola_sig": "sig",
 "neto_cola": 4.11,
 "target": 4.11,
-"tamano": 6.4,
-"dificultad": 0.3499,
-"nivel": "Pajosa",
-"indice": 1.556,
+"tamano": 6.43,
+"dificultad": 0.3493,
+"nivel": "Normal",
+"indice": 1.563,
 "outlier": false
 },
 {
@@ -4116,10 +4116,10 @@
 "cola_sig": "sig",
 "neto_cola": 17.59,
 "target": 17.59,
-"tamano": 27.52,
-"dificultad": 0.556,
+"tamano": 28.08,
+"dificultad": 0.568,
 "nivel": "Pajosa",
-"indice": 1.564,
+"indice": 1.596,
 "outlier": false
 },
 {
@@ -4135,10 +4135,10 @@
 "cola_sig": "sig",
 "neto_cola": 42.98,
 "target": 42.98,
-"tamano": 42.41,
-"dificultad": 0.2217,
+"tamano": 43.69,
+"dificultad": 0.229,
 "nivel": "Normal",
-"indice": 0.987,
+"indice": 1.016,
 "outlier": false
 },
 {
@@ -4154,10 +4154,10 @@
 "cola_sig": "sig",
 "neto_cola": 15.54,
 "target": 15.54,
-"tamano": 13.09,
-"dificultad": 0.229,
+"tamano": 13.33,
+"dificultad": 0.2333,
 "nivel": "Normal",
-"indice": 0.843,
+"indice": 0.858,
 "outlier": false
 },
 {
@@ -4173,10 +4173,10 @@
 "cola_sig": "sig",
 "neto_cola": 55.71,
 "target": 55.71,
-"tamano": 53.68,
-"dificultad": 0.3062,
+"tamano": 53.16,
+"dificultad": 0.3017,
 "nivel": "Normal",
-"indice": 0.964,
+"indice": 0.954,
 "outlier": false
 },
 {
@@ -4192,10 +4192,10 @@
 "cola_sig": "sig",
 "neto_cola": 49.08,
 "target": 49.08,
-"tamano": 46.05,
-"dificultad": 0.5587,
+"tamano": 46.16,
+"dificultad": 0.5583,
 "nivel": "Pajosa",
-"indice": 0.938,
+"indice": 0.941,
 "outlier": false
 },
 {
@@ -4211,10 +4211,10 @@
 "cola_sig": "sig",
 "neto_cola": 49.35,
 "target": 49.35,
-"tamano": 48.06,
-"dificultad": 0.4301,
+"tamano": 47.96,
+"dificultad": 0.4275,
 "nivel": "Pajosa",
-"indice": 0.974,
+"indice": 0.972,
 "outlier": false
 },
 {
@@ -4230,10 +4230,10 @@
 "cola_sig": "sig",
 "neto_cola": 23.91,
 "target": 23.91,
-"tamano": 25.32,
-"dificultad": 0.1251,
+"tamano": 25.76,
+"dificultad": 0.1273,
 "nivel": "Fácil",
-"indice": 1.059,
+"indice": 1.077,
 "outlier": false
 },
 {
@@ -4249,10 +4249,10 @@
 "cola_sig": "sig",
 "neto_cola": 86.66,
 "target": 86.66,
-"tamano": 48.68,
-"dificultad": 0.4836,
+"tamano": 48.44,
+"dificultad": 0.4791,
 "nivel": "Pajosa",
-"indice": 0.562,
+"indice": 0.559,
 "outlier": false
 },
 {
@@ -4268,10 +4268,10 @@
 "cola_sig": "sig",
 "neto_cola": 13.58,
 "target": 13.58,
-"tamano": 19.35,
-"dificultad": 0.1298,
+"tamano": 19.67,
+"dificultad": 0.1319,
 "nivel": "Fácil",
-"indice": 1.425,
+"indice": 1.448,
 "outlier": false
 },
 {
@@ -4287,10 +4287,10 @@
 "cola_sig": "sig",
 "neto_cola": 47.08,
 "target": 47.08,
-"tamano": 44.39,
-"dificultad": 0.5422,
+"tamano": 44.7,
+"dificultad": 0.5448,
 "nivel": "Pajosa",
-"indice": 0.943,
+"indice": 0.949,
 "outlier": false
 },
 {
@@ -4306,10 +4306,10 @@
 "cola_sig": "sig",
 "neto_cola": 35.17,
 "target": 35.17,
-"tamano": 37.22,
-"dificultad": 0.4227,
+"tamano": 38.38,
+"dificultad": 0.4374,
 "nivel": "Pajosa",
-"indice": 1.058,
+"indice": 1.091,
 "outlier": false
 },
 {
@@ -4325,10 +4325,10 @@
 "cola_sig": "sig",
 "neto_cola": 31.71,
 "target": 31.71,
-"tamano": 29.27,
-"dificultad": 0.2946,
+"tamano": 29.42,
+"dificultad": 0.2947,
 "nivel": "Normal",
-"indice": 0.923,
+"indice": 0.928,
 "outlier": false
 },
 {
@@ -4344,10 +4344,10 @@
 "cola_sig": "sig",
 "neto_cola": 36.57,
 "target": 36.57,
-"tamano": 48.84,
-"dificultad": 0.1421,
+"tamano": 49.41,
+"dificultad": 0.1436,
 "nivel": "Fácil",
-"indice": 1.336,
+"indice": 1.351,
 "outlier": false
 },
 {
@@ -4363,10 +4363,10 @@
 "cola_sig": "sig",
 "neto_cola": 24.85,
 "target": 24.85,
-"tamano": 33.46,
-"dificultad": 0.1618,
+"tamano": 33.42,
+"dificultad": 0.1607,
 "nivel": "Fácil",
-"indice": 1.346,
+"indice": 1.345,
 "outlier": false
 },
 {
@@ -4382,10 +4382,10 @@
 "cola_sig": "sig",
 "neto_cola": 12.27,
 "target": 12.27,
-"tamano": 18.36,
-"dificultad": 0.2862,
+"tamano": 18.74,
+"dificultad": 0.2929,
 "nivel": "Normal",
-"indice": 1.496,
+"indice": 1.528,
 "outlier": false
 },
 {
@@ -4404,7 +4404,7 @@
 "tamano": 4.09,
 "dificultad": null,
 "nivel": "Pajosa",
-"indice": 1.65,
+"indice": 1.649,
 "outlier": false
 },
 {
@@ -4420,10 +4420,10 @@
 "cola_sig": "sig",
 "neto_cola": 17.92,
 "target": 17.92,
-"tamano": 20.2,
-"dificultad": 0.0405,
+"tamano": 20.53,
+"dificultad": 0.0411,
 "nivel": "Fácil",
-"indice": 1.127,
+"indice": 1.146,
 "outlier": false
 },
 {
@@ -4439,10 +4439,10 @@
 "cola_sig": "sig",
 "neto_cola": 24.36,
 "target": 24.36,
-"tamano": 29.14,
-"dificultad": 0.057,
+"tamano": 29.46,
+"dificultad": 0.0575,
 "nivel": "Fácil",
-"indice": 1.196,
+"indice": 1.21,
 "outlier": false
 },
 {
@@ -4458,10 +4458,10 @@
 "cola_sig": "sig",
 "neto_cola": 5.12,
 "target": 5.12,
-"tamano": 11.88,
-"dificultad": 0.5461,
+"tamano": 12.16,
+"dificultad": 0.5665,
 "nivel": "Pajosa",
-"indice": 2.32,
+"indice": 2.376,
 "outlier": false
 },
 {
@@ -4477,10 +4477,10 @@
 "cola_sig": "sig",
 "neto_cola": 22.28,
 "target": 22.28,
-"tamano": 28.61,
-"dificultad": 0.2635,
+"tamano": 28.31,
+"dificultad": 0.2579,
 "nivel": "Normal",
-"indice": 1.284,
+"indice": 1.271,
 "outlier": false
 },
 {
@@ -4496,10 +4496,10 @@
 "cola_sig": "sig",
 "neto_cola": 0.76,
 "target": 0.76,
-"tamano": 5.97,
+"tamano": 5.96,
 "dificultad": 0.0074,
 "nivel": "Fácil",
-"indice": 7.853,
+"indice": 7.841,
 "outlier": false
 },
 {
@@ -4515,10 +4515,10 @@
 "cola_sig": "sig",
 "neto_cola": 19.31,
 "target": 19.31,
-"tamano": 24.32,
-"dificultad": 0.4171,
+"tamano": 24.98,
+"dificultad": 0.4304,
 "nivel": "Pajosa",
-"indice": 1.26,
+"indice": 1.294,
 "outlier": false
 },
 {
@@ -4534,10 +4534,10 @@
 "cola_sig": "sig",
 "neto_cola": 15.5,
 "target": 15.5,
-"tamano": 19.17,
-"dificultad": 0.2779,
+"tamano": 19.42,
+"dificultad": 0.2806,
 "nivel": "Normal",
-"indice": 1.237,
+"indice": 1.253,
 "outlier": false
 },
 {
@@ -4553,10 +4553,10 @@
 "cola_sig": "sig",
 "neto_cola": 5.46,
 "target": 5.46,
-"tamano": 12.92,
-"dificultad": 0.4054,
+"tamano": 13.29,
+"dificultad": 0.4245,
 "nivel": "Pajosa",
-"indice": 2.366,
+"indice": 2.434,
 "outlier": false
 },
 {
@@ -4572,10 +4572,10 @@
 "cola_sig": "sig",
 "neto_cola": 69.83,
 "target": 69.83,
-"tamano": 49.14,
-"dificultad": 0.6521,
+"tamano": 47.87,
+"dificultad": 0.6297,
 "nivel": "Pajosa",
-"indice": 0.704,
+"indice": 0.686,
 "outlier": false
 },
 {
@@ -4591,10 +4591,10 @@
 "cola_sig": "sig",
 "neto_cola": 74.36,
 "target": 66.1,
-"tamano": 46.68,
-"dificultad": 0.3679,
+"tamano": 46.8,
+"dificultad": 0.3677,
 "nivel": "Pajosa",
-"indice": 0.706,
+"indice": 0.708,
 "outlier": false
 },
 {
@@ -4610,10 +4610,10 @@
 "cola_sig": "sig",
 "neto_cola": 16.99,
 "target": 16.99,
-"tamano": 24.11,
-"dificultad": 0.3086,
+"tamano": 24.95,
+"dificultad": 0.3221,
 "nivel": "Normal",
-"indice": 1.419,
+"indice": 1.468,
 "outlier": false
 },
 {
@@ -4629,10 +4629,10 @@
 "cola_sig": "sig",
 "neto_cola": 11.17,
 "target": 11.17,
-"tamano": 16.6,
-"dificultad": 0.5028,
+"tamano": 16.28,
+"dificultad": 0.4755,
 "nivel": "Pajosa",
-"indice": 1.486,
+"indice": 1.458,
 "outlier": false
 },
 {
@@ -4648,10 +4648,10 @@
 "cola_sig": "sig",
 "neto_cola": 6.71,
 "target": 6.71,
-"tamano": 12.72,
-"dificultad": 0.212,
+"tamano": 12.75,
+"dificultad": 0.2068,
 "nivel": "Normal",
-"indice": 1.896,
+"indice": 1.9,
 "outlier": false
 },
 {
@@ -4667,10 +4667,10 @@
 "cola_sig": "sig",
 "neto_cola": 54.12,
 "target": 54.12,
-"tamano": 37.27,
-"dificultad": 0.1596,
+"tamano": 36.79,
+"dificultad": 0.1562,
 "nivel": "Fácil",
-"indice": 0.689,
+"indice": 0.68,
 "outlier": false
 },
 {
@@ -4686,8 +4686,8 @@
 "cola_sig": "sig",
 "neto_cola": 55.55,
 "target": 55.55,
-"tamano": 50.75,
-"dificultad": 0.232,
+"tamano": 50.8,
+"dificultad": 0.2315,
 "nivel": "Normal",
 "indice": 0.914,
 "outlier": false
@@ -4705,10 +4705,10 @@
 "cola_sig": "sig",
 "neto_cola": 3.06,
 "target": 3.06,
-"tamano": 8.11,
-"dificultad": 0.291,
+"tamano": 8.21,
+"dificultad": 0.2949,
 "nivel": "Normal",
-"indice": 2.651,
+"indice": 2.683,
 "outlier": false
 },
 {
@@ -4724,10 +4724,10 @@
 "cola_sig": "sig",
 "neto_cola": 9.07,
 "target": 9.07,
-"tamano": 13.76,
-"dificultad": 0.4075,
+"tamano": 14.0,
+"dificultad": 0.4144,
 "nivel": "Pajosa",
-"indice": 1.517,
+"indice": 1.544,
 "outlier": false
 },
 {
@@ -4743,10 +4743,10 @@
 "cola_sig": "sig",
 "neto_cola": 9.57,
 "target": 9.57,
-"tamano": 14.4,
-"dificultad": 0.127,
+"tamano": 14.53,
+"dificultad": 0.1267,
 "nivel": "Fácil",
-"indice": 1.505,
+"indice": 1.519,
 "outlier": false
 },
 {
@@ -4762,10 +4762,10 @@
 "cola_sig": "sig",
 "neto_cola": 36.08,
 "target": 36.08,
-"tamano": 36.78,
-"dificultad": 0.1941,
+"tamano": 36.32,
+"dificultad": 0.19,
 "nivel": "Normal",
-"indice": 1.019,
+"indice": 1.007,
 "outlier": false
 },
 {
@@ -4781,10 +4781,10 @@
 "cola_sig": "sig",
 "neto_cola": 26.97,
 "target": 26.97,
-"tamano": 25.23,
-"dificultad": 0.2725,
+"tamano": 24.77,
+"dificultad": 0.2631,
 "nivel": "Normal",
-"indice": 0.935,
+"indice": 0.918,
 "outlier": false
 },
 {
@@ -4800,10 +4800,10 @@
 "cola_sig": "sig",
 "neto_cola": 24.8,
 "target": 24.8,
-"tamano": 22.8,
-"dificultad": 0.3205,
+"tamano": 23.17,
+"dificultad": 0.3255,
 "nivel": "Normal",
-"indice": 0.919,
+"indice": 0.934,
 "outlier": false
 },
 {
@@ -4819,10 +4819,10 @@
 "cola_sig": "sig",
 "neto_cola": 29.22,
 "target": 29.22,
-"tamano": 25.75,
-"dificultad": 0.1512,
+"tamano": 25.46,
+"dificultad": 0.1475,
 "nivel": "Fácil",
-"indice": 0.881,
+"indice": 0.871,
 "outlier": false
 },
 {
@@ -4838,10 +4838,10 @@
 "cola_sig": "sig",
 "neto_cola": 58.57,
 "target": 58.57,
-"tamano": 57.36,
-"dificultad": 0.2622,
+"tamano": 58.12,
+"dificultad": 0.2655,
 "nivel": "Normal",
-"indice": 0.979,
+"indice": 0.992,
 "outlier": false
 },
 {
@@ -4857,10 +4857,10 @@
 "cola_sig": "sig",
 "neto_cola": 4.47,
 "target": 4.47,
-"tamano": 6.28,
-"dificultad": 0.1386,
+"tamano": 5.76,
+"dificultad": 0.1128,
 "nivel": "Fácil",
-"indice": 1.406,
+"indice": 1.289,
 "outlier": false
 },
 {
@@ -4876,10 +4876,10 @@
 "cola_sig": "sig",
 "neto_cola": 234.46,
 "target": 68.2,
-"tamano": 50.53,
-"dificultad": 0.397,
+"tamano": 51.97,
+"dificultad": 0.4091,
 "nivel": "Pajosa",
-"indice": 0.741,
+"indice": 0.762,
 "outlier": false
 },
 {
@@ -4895,10 +4895,10 @@
 "cola_sig": "sig",
 "neto_cola": 52.94,
 "target": 52.94,
-"tamano": 35.36,
-"dificultad": 0.1832,
+"tamano": 36.43,
+"dificultad": 0.1895,
 "nivel": "Normal",
-"indice": 0.668,
+"indice": 0.688,
 "outlier": false
 },
 {
@@ -4914,10 +4914,10 @@
 "cola_sig": "sig",
 "neto_cola": 13.6,
 "target": 13.6,
-"tamano": 18.03,
-"dificultad": 0.2495,
+"tamano": 18.41,
+"dificultad": 0.2554,
 "nivel": "Normal",
-"indice": 1.326,
+"indice": 1.354,
 "outlier": false
 },
 {
@@ -4933,10 +4933,10 @@
 "cola_sig": "sig",
 "neto_cola": 22.87,
 "target": 22.87,
-"tamano": 34.08,
-"dificultad": 0.6848,
+"tamano": 34.35,
+"dificultad": 0.6883,
 "nivel": "Pajosa",
-"indice": 1.49,
+"indice": 1.502,
 "outlier": false
 },
 {
@@ -4952,10 +4952,10 @@
 "cola_sig": "sig",
 "neto_cola": 18.58,
 "target": 18.58,
-"tamano": 37.01,
-"dificultad": 0.3114,
+"tamano": 36.22,
+"dificultad": 0.3014,
 "nivel": "Normal",
-"indice": 1.992,
+"indice": 1.95,
 "outlier": false
 },
 {
@@ -4971,10 +4971,10 @@
 "cola_sig": "sig",
 "neto_cola": 10.6,
 "target": 10.6,
-"tamano": 14.45,
-"dificultad": 0.3198,
+"tamano": 14.64,
+"dificultad": 0.3222,
 "nivel": "Normal",
-"indice": 1.363,
+"indice": 1.381,
 "outlier": false
 },
 {
@@ -4990,10 +4990,10 @@
 "cola_sig": "sig",
 "neto_cola": 16.83,
 "target": 16.83,
-"tamano": 34.37,
-"dificultad": 0.877,
+"tamano": 34.14,
+"dificultad": 0.8646,
 "nivel": "Pajosa",
-"indice": 2.042,
+"indice": 2.028,
 "outlier": false
 },
 {
@@ -5009,10 +5009,10 @@
 "cola_sig": "sig",
 "neto_cola": 39.22,
 "target": 39.22,
-"tamano": 58.08,
-"dificultad": 0.2452,
+"tamano": 58.72,
+"dificultad": 0.2476,
 "nivel": "Normal",
-"indice": 1.481,
+"indice": 1.497,
 "outlier": false
 },
 {
@@ -5028,10 +5028,10 @@
 "cola_sig": "sig",
 "neto_cola": 27.12,
 "target": 27.12,
-"tamano": 18.71,
-"dificultad": 0.4844,
+"tamano": 18.1,
+"dificultad": 0.4502,
 "nivel": "Pajosa",
-"indice": 0.69,
+"indice": 0.668,
 "outlier": false
 },
 {
@@ -5047,10 +5047,10 @@
 "cola_sig": "sig",
 "neto_cola": 21.75,
 "target": 21.75,
-"tamano": 43.7,
-"dificultad": 0.6254,
+"tamano": 43.27,
+"dificultad": 0.6153,
 "nivel": "Pajosa",
-"indice": 2.009,
+"indice": 1.989,
 "outlier": false
 },
 {
@@ -5066,10 +5066,10 @@
 "cola_sig": "sig",
 "neto_cola": 12.37,
 "target": 12.37,
-"tamano": 17.06,
-"dificultad": 0.4287,
+"tamano": 17.18,
+"dificultad": 0.4279,
 "nivel": "Pajosa",
-"indice": 1.379,
+"indice": 1.389,
 "outlier": false
 },
 {
@@ -5085,10 +5085,10 @@
 "cola_sig": "sig",
 "neto_cola": 34.01,
 "target": 34.01,
-"tamano": 22.44,
-"dificultad": 0.1563,
+"tamano": 22.7,
+"dificultad": 0.1576,
 "nivel": "Fácil",
-"indice": 0.66,
+"indice": 0.667,
 "outlier": false
 },
 {
@@ -5105,9 +5105,9 @@
 "neto_cola": 0.65,
 "target": 0.65,
 "tamano": 4.67,
-"dificultad": 0.1159,
+"dificultad": 0.1166,
 "nivel": "Fácil",
-"indice": 7.183,
+"indice": 7.187,
 "outlier": false
 },
 {
@@ -5123,10 +5123,10 @@
 "cola_sig": "sig",
 "neto_cola": 4.84,
 "target": 4.84,
-"tamano": 5.66,
-"dificultad": 0.1077,
+"tamano": 5.64,
+"dificultad": 0.107,
 "nivel": "Fácil",
-"indice": 1.17,
+"indice": 1.166,
 "outlier": false
 },
 {
@@ -5142,10 +5142,10 @@
 "cola_sig": "sig",
 "neto_cola": 10.54,
 "target": 10.54,
-"tamano": 14.24,
-"dificultad": 0.4121,
+"tamano": 14.18,
+"dificultad": 0.3987,
 "nivel": "Pajosa",
-"indice": 1.351,
+"indice": 1.345,
 "outlier": false
 },
 {
@@ -5161,10 +5161,10 @@
 "cola_sig": "sig",
 "neto_cola": 15.93,
 "target": 15.93,
-"tamano": 18.76,
-"dificultad": 0.4283,
+"tamano": 19.14,
+"dificultad": 0.4377,
 "nivel": "Pajosa",
-"indice": 1.178,
+"indice": 1.202,
 "outlier": false
 },
 {
@@ -5180,10 +5180,10 @@
 "cola_sig": "sig",
 "neto_cola": 29.85,
 "target": 29.85,
-"tamano": 46.78,
-"dificultad": 0.3282,
+"tamano": 47.26,
+"dificultad": 0.331,
 "nivel": "Normal",
-"indice": 1.567,
+"indice": 1.583,
 "outlier": false
 },
 {
@@ -5199,10 +5199,10 @@
 "cola_sig": "sig",
 "neto_cola": 8.34,
 "target": 8.34,
-"tamano": 21.91,
-"dificultad": 0.4948,
+"tamano": 21.89,
+"dificultad": 0.489,
 "nivel": "Pajosa",
-"indice": 2.627,
+"indice": 2.625,
 "outlier": false
 },
 {
@@ -5218,10 +5218,10 @@
 "cola_sig": "sig",
 "neto_cola": 5.31,
 "target": 5.31,
-"tamano": 9.07,
-"dificultad": 0.0737,
+"tamano": 9.11,
+"dificultad": 0.0739,
 "nivel": "Fácil",
-"indice": 1.708,
+"indice": 1.716,
 "outlier": false
 },
 {
@@ -5237,10 +5237,10 @@
 "cola_sig": "sig",
 "neto_cola": 30.7,
 "target": 30.7,
-"tamano": 53.11,
-"dificultad": 0.256,
+"tamano": 53.21,
+"dificultad": 0.2558,
 "nivel": "Normal",
-"indice": 1.73,
+"indice": 1.733,
 "outlier": false
 },
 {
@@ -5256,10 +5256,10 @@
 "cola_sig": "sig",
 "neto_cola": 8.4,
 "target": 8.4,
-"tamano": 12.44,
-"dificultad": 0.0542,
+"tamano": 12.48,
+"dificultad": 0.0534,
 "nivel": "Fácil",
-"indice": 1.481,
+"indice": 1.485,
 "outlier": false
 },
 {
@@ -5275,10 +5275,10 @@
 "cola_sig": "sig",
 "neto_cola": 10.93,
 "target": 10.93,
-"tamano": 13.35,
-"dificultad": 0.5884,
+"tamano": 12.64,
+"dificultad": 0.4933,
 "nivel": "Pajosa",
-"indice": 1.222,
+"indice": 1.156,
 "outlier": false
 },
 {
@@ -5294,10 +5294,10 @@
 "cola_sig": "sig",
 "neto_cola": 23.17,
 "target": 23.17,
-"tamano": 11.66,
-"dificultad": 0.1248,
+"tamano": 11.8,
+"dificultad": 0.1256,
 "nivel": "Fácil",
-"indice": 0.503,
+"indice": 0.509,
 "outlier": false
 },
 {
@@ -5313,10 +5313,10 @@
 "cola_sig": "sig",
 "neto_cola": 34.75,
 "target": 34.75,
-"tamano": 21.44,
-"dificultad": 0.2478,
+"tamano": 20.76,
+"dificultad": 0.2326,
 "nivel": "Normal",
-"indice": 0.617,
+"indice": 0.597,
 "outlier": false
 },
 {
@@ -5332,10 +5332,10 @@
 "cola_sig": "sig",
 "neto_cola": 42.05,
 "target": 42.05,
-"tamano": 23.62,
-"dificultad": 0.3891,
+"tamano": 23.54,
+"dificultad": 0.3834,
 "nivel": "Pajosa",
-"indice": 0.562,
+"indice": 0.56,
 "outlier": false
 },
 {
@@ -5351,10 +5351,10 @@
 "cola_sig": "sig",
 "neto_cola": 73.63,
 "target": 73.63,
-"tamano": 58.58,
-"dificultad": 0.2854,
+"tamano": 57.97,
+"dificultad": 0.2812,
 "nivel": "Normal",
-"indice": 0.796,
+"indice": 0.787,
 "outlier": false
 },
 {
@@ -5370,10 +5370,10 @@
 "cola_sig": "sig",
 "neto_cola": 42.02,
 "target": 42.02,
-"tamano": 21.58,
-"dificultad": 0.1241,
+"tamano": 21.23,
+"dificultad": 0.1196,
 "nivel": "Fácil",
-"indice": 0.514,
+"indice": 0.505,
 "outlier": false
 },
 {
@@ -5390,9 +5390,9 @@
 "neto_cola": 37.42,
 "target": 37.42,
 "tamano": 50.39,
-"dificultad": 0.116,
+"dificultad": 0.1156,
 "nivel": "Fácil",
-"indice": 1.346,
+"indice": 1.347,
 "outlier": false
 },
 {
@@ -5408,10 +5408,10 @@
 "cola_sig": "sig",
 "neto_cola": 17.99,
 "target": 17.99,
-"tamano": 21.6,
-"dificultad": 0.2221,
+"tamano": 21.62,
+"dificultad": 0.22,
 "nivel": "Normal",
-"indice": 1.201,
+"indice": 1.202,
 "outlier": false
 },
 {
@@ -5427,10 +5427,10 @@
 "cola_sig": "sig",
 "neto_cola": 12.6,
 "target": 12.6,
-"tamano": 12.58,
-"dificultad": 0.0755,
+"tamano": 12.74,
+"dificultad": 0.0762,
 "nivel": "Fácil",
-"indice": 0.999,
+"indice": 1.011,
 "outlier": false
 },
 {
@@ -5446,10 +5446,10 @@
 "cola_sig": "sig",
 "neto_cola": 28.75,
 "target": 28.75,
-"tamano": 17.23,
-"dificultad": 0.4587,
+"tamano": 17.51,
+"dificultad": 0.4657,
 "nivel": "Pajosa",
-"indice": 0.599,
+"indice": 0.609,
 "outlier": false
 },
 {
@@ -5465,10 +5465,10 @@
 "cola_sig": "sig",
 "neto_cola": 34.49,
 "target": 34.49,
-"tamano": 34.06,
-"dificultad": 0.0594,
+"tamano": 34.02,
+"dificultad": 0.0589,
 "nivel": "Fácil",
-"indice": 0.988,
+"indice": 0.986,
 "outlier": false
 },
 {
@@ -5484,10 +5484,10 @@
 "cola_sig": "sig",
 "neto_cola": 5.04,
 "target": 5.04,
-"tamano": 13.79,
-"dificultad": 0.3582,
+"tamano": 13.93,
+"dificultad": 0.358,
 "nivel": "Pajosa",
-"indice": 2.735,
+"indice": 2.763,
 "outlier": false
 },
 {
@@ -5503,10 +5503,10 @@
 "cola_sig": "sig",
 "neto_cola": 14.5,
 "target": 14.5,
-"tamano": 29.86,
-"dificultad": 0.3406,
+"tamano": 29.92,
+"dificultad": 0.3394,
 "nivel": "Normal",
-"indice": 2.059,
+"indice": 2.063,
 "outlier": false
 },
 {
@@ -5522,10 +5522,10 @@
 "cola_sig": "sig",
 "neto_cola": 4.56,
 "target": 4.56,
-"tamano": 11.35,
-"dificultad": 0.8233,
+"tamano": 11.59,
+"dificultad": 0.8483,
 "nivel": "Pajosa",
-"indice": 2.489,
+"indice": 2.542,
 "outlier": false
 },
 {
@@ -5541,10 +5541,10 @@
 "cola_sig": "sig",
 "neto_cola": 9.74,
 "target": 9.74,
-"tamano": 15.76,
-"dificultad": 0.4814,
+"tamano": 15.9,
+"dificultad": 0.4816,
 "nivel": "Pajosa",
-"indice": 1.618,
+"indice": 1.633,
 "outlier": false
 },
 {
@@ -5560,10 +5560,10 @@
 "cola_sig": "sig",
 "neto_cola": 31.07,
 "target": 31.07,
-"tamano": 38.15,
-"dificultad": 0.1,
+"tamano": 38.65,
+"dificultad": 0.1012,
 "nivel": "Fácil",
-"indice": 1.228,
+"indice": 1.244,
 "outlier": false
 },
 {
@@ -5579,10 +5579,10 @@
 "cola_sig": "sig",
 "neto_cola": 17.83,
 "target": 17.83,
-"tamano": 8.27,
-"dificultad": 0.4144,
+"tamano": 8.44,
+"dificultad": 0.4308,
 "nivel": "Pajosa",
-"indice": 0.464,
+"indice": 0.473,
 "outlier": false
 },
 {
@@ -5598,10 +5598,10 @@
 "cola_sig": "sig",
 "neto_cola": 9.26,
 "target": 9.26,
-"tamano": 15.95,
-"dificultad": 0.3589,
+"tamano": 16.16,
+"dificultad": 0.3619,
 "nivel": "Pajosa",
-"indice": 1.723,
+"indice": 1.745,
 "outlier": false
 },
 {
@@ -5617,7 +5617,7 @@
 "cola_sig": "sig",
 "neto_cola": 19.89,
 "target": 19.89,
-"tamano": 5.97,
+"tamano": 5.96,
 "dificultad": 0.0147,
 "nivel": "Fácil",
 "indice": 0.3,
@@ -5636,10 +5636,10 @@
 "cola_sig": "sig",
 "neto_cola": 4.9,
 "target": 4.9,
-"tamano": 13.88,
-"dificultad": 0.1188,
+"tamano": 13.96,
+"dificultad": 0.1177,
 "nivel": "Fácil",
-"indice": 2.832,
+"indice": 2.85,
 "outlier": false
 },
 {
@@ -5655,10 +5655,10 @@
 "cola_sig": "sig",
 "neto_cola": 34.1,
 "target": 34.1,
-"tamano": 46.44,
+"tamano": 46.59,
 "dificultad": 0.0423,
 "nivel": "Fácil",
-"indice": 1.362,
+"indice": 1.366,
 "outlier": false
 },
 {
@@ -5674,10 +5674,10 @@
 "cola_sig": "sig",
 "neto_cola": 43.86,
 "target": 43.86,
-"tamano": 63.51,
+"tamano": 63.66,
 "dificultad": 0.0932,
 "nivel": "Fácil",
-"indice": 1.448,
+"indice": 1.451,
 "outlier": false
 },
 {
@@ -5693,10 +5693,10 @@
 "cola_sig": "sig",
 "neto_cola": 17.12,
 "target": 17.12,
-"tamano": 32.28,
-"dificultad": 0.4177,
+"tamano": 32.5,
+"dificultad": 0.419,
 "nivel": "Pajosa",
-"indice": 1.886,
+"indice": 1.898,
 "outlier": false
 },
 {
@@ -5712,10 +5712,10 @@
 "cola_sig": "sig",
 "neto_cola": 23.07,
 "target": 23.07,
-"tamano": 26.58,
-"dificultad": 0.5146,
+"tamano": 26.62,
+"dificultad": 0.5116,
 "nivel": "Pajosa",
-"indice": 1.152,
+"indice": 1.154,
 "outlier": false
 },
 {
@@ -5731,10 +5731,10 @@
 "cola_sig": "sig",
 "neto_cola": 27.36,
 "target": 27.36,
-"tamano": 42.75,
-"dificultad": 0.2551,
+"tamano": 43.65,
+"dificultad": 0.2607,
 "nivel": "Normal",
-"indice": 1.562,
+"indice": 1.595,
 "outlier": false
 },
 {
@@ -5750,10 +5750,10 @@
 "cola_sig": "cubierta",
 "neto_cola": 35.8,
 "target": 35.8,
-"tamano": 23.08,
-"dificultad": 0.4694,
+"tamano": 22.84,
+"dificultad": 0.4575,
 "nivel": "Pajosa",
-"indice": 0.645,
+"indice": 0.638,
 "outlier": false
 },
 {
@@ -5769,10 +5769,10 @@
 "cola_sig": "sig",
 "neto_cola": 5.63,
 "target": 5.63,
-"tamano": 16.82,
-"dificultad": 0.2191,
+"tamano": 17.09,
+"dificultad": 0.2223,
 "nivel": "Normal",
-"indice": 2.988,
+"indice": 3.036,
 "outlier": false
 },
 {
@@ -5788,10 +5788,10 @@
 "cola_sig": "sig",
 "neto_cola": 43.56,
 "target": 43.56,
-"tamano": 56.53,
-"dificultad": 0.2388,
+"tamano": 57.03,
+"dificultad": 0.2406,
 "nivel": "Normal",
-"indice": 1.298,
+"indice": 1.309,
 "outlier": false
 },
 {
@@ -5807,10 +5807,10 @@
 "cola_sig": "sig",
 "neto_cola": 15.13,
 "target": 15.13,
-"tamano": 20.84,
-"dificultad": 0.1504,
+"tamano": 21.45,
+"dificultad": 0.1559,
 "nivel": "Fácil",
-"indice": 1.377,
+"indice": 1.418,
 "outlier": false
 },
 {
@@ -5826,10 +5826,10 @@
 "cola_sig": "sig",
 "neto_cola": 15.48,
 "target": 15.48,
-"tamano": 23.0,
-"dificultad": 0.1141,
+"tamano": 23.46,
+"dificultad": 0.1165,
 "nivel": "Fácil",
-"indice": 1.486,
+"indice": 1.516,
 "outlier": false
 },
 {
@@ -5845,10 +5845,10 @@
 "cola_sig": "sig",
 "neto_cola": 1.16,
 "target": 1.16,
-"tamano": 7.63,
-"dificultad": 1.849,
+"tamano": 7.7,
+"dificultad": 1.8473,
 "nivel": "Pajosa",
-"indice": 6.579,
+"indice": 6.637,
 "outlier": false
 },
 {
@@ -5864,10 +5864,10 @@
 "cola_sig": "sig",
 "neto_cola": 2.43,
 "target": 2.43,
-"tamano": 4.25,
-"dificultad": 0.7365,
+"tamano": 4.34,
+"dificultad": 0.8381,
 "nivel": "Pajosa",
-"indice": 1.748,
+"indice": 1.788,
 "outlier": false
 },
 {
@@ -5883,10 +5883,10 @@
 "cola_sig": "sig",
 "neto_cola": 24.06,
 "target": 24.06,
-"tamano": 39.78,
-"dificultad": 0.0535,
+"tamano": 38.76,
+"dificultad": 0.0515,
 "nivel": "Fácil",
-"indice": 1.654,
+"indice": 1.611,
 "outlier": false
 },
 {
@@ -5902,10 +5902,10 @@
 "cola_sig": "sig",
 "neto_cola": 5.04,
 "target": 5.04,
-"tamano": 12.23,
-"dificultad": 1.3902,
+"tamano": 11.96,
+"dificultad": 1.2523,
 "nivel": "Pajosa",
-"indice": 2.426,
+"indice": 2.372,
 "outlier": false
 },
 {
@@ -5921,10 +5921,10 @@
 "cola_sig": "sig",
 "neto_cola": 28.95,
 "target": 28.95,
-"tamano": 15.53,
-"dificultad": 0.4154,
+"tamano": 15.33,
+"dificultad": 0.3964,
 "nivel": "Pajosa",
-"indice": 0.537,
+"indice": 0.53,
 "outlier": false
 },
 {
@@ -5940,10 +5940,10 @@
 "cola_sig": "sig",
 "neto_cola": 12.36,
 "target": 12.36,
-"tamano": 23.2,
-"dificultad": 0.0352,
+"tamano": 23.14,
+"dificultad": 0.0347,
 "nivel": "Fácil",
-"indice": 1.877,
+"indice": 1.872,
 "outlier": false
 },
 {
@@ -5959,10 +5959,10 @@
 "cola_sig": "sig",
 "neto_cola": 13.52,
 "target": 13.52,
-"tamano": 24.31,
-"dificultad": 0.1322,
+"tamano": 23.89,
+"dificultad": 0.1276,
 "nivel": "Fácil",
-"indice": 1.798,
+"indice": 1.767,
 "outlier": false
 },
 {
@@ -5978,10 +5978,10 @@
 "cola_sig": "sig",
 "neto_cola": 13.26,
 "target": 13.26,
-"tamano": 19.94,
-"dificultad": 0.5166,
+"tamano": 19.09,
+"dificultad": 0.4737,
 "nivel": "Pajosa",
-"indice": 1.504,
+"indice": 1.44,
 "outlier": false
 },
 {
@@ -5997,10 +5997,10 @@
 "cola_sig": "sig",
 "neto_cola": 9.53,
 "target": 9.53,
-"tamano": 6.97,
-"dificultad": 1.1608,
+"tamano": 6.59,
+"dificultad": 0.9548,
 "nivel": "Pajosa",
-"indice": 0.731,
+"indice": 0.691,
 "outlier": false
 },
 {
@@ -6017,9 +6017,9 @@
 "neto_cola": 4.85,
 "target": 4.85,
 "tamano": 14.74,
-"dificultad": 0.1967,
+"dificultad": 0.1924,
 "nivel": "Normal",
-"indice": 3.04,
+"indice": 3.039,
 "outlier": false
 },
 {
@@ -6036,9 +6036,9 @@
 "neto_cola": 4.7,
 "target": 4.7,
 "tamano": 5.29,
-"dificultad": 0.0892,
+"dificultad": 0.0895,
 "nivel": "Fácil",
-"indice": 1.126,
+"indice": 1.127,
 "outlier": false
 },
 {
@@ -6054,10 +6054,10 @@
 "cola_sig": "sig",
 "neto_cola": 21.41,
 "target": 21.41,
-"tamano": 37.33,
-"dificultad": 0.1148,
+"tamano": 36.74,
+"dificultad": 0.1119,
 "nivel": "Fácil",
-"indice": 1.744,
+"indice": 1.716,
 "outlier": false
 },
 {
@@ -6073,10 +6073,10 @@
 "cola_sig": "sig",
 "neto_cola": 30.42,
 "target": 30.42,
-"tamano": 42.38,
-"dificultad": 0.4087,
+"tamano": 42.81,
+"dificultad": 0.412,
 "nivel": "Pajosa",
-"indice": 1.393,
+"indice": 1.407,
 "outlier": false
 },
 {
@@ -6092,10 +6092,10 @@
 "cola_sig": "sig",
 "neto_cola": 50.33,
 "target": 50.33,
-"tamano": 67.9,
-"dificultad": 0.1937,
+"tamano": 69.26,
+"dificultad": 0.1976,
 "nivel": "Normal",
-"indice": 1.349,
+"indice": 1.376,
 "outlier": false
 },
 {
@@ -6111,10 +6111,10 @@
 "cola_sig": "sig",
 "neto_cola": 23.64,
 "target": 23.64,
-"tamano": 50.93,
-"dificultad": 0.2409,
+"tamano": 50.3,
+"dificultad": 0.2365,
 "nivel": "Normal",
-"indice": 2.154,
+"indice": 2.128,
 "outlier": false
 },
 {
@@ -6130,10 +6130,10 @@
 "cola_sig": "sig",
 "neto_cola": 14.16,
 "target": 14.16,
-"tamano": 17.99,
-"dificultad": 0.1806,
-"nivel": "Fácil",
-"indice": 1.27,
+"tamano": 18.26,
+"dificultad": 0.1829,
+"nivel": "Normal",
+"indice": 1.289,
 "outlier": false
 },
 {
@@ -6149,8 +6149,8 @@
 "cola_sig": "cap",
 "neto_cola": 100.37,
 "target": 99.1,
-"tamano": 29.76,
-"dificultad": 0.1497,
+"tamano": 29.69,
+"dificultad": 0.1482,
 "nivel": "Fácil",
 "indice": 0.3,
 "outlier": false
@@ -6168,10 +6168,10 @@
 "cola_sig": "sig",
 "neto_cola": 11.9,
 "target": 11.9,
-"tamano": 18.84,
-"dificultad": 0.2766,
+"tamano": 18.35,
+"dificultad": 0.2602,
 "nivel": "Normal",
-"indice": 1.584,
+"indice": 1.542,
 "outlier": false
 },
 {
@@ -6187,10 +6187,10 @@
 "cola_sig": "sig",
 "neto_cola": 36.2,
 "target": 36.2,
-"tamano": 70.27,
-"dificultad": 0.3292,
+"tamano": 71.29,
+"dificultad": 0.3338,
 "nivel": "Normal",
-"indice": 1.941,
+"indice": 1.969,
 "outlier": false
 },
 {
@@ -6206,10 +6206,10 @@
 "cola_sig": "sig",
 "neto_cola": 6.04,
 "target": 6.04,
-"tamano": 15.8,
-"dificultad": 0.1844,
-"nivel": "Normal",
-"indice": 2.616,
+"tamano": 15.31,
+"dificultad": 0.1694,
+"nivel": "Fácil",
+"indice": 2.535,
 "outlier": false
 },
 {
@@ -6225,10 +6225,10 @@
 "cola_sig": "sig",
 "neto_cola": 3.89,
 "target": 3.89,
-"tamano": 13.69,
-"dificultad": 0.4331,
+"tamano": 13.82,
+"dificultad": 0.4321,
 "nivel": "Pajosa",
-"indice": 3.518,
+"indice": 3.551,
 "outlier": false
 },
 {
@@ -6244,10 +6244,10 @@
 "cola_sig": "sig",
 "neto_cola": 16.79,
 "target": 16.79,
-"tamano": 46.44,
-"dificultad": 0.0423,
+"tamano": 46.71,
+"dificultad": 0.0424,
 "nivel": "Fácil",
-"indice": 2.766,
+"indice": 2.782,
 "outlier": false
 },
 {
@@ -6263,8 +6263,8 @@
 "cola_sig": "sig",
 "neto_cola": 81.99,
 "target": 81.99,
-"tamano": 59.53,
-"dificultad": 0.4679,
+"tamano": 59.54,
+"dificultad": 0.4668,
 "nivel": "Pajosa",
 "indice": 0.726,
 "outlier": false
@@ -6282,10 +6282,10 @@
 "cola_sig": "sig",
 "neto_cola": 20.06,
 "target": 20.06,
-"tamano": 33.34,
-"dificultad": 0.1571,
+"tamano": 33.0,
+"dificultad": 0.1541,
 "nivel": "Fácil",
-"indice": 1.662,
+"indice": 1.645,
 "outlier": false
 },
 {
@@ -6301,10 +6301,10 @@
 "cola_sig": "sig",
 "neto_cola": 54.56,
 "target": 54.56,
-"tamano": 36.72,
-"dificultad": 0.3628,
+"tamano": 36.95,
+"dificultad": 0.364,
 "nivel": "Pajosa",
-"indice": 0.673,
+"indice": 0.677,
 "outlier": false
 },
 {
@@ -6320,10 +6320,10 @@
 "cola_sig": "sig",
 "neto_cola": 15.94,
 "target": 15.94,
-"tamano": 23.45,
-"dificultad": 0.1241,
+"tamano": 23.8,
+"dificultad": 0.1258,
 "nivel": "Fácil",
-"indice": 1.471,
+"indice": 1.493,
 "outlier": false
 },
 {
@@ -6339,10 +6339,10 @@
 "cola_sig": "sig",
 "neto_cola": 79.91,
 "target": 79.91,
-"tamano": 53.56,
-"dificultad": 0.3473,
+"tamano": 53.97,
+"dificultad": 0.3494,
 "nivel": "Normal",
-"indice": 0.67,
+"indice": 0.675,
 "outlier": false
 },
 {
@@ -6358,10 +6358,10 @@
 "cola_sig": "sig",
 "neto_cola": 3.14,
 "target": 3.14,
-"tamano": 9.94,
-"dificultad": 0.3359,
+"tamano": 10.15,
+"dificultad": 0.3469,
 "nivel": "Normal",
-"indice": 3.166,
+"indice": 3.232,
 "outlier": false
 },
 {
@@ -6377,10 +6377,10 @@
 "cola_sig": "sig",
 "neto_cola": 14.11,
 "target": 14.11,
-"tamano": 17.6,
-"dificultad": 0.2808,
+"tamano": 17.14,
+"dificultad": 0.2631,
 "nivel": "Normal",
-"indice": 1.248,
+"indice": 1.215,
 "outlier": false
 },
 {
@@ -6396,10 +6396,10 @@
 "cola_sig": "sig",
 "neto_cola": 37.36,
 "target": 37.36,
-"tamano": 51.91,
-"dificultad": 0.1297,
+"tamano": 52.16,
+"dificultad": 0.1301,
 "nivel": "Fácil",
-"indice": 1.389,
+"indice": 1.396,
 "outlier": false
 },
 {
@@ -6415,10 +6415,10 @@
 "cola_sig": "sig",
 "neto_cola": 46.94,
 "target": 46.94,
-"tamano": 42.82,
-"dificultad": 0.1347,
+"tamano": 42.12,
+"dificultad": 0.1315,
 "nivel": "Fácil",
-"indice": 0.912,
+"indice": 0.897,
 "outlier": false
 },
 {
@@ -6434,10 +6434,10 @@
 "cola_sig": "sig",
 "neto_cola": 32.97,
 "target": 32.97,
-"tamano": 56.05,
-"dificultad": 0.3428,
+"tamano": 56.18,
+"dificultad": 0.3427,
 "nivel": "Normal",
-"indice": 1.7,
+"indice": 1.704,
 "outlier": false
 },
 {
@@ -6453,10 +6453,10 @@
 "cola_sig": "sig",
 "neto_cola": 21.13,
 "target": 21.13,
-"tamano": 21.7,
-"dificultad": 0.1663,
+"tamano": 21.92,
+"dificultad": 0.1673,
 "nivel": "Fácil",
-"indice": 1.027,
+"indice": 1.037,
 "outlier": false
 }
 ]
