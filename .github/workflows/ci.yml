@@ -66,8 +66,13 @@ jobs:
       # verde. Si el issue está abierto, la suite está rota ahora.
       # ⚠ Un issue por vez: se busca el que ya esté abierto con la etiqueta antes de crear otro,
       # o cada push dejaría uno nuevo y el aviso volvería a ser ruido, que es de lo que se venía.
+      # v26.52 — el aviso NO puede pintar rojo una suite verde. El run 1706 (02/10) terminó con la
+      # suite en verde (413 corridas, 0 rojos) y el job en rojo porque `getBranch` colgó 5 min y
+      # recibió un 500 de la API de GitHub. El veredicto es el del paso de la suite: este paso
+      # avisa, y si no puede avisar lo dice con un warning y no cambia el color del run.
       - name: Avisar / dar por cerrado
         if: always()
+        continue-on-error: true
         uses: actions/github-script@v7
         env:
           ROJA: ${{ steps.suite.outcome == 'failure' }}
@@ -80,7 +85,14 @@ jobs:
             // uno viejo que cierra el issue que abrió uno nuevo diría "está verde" con main en
             // rojo. Si main ya avanzó, este run no opina sobre el estado de HOY.
             if (context.eventName === "push" && context.ref === "refs/heads/main") {
-              const b = await github.rest.repos.getBranch({ ...context.repo, branch: "main" });
+              let b;
+              try {
+                b = await github.rest.repos.getBranch({ ...context.repo, branch: "main" });
+              } catch (e) {
+                // v26.52 — sin saber dónde está main no se toca el issue: ni abrirlo ni cerrarlo.
+                core.warning(`No pude leer el head de main (${e.status || "?"} ${e.message}): no toco el issue. Suite ${roja ? "ROJA" : "verde"} en ${context.sha.slice(0,7)}.`);
+                return;
+              }
               if (b.data.commit.sha !== context.sha) {
                 core.info(`main ya está en ${b.data.commit.sha.slice(0,7)}; este run es de ${context.sha.slice(0,7)}: no toco el issue.`);
                 return;
