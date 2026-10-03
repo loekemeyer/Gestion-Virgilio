@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario)",
+  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -374,6 +374,11 @@
     {
       "objeto": "gv_oc_recompute_recibido",
       "regla": "La entrega del fabricante imputa contra la OC emitida a Log/ Fabr: sin esto la OC no se cierra nunca (eran 2.190 cajas de 544/560 con cantidad_recibida = 0).",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_picking_pickeado",
+      "regla": "D24: el m³ que se le acredita al picking de un operario se prorratea por lo pickeado (Σ reales×m³ ÷ Σ pedidas×m³, tope 1)",
       "quien": "Luis"
     },
     {

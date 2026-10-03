@@ -6732,6 +6732,15 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   con DELETE/DROP/UPDATE/CREATE TABLE de primer nivel: la instalación va adentro de `gv_picking_instalar()` (ver el SQL).
   `sql/gv_picking_puntaje_v2650.sql`. Acomodar en la mesa (cola vs cajas/NP/mesas): `docs/PICKING-ACOMODAR-MESA.md` — no sigue
   a las cajas ni a las mesas ocupadas; manda el operario.**
+  **v26.51 (Luis, D24, 03/10: *"debe descontar los m³ pickeados si algo no se pickeó"*): LO NO PICKEADO SE DESCUENTA.** El m³/h de
+  picking (TV, Mon. Admin y el monitor viejo del index) acredita **m³ de la tanda × fracción pickeada** (`gv_picking_pickeado`,
+  lectura, anon: último PKC por código, Σ reales×m³/caja ÷ Σ pedidas×m³/caja, tope 1; sin respuesta, m³ entero), y en el **puntaje**
+  una línea confirmada con **0 cajas no cuenta** (ni línea, ni parada, ni altura: `where pk.re > 0` en `gv_picking_tanda_calc`; sigue
+  en los huecos, que miden tiempo). **El armado no se prorratea.** Medido 60 días: 834 de 8.347 líneas en 0 (230 de 334 tandas),
+  10,0 % del m³ pedido; por operario el m³/h baja 6,4 % (122) · 8,8 % (104) · 11,2 % (504) · **17,5 % (277)**. El pop-up de m³/h
+  del Mon. Admin dice «1,2 de 1,5» cuando se prorrateó. `GV_Picking_Tanda` + `lineas_cero` · `cajas_ped` · `m3_frac`.
+  `sql/gv_picking_no_pickeado_v2651.sql` (centinelas v26.51; `gv_picking_pickeado` entró a `scripts/reglas-protegidas.json`),
+  `tests/mon-tv.cjs` (techo 100 → 105 KB) y `tests/mon-admin.cjs`.
 - `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
   v26.43 adentro). **Aplicado el 03/10 con el sí de Luis** (v26.45): el 15/09 dio idéntico a la foto, `gv_huellas_cambiadas`
   y `gv_reglas_perdidas` vacías. ⚠ **La huella se compara por `md5(prosrc)`, NO por `md5(pg_get_functiondef(...))`**:

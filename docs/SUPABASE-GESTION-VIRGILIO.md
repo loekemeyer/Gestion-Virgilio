@@ -31340,3 +31340,25 @@ un UPSERT sin DELETE y el TPX se filtra al leer. Centinelas 4 filas `v26.50`, `g
 
 **Rollback.** Cabecera de `sql/gv_picking_puntaje_v2650.sql` (unschedule del cron, drop de las 4 funciones y las 2 tablas, borrar
 los centinelas `v26.50`).
+
+### 3.v2651 — Lo NO pickeado se descuenta: m³/h de picking y puntaje (Luis, D24, 03/10/2026, v26.51)
+
+**Qué.** `gv_picking_pickeado(p_tandas text[])` (nueva, SQL stable, invoker, `anon`/`authenticated`): por tanda, líneas, líneas en
+0, cajas pedidas y pickeadas, m³ pedido y pickeado y la **fracción** (Σ reales × m³/caja ÷ Σ pedidas × m³/caja; sin volumen el
+promedio de la tanda, sin ninguno por cajas; tope 1), con el ÚLTIMO PKC de cada (tanda, código). La TV, el Mon. Admin y el monitor
+viejo multiplican el m³ de cada tanda con TP por esa fracción para el m³/h de **picking** (el armado no). `gv_picking_tanda_calc`:
+`where pk.re > 0` en `lin` (la línea en 0 no cuenta como línea, parada ni altura; sigue en `gaps`) y 3 columnas nuevas en
+`GV_Picking_Tanda` (`lineas_cero`, `cajas_ped`, `m3_frac`); `gv_picking_tanda_refresh` las upsertea; el detalle de
+`gv_picking_puntaje_operario` trae `cero` y `frac` (misma firma).
+
+**Medido (60 días, 334 tandas, 8.347 líneas).** 834 líneas en 0 (230 tandas con alguna) y 940 con menos cajas que las pedidas;
+cajas 48.774 pedidas → 44.594 pickeadas (8,6 %); m³ 233,96 → 210,53 (**10,0 %**); por tanda mediana 7,2 %, p90 21 %, máx 100 %.
+Por operario (m³/h 60 días, entero → pickeado): 104 2,23 → 2,04 (8,8 %) · 122 1,36 → 1,27 (6,4 %) · 277 1,07 → 0,88 (**17,5 %**) ·
+504 0,41 → 0,36 (11,2 %). Índice estimado sin las líneas en 0 (parada + altura media): 104 1,384 → 1,329 · 122 1,024 → 0,977 ·
+277 0,999 → 0,931 · 504 0,364 → 0,337 (el número exacto sale al recalcular el caché con el sí de Luis).
+
+**Cómo se aplica.** `gv_picking_instalar_v2651()` (ALTER + centinelas adentro, por el cuelgue de `execute_sql` con ALTER/DELETE de
+primer nivel), las 4 funciones (las dos protegidas con `-- REGLA_CONFIRMADA_POR_USUARIO` tras el sí) y `gv_picking_tanda_refresh(62)`.
+
+**Rollback.** Cabecera de `sql/gv_picking_no_pickeado_v2651.sql` (volver a las secciones 3-5 de la v26.50, drop de la RPC nueva y
+del instalador, borrar los centinelas `v26.51`).

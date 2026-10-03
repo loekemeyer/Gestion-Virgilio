@@ -104,7 +104,7 @@ function popTablaTandas(pares) {   // [[tanda, m3], …]
 function popRitmo(leg, sub) {
   var D = window.__MA_D || {}, M = window.__MA_M3 || {};
   var row = (D.horas || []).filter(function (o) { return String(o.legajo) === String(leg); })[0] || {};
-  var det = (M[leg] || { pick: {}, arm: {} })[sub] || {};
+  var det = (M[leg] || { pick: {}, arm: {} })[sub] || {}, ped = (M[leg] || {}).ped || {};   // v26.51: ped = m³ de la tanda cuando se prorrateó
   var pares = Object.keys(det).map(function (t) { return [t, det[t]]; }).sort(function (a, b) { return b[1] - a[1]; });
   var tot = pares.reduce(function (s, p) { return s + (Number(p[1]) || 0); }, 0);
   var hs = Number(sub === "pick" ? row.hs_pick : row.hs_arm) || 0;
@@ -132,9 +132,11 @@ function popRitmo(leg, sub) {
   var fm = function (mi, pa) { if (!(mi > 0)) return "—"; var r = Math.round(pa);
     return Math.round(mi) + (r > 0 ? ' <span style="color:#fca5a5">(-' + r + ')</span>' : ''); };
   var tm = 0, tp = 0, body = pares.map(function (p) { var mi = mins[p[0]] || 0, pa = pmin[p[0]] || 0; tm += mi; tp += pa;
-    return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + '</td><td>' + fm(mi, pa) + '</td><td>' +
+    /* v26.51 (Luis, D24): en picking el m³ es lo PICKEADO; si se prorrateó, al lado va el m³ de la tanda («1,2 de 1,5») */
+    var deN = (sub === "pick" && ped[p[0]] != null) ? ' <small style="color:#94a3b8">de ' + n1(ped[p[0]]) + '</small>' : '';
+    return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + deN + '</td><td>' + fm(mi, pa) + '</td><td>' +
       rit(Number(p[1]) || 0, mi) + '</td></tr>'; }).join("");
-  return head + '<table class="pop-cmp"><thead><tr><th>Tanda</th><th>m³</th><th>Min trab</th><th>Ritmo m³/h</th></tr></thead><tbody>' +
+  return head + '<table class="pop-cmp"><thead><tr><th>Tanda</th><th>m³' + (sub === "pick" ? ' pick.' : '') + '</th><th>Min trab</th><th>Ritmo m³/h</th></tr></thead><tbody>' +
     body + '<tr class="pop-tot"><td>Total</td><td>' + n1(tot) + '</td><td>' + fm(tm, tp) +
     '</td><td>' + rit(tot, tm) + '</td></tr></tbody></table>';
 }

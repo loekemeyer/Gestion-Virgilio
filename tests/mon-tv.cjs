@@ -29,7 +29,8 @@ const fallas = [];
 const KB = Buffer.byteLength(src) / 1024;
 /* v23.64: techo 80 → 100 KB — se sumaron el resumen de días de la PPP, el camión por grupo de
    zonas y el guardado. Sigue siendo el 2 % del index.html (~5 MB), que es lo que el techo cuida. */
-if (KB > 100) fallas.push("pesa " + KB.toFixed(0) + " KB (techo 100): dejó de ser la versión liviana");
+/* v26.51: techo 100 → 105 KB — entró el prorrateo del m³ de picking por lo pickeado (D24). Sigue siendo el 2 % del index. */
+if (KB > 105) fallas.push("pesa " + KB.toFixed(0) + " KB (techo 105): dejó de ser la versión liviana");
 for (const pesado of ["supabase.umd.js", "supabase.js", "chart.umd", "jspdf", "xlsx", "cdn."]) {
   if (src.includes(pesado)) fallas.push("carga " + pesado + " — la TV no lo necesita");
 }
@@ -202,6 +203,8 @@ function responder(url) {
   if (q.includes("/gv_tanda_status"))            return DATOS.status.filter(s => q.includes(s.tanda));
   if (q.includes("/gv_tandas_deshechas"))        return DATOS.deshechas;
   if (q.includes("/rpc/gv_ppp_prog_arbol"))      return DATOS.arbol;
+  /* v26.51 (D24): E31A se pickeó al 80 % (en m³). El m³/h de picking del legajo 8 va sobre 1,2, no sobre 1,5. */
+  if (q.includes("/rpc/gv_picking_pickeado"))    return [{ tanda: "E31A", lineas: 5, lineas_cero: 1, cajas_ped: 20, cajas_pick: 16, m3_ped: 1.5, m3_pick: 1.2, fraccion: 0.8 }];
   if (q.includes("/gv_monitor_horas_operario"))  return DATOS.horas;
   if (q.includes("/Facturacion_NP"))             return DATOS.facturadas;
   if (q.includes("/Fichadas_Virgilio"))          return DATOS.fichadas;
@@ -220,7 +223,9 @@ function responder(url) {
   const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
 
+  let pedidoPk = null;   // v26.51: qué tandas le pidió la TV a gv_picking_pickeado
   await p.route("**/rest/v1/**", (route) => {
+    if (route.request().url().includes("gv_picking_pickeado")) { try { pedidoPk = JSON.parse(route.request().postData() || "null"); } catch (_e) { pedidoPk = "mal"; } }
     const filas = responder(route.request().url());
     route.fulfill({
       status: 200,
@@ -406,6 +411,13 @@ function responder(url) {
   ok(/6:54/.test(r.ops) && /4:42/.test(r.ops),
      "la fila de Total no suma bien (prod 4:30+2:24=6:54 · no prod 1:42+3:00=4:42): " + r.ops.replace(/<[^>]*>/g, " "));
   ok(/>Ahora</.test(r.ops) && !/<th>Total<\/th>/.test(r.ops), "la columna Total tiene que ser «Ahora»");
+  /* v26.51 (Luis, D24): lo NO pickeado se descuenta. El m³/h de picking del legajo 8 = E31A 1,5 m³ × 0,8
+     pickeado = 1,2 ÷ 2,5 h = 0,5 (sin prorratear daba 0,6). El armado del 12 va entero: 1,5 ÷ 2,4 = 0,6. */
+  ok(/op-rit">0,5</.test(r.ops), "v26.51 (D24): el m³/h de picking tiene que ir sobre lo PICKEADO (1,2 ÷ 2,5 = 0,5): " + r.ops.replace(/<[^>]*>/g, " ").slice(0, 300));
+  ok(!/op-rit">0,6</.test(r.ops), "v26.51 (D24): el m³/h de picking salió con el m³ entero de la tanda (0,6)");
+  ok(/op-rit op-sep">0,6</.test(r.ops), "v26.51: el m³/h de ARMADO no se prorratea (1,5 ÷ 2,4 = 0,6)");
+  ok(pedidoPk && Array.isArray(pedidoPk.p_tandas) && pedidoPk.p_tandas.indexOf("E31A") >= 0 && pedidoPk.p_tandas.indexOf("E30A") < 0,
+     "v26.51: la TV tiene que pedirle a gv_picking_pickeado las tandas con TP de hoy (E31A sí, E30A en curso no): " + JSON.stringify(pedidoPk));
   ok(!r.actCard, "volvió la tarjeta «En este momento»: Luis la mudó a Operarios");
   /* El % va sobre el tiempo MEDIDO (prod + no prod), no sobre la jornada. */
   /* v23.92 (Luis): «Operarios» va solo y centrado — sin el conteo ni el % al lado. */

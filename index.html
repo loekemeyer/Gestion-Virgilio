@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.50"></script>
+<script type="module" src="recepcion.js?v=26.51"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10478,7 +10478,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.50";
+const APP_VERSION = "v26.51";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31982,8 +31982,9 @@ async function showDayBreakdown(dayKey, dayLabel) {
       return historic.get(t) || 0;
     };
     // Calcular fila por legajo y ordenar por m3 total desc
+    const _pkFr = await monPickFrac([...perLegajo.values()].flatMap((p) => [...p.pickedTandas]));   // v26.51 (D24)
     const rows = [...perLegajo.entries()].map(([leg, p]) => {
-      const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t), 0);
+      const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t) * (_pkFr.has(t) ? _pkFr.get(t) : 1), 0);   // v26.51 (D24): × lo pickeado
       const m3Arm  = [...p.armedTandas ].reduce((s, t) => s + tandaM3(t), 0);
       const m3Total = m3Pick + m3Arm;
       // Horas "trabajadas" (primer evento → último evento) — se mantiene
@@ -32132,6 +32133,22 @@ let _monitorDayStatsCache = new Map();
 // Setteado en renderMonitor; leído por showOperarioActivityDetail.
 let _monitorLiveStats = { todayKey: null, today: null, yesterdayKey: null, yesterday: null };
 const MONITOR_DAY_STATS_TTL_MS = 15000;
+/* v26.51 (Luis, D24): lo NO pickeado se descuenta del m³ de picking. Por tanda, la fracción (en m³) de lo
+   pedido que se pickeó (`gv_picking_pickeado`, último PKC por código). Sin respuesta → Map vacío = m³ entero
+   (fail-open). ≡ monitor/tv.html cargarPickeado. El armado NO se prorratea. */
+async function monPickFrac(tandas) {
+  const m = new Map();
+  const lista = [...new Set((tandas || []).map((t) => String(t || "").trim().toUpperCase()).filter(Boolean))];
+  if (!lista.length) return m;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_picking_pickeado", { method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_tandas: lista }) });
+    if (!r.ok) return m;
+    for (const f of (await r.json()) || []) { const x = Number(f.fraccion); if (f.tanda && isFinite(x)) m.set(String(f.tanda).toUpperCase(), Math.max(0, Math.min(1, x))); }
+  } catch (_e) {}
+  return m;
+}
 async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   // Cache hit: solo si la entrada cacheada se calculó CON el sheet (m³ real).
   // Si se cacheó con sheet vacío (carrera de la 1ra carga: _monitorSheetCache
@@ -32689,6 +32706,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       p.movDetail.push({ opcion: "RKB", texto: "racks (estimado: " + libres.length + " movimiento/s sin tramo)", durMs: tot, inferido: true });
     }
   }
+  const _pkFr = await monPickFrac([...perLegajo.values()].flatMap((p) => [...p.pickedTandas]));   // v26.51 (D24): lo no pickeado se descuenta
   const perOperario = [];
   for (const [leg, p] of perLegajo) {
     // Filtramos a los que NO tocaron nada del trabajo medible (picking, pedido,
@@ -32696,7 +32714,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     // el sheet (típico en tandas C-prefix nuevas), igual aparecen.
     if (p.pickedTandas.size === 0 && p.armedTandas.size === 0
         && p.ccTandas.size === 0 && p.movMs === 0 && p.otrosProdMs === 0 && !p.abiertoProdMs) continue;
-    const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t), 0);
+    const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t) * (_pkFr.has(t) ? _pkFr.get(t) : 1), 0);   // v26.51 (D24): × lo pickeado
     const m3Arm  = [...p.armedTandas ].reduce((s, t) => s + tandaM3(t), 0);
     const m3CC   = [...p.ccTandas    ].reduce((s, t) => s + tandaM3(t), 0);
     // HORAS por actividad: suma real de (ts_cliente - ts_inicio) de los
@@ -59226,7 +59244,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.50"></script>
+<script src="importacion.js?v=26.51"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62049,9 +62067,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.50"></script>
-<script src="hotsale.js?v=26.50"></script>
-<script src="estadisticas.js?v=26.50"></script>
+<script src="cobranzas.js?v=26.51"></script>
+<script src="hotsale.js?v=26.51"></script>
+<script src="estadisticas.js?v=26.51"></script>
 
 </body>
 </html>

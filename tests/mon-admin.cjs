@@ -157,6 +157,8 @@ function responder(url) {
   if (q.includes("/Fichadas_Virgilio"))          return DATOS.fichadas;
   if (q.includes("/Empleados"))                  return DATOS.empleados;
   if (q.includes("/rpc/gv_tv_clave_actual"))     return { clave: "1234", cambia_en_s: 60 };
+  /* v26.51 (D24): E31A se pickeó al 80 % → el pop-up de m³/h muestra «1,2 de 1,5» y el ritmo 1,2 */
+  if (q.includes("/rpc/gv_picking_pickeado"))    return [{ tanda: "E31A", lineas: 5, lineas_cero: 1, cajas_ped: 20, cajas_pick: 16, m3_ped: 1.5, m3_pick: 1.2, fraccion: 0.8 }];
   if (q.includes("/Registros_Produccion_Virgilio")) {
     if (q.includes("opcion=in.(EP,TP,AP,TAP)")) return DATOS.pickHs;   // v26.35: picking y armado   // v26.33: hora del picking de la tanda
     return q.includes("opcion=in.(CCN,FSS)") ? DATOS.ccn : DATOS.eventos;
@@ -229,6 +231,8 @@ function responder(url) {
   ok(t1 && /E31A/.test(t1), "el desglose de m³/h no lista la tanda que cerró el operario (E31A): " + (t1 || "").slice(0, 160));
   ok(t1 && /m³\/h/.test(t1), "el desglose de m³/h no muestra el cociente");
   ok(t1 && /Min trab/i.test(t1) && /Ritmo/i.test(t1) && /Total/.test(t1), "v25.92: el desglose de m³/h no trae Min trab · Ritmo · Total: " + (t1 || "").slice(0, 200));
+  /* v26.51 (Luis, D24): el m³ de picking es lo PICKEADO (1,5 × 0,8 = 1,2) y al lado dice de cuánto era la tanda */
+  ok(t1 && /1,2\s*de 1,5/.test(t1) && /m³ pick\./.test(t1), "v26.51 (D24): el desglose de picking tiene que decir «1,2 de 1,5» con el rótulo m³ pick.: " + (t1 || "").slice(0, 200));
 
   // cierre con ✕
   await p.click("#popX");
