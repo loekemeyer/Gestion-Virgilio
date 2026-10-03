@@ -4623,7 +4623,11 @@ medían algo que dejó de ser cierto:
 | `stk-buscar-cero-adelante` | medía la regla de la v18.20/18.25 (*"31" encuentra el 031*), que **la v21.09 derogó** (*"si busco 30 aparece el 030 y es un error"*) |
 
 ⚠ **Un test que falla un día de la semana es peor que uno roto**: pasa 6 de 7 y entrena a todos
-a ignorar el rojo. Se arregla midiendo **la regla** (están los dos atajos fijos; el del miércoles
+a ignorar el rojo. **Y uno que falla según la HORA, lo mismo** (v26.47): `mon-tv`, `mon-admin` y
+`monitor-abandonado` armaban sus fixtures con `Date.now() − 1,5 h` y entre las **00:00 y las 03:00 ART** eso cae AYER, así
+que la página los descartaba (CI 1700, a las 00:09 ART). Hoy fijan el reloj de la página a las **15:00 ART de hoy** con
+`page.clock.setFixedTime(T0)` y arman las fixtures contra ese `T0`. **Un test que simula «hace N horas» fija el reloj**; no
+depende de a qué hora corre CI. Se arregla midiendo **la regla** (están los dos atajos fijos; el del miércoles
 sólo cuando aporta una fecha nueva), no la cantidad.
 
 ⚠ **Y el mock nuevo va ADENTRO del `if (m)` que resuelve las `/rpc/`**, no debajo: toda RPC

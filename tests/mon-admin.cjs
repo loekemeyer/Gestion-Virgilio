@@ -63,19 +63,20 @@ catch (_e) {
 
 const AR = (ms) => new Date(new Date(ms).toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
 const key = (ms) => { const d = AR(ms); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
-const HOY = key(Date.now());
+// reloj FIJO a las 15:00 ART de hoy (v26.47): entre las 00:00 y las 03:00 ART «hace 1,5 h» caia AYER y la pagina lo descartaba (CI 1700 en rojo a las 00:09 ART)
+const T0 = Date.parse(key(Date.now()) + "T15:00:00-03:00");
+const HOY = key(T0);
 const _FER = (fs.readFileSync(path.join(MON, "tv.html"), "utf8").match(/var FERIADOS = \{[^}]*\}/) || [""])[0].match(/\d{4}-\d{2}-\d{2}/g) || [];
 const MANANA = (function () {
-  for (let t = Date.now() + 86400000, i = 0; i < 15; i++, t += 86400000) {
+  for (let t = T0 + 86400000, i = 0; i < 15; i++, t += 86400000) {
     const k = key(t), wd = AR(t).getDay();
     if (wd !== 0 && wd !== 6 && _FER.indexOf(k) < 0) return k;
   }
-  return key(Date.now() + 86400000);
+  return key(T0 + 86400000);
 })();
 const H = 3600 * 1000;
 const iso = (ms) => new Date(ms).toISOString();
-const RECEP_VIEJA = key(Date.now() - 28 * 86400000);
-const T0 = Date.now();
+const RECEP_VIEJA = key(T0 - 28 * 86400000);
 const hmAR = (ms) => { const k = key(ms); const h = new Date(ms).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Argentina/Buenos_Aires" });
   return k === HOY ? h : null; };
 
@@ -93,17 +94,17 @@ const DATOS = {
       zona: "Zona 3 - CABA Oeste", fecha_recep: HOY, m3: 0.8, es_agregado: false, agregado_a_np: null }
   ],
   status: [
-    { tanda: "E30A", last_pick_op: "EP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 1.5 * H),
+    { tanda: "E30A", last_pick_op: "EP", pick_legajo: 8, pick_start_ts: iso(T0 - 1.5 * H),
       last_arm_op: null, arm_legajo: null, arm_start_ts: null,
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
-    { tanda: "E31A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 3 * H),
-      last_arm_op: "TAP", arm_legajo: 12, arm_start_ts: iso(Date.now() - 2 * H),
+    { tanda: "E31A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(T0 - 3 * H),
+      last_arm_op: "TAP", arm_legajo: 12, arm_start_ts: iso(T0 - 2 * H),
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null }
   ],
   eventos: [
-    { legajo: 8,  opcion: "EP",  texto: "E30A", ts_cliente: iso(Date.now() - 1.5 * H), ts_inicio: null },
-    { legajo: 8,  opcion: "TP",  texto: "E31A", ts_cliente: iso(Date.now() - 2.5 * H), ts_inicio: iso(Date.now() - 3 * H) },
-    { legajo: 12, opcion: "TAP", texto: "E31A", ts_cliente: iso(Date.now() - 1 * H),  ts_inicio: iso(Date.now() - 2 * H) }
+    { legajo: 8,  opcion: "EP",  texto: "E30A", ts_cliente: iso(T0 - 1.5 * H), ts_inicio: null },
+    { legajo: 8,  opcion: "TP",  texto: "E31A", ts_cliente: iso(T0 - 2.5 * H), ts_inicio: iso(T0 - 3 * H) },
+    { legajo: 12, opcion: "TAP", texto: "E31A", ts_cliente: iso(T0 - 1 * H),  ts_inicio: iso(T0 - 2 * H) }
   ],
   /* v26.33: EP/TP de E30A — un ciclo cerrado (4 h → 3,5 h atrás), un EP de prueba (legajo 1,
      no cuenta) y el EP abierto de hace 1,5 h (en curso). */
@@ -116,13 +117,13 @@ const DATOS = {
     { legajo: 12, opcion: "APX", texto: "E31A", ts_cliente: iso(T0 - 2.2 * H), ts_inicio: null },
     { legajo: 12, opcion: "TAP", texto: "E31A", ts_cliente: iso(T0 - 1 * H),   ts_inicio: iso(T0 - 2 * H) }
   ],
-  fichadas: [{ legajo: 12, ts_cliente: iso(Date.now() - 4 * H) }],
+  fichadas: [{ legajo: 12, ts_cliente: iso(T0 - 4 * H) }],
   empleados: [
     { Legajo: 8,  Empleado: "Farias Juan Hilario", hora_entrada: "08:00:00", hora_salida: "17:00:00" },
     { Legajo: 12, Empleado: "Ortiz Franco",        hora_entrada: "08:00:00", hora_salida: "17:00:00" }
   ],
   facturadas: [{ np: "98802" }],
-  ccn: [{ opcion: "CCN", texto: "98805", ts_cliente: iso(Date.now() - 5 * H) }],
+  ccn: [{ opcion: "CCN", texto: "98805", ts_cliente: iso(T0 - 5 * H) }],
   deshechas: [],
   arbol: [
     { fecha: HOY, tanda: "E31A", np: "98802", m3: 1.5, estado: "facturado", razon_social: "Perez Zarate S.R.L." },
@@ -162,6 +163,7 @@ function responder(url) {
   const b = await chromium.launch();
   const ctx = await b.newContext({ timezoneId: "America/Argentina/Buenos_Aires", viewport: { width: 1600, height: 900 } });
   const p = await ctx.newPage();
+  await p.clock.setFixedTime(T0);   // la pagina ve la misma hora que las fixtures
   const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
 

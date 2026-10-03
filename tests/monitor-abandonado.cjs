@@ -46,6 +46,9 @@ catch (_e) {
 (async () => {
   const b = await chromium.launch();
   const p = await b.newPage();
+  // reloj FIJO a las 15:00 ART de hoy (v26.47): a las 00-03 ART «hace 1,5 h» caia ayer y statusCell lo tomaba por abandonada (CI 1700)
+  const T0 = Date.parse(new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }) + "T15:00:00-03:00");
+  await p.clock.setFixedTime(T0);
   const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
   await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });

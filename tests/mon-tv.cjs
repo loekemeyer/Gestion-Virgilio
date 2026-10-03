@@ -69,18 +69,20 @@ catch (_e) {
 /* ── Fixture: un día de planta con todos los casos que importan ───────────── */
 const AR = (ms) => new Date(new Date(ms).toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" }));
 const key = (ms) => { const d = AR(ms); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
-const HOY = key(Date.now());
+// reloj FIJO a las 15:00 ART de hoy (v26.47): entre las 00:00 y las 03:00 ART «hace 1,5 h» caia AYER y la pagina lo descartaba (CI 1700 en rojo a las 00:09 ART)
+const T0 = Date.parse(key(Date.now()) + "T15:00:00-03:00");
+const HOY = key(T0);
 /* v22.62 — «mañana» es el PRÓXIMO DÍA HÁBIL, no el día corrido: E32A tiene que decir 1 día de
    demora, y un viernes el día corrido es sábado (0 hábiles). El test fallaba los viernes y sábados.
    Salta fines de semana y los feriados de respaldo de tv.html (con el fetch mockeado vacío, son ésos). */
 const _FER_TV = (fs.readFileSync(path.join(__dirname, "..", "monitor", "tv.html"), "utf8")
   .match(/var FERIADOS = \{[^}]*\}/) || [""])[0].match(/\d{4}-\d{2}-\d{2}/g) || [];
 const MANANA = (function () {
-  for (let t = Date.now() + 86400000, i = 0; i < 15; i++, t += 86400000) {
+  for (let t = T0 + 86400000, i = 0; i < 15; i++, t += 86400000) {
     const k = key(t), wd = AR(t).getDay();
     if (wd !== 0 && wd !== 6 && _FER_TV.indexOf(k) < 0) return k;
   }
-  return key(Date.now() + 86400000);
+  return key(T0 + 86400000);
 })();
 const H = 3600 * 1000;
 const iso = (ms) => new Date(ms).toISOString();
@@ -88,7 +90,7 @@ const iso = (ms) => new Date(ms).toISOString();
    28 días corridos antes de HOY son siempre más de 10 hábiles contra una entrega
    de hoy, caiga donde caiga el fin de semana: así el caso ROJO no depende de qué
    día se corra el test. */
-const RECEP_VIEJA = key(Date.now() - 28 * 86400000);
+const RECEP_VIEJA = key(T0 - 28 * 86400000);
 
 const DATOS = {
   // E30A en curso · E31A terminada y facturada · E32A mañana sin tocar · E33A facturada Y despachada
@@ -125,40 +127,40 @@ const DATOS = {
       m3: 0.8, es_agregado: true, agregado_a_np: 95 }
   ],
   status: [
-    { tanda: "E30A", last_pick_op: "EP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 1.5 * H),
+    { tanda: "E30A", last_pick_op: "EP", pick_legajo: 8, pick_start_ts: iso(T0 - 1.5 * H),
       last_arm_op: null, arm_legajo: null, arm_start_ts: null,
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
-    { tanda: "E31A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 3 * H),
-      last_arm_op: "TAP", arm_legajo: 12, arm_start_ts: iso(Date.now() - 2 * H),
+    { tanda: "E31A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(T0 - 3 * H),
+      last_arm_op: "TAP", arm_legajo: 12, arm_start_ts: iso(T0 - 2 * H),
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
-    { tanda: "E33A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 5 * H),
-      last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(Date.now() - 4 * H),
+    { tanda: "E33A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(T0 - 5 * H),
+      last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(T0 - 4 * H),
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
-    { tanda: "E34A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 30 * H),
-      last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(Date.now() - 29 * H),
+    { tanda: "E34A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(T0 - 30 * H),
+      last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(T0 - 29 * H),
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
-    { tanda: "E36A", last_pick_op: "EP", pick_legajo: 12, pick_start_ts: iso(Date.now() - 2 * H),
+    { tanda: "E36A", last_pick_op: "EP", pick_legajo: 12, pick_start_ts: iso(T0 - 2 * H),
       last_arm_op: null, arm_legajo: null, arm_start_ts: null,
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
-    { tanda: "E37A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 32 * H),
-      last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(Date.now() - 31 * H),
+    { tanda: "E37A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(T0 - 32 * H),
+      last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(T0 - 31 * H),
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null },
-    { tanda: "E38A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(Date.now() - 34 * H),
-      last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(Date.now() - 33 * H),
+    { tanda: "E38A", last_pick_op: "TP", pick_legajo: 8, pick_start_ts: iso(T0 - 34 * H),
+      last_arm_op: "TAP", arm_legajo: 8, arm_start_ts: iso(T0 - 33 * H),
       pick_abandonado: false, arm_abandonado: false, pick_fj_ts: null, arm_fj_ts: null }
   ],
   eventos: [
-    { legajo: 8,  opcion: "EP",  texto: "E30A", ts_cliente: iso(Date.now() - 1.5 * H), ts_inicio: null },
-    { legajo: 8,  opcion: "TP",  texto: "E31A", ts_cliente: iso(Date.now() - 2.5 * H), ts_inicio: iso(Date.now() - 3 * H) },
-    { legajo: 12, opcion: "TAP", texto: "E31A", ts_cliente: iso(Date.now() - 1 * H),  ts_inicio: iso(Date.now() - 2 * H) },
+    { legajo: 8,  opcion: "EP",  texto: "E30A", ts_cliente: iso(T0 - 1.5 * H), ts_inicio: null },
+    { legajo: 8,  opcion: "TP",  texto: "E31A", ts_cliente: iso(T0 - 2.5 * H), ts_inicio: iso(T0 - 3 * H) },
+    { legajo: 12, opcion: "TAP", texto: "E31A", ts_cliente: iso(T0 - 1 * H),  ts_inicio: iso(T0 - 2 * H) },
     // trabajada y NO está en la programación → cartel "alguien se equivocó"
-    { legajo: 8,  opcion: "TP",  texto: "E99Z", ts_cliente: iso(Date.now() - 0.5 * H), ts_inicio: null },
+    { legajo: 8,  opcion: "TP",  texto: "E99Z", ts_cliente: iso(T0 - 0.5 * H), ts_inicio: null },
     // legajo de prueba: no tiene que aparecer en ningún lado
-    { legajo: 0,  opcion: "EP",  texto: "E32A", ts_cliente: iso(Date.now() - 0.2 * H), ts_inicio: null }
+    { legajo: 0,  opcion: "EP",  texto: "E32A", ts_cliente: iso(T0 - 0.2 * H), ts_inicio: null }
   ],
   fichadas: [
-    { legajo: 12, ts_cliente: iso(Date.now() - 4 * H) },
-    { legajo: 44, ts_cliente: iso(Date.now() - 1 * H) }   // fichó y no arrancó
+    { legajo: 12, ts_cliente: iso(T0 - 4 * H) },
+    { legajo: 44, ts_cliente: iso(T0 - 1 * H) }   // fichó y no arrancó
   ],
   empleados: [
     { Legajo: 8,  Empleado: "Farias Juan Hilario", hora_entrada: "08:00:00", hora_salida: "17:00:00" },
@@ -166,11 +168,11 @@ const DATOS = {
     { Legajo: 44, Empleado: "Gomez Ana",           hora_entrada: "08:00:00", hora_salida: "17:00:00" }
   ],
   facturadas: [{ np: "98802" }, { np: "98804" }],
-  ccn: [{ opcion: "CCN", texto: "98804", ts_cliente: iso(Date.now() - 6 * H) },
-         { opcion: "CCN", texto: "98805", ts_cliente: iso(Date.now() - 5 * H) },
-         { opcion: "CCN", texto: "98806", ts_cliente: iso(Date.now() - 1 * H) },
-         { opcion: "CCN", texto: "98807", ts_cliente: iso(Date.now() - 7 * H) },
-         { opcion: "CCN", texto: "98808", ts_cliente: iso(Date.now() - 8 * H) }],
+  ccn: [{ opcion: "CCN", texto: "98804", ts_cliente: iso(T0 - 6 * H) },
+         { opcion: "CCN", texto: "98805", ts_cliente: iso(T0 - 5 * H) },
+         { opcion: "CCN", texto: "98806", ts_cliente: iso(T0 - 1 * H) },
+         { opcion: "CCN", texto: "98807", ts_cliente: iso(T0 - 7 * H) },
+         { opcion: "CCN", texto: "98808", ts_cliente: iso(T0 - 8 * H) }],
   deshechas: [],
   /* v23.64 — el resumen de días de la PPP (gv_ppp_prog_arbol). 98805 tiene CCN → cuenta en
      SALIÓ y se descuenta de Armado (neto, como la PPP). */
@@ -214,6 +216,7 @@ function responder(url) {
   const b = await chromium.launch();
   const ctx = await b.newContext({ timezoneId: "America/Argentina/Buenos_Aires", viewport: { width: 1920, height: 1080 } });
   const p = await ctx.newPage();
+  await p.clock.setFixedTime(T0);   // la pagina ve la misma hora que las fixtures
   const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
 
