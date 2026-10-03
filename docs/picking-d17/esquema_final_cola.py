@@ -301,14 +301,22 @@ P(f"  el esquema redondeado reproduce los minutos con R2 {f(r2(y,pts_min),3)} ·
 # ------------------------------------------------------------------ tamano, dificultad, niveles (sobre las 340: las 2 outliers se clasifican con los mismos umbrales)
 tam = pred; arranque = c["cfijo"] + c["arranque"]*np.minimum(n, KARR)/KARR
 dif = np.where(caj > 0, (tam - arranque)/np.maximum(caj, 1e-9), np.nan); ok = caj > 0
-t1, t2 = (float(v) for v in np.percentile(dif[ok], [100/3, 200/3]))
-def nivel_de(d, cj): return "Pajosa" if cj <= 0 else ("Fácil" if d <= t1 else "Normal" if d <= t2 else "Pajosa")
-nivel = np.array([nivel_de(dif[i], caj[i]) for i in range(N)])
-dif_c = np.where(ok, tam/np.maximum(caj, 1e-9), np.nan); u1, u2 = np.percentile(dif_c[ok], [100/3, 200/3])
-nivel_c = np.where(~ok, "Pajosa", np.where(dif_c <= u1, "Fácil", np.where(dif_c <= u2, "Normal", "Pajosa")))
-P(f"\nDIFICULTAD = (tamano - arranque) / cajas reales, min/caja · terciles ({N} tandas): Facil <= {f(t1,3)} · Normal <= {f(t2,3)} · Pajosa > {f(t2,3)} · "
-  + " · ".join(f"{k} {int((nivel==k).sum())}" for k in ["Fácil","Normal","Pajosa"]))
-P(f"  (con la constante adentro los terciles serian {f(u1,3)} / {f(u2,3)} y cambian de nivel {int((nivel != nivel_c).sum())} tandas)")
+# Niveles (Luis, 03/10/2026: se retira «pajosa»; son CUATRO). La dificultad se corta en DECILES sobre las tandas con cajas
+# -> grado 1..10; el nivel agrupa grados para que nivel y grado nunca se contradigan: Baja 1-2 · Media 3-5 · Alta 6-8 · Muy alta 9-10.
+# El multiplicador del m3/h sale del grado: 1 + 0,1 x (grado - 5), de x0,6 a x1,5.
+DEC = [float(v) for v in np.percentile(dif[ok], [10*k for k in range(1, 10)])]
+t1, t2, t3 = DEC[1], DEC[4], DEC[7]
+NIV = ["Baja", "Media", "Alta", "Muy alta"]
+def grado_de(d, cj): return 10 if cj <= 0 else int(np.searchsorted(np.array(DEC), d, side="left")) + 1
+def nivel_de(d, cj): return "Muy alta" if cj <= 0 else ("Baja" if d <= t1 else "Media" if d <= t2 else "Alta" if d <= t3 else "Muy alta")
+def mult_de(g): return round(1 + 0.1*(g - 5), 1)
+nivel = np.array([nivel_de(dif[i], caj[i]) for i in range(N)]); grado = np.array([grado_de(dif[i], caj[i]) for i in range(N)])
+dif_c = np.where(ok, tam/np.maximum(caj, 1e-9), np.nan); u1, u2, u3 = np.percentile(dif_c[ok], [20, 50, 80])
+nivel_c = np.where(~ok, "Muy alta", np.where(dif_c <= u1, "Baja", np.where(dif_c <= u2, "Media", np.where(dif_c <= u3, "Alta", "Muy alta"))))
+P(f"\nDIFICULTAD = (tamano - arranque) / cajas reales, min/caja · deciles ({N} tandas) = grado 1-10 · Baja <= {f(t1,3)} (grado 1-2) · Media <= {f(t2,3)} (3-5) · Alta <= {f(t3,3)} (6-8) · Muy alta > {f(t3,3)} (9-10) · "
+  + " · ".join(f"{k} {int((nivel==k).sum())}" for k in NIV))
+P("  deciles: " + " · ".join(f"g{k+1} <= {f(v,3)}" for k, v in enumerate(DEC)) + " · g10 > " + f(DEC[-1],3))
+P(f"  (con la constante adentro los cortes serian {f(u1,3)} / {f(u2,3)} / {f(u3,3)} y cambian de nivel {int((nivel != nivel_c).sum())} tandas)")
 def sp(a, b):
     ra = np.argsort(np.argsort(a)); rb = np.argsort(np.argsort(b)); return float(np.corrcoef(ra, rb)[0,1])
 fesc = (NH["A4"]+NH["A5"]+NH["R3"]+NH["R4"])/np.maximum(n, 1); altas = NH["A4"]+NH["A5"]+NH["R3"]+NH["R4"]
@@ -316,7 +324,7 @@ P(f"  Spearman dificultad~cajas {f(sp(dif[ok], caj[ok]),2)} · dificultad~fracci
 difl = (tam - arranque)/np.maximum(n, 1); l1, l2 = np.percentile(difl, [100/3, 200/3])
 P(f"  (alternativa por LINEA: (tamano - arranque)/lineas, terciles {f(l1,2)} / {f(l2,2)} min/linea; Spearman con fraccion con escalera {f(sp(difl, fesc),2)}, con cajas por linea {f(sp(difl, caj/np.maximum(n,1)),2)})")
 P("  tandas de 1 o 2 paradas con lineas con escalera:")
-sel12 = sorted([i for i in range(N) if par[i] <= 2 and altas[i] > 0], key=lambda i: (nivel[i] != "Fácil", nivel[i] != "Normal", -caj[i]))
+sel12 = sorted([i for i in range(N) if par[i] <= 2 and altas[i] > 0], key=lambda i: (NIV.index(nivel[i]), -caj[i]))
 for i in sel12:
     r = D[i]
     P(f"    {r['t']} leg {r['l']}: {int(par[i])} par · {int(n[i])} lin (A4 {int(NH['A4'][i])} A5 {int(NH['A5'][i])} R3 {int(NH['R3'][i])} R4 {int(NH['R4'][i])}) · {f(caj[i],0)} caj · tamano {f(tam[i],1)} · "
@@ -367,7 +375,9 @@ esquema = {
     "punto_en_min": round(float(base), 4),
     "tope_cajas_por_linea": TOPE, "arranque_hasta_lineas": KARR, "tope_cola_min": TOPE_COLA, "lambda_prior": LAM, "prior_min": PRIOR,
     "mx_f_atadas": f"MX = {K_MX:g} x R4, F = {K_F:g} x R4 (sin prior propio son ruido; promedio con criterio de lo recomendado por los dos jueces)",
-    "umbrales": {"facil": round(t1, 4), "pajosa": round(t2, 4)},
+    "umbrales": {"baja": round(t1, 4), "media": round(t2, 4), "alta": round(t3, 4)},
+    "niveles": "Luis 03/10/2026: cuatro niveles, sin «pajosa». Grado 1-10 = decil de la dificultad; Baja = grado 1-2 · Media = 3-5 · Alta = 6-8 · Muy alta = 9-10; sin cajas = grado 10. Multiplicador del m3/h = 1 + 0,1 x (grado - 5) (x0,6 a x1,5).",
+    "deciles_grado": [round(v, 4) for v in DEC],
     "validacion": {"r2": round(r2(y, pred), 3), "rmse": round(rmse(y, pred), 2), "cv_rmse": round(cv_rmse, 2), "cv_r2": round(cv_r2, 3),
                    "loo_operario_rmse": round(loo_rmse, 2), "mae": round(float(np.mean(np.abs(res))), 2), "cv_sin_alturas": round(cv_sin, 2),
                    "contra_neto_cola_crudo": {"r2": round(r2(ycr, pred), 3), "rmse": round(rmse(ycr, pred), 2), "cv_rmse": round(cv_cr, 2)},
@@ -385,7 +395,7 @@ esquema = {
                       "n_A1..A5 lineas en gondolas A y P por altura, 1 = piso; n_R1..R4 idem en B a N~; MX = codigo con stock 0 en gondola al empezar; F = sin sector de gondola). "
                       "El fijo y el arranque ya incluyen la cola (acomodar en la mesa): ritmo = tamano / (neto_sh + min(cola,30)).",
     "formula_dificultad": f"dificultad_min_por_caja = (tamano_min - ({coef['cfijo']} + {coef['arranque']}*min(lineas,{KARR})/{KARR})) / cajas_reales; "
-                          f"nivel: Facil <= {round(t1,3)}, Normal <= {round(t2,3)}, Pajosa > {round(t2,3)} (terciles sobre {N} tandas; sin cajas = Pajosa)",
+                          f"grado 1-10 = decil sobre {N} tandas; nivel: Baja <= {round(t1,3)} (grado 1-2), Media <= {round(t2,3)} (3-5), Alta <= {round(t3,3)} (6-8), Muy alta > {round(t3,3)} (9-10); sin cajas = Muy alta (grado 10)",
     "regla_altura_inferida": "altura dentro del modulo = ((celda-1) mod alto) + 1, 1 = piso; A y P 5 alturas, B..N~ 4. Codigo con celdas en una sola altura: esa. "
                              "Codigo con celdas en varias alturas: se toma el stock de gondola al abrir el picking (EP) y la capacidad (cajas) de cada celda; se apila el stock "
                              "de la altura mas alta hacia abajo y se asigna la altura MAS BAJA que seguro tiene stock (stock > suma de capacidades de las alturas de arriba). "
@@ -407,12 +417,12 @@ for i, r in enumerate(D):
     tand.append({"t": r["t"], "l": r["l"], "dia": r["dia"], "caj": r["caj"], "paradas": r["paradas"], "esc": r["esc"], "n_inferidas": r["n_inferidas"],
                  "neto_sh": r["neto_sh"], "cola": r["cola"], "cola_sig": r["cola_sig"], "neto_cola": r["neto_cola"], "target": round(float(y[i]), 2),
                  "tamano": round(float(tam[i]), 2), "dificultad": (round(float(dif[i]), 4) if ok[i] else None),
-                 "nivel": str(nivel[i]), "indice": round(float(tam[i]/y[i]), 3), "outlier": False})
+                 "nivel": str(nivel[i]), "grado": int(grado[i]), "multiplicador": mult_de(int(grado[i])), "indice": round(float(tam[i]/y[i]), 3), "outlier": False})
 for r in OUT:
     tm = tam_de(r); arr_ = c["cfijo"] + c["arranque"]*min(r["n"], KARR)/KARR; d_ = (tm-arr_)/r["caj"] if r["caj"] > 0 else None; tg = r["neto_sh"] + min(r["cola"], TOPE_COLA)
     tand.append({"t": r["t"], "l": r["l"], "dia": r["dia"], "caj": r["caj"], "paradas": r["paradas"], "esc": r["esc"], "n_inferidas": r["n_inferidas"],
                  "neto_sh": r["neto_sh"], "cola": r["cola"], "cola_sig": r["cola_sig"], "neto_cola": r["neto_cola"], "target": round(tg, 2),
-                 "tamano": round(tm, 2), "dificultad": (round(d_, 4) if d_ is not None else None), "nivel": nivel_de(d_ if d_ is not None else 9e9, r["caj"]),
+                 "tamano": round(tm, 2), "dificultad": (round(d_, 4) if d_ is not None else None), "nivel": nivel_de(d_ if d_ is not None else 9e9, r["caj"]), "grado": grado_de(d_ if d_ is not None else 9e9, r["caj"]), "multiplicador": mult_de(grado_de(d_ if d_ is not None else 9e9, r["caj"])),
                  "indice": round(tm/tg, 3), "outlier": True})
 tand.sort(key=lambda z: (z["dia"], z["t"]))
 json.dump(tand, open(os.path.join(UP, "d17_tandas_dificultad.json"), "w"), ensure_ascii=False, indent=0)
@@ -429,11 +439,11 @@ def ejemplo(i):
             f"Fijo y arranque {f(arranque[i],1)} min + paradas {f(c['parada']*par[i],1)} + cajas {f(c['caja']*caj30[i],1)} + alturas {f(sum(c[h]*NH[h][i] for h in CL),1)} = **tamaño {f(tam[i],1)} min**. "
             f"Dificultad ({f(tam[i],1)} − {f(arranque[i],1)}) ÷ {f(caj[i],0)} = **{f(dif[i],3)} min/caja → {nivel[i]}**. "
             f"Tiempo real {f(y[i],1)} min (picking {f(ysh[i],1)} + cola {f(ct,1)}): ritmo {f(tam[i]/y[i],2)} (tamaño ÷ real)" + (f", contra {f(m3v/(y[i]/60),2)} m³/h." if m3v else "."))
-ej1 = next((i for i in sel12 if nivel[i] in ("Fácil", "Normal") and (NH["A5"][i] + NH["A4"][i]) > 0), next(i for i in sel12 if nivel[i] in ("Fácil", "Normal")))
-paj = [i for i in range(N) if nivel[i] == "Pajosa" and ok[i] and n[i] >= 10]
+ej1 = next((i for i in sel12 if nivel[i] in ("Baja", "Media") and (NH["A5"][i] + NH["A4"][i]) > 0), next(i for i in sel12 if nivel[i] in ("Baja", "Media")))
+paj = [i for i in range(N) if nivel[i] in ("Alta", "Muy alta") and ok[i] and n[i] >= 10]
 medp = np.median(dif[paj]); cand = [i for i in paj if abs(dif[i]-medp) <= 0.06 and 0.8 <= tam[i]/y[i] <= 1.25] or paj
 ej2 = sorted(cand, key=lambda i: abs(tam[i]/y[i]-1) + abs(dif[i]-medp))[0]
-tab_ej = [f"| {D[i]['t']} | {int(par[i])} | {int(n[i])} | {int(altas[i])} | {f(caj[i],0)} | {f(tam[i],1)} | {f(dif[i],3)} | {nivel[i]} | {f(y[i],1)} |" for i in sel12]
+tab_ej = [f"| {D[i]['t']} | {int(par[i])} | {int(n[i])} | {int(altas[i])} | {f(caj[i],0)} | {f(tam[i],1)} | {f(dif[i],3)} | {nivel[i]} ({int(grado[i])}) | {f(y[i],1)} |" for i in sel12]
 op_rows = []
 for o in sorted(idx_op, key=lambda o: (-o["publicable"], -o["indice"])):
     nm = (o["nombre"] + (" " + o["apodo"] if o["apodo"] else "")).strip()
@@ -489,25 +499,25 @@ Tres cosas que hay que saber de esta tabla:
 
 **Tamaño** = minutos esperados para el operario promedio, cola incluida: fijo {f(c['cfijo'],2)} min + arranque {f(c['arranque']/KARR,2)} por línea hasta {KARR} líneas + {f(c['parada'],2)} min por parada + {f(c['caja'],3)} min por caja (cada línea cuenta hasta 30) + la suma de los puntos por línea de la tabla. Reemplaza al m³ en el ritmo: **ritmo = tamaño ÷ tiempo real**, con el tiempo real = picking + cola topeada (1,00 = el promedio de estos 60 días; 1,20 = un 20 % más rápido).
 
-**Dificultad** = (tamaño − fijo − arranque) ÷ cajas reales, en minutos por caja. Se saca el fijo y el arranque porque con ellos adentro una tanda de 1 línea y 2 cajas daba más de 2 min/caja y salía Pajosa siendo trivial (lo marcaron los revisores de las dos corridas); la cola es tiempo de tanda, no de caja, y va en el fijo. Niveles por terciles de las {N} tandas: **Fácil ≤ {f(t1,3)} · Normal ≤ {f(t2,3)} · Pajosa > {f(t2,3)}** min/caja ({int((nivel=='Fácil').sum())} / {int((nivel=='Normal').sum())} / {int((nivel=='Pajosa').sum())} tandas; sin cajas = Pajosa). Contra la corrida anterior los umbrales suben de {f(V3['umbrales']['facil'],3)} / {f(V3['umbrales']['pajosa'],3)} porque la parada quedó más cara.
+**Dificultad** = (tamaño − fijo − arranque) ÷ cajas reales, en minutos por caja. Se saca el fijo y el arranque porque con ellos adentro una tanda de 1 línea y 2 cajas daba más de 2 min/caja y salía Muy alta siendo trivial (lo marcaron los revisores de las dos corridas); la cola es tiempo de tanda, no de caja, y va en el fijo. **Niveles (Luis, 03/10: cuatro, sin «pajosa»)**: cada tanda tiene un **grado 1 a 10**, que es su decil de dificultad sobre las {N} tandas (grado 1 = el 10 % más fácil), y el nivel agrupa grados, así nivel y grado nunca se contradicen: **Baja ≤ {f(t1,3)} (grado 1-2) · Media ≤ {f(t2,3)} (3-5) · Alta ≤ {f(t3,3)} (6-8) · Muy alta > {f(t3,3)} (9-10)** min/caja ({int((nivel=='Baja').sum())} / {int((nivel=='Media').sum())} / {int((nivel=='Alta').sum())} / {int((nivel=='Muy alta').sum())} tandas; sin cajas = Muy alta). Deciles: {' · '.join(f"g{k+1} ≤ {f(v,3)}" for k, v in enumerate(DEC))}. El **multiplicador del m³/h** sale del grado: 1 + 0,1 × (grado − 5), de ×0,6 (grado 1) a ×1,5 (grado 10); está topeado a propósito y no nivela una tanda de cajas sueltas: para eso está el índice tamaño ÷ real.
 
-Lo que la dificultad así definida mide, hay que decirlo: correlación de rangos con las cajas de la tanda {f(sp(dif[ok], caj[ok]),2)} y con la fracción de líneas con escalera {f(sp(dif[ok], fesc[ok]),2)}. Una tanda con muchas cajas por línea es Fácil casi siempre, con pocas es Pajosa casi siempre, y la altura corre la aguja poco. Si lo que se quiere es «qué tan pajosa es la tanda por el recorrido y la altura», el denominador tendría que ser líneas y no cajas: por línea los terciles serían {f(l1,2)} / {f(l2,2)} min/línea y el nivel deja de seguir a las cajas (correlación con cajas por línea {f(sp(difl, caj/np.maximum(n,1)),2)}, con la escalera {f(sp(difl, fesc),2)}). Es decisión de Luis (al final).
+Lo que la dificultad así definida mide, hay que decirlo: correlación de rangos con las cajas de la tanda {f(sp(dif[ok], caj[ok]),2)} y con la fracción de líneas con escalera {f(sp(dif[ok], fesc[ok]),2)}. Una tanda con muchas cajas por línea es Baja casi siempre, con pocas es Alta o Muy alta casi siempre, y la altura corre la aguja poco. Si lo que se quiere es «qué tan difícil es la tanda por el recorrido y la altura», el denominador tendría que ser líneas y no cajas: por línea los terciles serían {f(l1,2)} / {f(l2,2)} min/línea y el nivel deja de seguir a las cajas (correlación con cajas por línea {f(sp(difl, caj/np.maximum(n,1)),2)}, con la escalera {f(sp(difl, fesc),2)}). Es decisión de Luis (al final).
 
 Ejemplo de pocas paradas con cajas altas, que queda {nivel[ej1]} como pedía Luis:
 
 {ejemplo(ej1)}
 
-Ejemplo de Pajosa típica (10 líneas o más, dificultad cerca de la mediana de las Pajosas y tiempo real cerca del esperado):
+Ejemplo de dificultad Alta típica (10 líneas o más, grado 6 a 10, dificultad cerca de la mediana de ésas y tiempo real cerca del esperado):
 
 {ejemplo(ej2)}
 
 Todas las tandas de 1 o 2 paradas con alguna línea con escalera:
 
-| tanda | par. | líneas | c/esc. | cajas | tamaño min | min/caja | nivel | real min |
+| tanda | par. | líneas | c/esc. | cajas | tamaño min | min/caja | nivel (grado) | real min |
 |---|---|---|---|---|---|---|---|---|
 {chr(10).join(tab_ej)}
 
-Las que quedan Pajosa tienen entre 1 y 5 cajas: con pocas cajas cada parada y cada línea con escalera pesa mucho por caja, y eso es lo que el cociente mide. Ejemplo sintético: 1 parada, 4 líneas en la 5.ª de A, 40 cajas → tamaño {f(ej_tam,1)} min, {f(ej_d,3)} min/caja → {nivel_de(ej_d, 40)}.
+Las que quedan Alta o Muy alta tienen entre 1 y 5 cajas: con pocas cajas cada parada y cada línea con escalera pesa mucho por caja, y eso es lo que el cociente mide. Ejemplo sintético: 1 parada, 4 líneas en la 5.ª de A, 40 cajas → tamaño {f(ej_tam,1)} min, {f(ej_d,3)} min/caja → {nivel_de(ej_d, 40)}.
 
 Cómo cambia el ritmo medido en tamaño en vez de m³: en las dos tandas de arriba, por m³/h {D[ej1]['t']} hace {f(m3[D[ej1]['t']]/(y[ej1]/60),2)} y {D[ej2]['t']} {f(m3[D[ej2]['t']]/(y[ej2]/60),2)} m³/h ({'la primera parece ' + f(m3[D[ej1]['t']]/(y[ej1]/60)/(m3[D[ej2]['t']]/(y[ej2]/60)),1) + ' veces más rápida' if m3[D[ej1]['t']]/(y[ej1]/60) >= m3[D[ej2]['t']]/(y[ej2]/60) else 'la segunda parece ' + f((m3[D[ej2]['t']]/(y[ej2]/60))/(m3[D[ej1]['t']]/(y[ej1]/60)),1) + ' veces más rápida'}); por tamaño ÷ real son {f(tam[ej1]/y[ej1],2)} contra {f(tam[ej2]/y[ej2],2)}: el m³ no ve las {int(par[ej2])} paradas ni las {int(altas[ej2])} líneas con escalera de la segunda{', ni los ' + f(min(cola[ej2],TOPE_COLA),0) + ' min de cola que ahora se le cobran' if cola[ej2] >= 5 else ''}. Por operario (tabla en (f)): por m³/h el orden es {' > '.join(o['legajo'] for o in sorted([o for o in pub if o['m3_por_hora']], key=lambda o: -o['m3_por_hora']))} y por tamaño {' > '.join(o['legajo'] for o in sorted(pub, key=lambda o: -o['indice']))}; por m³/h el primero hace {f(max(o['m3_por_hora'] for o in pub)/min(o['m3_por_hora'] for o in pub),1)} veces lo del último, por tamaño {f(max(o['indice'] for o in pub)/min(o['indice'] for o in pub),1)} veces. El m³ premia a quien lleva pallets enteros de pocos códigos; el tamaño cobra las paradas, la altura y la cola.
 

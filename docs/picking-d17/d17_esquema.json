@@ -73,9 +73,22 @@
  },
  "mx_f_atadas": "MX = 2 x R4, F = 1 x R4 (sin prior propio son ruido; promedio con criterio de lo recomendado por los dos jueces)",
  "umbrales": {
-  "facil": 0.1755,
-  "pajosa": 0.3494
+  "baja": 0.1256,
+  "media": 0.2406,
+  "alta": 0.4277
  },
+ "niveles": "Luis 03/10/2026: cuatro niveles, sin «pajosa». Grado 1-10 = decil de la dificultad; Baja = grado 1-2 · Media = 3-5 · Alta = 6-8 · Muy alta = 9-10; sin cajas = grado 10. Multiplicador del m3/h = 1 + 0,1 x (grado - 5) (x0,6 a x1,5).",
+ "deciles_grado": [
+  0.0828,
+  0.1256,
+  0.1576,
+  0.2055,
+  0.2406,
+  0.3018,
+  0.3648,
+  0.4277,
+  0.5168
+ ],
  "validacion": {
   "r2": 0.532,
   "rmse": 13.34,
@@ -204,7 +217,7 @@
   }
  },
  "formula_tamano": "tamano_min = 2.3325 + 5.866*min(lineas,5)/5 + 0.3091*paradas + 0.0623*cajas_tope30 + 0.2333*n_A1 + 0.35*n_A2 + 0.35*n_A3 + 0.5833*n_A4 + 0.7*n_A5 + 0.2333*n_R1 + 0.35*n_R2 + 0.4667*n_R3 + 0.5833*n_R4 + 1.1667*n_MX + 0.5833*n_F  (cajas_tope30 = suma por linea de min(cajas,30); paradas = modulos distintos, el par enfrentado cuenta uno; n_A1..A5 lineas en gondolas A y P por altura, 1 = piso; n_R1..R4 idem en B a N~; MX = codigo con stock 0 en gondola al empezar; F = sin sector de gondola). El fijo y el arranque ya incluyen la cola (acomodar en la mesa): ritmo = tamano / (neto_sh + min(cola,30)).",
- "formula_dificultad": "dificultad_min_por_caja = (tamano_min - (2.3325 + 5.866*min(lineas,5)/5)) / cajas_reales; nivel: Facil <= 0.176, Normal <= 0.349, Pajosa > 0.349 (terciles sobre 338 tandas; sin cajas = Pajosa)",
+ "formula_dificultad": "dificultad_min_por_caja = (tamano_min - (2.3325 + 5.866*min(lineas,5)/5)) / cajas_reales; grado 1-10 = decil sobre 338 tandas; nivel: Baja <= 0.126 (grado 1-2), Media <= 0.241 (3-5), Alta <= 0.428 (6-8), Muy alta > 0.428 (9-10); sin cajas = Muy alta (grado 10)",
  "regla_altura_inferida": "altura dentro del modulo = ((celda-1) mod alto) + 1, 1 = piso; A y P 5 alturas, B..N~ 4. Codigo con celdas en una sola altura: esa. Codigo con celdas en varias alturas: se toma el stock de gondola al abrir el picking (EP) y la capacidad (cajas) de cada celda; se apila el stock de la altura mas alta hacia abajo y se asigna la altura MAS BAJA que seguro tiene stock (stock > suma de capacidades de las alturas de arriba). Stock mayor que la capacidad total = piso. Stock 0 o sin dato = clase MX. Es una cota a favor del operario.",
  "regla_cola": "cola = minutos sin registro desde el TP hasta la proxima tarea registrada del legajo ('sig') o el fin de jornada ('cap'); 0 si al cerrar ya habia otro tramo abierto ('cubierta'). Es picking de esa tanda (Luis 02/10). Para el esquema entra TOPEADA a 30 min por tanda y se absorbe en el fijo/arranque (no en la parada ni en la altura); las dos 'cap' de horas (D40F, D67D) quedan fuera del ajuste. Recomendacion para la base: aplicar el mismo tope (30 min) y no dejar correr 'cap' hasta la hora de salida.",
  "indice_operario": "indice = suma(tamano) / suma(neto_sh + min(cola,30)) sobre sus tandas; > 1 mas rapido que el promedio, < 1 mas lento. Publicable con >= 10 tandas.",

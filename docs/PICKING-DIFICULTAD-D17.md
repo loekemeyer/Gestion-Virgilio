@@ -39,42 +39,42 @@ Tres cosas que hay que saber de esta tabla:
 
 ## (b) Tamaño y dificultad
 
-**Tamaño** = minutos esperados para el operario promedio, cola incluida: fijo 2,37 min + arranque 1,14 por línea hasta 5 líneas + 0,32 min por parada + 0,063 min por caja (cada línea cuenta hasta 30) + la suma de los puntos por línea de la tabla. Reemplaza al m³ en el ritmo: **ritmo = tamaño ÷ tiempo real**, con el tiempo real = picking + cola topeada (1,00 = el promedio de estos 60 días; 1,20 = un 20 % más rápido).
+**Tamaño** = minutos esperados para el operario promedio, cola incluida: fijo 2,33 min + arranque 1,17 por línea hasta 5 líneas + 0,31 min por parada + 0,062 min por caja (cada línea cuenta hasta 30) + la suma de los puntos por línea de la tabla. Reemplaza al m³ en el ritmo: **ritmo = tamaño ÷ tiempo real**, con el tiempo real = picking + cola topeada (1,00 = el promedio de estos 60 días; 1,20 = un 20 % más rápido).
 
-**Dificultad** = (tamaño − fijo − arranque) ÷ cajas reales, en minutos por caja. Se saca el fijo y el arranque porque con ellos adentro una tanda de 1 línea y 2 cajas daba más de 2 min/caja y salía Pajosa siendo trivial (lo marcaron los revisores de las dos corridas); la cola es tiempo de tanda, no de caja, y va en el fijo. Niveles por terciles de las 338 tandas: **Fácil ≤ 0,181 · Normal ≤ 0,348 · Pajosa > 0,348** min/caja (113 / 112 / 113 tandas; sin cajas = Pajosa). Contra la corrida anterior los umbrales suben de 0,168 / 0,326 porque la parada quedó más cara.
+**Dificultad** = (tamaño − fijo − arranque) ÷ cajas reales, en minutos por caja. Se saca el fijo y el arranque porque con ellos adentro una tanda de 1 línea y 2 cajas daba más de 2 min/caja y salía Muy alta siendo trivial (lo marcaron los revisores de las dos corridas); la cola es tiempo de tanda, no de caja, y va en el fijo. **Niveles (Luis, 03/10: cuatro, sin «pajosa»)**: cada tanda tiene un **grado 1 a 10**, que es su decil de dificultad sobre las 338 tandas (grado 1 = el 10 % más fácil), y el nivel agrupa grados, así nivel y grado nunca se contradicen: **Baja ≤ 0,126 (grado 1-2) · Media ≤ 0,241 (3-5) · Alta ≤ 0,428 (6-8) · Muy alta > 0,428 (9-10)** min/caja (68 / 101 / 100 / 69 tandas; sin cajas = Muy alta). Deciles: g1 ≤ 0,083 · g2 ≤ 0,126 · g3 ≤ 0,158 · g4 ≤ 0,206 · g5 ≤ 0,241 · g6 ≤ 0,302 · g7 ≤ 0,365 · g8 ≤ 0,428 · g9 ≤ 0,517. El **multiplicador del m³/h** sale del grado: 1 + 0,1 × (grado − 5), de ×0,6 (grado 1) a ×1,5 (grado 10); está topeado a propósito y no nivela una tanda de cajas sueltas: para eso está el índice tamaño ÷ real.
 
-Lo que la dificultad así definida mide, hay que decirlo: correlación de rangos con las cajas de la tanda −0,69 y con la fracción de líneas con escalera 0,20. Una tanda con muchas cajas por línea es Fácil casi siempre, con pocas es Pajosa casi siempre, y la altura corre la aguja poco. Si lo que se quiere es «qué tan pajosa es la tanda por el recorrido y la altura», el denominador tendría que ser líneas y no cajas: por línea los terciles serían 0,79 / 1,01 min/línea y el nivel deja de seguir a las cajas (correlación con cajas por línea 0,90, con la escalera −0,06). Es decisión de Luis (al final).
+Lo que la dificultad así definida mide, hay que decirlo: correlación de rangos con las cajas de la tanda −0,69 y con la fracción de líneas con escalera 0,20. Una tanda con muchas cajas por línea es Baja casi siempre, con pocas es Alta o Muy alta casi siempre, y la altura corre la aguja poco. Si lo que se quiere es «qué tan difícil es la tanda por el recorrido y la altura», el denominador tendría que ser líneas y no cajas: por línea los terciles serían 0,78 / 0,99 min/línea y el nivel deja de seguir a las cajas (correlación con cajas por línea 0,92, con la escalera −0,04). Es decisión de Luis (al final).
 
-Ejemplo de pocas paradas con cajas altas, que queda Fácil como pedía Luis:
+Ejemplo de pocas paradas con cajas altas, que queda Baja como pedía Luis:
 
-**E25A** (legajo 277, 16/09): 1 parada, 1 línea (A1 0 · A2 0 · A3 0 · A4 0 · A5 1 · R1 0 · R2 0 · R3 0 · R4 0 · MX 0 · F 0), 20 cajas reales (20 con tope), 0,092 m³. Fijo y arranque 3,5 min + paradas 0,3 + cajas 1,3 + alturas 1,2 = **tamaño 6,3 min**. Dificultad (6,3 − 3,5) ÷ 20 = **0,139 min/caja → Fácil**. Tiempo real 4,5 min (picking 4,2 + cola 0,3): ritmo 1,41 (tamaño ÷ real), contra 1,23 m³/h.
+**E25A** (legajo 277, 16/09): 1 parada, 1 línea (A1 0 · A2 0 · A3 0 · A4 0 · A5 1 · R1 0 · R2 0 · R3 0 · R4 0 · MX 0 · F 0), 20 cajas reales (20 con tope), 0,092 m³. Fijo y arranque 3,5 min + paradas 0,3 + cajas 1,2 + alturas 0,7 = **tamaño 5,8 min**. Dificultad (5,8 − 3,5) ÷ 20 = **0,113 min/caja → Baja**. Tiempo real 4,5 min (picking 4,2 + cola 0,3): ritmo 1,29 (tamaño ÷ real), contra 1,23 m³/h.
 
-Ejemplo de Pajosa típica (10 líneas o más, dificultad cerca de la mediana de las Pajosas y tiempo real cerca del esperado):
+Ejemplo de dificultad Alta típica (10 líneas o más, grado 6 a 10, dificultad cerca de la mediana de ésas y tiempo real cerca del esperado):
 
-**D22F** (legajo 122, 13/08): 22 paradas, 29 líneas (A1 3 · A2 2 · A3 0 · A4 0 · A5 0 · R1 6 · R2 9 · R3 3 · R4 2 · MX 1 · F 3), 51 cajas reales (51 con tope), 0,281 m³. Fijo y arranque 8,1 min + paradas 7,1 + cajas 3,2 + alturas 11,1 = **tamaño 29,4 min**. Dificultad (29,4 − 8,1) ÷ 51 = **0,418 min/caja → Pajosa**. Tiempo real 29,3 min (picking 17,7 + cola 11,6): ritmo 1,00 (tamaño ÷ real), contra 0,58 m³/h.
+**D10A** (legajo 122, 10/08): 16 paradas, 23 líneas (A1 2 · A2 2 · A3 0 · A4 1 · A5 2 · R1 3 · R2 5 · R3 2 · R4 3 · MX 0 · F 3), 46 cajas reales (46 con tope), 0,246 m³. Fijo y arranque 8,2 min + paradas 4,9 + cajas 2,9 + alturas 10,0 = **tamaño 26,0 min**. Dificultad (26,0 − 8,2) ÷ 46 = **0,388 min/caja → Alta**. Tiempo real 25,3 min (picking 24,3 + cola 1,0): ritmo 1,03 (tamaño ÷ real), contra 0,58 m³/h.
 
 Todas las tandas de 1 o 2 paradas con alguna línea con escalera:
 
-| tanda | par. | líneas | c/esc. | cajas | tamaño min | min/caja | nivel | real min |
+| tanda | par. | líneas | c/esc. | cajas | tamaño min | min/caja | nivel (grado) | real min |
 |---|---|---|---|---|---|---|---|---|
-| E29B | 2 | 2 | 1 | 60 | 9,1 | 0,074 | Fácil | 5,3 |
-| D69I | 1 | 1 | 1 | 20 | 5,7 | 0,108 | Fácil | 4,8 |
-| E25A | 1 | 1 | 1 | 20 | 6,3 | 0,139 | Fácil | 4,5 |
-| D46G | 1 | 1 | 1 | 8 | 4,7 | 0,147 | Fácil | 7,0 |
-| D50C | 2 | 5 | 1 | 18 | 12,1 | 0,227 | Normal | 12,3 |
-| E08A | 2 | 2 | 1 | 5 | 6,4 | 0,350 | Pajosa | 4,1 |
-| D09E | 2 | 2 | 1 | 4 | 6,5 | 0,456 | Pajosa | 9,5 |
-| D47E | 2 | 2 | 1 | 4 | 6,1 | 0,364 | Pajosa | 14,1 |
-| D47F | 2 | 2 | 1 | 3 | 7,3 | 0,896 | Pajosa | 3,6 |
-| D47J | 2 | 2 | 1 | 3 | 6,3 | 0,542 | Pajosa | 1,0 |
-| D41C | 1 | 1 | 1 | 2 | 4,3 | 0,399 | Pajosa | 8,8 |
-| F06A | 2 | 2 | 2 | 2 | 7,0 | 1,161 | Pajosa | 9,5 |
-| F02A | 2 | 3 | 1 | 1 | 7,6 | 1,849 | Pajosa | 1,2 |
-| F04A | 1 | 1 | 1 | 1 | 4,2 | 0,736 | Pajosa | 2,4 |
+| E29B | 2 | 2 | 1 | 60 | 9,1 | 0,074 | Baja (1) | 5,3 |
+| D69I | 1 | 1 | 1 | 20 | 5,6 | 0,107 | Baja (2) | 4,8 |
+| E25A | 1 | 1 | 1 | 20 | 5,8 | 0,113 | Baja (2) | 4,5 |
+| D50C | 2 | 5 | 1 | 18 | 12,4 | 0,233 | Media (5) | 12,3 |
+| D46G | 1 | 1 | 1 | 8 | 4,8 | 0,159 | Media (4) | 7,0 |
+| E08A | 2 | 2 | 1 | 5 | 6,4 | 0,349 | Alta (7) | 4,1 |
+| D47E | 2 | 2 | 1 | 4 | 6,2 | 0,392 | Alta (8) | 14,1 |
+| D09E | 2 | 2 | 1 | 4 | 6,5 | 0,450 | Muy alta (9) | 9,5 |
+| D47F | 2 | 2 | 1 | 3 | 7,4 | 0,894 | Muy alta (10) | 3,6 |
+| D47J | 2 | 2 | 1 | 3 | 6,3 | 0,541 | Muy alta (10) | 1,0 |
+| D41C | 1 | 1 | 1 | 2 | 4,4 | 0,450 | Muy alta (9) | 8,8 |
+| F06A | 2 | 2 | 2 | 2 | 6,6 | 0,955 | Muy alta (10) | 9,5 |
+| F02A | 2 | 3 | 1 | 1 | 7,7 | 1,847 | Muy alta (10) | 1,2 |
+| F04A | 1 | 1 | 1 | 1 | 4,3 | 0,838 | Muy alta (10) | 2,4 |
 
-Las que quedan Pajosa tienen entre 1 y 5 cajas: con pocas cajas cada parada y cada línea con escalera pesa mucho por caja, y eso es lo que el cociente mide. Ejemplo sintético: 1 parada, 4 líneas en la 5.ª de A, 40 cajas → tamaño 14,5 min, 0,191 min/caja → Normal.
+Las que quedan Alta o Muy alta tienen entre 1 y 5 cajas: con pocas cajas cada parada y cada línea con escalera pesa mucho por caja, y eso es lo que el cociente mide. Ejemplo sintético: 1 parada, 4 líneas en la 5.ª de A, 40 cajas → tamaño 12,6 min, 0,140 min/caja → Media.
 
-Cómo cambia el ritmo medido en tamaño en vez de m³: en las dos tandas de arriba, por m³/h E25A hace 1,23 y D22F 0,58 m³/h (la primera parece 2,1 veces más rápida); por tamaño ÷ real son 1,41 contra 1,00: el m³ no ve las 22 paradas ni las 5 líneas con escalera de la segunda, ni los 12 min de cola que ahora se le cobran. Por operario (tabla en (f)): por m³/h el orden es 104 > 122 > 277 > 504 y por tamaño 104 > 277 > 122 > 504; por m³/h el primero hace 2,7 veces lo del último, por tamaño 1,8 veces. El m³ premia a quien lleva pallets enteros de pocos códigos; el tamaño cobra las paradas, la altura y la cola.
+Cómo cambia el ritmo medido en tamaño en vez de m³: en las dos tandas de arriba, por m³/h E25A hace 1,23 y D10A 0,58 m³/h (la primera parece 2,1 veces más rápida); por tamaño ÷ real son 1,29 contra 1,03: el m³ no ve las 16 paradas ni las 8 líneas con escalera de la segunda. Por operario (tabla en (f)): por m³/h el orden es 104 > 122 > 277 > 504 y por tamaño 104 > 277 > 122 > 504; por m³/h el primero hace 2,7 veces lo del último, por tamaño 1,8 veces. El m³ premia a quien lleva pallets enteros de pocos códigos; el tamaño cobra las paradas, la altura y la cola.
 
 ## (c) La altura cuando el artículo ocupa varias celdas
 
@@ -141,3 +141,4 @@ El registro por paso que arranca el lunes 05/10 (`GV_Picking_Paso_Evento`: mostr
 - **D18 — tope de la cola:** en la base (`gv_monitor_horas_operario_dia`) la cola corre SIN tope hasta la próxima tarea o la hora de salida, como dice la regla de Luis del 02/10; el tope de 30 min queda sólo en esta calibración, para que dos tandas con 5 y 8 horas sin registro no manden el ajuste. Si el monitor muestra colas de horas que no son picking, el tope en la base es una línea.
 - **D19 — dificultad por caja:** se mide por caja (min/caja sin el arranque), que es como se lee en el depósito; la alternativa por línea queda calculada en (b) por si hace falta.
 - **D20 — registrar la celda en la app:** no por ahora. Primero el registro por paso del 05/10; si la altura inferida (c) no alcanza, se agrega la celda al picking y al guardado.
+- **D22 — niveles (Luis, 03/10: *"cambié el término pajosa por dificultad alta; definilo en cuatro niveles… decime lo que te parezca mejor"*):** «pajosa» se retira. Los cuatro niveles son **Baja · Media · Alta · Muy alta** (no «moderado» y «mediano», que son sinónimos y no se ordenan solos), y van atados al **grado 1-10** que ya llevaba cada tanda (su decil de min/caja): Baja = grado 1-2 · Media = 3-5 · Alta = 6-8 · Muy alta = 9-10. Con cuartiles puros (25 % cada uno) el grado 3 y el grado 8 quedaban partidos en dos niveles; así nivel y grado nunca se contradicen. El multiplicador del m³/h sigue siendo 1 + 0,1 × (grado − 5). Sobre las 338 tandas ajustadas: 68 / 101 / 100 / 69.

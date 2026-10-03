@@ -6714,6 +6714,10 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   base; 30 min sólo en la calibración (D18) · dificultad por caja (D19) · la app no registra la celda por ahora (D20) · escala de altura
   FÍSICA de Luis (D21: piso 1 · 2.ª 1,5 · 3.ª 2 · 4.ª 2,5 · 5.ª de A 3; la 5.ª de A «es medio que lo mismo» que la 4.ª de B). Lo medido con
   alturas libres (A5 72 s, el doble de B4) queda de referencia en `d17_esquema.json`; el registro por paso del 05/10 dirá si era el artículo.**
+  **Niveles de dificultad (Luis, 03/10, v26.48): «pajosa» se RETIRA y son CUATRO — Baja · Media · Alta · Muy alta —, atados al grado
+  1-10 (decil de min/caja sobre las 338 tandas): Baja = grado 1-2 · Media = 3-5 · Alta = 6-8 · Muy alta = 9-10, así nivel y grado no se
+  contradicen. El multiplicador del m³/h es 1 + 0,1 × (grado − 5), de ×0,6 a ×1,5, topeado a propósito: una tanda de cajas sueltas
+  (Manig F54A: 19 artículos, 19 cajas, 0,102 m³, 10 líneas con escalera → grado 10) se evalúa por índice tamaño ÷ real, no por m³/h.**
 - `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
   v26.43 adentro). **Aplicado el 03/10 con el sí de Luis** (v26.45): el 15/09 dio idéntico a la foto, `gv_huellas_cambiadas`
   y `gv_reglas_perdidas` vacías. ⚠ **La huella se compara por `md5(prosrc)`, NO por `md5(pg_get_functiondef(...))`**:
