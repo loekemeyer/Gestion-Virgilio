@@ -6722,6 +6722,16 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   puntaje = 5,5 + 10 × (índice − 1), con índice = Σ tamaños esperados ÷ Σ tiempos reales de sus ÚLTIMAS 20 tandas (y el período
   aparte); 1 punto = 10 % de velocidad, 5-6 = el promedio del depósito. Con 10 tandas el margen es ±2 a ±3 puntos: menos de 10
   es provisorio. Mide velocidad, no calidad. `docs/picking-d17/puntaje_operario.py`, sección (j) de `docs/PICKING-DIFICULTAD-D17.md`.**
+  **v26.50: el puntaje VIVE EN LA BASE y se ve SÓLO en Mon. Admin** (Luis: *"en monitor admin, no en el que ven los operarios; sé que
+  hay dos, ojo con eso"*). `GV_Picking_Esquema` (coeficientes y deciles: recalibrar = UPDATE) · `GV_Picking_Tanda` (caché por
+  tanda+legajo: líneas, paradas, alturas por stock al EP, tamaño, dificultad, grado, tiempo real, índice; la llena
+  `gv_picking_tanda_refresh`, cron `gv-picking-tanda-refresh` c/10 min) · `gv_picking_puntaje_operario(p_dias)` SECURITY DEFINER
+  que **raise 'SUPERVISOR'** sin sesión de supervisor. Validado contra el Python de las 340 tandas: tamaño |dif| mediana 0,21 min,
+  p90 0,80, corr 1,000 (ninguna a más de 3 min). La columna «Punt.» y su pop-up los inyecta `monitor/build-admin.cjs` (el token sale de `window.parent.sbAuth`);
+  `tests/mon-admin.cjs` canda que **tv.html no lleve** `gv_picking_puntaje_operario`. Desde la sesión, `execute_sql` se cuelga
+  con DELETE/DROP/UPDATE/CREATE TABLE de primer nivel: la instalación va adentro de `gv_picking_instalar()` (ver el SQL).
+  `sql/gv_picking_puntaje_v2650.sql`. Acomodar en la mesa (cola vs cajas/NP/mesas): `docs/PICKING-ACOMODAR-MESA.md` — no sigue
+  a las cajas ni a las mesas ocupadas; manda el operario.**
 - `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
   v26.43 adentro). **Aplicado el 03/10 con el sí de Luis** (v26.45): el 15/09 dio idéntico a la foto, `gv_huellas_cambiadas`
   y `gv_reglas_perdidas` vacías. ⚠ **La huella se compara por `md5(prosrc)`, NO por `md5(pg_get_functiondef(...))`**:

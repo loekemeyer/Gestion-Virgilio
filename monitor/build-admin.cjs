@@ -70,6 +70,10 @@ const CSS = `
 .pop-sub{color:#94a3b8;font-size:calc(1.85*var(--u));margin:.2vh 0 1vh;line-height:1.4}
 .pop-k{color:#f8fafc;font-weight:900}
 .pop-empty{color:#64748b;padding:1.5vh;text-align:center;font-weight:700}
+/* v26.50 (Luis): puntaje 1-10 de picking — SÓLO en el admin (la TV de los operarios no lo lleva). */
+.op-punt{font-weight:900;text-align:center;font-variant-numeric:tabular-nums;border-left:1px solid #1e293b}
+.op-punt.prov{color:#94a3b8;font-weight:700}
+.op-punt.alto{color:#4ade80}.op-punt.bajo{color:#f87171}
 </style>`;
 
 /* La capa admin va DENTRO del IIFE principal, así ve a esc/n1/nH/npLabel/resumirCliente/
@@ -270,23 +274,89 @@ function popFaseHoras(code) {
 function abrirDesglose(pop, t) {
   if (pop === "rit")   return abrirPop("m³/h " + (t.getAttribute("data-sub") === "pick" ? "picking" : "armado"), popRitmo(t.getAttribute("data-leg"), t.getAttribute("data-sub")));
   if (pop === "hs")    return abrirPop("Horas del operario", popHoras(t.getAttribute("data-leg")));
+  if (pop === "punt")  return abrirPop("Puntaje de picking (1-10)", popPuntaje(t.getAttribute("data-leg")));
   if (pop === "dia")   return abrirPop("NPs · " + (POP_EST[t.getAttribute("data-sub")] || ""), popDiaBucket(t.getAttribute("data-dia"), t.getAttribute("data-sub")));
   if (pop === "diam3") return abrirPop("m³ del día", popDiaM3(t.getAttribute("data-dia")));
   if (pop === "tanda") { abrirPop("Tanda " + t.getAttribute("data-k"), popTanda(t.getAttribute("data-k"))); popFaseHoras(t.getAttribute("data-k")); return; }
 }
 /* Marca las celdas clickeables después de cada render (los nodos son nuevos en cada pintada,
    así que no se acumula). Zip por posición: el orden del DOM es el de los datos. */
+/* v26.50 (Luis, 03/10): PUNTAJE 1-10 DE PICKING por operario — sólo acá, nunca en la TV de los
+   operarios ("no para ellos"). Lo calcula la base (gv_picking_puntaje_operario: índice = Σ tamaño
+   esperado D17 ÷ Σ tiempo real de sus últimas 20 tandas; puntaje = 5,5 + 10 × (índice − 1), 1..10).
+   La RPC exige sesión de SUPERVISOR: el token sale de window.parent.sbAuth (el index que embebe
+   este iframe). Abierto suelto, sin parent, no se pide nada y la columna dice «—». Se relee cada
+   10 min; si la lectura falla, la columna lo dice en el title y no inventa un número. */
+var PUNT = null, PUNT_TS = 0, PUNT_ERR = "", PUNT_VUELO = false;
+function puntAuth() {
+  try { var pa = (window.parent && window.parent !== window) ? window.parent : null;
+    return (pa && pa.sbAuth && typeof pa.sbAuth.getAccessToken === "function") ? pa.sbAuth : null; } catch (_e) { return null; }
+}
+function cargarPuntajes() {
+  var auth = puntAuth();
+  if (!auth) { PUNT_ERR = "sin sesión de supervisor"; return Promise.resolve(); }
+  if (PUNT_VUELO) return Promise.resolve();
+  PUNT_VUELO = true;
+  return Promise.resolve().then(function () { return auth.getAccessToken(); }).then(function (tok) {
+    if (!tok) throw new Error("sin sesión de supervisor");
+    return fetch(SB_URL + "/rest/v1/rpc/gv_picking_puntaje_operario", { method: "POST", cache: "no-store",
+      headers: { apikey: SB_KEY, Authorization: "Bearer " + tok, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_dias: 60 }) });
+  }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (rows) {
+      var m = {}; (rows || []).forEach(function (o) { m[String(o.legajo)] = o; });
+      PUNT = m; PUNT_TS = Date.now(); PUNT_ERR = ""; PUNT_VUELO = false;
+      if (window.__MA_INSTR) window.__MA_INSTR();
+    }).catch(function (e) { PUNT_ERR = String((e && e.message) || e); PUNT_VUELO = false; });
+}
+function puntCelda(leg) {
+  var o = PUNT && PUNT[leg];
+  if (!o) return '<td class="op-punt" title="' + esc(PUNT_ERR || "sin tandas de picking en 60 días") + '">—</td>';
+  var p = Number(o.puntaje_ult), cls = o.publicable ? (p >= 8 ? " alto" : (p <= 3 ? " bajo" : "")) : " prov";
+  var tit = "últimas " + Math.min(20, o.tandas) + " tandas: índice " + n1(o.indice_ult) + " → " + p + (o.publicable ? "" : " (provisorio: menos de 10 tandas)") +
+    " · período " + o.tandas + " tandas: " + n1(o.indice_per) + " → " + o.puntaje_per;
+  return '<td class="op-punt cx' + cls + '" data-pop="punt" data-leg="' + esc(leg) + '" title="' + esc(tit) + '">' + p + (o.publicable ? "" : "*") + '</td>';
+}
+function popPuntaje(leg) {
+  var o = PUNT && PUNT[leg];
+  if (!o) return '<div class="pop-empty">' + esc(PUNT_ERR || "Sin tandas de picking en 60 días") + '</div>';
+  var tr = (o.tramos || []).map(function (x, i) { return (i * 10 + 1) + "-" + (i * 10 + 10) + ": " + n1(x); }).join(" · ");
+  var head = '<div class="pop-sub" style="text-align:center"><span class="pop-k">' + esc(o.nombre || leg) + '</span> · legajo ' + esc(leg) + '</div>' +
+    '<div class="pop-sub">Puntaje = 5,5 + 10 × (índice − 1), 1 a 10; índice = tiempo esperado (esquema D17) ÷ tiempo real (picking + cola). ' +
+    '1 punto = 10 % de velocidad; 5-6 = el promedio del depósito. Mide velocidad, no calidad.</div>' +
+    '<table class="pop-cmp"><thead><tr><th></th><th>Tandas</th><th>Índice</th><th>Puntaje</th></tr></thead><tbody>' +
+    '<tr><td class="pop-k">Últimas 20</td><td>' + Math.min(20, o.tandas) + '</td><td>' + n1(o.indice_ult) + '</td><td class="pop-k">' + o.puntaje_ult + (o.publicable ? "" : " (provisorio)") + '</td></tr>' +
+    '<tr><td class="pop-k">Período (60 días)</td><td>' + o.tandas + '</td><td>' + n1(o.indice_per) + '</td><td class="pop-k">' + o.puntaje_per + '</td></tr></tbody></table>' +
+    (o.margen_pts != null ? '<div class="pop-sub">Margen aprox. ±' + n1(o.margen_pts) + ' puntos (90 %) con esas tandas' + (o.publicable ? "" : " · con menos de 10 tandas el puntaje no se publica") + '.</div>' : "") +
+    (tr ? '<div class="pop-sub">Índice por tramo de 10 tandas (de la más vieja a la más nueva): ' + esc(tr) + '</div>' : "");
+  var det = o.detalle || [];
+  if (!det.length) return head;
+  var body = det.map(function (t) {
+    return '<tr><td class="pop-k">' + esc(t.tanda) + '</td><td>' + esc(t.fecha) + '</td><td>' + esc(String(t.nivel || "")) + ' (' + t.grado + ')</td><td>' +
+      t.lineas + ' / ' + n1(t.cajas) + '</td><td>' + t.paradas + ' / ' + t.esc + '</td><td>' + n1(t.tamano) + '</td><td>' + n1(t.real) + '</td><td class="pop-k">' + n1(t.indice) + '</td></tr>'; }).join("");
+  return head + '<table class="pop-cmp"><thead><tr><th>Tanda</th><th>Día</th><th>Dificultad</th><th>Lín / cajas</th><th>Paradas / esc.</th><th>Esperado min</th><th>Real min</th><th>Índice</th></tr></thead><tbody>' + body + '</tbody></table>';
+}
 function instrumentar() {
   var D = window.__MA_D || {};
   var H = D.horas || [], hi = 0;
+  if (!PUNT || (Date.now() - PUNT_TS) > 600000) cargarPuntajes();
+  var ops = document.querySelector("#opsBox table.ops");
+  if (ops && !ops.getAttribute("data-punt")) {
+    ops.setAttribute("data-punt", "1");
+    var hs = ops.querySelectorAll("thead tr");
+    if (hs[0]) hs[0].insertAdjacentHTML("beforeend", '<th class="op-punt" title="Sólo en Mon. Admin: no lo ve la TV de los operarios">Punt.</th>');
+    if (hs[1]) hs[1].insertAdjacentHTML("beforeend", '<th class="op-punt" title="Puntaje 1-10 de picking: índice de sus últimas 20 tandas (tiempo esperado ÷ real). Tocá para el detalle">1-10<br>picking</th>');
+  }
   document.querySelectorAll("#opsBox table.ops tbody tr").forEach(function (tr) {
-    if (tr.classList.contains("op-tot-row")) return;
-    var o = H[hi++]; if (!o) return;
+    if (tr.classList.contains("op-tot-row")) { if (ops && ops.getAttribute("data-punt") && tr.children.length < 7) tr.insertAdjacentHTML("beforeend", "<td></td>"); return; }
+    var o = H[hi++];
+    if (!o) { if (ops && tr.children.length < 7) tr.insertAdjacentHTML("beforeend", '<td class="op-punt">—</td>'); return; }
     var td = tr.children, leg = String(o.legajo);
     function marca(i, pop, sub) { if (!td[i]) return;
       td[i].className += " cx"; td[i].setAttribute("data-pop", pop); td[i].setAttribute("data-leg", leg);
       if (sub) td[i].setAttribute("data-sub", sub); }
     marca(1, "rit", "pick"); marca(2, "rit", "arm"); marca(3, "hs"); marca(4, "hs");
+    if (tr.children.length < 7) tr.insertAdjacentHTML("beforeend", puntCelda(leg));
   });
   var RDS = resumenDias(D.arbol || [], D.despachadas || new Set(), 4), ri = 0;
   var SUBS = ["salio", "facturado", "armado", "proceso", "pendiente"];

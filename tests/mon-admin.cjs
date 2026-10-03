@@ -37,7 +37,9 @@ try {
 /* ── 2) tiene la capa interactiva ─────────────────────────────────────────── */
 if (src) {
   for (const marca of ['id="pop"', ".cx", "abrirDesglose", "function instrumentar()",
-                       "window.__MA_INSTR", 'data-pop']) {
+                       "window.__MA_INSTR", 'data-pop',
+                       // v26.50 (Luis): puntaje 1-10 de picking, SÓLO en el admin (nunca en tv.html)
+                       "gv_picking_puntaje_operario", 'data-pop="punt"', "window.parent.sbAuth", "function popPuntaje("]) {
     if (!src.includes(marca)) fallas.push("le falta la capa admin: " + marca);
   }
   // sigue leyendo las MISMAS fuentes que la TV (lo hereda de tv.html, pero lo confirmamos)
@@ -46,6 +48,9 @@ if (src) {
     if (!src.includes(fuente)) fallas.push("no lee " + fuente);
   }
   if (!src.includes("../supabase-config.js")) fallas.push("no toma la key de supabase-config.js");
+  // y la TV NO lleva el puntaje (es de supervisor): candado invertido
+  const tvSrc = fs.readFileSync(path.join(MON, "tv.html"), "utf8");
+  if (tvSrc.includes("gv_picking_puntaje_operario")) fallas.push("tv.html NO puede llevar el puntaje de picking (es sólo del admin)");
 }
 
 if (fallas.length) {
@@ -201,6 +206,16 @@ function responder(url) {
   ok(base.cxOps >= 2, "las celdas de m³/h no quedaron clickeables (.cx): " + base.cxOps);
   ok(base.cxRd >= 5, "las celdas de «NPs por Día» no quedaron clickeables: " + base.cxRd);
   ok(base.cxTan >= 1, "las filas de tandas no quedaron clickeables: " + base.cxTan);
+  // v26.50 (Luis): la columna «Punt.» (puntaje 1-10 de picking) está en el admin; abierto suelto (sin
+  // window.parent.sbAuth) no pide nada y la celda dice «—» con el motivo en el title
+  const punt = await p.evaluate(() => {
+    const th = [...document.querySelectorAll("#opsBox table.ops thead th")].map((x) => x.textContent || "").join("|");
+    const tds = [...document.querySelectorAll("#opsBox table.ops tbody tr:not(.op-tot-row) td.op-punt")];
+    return { th, n: tds.length, txt: tds.map((x) => x.textContent.trim()).join(","), tit: tds.map((x) => x.getAttribute("title") || "").join("|") };
+  });
+  ok(/Punt\./.test(punt.th) && /picking/.test(punt.th), "v26.50: falta la columna «Punt.» en Operarios: " + punt.th);
+  ok(punt.n >= 2, "v26.50: cada operario tiene que tener su celda de puntaje: " + punt.n);
+  ok(/^—(,—)*$/.test(punt.txt) && /sin sesión de supervisor/.test(punt.tit), "v26.50: sin parent la celda tiene que decir «—» y el motivo: " + punt.txt + " / " + punt.tit);
 
   const popTxt = () => p.evaluate(() => {
     const pop = document.getElementById("pop");

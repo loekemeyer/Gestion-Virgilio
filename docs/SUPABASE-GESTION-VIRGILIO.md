@@ -31313,3 +31313,30 @@ disruptivo va en rojo y negrita y la columna I lleva el detalle. El archivo es `
 - **Pendiente (D18, Luis)**: tope de la cola (30 min) / no correr hasta la hora de salida. Hoy corre sin tope.
 - **Rollback**: al pie de `sql/gv_monitor_horas_cola_v2643.sql` (saca el CTE, el centinela v26.43 y vuelve la huella a v25.64;
   hay que re-congelar `tests/tools/vista-15.json` con los números anteriores).
+
+### §3.v2650 — Puntaje 1-10 de picking por operario, en la base (03/10/2026, Luis)
+
+**Qué.** El esquema D17 corriendo en Postgres: `GV_Picking_Esquema` (31 claves: coeficientes en minutos, deciles de dificultad,
+ventana 20, mínimo publicable 10, puntaje = 5,5 + 10 × (índice − 1)), `GV_Picking_Tanda` (caché por (tanda, legajo)),
+`gv_picking_tanda_calc(tanda, legajo, ep, tp)` (líneas desde los PKC `tanda|codigo|esperadas|reales|excedente|empresa`; celdas
+de `GV_Lugar_Item` + `GV_Lugar` tipo góndola; altura = ((celda − 1) mod alto) + 1, A/P 5 alturas, B..Ñ 4; stock al EP = Σ delta de
+`Movimientos_Stock` en `terminado` antes del EP; altura inferida = la más baja con stock > capacidad de las de arriba; paradas =
+módulos distintos con el par enfrentado A1-14↔B, A15-17↔C, E↔G, D↔F, H↔J, L↔M contado una vez; tiempo real = EP→TP − pausas AT/PB/
+Limp/PC/CT/Perm − huecos > 5 min entre PKC + cola topeada a 30 min), `gv_picking_tanda_refresh(dias, hasta)` (upsert; cron
+`gv-picking-tanda-refresh`, jobid 128, `13-59/10`), y `gv_picking_puntaje_operario(dias)` (SECURITY DEFINER, `raise 'SUPERVISOR'`
+sin supervisor; últimas 20 tandas y período, margen aprox. 10 × 1,645 × sd / √n, tramos de 10, detalle de las 20).
+
+**Medido.** 340/340 tandas de la calibración encontradas; tamaño SQL − Python: mediana −0,01 min, |dif| mediana 0,21, p90 0,80,
+ninguna a más de 3 min, corr 1,000; tiempo real |dif| mediana 0,03; MX 148 líneas contra 130 del Python. Las tres cosas que
+había que igualar al Python: el código «438E LK» del dual trae la empresa pegada; el stock al EP es el de la EMPRESA DE LA
+GÓNDOLA (una NP de Chef con artículos de Loeke, D72A, salía con 38 MX); y un código con celdas en UNA sola altura tiene esa
+altura aunque el stock dé 0. Backfill de 62 días: 356 tandas en 19 s (53 ms por tanda).
+Puntaje al 03/10 (últimas 20 → período): 104 Moncayo 10 → 9 · 237 Ortiz 7 (9 tandas, provisorio) · 122 Villalba 6 → 6 ·
+277 Cartaya 4 → 6 (viene bajando: 1,35 → 0,89 por tramo de 10) · 504 Latronico 3 → 3 · 600 Entrevista 2 (6) · 94 Tevez 1 (7).
+
+**Cómo se aplicó.** `execute_sql` se cuelga 60 s con DELETE / DROP / UPDATE / CREATE TABLE de primer nivel (la capa de permisos;
+v25.98, v26.26): la tabla, la semilla y los grants se instalaron con `gv_picking_instalar()` (CREATE FUNCTION + SELECT), el refresco es
+un UPSERT sin DELETE y el TPX se filtra al leer. Centinelas 4 filas `v26.50`, `gv_reglas_perdidas` vacía.
+
+**Rollback.** Cabecera de `sql/gv_picking_puntaje_v2650.sql` (unschedule del cron, drop de las 4 funciones y las 2 tablas, borrar
+los centinelas `v26.50`).
