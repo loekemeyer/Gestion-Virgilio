@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-01 (+ cuarentena deuda < 5 dias, + centinela gv_imp_pi_editar)",
+  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -99,6 +99,11 @@
     {
       "objeto": "gv_cuarentena_comentario_cod",
       "regla": "Un comentario de cuarentena sin cod se completa con el cliente del pedido; sin eso no aparece en el historial del cliente",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_cuarentena_deuda_pedido",
+      "regla": "La factura de menos de 5 dias corridos no cuenta como deuda para retener (v25.45)",
       "quien": "Luis"
     },
     {
@@ -290,6 +295,11 @@
       "objeto": "gv_importados_resync",
       "regla": "Importación: esta RPC escribe y sólo la puede usar un supervisor logueado (o el servicio); sin esto cualquiera con la clave pública carga o borra giros, baches,",
       "quien": "Thomas"
+    },
+    {
+      "objeto": "gv_ingreso_virgilio_denegado",
+      "regla": "Si Cervantes dice No a lo que Virgilio le recibió, el pedido vuelve a EN VIAJE en Virgilio (📥 RECIBIR y 📦 Baches) con el chip «Denegado por Cervantes».",
+      "quien": "dueño (30/09)"
     },
     {
       "objeto": "gv_insumo_unidad_base",
@@ -492,6 +502,11 @@
       "quien": "Thomas"
     },
     {
+      "objeto": "gv_ppp_web_fusionar_tandas",
+      "regla": "la fusion no junta tandas de gondola distinta ni pasa el tope de NP",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_ppp_web_proximo_dia_con_cupo",
       "regla": "La cascada de dias con cupo saltea el dia sin reparto. Va con gv_es_dia_con_reparto, NUNCA con gv_es_dia_habil: el deposito ese dia trabaja igual.",
       "quien": "Luis"
@@ -567,6 +582,11 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_tanda_reservar",
+      "regla": "una fase anulada (TPX/TAPX) sin TP/TAP vivo libera el candado: la tanda se puede volver a pickear/armar (D69H)",
+      "quien": "Marianela"
+    },
+    {
       "objeto": "gv_tanda_trabajo_hecho",
       "regla": "La fila de Entregas_Virgilio cuenta como armado SOLO si es posterior a la ultima anulacion del armado de esa tanda. Sin esto un armado ya anulado dice \"tanda co",
       "quien": "Luis"
@@ -574,6 +594,11 @@
     {
       "objeto": "gv_tandas_codigos_usados_sync",
       "regla": "La tanda de la que se saco un pedido retenido cuenta como codigo usado. Sin esta fuente el codigo se vacia de todas las tablas vivas y vuelve a la bolsa mientra",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_ventas_clientes_mes_cod",
+      "regla": "El desglose por cliente del pop-up de proyección suma la familia del principal (702EN en 702E), igual que el total mensual",
       "quien": "Luis"
     },
     {
@@ -685,11 +710,6 @@
       "objeto": "vista_stock_procesada",
       "regla": "La demanda de un codigo DUAL (437E/438E/439E/809E) se keyea CON la empresa: el de Loeke y el de Chef son dos productos en dos gondolas distintas. Si este patron",
       "quien": "Luis, Thomas"
-    },
-    {
-      "objeto": "gv_cuarentena_deuda_pedido",
-      "regla": "La factura de menos de 5 dias corridos no cuenta como deuda para retener (v25.45)",
-      "quien": "Luis"
     }
   ]
 }

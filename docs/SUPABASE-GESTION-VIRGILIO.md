@@ -31295,3 +31295,21 @@ disruptivo va en rojo y negrita y la columna I lleva el detalle. El archivo es `
 - **Vista probada** en transacción abortada: el reconfirmado conserva la 1.ª hora, la ráfaga sale `medible=false`
   y un bloqueo de 60 s se descuenta en `seg_oculto`.
 - **Rollback**: al pie de `sql/gv_picking_paso_evento_v2625.sql` (sacar antes el envío del front).
+
+## §3.v2643 — La COLA sin registro después del TP/TAP se suma al picking/armado: `gv_monitor_horas_operario_dia` (Luis, 02/10/2026 · aplicado 03/10)
+
+- **Qué**: CTE `cola` en `gv_monitor_horas_operario_dia(date)` y en su copia verbatim `gv_horas_operario_detalle_v2(date)`:
+  desde el TP/TAP hasta el inicio de la próxima tarea registrada del legajo (sin los eventos automáticos ni los `*X`),
+  la primera bajada de racks sin tramo, o `least(now(), max(último evento, hora de salida))`; la del PRIMER cierre de la
+  tanda. `pick/arm = max(dur_s) + cola`. Misma regla en `index.html` (`colaMsDe`) desde la v26.43.
+- **Impacto medido**: 15/09 → 277 picking 6,37 → 7,77 h · 237 armado 5,60 → 6,63 · 8 armado 6,75 → 8,76; igual a
+  `tests/tools/vista-15.json` (re-congelado en la v26.43). 60 días por tanda: mediana 1,7 min, p90 9,7 (TP) / 16,4 (TAP),
+  4 colas > 60 min (la mayor 518 min: TP a la mañana y nada hasta la hora de salida; a propósito, es lo que pide la regla).
+- **Cómo se aplicó**: `sql/gv_monitor_horas_cola_v2643.sql`, parche por texto sobre `pg_get_functiondef` (idempotente,
+  `raise` si un ancla no matchea), con `-- REGLA_CONFIRMADA_POR_USUARIO` y el sí de Luis (03/10, 00:05 ART). Centinela
+  nuevo (patrón `max\(e\.dur_s\) \+ coalesce\(max\(k\.s\), 0\)`, v26.43). ⚠ La huella (`GV_Huella_Objeto`) se compara por
+  `md5(prosrc)`: el script la escribía con `md5(pg_get_functiondef(...))` y `gv_huellas_cambiadas` quedó en rojo con el
+  cuerpo correcto; corregido en el acto y en el archivo. Después: `gv_huellas_cambiadas` 0 · `gv_reglas_perdidas` 0.
+- **Pendiente (D18, Luis)**: tope de la cola (30 min) / no correr hasta la hora de salida. Hoy corre sin tope.
+- **Rollback**: al pie de `sql/gv_monitor_horas_cola_v2643.sql` (saca el CTE, el centinela v26.43 y vuelve la huella a v25.64;
+  hay que re-congelar `tests/tools/vista-15.json` con los números anteriores).

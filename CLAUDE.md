@@ -6708,7 +6708,10 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   cola topeada a 30 min** (dos tandas con cola «cap» de 5 y 8 h quedaron afuera): la cola cayó 55 % en un fijo por
   tanda (2,4 min) y 32 % en la parada; las alturas no se movieron. Tope y «cap» en la regla de la base: decisión de Luis.
 - `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
-  v26.43 adentro). `tests/tools/vista-15.json` re-congelado con la cola; `tests/mon-vs-vista.cjs`;
+  v26.43 adentro). **Aplicado el 03/10 con el sí de Luis** (v26.45): el 15/09 dio idéntico a la foto, `gv_huellas_cambiadas`
+  y `gv_reglas_perdidas` vacías. ⚠ **La huella se compara por `md5(prosrc)`, NO por `md5(pg_get_functiondef(...))`**:
+  el primer intento la dejó en rojo con el cuerpo correcto. Lo pendiente de D18 (tope de la cola) no se tocó: corre
+  hasta la próxima tarea o la hora de salida, como está escrito arriba. `tests/tools/vista-15.json` re-congelado con la cola; `tests/mon-vs-vista.cjs`;
   `tests/muerto-neteado.cjs` y `tests/mejoras-v1297.cjs` (la siguiente tarea arranca 1 s después del cierre y el
   día termina con FJ, para que la cola quede en 0 y sigan midiendo lo suyo). CI 1698 cayó por el segundo: regla
   v21.53, se arregló en el mismo pedido.

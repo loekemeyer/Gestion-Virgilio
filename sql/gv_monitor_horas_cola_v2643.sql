@@ -90,7 +90,8 @@ end $do$;
 
 -- la huella (tests/tools/vista-15.json se re-congelo con esta version) y el centinela de la regla
 update public."GV_Huella_Objeto"
-   set md5_esperado = md5(pg_get_functiondef('public.gv_monitor_horas_operario_dia(date)'::regprocedure)),
+   set md5_esperado = (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace   -- la vista compara md5(prosrc), NO pg_get_functiondef
+                        where n.nspname = 'public' and p.proname = 'gv_monitor_horas_operario_dia' limit 1),
        version = 'v26.43', actualizado_en = now()
  where objeto = 'gv_monitor_horas_operario_dia';
 insert into public."GV_Reglas_Centinela" (objeto, clase, patron, regla, quien_pidio, version)
@@ -127,5 +128,5 @@ cola as (   -- v26.43-cola$x$ in v_def);
   end loop;
 end $do$;
 delete from public."GV_Reglas_Centinela" where objeto = 'gv_monitor_horas_operario_dia' and version = 'v26.43';
-update public."GV_Huella_Objeto" set md5_esperado = md5(pg_get_functiondef('public.gv_monitor_horas_operario_dia(date)'::regprocedure)), version = 'v25.64', actualizado_en = now() where objeto = 'gv_monitor_horas_operario_dia';
+update public."GV_Huella_Objeto" set md5_esperado = (select md5(p.prosrc) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'gv_monitor_horas_operario_dia' limit 1), version = 'v25.64', actualizado_en = now() where objeto = 'gv_monitor_horas_operario_dia';
 */
