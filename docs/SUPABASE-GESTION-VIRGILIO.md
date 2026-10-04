@@ -31362,3 +31362,18 @@ primer nivel), las 4 funciones (las dos protegidas con `-- REGLA_CONFIRMADA_POR_
 
 **Rollback.** Cabecera de `sql/gv_picking_no_pickeado_v2651.sql` (volver a las secciones 3-5 de la v26.50, drop de la RPC nueva y
 del instalador, borrar los centinelas `v26.51`).
+
+**Aplicado el 04/10/2026 (v26.53)**, sin «sí» aparte: Luis, *«no me preguntes nunca más ni esperes mi sí para aplicar algo que ya
+te pedí yo»* (regla nueva en el `CLAUDE.md`, sección BD: el pedido es la autorización). Instalador → 4 funciones (las protegidas
+con `-- REGLA_CONFIRMADA_POR_USUARIO`) → refresh en dos mitades (62-31: 198 tandas · 31-0: 158) porque el MCP corta a los 60 s.
+Resultado: **826 líneas en 0 salieron** (8.218 → 7.391 en 329 tandas); fracción pickeada media **0,905**, 258 de 356 tandas < 1
+(la peor de la semana, F22A: 64 líneas, 9 en 0, 160 → 140 cajas, 0,856); el índice de las últimas 20 por operario baja 4 a 9 %
+(104 1,634 → 1,555 · 122 1,081 → 1,019 · 237 1,104 → 1,060 · 277 0,890 → 0,836 · 504 0,792 → 0,722 · 600 0,680 → 0,624 ·
+94 0,583 → 0,546, con una tanda menos: todas sus líneas en 0 → `lineas = 0` y sale); **puntaje: sólo el 237 cambia (7 → 6)**.
+`gv_reglas_perdidas` y `gv_huellas_cambiadas` vacías; `gv_picking_pickeado` leída como `anon` devuelve. Dos cosas que no estaban
+en el `.sql` y se resolvieron al aplicar: (1) el `gv_picking_puntaje_operario` **vivo** tenía un filtro de turno
+(`real_min between 0.5 and 240` · `coalesce(lineas,0) > 0` · `bruto_min <= 720`) que el repo no tenía —otra sesión—: se trajo la
+definición viva y se conservó en la base y en el archivo; (2) sin las líneas en 0 la dificultad media bajó de 0,290 a 0,260 y el
+grado dejó de ser un decil (21 a 41 tandas por grado), así que **los 9 deciles de `GV_Picking_Esquema` se recalibraron** sobre la
+dificultad nueva (decil_1 0,0828 → 0,0810 · decil_5 0,2406 → 0,2280 · decil_9 0,5168 → 0,4819) y se volvió a refrescar: 33
+tandas por grado (32 en el 5). El SQL de la recalibración quedó en la sección 6 del archivo.

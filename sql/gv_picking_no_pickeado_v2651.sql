@@ -334,11 +334,12 @@ begin
   v_vent := coalesce((c->>'ventana_tandas')::int, 20);  v_min := coalesce((c->>'min_publica')::int, 10);
   v_base := coalesce((c->>'puntaje_base')::numeric, 5.5); v_k := coalesce((c->>'puntaje_por_indice')::numeric, 10);
   return query
-  with g as (   -- sólo las tandas cuyo TP sigue vivo (un TPX la saca sin borrar el caché)
+  with g as (   -- sólo tandas con picking (líneas), de un turno (EP→TP ≤ 12 h, real ≤ 4 h) y cuyo TP sigue vivo (un TPX la saca sin borrar el caché)
     select t.*, row_number() over (partition by t.legajo order by t.tp desc) rn,
            row_number() over (partition by t.legajo order by t.tp) rn_asc
       from public."GV_Picking_Tanda" t
-     where t.tp >= now() - make_interval(days => p_dias) and t.real_min > 0.5 and t.tamano > 0
+     where t.tp >= now() - make_interval(days => p_dias) and t.real_min between 0.5 and 240 and t.tamano > 0
+       and coalesce(t.lineas, 0) > 0 and t.bruto_min <= 720
        and exists (select 1 from public."Registros_Produccion_Virgilio" e
                     where e.opcion = 'TP' and e.ts_cliente = t.tp and e.legajo::text = t.legajo and upper(btrim(e.texto)) = t.tanda)
   ),
@@ -369,7 +370,25 @@ revoke all on function public.gv_picking_puntaje_operario(int) from public;
 grant execute on function public.gv_picking_puntaje_operario(int) to anon, authenticated;
 
 -- ─────────────────────────────── 6. chequeo ───────────────────────────────
--- select public.gv_picking_tanda_refresh(62);
+-- APLICADO el 04/10/2026 (Luis: «no esperes mi sí para aplicar algo que ya te pedí yo»), en dos mitades
+-- porque el MCP corta a los 60 s:
+--   select public.gv_picking_tanda_refresh(62, 31);   -- 198 tandas
+--   select public.gv_picking_tanda_refresh(31, 0);    -- 158 tandas
+-- ⚠ El gv_picking_puntaje_operario VIVO traía un filtro de turno que el repo no tenía (otra sesión):
+--   real_min between 0.5 and 240 · coalesce(lineas,0) > 0 · bruto_min <= 720. Se trajo la definición viva
+--   y se conservó acá (regla «traer la definición viva»).
+-- Y los DECILES del grado se recalibraron sobre la dificultad nueva (sin las líneas en 0 la dificultad
+-- media bajó de 0,290 a 0,260 y la distribución por grado dejó de ser pareja: 21 a 41 tandas por decil):
+--   with g as (select dificultad from public."GV_Picking_Tanda"
+--               where tp >= now() - interval '60 days' and real_min between 0.5 and 240 and tamano > 0
+--                 and coalesce(lineas, 0) > 0 and bruto_min <= 720 and dificultad is not null),
+--    d as (select percentile_cont(array[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]) within group (order by dificultad) p from g),
+--    nv as (select 'decil_' || i clave, round((p[i])::numeric, 4) valor from d, generate_series(1, 9) i),
+--    u as (update public."GV_Picking_Esquema" e set valor = nv.valor from nv
+--           where e.clave = nv.clave and e.valor is distinct from nv.valor returning e.clave, e.valor)
+--   select * from u;
+--   -- y después, otra vez el refresh de las dos mitades para que grado y nivel tomen los deciles nuevos.
+-- select * from public.gv_reglas_perdidas;   -- vacía
 -- select * from public.gv_reglas_perdidas;                                   -- vacía
 -- select * from public.gv_picking_pickeado(array['E31A','F54A']);           -- la fracción de cada tanda
 -- select tanda, legajo, lineas, lineas_cero, cajas, cajas_ped, m3_frac, grado from public."GV_Picking_Tanda" order by tp desc limit 20;

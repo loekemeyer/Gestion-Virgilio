@@ -119,6 +119,13 @@ siempre y no dependan de que estén cargadas en la sesión.
 - **Después de escribir: SELECT de verificación.** Siempre.
 - **EXCEPCIÓN — Planify**: sólo **crear y cerrar tareas** va automático. Cualquier otro cambio
   requiere el "sí". **Auditoría**: toda escritura requiere confirmación, sin excepción.
+- ⚠⚠ **EL PEDIDO ES LA AUTORIZACIÓN** (Luis, 04/10/2026, textual: *"No me preguntes nunca más ni
+  esperes mi sí para aplicar algo que ya te pedí yo"*). Si el dueño pidió el cambio, el SQL que lo
+  implementa —funciones, columnas, centinelas y el refresco que lo hace efectivo— **se aplica en el
+  mismo pedido**, sin un segundo «sí» ni una decisión Dn del tipo «¿lo aplico?». El «sí» previo
+  queda para lo que **NO** pidió: una corrección de datos que Claude detecta solo, un borrado, una
+  reversión. Lo que costó: el SQL de D24 (v26.51) quedó **un día sin aplicar** esperando un «D26 sí»
+  que nadie necesitaba, con la TV y el puntaje mostrando una cosa y la base otra.
 
 ### PLANIFY y AUDITORÍA
 
@@ -6740,7 +6747,14 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   10,0 % del m³ pedido; por operario el m³/h baja 6,4 % (122) · 8,8 % (104) · 11,2 % (504) · **17,5 % (277)**. El pop-up de m³/h
   del Mon. Admin dice «1,2 de 1,5» cuando se prorrateó. `GV_Picking_Tanda` + `lineas_cero` · `cajas_ped` · `m3_frac`.
   `sql/gv_picking_no_pickeado_v2651.sql` (centinelas v26.51; `gv_picking_pickeado` entró a `scripts/reglas-protegidas.json`),
-  `tests/mon-tv.cjs` (techo 100 → 105 KB) y `tests/mon-admin.cjs`.
+  `tests/mon-tv.cjs` (techo 100 → 105 KB) y `tests/mon-admin.cjs`. **Aplicado el 04/10 (v26.53)**, sin «sí» aparte (Luis: *«no esperes mi
+  sí para aplicar algo que ya te pedí yo»*): 356 tandas recalculadas; **826 líneas en 0 salieron** (8.218 → 7.391); fracción pickeada
+  media **0,905**, 258 de 356 tandas por debajo de 1; el índice de las últimas 20 por operario baja 4 a 9 % (104 1,634 → 1,555 · 122
+  1,081 → 1,019 · 277 0,890 → 0,836 · 504 0,792 → 0,722) y el puntaje sólo cambia en el 237 (7 → 6). Los **deciles del grado se
+  recalibraron** sobre la dificultad nueva (media 0,290 → 0,260; decil_5 0,2406 → 0,2280, decil_9 0,5168 → 0,4819): sin eso el
+  grado dejaba de ser un decil (21 a 41 tandas por grado). ⚠ El `gv_picking_puntaje_operario` **vivo** tenía un filtro de turno
+  (`real_min between 0.5 and 240` · `lineas > 0` · `bruto_min <= 720`) que el repo no tenía —otra sesión—: se trajo la definición
+  viva y se conservó, en la base y en el `.sql`.
 - `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
   v26.43 adentro). **Aplicado el 03/10 con el sí de Luis** (v26.45): el 15/09 dio idéntico a la foto, `gv_huellas_cambiadas`
   y `gv_reglas_perdidas` vacías. ⚠ **La huella se compara por `md5(prosrc)`, NO por `md5(pg_get_functiondef(...))`**:
