@@ -315,6 +315,7 @@ td.act-dur{font-weight:900;text-align:center;font-size:calc(2.1*var(--u))}
 .op-punt{font-weight:900;text-align:center;font-variant-numeric:tabular-nums;border-left:1px solid #1e293b}
 .op-punt.prov{color:#94a3b8;font-weight:700}
 .op-punt.alto{color:#4ade80}.op-punt.bajo{color:#f87171}
+.op-aj{color:#94a3b8;font-weight:600;font-size:.72em}
 
 </style>
 </head>
@@ -1944,14 +1945,53 @@ function popRitmo(leg, sub) {
   var rit = function (m3, mi) { return (mi > 0.5 && m3 > 0) ? n1(m3 / (mi / 60)) : "—"; };
   var fm = function (mi, pa) { if (!(mi > 0)) return "—"; var r = Math.round(pa);
     return Math.round(mi) + (r > 0 ? ' <span style="color:#fca5a5">(-' + r + ')</span>' : ''); };
-  var tm = 0, tp = 0, body = pares.map(function (p) { var mi = mins[p[0]] || 0, pa = pmin[p[0]] || 0; tm += mi; tp += pa;
+  /* v26.54 (Luis, 04/10: «¿cuánto debería decir si era difícil?»): en PICKING, dos columnas más —
+     Dif. (grado 1-10 y nivel de la tanda, GV_Picking_Tanda vía gv_picking_grado) y Ajust. = ritmo ×
+     (1 + 0,1 × (grado − 5)): Baja ×0,6-0,7 · Media ×0,8-1,0 · Alta ×1,1-1,3 · Muy alta ×1,4-1,5.
+     Sin grado todavía (el caché se recalcula cada 10 min) la fila dice «—» y no entra al total ajustado. */
+  var esPick = sub === "pick", G = esPick ? (window.__MA_GRADO || {}) : {};
+  var gradoDe = function (t) { return G[t + "|" + leg] || G[t] || null; };
+  var tm = 0, tp = 0, tAj = 0, tAjOk = true, body = pares.map(function (p) { var mi = mins[p[0]] || 0, pa = pmin[p[0]] || 0; tm += mi; tp += pa;
     /* v26.51 (Luis, D24): en picking el m³ es lo PICKEADO; si se prorrateó, al lado va el m³ de la tanda («1,2 de 1,5») */
-    var deN = (sub === "pick" && ped[p[0]] != null) ? ' <small style="color:#94a3b8">de ' + n1(ped[p[0]]) + '</small>' : '';
+    var deN = (esPick && ped[p[0]] != null) ? ' <small style="color:#94a3b8">de ' + n1(ped[p[0]]) + '</small>' : '';
+    var extra = "";
+    if (esPick) {
+      var g = gradoDe(p[0]), mu = g ? Number(g.multiplicador) : NaN;
+      if (g && isFinite(mu)) { tAj += (Number(p[1]) || 0) * mu;
+        extra = '<td title="' + esc("grado " + g.grado + " de 10 · " + (g.lineas || 0) + " líneas · " + (g.paradas || 0) + " paradas · " + (g.esc || 0) + " con escalera · ×" + n1(mu)) + '">' +
+          g.grado + ' <small style="color:#94a3b8">' + esc(String(g.nivel || "")) + '</small></td><td class="pop-k">' + rit((Number(p[1]) || 0) * mu, mi) + '</td>'; }
+      else { tAjOk = false; extra = '<td title="todavía sin grado (el caché se recalcula cada 10 min)">—</td><td>—</td>'; }
+    }
     return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + deN + '</td><td>' + fm(mi, pa) + '</td><td>' +
-      rit(Number(p[1]) || 0, mi) + '</td></tr>'; }).join("");
-  return head + '<table class="pop-cmp"><thead><tr><th>Tanda</th><th>m³' + (sub === "pick" ? ' pick.' : '') + '</th><th>Min trab</th><th>Ritmo m³/h</th></tr></thead><tbody>' +
+      rit(Number(p[1]) || 0, mi) + '</td>' + extra + '</tr>'; }).join("");
+  var thAj = esPick ? '<th title="Dificultad de la tanda: grado 1-10 (decil de min/caja) y nivel">Dif.</th><th title="Ritmo × (1 + 0,1 × (grado − 5)): Baja ×0,6-0,7 · Media ×0,8-1,0 · Alta ×1,1-1,3 · Muy alta ×1,4-1,5">Ajust. m³/h</th>' : '';
+  var tdAj = esPick ? '<td></td><td class="pop-k">' + (tAjOk && pares.length ? rit(tAj, tm) : "—") + '</td>' : '';
+  var nota = esPick ? '<div class="pop-sub" style="margin-top:.6vh">Ajust. = ritmo × (1 + 0,1 × (grado − 5)). Baja ×0,6-0,7 · Media ×0,8-1,0 · Alta ×1,1-1,3 · Muy alta ×1,4-1,5. Una tanda difícil a 0,5 m³/h vale 0,55-0,65.</div>' : '';
+  return head + '<table class="pop-cmp"><thead><tr><th>Tanda</th><th>m³' + (esPick ? ' pick.' : '') + '</th><th>Min trab</th><th>Ritmo m³/h</th>' + thAj + '</tr></thead><tbody>' +
     body + '<tr class="pop-tot"><td>Total</td><td>' + n1(tot) + '</td><td>' + fm(tm, tp) +
-    '</td><td>' + rit(tot, tm) + '</td></tr></tbody></table>';
+    '</td><td>' + rit(tot, tm) + '</td>' + tdAj + '</tr></tbody></table>' + nota;
+}
+/* v26.54: grado de dificultad por tanda (gv_picking_grado, lectura con la clave pública). Se pide para las
+   tandas de picking que el tablero ya tiene en __MA_M3, se guarda por «tanda|legajo» y por tanda, y se
+   relee en cada render si pasaron 5 min o aparecieron tandas nuevas. Si falla, el pop-up dice «—». */
+var GRADO_TS = 0, GRADO_KEYS = "", GRADO_VUELO = false;
+function cargarGrados() {
+  var M = window.__MA_M3 || {}, ts = {};
+  Object.keys(M).forEach(function (leg) { Object.keys((M[leg] || {}).pick || {}).forEach(function (t) { ts[t] = 1; }); });
+  var lista = Object.keys(ts).sort(), key = lista.join(",");
+  if (!lista.length || GRADO_VUELO) return;
+  if (key === GRADO_KEYS && (Date.now() - GRADO_TS) < 300000) return;
+  GRADO_VUELO = true;
+  fetch(SB_URL + "/rest/v1/rpc/gv_picking_grado", { method: "POST", cache: "no-store",
+    headers: Object.assign({ "Content-Type": "application/json" }, H), body: JSON.stringify({ p_tandas: lista }) })
+  .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+  .then(function (rows) {
+    var g = {};
+    (rows || []).forEach(function (o) { var t = String(o.tanda || "").toUpperCase(); if (!t) return;
+      g[t + "|" + String(o.legajo)] = o; if (!g[t]) g[t] = o; });
+    window.__MA_GRADO = g; GRADO_TS = Date.now(); GRADO_KEYS = key; GRADO_VUELO = false;
+    if (window.__MA_INSTR) window.__MA_INSTR();
+  }).catch(function (e) { GRADO_VUELO = false; console.warn("[admin] gv_picking_grado:", e && e.message); });
 }
 function popHoras(leg) {
   /* v25.89 (Luis): dos columnas. Prod = SÓLO picking y armado; todo lo demás es No prod, tiempo muerto incluido. */
@@ -2155,6 +2195,7 @@ function instrumentar() {
   var D = window.__MA_D || {};
   var H = D.horas || [], hi = 0;
   if (!PUNT || (Date.now() - PUNT_TS) > 600000) cargarPuntajes();
+  cargarGrados();   // v26.54: el grado de cada tanda pickeada, para el m³/h ajustado
   var ops = document.querySelector("#opsBox table.ops");
   if (ops && !ops.getAttribute("data-punt")) {
     ops.setAttribute("data-punt", "1");
@@ -2171,6 +2212,15 @@ function instrumentar() {
       td[i].className += " cx"; td[i].setAttribute("data-pop", pop); td[i].setAttribute("data-leg", leg);
       if (sub) td[i].setAttribute("data-sub", sub); }
     marca(1, "rit", "pick"); marca(2, "rit", "arm"); marca(3, "hs"); marca(4, "hs");
+    /* v26.54: en la celda de m³/h picking, chiquito, el ajustado por dificultad del día («→ 0,6») cuando
+       TODAS sus tandas ya tienen grado; el detalle por tanda está en el pop-up */
+    if (td[1] && !td[1].querySelector(".op-aj")) {
+      var M = window.__MA_M3 || {}, G = window.__MA_GRADO || {}, pk = (M[leg] || {}).pick || {}, s = 0, okG = true, n = 0;
+      Object.keys(pk).forEach(function (t) { var g = G[t + "|" + leg] || G[t]; n++;
+        if (g && isFinite(Number(g.multiplicador))) s += pk[t] * Number(g.multiplicador); else okG = false; });
+      var hp = Number(o.hs_pick) || 0;
+      if (n && okG && hp > 0.05 && s > 0) td[1].insertAdjacentHTML("beforeend", ' <small class="op-aj" title="ajustado por dificultad: m³ × (1 + 0,1 × (grado − 5)) ÷ h">→ ' + n1(s / hp) + '</small>');
+    }
     if (tr.children.length < 7) tr.insertAdjacentHTML("beforeend", puntCelda(leg));
   });
   var RDS = resumenDias(D.arbol || [], D.despachadas || new Set(), 4), ri = 0;

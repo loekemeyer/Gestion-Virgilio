@@ -39,7 +39,9 @@ if (src) {
   for (const marca of ['id="pop"', ".cx", "abrirDesglose", "function instrumentar()",
                        "window.__MA_INSTR", 'data-pop',
                        // v26.50 (Luis): puntaje 1-10 de picking, SÓLO en el admin (nunca en tv.html)
-                       "gv_picking_puntaje_operario", 'data-pop="punt"', "window.parent.sbAuth", "function popPuntaje("]) {
+                       "gv_picking_puntaje_operario", 'data-pop="punt"', "window.parent.sbAuth", "function popPuntaje(",
+                       // v26.54 (Luis): m³/h AJUSTADO por dificultad (gv_picking_grado), también sólo en el admin
+                       "gv_picking_grado", "function cargarGrados(", "Ajust. m³/h", 'class="op-aj"']) {
     if (!src.includes(marca)) fallas.push("le falta la capa admin: " + marca);
   }
   // sigue leyendo las MISMAS fuentes que la TV (lo hereda de tv.html, pero lo confirmamos)
@@ -51,6 +53,7 @@ if (src) {
   // y la TV NO lleva el puntaje (es de supervisor): candado invertido
   const tvSrc = fs.readFileSync(path.join(MON, "tv.html"), "utf8");
   if (tvSrc.includes("gv_picking_puntaje_operario")) fallas.push("tv.html NO puede llevar el puntaje de picking (es sólo del admin)");
+  if (tvSrc.includes("gv_picking_grado")) fallas.push("v26.54: tv.html NO puede llevar el grado de dificultad (es sólo del admin)");
 }
 
 if (fallas.length) {
@@ -159,6 +162,8 @@ function responder(url) {
   if (q.includes("/rpc/gv_tv_clave_actual"))     return { clave: "1234", cambia_en_s: 60 };
   /* v26.51 (D24): E31A se pickeó al 80 % → el pop-up de m³/h muestra «1,2 de 1,5» y el ritmo 1,2 */
   if (q.includes("/rpc/gv_picking_pickeado"))    return [{ tanda: "E31A", lineas: 5, lineas_cero: 1, cajas_ped: 20, cajas_pick: 16, m3_ped: 1.5, m3_pick: 1.2, fraccion: 0.8 }];
+  /* v26.54 (Luis): E31A es de dificultad ALTA (grado 7 → ×1,2): el ajustado = 1,2 m³ × 1,2 */
+  if (q.includes("/rpc/gv_picking_grado"))       return [{ tanda: "E31A", legajo: "8", grado: 7, nivel: "Alta", multiplicador: 1.2, dificultad: 0.302, lineas: 5, paradas: 4, esc: 2, calc_at: iso(T0 - H) }];
   if (q.includes("/Registros_Produccion_Virgilio")) {
     if (q.includes("opcion=in.(EP,TP,AP,TAP)")) return DATOS.pickHs;   // v26.35: picking y armado   // v26.33: hora del picking de la tanda
     return q.includes("opcion=in.(CCN,FSS)") ? DATOS.ccn : DATOS.eventos;
@@ -174,7 +179,9 @@ function responder(url) {
   const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
 
+  let pedidoGr = null;   // v26.54: qué tandas le pidió el admin a gv_picking_grado
   await p.route("**/rest/v1/**", (route) => {
+    if (route.request().url().includes("gv_picking_grado")) { try { pedidoGr = JSON.parse(route.request().postData() || "null"); } catch (_e) { pedidoGr = "mal"; } }
     const filas = responder(route.request().url());
     const arr = Array.isArray(filas) ? filas : [filas];
     route.fulfill({
@@ -224,6 +231,21 @@ function responder(url) {
     return (pop && !pop.classList.contains("hidden") && !pop.classList.contains("hide")) ? (pop.textContent || "") : null;
   });
 
+  /* v26.54 (Luis, 04/10: «me estás pidiendo aplicar algo que no me estás mostrando»): el admin pide el grado
+     de las tandas pickeadas y, con todas con grado, la celda de m³/h picking lleva el ajustado chiquito:
+     1,2 m³ pickeados × 1,2 (grado 7, Alta) ÷ 1,0 h = 1,44 → «→ 1,4». */
+  await p.waitForFunction(() => window.__MA_GRADO && Object.keys(window.__MA_GRADO).length > 0, null, { timeout: 5000 }).catch(() => {});
+  await p.waitForFunction(() => !!document.querySelector("#opsBox table.ops tbody tr:first-child td.op-rit .op-aj"), null, { timeout: 5000 }).catch(() => {});
+  ok(pedidoGr && pedidoGr.p_tandas && pedidoGr.p_tandas.indexOf("E31A") >= 0 && pedidoGr.p_tandas.indexOf("E30A") < 0,
+     "v26.54: el admin tiene que pedirle a gv_picking_grado las tandas con TP de hoy (E31A sí, E30A en curso no): " + JSON.stringify(pedidoGr));
+  const aj = await p.evaluate(() => {
+    const td = document.querySelector("#opsBox table.ops tbody tr:first-child td.op-rit");
+    const s = td && td.querySelector(".op-aj");
+    return { celda: td ? td.textContent.replace(/\s+/g, " ").trim() : "", aj: s ? s.textContent.trim() : null };
+  });
+  ok(aj.aj === "→ 1,4", "v26.54: la celda de m³/h picking tiene que llevar el ajustado «→ 1,4» (1,2 × 1,2 ÷ 1 h): " + JSON.stringify(aj));
+  ok(/^1,2\b/.test(aj.celda), "v26.54: el m³/h crudo (1,2) sigue siendo el número grande de la celda: " + aj.celda);
+
   // a) m³/h picking del primer operario (legajo 8 cerró E31A, 1,5 m³ ÷ 1 h)
   await p.click("#opsBox table.ops tbody tr:first-child td.op-rit.cx");
   let t1 = await popTxt();
@@ -233,6 +255,23 @@ function responder(url) {
   ok(t1 && /Min trab/i.test(t1) && /Ritmo/i.test(t1) && /Total/.test(t1), "v25.92: el desglose de m³/h no trae Min trab · Ritmo · Total: " + (t1 || "").slice(0, 200));
   /* v26.51 (Luis, D24): el m³ de picking es lo PICKEADO (1,5 × 0,8 = 1,2) y al lado dice de cuánto era la tanda */
   ok(t1 && /1,2\s*de 1,5/.test(t1) && /m³ pick\./.test(t1), "v26.51 (D24): el desglose de picking tiene que decir «1,2 de 1,5» con el rótulo m³ pick.: " + (t1 || "").slice(0, 200));
+  /* v26.54: en el pop-up, por tanda, «Dif.» (grado y nivel) y «Ajust. m³/h» = ritmo × multiplicador.
+     E31A: 1,2 m³ en 30 min (TP 3 h → 2,5 h atrás) → ritmo 2,4 · grado 7 Alta ×1,2 → 2,9. Y el Total ajustado igual. */
+  const popAj = await p.evaluate(() => {
+    const tb = document.querySelector("#pop table.pop-cmp");
+    if (!tb) return null;
+    const th = [...tb.querySelectorAll("thead th")].map((x) => x.textContent.trim());
+    const filas = [...tb.querySelectorAll("tbody tr")].map((tr) => [...tr.children].map((x) => x.textContent.replace(/\s+/g, " ").trim()));
+    return { th, filas, nota: (document.getElementById("pop") || {}).textContent || "" };
+  });
+  ok(popAj && popAj.th.indexOf("Dif.") >= 0 && popAj.th.indexOf("Ajust. m³/h") >= 0, "v26.54: el pop-up de picking no trae las columnas Dif. y Ajust. m³/h: " + JSON.stringify(popAj && popAj.th));
+  const f31 = popAj && popAj.filas.find((f) => f[0] === "E31A");
+  ok(f31 && /^7\b/.test(f31[4]) && /Alta/.test(f31[4]), "v26.54: E31A tiene que decir grado «7 Alta» en Dif.: " + JSON.stringify(f31));
+  ok(f31 && f31[3] === "2,4" && f31[5] === "2,9", "v26.54: E31A ritmo 2,4 y ajustado 2,9 (× 1,2): " + JSON.stringify(f31));
+  const fTot = popAj && popAj.filas.find((f) => f[0] === "Total");
+  ok(fTot && fTot[5] === "2,9", "v26.54: el Total ajustado tiene que ser 2,9: " + JSON.stringify(fTot));
+  ok(popAj && /Ajust\. = ritmo × \(1 \+ 0,1 × \(grado − 5\)\)/.test(popAj.nota) && /0,5 m³\/h vale 0,55-0,65/.test(popAj.nota),
+     "v26.54: falta la nota de cómo se calcula el ajustado (y el ejemplo de 0,5 m³/h)");
 
   // cierre con ✕
   await p.click("#popX");
@@ -297,5 +336,5 @@ function responder(url) {
   await b.close();
 
   if (mal.length) { console.log("mon-admin: ✗ FAIL\n  - " + mal.join("\n  - ")); process.exit(1); }
-  console.log("mon-admin: ✓ OK (frescura + tablero + 3 pop-ups + hora del picking y del armado)");
+  console.log("mon-admin: ✓ OK (frescura + tablero + 3 pop-ups + hora del picking y del armado + m³/h ajustado por dificultad)");
 })().catch((e) => { console.log("mon-admin: ✗ ERROR " + e.message); process.exit(1); });

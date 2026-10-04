@@ -31377,3 +31377,31 @@ definición viva y se conservó en la base y en el archivo; (2) sin las líneas 
 grado dejó de ser un decil (21 a 41 tandas por grado), así que **los 9 deciles de `GV_Picking_Esquema` se recalibraron** sobre la
 dificultad nueva (decil_1 0,0828 → 0,0810 · decil_5 0,2406 → 0,2280 · decil_9 0,5168 → 0,4819) y se volvió a refrescar: 33
 tandas por grado (32 en el 5). El SQL de la recalibración quedó en la sección 6 del archivo.
+
+### 3.v2654 — m³/h de picking AJUSTADO por dificultad, a la vista en el Mon. Admin (Luis, 04/10/2026, v26.54)
+
+**Qué pidió.** *«Si en un picking de dificultad alta la persona promedió 0,5 m³/h, ¿cuánto hace que mejore?»* y, al proponerle
+aplicarlo sin mostrarlo (D27): *«me estás pidiendo aplicar algo que no me estás mostrando»*. Hasta acá el grado 1-10 de cada tanda
+vivía en `GV_Picking_Tanda` (v26.50) y sólo lo usaba el puntaje; **ninguna pantalla mostraba el m³/h corregido**.
+
+**Qué se ve.** Mon. Admin → celda m³/h picking de un operario → pop-up: por tanda, **Dif.** (grado y nivel; el `title` dice líneas,
+paradas, escalera y el ×) y **Ajust. m³/h** = ritmo × (1 + 0,1 × (grado − 5)) — Baja ×0,6-0,7 · Media ×0,8-1,0 · Alta ×1,1-1,3 ·
+Muy alta ×1,4-1,5 — más el Total ajustado y la nota con la fórmula. En la celda de la tabla, chiquito, el ajustado del día («1,5
+→ 1,4») cuando TODAS sus tandas ya tienen grado; sin grado (el caché se rehace cada 10 min) la fila dice «—» y no entra al total.
+**La TV de los operarios no lo lleva** (misma regla que el puntaje: `tests/mon-admin.cjs` canda que `tv.html` no nombre
+`gv_picking_grado`).
+
+**Caso real del 02/10, Jhonny Moncayo (104):** F22A 0,877 m³ pickeados en 31 min = **1,7 m³/h**, grado 7 Alta ×1,2 → **2,0** ·
+E89A 1,534 m³ en 80 min = 1,2, grado 3 Media ×0,8 → **0,9** · F22E 0,329 en 20 min = 1,0, grado 4 ×0,9 → 0,9 · E48K 0,120 en
+12 min = 0,6, grado 6 Alta ×1,1 → 0,7. El día: 2,86 m³ ÷ 1,93 h = **1,5 → 1,4** (la tanda grande era fácil).
+
+**Un objeto nuevo, de lectura:** `gv_picking_grado(p_tandas text[])` (SECURITY DEFINER, `anon` + `authenticated`): tanda, legajo,
+grado, nivel, multiplicador, dificultad, líneas, paradas, escalera, `calc_at`, leído de `GV_Picking_Tanda`. **No se tocó**
+`gv_picking_pickeado` (cambiarle el retorno exige un DROP, que desde la sesión se cuelga) ni ninguna función con centinela.
+Verificado como `anon`. El admin la pide por POST con la clave pública (`cargarGrados()` en `monitor/build-admin.cjs`), para las
+tandas con TP de hoy que ya tiene en `__MA_M3`, y relee si aparecen tandas nuevas o pasaron 5 min; si falla, «—».
+
+**Aplicado el 04/10/2026** sin «sí» aparte (lo pidió Luis). `sql/gv_picking_grado_v2654.sql`. **Rollback, una línea:**
+`drop function if exists public.gv_picking_grado(text[]);` (el admin queda con «—» en Dif./Ajust.).
+`tests/mon-admin.cjs` (mock de la RPC, la celda «→ 1,4» y el pop-up 2,4 → 2,9 con grado 7; verificado que falla contra el admin
+anterior).

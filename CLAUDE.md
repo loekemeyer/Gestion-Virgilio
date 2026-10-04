@@ -6755,6 +6755,12 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   grado dejaba de ser un decil (21 a 41 tandas por grado). ⚠ El `gv_picking_puntaje_operario` **vivo** tenía un filtro de turno
   (`real_min between 0.5 and 240` · `lineas > 0` · `bruto_min <= 720`) que el repo no tenía —otra sesión—: se trajo la definición
   viva y se conservó, en la base y en el `.sql`.
+  **v26.54 (Luis, 04/10: *"me estás pidiendo aplicar algo que no me estás mostrando"*): el m³/h AJUSTADO por dificultad SE VE en el
+  Mon. Admin.** Pop-up de m³/h picking → por tanda **Dif.** (grado y nivel) y **Ajust. m³/h** = ritmo × (1 + 0,1 × (grado − 5)),
+  Total ajustado y la nota; en la celda, chiquito, el del día («1,5 → 1,4») cuando todas sus tandas tienen grado. Caso real 02/10
+  (104): F22A 1,7 m³/h grado 7 Alta → 2,0 · E89A 1,2 grado 3 → 0,9 · el día 1,5 → 1,4. RPC nueva de lectura `gv_picking_grado(text[])`
+  (anon, lee `GV_Picking_Tanda`); `gv_picking_pickeado` no se tocó. **La TV no lo lleva** (candado en `tests/mon-admin.cjs`).
+  `sql/gv_picking_grado_v2654.sql`, §3.v2654.
 - `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
   v26.43 adentro). **Aplicado el 03/10 con el sí de Luis** (v26.45): el 15/09 dio idéntico a la foto, `gv_huellas_cambiadas`
   y `gv_reglas_perdidas` vacías. ⚠ **La huella se compara por `md5(prosrc)`, NO por `md5(pg_get_functiondef(...))`**:
