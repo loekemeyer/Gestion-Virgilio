@@ -767,11 +767,6 @@
       "quien": "Luis"
     },
     {
-      "objeto": "gv_tanda_tomar_frenada",
-      "regla": "Al tomar una tanda frenada se devuelve dónde quedó el carro (ubicación del último freno)",
-      "quien": "Luis"
-    },
-    {
       "objeto": "gv_tandas_frenar_fichaje",
       "regla": "Una tanda tomada se frena sola cuando el dueño ficha salida, sólo si no volvió a trabajar después del FJ",
       "quien": "Luis"
