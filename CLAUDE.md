@@ -7763,7 +7763,7 @@ empresa) más de **5 %** por encima de `Capacidad_Sector` (D3, v26.87) manda UN 
 `GV_Alerta_Gondola_Llena`. Sin capacidad cargada no avisa. Probar sin mandar: `select * from
 public.gv_alerta_gondola_llena_telegram(true);`. Centinela 322. `sql/gv_alerta_gondola_llena_v2686.sql`.
 
-## ⚠ REGLA (Luis, 2026-10-05, v27.01): el RESUMEN de la PPP dice el orden del armado y CÓMO llegó cada NP a su día
+## ⚠ REGLA (Luis, 2026-10-05, v27.02): el RESUMEN de la PPP dice el orden del armado y CÓMO llegó cada NP a su día
 
 - Arriba de la tabla, desplegable **🧠 Orden de prioridad del armado automático** (`PPP_ARMADO_ORDEN_HTML`): si cambia una
   regla del armado, se cambia ese texto en el mismo pedido.

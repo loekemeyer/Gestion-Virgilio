@@ -131,7 +131,8 @@
       "mcp__claude-code-remote__add_repo",
       "mcp__claude-code-remote__register_repo_root",
       "mcp__claude-code-remote__delete_trigger",
-      "Bash(sed -i 's|// v26.95 \\(Luis, D3\\): + capacidad|// v26.96 \\(Luis, D3\\): + capacidad|' index.html && node scripts/bump-version.cjs 26.96 2>&1 | tail -1 && git add -A && git commit -qm \"v26.96: Excel de Generar las OCs con columna Cap. góndola *)"
+      "Bash(sed -i 's|// v26.95 \\(Luis, D3\\): + capacidad|// v26.96 \\(Luis, D3\\): + capacidad|' index.html && node scripts/bump-version.cjs 26.96 2>&1 | tail -1 && git add -A && git commit -qm \"v26.96: Excel de Generar las OCs con columna Cap. góndola *)",
+      "Bash(sed -i 's/REGLA \\(Luis, 2026-10-05, v27.01\\): el RESUMEN/REGLA \\(Luis, 2026-10-05, v27.02\\): el RESUMEN/' CLAUDE.md)"
     ]
   }
 }
