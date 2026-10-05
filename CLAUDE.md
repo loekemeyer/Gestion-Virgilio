@@ -4237,6 +4237,23 @@ hoy; valoriza los pedidos nuevos con su precio) y **no se hace el backfill de lo
   «forzar». «solo_pdf» lo arma sin mandar (queda como artifact). Si la plantilla no está APPROVED en Meta, no manda y el
   run queda en rojo. `tests/reporte-quincenal-params.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-05, v26.98): ➕ AGREGAR ARTÍCULO en Pedidos Importación — alta + primer pedido a mano
+
+Solapa **➕ Agregar artículo** (`openImpAgregar`, `importacion.js`): código, empresa (LK/CH/Loke/Mixto), proveedor,
+descripción, medidas MC e inner (cm → m³), uni × inner (0 = suelto), uni × MC, FOB, MOQ y el **primer pedido en MC**
+(sugerido = MOQ en MC enteras; editable). Una transacción: **`gv_importado_alta(jsonb)`** (supervisor; rechaza un
+(código, empresa) que ya existe y uni × MC que no sea múltiplo del inner).
+
+| dato | dónde |
+|---|---|
+| uni × inner | `Importados.uni_x_caja` + `Importados_Volumen.uni_inner` |
+| uni × MC, medidas MC | `Importados_Volumen.uni_master`, `largo/ancho/alto_cm`, `m3_master` |
+| medidas inner | `Importados_Volumen.inner_largo/ancho/alto_cm`, `m3_inner` (nuevas) |
+| MOQ del artículo | **`Importados.moq`** (nueva; vacío = el del proveedor). `_pedImpMoqCalc` lo usa antes que el del proveedor |
+| primer pedido | **`Importados.pedido_manual`** (unidades). 📦 Pedidos lo toma como MC pedido (`_pedImpPrimerPedidoMc`, chip «1.er pedido») mientras el código no tenga pedido en curso; al cargar el primer bache lo borra el trigger `gv_importados_bache_primer_pedido` |
+
+Centinelas 332-333. `sql/gv_importado_alta_v2698.sql`, `tests/imp-agregar-articulo.cjs`.
+
 ## ⚠ REGLA (2026-10-01, v25.94): ✏️ EDITAR PI — quién corrige, qué día y a qué hora
 
 En 🚢 En curso, el **✏️ Editar PI** de cada pedido (reemplaza al viejo «✏️ PI», que sólo renombraba) abre

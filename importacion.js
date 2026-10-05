@@ -23,6 +23,7 @@ function _impTabsHtml(cur) {
   const t = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:5px 11px;border-radius:999px;border:1px solid ' + (on ? '#1d4ed8' : '#cbd5e1') + ';background:' + (on ? '#1d4ed8' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap'; };
   return '<div class="imp-tabs" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px">' +
     '<button style="' + t(cur === 'ped') + '" onclick="openPedidosImportacion()">📦 Pedidos</button>' +
+    '<button style="' + t(cur === 'alta') + '" onclick="openImpAgregar()" title="Dar de alta un importado nuevo: código, medidas, unidades, FOB, MOQ, proveedor y el primer pedido a mano.">➕ Agregar artículo</button>' +
     '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">🚢 En curso</button>' +
     '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">💱 NTL</button>' +
     '<button style="' + t(cur === 'provcc') + '" onclick="openImpProvCC()" title="Una cuenta por fábrica: cuánto le debemos por los pedidos en curso, cada giro, y la historia (hoja del Excel + extracto NTL).">📒 Cta. proveedor</button>' +
@@ -604,7 +605,7 @@ function pedImpProyAbrir(codEnc, proyCajas) {
    Una cantidad puesta A MANO (mcOverride) gana siempre: acá no se mira. */
 function _pedImpMoqCalc(it) {
   const prov = String((it && it.prov) || "").trim();
-  const moq = _impProvNum(prov, "moq", _NAC_TASAS.moq);
+  const moq = (it && Number(it.moqArt) > 0) ? Number(it.moqArt) : _impProvNum(prov, "moq", _NAC_TASAS.moq);   // v26.98 — MOQ propio del artículo (Importados.moq) gana
   const topeMeses = _impProvNum(prov, "moq_meses_max", _NAC_TASAS.moq_meses_max) + ((it && it.esInsumo) ? INSUMO_MESES_PRODUCTO : 0);   // v25.01 — el insumo lleva sus 2 meses de producto también en el tope
   const pct = (Number(_NAC_TASAS.moq_pct) > 0 && Number(_NAC_TASAS.moq_pct) <= 1) ? Number(_NAC_TASAS.moq_pct) : 0.8;
   const div = (Number(it && it.uniMaster) > 0) ? Number(it.uniMaster) : (Number(it && it.uxc) > 0 ? Number(it.uxc) : 0);
@@ -625,6 +626,7 @@ function _pedImpMoqCalc(it) {
 function _pedImpMoqChip(it) {
   const ov = (_stkPop && _stkPop.mcOverride) ? _stkPop.mcOverride[it.key || it.cod] : undefined;
   if (ov != null) return "";
+  if (_pedImpPrimerPedidoMc(it) != null) return ' <span style="font-size:10px;font-weight:800;color:#1e3a8a;background:#dbeafe;border-radius:999px;padding:1px 6px" title="Primer pedido cargado a mano en ➕ Agregar artículo. Se borra solo al cargar el primer pedido en curso.">1.er pedido</span>';
   const m = _pedImpMoqCalc(it);
   if (m.estado === "ok") return "";
   const pisoTxt = Math.round(m.piso).toLocaleString("es-AR"), baseTxt = Math.round(m.mcBase).toLocaleString("es-AR");
@@ -1497,9 +1499,18 @@ function _pedImpQuiebreBadge(n) {
 function _pedImpAlertaBadge(n) {
   return n > 0 ? ' <span class="pedimp-alerta" style="font-size:11px;font-weight:800;color:#fff;background:#dc2626;border-radius:999px;padding:0 6px" title="' + n + ' con &lt; ' + _PEDIMP_MESES_ALERTA + ' meses de stock (stock + en camino)">⚠' + n + '</span>' : '';
 }
+/* v26.98 — primer pedido a mano (Importados.pedido_manual, en unidades): vale mientras el código no tenga
+   pedido en curso. Devuelve las MC o null si no aplica. */
+function _pedImpPrimerPedidoMc(it) {
+  const pu = Number(it && it.primerPedidoU) || 0;
+  if (!(pu > 0) || (Number(it.enCurso) || 0) > 0) return null;
+  const div = Number(it.uniMaster) > 0 ? Number(it.uniMaster) : (Number(it.uxc) > 0 ? Number(it.uxc) : 0);
+  return div > 0 ? Math.ceil(pu / div) : null;
+}
 function _pedImpMcOf(it) {
   const ov = (_stkPop && _stkPop.mcOverride) ? _stkPop.mcOverride[it.key || it.cod] : undefined;   // v22.93 — 809E LK y CH, cada uno el suyo
   if (ov != null) return ov;
+  const pp = _pedImpPrimerPedidoMc(it); if (pp != null) return pp;   // v26.98 — el primer pedido cargado a mano en ➕ Agregar artículo
   return (it.aPedirCajas != null) ? _pedImpMoqCalc(it).mc : 0;   // v24.55 — con la regla del 80 % del MOQ
 }
 /* v22.93 — 809E va en dos líneas (LK / CH): chip de planta, búsqueda por clave y a qué filas del maestro
@@ -1832,6 +1843,7 @@ function _pedImpDamianData(prov) {
 function _pedImpMoqPdf(it) {
   const ov = (_stkPop && _stkPop.mcOverride) ? _stkPop.mcOverride[it.key || it.cod] : undefined;
   if (ov != null) return "";
+  if (_pedImpPrimerPedidoMc(it) != null) return "";
   const m = _pedImpMoqCalc(it); if (m.estado !== "estira") return "";
   // v26.31 (Luis: "optimización horizontal absoluta") — en 2 renglones: la columna queda la mitad de ancha.
   return '<span class="moq">↑ ' + Math.round(m.pct * 100) + '% MOQ<br>' + (Math.round(m.mesesNec * 10) / 10).toLocaleString("es-AR") + ' m</span>';
@@ -2293,7 +2305,8 @@ const _PED_IMP_RPC_ESCRITURA = ["gv_imp_carga_pedido_set", "gv_imp_cc_deuda_add"
   "gv_imp_recibir", "gv_imp_recibir_contexto", "gv_imp_recibir_sin_pedido", "gv_imp_recibir_contexto_sin_pedido", "gv_imp_recepcion_historial", "gv_imp_recepcion_anular",   // v23.45 — sólo authenticated (supervisor)
   "gv_imp_cervantes_denegados",   // v25.37
   "gv_imp_pi_editar", "gv_imp_pi_editores", "gv_imp_pi_ediciones",   // v25.94 — editar una PI (quién, cuándo): sólo supervisor
-  "gv_importados_curso_fob"];   // v26.37 — el FOB guardado en cada pedido en curso (lectura, sólo supervisor)
+  "gv_importados_curso_fob",   // v26.37 — el FOB guardado en cada pedido en curso (lectura, sólo supervisor)
+  "gv_importado_alta"];   // v26.98 — ➕ Agregar artículo (sólo supervisor)
 async function _pedImpRpc(fn, body) {
   var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   if (_PED_IMP_RPC_ESCRITURA.indexOf(fn) >= 0) {
@@ -3120,6 +3133,162 @@ async function impRecGrabar() {
     (!r.sin_pedido && Number(r.sobra) > 0 ? ' Llegaron ' + Number(r.sobra).toLocaleString("es-AR") + ' u más de lo pedido: entraron al stock igual.' : '') + '</div>' +
     (_impRec.lineas.some(function (l) { return l.destino === "cervantes"; }) ? '<div class="irc-ok" style="margin-top:8px">🏭 Lo que va a <b>Cervantes</b> no entró al stock de Virgilio: les aparece en <b>Recepción de Insumos → Importados</b> de GP2 para que digan <b>Sí</b> o <b>No</b>. Si dicen No, el pedido vuelve a estar en viaje con «Denegado por Cervantes».</div>' : '') +
     '<div style="margin-top:10px"><button class="irc-b pri" onclick="impRecCerrar()">Listo</button><button class="irc-b sec" onclick="impRecCerrar();openImpHistRecep()">Ver historial de recepción</button></div>');
+}
+/* v26.98 (Luis, 05/10) — Solapa ➕ Agregar artículo: alta de un importado nuevo. Pide código, medidas de la
+   MC y del inner, unidades por inner y por MC, FOB, descripción, MOQ y proveedor, y deja ajustar A MANO el
+   PRIMER PEDIDO a mandar (master cajas). Un artículo nuevo no tiene Estadística Madre, así que la cuenta
+   automática daría 0: el primer pedido se guarda en Importados.pedido_manual (unidades) y 📦 Pedidos lo toma
+   como MC pedido mientras el código no tenga pedido en curso; al cargar el primer bache la base lo borra sola
+   (trigger gv_importados_bache_primer_pedido). Escribe gv_importado_alta (supervisor, una transacción). */
+let _impAlta = null;
+function _impAltaNum(v) {
+  let t = String(v == null ? "" : v).trim().replace(/\s/g, "");
+  if (!t) return null;
+  if (t.indexOf(",") >= 0) t = t.replace(/\./g, "").replace(",", ".");
+  const n = Number(t); return isFinite(n) ? n : NaN;
+}
+async function openImpAgregar() {
+  _stkPopShell("➕ Agregar artículo importado", "stkPopBody", true);
+  const body = document.getElementById("stkPopBody"); if (!body) return;
+  _stkPop = { kind: "impAlta" };
+  if (!_impAlta) _impAlta = { v: { marca: "LK" }, mcTocado: false, msg: "", msgTipo: "", guardando: false, ok: null };
+  body.innerHTML = _impTabsHtml('alta') + '<div class="stkpop-empty">Cargando proveedores…</div>';
+  try { await _impCfgCargar(); } catch (_e) {}
+  if (!_stkPop || _stkPop.kind !== "impAlta") return;
+  _impAltaRender();
+}
+function _impAltaLeer() {
+  const v = _impAlta.v;
+  document.querySelectorAll("#impAltaF [data-k]").forEach(function (e) { v[e.getAttribute("data-k")] = e.value; });
+  if (v.proveedor === "__otro") v.proveedor = "";
+  return v;
+}
+/* MOQ efectivo (el del artículo o, vacío, el del proveedor) y el primer pedido sugerido = el MOQ en MC enteras. */
+function _impAltaCalc(v) {
+  const um = _impAltaNum(v.uni_mc), ui = _impAltaNum(v.uni_inner), fob = _impAltaNum(v.fob);
+  const prov = String(v.proveedor || v.prov_otro || "").trim();
+  const moqArt = _impAltaNum(v.moq);
+  const moqProv = prov ? _impProvNum(prov, "moq", _NAC_TASAS.moq) : _nacNum(_NAC_TASAS.moq, 0);
+  const moq = (moqArt != null && isFinite(moqArt)) ? moqArt : moqProv;
+  const sugMc = (um > 0 && moq > 0) ? Math.ceil(moq / um) : 0;
+  let mc = _impAltaNum(v.mc); if (!_impAlta.mcTocado || mc == null || !isFinite(mc)) mc = sugMc;
+  mc = Math.max(0, Math.floor(mc || 0));
+  const m3 = function (a, b, c) { a = _impAltaNum(a); b = _impAltaNum(b); c = _impAltaNum(c); return (a > 0 && b > 0 && c > 0) ? a * b * c / 1e6 : null; };
+  const m3mc = m3(v.mc_largo, v.mc_ancho, v.mc_alto), m3in = m3(v.in_largo, v.in_ancho, v.in_alto);
+  const uni = um > 0 ? mc * um : 0;
+  return { um: um, ui: ui, fob: fob, prov: prov, moqArt: moqArt, moqProv: moqProv, moq: moq, sugMc: sugMc, mc: mc, uni: uni,
+    usd: (fob > 0 ? uni * fob : 0), m3mc: m3mc, m3in: m3in, m3tot: (m3mc != null ? mc * m3mc : null),
+    innerXmc: (um > 0 && ui > 0) ? um / ui : null };
+}
+function _impAltaRender() {
+  const body = document.getElementById("stkPopBody"); if (!body || !_impAlta) return;
+  const v = _impAlta.v, c = _impAltaCalc(v);
+  const fm = function (n, d) { return (n == null || !isFinite(n)) ? "—" : Number(n).toLocaleString("es-AR", { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); };
+  const val = function (k) { return escapeHtml(v[k] == null ? "" : String(v[k])); };
+  const inp = function (k, ph, num, w) { return '<input data-k="' + k + '" value="' + val(k) + '" placeholder="' + escapeHtml(ph || "") + '"' + (num ? ' inputmode="decimal"' : '') + ' style="width:' + (w || 90) + 'px" oninput="_impAltaCambio(\'' + k + '\')">'; };
+  const provs = (_PROV_IMP_LISTA || []).slice();
+  const esOtro = v.proveedor === "" && v.prov_otro != null;
+  const provSel = '<select data-k="proveedor" onchange="_impAltaCambio(\'proveedor\')" style="width:150px"><option value="">— elegí —</option>' +
+    provs.map(function (p) { return '<option' + (v.proveedor === p ? ' selected' : '') + '>' + escapeHtml(p) + '</option>'; }).join("") +
+    '<option value="__otro"' + (esOtro ? ' selected' : '') + '>Otro…</option></select>' +
+    (esOtro ? ' ' + inp("prov_otro", "nombre", false, 130) : '');
+  const marcaSel = '<select data-k="marca" onchange="_impAltaCambio(\'marca\')" style="width:90px">' +
+    ["LK", "CH", "Loke", "Mixto"].map(function (m) { return '<option' + (v.marca === m ? ' selected' : '') + '>' + m + '</option>'; }).join("") + '</select>';
+  const dims = function (p) { return inp(p + "_largo", "L", true, 58) + ' × ' + inp(p + "_ancho", "A", true, 58) + ' × ' + inp(p + "_alto", "H", true, 58); };
+  const lbl = function (t) { return '<div class="iaf-l">' + t + '</div>'; };
+  let h = _impTabsHtml('alta');
+  if (_impAlta.ok) {
+    const o = _impAlta.ok;
+    h += '<div class="iaf"><div class="iaf-ok">✓ <b>' + escapeHtml(o.cod) + '</b> (' + escapeHtml(o.marca) + ') quedó en el maestro de importados, con ' + escapeHtml(o.prov) + '.' +
+      (o.mc > 0 ? ' Primer pedido: <b>' + fm(o.mc) + ' MC</b> (' + fm(o.uni) + ' u), ya figura en 📦 Pedidos.' : ' Sin primer pedido.') + '</div>' +
+      '<div class="iaf-bar"><button class="stk-btn" onclick="_impAlta=null;openPedidosImportacion()">📦 Ver en Pedidos</button>' +
+      '<button class="stk-btn" onclick="_impAlta=null;openImpAgregar()">➕ Agregar otro</button></div></div>';
+    body.innerHTML = h + _impAltaCss(); return;
+  }
+  h += '<div class="iaf" id="impAltaF">' +
+    '<div class="iaf-g">' +
+      '<div>' + lbl("Código") + inp("cod", "999E", false, 90) + '</div>' +
+      '<div>' + lbl("Empresa") + marcaSel + '</div>' +
+      '<div>' + lbl("Proveedor") + provSel + '</div>' +
+      '<div style="grid-column:1/-1">' + lbl("Descripción") + '<input data-k="descripcion" value="' + val("descripcion") + '" style="width:100%;box-sizing:border-box" oninput="_impAltaCambio(\'descripcion\')"></div>' +
+    '</div>' +
+    '<div class="iaf-g">' +
+      '<div>' + lbl("Medidas MC <small>cm</small>") + dims("mc") + '<div class="iaf-s">' + (c.m3mc != null ? fm(c.m3mc, 3) + ' m³' : '') + '</div></div>' +
+      '<div>' + lbl("Medidas inner <small>cm</small>") + dims("in") + '<div class="iaf-s">' + (c.m3in != null ? fm(c.m3in, 4) + ' m³' : '') + '</div></div>' +
+    '</div>' +
+    '<div class="iaf-g">' +
+      '<div>' + lbl("Uni × inner") + inp("uni_inner", "12 · 0 = suelto", true, 110) + '</div>' +
+      '<div>' + lbl("Uni × MC") + inp("uni_mc", "144", true, 90) + '<div class="iaf-s">' + (c.innerXmc != null ? (Number.isInteger(c.innerXmc) ? fm(c.innerXmc) + ' inner por MC' : '<span style="color:#b91c1c">no es múltiplo del inner</span>') : '') + '</div></div>' +
+      '<div>' + lbl("FOB <small>u$s/u</small>") + inp("fob", "1,25", true, 80) + '</div>' +
+      '<div>' + lbl("MOQ <small>u</small>") + inp("moq", c.prov ? "prov: " + fm(c.moqProv) : "del prov.", true, 100) + '<div class="iaf-s">' + ((c.moqArt == null) ? (c.prov ? 'vacío = el de ' + escapeHtml(c.prov) : '') : 'propio de este código') + '</div></div>' +
+    '</div>' +
+    '<div class="iaf-ped"><div class="iaf-pt">🧾 Primer pedido a mandar <small>(a mano: el artículo nuevo no tiene Estadística Madre)</small></div>' +
+      '<div class="iaf-g" style="align-items:end">' +
+        '<div>' + lbl("MC a pedir") + '<input data-k="mc" inputmode="numeric" value="' + (_impAlta.mcTocado ? val("mc") : String(c.sugMc || "")) + '" style="width:80px" oninput="_impAlta.mcTocado=true;_impAltaCambio(\'mc\')">' +
+          '<div class="iaf-s">' + (c.sugMc > 0 ? 'sugerido ' + fm(c.sugMc) + ' (MOQ ' + fm(c.moq) + ' u)' + (_impAlta.mcTocado ? ' · <a href="#" onclick="_impAlta.mcTocado=false;_impAltaRender();return false">volver</a>' : '') : 'cargá Uni × MC') + '</div></div>' +
+        '<div class="iaf-n">' + lbl("Unidades") + '<b>' + fm(c.uni) + '</b>' + (c.moq > 0 && c.uni > 0 && c.uni < c.moq ? '<div class="iaf-s" style="color:#b45309">debajo del MOQ</div>' : '') + '</div>' +
+        '<div class="iaf-n">' + lbl("FOB <small>u$s</small>") + '<b>' + (c.usd > 0 ? fm(c.usd, 2) : '—') + '</b></div>' +
+        '<div class="iaf-n">' + lbl("m³") + '<b>' + (c.m3tot != null ? fm(c.m3tot, 2) : '—') + '</b></div>' +
+      '</div><div class="iaf-s">0 = no pedir todavía. Se puede volver a cambiar en 📦 Pedidos (MC pedido); se borra solo al cargar el primer bache.</div></div>' +
+    (_impAlta.msg ? '<div class="' + (_impAlta.msgTipo === "err" ? "iaf-err" : "iaf-ok") + '">' + escapeHtml(_impAlta.msg) + '</div>' : '') +
+    '<div class="iaf-bar"><button class="stk-btn" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:800"' + (_impAlta.guardando ? ' disabled' : '') + ' onclick="impAltaGuardar()">' + (_impAlta.guardando ? 'Guardando…' : '💾 Dar de alta') + '</button></div>' +
+  '</div>';
+  body.innerHTML = h + _impAltaCss();
+}
+function _impAltaCss() {
+  return '<style>.iaf{max-width:640px;margin:0 auto;font-size:15px}.iaf-g{display:flex;flex-wrap:wrap;gap:10px 14px;margin:0 0 10px;justify-content:center}' +
+    '.iaf input,.iaf select{font-size:18px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:6px;margin:0;box-sizing:border-box;text-align:center}' +
+    '.iaf-l{font-size:12px;font-weight:800;color:#475569;margin:0 0 2px;text-align:center}.iaf-s{font-size:11.5px;color:#64748b;text-align:center;min-height:14px}' +
+    '.iaf-ped{border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;padding:8px;margin:4px 0 10px}.iaf-pt{font-weight:800;text-align:center;margin:0 0 6px}' +
+    '.iaf-n{text-align:center;min-width:70px}.iaf-n b{font-size:18px}.iaf-bar{display:flex;gap:8px;justify-content:center}' +
+    '.iaf button,.iaf .stk-btn{width:auto;margin:0;padding:8px 16px;font-size:15px}.iaf-err{color:#b91c1c;font-weight:700;text-align:center;margin:0 0 8px}' +
+    '.iaf-ok{color:#166534;background:#f0fdf4;border-radius:8px;padding:8px;text-align:center;margin:0 0 8px}</style>';
+}
+function _impAltaCambio(k) {
+  if (!_impAlta) return;
+  _impAltaLeer();
+  _impAlta.msg = "";
+  if (k === "proveedor") { const e = document.querySelector('#impAltaF [data-k="proveedor"]'); if (e && e.value === "__otro") _impAlta.v.prov_otro = _impAlta.v.prov_otro || ""; else delete _impAlta.v.prov_otro; }
+  // se redibuja conservando el foco y el cursor del campo que se está tipeando
+  const act = document.activeElement, ak = act && act.getAttribute ? act.getAttribute("data-k") : null, pos = (act && act.selectionStart != null) ? act.selectionStart : null;
+  _impAltaRender();
+  if (ak) { const e = document.querySelector('#impAltaF [data-k="' + ak + '"]'); if (e) { e.focus(); try { if (pos != null && e.setSelectionRange) e.setSelectionRange(pos, pos); } catch (_e) {} } }
+}
+async function impAltaGuardar() {
+  if (!_impAlta || _impAlta.guardando) return;
+  const v = _impAltaLeer(), c = _impAltaCalc(v);
+  const err = function (m) { _impAlta.msg = m; _impAlta.msgTipo = "err"; _impAltaRender(); };
+  const cod = String(v.cod || "").trim().toUpperCase();
+  if (!cod) return err("Falta el código.");
+  if (!c.prov) return err("Falta el proveedor.");
+  if (!String(v.descripcion || "").trim()) return err("Falta la descripción.");
+  if (!(c.fob > 0)) return err("Falta el FOB (u$s por unidad).");
+  if (!(c.um > 0)) return err("Faltan las unidades por MC.");
+  if (c.ui == null || !isFinite(c.ui) || c.ui < 0) return err("Faltan las unidades por inner (0 si viene suelto).");
+  if (c.ui > 0 && c.um % c.ui !== 0) return err("Las unidades por MC (" + c.um + ") no son múltiplo de las del inner (" + c.ui + ").");
+  if (v.moq !== "" && v.moq != null && !(c.moqArt >= 0)) return err("El MOQ no es un número.");
+  const dimsNum = ["mc_largo", "mc_ancho", "mc_alto", "in_largo", "in_ancho", "in_alto"];
+  for (let i = 0; i < dimsNum.length; i++) { const n = _impAltaNum(v[dimsNum[i]]); if (n != null && !(n > 0)) return err("Una medida no es un número mayor a 0."); }
+  const msg = "Dar de alta " + cod + " (" + v.marca + ") con " + c.prov + "?\n\n" +
+    c.um + " u por MC · " + (c.ui > 0 ? c.ui + " u por inner" : "suelto") + " · FOB u$s " + c.fob + "\n" +
+    "MOQ " + (c.moqArt != null ? c.moqArt + " u (propio)" : c.moqProv + " u (del proveedor)") + "\n" +
+    "Primer pedido: " + (c.mc > 0 ? c.mc + " MC = " + c.uni + " u · u$s " + (Math.round(c.usd * 100) / 100) : "ninguno");
+  try { if (!confirm(msg)) return; } catch (_e) {}
+  const num = function (x) { const n = _impAltaNum(x); return (n == null || !isFinite(n)) ? null : n; };
+  const p = { cod: cod, marca: v.marca, proveedor: c.prov, descripcion: String(v.descripcion).trim(), fob: c.fob, uni_mc: c.um, uni_inner: c.ui,
+    moq: c.moqArt, primer_pedido_u: c.mc > 0 ? c.uni : null,
+    mc_largo: num(v.mc_largo), mc_ancho: num(v.mc_ancho), mc_alto: num(v.mc_alto), in_largo: num(v.in_largo), in_ancho: num(v.in_ancho), in_alto: num(v.in_alto) };
+  _impAlta.guardando = true; _impAltaRender();
+  try {
+    const r = await _pedImpRpc("gv_importado_alta", { p: p });
+    if (!r || !r.ok) throw new Error("la base no confirmó el alta");
+    _impAlta.ok = { cod: r.cod || cod, marca: v.marca, prov: c.prov, mc: c.mc, uni: c.uni };
+  } catch (e) {
+    let m = String((e && e.message) || e);
+    const mm = /"message":"([^"]+)"/.exec(m); if (mm) m = mm[1];
+    _impAlta.msg = "No se dio de alta: " + m; _impAlta.msgTipo = "err";
+  }
+  _impAlta.guardando = false; _impAltaRender();
 }
 /* Solapa 🚫 Discontinuos (v24.49, Thomas: "no deben aparecer en módulo importados, sino dentro de
    discontinuos de importados"). Son los de Importados.activo = false: la pantalla de Pedidos los
