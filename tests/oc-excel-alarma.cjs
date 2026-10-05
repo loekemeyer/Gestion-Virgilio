@@ -39,8 +39,15 @@ const XLSX = require(path.join(root, "vendor", "xlsx.full.min.js"));
       if (/vista_generador_oc/.test(ep)) return [{ cod: "207", descripcion: "Ñoquera", proveedor: "Log/ Fabr", proy: 82, stock: 10 }, { cod: "535", proy: 59, stock: 109 }];
       return [];
     };
+    const origSafe = supaFetchAllSafe;
+    let ancla = _ocgSumarDias(_ocgHoyArt(), 1);   // genera mañana → hoy es "el martes": talleristas activos
+    supaFetchAllSafe = async (ep, q) => (/GV_OC_Auto/.test(ep) ? [{ proxima_auto: ancla, cadencia_dias: 7 }] : origSafe(ep, q));
     _stk = null; await ocAlarmaCargar(true);
     const on = { on: ocAlarmaOn(), tall: _ocAlarma.tall.map((x) => x.prov).join(","), arts: _ocAlarma.arts.map((x) => x.cod).join(","), badge: /🚨 2/.test(ocAlarmaBadge()), banner: /Martin C/.test(ocAlarmaBanner()) && /207/.test(ocAlarmaBanner()) };
+    // genera en 3 días → todavía no es el martes: sin talleristas, los artículos siguen
+    ancla = _ocgSumarDias(_ocgHoyArt(), 3); await ocAlarmaCargar(true);
+    on.antesDelMartes = _ocAlarma.tall.length === 0 && _ocAlarma.arts.length === 1 && /🚨 1/.test(ocAlarmaBadge());
+    supaFetchAllSafe = origSafe;
     // falla de lectura → sin alarma
     _ocAlarma = null; supaFetchAll = async () => { throw new Error("x"); };
     await ocAlarmaCargar(true);
@@ -66,7 +73,7 @@ const XLSX = require(path.join(root, "vendor", "xlsx.full.min.js"));
     congelada: /state="frozen"/.test(sh), filtro: /<autoFilter /.test(sh),
     nombre: /^OC 2026-09-30\.xlsx$/.test(nombre),
     alarmaOn: alarma.on && alarma.tall === "Martin C" && alarma.arts === "207",
-    badge: alarma.badge, banner: alarma.banner, fallaSinAlarma: alarma.fallaSinAlarma,
+    badge: alarma.badge, banner: alarma.banner, antesDelMartes: alarma.antesDelMartes, fallaSinAlarma: alarma.fallaSinAlarma,
     sinErrores: errs.length === 0
   };
   const mal = Object.keys(chk).filter((k) => !chk[k]);

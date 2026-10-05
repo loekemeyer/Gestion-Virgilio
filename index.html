@@ -6300,7 +6300,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.03"></script>
+<script type="module" src="recepcion.js?v=27.04"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10542,7 +10542,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.03";
+const APP_VERSION = "v27.04";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17253,7 +17253,14 @@ async function ocAlarmaCargar(forzar) {
     const ult = await supaFetchAll(SUPABASE_OC_ENDPOINT, "select=fecha&fecha=not.is.null&order=fecha.desc&limit=1");
     const fe = ult && ult[0] && ult[0].fecha;
     const tall = [];
-    if (fe) {
+    // v27.03 (Luis: "se generan el miércoles, el badge se activa el martes"): lo de talleristas
+    // cuenta recién desde el día ANTERIOR a la próxima generación (ancla GV_OC_Auto.proxima_auto;
+    // sin ancla, OC + 6 días). Los artículos ≤ 20% de la E.M. avisan siempre.
+    let desde = "";
+    try { await ocgCargarAuto(); if (_ocgAuto && _ocgAuto.proxima) desde = _ocgSumarDias(_ocgAuto.proxima, -1); } catch (_e) {}
+    if (!desde && fe) desde = _ocgSumarDias(String(fe).slice(0, 10), 6);
+    const tallActiva = !!(fe && desde && _ocgHoyArt() >= desde);
+    if (fe && tallActiva) {
       const rows = await supaFetchAll(SUPABASE_OC_ENDPOINT, "select=proveedor,cantidad,cantidad_recibida&fecha=eq." + encodeURIComponent(fe));
       const by = {};
       (rows || []).forEach(function (r) { const k = r.proveedor || "—"; if (!by[k]) by[k] = { prov: k, ped: 0, rec: 0 }; by[k].ped += Number(r.cantidad) || 0; by[k].rec += Math.max(0, Number(r.cantidad_recibida) || 0); });
@@ -17264,7 +17271,7 @@ async function ocAlarmaCargar(forzar) {
     const arts = [];
     (gen || []).forEach(function (r) { const pr = Number(r.proy) || 0, s = Number(r.stock) || 0; if (pr > 0 && s <= pr * OC_ALARMA_PCT_EM / 100) arts.push({ cod: r.cod, desc: r.descripcion || "", prov: r.proveedor || "", proy: pr, stock: s, pct: Math.round(s / pr * 100) }); });
     arts.sort(function (a, b) { return a.pct - b.pct; });
-    _ocAlarma = { fecha: fe || null, tall: tall, arts: arts }; _ocAlarmaTs = Date.now();
+    _ocAlarma = { fecha: fe || null, tall: tall, arts: arts, desde: desde }; _ocAlarmaTs = Date.now();
   } catch (_e) { _ocAlarmaTs = Date.now(); /* sin lectura: no se pinta alarma; reintenta en 5 min */ }
   _ocAlarmaCargando = false;
   if (_stk && typeof stkRender === "function") stkRender();
@@ -60675,7 +60682,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.03"></script>
+<script src="importacion.js?v=27.04"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63498,9 +63505,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.03"></script>
-<script src="hotsale.js?v=27.03"></script>
-<script src="estadisticas.js?v=27.03"></script>
+<script src="cobranzas.js?v=27.04"></script>
+<script src="hotsale.js?v=27.04"></script>
+<script src="estadisticas.js?v=27.04"></script>
 
 </body>
 </html>
