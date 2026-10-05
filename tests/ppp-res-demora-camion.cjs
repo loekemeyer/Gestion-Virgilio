@@ -80,11 +80,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
         headPop = (ov.querySelector(".pppres-sum") || { textContent: "" }).textContent.replace(/\s+/g, " ").trim();
         camsPop = [...ov.querySelectorAll("tr.camh")].map(function (tr) {
           return { nombre: tr.children[0].textContent.replace(/\s+/g, " ").trim(),
-                   dem: parseInt(tr.children[tr.children.length - 1].textContent, 10) };
+                   dem: parseInt(tr.children[tr.children.length - 2].textContent, 10) };   // v27.01: la última es «Cómo llegó»
         });
         demPop = [...ov.querySelectorAll(".pppres-tbl tbody tr")].map(function (tr) {
           return tr.classList.contains("camh") ? "CAM:" + tr.children[0].textContent.replace(/\s+/g, " ").trim()
-                                               : tr.children[0].textContent.trim() + "=" + tr.children[tr.children.length - 1].textContent.trim();
+                                               : tr.children[0].textContent.trim() + "=" + parseInt(tr.children[tr.children.length - 2].textContent, 10);
         });
       }
     }

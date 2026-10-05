@@ -25,6 +25,8 @@ node() {
 
 echo "== ppp-res-demora-camion (v21.72: Resumen = MAYOR demora por camion, y camiones sin tope de m3) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-demora-camion.cjs
+echo "== ppp-res-origen (v27.01: Resumen dice el orden del armado y como llego cada NP a su dia) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-origen.cjs
 echo "== ppp-res-demora-ancla (v22.16: importado diferido / retiro o turno pactado no cuentan como demora) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-res-demora-ancla.cjs
 echo "== apr-cuar-isis-confirm (v22.20: NP de ISIS retenida y sumar a tanda respetan la cuarentena) =="

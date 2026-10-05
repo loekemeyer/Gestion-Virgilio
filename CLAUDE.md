@@ -7762,3 +7762,13 @@ cada movimiento que suma a `terminado` (guardado, baja_racks, recepcion_imp) que
 empresa) más de **5 %** por encima de `Capacidad_Sector` (D3, v26.87) manda UN Telegram (quién, cuántas, góndola vs capacidad). Dedup en
 `GV_Alerta_Gondola_Llena`. Sin capacidad cargada no avisa. Probar sin mandar: `select * from
 public.gv_alerta_gondola_llena_telegram(true);`. Centinela 322. `sql/gv_alerta_gondola_llena_v2686.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-05, v27.01): el RESUMEN de la PPP dice el orden del armado y CÓMO llegó cada NP a su día
+
+- Arriba de la tabla, desplegable **🧠 Orden de prioridad del armado automático** (`PPP_ARMADO_ORDEN_HTML`): si cambia una
+  regla del armado, se cambia ese texto en el mismo pedido.
+- Tocar una celda (zona, total, camiones o demora) → columna **«Cómo llegó a este día»**: 🤖 Automático + regla · ✋ A mano
+  (quién y cuándo) · ISIS. Fuente **`gv_ppp_np_origen()`** (lectura, anon). ⚠ El armador NO guarda la regla por NP: la
+  automática se DEDUCE (retira con día, súper, importado diferido, cron/optimizador de las 18:00 por su log, si no grupo de
+  zonas). Lo duro es lo manual (`gv_manual_por` / `creado_por`) y el log del cron. Sin RPC dice «—».
+- `sql/gv_ppp_np_origen_v2701.sql`, `tests/ppp-res-origen.cjs`.
