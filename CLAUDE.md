@@ -7413,8 +7413,9 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
 - **v26.58 (Luis, 05/10): el helper v1.2.0 NO cambia el contrato** (sólo su ventana: hoja global `papel` en el .json,
   «Opciones avanzadas», minimizar al cerrar). El ping ahora dice `Impresion Virgilio OK v1.2.0`: el front da vivo por el
   **HTTP 200, nunca por el texto** (candado en `tests/helper-impresion-fuente.cjs`; el helper falso del test contesta lo
-  mismo que el real). ⚠ **El fuente de este repo sigue en v1.0.0**: el v1.2.0 lo tiene la sesión que lo escribió y no
-  está en ningún branch; mientras no se suba, compilar desde acá da la ventana vieja (mismo contrato).
+  mismo que el real). **v26.59: el fuente del repo es el v1.2.0** (lo pasó la sesión local que lo escribe, que no toca
+  el repo: cada versión nueva del helper llega por el chat y se sube acá). Contra el v1.0.0 sólo cambian la ventana y el
+  aviso de puerto ocupado; `ServidorImpresion` es idéntico. El test exige que la versión del `.cs` y la del README coincidan.
 
 `tests/imp-helper-local.cjs` (helper falso en 127.0.0.1: mide el PDF que le llega, el orden, el fallback y el timeout).
 

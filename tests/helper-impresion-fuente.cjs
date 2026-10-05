@@ -46,6 +46,11 @@ const vivo = (idx.match(/async function helperVivo\(\)\{[\s\S]*?\n\}/) || [""])[
 chk("C helperVivo da vivo por el HTTP 200 (r.ok), no por el texto del ping",
     /ok = r\.ok;/.test(vivo) && !/Impresion Virgilio/.test(vivo));
 chk("C el puerto por defecto es el mismo (17777)", /17777/.test(cs) && /17777/.test(idx));
+// v26.59 — la versión del fuente y la del README van juntas, y el EJEMPLO trae el papel global (v1.2.0).
+const verCs = (cs.match(/VERSION = "([0-9.]+)"/) || [])[1];
+const verRd = (fs.readFileSync(path.join(dir, "README.md"), "utf8").match(/Versión: \*\*([0-9.]+)\*\*/) || [])[1];
+chk("C la versión del fuente es la del README", !!verCs && verCs === verRd, verCs + " / " + verRd);
+chk("C el EJEMPLO trae el tamaño de hoja global (papel)", typeof ej.papel === "string");
 chk("C compilar.bat compila src\\ImpresionVirgilio.cs", /src\\ImpresionVirgilio\.cs/.test(
     fs.readFileSync(path.join(dir, "compilar.bat"), "utf8")));
 
