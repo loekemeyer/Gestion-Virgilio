@@ -6743,7 +6743,7 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   picking (TV, Mon. Admin y el monitor viejo del index) acredita **m³ de la tanda × fracción pickeada** (`gv_picking_pickeado`,
   lectura, anon: último PKC por código, Σ reales×m³/caja ÷ Σ pedidas×m³/caja, tope 1; sin respuesta, m³ entero), y en el **puntaje**
   una línea confirmada con **0 cajas no cuenta** (ni línea, ni parada, ni altura: `where pk.re > 0` en `gv_picking_tanda_calc`; sigue
-  en los huecos, que miden tiempo). **El armado no se prorratea.** Medido 60 días: 834 de 8.347 líneas en 0 (230 de 334 tandas),
+  en los huecos, que miden tiempo). ~~**El armado no se prorratea.**~~ (retirado en la v26.55: ver abajo) Medido 60 días: 834 de 8.347 líneas en 0 (230 de 334 tandas),
   10,0 % del m³ pedido; por operario el m³/h baja 6,4 % (122) · 8,8 % (104) · 11,2 % (504) · **17,5 % (277)**. El pop-up de m³/h
   del Mon. Admin dice «1,2 de 1,5» cuando se prorrateó. `GV_Picking_Tanda` + `lineas_cero` · `cajas_ped` · `m3_frac`.
   `sql/gv_picking_no_pickeado_v2651.sql` (centinelas v26.51; `gv_picking_pickeado` entró a `scripts/reglas-protegidas.json`),
@@ -6761,6 +6761,17 @@ terminé antes de acomodarlas en la mesa, te estás beneficiando un tiempo que r
   (104): F22A 1,7 m³/h grado 7 Alta → 2,0 · E89A 1,2 grado 3 → 0,9 · el día 1,5 → 1,4. RPC nueva de lectura `gv_picking_grado(text[])`
   (anon, lee `GV_Picking_Tanda`); `gv_picking_pickeado` no se tocó. **La TV no lo lleva** (candado en `tests/mon-admin.cjs`).
   `sql/gv_picking_grado_v2654.sql`, §3.v2654.
+  **v26.55 (Luis, 04/10: *"una vez que ya se pickea, ya no se mira más el m³ del pedido entero … lo que se carga en el camión es lo
+  pickeado … el camión se debe pedir en función de lo pickeado"*): UNA TANDA CON TP VALE SU m³ PICKEADO EN TODOS LADOS.** No sólo el
+  m³/h de picking: armado, carga, Días, camión del día (y la unión Z2+Z3 < 1 m³), Programación y Resumen de la PPP. Fuente única
+  **`gv_tanda_m3_pickeado(text[])`** (lectura, anon): la fracción de `GV_Picking_Tanda.m3_frac` y, para un TP de las últimas 48 h que
+  la caché todavía no tiene, en vivo con `gv_picking_pickeado`; sin fila = sin pickear = m³ del pedido. La aplican **en la base**
+  `vista_tanda_m3` (m3 = pickeado; `m3_pedido` y `fraccion` al final), `gv_monitor_tanda_camion` y `gv_ppp_prog_arbol` (la NP va con la
+  fracción de su tanda); **en el front**, la TV / Mon. Admin (copia de la programación con el m³ pickeado; se fue el «1,2 de 1,5») y el
+  index **en la fuente**: `fetchMonitorSheet`, `fetchHistoricSheet` y `pppLoadProgFromSupabase` (`gvFracPickeado`, una lectura cada
+  60 s; `monPickFrac` se fue). ⚠ **Lo que se GUARDA sigue siendo el m³ del PEDIDO**: `pppGuardarWeb` manda `m3Ped`, o reprogramar una NP
+  pickeada pisaría `PPP_Web_Programacion.m3`. Medido 05/10: el 06/10 pasa de 6,869 a 6,372 m³ (10 de 11 tandas pickeadas).
+  `sql/gv_m3_pickeado_v2655.sql` (centinelas 292-295), `tests/m3-pickeado-fuente.cjs`, `tests/mon-tv.cjs`, `tests/mon-admin.cjs`, §3.v2655.
 - `sql/gv_monitor_horas_cola_v2643.sql` (idempotente sobre `pg_get_functiondef`, con rollback; huella y centinela
   v26.43 adentro). **Aplicado el 03/10 con el sí de Luis** (v26.45): el 15/09 dio idéntico a la foto, `gv_huellas_cambiadas`
   y `gv_reglas_perdidas` vacías. ⚠ **La huella se compara por `md5(prosrc)`, NO por `md5(pg_get_functiondef(...))`**:

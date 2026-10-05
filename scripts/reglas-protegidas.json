@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado)",
+  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -322,6 +322,11 @@
       "quien": "Damian (via Marianela), Luis (v19.07, v23.66) / Damian, Thomas"
     },
     {
+      "objeto": "gv_monitor_tanda_camion",
+      "regla": "El camión del día se arma con el m³ PICKEADO de cada tanda, no con el del pedido",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_mov_empresa_resuelta",
       "regla": "Idem en la vista que documenta la regla",
       "quien": "v19.28"
@@ -592,6 +597,11 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_tanda_m3_pickeado",
+      "regla": "El TP reciente que la caché todavía no tiene se calcula en vivo (gv_picking_pickeado): sin eso, la tanda recién pickeada vale el m³ del pedido hasta 10 min",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_tanda_registro_heredado",
       "regla": "La vista dice de que tanda heredo el registro un pedido movido ya armado, y DONDE quedo el detalle por articulo del picking: los PKC no viajan porque copiarlos ",
       "quien": "Luis"
@@ -725,6 +735,11 @@
       "objeto": "vista_stock_procesada",
       "regla": "La demanda de un codigo DUAL (437E/438E/439E/809E) se keyea CON la empresa: el de Loeke y el de Chef son dos productos en dos gondolas distintas. Si este patron",
       "quien": "Luis, Thomas"
+    },
+    {
+      "objeto": "vista_tanda_m3",
+      "regla": "Una vez pickeada, la tanda vale su m³ PICKEADO (fracción de gv_tanda_m3_pickeado), no el del pedido: lo que se carga en el camión es lo pickeado",
+      "quien": "Luis"
     }
   ]
 }

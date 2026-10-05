@@ -105,7 +105,7 @@ function popTablaTandas(pares) {   // [[tanda, m3], …]
 function popRitmo(leg, sub) {
   var D = window.__MA_D || {}, M = window.__MA_M3 || {};
   var row = (D.horas || []).filter(function (o) { return String(o.legajo) === String(leg); })[0] || {};
-  var det = (M[leg] || { pick: {}, arm: {} })[sub] || {}, ped = (M[leg] || {}).ped || {};   // v26.51: ped = m³ de la tanda cuando se prorrateó
+  var det = (M[leg] || { pick: {}, arm: {} })[sub] || {};   // v26.55: el m³ de una tanda pickeada ya es lo PICKEADO
   var pares = Object.keys(det).map(function (t) { return [t, det[t]]; }).sort(function (a, b) { return b[1] - a[1]; });
   var tot = pares.reduce(function (s, p) { return s + (Number(p[1]) || 0); }, 0);
   var hs = Number(sub === "pick" ? row.hs_pick : row.hs_arm) || 0;
@@ -139,8 +139,6 @@ function popRitmo(leg, sub) {
   var esPick = sub === "pick", G = esPick ? (window.__MA_GRADO || {}) : {};
   var gradoDe = function (t) { return G[t + "|" + leg] || G[t] || null; };
   var tm = 0, tp = 0, tAj = 0, tAjOk = true, body = pares.map(function (p) { var mi = mins[p[0]] || 0, pa = pmin[p[0]] || 0; tm += mi; tp += pa;
-    /* v26.51 (Luis, D24): en picking el m³ es lo PICKEADO; si se prorrateó, al lado va el m³ de la tanda («1,2 de 1,5») */
-    var deN = (esPick && ped[p[0]] != null) ? ' <small style="color:#94a3b8">de ' + n1(ped[p[0]]) + '</small>' : '';
     var extra = "";
     if (esPick) {
       var g = gradoDe(p[0]), mu = g ? Number(g.multiplicador) : NaN;
@@ -149,7 +147,7 @@ function popRitmo(leg, sub) {
           g.grado + ' <small style="color:#94a3b8">' + esc(String(g.nivel || "")) + '</small></td><td class="pop-k">' + rit((Number(p[1]) || 0) * mu, mi) + '</td>'; }
       else { tAjOk = false; extra = '<td title="todavía sin grado (el caché se recalcula cada 10 min)">—</td><td>—</td>'; }
     }
-    return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + deN + '</td><td>' + fm(mi, pa) + '</td><td>' +
+    return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + '</td><td>' + fm(mi, pa) + '</td><td>' +
       rit(Number(p[1]) || 0, mi) + '</td>' + extra + '</tr>'; }).join("");
   var thAj = esPick ? '<th title="Dificultad de la tanda: grado 1-10 (decil de min/caja) y nivel">Dif.</th><th title="Ritmo × (1 + 0,1 × (grado − 5)): Baja ×0,6-0,7 · Media ×0,8-1,0 · Alta ×1,1-1,3 · Muy alta ×1,4-1,5">Ajust. m³/h</th>' : '';
   var tdAj = esPick ? '<td></td><td class="pop-k">' + (tAjOk && pares.length ? rit(tAj, tm) : "—") + '</td>' : '';

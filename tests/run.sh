@@ -124,6 +124,7 @@ echo "== mon-tv (monitor liviano de TV: solo lectura, mismas fuentes que el moni
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-tv.cjs
 echo "== mon-admin (Mon. Admin: generado desde tv.html, tablero interactivo con pop-ups) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-admin.cjs
+node tests/m3-pickeado-fuente.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/gp2-abrir-app.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tv-meta-camion.cjs
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tandas-orden-camion.cjs

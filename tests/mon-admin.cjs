@@ -160,8 +160,8 @@ function responder(url) {
   if (q.includes("/Fichadas_Virgilio"))          return DATOS.fichadas;
   if (q.includes("/Empleados"))                  return DATOS.empleados;
   if (q.includes("/rpc/gv_tv_clave_actual"))     return { clave: "1234", cambia_en_s: 60 };
-  /* v26.51 (D24): E31A se pickeó al 80 % → el pop-up de m³/h muestra «1,2 de 1,5» y el ritmo 1,2 */
-  if (q.includes("/rpc/gv_picking_pickeado"))    return [{ tanda: "E31A", lineas: 5, lineas_cero: 1, cajas_ped: 20, cajas_pick: 16, m3_ped: 1.5, m3_pick: 1.2, fraccion: 0.8 }];
+  /* v26.55 (Luis, 04/10): E31A se pickeó al 80 % → vale 1,2 m³ en todo el tablero (picking y armado) */
+  if (q.includes("/rpc/gv_tanda_m3_pickeado"))   return [{ tanda: "E31A", fraccion: 0.8, tp: iso(T0 - 2.5 * H), calc_at: iso(T0) }];
   /* v26.54 (Luis): E31A es de dificultad ALTA (grado 7 → ×1,2): el ajustado = 1,2 m³ × 1,2 */
   if (q.includes("/rpc/gv_picking_grado"))       return [{ tanda: "E31A", legajo: "8", grado: 7, nivel: "Alta", multiplicador: 1.2, dificultad: 0.302, lineas: 5, paradas: 4, esc: 2, calc_at: iso(T0 - H) }];
   if (q.includes("/Registros_Produccion_Virgilio")) {
@@ -253,8 +253,8 @@ function responder(url) {
   ok(t1 && /E31A/.test(t1), "el desglose de m³/h no lista la tanda que cerró el operario (E31A): " + (t1 || "").slice(0, 160));
   ok(t1 && /m³\/h/.test(t1), "el desglose de m³/h no muestra el cociente");
   ok(t1 && /Min trab/i.test(t1) && /Ritmo/i.test(t1) && /Total/.test(t1), "v25.92: el desglose de m³/h no trae Min trab · Ritmo · Total: " + (t1 || "").slice(0, 200));
-  /* v26.51 (Luis, D24): el m³ de picking es lo PICKEADO (1,5 × 0,8 = 1,2) y al lado dice de cuánto era la tanda */
-  ok(t1 && /1,2\s*de 1,5/.test(t1) && /m³ pick\./.test(t1), "v26.51 (D24): el desglose de picking tiene que decir «1,2 de 1,5» con el rótulo m³ pick.: " + (t1 || "").slice(0, 200));
+  /* v26.55 (Luis, 04/10): «ya no se mira más el m³ del pedido»: el desglose dice 1,2 (lo pickeado) y NADA del 1,5 */
+  ok(t1 && /1,2/.test(t1) && /m³ pick\./.test(t1) && /E31A1,2/.test(t1) && !/E31A1,5/.test(t1) && !/de 1,5/.test(t1), "v26.55: el desglose de picking tiene que decir sólo 1,2 (lo pickeado), sin «de 1,5»: " + (t1 || "").slice(0, 200));
   /* v26.54: en el pop-up, por tanda, «Dif.» (grado y nivel) y «Ajust. m³/h» = ritmo × multiplicador.
      E31A: 1,2 m³ en 30 min (TP 3 h → 2,5 h atrás) → ritmo 2,4 · grado 7 Alta ×1,2 → 2,9. Y el Total ajustado igual. */
   const popAj = await p.evaluate(() => {

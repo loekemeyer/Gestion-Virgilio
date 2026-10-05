@@ -31378,6 +31378,36 @@ grado dejó de ser un decil (21 a 41 tandas por grado), así que **los 9 deciles
 dificultad nueva (decil_1 0,0828 → 0,0810 · decil_5 0,2406 → 0,2280 · decil_9 0,5168 → 0,4819) y se volvió a refrescar: 33
 tandas por grado (32 en el 5). El SQL de la recalibración quedó en la sección 6 del archivo.
 
+### 3.v2655 — Una tanda pickeada vale su m³ PICKEADO en todos lados (Luis, 04/10/2026, v26.55)
+
+**Qué pidió.** *«Una vez que ya se pickea, ya no se mira más el dato de los m³ del pedido entero. Ya corregís directamente y se
+analiza con los m³ pickeados y nada más que eso. Porque lo que se carga en el camión es lo pickeado, no lo que había pedido el
+cliente. El camión se debe pedir en función de lo pickeado.»* Retira el «el armado no se prorratea» de la v26.51.
+
+**Fuente única:** `gv_tanda_m3_pickeado(p_tandas text[] default null)` → tanda, fraccion, tp, calc_at (SECURITY DEFINER, `anon` +
+`authenticated`, sólo lectura). Toma `GV_Picking_Tanda.m3_frac` (cron `gv-picking-tanda-refresh`, c/10 min) y, para el TP de las
+últimas 48 h que la caché todavía no tiene, lo calcula en vivo con `gv_picking_pickeado` (caso medido: F53A, TP 08:36, en vivo a las
+08:39). Sin fila = sin pickear = m³ del pedido.
+
+| dónde | qué cambió |
+|---|---|
+| `vista_tanda_m3` | `m3` = m³ del pedido × fracción; columnas nuevas AL FINAL `m3_pedido`, `fraccion` (la leen productividad, horas por operario, atrasados y el reporte de eventos imposibles) |
+| `gv_monitor_tanda_camion` | el m³ de la tanda y del camión (y la unión Z2+Z3 < 1 m³) con lo pickeado |
+| `gv_ppp_prog_arbol` | la NP de una tanda pickeada va con la fracción de su tanda (Programación, resumen de Días de la TV) |
+| TV / Mon. Admin | `cargarPickeado` lee `gv_tanda_m3_pickeado` para las tandas del tablero; la programación se copia con el m³ pickeado (la cacheada no se toca). El pop-up de m³/h ya no dice «de 1,5» |
+| index | `gvFracPickeado()` (una lectura cada 60 s, timeout 6 s, fail-open) aplicada en `fetchMonitorSheet` (tanda y cada NP), `fetchHistoricSheet` y `pppLoadProgFromSupabase` |
+
+⚠ **Se GUARDA el m³ del pedido**: `pppGuardarWeb` manda `m3Ped`. Sin eso, reprogramar una NP pickeada desde la PPP escribía el m³
+pickeado en `PPP_Web_Programacion.m3` y la fracción se aplicaba dos veces en la próxima lectura.
+
+**Medido el 05/10 como anon:** función 33 ms · `vista_tanda_m3` 40 ms · `gv_monitor_tanda_camion` 59 ms · `gv_ppp_prog_arbol` 451 ms.
+356 tandas con fracción (media 0,906). 06/10: 6,869 → 6,372 m³ (10 de 11 tandas pickeadas). Centinelas 292-295; las tres
+vistas/funciones nuevas entraron a `scripts/reglas-protegidas.json`. `gv_reglas_perdidas` y `gv_huellas_cambiadas` vacías.
+
+**Aplicado el 05/10/2026** (el pedido es la autorización). `sql/gv_m3_pickeado_v2655.sql` (idempotente, rollback al pie).
+`tests/m3-pickeado-fuente.cjs` (candado del index + la cuenta), `tests/mon-tv.cjs` (Días 9,8 → 9,5; armado 0,6 → 0,5),
+`tests/mon-admin.cjs` (sin «de 1,5»); los tres verificados contra la versión anterior.
+
 ### 3.v2654 — m³/h de picking AJUSTADO por dificultad, a la vista en el Mon. Admin (Luis, 04/10/2026, v26.54)
 
 **Qué pidió.** *«Si en un picking de dificultad alta la persona promedió 0,5 m³/h, ¿cuánto hace que mejore?»* y, al proponerle

@@ -898,17 +898,18 @@ function cargarEventosHoy() {
     "ts_cliente=gte." + encodeURIComponent(desde) +
     "&select=legajo,opcion,texto,ts_cliente,ts_inicio&order=ts_cliente.asc");
 }
-/* v26.51 (Luis, D24): lo NO pickeado se descuenta. Por cada tanda con TP de hoy, la fracción (en m³)
-   de lo pedido que se pickeó (`gv_picking_pickeado`: último PKC por código). Sin respuesta → Map
-   vacío = m³ entero (fail-open). ≡ index.html monPickFrac. */
+/* v26.55 (Luis, 04/10): «una vez que se pickea, ya no se mira más el m³ del pedido»: el m³ de una tanda
+   pickeada (TP) es lo PICKEADO, en todo el tablero (tandas, días, camiones, ritmo de picking y de armado).
+   `gv_tanda_m3_pickeado`: fracción en m³ de lo pedido que se pickeó. Sin fila = sin pickear = m³ del pedido.
+   Sin respuesta → Map vacío = m³ del pedido (fail-open). ≡ index.html gvFracPickeado. */
 function cargarPickeado(tandas) {
   if (!tandas.length) return Promise.resolve(new Map());
   var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
-  return conTimeout(fetch(SB_URL + "/rest/v1/rpc/gv_picking_pickeado", {
+  return conTimeout(fetch(SB_URL + "/rest/v1/rpc/gv_tanda_m3_pickeado", {
     method: "POST", cache: "no-store", signal: ctrl ? ctrl.signal : undefined,
     headers: Object.assign({ "Content-Type": "application/json" }, H),
     body: JSON.stringify({ p_tandas: tandas })
-  }), ctrl, "gv_picking_pickeado").then(function (r) { return r.ok ? r.json() : []; }).then(function (filas) {
+  }), ctrl, "gv_tanda_m3_pickeado").then(function (r) { return r.ok ? r.json() : []; }).then(function (filas) {
     var m = new Map();
     (filas || []).forEach(function (f) { var x = Number(f.fraccion);
       if (f.tanda && isFinite(x)) m.set(String(f.tanda).toUpperCase(), Math.max(0, Math.min(1, x))); });
@@ -1599,7 +1600,7 @@ function diaEtiqueta(raw) {
 function pintarHoras(filas, d) {
   /* v23.70 (Luis) — dos bloques:
      · RITMO (índice, decimal): m³/h de picking y de armado = m³ de las tandas que ese operario
-       (picking: × lo PICKEADO de cada tanda, v26.51 D24)
+       (v26.55: el m³ de una tanda pickeada es lo PICKEADO)
        cerró HOY (TP / TAP, cada tanda una vez) ÷ sus horas de picking / armado (`hs_pick` / `hs_arm`
        de la vista, lo cerrado). Reemplaza al «h/tanda», que no servía: una tanda no mide nada fijo.
      · HORAS (H:MM): v25.89 — Prod = picking + armado; No prod = el resto de la jornada. */
@@ -1616,11 +1617,8 @@ function pintarHoras(filas, d) {
     var leg = String(ev.legajo == null ? "" : ev.legajo).trim(), t = String(ev.texto || "").trim().toUpperCase();
     if (!leg || !t) return;
     var v = d.prog && d.prog.get(t); if (!v) return;
-    var k = ev.opcion === "TP" ? "pick" : "arm", mm = (m3[leg] = m3[leg] || { pick: {}, arm: {}, ped: {} });
-    /* v26.51 (Luis, D24): el m³ de PICKING es lo pickeado: m³ de la tanda × fracción (gv_picking_pickeado). El armado va entero. */
-    var fr = (k === "pick" && d.pickeado) ? d.pickeado.get(t) : null;
-    mm[k][t] = (Number(v.m3) || 0) * (fr == null ? 1 : fr);
-    if (fr != null && fr < 0.999) mm.ped[t] = Number(v.m3) || 0;
+    var k = ev.opcion === "TP" ? "pick" : "arm", mm = (m3[leg] = m3[leg] || { pick: {}, arm: {} });
+    mm[k][t] = Number(v.m3) || 0;   // v26.55: ya es lo PICKEADO (picking y armado)
   });
   window.__MA_M3 = m3;
   var suma = function (o) { var s2 = 0; for (var k in o) s2 += o[k]; return s2; };
@@ -1727,11 +1725,14 @@ function ciclo() {
     var keys = [];
     prog.forEach(function (v, k) { if (anchas.has(v.fechaRaw)) keys.push(k); });
 
-    var tpHoy = [];   // v26.51: las tandas con TP de hoy, para prorratear su m³ por lo pickeado
+    var pkKeys = keys.slice();   // v26.55: las de la ventana + las de TP de hoy → su m³ pasa a ser lo pickeado
     eventos.forEach(function (ev) { var t = String(ev.texto || "").trim().toUpperCase();
-      if (ev.opcion === "TP" && ev.ts_inicio && t && dayKey(ev.ts_cliente) === hoy && tpHoy.indexOf(t) < 0) tpHoy.push(t); });
-    return Promise.all([cargarStatus(keys), cargarPickeado(tpHoy)]).then(function (sp) {
+      if (ev.opcion === "TP" && ev.ts_inicio && t && dayKey(ev.ts_cliente) === hoy && pkKeys.indexOf(t) < 0) pkKeys.push(t); });
+    return Promise.all([cargarStatus(keys), cargarPickeado(pkKeys)]).then(function (sp) {
       var status = sp[0], pickeado = sp[1];
+      /* v26.55: copia (la programación está cacheada: no se toca) con el m³ PICKEADO de cada tanda con TP. */
+      if (pickeado.size) { var p2 = new Map(); prog.forEach(function (v, k) { var f = pickeado.get(k);
+        p2.set(k, f == null ? v : Object.assign({}, v, { m3: (Number(v.m3) || 0) * f, m3Ped: Number(v.m3) || 0 })); }); prog = p2; }
       // TP/TAP de hoy + tandas trabajadas que no figuran en la programación
       var alertas = new Set(), fjHoy = new Set(), fichados = new Map();
       eventos.forEach(function (ev) {
@@ -1762,7 +1763,7 @@ function ciclo() {
         actividad: actividadActual(guardado.length ? eventos.concat(guardado) : eventos, hoy, fjHoy, fichados),
         alertas: Array.from(alertas).sort(),
         empleados: empleados, facturadas: facturadas, despachadas: despachadas,
-        horas: horas, arbol: arbol, eventos: eventos, pickeado: pickeado
+        horas: horas, arbol: arbol, eventos: eventos
       });
 
       ultimoOk = Date.now(); fallos = 0;
@@ -1918,7 +1919,7 @@ function popTablaTandas(pares) {   // [[tanda, m3], …]
 function popRitmo(leg, sub) {
   var D = window.__MA_D || {}, M = window.__MA_M3 || {};
   var row = (D.horas || []).filter(function (o) { return String(o.legajo) === String(leg); })[0] || {};
-  var det = (M[leg] || { pick: {}, arm: {} })[sub] || {}, ped = (M[leg] || {}).ped || {};   // v26.51: ped = m³ de la tanda cuando se prorrateó
+  var det = (M[leg] || { pick: {}, arm: {} })[sub] || {};   // v26.55: el m³ de una tanda pickeada ya es lo PICKEADO
   var pares = Object.keys(det).map(function (t) { return [t, det[t]]; }).sort(function (a, b) { return b[1] - a[1]; });
   var tot = pares.reduce(function (s, p) { return s + (Number(p[1]) || 0); }, 0);
   var hs = Number(sub === "pick" ? row.hs_pick : row.hs_arm) || 0;
@@ -1952,8 +1953,6 @@ function popRitmo(leg, sub) {
   var esPick = sub === "pick", G = esPick ? (window.__MA_GRADO || {}) : {};
   var gradoDe = function (t) { return G[t + "|" + leg] || G[t] || null; };
   var tm = 0, tp = 0, tAj = 0, tAjOk = true, body = pares.map(function (p) { var mi = mins[p[0]] || 0, pa = pmin[p[0]] || 0; tm += mi; tp += pa;
-    /* v26.51 (Luis, D24): en picking el m³ es lo PICKEADO; si se prorrateó, al lado va el m³ de la tanda («1,2 de 1,5») */
-    var deN = (esPick && ped[p[0]] != null) ? ' <small style="color:#94a3b8">de ' + n1(ped[p[0]]) + '</small>' : '';
     var extra = "";
     if (esPick) {
       var g = gradoDe(p[0]), mu = g ? Number(g.multiplicador) : NaN;
@@ -1962,7 +1961,7 @@ function popRitmo(leg, sub) {
           g.grado + ' <small style="color:#94a3b8">' + esc(String(g.nivel || "")) + '</small></td><td class="pop-k">' + rit((Number(p[1]) || 0) * mu, mi) + '</td>'; }
       else { tAjOk = false; extra = '<td title="todavía sin grado (el caché se recalcula cada 10 min)">—</td><td>—</td>'; }
     }
-    return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + deN + '</td><td>' + fm(mi, pa) + '</td><td>' +
+    return '<tr><td class="pop-k">' + esc(p[0]) + '</td><td>' + n1(p[1]) + '</td><td>' + fm(mi, pa) + '</td><td>' +
       rit(Number(p[1]) || 0, mi) + '</td>' + extra + '</tr>'; }).join("");
   var thAj = esPick ? '<th title="Dificultad de la tanda: grado 1-10 (decil de min/caja) y nivel">Dif.</th><th title="Ritmo × (1 + 0,1 × (grado − 5)): Baja ×0,6-0,7 · Media ×0,8-1,0 · Alta ×1,1-1,3 · Muy alta ×1,4-1,5">Ajust. m³/h</th>' : '';
   var tdAj = esPick ? '<td></td><td class="pop-k">' + (tAjOk && pares.length ? rit(tAj, tm) : "—") + '</td>' : '';

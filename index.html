@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.54"></script>
+<script type="module" src="recepcion.js?v=26.55"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10478,7 +10478,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.54";
+const APP_VERSION = "v26.55";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -31982,9 +31982,8 @@ async function showDayBreakdown(dayKey, dayLabel) {
       return historic.get(t) || 0;
     };
     // Calcular fila por legajo y ordenar por m3 total desc
-    const _pkFr = await monPickFrac([...perLegajo.values()].flatMap((p) => [...p.pickedTandas]));   // v26.51 (D24)
     const rows = [...perLegajo.entries()].map(([leg, p]) => {
-      const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t) * (_pkFr.has(t) ? _pkFr.get(t) : 1), 0);   // v26.51 (D24): × lo pickeado
+      const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t), 0);   // v26.55: tandaM3 ya es lo pickeado
       const m3Arm  = [...p.armedTandas ].reduce((s, t) => s + tandaM3(t), 0);
       const m3Total = m3Pick + m3Arm;
       // Horas "trabajadas" (primer evento → último evento) — se mantiene
@@ -32133,21 +32132,38 @@ let _monitorDayStatsCache = new Map();
 // Setteado en renderMonitor; leído por showOperarioActivityDetail.
 let _monitorLiveStats = { todayKey: null, today: null, yesterdayKey: null, yesterday: null };
 const MONITOR_DAY_STATS_TTL_MS = 15000;
-/* v26.51 (Luis, D24): lo NO pickeado se descuenta del m³ de picking. Por tanda, la fracción (en m³) de lo
-   pedido que se pickeó (`gv_picking_pickeado`, último PKC por código). Sin respuesta → Map vacío = m³ entero
-   (fail-open). ≡ monitor/tv.html cargarPickeado. El armado NO se prorratea. */
-async function monPickFrac(tandas) {
-  const m = new Map();
-  const lista = [...new Set((tandas || []).map((t) => String(t || "").trim().toUpperCase()).filter(Boolean))];
-  if (!lista.length) return m;
-  try {
-    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_picking_pickeado", { method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_tandas: lista }) });
-    if (!r.ok) return m;
-    for (const f of (await r.json()) || []) { const x = Number(f.fraccion); if (f.tanda && isFinite(x)) m.set(String(f.tanda).toUpperCase(), Math.max(0, Math.min(1, x))); }
-  } catch (_e) {}
-  return m;
+/* v26.55 (Luis, 04/10): «una vez que se pickea, ya no se mira más el m³ del pedido entero: se analiza con
+   el m³ PICKEADO y nada más, porque lo que se carga en el camión es lo pickeado». Por tanda con TP, la
+   fracción (en m³) de lo pedido que se pickeó (`gv_tanda_m3_pickeado`: caché GV_Picking_Tanda + en vivo el
+   TP reciente). Se aplica en la FUENTE (programación del monitor, histórico, PPP), así que picking, armado,
+   carga, días y camiones ven lo pickeado. Una sola lectura cada 60 s; sin respuesta → la última que se tuvo,
+   o ninguna = m³ del pedido (fail-open). ≡ monitor/tv.html cargarPickeado. Reemplaza al prorrateo sólo del picking (v26.51). */
+let _gvFracPk = { ts: 0, map: new Map(), vuelo: null };
+function gvFracPickeado() {
+  if (Date.now() - _gvFracPk.ts < 60000) return Promise.resolve(_gvFracPk.map);
+  if (_gvFracPk.vuelo) return _gvFracPk.vuelo;
+  _gvFracPk.vuelo = (async () => {
+    const ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    const tm = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch (_e) {} }, 6000) : null;
+    try {
+      const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_tanda_m3_pickeado", { method: "POST", cache: "no-store",
+        signal: ctrl ? ctrl.signal : undefined,
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: "{}" });
+      if (r.ok) {
+        const m = new Map();
+        for (const f of (await r.json()) || []) { const x = Number(f.fraccion); if (f.tanda && isFinite(x)) m.set(String(f.tanda).toUpperCase(), Math.max(0, Math.min(1, x))); }
+        _gvFracPk.map = m; _gvFracPk.ts = Date.now();
+      }
+    } catch (_e) {} finally { if (tm) clearTimeout(tm); _gvFracPk.vuelo = null; }
+    return _gvFracPk.map;
+  })();
+  return _gvFracPk.vuelo;
+}
+/* Aplica la fracción pickeada a un m³ de tanda. Sin fracción (sin pickear) = el m³ tal cual. */
+function gvM3Pickeado(fr, tanda, m3) {
+  const f = fr && fr.get(String(tanda || "").trim().toUpperCase());
+  return (f == null) ? m3 : Math.round((Number(m3) || 0) * f * 1000) / 1000;
 }
 async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   // Cache hit: solo si la entrada cacheada se calculó CON el sheet (m³ real).
@@ -32706,7 +32722,6 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       p.movDetail.push({ opcion: "RKB", texto: "racks (estimado: " + libres.length + " movimiento/s sin tramo)", durMs: tot, inferido: true });
     }
   }
-  const _pkFr = await monPickFrac([...perLegajo.values()].flatMap((p) => [...p.pickedTandas]));   // v26.51 (D24): lo no pickeado se descuenta
   const perOperario = [];
   for (const [leg, p] of perLegajo) {
     // Filtramos a los que NO tocaron nada del trabajo medible (picking, pedido,
@@ -32714,7 +32729,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     // el sheet (típico en tandas C-prefix nuevas), igual aparecen.
     if (p.pickedTandas.size === 0 && p.armedTandas.size === 0
         && p.ccTandas.size === 0 && p.movMs === 0 && p.otrosProdMs === 0 && !p.abiertoProdMs) continue;
-    const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t) * (_pkFr.has(t) ? _pkFr.get(t) : 1), 0);   // v26.51 (D24): × lo pickeado
+    const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t), 0);   // v26.55: tandaM3 ya es lo pickeado (el sheet y el histórico)
     const m3Arm  = [...p.armedTandas ].reduce((s, t) => s + tandaM3(t), 0);
     const m3CC   = [...p.ccTandas    ].reduce((s, t) => s + tandaM3(t), 0);
     // HORAS por actividad: suma real de (ts_cliente - ts_inicio) de los
@@ -33735,7 +33750,7 @@ async function pppGuardarWeb(filas) {
       cod_cliente: p.cod, razon_social: p.razon_social, direccion: p._wDir,
       barrio: p.localidad, fecha_recep: _pppFechaISO(p.fecha),
       tanda: p.tanda, zona: p.zona || null, fecha_entrega: _pppFechaISO(p.fecha_entrega),
-      m3: p.m3, m3_parcial: !!p._wM3Parcial, lineas: p._wLineas, cajas: p._wCajas
+      m3: (p.m3Ped != null ? p.m3Ped : p.m3), m3_parcial: !!p._wM3Parcial, lineas: p._wLineas, cajas: p._wCajas   // v26.55: se guarda el m³ del PEDIDO
     };
   });
   const rp = await fetch(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion?on_conflict=empresa,order_id,np_idx",
@@ -34315,6 +34330,11 @@ async function pppLoadProgFromSupabase() {
   try { web = await pppTraerWebProgramados(); }
   catch (e) { pppSetStatus("⚠ No pude traer los pedidos web programados (" + ((e && e.message) || e) + "). Muestro solo lo de ISIS.", false); }
   _pppParsed.prog = supa.concat(extra, web);
+  /* v26.55 (Luis, 04/10): «el camión se pide en función de lo pickeado»: la NP de una tanda pickeada lleva
+     el m³ PICKEADO (fracción de su tanda). El del pedido queda en m3Ped, que es el que se GUARDA. */
+  try { const fr = await gvFracPickeado();
+    _pppParsed.prog.forEach(function (p) { const t = String(p.tanda || "").trim().toUpperCase();
+      if (!t || !fr.has(t) || p.m3Ped != null) return; p.m3Ped = p.m3; p.m3 = gvM3Pickeado(fr, t, p.m3); }); } catch (_e) {}
   const prog = supa.filter(function (p) { return p.programmed; }).length;
   pppRenderProg();
   if (typeof pppRefreshArmado === "function") pppRefreshArmado();
@@ -46477,6 +46497,15 @@ function targetDeliveryDates(sheetMap, futureCount) {
 async function fetchMonitorSheet() {
   const acc = await fetchMonitorFromSupabase();
   await mergeMonitorPppWeb(acc);          // v12.64 — las tandas programadas desde la PPP Web
+  /* v26.55 (Luis, 04/10): tanda pickeada = su m³ PICKEADO (la tanda y cada NP, por la fracción de la tanda). */
+  try {
+    const fr = await gvFracPickeado();
+    for (const [k, v] of acc) {
+      if (!v || !fr.has(k)) continue;
+      v.m3Ped = v.m3; v.m3 = gvM3Pickeado(fr, k, v.m3);
+      (v.pedidos || []).forEach((q) => { q.m3Ped = q.m3; q.m3 = gvM3Pickeado(fr, k, q.m3); });
+    }
+  } catch (_e) {}
   // Persistimos cada tanda con m³ > 0 para que sobreviva cuando salga de la PPP
   // "Programacion Diaria" (mañana ya no estará pero la recordamos).
   for (const [k, v] of acc) { if (v && v.m3 > 0) rememberTandaM3(k, v.m3); }
@@ -52431,6 +52460,7 @@ function aprColDias() {
    Sheets. Suma m³ por tanda y persiste el m³ visto, venga de donde venga. v2.80. */
 async function fetchHistoricSheet() {
   const acc = await fetchHistoricFromSupabase();
+  try { const fr = await gvFracPickeado(); for (const [k, v] of acc) if (fr.has(k)) acc.set(k, gvM3Pickeado(fr, k, v)); } catch (_e) {}   // v26.55
   for (const [k, v] of acc) { if (v > 0) rememberTandaM3(k, v); }
   flushPersistedM3();
   return acc;
@@ -59244,7 +59274,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.54"></script>
+<script src="importacion.js?v=26.55"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62067,9 +62097,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.54"></script>
-<script src="hotsale.js?v=26.54"></script>
-<script src="estadisticas.js?v=26.54"></script>
+<script src="cobranzas.js?v=26.55"></script>
+<script src="hotsale.js?v=26.55"></script>
+<script src="estadisticas.js?v=26.55"></script>
 
 </body>
 </html>
