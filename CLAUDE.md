@@ -7286,7 +7286,7 @@ negativo para usos prácticos de importación"*.
 | 587C · 505C · 1546903 · 523C · 1000900 | Z23B · Z23A · C13 · E13 · D1 | 1 |
 | 323ES | GRJ31 | 1 |
 | 323E / 838E | GRJ31 | 0,2 / 0,8 |
-| 942E · 943E · 944E · 945E · 948E | Z47 + Z47-M505D + 942E · Z44 + Z44-M505C + 943E · Z48 + Z48-M505 + 944E · Z49 + Z49-M505F + 945E · Z45 + Z45-M505B + 948E | 1 c/u, se suman (v26.00) |
+| 942E · 943E · 944E · 945E · 948E | Z47 + Z47-M505 + 942E · Z44 + Z44-M505 + 943E · Z48 + Z48-M505 + 944E · Z49 + Z49-M505 + 945E · Z50 + Z50-M505 + 948E | 1 c/u, se suman (v26.00; 05/10 Luis: la matriz va sin letra final, y el 948E es Z50 Espumadera, no Z45) |
 | 522ES | GRJ33 | 1 |
 | 702E · 106E | 702 + 702E + 102E · 723 + 106E | 1 c/u (v26.03) |
 
@@ -7307,6 +7307,7 @@ negativo para usos prácticos de importación"*.
 - Al 01/10: 22 códigos en negativo (583E −210, 969E −204…); 505C +21.605, 587C +20.377, 323E +600 (444 neto).
 - ⚠ GRJ31 cuenta en 323ES (100 %) **y** en 323E/838E (20/80), a propósito (Luis, 01/10, D13: *"323ES es la pieza para fabricar los otros dos, así que la evaluación de esa es particular"*). No es doble conteo: no volver a proponer sacarlo.
 - **v26.00 (Luis, D19):** un importado puede tener VARIOS componentes y se suman; los que GP2 todavía no tiene (Z47, Z44-M505C, GRJ33…) cuentan solos cuando se creen (cruce por `upper`). El pop-up los lista todos. ⚠ Si el terminado de GP2 (942E…) se manda a Virgilio, tiene que salir del inventario de GP2 o cuenta dos veces.
+- **05/10 (Luis): lo que Virgilio RECIBE de un artículo que Cervantes hace con matriz y que GP2 no tiene cargado sale igual de GP2 en negativo** ("construimos el puente desde las dos puntas"): 323E, 50 cajas recibidas el 02/10 (OC 1728) → `GP2.movimiento` 85638, ajuste −600 u en «Art. Terminado (Fábrica)». Con eso el 323E suma 600 (GRJ31 20 %) − 600 = 0 de GP2 y no cuenta dos veces. Cuadra cuando se cargue la producción de Cervantes.
 - **v26.86 (Luis, 05/10): suma TAMBIÉN el componente de GP2 con el MISMO código** (323E en GP2 = el artículo terminado), factor 1, salvo que ya esté en `GV_Importados_Equiv_GP2` o el código sea dual. Bodegas = todo GP2 menos Virgilio (talleristas incluidos). Lateral `e_mismo`, centinela 323. `sql/gv_importados_gp2_mismo_codigo_v2686.sql`.
 - **v26.03 (Luis, 01/10, D23): también suma STOCK DE VIRGILIO de otro código que se convierte en el importado**
   (*"si tengo de eso, no tengo que salir corriendo a comprar"*): tabla **`GV_Importados_Equiv_Virgilio`** (importado,
