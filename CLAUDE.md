@@ -7621,8 +7621,8 @@ con su propia cola (`gv_pkm_q_v1`, tope 800) y todo en try/catch: **si falla, el
 - **📥 dd/mm** en cada NP de Pedidos Entregados = la fecha en que el cliente mandó el pedido (web: `lk_pedidos_match`
   fecha + hora; ISIS: «Fecha Recep» de la PPP / base de pedidos), **no** la de programación. Forward-facing:
   `GV_NP_Fecha_Pedido` + cron `gv-np-fecha-pedido` (59 * * * *). Las NP de ISIS anteriores al 23/06 no tienen el dato:
-  van sin chip, no se inventa. ⚠ Al 05/10 el SQL (`sql/gv_np_fecha_pedido_v2669.sql`) **no se pudo aplicar desde la
-  sesión** (se cuelga el permiso): el front lee las fuentes en vivo mientras tanto.
+  van sin chip, no se inventa. Aplicado el 05/10 (Luis, SQL Editor; cron jobid 130): 1.007 de 1.473
+  entregados con fecha. El front suma además las fuentes vivas (lo de la última hora).
 - **⬇ Excel** en Stocks baja lo que muestra la tabla (las filas salen de `stkBodyStocks` → `_stk._xl`; no volver a
   escribir una segunda cuenta en `stkDescargarExcel`). **⬇ Excel de insumos** en Insumos = «Todos los insumos» con sus
   filtros. Revierte el «se sacó Descargar Excel» de la v8.93: lo pidió Luis.

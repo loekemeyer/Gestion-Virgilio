@@ -31615,7 +31615,7 @@ del panel, con L), probada contra los pedidos 245-247. Dorinka sigue a mano en C
 - **Medido el 05/10** sobre 1.473 entregados: 194 web (186 con `lk_pedidos_match`, 189 con `fecha_recep`;
   `fecha_recep = fecha_pedido` en 363 de 363), 1.279 ISIS de las que 818 tienen fecha en `GV_PPP_Base_Pedidos`
   (= «Fecha Recep» de la PPP en 132 de 133; 98704 difiere y gana la PPP). Las ISIS anteriores al 23/06: sin dato.
-- **⚠ Estado al cerrar la v26.69: el SQL NO está aplicado.** `execute_sql` y `apply_migration` se colgaron a los 60 s
-  sin llegar a Postgres (el cartel de permiso de la sesión). El front no lo necesita para mostrar la fecha (lee las
-  fuentes en vivo); la tabla es la que la conserva si los espejos de ISIS se reescriben. Se corre entero en el SQL
-  Editor: `sql/gv_np_fecha_pedido_v2669.sql` (idempotente, con chequeo y rollback).
+- **Aplicado el 05/10 por Luis en el SQL Editor** (desde la sesión `execute_sql` y `apply_migration` se colgaban a los
+  60 s sin llegar a Postgres). Cron `gv-np-fecha-pedido` = jobid **130**. Primera captura: web 367 (364 con hora),
+  isis_prog 133, isis_base 701 → **1.007 de 1.473 entregados con fecha**; los que faltan son las NP de ISIS anteriores
+  al 23/06 y 5 web sin `fecha_recep` ni `lk_pedidos_match`. `anon` lee (SELECT) y no escribe.
