@@ -1,8 +1,4 @@
-/* v26.79 (Luis, 05/10/2026) — tocar el rótulo «Est. Madre» de Stocks:
-   1.º toque: saca los que tienen 0 y ordena de MAYOR a menor (▼)
-   2.º toque: de MENOR a mayor (▲), siguen afuera los 0
-   3.º toque: vuelve al estándar (todos, con el orden de siempre)
-   v26.81 (Luis, 05/10/2026) — las DEMÁS columnas tienen cuatro toques:
+/* v26.81-82 (Luis, 05/10/2026) — los rótulos de Stocks (Est. Madre incluida, v26.82) tienen cuatro toques:
    1.º sólo filtra > 0 (✓, orden de siempre) · 2.º mayor→menor (▼) · 3.º menor→mayor (▲) · 4.º estándar.
    Y pasar de una columna a otra arranca de cero en la nueva (no arrastra el orden).
    Corre stkBodyStocks + stkToggleFilCol de verdad. Sale 1 si falla. */
@@ -27,21 +23,22 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const toque = (k) => { stkToggleFilCol(k); const h = stkBodyStocks(); return { o: orden(h), rot: rotulo(h, k) }; };
     const out = {};
     let h = stkBodyStocks(); out.std = orden(h);
-    // Est. Madre: 3 toques
-    out.p1 = toque("_proy"); out.p2 = toque("_proy"); out.p3 = toque("_proy");
+    // Est. Madre: 4 toques, igual que las demás (v26.82)
+    out.p1 = toque("_proy"); out.p2 = toque("_proy"); out.p3 = toque("_proy"); out.p4 = toque("_proy");
     // Góndola: 4 toques
     out.g1 = toque("terminado"); out.g2 = toque("terminado"); out.g3 = toque("terminado"); out.g4 = toque("terminado");
     // de Est. Madre (▼) a Góndola: Góndola arranca en su 1.º toque (sólo filtra), sin el orden de Est. Madre
-    toque("_proy"); out.x = toque("terminado"); out.xOrd = _stk.colOrd || "";
+    toque("_proy"); toque("_proy"); out.x = toque("terminado"); out.xOrd = _stk.colOrd || "";
     return out;
   });
   const eq = (a, x) => JSON.stringify(a) === JSON.stringify(x);
   const sinMarca = (s) => s.indexOf("▼") < 0 && s.indexOf("▲") < 0 && s.indexOf("✓") < 0;
   const chk = {
     estandarTieneLos6: r.std.length === 6,
-    madre1MayorAMenorSinCeros: eq(r.p1.o, ["503", "501", "504"]) && r.p1.rot.indexOf("▼") >= 0,
-    madre2MenorAMayorSinCeros: eq(r.p2.o, ["504", "501", "503"]) && r.p2.rot.indexOf("▲") >= 0,
-    madre3VuelveAlEstandar: eq(r.p3.o, r.std) && sinMarca(r.p3.rot),
+    madre1SoloFiltra: eq(r.p1.o, ["501", "503", "504"]) && r.p1.rot.indexOf("✓") >= 0,
+    madre2MayorAMenor: eq(r.p2.o, ["503", "501", "504"]) && r.p2.rot.indexOf("▼") >= 0,
+    madre3MenorAMayor: eq(r.p3.o, ["504", "501", "503"]) && r.p3.rot.indexOf("▲") >= 0,
+    madre4VuelveAlEstandar: eq(r.p4.o, r.std) && sinMarca(r.p4.rot),
     gond1SoloFiltra: eq(r.g1.o, ["501", "502", "503", "504", "505"]) && r.g1.rot.indexOf("✓") >= 0,
     gond2MayorAMenor: eq(r.g2.o, ["503", "502", "501", "504", "505"]) && r.g2.rot.indexOf("▼") >= 0,
     gond3MenorAMayor: eq(r.g3.o, ["505", "504", "501", "502", "503"]) && r.g3.rot.indexOf("▲") >= 0,
