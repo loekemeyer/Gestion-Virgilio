@@ -2,8 +2,10 @@
    Cubre psSeedTodayIfNeeded (siembra lo YA terminado como impreso SIN imprimir, 1 vez por día),
    psPoll (detecta TAL nuevos, dedupea por NP, descarta TAL sin resumen marcándolo impreso,
    avanza lastSeen), psPrintBatch (imprime, loguea, y desde v12.08 marca en Impresion_NP para
-   que la Cola no acuse pendientes falsos), psDrain (serializado: 1 hoja cada ~2.6 s) y
-   psSetAuto/psIsAuto (switch por dispositivo en localStorage). Todo con fetch stubbeado —
+   que la Cola no acuse pendientes falsos) y psSetAuto/psIsAuto (switch por dispositivo).
+   v26.65 (Luis, 05/10): lo automático sale SÓLO por el helper (gvImprimirAuto → gvHelperEncolar con
+   {auto:true}); se marca en Impresion_NP sólo si salió; sin helper (o sin respuesta) psPoll no imprime
+   nada y corre los cursores: queda pendiente en la Cola de impresión NP. Todo con fetch stubbeado —
    no toca Supabase. Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -30,11 +32,18 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       return Promise.resolve({ ok: true, json: function () { return Promise.resolve([]); } });
     };
     const printed = [];
-    window.remitoPrintDoc = function (inner) { printed.push(String(inner)); };
+    window.__resp = { ok: true, impreso: ["HP"], errores: [] };
+    let helperOn = true;
+    window.gvHelperActivo = function () { return helperOn; };
+    window.helperVivo = async function () { return helperOn; };
+    // el helper real arma un PDF y lo manda a 127.0.0.1; acá se registra la hoja y se contesta __resp
+    window.gvHelperEncolar = function (tipo, inner, ref, opt) { printed.push(String(inner)); out.ultAuto = !!(opt && opt.auto); return Promise.resolve(window.__resp); };
+    window.remitoPrintDoc = function () { out.usoCuadro = true; };   // lo automático NUNCA pasa por acá
     window.armadoRemitoInnerHtml = function (d) { return "REMITO-" + d.np; };
     // el enriquecido real pega a PPP/Entregas/TP; acá alcanza con un passthrough
     window._armadoRemitoDataForItems = async function (items) { return items.map(function (x) { return { np: x.np, rs: "Test", total: 1, nLios: 1 }; }); };
-    window.colaImpLoadBadge = function () {};   // el badge real pega a la vista
+    window.colaImpLoadBadge = function () {};   // el badge real pega a la base
+    const espera = function (ms) { return new Promise(function (res) { setTimeout(res, ms); }); };
 
     // ---- seed: lo ya terminado HOY se marca impreso SIN imprimir ----
     talRows = [
@@ -57,8 +66,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { texto: "98010|3|D12B|C=3X2|L2", ts_cliente: "2026-01-01T12:01:00-03:00", legajo: "122" },  // nuevo → imprime
       { texto: "98011|4|D12B||L1",      ts_cliente: "2026-01-01T12:02:00-03:00", legajo: "122" }   // sin resumen → marca, no imprime
     ];
-    await psPoll(true);
-    out.poll_imprimeNuevo = printed.length === 1 && printed[0] === "REMITO-98010";
+    await psPoll(true); await espera(50);
+    out.poll_imprimeNuevo = printed.length === 1 && printed[0] === "REMITO-98010" && out.ultAuto === true && !out.usoCuadro;
     out.poll_marcaNuevo = psGetPrinted().has("98010");
     out.poll_sinResumenMarca = psGetPrinted().has("98011");
     out.poll_lastSeenAvanza = String(_ps.lastSeen) === "2026-01-01T12:02:00-03:00";
@@ -68,16 +77,22 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await psPoll(true);
     out.poll_dedup = printed.length === 1;
 
-    // ---- psDrain: serializado (1 hoja por vez, la 2ª sale ~2.6 s después) ----
-    await new Promise(function (res) { setTimeout(res, 2800); });   // dejar drenar el print del poll
-    printed.length = 0;
-    await psPrintBatch([{ np: "98020", tanda: "D13B", resumen: "D=1X1", armadorLeg: "9" },
-                        { np: "98021", tanda: "D13B", resumen: "E=1X1", armadorLeg: "9" }]);
-    out.drain_primeraSale = printed.length === 1;
-    out.drain_quedaEncolada = _ps.queue.length === 1;
-    await new Promise(function (res) { setTimeout(res, 2800); });
-    out.drain_segundaSale = printed.length === 2;
-    out.drain_log = _ps.log.length >= 2;
+    // ---- el helper NO imprimió: no se marca en Impresion_NP (queda pendiente en la Cola) y el log lo dice ----
+    window.__resp = { ok: false, impreso: [], errores: [], motivo: "sin regla para armado" };
+    impresionPosts.length = 0;
+    await psPrintBatch([{ np: "98020", tanda: "D13B", resumen: "D=1X1", armadorLeg: "9" }]); await espera(50);
+    out.fallo_noMarca = impresionPosts.indexOf("98020") < 0 && psGetPrinted().has("98020");
+    out.fallo_log = !!_ps.log.length && /queda en la Cola/.test(_ps.log[0].nota || "");
+    window.__resp = { ok: true, impreso: ["HP"], errores: [] };
+
+    // ---- sin helper: psPoll no imprime nada, no abre el cuadro y corre el cursor a ahora ----
+    helperOn = false; printed.length = 0; impresionPosts.length = 0;
+    talRows = [{ texto: "98030|1|D14B|C=1X1|L1", ts_cliente: "2026-01-01T13:00:00-03:00", legajo: "122" }];
+    _ps.lastSeen = "2026-01-01T12:30:00-03:00";
+    await psPoll(true); await espera(50);
+    out.sinHelper_noImprime = printed.length === 0 && !out.usoCuadro && impresionPosts.length === 0 && !psGetPrinted().has("98030");
+    out.sinHelper_cursorAhora = String(_ps.lastSeen) > "2026-01-02";
+    helperOn = true;
 
     // ---- switch por dispositivo ----
     psSetAuto(true);
@@ -91,7 +106,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   const pass = r.seed_marcaImpresas && r.seed_noImprime && r.seed_lastSeen && r.seed_idempotente &&
     r.poll_imprimeNuevo && r.poll_marcaNuevo && r.poll_sinResumenMarca && r.poll_lastSeenAvanza &&
     r.poll_marcaImpresionNP && r.poll_dedup &&
-    r.drain_primeraSale && r.drain_quedaEncolada && r.drain_segundaSale && r.drain_log &&
+    r.fallo_noMarca && r.fallo_log && r.sinHelper_noImprime && r.sinHelper_cursorAhora &&
     r.auto_on && r.auto_off && errs.length === 0;
   console.log("print-station:", JSON.stringify(r), "· pageerrors:", errs.length ? errs.join("|") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); process.exit(pass ? 0 : 1);

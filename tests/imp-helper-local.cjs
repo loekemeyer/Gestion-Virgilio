@@ -19,6 +19,9 @@
         lo prende; Conectar al puerto vivo lo prende. La Cola de impresión no habla del helper.
      L. gvHelperVigilar arranca la estación sola con helper + auto de la estación.
      M. v26.26 — el programa de la v26.12 se sacó: ni 🧩 Impresoras, ni cola en la base, ni gv_imp_encolar.
+     O. v26.65 — lo AUTOMÁTICO (gvImprimirAuto) sale sólo por el helper: con ok:false NO abre el cuadro y no
+        marca; si salió, marca; sin helper no hace nada; con el helper que no contesta la estación (psPoll)
+        no imprime ni abre el cuadro y corre los cursores (queda en la Cola de impresión NP).
    Sale 1 si algo falla. */
 const path = require("path");
 const http = require("http");
@@ -292,6 +295,43 @@ const helper = http.createServer((req, res) => {
     _ps.lastSeenImpt = ""; await psPoll(true); await new Promise(function (ok) { setTimeout(ok, 400); });
     return _gvHelper.log.length === 0 && window.__S.nav.length === 0;
   });
+
+  // ---- O. v26.65 (Luis, 05/10) — lo AUTOMÁTICO sale sólo por el helper conectado y respondiendo: nunca el
+  //         cuadro, y la hoja se marca impresa sólo si salió (si no, queda pendiente en la Cola de impresión NP).
+  H.reqs.length = 0; await ctl("modo", "sinregla");
+  out.O_autoNoCuadro = await p.evaluate(async (h) => {
+    gvHelperGuardar({ on: true }); window.__S.nav.length = 0; window.__S.marcas = [];
+    window.colaImpMarcarImpresas = function (nps) { window.__S.marcas = window.__S.marcas.concat(nps); };
+    const r = await gvImprimirAuto("armado", h, "98040", "98040");
+    return r.ok === false && window.__S.nav.length === 0 && window.__S.marcas.length === 0 && _gvHelper.log[0].alNavegador === false && _gvHelper.log[0].auto === true;
+  }, HOJA) && n() === 1;
+  await ctl("modo", "ok");
+  out.O_autoMarcaSiSalio = await p.evaluate(async (h) => {
+    window.__S.marcas = [];
+    const r = await gvImprimirAuto("facturado", h, "LK 0401", "FAC LK 0401");
+    return r.ok === true && window.__S.marcas.join() === "FAC LK 0401" && window.__S.nav.length === 0;
+  }, HOJA);
+  out.O_sinHelperNoHaceNada = await p.evaluate(async (h) => {
+    gvHelperGuardar({ on: false }); window.__S.marcas = []; const antes = _gvHelper.log.length;
+    const r = await gvImprimirAuto("armado", h, "98041", "98041");
+    gvHelperGuardar({ on: true });
+    return r.ok === false && _gvHelper.log.length === antes && window.__S.nav.length === 0 && window.__S.marcas.length === 0;
+  }, HOJA);
+  // helper prendido pero que no contesta: la estación no imprime nada, no abre el cuadro y corre los cursores
+  H.reqs.length = 0;
+  out.O_helperMuertoEstacion = await p.evaluate(async (pt) => {
+    if (_ps && _ps.timer) { clearInterval(_ps.timer); _ps.timer = null; }
+    const vivo = gvHelperCfg().puerto;
+    gvHelperGuardar({ on: true, puerto: pt }); window.__S.nav.length = 0; window.__S.marcas = []; _gvHelper.log.length = 0;
+    window.__S.talRows = [{ texto: "98050|1|E60A|C=3X2|L1", ts_cliente: "2099-02-01T12:00:00-03:00", legajo: "104" }];
+    window.__S.tpRows = [{ texto: "E60A", ts_cliente: "2099-02-01T11:00:00-03:00" }];
+    _ps.lastSeen = "2026-01-01T00:00:00-03:00";
+    await psPoll(true); await new Promise(function (ok) { setTimeout(ok, 500); });
+    const r = window.__S.nav.length === 0 && _gvHelper.log.length === 0 && window.__S.marcas.length === 0 &&
+      _ps.lastSeen > "2026-10-01" && /no contesta/.test(_ps.lastErr || "");
+    gvHelperGuardar({ puerto: vivo }); window.__S.talRows = []; window.__S.tpRows = [];
+    return r;
+  }, PUERTO_MUERTO) && n() === 0;
 
   // ---- M. el programa de la v26.12 no volvió (Luis, 02/10: "me quedo con mi helper, sacá lo otro")
   out.M_sinPrograma = await p.evaluate(() => {

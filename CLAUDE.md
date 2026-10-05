@@ -7433,8 +7433,9 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
   `tipo`, o sale por el cuadro aunque el helper esté prendido. Sin tipo = navegador (`_remitoPrintNavegador`).
 - El PDF lo arma el navegador: la hoja en un iframe (mismo CSS y `_rmtAutofit`) → `vendor/html2canvas.min.js` (a
   demanda) → jsPDF A4, márgenes 12 mm, varias páginas si hace falta. En FILA, una hoja por vez.
-- **Helper que no contesta o que no imprimió nada → la hoja sale por el navegador** (una hoja que no salió no se pierde
-  callada). **Más de 60 s sin respuesta → NO se repite** (puede haber salido).
+- **A MANO** (botón Imprimir de la Cola, Programación, la estación): helper que no contesta o que no imprimió nada →
+  la hoja sale por el navegador. **Más de 60 s sin respuesta → NO se repite** (puede haber salido).
+  ⚠⚠ **LO AUTOMÁTICO NUNCA abre el cuadro** (v26.65, ver la regla de abajo): sale sólo por el helper o queda en la Cola.
 - **Orden: helper > navegador.** (El programa de la v26.12 se sacó en la v26.26.) Qué sale SOLO lo siguen decidiendo los
   switches de 🖨️ Cola de impresión (auto-imprimir remitos = armado y picking; FACTURADO global).
 - Con el helper conectado + el auto de la estación prendidos, la estación arranca sola al abrir GV (`gvHelperVigilar`).
@@ -7474,6 +7475,32 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
   aviso de puerto ocupado; `ServidorImpresion` es idéntico. El test exige que la versión del `.cs` y la del README coincidan.
 
 `tests/imp-helper-local.cjs` (helper falso en 127.0.0.1: mide el PDF que le llega, el orden, el fallback y el timeout).
+
+## ⚠⚠ REGLA (Luis, 2026-10-05, v26.65): LO AUTOMÁTICO SALE SÓLO POR EL HELPER — lo que no salió queda en la COLA DE IMPRESIÓN NP
+
+**Luis:** *"solo cuando se conecta el helper salen automaticas. si no esta conectado el helper o si estuvo conectado pero no
+responde, no manda a imprimir automaticamente la app sino que figuran en el modulo [Cola de impresión NP]. Que ahi figuren
+todas las NPs pasadas y presentes (en buena vista) con los comprobantes que se les puede imprimir porque esta la data (nota de
+picking, armado o facturado). En caso de que sea de la tanda, es de la tanda, si es de la NP, es de la NP"*. Caso: al cerrar
+el helper, las PC con la estación prendida empezaron a abrir el cuadro de impresión por cada hoja.
+
+| qué | cómo queda |
+|---|---|
+| puerta única de lo automático | **`gvImprimirAuto(tipo, inner, ref, marca)`**: sin helper conectado no hace nada; con el helper que contesta `ok:false` o no contesta, **no abre el cuadro** (`gvHelperEncolar(..., {auto:true})`). Marca en `Impresion_NP` **sólo si salió** |
+| estación (`psPoll`) | antes de todo hace ping al helper; sin helper o sin respuesta **no imprime nada** y corre los cursores a ahora (`_psCorrerCursores`): cuando vuelve no vuelca lo de atrás, queda en la Cola |
+| TAL / TP / IMPT / facturado | `psPrintBatch`, `pkHojaImprimir(..., "estacion")`, la señal de prueba y `facPrintFacturado(np, tanda, true)` van por `gvImprimirAuto` |
+| marcas en `Impresion_NP` | armado = la **NP** · picking = **`PK <tanda>`** · facturado = **`FAC <np>`** (nuevo) |
+| Cola de impresión NP | **`gv_cola_impresion_lista(desde, hasta)`** (lectura, anon, ~70 ms 28 días): por **día** (entrega) → **tanda** (la tanda y su 📋 Picking en UNA celda para todas sus NP) → **NP** (📦 Armado, 🧾 Facturado). ✓ hora en lo impreso · rojo pendiente (⚠ +24 h) · azul disponible sin marca · — sin datos. Tocar abre la hoja (`gvHojaPreview`) con Imprimir (a mano: helper o cuadro) y la marca. «🖨️ Imprimir pendientes» del día más viejo al más nuevo |
+| pendiente = tiene la data y no tiene marca | picking con TP desde 01/10 · armado con TAL desde 25/08 · facturado con TAL + `facturado_at` desde 05/10 13:00 (antes la marca no existía) |
+| badge del panel | pendientes de −21 a +14 días; rojo si alguno hace +24 h; una lectura rota no lo apaga |
+
+- **La disponibilidad sale de la base, no de la estación**: picking = TP de la tanda; armado = TAL con resumen o
+  `Entregas_Virgilio` vivas (sin `-X`); facturado = `Facturacion_NP.facturado_at` + el resumen del TAL (lo pide la hoja).
+- ⚠ **Sin un solo texto del helper en la Cola ni en la estación** (regla v26.28: lo único del helper es el botón de ⚙️).
+- ⚠ El `_ci_ev` de la RPC va **`as materialized`**: sin eso el plan lo re-agregaba una vez por fila (**2,4 s → 68 ms**).
+- `vista_cola_impresion` / `gv_vista_cola_impresion` quedan en la base sin lector del front.
+- Centinelas 311 y 312. `sql/gv_cola_impresion_lista_v2665.sql`, `tests/cola-impresion-np.cjs`, `tests/print-station.cjs`,
+  bloque **O** de `tests/imp-helper-local.cjs` (verificado que los tres fallan con la regla rota).
 
 ## ⚠ REGLA (Luis, 2026-10-02, v26.16 · v26.20): 📑 ESTADÍSTICAS ISIS — ventas y pedidos por artículo sin entrar a ISIS
 
