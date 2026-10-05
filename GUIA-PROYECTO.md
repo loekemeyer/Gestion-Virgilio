@@ -1,3 +1,10 @@
+## Nota v26.78 (2026-10-05) — Stocks: el rótulo «Est. Madre» filtra y ORDENA
+
+- Luis: tocar el rótulo **Est. Madre** de la tabla de Stocks tiene tres toques: 1.º saca los que tienen 0 y
+  ordena de mayor a menor (▼) · 2.º de menor a mayor (▲) · 3.º vuelve al estándar. Las otras columnas siguen
+  como antes (un toque filtra > 0 con ✓, otro lo saca). El Excel baja ese mismo orden.
+  `stkToggleFilCol` (estado `_stk.proyOrd`), `tests/stk-est-madre-orden.cjs`.
+
 ## Nota v26.72 (2026-10-05) — Barra de Stocks sin emojis y en dos renglones
 
 - Todos los botones de la barra de Stocks (filtros, Ver stock, Refrescar ya, Descargar Excel) con el mismo molde

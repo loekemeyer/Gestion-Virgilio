@@ -6292,7 +6292,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.77"></script>
+<script type="module" src="recepcion.js?v=26.78"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10531,7 +10531,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.77";
+const APP_VERSION = "v26.78";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20152,7 +20152,17 @@ function stkToggleSoloNeg() { if (!_stk) return; _stk.soloNeg = !_stk.soloNeg; s
 function stkToggleSoloLow() { if (!_stk) return; _stk.soloLow = !_stk.soloLow; stkRender(); }
 // v8.52 — filtro por línea LK/CH (empresa) + fijar códigos (📌, persistente en localStorage)
 function stkFiltroLinea(l) { if (!_stk) return; _stk.filLinea = (_stk.filLinea === l) ? "" : l; _stk.openArt = null; stkRender(); }
-function stkToggleFilCol(key) { if (!_stk) return; _stk.filCol = (_stk.filCol === key) ? "" : key; _stk.openArt = null; stkRender(); }   // v8.95 — filtro por columna > 0
+function stkToggleFilCol(key) {   // v8.95 — filtro por columna > 0
+  if (!_stk) return;
+  /* v26.78 (Luis, 05/10) — Est. Madre tiene TRES toques: 1.º saca los 0 y ordena de mayor a menor,
+     2.º de menor a mayor, 3.º vuelve al estándar (sin filtro y con el orden de siempre). */
+  if (key === "_proy") {
+    if (_stk.filCol !== "_proy") { _stk.filCol = "_proy"; _stk.proyOrd = "desc"; }
+    else if (_stk.proyOrd === "desc") _stk.proyOrd = "asc";
+    else { _stk.filCol = ""; _stk.proyOrd = ""; }
+  } else { _stk.filCol = (_stk.filCol === key) ? "" : key; _stk.proyOrd = ""; }
+  _stk.openArt = null; stkRender();
+}
 function stkToggleSoloPin() { if (!_stk) return; _stk.soloPin = !_stk.soloPin; _stk.openArt = null; stkRender(); }
 const STK_PINS_KEY = "stk_pins_vir";
 function _stkPinsLoad() { try { const a = JSON.parse(localStorage.getItem(STK_PINS_KEY) || "[]"); return Array.isArray(a) ? a : []; } catch (_e) { return []; } }
@@ -20479,7 +20489,11 @@ function stkBodyStocks() {
   const _thNum = function (key, label, baseStyle, title) {
     const on = _stk.filCol === key;
     const st = on ? "background:#16a34a;color:#fff;" : (baseStyle || "");
-    return '<th class="num" onclick="stkToggleFilCol(\'' + key + '\')" title="' + (title || "Filtrar") + ' — tocá para mostrar solo los que tienen &gt; 0" style="cursor:pointer;' + st + '">' + label + (on ? " ✓" : " <span style=\"opacity:.4;font-weight:400\">⌵</span>") + '</th>';
+    // v26.78 — Est. Madre además ordena: ▼ mayor→menor, ▲ menor→mayor (stkToggleFilCol).
+    const _ord = on && key === "_proy" && _stk.proyOrd;
+    const _mk = _ord ? (_stk.proyOrd === "asc" ? " ▲" : " ▼") : (on ? " ✓" : " <span style=\"opacity:.4;font-weight:400\">⌵</span>");
+    const _tt = key === "_proy" ? " — 1.º toque: sin los 0 y de mayor a menor · 2.º: de menor a mayor · 3.º: vuelve al orden normal" : " — tocá para mostrar solo los que tienen &gt; 0";
+    return '<th class="num" onclick="stkToggleFilCol(\'' + key + '\')" title="' + (title || "Filtrar") + _tt + '" style="cursor:pointer;' + st + '">' + label + _mk + '</th>';
   };
   let th = '<th>Código</th><th style="text-align:center;padding:7px 5px;font-size:10px;">LK/<br>CH</th><th>Descripción</th>' +
     _thNum("_proy", "Est. Madre<br>caj/mes", "background:#f5f3ff;color:#6d28d9;", "Estadística Madre (cajas/mes) — el valor antes del índice que se usa en las OCs") +
@@ -20503,6 +20517,12 @@ function stkBodyStocks() {
     if (ap !== bp) return bp - ap;                       // fijados arriba
     return 0;                                            // resto: orden original (sort estable)
   });
+  // v26.78 (Luis, 05/10) — con Est. Madre tocada, el orden es por Est. Madre (▼ mayor→menor / ▲ menor→mayor).
+  // Sort estable: a igual Est. Madre queda el orden de arriba (negativos y fijados primero).
+  if (_stk.filCol === "_proy" && _stk.proyOrd) {
+    const _pd = _stk.proyOrd === "asc" ? 1 : -1;
+    shown.sort(function (a, b) { return _pd * ((Number(_proyOf(a.cod)) || 0) - (Number(_proyOf(b.cod)) || 0)); });
+  }
   /* v26.69 (Luis, 05/10) — «⬇ Excel» baja EXACTAMENTE lo que muestra la tabla: las mismas filas (búsqueda,
      LK/CH, negativos, stock bajo, fijados, discontinuos, filtro de columna), el mismo orden y los mismos
      números. Se arma acá, con los helpers de la pantalla, para que stkDescargarExcel no tenga una
@@ -60230,7 +60250,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.77"></script>
+<script src="importacion.js?v=26.78"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63053,9 +63073,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.77"></script>
-<script src="hotsale.js?v=26.77"></script>
-<script src="estadisticas.js?v=26.77"></script>
+<script src="cobranzas.js?v=26.78"></script>
+<script src="hotsale.js?v=26.78"></script>
+<script src="estadisticas.js?v=26.78"></script>
 
 </body>
 </html>
