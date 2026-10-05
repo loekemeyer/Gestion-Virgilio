@@ -1,5 +1,5 @@
 -- =============================================================================
--- v26.70 · CORRER EN EL PROYECTO DE CHEF (nkhzocgdpwtgrmwleihr) · SQL Editor, todo junto.
+-- v26.71 · CORRER EN EL PROYECTO DE CHEF (nkhzocgdpwtgrmwleihr) · SQL Editor, todo junto.
 -- Luis, 05/10/2026: «correr un sql en el proyecto de chef que le permita al programa hacer lo
 -- que necesita» · «DORINKA Y CENCOSUD QUIERO QUE SE CARGUEN AUTOMATICAMENTE».
 -- =============================================================================

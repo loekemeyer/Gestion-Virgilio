@@ -31600,7 +31600,7 @@ columnas donde el automático saldría distinto, las obligatorias que el panel n
 Probado en LK con `pg_temp` en transacción abortada: simula sin dejar filas, la 2.ª carga de la misma OC devuelve
 `duplicado`, el token falso se rechaza, y si falta una columna obligatoria la prueba la nombra con su valor de
 referencia en vez de cortarse. ⚠ Esa prueba consumió los ids 1611-1613 de la secuencia de `orders` de LK (sin
-filas: el próximo pedido de LK salta esos números). ⚠ **Reemplazado por la v26.70 (§3.v2670): ese SQL no se corrió
+filas: el próximo pedido de LK salta esos números). ⚠ **Reemplazado por la v26.71 (§3.v2671): ese SQL no se corrió
 en Chef y el archivo se borró.**
 
 Falta (tarea de Planify de Luis): la clave de ventas@chefsrl.com en el Vault de LK (`KRIKOS_CHEF_IMAP_PASS`), el
@@ -31621,7 +31621,7 @@ del panel, con L), probada contra los pedidos 245-247. Dorinka sigue a mano en C
   isis_prog 133, isis_base 701 → **1.007 de 1.473 entregados con fecha**; los que faltan son las NP de ISIS anteriores
   al 23/06 y 5 web sin `fecha_recep` ni `lk_pedidos_match`. `anon` lee (SELECT) y no escribe.
 
-### 3.v2670 — Chef: la puerta del pedido automático usa `submit_order_fast` y sirve para Cencosud Y Dorinka (Luis, 05/10/2026, v26.70)
+### 3.v2671 — Chef: la puerta del pedido automático usa `submit_order_fast` y sirve para Cencosud Y Dorinka (Luis, 05/10/2026, v26.71)
 
 Luis: *«DORINKA Y CENCOSUD QUIERO QUE SE CARGUEN AUTOMATICAMENTE»*. No cambia dónde vive ningún pedido: hoy, cargado
 a mano, Cencosud (PDF Krikos del admin de LK, artículos de LK con L) ya queda guardado en la base de **Chef** porque lo
@@ -31637,7 +31637,7 @@ puerta deja el automático en el mismo lugar y de la misma forma.
 por la puerta: **16/16 y 22/22 renglones idénticos** a los cargados por el panel, **0 grabados**. Sólo cambian
 `sheets_sent` (lo pone el panel después de mandar a la planilla: el auto-import tiene que hacer lo mismo) y
 `placed_by_auth_user_id` (columna que sólo existe en LK). El SQL termina con la misma prueba contra el 247 (Cencosud)
-y el 241 (Dorinka), para correr en Chef: `sql/chef_krikos_crear_pedido_super_v2670_CHEF.sql` (lo corre Luis en el SQL
+y el 241 (Dorinka), para correr en Chef: `sql/chef_krikos_crear_pedido_super_v2671_CHEF.sql` (lo corre Luis en el SQL
 Editor de Chef; esta sesión no tiene acceso a ese proyecto).
 
 Falta (tarea de Planify de Luis): el resultado de esa prueba en Chef, la clave de ventas@chefsrl.com en el Vault de LK
