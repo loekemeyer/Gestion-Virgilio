@@ -29,6 +29,20 @@
 // Deploy (una vez): verify_jwt=false y depende de los secrets RESEND_API_KEY /
 // RESEND_FROM (opcional; fallback a onboarding@resend.dev, dominio verificado
 // por Resend). Ya usados por la Edge Function admin-otp.
+//
+// ⚠⚠ v26.78 (05/10, Tomás Gonzalez: "No se pudo crear el login (CUIT + PIN): invalid_token").
+// Cambiarle la password al usuario con updateUserById CIERRA TODAS SUS SESIONES (GoTrue
+// hace Logout del usuario entero al cambiar la password por la API de admin). La cuenta
+// loekemeyer.n8n@gmail.com es COMPARTIDA: la usan el Panel Web LK de cada persona y la
+// PPP de Gestión (pwebLkToken), que la pedía ~22 veces por día (medido el 05/10). Cada
+// entrada mataba la sesión de los demás: la pantalla seguía leyendo (PostgREST no mira
+// la sesión) pero todo lo que pasa por Auth —crear-cliente-auth, refrescar el token—
+// contestaba "Session not found" → el alta de clientes fallaba con invalid_token.
+// Con { modo: "enlace" } la función ya NO toca la password: genera un enlace mágico
+// (admin.generateLink, no manda mail), lo canjea acá mismo por una sesión NUEVA y
+// devuelve access_token + refresh_token. Las demás sesiones siguen vivas. Si el enlace
+// falla por lo que sea, cae al modo password de siempre: el login nunca queda peor que
+// antes. Sin "modo" (fronts viejos cacheados) sigue el modo password.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -50,6 +64,7 @@ const VIRGILIO_ANON_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -95,6 +110,58 @@ function buildEmailHtml(code: string): string {
 </body></html>`;
 }
 
+// v26.78: sesión NUEVA sin tocar la password (las demás sesiones de la cuenta siguen vivas).
+// generateLink pisa el token del enlace anterior, así que si otro login genera uno entre
+// medio, el canje falla: se reintenta. Devuelve null si no se pudo (el que llama cae al
+// modo password).
+async function sesionPorEnlace(admin: ReturnType<typeof createClient>): Promise<Record<string, unknown> | null> {
+  const canje = createClient(SUPABASE_URL, SUPABASE_ANON_KEY || SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+  });
+  for (let intento = 0; intento < 3; intento++) {
+    try {
+      const gl = await admin.auth.admin.generateLink({ type: "magiclink", email: RECIPIENT_EMAIL });
+      const props = (gl.data && gl.data.properties) || null;
+      const th = props && props.hashed_token;
+      if (gl.error || !th) {
+        console.error("enlace: generateLink falló:", gl.error ? gl.error.message : "sin hashed_token");
+      } else {
+        const tipo = (props.verification_type || "magiclink") as "magiclink";
+        const vr = await canje.auth.verifyOtp({ token_hash: th, type: tipo });
+        const s = vr.data && vr.data.session;
+        if (!vr.error && s && s.access_token && s.refresh_token) {
+          return {
+            ok: true, email: RECIPIENT_EMAIL, modo: "enlace",
+            access_token: s.access_token, refresh_token: s.refresh_token,
+            expires_in: s.expires_in, expires_at: s.expires_at,
+          };
+        }
+        console.error("enlace: canje falló (intento " + (intento + 1) + "):", vr.error ? vr.error.message : "sin sesión");
+      }
+    } catch (e) {
+      console.error("enlace: excepción (intento " + (intento + 1) + "):", e);
+    }
+    await new Promise((r) => setTimeout(r, 150 + Math.floor(Math.random() * 250)));
+  }
+  return null;
+}
+
+// Entrar: primero por enlace si el front lo pide; si no se puede, password temporal (modo viejo).
+async function entrar(admin: ReturnType<typeof createClient>, userId: string, modo: unknown): Promise<Response> {
+  if (modo === "enlace") {
+    const ses = await sesionPorEnlace(admin);
+    if (ses) return jsonResponse(ses);
+    console.error("enlace: cae al modo password (cierra las demás sesiones de la cuenta)");
+  }
+  // Password temporal aleatorio. 36 chars de UUID (122 bits) alcanzan y sobran; NO usar
+  // dos concatenados porque Supabase Auth (bcrypt) tope 72 chars y dos UUID + "-" son 73.
+  // ⚠ Cambiar la password CIERRA todas las sesiones de la cuenta (ver la cabecera).
+  const tmpPassword = crypto.randomUUID();
+  const upd = await admin.auth.admin.updateUserById(userId, { password: tmpPassword });
+  if (upd.error) return jsonResponse({ error: "set_password_failed", detail: upd.error.message }, 500);
+  return jsonResponse({ ok: true, email: RECIPIENT_EMAIL, tmp_password: tmpPassword, modo: "password" });
+}
+
 async function getSecret(sb: ReturnType<typeof createClient>, name: string, fallbackEnv?: string): Promise<string> {
   const { data, error } = await sb.rpc("get_admin_otp_secret", { secret_name: name });
   if (!error && typeof data === "string" && data.length > 0) return data;
@@ -129,7 +196,7 @@ Deno.serve(async (req: Request) => {
     const isAdmin = await admin.from("admins").select("auth_user_id").eq("auth_user_id", userId).maybeSingle();
     if (isAdmin.error || !isAdmin.data) return jsonResponse({ error: "not_admin" }, 403);
 
-    let body: { action?: string; code?: string; vjwt?: string } = {};
+    let body: { action?: string; code?: string; vjwt?: string; modo?: string } = {};
     try { body = await req.json(); } catch (_) { return jsonResponse({ error: "invalid_body" }, 400); }
     const action = body.action;
 
@@ -162,11 +229,7 @@ Deno.serve(async (req: Request) => {
       // Gate estricto: sólo el MISMO mail que el admin LK. No amplía acceso.
       if (!vemail || vemail !== RECIPIENT_EMAIL) return jsonResponse({ error: "not_authorized", detail: "email=" + vemail }, 403);
 
-      const tmpPassword = crypto.randomUUID();
-      const updB = await admin.auth.admin.updateUserById(userId, { password: tmpPassword });
-      if (updB.error) return jsonResponse({ error: "set_password_failed", detail: updB.error.message }, 500);
-
-      return jsonResponse({ ok: true, email: RECIPIENT_EMAIL, tmp_password: tmpPassword });
+      return await entrar(admin, userId, body.modo);
     }
 
     if (action === "send") {
@@ -229,15 +292,7 @@ Deno.serve(async (req: Request) => {
       const upd = await admin.from("admin_otp_codes").update({ used: true }).eq("id", found.data.id);
       if (upd.error) return jsonResponse({ error: "db_error", detail: upd.error.message }, 500);
 
-      // Password temporal aleatorio. El front lo usa inmediatamente para signInWithPassword
-      // y queda con sesión. El user nunca lo ve; cambia en cada login por OTP.
-      // 36 chars de UUID (122 bits) alcanzan y sobran; NO usar dos concatenados
-      // porque Supabase Auth (bcrypt) tope 72 chars y dos UUID + "-" son 73.
-      const tmpPassword = crypto.randomUUID();
-      const upd2 = await admin.auth.admin.updateUserById(userId, { password: tmpPassword });
-      if (upd2.error) return jsonResponse({ error: "set_password_failed", detail: upd2.error.message }, 500);
-
-      return jsonResponse({ ok: true, email: RECIPIENT_EMAIL, tmp_password: tmpPassword });
+      return await entrar(admin, userId, body.modo);
     }
 
     return jsonResponse({ error: "unknown_action" }, 400);

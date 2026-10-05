@@ -4515,6 +4515,27 @@ Al verificar setea un password temporal aleatorio en el user y el front hace
   front no puede falsear identidad. Si mañana se quiere que otro supervisor
   entre, ampliar el chequeo de `vemail` en la función (y crear su user en LK).
 
+### ⚠⚠ REGLA (Tomás Gonzalez, 2026-10-05, v26.80): entrar al panel de LK NO le cambia la clave al usuario compartido
+
+**Caso:** alta de cliente en el Panel Web LK → *«No se pudo crear el login (CUIT + PIN): invalid_token»*. El
+usuario de LK `loekemeyer.n8n@gmail.com` lo comparten el panel (OTP y puente) y Gestión (`pwebLkToken`), y
+`admin-login-otp` entraba **cambiándole la password: en Supabase eso CIERRA TODAS las sesiones del usuario**
+(medido el 05/10: 22 cambios de clave por día). La sesión del que estaba en el panel quedaba muerta en el
+servidor y viva en el navegador: las lecturas andaban (PostgREST sólo mira la firma del JWT) y
+`crear-cliente-auth` (que pregunta al auth) contestaba `invalid_token`.
+
+| pieza | qué hace desde v26.80 |
+|---|---|
+| `admin-login-otp` | con `modo: "enlace"` entra por `generateLink` (magiclink) + `verifyOtp` server-side y devuelve `access_token` + `refresh_token` **sin tocar la clave**. Si el enlace falla, cae al modo viejo (password temporal) y lo loguea |
+| espejo `admin/admin.js` | `_lkOtpFn` pide enlace; `_lkAplicarLogin` entra con `setSession` (o con el password del modo viejo); `checkAuth` descarta la sesión muerta en el servidor (`_lkSesionViva`); todo `signOut` con `scope: "local"` |
+| Gestión `pwebLkToken` | pide enlace y **renueva con el refresh token** la sesión que ya tiene en vez de abrir otra por el puente |
+| rollback por navegador | `localStorage.lk_login_legacy = "1"` vuelve al modo viejo sin deploy |
+
+⚠ **Nunca escribir `signOut()` pelado sobre un usuario compartido**: el default es `global` y cierra las sesiones
+de todos. Lo sostiene `tests/lk-login-sin-pisar.cjs` (falla contra el código anterior: 4 `signOut()` pelados).
+⚠ Con el enlace las sesiones del usuario ya no se borran solas: se acumulan en `auth.sessions` de LK (una por
+entrada al panel o por pestaña de Gestión).
+
 ## Agentes + código de 4 dígitos (Telegram)
 
 Los agentes ya **NO corren automáticos** (el loop cada 2 h y el curador diario

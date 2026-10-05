@@ -74,6 +74,14 @@ async function checkAuth() {
   }
 
   var result = await sb.auth.getSession();
+  // v26.78: la sesión puede estar MUERTA en el servidor y viva en el navegador (otra
+  // persona entró con el mismo usuario y el login viejo le cambiaba la clave, lo que
+  // cierra TODAS las sesiones). PostgREST la sigue aceptando —sólo mira la firma del
+  // JWT— pero crear-cliente-auth no: el alta de clientes daba «invalid_token».
+  if (!result.error && result.data && result.data.session && !(await _lkSesionViva())) {
+    try { await sb.auth.signOut({ scope: "local" }); } catch (_) {}
+    result = { data: { session: null } };
+  }
   if (result.error || !result.data || !result.data.session) {
     // v12.35: ¿vino un token puente desde Producción Virgilio (mismo origen)?
     // Si el mail coincide con el admin LK, entramos directo sin pedir OTP.
@@ -97,7 +105,7 @@ async function checkAuth() {
   if (adminCheck.error || !adminCheck.data) {
     // Usuario válido pero no es admin. Cerramos sesión y mostramos el form
     // otra vez para que pueda probar con otro CUIT sin quedar atrapado.
-    try { await sb.auth.signOut(); } catch (e) {}
+    try { await sb.auth.signOut({ scope: "local" }); } catch (e) {}
     if (statusEl) statusEl.textContent = "Acceso denegado. Solo administradores.";
     var f2 = document.getElementById("lkLoginBox");
     if (f2) f2.style.display = "block";
@@ -194,7 +202,8 @@ function _otpHide(id) {
 }
 async function _otpLogoutAndRedirect() {
   try {
-    await sb.auth.signOut();
+    // v26.78: el usuario del panel es COMPARTIDO: cerrar sólo esta sesión, no la de todos.
+    await sb.auth.signOut({ scope: "local" });
   } catch (e) {}
   location.href = "../";
 }
@@ -480,6 +489,8 @@ function _authLoginMotivo(em) {
     return "Supabase rechazó el PIN por «contraseña filtrada»: hace falta un PIN nuevo de 8 números (los de 6 no pasan nunca)";
   if (em === "no_autorizado") return "tu usuario no tiene permiso para crear logins";
   if (em === "sin_sesion") return "no hay sesión de admin: volvé a entrar al panel";
+  if (em === "invalid_token")
+    return "tu sesión del panel se cerró (alguien entró con el mismo usuario desde otro lado): cerrá el panel y volvé a entrar";
   if (em === "red") return "error de red, probá de nuevo";
   return em;
 }
@@ -1752,7 +1763,7 @@ async function _repairTestPin(cuit, pin) {
       if (msg.indexOf("rate") !== -1 || msg.indexOf("too many") !== -1 || res.error.status === 429) return "rate";
       return "fail";
     }
-    try { await tmpClient.auth.signOut(); } catch (_) {}
+    try { await tmpClient.auth.signOut({ scope: "local" }); } catch (_) {}
     return "ok";
   } catch (e) {
     var m = (e && e.message ? e.message : "").toLowerCase();
@@ -1943,7 +1954,7 @@ async function tryLoginWithStoredPin(tmpClient, email, pin) {
       return "fail";
     }
     try {
-      await tmpClient.auth.signOut();
+      await tmpClient.auth.signOut({ scope: "local" });
     } catch (_) {}
     return "ok";
   } catch (e) {
@@ -16584,12 +16595,49 @@ var LK_ADMIN_EMAIL = "loekemeyer.n8n@gmail.com";
 // admin/supabase/admin-login-otp/index.ts. Deploy: verify_jwt = false.
 var LK_OTP_FN_URL = SUPABASE_URL + "/functions/v1/admin-login-otp";
 
+// v26.78: modo "enlace" = la función devuelve una sesión NUEVA (access + refresh token)
+// sin cambiarle la clave al usuario. El modo viejo (password temporal) cerraba TODAS las
+// sesiones de la cuenta compartida: cada entrada al panel echaba al que ya estaba adentro
+// y su alta de clientes moría con «invalid_token». localStorage lk_login_legacy = "1"
+// vuelve al modo viejo en este navegador (rollback sin deploy).
+function _lkModoLogin() {
+  try { return localStorage.getItem("lk_login_legacy") === "1" ? null : "enlace"; } catch (_) { return "enlace"; }
+}
+
+// Deja la sesión puesta con lo que devolvió la función: sesión directa o password temporal.
+// Devuelve null si entró, o el error.
+async function _lkAplicarLogin(d) {
+  if (d && d.access_token && d.refresh_token) {
+    var ss = await sb.auth.setSession({ access_token: d.access_token, refresh_token: d.refresh_token });
+    return ss && ss.error ? ss.error : null;
+  }
+  if (d && d.tmp_password) {
+    var sr = await sb.auth.signInWithPassword({ email: d.email, password: d.tmp_password });
+    return sr && sr.error ? sr.error : null;
+  }
+  return new Error("la función no devolvió credenciales");
+}
+
+// ¿El auth de LK reconoce la sesión del navegador? Un error de red NO la da por muerta.
+async function _lkSesionViva() {
+  try {
+    var u = await sb.auth.getUser();
+    if (!u || !u.error) return true;
+    var st = u.error.status || 0;
+    var cod = String(u.error.code || "");
+    return !(st === 401 || st === 403 || cod === "session_not_found" || cod === "bad_jwt" ||
+             /session/i.test(String(u.error.message || "")));
+  } catch (_) { return true; }
+}
+
 async function _lkOtpFn(action, code, vjwt) {
   // Aunque la función tenga verify_jwt=false, Supabase igual exige apikey en el header.
   var apikey = SUPABASE_ANON_KEY;
   var body = { action: action };
   if (code) body.code = code;
   if (vjwt) body.vjwt = vjwt;
+  var modo = _lkModoLogin();
+  if (modo && action !== "send") body.modo = modo;
   var res = await fetch(LK_OTP_FN_URL, {
     method: "POST",
     headers: { apikey: apikey, "Content-Type": "application/json" },
@@ -16616,15 +16664,15 @@ async function lkTryBridge() {
   try {
     var r = await _lkOtpFn("bridge", null, vjwt);
     console.log("[bridge] respuesta:", r.status, r.data);
-    if (!r.ok || !r.data || !r.data.tmp_password) {
+    if (!r.ok || !r.data || (!r.data.tmp_password && !r.data.access_token)) {
       var det = (r.data && (r.data.detail || r.data.error)) || ("HTTP " + r.status);
       if (statusEl) statusEl.textContent = "Entrada directa falló (" + det + "). Usá el código.";
       return false;
     }
-    var sr = await sb.auth.signInWithPassword({ email: r.data.email, password: r.data.tmp_password });
-    if (sr.error) {
-      console.log("[bridge] signIn error:", sr.error);
-      if (statusEl) statusEl.textContent = "Entrada directa: login falló (" + sr.error.message + "). Usá el código.";
+    var srErr = await _lkAplicarLogin(r.data);
+    if (srErr) {
+      console.log("[bridge] signIn error:", srErr);
+      if (statusEl) statusEl.textContent = "Entrada directa: login falló (" + (srErr.message || srErr) + "). Usá el código.";
       return false;
     }
     location.reload();
@@ -16689,17 +16737,17 @@ async function lkVerifyOtp() {
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = "Verificando..."; }
   try {
     var r = await _lkOtpFn("verify", code);
-    if (!r.ok || !r.data || !r.data.tmp_password) {
+    if (!r.ok || !r.data || (!r.data.tmp_password && !r.data.access_token)) {
       var det = (r.data && (r.data.detail || r.data.error)) || "HTTP " + r.status;
       if (errEl) errEl.textContent = det === "invalid_code" ? "Código inválido o expirado." : "No se pudo verificar: " + det;
       if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Verificar código"; }
       return;
     }
-    // La Edge Function seteó un password temporal en el user. Lo usamos para
-    // crear sesión con signInWithPassword y recargar el panel.
-    var sr = await sb.auth.signInWithPassword({ email: r.data.email, password: r.data.tmp_password });
-    if (sr.error) {
-      if (errEl) errEl.textContent = "No se pudo iniciar sesión: " + sr.error.message;
+    // v26.78: la función devuelve una sesión directa (modo enlace) o, en el modo viejo,
+    // un password temporal para signInWithPassword. _lkAplicarLogin resuelve cualquiera.
+    var srErr = await _lkAplicarLogin(r.data);
+    if (srErr) {
+      if (errEl) errEl.textContent = "No se pudo iniciar sesión: " + (srErr.message || srErr);
       if (btnEl) { btnEl.disabled = false; btnEl.textContent = "Verificar código"; }
       return;
     }

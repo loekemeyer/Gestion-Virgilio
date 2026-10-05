@@ -6292,7 +6292,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.79"></script>
+<script type="module" src="recepcion.js?v=26.80"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10531,7 +10531,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.79";
+const APP_VERSION = "v26.80";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -33985,14 +33985,25 @@ function closePPP() {
 const PWEB_LK_URL  = "https://kwkclwhmoygunqmlegrg.supabase.co";
 const PWEB_LK_ANON = "sb_publishable_mVX5MnjwM770cNjgiL6yLw_LDNl9pML";
 
-let _pwebTok = null, _pwebTokExp = 0;
+let _pwebTok = null, _pwebTokExp = 0, _pwebRef = null;
 // v13.11 — el token de LK dura 1 h: guardado en sessionStorage se ahorra el puente
 // (Edge Function 1,6 s + login 0,4 s, medido) en cada recarga dentro de esa hora.
 const PWEB_TOK_SS_KEY = "gv_lk_tok_v1";
 try {
   const _s = JSON.parse(sessionStorage.getItem(PWEB_TOK_SS_KEY) || "null");
   if (_s && _s.tok && _s.exp && Date.now() < _s.exp - 60000) { _pwebTok = _s.tok; _pwebTokExp = _s.exp; }
+  if (_s && _s.ref) _pwebRef = _s.ref;
 } catch (_e) {}
+
+/* v26.78 — guarda la sesión de LK (access + refresh token). Con el refresh token la hora
+   siguiente se RENUEVA la misma sesión en vez de abrir otra por el puente. */
+function _pwebGuardarSesion(d) {
+  _pwebTok = d.access_token;
+  _pwebTokExp = Date.now() + ((d.expires_in || 3600) * 1000);
+  _pwebRef = d.refresh_token || null;
+  try { sessionStorage.setItem(PWEB_TOK_SS_KEY, JSON.stringify({ tok: _pwebTok, exp: _pwebTokExp, ref: _pwebRef })); } catch (_e) {}
+  return _pwebTok;
+}
 
 /* Canjea el JWT de Virgilio por uno de LK. Se cachea en memoria: el token dura
    una hora y pedirlo en cada carga sería un viaje de más por nada. */
@@ -34009,24 +34020,46 @@ try {
 
    Con `_pwebTokProm` la primera llamada abre el puente y las demás esperan ESA
    misma promesa. La promesa se limpia al terminar (bien o mal) para poder
-   reintentar. */
+   reintentar.
+
+   ⚠⚠ v26.78 (Tomás Gonzalez, 05/10): cambiarle la password al usuario de LK CIERRA TODAS
+   sus sesiones, y es el mismo usuario del Panel Web LK: cada vez que Gestión pedía el token
+   echaba al que estaba en el panel, y su alta de clientes moría con «invalid_token» (22
+   cambios de clave por día). Ahora se pide `modo: "enlace"`: la función devuelve una sesión
+   NUEVA sin tocar la clave. Si contesta con el modo viejo (tmp_password) se sigue entrando
+   igual. Y antes de abrir el puente se renueva la sesión que ya hay con su refresh token. */
 let _pwebTokProm = null;
 async function pwebLkToken() {
   if (_pwebTok && Date.now() < _pwebTokExp - 60000) return _pwebTok;
   if (_pwebTokProm) return await _pwebTokProm;
   _pwebTokProm = (async function () {
+    // v26.78: primero renovar la sesión que ya tenemos (no crea otra ni toca la clave).
+    if (_pwebRef) {
+      try {
+        const rr = await fetch(PWEB_LK_URL + "/auth/v1/token?grant_type=refresh_token", {
+          method: "POST",
+          headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: _pwebRef })
+        });
+        let rd = {}; try { rd = await rr.json(); } catch (_e) {}
+        if (rr.ok && rd.access_token) return _pwebGuardarSesion(rd);
+      } catch (_e) {}
+      _pwebRef = null;   // no sirvió: se abre el puente como siempre
+    }
     let vjwt = null;
     try { if (window.sbAuth) vjwt = await window.sbAuth.getAccessToken(); } catch (_e) {}
     if (!vjwt) throw new Error(authNoSesionMsg("Iniciá sesión para ver la PPP Web."));
     const br = await fetch(PWEB_LK_URL + "/functions/v1/admin-login-otp", {
       method: "POST",
       headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "bridge", vjwt: vjwt })
+      body: JSON.stringify({ action: "bridge", vjwt: vjwt, modo: "enlace" })
     });
     let bd = {}; try { bd = await br.json(); } catch (_e) {}
-    if (!br.ok || !bd.tmp_password) {
+    if (!br.ok || (!bd.tmp_password && !bd.access_token)) {
       throw new Error("No se pudo entrar a LK (" + (bd.detail || bd.error || bd.msg || ("HTTP " + br.status)) + ").");
     }
+    // v26.78: modo enlace → la sesión viene armada, sin login con password.
+    if (bd.access_token) return _pwebGuardarSesion(bd);
     const lr = await fetch(PWEB_LK_URL + "/auth/v1/token?grant_type=password", {
       method: "POST",
       headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
@@ -34040,10 +34073,7 @@ async function pwebLkToken() {
       throw new Error("Login LK falló (" +
         (ld.error_description || ld.msg || ld.error_code || ld.error || ("HTTP " + lr.status)) + ").");
     }
-    _pwebTok = ld.access_token;
-    _pwebTokExp = Date.now() + ((ld.expires_in || 3600) * 1000);
-    try { sessionStorage.setItem(PWEB_TOK_SS_KEY, JSON.stringify({ tok: _pwebTok, exp: _pwebTokExp })); } catch (_e) {}
-    return _pwebTok;
+    return _pwebGuardarSesion(ld);
   })();
   try { return await _pwebTokProm; }
   finally { _pwebTokProm = null; }
@@ -60250,7 +60280,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.79"></script>
+<script src="importacion.js?v=26.80"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63073,9 +63103,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.79"></script>
-<script src="hotsale.js?v=26.79"></script>
-<script src="estadisticas.js?v=26.79"></script>
+<script src="cobranzas.js?v=26.80"></script>
+<script src="hotsale.js?v=26.80"></script>
+<script src="estadisticas.js?v=26.80"></script>
 
 </body>
 </html>

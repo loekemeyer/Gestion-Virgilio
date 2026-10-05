@@ -473,6 +473,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pweb-lk-token (v12.82: el token de LK se pide UNA sola vez aunque lo pidan varios) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-lk-token.cjs
+echo "== lk-login-sin-pisar (v26.78: entrar al panel de LK no echa al que ya está adentro) =="
+node tests/lk-login-sin-pisar.cjs
 
 echo "== pk-prioridad-agregado (idea 4990 / v12.85: la tanda con un agregado urgente va arriba de la lista del operario) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-prioridad-agregado.cjs
