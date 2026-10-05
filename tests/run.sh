@@ -757,6 +757,9 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== krikos-parsers (v15.90: el módulo de parsers del importador automático, sincronizado con el panel) =="
 node tests/krikos-parsers.cjs
 
+echo "== krikos-auto-chef (v26.77: Cencosud y Dorinka se cargan solas en Chef — modo prueba, L, sin duplicar) =="
+node tests/krikos-auto-chef.cjs
+
 echo "== apr-krikos (v15.90: las OC de súper en A Programar — las que entraron mal gritan, las que no entraron dicen por qué) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-krikos.cjs
 

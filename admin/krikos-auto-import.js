@@ -30,6 +30,18 @@
 //   POST { dry_run: true }          → no escribe nada, devuelve el diagnóstico
 //   POST { ids: [10], force: true } → esas OC, salteando el guarda de vencidas
 //   header  x-krikos-secret: <KRIKOS_INGEST_SECRET>
+//
+// CADENAS QUE FACTURAN POR CHEF (v26.77, Luis 05/10: «DORINKA Y CENCOSUD QUIERO QUE SE
+// CARGUEN AUTOMATICAMENTE»). Igual que la card del panel: el pedido se crea en la base de
+// Chef, por la puerta krikos_crear_pedido_super (token KRIKOS_CHEF_TOKEN del Vault de LK).
+//   · Cencosud: artículos de LK (+ Loke) con L al final, pedido sin renglones en Chef
+//     (como el panel: el artículo de LK no existe en Chef) → góndola LK.
+//   · Dorinka: catálogo de Chef, sin L, con renglones; su cod_remap (838 → 838E).
+//   · Si la OC YA está en Chef (cargada a mano), no se crea otra: la fila queda 'cargado'
+//     con ese pedido. Para una OC de la casilla de Chef se mira ANTES del guarda de vencidas.
+//   · Interruptor KRIKOS_CHEF_AUTO (Vault): sin 'si' arma todo y NO crea nada; la OC sigue
+//     esperando en la PPP con auto_estado 'prueba' y lo que se habría cargado.
+//   · dry_run con una OC ya cargada devuelve la comparación contra el pedido a mano.
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
@@ -50,6 +62,11 @@ const SUPER_COD_MAP = { coto: { "505": "505I" } };
 const TOTAL_TOL = 0.01;
 
 const sb = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+// Base de Chef: la misma clave PÚBLICA que usa la card del panel (admin-supercot.js). Con ella
+// se lee el catálogo y las sucursales; el pedido entra sólo por la puerta, que pide el token.
+const CHEF_URL = "https://nkhzocgdpwtgrmwleihr.supabase.co";
+const CHEF_KEY = "sb_publishable_aThHtJLBKytg9k_6UdH2Eg_Use7f1zH";
+const chef = createClient(CHEF_URL, CHEF_KEY, { auth: { persistSession: false } });
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -153,9 +170,284 @@ function superListPrice(precios, sk, cod) {
   return null;
 }
 
+// ============================ cadenas de CHEF ============================
+// Una fila que trajo krikos-ingest de la casilla de Chef (ventas@chefsrl.com).
+function esFilaChef(fila) {
+  return /^chef:/.test(String(fila.mail_uid || ""));
+}
+
+let chefProductsCache = null;
+async function loadChefProducts() {
+  if (chefProductsCache) return chefProductsCache;
+  const PAGE = 1000;
+  let all = [];
+  let offset = 0;
+  for (;;) {
+    const r = await chef.from("products").select("id,cod,description,list_price,uxb,active")
+      .range(offset, offset + PAGE - 1);
+    if (r.error) throw new Error("productos de Chef: " + r.error.message);
+    const batch = r.data || [];
+    all = all.concat(batch);
+    if (batch.length < PAGE) break;
+    offset += PAGE;
+  }
+  // Un catálogo vacío no es "no hay artículos": es que no se pudo leer.
+  if (!all.length) throw new Error("productos de Chef: la lectura volvió vacía");
+  chefProductsCache = all;
+  return all;
+}
+
+const chefCtxCache = {};
+async function chefCtx(key) {
+  if (chefCtxCache[key] !== undefined) return chefCtxCache[key];
+  const { data, error } = await sb.rpc("krikos_auto_chef_ctx", { p_super_key: key });
+  if (error) throw new Error("cliente de Chef: " + error.message);
+  chefCtxCache[key] = data || null;
+  return chefCtxCache[key];
+}
+
+// ¿Esa OC ya es un pedido en Chef? Devuelve el más nuevo (la función los trae por id).
+// Si la lectura falla se corta: sin saberlo, crear otro podría duplicar el pedido.
+async function ocYaEnChef(ocs) {
+  const vistos = {};
+  for (const oc of ocs) {
+    const v = String(oc == null ? "" : oc).trim();
+    if (!v || vistos[v]) continue;
+    vistos[v] = true;
+    const { data, error } = await sb.rpc("krikos_auto_chef_oc_cargada", { p_oc: v });
+    if (error) throw new Error("no se pudo mirar si la OC ya está en Chef: " + error.message);
+    if (Array.isArray(data) && data.length) return data[data.length - 1];
+  }
+  return null;
+}
+
+async function marcarYaEnChef(fila, r0, ya) {
+  const aviso = "ya estaba cargada en Chef: pedido CH " + ya.order_id;
+  const { error } = await sb.rpc("krikos_auto_marcar_chef", {
+    p_id: fila.id, p_order_id: Number(ya.order_id), p_auto_estado: "ok", p_auto_aviso: aviso,
+  });
+  if (error) return { ...r0, resultado: "no_importada", aviso: aviso + " (no se pudo marcar: " + error.message + ")" };
+  return { ...r0, resultado: "ya_cargada", aviso, order_id: Number(ya.order_id) };
+}
+
+async function chefAutoVivo() {
+  return String(await getSecret("KRIKOS_CHEF_AUTO")).trim().toLowerCase() === "si";
+}
+
+// Compara lo que se armó contra el pedido que ya está en Chef (para el modo prueba).
+function compararConChef(ya, sp, subtotal) {
+  const difs = [];
+  const yp = (ya && ya.sheets_payload) || {};
+  for (const k of ["cod_cliente", "vend", "condicion_pago", "condicion_pago_code", "sucursal_entrega",
+                   "is_chef", "target_sheet", "empresa", "fecha_entrega"]) {
+    const a = yp[k] == null ? "" : String(yp[k]);
+    const b = sp[k] == null ? "" : String(sp[k]);
+    if (a !== b) difs.push(k + ": a mano «" + a + "» · automático «" + b + "»");
+  }
+  const tot = (arr) => {
+    const m = {};
+    for (const it of arr || []) {
+      const c = String(it.cod_art || "").trim().toUpperCase();
+      if (!m[c]) m[c] = { cajas: 0, uxb: Number(it.uxb || 0) };
+      m[c].cajas += Number(it.cajas || 0);
+    }
+    return m;
+  };
+  const a = tot(yp.items);
+  const b = tot(sp.items);
+  for (const c of Object.keys(a)) {
+    if (!b[c]) difs.push(c + ": a mano " + a[c].cajas + " caj · automático no lo trae");
+    else if (a[c].cajas !== b[c].cajas || a[c].uxb !== b[c].uxb) {
+      difs.push(c + ": a mano " + a[c].cajas + "×" + a[c].uxb + " · automático " + b[c].cajas + "×" + b[c].uxb);
+    }
+  }
+  for (const c of Object.keys(b)) if (!a[c]) difs.push(c + ": automático " + b[c].cajas + " caj · a mano no está");
+  const tm = Number(ya && ya.total);
+  if (Number.isFinite(tm) && Math.abs(tm - subtotal) > 1) {
+    difs.push("total: a mano $ " + tm.toFixed(2) + " · automático $ " + subtotal.toFixed(2));
+  }
+  return { order_id: ya ? Number(ya.order_id) : null, iguales: difs.length === 0, difs };
+}
+
+async function procesarChef(fila, opts, c) {
+  const { base, key, cad, parsed, text } = c;
+  const r0 = { ...base, super_key: key, empresa: "CH" };
+
+  const ctx = await chefCtx(key);
+  const customer = ctx && ctx.customer;
+  if (!customer || !customer.id) {
+    return { ...r0, resultado: "no_importada",
+      aviso: "no se encontró el cliente de Chef " + ((ctx && ctx.cod_cliente_chef) || "(sin código)") + " de " + cad.label };
+  }
+  const usaChef = ctx.usa_productos_chef === true;
+
+  // Ref.Prov mal cargada en el sistema del súper (Dorinka: 838 es el 838E): se traduce antes
+  // de matchear, igual que remapCodSuper() de la card. Sin ceros a la izquierda.
+  const remap = (ctx.cod_remap && typeof ctx.cod_remap === "object") ? ctx.cod_remap : {};
+  const crudos = (parsed.items || []).map((it) => {
+    const cc = String(it.codLk == null ? "" : it.codLk).trim().toUpperCase();
+    const real = remap[cc] || remap[cc.replace(/^0+(?=\d)/, "")];
+    return real ? { ...it, codOc: it.codLk, codLk: real } : it;
+  });
+  if (!crudos.length) {
+    return { ...r0, resultado: "no_importada", aviso: "se reconoció la cadena pero no se pudo leer ningún renglón" };
+  }
+
+  // Dorinka matchea contra el catálogo de Chef; Cencosud contra LK y después Loke.
+  let pool;
+  if (usaChef) pool = await loadChefProducts();
+  else { await loadProducts(); pool = productsCache; }
+  const precios = await loadPrecios();
+
+  const ok = [];
+  const sinMatch = [];
+  for (const it of crudos) {
+    const variants = codVariants(it.codLk);
+    let p = findInPool(pool, variants);
+    let isLoke = false;
+    if (!p && !usaChef) { p = findInPool(lokeCache, variants); isLoke = !!p; }
+    if (!p) { sinMatch.push(it); continue; }
+    const codReal = String(p.cod || "").trim();
+    let pSuper = superListPrice(precios, key, codReal);
+    if (pSuper == null) pSuper = superListPrice(precios, key, it.codLk);
+    const listPrice = pSuper != null ? pSuper : Number(p.list_price || 0);
+    const uxb = it.uxb || Number(p.uxb || 0);
+    ok.push({
+      product_id: p.id, cod: codReal, description: p.description, cajas: it.cajas, uxb,
+      is_loke: isLoke, unit_list_price: listPrice, unit_your_price: Number(it.unitPrice || 0),
+      line_total: Number(it.unitPrice || 0) * (it.cajas || 0) * (uxb || 0),
+    });
+  }
+  if (!ok.length) {
+    return { ...r0, resultado: "no_importada", items_sin_match: sinMatch.length,
+      aviso: "ninguno de los " + crudos.length + " renglones matcheó con el catálogo" };
+  }
+
+  const subtotal = ok.reduce((a, x) => a + x.line_total, 0);
+  const pdfTotal = extractPdfTotal(text, key);
+  const ratio = Number(cad.pdf_ratio) || 1;
+  const difTotal = pdfTotal != null && pdfTotal > 0 ? Math.abs(subtotal / ratio - pdfTotal) / pdfTotal : null;
+  const motivos = [];
+  if (sinMatch.length) {
+    motivos.push(sinMatch.length + " de " + crudos.length + " renglones NO entraron (código sin match en el catálogo: " +
+      sinMatch.map((x) => x.codLk + " × " + x.cajas + " caj").join(", ") + ")");
+  }
+  if (difTotal != null && difTotal > TOTAL_TOL) {
+    motivos.push("el total no cierra: calculado $ " + (subtotal / ratio).toFixed(2) +
+      " vs PDF $ " + pdfTotal.toFixed(2) + " (" + (difTotal * 100).toFixed(1) + "% de diferencia)");
+  }
+  const parcial = motivos.length > 0;
+  const aviso = parcial ? motivos.join(" · ") : ok.length + " renglones, total $ " + subtotal.toFixed(2);
+
+  // Sucursal: en la base de Chef, misma consulta que la card.
+  let dirEntrega = "";
+  let zona = "";
+  let etiqueta = "";
+  if (parsed.branchId) {
+    const da = await chef.from("customer_delivery_addresses")
+      .select("slot,label,direccion_entrega,zona_expreso,super_branch_id")
+      .eq("customer_id", customer.id).eq("super_branch_id", String(parsed.branchId)).limit(1);
+    const row = !da.error && da.data && da.data[0];
+    if (row) { dirEntrega = row.direccion_entrega || ""; zona = row.zona_expreso || ""; etiqueta = row.label || ""; }
+  }
+  const sucursalTxt = (parsed.branchId || "") + (parsed.branchName ? " - " + parsed.branchName : "");
+  if (!dirEntrega) dirEntrega = sucursalTxt;
+
+  // La L la lleva el artículo de LK que factura Chef (Cencosud), nunca el de Chef (Dorinka).
+  const outCod = (cod) => (usaChef ? String(cod) : String(cod) + "L");
+  const pago = parsed.paymentTermRaw || "Sin especificar";
+  const sheetsPayload = {
+    order_number: "", pdf_oc: String(parsed.orderNumber || ""),
+    cod_cliente: String(customer.cod_cliente || ""), vend: String(customer.vend || ""),
+    condicion_pago: pago, condicion_pago_code: cad.payment_code || 1,
+    sucursal_entrega: etiqueta || (sucursalTxt + " [" + cad.label + "]"),
+    cliente_nuevo: "", is_promo: false, is_chef: true, target_sheet: "Pedidos CH", empresa: "CH",
+    extra_discount: 0, deuda: Number(customer.debt || 0),
+    payment_term: customer.payment_term == null ? null : Number(customer.payment_term),
+    credit_limit: customer.credit_limit == null ? null : Number(customer.credit_limit),
+    due_date: String(parsed.dueDate || ""),
+    fecha_entrega: String(fila.fecha_entrega || ""), fecha_entrega_origen: "Krikos",
+    source: "Krikos",
+    items: ok.map((x) => ({ cod_art: outCod(x.cod), cajas: x.cajas, uxb: x.uxb })),
+  };
+  // Cencosud va sin renglones en Chef (el artículo de LK no existe ahí), igual que la card.
+  const itemsPedido = usaChef ? ok.map((x) => ({
+    product_id: x.product_id, cajas: x.cajas, uxb: x.uxb, is_loke: false,
+    unit_list_price: x.unit_list_price, unit_your_price: x.unit_your_price, line_total: x.line_total,
+  })) : [];
+
+  const ya = c.yaChef || await ocYaEnChef([parsed.orderNumber, fila.nro_documento]);
+
+  if (opts.dryRun) {
+    return { ...r0, resultado: ya ? "ya_cargada" : (parcial ? "parcial" : "importada"), aviso,
+      items_ok: ok.length, items_sin_match: sinMatch.length, total_calc: subtotal, total_pdf: pdfTotal,
+      cliente_chef: customer.cod_cliente, renglones_en_chef: itemsPedido.length,
+      comparacion: ya ? compararConChef(ya, sheetsPayload, subtotal) : null, sheets_payload: sheetsPayload };
+  }
+  if (ya) return await marcarYaEnChef(fila, r0, ya);
+
+  if (!(await chefAutoVivo())) {
+    return { ...r0, resultado: "prueba",
+      aviso: "MODO PRUEBA, todavía no se carga sola: se cargaría en Chef con " + aviso + ". Cargala a mano." };
+  }
+  const token = await getSecret("KRIKOS_CHEF_TOKEN");
+  if (!token) return { ...r0, resultado: "no_importada", aviso: "falta KRIKOS_CHEF_TOKEN en el Vault de LK" };
+
+  const res = await chef.rpc("krikos_crear_pedido_super", {
+    p_token: token,
+    p_order: {
+      customer_id: customer.id, status: "pendiente", payment_method: pago,
+      payment_discount: 0, web_discount: 0, subtotal, total: subtotal,
+      items: itemsPedido, sheets_payload: sheetsPayload,
+    },
+  });
+  const d = res.data || {};
+  if (res.error || d.ok === false || !d.order_id) {
+    return { ...r0, resultado: "no_importada",
+      aviso: "no se pudo crear el pedido en Chef: " + ((res.error && res.error.message) || d.error || "sin número de pedido") };
+  }
+  const orderId = Number(d.order_id);
+  const avisoFinal = (d.duplicado ? "ya estaba en Chef · " : "") + aviso + " · pedido CH " + orderId;
+  // Si esta marca falla, la próxima corrida encuentra la OC en Chef y la marca sola.
+  await sb.rpc("krikos_auto_marcar_chef", {
+    p_id: fila.id, p_order_id: orderId, p_auto_estado: parcial ? "parcial" : "ok", p_auto_aviso: avisoFinal,
+  });
+
+  if (!d.duplicado) {
+    // Hoja "Pedidos CH" y entregas: best-effort, igual que la card (el pedido ya existe).
+    sheetsPayload.order_number = String(orderId);
+    const H = { "Content-Type": "application/json", Authorization: "Bearer " + ANON, apikey: ANON };
+    try {
+      await fetch(SHEETS_PROXY_URL, { method: "POST", headers: H, body: JSON.stringify(sheetsPayload) });
+    } catch (_e) { /* el pedido ya está en Chef */ }
+    try {
+      await fetch(SHEETS_ENTREGAS_URL, { method: "POST", headers: H, body: JSON.stringify({
+        order_number: orderId, fecha: hoyAr().split("-").reverse().join("/"),
+        cod_cliente: customer.cod_cliente, cliente: customer.business_name, vendedor: customer.vend || "",
+        direccion_entrega: dirEntrega, barrio_entrega: zona, fecha_entrega: String(fila.fecha_entrega || ""),
+        empresa: "CH", is_promo: false, extra_discount: 0,
+        items: ok.map((x) => ({ cod_art: outCod(x.cod), description: x.description || "", cajas: x.cajas, uxb: x.uxb })),
+      }) });
+    } catch (_e) { /* idem */ }
+  }
+
+  return { ...r0, resultado: d.duplicado ? "ya_cargada" : (parcial ? "parcial" : "importada"), aviso: avisoFinal,
+    order_id: orderId, items_ok: ok.length, items_sin_match: sinMatch.length, total_calc: subtotal, total_pdf: pdfTotal };
+}
+
 async function procesar(fila, opts) {
   const base = { id: fila.id, cadena: fila.cadena, nro: fila.nro_documento };
   if (!fila.storage_path) return { ...base, resultado: "no_importada", aviso: "la OC no tiene PDF guardado" };
+
+  // OC de la casilla de Chef: antes que nada, ¿ya la cargaron a mano? Una OC vieja que ya
+  // es un pedido no es "salteada": es "cargada", y no tiene que quedar esperando en la PPP.
+  let yaChef = null;
+  if (esFilaChef(fila)) {
+    yaChef = await ocYaEnChef([fila.nro_documento]);
+    if (yaChef && !opts.dryRun) {
+      return await marcarYaEnChef(fila, { ...base, empresa: "CH" }, yaChef);
+    }
+  }
 
   // Guarda de vencidas: una OC cuya fecha de entrega ya pasó no se carga sola —
   // un pedido viejo metido en la PPP mueve stock y confunde la programación.
@@ -182,14 +474,9 @@ async function procesar(fila, opts) {
     return { ...base, super_key: key, resultado: "no_importada",
       aviso: "la cadena " + key + " no está configurada en precios_super.cadena" };
   }
-  if (cad.empresa === "chef") {
-    // El pedido iría al Supabase de Chef (otro proyecto, otras credenciales).
-    // Fuera del alcance de esta versión: se avisa y se carga a mano.
-    return { ...base, super_key: key, resultado: "no_importada",
-      aviso: cad.label + " factura por Chef: todavía se carga a mano desde el panel" };
-  }
-
   const parsed = parser(text);
+  if (cad.empresa === "chef") return await procesarChef(fila, opts, { base, key, cad, parsed, text, yaChef });
+
   const crudos = parsed.items || [];
   if (!crudos.length) {
     return { ...base, super_key: key, resultado: "no_importada",
@@ -345,8 +632,12 @@ export async function handler(req) {
     const limite = Number(body.limit) > 0 ? Number(body.limit) : 10;
 
     let q = sb.from("krikos_oc_inbox")
-      .select("id, cadena, nro_documento, sucursal, fecha_entrega, storage_path, estado, mail_fecha, auto_estado")
-      .not("storage_path", "is", null).order("id", { ascending: true }).limit(limite);
+      .select("id, cadena, nro_documento, sucursal, fecha_entrega, storage_path, estado, mail_fecha, auto_estado, mail_uid")
+      .not("storage_path", "is", null)
+      // Primero lo que nunca se miró y después lo que hace más que se miró: una OC que
+      // queda esperando (prueba, salteada, sin match) no le tapa el paso a las nuevas.
+      .order("auto_at", { ascending: true, nullsFirst: true }).order("id", { ascending: true })
+      .limit(limite);
     // Sólo lo que está esperando y todavía no tiene pedido: lo ya cargado no se
     // vuelve a tocar NUNCA (además del candado de la RPC, que es el que manda).
     if (ids.length) q = q.in("id", ids);
@@ -361,9 +652,9 @@ export async function handler(req) {
         out.push(r);
         // El motivo se guarda SIEMPRE, se haya podido cargar o no: es lo que la
         // PPP muestra para que se sepa por qué esa OC sigue esperando.
-        if (!dryRun && (r.resultado === "no_importada" || r.resultado === "salteada")) {
+        if (!dryRun && (r.resultado === "no_importada" || r.resultado === "salteada" || r.resultado === "prueba")) {
           await sb.rpc("krikos_auto_marcar", {
-            p_id: f.id, p_auto_estado: r.resultado === "salteada" ? "salteada" : "no", p_auto_aviso: r.aviso,
+            p_id: f.id, p_auto_estado: r.resultado === "no_importada" ? "no" : r.resultado, p_auto_aviso: r.aviso,
           });
         }
       } catch (e) {

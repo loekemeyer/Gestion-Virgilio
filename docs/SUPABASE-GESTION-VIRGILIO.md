@@ -31660,3 +31660,27 @@ Luis: *"que entre la parte de cada uno"*. Hasta la v26.67 una tanda con freno de
 **Impacto hoy:** 0 frenos en producción → ninguna fila cambia. Las tandas sin freno siguen idénticas (F13E: 25 líneas, real 22,6, índice 1,573 antes y después).
 **Prueba** (transacción abortada): F13E partida en dos tramos con retome a 1 min → 13 + 12 líneas = 25 (sin la ventana sin solape daba 29); con legajos reales el puntaje trae la tanda en el detalle de los dos con `frenada: true`.
 **Centinelas** 304 (actualizado) y 316-319 (dicen `v26.68`: llave, no cambiar). **Rollback** en `sql/gv_picking_puntaje_frenada_v2674.sql`.
+
+### 3.v2677 — Krikos: Cencosud y Dorinka se cargan SOLAS en Chef, y se lee la casilla de Chef con su spam (Luis, 05/10/2026, v26.77)
+
+Luis: *«DORINKA Y CENCOSUD QUIERO QUE SE CARGUEN AUTOMATICAMENTE»* · *«no quiero que se reenvíe nada a la cuenta de
+loekemeyer»* · *«los de cencosud cayeron en spam, ¿se puede controlar y vigilar eso?»*. Sigue la §3.v2671 (la puerta en Chef).
+
+| pieza | dónde | qué |
+|---|---|---|
+| `krikos-ingest` (Edge Function, LK) | repo `pagina-LK-copia` | lee también **ventas@chefsrl.com** (`KRIKOS_CHEF_IMAP_PASS` en el Vault de LK; sin la clave, sólo LK, como hoy). Mira TODAS las carpetas menos papelera, enviados y borradores; si una OC entra desde una carpeta de spam, avisa al grupo de Gestión por Telegram (una vez por mail). Lo de Chef desde el 28/09 (`KRIKOS_CHEF_DESDE`) y con `mail_uid` `chef:…` |
+| `krikos_auto_chef_ctx(super)` · `krikos_auto_chef_oc_cargada(oc)` · `krikos_auto_marcar_chef(...)` (LK, sólo service_role) | `sql/krikos_auto_chef_v2677_LK.sql` | el cliente de Chef (FDW, fallback `chef_customers_cache`) y el `cod_remap`; ¿la OC ya es un pedido en Chef?; marcar la fila `cargado` con el pedido de Chef. **Aplicado** |
+| rama Chef de `admin/krikos-auto-import.js` | este repo | igual que la card: Cencosud con catálogo LK + Loke, **L** al final, pedido **sin renglones** en Chef; Dorinka con catálogo de Chef, sin L, con el remap 838 → 838E. Hoja «Pedidos CH», empresa CH. Por la puerta `krikos_crear_pedido_super` |
+
+- **No duplica**: si la OC ya está en Chef (cargada a mano), la fila queda `cargado` con ese pedido. Para una OC de la
+  casilla de Chef se mira **antes** del guarda de vencidas (una OC vieja ya cargada no queda "salteada" en la PPP). Si
+  no se puede mirar, **no crea** (fail-closed) y queda `no` con el motivo; la puerta además deduplica por cliente + OC +
+  sucursal.
+- **Interruptor `KRIKOS_CHEF_AUTO`** (Vault de LK). Sin `si` arma todo y **no crea nada**: la OC sigue esperando en la
+  PPP con `auto_estado = 'prueba'` y lo que se habría cargado. Con `si`, crea.
+- `dry_run` con `ids` y `force` sobre una OC ya cargada devuelve la **comparación** contra el pedido a mano.
+- El handler toma primero lo que nunca miró (`auto_at nulls first`): una OC que queda esperando no tapa a las nuevas.
+- **Pendiente**: la clave de ventas@chefsrl.com la carga Luis (`select vault.create_secret('<clave>', 'KRIKOS_CHEF_IMAP_PASS');`
+  en el SQL Editor de LK); después, prueba de la casilla y comparación contra 245-247 / 241, y recién ahí `KRIKOS_CHEF_AUTO = 'si'`.
+- Test: `tests/krikos-auto-chef.cjs` (corre el handler con las dos bases de mentira; verificado que falla sin la L, con
+  renglones en Cencosud y sin el dedup previo a vencidas).
