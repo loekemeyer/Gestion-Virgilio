@@ -7715,6 +7715,6 @@ con su propia cola (`gv_pkm_q_v1`, tope 800) y todo en try/catch: **si falla, el
 
 D1 = no se bloquea el guardado. Cron **132** `gv-alerta-gondola-llena` (`3-58/5`) → `gv_alerta_gondola_llena_telegram()`:
 cada movimiento que suma a `terminado` (guardado, baja_racks, recepcion_imp) que deja la góndola del código (dual: por
-empresa) por encima de `Capacidad_Sector` manda UN Telegram (quién, cuántas, góndola vs capacidad). Dedup en
+empresa) más de **5 %** por encima de `Capacidad_Sector` (D3, v26.87) manda UN Telegram (quién, cuántas, góndola vs capacidad). Dedup en
 `GV_Alerta_Gondola_Llena`. Sin capacidad cargada no avisa. Probar sin mandar: `select * from
 public.gv_alerta_gondola_llena_telegram(true);`. Centinela 322. `sql/gv_alerta_gondola_llena_v2686.sql`.

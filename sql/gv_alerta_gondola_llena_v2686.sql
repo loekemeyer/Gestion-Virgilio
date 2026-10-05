@@ -58,7 +58,7 @@ begin
         where gv_cod_stock(k.cod) = g.c and (not g.dual or k.empresa = g.emp)) as capa
     from _gl_c g
   loop
-    continue when coalesce(r.capa, 0) <= 0 or r.sal <= r.capa;
+    continue when coalesce(r.capa, 0) <= 0 or r.sal <= r.capa * 1.05;  -- v26.87 (Luis, D3): tolerancia +5 %
     mov_id := r.id; cod := r.cod_art; empresa := r.emp; delta := r.d; saldo := r.sal; cap := r.capa; legajo := r.leg;
     enviado := not p_simular;
     if not p_simular then

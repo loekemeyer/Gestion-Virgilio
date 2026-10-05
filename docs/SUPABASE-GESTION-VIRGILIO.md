@@ -31726,3 +31726,5 @@ sin cambios. Impacto al 05/10: **0** (ningún importado tiene hoy stock propio e
 transacción abortada (590E +150 de sector + tallerista; 942E sin doble conteo). El pop-up «📦 Stock» lo nombra.
 Centinela 323 (etiqueta v26.85). `sql/gv_importados_gp2_mismo_codigo_v2686.sql` (rollback adentro),
 `sql/gv_alerta_gondola_llena_v2686.sql`, `tests/pedimp-stock-desg-gp2.cjs` (g y h).
+- **v26.87 (Luis, D3): tolerancia +5 %** — avisa sólo si la góndola queda más de 5 % por encima de la capacidad
+  (`r.sal <= r.capa * 1.05`). Los 9 del 05/10 (legajo 94) estaban todos por encima del 5 %: igual habrían avisado.
