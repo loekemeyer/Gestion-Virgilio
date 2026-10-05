@@ -342,6 +342,7 @@ echo "== ocg-una-fila (v19.76: un artículo con 2 talleristas = UNA fila, sin la
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ocg-una-fila.cjs
 echo "== ocg-excel (v26.90: Generar las OCs baja Excel con columna Proveedor) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ocg-excel.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/oc-excel-alarma.cjs
 
 echo "== ocg-config (v7.51: editor de OC_Maximos (objetivo/uni×caja/índice/proveedor/activo + alta) → sin Excel) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ocg-config.cjs
