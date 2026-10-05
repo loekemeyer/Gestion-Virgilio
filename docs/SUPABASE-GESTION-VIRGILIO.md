@@ -31573,3 +31573,35 @@ Sin respuesta, la tanda va entera al del TP/TAP (fail-open). Al 05/10: 0 frenos 
 función está lista; empieza a tener filas con la primera tanda frenada).
 
 **Centinelas** 313-315 (dicen `v26.66` en la base: la versión con que se aplicó; llave, no cambiar). **Rollback** en `sql/gv_tanda_credito_v2667.sql`.
+
+### 3.v2668 — LK: poda del historial de crons (D13) · Chef: puerta para el pedido automático de Cencosud (Luis, 05/10/2026, v26.68)
+
+**LK (`kwkclwhmoygunqmlegrg`), D13 — APLICADO.** `cron.job_run_details` nunca se podaba: 410.943 filas desde el
+28/03, 179 MB = 38 % de la base de LK (471 MB), en la instancia de 0,5 GB que se cayó el 05/10. Se borró lo de más de
+7 días (355.136 filas, en 4 tandas), `vacuum full` y cron nuevo **77 `lk-podar-historial-cron`** (`27 6 * * *` =
+03:27 ART; ese minuto tenía 3 crons, queda en 4). **Medido después: 55.855 filas, 18 MB; la base, 311 MB.**
+Backup en `zz_backups."LK_Backup_cron_fallidas_20261005"` (6.979 corridas fallidas completas) y
+`zz_backups."LK_Backup_cron_resumen_20261005"` (corridas y fallidas por job y día). Efecto: `rep_salud` dice
+«nunca terminó bien» para un cron que falla hace más de 7 días. `sql/lk_cron_historial_poda_v2668_LK.sql`.
+
+**Chef (`nkhzocgdpwtgrmwleihr`) — PARA QUE LO CORRA LUIS en el SQL Editor de Chef** (la sesión no tiene acceso a
+Chef). Las OC de Cencosud llegan a ventas@chefsrl.com y hoy se cargan a mano en el PDF Krikos del admin de LK, que
+crea el pedido en Chef por la Edge Function `create-super-order` (exige un admin de LK logueado). Para que la carga
+automática haga lo mismo:
+
+| objeto (Chef) | qué |
+|---|---|
+| `_krikos_insert_pedido(p_order, p_simular)` | escribe la cabecera en `orders` con SÓLO las columnas que trae el pedido (como un insert de supabase-js), pone `sheets_payload.order_number` = id, no duplica la misma OC + cliente + sucursal en 60 días; `p_simular` inserta y deshace. Sin permiso para anon |
+| `krikos_crear_pedido_super(p_token, p_order)` | la puerta: valida el token contra su sha256 y llama a la de arriba. anon/authenticated |
+
+El token vive en el **Vault de LK** (`KRIKOS_CHEF_TOKEN`, creado el 05/10); Chef guarda sólo la huella. El archivo
+termina con una **prueba que no graba nada** contra el pedido 247 (Cencosud cargado a mano el 02/10): lista las
+columnas donde el automático saldría distinto, las obligatorias que el panel no manda y los triggers de `orders`.
+Probado en LK con `pg_temp` en transacción abortada: simula sin dejar filas, la 2.ª carga de la misma OC devuelve
+`duplicado`, el token falso se rechaza, y si falta una columna obligatoria la prueba la nombra con su valor de
+referencia en vez de cortarse. ⚠ Esa prueba consumió los ids 1611-1613 de la secuencia de `orders` de LK (sin
+filas: el próximo pedido de LK salta esos números). `sql/chef_krikos_crear_pedido_super_v2668_CHEF.sql`.
+
+Falta (tarea de Planify de Luis): la clave de ventas@chefsrl.com en el Vault de LK (`KRIKOS_CHEF_IMAP_PASS`), el
+lector con las dos casillas y la carpeta de spam con aviso, y la rama de Cencosud del auto-import (mismas funciones
+del panel, con L), probada contra los pedidos 245-247. Dorinka sigue a mano en Chef, sin reglas.
