@@ -6293,7 +6293,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.95"></script>
+<script type="module" src="recepcion.js?v=26.96"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10535,7 +10535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.95";
+const APP_VERSION = "v26.96";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18230,11 +18230,11 @@ function ocgDescargarExcel() {
   if (!gen || gen.error) { alert("Todavía se está calculando. Probá de nuevo en un momento."); return; }
   if (!items.length) { alert("No hay artículos para bajar."); return; }
   const filas = items.slice().sort(function (a, b) { return _ocgProvSort(a.prov, b.prov) || (b.falta - a.falta); });
-  const headers = ["Proveedor", "Código", "Descripción", "A pedir", "% prov", "E.M. (cj/m)", "Índice", "Máx", "Pedidos", "Stock"];   // v26.92: cortos, en 2 renglones
+  const headers = ["Proveedor", "Código", "Descripción", "A pedir", "% prov", "E.M. (cj/m)", "Índice", "Máx", "Cap. gónd.", "Pedidos", "Stock"];   // v26.96 (Luis, D3): + capacidad de góndola al lado del Máx   // v26.92: cortos, en 2 renglones
   const aoa = [headers];
   filas.forEach(function (it) {
     aoa.push([it.prov, String(codCanon(it.cod)), String(artNombre(it.cod, it.desc) || ""), it.falta, Math.round(it.prop || 100),
-      (it.proy == null ? 0 : Math.round(it.proy)), it.indice, (it.maxTot != null ? it.maxTot : it.max), (it.demandaTot != null ? it.demandaTot : it.demanda), (it.stockTot != null ? it.stockTot : it.stock)]);
+      (it.proy == null ? 0 : Math.round(it.proy)), it.indice, (it.maxTot != null ? it.maxTot : it.max), (it.cap > 0 ? it.cap : "—"), (it.demandaTot != null ? it.demandaTot : it.demanda), (it.stockTot != null ? it.stockTot : it.stock)]);
   });
   const d = new Date(), p2 = function (n) { return String(n).padStart(2, "0"); };
   const nombre = "OCs a generar " + d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()) + " " + p2(d.getHours()) + "." + p2(d.getMinutes()) + ".xlsx";
@@ -60501,7 +60501,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.95"></script>
+<script src="importacion.js?v=26.96"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63324,9 +63324,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.95"></script>
-<script src="hotsale.js?v=26.95"></script>
-<script src="estadisticas.js?v=26.95"></script>
+<script src="cobranzas.js?v=26.96"></script>
+<script src="hotsale.js?v=26.96"></script>
+<script src="estadisticas.js?v=26.96"></script>
 
 </body>
 </html>

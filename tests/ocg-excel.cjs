@@ -39,13 +39,14 @@ const XLSX = require(path.join(root, "vendor", "xlsx.full.min.js"));
   const anchoDesc = (sh.match(/<col min="3" max="3" width="([\d.]+)"/) || [])[1];
   const chk = {
     boton,
-    headerProveedor: a[0] && a[0][0] === "Proveedor" && a[0][3] === "A pedir" && a[0][5] === "E.M. (cj/m)",
+    headerProveedor: a[0] && a[0][0] === "Proveedor" && a[0][3] === "A pedir" && a[0][5] === "E.M. (cj/m)" && a[0][8] === "Cap. gónd.",
+    capacidad: a.length === 6 && a[1][8] === 50,
     unaFilaPorProveedor: a.length === 6,
     incluyeCero: a.length === 6 && a[4][1] === "508" && a[4][3] === 0,
     orden: a.length === 6 && a[1][0] === "Garcia" && a[1][1] === "507" && a[2][0] === "Garcia" && a[3][0] === "Lucho" && a[5][0] === "(sin proveedor)",
     cajas: a.length === 6 && a[1][3] === 900 && a[3][3] === 384,
     arial10: /<name val="Arial"\/>/.test(st) && /<sz val="10"\/>/.test(st),
-    encabezadoAjustado: /wrapText="1"/.test(st) && /<c r="A1" s="1"/.test(sh) && /<c r="J1" s="1"/.test(sh),
+    encabezadoAjustado: /wrapText="1"/.test(st) && /<c r="A1" s="1"/.test(sh) && /<c r="K1" s="1"/.test(sh),
     datosSinEstilo: !/<c r="A2" s="1"/.test(sh),
     congelada: /state="frozen"/.test(sh),
     filtro: /<autoFilter /.test(sh),
