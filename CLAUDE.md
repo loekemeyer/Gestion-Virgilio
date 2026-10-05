@@ -7410,6 +7410,12 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
   = editar ahí, compilar y reemplazar el `.exe` en la PC (la config queda). Las reglas tipo → impresora son de cada PC:
   una PC sin regla para un tipo contesta `ok:false` y esa hoja sale por el cuadro.
 
+- **v26.58 (Luis, 05/10): el helper v1.2.0 NO cambia el contrato** (sólo su ventana: hoja global `papel` en el .json,
+  «Opciones avanzadas», minimizar al cerrar). El ping ahora dice `Impresion Virgilio OK v1.2.0`: el front da vivo por el
+  **HTTP 200, nunca por el texto** (candado en `tests/helper-impresion-fuente.cjs`; el helper falso del test contesta lo
+  mismo que el real). ⚠ **El fuente de este repo sigue en v1.0.0**: el v1.2.0 lo tiene la sesión que lo escribió y no
+  está en ningún branch; mientras no se suba, compilar desde acá da la ventana vieja (mismo contrato).
+
 `tests/imp-helper-local.cjs` (helper falso en 127.0.0.1: mide el PDF que le llega, el orden, el fallback y el timeout).
 
 ## ⚠ REGLA (Luis, 2026-10-02, v26.16 · v26.20): 📑 ESTADÍSTICAS ISIS — ventas y pedidos por artículo sin entrar a ISIS

@@ -41,6 +41,10 @@ chk("C GET / contesta «Impresion Virgilio OK»", /"Impresion Virgilio OK v"/.te
 chk("C atiende /print y lee ?tipo=", /StartsWith\("\/print"\)/.test(cs) && /tipo/.test(cs));
 chk("C CORS con Allow-Private-Network", /Access-Control-Allow-Private-Network: true/.test(cs));
 chk("C el front pega a /print?tipo=", /gvHelperUrl\("\/print\?tipo="/.test(idx));
+// v26.58 — el ping lleva la versión ("Impresion Virgilio OK v1.2.0"): el front mira el HTTP 200, no el texto.
+const vivo = (idx.match(/async function helperVivo\(\)\{[\s\S]*?\n\}/) || [""])[0];
+chk("C helperVivo da vivo por el HTTP 200 (r.ok), no por el texto del ping",
+    /ok = r\.ok;/.test(vivo) && !/Impresion Virgilio/.test(vivo));
 chk("C el puerto por defecto es el mismo (17777)", /17777/.test(cs) && /17777/.test(idx));
 chk("C compilar.bat compila src\\ImpresionVirgilio.cs", /src\\ImpresionVirgilio\.cs/.test(
     fs.readFileSync(path.join(dir, "compilar.bat"), "utf8")));

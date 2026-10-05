@@ -27,11 +27,13 @@ try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { console.error("no playwright"); process.exit(2); } }
 
 const H = { reqs: [], modo: "ok", demora: 0, activos: 0, maxActivos: 0 };
+// v26.58 — los mismos headers y el mismo ping que el helper real v1.2.0 (Responder() de ImpresionVirgilio.cs).
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Private-Network": "true" };
+  "Access-Control-Allow-Headers": "Content-Type, X-Virgilio-Tipo", "Access-Control-Allow-Private-Network": "true",
+  "Access-Control-Max-Age": "86400" };
 const helper = http.createServer((req, res) => {
   if (req.method === "OPTIONS") { res.writeHead(204, cors); return res.end(); }
-  if (req.method === "GET" && req.url === "/") { res.writeHead(200, Object.assign({ "Content-Type": "text/plain" }, cors)); return res.end("Impresion Virgilio OK"); }
+  if (req.method === "GET" && req.url === "/") { res.writeHead(200, Object.assign({ "Content-Type": "text/plain" }, cors)); return res.end("Impresion Virgilio OK v1.2.0"); }
   if (req.method === "POST" && req.url.indexOf("/print?") === 0) {
     const chunks = [];
     H.activos++; H.maxActivos = Math.max(H.maxActivos, H.activos);
