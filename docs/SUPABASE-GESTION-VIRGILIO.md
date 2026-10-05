@@ -31529,3 +31529,19 @@ deja de contarse como abierto y suma su tramo; un TP posterior de otro operario 
 
 **Rollback:** al final de `sql/gv_tanda_frenada_v2662.sql` (definiciones anteriores en
 `zz_backups."GV_Backup_TandaFreno_defs_20261005"`).
+
+### 3.v2665 — FRENAR la tanda, parte 2b: freno al fichar salida, aviso y supervisor (Luis, 05/10/2026, v26.65)
+
+| objeto | qué |
+|---|---|
+| `gv_tanda_frenar` | ventana del fichaje desde `ts_estado` (marcador `v26.64-fichaje`): retomada al otro día, el FJ de ayer no la vuelve a frenar |
+| `gv_tandas_frenar_fichaje(p_simular)` | frena las TOMADAS cuyo dueño hizo FJ después de tomarlas, que arrancaron (EP/AP), sin TP/TAP y sin actividad del dueño después del FJ. Sólo `postgres` (cron) |
+| cron **129** `gv-tandas-frenar-fichaje` | `6-59/10 * * * *`. Creado apagado; se prendió con el push del front v26.65 |
+| `gv_tandas_frenadas_de(p_legajo)` | las frenadas a nombre de un legajo que nadie tomó (aviso del día siguiente). anon |
+| `gv_tanda_lock_estado(p_tanda)` | quién tiene tomada / frenada cada fase (para el ✋ del supervisor). anon |
+
+**Prueba** (transacción abortada, 05/10): de 3 tandas tomadas con FJ, frenó sólo la que no tenía TP ni
+actividad posterior al FJ; PKF con la hora del FJ y `ts_inicio` = su EP; retomada por el dueño
+(`gv_tanda_reservar` → `retomada`), la segunda corrida no la volvió a frenar.
+
+**Centinelas** 307-310. **Rollback** en `sql/gv_tanda_frenada_v2665.sql`.

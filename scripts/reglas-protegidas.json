@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada)",
+  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -759,6 +759,16 @@
     {
       "objeto": "gv_tanda_tomar_frenada",
       "regla": "Al tomar una tanda frenada se devuelve dónde quedó el carro (ubicación del último freno)",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_tandas_frenar_fichaje",
+      "regla": "Una tanda tomada se frena sola cuando el dueño ficha salida, sólo si no volvió a trabajar después del FJ",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_tandas_frenadas_de",
+      "regla": "El aviso del día siguiente sólo trae las tandas que siguen frenadas a nombre de ese legajo (nadie las tomó)",
       "quien": "Luis"
     }
   ]

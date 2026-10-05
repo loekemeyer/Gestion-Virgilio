@@ -67,6 +67,8 @@ catch (_e) {
     out.libreNormal    = !!(cLibre && !cLibre.disabled && !/seguir/i.test(cLibre.textContent));
 
     // tocar la mía → abre el asistente y reconstruye el arranque desde el servidor
+    // v26.65: antes de abrir pregunta a la reserva; acá contesta que sigue siendo suya
+    window.tandaReservar = async function () { return { ok: true, motivo: "propia", legajo: MIO }; };
     let comp = null; window.showCompletarWizard = function (l, c) { comp = [l, c]; };
     const st0 = getLegajoState(MIO);
     st0.armado = { active: false, value: "", ts_inicio: null }; setLegajoState(MIO, st0);

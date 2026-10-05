@@ -5606,11 +5606,20 @@ rollback y pruebas en `sql/gv_tanda_frenada_v2661.sql` · `tests/arm-avance-serv
 | puntaje | una tanda con freno de picking **no entra** en `gv_picking_puntaje_operario` hasta el reparto por operario (parte 3) |
 
 ⚠ El m³ de la tanda sigue acreditándose a quien da el **TP/TAP** final: el reparto por operario (D6) es la parte 3.
-⚠ Falta (parte 2b): el freno **al fichar salida**, el botón del **supervisor** y el aviso del día siguiente
-(*«Tenés la tanda X frenada. ¿La retomás?»*). Hasta entonces una tanda tomada que el operario deja al irse queda
-`tomada` como siempre.
-⚠ Un celular con estado local viejo de una tanda que ya se frenó desde otro (▶ Seguir) no pasa por la reserva.
 Centinelas v26.62 ids 300-306 · `sql/gv_tanda_frenada_v2662.sql` (CREATE completos + rollback) · `tests/tanda-frenar.cjs`.
+
+**Parte 2b (v26.65) — fichaje, supervisor y aviso del día siguiente:**
+
+| pieza | qué hace |
+|---|---|
+| freno al **fichar salida** | cron **129** `gv-tandas-frenar-fichaje` (`6-59/10`) → `gv_tandas_frenar_fichaje()`: tanda TOMADA cuyo dueño hizo Terminar Día (FJ) después de tomarla, arrancó (EP/AP) y **no volvió a trabajar** desde el FJ → `gv_tanda_frenar(…,'fichaje')`; el PKF/APF queda con la hora del FJ. No toca la que ya tiene TP/TAP. La ventana se mide desde `ts_estado` (al retomarla, el FJ de ayer no la vuelve a frenar) |
+| retomar por **«▶ Seguir»** | `pkResume` (abre al instante, offline-first, y consulta después), `pkResumeServer`, «▶ Seguir armado», la ficha de la lista y re-tocar EP/AP de la abierta pasan por `_frenoGuardSeguir`: frenada propia → vuelve a `tomada` y abre un tramo **nuevo** (EP/AP) sembrando de todos; la tomó **otro** → suelta lo del celular y dice *«La tanda X ya la tiene Y.»*; sin señal (techo 4 s) → abre como siempre |
+| **aviso del día siguiente** | al entrar a la botonera (`goToOptions`): *«Tenés la tanda X frenada. ¿La retomás?»* sólo si la frenada es de un **día anterior**, sigue a su nombre (`gv_tandas_frenadas_de`) y el celular no la tiene abierta. Una vez por día. «Sí» = EP/AP de esa tanda (la reserva la retoma) |
+| **supervisor** | «🔧 Modificar tanda» → **✋ Frenar (soltarla del operario)**: dice quién la tiene (`gv_tanda_lock_estado`); en **armado** sólo si hay copia en el servidor (dice hace cuánto, NP listas y líos), si no le pide al operario que la frene él; motivo `supervisor` |
+| «una por vez» | el cartel dice que también se puede **frenar** con «✋ Frenar la tanda» (D9) |
+
+⚠ El crédito por operario (D6: m³ de picking/armado repartido) sigue en la **parte 3**.
+Centinelas 307-310 · `sql/gv_tanda_frenada_v2665.sql` · `tests/tanda-frenar-2b.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-01, v25.63): todo módulo que abre tarea tiene ⛔ ANULAR — y la anulación QUEDA REGISTRADA
 

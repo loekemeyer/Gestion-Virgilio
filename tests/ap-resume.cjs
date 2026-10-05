@@ -49,6 +49,7 @@ catch (_e) {
       out.btnShownDuringToggle = !!seguir;
       out.btnText = seguir ? seguir.innerText : null;
       if (seguir) seguir.click();
+      await new Promise(function (r) { setTimeout(r, 80); });   // v26.65: el botón pregunta a la reserva antes de abrir
       out.btnClick = called;
       const st2 = getLegajoState(leg); st2.armado = { active: false, value: "", ts_inicio: null }; st2.toggles = {}; setLegajoState(leg, st2);
       renderPendingSuggestion();
