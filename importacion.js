@@ -23,7 +23,7 @@ function _impTabsHtml(cur) {
   const t = function (on) { return 'width:auto;margin:0;flex:0 0 auto;padding:5px 11px;border-radius:999px;border:1px solid ' + (on ? '#1d4ed8' : '#cbd5e1') + ';background:' + (on ? '#1d4ed8' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-size:12.5px;font-weight:800;cursor:pointer;white-space:nowrap'; };
   return '<div class="imp-tabs" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px">' +
     '<button style="' + t(cur === 'ped') + '" onclick="openPedidosImportacion()">📦 Pedidos</button>' +
-    '<button style="' + t(cur === 'alta') + '" onclick="openImpAgregar()" title="Dar de alta un importado nuevo: código, medidas, unidades, FOB, MOQ, proveedor y el primer pedido a mano.">➕ Agregar artículo</button>' +
+    '<button style="' + t(cur === 'alta') + '" onclick="openImpAgregar()" title="Dar de alta un importado nuevo o modificar uno existente: código, medidas, unidades, FOB, MOQ, proveedor, tipo, INAL, góndola y el primer pedido a mano.">➕ Agregar / modificar</button>' +
     '<button style="' + t(cur === 'curso') + '" onclick="openImpEnCurso()" title="Los pedidos YA HECHOS que vienen en camino: qué día embarcan y qué día llegan. No mira lo que hay que pedir.">🚢 En curso</button>' +
     '<button style="' + t(cur === 'ntl') + '" onclick="openImpNtl()" title="La cuenta corriente de NTL, el forwarder de Hong Kong: depósitos, giros a las fábricas, recuperos y comisiones.">💱 NTL</button>' +
     '<button style="' + t(cur === 'provcc') + '" onclick="openImpProvCC()" title="Una cuenta por fábrica: cuánto le debemos por los pedidos en curso, cada giro, y la historia (hoja del Excel + extracto NTL).">📒 Cta. proveedor</button>' +
@@ -2306,7 +2306,7 @@ const _PED_IMP_RPC_ESCRITURA = ["gv_imp_carga_pedido_set", "gv_imp_cc_deuda_add"
   "gv_imp_cervantes_denegados",   // v25.37
   "gv_imp_pi_editar", "gv_imp_pi_editores", "gv_imp_pi_ediciones",   // v25.94 — editar una PI (quién, cuándo): sólo supervisor
   "gv_importados_curso_fob",   // v26.37 — el FOB guardado en cada pedido en curso (lectura, sólo supervisor)
-  "gv_importado_alta"];   // v26.98 — ➕ Agregar artículo (sólo supervisor)
+  "gv_importado_alta", "gv_importado_guardar", "gv_importado_ficha"];   // v26.98/v26.99 — ➕ Agregar / modificar producto (sólo supervisor)
 async function _pedImpRpc(fn, body) {
   var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
   if (_PED_IMP_RPC_ESCRITURA.indexOf(fn) >= 0) {
@@ -3134,12 +3134,16 @@ async function impRecGrabar() {
     (_impRec.lineas.some(function (l) { return l.destino === "cervantes"; }) ? '<div class="irc-ok" style="margin-top:8px">🏭 Lo que va a <b>Cervantes</b> no entró al stock de Virgilio: les aparece en <b>Recepción de Insumos → Importados</b> de GP2 para que digan <b>Sí</b> o <b>No</b>. Si dicen No, el pedido vuelve a estar en viaje con «Denegado por Cervantes».</div>' : '') +
     '<div style="margin-top:10px"><button class="irc-b pri" onclick="impRecCerrar()">Listo</button><button class="irc-b sec" onclick="impRecCerrar();openImpHistRecep()">Ver historial de recepción</button></div>');
 }
-/* v26.98 (Luis, 05/10) — Solapa ➕ Agregar artículo: alta de un importado nuevo. Pide código, medidas de la
-   MC y del inner, unidades por inner y por MC, FOB, descripción, MOQ y proveedor, y deja ajustar A MANO el
-   PRIMER PEDIDO a mandar (master cajas). Un artículo nuevo no tiene Estadística Madre, así que la cuenta
-   automática daría 0: el primer pedido se guarda en Importados.pedido_manual (unidades) y 📦 Pedidos lo toma
-   como MC pedido mientras el código no tenga pedido en curso; al cargar el primer bache la base lo borra sola
-   (trigger gv_importados_bache_primer_pedido). Escribe gv_importado_alta (supervisor, una transacción). */
+/* v26.98 (Luis, 05/10) — Solapa ➕ Agregar artículo: alta de un importado nuevo (código, medidas de la MC y
+   del inner, unidades por inner y por MC, FOB, descripción, MOQ, proveedor) y el PRIMER PEDIDO a mano, que se
+   guarda en Importados.pedido_manual (unidades): 📦 Pedidos lo toma como MC pedido mientras el código no tenga
+   pedido en curso, y la base lo borra sola al cargar el primer bache (trigger gv_importados_bache_primer_pedido).
+   v26.99 (Luis: "AGREGAR O MODIFICAR PRODUCTO … que impacte en todos los lugares pertinentes de stock … si
+   necesitas que pida más data, que la pida") — la solapa también MODIFICA un importado existente, y pide además
+   tipo de producto y familia, INAL (certificado y vencimiento), góndola y capacidad, y si es secundario de otro
+   código. Todo va por gv_importado_guardar (supervisor, una transacción): maestro, volumen, GV_UxB, OC_Maximos,
+   GV_Producto_Tipo, GV_Articulo_INAL, GV_Lugar_Item, Equivalencias_Familia y, en el alta, un ajuste de 0 cajas
+   para que figure en Stocks antes de que llegue. Código y empresa no se cambian al modificar. */
 let _impAlta = null;
 function _impAltaNum(v) {
   let t = String(v == null ? "" : v).trim().replace(/\s/g, "");
@@ -3147,19 +3151,57 @@ function _impAltaNum(v) {
   if (t.indexOf(",") >= 0) t = t.replace(/\./g, "").replace(",", ".");
   const n = Number(t); return isFinite(n) ? n : NaN;
 }
+function _impAltaNuevo() { return { modo: "nuevo", id: null, v: { marca: "LK" }, orig: null, mcTocado: false, msg: "", msgTipo: "", guardando: false, ok: null, cargando: false }; }
 async function openImpAgregar() {
-  _stkPopShell("➕ Agregar artículo importado", "stkPopBody", true);
+  _stkPopShell("➕ Agregar o modificar producto importado", "stkPopBody", true);
   const body = document.getElementById("stkPopBody"); if (!body) return;
   _stkPop = { kind: "impAlta" };
-  if (!_impAlta) _impAlta = { v: { marca: "LK" }, mcTocado: false, msg: "", msgTipo: "", guardando: false, ok: null };
-  body.innerHTML = _impTabsHtml('alta') + '<div class="stkpop-empty">Cargando proveedores…</div>';
-  try { await _impCfgCargar(); } catch (_e) {}
+  if (!_impAlta) _impAlta = _impAltaNuevo();
+  body.innerHTML = _impTabsHtml('alta') + '<div class="stkpop-empty">Cargando…</div>';
+  const res = await Promise.all([
+    _impCfgCargar().catch(function () {}),
+    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/Importados", "select=id,cod_art,marca,descripcion,proveedor,activo&order=cod_art").catch(function () { return null; }),
+    _pedImpRpc("gv_importado_ficha", { p_id: null }).catch(function () { return null; })
+  ]);
   if (!_stkPop || _stkPop.kind !== "impAlta") return;
+  _impAlta.lista = Array.isArray(res[1]) ? res[1] : null;
+  _impAlta.tipos = (res[2] && res[2].tipos) || [];
+  _impAlta.familias = (res[2] && res[2].familias) || [];
   _impAltaRender();
 }
+function impAltaModo(m) {
+  if (!_impAlta) return;
+  const keep = { lista: _impAlta.lista, tipos: _impAlta.tipos, familias: _impAlta.familias };
+  _impAlta = Object.assign(_impAltaNuevo(), keep, { modo: m });
+  _impAltaRender();
+}
+/* Modificar: se elige un importado del maestro y se trae TODO lo que tiene cargado. */
+async function impAltaElegir(txt) {
+  if (!_impAlta) return;
+  const t = String(txt || "").trim(); if (!t) return;
+  const l = (_impAlta.lista || []).find(function (r) { return _impAltaEtiq(r) === t; });
+  if (!l) return;
+  _impAlta.cargando = true; _impAlta.msg = ""; _impAltaRender();
+  try {
+    const f = await _pedImpRpc("gv_importado_ficha", { p_id: l.id });
+    const a = f && f.art; if (!a) throw new Error("no vino la ficha");
+    const s = function (x) { return x == null ? "" : String(x).replace(".", ","); };
+    _impAlta.id = a.id; _impAlta.orig = a;
+    _impAlta.v = { cod: a.cod, marca: a.marca, proveedor: a.proveedor || "", descripcion: a.descripcion || "", fob: s(a.fob),
+      uni_mc: s(a.uni_mc), uni_inner: s(a.uni_inner), moq: s(a.moq),
+      mc_largo: s(a.mc_largo), mc_ancho: s(a.mc_ancho), mc_alto: s(a.mc_alto), in_largo: s(a.in_largo), in_ancho: s(a.in_ancho), in_alto: s(a.in_alto),
+      tipo: a.tipo || "", familia: a.familia || "", inal: !!a.inal, inal_certificado: a.inal_certificado || "", inal_vence: a.inal_vence || "",
+      secundario_de: a.secundario_de || "", gondola_sector: "", gondola_cap: "" };
+    if (_impAlta.v.proveedor && (_PROV_IMP_LISTA || []).indexOf(_impAlta.v.proveedor) < 0) { _impAlta.v.prov_otro = _impAlta.v.proveedor; _impAlta.v.proveedor = ""; }
+    const um = Number(a.uni_mc) || 0, pu = Number(a.primer_pedido_u) || 0;
+    _impAlta.mcTocado = true; _impAlta.v.mc = um > 0 ? String(Math.round(pu / um)) : "0";
+  } catch (e) { _impAlta.msg = "No se pudo leer el artículo: " + ((e && e.message) || e); _impAlta.msgTipo = "err"; }
+  _impAlta.cargando = false; _impAltaRender();
+}
+function _impAltaEtiq(r) { return String(r.cod_art || "").trim() + " · " + (r.marca || "") + " · " + String(r.descripcion || "").trim() + (r.activo === false ? " (discontinuo)" : ""); }
 function _impAltaLeer() {
   const v = _impAlta.v;
-  document.querySelectorAll("#impAltaF [data-k]").forEach(function (e) { v[e.getAttribute("data-k")] = e.value; });
+  document.querySelectorAll("#impAltaF [data-k]").forEach(function (e) { v[e.getAttribute("data-k")] = e.type === "checkbox" ? e.checked : e.value; });
   if (v.proveedor === "__otro") v.proveedor = "";
   return v;
 }
@@ -3182,65 +3224,95 @@ function _impAltaCalc(v) {
 }
 function _impAltaRender() {
   const body = document.getElementById("stkPopBody"); if (!body || !_impAlta) return;
-  const v = _impAlta.v, c = _impAltaCalc(v);
+  const A = _impAlta, v = A.v, c = _impAltaCalc(v), mod = A.modo === "mod";
   const fm = function (n, d) { return (n == null || !isFinite(n)) ? "—" : Number(n).toLocaleString("es-AR", { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); };
   const val = function (k) { return escapeHtml(v[k] == null ? "" : String(v[k])); };
-  const inp = function (k, ph, num, w) { return '<input data-k="' + k + '" value="' + val(k) + '" placeholder="' + escapeHtml(ph || "") + '"' + (num ? ' inputmode="decimal"' : '') + ' style="width:' + (w || 90) + 'px" oninput="_impAltaCambio(\'' + k + '\')">'; };
+  const inp = function (k, ph, num, w, extra) { return '<input data-k="' + k + '" value="' + val(k) + '" placeholder="' + escapeHtml(ph || "") + '"' + (num ? ' inputmode="decimal"' : '') + (extra || '') + ' style="width:' + (w || 90) + 'px" oninput="_impAltaCambio(\'' + k + '\')">'; };
+  const lbl = function (t) { return '<div class="iaf-l">' + t + '</div>'; };
+  const dims = function (p) { return inp(p + "_largo", "L", true, 58) + ' × ' + inp(p + "_ancho", "A", true, 58) + ' × ' + inp(p + "_alto", "H", true, 58); };
+  const dl = function (id, arr) { return '<datalist id="' + id + '">' + (arr || []).map(function (x) { return '<option value="' + escapeHtml(String(x)) + '">'; }).join("") + '</datalist>'; };
+  const bt = function (on) { return 'style="width:auto;margin:0;padding:6px 14px;border-radius:999px;border:1px solid ' + (on ? '#0f766e' : '#cbd5e1') + ';background:' + (on ? '#0f766e' : '#fff') + ';color:' + (on ? '#fff' : '#334155') + ';font-weight:800;font-size:14px"'; };
+  let h = _impTabsHtml('alta');
+  if (A.ok) {
+    const o = A.ok;
+    h += '<div class="iaf"><div class="iaf-ok">✓ <b>' + escapeHtml(o.cod) + '</b> (' + escapeHtml(o.marca) + ') ' + (o.alta ? 'quedó dado de alta' : 'quedó modificado') + ' con ' + escapeHtml(o.prov) + '.' +
+      (o.mc > 0 ? ' Primer pedido: <b>' + fm(o.mc) + ' MC</b> (' + fm(o.uni) + ' u), figura en 📦 Pedidos.' : '') +
+      '<div style="margin-top:4px;font-size:13px">Cargado en: ' + escapeHtml(o.hechos.join(" · ")) + '. Stocks lo muestra en hasta 2 min (lo que tarda en refrescarse).</div></div>' +
+      '<div class="iaf-bar"><button class="stk-btn" onclick="_impAlta=null;openPedidosImportacion()">📦 Ver en Pedidos</button>' +
+      '<button class="stk-btn" onclick="impAltaModo(\'nuevo\')">➕ Agregar otro</button><button class="stk-btn" onclick="impAltaModo(\'mod\')">✏️ Modificar otro</button></div></div>';
+    body.innerHTML = h + _impAltaCss(); return;
+  }
+  h += '<div class="iaf" id="impAltaF">' +
+    '<div class="iaf-bar" style="margin-bottom:10px"><button ' + bt(!mod) + ' onclick="impAltaModo(\'nuevo\')">➕ Nuevo producto</button><button ' + bt(mod) + ' onclick="impAltaModo(\'mod\')">✏️ Modificar uno existente</button></div>';
+  if (mod && !A.id) {
+    h += '<div class="iaf-g">' + (A.lista === null ? '<div class="iaf-err">No se pudo leer el maestro de importados. Probá de nuevo.</div>' :
+      '<div>' + lbl("Buscá el producto (código o descripción)") + '<input id="impAltaBusq" list="impAltaLista" placeholder="438E · LK · Colador…" style="width:380px" onchange="impAltaElegir(this.value)">' +
+      dl("impAltaLista", (A.lista || []).map(_impAltaEtiq)) + '</div>') + '</div>' +
+      (A.cargando ? '<div class="stkpop-empty">Cargando el artículo…</div>' : '') +
+      (A.msg ? '<div class="iaf-err">' + escapeHtml(A.msg) + '</div>' : '') + '</div>';
+    body.innerHTML = h + _impAltaCss(); return;
+  }
   const provs = (_PROV_IMP_LISTA || []).slice();
   const esOtro = v.proveedor === "" && v.prov_otro != null;
   const provSel = '<select data-k="proveedor" onchange="_impAltaCambio(\'proveedor\')" style="width:150px"><option value="">— elegí —</option>' +
     provs.map(function (p) { return '<option' + (v.proveedor === p ? ' selected' : '') + '>' + escapeHtml(p) + '</option>'; }).join("") +
     '<option value="__otro"' + (esOtro ? ' selected' : '') + '>Otro…</option></select>' +
     (esOtro ? ' ' + inp("prov_otro", "nombre", false, 130) : '');
-  const marcaSel = '<select data-k="marca" onchange="_impAltaCambio(\'marca\')" style="width:90px">' +
+  const marcaSel = mod ? '<b style="font-size:18px">' + escapeHtml(v.marca || "") + '</b>' : '<select data-k="marca" onchange="_impAltaCambio(\'marca\')" style="width:90px">' +
     ["LK", "CH", "Loke", "Mixto"].map(function (m) { return '<option' + (v.marca === m ? ' selected' : '') + '>' + m + '</option>'; }).join("") + '</select>';
-  const dims = function (p) { return inp(p + "_largo", "L", true, 58) + ' × ' + inp(p + "_ancho", "A", true, 58) + ' × ' + inp(p + "_alto", "H", true, 58); };
-  const lbl = function (t) { return '<div class="iaf-l">' + t + '</div>'; };
-  let h = _impTabsHtml('alta');
-  if (_impAlta.ok) {
-    const o = _impAlta.ok;
-    h += '<div class="iaf"><div class="iaf-ok">✓ <b>' + escapeHtml(o.cod) + '</b> (' + escapeHtml(o.marca) + ') quedó en el maestro de importados, con ' + escapeHtml(o.prov) + '.' +
-      (o.mc > 0 ? ' Primer pedido: <b>' + fm(o.mc) + ' MC</b> (' + fm(o.uni) + ' u), ya figura en 📦 Pedidos.' : ' Sin primer pedido.') + '</div>' +
-      '<div class="iaf-bar"><button class="stk-btn" onclick="_impAlta=null;openPedidosImportacion()">📦 Ver en Pedidos</button>' +
-      '<button class="stk-btn" onclick="_impAlta=null;openImpAgregar()">➕ Agregar otro</button></div></div>';
-    body.innerHTML = h + _impAltaCss(); return;
-  }
-  h += '<div class="iaf" id="impAltaF">' +
-    '<div class="iaf-g">' +
-      '<div>' + lbl("Código") + inp("cod", "999E", false, 90) + '</div>' +
+  const o = A.orig || {};
+  const gonds = (o.gondolas || []).map(function (g) { return g.sector + (g.cap != null ? " (" + fm(g.cap) + " caj)" : ""); }).join(", ");
+  const enCurso = Number(o.en_curso) || 0;
+  h += (mod ? '<div style="text-align:center;margin:0 0 8px"><button class="stk-btn" onclick="impAltaModo(\'mod\')">↩ Elegir otro</button></div>' : '') +
+    '<div class="iaf-sec">Producto</div><div class="iaf-g">' +
+      '<div>' + lbl("Código") + (mod ? '<b style="font-size:18px">' + escapeHtml(v.cod || "") + '</b>' : inp("cod", "999E", false, 90)) + '</div>' +
       '<div>' + lbl("Empresa") + marcaSel + '</div>' +
       '<div>' + lbl("Proveedor") + provSel + '</div>' +
-      '<div style="grid-column:1/-1">' + lbl("Descripción") + '<input data-k="descripcion" value="' + val("descripcion") + '" style="width:100%;box-sizing:border-box" oninput="_impAltaCambio(\'descripcion\')"></div>' +
+      '<div style="flex:1 1 100%">' + lbl("Descripción") + '<input data-k="descripcion" value="' + val("descripcion") + '" style="width:100%" oninput="_impAltaCambio(\'descripcion\')"></div>' +
+      '<div>' + lbl("Tipo de producto") + '<input data-k="tipo" list="impAltaTipos" value="' + val("tipo") + '" style="width:230px" oninput="_impAltaCambio(\'tipo\')">' + dl("impAltaTipos", A.tipos) + '<div class="iaf-s">agrupa las marcas en el PDF de Damián</div></div>' +
+      '<div>' + lbl("Familia") + '<input data-k="familia" list="impAltaFams" value="' + val("familia") + '" style="width:150px" oninput="_impAltaCambio(\'familia\')">' + dl("impAltaFams", A.familias) + '</div>' +
+      '<div>' + lbl("Secundario de <small>(cód. principal)</small>") + inp("secundario_de", "vacío = no", false, 110) + '<div class="iaf-s">su venta suma al principal</div></div>' +
     '</div>' +
-    '<div class="iaf-g">' +
+    '<div class="iaf-sec">Empaque</div><div class="iaf-g">' +
       '<div>' + lbl("Medidas MC <small>cm</small>") + dims("mc") + '<div class="iaf-s">' + (c.m3mc != null ? fm(c.m3mc, 3) + ' m³' : '') + '</div></div>' +
       '<div>' + lbl("Medidas inner <small>cm</small>") + dims("in") + '<div class="iaf-s">' + (c.m3in != null ? fm(c.m3in, 4) + ' m³' : '') + '</div></div>' +
-    '</div>' +
-    '<div class="iaf-g">' +
-      '<div>' + lbl("Uni × inner") + inp("uni_inner", "12 · 0 = suelto", true, 110) + '</div>' +
+      '<div>' + lbl("Uni × inner") + inp("uni_inner", "12 · 0 = suelto", true, 110) + '<div class="iaf-s">= la caja de Stocks</div></div>' +
       '<div>' + lbl("Uni × MC") + inp("uni_mc", "144", true, 90) + '<div class="iaf-s">' + (c.innerXmc != null ? (Number.isInteger(c.innerXmc) ? fm(c.innerXmc) + ' inner por MC' : '<span style="color:#b91c1c">no es múltiplo del inner</span>') : '') + '</div></div>' +
+    '</div>' +
+    '<div class="iaf-sec">Compra</div><div class="iaf-g">' +
       '<div>' + lbl("FOB <small>u$s/u</small>") + inp("fob", "1,25", true, 80) + '</div>' +
       '<div>' + lbl("MOQ <small>u</small>") + inp("moq", c.prov ? "prov: " + fm(c.moqProv) : "del prov.", true, 100) + '<div class="iaf-s">' + ((c.moqArt == null) ? (c.prov ? 'vacío = el de ' + escapeHtml(c.prov) : '') : 'propio de este código') + '</div></div>' +
+      '<div>' + lbl("INAL") + '<label style="font-size:16px"><input type="checkbox" data-k="inal"' + (v.inal ? ' checked' : '') + ' onchange="_impAltaCambio(\'inal\')" style="width:22px;height:22px;vertical-align:middle"> lleva</label>' +
+        (o.inal && !o.inal_propio ? '<div class="iaf-s">lo toma de otro código</div>' : '') + '</div>' +
+      (v.inal ? '<div>' + lbl("Certificado") + inp("inal_certificado", "RNPA / RNE", false, 140) + '</div><div>' + lbl("Vence") + '<input type="date" data-k="inal_vence" value="' + val("inal_vence") + '" style="width:160px" onchange="_impAltaCambio(\'inal_vence\')"></div>' : '') +
     '</div>' +
-    '<div class="iaf-ped"><div class="iaf-pt">🧾 Primer pedido a mandar <small>(a mano: el artículo nuevo no tiene Estadística Madre)</small></div>' +
+    '<div class="iaf-sec">Depósito</div><div class="iaf-g">' +
+      (gonds ? '<div>' + lbl("Góndola actual") + '<b>' + escapeHtml(gonds) + '</b><div class="iaf-s">se cambia o se saca en el Mapa</div></div>' : '') +
+      '<div>' + lbl(gonds ? "Agregar otra góndola" : "Góndola") + inp("gondola_sector", "A60", false, 80) + '</div>' +
+      '<div>' + lbl("Capacidad <small>caj</small>") + inp("gondola_cap", "40", true, 80) + '</div>' +
+      (!gonds ? '<div class="iaf-s" style="flex:1 1 100%">sin góndola el artículo queda «sin lugar» en el Mapa hasta que se le asigne</div>' : '') +
+    '</div>' +
+    '<div class="iaf-ped"><div class="iaf-pt">🧾 Primer pedido a mandar <small>(a mano: un artículo nuevo no tiene Estadística Madre)</small></div>' +
+      (enCurso > 0 ? '<div class="iaf-s">Ya tiene ' + fm(enCurso) + ' u en curso: el primer pedido a mano no se usa.</div>' : '') +
       '<div class="iaf-g" style="align-items:end">' +
-        '<div>' + lbl("MC a pedir") + '<input data-k="mc" inputmode="numeric" value="' + (_impAlta.mcTocado ? val("mc") : String(c.sugMc || "")) + '" style="width:80px" oninput="_impAlta.mcTocado=true;_impAltaCambio(\'mc\')">' +
-          '<div class="iaf-s">' + (c.sugMc > 0 ? 'sugerido ' + fm(c.sugMc) + ' (MOQ ' + fm(c.moq) + ' u)' + (_impAlta.mcTocado ? ' · <a href="#" onclick="_impAlta.mcTocado=false;_impAltaRender();return false">volver</a>' : '') : 'cargá Uni × MC') + '</div></div>' +
+        '<div>' + lbl("MC a pedir") + '<input data-k="mc" inputmode="numeric" value="' + (A.mcTocado ? val("mc") : String(c.sugMc || "")) + '" style="width:80px" oninput="_impAlta.mcTocado=true;_impAltaCambio(\'mc\')">' +
+          '<div class="iaf-s">' + (c.sugMc > 0 ? 'sugerido ' + fm(c.sugMc) + ' (MOQ ' + fm(c.moq) + ' u)' + (A.mcTocado ? ' · <a href="#" onclick="_impAlta.mcTocado=false;_impAltaRender();return false">usar sugerido</a>' : '') : 'cargá Uni × MC') + '</div></div>' +
         '<div class="iaf-n">' + lbl("Unidades") + '<b>' + fm(c.uni) + '</b>' + (c.moq > 0 && c.uni > 0 && c.uni < c.moq ? '<div class="iaf-s" style="color:#b45309">debajo del MOQ</div>' : '') + '</div>' +
         '<div class="iaf-n">' + lbl("FOB <small>u$s</small>") + '<b>' + (c.usd > 0 ? fm(c.usd, 2) : '—') + '</b></div>' +
         '<div class="iaf-n">' + lbl("m³") + '<b>' + (c.m3tot != null ? fm(c.m3tot, 2) : '—') + '</b></div>' +
-      '</div><div class="iaf-s">0 = no pedir todavía. Se puede volver a cambiar en 📦 Pedidos (MC pedido); se borra solo al cargar el primer bache.</div></div>' +
-    (_impAlta.msg ? '<div class="' + (_impAlta.msgTipo === "err" ? "iaf-err" : "iaf-ok") + '">' + escapeHtml(_impAlta.msg) + '</div>' : '') +
-    '<div class="iaf-bar"><button class="stk-btn" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:800"' + (_impAlta.guardando ? ' disabled' : '') + ' onclick="impAltaGuardar()">' + (_impAlta.guardando ? 'Guardando…' : '💾 Dar de alta') + '</button></div>' +
+      '</div><div class="iaf-s">0 = no pedir todavía. Se puede cambiar en 📦 Pedidos (MC pedido); se borra solo al cargar el primer bache.</div></div>' +
+    (A.msg ? '<div class="' + (A.msgTipo === "err" ? "iaf-err" : "iaf-ok") + '">' + escapeHtml(A.msg) + '</div>' : '') +
+    '<div class="iaf-bar"><button class="stk-btn" style="background:#1d4ed8;color:#fff;border-color:#1d4ed8;font-weight:800"' + (A.guardando ? ' disabled' : '') + ' onclick="impAltaGuardar()">' + (A.guardando ? 'Guardando…' : (mod ? '💾 Guardar cambios' : '💾 Dar de alta')) + '</button></div>' +
   '</div>';
   body.innerHTML = h + _impAltaCss();
 }
 function _impAltaCss() {
-  return '<style>.iaf{max-width:640px;margin:0 auto;font-size:15px}.iaf-g{display:flex;flex-wrap:wrap;gap:10px 14px;margin:0 0 10px;justify-content:center}' +
+  return '<style>.iaf{max-width:720px;margin:0 auto;font-size:15px}.iaf-g{display:flex;flex-wrap:wrap;gap:10px 14px;margin:0 0 10px;justify-content:center}' +
     '.iaf input,.iaf select{font-size:18px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:6px;margin:0;box-sizing:border-box;text-align:center}' +
+    '.iaf-sec{font-size:12px;font-weight:800;color:#1e3a8a;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #dbeafe;margin:4px 0 6px;text-align:center}' +
     '.iaf-l{font-size:12px;font-weight:800;color:#475569;margin:0 0 2px;text-align:center}.iaf-s{font-size:11.5px;color:#64748b;text-align:center;min-height:14px}' +
     '.iaf-ped{border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;padding:8px;margin:4px 0 10px}.iaf-pt{font-weight:800;text-align:center;margin:0 0 6px}' +
-    '.iaf-n{text-align:center;min-width:70px}.iaf-n b{font-size:18px}.iaf-bar{display:flex;gap:8px;justify-content:center}' +
+    '.iaf-n{text-align:center;min-width:70px}.iaf-n b{font-size:18px}.iaf-bar{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}' +
     '.iaf button,.iaf .stk-btn{width:auto;margin:0;padding:8px 16px;font-size:15px}.iaf-err{color:#b91c1c;font-weight:700;text-align:center;margin:0 0 8px}' +
     '.iaf-ok{color:#166534;background:#f0fdf4;border-radius:8px;padding:8px;text-align:center;margin:0 0 8px}</style>';
 }
@@ -3256,8 +3328,9 @@ function _impAltaCambio(k) {
 }
 async function impAltaGuardar() {
   if (!_impAlta || _impAlta.guardando) return;
+  const A = _impAlta, mod = A.modo === "mod";
   const v = _impAltaLeer(), c = _impAltaCalc(v);
-  const err = function (m) { _impAlta.msg = m; _impAlta.msgTipo = "err"; _impAltaRender(); };
+  const err = function (m) { A.msg = m; A.msgTipo = "err"; _impAltaRender(); };
   const cod = String(v.cod || "").trim().toUpperCase();
   if (!cod) return err("Falta el código.");
   if (!c.prov) return err("Falta el proveedor.");
@@ -3267,28 +3340,42 @@ async function impAltaGuardar() {
   if (c.ui == null || !isFinite(c.ui) || c.ui < 0) return err("Faltan las unidades por inner (0 si viene suelto).");
   if (c.ui > 0 && c.um % c.ui !== 0) return err("Las unidades por MC (" + c.um + ") no son múltiplo de las del inner (" + c.ui + ").");
   if (v.moq !== "" && v.moq != null && !(c.moqArt >= 0)) return err("El MOQ no es un número.");
-  const dimsNum = ["mc_largo", "mc_ancho", "mc_alto", "in_largo", "in_ancho", "in_alto"];
-  for (let i = 0; i < dimsNum.length; i++) { const n = _impAltaNum(v[dimsNum[i]]); if (n != null && !(n > 0)) return err("Una medida no es un número mayor a 0."); }
-  const msg = "Dar de alta " + cod + " (" + v.marca + ") con " + c.prov + "?\n\n" +
+  const dimsNum = ["mc_largo", "mc_ancho", "mc_alto", "in_largo", "in_ancho", "in_alto", "gondola_cap"];
+  for (let i = 0; i < dimsNum.length; i++) { const n = _impAltaNum(v[dimsNum[i]]); if (n != null && !(n >= 0)) return err("Una medida o la capacidad no es un número."); }
+  if (_impAltaNum(v.gondola_cap) != null && !String(v.gondola_sector || "").trim()) return err("Pusiste capacidad: falta la góndola.");
+  if (!mod && !String(v.tipo || "").trim() && v.marca !== "Mixto") return err("Falta el tipo de producto (agrupa las marcas del mismo producto en el PDF de Damián).");
+  if (!mod && !String(v.gondola_sector || "").trim() && v.marca !== "Mixto") {
+    try { if (!confirm("No le pusiste góndola: va a quedar «sin lugar» en el Mapa hasta que se le asigne. ¿Seguir igual?")) return; } catch (_e) {}
+  }
+  const o = A.orig || {};
+  const quitaSec = mod && o.secundario_de && !String(v.secundario_de || "").trim();
+  const quitaInal = mod && o.inal_propio && !v.inal;
+  const msg = (mod ? "Guardar los cambios de " : "Dar de alta ") + cod + " (" + v.marca + ") con " + c.prov + "?\n\n" +
     c.um + " u por MC · " + (c.ui > 0 ? c.ui + " u por inner" : "suelto") + " · FOB u$s " + c.fob + "\n" +
     "MOQ " + (c.moqArt != null ? c.moqArt + " u (propio)" : c.moqProv + " u (del proveedor)") + "\n" +
-    "Primer pedido: " + (c.mc > 0 ? c.mc + " MC = " + c.uni + " u · u$s " + (Math.round(c.usd * 100) / 100) : "ninguno");
+    "Primer pedido: " + (c.mc > 0 ? c.mc + " MC = " + c.uni + " u · u$s " + (Math.round(c.usd * 100) / 100) : "ninguno") +
+    (quitaInal ? "\n\n⚠ Le sacás el INAL: se borra su certificado." : "") + (quitaSec ? "\n⚠ Deja de ser secundario de " + o.secundario_de + "." : "");
   try { if (!confirm(msg)) return; } catch (_e) {}
   const num = function (x) { const n = _impAltaNum(x); return (n == null || !isFinite(n)) ? null : n; };
-  const p = { cod: cod, marca: v.marca, proveedor: c.prov, descripcion: String(v.descripcion).trim(), fob: c.fob, uni_mc: c.um, uni_inner: c.ui,
+  const p = { id: mod ? A.id : null, cod: cod, marca: v.marca, proveedor: c.prov, descripcion: String(v.descripcion).trim(), fob: c.fob, uni_mc: c.um, uni_inner: c.ui,
     moq: c.moqArt, primer_pedido_u: c.mc > 0 ? c.uni : null,
-    mc_largo: num(v.mc_largo), mc_ancho: num(v.mc_ancho), mc_alto: num(v.mc_alto), in_largo: num(v.in_largo), in_ancho: num(v.in_ancho), in_alto: num(v.in_alto) };
-  _impAlta.guardando = true; _impAltaRender();
+    mc_largo: num(v.mc_largo), mc_ancho: num(v.mc_ancho), mc_alto: num(v.mc_alto), in_largo: num(v.in_largo), in_ancho: num(v.in_ancho), in_alto: num(v.in_alto),
+    tipo: String(v.tipo || "").trim() || null, familia: String(v.familia || "").trim() || null,
+    inal: !!v.inal, inal_certificado: v.inal ? (String(v.inal_certificado || "").trim() || null) : null, inal_vence: v.inal ? (v.inal_vence || null) : null,
+    gondola_sector: String(v.gondola_sector || "").trim() || null, gondola_cap: num(v.gondola_cap),
+    secundario_de: String(v.secundario_de || "").trim() || null, secundario_de_quitar: !!quitaSec };
+  A.guardando = true; _impAltaRender();
   try {
-    const r = await _pedImpRpc("gv_importado_alta", { p: p });
-    if (!r || !r.ok) throw new Error("la base no confirmó el alta");
-    _impAlta.ok = { cod: r.cod || cod, marca: v.marca, prov: c.prov, mc: c.mc, uni: c.uni };
+    const r = await _pedImpRpc("gv_importado_guardar", { p: p });
+    if (!r || !r.ok) throw new Error("la base no confirmó");
+    const nom = { maestro: "maestro de importados", volumen: "volumen", uxb: "UxB de Stocks", oc: "OCs", tipo: "tipo de producto", inal: "INAL", gondola: "góndola", familia: "familia", stock: "Stocks" };
+    A.ok = { alta: !!r.alta, cod: r.cod || cod, marca: v.marca, prov: c.prov, mc: c.mc, uni: c.uni, hechos: (r.hechos || []).map(function (x) { return nom[x] || x; }) };
   } catch (e) {
     let m = String((e && e.message) || e);
     const mm = /"message":"([^"]+)"/.exec(m); if (mm) m = mm[1];
-    _impAlta.msg = "No se dio de alta: " + m; _impAlta.msgTipo = "err";
+    A.msg = "No se guardó: " + m; A.msgTipo = "err";
   }
-  _impAlta.guardando = false; _impAltaRender();
+  A.guardando = false; _impAltaRender();
 }
 /* Solapa 🚫 Discontinuos (v24.49, Thomas: "no deben aparecer en módulo importados, sino dentro de
    discontinuos de importados"). Son los de Importados.activo = false: la pantalla de Pedidos los

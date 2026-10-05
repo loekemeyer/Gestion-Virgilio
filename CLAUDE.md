@@ -4237,22 +4237,33 @@ hoy; valoriza los pedidos nuevos con su precio) y **no se hace el backfill de lo
   «forzar». «solo_pdf» lo arma sin mandar (queda como artifact). Si la plantilla no está APPROVED en Meta, no manda y el
   run queda en rojo. `tests/reporte-quincenal-params.cjs`.
 
-## ⚠ REGLA (Luis, 2026-10-05, v26.98): ➕ AGREGAR ARTÍCULO en Pedidos Importación — alta + primer pedido a mano
+## ⚠ REGLA (Luis, 2026-10-05, v26.98 · v26.99): ➕ AGREGAR O MODIFICAR PRODUCTO importado — y que impacte en Stock
 
-Solapa **➕ Agregar artículo** (`openImpAgregar`, `importacion.js`): código, empresa (LK/CH/Loke/Mixto), proveedor,
-descripción, medidas MC e inner (cm → m³), uni × inner (0 = suelto), uni × MC, FOB, MOQ y el **primer pedido en MC**
-(sugerido = MOQ en MC enteras; editable). Una transacción: **`gv_importado_alta(jsonb)`** (supervisor; rechaza un
-(código, empresa) que ya existe y uni × MC que no sea múltiplo del inner).
+Solapa **➕ Agregar / modificar** de Pedidos Importación (`openImpAgregar`, `importacion.js`). **Nuevo** o **Modificar uno
+existente** (buscador del maestro; código y empresa no se cambian). Pide: código, empresa (LK/CH/Loke/Mixto), proveedor,
+descripción, **tipo de producto** y familia, **secundario de**, medidas MC e inner (cm → m³), uni × inner (0 = suelto),
+uni × MC, FOB, MOQ, **INAL** (certificado y vencimiento), **góndola y capacidad**, y el **primer pedido en MC** (sugerido =
+MOQ en MC enteras; editable). Todo en una transacción: **`gv_importado_guardar(jsonb)`** (sin `id` = alta; supervisor).
+`gv_importado_alta` (v26.98) quedó como envoltorio. La ficha la lee `gv_importado_ficha(id)`.
 
-| dato | dónde |
+| dato | dónde (y quién lo lee) |
 |---|---|
-| uni × inner | `Importados.uni_x_caja` + `Importados_Volumen.uni_inner` |
-| uni × MC, medidas MC | `Importados_Volumen.uni_master`, `largo/ancho/alto_cm`, `m3_master` |
-| medidas inner | `Importados_Volumen.inner_largo/ancho/alto_cm`, `m3_inner` (nuevas) |
-| MOQ del artículo | **`Importados.moq`** (nueva; vacío = el del proveedor). `_pedImpMoqCalc` lo usa antes que el del proveedor |
-| primer pedido | **`Importados.pedido_manual`** (unidades). 📦 Pedidos lo toma como MC pedido (`_pedImpPrimerPedidoMc`, chip «1.er pedido») mientras el código no tenga pedido en curso; al cargar el primer bache lo borra el trigger `gv_importados_bache_primer_pedido` |
+| maestro, FOB, uni × inner, MOQ, primer pedido | `Importados` (`moq` y `pedido_manual` son del artículo; el proveedor se cambia en todas las filas del código) |
+| uni × MC, medidas MC e inner | `Importados_Volumen` (`inner_*`, `m3_inner` nuevas) |
+| **caja de Stocks** | `GV_UxB` por empresa (= inner; suelto = MC), curado |
+| **línea en Stocks / OCs** | `OC_Maximos` (cod, línea, sin proveedor: un importado no se compra por OC) |
+| **m³ por caja (PPP)** | `GV_Volumen_Articulos`: el inner medido o la MC repartida; en un código con m³ sólo se pisa si se midió el inner |
+| tipo / familia | `GV_Producto_Tipo` (agrupa el PDF de Damián) |
+| INAL | `GV_Articulo_INAL` (desmarcarlo al modificar BORRA la fila; el front lo avisa) |
+| **góndola** | `GV_Lugar_Item` vía `gv_lugar_item_guardar`. **Tiene que ser góndola de la MISMA empresa**: la empresa del artículo en stock la da su góndola (un CH en góndola LK quedaba LK) |
+| secundario de | `Equivalencias_Familia` |
+| **aparecer en Stocks antes de que llegue** | en el ALTA, un ajuste de **0 cajas** en `terminado` (`ref 'ALTA IMP <cod>'`, descripción = la del artículo): Stocks arma su lista con lo que tiene movimientos o pedidos. Aparece en ≤ 2 min (refresco) |
 
-Centinelas 332-333. `sql/gv_importado_alta_v2698.sql`, `tests/imp-agregar-articulo.cjs`.
+- Mixto (insumo) no lleva UxB, tipo, OC ni movimiento. La página LK no se toca (D2, Luis: *"en página está bien que no"*).
+- El primer pedido: 📦 Pedidos lo toma como MC pedido (`_pedImpPrimerPedidoMc`, chip «1.er pedido») mientras no haya
+  pedido en curso; el trigger `gv_importados_bache_primer_pedido` lo borra al cargar el primer bache.
+
+Centinelas 332-335. `sql/gv_importado_alta_v2698.sql`, `sql/gv_importado_guardar_v2699.sql`, `tests/imp-agregar-articulo.cjs`.
 
 ## ⚠ REGLA (2026-10-01, v25.94): ✏️ EDITAR PI — quién corrige, qué día y a qué hora
 
