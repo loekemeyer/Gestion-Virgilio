@@ -6292,7 +6292,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.81"></script>
+<script type="module" src="recepcion.js?v=26.82"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10531,7 +10531,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.81";
+const APP_VERSION = "v26.82";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20154,21 +20154,14 @@ function stkToggleSoloLow() { if (!_stk) return; _stk.soloLow = !_stk.soloLow; s
 function stkFiltroLinea(l) { if (!_stk) return; _stk.filLinea = (_stk.filLinea === l) ? "" : l; _stk.openArt = null; stkRender(); }
 function stkToggleFilCol(key) {   // v8.95 — filtro por columna > 0
   if (!_stk) return;
-  /* v26.79 (Luis, 05/10) — Est. Madre tiene TRES toques: 1.º saca los 0 y ordena de mayor a menor,
-     2.º de menor a mayor, 3.º vuelve al estándar (sin filtro y con el orden de siempre).
-     v26.81 (Luis, 05/10) — las demás columnas tienen CUATRO: 1.º sólo filtra (> 0), 2.º de mayor a
-     menor, 3.º de menor a mayor, 4.º vuelve al estándar. Tocar otra columna arranca de cero en ésa. */
+  /* v26.81 (Luis, 05/10) — CUATRO toques en cada columna: 1.º sólo filtra (> 0), 2.º de mayor a
+     menor, 3.º de menor a mayor, 4.º vuelve al estándar. Tocar otra columna arranca de cero en ésa.
+     v26.82 (Luis, 05/10) — Est. Madre igual que las demás (en la v26.79 tenía 3 toques). */
   var ord = _stk.filCol === key ? (_stk.colOrd || "") : null;   // null = esta columna no estaba tocada
-  if (key === "_proy") {
-    if (ord === null) { _stk.filCol = key; _stk.colOrd = "desc"; }
-    else if (ord === "desc") _stk.colOrd = "asc";
-    else { _stk.filCol = ""; _stk.colOrd = ""; }
-  } else {
-    if (ord === null) { _stk.filCol = key; _stk.colOrd = ""; }
-    else if (ord === "") _stk.colOrd = "desc";
-    else if (ord === "desc") _stk.colOrd = "asc";
-    else { _stk.filCol = ""; _stk.colOrd = ""; }
-  }
+  if (ord === null) { _stk.filCol = key; _stk.colOrd = ""; }
+  else if (ord === "") _stk.colOrd = "desc";
+  else if (ord === "desc") _stk.colOrd = "asc";
+  else { _stk.filCol = ""; _stk.colOrd = ""; }
   _stk.openArt = null; stkRender();
 }
 function stkToggleSoloPin() { if (!_stk) return; _stk.soloPin = !_stk.soloPin; _stk.openArt = null; stkRender(); }
@@ -20501,8 +20494,7 @@ function stkBodyStocks() {
     // v26.79/v26.81 — además ordena: ▼ mayor→menor, ▲ menor→mayor; ✓ = sólo filtrada (stkToggleFilCol).
     const _ord = on && _stk.colOrd;
     const _mk = _ord ? (_stk.colOrd === "asc" ? " ▲" : " ▼") : (on ? " ✓" : " <span style=\"opacity:.4;font-weight:400\">⌵</span>");
-    const _tt = key === "_proy" ? " — 1.º toque: sin los 0 y de mayor a menor · 2.º: de menor a mayor · 3.º: vuelve al orden normal"
-      : " — 1.º toque: sólo los que tienen &gt; 0 · 2.º: de mayor a menor · 3.º: de menor a mayor · 4.º: vuelve al orden normal";
+    const _tt = " — 1.º toque: sólo los que tienen &gt; 0 · 2.º: de mayor a menor · 3.º: de menor a mayor · 4.º: vuelve al orden normal";
     return '<th class="num" onclick="stkToggleFilCol(\'' + key + '\')" title="' + (title || "Filtrar") + _tt + '" style="cursor:pointer;' + st + '">' + label + _mk + '</th>';
   };
   let th = '<th>Código</th><th style="text-align:center;padding:7px 5px;font-size:10px;">LK/<br>CH</th><th>Descripción</th>' +
@@ -60291,7 +60283,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.81"></script>
+<script src="importacion.js?v=26.82"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63114,9 +63106,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.81"></script>
-<script src="hotsale.js?v=26.81"></script>
-<script src="estadisticas.js?v=26.81"></script>
+<script src="cobranzas.js?v=26.82"></script>
+<script src="hotsale.js?v=26.82"></script>
+<script src="estadisticas.js?v=26.82"></script>
 
 </body>
 </html>

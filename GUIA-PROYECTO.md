@@ -1,3 +1,8 @@
+## Nota v26.82 (2026-10-05) — Stocks: Est. Madre también va en 4 toques
+
+- Luis: el rótulo **Est. Madre** funciona igual que las demás columnas (1.º sólo filtra > 0 · 2.º ▼ · 3.º ▲ ·
+  4.º estándar). Retira los 3 toques de la v26.79. `tests/stk-est-madre-orden.cjs`.
+
 ## Nota v26.81 (2026-10-05) — Stocks: todos los rótulos ordenan (4 toques)
 
 - Luis: las demás columnas de Stocks (Total Stock, Cajas Pedidas, Capacidad, Góndola, Excedente, Pickeados,
