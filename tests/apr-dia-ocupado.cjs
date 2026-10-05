@@ -12,7 +12,10 @@
    (f) si sumándolo el día se pasa, el encabezado lo dice y la opción 1 es «Programarlo así igual»;
    (g) el reporte de la opción 2 cuenta lo que YA tiene el día destino (E70A el 01/10);
    (h) elegir 2 → gv_ppp_dia_ajustar con p_simular=false y el mismo p_nuevo, DESPUÉS la tanda;
-   (i) un súper con zona numérica es su propio camión (es_super o motivo «súper:»). */
+   v26.88 (Luis, 05/10: "olvidate del 2 camiones por día" · "no debería mover los fijos"):
+   (i) el día se mide SÓLO por m³: ya no existe el conteo de camiones (_adoCamiones) ni el aviso «más de 2»,
+       y un día con 5 grupos de zonas que entra en los 4,30 m³ no tiene problemas;
+   (j) lo programado o movido a mano que devuelve gv_ppp_dia_ajustar se lista como fijo en la opción 2. */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -38,10 +41,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ];
     // lo que devuelve gv_ppp_dia_ajustar: sólo el día; E48G (Z3) sale al 01/10, donde ya está E70A
     const auto = [
-      { tanda: "E48G", fecha_actual: F, fecha_nueva: "2026-10-01", accion: "mueve", motivo: "pendiente: su grupo no entra (más de 2 camiones)", m3: 2.5, zona: "Zona 3 - CABA Oeste", vence: false, es_super: false },
+      { tanda: "E48G", fecha_actual: F, fecha_nueva: "2026-10-01", accion: "mueve", motivo: "pendiente: su grupo no entra en los 4,30 m³ del día", m3: 2.5, zona: "Zona 3 - CABA Oeste", vence: false, es_super: false },
       { tanda: "E48H", fecha_actual: F, fecha_nueva: F, accion: "queda", motivo: "pendiente: entra en el día", m3: 0.5, zona: "Zona 2 - CABA Centro", vence: false, es_super: false },
       { tanda: "E50B", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "en proceso (picking o armado sin terminar): no se toca", m3: 1.2, zona: "Zona 5 - GBA Oeste", vence: false, es_super: false },
-      { tanda: "E60A", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "súper: queda en su día", m3: 3, zona: "Super", vence: false, es_super: true }
+      { tanda: "E60A", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "súper: queda en su día", m3: 3, zona: "Super", vence: false, es_super: true },
+      { tanda: "E49A", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "programada o movida a mano: no se mueve", m3: 0.3, zona: "Zona 4 - GBA Sur", vence: false, es_super: false }
     ];
     const llamadas = [];
     window.aprQuien = async function () { return "test@x"; };
@@ -86,11 +90,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ov.querySelectorAll(".ado-op")[1].querySelector(".ado-b").click(); await new Promise(function (res) { setTimeout(res, 50); });
     const h = { log: log.slice(), ej: llamadas.filter(function (x) { return x.fn === "gv_ppp_dia_ajustar"; }).map(function (x) { return x.body; }) };
 
-    // (i) súper con zona numérica
+    // (i) sin tope de camiones: 5 grupos de zonas + un súper, 3 m³ en total → sin problemas
     const i = {
-      porMarca: _adoCamiones([{ zona: "Zona 5 - GBA Oeste", m3: 3, es_super: true }, { zona: "Zona 5 - GBA Oeste", m3: 1 }]),
-      porMotivo: _adoCamiones([{ zona: "Zona 5 - GBA Oeste", m3: 3, motivo: "súper: queda en su día" }, { zona: "Zona 5 - GBA Oeste", m3: 1 }]),
-      comun: _adoCamiones([{ zona: "Zona 5 - GBA Oeste", m3: 3 }, { zona: "Zona 5 - GBA Oeste", m3: 1 }])
+      sinConteo: typeof _adoCamiones === "undefined",
+      probs: _adoProblemasDia(F, [
+        { zona: "Zona 1 - CABA Sur", m3: 0.5 }, { zona: "Zona 2 - CABA Centro", m3: 0.5 }, { zona: "Zona 3 - CABA Oeste", m3: 0.5 },
+        { zona: "Zona 4 - GBA Sur", m3: 0.5 }, { zona: "Zona 6 - GBA Norte", m3: 0.5 }, { zona: "Zona 5 - GBA Oeste", m3: 0.5, es_super: true }])
     };
     return { a: a, bShow: bShow, ops: ops, c: c, d: d, head: head, simAj: simAj, h: h, i: i };
   });
@@ -102,7 +107,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   else {
     if (!/Programarlo así igual/.test(r.ops[0])) fallas.push("(f) el día se pasa y la opción 1 no dice «Programarlo así igual»: " + r.ops[0]);
     if (!/se pasa/.test(r.head)) fallas.push("(f) el encabezado no avisa que sumándolo el día se pasa: " + r.head);
-    if (!/más de 2/.test(r.ops[0])) fallas.push("(b) opción 1 no avisa los camiones de más: " + r.ops[0]);
+    if (!/m³ \(más que el promedio/.test(r.ops[0])) fallas.push("(b) opción 1 no avisa los m³ de más: " + r.ops[0]);
+    if (/camion/i.test(r.ops[0] + r.head)) fallas.push("(i) el pop-up sigue hablando de camiones: " + r.head + " / " + r.ops[0]);
+    if (!/E49A — programada o movida a mano/.test(r.ops[1])) fallas.push("(j) opción 2 no lista como fija la tanda movida a mano: " + r.ops[1]);
     if (!/E50B.*en proceso/.test(r.ops[2])) fallas.push("(b) opción 3 no muestra la tanda EN PROCESO fija: " + r.ops[2]);
     if (!/E60A.*súper/.test(r.ops[2])) fallas.push("(b) opción 3 no muestra el súper fijo");
     if (!/E48H.*mismo código/.test(r.ops[2])) fallas.push("(b) opción 3 no dice que la armada va con su mismo código");
@@ -127,7 +134,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   if (iGen2 < 0 || iGen2 < iAj) fallas.push("(h) la tanda nueva no se armó DESPUÉS de ajustar: " + r.h.log.join(" | "));
   if (r.h.log.some(function (x) { return /gv_ppp_dia_reprogramar:automatico/.test(x); })) fallas.push("(h) elegir 2 sigue llamando al automático viejo");
   if (!r.h.ej.length || JSON.stringify(r.h.ej[0].p_nuevo) !== JSON.stringify(s0.p_nuevo)) fallas.push("(h) se ejecutó con otro p_nuevo que el simulado");
-  if (r.i.porMarca !== 2 || r.i.porMotivo !== 2 || r.i.comun !== 1) fallas.push("(i) súper con zona numérica mal contado: " + JSON.stringify(r.i));
+  if (!r.i.sinConteo) fallas.push("(i) sigue existiendo el conteo de camiones (_adoCamiones)");
+  if (r.i.probs.length) fallas.push("(i) un día de 3 m³ con 5 grupos marca problemas: " + JSON.stringify(r.i.probs));
   if (errs.length) fallas.push("pageerrors: " + errs.join(" | "));
 
   const ok = fallas.length === 0;

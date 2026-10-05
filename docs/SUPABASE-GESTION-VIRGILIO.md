@@ -31728,3 +31728,23 @@ Centinela 323 (etiqueta v26.85). `sql/gv_importados_gp2_mismo_codigo_v2686.sql` 
 `sql/gv_alerta_gondola_llena_v2686.sql`, `tests/pedimp-stock-desg-gp2.cjs` (g y h).
 - **v26.87 (Luis, D3): tolerancia +5 %** — avisa sólo si la góndola queda más de 5 % por encima de la capacidad
   (`r.sal <= r.capa * 1.05`). Los 9 del 05/10 (legajo 94) estaban todos por encima del 5 %: igual habrían avisado.
+
+### 3.v2688 — Pop-up de día ocupado: la opción 2 no mueve lo FIJO y no mira camiones (Luis, 05/10/2026, v26.88)
+
+Luis: *"no debería mover los fijos (los programados a mano, supers, retira con fecha)"* · *"olvidate del 2 camiones por día"*.
+
+- **`gv_ppp_dia_ajustar`** (CREATE OR REPLACE sobre la definición viva): cada tanda lleva `man` = programada o movida a mano,
+  con el MISMO criterio que `gv_ppp_reprogramar_sin_factura` ('aviso_manual'): una NP web con `creado_por <> 'sistema'` o
+  `gv_manual_por`, o un `GV_PPP_Prog_Override` con `gv_manual_por`. `man` → `accion = 'fijo'`, motivo *"programada o movida a
+  mano: no se mueve"*, y el grupo que la contiene no es candidato (se mueve siempre el grupo entero). Súper y retira ya eran fijos.
+- Se borró el corte por camiones (`jornada_camiones`, `v_cam`, `v_out_cam`): el loop sólo baja m³ hasta `p_cupo`; a igual apuro
+  sale el grupo más grande.
+- Front: se fueron `_adoCamiones`, `_adoGrupo`, `_adoEsSuper` y el aviso «N camiones (más de 2)»; el texto de la opción 2 dice que
+  lo fijo no se mueve.
+- **Medido el 05/10** (lo programado desde hoy, web): 57 tandas, **45 a mano** (41 `creado_por = 'sistema'` + `gv_manual_por` del
+  panel), 3 súper, 4 retira; libres 9 tandas / 6,05 m³. Simulado: 09/10 y 14/10 con un súper de 3 m³ → nada se mueve (todas las
+  tandas de esos grupos son a mano). En transacción abortada, sacándole la marca a F47A/B/C (Z1, 14/10): las tres salen juntas al
+  16/10 y F45A/F45B/F12A quedan fijas.
+- Centinelas: id 320 pasa a `exit when v_m3 <= p_cupo` (vigilaba `v_cam`); id 324 nuevo `not d\.man`. `gv_reglas_perdidas` = 0.
+- Rollback: correr `sql/gv_ppp_dia_ajustar_v2682.sql` y devolverle al 320 el patrón `exit when v_cam <= v_max and v_m3 <= p_cupo`.
+`sql/gv_ppp_dia_ajustar_fijos_v2688.sql`, `tests/apr-dia-ocupado.cjs` (i)-(j).

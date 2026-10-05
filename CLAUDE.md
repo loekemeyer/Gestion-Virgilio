@@ -1046,13 +1046,20 @@ mismo día" — frenaba los movimientos y movía solos los otros pedidos del cli
 ⚠⚠ **v26.85 (Luis, 05/10): la opción 2 se REACOMODA ALREDEDOR DE LO NUEVO** (*"si programo un súper para un día que haría que
 se zarpe en m³ y/o camiones … que reprograme automáticamente en base a la programación de ese súper"*). Antes sacaba del día
 **todo** lo pendiente. Hoy la resuelve **`gv_ppp_dia_ajustar(fecha, p_nuevo, simular, por, cupo, excluir)`**: lo nuevo
-queda fijo, y del resto sale **sólo lo que no entra**, siempre de a **grupo de zonas entero** (principio rector): primero
-hasta 2 camiones (un súper es su propio camión, también con zona numérica; Z2+Z3 juntas si c/u < 1 m³; Z6+Z7 juntas),
-después hasta los 4,30 m³; sale el grupo que menos apura y va al día de `gv_ppp_web_dia_grupo`, uno por grupo.
+queda fijo, y del resto sale **sólo lo que no entra en los 4,30 m³**, siempre de a **grupo de zonas entero** (principio
+rector: Z6+Z7 juntas); sale el grupo que menos apura y va al día de `gv_ppp_web_dia_grupo`, uno por grupo.
+- ⚠⚠ **v26.88 (Luis, 05/10): NO mueve lo FIJO** (*"no debería mover los fijos (los programados a mano, supers, retira con
+  fecha)"*): además de súper, retira, lo salido, lo en proceso y lo armado, queda fijo lo **programado o movido A MANO**, con
+  el MISMO criterio que el cron de las 18:00 (`creado_por <> 'sistema'` o `gv_manual_por`, u override de ISIS con
+  `gv_manual_por`). Un grupo con una tanda fija no sale. Medido el 05/10: de 57 tandas programadas, **45 a mano** (41 creadas
+  por el sistema y movidas desde el panel): la opción 2 tiene poco para mover.
+- ⚠⚠ **v26.88 (Luis, 05/10): «olvidate del 2 camiones por día»**: el pop-up y `gv_ppp_dia_ajustar` miden el día **sólo por
+  m³**. Se fueron el corte por camiones, el conteo `_adoCamiones` y el aviso «más de 2 camiones». El armador no se tocó.
 - El reporte de la opción 2 **cuenta lo que ya tiene el día destino** (la simulación de 'correr' da la carga de cada día).
-- Si sumándolo **se pasa** (m³ o camiones), la opción 1 se llama **«Programarlo así igual»** y el encabezado lo dice.
+- Si sumándolo **se pasa de m³**, la opción 1 se llama **«Programarlo así igual»** y el encabezado lo dice.
 - La simulación y la ejecución mandan el MISMO `p_nuevo`. El modo 'automatico' de `gv_ppp_dia_reprogramar` quedó sin puerta.
-`sql/gv_ppp_dia_ajustar_v2682.sql` (centinelas v26.82), `tests/apr-dia-ocupado.cjs` (e)-(i).
+`sql/gv_ppp_dia_ajustar_v2682.sql` + `sql/gv_ppp_dia_ajustar_fijos_v2688.sql` (centinelas 320, 321 y 324),
+`tests/apr-dia-ocupado.cjs` (e)-(j).
 
 ⚠ **El pop-up NO es sólo del arrastre** (Luis, 28/09, v23.35: *"fijate que no quede ninguna feature colgada así
 porque no estamos arrastrando"*). Lo abren los cuatro caminos que programan un día a mano: soltar un pedido

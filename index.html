@@ -6293,7 +6293,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.87"></script>
+<script type="module" src="recepcion.js?v=26.88"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10535,7 +10535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.87";
+const APP_VERSION = "v26.88";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49015,47 +49015,22 @@ function aprDropDia(ev, fecha) {
    programación:
      1) sumarlo al día · 2) programarlo y reprogramar lo PENDIENTE del día con la lógica automática ·
      3) programarlo y CORRER toda la programación desde ese día, 1 día con reparto.
-   Cada opción muestra antes los problemas que deja (m³ del día, camiones, pedidos que pasan a vencer).
-   Las opciones 2 y 3 las resuelve el backend (gv_ppp_dia_reprogramar), que NO mueve súper, retira fijos,
-   lo que ya salió ni una tanda EN PROCESO (pickeo/armado sin terminar); lo armado se mueve con su
-   mismo código. Si la simulación falla, se sigue como antes (tanda nueva con su confirm). */
+   Cada opción muestra antes los problemas que deja (m³ del día, pedidos que pasan a vencer).
+   La 3 la resuelve gv_ppp_dia_reprogramar 'correr' (NO mueve súper, retira fijos, lo que ya salió ni una
+   tanda EN PROCESO; lo armado se mueve con su mismo código) y la 2 gv_ppp_dia_ajustar, que además deja fijo
+   lo programado o movido A MANO (v26.88). Si la simulación falla, se sigue como antes (tanda nueva con su
+   confirm). v26.88 (Luis, 05/10: "olvidate del 2 camiones por día"): el día sólo se mide por m³. */
 const APR_DO_CUPO = 4.3;
-/* v26.82 (Luis): un súper con zona numérica (Dorinka, Diarco: "Zona 5") es SU camión, no el de la zona.
-   La marca viene en la fila (es_super del backend, o el motivo «súper:» de la simulación). */
-function _adoEsSuper(r) {
-  if (!r) return false;
-  return !!(r.es_super || /^s[úu]per/i.test(String(r.motivo || "")) || /super/i.test(String(r.zona || "")));
-}
 function _adoEsSuperPed(x) {
   if (!x) return false;
   if (x.es_super != null) return !!x.es_super;
   try { if (typeof pppEsSuper === "function" && pppEsSuper(x)) return true; } catch (_e) {}
   return /super/i.test(String(x.zona || ""));
 }
-function _adoGrupo(z, sup) {
-  z = String(z || "");
-  if (sup || /super/i.test(z)) return "SUPER";
-  if (/retira/i.test(z)) return null;
-  const m = z.match(/Zona\s*(\d+)/i); if (!m) return "?";
-  return ({ "1": "Z1", "2": "Z2", "3": "Z3", "4": "Z4", "5": "Z5", "6": "Z6+Z7", "7": "Z6+Z7" })[m[1]] || ("Z" + m[1]);
-}
-function _adoCamiones(rows) {
-  const g = {}; let sup = 0;
-  rows.forEach(function (r) {
-    const k = _adoGrupo(r.zona, _adoEsSuper(r)); if (!k) return;
-    if (k === "SUPER") { sup++; return; }
-    g[k] = (g[k] || 0) + (Number(r.m3) || 0);
-  });
-  let n = Object.keys(g).length + sup;
-  if (g.Z2 != null && g.Z3 != null && g.Z2 < 1 && g.Z3 < 1) n--;   // Z2+Z3 juntas si cada una < 1 m³
-  return n;
-}
 function _adoProblemasDia(fecha, rows) {
   const out = [];
   const m3 = rows.reduce(function (s, r) { return s + (Number(r.m3) || 0); }, 0);
-  const cam = _adoCamiones(rows);
   if (m3 > APR_DO_CUPO) out.push(aprDiaCorto(fecha) + ": " + aprNum(m3, 2) + " m³ (más que el promedio de " + aprNum(APR_DO_CUPO, 2) + ")");
-  if (cam > 2) out.push(aprDiaCorto(fecha) + ": " + cam + " camiones (más de 2)");
   return out;
 }
 function _adoReporte(fecha, rows, nuevo, modo, base) {
@@ -49100,7 +49075,8 @@ async function aprDiaOcupadoAbrir(fecha, ped, opt) {
   if (opt.antes && opt.antes() === false) return;
   const pedsN = opt.peds || (ped ? [ped] : []);
   // v26.82 (Luis, 05/10): lo nuevo (un súper que llega) va a la función como dato: queda FIJO en el día y
-  // del pendiente sale sólo lo que no entra en los camiones y el cupo, por grupo de zonas entero.
+  // del pendiente sale sólo lo que no entra en el cupo de m³, por grupo de zonas entero (v26.88: sin tope de
+  // camiones, y lo programado o movido a mano también queda fijo).
   const pNuevo = pedsN.map(function (x) { return { zona: x.zona || "", m3: Number(x.m3) || 0, super: _adoEsSuperPed(x) }; });
   try { auto = await aprRpc("gv_ppp_dia_ajustar", { p_fecha: fecha, p_nuevo: pNuevo, p_simular: true, p_cupo: APR_DO_CUPO, p_excluir: exT || null }); }
   catch (_e) { auto = null; }
@@ -49153,7 +49129,7 @@ async function aprDiaOcupadoAbrir(fecha, ped, opt) {
     card("sumar", sePasa ? "1) Programarlo así igual" : "1) Sumarlo",
       sePasa ? "Va a este día aunque se pase; no se mueve nada más." : "Va a este día y no se mueve nada más.", rep.sumar) +
     card("automatico", "2) Reprogramar el resto alrededor de lo nuevo",
-      "Lo nuevo queda en este día. Del resto sale sólo lo que no entra (camiones y m³), cada grupo de zonas entero, al día que elige la lógica automática.", rep.automatico) +
+      "Lo nuevo queda en este día. Del resto sale sólo lo que no entra en los m³ del día, cada grupo de zonas entero, al día que elige la lógica automática. Lo programado o movido a mano, súper y retira no se mueven.", rep.automatico) +
     card("correr", "3) Correr la programación", "Va a este día y todo lo programado desde acá se corre 1 día con reparto.", rep.correr) +
     '</div><button class="ado-x" onclick="aprDiaOcupadoCerrar()">Cancelar</button></div>';
   ov.classList.add("show");
@@ -60459,7 +60435,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.87"></script>
+<script src="importacion.js?v=26.88"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63282,9 +63258,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.87"></script>
-<script src="hotsale.js?v=26.87"></script>
-<script src="estadisticas.js?v=26.87"></script>
+<script src="cobranzas.js?v=26.88"></script>
+<script src="hotsale.js?v=26.88"></script>
+<script src="estadisticas.js?v=26.88"></script>
 
 </body>
 </html>

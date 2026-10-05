@@ -448,7 +448,7 @@
     },
     {
       "objeto": "gv_ppp_dia_ajustar",
-      "regla": "opción 2 del pop-up de día ocupado: lo nuevo queda fijo y del pendiente se mueve sólo lo que no entra (camiones y m³)",
+      "regla": "opción 2 del pop-up de día ocupado: lo nuevo queda fijo y del pendiente se mueve sólo lo que no entra en los m³ del día (sin tope de camiones, Luis 05/10)",
       "quien": "Luis"
     },
     {
