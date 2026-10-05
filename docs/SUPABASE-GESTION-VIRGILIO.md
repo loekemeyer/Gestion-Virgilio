@@ -31546,15 +31546,30 @@ actividad posterior al FJ; PKF con la hora del FJ y `ts_inicio` = su EP; retomad
 
 **Centinelas** 307-310. **Rollback** en `sql/gv_tanda_frenada_v2665.sql`.
 
-### 3.v2666 — FRENAR la tanda, parte 3: crédito por operario y día (Luis, 05/10/2026, v26.66, D6)
+### 3.v2666 — COLA DE IMPRESIÓN NP: `gv_cola_impresion_lista` (Luis, 05/10/2026, v26.66)
+
+| objeto | qué |
+|---|---|
+| `gv_cola_impresion_lista(p_desde, p_hasta)` | lectura, SECURITY INVOKER, anon. Una fila por NP (web + ISIS) con fecha de entrega y tanda; por hoja: cuándo hay data (`pick_ts` = TP de la tanda, `arm_ts` = TAL o Entregas vivas, `fac_ts` = `Facturacion_NP.facturado_at`), cuándo se imprimió (`Impresion_NP`: `PK <tanda>` · `<np>` · `FAC <np>`) y si está pendiente |
+
+**Pendiente** desde que existe cada marca: picking TP ≥ 01/10 · armado TAL ≥ 25/08 12:10 · facturado ≥ 05/10 13:00.
+
+**Medido:** 28 días como anon, **68 ms** (con `_ci_ev` sin `materialized` eran 2,4 s: el plan lo re-agregaba por fila).
+No escribe nada; `vista_cola_impresion` / `gv_vista_cola_impresion` siguen en la base sin lector del front.
+
+**Centinelas** 311 y 312. **Rollback:** `drop function if exists public.gv_cola_impresion_lista(date, date);`
+(`sql/gv_cola_impresion_lista_v2666.sql`).
+
+### 3.v2667 — FRENAR la tanda, parte 3: crédito por operario y día (Luis, 05/10/2026, v26.67, D6)
 
 | objeto | qué |
 |---|---|
 | `gv_tanda_credito(p_tandas text[])` | (tanda, fase, legajo, día, cajas, m³) de las tandas con freno. Picking: último PKC por código × m³/caja (`vista_volumen_articulo_resuelto`). Armado: cajas de los líos que cerró cada uno (`GV_Armado_Avance.snapshot.nps[].liosArr[].leg/ts`); súper / retira: lo separado (`codes[].sepLeg/sepTs`). STABLE SECURITY DEFINER, anon/authenticated |
 
 **Lectores:** `index.html` (`gvCreditoTandas`, `gvM3ConCredito`: monitor del día y desglose por día) y
-`monitor/tv.html` (`cargarCredito`). La parte de un operario entra cuando él cierra su tramo ese día.
+`monitor/tv.html` (`cargarCredito`), y **Productividad / premio** (`prodCompute`, D15: PKF/APF cierran el tramo
+del que frenó y su m³ es la parte del período). La parte de un operario entra cuando él cierra su tramo ese día.
 Sin respuesta, la tanda va entera al del TP/TAP (fail-open). Al 05/10: 0 frenos registrados (la
 función está lista; empieza a tener filas con la primera tanda frenada).
 
-**Centinelas** 313-315. **Rollback** en `sql/gv_tanda_credito_v2666.sql`.
+**Centinelas** 313-315 (dicen `v26.66` en la base: la versión con que se aplicó; llave, no cambiar). **Rollback** en `sql/gv_tanda_credito_v2667.sql`.

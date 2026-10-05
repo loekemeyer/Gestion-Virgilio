@@ -257,7 +257,7 @@ echo "== tanda-frenar (v26.62: frenar picking/armado, cartel de la tanda de otro
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-frenar.cjs
 echo "== tanda-frenar-2b (v26.65: retomar por «Seguir», aviso del día siguiente, freno del supervisor) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-frenar-2b.cjs
-echo "== tanda-credito (v26.66: la tanda frenada se reparte, cada uno su m³ en su día) =="
+echo "== tanda-credito (v26.67: la tanda frenada se reparte, cada uno su m³ en su día) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-credito.cjs
 
 echo "== fac-block-recuperable (regresión v6.21: bloqueo del tilde si el faltante se puede completar) =="
@@ -381,11 +381,14 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== clock-skew (idea 9782: banner si el reloj del celular está desfasado vs el servidor) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/clock-skew.cjs
 
-echo "== print-station (idea 5044: estación de impresión — seed, poll, dedup, drain, Impresion_NP) =="
+echo "== print-station (idea 5044 + v26.65: estación de impresión — seed, poll, dedup, sólo por el helper, Impresion_NP) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/print-station.cjs
 
 echo "== imp-helper-local (v26.24/26: picking/armado/facturado en PDF al helper local 127.0.0.1:17777, config en ⚙️ Configuración) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/imp-helper-local.cjs
+
+echo "== cola-impresion-np (v26.65: Cola de impresión NP por día → tanda → NP; picking de la tanda, armado y facturado de la NP) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cola-impresion-np.cjs
 
 echo "== mg-prioridad (idea 4926: Guardar a Góndola — prioridad con demanda + hint de MCs) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-prioridad.cjs

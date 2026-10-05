@@ -876,7 +876,7 @@ function cargarPickeado(tandas) {
     return m;
   }).catch(function (e) { console.warn("[tv] pickeado:", e.message); return new Map(); });
 }
-/* v26.66 (D6): una tanda FRENADA se reparte: cada uno su m³, en su día. ≡ index gvCreditoTandas. Sin respuesta: Map vacío. */
+/* v26.67 (D6): una tanda FRENADA se reparte: cada uno su m³, en su día. ≡ index gvCreditoTandas. Sin respuesta: Map vacío. */
 function cargarCredito(tandas) {
   if (!tandas.length) return Promise.resolve(new Map());
   var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
@@ -1588,10 +1588,10 @@ function pintarHoras(filas, d) {
     if (!leg || !t) return;
     var v = d.prog && d.prog.get(t); if (!v) return;
     var k = ev.opcion === "TP" ? "pick" : "arm", mm = (m3[leg] = m3[leg] || { pick: {}, arm: {} });
-    if (cred.has(t + "|" + (k === "pick" ? "picking" : "armado"))) return;   // v26.66: frenada → se reparte abajo
+    if (cred.has(t + "|" + (k === "pick" ? "picking" : "armado"))) return;   // v26.67: frenada → se reparte abajo
     mm[k][t] = Number(v.m3) || 0;   // v26.55: ya es lo PICKEADO (picking y armado)
   });
-  /* v26.66: la parte de una frenada se cuenta cuando ESE operario cierra su tramo hoy (TP/TAP/PKF/APF) ≡ index gvM3ConCredito */
+  /* v26.67: la parte de una frenada se cuenta cuando ESE operario cierra su tramo hoy (TP/TAP/PKF/APF) ≡ index gvM3ConCredito */
   var cierreHoy = {};
   ((d && d.eventos) || []).forEach(function (ev) {
     if (!/^(TP|TAP|PKF|APF)$/.test(ev.opcion) || !ev.ts_inicio || dayKey(ev.ts_cliente) !== hoyKey()) return;
@@ -1707,7 +1707,7 @@ function ciclo() {
     var pkKeys = keys.slice();   // v26.55: las de la ventana + las de TP de hoy → su m³ pasa a ser lo pickeado
     eventos.forEach(function (ev) { var t = String(ev.texto || "").trim().toUpperCase();
       if (ev.opcion === "TP" && ev.ts_inicio && t && dayKey(ev.ts_cliente) === hoy && pkKeys.indexOf(t) < 0) pkKeys.push(t); });
-    var crKeys = [];   // v26.66: tandas cerradas o frenadas hoy → si alguna está frenada, se reparte
+    var crKeys = [];   // v26.67: tandas cerradas o frenadas hoy → si alguna está frenada, se reparte
     eventos.forEach(function (ev) { var t = String(ev.texto || "").trim().toUpperCase();
       if (t && /^(TP|TAP|PKF|APF)$/.test(ev.opcion) && dayKey(ev.ts_cliente) === hoy && crKeys.indexOf(t) < 0) crKeys.push(t); });
     return Promise.all([cargarStatus(keys), cargarPickeado(pkKeys), cargarCredito(crKeys)]).then(function (sp) {

@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_tanda_credito)",
+  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -79,6 +79,11 @@
     {
       "objeto": "gv_cod_stock_de_entrega",
       "regla": "gv_cod_stock_de_entrega devuelve SOLO el codigo (026L -> 026, 438EL -> 438E) y ADEMAS pela cualquier sufijo de empresa que le llegue pegado. \"438E LK\" NO es un ",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_cola_impresion_lista",
+      "regla": "Cola de impresión NP: la hoja de PICKING es de la TANDA (marca «PK <tanda>»), el armado y el facturado de la NP (Luis 05/10)",
       "quien": "Luis"
     },
     {
@@ -620,6 +625,11 @@
       "objeto": "gv_tanda_reservar",
       "regla": "una fase anulada (TPX/TAPX) sin TP/TAP vivo libera el candado: la tanda se puede volver a pickear/armar (D69H)",
       "quien": "Marianela"
+    },
+    {
+      "objeto": "gv_tanda_tomar_frenada",
+      "regla": "Al tomar una tanda frenada se devuelve dónde quedó el carro (ubicación del último freno)",
+      "quien": "Luis"
     },
     {
       "objeto": "gv_tanda_trabajo_hecho",

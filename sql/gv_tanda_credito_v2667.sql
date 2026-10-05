@@ -1,5 +1,5 @@
 -- =====================================================================================
--- v26.66 · «FRENAR la tanda» — parte 3: CRÉDITO por operario y día (Luis, 2026-10-05, D6)
+-- v26.67 · «FRENAR la tanda» — parte 3: CRÉDITO por operario y día (Luis, 2026-10-05, D6)
 -- Proyecto Gestión Virgilio (hrxfctzncixxqmpfhskv). APLICADO el 05/10 (el pedido es la autorización).
 --
 -- Una tanda FRENADA la hicieron varios (o el mismo en varios días). Cada uno se lleva el m³ de lo
@@ -92,7 +92,7 @@ grant execute on function public.gv_tanda_credito(text[]) to anon, authenticated
 --   select * from public.gv_reglas_perdidas;     -- vacía
 
 -- ROLLBACK (front y base, independientes):
---   front: revertir el commit v26.66 (sin gvCreditoTandas el monitor vuelve a dar la tanda entera al del TP/TAP).
+--   front: revertir el commit v26.67 (sin gvCreditoTandas el monitor vuelve a dar la tanda entera al del TP/TAP).
 --   base:  la función no tiene otros lectores; se puede dejar. Para sacarla:
 --          update public."GV_Reglas_Centinela" set activo = false where id between 313 and 315;
 --          drop function public.gv_tanda_credito(text[]);   -- (desde el SQL Editor; el MCP se cuelga con DROP)

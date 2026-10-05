@@ -6291,7 +6291,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.66"></script>
+<script type="module" src="recepcion.js?v=26.67"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10530,7 +10530,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.66";
+const APP_VERSION = "v26.67";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10888,7 +10888,7 @@ async function _frenoGuardSeguir(legajo, tanda, fase) {
   return "seguir";
 }
 
-/* v26.66 (Luis, 05/10, D6) — CRÉDITO de una tanda FRENADA: la hicieron varios (o el mismo en varios
+/* v26.67 (Luis, 05/10, D6) — CRÉDITO de una tanda FRENADA: la hicieron varios (o el mismo en varios
    días) y cada uno se lleva el m³ de lo que hizo, en el día en que lo hizo — picking por sus cajas
    pickeadas, armado por las cajas de los líos que cerró (súper / retira: lo que separó). Lo calcula
    `gv_tanda_credito` (sólo devuelve tandas con freno; el resto sigue entero al que dio el TP/TAP).
@@ -15175,7 +15175,7 @@ function _compSepNp(j) { if (_comp) { _comp.sepNpIdx = j; _comp.liosNpIdx = j; _
 function _compSepTap(npIdx, ci) {
   if (!_comp) return; const n = _comp.nps[npIdx]; if (!n || !n.codes || !n.codes[ci]) return;
   n.codes[ci].sep = !n.codes[ci].sep;
-  /* v26.66 (D6): quién lo separó y cuándo. En súper / retira (no arman líos) el crédito del armado de
+  /* v26.67 (D6): quién lo separó y cuándo. En súper / retira (no arman líos) el crédito del armado de
      una tanda FRENADA sale de acá (gv_tanda_credito). No cambia nada de la pantalla. */
   if (n.codes[ci].sep) { try { n.codes[ci].sepLeg = String((_comp && _comp.legajo) || ""); n.codes[ci].sepTs = Date.now(); } catch (_e) {} }
   _compRenderSep(); _compRecalc();
@@ -19271,7 +19271,7 @@ function prodExportCsvDiario() {
   var rows = [["Fecha", "legajo", "tarea", "hora inicio", "hora fin", "mins otra tarea", "minutos netos", "mt3 reales", "ritmo"]];
   for (var dd = d1; dd <= d2; dd++) {
     var A = _pvDayStart(dd), B = A + _PV_DAY, fecha = _pvYmd(A);
-    var comp = prodCompute(_prod.events, _prod.m3map, A, B, _prod.factorMap);
+    var comp = prodCompute(_prod.events, _prod.m3map, A, B, _prod.factorMap, _prod.cred);
     var legs = Object.keys(comp).sort(function (a, b) { return (+a) - (+b); });
     for (var li = 0; li < legs.length; li++) {
       var leg = legs[li], its = (comp[leg].rows || []).slice().sort(function (a, b) { return a.ini - b.ini; });
@@ -19327,7 +19327,7 @@ function _pvSub(a, b) {
 var _PV_BUCKET = { CC: "carga", CCN: "carga", CCR: "carga", CR: "control", CRN: "control", MG: "movim", EI: "insumos", RI: "insumos", RT: "recep", RR: "recep", CP: "completar", AT: "atencion", CT: "conteo", Perm: "permiso", PC: "comida", PB: "pausa", Limp: "limpieza" };   // v7.53: AT (timbre), CT (conteo) y Perm (permiso) dejan de caer en "Otros" → bucket propio
 var _PV_ORDER = ["comida", "pausa", "permiso", "carga", "control", "movim", "insumos", "recep", "completar", "atencion", "conteo", "limpieza", "otros"];   // descansos primero (recortan tareas dejadas abiertas)
 var _PV_CAP = { comida: 90, pausa: 60, permiso: 120, carga: 180, control: 45, movim: 30, insumos: 240, recep: 240, completar: 120, atencion: 45, conteo: 180, limpieza: 45, otros: 90 };   // topes (min) SOLO de tareas secundarias
-function _pvOperator(evs, m3of, D1, D2) {
+function _pvOperator(evs, m3of, D1, D2, credOf) {
   evs = evs.filter(function (e) { return e.cli >= D1 && e.cli < D2; }).sort(function (a, b) { return a.cli - b.cli; });
   var byDay = {}, e, d, o, i;
   for (i = 0; i < evs.length; i++) {
@@ -19345,8 +19345,9 @@ function _pvOperator(evs, m3of, D1, D2) {
   for (i = 0; i < evs.length; i++) {
     e = evs[i];
     if (e.ini != null && e.cli > e.ini) {
-      if (e.opcion === "TAP") armEnv.push({ tanda: e.texto, ini: e.ini, cli: e.cli });
-      else if (e.opcion === "TP") pickEnv.push({ tanda: e.texto, ini: e.ini, cli: e.cli });
+      // v26.67 (D15): PKF / APF cierran el tramo del que FRENÓ la tanda, igual que TP / TAP (antes caían en «otros»)
+      if (e.opcion === "TAP" || e.opcion === "APF") armEnv.push({ tanda: e.texto, ini: e.ini, cli: e.cli, fr: e.opcion === "APF" });
+      else if (e.opcion === "TP" || e.opcion === "PKF") pickEnv.push({ tanda: e.texto, ini: e.ini, cli: e.cli, fr: e.opcion === "PKF" });
       else { b = _PV_BUCKET[e.opcion] || "otros"; var ce = Math.min(e.cli, e.ini + _PV_CAP[b] * 60000); taskIv[b].push([e.ini, ce]); taskDet[b].push({ ts: e.ini, ms: ce - e.ini, txt: e.texto }); }
     } else if (e.ini == null) {
       if (e.opcion === "AP") starts.push({ role: "arm", tanda: e.texto, t: e.cli });
@@ -19363,11 +19364,14 @@ function _pvOperator(evs, m3of, D1, D2) {
   for (i = 0; i < _PV_ORDER.length; i++) { var bn = _PV_ORDER[i]; buckets[bn] = _pvTot(_pvInter(taskIv[bn], avail)); avail = _pvSub(avail, taskIv[bn]); }
   function alloc(envs, role) {
     var time = 0, timeM3 = 0, m3 = 0, tset = {}, m3set = {}, det = {}, items = [], list = envs.filter(function (x) { return !x.cross; }).sort(function (a, b) { return a.ini - b.ini; });
+    // v26.67 (D15): tanda FRENADA → sólo la parte de ESTE legajo en el período (credOf); el resto, la tanda entera.
+    // Sin crédito leído, el tramo FRENADO (PKF/APF) va sin m³ y el TP/TAP se lleva la tanda entera: como antes, sin contar dos veces.
+    var m3of2 = function (t, fr) { var c = credOf ? credOf(t, role) : null; return (c == null) ? (fr ? 0 : (m3of(t) || 0)) : c; };
     for (var k = 0; k < list.length; k++) {
       var en = list[k], got = _pvTot(_pvInter([[en.ini, en.cli]], avail)); if (got > 0) avail = _pvSub(avail, [[en.ini, en.cli]]);
       time += got; tset[en.tanda] = 1;
-      if (!det[en.tanda]) det[en.tanda] = { tanda: en.tanda, m3: m3of(en.tanda) || 0, ms: 0, role: role }; det[en.tanda].ms += got;
-      var m = m3of(en.tanda) || 0, firstOfTanda = !m3set[en.tanda];
+      if (!det[en.tanda]) det[en.tanda] = { tanda: en.tanda, m3: m3of2(en.tanda, en.fr), ms: 0, role: role }; det[en.tanda].ms += got;
+      var m = m3of2(en.tanda, en.fr), firstOfTanda = !m3set[en.tanda];
       if (m > 0) { timeM3 += got; if (firstOfTanda) { m3set[en.tanda] = 1; m3 += m; } }
       // una fila por envase (v5.31): el m³ se acredita 1 sola vez por tanda (en su 1er envase del día)
       items.push({ tanda: en.tanda, role: role, ini: en.ini, cli: en.cli, net: got, m3: firstOfTanda ? m : 0 });
@@ -19383,11 +19387,25 @@ function _pvOperator(evs, m3of, D1, D2) {
     pickTime: pick.time, pickTimeM3: pick.timeM3, pickM3: pick.m3, pickTandas: pick.tandas, pickTandasM3: pick.tandasM3,
     rows: pick.items.concat(arm.items) };
 }
-function prodCompute(events, m3map, D1, D2, factorMap) {
+function prodCompute(events, m3map, D1, D2, factorMap, cred) {
   var fm = factorMap || {};
   var m3of = function (t) { var f = (fm[t] != null) ? fm[t] : 1; return (m3map[t] || 0) * f; }, byLeg = {}, i, e;
   for (i = 0; i < events.length; i++) { e = events[i]; if (!e.legajo || esLegajoPrueba(e.legajo)) continue; if (!byLeg[e.legajo]) byLeg[e.legajo] = []; byLeg[e.legajo].push(e); }
-  var out = {}; for (var leg in byLeg) out[leg] = _pvOperator(byLeg[leg], m3of, D1, D2);
+  /* v26.67 (Luis, D15: «se reparte el trabajo, se reparte el premio/productividad»): de una tanda FRENADA cada
+     legajo se lleva el m³ de lo que hizo dentro del período (gv_tanda_credito, por día; ≡ monitor gvM3ConCredito).
+     null = la tanda no tiene freno en esa fase → entera, como siempre. Sin crédito leído (cred vacío) → como antes. */
+  var y1 = _pvYmd(D1), y2 = _pvYmd(D2);
+  var credFor = function (leg) {
+    if (!cred || !cred.size) return null;
+    return function (t, role) {
+      var rows = cred.get(String(t || "").toUpperCase() + "|" + (role === "arm" ? "armado" : "picking"));
+      if (!rows || !rows.length) return null;
+      var s = 0;
+      rows.forEach(function (r) { if (r.legajo === String(leg).trim() && r.dia >= y1 && r.dia < y2) s += r.m3; });
+      return s;
+    };
+  };
+  var out = {}; for (var leg in byLeg) out[leg] = _pvOperator(byLeg[leg], m3of, D1, D2, credFor(leg));
   return out;
 }
 /* v5.28: factor de faltantes por tanda. Desde que se registran faltantes (evento PKC,
@@ -19447,9 +19465,16 @@ async function prodLoad() {
     var rows = res[0] || [], events = [];
     for (var i = 0; i < rows.length; i++) { var x = rows[i], cli = Date.parse(x.ts_cliente); if (!cli) continue; events.push({ legajo: x.legajo, opcion: x.opcion, texto: (x.texto || "").trim().toUpperCase(), ini: x.ts_inicio ? Date.parse(x.ts_inicio) : null, cli: cli }); }
     var factorMap = _pvFaltanteFactores(events, res[3]);   // v5.28: m³ real = m³ tanda × (1 − faltante)
+    // v26.67 (D15): reparto de las tandas FRENADAS. Sin respuesta → Map vacío = como antes.
+    var cred = new Map();
+    try {
+      var _crT = {};
+      for (var ci = 0; ci < events.length; ci++) if (/^(TP|TAP|PKF|APF)$/.test(events[ci].opcion) && events[ci].texto) _crT[events[ci].texto] = 1;
+      cred = await gvCreditoTandas(Object.keys(_crT));
+    } catch (_e) { cred = new Map(); }
     var weeks = _pvWeeks(D1, D2).slice(-8);
-    var weekly = weeks.map(function (w) { return prodCompute(events, res[2], w[0], w[1], factorMap); });
-    _prod = { total: prodCompute(events, res[2], D1, D2, factorMap), weekly: weekly, weeks: weeks, d1: _prodPeriod.d1, d2: _prodPeriod.d2, events: events, m3map: res[2], factorMap: factorMap };
+    var weekly = weeks.map(function (w) { return prodCompute(events, res[2], w[0], w[1], factorMap, cred); });
+    _prod = { total: prodCompute(events, res[2], D1, D2, factorMap, cred), weekly: weekly, weeks: weeks, d1: _prodPeriod.d1, d2: _prodPeriod.d2, events: events, m3map: res[2], factorMap: factorMap, cred: cred };
     _prodNombres = res[1] || new Map();
     prodRender();
   } catch (e) { if (body) body.innerHTML = '<div class="prod-empty" style="color:#b91c1c">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
@@ -32434,7 +32459,7 @@ async function showDayBreakdown(dayKey, dayLabel) {
         lastTs: ev.ts_cliente,
         pickedTandas: new Set(),
         armedTandas: new Set(),
-        pickFr: new Set(), armFr: new Set(),   // v26.66
+        pickFr: new Set(), armFr: new Set(),   // v26.67
         comidaMs: 0,
         fjTs: null
       });
@@ -32444,7 +32469,7 @@ async function showDayBreakdown(dayKey, dayLabel) {
       if (tanda) {
         if (ev.opcion === "TP")  p.pickedTandas.add(tanda);
         if (ev.opcion === "TAP") p.armedTandas.add(tanda);
-        if (ev.opcion === "PKF") p.pickFr.add(tanda);   // v26.66: frenó (su parte se acredita)
+        if (ev.opcion === "PKF") p.pickFr.add(tanda);   // v26.67: frenó (su parte se acredita)
         if (ev.opcion === "APF") p.armFr.add(tanda);
       }
       if (ev.opcion === "PC" && ev.ts_inicio) {
@@ -32484,7 +32509,7 @@ async function showDayBreakdown(dayKey, dayLabel) {
       if (e) return e.m3;
       return historic.get(t) || 0;
     };
-    // v26.66 (D6): las tandas FRENADAS se reparten entre los que las hicieron, cada uno en su día
+    // v26.67 (D6): las tandas FRENADAS se reparten entre los que las hicieron, cada uno en su día
     let _credD = new Map();
     try {
       const _ts = new Set();
@@ -33005,7 +33030,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       // *Detail = lista de cierres con info para el popup (uno por evento).
       pickedTandas: new Set(), pickedDetail: [], pickMs: 0,
       armedTandas:  new Set(), armedDetail:  [], armMs:  0,
-      pickFrTandas: new Set(), armFrTandas: new Set(),   // v26.66: tandas que FRENÓ ese día (sin TP/TAP propio)
+      pickFrTandas: new Set(), armFrTandas: new Set(),   // v26.67: tandas que FRENÓ ese día (sin TP/TAP propio)
       ccTandas:     new Set(), ccDetail:     [], ccMs:   0,
       comidaMs: 0, movMs: 0, movDetail: [], noprodMs: 0, noprodDetail: [],
       otrosProdMs: 0, otrosProdDetail: [], fjTs: null
@@ -33236,7 +33261,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       p.movDetail.push({ opcion: "RKB", texto: "racks (estimado: " + libres.length + " movimiento/s sin tramo)", durMs: tot, inferido: true });
     }
   }
-  /* v26.66 (D6): las tandas FRENADAS se reparten entre los que las hicieron, cada uno en su día. */
+  /* v26.67 (D6): las tandas FRENADAS se reparten entre los que las hicieron, cada uno en su día. */
   let _cred = new Map();
   try {
     const _ts = new Set();
@@ -33251,7 +33276,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const _frP = p.pickFrTandas || new Set(), _frA = p.armFrTandas || new Set();
     if (p.pickedTandas.size === 0 && p.armedTandas.size === 0 && _frP.size === 0 && _frA.size === 0
         && p.ccTandas.size === 0 && p.movMs === 0 && p.otrosProdMs === 0 && !p.abiertoProdMs) continue;
-    // v26.66: de una tanda frenada, sólo la parte de ESTE legajo en ESTE día (gvCreditoDe); el resto, entera
+    // v26.67: de una tanda frenada, sólo la parte de ESTE legajo en ESTE día (gvCreditoDe); el resto, entera
     [["picking", p.pickedDetail], ["armado", p.armedDetail]].forEach(function (fd) {
       const visto = new Set();
       (fd[1] || []).forEach(function (dt) {
@@ -38171,124 +38196,300 @@ async function expIsisLoadBadge() {
   } catch (_e) {}
 }
 
-async function colaImpLoadBadge() {
-  try {
-    var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    var rows = await fetch(SUPABASE_URL + "/rest/v1/vista_cola_impresion?select=np,vencido&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
-    var n = (rows || []).length, venc = (rows || []).filter(function (r) { return r.vencido; }).length;
-    var b = document.getElementById("colaImpBadge"); if (!b) return;
-    if (!n) { b.style.display = "none"; return; }
-    b.style.display = ""; b.className = "dp-badge"; b.textContent = (venc ? "⚠ " : "") + n;
-    b.style.background = venc ? "#b91c1c" : "#2563eb";
-    b.title = venc ? (venc + " nota(s) de pedido hace +24 h sin imprimir") : (n + " nota(s) de pedido armadas sin imprimir");
-  } catch (_e) {}
+/* v26.66 (Luis, 05/10: "Que ahi figuren todas las NPs pasadas y presentes (en buena vista) con los
+   comprobantes que se les puede imprimir porque esta la data (nota de picking, armado o facturado). En
+   caso de que sea de la tanda, es de la tanda, si es de la NP, es de la NP") — COLA DE IMPRESIÓN NP.
+   · Por DÍA (fecha de entrega) → TANDA → NP. La hoja de PICKING es de la TANDA (una por tanda, marca
+     «PK <tanda>»); el ARMADO (marca = la NP) y el FACTURADO (marca «FAC <np>») son de la NP.
+   · Cada hoja: ✓ cuándo salió · 🖨 pendiente (rojo) · 🖨 disponible sin marca (azul) · — sin datos.
+     Tocarla abre la hoja (gvHojaPreview) con «🖨️ Imprimir» (helper o cuadro) y la marca impresa.
+   · Lo automático sale SÓLO por el helper conectado y respondiendo (gvImprimirAuto): lo que no salió
+     queda acá pendiente. «Imprimir pendientes» manda lo pendiente de lo que se ve.
+   Fuente: gv_cola_impresion_lista(desde, hasta) — sql/gv_cola_impresion_lista_v2666.sql. */
+var COLA_FAC_PREFIJO = "FAC ";
+var _colaImpBusy = false;
+var COLA_IMP_CSS =
+  "#colaImpOv{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.72);overflow:auto;padding:12px;box-sizing:border-box;}" +
+  "#colaImpOv .ci-box{background:#f8fafc;max-width:1080px;margin:0 auto;border-radius:14px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}" +
+  "#colaImpOv .ci-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;background:linear-gradient(90deg,#1e3a8a,#1e40af);color:#fff;}" +
+  "#colaImpOv .ci-tit{font-size:17px;font-weight:800;}" +
+  "#colaImpOv button{width:auto;margin:0;font:inherit;cursor:pointer;}" +
+  "#colaImpOv .ci-x{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;}" +
+  "#colaImpOv .ci-ctrl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;padding:8px 12px;border-bottom:1px solid #e2e8f0;background:#fff;font-size:13px;color:#334155;}" +
+  "#colaImpOv .ci-ctrl input{font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:7px;box-sizing:border-box;width:auto;margin:0;}" +
+  "#colaImpOv .ci-ctrl input[type=search]{width:170px;}" +
+  "#colaImpOv .ci-ctrl label{display:inline-flex;align-items:center;gap:4px;font-weight:700;}" +
+  "#colaImpOv .ci-btn{border:1px solid #cbd5e1;border-radius:8px;padding:5px 11px;font-weight:800;background:#fff;color:#334155;font-size:13px;}" +
+  "#colaImpOv .ci-btn.pri{background:#1e40af;border-color:#1e40af;color:#fff;}" +
+  "#colaImpOv .ci-ley{text-align:center;font-size:11.5px;color:#64748b;padding:5px 10px 0;}" +
+  "#colaImpOv .ci-st{text-align:center;font-size:12.5px;font-weight:700;color:#334155;min-height:16px;padding:3px 10px;}" +
+  "#colaImpOv .ci-body{padding:4px 12px 14px;max-height:calc(100vh - 170px);overflow:auto;}" +
+  "#colaImpOv .ci-dia{text-align:center;font-weight:800;color:#0f172a;font-size:14px;margin:12px 0 4px;}" +
+  "#colaImpOv .ci-dia .ci-hoy{background:#2563eb;color:#fff;border-radius:6px;padding:0 6px;margin-left:4px;font-size:11.5px;}" +
+  "#colaImpOv .ci-dia .ci-sub{color:#64748b;font-weight:600;font-size:12px;}" +
+  "#colaImpOv .ci-tw{overflow-x:auto;}" +
+  "#colaImpOv table.ci-t{border-collapse:collapse;font-size:13px;margin:0 auto;background:#fff;}" +
+  "#colaImpOv table.ci-t th{font-size:10.5px;text-transform:uppercase;color:#475569;background:#f1f5f9;padding:4px 7px;border-bottom:1px solid #cbd5e1;text-align:center;line-height:1.15;}" +
+  "#colaImpOv table.ci-t td{padding:3px 7px;border-bottom:1px solid #eef2f7;text-align:center;vertical-align:middle;}" +
+  "#colaImpOv table.ci-t td.ci-tanda{font-weight:800;font-family:Consolas,Menlo,monospace;border-right:1px solid #e2e8f0;}" +
+  "#colaImpOv table.ci-t td.ci-np{font-weight:800;font-family:Consolas,Menlo,monospace;white-space:nowrap;}" +
+  "#colaImpOv table.ci-t td.ci-rs{max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+  "#colaImpOv .ci-b{border:1px solid #cbd5e1;border-radius:7px;padding:2px 8px;font-size:12px;font-weight:800;background:#fff;white-space:nowrap;}" +
+  "#colaImpOv .ci-b.ok{background:#f0fdf4;border-color:#86efac;color:#166534;}" +
+  "#colaImpOv .ci-b.pend{background:#fef2f2;border-color:#fca5a5;color:#b91c1c;}" +
+  "#colaImpOv .ci-b.disp{background:#eff6ff;border-color:#bfdbfe;color:#1e40af;}" +
+  "#colaImpOv .ci-no{color:#cbd5e1;font-weight:800;}" +
+  "#colaImpOv .ci-vacio{padding:22px;text-align:center;color:#94a3b8;}";
+function _colaImpDia(offset){
+  var base = new Date(cpTodayAR() + "T12:00:00-03:00");
+  base.setUTCDate(base.getUTCDate() + (offset || 0));
+  return base.toISOString().slice(0, 10);
 }
-function colaImpModal() {
-  var ov = document.getElementById("colaImpOv");
-  if (!ov) {
-    ov = document.createElement("div"); ov.id = "colaImpOv";
-    ov.style.cssText = "display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.72);overflow:auto;padding:14px;";
-    ov.addEventListener("click", function (e) { if (e.target === ov) colaImpClose(); });
-    ov.innerHTML = '<div style="background:#f8fafc;max-width:780px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:linear-gradient(90deg,#1e3a8a,#1e40af);color:#fff;">' +
-      '<span style="font-size:18px;font-weight:800;">🖨️ Cola de impresión — NP armadas</span>' +
-      '<button onclick="colaImpClose()" style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:800;cursor:pointer;width:auto;">Cerrar</button></div>' +
-      '<div id="colaImpBody" style="padding:14px 16px;max-height:calc(100vh - 120px);overflow:auto;"></div></div>';
-    document.body.appendChild(ov);
-  }
-  return ov;
-}
-function colaImpClose() { var ov = document.getElementById("colaImpOv"); if (ov) ov.style.display = "none"; }
-function colaImpStatus(msg, ok) { var el = document.getElementById("colaImpStatus"); if (el) { el.textContent = msg; el.style.color = ok === false ? "#b91c1c" : (ok ? "#166534" : "#334155"); } }
 function _colaImpHace(ts) {
   if (!ts) return "";
   var ms = Date.now() - new Date(ts).getTime(); if (ms < 0) ms = 0;
   var h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
   return h > 0 ? (h + "h " + m + "m") : (m + "m");
 }
+/* Trae las filas de la base. null = no se pudo leer (no es "no hay"). */
+async function colaImpFetch(desde, hasta){
+  try {
+    var r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_cola_impresion_lista", {
+      method: "POST", cache: "no-store",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_desde: desde, p_hasta: hasta })
+    });
+    if (!r.ok) return null;
+    var a = await r.json();
+    return Array.isArray(a) ? a : null;
+  } catch (_e) { return null; }
+}
+function _colaImpTieneArm(f){ return !!(f && (f.arm_resumen || (Array.isArray(f.arm_arts) && f.arm_arts.length) || (Array.isArray(f.arm_falt) && f.arm_falt.length))); }
+function _colaImpTieneFac(f){ return !!(f && f.fac_ts && f.arm_resumen); }
+/* Lo pendiente de un lote de filas: picking una vez por tanda, armado y facturado por NP. */
+function _colaImpPendientes(filas){
+  var out = [], vistas = {};
+  (filas || []).forEach(function (f){
+    if (f.pick_pend && f.tanda && !vistas[f.tanda]) { vistas[f.tanda] = 1; out.push({ tipo: "pick", f: f, ts: f.pick_ts }); }
+    if (f.arm_pend) out.push({ tipo: "arm", f: f, ts: f.arm_ts });
+    if (f.fac_pend) out.push({ tipo: "fac", f: f, ts: f.fac_ts });
+  });
+  return out;
+}
+async function colaImpLoadBadge() {
+  try {
+    var rows = await colaImpFetch(_colaImpDia(-21), _colaImpDia(14));
+    var b = document.getElementById("colaImpBadge"); if (!b || !rows) return;
+    var pend = _colaImpPendientes(rows);
+    var lim = Date.now() - 24 * 3600000;
+    var venc = pend.filter(function (p){ return p.ts && new Date(p.ts).getTime() < lim; }).length;
+    var n = pend.length;
+    if (!n) { b.style.display = "none"; return; }
+    b.style.display = ""; b.className = "dp-badge"; b.textContent = (venc ? "⚠ " : "") + n;
+    b.style.background = venc ? "#b91c1c" : "#2563eb";
+    b.title = venc ? (venc + " hoja(s) hace +24 h sin imprimir (de " + n + " pendientes)") : (n + " hoja(s) pendientes de imprimir (picking, armado o facturado)");
+  } catch (_e) {}
+}
+function colaImpModal() {
+  if (!document.getElementById("colaImpCss")) { var st = document.createElement("style"); st.id = "colaImpCss"; st.textContent = COLA_IMP_CSS; document.head.appendChild(st); }
+  var ov = document.getElementById("colaImpOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "colaImpOv";
+    ov.addEventListener("click", function (e) { if (e.target === ov) colaImpClose(); });
+    ov.innerHTML = '<div class="ci-box"><div class="ci-head"><span class="ci-tit">🖨️ Cola de impresión NP</span>' +
+      '<button class="ci-x" onclick="colaImpClose()">Cerrar</button></div>' +
+      '<div class="ci-ctrl">Desde <input type="date" id="colaImpDesde"> hasta <input type="date" id="colaImpHasta">' +
+      '<button class="ci-btn" onclick="colaImpRango()">Ver</button>' +
+      '<input type="search" id="colaImpQ" placeholder="NP, tanda o cliente" oninput="colaImpRender()">' +
+      '<label><input type="checkbox" id="colaImpSoloPend" onchange="colaImpRender()"> Sólo pendientes</label>' +
+      '<button class="ci-btn" onclick="openColaImpresion(true)">↻</button>' +
+      '<button class="ci-btn pri" id="colaImpBtnPend" onclick="colaImprimirPendientes()">🖨️ Imprimir pendientes</button></div>' +
+      '<div class="ci-ley">📋 Picking = de la tanda · 📦 Armado y 🧾 Facturado = de la NP · ✓ ya salió · <span style="color:#b91c1c;font-weight:800;">rojo</span> = pendiente (no salió sola) · — sin datos</div>' +
+      '<div class="ci-st" id="colaImpStatus"></div>' +
+      '<div class="ci-body" id="colaImpBody"></div></div>';
+    document.body.appendChild(ov);
+  }
+  return ov;
+}
+function colaImpClose() { var ov = document.getElementById("colaImpOv"); if (ov) ov.style.display = "none"; }
+function colaImpStatus(msg, ok) { var el = document.getElementById("colaImpStatus"); if (el) { el.textContent = msg; el.style.color = ok === false ? "#b91c1c" : (ok ? "#166534" : "#334155"); } }
+function colaImpRango(){
+  var d = document.getElementById("colaImpDesde"), h = document.getElementById("colaImpHasta");
+  if (!_colaImp) _colaImp = {};
+  if (d && d.value) _colaImp.desde = d.value;
+  if (h && h.value) _colaImp.hasta = h.value;
+  if (_colaImp.desde && _colaImp.hasta && _colaImp.desde > _colaImp.hasta) { var x = _colaImp.desde; _colaImp.desde = _colaImp.hasta; _colaImp.hasta = x; }
+  openColaImpresion(true);
+}
 async function openColaImpresion(keepOpen) {
   var ov = colaImpModal(); ov.style.display = "block";
+  if (!_colaImp || !_colaImp.desde) _colaImp = { desde: _colaImpDia(-7), hasta: _colaImpDia(7), filas: [] };
+  var d = document.getElementById("colaImpDesde"), h = document.getElementById("colaImpHasta");
+  if (d) d.value = _colaImp.desde; if (h) h.value = _colaImp.hasta;
   var body = document.getElementById("colaImpBody");
-  if (body && !keepOpen) body.innerHTML = '<div style="padding:24px;text-align:center;color:#64748b;">Cargando cola…</div>';
-  try {
-    var H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
-    var rows = await fetch(SUPABASE_URL + "/rest/v1/gv_vista_cola_impresion?select=np,tanda,razon_social,armado_ts,vencido,resumen,armador_leg,arts_fallback,faltantes_fallback&order=armado_ts.asc&limit=5000", { headers: H, cache: "no-store" }).then(function (r) { return r.ok ? r.json() : []; });
-    var pkh = []; try { pkh = await pkHojaPendientes(); } catch (_e) {}
-    _colaImp = { items: rows || [], pkh: pkh || [] };
-    colaImpRender();
-  } catch (e) { if (body) body.innerHTML = '<div style="padding:20px;color:#b91c1c;">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
+  if (body && !keepOpen) body.innerHTML = '<div class="ci-vacio">Cargando…</div>';
+  var rows = await colaImpFetch(_colaImp.desde, _colaImp.hasta);
+  if (!rows) { colaImpStatus("No pude leer la cola (sin conexión con la base). Probá ↻ de nuevo.", false); if (body && !keepOpen) body.innerHTML = '<div class="ci-vacio">No se pudo leer.</div>'; return; }
+  _colaImp.filas = rows;
+  try { if (typeof getEmpleadosNombres === "function") getEmpleadosNombres().catch(function (){}); } catch (_e) {}
+  colaImpRender();
+  colaImpLoadBadge();
+}
+/* Las filas que se ven: búsqueda (NP, tanda, código o razón social) y "sólo pendientes". */
+function _colaImpVisibles(){
+  var filas = (_colaImp && _colaImp.filas) || [];
+  var qEl = document.getElementById("colaImpQ"), q = qEl ? String(qEl.value || "").trim().toLowerCase() : "";
+  var sp = document.getElementById("colaImpSoloPend"), solo = !!(sp && sp.checked);
+  return filas.filter(function (f){
+    if (q) {
+      var txt = [f.np, f.tanda, f.cod_cliente, f.razon_social].join(" ").toLowerCase();
+      if (q.split(/\s+/).some(function (w){ return txt.indexOf(w) < 0; })) return false;
+    }
+    if (solo) {
+      var pickPendT = f.tanda && filas.some(function (g){ return g.tanda === f.tanda && g.pick_pend; });
+      if (!(f.arm_pend || f.fac_pend || pickPendT)) return false;
+    }
+    return true;
+  });
+}
+function _colaImpCelda(tipo, i, disp, impresoEn, pend, ts){
+  if (!disp) return '<span class="ci-no">—</span>';
+  if (impresoEn) return '<button class="ci-b ok" title="Salió ' + escapeHtml(_pkHojaDm(impresoEn) + " " + _pkHojaHm(impresoEn)) + '. Tocá para verla o reimprimirla." onclick="colaImpVer(\'' + tipo + '\',' + i + ')">✓ ' + escapeHtml(_pkHojaDm(impresoEn) + " " + _pkHojaHm(impresoEn)) + '</button>';
+  if (pend) {
+    var viejo = ts && (Date.now() - new Date(ts).getTime() > 24 * 3600000);
+    return '<button class="ci-b pend" title="Pendiente de imprimir' + (ts ? " (lista hace " + escapeHtml(_colaImpHace(ts)) + ")" : "") + '" onclick="colaImpVer(\'' + tipo + '\',' + i + ')">' + (viejo ? "⚠ " : "") + '🖨 Imprimir</button>';
+  }
+  return '<button class="ci-b disp" title="Se puede imprimir (sin marca de impresa)" onclick="colaImpVer(\'' + tipo + '\',' + i + ')">🖨 Ver</button>';
 }
 function colaImpRender() {
   var body = document.getElementById("colaImpBody"); if (!body || !_colaImp) return;
-  var items = _colaImp.items || [];
-  var pkh = _colaImp.pkh || [];
-  var venc = items.filter(function (x) { return x.vencido; }).length;
-  var h = '';
-  // v25.51 — hojas de PICKING (una por tanda) que todavía no salieron.
-  var pkhHtml = '<div style="font-weight:800;color:#0f172a;margin:4px 0 6px;">📋 Hojas de picking pendientes (' + pkh.length + ')</div>' +
-    (pkh.length ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">' + pkh.map(function (x) {
-      return '<button onclick="pkHojaImprimir([\'' + escapeHtml(x.tanda) + '\']).then(function(){ setTimeout(function(){ openColaImpresion(true); }, 1500); })" style="width:auto;margin:0;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;font-weight:800;cursor:pointer;font-size:13px;">🖨️ ' + escapeHtml(x.tanda) + ' <span style="color:#64748b;font-weight:600;">· ' + escapeHtml(npcNombre(x.legajo)) + ' · ' + _colaImpHace(x.ts) + '</span></button>';
-    }).join('') + '</div>' : '<div style="color:#94a3b8;font-size:13px;margin-bottom:12px;">Ninguna.</div>');
-  h += '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">' +
-    '<button onclick="colaImprimirTodas()" style="background:#1e40af;color:#fff;border:none;border-radius:9px;padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;width:auto;">🖨️ Imprimir todas (' + (items.length + pkh.length) + ')</button>' +
-    '<button onclick="openColaImpresion()" style="background:#fff;border:1px solid #cbd5e1;border-radius:9px;padding:9px 13px;font-weight:800;cursor:pointer;width:auto;">↻ Actualizar</button></div>';
-  h += '<div style="font-size:12px;color:#64748b;margin-bottom:8px;">Imprime el <b>remito de armado</b> de cada NP (se genera en la app desde lo armado — no usa la carpeta de PDF). Con Chrome en modo <b>--kiosk-printing</b> salen solas a la impresora predeterminada; si no, un diálogo por hoja.</div>';
-  h += '<div id="colaImpStatus" style="font-size:12.5px;color:#334155;margin-bottom:8px;min-height:16px;"></div>';
-  h += pkhHtml;
-  if (venc) h += '<div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:9px;padding:9px 12px;font-weight:800;margin-bottom:10px;">⚠ ' + venc + ' nota(s) de pedido hace +24 h sin imprimir.</div>';
-  if (!items.length) { body.innerHTML = h + '<div style="padding:20px;text-align:center;color:#94a3b8;">No hay notas de pedido pendientes de imprimir. 👍</div>'; return; }
-  var thc = 'text-align:left;padding:7px 9px;background:#f1f5f9;color:#475569;font-size:11px;text-transform:uppercase;border-bottom:1px solid #cbd5e1;';
-  h += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13.5px;"><thead><tr>' +
-    '<th style="' + thc + '">NP</th><th style="' + thc + '">Tanda</th><th style="' + thc + '">Razón Social</th>' +
-    '<th style="' + thc + 'text-align:right;">Armado hace</th></tr></thead><tbody>';
-  items.forEach(function (x) {
-    h += '<tr' + (x.vencido ? ' style="background:#fef2f2;"' : '') + '>' +
-      '<td style="padding:7px 9px;border-bottom:1px solid #eef2f7;font-weight:800;font-family:Consolas,Menlo,monospace;color:#0f172a;">' + escapeHtml(x.np) + (x.vencido ? ' <span style="color:#b91c1c;">⚠</span>' : '') + '</td>' +
-      '<td style="padding:7px 9px;border-bottom:1px solid #eef2f7;">' + escapeHtml(x.tanda || "—") + '</td>' +
-      '<td style="padding:7px 9px;border-bottom:1px solid #eef2f7;">' + escapeHtml(x.razon_social || "—") + '</td>' +
-      '<td style="padding:7px 9px;border-bottom:1px solid #eef2f7;text-align:right;color:' + (x.vencido ? '#b91c1c' : '#64748b') + ';font-weight:' + (x.vencido ? '800' : '600') + ';">' + _colaImpHace(x.armado_ts) + '</td></tr>';
+  var todas = _colaImp.filas || [];
+  var vis = _colaImpVisibles();
+  var pendVis = _colaImpPendientes(vis);
+  var bt = document.getElementById("colaImpBtnPend"); if (bt) bt.textContent = "🖨️ Imprimir pendientes (" + pendVis.length + ")";
+  if (!vis.length) { body.innerHTML = '<div class="ci-vacio">' + (todas.length ? "Nada con ese filtro." : "No hay NP en esas fechas.") + '</div>'; return; }
+  var hoy = cpTodayAR();
+  // agrupar por día (ya vienen fecha desc, tanda, np) y por tanda
+  var dias = [], porDia = {};
+  vis.forEach(function (f){
+    var k = String(f.fecha || "").slice(0, 10) || "—";
+    if (!porDia[k]) { porDia[k] = []; dias.push(k); }
+    porDia[k].push(f);
   });
-  h += '</tbody></table></div>';
+  var h = '';
+  dias.forEach(function (dia){
+    var fs = porDia[dia];
+    var tandas = {}; fs.forEach(function (f){ if (f.tanda) tandas[f.tanda] = 1; });
+    var nPend = _colaImpPendientes(fs).length;
+    h += '<div class="ci-dia">' + escapeHtml(_pkHojaDia(dia) || dia) + (dia === hoy ? '<span class="ci-hoy">hoy</span>' : '') +
+      ' <span class="ci-sub">· ' + fs.length + ' NP · ' + Object.keys(tandas).length + ' tanda(s)' + (nPend ? ' · <b style="color:#b91c1c;">' + nPend + ' pendiente(s)</b>' : '') + '</span></div>';
+    h += '<div class="ci-tw"><table class="ci-t"><thead><tr><th>Tanda</th><th>📋<br>Picking</th><th>NP</th><th>Cliente</th><th>📦<br>Armado</th><th>🧾<br>Factur.</th></tr></thead><tbody>';
+    var j = 0;
+    while (j < fs.length) {
+      var t = fs[j].tanda || "", n = 1;
+      if (t) { while (j + n < fs.length && fs[j + n].tanda === t) n++; }
+      for (var m = 0; m < n; m++) {
+        var f = fs[j + m], i = todas.indexOf(f);
+        h += '<tr>';
+        if (m === 0) {
+          var i0 = i;
+          h += '<td class="ci-tanda" rowspan="' + n + '">' + escapeHtml(t || "—") + '</td>' +
+            '<td rowspan="' + n + '" style="border-right:1px solid #e2e8f0;">' + (t ? _colaImpCelda("pick", i0, !!f.pick_ts, f.pick_impreso_en, f.pick_pend, f.pick_ts) : '<span class="ci-no">—</span>') + '</td>';
+        }
+        var cli = (f.cod_cliente ? f.cod_cliente + " · " : "") + (f.razon_social || "—");
+        h += '<td class="ci-np">' + escapeHtml(f.np) + '</td>' +
+          '<td class="ci-rs" title="' + escapeHtml(cli) + '">' + escapeHtml(cli) + '</td>' +
+          '<td>' + _colaImpCelda("arm", i, _colaImpTieneArm(f), f.arm_impreso_en, f.arm_pend, f.arm_ts) + '</td>' +
+          '<td>' + _colaImpCelda("fac", i, _colaImpTieneFac(f), f.fac_impreso_en, f.fac_pend, f.fac_ts) + '</td></tr>';
+      }
+      j += n;
+    }
+    h += '</tbody></table></div>';
+  });
   body.innerHTML = h;
 }
-/* Imprime el REMITO DE ARMADO (generado en la app desde el resumen del TAL, mismo formato
-   que la estación de auto-impresión) de cada NP de la cola, uno tras otro. NO usa PDF: reusa
-   armadoRemitoData/InnerHtml + remitoPrintDoc. Con Chrome --kiosk-printing salen solas. */
-var _colaImpBusy = false;
-async function colaImprimirTodas() {
-  if (_colaImpBusy) { alert("Esperá, ya hay una impresión en curso."); return; }
-  var items0 = (_colaImp && _colaImp.items) ? _colaImp.items.slice() : [];
-  // v12.24 — imprimir aunque el TAL no traiga `resumen`: si hay artículos entregados o
-  // faltantes en Entregas_Virgilio (arts_fallback / faltantes_fallback de la vista),
-  // el remito igual se puede armar (caso súper con etiqueta y NP cerradas con 0 líos).
-  items0 = items0.filter(function (x) {
-    if (!x) return false;
-    if (x.resumen) return true;
-    var af = Array.isArray(x.arts_fallback) ? x.arts_fallback : [];
-    var ff = Array.isArray(x.faltantes_fallback) ? x.faltantes_fallback : [];
-    return af.length > 0 || ff.length > 0;
-  });
-  var pkh0 = (_colaImp && _colaImp.pkh) ? _colaImp.pkh.map(function (x) { return x.tanda; }) : [];
-  if (!items0.length && !pkh0.length) { alert("No hay notas de pedido ni hojas de picking para imprimir."); return; }
-  _colaImpBusy = true;
-  try {
-    // v25.51 — primero las hojas de picking (una por tanda), después los remitos de armado.
-    if (pkh0.length) { colaImpStatus("Imprimiendo " + pkh0.length + " hoja(s) de picking…"); await pkHojaImprimir(pkh0, true, "cola"); if (items0.length) await new Promise(function (r) { setTimeout(r, 2600 * pkh0.length); }); }
-    if (!items0.length) { colaImpStatus("🖨️ Mandé a imprimir " + pkh0.length + " hoja(s) de picking.", true); setTimeout(function () { openColaImpresion(true); }, 1600); return; }
-    colaImpStatus("Preparando " + items0.length + " remito(s)…");
-    var items = items0.map(function (x) { return { np: x.np, tanda: (x.tanda === "—" ? "" : x.tanda), resumen: x.resumen, armadorLeg: x.armador_leg || "", artsFallback: Array.isArray(x.arts_fallback) ? x.arts_fallback : [], faltantesFallback: Array.isArray(x.faltantes_fallback) ? x.faltantes_fallback : [] }; });
-    var ds = await _armadoRemitoDataForItems(items);
-    // imprimir serializado (1 hoja cada ~2.6 s, como la estación); con kiosk salen solas.
-    var k = 0;
-    var next = function () { if (k >= ds.length) return; try { remitoPrintDoc(armadoRemitoInnerHtml(ds[k]), "armado", ds[k].np); } catch (_e) {} k++; if (k < ds.length) setTimeout(next, 2600); };
-    next();
-    colaImpMarcarImpresas(items.map(function (it) { return it.np; }), "cola");
-    colaImpStatus("🖨️ Mandé a imprimir " + ds.length + " remito(s) de armado.", true);
-    setTimeout(function () { colaImpLoadBadge(); openColaImpresion(true); }, 1600);
-  } catch (e) { colaImpStatus("Error: " + (e && e.message ? e.message : e), false); }
-  finally { _colaImpBusy = false; }
+/* Arma la hoja de una fila: picking (de la tanda), armado o facturado (de la NP). null = no hay hoja. */
+async function _colaImpHoja(tipo, f){
+  if (!f) return null;
+  if (tipo === "pick") {
+    if (!f.tanda) return null;
+    var ds = await pkHojaDatos([f.tanda]); var d = ds && ds[0];
+    return d ? { inner: pkHojaHtml(d), tipo: "picking", ref: d.tanda, marca: PK_HOJA_PREFIJO + d.tanda } : null;
+  }
+  if (tipo === "arm") {
+    var dd = await _armadoRemitoDataForItems([{ np: f.np, tanda: f.tanda || "", resumen: f.arm_resumen || "", armadorLeg: f.arm_leg || "",
+      artsFallback: Array.isArray(f.arm_arts) ? f.arm_arts : [], faltantesFallback: Array.isArray(f.arm_falt) ? f.arm_falt : [] }]);
+    return (dd && dd[0]) ? { inner: armadoRemitoInnerHtml(dd[0]), tipo: "armado", ref: f.np, marca: String(f.np) } : null;
+  }
+  if (tipo === "fac") {
+    var inner = await facFacturadoInner(f.np, f.tanda || "");
+    return inner ? { inner: inner, tipo: "facturado", ref: f.np, marca: COLA_FAC_PREFIJO + f.np } : null;
+  }
+  return null;
 }
-/* Marca en Impresion_NP las NP que se mandaron a imprimir (idempotente, PK np). */
+/* Marca en pantalla (sin volver a leer la base) lo que se acaba de mandar a imprimir. */
+function _colaImpMarcarLocal(tipo, f){
+  var ahora = new Date().toISOString();
+  ((_colaImp && _colaImp.filas) || []).forEach(function (g){
+    if (tipo === "pick" && f.tanda && g.tanda === f.tanda) { if (!g.pick_impreso_en) g.pick_impreso_en = ahora; g.pick_pend = false; }
+    if (g === f && tipo === "arm") { if (!g.arm_impreso_en) g.arm_impreso_en = ahora; g.arm_pend = false; }
+    if (g === f && tipo === "fac") { if (!g.fac_impreso_en) g.fac_impreso_en = ahora; g.fac_pend = false; }
+  });
+}
+function _colaImpImprimir(h, tipo, f, origen){
+  remitoPrintDoc(h.inner, h.tipo, h.ref);
+  colaImpMarcarImpresas([h.marca], origen || "cola");
+  _colaImpMarcarLocal(tipo, f);
+}
+/* Tocar una hoja: la muestra y ofrece imprimirla (helper o cuadro). */
+async function colaImpVer(tipo, i){
+  var f = _colaImp && _colaImp.filas ? _colaImp.filas[i] : null; if (!f) return;
+  var nom = { pick: "picking de " + (f.tanda || ""), arm: "armado de " + f.np, fac: "facturado de " + f.np }[tipo] || "";
+  gvHojaPreview('<div style="padding:28px;text-align:center;color:#64748b;">Cargando ' + escapeHtml(nom) + '…</div>', null);
+  var h = null; try { h = await _colaImpHoja(tipo, f); } catch (_e) {}
+  if (!h) { gvHojaPreview('<div style="padding:28px;color:#64748b;">No pude armar la hoja de ' + escapeHtml(nom) + '. Probá de nuevo.</div>', null); return; }
+  gvHojaPreview(h.inner, function (){
+    _colaImpImprimir(h, tipo, f, "cola");
+    gvHojaClose(); colaImpRender(); colaImpStatus("🖨️ Mandé a imprimir " + nom + ".", true);
+    setTimeout(function (){ colaImpLoadBadge(); }, 1500);
+  });
+}
+/* Imprime lo PENDIENTE de lo que se ve, del día más viejo al más nuevo: por tanda, el picking y
+   después el armado y el facturado de cada NP. Con el helper salen en fila; sin helper, un cuadro
+   cada ~2,6 s (como la estación). */
+async function colaImprimirPendientes() {
+  if (_colaImpBusy) { alert("Esperá, ya hay una impresión en curso."); return; }
+  var vis = _colaImpVisibles();
+  var orden = { pick: 0, arm: 1, fac: 2 };
+  var tareas = _colaImpPendientes(vis).sort(function (a, b){
+    var fa = String(a.f.fecha || ""), fb = String(b.f.fecha || "");
+    if (fa !== fb) return fa < fb ? -1 : 1;
+    var ta = String(a.f.tanda || "~"), tb = String(b.f.tanda || "~");
+    if (ta !== tb) return ta < tb ? -1 : 1;
+    if (a.tipo === "pick" || b.tipo === "pick") return orden[a.tipo] - orden[b.tipo];
+    if (a.f.np !== b.f.np) return String(a.f.np) < String(b.f.np) ? -1 : 1;
+    return orden[a.tipo] - orden[b.tipo];
+  });
+  if (!tareas.length) { alert("No hay hojas pendientes en lo que se ve."); return; }
+  var conHelper = gvHelperActivo();
+  if (!confirm("¿Imprimir " + tareas.length + " hoja(s) pendientes?" + (conHelper ? "" : "\n\nSin helper conectado se abre un cuadro de impresión por hoja."))) return;
+  _colaImpBusy = true;
+  var ok = 0, sin = 0;
+  try {
+    for (var k = 0; k < tareas.length; k++) {
+      var t = tareas[k];
+      colaImpStatus("Imprimiendo " + (k + 1) + " de " + tareas.length + "…");
+      var h = null; try { h = await _colaImpHoja(t.tipo, t.f); } catch (_e) {}
+      if (!h) { sin++; continue; }
+      _colaImpImprimir(h, t.tipo, t.f, "cola"); ok++;
+      if (!conHelper && k < tareas.length - 1) await new Promise(function (r){ setTimeout(r, 2600); });
+    }
+    colaImpStatus("🖨️ Mandé a imprimir " + ok + " hoja(s)" + (sin ? " · " + sin + " no se pudieron armar" : "") + ".", !sin);
+  } catch (e) { colaImpStatus("Error: " + (e && e.message ? e.message : e), false); }
+  finally { _colaImpBusy = false; colaImpRender(); setTimeout(function (){ colaImpLoadBadge(); }, 1600); }
+}
+/* Marca en Impresion_NP las hojas que se mandaron a imprimir (idempotente, PK np). La clave es la NP
+   (armado), «PK <tanda>» (picking) o «FAC <np>» (facturado). */
 function colaImpMarcarImpresas(nps, origen) {
   if (!nps || !nps.length) return;
   var leg = (typeof legajoInput !== "undefined" && legajoInput && legajoInput.value) ? legajoInput.value : null;
@@ -55326,6 +55527,12 @@ async function pkHojaDatos(tandas){
 }
 async function pkHojaImprimir(tandas, marcar, origen){
   var ds = await pkHojaDatos(tandas);
+  // v26.66 — la estación (automático) imprime SÓLO por el helper y marca cada hoja que salió; la que no
+  // salió queda pendiente en la Cola de impresión NP. A mano (Cola) sigue como siempre: helper o cuadro.
+  if (origen === "estacion") {
+    ds.forEach(function (d){ gvImprimirAuto("picking", pkHojaHtml(d), d.tanda, PK_HOJA_PREFIJO + d.tanda); });
+    return ds.length;
+  }
   var k = 0;
   var next = function (){ if (k >= ds.length) return; try { remitoPrintDoc(pkHojaHtml(ds[k]), "picking", ds[k].tanda); } catch (_e){} k++; if (k < ds.length) setTimeout(next, 2600); };
   next();
@@ -55663,26 +55870,44 @@ function _gvHelperLogAdd(e){
   try { gvHelperRender(false); } catch (_e) {}
 }
 /* En fila: cada hoja espera a que el helper conteste la anterior. */
-function gvHelperEncolar(tipo, inner, ref){
+function gvHelperEncolar(tipo, inner, ref, opt){
   _gvHelper.enFila++;
-  const paso = function (){ return _gvHelperImprimirHoja(tipo, inner, ref).finally(function (){ _gvHelper.enFila = Math.max(0, _gvHelper.enFila - 1); }); };
+  const paso = function (){ return _gvHelperImprimirHoja(tipo, inner, ref, opt).finally(function (){ _gvHelper.enFila = Math.max(0, _gvHelper.enFila - 1); }); };
   _gvHelper.cadena = _gvHelper.cadena.then(paso, paso);
   return _gvHelper.cadena;
 }
-async function _gvHelperImprimirHoja(tipo, inner, ref){
+async function _gvHelperImprimirHoja(tipo, inner, ref, opt){
+  const auto = !!(opt && opt.auto);
   let r, pdf = null;
   try { pdf = await gvHojaPdf(inner); }
   catch (e) { r = { ok: false, sin_pdf: true, impreso: [], errores: [], motivo: "no pude armar el PDF (" + String((e && e.message) || e) + ")" }; }
   if (pdf) r = await imprimirLocal(tipo, pdf);
-  // Al navegador SÓLO si el helper no imprimió nada y no hay duda de que no salió.
-  const alNavegador = !r.ok && !r.timeout && !(r.impreso && r.impreso.length);
+  // Al navegador SÓLO si el helper no imprimió nada y no hay duda de que no salió — y NUNCA en lo
+  // automático (v26.66, Luis 05/10): lo automático sale sólo por el helper; si no salió, queda en la
+  // Cola de impresión NP (gvImprimirAuto no la marca) y se imprime desde ahí.
+  const alNavegador = !auto && !r.ok && !r.timeout && !(r.impreso && r.impreso.length);
   _gvHelperLogAdd({ tipo: tipo, ref: ref || "", ok: !!r.ok, impreso: r.impreso || [], errores: r.errores || [],
-    motivo: r.motivo || "", alNavegador: alNavegador, kb: pdf ? Math.round(pdf.size / 1024) : 0 });
+    motivo: r.motivo || "", alNavegador: alNavegador, auto: auto, kb: pdf ? Math.round(pdf.size / 1024) : 0 });
   if (alNavegador) {
     _remitoPrintNavegador(inner);
     await new Promise(function (ok){ setTimeout(ok, 2600); });   // como la estación: 1 cuadro cada ~2,6 s
   }
   return r;
+}
+/* v26.66 (Luis, 05/10: "solo cuando se conecta el helper salen automaticas. si no esta conectado el helper o
+   si estuvo conectado pero no responde, no manda a imprimir automaticamente la app sino que figuran en el
+   modulo [Cola de impresión NP]") — la ÚNICA puerta de la impresión automática (estación: TAL, TP, IMPT y
+   facturado). Sin helper conectado no hace nada; con el helper que no contesta o que no imprimió, tampoco
+   abre el cuadro. Marca la hoja en Impresion_NP (`marca`: la NP, «PK <tanda>» o «FAC <np>») SÓLO si el
+   helper dice que salió: lo que no salió queda pendiente en la Cola. */
+function gvImprimirAuto(tipo, inner, ref, marca){
+  if (!inner || !GV_HELPER_TIPOS[tipo] || !gvHelperActivo()) return Promise.resolve({ ok: false, impreso: [], errores: [], motivo: "sin helper conectado" });
+  return gvHelperEncolar(tipo, inner, ref, { auto: true }).then(function (r){
+    const salio = !!(r && (r.ok || (r.impreso && r.impreso.length)));
+    if (salio && marca) { try { colaImpMarcarImpresas([marca], "estacion"); } catch (_e) {} }
+    try { setTimeout(function (){ try { colaImpLoadBadge(); } catch (_e) {} }, 1500); } catch (_e) {}
+    return r || { ok: false, impreso: [], errores: [], motivo: "sin respuesta" };
+  }, function (e){ return { ok: false, impreso: [], errores: [], motivo: String((e && e.message) || e) }; });
 }
 /* v26.28 (Luis, 02/10: "lo único que tiene que haber es un botón en configuración «Helper de
    impresión» que permita conectar con el helper") — ⚙️ Configuración → 🖨️ Helper de impresión abre
@@ -55759,7 +55984,7 @@ async function gvHelperConectar(){
 function gvHelperDesconectar(){
   gvHelperGuardar({ on: false });
   try { psSetAuto(false); } catch (_e) {}   // v26.30 — sin helper, esta PC deja de imprimir sola
-  _gvHelper.msg = "Desconectado: las hojas salen con el cuadro de impresión.";
+  _gvHelper.msg = "Desconectado: nada se imprime solo; las hojas quedan en la Cola de impresión NP.";
   gvHelperRender(false);
 }
 /* Cada minuto, en un GV de supervisor en una PC: con el helper y el auto de la estación
@@ -55833,6 +56058,18 @@ function psToggle(){ psSetAuto(!psIsAuto()); }
 async function psPoll(force){
   if (!force && !psIsAuto()) return;
   _psEnsure();
+  // v26.66 (Luis, 05/10) — lo automático sale SÓLO por el helper conectado y respondiendo. Sin helper (o
+  // con el helper que no contesta) la estación no imprime nada ni abre el cuadro: corre los cursores a
+  // ahora (cuando vuelva no vuelca lo de atrás) y todo queda pendiente en la Cola de impresión NP.
+  let conHelper = false;
+  if (gvHelperActivo()) { try { conHelper = await helperVivo(); } catch (_e) { conHelper = false; } }
+  if (!conHelper) {
+    _psCorrerCursores();
+    _ps.lastPollTs = Date.now();
+    _ps.lastErr = gvHelperActivo() ? "la impresión automática no contesta: lo nuevo queda en la Cola de impresión NP" : "sin impresión automática en esta PC: lo nuevo queda en la Cola de impresión NP";
+    _psUpdatePollInfo();
+    return;
+  }
   const since = _ps.lastSeen || new Date(Date.now() - 3600000).toISOString();
   try {
     const url = SUPABASE_TABLE_ENDPOINT + "?opcion=eq.TAL&ts_cliente=gt." + encodeURIComponent(since) + "&select=texto,ts_cliente,legajo&order=ts_cliente.asc&limit=2000";
@@ -55875,7 +56112,7 @@ async function psPoll(force){
             const tipo = String(ev.texto || "").trim().toLowerCase(); const k = "IMPT|" + ev.id;
             if (!GV_HELPER_TIPOS[tipo] || printed.has(k)) return;
             psMarkPrinted(k);
-            remitoPrintDoc(_psHojaPrueba(ev.descripcion || ("test " + tipo)), tipo, "PRUEBA");
+            gvImprimirAuto(tipo, _psHojaPrueba(ev.descripcion || ("test " + tipo)), "PRUEBA", null);
           });
         }
       } catch (_e3) {}
@@ -55900,7 +56137,7 @@ async function psPoll(force){
                 if (!np || printed.has(k) || nuevas.some(function (y){ return y.np === np; })) return;
                 psMarkPrinted(k); nuevas.push({ np: np, tanda: String(x.tanda || "").trim().toUpperCase() });
               });
-              for (const f of nuevas) { try { await facPrintFacturado(f.np, f.tanda); } catch (_e) {} }
+              for (const f of nuevas) { try { await facPrintFacturado(f.np, f.tanda, true); } catch (_e) {} }
             }
           }
         }
@@ -55910,6 +56147,14 @@ async function psPoll(force){
   _psUpdatePollInfo();
 }
 function _psSetLastFac(ts){ _psEnsure(); _ps.lastSeenFac = ts; try { localStorage.setItem(PS_LASTSEEN_FAC_KEY, ts); } catch (_e) {} }
+/* v26.66 — sin helper que conteste, la estación "ve" todo hasta ahora sin imprimirlo: queda en la Cola. */
+function _psCorrerCursores(){
+  _psEnsure();
+  const ahora = new Date().toISOString();
+  _ps.lastSeen = ahora; _ps.lastSeenTp = ahora; _ps.lastSeenImpt = ahora;
+  try { localStorage.setItem(PS_LASTSEEN_KEY, ahora); } catch (_e) {}
+  _psSetLastFac(ahora);
+}
 /* v26.30 — la hoja de la señal de prueba: sólo el texto, grande y centrado. */
 function _psHojaPrueba(txt){
   return '<div style="display:flex;align-items:center;justify-content:center;min-height:880px;font-size:64px;font-weight:800;text-align:center;">' + escapeHtml(String(txt || "")) + '</div>';
@@ -55976,20 +56221,13 @@ async function psPrintBatch(items){
   const ds = await _armadoRemitoDataForItems(items);
   ds.forEach(function (d){
     psMarkPrinted(d.np);   // marcar ANTES de encolar → si hay 2 pestañas abiertas, no imprimen doble
-    psEnqueuePrint(d);
-    psLog(d);
+    // v26.66 — sólo por el helper (gvImprimirAuto, que ya serializa): marca Impresion_NP SÓLO si salió
+    // (v12.08: si no, la Cola acusaba pendientes falsos); si no salió, queda pendiente en la Cola.
+    gvImprimirAuto("armado", armadoRemitoInnerHtml(d), d.np, String(d.np)).then(function (r){
+      const salio = !!(r && (r.ok || (r.impreso && r.impreso.length)));
+      psLog(d, salio ? "" : "no salió: queda en la Cola de impresión NP");
+    });
   });
-  // v12.08 — también marcar en Impresion_NP (server): si no, la Cola de impresión y su
-  // badge seguían acusando "sin imprimir" NPs que la estación ya imprimió sola.
-  try { colaImpMarcarImpresas(ds.map(function (d){ return String(d.np); }), "estacion"); } catch (_e) {}
-  setTimeout(function (){ try { colaImpLoadBadge(); } catch (_e) {} }, 1600);   // refresca el badge cuando el insert ya pegó
-}
-function psEnqueuePrint(d){ _psEnsure(); _ps.queue.push(d); psDrain(); }
-function psDrain(){
-  if (!_ps || _ps.printing || !_ps.queue.length) return;
-  _ps.printing = true; const d = _ps.queue.shift();
-  try { remitoPrintDoc(armadoRemitoInnerHtml(d), "armado", d.np); } catch (_e){}
-  setTimeout(function (){ if (_ps){ _ps.printing = false; psDrain(); } }, 2600);   // serializado: 1 hoja cada ~2.6 s
 }
 function psLog(d, nota){
   _psEnsure();
@@ -56065,7 +56303,7 @@ function psRender(){
     '<div style="display:flex;gap:8px;margin:8px 0;"><input id="etlLegInp" type="text" inputmode="numeric" placeholder="legajo" onkeydown="if(event.key===\'Enter\')etlLegAgregar()" style="width:100px;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;">' +
     '<button onclick="etlLegAgregar()" style="padding:8px 14px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer;">+ Agregar</button></div>' +
     '<div id="etlLegList"><div class="ps-help">Cargando…</div></div></div>';
-  h += '<div class="ps-help">Dejá <b>esta pantalla abierta</b> en la PC que está al lado de la impresora. Para que salga <b>sin diálogo</b>: abrí la app en <b>Chrome con <code>--kiosk-printing</code></b> y poné esa impresora como <b>predeterminada de Windows</b>. Probá con el botón de abajo antes de prender el automático.</div>';
+  h += '<div class="ps-help">Lo que no sale solo <b>no abre el cuadro de impresión</b>: queda pendiente en la <b>Cola de impresión NP</b>, desde donde se imprime.</div>';
   h += '<div class="ps-actions"><button class="ps-test" onclick="psTestPrint()">🖨️ Imprimir hoja de prueba</button></div>';
   const log = (_ps && _ps.log) || [];
   h += '<div class="ps-log-t">Impresos en esta sesión (' + log.length + ')</div>';
@@ -56110,9 +56348,13 @@ async function facPrintSetPref(v){
   } catch(_e){}
 }
 function facPrintToggle(){ facPrintSetPref(facPrintIsOn() ? "0" : "1").then(function(){ psRender(); }); }
-async function facPrintFacturado(np, tanda){
+async function facPrintFacturado(np, tanda, auto){
   const inner = await facFacturadoInner(np, tanda);
-  if (inner) remitoPrintDoc(inner, "facturado", np);
+  if (!inner) return;
+  // v26.66 — automático (estación): sólo por el helper; marca «FAC <np>» si salió. A mano: helper o cuadro.
+  if (auto) { await gvImprimirAuto("facturado", inner, np, COLA_FAC_PREFIJO + String(np)); return; }
+  remitoPrintDoc(inner, "facturado", np);
+  try { colaImpMarcarImpresas([COLA_FAC_PREFIJO + String(np)], "cola"); } catch (_e) {}
 }
 /* v26.12 — arma la hoja FACTURADO (sin imprimir); la imprime facPrintFacturado (helper o navegador). null = no hay hoja. */
 async function facFacturadoInner(np, tanda){
@@ -59879,7 +60121,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.66"></script>
+<script src="importacion.js?v=26.67"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62702,9 +62944,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.66"></script>
-<script src="hotsale.js?v=26.66"></script>
-<script src="estadisticas.js?v=26.66"></script>
+<script src="cobranzas.js?v=26.67"></script>
+<script src="hotsale.js?v=26.67"></script>
+<script src="estadisticas.js?v=26.67"></script>
 
 </body>
 </html>

@@ -1,4 +1,4 @@
-/* v26.66 (Luis, 05/10, D6) — «Frenar la tanda», parte 3: CRÉDITO por operario y día.
+/* v26.67 (Luis, 05/10, D6) — «Frenar la tanda», parte 3: CRÉDITO por operario y día.
    Una tanda FRENADA la hicieron varios: cada uno se lleva el m³ de lo que hizo, en el día en que
    lo hizo (picking por sus cajas pickeadas, armado por los líos que cerró). Lo dice
    `gv_tanda_credito`; una tanda SIN freno sigue entera al que dio el TP/TAP.
@@ -8,6 +8,7 @@
    (B) Sin respuesta de gv_tanda_credito → como antes (F30A entera al del TP).
    (C) TV: mismo reparto en el m³/h; la parte de un operario entra cuando ÉL cierra su tramo hoy.
    (E) El desglose por día del monitor viejo usa el mismo helper (gvM3ConCredito).
+   (F) Productividad / premio (D15): PKF/APF cierran el tramo del que frenó y se lleva su parte del período.
    (D) Armado: separar un código deja quién lo separó (súper / retira se acreditan por eso).
    Sale 1 si falla. */
 const path = require("path");
@@ -155,6 +156,43 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.dQuienSeparo = out.d.sep === true && out.d.leg === "277" && out.d.ts && out.d.persistio === 1;
     await p.close();
   }
+
+  // ---------------- (F) Productividad / premio (D15): el frenador cierra su tramo y se lleva su parte
+  {
+    const p = await b.newPage();
+    const errs = []; p.on("pageerror", (e) => errs.push(e.message));
+    await p.route("**/*.supabase.co/**", (r) => r.abort());
+    await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
+    await p.waitForFunction(() => typeof prodCompute === "function" && typeof _pvParse === "function");
+    out.f = await p.evaluate(({ DIA, CRED }) => {
+      const t = (hh) => Date.parse(DIA + "T" + String(hh).padStart(2, "0") + ":00:00-03:00");
+      const ev = [
+        { legajo: "104", opcion: "EP",  texto: "F30A", ini: null,  cli: t(9) },
+        { legajo: "104", opcion: "PKF", texto: "F30A", ini: t(9),  cli: t(10) },
+        { legajo: "277", opcion: "EP",  texto: "F30A", ini: null,  cli: t(11) },
+        { legajo: "277", opcion: "TP",  texto: "F30A", ini: t(11), cli: t(12) },
+        { legajo: "277", opcion: "EP",  texto: "F31B", ini: null,  cli: t(13) },
+        { legajo: "277", opcion: "TP",  texto: "F31B", ini: t(13), cli: t(14) },
+        { legajo: "104", opcion: "FJ",  texto: "",     ini: null,  cli: t(17) },
+        { legajo: "277", opcion: "FJ",  texto: "",     ini: null,  cli: t(17) }
+      ];
+      const D1 = _pvParse(DIA), D2 = D1 + 86400000, m3 = { F30A: 1, F31B: 0.5 };
+      const cred = new Map([["F30A|picking", CRED.map((c) => ({ legajo: c.legajo, dia: c.dia, m3: c.m3, cajas: c.cajas }))]]);
+      const r = (o) => ({ m3: Math.round(o.pickM3 * 1000) / 1000, min: Math.round(o.pickTime / 60000), otros: Math.round((o.buckets.otros || 0) / 60000) });
+      const con = prodCompute(ev, m3, D1, D2, {}, cred), sin = prodCompute(ev, m3, D1, D2, {}, new Map());
+      const otroDia = prodCompute(ev, m3, D1, D2, {}, new Map([["F30A|picking", CRED.map((c) => ({ legajo: c.legajo, dia: "2026-10-04", m3: c.m3 }))]]));
+      return { con104: r(con["104"]), con277: r(con["277"]), sin104: r(sin["104"]), sin277: r(sin["277"]), otro104: r(otroDia["104"]) };
+    }, { DIA, CRED });
+    if (errs.length) out.fErr = errs.slice(0, 3);
+    await p.close();
+  }
+  // con crédito: 104 se lleva 0,6 y su hora de picking (antes caía en «otros»); 277 0,4 + 0,5
+  out.fCadaUnoSuParte = out.f.con104.m3 === 0.6 && out.f.con277.m3 === 0.9;
+  out.fElFrenoEsPicking = out.f.con104.min === 60 && out.f.con104.otros === 0;
+  // sin crédito leído: como antes (el del TP se lleva la tanda entera) y NO se cuenta dos veces
+  out.fSinCreditoNoDuplica = out.f.sin104.m3 === 0 && out.f.sin277.m3 === 1.5;
+  // la parte de otro día no entra en este período
+  out.fSoloSuDia = out.f.otro104.m3 === 0;
 
   let ok = true;
   for (const k of Object.keys(out)) {
