@@ -68,6 +68,52 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     try { await pwebLkToken(); out.reintento = "(no falló)"; }
     catch (e) { out.reintento = e.message; }
 
+    // ── 4) v26.78: modo enlace → la sesión viene armada, SIN login con password ──
+    _pwebTok = null; _pwebTokExp = 0; _pwebRef = null;
+    let cuerpoPuente = null, loginPw = 0;
+    window.fetch = async (url, opt) => {
+      const u = String(url);
+      if (u.indexOf("admin-login-otp") >= 0) {
+        cuerpoPuente = JSON.parse((opt && opt.body) || "{}");
+        return { ok: true, json: async () => ({ ok: true, modo: "enlace", email: "a@b.c",
+          access_token: "TOK_ENLACE", refresh_token: "REF1", expires_in: 3600 }) };
+      }
+      if (u.indexOf("grant_type=password") >= 0) loginPw++;
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+    out.tokEnlace = await pwebLkToken();
+    out.modoPedido = cuerpoPuente && cuerpoPuente.modo;
+    out.loginPw = loginPw;
+
+    // ── 5) vencido con refresh token → renueva la MISMA sesión, sin puente ──────
+    _pwebTokExp = 0;
+    let puente5 = 0, refresh5 = 0;
+    window.fetch = async (url, opt) => {
+      const u = String(url);
+      if (u.indexOf("admin-login-otp") >= 0) { puente5++; return { ok: false, status: 500, json: async () => ({}) }; }
+      if (u.indexOf("grant_type=refresh_token") >= 0) {
+        refresh5++;
+        const bd = JSON.parse((opt && opt.body) || "{}");
+        if (bd.refresh_token !== "REF1") return { ok: false, status: 400, json: async () => ({}) };
+        return { ok: true, json: async () => ({ access_token: "TOK_REFRESCADO", refresh_token: "REF2", expires_in: 3600 }) };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+    out.tokRefresh = await pwebLkToken();
+    out.puente5 = puente5; out.refresh5 = refresh5;
+
+    // ── 6) refresh rechazado → cae al puente y sigue andando ────────────────────
+    _pwebTokExp = 0; _pwebRef = "REF_MUERTO";
+    let puente6 = 0;
+    window.fetch = async (url) => {
+      const u = String(url);
+      if (u.indexOf("grant_type=refresh_token") >= 0) return { ok: false, status: 400, json: async () => ({ error_code: "refresh_token_not_found" }) };
+      if (u.indexOf("admin-login-otp") >= 0) { puente6++;
+        return { ok: true, json: async () => ({ ok: true, access_token: "TOK_6", refresh_token: "REF6", expires_in: 3600 }) }; }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+    out.tok6 = await pwebLkToken(); out.puente6 = puente6;
+
     window.fetch = real;
     return out;
   });
@@ -80,6 +126,11 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.puenteTrasCache === 1,   "con el token cacheado no reabre el puente");
   chk(/Invalid login credentials/.test(r.msg), "el error dice lo que contestó LK: " + r.msg);
   chk(/Invalid login credentials/.test(r.reintento), "se puede reintentar (la promesa no queda pegada)");
+  chk(r.modoPedido === "enlace",  "v26.78: el puente se pide en modo enlace (no cambia la clave del usuario compartido)");
+  chk(r.tokEnlace === "TOK_ENLACE" && r.loginPw === 0, "modo enlace: usa la sesión que viene, sin login con password");
+  chk(r.tokRefresh === "TOK_REFRESCADO" && r.puente5 === 0 && r.refresh5 === 1,
+      "token vencido con refresh token: renueva la misma sesión sin abrir el puente");
+  chk(r.tok6 === "TOK_6" && r.puente6 === 1, "refresh rechazado: cae al puente y entra igual");
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));
 
   await b.close();

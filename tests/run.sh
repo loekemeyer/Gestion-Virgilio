@@ -473,6 +473,8 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pweb-lk-token (v12.82: el token de LK se pide UNA sola vez aunque lo pidan varios) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pweb-lk-token.cjs
+echo "== lk-login-sin-pisar (v26.78: entrar al panel de LK no echa al que ya está adentro) =="
+node tests/lk-login-sin-pisar.cjs
 
 echo "== pk-prioridad-agregado (idea 4990 / v12.85: la tanda con un agregado urgente va arriba de la lista del operario) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pk-prioridad-agregado.cjs
@@ -1156,7 +1158,7 @@ echo "== helper-impresion-fuente (v26.29: fuente del helper en tools/helper-impr
 node tests/helper-impresion-fuente.cjs
 echo "== stk-excel-stock-insumos (v26.69: botón Excel en Stocks e Insumos; baja lo que muestra la tabla) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-excel-stock-insumos.cjs
-echo "== stk-est-madre-orden (v26.79: rótulo Est. Madre — 1.º sin 0 mayor→menor, 2.º menor→mayor, 3.º estándar) =="
+echo "== stk-est-madre-orden (v26.79-81: rótulos de Stocks — Est. Madre 3 toques, el resto 4: filtra · ▼ · ▲ · estándar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-orden.cjs
 echo "== ppp-ent-fecha-pedido (v26.69: Pedidos Entregados muestra la fecha en que llegó el pedido del cliente) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-ent-fecha-pedido.cjs

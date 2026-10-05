@@ -6292,7 +6292,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.79"></script>
+<script type="module" src="recepcion.js?v=26.81"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10531,7 +10531,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.79";
+const APP_VERSION = "v26.81";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20155,12 +20155,20 @@ function stkFiltroLinea(l) { if (!_stk) return; _stk.filLinea = (_stk.filLinea =
 function stkToggleFilCol(key) {   // v8.95 — filtro por columna > 0
   if (!_stk) return;
   /* v26.79 (Luis, 05/10) — Est. Madre tiene TRES toques: 1.º saca los 0 y ordena de mayor a menor,
-     2.º de menor a mayor, 3.º vuelve al estándar (sin filtro y con el orden de siempre). */
+     2.º de menor a mayor, 3.º vuelve al estándar (sin filtro y con el orden de siempre).
+     v26.81 (Luis, 05/10) — las demás columnas tienen CUATRO: 1.º sólo filtra (> 0), 2.º de mayor a
+     menor, 3.º de menor a mayor, 4.º vuelve al estándar. Tocar otra columna arranca de cero en ésa. */
+  var ord = _stk.filCol === key ? (_stk.colOrd || "") : null;   // null = esta columna no estaba tocada
   if (key === "_proy") {
-    if (_stk.filCol !== "_proy") { _stk.filCol = "_proy"; _stk.proyOrd = "desc"; }
-    else if (_stk.proyOrd === "desc") _stk.proyOrd = "asc";
-    else { _stk.filCol = ""; _stk.proyOrd = ""; }
-  } else { _stk.filCol = (_stk.filCol === key) ? "" : key; _stk.proyOrd = ""; }
+    if (ord === null) { _stk.filCol = key; _stk.colOrd = "desc"; }
+    else if (ord === "desc") _stk.colOrd = "asc";
+    else { _stk.filCol = ""; _stk.colOrd = ""; }
+  } else {
+    if (ord === null) { _stk.filCol = key; _stk.colOrd = ""; }
+    else if (ord === "") _stk.colOrd = "desc";
+    else if (ord === "desc") _stk.colOrd = "asc";
+    else { _stk.filCol = ""; _stk.colOrd = ""; }
+  }
   _stk.openArt = null; stkRender();
 }
 function stkToggleSoloPin() { if (!_stk) return; _stk.soloPin = !_stk.soloPin; _stk.openArt = null; stkRender(); }
@@ -20363,19 +20371,20 @@ function stkBodyStocks() {
   });
   // v8.95 — filtro rápido por columna: tocar el header de una columna muestra solo las filas
   // con ese valor > 0. Vale para todas (depósitos + Total Stock/Pedidas/Capacidad/FC s/Salida).
+  // v26.81 — el valor de cada columna sale de UN lugar: lo usan el filtro (> 0) y el orden (▼/▲).
+  // Al ordenar, Cajas Pedidas va por el número que muestra la celda (el neto, v24.04).
+  var _stkColVal = function (a, k, ordenar) {
+    if (k === "_tot") return SECTKEYS.reduce(function (s, kk) { return s + (Number(a[kk]) || 0); }, 0) + (Number(a.racks_ch) || 0);
+    if (k === "_proy") return Number(_proyOf(a.cod)) || 0;
+    if (k === "_ped") { if (ordenar) { var _pn0 = _pedNetoOf(a.cod); if (_pn0) return Number(_pn0.neto) || 0; } return Number(_demOf(a.cod)) || 0; }
+    if (k === "_cap") return Number(_capOf(a.cod)) || 0;
+    if (k === "_fc") return Number(_fcArtCajas(a)) || 0;
+    if (k === "racks") return (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
+    return Number(a[k]) || 0;
+  };
   if (_stk.filCol) {
     var _fcK = _stk.filCol;
-    shown = shown.filter(function (a) {
-      var v;
-      if (_fcK === "_tot") v = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);
-      else if (_fcK === "_proy") v = _proyOf(a.cod);
-      else if (_fcK === "_ped") v = _demOf(a.cod);
-      else if (_fcK === "_cap") v = _capOf(a.cod);
-      else if (_fcK === "_fc") v = _fcArtCajas(a);
-      else if (_fcK === "racks") v = (Number(a.racks) || 0) + (Number(a.racks_ch) || 0);
-      else v = Number(a[_fcK]) || 0;
-      return v > 0.05;
-    });
+    shown = shown.filter(function (a) { return _stkColVal(a, _fcK) > 0.05; });
   }
   // v7.71 — ocultar la fila del CÓDIGO BASE de una familia empresa-split (ej. "438E") cuando NO
   // tiene stock propio y la familia SÍ tiene stock en su variante LK/CH. El stock físico vive en
@@ -20489,10 +20498,11 @@ function stkBodyStocks() {
   const _thNum = function (key, label, baseStyle, title) {
     const on = _stk.filCol === key;
     const st = on ? "background:#16a34a;color:#fff;" : (baseStyle || "");
-    // v26.79 — Est. Madre además ordena: ▼ mayor→menor, ▲ menor→mayor (stkToggleFilCol).
-    const _ord = on && key === "_proy" && _stk.proyOrd;
-    const _mk = _ord ? (_stk.proyOrd === "asc" ? " ▲" : " ▼") : (on ? " ✓" : " <span style=\"opacity:.4;font-weight:400\">⌵</span>");
-    const _tt = key === "_proy" ? " — 1.º toque: sin los 0 y de mayor a menor · 2.º: de menor a mayor · 3.º: vuelve al orden normal" : " — tocá para mostrar solo los que tienen &gt; 0";
+    // v26.79/v26.81 — además ordena: ▼ mayor→menor, ▲ menor→mayor; ✓ = sólo filtrada (stkToggleFilCol).
+    const _ord = on && _stk.colOrd;
+    const _mk = _ord ? (_stk.colOrd === "asc" ? " ▲" : " ▼") : (on ? " ✓" : " <span style=\"opacity:.4;font-weight:400\">⌵</span>");
+    const _tt = key === "_proy" ? " — 1.º toque: sin los 0 y de mayor a menor · 2.º: de menor a mayor · 3.º: vuelve al orden normal"
+      : " — 1.º toque: sólo los que tienen &gt; 0 · 2.º: de mayor a menor · 3.º: de menor a mayor · 4.º: vuelve al orden normal";
     return '<th class="num" onclick="stkToggleFilCol(\'' + key + '\')" title="' + (title || "Filtrar") + _tt + '" style="cursor:pointer;' + st + '">' + label + _mk + '</th>';
   };
   let th = '<th>Código</th><th style="text-align:center;padding:7px 5px;font-size:10px;">LK/<br>CH</th><th>Descripción</th>' +
@@ -20517,11 +20527,12 @@ function stkBodyStocks() {
     if (ap !== bp) return bp - ap;                       // fijados arriba
     return 0;                                            // resto: orden original (sort estable)
   });
-  // v26.79 (Luis, 05/10) — con Est. Madre tocada, el orden es por Est. Madre (▼ mayor→menor / ▲ menor→mayor).
-  // Sort estable: a igual Est. Madre queda el orden de arriba (negativos y fijados primero).
-  if (_stk.filCol === "_proy" && _stk.proyOrd) {
-    const _pd = _stk.proyOrd === "asc" ? 1 : -1;
-    shown.sort(function (a, b) { return _pd * ((Number(_proyOf(a.cod)) || 0) - (Number(_proyOf(b.cod)) || 0)); });
+  // v26.79/v26.81 (Luis, 05/10) — con una columna ordenada (▼ mayor→menor / ▲ menor→mayor), manda esa columna.
+  // Sort estable: a igual valor queda el orden de arriba (negativos y fijados primero).
+  if (_stk.filCol && _stk.colOrd) {
+    const _pd = _stk.colOrd === "asc" ? 1 : -1, _ok = _stk.filCol, _cv = new Map();
+    shown.forEach(function (a) { _cv.set(a, _stkColVal(a, _ok, true)); });
+    shown.sort(function (a, b) { return _pd * (_cv.get(a) - _cv.get(b)); });
   }
   /* v26.69 (Luis, 05/10) — «⬇ Excel» baja EXACTAMENTE lo que muestra la tabla: las mismas filas (búsqueda,
      LK/CH, negativos, stock bajo, fijados, discontinuos, filtro de columna), el mismo orden y los mismos
@@ -33985,14 +33996,25 @@ function closePPP() {
 const PWEB_LK_URL  = "https://kwkclwhmoygunqmlegrg.supabase.co";
 const PWEB_LK_ANON = "sb_publishable_mVX5MnjwM770cNjgiL6yLw_LDNl9pML";
 
-let _pwebTok = null, _pwebTokExp = 0;
+let _pwebTok = null, _pwebTokExp = 0, _pwebRef = null;
 // v13.11 — el token de LK dura 1 h: guardado en sessionStorage se ahorra el puente
 // (Edge Function 1,6 s + login 0,4 s, medido) en cada recarga dentro de esa hora.
 const PWEB_TOK_SS_KEY = "gv_lk_tok_v1";
 try {
   const _s = JSON.parse(sessionStorage.getItem(PWEB_TOK_SS_KEY) || "null");
   if (_s && _s.tok && _s.exp && Date.now() < _s.exp - 60000) { _pwebTok = _s.tok; _pwebTokExp = _s.exp; }
+  if (_s && _s.ref) _pwebRef = _s.ref;
 } catch (_e) {}
+
+/* v26.78 — guarda la sesión de LK (access + refresh token). Con el refresh token la hora
+   siguiente se RENUEVA la misma sesión en vez de abrir otra por el puente. */
+function _pwebGuardarSesion(d) {
+  _pwebTok = d.access_token;
+  _pwebTokExp = Date.now() + ((d.expires_in || 3600) * 1000);
+  _pwebRef = d.refresh_token || null;
+  try { sessionStorage.setItem(PWEB_TOK_SS_KEY, JSON.stringify({ tok: _pwebTok, exp: _pwebTokExp, ref: _pwebRef })); } catch (_e) {}
+  return _pwebTok;
+}
 
 /* Canjea el JWT de Virgilio por uno de LK. Se cachea en memoria: el token dura
    una hora y pedirlo en cada carga sería un viaje de más por nada. */
@@ -34009,24 +34031,46 @@ try {
 
    Con `_pwebTokProm` la primera llamada abre el puente y las demás esperan ESA
    misma promesa. La promesa se limpia al terminar (bien o mal) para poder
-   reintentar. */
+   reintentar.
+
+   ⚠⚠ v26.78 (Tomás Gonzalez, 05/10): cambiarle la password al usuario de LK CIERRA TODAS
+   sus sesiones, y es el mismo usuario del Panel Web LK: cada vez que Gestión pedía el token
+   echaba al que estaba en el panel, y su alta de clientes moría con «invalid_token» (22
+   cambios de clave por día). Ahora se pide `modo: "enlace"`: la función devuelve una sesión
+   NUEVA sin tocar la clave. Si contesta con el modo viejo (tmp_password) se sigue entrando
+   igual. Y antes de abrir el puente se renueva la sesión que ya hay con su refresh token. */
 let _pwebTokProm = null;
 async function pwebLkToken() {
   if (_pwebTok && Date.now() < _pwebTokExp - 60000) return _pwebTok;
   if (_pwebTokProm) return await _pwebTokProm;
   _pwebTokProm = (async function () {
+    // v26.78: primero renovar la sesión que ya tenemos (no crea otra ni toca la clave).
+    if (_pwebRef) {
+      try {
+        const rr = await fetch(PWEB_LK_URL + "/auth/v1/token?grant_type=refresh_token", {
+          method: "POST",
+          headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: _pwebRef })
+        });
+        let rd = {}; try { rd = await rr.json(); } catch (_e) {}
+        if (rr.ok && rd.access_token) return _pwebGuardarSesion(rd);
+      } catch (_e) {}
+      _pwebRef = null;   // no sirvió: se abre el puente como siempre
+    }
     let vjwt = null;
     try { if (window.sbAuth) vjwt = await window.sbAuth.getAccessToken(); } catch (_e) {}
     if (!vjwt) throw new Error(authNoSesionMsg("Iniciá sesión para ver la PPP Web."));
     const br = await fetch(PWEB_LK_URL + "/functions/v1/admin-login-otp", {
       method: "POST",
       headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "bridge", vjwt: vjwt })
+      body: JSON.stringify({ action: "bridge", vjwt: vjwt, modo: "enlace" })
     });
     let bd = {}; try { bd = await br.json(); } catch (_e) {}
-    if (!br.ok || !bd.tmp_password) {
+    if (!br.ok || (!bd.tmp_password && !bd.access_token)) {
       throw new Error("No se pudo entrar a LK (" + (bd.detail || bd.error || bd.msg || ("HTTP " + br.status)) + ").");
     }
+    // v26.78: modo enlace → la sesión viene armada, sin login con password.
+    if (bd.access_token) return _pwebGuardarSesion(bd);
     const lr = await fetch(PWEB_LK_URL + "/auth/v1/token?grant_type=password", {
       method: "POST",
       headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
@@ -34040,10 +34084,7 @@ async function pwebLkToken() {
       throw new Error("Login LK falló (" +
         (ld.error_description || ld.msg || ld.error_code || ld.error || ("HTTP " + lr.status)) + ").");
     }
-    _pwebTok = ld.access_token;
-    _pwebTokExp = Date.now() + ((ld.expires_in || 3600) * 1000);
-    try { sessionStorage.setItem(PWEB_TOK_SS_KEY, JSON.stringify({ tok: _pwebTok, exp: _pwebTokExp })); } catch (_e) {}
-    return _pwebTok;
+    return _pwebGuardarSesion(ld);
   })();
   try { return await _pwebTokProm; }
   finally { _pwebTokProm = null; }
@@ -60250,7 +60291,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.79"></script>
+<script src="importacion.js?v=26.81"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63073,9 +63114,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.79"></script>
-<script src="hotsale.js?v=26.79"></script>
-<script src="estadisticas.js?v=26.79"></script>
+<script src="cobranzas.js?v=26.81"></script>
+<script src="hotsale.js?v=26.81"></script>
+<script src="estadisticas.js?v=26.81"></script>
 
 </body>
 </html>
