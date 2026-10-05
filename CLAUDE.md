@@ -5639,9 +5639,21 @@ Centinelas 307-310 · `sql/gv_tanda_frenada_v2665.sql` · `tests/tanda-frenar-2b
 | cuándo entra | la parte de un operario entra cuando **ÉL cierra su tramo ese día** (TP/TAP/PKF/APF): mismo criterio de siempre, el m³ entra al cerrar. Con el freno al fichar, todo tramo cierra en el día |
 | sin respuesta | como antes: la tanda entera al del TP/TAP |
 
-⚠ Lo que **no** cambió: el **puntaje 1-10** de picking (`gv_picking_puntaje_operario`) sigue sin las tandas frenadas: mide velocidad por tanda entera y una tanda partida no tiene un tiempo de punta a punta de un solo operario.
+~~El puntaje 1-10 de picking sigue sin las tandas frenadas~~ → **retirado en la v26.74 (D17, abajo)**.
 ⚠ Una corrida que cruza la medianoche sin FJ deja su parte del primer día sin contar (no hay cierre ese día): con el cron 129 no pasa.
 Centinelas 313-315 · `sql/gv_tanda_credito_v2667.sql` · `tests/tanda-credito.cjs` (verificado que falla contra la v26.65 y sin el guard de cierre de la TV).
+
+**D17 (v26.74; los marcadores y centinelas de la base dicen v26.68 — llave, no cambiar. Luis: *"que entre la parte de cada uno"*) — el PUNTAJE 1-10 de picking también reparte:**
+
+| pieza | qué hace |
+|---|---|
+| `gv_picking_tanda_calc_frenada(tanda, legajo)` | cada TRAMO del legajo (EP → PKF del que frenó, EP → TP del que terminó) con la cuenta de siempre (`gv_picking_tanda_calc`: sus líneas, paradas, alturas, tiempo), sumados en UNA fila de `GV_Picking_Tanda` (`cola_tipo = 'frenada'`). El tramo del **freno no lleva cola** (≡ horas) y la espera del último PKC al freno se topea en `cola_tope_min` (30). Cada tramo paga su fijo y su arranque (el que retoma vuelve a buscar el carro) |
+| ventana sin solape (`v26.68-ventana`) | la ventana de PKC de un tramo termina donde empieza el vecino (de cualquier legajo): con el ±5 min de siempre, el que retoma a los 2 min contaba sus líneas también en el que frenó. calc_frenada la fija con `set_config('gv.pkc_desde'/'gv.pkc_hasta')` y la limpia después de cada tramo; sin eso `gv_picking_tanda_calc` usa ±5 min como siempre |
+| `gv_picking_tanda_refresh` | mira TP **y PKF**; tanda con freno de picking → por tramos; sin freno, igual que antes |
+| `gv_picking_puntaje_operario` | el «TP vivo» acepta el PKF del que frenó; el detalle lleva `frenada`. Mon. Admin: **⏸** en la tanda y la nota |
+
+Probado en transacción abortada: F13E partida (retoma a 1 min) → 13 + 12 líneas = las 25 de la original (sin la ventana daba 29).
+Centinelas 304 (actualizado) y 316-319 · `sql/gv_picking_puntaje_frenada_v2674.sql` · `tests/puntaje-frenada.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-01, v25.63): todo módulo que abre tarea tiene ⛔ ANULAR — y la anulación QUEDA REGISTRADA
 

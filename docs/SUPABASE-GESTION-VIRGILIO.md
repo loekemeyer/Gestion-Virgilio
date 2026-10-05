@@ -31645,3 +31645,18 @@ aplicó en Chef (el error fue al parsear). Mismo contenido, sólo partido en el 
 Falta (tarea de Planify de Luis): el resultado de esa prueba en Chef, la clave de ventas@chefsrl.com en el Vault de LK
 (`KRIKOS_CHEF_IMAP_PASS`, la carga Luis), el lector con las dos casillas y la carpeta de spam con aviso, y la rama de
 Chef del auto-import (Cencosud con catálogo LK + L; Dorinka con catálogo de Chef, sin L), probada contra 245-247 y 241.
+
+### 3.v2674 — FRENAR la tanda, D17: el puntaje 1-10 de picking entra con la parte de cada uno (Luis, 05/10/2026, v26.74)
+
+Luis: *"que entre la parte de cada uno"*. Hasta la v26.67 una tanda con freno de picking quedaba **afuera** del puntaje.
+
+| objeto | cambio |
+|---|---|
+| `gv_picking_tanda_calc_frenada(tanda, legajo)` **nueva** (volatile, SECURITY DEFINER, sin grant a anon/authenticated) | mide cada tramo del legajo (EP → PKF, EP → TP) con `gv_picking_tanda_calc` y los suma en una fila de `GV_Picking_Tanda` con `cola_tipo = 'frenada'`; el tramo del freno sin cola y con la espera hasta el freno topeada en `cola_tope_min` |
+| `gv_picking_tanda_calc` | la ventana de PKC puede venir fijada (`current_setting('gv.pkc_desde' / 'gv.pkc_hasta')`); sin eso, ±5 min como siempre. Patch sobre la definición viva, idempotente (`v26.68-ventana`) |
+| `gv_picking_tanda_refresh` | también PKF; tanda con freno de picking → por tramos |
+| `gv_picking_puntaje_operario` | el TP vivo acepta el PKF; sale la exclusión de `GV_Tanda_Freno`; el detalle lleva `frenada`. Patch sobre la viva (`v26.68-frenada`) |
+
+**Impacto hoy:** 0 frenos en producción → ninguna fila cambia. Las tandas sin freno siguen idénticas (F13E: 25 líneas, real 22,6, índice 1,573 antes y después).
+**Prueba** (transacción abortada): F13E partida en dos tramos con retome a 1 min → 13 + 12 líneas = 25 (sin la ventana sin solape daba 29); con legajos reales el puntaje trae la tanda en el detalle de los dos con `frenada: true`.
+**Centinelas** 304 (actualizado) y 316-319 (dicen `v26.68`: llave, no cambiar). **Rollback** en `sql/gv_picking_puntaje_frenada_v2674.sql`.

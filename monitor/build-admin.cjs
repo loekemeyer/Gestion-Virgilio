@@ -371,10 +371,13 @@ function popPuntaje(leg) {
     (tr ? '<div class="pop-sub">Índice por tramo de 10 tandas (de la más vieja a la más nueva): ' + esc(tr) + '</div>' : "");
   var det = o.detalle || [];
   if (!det.length) return head;
+  var fr = 0;
   var body = det.map(function (t) {
-    return '<tr><td class="pop-k">' + esc(t.tanda) + '</td><td>' + esc(t.fecha) + '</td><td>' + esc(String(t.nivel || "")) + ' (' + t.grado + ')</td><td>' +
+    if (t.frenada) fr++;   // v26.74 (D17): tanda FRENADA → sólo la parte de este operario (sus tramos)
+    return '<tr><td class="pop-k"' + (t.frenada ? ' title="Tanda frenada: cuenta sólo la parte que pickeó este operario"' : '') + '>' + esc(t.tanda) + (t.frenada ? ' ⏸' : '') + '</td><td>' + esc(t.fecha) + '</td><td>' + esc(String(t.nivel || "")) + ' (' + t.grado + ')</td><td>' +
       t.lineas + ' / ' + n1(t.cajas) + '</td><td>' + t.paradas + ' / ' + t.esc + '</td><td>' + n1(t.tamano) + '</td><td>' + n1(t.real) + '</td><td class="pop-k">' + n1(t.indice) + '</td></tr>'; }).join("");
-  return head + '<table class="pop-cmp"><thead><tr><th>Tanda</th><th>Día</th><th>Dificultad</th><th>Lín / cajas</th><th>Paradas / esc.</th><th>Esperado min</th><th>Real min</th><th>Índice</th></tr></thead><tbody>' + body + '</tbody></table>';
+  return head + '<table class="pop-cmp"><thead><tr><th>Tanda</th><th>Día</th><th>Dificultad</th><th>Lín / cajas</th><th>Paradas / esc.</th><th>Esperado min</th><th>Real min</th><th>Índice</th></tr></thead><tbody>' + body + '</tbody></table>' +
+    (fr ? '<div class="pop-sub">⏸ tanda frenada: entra sólo la parte que pickeó este operario (sus tramos; el que retoma vuelve a pagar el arranque).</div>' : '');
 }
 function instrumentar() {
   var D = window.__MA_D || {};

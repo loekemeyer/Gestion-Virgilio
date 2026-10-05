@@ -261,6 +261,8 @@ echo "== tanda-frenar-2b (v26.65: retomar por «Seguir», aviso del día siguien
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-frenar-2b.cjs
 echo "== tanda-credito (v26.67: la tanda frenada se reparte, cada uno su m³ en su día) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-credito.cjs
+echo "== puntaje-frenada (v26.74 D17: la tanda frenada entra en el puntaje con la parte de cada uno) =="
+node tests/puntaje-frenada.cjs
 
 echo "== fac-block-recuperable (regresión v6.21: bloqueo del tilde si el faltante se puede completar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-block-recuperable.cjs
