@@ -5467,6 +5467,13 @@ Dos detalles de implementación que costaron y conviene no repetir:
 para mirar; `sin nada que armar` y `fuera de horario` son sanos. §3.jf,
 `sql/gv_armado_salud_feed_v1958.sql`.
 
+⚠ **Y en la TV de la pared también** (v26.70, Luis D28): si fallaba la lectura de `Facturacion_NP`, el catch
+devolvía un conjunto vacío, la caché lo guardaba como bueno y salía el cartel violeta **«143 TANDAS YA SALIERON Y NO
+ESTÁN FACTURADAS»**, falso. Hoy facturadas y despachadas (CCN) **re-lanzan el error**: la caché sigue con lo último
+bueno, y si nunca leyó llegan como `null` → sin cartel, y «NPs por Día» / «Pendientes» dicen *«No se pudo leer lo
+cargado al camión»*. Y las columnas de la tabla de tandas miden lo que mide su dato (en `--u`), no un % (D29: en el
+Mon. Admin el código se pisaba con el m³, «E48L0,4»). `tests/mon-lectura-rota-ancho.cjs` (falla contra la v26.69).
+
 ## ⚠ REGLA (v21.10): `index.html` es UTF-8 — un byte en latin1 se multiplica solo
 
 El archivo declara `<meta charset="UTF-8">`. El 22/09 tenía **5 bytes sueltos en latin1/cp1252**,

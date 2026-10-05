@@ -177,6 +177,11 @@ tr.dia td{background:#0e1830;color:#93c5fd;font-size:calc(1.9*var(--u));font-wei
    Tres columnas de ancho fijo: sin `table-layout:fixed` el semáforo se corre de
    lugar de una fila a otra y la columna deja de leerse como columna. */
 table.tandas{table-layout:fixed}
+/* v26.70 (Luis, D29): cada columna mide lo que mide su DATO (en --u, que escala con la letra), no un %
+   de la tabla: con % el código de la tanda se pisaba con el m³ en el Mon. Admin («E48L0,4»). El cliente
+   se queda con el resto y rota si no entra. */
+table.tandas col.c-tan{width:calc(11.5*var(--u) + .8vw)}table.tandas col.c-m3{width:calc(8*var(--u) + .8vw)}
+table.tandas col.c-np{width:calc(5*var(--u) + .8vw)}table.tandas col.c-pro{width:calc(10.5vh + 1.6vw)}
 /* v24.88: cliente y NP, más chicos que el código de tanda (lo que se busca de lejos sigue siendo la tanda). */
 .t-cli{font-weight:800;font-size:calc(2.3*var(--u));color:#e2e8f0}
 .t-cli div{overflow:hidden;white-space:nowrap}
@@ -273,7 +278,7 @@ td.act-dur{font-weight:900;text-align:center;font-size:calc(2.1*var(--u))}
 .aviso-err{background:#450a0a;color:#fecaca;border:1px solid #991b1b}
 /* v20.20 — salió y sin factura: violeta, el mismo color que la columna Salió */
 .aviso-salio{background:#2e1065;color:#ddd6fe;border:1px solid #6d28d9}
-.t-salio{font-size:calc(1.5*var(--u));margin-left:.2vw}
+.t-salio{display:block;font-size:calc(1.5*var(--u));line-height:1}
 .vacio{color:#475569;font-size:calc(1.9*var(--u));font-weight:700;padding:1.5vh .5vw;text-align:center}
 .mas{color:#64748b;font-size:calc(1.5*var(--u));font-weight:800;padding:.5vh;text-align:center}
 
@@ -1059,13 +1064,17 @@ var cargarHoras = cache(HORAS_TTL, function () {
     .catch(function (e) { console.warn("[tv] horas:", e.message); return []; });
 });
 
-/* NP facturadas (con o sin cierre): el ✅ del panel de facturación. */
+/* NP facturadas (con o sin cierre): el ✅ del panel de facturación.
+   v26.70 (Luis, D28): una lectura ROTA no es un CERO. El catch devolvía un Set vacío, la caché lo
+   guardaba como dato bueno y el tablero leía «no hay nada facturado»: con un corte de red salía el
+   cartel falso «143 TANDAS YA SALIERON Y NO ESTÁN FACTURADAS». Ahora el error sube: la caché sigue
+   con lo último bueno y, si todavía no leyó nunca, `ciclo` recibe null («no sé»). Igual despachadas. */
 var cargarFacturadas = cache(FAC_TTL, function () {
   return getAll("Facturacion_NP", "select=np&order=np.asc").then(function (filas) {
     var s = new Set();
     (filas || []).forEach(function (f) { if (f && f.np != null) s.add(String(f.np)); });
     return s;
-  }).catch(function (e) { console.warn("[tv] facturadas:", e.message); return new Set(); });
+  }).catch(function (e) { console.warn("[tv] facturadas:", e.message); throw e; });
 });
 
 /* NP despachadas: último CCN posterior al último FSS ("↩ sin salida" devuelve
@@ -1089,7 +1098,7 @@ var cargarDespachadas = cache(DESPACHO_TTL, function () {
         if (!(fss[np] && fss[np] > ccn[np])) s.add(np);
       });
       return s;
-    }).catch(function (e) { console.warn("[tv] despachadas:", e.message); return new Set(); });
+    }).catch(function (e) { console.warn("[tv] despachadas:", e.message); throw e; });
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1484,8 +1493,8 @@ function pintar(d) {
   var etiqueta = d.fechas.map(diaEtiqueta).join(" · ") || "—";
   var topeT = cabenFilas("tandasBox", true);
   el("tandasBox").innerHTML = filas.length
-    ? '<table class="tandas"><colgroup><col style="width:14%"><col style="width:9%"><col style="width:49%">' +
-      '<col style="width:7%"><col></colgroup>' +
+    ? '<table class="tandas"><colgroup><col class="c-tan"><col class="c-m3"><col>' +
+      '<col class="c-np"><col class="c-pro"></colgroup>' +
       '<thead><tr><th>Tanda</th><th class="num">M³</th><th>Cliente</th><th>NP</th><th class="cen">Progreso</th></tr></thead><tbody>' +
       filas.slice(0, topeT).join("") + '</tbody></table>' +
       (filas.length > topeT ? '<div class="mas">+ ' + (filas.length - topeT) + ' más</div>' : "")
@@ -1495,9 +1504,10 @@ function pintar(d) {
 
   /* v20.21 (Thomas): cuáles de las que faltan facturar YA SE FUERON en el camión. v20.20: la
      lista (no sólo el número) porque el cartel de arriba las nombra. */
-  var fcSinFc = fc.filter(function (x) {
+  /* v26.70 (D28): sin el dato de lo facturado o de lo cargado no hay cartel — no se sabe. */
+  var fcSinFc = (d.facturadas && d.despachadas) ? fc.filter(function (x) {
     return tandaSalio(x.v, d.despachadas) && !tandaFacturada(x.v, d.facturadas);
-  });
+  }) : [];
   var fcSalidas = fcSinFc.length;
 
   // ── Avisos: agregados primero (son los que hacen salir un camión incompleto)
@@ -1530,6 +1540,9 @@ function pintar(d) {
   if (d.arbol === null) {
     el("fcTit").innerHTML = "NPs por Día";
     el("fcBox").innerHTML = '<div class="vacio">No se pudo leer la programación</div>';
+  } else if (d.despachadas === null) {   // v26.70 (D28): sin lo cargado, «Salió» diría 0 y es falso
+    el("fcTit").innerHTML = "NPs por Día";
+    el("fcBox").innerHTML = '<div class="vacio">No se pudo leer lo cargado al camión</div>';
   } else {
     var rds = resumenDias(d.arbol, d.despachadas, 4);   /* v24.38 (Luis): un día más */
     el("fcTit").innerHTML = "NPs por Día" +
@@ -1561,6 +1574,9 @@ function pintar(d) {
   if (d.arbol === null) {
     el("penTit").innerHTML = "Pendientes de salir hoy";
     el("penBox").innerHTML = '<div class="vacio">No se pudo leer la programación</div>';
+  } else if (d.despachadas === null) {   // v26.70 (D28): sin lo cargado, todo el día parecería pendiente
+    el("penTit").innerHTML = "Pendientes de salir hoy";
+    el("penBox").innerHTML = '<div class="vacio">No se pudo leer lo cargado al camión</div>';
   } else {
     var pens = pendientesHoy(d.arbol, d.despachadas);
     var penNp = pens.reduce(function (a, x) { return a + x.nps.length; }, 0);
@@ -1707,14 +1723,14 @@ function pintarHoras(filas, d) {
    FSS posterior en `cargarDespachadas`). Una tanda "dada por salida a mano" o
    "presunta" NO cuenta acá tampoco. */
 function tandaSalio(v, despachadas) {
-  if (!v.nps.length) return false;
+  if (!despachadas || !v.nps.length) return false;   // v26.70: null = no se pudo leer → no se afirma que salió
   for (var i = 0; i < v.nps.length; i++) {
     if (!despachadas.has(String(v.nps[i]).trim().replace(/\.0+$/, ""))) return false;
   }
   return true;
 }
 function tandaFacturada(v, facturadas) {
-  if (!v.nps.length) return false;
+  if (!facturadas || !v.nps.length) return false;   // v26.70: null = no se pudo leer
   for (var i = 0; i < v.nps.length; i++) {
     var np = String(v.nps[i]).trim();
     if (!(facturadas.has(np) || facturadas.has(np.replace(/\.0+$/, "")))) return false;
@@ -1731,11 +1747,14 @@ function despachadaYFacturada(v, facturadas, despachadas) {
    6 · CICLO
    ═══════════════════════════════════════════════════════════════════════════ */
 var ultimoOk = 0, fallos = 0, arrancado = false;
+/* v26.70 (D28): facturadas y despachadas que no se pudieron leer NUNCA (sin un dato bueno en la caché)
+   llegan como null, no como vacío: el tablero no afirma ni «salió» ni «no está facturada». */
+function sinDato() { return null; }
 
 function ciclo() {
   return Promise.all([
     cargarProgramacion(), cargarEventosHoy(), cargarEmpleados(),
-    cargarFichadasHoy(), cargarDeshechas(), cargarFacturadas(), cargarDespachadas(),
+    cargarFichadasHoy(), cargarDeshechas(), cargarFacturadas().catch(sinDato), cargarDespachadas().catch(sinDato),
     cargarHoras(), cargarFeriados(), cargarCamiones(), cargarGuardadoHoy(), cargarArbol()
   ]).then(function (r) {
     var arbol = r[11];
