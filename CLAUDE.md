@@ -7773,3 +7773,16 @@ public.gv_alerta_gondola_llena_telegram(true);`. Centinela 322. `sql/gv_alerta_g
   automática se DEDUCE (retira con día, súper, importado diferido, cron/optimizador de las 18:00 por su log, si no grupo de
   zonas). Lo duro es lo manual (`gv_manual_por` / `creado_por`) y el log del cron. Sin RPC dice «—».
 - `sql/gv_ppp_np_origen_v2701.sql`, `tests/ppp-res-origen.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-05, v27.07): cada NP dice con qué PAUTA (P1..P24) se programó — botón P# en el Resumen
+
+- Catálogo **`GV_PPP_Pautas`** (P1..P24 + P14a-d, el orden del código del armado). El armador pone
+  `set_config('gv.pauta', …)` antes de cada pase (marcador `v27.05-pauta`) y el trigger
+  **`gv_ppp_np_pauta_registrar`** de `PPP_Web_Programacion` anota en **`GV_PPP_NP_Pauta`** cuando la NP toma tanda o
+  cambia de día. En el pase (g), **`gv_ppp_pauta_grupo_clasificar`** dice la rama (P14a/b/c/d) leyendo `_gdg_oc` que
+  `gv_ppp_web_dia_grupo` acaba de armar (misma cuenta, no se duplica) y por qué no siguió la siguiente.
+- Lectura **`gv_ppp_np_pauta_lista()`** (anon): manual P24 > cron 18:00 P22/P23 > registrada > **deducida** (lo
+  programado antes del 05/10: la rama exacta no quedó anotada).
+- Front: botoncito **P#** en «Cómo llegó a este día» del Resumen → pop-up (por qué frenó · lo evaluado antes · por qué
+  no siguió · la tanda). Al agregar o reordenar un pase del armador, sumar su `set_config` y su fila al catálogo.
+- `sql/gv_ppp_np_pauta_v2705.sql`, centinela 336, `tests/ppp-res-origen.cjs`.

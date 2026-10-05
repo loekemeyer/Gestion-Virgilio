@@ -50,6 +50,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     [...host.querySelectorAll(".ppp-restbl td.cam")][0].click();
     ov = document.getElementById("pppResPopOv");
     out.cam = [...ov.querySelectorAll(".pppres-tbl tbody tr:not(.camh) td.orig")].map(function (t) { return t.textContent.replace(/\s+/g, " ").trim(); });
+    // v27.05: con pauta, botoncito P# que abre por qué frenó y por qué no siguió
+    _pppNpOrig["LK 0300"] = { np: "LK 0300", pauta: "P14a", titulo: "Su grupo ya sale en el plazo", fuente: "registrada", origen: "automatico",
+      motivo: "Su grupo (GBA Oeste) ya tenía camión el 08/10.", previas: "P1 a P13 no la frenaron.", no_siguiente: "No pasó a P14b porque su grupo sale en el plazo.", tanda_info: "Tanda F31A: 1 NP" };
+    host.remove(); host = document.createElement("div"); host.innerHTML = pppResumenHtml(prog); document.body.appendChild(host);
+    [...host.querySelectorAll(".ppp-restbl td.z5.zc")][0].click();
+    ov = document.getElementById("pppResPopOv");
+    const btn = [...ov.querySelectorAll("button.pauta-b")].find(function (x) { return x.textContent === "P14a"; });
+    out.btn = !!btn;
+    if (btn) { btn.click(); const pv = document.getElementById("pppPautaOv"); out.pop = pv ? pv.textContent.replace(/\s+/g, " ") : ""; out.popVis = pv && pv.style.display === "flex"; }
+    out.ordenP = [...host.querySelectorAll("details.ppp-res-orden li b")].map(function (x) { return x.textContent; });
     return out;
   });
 
@@ -63,6 +73,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   if (!/Automático/.test(r.conRpc["LK 0300"] || "") || !/Grupo de zonas/.test(r.conRpc["LK 0300"] || "")) f.push("LK 0300 no dice automático con su regla: " + r.conRpc["LK 0300"]);
   if (!/ISIS/.test(r.conRpc["98700"] || "")) f.push("98700 no dice ISIS: " + r.conRpc["98700"]);
   if (r.cam.length !== 3 || !r.cam.some(function (t) { return /A mano/.test(t); })) f.push("el pop-up de camiones no trae el origen: " + JSON.stringify(r.cam));
+  if (!r.btn) f.push("no está el botón P14a en la celda");
+  if (!r.popVis || !/GBA Oeste/.test(r.pop || "") || !/No pasó a P14b/.test(r.pop || "") || !/Tanda F31A/.test(r.pop || "")) f.push("el pop-up de la pauta no dice por qué frenó / por qué no siguió: " + r.pop);
+  if ((r.ordenP || [])[0] !== "P1" || (r.ordenP || []).indexOf("P24") < 0) f.push("el orden no va numerado P1..P24: " + JSON.stringify(r.ordenP));
   if (errs.length) f.push("pageerrors: " + errs.join(" | "));
   console.log("ppp-res-origen:", JSON.stringify(r.conRpc));
   if (f.length) console.log("  ✗ " + f.join("\n  ✗ "));

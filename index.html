@@ -4349,6 +4349,14 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pppres-tbl td.orig .og{ display:inline-block; font-weight:800; font-size:11px; padding:1px 6px; border-radius:8px; }
 .og-auto{ background:#dcfce7; color:#166534; } .og-man{ background:#fef3c7; color:#92400e; } .og-isis{ background:#e0e7ff; color:#3730a3; }
 .pppres-tbl td.orig .og-r{ display:block; color:#475569; }
+.pauta-b{ display:inline-block; width:auto; margin:0; padding:0 5px; font-size:10.5px; font-weight:800; line-height:16px; border:1px solid #1d4ed8; border-radius:9px; background:#eff6ff; color:#1d4ed8; cursor:pointer; vertical-align:middle; }
+.pauta-b.ded{ border-style:dashed; color:#64748b; border-color:#94a3b8; background:#f8fafc; }
+.pauta-b.big{ font-size:14px; line-height:22px; padding:0 8px; cursor:default; }
+.pauta-pop{ background:#fff; color:#0f172a; border-radius:10px; padding:12px 14px; max-width:560px; width:calc(100% - 32px); font-size:14px; text-align:left; box-shadow:0 10px 30px rgba(0,0,0,.3); }
+.pauta-h{ display:flex; align-items:center; gap:6px; margin-bottom:8px; font-size:15px; }
+.pauta-x{ margin-left:auto; width:auto; margin-top:0; padding:2px 8px; font-size:14px; background:#e2e8f0; color:#0f172a; border:0; border-radius:6px; cursor:pointer; }
+.pauta-sec{ margin:6px 0; } .pauta-t{ font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; }
+.pauta-ol{ list-style:none; padding-left:4px; } .pauta-f{ margin-top:8px; font-size:12px; color:#64748b; }
 .ppp-res-orden{ max-width:1140px; margin:6px auto 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px 14px; font-size:13px; }
 .ppp-res-orden summary{ cursor:pointer; text-align:center; }
 .ppp-res-orden ol{ margin:8px 0 4px 18px; padding:0; line-height:1.45; }
@@ -6300,7 +6308,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.06"></script>
+<script type="module" src="recepcion.js?v=27.07"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10542,7 +10550,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.06";
+const APP_VERSION = "v27.07";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39653,56 +39661,97 @@ function _pppDemAnclaTxt(np, anc) {
   return np + " " + t[1] + " " + anc.fecha + (anc.bruta != null ? " (" + anc.bruta + " d desde el pedido)" : "");
 }
 /* v27.01 (Luis, 05/10): «que eligiendo una celda me diga la lógica que empleó para armarla así
-   y/o si alguien metió mano». `gv_ppp_np_origen()` dice por NP: automático / a mano (quién y
-   cuándo) y la regla. Sin respuesta, el pop-up dice «—» (no inventa). */
+   y/o si alguien metió mano». v27.05: la fuente es `gv_ppp_np_pauta_lista()` — por NP, la PAUTA
+   (P1..P24) con la que quedó en su día, por qué frenó ahí y por qué no siguió con la siguiente.
+   El botoncito P# abre el pop-up. Sin respuesta, la celda dice «—» (no inventa). */
 let _pppNpOrig = null, _pppNpOrigTs = 0, _pppNpOrigBusy = false;
 function pppNpOrigNeed() {
   if (_pppNpOrigBusy) return;
   if (_pppNpOrig && (Date.now() - _pppNpOrigTs) < PPP_DEM_ANCLA_TTL_MS) return;
   _pppNpOrigBusy = true;
-  fetch(SUPABASE_URL + "/rest/v1/rpc/gv_ppp_np_origen", {
+  fetch(SUPABASE_URL + "/rest/v1/rpc/gv_ppp_np_pauta_lista", {
     method: "POST",
     headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
     body: "{}"
   }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then(function (rows) {
       const m = {};
-      (rows || []).forEach(function (r) { m[_pppNpKey(r.np)] = r; });
+      (rows || []).forEach(function (r) {
+        if (r.pauta && !r.origen) r.origen = r.pauta === "P24" ? "manual" : "automatico";
+        m[_pppNpKey(r.np)] = r;
+      });
       _pppNpOrig = m; _pppNpOrigTs = Date.now(); _pppNpOrigBusy = false;
     })
     .catch(function () { _pppNpOrigBusy = false; _pppNpOrigTs = Date.now(); });
 }
+function _pppFcAR(s) { const d = new Date(s); if (!s || isNaN(d)) return ""; const a = new Date(d.getTime() - 3 * 3600000), z = function (n) { return n < 10 ? "0" + n : "" + n; }; return z(a.getUTCDate()) + "/" + z(a.getUTCMonth() + 1) + " " + a.getUTCHours() + ":" + z(a.getUTCMinutes()); }
 function _pppNpOrigCell(nps) {
   if (!_pppNpOrig) return '<td class="orig">—</td>';
   const vistos = {}, partes = [];
   nps.forEach(function (np) {
     const o = _pppNpOrig[_pppNpKey(np)];
-    const k = o ? (o.origen + "|" + o.regla + "|" + (o.por || "")) : "isis";
+    const k = o ? ((o.pauta || "") + "|" + o.origen + "|" + (o.motivo || o.regla) + "|" + (o.por || "")) : "isis";
     if (vistos[k]) { vistos[k].nps.push(np); return; }
     vistos[k] = { o: o, nps: [np] }; partes.push(vistos[k]);
   });
-  const fc = function (s) { const d = new Date(s); if (isNaN(d)) return ""; const a = new Date(d.getTime() - 3 * 3600000), z = function (n) { return n < 10 ? "0" + n : "" + n; }; return z(a.getUTCDate()) + "/" + z(a.getUTCMonth() + 1) + " " + a.getUTCHours() + ":" + z(a.getUTCMinutes()); };
   return '<td class="orig">' + partes.map(function (x) {
     const o = x.o, pre = partes.length > 1 ? escapeHtml(_pppNpsCompact(x.nps)) + ': ' : '';
     if (!o) return '<div>' + pre + '<span class="og og-isis">ISIS</span> la cargó ISIS (Producción)</div>';
     const man = o.origen === "manual";
-    return '<div>' + pre + '<span class="og ' + (man ? 'og-man">✋ A mano' : 'og-auto">🤖 Automático') + '</span>' +
-      (man && (o.por || o.cuando) ? ' <b>' + escapeHtml(String(o.por || "").replace(/@.*/, "")) + '</b> ' + escapeHtml(fc(o.cuando)) : '') +
-      '<span class="og-r">' + escapeHtml(o.regla || "") + '</span></div>';
+    const btn = o.pauta ? '<button type="button" class="pauta-b' + (o.fuente === "deducida" ? ' ded' : '') + '" onclick="event.stopPropagation();pppPautaPop(\'' + _pppArg(x.nps[0]) + '\')" title="Por qué quedó en este día">' + escapeHtml(o.pauta) + '</button> ' : '';
+    return '<div>' + pre + btn + '<span class="og ' + (man ? 'og-man">✋ A mano' : 'og-auto">🤖 Automático') + '</span>' +
+      (man && (o.por || o.cuando) ? ' <b>' + escapeHtml(String(o.por || "").replace(/@.*/, "")) + '</b> ' + escapeHtml(_pppFcAR(o.cuando)) : '') +
+      '<span class="og-r">' + escapeHtml(o.titulo || o.regla || "") + '</span></div>';
   }).join("") + '</td>';
 }
+/* v27.05 (Luis): tocar el P# abre por qué frenó en esa pauta y por qué no siguió la siguiente. */
+function pppPautaPop(np) {
+  const o = _pppNpOrig && _pppNpOrig[_pppNpKey(np)];
+  if (!o) return;
+  let ov = document.getElementById("pppPautaOv");
+  if (!ov) {
+    ov = document.createElement("div"); ov.id = "pppPautaOv"; ov.className = "pppres-ov";
+    ov.style.zIndex = "100050";
+    ov.addEventListener("click", function (e) { if (e.target === ov) ov.style.display = "none"; });
+    document.body.appendChild(ov);
+  }
+  const sec = function (t, v) { return v ? '<div class="pauta-sec"><div class="pauta-t">' + t + '</div><div>' + escapeHtml(v) + '</div></div>' : ''; };
+  ov.innerHTML = '<div class="pauta-pop"><div class="pauta-h"><span class="pauta-b big">' + escapeHtml(o.pauta || "?") + '</span> <b>' +
+    escapeHtml(o.np || np) + '</b> · ' + escapeHtml(o.titulo || "") +
+    '<button type="button" class="pauta-x" onclick="document.getElementById(\'pppPautaOv\').style.display=\'none\'">✕</button></div>' +
+    sec("Por qué frenó acá", o.motivo || o.regla) +
+    sec("Lo que se evaluó antes", o.previas) +
+    sec("Por qué no siguió con la pauta siguiente", o.no_siguiente) +
+    sec("La tanda", o.tanda_info) +
+    '<div class="pauta-f">' + (o.fuente === "deducida" ? "⚠ Deducida: se programó antes de que el armado anotara la pauta (05/10)." : "Registrada por el armado" + (o.cuando ? " el " + escapeHtml(_pppFcAR(o.cuando)) : "") + ".") + '</div></div>';
+  ov.style.display = "flex";
+}
 const PPP_ARMADO_ORDEN_HTML =
-  '<details class="ppp-res-orden"><summary>🧠 <b>Orden de prioridad del armado automático</b> (tocá para ver)</summary><ol>' +
-  '<li><b>No se programa solo</b>: cuarentena o cliente nuevo sin aprobar, súper sin turno, Retira sin día, sin zona → quedan en A Programar.</li>' +
-  '<li><b>Lo fijo primero</b>: súper con turno y Retira con día elegido van a ESE día (pisan el cupo). Cliente nuevo aprobado: en los 2 días con reparto siguientes. Importado diferido: desde que llega.</li>' +
-  '<li><b>Plazo</b>: entrada del pedido + 14 días corridos (expreso + 13), nunca antes de 4 días hábiles.</li>' +
-  '<li><b>Su grupo de zonas ya sale</b> un día del plazo → ese día, sin mirar el cupo.</li>' +
-  '<li>Si no, el <b>último día libre</b> del plazo (para que se sumen los que entren después).</li>' +
-  '<li>Si todos los días tienen otro grupo → el día con <b>menos grupos</b>.</li>' +
-  '<li><b>Vencido</b> → lo antes posible, aunque mezcle grupos.</li>' +
-  '<li><b>Tandas</b>: acumulan hasta 0,80 m³ (máx. 1,00), por cercanía; se fusionan las chicas del mismo camión.</li>' +
-  '<li><b>18:00</b>: lo no facturado pasa al próximo día con camión de su grupo, y se juntan camiones del mismo grupo.</li>' +
-  '<li><b>Lo programado o movido A MANO no lo toca nada de lo anterior.</b> Cada celda dice cuál se aplicó.</li>' +
+  '<details class="ppp-res-orden"><summary>🧠 <b>Orden de prioridad del armado automático</b> (tocá para ver) — cada NP frena en la primera que la agarra; el botón P# de cada celda dice cuál</summary><ol class="pauta-ol">' +
+  '<li><b>P1</b> Retira: zona «Retira», ningún pase de reparto lo toma</li>' +
+  '<li><b>P2</b> Diferido programado antes del reingreso: se saca de su tanda</li>' +
+  '<li><b>P3</b> Ya programado: no se vuelve a evaluar</li>' +
+  '<li><b>P4</b> Espera mercadería: lo toma P16</li>' +
+  '<li><b>P5</b> Retenido a mano</li>' +
+  '<li><b>P6</b> Cancelado a mano</li>' +
+  '<li><b>P7</b> Tope de 120 pedidos por corrida</li>' +
+  '<li><b>P8</b> Cuarentena / cliente nuevo sin aprobar: nunca solo</li>' +
+  '<li><b>P9</b> Diferido en cuarentena</li>' +
+  '<li><b>P10</b> Cliente nuevo aprobado: en los 2 días con reparto siguientes</li>' +
+  '<li><b>P11</b> Chef de razón social que entró por LK: mismo día</li>' +
+  '<li><b>P12</b> Súper con turno: el día del turno</li>' +
+  '<li><b>P13</b> Retira con día elegido: ese día</li>' +
+  '<li><b>P14</b> Grupo de zonas (plazo pedido + 14, expreso + 13; piso 4 hábiles): a) su grupo ya sale en el plazo · b) último día libre · c) día con menos grupos · d) vencido: lo antes posible</li>' +
+  '<li><b>P15</b> Súper sin turno (INC): próximo día con cupo</li>' +
+  '<li><b>P16</b> Diferido: desde el reingreso</li>' +
+  '<li><b>P17</b> Tanda: máx. 5 NP</li>' +
+  '<li><b>P18</b> Tanda: una góndola (LK o CH)</li>' +
+  '<li><b>P19</b> Tanda: un grupo, una empresa, súper solo</li>' +
+  '<li><b>P20</b> Tanda: cercanía, hasta 1,00 m³</li>' +
+  '<li><b>P21</b> Fusión de tandas hasta 0,80 m³</li>' +
+  '<li><b>P22</b> Cron 18:00: lo no facturado al día con camión de su grupo</li>' +
+  '<li><b>P23</b> Optimizador 18:00: junta camiones</li>' +
+  '<li><b>P24</b> A mano: gana sobre todo</li>' +
   '</ol></details>';
 function pppResumenHtml(prog) {
   pppDemAnclaNeed();
@@ -60682,7 +60731,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.06"></script>
+<script src="importacion.js?v=27.07"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63505,9 +63554,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.06"></script>
-<script src="hotsale.js?v=27.06"></script>
-<script src="estadisticas.js?v=27.06"></script>
+<script src="cobranzas.js?v=27.07"></script>
+<script src="hotsale.js?v=27.07"></script>
+<script src="estadisticas.js?v=27.07"></script>
 
 </body>
 </html>
