@@ -564,7 +564,7 @@ async function pedImpSetMeses(provEnc, v) {
     // ⚠ sólo se reemplaza si el refetch trajo algo: una lectura vacía dejaría la pantalla en
     // blanco, y "no pude leer" no es "no hay importados" (§ una lectura ROTA no es un CERO).
     if (_stkPop && _stkPop.kind === "pedImp") {
-      if (data && data.items && data.items.length) _stkPop.data = data;
+      if (data && data.items && data.items.length) _stkPop.data = _pedImpConCfg(data, _stkPop.data);
       _pedImpRender();
     }
   } catch (e) {
@@ -1016,12 +1016,23 @@ async function openPedidosImportacion() {
   _pedImpRender();
   _impCervDenRepintar();   // v25.37 — el chip «Denegado por Cervantes» llega después, sin frenar la pantalla
 }
+/* v27.06 — el refetch de importados no trae la config de nacionalización (nac) ni la entrega global:
+   se arrastran de la pantalla anterior. Sin esto, tocar el modo o el u$s/m³ después de un refresco
+   tiraba «_stkPop.data.nac is undefined» (reporte de agentes 05/10). */
+function _pedImpConCfg(data, prev) {
+  if (!data) return prev;
+  prev = prev || {};
+  if (!data.nac) data.nac = prev.nac || { modo: _NAC_DEFAULTS.modo, valorM3: _NAC_DEFAULTS.valorM3, tn: 0 };
+  if (data.entregaGlobal == null) data.entregaGlobal = prev.entregaGlobal || "";
+  return data;
+}
 /* v22.37 — guarda un parámetro de nacionalización / el mínimo en Stock_Config y re-renderiza.
    clave: 'impo_nac_modo' | 'impo_nac_valor_m3'. */
 async function pedImpSetNacCfg(clave, valor) {
   if (!_stkPop || _stkPop.kind !== "pedImp") return;
   var v = String(valor == null ? "" : valor).trim();
   // reflejo inmediato en memoria (no esperamos al backend para pintar)
+  _pedImpConCfg(_stkPop.data, null);
   if (clave === "impo_nac_modo") _stkPop.data.nac.modo = v || _NAC_DEFAULTS.modo;
   else if (clave === "impo_nac_valor_m3") _stkPop.data.nac.valorM3 = _nacNum(v, _NAC_DEFAULTS.valorM3);
   _pedImpRender();
@@ -1033,7 +1044,7 @@ async function pedImpSetNacCfg(clave, valor) {
     });
   } catch (_e) {}
 }
-function pedImpSetNacTn(v) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.data.nac.tn = _nacNum(v, 0); _pedImpRender(); }
+function pedImpSetNacTn(v) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _pedImpConCfg(_stkPop.data, null); _stkPop.data.nac.tn = _nacNum(v, 0); _pedImpRender(); }
 /* v10.38 — filtro Solo Pedido / Ver Todo. */
 function pedImpSetFiltro(solo) { if (!_stkPop || _stkPop.kind !== "pedImp") return; _stkPop.soloPedir = !!solo; _pedImpRender(); }
 /* Filtro por PROVEEDOR: "" = todas las tarjetas (un box por proveedor), o el nombre de un proveedor = solo ese box. */
@@ -2323,7 +2334,7 @@ async function _pedImpRpc(fn, body) {
 }
 async function pedImpReload() {
   _pedImpViaje.st = "";   // v24.74 — releer el u$s en viaje (pudo entrar o llegar un pedido)
-  try { var data = await ocgFetchImportados(); if (_stkPop && _stkPop.kind === "pedImp") { _stkPop.data = data; _pedImpRender(); } } catch (_e) {}
+  try { var data = await ocgFetchImportados(); if (_stkPop && _stkPop.kind === "pedImp") { _stkPop.data = _pedImpConCfg(data, _stkPop.data); _pedImpRender(); } } catch (_e) {}
   _impCervDenRepintar();
 }
 /* v25.37 (30/09) — «Denegado por Cervantes». Lo que se recibe con destino 🏭 Cervantes le aparece a Cervantes
