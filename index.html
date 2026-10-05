@@ -57347,7 +57347,18 @@ async function facXlsBajar() {
   if (b) { b.disabled = true; b.innerHTML = "Armando…"; }
   try {
     const filas = await _facXlsArmar(nps);
-    if (!filas.length) { try { alert("Ninguna de las NP marcadas tiene artículos armados con cajas entregadas."); } catch (_e) {} return; }
+    // v27.02 (Luis, 05/10): una NP en 0 cajas (todo faltó) no entra al Excel ni queda
+    // facturada. Se AVISA, se le saca el tilde y SIGUE en la lista hasta que se cancele a mano.
+    const _enFilas = new Set(filas.map(function (r) { return String(r.np); }));
+    const enCero = nps.filter(function (n) { return !_enFilas.has(String(n)); });
+    if (enCero.length) {
+      enCero.forEach(function (n) { _facXlsSel.delete(n); });
+      facXlsBtnSync();
+      try { alert((enCero.length === 1 ? "La NP " : "Las NP ") + enCero.join(", ") + " van en 0 cajas (todo faltó o no se armaron):\n" +
+        "NO entran al Excel y NO quedan facturadas. Les saqué el tilde.\n\n" +
+        "Siguen en la lista hasta que las canceles a mano con ✕ Cancelar."); } catch (_e) {}
+    }
+    if (!filas.length) return;
 
     // Único aviso que corta: la NP se armó dos veces y lo entregado supera lo pedido.
     // Raro (28 de 748 en 60 días) pero manda el doble de cajas si no se mira.
