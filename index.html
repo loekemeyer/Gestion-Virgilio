@@ -18195,6 +18195,34 @@ function ocgGroups(list) {
    importante de proveedor». Baja LO QUE SE GENERA: gen.items (a pedir > 0), una fila por artículo
    y proveedor —un artículo repartido sale en una fila por tallerista, con su % y sus cajas—, el
    mismo armado que usa ocgGenerar. Ordenado por proveedor (sin proveedor al final) y cajas. */
+/* v26.92 — SheetJS community NO escribe estilos (regla v24.32), así que el formato se le pone al
+   .xlsx ya armado: se abre el zip con XLSX.CFB, se reescribe styles.xml (Arial 10 y un estilo
+   centrado con ajuste de texto) y la fila 1 de cada hoja toma ese estilo y queda congelada. */
+function gvXlsxFormato(XLSX, wb) {
+  const u8 = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  const cfb = XLSX.CFB.read(new Uint8Array(u8), { type: "array" });
+  const dec = new TextDecoder(), enc = new TextEncoder();
+  const iSt = cfb.FullPaths.findIndex(function (p) { return /\/xl\/styles\.xml$/.test(p); });
+  if (iSt < 0) throw new Error("xlsx sin styles.xml");
+  let st = dec.decode(new Uint8Array(cfb.FileIndex[iSt].content));
+  st = st.replace(/<fonts[\s\S]*?<\/fonts>/, '<fonts count="1"><font><sz val="10"/><name val="Arial"/><family val="2"/></font></fonts>')
+         .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+           + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs>');
+  cfb.FileIndex[iSt].content = enc.encode(st);
+  cfb.FullPaths.forEach(function (p, i) {
+    if (!/\/xl\/worksheets\/sheet\d+\.xml$/.test(p)) return;
+    let x = dec.decode(new Uint8Array(cfb.FileIndex[i].content));
+    x = x.replace(/<c r="([A-Z]+)1"( s="\d+")?/g, '<c r="$11" s="1"')
+         .replace(/<sheetView workbookViewId="0"\/>/, '<sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView>');
+    cfb.FileIndex[i].content = enc.encode(x);
+  });
+  return XLSX.CFB.write(cfb, { fileType: "zip", type: "array" });
+}
+function gvXlsxBajar(bytes, nombre) {
+  const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nombre;
+  document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
 function ocgDescargarExcel() {
   const gen = _oc && _oc.gen;
   // v26.91 (Luis, D2): también los que hoy no se piden (a pedir 0), al final de cada proveedor.
@@ -18202,7 +18230,7 @@ function ocgDescargarExcel() {
   if (!gen || gen.error) { alert("Todavía se está calculando. Probá de nuevo en un momento."); return; }
   if (!items.length) { alert("No hay artículos para bajar."); return; }
   const filas = items.slice().sort(function (a, b) { return _ocgProvSort(a.prov, b.prov) || (b.falta - a.falta); });
-  const headers = ["Proveedor", "Código", "Descripción", "A pedir (cajas)", "% del proveedor", "E.M. (caj/mes)", "Índice", "Máx", "Pedidos", "Stock"];
+  const headers = ["Proveedor", "Código", "Descripción", "A pedir", "% prov", "E.M. (cj/m)", "Índice", "Máx", "Pedidos", "Stock"];   // v26.92: cortos, en 2 renglones
   const aoa = [headers];
   filas.forEach(function (it) {
     aoa.push([it.prov, String(codCanon(it.cod)), String(artNombre(it.cod, it.desc) || ""), it.falta, Math.round(it.prop || 100),
@@ -18212,14 +18240,19 @@ function ocgDescargarExcel() {
   const nombre = "OCs a generar " + d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()) + " " + p2(d.getHours()) + "." + p2(d.getMinutes()) + ".xlsx";
   pppLoadXlsx().then(function (XLSX) {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = headers.map(function (_h, i) {   // ancho según el dato (regla de Damian)
-      let w = 4; aoa.forEach(function (row) { const v = row[i]; const l = v == null ? 0 : String(v).length; if (l > w) w = l; });
-      return { wch: Math.min(w + 1, 60) };
+    /* v26.92 (Luis, con la foto de su Excel): «optimizado horizontalmente así». El ancho lo da el
+       DATO (+2 por la flecha del filtro); el encabezado se parte en 2 renglones, centrado, y nunca
+       ensancha la columna más que su palabra más larga. Arial 10, primera fila congelada. */
+    ws["!cols"] = headers.map(function (h, i) {
+      let w = Math.max.apply(null, String(h).split(" ").map(function (x) { return x.length; }));
+      for (let r = 1; r < aoa.length; r++) { const v = aoa[r][i]; const l = v == null ? 0 : String(v).length; if (l > w) w = l; }
+      return { wch: Math.min(w + 2, 40) };
     });
+    ws["!rows"] = [{ hpt: 26 }];
     ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: headers.length - 1 } }) };
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "OCs");
-    XLSX.writeFile(wb, nombre);
+    gvXlsxBajar(gvXlsxFormato(XLSX, wb), nombre);
   }).catch(function (e) { alert("No pude generar el Excel: " + (e && e.message ? e.message : e)); });
 }
 function ocgSetMode(m) { if (_oc) { _oc.genMode = (m === "tall" ? "tall" : "art"); ocRender(); } }

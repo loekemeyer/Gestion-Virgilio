@@ -2932,6 +2932,9 @@ genera sale con `cellXfs count="1"` sin alignment. Por eso cada comentario va **
 fecha y su autor** (`1) 26/09/26 09:00 · Vivi: …`) y separado además por salto de línea: sin el
 ajuste de texto se leen igual, y con el ajuste puesto quedan uno por renglón. **No volver a
 intentar el wrap desde el front.**
+⚠ **v26.92: el formato SÍ se puede, pero no con `cell.s`**: `gvXlsxFormato(XLSX, wb)` abre el .xlsx ya
+armado con `XLSX.CFB`, reescribe `styles.xml` (Arial 10 + encabezado centrado con ajuste) y congela la fila 1;
+`gvXlsxBajar` lo descarga. Lo usa el Excel de Generar las OCs (`tests/ocg-excel.cjs` lo abre y lo mide).
 
 **Chequeo:** `node tests/pipe-imprimir-excel.cjs` — corre el export de verdad con la RPC
 mockeada (verificado que falla contra el index anterior). `sql/gv_clin_dos_estados_v2086.sql` (vigente; se aplicó como v20.89 — la v20.86, la v20.87 y la v20.88 se las llevaron otras sesiones) y
