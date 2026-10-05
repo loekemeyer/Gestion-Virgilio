@@ -11,6 +11,8 @@
    E. dry_run contra un pedido a mano igual: comparacion.iguales = true, y no escribe nada.
    F. Si no se puede mirar si la OC ya está en Chef: NO crea (podría duplicar) y queda 'no'.
    G. Una cadena de LK (Coto) sigue por su camino de siempre (krikos_auto_crear_pedido).
+   H. Vencida, con el número del mail distinto al del PDF, ya cargada: la encuentra por el del PDF.
+   I. Vencida y no cargada: salteada (el guarda de vencidas va después de mirar Chef).
 
    Sale 1 si falla. Sin Playwright ni red. */
 const fs = require("fs");
@@ -242,6 +244,22 @@ const fila = (id, p, extra) => Object.assign({ id, cadena: "X", nro_documento: "
   out.F_noCrea = !!d && d.resultado === "no_importada" && rpcs("krikos_crear_pedido_super").length === 0 &&
     rpcs("krikos_auto_marcar").some((x) => x.args.p_id === 5 && x.args.p_auto_estado === "no");
   S.ocCargadaFalla = false;
+
+  // H. el número del mail no coincide con el del PDF y está vencida: la encuentra por el del PDF (no "salteada")
+  S.inbox = [fila(7, "cen.pdf", { nro_documento: "OTRO-NRO", fecha_entrega: "01/01/2020" })];
+  S.ocCargada["198000001"] = [{ order_id: 250 }];
+  r = await correr({});
+  d = r.docs && r.docs[0];
+  out.H_yaCargadaPorPdf = !!d && d.resultado === "ya_cargada" && d.order_id === 250 &&
+    rpcs("krikos_auto_marcar_chef").some((x) => x.args.p_id === 7 && x.args.p_order_id === 250);
+  delete S.ocCargada["198000001"];
+
+  // I. vencida y NO cargada: salteada, sin crear nada
+  S.inbox = [fila(8, "cen.pdf", { nro_documento: "198000001", fecha_entrega: "01/01/2020" })];
+  r = await correr({});
+  d = r.docs && r.docs[0];
+  out.I_vencida = !!d && d.resultado === "salteada" && rpcs("krikos_crear_pedido_super").length === 0 &&
+    rpcs("krikos_auto_marcar").some((x) => x.args.p_id === 8 && x.args.p_auto_estado === "salteada");
 
   // G. Coto (LK) sigue igual
   S.inbox = [fila(6, "coto.pdf", { mail_uid: "INBOX:1:6", nro_documento: "90000000001" })];

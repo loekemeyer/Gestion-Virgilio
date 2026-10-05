@@ -386,6 +386,13 @@ async function procesarChef(fila, opts, c) {
   }
   if (ya) return await marcarYaEnChef(fila, r0, ya);
 
+  // Guarda de vencidas (el mismo de las cadenas de LK), recién después de saber que no está cargada.
+  const fe = fechaEntregaIso(fila.fecha_entrega);
+  if (!opts.force && fe && fe < hoyAr()) {
+    return { ...r0, resultado: "salteada",
+      aviso: "fecha de entrega vencida (" + fila.fecha_entrega + ") — se carga a mano si todavía va" };
+  }
+
   if (!(await chefAutoVivo())) {
     return { ...r0, resultado: "prueba",
       aviso: "MODO PRUEBA, todavía no se carga sola: se cargaría en Chef con " + aviso + ". Cargala a mano." };
@@ -451,8 +458,10 @@ async function procesar(fila, opts) {
 
   // Guarda de vencidas: una OC cuya fecha de entrega ya pasó no se carga sola —
   // un pedido viejo metido en la PPP mueve stock y confunde la programación.
+  // En una OC de la casilla de Chef el guarda va en procesarChef, DESPUÉS de mirar con el
+  // número del PDF si ya está cargada (el del mail puede no coincidir con el del PDF).
   const fe = fechaEntregaIso(fila.fecha_entrega);
-  if (!opts.force && fe && fe < hoyAr()) {
+  if (!esFilaChef(fila) && !opts.force && fe && fe < hoyAr()) {
     return { ...base, resultado: "salteada",
       aviso: "fecha de entrega vencida (" + fila.fecha_entrega + ") — se carga a mano si todavía va" };
   }
