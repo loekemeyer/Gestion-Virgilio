@@ -255,6 +255,8 @@ echo "== arm-avance-servidor (v26.61: la copia del armado viaja al servidor sin 
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/arm-avance-servidor.cjs
 echo "== tanda-frenar (v26.62: frenar picking/armado, cartel de la tanda de otro, marcas de todos) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-frenar.cjs
+echo "== tanda-frenar-2b (v26.65: retomar por «Seguir», aviso del día siguiente, freno del supervisor) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-frenar-2b.cjs
 
 echo "== fac-block-recuperable (regresión v6.21: bloqueo del tilde si el faltante se puede completar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-block-recuperable.cjs
