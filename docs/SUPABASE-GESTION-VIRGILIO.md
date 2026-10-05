@@ -31600,7 +31600,8 @@ columnas donde el automático saldría distinto, las obligatorias que el panel n
 Probado en LK con `pg_temp` en transacción abortada: simula sin dejar filas, la 2.ª carga de la misma OC devuelve
 `duplicado`, el token falso se rechaza, y si falta una columna obligatoria la prueba la nombra con su valor de
 referencia en vez de cortarse. ⚠ Esa prueba consumió los ids 1611-1613 de la secuencia de `orders` de LK (sin
-filas: el próximo pedido de LK salta esos números). `sql/chef_krikos_crear_pedido_super_v2668_CHEF.sql`.
+filas: el próximo pedido de LK salta esos números). ⚠ **Reemplazado por la v26.70 (§3.v2670): ese SQL no se corrió
+en Chef y el archivo se borró.**
 
 Falta (tarea de Planify de Luis): la clave de ventas@chefsrl.com en el Vault de LK (`KRIKOS_CHEF_IMAP_PASS`), el
 lector con las dos casillas y la carpeta de spam con aviso, y la rama de Cencosud del auto-import (mismas funciones
@@ -31619,3 +31620,26 @@ del panel, con L), probada contra los pedidos 245-247. Dorinka sigue a mano en C
   60 s sin llegar a Postgres). Cron `gv-np-fecha-pedido` = jobid **130**. Primera captura: web 367 (364 con hora),
   isis_prog 133, isis_base 701 → **1.007 de 1.473 entregados con fecha**; los que faltan son las NP de ISIS anteriores
   al 23/06 y 5 web sin `fecha_recep` ni `lk_pedidos_match`. `anon` lee (SELECT) y no escribe.
+
+### 3.v2670 — Chef: la puerta del pedido automático usa `submit_order_fast` y sirve para Cencosud Y Dorinka (Luis, 05/10/2026, v26.70)
+
+Luis: *«DORINKA Y CENCOSUD QUIERO QUE SE CARGUEN AUTOMATICAMENTE»*. No cambia dónde vive ningún pedido: hoy, cargado
+a mano, Cencosud (PDF Krikos del admin de LK, artículos de LK con L) ya queda guardado en la base de **Chef** porque lo
+factura Chef (245-247 del 02/10), y Dorinka (admin de Chef, artículos de Chef sin L) también (241 del 30/09). La
+puerta deja el automático en el mismo lugar y de la misma forma.
+
+| objeto (Chef) | qué |
+|---|---|
+| `_krikos_insert_pedido(p_order, p_simular)` | llama a **`submit_order_fast`** (la MISMA función con la que carga el admin de Chef) a nombre de un admin de `public.admins` (prefiere `loekemeyer.n8n@`; pone `request.jwt.claim.sub` / `request.jwt.claims` para que `auth.uid()` pase su control) y después hace lo que hace el panel: `sheets_payload` con `order_number` = id, `is_promo = false`, `extra_discount = 0`. Cencosud manda `items = []` (los renglones con L viajan en `sheets_payload.items`); Dorinka manda sus renglones. No duplica la misma OC + cliente + sucursal en 60 días. Sin permiso para anon |
+| `krikos_crear_pedido_super(p_token, p_order)` | la puerta: token contra su sha256 (el token, en el Vault de LK como `KRIKOS_CHEF_TOKEN`) |
+
+**Probado en LK** con `pg_temp`, en transacción abortada, rearmando los pedidos 1564 y 1504 (con artículos de Loeke)
+por la puerta: **16/16 y 22/22 renglones idénticos** a los cargados por el panel, **0 grabados**. Sólo cambian
+`sheets_sent` (lo pone el panel después de mandar a la planilla: el auto-import tiene que hacer lo mismo) y
+`placed_by_auth_user_id` (columna que sólo existe en LK). El SQL termina con la misma prueba contra el 247 (Cencosud)
+y el 241 (Dorinka), para correr en Chef: `sql/chef_krikos_crear_pedido_super_v2670_CHEF.sql` (lo corre Luis en el SQL
+Editor de Chef; esta sesión no tiene acceso a ese proyecto).
+
+Falta (tarea de Planify de Luis): el resultado de esa prueba en Chef, la clave de ventas@chefsrl.com en el Vault de LK
+(`KRIKOS_CHEF_IMAP_PASS`, la carga Luis), el lector con las dos casillas y la carpeta de spam con aviso, y la rama de
+Chef del auto-import (Cencosud con catálogo LK + L; Dorinka con catálogo de Chef, sin L), probada contra 245-247 y 241.
