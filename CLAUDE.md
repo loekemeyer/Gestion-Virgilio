@@ -970,6 +970,10 @@ Lo mismo con el resto del vocabulario de la operación, que ya está en la regla
 **góndola**, **rack**. Si un número es chico, se dice chico con su unidad —`0,097 m³`— o se lo
 compara contra algo de la operación (*"menos de una caja"*), no cambiando de unidad.
 
+⚠ **Los tiempos van en HORA:MINUTOS, redondeados al minuto** (Luis, 05/10/2026: *"usá formato de
+hora:minutos así es más legible, siempre, redondeando"*): una duración es `0:32` / `2:15`, nunca
+"32 min", "2,14 h" ni con segundos; una hora del día es `12:05`, nunca `12:05:22`.
+
 Vale para TODOS los repos. Es sólo cómo se escribe el mensaje del chat: no cambia nada técnico.
 
 ## ⚠ REGLA de TABLAS (Damian, 2026-09-25): ancho de columna SEGÚN EL CONTENIDO, nunca rellenando la hoja
