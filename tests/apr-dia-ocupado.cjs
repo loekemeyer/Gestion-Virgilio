@@ -5,7 +5,14 @@
    (b) día OCUPADO → 3 opciones, cada una con su reporte (problemas, tandas que se mueven, fijas);
    (c) elegir 3 → primero gv_ppp_dia_reprogramar con p_simular=false y modo correr, DESPUÉS la tanda
        nueva (si fuera al revés, la tanda nueva también se correría);
-   (d) elegir 1 → no llama a reprogramar, sólo arma la tanda. */
+   (d) elegir 1 → no llama a reprogramar, sólo arma la tanda.
+   v26.82 (Luis, 05/10) — la opción 2 es gv_ppp_dia_ajustar: lo NUEVO va como dato (queda fijo) y sale
+   sólo lo que no entra, por grupo de zonas entero:
+   (e) la simulación de la opción 2 manda p_nuevo con el pedido (y si es súper);
+   (f) si sumándolo el día se pasa, el encabezado lo dice y la opción 1 es «Programarlo así igual»;
+   (g) el reporte de la opción 2 cuenta lo que YA tiene el día destino (E70A el 01/10);
+   (h) elegir 2 → gv_ppp_dia_ajustar con p_simular=false y el mismo p_nuevo, DESPUÉS la tanda;
+   (i) un súper con zona numérica es su propio camión (es_super o motivo «súper:»). */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -27,17 +34,26 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { tanda: "E48H", fecha_actual: F, fecha_nueva: "2026-10-01", accion: "mueve", motivo: "armada: se mueve con su mismo código", m3: 0.5, zona: "Zona 2 - CABA Centro", vence: false, vencia: false },
       { tanda: "E50B", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "en proceso (picking o armado sin terminar): no se toca", m3: 1.2, zona: "Zona 5 - GBA Oeste", vence: false, vencia: false },
       { tanda: "E60A", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "súper: queda en su día (moverlo a mano si hace falta)", m3: 3, zona: "Super", vence: false, vencia: false },
-      { tanda: "E70A", fecha_actual: "2026-10-01", fecha_nueva: "2026-10-02", accion: "mueve", motivo: "pendiente", m3: 1, zona: "Zona 4 - GBA Sur", vence: false, vencia: false }
+      { tanda: "E70A", fecha_actual: "2026-10-01", fecha_nueva: "2026-10-02", accion: "mueve", motivo: "pendiente", m3: 2, zona: "Zona 4 - GBA Sur", vence: false, vencia: false }
     ];
-    const auto = corr.filter(function (x) { return x.fecha_actual === F; });
+    // lo que devuelve gv_ppp_dia_ajustar: sólo el día; E48G (Z3) sale al 01/10, donde ya está E70A
+    const auto = [
+      { tanda: "E48G", fecha_actual: F, fecha_nueva: "2026-10-01", accion: "mueve", motivo: "pendiente: su grupo no entra (más de 2 camiones)", m3: 2.5, zona: "Zona 3 - CABA Oeste", vence: false, es_super: false },
+      { tanda: "E48H", fecha_actual: F, fecha_nueva: F, accion: "queda", motivo: "pendiente: entra en el día", m3: 0.5, zona: "Zona 2 - CABA Centro", vence: false, es_super: false },
+      { tanda: "E50B", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "en proceso (picking o armado sin terminar): no se toca", m3: 1.2, zona: "Zona 5 - GBA Oeste", vence: false, es_super: false },
+      { tanda: "E60A", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "súper: queda en su día", m3: 3, zona: "Super", vence: false, es_super: true }
+    ];
+    const llamadas = [];
     window.aprQuien = async function () { return "test@x"; };
     window.aprRender = function () {};
     window.aprGenerarTanda = async function (f, keys, o) { log.push("generar:" + f + ":" + keys.join(",") + ":" + !!(o && o.sinConfirm)); };
     let vacio = false;
     window.aprRpc = async function (fn, body) {
       log.push(fn + ":" + body.p_modo + ":" + body.p_simular);
+      llamadas.push({ fn: fn, body: JSON.parse(JSON.stringify(body)) });
       if (vacio) return [];
-      return body.p_modo === "correr" ? corr : auto;
+      if (fn === "gv_ppp_dia_ajustar") return auto;
+      return body.p_modo === "correr" ? corr : [];
     };
     const ped = { empresa: "lk", order_id: 1600, zona: "Zona 1 - CABA Sur", m3: 0.4, np_total: 1 };
 
@@ -51,6 +67,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const ov = document.getElementById("aprDoOv");
     const ops = [...ov.querySelectorAll(".ado-op")].map(function (o) { return o.textContent.replace(/\s+/g, " "); });
     const bShow = ov.classList.contains("show");
+    const head = ov.querySelector(".ado-h").textContent.replace(/\s+/g, " ");
+    const simAj = llamadas.filter(function (x) { return x.fn === "gv_ppp_dia_ajustar"; }).map(function (x) { return x.body; });
 
     // (c) elegir 3
     log.length = 0;
@@ -62,7 +80,19 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     await aprDiaOcupadoAbrir(F, ped); log.length = 0;
     ov.querySelectorAll(".ado-op")[0].querySelector(".ado-b").click(); await new Promise(function (res) { setTimeout(res, 50); });
     const d = log.slice();
-    return { a: a, bShow: bShow, ops: ops, c: c, d: d };
+
+    // (h) elegir 2
+    await aprDiaOcupadoAbrir(F, ped); log.length = 0; llamadas.length = 0;
+    ov.querySelectorAll(".ado-op")[1].querySelector(".ado-b").click(); await new Promise(function (res) { setTimeout(res, 50); });
+    const h = { log: log.slice(), ej: llamadas.filter(function (x) { return x.fn === "gv_ppp_dia_ajustar"; }).map(function (x) { return x.body; }) };
+
+    // (i) súper con zona numérica
+    const i = {
+      porMarca: _adoCamiones([{ zona: "Zona 5 - GBA Oeste", m3: 3, es_super: true }, { zona: "Zona 5 - GBA Oeste", m3: 1 }]),
+      porMotivo: _adoCamiones([{ zona: "Zona 5 - GBA Oeste", m3: 3, motivo: "súper: queda en su día" }, { zona: "Zona 5 - GBA Oeste", m3: 1 }]),
+      comun: _adoCamiones([{ zona: "Zona 5 - GBA Oeste", m3: 3 }, { zona: "Zona 5 - GBA Oeste", m3: 1 }])
+    };
+    return { a: a, bShow: bShow, ops: ops, c: c, d: d, head: head, simAj: simAj, h: h, i: i };
   });
 
   const fallas = [];
@@ -70,13 +100,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   if (!r.a.log.some(function (x) { return /^generar:2026-09-30/.test(x); })) fallas.push("(a) día vacío no fue derecho a armar la tanda: " + r.a.log.join(" | "));
   if (!r.bShow || r.ops.length !== 3) fallas.push("(b) el pop-up no tiene 3 opciones: " + r.ops.length);
   else {
-    if (!/Sumarlo/.test(r.ops[0])) fallas.push("(b) opción 1 no es Sumarlo");
+    if (!/Programarlo así igual/.test(r.ops[0])) fallas.push("(f) el día se pasa y la opción 1 no dice «Programarlo así igual»: " + r.ops[0]);
+    if (!/se pasa/.test(r.head)) fallas.push("(f) el encabezado no avisa que sumándolo el día se pasa: " + r.head);
     if (!/más de 2/.test(r.ops[0])) fallas.push("(b) opción 1 no avisa los camiones de más: " + r.ops[0]);
     if (!/E50B.*en proceso/.test(r.ops[2])) fallas.push("(b) opción 3 no muestra la tanda EN PROCESO fija: " + r.ops[2]);
     if (!/E60A.*súper/.test(r.ops[2])) fallas.push("(b) opción 3 no muestra el súper fijo");
     if (!/E48H.*mismo código/.test(r.ops[2])) fallas.push("(b) opción 3 no dice que la armada va con su mismo código");
     if (!/Pasan a vencer[\s\S]*E48G/.test(r.ops[2])) fallas.push("(b) opción 3 no avisa que E48G pasa a vencer");
     if (!/Reprogramar el resto/.test(r.ops[1])) fallas.push("(b) opción 2 no es Reprogramar el resto");
+    if (!/E48G[^→]*30\/9 → [^0-9]*1\/10/.test(r.ops[1])) fallas.push("(g) opción 2 no muestra E48G al 01/10: " + r.ops[1]);
+    if (!/1\/10: 4,50 m³/.test(r.ops[1])) fallas.push("(g) opción 2 no cuenta lo que ya tiene el 01/10 (E70A 2 + E48G 2,5): " + r.ops[1]);
   }
   const iRep = r.c.findIndex(function (x) { return x === "gv_ppp_dia_reprogramar:correr:false"; });
   const iGen = r.c.findIndex(function (x) { return /^generar:2026-09-30:lk\|1600|^generar:2026-09-30/.test(x); });
@@ -84,10 +117,21 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   if (iGen < 0 || iGen < iRep) fallas.push("(c) la tanda nueva no se armó DESPUÉS de correr: " + r.c.join(" | "));
   if (r.d.some(function (x) { return /:false$/.test(x) && /reprogramar/.test(x); })) fallas.push("(d) sumar llamó a reprogramar");
   if (!r.d.some(function (x) { return /^generar:/.test(x); })) fallas.push("(d) sumar no armó la tanda");
+  const s0 = r.simAj[0] || {};
+  if (!r.simAj.length || s0.p_simular !== true) fallas.push("(e) la opción 2 no se simuló con gv_ppp_dia_ajustar");
+  else if (!Array.isArray(s0.p_nuevo) || s0.p_nuevo.length !== 1 || s0.p_nuevo[0].m3 !== 0.4 || s0.p_nuevo[0].zona !== "Zona 1 - CABA Sur" || s0.p_nuevo[0].super !== false)
+    fallas.push("(e) p_nuevo de la simulación no trae el pedido: " + JSON.stringify(s0.p_nuevo));
+  const iAj = r.h.log.findIndex(function (x) { return x === "gv_ppp_dia_ajustar:undefined:false"; });
+  const iGen2 = r.h.log.findIndex(function (x) { return /^generar:2026-09-30/.test(x); });
+  if (iAj < 0) fallas.push("(h) elegir 2 no ejecutó gv_ppp_dia_ajustar: " + r.h.log.join(" | "));
+  if (iGen2 < 0 || iGen2 < iAj) fallas.push("(h) la tanda nueva no se armó DESPUÉS de ajustar: " + r.h.log.join(" | "));
+  if (r.h.log.some(function (x) { return /gv_ppp_dia_reprogramar:automatico/.test(x); })) fallas.push("(h) elegir 2 sigue llamando al automático viejo");
+  if (!r.h.ej.length || JSON.stringify(r.h.ej[0].p_nuevo) !== JSON.stringify(s0.p_nuevo)) fallas.push("(h) se ejecutó con otro p_nuevo que el simulado");
+  if (r.i.porMarca !== 2 || r.i.porMotivo !== 2 || r.i.comun !== 1) fallas.push("(i) súper con zona numérica mal contado: " + JSON.stringify(r.i));
   if (errs.length) fallas.push("pageerrors: " + errs.join(" | "));
 
   const ok = fallas.length === 0;
-  console.log("apr-dia-ocupado:", JSON.stringify({ c: r.c, d: r.d }));
+  console.log("apr-dia-ocupado:", JSON.stringify({ c: r.c, d: r.d, h: r.h.log }));
   if (!ok) console.log("  ✗ " + fallas.join("\n  ✗ "));
   console.log(ok ? "· ✓ OK" : "· ✗ FALLÓ");
   await b.close();

@@ -31684,3 +31684,20 @@ loekemeyer»* · *«los de cencosud cayeron en spam, ¿se puede controlar y vigi
   en el SQL Editor de LK); después, prueba de la casilla y comparación contra 245-247 / 241, y recién ahí `KRIKOS_CHEF_AUTO = 'si'`.
 - Test: `tests/krikos-auto-chef.cjs` (corre el handler con las dos bases de mentira; verificado que falla sin la L, con
   renglones en Cencosud y sin el dedup previo a vencidas).
+
+### 3.v2685 — Pop-up de día ocupado: la opción 2 se reacomoda ALREDEDOR de lo nuevo (Luis, 05/10/2026, v26.85)
+
+Luis: *«supongamos que programo un súper para un día que haría que se zarpe en m³ y/o camiones … que reprograme
+automáticamente en base a la programación de ese súper»*. Las tres opciones ya existían (v21.97); lo que cambió es la 2.
+
+| pieza | qué |
+|---|---|
+| `gv_ppp_dia_ajustar(p_fecha, p_nuevo jsonb, p_simular, p_por, p_cupo, p_excluir)` | lo nuevo (`[{zona, m3, super}]`) queda fijo en el día; del pendiente del día sale sólo lo que no entra, de a **grupo entero**: hasta `jornada_camiones` (2) y después hasta `p_cupo` (4,30). Sale el que menos apura (plazo 14 / expreso 13 más lejano); destino `gv_ppp_web_dia_grupo`, uno por grupo. No mueve súper, retira, lo salido, lo en proceso ni lo armado. Ejecuta con `gv_ppp_tanda_mover(…, true, null)` (mismo código). Supervisor. **Aplicado** |
+| front (`aprDiaOcupadoAbrir`) | simula con `p_simular = true`; el reporte suma la carga que ya tiene cada día destino (simulación 'correr'); con el día pasado, la opción 1 dice «Programarlo así igual». La ejecución manda el mismo `p_nuevo` |
+
+- Medido en la base (05/10, simulación del 13/10): por camiones sale F51A; por m³ sale el grupo Z1 entero (F48A–E) al 14/10. 240 ms.
+- `gv_ppp_dia_reprogramar` no se tocó: 'correr' sigue siendo la opción 3; 'automatico' quedó sin puerta.
+- Centinelas 320 y 321 (v26.82, la versión con que se aplicó). `gv_reglas_perdidas` = 0.
+- Rollback: `drop function if exists public.gv_ppp_dia_ajustar(date, jsonb, boolean, text, numeric, text);` + volver el front.
+- `sql/gv_ppp_dia_ajustar_v2682.sql`, `tests/apr-dia-ocupado.cjs`.
+

@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh)",
+  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82 gv_ppp_dia_ajustar)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -407,6 +407,16 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_picking_tanda_calc_frenada",
+      "regla": "D17: en el puntaje de picking, una tanda FRENADA entra con la parte de cada uno (sus tramos); el tramo del freno sin cola y la ventana de PKC sin solaparse con el tramo vecino",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_picking_tanda_refresh",
+      "regla": "D17: una tanda con freno de picking se mide por tramos y se suma por legajo (gv_picking_tanda_calc_frenada)",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_ppp_avisos",
       "regla": "El badge de la PPP tiene que contar los armados que esperan camion (GV_PPP_Armados_Espera): sin eso un pedido facturado queda invisible, como Iro Iro 98626/9862",
       "quien": "Thomas"
@@ -434,6 +444,11 @@
     {
       "objeto": "gv_ppp_demora_ancla",
       "regla": "la parte de un pedido partido por un importado que no llego no cuenta como demora en el Resumen de la PPP",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_ppp_dia_ajustar",
+      "regla": "opción 2 del pop-up de día ocupado: lo nuevo queda fijo y del pendiente se mueve sólo lo que no entra (camiones y m³)",
       "quien": "Luis"
     },
     {
@@ -607,6 +622,11 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_tanda_credito",
+      "regla": "Una tanda FRENADA se reparte: cada operario se lleva el m³ de lo que hizo (último PKC por código; líos que cerró), en el día en que lo hizo",
+      "quien": "Luis"
+    },
+    {
       "objeto": "gv_tanda_frenar",
       "regla": "el freno por fichaje sólo vale si el dueño fichó salida después de tomar la tanda",
       "quien": "Luis"
@@ -639,6 +659,16 @@
     {
       "objeto": "gv_tandas_codigos_usados_sync",
       "regla": "La tanda de la que se saco un pedido retenido cuenta como codigo usado. Sin esta fuente el codigo se vacia de todas las tablas vivas y vuelve a la bolsa mientra",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_tandas_frenadas_de",
+      "regla": "El aviso del día siguiente sólo trae las tandas que siguen frenadas a nombre de ese legajo (nadie las tomó)",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_tandas_frenar_fichaje",
+      "regla": "Una tanda tomada se frena sola cuando el dueño ficha salida, sólo si no volvió a trabajar después del FJ",
       "quien": "Luis"
     },
     {
@@ -764,31 +794,6 @@
     {
       "objeto": "vista_tanda_status",
       "regla": "Una tanda con PKF/APF figura FRENADA (picking/armado), no en curso ni terminada",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_tandas_frenar_fichaje",
-      "regla": "Una tanda tomada se frena sola cuando el dueño ficha salida, sólo si no volvió a trabajar después del FJ",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_tandas_frenadas_de",
-      "regla": "El aviso del día siguiente sólo trae las tandas que siguen frenadas a nombre de ese legajo (nadie las tomó)",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_tanda_credito",
-      "regla": "Una tanda FRENADA se reparte: cada operario se lleva el m³ de lo que hizo (último PKC por código; líos que cerró), en el día en que lo hizo",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_picking_tanda_calc_frenada",
-      "regla": "D17: en el puntaje de picking, una tanda FRENADA entra con la parte de cada uno (sus tramos); el tramo del freno sin cola y la ventana de PKC sin solaparse con el tramo vecino",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_picking_tanda_refresh",
-      "regla": "D17: una tanda con freno de picking se mide por tramos y se suma por legajo (gv_picking_tanda_calc_frenada)",
       "quien": "Luis"
     }
   ]

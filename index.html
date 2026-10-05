@@ -5818,6 +5818,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 #aprDoOv .ado-op.dis{opacity:.5}
 #aprDoOv .ado-s{margin-top:6px;font-weight:600}
 #aprDoOv .ado-w{color:#b45309}
+.ado-pasa{margin-top:4px;font-weight:600;font-size:13px}
 #aprDoOv .ado-ok{margin-top:6px;color:#15803d;font-weight:600}
 #aprDoOv ul{margin:2px 0 0 16px;padding:0}
 #aprDoOv .ado-b{margin-top:8px;padding:6px 12px;cursor:pointer}
@@ -6292,7 +6293,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.84"></script>
+<script type="module" src="recepcion.js?v=26.85"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10534,7 +10535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.84";
+const APP_VERSION = "v26.85";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -37076,7 +37077,7 @@ async function pppMovElegir(iso) {
     : (M.tanda ? (_pppParsed.prog || []).filter(function (p) { return String(p.tanda || "").toUpperCase() === M.tanda; }) : []);
   const seguir = function () { if (_pppMov === M) return pppMovPaso2(iso); };
   return aprDiaOcupadoAbrir(iso, null, {
-    peds: filas.map(function (p) { return { zona: p.zona || "", m3: Number(p.m3) || 0 }; }),
+    peds: filas.map(function (p) { return { zona: p.zona || "", m3: Number(p.m3) || 0, es_super: _adoEsSuperPed(p) }; }),
     label: M.pedidoNp ? ("NP " + M.pedidoNp) : ("tanda " + (M.tanda || "")),
     excluir: M.pedidoNp ? "" : (M.tanda || ""), fuera: true,
     alVacio: seguir, alSumar: seguir
@@ -38019,7 +38020,7 @@ async function pppReprogElegir(iso) {
   const filas = (_pppParsed && _pppParsed.prog || []).filter(function (p) { return nps.indexOf(String(p.np)) >= 0; });
   const seguir = function () { return pppReprogElegirYa(iso); };
   return aprDiaOcupadoAbrir(m[1] + "-" + m[2] + "-" + m[3], null, {
-    peds: filas.map(function (p) { return { zona: p.zona || "", m3: Number(p.m3) || 0 }; }),
+    peds: filas.map(function (p) { return { zona: p.zona || "", m3: Number(p.m3) || 0, es_super: _adoEsSuperPed(p) }; }),
     label: _pppMov.reprogLabel || nps.join(", "), fuera: true,
     alVacio: seguir, alSumar: function () { return pppReprogElegirYa(iso, true); }
   });
@@ -49019,9 +49020,21 @@ function aprDropDia(ev, fecha) {
    lo que ya salió ni una tanda EN PROCESO (pickeo/armado sin terminar); lo armado se mueve con su
    mismo código. Si la simulación falla, se sigue como antes (tanda nueva con su confirm). */
 const APR_DO_CUPO = 4.3;
-function _adoGrupo(z) {
+/* v26.82 (Luis): un súper con zona numérica (Dorinka, Diarco: "Zona 5") es SU camión, no el de la zona.
+   La marca viene en la fila (es_super del backend, o el motivo «súper:» de la simulación). */
+function _adoEsSuper(r) {
+  if (!r) return false;
+  return !!(r.es_super || /^s[úu]per/i.test(String(r.motivo || "")) || /super/i.test(String(r.zona || "")));
+}
+function _adoEsSuperPed(x) {
+  if (!x) return false;
+  if (x.es_super != null) return !!x.es_super;
+  try { if (typeof pppEsSuper === "function" && pppEsSuper(x)) return true; } catch (_e) {}
+  return /super/i.test(String(x.zona || ""));
+}
+function _adoGrupo(z, sup) {
   z = String(z || "");
-  if (/super/i.test(z)) return "SUPER";
+  if (sup || /super/i.test(z)) return "SUPER";
   if (/retira/i.test(z)) return null;
   const m = z.match(/Zona\s*(\d+)/i); if (!m) return "?";
   return ({ "1": "Z1", "2": "Z2", "3": "Z3", "4": "Z4", "5": "Z5", "6": "Z6+Z7", "7": "Z6+Z7" })[m[1]] || ("Z" + m[1]);
@@ -49029,7 +49042,7 @@ function _adoGrupo(z) {
 function _adoCamiones(rows) {
   const g = {}; let sup = 0;
   rows.forEach(function (r) {
-    const k = _adoGrupo(r.zona); if (!k) return;
+    const k = _adoGrupo(r.zona, _adoEsSuper(r)); if (!k) return;
     if (k === "SUPER") { sup++; return; }
     g[k] = (g[k] || 0) + (Number(r.m3) || 0);
   });
@@ -49045,18 +49058,24 @@ function _adoProblemasDia(fecha, rows) {
   if (cam > 2) out.push(aprDiaCorto(fecha) + ": " + cam + " camiones (más de 2)");
   return out;
 }
-function _adoReporte(fecha, rows, nuevo, modo) {
-  // estado DESPUÉS: cada tanda en su día final, más el pedido nuevo en `fecha`
+function _adoReporte(fecha, rows, nuevo, modo, base) {
+  // estado DESPUÉS: cada tanda en su día final, más el pedido nuevo en `fecha`.
+  // v26.82: `base` = lo que ya está programado en los otros días y no se toca (sale de la simulación de
+  // «correr», que trae todo desde `fecha`): sin eso el día al que va lo movido se veía vacío.
   const porDia = {};
   const add = function (d, r) { (porDia[d] = porDia[d] || []).push(r); };
+  (base || []).forEach(function (r) { add(r.fecha_actual, r); });
   rows.forEach(function (r) { add(r.accion === "mueve" ? r.fecha_nueva : r.fecha_actual, r); });
   (Array.isArray(nuevo) ? nuevo : [nuevo]).forEach(function (n) { add(fecha, n); });
+  const mov = rows.filter(function (r) { return r.accion === "mueve" && r.fecha_nueva !== r.fecha_actual; });
+  const mirar = {}; mirar[fecha] = true;
+  mov.forEach(function (r) { mirar[r.fecha_nueva] = true; });
   let probs = [];
   Object.keys(porDia).sort().forEach(function (d) {
     if (modo === "sumar" && d !== fecha) return;
+    if (modo === "automatico" && !mirar[d]) return;   // el resto de los días no cambia con esta opción
     probs = probs.concat(_adoProblemasDia(d, porDia[d]));
   });
-  const mov = rows.filter(function (r) { return r.accion === "mueve" && r.fecha_nueva !== r.fecha_actual; });
   const fijos = rows.filter(function (r) { return r.accion === "fijo" && r.fecha_actual === fecha; });
   const vencen = mov.filter(function (r) { return r.vence && !r.vencia; });
   return { probs: probs, mov: mov, fijos: fijos, vencen: vencen };
@@ -49079,18 +49098,32 @@ async function aprDiaOcupadoAbrir(fecha, ped, opt) {
   const delDia = (corr || []).filter(function (r) { return r.fecha_actual === fecha && (!exT || String(r.tanda || "").toUpperCase() !== exT); });
   if (!delDia.length) return alVacio();   // día vacío: como siempre
   if (opt.antes && opt.antes() === false) return;
-  try { auto = await aprRpc("gv_ppp_dia_reprogramar", { p_fecha: fecha, p_modo: "automatico", p_simular: true }); }
-  catch (_e) { auto = null; }
   const pedsN = opt.peds || (ped ? [ped] : []);
-  const nuevo = pedsN.map(function (x) { return { tanda: "(nuevo)", zona: x.zona || "", m3: Number(x.m3) || 0, accion: "nuevo", fecha_actual: fecha }; });
+  // v26.82 (Luis, 05/10): lo nuevo (un súper que llega) va a la función como dato: queda FIJO en el día y
+  // del pendiente sale sólo lo que no entra en los camiones y el cupo, por grupo de zonas entero.
+  const pNuevo = pedsN.map(function (x) { return { zona: x.zona || "", m3: Number(x.m3) || 0, super: _adoEsSuperPed(x) }; });
+  try { auto = await aprRpc("gv_ppp_dia_ajustar", { p_fecha: fecha, p_nuevo: pNuevo, p_simular: true, p_cupo: APR_DO_CUPO, p_excluir: exT || null }); }
+  catch (_e) { auto = null; }
+  const nuevo = pNuevo.map(function (x) { return { tanda: "(nuevo)", zona: x.zona, m3: x.m3, es_super: x.super, accion: "nuevo", fecha_actual: fecha }; });
   const m3Nuevo = nuevo.reduce(function (s, x) { return s + x.m3; }, 0);
   const label = opt.label || (ped ? aprPedLabel(ped) : "lo nuevo");
+  // «vencía» = ya estaba vencida en su día de hoy: no cuenta como que el movimiento la vence
+  const vencia = {};
+  (corr || []).forEach(function (r) { vencia[String(r.tanda || "").toUpperCase()] = !!r.vencia; });
+  const autoR = auto ? auto.map(function (r) { return Object.assign({}, r, { vencia: !!vencia[String(r.tanda || "").toUpperCase()] }); }) : null;
+  const enAuto = {};
+  (autoR || []).forEach(function (r) { enAuto[String(r.tanda || "").toUpperCase()] = true; });
+  const baseAuto = (corr || []).filter(function (r) {
+    const t = String(r.tanda || "").toUpperCase();
+    return !enAuto[t] && (!exT || t !== exT);
+  });
   const rep = {
     sumar: _adoReporte(fecha, delDia.map(function (r) { return Object.assign({}, r, { accion: "fijo" }); }), nuevo, "sumar"),
-    automatico: auto ? _adoReporte(fecha, auto, nuevo, "automatico") : null,
+    automatico: autoR ? _adoReporte(fecha, autoR, nuevo, "automatico", baseAuto) : null,
     correr: _adoReporte(fecha, corr || [], nuevo, "correr")
   };
-  _apr.doCtx = { fecha: fecha, keys: keys, ped: ped, alSumar: opt.alSumar || null, fuera: !!opt.fuera };
+  const sePasa = rep.sumar.probs.length > 0;
+  _apr.doCtx = { fecha: fecha, keys: keys, ped: ped, alSumar: opt.alSumar || null, fuera: !!opt.fuera, pNuevo: pNuevo, excluir: exT || null };
   const lista = function (arr, fmt, max) {
     if (!arr.length) return "";
     const n = max || 6;
@@ -49114,9 +49147,13 @@ async function aprDiaOcupadoAbrir(fecha, ped, opt) {
   let ov = document.getElementById("aprDoOv");
   if (!ov) { ov = document.createElement("div"); ov.id = "aprDoOv"; document.body.appendChild(ov); }
   ov.innerHTML = '<div class="ado-box"><div class="ado-h">El ' + aprDiaCorto(fecha) + ' ya tiene programación (' + delDia.length +
-    ' tanda/s). ¿Qué hacemos con ' + escapeHtml(label) + ' · ' + aprNum(m3Nuevo) + ' m³?</div><div class="ado-ops">' +
-    card("sumar", "1) Sumarlo", "Va a este día y no se mueve nada más.", rep.sumar) +
-    card("automatico", "2) Reprogramar el resto", "Va a este día y lo PENDIENTE del día se reprograma con la lógica automática.", rep.automatico) +
+    ' tanda/s). ¿Qué hacemos con ' + escapeHtml(label) + ' · ' + aprNum(m3Nuevo) + ' m³?' +
+    (sePasa ? '<div class="ado-w ado-pasa">⚠ Sumándolo, el día se pasa: ' + rep.sumar.probs.map(escapeHtml).join(" · ") + '</div>' : "") +
+    '</div><div class="ado-ops">' +
+    card("sumar", sePasa ? "1) Programarlo así igual" : "1) Sumarlo",
+      sePasa ? "Va a este día aunque se pase; no se mueve nada más." : "Va a este día y no se mueve nada más.", rep.sumar) +
+    card("automatico", "2) Reprogramar el resto alrededor de lo nuevo",
+      "Lo nuevo queda en este día. Del resto sale sólo lo que no entra (camiones y m³), cada grupo de zonas entero, al día que elige la lógica automática.", rep.automatico) +
     card("correr", "3) Correr la programación", "Va a este día y todo lo programado desde acá se corre 1 día con reparto.", rep.correr) +
     '</div><button class="ado-x" onclick="aprDiaOcupadoCerrar()">Cancelar</button></div>';
   ov.classList.add("show");
@@ -49130,7 +49167,12 @@ async function aprDiaOcupadoElegir(op) {
   if (op !== "sumar") {
     _apr.ocupado = true; if (!c.fuera) aprRender();
     try {
-      await aprRpc("gv_ppp_dia_reprogramar", { p_fecha: c.fecha, p_modo: op, p_simular: false, p_por: await aprQuien() });
+      if (op === "automatico") {
+        await aprRpc("gv_ppp_dia_ajustar", { p_fecha: c.fecha, p_nuevo: c.pNuevo || [], p_simular: false, p_por: await aprQuien(),
+          p_cupo: APR_DO_CUPO, p_excluir: c.excluir || null });
+      } else {
+        await aprRpc("gv_ppp_dia_reprogramar", { p_fecha: c.fecha, p_modo: op, p_simular: false, p_por: await aprQuien() });
+      }
     } catch (e) {
       _apr.ocupado = false;
       const m = "⚠ No se reprogramó nada: " + (e && e.message ? e.message : String(e));
@@ -60417,7 +60459,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.84"></script>
+<script src="importacion.js?v=26.85"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63240,9 +63282,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.84"></script>
-<script src="hotsale.js?v=26.84"></script>
-<script src="estadisticas.js?v=26.84"></script>
+<script src="cobranzas.js?v=26.85"></script>
+<script src="hotsale.js?v=26.85"></script>
+<script src="estadisticas.js?v=26.85"></script>
 
 </body>
 </html>

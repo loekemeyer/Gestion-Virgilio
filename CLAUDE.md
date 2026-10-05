@@ -1043,6 +1043,17 @@ mismo día" — frenaba los movimientos y movía solos los otros pedidos del cli
 `alter table public."PPP_Web_Programacion" enable trigger gv_web_cliente_un_solo_dia;`
 `sql/gv_ppp_dia_reprogramar_v2197.sql`, `tests/apr-dia-ocupado.cjs`.
 
+⚠⚠ **v26.85 (Luis, 05/10): la opción 2 se REACOMODA ALREDEDOR DE LO NUEVO** (*"si programo un súper para un día que haría que
+se zarpe en m³ y/o camiones … que reprograme automáticamente en base a la programación de ese súper"*). Antes sacaba del día
+**todo** lo pendiente. Hoy la resuelve **`gv_ppp_dia_ajustar(fecha, p_nuevo, simular, por, cupo, excluir)`**: lo nuevo
+queda fijo, y del resto sale **sólo lo que no entra**, siempre de a **grupo de zonas entero** (principio rector): primero
+hasta 2 camiones (un súper es su propio camión, también con zona numérica; Z2+Z3 juntas si c/u < 1 m³; Z6+Z7 juntas),
+después hasta los 4,30 m³; sale el grupo que menos apura y va al día de `gv_ppp_web_dia_grupo`, uno por grupo.
+- El reporte de la opción 2 **cuenta lo que ya tiene el día destino** (la simulación de 'correr' da la carga de cada día).
+- Si sumándolo **se pasa** (m³ o camiones), la opción 1 se llama **«Programarlo así igual»** y el encabezado lo dice.
+- La simulación y la ejecución mandan el MISMO `p_nuevo`. El modo 'automatico' de `gv_ppp_dia_reprogramar` quedó sin puerta.
+`sql/gv_ppp_dia_ajustar_v2682.sql` (centinelas v26.82), `tests/apr-dia-ocupado.cjs` (e)-(i).
+
 ⚠ **El pop-up NO es sólo del arrastre** (Luis, 28/09, v23.35: *"fijate que no quede ninguna feature colgada así
 porque no estamos arrastrando"*). Lo abren los cuatro caminos que programan un día a mano: soltar un pedido
 (`aprDropDia`), **tildar + día + ✅ Confirmar** (`aprConfirmar`, por donde se programó La Anónima al 30/09 sin
