@@ -31467,3 +31467,32 @@ posterior · legajo de prueba no guarda. Y como `anon`: las 4 RPC contestan.
 **Rollback** (al final de `sql/gv_tanda_frenada_v2661.sql`): restaurar `gv_tanda_reservar` desde el backup, `frenada → tomada`,
 volver el check a 2 estados, dropear las 4 funciones y las 2 tablas, borrar los centinelas v26.61.
 `tests/arm-avance-servidor.cjs` (verificado que falla sin el envío al cerrar el lío).
+
+### §3.v2662 — «Ya programados en cuarentena» en 10,5 s y la base de LK caída (05/10/2026, Luis)
+
+**Luis:** *"la PPP no está cargando… el problema es en A programar"*. Eran dos cosas distintas, el mismo día.
+
+**1. LK (`kwkclwhmoygunqmlegrg`) dejó de responder de 10:35 a 11:18 ART.** De un minuto al otro, las
+consultas a la API pasaron de ~0,15 s a 40–140 s y casi todas terminaron en 500/504. Hasta un `count` de
+`pg_settings` tardó 13 s, había escrituras esperando el disco (`LWLock WALInsert`), los crons no arrancaban
+(`job startup timeout`) y Auth no encontraba usuarios (`context deadline exceeded`). Conexiones: 15 de 60, sin
+bloqueos. Dashboard: Postgres y Storage *Unhealthy*. Se arregló **reiniciando el proyecto** (11:18, postmaster
+nuevo); al minuto, 32 de 32 consultas OK a 0,23 s. A Programar lee de LK los pedidos de LK **y** de Chef (el de Chef
+por FDW desde LK), por eso no cargaba nada.
+- La máquina de LK es chica (`shared_buffers` 224 MB, `max_worker_processes` 6, base 470 MB). Lo que más escribe
+  (pg_stat_statements desde el 23/06): `sincronizar_fact_live` **14 GB de WAL** (cron 38, :06 y :36),
+  `sincronizar_chef_orders` 2,8 GB, `sync_reingresos_virgilio` 1,8 GB y 9,9 s por corrida, cada 5 min. Este último
+  y `sync_pedidos_match_virgilio` (6,4 s) arrancan los dos en el mismo minuto (`1-59/5`, crons 39 y 24).
+- La causa exacta **no se pudo medir desde el MCP**: depende de las métricas de la instancia (Reports → Database:
+  CPU, memoria, Disk IO budget). Queda como pendiente mirarlas.
+- Chef: el enlace LK → Chef (`chef_db`) anda y la copia `chef_orders_cache` tiene los 82 pedidos de 90 días
+  (0 faltantes). `sincronizar_chef_orders` (cron 48) falló de 10:42 a 11:12 por la caída.
+
+**2. `gv_cuarentena_ya_programado` tardaba 10,5 s contra 8 s del rol: 16 de 16 en 500 desde las 08:40.** Los CTE
+`repo` y `mismo` se nombran una sola vez, adentro del subselect correlacionado de `motivos_ok`, así que Postgres los
+inlinea y corre `gv_cuarentena_repo_seguro` (~105 ms) y `gv_cuarentena_mismo_pedido_seguro` (~60 ms) **por pedido**.
+Con `as materialized`: **480 ms**, las mismas 13 filas (`EXCEPT ALL` 0 en las dos direcciones),
+`gv_reglas_perdidas` vacía. Centinela id 299. `sql/gv_cuarentena_ya_programado_mat_v2662.sql` (rollback adentro).
+
+> **Un CTE nombrado una sola vez dentro de un subselect correlacionado se re-ejecuta por fila.** Si adentro hay una
+> función cara, va `as materialized`.

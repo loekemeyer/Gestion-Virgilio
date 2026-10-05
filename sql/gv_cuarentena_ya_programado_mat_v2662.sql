@@ -1,4 +1,4 @@
--- v26.60 (Luis, 2026-10-05: "la PPP no esta cargando… el problema es en A programar")
+-- v26.62 (Luis, 2026-10-05: "la PPP no esta cargando… el problema es en A programar")
 --
 -- gv_cuarentena_ya_programado (el recuadro «Ya programados en cuarentena» de A Programar)
 -- tardaba 10,5 s y authenticated corta a los 8 s: 16 de 16 llamadas en 500 (57014) desde
@@ -13,10 +13,16 @@
 --
 -- No cambia ninguna regla (los tres patrones de GV_Reglas_Centinela siguen: el left join de
 -- liberados_familia, gv_cuarentena_repo_seguro y _rec5). Se aplica sobre la definición VIVA,
--- es idempotente (marcador v26.60-cuar-mat) y falla con raise si el texto no matchea.
+-- es idempotente (marcador v26.60-cuar-mat: es la llave, no cambiarlo aunque la version sea v26.62)
+-- y falla con raise si el texto no matchea.
+--
+-- APLICADO el 05/10 11:25 ART con el si de Luis ("fijate que este ok eso ahora y dale"): 480 ms,
+-- 13 filas (las mismas, 0 diferencias por EXCEPT ALL), gv_reglas_perdidas vacia.
+-- Centinela nuevo: GV_Reglas_Centinela id 299 (version 'v26.60', la del marcador), patron 'repo as materialized \('.
 --
 -- Rollback: el mismo bloque con los replace al revés (sacar " materialized" de repo y mismo).
 
+-- REGLA_CONFIRMADA_POR_USUARIO (Luis, 05/10)
 do $do$
 declare
   d text := pg_get_functiondef('public.gv_cuarentena_ya_programado()'::regprocedure);
