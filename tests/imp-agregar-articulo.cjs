@@ -7,7 +7,7 @@
    (d) gv_importado_alta va con la sesión (_PED_IMP_RPC_ESCRITURA)
    (e) 📦 Pedidos toma el primer pedido a mano mientras no haya en curso, y el MOQ propio del artículo
    v26.99 — «Agregar o modificar producto»:
-   (f) el alta manda también tipo, familia, INAL, góndola y secundario (gv_importado_guardar)
+   (f) el alta manda también tipo, familia, INAL y secundario; la góndola NO (D4: se asigna en el Mapa) (gv_importado_guardar)
    (g) MODIFICAR: se elige un importado, se cargan sus datos de la ficha, el código y la empresa no se
        editan, y guardar manda su id; sacarle el INAL o el secundario lo dice antes de guardar
    Sale 1 si falla. */
@@ -65,7 +65,7 @@ const llamadas = [];
   await set("mc_largo", "60"); await set("mc_ancho", "40"); await set("mc_alto", "30");
   await set("in_largo", "20"); await set("in_ancho", "10"); await set("in_alto", "10");
   await set("uni_inner", "12"); await set("uni_mc", "144"); await set("fob", "1,25");
-  await set("tipo", "Colador prueba"); await set("familia", "Coladores"); await set("gondola_sector", "A60"); await set("gondola_cap", "20");
+  await set("tipo", "Colador prueba"); await set("familia", "Coladores");
   await p.evaluate(() => { const e = document.querySelector('#impAltaF [data-k="inal"]'); e.checked = true; e.dispatchEvent(new Event("change")); });
   await set("inal_certificado", "RNPA-1");
   const sug = await p.evaluate(() => document.querySelector('#impAltaF [data-k="mc"]').value);
@@ -79,13 +79,16 @@ const llamadas = [];
   if (!/1\.440/.test(txt)) fail("(b) 10 MC × 144 = 1.440 u no aparece");
   if (!/1\.800,00/.test(txt)) fail("(b) FOB 1.440 × 1,25 = 1.800,00 no aparece");
 
+  { const camp = await p.evaluate(() => !!document.querySelector('#impAltaF [data-k="gondola_sector"], #impAltaF [data-k="gondola_cap"]')); if (camp) fail("(b) el form no lleva campos de góndola (D4)"); }
+  if (!/se asigna y se edita en el Mapa/.test(txt)) fail("(b) no dice que la góndola se asigna en el Mapa");
   // (c)
   await p.evaluate(() => impAltaGuardar());
   await p.waitForFunction(() => /quedó dado de alta|No se guardó/.test(document.getElementById("stkPopBody").innerText), null, { timeout: 8000 });
   { const t = await p.evaluate(() => document.getElementById("stkPopBody").innerText); if (/No se guardó/.test(t)) fail("(c) " + t.slice(t.indexOf("No se guardó"), t.indexOf("No se guardó") + 200)); }
   const c = llamadas[0] || {};
   const esp = { id: null, cod: "999E", marca: "LK", proveedor: "Fujian", fob: 1.25, uni_mc: 144, uni_inner: 12, moq: 2000, primer_pedido_u: 1440, mc_largo: 60, in_alto: 10,
-    tipo: "Colador prueba", familia: "Coladores", inal: true, inal_certificado: "RNPA-1", gondola_sector: "A60", gondola_cap: 20 };
+    tipo: "Colador prueba", familia: "Coladores", inal: true, inal_certificado: "RNPA-1" };
+  if ("gondola_sector" in c || "gondola_cap" in c) fail("(c) la góndola no se manda desde acá: se asigna en el Mapa (D4)");
   Object.keys(esp).forEach(function (k) { if (c[k] !== esp[k]) fail("(c) " + k + " = " + JSON.stringify(c[k]) + ", esperaba " + esp[k]); });
 
   // (e)

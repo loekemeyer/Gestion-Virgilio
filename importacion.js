@@ -3191,7 +3191,7 @@ async function impAltaElegir(txt) {
       uni_mc: s(a.uni_mc), uni_inner: s(a.uni_inner), moq: s(a.moq),
       mc_largo: s(a.mc_largo), mc_ancho: s(a.mc_ancho), mc_alto: s(a.mc_alto), in_largo: s(a.in_largo), in_ancho: s(a.in_ancho), in_alto: s(a.in_alto),
       tipo: a.tipo || "", familia: a.familia || "", inal: !!a.inal, inal_certificado: a.inal_certificado || "", inal_vence: a.inal_vence || "",
-      secundario_de: a.secundario_de || "", gondola_sector: "", gondola_cap: "" };
+      secundario_de: a.secundario_de || "" };
     if (_impAlta.v.proveedor && (_PROV_IMP_LISTA || []).indexOf(_impAlta.v.proveedor) < 0) { _impAlta.v.prov_otro = _impAlta.v.proveedor; _impAlta.v.proveedor = ""; }
     const um = Number(a.uni_mc) || 0, pu = Number(a.primer_pedido_u) || 0;
     _impAlta.mcTocado = true; _impAlta.v.mc = um > 0 ? String(Math.round(pu / um)) : "0";
@@ -3286,11 +3286,10 @@ function _impAltaRender() {
         (o.inal && !o.inal_propio ? '<div class="iaf-s">lo toma de otro código</div>' : '') + '</div>' +
       (v.inal ? '<div>' + lbl("Certificado") + inp("inal_certificado", "RNPA / RNE", false, 140) + '</div><div>' + lbl("Vence") + '<input type="date" data-k="inal_vence" value="' + val("inal_vence") + '" style="width:160px" onchange="_impAltaCambio(\'inal_vence\')"></div>' : '') +
     '</div>' +
+    /* v27.05 (Luis, D4: "se edita y asigna en el mapa eso"): la góndola NO se carga acá; se muestra y se asigna en el Mapa */
     '<div class="iaf-sec">Depósito</div><div class="iaf-g">' +
-      (gonds ? '<div>' + lbl("Góndola actual") + '<b>' + escapeHtml(gonds) + '</b><div class="iaf-s">se cambia o se saca en el Mapa</div></div>' : '') +
-      '<div>' + lbl(gonds ? "Agregar otra góndola" : "Góndola") + inp("gondola_sector", "A60", false, 80) + '</div>' +
-      '<div>' + lbl("Capacidad <small>caj</small>") + inp("gondola_cap", "40", true, 80) + '</div>' +
-      (!gonds ? '<div class="iaf-s" style="flex:1 1 100%">sin góndola el artículo queda «sin lugar» en el Mapa hasta que se le asigne</div>' : '') +
+      '<div>' + lbl("Góndola") + '<b>' + (gonds ? escapeHtml(gonds) : 'sin lugar') + '</b><div class="iaf-s">se asigna y se edita en el Mapa' +
+        (typeof openPlanimMapa === "function" ? ' · <a href="#" onclick="openPlanimMapa();return false">abrir el Mapa</a>' : '') + '</div></div>' +
     '</div>' +
     '<div class="iaf-ped"><div class="iaf-pt">🧾 Primer pedido a mandar <small>(a mano: un artículo nuevo no tiene Estadística Madre)</small></div>' +
       (enCurso > 0 ? '<div class="iaf-s">Ya tiene ' + fm(enCurso) + ' u en curso: el primer pedido a mano no se usa.</div>' : '') +
@@ -3340,13 +3339,9 @@ async function impAltaGuardar() {
   if (c.ui == null || !isFinite(c.ui) || c.ui < 0) return err("Faltan las unidades por inner (0 si viene suelto).");
   if (c.ui > 0 && c.um % c.ui !== 0) return err("Las unidades por MC (" + c.um + ") no son múltiplo de las del inner (" + c.ui + ").");
   if (v.moq !== "" && v.moq != null && !(c.moqArt >= 0)) return err("El MOQ no es un número.");
-  const dimsNum = ["mc_largo", "mc_ancho", "mc_alto", "in_largo", "in_ancho", "in_alto", "gondola_cap"];
-  for (let i = 0; i < dimsNum.length; i++) { const n = _impAltaNum(v[dimsNum[i]]); if (n != null && !(n >= 0)) return err("Una medida o la capacidad no es un número."); }
-  if (_impAltaNum(v.gondola_cap) != null && !String(v.gondola_sector || "").trim()) return err("Pusiste capacidad: falta la góndola.");
+  const dimsNum = ["mc_largo", "mc_ancho", "mc_alto", "in_largo", "in_ancho", "in_alto"];
+  for (let i = 0; i < dimsNum.length; i++) { const n = _impAltaNum(v[dimsNum[i]]); if (n != null && !(n >= 0)) return err("Una medida no es un número."); }
   if (!mod && !String(v.tipo || "").trim() && v.marca !== "Mixto") return err("Falta el tipo de producto (agrupa las marcas del mismo producto en el PDF de Damián).");
-  if (!mod && !String(v.gondola_sector || "").trim() && v.marca !== "Mixto") {
-    try { if (!confirm("No le pusiste góndola: va a quedar «sin lugar» en el Mapa hasta que se le asigne. ¿Seguir igual?")) return; } catch (_e) {}
-  }
   const o = A.orig || {};
   const quitaSec = mod && o.secundario_de && !String(v.secundario_de || "").trim();
   const quitaInal = mod && o.inal_propio && !v.inal;
@@ -3362,7 +3357,6 @@ async function impAltaGuardar() {
     mc_largo: num(v.mc_largo), mc_ancho: num(v.mc_ancho), mc_alto: num(v.mc_alto), in_largo: num(v.in_largo), in_ancho: num(v.in_ancho), in_alto: num(v.in_alto),
     tipo: String(v.tipo || "").trim() || null, familia: String(v.familia || "").trim() || null,
     inal: !!v.inal, inal_certificado: v.inal ? (String(v.inal_certificado || "").trim() || null) : null, inal_vence: v.inal ? (v.inal_vence || null) : null,
-    gondola_sector: String(v.gondola_sector || "").trim() || null, gondola_cap: num(v.gondola_cap),
     secundario_de: String(v.secundario_de || "").trim() || null, secundario_de_quitar: !!quitaSec };
   A.guardando = true; _impAltaRender();
   try {

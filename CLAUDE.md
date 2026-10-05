@@ -4237,12 +4237,12 @@ hoy; valoriza los pedidos nuevos con su precio) y **no se hace el backfill de lo
   «forzar». «solo_pdf» lo arma sin mandar (queda como artifact). Si la plantilla no está APPROVED en Meta, no manda y el
   run queda en rojo. `tests/reporte-quincenal-params.cjs`.
 
-## ⚠ REGLA (Luis, 2026-10-05, v26.98 · v26.99): ➕ AGREGAR O MODIFICAR PRODUCTO importado — y que impacte en Stock
+## ⚠ REGLA (Luis, 2026-10-05, v26.98 · v26.99 · v27.05): ➕ AGREGAR O MODIFICAR PRODUCTO importado — y que impacte en Stock
 
 Solapa **➕ Agregar / modificar** de Pedidos Importación (`openImpAgregar`, `importacion.js`). **Nuevo** o **Modificar uno
 existente** (buscador del maestro; código y empresa no se cambian). Pide: código, empresa (LK/CH/Loke/Mixto), proveedor,
 descripción, **tipo de producto** y familia, **secundario de**, medidas MC e inner (cm → m³), uni × inner (0 = suelto),
-uni × MC, FOB, MOQ, **INAL** (certificado y vencimiento), **góndola y capacidad**, y el **primer pedido en MC** (sugerido =
+uni × MC, FOB, MOQ, **INAL** (certificado y vencimiento) y el **primer pedido en MC** (sugerido =
 MOQ en MC enteras; editable). Todo en una transacción: **`gv_importado_guardar(jsonb)`** (sin `id` = alta; supervisor).
 `gv_importado_alta` (v26.98) quedó como envoltorio. La ficha la lee `gv_importado_ficha(id)`.
 
@@ -4255,13 +4255,14 @@ MOQ en MC enteras; editable). Todo en una transacción: **`gv_importado_guardar(
 | **m³ por caja (PPP)** | `GV_Volumen_Articulos`: el inner medido o la MC repartida; en un código con m³ sólo se pisa si se midió el inner |
 | tipo / familia | `GV_Producto_Tipo` (agrupa el PDF de Damián) |
 | INAL | `GV_Articulo_INAL` (desmarcarlo al modificar BORRA la fila; el front lo avisa) |
-| **góndola** | `GV_Lugar_Item` vía `gv_lugar_item_guardar`. **Tiene que ser góndola de la MISMA empresa**: la empresa del artículo en stock la da su góndola (un CH en góndola LK quedaba LK) |
+| **góndola** | **NO se carga acá** (v27.04, Luis D4: *"se edita y asigna en el mapa eso"*): el form la muestra («sin lugar» si no tiene) con el link al Mapa. El parámetro `gondola_sector` de `gv_importado_guardar` queda sin llamador (si alguien lo manda, exige góndola de la MISMA empresa) |
 | secundario de | `Equivalencias_Familia` |
 | **aparecer en Stocks antes de que llegue** | en el ALTA, un ajuste de **0 cajas** en `terminado` (`ref 'ALTA IMP <cod>'`, descripción = la del artículo): Stocks arma su lista con lo que tiene movimientos o pedidos. Aparece en ≤ 2 min (refresco) |
 
 - Mixto (insumo) no lleva UxB, tipo, OC ni movimiento. La página LK no se toca (D2, Luis: *"en página está bien que no"*).
 - El primer pedido: 📦 Pedidos lo toma como MC pedido (`_pedImpPrimerPedidoMc`, chip «1.er pedido») mientras no haya
   pedido en curso; el trigger `gv_importados_bache_primer_pedido` lo borra al cargar el primer bache.
+- **Precio y costo NO van en este form** (Luis D3, 05/10: *"debería editarse en listas de precio eso"*).
 
 Centinelas 332-335. `sql/gv_importado_alta_v2698.sql`, `sql/gv_importado_guardar_v2699.sql`, `tests/imp-agregar-articulo.cjs`.
 
