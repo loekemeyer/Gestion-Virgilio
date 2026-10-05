@@ -3877,6 +3877,8 @@ borró). Layout:
      igualdad** sobre `Dia-mes`. ⚠ Al tocar cualquier pantalla de carga, mirar que la fecha que
      se guarda tenga año. **`Entregas PS` escribe ISO (`arDateISO()`) y se dejó como está**:
      tiene el año, y cambiarla movería un formato que los lectores ya soportan a propósito.
+  5. **`entero/Produccion/maestro.html` no tiene «📷 Cargar foto»** (v27.10, 05/10: *"no se usa, sacá lo de OCR"*).
+     Era el OCR de la planilla de matricería por `leer-produccion-foto`, que quedó como tapón 410. No reponerlo al re-sincronizar.
 - **`.nojekyll` en la raíz**: sin eso, Pages corre Jekyll y **no publica** lo que empieza con
   `_` — y las copias traen varios (`_backup_relevamiento_*`, `_export`, `_archivo`).
 - El botón **🏭 Admin Cervantes (GP2)** del panel supervisor abre **esa misma pantalla**

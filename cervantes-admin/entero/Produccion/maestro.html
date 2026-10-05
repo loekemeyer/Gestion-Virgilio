@@ -368,8 +368,6 @@
         </div>
         <div class="field" style="justify-content:flex-end;display:flex;gap:8px;align-items:flex-end;">
           <button class="btn" id="cmAgregarFila">+ Agregar fila</button>
-          <button class="btn" id="cmCargarFoto" style="background:#1565c0;">&#128247; Cargar foto</button>
-          <input type="file" id="cmFotoInput" accept="image/*" style="display:none;" />
         </div>
       </div>
       <div class="table-wrap">
@@ -1371,64 +1369,7 @@
 
   document.getElementById('cmAgregarFila').addEventListener('click', () => agregarFilaCM());
 
-  // ----- Cargar foto (OCR) -----
-  const cmFotoInput = document.getElementById('cmFotoInput');
-  document.getElementById('cmCargarFoto').addEventListener('click', () => cmFotoInput.click());
-  cmFotoInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    cmStatus.style.color = '#1565c0';
-    cmStatus.textContent = 'Procesando foto...';
-    try {
-      const b64 = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result.split(',')[1]);
-        r.onerror = reject;
-        r.readAsDataURL(file);
-      });
-      // v23.40 (seguridad): la funcion exige la sesion de una cuenta habilitada, no la clave publica.
-      const _ses = (await sb.auth.getSession()).data.session;
-      if (!_ses) { cmStatus.style.color = '#c62828'; cmStatus.textContent = 'Error OCR: iniciá sesión de nuevo.'; cmFotoInput.value = ''; return; }
-      const res = await fetch(SUPABASE_URL + '/functions/v1/leer-produccion-foto', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + _ses.access_token },
-        body: JSON.stringify({ image_base64: b64, mime: file.type || 'image/jpeg' })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.filas) {
-        cmStatus.style.color = '#c62828';
-        cmStatus.textContent = 'Error OCR: ' + (data.error || 'sin respuesta');
-        cmFotoInput.value = '';
-        return;
-      }
-      // Limpiar tabla actual y poblar con OCR
-      cmBody.innerHTML = '';
-      data.filas.forEach(f => agregarFilaCM(f));
-      if (data.filas.length === 0) agregarFilaCM();
-      // Contar filas con al menos un campo no leído
-      const filasIncompletas = data.filas.filter(f =>
-        f.dia == null || !f.codigo || !f.hIni || !f.hFin || (f.tipo !== 'tm' && f.uni == null)
-      ).length;
-      if (filasIncompletas > 0) {
-        cmStatus.style.color = '#c62828';
-        cmStatus.textContent = 'OCR: ' + data.filas.length + ' filas leídas, ' + filasIncompletas + ' con campos sin leer (en rojo). Revisá y completá manualmente antes de guardar.';
-      } else {
-        cmStatus.style.color = '#2e7d32';
-        cmStatus.textContent = 'OCR: ' + data.filas.length + ' filas leídas correctamente. Revisá y guardá.';
-      }
-      // Si OCR detectó mes/año, actualizar headers
-      if (data.mes) cmMes.value = data.mes;
-      if (data.anio) cmAnio.value = data.anio;
-      if (data.legajo) {
-        const opt = [...cmOperario.options].find(o => o.value === String(data.legajo));
-        if (opt) cmOperario.value = String(data.legajo);
-      }
-    } catch (err) {
-      cmStatus.style.color = '#c62828';
-      cmStatus.textContent = 'Error: ' + err.message;
-    }
-    cmFotoInput.value = '';
-  });
+  // v27.10: se sacó «Cargar foto» (OCR de la planilla): no se usaba (0 lecturas desde el 15/09).
 
   document.getElementById('cmLimpiar').addEventListener('click', () => {
     cmBody.innerHTML = '';
