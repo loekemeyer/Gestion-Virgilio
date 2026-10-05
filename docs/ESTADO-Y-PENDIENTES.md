@@ -305,6 +305,9 @@
    alguien la enchufa, arrastra los 47 valores malos.
 10. **187 mails viejos de Krikos nunca ingresados**: el cron mira 90 días y ésos son más viejos.
    Traerlos es un `{"action":"sync","days":365}` a mano — decisión del dueño, no se hizo.
+11. **Cámaras de las mesas de armado (05/10, Luis: *"ponelo como plan, no se va a poder resolver ahora"*).**
+   Plan en espera en `docs/PLAN-CAMARAS-MESAS.md`: falta la marca y modelo del NVR, una captura de cada cámara que
+   ve las mesas de armado, quién tiene el usuario y la clave, y el aviso por escrito a los operarios.
 
 ## 4. Tareas de Planify abiertas de esta sesión
 

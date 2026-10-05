@@ -67,7 +67,8 @@ acomodar **1,3 min**. Por operario: 104 3,1 min · 277 5,2 · 122 5,7 · 504 **8
 - **Lo que manda es el operario**, no la tanda: por eso la cola se le cobra al picking de cada uno (v26.43) y entra al puntaje
   por índice, no por m³.
 - **No se puede medir hoy** dónde quedaron las cajas (mesa / carro / pallet) ni cuántas mesas hay. Para cerrarlo hace falta
-  que el celular lo pregunte al dar el TP, o la cámara de las mesas de armado (D25, Luis manda capturas el lunes 06/10).
+  que el celular lo pregunte al dar el TP, o la cámara de las mesas de armado: plan en espera en `docs/PLAN-CAMARAS-MESAS.md`
+  (Luis, 05/10).
 
 Script del agente: `scratchpad/acomodar.py` de la sesión (Spearman con rangos promedio, OLS por ecuaciones normales); el de 60
 días usa `docs/picking-d17/d17_tandas_dificultad.json` y los `d17_feat` de la calibración.
