@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.59"></script>
+<script type="module" src="recepcion.js?v=26.61"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10478,7 +10478,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.59";
+const APP_VERSION = "v26.61";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -14594,9 +14594,13 @@ function etlEnqueueLio(comp, n, lio) { try { const row = etlBuildLioRow(comp, n,
    .push para no chocar con búsquedas de texto. Persiste el _etlSeq. */
 function _compAddLio(n, lio) {
   if (!n) return;
+  // v26.61 (D6, Luis 05/10): cada lío dice QUIÉN lo cerró y CUÁNDO — el crédito del armado va por lío.
+  // No cambia la firma del lío (_compLioSig mira items + suelta), así que no mueve letras ni grupos.
+  if (lio && lio.leg == null) { try { lio.leg = String((_comp && _comp.legajo) || ""); lio.ts = Date.now(); } catch (_e) {} }
   n.liosArr[n.liosArr.length] = lio;
   try { etlEnqueueLio(_comp, n, lio); } catch (_e) {}
   try { _compPersist(); } catch (_e) {}
+  try { _armAvProgramar(1500); } catch (_e) {}   // v26.61: lío cerrado → copia al servidor enseguida
 }
 /* (v6.90) El toggle de etiquetas de lío ya NO va en el módulo del operador ni gateado
    por legajo: es un ajuste GLOBAL que maneja la operadora desde el Print Station
@@ -15311,6 +15315,7 @@ async function compTerminar() {
   // v11.09: flush síncrono de ajustes picking_difiere ANTES de Entregas (para que el
   // trigger trg_entregas_reconciliar_stock vea separar_pedidos ya reducido).
   const _difPend = (_comp._difMovs && _comp._difMovs.length) ? _comp._difMovs.slice() : [];
+  try { _armAvCerrar(_comp, "terminado", true); } catch (_e) {}   // v26.61: la foto final queda en el servidor (crédito por lío)
   _compClearPersist(tanda);   // v4.04: completado → borrar el avance persistido
   _comp = null;
   const ov = document.getElementById("completarModal"); if (ov) ov.classList.remove("show");
@@ -15391,6 +15396,7 @@ function compPausar() {
   if (!_comp) { if (ov) ov.classList.remove("show"); return; }
   const tanda = _comp.tanda;
   try { _compPersist(); } catch (_e) {}   // asegura el avance en localStorage antes de salir
+  try { _armAvCerrar(_comp, "en_curso", true); } catch (_e) {}   // v26.61: y en el servidor, sin esperar los 8 s
   _comp = null;                            // salgo del asistente en memoria (queda en localStorage)
   if (ov) ov.classList.remove("show");
   try { renderPendingSuggestion(); } catch (_e) {}   // dibuja "▶ Seguir armado" en la pantalla del operario
@@ -15455,6 +15461,7 @@ async function compAnularArmado(_tandaArg, _legajoArg) {
   // 3) estado local: el casillero del armado, el borrador del asistente y el historial del día
   try { const st = getLegajoState(legajo); st.armado = { active: false, value: "", ts_inicio: null }; setLegajoState(legajo, st); } catch (_e) {}
   try { localStorage.removeItem("vir_comp_" + tanda); } catch (_e) {}
+  try { _armAvCerrar({ tanda: tanda, legajo: legajo }, "anulado", false); } catch (_e) {}   // v26.61: la copia del servidor queda anulada
   try {
     const f = getTodayKey();
     writeDayHist(f, legajo, readDayHist(f, legajo).filter(function (h) {
@@ -30291,7 +30298,72 @@ async function stockDrenarCPFacturado(np, legajo) {
    Se guarda en cada cambio (_compRecalc/_compLioNp), se retoma al reabrir AP, y se
    borra al Terminar. Ventana de 36h (cubre un armado de un día para el otro). */
 function _compPersistKey(tanda) { return "vir_comp_" + String(tanda || "").toUpperCase(); }
-function _compPersist() { try { if (_comp && _comp.tanda) localStorage.setItem(_compPersistKey(_comp.tanda), JSON.stringify(Object.assign({ _ts: Date.now() }, _comp))); } catch (_e) {} }
+function _compPersist() { try { if (_comp && _comp.tanda) localStorage.setItem(_compPersistKey(_comp.tanda), JSON.stringify(Object.assign({ _ts: Date.now() }, _comp))); } catch (_e) {} try { _armAvProgramar(8000); } catch (_e) {} }
+/* v26.61 (Luis, 05/10) — COPIA DEL ARMADO EN EL SERVIDOR (parte 1 de «Frenar la tanda»).
+   El avance del asistente vivía SÓLO en el celular hasta «Terminar»: si el celular se perdía, o
+   la tanda la seguía otro, se arrancaba de cero. Ahora la última foto viaja además a
+   `GV_Armado_Avance` (una fila por tanda): al cerrar cada lío (1,5 s), con cualquier otro cambio
+   (8 s, para no mandar una por caja contada), al pausar, al terminar y al soltar.
+   NADIE LA LEE TODAVÍA: retomar desde el servidor y frenar la tanda son la parte 2.
+   Todo sin esperar respuesta y en try/catch: si falla, el armado sigue igual y la foto sale con el
+   próximo cambio. El legajo de prueba no manda nada (y la base lo rechaza igual). */
+let _armAvTimer = null, _armAvEnVuelo = false, _armAvOtraVez = false;
+function _armAvFoto(c) {
+  if (!c || !c.tanda) return null;
+  const f = {};
+  Object.keys(c).forEach(function (k) {
+    if (k === "dirByNp" || k === "sucByNp" || k === "pickUbic" || k === "_terminando") return;   // se rearman al abrir
+    f[k] = c[k];
+  });
+  try { return JSON.parse(JSON.stringify(f)); } catch (_e) { return null; }
+}
+function _armAvPost(body, intento, reintentar) {
+  return fetch(SUPABASE_URL + "/rest/v1/rpc/gv_armado_avance_guardar", {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  }).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return true;
+  }).catch(function () {
+    // un cierre (pausa/terminado/anulado) no se vuelve a sacar de _comp: se reintenta el MISMO cuerpo
+    const n = (intento || 0) + 1;
+    if (reintentar && n <= 3) setTimeout(function () { _armAvPost(body, n, true); }, n * 30000);
+    return false;
+  });
+}
+function _armAvCuerpo(tanda, legajo, estado, foto) {
+  let disp = ""; try { disp = gvDispositivoId(); } catch (_e) {}
+  return { p_tanda: String(tanda || "").trim().toUpperCase(), p_legajo: String(legajo || "").trim(),
+           p_estado: estado, p_ts_cliente: new Date().toISOString(), p_snapshot: foto,
+           p_dispositivo: disp || null, p_app: APP_VERSION };
+}
+function _armAvProgramar(ms) {
+  if (!_comp || !_comp.tanda || esLegajoPrueba(_comp.legajo)) return;
+  if (_armAvTimer) clearTimeout(_armAvTimer);
+  const tanda = _comp.tanda;
+  _armAvTimer = setTimeout(function () { _armAvTimer = null; _armAvEnviar(tanda); }, ms);
+}
+function _armAvEnviar(tanda) {
+  if (!_comp || _comp.tanda !== tanda || esLegajoPrueba(_comp.legajo)) return;   // ya se cerró o es otra
+  if (_armAvEnVuelo) { _armAvOtraVez = true; return; }
+  const foto = _armAvFoto(_comp); if (!foto) return;
+  _armAvEnVuelo = true;
+  _armAvPost(_armAvCuerpo(tanda, _comp.legajo, "en_curso", foto), 0, false).then(function (ok) {
+    _armAvEnVuelo = false;
+    if (_armAvOtraVez || !ok) { _armAvOtraVez = false; _armAvProgramar(ok ? 1500 : 30000); }
+  });
+}
+/* Cierre (pausa = "en_curso" con la foto final, terminado o anulado): sale YA, con la foto del
+   momento, y apaga lo programado para que no llegue después una foto vieja. */
+function _armAvCerrar(c, estado, conFoto) {
+  try {
+    if (_armAvTimer) { clearTimeout(_armAvTimer); _armAvTimer = null; }
+    _armAvOtraVez = false;
+    if (!c || !c.tanda || esLegajoPrueba(c.legajo)) return;
+    _armAvPost(_armAvCuerpo(c.tanda, c.legajo, estado, conFoto ? _armAvFoto(c) : null), 0, true);
+  } catch (_e) {}
+}
 /* v26.56 (Luis, 05/10: "si uno termina el día con un armado abierto, queda guardado y se puede retomar
    después") — pasadas las 36 h el avance se conserva MIENTRAS el armado de esa tanda siga abierto en este
    celular (mismo criterio que el picking, v5.91). Antes se borraba siempre: un armado del viernes a la
@@ -59294,7 +59366,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.59"></script>
+<script src="importacion.js?v=26.61"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62117,9 +62189,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.59"></script>
-<script src="hotsale.js?v=26.59"></script>
-<script src="estadisticas.js?v=26.59"></script>
+<script src="cobranzas.js?v=26.61"></script>
+<script src="hotsale.js?v=26.61"></script>
+<script src="estadisticas.js?v=26.61"></script>
 
 </body>
 </html>

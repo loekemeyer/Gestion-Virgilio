@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado)",
+  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -9,6 +9,11 @@
     {
       "objeto": "facturacion_neto_lote",
       "regla": "el filtro de NP baja por el GROUP BY de la vista (un JOIN no baja)",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_armado_avance_guardar",
+      "regla": "la copia del armado no se pisa con una foto más vieja del mismo celular",
       "quien": "Luis"
     },
     {
@@ -594,6 +599,11 @@
     {
       "objeto": "gv_tanda_armada_sin_armado",
       "regla": "TAP y EP/TP son eventos de la TANDA, no del pedido: una tanda queda armada para siempre aunque despues le cambien los pedidos de adentro. El unico registro por ",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_tanda_frenar",
+      "regla": "el freno por fichaje sólo vale si el dueño fichó salida después de tomar la tanda",
       "quien": "Luis"
     },
     {

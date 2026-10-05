@@ -31435,3 +31435,35 @@ tandas con TP de hoy que ya tiene en `__MA_M3`, y relee si aparecen tandas nueva
 `drop function if exists public.gv_picking_grado(text[]);` (el admin queda con «—» en Dif./Ajust.).
 `tests/mon-admin.cjs` (mock de la RPC, la celda «→ 1,4» y el pop-up 2,4 → 2,9 con grado 7; verificado que falla contra el admin
 anterior).
+
+### 3.v2661 — FRENAR la tanda, parte 1: estado «frenada» y copia del armado en el servidor (Luis, 05/10/2026, v26.61)
+
+**Qué pidió.** *«Cuando se termina (completo o incompleto) debería capturar la información el servidor para que después se pueda
+continuar desde otro dispositivo»* · *«que no se pueda abrir una tanda con la que otra persona ya está trabajando»* · FRENAR ≠
+PAUSAR (pausar = salir un rato, ya existe y no se toca; frenar = soltarla con lo hecho registrado). Medido (60 días): armado 339
+tandas, 25 cruzan de día, 0 cambian de celular; el avance del armado vivía SÓLO en el celular hasta «Terminar».
+
+**Qué se aplicó (05/10, 11:07–11:15 ART), en este orden:**
+1. Backup `zz_backups."GV_Backup_TandaFreno_defs_20261005"` (def de `gv_tanda_reservar` 3.051 caracteres y el check de estado).
+2. `GV_Tandas_Lock.gv_tandas_lock_estado` → `tomada | frenada | completada`. Al aplicar: 711 completadas, 3 tomadas, 0 frenadas.
+3. Tablas nuevas `GV_Tanda_Freno` (historial) y `GV_Armado_Avance` (una fila por tanda), RLS prendida, sin acceso directo de
+   `anon`/`authenticated` (verificado: `select` directo como anon → 42501).
+4. RPC nuevas (SECURITY DEFINER, `anon` + `authenticated`): `gv_tanda_frenar`, `gv_tanda_tomar_frenada`,
+   `gv_armado_avance_guardar`, `gv_armado_avance_leer`.
+5. `gv_tanda_reservar` parcheado sobre la definición VIVA (bloque `v26.61-frenada` antes del «propia»): la regla v23.65
+   `_tr_anulada` intacta. Con el hook de reglas: `-- REGLA_CONFIRMADA_POR_USUARIO` (Luis: «metele»).
+6. Centinelas v26.61 (3 filas). `gv_reglas_perdidas` vacía.
+
+**Impacto medido: ninguno sobre lo que se ve.** Nadie produce `frenada` todavía; con 0 frenadas, `gv_tanda_reservar` contesta
+igual que antes (probado: toma, «tomada» por otro, «ya_completada»). La copia del armado sólo se escribe.
+
+**Probado en transacción abortada (25 casos):** A toma · B rebota «tomada» · B no puede frenar la de A · A frena (ubicación
+guardada) · reintento idempotente · B rebota «frenada» con el nombre de A · A agarra otra con una frenada (D9) · A no se lleva la
+frenada mientras tiene otra abierta · B se la lleva (historial A→B) · A retoma la suya por la reserva → `tomada` · fichaje sin FJ
+rebota, con FJ frena (`sistema`) · supervisor sin sesión `sin_permiso` · completar una frenada → `completada` · copia: resumen
+2 NP / 1 lista / 3 líos / 10 cajas · foto vieja del mismo celular rebota · de otro celular entra · terminada sólo la pisa una
+posterior · legajo de prueba no guarda. Y como `anon`: las 4 RPC contestan.
+
+**Rollback** (al final de `sql/gv_tanda_frenada_v2661.sql`): restaurar `gv_tanda_reservar` desde el backup, `frenada → tomada`,
+volver el check a 2 estados, dropear las 4 funciones y las 2 tablas, borrar los centinelas v26.61.
+`tests/arm-avance-servidor.cjs` (verificado que falla sin el envío al cerrar el lío).

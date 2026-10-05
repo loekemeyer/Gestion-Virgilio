@@ -5554,7 +5554,49 @@ tarea abierta y al otro día sale «▶ Continuar».
 la tarde que se seguía el lunes** (~65 h: D45B, D52C, D67F; F22A al 05/10) arrancaba de cero. `_compSigueAbierta`.
 ⚠ **Lo que sigue sin cubrirse:** el avance de un armado sin terminar **no está en el servidor**. Retomarlo en
 **otro celular** (o con el celular reseteado) arranca de cero; el picking no tiene ese problema.
-`tests/tarea-abierta-otro-dia.cjs`.
+`tests/tarea-abierta-otro-dia.cjs`. → **Desde la v26.61 el armado SÍ viaja al servidor** (regla de abajo); leerlo para
+retomar en otro celular es la parte 2.
+
+## ⚠⚠ REGLA (Luis, 2026-10-05, v26.61): FRENAR la tanda ≠ PAUSAR — parte 1: estado «frenada» y copia del armado
+
+**Luis:** *"cuando se termina (completo o incompleto) debería capturar la información el servidor para que después
+se pueda continuar desde otro dispositivo"* · *"que no se pueda abrir una tanda con la que otra persona ya está
+trabajando"* · *"en vez de «Pausar» deberíamos llamar a esto «FRENAR»"*.
+
+| palabra | qué es | estado |
+|---|---|---|
+| **PAUSAR** | salir un rato (baño, comida): la tanda SIGUE SIENDO del operario. Picking: «Cerrar» arriba a la derecha; armado: «⏸ Pausar» del asistente | ya existe, **no se toca** |
+| **FRENAR** | soltarla con todo lo hecho registrado: la retoma él (sin cartel) u OTRO (con cartel «Estás por agarrar una tanda que empezó A ¿Seguro?») | `GV_Tandas_Lock.estado = 'frenada'` |
+| **TERMINAR** | se cierra aunque falte algo (lo que falta sale faltante) y no se vuelve a entrar | `completada` |
+
+Decidido por Luis (05/10), no volver a preguntar: una tanda **tomada** (no frenada) no la abre nadie más · con una
+frenada el operario **puede agarrar otra** (D9; la frenada no cuenta como «otra tanda abierta») · botón **«Frenar la
+tanda»** en picking y armado con pop-up *«Se guardará el registro de todo lo que se pickeó/armó hasta ahora y se podrá
+retomar después por vos u otro operario»* · frenar el **picking** pide dónde quedó el carro (D12) · se frena sola al
+**fichar salida** y la puede frenar un **supervisor** desde el panel (en armado, sólo con la copia del servidor) · al
+día siguiente avisa *«Tenés la tanda X frenada. ¿La retomás?»* **sólo** si sigue frenada y nadie la tomó · al que se
+la tomaron **no** se le avisa nada · **crédito**: picking por cajas pickeadas de cada uno, armado por cajas de los
+**líos** que cerró cada uno (súper/retira: la NP), en el día en que lo hizo (D6).
+
+**Parte 1 (v26.61) — NO cambia nada de lo que se ve hoy:**
+
+| pieza | qué hace |
+|---|---|
+| `GV_Tandas_Lock` | acepta `frenada` (check `gv_tandas_lock_estado`) |
+| `GV_Tanda_Freno` | historial: de quién era, quién la frenó (`legajo` / `sup:<mail>` / `sistema`), motivo `boton`/`fichaje`/`supervisor`, ubicación, quién la retomó |
+| `gv_tanda_frenar(tanda, fase, legajo, motivo, ubic)` | frena una TOMADA. `boton` = sólo el dueño · `supervisor` = `es_supervisor_virgilio()` · `fichaje` = sólo si el dueño tiene un **FJ** posterior a tomarla (lo verifica la base). Idempotente (`ya_frenada`) |
+| `gv_tanda_reservar` | frenada + mismo legajo → vuelve a `tomada` sin cartel (`retomada: true`); otro legajo → `ok:false motivo 'frenada'` (un celular viejo muestra el «ya la tiene X» de siempre) |
+| `gv_tanda_tomar_frenada(tanda, fase, legajo, nombre)` | otro operario se la lleva (después del cartel); respeta «una por vez» |
+| `GV_Armado_Avance` + `gv_armado_avance_guardar` / `_leer` | la ÚLTIMA foto del asistente de armado por tanda, con resumen (NP, NP listas, líos, cajas en líos). La manda el celular al cerrar cada lío (1,5 s), con cualquier cambio (8 s), al pausar, al terminar (`terminado`) y al soltar (`anulado`). Desde el mismo celular no se pisa con una foto más vieja; una terminada sólo la pisa una posterior |
+| cada lío | lleva `leg` y `ts` (quién lo cerró y cuándo): no cambia su firma (`_compLioSig`), ni letras ni grupos |
+
+⚠ **Nadie produce todavía `frenada` ni lee la copia**: el botón, el cartel, el freno al fichar, el del supervisor,
+el aviso del día siguiente y los lectores (TV ⏸, tiempo muerto, horas, puntaje, lista de tandas, PPP) son la parte 2.
+⚠ **Al retomar una frenada por un camino que NO pasa por `gv_tanda_reservar`** (▶ Seguir picking / armado), el
+candado queda `frenada` con el operario trabajando: la parte 2 tiene que llamar a la reserva (o a
+`gv_tanda_tomar_frenada`) en esos caminos, o otro se la podría llevar.
+Centinelas v26.61 (3 filas) · `scripts/reglas-protegidas.json` · backup `zz_backups."GV_Backup_TandaFreno_defs_20261005"` ·
+rollback y pruebas en `sql/gv_tanda_frenada_v2661.sql` · `tests/arm-avance-servidor.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-01, v25.63): todo módulo que abre tarea tiene ⛔ ANULAR — y la anulación QUEDA REGISTRADA
 
