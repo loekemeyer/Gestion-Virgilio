@@ -6293,7 +6293,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.90"></script>
+<script type="module" src="recepcion.js?v=26.91"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10535,7 +10535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.90";
+const APP_VERSION = "v26.91";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18197,9 +18197,10 @@ function ocgGroups(list) {
    mismo armado que usa ocgGenerar. Ordenado por proveedor (sin proveedor al final) y cajas. */
 function ocgDescargarExcel() {
   const gen = _oc && _oc.gen;
-  const items = (gen && gen.items) || [];
+  // v26.91 (Luis, D2): también los que hoy no se piden (a pedir 0), al final de cada proveedor.
+  const items = (gen && (gen.itemsAll || gen.items)) || [];
   if (!gen || gen.error) { alert("Todavía se está calculando. Probá de nuevo en un momento."); return; }
-  if (!items.length) { alert("No hay nada para pedir: no hay OCs para bajar."); return; }
+  if (!items.length) { alert("No hay artículos para bajar."); return; }
   const filas = items.slice().sort(function (a, b) { return _ocgProvSort(a.prov, b.prov) || (b.falta - a.falta); });
   const headers = ["Proveedor", "Código", "Descripción", "A pedir (cajas)", "% del proveedor", "E.M. (caj/mes)", "Índice", "Máx", "Pedidos", "Stock"];
   const aoa = [headers];
@@ -60465,7 +60466,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.90"></script>
+<script src="importacion.js?v=26.91"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63288,9 +63289,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.90"></script>
-<script src="hotsale.js?v=26.90"></script>
-<script src="estadisticas.js?v=26.90"></script>
+<script src="cobranzas.js?v=26.91"></script>
+<script src="hotsale.js?v=26.91"></script>
+<script src="estadisticas.js?v=26.91"></script>
 
 </body>
 </html>
