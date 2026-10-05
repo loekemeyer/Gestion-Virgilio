@@ -5539,6 +5539,23 @@ anterior). Al agregar un módulo con toggle + lista, agregarle su caso vacío a 
   *"está bien que se quede en atrasados, pero que esté con el badge"* — **no** pasarlo al día de hoy de la Programación.
 - `sql/vista_control_remitos_ciclo_v2595.sql`, `tests/rr-volvio-ciclo.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-05, v26.57): un picking o armado abierto al terminar el día se RETOMA con su avance
+
+**Luis:** *"si uno termina el día con un picking o armado abierto, queda guardado con la data que se llegó a
+generar y se puede retomar después? debería ser así"*. En Terminar Día, «Continúa mañana» (el default) deja la
+tarea abierta y al otro día sale «▶ Continuar».
+
+| tarea | dónde vive el avance | cuánto dura |
+|---|---|---|
+| picking | `vir_pk_<legajo>` en el celular **+** los PKC en el servidor (`pkResumeServer` lo reconstruye en otro celular) | mientras el picking siga abierto (v5.91) |
+| armado | **sólo** `vir_comp_<tanda>` en el celular (TAL, ENT y Entregas salen recién al Terminar) | 36 h, o **más mientras el armado siga abierto en ese celular** (v26.57) |
+
+⚠ Hasta la v26.56 el avance del armado se borraba a las 36 h aunque siguiera abierto: todo armado del **viernes a
+la tarde que se seguía el lunes** (~65 h: D45B, D52C, D67F; F22A al 05/10) arrancaba de cero. `_compSigueAbierta`.
+⚠ **Lo que sigue sin cubrirse:** el avance de un armado sin terminar **no está en el servidor**. Retomarlo en
+**otro celular** (o con el celular reseteado) arranca de cero; el picking no tiene ese problema.
+`tests/tarea-abierta-otro-dia.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-01, v25.63): todo módulo que abre tarea tiene ⛔ ANULAR — y la anulación QUEDA REGISTRADA
 
 **Luis:** *"RR tampoco tiene botón de anular, así que si entrás al módulo y no hacés nada, no podés salir · que
