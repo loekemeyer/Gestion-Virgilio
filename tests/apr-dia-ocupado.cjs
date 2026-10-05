@@ -15,7 +15,10 @@
    v26.88 (Luis, 05/10: "olvidate del 2 camiones por día" · "no debería mover los fijos"):
    (i) el día se mide SÓLO por m³: ya no existe el conteo de camiones (_adoCamiones) ni el aviso «más de 2»,
        y un día con 5 grupos de zonas que entra en los 4,30 m³ no tiene problemas;
-   (j) lo programado o movido a mano que devuelve gv_ppp_dia_ajustar se lista como fijo en la opción 2. */
+   (j) lo programado o movido a mano que devuelve gv_ppp_dia_ajustar se lista como fijo en la opción 2.
+   v26.93 (Luis, 05/10: "automático debería priorizar que no venza nada"):
+   (k) la opción 2 dice que nada se mueve si así pasa a vencer, lista como fija la tanda que la base frena por
+       vencimiento y no tiene «Pasan a vencer». */
 const path = require("path");
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -45,7 +48,8 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
       { tanda: "E48H", fecha_actual: F, fecha_nueva: F, accion: "queda", motivo: "pendiente: entra en el día", m3: 0.5, zona: "Zona 2 - CABA Centro", vence: false, es_super: false },
       { tanda: "E50B", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "en proceso (picking o armado sin terminar): no se toca", m3: 1.2, zona: "Zona 5 - GBA Oeste", vence: false, es_super: false },
       { tanda: "E60A", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "súper: queda en su día", m3: 3, zona: "Super", vence: false, es_super: true },
-      { tanda: "E49A", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "programada o movida a mano: no se mueve", m3: 0.3, zona: "Zona 4 - GBA Sur", vence: false, es_super: false }
+      { tanda: "E49A", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "programada o movida a mano: no se mueve", m3: 0.3, zona: "Zona 4 - GBA Sur", vence: false, es_super: false },
+      { tanda: "E49B", fecha_actual: F, fecha_nueva: F, accion: "fijo", motivo: "pendiente: no se mueve porque pasaría a vencer (vence el 30/09)", m3: 0.2, zona: "Zona 6 - GBA Norte", vence: false, es_super: false }
     ];
     const llamadas = [];
     window.aprQuien = async function () { return "test@x"; };
@@ -110,6 +114,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     if (!/m³ \(más que el promedio/.test(r.ops[0])) fallas.push("(b) opción 1 no avisa los m³ de más: " + r.ops[0]);
     if (/camion/i.test(r.ops[0] + r.head)) fallas.push("(i) el pop-up sigue hablando de camiones: " + r.head + " / " + r.ops[0]);
     if (!/E49A — programada o movida a mano/.test(r.ops[1])) fallas.push("(j) opción 2 no lista como fija la tanda movida a mano: " + r.ops[1]);
+    if (!/nada se mueve si así pasa a vencer/.test(r.ops[1])) fallas.push("(k) opción 2 no dice que nada se mueve si así pasa a vencer: " + r.ops[1]);
+    if (!/E49B — pendiente: no se mueve porque pasaría a vencer/.test(r.ops[1])) fallas.push("(k) opción 2 no lista como fija la tanda frenada por vencimiento: " + r.ops[1]);
+    if (/Pasan a vencer/.test(r.ops[1])) fallas.push("(k) opción 2 tiene tandas que pasan a vencer: " + r.ops[1]);
     if (!/E50B.*en proceso/.test(r.ops[2])) fallas.push("(b) opción 3 no muestra la tanda EN PROCESO fija: " + r.ops[2]);
     if (!/E60A.*súper/.test(r.ops[2])) fallas.push("(b) opción 3 no muestra el súper fijo");
     if (!/E48H.*mismo código/.test(r.ops[2])) fallas.push("(b) opción 3 no dice que la armada va con su mismo código");

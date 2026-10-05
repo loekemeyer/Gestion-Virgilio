@@ -31748,3 +31748,26 @@ Luis: *"no debería mover los fijos (los programados a mano, supers, retira con 
 - Centinelas: id 320 pasa a `exit when v_m3 <= p_cupo` (vigilaba `v_cam`); id 324 nuevo `not d\.man`. `gv_reglas_perdidas` = 0.
 - Rollback: correr `sql/gv_ppp_dia_ajustar_v2682.sql` y devolverle al 320 el patrón `exit when v_cam <= v_max and v_m3 <= p_cupo`.
 `sql/gv_ppp_dia_ajustar_fijos_v2688.sql`, `tests/apr-dia-ocupado.cjs` (i)-(j).
+
+### 3.v2693 — Pop-up de día ocupado: la opción 2 no hace vencer nada (Luis, 05/10/2026, v26.93, D9)
+
+Luis: *"definición de humano si es manual. automático debería priorizar que no venza nada"*. La opción 1 (programarlo así
+igual) es decisión de la persona y no cambia; «movido a mano» cuenta como manual (D10, ya estaba).
+
+- **`gv_ppp_dia_ajustar`** (CREATE OR REPLACE sobre la definición viva): cada tanda lleva `limr` = entrada + 14 (expreso + 13)
+  hacia atrás al día con reparto (CTE `_da_r`). Antes del loop se calcula, para cada grupo MOVIBLE, su día nuevo
+  (`gv_ppp_web_dia_grupo`, igual que antes) y su límite (el `limr` más chico del grupo) en `v_gi`; el loop elige sólo grupos con
+  `dia <= limr` (`q.mov and q.ok`). Si el día sigue pasado, las tandas de los grupos frenados salen `fijo` con *"pendiente: no se
+  mueve porque pasaría a vencer (vence el dd/mm)"* o, si ya estaba vencida, *"pendiente: ya está vencida (vencía el dd/mm): no se
+  corre más"*. `vence` sale del mismo `limr`.
+- **Medido el 05/10**: las simulaciones de los días programados (hasta 20 días, con un súper de 3 m³) dan idéntico a la v26.88
+  (nada se mueve: los grupos tienen tandas a mano). En transacción abortada sobre el 14/10, sacándole la marca a F47A/B/C (Z1):
+  con su entrada real (25/09, vencía el 08/10) quedan fijas *"ya está vencida"* — la v26.88 las corría al 16/10 —; con entrada
+  01/10 (vence el 14/10) quedan fijas *"pasaría a vencer"*; con entrada 05/10 salen las tres al 16/10 con `vence = false`, y
+  ejecutando de verdad quedan en el 16/10.
+- Front: el texto de la opción 2 suma *"y nada se mueve si así pasa a vencer"*.
+- Centinelas: id 321 pasa a `v_gi := v_gi \|\| jsonb_build_object\(r\.grp` (el día por grupo vive en `v_gi`); id 325 nuevo
+  `q\.mov and q\.ok`. `gv_reglas_perdidas` = 0, `gv_centinelas_flojos` sin filas de esta función.
+- Rollback: correr `sql/gv_ppp_dia_ajustar_fijos_v2688.sql`, devolverle al 321 `v_dest := v_dest \|\| jsonb_build_object\(r\.grp`
+  y borrar el 325.
+`sql/gv_ppp_dia_ajustar_sin_vencer_v2693.sql`, `tests/apr-dia-ocupado.cjs` (k).

@@ -1055,11 +1055,17 @@ rector: Z6+Z7 juntas); sale el grupo que menos apura y va al día de `gv_ppp_web
   por el sistema y movidas desde el panel): la opción 2 tiene poco para mover.
 - ⚠⚠ **v26.88 (Luis, 05/10): «olvidate del 2 camiones por día»**: el pop-up y `gv_ppp_dia_ajustar` miden el día **sólo por
   m³**. Se fueron el corte por camiones, el conteo `_adoCamiones` y el aviso «más de 2 camiones». El armador no se tocó.
+- ⚠⚠ **v26.93 (Luis, 05/10, D9): la opción 2 NO hace vencer nada** (*"definición de humano si es manual. automático debería
+  priorizar que no venza nada"*): un grupo se mueve sólo si su día nuevo (`gv_ppp_web_dia_grupo`) cae dentro del plazo de
+  TODAS sus tandas (entrada + 14, expreso + 13, hacia atrás al día con reparto); una tanda ya vencida no se corre más. Si nada
+  se puede mover sin vencer, el día queda pasado de m³ y esas tandas salen fijas con el motivo («pasaría a vencer (vence el
+  dd/mm)» o «ya está vencida»). La opción 1 (programarlo así igual) es decisión de la persona: no cambia. **«Movido a mano»
+  cuenta como manual** (D10).
 - El reporte de la opción 2 **cuenta lo que ya tiene el día destino** (la simulación de 'correr' da la carga de cada día).
 - Si sumándolo **se pasa de m³**, la opción 1 se llama **«Programarlo así igual»** y el encabezado lo dice.
 - La simulación y la ejecución mandan el MISMO `p_nuevo`. El modo 'automatico' de `gv_ppp_dia_reprogramar` quedó sin puerta.
-`sql/gv_ppp_dia_ajustar_v2682.sql` + `sql/gv_ppp_dia_ajustar_fijos_v2688.sql` (centinelas 320, 321 y 324),
-`tests/apr-dia-ocupado.cjs` (e)-(j).
+`sql/gv_ppp_dia_ajustar_v2682.sql` + `sql/gv_ppp_dia_ajustar_fijos_v2688.sql` + `sql/gv_ppp_dia_ajustar_sin_vencer_v2693.sql`
+(centinelas 320, 321, 324 y 325), `tests/apr-dia-ocupado.cjs` (e)-(k).
 
 ⚠ **El pop-up NO es sólo del arrastre** (Luis, 28/09, v23.35: *"fijate que no quede ninguna feature colgada así
 porque no estamos arrastrando"*). Lo abren los cuatro caminos que programan un día a mano: soltar un pedido

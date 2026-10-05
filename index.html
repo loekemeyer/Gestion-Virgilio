@@ -6293,7 +6293,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.92"></script>
+<script type="module" src="recepcion.js?v=26.93"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10535,7 +10535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.92";
+const APP_VERSION = "v26.93";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49050,7 +49050,9 @@ function aprDropDia(ev, fecha) {
    La 3 la resuelve gv_ppp_dia_reprogramar 'correr' (NO mueve súper, retira fijos, lo que ya salió ni una
    tanda EN PROCESO; lo armado se mueve con su mismo código) y la 2 gv_ppp_dia_ajustar, que además deja fijo
    lo programado o movido A MANO (v26.88). Si la simulación falla, se sigue como antes (tanda nueva con su
-   confirm). v26.88 (Luis, 05/10: "olvidate del 2 camiones por día"): el día sólo se mide por m³. */
+   confirm). v26.88 (Luis, 05/10: "olvidate del 2 camiones por día"): el día sólo se mide por m³.
+   v26.93 (Luis, 05/10: "automático debería priorizar que no venza nada"): la 2 no mueve un grupo si así pasa a
+   vencer; esas tandas vuelven como fijas con el motivo. La 1 es decisión de la persona y no cambia. */
 const APR_DO_CUPO = 4.3;
 function _adoEsSuperPed(x) {
   if (!x) return false;
@@ -49160,7 +49162,7 @@ async function aprDiaOcupadoAbrir(fecha, ped, opt) {
     card("sumar", sePasa ? "1) Programarlo así igual" : "1) Sumarlo",
       sePasa ? "Va a este día aunque se pase; no se mueve nada más." : "Va a este día y no se mueve nada más.", rep.sumar) +
     card("automatico", "2) Reprogramar el resto alrededor de lo nuevo",
-      "Lo nuevo queda en este día. Del resto sale sólo lo que no entra en los m³ del día, cada grupo de zonas entero, al día que elige la lógica automática. Lo programado o movido a mano, súper y retira no se mueven.", rep.automatico) +
+      "Lo nuevo queda en este día. Del resto sale sólo lo que no entra en los m³ del día, cada grupo de zonas entero, al día que elige la lógica automática. Lo programado o movido a mano, súper y retira no se mueven, y nada se mueve si así pasa a vencer.", rep.automatico) +
     card("correr", "3) Correr la programación", "Va a este día y todo lo programado desde acá se corre 1 día con reparto.", rep.correr) +
     '</div><button class="ado-x" onclick="aprDiaOcupadoCerrar()">Cancelar</button></div>';
   ov.classList.add("show");
@@ -60466,7 +60468,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.92"></script>
+<script src="importacion.js?v=26.93"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63289,9 +63291,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.92"></script>
-<script src="hotsale.js?v=26.92"></script>
-<script src="estadisticas.js?v=26.92"></script>
+<script src="cobranzas.js?v=26.93"></script>
+<script src="hotsale.js?v=26.93"></script>
+<script src="estadisticas.js?v=26.93"></script>
 
 </body>
 </html>
