@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram)",
+  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82/v26.93 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram; + v26.97 gv_web_np_809_nacional)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -9,6 +9,11 @@
     {
       "objeto": "facturacion_neto_lote",
       "regla": "el filtro de NP baja por el GROUP BY de la vista (un JOIN no baja)",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_alerta_gondola_llena_telegram",
+      "regla": "guardar en gondola por encima de la capacidad avisa por Telegram (no frena el guardado)",
       "quien": "Luis"
     },
     {
@@ -677,6 +682,11 @@
       "quien": "Luis"
     },
     {
+      "objeto": "gv_web_np_809_nacional",
+      "regla": "Las 9 cajas del 809 nacional salen primero: en NP de CH el 809E se cambia por 809 hasta agotar el cupo; no toca tanda empezada/pickeada ni NP armada/facturada",
+      "quien": "Luis 05/10"
+    },
+    {
       "objeto": "gv_web_oculto_set",
       "regla": "switch Web de Importados escribe la lista que LK aplica a products.active",
       "quien": "Luis"
@@ -739,7 +749,7 @@
     {
       "objeto": "trg_normalizar_empresa_stock",
       "regla": "Codigo NO dual: la empresa la da el ARTICULO, no el pedido",
-      "quien": "Luis 16/09, problema 336, problema 378"
+      "quien": "Luis 16/09, problema 336, problema 378, Luis 05/10 (facturado Mixto tras mover tanda)"
     },
     {
       "objeto": "trg_pipeline_empresa_estable",
@@ -794,11 +804,6 @@
     {
       "objeto": "vista_tanda_status",
       "regla": "Una tanda con PKF/APF figura FRENADA (picking/armado), no en curso ni terminada",
-      "quien": "Luis"
-    },
-    {
-      "objeto": "gv_alerta_gondola_llena_telegram",
-      "regla": "guardar en gondola por encima de la capacidad avisa por Telegram (no frena el guardado)",
       "quien": "Luis"
     }
   ]

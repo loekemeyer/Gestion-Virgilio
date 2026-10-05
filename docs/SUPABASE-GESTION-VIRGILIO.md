@@ -31771,3 +31771,28 @@ igual) es decisión de la persona y no cambia; «movido a mano» cuenta como man
 - Rollback: correr `sql/gv_ppp_dia_ajustar_fijos_v2688.sql`, devolverle al 321 `v_dest := v_dest \|\| jsonb_build_object\(r\.grp`
   y borrar el 325.
 `sql/gv_ppp_dia_ajustar_sin_vencer_v2693.sql`, `tests/apr-dia-ocupado.cjs` (k).
+
+### 3.v2697 — 809E de CH: facturado «Mixto» tras mover la tanda, y las 9 cajas del 809 primero (Luis, 05/10/2026, v26.97)
+
+Luis: *«¿por qué se facturó un 809E que no existe?»* → *«d1 dale, d2 dale, d3 hardcode… que no joda pedidos ya pickeados, armados, en proceso, facturados»*.
+
+- **Causa.** `Movimientos_Stock` id 119150819 (a_facturar, facturado, −4, ref F22F, `__barrido__`) quedó con empresa `Mixto`: la porción de
+  la NP CH 0033 llegó a F22F como `ajuste` `F22F|MOV-F21C` (traslado de tanda, v21.10) y `trg_normalizar_empresa_stock` buscaba la
+  empresa del facturado sólo en el picking de la tanda, en la NP del ref o en un `separado`. Efecto: fila `809E` pelada con −4 y
+  A facturar de 809E CH inflado (16 en vez de 12). Era el único `Mixto` de los 4 duales en todo el libro.
+- **D1** (aplicado, con backup): el movimiento pasó a `CH`; `gv_refresh_stock_si_cambio(0,false)`. A facturar 809E CH 16 → 12.
+- **D2** (aplicado sobre la definición viva): `m.tipo IN ('separado','ajuste')` en el fallback del facturado. Probado con inserts
+  reales en transacción abortada: antes → `Mixto`, después → `CH` (tanda CH) y `LK` (tanda LK). `gv_reglas_perdidas` = 0.
+- **D3** (aplicado): `gv_web_np_809_nacional(p_simular, p_por)` + cron `gv-np-809-nacional` (`3-59/5 9-23 * * *`, jobid 134) +
+  `PPP_Web_Config` `np_809_nacional_activo` = 1 y `np_809_nacional_cupo` = 9. Cambia el 809E (sin L) de NP de Chef por 809, 1 a 1
+  (los dos van de a 12), reusando `GV_NP_Cambio_Codigo`; frena tanda empezada, tanda con picking, NP armada, NP facturada, NP ya
+  cambiada o que ya trae 809, y línea que no entra entera en el cupo o en el stock del 809. Probado en transacción abortada: las dos
+  NP quedan con 809 (5 y 3), `gv_web_np_809_nacional(true)` simula 12 frenadas / 2 cambios, `gv_web_np_sec_auto(true)` no las deshace
+  y el panel marca `sec_cubre = true`.
+- **Medido:** el 809 (M16) tiene 9 cajas sin moverse desde el 01/08; los 6 picking de 809E CH desde el 15/09 (69 cajas) salieron del
+  809E. Aplicado: CH 0039 (F13C, 5 cajas) y CH 0041 (F48A, 3 cajas) → 809; queda 1 caja de cupo.
+- **Centinelas:** ids 326-331 (`trg_normalizar_empresa_stock` ×1, `gv_web_np_809_nacional` ×5). `scripts/reglas-protegidas.json` suma la función.
+- **Conector de Supabase:** cualquier `delete from` / `drop` en el SQL de una sesión cloud corta a los 60 s sin llegar a la base; por eso
+  la función renombra la línea con `update`.
+- Rollback: ver cabecera de `sql/gv_np_809_nacional_v2697.sql` (D1 un `update`; D3 apagar cron + interruptor; D2 sacar `,'ajuste'`).
+`sql/gv_np_809_nacional_v2697.sql`, `tests/np-809-nacional.cjs`.

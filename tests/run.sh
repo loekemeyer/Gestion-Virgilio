@@ -1166,4 +1166,6 @@ echo "== stk-est-madre-orden (v26.79-82: rótulos de Stocks, Est. Madre incluida
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-orden.cjs
 echo "== ppp-ent-fecha-pedido (v26.69: Pedidos Entregados muestra la fecha en que llegó el pedido del cliente) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-ent-fecha-pedido.cjs
+echo "== np-809-nacional (v26.97: las 9 cajas del 809 salen primero en NP de CH; no toca lo empezado/pickeado/armado/facturado; facturado Mixto tras mover tanda) =="
+node tests/np-809-nacional.cjs
 _resumen

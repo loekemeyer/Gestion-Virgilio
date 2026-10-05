@@ -7734,3 +7734,38 @@ cada movimiento que suma a `terminado` (guardado, baja_racks, recepcion_imp) que
 empresa) más de **5 %** por encima de `Capacidad_Sector` (D3, v26.87) manda UN Telegram (quién, cuántas, góndola vs capacidad). Dedup en
 `GV_Alerta_Gondola_Llena`. Sin capacidad cargada no avisa. Probar sin mandar: `select * from
 public.gv_alerta_gondola_llena_telegram(true);`. Centinela 322. `sql/gv_alerta_gondola_llena_v2686.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-05, v26.97): las 9 cajas del 809 salen PRIMERO — y un dual trasladado de tanda no se factura «Mixto»
+
+**Caso («¿por qué se facturó un 809E que no existe?»):** Stocks mostraba una fila `809E` **pelada** con A facturar −4. No era una
+factura de más: era la NP **CH 0033** (F22F, 4 cajas de 809E CH) facturada el 05/10 15:04 por el barrido, y su descuento quedó con
+empresa **`Mixto`**. Las cajas se pickearon en F21C y la NP se trasladó a F22F (02/10 12:54); ese traslado deja la porción como
+`ajuste` (`F22F|MOV-F21C`) y `trg_normalizar_empresa_stock` buscaba la empresa del facturado sólo en el picking, la NP del ref o un
+`separado`: no encontró nada. Resultado: la pila CH con 4 cajas ya facturadas (16 en vez de 12) y la fila fantasma.
+
+| qué | cómo |
+|---|---|
+| el movimiento (id 119150819) | `Mixto` → `CH`, con backup `zz_backups."GV_Backup_Mov119150819_20261005"` |
+| la causa | el fallback del facturado toma también un `ajuste` de la tanda (`m.tipo IN ('separado','ajuste')`). Probado con inserts reales: antes → Mixto, después → CH / LK según la tanda |
+| **las 9 cajas del 809** | `gv_web_np_809_nacional` (cron `gv-np-809-nacional`, c/5 min): en NP de **Chef** con 809E **sin L**, la línea se cambia por **809** (nacional, factor 1: los dos van de a 12) hasta agotar `PPP_Web_Config.np_809_nacional_cupo` (9) |
+
+- **Reusa el mecanismo de v25.40** (`GV_NP_Cambio_Codigo`) en sentido contrario: la Edge Function ya aplica el registro, el trigger
+  impide que el 809E vuelva y el podado reconoce el destino. La línea de `PPP_Web_Base` se **renombra** (update 809E → 809).
+- **No toca lo empezado** (Luis: *«que no joda pedidos ya pickeados, armados, en proceso, facturados»*): tanda con evento de un
+  operario real, tanda con picking en el libro, NP con armado (`Entregas_Virgilio`) o facturada (`Facturacion_NP`). Probado
+  corriéndolo: de 14 líneas de 809E de CH, 12 frenadas; cambiaron sólo CH 0039 (5) y CH 0041 (3).
+- ⚠ **No parte una línea**: si una NP pide más de lo que queda del cupo (o del stock del 809 menos lo ya comprometido), se queda en
+  809E. Con 8 de 9 usadas **queda 1 caja**: sólo sale si entra una línea de exactamente 1.
+- ⚠ El 809E y el 809 son **artículos distintos**: la NP, el picking, el armado y la factura de esas NP dicen **809**. Gestión
+  valoriza el 809 con la lista `precios_venta` (Corta Queso, 2.755) — `precios_venta_chef` no lo tiene — y el 809E de Chef vale 3.005.
+- ⚠ **El conector de Supabase de las sesiones cloud se cuelga a los 60 s con cualquier `delete from` / `drop`** dentro del SQL
+  (pide una confirmación que nadie puede dar): la misma función cortó tres veces con un `delete` y entró al instante sin él. Por eso
+  `gv_web_np_809_nacional` no borra y es SECURITY INVOKER. `tests/np-809-nacional.cjs` falla si vuelve a aparecer un `delete`.
+- **Apagar:** `select cron.unschedule('gv-np-809-nacional');` y `update public."PPP_Web_Config" set valor = 0 where clave = 'np_809_nacional_activo';`.
+  **Rollback de una NP:** borrar su fila de `GV_NP_Cambio_Codigo` (`cod_destino = '809'`) desde el SQL Editor: la Edge Function vuelve a
+  escribir el 809E y el podado saca el 809.
+- **Chequeo:** `select * from public.gv_web_np_809_nacional(true);` · `select * from public."GV_NP_Cambio_Codigo" where cod_destino = '809';`
+  · `select * from public.gv_reglas_perdidas;` (8 filas nuevas `v26.93`; la versión del repo es v26.97 — los marcadores internos del
+  SQL dicen v26.93 porque es la llave de idempotencia con la que se aplicó).
+
+`sql/gv_np_809_nacional_v2697.sql`, `tests/np-809-nacional.cjs`, §3.v2697.
