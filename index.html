@@ -6273,7 +6273,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.55"></script>
+<script type="module" src="recepcion.js?v=26.56"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -8592,7 +8592,7 @@ function updateCoreButtonsState(){
     else if ((code === "AP" || code === "TAP") && armadoActive) pending = true;
     else if (TOGGLE_CODES.includes(code) && st && st.toggles && st.toggles[code]) pending = true;
     else if (code === "BR" && st && st.racks && st.racks.active) pending = true;
-    else if (code === "MG" && st && st.mg && st.mg.active) pending = true;   // v25.86     // v25.79 (el título del botón RKBM)
+    else if (code === "MG" && _gvModVivo(st, "mg")) pending = true;   // v25.86 · v26.56: vencida no pinta rojo    // v25.79 (el título del botón RKBM)
     b.classList.toggle("pending", pending);
   });
 }
@@ -10478,7 +10478,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.55";
+const APP_VERSION = "v26.56";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -27778,11 +27778,19 @@ function closeMGChooser() { const ov = document.getElementById("mgChooserModal")
    del módulo. El chooser, «¿qué bajar primero?», «lo que llegó» y «excedente» son pantallas de la
    MISMA tarea: termina recién cuando no queda ninguna abierta. El tiempo de cada código lo siguen
    llevando los MG del confirmar (v23.76); esto es el estado del celular y el Historial. */
+/* v26.56 (Luis, 05/10: alarma de inactividad de Isidro con el guardado ABIERTO) — una tarea que quedó
+   «activa» de otro día (salió del módulo cerrando la app o con Terminar Día) NO es la de hoy: vencida
+   (12 h, el mismo tope de _tmLibre) se arranca de nuevo con la hora de ahora. Antes «Enviar» la veía
+   activa y no renovaba la hora, así que _tmLibre la daba por vencida y contaba tiempo muerto con el
+   operario adentro del módulo (94: guardado abierto el 02/10 15:23 → alarma 05/10 08:41 y 08:50). */
+function _gvModVivo(st, k) {
+  return !!(st && st[k] && st[k].active && Date.now() - (st[k].ts || 0) < 12 * 3600 * 1000);
+}
 function gvModTareaAbrir(leg, k) {
   leg = String(leg || "").trim(); if (!leg) return;
   try {
     const st = getLegajoState(leg) || {};
-    if (!(st[k] && st[k].active)) { st[k] = { active: true, ts: Date.now() }; setLegajoState(leg, st); }
+    if (!_gvModVivo(st, k)) { st[k] = { active: true, ts: Date.now() }; setLegajoState(leg, st); }
     tmMarcarEvento(leg, Date.now());
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
   } catch (_e) {}
@@ -27792,9 +27800,10 @@ function gvModTareaFin(leg, k, op, descr, texto) {
   try {
     const st = getLegajoState(leg) || {};
     if (!(st[k] && st[k].active)) return;
-    const ini = st[k].ts || Date.now(), nowMs = Date.now();
+    const vivo = _gvModVivo(st, k), ini = st[k].ts || Date.now(), nowMs = Date.now();
     st[k] = { active: false }; setLegajoState(leg, st);
-    pushHistoryForLegajo(leg, { ts: nowMs, opcion: op, descripcion: descr, texto: String(texto || ""),
+    // v26.56: una vencida se cierra sin entrar al Historial (duraría días)
+    if (vivo) pushHistoryForLegajo(leg, { ts: nowMs, opcion: op, descripcion: descr, texto: String(texto || ""),
       id: "h_" + op.toLowerCase() + "_" + nowMs.toString(36), status: "queued", ts_inicio_iso: new Date(ini).toISOString() });
     tmMarcarEvento(leg, nowMs);
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
@@ -59274,7 +59283,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.55"></script>
+<script src="importacion.js?v=26.56"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62097,9 +62106,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.55"></script>
-<script src="hotsale.js?v=26.55"></script>
-<script src="estadisticas.js?v=26.55"></script>
+<script src="cobranzas.js?v=26.56"></script>
+<script src="hotsale.js?v=26.56"></script>
+<script src="estadisticas.js?v=26.56"></script>
 
 </body>
 </html>

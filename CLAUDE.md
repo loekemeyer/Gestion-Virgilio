@@ -5611,6 +5611,13 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
   en 0, y al terminar va al Historial de tareas con su duración (además del tramo RKI→RKB de siempre). Tope 12 h por si el celular
   murió adentro.
 - `sql/gv_alerta_inactivo_v2579.sql`, `tests/alerta-inactivo.cjs`.
+- ⚠ **v26.56 (Luis, 05/10): una tarea de módulo (MG) que quedó «activa» de OTRO día no es la de hoy.** Isidro (94)
+  dejó el guardado abierto el 02/10 (MGI 15:23 + Terminar Día); el 05/10 «Enviar» la vio activa y no renovó la hora,
+  `_tmLibre` la dio por vencida (> 12 h) y contó tiempo muerto con él adentro del módulo: alarma a las 08:41 y 08:50,
+  justo 5 min después de cada MGI. Hoy `_gvModVivo` (el mismo tope de 12 h) decide en `gvModTareaAbrir` (vencida →
+  arranca con la hora de ahora), en el rojo del botón MG y en `gvModTareaFin` (vencida → no entra al Historial).
+  **Una alarma que salta exactamente 5:00 después de un evento del operario = el celular lo cree libre: mirar su
+  `st.*` de días anteriores.** `tests/mg-tarea-vencida.cjs`.
 
 ## ⚠⚠ REGLA GENERAL (Luis, 2026-10-01, v25.89): PROD es SÓLO picking y armado — todo lo demás es NO PROD
 
