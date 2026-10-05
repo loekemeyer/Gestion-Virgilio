@@ -7503,6 +7503,8 @@ el helper, las PC con la estación prendida empezaron a abrir el cuadro de impre
 | pendiente = tiene la data y no tiene marca | picking con TP desde 01/10 · armado con TAL desde 25/08 · facturado con TAL + `facturado_at` desde 05/10 13:00 (antes la marca no existía) |
 | badge del panel | pendientes de −21 a +14 días; rojo si alguno hace +24 h; una lectura rota no lo apaga |
 
+- **D5 (Luis, 05/10): lo facturado ANTES del 05/10 13:00 NO es pendiente** (*"dejalos afuera. se buscan y se imprimen
+  de forma manual si hace falta"*): antes de esa hora la marca del facturado no se guardaba. No volver a proponer marcarlos.
 - **La disponibilidad sale de la base, no de la estación**: picking = TP de la tanda; armado = TAL con resumen o
   `Entregas_Virgilio` vivas (sin `-X`); facturado = `Facturacion_NP.facturado_at` + el resumen del TAL (lo pide la hoja).
 - ⚠ **Sin un solo texto del helper en la Cola ni en la estación** (regla v26.28: lo único del helper es el botón de ⚙️).
