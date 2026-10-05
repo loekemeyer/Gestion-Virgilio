@@ -1,3 +1,11 @@
+## Nota v26.81 (2026-10-05) — Stocks: todos los rótulos ordenan (4 toques)
+
+- Luis: las demás columnas de Stocks (Total Stock, Cajas Pedidas, Capacidad, Góndola, Excedente, Pickeados,
+  A facturar, A guardar, Racks, FC s/Salida) tienen cuatro toques: 1.º sólo filtra > 0 (✓) · 2.º de mayor a
+  menor (▼) · 3.º de menor a mayor (▲) · 4.º vuelve al estándar. Est. Madre sigue con sus tres (v26.79).
+  Cajas Pedidas ordena por el neto que muestra la celda. Un solo cálculo por columna para filtrar y ordenar
+  (`_stkColVal`); estado `_stk.filCol` + `_stk.colOrd`. `tests/stk-est-madre-orden.cjs`.
+
 ## Nota v26.79 (2026-10-05) — Stocks: el rótulo «Est. Madre» filtra y ORDENA
 
 - Luis: tocar el rótulo **Est. Madre** de la tabla de Stocks tiene tres toques: 1.º saca los que tienen 0 y

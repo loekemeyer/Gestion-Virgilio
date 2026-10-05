@@ -1158,7 +1158,7 @@ echo "== helper-impresion-fuente (v26.29: fuente del helper en tools/helper-impr
 node tests/helper-impresion-fuente.cjs
 echo "== stk-excel-stock-insumos (v26.69: botón Excel en Stocks e Insumos; baja lo que muestra la tabla) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-excel-stock-insumos.cjs
-echo "== stk-est-madre-orden (v26.79: rótulo Est. Madre — 1.º sin 0 mayor→menor, 2.º menor→mayor, 3.º estándar) =="
+echo "== stk-est-madre-orden (v26.79-81: rótulos de Stocks — Est. Madre 3 toques, el resto 4: filtra · ▼ · ▲ · estándar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-orden.cjs
 echo "== ppp-ent-fecha-pedido (v26.69: Pedidos Entregados muestra la fecha en que llegó el pedido del cliente) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-ent-fecha-pedido.cjs
