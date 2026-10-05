@@ -31496,3 +31496,11 @@ Con `as materialized`: **480 ms**, las mismas 13 filas (`EXCEPT ALL` 0 en las do
 
 > **Un CTE nombrado una sola vez dentro de un subselect correlacionado se re-ejecuta por fila.** Si adentro hay una
 > función cara, va `as materialized`.
+
+### §3.v2663 — LK: crons 39 y 38 corridos de minuto (05/10/2026, Luis, D5)
+
+Después de la caída de LK (§3.v2662, problema 701): `sync-reingresos-virgilio` (39) pasó de `1-59/5` a
+**`3-59/5`** y `sincronizar-fact-live` (38) de `6,36` a **`9,39`**. `sync-pedidos-match-virgilio` (24) **se queda
+en `1-59/5`**: es el que alimenta `lk_pedidos_match` y tiene que llegar antes del armado de Gestión (cron 73,
+:00/:05…). Ninguno de los dos movidos depende de otro (39 → reingreso_cache para la página; 38 → reportes).
+Tareas largas que arrancan en el mismo minuto: **4 → 2**. `sql/lk_crons_separados_v2663_LK.sql` (rollback adentro).
