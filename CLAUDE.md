@@ -5589,6 +5589,30 @@ la tarde que se seguía el lunes** (~65 h: D45B, D52C, D67F; F22A al 05/10) arra
 `tests/tarea-abierta-otro-dia.cjs`. → **Desde la v26.61 el armado SÍ viaja al servidor** (regla de abajo); leerlo para
 retomar en otro celular es la parte 2.
 
+## ⚠ REGLA (Luis, 2026-10-05, v26.83): en BAJAR DE RACKS, GUARDADO e INGRESO A RACKS, «Cerrar» MINIMIZA y «Anular» SALE
+
+**Luis:** *"si envía bajada de racks y cierra con el botón de cerrar de arriba, se debería considerar que sigue bajando
+de racks por más que no haya elegido nada … agregar un botón abajo de registrar bajada que sea «Anular bajada» para que
+pueda salir sin quedar atrapado si entró por error al módulo. Lo mismo con guardado a góndola"* · *"fijate si hay algún
+otro módulo donde aplique este problema"* (sí: Ingreso a racks).
+
+| módulo | «Cerrar» de arriba | volver a entrar | botón abajo |
+|---|---|---|---|
+| BR Bajar de racks | minimiza (`rkbAskClose`): sin RKB, tarea abierta, BR rojo | la MISMA bajada, mismo tramo (sin RKI nuevo) | **⛔ Anular bajada** → RKB `ANULADO` |
+| MG Guardado (lo que llegó / excedente) | minimiza (`mgAskClose` / `excAskClose`): sin MGC | `_mgReabrirMinimizado`, mismo tramo (sin MGI nuevo; `st.mg.tramo`) | **⛔ Anular guardado** → MGC `ANULADO` + cierra la tarea |
+| IR Ingreso a racks | minimiza (`irMinimizar`): sin IRT | mismo tramo (sin IRI nuevo) | **⛔ Anular ingreso** (sin palets) o **🏁 Terminé de ingresar** |
+
+- **Aunque la app se reinicie** el tramo sigue con su hora de inicio: sale del estado del legajo (`_gvTramoVivo`,
+  `_mgTramoAbierto`), con el tope de 12 h de `_gvModVivo`. Caso: Isidro (94) entró 3 veces a BR el 05/10 y cada RKI
+  nuevo mandaba el tiempo anterior a tiempo muerto (0:32 de 11:18 a 11:50, más la alarma de 5 min).
+- Medido antes del cambio: **0 RKB «sin bajar» y 0 IRT en toda la historia** — nadie apretaba «Cerrar»: los módulos se
+  perdían con el reinicio de la app. La app no se recarga sola para actualizarse con uno de estos módulos abierto
+  (`_gvAppInactiva`).
+- **ANULADO no es movimiento**: la vista ya lo saca de `mov_s` y `fetchMonitorDayStats` también (≡). Son segundos y caen
+  en tiempo muerto; la vista no se tocó.
+- El cierre de verdad sigue igual: «Registrar bajada» (RKB con cajas), «Guardar» / «Terminé de guardar», cargar palets.
+- `tests/modulo-minimizar-anular.cjs` (verificado que falla contra la v26.82).
+
 ## ⚠⚠ REGLA (Luis, 2026-10-05, v26.61): FRENAR la tanda ≠ PAUSAR — parte 1: estado «frenada» y copia del armado
 
 **Luis:** *"cuando se termina (completo o incompleto) debería capturar la información el servidor para que después

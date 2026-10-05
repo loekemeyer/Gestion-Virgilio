@@ -251,6 +251,8 @@ echo "== mg-reentrada (v7.68: MG ya no es toggle — entrar/salir sin rojo pegad
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-reentrada.cjs
 echo "== mg-tarea-vencida (v26.56: guardado abierto de otro día no cuenta tiempo muerto ni hace saltar la alarma) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mg-tarea-vencida.cjs
+echo "== modulo-minimizar-anular (v26.83: Cerrar minimiza BR/MG/IR sin cortar el tramo; Anular sale con ANULADO) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/modulo-minimizar-anular.cjs
 echo "== tarea-abierta-otro-dia (v26.56: armado/picking abierto del viernes se retoma el lunes con su avance) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tarea-abierta-otro-dia.cjs
 echo "== arm-avance-servidor (v26.61: la copia del armado viaja al servidor sin cambiar nada del operario) =="

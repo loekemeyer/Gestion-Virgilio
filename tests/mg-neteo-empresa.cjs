@@ -110,11 +110,10 @@ catch (_e) {
     window.gvFetchLugares    = async function () { return null; };
     await showMGModal("999");
     await new Promise(function (res) { setTimeout(res, 60); });
-    /* `_mg` es un `let` de módulo, no cuelga de window. `mgAskClose()` se lo pasa a
-       `opAskClose` como 5º argumento: es la única costura pública que lo expone. */
-    let snap = null;
-    window.opAskClose = function (_p, _op, _leg, _lbl, s) { snap = s; };
-    mgAskClose();
+    /* `_mg` es un `let` del script clásico: no cuelga de window pero está en el ámbito global,
+       así que se lee directo. (Hasta la v26.82 se sacaba por `mgAskClose` → `opAskClose`; desde
+       la v26.83 «Cerrar» minimiza y ya no pasa por ahí.) */
+    let snap = (typeof _mg !== "undefined") ? _mg : null;
     const items = (snap && snap.items) || [];
     const de = function (c) { return items.filter(function (x) { return x.cod === c; }); };
 

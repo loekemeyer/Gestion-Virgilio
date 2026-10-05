@@ -6292,7 +6292,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.82"></script>
+<script type="module" src="recepcion.js?v=26.83"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -8610,7 +8610,8 @@ function updateCoreButtonsState(){
     if ((code === "EP" || code === "TP") && pickingActive) pending = true;
     else if ((code === "AP" || code === "TAP") && armadoActive) pending = true;
     else if (TOGGLE_CODES.includes(code) && st && st.toggles && st.toggles[code]) pending = true;
-    else if (code === "BR" && st && st.racks && st.racks.active) pending = true;
+    else if (code === "BR" && _gvModVivo(st, "racks")) pending = true;   // v26.83: vencida no pinta rojo (≡ MG)
+    else if (code === "IR" && _gvModVivo(st, "ir")) pending = true;      // v26.83: Ingreso a racks abierto (minimizado) en rojo
     else if (code === "MG" && _gvModVivo(st, "mg")) pending = true;   // v25.86 · v26.56: vencida no pinta rojo    // v25.79 (el título del botón RKBM)
     b.classList.toggle("pending", pending);
   });
@@ -9927,7 +9928,8 @@ function selectOption(code) {
     const stMod = getLegajoState(legajoStr) || {};
     const kMod = code === "MG" ? "mg" : "racks";
     if (stMod[kMod] && stMod[kMod].active && Date.now() - (stMod[kMod].ts || 0) < 12 * 3600 * 1000) {
-      if (code === "MG") showMGChooser(legajoStr); else showRacksBajarModal(legajoStr);
+      // v26.83: si el módulo quedó MINIMIZADO («Cerrar» de arriba) vuelve esa pantalla, con su tramo intacto
+      if (code === "MG") { if (!_mgReabrirMinimizado(legajoStr)) showMGChooser(legajoStr); } else showRacksBajarModal(legajoStr);
       return;
     }
   }
@@ -10531,7 +10533,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.82";
+const APP_VERSION = "v26.83";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -12224,6 +12226,9 @@ function _gvAppInactiva() {
     // un modal abierto = algo en curso: no se toca
     const abiertos = document.querySelectorAll('[id$="Modal"].show, [id$="Overlay"].show, .modal.show, [id$="Modal"][style*="display: block"], [id$="Modal"][style*="display: flex"]');
     for (let i = 0; i < abiertos.length; i++) { if (abiertos[i].offsetParent !== null || abiertos[i].getClientRects().length) return false; }
+    // v26.83: Bajar de racks / Guardado / Ingreso a racks MINIMIZADO sigue en curso: no se recarga encima
+    try { const lg = String((legajoInput && legajoInput.value) || "").trim(); const stA = lg ? getLegajoState(lg) : null;
+          if (stA && (_gvModVivo(stA, "racks") || _gvModVivo(stA, "mg") || _gvModVivo(stA, "ir"))) return false; } catch (_e) {}
     return true;
   } catch (_e) { return false; }
 }
@@ -27749,7 +27754,15 @@ async function showMGModal(legajo, _resume) {
   if (!ov) { ov = document.createElement("div"); ov.id = "mgModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
   ov.innerHTML = '<div class="mg-card"><div class="mg-head"><span class="mg-title">📥 Guardar a góndola</span><button class="mg-close" onclick="mgAskClose()">Cerrar</button></div><div class="mg-body" id="mgBody"><div class="mg-loading">Cargando lo que hay para guardar…</div></div></div>';
-  if (_resume) { _mg = _resume; mgRender(); return; }
+  /* v26.83 (Luis, 05/10) — «Cerrar» MINIMIZA el guardado: volver a entrar muestra lo mismo, y si la app se reinició
+     el tramo sigue con su hora de inicio (sin MGI nuevo). Antes cada entrada arrancaba el reloj de cero. */
+  if (!_resume && _mg && String(_mg.legajo) === String(legajo || "")) { mgRender(); return; }
+  if (_resume) {
+    _mg = _resume; const _trR = _mgTramoAbierto(_mg.legajo);
+    if (_trR) { _mg.tsInicio = _trR; _mg._mgi = true; }
+    else { _mg.tsInicio = Date.now(); try { mgEmitMarca("MGI", _mg.legajo); _mg._mgi = true; } catch (_e) {} _mgTramoGuardar(_mg.legajo, _mg.tsInicio); }
+    mgRender(); return;
+  }
   try {
     const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), ocgFetchCapacidad(), ocgFetchCeldas(),
       // v12.14 (idea 4926) — demanda del día y cajas×MC, best-effort: si fallan no bloquean el guardado.
@@ -27817,8 +27830,10 @@ async function showMGModal(legajo, _resume) {
       if (a.prio !== b.prio) return a.prio - b.prio;   // góndola más vacía primero
       return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0);
     });
-    _mg = { legajo: String(legajo || ""), items: items, filtro: "", tsInicio: Date.now() };
-    try { mgEmitMarca("MGI", _mg.legajo); _mg._mgi = true; } catch (_e) {}   // v23.63: el monitor ve el guardado EN CURSO
+    const _trG = _mgTramoAbierto(legajo);   // v26.83: el tramo que quedó abierto (la app se reinició) sigue
+    _mg = { legajo: String(legajo || ""), items: items, filtro: "", tsInicio: _trG || Date.now() };
+    if (_trG) _mg._mgi = true;              // su MGI sigue abierto en el servidor: no se manda otro
+    else { try { mgEmitMarca("MGI", _mg.legajo); _mg._mgi = true; } catch (_e) {} _mgTramoGuardar(_mg.legajo, _mg.tsInicio); }   // v23.63: el monitor ve el guardado EN CURSO
     mgRender();
   } catch (e) { const b = document.getElementById("mgBody"); if (b) b.innerHTML = '<div class="mg-loading">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -27905,6 +27920,7 @@ function mgRender() {
   const lbl = totE > 0 ? ('✓ Guardar ' + totG + ' góndola + ' + totE + ' excedente') : ('✓ Guardar ' + totG + ' caja(s) a Terminado');
   h += '<button class="mg-fin"' + ((totG + totE) <= 0 ? " disabled" : "") + ' onclick="mgConfirmar()">' + lbl + '</button>';
   if (_mg._guardados) h += '<button class="mg-term" onclick="closeMG()">🏁 Terminé de guardar <span>(' + _mg._guardados + ' código' + (_mg._guardados === 1 ? '' : 's') + ' guardado' + (_mg._guardados === 1 ? '' : 's') + ')</span></button>';
+  else { _gvAnularCss(); h += '<button class="gv-anular" onclick="mgAnular()">⛔ Anular guardado</button>'; }   // v26.83: salir sin registrar nada
   _renderKeepFocus(body, h);
   // v6.12: auto-guardar el borrador en cada cambio (si hay algo cargado) → se puede
   // "Seguir Guardar a góndola" aunque salgan sin tocar "Cerrar".
@@ -28056,6 +28072,7 @@ async function mgGuardarUno(i, modo) {
   _mg._guardados = (_mg._guardados || 0) + 1;
   // el MG de recién cerró la apertura en el monitor: se vuelve a abrir (sigue guardando)
   try { mgEmitMarca("MGI", _leg); _mg._mgi = true; } catch (_e) {}
+  _mgTramoGuardar(_leg, _mg.tsInicio);   // v26.83
   if (!it.manual) it.disponible = Math.max(0, it.disponible - tot);
   it.cargar = 0; it.exc = 0; it.excOn = false; it.ubic = "";
   _mg.items = _mg.items.filter(function (x) { return x.manual ? x !== it : x.disponible > 0; });
@@ -28135,6 +28152,7 @@ function closeMG() {
   const ov = document.getElementById("mgModal"); if (ov) ov.classList.remove("show");
   // v23.63: salió sin confirmar (el confirmar marca _enviando y emite MG): cierra el MGI del monitor.
   try { if (_mg && _mg._mgi && !_mg._enviando) mgEmitMarca("MGC", _mg.legajo); } catch (_e) {}
+  try { if (_mg) _mgTramoGuardar(_mg.legajo, 0); } catch (_e) {}   // v26.83: el tramo quedó cerrado (MGC o el MG del confirmar)
   _mg = null;
   _mgTareaQuizasFin();   // v25.86
 }
@@ -28153,7 +28171,47 @@ function mgEmitMarca(op, legajo, texto) {
   if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
 }
 function mgHasProgress() { return !!(_mg && _mg.items && _mg.items.some(function (it) { return (it.cargar > 0) || (it.exc > 0); })); }
-function mgAskClose() { opAskClose(mgHasProgress(), "MG", _mg && _mg.legajo, "Guardar a góndola", _mg, closeMG); }
+/* v26.83 — «Cerrar» de arriba MINIMIZA: el guardado sigue (no se manda MGC ni se cierra la tarea) y lo cargado
+   queda; se termina con «Guardar …» / «Terminé de guardar» o se sale con «Anular guardado». */
+function mgAskClose() {
+  const ov = document.getElementById("mgModal"); if (ov) ov.classList.remove("show");
+  try { if (_mg && mgHasProgress()) opDraftSaveQuiet("MG", _mg.legajo, "Guardar a góndola", _mg); } catch (_e) {}
+  try { if (typeof updateCoreButtonsState === "function") updateCoreButtonsState(); } catch (_e) {}
+}
+function mgAnular() {
+  if (!_mg) return;
+  if (mgHasProgress() && typeof confirm === "function" && !confirm("¿Anular el guardado?\n\nLo que cargaste NO se registra y la tarea se cierra.")) return;
+  _mgAnularTarea(_mg.legajo);
+}
+/* v26.83 — el tramo abierto del guardado (el último MGI) vive en el estado del legajo, así volver a entrar no
+   reinicia el reloj aunque la app se haya reiniciado. Sólo con la tarea abierta («Enviar»). */
+function _mgTramoGuardar(leg, ts) {
+  try { leg = String(leg || "").trim(); if (!leg) return; const st = getLegajoState(leg) || {};
+        if (!st.mg || !st.mg.active) return; st.mg.tramo = ts || 0; setLegajoState(leg, st); } catch (_e) {}
+}
+function _mgTramoAbierto(leg) {
+  try { const st = getLegajoState(String(leg || "").trim()) || {};
+        return (_gvModVivo(st, "mg") && st.mg.tramo && Date.now() - st.mg.tramo < 12 * 3600 * 1000) ? Number(st.mg.tramo) : 0; } catch (_e) { return 0; }
+}
+/* «Anular guardado» (lo que llegó o excedente): cierra el tramo abierto con MGC «ANULADO» (no suma horas),
+   descarta lo cargado y cierra la tarea entera. Lo que ya se guardó código por código queda guardado. */
+function _mgAnularTarea(leg) {
+  leg = String(leg || "").trim();
+  try { if (_mgTramoAbierto(leg) || (_mg && _mg._mgi && !_mg._enviando)) mgEmitMarca("MGC", leg, "ANULADO"); } catch (_e) {}
+  _mgTramoGuardar(leg, 0);
+  try { opDraftClear(leg); } catch (_e) {}
+  ["mgModal", "excModal"].forEach(function (id) { const e = document.getElementById(id); if (e) e.classList.remove("show"); });
+  ["mgChooserModal", "gordenModal"].forEach(function (id) { const e = document.getElementById(id); if (e) e.style.display = "none"; });
+  _mg = null; _exc = null;
+  gvModTareaFin(leg, "mg", "MG", "Guardado a Góndola", "ANULADO");
+}
+/* Tocar MG con la tarea abierta: si una pantalla quedó MINIMIZADA, vuelve esa (no el chooser). */
+function _mgReabrirMinimizado(leg) {
+  leg = String(leg || "");
+  if (_mg && String(_mg.legajo) === leg) { const ov = document.getElementById("mgModal"); if (ov) { ov.classList.add("show"); mgRender(); return true; } }
+  if (_exc && String(_exc.legajo) === leg) { const ov = document.getElementById("excModal"); if (ov) { ov.classList.add("show"); excRender(); return true; } }
+  return false;
+}
 
 /* ===== Bajar EXCEDENTE a góndola (v6.10, operario). El excedente son cajas que NO
    entraron cuando la góndola estaba llena (se guardaron "arriba" con su ubicación en el
@@ -28173,6 +28231,7 @@ async function showExcModal(legajo, _resume) {
   if (!ov) { ov = document.createElement("div"); ov.id = "excModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
   ov.innerHTML = '<div class="exc-card"><div class="exc-head"><span class="exc-title">📦 Bajar excedente a góndola</span><button class="exc-close" onclick="excAskClose()">Cerrar</button></div><div class="exc-body" id="excBody"><div class="exc-empty">Cargando excedente…</div></div></div>';
+  if (!_resume && _exc && String(_exc.legajo) === String(legajo || "")) { excRender(); return; }   // v26.83: estaba minimizado
   if (_resume) { _exc = _resume; excRender(); return; }
   try {
     const res = await Promise.all([stockFetchSaldos(), loadArtNombres()]);
@@ -28211,6 +28270,7 @@ function excRender() {
   }).join("");
   const tot = _exc.items.reduce(function (s, it) { return s + (it.bajar || 0); }, 0);
   h += '<button class="exc-fin"' + (tot <= 0 ? " disabled" : "") + ' onclick="excConfirmar()">✓ Bajar ' + tot + ' caja(s) a góndola</button>';
+  _gvAnularCss(); h += '<button class="gv-anular" onclick="excAnular()">⛔ Anular guardado</button>';   // v26.83
   _renderKeepFocus(body, h);
   // v6.12: auto-guardar el borrador en cada cambio (como MG) → "Seguir …" sin "Cerrar".
   try { if (_exc && tot > 0) opDraftSaveQuiet("EXC", _exc.legajo, "Bajar excedente a góndola", _exc); } catch (_e) {}
@@ -28239,7 +28299,17 @@ function excConfirmar() {
 }
 function closeExc() { const ov = document.getElementById("excModal"); if (ov) ov.classList.remove("show"); _exc = null; _mgTareaQuizasFin(); }
 function excHasProgress() { return !!(_exc && _exc.items && _exc.items.some(function (it) { return (it.bajar > 0); })); }
-function excAskClose() { opAskClose(excHasProgress(), "EXC", _exc && _exc.legajo, "Bajar excedente a góndola", _exc, closeExc); }
+/* v26.83 — «Cerrar» de arriba MINIMIZA (≡ mgAskClose); «Anular guardado» sale sin registrar nada. */
+function excAskClose() {
+  const ov = document.getElementById("excModal"); if (ov) ov.classList.remove("show");
+  try { if (_exc && excHasProgress()) opDraftSaveQuiet("EXC", _exc.legajo, "Bajar excedente a góndola", _exc); } catch (_e) {}
+  try { if (typeof updateCoreButtonsState === "function") updateCoreButtonsState(); } catch (_e) {}
+}
+function excAnular() {
+  if (!_exc) return;
+  if (excHasProgress() && typeof confirm === "function" && !confirm("¿Anular el guardado?\n\nLo que cargaste NO se registra y la tarea se cierra.")) return;
+  _mgAnularTarea(_exc.legajo);
+}
 
 /* MG ahora pregunta QUÉ se baja a góndola (v5.15): lo que llegó (a guardar), del
    excedente (v6.10) o de los racks. Cada uno abre su modal. */
@@ -28301,6 +28371,9 @@ function _mgTareaQuizasFin() {
     const vis = function (id, porClase) { const e = document.getElementById(id); if (!e) return false;
       return porClase ? e.classList.contains("show") : (e.style.display && e.style.display !== "none"); };
     if (vis("mgChooserModal") || vis("gordenModal") || vis("mgModal", true) || vis("excModal", true)) return;
+    if (_mg || _exc) return;   // v26.83: una pantalla MINIMIZADA sigue siendo la misma tarea
+    // v26.83: si quedó un tramo abierto (MGI de una entrada anterior a un reinicio de la app), se cierra
+    try { if (_mgTramoAbierto(leg)) { mgEmitMarca("MGC", leg); _mgTramoGuardar(leg, 0); } } catch (_e) {}
     gvModTareaFin(leg, "mg", "MG", "Guardado a Góndola");
   }, 400);
 }
@@ -28529,7 +28602,13 @@ async function showRacksBajarModal(legajo, _resume) {
   if (!ov) { ov = document.createElement("div"); ov.id = "rkbModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
   ov.innerHTML = '<div class="rkb-card"><div class="rkb-head"><span class="rkb-title">🏗 Bajar de racks a A guardar</span><button class="rkb-close" onclick="rkbAskClose()">Cerrar</button></div><div class="rkb-body" id="rkbBody"><div class="rkb-empty">Cargando racks…</div></div></div>';
-  if (_resume) { _rkb = _resume; _rkb._cerrado = false; _rkb.tsInicio = Date.now(); try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {} rkbRender(); return; }   // v23.66: tramo nuevo
+  /* v26.83 (Luis, 05/10: «si envía bajada de racks y cierra con el botón de cerrar de arriba, se debería
+     considerar que sigue bajando de racks») — «Cerrar» MINIMIZA: volver a tocar BR muestra la MISMA
+     bajada, y si la app se reinició en el medio, la tarea sigue abierta con su hora de inicio. Antes cada
+     entrada mandaba un RKI nuevo y el tiempo anterior caía a tiempo muerto (94, 05/10: 0:32 en 11:18–11:50). */
+  if (!_resume && _rkb && !_rkb._cerrado && String(_rkb.legajo) === String(legajo || "")) { rkbRender(); return; }
+  const _rkIni = _gvTramoVivo(legajo, "racks");
+  if (_resume) { _rkb = _resume; _rkb._cerrado = false; _rkb.tsInicio = _rkIni || Date.now(); if (!_rkIni) { try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {} } rkbRender(); return; }   // v23.66: tramo nuevo · v26.83: o el que sigue abierto
   try {
     const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), ocgFetchCapacidad().catch(function () { return {}; }),
       (async function () { try { return await ocgDemanda(true); } catch (_e) { return {}; } })()]);   // v25.89: demanda, para la prioridad
@@ -28556,8 +28635,8 @@ async function showRacksBajarModal(legajo, _resume) {
         if (x.prio !== y.prio) return x.prio - y.prio;
         return (parseInt(x.cod, 10) || 0) - (parseInt(y.cod, 10) || 0);
       });
-    _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, capMap: capMap, filtro: "", tsInicio: Date.now() };
-    try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {}   // v23.66
+    _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, capMap: capMap, filtro: "", tsInicio: _rkIni || Date.now() };
+    if (!_rkIni) { try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {} }   // v23.66 · v26.83: sin RKI nuevo si la bajada sigue abierta
     rkbRender();
   } catch (e) { const b = document.getElementById("rkbBody"); if (b) b.innerHTML = '<div class="rkb-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -28614,6 +28693,7 @@ function rkbRender() {
   const sinPos = _rkb.items.filter(function (it) { return it.baja > 0 && !String(it.sec || "").trim(); }).length;
   if (sinPos) h += '<div class="rkb-sug" style="color:#dc2626;text-align:center">⚠ Falta la posición de ' + sinPos + ' código(s): sin posición no se registra.</div>';
   h += '<button class="rkb-fin"' + (tot <= 0 || sinPos ? " disabled" : "") + ' onclick="rkbConfirmar()">✓ Registrar bajada' + (totInner > 0 ? " (" + totInner + " cajas)" : "") + '</button>';
+  _gvAnularCss(); h += '<button class="gv-anular" onclick="rkbAnular()">⛔ Anular bajada</button>';   // v26.83: salir sin registrar nada
   _renderKeepFocus(body, h);
 }
 function rkbSearchInput(v) { if (!_rkb) return; _rkb.filtro = String(v == null ? "" : v); rkbRender(); }
@@ -28689,7 +28769,34 @@ function closeRkb() {
   _rkb = null;
 }
 function rkbHasProgress() { return !!(_rkb && _rkb.items && _rkb.items.some(function (it) { return (it.baja > 0); })); }
-function rkbAskClose() { opAskClose(rkbHasProgress(), "RKB", _rkb && _rkb.legajo, "Bajar de racks", _rkb, closeRkb); }
+/* v26.83 — «Cerrar» de arriba MINIMIZA: la bajada sigue (no se manda RKB) y lo cargado queda; se termina con
+   «Registrar bajada» o se sale con «Anular bajada». */
+function rkbAskClose() {
+  const ov = document.getElementById("rkbModal"); if (ov) ov.classList.remove("show");
+  try { if (_rkb && rkbHasProgress()) opDraftSaveQuiet("RKB", _rkb.legajo, "Bajar de racks", _rkb); } catch (_e) {}
+  try { if (typeof updateCoreButtonsState === "function") updateCoreButtonsState(); } catch (_e) {}
+}
+/* v26.83 — «Anular bajada»: sale sin registrar nada (entró por error). Cierra el tramo con RKB «ANULADO», que la
+   vista no cuenta como movimiento (mov_s saca el ANULADO) ≡ fetchMonitorDayStats. */
+function rkbAnular() {
+  if (!_rkb) return;
+  if (rkbHasProgress() && typeof confirm === "function" && !confirm("¿Anular la bajada?\n\nLo que cargaste NO se registra y la tarea se cierra.")) return;
+  const leg = _rkb.legajo;
+  try { if (!_rkb._cerrado && _rkb.tsInicio) { gvRacksTramo("RKB", leg, _rkb.tsInicio, "ANULADO"); _rkb._cerrado = true; } } catch (_e) {}
+  try { opDraftClear(leg); } catch (_e) {}
+  const ov = document.getElementById("rkbModal"); if (ov) ov.classList.remove("show");
+  _rkb = null;
+}
+/* v26.83 — helpers comunes de Bajar de racks / Guardado / Ingreso a racks */
+function _gvTramoVivo(leg, k) {
+  try { const st = getLegajoState(String(leg || "").trim()) || {}; return _gvModVivo(st, k) ? (Number(st[k].ts) || 0) : 0; } catch (_e) { return 0; }
+}
+function _gvAnularCss() {
+  if (document.getElementById("gvAnularCss")) return;
+  const s = document.createElement("style"); s.id = "gvAnularCss";
+  s.textContent = ".gv-anular{display:block;width:100%;margin:10px 0 0;padding:12px;border:1.5px solid #fca5a5;border-radius:12px;background:#fff;color:#b91c1c;font-size:15px;font-weight:800;cursor:pointer;box-sizing:border-box}.gv-anular:active{background:#fef2f2}";
+  document.head.appendChild(s);
+}
 async function rkbConfirmar() {
   if (!_rkb) return;
   const sel = _rkb.items.filter(function (it) { return it.baja > 0; });
@@ -29130,8 +29237,13 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
   let ov = document.getElementById("irModal");
   if (!ov) { ov = document.createElement("div"); ov.id = "irModal"; document.body.appendChild(ov); }
   ov.classList.add("show");
-  ov.innerHTML = '<div class="ir-card"><div class="ir-head"><span class="ir-title">📥 Ingreso a racks</span><button class="ir-close" onclick="closeIR()">Cerrar</button></div><div class="ir-body" id="irBody"><div class="ir-empty">Cargando racks…</div></div></div>';
-  if (_resume) { _ir = _resume; _ir._cerrado = false; _ir.tsInicio = Date.now(); try { gvRacksTramo("IRI", _ir.legajo); } catch (_e) {} irRender(); return; }   // v23.66: tramo nuevo
+  ov.innerHTML = '<div class="ir-card"><div class="ir-head"><span class="ir-title">📥 Ingreso a racks</span><button class="ir-close" onclick="irMinimizar()">Cerrar</button></div><div class="ir-body" id="irBody"><div class="ir-empty">Cargando racks…</div></div></div>';
+  /* v26.83 (Luis, 05/10: «fíjate si hay algún otro módulo donde aplique este problema») — Ingreso a racks tenía lo
+     mismo que Bajar de racks: cada entrada mandaba un IRI nuevo y el tiempo anterior caía a muerto. Ahora
+     «Cerrar» minimiza y volver a entrar sigue el MISMO tramo (aunque la app se haya reiniciado). */
+  if (!_resume && _ir && !_ir._cerrado && String(_ir.legajo) === String(legajo || "")) { irRender(); return; }
+  const _irIni = _gvTramoVivo(legajo, "ir");
+  if (_resume) { _ir = _resume; _ir._cerrado = false; _ir.tsInicio = _irIni || Date.now(); if (!_irIni) { try { gvRacksTramo("IRI", _ir.legajo); } catch (_e) {} } irRender(); return; }   // v23.66: tramo nuevo
   try {
     const plani = await racksFetchPlani();
     await loadArtNombres();
@@ -29147,7 +29259,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
     });
     libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
     _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, libres: libres, ocupados: ocupados, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
-    _ir.tsInicio = Date.now(); try { gvRacksTramo("IRI", _ir.legajo); } catch (_e) {}   // v23.66: el tramo de racks arranca al abrir
+    _ir.tsInicio = _irIni || Date.now(); if (!_irIni) { try { gvRacksTramo("IRI", _ir.legajo); } catch (_e) {} }   // v23.66: el tramo de racks arranca al abrir · v26.83: o sigue el abierto
     irRender();
   } catch (e) { const b = document.getElementById("irBody"); if (b) b.innerHTML = '<div class="ir-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -29196,6 +29308,10 @@ function irRender() {
     h += '<div class="ir-done-h">Cargados en esta sesión (' + _ir.done.length + ')</div>';
     h += _ir.done.map(function (d) { return '<div class="ir-done-row"><span class="ir-done-sec">' + escapeHtml(d.sector) + '</span> <span class="ir-done-cod">' + escapeHtml(codCanonSuf(d.cod)) + '</span><span class="ir-done-q">' + d.inner + ' cajas' + (d.masters ? ' · ' + d.masters + ' master' : '') + (d.nac ? ' · 🏠 desde ' + escapeHtml(d.nac) : '') + '</span></div>'; }).join("");
   }
+  // v26.83: «Cerrar» de arriba minimiza; la tarea se termina acá (con palets cargados) o se anula (sin cargar nada)
+  _gvAnularCss();
+  if (_ir.done.length) h += '<button class="gv-anular" style="border-color:#86efac;color:#15803d" onclick="closeIR()">🏁 Terminé de ingresar (' + _ir.done.length + ' palet' + (_ir.done.length === 1 ? '' : 's') + ')</button>';
+  else h += '<button class="gv-anular" onclick="irAnular()">⛔ Anular ingreso</button>';
   _renderKeepFocus(body, h);
 }
 function irSetCod(v) { if (!_ir) return; _ir.cod = String(v == null ? "" : v).toUpperCase().replace(/\s+/g, ""); const cxm = _ir.cxm[_irNorm(_ir.cod)] || 0; if (cxm > 0 && Number(_ir.masters) > 0) _ir.inner = Number(_ir.masters) * cxm; irRender(); }
@@ -29273,6 +29389,21 @@ function irRenderConfirm(body) {
   h += '</div>';
   h += '<div class="ir-conf-btns"><button class="ir-back" onclick="irVolver()">← Volver</button><button class="ir-confirm" onclick="irCargar()">✓ Confirmar carga</button></div>';
   body.innerHTML = h;
+}
+/* v26.83 — «Cerrar» de arriba MINIMIZA: el ingreso sigue (sin IRT) y vuelve igual al tocar IR. */
+function irMinimizar() {
+  const ov = document.getElementById("irModal"); if (ov) ov.classList.remove("show");
+  try { if (typeof updateCoreButtonsState === "function") updateCoreButtonsState(); } catch (_e) {}
+}
+/* v26.83 — «Anular ingreso»: sale sin cargar nada. Cierra el tramo con IRT «ANULADO», que la vista no cuenta como
+   movimiento (mov_s saca el ANULADO) ≡ fetchMonitorDayStats. */
+function irAnular() {
+  if (!_ir) return;
+  if ((_ir.cod || Number(_ir.inner) > 0) && typeof confirm === "function" && !confirm("¿Anular el ingreso?\n\nLo que cargaste NO se registra y la tarea se cierra.")) return;
+  const leg = _ir.legajo;
+  try { if (!_ir._cerrado && _ir.tsInicio) { gvRacksTramo("IRT", leg, _ir.tsInicio, "ANULADO"); _ir._cerrado = true; } } catch (_e) {}
+  const ov = document.getElementById("irModal"); if (ov) ov.classList.remove("show");
+  _ir = null;
 }
 function closeIR() {
   const ov = document.getElementById("irModal"); if (ov) ov.classList.remove("show");
@@ -33097,6 +33228,8 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       }
       continue;
     }
+    // v26.83 ≡ vista (mov_s saca el texto ANULADO): una bajada / ingreso a racks ANULADO no es movimiento
+    if (tanda === "ANULADO" && ev.ts_inicio && MOV_TOGGLE_CODES.has(ev.opcion)) continue;
     if (tanda && ev.ts_inicio) {
       // Duración real (ms) + breakdown (cómo se calculó) usando el helper.
       const _br = {};
@@ -60283,7 +60416,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.82"></script>
+<script src="importacion.js?v=26.83"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63106,9 +63239,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.82"></script>
-<script src="hotsale.js?v=26.82"></script>
-<script src="estadisticas.js?v=26.82"></script>
+<script src="cobranzas.js?v=26.83"></script>
+<script src="hotsale.js?v=26.83"></script>
+<script src="estadisticas.js?v=26.83"></script>
 
 </body>
 </html>

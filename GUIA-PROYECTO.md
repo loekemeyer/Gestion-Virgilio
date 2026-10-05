@@ -1,3 +1,11 @@
+## Nota v26.83 (2026-10-05) — BR, Guardado e Ingreso a racks: «Cerrar» minimiza, «Anular» sale
+
+- Luis: el «Cerrar» de arriba de **Bajar de racks**, **Guardado a góndola** e **Ingreso a racks** ya no corta la
+  tarea: la minimiza (el botón queda rojo) y volver a entrar sigue el MISMO tramo, aunque la app se haya reiniciado
+  (sin RKI / MGI / IRI nuevo). Abajo hay **⛔ Anular bajada / guardado / ingreso**: cierra con RKB / MGC / IRT de texto
+  `ANULADO`, que no suma a movimiento (vista ≡ `fetchMonitorDayStats`). Caso: Isidro (94), 3 RKI el 05/10 y 0:32 de
+  tiempo muerto. `tests/modulo-minimizar-anular.cjs`.
+
 ## Nota v26.82 (2026-10-05) — Stocks: Est. Madre también va en 4 toques
 
 - Luis: el rótulo **Est. Madre** funciona igual que las demás columnas (1.º sólo filtra > 0 · 2.º ▼ · 3.º ▲ ·
