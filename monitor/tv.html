@@ -876,6 +876,16 @@ function cargarPickeado(tandas) {
     return m;
   }).catch(function (e) { console.warn("[tv] pickeado:", e.message); return new Map(); });
 }
+/* v26.66 (D6): una tanda FRENADA se reparte: cada uno su m³, en su día. ≡ index gvCreditoTandas. Sin respuesta: Map vacío. */
+function cargarCredito(tandas) {
+  if (!tandas.length) return Promise.resolve(new Map());
+  var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+  return conTimeout(fetch(SB_URL + "/rest/v1/rpc/gv_tanda_credito", { method: "POST", cache: "no-store", signal: ctrl ? ctrl.signal : undefined,
+    headers: Object.assign({ "Content-Type": "application/json" }, H), body: JSON.stringify({ p_tandas: tandas }) }), ctrl, "gv_tanda_credito")
+    .then(function (r) { return r.ok ? r.json() : []; }).then(function (f) { var m = new Map();
+      (f || []).forEach(function (x) { var k = String(x.tanda).toUpperCase() + "|" + x.fase; if (!m.has(k)) m.set(k, []); m.get(k).push(x); }); return m; })
+    .catch(function () { return new Map(); });
+}
 /* v23.64 (Luis: "está guardando") — la bajada de racks y el guardado viven en
    Movimientos_Stock, no en los eventos: entran como eventos `GST` sólo para
    "En este momento". Si falla, nada. ≡ index.html monGuardadoHoy. */
@@ -1570,7 +1580,7 @@ function pintarHoras(filas, d) {
     el("opsBox").innerHTML = '<div class="vacio">Nadie fichado todavía</div>';
     return;
   }
-  var m3 = {};                                   // legajo -> { pick: {tanda:m3}, arm: {...} }
+  var m3 = {}, cred = (d && d.credito) || new Map();   // legajo -> { pick: {tanda:m3}, arm: {...} }
   ((d && d.eventos) || []).forEach(function (ev) {
     if (ev.opcion !== "TP" && ev.opcion !== "TAP") return;
     if (!ev.ts_inicio || dayKey(ev.ts_cliente) !== hoyKey()) return;
@@ -1578,8 +1588,18 @@ function pintarHoras(filas, d) {
     if (!leg || !t) return;
     var v = d.prog && d.prog.get(t); if (!v) return;
     var k = ev.opcion === "TP" ? "pick" : "arm", mm = (m3[leg] = m3[leg] || { pick: {}, arm: {} });
+    if (cred.has(t + "|" + (k === "pick" ? "picking" : "armado"))) return;   // v26.66: frenada → se reparte abajo
     mm[k][t] = Number(v.m3) || 0;   // v26.55: ya es lo PICKEADO (picking y armado)
   });
+  /* v26.66: la parte de una frenada se cuenta cuando ESE operario cierra su tramo hoy (TP/TAP/PKF/APF) ≡ index gvM3ConCredito */
+  var cierreHoy = {};
+  ((d && d.eventos) || []).forEach(function (ev) {
+    if (!/^(TP|TAP|PKF|APF)$/.test(ev.opcion) || !ev.ts_inicio || dayKey(ev.ts_cliente) !== hoyKey()) return;
+    cierreHoy[String(ev.legajo == null ? "" : ev.legajo).trim() + "|" + String(ev.texto || "").trim().toUpperCase() + "|" + (/^(TP|PKF)$/.test(ev.opcion) ? "picking" : "armado")] = 1;
+  });
+  cred.forEach(function (rows, key) { var z = key.split("|"), k = z[1] === "picking" ? "pick" : "arm";
+    rows.forEach(function (x) { var leg = String(x.legajo || "").trim(); if (!leg || String(x.dia) !== hoyKey() || !cierreHoy[leg + "|" + key]) return;
+      var mm = (m3[leg] = m3[leg] || { pick: {}, arm: {} }); mm[k][z[0]] = (mm[k][z[0]] || 0) + (Number(x.m3) || 0); }); });
   var suma = function (o) { var s2 = 0; for (var k in o) s2 += o[k]; return s2; };
   var ritmo = function (m, h) { h = Number(h) || 0; return (h > 0.05 && m > 0) ? n1(m / h) : "—"; };
   /* v25.89 (Luis, 01/10) — REGLA GENERAL: Prod = SOLAMENTE picking + armado. Todo lo demás es No
@@ -1687,8 +1707,11 @@ function ciclo() {
     var pkKeys = keys.slice();   // v26.55: las de la ventana + las de TP de hoy → su m³ pasa a ser lo pickeado
     eventos.forEach(function (ev) { var t = String(ev.texto || "").trim().toUpperCase();
       if (ev.opcion === "TP" && ev.ts_inicio && t && dayKey(ev.ts_cliente) === hoy && pkKeys.indexOf(t) < 0) pkKeys.push(t); });
-    return Promise.all([cargarStatus(keys), cargarPickeado(pkKeys)]).then(function (sp) {
-      var status = sp[0], pickeado = sp[1];
+    var crKeys = [];   // v26.66: tandas cerradas o frenadas hoy → si alguna está frenada, se reparte
+    eventos.forEach(function (ev) { var t = String(ev.texto || "").trim().toUpperCase();
+      if (t && /^(TP|TAP|PKF|APF)$/.test(ev.opcion) && dayKey(ev.ts_cliente) === hoy && crKeys.indexOf(t) < 0) crKeys.push(t); });
+    return Promise.all([cargarStatus(keys), cargarPickeado(pkKeys), cargarCredito(crKeys)]).then(function (sp) {
+      var status = sp[0], pickeado = sp[1], credito = sp[2];
       /* v26.55: copia (la programación está cacheada: no se toca) con el m³ PICKEADO de cada tanda con TP. */
       if (pickeado.size) { var p2 = new Map(); prog.forEach(function (v, k) { var f = pickeado.get(k);
         p2.set(k, f == null ? v : Object.assign({}, v, { m3: (Number(v.m3) || 0) * f, m3Ped: Number(v.m3) || 0 })); }); prog = p2; }
@@ -1722,7 +1745,7 @@ function ciclo() {
         actividad: actividadActual(guardado.length ? eventos.concat(guardado) : eventos, hoy, fjHoy, fichados),
         alertas: Array.from(alertas).sort(),
         empleados: empleados, facturadas: facturadas, despachadas: despachadas,
-        horas: horas, arbol: arbol, eventos: eventos
+        horas: horas, arbol: arbol, eventos: eventos, credito: credito
       });
 
       ultimoOk = Date.now(); fallos = 0;

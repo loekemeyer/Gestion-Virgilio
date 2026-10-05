@@ -5605,7 +5605,7 @@ rollback y pruebas en `sql/gv_tanda_frenada_v2661.sql` · `tests/arm-avance-serv
 | estado y TV | `vista_tanda_status`: PKF/APF = sigue en picking/armando. TV / Mon. Admin / monitor viejo: luz **⏸ frenada** (ámbar) |
 | puntaje | una tanda con freno de picking **no entra** en `gv_picking_puntaje_operario` hasta el reparto por operario (parte 3) |
 
-⚠ El m³ de la tanda sigue acreditándose a quien da el **TP/TAP** final: el reparto por operario (D6) es la parte 3.
+⚠ ~~El m³ de la tanda sigue acreditándose a quien da el **TP/TAP** final~~ → desde la **v26.66** (parte 3) se reparte por operario.
 Centinelas v26.62 ids 300-306 · `sql/gv_tanda_frenada_v2662.sql` (CREATE completos + rollback) · `tests/tanda-frenar.cjs`.
 
 **Parte 2b (v26.65) — fichaje, supervisor y aviso del día siguiente:**
@@ -5618,8 +5618,21 @@ Centinelas v26.62 ids 300-306 · `sql/gv_tanda_frenada_v2662.sql` (CREATE comple
 | **supervisor** | «🔧 Modificar tanda» → **✋ Frenar (soltarla del operario)**: dice quién la tiene (`gv_tanda_lock_estado`); en **armado** sólo si hay copia en el servidor (dice hace cuánto, NP listas y líos), si no le pide al operario que la frene él; motivo `supervisor` |
 | «una por vez» | el cartel dice que también se puede **frenar** con «✋ Frenar la tanda» (D9) |
 
-⚠ El crédito por operario (D6: m³ de picking/armado repartido) sigue en la **parte 3**.
 Centinelas 307-310 · `sql/gv_tanda_frenada_v2665.sql` · `tests/tanda-frenar-2b.cjs`.
+
+**Parte 3 (v26.66) — el CRÉDITO por operario y día (D6):**
+
+| pieza | qué hace |
+|---|---|
+| `gv_tanda_credito(text[])` | sólo tandas con freno en esa fase. **Picking**: el ÚLTIMO PKC de cada código × m³/caja (corregir pisa y queda a nombre del que corrigió). **Armado**: las cajas de los líos que cerró cada uno (`lío.leg` / `lío.ts` de `GV_Armado_Avance`); súper / retira: lo que separó (`código.sepLeg` / `sepTs`, que ahora graba `_compSepTap`). Día = el del PKC / lío. anon |
+| monitor grande (`fetchMonitorDayStats`) y desglose por día (`showDayBreakdown`) | `gvM3ConCredito`: tandas cerradas (TP/TAP) enteras salvo las frenadas, que dan sólo la parte de ese legajo ese día; más su parte de las que **frenó** ese día. El que sólo frenó también sale. El detalle por tanda dice su parte |
+| TV / Mon. Admin | lo mismo (`cargarCredito` ≡ `gvCreditoTandas`) |
+| cuándo entra | la parte de un operario entra cuando **ÉL cierra su tramo ese día** (TP/TAP/PKF/APF): mismo criterio de siempre, el m³ entra al cerrar. Con el freno al fichar, todo tramo cierra en el día |
+| sin respuesta | como antes: la tanda entera al del TP/TAP |
+
+⚠ Lo que **no** cambió: el **puntaje** de picking sigue sin las tandas frenadas, y Premios / Productividad no leen el reparto (D15).
+⚠ Una corrida que cruza la medianoche sin FJ deja su parte del primer día sin contar (no hay cierre ese día): con el cron 129 no pasa.
+Centinelas 313-315 · `sql/gv_tanda_credito_v2666.sql` · `tests/tanda-credito.cjs` (verificado que falla contra la v26.65 y sin el guard de cierre de la TV).
 
 ## ⚠ REGLA (Luis, 2026-10-01, v25.63): todo módulo que abre tarea tiene ⛔ ANULAR — y la anulación QUEDA REGISTRADA
 

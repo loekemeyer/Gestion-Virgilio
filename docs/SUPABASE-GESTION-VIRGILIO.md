@@ -31545,3 +31545,16 @@ actividad posterior al FJ; PKF con la hora del FJ y `ts_inicio` = su EP; retomad
 (`gv_tanda_reservar` → `retomada`), la segunda corrida no la volvió a frenar.
 
 **Centinelas** 307-310. **Rollback** en `sql/gv_tanda_frenada_v2665.sql`.
+
+### 3.v2666 — FRENAR la tanda, parte 3: crédito por operario y día (Luis, 05/10/2026, v26.66, D6)
+
+| objeto | qué |
+|---|---|
+| `gv_tanda_credito(p_tandas text[])` | (tanda, fase, legajo, día, cajas, m³) de las tandas con freno. Picking: último PKC por código × m³/caja (`vista_volumen_articulo_resuelto`). Armado: cajas de los líos que cerró cada uno (`GV_Armado_Avance.snapshot.nps[].liosArr[].leg/ts`); súper / retira: lo separado (`codes[].sepLeg/sepTs`). STABLE SECURITY DEFINER, anon/authenticated |
+
+**Lectores:** `index.html` (`gvCreditoTandas`, `gvM3ConCredito`: monitor del día y desglose por día) y
+`monitor/tv.html` (`cargarCredito`). La parte de un operario entra cuando él cierra su tramo ese día.
+Sin respuesta, la tanda va entera al del TP/TAP (fail-open). Al 05/10: 0 frenos registrados (la
+función está lista; empieza a tener filas con la primera tanda frenada).
+
+**Centinelas** 313-315. **Rollback** en `sql/gv_tanda_credito_v2666.sql`.

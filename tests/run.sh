@@ -257,6 +257,8 @@ echo "== tanda-frenar (v26.62: frenar picking/armado, cartel de la tanda de otro
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-frenar.cjs
 echo "== tanda-frenar-2b (v26.65: retomar por «Seguir», aviso del día siguiente, freno del supervisor) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-frenar-2b.cjs
+echo "== tanda-credito (v26.66: la tanda frenada se reparte, cada uno su m³ en su día) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-credito.cjs
 
 echo "== fac-block-recuperable (regresión v6.21: bloqueo del tilde si el faltante se puede completar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-block-recuperable.cjs

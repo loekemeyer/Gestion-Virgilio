@@ -6291,7 +6291,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.65"></script>
+<script type="module" src="recepcion.js?v=26.66"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10530,7 +10530,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.65";
+const APP_VERSION = "v26.66";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10886,6 +10886,58 @@ async function _frenoGuardSeguir(legajo, tanda, fase) {
     return "ajena";
   }
   return "seguir";
+}
+
+/* v26.66 (Luis, 05/10, D6) — CRÉDITO de una tanda FRENADA: la hicieron varios (o el mismo en varios
+   días) y cada uno se lleva el m³ de lo que hizo, en el día en que lo hizo — picking por sus cajas
+   pickeadas, armado por las cajas de los líos que cerró (súper / retira: lo que separó). Lo calcula
+   `gv_tanda_credito` (sólo devuelve tandas con freno; el resto sigue entero al que dio el TP/TAP).
+   Falla ABIERTO: sin respuesta, Map vacío = como antes. ≡ monitor/tv.html cargarCredito. */
+let _gvCredCache = { k: "", ts: 0, m: null };
+async function gvCreditoTandas(tandas) {
+  const L = Array.from(new Set((tandas || []).map(function (t) { return String(t || "").trim().toUpperCase(); }).filter(Boolean))).sort();
+  if (!L.length) return new Map();
+  const k = L.join(",");
+  if (_gvCredCache.m && _gvCredCache.k === k && (Date.now() - _gvCredCache.ts) < 60000) return _gvCredCache.m;
+  try {
+    const r = await Promise.race([
+      fetch(SUPABASE_URL + "/rest/v1/rpc/gv_tanda_credito", {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_tandas: L })
+      }),
+      new Promise(function (res) { setTimeout(function () { res(null); }, 4000); })
+    ]);
+    if (!r || !r.ok) return new Map();
+    const filas = await r.json();
+    const m = new Map();
+    (Array.isArray(filas) ? filas : []).forEach(function (f) {
+      const key = String(f.tanda || "").toUpperCase() + "|" + f.fase;
+      if (!m.has(key)) m.set(key, []);
+      m.get(key).push({ legajo: String(f.legajo || "").trim(), dia: String(f.dia || ""), m3: Number(f.m3) || 0, cajas: Number(f.cajas) || 0 });
+    });
+    _gvCredCache = { k: k, ts: Date.now(), m: m };
+    return m;
+  } catch (_e) { return new Map(); }
+}
+/* El m³ que le toca a `legajo` de esa tanda y fase en el día `dia`. null = la tanda no se reparte
+   (no está frenada): va entera al que la cerró, como siempre. */
+function gvCreditoDe(cred, tanda, fase, legajo, dia) {
+  const rows = cred && cred.get(String(tanda || "").toUpperCase() + "|" + fase);
+  if (!rows || !rows.length) return null;
+  let s = 0;
+  rows.forEach(function (r) { if (r.legajo === String(legajo || "").trim() && (!dia || r.dia === dia)) s += r.m3; });
+  return s;
+}
+
+/* m³ de un operario en un día: las tandas que CERRÓ (TP/TAP) enteras, salvo las frenadas (sólo su parte de ese
+   día), más su parte de las que FRENÓ ese día sin cerrarlas. El crédito se cuenta cuando el operario cierra su
+   tramo (TP/TAP/PKF/APF) — mismo criterio que antes: el m³ entra al cerrar. ≡ monitor/tv.html (cierreHoy). */
+function gvM3ConCredito(cred, cerradas, frenadas, fase, leg, dia, m3De) {
+  let s = 0; const vistas = new Set();
+  (cerradas || new Set()).forEach(function (t) { const c = gvCreditoDe(cred, t, fase, leg, dia); s += (c == null ? (Number(m3De(t)) || 0) : c); vistas.add(t); });
+  (frenadas || new Set()).forEach(function (t) { if (!vistas.has(t)) s += gvCreditoDe(cred, t, fase, leg, dia) || 0; });
+  return s;
 }
 
 /* v26.65 — al entrar a la botonera: «Tenés la tanda X frenada. ¿La retomás?» (texto de Luis), sólo
@@ -15122,7 +15174,12 @@ function _compSepView(v) { if (_comp) { _comp.sepView = v; _compRenderSep(); } }
 function _compSepNp(j) { if (_comp) { _comp.sepNpIdx = j; _comp.liosNpIdx = j; _compRenderSep(); } }
 function _compSepTap(npIdx, ci) {
   if (!_comp) return; const n = _comp.nps[npIdx]; if (!n || !n.codes || !n.codes[ci]) return;
-  n.codes[ci].sep = !n.codes[ci].sep; _compRenderSep(); _compRecalc();
+  n.codes[ci].sep = !n.codes[ci].sep;
+  /* v26.66 (D6): quién lo separó y cuándo. En súper / retira (no arman líos) el crédito del armado de
+     una tanda FRENADA sale de acá (gv_tanda_credito). No cambia nada de la pantalla. */
+  if (n.codes[ci].sep) { try { n.codes[ci].sepLeg = String((_comp && _comp.legajo) || ""); n.codes[ci].sepTs = Date.now(); } catch (_e) {} }
+  _compRenderSep(); _compRecalc();
+  try { _compPersist(); } catch (_e) {}
 }
 function _compSepArmar() { if (!_comp) return; if (_comp.sepNpIdx != null) _comp.liosNpIdx = _comp.sepNpIdx; _compGo(3); }
 /* Clasificación por NP (v5.12): antes de separar, marcar cada pedido Lío/Etiqueta/Nada
@@ -32377,6 +32434,7 @@ async function showDayBreakdown(dayKey, dayLabel) {
         lastTs: ev.ts_cliente,
         pickedTandas: new Set(),
         armedTandas: new Set(),
+        pickFr: new Set(), armFr: new Set(),   // v26.66
         comidaMs: 0,
         fjTs: null
       });
@@ -32386,6 +32444,8 @@ async function showDayBreakdown(dayKey, dayLabel) {
       if (tanda) {
         if (ev.opcion === "TP")  p.pickedTandas.add(tanda);
         if (ev.opcion === "TAP") p.armedTandas.add(tanda);
+        if (ev.opcion === "PKF") p.pickFr.add(tanda);   // v26.66: frenó (su parte se acredita)
+        if (ev.opcion === "APF") p.armFr.add(tanda);
       }
       if (ev.opcion === "PC" && ev.ts_inicio) {
         const dur = new Date(ev.ts_cliente) - new Date(ev.ts_inicio);
@@ -32424,10 +32484,17 @@ async function showDayBreakdown(dayKey, dayLabel) {
       if (e) return e.m3;
       return historic.get(t) || 0;
     };
+    // v26.66 (D6): las tandas FRENADAS se reparten entre los que las hicieron, cada uno en su día
+    let _credD = new Map();
+    try {
+      const _ts = new Set();
+      for (const ev of events) if (/^(TP|TAP|PKF|APF)$/.test(ev.opcion)) _ts.add(String(ev.texto || "").trim().toUpperCase());
+      _credD = await gvCreditoTandas([..._ts]);
+    } catch (_e) { _credD = new Map(); }
     // Calcular fila por legajo y ordenar por m3 total desc
     const rows = [...perLegajo.entries()].map(([leg, p]) => {
-      const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t), 0);   // v26.55: tandaM3 ya es lo pickeado
-      const m3Arm  = [...p.armedTandas ].reduce((s, t) => s + tandaM3(t), 0);
+      const m3Pick = gvM3ConCredito(_credD, p.pickedTandas, p.pickFr, "picking", leg, dayKey, tandaM3);   // v26.55: tandaM3 ya es lo pickeado
+      const m3Arm  = gvM3ConCredito(_credD, p.armedTandas,  p.armFr,  "armado",  leg, dayKey, tandaM3);
       const m3Total = m3Pick + m3Arm;
       // Horas "trabajadas" (primer evento → último evento) — se mantiene
       // para no romper la comparación histórica, pero la jornada nueva
@@ -32938,6 +33005,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       // *Detail = lista de cierres con info para el popup (uno por evento).
       pickedTandas: new Set(), pickedDetail: [], pickMs: 0,
       armedTandas:  new Set(), armedDetail:  [], armMs:  0,
+      pickFrTandas: new Set(), armFrTandas: new Set(),   // v26.66: tandas que FRENÓ ese día (sin TP/TAP propio)
       ccTandas:     new Set(), ccDetail:     [], ccMs:   0,
       comidaMs: 0, movMs: 0, movDetail: [], noprodMs: 0, noprodDetail: [],
       otrosProdMs: 0, otrosProdDetail: [], fjTs: null
@@ -32972,8 +33040,8 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       if (ev.opcion === "TP"  && durOK) { if (!p.pickedTandas.has(tanda)) p.pickMs += dur + colaMs; p.pickedTandas.add(tanda); p.pickedDetail.push(detail); }
       if (ev.opcion === "TAP" && durOK) { if (!p.armedTandas.has(tanda))  p.armMs  += dur + colaMs; p.armedTandas.add(tanda);  p.armedDetail.push(detail);  }
       // v26.62-frenada ≡ vista: el tramo FRENADO (PKF/APF) suma a quien lo hizo, cada uno, sin cola ni m³
-      if (ev.opcion === "PKF" && durOK) { p.pickMs += dur; detail.m3 = 0; detail.frenada = true; p.pickedDetail.push(detail); }
-      if (ev.opcion === "APF" && durOK) { p.armMs  += dur; detail.m3 = 0; detail.frenada = true; p.armedDetail.push(detail); }
+      if (ev.opcion === "PKF" && durOK) { p.pickMs += dur; detail.m3 = 0; detail.frenada = true; p.pickedDetail.push(detail); p.pickFrTandas.add(tanda); }
+      if (ev.opcion === "APF" && durOK) { p.armMs  += dur; detail.m3 = 0; detail.frenada = true; p.armedDetail.push(detail); p.armFrTandas.add(tanda); }
       if (ev.opcion === "CC"  && durOK) { if (!p.ccTandas.has(tanda))     p.ccMs   += dur; p.ccTandas.add(tanda);     p.ccDetail.push(detail);     }
     }
     /* v21.47 — CC + CR + RR por duración, con el MISMO `computeClosureDur` que
@@ -33168,15 +33236,31 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       p.movDetail.push({ opcion: "RKB", texto: "racks (estimado: " + libres.length + " movimiento/s sin tramo)", durMs: tot, inferido: true });
     }
   }
+  /* v26.66 (D6): las tandas FRENADAS se reparten entre los que las hicieron, cada uno en su día. */
+  let _cred = new Map();
+  try {
+    const _ts = new Set();
+    for (const ev of events) if (ev.opcion === "TP" || ev.opcion === "TAP" || ev.opcion === "PKF" || ev.opcion === "APF") _ts.add(String(ev.texto || "").trim().toUpperCase());
+    _cred = await gvCreditoTandas([..._ts]);
+  } catch (_e) { _cred = new Map(); }
   const perOperario = [];
   for (const [leg, p] of perLegajo) {
     // Filtramos a los que NO tocaron nada del trabajo medible (picking, pedido,
     // CC con tanda, ni movimientos). Si tocaron pero no tenemos m³ cargado en
     // el sheet (típico en tandas C-prefix nuevas), igual aparecen.
-    if (p.pickedTandas.size === 0 && p.armedTandas.size === 0
+    const _frP = p.pickFrTandas || new Set(), _frA = p.armFrTandas || new Set();
+    if (p.pickedTandas.size === 0 && p.armedTandas.size === 0 && _frP.size === 0 && _frA.size === 0
         && p.ccTandas.size === 0 && p.movMs === 0 && p.otrosProdMs === 0 && !p.abiertoProdMs) continue;
-    const m3Pick = [...p.pickedTandas].reduce((s, t) => s + tandaM3(t), 0);   // v26.55: tandaM3 ya es lo pickeado (el sheet y el histórico)
-    const m3Arm  = [...p.armedTandas ].reduce((s, t) => s + tandaM3(t), 0);
+    // v26.66: de una tanda frenada, sólo la parte de ESTE legajo en ESTE día (gvCreditoDe); el resto, entera
+    [["picking", p.pickedDetail], ["armado", p.armedDetail]].forEach(function (fd) {
+      const visto = new Set();
+      (fd[1] || []).forEach(function (dt) {
+        const c = gvCreditoDe(_cred, dt.tanda, fd[0], leg, dayKey); if (c == null) return;
+        dt.m3 = visto.has(dt.tanda) ? 0 : c; dt.credito = true; visto.add(dt.tanda);
+      });
+    });
+    const m3Pick = gvM3ConCredito(_cred, p.pickedTandas, _frP, "picking", leg, dayKey, tandaM3);   // v26.55: tandaM3 ya es lo pickeado (el sheet y el histórico)
+    const m3Arm  = gvM3ConCredito(_cred, p.armedTandas,  _frA, "armado",  leg, dayKey, tandaM3);
     const m3CC   = [...p.ccTandas    ].reduce((s, t) => s + tandaM3(t), 0);
     // HORAS por actividad: suma real de (ts_cliente - ts_inicio) de los
     // cierres TP/TAP/CC. Si TP cerró un EP de ayer, dur = ts hoy - ts ayer.
@@ -33207,8 +33291,8 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       movDetail:    p.movDetail,
       noprodDetail: p.noprodDetail,
       otrosProdDetail: p.otrosProdDetail,
-      didPick: p.pickedTandas.size > 0,
-      didArm:  p.armedTandas.size  > 0,
+      didPick: p.pickedTandas.size > 0 || _frP.size > 0,
+      didArm:  p.armedTandas.size  > 0 || _frA.size > 0,
       didCC:   p.ccTandas.size     > 0,
       didMov:  p.movMs > 0,
       didNoprod: p.noprodMs > 0,
@@ -59795,7 +59879,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.65"></script>
+<script src="importacion.js?v=26.66"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62618,9 +62702,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.65"></script>
-<script src="hotsale.js?v=26.65"></script>
-<script src="estadisticas.js?v=26.65"></script>
+<script src="cobranzas.js?v=26.66"></script>
+<script src="hotsale.js?v=26.66"></script>
+<script src="estadisticas.js?v=26.66"></script>
 
 </body>
 </html>
