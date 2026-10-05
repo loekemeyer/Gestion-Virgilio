@@ -7444,7 +7444,7 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
   demanda) → jsPDF A4, márgenes 12 mm, varias páginas si hace falta. En FILA, una hoja por vez.
 - **A MANO** (botón Imprimir de la Cola, Programación, la estación): helper que no contesta o que no imprimió nada →
   la hoja sale por el navegador. **Más de 60 s sin respuesta → NO se repite** (puede haber salido).
-  ⚠⚠ **LO AUTOMÁTICO NUNCA abre el cuadro** (v26.65, ver la regla de abajo): sale sólo por el helper o queda en la Cola.
+  ⚠⚠ **LO AUTOMÁTICO NUNCA abre el cuadro** (v26.66, ver la regla de abajo): sale sólo por el helper o queda en la Cola.
 - **Orden: helper > navegador.** (El programa de la v26.12 se sacó en la v26.26.) Qué sale SOLO lo siguen decidiendo los
   switches de 🖨️ Cola de impresión (auto-imprimir remitos = armado y picking; FACTURADO global).
 - Con el helper conectado + el auto de la estación prendidos, la estación arranca sola al abrir GV (`gvHelperVigilar`).
@@ -7485,7 +7485,7 @@ armado|facturado>` con el PDF crudo → `{ ok, tipo, impreso, errores, motivo }`
 
 `tests/imp-helper-local.cjs` (helper falso en 127.0.0.1: mide el PDF que le llega, el orden, el fallback y el timeout).
 
-## ⚠⚠ REGLA (Luis, 2026-10-05, v26.65): LO AUTOMÁTICO SALE SÓLO POR EL HELPER — lo que no salió queda en la COLA DE IMPRESIÓN NP
+## ⚠⚠ REGLA (Luis, 2026-10-05, v26.66): LO AUTOMÁTICO SALE SÓLO POR EL HELPER — lo que no salió queda en la COLA DE IMPRESIÓN NP
 
 **Luis:** *"solo cuando se conecta el helper salen automaticas. si no esta conectado el helper o si estuvo conectado pero no
 responde, no manda a imprimir automaticamente la app sino que figuran en el modulo [Cola de impresión NP]. Que ahi figuren
@@ -7508,7 +7508,7 @@ el helper, las PC con la estación prendida empezaron a abrir el cuadro de impre
 - ⚠ **Sin un solo texto del helper en la Cola ni en la estación** (regla v26.28: lo único del helper es el botón de ⚙️).
 - ⚠ El `_ci_ev` de la RPC va **`as materialized`**: sin eso el plan lo re-agregaba una vez por fila (**2,4 s → 68 ms**).
 - `vista_cola_impresion` / `gv_vista_cola_impresion` quedan en la base sin lector del front.
-- Centinelas 311 y 312. `sql/gv_cola_impresion_lista_v2665.sql`, `tests/cola-impresion-np.cjs`, `tests/print-station.cjs`,
+- Centinelas 311 y 312. `sql/gv_cola_impresion_lista_v2666.sql`, `tests/cola-impresion-np.cjs`, `tests/print-station.cjs`,
   bloque **O** de `tests/imp-helper-local.cjs` (verificado que los tres fallan con la regla rota).
 
 ## ⚠ REGLA (Luis, 2026-10-02, v26.16 · v26.20): 📑 ESTADÍSTICAS ISIS — ventas y pedidos por artículo sin entrar a ISIS

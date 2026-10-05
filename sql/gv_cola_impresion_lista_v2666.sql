@@ -1,4 +1,4 @@
--- v26.65 (Luis, 05/10): COLA DE IMPRESIÓN NP — todas las NP (pasadas y presentes) con las hojas
+-- v26.66 (Luis, 05/10): COLA DE IMPRESIÓN NP — todas las NP (pasadas y presentes) con las hojas
 -- que se pueden imprimir porque está la data, y si ya salieron.
 --   · picking   → es de la TANDA (TP de la tanda; marca «PK <tanda>» en Impresion_NP)
 --   · armado    → es de la NP (TAL con resumen, o Entregas_Virgilio de un armado vivo; marca «<np>»)

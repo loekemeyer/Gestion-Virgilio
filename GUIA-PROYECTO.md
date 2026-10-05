@@ -1,4 +1,4 @@
-## Nota v26.65 (2026-10-05) — Impresión: lo automático sale SÓLO por el helper; la Cola de impresión NP lista todo
+## Nota v26.66 (2026-10-05) — Impresión: lo automático sale SÓLO por el helper; la Cola de impresión NP lista todo
 
 - **Automático** (estación `psPoll`: TAL → armado, TP → picking, IMPT, facturado) pasa por **`gvImprimirAuto`**: sin helper
   conectado no hace nada; con el helper que no contesta o que no imprimió, **no abre el cuadro**. Marca `Impresion_NP` sólo
@@ -8,7 +8,7 @@
   picking, UNA vez por tanda, marca `PK <tanda>`) → NP (📦 armado, marca = la NP; 🧾 facturado, marca `FAC <np>`).
   ✓ impresa con la hora · rojo pendiente (⚠ +24 h) · azul disponible sin marca · — sin datos. Tocar = ver la hoja e
   imprimirla. «Imprimir pendientes» del día más viejo al más nuevo. Badge: pendientes de −21 a +14 días.
-- `sql/gv_cola_impresion_lista_v2665.sql`, `tests/cola-impresion-np.cjs`, `tests/print-station.cjs`, bloque O de
+- `sql/gv_cola_impresion_lista_v2666.sql`, `tests/cola-impresion-np.cjs`, `tests/print-station.cjs`, bloque O de
   `tests/imp-helper-local.cjs`.
 
 ## Nota v26.38 (2026-10-02) — Picking: escalera desde la 3.ª altura en TODAS las góndolas de 4 alturas (B a Ñ)

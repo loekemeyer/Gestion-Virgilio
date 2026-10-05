@@ -31545,3 +31545,17 @@ actividad posterior al FJ; PKF con la hora del FJ y `ts_inicio` = su EP; retomad
 (`gv_tanda_reservar` → `retomada`), la segunda corrida no la volvió a frenar.
 
 **Centinelas** 307-310. **Rollback** en `sql/gv_tanda_frenada_v2665.sql`.
+
+### 3.v2666 — COLA DE IMPRESIÓN NP: `gv_cola_impresion_lista` (Luis, 05/10/2026, v26.66)
+
+| objeto | qué |
+|---|---|
+| `gv_cola_impresion_lista(p_desde, p_hasta)` | lectura, SECURITY INVOKER, anon. Una fila por NP (web + ISIS) con fecha de entrega y tanda; por hoja: cuándo hay data (`pick_ts` = TP de la tanda, `arm_ts` = TAL o Entregas vivas, `fac_ts` = `Facturacion_NP.facturado_at`), cuándo se imprimió (`Impresion_NP`: `PK <tanda>` · `<np>` · `FAC <np>`) y si está pendiente |
+
+**Pendiente** desde que existe cada marca: picking TP ≥ 01/10 · armado TAL ≥ 25/08 12:10 · facturado ≥ 05/10 13:00.
+
+**Medido:** 28 días como anon, **68 ms** (con `_ci_ev` sin `materialized` eran 2,4 s: el plan lo re-agregaba por fila).
+No escribe nada; `vista_cola_impresion` / `gv_vista_cola_impresion` siguen en la base sin lector del front.
+
+**Centinelas** 311 y 312. **Rollback:** `drop function if exists public.gv_cola_impresion_lista(date, date);`
+(`sql/gv_cola_impresion_lista_v2666.sql`).

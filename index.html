@@ -6291,7 +6291,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.65"></script>
+<script type="module" src="recepcion.js?v=26.66"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10530,7 +10530,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.65";
+const APP_VERSION = "v26.66";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -38087,7 +38087,7 @@ async function expIsisLoadBadge() {
   } catch (_e) {}
 }
 
-/* v26.65 (Luis, 05/10: "Que ahi figuren todas las NPs pasadas y presentes (en buena vista) con los
+/* v26.66 (Luis, 05/10: "Que ahi figuren todas las NPs pasadas y presentes (en buena vista) con los
    comprobantes que se les puede imprimir porque esta la data (nota de picking, armado o facturado). En
    caso de que sea de la tanda, es de la tanda, si es de la NP, es de la NP") — COLA DE IMPRESIÓN NP.
    · Por DÍA (fecha de entrega) → TANDA → NP. La hoja de PICKING es de la TANDA (una por tanda, marca
@@ -38096,7 +38096,7 @@ async function expIsisLoadBadge() {
      Tocarla abre la hoja (gvHojaPreview) con «🖨️ Imprimir» (helper o cuadro) y la marca impresa.
    · Lo automático sale SÓLO por el helper conectado y respondiendo (gvImprimirAuto): lo que no salió
      queda acá pendiente. «Imprimir pendientes» manda lo pendiente de lo que se ve.
-   Fuente: gv_cola_impresion_lista(desde, hasta) — sql/gv_cola_impresion_lista_v2665.sql. */
+   Fuente: gv_cola_impresion_lista(desde, hasta) — sql/gv_cola_impresion_lista_v2666.sql. */
 var COLA_FAC_PREFIJO = "FAC ";
 var _colaImpBusy = false;
 var COLA_IMP_CSS =
@@ -55418,7 +55418,7 @@ async function pkHojaDatos(tandas){
 }
 async function pkHojaImprimir(tandas, marcar, origen){
   var ds = await pkHojaDatos(tandas);
-  // v26.65 — la estación (automático) imprime SÓLO por el helper y marca cada hoja que salió; la que no
+  // v26.66 — la estación (automático) imprime SÓLO por el helper y marca cada hoja que salió; la que no
   // salió queda pendiente en la Cola de impresión NP. A mano (Cola) sigue como siempre: helper o cuadro.
   if (origen === "estacion") {
     ds.forEach(function (d){ gvImprimirAuto("picking", pkHojaHtml(d), d.tanda, PK_HOJA_PREFIJO + d.tanda); });
@@ -55774,7 +55774,7 @@ async function _gvHelperImprimirHoja(tipo, inner, ref, opt){
   catch (e) { r = { ok: false, sin_pdf: true, impreso: [], errores: [], motivo: "no pude armar el PDF (" + String((e && e.message) || e) + ")" }; }
   if (pdf) r = await imprimirLocal(tipo, pdf);
   // Al navegador SÓLO si el helper no imprimió nada y no hay duda de que no salió — y NUNCA en lo
-  // automático (v26.65, Luis 05/10): lo automático sale sólo por el helper; si no salió, queda en la
+  // automático (v26.66, Luis 05/10): lo automático sale sólo por el helper; si no salió, queda en la
   // Cola de impresión NP (gvImprimirAuto no la marca) y se imprime desde ahí.
   const alNavegador = !auto && !r.ok && !r.timeout && !(r.impreso && r.impreso.length);
   _gvHelperLogAdd({ tipo: tipo, ref: ref || "", ok: !!r.ok, impreso: r.impreso || [], errores: r.errores || [],
@@ -55785,7 +55785,7 @@ async function _gvHelperImprimirHoja(tipo, inner, ref, opt){
   }
   return r;
 }
-/* v26.65 (Luis, 05/10: "solo cuando se conecta el helper salen automaticas. si no esta conectado el helper o
+/* v26.66 (Luis, 05/10: "solo cuando se conecta el helper salen automaticas. si no esta conectado el helper o
    si estuvo conectado pero no responde, no manda a imprimir automaticamente la app sino que figuran en el
    modulo [Cola de impresión NP]") — la ÚNICA puerta de la impresión automática (estación: TAL, TP, IMPT y
    facturado). Sin helper conectado no hace nada; con el helper que no contesta o que no imprimió, tampoco
@@ -55949,7 +55949,7 @@ function psToggle(){ psSetAuto(!psIsAuto()); }
 async function psPoll(force){
   if (!force && !psIsAuto()) return;
   _psEnsure();
-  // v26.65 (Luis, 05/10) — lo automático sale SÓLO por el helper conectado y respondiendo. Sin helper (o
+  // v26.66 (Luis, 05/10) — lo automático sale SÓLO por el helper conectado y respondiendo. Sin helper (o
   // con el helper que no contesta) la estación no imprime nada ni abre el cuadro: corre los cursores a
   // ahora (cuando vuelva no vuelca lo de atrás) y todo queda pendiente en la Cola de impresión NP.
   let conHelper = false;
@@ -56038,7 +56038,7 @@ async function psPoll(force){
   _psUpdatePollInfo();
 }
 function _psSetLastFac(ts){ _psEnsure(); _ps.lastSeenFac = ts; try { localStorage.setItem(PS_LASTSEEN_FAC_KEY, ts); } catch (_e) {} }
-/* v26.65 — sin helper que conteste, la estación "ve" todo hasta ahora sin imprimirlo: queda en la Cola. */
+/* v26.66 — sin helper que conteste, la estación "ve" todo hasta ahora sin imprimirlo: queda en la Cola. */
 function _psCorrerCursores(){
   _psEnsure();
   const ahora = new Date().toISOString();
@@ -56112,7 +56112,7 @@ async function psPrintBatch(items){
   const ds = await _armadoRemitoDataForItems(items);
   ds.forEach(function (d){
     psMarkPrinted(d.np);   // marcar ANTES de encolar → si hay 2 pestañas abiertas, no imprimen doble
-    // v26.65 — sólo por el helper (gvImprimirAuto, que ya serializa): marca Impresion_NP SÓLO si salió
+    // v26.66 — sólo por el helper (gvImprimirAuto, que ya serializa): marca Impresion_NP SÓLO si salió
     // (v12.08: si no, la Cola acusaba pendientes falsos); si no salió, queda pendiente en la Cola.
     gvImprimirAuto("armado", armadoRemitoInnerHtml(d), d.np, String(d.np)).then(function (r){
       const salio = !!(r && (r.ok || (r.impreso && r.impreso.length)));
@@ -56242,7 +56242,7 @@ function facPrintToggle(){ facPrintSetPref(facPrintIsOn() ? "0" : "1").then(func
 async function facPrintFacturado(np, tanda, auto){
   const inner = await facFacturadoInner(np, tanda);
   if (!inner) return;
-  // v26.65 — automático (estación): sólo por el helper; marca «FAC <np>» si salió. A mano: helper o cuadro.
+  // v26.66 — automático (estación): sólo por el helper; marca «FAC <np>» si salió. A mano: helper o cuadro.
   if (auto) { await gvImprimirAuto("facturado", inner, np, COLA_FAC_PREFIJO + String(np)); return; }
   remitoPrintDoc(inner, "facturado", np);
   try { colaImpMarcarImpresas([COLA_FAC_PREFIJO + String(np)], "cola"); } catch (_e) {}
@@ -60012,7 +60012,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.65"></script>
+<script src="importacion.js?v=26.66"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62835,9 +62835,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.65"></script>
-<script src="hotsale.js?v=26.65"></script>
-<script src="estadisticas.js?v=26.65"></script>
+<script src="cobranzas.js?v=26.66"></script>
+<script src="hotsale.js?v=26.66"></script>
+<script src="estadisticas.js?v=26.66"></script>
 
 </body>
 </html>

@@ -3,7 +3,7 @@
    psPoll (detecta TAL nuevos, dedupea por NP, descarta TAL sin resumen marcándolo impreso,
    avanza lastSeen), psPrintBatch (imprime, loguea, y desde v12.08 marca en Impresion_NP para
    que la Cola no acuse pendientes falsos) y psSetAuto/psIsAuto (switch por dispositivo).
-   v26.65 (Luis, 05/10): lo automático sale SÓLO por el helper (gvImprimirAuto → gvHelperEncolar con
+   v26.66 (Luis, 05/10): lo automático sale SÓLO por el helper (gvImprimirAuto → gvHelperEncolar con
    {auto:true}); se marca en Impresion_NP sólo si salió; sin helper (o sin respuesta) psPoll no imprime
    nada y corre los cursores: queda pendiente en la Cola de impresión NP. Todo con fetch stubbeado —
    no toca Supabase. Sale 1 si falla. */

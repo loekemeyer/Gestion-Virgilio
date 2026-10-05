@@ -1,4 +1,4 @@
-/* v26.65 (Luis, 05/10) — COLA DE IMPRESIÓN NP: todas las NP (pasadas y presentes) con las hojas que
+/* v26.66 (Luis, 05/10) — COLA DE IMPRESIÓN NP: todas las NP (pasadas y presentes) con las hojas que
    se pueden imprimir porque está la data. "En caso de que sea de la tanda, es de la tanda, si es de la
    NP, es de la NP": el PICKING va una vez por TANDA (marca «PK <tanda>»), el ARMADO (marca = la NP) y el
    FACTURADO (marca «FAC <np>») por NP. Corre index.html de verdad con la RPC gv_cola_impresion_lista

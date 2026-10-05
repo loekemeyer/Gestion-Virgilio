@@ -19,7 +19,7 @@
         lo prende; Conectar al puerto vivo lo prende. La Cola de impresión no habla del helper.
      L. gvHelperVigilar arranca la estación sola con helper + auto de la estación.
      M. v26.26 — el programa de la v26.12 se sacó: ni 🧩 Impresoras, ni cola en la base, ni gv_imp_encolar.
-     O. v26.65 — lo AUTOMÁTICO (gvImprimirAuto) sale sólo por el helper: con ok:false NO abre el cuadro y no
+     O. v26.66 — lo AUTOMÁTICO (gvImprimirAuto) sale sólo por el helper: con ok:false NO abre el cuadro y no
         marca; si salió, marca; sin helper no hace nada; con el helper que no contesta la estación (psPoll)
         no imprime ni abre el cuadro y corre los cursores (queda en la Cola de impresión NP).
    Sale 1 si algo falla. */
@@ -296,7 +296,7 @@ const helper = http.createServer((req, res) => {
     return _gvHelper.log.length === 0 && window.__S.nav.length === 0;
   });
 
-  // ---- O. v26.65 (Luis, 05/10) — lo AUTOMÁTICO sale sólo por el helper conectado y respondiendo: nunca el
+  // ---- O. v26.66 (Luis, 05/10) — lo AUTOMÁTICO sale sólo por el helper conectado y respondiendo: nunca el
   //         cuadro, y la hoja se marca impresa sólo si salió (si no, queda pendiente en la Cola de impresión NP).
   H.reqs.length = 0; await ctl("modo", "sinregla");
   out.O_autoNoCuadro = await p.evaluate(async (h) => {
