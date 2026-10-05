@@ -31637,8 +31637,10 @@ puerta deja el automático en el mismo lugar y de la misma forma.
 por la puerta: **16/16 y 22/22 renglones idénticos** a los cargados por el panel, **0 grabados**. Sólo cambian
 `sheets_sent` (lo pone el panel después de mandar a la planilla: el auto-import tiene que hacer lo mismo) y
 `placed_by_auth_user_id` (columna que sólo existe en LK). El SQL termina con la misma prueba contra el 247 (Cencosud)
-y el 241 (Dorinka), para correr en Chef: `sql/chef_krikos_crear_pedido_super_v2671_CHEF.sql` (lo corre Luis en el SQL
-Editor de Chef; esta sesión no tiene acceso a ese proyecto).
+y el 241 (Dorinka), para correr en Chef (lo corre Luis en el SQL Editor de Chef; esta sesión no tiene acceso a ese
+proyecto). ⚠ **v26.73: va en TRES archivos de menos de 100 líneas**, que se corren en orden: `sql/chef_krikos_v2673_CHEF_1_funcion.sql`, `_2_puerta.sql` y `_3_prueba.sql`. El archivo único de 200 líneas se cortó al
+copiarlo: el visor mostró sólo las primeras 100 y el SQL Editor contestó `unterminated dollar-quoted string`. Nada se
+aplicó en Chef (el error fue al parsear). Mismo contenido, sólo partido en el borde de cada sentencia.
 
 Falta (tarea de Planify de Luis): el resultado de esa prueba en Chef, la clave de ventas@chefsrl.com en el Vault de LK
 (`KRIKOS_CHEF_IMAP_PASS`, la carga Luis), el lector con las dos casillas y la carpeta de spam con aviso, y la rama de
