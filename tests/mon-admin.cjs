@@ -136,7 +136,8 @@ const DATOS = {
   arbol: [
     { fecha: HOY, tanda: "E31A", np: "98802", m3: 1.5, estado: "facturado", razon_social: "Perez Zarate S.R.L." },
     { fecha: HOY, tanda: "E34A", np: "98805", m3: 2.0, estado: "armado", razon_social: "Nexxo S.R.L." },
-    { fecha: HOY, tanda: "E30A", np: "98809", m3: 1.0, estado: "proceso", razon_social: "Bazar Mandarin S.R.L." },
+    /* v27.00: el árbol trae la NP web YA etiquetada («LK 0147»): el pop-up la muestra tal cual, sin «LK LK». */
+    { fecha: HOY, tanda: "E30A", np: "LK 0147", empresa: "LK", m3: 1.0, estado: "proceso", razon_social: "Bazar Mandarin S.R.L." },
     { fecha: HOY, tanda: "E30A", np: "98810", m3: 0.5, estado: "pendiente", razon_social: "Bazar Mandarin S.R.L." }
   ],
   /* con hs_pick/hs_arm para que el m³/h salga un número y el pop-up muestre el cociente. */
@@ -286,6 +287,13 @@ function responder(url) {
   // cierre con Esc
   await p.keyboard.press("Escape");
   ok((await popTxt()) === null, "Escape no cerró el pop-up");
+
+  // b') v27.00: la celda «En proceso» lista la NP web como viene del árbol, sin repetir el prefijo
+  await p.click("#fcBox table.rd tbody tr:first-child td.cx[data-sub='proceso']");
+  let t2b = await popTxt();
+  ok(t2b && /LK 0147/.test(t2b), "el pop-up de «En proceso» no lista la NP web LK 0147: " + (t2b || "").slice(0, 160));
+  ok(t2b && !/LK\s+LK/.test(t2b), "v27.00: la NP web sale con el prefijo repetido («LK LK 0147»): " + (t2b || "").slice(0, 160));
+  await p.keyboard.press("Escape");
 
   // c) una tanda (E30A: dos clientes, uno web)
   await p.evaluate(() => {

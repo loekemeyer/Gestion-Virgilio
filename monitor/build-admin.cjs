@@ -217,7 +217,9 @@ function popDiaBucket(dia, sub) {
   var tot = 0;
   var body = filas.map(function (r) {
     tot += Number(r.m3) || 0;
-    return '<tr><td class="pop-k">' + esc(npLabel(r.empresa, r.np)) + '</td>' +
+    /* v27.00: el árbol de la PPP ya trae la NP con su etiqueta («LK 0147», o «98615» la de ISIS):
+       se muestra tal cual. Pasarla por npLabel le pegaba otro prefijo («LK LK 0147»). */
+    return '<tr><td class="pop-k">' + esc(String(r.np || "").trim().replace(/\\.0+$/, "") || "—") + '</td>' +
       '<td>' + esc(resumirCliente(r.razon_social || r.cliente || "") || "—") + '</td>' +
       '<td>' + esc(String(r.tanda || "—").toUpperCase()) + '</td>' + popNum(r.m3) + '</tr>';
   }).join("");

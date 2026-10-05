@@ -1,3 +1,9 @@
+## Nota v27.00 (2026-10-05) — Mon. Admin: la NP web ya no sale «LK LK»
+
+- Luis: el pop-up de un estado del día («NPs por Día», p. ej. Jue 08/10 · En proceso) mostraba «LK LK 0147». El árbol de
+  la PPP (`gv_ppp_prog_arbol`) ya trae la NP etiquetada y `popDiaBucket` (build-admin.cjs) le volvía a pegar el prefijo con
+  `npLabel`. Ahora la muestra tal cual (una NP de ISIS sigue sin prefijo). `tests/mon-admin.cjs` (b').
+
 ## Nota v26.83 (2026-10-05) — BR, Guardado e Ingreso a racks: «Cerrar» minimiza, «Anular» sale
 
 - Luis: el «Cerrar» de arriba de **Bajar de racks**, **Guardado a góndola** e **Ingreso a racks** ya no corta la
