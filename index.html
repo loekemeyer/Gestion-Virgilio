@@ -6293,7 +6293,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.89"></script>
+<script type="module" src="recepcion.js?v=26.90"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10535,7 +10535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.89";
+const APP_VERSION = "v26.90";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -18191,6 +18191,36 @@ function ocgGroups(list) {
   (list || (_oc.gen && _oc.gen.items) || []).forEach(function (it) { const k = it.prov; if (!g[k]) g[k] = { prov: k, items: [], total: 0 }; g[k].items.push(it); g[k].total += it.falta; });
   return g;
 }
+/* v26.90 (Luis, 05/10): «en Generar las OCs, un botón para descargarlas como Excel; columna
+   importante de proveedor». Baja LO QUE SE GENERA: gen.items (a pedir > 0), una fila por artículo
+   y proveedor —un artículo repartido sale en una fila por tallerista, con su % y sus cajas—, el
+   mismo armado que usa ocgGenerar. Ordenado por proveedor (sin proveedor al final) y cajas. */
+function ocgDescargarExcel() {
+  const gen = _oc && _oc.gen;
+  const items = (gen && gen.items) || [];
+  if (!gen || gen.error) { alert("Todavía se está calculando. Probá de nuevo en un momento."); return; }
+  if (!items.length) { alert("No hay nada para pedir: no hay OCs para bajar."); return; }
+  const filas = items.slice().sort(function (a, b) { return _ocgProvSort(a.prov, b.prov) || (b.falta - a.falta); });
+  const headers = ["Proveedor", "Código", "Descripción", "A pedir (cajas)", "% del proveedor", "E.M. (caj/mes)", "Índice", "Máx", "Pedidos", "Stock"];
+  const aoa = [headers];
+  filas.forEach(function (it) {
+    aoa.push([it.prov, String(codCanon(it.cod)), String(artNombre(it.cod, it.desc) || ""), it.falta, Math.round(it.prop || 100),
+      (it.proy == null ? 0 : Math.round(it.proy)), it.indice, (it.maxTot != null ? it.maxTot : it.max), (it.demandaTot != null ? it.demandaTot : it.demanda), (it.stockTot != null ? it.stockTot : it.stock)]);
+  });
+  const d = new Date(), p2 = function (n) { return String(n).padStart(2, "0"); };
+  const nombre = "OCs a generar " + d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()) + " " + p2(d.getHours()) + "." + p2(d.getMinutes()) + ".xlsx";
+  pppLoadXlsx().then(function (XLSX) {
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = headers.map(function (_h, i) {   // ancho según el dato (regla de Damian)
+      let w = 4; aoa.forEach(function (row) { const v = row[i]; const l = v == null ? 0 : String(v).length; if (l > w) w = l; });
+      return { wch: Math.min(w + 1, 60) };
+    });
+    ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: headers.length - 1 } }) };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "OCs");
+    XLSX.writeFile(wb, nombre);
+  }).catch(function (e) { alert("No pude generar el Excel: " + (e && e.message ? e.message : e)); });
+}
 function ocgSetMode(m) { if (_oc) { _oc.genMode = (m === "tall" ? "tall" : "art"); ocRender(); } }
 // ordena proveedores dejando "(sin proveedor)" al final
 function _ocgProvSort(a, b) { if (a === "(sin proveedor)") return 1; if (b === "(sin proveedor)") return -1; return a.localeCompare(b); }
@@ -18200,7 +18230,7 @@ function ocBodyGen() {
   const canGen = ((gen && gen.items) || []).length > 0;
   // v7.66: botón grande "Generar las OCs" arriba, a la altura del ← Volver (pedido del usuario).
   const genBtn = canGen ? '<button class="oc-btn ok" style="font-size:15px;padding:8px 20px;font-weight:800;line-height:1.2;text-align:center" onclick="ocgGenerar()">✓ Generar las OCs<br><span id="ocgCountdown" style="font-size:10.5px;font-weight:600;opacity:.9">' + escapeHtml(_ocgAutoEnTxt()) + '</span></button>' : '';
-  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>' + genBtn + '<button class="oc-btn" onclick="ocgEnterCfg()">⚙ Configuraciones</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar código / descripción / proveedor" value="' + escapeHtml(_oc.genFiltro || "") + '" oninput="if(_oc){_oc.genFiltro=this.value;ocRender();}"></div>';
+  let h = '<div class="oc-tools"><button class="oc-btn" onclick="ocBack()">← Volver</button>' + genBtn + '<button class="oc-btn" onclick="ocgDescargarExcel()" title="Baja en Excel lo que se va a generar: una fila por artículo y proveedor">⬇ Excel</button><button class="oc-btn" onclick="ocgEnterCfg()">⚙ Configuraciones</button><input class="oc-filtro" type="search" placeholder="🔎 Buscar código / descripción / proveedor" value="' + escapeHtml(_oc.genFiltro || "") + '" oninput="if(_oc){_oc.genFiltro=this.value;ocRender();}"></div>';
   // v11.67 — toggle de vista: Por artículo (lista plana, solo a pedir>0) · Por tallerista (agrupado, TODOS los artículos incl. a pedir 0).
   h += '<div class="oc-viewtoggle" style="display:flex;gap:6px;margin:2px 0 8px">' +
     '<button class="oc-btn' + (mode === "art" ? " ok" : "") + '" onclick="ocgSetMode(\'art\')">📦 Por artículo</button>' +
@@ -60435,7 +60465,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.89"></script>
+<script src="importacion.js?v=26.90"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63258,9 +63288,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.89"></script>
-<script src="hotsale.js?v=26.89"></script>
-<script src="estadisticas.js?v=26.89"></script>
+<script src="cobranzas.js?v=26.90"></script>
+<script src="hotsale.js?v=26.90"></script>
+<script src="estadisticas.js?v=26.90"></script>
 
 </body>
 </html>
