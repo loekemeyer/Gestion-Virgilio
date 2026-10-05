@@ -40,15 +40,16 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const off = stkBodyStocks();
     out.off_ve700 = off.indexOf('stk-cod">700') >= 0;
     out.off_ve800 = off.indexOf('stk-cod">800') >= 0;
-    out.off_botonOff = off.indexOf("☐ 🔴 Negativos") >= 0;
-    out.off_contador = off.indexOf("🔴 Negativos (1)") >= 0;
+    // v26.72 — sin ☐/☑ ni emoji (Luis): el estado lo dice el color del chip (rojo = prendido)
+    out.off_botonOff = /onclick="stkToggleSoloNeg\(\)"[^>]*border:1\.5px solid #cbd5e1/.test(off);
+    out.off_contador = off.indexOf("Sólo<br>negativos (1)") >= 0;
 
     // ---- ENCENDIDO: sólo el negativo ----
     _stk.soloNeg = true;
     const on = stkBodyStocks();
     out.on_ve700 = on.indexOf('stk-cod">700') >= 0;
     out.on_oculta800 = on.indexOf('stk-cod">800') < 0;
-    out.on_botonOn = on.indexOf("☑ 🔴 Negativos") >= 0;
+    out.on_botonOn = /onclick="stkToggleSoloNeg\(\)"[^>]*border:1\.5px solid #dc2626/.test(on);
     return out;
   });
   const pass = r.off_ve700 && r.off_ve800 && r.off_botonOff && r.off_contador &&

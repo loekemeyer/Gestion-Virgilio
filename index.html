@@ -6292,7 +6292,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.71"></script>
+<script type="module" src="recepcion.js?v=26.72"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10531,7 +10531,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.71";
+const APP_VERSION = "v26.72";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16727,11 +16727,12 @@ function stkUnsubscribeRealtime() {
    hasta que cambia; recién ahí vuelve a leer stocks_carga_rapida y redibuja en la misma solapa. */
 async function stkRefrescarYa() {
   var btn = document.getElementById("stkRefYaBtn");
-  var set = function (t, dis) { var b2 = document.getElementById("stkRefYaBtn"); if (b2) { b2.textContent = t; b2.disabled = !!dis; } };
+  // v26.72 — el rótulo va en dos renglones (innerHTML), sin emojis, igual que el resto de la barra
+  var set = function (t, dis) { var b2 = document.getElementById("stkRefYaBtn"); if (b2) { b2.innerHTML = t; b2.disabled = !!dis; } };
   if (btn && btn.disabled) return;
   var cli = window.sb;
   if (!cli) { alert("No hay sesión de supervisor para refrescar."); return; }
-  set("⟳ Refrescando…", true);
+  set("Refrescando<br>…", true);
   try {
     var r = await cli.rpc("gv_stock_refrescar_ya");
     if (r.error) throw r.error;
@@ -16742,14 +16743,14 @@ async function stkRefrescarYa() {
       var u = await cli.rpc("gv_stock_refresco_ultimo");
       if (!u.error && u.data && Date.parse(u.data) > antes) { listo = true; break; }
     }
-    if (!listo) { set("⟳ Refrescar ya", false); alert("El refresco sigue corriendo en el servidor; en un momento se ve solo."); return; }
+    if (!listo) { set("Refrescar<br>ya", false); alert("El refresco sigue corriendo en el servidor; en un momento se ve solo."); return; }
     if (!_stk) return;
     var keep = { tab: _stk.tab, filtro: _stk.filtro, solo: _stk.soloConteo };
     closeStockAdmin();
     await openStockAdmin(keep.solo);
     if (_stk) { _stk.tab = keep.tab; _stk.filtro = keep.filtro; stkRender(); }
   } catch (e) {
-    set("⟳ Refrescar ya", false);
+    set("Refrescar<br>ya", false);
     alert("No se pudo refrescar: " + ((e && e.message) || e) + "\nNo se cambió nada; probá de nuevo.");
   }
 }
@@ -18781,13 +18782,14 @@ function stkAsOfControl() {
   // v11.38 — MISMO molde que los chips (E/LK/CH/…): borde 1.5px, radio 9px, alto 38px,
   // centrado con inline-flex. Antes usaban .stk-btn (borde 1px, sin flex) y quedaban
   // desnivelados respecto a los chips.
-  const _pill = 'width:auto;margin:0;flex:0 0 auto;padding:0 12px;height:38px;border-radius:9px;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;line-height:1;';
+  // v26.72 (Luis) — mismo molde que la barra: dos renglones, letra 11,5, sin emojis.
+  const _pill = 'width:auto;margin:0;flex:0 0 auto;padding:0 8px;height:38px;border-radius:9px;font-weight:800;font-size:11.5px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1.15;';
   // v24.00 — los tres controles van dentro de UN contenedor flex propio: la barra de filtros
   // scrollea en horizontal, y suelto el grupo se partía al medio ("Ver stock: 🔴 En vivo" de un
   // lado y el campo de fecha del otro). Junto, o entra entero o se scrollea entero.
-  let h = '<span style="flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;">';
-  h += '<span style="font-size:12px;font-weight:800;color:#475569;flex:0 0 auto;display:inline-flex;align-items:center;">Ver stock:</span>';
-  h += '<button onclick="stkAsOfLive()" style="' + _pill + 'border:1.5px solid ' + (on ? '#cbd5e1' : '#16a34a') + ';background:' + (on ? '#fff' : '#16a34a') + ';color:' + (on ? '#334155' : '#fff') + ';">🔴 En vivo</button>';
+  let h = '<span style="flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;">';
+  h += '<span style="font-size:11.5px;font-weight:800;color:#475569;flex:0 0 auto;display:inline-flex;align-items:center;text-align:right;line-height:1.15;">Ver<br>stock:</span>';
+  h += '<button onclick="stkAsOfLive()" style="' + _pill + 'border:1.5px solid ' + (on ? '#cbd5e1' : '#16a34a') + ';background:' + (on ? '#fff' : '#16a34a') + ';color:' + (on ? '#334155' : '#fff') + ';">En<br>vivo</button>';
   if (showPicker) {
     // v24.00 (Luis, 29/09) — el ancho FIJO de 158px con font 11 no alcanza para el widget nativo
     // de `datetime-local`: Chrome dibuja dd/mm/aaaa --:-- más el botón de calendario y necesita
@@ -18796,7 +18798,7 @@ function stkAsOfControl() {
     // aplicada a un control: el ancho lo decide el dato, no un número puesto a mano.
     h += '<input type="datetime-local" id="stkAsOfInp" value="' + escapeHtml(_stk.asOfInput || '') + '" onchange="if(_stk){_stk.asOfInput=this.value;}" style="flex:0 0 auto;width:auto;min-width:172px;height:38px;box-sizing:border-box;border:1.5px solid #cbd5e1;border-radius:9px;padding:0 8px;font-size:12px;">';
   }
-  h += '<button onclick="stkAsOfDateBtn()" style="' + _pill + 'border:1.5px solid ' + (on ? '#16a34a' : '#cbd5e1') + ';background:#fff;color:#334155;">📅 A esa fecha</button>';
+  h += '<button onclick="stkAsOfDateBtn()" style="' + _pill + 'border:1.5px solid ' + (on ? '#16a34a' : '#cbd5e1') + ';background:#fff;color:#334155;">A esa<br>fecha</button>';
   return h + '</span>';
 }
 /* v11.37 — 1er toque "A esa fecha": revela el selector de fecha/hora. 2º toque (ya visible
@@ -20422,37 +20424,42 @@ function stkBodyStocks() {
   // v8.52 — búsqueda de VARIOS códigos + filtro LK/CH + Fijados. Botones en fila (wrap si no entran).
   const _linBtn = function (l) {
     const on = _stk.filLinea === l, col = l === "LK" ? "#b91c1c" : "#1e40af";
-    return '<button type="button" onclick="stkFiltroLinea(\'' + l + '\')" title="Mostrar sólo línea ' + l + '" style="width:auto;margin:0;flex:0 0 auto;padding:0 13px;height:38px;border:1.5px solid ' + (on ? col : "#cbd5e1") + ';border-radius:9px;background:' + (on ? col : "#fff") + ';color:' + (on ? "#fff" : col) + ';font-weight:800;font-size:13px;cursor:pointer;">' + l + '</button>';
+    return '<button type="button" onclick="stkFiltroLinea(\'' + l + '\')" title="Mostrar sólo línea ' + l + '" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (on ? col : "#cbd5e1") + ';border-radius:9px;background:' + (on ? col : "#fff") + ';color:' + (on ? "#fff" : col) + ';font-weight:800;font-size:13px;cursor:pointer;">' + l + '</button>';
   };
   // v10.44 — UNA sola fila con TODO: fecha + búsqueda + chips. nowrap + scroll horizontal si no entra
   // (así no se apila en dos filas y no hay cosas anchas al pedo). Input de fecha y búsqueda achicados.
   // v11.19 — orden pedido por el dueño: 1º BÚSQUEDA (lo más importante, bien ancho),
   // 2º filtros de estado, 3º grupo fecha al final.
-  h += '<div class="stk-filtbar" style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;">' +
-    '<input class="stk-filtro" style="margin:0;flex:1 1 220px;min-width:170px;max-width:340px;" type="text" enterkeyhint="search" autocomplete="off" placeholder="🔎 códigos (varios: 026 031 508)" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
-    '<button type="button" onclick="stkFiltroToggleE()" title="Agregar/quitar la E (importado)" style="width:auto;margin:0;flex:0 0 auto;padding:0 14px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;font-weight:800;font-size:16px;cursor:pointer;">E</button>' +
+  /* v26.72 (Luis, 05/10: «el botón queda a la derecha de Refrescar ya y se ve horrible. Optimizá el
+     espacio optimizando los botones: sacá emojis y meteles el texto en doble fila»). Todos los chips
+     de la barra con el MISMO molde (_stkChip2): alto 38, letra 11,5, texto en dos renglones y sin
+     emojis ni ☐/☑ — el estado prendido lo dice el color, como LK/CH. */
+  const _stkChip2 = "width:auto;margin:0;flex:0 0 auto;padding:0 8px;height:38px;border-radius:9px;font-weight:800;font-size:11.5px;line-height:1.15;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;text-align:center;";
+  h += '<div class="stk-filtbar" style="display:flex;gap:5px;margin-bottom:10px;align-items:center;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;">' +
+    '<input class="stk-filtro" style="margin:0;flex:1 1 200px;min-width:160px;max-width:300px;" type="text" enterkeyhint="search" autocomplete="off" placeholder="códigos (varios: 026 031 508)" value="' + escapeHtml(_stk.filtro) + '" oninput="if(_stk){_stk.filtro=this.value;stkRender();}">' +
+    '<button type="button" onclick="stkFiltroToggleE()" title="Agregar/quitar la E (importado)" style="width:auto;margin:0;flex:0 0 auto;padding:0 12px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;font-weight:800;font-size:16px;cursor:pointer;">E</button>' +
     _linBtn("LK") + _linBtn("CH") +
     // v10.40 — el botón Negativos solo se puede tocar si HAY negativos; si no, queda deshabilitado (gris).
     (_stkNegCount > 0
-      ? '<button type="button" onclick="stkToggleSoloNeg()" title="Mostrar sólo los artículos con saldo NEGATIVO en algún depósito (góndola, racks, a facturar, etc.)" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloNeg ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloNeg ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloNeg ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloNeg ? "☑" : "☐") + ' 🔴 Negativos (' + _stkNegCount + ')</button>'
-      : '<button type="button" disabled title="No hay stock negativo — nada para filtrar" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid #e2e8f0;border-radius:9px;background:#f8fafc;color:#cbd5e1;font-weight:800;font-size:13px;cursor:default;white-space:nowrap;">☐ 🔴 Negativos</button>') +
-    '<button type="button" onclick="stkToggleSoloLow()" title="Mostrar sólo los códigos donde la suma de depósitos (góndola+excedente+pickeados+a facturar+a guardar+racks) es MENOR que lo pedido" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloLow ? "#dc2626" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloLow ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloLow ? "#b91c1c" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloLow ? "☑" : "☐") + ' ⚠ Stock bajo' + (_stkLowCount ? " (" + _stkLowCount + ")" : "") + '</button>' +
-    '<button type="button" onclick="stkToggleSoloPin()" title="Mostrar sólo los códigos que fijaste (📌). Se guardan aunque cierres la app." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.soloPin ? "#b45309" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.soloPin ? "#fffbeb" : "#fff") + ';color:' + (_stk.soloPin ? "#b45309" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.soloPin ? "☑" : "📌") + ' Fijados' + ((_stk.pins || []).length ? " (" + _stk.pins.length + ")" : "") + '</button>' +
-    // v10.50 — chip "🚫 Ocultar discontinuos" (off por defecto: se ven).
-    '<button type="button" onclick="stkToggleOcultarDisc()" title="Ocultar los códigos DISCONTINUADOS (OC_Maximos activo=false o marcados a mano). Por defecto se ven." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid ' + (_stk.ocultarDisc ? "#7c3aed" : "#cbd5e1") + ';border-radius:9px;background:' + (_stk.ocultarDisc ? "#f5f3ff" : "#fff") + ';color:' + (_stk.ocultarDisc ? "#6d28d9" : "#334155") + ';font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">' + (_stk.ocultarDisc ? "☑" : "☐") + ' 🚫 Discontinuos' + (_stkDiscCount ? " (" + _stkDiscCount + ")" : "") + '</button>' +
-    '<span style="flex:0 0 auto;width:1px;height:26px;background:#e2e8f0;margin:0 2px;"></span>' +
+      ? '<button type="button" onclick="stkToggleSoloNeg()" title="Mostrar sólo los artículos con saldo NEGATIVO en algún depósito (góndola, racks, a facturar, etc.)" style="' + _stkChip2 + 'border:1.5px solid ' + (_stk.soloNeg ? "#dc2626" : "#cbd5e1") + ';background:' + (_stk.soloNeg ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloNeg ? "#b91c1c" : "#334155") + ';">Sólo<br>negativos (' + _stkNegCount + ')</button>'
+      : '<button type="button" disabled title="No hay stock negativo — nada para filtrar" style="' + _stkChip2 + 'border:1.5px solid #e2e8f0;background:#f8fafc;color:#cbd5e1;cursor:default;">Sólo<br>negativos</button>') +
+    '<button type="button" onclick="stkToggleSoloLow()" title="Mostrar sólo los códigos donde la suma de depósitos (góndola+excedente+pickeados+a facturar+a guardar+racks) es MENOR que lo pedido" style="' + _stkChip2 + 'border:1.5px solid ' + (_stk.soloLow ? "#dc2626" : "#cbd5e1") + ';background:' + (_stk.soloLow ? "#fef2f2" : "#fff") + ';color:' + (_stk.soloLow ? "#b91c1c" : "#334155") + ';">Sólo stock<br>bajo' + (_stkLowCount ? " (" + _stkLowCount + ")" : "") + '</button>' +
+    '<button type="button" onclick="stkToggleSoloPin()" title="Mostrar sólo los códigos que fijaste (el alfiler de cada fila). Se guardan aunque cierres la app." style="' + _stkChip2 + 'border:1.5px solid ' + (_stk.soloPin ? "#b45309" : "#cbd5e1") + ';background:' + (_stk.soloPin ? "#fffbeb" : "#fff") + ';color:' + (_stk.soloPin ? "#b45309" : "#334155") + ';">Sólo<br>fijados' + ((_stk.pins || []).length ? " (" + _stk.pins.length + ")" : "") + '</button>' +
+    // v10.50 — ocultar discontinuos (off por defecto: se ven).
+    '<button type="button" onclick="stkToggleOcultarDisc()" title="Ocultar los códigos DISCONTINUADOS (OC_Maximos activo=false o marcados a mano). Por defecto se ven." style="' + _stkChip2 + 'border:1.5px solid ' + (_stk.ocultarDisc ? "#7c3aed" : "#cbd5e1") + ';background:' + (_stk.ocultarDisc ? "#f5f3ff" : "#fff") + ';color:' + (_stk.ocultarDisc ? "#6d28d9" : "#334155") + ';">Ocultar<br>discont.' + (_stkDiscCount ? " (" + _stkDiscCount + ")" : "") + '</button>' +
+    '<span style="flex:0 0 auto;width:1px;height:26px;background:#e2e8f0;margin:0 1px;"></span>' +
     stkAsOfControl() +
-    '<span id="stkMergeStatus" title="' + (_stk._mergeComplete ? 'Datos completos cargados' : 'Cargando datos completos…') + '" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex:0 0 auto;">' +
+    '<span id="stkMergeStatus" title="' + (_stk._mergeComplete ? 'Datos completos cargados' : 'Cargando datos completos…') + '" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:28px;flex:0 0 auto;">' +
       (_stk._mergeComplete
-        ? '<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="#16a34a" stroke="none"/><path d="M6.5 11.5 L9.5 14.5 L15.5 8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-        : '<svg width="22" height="22" viewBox="0 0 22 22" style="animation:stkSpin 1s linear infinite"><circle cx="11" cy="11" r="9" fill="none" stroke="#e2e8f0" stroke-width="2.5"/><circle cx="11" cy="11" r="9" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-dasharray="40 60" stroke-linecap="round"/></svg>') +
+        ? '<svg width="20" height="20" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="#16a34a" stroke="none"/><path d="M6.5 11.5 L9.5 14.5 L15.5 8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        : '<svg width="20" height="20" viewBox="0 0 22 22" style="animation:stkSpin 1s linear infinite"><circle cx="11" cy="11" r="9" fill="none" stroke="#e2e8f0" stroke-width="2.5"/><circle cx="11" cy="11" r="9" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-dasharray="40 60" stroke-linecap="round"/></svg>') +
     '</span>' +
     // v25.6 (Luis) — forzar el refresco de lo que NO es saldo (pedidas, proyección, capacidad,
     // FC s/salida, altas y bajas de códigos). Los saldos ya llegan en vivo por el trigger +
     // realtime; esto adelanta el cron de 2 min. Ver stkRefrescarYa.
-    '<button type="button" id="stkRefYaBtn" onclick="stkRefrescarYa()" title="Recalcula ya pedidas, Estadística Madre, capacidad y FC s/salida (sin esperar los 2 min del ciclo automático). Los saldos por depósito ya se ven en vivo." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;color:#1e3a8a;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">⟳ Refrescar ya</button>' +
+    '<button type="button" id="stkRefYaBtn" onclick="stkRefrescarYa()" title="Recalcula ya pedidas, Estadística Madre, capacidad y FC s/salida (sin esperar los 2 min del ciclo automático). Los saldos por depósito ya se ven en vivo." style="' + _stkChip2 + 'border:1.5px solid #cbd5e1;background:#fff;color:#1e3a8a;">Refrescar<br>ya</button>' +
     // v26.69 (Luis) — baja la tabla tal cual se ve (mismos filtros, orden y números)
-    '<button type="button" id="stkXlsBtn" onclick="stkDescargarExcel()" title="Descargar en Excel la tabla de stock tal como se ve ahora (con los filtros y la búsqueda puestos)" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid #86efac;border-radius:9px;background:#f0fdf4;color:#166534;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">⬇ Excel</button>' +
+    '<button type="button" id="stkXlsBtn" onclick="stkDescargarExcel()" title="Descargar en Excel la tabla de stock tal como se ve ahora (con los filtros y la búsqueda puestos)" style="' + _stkChip2 + 'border:1.5px solid #86efac;background:#f0fdf4;color:#166534;">Descargar<br>Excel</button>' +
     '</div>';
   // v10.44 — aviso "histórico" (cuando se mira stock a una fecha pasada), debajo de la barra única.
   if (_stk.asOf) h += '<div style="margin:0 0 10px;font-size:12.5px;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:5px 9px;">📅 Stock al <b>' + escapeHtml(stockFmtTs(_stk.asOf)) + '</b> hs (histórico, no el actual)</div>';
@@ -24800,7 +24807,7 @@ function stkBodyInsumos() {
   if (_stkIns.msg) h += '<div class="stk-cut" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;">' + escapeHtml(_stkIns.msg) + '</div>';
   // v26.69 (Luis) — Excel de los insumos que tenemos: el catálogo de «Todos los insumos», con sus filtros
   const _nXl = _stkInsTodosLista(items).length;
-  h += '<div style="display:flex;justify-content:flex-end;margin:0 0 8px;"><button type="button" id="stkInsXlsBtn" onclick="stkInsDescargarExcel()" title="Descargar en Excel los insumos (código, detalle, categoría, ubicación, cantidad y unidad). Respeta los filtros de «Todos los insumos»." style="width:auto;margin:0;padding:0 11px;height:34px;border:1.5px solid #86efac;border-radius:9px;background:#f0fdf4;color:#166534;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">⬇ Excel de insumos (' + _nXl + ')</button></div>';
+  h += '<div style="display:flex;justify-content:flex-end;margin:0 0 8px;"><button type="button" id="stkInsXlsBtn" onclick="stkInsDescargarExcel()" title="Descargar en Excel los insumos (código, detalle, categoría, ubicación, cantidad y unidad). Respeta los filtros de «Todos los insumos»." style="width:auto;margin:0;padding:0 11px;height:34px;border:1.5px solid #86efac;border-radius:9px;background:#f0fdf4;color:#166534;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">Descargar Excel de insumos (' + _nXl + ')</button></div>';
   h += _stkInsMezclaUni(items);   // v8.63 — aviso: insumos con varias unidades sin factor (suma sin sentido)
   if (pend.length) h += _stkInsPend(pend);   // v8.35 — si no hay pendientes, no aparece la sección
   h += _stkInsCats(items, pend);
@@ -60223,7 +60230,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.71"></script>
+<script src="importacion.js?v=26.72"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63046,9 +63053,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.71"></script>
-<script src="hotsale.js?v=26.71"></script>
-<script src="estadisticas.js?v=26.71"></script>
+<script src="cobranzas.js?v=26.72"></script>
+<script src="hotsale.js?v=26.72"></script>
+<script src="estadisticas.js?v=26.72"></script>
 
 </body>
 </html>

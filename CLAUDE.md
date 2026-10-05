@@ -7633,4 +7633,7 @@ con su propia cola (`gv_pkm_q_v1`, tope 800) y todo en try/catch: **si falla, el
 - **⬇ Excel** en Stocks baja lo que muestra la tabla (las filas salen de `stkBodyStocks` → `_stk._xl`; no volver a
   escribir una segunda cuenta en `stkDescargarExcel`). **⬇ Excel de insumos** en Insumos = «Todos los insumos» con sus
   filtros. Revierte el «se sacó Descargar Excel» de la v8.93: lo pidió Luis.
+- **La barra de Stocks va SIN emojis y con el texto en DOS renglones** (Luis, v26.72: *"sacá emojis y meteles el texto en
+  doble fila"*): todos los chips usan el molde `_stkChip2` (alto 38, letra 11,5); el estado prendido lo dice el color, no
+  ☐/☑. Al agregar un botón a esa barra, va con ese molde.
 - `tests/stk-excel-stock-insumos.cjs`, `tests/ppp-ent-fecha-pedido.cjs`.

@@ -1,3 +1,9 @@
+## Nota v26.72 (2026-10-05) — Barra de Stocks sin emojis y en dos renglones
+
+- Todos los botones de la barra de Stocks (filtros, Ver stock, Refrescar ya, Descargar Excel) con el mismo molde
+  `_stkChip2`: texto en dos renglones, letra 11,5, sin emojis ni ☐/☑ (el color dice si está prendido). Entra entera
+  en 1280 px. `tests/stk-solo-negativos.cjs`, `tests/oc-recibido-backend.cjs`.
+
 ## Nota v26.69 (2026-10-05) — Pedidos Entregados muestra cuándo LLEGÓ el pedido · Excel de Stocks e Insumos
 
 - **Pedidos Entregados** (las dos vistas): cada NP lleva **📥 dd/mm** = la fecha en que llegó el pedido del cliente,

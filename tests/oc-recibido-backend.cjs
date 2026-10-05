@@ -89,8 +89,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     // el grupo viaja junto: abre con un <span> contenedor y cierra con </span>
     out.grupoEnvuelto = /^<span style="flex:0 0 auto;display:inline-flex;/.test(c) && /<\/span>$/.test(c);
     // y sigue trayendo los tres controles
-    out.tresControles = c.indexOf("Ver stock:") >= 0 && c.indexOf("En vivo") >= 0
-      && c.indexOf('id="stkAsOfInp"') >= 0 && c.indexOf("A esa fecha") >= 0;
+    // v26.72 — los rótulos van en dos renglones (Luis)
+    out.tresControles = c.indexOf("Ver<br>stock:") >= 0 && c.indexOf("En<br>vivo") >= 0
+      && c.indexOf('id="stkAsOfInp"') >= 0 && c.indexOf("A esa<br>fecha") >= 0;
     return out;
   });
   const malas = Object.keys(r).filter(k => r[k] !== true);
