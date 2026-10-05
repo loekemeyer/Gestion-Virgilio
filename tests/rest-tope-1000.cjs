@@ -38,6 +38,9 @@ const DEBEN_PAGINAR = [
   // Cajas pedidas netas de Stocks: una fila por codigo con demanda viva (237 al 29/09), crece
   // con el catalogo (v24.33).
   "gv_stock_pedidas_neto",
+  // Fecha en que llegó el pedido del cliente (Pedidos Entregados, v26.69): una fila por NP, crece
+  // con cada pedido. La base de pedidos de ISIS (9.786 renglones) sólo se lee si la tabla no contesta.
+  "GV_NP_Fecha_Pedido", "GV_PPP_Base_Pedidos",
 ];
 
 /* v24.65: los módulos que salieron del index (importacion.js, cobranzas.js) se barren igual. */

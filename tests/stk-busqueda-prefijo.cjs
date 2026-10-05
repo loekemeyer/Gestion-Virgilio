@@ -73,7 +73,8 @@ const LIBRE = [
     // para que no haya dos criterios de búsqueda según la pantalla.
     [
       // Stock y Compras (admin)
-      "stkBodyStocks", "stkDescargarExcel", "stkBodyIngresos", "stkBodySalidas", "stkBodyHistAjustes",
+      // v26.69: stkDescargarExcel ya no busca por su cuenta — baja las filas que armó stkBodyStocks
+      "stkBodyStocks", "stkBodyIngresos", "stkBodySalidas", "stkBodyHistAjustes",
       "stkGondRender", "abastRender", "dpRender", "tallArtsRender",
       // Compras / OC
       "ocBodyEntregas", "ocBodyGeneral", "ocBodyCfg",
@@ -89,6 +90,9 @@ const LIBRE = [
       const src = String(window[fn]);
       if (!/stkMatchBusq|codEmpiezaCon/.test(src)) fallas.push(fn + " no usa el helper de búsqueda por prefijo");
     });
+    // y el Excel de Stock tiene que salir de esa misma búsqueda, no de una copia propia
+    if (!/stkBodyStocks\(\)/.test(String(window.stkDescargarExcel || "")) || !/_stk\._xl/.test(String(window.stkDescargarExcel || "")))
+      fallas.push("stkDescargarExcel no reusa las filas de stkBodyStocks (_stk._xl): el Excel y la tabla se desfasarían");
     // ⚠ los que NO van por prefijo, a propósito: ahí un número es una NP, un cliente, un remito
     // o una fecha, no un artículo. Si alguien les mete el helper, la búsqueda deja de encontrar.
     ["ocBodyList", "_pppEntFilter"].forEach((fn) => {

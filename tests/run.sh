@@ -1147,4 +1147,8 @@ echo "== reparar-auth-cuit-compartido (v26.27: Reparar Auth del Panel Web LK no 
 node tests/reparar-auth-cuit-compartido.cjs
 echo "== helper-impresion-fuente (v26.29: fuente del helper en tools/helper-impresion; config de PC y binarios fuera del repo) =="
 node tests/helper-impresion-fuente.cjs
+echo "== stk-excel-stock-insumos (v26.69: botón Excel en Stocks e Insumos; baja lo que muestra la tabla) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-excel-stock-insumos.cjs
+echo "== ppp-ent-fecha-pedido (v26.69: Pedidos Entregados muestra la fecha en que llegó el pedido del cliente) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-ent-fecha-pedido.cjs
 _resumen

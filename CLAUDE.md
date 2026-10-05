@@ -7615,3 +7615,15 @@ con su propia cola (`gv_pkm_q_v1`, tope 800) y todo en try/catch: **si falla, el
 - Parada: el módulo k de A más el módulo k de B (A1–A5 + B1–B4); los otros pasillos todavía no están confirmados.
 
 `sql/gv_picking_paso_evento_v2625.sql`, `tests/pk-metricas-paso.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-05, v26.69): Entregados dice cuándo LLEGÓ el pedido · Stocks e Insumos bajan a Excel
+
+- **📥 dd/mm** en cada NP de Pedidos Entregados = la fecha en que el cliente mandó el pedido (web: `lk_pedidos_match`
+  fecha + hora; ISIS: «Fecha Recep» de la PPP / base de pedidos), **no** la de programación. Forward-facing:
+  `GV_NP_Fecha_Pedido` + cron `gv-np-fecha-pedido` (59 * * * *). Las NP de ISIS anteriores al 23/06 no tienen el dato:
+  van sin chip, no se inventa. ⚠ Al 05/10 el SQL (`sql/gv_np_fecha_pedido_v2669.sql`) **no se pudo aplicar desde la
+  sesión** (se cuelga el permiso): el front lee las fuentes en vivo mientras tanto.
+- **⬇ Excel** en Stocks baja lo que muestra la tabla (las filas salen de `stkBodyStocks` → `_stk._xl`; no volver a
+  escribir una segunda cuenta en `stkDescargarExcel`). **⬇ Excel de insumos** en Insumos = «Todos los insumos» con sus
+  filtros. Revierte el «se sacó Descargar Excel» de la v8.93: lo pidió Luis.
+- `tests/stk-excel-stock-insumos.cjs`, `tests/ppp-ent-fecha-pedido.cjs`.

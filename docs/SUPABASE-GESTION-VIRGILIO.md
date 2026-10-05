@@ -31605,3 +31605,17 @@ filas: el próximo pedido de LK salta esos números). `sql/chef_krikos_crear_ped
 Falta (tarea de Planify de Luis): la clave de ventas@chefsrl.com en el Vault de LK (`KRIKOS_CHEF_IMAP_PASS`), el
 lector con las dos casillas y la carpeta de spam con aviso, y la rama de Cencosud del auto-import (mismas funciones
 del panel, con L), probada contra los pedidos 245-247. Dorinka sigue a mano en Chef, sin reglas.
+
+### 3.v2669 — `GV_NP_Fecha_Pedido`: la fecha en que llegó el pedido del cliente (Luis, 05/10/2026, v26.69)
+
+- **Qué**: tabla nueva (np PK, empresa, fecha_pedido, hora_pedido, origen web/isis_prog/isis_base, order_id),
+  RLS con SELECT para anon/authenticated (NP + fecha, nada sensible), sin escritura salvo
+  `gv_np_fecha_pedido_capturar()` (SECURITY DEFINER, `insert … on conflict do nothing`; sólo completa la hora web si
+  faltaba). Cron `gv-np-fecha-pedido` `59 * * * *` (minuto impar libre).
+- **Medido el 05/10** sobre 1.473 entregados: 194 web (186 con `lk_pedidos_match`, 189 con `fecha_recep`;
+  `fecha_recep = fecha_pedido` en 363 de 363), 1.279 ISIS de las que 818 tienen fecha en `GV_PPP_Base_Pedidos`
+  (= «Fecha Recep» de la PPP en 132 de 133; 98704 difiere y gana la PPP). Las ISIS anteriores al 23/06: sin dato.
+- **⚠ Estado al cerrar la v26.69: el SQL NO está aplicado.** `execute_sql` y `apply_migration` se colgaron a los 60 s
+  sin llegar a Postgres (el cartel de permiso de la sesión). El front no lo necesita para mostrar la fecha (lee las
+  fuentes en vivo); la tabla es la que la conserva si los espejos de ISIS se reescriben. Se corre entero en el SQL
+  Editor: `sql/gv_np_fecha_pedido_v2669.sql` (idempotente, con chequeo y rollback).

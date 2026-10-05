@@ -3290,6 +3290,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
 .ppp-ent-row{ font-size:12.5px; color:#334155; padding:2px 0; }
 .ppp-ent-row b{ color:#0f172a; }
 .ppp-ent-m3{ color:#1e6bd6; font-weight:600; }
+.ppp-ent-fped{ color:#475569; font-size:11.5px; white-space:nowrap; }   /* v26.69 — 📥 fecha en que llegó el pedido */
 .ppp-ent-cell{ font-size:12px; color:#334155; padding:2px 0; border-bottom:1px solid #f1f5f9; }
 .ppp-ent-cell b{ color:#0f172a; }
 /* v6.97 — Ocupación (m³ armado/programado por día) */
@@ -6291,7 +6292,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.68"></script>
+<script type="module" src="recepcion.js?v=26.69"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10530,7 +10531,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.68";
+const APP_VERSION = "v26.69";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -20450,6 +20451,8 @@ function stkBodyStocks() {
     // FC s/salida, altas y bajas de códigos). Los saldos ya llegan en vivo por el trigger +
     // realtime; esto adelanta el cron de 2 min. Ver stkRefrescarYa.
     '<button type="button" id="stkRefYaBtn" onclick="stkRefrescarYa()" title="Recalcula ya pedidas, Estadística Madre, capacidad y FC s/salida (sin esperar los 2 min del ciclo automático). Los saldos por depósito ya se ven en vivo." style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;color:#1e3a8a;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">⟳ Refrescar ya</button>' +
+    // v26.69 (Luis) — baja la tabla tal cual se ve (mismos filtros, orden y números)
+    '<button type="button" id="stkXlsBtn" onclick="stkDescargarExcel()" title="Descargar en Excel la tabla de stock tal como se ve ahora (con los filtros y la búsqueda puestos)" style="width:auto;margin:0;flex:0 0 auto;padding:0 11px;height:38px;border:1.5px solid #86efac;border-radius:9px;background:#f0fdf4;color:#166534;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">⬇ Excel</button>' +
     '</div>';
   // v10.44 — aviso "histórico" (cuando se mira stock a una fecha pasada), debajo de la barra única.
   if (_stk.asOf) h += '<div style="margin:0 0 10px;font-size:12.5px;font-weight:800;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:5px 9px;">📅 Stock al <b>' + escapeHtml(stockFmtTs(_stk.asOf)) + '</b> hs (histórico, no el actual)</div>';
@@ -20493,6 +20496,28 @@ function stkBodyStocks() {
     if (ap !== bp) return bp - ap;                       // fijados arriba
     return 0;                                            // resto: orden original (sort estable)
   });
+  /* v26.69 (Luis, 05/10) — «⬇ Excel» baja EXACTAMENTE lo que muestra la tabla: las mismas filas (búsqueda,
+     LK/CH, negativos, stock bajo, fijados, discontinuos, filtro de columna), el mismo orden y los mismos
+     números. Se arma acá, con los helpers de la pantalla, para que stkDescargarExcel no tenga una
+     segunda copia de la cuenta que se desfase (la vieja v7.77 ya no tenía Est. Madre ni LK/CH). */
+  _stk._xl = {
+    cols: cols.map(function (c) { return { key: c.key, label: c.label, racksKey: !!c.racksKey }; }),
+    rows: shown.map(function (a) {
+      const _ped = _demOf(a.cod), _pn = _pedNetoOf(a.cod);
+      const _sfx = String(a.cod || "").match(/\s+(LK|CH|LOKE)$/i);
+      const dep = {};
+      cols.forEach(function (c) { dep[c.key] = c.racksKey ? ((Number(a[c.key]) || 0) + (Number(a.racks_ch) || 0)) : (Number(a[c.key]) || 0); });
+      return {
+        cod: codCanon(_sfx ? codBase(a.cod) : a.cod),
+        lin: artMarca(a.cod) || String(a.linea || "").toUpperCase().trim() || "",
+        desc: artNombre(a.cod, a.desc) || "",
+        proy: Math.round(_proyOf(a.cod) || 0),
+        tot: SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0),
+        ped: _pn ? _pn.neto : _ped, pedTot: _ped, pedTp: _pn ? _pn.tp : 0, pedCurso: _pn ? _pn.curso : 0,
+        cap: _capOf(a.cod), dep: dep, fc: _fcArtCajas(a)
+      };
+    })
+  };
   shown.forEach(function (a) {
     const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);  // v7.54: racks_ch sumado al total
     const _ped = _demOf(a.cod);
@@ -22865,97 +22890,37 @@ function stkOpenGondola() {
   try { getEmpleadosNombres().then(function () { if (_stkPop) stkGondRender(); }).catch(function () {}); } catch (_e) {}
 }
 // v7.77: descargar tabla de stock en Excel (.xlsx real vía SheetJS)
+/* v26.69 (Luis, 05/10): «quiero que se pueda descargar un excel del stock … botón de descargar excel
+   en las pestañas correspondientes de Stock y Compras». El botón «⬇ Excel» de la barra de Stocks
+   baja LO QUE SE VE: las filas, el orden y los números salen de stkBodyStocks (_stk._xl), así el
+   Excel no puede decir otra cosa que la tabla. Se le agregan el desglose de las cajas pedidas (neto
+   adelante, como la celda; ya pickeadas y en curso al lado) y la fecha/hora en el nombre. */
 function stkDescargarExcel() {
   if (!_stk) return;
-  // v10.00: modo normal → saldos desde vista SQL; modo As-Of → recalcular desde movimientos
-  const saldos = _stk.asOf ? stockComputeSaldos(_stk.movs, _stk.cutoff, _stk.asOf) : _stkSaldosFromView(_stk.viewRows);
-  const dem = _stk.dem || {};
-  const capByCod = {};
-  (_stk.cap || []).forEach(function (r) { const k = _ocgNorm(r.cod); if (!k) return; capByCod[k] = (capByCod[k] || 0) + (Number(r.cajas_max) || 0); });
-  // v8.88: helpers desconcatenación (mismo patrón que stkBodyStocks)
-  var _demOf = function (cod) { return _stkLookupEmp(dem, cod); };   // v19.91: un dual no cae al base (problema 427)
-  // v8.97 — cajas pedidas que vienen de NP SIN programar (en la base pero no en PPP_Programacion_Diaria) → ⚠.
-  var _demSP = (dem && dem._sinProg) || {};
-  var _demSPOf = function (cod) { return _stkLookupEmp(_demSP, cod); };   // v19.91 (problema 427)
-  var _capOf = function (cod) {
-    var k = _ocgNorm(cod);
-    if (capByCod[k] != null) return Number(capByCod[k]) || 0;   // match exacto (si la celda tuviera sufijo)
-    var _cbN = _ocgNorm(codBase(cod));
-    // v8.92 — desconcatenación: si el código es dual y tiene sufijo (437E LK / 437E CH), la
-    // capacidad de esa fila es SOLO la de los sectores de esa marca (Loeke=F.., Chef=L..),
-    // no la suma de las dos empresas. Mismo criterio que el pop-up stkOpenCapArt.
-    var _sfx = String(cod || "").match(/\s+(LK|CH|LOKE)$/i);
-    var _emp = _sfx ? _sfx[1].toUpperCase().replace("LOKE", "LK") : "";
-    if (_emp && typeof PICK_UBIC_DUAL !== "undefined" && PICK_UBIC_DUAL[_cbN]) {
-      var _d = PICK_UBIC_DUAL[_cbN];
-      var _pfx = (_emp === "LK" ? String(_d.loeke.sector || "") : String(_d.chef.sector || "")).charAt(0).toUpperCase();
-      if (_pfx) {
-        var _sum = 0;
-        (_stk.cap || []).forEach(function (r) {
-          if (_ocgNorm(r.cod) !== _cbN) return;
-          if (String(r.sector || "").charAt(0).toUpperCase() !== _pfx) return;
-          _sum += Number(r.cajas_max) || 0;
-        });
-        return _sum;
-      }
-    }
-    return Number(capByCod[_cbN]) || 0;
-  };
-  let arts = Object.keys(saldos).map(function (k) { return saldos[k]; });
-  const _seenN = {}; arts.forEach(function (a) { _seenN[_ocgNorm(a.cod)] = true; });
-  Object.keys(dem).forEach(function (k) { if (!_seenN[k] && (Number(dem[k]) || 0) > 0) arts.push({ cod: k, desc: artNombre(k, ""), terminado: 0, excedente: 0, separar_pedidos: 0, a_facturar: 0, a_guardar: 0, racks: 0, insumos: 0, racks_ch: 0 }); });
-  arts.sort(function (a, b) { return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0); });
-  const f = (_stk.filtro || "").toLowerCase();
-  const SECTKEYS = ["terminado", "excedente", "separar_pedidos", "a_facturar", "a_guardar", "racks", "para_envasar"];
-  const _stkStockKeys = SECTKEYS.concat(["racks_ch"]);
-  // v8.71: mismo filtro dinámico que stkBodyStocks — oculta insumos SALVO que tengan stock de producto
-  const _insCodsSet = new Set((_stk.insumosCods || []).map(function (c) { return String(c || "").trim().toUpperCase(); }));
-  const _xlTerms = f.split(/[\s,]+/).filter(Boolean);   // v21.02 — el mismo prefijo que la pantalla
-  let shown = _xlTerms.length
-    ? arts.filter(function (a) { const s = (a.cod + " " + a.desc).toLowerCase(); return _xlTerms.some(function (t) { return stkMatchBusq(t, a.cod, s, false); }); })
-    : arts.filter(function (a) { return _stkStockKeys.some(function (k) { return (Number(a[k]) || 0) !== 0; }) || _demOf(a.cod) > 0 || (Number(a.fc_sin_salida) || 0) > 0; });
-  shown = shown.filter(function (a) {
-    if (!_insCodsSet.has(String(a.cod || "").trim().toUpperCase())) return true;
-    return (Number(a.terminado) || 0) !== 0 || (Number(a.excedente) || 0) !== 0 || (Number(a.separar_pedidos) || 0) !== 0 || (Number(a.a_facturar) || 0) !== 0 || (Number(a.a_guardar) || 0) !== 0 || (Number(a.racks) || 0) !== 0 || (Number(a.para_envasar) || 0) !== 0 || (Number(a.racks_ch) || 0) !== 0;
-  });
-
-  // Preparar datos para Excel — números como número real (no string) para que
-  // Excel los trate como numéricos y no como texto.
+  try { stkBodyStocks(); } catch (_e) {}              // recalcula _stk._xl con el estado de AHORA
+  const xl = _stk._xl;
+  if (!xl || !xl.rows) { alert("Todavía se está cargando el stock. Probá de nuevo en un momento."); return; }
   const num = function (n) { return Math.round((Number(n) || 0) * 10) / 10; };
-  const _fcArt = (_stk.fcs && _stk.fcs.porArt) || {};
-  const headers = ["Código", "Descripción", "Total Stock", "Cajas Pedidas", "Ped. ya pickeadas (TP)", "Ped. picking s/TP", "Capacidad Góndola", "Góndola", "Excedente", "Pickeados", "A facturar", "A guardar", "Racks", "P/ envasar", "FC s/Salida"];
+  const headers = ["Código", "LK/CH", "Descripción", "Est. Madre (caj/mes)", "Total Stock", "Cajas Pedidas (a cubrir)", "Ped. ya pickeadas (TP)", "Ped. picking s/TP", "Ped. total", "Capacidad Góndola"]
+    .concat(xl.cols.map(function (c) { return c.label; })).concat(["FC s/Salida"]);
   const aoa = [headers];
-  shown.forEach(function (a) {
-    const _tot = SECTKEYS.reduce(function (s, k) { return s + (Number(a[k]) || 0); }, 0) + (Number(a.racks_ch) || 0);
-    const _ped = _demOf(a.cod);
-    const _pnx = _pedNetoOf(a.cod);   // v24.04 — el mismo neto que la pantalla, o el Excel diría otro número
-    const _cap = _capOf(a.cod);
-    const _fcV = Number(a.fc_sin_salida) || 0;   // v21.13: de la propia fila
-    aoa.push([
-      String(codBase(a.cod) || ""),
-      String(artNombre(a.cod, a.desc) || ""),
-      num(_tot),
-      num(_pnx ? _pnx.neto : _ped),
-      num(_pnx ? _pnx.tp : 0),
-      num(_pnx ? _pnx.curso : 0),
-      num(_cap),
-      num(a.terminado),
-      num(a.excedente),
-      num(a.separar_pedidos),
-      num(a.a_facturar),
-      num(a.a_guardar),
-      num((Number(a.racks) || 0) + (Number(a.racks_ch) || 0)),
-      num(a.para_envasar),
-      num(_fcV)
-    ]);
+  xl.rows.forEach(function (r) {
+    aoa.push([String(r.cod || ""), r.lin || "", String(r.desc || ""), num(r.proy), num(r.tot), num(r.ped), num(r.pedTp), num(r.pedCurso), num(r.pedTot), num(r.cap)]
+      .concat(xl.cols.map(function (c) { return num(r.dep[c.key]); })).concat([num(r.fc)]));
   });
-
+  const d = new Date(), p2 = function (n) { return String(n).padStart(2, "0"); };
+  const nombre = "Stock " + d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()) + " " + p2(d.getHours()) + "." + p2(d.getMinutes()) + ".xlsx";
   pppLoadXlsx().then(function (XLSX) {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 9 }, { wch: 34 }, { wch: 11 }, { wch: 13 }, { wch: 16 }, { wch: 9 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 9 }, { wch: 11 }, { wch: 12 }];
+    /* ancho según el dato (regla de Damian, 25/09): cada columna al largo de su valor más largo */
+    ws["!cols"] = headers.map(function (_h, i) {
+      let w = 4; aoa.forEach(function (row) { const v = row[i]; const l = v == null ? 0 : String(v).length; if (l > w) w = l; });
+      return { wch: Math.min(w + 1, 60) };
+    });
+    ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: headers.length - 1 } }) };
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Stock");
-    XLSX.writeFile(wb, "Stock_" + new Date().toISOString().split("T")[0] + ".xlsx");
+    XLSX.writeFile(wb, nombre);
   }).catch(function (e) {
     alert("No pude generar el Excel: " + (e && e.message ? e.message : e));
   });
@@ -24833,6 +24798,9 @@ function stkBodyInsumos() {
   const pend = items.filter(function (it) { return _stkInsPendiente(it); });
   let h = '';
   if (_stkIns.msg) h += '<div class="stk-cut" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;">' + escapeHtml(_stkIns.msg) + '</div>';
+  // v26.69 (Luis) — Excel de los insumos que tenemos: el catálogo de «Todos los insumos», con sus filtros
+  const _nXl = _stkInsTodosLista(items).length;
+  h += '<div style="display:flex;justify-content:flex-end;margin:0 0 8px;"><button type="button" id="stkInsXlsBtn" onclick="stkInsDescargarExcel()" title="Descargar en Excel los insumos (código, detalle, categoría, ubicación, cantidad y unidad). Respeta los filtros de «Todos los insumos»." style="width:auto;margin:0;padding:0 11px;height:34px;border:1.5px solid #86efac;border-radius:9px;background:#f0fdf4;color:#166534;font-weight:800;font-size:13px;cursor:pointer;white-space:nowrap;">⬇ Excel de insumos (' + _nXl + ')</button></div>';
   h += _stkInsMezclaUni(items);   // v8.63 — aviso: insumos con varias unidades sin factor (suma sin sentido)
   if (pend.length) h += _stkInsPend(pend);   // v8.35 — si no hay pendientes, no aparece la sección
   h += _stkInsCats(items, pend);
@@ -24840,6 +24808,49 @@ function stkBodyInsumos() {
   h += _stkInsTodos(items);         // foto completa, sólo lectura
   h += _stkInsUnis(items);          // v8.27 — las unidades van al final, abajo de Todos los insumos
   return h;
+}
+/* v26.69 (Luis, 05/10): «quiero que se pueda descargar un excel … de los insumos que tenemos».
+   Una fila por insumo (las de «Todos los insumos», con sus filtros y su orden). Cantidad en la unidad
+   BASE cuando el insumo tiene factores (y las equivalencias en otra columna, como la tabla); sin
+   factor, una fila por unidad con saldo (sumar Kg + Uni no significa nada, v8.63). Los que están en
+   0 van igual: es el catálogo. */
+function stkInsDescargarExcel() {
+  if (!_stkIns || !_stkIns.items) { alert("Todavía se están cargando los insumos. Probá de nuevo en un momento."); return; }
+  const lista = _stkInsTodosLista(_stkIns.items);
+  const r3 = function (n) { return Math.round((Number(n) || 0) * 1000) / 1000; };
+  const catTxt = function (it) { return String(insCatLbl(insCatOf(it)) || "").replace(/^[^\p{L}\p{N}]+/u, "").trim(); };
+  const headers = ["Código", "ISIS", "Detalle", "Categoría", "Rack / sector", "Cantidad", "Unidad", "Equivalencias / nota"];
+  const aoa = [headers];
+  lista.forEach(function (it) {
+    const base = [String(it.cod || ""), String(it.isis || ""), String(it.nombre || ""), catTxt(it), String(_stkInsUbicStr(it) || "")];
+    const fac = insFactDe(it.cod);
+    if (fac && fac.unis && fac.unis.length) {
+      const sb = insSaldoBase(it) || { base: 0, otras: [] };
+      const otras = (sb.otras || []).map(function (x) { return r3(x.saldo) + " " + x.uni + " (sin factor)"; });
+      aoa.push(base.concat([r3(sb.base), String(fac.base || ""), [insEquivStr(it.cod, sb.base)].concat(otras).filter(Boolean).join(" · ")]));
+      return;
+    }
+    const xs = (it.xuni || []).filter(function (u) { return Math.abs(Number(u.saldo) || 0) > 0.0005; });
+    if (!xs.length) { aoa.push(base.concat([0, String(_stkInsUniMostrar(it) || ""), ""])); return; }
+    xs.forEach(function (u) {
+      aoa.push(base.concat([r3(u.saldo), String(u.uni || ""), xs.length > 1 ? "varias unidades sin factor de conversión" : ""]));
+    });
+  });
+  const d = new Date(), p2 = function (n) { return String(n).padStart(2, "0"); };
+  const nombre = "Insumos " + d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()) + " " + p2(d.getHours()) + "." + p2(d.getMinutes()) + ".xlsx";
+  pppLoadXlsx().then(function (XLSX) {
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = headers.map(function (_h, i) {   // ancho según el dato, no el título
+      let w = 4; aoa.forEach(function (row) { const v = row[i]; const l = v == null ? 0 : String(v).length; if (l > w) w = l; });
+      return { wch: Math.min(w + 1, 60) };
+    });
+    ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: headers.length - 1 } }) };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Insumos");
+    XLSX.writeFile(wb, nombre);
+  }).catch(function (e) {
+    alert("No pude generar el Excel: " + (e && e.message ? e.message : e));
+  });
 }
 /* v8.63 — insumos con stock en VARIAS unidades sin factor de conversión que las cubra: la suma
    cruda no significa nada (Kg + Uni). Aviso para que el admin cargue el factor (⚖ / "＋ unidad"). */
@@ -25088,10 +25099,12 @@ function _stkInsUniUso(u, items) {
    que permite corregir cantidad, unidad, nombre, categoría y ubicación in-line —
    ideal para ponerle stock a un código que está en 0 y no aparece arriba. Usa el
    mismo `_stkIns.edit = "art:<cod>"` y `stkInsGuardar` que el listado por categoría. */
-function _stkInsTodos(items) {
-  const f = _stkIns.tf || {};
+/* v26.69 — el filtro de «Todos los insumos» sale a su propia función: lo usan la tabla y el Excel, así no
+   hay dos criterios de qué se ve. */
+function _stkInsTodosLista(items) {
+  const f = (_stkIns && _stkIns.tf) || {};
   const _m = function (v, q) { return !q || String(v == null ? "" : v).toLowerCase().indexOf(String(q).toLowerCase().trim()) >= 0; };
-  const lista = (items || []).filter(function (it) {
+  return (items || []).filter(function (it) {
     if (!_m(it.cod, f.cod)) return false;
     if (f.cat && (f.cat === "?" ? !insSinCat(it) : insCatOf(it) !== f.cat)) return false;
     if (!_m(_stkInsUbicStr(it), f.ubic)) return false;
@@ -25103,6 +25116,10 @@ function _stkInsTodos(items) {
     }
     return true;
   });
+}
+function _stkInsTodos(items) {
+  const f = _stkIns.tf || {};
+  const lista = _stkInsTodosLista(items);
   const unisEnUso = {}; (items || []).forEach(function (it) { (it.xuni || []).forEach(function (u) { unisEnUso[u.uni] = 1; }); });
   let h = _stkSec("todos", "📋 Todos los insumos", lista.length + (lista.length !== (items || []).length ? " / " + (items || []).length : ""));
   if (!_stkAbierta("todos")) return h;
@@ -34527,15 +34544,21 @@ const PPP_XLS_HOJAS = [
   { view: "vista_ppp_programacion_pendiente", hoja: "Programación Diaria", order: "tanda.asc,np.asc",
     cols: [["tanda","Tanda"],["np","NP"],["tipo","Tipo"],["cod_cliente","Cód cliente"],["razon_social","Razón social"],["m3","m³"],["zona","Zona"],["barrio","Barrio"],["direccion","Dirección"],["op","Op"],["fecha_recep","Fecha recep"],["fecha_entrega","Fecha entrega"],["fecha_fc","Fecha FC"],["observaciones","Observaciones"]] },
   { view: "vista_ppp_pedidos_entregados", hoja: "Pedidos Entregados", order: "facturado_at.desc",
-    cols: [["np","NP"],["tanda","Tanda"],["cod_cliente","Cód cliente"],["razon_social","Razón social"],["m3","m³"],["fecha_salida_real","Salió (carga cam.)"],["fecha_ppp","Fecha PPP"],["fecha_cierre","Fecha cierre"],["facturado_at","Facturado"],["cajas_pedidas","Cajas ped."],["cajas_entregadas","Cajas entr."],["cajas_falto","Faltó"]] }
+    cols: [["np","NP"],["tanda","Tanda"],["cod_cliente","Cód cliente"],["razon_social","Razón social"],["m3","m³"],["fecha_salida_real","Salió (carga cam.)"],["fecha_ppp","Fecha PPP"],["fecha_cierre","Fecha cierre"],["facturado_at","Facturado"],["cajas_pedidas","Cajas ped."],["cajas_entregadas","Cajas entr."],["cajas_falto","Faltó"],["_fped","Llegó el pedido"]] }   // v26.69: _fped no es columna de la vista, lo agrega pppExportExcel
 ];
 async function pppExportExcel() {
   try {
     const H = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
     const datos = await Promise.all(PPP_XLS_HOJAS.map(function (h) {
-      const sel = h.cols.map(function (c) { return c[0]; }).join(",");
+      const sel = h.cols.map(function (c) { return c[0]; }).filter(function (k) { return k.charAt(0) !== "_"; }).join(",");
       return supaFetchAllSafe(SUPABASE_URL + "/rest/v1/" + h.view, "select=" + sel + "&order=" + encodeURIComponent(h.order));   // v11.23 paginado (corte 1000 de PostgREST)
     }));
+    // v26.69 — la fecha en que llegó el pedido del cliente (columna _fped de Pedidos Entregados)
+    let _fpm = null; try { _fpm = await pppRefreshFechaPedido(); } catch (_e) {}
+    (datos || []).forEach(function (rows) { (rows || []).forEach(function (row) {
+      const fp = _fpm ? _fpm.get(_pppNpNorm(row.np)) : null;
+      row._fped = fp ? (fp.f + (fp.h ? " " + fp.h : "")) : "";
+    }); });
     let wsXml = "", body = "";
     PPP_XLS_HOJAS.forEach(function (h, i) {
       wsXml += '<x:ExcelWorksheet><x:Name>' + h.hoja + '</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet>';
@@ -35069,7 +35092,7 @@ function _pppSearchStr(p) { return [p.np, p.cod, p.razon_social, p.tanda, p.loca
 function pppSetSearch(v) { _pppSearch = String(v == null ? "" : v).trim(); pppRenderProg(); }
 function pppLoadEntregados() { if (_pppEntregados) return _pppEntregados; let a = []; try { a = JSON.parse(localStorage.getItem(PPP_ENT_KEY) || "[]"); } catch (_e) {} _pppEntregados = new Set(Array.isArray(a) ? a.map(String) : []); return _pppEntregados; }
 function pppSaveEntregados() { try { localStorage.setItem(PPP_ENT_KEY, JSON.stringify(Array.from(pppLoadEntregados()))); } catch (_e) {} }
-function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "plan" || t === "ent" || t === "enviaje" || t === "resumen") pppRefreshEnSalida(); if (t === "plan") { pppRefreshValor(); pppRefreshGeo(); } if (t === "ent" || t === "enviaje") { pppRefreshDelivered(); pppRefreshMetaEntSet(); } if (t === "ocup") pppRefreshOcupacion(); }
+function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "plan" || t === "ent" || t === "enviaje" || t === "resumen") pppRefreshEnSalida(); if (t === "plan") { pppRefreshValor(); pppRefreshGeo(); } if (t === "ent" || t === "enviaje") { pppRefreshDelivered(); pppRefreshMetaEntSet(); } if (t === "ent") { pppRefreshFechaPedido().then(function () { if (_pppTab === "ent") pppRenderProg(); }).catch(function () {}); } if (t === "ocup") pppRefreshOcupacion(); }
 /* "Controlado" (manual, lo marca la operadora) → recién ahí el pedido pasa a Pedidos
    Entregados. _pppEntregados = NPs controlados (persistido en vir_ppp_entregados). */
 function pppControlar(np) { pppLoadEntregados().add(String(np)); pppSaveEntregados(); pppRenderProg(); }
@@ -35468,6 +35491,84 @@ function pppEsSinSalida(npc) {
 window.pppEsToggle = pppEsToggle; window.pppEsFinish = pppEsFinish;
 window.pppEsClear = pppEsClear; window.pppEsSinSalida = pppEsSinSalida;
 function _pppYmdKey(s) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || "")); return m ? (m[1] + m[2] + m[3]) : ""; }
+/* v26.69 (Luis, 05/10): «en pedidos entregados quiero que figure la fecha de cuando nos
+   llegaron los pedidos de los clientes, no necesariamente de cuando se programaron. De todos
+   los que tengas datos, y forward-facing».
+   Map NP → { f: "YYYY-MM-DD", h: "HH:MM" | "" }. Fuente durable: GV_NP_Fecha_Pedido (la llena
+   gv_np_fecha_pedido_capturar cada hora, sql/gv_np_fecha_pedido_v2667.sql). Encima, EN VIVO:
+   · NP web: PPP_Web_Programacion.fecha_recep (= lk_pedidos_match.fecha_pedido, 363 de 363) y la
+     hora de lk_pedidos_match — así lo de la última hora, que la captura todavía no tomó, sale igual.
+   · NP de ISIS, sólo si la tabla no contesta: la «Fecha Recep» de la PPP y la base de pedidos
+     (cubren 23/06 → 04/09; lo de antes no tiene el dato en ningún lado y queda sin fecha).
+   Si nada contesta, el mapa queda vacío y la fila sale sin fecha: no se inventa. */
+let _pppFechaPed = null, _pppFechaPedTs = 0;
+function _pppFechaPedOf(np) { return _pppFechaPed ? (_pppFechaPed.get(_pppNpNorm(np)) || null) : null; }
+async function pppRefreshFechaPedido(force) {
+  if (!force && _pppFechaPed && (Date.now() - _pppFechaPedTs) < 10 * 60 * 1000) return _pppFechaPed;
+  const m = new Map();
+  const put = function (np, f, h) {
+    const k = _pppNpNorm(np), d = String(f == null ? "" : f).slice(0, 10);
+    if (!k || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+    const hh = String(h == null ? "" : h).slice(0, 5);
+    const ya = m.get(k);
+    if (!ya) m.set(k, { f: d, h: /^\d{2}:\d{2}$/.test(hh) ? hh : "" });
+    else if (!ya.h && /^\d{2}:\d{2}$/.test(hh) && ya.f === d) ya.h = hh;
+  };
+  let conTabla = false;
+  try {
+    const rows = await gvRestTodo("GV_NP_Fecha_Pedido?select=np,fecha_pedido,hora_pedido&order=np.asc");
+    if (Array.isArray(rows)) { rows.forEach(function (r) { put(r.np, r.fecha_pedido, r.hora_pedido); }); conTabla = true; }
+  } catch (_e) {}
+  try {
+    const prog = await gvRestTodo("PPP_Web_Programacion?select=empresa,order_id,np,fecha_recep&order=order_id.asc");
+    const falta = [];
+    (prog || []).forEach(function (p) {
+      if (p.np == null || !p.fecha_recep) return;
+      const lbl = pwebNpLabel(p.empresa, p.np);
+      const ya = m.get(_pppNpNorm(lbl));
+      if (ya && ya.h) return;
+      falta.push({ lbl: lbl, emp: String(p.empresa || "").toLowerCase(), oid: p.order_id, f: p.fecha_recep });
+    });
+    // la hora sale de lk_pedidos_match, pedida sólo por los order_id que faltan (de a 150)
+    const hora = {};
+    const ids = Array.from(new Set(falta.map(function (x) { return x.oid; }).filter(function (x) { return x != null; })));
+    for (let i = 0; i < ids.length; i += 150) {
+      try {
+        const r = await fetch(SUPABASE_URL + "/rest/v1/lk_pedidos_match?select=empresa,order_id,fecha_pedido,hora_pedido&order_id=in.(" + ids.slice(i, i + 150).join(",") + ")",
+          { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }, cache: "no-store" });
+        if (!r.ok) continue;
+        (await r.json()).forEach(function (x) { hora[String(x.empresa || "").toLowerCase() + "|" + x.order_id] = x; });
+      } catch (_e) {}
+    }
+    falta.forEach(function (x) {
+      const lp = hora[x.emp + "|" + x.oid];
+      put(x.lbl, (lp && lp.fecha_pedido) || x.f, lp ? lp.hora_pedido : "");
+    });
+  } catch (_e) {}
+  if (!conTabla) {
+    try {
+      const isis = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_PPP_Programacion_Diaria", "select=np,fecha_recep&order=np.asc");
+      (isis || []).forEach(function (r) { if (/^\d+$/.test(_pppNpNorm(r.np))) put(r.np, r.fecha_recep, ""); });
+      const base = await gvRestTodo("GV_PPP_Base_Pedidos?select=pedido,fecha&order=id.asc");
+      (base || []).forEach(function (r) { if (/^\d+$/.test(_pppNpNorm(r.pedido))) put(r.pedido, r.fecha, ""); });
+    } catch (_e) {}
+  }
+  _pppFechaPed = m; _pppFechaPedTs = Date.now();
+  return m;
+}
+/* El chip de la fila: «📥 12/09» y, en el title, la fecha entera, la hora y cuántos días pasaron
+   hasta la salida. Sin dato no se dibuja nada (las NP de ISIS anteriores al 23/06 no lo tienen). */
+function _pppFechaPedHtml(p) {
+  const fp = _pppFechaPedOf(p && p.np); if (!fp) return "";
+  const d = fp.f, dd = d.slice(8, 10) + "/" + d.slice(5, 7);
+  let tit = "Llegó el pedido del cliente: " + dd + "/" + d.slice(0, 4) + (fp.h ? " " + fp.h + " hs" : "");
+  const sal = String((p && p.frep) || "").slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(sal)) {
+    const n = Math.round((Date.parse(sal + "T12:00:00") - Date.parse(d + "T12:00:00")) / 86400000);
+    if (isFinite(n) && n >= 0) tit += " · salió " + n + " día" + (n === 1 ? "" : "s") + " corrido" + (n === 1 ? "" : "s") + " después";
+  }
+  return ' <span class="ppp-ent-fped" title="' + escapeHtml(tit) + '">📥 ' + escapeHtml(dd) + '</span>';
+}
 async function pppRefreshDelivered() {
   try {
     // v8.33 — la fecha de SALIDA real = carga camión (CCN). Default = PPP (fecha_entrega).
@@ -35600,7 +35701,8 @@ function _pppEntGroupedHtml(list, showCajas, cap) {
         const disc = (p.discrep && p.pppDate) ? ' <span style="color:#b45309;font-weight:700;" title="Salió (carga camión) en otra fecha que la de la PPP — revisar la PPP">⚠ PPP decía ' + p.pppDate.slice(8, 10) + '/' + p.pppDate.slice(5, 7) + '</span>' : '';
         // v13.02 — en En Salida, lo cargado y sin controlar pasado el plazo lleva la pastilla roja (antes iba en Programación).
         const venc = (p._cargado && _pppCargaVencida(p)) ? ' <span class="ppp-cargvenc-badge">🚨 SIN CONTROLAR</span>' : '';
-        html += '<div class="ppp-ent-row"><b>' + escapeHtml(p.np) + '</b>' + ' ' + escapeHtml((p.rs || p.cod || "").slice(0, 32)) + (p.m3 != null ? ' <span class="ppp-ent-m3">' + p.m3.toFixed(3).replace('.', ',') + ' m³</span>' : '') + cajas + disc + venc + '</div>';
+        // v26.69 — 📥 fecha en que llegó el pedido del cliente (Luis)
+        html += '<div class="ppp-ent-row"><b>' + escapeHtml(p.np) + '</b>' + ' ' + escapeHtml((p.rs || p.cod || "").slice(0, 32)) + (p.m3 != null ? ' <span class="ppp-ent-m3">' + p.m3.toFixed(3).replace('.', ',') + ' m³</span>' : '') + cajas + _pppFechaPedHtml(p) + disc + venc + '</div>';
       }
       html += '</div>';
     }
@@ -35611,7 +35713,7 @@ function _pppEntGroupedHtml(list, showCajas, cap) {
 function _pppEntFilter(list) {
   if (!_pppSearch) return list;
   const q = _pppSearch.toLowerCase();
-  return list.filter(function (p) { return [p.np, p.cod, p.rs, p.tanda, p.frep].join(" ").toLowerCase().indexOf(q) >= 0; });
+  return list.filter(function (p) { const fp = _pppFechaPedOf(p.np); return [p.np, p.cod, p.rs, p.tanda, p.frep, fp ? fp.f : ""].join(" ").toLowerCase().indexOf(q) >= 0; });
 }
 function _pppEntAppHtml() {
   if (_pppDelivered == null) return '<div class="planim-empty">Cargando pedidos entregados…</div>';
@@ -35619,7 +35721,7 @@ function _pppEntAppHtml() {
   if (!list.length) return '<div class="ppp-ent-note">' + (_pppSearch ? "Sin coincidencias." : "Todavía no hay pedidos con entrega confirmada (control de remito o hoja de entregados). Los que salieron están en «En Salida».") + '</div>';
   let totM3 = 0, nDisc = 0; for (const p of list) { totM3 += (p.m3 || 0); if (p.discrep) nDisc++; }
   const r = _pppEntGroupedHtml(list, true, 0);
-  return '<div class="ppp-ent-note">🚚 Pedidos <b>entregados</b>, con <b>fecha de salida</b> (carga camión; si no hay, la de la PPP), cliente, m³ y cajas. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³.' +
+  return '<div class="ppp-ent-note">🚚 Pedidos <b>entregados</b>, con <b>fecha de salida</b> (carga camión; si no hay, la de la PPP), cliente, m³, cajas y <b>📥 la fecha en que llegó el pedido del cliente</b>. <b>' + list.length + '</b> pedido(s) · <b>' + totM3.toFixed(2).replace('.', ',') + '</b> m³.' +
     (nDisc > 0 ? ' <span style="color:#b45309;font-weight:700;">· ⚠ ' + nDisc + ' con fecha distinta a la PPP</span>' : '') + '</div>' + r.html;
 }
 function _pppEntExcelHtml() {
@@ -60121,7 +60223,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.68"></script>
+<script src="importacion.js?v=26.69"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62944,9 +63046,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.68"></script>
-<script src="hotsale.js?v=26.68"></script>
-<script src="estadisticas.js?v=26.68"></script>
+<script src="cobranzas.js?v=26.69"></script>
+<script src="hotsale.js?v=26.69"></script>
+<script src="estadisticas.js?v=26.69"></script>
 
 </body>
 </html>

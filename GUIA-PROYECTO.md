@@ -1,3 +1,18 @@
+## Nota v26.69 (2026-10-05) — Pedidos Entregados muestra cuándo LLEGÓ el pedido · Excel de Stocks e Insumos
+
+- **Pedidos Entregados** (las dos vistas): cada NP lleva **📥 dd/mm** = la fecha en que llegó el pedido del cliente,
+  no la de programación; el title trae la fecha entera, la hora (web) y los días corridos hasta la salida. También
+  en el buscador y en el Excel de la PPP (columna «Llegó el pedido»). Fuente: `GV_NP_Fecha_Pedido` (captura horaria,
+  `sql/gv_np_fecha_pedido_v2669.sql`) + en vivo `PPP_Web_Programacion.fecha_recep` / `lk_pedidos_match.hora_pedido`;
+  sin la tabla, ISIS sale de la «Fecha Recep» de la PPP y de la base de pedidos. Las NP de ISIS anteriores al 23/06 no
+  tienen el dato en ningún lado: van sin chip. `pppRefreshFechaPedido`, `_pppFechaPedHtml`.
+- **Stock y Compras → Stocks**: botón **⬇ Excel** en la barra (`stkDescargarExcel`): baja la tabla TAL CUAL se ve
+  (búsqueda, LK/CH, negativos, stock bajo, fijados, discontinuos y filtro de columna), con LK/CH, Est. Madre, el neto de
+  cajas pedidas y su desglose. Las filas salen de `stkBodyStocks` (`_stk._xl`): no hay una segunda cuenta.
+- **Stock y Compras → Insumos**: botón **⬇ Excel de insumos (N)** (`stkInsDescargarExcel`): una fila por insumo de
+  «Todos los insumos» (con sus filtros), cantidad en la unidad base si tiene factores y una fila por unidad si no.
+- `tests/stk-excel-stock-insumos.cjs`, `tests/ppp-ent-fecha-pedido.cjs`.
+
 ## Nota v26.66 (2026-10-05) — Impresión: lo automático sale SÓLO por el helper; la Cola de impresión NP lista todo
 
 - **Automático** (estación `psPoll`: TAL → armado, TP → picking, IMPT, facturado) pasa por **`gvImprimirAuto`**: sin helper
