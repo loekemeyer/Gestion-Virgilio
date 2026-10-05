@@ -31680,8 +31680,15 @@ loekemeyer»* · *«los de cencosud cayeron en spam, ¿se puede controlar y vigi
   PPP con `auto_estado = 'prueba'` y lo que se habría cargado. Con `si`, crea.
 - `dry_run` con `ids` y `force` sobre una OC ya cargada devuelve la **comparación** contra el pedido a mano.
 - El handler toma primero lo que nunca miró (`auto_at nulls first`): una OC que queda esperando no tapa a las nuevas.
-- **Pendiente**: la clave de ventas@chefsrl.com la carga Luis (`select vault.create_secret('<clave>', 'KRIKOS_CHEF_IMAP_PASS');`
-  en el SQL Editor de LK); después, prueba de la casilla y comparación contra 245-247 / 241, y recién ahí `KRIKOS_CHEF_AUTO = 'si'`.
+- **PRENDIDO el 05/10/2026 ~15:45** (v26.97): Luis cargó `KRIKOS_CHEF_IMAP_PASS` en el Vault de LK; `krikos-ingest` v16
+  y `krikos-auto-import` v4 deployados. La casilla de Chef tiene 20 carpetas que se miran (spam = «Junk E-Mail», vacía);
+  entraron las 3 OC de Cencosud del 01/10 (filas 29-31, de «Inbox/Pedidos Super»). Comparadas contra los pedidos a mano
+  **245, 246 y 247: mismos renglones (41 · 36 · 46), mismos totales**; la única diferencia es que el automático lleva la
+  `fecha_entrega` del mail (01/10/2026) y el de a mano la dejó vacía (se cargó desde el archivo, no desde la bandeja),
+  que es lo mismo que hace la card cuando la OC entra por la bandeja. Las 3 quedaron `cargado` con su pedido.
+  Después, `KRIKOS_CHEF_AUTO = 'si'`. Dorinka no tiene OC en la casilla desde el 28/09: su primera OC automática se mira a mano.
+  Para apagar: `delete from vault.secrets where name = 'KRIKOS_CHEF_AUTO';` (o cambiarle el valor) en el SQL Editor de LK.
+- 242, 243 y 244 (los pedidos de un solo renglón 816L del 01/10) ya estaban anulados en Gestión (`GV_Web_Cancelados`).
 - Test: `tests/krikos-auto-chef.cjs` (corre el handler con las dos bases de mentira; verificado que falla sin la L, con
   renglones en Cencosud y sin el dedup previo a vencidas).
 
