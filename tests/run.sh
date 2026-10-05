@@ -253,6 +253,8 @@ echo "== tarea-abierta-otro-dia (v26.56: armado/picking abierto del viernes se r
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tarea-abierta-otro-dia.cjs
 echo "== arm-avance-servidor (v26.61: la copia del armado viaja al servidor sin cambiar nada del operario) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/arm-avance-servidor.cjs
+echo "== tanda-frenar (v26.62: frenar picking/armado, cartel de la tanda de otro, marcas de todos) =="
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/tanda-frenar.cjs
 
 echo "== fac-block-recuperable (regresión v6.21: bloqueo del tilde si el faltante se puede completar) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/fac-block-recuperable.cjs

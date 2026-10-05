@@ -456,6 +456,11 @@ button {
 }
 .tanda-chip.mia:active{ background:#bbf7d0; }
 .tandas-mia-txt{ font-size:12px; color:#166534; font-weight:600; margin-top:4px; line-height:1.3; }
+/* v26.62 (Luis, 05/10) — tanda FRENADA: se ve en ámbar y se toca. La retoma el que la frenó o
+   cualquier otro (a ése le sale «Estás por agarrar una tanda que empezó X ¿Seguro?»). */
+.tanda-chip.frenada{ background:#fffbeb; border-color:#f59e0b; color:#92400e; font-weight:700; }
+.tanda-chip.frenada:active{ background:#fef3c7; }
+.tandas-frenada-txt{ font-size:12px; color:#92400e; font-weight:600; margin-top:4px; line-height:1.3; }
 .tandas-list-empty,
 .tandas-list-label{
   font-size: 14px;
@@ -2761,6 +2766,12 @@ button.pk-anular{
 }
 button.pk-anular:hover{ background:#b91c1c; }
 button.pk-anular small{ display:block; font-size:12px; font-weight:700; opacity:.9; margin-top:2px; }
+/* v26.62 — FRENAR la tanda (picking), arriba de «Anular picking». */
+button.pk-frenar{
+  width:100%; margin:0 0 8px; padding:13px 14px; font-size:17px; font-weight:900;
+  background:#fff7ed; color:#9a3412; border:1.5px solid #b45309; border-radius:12px; cursor:pointer;
+}
+button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:.9; margin-top:2px; }
 .tanda-modal-card{
   background: #fff;
   border-radius: 12px;
@@ -4941,6 +4952,9 @@ table.facfc-tbl tr.facneto-row-falt td{ background: #fef2f2; }
    es la salida de escape, no el camino normal. */
 .comp-anular{ width:100%; margin:0; padding:13px; border:1.5px solid #dc2626; border-radius:12px; background:#fef2f2; color:#b91c1c; font-size:15px; font-weight:800; cursor:pointer; }
 .comp-anular:active{ background:#fee2e2; }
+/* v26.62 — FRENAR la tanda (armado): soltarla con lo hecho registrado. */
+.comp-frenar{ width:100%; margin:0; padding:13px; border:1.5px solid #b45309; border-radius:12px; background:#fff7ed; color:#9a3412; font-size:15px; font-weight:800; cursor:pointer; }
+.comp-frenar:active{ background:#ffedd5; }
 .comp-mode-toggle{ display:inline-block; font-size:11.5px; font-weight:700; color:#1e6bd6; background:#eff6ff; border:1px solid #bfdbfe; border-radius:999px; padding:5px 12px; cursor:pointer; margin:0 0 10px; }
 .comp-mode-toggle b{ font-weight:800; }
 .comp-fnp-box{ display:flex; flex-direction:column; align-items:center; gap:2px; flex:0 0 auto; }
@@ -6010,6 +6024,10 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
            para siempre, que es lo que pasó con E11B. -->
       <button class="comp-anular" id="compAnular" onclick="compAnularArmado()"
               title="No la armás vos: suelta la tanda y vuelve a quedar pendiente de armar">✖ No la armo yo</button>
+      <!-- v26.62 (Luis, 05/10): FRENAR ≠ pausar. Pausar = salir un rato (la tanda sigue siendo tuya);
+           Frenar = soltarla con lo hecho guardado en el servidor, para que la siga quien sea. -->
+      <button class="comp-frenar" id="compFrenar" onclick="compFrenar()"
+              title="Se guarda todo lo armado y la puede seguir otro operario (o vos después)">✋ Frenar la tanda</button>
       <button class="comp-fin" id="compFin" onclick="compTerminar()">Terminar</button>
     </div>
   </div>
@@ -6273,7 +6291,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=26.63"></script>
+<script type="module" src="recepcion.js?v=26.64"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -9393,6 +9411,7 @@ let _apEnCurso           = new Map();
 let _apMio               = new Map();   // tanda -> ts del AP propio
 let _pkAjeno             = new Map();   // tanda -> legajo del EP de otro
 let _pkMio               = new Map();   // tanda -> ts del EP propio
+let _tFrenada            = new Map();   // v26.62: tanda FRENADA -> legajo que la frenó
 function _legajoActual() {
   try { return String((typeof legajoInput !== "undefined" && legajoInput.value) || "").trim(); }
   catch (_e) { return ""; }
@@ -9518,7 +9537,9 @@ async function getActivityStatus(force) {
     pickingEnCursoBy:  new Map(),   // v5.74: tanda EN CURSO (EP sin TP) -> legajo que la arrancó
     armadoEnCursoBy:   new Map(),   // v5.74: tanda EN CURSO (AP sin TAP) -> legajo que la arrancó
     pickingEnCursoTs:  new Map(),   // v18.46: -> ts del EP (para retomar sin perder la duración)
-    armadoEnCursoTs:   new Map()    // v18.46: -> ts del AP
+    armadoEnCursoTs:   new Map(),   // v18.46: -> ts del AP
+    pickingFrenadaBy:  new Map(),   // v26.62: tanda FRENADA (último evento PKF) -> legajo que la frenó
+    armadoFrenadaBy:   new Map()    // v26.62: idem armado (APF)
   };
   try {
     const since = new Date(Date.now() - ACTIVITY_LOOKBACK_DAYS*24*60*60*1000).toISOString();
@@ -9527,7 +9548,7 @@ async function getActivityStatus(force) {
     // los TP/AP recientes quedaban truncados → tandas pickeadas no aparecían
     // en la lista de armado.
     const data = await supaFetchAll(SUPABASE_TABLE_ENDPOINT,
-      "opcion=in.(EP,TP,AP,TAP)" +
+      "opcion=in.(EP,TP,AP,TAP,PKF,APF)" +   // v26.62: PKF/APF = la tanda quedó FRENADA
       "&ts_cliente=gte." + encodeURIComponent(since) +
       "&order=ts_cliente.asc" +
       "&select=opcion,texto,ts_cliente,legajo");
@@ -9549,7 +9570,11 @@ async function getActivityStatus(force) {
       // en localStorage y si se pierde, el TP/TAP sale sin duración y la tanda no figura en
       // «Terminar Día». Con esto se reconstruye desde el servidor, que es la fuente real.
       pickingEnCursoTs:  new Map(),
-      armadoEnCursoTs:   new Map()
+      armadoEnCursoTs:   new Map(),
+      // v26.62 — FRENADA: el último evento de la fase es PKF/APF. No está en curso (otro la puede
+      // agarrar, con cartel) ni terminada (no va a la lista de armado / carga).
+      pickingFrenadaBy:  new Map(),
+      armadoFrenadaBy:   new Map()
     };
     for (const ev of data) {
       const tRaw  = ev.texto || "";
@@ -9561,13 +9586,13 @@ async function getActivityStatus(force) {
       // de los reportes y que el monitor de silencios.
       if (esLegajoPrueba(ev.legajo)) continue;
       const ts = ev.ts_cliente;
-      if (ev.opcion === "EP" || ev.opcion === "TP") {
+      if (ev.opcion === "EP" || ev.opcion === "TP" || ev.opcion === "PKF") {
         status.pickingStarted.add(tNorm);
         const cur = lastPick.get(tNorm);
         if (!cur || ts > cur.ts) lastPick.set(tNorm, { opcion: ev.opcion, ts, legajo: ev.legajo });
         const curS = lastPickStrict.get(tRaw);
         if (!curS || ts > curS.ts) lastPickStrict.set(tRaw, { opcion: ev.opcion, ts });
-      } else if (ev.opcion === "AP" || ev.opcion === "TAP") {
+      } else if (ev.opcion === "AP" || ev.opcion === "TAP" || ev.opcion === "APF") {
         status.armadoStarted.add(tNorm);
         const cur = lastArm.get(tNorm);
         if (!cur || ts > cur.ts) lastArm.set(tNorm, { opcion: ev.opcion, ts, legajo: ev.legajo });
@@ -9575,9 +9600,9 @@ async function getActivityStatus(force) {
         if (!curS || ts > curS.ts) lastArmStrict.set(tRaw, { opcion: ev.opcion, ts });
       }
     }
-    for (const [t, ev] of lastPick)       { if (ev.opcion === "TP")  status.pickingDone.add(t); else if (ev.opcion === "EP") { status.pickingEnCursoBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); status.pickingEnCursoTs.set(t, ev.ts || null); } }
+    for (const [t, ev] of lastPick)       { if (ev.opcion === "TP")  status.pickingDone.add(t); else if (ev.opcion === "EP") { status.pickingEnCursoBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); status.pickingEnCursoTs.set(t, ev.ts || null); } else if (ev.opcion === "PKF") status.pickingFrenadaBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); }
     for (const [t, ev] of lastPickStrict) if (ev.opcion === "TP")  status.pickingDoneStrict.add(t);
-    for (const [t, ev] of lastArm)        { if (ev.opcion === "TAP") status.armadoDone.add(t);  else if (ev.opcion === "AP") { status.armadoEnCursoBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); status.armadoEnCursoTs.set(t, ev.ts || null); } }
+    for (const [t, ev] of lastArm)        { if (ev.opcion === "TAP") status.armadoDone.add(t);  else if (ev.opcion === "AP") { status.armadoEnCursoBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); status.armadoEnCursoTs.set(t, ev.ts || null); } else if (ev.opcion === "APF") status.armadoFrenadaBy.set(t, String(ev.legajo == null ? "" : ev.legajo).trim()); }
     for (const [t, ev] of lastArmStrict)  if (ev.opcion === "TAP") status.armadoDoneStrict.add(t);
     _activityStatusCache = status;
     _activityStatusTs    = Date.now();
@@ -9634,6 +9659,7 @@ async function populateTandasList(filterMode) {
   if (filterMode != null) _tandasListMode = filterMode;
   _apEnCurso = new Map();   // v18.31: tanda → legajo que ya arrancó el armado (solo modo AP)
   _apMio = new Map(); _pkAjeno = new Map(); _pkMio = new Map();   // v18.46
+  _tFrenada = new Map();   // v26.62
   const container = document.getElementById("tandasList");
   if (!container) return;
   container.classList.remove("hidden");
@@ -9642,7 +9668,12 @@ async function populateTandasList(filterMode) {
   let filtered;
   if (_tandasListMode === "notStarted") {
     const s = await getActivityStatus();
-    filtered = items.filter(it => !s.pickingStarted.has(it.tanda.toUpperCase()));   // v10.28: sin exigir Op=SI
+    filtered = items.filter(it => {   // v10.28: sin exigir Op=SI
+      const k = it.tanda.toUpperCase();
+      // v26.62: la FRENADA vuelve a la lista de picking — la retoma el que la frenó u otro (con cartel)
+      if (s.pickingFrenadaBy && s.pickingFrenadaBy.has(k)) { _tFrenada.set(it.tanda, String(s.pickingFrenadaBy.get(k) || "")); return true; }
+      return !s.pickingStarted.has(k);
+    });
   } else if (_tandasListMode === "pickingCurso") {
     const s = await getActivityStatus();
     // pickingStarted: lenient (cualquier EP/TP entra como "empezado").
@@ -9656,6 +9687,7 @@ async function populateTandasList(filterMode) {
     filtered = items.filter(it => {
       const k = it.tanda.toUpperCase();
       if (!(s.pickingStarted.has(k) && !s.pickingDoneStrict.has(it.tanda))) return false;
+      if (s.pickingFrenadaBy && s.pickingFrenadaBy.has(k)) return false;   // v26.62: una frenada no se cierra sin retomarla
       const due = String(s.pickingEnCursoBy.get(k) || "").trim();
       if (due && _legTP && due === _legTP) _pkMio.set(it.tanda, s.pickingEnCursoTs.get(k) || null);
       else if (due && !esLegajoPrueba(due)) _pkAjeno.set(it.tanda, due);
@@ -9682,6 +9714,7 @@ async function populateTandasList(filterMode) {
     filtered = items.filter(it => {
       const k = it.tanda.toUpperCase();
       if (!s.pickingDone.has(k) || s.armadoDoneStrict.has(it.tanda)) return false;
+      if (s.armadoFrenadaBy && s.armadoFrenadaBy.has(k)) _tFrenada.set(it.tanda, String(s.armadoFrenadaBy.get(k) || ""));   // v26.62
       if (s.armadoEnCursoBy.has(k)) {
         const due = String(s.armadoEnCursoBy.get(k) || "").trim();
         if (due && _legAP && due === _legAP) _apMio.set(it.tanda, s.armadoEnCursoTs.get(k) || null);
@@ -9693,7 +9726,7 @@ async function populateTandasList(filterMode) {
     const s = await getActivityStatus();
     filtered = items.filter(it => {
       const k = it.tanda.toUpperCase();
-      return s.armadoStarted.has(k) && !s.armadoDone.has(k);
+      return s.armadoStarted.has(k) && !s.armadoDone.has(k) && !(s.armadoFrenadaBy && s.armadoFrenadaBy.has(k));   // v26.62
     });
   } else {
     filtered = items.slice();   // v10.28: sin exigir Op=SI
@@ -9777,6 +9810,11 @@ async function populateTandasList(filterMode) {
             const lg = String(_pkAjeno.get(c) || "").trim();
             return `<button class="tanda-chip ocupada" type="button" disabled title="Lo está pickeando ${lg ? "el legajo " + escapeHtml(lg) : "otro operario"}. Lo cierra el que lo empezó.">${escapeHtml(c)} 🔒</button>`;
           }
+          // v26.62 — FRENADA: se toca como cualquiera (código + Enviar). Si la frenó otro, al Enviar sale el cartel.
+          if (_tFrenada.has(c)) {
+            const lg = String(_tFrenada.get(c) || "").trim(), mia = !!(lg && lg === _legajoActual());
+            return `<button class="tanda-chip frenada" type="button" data-code="${escapeHtml(c)}" title="${mia ? "La frenaste vos" : "La frenó " + (lg ? "el legajo " + escapeHtml(lg) : "otro operario")}. Tocala y Enviar para retomarla." onclick="textInput.value=this.dataset.code;textInput.focus()">${escapeHtml(c)} ⏸</button>`;
+          }
           return `<button class="tanda-chip" type="button" data-code="${escapeHtml(c)}" onclick="textInput.value=this.dataset.code;textInput.focus()">${escapeHtml(c)}</button>`;
         })()).join("")}
       </div>
@@ -9785,6 +9823,9 @@ async function populateTandasList(filterMode) {
         : ""}
       ${g.codes.some(c => _apEnCurso.has(c))
         ? `<div class="tandas-ocupada-txt">🔒 = ya la está armando ${g.codes.filter(c => _apEnCurso.has(c)).map(c => { const lg = String(_apEnCurso.get(c) || "").trim(); return escapeHtml(c) + (lg ? " → legajo " + escapeHtml(lg) : ""); }).join(" · ")}. Se libera cuando cierre con «Terminé Armado Pedido».</div>`
+        : ""}
+      ${g.codes.some(c => _tFrenada.has(c))
+        ? `<div class="tandas-frenada-txt">⏸ = frenada (${g.codes.filter(c => _tFrenada.has(c)).map(c => { const lg = String(_tFrenada.get(c) || "").trim(); return escapeHtml(c) + (lg ? " → legajo " + escapeHtml(lg) : ""); }).join(" · ")}). Tocala y Enviar para retomarla.</div>`
         : ""}
       ${g.codes.some(c => _pkAjeno.has(c))
         ? `<div class="tandas-ocupada-txt">🔒 = lo está pickeando ${g.codes.filter(c => _pkAjeno.has(c)).map(c => { const lg = String(_pkAjeno.get(c) || "").trim(); return escapeHtml(c) + (lg ? " → legajo " + escapeHtml(lg) : ""); }).join(" · ")}. Lo cierra el que lo empezó.</div>`
@@ -10478,7 +10519,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v26.63";
+const APP_VERSION = "v26.64";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10751,6 +10792,127 @@ async function tandaReservar(tanda, fase, legajo, nombre) {
     return await r.json();
   } catch (_e) { return null; }
 }
+/* v26.62 (Luis, 05/10) — FRENAR / TOMAR una tanda frenada. Las dos contestan {ok, motivo, …} o
+   null sin señal (el que llama decide; frenar SIN señal no se hace: el candado lo mueve la base). */
+async function tandaFrenar(tanda, fase, legajo, motivo, ubicacion) {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_tanda_frenar", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_tanda: String(tanda || ""), p_fase: fase, p_legajo: String(legajo || ""),
+                             p_motivo: motivo || "boton", p_ubicacion: ubicacion || null, p_ts_cliente: new Date().toISOString() })
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (_e) { return null; }
+}
+async function tandaTomarFrenada(tanda, fase, legajo, nombre) {
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_tanda_tomar_frenada", {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_tanda: String(tanda || ""), p_fase: fase, p_legajo: String(legajo || ""), p_nombre: String(nombre || "") })
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (_e) { return null; }
+}
+/* Antes de frenar, lo que la cola todavía no mandó de ESA tanda (el EP y los PKC) tiene que estar
+   en el servidor: si no, el que la retoma no lo ve. Devuelve false si algo no salió. */
+async function _frenoMandarCola(legajo, tanda) {
+  const T = String(tanda || "").trim().toUpperCase(), L = String(legajo || "");
+  let pend = [];
+  try {
+    pend = readQueue().filter(function (it) {
+      const pl = it && it.payload; if (!pl || String(it.legajo || "") !== L) return false;
+      const tx = String(pl.texto || "").trim().toUpperCase();
+      return ((pl.opcion === "EP" || pl.opcion === "AP") && tx === T) || (pl.opcion === "PKC" && tx.indexOf(T + "|") === 0);
+    });
+  } catch (_e) { pend = []; }
+  for (const it of pend) {
+    let r = null; try { r = await trySendOneReport(it.payload, 15000); } catch (_e) { r = null; }
+    if (r && r.ok) { try { removeFromQueue(it.id); } catch (_e) {} } else return false;
+  }
+  return true;
+}
+/* Lo que queda en el celular después de frenar: la tarea se cierra (no pasa por TP/TAP), el
+   avance local se borra (vive en el servidor) y el historial lo muestra con su duración. */
+function _frenoCerrarLocal(legajo, fase, tanda, tsIniIso) {
+  try {
+    const st = getLegajoState(legajo);
+    if (fase === "picking") st.picking = { active: false, value: "", ts_inicio: null };
+    else                    st.armado  = { active: false, value: "", ts_inicio: null };
+    if (st.continuar) delete st.continuar[fase === "picking" ? "Picking" : "Armado"];
+    setLegajoState(legajo, st);
+  } catch (_e) {}
+  try {
+    pushHistoryForLegajo(legajo, { ts: Date.now(), opcion: fase === "picking" ? "PKF" : "APF",
+      descripcion: fase === "picking" ? "Frenó picking" : "Frenó armado", texto: tanda,
+      id: "frn_" + Date.now().toString(36), ts_inicio_iso: tsIniIso || null, status: "sent" });
+  } catch (_e) {}
+  try { tmMarcarEvento(legajo, Date.now()); } catch (_e) {}
+  try { _activityStatusTs = 0; } catch (_e) {}
+  try { renderLegajoHistory(legajo); } catch (_e) {}
+  try { renderPendingSuggestion(); } catch (_e) {}
+  try { updateCoreButtonsState(); } catch (_e) {}
+  try { updatePendingIndicator(); } catch (_e) {}
+}
+async function pkFrenar() {
+  if (!_pk) return;
+  const tanda = String(_pk.tanda || ""), legajo = String(_pk.legajo || "");
+  let ok = false;
+  try { ok = confirm("Se guardará el registro de todo lo que se pickeó hasta ahora y se podrá retomar después por vos u otro operario.\n\n¿Frenar la tanda " + tanda + "?"); } catch (_e) { ok = false; }
+  if (!ok) return;
+  const ubic = await askPickUbicacion(tanda);   // D12: dónde quedó el carro, para el que la retome
+  if (ubic == null) { try { alert("No se frenó: falta decir dónde queda lo pickeado."); } catch (_e) {} return; }
+  if (!(await _frenoMandarCola(legajo, tanda))) { try { alert("Sin señal: no se pudo frenar (lo pickeado tiene que llegar al servidor). Probá de nuevo con señal."); } catch (_e) {} return; }
+  let r = await tandaFrenar(tanda, "picking", legajo, "boton", ubic);
+  if (r && r.ok === false && r.motivo === "no_tomada") {   // la reserva nunca llegó (EP sin señal): se toma y se frena
+    try { await tandaReservar(tanda, "picking", legajo, ""); } catch (_e) {}
+    r = await tandaFrenar(tanda, "picking", legajo, "boton", ubic);
+  }
+  if (!r || r.ok !== true) {
+    try { alert(r && r.motivo === "no_es_tuya" ? "Esa tanda no figura a tu nombre: no la podés frenar." : "Sin señal: no se pudo frenar. Probá de nuevo."); } catch (_e) {}
+    return;
+  }
+  let ini = null; try { const st = getLegajoState(legajo); ini = (st.picking && st.picking.ts_inicio) || null; } catch (_e) {}
+  try { pkClearSaved(legajo); } catch (_e) {}
+  _pk = null;
+  try { closeTandaModal(); } catch (_e) {}
+  _frenoCerrarLocal(legajo, "picking", tanda, ini);
+  try { alert("✋ Frenaste la tanda " + tanda + ".\nQuedó guardado lo pickeado: la puede seguir otro operario o vos después."); } catch (_e) {}
+}
+window.pkFrenar = pkFrenar;
+async function compFrenar() {
+  if (!_comp) return;
+  const tanda = String(_comp.tanda || ""), legajo = String(_comp.legajo || "");
+  let ok = false;
+  try { ok = confirm("Se guardará el registro de todo lo que se armó hasta ahora y se podrá retomar después por vos u otro operario.\n\n¿Frenar la tanda " + tanda + "?"); } catch (_e) { ok = false; }
+  if (!ok) return;
+  try { _compPersist(); } catch (_e) {}
+  // la foto del armado TIENE que estar en el servidor antes de soltar la tanda
+  if (_armAvTimer) { clearTimeout(_armAvTimer); _armAvTimer = null; }
+  let okFoto = esLegajoPrueba(legajo);
+  if (!okFoto) { try { okFoto = await _armAvPost(_armAvCuerpo(tanda, legajo, "en_curso", _armAvFoto(_comp)), 0, false); } catch (_e) { okFoto = false; } }
+  if (!okFoto || !(await _frenoMandarCola(legajo, tanda))) { try { alert("Sin señal: no se pudo frenar (lo armado tiene que llegar al servidor). Probá de nuevo con señal."); } catch (_e) {} return; }
+  let r = await tandaFrenar(tanda, "armado", legajo, "boton", null);
+  if (r && r.ok === false && r.motivo === "no_tomada") {
+    try { await tandaReservar(tanda, "armado", legajo, ""); } catch (_e) {}
+    r = await tandaFrenar(tanda, "armado", legajo, "boton", null);
+  }
+  if (!r || r.ok !== true) {
+    try { alert(r && r.motivo === "no_es_tuya" ? "Esa tanda no figura a tu nombre: no la podés frenar." : "Sin señal: no se pudo frenar. Probá de nuevo."); } catch (_e) {}
+    return;
+  }
+  let ini = null; try { const st = getLegajoState(legajo); ini = (st.armado && st.armado.ts_inicio) || null; } catch (_e) {}
+  try { _compClearPersist(tanda); } catch (_e) {}
+  _comp = null;
+  try { document.getElementById("completarModal").classList.remove("show"); } catch (_e) {}
+  _frenoCerrarLocal(legajo, "armado", tanda, ini);
+  try { alert("✋ Frenaste la tanda " + tanda + ".\nQuedó guardado lo armado: la puede seguir otro operario o vos después."); } catch (_e) {}
+}
+window.compFrenar = compFrenar;
+
 /* v18.65 — COMPLETAR (TP/TAP): la fase queda 'completada', no borrada, así nadie la
    reabre. Para soltar de verdad está `tandaLockAnular`, que es la puerta de la anulación. */
 async function tandaLiberar(tanda, fase, legajo) {
@@ -11105,6 +11267,7 @@ async function send() {
     }
   }
 
+  let _retomaFrenada = false;   // v26.62: este EP/AP retoma una tanda FRENADA (propia o de otro)
   // v5.74b: RESERVA ATÓMICA (última compuerta antes de emitir EP/AP). Gana el primero:
   // el RPC devuelve el dueño que quedó; si no soy yo → tomada, no arranco. Cierra la
   // ventana de carrera del lock por eventos. Falla ABIERTO (sin red no bloquea). El
@@ -11115,10 +11278,43 @@ async function send() {
     let nombreMio = "";
     try { const mp = await getEmpleadosNombres(); if (mp && mp.get) nombreMio = mp.get(legajoStr) || ""; } catch (_e) {}
     const lock = await tandaReservar(texto, fase, legajoStr, nombreMio);
+    /* v26.62 (Luis, 05/10) — tanda FRENADA. La propia la retoma sin cartel (la reserva ya la
+       volvió a 'tomada'). La de otro: «Estás por agarrar una tanda que empezó X ¿Seguro?» y,
+       si dice que sí, se la lleva (gv_tanda_tomar_frenada). Sin señal no se agarra una frenada
+       ajena: el candado lo tiene que mover el servidor. */
+    if (lock && lock.ok === true && lock.retomada) _retomaFrenada = true;
+    if (lock && lock.ok === false && lock.motivo === "frenada" && !esLegajoPrueba(lock.legajo)) {
+      let nomF = String(lock.nombre || "").trim();
+      if (!nomF) { try { const mp = await getEmpleadosNombres(); if (mp && mp.get) nomF = mp.get(String(lock.legajo)) || ""; } catch (_e) {} }
+      let okF = false;
+      try { okF = confirm("Estás por agarrar una tanda que empezó " + (nomF || ("el legajo " + lock.legajo)) + " ¿Seguro?"); } catch (_e) { okF = false; }
+      if (!okF) return;
+      const rt = await tandaTomarFrenada(texto, fase, legajoStr, nombreMio);
+      if (!rt || rt.ok !== true) {
+        const mot = rt && rt.motivo;
+        try {
+          alert(mot === "otra_tanda_abierta"
+            ? "⛔ Ya tenés abierta la tanda " + (rt.tanda_abierta || "") + ". Una por vez: terminala o frenala primero."
+            : (mot === "no_frenada" ? "La tanda " + texto + " ya no está frenada (la agarró otro o se terminó). Elegí otra."
+                                    : "Sin señal: no se pudo agarrar la tanda. Probá de nuevo."));
+        } catch (_e) {}
+        return;
+      }
+      _retomaFrenada = true;
+      try { if (rt.ubicacion) alert("📍 Lo pickeado quedó en: " + rt.ubicacion); } catch (_e) {}
+    } else if (!lock) {
+      // sin señal: si la lista vieja dice que la frenó OTRO, no se agarra a ciegas
+      try {
+        const _sa = await getActivityStatus();
+        const fb = String(((fase === "picking") ? _sa.pickingFrenadaBy : _sa.armadoFrenadaBy).get(texto) || "").trim();
+        if (fb && fb !== legajoStr) { alert("Sin señal: esa tanda la frenó otro operario y hay que tener conexión para agarrarla. Probá de nuevo con señal."); return; }
+        if (fb && fb === legajoStr) _retomaFrenada = true;
+      } catch (_e) {}
+    }
     /* v18.65 — el backend ahora contesta {ok, motivo, …}. Falla ABIERTO: sin red `lock` es
        null y no se bloquea nada (igual que antes). Se mira `ok === false` para que una
        respuesta vieja (pestaña sin recargar) tampoco trabe a nadie. */
-    if (lock && lock.ok === false && !esLegajoPrueba(lock.legajo)) {
+    if (lock && lock.ok === false && lock.motivo !== "frenada" && !esLegajoPrueba(lock.legajo)) {
       const quien = lock.nombre ? (lock.nombre + " (leg " + lock.legajo + ")")
                   : (lock.legajo ? ("el legajo " + lock.legajo) : "otro operario");
       const esPick = (opcion === "EP");
@@ -11433,7 +11629,8 @@ async function send() {
   }
 
   // Al EMPEZAR PICKING: flujo interactivo de artículos a levantar (Ok / F).
-  if (opcion === "EP" && (texto || "").trim()) showPickingList(texto, legajoStr);
+  // v26.62: si retoma una FRENADA, lo pickeado sale del SERVIDOR (de todos los que la tocaron), no del celular.
+  if (opcion === "EP" && (texto || "").trim()) showPickingList(texto, legajoStr, _retomaFrenada ? { seedFromServer: true, todos: true } : undefined);
   // v4.07/v5.76: al TERMINAR PICKING (TP). La baja de stock la hace ahora SOLO el cron
   // server-side (single writer, evita el doble-conteo); acá el cliente solo chequea si
   // el pick quedó sin stock en góndola → aviso SSG.
@@ -12301,7 +12498,7 @@ function pkSave() {
     localStorage.setItem(PK_SAVE_PREFIX + _pk.legajo, JSON.stringify({
       day: getTodayKey(), tanda: _pk.tanda, legajo: _pk.legajo,
       items: _pk.items, idx: _pk.idx, results: _pk.results, mode: _pk.mode,
-      forced: _pk.forced || {},
+      forced: _pk.forced || {}, cid: _pk.cid || {},   // v26.62
       app: (typeof APP_VERSION !== "undefined" ? APP_VERSION : "")   // v18.53 — con qué versión se armó esta lista
     }));
   } catch (_e) { /* localStorage lleno / privado: no rompe el picking */ }
@@ -12369,7 +12566,7 @@ function pkResume(legajo) {
   m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + saved.tanda;
   _pk = { tanda: saved.tanda, legajo: saved.legajo, items: saved.items,
           idx: saved.idx || 0, results: saved.results || {}, mode: saved.mode || "item",
-          forced: saved.forced || {} };
+          forced: saved.forced || {}, cid: saved.cid || {} };   // v26.62
   m.classList.add("show");
   pkRender();
 }
@@ -12379,15 +12576,18 @@ function pkResume(legajo) {
    RECONSTRUIR el avance cuando el guardado local no está: el picking cruzó de día,
    se hizo en otro celular, o se limpió. `sinceIso` acota al arranque del picking
    (ts_inicio del EP) para no traer marcas de una vez anterior con el mismo código. */
-async function pkFetchServerMarks(tanda, legajo, sinceIso) {
+async function pkFetchServerMarks(tanda, legajo, sinceIso, todos) {
   const out = new Map();
+  out.cid = {};   // v26.62: CÓDIGO -> client_id de su PKC (corregir un artículo pisa ESA fila, no suma otra)
   try {
     const lg = String(legajo || "").trim();
     const tU = String(tanda || "").trim().toUpperCase();
-    if (!lg || !tU) return out;
+    if ((!lg && !todos) || !tU) return out;
     let since = sinceIso;
-    if (!since) { try { since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(); } catch (_e) { since = null; } }
-    let q = "opcion=eq.PKC&legajo=eq." + encodeURIComponent(lg) + "&select=texto,ts_cliente&order=ts_cliente.asc";
+    if (!since) { try { since = new Date(Date.now() - (todos ? 10 : 3) * 24 * 60 * 60 * 1000).toISOString(); } catch (_e) { since = null; } }
+    /* v26.62 — `todos`: tanda FRENADA que retoma otro (o el mismo en otro día): las marcas de TODOS
+       los que la tocaron. Las de un ciclo anulado no molestan: la anulación las pasa a PKCX. */
+    let q = "opcion=eq.PKC" + (todos ? "&texto=like." + encodeURIComponent(tU + "|*") : "&legajo=eq." + encodeURIComponent(lg)) + "&select=texto,ts_cliente,client_id&order=ts_cliente.asc";
     if (since) q += "&ts_cliente=gte." + encodeURIComponent(since);
     const rows = await supaFetchAll(SUPABASE_TABLE_ENDPOINT, q);
     for (const r of rows) {
@@ -12398,6 +12598,7 @@ async function pkFetchServerMarks(tanda, legajo, sinceIso) {
       if (!code) continue;
       const real = Number(parts[3]);
       out.set(code, isNaN(real) ? 0 : real);                            // order asc → queda la última del código
+      if (r.client_id) out.cid[code] = String(r.client_id);
     }
   } catch (_e) { /* best-effort: si no hay red, devuelve vacío y arranca sin sembrar */ }
   return out;
@@ -12728,7 +12929,8 @@ async function showPickingList(tanda, legajo, opts) {
     // volver a pickear lo de ayer.
     if (opts && opts.seedFromServer) {
       try {
-        const srv = await pkFetchServerMarks(tNorm, _pk.legajo, opts.sinceIso);
+        const srv = await pkFetchServerMarks(tNorm, _pk.legajo, opts.sinceIso, !!opts.todos);
+        _pk.cid = srv.cid || {};   // v26.62: re-confirmar un artículo ya marcado pisa SU fila (el stock suma por fila)
         for (const it of _pk.items) {
           if (it.skip || it.isExc) continue;
           const code = String(it.art).toUpperCase();
@@ -13473,7 +13675,8 @@ function pkFootRender(m) {
   const foot = m ? m.querySelector(".tanda-modal-foot") : null;
   if (!foot) return;
   foot.innerHTML = _pk
-    ? '<button class="pk-anular" onclick="pkAnular()">✕ Anular picking<small>borra lo cargado y libera la tanda</small></button>'
+    ? '<button class="pk-frenar" onclick="pkFrenar()">✋ Frenar la tanda<small>queda guardado lo pickeado; la sigue otro o vos después</small></button>' +   // v26.62
+      '<button class="pk-anular" onclick="pkAnular()">✕ Anular picking<small>borra lo cargado y libera la tanda</small></button>'
     : "";
 }
 async function pkAnular() {
@@ -13771,8 +13974,10 @@ function pkSendDetail(art, esp, real) {
     ts: nowMs,
     // client_id determinístico → reenviar/corregir el mismo artículo hace UPSERT
     // (merge-duplicates) en vez de duplicar. Por eso se puede ir y volver.
-    id: ("pkc_" + _pk.legajo + "_" + _pk.tanda + "_" + String(art).toUpperCase() + "_" + getTodayKey())
-          .replace(/[^a-zA-Z0-9_\-]/g, ""),
+    // v26.62: si el artículo ya tiene su PKC en el servidor (tanda frenada que se retoma), se pisa ESA fila.
+    id: ((_pk.cid && _pk.cid[String(art).toUpperCase()]) ||
+         ("pkc_" + _pk.legajo + "_" + _pk.tanda + "_" + String(art).toUpperCase() + "_" + getTodayKey())
+          .replace(/[^a-zA-Z0-9_\-]/g, "")),
     ts_inicio_iso: null
   };
   try {
@@ -14175,9 +14380,21 @@ async function showCompletarWizard(legajo, codigo) {
       }
     } catch (_e) {}
     // v4.04: si hay avance guardado de esta tanda (el wizard que se abrió en AP), retomarlo.
-    const _savedC = _compRestore(tanda);
+    let _savedC = _compRestore(tanda);
+    /* v26.62 (Luis, 05/10) — sin avance en ESTE celular (otro celular, o una tanda FRENADA que
+       retoma otro operario): la última foto del servidor (GV_Armado_Avance), si sigue en curso. */
+    if (!(_savedC && _savedC.nps && _savedC.nps.length)) {
+      try {
+        const _ra = await fetch(SUPABASE_URL + "/rest/v1/rpc/gv_armado_avance_leer", {
+          method: "POST", headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_tanda: tanda }), cache: "no-store" });
+        const _av = _ra.ok ? await _ra.json() : null;
+        if (_av && _av.estado === "en_curso" && _av.snapshot && _av.snapshot.nps && _av.snapshot.nps.length) _savedC = _av.snapshot;
+      } catch (_e) { /* sin señal: arranca como siempre */ }
+    }
     if (_savedC && _savedC.nps && _savedC.nps.length) {
       _comp = _savedC;
+      _comp.legajo = String(legajo || _comp.legajo || "").trim();   // v26.62: el que arma AHORA (la foto puede ser de otro)
       if (!_comp._difMovs) _comp._difMovs = [];   // v11.09: armados persistidos pre-v11.09 no tienen el array
       _comp.pickUbic = _pickUbic; _comp.dirByNp = _dirByNp; _comp.sucByNp = _sucByNp;
       try { etlLoadGlobal(); } catch (_e) {}   // idea 5290 (fix): retomar un armado en curso NO se saltea el refresco del switch/legajos — si no, queda pegado con el mirror viejo (o vacío) para siempre
@@ -31841,8 +32058,10 @@ async function showOperarioDia(legajo) {
       const ts = new Date(e.ts_cliente).getTime();
       if (op === "EP") { pick = tanda; pickTs = ts; }
       else if (op === "TP") { if (!tanda || pick === tanda) pick = null; }
+      else if (op === "PKF") { if (pick === tanda) pick = null; }   // v26.62
       else if (op === "AP") { arm = tanda; armTs = ts; }
       else if (op === "TAP") { if (!tanda || arm === tanda) arm = null; }
+      else if (op === "APF") { if (arm === tanda) arm = null; }
       else if (_MON_ACT_TOGGLES[op]) { if (!e.ts_inicio) { togOpen[op] = ts; } else { delete togOpen[op]; } }
     }
     const nowMs = Date.now();
@@ -32620,6 +32839,9 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       if (colaMs > 0) { detail.colaMs = colaMs; detail.durMs = dur + colaMs; }
       if (ev.opcion === "TP"  && durOK) { if (!p.pickedTandas.has(tanda)) p.pickMs += dur + colaMs; p.pickedTandas.add(tanda); p.pickedDetail.push(detail); }
       if (ev.opcion === "TAP" && durOK) { if (!p.armedTandas.has(tanda))  p.armMs  += dur + colaMs; p.armedTandas.add(tanda);  p.armedDetail.push(detail);  }
+      // v26.62-frenada ≡ vista: el tramo FRENADO (PKF/APF) suma a quien lo hizo, cada uno, sin cola ni m³
+      if (ev.opcion === "PKF" && durOK) { p.pickMs += dur; detail.m3 = 0; detail.frenada = true; p.pickedDetail.push(detail); }
+      if (ev.opcion === "APF" && durOK) { p.armMs  += dur; detail.m3 = 0; detail.frenada = true; p.armedDetail.push(detail); }
       if (ev.opcion === "CC"  && durOK) { if (!p.ccTandas.has(tanda))     p.ccMs   += dur; p.ccTandas.add(tanda);     p.ccDetail.push(detail);     }
     }
     /* v21.47 — CC + CR + RR por duración, con el MISMO `computeClosureDur` que
@@ -32709,8 +32931,8 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
         for (let j = i + 1; j < evs.length && !cerrada && finFJ == null; j++) {
           const c = evs[j], ct = String(c.texto || "").trim().toUpperCase();
           if (c.opcion === "FJ") finFJ = new Date(c.ts_cliente).getTime();   // v23.69: el FJ CIERRA la tarea, no la borra
-          else if (k === "EP") cerrada = c.opcion === "TP" && (!ct || ct === tx);
-          else if (k === "AP") cerrada = c.opcion === "TAP" && (!ct || ct === tx);
+          else if (k === "EP") cerrada = (c.opcion === "TP" && (!ct || ct === tx)) || (c.opcion === "PKF" && ct === tx);   // v26.62-frenada ≡ vista
+          else if (k === "AP") cerrada = (c.opcion === "TAP" && (!ct || ct === tx)) || (c.opcion === "APF" && ct === tx);
           else if (k === "MG") cerrada = c.opcion === "MG" || c.opcion === "MGC";
           else cerrada = c.opcion === k && !!c.ts_inicio;
         }
@@ -52741,8 +52963,10 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
       gstIni = 0; gstUlt = 0;                                          // un evento real corta la racha
       if (e.op === "EP") { pick = e.tx; pickTs = e.ts; }
       else if (e.op === "TP") { if (!e.tx || pick === e.tx) pick = null; }
+      else if (e.op === "PKF") { if (pick === e.tx) pick = null; }    // v26.62: frenó la tanda ≡ tv.html
       else if (e.op === "AP") { arm = e.tx; armTs = e.ts; }
       else if (e.op === "TAP") { if (!e.tx || arm === e.tx) arm = null; }
+      else if (e.op === "APF") { if (arm === e.tx) arm = null; }
       else if (e.op === "MGI") { tog = "MG"; togTs = e.ts; }                       // v23.63
       else if (e.op === "MGC") { if (tog === "MG") tog = null; }
       else if (e.op === "RKI") { tog = "RKB"; togTs = e.ts; }                      // v23.66: bajando racks
@@ -52927,8 +53151,9 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
     const t = (row.tanda || "").trim().toUpperCase();
     if (!t) continue;
     statusMap.set(t, {
-      picking:  !row.last_pick_op ? null : (row.last_pick_op === "TP"  ? "done" : "curso"),
-      separado: !row.last_arm_op  ? null : (row.last_arm_op  === "TAP" ? "done" : "curso"),
+      // v26.62: PKF / APF = FRENADA (≠ en curso: nadie la está haciendo ahora) ≡ tv.html
+      picking:  !row.last_pick_op ? null : (row.last_pick_op === "TP"  ? "done" : (row.last_pick_op === "PKF" ? "frenada" : "curso")),
+      separado: !row.last_arm_op  ? null : (row.last_arm_op  === "TAP" ? "done" : (row.last_arm_op  === "APF" ? "frenada" : "curso")),
       doneTodayP: false,
       doneTodayA: false,
       pickLegajo:  row.pick_legajo  || null,
@@ -53017,6 +53242,7 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
 function statusIconToday(s) {
   // Solo eventos de HOY. null/undefined -> celda vacía.
   if (s === "done")  return `<span class="status-icon status-done" title="Terminado hoy">✅</span>`;
+  if (s === "frenada") return `<span class="status-icon" title="Frenada: la retoma el que la frenó u otro operario">⏸</span>`;   // v26.62
   if (s === "curso") {
     // Spinner CSS liviano (1 elemento, 1 animation) — antes eran 12 rects SVG
     // que trababan la pc cuando había muchas tandas en curso.
@@ -59366,7 +59592,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=26.63"></script>
+<script src="importacion.js?v=26.64"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -62189,9 +62415,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=26.63"></script>
-<script src="hotsale.js?v=26.63"></script>
-<script src="estadisticas.js?v=26.63"></script>
+<script src="cobranzas.js?v=26.64"></script>
+<script src="hotsale.js?v=26.64"></script>
+<script src="estadisticas.js?v=26.64"></script>
 
 </body>
 </html>

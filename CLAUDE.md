@@ -5590,13 +5590,27 @@ la tomaron **no** se le avisa nada · **crédito**: picking por cajas pickeadas 
 | `GV_Armado_Avance` + `gv_armado_avance_guardar` / `_leer` | la ÚLTIMA foto del asistente de armado por tanda, con resumen (NP, NP listas, líos, cajas en líos). La manda el celular al cerrar cada lío (1,5 s), con cualquier cambio (8 s), al pausar, al terminar (`terminado`) y al soltar (`anulado`). Desde el mismo celular no se pisa con una foto más vieja; una terminada sólo la pisa una posterior |
 | cada lío | lleva `leg` y `ts` (quién lo cerró y cuándo): no cambia su firma (`_compLioSig`), ni letras ni grupos |
 
-⚠ **Nadie produce todavía `frenada` ni lee la copia**: el botón, el cartel, el freno al fichar, el del supervisor,
-el aviso del día siguiente y los lectores (TV ⏸, tiempo muerto, horas, puntaje, lista de tandas, PPP) son la parte 2.
-⚠ **Al retomar una frenada por un camino que NO pasa por `gv_tanda_reservar`** (▶ Seguir picking / armado), el
-candado queda `frenada` con el operario trabajando: la parte 2 tiene que llamar a la reserva (o a
-`gv_tanda_tomar_frenada`) en esos caminos, o otro se la podría llevar.
 Centinelas v26.61 (3 filas) · `scripts/reglas-protegidas.json` · backup `zz_backups."GV_Backup_TandaFreno_defs_20261005"` ·
 rollback y pruebas en `sql/gv_tanda_frenada_v2661.sql` · `tests/arm-avance-servidor.cjs`.
+
+**Parte 2 (v26.64; en la base, los marcadores, la huella y los centinelas dicen v26.62 — llave, no cambiar) — el botón, el cartel y los lectores:**
+
+| pieza | qué hace |
+|---|---|
+| **✋ Frenar la tanda** | picking (pie del asistente, al lado de Anular) y armado (pie del asistente). Pop-up con el texto de Luis; el picking pide dónde quedó el carro. Antes de frenar manda la cola del celular de ESA tanda (EP/AP/PKC) y, en armado, la foto (`_armAvPost` esperada). Sin señal **no frena** (lo dice): frenar sin que llegue lo hecho perdería el avance |
+| evento **PKF / APF** | lo escribe `gv_tanda_frenar` (nueva firma + `p_ts_cliente`; la v26.61 quedó como `gv_tanda_frenar_v2661`): `texto` = tanda, `ts_inicio` = el EP/AP del dueño, `client_id 'frn_<id>'`. Es el **cierre del tramo** del que frenó |
+| lista de tandas | la frenada vuelve a **EP** con chip **⏸** y leyenda «frenada por …»; **no** sale en TP (no se termina sin retomarla); en AP se marca, en TAP no sale (`getActivityStatus.pickingFrenadaBy` / `armadoFrenadaBy`) |
+| retomar | `send()`: la propia vuelve sin cartel (`retomada`); la de otro → *«Estás por agarrar una tanda que empezó A ¿Seguro?»* → `gv_tanda_tomar_frenada` (devuelve `ubicacion`: «📍 Lo pickeado quedó en: …»). El picking se abre sembrado con las marcas de **todos** (`pkFetchServerMarks(…, todos)`) y re-confirmar un código **pisa la fila PKC original** (`_pk.cid`, mismo `client_id`): el reconciliador suma PKC por tanda+artículo y una segunda fila contaría doble. El armado arranca de la foto del servidor (`gv_armado_avance_leer`) a nombre de quien arma ahora |
+| horas | `gv_monitor_horas_operario_dia` (≡ `fetchMonitorDayStats`): PKF/APF **cierran** el EP/AP abierto y su tramo suma a picking/armado de **quien lo hizo**, sin cola. Huella `511b8f5e…` |
+| estado y TV | `vista_tanda_status`: PKF/APF = sigue en picking/armando. TV / Mon. Admin / monitor viejo: luz **⏸ frenada** (ámbar) |
+| puntaje | una tanda con freno de picking **no entra** en `gv_picking_puntaje_operario` hasta el reparto por operario (parte 3) |
+
+⚠ El m³ de la tanda sigue acreditándose a quien da el **TP/TAP** final: el reparto por operario (D6) es la parte 3.
+⚠ Falta (parte 2b): el freno **al fichar salida**, el botón del **supervisor** y el aviso del día siguiente
+(*«Tenés la tanda X frenada. ¿La retomás?»*). Hasta entonces una tanda tomada que el operario deja al irse queda
+`tomada` como siempre.
+⚠ Un celular con estado local viejo de una tanda que ya se frenó desde otro (▶ Seguir) no pasa por la reserva.
+Centinelas v26.62 ids 300-306 · `sql/gv_tanda_frenada_v2662.sql` (CREATE completos + rollback) · `tests/tanda-frenar.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-01, v25.63): todo módulo que abre tarea tiene ⛔ ANULAR — y la anulación QUEDA REGISTRADA
 

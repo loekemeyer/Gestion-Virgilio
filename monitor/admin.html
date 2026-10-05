@@ -213,6 +213,7 @@ table.tandas td,table.tandas th{text-align:center;padding:.85vh .4vw}
 .sem .s-curso{background:#f59e0b;color:#3b2200;animation:pulso 1.4s ease-in-out infinite}
 .sem .s-ok{background:#16a34a}
 .sem .s-aband{background:#6d28d9;box-shadow:inset 0 0 0 .25vh #a78bfa}
+.sem .s-fren{background:#b45309;color:#fff7ed}.st-fren{color:#fbbf24;font-weight:900}
 @keyframes pulso{0%,100%{opacity:1}50%{opacity:.35}}
 
 /* ── Horas por operario (v21.17, Damián) ─────────────────────────────────
@@ -839,8 +840,8 @@ function npsCortas(nps) {
    iniciales de quién la tiene y hace cuánto, que es lo que se acciona. */
 /* v23.92 (Luis): la luz lleva la letra de su etapa adentro — P de picking, A de armado. */
 function luz(estado, aband, letra) {
-  var c = aband ? "s-aband" : (estado === "done" ? "s-ok" : (estado === "curso" ? "s-curso" : "s-no"));
-  var t = aband ? "Abandonada" : (estado === "done" ? "Terminado" : (estado === "curso" ? "En curso" : "Sin empezar"));
+  var c = aband ? "s-aband" : (estado === "done" ? "s-ok" : (estado === "curso" ? "s-curso" : (estado === "frenada" ? "s-fren" : "s-no")));
+  var t = aband ? "Abandonada" : (estado === "done" ? "Terminado" : (estado === "curso" ? "En curso" : (estado === "frenada" ? "Frenada" : "Sin empezar")));
   return '<i class="' + c + '" title="' + (letra === "P" ? "Picking" : "Armado") + ': ' + t + '">' + letra + '</i>';
 }
 function semaforo(ev, nombres, horarios) {
@@ -851,6 +852,8 @@ function semaforo(ev, nombres, horarios) {
   var det = "";
   if (ev.armado === "curso")       det = celdaEstado("curso", ev.armLegajo,  ev.armStart,  ev.armAband,  ev.armFj,  nombres, horarios);
   else if (ev.picking === "curso") det = celdaEstado("curso", ev.pickLegajo, ev.pickStart, ev.pickAband, ev.pickFj, nombres, horarios);
+  else if (ev.armado === "frenada")  det = celdaEstado("frenada", ev.armLegajo, null, false, null, nombres, horarios);   /* v26.62 */
+  else if (ev.picking === "frenada") det = celdaEstado("frenada", ev.pickLegajo, null, false, null, nombres, horarios);
   return s + (det ? '<span class="semdet">' + det + '</span>' : "");
 }
 
@@ -874,8 +877,9 @@ function cargarStatus(keys) {
         var t = String(row.tanda || "").trim().toUpperCase();
         if (!t) return;
         m.set(t, {
-          picking:  !row.last_pick_op ? null : (row.last_pick_op === "TP"  ? "done" : "curso"),
-          armado:   !row.last_arm_op  ? null : (row.last_arm_op  === "TAP" ? "done" : "curso"),
+          /* v26.62: PKF/APF = FRENADA (nadie la está haciendo; la retoma cualquiera) ≡ index.html */
+          picking:  !row.last_pick_op ? null : (row.last_pick_op === "TP"  ? "done" : (row.last_pick_op === "PKF" ? "frenada" : "curso")),
+          armado:   !row.last_arm_op  ? null : (row.last_arm_op  === "TAP" ? "done" : (row.last_arm_op  === "APF" ? "frenada" : "curso")),
           doneHoyP: false, doneHoyA: false,
           pickLegajo: row.pick_legajo || null, armLegajo: row.arm_legajo || null,
           pickStart: row.pick_start_ts || null, armStart: row.arm_start_ts || null,
@@ -1161,6 +1165,8 @@ function actividadActual(eventos, hoy, fjHoy, fichados) {
       gstIni = 0; gstUlt = 0;
       if (e.op === "EP") { pick = e.tx; pickTs = e.ts; }
       else if (e.op === "TP")  { if (!e.tx || pick === e.tx) pick = null; }
+      else if (e.op === "PKF") { if (pick === e.tx) pick = null; }   /* v26.62: frenó ≡ index.html */
+      else if (e.op === "APF") { if (arm === e.tx) arm = null; }
       else if (e.op === "AP")  { arm = e.tx; armTs = e.ts; }
       else if (e.op === "TAP") { if (!e.tx || arm === e.tx) arm = null; }
       else if (e.op === "MGI") { tog = "MG"; togTs = e.ts; }                       /* ≡ index.html v23.63 */
@@ -1215,7 +1221,7 @@ function celdaEstado(estado, legajo, inicio, aband, fjTs, nombres, horarios) {
      que la v18.71 vino a arreglar. Lleva ⏏ y color propio. */
   var icono = estado === "done"
     ? '<span class="st-done">✅</span>'
-    : (aband ? '<span class="st-aband">■</span>' : '<span class="spin"></span>');
+    : estado === "frenada" ? '<span class="st-fren">⏸</span>' : (aband ? '<span class="st-aband">■</span>' : '<span class="spin"></span>');
   var tag = "";
   if (legajo != null) {
     var nom = nombres.get(String(legajo)) || "";

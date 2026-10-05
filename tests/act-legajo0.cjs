@@ -19,7 +19,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     function J(data) { return Promise.resolve({ ok: true, status: 200, headers: { get: function () { return null; } }, json: function () { return Promise.resolve(data); } }); }
     window.fetch = function (url) {
       url = String(url);
-      if (url.indexOf("opcion=in.(EP,TP,AP,TAP)") >= 0) {
+      if (url.indexOf("opcion=in.(EP,TP,AP,TAP") >= 0) {
         return J([
           { opcion: "EP", texto: "D05B",  ts_cliente: "2026-08-03T18:59:00Z", legajo: "0" },   // PRUEBA → NO
           { opcion: "EP", texto: "REAL",  ts_cliente: "2026-08-04T12:00:00Z", legajo: "122" }, // real → SÍ

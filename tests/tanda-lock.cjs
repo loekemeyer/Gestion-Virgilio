@@ -22,7 +22,7 @@ catch (_e) {
     function J(data) { return Promise.resolve({ ok: true, status: 200, headers: { get: function () { return null; } }, json: function () { return Promise.resolve(data); } }); }
     window.fetch = function (url) {
       url = String(url);
-      if (url.indexOf("opcion=in.(EP,TP,AP,TAP)") >= 0) {
+      if (url.indexOf("opcion=in.(EP,TP,AP,TAP") >= 0) {
         return J([
           // TANDA_A: picking EN CURSO por 104 (EP sin TP)
           { opcion: "EP", texto: "TANDA_A", ts_cliente: "2026-07-23T10:00:00Z", legajo: "104" },

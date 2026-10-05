@@ -31504,3 +31504,28 @@ Después de la caída de LK (§3.v2662, problema 701): `sync-reingresos-virgilio
 en `1-59/5`**: es el que alimenta `lk_pedidos_match` y tiene que llegar antes del armado de Gestión (cron 73,
 :00/:05…). Ninguno de los dos movidos depende de otro (39 → reingreso_cache para la página; 38 → reportes).
 Tareas largas que arrancan en el mismo minuto: **4 → 2**. `sql/lk_crons_separados_v2663_LK.sql` (rollback adentro).
+
+### 3.v2664 — FRENAR la tanda, parte 2: evento PKF/APF y lectores (Luis, 05/10/2026, v26.64)
+
+⚠ Se aplicó en la base con la etiqueta **v26.62** (otra sesión pusheó su v26.62 y v26.63 en el medio): los
+marcadores internos (`v26.62-frenada`, `v26.62-evento`), la huella y los centinelas 300-306 dicen v26.62. Son
+la llave de idempotencia: no cambiarlos.
+
+**Objetos** (aplicados el 05/10; CREATE completos en `sql/gv_tanda_frenada_v2662.sql`):
+
+| objeto | cambio |
+|---|---|
+| `gv_tanda_frenar(text,text,text,text,text,timestamptz)` | nueva firma (+ `p_ts_cliente`). Además de frenar, inserta en `Registros_Produccion_Virgilio` el **PKF** (picking) / **APF** (armado): `texto` = tanda, `ts_inicio` = último EP/AP del dueño, `ts_cliente` = cuándo frenó (el del celular si es creíble; por fichaje, el FJ; si no, `now()`), `client_id 'frn_<id GV_Tanda_Freno>'`, `gv_app 'gestion-db'`. La v26.61 quedó renombrada `gv_tanda_frenar_v2661` (el DROP se cuelga en el MCP) |
+| `gv_tanda_tomar_frenada` | devuelve `ubicacion` del último freno |
+| `vista_tanda_status` | PKF/APF entran como último evento de la fase: estado `picking` / `armando`, legajo = el que frenó. `security_invoker` repuesto |
+| `gv_monitor_horas_operario_dia` | PKF/APF cierran el EP/AP abierto (CTE `abierta`) y su tramo suma a `hs_pick`/`hs_arm` de quien lo hizo (`pick_fr`/`arm_fr`, sin cola). Huella `511b8f5eac8c198a3cbbc49c7de9b25c` (v26.62) |
+| `gv_picking_puntaje_operario` | saca las tandas con freno de picking (`GV_Tanda_Freno`) |
+
+**Impacto medido:** `vista_tanda_status` 0 filas distintas contra la definición anterior; `gv_monitor_horas_operario_dia`
+idéntica en 15/09 y del 01 al 05/10 (no había PKF/APF). Casos simulados en transacción abortada: un EP cerrado por PKF
+deja de contarse como abierto y suma su tramo; un TP posterior de otro operario suma el suyo aparte.
+
+**Centinelas:** `GV_Reglas_Centinela` ids 300-306. `gv_reglas_perdidas` y `gv_huellas_cambiadas` vacías.
+
+**Rollback:** al final de `sql/gv_tanda_frenada_v2662.sql` (definiciones anteriores en
+`zz_backups."GV_Backup_TandaFreno_defs_20261005"`).
