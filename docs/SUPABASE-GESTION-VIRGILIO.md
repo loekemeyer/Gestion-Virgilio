@@ -31701,3 +31701,28 @@ automáticamente en base a la programación de ese súper»*. Las tres opciones 
 - Rollback: `drop function if exists public.gv_ppp_dia_ajustar(date, jsonb, boolean, text, numeric, text);` + volver el front.
 - `sql/gv_ppp_dia_ajustar_v2682.sql`, `tests/apr-dia-ocupado.cjs`.
 
+
+### 3.v2686 — Góndola sin lugar avisa por Telegram · el stock GP2 de un importado suma su MISMO código (Luis, 05/10/2026, v26.86)
+
+**1. Telegram cuando se guarda en una góndola que no tiene lugar** (Luis: *«que salte mensaje en telegram cuando alguien
+guarda cosas en una góndola cuando en teoría no entran por espacio»*; D1 = **no se frena** el guardado). Caso: 505,
+góndola 3.617 contra capacidad 3.340 (guardados de 574 el 21/09 y el 28/09 con lugar para ~170).
+
+| pieza | qué |
+|---|---|
+| `gv_alerta_gondola_llena_telegram(p_simular)` | cada movimiento que SUMA a `terminado` (guardado, baja_racks, recepcion_imp) de las últimas 6 h: saldo de góndola de ese código después del movimiento (dual: por empresa) contra `Capacidad_Sector`; si se pasa, UN Telegram por movimiento (`tg_enqueue`, grupo de siempre). Sin capacidad cargada, no avisa |
+| `GV_Alerta_Gondola_Llena` | dedup por `mov_id` (el outbox se purga al mandar). RLS cerrada, sin grants a anon |
+| cron **132** `gv-alerta-gondola-llena` | `3-58/5 * * * *` |
+
+- Forward-facing: al instalar se sembró el dedup con lo de las últimas 6 h (9 movimientos, todos del legajo 94) y no se avisaron.
+- Probar sin mandar: `select * from public.gv_alerta_gondola_llena_telegram(true);`
+- Centinela 322 (etiqueta v26.85). Rollback: `select cron.unschedule('gv-alerta-gondola-llena');` + drop de la función.
+
+**2. El stock GP2 de un importado suma TAMBIÉN el componente de GP2 con el MISMO código** (Luis: *«323E considera GRJ31
+pero debería considerar también 323E»*). `gv_importados_ordenes`, lateral `g2`: `GV_Importados_Equiv_GP2` ∪ el propio
+`cod_art` con factor 1, salvo que ya esté en la tabla de equivalencias (no duplica, 942E) o que el código sea un dual
+(`dup`). Bodegas: las de `gv_gp2_stock_componente` = todo GP2 menos `parte = 'virgilio'` (sector, **talleristas**, PS…),
+sin cambios. Impacto al 05/10: **0** (ningún importado tiene hoy stock propio en GP2 fuera de Virgilio); probado en
+transacción abortada (590E +150 de sector + tallerista; 942E sin doble conteo). El pop-up «📦 Stock» lo nombra.
+Centinela 323 (etiqueta v26.85). `sql/gv_importados_gp2_mismo_codigo_v2686.sql` (rollback adentro),
+`sql/gv_alerta_gondola_llena_v2686.sql`, `tests/pedimp-stock-desg-gp2.cjs` (g y h).

@@ -7291,6 +7291,7 @@ negativo para usos prácticos de importación"*.
 - Al 01/10: 22 códigos en negativo (583E −210, 969E −204…); 505C +21.605, 587C +20.377, 323E +600 (444 neto).
 - ⚠ GRJ31 cuenta en 323ES (100 %) **y** en 323E/838E (20/80), a propósito (Luis, 01/10, D13: *"323ES es la pieza para fabricar los otros dos, así que la evaluación de esa es particular"*). No es doble conteo: no volver a proponer sacarlo.
 - **v26.00 (Luis, D19):** un importado puede tener VARIOS componentes y se suman; los que GP2 todavía no tiene (Z47, Z44-M505C, GRJ33…) cuentan solos cuando se creen (cruce por `upper`). El pop-up los lista todos. ⚠ Si el terminado de GP2 (942E…) se manda a Virgilio, tiene que salir del inventario de GP2 o cuenta dos veces.
+- **v26.86 (Luis, 05/10): suma TAMBIÉN el componente de GP2 con el MISMO código** (323E en GP2 = el artículo terminado), factor 1, salvo que ya esté en `GV_Importados_Equiv_GP2` o el código sea dual. Bodegas = todo GP2 menos Virgilio (talleristas incluidos). Lateral `e_mismo`, centinela 323. `sql/gv_importados_gp2_mismo_codigo_v2686.sql`.
 - **v26.03 (Luis, 01/10, D23): también suma STOCK DE VIRGILIO de otro código que se convierte en el importado**
   (*"si tengo de eso, no tengo que salir corriendo a comprar"*): tabla **`GV_Importados_Equiv_Virgilio`** (importado,
   código, empresa, factor) → CTE `conv` de `gv_importados_ordenes` → columna **`stock_conv`** (dentro de
@@ -7709,3 +7710,11 @@ con su propia cola (`gv_pkm_q_v1`, tope 800) y todo en try/catch: **si falla, el
   doble fila"*): todos los chips usan el molde `_stkChip2` (alto 38, letra 11,5); el estado prendido lo dice el color, no
   ☐/☑. Al agregar un botón a esa barra, va con ese molde.
 - `tests/stk-excel-stock-insumos.cjs`, `tests/ppp-ent-fecha-pedido.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-05, v26.86): guardar en una GÓNDOLA SIN LUGAR no se frena — AVISA por Telegram
+
+D1 = no se bloquea el guardado. Cron **132** `gv-alerta-gondola-llena` (`3-58/5`) → `gv_alerta_gondola_llena_telegram()`:
+cada movimiento que suma a `terminado` (guardado, baja_racks, recepcion_imp) que deja la góndola del código (dual: por
+empresa) por encima de `Capacidad_Sector` manda UN Telegram (quién, cuántas, góndola vs capacidad). Dedup en
+`GV_Alerta_Gondola_Llena`. Sin capacidad cargada no avisa. Probar sin mandar: `select * from
+public.gv_alerta_gondola_llena_telegram(true);`. Centinela 322. `sql/gv_alerta_gondola_llena_v2686.sql`.

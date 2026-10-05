@@ -1,5 +1,5 @@
 {
-  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82 gv_ppp_dia_ajustar)",
+  "_generado": "2026-10-03 (+ cola TP/TAP v26.43 en gv_monitor_horas_operario_dia; + gv_ppp_web_fusionar_tandas, gv_ingreso_virgilio_denegado, gv_ventas_clientes_mes_cod, gv_tanda_reservar; + v26.50 gv_picking_tanda_calc, gv_picking_puntaje_operario; + v26.51 gv_picking_pickeado; + v26.55 vista_tanda_m3, gv_monitor_tanda_camion, gv_tanda_m3_pickeado; + v26.61 gv_tanda_frenar, gv_armado_avance_guardar; + v26.62 vista_tanda_status, gv_tanda_tomar_frenada; + v26.65 gv_tandas_frenar_fichaje, gv_tandas_frenadas_de; + v26.66 gv_cola_impresion_lista; + v26.67 gv_tanda_credito; + v26.68 gv_picking_tanda_calc_frenada, gv_picking_tanda_refresh; + v26.82 gv_ppp_dia_ajustar; + v26.86 gv_alerta_gondola_llena_telegram)",
   "reglas": [
     {
       "objeto": "entregas_virgilio_dedup",
@@ -794,6 +794,11 @@
     {
       "objeto": "vista_tanda_status",
       "regla": "Una tanda con PKF/APF figura FRENADA (picking/armado), no en curso ni terminada",
+      "quien": "Luis"
+    },
+    {
+      "objeto": "gv_alerta_gondola_llena_telegram",
+      "regla": "guardar en gondola por encima de la capacidad avisa por Telegram (no frena el guardado)",
       "quien": "Luis"
     }
   ]

@@ -918,9 +918,19 @@ async function pedImpStockDesglose(keyEnc, foco) {
   };
   pintar(null, false);
   if (foco !== "proy") {
-    supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Importados_Equiv_GP2", "select=componente_codigo,factor&importado_cod=eq." + encodeURIComponent(it.cod))
-      .then(function (r) { if (r && r.length && document.getElementById("impStkDesgOv")) { equiv = r; pintar(); } })
-      .catch(function () { /* sin el código se ve como antes */ });
+    /* v26.86 (Luis, 05/10): el componente de GP2 con el MISMO código (323E en GP2 = el artículo terminado)
+       también suma, factor 1 (≡ gv_importados_ordenes, lateral e_mismo). No en un dual (it.planta): la
+       vista tampoco lo suma ahí. */
+    Promise.all([
+      supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Importados_Equiv_GP2", "select=componente_codigo,factor&importado_cod=eq." + encodeURIComponent(it.cod)).catch(function () { return null; }),
+      it.planta ? Promise.resolve(null) : supaFetchAllSafe(SUPABASE_URL + "/rest/v1/gv_gp2_stock_componente", "select=codigo&codigo=ilike." + encodeURIComponent(it.cod)).catch(function () { return null; })
+    ]).then(function (rs) {
+      const e = (rs[0] || []).slice(), mismo = rs[1] || [];
+      const C = String(it.cod).toUpperCase().trim();
+      if (mismo.length && !e.some(function (x) { return String(x.componente_codigo).toUpperCase().trim() === C; }))
+        e.push({ componente_codigo: mismo[0].codigo, factor: 1 });
+      if (e.length && document.getElementById("impStkDesgOv")) { equiv = e; pintar(); }
+    });
     // v26.03 (Luis, D23) — stock de OTRO código de Virgilio que se convierte en éste (102E LK → 702E)
     supaFetchAllSafe(SUPABASE_URL + "/rest/v1/GV_Importados_Equiv_Virgilio", "select=cod_art,empresa&importado_cod=eq." + encodeURIComponent(it.cod))
       .then(function (r) { if (r && r.length && document.getElementById("impStkDesgOv")) { conv = r; pintar(); } })
