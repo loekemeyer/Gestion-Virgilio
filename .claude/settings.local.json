@@ -127,7 +127,9 @@
       "Bash(python3 - *)",
       "Bash(sed -i 's/- \\\\*\\\\*v25.69\\\\*\\\\*: sin fila en la vista/- **v25.70**: sin fila en la vista/' CLAUDE.md)",
       "Bash(sed -i '26s|const VERSION_PROPIA = \\\\[\"planimetria.js\", \"supabase-config.js\"\\\\];|const VERSION_PROPIA = [\"planimetria.js\", \"supabase-config.js\", \"alerta-inactivo.js\"];   // alerta-inactivo: mismo ?v= que monitor/tv.html|' tests/version-tokens.cjs && node tests/version-tokens.cjs | tail -1 && node tests/version-sync.cjs | tail -1 && git add -A && git commit -qm \"v25.90: vuelve la alarma de inactivo sólo en el monitor del depósito y por operarios reales; Prod/No prod en el monitor viejo *)",
-      "mcp__claude-code-remote__update_trigger"
+      "mcp__claude-code-remote__update_trigger",
+      "mcp__claude-code-remote__add_repo",
+      "mcp__claude-code-remote__register_repo_root"
     ]
   }
 }

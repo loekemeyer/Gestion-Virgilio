@@ -3,6 +3,7 @@
   "actualizado": "2026-10-02 12:00:00 por usuario",
   "puerto": 17777,
   "ajuste": "fit",
+  "papel": "A4",
   "reglas": [
     { "tipo": "picking",   "impresora": "Impresora Deposito 1", "copias": 1, "papel": "A4", "activa": true },
     { "tipo": "armado",    "impresora": "Impresora Deposito 1", "copias": 1, "papel": "A4", "activa": true },

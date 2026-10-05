@@ -1,6 +1,6 @@
 # Helper de impresión — Gestión Virgilio
 
-Versión: **1.0.0**
+Versión: **1.2.0**
 
 Programa local (un solo `.exe`, sin instalar, sin permisos de administrador) que corre en la
 PC de depósito e imprime **solas** las hojas de picking / armado / facturado que genera Gestión
@@ -43,12 +43,25 @@ Doble clic en `compilar.bat` (o el comando que está adentro). Genera `Impresion
 1. Armar una carpeta con `Impresion Virgilio.exe` + `SumatraPDF.exe`.
 2. Copiarla a la PC de depósito (ej. `C:\Impresion Virgilio\`). No se instala: se copia.
 3. Doble clic en `Impresion Virgilio.exe`. Se abre la ventana.
-4. En la ventana: configurar las reglas (tipo de hoja → impresora), Guardar, y probar con el
-   botón **Probar...**.
+4. En la ventana hay una fila por hoja (Picking · Armado · Facturado): tildarla, elegir la
+   impresora y las copias. **Se guarda sola** con cada cambio. El cartel de arriba dice si la PC
+   está lista (`✓ TODOS LOS DOCUMENTOS CONFIGURADOS`) y el puerto.
+5. Para probar una impresora: **Opciones avanzadas… → Probar impresión** (manda un PDF elegido a mano).
+
+### Ventana (v1.2.0)
+
+- **Principal:** el cartel de estado + el puerto, y la tabla hoja → impresora → copias.
+- **Opciones avanzadas…:** puerto, **tamaño de hoja (uno para todas las hojas)**, tamaño en la
+  hoja (ajustar / real / reducir), Iniciar con Windows, Probar impresión, rutas de la
+  configuración y del registro, y la actividad en vivo.
+- **Al cerrar** (X o Alt+F4) pregunta si minimizar: cerrado, las hojas dejan de imprimirse en
+  esa PC (Gestión Virgilio las manda al cuadro de impresión del navegador).
+- Si el puerto está ocupado (casi siempre, el programa ya abierto en otra ventana) lo dice y
+  ofrece **Reintentar**.
 
 ## Iniciar solo con Windows
 
-Tildar **"Iniciar con Windows"** en la ventana. Crea un acceso directo en la carpeta de inicio
+Tildar **"Iniciar con Windows"** en **Opciones avanzadas…**. Crea un acceso directo en la carpeta de inicio
 del usuario (`shell:startup`), sin admin. Destildar para sacarlo.
 
 ## Actualizar
@@ -67,6 +80,7 @@ falta editarlo a mano. Formato (ver `virgilio-impresion-EJEMPLO.json`):
       "actualizado": "2026-10-02 12:00:00 por usuario",
       "puerto": 17777,
       "ajuste": "fit",
+      "papel": "A4",
       "reglas": [
         { "tipo": "picking", "impresora": "Impresora Deposito 1", "copias": 1, "papel": "A4", "activa": true }
       ]
@@ -74,17 +88,20 @@ falta editarlo a mano. Formato (ver `virgilio-impresion-EJEMPLO.json`):
 
 - `puerto`: puerto del servidor local (default 17777).
 - `ajuste`: `fit` (ajustar a la hoja) | `noscale` (tamaño real) | `shrink` (reducir solo si no entra).
+- `papel` (v1.2.0, **global**): `A4` | `A5` | `A3` | `letter` | `legal` | `""` (el del PDF). Vale
+  para todas las hojas. Un archivo viejo sin `papel` global toma el de la primera regla, o A4.
 - `reglas[].tipo`: `picking` | `armado` | `facturado` (debe coincidir con el `tipo` que manda Virgilio).
-- `reglas[].papel`: `A4` | `A5` | `A3` | `letter` | `legal` | `""` (el del PDF).
+- `reglas[].papel`: se sigue escribiendo igual al global, por compatibilidad con la v1.0.
 - `reglas[].copias`: 1 a 5. · `activa`: `true`/`false`.
-- Varios tipos pueden apuntar a la misma impresora (una regla por tipo).
+- Varios tipos pueden apuntar a la misma impresora; **una impresora por hoja** (si el archivo
+  trae dos reglas para la misma hoja se usa la primera). Reglas de otros tipos se respetan tal cual.
 
 ## Contrato HTTP
 
 Base: `http://127.0.0.1:17777` (el puerto es configurable).
 
 ### `GET /`
-Ping de salud. Responde `200` con el texto `Impresion Virgilio OK v1.0.0`.
+Ping de salud. Responde `200` con el texto `Impresion Virgilio OK v1.2.0`. Virgilio da vivo por el `200`, no por el texto.
 
 ### `OPTIONS /print`
 Preflight CORS. Responde `204` con los headers CORS (ver abajo). Lo maneja el helper solo.
@@ -121,6 +138,10 @@ Funciona desde una página `https://` pública porque `127.0.0.1` no cuenta como
 y el helper responde el preflight + Private Network Access.
 
 ## Cómo lo llama Virgilio (lado web)
+
+> En `index.html` esto vive en `imprimirLocal` / `helperVivo` (bloque «HELPER LOCAL DE IMPRESIÓN»),
+> con timeout, fila de a una hoja y vuelta al cuadro del navegador si el helper no imprimió. Lo
+> mide `tests/imp-helper-local.cjs`. Abajo, la versión mínima del contrato.
 
     // tipo: "picking" | "armado" | "facturado"; pdfBlob: Blob/ArrayBuffer con el PDF
     async function imprimirLocal(tipo, pdfBlob) {

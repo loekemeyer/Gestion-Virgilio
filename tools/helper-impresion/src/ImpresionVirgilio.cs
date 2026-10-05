@@ -8,18 +8,19 @@
 // impresora que el usuario asignó a ese tipo, con SumatraPDF, sin cuadro y sin tocar la
 // impresora predeterminada de Windows.
 //
-// Se compila a un único .exe con csc.exe (ver compilar.bat / README). No necesita instalar
-// nada ni permisos de administrador: el servidor usa TcpListener sobre loopback (no
-// HttpListener), así que no hace falta reservar la URL con netsh.
+// Se compila a un único .exe con csc.exe (ver build.txt). No necesita instalar nada ni
+// permisos de administrador: el servidor usa TcpListener sobre loopback (no HttpListener),
+// así que no hace falta reservar la URL con netsh.
 //
 // Contrato HTTP (lo que la página de Virgilio debe llamar):
-//   GET  /                      -> 200 "Impresion Virgilio OK vX" (ping: saber si corre).
+//   GET  /                      -> 200 "Impresion Virgilio OK" (ping: saber si corre).
 //   OPTIONS /print              -> 204 con CORS (preflight del navegador).
 //   POST /print?tipo=picking    -> body = el PDF (crudo, empieza con %PDF) o en base64.
 //                                  Respuesta 200 JSON { ok, tipo, impreso[], errores[], motivo }.
 //   El tipo también puede ir en el header X-Virgilio-Tipo.
 //
 // Las reglas (tipo -> impresora) se guardan en virgilio-impresion-<PC>.json, junto al .exe.
+// La ventana muestra una fila fija por tipo de hoja y guarda sola cada cambio.
 
 using System;
 using System.Collections.Generic;
@@ -39,7 +40,7 @@ namespace ImpresionVirgilio
 {
     static class Program
     {
-        public const string VERSION = "1.0.0";
+        public const string VERSION = "1.2.0";
 
         [STAThread]
         static void Main()
@@ -79,12 +80,32 @@ namespace ImpresionVirgilio
         public override string ToString() { return Texto; }
     }
 
+    // Una fila de la ventana: un tipo de hoja y a qué impresora va. Tildada = regla activa.
+    public class FilaTipo
+    {
+        public string Tipo;     // lo que manda Virgilio: picking | armado | facturado
+        public string Titulo;   // lo que se ve
+        public CheckBox Chk;
+        public ComboBox CboImp, CboCop;
+        public Label LblAviso;
+    }
+
     public class MainForm : Form
     {
+        // Las hojas que genera Virgilio: valor que manda la página y texto que se ve.
+        static readonly string[,] TIPOS = { { "picking", "Picking" }, { "armado", "Armado" }, { "facturado", "Facturado" } };
+
+        static readonly Color VerdeFondo = Color.FromArgb(226, 243, 228), VerdeTexto = Color.FromArgb(27, 94, 32);
+        static readonly Color NaranjaFondo = Color.FromArgb(255, 240, 214), NaranjaTexto = Color.FromArgb(150, 80, 0);
+        static readonly Color RojoFondo = Color.FromArgb(253, 228, 226), RojoTexto = Color.FromArgb(165, 30, 30);
+        static readonly Color Gris = Color.FromArgb(110, 110, 110);
+
         // --- impresión / servidor ---
         ServidorImpresion servidor;
+        string errorServidor = "";
         volatile List<Regla> reglasVigentes = new List<Regla>();
         volatile string ajusteVigente = "fit";
+        volatile string papelVigente = "A4";   // tamaño de hoja, global (se configura en Opciones avanzadas)
         int puertoVigente = 17777;
         readonly object printLock = new object();
         int recibidos = 0, impresos = 0, erroresImp = 0;
@@ -92,203 +113,44 @@ namespace ImpresionVirgilio
         // --- rutas ---
         string baseDir, sumatraPath, reglasPath, logPath, tempDir;
 
+        // --- configuración en pantalla ---
+        List<FilaTipo> filas = new List<FilaTipo>();
+        // Reglas del .json de otros tipos (cargadas a mano): se siguen usando y se guardan tal cual.
+        List<Dictionary<string, object>> reglasExtra = new List<Dictionary<string, object>>();
+        List<string> instaladas = new List<string>();
+
         // --- UI ---
-        Label lblEstado, lblListener, lblImp;
-        TextBox txtLog;
-        NumericUpDown numPuerto;
-        ListBox lstImpresoras;
-        DataGridView grid;
-        DataGridViewComboBoxColumn colTipo, colImp, colCop, colPapel;
-        DataGridViewCheckBoxColumn colAct;
-        ComboBox cboAjuste;
-        Button btnAgregar, btnQuitar, btnProbar, btnGuardar, btnReiniciar, btnActualizar;
-        CheckBox chkInicio;
-        bool dirty = false, cargando = false;
+        TableLayoutPanel banner, tablaReglas;
+        Label lblTitulo, lblDetalle, lblGuardado;
+        Button btnReintentar;
+        bool cargando = false, sinGuardar = false;
         object logLock = new object();
+        StringBuilder logBuf = new StringBuilder();   // historial de actividad, se muestra en Opciones avanzadas
+        volatile TextBox logView;                      // cuadro de Actividad del diálogo, mientras está abierto
+        volatile Label lblContadorDlg;                 // contador del diálogo, mientras está abierto
 
         public MainForm()
         {
-            Text = "Impresión Virgilio v" + Program.VERSION + " — hojas de picking / armado / facturado";
-            ClientSize = new Size(820, 620);
+            Text = "Impresión Virgilio";
+            Font = new Font("Segoe UI", 9.75f);
+            BackColor = Color.White;
+            ClientSize = new Size(960, 620);
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(700, 540);
-            Font = new Font("Segoe UI", 9);
 
             ResolvePaths();
 
-            // Estado general (arriba del todo)
-            lblEstado = new Label();
-            lblEstado.AutoSize = true;
-            lblEstado.Location = new Point(14, 10);
-            lblEstado.Font = new Font("Segoe UI", 11, FontStyle.Bold);
-            lblEstado.Text = "Iniciando...";
-            Controls.Add(lblEstado);
-
-            // Panel superior: listener + puerto + impresoras
-            Panel arriba = new Panel();
-            arriba.Dock = DockStyle.Top;
-            arriba.Height = 150;
-            arriba.Padding = new Padding(12, 36, 12, 4);
-
-            lblListener = new Label();
-            lblListener.AutoSize = true;
-            lblListener.Location = new Point(12, 38);
-            lblListener.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-
-            Label lPuerto = new Label();
-            lPuerto.Text = "Puerto:";
-            lPuerto.AutoSize = true;
-            lPuerto.Location = new Point(12, 64);
-            numPuerto = new NumericUpDown();
-            numPuerto.Minimum = 1024;
-            numPuerto.Maximum = 65535;
-            numPuerto.Value = puertoVigente;
-            numPuerto.Location = new Point(66, 61);
-            numPuerto.Width = 80;
-            btnReiniciar = new Button();
-            btnReiniciar.Text = "Reiniciar servidor";
-            btnReiniciar.Location = new Point(156, 59);
-            btnReiniciar.Size = new Size(130, 26);
-            btnReiniciar.Click += delegate { ReiniciarServidor(); };
-
-            chkInicio = new CheckBox();
-            chkInicio.Text = "Iniciar con Windows";
-            chkInicio.AutoSize = true;
-            chkInicio.Location = new Point(300, 63);
-            chkInicio.Checked = AutostartActivo();
-            chkInicio.CheckedChanged += delegate { if (!cargando) SetAutostart(chkInicio.Checked); };
-
-            Label lImp = new Label();
-            lImp.Text = "Impresoras de esta PC (" + Environment.MachineName + "):";
-            lImp.AutoSize = true;
-            lImp.Location = new Point(12, 92);
-            lstImpresoras = new ListBox();
-            lstImpresoras.Location = new Point(12, 110);
-            lstImpresoras.Size = new Size(660, 34);
-            lstImpresoras.IntegralHeight = false;
-            lstImpresoras.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            btnActualizar = new Button();
-            btnActualizar.Text = "Actualizar";
-            btnActualizar.Location = new Point(680, 110);
-            btnActualizar.Size = new Size(110, 26);
-            btnActualizar.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnActualizar.Click += delegate { CargarImpresoras(); };
-
-            arriba.Controls.AddRange(new Control[] { lblListener, lPuerto, numPuerto, btnReiniciar, chkInicio, lImp, lstImpresoras, btnActualizar });
-            Controls.Add(arriba);
-
-            // Panel inferior: botones + escala + estado reglas
-            Panel abajo = new Panel();
-            abajo.Dock = DockStyle.Bottom;
-            abajo.Height = 72;
-            abajo.Padding = new Padding(12, 6, 12, 6);
-
-            btnAgregar = Boton("Agregar regla", 12, delegate { AgregarRegla(); });
-            btnQuitar = Boton("Quitar", 132, delegate { QuitarRegla(); });
-            btnProbar = Boton("Probar...", 222, delegate { Probar(); });
-            btnGuardar = Boton("Guardar", 322, delegate { Guardar(); });
-            btnGuardar.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-            Label lAj = new Label();
-            lAj.Text = "Escala:";
-            lAj.AutoSize = true;
-            lAj.Location = new Point(430, 10);
-            cboAjuste = new ComboBox();
-            cboAjuste.DropDownStyle = ComboBoxStyle.DropDownList;
-            cboAjuste.Width = 180;
-            cboAjuste.Location = new Point(478, 6);
-            cboAjuste.Items.AddRange(new object[] {
-                new Opcion("fit", "Ajustar a la hoja"),
-                new Opcion("noscale", "Tamaño real"),
-                new Opcion("shrink", "Reducir solo si no entra") });
-            cboAjuste.SelectedIndex = 0;
-            cboAjuste.SelectedIndexChanged += delegate { if (!cargando) MarcarCambios(); };
-
-            lblImp = new Label();
-            lblImp.AutoSize = true;
-            lblImp.Location = new Point(12, 42);
-            lblImp.ForeColor = Color.DimGray;
-
-            abajo.Controls.AddRange(new Control[] { btnAgregar, btnQuitar, btnProbar, btnGuardar, lAj, cboAjuste, lblImp });
-            Controls.Add(abajo);
-
-            // Centro: grilla de reglas (arriba) + log (abajo)
-            SplitContainer split = new SplitContainer();
-            split.Dock = DockStyle.Fill;
-            split.Orientation = Orientation.Horizontal;
-            split.SplitterDistance = 210;
-
-            grid = new DataGridView();
-            grid.Dock = DockStyle.Fill;
-            grid.AllowUserToAddRows = false;
-            grid.AllowUserToDeleteRows = false;
-            grid.AllowUserToResizeRows = false;
-            grid.RowHeadersVisible = false;
-            grid.EditMode = DataGridViewEditMode.EditOnEnter;
-            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
-            grid.BackgroundColor = SystemColors.Window;
-
-            colTipo = new DataGridViewComboBoxColumn();
-            colTipo.HeaderText = "Tipo de hoja";
-            colTipo.FlatStyle = FlatStyle.Flat;
-            colTipo.DataSource = new List<Opcion> {
-                new Opcion("picking", "Picking"),
-                new Opcion("armado", "Armado"),
-                new Opcion("facturado", "Facturado") };
-            colTipo.ValueMember = "Valor";
-            colTipo.DisplayMember = "Texto";
-            colImp = new DataGridViewComboBoxColumn();
-            colImp.HeaderText = "Impresora";
-            colImp.FlatStyle = FlatStyle.Flat;
-            colCop = new DataGridViewComboBoxColumn();
-            colCop.HeaderText = "Copias";
-            colCop.FlatStyle = FlatStyle.Flat;
-            colCop.Items.AddRange("1", "2", "3", "4", "5");
-            colPapel = new DataGridViewComboBoxColumn();
-            colPapel.HeaderText = "Papel";
-            colPapel.FlatStyle = FlatStyle.Flat;
-            colPapel.DataSource = new List<Opcion> {
-                new Opcion("A4", "A4"), new Opcion("A5", "A5"), new Opcion("A3", "A3"),
-                new Opcion("letter", "Carta"), new Opcion("legal", "Legal / Oficio"),
-                new Opcion("", "El del PDF") };
-            colPapel.ValueMember = "Valor";
-            colPapel.DisplayMember = "Texto";
-            colAct = new DataGridViewCheckBoxColumn();
-            colAct.HeaderText = "Activa";
-            grid.Columns.AddRange(colTipo, colImp, colCop, colPapel, colAct);
-            grid.DataError += delegate(object s, DataGridViewDataErrorEventArgs e) { e.ThrowException = false; };
-            grid.CurrentCellDirtyStateChanged += delegate
-            {
-                if (grid.IsCurrentCellDirty) grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
-            };
-            grid.CellValueChanged += delegate { if (!cargando) MarcarCambios(); };
-            split.Panel1.Controls.Add(grid);
-            Label hGrid = new Label();
-            hGrid.Text = "Reglas: cada tipo de hoja va a una impresora de esta PC. Varios tipos pueden ir a la misma impresora.";
-            hGrid.Dock = DockStyle.Top;
-            hGrid.Height = 18;
-            hGrid.ForeColor = Color.DimGray;
-            split.Panel1.Controls.Add(hGrid);
-            hGrid.BringToFront();
-
-            txtLog = new TextBox();
-            txtLog.Multiline = true;
-            txtLog.ScrollBars = ScrollBars.Vertical;
-            txtLog.ReadOnly = true;
-            txtLog.BackColor = Color.FromArgb(24, 24, 24);
-            txtLog.ForeColor = Color.Gainsboro;
-            txtLog.Font = new Font("Consolas", 9);
-            txtLog.Dock = DockStyle.Fill;
-            split.Panel2.Controls.Add(txtLog);
-            Label hLog = new Label();
-            hLog.Text = "Trabajos recibidos:";
-            hLog.Dock = DockStyle.Top;
-            hLog.Height = 18;
-            hLog.ForeColor = Color.DimGray;
-            split.Panel2.Controls.Add(hLog);
-            hLog.BringToFront();
-
-            Controls.Add(split);
-            split.BringToFront();
+            TableLayoutPanel raiz = new TableLayoutPanel();
+            raiz.Dock = DockStyle.Fill;
+            raiz.ColumnCount = 1;
+            raiz.RowCount = 3;
+            raiz.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            raiz.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            raiz.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            raiz.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            raiz.Controls.Add(ArmarBanner(), 0, 0);
+            raiz.Controls.Add(ArmarReglas(), 0, 1);
+            raiz.Controls.Add(ArmarBotonera(), 0, 2);
+            Controls.Add(raiz);
 
             FormClosing += OnClosing;
             Load += delegate
@@ -296,17 +158,175 @@ namespace ImpresionVirgilio
                 CargarImpresoras();
                 CargarReglas();
                 IniciarServidor();
+                // ventana compacta: que entre justo el contenido (tabla entera incluida)
+                int cromoW = Width - ClientSize.Width, cromoH = Height - ClientSize.Height;
+                int ancho = Math.Max(tablaReglas.PreferredSize.Width + 40, 460) + cromoW;
+                int alto = raiz.PreferredSize.Height + 16 + cromoH;
+                MinimumSize = new Size(ancho, alto);
+                Size = new Size(ancho, alto);
+                CenterToScreen();
             };
         }
 
-        Button Boton(string texto, int x, EventHandler click)
+        // ================= Armado de la ventana =================
+
+        // Cartel de arriba: dice en una línea si esta PC está lista para imprimir.
+        Control ArmarBanner()
+        {
+            banner = new TableLayoutPanel();
+            banner.Dock = DockStyle.Fill;
+            banner.AutoSize = true;
+            banner.Margin = new Padding(0);
+            banner.Padding = new Padding(18, 12, 18, 12);
+            banner.ColumnCount = 2;
+            banner.RowCount = 2;
+            banner.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            banner.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+            lblTitulo = new Label();
+            lblTitulo.AutoSize = true;
+            lblTitulo.Font = new Font("Segoe UI", 15, FontStyle.Bold);
+            lblTitulo.Margin = new Padding(0);
+            lblTitulo.Text = "Iniciando...";
+            lblDetalle = new Label();
+            lblDetalle.AutoSize = true;
+            lblDetalle.Font = new Font("Segoe UI", 10.5f);
+            lblDetalle.Margin = new Padding(2, 4, 0, 0);
+            lblDetalle.MaximumSize = new Size(700, 0);
+
+            btnReintentar = new Button();
+            btnReintentar.Text = "Reintentar";
+            btnReintentar.AutoSize = true;
+            btnReintentar.Padding = new Padding(10, 4, 10, 4);
+            btnReintentar.Anchor = AnchorStyles.Right;
+            btnReintentar.UseVisualStyleBackColor = true;
+            btnReintentar.Visible = false;
+            btnReintentar.Click += delegate { ReiniciarServidor(); };
+
+            banner.Controls.Add(lblTitulo, 0, 0);
+            banner.Controls.Add(lblDetalle, 0, 1);
+            banner.Controls.Add(btnReintentar, 1, 0);
+            banner.SetRowSpan(btnReintentar, 2);
+            banner.SizeChanged += delegate { lblDetalle.MaximumSize = new Size(Math.Max(300, banner.Width - 200), 0); };
+            return banner;
+        }
+
+        // Una fila fija por tipo de hoja: tilde, impresora, copias y cómo quedó.
+        Control ArmarReglas()
+        {
+            TableLayoutPanel sec = new TableLayoutPanel();
+            sec.Dock = DockStyle.Fill;
+            sec.AutoSize = true;
+            sec.ColumnCount = 1;
+            sec.Padding = new Padding(14, 8, 14, 6);
+
+            tablaReglas = new TableLayoutPanel();
+            tablaReglas.AutoSize = true;
+            tablaReglas.ColumnCount = 4;
+            for (int c = 0; c < 4; c++) tablaReglas.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            string[] cabeceras = { "Hoja", "Impresora", "Copias", "" };
+            for (int c = 0; c < cabeceras.Length; c++)
+            {
+                Label h = new Label();
+                h.Text = cabeceras[c];
+                h.AutoSize = true;
+                h.ForeColor = Gris;
+                h.Font = new Font("Segoe UI", 9);
+                h.Margin = new Padding(3, 0, 3, 0);
+                tablaReglas.Controls.Add(h, c, 0);
+            }
+            for (int i = 0; i < TIPOS.GetLength(0); i++)
+            {
+                FilaTipo f = ArmarFila(TIPOS[i, 0], TIPOS[i, 1]);
+                filas.Add(f);
+                tablaReglas.Controls.Add(f.Chk, 0, i + 1);
+                tablaReglas.Controls.Add(f.CboImp, 1, i + 1);
+                tablaReglas.Controls.Add(f.CboCop, 2, i + 1);
+                tablaReglas.Controls.Add(f.LblAviso, 3, i + 1);
+            }
+
+            sec.Controls.Add(tablaReglas);
+            return sec;
+        }
+
+        FilaTipo ArmarFila(string tipo, string titulo)
+        {
+            FilaTipo f = new FilaTipo();
+            f.Tipo = tipo;
+            f.Titulo = titulo;
+
+            f.Chk = new CheckBox();
+            f.Chk.Text = titulo;
+            f.Chk.AutoSize = true;
+            f.Chk.Font = new Font("Segoe UI", 10.5f, FontStyle.Bold);
+            f.Chk.Anchor = AnchorStyles.Left;
+            f.Chk.Margin = new Padding(3, 6, 18, 6);
+
+            f.CboImp = Combo(280);
+            f.CboCop = Combo(90);
+            for (int n = 1; n <= 5; n++) f.CboCop.Items.Add(new Opcion(n.ToString(), n == 1 ? "1 copia" : n + " copias"));
+            Seleccionar(f.CboCop, "1");
+
+            f.LblAviso = new Label();
+            f.LblAviso.AutoSize = true;
+            f.LblAviso.Anchor = AnchorStyles.Left;
+            f.LblAviso.Margin = new Padding(8, 3, 3, 3);
+            f.LblAviso.MinimumSize = new Size(170, 0);
+
+            f.Chk.CheckedChanged += delegate { if (!cargando) Cambio(f); };
+            f.CboImp.SelectedIndexChanged += delegate
+            {
+                if (cargando) return;
+                // elegir una impresora = querer que esa hoja salga: se tilda sola
+                if (ImpresoraDe(f) != "" && !f.Chk.Checked) { cargando = true; f.Chk.Checked = true; cargando = false; }
+                Cambio(f);
+            };
+            f.CboCop.SelectedIndexChanged += delegate { if (!cargando) Cambio(f); };
+            return f;
+        }
+
+        static ComboBox Combo(int ancho)
+        {
+            ComboBox c = new ComboBox();
+            c.DropDownStyle = ComboBoxStyle.DropDownList;
+            c.Width = ancho;
+            c.Anchor = AnchorStyles.Left;
+            c.Margin = new Padding(3, 5, 6, 5);
+            return c;
+        }
+
+        static Button BotonChico(string texto)
         {
             Button b = new Button();
             b.Text = texto;
-            b.Location = new Point(x, 6);
-            b.Size = new Size(x == 12 ? 110 : (x == 132 ? 80 : (x == 222 ? 90 : 90)), 28);
-            b.Click += click;
+            b.AutoSize = true;
+            b.Padding = new Padding(6, 1, 6, 1);
+            b.UseVisualStyleBackColor = true;
             return b;
+        }
+
+        Control ArmarBotonera()
+        {
+            FlowLayoutPanel p = new FlowLayoutPanel();
+            p.Dock = DockStyle.Fill;
+            p.AutoSize = true;
+            p.Padding = new Padding(14, 4, 14, 8);
+
+            Button actualizar = BotonChico("Actualizar impresoras");
+            actualizar.Click += delegate
+            {
+                CargarImpresoras();
+                Log("Lista de impresoras actualizada (" + instaladas.Count + " en esta PC).");
+            };
+            Button avanzadas = BotonChico("Opciones avanzadas…");
+            avanzadas.Click += delegate { OpcionesAvanzadas(); };
+            lblGuardado = new Label();
+            lblGuardado.AutoSize = true;
+            lblGuardado.ForeColor = Gris;
+            lblGuardado.Margin = new Padding(14, 8, 3, 3);
+
+            p.Controls.AddRange(new Control[] { actualizar, avanzadas, lblGuardado });
+            return p;
         }
 
         void ResolvePaths()
@@ -326,21 +346,12 @@ namespace ImpresionVirgilio
 
         void IniciarServidor()
         {
-            puertoVigente = (int)numPuerto.Value;
             servidor = new ServidorImpresion(puertoVigente, Log, Procesar);
-            string err = servidor.Iniciar();
-            if (err == "")
-            {
-                lblListener.Text = "Escuchando en  http://127.0.0.1:" + puertoVigente + "/print   ✓";
-                lblListener.ForeColor = Color.FromArgb(30, 120, 40);
+            errorServidor = servidor.Iniciar();
+            if (errorServidor == "")
                 Log("Servidor iniciado en http://127.0.0.1:" + puertoVigente + " (PC " + Environment.MachineName + ")");
-            }
             else
-            {
-                lblListener.Text = "NO se pudo abrir el puerto " + puertoVigente + ": " + err;
-                lblListener.ForeColor = Color.FromArgb(170, 40, 40);
-                Log("ERROR al abrir el puerto " + puertoVigente + ": " + err);
-            }
+                Log("ERROR al abrir el puerto " + puertoVigente + ": " + errorServidor);
             ActualizarEstado();
         }
 
@@ -466,35 +477,89 @@ namespace ImpresionVirgilio
             catch { }
         }
 
+        // Cartel de arriba: en una línea, si esta PC está lista, + el puerto. El detalle de errores
+        // y el contador quedan para Opciones avanzadas. "Documento configurado" = la hoja está
+        // tildada y con una impresora que existe en esta PC.
         void ActualizarEstado()
         {
             bool corriendo = servidor != null && servidor.Corriendo;
-            lblEstado.Text = (corriendo ? "ESCUCHANDO" : "DETENIDO")
-                + "   |   recibidos: " + recibidos + "   impresos: " + impresos + "   errores: " + erroresImp;
-            lblEstado.ForeColor = corriendo ? Color.FromArgb(30, 120, 40) : Color.FromArgb(160, 40, 40);
+            int configurados = 0, total = filas.Count;
+            foreach (FilaTipo f in filas)
+            {
+                string imp = ImpresoraDe(f);
+                if (f.Chk.Checked && imp != "" && instaladas.Contains(imp)) configurados++;
+            }
+
+            string titulo, detalle;
+            Color fondo, texto;
+            string puerto = "Puerto " + puertoVigente;
+            if (!corriendo)
+            {
+                titulo = "✗  NO ESTÁ RECIBIENDO HOJAS";
+                detalle = servidor != null && servidor.PuertoOcupado
+                    ? "El puerto " + puertoVigente + " ya está en uso: seguramente el programa ya está abierto en otra ventana (mirá la barra de tareas)."
+                    : "No se pudo abrir el puerto " + puertoVigente + ": " + errorServidor;
+                fondo = RojoFondo; texto = RojoTexto;
+            }
+            else if (!File.Exists(sumatraPath))
+            {
+                titulo = "✗  FALTA SumatraPDF.exe";
+                detalle = "Copiá SumatraPDF.exe en la carpeta del programa.   ·   " + puerto;
+                fondo = RojoFondo; texto = RojoTexto;
+            }
+            else if (configurados >= total)
+            {
+                titulo = "✓  TODOS LOS DOCUMENTOS CONFIGURADOS";
+                detalle = puerto;
+                fondo = VerdeFondo; texto = VerdeTexto;
+            }
+            else
+            {
+                titulo = "⚠  FALTAN CONFIGURAR DOCUMENTOS";
+                detalle = configurados + " de " + total + " listos   ·   " + puerto;
+                fondo = NaranjaFondo; texto = NaranjaTexto;
+            }
+
+            banner.BackColor = fondo;
+            lblTitulo.Text = titulo;
+            lblTitulo.ForeColor = texto;
+            lblDetalle.Text = detalle;
+            lblDetalle.ForeColor = texto;
+            btnReintentar.Visible = !corriendo;
+
+            Label c = lblContadorDlg;
+            if (c != null) c.Text = TextoContador();
+        }
+
+        string TextoContador()
+        {
+            return "Desde que se abrió: " + recibidos + " recibidas, " + impresos + " impresas, " + erroresImp + " con error.";
         }
 
         public void Log(string s)
         {
             string line = "[" + DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss") + "] " + s;
-            try
+            lock (logLock)
             {
-                lock (logLock) { File.AppendAllText(logPath, line + "\r\n", Encoding.UTF8); }
+                try { File.AppendAllText(logPath, line + "\r\n", Encoding.UTF8); } catch { }
+                logBuf.Append(line).Append("\r\n");
+                if (logBuf.Length > 200000) logBuf.Remove(0, logBuf.Length - 150000); // acota el historial en memoria
             }
-            catch { }
+            TextBox v = logView;
+            if (v == null) return;
             try
             {
-                if (txtLog.InvokeRequired) txtLog.BeginInvoke((Action)delegate { AppendLog(line); });
-                else AppendLog(line);
+                if (v.InvokeRequired) v.BeginInvoke((Action)delegate { AppendLog(v, line); });
+                else AppendLog(v, line);
             }
             catch { }
         }
 
-        void AppendLog(string line)
+        static void AppendLog(TextBox v, string line)
         {
-            txtLog.AppendText(line + "\r\n");
-            txtLog.SelectionStart = txtLog.TextLength;
-            txtLog.ScrollToCaret();
+            v.AppendText(line + "\r\n");
+            v.SelectionStart = v.TextLength;
+            v.ScrollToCaret();
         }
 
         // ================= Impresoras =================
@@ -505,37 +570,100 @@ namespace ImpresionVirgilio
             string pred = "";
             try { pred = new PrinterSettings().PrinterName; } catch { }
             try { foreach (string n in PrinterSettings.InstalledPrinters) nombres.Add(n); } catch { }
+            instaladas = nombres;
 
-            lstImpresoras.Items.Clear();
-            foreach (string n in nombres) lstImpresoras.Items.Add(n == pred ? n + "   (predeterminada)" : n);
-            if (nombres.Count == 0) lstImpresoras.Items.Add("(no se encontró ninguna impresora)");
-
-            foreach (string n in nombres) if (!colImp.Items.Contains(n)) colImp.Items.Add(n);
+            bool antes = cargando;
+            cargando = true;
+            foreach (FilaTipo f in filas)
+            {
+                string sel = ImpresoraDe(f);
+                f.CboImp.Items.Clear();
+                f.CboImp.Items.Add(new Opcion("", nombres.Count == 0 ? "(no hay impresoras en esta PC)" : "— elegí una impresora —"));
+                foreach (string n in nombres) f.CboImp.Items.Add(new Opcion(n, n == pred ? n + "  (predeterminada)" : n));
+                SeleccionarImpresora(f, sel);
+            }
+            cargando = antes;
+            foreach (FilaTipo f in filas) ActualizarFila(f);
+            ActualizarEstado();
         }
 
-        bool ImpresoraInstalada(string n)
+        // Selecciona la impresora en el combo de la fila. Si no está en esta PC la agrega marcada,
+        // para que se vea cuál era y se pueda cambiar.
+        void SeleccionarImpresora(FilaTipo f, string imp)
         {
-            try { foreach (string i in PrinterSettings.InstalledPrinters) if (i == n) return true; } catch { }
+            if (!Seleccionar(f.CboImp, imp))
+            {
+                f.CboImp.Items.Add(new Opcion(imp, imp + "  (no está en esta PC)"));
+                Seleccionar(f.CboImp, imp);
+            }
+            int w = f.CboImp.Width;
+            foreach (object o in f.CboImp.Items) w = Math.Max(w, TextRenderer.MeasureText(o.ToString(), f.CboImp.Font).Width + 24);
+            f.CboImp.DropDownWidth = w;
+        }
+
+        static bool Seleccionar(ComboBox c, string valor)
+        {
+            for (int i = 0; i < c.Items.Count; i++)
+            {
+                Opcion o = c.Items[i] as Opcion;
+                if (o != null && o.Valor == valor) { c.SelectedIndex = i; return true; }
+            }
             return false;
         }
 
+        static string ValorDe(ComboBox c)
+        {
+            Opcion o = c.SelectedItem as Opcion;
+            return o == null ? "" : o.Valor;
+        }
+
+        static string ImpresoraDe(FilaTipo f) { return ValorDe(f.CboImp); }
+
+        static int CopiasDe(FilaTipo f)
+        {
+            int n;
+            int.TryParse(ValorDe(f.CboCop), out n);
+            return Math.Max(1, Math.Min(5, n));
+        }
+
         // ================= Reglas: cargar / editar / guardar =================
+
+        int IndiceFila(string tipo)
+        {
+            string nt = Normalizar(tipo);
+            for (int i = 0; i < filas.Count; i++) if (filas[i].Tipo == nt) return i;
+            return -1;
+        }
+
+        static Regla LeerRegla(Dictionary<string, object> r)
+        {
+            Regla g = new Regla();
+            g.Tipo = Texto(r, "tipo");
+            g.Impresora = Texto(r, "impresora");
+            try { g.Copias = Math.Max(1, Math.Min(5, Convert.ToInt32(r["copias"]))); } catch { g.Copias = 1; }
+            g.Papel = r.ContainsKey("papel") ? Texto(r, "papel") : "A4";
+            if (Array.IndexOf(new string[] { "A4", "A5", "A3", "letter", "legal", "" }, g.Papel) < 0) g.Papel = "A4";
+            try { g.Activa = r.ContainsKey("activa") ? Convert.ToBoolean(r["activa"]) : true; } catch { g.Activa = true; }
+            return g;
+        }
 
         void CargarReglas()
         {
             object[] reglas = new object[0];
             string ajuste = "fit";
+            string papel = null;   // null = el archivo no trae tamaño global; se toma de la 1ª regla o A4
             int puerto = 17777;
             string errLeer = null;
             if (File.Exists(reglasPath))
             {
                 try
                 {
-                    string txt = File.ReadAllText(reglasPath, Encoding.UTF8).Replace("\uFEFF", "");
+                    string txt = File.ReadAllText(reglasPath, Encoding.UTF8).Replace("﻿", "");
                     Dictionary<string, object> cfg = new JavaScriptSerializer().DeserializeObject(txt) as Dictionary<string, object>;
                     if (cfg != null)
                     {
                         if (cfg.ContainsKey("ajuste")) ajuste = Convert.ToString(cfg["ajuste"]);
+                        if (cfg.ContainsKey("papel")) papel = Convert.ToString(cfg["papel"]);
                         if (cfg.ContainsKey("puerto")) { try { puerto = Convert.ToInt32(cfg["puerto"]); } catch { } }
                         if (cfg.ContainsKey("reglas") && cfg["reglas"] is object[]) reglas = (object[])cfg["reglas"];
                     }
@@ -543,46 +671,56 @@ namespace ImpresionVirgilio
                 catch (Exception ex) { errLeer = ex.Message; }
             }
 
-            // una impresora guardada que ya no está se agrega igual al combo para que se vea
-            foreach (object o in reglas)
-            {
-                Dictionary<string, object> r = o as Dictionary<string, object>;
-                if (r == null) continue;
-                string imp = Texto(r, "impresora");
-                if (imp != "" && !colImp.Items.Contains(imp)) colImp.Items.Add(imp);
-            }
-
+            // Cada hoja toma la primera regla de su tipo (una impresora por hoja). Las de otros tipos
+            // se guardan aparte y se siguen usando.
             cargando = true;
-            grid.Rows.Clear();
-            List<Regla> vigentes = new List<Regla>();
+            reglasExtra = new List<Dictionary<string, object>>();
+            List<string> repetidas = new List<string>();
+            List<string> otrosTipos = new List<string>();
+            bool[] asignada = new bool[filas.Count];
+            foreach (FilaTipo f in filas)
+            {
+                f.Chk.Checked = false;
+                SeleccionarImpresora(f, "");
+                Seleccionar(f.CboCop, "1");
+            }
             foreach (object o in reglas)
             {
                 Dictionary<string, object> r = o as Dictionary<string, object>;
                 if (r == null) continue;
-                string tipo = Texto(r, "tipo");
-                string imp = Texto(r, "impresora");
-                int copias = 1;
-                try { copias = Math.Max(1, Math.Min(5, Convert.ToInt32(r["copias"]))); } catch { }
-                string papel = r.ContainsKey("papel") ? Texto(r, "papel") : "A4";
-                if (Array.IndexOf(new string[] { "A4", "A5", "A3", "letter", "legal", "" }, papel) < 0) papel = "A4";
-                bool activa = true;
-                try { activa = r.ContainsKey("activa") ? Convert.ToBoolean(r["activa"]) : true; } catch { }
-                grid.Rows.Add(tipo == "" ? null : tipo, imp == "" ? null : imp, copias.ToString(), papel, activa);
-
-                Regla reg = new Regla();
-                reg.Tipo = tipo; reg.Impresora = imp; reg.Copias = copias; reg.Papel = papel; reg.Activa = activa;
-                vigentes.Add(reg);
+                Regla g = LeerRegla(r);
+                int i = IndiceFila(g.Tipo);
+                if (i < 0) { reglasExtra.Add(r); otrosTipos.Add(g.Tipo); continue; }
+                if (asignada[i]) { repetidas.Add(filas[i].Titulo + " -> " + g.Impresora); continue; }
+                asignada[i] = true;
+                if (papel == null) papel = g.Papel;   // sin tamaño global: se toma el de la 1ª regla
+                FilaTipo fila = filas[i];
+                fila.Chk.Checked = g.Activa && g.Impresora != "";
+                SeleccionarImpresora(fila, g.Impresora);
+                Seleccionar(fila.CboCop, g.Copias.ToString());
             }
-            for (int i = 0; i < cboAjuste.Items.Count; i++)
-                if (((Opcion)cboAjuste.Items[i]).Valor == ajuste) cboAjuste.SelectedIndex = i;
-            numPuerto.Value = Math.Max(numPuerto.Minimum, Math.Min(numPuerto.Maximum, puerto));
+            if (Array.IndexOf(new string[] { "fit", "noscale", "shrink" }, ajuste) < 0) ajuste = "fit";
+            if (papel == null || Array.IndexOf(new string[] { "A4", "A5", "A3", "letter", "legal", "" }, papel) < 0) papel = "A4";
             cargando = false;
 
-            reglasVigentes = vigentes;
             ajusteVigente = ajuste;
-            dirty = false;
-            if (errLeer != null) Estado("No se pudo leer " + Path.GetFileName(reglasPath) + ": " + errLeer, true);
-            else RevisarReglas();
+            papelVigente = papel;
+            puertoVigente = Math.Max(1024, Math.Min(65535, puerto));
+            reglasVigentes = ReglasDePantalla();
+            foreach (FilaTipo f in filas) ActualizarFila(f);
+            ActualizarEstado();
+
+            if (errLeer != null)
+            {
+                MarcarGuardado("No se pudo leer " + Path.GetFileName(reglasPath) + ": " + errLeer, true);
+                Log("ERROR leyendo " + Path.GetFileName(reglasPath) + ": " + errLeer);
+            }
+            else MarcarGuardado(File.Exists(reglasPath) ? "Configuración: " + Path.GetFileName(reglasPath) : "Todavía sin configurar en esta PC.", false);
+            if (repetidas.Count > 0)
+                Log("Aviso: el archivo tenía más de una impresora para la misma hoja. Se usa la primera; quedan sin usar: "
+                    + string.Join(", ", repetidas.ToArray()) + ".");
+            if (otrosTipos.Count > 0)
+                Log("Aviso: el archivo tiene reglas de otros tipos de hoja (" + string.Join(", ", otrosTipos.ToArray()) + "); se siguen usando tal cual.");
         }
 
         static string Texto(Dictionary<string, object> r, string k)
@@ -590,92 +728,74 @@ namespace ImpresionVirgilio
             return r.ContainsKey(k) && r[k] != null ? Convert.ToString(r[k]).Trim() : "";
         }
 
-        void RevisarReglas()
+        // Reglas que valen según lo que está en pantalla (+ las de otros tipos del archivo).
+        List<Regla> ReglasDePantalla()
         {
-            if (dirty) return;
-            foreach (DataGridViewRow row in grid.Rows)
+            List<Regla> l = new List<Regla>();
+            foreach (FilaTipo f in filas)
             {
-                string imp = Convert.ToString(row.Cells[colImp.Index].Value);
-                if (imp != "" && !ImpresoraInstalada(imp))
-                {
-                    Estado("Ojo: la impresora \"" + imp + "\" no está en esta PC. Elegí otra y Guardá.", true);
-                    return;
-                }
+                string imp = ImpresoraDe(f);
+                if (imp == "") continue;
+                Regla g = new Regla();
+                g.Tipo = f.Tipo; g.Impresora = imp; g.Copias = CopiasDe(f); g.Papel = papelVigente; g.Activa = f.Chk.Checked;
+                l.Add(g);
             }
-            Estado(grid.Rows.Count == 0
-                ? "Sin reglas: esta PC no imprime nada. «Agregar regla» para empezar."
-                : grid.Rows.Count + " regla(s) en " + Path.GetFileName(reglasPath) + ". Los cambios valen al Guardar.", false);
+            foreach (Dictionary<string, object> r in reglasExtra) l.Add(LeerRegla(r));
+            return l;
         }
 
-        void Estado(string texto, bool alerta)
+        // Cómo quedó la fila, en palabras, al lado de la impresora.
+        void ActualizarFila(FilaTipo f)
         {
-            lblImp.Text = texto;
-            lblImp.ForeColor = alerta ? Color.FromArgb(180, 90, 0) : Color.DimGray;
+            string imp = ImpresoraDe(f);
+            f.Chk.ForeColor = f.Chk.Checked ? SystemColors.ControlText : Gris;
+            if (!f.Chk.Checked) Aviso(f, "No se imprime en esta PC", Gris);
+            else if (imp == "") Aviso(f, "⚠ Falta elegir impresora", NaranjaTexto);
+            else if (!instaladas.Contains(imp)) Aviso(f, "⚠ No está en esta PC", RojoTexto);
+            else Aviso(f, "✓ Se imprime", VerdeTexto);
         }
 
-        void MarcarCambios()
+        static void Aviso(FilaTipo f, string texto, Color color)
         {
-            dirty = true;
-            Estado("Cambios SIN GUARDAR.", true);
+            f.LblAviso.Text = texto;
+            f.LblAviso.ForeColor = color;
         }
 
-        void AgregarRegla()
+        void Cambio(FilaTipo f)
         {
-            int i = grid.Rows.Add(null, null, "1", "A4", true);
-            grid.CurrentCell = grid.Rows[i].Cells[colTipo.Index];
-            MarcarCambios();
+            ActualizarFila(f);
+            Guardar();
+            ActualizarEstado();
         }
 
-        void QuitarRegla()
+        void MarcarGuardado(string texto, bool alerta)
         {
-            if (grid.CurrentRow == null) return;
-            grid.Rows.Remove(grid.CurrentRow);
-            MarcarCambios();
+            lblGuardado.Text = texto;
+            lblGuardado.ForeColor = alerta ? RojoTexto : Gris;
         }
 
-        string AjusteActual()
-        {
-            Opcion o = cboAjuste.SelectedItem as Opcion;
-            return o == null ? "fit" : o.Valor;
-        }
-
+        // Guarda lo que está en pantalla. Vale al instante (aunque falle el archivo).
         bool Guardar()
         {
-            grid.EndEdit();
+            List<Regla> vigentes = ReglasDePantalla();
+            reglasVigentes = vigentes;
+
             List<object> reglasJson = new List<object>();
-            List<Regla> vigentes = new List<Regla>();
-            foreach (DataGridViewRow row in grid.Rows)
+            foreach (Regla g in vigentes)
             {
-                string tipo = Convert.ToString(row.Cells[colTipo.Index].Value);
-                string imp = Convert.ToString(row.Cells[colImp.Index].Value);
-                if (tipo == "" || imp == "")
-                {
-                    MessageBox.Show("La regla " + (row.Index + 1) + " no tiene " + (tipo == "" ? "tipo" : "impresora") + ".",
-                        "Impresión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    grid.CurrentCell = row.Cells[tipo == "" ? colTipo.Index : colImp.Index];
-                    return false;
-                }
-                int copias = 1;
-                int.TryParse(Convert.ToString(row.Cells[colCop.Index].Value), out copias);
-                copias = Math.Max(1, Math.Min(5, copias));
-                string papel = Convert.ToString(row.Cells[colPapel.Index].Value);
-                bool activa = row.Cells[colAct.Index].Value is bool ? (bool)row.Cells[colAct.Index].Value : true;
-
+                if (IndiceFila(g.Tipo) < 0) continue;   // las de otros tipos van abajo, tal cual estaban
                 Dictionary<string, object> r = new Dictionary<string, object>();
-                r["tipo"] = tipo; r["impresora"] = imp; r["copias"] = copias; r["papel"] = papel; r["activa"] = activa;
+                r["tipo"] = g.Tipo; r["impresora"] = g.Impresora; r["copias"] = g.Copias; r["papel"] = g.Papel; r["activa"] = g.Activa;
                 reglasJson.Add(r);
-
-                Regla reg = new Regla();
-                reg.Tipo = tipo; reg.Impresora = imp; reg.Copias = copias; reg.Papel = papel; reg.Activa = activa;
-                vigentes.Add(reg);
             }
+            foreach (Dictionary<string, object> r in reglasExtra) reglasJson.Add(r);
 
-            int puerto = (int)numPuerto.Value;
             Dictionary<string, object> cfg = new Dictionary<string, object>();
             cfg["pc"] = Environment.MachineName;
             cfg["actualizado"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " por " + Environment.UserName;
-            cfg["puerto"] = puerto;
-            cfg["ajuste"] = AjusteActual();
+            cfg["puerto"] = puertoVigente;
+            cfg["ajuste"] = ajusteVigente;
+            cfg["papel"] = papelVigente;
             cfg["reglas"] = reglasJson;
             try
             {
@@ -686,47 +806,58 @@ namespace ImpresionVirgilio
             }
             catch (Exception ex)
             {
-                MessageBox.Show("No se pudo guardar " + reglasPath + ":\n" + ex.Message, "Impresión", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                sinGuardar = true;
+                MarcarGuardado("⚠ NO se pudo guardar: " + ex.Message, true);
+                Log("ERROR guardando " + reglasPath + ": " + ex.Message);
                 return false;
             }
 
-            reglasVigentes = vigentes;
-            ajusteVigente = AjusteActual();
-            Log("Reglas guardadas (" + vigentes.Count + ") por " + Environment.UserName);
-            dirty = false;
-
-            if (puerto != puertoVigente) ReiniciarServidor();
-            RevisarReglas();
+            sinGuardar = false;
+            MarcarGuardado("Guardado ✓ " + DateTime.Now.ToString("HH:mm:ss"), false);
+            Log("Reglas guardadas por " + Environment.UserName + ": " + Resumen());
             return true;
         }
 
-        // Manda un PDF elegido a mano a la impresora de la regla marcada (1 copia).
-        void Probar()
+        string Resumen()
         {
-            grid.EndEdit();
-            if (grid.CurrentRow == null) { Estado("Marcá una regla para probar su impresora.", true); return; }
-            string imp = Convert.ToString(grid.CurrentRow.Cells[colImp.Index].Value);
-            if (imp == "") { Estado("Esa regla no tiene impresora.", true); return; }
-            string papel = Convert.ToString(grid.CurrentRow.Cells[colPapel.Index].Value);
+            List<string> partes = new List<string>();
+            foreach (FilaTipo f in filas)
+            {
+                string imp = ImpresoraDe(f);
+                if (!f.Chk.Checked) partes.Add(f.Titulo + " -> no se imprime");
+                else if (imp == "") partes.Add(f.Titulo + " -> sin impresora");
+                else partes.Add(f.Titulo + " -> " + imp + " (" + CopiasDe(f) + "x, " + NombrePapel(papelVigente) + ")");
+            }
+            return string.Join(" | ", partes.ToArray());
+        }
+
+        // Manda un PDF elegido a mano a una impresora (1 copia), con el tamaño y la escala globales.
+        // Se usa desde Opciones avanzadas. owner = la ventana sobre la que se muestran los diálogos.
+        void Probar(IWin32Window owner, string impresora)
+        {
+            if (string.IsNullOrEmpty(impresora)) return;
             OpenFileDialog dlg = new OpenFileDialog();
             dlg.Filter = "PDF (*.pdf)|*.pdf";
-            dlg.Title = "Elegir un PDF para imprimir de prueba en " + imp;
-            if (dlg.ShowDialog(this) != DialogResult.OK) return;
+            dlg.Title = "Elegí un PDF para probar la impresora " + impresora;
+            if (dlg.ShowDialog(owner) != DialogResult.OK) return;
             string pdf = dlg.FileName;
-            string ajuste = AjusteActual();
-            Estado("Mandando " + Path.GetFileName(pdf) + " a " + imp + "...", false);
+            string papel = papelVigente, ajuste = ajusteVigente;
             Thread t = new Thread(delegate()
             {
-                string res = ImprimirConSumatra(pdf, imp, 1, papel, ajuste);
+                string res = ImprimirConSumatra(pdf, impresora, 1, papel, ajuste);
                 try
                 {
                     BeginInvoke((Action)delegate
                     {
-                        if (res == "") Estado("Prueba enviada a " + imp + ": " + Path.GetFileName(pdf), false);
+                        if (res == "")
+                        {
+                            Log("PRUEBA -> " + impresora + ": " + Path.GetFileName(pdf));
+                            MessageBox.Show("Prueba enviada a " + impresora + ".", "Impresión Virgilio", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
                         else
                         {
-                            Estado("La prueba NO salió: " + res, true);
-                            MessageBox.Show("La prueba no salió:\n" + res, "Impresión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            Log("ERR PRUEBA -> " + impresora + " :: " + res);
+                            MessageBox.Show("La prueba no salió:\n" + res, "Impresión Virgilio", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         }
                     });
                 }
@@ -734,6 +865,202 @@ namespace ImpresionVirgilio
             });
             t.IsBackground = true;
             t.Start();
+        }
+
+        // ================= Opciones avanzadas (puerto, tamaño de hoja, escala, inicio, probar, registro) =================
+
+        void OpcionesAvanzadas()
+        {
+            using (Form d = new Form())
+            {
+                d.Text = "Opciones avanzadas";
+                d.Font = Font;
+                d.BackColor = Color.White;
+                d.FormBorderStyle = FormBorderStyle.Sizable;
+                d.MaximizeBox = true;
+                d.MinimizeBox = false;
+                d.ShowInTaskbar = false;
+                d.StartPosition = FormStartPosition.CenterParent;
+                d.ClientSize = new Size(640, 600);
+                d.MinimumSize = new Size(560, 520);
+
+                TableLayoutPanel t = new TableLayoutPanel();
+                t.Dock = DockStyle.Fill;
+                t.ColumnCount = 1;
+                t.Padding = new Padding(16);
+                t.RowCount = 9;
+                for (int i = 0; i < 9; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                t.RowStyles[6] = new RowStyle(SizeType.Percent, 100);   // la fila del registro crece
+
+                // --- grilla de ajustes (puerto / tamaño de hoja / escala) ---
+                TableLayoutPanel g = new TableLayoutPanel();
+                g.AutoSize = true;
+                g.ColumnCount = 2;
+                NumericUpDown num = new NumericUpDown();
+                num.Minimum = 1024;
+                num.Maximum = 65535;
+                num.Value = puertoVigente;
+                num.Width = 90;
+                num.Anchor = AnchorStyles.Left;
+                ComboBox cboPapel = Combo(200);
+                cboPapel.Items.AddRange(new object[] {
+                    new Opcion("A4", "A4"), new Opcion("A5", "A5"), new Opcion("A3", "A3"),
+                    new Opcion("letter", "Carta"), new Opcion("legal", "Legal / Oficio"),
+                    new Opcion("", "El del PDF") });
+                if (!Seleccionar(cboPapel, papelVigente)) Seleccionar(cboPapel, "A4");
+                ComboBox cboEscala = Combo(260);
+                cboEscala.Items.AddRange(new object[] {
+                    new Opcion("fit", "Ajustar a la hoja (recomendado)"),
+                    new Opcion("noscale", "Tamaño real"),
+                    new Opcion("shrink", "Reducir solo si no entra") });
+                if (!Seleccionar(cboEscala, ajusteVigente)) cboEscala.SelectedIndex = 0;
+
+                g.Controls.Add(Etiqueta("Puerto:"), 0, 0);
+                g.Controls.Add(num, 1, 0);
+                Label notaPuerto = Nota("Virgilio manda las hojas a http://127.0.0.1:" + puertoVigente + "/print. Cambialo solo si "
+                    + "otro programa usa ese puerto, y avisá a quien mantiene Virgilio: la página tiene que usar el mismo.");
+                g.Controls.Add(notaPuerto, 1, 1);
+                g.Controls.Add(Etiqueta("Tamaño de hoja:"), 0, 2);
+                g.Controls.Add(cboPapel, 1, 2);
+                g.Controls.Add(Etiqueta("Tamaño en la hoja:"), 0, 3);
+                g.Controls.Add(cboEscala, 1, 3);
+                t.Controls.Add(g, 0, 0);
+
+                // --- iniciar con Windows ---
+                CheckBox chk = new CheckBox();
+                chk.Text = "Iniciar con Windows";
+                chk.AutoSize = true;
+                chk.Margin = new Padding(3, 8, 3, 2);
+                chk.Checked = AutostartActivo();
+                chk.CheckedChanged += delegate
+                {
+                    if (!SetAutostart(chk.Checked))
+                    { bool a = cargando; cargando = true; chk.Checked = AutostartActivo(); cargando = a; }
+                };
+                t.Controls.Add(chk, 0, 1);
+
+                // --- probar una impresora ---
+                FlowLayoutPanel probar = new FlowLayoutPanel();
+                probar.AutoSize = true;
+                probar.Margin = new Padding(0, 8, 0, 2);
+                probar.Controls.Add(Etiqueta("Probar impresión:"));
+                ComboBox cboProbar = Combo(260);
+                cboProbar.Items.Clear();
+                foreach (string n in instaladas) cboProbar.Items.Add(new Opcion(n, n));
+                if (cboProbar.Items.Count > 0) cboProbar.SelectedIndex = 0;
+                Button btnProbar = BotonChico("Enviar PDF de prueba…");
+                btnProbar.Click += delegate { Probar(d, ValorDe(cboProbar)); };
+                probar.Controls.Add(cboProbar);
+                probar.Controls.Add(btnProbar);
+                t.Controls.Add(probar, 0, 2);
+
+                // --- info de archivos ---
+                Label info = Nota("Versión " + Program.VERSION + "   ·   PC " + Environment.MachineName
+                    + "\r\nConfiguración: " + reglasPath + "\r\nRegistro: " + logPath);
+                info.Margin = new Padding(3, 12, 3, 4);
+                t.Controls.Add(info, 0, 3);
+
+                FlowLayoutPanel archivos = new FlowLayoutPanel();
+                archivos.AutoSize = true;
+                Button carpeta = BotonChico("Abrir carpeta del programa");
+                carpeta.Click += delegate { Abrir("explorer.exe", baseDir); };
+                Button registro = BotonChico("Abrir registro en Bloc de notas");
+                registro.Click += delegate { Abrir("notepad.exe", logPath); };
+                archivos.Controls.AddRange(new Control[] { carpeta, registro });
+                t.Controls.Add(archivos, 0, 4);
+
+                // --- actividad (registro en vivo) ---
+                Label hAct = new Label();
+                hAct.Text = "Actividad";
+                hAct.AutoSize = true;
+                hAct.ForeColor = Gris;
+                hAct.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+                hAct.Margin = new Padding(3, 10, 3, 2);
+                t.Controls.Add(hAct, 0, 5);
+
+                TextBox txt = new TextBox();
+                txt.Multiline = true;
+                txt.ScrollBars = ScrollBars.Vertical;
+                txt.ReadOnly = true;
+                txt.BackColor = Color.FromArgb(247, 247, 247);
+                txt.ForeColor = Color.FromArgb(40, 40, 40);
+                txt.Font = new Font("Consolas", 9);
+                txt.Dock = DockStyle.Fill;
+                lock (logLock) txt.Text = logBuf.ToString();
+                txt.SelectionStart = txt.TextLength;
+                txt.ScrollToCaret();
+                t.Controls.Add(txt, 0, 6);
+
+                Label lblCont = new Label();
+                lblCont.AutoSize = true;
+                lblCont.ForeColor = Gris;
+                lblCont.Margin = new Padding(3, 4, 3, 2);
+                lblCont.Text = TextoContador();
+                t.Controls.Add(lblCont, 0, 7);
+
+                // --- aceptar / cancelar ---
+                FlowLayoutPanel botones = new FlowLayoutPanel();
+                botones.AutoSize = true;
+                botones.Dock = DockStyle.Fill;
+                botones.FlowDirection = FlowDirection.RightToLeft;
+                botones.Margin = new Padding(3, 8, 3, 0);
+                Button cancelar = BotonChico("Cancelar");
+                cancelar.DialogResult = DialogResult.Cancel;
+                Button aceptar = BotonChico("Aceptar");
+                aceptar.DialogResult = DialogResult.OK;
+                botones.Controls.AddRange(new Control[] { cancelar, aceptar });
+                t.Controls.Add(botones, 0, 8);
+
+                d.AcceptButton = aceptar;
+                d.CancelButton = cancelar;
+                d.Controls.Add(t);
+
+                // mientras el diálogo está abierto, el registro y el contador se actualizan en vivo
+                logView = txt;
+                lblContadorDlg = lblCont;
+                DialogResult dr;
+                try { dr = d.ShowDialog(this); }
+                finally { logView = null; lblContadorDlg = null; }
+                if (dr != DialogResult.OK) return;
+
+                int puerto = (int)num.Value;
+                string ajuste = ValorDe(cboEscala);
+                string papel = ValorDe(cboPapel);
+                if (puerto == puertoVigente && ajuste == ajusteVigente && papel == papelVigente) return;
+                bool reiniciar = puerto != puertoVigente;
+                puertoVigente = puerto;
+                ajusteVigente = ajuste;
+                papelVigente = papel;
+                Guardar();
+                if (reiniciar) ReiniciarServidor();
+            }
+        }
+
+        static Label Etiqueta(string texto)
+        {
+            Label l = new Label();
+            l.Text = texto;
+            l.AutoSize = true;
+            l.Anchor = AnchorStyles.Left;
+            l.Margin = new Padding(3, 6, 12, 3);
+            return l;
+        }
+
+        static Label Nota(string texto)
+        {
+            Label l = new Label();
+            l.Text = texto;
+            l.AutoSize = true;
+            l.MaximumSize = new Size(460, 0);
+            l.ForeColor = Gris;
+            l.Margin = new Padding(3, 2, 3, 12);
+            return l;
+        }
+
+        void Abrir(string programa, string ruta)
+        {
+            try { System.Diagnostics.Process.Start(programa, Q(ruta)); }
+            catch (Exception ex) { MessageBox.Show("No se pudo abrir " + ruta + ":\n" + ex.Message, "Impresión Virgilio", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
 
         // ================= Iniciar con Windows (sin admin: acceso directo en shell:startup) =================
@@ -748,7 +1075,8 @@ namespace ImpresionVirgilio
             try { return File.Exists(RutaAccesoDirecto()); } catch { return false; }
         }
 
-        void SetAutostart(bool on)
+        // Devuelve true si quedó como se pedía. Si falla, avisa y devuelve false (quien llama revierte el tilde).
+        bool SetAutostart(bool on)
         {
             string lnk = RutaAccesoDirecto();
             try
@@ -768,21 +1096,35 @@ namespace ImpresionVirgilio
                 {
                     if (File.Exists(lnk)) File.Delete(lnk);
                 }
+                Log(on ? "Iniciar con Windows: activado." : "Iniciar con Windows: desactivado.");
+                return true;
             }
             catch (Exception ex)
             {
-                MessageBox.Show("No se pudo cambiar el inicio con Windows:\n" + ex.Message, "Impresión", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                cargando = true; chkInicio.Checked = AutostartActivo(); cargando = false;
+                MessageBox.Show("No se pudo cambiar el inicio con Windows:\n" + ex.Message, "Impresión Virgilio", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
             }
         }
 
         void OnClosing(object sender, FormClosingEventArgs e)
         {
-            if (dirty)
+            // Si el usuario cierra (X o Alt+F4), ofrecer minimizar: cerrado = deja de imprimir.
+            if (e.CloseReason == CloseReason.UserClosing)
             {
-                DialogResult r = MessageBox.Show("Hay cambios en las reglas sin guardar.\n¿Guardarlos antes de cerrar?",
-                    "Impresión", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
-                if (r == DialogResult.Cancel || (r == DialogResult.Yes && !Guardar())) { e.Cancel = true; return; }
+                DialogResult r = MessageBox.Show(
+                    "Si cerrás el programa, las hojas de Virgilio dejan de imprimirse en esta PC.\n\n"
+                    + "¿Minimizarlo y dejarlo funcionando en vez de cerrarlo?\n\n"
+                    + "Sí = minimizar (sigue imprimiendo)\nNo = cerrar\nCancelar = volver",
+                    "Impresión Virgilio", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                if (r == DialogResult.Yes) { e.Cancel = true; WindowState = FormWindowState.Minimized; return; }
+                if (r == DialogResult.Cancel) { e.Cancel = true; return; }
+            }
+            if (sinGuardar)
+            {
+                DialogResult r = MessageBox.Show("El último cambio no se pudo guardar en " + Path.GetFileName(reglasPath)
+                    + ".\nSi cerrás, al volver a abrir el programa no va a estar.\n\n¿Cerrar igual?",
+                    "Impresión Virgilio", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (r == DialogResult.No) { e.Cancel = true; return; }
             }
             if (servidor != null) servidor.Detener();
         }
@@ -794,11 +1136,14 @@ namespace ImpresionVirgilio
         TcpListener listener;
         Thread hilo;
         volatile bool corriendo = false;
+        volatile bool puertoOcupado = false;
         int puerto;
         Action<string> log;
         Func<string, byte[], Resultado> handler;
 
         public bool Corriendo { get { return corriendo; } }
+        // true si Iniciar falló porque otro programa (u otra ventana de este) ya usa el puerto.
+        public bool PuertoOcupado { get { return puertoOcupado; } }
 
         public ServidorImpresion(int puerto, Action<string> log, Func<string, byte[], Resultado> handler)
         {
@@ -818,6 +1163,12 @@ namespace ImpresionVirgilio
                 hilo.IsBackground = true;
                 hilo.Start();
                 return "";
+            }
+            catch (SocketException ex)
+            {
+                corriendo = false;
+                puertoOcupado = ex.SocketErrorCode == SocketError.AddressAlreadyInUse;
+                return ex.Message;
             }
             catch (Exception ex) { corriendo = false; return ex.Message; }
         }
