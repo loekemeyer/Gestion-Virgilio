@@ -4409,6 +4409,10 @@ también la anterior). En el celular: clave → **elige su nombre** (los que tie
 md5 del `system_identifier` del cluster (no hay secreto en el repo, que es público).
 **Lista = los que trabajaron en Virgilio en 15 días** (v23.84); apodos en la lista: 104 → «J. Colombia», 277 → «Jhonny» (v23.85, en `gv_tv_clave_validar`).
 `sql/gv_tv_clave_v2382.sql`, `tests/tv-clave-login.cjs`.
+⚠⚠ **v27.56 (Thomas, 06/10): «sacá todo el módulo de registro con legajo» — NO hay entrada tipeando el legajo.** Se
+retira el «legajo sin clave» de la v23.83. Se entra con la clave de la TV → nombre de la lista; quien no está toca
+«＋ No estoy en la lista» → tipea su nombre y entra con el legajo 600 (v27.37), y un admin lo valida en ⚙️ →
+«Validar Operarios». `loginWithLegajo` quedó como alias que abre ese paso. Lo mismo en `Registro-Produccion-3.0` (v30.07).
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.56): si la base de Gestión NO CONTESTA, avisa Telegram — y el vigilante vive en LK
 

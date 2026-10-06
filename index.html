@@ -58,7 +58,7 @@ button {
 .auth-divider::before, .auth-divider::after {
   content: ""; flex: 1; height: 1px; background: #dadce0;
 }
-#legajoLoginInput, #nombreLoginInput {
+#nombreLoginInput {
   width: 100%; font-size: 22px; padding: 12px; text-align: center;
   border: 1px solid #dadce0; border-radius: 6px; box-sizing: border-box;
 }
@@ -6323,7 +6323,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.55"></script>
+<script type="module" src="recepcion.js?v=27.56"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6380,7 +6380,6 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <div class="tvclave-lbl">🔑 Código de ingreso (en la TV)</div>
         <input id="tvClaveInput" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4 números" onkeydown="if(event.key==='Enter')loginConClaveTv()">
         <button class="primary-btn" onclick="loginConClaveTv()">Entrar</button>
-        <button class="tvnom-mas" style="margin-top:10px" onclick="tvMostrarLegajo()">Entrar con mi legajo</button>
       </div>
       <div id="tvNombreStep" class="hidden">
         <div class="tvclave-lbl">¿Quién sos?</div>
@@ -6388,11 +6387,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="tvnom-mas" onclick="tvMostrarLegajo()">＋ No estoy en la lista</button>
       </div>
       <div id="tvLegajoStep" class="hidden">
-        <input id="legajoLoginInput" type="number" inputmode="numeric" placeholder="Tu número de legajo">
-        <button class="primary-btn" onclick="loginWithLegajo()">Entrar con legajo</button>
-        <!-- v27.37 (Thomas): el que no tiene legajo tipea su nombre y entra; queda para que un admin lo valide. -->
-        <div class="auth-divider"><span>o</span></div>
-        <div class="tvclave-lbl">No tengo legajo todavía</div>
+        <!-- v27.37 (Thomas): el que no está en la lista tipea su nombre y entra; queda para que un admin lo valide.
+             v27.56 (Thomas, 06/10): «sacá todo el módulo de registro con legajo» — no hay campo de legajo. -->
+        <div class="tvclave-lbl">Tu nombre y apellido</div>
         <input id="nombreLoginInput" type="text" autocomplete="off" placeholder="Tu nombre y apellido" onkeydown="if(event.key==='Enter')loginConNombre()">
         <button class="primary-btn" onclick="loginConNombre()">Entrar con mi nombre</button>
       </div>
@@ -10597,7 +10594,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.55";
+const APP_VERSION = "v27.56";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -61075,7 +61072,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.55"></script>
+<script src="importacion.js?v=27.56"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61742,7 +61739,7 @@ window.loginConClaveTv = async function () {
 };
 window.tvMostrarLegajo = function () {
   _tvPaso("tvLegajoStep");
-  setTimeout(function () { try { $("legajoLoginInput").focus(); } catch (_e) {} }, 40);
+  setTimeout(function () { try { $("nombreLoginInput").focus(); } catch (_e) {} }, 40);
 };
 function tvElegirOperario(o) {
   const errEl = $("legajoLoginError");
@@ -61756,37 +61753,9 @@ function tvElegirOperario(o) {
 }
 window.tvElegirOperario = tvElegirOperario;
 
-window.loginWithLegajo = async function () {
-  const input = $("legajoLoginInput");
-  const errEl = $("legajoLoginError");
-  if (errEl) errEl.textContent = "";
-  // v23.83 (Luis): "que puedan loguearse con pin o con legajo. No los limitemos" → el legajo entra sin clave.
-  const raw = input ? String(input.value || "").trim() : "";
-  if (!raw) {
-    if (errEl) errEl.textContent = "Ingresá tu número de legajo";
-    return;
-  }
-  // v14.62 — Legajo 600 = ENTREVISTA / PRUEBA. No está en Empleados a propósito: es
-  // compartido. Cada candidato pone su NOMBRE y hace la prueba real (descuenta stock);
-  // cada evento queda sellado con ese nombre (gv_nombre_prueba).
-  let emp;
-  if (esLegajoEntrevista(raw)) {
-    const nombre = await promptNombreEntrevista();
-    if (!nombre) { if (errEl) errEl.textContent = "Poné tu nombre para empezar la prueba."; return; }
-    emp = { legajo: INTERVIEW_LEGAJO, nombre: nombre };
-  } else {
-    emp = await resolveEmpleadoByLegajo(raw);
-    if (!emp) {
-      if (errEl) errEl.textContent = "No encontramos ese legajo en Empleados. Avisá al supervisor.";
-      return;
-    }
-  }
-  saveLegajoSession(emp, todayKeyBsAs() || "");
-  __identity = { type: "operario", emp: emp, nombre: emp.nombre || ("Legajo " + emp.legajo) };
-  __plantChosen = false;
-  window.__gvLoginMetodo = "legajo";
-  _routeAfterAuth();
-};
+/* v27.56 (Thomas, 06/10): «sacá todo el módulo de registro con legajo». No se entra tipeando el legajo:
+   clave de la TV → nombre de la lista, o «No estoy en la lista» → nombre (v27.37). */
+window.loginWithLegajo = function () { window.tvMostrarLegajo(); };
 
 /* v27.37 (Thomas): el operario que no está en la lista ni tiene legajo tipea su nombre y
    entra YA — trabaja con el legajo compartido 600 (nombre sellado en cada evento, igual que
@@ -63923,10 +63892,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.55"></script>
-<script src="hotsale.js?v=27.55"></script>
-<script src="estadisticas.js?v=27.55"></script>
-<script src="ads.js?v=27.55"></script>
+<script src="cobranzas.js?v=27.56"></script>
+<script src="hotsale.js?v=27.56"></script>
+<script src="estadisticas.js?v=27.56"></script>
+<script src="ads.js?v=27.56"></script>
 
 </body>
 </html>

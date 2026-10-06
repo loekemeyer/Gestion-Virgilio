@@ -56,8 +56,9 @@ const OPS = [{ legajo: "104", nombre: "Jhonny Cartaya" }, { legajo: "77", nombre
     localStorage.removeItem("vir_legajo_auth");
     const err = () => (document.getElementById("legajoLoginError") || {}).textContent || "";
     const vis = (id) => { const e = document.getElementById(id); return !!e && !e.classList.contains("hidden"); };
-    // (d-bis) legajo sin clave
-    document.getElementById("legajoLoginInput").value = "300";
+    // (d-bis) v27.56: no hay campo de legajo ni atajo «Entrar con mi legajo»; loginWithLegajo() no entra
+    out.campoLegajo = !!document.getElementById("legajoLoginInput");
+    out.atajo = /Entrar con mi legajo|Entrar con legajo/.test(document.getElementById("legajoLoginRow").textContent);
     await window.loginWithLegajo();
     out.sinClave = { entro: ses(), err: err() };
     localStorage.removeItem("vir_legajo_auth");
@@ -73,9 +74,8 @@ const OPS = [{ legajo: "104", nombre: "Jhonny Cartaya" }, { legajo: "77", nombre
     // (d) «+»
     window.tvMostrarLegajo();
     out.mas = { legajo: vis("tvLegajoStep"), lista: vis("tvNombreStep") };
-    document.getElementById("legajoLoginInput").value = "300";
-    await window.loginWithLegajo();
     out.porLegajo = ses();
+    out.nombreVisible = vis("tvLegajoStep") && !!document.getElementById("nombreLoginInput");
     localStorage.removeItem("vir_legajo_auth");
     // (c) elegir nombre
     window.tvElegirOperario({ legajo: "104", nombre: "Jhonny Cartaya" });
@@ -83,11 +83,10 @@ const OPS = [{ legajo: "104", nombre: "Jhonny Cartaya" }, { legajo: "77", nombre
     out.sesion = localStorage.getItem("vir_legajo_auth");
     return out;
   }, CLAVE);
-  ok(res.sinClave.entro && res.sinClave.entro.legajo === "300", "(d) v23.83: el legajo entra también SIN clave (pin o legajo, sin limitar)");
+  ok(!res.campoLegajo && !res.atajo && !res.sinClave.entro, "(d) v27.56: sin campo de legajo ni «Entrar con mi legajo», y loginWithLegajo() no entra");
   ok(!res.mala.lista && /incorrecta/i.test(res.mala.err), "(b) clave incorrecta no deja pasar");
   ok(res.buena.lista && res.buena.btns.join("|") === "Jhonny Cartaya|Juan Perez", "(c) clave buena muestra los nombres: " + res.buena.btns.join(", "));
-  ok(res.mas.legajo && !res.mas.lista, "(d) «+» muestra el legajo");
-  ok(res.porLegajo && res.porLegajo.legajo === "300", "(d) con clave, el legajo entra");
+  ok(res.mas.legajo && !res.mas.lista && res.nombreVisible && !res.porLegajo, "(d) «+» muestra el nombre (v27.37), no un legajo");
   ok(res.porNombre && res.porNombre.legajo === "104" && /104/.test(res.sesion || ""), "(c) tocar el nombre entra con su legajo");
   ok(!errs.length, "sin errores de JS" + (errs.length ? ": " + errs[0] : ""));
   await b.close();
