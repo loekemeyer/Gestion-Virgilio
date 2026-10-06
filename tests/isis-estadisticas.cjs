@@ -153,7 +153,7 @@ ok(ei.eiNombreHoja("lk", "2026-09-10", "2026-09-20") === "LK 10.09-20.09-26", "h
 /* ---------- E) candados de puerta y de la regla de vacío ---------- */
 const src = fs.readFileSync(path.join(__dirname, "..", "estadisticas.js"), "utf8");
 const idx = fs.readFileSync(path.join(__dirname, "..", "index.html"), "latin1");
-ok(/onclick="openEstadisticasIsis\(\)"/.test(idx), "index: botón del panel supervisor abre openEstadisticasIsis()");
+ok(!/onclick="openEstadisticasIsis\(\)"/.test(idx), "index: v27.36 — el botón de Estadísticas ISIS ya NO está en el panel supervisor (vive en Est. Madre)");
 ok(/<script src="estadisticas\.js\?v=/.test(idx), "index: carga estadisticas.js con ?v=");
 ok(/if \(!rows\.length\)[^\n]*No se bajó nada/.test(src), "una RPC vacía NO baja un Excel vacío");
 ok(/if \(q\.error\)[^\n]*No se bajó nada/.test(src), "una RPC con error NO baja nada");
@@ -191,7 +191,7 @@ ok(/"GV_Web_Cancelados"/.test(sqlPed) && /"GV_Pedidos_Anulados"/.test(sqlPed), "
       } };
     }, { v: filasV, p: filasP, d: disrup });
     const btn = await p.$('.sup-actions.sup-secondary .sup-action-btn[onclick="openEstadisticasIsis()"]');
-    ok(!!btn, "pantalla: el botón está en los secundarios del panel supervisor");
+    ok(!btn, "pantalla: v27.36 — el botón ya no está en el panel supervisor (pasó a Stock y Compras → Est. Madre)");
     await p.evaluate(() => window.openEstadisticasIsis());
     await p.waitForSelector("#eiB_vlk", { timeout: 5000 });
     await p.evaluate(() => { document.getElementById("eiMes").value = "2026-09"; window.eiMes(); });

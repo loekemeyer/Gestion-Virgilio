@@ -7993,3 +7993,23 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
   pantalla y se pierde al cerrar.
 - **Excel (v27.34, Luis)**: «Descargar Excel» en Talleristas (una fila por tallerista + artículo) y en Stock un botón por rango (10 / 20 / 30 días, sólo lo que quiebra a ese horizonte). La pantalla y el Excel usan la misma cuenta (`_adsStockCalc`). Formato provisorio: Luis manda el Excel modificado y se replica.
 - `sql/gv_ads_alertas_damian_v2720.sql`, `sql/gv_ads_excedente_semaforo_v2722.sql`, `tests/ads-alertas.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-06, v27.36): Estadísticas ISIS vive en la pestaña 📈 EST. MADRE — plantillas subidas y bajada por mes
+
+El botón «📑 Estadísticas ISIS» salió del panel supervisor (`openEstadisticasIsis` queda en `estadisticas.js` sin
+puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBar` (`emBarPintar`, en
+`estadisticas.js`; **`admin/est-madre.js` no se toca**, es compartido con la página LK):
+
+| botón | qué hace |
+|---|---|
+| ⬆ Subir Estadística Madre | lee «Loeke Madre…» (col «Cod Nuevo Isis») y «Chef Madre / Chef Master» (col «Cod. Isis»); saltea copias «(2)» y «por menor vta» |
+| ⬆ Subir Costos | bloques «Loeke» / «Chef» de «Aportes Gastos» (celda con «Uni x mes…» al lado), sin cortar en una fila en blanco |
+| ⬇ Bajar por mes | meses elegidos → Pedidos LK/CH (orden Est. Madre) o Facturación LK/CH (orden Costos), una columna por mes del más nuevo al más viejo, **en unidades** |
+
+- Se guarda el ORDEN, el TIPO de cada código (505 número, '026' texto) y los renglones en blanco / títulos, para
+  pegar al lado sin correr filas: tabla **`GV_Est_Plantilla`** (`gv_est_plantilla_guardar` / `_leer`, sólo supervisor).
+- **LK suma lo de Chef con L** (031 = 031 LK + 031L Chef), igual que el BUSCARV + SUMAR.SI de las dos planillas.
+  Medido ago/26 contra el «costo lk final»: 248 de 249 códigos iguales (598E: 2.568 contra 2.772 de la planilla).
+- Disruptivo (regla v26.20): la celda del mes en **rojo negrita con fondo amarillo** y el detalle como **comentario**.
+  .xlsx con estilos reescribiendo `styles.xml` (`emXlsxBytes`). Sin UxB: 0 con comentario.
+- Una RPC vacía o con error no baja nada. `sql/gv_est_plantilla_v2736.sql`, `tests/est-madre-mes.cjs`.

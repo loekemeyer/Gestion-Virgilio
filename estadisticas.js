@@ -427,7 +427,365 @@ async function eiBajarTodas() {
   }
 }
 
+/* ============================================================================
+   EST. MADRE y COSTOS por mes (v27.36, Luis 06/10/2026)
+   ----------------------------------------------------------------------------
+   El módulo «Estadísticas ISIS» sale del panel supervisor y su lógica pasa a la pestaña
+   📈 Est. Madre de Stock y Compras:
+     · «⬆ Subir Estadística Madre» lee el Excel de la Est. Madre y guarda el ORDEN de los códigos
+       de la hoja «Loeke Madre…» (LK) y «Chef Madre / Chef Master» (CH), con el TIPO de cada código
+       (505 número, '026' texto) y los renglones en blanco / títulos, para que lo que se baja se pegue
+       al lado sin correr una fila.
+     · «⬆ Subir Costos» hace lo mismo con los bloques «Loeke» y «Chef» de «Aportes Gastos» (o un
+       «costo lk final» suelto: celda «Loeke» con «Uni x mes…» al lado).
+     · «⬇ Bajar por mes»: se eligen meses y sale Pedidos LK / Pedidos CH (orden de la Est. Madre)
+       o Facturación LK / CH (orden de Costos), una columna por mes, del más nuevo al más viejo,
+       SIEMPRE EN UNIDADES.
+   LK suma lo de Chef con L (031 = 031 de LK + 031L de Chef): es la cuenta de las dos planillas
+   (BUSCARV + SUMAR.SI.CONJUNTO del código&"L"). Verificado: costos 031 ago/26 = 7.056 + 3.336.
+   Pedido DISRUPTIVO (gv_isis_estad_pedidos_disruptivos, misma regla de la v26.20): la celda del mes
+   va en rojo y negrita con fondo amarillo y el detalle como COMENTARIO de esa celda.
+   Plantillas: tabla GV_Est_Plantilla (sql/gv_est_plantilla_v2736.sql). Candado: tests/est-madre-mes.cjs.
+   ============================================================================ */
+
+var _EM_MES_L = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+var _em = { pl: {}, sel: {}, msg: "", busy: false, leido: false };
+
+/* clave de cruce de un código: mayúsculas, sin espacios, sin ceros a la izquierda (026 = 26) */
+function emKey(c) { return String(c == null ? "" : c).trim().toUpperCase().replace(/\s+/g, "").replace(/^0+(?=[0-9])/, ""); }
+function _emEsCodigo(s) { return /^[0-9A-Z][0-9A-Z.\-\/]{0,13}$/i.test(String(s).trim()) && /[0-9]/.test(String(s)); }
+function _emTxt(cell) { return cell == null || cell.v == null ? "" : String(cell.v).trim(); }
+
+/* filas de una plantilla a partir de una columna de códigos, desde la fila r0 hasta la última con código */
+function _emFilas(ws, X, colCod, colDesc, r0, rFin, cortarEnVacio) {
+  var filas = [], ult = -1;
+  for (var r = r0; r <= rFin; r++) {
+    var c = ws[X.utils.encode_cell({ r: r, c: colCod })];
+    var v = c && c.v != null && String(c.v).trim() !== "" ? c.v : null;
+    if (cortarEnVacio) {   /* costos: el bloque sigue aunque haya una fila en blanco; corta en 3 seguidas o en el encabezado del otro bloque */
+      if (v == null) { var vac = 0; for (var q = r; q <= rFin && q < r + 3; q++) { var cq = ws[X.utils.encode_cell({ r: q, c: colCod })]; if (!cq || cq.v == null || String(cq.v).trim() === "") vac++; } if (vac >= 3) break; }
+      else if (/^(loeke|chef)$/i.test(String(v).trim())) break;
+    }
+    var d = colDesc != null ? _emTxt(ws[X.utils.encode_cell({ r: r, c: colDesc })]) : "";
+    if (v == null) { filas.push({ c: null }); continue; }
+    var t = String(v).trim();
+    if (c.t !== "n" && !_emEsCodigo(t)) { filas.push({ c: null, t: t }); ult = filas.length - 1; continue; }
+    filas.push(c.t === "n" ? { c: String(v), n: true, d: d } : { c: t, d: d });
+    ult = filas.length - 1;
+  }
+  return filas.slice(0, ult + 1);
+}
+function _emBuscarEnc(ws, X, re, maxFil) {
+  var rg = X.utils.decode_range(ws["!ref"] || "A1:A1");
+  for (var r = rg.s.r; r <= Math.min(rg.e.r, maxFil || 15); r++)
+    for (var c = rg.s.c; c <= Math.min(rg.e.c, 60); c++) {
+      var t = _emTxt(ws[X.utils.encode_cell({ r: r, c: c })]);
+      if (t && re.test(t)) return { r: r, c: c };
+    }
+  return null;
+}
+/* Est. Madre: hoja «Loeke Madre…» → columna «Cod Nuevo Isis»; «Chef Madre…» / «Chef Master» → «Cod. Isis».
+   Se descartan las copias («(2)») y las auxiliares («por menor vta»). Devuelve { lk, ch } (lo que encontró). */
+function emParsearMadre(X, wb) {
+  var out = {};
+  [["lk", /^\s*loeke\s+madre/i], ["ch", /^\s*chef\s+(madre|master)/i]].forEach(function (par) {
+    var mejor = null;
+    wb.SheetNames.forEach(function (nom) {
+      if (!par[1].test(nom) || /\(\d+\)|menor|\bpor\b/i.test(nom)) return;
+      var ws = wb.Sheets[nom]; if (!ws || !ws["!ref"]) return;
+      var enc = _emBuscarEnc(ws, X, /^cod(\.|igo)?\s*(nuevo\s*)?isis$/i, 15);
+      if (!enc) return;
+      var de = null;
+      for (var c = 0; c <= 30; c++) { var t = _emTxt(ws[X.utils.encode_cell({ r: enc.r, c: c })]); if (/^descrip/i.test(t)) { de = c; break; } }
+      var rg = X.utils.decode_range(ws["!ref"]);
+      var filas = _emFilas(ws, X, enc.c, de, enc.r + 1, rg.e.r, false);
+      var n = filas.filter(function (f) { return f.c; }).length;
+      if (!mejor || n > mejor.n) mejor = { hoja: nom, filas: filas, n: n, meta: { fila_enc: enc.r + 1, col_cod: X.utils.encode_col(enc.c), fila_desde: enc.r + 2 } };
+    });
+    if (mejor && mejor.n >= 5) out[par[0]] = mejor;
+  });
+  return out;
+}
+/* Costos: celda «Loeke» / «Chef» con «Uni x mes…» a la derecha; el bloque sigue hacia abajo hasta la primera vacía. */
+function emParsearCostos(X, wb) {
+  var out = {}, noms = wb.SheetNames.slice();
+  var ia = noms.findIndex(function (n) { return /aportes\s*gastos/i.test(n); });
+  if (ia > 0) { noms.unshift(noms.splice(ia, 1)[0]); }
+  noms.forEach(function (nom) {
+    var ws = wb.Sheets[nom]; if (!ws || !ws["!ref"]) return;
+    var rg = X.utils.decode_range(ws["!ref"]);
+    for (var r = rg.s.r; r <= rg.e.r; r++)
+      for (var c = rg.s.c; c <= Math.min(rg.e.c, 60); c++) {
+        var t = _emTxt(ws[X.utils.encode_cell({ r: r, c: c })]).toLowerCase();
+        var emp = t === "loeke" ? "lk" : t === "chef" ? "ch" : null;
+        if (!emp || out[emp]) continue;
+        if (!/^uni\s*x/i.test(_emTxt(ws[X.utils.encode_cell({ r: r, c: c + 1 })]))) continue;
+        var filas = _emFilas(ws, X, c, null, r + 1, rg.e.r, true);
+        var n = filas.filter(function (f) { return f.c; }).length;
+        if (n >= 5) out[emp] = { hoja: nom, filas: filas, n: n, meta: { fila_enc: r + 1, col_cod: X.utils.encode_col(c), fila_desde: r + 2 } };
+      }
+  });
+  return out;
+}
+
+/* meses "AAAA-MM" → etiqueta de la columna, como la escriben las planillas */
+function emRotulo(tipo, ym) {
+  var p = String(ym).split("-"), a = p[0], m = Number(p[1]);
+  if (tipo === "fac") return "Vtas " + _EM_MES_L[m - 1] + " " + a + " Uni";
+  var m3 = _EI_MES3[m - 1]; return m3.charAt(0).toUpperCase() + m3.slice(1) + " " + a.slice(2) + " Uni";
+}
+function emRangoMes(ym) {
+  var p = String(ym).split("-"), a = Number(p[0]), m = Number(p[1]);
+  var fin = new Date(Date.UTC(a, m, 0)).getUTCDate();
+  return { desde: a + "-" + String(m).padStart(2, "0") + "-01", hasta: a + "-" + String(m).padStart(2, "0") + "-" + String(fin).padStart(2, "0") };
+}
+/* suma por clave las filas de una RPC; si emp destino es LK, las de Chef con L van al código base */
+function emAcumular(mapa, filas, campo, soloL) {
+  (filas || []).forEach(function (x) {
+    var cod = String(x.cod == null ? "" : x.cod).trim().toUpperCase();
+    if (soloL) { var m = /^(.*[0-9E])L$/.exec(cod); if (!m) return; cod = m[1]; }
+    var k = emKey(cod); if (!k) return;
+    var e = mapa[k] || (mapa[k] = { u: 0, sinUxb: 0 });
+    var v = x[campo];
+    if (v == null || v === "") e.sinUxb += _eiNum(x.cajas); else e.u += _eiNum(v);
+  });
+  return mapa;
+}
+function emDisAcumular(mapa, filas, soloL) {
+  (filas || []).forEach(function (d) {
+    var cod = String(d.cod == null ? "" : d.cod).trim().toUpperCase();
+    if (soloL) { var m = /^(.*[0-9E])L$/.exec(cod); if (!m) return; cod = m[1]; }
+    var k = emKey(cod); if (k) (mapa[k] = mapa[k] || []).push(d);
+  });
+  return mapa;
+}
+
+/* arma la hoja. tipo "ped" (A cód · B descripción · meses) o "fac" (A cód · meses).
+   datos[ym] = { u: {clave: {u, sinUxb}}, dis: {clave: [...]} }. Devuelve { ws, estilo(col,row) } */
+function emArmarHoja(X, tipo, emp, pl, meses, datos) {
+  var ws = {}, conDesc = tipo === "ped", c0 = conDesc ? 2 : 1, disr = {}, nDis = 0, nSin = 0;
+  var put = function (r, c, cell) { ws[X.utils.encode_cell({ r: r, c: c })] = cell; };
+  put(0, 0, { t: "s", v: tipo === "fac" ? (emp === "lk" ? "Loeke" : "Chef") : (emp === "lk" ? "Cod Nuevo Isis" : "Cod. Isis") });
+  if (conDesc) put(0, 1, { t: "s", v: "Descripcion" });
+  meses.forEach(function (ym, j) { put(0, c0 + j, { t: "s", v: emRotulo(tipo, ym) }); });
+  (pl.filas || []).forEach(function (f, i) {
+    var r = i + 1;
+    if (!f.c) { if (f.t) put(r, 0, { t: "s", v: f.t }); return; }
+    put(r, 0, f.n ? { t: "n", v: Number(f.c) } : { t: "s", v: String(f.c) });
+    if (conDesc && f.d) put(r, 1, { t: "s", v: String(f.d) });
+    var k = emKey(f.c);
+    meses.forEach(function (ym, j) {
+      var d = datos[ym] || {}, e = (d.u || {})[k], lista = (d.dis || {})[k];
+      var cell = { t: "n", v: e ? Math.round(e.u * 100) / 100 : 0 };
+      var notas = [];
+      if (lista && lista.length) { notas.push(eiDisrupTexto(lista, emp).split(" | ").join("\n")); disr[X.utils.encode_cell({ r: r, c: c0 + j })] = 1; nDis++; }
+      if (e && e.sinUxb) { notas.push("Sin UxB cargada: " + _eiN(e.sinUxb, 1) + " cajas no se pudieron pasar a unidades."); nSin++; }
+      if (notas.length) { cell.c = [{ a: "Gestion", t: notas.join("\n\n") }]; cell.c.hidden = true; }
+      put(r, c0 + j, cell);
+    });
+  });
+  var nf = (pl.filas || []).length;
+  ws["!ref"] = "A1:" + X.utils.encode_cell({ r: Math.max(nf, 1), c: c0 + meses.length - 1 });
+  ws["!cols"] = [{ wch: 12 }].concat(conDesc ? [{ wch: 34 }] : []).concat(meses.map(function () { return { wch: tipo === "fac" ? 22 : 13 }; }));
+  return {
+    ws: ws, nDis: nDis, nSin: nSin,
+    estilo: function (ref) {
+      var m = /^([A-Z]+)(\d+)$/.exec(ref); if (!m) return 0;
+      if (m[2] === "1") return 1;
+      if (disr[ref]) return 3;
+      return X.utils.decode_col(m[1]) >= c0 ? 2 : 0;
+    }
+  };
+}
+/* .xlsx con estilos: 0 normal · 1 encabezado negrita centrado · 2 número #,##0 · 3 disruptivo
+   (rojo, negrita, fondo amarillo). SheetJS community no escribe estilos: se reescribe styles.xml. */
+function emXlsxBytes(X, hojas, tam) {
+  var wb = X.utils.book_new();
+  hojas.forEach(function (h) { X.utils.book_append_sheet(wb, h.ws, String(h.nombre).slice(0, 31)); });
+  var u8 = X.write(wb, { type: "array", bookType: "xlsx" });
+  var cfb = X.CFB.read(new Uint8Array(u8), { type: "array" });
+  var dec = new TextDecoder(), enc = new TextEncoder(), sz = tam || 10;
+  var iSt = cfb.FullPaths.findIndex(function (p) { return /\/xl\/styles\.xml$/.test(p); });
+  if (iSt < 0) throw new Error("xlsx sin styles.xml");
+  var st = dec.decode(new Uint8Array(cfb.FileIndex[iSt].content));
+  var font = function (b, rojo) { return '<font>' + (b ? '<b/>' : '') + '<sz val="' + sz + '"/>' + (rojo ? '<color rgb="FFFF0000"/>' : '') + '<name val="Arial"/><family val="2"/></font>'; };
+  st = st.replace(/<numFmts[\s\S]*?<\/numFmts>/, "").replace(/<numFmts[^>]*\/>/, "")
+    .replace(/<fonts[\s\S]*?<\/fonts>/, '<fonts count="3">' + font(false) + font(true) + font(true, true) + '</fonts>')
+    .replace(/<fills[\s\S]*?<\/fills>/, '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill></fills>')
+    .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
+      '<xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
+      '<xf numFmtId="3" fontId="2" fillId="2" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/></cellXfs>');
+  cfb.FileIndex[iSt].content = enc.encode(st);
+  var n = 0;
+  cfb.FullPaths.forEach(function (p, i) {
+    var m = /\/xl\/worksheets\/sheet(\d+)\.xml$/.exec(p); if (!m) return;
+    var h = hojas[Number(m[1]) - 1]; if (!h) return;
+    var x = dec.decode(new Uint8Array(cfb.FileIndex[i].content));
+    x = x.replace(/<c r="([A-Z]+\d+)"( s="\d+")?/g, function (_m, ref) { return '<c r="' + ref + '" s="' + h.estilo(ref) + '"'; })
+         .replace(/<sheetView workbookViewId="0"\/>/, '<sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView>');
+    cfb.FileIndex[i].content = enc.encode(x); n++;
+  });
+  return X.CFB.write(cfb, { fileType: "zip", type: "array" });
+}
+
+/* ---------- pantalla: barra arriba de la Est. Madre + pop-up de meses ---------- */
+var _EM_SAL = [
+  { k: "plk", tipo: "ped", emp: "lk", t: "Pedidos LK", pl: "madre_lk" },
+  { k: "pch", tipo: "ped", emp: "ch", t: "Pedidos CH", pl: "madre_ch" },
+  { k: "flk", tipo: "fac", emp: "lk", t: "Facturación LK", pl: "costos_lk" },
+  { k: "fch", tipo: "fac", emp: "ch", t: "Facturación CH", pl: "costos_ch" }
+];
+function _emCss() {
+  if (document.getElementById("emCss")) return;
+  var st = document.createElement("style"); st.id = "emCss";
+  st.textContent = [
+    "#emBar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:center;padding:6px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font:12.5px system-ui,Segoe UI,Arial,sans-serif;color:#0f172a;}",
+    "#emBar button,#emOv button{width:auto;margin-top:0;padding:5px 11px;font-size:12.5px;line-height:1.25;border:none;border-radius:8px;font-weight:800;cursor:pointer;background:#1e3a8a;color:#fff;}",
+    "#emBar button.sec{background:#e2e8f0;color:#0f172a;}",
+    "#emBar .pl{font-size:11.5px;color:#475569;}#emBar .pl b{color:#0f172a;}#emBar .pl .no{color:#b91c1c;font-weight:700;}",
+    "#emBar .msg{font-size:12px;font-weight:700;color:#1e3a8a;}#emBar .msg.err{color:#b91c1c;}",
+    "#emOv{position:fixed;inset:0;z-index:9600;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;padding:40px 12px;font-family:system-ui,Segoe UI,Arial,sans-serif;color:#0f172a;}",
+    "#emOv .cj{background:#fff;border-radius:12px;padding:14px 16px;max-width:620px;width:fit-content;display:grid;gap:10px;justify-items:center;box-shadow:0 10px 40px rgba(0,0,0,.25);}",
+    "#emOv h3{margin:0;font-size:15px;}",
+    "#emOv .ms{display:grid;grid-template-columns:repeat(6,auto);gap:5px;}",
+    "#emOv .ms button{background:#f1f5f9;color:#0f172a;font-weight:600;padding:5px 8px;}#emOv .ms button.on{background:#1e3a8a;color:#fff;}",
+    "#emOv .sal{display:grid;grid-template-columns:repeat(4,auto);gap:6px;}",
+    "#emOv .sal button:disabled{opacity:.45;cursor:not-allowed;}",
+    "#emOv .x{background:#e2e8f0;color:#0f172a;}",
+    "#emOv .nota{font-size:11.5px;color:#475569;max-width:560px;text-align:center;line-height:1.35;}",
+    "#emOv .res{font-size:12px;font-weight:700;color:#1e3a8a;text-align:center;}#emOv .res.err{color:#b91c1c;}"
+  ].join("\n");
+  document.head.appendChild(st);
+}
+function _emFecha(t) { var d = new Date(t); return isNaN(d) ? "" : String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0"); }
+function emBarPintar() {
+  var b = document.getElementById("emBar"); if (!b) return;
+  _emCss();
+  var plTxt = function (k, t) {
+    var p = _em.pl[k];
+    return p ? t + ' <b>' + _eiFmt(p.n, 0) + '</b>' + (p.subido_en ? ' (' + _emFecha(p.subido_en) + ')' : '') : t + ' <span class="no">sin subir</span>';
+  };
+  b.innerHTML =
+    '<button type="button" onclick="emSubir(\'madre\')">⬆ Subir Estadística Madre</button>' +
+    '<button type="button" onclick="emSubir(\'costos\')">⬆ Subir Costos</button>' +
+    '<button type="button" class="sec" onclick="emAbrir()">⬇ Bajar por mes</button>' +
+    '<span class="pl">' + plTxt("madre_lk", "Madre LK") + ' · ' + plTxt("madre_ch", "CH") + ' · ' + plTxt("costos_lk", "Costos LK") + ' · ' + plTxt("costos_ch", "CH") + '</span>' +
+    (_em.msg ? '<span class="msg' + (_em.msgErr ? ' err' : '') + '">' + _eiEsc(_em.msg) + '</span>' : '') +
+    '<input type="file" id="emFile" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="emArchivo(this)">';
+  if (!_em.leido) { _em.leido = true; emLeerPlantillas(); }
+}
+async function emLeerPlantillas() {
+  var q = await _eiRpc("gv_est_plantilla_leer", {});
+  if (q.error) { _em.msg = "No pude leer las plantillas: " + (q.error.message || q.error); _em.msgErr = true; }
+  else (q.data || []).forEach(function (p) {
+    p.n = (p.filas || []).filter(function (f) { return f && f.c; }).length;
+    _em.pl[p.clave] = p;
+  });
+  emBarPintar(); emPintar();
+}
+function emSubir(cual) {
+  _em.subiendo = cual;
+  var f = document.getElementById("emFile"); if (f) { f.value = ""; f.click(); }
+}
+async function emArchivo(inp) {
+  var file = inp && inp.files && inp.files[0]; if (!file) return;
+  var cual = _em.subiendo;
+  _em.msg = "Leyendo " + file.name + "…"; _em.msgErr = false; emBarPintar();
+  try {
+    var X = await _eiXlsx();
+    var buf = new Uint8Array(await file.arrayBuffer());
+    var nombres = X.read(buf, { type: "array", bookSheets: true }).SheetNames;
+    var quiero = cual === "madre"
+      ? nombres.filter(function (n) { return /^\s*(loeke\s+madre|chef\s+(madre|master))/i.test(n); })
+      : (nombres.filter(function (n) { return /aportes\s*gastos/i.test(n); }).length ? nombres.filter(function (n) { return /aportes\s*gastos/i.test(n); }) : nombres.slice(0, 5));
+    if (!quiero.length) throw new Error(cual === "madre" ? "no encontré las hojas «Loeke Madre» / «Chef Madre»" : "no encontré la hoja «Aportes Gastos»");
+    var wb = X.read(buf, { type: "array", sheets: quiero, cellFormula: false, cellHTML: false, cellStyles: false });
+    var res = cual === "madre" ? emParsearMadre(X, wb) : emParsearCostos(X, wb);
+    var ks = Object.keys(res);
+    if (!ks.length) throw new Error(cual === "madre" ? "ninguna hoja tiene la columna «Cod Nuevo Isis» / «Cod. Isis»" : "no encontré la celda «Loeke» / «Chef» con «Uni x mes…» al lado");
+    var dichos = [];
+    for (var i = 0; i < ks.length; i++) {
+      var r = res[ks[i]], clave = cual + "_" + ks[i];
+      var q = await _eiRpc("gv_est_plantilla_guardar", { p_clave: clave, p_archivo: file.name, p_hoja: r.hoja, p_filas: r.filas, p_meta: r.meta });
+      if (q.error) throw new Error("no se pudo guardar " + clave + ": " + (q.error.message || q.error));
+      dichos.push(ks[i].toUpperCase() + " " + r.n + " códigos (hoja «" + r.hoja + "»)");
+    }
+    _em.msg = "✓ " + (cual === "madre" ? "Est. Madre" : "Costos") + ": " + dichos.join(" · ");
+    _em.msgErr = false; _em.leido = true;
+    await emLeerPlantillas();
+  } catch (e) { _em.msg = "No se subió: " + (e && e.message || e); _em.msgErr = true; emBarPintar(); }
+}
+function _emMesesOpc() {
+  var hoy = new Date(), out = [];
+  for (var i = 1; i <= 18; i++) { var d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1); out.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); }
+  var cur = hoy.getFullYear() + "-" + String(hoy.getMonth() + 1).padStart(2, "0");
+  return [cur].concat(out);
+}
+function emAbrir() {
+  _emCss();
+  var ov = document.getElementById("emOv");
+  if (!ov) { ov = document.createElement("div"); ov.id = "emOv"; ov.onclick = function (e) { if (e.target === ov) emCerrar(); }; document.body.appendChild(ov); }
+  if (!Object.keys(_em.sel).length) { var o = _emMesesOpc(); _em.sel[o[1]] = true; }
+  ov.style.display = "flex"; emPintar();
+}
+function emCerrar() { var ov = document.getElementById("emOv"); if (ov) ov.style.display = "none"; }
+function emToggleMes(ym) { if (_em.sel[ym]) delete _em.sel[ym]; else _em.sel[ym] = true; emPintar(); }
+function emPintar() {
+  var ov = document.getElementById("emOv"); if (!ov || ov.style.display === "none") return;
+  var opc = _emMesesOpc();
+  ov.innerHTML = '<div class="cj"><h3>Bajar por mes — siempre en unidades</h3>' +
+    '<div class="ms">' + opc.map(function (ym) {
+      var p = ym.split("-"); var m3 = _EI_MES3[Number(p[1]) - 1];
+      return '<button type="button" class="' + (_em.sel[ym] ? "on" : "") + '" onclick="emToggleMes(\'' + ym + '\')">' + m3.charAt(0).toUpperCase() + m3.slice(1) + ' ' + p[0].slice(2) + '</button>';
+    }).join("") + '</div>' +
+    '<div class="sal">' + _EM_SAL.map(function (s) {
+      var ok = !!_em.pl[s.pl];
+      return '<button type="button"' + (ok && !_em.busy ? '' : ' disabled') + ' title="' + (ok ? "" : "Falta subir " + (s.tipo === "ped" ? "la Estadística Madre" : "los Costos")) + '" onclick="emBajar(\'' + s.k + '\')">⬇ ' + s.t + '</button>';
+    }).join("") + '</div>' +
+    (_em.res ? '<div class="res' + (_em.resErr ? ' err' : '') + '">' + _eiEsc(_em.res) + '</div>' : '') +
+    '<div class="nota">Pedidos salen en el orden de la Est. Madre y Facturación en el de Costos, una columna por mes del más nuevo al más viejo, listos para pegar. LK incluye lo de Chef con L. ' +
+    'Un pedido disruptivo (±50 % del promedio de ese cliente en 12 meses, o incorporación) va en <b>rojo con fondo amarillo</b> y el detalle como comentario de la celda.</div>' +
+    '<button type="button" class="x" onclick="emCerrar()">Cerrar</button></div>';
+}
+async function emBajar(k) {
+  var s = _EM_SAL.find(function (z) { return z.k === k; }); if (!s || _em.busy) return false;
+  var pl = _em.pl[s.pl];
+  var meses = Object.keys(_em.sel).sort().reverse();
+  if (!pl) { _em.res = "Falta subir la plantilla."; _em.resErr = true; emPintar(); return false; }
+  if (!meses.length) { _em.res = "Elegí al menos un mes."; _em.resErr = true; emPintar(); return false; }
+  _em.busy = true; _em.res = "Armando " + s.t + "…"; _em.resErr = false; emPintar();
+  try {
+    var X = await _eiXlsx(), datos = {};
+    var rpc = s.tipo === "ped" ? "gv_isis_estad_pedidos" : "gv_isis_estad_ventas", campo = s.tipo === "ped" ? "unidades" : "cantidad";
+    await Promise.all(meses.map(async function (ym) {
+      var rg = emRangoMes(ym), a = function (emp) { return { p_empresa: emp, p_desde: rg.desde, p_hasta: rg.hasta }; };
+      var llamadas = [_eiRpc(rpc, a(s.emp))];
+      if (s.emp === "lk") llamadas.push(_eiRpc(rpc, a("ch")));
+      if (s.tipo === "ped") { llamadas.push(_eiRpc(_EI_RPC_DISRUP, a(s.emp))); if (s.emp === "lk") llamadas.push(_eiRpc(_EI_RPC_DISRUP, a("ch"))); }
+      var r = await Promise.all(llamadas);
+      r.forEach(function (q) { if (q.error) throw new Error(emRotulo(s.tipo, ym) + ": " + (q.error.message || q.error)); });
+      if (!Array.isArray(r[0].data) || !r[0].data.length) throw new Error(emRotulo(s.tipo, ym) + " volvió vacío (sin datos o sin sesión de supervisor)");
+      var u = emAcumular({}, r[0].data, campo, false), dis = {}, i = 1;
+      if (s.emp === "lk") { emAcumular(u, r[1].data, campo, true); i = 2; }
+      if (s.tipo === "ped") { emDisAcumular(dis, r[i].data, false); if (s.emp === "lk") emDisAcumular(dis, r[i + 1].data, true); }
+      datos[ym] = { u: u, dis: dis };
+    }));
+    var h = emArmarHoja(X, s.tipo, s.emp, pl, meses, datos);
+    h.nombre = s.t;
+    var nom = s.t.replace(/\s+/g, "_").replace("ó", "o") + "_" + meses.slice().reverse().map(function (ym) { var p = ym.split("-"); return _EI_MES3[Number(p[1]) - 1] + p[0].slice(2); }).join("-") + ".xlsx";
+    gvXlsxBajar(emXlsxBytes(X, [h], s.tipo === "fac" ? 14 : 10), nom);
+    _em.res = "✓ " + s.t + ": " + meses.length + " mes(es), " + pl.n + " códigos" + (h.nDis ? " · " + h.nDis + " celdas disruptivas" : "") + (h.nSin ? " · " + h.nSin + " sin UxB (ver comentario)" : "");
+    _em.resErr = false;
+  } catch (e) { _em.res = "No se bajó nada: " + (e && e.message || e); _em.resErr = true; }
+  _em.busy = false; emPintar();
+  return !_em.resErr;
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = { eiHojaVentas: eiHojaVentas, eiHojaPedidos: eiHojaPedidos, eiXlsBytes: eiXlsBytes, eiNombre: eiNombre,
-                     eiNombreHoja: eiNombreHoja, eiCodVal: eiCodVal, eiDisrupMapa: eiDisrupMapa, eiDisrupTexto: eiDisrupTexto };
+                     eiNombreHoja: eiNombreHoja, eiCodVal: eiCodVal, eiDisrupMapa: eiDisrupMapa, eiDisrupTexto: eiDisrupTexto,
+                     emKey: emKey, emParsearMadre: emParsearMadre, emParsearCostos: emParsearCostos, emArmarHoja: emArmarHoja,
+                     emXlsxBytes: emXlsxBytes, emAcumular: emAcumular, emDisAcumular: emDisAcumular, emRotulo: emRotulo, emRangoMes: emRangoMes };
 }
