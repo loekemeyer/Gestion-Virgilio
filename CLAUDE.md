@@ -7945,9 +7945,14 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
   no entra por defecto (su semana corre). Tallerista con % < umbral → cuenta en el badge.
 - Rango, umbral (50 %) e «incluir la OC en curso» viven en `Stock_Config` (`ads_n_ocs`, `ads_umbral`,
   `ads_incluir_actual`); los guarda `gv_ads_config_guardar` (supervisor). Cambiarlos es un `update`.
-- **Stock** (`gv_ads_stock()`): saldo a 10/20/30 días = (góndola + racks + racks CH + a guardar) − NP programadas sin
+- **Stock** (`gv_ads_stock2()`, v27.22; `gv_ads_stock` queda sin llamador, de rollback): saldo a 10/20/30 días =
+  (góndola + racks + racks CH + a guardar + **excedente**, D2 Luis 06/10) − NP programadas sin
   pickear con entrega hasta hoy+N (vencidas incluidas, `gv_demanda_programada_pendiente`) − Est. Madre × N/30.
   Negativo = quiebre. Con la última OC vigente del código y el % de entrega del tallerista en ese artículo.
-- Medido 06/10 (últimas 4 OC cerradas): 13 de 18 talleristas debajo del 50 %; quiebres 81 / 102 / 131 a 10/20/30 días.
+- **Botón del panel (D3, Luis 06/10)**: a la IZQUIERDA badge violeta = talleristas a revisar; a la DERECHA semáforo
+  (`gv_ads_badge_stock`): **rojo** = quiebre a 10 días · **naranja** = los que recién quiebran a 20 · **amarillo** = los que
+  recién quiebran a 30 (cada artículo cuenta una vez, en su color más urgente). Son DOS pestañas (D1: no hay tercera).
+- Medido 06/10 (últimas 4 OC cerradas): 13 de 18 talleristas debajo del 50 %; quiebres 80 / 98 / 127 a 10/20/30 días
+  (con excedente) → semáforo 80 · 18 · 29.
   El % bajo refleja también la imputación (Oscar / Tierra Nativa se reciben como Log/ Fabr): mirar antes de reclamar.
-- `sql/gv_ads_alertas_damian_v2720.sql`, `tests/ads-alertas.cjs`.
+- `sql/gv_ads_alertas_damian_v2720.sql`, `sql/gv_ads_excedente_semaforo_v2722.sql`, `tests/ads-alertas.cjs`.

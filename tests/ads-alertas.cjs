@@ -1,6 +1,7 @@
 /* v27.20 — ADS · Alertas Damián Stock (Luis, 06/10/2026). Corre la pantalla de verdad (ads.js
    dentro de index.html) con las RPC mockeadas y mide:
-     (a) el botón está en el panel con su badge violeta, y el badge pinta lo que devuelve gv_ads_badge;
+     (a) el botón está en el panel con su badge violeta a la IZQUIERDA (gv_ads_badge) y el semáforo a la
+         derecha (gv_ads_badge_stock): rojo = quiebre a 10 · naranja = recién a 20 · amarillo = recién a 30;
      (b) Entregas talleristas: agrupa por tallerista, suma pedido/entregado, ordena por % (peor
          primero) y marca en rojo el que queda debajo del umbral; al tocarlo abre sus artículos;
      (c) Stock: por defecto muestra sólo el quiebre a 10 días, los chips cuentan 10/20/30 y la
@@ -37,8 +38,9 @@ const STOCK = [
       if (modo === "vacio") return { data: [], error: null };
       if (n === "gv_ads_config") return { data: { n_ocs: 4, umbral: 0.5, incluir_actual: false }, error: null };
       if (n === "gv_ads_talleristas") return { data: TALL, error: null };
-      if (n === "gv_ads_stock") return { data: STOCK, error: null };
+      if (n === "gv_ads_stock2") return { data: STOCK, error: null };
       if (n === "gv_ads_badge") return { data: 1, error: null };
+      if (n === "gv_ads_badge_stock") return { data: { q10: 80, q20: 98, q30: 127 }, error: null };
       return { data: null, error: { message: "?" } };
     } };
     const out = {};
@@ -47,6 +49,9 @@ const STOCK = [
     window.adsLoadBadge(); await espera(50);
     const bd = document.getElementById("adsBadge");
     out.badge = bd && bd.style.display !== "none" ? bd.textContent : "";
+    out.badgeIzq = bd ? (bd.style.left === "2px" && bd.style.right === "auto") : false;
+    const sem = document.getElementById("adsSemaf");
+    out.semaf = sem && sem.style.display !== "none" ? [...sem.querySelectorAll(".ads-sem")].map((x) => x.textContent + "|" + x.style.background) : [];
     window.openAds(); await espera(150);
     const filas = [...document.querySelectorAll("#adsOv tr.t")];
     out.orden = filas.map((f) => f.cells[0].textContent.replace(/[▸▾ ]/g, ""));
@@ -72,6 +77,10 @@ const STOCK = [
   const fallas = [];
   if (!r.boton) fallas.push("(a) falta el botón ADS con su badge");
   if (r.badge !== "1") fallas.push("(a) badge no pinta: " + r.badge);
+  if (!r.badgeIzq) fallas.push("(a) el badge violeta no va a la izquierda");
+  const semOk = r.semaf.length === 3 && /^80\|/.test(r.semaf[0]) && /rgb\(220, 38, 38\)/.test(r.semaf[0])
+    && /^18\|/.test(r.semaf[1]) && /rgb\(234, 88, 12\)/.test(r.semaf[1]) && /^29\|/.test(r.semaf[2]) && /rgb\(250, 204, 21\)/.test(r.semaf[2]);
+  if (!semOk) fallas.push("(a) semáforo rojo/naranja/amarillo: " + JSON.stringify(r.semaf));
   if (JSON.stringify(r.orden) !== JSON.stringify(["Oscar", "Lucho"])) fallas.push("(b) orden: " + JSON.stringify(r.orden));
   if (!r.oscarRojo || r.oscarPct !== "20 %" || r.oscarPed !== "150") fallas.push("(b) Oscar: " + r.oscarPct + " / " + r.oscarPed);
   if (r.sub !== 2) fallas.push("(b) artículos al abrir: " + r.sub);

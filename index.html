@@ -6313,7 +6313,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.21"></script>
+<script type="module" src="recepcion.js?v=27.22"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6431,7 +6431,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <button class="sup-action-btn" onclick="openAgentesAdmin()"><span class="sup-ico">🤖</span><span>Agentes</span></button>
       <button class="sup-action-btn" onclick="openMonitor()"><span class="sup-ico">📊</span><span>Monitor / Análisis / Inconsistencias</span></button>
       <button class="sup-action-btn" onclick="showGuardarOrden('')" style="position:relative;"><span class="sup-ico">📋</span><span>Qué bajar primero</span><span id="qbpHoras" style="display:none;font-size:12px;font-weight:800;background:rgba(255,255,255,.18);padding:2px 9px;border-radius:8px;line-height:1.15;white-space:nowrap;" title="Horas de guardado pendientes (lo que entra ahora a góndola ÷ cajas/h)"></span><span id="qbpBadge" class="dp-badge" style="display:none;" title="Urgentes (SOS): góndola < 20% con stock atrás para bajar"></span></button>
-      <button class="sup-action-btn" onclick="openAds()" style="position:relative;" title="Alertas Damián Stock: talleristas que no entregan lo pedido y quiebres de stock a 10, 20 y 30 días"><span class="sup-ico">🚨</span><span>ADS — Alertas Damián Stock</span><span id="adsBadge" class="dp-badge" style="display:none;background:#7c3aed;"></span></button>
+      <button class="sup-action-btn" onclick="openAds()" style="position:relative;" title="Alertas Damián Stock: talleristas que no entregan lo pedido y quiebres de stock a 10, 20 y 30 días"><span class="sup-ico">🚨</span><span>ADS — Alertas Damián Stock</span><span id="adsBadge" class="dp-badge" style="display:none;background:#7c3aed;left:2px;right:auto;"></span><span id="adsSemaf" style="display:none;position:absolute;top:2px;right:2px;flex-direction:column;gap:2px;align-items:flex-end;" title="Quiebres de stock previstos: rojo a 10 días · naranja a 20 · amarillo a 30"></span></button>
       <button class="sup-action-btn" onclick="openCorreccPanel()" style="position:relative;"><span class="sup-ico">🔀</span><span>Corregir códigos de NPs</span><span id="corrBadgeGreen" class="dp-badge" style="left:2px;right:auto;background:#16a34a;display:none;" title="Se pueden corregir pero NO es obligatorio (hay stock del secundario)"></span><span id="corrBadge" class="dp-badge" style="display:none;" title="Hay que corregir SÍ o SÍ (el secundario no tiene stock)"></span></button>
       <button class="sup-action-btn" onclick="openNpConsulta()"><span class="sup-ico">🔎</span><span>Consultar NP / Líos</span></button>
       <button class="sup-action-btn" onclick="openExpresoIsis()" style="position:relative;"><span class="sup-ico">🚚</span><span>Agregar Expreso ISIS</span><span id="expIsisBadge" class="dp-badge" style="display:none;" title="Expresos que el cliente eligió desde la página y falta cargar en ISIS. NO frena ningún pedido."></span></button>
@@ -10562,7 +10562,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.21";
+const APP_VERSION = "v27.22";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -60791,7 +60791,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.21"></script>
+<script src="importacion.js?v=27.22"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63615,10 +63615,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.21"></script>
-<script src="hotsale.js?v=27.21"></script>
-<script src="estadisticas.js?v=27.21"></script>
-<script src="ads.js?v=27.21"></script>
+<script src="cobranzas.js?v=27.22"></script>
+<script src="hotsale.js?v=27.22"></script>
+<script src="estadisticas.js?v=27.22"></script>
+<script src="ads.js?v=27.22"></script>
 
 </body>
 </html>

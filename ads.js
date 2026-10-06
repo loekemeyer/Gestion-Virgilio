@@ -16,13 +16,13 @@
      botón ADS del panel, con cuántos son. Rango y umbral viven en Stock_Config
      (ads_n_ocs, ads_umbral, ads_incluir_actual): el badge es el mismo para todos.
    PESTAÑA 2 · STOCK (quiebres a 10, 20 y 30 días)
-     saldo N = (góndola + racks + a guardar) − NP programadas sin pickear con
+     saldo N = (góndola + racks + a guardar + excedente) − NP programadas sin pickear con
                entrega hasta hoy + N (las vencidas también) − Est. Madre × N/30
      Negativo = quiebre. Con la última OC del código (cuánto se recibió) y el %
      que viene entregando ese tallerista en ese artículo (rango de la pestaña 1).
 
-   Backend: sql/gv_ads_alertas_damian_v2720.sql (gv_ads_talleristas, gv_ads_stock,
-   gv_ads_badge, gv_ads_config, gv_ads_config_guardar). Sólo lectura salvo la config.
+   Backend: sql/gv_ads_alertas_damian_v2720.sql + sql/gv_ads_excedente_semaforo_v2722.sql (gv_ads_talleristas, gv_ads_stock2,
+   gv_ads_badge, gv_ads_badge_stock, gv_ads_config, gv_ads_config_guardar). Sólo lectura salvo la config.
    ⚠ Una lectura que falla se DICE, no se dibuja como "todo bien" (regla "una
    lectura ROTA no es un CERO"). Vive en su propio archivo (regla v23.98), con ?v=
    atado a APP_VERSION. Candado: tests/ads-alertas.cjs.
@@ -124,7 +124,7 @@ function _adsCargarTall() {
 }
 function _adsCargarStock() {
   _ads.stock = null; _ads.stockErr = "";
-  _adsRpc("gv_ads_stock").then(function (r) {
+  _adsRpc("gv_ads_stock2").then(function (r) {
     if (r.error || !Array.isArray(r.data)) _ads.stockErr = "No se pudo leer el stock: " + ((r.error && r.error.message) || "sin respuesta");
     else if (!r.data.length) _ads.stockErr = "La lectura del stock volvió vacía (no se dibuja como «sin quiebres»).";
     else _ads.stock = r.data;
@@ -211,7 +211,7 @@ function _adsHtmlStock() {
   if (_ads.stockErr) return h + '<div class="err">' + _adsEsc(_ads.stockErr) + "</div></div>";
   if (!_ads.stock) return h + '<div class="msg">Leyendo stock…</div></div>';
   var f = adsFiltrarStock(rows, _ads.horiz, _ads.q);
-  h += '<div class="res">Disponible = góndola + racks + a guardar · comprometido = NP programadas sin pickear con entrega hasta ese día · Est. Madre prorrateada · en cajas</div>';
+  h += '<div class="res">Disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · Est. Madre prorrateada · en cajas</div>';
   h += '<table><thead><tr><th>Cód.</th><th>Descripción</th><th>Disp.</th><th>Est.<br>Madre<br>/mes</th><th>Comprom.<br>10 · 20 · 30 d</th>' +
     '<th>Saldo<br>10 d</th><th>Saldo<br>20 d</th><th>Saldo<br>30 d</th><th>Cubre<br>días</th><th>Última OC<br>fecha · prov.</th><th>OC<br>pedida · recib.</th><th>% entrega<br>tallerista</th></tr></thead><tbody>';
   if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + _ads.horiz + " días.</td></tr>";
@@ -221,7 +221,7 @@ function _adsHtmlStock() {
     var tp = pc.length ? pc.map(function (x) { var al = x.pct != null && Number(x.pct) < _ads.umbral; return '<span class="' + (al ? "neg" : "") + '">' + _adsEsc(x.proveedor) + " " + _adsPct(x.pct) + "</span>"; }).join("<br>") : "—";
     var ocPct = r.oc_cant ? " (" + _adsPct(Number(r.oc_rec) / Number(r.oc_cant)) + ")" : "";
     h += "<tr><td><b>" + _adsEsc(r.cod) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
-      '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + '">' + _adsN(r.disponible) +
+      '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + " · excedente " + _adsN(r.excedente) + '">' + _adsN(r.disponible) +
       "</td><td>" + _adsN(r.proy_mes) + "</td><td>" + _adsN(r.comp10) + " · " + _adsN(r.comp20) + " · " + _adsN(r.comp30) + "</td>" +
       s(r.saldo10) + s(r.saldo20) + s(r.saldo30) + "<td>" + (r.dias_cubre == null ? "—" : _adsN(r.dias_cubre)) + "</td>" +
       "<td>" + (r.oc_fecha ? _adsFecha(r.oc_fecha) + ' · <span class="tp">' + _adsEsc(r.oc_prov) + "</span>" : '<span class="neg">sin OC</span>') + "</td>" +
@@ -240,13 +240,31 @@ function _adsRender() {
   ov.innerHTML = h;
 }
 
-/* Badge violeta del botón del panel: talleristas debajo del umbral (config guardada). */
+/* Badges del botón del panel (v27.22, Luis D3): a la IZQUIERDA el violeta = talleristas a revisar
+   (gv_ads_badge, con la config guardada); a la DERECHA el semáforo de quiebres (gv_ads_badge_stock):
+   rojo = quiebre a 10 días · naranja = los que recién quiebran a 20 · amarillo = los que recién
+   quiebran a 30. Cada artículo cuenta UNA vez, en su color más urgente. Una lectura rota no apaga
+   lo que ya se mostraba: no pinta nada. */
+function adsSemaforoCuentas(q) {
+  var q10 = Number(q && q.q10) || 0, q20 = Number(q && q.q20) || 0, q30 = Number(q && q.q30) || 0;
+  return { rojo: q10, naranja: Math.max(0, q20 - q10), amarillo: Math.max(0, q30 - q20) };
+}
 function adsLoadBadge() {
-  var b = document.getElementById("adsBadge"); if (!b) return;
-  _adsRpc("gv_ads_badge").then(function (r) {
-    var n = r && !r.error ? Number(r.data) : NaN;
+  var b = document.getElementById("adsBadge");
+  if (b) _adsRpc("gv_ads_badge").then(function (r) {
+    if (!r || r.error) return;
+    var n = Number(r.data);
     if (!(n > 0)) { b.style.display = "none"; return; }
     b.style.display = ""; b.textContent = n;
     b.title = n + " tallerista(s) entregaron menos del umbral de lo pedido en el rango de OC";
+  });
+  var s = document.getElementById("adsSemaf");
+  if (s) _adsRpc("gv_ads_badge_stock").then(function (r) {
+    if (!r || r.error || !r.data) return;
+    var c = adsSemaforoCuentas(r.data), h = "";
+    [["rojo", "#dc2626", "#fff", "a 10 días"], ["naranja", "#ea580c", "#fff", "a 20 días"], ["amarillo", "#facc15", "#422006", "a 30 días"]].forEach(function (x) {
+      if (c[x[0]] > 0) h += '<span class="ads-sem" style="min-width:22px;height:18px;line-height:18px;padding:0 5px;border-radius:9px;background:' + x[1] + ';color:' + x[2] + ';font-size:12px;font-weight:800;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.3);" title="' + c[x[0]] + ' artículo(s) quiebran ' + x[3] + '">' + c[x[0]] + "</span>";
+    });
+    s.innerHTML = h; s.style.display = h ? "flex" : "none";
   });
 }
