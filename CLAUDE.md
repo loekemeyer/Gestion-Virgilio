@@ -4977,6 +4977,11 @@ sale— y devuelve el % que queda en el período, **por separado para importados
   **NUNCA crear ni usar ramas** (ni feature branches, ni ramas de Claude).
   Todo va a `main` directo. Si la plataforma crea una rama automáticamente,
   mergear a `main` de inmediato y trabajar desde ahí.
+  ⚠⚠ **REGLA GENERAL (Luis, 2026-10-06): TODO va a `main`, salvo que se diga lo contrario
+  EN EL MOMENTO.** Vale aunque el entorno/harness arranque la sesión en una rama
+  `claude/...`: el commit se mergea a `main` (fast-forward) y se pushea ahí sin esperar
+  que lo pida. No dejar el trabajo en una rama suelta ni preguntar a qué rama va: Pages
+  sirve la app desde `main`, así que en una rama no llega a nadie.
 - Estilo de commits: `vX.YZ: descripción` cuando hay bump de versión.
 - **Desde el 2026-09-05: TODO cambio lleva bump** de `APP_VERSION` (index.html) y `SW_VERSION`
   (sw.js), también los de backend/Supabase/Edge Functions. Pedido del dueño: *"empezá a bumpear

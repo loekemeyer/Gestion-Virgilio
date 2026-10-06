@@ -46,7 +46,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     ov = document.getElementById("pppResPopOv");
     out.th = [...ov.querySelectorAll("thead th")].map(function (t) { return t.textContent.trim(); });
     out.conRpc = {};
-    [...ov.querySelectorAll(".pppres-tbl tbody tr")].forEach(function (tr) { out.conRpc[tr.children[0].textContent.trim()] = tr.querySelector("td.orig").textContent.replace(/\s+/g, " ").trim(); });
+    [...ov.querySelectorAll(".pppres-tbl tbody tr")].forEach(function (tr) { out.conRpc[tr.children[0].textContent.replace(/\s+/g, " ").trim()] = tr.querySelector("td.orig").textContent.replace(/\s+/g, " ").trim(); });
     [...host.querySelectorAll(".ppp-restbl td.cam")][0].click();
     ov = document.getElementById("pppResPopOv");
     out.cam = [...ov.querySelectorAll(".pppres-tbl tbody tr:not(.camh) td.orig")].map(function (t) { return t.textContent.replace(/\s+/g, " ").trim(); });
