@@ -5585,6 +5585,41 @@ nada—: el reintento tapa el blip, el fail-closed de arriba sobrevive a una ca�
 crons de LK que ahogaban la base— se bajó el mismo día: watchdog **job 63** de 1 a 2 min, y los `*/10` **62/66/68**
 sacados del stack de minuto :00 (pico por minuto 9 → 6, con 6 worker slots). `tests/pweb-lk-token.cjs` bloque 7.
 
+## ⚠ REGLA (Luis, 2026-10-06, v27.17): ANTES DE CREAR O MOVER UN CRON, mirar `gv_cron_colisiones`
+
+**La instancia tiene 6 worker slots.** Cuando varios crons disparan el mismo minuto se agotan, y
+el que no consigue slot corta con `job startup timeout` —no sólo él, cualquier consulta de ese
+momento—. Fue la causa de fondo del 504 del armado del 06/10 (LK ahogada 10:40–12:40 UTC): el
+watchdog cada 1 min y cuatro `*/10` amontonados en el minuto :00 (9 jobs contra 6 slots). Acomodar
+minutos a mano no escala: cada cron nuevo vuelve a ser una adivinanza.
+
+> **Al crear o mover un cron (en LK o en Gestión), PRIMERO se consulta `gv_cron_colisiones`** y se
+> elige un minuto con pocos jobs y **ningún pesado**. NUNCA minuto redondo (:00, :30): ahí se
+> amontonan los `*/10`, `*/15`, `*/30` y los de hora fija.
+
+```sql
+select minuto, jobs, pesados, detalle from public.gv_cron_colisiones;   -- mapa por minuto (pesados con *)
+select jobid, jobname, schedule, avg_s, max_s, pesado from public.gv_cron_agenda order by avg_s desc nulls last;
+```
+
+Las tres prácticas, en orden de impacto:
+
+1. **Un cron pesado NO se solapa consigo mismo.** Es lo que agota los slots: un job lento que
+   sigue disparando se apila (el watchdog de 748 s llegó a ~12 instancias). Se envuelve el
+   **command** del cron en un `DO` con `pg_try_advisory_xact_lock(hashtext('cron:<fn>')::bigint)`
+   — si una corrida anterior sigue viva, la nueva se saltea. **No se toca el cuerpo de la
+   función**; el lock se libera solo al terminar la transacción. Aplicado el 06/10 a los 5 pesados
+   de LK (63, 39, 48, 41, 66).
+2. **El minuto por FÓRMULA, no a dedo.** Un `*/10` en el offset `jobid % 10` (o cualquier minuto
+   impar libre que muestre la vista) no cae con otro `*/10`. Así un cron nuevo se ubica solo sin
+   romper a los demás.
+3. **Medir, no adivinar.** La vista es la foto; se mira antes de agregar, no después de que se cae.
+
+⚠ `gv_cron_colisiones` cuenta sólo los crons que corren **cada hora** (campo de hora `*`), que son
+los del riesgo sostenido; los reportes de hora fija van en `gv_cron_agenda`. **Las dos vistas viven
+en LK y en Gestión** (`sql/gv_cron_colisiones_antisolape_v2716.sql`). No subir la instancia (Luis,
+28/09): el amontonamiento vuelve igual.
+
 ## ⚠ REGLA (v21.10): `index.html` es UTF-8 — un byte en latin1 se multiplica solo
 
 El archivo declara `<meta charset="UTF-8">`. El 22/09 tenía **5 bytes sueltos en latin1/cp1252**,
