@@ -5620,6 +5620,17 @@ los del riesgo sostenido; los reportes de hora fija van en `gv_cron_agenda`. **L
 en LK y en Gestión** (`sql/gv_cron_colisiones_antisolape_v2716.sql`). No subir la instancia (Luis,
 28/09): el amontonamiento vuelve igual.
 
+⚠ **Y hay ALARMA automática, no sólo el mapa** (Thomas, 06/10): cron **78 `gv-cron-slots-alarma`** de
+LK (`1-59/5`, do-block con anti-solape) avisa al grupo de infra cuando **3+ jobs fallan con `job
+startup timeout` o `statement timeout` en 6 min** — o sea cuando la base se queda sin worker slots,
+en la cara inicial del episodio, no 2 h después. Dedup por hora. `sql/gv_cron_slots_alarma_20261006_LK.sql`.
+Cubre lo que `gv_cron_colisiones` no: nadie tiene que mirar la tabla. **Falta el espejo en Gestión**
+(GV tuvo 0 choques en 3 días, va después). Medido el 06/10: el incidente NO fue el bug de un cron
+(39/48 corren 7-11 s normal; el 353 s era histórico) sino **contención general de la base de LK** con
+el watchdog 63 de amplificador (sus ticks murieron con statement timeout de 6-12 min); el fix fue el
+anti-solape + watchdog a 2 min. Las queries del incidente se perdieron (`pg_stat_statements` se
+reseteó 12:44 UTC, ~cuando se cortó — quizás un restart de la base).
+
 ## ⚠ REGLA (v21.10): `index.html` es UTF-8 — un byte en latin1 se multiplica solo
 
 El archivo declara `<meta charset="UTF-8">`. El 22/09 tenía **5 bytes sueltos en latin1/cp1252**,
