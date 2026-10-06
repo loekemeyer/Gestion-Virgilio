@@ -52387,7 +52387,8 @@ function pipeAccionesBtns(p) {
   if (et === "ingresado")
     return B("pipe-b-eq", "pipeAnalisis('" + emp + "','" + oid + "')", "🔎 Análisis Cred.",
              "Abre Equifax y arranca el reloj del análisis") +
-           _ref +
+           B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
+             "Vincularlo a una razón social que ya es cliente") +
            _enviarBtn() +
            B("pipe-b-no", _eliminar, "🗑 Eliminar pedido",
              "Lo saca de la PPP y queda en el log de anulados");
