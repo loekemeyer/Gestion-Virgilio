@@ -504,9 +504,6 @@ var EM_CSS = `
 var EM_HTML =
   '<div class="page-header"><div>' +
     '<h1>Estadística Madre</h1>' +
-    '<p class="page-sub">Cajas (o unidades, con el switch) vendidas por mes de cada artículo de <b>Stocks</b> de Gestión Virgilio. ' +
-    '<b>Est Madre</b> es la misma columna «Est. Madre caj/mes» de Stocks: el principal suma a sus secundarios. ' +
-    'Es un solo cuadro: el panel de LK y Gestión muestran este mismo.</p>' +
   '</div></div>' +
   /* v27.43 (Luis, 06/10): un solo sector de filtros, compacto: buscar · meses a mostrar · cajas/unidades · Descargar E.M.
      (baja los meses que se están mostrando). Lo de importar/exportar vive en la barra de Gestión. */
@@ -525,6 +522,8 @@ var EM_HTML =
       '<button type="button" data-u="uni" onclick="setEstMadreUnidad(\'uni\')" title="Unidades = cajas × unidades por caja (uxb de Gestión)">Unidades</button>' +
     '</div>' +
     '<button class="btn-primary em-bajar" onclick="descargarEstadisticaMadreExcel()" title="Bajar en Excel la Est. Madre con los meses que se están mostrando">⬇ Descargar E.M.</button>' +
+    /* v27.46 (Luis, 06/10): VIVI abre en un pop-up el importar / exportar de Gestión. Sólo en el iframe de Gestión. */
+    '<button type="button" id="emViviBtn" class="btn-primary em-vivi" style="display:none" onclick="window.parent.emViviAbrir()" title="Subir las planillas y bajar Pedidos / Facturación por mes">VIVI</button>' +
     '<div id="estMadreStatus" class="cliente-lookup-status"></div>' +
   '</div>' +
   '<div class="card est-madre-card"><div class="est-madre-table-wrap">' +
@@ -566,6 +565,10 @@ function _emPintarPagina() {
   var sec = document.getElementById("estadistica-madre");
   if (!sec) return null;
   if (!document.getElementById("estMadreTable")) sec.innerHTML = EM_HTML;
+  try {
+    var vb = document.getElementById("emViviBtn");
+    if (vb && window.parent !== window && typeof window.parent.emViviAbrir === "function") vb.style.display = "";
+  } catch (e) { /* otro origen: sin VIVI */ }
   return sec;
 }
 
@@ -751,11 +754,12 @@ function aplicarRangoEstadisticaMadre() {
   if (status) {
     var when = _estMadreLoadedAt ? _estMadreLoadedAt.toLocaleTimeString("es-AR") : "";
     var sinUxb = items.filter(function (f) { return !f.uxb; }).length;
-    status.textContent = items.length + " artículos de Stocks · " + yms.length + " meses · leído " + when +
-      (_estMadreUnidad === "uni" ? " · en UNIDADES (cajas × uxb de Gestión" + (sinUxb ? "; " + sinUxb + " sin uxb no suman" : "") + ")" : "") +
-      (_estMadreUxbErr ? " · no se pudo leer el uxb: el modo unidades está apagado" : "");
+    /* v27.46 (Luis): sin texto informativo; sólo lo que falla. */
+    void when;
+    status.textContent = (_estMadreUnidad === "uni" && sinUxb ? sinUxb + " sin uxb no suman en unidades" : "") +
+      (_estMadreUxbErr ? "No se pudo leer el uxb: el modo unidades está apagado" : "");
     status.className = "cliente-lookup-status";
-    status.style.display = "";
+    status.style.display = status.textContent ? "" : "none";
   }
   _actualizarSelectorMesesDisruptivas();
 }

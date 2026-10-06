@@ -116,8 +116,8 @@ ok(v("A6") === "Articulos  Discontinuos", "el título sale en su fila");
 ok(v("C5") === 1680, "702E LK = 1.680 de 702EL de Chef");
 ok(v("C7") === 0 && ws.C7.c && /Sin UxB/.test(ws.C7.c[0].t), "sin UxB: 0 con comentario que lo dice");
 ok(ws.C5.c && /Incorporación/.test(ws.C5.c[0].t) && /Cencosud/.test(ws.C5.c[0].t), "disruptivo: el detalle va como COMENTARIO de la celda");
-ok(h.nDis === 1 && h.estilo("C5") === 7 && h.estilo("C3") === 4 && h.estilo("C2") === 2 && h.estilo("D5") === 2 && h.estilo("A5") === 0 && h.estilo("C1") === 1,
-   "estilos: 702E 1.680 > 1.000×1,3 celeste+disruptivo (7) · 026 4.348 > 4.000 amarillo (4) · 505 bajo la E.Madre (2) · código 0 · encabezado 1");
+ok(h.nDis === 1 && h.estilo("C5") === 7 && h.estilo("C3") === 4 && h.estilo("C2") === 2 && h.estilo("D5") === 2 && h.estilo("A5") === 10 && h.estilo("C1") === 1,
+   "estilos: 702E 1.680 > 1.000×1,3 celeste+disruptivo (7) · 026 4.348 > 4.000 amarillo (4) · 505 bajo la E.Madre (2) · código centrado 10 · encabezado 1");
 ok(h.nCel === 1 && h.nAma === 1, "cuenta celestes y amarillas");
 /* lo que tenemos y NO está en la planilla: al fondo (un blanco antes), fila entera naranja, con la nota */
 ok(JSON.stringify(h.sueltos) === '["999E"]', "sueltos: 999E (vino " + JSON.stringify(h.sueltos) + ")");
@@ -125,13 +125,13 @@ const rN = (m.lk.filas.length + 3);   /* fila 1 encabezado + filas + 1 blanco �
 ok(v("A" + rN) === "999E" && v("B" + rN) === "Pica Ajo Nuevo" && v("C" + rN) === 50 && /No está en la planilla/.test(v("E" + rN)),
    "el suelto va al fondo con código, descripción, unidades y nota (fila " + rN + ")");
 ok(v("A" + (rN - 1)) === undefined, "un renglón en blanco antes de los sueltos");
-ok(h.estilo("A" + rN) === 8 && h.estilo("C" + rN) === 9 && h.estilo("E" + rN) === 8, "la fila del suelto va entera en naranja (8 texto / 9 número)");
+ok(h.estilo("A" + rN) === 11 && h.estilo("B" + rN) === 8 && h.estilo("C" + rN) === 9 && h.estilo("E" + rN) === 8, "la fila del suelto va entera en naranja (11 código centrado / 8 texto / 9 número)");
 /* el xlsx de verdad: styles.xml con el fondo amarillo y la letra roja, y la celda con s=3 */
 const cfb = X.CFB.read(new Uint8Array(bytes), { type: "array" });
 const leer = (re) => { const i = cfb.FullPaths.findIndex((p) => re.test(p)); return i < 0 ? "" : new TextDecoder().decode(new Uint8Array(cfb.FileIndex[i].content)); };
 const st = leer(/\/xl\/styles\.xml$/), sh = leer(/\/xl\/worksheets\/sheet1\.xml$/);
-ok(/FFFFFF00/.test(st) && /FFBDD7EE/.test(st) && /FFFF0000/.test(st) && /<cellXfs count="10">/.test(st) && /FFFFC000/.test(st), "styles.xml: amarillo, celeste, naranja, letra roja, 10 estilos");
-ok(/<c r="C5" s="7"/.test(sh) && /<c r="C3" s="4"/.test(sh) && /<c r="C2" s="2"/.test(sh) && /<c r="A1" s="1"/.test(sh), "sheet1.xml: C5 s=7, C3 s=4, números s=2, encabezado s=1");
+ok(/FFFFFF00/.test(st) && /FFBDD7EE/.test(st) && /FFFF0000/.test(st) && /<cellXfs count="12">/.test(st) && /<alignment horizontal="center"\/><\/xf>/.test(st) && /FFFFC000/.test(st), "styles.xml: amarillo, celeste, naranja, letra roja, código centrado, 12 estilos");
+ok(/<c r="C5" s="7"/.test(sh) && /<c r="C3" s="4"/.test(sh) && /<c r="C2" s="2"/.test(sh) && /<c r="A1" s="1"/.test(sh) && /<c r="A2" s="10"/.test(sh), "sheet1.xml: C5 s=7, C3 s=4, números s=2, encabezado s=1, código s=10");
 ok(cfb.FullPaths.some((p) => /comments\d*\.xml$/.test(p)), "el xlsx trae los comentarios");
 /* CH: no suma lo de L */
 const uCh = em.emAcumular({}, pedCh["2026-09"], "unidades", false);
@@ -161,7 +161,10 @@ const idx = fs.readFileSync(path.join(__dirname, "..", "index.html"), "latin1");
 const src = fs.readFileSync(path.join(__dirname, "..", "estadisticas.js"), "utf8");
 ok(!/onclick="openEstadisticasIsis\(\)"/.test(idx), "el botón viejo de Estadísticas ISIS no está en el panel");
 ok(/<div id="emBar"><\/div>/.test(idx) && /emBarPintar\(\)/.test(idx), "la barra va arriba del iframe de la Est. Madre");
-ok(!/emBar|emParsear/.test(fs.readFileSync(path.join(__dirname, "..", "admin", "est-madre.js"), "utf8")), "est-madre.js (compartido con LK) no se tocó");
+const emj = fs.readFileSync(path.join(__dirname, "..", "admin", "est-madre.js"), "utf8");
+ok(!/emBarPintar|emParsear/.test(emj), "est-madre.js (compartido con LK) no trae la barra de Gestión");
+ok(/id="emViviBtn"[^>]*display:none/.test(emj) && /typeof window\.parent\.emViviAbrir === "function"/.test(emj), "est-madre.js: botón VIVI escondido, sólo se ve dentro de Gestión");
+ok(!/page-sub/.test(emj.split("var EM_HTML")[1].split("_emInyectarCss")[0]) && !/artículos de Stocks · /.test(emj), "est-madre.js: sin el texto de abajo del título ni el «N artículos de Stocks»");
 ok(/volvió vacío/.test(src) && /No se bajó nada/.test(src), "una RPC vacía o con error no baja nada");
 
 (async () => {
@@ -187,9 +190,11 @@ ok(/volvió vacío/.test(src) && /No se bajó nada/.test(src), "una RPC vacía o
         return { data: [], error: null };
       } };
       const d = document.createElement("div"); d.id = "emBar"; document.body.prepend(d);
-      window.emBarPintar();
+      window.emViviAbrir();
       for (let i = 0; i < 30 && !/LK ✓/.test(d.textContent); i++) await espera(100);
     }, m.lk.filas);
+    const vis = await p.$eval("#emBar", (e) => ({ d: getComputedStyle(e).display, pos: getComputedStyle(e).position }));
+    ok(vis.d === "flex" && vis.pos === "fixed", "VIVI: abre la barra como pop-up (" + JSON.stringify(vis) + ")");
     const bar = await p.$eval("#emBar", (e) => e.textContent);
     ok(/Importar \/ exportar/i.test(bar) && /Subir Estadística Madre/.test(bar) && /Subir Costos/.test(bar) && /Descargar seleccionados/.test(bar), "pantalla: sector Importar / exportar con sus botones");
     ok(/Estadística Madre\s*LK ✓ 06\/10 · CH falta/.test(bar) && /Subir Costos\s*LK falta · CH falta/.test(bar), "pantalla: el estado de cada planilla va en su botón (" + bar.slice(0, 220) + ")");
@@ -230,6 +235,8 @@ ok(/volvió vacío/.test(src) && /No se bajó nada/.test(src), "una RPC vacía o
     await p.click("#emBajarSel");
     await p.waitForFunction(() => /No se bajó nada/.test(document.querySelector("#emBar").textContent), null, { timeout: 5000 });
     ok(!bajo, "pantalla: un mes vacío no baja nada");
+    await p.click("#emBar .em-x");
+    ok(await p.$eval("#emBar", (e) => getComputedStyle(e).display) === "none", "VIVI: la X cierra el pop-up");
     ok(!errs.length, "pantalla sin errores JS: " + errs.join(" | "));
   } finally { await b.close(); }
   fin();

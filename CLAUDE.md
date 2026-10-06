@@ -8020,6 +8020,11 @@ puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBa
 | ⬆ Subir Costos | bloques «Loeke» / «Chef» de «Aportes Gastos» (celda con «Uni x mes…» al lado), sin cortar en una fila en blanco |
 | ⬇ Bajar por mes | meses elegidos → Pedidos LK / Pedidos CH (orden Est. Madre) o **Facturación LK + CH en UNA columna** (como «Aportes Gastos»: bloque Loeke, el blanco, «Chef» y su bloque; se copia y pega una vez). Una columna por mes, del más nuevo al más viejo, **en unidades** |
 
+- **v27.47 (Luis): lo de importar/exportar es un POP-UP que abre el botón «VIVI»** de la barra de la Est. Madre
+  (`emViviAbrir` / `emViviCerrar`; X arriba a la derecha, Escape o clic afuera lo cierran). El botón vive en
+  `admin/est-madre.js` escondido y sólo se muestra dentro del iframe de Gestión (la página LK no lo ve). Se sacaron el
+  texto de abajo del título y el «N artículos de Stocks · …»: el status sólo dice lo que falla. En el .xlsx bajado el
+  **código va CENTRADO** sea texto (026) o número (207), como en las planillas (cellXfs 10/11).
 - Se guarda el ORDEN, el TIPO de cada código (505 número, '026' texto) y los renglones en blanco / títulos, para
   pegar al lado sin correr filas: tabla **`GV_Est_Plantilla`** (`gv_est_plantilla_guardar` / `_leer`, sólo supervisor).
 - **LK suma lo de Chef con L** (031 = 031 LK + 031L Chef), igual que el BUSCARV + SUMAR.SI de las dos planillas.

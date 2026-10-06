@@ -664,8 +664,11 @@ function emArmarHoja(X, tipo, emp, pl, meses, datos) {
     estilo: function (ref) {
       var m = /^([A-Z]+)(\d+)$/.exec(ref); if (!m) return 0;
       if (hdr[Number(m[2]) - 1]) return 1;
-      if (naranja[Number(m[2]) - 1]) return X.utils.decode_col(m[1]) >= c0 && X.utils.decode_col(m[1]) < cNota ? 9 : 8;   /* fila entera naranja */
-      if (X.utils.decode_col(m[1]) < c0) return 0;
+      var col = X.utils.decode_col(m[1]);
+      /* v27.46 (Luis): el código va CENTRADO, sea texto (026) o número (207), como en las planillas. */
+      if (naranja[Number(m[2]) - 1]) return col >= c0 && col < cNota ? 9 : (col === 0 ? 11 : 8);   /* fila entera naranja */
+      if (col === 0) return 10;
+      if (col < c0) return 0;
       var e = disr[ref] || 0, fondo = e % 10, rojo = e >= 10;
       return 2 + fondo * 2 + (rojo ? 1 : 0);   /* 2 número · 3 rojo · 4 amarillo · 5 amarillo+rojo · 6 celeste · 7 celeste+rojo */
     }
@@ -705,10 +708,13 @@ function emXlsxBytes(X, hojas, tam) {
       '<fill><patternFill patternType="solid"><fgColor rgb="FFFFC000"/><bgColor indexed="64"/></patternFill></fill></fills>')
     .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, function () {
       var xn = function (font, fill) { return '<xf numFmtId="3" fontId="' + font + '" fillId="' + fill + '" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>'; };
-      return '<cellXfs count="10"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      return '<cellXfs count="12"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
         '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
         xn(0, 0) + xn(2, 0) + xn(0, 2) + xn(2, 2) + xn(0, 3) + xn(2, 3) +
-        '<xf numFmtId="0" fontId="1" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/>' + xn(1, 4) + '</cellXfs>';   /* 8/9 naranja: sin fila en la planilla */
+        '<xf numFmtId="0" fontId="1" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/>' + xn(1, 4) +
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center"/></xf>' +   /* 10 código centrado */
+        '<xf numFmtId="0" fontId="1" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf>' +   /* 11 código naranja centrado */
+        '</cellXfs>';   /* 8/9 naranja: sin fila en la planilla */
     });
   cfb.FileIndex[iSt].content = enc.encode(st);
   var n = 0;
@@ -739,8 +745,11 @@ function _emCss() {
   st.textContent = [
     /* v27.44 (Luis, 06/10: «inentendible… más grande, más visible, sin el texto de abajo; los meses con un calendario»):
        tres pasos grandes, uno al lado del otro — 1 subir · 2 meses (calendario) · 3 descargar */
-    "#emBar{display:flex;justify-content:center;padding:10px 12px;background:#f1f5f9;border-bottom:1px solid #cbd5e1;font:15px system-ui,Segoe UI,Arial,sans-serif;color:#0f172a;}",
-    "#emBar .sec-box{display:grid;gap:8px;justify-items:center;border:2px solid #1e3a8a;border-radius:14px;background:#fff;padding:10px 14px;max-width:100%;box-shadow:0 2px 8px rgba(15,23,42,.08);}",
+    /* v27.46 (Luis, 06/10): la barra es un POP-UP que abre el botón «VIVI» de la Est. Madre, con una X para cerrar */
+    "#emBar{display:none;position:fixed;inset:0;z-index:9000;align-items:center;justify-content:center;padding:16px;background:rgba(15,23,42,.5);font:15px system-ui,Segoe UI,Arial,sans-serif;color:#0f172a;overflow:auto;}",
+    "#emBar.abierto{display:flex;}",
+    "#emBar .sec-box{position:relative;display:grid;gap:8px;justify-items:center;border:2px solid #1e3a8a;border-radius:14px;background:#fff;padding:14px 18px;max-width:100%;max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 10px 40px rgba(15,23,42,.35);}",
+    "#emBar .em-x{position:absolute;top:8px;right:8px;background:#e2e8f0;color:#0f172a;width:34px;height:34px;padding:0;border-radius:50%;font-size:18px;line-height:34px;}",
     "#emBar .tit{font-size:15px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#1e3a8a;}",
     "#emBar .pasos{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch;justify-content:center;}",
     "#emBar .paso{display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:flex-start;border:1px solid #e2e8f0;border-radius:12px;padding:8px 12px;background:#f8fafc;}",
@@ -813,7 +822,7 @@ function emBarPintar() {
     '<div class="cal-pie"><button type="button" onclick="emMesesLimpiar()">Limpiar</button>' +
       (otrosAnios ? '<span style="font-size:13px;font-weight:700;color:#475569;align-self:center">+' + otrosAnios + ' de otro año</span>' : '') + '</div>' +
   '</div>';
-  b.innerHTML = '<div class="sec-box"><div class="tit">Importar / exportar</div><div class="pasos">' +
+  b.innerHTML = '<div class="sec-box"><button type="button" class="em-x" onclick="emViviCerrar()" title="Cerrar">✕</button><div class="tit">Importar / exportar</div><div class="pasos">' +
     '<div class="paso"><div class="paso-t"><span class="n">1</span>Subir planillas</div>' +
       '<button type="button" class="subir" onclick="emSubir(\'madre\')">⬆ Subir Estadística Madre<small>' + _emPlEstado("madre") + '</small></button>' +
       '<button type="button" class="subir" onclick="emSubir(\'costos\')">⬆ Subir Costos<small>' + _emPlEstado("costos") + '</small></button>' +
@@ -834,6 +843,15 @@ function emBarPintar() {
   if (!_em.leido) { _em.leido = true; emLeerPlantillas(); }
 }
 function emPintar() { emBarPintar(); }
+/* v27.46: el botón «VIVI» del encabezado de la Est. Madre (adentro del iframe) llama a estas dos */
+function emViviAbrir() {
+  var b = document.getElementById("emBar"); if (!b) return;
+  if (!b._emClick) { b._emClick = true; b.addEventListener("click", function (e) { if (e.target === b) emViviCerrar(); }); }
+  emBarPintar(); b.classList.add("abierto");
+}
+function emViviCerrar() { var b = document.getElementById("emBar"); if (b) b.classList.remove("abierto"); }
+if (typeof document !== "undefined") document.addEventListener("keydown", function (e) { if (e.key === "Escape") emViviCerrar(); });
+if (typeof window !== "undefined") { window.emViviAbrir = emViviAbrir; window.emViviCerrar = emViviCerrar; }
 function emCalAnio(d) { _em.anio = (_em.anio || new Date().getFullYear()) + d; emBarPintar(); }
 function emMesesLimpiar() { _em.sel = {}; _em.limpio = true; emBarPintar(); }
 function emToggleMes(ym) { if (_em.sel[ym]) delete _em.sel[ym]; else _em.sel[ym] = true; _em.limpio = true; emBarPintar(); }

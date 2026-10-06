@@ -19096,7 +19096,7 @@ function _stkEmMostrar(on) {
     /* v27.36 (Luis, 06/10): arriba de la Est. Madre va la barra de Estadisticas ISIS (subir Est. Madre / Costos,
        bajar por mes). Vive en estadisticas.js, NO en est-madre.js (ese es compartido con la pagina LK). */
     host.innerHTML = '<div id="emBar"></div><div class="stk-loading" id="stkEmCarga">Cargando Estadística Madre…</div>' +
-      '<iframe id="stkEmFrame" title="Estadística Madre" style="display:block;width:100%;height:calc(100vh - 330px);min-height:520px;border:0"></iframe>';
+      '<iframe id="stkEmFrame" title="Estadística Madre" style="display:block;width:100%;height:calc(100vh - 180px);min-height:520px;border:0"></iframe>';
     card.appendChild(host);
     _stkEmCargar();
     try { if (typeof emBarPintar === "function") emBarPintar(); } catch (_e) {}
