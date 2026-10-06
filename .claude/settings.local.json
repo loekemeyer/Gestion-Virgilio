@@ -132,7 +132,10 @@
       "mcp__claude-code-remote__register_repo_root",
       "mcp__claude-code-remote__delete_trigger",
       "Bash(sed -i 's|// v26.95 \\(Luis, D3\\): + capacidad|// v26.96 \\(Luis, D3\\): + capacidad|' index.html && node scripts/bump-version.cjs 26.96 2>&1 | tail -1 && git add -A && git commit -qm \"v26.96: Excel de Generar las OCs con columna Cap. góndola *)",
-      "Bash(sed -i 's/REGLA \\(Luis, 2026-10-05, v27.01\\): el RESUMEN/REGLA \\(Luis, 2026-10-05, v27.02\\): el RESUMEN/' CLAUDE.md)"
+      "Bash(sed -i 's/REGLA \\(Luis, 2026-10-05, v27.01\\): el RESUMEN/REGLA \\(Luis, 2026-10-05, v27.02\\): el RESUMEN/' CLAUDE.md)",
+      "Bash(mv sql/gv_ads_recibido_virgilio_v2727.sql sql/gv_ads_recibido_virgilio_v2728.sql)",
+      "Bash(sed -i 's/v27\\\\.27/v27.28/g; s/gv_ads_recibido_virgilio_v2727/gv_ads_recibido_virgilio_v2728/' sql/gv_ads_recibido_virgilio_v2728.sql ads.js)",
+      "Bash(sed -i 's/→ \\\\*\\\\*v27\\\\.27 \\(Luis, D6/→ **v27.28 \\(Luis, D6/; s/gv_ads_recibido_virgilio_v2727/gv_ads_recibido_virgilio_v2728/' CLAUDE.md)"
     ]
   }
 }

@@ -7959,8 +7959,13 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
 - **Entregas talleristas** (`gv_ads_talleristas(p_n, p_incluir_actual)`): por (proveedor de la OC, código) en las
   últimas N OC (fechas de generación, rubro `Art Term`). La OC de cada semana REEMPLAZA a la anterior, así que
   **pedido = 1.ª OC del rango + Σ max(0, OC_k − (OC_{k−1} − recibido_{k−1}))** (ejemplo de Luis: 300/150 + 200/100 →
-  350 pedido, 250 entregado). Entregado = `cantidad_recibida` (lo imputa `gv_oc_recompute_recibido`). La OC más nueva
-  no entra por defecto (su semana corre). Tallerista con % < umbral → cuenta en el badge.
+  350 pedido, 250 entregado). ~~Entregado = `cantidad_recibida` (imputado a la OC)~~ → **v27.28 (Luis, D6: *"estamos
+  tratando de evaluar stock real y quiebres reales"*): Entregado = lo que RECIBIÓ VIRGILIO** de ese proveedor y código
+  (`Entregas Tallerista Virgilio` + `Entregas Prov AT`, `gv_prov_match` + `GV_OC_Fabrica_Para`) desde la 1.ª OC del
+  rango hasta la OC siguiente a la última (o hoy), **topado en lo pedido por artículo** (el exceso de un código no tapa
+  a otro). Las dos tablas de entregas quedan separadas (D8, Luis: *"dejalo"*). La OC más nueva
+  no entra por defecto (su semana corre). Tallerista con % < umbral → cuenta en el badge. Medido 06/10: badge 13 → 10
+  (Lucho 40 → 51 %, Poly 36 → 60 %, Pedernera 22 → 76 %). `sql/gv_ads_recibido_virgilio_v2728.sql`.
 - Rango, umbral (50 %) e «incluir la OC en curso» viven en `Stock_Config` (`ads_n_ocs`, `ads_umbral`,
   `ads_incluir_actual`); los guarda `gv_ads_config_guardar` (supervisor). Cambiarlos es un `update`.
 - **Stock** (`gv_ads_stock2()`, v27.22; `gv_ads_stock` queda sin llamador, de rollback): saldo a 10/20/30 días =

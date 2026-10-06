@@ -10,8 +10,9 @@
      lo nuevo), así que lo pedido NO es la suma de las OC:
         pedido = 1.ª OC del rango + Σ max(0, OC_k − lo que faltaba de OC_{k−1})
      Ejemplo de Luis: OC1 300 (entregó 150), OC2 200 (entregó 100) → pedido 350,
-     entregado 250. Lo entregado es lo que cada OC tiene imputado
-     (cantidad_recibida). Por defecto la OC más nueva NO entra: su semana corre.
+     entregado 250. Lo entregado es lo que RECIBIÓ VIRGILIO de ese proveedor y código
+     en el período (talleristas + prov AT), topado en lo pedido (v27.28, D6). Por defecto
+     la OC más nueva NO entra: su semana corre.
      Tallerista con % < umbral (50 % por defecto, editable) → badge VIOLETA en el
      botón ADS del panel, con cuántos son. Rango y umbral viven en Stock_Config
      (ads_n_ocs, ads_umbral, ads_incluir_actual): el badge es el mismo para todos.
@@ -168,7 +169,7 @@ function _adsHtmlTall() {
     h += '<tr class="t' + (t.alerta ? " al" : "") + '" onclick="adsToggle(decodeURIComponent(\'' + encodeURIComponent(t.pkey).replace(/'/g, "%27") + '\'))"><td><b>' + (_ads.abiertos[t.pkey] ? "▾ " : "▸ ") + _adsEsc(t.proveedor) + "</b></td><td>" + t.arts.length +
       "</td><td>" + _adsN(t.pedido) + "</td><td>" + _adsN(t.entregado) + '</td><td class="pct">' + _adsPct(t.pct) + "</td><td>" + _adsBar(t.pct, t.alerta) + "</td></tr>";
     if (_ads.abiertos[t.pkey]) {
-      h += '<tr class="sub"><td colspan="6"><table style="margin:4px auto"><thead><tr><th>Cód.</th><th>Descripción</th><th title="Cuántas OC del rango incluyen este artículo">OC<br>evaluadas</th><th>Pedido</th><th>Entreg.</th><th>%</th><th>Última<br>OC</th><th>Pedida</th><th>Recibida</th></tr></thead><tbody>';
+      h += '<tr class="sub"><td colspan="6"><table style="margin:4px auto"><thead><tr><th>Cód.</th><th>Descripción</th><th title="Cuántas OC del rango incluyen este artículo">OC<br>evaluadas</th><th>Pedido</th><th title="Cajas que recibió Virgilio de este proveedor en el período, hasta lo pedido">Recib.<br>Virgilio</th><th>%</th><th>Última<br>OC</th><th>Pedida</th><th>Recibida</th></tr></thead><tbody>';
       t.arts.forEach(function (a) {
         var al = a.pct != null && Number(a.pct) < _ads.umbral;
         h += "<tr><td><b>" + _adsEsc(a.codigo) + '</b></td><td class="desc" title="' + _adsEsc(a.descripcion) + '">' + _adsEsc(a.descripcion) + "</td><td>" + a.ocs +
