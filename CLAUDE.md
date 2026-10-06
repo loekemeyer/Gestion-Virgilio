@@ -5744,7 +5744,8 @@ borrar libera el `client_id` y la cola offline resucita el evento (regla v18.71)
 Hoy `undoLastSent` llama a **`gv_deshacer_evento(client_id, legajo)`** (`_gvDeshacerServidor`, reintenta 4 veces
 si el evento todavía no llegó): **EP** → `gv_anular_picking_virgilio` (EPX + suelta la reserva) · **AP** →
 `anular_armado_virgilio` · el resto → `<opcion>X`. Sólo el propio legajo y los últimos 10 min.
-⚠ Deshacer un **TP/TAP** marca TPX/TAPX pero **no vuelve el lock** de `completada` a `tomada`.
+**Deshacer un TP/TAP es como si nunca hubiera ocurrido** (Thomas, D3, v27.50): TPX/TAPX, la fase vuelve a
+`tomada` por ese legajo, el TP sale del caché del puntaje (`GV_Picking_Tanda`) y se reconcilia el stock.
 `sql/gv_deshacer_evento_v2746.sql`, `tests/deshacer-evento.cjs`. Mismo arreglo en `Registro-Produccion-3.0`.
 
 ## ⚠ REGLA (2026-10-01, v25.95): lo que VOLVIÓ y se recarga arranca el plazo de control DE NUEVO

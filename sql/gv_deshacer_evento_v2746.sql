@@ -27,3 +27,18 @@ end $f$;
 revoke all on function public.gv_deshacer_evento(text,text) from public;
 grant execute on function public.gv_deshacer_evento(text,text) to anon, authenticated;
 -- Probado como anon en transaccion abortada: EP -> 'ok' (EPX) · RT -> 'ok' (RTX) · repetir -> 'ya_deshecho' · otro legajo -> 'sin_fila'.
+
+-- v27.50 (Thomas, D3, 06/10): deshacer un TP/TAP = como si nunca hubiera ocurrido. Reemplaza la funcion
+-- de arriba agregando, despues del update a <opcion>X:
+--   if r.opcion in ('TP','TAP') then   -- v27.47-deshacer-tp
+--     v_t := upper(btrim(split_part(coalesce(r.texto,''),'|',1)));
+--     v_f := case r.opcion when 'TP' then 'picking' else 'armado' end;
+--     update "GV_Tandas_Lock" set estado='tomada', legajo=r.legajo, ts_estado=now()
+--      where tanda=v_t and fase=v_f and estado='completada';
+--     if r.opcion='TP' then
+--       delete from "GV_Picking_Tanda" where tanda=v_t and legajo=r.legajo;
+--       begin perform reconciliar_pipeline_stock_etapa1(); exception when others then null; end;
+--     end if;
+--   end if;
+-- Probado como anon en transaccion abortada: TP -> 'ok' (TPX), lock completada -> tomada:1.
+-- La definicion viva completa: select pg_get_functiondef('public.gv_deshacer_evento(text,text)'::regprocedure);
