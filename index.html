@@ -1383,6 +1383,13 @@ body:has(#optionsScreen:not(.hidden)) #btnHistDias{ display:none !important; }
 .cuar-prev table{ border-collapse:collapse; width:100%; font-size:11.5px; }
 .cuar-prev th, .cuar-prev td{ border:1px solid #eef2f7; padding:4px 6px; text-align:left; white-space:nowrap; }
 .cuar-prev th{ background:#f8fafc; color:#475569; }
+.cuar-log-ver{ margin-top:4px; border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:6px; font-size:11px; padding:2px 7px; cursor:pointer; width:auto; }
+.cuar-log-ver:hover{ background:#f1f5f9; }
+.cuar-ped-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 14px; font-size:12.5px; color:#334155; margin-bottom:10px; }
+.cuar-ped-grid div{ display:flex; gap:5px; }
+.cuar-ped-grid b{ color:#64748b; font-weight:600; white-space:nowrap; }
+.cuar-ped-tot{ font-size:13px; font-weight:700; color:#0f172a; margin:8px 0 2px; text-align:right; }
+.cuar-prev td.n, .cuar-prev th.n{ text-align:right; }
 .cuar-file-again{ margin-top:2px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:7px; padding:5px 10px; cursor:pointer; width:auto; color:#334155; font-size:12px; }
 .cuar-m-foot{ padding:12px 16px; border-top:1px solid #e2e8f0; text-align:right; }
 .cuar-save{ background:#166534; color:#fff; border:none; border-radius:8px; padding:8px 16px; font-weight:800; cursor:pointer; width:auto; }
@@ -53082,7 +53089,9 @@ function cuarLogHtml() {
       // hayan puesto en "Otro"); el mail de la sesión queda en el title, como trazabilidad.
       const comQuien = String(r.com_persona || "").trim();
       h += '<tr class="r-' + escapeHtml(est) + '">'
-        + '<td class="cuar-log-np">' + escapeHtml(String(r.np || r.clave || "")) + '</td>'
+        + '<td class="cuar-log-np">' + escapeHtml(String(r.np || r.clave || ""))
+          + '<div><button class="cuar-log-ver" onclick="cuarLogVerPedido(' + i + ')" '
+            + 'title="Ver todo el detalle del pedido">Ver pedido</button></div></td>'
         + '<td><div class="cuar-log-cli">'
           + (cod ? '<span class="cuar-card-cod">' + cuarEmpCod(r.empresa) + " " + escapeHtml(cod) + '</span>' : '')
           + '<span class="cuar-log-rs">' + escapeHtml(String(r.razon_social || "")) + '</span>'
@@ -53121,6 +53130,79 @@ function cuarLogComentarios(i) {
   const r = (_apr.cuarLog || [])[i]; if (!r) return;
   cuarComAbrir({ modo: "log", empresa: r.empresa || "lk", clave: String(r.clave || ""),
                  np: String(r.np || r.clave || ""), cli: String(r.razon_social || r.cod || "") });
+}
+/* v27.22 (Luis, 2026-10-06): "Ver pedido" del Log de Cuarentena — todo el detalle del pedido.
+   Lee gv_cuarentena_pedido_detalle (una sola RPC): cabecera del cliente + ítems con descripción,
+   UxB, unidades y m³, y los totales. Si la lectura falla, lo dice; no inventa. */
+function cuarPedEl() {
+  let el = document.getElementById("cuarPedModal");
+  if (!el) { el = document.createElement("div"); el.id = "cuarPedModal"; el.className = "cuar-modal"; el.hidden = true; document.body.appendChild(el); }
+  return el;
+}
+function cuarPedCerrar() { const el = document.getElementById("cuarPedModal"); if (el) { el.hidden = true; el.innerHTML = ""; } _apr.cuarPed = null; }
+async function cuarLogVerPedido(i) {
+  const r = (_apr.cuarLog || [])[i]; if (!r) return;
+  _apr.cuarPed = { cargando: true, err: "", det: null,
+                   empresa: r.empresa || "lk", clave: String(r.clave || ""),
+                   np: String(r.np || r.clave || ""), cli: String(r.razon_social || r.cod || "") };
+  cuarPedEl().hidden = false; cuarPedRender();
+  try {
+    const d = await aprRpc("gv_cuarentena_pedido_detalle",
+      { p_empresa: _apr.cuarPed.empresa, p_clave: _apr.cuarPed.clave });
+    if (_apr.cuarPed) _apr.cuarPed.det = (Array.isArray(d) ? d[0] : d) || null;
+  } catch (e) { if (_apr.cuarPed) _apr.cuarPed.err = String((e && e.message) || e); }
+  if (_apr.cuarPed) { _apr.cuarPed.cargando = false; cuarPedRender(); }
+}
+function cuarPedRender() {
+  const s = _apr.cuarPed, el = document.getElementById("cuarPedModal");
+  if (!s || !el) return;
+  const d = s.det || {};
+  const n0 = function (x) { return Number(x) || 0; };
+  let body;
+  if (s.cargando) body = '<div class="cuar-m-load">Buscando el pedido…</div>';
+  else if (s.err) body = '<div class="cuar-m-err">⚠ No se pudo leer el pedido: ' + escapeHtml(s.err) + '</div>';
+  else if (!s.det || !(d.items || []).length) body = '<div class="cuar-log-vacio">No hay ítems cargados para este pedido.</div>';
+  else {
+    const fp = d.fecha_pedido ? String(d.fecha_pedido).slice(0, 10).split("-").reverse().join("/") : "";
+    const fe = d.fecha_entrega ? String(d.fecha_entrega).slice(0, 10).split("-").reverse().join("/") : "";
+    const row = function (lab, val) { return val ? '<div><b>' + lab + '</b><span>' + escapeHtml(String(val)) + '</span></div>' : ''; };
+    body = '<div class="cuar-ped-grid">'
+      + row("Cliente", (d.cod ? cuarEmpCod(d.empresa) + " " + d.cod + " · " : "") + (d.razon_social || ""))
+      + row("CUIT", d.cuit)
+      + row("Dirección", d.direccion)
+      + row("Localidad", [d.localidad, d.provincia].filter(Boolean).join(", "))
+      + row("Zona", d.zona)
+      + row("Pago", d.metodo_pago)
+      + row("Pedido del", fp)
+      + row("Entrega", fe)
+      + row("Obs.", d.observaciones)
+      + '</div>'
+      + '<div class="cuar-prev"><table><thead><tr>'
+      + '<th>Código</th><th>Descripción</th><th class="n">Cajas</th><th class="n">UxB</th><th class="n">Unid.</th><th class="n">m³</th>'
+      + '</tr></thead><tbody>'
+      + (d.items || []).map(function (it) {
+          return '<tr><td>' + escapeHtml(String(it.art || "")) + '</td>'
+            + '<td>' + escapeHtml(String(it.descripcion || "—")) + '</td>'
+            + '<td class="n">' + n0(it.cajas) + '</td>'
+            + '<td class="n">' + (n0(it.uxb) ? n0(it.uxb) : "—") + '</td>'
+            + '<td class="n">' + (n0(it.uni) ? n0(it.uni) : "—") + '</td>'
+            + '<td class="n">' + (n0(it.m3) ? n0(it.m3).toFixed(3).replace(".", ",") : "—") + '</td></tr>';
+        }).join("")
+      + '</tbody></table></div>'
+      + '<div class="cuar-ped-tot">' + (d.items || []).length + ' códigos · ' + n0(d.cajas_total) + ' cajas · '
+        + n0(d.m3_total).toFixed(3).replace(".", ",") + ' m³</div>';
+  }
+  el.innerHTML =
+    '<div class="cuar-m-back" onclick="cuarPedCerrar()"></div>' +
+    '<div class="cuar-m-card">' +
+      '<div class="cuar-m-head"><b>Detalle del pedido</b>' +
+        '<button class="cuar-m-x" onclick="cuarPedCerrar()">✕</button></div>' +
+      '<div class="cuar-m-body">' +
+        '<p class="cuar-com-sub"><b>' + escapeHtml(String(s.np || "")) + '</b>' +
+          (s.cli ? ' · ' + escapeHtml(String(s.cli)) : '') + '</p>' +
+        body +
+      '</div>' +
+    '</div>';
 }
 /* Fila del sector Cuarentena (no en Config): la ayuda y el boton Imprimir. */
 function cuarDemoRowHtml() {
