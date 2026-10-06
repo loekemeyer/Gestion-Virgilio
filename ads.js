@@ -168,12 +168,12 @@ function _adsHtmlTall() {
     h += '<tr class="t' + (t.alerta ? " al" : "") + '" onclick="adsToggle(decodeURIComponent(\'' + encodeURIComponent(t.pkey).replace(/'/g, "%27") + '\'))"><td><b>' + (_ads.abiertos[t.pkey] ? "▾ " : "▸ ") + _adsEsc(t.proveedor) + "</b></td><td>" + t.arts.length +
       "</td><td>" + _adsN(t.pedido) + "</td><td>" + _adsN(t.entregado) + '</td><td class="pct">' + _adsPct(t.pct) + "</td><td>" + _adsBar(t.pct, t.alerta) + "</td></tr>";
     if (_ads.abiertos[t.pkey]) {
-      h += '<tr class="sub"><td colspan="6"><table style="margin:4px auto"><thead><tr><th>Cód.</th><th>Descripción</th><th>OC</th><th>Pedido</th><th>Entreg.</th><th>%</th><th>Última OC<br>pedida · recibida</th></tr></thead><tbody>';
+      h += '<tr class="sub"><td colspan="6"><table style="margin:4px auto"><thead><tr><th>Cód.</th><th>Descripción</th><th title="Cuántas OC del rango incluyen este artículo">OC<br>evaluadas</th><th>Pedido</th><th>Entreg.</th><th>%</th><th>Última<br>OC</th><th>Pedida</th><th>Recibida</th></tr></thead><tbody>';
       t.arts.forEach(function (a) {
         var al = a.pct != null && Number(a.pct) < _ads.umbral;
         h += "<tr><td><b>" + _adsEsc(a.codigo) + '</b></td><td class="desc" title="' + _adsEsc(a.descripcion) + '">' + _adsEsc(a.descripcion) + "</td><td>" + a.ocs +
           "</td><td>" + _adsN(a.pedido) + "</td><td>" + _adsN(a.entregado) + '</td><td class="' + (al ? "neg" : "") + '">' + _adsPct(a.pct) +
-          "</td><td>" + _adsFecha(a.ult_fecha) + " · " + _adsN(a.ult_cant) + " · " + _adsN(a.ult_rec) + "</td></tr>";
+          "</td><td>" + _adsFecha(a.ult_fecha) + "</td><td>" + _adsN(a.ult_cant) + "</td><td>" + _adsN(a.ult_rec) + "</td></tr>";
       });
       h += "</tbody></table></td></tr>";
     }

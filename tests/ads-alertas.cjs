@@ -60,6 +60,9 @@ const STOCK = [
     out.oscarPed = filas[0] && filas[0].cells[2].textContent;
     filas[0].click(); await espera(50);
     out.sub = document.querySelectorAll("#adsOv tr.sub tbody tr").length;
+    out.subCols = [...document.querySelectorAll("#adsOv tr.sub thead th")].map((t) => t.textContent);
+    const f1 = document.querySelector("#adsOv tr.sub tbody tr");
+    out.subFila = f1 ? [...f1.cells].slice(-3).map((c) => c.textContent) : [];
     const cerrar = [...document.querySelectorAll("#adsOv .ads-top button")].find((x) => x.textContent === "Cerrar");
     out.cerrarAncho = cerrar ? cerrar.getBoundingClientRect().width : 9999;
     window.adsTab("stock"); await espera(50);
@@ -84,6 +87,8 @@ const STOCK = [
   if (JSON.stringify(r.orden) !== JSON.stringify(["Oscar", "Lucho"])) fallas.push("(b) orden: " + JSON.stringify(r.orden));
   if (!r.oscarRojo || r.oscarPct !== "20 %" || r.oscarPed !== "150") fallas.push("(b) Oscar: " + r.oscarPct + " / " + r.oscarPed);
   if (r.sub !== 2) fallas.push("(b) artículos al abrir: " + r.sub);
+  if (JSON.stringify(r.subCols.slice(-3)) !== JSON.stringify(["ÚltimaOC", "Pedida", "Recibida"])) fallas.push("(b) columnas de la última OC separadas: " + JSON.stringify(r.subCols));
+  if (JSON.stringify(r.subFila) !== JSON.stringify(["23/09", "90", "0"])) fallas.push("(b) fila última OC: " + JSON.stringify(r.subFila));
   if (r.cerrarAncho > 200) fallas.push("(e) Cerrar ancho " + r.cerrarAncho);
   if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
   if (JSON.stringify(r.stockCods) !== JSON.stringify(["505"])) fallas.push("(c) quiebre 10 d: " + JSON.stringify(r.stockCods));
