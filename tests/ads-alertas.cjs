@@ -19,7 +19,7 @@ const TALL = [
   { proveedor: "Oscar", pkey: "oscar", codigo: "280", descripcion: "Manga", ocs: 1, pedido: 50, entregado: 20, pct: 0.4, desde: "2026-09-16", hasta: "2026-09-16", ult_fecha: "2026-09-16", ult_cant: 50, ult_rec: 20, ult_estado: "anulada" }
 ];
 const STOCK = [
-  { cod: "505", cod_base: "505", linea: "LK", descripcion: "Cuchillo", terminado: 50, racks: 0, a_guardar: 0, disponible: 50, proy_mes: 300, comp10: 20, comp20: 40, comp30: 60, saldo10: -70, saldo20: -190, saldo30: -310, dias_cubre: 0, oc_fecha: "2026-09-30", oc_prov: "Lucho", oc_cant: 174, oc_rec: 87, oc_estado: "pendiente" },
+  { cod: "505", cod_base: "505", linea: "LK", descripcion: "Cuchillo", terminado: 50, racks: 0, a_guardar: 0, disponible: 50, proy_mes: 300, comp10: 20, comp20: 40, comp30: 60, saldo10: -70, saldo20: -190, saldo30: -310, dias_cubre: 0, oc_fecha: "2026-09-30", oc_prov: "Lucho", oc_cant: 174, oc_rec: 87, oc_estado: "pendiente", oc_rec_v: 90 },
   { cod: "506", cod_base: "506", linea: "LK", descripcion: "Abrelata", terminado: 100, racks: 0, a_guardar: 0, disponible: 100, proy_mes: 90, comp10: 0, comp20: 0, comp30: 20, saldo10: 70, saldo20: 40, saldo30: -10, dias_cubre: 27, oc_fecha: null, oc_prov: null, oc_cant: null, oc_rec: null, oc_estado: null },
   { cod: "501", cod_base: "501", linea: "LK", descripcion: "Untar", terminado: 500, racks: 0, a_guardar: 0, disponible: 500, proy_mes: 30, comp10: 0, comp20: 0, comp30: 0, saldo10: 490, saldo20: 480, saldo30: 470, dias_cubre: 500, oc_fecha: null, oc_prov: null, oc_cant: null, oc_rec: null, oc_estado: null }
 ];
@@ -38,7 +38,7 @@ const STOCK = [
       if (modo === "vacio") return { data: [], error: null };
       if (n === "gv_ads_config") return { data: { n_ocs: 4, umbral: 0.5, incluir_actual: false }, error: null };
       if (n === "gv_ads_talleristas") return { data: TALL, error: null };
-      if (n === "gv_ads_stock2") return { data: STOCK, error: null };
+      if (n === "gv_ads_stock3") return { data: STOCK, error: null };
       if (n === "gv_ads_badge") return { data: 1, error: null };
       if (n === "gv_ads_badge_stock") return { data: { q10: 80, q20: 98, q30: 127 }, error: null };
       return { data: null, error: { message: "?" } };
@@ -72,8 +72,12 @@ const STOCK = [
     const fs = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")];
     out.stockCods = fs.map((f) => f.cells[0].textContent);
     out.pctTall = fs[0] ? fs[0].cells[11].textContent : "";
+    out.cols10 = [...document.querySelectorAll("#adsOv .ads-body > table > thead th")].map((t) => t.textContent);
+    out.fila10 = fs[0] ? [...fs[0].cells].slice(2, 11).map((c) => c.textContent) : [];
     window.adsHoriz(30); await espera(30);
     out.stock30 = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")].map((f) => f.cells[0].textContent);
+    const f30 = document.querySelector("#adsOv .ads-body > table tbody tr");
+    out.fila30 = f30 ? [...f30.cells].slice(2, 7).map((c) => c.textContent) : [];
     modo = "vacio"; window.adsClose(); window.openAds(); await espera(150);
     out.vacio = document.querySelector("#adsOv .err") ? document.querySelector("#adsOv .err").textContent : "";
     return out;
@@ -96,6 +100,10 @@ const STOCK = [
   if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
   if (JSON.stringify(r.stockCods) !== JSON.stringify(["505"])) fallas.push("(c) quiebre 10 d: " + JSON.stringify(r.stockCods));
   if (!/Lucho 71 %/.test(r.pctTall)) fallas.push("(c) % tallerista: " + r.pctTall);
+  const C10 = ["Cód.","Descripción","Disp.","Comprom.10 d","Est. Madre10 d","Saldo10 d","Díascobertura","Última OC","Dist.","Fecha","Pedido","Recibido","%"];
+  if (JSON.stringify(r.cols10) !== JSON.stringify(C10)) fallas.push("(c) columnas stock: " + JSON.stringify(r.cols10));
+  if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","3","30/09","174","90","52 %"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
+  if (JSON.stringify(r.fila30) !== JSON.stringify(["50","60","300","-310","0"])) fallas.push("(c) fila a 30 d: " + JSON.stringify(r.fila30));
   if (JSON.stringify(r.stock30) !== JSON.stringify(["505", "506"])) fallas.push("(c) quiebre 30 d: " + JSON.stringify(r.stock30));
   if (!/vac/i.test(r.vacio)) fallas.push("(d) lectura vacía no se dice: " + r.vacio);
   if (errs.length) fallas.push("errores de página: " + errs.slice(0, 3).join(" | "));

@@ -7983,6 +7983,11 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
   El % bajo refleja también la imputación (Oscar / Tierra Nativa se reciben como Log/ Fabr): mirar antes de reclamar.
 - Sub-tabla (v27.29, Luis): **Fecha · Pedida · Recibida son de la ÚLTIMA OC** y van bajo un rótulo común «Última OC»
   dentro de un recuadro violeta. «Incluir la OC en curso» viene **prendido** por defecto.
+- **Pestaña Stock (v27.30, Luis)**: TODO se calcula al horizonte elegido (10/20/30; «todos» muestra todo al último
+  elegido). Columnas: Cód · Descripción · Disp. · Comprom. H d · Est. Madre H d (mes × H/30) · Saldo H d · Días cobertura
+  ((disp − comprom. H) ÷ Est. Madre diaria) · recuadro «Última OC» (Fecha · Pedido · **Recibido** · %) · Dist. (tallerista
+  y su % del rango). **Recibido = lo que recibió Virgilio de ese proveedor desde la fecha de la OC** (D10), no lo imputado:
+  `gv_ads_stock3` (= stock2 + `oc_rec_v`). `sql/gv_ads_stock3_v2730.sql`.
 - Rango y umbral se guardan en `Stock_Config` **sólo con «Guardar para el badge»**: cambiarlos sin guardar vale para esa
   pantalla y se pierde al cerrar.
 - `sql/gv_ads_alertas_damian_v2720.sql`, `sql/gv_ads_excedente_semaforo_v2722.sql`, `tests/ads-alertas.cjs`.

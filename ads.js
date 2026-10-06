@@ -23,7 +23,7 @@
      Con la última OC del código (cuánto se recibió) y el %
      que viene entregando ese tallerista en ese artículo (rango de la pestaña 1).
 
-   Backend: sql/gv_ads_alertas_damian_v2720.sql + sql/gv_ads_excedente_semaforo_v2722.sql (gv_ads_talleristas, gv_ads_stock2,
+   Backend: sql/gv_ads_alertas_damian_v2720.sql + sql/gv_ads_excedente_semaforo_v2722.sql (gv_ads_talleristas, gv_ads_stock3 (v27.30: + recibido por Virgilio desde la OC),
    gv_ads_badge, gv_ads_badge_stock, gv_ads_config, gv_ads_config_guardar). Sólo lectura salvo la config.
    ⚠ Una lectura que falla se DICE, no se dibuja como "todo bien" (regla "una
    lectura ROTA no es un CERO"). Vive en su propio archivo (regla v23.98), con ?v=
@@ -98,6 +98,10 @@ function _adsCss() {
     "#adsOv .tp{font-size:11px;color:#64748b;}",
     // v27.29: Fecha · Pedida · Recibida de la última OC se leen juntas: un recuadro las encierra
     "#adsOv tr.sub th{position:static;}",
+    "#adsOv .ads-body > table > thead{position:sticky;top:0;z-index:2;} #adsOv .ads-body > table > thead th{position:static;}",
+    "#adsOv .ads-body > table .ug,#adsOv .ads-body > table .u1,#adsOv .ads-body > table .u2,#adsOv .ads-body > table .u3{background:#f5f3ff;}",
+    "#adsOv .ads-body > table .ug{border:2px solid #7c3aed;border-bottom:0;} #adsOv .ads-body > table .u1{border-left:2px solid #7c3aed;} #adsOv .ads-body > table .u3{border-right:2px solid #7c3aed;}",
+    "#adsOv .ads-body > table tbody tr:last-child .u1,#adsOv .ads-body > table tbody tr:last-child .u2,#adsOv .ads-body > table tbody tr:last-child .u3{border-bottom:2px solid #7c3aed;}",
     "#adsOv tr.sub .ug,#adsOv tr.sub .u1,#adsOv tr.sub .u2,#adsOv tr.sub .u3{background:#f5f3ff;}",
     "#adsOv tr.sub .ug{border:2px solid #7c3aed;border-bottom:0;}",
     "#adsOv tr.sub .u1{border-left:2px solid #7c3aed;}",
@@ -133,7 +137,7 @@ function _adsCargarTall() {
 }
 function _adsCargarStock() {
   _ads.stock = null; _ads.stockErr = "";
-  _adsRpc("gv_ads_stock2").then(function (r) {
+  _adsRpc("gv_ads_stock3").then(function (r) {
     if (r.error || !Array.isArray(r.data)) _ads.stockErr = "No se pudo leer el stock: " + ((r.error && r.error.message) || "sin respuesta");
     else if (!r.data.length) _ads.stockErr = "La lectura del stock volvió vacía (no se dibuja como «sin quiebres»).";
     else _ads.stock = r.data;
@@ -152,7 +156,7 @@ function adsGuardarCfg() {
   });
 }
 function adsToggle(k) { _ads.abiertos[k] = !_ads.abiertos[k]; _adsRender(); }
-function adsHoriz(h) { _ads.horiz = h; _adsRender(); }
+function adsHoriz(h) { if (h) { _ads.horiz = h; _ads.todos = false; } else _ads.todos = true; _adsRender(); }
 function adsBuscar(v) { _ads.q = String(v || "").trim().toUpperCase(); _adsRender(); var i = document.getElementById("adsQ"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
 
 function _adsBar(p, al) { var w = Math.max(0, Math.min(1, p || 0)) * 100; return '<span class="bar"><i class="' + (al ? "r" : "") + '" style="width:' + w.toFixed(0) + '%"></i></span>'; }
@@ -208,33 +212,44 @@ function adsFiltrarStock(rows, horiz, q) {
 
 function _adsHtmlStock() {
   var rows = _ads.stock || [];
+  var H = _ads.horiz || 10, ver = _ads.todos ? 0 : H;   // v27.30: TODO va al horizonte elegido
   var n10 = rows.filter(function (r) { return Number(r.saldo10) < 0; }).length,
       n20 = rows.filter(function (r) { return Number(r.saldo20) < 0; }).length,
       n30 = rows.filter(function (r) { return Number(r.saldo30) < 0; }).length;
   var h = '<div class="ads-bar">Quiebre a: ' +
     [[10, n10], [20, n20], [30, n30], [0, rows.length]].map(function (x) {
-      return '<span class="chip' + (_ads.horiz === x[0] ? " on" : "") + '" onclick="adsHoriz(' + x[0] + ')">' + (x[0] ? x[0] + " días · " + x[1] : "todos · " + x[1]) + "</span>";
+      var on = x[0] ? (!_ads.todos && H === x[0]) : !!_ads.todos;
+      return '<span class="chip' + (on ? " on" : "") + '" onclick="adsHoriz(' + x[0] + ')">' + (x[0] ? x[0] + " días · " + x[1] : "todos · " + x[1]) + "</span>";
     }).join(" ") +
     ' · <input id="adsQ" placeholder="Buscar código" style="width:130px" value="' + _adsEsc(_ads.q) + '" oninput="adsBuscar(this.value)"></div>';
   h += '<div class="ads-body">';
   if (_ads.stockErr) return h + '<div class="err">' + _adsEsc(_ads.stockErr) + "</div></div>";
   if (!_ads.stock) return h + '<div class="msg">Leyendo stock…</div></div>';
-  var f = adsFiltrarStock(rows, _ads.horiz, _ads.q);
-  h += '<div class="res">Sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · Est. Madre prorrateada · en cajas</div>';
-  h += '<table><thead><tr><th>Cód.</th><th>Descripción</th><th>Disp.</th><th>Est.<br>Madre<br>/mes</th><th>Comprom.<br>10 · 20 · 30 d</th>' +
-    '<th>Saldo<br>10 d</th><th>Saldo<br>20 d</th><th>Saldo<br>30 d</th><th>Cubre<br>días</th><th>Última OC<br>fecha · prov.</th><th>OC<br>pedida · recib.</th><th>% entrega<br>tallerista</th></tr></thead><tbody>';
-  if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + _ads.horiz + " días.</td></tr>";
+  var f = adsFiltrarStock(rows, ver, _ads.q);
+  h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · en cajas</div>';
+  h += '<table><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Disp.</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × ' + H + '/30">Est. Madre<br>' + H + ' d</th>' +
+    '<th rowspan="2">Saldo<br>' + H + ' d</th><th rowspan="2" title="Días que cubre lo disponible menos lo comprometido a ' + H + ' días, al ritmo de la Est. Madre">Días<br>cobertura</th>' +
+    '<th colspan="4" class="ug" title="Última OC del artículo · recibido = lo que recibió Virgilio de ese proveedor desde la fecha de la OC">Última OC</th>' +
+    '<th rowspan="2" title="Tallerista y su % de entrega en el rango de la pestaña Entregas talleristas">Dist.</th></tr>' +
+    '<tr><th class="u1">Fecha</th><th class="u2">Pedido</th><th class="u2">Recibido</th><th class="u3">%</th></tr></thead><tbody>';
+  if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
-    var s = function (v) { var n = Number(v); return '<td class="' + (n < 0 ? "neg" : "pos") + '">' + _adsN(n) + "</td>"; };
+    var disp = Number(r.disponible) || 0, proy = Number(r.proy_mes) || 0, comp = Number(r["comp" + H]) || 0;
+    var em = proy * H / 30, saldo = Number(r["saldo" + H]);
+    var cob = proy > 0 ? Math.max(0, disp - comp) / (proy / 30) : null;
     var pc = _adsPctCod(r.cod) || [];
-    var tp = pc.length ? pc.map(function (x) { var al = x.pct != null && Number(x.pct) < _ads.umbral; return '<span class="' + (al ? "neg" : "") + '">' + _adsEsc(x.proveedor) + " " + _adsPct(x.pct) + "</span>"; }).join("<br>") : "—";
-    var ocPct = r.oc_cant ? " (" + _adsPct(Number(r.oc_rec) / Number(r.oc_cant)) + ")" : "";
+    var dist = pc.length ? pc.map(function (x) { var al = x.pct != null && Number(x.pct) < _ads.umbral; return '<span class="' + (al ? "neg" : "") + '">' + _adsEsc(x.proveedor) + " " + _adsPct(x.pct) + "</span>"; }).join("<br>")
+                         : (r.oc_prov ? _adsEsc(r.oc_prov) : "—");
+    var rec = r.oc_rec_v != null ? r.oc_rec_v : r.oc_rec;
+    var ocPct = r.oc_cant ? Number(rec) / Number(r.oc_cant) : null;
     h += "<tr><td><b>" + _adsEsc(r.cod) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
-      '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + " · excedente " + _adsN(r.excedente) + '">' + _adsN(r.disponible) +
-      "</td><td>" + _adsN(r.proy_mes) + "</td><td>" + _adsN(r.comp10) + " · " + _adsN(r.comp20) + " · " + _adsN(r.comp30) + "</td>" +
-      s(r.saldo10) + s(r.saldo20) + s(r.saldo30) + "<td>" + (r.dias_cubre == null ? "—" : _adsN(r.dias_cubre)) + "</td>" +
-      "<td>" + (r.oc_fecha ? _adsFecha(r.oc_fecha) + ' · <span class="tp">' + _adsEsc(r.oc_prov) + "</span>" : '<span class="neg">sin OC</span>') + "</td>" +
-      "<td>" + (r.oc_fecha ? _adsN(r.oc_cant) + " · " + _adsN(r.oc_rec) + ocPct : "—") + "</td><td>" + tp + "</td></tr>";
+      '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + " · excedente " + _adsN(r.excedente) + '">' + _adsN(disp) +
+      "</td><td>" + _adsN(comp) + '</td><td title="' + _adsN(proy) + ' por mes">' + _adsN(Math.round(em)) +
+      '</td><td class="' + (saldo < 0 ? "neg" : "pos") + '">' + _adsN(saldo) + "</td><td>" + (cob == null ? "—" : _adsN(Math.round(cob))) + "</td>";
+    if (r.oc_fecha) h += '<td class="u1">' + _adsFecha(r.oc_fecha) + '</td><td class="u2">' + _adsN(r.oc_cant) + '</td><td class="u2">' + _adsN(rec) +
+      '</td><td class="u3' + (ocPct != null && ocPct < _ads.umbral ? " neg" : "") + '">' + _adsPct(ocPct) + "</td>";
+    else h += '<td colspan="4" class="u1 u3"><span class="neg">sin OC</span></td>';
+    h += "<td>" + dist + "</td></tr>";
   });
   return h + "</tbody></table></div>";
 }
