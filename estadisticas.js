@@ -759,6 +759,9 @@ function _emCss() {
     "#emBar .cal-g button{padding:8px 0;font-size:15px;background:#fff;color:#0f172a;border:1px solid #cbd5e1;font-weight:700;text-transform:capitalize;}",
     "#emBar .cal-g button.on{background:#1e3a8a;color:#fff;border-color:#1e3a8a;}",
     "#emBar .cal-g button.otro{box-shadow:inset 0 -3px 0 #1e3a8a;}",
+    "#emBar .cal-g button.incomp{color:#b91c1c;border-color:#fca5a5;background:#fef2f2;}",
+    "#emBar .cal-g button.incomp.on{background:#b91c1c;color:#fff;border-color:#b91c1c;}",
+    "#emBar .mes-incomp{color:#b91c1c;}",
     "#emBar .cal-g button:disabled{background:#f1f5f9;color:#cbd5e1;border-color:#e2e8f0;opacity:1;}",
     "#emBar .cal-pie{display:flex;gap:6px;justify-content:center;}",
     "#emBar .cal-pie button{background:#e2e8f0;color:#0f172a;padding:5px 10px;font-size:13px;}",
@@ -802,7 +805,9 @@ function emBarPintar() {
       '<b>' + A + '</b><button type="button" onclick="emCalAnio(1)"' + (A >= hoy.getFullYear() ? " disabled" : "") + ' title="Año siguiente">›</button></div>' +
     '<div class="cal-g">' + _EI_MES3.map(function (m, i) {
       var ym = A + "-" + String(i + 1).padStart(2, "0");
-      return '<button type="button" data-ym="' + ym + '" class="' + (_em.sel[ym] ? "on" : "") + '"' + (ym > ymHoy ? " disabled" : "") +
+      var cls = (_em.sel[ym] ? "on" : "") + (ym === ymHoy ? " incomp" : "");
+      return '<button type="button" data-ym="' + ym + '" class="' + cls + '"' + (ym > ymHoy ? " disabled" : "") +
+        (ym === ymHoy ? ' title="Mes en curso: todavía no está completo"' : "") +
         ' onclick="emToggleMes(\'' + ym + '\')">' + m + '</button>';
     }).join("") + '</div>' +
     '<div class="cal-pie"><button type="button" onclick="emMesesLimpiar()">Limpiar</button>' +
@@ -814,7 +819,7 @@ function emBarPintar() {
       '<button type="button" class="subir" onclick="emSubir(\'costos\')">⬆ Subir Costos<small>' + _emPlEstado("costos") + '</small></button>' +
     '</div>' +
     '<div class="paso"><div class="paso-t" id="emMesesBtn"><span class="n">2</span>Meses: ' +
-      (sel.length ? _eiEsc(sel.map(_emMesCorto).join(", ")) : "ninguno") + '</div>' + cal + '</div>' +
+      (sel.length ? sel.map(function (ym) { var t = _eiEsc(_emMesCorto(ym)); return ym === ymHoy ? '<span class="mes-incomp" title="Mes en curso: incompleto">' + t + ' (incompleto)</span>' : t; }).join(", ") : "ninguno") + '</div>' + cal + '</div>' +
     '<div class="paso"><div class="paso-t"><span class="n">3</span>Descargar</div>' +
       '<div class="chks">' + _EM_CHK.map(function (c) {
         return '<label class="ck' + (_em.chk[c[0]] ? " on" : "") + '"><input type="checkbox"' + (_em.chk[c[0]] ? " checked" : "") + ' onchange="emChk(\'' + c[0] + '\', this.checked)">' + c[1] + '</label>';

@@ -203,6 +203,11 @@ ok(/volvió vacío/.test(src) && /No se bajó nada/.test(src), "una RPC vacía o
     ok(on.length === 1 && on[0] === "2025-12", "pantalla: el año anterior muestra sólo lo suyo marcado (" + on.join(",") + ")");
     const txtMes = await p.$eval("#emMesesBtn", (e) => e.textContent);
     ok(/sep 26/.test(txtMes) && /ago 26/.test(txtMes) && /dic 25/.test(txtMes), "pantalla: el título dice los meses elegidos (" + txtMes + ")");
+    /* mes en curso: se puede elegir, en rojo */
+    const ymHoy = await p.evaluate(() => { const h = new Date(); const ym = h.getFullYear() + "-" + String(h.getMonth() + 1).padStart(2, "0"); window._em.anio = h.getFullYear(); window._em.sel = {}; window.emToggleMes(ym); return ym; });
+    const inc = await p.$eval('#emBar .cal-g button[data-ym="' + ymHoy + '"]', (e) => ({ dis: e.disabled, cls: e.className, col: getComputedStyle(e).backgroundColor }));
+    ok(!inc.dis && /incomp/.test(inc.cls) && /on/.test(inc.cls) && /185, 28, 28/.test(inc.col), "pantalla: el mes en curso se elige y va en rojo (" + JSON.stringify(inc) + ")");
+    ok(/incompleto/.test(await p.$eval("#emMesesBtn", (e) => e.textContent)), "pantalla: el título marca el mes en curso como incompleto");
     const big = await p.$eval("#emBajarSel", (e) => parseFloat(getComputedStyle(e).fontSize));
     ok(big >= 16, "pantalla: el botón de descarga es grande (" + big + "px)");
     /* sólo Pedidos LK tildado (Costos no está subido) */
