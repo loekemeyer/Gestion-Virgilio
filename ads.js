@@ -266,7 +266,7 @@ function _adsStockCalc(r, H) {
 }
 
 /* v27.34 (Luis): Excel de cada pestaña — talleristas, y stock uno por rango (10/20/30).
-   v27.35 (Luis): el formato lo dio Luis con su Excel («ADS_talleristas_4OC», 06/10) y la regla es
+   v27.40 (Luis): el formato lo dio Luis con su Excel («ADS_talleristas_4OC», 06/10) y la regla es
    OPTIMIZACIÓN HORIZONTAL: anchos fijos chicos (los suyos), rótulo en 2-3 renglones (fila 1 de alto 45,
    centrado y con ajuste), datos centrados salvo tallerista / descripción / dist (a la izquierda), Arial 10,
    fila 1 congelada, zoom 130 y al imprimir entra a lo ancho de la hoja. */
