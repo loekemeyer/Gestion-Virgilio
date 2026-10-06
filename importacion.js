@@ -4610,6 +4610,7 @@ function _impCursoLineasHtml(ls, r) {
   // ⚠ SIN width:99% en Descripción: se probó y deja un hueco muerto entre ella y Unidades (y parte
   // la marca en dos líneas). El reparto natural de la tabla queda más apretado, que es la regla.
   h += '<table><thead><tr><th style="text-align:left">Código</th><th style="text-align:left">Descripción</th><th style="text-align:right">Unidades</th><th style="text-align:right">u$s</th><th style="text-align:right">m³</th>' +
+    '<th style="text-align:right;white-space:nowrap" title="FOB por unidad = u$s ÷ unidades (el precio del artículo, antes de nacionalizar).">FOB<small style="display:block;font-weight:600;opacity:.75">u$s/u</small></th>' +
     '<th style="text-align:right;white-space:nowrap" title="Costo de nacionalización de ESTE artículo: la parte que le toca del costo del embarque, repartida ' + escapeHtml(ct.lbl) + '. Abajo, por unidad.">🛃 Nac. u$s<small style="display:block;font-weight:600;opacity:.75">u$s/u</small></th>' +
     '<th style="text-align:right;white-space:nowrap" title="Puesto en Argentina por unidad = FOB por unidad + la nacionalización que le toca. Es el costo real de la caja cuando llega al depósito.">Puesto<small style="display:block;font-weight:600;opacity:.75">u$s/u</small></th>' +
     '<th style="text-align:left">Llegada</th></tr></thead><tbody>';
@@ -4623,12 +4624,13 @@ function _impCursoLineasHtml(ls, r) {
       '<td style="text-align:right;font-variant-numeric:tabular-nums">' + _impCursoNum(uni) + '</td>' +
       '<td style="text-align:right;color:#065f46">' + (Number(l.usd) > 0 ? _impCursoNum(Math.round(l.usd)) : '—') + '</td>' +
       '<td style="text-align:right;color:#0369a1">' + (Number(l.m3) > 0 ? (Math.round(l.m3 * 100) / 100).toLocaleString("es-AR") : '—') + '</td>' +
+      '<td style="text-align:right;color:#065f46;font-weight:700">' + (fobU > 0 ? _nacF2(fobU) : '—') + '</td>' +
       '<td style="text-align:right;color:#6d28d9;font-weight:700">' + (nacU > 0 ? _nacF(nacU) : '—') +
         (nacUni > 0 ? '<div style="font-size:10.5px;color:#7c3aed;font-weight:600">' + _nacF2(nacUni) + '</div>' : '') + '</td>' +
       '<td style="text-align:right;font-weight:800;color:#0f172a">' + ((fobU + nacUni) > 0 ? _nacF2(fobU + nacUni) : '—') + '</td>' +
       '<td>' + (l.fecha_reingreso ? _isoToDdMmAa(String(l.fecha_reingreso).slice(0, 10)) : '<span style="color:#b45309">sin fecha</span>') + '</td></tr>';
   }).join("");
-  h += '<tr style="background:#f8fafc"><td colspan="5" style="text-align:right;font-weight:700;color:#334155">TOTAL nacionalización repartida</td>' +
+  h += '<tr style="background:#f8fafc"><td colspan="6" style="text-align:right;font-weight:700;color:#334155">TOTAL nacionalización repartida</td>' +
     '<td style="text-align:right;font-weight:800;color:#6d28d9">' + _nacF(N.rep.total) + '</td><td colspan="2"></td></tr>';
   return h + '</tbody></table>';
 }
