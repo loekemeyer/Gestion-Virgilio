@@ -5631,6 +5631,30 @@ el watchdog 63 de amplificador (sus ticks murieron con statement timeout de 6-12
 anti-solape + watchdog a 2 min. Las queries del incidente se perdieron (`pg_stat_statements` se
 reseteó 12:44 UTC, ~cuando se cortó — quizás un restart de la base).
 
+⚠ **Y se BAJÓ el gasto sostenido de LK (06/10, Thomas), no sólo la alarma** — los 3 syncs cruzados que
+corrían cada 5 min eran el grueso. `sql/gv_lk_syncs_bajar_gasto_20261006_LK.sql`:
+1. **Cadencia 5 → 15 min** en `sync-pedidos-match` (job 24, `9-59/15`) y `sync-reingresos` (job 39,
+   `14-59/15`); minutos elegidos con `gv_cron_colisiones` (0 pesados, no se pisan).
+2. **«Sólo si cambió»** (patrón `gv_refresh_stock_si_cambio`, FAIL-OPEN) en el COMMAND de cada cron,
+   como do-block (no se edita ninguna función): pedidos con huella LOCAL barata (0,5 ms, orders +
+   chef_orders_cache, ventana 21 días — un pedido nuevo o cambio de estado siempre la mueve; red de
+   seguridad el job 70 cada hora); reingresos con hash de CONTENIDO de las 4 fuentes sobre el FDW a GV
+   (~1,6 s; lo caro es que GV computa `v_lk_reingresos`). Las huellas en `app_settings['huella_sync_*']`.
+3. ⚠ **El latido de la cache de precios de Chef se separó a su propio cron** (jobid 79
+   `lk-item-precio-heartbeat`, `3-59/5`): `sync_reingresos_virgilio` llamaba al final a
+   `sync_web_ocultos_virgilio`, que SIEMPRE corre `refrescar_item_precio_cache()` (~3,8 s) — y Pablo
+   (06/10) dejó anotado que esa reconstrucción es lo ÚNICO que refresca `item_precio_cache` para los
+   productos de Chef (FDW, sin trigger local). Gatear reingresos lo habría matado, y el paso 1 ya lo
+   había bajado de 5 a 15 min sin querer. El cron nuevo corre `sync_web_ocultos_virgilio()` cada 5 min
+   en los minutos viejos de reingresos (que ya cargaban ese trabajo): restaura la cadencia de Pablo sin
+   tocar su función. **Ese latido (3,8 s × 12/h ≈ 54 s/h) pasa a ser el mayor gasto sostenido y queda
+   AISLADO**: gatearlo necesita una huella de la fuente Chef (que paga el piso de ~2,4 s del FDW) o bajar
+   su cadencia — decisión de Pablo.
+4. **Chef (`sincronizar-chef-orders`, job 48) NO se gatea**: su costo es el piso de ~2,4 s de abrir el
+   FDW a Chef (otra org/región), que una huella pagaría igual, y la copia alimenta el padrón y los
+   pedidos de Chef del armado — un skip sacaría pedidos de la PPP. Queda en 10 min.
+   Medido: ~204 → ~82 s/h en estos objetos (~60% menos). Marcadores internos de las funciones sin tocar.
+
 ## ⚠ REGLA (v21.10): `index.html` es UTF-8 — un byte en latin1 se multiplica solo
 
 El archivo declara `<meta charset="UTF-8">`. El 22/09 tenía **5 bytes sueltos en latin1/cp1252**,
