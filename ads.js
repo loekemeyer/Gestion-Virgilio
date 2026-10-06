@@ -166,7 +166,8 @@ function _adsHtmlTall() {
   [2, 3, 4, 5, 6, 8, 10, 12].forEach(function (n) { h += '<option' + (n === _ads.n ? " selected" : "") + ">" + n + "</option>"; });
   h += '</select> OC · <label><input type="checkbox"' + (_ads.inc ? " checked" : "") + ' onchange="adsSetInc(this.checked)"> incluir la OC en curso</label>' +
     ' · Alerta debajo de <input type="number" min="1" max="100" style="width:60px" value="' + Math.round(_ads.umbral * 100) + '" onchange="adsSetUmbral(this.value)"> %' +
-    ' <button onclick="adsGuardarCfg()" title="Guarda rango y umbral para el badge del panel (vale para todos)">Guardar para el badge</button></div>';
+    ' <button onclick="adsGuardarCfg()" title="Guarda rango y umbral para el badge del panel (vale para todos)">Guardar para el badge</button>' +
+    ' <button class="xl" onclick="adsExcelTall()">Descargar Excel</button></div>';
   h += '<div class="ads-body">';
   if (_ads.tallErr) return h + '<div class="err">' + _adsEsc(_ads.tallErr) + "</div></div>";
   if (!_ads.tall) return h + '<div class="msg">Leyendo OC…</div></div>';
@@ -221,7 +222,8 @@ function _adsHtmlStock() {
       var on = x[0] ? (!_ads.todos && H === x[0]) : !!_ads.todos;
       return '<span class="chip' + (on ? " on" : "") + '" onclick="adsHoriz(' + x[0] + ')">' + (x[0] ? x[0] + " días · " + x[1] : "todos · " + x[1]) + "</span>";
     }).join(" ") +
-    ' · <input id="adsQ" placeholder="Buscar código" style="width:130px" value="' + _adsEsc(_ads.q) + '" oninput="adsBuscar(this.value)"></div>';
+    ' · <input id="adsQ" placeholder="Buscar código" style="width:130px" value="' + _adsEsc(_ads.q) + '" oninput="adsBuscar(this.value)">' +
+    ' · Excel: ' + [10, 20, 30].map(function (d) { return '<button class="xl" onclick="adsExcelStock(' + d + ')">' + d + ' días</button>'; }).join(" ") + '</div>';
   h += '<div class="ads-body">';
   if (_ads.stockErr) return h + '<div class="err">' + _adsEsc(_ads.stockErr) + "</div></div>";
   if (!_ads.stock) return h + '<div class="msg">Leyendo stock…</div></div>';
@@ -234,17 +236,8 @@ function _adsHtmlStock() {
     '<tr><th class="u1">Fecha</th><th class="u2">Pedido</th><th class="u2">Recibido</th><th class="u3">%</th></tr></thead><tbody>';
   if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
-    var disp = Number(r.disponible) || 0, proy = Number(r.proy_mes) || 0, comp = Number(r["comp" + H]) || 0;
-    var em = proy * H / 30, saldo = Number(r["saldo" + H]);
-    var cob = proy > 0 ? Math.max(0, disp - comp) / (proy / 30) : null;
-    var pc = _adsPctCod(r.cod) || [];
-    // v27.33 (Luis): Dist = a qué tallerista le corresponde; con varios, la parte de cada uno en lo pedido del rango.
-    // Lo que entregó cada uno está en la pestaña Entregas talleristas.
-    var totPed = pc.reduce(function (s, x) { return s + (Number(x.pedido) || 0); }, 0);
-    var dist = pc.length > 1 ? pc.map(function (x) { return _adsEsc(x.proveedor) + " " + (totPed > 0 ? _adsPct((Number(x.pedido) || 0) / totPed) : "—"); }).join("<br>")
-             : pc.length ? _adsEsc(pc[0].proveedor) : (r.oc_prov ? _adsEsc(r.oc_prov) : "—");
-    var rec = r.oc_rec_v != null ? r.oc_rec_v : r.oc_rec;
-    var ocPct = r.oc_cant ? Number(rec) / Number(r.oc_cant) : null;
+    var c = _adsStockCalc(r, H), disp = c.disp, proy = c.proy, comp = c.comp, em = c.em, saldo = c.saldo, cob = c.cob, rec = c.rec, ocPct = c.ocPct;
+    var dist = c.dist.length ? c.dist.map(_adsEsc).join("<br>") : "—";
     h += "<tr><td><b>" + _adsEsc(r.cod) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
       '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + " · excedente " + _adsN(r.excedente) + '">' + _adsN(disp) +
       "</td><td>" + _adsN(comp) + '</td><td title="' + _adsN(proy) + ' por mes">' + _adsN(Math.round(em)) +
@@ -255,6 +248,65 @@ function _adsHtmlStock() {
     h += "<td>" + dist + "</td></tr>";
   });
   return h + "</tbody></table></div>";
+}
+
+/* Cuenta de una fila de la pestaña Stock al horizonte H. La usan la pantalla y el Excel (una sola cuenta). */
+function _adsStockCalc(r, H) {
+  var disp = Number(r.disponible) || 0, proy = Number(r.proy_mes) || 0, comp = Number(r["comp" + H]) || 0;
+  var pc = _adsPctCod(r.cod) || [];
+  // v27.33 (Luis): Dist = a qué tallerista le corresponde; con varios, la parte de cada uno en lo pedido del período.
+  // Lo que entregó cada uno está en la pestaña Entregas talleristas.
+  var totPed = pc.reduce(function (s, x) { return s + (Number(x.pedido) || 0); }, 0);
+  var dist = pc.length > 1 ? pc.map(function (x) { return x.proveedor + " " + (totPed > 0 ? _adsPct((Number(x.pedido) || 0) / totPed) : "—"); })
+           : pc.length ? [pc[0].proveedor] : (r.oc_prov ? [r.oc_prov] : []);
+  var rec = r.oc_rec_v != null ? r.oc_rec_v : r.oc_rec;
+  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]),
+           cob: proy > 0 ? Math.max(0, disp - comp) / (proy / 30) : null,
+           rec: rec, ocPct: r.oc_cant ? Number(rec) / Number(r.oc_cant) : null, dist: dist };
+}
+
+/* v27.34 (Luis): Excel de cada pestaña — talleristas, y stock uno por rango (10/20/30). */
+function _adsXlsx(aoa, hoja, nombre) {
+  if (typeof pppLoadXlsx !== "function") { alert("No pude cargar el generador de Excel."); return Promise.resolve(); }
+  return pppLoadXlsx().then(function (XLSX) {
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = aoa[0].map(function (_h, i) {
+      var w = 6; aoa.forEach(function (f) { var v = f[i] == null ? "" : String(f[i]); if (v.length + 2 > w) w = v.length + 2; });
+      return { wch: Math.min(w, 45) };
+    });
+    var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, hoja);
+    var bytes = typeof gvXlsxFormato === "function" ? gvXlsxFormato(XLSX, wb) : XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    var d = new Date(), p2 = function (n) { return String(n).padStart(2, "0"); };
+    var fn = nombre + "_" + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + ".xlsx";
+    if (typeof gvXlsxBajar === "function") gvXlsxBajar(bytes, fn);
+    else { var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([bytes])); a.download = fn; document.body.appendChild(a); a.click(); a.remove(); }
+  }).catch(function (e) { alert("No se pudo armar el Excel: " + (e && e.message || e)); });
+}
+function _adsNum(v) { var n = Number(v); return v == null || v === "" || !isFinite(n) ? "" : n; }
+function _adsPctNum(x) { return x == null || !isFinite(x) ? "" : Math.round(x * 100); }
+function adsExcelTall() {
+  if (!_ads.tall) { alert("Todavía se están leyendo las OC."); return; }
+  var g = adsAgruparTalleristas(_ads.tall, _ads.umbral);
+  var aoa = [["Tallerista", "% tallerista", "Cód.", "Descripción", "OC evaluadas", "Pedido", "Recib. Virgilio", "%", "Última OC fecha", "Última OC pedida", "Última OC recibida"]];
+  g.forEach(function (t) {
+    t.arts.forEach(function (a) {
+      aoa.push([t.proveedor, _adsPctNum(t.pct), String(a.codigo), a.descripcion || "", _adsNum(a.ocs), _adsNum(a.pedido), _adsNum(a.entregado),
+        _adsPctNum(a.pct), a.ult_fecha ? _adsFecha(a.ult_fecha) : "", _adsNum(a.ult_cant), _adsNum(a.ult_rec)]);
+    });
+  });
+  return _adsXlsx(aoa, "Talleristas", "ADS_talleristas_" + _ads.n + "OC");
+}
+function adsExcelStock(H) {
+  if (!_ads.stock) { alert("Todavía se está leyendo el stock."); return; }
+  var f = adsFiltrarStock(_ads.stock, H, "");
+  var aoa = [["Cód.", "Descripción", "Stk", "Comprom. " + H + " d", "Est. Madre " + H + " d", "Saldo " + H + " d", "Días cobertura",
+              "Última OC fecha", "Última OC pedido", "Última OC recibido", "Última OC %", "Dist."]];
+  f.forEach(function (r) {
+    var c = _adsStockCalc(r, H);
+    aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo), c.cob == null ? "" : Math.round(c.cob),
+      r.oc_fecha ? _adsFecha(r.oc_fecha) : "sin OC", _adsNum(r.oc_cant), r.oc_fecha ? _adsNum(c.rec) : "", _adsPctNum(c.ocPct), c.dist.join(" · ")]);
+  });
+  return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d");
 }
 
 function _adsRender() {

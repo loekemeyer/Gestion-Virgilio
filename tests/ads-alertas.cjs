@@ -74,6 +74,12 @@ const STOCK = [
     out.pctTall = fs[0] ? fs[0].cells[11].textContent : "";
     out.cols10 = [...document.querySelectorAll("#adsOv .ads-body > table > thead th")].map((t) => t.textContent);
     out.fila10 = fs[0] ? [...fs[0].cells].slice(2, 11).map((c) => c.textContent) : [];
+    // v27.34: Excel por rango y de talleristas (se lee el archivo que se baja)
+    const bajados = [];
+    window.gvXlsxBajar = (bytes, nombre) => { const wb = window.XLSX.read(bytes, { type: "array" }); bajados.push({ nombre, filas: window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 }) }); };
+    out.btnXl = [...document.querySelectorAll("#adsOv .ads-bar button.xl")].map((x) => x.textContent);
+    await window.adsExcelStock(10); await window.adsExcelStock(30); await window.adsExcelTall();
+    out.xl = bajados.map((x) => ({ n: x.nombre.replace(/_\d{8}\.xlsx$/, ""), cab: x.filas[0], f1: x.filas[1], len: x.filas.length }));
     window.adsHoriz(30); await espera(30);
     out.stock30 = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")].map((f) => f.cells[0].textContent);
     const f30 = document.querySelector("#adsOv .ads-body > table tbody tr");
@@ -105,6 +111,11 @@ const STOCK = [
   if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","3","30/09","174","90","52 %"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
   if (JSON.stringify(r.fila30) !== JSON.stringify(["50","60","300","-310","0"])) fallas.push("(c) fila a 30 d: " + JSON.stringify(r.fila30));
   if (JSON.stringify(r.stock30) !== JSON.stringify(["505", "506"])) fallas.push("(c) quiebre 30 d: " + JSON.stringify(r.stock30));
+  if (JSON.stringify(r.btnXl) !== JSON.stringify(["10 días", "20 días", "30 días"])) fallas.push("(f) botones Excel por rango: " + JSON.stringify(r.btnXl));
+  const x10 = r.xl && r.xl[0], x30 = r.xl && r.xl[1], xt = r.xl && r.xl[2];
+  if (!x10 || x10.n !== "ADS_stock_10d" || x10.len !== 2 || x10.cab[2] !== "Stk" || JSON.stringify(x10.f1.slice(0, 7)) !== JSON.stringify(["505", "Cuchillo", 50, 20, 100, -70, 3])) fallas.push("(f) Excel stock 10 d: " + JSON.stringify(x10));
+  if (!x30 || x30.n !== "ADS_stock_30d" || x30.len !== 3) fallas.push("(f) Excel stock 30 d: " + JSON.stringify(x30));
+  if (!xt || !/^ADS_talleristas_/.test(xt.n) || xt.cab[0] !== "Tallerista" || xt.len !== 4) fallas.push("(f) Excel talleristas: " + JSON.stringify(xt));
   if (!/vac/i.test(r.vacio)) fallas.push("(d) lectura vacía no se dice: " + r.vacio);
   if (errs.length) fallas.push("errores de página: " + errs.slice(0, 3).join(" | "));
   if (fallas.length) { console.error("✗ ADS:\n  " + fallas.join("\n  ")); process.exit(1); }

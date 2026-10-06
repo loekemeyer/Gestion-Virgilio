@@ -7991,4 +7991,5 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
 - **Saldos en cajas ENTERAS (v27.32, Luis D11)**: quiebre sólo si falta media caja o más (antes −0,3 de una Est. Madre de 1 caja/mes contaba). Rojo 45 → 40. `sql/gv_ads_saldo_cajas_enteras_v2732.sql`.
 - Rango y umbral se guardan en `Stock_Config` **sólo con «Guardar para el badge»**: cambiarlos sin guardar vale para esa
   pantalla y se pierde al cerrar.
+- **Excel (v27.34, Luis)**: «Descargar Excel» en Talleristas (una fila por tallerista + artículo) y en Stock un botón por rango (10 / 20 / 30 días, sólo lo que quiebra a ese horizonte). La pantalla y el Excel usan la misma cuenta (`_adsStockCalc`). Formato provisorio: Luis manda el Excel modificado y se replica.
 - `sql/gv_ads_alertas_damian_v2720.sql`, `sql/gv_ads_excedente_semaforo_v2722.sql`, `tests/ads-alertas.cjs`.
