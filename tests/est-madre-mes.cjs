@@ -133,6 +133,22 @@ ok(uCh["702EL"] && !uCh["702E"], "CH usa su propio código (702EL queda 702EL)")
 const hf = em.emArmarHoja(X, "fac", "lk", c.lk, ["2026-08"], { "2026-08": { u: em.emAcumular({}, [{ cod: "026", cantidad: 4319 }], "cantidad", false), dis: {} } });
 ok(hf.ws.A1.v === "Loeke" && hf.ws.B1.v === "Vtas Agosto 2026 Uni" && hf.ws.B2.v === 4319 && hf.ws.A2.v === "026", "facturación: formato del «costo lk final»");
 
+/* Costos LK + CH en UNA columna, con la misma separación que «Aportes Gastos» (Loeke fila 8, Chef fila 21 en la prueba) */
+const pc = em.emPlantillaCostos(c.lk, c.ch);
+const hc = em.emArmarHoja(X, "fac", "lk", pc, ["2026-08"], {
+  lk: { "2026-08": { u: em.emAcumular(em.emAcumular({}, [{ cod: "026", cantidad: 4319 }, { cod: "031", cantidad: 7056 }], "cantidad", false), [{ cod: "031L", cantidad: 3336 }, { cod: "043", cantidad: 120 }], "cantidad", true), dis: {} } },
+  ch: { "2026-08": { u: em.emAcumular({}, [{ cod: "031L", cantidad: 3336 }, { cod: "043", cantidad: 120 }], "cantidad", false), dis: {} } } });
+const wc = hc.ws, vc = (a) => (wc[a] ? wc[a].v : undefined);
+/* fila 1 = «Loeke» (fila 8 del original) → el «Chef» de la fila 21 cae en la 14 */
+ok(vc("A1") === "Loeke" && vc("A2") === "026" && vc("B2") === 4319 && vc("B4") === 10392, "costos combinado: bloque LK arriba, 031 = 7.056 + 3.336 de 031L");
+ok(vc("A11") === undefined && vc("A13") === undefined && vc("A14") === "Chef" && vc("B14") === "Vtas Agosto 2026 Uni", "costos combinado: «Chef» en la misma columna y con la misma separación que «Aportes Gastos» (fila 14)");
+ok(vc("A15") === "043" && vc("B15") === 120 && hc.estilo("B14") === 1 && hc.estilo("B15") === 2, "costos combinado: el bloque Chef cuenta lo de Chef (043 = 120) y su rótulo va como encabezado");
+
+/* variante facturada sin fila → al código base; lo de Chef con L no cuenta como suelto; lo que no tiene lugar se avisa */
+const ur = { "727EN": { u: 396, sinUxb: 0 }, "031L": { u: 10, sinUxb: 0 }, "999X": { u: 5, sinUxb: 0 } };
+const su = em.emReubicar(ur, { "727E": true }, true);
+ok(ur["727E"] && ur["727E"].u === 396 && !ur["727EN"] && JSON.stringify(su) === '["999X"]', "727EN va al 727E, 031L no es suelto, 999X se avisa (vino " + JSON.stringify(su) + ")");
+
 /* ---------- E) puertas ---------- */
 const idx = fs.readFileSync(path.join(__dirname, "..", "index.html"), "latin1");
 const src = fs.readFileSync(path.join(__dirname, "..", "estadisticas.js"), "utf8");
@@ -172,7 +188,7 @@ ok(/volvió vacío/.test(src) && /No se bajó nada/.test(src), "una RPC vacía o
     ok(/Madre LK 6/.test(bar) && /Costos LK sin subir/.test(bar), "pantalla: dice qué plantillas hay (" + bar.slice(0, 160) + ")");
     await p.evaluate(() => { window._em.sel = { "2026-09": true }; window.emAbrir(); });
     const dis = await p.$$eval("#emOv .sal button", (bs) => bs.map((b) => b.disabled));
-    ok(dis[0] === false && dis[2] === true, "pantalla: Pedidos LK habilitado, Facturación LK no (falta Costos)");
+    ok(dis[0] === false && dis[2] === true, "pantalla: Pedidos LK habilitado, Facturación LK + CH no (falta Costos)");
     const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }), p.click("#emOv .sal button")]);
     ok(dl.suggestedFilename() === "Pedidos_LK_sep26.xlsx", "pantalla: nombre (" + dl.suggestedFilename() + ")");
     const w2 = X.read(fs.readFileSync(await dl.path()), { type: "buffer" });

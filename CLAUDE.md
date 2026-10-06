@@ -8003,7 +8003,7 @@ puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBa
 |---|---|
 | ⬆ Subir Estadística Madre | lee «Loeke Madre…» (col «Cod Nuevo Isis») y «Chef Madre / Chef Master»; saltea copias «(2)» y «por menor vta». **Manda el COD ART** (Luis, v27.38: *"es lo que trackeamos"*): si la hoja tiene «Cod.Art.» (Chef: B y D) se usa ésa, no «Cod. Isis», que guarda códigos viejos de ISIS en los discontinuados |
 | ⬆ Subir Costos | bloques «Loeke» / «Chef» de «Aportes Gastos» (celda con «Uni x mes…» al lado), sin cortar en una fila en blanco |
-| ⬇ Bajar por mes | meses elegidos → Pedidos LK/CH (orden Est. Madre) o Facturación LK/CH (orden Costos), una columna por mes del más nuevo al más viejo, **en unidades** |
+| ⬇ Bajar por mes | meses elegidos → Pedidos LK / Pedidos CH (orden Est. Madre) o **Facturación LK + CH en UNA columna** (como «Aportes Gastos»: bloque Loeke, el blanco, «Chef» y su bloque; se copia y pega una vez). Una columna por mes, del más nuevo al más viejo, **en unidades** |
 
 - Se guarda el ORDEN, el TIPO de cada código (505 número, '026' texto) y los renglones en blanco / títulos, para
   pegar al lado sin correr filas: tabla **`GV_Est_Plantilla`** (`gv_est_plantilla_guardar` / `_leer`, sólo supervisor).
@@ -8015,4 +8015,6 @@ puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBa
   pasa la E.Madre. La E.Madre de cada código («E.Madre Uni x Mes» col I / «Est Madre Uni» col J) se captura al subir; sin E.Madre, sin color.
 - Disruptivo (regla v26.20): **letra roja negrita** (no pisa el fondo) y el detalle como **comentario**.
   .xlsx con estilos reescribiendo `styles.xml` (`emXlsxBytes`). Sin UxB: 0 con comentario.
+- **Para qué**: la de cobranzas sube la Est. Madre y Costos, baja y pega al lado de su columna. Por eso cada fila (blancos, títulos, Krea en 0) va donde está en su planilla.
+- Código vendido SIN fila en la planilla → al código base si la planilla lo tiene (727EN → 727E, 865ED → 865E, 599EZ → 599E): la factura dice la variante y la estadística de ISIS el base. Con eso, Costos ago/26 da igual a «Aportes Gastos» en 373 de 374 filas (falta sólo el 598E). Lo que queda sin lugar se avisa en pantalla (ej. LK 599E / 599EZ, que Costos no tiene).
 - Una RPC vacía o con error no baja nada. `sql/gv_est_plantilla_v2736.sql`, `tests/est-madre-mes.cjs`.
