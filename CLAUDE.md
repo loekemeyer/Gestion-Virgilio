@@ -7453,6 +7453,32 @@ Recibir → Virgilio, Fábrica → producir, Stock General en 3 cajas). Afuera: 
 Insumos (`GP2.envio_virgilio`, borrada). **Queda sólo el aviso de importados** (GV → GP2 con Sí/No). El contenedor
 de insumos de Virgilio en GP2 se rearma **desde cero y en blanco** cuando Luis lo defina: no reponer lo revertido.
 
+### ⚠ ESPEJO DE ENTREGAS GV → GP2: lo que un tallerista entrega en Virgilio SUMA stock en GP2 (Luis, 05/10)
+
+**Trigger `trg_virgilio_espejo_gp2`** (vive sobre `public."Entregas Tallerista Virgilio"`, llama a
+`GP2.fn_entregas_virgilio_espejo`; **NO está en `db/` del repo GP2** — su estado sólo se ve en la base). Se
+**re-prendió el 05/10 14:44** después de haber estado apagado desde el 18/09.
+
+> **Cuando un tallerista o prov AT entrega algo en Virgilio, GP2 lo registra SOLO como recepción** (suma stock
+> del artículo en GP2, `cajas × articulos_por_caja`, vía `recepcion_virgilio`). Resuelve la contraparte por
+> nombre y el **artículo por código contra `GP2.articulo`** (exacto, si no sin ceros a la izquierda).
+
+- **Es FORWARD-FACING: no hay backfill** (Luis, 05/10). Las ~99 entregas del 18/09–05/10 (7.981 cajas) cargadas con
+  el trigger apagado **no se reprocesan** — ni siquiera quedaron en la cola, porque es el trigger el que encola. De acá
+  para adelante.
+- **Si el código no existe en `GP2.articulo` o la contraparte no resuelve, NO suma: queda en `GP2.virgilio_espejo_pend`**
+  con el motivo (`articulo sin equivalente en GP2`, `contraparte sin resolver`, `cantidad en cero`, `error: …`). No se
+  pierde: cruza cuando se da de alta el artículo en GP2.
+- **Alta de un importado en GP2 con su receta**: se va haciendo **a medida que haga falta, por SQL en el back, no desde el
+  front** (Luis, 05/10). Pendientes al 05/10 (sin fila): 323E, 838E, 438E, 439E, 584E, 727E, 865E, 55289. Hecho: 599E.
+- **Mapeo componente ↔ artículo**: tabla **`GP2.importado_virgilio_componente`** (`cod_virgilio → componente_id`), un
+  insert por código. Es el vínculo del flujo de recepción de insumos importados; el espejo de entregas cruza por
+  `GP2.articulo` directo.
+- **Chequeo:** `select count(*), min(fecha), max(fecha) from "GP2".virgilio_espejo_pend;` — lo que todavía no cruzó, con
+  su motivo. Vivo del trigger: `select tgenabled from pg_trigger t join pg_class c on c.oid=t.tgrelid where c.relname='Entregas Tallerista Virgilio' and t.tgname='trg_virgilio_espejo_gp2';` (`O` = vivo, `D` = apagado).
+
+⚠ **El CONOCIMIENTO_GP2.md del repo GP2 queda por documentar aparte** (no se puede pushear a `loekemeyer/Gestion-Productiva-2.0` desde una sesión de este repo: acceso de solo lectura).
+
 ### v25.37: el «No» de Cervantes vuelve a poner el pedido EN VIAJE — chip «⛔ Denegado por Cervantes»
 
 - GP2 contesta con `GP2.resolver_ingreso_virgilio(id, acepta, motivo)`: **Sí** = recepción de insumo normal
