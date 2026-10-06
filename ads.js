@@ -263,8 +263,9 @@ function adsLoadBadge() {
   if (s) _adsRpc("gv_ads_badge_stock").then(function (r) {
     if (!r || r.error || !r.data) return;
     var c = adsSemaforoCuentas(r.data), h = "";
-    [["rojo", "#dc2626", "#fff", "a 10 días"], ["naranja", "#ea580c", "#fff", "a 20 días"], ["amarillo", "#facc15", "#422006", "a 30 días"]].forEach(function (x) {
-      if (c[x[0]] > 0) h += '<span class="ads-sem" style="min-width:22px;height:18px;line-height:18px;padding:0 5px;border-radius:9px;background:' + x[1] + ';color:' + x[2] + ';font-size:12px;font-weight:800;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.3);" title="' + c[x[0]] + ' artículo(s) quiebran ' + x[3] + '">' + c[x[0]] + "</span>";
+    /* v27.25 (Luis): cada pastilla dice su plazo (10d / 20d / 30d) al lado del número */
+    [["rojo", "#dc2626", "#fff", "10d", "a 10 días"], ["naranja", "#ea580c", "#fff", "20d", "recién a 20 días"], ["amarillo", "#facc15", "#422006", "30d", "recién a 30 días"]].forEach(function (x) {
+      if (c[x[0]] > 0) h += '<span class="ads-sem" data-n="' + c[x[0]] + '" style="height:18px;line-height:18px;padding:0 5px;border-radius:9px;background:' + x[1] + ';color:' + x[2] + ';font-size:12px;font-weight:800;text-align:center;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3);" title="' + c[x[0]] + ' artículo(s) quiebran ' + x[4] + ' (cada artículo cuenta una vez, en su color más urgente)">' + c[x[0]] + '<span style="font-size:9px;font-weight:700;margin-left:3px;opacity:.85;">' + x[3] + "</span></span>";
     });
     s.innerHTML = h; s.style.display = h ? "flex" : "none";
   });

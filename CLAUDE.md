@@ -7954,7 +7954,7 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
   quiebres 45 / 61 / 90 a 10/20/30 días.
 - **Botón del panel (D3, Luis 06/10)**: a la IZQUIERDA badge violeta = talleristas a revisar; a la DERECHA semáforo
   (`gv_ads_badge_stock`): **rojo** = quiebre a 10 días · **naranja** = los que recién quiebran a 20 · **amarillo** = los que
-  recién quiebran a 30 (cada artículo cuenta una vez, en su color más urgente). Son DOS pestañas (D1: no hay tercera).
+  recién quiebran a 30 (cada artículo cuenta una vez, en su color más urgente). Cada pastilla lleva su leyenda **10d / 20d / 30d** al lado del número (v27.25, Luis). Son DOS pestañas (D1: no hay tercera).
 - Medido 06/10 (últimas 4 OC cerradas): 13 de 18 talleristas debajo del 50 %; quiebres 80 / 98 / 127 a 10/20/30 días
   (con excedente) → semáforo 80 · 18 · 29.
   El % bajo refleja también la imputación (Oscar / Tierra Nativa se reciben como Log/ Fabr): mirar antes de reclamar.

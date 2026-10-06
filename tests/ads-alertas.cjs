@@ -78,8 +78,8 @@ const STOCK = [
   if (!r.boton) fallas.push("(a) falta el botón ADS con su badge");
   if (r.badge !== "1") fallas.push("(a) badge no pinta: " + r.badge);
   if (!r.badgeIzq) fallas.push("(a) el badge violeta no va a la izquierda");
-  const semOk = r.semaf.length === 3 && /^80\|/.test(r.semaf[0]) && /rgb\(220, 38, 38\)/.test(r.semaf[0])
-    && /^18\|/.test(r.semaf[1]) && /rgb\(234, 88, 12\)/.test(r.semaf[1]) && /^29\|/.test(r.semaf[2]) && /rgb\(250, 204, 21\)/.test(r.semaf[2]);
+  const semOk = r.semaf.length === 3 && /^8010d\|/.test(r.semaf[0]) && /rgb\(220, 38, 38\)/.test(r.semaf[0])
+    && /^1820d\|/.test(r.semaf[1]) && /rgb\(234, 88, 12\)/.test(r.semaf[1]) && /^2930d\|/.test(r.semaf[2]) && /rgb\(250, 204, 21\)/.test(r.semaf[2]);
   if (!semOk) fallas.push("(a) semáforo rojo/naranja/amarillo: " + JSON.stringify(r.semaf));
   if (JSON.stringify(r.orden) !== JSON.stringify(["Oscar", "Lucho"])) fallas.push("(b) orden: " + JSON.stringify(r.orden));
   if (!r.oscarRojo || r.oscarPct !== "20 %" || r.oscarPed !== "150") fallas.push("(b) Oscar: " + r.oscarPct + " / " + r.oscarPed);
