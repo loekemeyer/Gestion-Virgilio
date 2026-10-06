@@ -45,6 +45,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== ppp-tanda-candado-codigo (v21.76: una tanda empezada conserva su codigo al cambiar de dia) =="
 node tests/ppp-tanda-candado-codigo.cjs
 node tests/deshacer-evento.cjs
+node tests/legajo1-confirma.cjs
 
 echo "== ppp-retiro-y-comentario (v21.65: el retiro viaja con el pedido; badge de comentario en la NP) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-retiro-y-comentario.cjs

@@ -5772,6 +5772,15 @@ repetía los tres anteriores (con un RT adentro). La vista sumaba mov 4,97 h + n
   15/09 de `vista-15.json` no cambia. Centinelas 96 (actualizado), 338 y 339.
   `sql/gv_monitor_horas_mg_pisa_v2757.sql`, `tests/mg-pisa-tarea.cjs`.
 
+## ⚠ REGLA (Thomas, 2026-10-06, v27.58): el LEGAJO 1 pregunta antes de registrar y tiene 10 min para deshacer
+
+Para probar el programa de punta a punta. Con el legajo **1**, cada «Enviar» de la botonera (`send()`) pregunta
+*«Legajo 1 (prueba): ¿querés que esto se REGISTRE de verdad?»*; «Cancelar» no registra nada. Si se registra, el
+Deshacer dura **10 min** (`_undoWindowMs`, ≡ el tope de `gv_deshacer_evento`); el resto de los legajos sigue en 60 s.
+Lo que pasa adentro de un módulo abierto con «sí» (cada código del picking, el armado, el guardado) no vuelve a preguntar.
+⚠ **El legajo 1 sigue siendo de prueba en la base**: horas, monitor/TV y alertas lo excluyen (`not in ('', '0', '1')`).
+Va igual en Registro Producción 3.0 (v30.09). `tests/legajo1-confirma.cjs`.
+
 ## ⚠ REGLA (06/10/2026, v27.46): el DESHACER (60 s) del operario va por RPC — nunca DELETE
 
 Caso **F46A** (legajo 191, 17:39): el operario tocó «↩ Deshacer» sobre su EP, el celular mandó
