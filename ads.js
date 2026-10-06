@@ -232,7 +232,7 @@ function _adsHtmlStock() {
   h += '<table><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Stk</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × ' + H + '/30">Est. Madre<br>' + H + ' d</th>' +
     '<th rowspan="2">Saldo<br>' + H + ' d</th><th rowspan="2" title="Días que cubre lo disponible menos lo comprometido a ' + H + ' días, al ritmo de la Est. Madre">Días<br>cobertura</th>' +
     '<th colspan="4" class="ug" title="Última OC del artículo · recibido = lo que recibió Virgilio de ese proveedor desde la fecha de la OC">Última OC</th>' +
-    '<th rowspan="2" title="Tallerista al que le corresponde; si son varios, la parte de cada uno en lo pedido del rango">Dist.</th></tr>' +
+    '<th rowspan="2" title="Tallerista al que le corresponde; si son varios, la parte de cada uno en lo pedido del rango">Proporción</th></tr>' +
     '<tr><th class="u1">Fecha</th><th class="u2">Pedido</th><th class="u2">Recibido</th><th class="u3">%</th></tr></thead><tbody>';
   if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
@@ -340,15 +340,16 @@ function adsExcelTall() {
 function adsExcelStock(H) {
   if (!_ads.stock) { alert("Todavía se está leyendo el stock."); return; }
   var f = adsFiltrarStock(_ads.stock, H, "");
-  var aoa = [["Cód.", "Descripción", "Stk", "Comprom. " + H + " d", "Est. Madre " + H + " d", "Saldo " + H + " d", "Días cobertura",
-              "Fecha última OC", "Pedido última OC", "Recibido última OC", "% última OC", "Dist."]];
+  // v27.42 (Luis): rótulos abreviados para que ninguna palabra se parta en el medio con los anchos chicos
+  var aoa = [["Cód.", "Descripción", "Stk", "Comp. " + H + " d", "Est. Madre " + H + " d", "Saldo " + H + " d", "Días cob.",
+              "Fecha últ. OC", "Ped. últ. OC", "Rec. últ. OC", "% últ. OC", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo), c.cob == null ? "" : Math.round(c.cob),
       r.oc_fecha ? _adsFecha(r.oc_fecha) : "sin OC", _adsNum(r.oc_cant), r.oc_fecha ? _adsNum(c.rec) : "", _adsPctNum(c.ocPct), c.dist.join(" · ")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
-    { anchos: [6.57, 23, 5.14, 6.57, 6.57, 5.29, 6, 6.57, 5.86, 6, 5.29, _adsAnchoTexto(aoa, 11, 6, 22)], izq: [1, 11] });
+    { anchos: [6.57, 23, 5.14, 6, 6.29, 6, 5.43, 6.29, 5.86, 5.86, 5.29, _adsAnchoTexto(aoa, 11, 10.5, 24)], izq: [1, 11] });
 }
 
 function _adsRender() {

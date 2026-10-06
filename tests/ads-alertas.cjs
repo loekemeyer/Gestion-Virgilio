@@ -115,7 +115,7 @@ const STOCK = [
   if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
   if (JSON.stringify(r.stockCods) !== JSON.stringify(["505"])) fallas.push("(c) quiebre 10 d: " + JSON.stringify(r.stockCods));
   if (String(r.pctTall).trim() !== "Lucho") fallas.push("(c) Dist sólo el tallerista (un solo, sin %): " + r.pctTall);
-  const C10 = ["Cód.","Descripción","Stk","Comprom.10 d","Est. Madre10 d","Saldo10 d","Díascobertura","Última OC","Dist.","Fecha","Pedido","Recibido","%"];
+  const C10 = ["Cód.","Descripción","Stk","Comprom.10 d","Est. Madre10 d","Saldo10 d","Díascobertura","Última OC","Proporción","Fecha","Pedido","Recibido","%"];
   if (JSON.stringify(r.cols10) !== JSON.stringify(C10)) fallas.push("(c) columnas stock: " + JSON.stringify(r.cols10));
   if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","3","30/09","174","90","52 %"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
   if (JSON.stringify(r.fila30) !== JSON.stringify(["50","60","300","-310","0"])) fallas.push("(c) fila a 30 d: " + JSON.stringify(r.fila30));
@@ -129,7 +129,7 @@ const STOCK = [
   // v27.40: el formato de Luis (anchos chicos, rótulo de 45, congelado, entra a lo ancho; texto a la izq., números centrados)
   if (!xt || JSON.stringify(xt.anchos.slice(1)) !== JSON.stringify([6.57, 23, 5.14, 5.29, 5.86, 4, 6.57, 5.86, 6]) || xt.anchos[0] < 11.14 || xt.anchos[0] > 16 ||
       !xt.alto1 || !xt.congela || !xt.ajusta || xt.a2 !== "" || xt.b2 !== ' s="2"') fallas.push("(g) formato Excel talleristas: " + JSON.stringify(xt && [xt.anchos, xt.alto1, xt.congela, xt.ajusta, xt.a2, xt.b2]));
-  if (!x10 || x10.anchos.length !== 12 || Math.max(...x10.anchos) > 23 || x10.anchos.reduce((a, b) => a + b, 0) > 110) fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
+  if (!x10 || x10.anchos.length !== 12 || Math.max(...x10.anchos) > 24 || x10.cab[11] !== "Proporción" || x10.cab.slice(3).some((h) => String(h).split(/\s+/).some((w) => w.length > 6 && w !== "Proporción")) || x10.anchos.reduce((a, b) => a + b, 0) > 110) fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
   if (!/vac/i.test(r.vacio)) fallas.push("(d) lectura vacía no se dice: " + r.vacio);
   if (errs.length) fallas.push("errores de página: " + errs.slice(0, 3).join(" | "));
   if (fallas.length) { console.error("✗ ADS:\n  " + fallas.join("\n  ")); process.exit(1); }
