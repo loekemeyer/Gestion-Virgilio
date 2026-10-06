@@ -6323,7 +6323,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.56"></script>
+<script type="module" src="recepcion.js?v=27.57"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10594,7 +10594,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.56";
+const APP_VERSION = "v27.57";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -33450,6 +33450,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     return Math.max(0, fin - ini);
   };
   const perLegajo = new Map();
+  const _mgRaw = new Map(), _mgOcAb = new Map(), _rkSegs = new Map();   // v27.55-mgpisa
   for (const ev of events) {
     const leg = String(ev.legajo || "").trim();
     if (!leg || leg === "0" || leg === "1") continue;
@@ -33519,6 +33520,14 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     if (ev.opcion === "PC" && ev.ts_inicio) {
       const dur = new Date(ev.ts_cliente) - new Date(ev.ts_inicio);
       if (dur > 0 && dur < 8 * 3600 * 1000) p.comidaMs += dur;
+    }
+    /* v27.55-mgpisa (Thomas D6, 06/10: *"puede guardarse por mucho tiempo, siempre y cuando se esté guardando o
+       que en el medio se pise con otra tarea"*) ≡ gv_monitor_horas_operario_dia, CTE mg_ag: el MG cerrado del día
+       NO suma acá; va por la unión de sus tramos menos lo que se pisa con otra tarea (bloque de abajo). */
+    if (ev.opcion === "MG" && ev.ts_inicio && isoToDayKey(ev.ts_inicio) === dayKey) {
+      const _a = new Date(ev.ts_inicio).getTime(), _b = new Date(ev.ts_cliente).getTime();
+      if (_b > _a && _b - _a < 24 * 3600 * 1000) { if (!_mgRaw.has(leg)) _mgRaw.set(leg, []); _mgRaw.get(leg).push({ s: _a, e: _b, ev: ev }); }
+      continue;
     }
     // Toggles de movimiento: sumar duración cuando se cierra (ts_inicio set)
     // y guardar el evento en movDetail para el popup.
@@ -33624,6 +33633,12 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
         ccTandas: new Set(), ccDetail: [], ccMs: 0, comidaMs: 0, movMs: 0, movDetail: [], noprodMs: 0, noprodDetail: [],
         otrosProdMs: 0, otrosProdDetail: [], fjTs: null });
       const p = perLegajo.get(leg);
+      {   // v27.55-mgpisa ≡ vista (ab_tr sin MG + ab_no): lo abierto también "pisa" al MG
+        const _oc = [];
+        if (trab && trab.k !== "MG" && trab.fin > trab.ini) _oc.push({ s: trab.ini, e: trab.fin });
+        if (noab && noab.fin > noab.ini) _oc.push({ s: noab.ini, e: noab.fin });
+        if (_oc.length) _mgOcAb.set(leg, _oc);
+      }
       if (trab) {
         let muerto = deadOverlapMs(leg, trab.ini, trab.fin);
         for (const d of deadAb) { const ov = Math.min(trab.fin, d.e) - Math.max(trab.ini, d.s); if (ov > 0) muerto += ov; }
@@ -33661,12 +33676,18 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       if (!leg || leg === "0" || leg === "1" || isoToDayKey(m.ts) !== dayKey) continue;
       addPt(leg, new Date(m.ts).getTime());
     }
-    for (const [leg, evs] of evDia) for (const ev of evs) if (ev.opcion === "IR") addPt(leg, new Date(ev.ts_cliente).getTime());
+    const irPts = new Map();   // v27.55-mgpisa ≡ vista (rk_pts.src): un IR adentro de un MG ya no queda tapado por el MG
+    for (const [leg, evs] of evDia) for (const ev of evs) if (ev.opcion === "IR") {
+      const _t = new Date(ev.ts_cliente).getTime(); addPt(leg, _t);
+      if (!irPts.has(leg)) irPts.set(leg, new Set()); irPts.get(leg).add(_t);
+    }
     for (const [leg, set] of pts) {
       const evs = evDia.get(leg) || [];
+      const _irs = irPts.get(leg) || new Set();
       const libres = [...set].filter(function (t) {
         return !evs.some(function (c) {
           if (!c.ts_inicio || DEAD_TIME_CODES.includes(c.opcion) || c.opcion === "Perm") return false;
+          if (c.opcion === "MG" && _irs.has(t)) return false;
           const a = new Date(c.ts_inicio).getTime(), b = new Date(c.ts_cliente).getTime();
           return t > a && t <= b + 60000;
         });
@@ -33680,6 +33701,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
         for (const c of evs) { const x = new Date(c.ts_cliente).getTime(); if (x < t && (prev == null || x > prev)) prev = x; }
         for (const q of libres) if (q < t && (prev == null || q > prev)) prev = q;
         if (prev == null) prev = Math.min(t, entradaMs);
+        if (t > prev) { if (!_rkSegs.has(leg)) _rkSegs.set(leg, []); _rkSegs.get(leg).push({ s: prev, e: t }); }   // v27.55-mgpisa
         const bruto = t - prev;
         tot += Math.max(0, bruto - Math.min(bruto, deadOverlapMs(leg, prev, t)));
       }
@@ -33691,6 +33713,46 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
       const p = perLegajo.get(leg);
       p.movMs += tot;
       p.movDetail.push({ opcion: "RKB", texto: "racks (estimado: " + libres.length + " movimiento/s sin tramo)", durMs: tot, inferido: true });
+    }
+  }
+  /* v27.55-mgpisa (Thomas D6, 06/10) ≡ gv_monitor_horas_operario_dia (mg_isla / mg_oc / mg_ag): el GUARDADO del día
+     cuenta como la UNIÓN de sus tramos (un MG que repite a otros no suma dos veces) MENOS lo que se pisa con
+     cualquier otra tarea del legajo: tiempo muerto, tramos cerrados de otras tareas, racks inferidos (IR incluido)
+     y lo abierto. Caso Isidro 06/10: MG 10:48 → 16:49 con 4:22 de limpieza y un IR adentro → 1:42. */
+  {
+    const _merge = function (arr) {
+      arr.sort(function (a, b) { return a.s - b.s; });
+      const out = [];
+      for (const it of arr) { const l = out[out.length - 1]; if (l && it.s <= l.e) l.e = Math.max(l.e, it.e); else out.push({ s: it.s, e: it.e }); }
+      return out;
+    };
+    for (const [leg, raw] of _mgRaw) {
+      const islas = _merge(raw.map(function (x) { return { s: x.s, e: x.e }; }));
+      const oc = (deadByLeg.get(String(leg)) || []).map(function (d) { return { s: d.s, e: d.e }; });
+      for (const c of events) {
+        if (String(c.legajo || "").trim() !== leg || !c.ts_inicio || c.opcion === "MG" || c.opcion === "LT") continue;
+        if (DEAD_TIME_CODES.includes(c.opcion) || isoToDayKey(c.ts_cliente) !== dayKey) continue;
+        const a = new Date(c.ts_inicio).getTime(), b = new Date(c.ts_cliente).getTime();
+        if (b > a) oc.push({ s: a, e: b });
+      }
+      for (const s of (_rkSegs.get(leg) || [])) oc.push(s);
+      for (const s of (_mgOcAb.get(leg) || [])) oc.push(s);
+      const ocM = _merge(oc);
+      if (!perLegajo.has(leg)) perLegajo.set(leg, { firstTs: null, lastTs: null,
+        pickedTandas: new Set(), pickedDetail: [], pickMs: 0, armedTandas: new Set(), armedDetail: [], armMs: 0,
+        ccTandas: new Set(), ccDetail: [], ccMs: 0, comidaMs: 0, movMs: 0, movDetail: [], noprodMs: 0, noprodDetail: [],
+        otrosProdMs: 0, otrosProdDetail: [], fjTs: null });
+      const p = perLegajo.get(leg);
+      for (const i of islas) {
+        let pis = 0;
+        for (const o of ocM) { const ov = Math.min(i.e, o.e) - Math.max(i.s, o.s); if (ov > 0) pis += ov; }
+        const bruto = i.e - i.s, dur = Math.max(0, bruto - pis);
+        if (dur <= 0) continue;
+        p.movMs += dur;
+        p.movDetail.push({ opcion: "MG", texto: pis > 0 ? "guardado (sin lo pisado por otras tareas)" : "",
+                           ts_inicio: new Date(i.s).toISOString(), ts_cliente: new Date(i.e).toISOString(),
+                           durMs: dur, brutoMs: bruto, muertoMs: pis });
+      }
     }
   }
   /* v26.67 (D6): las tandas FRENADAS se reparten entre los que las hicieron, cada uno en su día. */
@@ -61072,7 +61134,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.56"></script>
+<script src="importacion.js?v=27.57"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63892,10 +63954,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.56"></script>
-<script src="hotsale.js?v=27.56"></script>
-<script src="estadisticas.js?v=27.56"></script>
-<script src="ads.js?v=27.56"></script>
+<script src="cobranzas.js?v=27.57"></script>
+<script src="hotsale.js?v=27.57"></script>
+<script src="estadisticas.js?v=27.57"></script>
+<script src="ads.js?v=27.57"></script>
 
 </body>
 </html>

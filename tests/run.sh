@@ -140,6 +140,7 @@ echo "== mon-header-codigo (v23.93: sin QR, dos pestanas con subpestanas y el co
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/mon-header-codigo.cjs
 node tests/tiempos-captura.cjs
 node tests/mg-por-codigo.cjs
+node tests/mg-pisa-tarea.cjs
 
 echo "== mon-guardado-camion (v23.64: bajada de racks = actividad · camion = grupo de zonas · pestaña Vista TV) =="
 node tests/mon-guardado-camion.cjs

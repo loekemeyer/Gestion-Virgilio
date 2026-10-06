@@ -5756,6 +5756,22 @@ andar a pesar de que pase en la app"*.
 - `sql/gv_alerta_inactivo_servidor_v2751.sql` (rollback en la cabecera).
 - **v27.54 (Thomas, D5): la JORNADA arranca al FICHAR** (*"deben fichar por el programa con el código de TV y después arrancar la producción"*): `hs_total` de `gv_monitor_horas_operario_dia` (y `gv_horas_operario_detalle_v2`) cuenta desde el primer ingreso del día en `GV_Dispositivo_Login`, no desde el primer evento. Lo que va del ingreso a la primera tarea es tiempo muerto (Franco 06/10: 2:08). Centinela 337, huella re-congelada. `sql/gv_monitor_jornada_fichaje_v2754.sql`.
 
+## ⚠ REGLA (Thomas, 2026-10-06, v27.57): el GUARDADO (MG) cuenta lo suyo — no el tiempo que se pisa con otra tarea
+
+Thomas (D6): *"puede guardarse por mucho tiempo, siempre y cuando se esté guardando o que en el medio se pise con otra
+tarea"*. Caso Isidro (94) 06/10: un MG 10:48 → 16:49 con 4:22 de limpieza y un IR adentro, más un MG 09:30 → 10:48 que
+repetía los tres anteriores (con un RT adentro). La vista sumaba mov 4,97 h + no prod 5,65 h en una jornada de 8,82 h.
+
+- Los MG cerrados del día cuentan como la **UNIÓN de sus tramos** (un MG que repite a otros no suma dos veces) **MENOS
+  lo que se pisa** con cualquier otra tarea del legajo: tiempo muerto, tramos cerrados de otras tareas (RT, CC, TP…),
+  racks inferidos y lo abierto. Isidro 06/10: mov 4,97 → 3,14 h (MG 2,48 + RT 0,53 + racks 0,13).
+- Un **IR adentro de un MG** ya no queda tapado por el MG: cuenta como racks y se le saca al MG.
+- El MG que cruza el día sigue como antes. **D7 (Thomas): lo anulado (EPX/APX) es tiempo muerto** — ya caía ahí: no se cuenta en ningún balde.
+- `gv_monitor_horas_operario_dia` y `gv_horas_operario_detalle_v2` (CTEs `mg_raw` / `mg_isla` / `mg_oc` / `mg_ag`,
+  marcador `v27.55-mgpisa`) ≡ `fetchMonitorDayStats` (bloque `v27.55-mgpisa`). Huella re-congelada (`e32bc4a5…`), el
+  15/09 de `vista-15.json` no cambia. Centinelas 96 (actualizado), 338 y 339.
+  `sql/gv_monitor_horas_mg_pisa_v2757.sql`, `tests/mg-pisa-tarea.cjs`.
+
 ## ⚠ REGLA (06/10/2026, v27.46): el DESHACER (60 s) del operario va por RPC — nunca DELETE
 
 Caso **F46A** (legajo 191, 17:39): el operario tocó «↩ Deshacer» sobre su EP, el celular mandó
