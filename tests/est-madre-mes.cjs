@@ -90,7 +90,7 @@ ok(c.ch && c.ch.filas.length === 6 && c.ch.filas[0].c === "043", "costos CH: 6 f
 /* ---------- C/D) bajada ---------- */
 ok(em.emRotulo("ped", "2026-09") === "Sep 26 Uni" && em.emRotulo("fac", "2026-08") === "Vtas Agosto 2026 Uni", "rótulos de mes como las planillas");
 ok(JSON.stringify(em.emRangoMes("2026-02")) === JSON.stringify({ desde: "2026-02-01", hasta: "2026-02-28" }), "rango del mes");
-const pedLk = { "2026-09": [{ cod: "505", unidades: 26124, cajas: 2177 }, { cod: "026", unidades: 4248, cajas: 118 }, { cod: "561", unidades: null, cajas: 3 }],
+const pedLk = { "2026-09": [{ cod: "505", unidades: 26124, cajas: 2177 }, { cod: "026", unidades: 4248, cajas: 118 }, { cod: "561", unidades: null, cajas: 3 }, { cod: "999E", descripcion: "Pica Ajo Nuevo", unidades: 50, cajas: 1 }],
                 "2026-08": [{ cod: "505", unidades: 20000, cajas: 1 }] };
 const pedCh = { "2026-09": [{ cod: "702EL", unidades: 1680, cajas: 1 }, { cod: "026L", unidades: 100, cajas: 1 }, { cod: "706", unidades: 50, cajas: 1 }], "2026-08": [] };
 const disCh = [{ cod: "702EL", cliente: "2444", razon_social: "Cencosud", fecha: "2026-09-10", cajas: 70, unidades: 1680, tipo: "incorporacion" }];
@@ -119,11 +119,18 @@ ok(ws.C5.c && /Incorporación/.test(ws.C5.c[0].t) && /Cencosud/.test(ws.C5.c[0].
 ok(h.nDis === 1 && h.estilo("C5") === 7 && h.estilo("C3") === 4 && h.estilo("C2") === 2 && h.estilo("D5") === 2 && h.estilo("A5") === 0 && h.estilo("C1") === 1,
    "estilos: 702E 1.680 > 1.000×1,3 celeste+disruptivo (7) · 026 4.348 > 4.000 amarillo (4) · 505 bajo la E.Madre (2) · código 0 · encabezado 1");
 ok(h.nCel === 1 && h.nAma === 1, "cuenta celestes y amarillas");
+/* lo que tenemos y NO está en la planilla: al fondo (un blanco antes), fila entera naranja, con la nota */
+ok(JSON.stringify(h.sueltos) === '["999E"]', "sueltos: 999E (vino " + JSON.stringify(h.sueltos) + ")");
+const rN = (m.lk.filas.length + 3);   /* fila 1 encabezado + filas + 1 blanco → el suelto */
+ok(v("A" + rN) === "999E" && v("B" + rN) === "Pica Ajo Nuevo" && v("C" + rN) === 50 && /No está en la planilla/.test(v("E" + rN)),
+   "el suelto va al fondo con código, descripción, unidades y nota (fila " + rN + ")");
+ok(v("A" + (rN - 1)) === undefined, "un renglón en blanco antes de los sueltos");
+ok(h.estilo("A" + rN) === 8 && h.estilo("C" + rN) === 9 && h.estilo("E" + rN) === 8, "la fila del suelto va entera en naranja (8 texto / 9 número)");
 /* el xlsx de verdad: styles.xml con el fondo amarillo y la letra roja, y la celda con s=3 */
 const cfb = X.CFB.read(new Uint8Array(bytes), { type: "array" });
 const leer = (re) => { const i = cfb.FullPaths.findIndex((p) => re.test(p)); return i < 0 ? "" : new TextDecoder().decode(new Uint8Array(cfb.FileIndex[i].content)); };
 const st = leer(/\/xl\/styles\.xml$/), sh = leer(/\/xl\/worksheets\/sheet1\.xml$/);
-ok(/FFFFFF00/.test(st) && /FFBDD7EE/.test(st) && /FFFF0000/.test(st) && /<cellXfs count="8">/.test(st), "styles.xml: amarillo, celeste, letra roja, 8 estilos");
+ok(/FFFFFF00/.test(st) && /FFBDD7EE/.test(st) && /FFFF0000/.test(st) && /<cellXfs count="10">/.test(st) && /FFFFC000/.test(st), "styles.xml: amarillo, celeste, naranja, letra roja, 10 estilos");
 ok(/<c r="C5" s="7"/.test(sh) && /<c r="C3" s="4"/.test(sh) && /<c r="C2" s="2"/.test(sh) && /<c r="A1" s="1"/.test(sh), "sheet1.xml: C5 s=7, C3 s=4, números s=2, encabezado s=1");
 ok(cfb.FullPaths.some((p) => /comments\d*\.xml$/.test(p)), "el xlsx trae los comentarios");
 /* CH: no suma lo de L */
@@ -176,7 +183,7 @@ ok(/volvió vacío/.test(src) && /No se bajó nada/.test(src), "una RPC vacía o
       window.sb = { rpc: async (name, args) => {
         if (name === "gv_est_plantilla_leer") return { data: [{ clave: "madre_lk", archivo: "x.xlsx", hoja: "Loeke Madre", filas: PL, subido_en: "2026-10-06T12:00:00Z" }], error: null };
         if (name === "gv_isis_estad_pedidos_disruptivos") return { data: [], error: null };
-        if (name === "gv_isis_estad_pedidos") return { data: window.__vacio || args.p_empresa === "ch" ? [] : [{ cod: "505", unidades: 12, cajas: 1 }], error: null };
+        if (name === "gv_isis_estad_pedidos") return { data: window.__vacio || args.p_empresa === "ch" ? [] : [{ cod: "505", unidades: 12, cajas: 1 }].concat(window.__extra ? [{ cod: "999E", descripcion: "Nuevo", unidades: 7, cajas: 1 }] : []), error: null };
         return { data: [], error: null };
       } };
       const d = document.createElement("div"); d.id = "emBar"; document.body.prepend(d);
@@ -194,7 +201,15 @@ ok(/volvió vacío/.test(src) && /No se bajó nada/.test(src), "una RPC vacía o
     const w2 = X.read(fs.readFileSync(await dl.path()), { type: "buffer" });
     const s2 = w2.Sheets[w2.SheetNames[0]];
     ok(s2.A2 && s2.A2.v === 505 && s2.C2 && s2.C2.v === 12, "pantalla: el .xlsx bajado trae 505 → 12 u");
-    await p.evaluate(() => { window.__vacio = true; });
+    /* un código nuestro sin fila en la planilla: AVISA antes de bajar y lo pone al fondo en naranja */
+    await p.evaluate(() => { window.__extra = true; });
+    let aviso = ""; p.once("dialog", (dg) => { aviso = dg.message(); dg.accept(); });
+    const [dl3] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }), p.click("#emOv .sal button")]);
+    ok(/999E/.test(aviso) && /NARANJA/.test(aviso), "pantalla: avisa antes de bajar (" + aviso.slice(0, 80) + ")");
+    const w3 = X.read(fs.readFileSync(await dl3.path()), { type: "buffer" }), s3 = w3.Sheets[w3.SheetNames[0]];
+    const ult = X.utils.decode_range(s3["!ref"]).e.r + 1;
+    ok(s3["A" + ult] && s3["A" + ult].v === "999E" && s3["C" + ult].v === 7, "pantalla: el 999E sale en la última fila");
+    await p.evaluate(() => { window.__extra = false; window.__vacio = true; });
     let bajo = false; p.once("download", () => { bajo = true; });
     await p.click("#emOv .sal button");
     await p.waitForFunction(() => /No se bajó nada/.test(document.querySelector("#emOv .res").textContent), null, { timeout: 5000 });

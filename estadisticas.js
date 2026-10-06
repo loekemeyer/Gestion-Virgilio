@@ -564,6 +564,8 @@ function emAcumular(mapa, filas, campo, soloL) {
     if (soloL) { var m = /^(.*[0-9E])L$/.exec(cod); if (!m) return; cod = m[1]; }
     var k = emKey(cod); if (!k) return;
     var e = mapa[k] || (mapa[k] = { u: 0, sinUxb: 0 });
+    if (!e.cod) e.cod = cod;
+    if (!e.d && x.descripcion) e.d = String(x.descripcion).trim();
     var v = x[campo];
     if (v == null || v === "") e.sinUxb += _eiNum(x.cajas); else e.u += _eiNum(v);
   });
@@ -608,7 +610,10 @@ function emArmarHoja(X, tipo, emp, pl, meses, datos) {
   meses.forEach(function (ym) {
     (pl.filas.some(function (f) { return f.src; }) ? ["lk", "ch"] : ["x"]).forEach(function (sr) {
       var d = (sr === "x" ? datos : (datos[sr] || {}))[ym];
-      if (d) emReubicar(d.u, enPl[sr], sr === "ch" || (sr === "x" && emp === "ch")).forEach(function (k) { sueltos[(sr === "x" ? "" : sr.toUpperCase() + " ") + k] = 1; });
+      if (d) emReubicar(d.u, enPl[sr], sr === "ch" || (sr === "x" && emp === "ch")).forEach(function (k) {
+        var id = sr + "|" + k;
+        if (!sueltos[id]) sueltos[id] = { sr: sr, k: k, cod: (d.u[k] && d.u[k].cod) || k, d: (d.u[k] && d.u[k].d) || "" };
+      });
     });
   });
   (pl.filas || []).forEach(function (f, i) {
@@ -634,14 +639,32 @@ function emArmarHoja(X, tipo, emp, pl, meses, datos) {
       put(r, c0 + j, cell);
     });
   });
-  var nf = (pl.filas || []).length;
-  ws["!ref"] = "A1:" + X.utils.encode_cell({ r: Math.max(nf, 1), c: c0 + meses.length - 1 });
-  ws["!cols"] = [{ wch: 12 }].concat(conDesc ? [{ wch: 34 }] : []).concat(meses.map(function () { return { wch: tipo === "fac" ? 22 : 13 }; }));
+  /* v27.40 (Luis, 06/10): lo que tenemos en nuestra data y NO está en la planilla va AL FONDO, con la fila entera en
+     NARANJA, para que lo ubiquen a mano. Un renglón en blanco antes; la última columna dice de qué empresa es. */
+  var nf = (pl.filas || []).length, naranja = {}, lista = Object.keys(sueltos).map(function (id) { return sueltos[id]; })
+    .sort(function (a, b) { return a.sr === b.sr ? String(a.cod).localeCompare(String(b.cod), "es", { numeric: true }) : (a.sr < b.sr ? 1 : -1); });
+  var cNota = c0 + meses.length;
+  if (lista.length) {
+    nf++;
+    lista.forEach(function (x) {
+      nf++; var r = nf; naranja[r] = true;
+      put(r, 0, /^\d+$/.test(x.cod) ? { t: "n", v: Number(x.cod) } : { t: "s", v: x.cod });
+      if (conDesc) put(r, 1, { t: "s", v: x.d || "" });
+      meses.forEach(function (ym, j) {
+        var d = (x.sr === "x" ? datos : (datos[x.sr] || {}))[ym] || {}, e = (d.u || {})[x.k];
+        put(r, c0 + j, { t: "n", v: e ? Math.round(e.u * 100) / 100 : 0 });
+      });
+      put(r, cNota, { t: "s", v: "No está en la planilla" + (x.sr === "x" ? "" : " (" + (x.sr === "lk" ? "Loeke" : "Chef") + ")") + (x.d && !conDesc ? " · " + x.d : "") + ": ubicarlo a mano" });
+    });
+  }
+  ws["!ref"] = "A1:" + X.utils.encode_cell({ r: Math.max(nf, 1), c: lista.length ? cNota : c0 + meses.length - 1 });
+  ws["!cols"] = [{ wch: 12 }].concat(conDesc ? [{ wch: 34 }] : []).concat(meses.map(function () { return { wch: tipo === "fac" ? 22 : 13 }; })).concat(lista.length ? [{ wch: 48 }] : []);
   return {
-    ws: ws, nDis: nDis, nSin: nSin, nAma: nAma, nCel: nCel, sueltos: Object.keys(sueltos).sort(),
+    ws: ws, nDis: nDis, nSin: nSin, nAma: nAma, nCel: nCel, sueltos: lista.map(function (x) { return (x.sr === "x" ? "" : x.sr.toUpperCase() + " ") + x.cod; }),
     estilo: function (ref) {
       var m = /^([A-Z]+)(\d+)$/.exec(ref); if (!m) return 0;
       if (hdr[Number(m[2]) - 1]) return 1;
+      if (naranja[Number(m[2]) - 1]) return X.utils.decode_col(m[1]) >= c0 && X.utils.decode_col(m[1]) < cNota ? 9 : 8;   /* fila entera naranja */
       if (X.utils.decode_col(m[1]) < c0) return 0;
       var e = disr[ref] || 0, fondo = e % 10, rojo = e >= 10;
       return 2 + fondo * 2 + (rojo ? 1 : 0);   /* 2 número · 3 rojo · 4 amarillo · 5 amarillo+rojo · 6 celeste · 7 celeste+rojo */
@@ -662,7 +685,7 @@ function emPlantillaCostos(lk, ch) {
   return { filas: filas, n: (lk.n || 0) + (ch.n || 0) };
 }
 /* .xlsx con estilos: 0 normal · 1 encabezado negrita centrado · 2 número #,##0 · 3 disruptivo (letra roja negrita)
-   · 4/5 amarillo (> E.Madre) · 6/7 celeste (> E.Madre × 1,3), con o sin disruptivo. SheetJS community no escribe
+   · 4/5 amarillo (> E.Madre) · 6/7 celeste (> E.Madre × 1,3), con o sin disruptivo · 8/9 naranja (sin fila en la planilla). SheetJS community no escribe
    estilos: se reescribe styles.xml. */
 function emXlsxBytes(X, hojas, tam) {
   var wb = X.utils.book_new();
@@ -676,14 +699,16 @@ function emXlsxBytes(X, hojas, tam) {
   var font = function (b, rojo) { return '<font>' + (b ? '<b/>' : '') + '<sz val="' + sz + '"/>' + (rojo ? '<color rgb="FFFF0000"/>' : '') + '<name val="Arial"/><family val="2"/></font>'; };
   st = st.replace(/<numFmts[\s\S]*?<\/numFmts>/, "").replace(/<numFmts[^>]*\/>/, "")
     .replace(/<fonts[\s\S]*?<\/fonts>/, '<fonts count="3">' + font(false) + font(true) + font(true, true) + '</fonts>')
-    .replace(/<fills[\s\S]*?<\/fills>/, '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+    .replace(/<fills[\s\S]*?<\/fills>/, '<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
       '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFBDD7EE"/><bgColor indexed="64"/></patternFill></fill></fills>')
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFBDD7EE"/><bgColor indexed="64"/></patternFill></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFFFC000"/><bgColor indexed="64"/></patternFill></fill></fills>')
     .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, function () {
       var xn = function (font, fill) { return '<xf numFmtId="3" fontId="' + font + '" fillId="' + fill + '" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>'; };
-      return '<cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      return '<cellXfs count="10"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
         '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
-        xn(0, 0) + xn(2, 0) + xn(0, 2) + xn(2, 2) + xn(0, 3) + xn(2, 3) + '</cellXfs>';
+        xn(0, 0) + xn(2, 0) + xn(0, 2) + xn(2, 2) + xn(0, 3) + xn(2, 3) +
+        '<xf numFmtId="0" fontId="1" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/>' + xn(1, 4) + '</cellXfs>';   /* 8/9 naranja: sin fila en la planilla */
     });
   cfb.FileIndex[iSt].content = enc.encode(st);
   var n = 0;
@@ -847,10 +872,16 @@ async function emBajar(k) {
     }));
     var h = emArmarHoja(X, s.tipo, s.emp, pl, meses, datos);
     h.nombre = s.t;
+    /* v27.40: ANTES de bajar se avisa qué códigos nuestros no están en la planilla (van al fondo, en naranja) */
+    if (h.sueltos.length && typeof window !== "undefined" && typeof window.confirm === "function" &&
+        !window.confirm(h.sueltos.length + " código(s) con " + (s.tipo === "ped" ? "pedidos" : "facturación") + " NO están en la planilla:\n\n" +
+          h.sueltos.join(", ") + "\n\nVan al final de la lista con la fila en NARANJA para que los ubiques a mano. ¿Bajar el archivo?")) {
+      _em.busy = false; _em.res = "No se bajó: " + h.sueltos.length + " código(s) sin fila en la planilla (" + h.sueltos.join(", ") + ")."; _em.resErr = true; emPintar(); return false;
+    }
     var nom = s.t.replace(/\s+/g, "_").replace("ó", "o") + "_" + meses.slice().reverse().map(function (ym) { var p = ym.split("-"); return _EI_MES3[Number(p[1]) - 1] + p[0].slice(2); }).join("-") + ".xlsx";
     gvXlsxBajar(emXlsxBytes(X, [h], s.tipo === "fac" ? 14 : 10), nom);
     _em.res = "✓ " + s.t + ": " + meses.length + " mes(es), " + pl.n + " códigos" + (h.nCel ? " · " + h.nCel + " celestes (> E.Madre +30 %)" : "") + (h.nAma ? " · " + h.nAma + " amarillas (> E.Madre)" : "") + (h.nDis ? " · " + h.nDis + " disruptivas" : "") + (h.nSin ? " · " + h.nSin + " sin UxB (ver comentario)" : "") +
-      (h.sueltos.length ? " · ⚠ con venta y SIN FILA en la planilla (no salen): " + h.sueltos.join(", ") : "");
+      (h.sueltos.length ? " · 🟧 " + h.sueltos.length + " sin fila en la planilla, al final en naranja: " + h.sueltos.join(", ") : "");
     _em.resErr = false;
   } catch (e) { _em.res = "No se bajó nada: " + (e && e.message || e); _em.resErr = true; }
   _em.busy = false; emPintar();
