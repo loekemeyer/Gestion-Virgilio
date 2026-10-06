@@ -8009,6 +8009,8 @@ puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBa
   pegar al lado sin correr filas: tabla **`GV_Est_Plantilla`** (`gv_est_plantilla_guardar` / `_leer`, sólo supervisor).
 - **LK suma lo de Chef con L** (031 = 031 LK + 031L Chef), igual que el BUSCARV + SUMAR.SI de las dos planillas.
   Medido ago/26 contra el «costo lk final»: 248 de 249 códigos iguales (598E: 2.568 contra 2.772 de la planilla).
-- Disruptivo (regla v26.20): la celda del mes en **rojo negrita con fondo amarillo** y el detalle como **comentario**.
+- **Colores de la Est. Madre** (su formato condicional, Luis 06/10): **celeste** = el mes pasa la E.Madre × 1,3 · **amarillo** =
+  pasa la E.Madre. La E.Madre de cada código («E.Madre Uni x Mes» col I / «Est Madre Uni» col J) se captura al subir; sin E.Madre, sin color.
+- Disruptivo (regla v26.20): **letra roja negrita** (no pisa el fondo) y el detalle como **comentario**.
   .xlsx con estilos reescribiendo `styles.xml` (`emXlsxBytes`). Sin UxB: 0 con comentario.
 - Una RPC vacía o con error no baja nada. `sql/gv_est_plantilla_v2736.sql`, `tests/est-madre-mes.cjs`.

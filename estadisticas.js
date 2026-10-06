@@ -443,8 +443,10 @@ async function eiBajarTodas() {
        SIEMPRE EN UNIDADES.
    LK suma lo de Chef con L (031 = 031 de LK + 031L de Chef): es la cuenta de las dos planillas
    (BUSCARV + SUMAR.SI.CONJUNTO del código&"L"). Verificado: costos 031 ago/26 = 7.056 + 3.336.
-   Pedido DISRUPTIVO (gv_isis_estad_pedidos_disruptivos, misma regla de la v26.20): la celda del mes
-   va en rojo y negrita con fondo amarillo y el detalle como COMENTARIO de esa celda.
+   Colores de la Est. Madre (su formato condicional, Luis 06/10): celeste = el mes pasa la E.Madre × 1,3 ·
+   amarillo = pasa la E.Madre (columna «E.Madre Uni x Mes» / «Est Madre Uni», capturada al subir).
+   Pedido DISRUPTIVO (gv_isis_estad_pedidos_disruptivos, regla v26.20): letra roja negrita y el detalle
+   como COMENTARIO de esa celda.
    Plantillas: tabla GV_Est_Plantilla (sql/gv_est_plantilla_v2736.sql). Candado: tests/est-madre-mes.cjs.
    ============================================================================ */
 
@@ -457,7 +459,7 @@ function _emEsCodigo(s) { return /^[0-9A-Z][0-9A-Z.\-\/]{0,13}$/i.test(String(s)
 function _emTxt(cell) { return cell == null || cell.v == null ? "" : String(cell.v).trim(); }
 
 /* filas de una plantilla a partir de una columna de códigos, desde la fila r0 hasta la última con código */
-function _emFilas(ws, X, colCod, colDesc, r0, rFin, cortarEnVacio) {
+function _emFilas(ws, X, colCod, colDesc, r0, rFin, cortarEnVacio, colEm) {
   var filas = [], ult = -1;
   for (var r = r0; r <= rFin; r++) {
     var c = ws[X.utils.encode_cell({ r: r, c: colCod })];
@@ -470,7 +472,9 @@ function _emFilas(ws, X, colCod, colDesc, r0, rFin, cortarEnVacio) {
     if (v == null) { filas.push({ c: null }); continue; }
     var t = String(v).trim();
     if (c.t !== "n" && !_emEsCodigo(t)) { filas.push({ c: null, t: t }); ult = filas.length - 1; continue; }
-    filas.push(c.t === "n" ? { c: String(v), n: true, d: d } : { c: t, d: d });
+    var f = c.t === "n" ? { c: String(v), n: true, d: d } : { c: t, d: d };
+    if (colEm != null) { var ce = ws[X.utils.encode_cell({ r: r, c: colEm })]; if (ce && ce.t === "n" && isFinite(ce.v)) f.em = ce.v; }
+    filas.push(f);
     ult = filas.length - 1;
   }
   return filas.slice(0, ult + 1);
@@ -495,12 +499,17 @@ function emParsearMadre(X, wb) {
       var ws = wb.Sheets[nom]; if (!ws || !ws["!ref"]) return;
       var enc = _emBuscarEnc(ws, X, /^cod(\.|igo)?\s*(nuevo\s*)?isis$/i, 15);
       if (!enc) return;
-      var de = null;
-      for (var c = 0; c <= 30; c++) { var t = _emTxt(ws[X.utils.encode_cell({ r: enc.r, c: c })]); if (/^descrip/i.test(t)) { de = c; break; } }
+      var de = null, ce = null;
+      for (var c = 0; c <= 30; c++) {
+        var t = _emTxt(ws[X.utils.encode_cell({ r: enc.r, c: c })]);
+        if (de == null && /^descrip/i.test(t)) de = c;
+        /* «E.Madre Uni x Mes» (LK, col I) / «Est Madre Uni» (CH, col J): la de HOY, no las «… 10/25» de la derecha */
+        if (ce == null && /^e(st)?\.?\s*madre\s*uni(\s*x\s*mes)?$/i.test(t.replace(/\s+/g, " "))) ce = c;
+      }
       var rg = X.utils.decode_range(ws["!ref"]);
-      var filas = _emFilas(ws, X, enc.c, de, enc.r + 1, rg.e.r, false);
+      var filas = _emFilas(ws, X, enc.c, de, enc.r + 1, rg.e.r, false, ce);
       var n = filas.filter(function (f) { return f.c; }).length;
-      if (!mejor || n > mejor.n) mejor = { hoja: nom, filas: filas, n: n, meta: { fila_enc: enc.r + 1, col_cod: X.utils.encode_col(enc.c), fila_desde: enc.r + 2 } };
+      if (!mejor || n > mejor.n) mejor = { hoja: nom, filas: filas, n: n, meta: { fila_enc: enc.r + 1, col_cod: X.utils.encode_col(enc.c), fila_desde: enc.r + 2, col_em: ce == null ? null : X.utils.encode_col(ce) } };
     });
     if (mejor && mejor.n >= 5) out[par[0]] = mejor;
   });
@@ -563,7 +572,7 @@ function emDisAcumular(mapa, filas, soloL) {
 /* arma la hoja. tipo "ped" (A cód · B descripción · meses) o "fac" (A cód · meses).
    datos[ym] = { u: {clave: {u, sinUxb}}, dis: {clave: [...]} }. Devuelve { ws, estilo(col,row) } */
 function emArmarHoja(X, tipo, emp, pl, meses, datos) {
-  var ws = {}, conDesc = tipo === "ped", c0 = conDesc ? 2 : 1, disr = {}, nDis = 0, nSin = 0;
+  var ws = {}, conDesc = tipo === "ped", c0 = conDesc ? 2 : 1, disr = {}, nDis = 0, nSin = 0, nAma = 0, nCel = 0;
   var put = function (r, c, cell) { ws[X.utils.encode_cell({ r: r, c: c })] = cell; };
   put(0, 0, { t: "s", v: tipo === "fac" ? (emp === "lk" ? "Loeke" : "Chef") : (emp === "lk" ? "Cod Nuevo Isis" : "Cod. Isis") });
   if (conDesc) put(0, 1, { t: "s", v: "Descripcion" });
@@ -578,7 +587,11 @@ function emArmarHoja(X, tipo, emp, pl, meses, datos) {
       var d = datos[ym] || {}, e = (d.u || {})[k], lista = (d.dis || {})[k];
       var cell = { t: "n", v: e ? Math.round(e.u * 100) / 100 : 0 };
       var notas = [];
-      if (lista && lista.length) { notas.push(eiDisrupTexto(lista, emp).split(" | ").join("\n")); disr[X.utils.encode_cell({ r: r, c: c0 + j })] = 1; nDis++; }
+      var ref = X.utils.encode_cell({ r: r, c: c0 + j }), est = 0;
+      /* colores de la Est. Madre (Luis, 06/10, su formato condicional): celeste = mes > E.Madre × 1,3 · amarillo = mes > E.Madre */
+      if (tipo === "ped" && f.em > 0 && cell.v > f.em) { est = cell.v > f.em * 1.3 ? 2 : 1; if (est === 2) nCel++; else nAma++; }
+      if (lista && lista.length) { notas.push(eiDisrupTexto(lista, emp).split(" | ").join("\n")); est += 10; nDis++; }
+      if (est) disr[ref] = est;
       if (e && e.sinUxb) { notas.push("Sin UxB cargada: " + _eiN(e.sinUxb, 1) + " cajas no se pudieron pasar a unidades."); nSin++; }
       if (notas.length) { cell.c = [{ a: "Gestion", t: notas.join("\n\n") }]; cell.c.hidden = true; }
       put(r, c0 + j, cell);
@@ -588,17 +601,19 @@ function emArmarHoja(X, tipo, emp, pl, meses, datos) {
   ws["!ref"] = "A1:" + X.utils.encode_cell({ r: Math.max(nf, 1), c: c0 + meses.length - 1 });
   ws["!cols"] = [{ wch: 12 }].concat(conDesc ? [{ wch: 34 }] : []).concat(meses.map(function () { return { wch: tipo === "fac" ? 22 : 13 }; }));
   return {
-    ws: ws, nDis: nDis, nSin: nSin,
+    ws: ws, nDis: nDis, nSin: nSin, nAma: nAma, nCel: nCel,
     estilo: function (ref) {
       var m = /^([A-Z]+)(\d+)$/.exec(ref); if (!m) return 0;
       if (m[2] === "1") return 1;
-      if (disr[ref]) return 3;
-      return X.utils.decode_col(m[1]) >= c0 ? 2 : 0;
+      if (X.utils.decode_col(m[1]) < c0) return 0;
+      var e = disr[ref] || 0, fondo = e % 10, rojo = e >= 10;
+      return 2 + fondo * 2 + (rojo ? 1 : 0);   /* 2 número · 3 rojo · 4 amarillo · 5 amarillo+rojo · 6 celeste · 7 celeste+rojo */
     }
   };
 }
-/* .xlsx con estilos: 0 normal · 1 encabezado negrita centrado · 2 número #,##0 · 3 disruptivo
-   (rojo, negrita, fondo amarillo). SheetJS community no escribe estilos: se reescribe styles.xml. */
+/* .xlsx con estilos: 0 normal · 1 encabezado negrita centrado · 2 número #,##0 · 3 disruptivo (letra roja negrita)
+   · 4/5 amarillo (> E.Madre) · 6/7 celeste (> E.Madre × 1,3), con o sin disruptivo. SheetJS community no escribe
+   estilos: se reescribe styles.xml. */
 function emXlsxBytes(X, hojas, tam) {
   var wb = X.utils.book_new();
   hojas.forEach(function (h) { X.utils.book_append_sheet(wb, h.ws, String(h.nombre).slice(0, 31)); });
@@ -611,12 +626,15 @@ function emXlsxBytes(X, hojas, tam) {
   var font = function (b, rojo) { return '<font>' + (b ? '<b/>' : '') + '<sz val="' + sz + '"/>' + (rojo ? '<color rgb="FFFF0000"/>' : '') + '<name val="Arial"/><family val="2"/></font>'; };
   st = st.replace(/<numFmts[\s\S]*?<\/numFmts>/, "").replace(/<numFmts[^>]*\/>/, "")
     .replace(/<fonts[\s\S]*?<\/fonts>/, '<fonts count="3">' + font(false) + font(true) + font(true, true) + '</fonts>')
-    .replace(/<fills[\s\S]*?<\/fills>/, '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
-      '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill></fills>')
-    .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
-      '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
-      '<xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>' +
-      '<xf numFmtId="3" fontId="2" fillId="2" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/></cellXfs>');
+    .replace(/<fills[\s\S]*?<\/fills>/, '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFBDD7EE"/><bgColor indexed="64"/></patternFill></fill></fills>')
+    .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, function () {
+      var xn = function (font, fill) { return '<xf numFmtId="3" fontId="' + font + '" fillId="' + fill + '" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1"/>'; };
+      return '<cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+        '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
+        xn(0, 0) + xn(2, 0) + xn(0, 2) + xn(2, 2) + xn(0, 3) + xn(2, 3) + '</cellXfs>';
+    });
   cfb.FileIndex[iSt].content = enc.encode(st);
   var n = 0;
   cfb.FullPaths.forEach(function (p, i) {
@@ -746,7 +764,8 @@ function emPintar() {
     }).join("") + '</div>' +
     (_em.res ? '<div class="res' + (_em.resErr ? ' err' : '') + '">' + _eiEsc(_em.res) + '</div>' : '') +
     '<div class="nota">Pedidos salen en el orden de la Est. Madre y Facturación en el de Costos, una columna por mes del más nuevo al más viejo, listos para pegar. LK incluye lo de Chef con L. ' +
-    'Un pedido disruptivo (±50 % del promedio de ese cliente en 12 meses, o incorporación) va en <b>rojo con fondo amarillo</b> y el detalle como comentario de la celda.</div>' +
+    'Colores de la Est. Madre: <b style="background:#bdd7ee">celeste</b> = el mes pasa la E.Madre en más de 30 % · <b style="background:#ffff00">amarillo</b> = pasa la E.Madre. ' +
+    'Un pedido disruptivo (±50 % del promedio de ese cliente en 12 meses, o incorporación) va en <b style="color:#dc2626">letra roja</b> y el detalle como comentario de la celda.</div>' +
     '<button type="button" class="x" onclick="emCerrar()">Cerrar</button></div>';
 }
 async function emBajar(k) {
@@ -776,7 +795,7 @@ async function emBajar(k) {
     h.nombre = s.t;
     var nom = s.t.replace(/\s+/g, "_").replace("ó", "o") + "_" + meses.slice().reverse().map(function (ym) { var p = ym.split("-"); return _EI_MES3[Number(p[1]) - 1] + p[0].slice(2); }).join("-") + ".xlsx";
     gvXlsxBajar(emXlsxBytes(X, [h], s.tipo === "fac" ? 14 : 10), nom);
-    _em.res = "✓ " + s.t + ": " + meses.length + " mes(es), " + pl.n + " códigos" + (h.nDis ? " · " + h.nDis + " celdas disruptivas" : "") + (h.nSin ? " · " + h.nSin + " sin UxB (ver comentario)" : "");
+    _em.res = "✓ " + s.t + ": " + meses.length + " mes(es), " + pl.n + " códigos" + (h.nCel ? " · " + h.nCel + " celestes (> E.Madre +30 %)" : "") + (h.nAma ? " · " + h.nAma + " amarillas (> E.Madre)" : "") + (h.nDis ? " · " + h.nDis + " disruptivas" : "") + (h.nSin ? " · " + h.nSin + " sin UxB (ver comentario)" : "");
     _em.resErr = false;
   } catch (e) { _em.res = "No se bajó nada: " + (e && e.message || e); _em.resErr = true; }
   _em.busy = false; emPintar();
