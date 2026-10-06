@@ -1171,4 +1171,6 @@ echo "== stk-est-madre-orden (v26.79-82: rótulos de Stocks, Est. Madre incluida
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/stk-est-madre-orden.cjs
 echo "== ppp-ent-fecha-pedido (v26.69: Pedidos Entregados muestra la fecha en que llegó el pedido del cliente) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-ent-fecha-pedido.cjs
+echo "== rcp-comentarios (v27.12: botón de comentarios por recepción, hilo append-only, mismo 'quién' que Recibido) =="
+node tests/rcp-comentarios.cjs
 _resumen

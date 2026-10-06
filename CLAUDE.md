@@ -7805,3 +7805,20 @@ public.gv_alerta_gondola_llena_telegram(true);`. Centinela 322. `sql/gv_alerta_g
 - Front: botoncito **P#** en «Cómo llegó a este día» del Resumen → pop-up (por qué frenó · lo evaluado antes · por qué
   no siguió · la tanda). Al agregar o reordenar un pase del armador, sumar su `set_config` y su fila al catálogo.
 - `sql/gv_ppp_np_pauta_v2705.sql`, centinela 336, `tests/ppp-res-origen.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-06, v27.12): COMENTARIOS por recepción en Pendientes (Recepción de Mercadería)
+
+Botón redondo 📓 en el encabezado de cada tarjeta de Pendientes (`recepcion.js`, `pendCard` → `pendComentBtn`):
+abre un **hilo** de comentarios sobre el estado de esa recepción. Badge azul con el conteo (batch al abrir,
+`pendComentConteos`).
+
+- **Append-only en `GV_Recepcion_Comentarios`** (`id`, `recepcion_id` → `Control_Modo_OP(id)`, `autor`, `texto`,
+  `created_at`): anon **SELECT + INSERT**, nunca UPDATE/DELETE (es un log, como `GV_Cuarentena_Comentarios`). RLS on,
+  policies `gv_rcpc_sel`/`gv_rcpc_ins`. Se instaló con `select public.gv_rcp_coment_instalar();` (DDL de 1.er nivel se
+  cuelga en el MCP; va adentro de la función).
+- **Mismo "quién escribe" que Recibido**: chips Nora/Pablo/Otro de `GV_Recepcion_Receptores` (`pendReceptoresLista` +
+  `pendNombreCap` + `pendReceptorGuardar`), reusados dentro del cuadro de comentarios.
+- **No frena nada**: no toca el checklist ni el botón Enviar; se puede comentar aunque la recepción no esté completa.
+- Si la lectura del hilo falla, lo dice; no se queda vacío ("no pude leer" no es "sin comentarios").
+- **Chequeo:** `node tests/rcp-comentarios.cjs` (candado estático: las funciones de `recepcion.js` son de módulo, no
+  viven en `window`).
