@@ -58,7 +58,7 @@ button {
 .auth-divider::before, .auth-divider::after {
   content: ""; flex: 1; height: 1px; background: #dadce0;
 }
-#legajoLoginInput {
+#legajoLoginInput, #nombreLoginInput {
   width: 100%; font-size: 22px; padding: 12px; text-align: center;
   border: 1px solid #dadce0; border-radius: 6px; box-sizing: border-box;
 }
@@ -6323,7 +6323,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.54"></script>
+<script type="module" src="recepcion.js?v=27.55"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6390,6 +6390,11 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div id="tvLegajoStep" class="hidden">
         <input id="legajoLoginInput" type="number" inputmode="numeric" placeholder="Tu número de legajo">
         <button class="primary-btn" onclick="loginWithLegajo()">Entrar con legajo</button>
+        <!-- v27.37 (Thomas): el que no tiene legajo tipea su nombre y entra; queda para que un admin lo valide. -->
+        <div class="auth-divider"><span>o</span></div>
+        <div class="tvclave-lbl">No tengo legajo todavía</div>
+        <input id="nombreLoginInput" type="text" autocomplete="off" placeholder="Tu nombre y apellido" onkeydown="if(event.key==='Enter')loginConNombre()">
+        <button class="primary-btn" onclick="loginConNombre()">Entrar con mi nombre</button>
       </div>
       <div id="legajoLoginError" class="small error"></div>
     </div>
@@ -6723,6 +6728,8 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <button class="sup-action-btn" onclick="cfgGo(openZonasMapa)" title="Geocodifica las direcciones y las muestra en un mapa por zona, marcando desajustes"><span class="sup-ico">📍</span><span>Mapa de zonas</span></button>
         <!-- v23.93 (Luis, 29/09): vino del panel supervisor. El badge lo sigue poniendo dpLoadBadge() al entrar. -->
         <button class="sup-action-btn" onclick="cfgGo(openDatosProducto)" style="position:relative;" title="Artículos a los que les falta m³, unidades por caja o descripción"><span class="sup-ico">🚦</span><span>Completar datos producto</span><span id="dpBadge" class="dp-badge" style="display:none;"></span></button>
+        <!-- v27.37 (Thomas): validar los nombres que se cargaron solos en el login y darles legajo; ver y sacar los de la lista -->
+        <button class="sup-action-btn" onclick="cfgGo(openValidarOperarios)" style="position:relative;" title="Aceptar los operarios que entraron tipeando su nombre (darles legajo) y sacar los que ya están en la lista"><span class="sup-ico">🧑‍🏭</span><span>Validar Operarios</span><span id="voBadge" class="dp-badge" style="display:none;"></span></button>
       </div>
       <!-- idea 5162: los interruptores del pipeline web, visibles (sólo lectura; se cambian por SQL a pedido del dueño) -->
       <div class="sup-cfg" id="pwebCfgRow" style="max-width:none;margin:16px auto 0;">
@@ -6758,6 +6765,24 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
       <div class="planim-sec-t">Autorizados</div>
       <div id="mailsList" class="planim-list"></div>
       <div id="mailsStatus" class="planim-status"></div>
+    </div>
+  </div>
+
+  <!-- v27.37 (Thomas): Validar Operarios — los nombres que se cargaron solos en el login
+       (GV_Operario_Alta). Validar = darle legajo (lo crea en Empleados y lo pone en la lista
+       del login). Sacar = quitarlo. -->
+  <div id="validarOperariosOverlay" class="recp-admin-overlay">
+    <div class="recp-admin-bar">
+      <span class="recp-admin-title">🧑‍🏭 Validar Operarios</span>
+      <button class="recp-admin-close" onclick="closeValidarOperarios()">Cerrar</button>
+    </div>
+    <div class="planim-body">
+      <div class="planim-hint">Los que entraron tipeando su nombre (sin legajo) aparecen acá. <b>Validar</b> = darle un número de legajo: a partir de ahí cuenta como operario real (monitor, puntaje) y queda de un toque en la lista del login. <b>Sacar</b> lo quita.</div>
+      <div class="planim-sec-t">⏳ Pendientes de validar</div>
+      <div id="voPendientes" class="planim-list"></div>
+      <div class="planim-sec-t" style="margin-top:14px;">✅ Validados (agregados a mano)</div>
+      <div id="voValidados" class="planim-list"></div>
+      <div id="voStatus" class="planim-status"></div>
     </div>
   </div>
 
@@ -10572,7 +10597,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.54";
+const APP_VERSION = "v27.55";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -45024,6 +45049,7 @@ function openConfiguracion() {
   if (ov) ov.classList.add("show");
   try { loadSsgSwitch(); } catch (_e) {}
   try { loadPwebCfg(); } catch (_e) {}   // idea 5162
+  try { voLoadBadge(); } catch (_e) {}   // v27.37: operarios pendientes de validar
 }
 /* idea 5162 — los interruptores del pipeline web, visibles en Configuración. Sólo lectura: cambiarlos
    es una decisión del dueño y se hace por SQL (PPP_Web_Config), acá se ve qué quedó prendido. */
@@ -45115,6 +45141,108 @@ async function mailsDelete(email) {
     mailsRender(); mailsSetStatus("✓ " + e + " sacado.", true);
   } catch (_e) { mailsSetStatus("Sin conexión: no se borró.", false); }
 }
+
+/* ===== v27.37 (Thomas): Validar Operarios =====================================
+   Los nombres que un operario cargó solo en el login (sin legajo) quedan en
+   GV_Operario_Alta como 'pendiente'. El admin los valida (les da un legajo: se
+   crean en Empleados y entran a la lista del login) o los saca. Backend:
+   gv_operario_alta_lista / _validar / _sacar (supervisor). ============================= */
+let _voData = null;
+function voFechaHora(iso) {
+  try {
+    const d = new Date(iso); if (isNaN(d.getTime())) return "";
+    const p = function (n) { return String(n).padStart(2, "0"); };
+    return p(d.getDate()) + "/" + p(d.getMonth() + 1) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  } catch (_e) { return ""; }
+}
+function voSetStatus(msg, ok) {
+  const el = document.getElementById("voStatus");
+  if (el) { el.textContent = msg || ""; el.style.color = (ok === false) ? "#b42318" : "#166534"; }
+}
+function openValidarOperarios() {
+  if (!requireSupervisor()) return;
+  const ov = document.getElementById("validarOperariosOverlay");
+  if (ov) ov.classList.add("show");
+  voSetStatus("Cargando…");
+  voLoad();
+}
+function closeValidarOperarios() {
+  const ov = document.getElementById("validarOperariosOverlay");
+  if (ov) ov.classList.remove("show");
+}
+async function voLoad() {
+  try {
+    const r = await sb.rpc("gv_operario_alta_lista");
+    if (r.error) { voSetStatus("Error: " + r.error.message, false); return; }
+    _voData = r.data || { pendientes: [], validados: [] };
+    voRender(); voSetStatus("");
+  } catch (_e) { voSetStatus("Sin conexión: probá de nuevo.", false); }
+}
+function voRender() {
+  const d = _voData || { pendientes: [], validados: [] };
+  const pend = document.getElementById("voPendientes");
+  const val = document.getElementById("voValidados");
+  if (pend) {
+    const rows = (d.pendientes || []).map(function (o) {
+      const n = escapeHtml(o.nombre);
+      const cuando = o.creado_at ? voFechaHora(o.creado_at) : "";
+      return '<div class="mails-row" style="flex-wrap:wrap;gap:6px;">' +
+        '<span class="mails-mail"><b>' + n + '</b>' + (cuando ? ' <span class="small" style="color:#64748b;">· ' + cuando + '</span>' : '') + '</span>' +
+        '<input id="voLeg' + o.id + '" type="number" inputmode="numeric" placeholder="Legajo" style="width:96px;font-size:16px;padding:6px;border:1px solid #dadce0;border-radius:6px;box-sizing:border-box;">' +
+        '<button class="planim-btn-save" onclick="voValidar(' + o.id + ')">Validar</button>' +
+        '<button class="planim-btn-del" onclick="voSacar(' + o.id + ',\'' + n.replace(/'/g, "\\'") + '\')">Sacar</button>' +
+        '</div>';
+    }).join("");
+    pend.innerHTML = rows || '<div class="planim-empty">No hay operarios esperando validación.</div>';
+  }
+  if (val) {
+    const rows = (d.validados || []).map(function (o) {
+      const n = escapeHtml(o.nombre);
+      return '<div class="mails-row">' +
+        '<span class="mails-mail"><b>' + n + '</b> <span class="small" style="color:#64748b;">· legajo ' + escapeHtml(String(o.legajo || "")) + '</span></span>' +
+        '<button class="planim-btn-del" onclick="voSacar(' + o.id + ',\'' + n.replace(/'/g, "\\'") + '\')">Sacar</button>' +
+        '</div>';
+    }).join("");
+    val.innerHTML = rows || '<div class="planim-empty">Todavía no validaste a nadie a mano.</div>';
+  }
+}
+async function voValidar(id) {
+  const inp = document.getElementById("voLeg" + id);
+  const leg = inp ? String(inp.value || "").replace(/\D/g, "") : "";
+  if (!leg) { voSetStatus("Poné el número de legajo que le vas a dar.", false); return; }
+  if (leg === "0" || leg === "1" || leg === "600") { voSetStatus("Ese legajo no se puede usar (0, 1 ni 600).", false); return; }
+  voSetStatus("Validando…");
+  try {
+    const r = await sb.rpc("gv_operario_alta_validar", { p_id: id, p_legajo: leg });
+    if (r.error) { voSetStatus("Error: " + r.error.message, false); return; }
+    const res = r.data || {};
+    voSetStatus("✓ Validado como legajo " + leg + (res.empleado_ya_existia ? " (ya existía en Empleados)." : " (operario nuevo)."), true);
+    voLoad(); voLoadBadge();
+  } catch (_e) { voSetStatus("Sin conexión: no se validó.", false); }
+}
+async function voSacar(id, nombre) {
+  if (!confirm("¿Sacar a " + (nombre || "este operario") + "?")) return;
+  voSetStatus("Sacando…");
+  try {
+    const r = await sb.rpc("gv_operario_alta_sacar", { p_id: id });
+    if (r.error) { voSetStatus("Error: " + r.error.message, false); return; }
+    voSetStatus("✓ Sacado.", true);
+    voLoad(); voLoadBadge();
+  } catch (_e) { voSetStatus("Sin conexión: no se sacó.", false); }
+}
+async function voLoadBadge() {
+  const b = document.getElementById("voBadge"); if (!b) return;
+  try {
+    const r = await sb.rpc("gv_operario_alta_lista");
+    if (r.error || !r.data) { b.style.display = "none"; return; }
+    const n = (r.data.pendientes || []).length;
+    if (n > 0) { b.textContent = n; b.style.display = ""; } else { b.style.display = "none"; }
+  } catch (_e) { b.style.display = "none"; }
+}
+window.openValidarOperarios = openValidarOperarios;
+window.closeValidarOperarios = closeValidarOperarios;
+window.voValidar = voValidar;
+window.voSacar = voSacar;
 
 /* ===== Editor de Talleristas de Recepción — tabla Supabase "Codigos X Tallerista"
    (id, Nombre, Linea LK/CH, Codigo). La RLS ya permite que authenticated (supervisor
@@ -60947,7 +61075,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.54"></script>
+<script src="importacion.js?v=27.55"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61657,6 +61785,30 @@ window.loginWithLegajo = async function () {
   __identity = { type: "operario", emp: emp, nombre: emp.nombre || ("Legajo " + emp.legajo) };
   __plantChosen = false;
   window.__gvLoginMetodo = "legajo";
+  _routeAfterAuth();
+};
+
+/* v27.37 (Thomas): el operario que no está en la lista ni tiene legajo tipea su nombre y
+   entra YA — trabaja con el legajo compartido 600 (nombre sellado en cada evento, igual que
+   la prueba: descuenta stock de verdad). Queda anotado en GV_Operario_Alta para que un admin
+   lo valide (Configuración → Validar Operarios); al validarlo recibe su propio legajo. */
+window.loginConNombre = async function () {
+  const input = $("nombreLoginInput");
+  const errEl = $("legajoLoginError");
+  if (errEl) errEl.textContent = "";
+  const nombre = input ? String(input.value || "").replace(/\s+/g, " ").trim() : "";
+  if (nombre.length < 3) { if (errEl) errEl.textContent = "Poné tu nombre y apellido."; return; }
+  try {
+    let disp = ""; try { disp = (typeof gvDispositivoId === "function") ? gvDispositivoId() : ""; } catch (_e) {}
+    fetch(SB_URL + "/rest/v1/rpc/gv_operario_alta_crear", { method: "POST",
+      headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_nombre: nombre, p_dispositivo: disp }) });
+  } catch (_e) {}
+  const emp = { legajo: INTERVIEW_LEGAJO, nombre: nombre };
+  saveLegajoSession(emp, todayKeyBsAs() || "");
+  __identity = { type: "operario", emp: emp, nombre: nombre };
+  __plantChosen = false;
+  window.__gvLoginMetodo = "nombre";
   _routeAfterAuth();
 };
 
@@ -63771,10 +63923,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.54"></script>
-<script src="hotsale.js?v=27.54"></script>
-<script src="estadisticas.js?v=27.54"></script>
-<script src="ads.js?v=27.54"></script>
+<script src="cobranzas.js?v=27.55"></script>
+<script src="hotsale.js?v=27.55"></script>
+<script src="estadisticas.js?v=27.55"></script>
+<script src="ads.js?v=27.55"></script>
 
 </body>
 </html>

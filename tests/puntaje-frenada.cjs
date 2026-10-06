@@ -40,12 +40,16 @@ else {
   const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
   const n1 = (x) => (Math.round((Number(x) || 0) * 10) / 10).toFixed(1).replace(".", ",");
   const t = (tanda, fr) => ({ tanda, fecha: "05/10", nivel: "Alta", grado: 7, lineas: 13, cajas: 40, paradas: 11, esc: 6, tamano: 20.3, real: 23.4, indice: 0.87, frenada: fr });
-  const run = (det) => new Function("esc", "n1", "PUNT", "PUNT_ERR", adm.slice(i0, i1) + "; return popPuntaje('104');")(
+  // popPuntaje usa hm() → nH() (v23.70, formateador H:MM definido arriba en admin.html, fuera del slice):
+  // inyectamos su FUENTE real (no una copia) para que el eval lo tenga en scope.
+  const _nH0 = adm.indexOf("function nH(");
+  const nHsrc = _nH0 >= 0 ? adm.slice(_nH0, adm.indexOf("}", _nH0) + 1) : "";
+  const run = (det) => new Function("esc", "n1", "PUNT", "PUNT_ERR", nHsrc + "\n" + adm.slice(i0, i1) + "; return popPuntaje('104');")(
     esc, n1, { "104": { nombre: "Isidro", tandas: 12, indice_ult: 1.1, puntaje_ult: 6, indice_per: 1.1, puntaje_per: 6, publicable: true, tramos: [1.1], detalle: det } }, "");
   const con = run([t("ZZ99Z", true), t("F13E", false)]);
   if (!con.includes("ZZ99Z ⏸")) fallas.push("B) la tanda frenada no lleva ⏸ en el pop-up");
   if (con.includes("F13E ⏸")) fallas.push("B) una tanda sin freno salió con ⏸");
-  if (!con.includes("tanda frenada: entra sólo la parte que pickeó este operario")) fallas.push("B) falta la nota de la frenada");
+  if (!con.includes("tanda frenada: sólo la parte que pickeó este operario")) fallas.push("B) falta la nota de la frenada");
   const sin = run([t("F13E", false)]);
   if (sin.includes("⏸") || sin.includes("tanda frenada")) fallas.push("B) sin frenadas no tiene que haber ⏸ ni nota");
 }
