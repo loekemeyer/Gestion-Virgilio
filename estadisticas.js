@@ -507,9 +507,18 @@ function emParsearMadre(X, wb) {
         if (ce == null && /^e(st)?\.?\s*madre\s*uni(\s*x\s*mes)?$/i.test(t.replace(/\s+/g, " "))) ce = c;
       }
       var rg = X.utils.decode_range(ws["!ref"]);
-      var filas = _emFilas(ws, X, enc.c, de, enc.r + 1, rg.e.r, false, ce);
+      /* v27.38 (Luis, 06/10): «COD ART es lo importante, es lo que trackeamos». Si la hoja tiene «Cod.Art.»
+         (Chef Madre: B y D), manda esa columna —la que más códigos tiene— y no «Cod. Isis», que en Chef guarda
+         códigos viejos de ISIS (7053800, «H Lider») en los discontinuados. LK no tiene «Cod.Art.»: sigue «Cod Nuevo Isis». */
+      var colCod = enc.c, mejorArt = -1;
+      for (var ca = 0; ca <= 30; ca++) {
+        if (!/^cod\.?\s*art/i.test(_emTxt(ws[X.utils.encode_cell({ r: enc.r, c: ca })]))) continue;
+        var nArt = _emFilas(ws, X, ca, null, enc.r + 1, rg.e.r, false).filter(function (f) { return f.c; }).length;
+        if (nArt > mejorArt) { mejorArt = nArt; colCod = ca; }
+      }
+      var filas = _emFilas(ws, X, colCod, de, enc.r + 1, rg.e.r, false, ce);
       var n = filas.filter(function (f) { return f.c; }).length;
-      if (!mejor || n > mejor.n) mejor = { hoja: nom, filas: filas, n: n, meta: { fila_enc: enc.r + 1, col_cod: X.utils.encode_col(enc.c), fila_desde: enc.r + 2, col_em: ce == null ? null : X.utils.encode_col(ce) } };
+      if (!mejor || n > mejor.n) mejor = { hoja: nom, filas: filas, n: n, meta: { fila_enc: enc.r + 1, col_cod: X.utils.encode_col(colCod), fila_desde: enc.r + 2, col_em: ce == null ? null : X.utils.encode_col(ce) } };
     });
     if (mejor && mejor.n >= 5) out[par[0]] = mejor;
   });

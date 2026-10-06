@@ -77,9 +77,9 @@ ok(fl[4] && fl[4].c === null && fl[4].t === "Articulos  Discontinuos", "madre LK
 ok(m.lk && m.lk.meta.col_cod === "E" && m.lk.meta.fila_desde === 5 && m.lk.meta.col_em === "I", "madre LK: meta col E desde fila 5, E.Madre en I");
 ok(fl[0] && fl[0].em === 30000 && fl[1].em === 4000, "madre LK: captura la E.Madre de cada código");
 ok(m.ch && m.ch.meta.col_em === "J" && m.ch.filas[0].em === 1500, "madre CH: E.Madre en «Est Madre Uni» (J)");
-ok(m.ch && m.ch.hoja === "Chef Madre - 7-26" && m.ch.meta.col_cod === "F", "madre CH: «Chef Madre», columna «Cod. Isis» (F)");
+ok(m.ch && m.ch.hoja === "Chef Madre - 7-26" && /^[BD]$/.test(m.ch.meta.col_cod), "madre CH: «Chef Madre», manda «Cod.Art.» (la columna con más códigos), no «Cod. Isis» (vino " + (m.ch && m.ch.meta.col_cod) + ")");
 const fc = m.ch ? m.ch.filas : [];
-ok(fc[1] && fc[1].c === "099" && fc[3] && fc[3].c === null && fc[3].t === "H Lider", "madre CH: '099' texto y «H Lider» como título");
+ok(fc[1] && fc[1].c === "99" && fc[1].n && fc[3] && fc[3].c === "1077" && fc[3].em === undefined, "madre CH: el código es el Cod.Art. (99, y 1077 en vez de «H Lider»)");
 
 /* ---------- B) Costos ---------- */
 const c = em.emParsearCostos(X, libroCostos());

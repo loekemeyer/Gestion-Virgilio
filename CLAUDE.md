@@ -8001,14 +8001,16 @@ puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBa
 
 | botón | qué hace |
 |---|---|
-| ⬆ Subir Estadística Madre | lee «Loeke Madre…» (col «Cod Nuevo Isis») y «Chef Madre / Chef Master» (col «Cod. Isis»); saltea copias «(2)» y «por menor vta» |
+| ⬆ Subir Estadística Madre | lee «Loeke Madre…» (col «Cod Nuevo Isis») y «Chef Madre / Chef Master»; saltea copias «(2)» y «por menor vta». **Manda el COD ART** (Luis, v27.38: *"es lo que trackeamos"*): si la hoja tiene «Cod.Art.» (Chef: B y D) se usa ésa, no «Cod. Isis», que guarda códigos viejos de ISIS en los discontinuados |
 | ⬆ Subir Costos | bloques «Loeke» / «Chef» de «Aportes Gastos» (celda con «Uni x mes…» al lado), sin cortar en una fila en blanco |
 | ⬇ Bajar por mes | meses elegidos → Pedidos LK/CH (orden Est. Madre) o Facturación LK/CH (orden Costos), una columna por mes del más nuevo al más viejo, **en unidades** |
 
 - Se guarda el ORDEN, el TIPO de cada código (505 número, '026' texto) y los renglones en blanco / títulos, para
   pegar al lado sin correr filas: tabla **`GV_Est_Plantilla`** (`gv_est_plantilla_guardar` / `_leer`, sólo supervisor).
 - **LK suma lo de Chef con L** (031 = 031 LK + 031L Chef), igual que el BUSCARV + SUMAR.SI de las dos planillas.
-  Medido ago/26 contra el «costo lk final»: 248 de 249 códigos iguales (598E: 2.568 contra 2.772 de la planilla).
+  Medido ago/26 contra el «costo lk final»: 248 de 249 iguales. El 598E NO es error de Gestión: el Excel de ISIS pegado en
+  Costos le sumó al 598E las 180 u del 599E y las 24 del 599EZ (2.328 + 180 + 24 = 2.532) y dejó esas dos filas en blanco;
+  las facturas tienen cada línea con su código.
 - **Colores de la Est. Madre** (su formato condicional, Luis 06/10): **celeste** = el mes pasa la E.Madre × 1,3 · **amarillo** =
   pasa la E.Madre. La E.Madre de cada código («E.Madre Uni x Mes» col I / «Est Madre Uni» col J) se captura al subir; sin E.Madre, sin color.
 - Disruptivo (regla v26.20): **letra roja negrita** (no pisa el fondo) y el detalle como **comentario**.
