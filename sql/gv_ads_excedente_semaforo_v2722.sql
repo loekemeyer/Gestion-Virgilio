@@ -1,4 +1,5 @@
 -- v27.22 (Luis, 06/10/2026, D2 «sí cuenta»): el EXCEDENTE entra en el disponible de ADS.
+-- v27.23 (Luis, 06/10): sólo artículos con tallerista (filtro al final de gv_ads_stock2).
 -- D3: badge del botón = violeta a la izquierda (talleristas, gv_ads_badge) + semáforo a la derecha
 --     (gv_ads_badge_stock: quiebres a 10 rojo · 20 naranja · 30 amarillo).
 -- Cambiar el tipo de retorno exige DROP, y el DROP se cuelga en el MCP: va como función NUEVA
@@ -43,7 +44,13 @@ language sql stable security definer set search_path = public as $$
          case when s.proy > 0 then round(greatest(s.term + s.rk + s.ag + s.ex - coalesce(c.c30,0), 0) / (s.proy / 30.0), 0) end,
          oc.fecha, oc.prov, oc.cant, oc.rec, oc.est
     from s left join c on c.cod = s.cod left join oc on oc.cod = s.cod
-   where s.proy > 0 or coalesce(c.c30,0) > 0;
+   where (s.proy > 0 or coalesce(c.c30,0) > 0)
+     -- v27.23 (Luis, 06/10): sólo artículos con TALLERISTA (los importados que no tienen tallerista no van).
+     -- Tallerista = proveedor activo en OC_Maximos (el que el generador le emite la OC). Un importado que
+     -- igual se compra a un tallerista local (437E, 590E, 26…) SÍ entra: tiene OC.
+     and exists (select 1 from "OC_Maximos" m
+                  where coalesce(m.activo, true) and nullif(btrim(m.proveedor), '') is not null
+                    and regexp_replace(norm_cod(m.cod), '\s+(LK|CH)$', '') = s.cod_base);
 $$;
 
 

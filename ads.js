@@ -18,7 +18,8 @@
    PESTAÑA 2 · STOCK (quiebres a 10, 20 y 30 días)
      saldo N = (góndola + racks + a guardar + excedente) − NP programadas sin pickear con
                entrega hasta hoy + N (las vencidas también) − Est. Madre × N/30
-     Negativo = quiebre. Con la última OC del código (cuánto se recibió) y el %
+     Negativo = quiebre. Sólo artículos CON TALLERISTA (v27.23: los importados sin tallerista no van).
+     Con la última OC del código (cuánto se recibió) y el %
      que viene entregando ese tallerista en ese artículo (rango de la pestaña 1).
 
    Backend: sql/gv_ads_alertas_damian_v2720.sql + sql/gv_ads_excedente_semaforo_v2722.sql (gv_ads_talleristas, gv_ads_stock2,
@@ -211,7 +212,7 @@ function _adsHtmlStock() {
   if (_ads.stockErr) return h + '<div class="err">' + _adsEsc(_ads.stockErr) + "</div></div>";
   if (!_ads.stock) return h + '<div class="msg">Leyendo stock…</div></div>';
   var f = adsFiltrarStock(rows, _ads.horiz, _ads.q);
-  h += '<div class="res">Disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · Est. Madre prorrateada · en cajas</div>';
+  h += '<div class="res">Sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · Est. Madre prorrateada · en cajas</div>';
   h += '<table><thead><tr><th>Cód.</th><th>Descripción</th><th>Disp.</th><th>Est.<br>Madre<br>/mes</th><th>Comprom.<br>10 · 20 · 30 d</th>' +
     '<th>Saldo<br>10 d</th><th>Saldo<br>20 d</th><th>Saldo<br>30 d</th><th>Cubre<br>días</th><th>Última OC<br>fecha · prov.</th><th>OC<br>pedida · recib.</th><th>% entrega<br>tallerista</th></tr></thead><tbody>';
   if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + _ads.horiz + " días.</td></tr>";
