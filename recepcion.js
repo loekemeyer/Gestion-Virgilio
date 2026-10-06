@@ -303,7 +303,7 @@ const RCP_CSS = `
   #rcpRoot .fotoOverlayInfo{ flex:0 0 auto; max-width:none; max-height:38vh; }
   #rcpRoot .fotoOverlay img{ max-height:46vh; }
 }
-#rcpRoot .pcFoot{ margin-top:10px; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
+#rcpRoot .pcFoot{ margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
 #rcpRoot .enviarBtn{ padding:11px 22px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#111; color:#fff; cursor:pointer; }
 #rcpRoot .enviarBtn:disabled{ opacity:.4; cursor:default; }
 /* v22.48 (Luis, 25/09) — botón «Recibido» en Pendientes + cuadro de quién recibe. */
@@ -367,7 +367,7 @@ const RCP_CSS = `
 #rcpRoot .histLoading, #rcpRoot .histEmpty{ padding:26px; text-align:center; color:#64748b; font-weight:700; }
 /* v27.12 (Luis, 06/10) — botón redondo de comentarios por recepción + cuadro con el hilo.
    Mismo "quién escribe" que Recibido (chips Nora/Pablo/Otro, GV_Recepcion_Receptores). */
-#rcpRoot .pcComentBtn{ margin-left:6px; width:34px; height:34px; border-radius:50%; border:2px solid #cbd5e1; background:#fff; cursor:pointer; padding:0; display:inline-flex; align-items:center; justify-content:center; position:relative; flex:0 0 auto; font-size:17px; line-height:1; }
+#rcpRoot .pcComentBtn{ width:38px; height:38px; border-radius:50%; border:2px solid #cbd5e1; background:#fff; cursor:pointer; padding:0; display:inline-flex; align-items:center; justify-content:center; position:relative; flex:0 0 auto; font-size:17px; line-height:1; }
 #rcpRoot .pcComentBtn.has{ border-color:#2563eb; background:#eff4ff; }
 #rcpRoot .pcComentBadge{ position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px; border-radius:999px; background:#2563eb; color:#fff; font-size:11px; font-weight:900; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
 #rcpRoot .cmtBox{ max-width:440px; max-height:88vh; display:flex; flex-direction:column; }
@@ -3412,7 +3412,6 @@ function pendCard(r) {
   const tag = document.createElement("span"); tag.className = "pcTag"; tag.textContent = (r.tipo === "prov_at") ? "Prov. AT" : "Tallerista";
   const rto = document.createElement("span"); rto.className = "pcRto"; rto.textContent = r.remito ? ("RTO/FC " + r.remito) : "";
   head.appendChild(name); head.appendChild(tag); head.appendChild(rto);
-  head.appendChild(pendComentBtn(id, r));   // v27.12 (Luis): comentarios sobre el estado
   card.appendChild(head);
   const meta = document.createElement("div"); meta.className = "pcMeta";
   const mp = [pendFmtFecha(r.fecha, tsMs)]; if (tsMs) mp.push(pendFmtHora(tsMs)); if (r.linea) mp.push(r.linea);
@@ -3437,6 +3436,7 @@ function pendCard(r) {
   acts.appendChild(pendFotoRow(id));
   card.appendChild(acts);
   const foot = document.createElement("div"); foot.className = "pcFoot";
+  foot.appendChild(pendComentBtn(id, r));   // v27.17 (Luis): comentarios abajo a la izquierda, al nivel de Enviar
   /* v10.02 — el código lo genera opEnviar() AL CREAR la fila (v8.83), para que el operario
      lo vea y lo escriba en el remito físico. Por eso tener `codigo` NO significa "ya
      procesada": esta lista trae SOLO estado='pendiente'. Antes el `if (r.codigo)` tapaba
@@ -3450,7 +3450,8 @@ function pendCard(r) {
   return card;
 }
 /* ===== v27.12 (Luis, 06/10) — Comentarios por recepción =====
-   Botón redondo con bloc de notas en el encabezado de cada tarjeta. Abre un hilo (log
+   Botón redondo con bloc de notas en el pie de cada tarjeta, abajo a la izquierda al
+   nivel de Enviar (v27.17). Abre un hilo (log
    append-only en GV_Recepcion_Comentarios: anon lee e inserta, nunca edita ni borra) y usa
    el MISMO "quién escribe" que Recibido (chips de GV_Recepcion_Receptores). No frena nada:
    no toca el checklist ni el botón Enviar. */

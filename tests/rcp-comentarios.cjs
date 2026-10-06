@@ -8,8 +8,8 @@ const path = require("path");
 const src = fs.readFileSync(path.join(__dirname, "..", "recepcion.js"), "utf8");
 
 const checks = [
-  ["el botón redondo se agrega al encabezado de la tarjeta",
-    /head\.appendChild\(pendComentBtn\(id,\s*r\)\)/.test(src)],
+  ["el botón redondo se agrega al pie, al nivel de Enviar (v27.17)",
+    /foot\.appendChild\(pendComentBtn\(id,\s*r\)\)/.test(src)],
   ["existe pendComentBtn", /function pendComentBtn\(/.test(src)],
   ["existe pendComentariosAbrir", /function pendComentariosAbrir\(/.test(src)],
   ["se LEE el hilo (select sobre GV_Recepcion_Comentarios)",
