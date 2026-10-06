@@ -5575,6 +5575,16 @@ bueno, y si nunca leyó llegan como `null` → sin cartel, y «NPs por Día» / 
 cargado al camión»*. Y las columnas de la tabla de tandas miden lo que mide su dato (en `--u`), no un % (D29: en el
 Mon. Admin el código se pisaba con el m³, «E48L0,4»). `tests/mon-lectura-rota-ancho.cjs` (falla contra la v26.69).
 
+⚠ **El puente a LK reintenta un 504 TRANSITORIO, pero un 504 SOSTENIDO sigue frenando** (v27.14, Luis 06/10).
+El armado automático y toda lectura del feed de LK pasan por `pwebLkToken()` (`index.html`), que abre el puente
+`admin-login-otp`. El 06/10 la base de LK se saturó 10:40–12:40 UTC y ese `fetch` dio **504**, abortando el armado
+(*«No se pudo entrar a LK (HTTP 504)»*). Hoy el puente **reintenta hasta 3 veces** con backoff (1,5 s · 4 s) **sólo
+ante fallo transitorio** (red, o 502/503/504/408/429); un 4xx de auth (401/403) **no se reintenta** (no se arregla
+solo). Si después de los reintentos LK sigue sin contestar, **tira el error igual y el armado FRENA** —no arma sobre
+nada—: el reintento tapa el blip, el fail-closed de arriba sobrevive a una caída sostenida. La causa de fondo —los
+crons de LK que ahogaban la base— se bajó el mismo día: watchdog **job 63** de 1 a 2 min, y los `*/10` **62/66/68**
+sacados del stack de minuto :00 (pico por minuto 9 → 6, con 6 worker slots). `tests/pweb-lk-token.cjs` bloque 7.
+
 ## ⚠ REGLA (v21.10): `index.html` es UTF-8 — un byte en latin1 se multiplica solo
 
 El archivo declara `<meta charset="UTF-8">`. El 22/09 tenía **5 bytes sueltos en latin1/cp1252**,

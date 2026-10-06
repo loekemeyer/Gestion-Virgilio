@@ -114,6 +114,45 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     };
     out.tok6 = await pwebLkToken(); out.puente6 = puente6;
 
+    // ── 7) v27.14: un 504 TRANSITORIO se reintenta; un error de auth NO; y un 504 ──────
+    //      sostenido SIGUE frenando (fail-closed: no se arma sobre nada).
+    // 7a) 504 una vez y después entra → reintenta y sale bien
+    _pwebTok = null; _pwebTokExp = 0; _pwebRef = null;
+    let p7a = 0;
+    window.fetch = async (url) => {
+      const u = String(url);
+      if (u.indexOf("admin-login-otp") >= 0) {
+        p7a++;
+        if (p7a === 1) return { ok: false, status: 504, json: async () => ({}) };
+        return { ok: true, json: async () => ({ access_token: "TOK_7A", refresh_token: "R7A", expires_in: 3600 }) };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+    try { out.tok7a = await pwebLkToken(); } catch (e) { out.tok7a = "ERR:" + e.message; }
+    out.puente7a = p7a;
+
+    // 7b) 403 de auth → NO se reintenta (no se arregla solo), falla al primer intento
+    _pwebTok = null; _pwebTokExp = 0; _pwebRef = null;
+    let p7b = 0;
+    window.fetch = async (url) => {
+      const u = String(url);
+      if (u.indexOf("admin-login-otp") >= 0) { p7b++; return { ok: false, status: 403, json: async () => ({ msg: "forbidden" }) }; }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+    try { await pwebLkToken(); out.msg7b = "(no falló)"; } catch (e) { out.msg7b = e.message; }
+    out.puente7b = p7b;
+
+    // 7c) 504 sostenido → 3 intentos y SIGUE frenando (el armado no arma)
+    _pwebTok = null; _pwebTokExp = 0; _pwebRef = null;
+    let p7c = 0;
+    window.fetch = async (url) => {
+      const u = String(url);
+      if (u.indexOf("admin-login-otp") >= 0) { p7c++; return { ok: false, status: 504, json: async () => ({}) }; }
+      return { ok: false, status: 404, json: async () => ({}) };
+    };
+    try { await pwebLkToken(); out.msg7c = "(no falló)"; } catch (e) { out.msg7c = e.message; }
+    out.puente7c = p7c;
+
     window.fetch = real;
     return out;
   });
@@ -131,6 +170,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.tokRefresh === "TOK_REFRESCADO" && r.puente5 === 0 && r.refresh5 === 1,
       "token vencido con refresh token: renueva la misma sesión sin abrir el puente");
   chk(r.tok6 === "TOK_6" && r.puente6 === 1, "refresh rechazado: cae al puente y entra igual");
+  chk(r.tok7a === "TOK_7A" && r.puente7a === 2, "v27.14: un 504 transitorio se reintenta y entra (intentos " + r.puente7a + ")");
+  chk(r.puente7b === 1 && /HTTP 403|forbidden/.test(r.msg7b), "v27.14: un error de auth (403) NO se reintenta (intentos " + r.puente7b + ")");
+  chk(r.puente7c === 3 && /No se pudo entrar a LK/.test(r.msg7c), "v27.14: un 504 sostenido frena igual tras 3 intentos (fail-closed): " + r.msg7c);
   chk(errs.length === 0, "sin errores de página" + (errs.length ? ": " + errs[0] : ""));
 
   await b.close();

@@ -6310,7 +6310,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.13"></script>
+<script type="module" src="recepcion.js?v=27.14"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10558,7 +10558,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.13";
+const APP_VERSION = "v27.14";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34386,14 +34386,31 @@ async function pwebLkToken() {
     let vjwt = null;
     try { if (window.sbAuth) vjwt = await window.sbAuth.getAccessToken(); } catch (_e) {}
     if (!vjwt) throw new Error(authNoSesionMsg("Iniciá sesión para ver la PPP Web."));
-    const br = await fetch(PWEB_LK_URL + "/functions/v1/admin-login-otp", {
-      method: "POST",
-      headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "bridge", vjwt: vjwt, modo: "enlace" })
-    });
-    let bd = {}; try { bd = await br.json(); } catch (_e) {}
-    if (!br.ok || (!bd.tmp_password && !bd.access_token)) {
-      throw new Error("No se pudo entrar a LK (" + (bd.detail || bd.error || bd.msg || ("HTTP " + br.status)) + ").");
+    // v27.14 (Luis, 06/10): el puente a LK puede dar un 504/502 TRANSITORIO cuando la base de
+    // LK está momentáneamente saturada (no es lo mismo que caída: un reintento corto suele pasar;
+    // la saturación del 06/10 10:40–12:40 UTC se comió este fetch y abortó el armado). Se
+    // reintenta hasta 3 veces con backoff SOLO ante fallo transitorio (red, o 502/503/504/408/
+    // 429); un 4xx de auth NO se reintenta (no se arregla solo). Si igual falla después de los
+    // reintentos, se tira el error como siempre y el armado FRENA sin armar sobre nada (regla
+    // «una lectura ROTA no es un CERO»): el reintento tapa el blip, el fail-closed sobrevive a
+    // una caída sostenida.
+    let br = null, bd = {}, _lkErr = "sin respuesta";
+    for (let _i = 0; _i < 3; _i++) {
+      if (_i) await new Promise(function (r) { setTimeout(r, _i === 1 ? 1500 : 4000); });
+      try {
+        br = await fetch(PWEB_LK_URL + "/functions/v1/admin-login-otp", {
+          method: "POST",
+          headers: { apikey: PWEB_LK_ANON, "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "bridge", vjwt: vjwt, modo: "enlace" })
+        });
+      } catch (_e) { br = null; _lkErr = "red"; continue; }   // fetch tiró (red/timeout) → reintentar
+      bd = {}; try { bd = await br.json(); } catch (_e) {}
+      if (br.ok && (bd.tmp_password || bd.access_token)) break;   // entró
+      _lkErr = (bd.detail || bd.error || bd.msg || ("HTTP " + br.status));
+      if (![502, 503, 504, 408, 429].includes(br.status)) break;  // no transitorio (auth, etc.) → no insistir
+    }
+    if (!br || !br.ok || (!bd.tmp_password && !bd.access_token)) {
+      throw new Error("No se pudo entrar a LK (" + _lkErr + ").");
     }
     // v26.78: modo enlace → la sesión viene armada, sin login con password.
     if (bd.access_token) return _pwebGuardarSesion(bd);
@@ -60748,7 +60765,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.13"></script>
+<script src="importacion.js?v=27.14"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63571,9 +63588,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.13"></script>
-<script src="hotsale.js?v=27.13"></script>
-<script src="estadisticas.js?v=27.13"></script>
+<script src="cobranzas.js?v=27.14"></script>
+<script src="hotsale.js?v=27.14"></script>
+<script src="estadisticas.js?v=27.14"></script>
 
 </body>
 </html>
