@@ -5750,6 +5750,7 @@ andar a pesar de que pase en la app"*.
 - Probar sin escribir: `select * from public.gv_alerta_inactivo_servidor(true, '2026-10-06 08:40-03');` → 237 ABRE ALERTA.
 - La v1 de un argumento `(boolean)` queda en la base sin llamador (el DROP se cuelga en el MCP).
 - `sql/gv_alerta_inactivo_servidor_v2751.sql` (rollback en la cabecera).
+- **v27.54 (Thomas, D5): la JORNADA arranca al FICHAR** (*"deben fichar por el programa con el código de TV y después arrancar la producción"*): `hs_total` de `gv_monitor_horas_operario_dia` (y `gv_horas_operario_detalle_v2`) cuenta desde el primer ingreso del día en `GV_Dispositivo_Login`, no desde el primer evento. Lo que va del ingreso a la primera tarea es tiempo muerto (Franco 06/10: 2:08). Centinela 337, huella re-congelada. `sql/gv_monitor_jornada_fichaje_v2754.sql`.
 
 ## ⚠ REGLA (06/10/2026, v27.46): el DESHACER (60 s) del operario va por RPC — nunca DELETE
 
