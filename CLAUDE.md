@@ -8037,4 +8037,7 @@ puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBa
   .xlsx con estilos reescribiendo `styles.xml` (`emXlsxBytes`). Sin UxB: 0 con comentario.
 - **Para qué**: la de cobranzas sube la Est. Madre y Costos, baja y pega al lado de su columna. Por eso cada fila (blancos, títulos, Krea en 0) va donde está en su planilla.
 - Código vendido SIN fila en la planilla → al código base si la planilla lo tiene (727EN → 727E, 865ED → 865E, 599EZ → 599E): la factura dice la variante y la estadística de ISIS el base. Con eso, Costos ago/26 da igual a «Aportes Gastos» en 373 de 374 filas (falta sólo el 598E). Lo que queda sin lugar (v27.40, Luis): **se avisa ANTES de bajar** (confirm con la lista) y va **al FONDO de la lista, con la fila entera en NARANJA** y la nota «No está en la planilla (Loeke/Chef): ubicarlo a mano», para que lo pasen a mano. Vale para Est. Madre y Costos (ej. ago/26: LK 599E / 599EZ).
+- **Decidido por Luis (06/10), no volver a preguntar**: las NC por unidades sueltas **se siguen restando** como en ISIS
+  (026 sep/26 = 165 cajas − 3 u de la NC a Coto + 36 u de 026L de Chef = 5.973 u; sale del parser de ISIS), y un código
+  vendido que no tiene fila en la planilla (599E / 599EZ en Costos LK) va **al fondo en naranja**, como está.
 - Una RPC vacía o con error no baja nada. `sql/gv_est_plantilla_v2736.sql`, `tests/est-madre-mes.cjs`.
