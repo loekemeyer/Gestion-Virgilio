@@ -7933,3 +7933,21 @@ abre un **hilo** de comentarios sobre el estado de esa recepción. Badge azul co
 - Si la lectura del hilo falla, lo dice; no se queda vacío ("no pude leer" no es "sin comentarios").
 - **Chequeo:** `node tests/rcp-comentarios.cjs` (candado estático: las funciones de `recepcion.js` son de módulo, no
   viven en `window`).
+
+## ⚠ REGLA (Luis, 2026-10-06, v27.21): ADS — ALERTAS DAMIÁN STOCK (`ads.js`)
+
+Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **violeta** (`#adsBadge`, `gv_ads_badge()`).
+
+- **Entregas talleristas** (`gv_ads_talleristas(p_n, p_incluir_actual)`): por (proveedor de la OC, código) en las
+  últimas N OC (fechas de generación, rubro `Art Term`). La OC de cada semana REEMPLAZA a la anterior, así que
+  **pedido = 1.ª OC del rango + Σ max(0, OC_k − (OC_{k−1} − recibido_{k−1}))** (ejemplo de Luis: 300/150 + 200/100 →
+  350 pedido, 250 entregado). Entregado = `cantidad_recibida` (lo imputa `gv_oc_recompute_recibido`). La OC más nueva
+  no entra por defecto (su semana corre). Tallerista con % < umbral → cuenta en el badge.
+- Rango, umbral (50 %) e «incluir la OC en curso» viven en `Stock_Config` (`ads_n_ocs`, `ads_umbral`,
+  `ads_incluir_actual`); los guarda `gv_ads_config_guardar` (supervisor). Cambiarlos es un `update`.
+- **Stock** (`gv_ads_stock()`): saldo a 10/20/30 días = (góndola + racks + racks CH + a guardar) − NP programadas sin
+  pickear con entrega hasta hoy+N (vencidas incluidas, `gv_demanda_programada_pendiente`) − Est. Madre × N/30.
+  Negativo = quiebre. Con la última OC vigente del código y el % de entrega del tallerista en ese artículo.
+- Medido 06/10 (últimas 4 OC cerradas): 13 de 18 talleristas debajo del 50 %; quiebres 81 / 102 / 131 a 10/20/30 días.
+  El % bajo refleja también la imputación (Oscar / Tierra Nativa se reciben como Log/ Fabr): mirar antes de reclamar.
+- `sql/gv_ads_alertas_damian_v2720.sql`, `tests/ads-alertas.cjs`.

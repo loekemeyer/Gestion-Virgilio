@@ -1,0 +1,87 @@
+/* v27.20 — ADS · Alertas Damián Stock (Luis, 06/10/2026). Corre la pantalla de verdad (ads.js
+   dentro de index.html) con las RPC mockeadas y mide:
+     (a) el botón está en el panel con su badge violeta, y el badge pinta lo que devuelve gv_ads_badge;
+     (b) Entregas talleristas: agrupa por tallerista, suma pedido/entregado, ordena por % (peor
+         primero) y marca en rojo el que queda debajo del umbral; al tocarlo abre sus artículos;
+     (c) Stock: por defecto muestra sólo el quiebre a 10 días, los chips cuentan 10/20/30 y la
+         columna de % del tallerista sale de la pestaña 1;
+     (d) una lectura VACÍA o con error se dice, no se dibuja como «todo bien»;
+     (e) el botón Cerrar no hereda el button{width:100%} global. Sale 1 si falla. */
+const path = require("path");
+let chromium;
+try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
+catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { console.error("Playwright no encontrado."); process.exit(2); } }
+
+const TALL = [
+  { proveedor: "Lucho", pkey: "lucho", codigo: "505", descripcion: "Cuchillo", ocs: 2, pedido: 350, entregado: 250, pct: 0.7143, desde: "2026-09-09", hasta: "2026-09-23", ult_fecha: "2026-09-23", ult_cant: 200, ult_rec: 100, ult_estado: "anulada" },
+  { proveedor: "Oscar", pkey: "oscar", codigo: "506", descripcion: "Abrelata", ocs: 2, pedido: 100, entregado: 10, pct: 0.1, desde: "2026-09-09", hasta: "2026-09-23", ult_fecha: "2026-09-23", ult_cant: 90, ult_rec: 0, ult_estado: "anulada" },
+  { proveedor: "Oscar", pkey: "oscar", codigo: "280", descripcion: "Manga", ocs: 1, pedido: 50, entregado: 20, pct: 0.4, desde: "2026-09-16", hasta: "2026-09-16", ult_fecha: "2026-09-16", ult_cant: 50, ult_rec: 20, ult_estado: "anulada" }
+];
+const STOCK = [
+  { cod: "505", cod_base: "505", linea: "LK", descripcion: "Cuchillo", terminado: 50, racks: 0, a_guardar: 0, disponible: 50, proy_mes: 300, comp10: 20, comp20: 40, comp30: 60, saldo10: -70, saldo20: -190, saldo30: -310, dias_cubre: 0, oc_fecha: "2026-09-30", oc_prov: "Lucho", oc_cant: 174, oc_rec: 87, oc_estado: "pendiente" },
+  { cod: "506", cod_base: "506", linea: "LK", descripcion: "Abrelata", terminado: 100, racks: 0, a_guardar: 0, disponible: 100, proy_mes: 90, comp10: 0, comp20: 0, comp30: 20, saldo10: 70, saldo20: 40, saldo30: -10, dias_cubre: 27, oc_fecha: null, oc_prov: null, oc_cant: null, oc_rec: null, oc_estado: null },
+  { cod: "501", cod_base: "501", linea: "LK", descripcion: "Untar", terminado: 500, racks: 0, a_guardar: 0, disponible: 500, proy_mes: 30, comp10: 0, comp20: 0, comp30: 0, saldo10: 490, saldo20: 480, saldo30: 470, dias_cubre: 500, oc_fecha: null, oc_prov: null, oc_cant: null, oc_rec: null, oc_estado: null }
+];
+
+(async () => {
+  const b = await chromium.launch();
+  const p = await (await b.newContext({ viewport: { width: 1400, height: 900 }, serviceWorkers: "block" })).newPage();
+  const errs = []; p.on("pageerror", (e) => errs.push(e.message));
+  await p.route("**/rest/v1/**", (r) => r.abort());
+  await p.goto("file://" + path.join(__dirname, "..", "index.html"), { waitUntil: "domcontentloaded" });
+  const r = await p.evaluate(async ({ TALL, STOCK }) => {
+    const espera = (ms) => new Promise((res) => setTimeout(res, ms));
+    for (let i = 0; i < 50 && typeof window.openAds !== "function"; i++) await espera(100);
+    let modo = "ok";
+    window.sb = { rpc: async (n) => {
+      if (modo === "vacio") return { data: [], error: null };
+      if (n === "gv_ads_config") return { data: { n_ocs: 4, umbral: 0.5, incluir_actual: false }, error: null };
+      if (n === "gv_ads_talleristas") return { data: TALL, error: null };
+      if (n === "gv_ads_stock") return { data: STOCK, error: null };
+      if (n === "gv_ads_badge") return { data: 1, error: null };
+      return { data: null, error: { message: "?" } };
+    } };
+    const out = {};
+    const btn = [...document.querySelectorAll(".sup-action-btn")].find((x) => /openAds/.test(x.getAttribute("onclick") || ""));
+    out.boton = !!btn && /ADS/.test(btn.textContent) && !!btn.querySelector("#adsBadge");
+    window.adsLoadBadge(); await espera(50);
+    const bd = document.getElementById("adsBadge");
+    out.badge = bd && bd.style.display !== "none" ? bd.textContent : "";
+    window.openAds(); await espera(150);
+    const filas = [...document.querySelectorAll("#adsOv tr.t")];
+    out.orden = filas.map((f) => f.cells[0].textContent.replace(/[▸▾ ]/g, ""));
+    out.oscarRojo = filas[0] && filas[0].classList.contains("al");
+    out.oscarPct = filas[0] && filas[0].cells[4].textContent;
+    out.oscarPed = filas[0] && filas[0].cells[2].textContent;
+    filas[0].click(); await espera(50);
+    out.sub = document.querySelectorAll("#adsOv tr.sub tbody tr").length;
+    const cerrar = [...document.querySelectorAll("#adsOv .ads-top button")].find((x) => x.textContent === "Cerrar");
+    out.cerrarAncho = cerrar ? cerrar.getBoundingClientRect().width : 9999;
+    window.adsTab("stock"); await espera(50);
+    out.chips = [...document.querySelectorAll("#adsOv .chip")].map((c) => c.textContent);
+    const fs = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")];
+    out.stockCods = fs.map((f) => f.cells[0].textContent);
+    out.pctTall = fs[0] ? fs[0].cells[11].textContent : "";
+    window.adsHoriz(30); await espera(30);
+    out.stock30 = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")].map((f) => f.cells[0].textContent);
+    modo = "vacio"; window.adsClose(); window.openAds(); await espera(150);
+    out.vacio = document.querySelector("#adsOv .err") ? document.querySelector("#adsOv .err").textContent : "";
+    return out;
+  }, { TALL, STOCK });
+  await b.close();
+  const fallas = [];
+  if (!r.boton) fallas.push("(a) falta el botón ADS con su badge");
+  if (r.badge !== "1") fallas.push("(a) badge no pinta: " + r.badge);
+  if (JSON.stringify(r.orden) !== JSON.stringify(["Oscar", "Lucho"])) fallas.push("(b) orden: " + JSON.stringify(r.orden));
+  if (!r.oscarRojo || r.oscarPct !== "20 %" || r.oscarPed !== "150") fallas.push("(b) Oscar: " + r.oscarPct + " / " + r.oscarPed);
+  if (r.sub !== 2) fallas.push("(b) artículos al abrir: " + r.sub);
+  if (r.cerrarAncho > 200) fallas.push("(e) Cerrar ancho " + r.cerrarAncho);
+  if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
+  if (JSON.stringify(r.stockCods) !== JSON.stringify(["505"])) fallas.push("(c) quiebre 10 d: " + JSON.stringify(r.stockCods));
+  if (!/Lucho 71 %/.test(r.pctTall)) fallas.push("(c) % tallerista: " + r.pctTall);
+  if (JSON.stringify(r.stock30) !== JSON.stringify(["505", "506"])) fallas.push("(c) quiebre 30 d: " + JSON.stringify(r.stock30));
+  if (!/vac/i.test(r.vacio)) fallas.push("(d) lectura vacía no se dice: " + r.vacio);
+  if (errs.length) fallas.push("errores de página: " + errs.slice(0, 3).join(" | "));
+  if (fallas.length) { console.error("✗ ADS:\n  " + fallas.join("\n  ")); process.exit(1); }
+  console.log("✓ ADS: botón + badge violeta, talleristas por % con umbral, quiebres 10/20/30, lectura vacía avisada");
+})();

@@ -33,7 +33,7 @@ const VJSON = path.join(root, "version.json");
 
 // los ?v= del index que se versionan CON la app (tiene que coincidir con
 // SIGUEN_APP_VERSION de tests/version-tokens.cjs)
-const SIGUEN_APP_VERSION = ["recepcion.js", "cobranzas.js", "importacion.js", "hotsale.js", "estadisticas.js"];
+const SIGUEN_APP_VERSION = ["recepcion.js", "cobranzas.js", "importacion.js", "hotsale.js", "estadisticas.js", "ads.js"];
 
 function salir(msg) { console.error("bump-version: " + msg); process.exit(1); }
 
