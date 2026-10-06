@@ -8020,7 +8020,7 @@ puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBa
 | ⬆ Subir Costos | bloques «Loeke» / «Chef» de «Aportes Gastos» (celda con «Uni x mes…» al lado), sin cortar en una fila en blanco |
 | ⬇ Bajar por mes | meses elegidos → Pedidos LK / Pedidos CH (orden Est. Madre) o **Facturación LK + CH en UNA columna** (como «Aportes Gastos»: bloque Loeke, el blanco, «Chef» y su bloque; se copia y pega una vez). Una columna por mes, del más nuevo al más viejo, **en unidades** |
 
-- **v27.47 (Luis): lo de importar/exportar es un POP-UP que abre el botón «VIVI»** de la barra de la Est. Madre
+- **v27.48 (Luis): lo de importar/exportar es un POP-UP que abre el botón «VIVI»** de la barra de la Est. Madre
   (`emViviAbrir` / `emViviCerrar`; X arriba a la derecha, Escape o clic afuera lo cierran). El botón vive en
   `admin/est-madre.js` escondido y sólo se muestra dentro del iframe de Gestión (la página LK no lo ve). Se sacaron el
   texto de abajo del título y el «N artículos de Stocks · …»: el status sólo dice lo que falla. En el .xlsx bajado el
