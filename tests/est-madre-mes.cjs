@@ -188,18 +188,23 @@ ok(/volvió vacío/.test(src) && /No se bajó nada/.test(src), "una RPC vacía o
       } };
       const d = document.createElement("div"); d.id = "emBar"; document.body.prepend(d);
       window.emBarPintar();
-      for (let i = 0; i < 30 && !/Madre LK <b>/.test(d.innerHTML); i++) await espera(100);
+      for (let i = 0; i < 30 && !/LK ✓/.test(d.textContent); i++) await espera(100);
     }, m.lk.filas);
     const bar = await p.$eval("#emBar", (e) => e.textContent);
     ok(/Importar \/ exportar/i.test(bar) && /Subir Estadística Madre/.test(bar) && /Subir Costos/.test(bar) && /Descargar seleccionados/.test(bar), "pantalla: sector Importar / exportar con sus botones");
-    ok(/Est\. Madre LK 6/.test(bar) && /Costos LK sin subir/.test(bar), "pantalla: dice qué plantillas hay (" + bar.slice(0, 200) + ")");
-    /* meses: varios a la vez desde el desplegable */
-    await p.evaluate(() => { window._em.sel = {}; window.emMesesToggle(); });
-    const nMeses = await p.$$eval("#emBar .mpop button:not(.listo)", (bs) => bs.length);
-    ok(nMeses >= 12, "pantalla: el desplegable ofrece los meses (" + nMeses + ")");
-    await p.evaluate(() => { window.emToggleMes("2026-09"); window.emToggleMes("2026-08"); window.emMesesToggle(); });
+    ok(/Estadística Madre\s*LK ✓ 06\/10 · CH falta/.test(bar) && /Subir Costos\s*LK falta · CH falta/.test(bar), "pantalla: el estado de cada planilla va en su botón (" + bar.slice(0, 220) + ")");
+    ok(!/celeste|amarillo|letra roja|naranja =/.test(bar), "pantalla: sin el renglón de leyenda abajo");
+    /* meses: calendario (año + 12 meses), varios a la vez */
+    await p.evaluate(() => { window._em.anio = 2026; window.emMesesLimpiar(); });
+    const nMeses = await p.$$eval("#emBar .cal-g button", (bs) => bs.length);
+    ok(nMeses === 12, "pantalla: el calendario muestra los 12 meses del año (" + nMeses + ")");
+    await p.evaluate(() => { window.emToggleMes("2026-09"); window.emToggleMes("2026-08"); window.emCalAnio(-1); window.emToggleMes("2025-12"); });
+    const on = await p.$$eval("#emBar .cal-g button.on", (bs) => bs.map((x) => x.dataset.ym));
+    ok(on.length === 1 && on[0] === "2025-12", "pantalla: el año anterior muestra sólo lo suyo marcado (" + on.join(",") + ")");
     const txtMes = await p.$eval("#emMesesBtn", (e) => e.textContent);
-    ok(/sep 26/.test(txtMes) && /ago 26/.test(txtMes), "pantalla: el botón de meses dice los elegidos (" + txtMes + ")");
+    ok(/sep 26/.test(txtMes) && /ago 26/.test(txtMes) && /dic 25/.test(txtMes), "pantalla: el título dice los meses elegidos (" + txtMes + ")");
+    const big = await p.$eval("#emBajarSel", (e) => parseFloat(getComputedStyle(e).fontSize));
+    ok(big >= 16, "pantalla: el botón de descarga es grande (" + big + "px)");
     /* sólo Pedidos LK tildado (Costos no está subido) */
     await p.evaluate(() => { window.emChk("pch", false); window.emChk("flk", false); window.emChk("fch", false); window._em.sel = { "2026-09": true }; window.emBarPintar(); });
     const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }), p.click("#emBajarSel")]);

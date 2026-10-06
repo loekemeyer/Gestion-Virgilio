@@ -737,24 +737,37 @@ function _emCss() {
   if (document.getElementById("emCss")) return;
   var st = document.createElement("style"); st.id = "emCss";
   st.textContent = [
-    /* v27.43 (Luis, 06/10: «está horrible»): un sector compacto de Importar / exportar arriba del cuadro */
-    "#emBar{display:flex;justify-content:center;padding:6px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font:12.5px system-ui,Segoe UI,Arial,sans-serif;color:#0f172a;}",
-    "#emBar .sec-box{display:grid;gap:4px;justify-items:center;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:5px 10px;max-width:100%;}",
-    "#emBar .fila{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;justify-content:center;}",
-    "#emBar .tit{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#64748b;}",
-    "#emBar button{width:auto;margin-top:0;padding:4px 10px;font-size:12.5px;line-height:1.25;border:none;border-radius:7px;font-weight:800;cursor:pointer;background:#1e3a8a;color:#fff;}",
-    "#emBar button.sec{background:#e2e8f0;color:#0f172a;}",
+    /* v27.44 (Luis, 06/10: «inentendible… más grande, más visible, sin el texto de abajo; los meses con un calendario»):
+       tres pasos grandes, uno al lado del otro — 1 subir · 2 meses (calendario) · 3 descargar */
+    "#emBar{display:flex;justify-content:center;padding:10px 12px;background:#f1f5f9;border-bottom:1px solid #cbd5e1;font:15px system-ui,Segoe UI,Arial,sans-serif;color:#0f172a;}",
+    "#emBar .sec-box{display:grid;gap:8px;justify-items:center;border:2px solid #1e3a8a;border-radius:14px;background:#fff;padding:10px 14px;max-width:100%;box-shadow:0 2px 8px rgba(15,23,42,.08);}",
+    "#emBar .tit{font-size:15px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#1e3a8a;}",
+    "#emBar .pasos{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch;justify-content:center;}",
+    "#emBar .paso{display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:flex-start;border:1px solid #e2e8f0;border-radius:12px;padding:8px 12px;background:#f8fafc;}",
+    "#emBar .paso-t{font-size:13px;font-weight:900;color:#475569;text-transform:uppercase;letter-spacing:.5px;}",
+    "#emBar .paso-t .n{display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;background:#1e3a8a;color:#fff;text-align:center;margin-right:6px;font-size:13px;}",
+    "#emBar button{width:auto;margin-top:0;padding:10px 16px;font-size:15px;line-height:1.2;border:none;border-radius:10px;font-weight:800;cursor:pointer;background:#1e3a8a;color:#fff;}",
     "#emBar button:disabled{opacity:.45;cursor:not-allowed;}",
-    "#emBar .sep{width:1px;align-self:stretch;background:#e2e8f0;}",
-    "#emBar label.ck{display:inline-flex;gap:3px;align-items:center;font-weight:600;cursor:pointer;white-space:nowrap;}",
-    "#emBar label.ck input{width:auto;margin:0;}",
-    "#emBar .mwrap{position:relative;}",
-    /* los meses se abren EN el recuadro (una fila más), no flotando: el iframe de abajo los tapaba */
-    "#emBar .mpop{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center;}",
-    "#emBar .mpop button{background:#f1f5f9;color:#0f172a;font-weight:600;padding:3px 7px;white-space:nowrap;}#emBar .mpop button.on{background:#1e3a8a;color:#fff;}",
-    "#emBar .mpop button.listo{background:#1e3a8a;color:#fff;font-weight:800;}",
-    "#emBar .pl{font-size:11px;color:#64748b;}#emBar .pl b{color:#0f172a;}#emBar .pl .no{color:#b91c1c;font-weight:700;}",
-    "#emBar .msg{font-size:11.5px;font-weight:700;color:#1e3a8a;text-align:center;max-width:900px;}#emBar .msg.err{color:#b91c1c;}"
+    "#emBar .subir{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:230px;}",
+    "#emBar .subir small{font-size:12.5px;font-weight:700;opacity:.9;}#emBar .subir small .no{color:#fecaca;}",
+    /* calendario: año arriba con flechas, los 12 meses en 4 × 3 */
+    "#emBar .cal{display:grid;gap:6px;}",
+    "#emBar .cal-h{display:flex;align-items:center;justify-content:space-between;gap:8px;}",
+    "#emBar .cal-h b{font-size:17px;}",
+    "#emBar .cal-h button{background:#e2e8f0;color:#0f172a;padding:4px 12px;font-size:17px;}",
+    "#emBar .cal-g{display:grid;grid-template-columns:repeat(4,58px);gap:5px;}",
+    "#emBar .cal-g button{padding:8px 0;font-size:15px;background:#fff;color:#0f172a;border:1px solid #cbd5e1;font-weight:700;text-transform:capitalize;}",
+    "#emBar .cal-g button.on{background:#1e3a8a;color:#fff;border-color:#1e3a8a;}",
+    "#emBar .cal-g button.otro{box-shadow:inset 0 -3px 0 #1e3a8a;}",
+    "#emBar .cal-g button:disabled{background:#f1f5f9;color:#cbd5e1;border-color:#e2e8f0;opacity:1;}",
+    "#emBar .cal-pie{display:flex;gap:6px;justify-content:center;}",
+    "#emBar .cal-pie button{background:#e2e8f0;color:#0f172a;padding:5px 10px;font-size:13px;}",
+    "#emBar .chks{display:grid;grid-template-columns:repeat(2,auto);gap:6px;}",
+    "#emBar label.ck{display:flex;gap:7px;align-items:center;font-weight:800;cursor:pointer;white-space:nowrap;padding:8px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:15px;}",
+    "#emBar label.ck.on{border-color:#1e3a8a;background:#dbeafe;}",
+    "#emBar label.ck input{width:18px;height:18px;margin:0;}",
+    "#emBar #emBajarSel{background:#15803d;font-size:17px;padding:12px 20px;}",
+    "#emBar .msg{font-size:14px;font-weight:800;color:#1e3a8a;text-align:center;max-width:1000px;}#emBar .msg.err{color:#b91c1c;}"
   ].join("\n");
   document.head.appendChild(st);
 }
@@ -765,34 +778,50 @@ function _emMesesOpc() {
   for (var i = 0; i <= 18; i++) { var d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1); out.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); }
   return out;
 }
+/* el estado de cada planilla va DENTRO de su botón (sin renglón de texto abajo) */
+function _emPlEstado(base) {
+  var p = function (emp) {
+    var x = _em.pl[base + "_" + emp];
+    return x ? emp.toUpperCase() + " ✓ " + (x.subido_en ? _emFecha(x.subido_en) : "") : '<span class="no">' + emp.toUpperCase() + " falta</span>";
+  };
+  return p("lk") + " · " + p("ch");
+}
 function emBarPintar() {
   var b = document.getElementById("emBar"); if (!b) return;
   _emCss();
-  if (!Object.keys(_em.sel).length) _em.sel[_emMesesOpc()[1]] = true;   /* default: el último mes cerrado */
+  var hoy = new Date(), ymHoy = hoy.getFullYear() + "-" + String(hoy.getMonth() + 1).padStart(2, "0");
+  if (!_em.limpio && !Object.keys(_em.sel).length) _em.sel[_emMesesOpc()[1]] = true;   /* default: el último mes cerrado */
   if (!_em.chk) _em.chk = { plk: true, pch: true, flk: true, fch: true };
-  var plTxt = function (k, t) {
-    var p = _em.pl[k];
-    return p ? t + ' <b>' + _eiFmt(p.n, 0) + '</b>' + (p.subido_en ? ' (' + _emFecha(p.subido_en) + ')' : '') : t + ' <span class="no">sin subir</span>';
-  };
+  if (!_em.anio) _em.anio = hoy.getFullYear();
+  var anioMin = hoy.getFullYear() - 2, A = _em.anio;
   var sel = Object.keys(_em.sel).sort().reverse();
   var algun = _EM_CHK.some(function (c) { return _em.chk[c[0]]; });
-  b.innerHTML = '<div class="sec-box">' +
-    '<div class="fila"><span class="tit">Importar / exportar</span>' +
-      '<button type="button" onclick="emSubir(\'madre\')">⬆ Subir Estadística Madre</button>' +
-      '<button type="button" onclick="emSubir(\'costos\')">⬆ Subir Costos</button>' +
-      '<span class="sep"></span>' +
-      '<button type="button" class="sec" id="emMesesBtn" onclick="emMesesToggle()" title="Elegí uno o varios meses">📅 ' +
-        (sel.length ? _eiEsc(sel.map(_emMesCorto).join(", ")) : "Seleccionar meses") + (_em.mopen ? ' ▴' : ' ▾') + '</button>' +
-      _EM_CHK.map(function (c) {
-        return '<label class="ck"><input type="checkbox"' + (_em.chk[c[0]] ? " checked" : "") + ' onchange="emChk(\'' + c[0] + '\', this.checked)">' + c[1] + '</label>';
-      }).join("") +
+  var otrosAnios = sel.filter(function (ym) { return Number(ym.slice(0, 4)) !== A; }).length;
+  var cal = '<div class="cal">' +
+    '<div class="cal-h"><button type="button" onclick="emCalAnio(-1)"' + (A <= anioMin ? " disabled" : "") + ' title="Año anterior">‹</button>' +
+      '<b>' + A + '</b><button type="button" onclick="emCalAnio(1)"' + (A >= hoy.getFullYear() ? " disabled" : "") + ' title="Año siguiente">›</button></div>' +
+    '<div class="cal-g">' + _EI_MES3.map(function (m, i) {
+      var ym = A + "-" + String(i + 1).padStart(2, "0");
+      return '<button type="button" data-ym="' + ym + '" class="' + (_em.sel[ym] ? "on" : "") + '"' + (ym > ymHoy ? " disabled" : "") +
+        ' onclick="emToggleMes(\'' + ym + '\')">' + m + '</button>';
+    }).join("") + '</div>' +
+    '<div class="cal-pie"><button type="button" onclick="emMesesLimpiar()">Limpiar</button>' +
+      (otrosAnios ? '<span style="font-size:13px;font-weight:700;color:#475569;align-self:center">+' + otrosAnios + ' de otro año</span>' : '') + '</div>' +
+  '</div>';
+  b.innerHTML = '<div class="sec-box"><div class="tit">Importar / exportar</div><div class="pasos">' +
+    '<div class="paso"><div class="paso-t"><span class="n">1</span>Subir planillas</div>' +
+      '<button type="button" class="subir" onclick="emSubir(\'madre\')">⬆ Subir Estadística Madre<small>' + _emPlEstado("madre") + '</small></button>' +
+      '<button type="button" class="subir" onclick="emSubir(\'costos\')">⬆ Subir Costos<small>' + _emPlEstado("costos") + '</small></button>' +
+    '</div>' +
+    '<div class="paso"><div class="paso-t" id="emMesesBtn"><span class="n">2</span>Meses: ' +
+      (sel.length ? _eiEsc(sel.map(_emMesCorto).join(", ")) : "ninguno") + '</div>' + cal + '</div>' +
+    '<div class="paso"><div class="paso-t"><span class="n">3</span>Descargar</div>' +
+      '<div class="chks">' + _EM_CHK.map(function (c) {
+        return '<label class="ck' + (_em.chk[c[0]] ? " on" : "") + '"><input type="checkbox"' + (_em.chk[c[0]] ? " checked" : "") + ' onchange="emChk(\'' + c[0] + '\', this.checked)">' + c[1] + '</label>';
+      }).join("") + '</div>' +
       '<button type="button" id="emBajarSel"' + (_em.busy || !sel.length || !algun ? " disabled" : "") + ' onclick="emBajarSeleccionados()">' + (_em.busy ? "Armando…" : "⬇ Descargar seleccionados") + '</button>' +
     '</div>' +
-    (_em.mopen ? '<div class="mpop">' + _emMesesOpc().map(function (ym) {
-      return '<button type="button" class="' + (_em.sel[ym] ? "on" : "") + '" onclick="emToggleMes(\'' + ym + '\')">' + _emMesCorto(ym) + '</button>';
-    }).join("") + '<button type="button" class="listo" onclick="emMesesToggle()">Listo</button></div>' : '') +
-    '<div class="pl">' + plTxt("madre_lk", "Est. Madre LK") + ' · ' + plTxt("madre_ch", "CH") + ' · ' + plTxt("costos_lk", "Costos LK") + ' · ' + plTxt("costos_ch", "CH") +
-      ' · LK incluye Chef con L · celeste &gt; E.Madre +30 % · amarillo &gt; E.Madre · letra roja = disruptivo · naranja = no está en la planilla</div>' +
+    '</div>' +
     (_em.msg ? '<div class="msg' + (_em.msgErr ? ' err' : '') + '">' + _eiEsc(_em.msg) + '</div>' : '') +
     (_em.res ? '<div class="msg' + (_em.resErr ? ' err' : '') + '">' + _eiEsc(_em.res) + '</div>' : '') +
     '<input type="file" id="emFile" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="emArchivo(this)">' +
@@ -800,8 +829,9 @@ function emBarPintar() {
   if (!_em.leido) { _em.leido = true; emLeerPlantillas(); }
 }
 function emPintar() { emBarPintar(); }
-function emMesesToggle() { _em.mopen = !_em.mopen; emBarPintar(); }
-function emToggleMes(ym) { if (_em.sel[ym]) delete _em.sel[ym]; else _em.sel[ym] = true; emBarPintar(); }
+function emCalAnio(d) { _em.anio = (_em.anio || new Date().getFullYear()) + d; emBarPintar(); }
+function emMesesLimpiar() { _em.sel = {}; _em.limpio = true; emBarPintar(); }
+function emToggleMes(ym) { if (_em.sel[ym]) delete _em.sel[ym]; else _em.sel[ym] = true; _em.limpio = true; emBarPintar(); }
 function emChk(k, on) { _em.chk = _em.chk || {}; _em.chk[k] = !!on; emBarPintar(); }
 /* baja lo tildado, de a uno (el navegador frena descargas pegadas); Facturación LK + CH juntas = UN archivo */
 async function emBajarSeleccionados() {
