@@ -6313,7 +6313,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.34"></script>
+<script type="module" src="recepcion.js?v=27.35"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10562,7 +10562,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.34";
+const APP_VERSION = "v27.35";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -52367,24 +52367,29 @@ function pipeAccionesBtns(p) {
   if (et === "cancelado")
     return '<span class="pipe-cerrado pipe-cerrado-no">🗑 Cancelado</span>';
 
-  // v20.86: el 🗑 esta desde el minuto cero — un pedido que entro MAL no hay que analizarlo
-  // para poder sacarlo, y desde que "No valido" no existe es la unica via de descarte.
-  if (et === "ingresado")
-    return B("pipe-b-eq", "pipeAnalisis('" + emp + "','" + oid + "')", "🔎 Análisis Cred.",
-             "Abre Equifax y arranca el reloj del análisis") +
-           _enviarBtn() +
-           B("pipe-b-no", _eliminar, "🗑 Eliminar pedido",
-             "Lo saca de la PPP y queda en el log de anulados");
-
-  const _her = !!(pipeEst(p) || {}).analisis_heredado;
   // v21.48 (Luis): "agregar la opcion de marcarlo como referido" en las etapas del Speech —
   // el recurrente arranca ahi sin pasar por el analisis. gv_clin_etapa ya le da prioridad a
   // 'referenciado' sobre speech1/speech2, asi que marcarlo corta el cobro por adelantado.
+  // v27.20 (Luis, 06/10): y tambien en «Sin analizar» — un cliente que ya sabes que es
+  // referenciado (uno grande, un amigo, una razon social nueva de un cliente activo) no hay
+  // que mandarlo a Equifax primero: se marca Referenciado directo.
   const _ref = B("pipe-b-ref", "pipeFirmaAbrir('" + emp + "','" + oid + "','referenciado','Marcar REFERENCIADO'," +
              "'Cliente que NO paga por adelantado en sus primeros pedidos: un cliente muy grande, un amigo de la " +
              "empresa, o el que compra por una razon social nueva de un cliente ya activo. Exime al CLIENTE, " +
              "no solo a este pedido (Thomas, 21/09), y el pedido se programa con prioridad.',true)",
              "🤝 Referenciado", "Cuenta como habitual: no paga por adelantado, ni este pedido ni los próximos");
+
+  // v20.86: el 🗑 esta desde el minuto cero — un pedido que entro MAL no hay que analizarlo
+  // para poder sacarlo, y desde que "No valido" no existe es la unica via de descarte.
+  if (et === "ingresado")
+    return B("pipe-b-eq", "pipeAnalisis('" + emp + "','" + oid + "')", "🔎 Análisis Cred.",
+             "Abre Equifax y arranca el reloj del análisis") +
+           _ref +
+           _enviarBtn() +
+           B("pipe-b-no", _eliminar, "🗑 Eliminar pedido",
+             "Lo saca de la PPP y queda en el log de anulados");
+
+  const _her = !!(pipeEst(p) || {}).analisis_heredado;
   // ⚠ v20.86 (Luis, 21/09): DESPUES DEL ANALISIS SOLO HAY DOS ESTADOS. "No válido" ya no existe:
   // al cliente al que no se le quiere vender se le elimina el pedido (🗑, que está en todas las
   // etapas) y queda en el log de anulados, que ahora es del CLIENTE y no sólo del pedido.
@@ -52392,11 +52397,7 @@ function pipeAccionesBtns(p) {
     return (_her ? B("pipe-b-sec2", "pipeAnalisis('" + emp + "','" + oid + "')", "🔎 Re-analizar",
                      "Al cliente ya se le hizo el análisis en un pedido anterior. Esto vuelve a abrir Equifax " +
                      "y arranca el reloj de nuevo, sólo si hace falta rever el caso.") : "") +
-           B("pipe-b-ref", "pipeFirmaAbrir('" + emp + "','" + oid + "','referenciado','Marcar REFERENCIADO'," +
-             "'Cliente que NO paga por adelantado en sus primeros pedidos: un cliente muy grande, un amigo de la " +
-             "empresa, o el que compra por una razon social nueva de un cliente ya activo. Exime al CLIENTE, " +
-             "no solo a este pedido (Thomas, 21/09), y el pedido se programa con prioridad.',true)",
-             "🤝 Referenciado", "Cuenta como habitual: no paga por adelantado, ni este pedido ni los próximos") +
+           _ref +
            B("pipe-b-val", "pipeFirmaAbrir('" + emp + "','" + oid + "','no_referenciado','Marcar NO REFERENCIADO'," +
              "'Paga por adelantado sus 3 primeros pedidos. Se lo contacta por Speech 1; el pedido no se " +
              "programa hasta que pague. Vale para el CLIENTE: sus proximos pedidos arrancan en el Speech.',true)",
@@ -60791,7 +60792,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.34"></script>
+<script src="importacion.js?v=27.35"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63615,10 +63616,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.34"></script>
-<script src="hotsale.js?v=27.34"></script>
-<script src="estadisticas.js?v=27.34"></script>
-<script src="ads.js?v=27.34"></script>
+<script src="cobranzas.js?v=27.35"></script>
+<script src="hotsale.js?v=27.35"></script>
+<script src="estadisticas.js?v=27.35"></script>
+<script src="ads.js?v=27.35"></script>
 
 </body>
 </html>
