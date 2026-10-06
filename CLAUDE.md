@@ -5734,6 +5734,23 @@ otro era `crMarkSinSalida`: al marcar «↩ s/salida» el último remito caía e
 correr la pantalla: `node tests/rr-sin-remitos-cierra.cjs` (verificado que falla contra el código
 anterior). Al agregar un módulo con toggle + lista, agregarle su caso vacío a ese test.
 
+## ⚠ REGLA (Thomas, 2026-10-06, v27.53): la alarma de 5 MIN de tiempo muerto también la decide el SERVIDOR
+
+Caso Franco Ortiz (237): entró a la app 08:29 y su primera tarea fue 10:37 — 2:08 sin que sonara nada, porque la
+alarma (`_tmAlertaAbrir`, v25.82) la disparaba sólo el celular con la botonera en pantalla. Thomas (D8): *"tiene que
+andar a pesar de que pase en la app"*.
+
+- **`gv_alerta_inactivo_servidor(p_simular, p_ahora)`** (security definer, sólo postgres) — cron **136**
+  `gv-alerta-inactivo-servidor`, `1-59/2 10-21 * * *` (07:00–18:58 ART), con anti-solape.
+- En jornada = ingresó hoy (`GV_Dispositivo_Login`) o registró algo hoy, sin FJ después. Última actividad =
+  max(primer ingreso, último evento no `X`). **No avisa**: tarea abierta (EP/AP/MGI/RKI/IRI/toggles sin cierre, < 12 h),
+  fuera de 7–18 h o día no hábil, < 5 min, o ya avisado desde la última actividad.
+- Abre en `GV_Alerta_Inactivo` con `dispositivo = 'servidor'` (la misma tabla que lee la TV) y cierra la viva cuando
+  vuelve la actividad. **El celular sigue avisando igual**: los dos escriben la misma tabla.
+- Probar sin escribir: `select * from public.gv_alerta_inactivo_servidor(true, '2026-10-06 08:40-03');` → 237 ABRE ALERTA.
+- La v1 de un argumento `(boolean)` queda en la base sin llamador (el DROP se cuelga en el MCP).
+- `sql/gv_alerta_inactivo_servidor_v2751.sql` (rollback en la cabecera).
+
 ## ⚠ REGLA (06/10/2026, v27.46): el DESHACER (60 s) del operario va por RPC — nunca DELETE
 
 Caso **F46A** (legajo 191, 17:39): el operario tocó «↩ Deshacer» sobre su EP, el celular mandó
