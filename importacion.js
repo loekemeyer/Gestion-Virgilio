@@ -2440,6 +2440,24 @@ function _impSyncPaginas() {
     }, 800);
   } catch (_e) {}
 }
+// v27.18 (Thomas, 06/10): el switch «Web» avisa a LK AL TOQUE, no espera el cron de 5 min.
+// LK: web_ocultos_poke reconstruye sync_web_ocultos (oculta/muestra + cache de precios) ya, con
+// guard de 20 s (idempotente: dos toques seguidos = una reconstrucción). Si falla, el job 79 de LK
+// la rehace igual (red de seguridad), así que no se avisa error: el dato ya quedó en GV_Web_Oculto.
+var _impPokeWebT = null;
+function _impPokeWebOcultos() {
+  try {
+    if (typeof PWEB_LK_URL === "undefined" || typeof PWEB_LK_ANON === "undefined") return;
+    clearTimeout(_impPokeWebT);
+    _impPokeWebT = setTimeout(function () {
+      fetch(PWEB_LK_URL + "/rest/v1/rpc/web_ocultos_poke", {
+        method: "POST",
+        headers: { apikey: PWEB_LK_ANON, Authorization: "Bearer " + PWEB_LK_ANON, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_rebuild: true })
+      }).catch(function () {});
+    }, 800);
+  } catch (_e) {}
+}
 // v22.07 (Luis, 23/09) — switch "Cartel web" por importado: prende/apaga el badge de
 // reingreso de las páginas y el partido del pedido. OFF = fila en GV_Reingreso_Excluido
 // (la lee gv_reingresos_feed). Lectura anon (gv_reingreso_excluidos), escritura supervisor
@@ -2519,6 +2537,7 @@ async function pedImpWebVisible(codEnc, on, emp) {
     if (!_webOcul) _webOcul = new Set();
     var k = _reingNorm(cod) + "|" + emp;
     if (on) _webOcul.delete(k); else _webOcul.add(k);
+    _impPokeWebOcultos();   // v27.18 — aplicar en LK al toque, no esperar el cron de 5 min
   } catch (e) { alert("No se pudo cambiar la visibilidad web: " + (e.message || e)); }
   _pedImpRender();
 }

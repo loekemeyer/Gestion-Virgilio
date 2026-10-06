@@ -5655,6 +5655,24 @@ corrían cada 5 min eran el grueso. `sql/gv_lk_syncs_bajar_gasto_20261006_LK.sql
    pedidos de Chef del armado — un skip sacaría pedidos de la PPP. Queda en 10 min.
    Medido: ~204 → ~82 s/h en estos objetos (~60% menos). Marcadores internos de las funciones sin tocar.
 
+⚠⚠ **Y el latido del punto 3 pasó de POLL CIEGO a EVENTO (06/10, Thomas, v27.18 — gasto ~49 → casi
+nada, y el cambio se ve AL TOQUE).** El punto 3 dejaba el latido de precios de Chef / on-off web en un
+poll de 5 min porque lo que aplica vive en OTRAS bases (Chef por FDW, GV por FDW) y un trigger local de
+LK no lo puede ver. Pero los que CAMBIAN esas bases sí pueden avisarle a LK, así que ahora avisan:
+- **RPC `public.web_ocultos_poke(p_rebuild)` en LK** (anon): marca `app_settings['web_ocultos_dirty']` y
+  reconstruye `sync_web_ocultos_virgilio()` en el acto, con guard de 20 s + advisory lock (imposible
+  martillarla). El **job 79 queda GATEADO**: cada 5 min reconstruye sólo si `dirty > done` o cada 30 min
+  de backstop — ~0 cuando no cambió nada. **No se tocó `sync_web_ocultos_virgilio`** (la de Pablo): sólo se
+  decide CUÁNDO corre.
+- **on/off web (Gestión)**: `importacion.js` `pedImpWebVisible` → `_impPokeWebOcultos()` pokea
+  `web_ocultos_poke` de LK (patrón de `_impSyncPaginas`, debounce 800 ms). El switch «Web» ya no espera 5 min.
+- **precios de Chef**: TRIGGER en la base de Chef sobre `products` (after update of list_price, statement-level)
+  que hace `net.http_post` a `web_ocultos_poke`. **Vive en el proyecto de Chef, se corre a mano** (está
+  comentado en el .sql; esta sesión no tiene MCP sobre Chef). Hasta correrlo, Chef lo cubre el backstop de 30 min.
+- **precios de LK**: nadie pokea — `products`/`loke_products`/`item_precios` YA reconstruyen por su trigger
+  (`tg_item_precio_*`), así que para LK la cache siempre fue event-driven.
+`sql/gv_web_ocultos_poke_20261006_LK.sql` (RPC + gate + el trigger de Chef para copiar y pegar, con rollback).
+
 ## ⚠ REGLA (v21.10): `index.html` es UTF-8 — un byte en latin1 se multiplica solo
 
 El archivo declara `<meta charset="UTF-8">`. El 22/09 tenía **5 bytes sueltos en latin1/cp1252**,
