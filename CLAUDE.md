@@ -7950,7 +7950,7 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
   pickear con entrega hasta hoy+N (vencidas incluidas, `gv_demanda_programada_pendiente`) − Est. Madre × N/30.
   Negativo = quiebre. Con la última OC vigente del código y el % de entrega del tallerista en ese artículo.
   **Sólo artículos CON TALLERISTA** (v27.23, Luis: *"los importados no"*): proveedor activo en `OC_Maximos`. Un importado
-  que igual se le compra a un tallerista local (437E, 590E, 26…: 34 códigos) entra, porque tiene OC. 316 → 220 artículos;
+  que igual se le compra a un tallerista local (437E, 590E, 26…: 34 códigos) entra, porque tiene OC (D4, Luis 06/10: *"quedan, tienen tallerista"* — no volver a proponer sacarlos). 316 → 220 artículos;
   quiebres 45 / 61 / 90 a 10/20/30 días.
 - **Botón del panel (D3, Luis 06/10)**: a la IZQUIERDA badge violeta = talleristas a revisar; a la DERECHA semáforo
   (`gv_ads_badge_stock`): **rojo** = quiebre a 10 días · **naranja** = los que recién quiebran a 20 · **amarillo** = los que
