@@ -31,7 +31,7 @@
    ============================================================================ */
 
 var _ads = { tab: "tall", cfg: null, tall: null, tallErr: "", stock: null, stockErr: "",
-             n: 4, inc: false, umbral: 0.5, abiertos: {}, horiz: 10, q: "", cargando: 0 };
+             n: 4, inc: true, umbral: 0.5, abiertos: {}, horiz: 10, q: "", cargando: 0 };
 
 function _adsRpc(name, args) {
   var sb = window.sb;
@@ -95,7 +95,14 @@ function _adsCss() {
     "#adsOv .msg{text-align:center;padding:30px;color:#64748b;}",
     "#adsOv .err{text-align:center;padding:20px;color:#b91c1c;font-weight:700;}",
     "#adsOv .res{text-align:center;font-size:13px;color:#334155;margin:0 0 8px;}",
-    "#adsOv .tp{font-size:11px;color:#64748b;}"
+    "#adsOv .tp{font-size:11px;color:#64748b;}",
+    // v27.29: Fecha · Pedida · Recibida de la última OC se leen juntas: un recuadro las encierra
+    "#adsOv tr.sub th{position:static;}",
+    "#adsOv tr.sub .ug,#adsOv tr.sub .u1,#adsOv tr.sub .u2,#adsOv tr.sub .u3{background:#f5f3ff;}",
+    "#adsOv tr.sub .ug{border:2px solid #7c3aed;border-bottom:0;}",
+    "#adsOv tr.sub .u1{border-left:2px solid #7c3aed;}",
+    "#adsOv tr.sub .u3{border-right:2px solid #7c3aed;}",
+    "#adsOv tr.sub tbody tr:last-child .u1,#adsOv tr.sub tbody tr:last-child .u2,#adsOv tr.sub tbody tr:last-child .u3{border-bottom:2px solid #7c3aed;}"
   ].join("\n");
   document.head.appendChild(st);
 }
@@ -107,7 +114,7 @@ function openAds() {
   ov.style.display = "flex";
   _adsRpc("gv_ads_config").then(function (r) {
     var c = r && r.data;
-    if (c) { _ads.cfg = c; _ads.n = Number(c.n_ocs) || 4; _ads.inc = !!c.incluir_actual; _ads.umbral = Number(c.umbral) || 0.5; }
+    if (c) { _ads.cfg = c; _ads.n = Number(c.n_ocs) || 4; _ads.inc = c.incluir_actual == null ? true : !!c.incluir_actual; _ads.umbral = Number(c.umbral) || 0.5; }
     _adsRender(); _adsCargarTall(); _adsCargarStock();
   });
   _adsRender();
@@ -169,12 +176,12 @@ function _adsHtmlTall() {
     h += '<tr class="t' + (t.alerta ? " al" : "") + '" onclick="adsToggle(decodeURIComponent(\'' + encodeURIComponent(t.pkey).replace(/'/g, "%27") + '\'))"><td><b>' + (_ads.abiertos[t.pkey] ? "▾ " : "▸ ") + _adsEsc(t.proveedor) + "</b></td><td>" + t.arts.length +
       "</td><td>" + _adsN(t.pedido) + "</td><td>" + _adsN(t.entregado) + '</td><td class="pct">' + _adsPct(t.pct) + "</td><td>" + _adsBar(t.pct, t.alerta) + "</td></tr>";
     if (_ads.abiertos[t.pkey]) {
-      h += '<tr class="sub"><td colspan="6"><table style="margin:4px auto"><thead><tr><th>Cód.</th><th>Descripción</th><th title="Cuántas OC del rango incluyen este artículo">OC<br>evaluadas</th><th>Pedido</th><th title="Cajas que recibió Virgilio de este proveedor en el período, hasta lo pedido">Recib.<br>Virgilio</th><th>%</th><th>Última<br>OC</th><th>Pedida</th><th>Recibida</th></tr></thead><tbody>';
+      h += '<tr class="sub"><td colspan="6"><table style="margin:4px auto"><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2" title="Cuántas OC del rango incluyen este artículo">OC<br>evaluadas</th><th rowspan="2">Pedido</th><th rowspan="2" title="Cajas que recibió Virgilio de este proveedor en el período, hasta lo pedido">Recib.<br>Virgilio</th><th rowspan="2">%</th><th colspan="3" class="ug" title="Pedida y recibida de la última OC del artículo">Última OC</th></tr><tr><th class="u1">Fecha</th><th class="u2">Pedida</th><th class="u3">Recibida</th></tr></thead><tbody>';
       t.arts.forEach(function (a) {
         var al = a.pct != null && Number(a.pct) < _ads.umbral;
         h += "<tr><td><b>" + _adsEsc(a.codigo) + '</b></td><td class="desc" title="' + _adsEsc(a.descripcion) + '">' + _adsEsc(a.descripcion) + "</td><td>" + a.ocs +
           "</td><td>" + _adsN(a.pedido) + "</td><td>" + _adsN(a.entregado) + '</td><td class="' + (al ? "neg" : "") + '">' + _adsPct(a.pct) +
-          "</td><td>" + _adsFecha(a.ult_fecha) + "</td><td>" + _adsN(a.ult_cant) + "</td><td>" + _adsN(a.ult_rec) + "</td></tr>";
+          '</td><td class="u1">' + _adsFecha(a.ult_fecha) + '</td><td class="u2">' + _adsN(a.ult_cant) + '</td><td class="u3">' + _adsN(a.ult_rec) + "</td></tr>";
       });
       h += "</tbody></table></td></tr>";
     }

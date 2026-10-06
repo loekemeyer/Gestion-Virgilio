@@ -7981,4 +7981,8 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
 - Medido 06/10 (últimas 4 OC cerradas): 13 de 18 talleristas debajo del 50 %; quiebres 80 / 98 / 127 a 10/20/30 días
   (con excedente) → semáforo 80 · 18 · 29.
   El % bajo refleja también la imputación (Oscar / Tierra Nativa se reciben como Log/ Fabr): mirar antes de reclamar.
+- Sub-tabla (v27.29, Luis): **Fecha · Pedida · Recibida son de la ÚLTIMA OC** y van bajo un rótulo común «Última OC»
+  dentro de un recuadro violeta. «Incluir la OC en curso» viene **prendido** por defecto.
+- Rango y umbral se guardan en `Stock_Config` **sólo con «Guardar para el badge»**: cambiarlos sin guardar vale para esa
+  pantalla y se pierde al cerrar.
 - `sql/gv_ads_alertas_damian_v2720.sql`, `sql/gv_ads_excedente_semaforo_v2722.sql`, `tests/ads-alertas.cjs`.

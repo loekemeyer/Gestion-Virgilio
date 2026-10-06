@@ -61,6 +61,8 @@ const STOCK = [
     filas[0].click(); await espera(50);
     out.sub = document.querySelectorAll("#adsOv tr.sub tbody tr").length;
     out.subCols = [...document.querySelectorAll("#adsOv tr.sub thead th")].map((t) => t.textContent);
+    const ug = document.querySelector("#adsOv tr.sub th.ug"), u1 = document.querySelector("#adsOv tr.sub td.u1"), u3 = document.querySelector("#adsOv tr.sub td.u3");
+    out.recuadro = !!(ug && ug.colSpan === 3 && u1 && u3 && getComputedStyle(u1).borderLeftWidth === "2px" && getComputedStyle(u3).borderRightWidth === "2px");
     const f1 = document.querySelector("#adsOv tr.sub tbody tr");
     out.subFila = f1 ? [...f1.cells].slice(-3).map((c) => c.textContent) : [];
     const cerrar = [...document.querySelectorAll("#adsOv .ads-top button")].find((x) => x.textContent === "Cerrar");
@@ -87,7 +89,8 @@ const STOCK = [
   if (JSON.stringify(r.orden) !== JSON.stringify(["Oscar", "Lucho"])) fallas.push("(b) orden: " + JSON.stringify(r.orden));
   if (!r.oscarRojo || r.oscarPct !== "20 %" || r.oscarPed !== "150") fallas.push("(b) Oscar: " + r.oscarPct + " / " + r.oscarPed);
   if (r.sub !== 2) fallas.push("(b) artículos al abrir: " + r.sub);
-  if (JSON.stringify(r.subCols.slice(-3)) !== JSON.stringify(["ÚltimaOC", "Pedida", "Recibida"])) fallas.push("(b) columnas de la última OC separadas: " + JSON.stringify(r.subCols));
+  if (JSON.stringify(r.subCols.slice(-4)) !== JSON.stringify(["Última OC", "Fecha", "Pedida", "Recibida"])) fallas.push("(b) columnas de la última OC separadas: " + JSON.stringify(r.subCols));
+  if (!r.recuadro) fallas.push("(b) la última OC (fecha, pedida, recibida) no va en un recuadro");
   if (JSON.stringify(r.subFila) !== JSON.stringify(["23/09", "90", "0"])) fallas.push("(b) fila última OC: " + JSON.stringify(r.subFila));
   if (r.cerrarAncho > 200) fallas.push("(e) Cerrar ancho " + r.cerrarAncho);
   if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
