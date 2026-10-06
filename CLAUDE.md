@@ -5734,6 +5734,19 @@ otro era `crMarkSinSalida`: al marcar «↩ s/salida» el último remito caía e
 correr la pantalla: `node tests/rr-sin-remitos-cierra.cjs` (verificado que falla contra el código
 anterior). Al agregar un módulo con toggle + lista, agregarle su caso vacío a ese test.
 
+## ⚠ REGLA (06/10/2026, v27.46): el DESHACER (60 s) del operario va por RPC — nunca DELETE
+
+Caso **F46A** (legajo 191, 17:39): el operario tocó «↩ Deshacer» sobre su EP, el celular mandó
+`DELETE …Registros_Produccion_Virgilio?client_id=eq.…` con la clave pública y **anon no tiene DELETE**: 401
+silencioso, el celular dijo «Mensaje deshecho» y la TV siguió con «Pickeando F46A» y la tanda tomada. Además
+borrar libera el `client_id` y la cola offline resucita el evento (regla v18.71).
+
+Hoy `undoLastSent` llama a **`gv_deshacer_evento(client_id, legajo)`** (`_gvDeshacerServidor`, reintenta 4 veces
+si el evento todavía no llegó): **EP** → `gv_anular_picking_virgilio` (EPX + suelta la reserva) · **AP** →
+`anular_armado_virgilio` · el resto → `<opcion>X`. Sólo el propio legajo y los últimos 10 min.
+⚠ Deshacer un **TP/TAP** marca TPX/TAPX pero **no vuelve el lock** de `completada` a `tomada`.
+`sql/gv_deshacer_evento_v2746.sql`, `tests/deshacer-evento.cjs`. Mismo arreglo en `Registro-Produccion-3.0`.
+
 ## ⚠ REGLA (2026-10-01, v25.95): lo que VOLVIÓ y se recarga arranca el plazo de control DE NUEVO
 
 - Un pedido que salió, volvió (↩ s/salida en RR = **FSS**) y se recargó (CCN nuevo) cuenta las 30 hs de
