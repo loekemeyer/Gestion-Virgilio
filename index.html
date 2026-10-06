@@ -1175,6 +1175,9 @@ body:has(#optionsScreen:not(.hidden)) #btnHistDias{ display:none !important; }
 .cuar-log-bar button{ width:auto; margin:0; background:#fff; border:1px solid #cbd5e1; color:#334155;
   border-radius:9px; padding:8px 15px; font-size:14.5px; font-weight:700; cursor:pointer; }
 .cuar-log-bar button:hover{ background:#f1f5f9; }
+.cuar-log-busca{ flex:1 1 320px; min-width:220px; padding:8px 12px; border:1px solid #cbd5e1;
+  border-radius:9px; font-size:14.5px; font-family:inherit; background:#fff; }
+.cuar-log-busca:focus{ outline:none; border-color:#2563eb; }
 /* chips de estado: además de contar, filtran la tabla */
 .cuar-log-chips{ display:flex; gap:7px; flex-wrap:wrap; margin-bottom:10px; }
 .cuar-log-chip{ width:auto; margin:0; border-radius:999px; padding:7px 17px; font-size:14px;
@@ -6310,7 +6313,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.15"></script>
+<script type="module" src="recepcion.js?v=27.16"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10558,7 +10561,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.15";
+const APP_VERSION = "v27.16";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -52997,11 +53000,30 @@ function cuarLogFiltro(est) {
   _apr.cuarLogEstado = (_apr.cuarLogEstado === est) ? null : est;
   if (_pppTab === "cuarcfg") pppRenderProg();
 }
+// v27.16 (Luis, 2026-10-06): barra de búsqueda del Log de Cuarentena — NP, cliente, código,
+// razón social, motivo o comentario. Busca sobre lo que ya está cargado (no pega a la base).
+function cuarLogBuscar(v) {
+  _apr.cuarLogBusqueda = v || "";
+  if (_pppTab === "cuarcfg") pppRenderProg();
+  setTimeout(function () {
+    var el = document.getElementById("cuarLogBuscaInp");
+    if (el) { try { el.focus(); var n = el.value.length; el.setSelectionRange(n, n); } catch (_e) {} }
+  }, 0);
+}
 function cuarLogHtml() {
   if (_apr.cuarLog === undefined && !_apr.cuarLogLoading) { cuarLogCargar(); }
   const dias = _apr.cuarLogDias || 60;
-  const todos = _apr.cuarLog || [];
+  const todosReal = _apr.cuarLog || [];
   const filtro = _apr.cuarLogEstado || null;
+  const q = String(_apr.cuarLogBusqueda || "").trim().toLowerCase();
+  const toks = q ? q.split(/\s+/) : [];
+  const matchQ = function (r) {
+    if (!toks.length) return true;
+    const s = [r.np, r.clave, r.cod, r.razon_social, (r.motivos || []).join(" "), r.estado, r.comentario, r.com_persona]
+      .join(" ").toLowerCase();
+    return toks.every(function (t) { return s.indexOf(t) >= 0; });
+  };
+  const todos = todosReal.filter(matchQ);   // lo que pasa la búsqueda
   const l = filtro ? todos.filter(function (r) { return String(r.estado || "retenido") === filtro; }) : todos;
   const cuenta = function (e) { return todos.filter(function (r) { return String(r.estado || "retenido") === e; }).length; };
   let h = '<div class="cuar-log-cfg">' +
@@ -53010,6 +53032,8 @@ function cuarLogHtml() {
       '<p>Cada pedido que quedó retenido: cuándo entró, por qué, en qué estado está y el último ' +
       'comentario que alguien le dejó, con su nombre. Se escribe solo — no hay que cargar nada.</p></div>' +
       '<div class="cuar-log-bar">' +
+        '<input id="cuarLogBuscaInp" class="cuar-log-busca" type="search" placeholder="🔎 Buscar NP, cliente, código, motivo o comentario" ' +
+          'value="' + escapeHtml(String(_apr.cuarLogBusqueda || "")) + '" oninput="cuarLogBuscar(this.value)">' +
         '<select onchange="cuarLogCargar(this.value)">' +
           [7, 30, 60, 90, 365].map(function (d) {
             return '<option value="' + d + '"' + (d === dias ? " selected" : "") + '>' +
@@ -53036,12 +53060,13 @@ function cuarLogHtml() {
   if (!l.length) {
     h += '<tr><td colspan="7"><div class="cuar-log-vacio2">' +
       (_apr.cuarLogLoading ? "Buscando…"
+        : q ? "Nada que coincida con «" + escapeHtml(q) + "»."
         : filtro ? "Ningún pedido " + filtro + " en este período."
         : "Todavía no cayó ningún pedido en cuarentena en este período.") +
       '</div></td></tr>';
   } else {
     l.forEach(function (r) {
-      const i = todos.indexOf(r);   // el 📖 indexa sobre la lista completa, no sobre el filtro
+      const i = todosReal.indexOf(r);   // el 📖 indexa sobre la lista completa (cuarLogComentarios lee _apr.cuarLog[i])
       const cod = String(r.cod || "").trim();
       const est = String(r.estado || "retenido");
       const badges = aprCuarBadgesHtml({ cuarentena_motivos: r.motivos || [],
@@ -60765,7 +60790,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.15"></script>
+<script src="importacion.js?v=27.16"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63588,9 +63613,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.15"></script>
-<script src="hotsale.js?v=27.15"></script>
-<script src="estadisticas.js?v=27.15"></script>
+<script src="cobranzas.js?v=27.16"></script>
+<script src="hotsale.js?v=27.16"></script>
+<script src="estadisticas.js?v=27.16"></script>
 
 </body>
 </html>

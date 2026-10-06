@@ -3990,7 +3990,7 @@ function _impCursoRender() {
   if (sinEmb) h += '<div style="margin-bottom:10px;padding:9px 13px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:12.5px;color:#92400e"><b>⚠ ' + sinEmb + ' pedido(s) sin fecha de embarque.</b> Cargala en la columna 🚢 (dd/mm/aa) y queda guardada en todas sus líneas.</div>';
   if (!vista.length) { body.innerHTML = h + '<div class="stkpop-empty">Nada con ese filtro.</div>'; return; }
   h += '<div class="mva-tblwrap wide"><table class="imcu-tbl">' +
-    '<thead><tr><th>Proveedor</th><th>Pedido (PI)</th><th class="num">Líneas</th><th class="num">Unidades</th><th class="num">u$s</th><th class="num" title="FOB por unidad del pedido = u$s ÷ unidades. Es el precio con que se cargó el pedido (GV_Importados_Baches.fob_uni), no el FOB de hoy del maestro.">FOB<small>u$s/u</small></th><th class="num">m³</th><th>🚢 Embarque</th><th>🛬 Llegada</th><th>Estado</th></tr></thead><tbody>';
+    '<thead><tr><th>Proveedor</th><th>Pedido (PI)</th><th class="num">Líneas</th><th class="num">Unidades</th><th class="num">u$s</th><th class="num">m³</th><th>🚢 Embarque</th><th>🛬 Llegada</th><th>Estado</th></tr></thead><tbody>';
   vista.forEach(function (r) {
     const key = _impCursoKey(r);
     const abierto = _stkPop.abierto === key;
@@ -4005,14 +4005,13 @@ function _impCursoRender() {
       '<td class="num">' + r.n_lineas + '</td>' +
       '<td class="num"><b>' + _impCursoNum(r.pendiente) + '</b></td>' +
       '<td class="num" style="color:#065f46;font-weight:700">' + (Number(r.usd) > 0 ? _impCursoNum(Math.round(r.usd)) : '—') + '</td>' +
-      '<td class="num" style="color:#047857;font-weight:700">' + ((Number(r.usd) > 0 && Number(r.pendiente) > 0) ? (Math.round(Number(r.usd) / Number(r.pendiente) * 100) / 100).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—') + '</td>' +
       '<td class="num" style="color:#0369a1;font-weight:700">' + (Number(r.m3) > 0 ? (Math.round(r.m3 * 10) / 10).toLocaleString("es-AR") : '—') + '</td>' +
       '<td>' + _impCursoFechaCell(r, "emb") + '</td>' +
       '<td>' + _impCursoFechaCell(r, "lleg") + '</td>' +
       '<td>' + _impCursoEstado(r) + '</td></tr>';
     if (abierto) {
       const ls = _stkPop.lineas[key];
-      h += '<tr><td class="imcu-det" colspan="10">' + (ls ? _impCursoLineasHtml(ls, r) : '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Cargando artículos…</div>') + '</td></tr>';
+      h += '<tr><td class="imcu-det" colspan="9">' + (ls ? _impCursoLineasHtml(ls, r) : '<div style="padding:10px 14px;color:#64748b;font-size:12.5px">Cargando artículos…</div>') + '</td></tr>';
     }
   });
   h += '</tbody></table></div>';
