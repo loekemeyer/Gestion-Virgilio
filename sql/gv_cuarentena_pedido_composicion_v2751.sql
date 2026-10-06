@@ -94,10 +94,11 @@ as $function$
                     then x.cajas * x.uxb::numeric * x.precio * (1 - x.dto_vol) * x.factor_web
                     else 0 end, 2),
          (x.precio is null or x.precio <= 0),
-         coalesce(n.descripcion, nb.descripcion)
+         -- v27.52: la descripción se cruza por código NORMALIZADO (gv_cod_stock), no por el crudo:
+         -- vista_nombres_articulos guarda 26, no 026, así que los códigos con cero adelante no matcheaban.
+         (select nn.descripcion from public.vista_nombres_articulos nn
+           where public.gv_cod_stock(nn.cod) = public.gv_cod_stock(x.art) limit 1)
     from _px x
-    left join public.vista_nombres_articulos n  on n.cod  = x.art
-    left join public.vista_nombres_articulos nb on nb.cod = regexp_replace(x.art, '([0-9E])L$', '\1')
    where es_supervisor_virgilio() or gv_es_supervisor_o_servicio()
    order by x.art;
 $function$;
