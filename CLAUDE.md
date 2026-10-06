@@ -253,6 +253,19 @@ con celdas vacías, pagos separados y rótulo "Mail") pasó a una grilla de 6 co
 rótulo arriba: **~530 px**, sin una celda vacía. Lo sostiene `tests/ficha-hoja.cjs` (bloque E) en
 `pagina-LK-copia`.
 
+### ⚠ MENOS EMOJIS (Luis, 2026-10-06): limpieza visual, no decoración
+
+**Vale para TODOS los repos y toda pantalla, tabla, cartel o reporte.** Luis, con el desplegable
+del orden de prioridad del Resumen de la PPP: *"menos emojis en general"*. El emoji **decorativo**
+—el que sólo adorna un título, un botón o un bullet— se saca: una pantalla llena de íconos cansa
+y resta claridad. Una lista larga NO va como columna de 24 bullets con un emoji por línea: va en
+**grilla compacta** (CSS `column-width`), sin pictogramas al costado de cada ítem.
+
+El emoji **se deja sólo cuando ES el dato**: un ícono que la tabla usa de verdad y que la leyenda
+explica (📦/📅 de «no es demora»), un estado que se lee de un vistazo, el prefijo de un módulo que
+el operario ya tiene memorizado. La prueba es: si el emoji se saca y no se pierde información, se
+saca.
+
 ## 📌 LEER PRIMERO: `docs/ESTADO-Y-PENDIENTES.md`
 
 **Foto del estado al 2026-09-13.** Qué falta de verdad está en la base
@@ -7768,8 +7781,12 @@ public.gv_alerta_gondola_llena_telegram(true);`. Centinela 322. `sql/gv_alerta_g
 
 ## ⚠ REGLA (Luis, 2026-10-05, v27.02): el RESUMEN de la PPP dice el orden del armado y CÓMO llegó cada NP a su día
 
-- Arriba de la tabla, desplegable **🧠 Orden de prioridad del armado automático** (`PPP_ARMADO_ORDEN_HTML`): si cambia una
-  regla del armado, se cambia ese texto en el mismo pedido.
+- Arriba de la tabla, desplegable **Orden de prioridad del armado automático** (`PPP_ARMADO_ORDEN_HTML`): si cambia una
+  regla del armado, se cambia ese texto en el mismo pedido. ⚠ **v27.11 (Luis): la lista va en GRILLA compacta
+  (`.pauta-ol` con `column-width`), sin emoji por línea, y el `<details>` lleva `ontoggle="pppFitProgramar()"`**: en
+  Resumen `pppFitPantalla` deja `overflow:hidden` por el zoom-a-pantalla, así que al abrir el desplegable sin ese
+  re-fit la tabla quedaba comprimida y cortada SIN poder scrollear. Ahora, con el desplegable abierto, Resumen se ve a
+  tamaño normal y scrollea (igual que el acordeón de Programación).
 - Tocar una celda (zona, total, camiones o demora) → columna **«Cómo llegó a este día»**: 🤖 Automático + regla · ✋ A mano
   (quién y cuándo) · ISIS. Fuente **`gv_ppp_np_origen()`** (lectura, anon). ⚠ El armador NO guarda la regla por NP: la
   automática se DEDUCE (retira con día, súper, importado diferido, cron/optimizador de las 18:00 por su log, si no grupo de

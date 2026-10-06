@@ -4356,10 +4356,12 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pauta-h{ display:flex; align-items:center; gap:6px; margin-bottom:8px; font-size:15px; }
 .pauta-x{ margin-left:auto; width:auto; margin-top:0; padding:2px 8px; font-size:14px; background:#e2e8f0; color:#0f172a; border:0; border-radius:6px; cursor:pointer; }
 .pauta-sec{ margin:6px 0; } .pauta-t{ font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; }
-.pauta-ol{ list-style:none; padding-left:4px; } .pauta-f{ margin-top:8px; font-size:12px; color:#64748b; }
-.ppp-res-orden{ max-width:1140px; margin:6px auto 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px 14px; font-size:13px; }
-.ppp-res-orden summary{ cursor:pointer; text-align:center; }
-.ppp-res-orden ol{ margin:8px 0 4px 18px; padding:0; line-height:1.45; }
+.pauta-ol{ list-style:none; margin:10px 0 2px; padding:0; column-width:330px; column-gap:28px; } .pauta-f{ margin-top:8px; font-size:12px; color:#64748b; }
+.ppp-res-orden{ max-width:1140px; margin:6px auto 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 16px; font-size:12.5px; }
+.ppp-res-orden summary{ cursor:pointer; text-align:center; color:#334155; font-weight:600; }
+.ppp-res-orden ol{ margin:0; padding:0; }
+.pauta-ol li{ break-inside:avoid; padding:4px 0; line-height:1.3; border-top:1px solid #edf1f6; color:#475569; }
+.pauta-ol li b{ color:#1e3a8a; margin-right:4px; }
 .pppres-tbl td.num, .pppres-tbl th.num{ text-align:right; font-variant-numeric:tabular-nums; }
 .pppres-tbl td.np{ font-family:Consolas,Menlo,monospace; font-weight:800; color:#0f766e; white-space:nowrap; }
 .pppres-tbl td.np.npc{ cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px; }
@@ -6308,7 +6310,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.10"></script>
+<script type="module" src="recepcion.js?v=27.11"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -7427,6 +7429,12 @@ function pppFitPantalla() {
   // bloque abierto —o hay una búsqueda, que abre sola las tandas que coinciden— se ve a tamaño
   // normal y se scrollea. Cerrando el acordeón vuelve a entrar entero en la pantalla, como siempre.
   if ((typeof _pppOpen !== "undefined" && _pppOpen && _pppOpen.size) || (typeof _pppSearch !== "undefined" && _pppSearch)) {
+    body.style.zoom = "1"; body.style.overflowY = "auto"; return;
+  }
+  // v27.11 (Luis): en Resumen, con el desplegable del orden de prioridad ABIERTO el zoom
+  // comprimía la tabla y cortaba abajo sin dejar scrollear. Como el acordeón de Programación:
+  // a tamaño normal y se scrollea. El ontoggle del <details> vuelve a llamar acá al abrir/cerrar.
+  if (typeof _pppTab !== "undefined" && _pppTab === "resumen" && body.querySelector("details.ppp-res-orden[open]")) {
     body.style.zoom = "1"; body.style.overflowY = "auto"; return;
   }
   body.style.zoom = "1"; body.style.overflowY = "hidden";
@@ -10550,7 +10558,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.10";
+const APP_VERSION = "v27.11";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -39729,7 +39737,7 @@ function pppPautaPop(np) {
   ov.style.display = "flex";
 }
 const PPP_ARMADO_ORDEN_HTML =
-  '<details class="ppp-res-orden"><summary>🧠 <b>Orden de prioridad del armado automático</b> (tocá para ver) — cada NP frena en la primera que la agarra; el botón P# de cada celda dice cuál</summary><ol class="pauta-ol">' +
+  '<details class="ppp-res-orden" ontoggle="pppFitProgramar()"><summary><b>Orden de prioridad del armado automático</b> (tocá para ver) — cada NP frena en la primera que la agarra; el botón P# de cada celda dice cuál</summary><ol class="pauta-ol">' +
   '<li><b>P1</b> Retira: zona «Retira», ningún pase de reparto lo toma</li>' +
   '<li><b>P2</b> Diferido programado antes del reingreso: se saca de su tanda</li>' +
   '<li><b>P3</b> Ya programado: no se vuelve a evaluar</li>' +
@@ -39895,8 +39903,8 @@ function pppResumenHtml(prog) {
     '<td class="num">' + Tcam + '</td><td class="num' + (demT != null && demT >= PPP_DEM_ALERTA ? ' hot' : '') + '">' + (demT != null ? demT : "·") + '</td></tr>';
   return head +
     '<div class="ppp-res-leg" title="Un camión = un grupo de zonas (regla del 23/09): Capital Sur = Z1 · Capital Centro = Z2 · Capital Oeste = Z3 (juntas si cada una < 1 m³) · GBA Sur = Z4 · GBA Oeste = Z5 · GBA Norte = Z6+Z7. Cada grupo sale UNA vez: no se parte por m³ hasta los ' + CAMM3 + ' m³ que entran físicamente en el camión. La demora se cuenta en días corridos entre la fecha del pedido y la de entrega.">' +
-      '🚚 <b>1 camión = 1 grupo de zonas</b>: Z1 · Z2 · Z3 (Z2+Z3 juntas si cada una &lt; 1 m³) · Z4 · Z5 · Z6+Z7 · Súper 1 x cliente · Retira sin camión. Sin partir hasta <b>' + CAMM3 + ' m³</b>. ' +
-      '⏱ <b>Demora</b> = la del pedido que más esperó — tocala.<br>📦 / 📅 = no es demora: importado que todavía no llegó, o retiro / turno que eligió el cliente. Se cuenta desde esa fecha.</div>' + PPP_ARMADO_ORDEN_HTML +
+      '<b>1 camión = 1 grupo de zonas</b>: Z1 · Z2 · Z3 (Z2+Z3 juntas si cada una &lt; 1 m³) · Z4 · Z5 · Z6+Z7 · Súper 1 x cliente · Retira sin camión. Sin partir hasta <b>' + CAMM3 + ' m³</b>. ' +
+      '<b>Demora</b> = la del pedido que más esperó — tocala.<br>📦 / 📅 = no es demora: importado que todavía no llegó, o retiro / turno que eligió el cliente. Se cuenta desde esa fecha.</div>' + PPP_ARMADO_ORDEN_HTML +
     '<div class="ppp-restbl-wrap"><table class="ppp-restbl"><thead><tr>' +
       '<th>Fecha</th><th>Día</th><th class="tot">Total<br>m³</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Cam.</th><th>Mayor<br>demora</th>' +
     '</tr></thead><tbody>' + rows + totRow + '</tbody></table></div>';
@@ -60733,7 +60741,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.10"></script>
+<script src="importacion.js?v=27.11"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -63556,9 +63564,9 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.10"></script>
-<script src="hotsale.js?v=27.10"></script>
-<script src="estadisticas.js?v=27.10"></script>
+<script src="cobranzas.js?v=27.11"></script>
+<script src="hotsale.js?v=27.11"></script>
+<script src="estadisticas.js?v=27.11"></script>
 
 </body>
 </html>
