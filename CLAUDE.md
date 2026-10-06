@@ -7431,8 +7431,7 @@ negativo para usos prácticos de importación"*.
 | importado | componente GP2 | factor |
 |---|---|---|
 | 587C · 505C · 1546903 · 523C · 1000900 | Z23B · Z23A · C13 · E13 · D1 | 1 |
-| 323ES | GRJ31 | 1 |
-| 323E / 838E | GRJ31 | 0,2 / 0,8 |
+| 323E / 838E | **GRJ31 + 323E + 838E** (pool compartido, totalidad) | 1 c/u (v26.99, Thomas 06/10) |
 | 942E · 943E · 944E · 945E · 948E | Z47 + Z47-M505D + 942E · Z44 + Z44-M505C + 943E · Z48 + Z48-M505 + 944E · Z49 + Z49-M505F + 945E · Z45 + Z45-M505B + 948E | 1 c/u, se suman (v26.00) |
 | 522ES | GRJ33 | 1 |
 | 702E · 106E | 702 + 702E + 102E · 723 + 106E | 1 c/u (v26.03) |
@@ -7452,7 +7451,7 @@ negativo para usos prácticos de importación"*.
   + GP2). `stock_total` / `stock_actual` / `stock_cajas` **no se tocaron** (los leen otros). El módulo de importación
   lee el neto: la cuenta de «a pedir», los meses y la pantalla muestran el negativo; la celda Stock lleva **🏭+N**.
 - Al 01/10: 22 códigos en negativo (583E −210, 969E −204…); 505C +21.605, 587C +20.377, 323E +600 (444 neto).
-- ⚠ GRJ31 cuenta en 323ES (100 %) **y** en 323E/838E (20/80), a propósito (Luis, 01/10, D13: *"323ES es la pieza para fabricar los otros dos, así que la evaluación de esa es particular"*). No es doble conteo: no volver a proponer sacarlo.
+- ⚠⚠ **v26.99 (Thomas, 06/10): GRJ31 es un POOL COMPARTIDO.** Tanto 323E como 838E cuentan **GRJ31 (totalidad) + 323E terminado (totalidad) + 838E terminado (totalidad)**, los tres a factor 1 — así los dos ven el pool neteado por lo ya despachado como cualquiera de los dos (3000 − 600 − 396 = 2.004 para ambos). La leyenda del pop-up los lista a los tres (se arma sola de `GV_Importados_Equiv_GP2`). **El 323ES ya NO ve GRJ31** (*"no va más"*): se borró su fila `(323ES, GRJ31)`. Esto **RETIRA** la regla D13 (Luis, 01/10, 20/80 + 323ES 100%): Thomas la dio vuelta — no volver al 20/80. Que GRJ31 figure entero en 323E y en 838E a la vez es a propósito (cada ítem ve el pool compartido; no se suman entre sí para comprar). Backup de las 3 filas viejas en el chat de la sesión 01RNVK8H (323E/GRJ31/0,2 · 838E/GRJ31/0,8 · 323ES/GRJ31/1).
 - **v26.00 (Luis, D19):** un importado puede tener VARIOS componentes y se suman; los que GP2 todavía no tiene (Z47, Z44-M505C, GRJ33…) cuentan solos cuando se creen (cruce por `upper`). El pop-up los lista todos. ⚠ Si el terminado de GP2 (942E…) se manda a Virgilio, tiene que salir del inventario de GP2 o cuenta dos veces.
 - **v26.86 (Luis, 05/10): suma TAMBIÉN el componente de GP2 con el MISMO código** (323E en GP2 = el artículo terminado), factor 1, salvo que ya esté en `GV_Importados_Equiv_GP2` o el código sea dual. Bodegas = todo GP2 menos Virgilio (talleristas incluidos). Lateral `e_mismo`, centinela 323. `sql/gv_importados_gp2_mismo_codigo_v2686.sql`.
 - **v26.03 (Luis, 01/10, D23): también suma STOCK DE VIRGILIO de otro código que se convierte en el importado**
