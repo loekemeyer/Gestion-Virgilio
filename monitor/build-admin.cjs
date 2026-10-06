@@ -362,44 +362,33 @@ function puntCelda(leg) {
     " · período " + o.tandas + " tandas: " + n1(o.indice_per) + " → " + o.puntaje_per;
   return '<td class="op-punt cx' + cls + '" data-pop="punt" data-leg="' + esc(leg) + '" title="' + esc(tit) + '">' + p + (o.publicable ? "" : "*") + '</td>';
 }
-/* v27.18 (Luis, 06/10): el pop-up arranca PLANO — qué significa el número para un humano.
-   El índice se traduce a «X % más rápido / más lento que el promedio». El detalle técnico
-   (tanda por tanda, fórmula, tramos) queda colapsado abajo para quien lo quiera. */
-function puntFrase(idx) {
-  var pct = Math.round((Number(idx) - 1) * 100);
-  if (pct >= 3)  return "pickeó un <b>" + pct + " % más rápido</b> que el promedio del depósito";
-  if (pct <= -3) return "pickeó un <b>" + (-pct) + " % más lento</b> que el promedio del depósito";
-  return "pickeó <b>al ritmo del promedio</b> del depósito";
-}
+/* v27.19 (Luis, 06/10): el pop-up titula con lo ÚNICO que importa — cuánto más rápido/lento
+   que el tiempo estimado, en PROMEDIO (ej. «0:10 más rápido»). Abajo, el desglose por tanda
+   recortado: Tanda · Día · Estimado · Real · Dif. Nada de dificultad, líneas, paradas ni fórmula. */
 function popPuntaje(leg) {
   var o = PUNT && PUNT[leg];
   if (!o) return '<div class="pop-empty">' + esc(PUNT_ERR || "Sin tandas de picking en 60 días") + '</div>';
-  var prov = !o.publicable, nT = Math.min(20, o.tandas);
-  var nombre = esc(String(o.nombre || leg).split(" ")[0] || "El operario");
+  var det = o.detalle || [];
+  var hm = function (min) { return nH(Math.abs(Number(min) || 0) / 60); };   // minutos → H:MM
+  var dif = 0, nd = 0, fr = 0;
+  det.forEach(function (t) { if (t.frenada) fr++; var d = Number(t.tamano) - Number(t.real); if (isFinite(d)) { dif += d; nd++; } });
+  var avg = nd ? dif / nd : 0;                                               // + = más rápido que el estimado
+  var frase, col;
+  if (avg >= 0.5)       { frase = 'En promedio termina <b>' + hm(avg) + ' más rápido</b> que el tiempo estimado'; col = '#34d399'; }
+  else if (avg <= -0.5) { frase = 'En promedio termina <b>' + hm(avg) + ' más lento</b> que el tiempo estimado'; col = '#fca5a5'; }
+  else                  { frase = 'En promedio termina <b>al ritmo del tiempo estimado</b>'; col = '#cbd5e1'; }
   var head =
     '<div class="pop-sub" style="text-align:center"><span class="pop-k">' + esc(o.nombre || leg) + '</span></div>' +
-    '<div class="pop-big"><b>' + o.puntaje_ult + '</b><span> de 10</span>' + (prov ? ' <span style="color:#fbbf24;font-size:calc(1.9*var(--u))">provisorio</span>' : '') + '</div>' +
-    '<div class="pop-frase">En sus últimas ' + nT + ' tandas, ' + nombre + ' ' + puntFrase(o.indice_ult) + '.</div>' +
-    '<div class="pop-sub"><b style="color:#cbd5e1">5 o 6</b> es el ritmo normal del depósito. Más alto = más rápido; cada punto arriba o abajo es un 10 % de velocidad. Mide la <b style="color:#cbd5e1">velocidad</b>, no si el pedido quedó bien armado.</div>' +
-    (prov
-      ? '<div class="pop-sub" style="color:#fbbf24">Son pocas tandas todavía (menos de 10): el número puede moverse bastante. Recién se toma en firme con 10 o más.</div>'
-      : (o.margen_pts != null ? '<div class="pop-sub">Puede variar ±' + n1(o.margen_pts) + ' puntos según las tandas que le toquen.</div>' : "")) +
-    '<div class="pop-sub">Mirando los 60 días completos (' + o.tandas + ' tandas): puntaje <span class="pop-k">' + o.puntaje_per + '</span>.</div>';
-  var det = o.detalle || [];
+    '<div class="pop-frase" style="color:' + col + ';font-size:calc(2.6*var(--u));font-weight:700">' + frase + '</div>' +
+    '<div class="pop-sub" style="text-align:center">Sobre sus últimas ' + nd + ' tandas de picking · puntaje <span class="pop-k">' + o.puntaje_ult + (o.publicable ? '' : '*') + '</span> de 10' + (o.publicable ? '' : ' (provisorio, menos de 10 tandas)') + '.</div>';
   if (!det.length) return head;
-  var fr = 0;
   var body = det.map(function (t) {
-    if (t.frenada) fr++;   // v26.74 (D17): tanda FRENADA → sólo la parte de este operario (sus tramos)
-    return '<tr><td class="pop-k"' + (t.frenada ? ' title="Tanda frenada: cuenta sólo la parte que pickeó este operario"' : '') + '>' + esc(t.tanda) + (t.frenada ? ' ⏸' : '') + '</td><td>' + esc(t.fecha) + '</td><td>' + esc(String(t.nivel || "")) + ' (' + t.grado + ')</td><td>' +
-      t.lineas + ' / ' + n1(t.cajas) + '</td><td>' + t.paradas + ' / ' + t.esc + '</td><td>' + n1(t.tamano) + '</td><td>' + n1(t.real) + '</td><td class="pop-k">' + n1(t.indice) + '</td></tr>'; }).join("");
-  var tr = (o.tramos || []).map(function (x, i) { return (i * 10 + 1) + "-" + (i * 10 + 10) + ": " + n1(x); }).join(" · ");
+    var d = Number(t.tamano) - Number(t.real);
+    var dc = d >= -0.0083 ? '#34d399' : '#fca5a5', ds = (d >= 0 ? '+' : '−') + hm(d);
+    return '<tr><td class="pop-k"' + (t.frenada ? ' title="Tanda frenada: sólo la parte que pickeó este operario"' : '') + '>' + esc(t.tanda) + (t.frenada ? ' ⏸' : '') + '</td><td>' + esc(t.fecha) + '</td><td>' + hm(t.tamano) + '</td><td>' + hm(t.real) + '</td><td class="pop-k" style="color:' + dc + '">' + ds + '</td></tr>'; }).join("");
   return head +
-    '<details class="pop-det"><summary>▸ Ver el detalle técnico (tanda por tanda)</summary>' +
-    '<div class="pop-sub" style="margin-top:1vh">Puntaje = 5,5 + 10 × (índice − 1), 1 a 10; índice = tiempo esperado (esquema D17) ÷ tiempo real (picking + cola). Últimas 20: índice ' + n1(o.indice_ult) + '. Período: índice ' + n1(o.indice_per) + '.</div>' +
-    (tr ? '<div class="pop-sub">Índice por tramo de 10 tandas (de la más vieja a la más nueva): ' + esc(tr) + '</div>' : "") +
-    '<table class="pop-cmp"><thead><tr><th>Tanda</th><th>Día</th><th>Dificultad</th><th>Lín / cajas</th><th>Paradas / esc.</th><th>Esperado min</th><th>Real min</th><th>Índice</th></tr></thead><tbody>' + body + '</tbody></table>' +
-    (fr ? '<div class="pop-sub">⏸ tanda frenada: entra sólo la parte que pickeó este operario (sus tramos; el que retoma vuelve a pagar el arranque).</div>' : '') +
-    '</details>';
+    '<table class="pop-cmp" style="margin-top:1vh"><thead><tr><th>Tanda</th><th>Día</th><th>Estimado</th><th>Real</th><th>Dif</th></tr></thead><tbody>' + body + '</tbody></table>' +
+    '<div class="pop-sub">Dif = estimado − real: <b style="color:#34d399">verde</b> terminó antes, <b style="color:#fca5a5">rojo</b> tardó más.' + (fr ? ' ⏸ tanda frenada: sólo la parte que pickeó este operario.' : '') + '</div>';
 }
 function instrumentar() {
   var D = window.__MA_D || {};
