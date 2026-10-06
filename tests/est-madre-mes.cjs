@@ -191,12 +191,18 @@ ok(/volvió vacío/.test(src) && /No se bajó nada/.test(src), "una RPC vacía o
       for (let i = 0; i < 30 && !/Madre LK <b>/.test(d.innerHTML); i++) await espera(100);
     }, m.lk.filas);
     const bar = await p.$eval("#emBar", (e) => e.textContent);
-    ok(/Subir Estadística Madre/.test(bar) && /Subir Costos/.test(bar) && /Bajar por mes/.test(bar), "pantalla: la barra tiene los tres botones");
-    ok(/Madre LK 6/.test(bar) && /Costos LK sin subir/.test(bar), "pantalla: dice qué plantillas hay (" + bar.slice(0, 160) + ")");
-    await p.evaluate(() => { window._em.sel = { "2026-09": true }; window.emAbrir(); });
-    const dis = await p.$$eval("#emOv .sal button", (bs) => bs.map((b) => b.disabled));
-    ok(dis[0] === false && dis[2] === true, "pantalla: Pedidos LK habilitado, Facturación LK + CH no (falta Costos)");
-    const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }), p.click("#emOv .sal button")]);
+    ok(/Importar \/ exportar/i.test(bar) && /Subir Estadística Madre/.test(bar) && /Subir Costos/.test(bar) && /Descargar seleccionados/.test(bar), "pantalla: sector Importar / exportar con sus botones");
+    ok(/Est\. Madre LK 6/.test(bar) && /Costos LK sin subir/.test(bar), "pantalla: dice qué plantillas hay (" + bar.slice(0, 200) + ")");
+    /* meses: varios a la vez desde el desplegable */
+    await p.evaluate(() => { window._em.sel = {}; window.emMesesToggle(); });
+    const nMeses = await p.$$eval("#emBar .mpop button:not(.listo)", (bs) => bs.length);
+    ok(nMeses >= 12, "pantalla: el desplegable ofrece los meses (" + nMeses + ")");
+    await p.evaluate(() => { window.emToggleMes("2026-09"); window.emToggleMes("2026-08"); window.emMesesToggle(); });
+    const txtMes = await p.$eval("#emMesesBtn", (e) => e.textContent);
+    ok(/sep 26/.test(txtMes) && /ago 26/.test(txtMes), "pantalla: el botón de meses dice los elegidos (" + txtMes + ")");
+    /* sólo Pedidos LK tildado (Costos no está subido) */
+    await p.evaluate(() => { window.emChk("pch", false); window.emChk("flk", false); window.emChk("fch", false); window._em.sel = { "2026-09": true }; window.emBarPintar(); });
+    const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }), p.click("#emBajarSel")]);
     ok(dl.suggestedFilename() === "Pedidos_LK_sep26.xlsx", "pantalla: nombre (" + dl.suggestedFilename() + ")");
     const w2 = X.read(fs.readFileSync(await dl.path()), { type: "buffer" });
     const s2 = w2.Sheets[w2.SheetNames[0]];
@@ -204,15 +210,15 @@ ok(/volvió vacío/.test(src) && /No se bajó nada/.test(src), "una RPC vacía o
     /* un código nuestro sin fila en la planilla: AVISA antes de bajar y lo pone al fondo en naranja */
     await p.evaluate(() => { window.__extra = true; });
     let aviso = ""; p.once("dialog", (dg) => { aviso = dg.message(); dg.accept(); });
-    const [dl3] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }), p.click("#emOv .sal button")]);
+    const [dl3] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }), p.click("#emBajarSel")]);
     ok(/999E/.test(aviso) && /NARANJA/.test(aviso), "pantalla: avisa antes de bajar (" + aviso.slice(0, 80) + ")");
     const w3 = X.read(fs.readFileSync(await dl3.path()), { type: "buffer" }), s3 = w3.Sheets[w3.SheetNames[0]];
     const ult = X.utils.decode_range(s3["!ref"]).e.r + 1;
     ok(s3["A" + ult] && s3["A" + ult].v === "999E" && s3["C" + ult].v === 7, "pantalla: el 999E sale en la última fila");
     await p.evaluate(() => { window.__extra = false; window.__vacio = true; });
     let bajo = false; p.once("download", () => { bajo = true; });
-    await p.click("#emOv .sal button");
-    await p.waitForFunction(() => /No se bajó nada/.test(document.querySelector("#emOv .res").textContent), null, { timeout: 5000 });
+    await p.click("#emBajarSel");
+    await p.waitForFunction(() => /No se bajó nada/.test(document.querySelector("#emBar").textContent), null, { timeout: 5000 });
     ok(!bajo, "pantalla: un mes vacío no baja nada");
     ok(!errs.length, "pantalla sin errores JS: " + errs.join(" | "));
   } finally { await b.close(); }

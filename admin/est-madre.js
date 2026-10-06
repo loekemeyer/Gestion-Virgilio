@@ -46,6 +46,20 @@ var _estMadreUnidad = (function () { try { return localStorage.getItem("em_unida
 var _estMadreUxbErr = null;   // si la lectura del uxb falló, el modo unidades queda apagado (no se muestra un 0)
 
 var EM_CSS = `
+/* v27.43 — compacto (Luis: «está horrible»): título chico, una sola fila de filtros */
+#estadistica-madre .page-header { margin-bottom: 8px; }
+#estadistica-madre .page-header h1 { font-size: 20px; margin: 0; }
+#estadistica-madre .page-sub { font-size: 12px; margin: 2px 0 0; }
+#estadistica-madre .est-madre-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 8px 10px; padding: 8px 12px !important; margin-bottom: 10px; width: fit-content; max-width: 100%; margin-left: auto; margin-right: auto; }
+#estadistica-madre .em-sec-tit { font-size: 10.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: #64748b; }
+#estadistica-madre .est-madre-toolbar .em-buscar,
+#estadistica-madre .est-madre-toolbar select { width: auto; margin: 0; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 8px;
+  font-size: 13px; font-family: inherit; background: #f9fafb; }
+#estadistica-madre .est-madre-toolbar .em-buscar { width: 230px; }
+#estadistica-madre .est-madre-toolbar .em-unidad-sw button { padding: 6px 11px; font-size: 13px; }
+#estadistica-madre .est-madre-toolbar .em-bajar { width: auto; margin: 0; padding: 6px 12px; font-size: 13px; }
+#estadistica-madre .est-madre-toolbar #estMadreStatus { font-size: 11.5px; margin: 0; color: #64748b; }
 /* =========================================================
    ESTADÍSTICA MADRE — tabla cajas x mes por artículo (módulo único est-madre.js)
    ========================================================= */
@@ -494,40 +508,23 @@ var EM_HTML =
     '<b>Est Madre</b> es la misma columna «Est. Madre caj/mes» de Stocks: el principal suma a sus secundarios. ' +
     'Es un solo cuadro: el panel de LK y Gestión muestran este mismo.</p>' +
   '</div></div>' +
+  /* v27.43 (Luis, 06/10): un solo sector de filtros, compacto: buscar · meses a mostrar · cajas/unidades · Descargar E.M.
+     (baja los meses que se están mostrando). Lo de importar/exportar vive en la barra de Gestión. */
   '<div class="card est-madre-toolbar">' +
-    '<div class="est-madre-search-wrap">' +
-      '<label for="estMadreSearch">Buscar artículo (cod o descripción)</label>' +
-      '<input type="text" id="estMadreSearch" placeholder="Ej: 505 o &quot;Abrelatas&quot;" autocomplete="off" oninput="filtrarEstadisticaMadre()" />' +
+    '<span class="em-sec-tit">Ver la tabla</span>' +
+    '<input type="text" id="estMadreSearch" class="em-buscar" placeholder="Buscar: 505 o &quot;Abrelatas&quot;" autocomplete="off" oninput="filtrarEstadisticaMadre()" title="Buscar artículo (código o descripción)" />' +
+    '<select id="estMadreMonths" onchange="aplicarRangoEstadisticaMadre()" title="Meses a mostrar">' +
+      '<option value="6">Últimos 6 meses</option>' +
+      '<option value="12">Últimos 12 meses</option>' +
+      '<option value="24" selected>Últimos 24 meses</option>' +
+      '<option value="36">Últimos 36 meses</option>' +
+      '<option value="0">Todo el historial</option>' +
+    '</select>' +
+    '<div class="em-unidad-sw" id="estMadreUnidadSw" title="Ver en">' +
+      '<button type="button" data-u="caj" onclick="setEstMadreUnidad(\'caj\')" title="Cajas, como Stocks">Cajas</button>' +
+      '<button type="button" data-u="uni" onclick="setEstMadreUnidad(\'uni\')" title="Unidades = cajas × unidades por caja (uxb de Gestión)">Unidades</button>' +
     '</div>' +
-    '<div class="est-madre-range-wrap">' +
-      '<label for="estMadreMonths">Meses a mostrar</label>' +
-      '<select id="estMadreMonths" onchange="aplicarRangoEstadisticaMadre()">' +
-        '<option value="12">Últimos 12 meses</option>' +
-        '<option value="24" selected>Últimos 24 meses</option>' +
-        '<option value="36">Últimos 36 meses</option>' +
-        '<option value="0">Todo el historial</option>' +
-      '</select>' +
-    '</div>' +
-    '<div class="est-madre-range-wrap" style="min-width:auto">' +
-      '<label>Ver en</label>' +
-      '<div class="em-unidad-sw" id="estMadreUnidadSw">' +
-        '<button type="button" data-u="caj" onclick="setEstMadreUnidad(\'caj\')" title="Cajas, como Stocks">Cajas</button>' +
-        '<button type="button" data-u="uni" onclick="setEstMadreUnidad(\'uni\')" title="Unidades = cajas × unidades por caja (uxb de Gestión)">Unidades</button>' +
-      '</div>' +
-    '</div>' +
-    '<div class="est-madre-range-wrap" style="min-width:auto">' +
-      '<label for="estMadreDisruptivasMonth">Mes a descargar</label>' +
-      '<select id="estMadreDisruptivasMonth"><option value="">Seleccionar mes...</option></select>' +
-    '</div>' +
-    '<div class="est-madre-range-wrap" style="min-width:auto"><label>&nbsp;</label>' +
-      '<button class="btn-primary" onclick="descargarReporteVentasDisruptivas()" title="Descargar reporte de ventas anómalas del mes seleccionado">⬇ Descargar Disruptivas</button>' +
-    '</div>' +
-    '<div class="est-madre-range-wrap" style="min-width:auto"><label>&nbsp;</label>' +
-      '<button class="btn-primary" onclick="descargarEstadisticaMadreExcel()" title="Descargar en Excel los artículos de Stocks con su Est Madre y las cajas de cada mes">⬇ Descargar Excel</button>' +
-    '</div>' +
-    '<div class="est-madre-range-wrap" style="min-width:auto"><label>&nbsp;</label>' +
-      '<button class="btn-primary" onclick="cargarEstadisticaMadre(true)" title="Volver a leer Stocks y las ventas">↻ Actualizar</button>' +
-    '</div>' +
+    '<button class="btn-primary em-bajar" onclick="descargarEstadisticaMadreExcel()" title="Bajar en Excel la Est. Madre con los meses que se están mostrando">⬇ Descargar E.M.</button>' +
     '<div id="estMadreStatus" class="cliente-lookup-status"></div>' +
   '</div>' +
   '<div class="card est-madre-card"><div class="est-madre-table-wrap">' +
@@ -946,7 +943,8 @@ function descargarEstadisticaMadreExcel() {
   if (!_estMadreRows || !_estMadreAllYms || !_estMadreAllYms.length) { alert("No hay datos cargados. Esperá a que termine de cargar la Estadística Madre."); return; }
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = "Generando…"; }
   try {
-    var yms = _estMadreAllYms.slice().reverse();
+    /* v27.43: los meses que se están mostrando (selector «meses a mostrar»), del más nuevo al más viejo */
+    var yms = (_estMadreYms && _estMadreYms.length) ? _estMadreYms.slice() : _estMadreAllYms.slice().reverse();
     var items = _estMadreRows.slice();
     var sortGuard = _estMadreSort; _estMadreSort = { col: "rank", dir: "asc" };
     _applyEstMadreSort(items);

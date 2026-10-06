@@ -7995,6 +7995,8 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
 
 ## ⚠ REGLA (Luis, 2026-10-06, v27.36): Estadísticas ISIS vive en la pestaña 📈 EST. MADRE — plantillas subidas y bajada por mes
 
+**Dos sectores (Luis, v27.43 «está horrible»)**: (1) **Ver la tabla**, en `admin/est-madre.js` (vale para LK y Gestión): buscar · meses a mostrar · Cajas/Unidades · «⬇ Descargar E.M.» (baja los meses mostrados); se fueron «Mes a descargar», «Descargar Disruptivas» y «Actualizar» (los disruptivos van en la bajada de pedidos). (2) **Importar / exportar**, en la barra de Gestión: Subir Est. Madre · Subir Costos · meses (varios) · casillas Pedidos LK / Pedidos CH / Facturación LK / Facturación CH · «⬇ Descargar seleccionados» (Facturación LK + CH tildadas = un solo archivo en una columna).
+
 El botón «📑 Estadísticas ISIS» salió del panel supervisor (`openEstadisticasIsis` queda en `estadisticas.js` sin
 puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBar` (`emBarPintar`, en
 `estadisticas.js`; **`admin/est-madre.js` no se toca**, es compartido con la página LK):

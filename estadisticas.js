@@ -727,46 +727,96 @@ function emXlsxBytes(X, hojas, tam) {
 var _EM_SAL = [
   { k: "plk", tipo: "ped", emp: "lk", t: "Pedidos LK", pl: "madre_lk" },
   { k: "pch", tipo: "ped", emp: "ch", t: "Pedidos CH", pl: "madre_ch" },
+  { k: "flk", tipo: "fac", emp: "lk", t: "Facturación LK", pl: "costos_lk" },
+  { k: "fch", tipo: "fac", emp: "ch", t: "Facturación CH", pl: "costos_ch" },
+  /* las dos tildadas → un solo archivo con LK y Chef en la misma columna, como «Aportes Gastos» */
   { k: "fac", tipo: "fac", emp: "lk", t: "Facturación LK + CH", pl: "costos_lk", pl2: "costos_ch" }
 ];
+var _EM_CHK = [["plk", "Pedidos LK"], ["pch", "Pedidos CH"], ["flk", "Facturación LK"], ["fch", "Facturación CH"]];
 function _emCss() {
   if (document.getElementById("emCss")) return;
   var st = document.createElement("style"); st.id = "emCss";
   st.textContent = [
-    "#emBar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:center;padding:6px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font:12.5px system-ui,Segoe UI,Arial,sans-serif;color:#0f172a;}",
-    "#emBar button,#emOv button{width:auto;margin-top:0;padding:5px 11px;font-size:12.5px;line-height:1.25;border:none;border-radius:8px;font-weight:800;cursor:pointer;background:#1e3a8a;color:#fff;}",
+    /* v27.43 (Luis, 06/10: «está horrible»): un sector compacto de Importar / exportar arriba del cuadro */
+    "#emBar{display:flex;justify-content:center;padding:6px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font:12.5px system-ui,Segoe UI,Arial,sans-serif;color:#0f172a;}",
+    "#emBar .sec-box{display:grid;gap:4px;justify-items:center;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:5px 10px;max-width:100%;}",
+    "#emBar .fila{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;justify-content:center;}",
+    "#emBar .tit{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#64748b;}",
+    "#emBar button{width:auto;margin-top:0;padding:4px 10px;font-size:12.5px;line-height:1.25;border:none;border-radius:7px;font-weight:800;cursor:pointer;background:#1e3a8a;color:#fff;}",
     "#emBar button.sec{background:#e2e8f0;color:#0f172a;}",
-    "#emBar .pl{font-size:11.5px;color:#475569;}#emBar .pl b{color:#0f172a;}#emBar .pl .no{color:#b91c1c;font-weight:700;}",
-    "#emBar .msg{font-size:12px;font-weight:700;color:#1e3a8a;}#emBar .msg.err{color:#b91c1c;}",
-    "#emOv{position:fixed;inset:0;z-index:9600;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;padding:40px 12px;font-family:system-ui,Segoe UI,Arial,sans-serif;color:#0f172a;}",
-    "#emOv .cj{background:#fff;border-radius:12px;padding:14px 16px;max-width:620px;width:fit-content;display:grid;gap:10px;justify-items:center;box-shadow:0 10px 40px rgba(0,0,0,.25);}",
-    "#emOv h3{margin:0;font-size:15px;}",
-    "#emOv .ms{display:grid;grid-template-columns:repeat(6,auto);gap:5px;}",
-    "#emOv .ms button{background:#f1f5f9;color:#0f172a;font-weight:600;padding:5px 8px;}#emOv .ms button.on{background:#1e3a8a;color:#fff;}",
-    "#emOv .sal{display:grid;grid-template-columns:repeat(3,auto);gap:6px;}",
-    "#emOv .sal button:disabled{opacity:.45;cursor:not-allowed;}",
-    "#emOv .x{background:#e2e8f0;color:#0f172a;}",
-    "#emOv .nota{font-size:11.5px;color:#475569;max-width:560px;text-align:center;line-height:1.35;}",
-    "#emOv .res{font-size:12px;font-weight:700;color:#1e3a8a;text-align:center;}#emOv .res.err{color:#b91c1c;}"
+    "#emBar button:disabled{opacity:.45;cursor:not-allowed;}",
+    "#emBar .sep{width:1px;align-self:stretch;background:#e2e8f0;}",
+    "#emBar label.ck{display:inline-flex;gap:3px;align-items:center;font-weight:600;cursor:pointer;white-space:nowrap;}",
+    "#emBar label.ck input{width:auto;margin:0;}",
+    "#emBar .mwrap{position:relative;}",
+    /* los meses se abren EN el recuadro (una fila más), no flotando: el iframe de abajo los tapaba */
+    "#emBar .mpop{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center;}",
+    "#emBar .mpop button{background:#f1f5f9;color:#0f172a;font-weight:600;padding:3px 7px;white-space:nowrap;}#emBar .mpop button.on{background:#1e3a8a;color:#fff;}",
+    "#emBar .mpop button.listo{background:#1e3a8a;color:#fff;font-weight:800;}",
+    "#emBar .pl{font-size:11px;color:#64748b;}#emBar .pl b{color:#0f172a;}#emBar .pl .no{color:#b91c1c;font-weight:700;}",
+    "#emBar .msg{font-size:11.5px;font-weight:700;color:#1e3a8a;text-align:center;max-width:900px;}#emBar .msg.err{color:#b91c1c;}"
   ].join("\n");
   document.head.appendChild(st);
 }
 function _emFecha(t) { var d = new Date(t); return isNaN(d) ? "" : String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0"); }
+function _emMesCorto(ym) { var p = String(ym).split("-"), m = _EI_MES3[Number(p[1]) - 1] || ""; return m + " " + String(p[0]).slice(2); }
+function _emMesesOpc() {
+  var hoy = new Date(), out = [];
+  for (var i = 0; i <= 18; i++) { var d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1); out.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); }
+  return out;
+}
 function emBarPintar() {
   var b = document.getElementById("emBar"); if (!b) return;
   _emCss();
+  if (!Object.keys(_em.sel).length) _em.sel[_emMesesOpc()[1]] = true;   /* default: el último mes cerrado */
+  if (!_em.chk) _em.chk = { plk: true, pch: true, flk: true, fch: true };
   var plTxt = function (k, t) {
     var p = _em.pl[k];
     return p ? t + ' <b>' + _eiFmt(p.n, 0) + '</b>' + (p.subido_en ? ' (' + _emFecha(p.subido_en) + ')' : '') : t + ' <span class="no">sin subir</span>';
   };
-  b.innerHTML =
-    '<button type="button" onclick="emSubir(\'madre\')">⬆ Subir Estadística Madre</button>' +
-    '<button type="button" onclick="emSubir(\'costos\')">⬆ Subir Costos</button>' +
-    '<button type="button" class="sec" onclick="emAbrir()">⬇ Bajar por mes</button>' +
-    '<span class="pl">' + plTxt("madre_lk", "Madre LK") + ' · ' + plTxt("madre_ch", "CH") + ' · ' + plTxt("costos_lk", "Costos LK") + ' · ' + plTxt("costos_ch", "CH") + '</span>' +
-    (_em.msg ? '<span class="msg' + (_em.msgErr ? ' err' : '') + '">' + _eiEsc(_em.msg) + '</span>' : '') +
-    '<input type="file" id="emFile" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="emArchivo(this)">';
+  var sel = Object.keys(_em.sel).sort().reverse();
+  var algun = _EM_CHK.some(function (c) { return _em.chk[c[0]]; });
+  b.innerHTML = '<div class="sec-box">' +
+    '<div class="fila"><span class="tit">Importar / exportar</span>' +
+      '<button type="button" onclick="emSubir(\'madre\')">⬆ Subir Estadística Madre</button>' +
+      '<button type="button" onclick="emSubir(\'costos\')">⬆ Subir Costos</button>' +
+      '<span class="sep"></span>' +
+      '<button type="button" class="sec" id="emMesesBtn" onclick="emMesesToggle()" title="Elegí uno o varios meses">📅 ' +
+        (sel.length ? _eiEsc(sel.map(_emMesCorto).join(", ")) : "Seleccionar meses") + (_em.mopen ? ' ▴' : ' ▾') + '</button>' +
+      _EM_CHK.map(function (c) {
+        return '<label class="ck"><input type="checkbox"' + (_em.chk[c[0]] ? " checked" : "") + ' onchange="emChk(\'' + c[0] + '\', this.checked)">' + c[1] + '</label>';
+      }).join("") +
+      '<button type="button" id="emBajarSel"' + (_em.busy || !sel.length || !algun ? " disabled" : "") + ' onclick="emBajarSeleccionados()">' + (_em.busy ? "Armando…" : "⬇ Descargar seleccionados") + '</button>' +
+    '</div>' +
+    (_em.mopen ? '<div class="mpop">' + _emMesesOpc().map(function (ym) {
+      return '<button type="button" class="' + (_em.sel[ym] ? "on" : "") + '" onclick="emToggleMes(\'' + ym + '\')">' + _emMesCorto(ym) + '</button>';
+    }).join("") + '<button type="button" class="listo" onclick="emMesesToggle()">Listo</button></div>' : '') +
+    '<div class="pl">' + plTxt("madre_lk", "Est. Madre LK") + ' · ' + plTxt("madre_ch", "CH") + ' · ' + plTxt("costos_lk", "Costos LK") + ' · ' + plTxt("costos_ch", "CH") +
+      ' · LK incluye Chef con L · celeste &gt; E.Madre +30 % · amarillo &gt; E.Madre · letra roja = disruptivo · naranja = no está en la planilla</div>' +
+    (_em.msg ? '<div class="msg' + (_em.msgErr ? ' err' : '') + '">' + _eiEsc(_em.msg) + '</div>' : '') +
+    (_em.res ? '<div class="msg' + (_em.resErr ? ' err' : '') + '">' + _eiEsc(_em.res) + '</div>' : '') +
+    '<input type="file" id="emFile" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="emArchivo(this)">' +
+  '</div>';
   if (!_em.leido) { _em.leido = true; emLeerPlantillas(); }
+}
+function emPintar() { emBarPintar(); }
+function emMesesToggle() { _em.mopen = !_em.mopen; emBarPintar(); }
+function emToggleMes(ym) { if (_em.sel[ym]) delete _em.sel[ym]; else _em.sel[ym] = true; emBarPintar(); }
+function emChk(k, on) { _em.chk = _em.chk || {}; _em.chk[k] = !!on; emBarPintar(); }
+/* baja lo tildado, de a uno (el navegador frena descargas pegadas); Facturación LK + CH juntas = UN archivo */
+async function emBajarSeleccionados() {
+  var c = _em.chk || {}, ks = [];
+  if (c.plk) ks.push("plk");
+  if (c.pch) ks.push("pch");
+  if (c.flk && c.fch) ks.push("fac"); else if (c.flk) ks.push("flk"); else if (c.fch) ks.push("fch");
+  var res = [], err = false;
+  for (var i = 0; i < ks.length; i++) {
+    var ok = await emBajar(ks[i]);
+    res.push(_em.res); if (!ok) err = true;
+    if (i < ks.length - 1) await new Promise(function (r) { setTimeout(r, 700); });
+  }
+  _em.res = res.join("  ·  "); _em.resErr = err; emBarPintar();
+  return !err;
 }
 async function emLeerPlantillas() {
   var q = await _eiRpc("gv_est_plantilla_leer", {});
@@ -808,39 +858,6 @@ async function emArchivo(inp) {
     _em.msgErr = false; _em.leido = true;
     await emLeerPlantillas();
   } catch (e) { _em.msg = "No se subió: " + (e && e.message || e); _em.msgErr = true; emBarPintar(); }
-}
-function _emMesesOpc() {
-  var hoy = new Date(), out = [];
-  for (var i = 1; i <= 18; i++) { var d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1); out.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); }
-  var cur = hoy.getFullYear() + "-" + String(hoy.getMonth() + 1).padStart(2, "0");
-  return [cur].concat(out);
-}
-function emAbrir() {
-  _emCss();
-  var ov = document.getElementById("emOv");
-  if (!ov) { ov = document.createElement("div"); ov.id = "emOv"; ov.onclick = function (e) { if (e.target === ov) emCerrar(); }; document.body.appendChild(ov); }
-  if (!Object.keys(_em.sel).length) { var o = _emMesesOpc(); _em.sel[o[1]] = true; }
-  ov.style.display = "flex"; emPintar();
-}
-function emCerrar() { var ov = document.getElementById("emOv"); if (ov) ov.style.display = "none"; }
-function emToggleMes(ym) { if (_em.sel[ym]) delete _em.sel[ym]; else _em.sel[ym] = true; emPintar(); }
-function emPintar() {
-  var ov = document.getElementById("emOv"); if (!ov || ov.style.display === "none") return;
-  var opc = _emMesesOpc();
-  ov.innerHTML = '<div class="cj"><h3>Bajar por mes — siempre en unidades</h3>' +
-    '<div class="ms">' + opc.map(function (ym) {
-      var p = ym.split("-"); var m3 = _EI_MES3[Number(p[1]) - 1];
-      return '<button type="button" class="' + (_em.sel[ym] ? "on" : "") + '" onclick="emToggleMes(\'' + ym + '\')">' + m3.charAt(0).toUpperCase() + m3.slice(1) + ' ' + p[0].slice(2) + '</button>';
-    }).join("") + '</div>' +
-    '<div class="sal">' + _EM_SAL.map(function (s) {
-      var ok = !!_em.pl[s.pl] && (!s.pl2 || !!_em.pl[s.pl2]);
-      return '<button type="button"' + (ok && !_em.busy ? '' : ' disabled') + ' title="' + (ok ? "" : "Falta subir " + (s.tipo === "ped" ? "la Estadística Madre" : "los Costos")) + '" onclick="emBajar(\'' + s.k + '\')">⬇ ' + s.t + '</button>';
-    }).join("") + '</div>' +
-    (_em.res ? '<div class="res' + (_em.resErr ? ' err' : '') + '">' + _eiEsc(_em.res) + '</div>' : '') +
-    '<div class="nota">Pedidos salen en el orden de la Est. Madre (uno para LK y otro para CH) y Facturación en el de Costos, con LK y Chef en la misma columna como en «Aportes Gastos», una columna por mes del más nuevo al más viejo, listos para pegar. LK incluye lo de Chef con L. ' +
-    'Colores de la Est. Madre: <b style="background:#bdd7ee">celeste</b> = el mes pasa la E.Madre en más de 30 % · <b style="background:#ffff00">amarillo</b> = pasa la E.Madre. ' +
-    'Un pedido disruptivo (±50 % del promedio de ese cliente en 12 meses, o incorporación) va en <b style="color:#dc2626">letra roja</b> y el detalle como comentario de la celda.</div>' +
-    '<button type="button" class="x" onclick="emCerrar()">Cerrar</button></div>';
 }
 async function emBajar(k) {
   var s = _EM_SAL.find(function (z) { return z.k === k; }); if (!s || _em.busy) return false;
