@@ -227,10 +227,10 @@ function _adsHtmlStock() {
   if (!_ads.stock) return h + '<div class="msg">Leyendo stock…</div></div>';
   var f = adsFiltrarStock(rows, ver, _ads.q);
   h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · en cajas</div>';
-  h += '<table><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Disp.</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × ' + H + '/30">Est. Madre<br>' + H + ' d</th>' +
+  h += '<table><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Stk</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × ' + H + '/30">Est. Madre<br>' + H + ' d</th>' +
     '<th rowspan="2">Saldo<br>' + H + ' d</th><th rowspan="2" title="Días que cubre lo disponible menos lo comprometido a ' + H + ' días, al ritmo de la Est. Madre">Días<br>cobertura</th>' +
     '<th colspan="4" class="ug" title="Última OC del artículo · recibido = lo que recibió Virgilio de ese proveedor desde la fecha de la OC">Última OC</th>' +
-    '<th rowspan="2" title="Tallerista y su % de entrega en el rango de la pestaña Entregas talleristas">Dist.</th></tr>' +
+    '<th rowspan="2" title="Tallerista al que le corresponde; si son varios, la parte de cada uno en lo pedido del rango">Dist.</th></tr>' +
     '<tr><th class="u1">Fecha</th><th class="u2">Pedido</th><th class="u2">Recibido</th><th class="u3">%</th></tr></thead><tbody>';
   if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
@@ -238,8 +238,11 @@ function _adsHtmlStock() {
     var em = proy * H / 30, saldo = Number(r["saldo" + H]);
     var cob = proy > 0 ? Math.max(0, disp - comp) / (proy / 30) : null;
     var pc = _adsPctCod(r.cod) || [];
-    var dist = pc.length ? pc.map(function (x) { var al = x.pct != null && Number(x.pct) < _ads.umbral; return '<span class="' + (al ? "neg" : "") + '">' + _adsEsc(x.proveedor) + " " + _adsPct(x.pct) + "</span>"; }).join("<br>")
-                         : (r.oc_prov ? _adsEsc(r.oc_prov) : "—");
+    // v27.33 (Luis): Dist = a qué tallerista le corresponde; con varios, la parte de cada uno en lo pedido del rango.
+    // Lo que entregó cada uno está en la pestaña Entregas talleristas.
+    var totPed = pc.reduce(function (s, x) { return s + (Number(x.pedido) || 0); }, 0);
+    var dist = pc.length > 1 ? pc.map(function (x) { return _adsEsc(x.proveedor) + " " + (totPed > 0 ? _adsPct((Number(x.pedido) || 0) / totPed) : "—"); }).join("<br>")
+             : pc.length ? _adsEsc(pc[0].proveedor) : (r.oc_prov ? _adsEsc(r.oc_prov) : "—");
     var rec = r.oc_rec_v != null ? r.oc_rec_v : r.oc_rec;
     var ocPct = r.oc_cant ? Number(rec) / Number(r.oc_cant) : null;
     h += "<tr><td><b>" + _adsEsc(r.cod) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +

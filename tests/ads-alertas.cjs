@@ -99,8 +99,8 @@ const STOCK = [
   if (r.cerrarAncho > 200) fallas.push("(e) Cerrar ancho " + r.cerrarAncho);
   if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
   if (JSON.stringify(r.stockCods) !== JSON.stringify(["505"])) fallas.push("(c) quiebre 10 d: " + JSON.stringify(r.stockCods));
-  if (!/Lucho 71 %/.test(r.pctTall)) fallas.push("(c) % tallerista: " + r.pctTall);
-  const C10 = ["Cód.","Descripción","Disp.","Comprom.10 d","Est. Madre10 d","Saldo10 d","Díascobertura","Última OC","Dist.","Fecha","Pedido","Recibido","%"];
+  if (String(r.pctTall).trim() !== "Lucho") fallas.push("(c) Dist sólo el tallerista (un solo, sin %): " + r.pctTall);
+  const C10 = ["Cód.","Descripción","Stk","Comprom.10 d","Est. Madre10 d","Saldo10 d","Díascobertura","Última OC","Dist.","Fecha","Pedido","Recibido","%"];
   if (JSON.stringify(r.cols10) !== JSON.stringify(C10)) fallas.push("(c) columnas stock: " + JSON.stringify(r.cols10));
   if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","3","30/09","174","90","52 %"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
   if (JSON.stringify(r.fila30) !== JSON.stringify(["50","60","300","-310","0"])) fallas.push("(c) fila a 30 d: " + JSON.stringify(r.fila30));

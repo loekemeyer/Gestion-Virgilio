@@ -7984,9 +7984,9 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
 - Sub-tabla (v27.29, Luis): **Fecha · Pedida · Recibida son de la ÚLTIMA OC** y van bajo un rótulo común «Última OC»
   dentro de un recuadro violeta. «Incluir la OC en curso» viene **prendido** por defecto.
 - **Pestaña Stock (v27.30, Luis)**: TODO se calcula al horizonte elegido (10/20/30; «todos» muestra todo al último
-  elegido). Columnas: Cód · Descripción · Disp. · Comprom. H d · Est. Madre H d (mes × H/30) · Saldo H d · Días cobertura
+  elegido). Columnas: Cód · Descripción · Stk · Comprom. H d · Est. Madre H d (mes × H/30) · Saldo H d · Días cobertura
   ((disp − comprom. H) ÷ Est. Madre diaria) · recuadro «Última OC» (Fecha · Pedido · **Recibido** · %) · Dist. (tallerista
-  y su % del rango). **Recibido = lo que recibió Virgilio de ese proveedor desde la fecha de la OC** (D10), no lo imputado:
+  ; v27.33: sólo a quién le corresponde, y con varios la parte de cada uno en lo pedido del rango — lo entregado está en la otra pestaña). **Recibido = lo que recibió Virgilio de ese proveedor desde la fecha de la OC** (D10), no lo imputado:
   `gv_ads_stock3` (= stock2 + `oc_rec_v`). `sql/gv_ads_stock3_v2730.sql`.
 - **Saldos en cajas ENTERAS (v27.32, Luis D11)**: quiebre sólo si falta media caja o más (antes −0,3 de una Est. Madre de 1 caja/mes contaba). Rojo 45 → 40. `sql/gv_ads_saldo_cajas_enteras_v2732.sql`.
 - Rango y umbral se guardan en `Stock_Config` **sólo con «Guardar para el badge»**: cambiarlos sin guardar vale para esa
