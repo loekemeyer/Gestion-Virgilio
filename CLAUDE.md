@@ -7990,7 +7990,7 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
 - **Saldos en cajas ENTERAS (v27.32, Luis D11)**: quiebre sólo si falta media caja o más (antes −0,3 de una Est. Madre de 1 caja/mes contaba). Rojo 45 → 40. `sql/gv_ads_saldo_cajas_enteras_v2732.sql`.
 - Rango y umbral se guardan en `Stock_Config` **sólo con «Guardar para el badge»**: cambiarlos sin guardar vale para esa
   pantalla y se pierde al cerrar.
-- **Excel (v27.34, Luis)**: «Descargar Excel» en Talleristas (una fila por tallerista + artículo) y en Stock un botón por rango (10 / 20 / 30 días, sólo lo que quiebra a ese horizonte). La pantalla y el Excel usan la misma cuenta (`_adsStockCalc`). Formato provisorio: Luis manda el Excel modificado y se replica.
+- **Excel (v27.34, Luis)**: «Descargar Excel» en Talleristas (una fila por tallerista + artículo) y en Stock un botón por rango (10 / 20 / 30 días, sólo lo que quiebra a ese horizonte). La pantalla y el Excel usan la misma cuenta (`_adsStockCalc`). **v27.35: el formato es el del Excel de Luis** (`_adsXlsxFormato`): talleristas sin «% tallerista», anchos fijos chicos (los de su archivo: 11,14 · 6,57 · 23 · 5,14 · 5,29 · 5,86 · 4 · 6,57 · 5,86 · 6), rótulo de alto 45 centrado con ajuste, datos centrados salvo tallerista / descripción / dist., Arial 10, fila 1 congelada, zoom 130 y al imprimir entra a lo ancho (A4 vertical). El de stock va con el mismo molde; Dist. al ancho de su dato (tope 22). **Optimización horizontal: no ensanchar columnas.**
 - `sql/gv_ads_alertas_damian_v2720.sql`, `sql/gv_ads_excedente_semaforo_v2722.sql`, `tests/ads-alertas.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-06, v27.36): Estadísticas ISIS vive en la pestaña 📈 EST. MADRE — plantillas subidas y bajada por mes

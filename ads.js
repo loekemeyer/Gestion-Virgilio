@@ -265,48 +265,90 @@ function _adsStockCalc(r, H) {
            rec: rec, ocPct: r.oc_cant ? Number(rec) / Number(r.oc_cant) : null, dist: dist };
 }
 
-/* v27.34 (Luis): Excel de cada pestaña — talleristas, y stock uno por rango (10/20/30). */
-function _adsXlsx(aoa, hoja, nombre) {
+/* v27.34 (Luis): Excel de cada pestaña — talleristas, y stock uno por rango (10/20/30).
+   v27.35 (Luis): el formato lo dio Luis con su Excel («ADS_talleristas_4OC», 06/10) y la regla es
+   OPTIMIZACIÓN HORIZONTAL: anchos fijos chicos (los suyos), rótulo en 2-3 renglones (fila 1 de alto 45,
+   centrado y con ajuste), datos centrados salvo tallerista / descripción / dist (a la izquierda), Arial 10,
+   fila 1 congelada, zoom 130 y al imprimir entra a lo ancho de la hoja. */
+function _adsXlsxFormato(XLSX, wb, cfg) {
+  var u8 = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  var cfb = XLSX.CFB.read(new Uint8Array(u8), { type: "array" });
+  var dec = new TextDecoder(), enc = new TextEncoder();
+  var iSt = cfb.FullPaths.findIndex(function (p) { return /\/xl\/styles\.xml$/.test(p); });
+  if (iSt < 0) throw new Error("xlsx sin styles.xml");
+  var st = dec.decode(new Uint8Array(cfb.FileIndex[iSt].content));
+  st = st.replace(/<fonts[\s\S]*?<\/fonts>/, '<fonts count="1"><font><sz val="10"/><name val="Arial"/><family val="2"/></font></fonts>')
+         .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+           + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+           + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs>');
+  cfb.FileIndex[iSt].content = enc.encode(st);
+  var izq = {}; (cfg.izq || []).forEach(function (i) { izq[i] = 1; });
+  var colN = function (L) { var n = 0; for (var k = 0; k < L.length; k++) n = n * 26 + (L.charCodeAt(k) - 64); return n - 1; };
+  var cols = '<cols>' + cfg.anchos.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + '</cols>';
+  cfb.FullPaths.forEach(function (p, i) {
+    if (!/\/xl\/worksheets\/sheet\d+\.xml$/.test(p)) return;
+    var x = dec.decode(new Uint8Array(cfb.FileIndex[i].content));
+    x = x.replace(/<cols>[\s\S]*?<\/cols>/, "");
+    x = x.replace(/<sheetData/, cols + "<sheetData");
+    x = x.replace(/<c r="([A-Z]+)(\d+)"( s="\d+")?/g, function (_m, L, r) {
+      if (r === "1") return '<c r="' + L + r + '" s="1"';
+      return izq[colN(L)] ? '<c r="' + L + r + '"' : '<c r="' + L + r + '" s="2"';
+    });
+    x = x.replace(/<row r="1"([^>]*)>/, function (_m, at) { return '<row r="1"' + at.replace(/ ht="[^"]*"| customHeight="[^"]*"/g, "") + ' ht="45" customHeight="1">'; });
+    x = x.replace(/<sheetViews>[\s\S]*?<\/sheetViews>/, "")
+         .replace(/<dimension[^>]*\/>/, function (d) { return d + '<sheetViews><sheetView zoomScale="130" zoomScaleNormal="130" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr baseColWidth="10" defaultRowHeight="12.75"/>'; });
+    x = x.replace(/<sheetFormatPr[^>]*\/>(?=[\s\S]*<sheetFormatPr)/, "");
+    if (!/<sheetPr/.test(x)) x = x.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
+    x = x.replace(/<pageMargins[^>]*\/>/, "");
+    x = x.replace(/<\/sheetData>/, '</sheetData><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>');
+    cfb.FileIndex[i].content = enc.encode(x);
+  });
+  return XLSX.CFB.write(cfb, { fileType: "zip", type: "array" });
+}
+function _adsXlsx(aoa, hoja, nombre, cfg) {
   if (typeof pppLoadXlsx !== "function") { alert("No pude cargar el generador de Excel."); return Promise.resolve(); }
   return pppLoadXlsx().then(function (XLSX) {
     var ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = aoa[0].map(function (_h, i) {
-      var w = 6; aoa.forEach(function (f) { var v = f[i] == null ? "" : String(f[i]); if (v.length + 2 > w) w = v.length + 2; });
-      return { wch: Math.min(w, 45) };
-    });
     var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, hoja);
-    var bytes = typeof gvXlsxFormato === "function" ? gvXlsxFormato(XLSX, wb) : XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    var bytes = _adsXlsxFormato(XLSX, wb, cfg);
     var d = new Date(), p2 = function (n) { return String(n).padStart(2, "0"); };
     var fn = nombre + "_" + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + ".xlsx";
     if (typeof gvXlsxBajar === "function") gvXlsxBajar(bytes, fn);
     else { var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([bytes])); a.download = fn; document.body.appendChild(a); a.click(); a.remove(); }
   }).catch(function (e) { alert("No se pudo armar el Excel: " + (e && e.message || e)); });
 }
+/* ancho de una columna de texto según su dato (Arial 10 ≈ 0,9 de un carácter estándar), con tope */
+function _adsAnchoTexto(aoa, i, min, max) {
+  var w = min; aoa.slice(1).forEach(function (f) { var n = String(f[i] == null ? "" : f[i]).length * 0.9 + 1; if (n > w) w = n; });
+  return Math.round(Math.min(w, max) * 100) / 100;
+}
 function _adsNum(v) { var n = Number(v); return v == null || v === "" || !isFinite(n) ? "" : n; }
 function _adsPctNum(x) { return x == null || !isFinite(x) ? "" : Math.round(x * 100); }
 function adsExcelTall() {
   if (!_ads.tall) { alert("Todavía se están leyendo las OC."); return; }
   var g = adsAgruparTalleristas(_ads.tall, _ads.umbral);
-  var aoa = [["Tallerista", "% tallerista", "Cód.", "Descripción", "OC evaluadas", "Pedido", "Recib. Virgilio", "%", "Última OC fecha", "Última OC pedida", "Última OC recibida"]];
+  var aoa = [["Tallerista", "Cód.", "Descripción", "OC evaluadas", "Pedido", "Recibio Virgilio", "%", "Fecha última OC", "Pedido última OC", "Recibido última OC"]];
   g.forEach(function (t) {
     t.arts.forEach(function (a) {
-      aoa.push([t.proveedor, _adsPctNum(t.pct), String(a.codigo), a.descripcion || "", _adsNum(a.ocs), _adsNum(a.pedido), _adsNum(a.entregado),
+      aoa.push([t.proveedor, String(a.codigo), a.descripcion || "", _adsNum(a.ocs), _adsNum(a.pedido), _adsNum(a.entregado),
         _adsPctNum(a.pct), a.ult_fecha ? _adsFecha(a.ult_fecha) : "", _adsNum(a.ult_cant), _adsNum(a.ult_rec)]);
     });
   });
-  return _adsXlsx(aoa, "Talleristas", "ADS_talleristas_" + _ads.n + "OC");
+  return _adsXlsx(aoa, "Talleristas", "ADS_talleristas_" + _ads.n + "OC",
+    { anchos: [Math.max(11.14, _adsAnchoTexto(aoa, 0, 6, 16)), 6.57, 23, 5.14, 5.29, 5.86, 4, 6.57, 5.86, 6], izq: [0, 2] });
 }
 function adsExcelStock(H) {
   if (!_ads.stock) { alert("Todavía se está leyendo el stock."); return; }
   var f = adsFiltrarStock(_ads.stock, H, "");
   var aoa = [["Cód.", "Descripción", "Stk", "Comprom. " + H + " d", "Est. Madre " + H + " d", "Saldo " + H + " d", "Días cobertura",
-              "Última OC fecha", "Última OC pedido", "Última OC recibido", "Última OC %", "Dist."]];
+              "Fecha última OC", "Pedido última OC", "Recibido última OC", "% última OC", "Dist."]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo), c.cob == null ? "" : Math.round(c.cob),
       r.oc_fecha ? _adsFecha(r.oc_fecha) : "sin OC", _adsNum(r.oc_cant), r.oc_fecha ? _adsNum(c.rec) : "", _adsPctNum(c.ocPct), c.dist.join(" · ")]);
   });
-  return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d");
+  return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
+    { anchos: [6.57, 23, 5.14, 6.57, 6.57, 5.29, 6, 6.57, 5.86, 6, 5.29, _adsAnchoTexto(aoa, 11, 6, 22)], izq: [1, 11] });
 }
 
 function _adsRender() {

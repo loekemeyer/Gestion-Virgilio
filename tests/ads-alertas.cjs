@@ -76,10 +76,19 @@ const STOCK = [
     out.fila10 = fs[0] ? [...fs[0].cells].slice(2, 11).map((c) => c.textContent) : [];
     // v27.34: Excel por rango y de talleristas (se lee el archivo que se baja)
     const bajados = [];
-    window.gvXlsxBajar = (bytes, nombre) => { const wb = window.XLSX.read(bytes, { type: "array" }); bajados.push({ nombre, filas: window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 }) }); };
+    window.gvXlsxBajar = (bytes, nombre) => {
+      const wb = window.XLSX.read(bytes, { type: "array" });
+      const cfb = window.XLSX.CFB.read(new Uint8Array(bytes), { type: "array" });
+      const iS = cfb.FullPaths.findIndex((p) => /sheet1\.xml$/.test(p));
+      const xml = new TextDecoder().decode(new Uint8Array(cfb.FileIndex[iS].content));
+      bajados.push({ nombre, xml, filas: window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 }) });
+    };
     out.btnXl = [...document.querySelectorAll("#adsOv .ads-bar button.xl")].map((x) => x.textContent);
     await window.adsExcelStock(10); await window.adsExcelStock(30); await window.adsExcelTall();
-    out.xl = bajados.map((x) => ({ n: x.nombre.replace(/_\d{8}\.xlsx$/, ""), cab: x.filas[0], f1: x.filas[1], len: x.filas.length }));
+    out.xl = bajados.map((x) => ({ n: x.nombre.replace(/_\d{8}\.xlsx$/, ""), cab: x.filas[0], f1: x.filas[1], len: x.filas.length,
+      anchos: [...x.xml.matchAll(/<col [^>]*width="([\d.]+)"/g)].map((m) => Number(m[1])),
+      alto1: /<row r="1"[^>]* ht="45"/.test(x.xml), congela: /state="frozen"/.test(x.xml), ajusta: /fitToWidth="1"/.test(x.xml),
+      a2: (x.xml.match(/<c r="A2"( s="\d+")?/) || [])[1] || "", b2: (x.xml.match(/<c r="B2"( s="\d+")?/) || [])[1] || "" }));
     window.adsHoriz(30); await espera(30);
     out.stock30 = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")].map((f) => f.cells[0].textContent);
     const f30 = document.querySelector("#adsOv .ads-body > table tbody tr");
@@ -115,7 +124,12 @@ const STOCK = [
   const x10 = r.xl && r.xl[0], x30 = r.xl && r.xl[1], xt = r.xl && r.xl[2];
   if (!x10 || x10.n !== "ADS_stock_10d" || x10.len !== 2 || x10.cab[2] !== "Stk" || JSON.stringify(x10.f1.slice(0, 7)) !== JSON.stringify(["505", "Cuchillo", 50, 20, 100, -70, 3])) fallas.push("(f) Excel stock 10 d: " + JSON.stringify(x10));
   if (!x30 || x30.n !== "ADS_stock_30d" || x30.len !== 3) fallas.push("(f) Excel stock 30 d: " + JSON.stringify(x30));
-  if (!xt || !/^ADS_talleristas_/.test(xt.n) || xt.cab[0] !== "Tallerista" || xt.len !== 4) fallas.push("(f) Excel talleristas: " + JSON.stringify(xt));
+  if (!xt || !/^ADS_talleristas_/.test(xt.n) || xt.len !== 4 ||
+      JSON.stringify(xt.cab) !== JSON.stringify(["Tallerista","Cód.","Descripción","OC evaluadas","Pedido","Recibio Virgilio","%","Fecha última OC","Pedido última OC","Recibido última OC"])) fallas.push("(f) Excel talleristas: " + JSON.stringify(xt && xt.cab));
+  // v27.35: el formato de Luis (anchos chicos, rótulo de 45, congelado, entra a lo ancho; texto a la izq., números centrados)
+  if (!xt || JSON.stringify(xt.anchos.slice(1)) !== JSON.stringify([6.57, 23, 5.14, 5.29, 5.86, 4, 6.57, 5.86, 6]) || xt.anchos[0] < 11.14 || xt.anchos[0] > 16 ||
+      !xt.alto1 || !xt.congela || !xt.ajusta || xt.a2 !== "" || xt.b2 !== ' s="2"') fallas.push("(g) formato Excel talleristas: " + JSON.stringify(xt && [xt.anchos, xt.alto1, xt.congela, xt.ajusta, xt.a2, xt.b2]));
+  if (!x10 || x10.anchos.length !== 12 || Math.max(...x10.anchos) > 23 || x10.anchos.reduce((a, b) => a + b, 0) > 110) fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
   if (!/vac/i.test(r.vacio)) fallas.push("(d) lectura vacía no se dice: " + r.vacio);
   if (errs.length) fallas.push("errores de página: " + errs.slice(0, 3).join(" | "));
   if (fallas.length) { console.error("✗ ADS:\n  " + fallas.join("\n  ")); process.exit(1); }
