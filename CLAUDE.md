@@ -8301,7 +8301,7 @@ picking, motivo con monto) y **sólo 3 botones: ✅ Aprobar · 🐊 Sacarlo a cu
 pantano (`.apr-col-pantano`, la tabla sobre fondo claro) y Clientes nuevos rosa bebé con textura (`.apr-col-clin`). Sólo visual.
 `tests/apr-cuarentena.cjs`, `tests/cuar-yaprog-fecha-pedido.cjs`, `tests/pipe-clientes-nuevos.cjs`.
 
-## ⚠ REGLA (Luis, 2026-10-07, v28.48): «🐊 SACARLO A CUARENTENA» mira la TANDA ENTERA — armado viaja sin día, en proceso no se puede
+## ⚠ REGLA (Luis, 2026-10-07, v28.49): «🐊 SACARLO A CUARENTENA» mira la TANDA ENTERA — armado viaja sin día, en proceso no se puede
 
 **Luis:** *"Esperemos a que la tanda entera esté armada. Absolutamente nada en proceso"* · *"que no se imprima papel de
 cuarentena ni nada"* · *"si no tenía nada armado que se programe automáticamente … si estaba armado, que se quede y salte un
