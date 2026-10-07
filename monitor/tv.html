@@ -1121,7 +1121,7 @@ function actividadActual(eventos, hoy, fjHoy, fichados) {
   var porLeg = {}, i;
   for (i = 0; i < eventos.length; i++) {
     var ev = eventos[i], leg = String(ev.legajo == null ? "" : ev.legajo).trim();
-    if (!leg || leg === "0" || leg === "1") continue;      // legajos de prueba/basura
+    if (!leg || leg === "0") continue;      // legajos de prueba/basura
     if (dayKey(ev.ts_cliente) !== hoy) continue;
     (porLeg[leg] || (porLeg[leg] = [])).push({
       op: ev.opcion, tx: String(ev.texto || "").trim().toUpperCase(),
@@ -1164,7 +1164,7 @@ function actividadActual(eventos, hoy, fjHoy, fichados) {
   }
   fichados.forEach(function (ts, leg3) {
     leg3 = String(leg3);
-    if (leg3 === "0" || leg3 === "1" || vistos[leg3] || fjHoy.has(leg3)) return;
+    if (leg3 === "0" || vistos[leg3] || fjHoy.has(leg3)) return;
     out.push({ legajo: leg3, idle: true, desde: ts, kind: null, tanda: "", arranco: false });
   });
   // trabajando primero; dentro de cada grupo, el que arrancó hace más rato arriba
@@ -1754,7 +1754,7 @@ function ciclo() {
       });
       (fichadas || []).forEach(function (f) {
         var leg = f.legajo ? String(f.legajo) : null;
-        if (!leg || leg === "0" || leg === "1") return;
+        if (!leg || leg === "0") return;
         var ts = new Date(f.ts_cliente).getTime();
         if (!fichados.has(leg) || ts < fichados.get(leg)) fichados.set(leg, ts);
       });

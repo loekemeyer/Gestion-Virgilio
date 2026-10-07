@@ -114,11 +114,11 @@ const DATOS = {
     { legajo: 8,  opcion: "TP",  texto: "E31A", ts_cliente: iso(T0 - 2.5 * H), ts_inicio: iso(T0 - 3 * H) },
     { legajo: 12, opcion: "TAP", texto: "E31A", ts_cliente: iso(T0 - 1 * H),  ts_inicio: iso(T0 - 2 * H) }
   ],
-  /* v26.33: EP/TP de E30A — un ciclo cerrado (4 h → 3,5 h atrás), un EP de prueba (legajo 1,
-     no cuenta) y el EP abierto de hace 1,5 h (en curso). */
+  /* v26.33: EP/TP de E30A — un ciclo cerrado (4 h → 3,5 h atrás), un EP de prueba (legajo 0,
+     no cuenta; desde la v27.63 el legajo 1 sí cuenta en el monitor) y el EP abierto de hace 1,5 h (en curso). */
   pickHs: [
     { legajo: 8, opcion: "TP", texto: "E30A", ts_cliente: iso(T0 - 3.5 * H), ts_inicio: iso(T0 - 4 * H) },
-    { legajo: 1, opcion: "EP", texto: "E30A", ts_cliente: iso(T0 - 2 * H), ts_inicio: null },
+    { legajo: 0, opcion: "EP", texto: "E30A", ts_cliente: iso(T0 - 2 * H), ts_inicio: null },
     { legajo: 8, opcion: "EP", texto: "e30a", ts_cliente: iso(T0 - 1.5 * H), ts_inicio: null },
     /* v26.35 (D15): E31A pickeada (3 h → 2,5 h) y armada (2 h → 1 h); un APX anulado no cuenta. */
     { legajo: 8,  opcion: "TP",  texto: "E31A", ts_cliente: iso(T0 - 2.5 * H), ts_inicio: iso(T0 - 3 * H) },

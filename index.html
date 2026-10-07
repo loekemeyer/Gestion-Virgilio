@@ -29160,7 +29160,7 @@ function gvRacksTramo(op, legajo, iniMs, texto) {
     tmMarcarEvento(leg, nowMs);
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
   } catch (_e) {}
-  if (leg === "0" || leg === "1") return;   // prueba: la tarea vive en el celular, el evento no se manda
+  if (leg === "0") return;   // prueba: la tarea vive en el celular, el evento no se manda (v27.63, Thomas D13: el legajo 1 sí manda y cuenta en el monitor)
   if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
   const payload = { legajo: leg, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""), ts: nowMs,
     id: (op.toLowerCase() + "_" + leg + "_" + nowMs.toString(36)).replace(/[^a-zA-Z0-9_\-]/g, ""),
@@ -32890,7 +32890,7 @@ async function showDayBreakdown(dayKey, dayLabel) {
         continue;
       }
       const legStr = String(leg);
-      if (legStr === "0" || legStr === "1") continue;   // test/basura
+      if (legStr === "0") continue;   // test/basura
       const prev = ingresoByLegajo.get(legStr);
       if (!prev || tsIngreso < prev) ingresoByLegajo.set(legStr, tsIngreso);
       if (f.email) emailByLegajo.set(legStr, f.email);
@@ -32901,7 +32901,7 @@ async function showDayBreakdown(dayKey, dayLabel) {
     const perLegajo = new Map();
     for (const ev of events) {
       const leg = String(ev.legajo || "").trim();
-      if (!leg || leg === "0" || leg === "1") continue;   // 0/1 = test/basura
+      if (!leg || leg === "0") continue;   // 0/1 = test/basura
       if (ev.opcion === "LT") continue;   // LT = llegada tarde: tiempo NO trabajado
       if (!perLegajo.has(leg)) perLegajo.set(leg, {
         firstTs: ev.ts_cliente,
@@ -33220,7 +33220,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   const ingresoByLegajo = new Map();
   for (const f of fichadas) {
     const leg = String(f.legajo || "").trim();
-    if (!leg || leg === "0" || leg === "1") continue;
+    if (!leg || leg === "0") continue;
     const ts = new Date(f.ts_cliente);
     const prev = ingresoByLegajo.get(leg);
     if (!prev || ts < prev) ingresoByLegajo.set(leg, ts);
@@ -33437,14 +33437,14 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   const _colaEvs = new Map(), _colaRk = new Map();
   for (const ev of events) {
     const leg = String(ev.legajo || "").trim();
-    if (!leg || leg === "0" || leg === "1" || ev.opcion === "LT") continue;
+    if (!leg || leg === "0" || ev.opcion === "LT") continue;
     if (isoToDayKey(ev.ts_cliente) !== dayKey) continue;
     if (!_colaEvs.has(leg)) _colaEvs.set(leg, []);
     _colaEvs.get(leg).push(ev);
   }
   for (const m of (Array.isArray(rkMov) ? rkMov : [])) {
     const leg = String(m.legajo == null ? "" : m.legajo).trim();
-    if (!leg || leg === "0" || leg === "1" || isoToDayKey(m.ts) !== dayKey) continue;
+    if (!leg || leg === "0" || isoToDayKey(m.ts) !== dayKey) continue;
     if (!_colaRk.has(leg)) _colaRk.set(leg, []);
     _colaRk.get(leg).push(new Date(m.ts).getTime());
   }
@@ -33472,7 +33472,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
   const _mgRaw = new Map(), _mgOcAb = new Map(), _rkSegs = new Map();   // v27.55-mgpisa
   for (const ev of events) {
     const leg = String(ev.legajo || "").trim();
-    if (!leg || leg === "0" || leg === "1") continue;
+    if (!leg || leg === "0") continue;
     if (ev.opcion === "LT") continue;   // LT = llegada tarde: tiempo NO trabajado, no cuenta
     if (!perLegajo.has(leg)) perLegajo.set(leg, {
       firstTs: ev.ts_cliente, lastTs: ev.ts_cliente,
@@ -33597,7 +33597,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const porLeg = new Map();
     for (const ev of events) {
       const leg = String(ev.legajo || "").trim();
-      if (!leg || leg === "0" || leg === "1" || ev.opcion === "LT") continue;
+      if (!leg || leg === "0" || ev.opcion === "LT") continue;
       if (isoToDayKey(ev.ts_cliente) !== dayKey) continue;
       if (!porLeg.has(leg)) porLeg.set(leg, []);
       porLeg.get(leg).push(ev);
@@ -33683,7 +33683,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const evDia = new Map();
     for (const ev of events) {
       const leg = String(ev.legajo || "").trim();
-      if (!leg || leg === "0" || leg === "1" || ev.opcion === "LT") continue;
+      if (!leg || leg === "0" || ev.opcion === "LT") continue;
       if (isoToDayKey(ev.ts_cliente) !== dayKey) continue;
       if (!evDia.has(leg)) evDia.set(leg, []);
       evDia.get(leg).push(ev);
@@ -33692,7 +33692,7 @@ async function fetchMonitorDayStats(dayKey, sheetMapArg) {
     const addPt = (leg, ms) => { if (!pts.has(leg)) pts.set(leg, new Set()); pts.get(leg).add(ms); };
     for (const m of (Array.isArray(rkMov) ? rkMov : [])) {
       const leg = String(m.legajo == null ? "" : m.legajo).trim();
-      if (!leg || leg === "0" || leg === "1" || isoToDayKey(m.ts) !== dayKey) continue;
+      if (!leg || leg === "0" || isoToDayKey(m.ts) !== dayKey) continue;
       addPt(leg, new Date(m.ts).getTime());
     }
     const irPts = new Map();   // v27.55-mgpisa ≡ vista (rk_pts.src): un IR adentro de un MG ya no queda tapado por el MG
@@ -54513,7 +54513,7 @@ function _monEnSilencio(eventos, todayKey, fjHoy, nowMs, gapMin) {
   const last = new Map();
   for (const ev of (eventos || [])) {
     const leg = String(ev.legajo || "").trim();
-    if (!leg || leg === "0" || leg === "1") continue;                 // test/basura
+    if (!leg || leg === "0") continue;                 // test/basura
     if (isoToDayKey(ev.ts_cliente) !== todayKey) continue;            // sólo hoy
     const ts = new Date(ev.ts_cliente).getTime();
     const cur = last.get(leg);
@@ -54567,7 +54567,7 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
   var byLeg = {};
   for (var i = 0; i < (eventos || []).length; i++) {
     var ev = eventos[i], leg = String(ev.legajo == null ? "" : ev.legajo).trim();
-    if (!leg || leg === "0" || leg === "1") continue;                 // test/basura
+    if (!leg || leg === "0") continue;                 // test/basura
     if (isoToDayKey(ev.ts_cliente) !== todayKey) continue;            // sólo hoy
     (byLeg[leg] || (byLeg[leg] = [])).push({ op: ev.opcion, tx: String(ev.texto || "").trim().toUpperCase(), ini: ev.ts_inicio, ts: new Date(ev.ts_cliente).getTime() });
   }
@@ -54609,7 +54609,7 @@ function _monActividadActual(eventos, todayKey, fjHoy, nowMs, fichados) {
   if (fichados && fichados.forEach) {
     fichados.forEach(function (fecha, leg) {
       leg = String(leg);
-      if (leg === "0" || leg === "1" || vistos[leg]) return;
+      if (leg === "0" || vistos[leg]) return;
       if (fjHoy && fjHoy.has(leg)) return;                            // fichó y ya cerró jornada → fuera
       var ts = (fecha instanceof Date) ? fecha.getTime() : new Date(fecha).getTime();
       out.push({ legajo: leg, idle: true, sinceTs: ts || nowMs, kind: null, tanda: "", arranco: false });
@@ -54743,7 +54743,7 @@ async function fetchMonitorEvents(targetTandaKeys, sheetMap) {
   for (const f of dataD) {
     const ts = new Date(f.ts_cliente);
     const leg = f.legajo ? String(f.legajo) : null;
-    if (leg === "0" || leg === "1") continue;   // test/basura
+    if (leg === "0") continue;   // test/basura
     if (!leg) {
       fichadosSinLeg.push({ email: f.email || "(sin email)", ts });
       continue;

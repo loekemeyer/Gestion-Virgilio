@@ -5782,7 +5782,7 @@ Para probar el programa de punta a punta. Con el legajo **1**, cada «Enviar» d
 *«Legajo 1 (prueba): ¿querés que esto se REGISTRE de verdad?»*; «Cancelar» no registra nada. Si se registra, el
 Deshacer dura **10 min** (`_undoWindowMs`, ≡ el tope de `gv_deshacer_evento`); el resto de los legajos sigue en 60 s.
 Lo que pasa adentro de un módulo abierto con «sí» (cada código del picking, el armado, el guardado) no vuelve a preguntar.
-⚠ **El legajo 1 sigue siendo de prueba en la base**: horas, monitor/TV y alertas lo excluyen (`not in ('', '0', '1')`).
+⚠ **v27.63 (Thomas, D13): el legajo 1 CUENTA en el MONITOR** (vista `gv_monitor_horas_operario_dia`, marcador `v27.59-leg1`, TV, Mon. Admin, monitor del index) y Bajar/Ingreso a racks ya manda su tramo. Sigue excluido en la alarma de inactividad, la planilla de horas (`gv_horas_operario_detalle_v2`), productividad y reportes. `sql/gv_monitor_legajo1_v2763.sql`.
 Va igual en Registro Producción 3.0 (v30.09). `tests/legajo1-confirma.cjs`.
 
 ## ⚠ REGLA (06/10/2026, v27.46): el DESHACER (60 s) del operario va por RPC — nunca DELETE
