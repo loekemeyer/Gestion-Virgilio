@@ -17,8 +17,9 @@
      botón ADS del panel, con cuántos son. Rango y umbral viven en Stock_Config
      (ads_n_ocs, ads_umbral, ads_incluir_actual): el badge es el mismo para todos.
    PESTAÑA 2 · STOCK (quiebres a 10, 20 y 30 días)
-     saldo N = (góndola + racks + a guardar + excedente) − NP programadas sin pickear con
-               entrega hasta hoy + N (las vencidas también) − Est. Madre × N/30
+     saldo N = (góndola + racks + a guardar + excedente) − el MAYOR entre las NP programadas
+               sin pickear con entrega hasta hoy + N (vencidas también) y Est. Madre × N/30
+               (v27.92, Luis D3: no la suma — lo comprometido ya es parte de la Est. Madre)
      Negativo = quiebre. Sólo artículos CON TALLERISTA (v27.23: los importados sin tallerista no van).
      Con la última OC del código (cuánto se recibió) y el %
      que viene entregando ese tallerista en ese artículo (rango de la pestaña 1).
