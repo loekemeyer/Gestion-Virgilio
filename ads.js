@@ -240,10 +240,11 @@ function _adsHtmlStock() {
   h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · en cajas</div>';
   h += '<table><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Stk</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × ' + H + '/30">Est. Madre<br>' + H + ' d</th>' +
     '<th rowspan="2">Saldo<br>' + H + ' d</th>' +
-    '<th colspan="4" class="ug" title="Pedido y recibido de las últimas ' + _ads.n + ' OC (el rango de Entregas talleristas), sumando todos los talleristas · recibido = lo que recibió Virgilio, hasta lo pedido">Período (' + _ads.n + ' OC)</th>' +
-    '<th rowspan="2" title="Tallerista al que le corresponde; si son varios, la parte de cada uno en lo pedido del rango">Proporción</th></tr>' +
-    '<tr><th class="u1">Fecha<br>últ. OC</th><th class="u2">Pedido<br>período</th><th class="u2">Recibido<br>período</th><th class="u3">%</th></tr></thead><tbody>';
-  if (!f.length) h += '<tr><td colspan="11" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
+    '<th colspan="6" class="ug" title="Pedido y recibido de las últimas ' + _ads.n + ' OC (el rango de Entregas talleristas), sumando todos los talleristas · recibido = lo que recibió Virgilio, hasta lo pedido">Período (' + _ads.n + ' OC)</th></tr>' +
+    '<tr><th class="u1">Fecha<br>últ. OC</th><th class="u2">Pedido<br>período</th><th class="u2">Recibido<br>período</th><th class="u2">%</th>' +
+    '<th class="u2" title="Lo que se estima que entreguen en ' + H + ' días: por tallerista, su ritmo del período (recibido ÷ días desde su 1.ª OC del rango) × ' + H + ', hasta lo que le falta entregar">Entrega<br>est. ' + H + ' d</th>' +
+    '<th class="u3" title="Tallerista al que le corresponde; si son varios, la parte de cada uno en lo pedido del período">Proporción</th></tr></thead><tbody>';
+  if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H), disp = c.disp, proy = c.proy, comp = c.comp, em = c.em, saldo = c.saldo;
     var dist = c.dist.length ? c.dist.map(_adsEsc).join("<br>") : "—";
@@ -253,10 +254,11 @@ function _adsHtmlStock() {
       '</td><td class="' + (saldo < 0 ? "neg" : "pos") + '">' + _adsN(saldo) + "</td>";
     // v27.78 (Luis): el recuadro es del PERÍODO (las N OC del rango), no de la última OC; la fecha sí es la de la última OC
     var fUlt = c.fechaUlt ? _adsFecha(c.fechaUlt) : '<span class="neg">sin OC</span>';
-    if (c.pedP == null) h += '<td class="u1">' + fUlt + '</td><td colspan="3" class="u3">' + (_ads.tall ? "sin OC en el período" : "…") + "</td>";
+    if (c.pedP == null) h += '<td class="u1">' + fUlt + '</td><td colspan="4" class="u2">' + (_ads.tall ? "sin OC en el período" : "…") + "</td>";
     else h += '<td class="u1">' + fUlt + '</td><td class="u2">' + _adsN(c.pedP) + '</td><td class="u2">' + _adsN(c.recP) +
-      '</td><td class="u3' + (c.pctP != null && c.pctP < _ads.umbral ? " neg" : "") + '">' + _adsPct(c.pctP) + "</td>";
-    h += "<td>" + dist + "</td></tr>";
+      '</td><td class="u2' + (c.pctP != null && c.pctP < _ads.umbral ? " neg" : "") + '">' + _adsPct(c.pctP) +
+      '</td><td class="u2" title="' + _adsEsc(c.estDet.join(" · ")) + '"><b>' + _adsN(c.estH) + "</b></td>";
+    h += '<td class="u3">' + dist + "</td></tr>";
   });
   return h + "</tbody></table></div>";
 }
@@ -274,7 +276,17 @@ function _adsStockCalc(r, H) {
   // v27.78: pedido y recibido del período = suma de todos los talleristas del código en las N OC del rango
   var recP = pc.reduce(function (s, x) { return s + (Number(x.entregado) || 0); }, 0);
   var fechaUlt = r.oc_fecha || pc.reduce(function (m, x) { return x.ult_fecha && (!m || x.ult_fecha > m) ? x.ult_fecha : m; }, null) || null;
-  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]),
+  // v27.81 (Luis): entrega estimada a H días, proporcional a cómo viene entregando cada tallerista:
+  // ritmo = recibido ÷ días desde su 1.ª OC del período; estimado = ritmo × H, topado en lo que le falta.
+  var hoy = Date.now(), estH = 0, estDet = [];
+  pc.forEach(function (x) {
+    var ped = Number(x.pedido) || 0, ent = Number(x.entregado) || 0, falta = Math.max(0, ped - ent);
+    var t0 = x.desde ? Date.parse(String(x.desde).slice(0, 10) + "T12:00:00-03:00") : NaN;
+    var dias = isFinite(t0) ? Math.max(1, (hoy - t0) / 864e5) : null;
+    var e = dias ? Math.min(falta, Math.round(ent / dias * H)) : 0;
+    estH += e; estDet.push(x.proveedor + ": " + e + " (faltan " + falta + ")");
+  });
+  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estDet: estDet,
            pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
            fechaUlt: fechaUlt, dist: dist };
 }
@@ -356,14 +368,14 @@ function adsExcelStock(H) {
   var f = adsFiltrarStock(_ads.stock, H, "");
   // v27.42 (Luis): rótulos abreviados para que ninguna palabra se parta en el medio con los anchos chicos
   var aoa = [["Cód.", "Descripción", "Stk", "Comp. " + H + " d", "Est. Madre " + H + " d", "Saldo " + H + " d",
-              "Fecha últ. OC", "Ped. período", "Rec. período", "% período", "Proporción"]];
+              "Fecha últ. OC", "Ped. período", "Rec. período", "% período", "Entr. est. " + H + " d", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo),
-      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), c.dist.join(" - ")]);
+      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.dist.join(" - ")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
-    { anchos: [6.57, 23, 5.14, 6, 6.29, 6, 6.29, 6.29, 6.29, 5.29, _adsAnchoTexto(aoa, 10, 10.5, 24)], izq: [1, 10] });
+    { anchos: [6.57, 23, 5.14, 6, 6.29, 6, 6.29, 6.29, 6.29, 5.29, 6.29, _adsAnchoTexto(aoa, 11, 10.5, 24)], izq: [1, 11] });
 }
 
 function _adsRender() {

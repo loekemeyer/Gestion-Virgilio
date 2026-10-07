@@ -75,7 +75,7 @@ const STOCK = [
     out.chips = [...document.querySelectorAll("#adsOv .chip")].map((c) => c.textContent);
     const fs = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")];
     out.stockCods = fs.map((f) => f.cells[0].textContent);
-    out.pctTall = fs[0] ? fs[0].cells[10].textContent : "";
+    out.pctTall = fs[0] ? fs[0].cells[11].textContent : "";
     out.cols10 = [...document.querySelectorAll("#adsOv .ads-body > table > thead th")].map((t) => t.textContent);
     out.fila10 = fs[0] ? [...fs[0].cells].slice(2, 10).map((c) => c.textContent) : [];
     // v27.34: Excel por rango y de talleristas (se lee el archivo que se baja)
@@ -122,7 +122,7 @@ const STOCK = [
   if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
   if (JSON.stringify(r.stockCods) !== JSON.stringify(["505"])) fallas.push("(c) quiebre 10 d: " + JSON.stringify(r.stockCods));
   if (String(r.pctTall).trim() !== "Lucho (350)") fallas.push("(c) Dist un solo tallerista, sin % y con cajas: " + r.pctTall);
-  const C10 = ["Cód.","Descripción","Stk","Comprom.10 d","Est. Madre10 d","Saldo10 d","Período (4 OC)","Proporción","Fechaúlt. OC","Pedidoperíodo","Recibidoperíodo","%"];
+  const C10 = ["Cód.","Descripción","Stk","Comprom.10 d","Est. Madre10 d","Saldo10 d","Período (4 OC)","Fechaúlt. OC","Pedidoperíodo","Recibidoperíodo","%","Entregaest. 10 d","Proporción"];
   if (JSON.stringify(r.cols10) !== JSON.stringify(C10)) fallas.push("(c) columnas stock: " + JSON.stringify(r.cols10));
   if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","30/09","350","250","71 %"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
   if (JSON.stringify(r.fila30) !== JSON.stringify(["50","60","300","-310","30/09"])) fallas.push("(c) fila a 30 d: " + JSON.stringify(r.fila30));
@@ -136,7 +136,7 @@ const STOCK = [
   // v27.40: el formato de Luis (anchos chicos, rótulo de 45, congelado, entra a lo ancho; texto a la izq., números centrados)
   if (!xt || JSON.stringify(xt.anchos.slice(1)) !== JSON.stringify([6.57, 23, 5.14, 5.29, 5.86, 4, 6.57, 5.86, 6]) || xt.anchos[0] < 11.14 || xt.anchos[0] > 16 ||
       !xt.alto1 || !xt.congela || !xt.ajusta || xt.a2 !== "" || xt.b2 !== ' s="2"') fallas.push("(g) formato Excel talleristas: " + JSON.stringify(xt && [xt.anchos, xt.alto1, xt.congela, xt.ajusta, xt.a2, xt.b2]));
-  if (!x10 || x10.anchos.length !== 11 || Math.max(...x10.anchos) > 24 || x10.cab[10] !== "Proporción" || x10.cab.slice(3).some((h) => String(h).split(/\s+/).some((w) => w.length > 6 && w !== "Proporción" && w !== "período")) || x10.anchos.reduce((a, b) => a + b, 0) > 110) fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
+  if (!x10 || x10.anchos.length !== 12 || Math.max(...x10.anchos) > 24 || x10.cab[11] !== "Proporción" || x10.cab.slice(3).some((h) => String(h).split(/\s+/).some((w) => w.length > 6 && w !== "Proporción" && w !== "período")) || x10.anchos.reduce((a, b) => a + b, 0) > 110) fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
   // v27.59 D16 (Luis): sin stock que cubra lo comprometido = 0 días aunque no tenga Est. Madre; con sobrante y sin Est. Madre = «sin venta»
   {
     const src = require("fs").readFileSync(path.join(__dirname, "..", "ads.js"), "utf8");
@@ -148,6 +148,12 @@ const STOCK = [
     ctx._adsN = (v) => Number(v).toLocaleString("es-AR");
     ctx._adsPctCod = () => [{ proveedor: "Garcia", pedido: 140 }, { proveedor: "Poly", pedido: 107 }];
     const dist = ctx._adsStockCalc({ disponible: 5, proy_mes: 0, comp10: 0, saldo10: 5 }, 10).dist;
+    // v27.79: entrega estimada proporcional al ritmo de cada uno (10 días de período, H = 10)
+    const d10 = new Date(Date.now() - 10 * 864e5).toISOString().slice(0, 10);
+    ctx._adsPctCod = () => [{ proveedor: "A", pedido: 200, entregado: 50, desde: d10 }, { proveedor: "B", pedido: 30, entregado: 20, desde: d10 }];
+    const est = ctx._adsStockCalc({ disponible: 5, proy_mes: 0, comp10: 0, saldo10: 5 }, 10).estH;
+    if (est < 57 || est > 61) fallas.push("(j) entrega estimada (A 50 + B topado en 10 = 60): " + est);
+    ctx._adsPctCod = () => [{ proveedor: "Garcia", pedido: 140 }, { proveedor: "Poly", pedido: 107 }];
     if (JSON.stringify(dist) !== JSON.stringify(["Garcia 57 % (140)", "Poly 43 % (107)"])) fallas.push("(i) proporción con cajas: " + JSON.stringify(dist));
     if (corto.pedP !== null || vende.pctP !== null) fallas.push("(h) sin OC en el período: " + JSON.stringify([corto, vende]));
   }
