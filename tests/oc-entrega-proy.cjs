@@ -15,8 +15,8 @@ ok(/catch \(e\) \{ box\.innerHTML = '<span style="color:#b91c1c">No se pudo leer
 ok(!det.includes("ocDetEditCant(") && !det.includes("ocDetSaveBtn") && !det.includes("Llenar góndola:"), "v28.22: Pedido no editable y sin la barra Llenar góndola");
 ok(!det.includes("fillBtn + '</td>'") && !det.includes('<th class="num">Pedido</th><th></th>'), "v28.22: sin el botón ⛽ al lado de Pedido");
 ok(!det.includes('class="oc-meta"') && !det.includes('class="oc-note" style="margin-top:0'), "v28.22: sin la línea de totales ni la nota de Recibido");
-ok(/class="oc-fillbtn oc-logbtn"/.test(s), "v28.22: el 📓 tiene el tamaño del ⛽ (oc-fillbtn)");
+ok(/class="oc-epbtn oc-logbtn"/.test(s) && /id="ocEpSave' \+ r\.id/.test(s), "v28.29: 💾 y 📓 chiquitos apilados al lado de la casilla");
 ok(/oninput="ocEntProyEdit\(/.test(s) && !/onchange="ocEntProyGuardar\(/.test(s), "v28.27: la casilla NO guarda sola al cambiar");
-ok(/id="ocEpSaveBtn"/.test(s) && det.includes("_ocEpBtnHtml()"), "v28.27: botón Guardar entrega proy. en la barra del detalle");
-ok(/gv_oc_entrega_proy_guardar/.test(s.slice(s.indexOf("async function ocEntProyGuardar()"))), "v28.27: el botón guarda por la RPC (que deja historial)");
+ok(/onclick="ocEntProyGuardar\(' \+ r\.id/.test(s) && !det.includes("_ocEpBtnHtml()"), "v28.29: el 💾 de cada línea guarda esa línea (sin botón en la barra)");
+ok(/gv_oc_entrega_proy_guardar/.test(s.slice(s.indexOf("async function ocEntProyGuardar(id)"))), "v28.27: el botón guarda por la RPC (que deja historial)");
 process.exit(bad ? 1 : 0);

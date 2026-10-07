@@ -8132,6 +8132,7 @@ abre un **hilo** de comentarios sobre el estado de esa recepción. Badge azul co
 - **v28.22 (Luis): el detalle de la OC ya NO edita.** Pedido es texto, se fueron el ⛽ de cada línea, la barra verde «Llenar góndola» (con «Guardar cantidades»), la línea de totales y la nota de Recibido; el 📓 va al tamaño del ⛽ (`oc-fillbtn`). Las funciones `ocDet*` quedan sin puerta.
 - **v28.24 (Luis): la tabla del detalle va al ancho del dato** (`width:auto`), encabezados y números centrados, relleno 5 px, Entrega proy. de 46 px. v28.25: cada encabezado dividido con una línea, como Stock · Máximo · Cap gónd.
 - **v28.27 (Luis: *"si no te quedó registro en ningún lado estamos mal"*): Entrega proy. se guarda con el botón «💾 Guardar entrega proy. (N)»** de la barra, no al cambiar la casilla; salir con cambios sin guardar pide confirmación. **Cada guardado queda en `GV_OC_Entrega_Proy_Hist`** (valor, anterior, quién, cuándo), aunque después se borre; `Ordenes_Compra.gv_entrega_proy` es sólo el valor de hoy. El 📓 (`GV_OC_Log`) es aparte. Lo cargado antes de la v28.27 (el 50 del 248 del 07/10) no quedó en ningún lado.
+- **v28.29 (Luis): al lado de la casilla van DOS botones chiquitos apilados: arriba 💾 (guarda ESA línea; se pinta amarillo con un cambio sin guardar) y abajo 📓 (log).** Se fue el botón «Guardar entrega proy.» de la barra.
 - `sql/gv_oc_entrega_proy_log_v2802.sql` (v28.21; salió como v28.03, número que quedaba por debajo del 28.2 de otra sesión), `tests/oc-entrega-proy.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-06, v27.21): ADS — ALERTAS DAMIÁN STOCK (`ads.js`)
