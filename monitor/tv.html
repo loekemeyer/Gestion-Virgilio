@@ -1639,7 +1639,17 @@ function pintarHoras(filas, d) {
     var mm = m3[leg] || { pick: {}, arm: {} };
     var mp = suma(mm.pick), ma = suma(mm.arm);
     var prod = (Number(o.hs_pick) || 0) + (Number(o.hs_arm) || 0);
-    var no = Math.max(0, (Number(o.hs_total) || 0) - prod);
+    /* v27.72 (Luis): el picking/armado EN CURSO (EP/AP sin cerrar) cuenta en Prod, no en No prod.
+       La vista deja ese tramo abierto en hs_total pero NO en hs_pick/hs_arm (ésas son lo CERRADO),
+       así que sin esto el tiempo de un picking todavía abierto caía ENTERO en No prod (Jhonny:
+       Prod «—» mientras pickeaba). El tramo sale del mismo `act[leg]` que pinta la columna «Ahora»;
+       la vista ya lo tiene en hs_prod, pero hs_prod incluye CC/CR/RR, que v25.89 saca de Prod. */
+    var aOp = act[leg], tot = Number(o.hs_total) || 0;
+    if (aOp && !aOp.idle && (aOp.kind === "pick" || aOp.kind === "arm") && aOp.desde) {
+      prod += Math.max(0, (Date.now() - aOp.desde) / 3600000);
+      if (tot > 0 && prod > tot) prod = tot;   // nunca más que la jornada
+    }
+    var no = Math.max(0, tot - prod);
     tPm += mp; tPh += Number(o.hs_pick) || 0; tAm += ma; tAh += Number(o.hs_arm) || 0;
     tProd += prod; tNo += no;
     return '<tr><td title="' + esc(o.nombre) + '">' + esc(nombreCorto(o.nombre, o.legajo)) +

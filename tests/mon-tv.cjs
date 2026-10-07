@@ -411,8 +411,14 @@ function responder(url) {
   ok(!/\d,\d h/.test(r.ops), "las horas tienen que ir en H:MM, no en decimal");
   /* v25.89 (Luis): Prod = SÓLO picking + armado; No prod = jornada − prod (tiempo muerto incluido).
      Total se fue: la última columna es «Ahora» (lo que era «En este momento»). */
-  ok(/6:54/.test(r.ops) && /4:42/.test(r.ops),
-     "la fila de Total no suma bien (prod 4:30+2:24=6:54 · no prod 1:42+3:00=4:42): " + r.ops.replace(/<[^>]*>/g, " "));
+  /* v27.72 (Luis): el picking EN CURSO cuenta en Prod. Farias pickea E30A desde hace 1:30 (abierto):
+     Prod 4:30 + 1:30 = 6:00 y su No prod baja a 0:12. Total prod 6:00+2:24=8:24 · no 0:12+3:00=3:12. */
+  ok(/8:24/.test(r.ops) && /3:12/.test(r.ops),
+     "la fila de Total no suma bien (prod 6:00+2:24=8:24 · no prod 0:12+3:00=3:12): " + r.ops.replace(/<[^>]*>/g, " "));
+  ok(/<td class="op-prod">6:00<\/td>/.test(r.ops),
+     "v27.72: el picking EN CURSO de Farias (E30A, 1:30) tiene que entrar en Prod (4:30+1:30=6:00): " + r.ops.replace(/<[^>]*>/g, " ").slice(0, 240));
+  ok(/<td class="op-no op-sep">0:12<\/td>/.test(r.ops),
+     "v27.72: y bajar su No prod a 0:12 (el picking abierto ya no cae en No prod)");
   ok(/>Ahora</.test(r.ops) && !/<th>Total<\/th>/.test(r.ops), "la columna Total tiene que ser «Ahora»");
   /* v26.55 (Luis, 04/10): una vez pickeada, la tanda vale su m³ PICKEADO, en picking Y en armado.
      E31A 1,5 × 0,8 = 1,2. Picking del 8: 1,2 ÷ 2,5 h = 0,5. Armado del 12: 1,2 ÷ 2,4 h = 0,5 (antes 0,6). */
