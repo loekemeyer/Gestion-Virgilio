@@ -375,7 +375,7 @@ function adsExcelStock(H) {
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo),
-      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estDist.length > 1 ? c.estDist.join(" - ") : "", c.dist.join(" - ")]);
+      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estDist.join(" - "), c.dist.join(" - ")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
     { anchos: [6.57, 23, 5.14, 6, 6.29, 6, 6.29, 6.29, 6.29, 5.29, 6.29, _adsAnchoTexto(aoa, 11, 10.5, 24), _adsAnchoTexto(aoa, 12, 10.5, 24)], izq: [1, 11, 12] });
