@@ -306,10 +306,11 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
   var iSt = cfb.FullPaths.findIndex(function (p) { return /\/xl\/styles\.xml$/.test(p); });
   if (iSt < 0) throw new Error("xlsx sin styles.xml");
   var st = dec.decode(new Uint8Array(cfb.FileIndex[iSt].content));
-  st = st.replace(/<fonts[\s\S]*?<\/fonts>/, '<fonts count="1"><font><sz val="10"/><name val="Arial"/><family val="2"/></font></fonts>')
-         .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+  st = st.replace(/<fonts[\s\S]*?<\/fonts>/, '<fonts count="1"><font><sz val="' + (cfg.fuente || 10) + '"/><name val="Arial"/><family val="2"/></font></fonts>')
+         .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
            + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
-           + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs>');
+           + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+           + '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf></cellXfs>');
   cfb.FileIndex[iSt].content = enc.encode(st);
   var izq = {}; (cfg.izq || []).forEach(function (i) { izq[i] = 1; });
   var colN = function (L) { var n = 0; for (var k = 0; k < L.length; k++) n = n * 26 + (L.charCodeAt(k) - 64); return n - 1; };
@@ -321,9 +322,14 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
     x = x.replace(/<sheetData/, cols + "<sheetData");
     x = x.replace(/<c r="([A-Z]+)(\d+)"( s="\d+")?/g, function (_m, L, r) {
       if (r === "1") return '<c r="' + L + r + '" s="1"';
+      if (cfg.wrap) return '<c r="' + L + r + '" s="' + (izq[colN(L)] ? 3 : 1) + '"';
       return izq[colN(L)] ? '<c r="' + L + r + '"' : '<c r="' + L + r + '" s="2"';
     });
-    x = x.replace(/<row r="1"([^>]*)>/, function (_m, at) { return '<row r="1"' + at.replace(/ ht="[^"]*"| customHeight="[^"]*"/g, "") + ' ht="45" customHeight="1">'; });
+    if (cfg.altos) x = x.replace(/<row r="(\d+)"([^>]*)>/g, function (m, r, at) {
+      var h = cfg.altos[Number(r) - 1]; if (!h || r === "1") return m;
+      return '<row r="' + r + '"' + at.replace(/ ht="[^"]*"| customHeight="[^"]*"/g, "") + ' ht="' + h + '" customHeight="1">';
+    });
+    x = x.replace(/<row r="1"([^>]*)>/, function (_m, at) { return '<row r="1"' + at.replace(/ ht="[^"]*"| customHeight="[^"]*"/g, "") + ' ht="' + (cfg.altoRot || 45) + '" customHeight="1">'; });
     x = x.replace(/<sheetViews>[\s\S]*?<\/sheetViews>/, "")
          .replace(/<dimension[^>]*\/>/, function (d) { return d + '<sheetViews><sheetView zoomScale="130" zoomScaleNormal="130" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr baseColWidth="10" defaultRowHeight="12.75"/>'; });
     x = x.replace(/<sheetFormatPr[^>]*\/>(?=[\s\S]*<sheetFormatPr)/, "");
@@ -369,16 +375,26 @@ function adsExcelTall() {
 function adsExcelStock(H) {
   if (!_ads.stock) { alert("Todavía se está leyendo el stock."); return; }
   var f = adsFiltrarStock(_ads.stock, H, "");
-  // v27.42 (Luis): rótulos abreviados para que ninguna palabra se parta en el medio con los anchos chicos
-  var aoa = [["Cód.", "Descripción", "Stk", "Comp. " + H + " d", "Est. Madre " + H + " d", "Saldo " + H + " d",
-              "Fecha últ. OC", "Ped. período", "Rec. período", "% período", "Entr. est. " + H + " d", "Entr. est. x tall.", "Proporción"]];
+  // v27.87 (Luis, 07/10): el formato es el de su Excel «ADS_stock_10d_20261007_1»: Arial 14, rótulo de alto 72,
+  // todo con ajuste de texto, sus anchos y sus rótulos; el alto de cada fila según el texto más largo.
+  var aoa = [["Cód.", "Descripción", "Stk", "Comprom " + H + " d", "E M " + H + " d", "Saldo " + H + " d",
+              "Fecha últ. OC", "Ped período", "Rec período", "% período", "Entr est " + H + " d", "Entr. est. x tall.", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo),
       c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estDist.join(" - "), c.dist.join(" - ")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
-    { anchos: [6.57, 23, 5.14, 6, 6.29, 6, 6.29, 6.29, 6.29, 5.29, 6.29, _adsAnchoTexto(aoa, 11, 10.5, 24), _adsAnchoTexto(aoa, 12, 10.5, 24)], izq: [1, 11, 12] });
+    { anchos: ADS_XLS_STOCK_ANCHOS, izq: [1, 11, 12], fuente: 14, altoRot: 72, wrap: true, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [1, 11, 12]) });
+}
+var ADS_XLS_STOCK_ANCHOS = [5.86, 14.86, 6, 7.14, 6.29, 6, 5.57, 8.71, 6.29, 5.29, 6.29, 21, 18.86];
+/* alto de cada fila (Arial 14 con ajuste): renglones del texto más largo × 18 pt; ~1,35 de ancho por carácter */
+function _adsAltos(aoa, anchos, cols) {
+  return aoa.map(function (f, i) {
+    if (!i) return null;
+    var n = 1; cols.forEach(function (c) { var t = String(f[c] == null ? "" : f[c]); if (t) n = Math.max(n, Math.ceil(t.length / Math.max(1, Math.floor(anchos[c] / 1.35)))); });
+    return n * 18;
+  });
 }
 
 function _adsRender() {

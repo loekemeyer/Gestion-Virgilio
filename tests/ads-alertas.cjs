@@ -136,7 +136,8 @@ const STOCK = [
   // v27.40: el formato de Luis (anchos chicos, rótulo de 45, congelado, entra a lo ancho; texto a la izq., números centrados)
   if (!xt || JSON.stringify(xt.anchos.slice(1)) !== JSON.stringify([6.57, 23, 5.14, 5.29, 5.86, 4, 6.57, 5.86, 6]) || xt.anchos[0] < 11.14 || xt.anchos[0] > 16 ||
       !xt.alto1 || !xt.congela || !xt.ajusta || xt.a2 !== "" || xt.b2 !== ' s="2"') fallas.push("(g) formato Excel talleristas: " + JSON.stringify(xt && [xt.anchos, xt.alto1, xt.congela, xt.ajusta, xt.a2, xt.b2]));
-  if (!x10 || x10.anchos.length !== 13 || Math.max(...x10.anchos) > 24 || x10.cab[12] !== "Proporción" || x10.cab.slice(3).some((h) => String(h).split(/\s+/).some((w) => w.length > 6 && w !== "Proporción" && w !== "período")) || x10.anchos.reduce((a, b) => a + b, 0) > 110) fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
+  // v27.87 (Luis): los anchos y rótulos son los de su Excel «ADS_stock_10d_20261007_1»
+  if (!x10 || JSON.stringify(x10.anchos) !== JSON.stringify([5.86, 14.86, 6, 7.14, 6.29, 6, 5.57, 8.71, 6.29, 5.29, 6.29, 21, 18.86]) || x10.cab[3] !== "Comprom 10 d" || x10.cab[4] !== "E M 10 d" || x10.cab[12] !== "Proporción") fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
   // v27.59 D16 (Luis): sin stock que cubra lo comprometido = 0 días aunque no tenga Est. Madre; con sobrante y sin Est. Madre = «sin venta»
   {
     const src = require("fs").readFileSync(path.join(__dirname, "..", "ads.js"), "utf8");
