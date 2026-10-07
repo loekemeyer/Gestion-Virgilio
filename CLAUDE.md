@@ -127,6 +127,8 @@ siempre y no dependan de que estén cargadas en la sesión.
   reversión. Lo que costó: el SQL de D24 (v26.51) quedó **un día sin aplicar** esperando un «D26 sí»
   que nadie necesitaba, con la TV y el puntaje mostrando una cosa y la base otra.
 
+- ⚠⚠ **EL SQL LO CORRE LA SESIÓN, NUNCA EL USUARIO** (Luis, 07/10/2026: *"si tengo que correr SQL, se pasa por acá. regla general para el repo"*). No se le dan pasos para el SQL Editor. Si el MCP se cuelga a los 60 s con DDL o escrituras (la llamada **no llega a Postgres**: `pg_stat_activity` no la muestra; es el cartel de permiso del connector esperando), se le pide **una vez** que apruebe el cartel o ponga `execute_sql` / `apply_migration` en *Always allow* (claude.ai → Settings → Connectors → Supabase), y se reintenta. Antes de dar el SQL por aplicado, SELECT de verificación.
+
 ### PLANIFY y AUDITORÍA
 
 Las reglas completas están más abajo en este mismo archivo (bloques *"preguntar QUIÉN habla"*
