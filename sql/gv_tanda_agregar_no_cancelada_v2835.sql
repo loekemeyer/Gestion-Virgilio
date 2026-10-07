@@ -1,0 +1,13 @@
+-- v28.35 (07/10/2026) — un pedido CANCELADO no se vuelve a programar desde A Programar.
+-- Caso LK 0066 (pedido 1387, MRG Soluciones): armado en E48H, facturado 05/10, cancelado desde la PPP
+-- el 06/10 09:56 ("falta stock": la caja vuelve a A guardar y se revierte el facturado) y a las 11:15
+-- arrastrado desde A Programar a la tanda nueva F63A del 13/10. Quedo vivo en PPP_Web_Programacion
+-- (el Resumen lo cuenta) y cancelado en GV_PPP_Web_NP_Cancelada (gv_ppp_prog_arbol lo esconde).
+-- Aplicado el 07/10. Guard en gv_ppp_web_tanda_agregar (el paso de A Programar que arma la tanda):
+--   select string_agg(...) from jsonb_array_elements(v_arr) x join public."GV_PPP_Web_NP_Cancelada" c
+--     on c.empresa = p_empresa and c.order_id = (x->>'order_id')::bigint and c.np_idx = (x->>'np_idx')::int;
+--   if v_canc is not null then raise exception 'CANCELADO: % . Un pedido cancelado no se vuelve a programar.', v_canc;
+-- Probado en transaccion abortada: 1387 -> CANCELADO; un pedido sano -> pasa.
+-- Centinela: GV_Reglas_Centinela id 357 (patron GV_PPP_Web_NP_Cancelada).
+-- Front: A Programar saca de la lista los pedidos con fila en GV_PPP_Web_NP_Cancelada.
+-- Rollback: CREATE OR REPLACE con la definicion sin el bloque v28.35-cancelada (pg_get_functiondef y borrar ese bloque).
