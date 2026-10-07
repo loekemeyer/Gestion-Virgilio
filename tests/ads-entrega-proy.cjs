@@ -1,4 +1,4 @@
-/* v28.43 (Luis): en ADS → Stock, la «Entrega est.» usa la ENTREGA PROY. cargada a mano en la OC vigente
+/* v28.44 (Luis): en ADS → Stock, la «Entrega est.» usa la ENTREGA PROY. cargada a mano en la OC vigente
    (Ordenes_Compra.gv_entrega_proy) en vez de la estimación por ritmo; sin dato, sigue por ritmo. */
 const fs = require("fs"), path = require("path"), vm = require("vm");
 const src = fs.readFileSync(path.join(__dirname, "..", "ads.js"), "utf8");

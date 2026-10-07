@@ -139,7 +139,7 @@ function _adsCargarTall() {
     _adsRender();
   });
 }
-/* v28.43 (Luis): la ENTREGA PROY. que se carga a mano en la OC vigente (consultándole al tallerista,
+/* v28.44 (Luis): la ENTREGA PROY. que se carga a mano en la OC vigente (consultándole al tallerista,
    Ordenes_Compra.gv_entrega_proy) manda sobre la estimación por ritmo. Clave proveedor|código|fecha de la OC.
    Si la lectura falla, queda la estimación por ritmo (no se inventa un 0). */
 function _adsCargarEntregaProy() {
@@ -309,7 +309,7 @@ function _adsStockCalc(r, H) {
     var t0 = x.desde ? Date.parse(String(x.desde).slice(0, 10) + "T12:00:00-03:00") : NaN;
     var dias = isFinite(t0) ? Math.max(1, (hoy - t0) / 864e5) : null;
     var e = dias ? Math.min(falta, Math.round(ent / dias * H)) : 0;
-    // v28.43 (Luis): si en la OC vigente se cargó la entrega proyectada (consultada al tallerista), manda ESE dato
+    // v28.44 (Luis): si en la OC vigente se cargó la entrega proyectada (consultada al tallerista), manda ESE dato
     var ep = (typeof _ads !== "undefined" && _ads.epOc && typeof _adsEpKey === "function") ? _ads.epOc[_adsEpKey(x.proveedor, r.cod, ultOc)] : null;
     if (ep != null && isFinite(ep)) { e = Math.max(0, Math.round(ep)); estDet.push(x.proveedor + ": " + e + " (cargado en la OC · faltan " + falta + ")"); }
     else estDet.push(x.proveedor + ": " + e + " (por ritmo · faltan " + falta + ")");
