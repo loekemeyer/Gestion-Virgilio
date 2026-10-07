@@ -180,7 +180,7 @@ catch (_e) {
     const fila58 = [...prev.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("LK 0058") >= 0);
     out.npCod    = !!fila58 && (fila58.querySelector(".pga-cod") || {}).textContent === "LK 1000";
     out.npZonaBarrio = !!fila58 && (fila58.querySelector(".pga-loc") || {}).textContent === "Zona 2 - CABA Centro · Villa Crespo";
-    out.npFechaPed   = !!fila58 && (fila58.querySelector(".pga-ped") || {}).textContent === "📥 11/09";
+    out.npFechaPed   = !!fila58 && (fila58.querySelector(".pga-ped") || {}).textContent === "📥 Vie 11/09";
     const filaCh = [...prev.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("CH 0019") >= 0);
     out.npCodCh = !!filaCh && (filaCh.querySelector(".pga-cod") || {}).textContent === "CH 1000";
 
@@ -244,7 +244,7 @@ catch (_e) {
   t(r.salidas, "(1) v21.38: ya no hay botón al tablero de 6 días");
   t(r.dias.length === 2, "(2) una fila por día con programación (2)");
   t(r.esperaNo, "(2) v21.41: el día «⏸ Armados en espera» no existe más en la tabla (Luis, 23/09)");
-  t(eq(r.dias[0].slice(0, 4), ["▸Lunes 14/09", "5,2", "2", "3"]), "(2) el día trae m³, tandas y NPs — " + JSON.stringify(r.dias[0].slice(0, 4)));
+  t(eq(r.dias[0].slice(0, 4), ["▸Lun 14/09", "5,2", "2", "3"]), "(2) el día trae m³, tandas y NPs — " + JSON.stringify(r.dias[0].slice(0, 4)));
   t(r.hoy, "(2) el día de hoy está marcado");
   t(r.sinTandasCerrado, "(2) arranca cerrado: no se ven tandas");
   t(eq(r.pctMartes, ["20 %1", "20 %1", "40 %2", "20 %1"]), "(3) los 4 % del martes en números — " + JSON.stringify(r.pctMartes));

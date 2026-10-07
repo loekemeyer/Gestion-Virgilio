@@ -6333,7 +6333,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.33"></script>
+<script type="module" src="recepcion.js?v=28.34"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10612,7 +10612,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.33";
+const APP_VERSION = "v28.34";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36049,7 +36049,7 @@ function _pppEnViajeHtml() {
     const arr = byDay[k];
     let m3d = 0; for (const p of arr) m3d += (p.m3 || 0);
     let dh = "Sin fecha";
-    if (k !== "00000000") { const dt = new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)); dh = DOW[dt.getDay()] + " " + (+k.slice(6, 8)) + "/" + (+k.slice(4, 6)) + "/" + k.slice(0, 4); }
+    if (k !== "00000000") { const dt = new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)); dh = gvDiaTxt(dt); }
     const camRes = _pppEsCamResumen(arr);
     html += '<div class="ppp-es-day"><div class="ppp-es-day-h"><span>🗓️ ' + dh + (camRes ? ' ' + camRes : '') + '</span><span class="m3">' + arr.length + ' ped · ' + m3d.toFixed(2).replace('.', ',') + ' m³</span></div>' +
       '<div class="ppp-es-wrap"><table class="ppp-es-table"><thead><tr>' +
@@ -36194,7 +36194,7 @@ function gvFechaPedChip(np, fIso, hasta, cls) {
   const fp = _pppFechaPedOf(np);
   if (fp && (!f || fp.f === f)) { f = f || fp.f; h = fp.h || ""; }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return "";
-  const dd = f.slice(8, 10) + "/" + f.slice(5, 7);
+  const dd = gvDiaTxt(f);
   let tit = "El cliente mandó el pedido el " + dd + "/" + f.slice(0, 4) + (h ? " a las " + h : "");
   const ha = String(hasta || "").slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(ha)) {
@@ -36335,7 +36335,7 @@ function _pppEntGroupedHtml(list, showCajas, cap) {
     const arr = byDay[k];
     let m3d = 0; for (const p of arr) m3d += (p.m3 || 0);
     let dh = "Sin fecha";
-    if (k !== "00000000") { const dt = new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)); dh = DOW[dt.getDay()] + " " + (+k.slice(6, 8)) + "/" + (+k.slice(4, 6)) + "/" + k.slice(0, 4); }
+    if (k !== "00000000") { const dt = new Date(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8)); dh = gvDiaTxt(dt); }
     html += '<div class="ppp-ent-day"><div class="ppp-ent-day-h"><span>🗓️ ' + dh + '</span><span class="m3">' + arr.length + ' ped · ' + m3d.toFixed(2).replace('.', ',') + ' m³</span></div>';
     const byT = {}, tord = [];
     for (const p of arr) { const t = p.tanda || "—"; if (!(t in byT)) { byT[t] = []; tord.push(t); } byT[t].push(p); }
@@ -37473,7 +37473,7 @@ function pppMovRender() {
         '<span class="mv-d-q">' + (cupo ? (m3 >= cupo ? 'pasado por ' + _pppFmtM3(m3 - cupo) + ' m³' : 'quedan ' + _pppFmtM3(cupo - m3) + ' m³') : (d.tandas || 0) + ' tanda(s)') + '</span>' +
         (cupo ? '<div class="mv-bar"><i style="width:' + pct + '%"></i></div>' : '');
     h += '<button class="' + cls.join(" ") + '"' + (noHabil || esActual ? ' disabled' : ' onclick="pppMovElegir(\'' + dISO + '\')"') + '>' + tag +
-      '<span class="mv-d-dow">' + DOW[dt.getDay()] + '</span><span class="mv-d-num">' + dt.getDate() + ' ' + MES[dt.getMonth()] + '</span>' + cuerpo + '</button>';
+      '<span class="mv-d-dow">' + DOW[dt.getDay()] + '</span><span class="mv-d-num">' + String(dt.getDate()).padStart(2, "0") + '/' + String(dt.getMonth() + 1).padStart(2, "0") + '</span>' + cuerpo + '</button>';
   }
   h += '</div><div class="mv-mas"><button onclick="pppMovMas()">Ver más días →</button></div>';
   body.innerHTML = h;
@@ -37592,8 +37592,7 @@ function pppMovVolverDias() { if (_pppMov) { _pppMov.paso = "dia"; pppMovRender(
 function _pppMovDiaTxt(iso) {
   if (String(iso) === PGA_ESPERA_ISO) return PGA_ESPERA_TXT;
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); if (!m) return String(iso || "");
-  const d = new Date(+m[1], +m[2] - 1, +m[3]);
-  return _PN_DOW[d.getDay()] + " " + (+m[3]) + "/" + m[2];
+  return gvDiaTxt(iso);
 }
 function pppMovPaso2Html() {
   const M = _pppMov, qué = M.pedidoNp ? ("el pedido de " + (M.pedidoCli || M.pedidoNp)) : ("la tanda " + M.tanda);
@@ -40254,7 +40253,7 @@ function pppResumenHtml(prog) {
     // v15.54 (dueño): el TOTAL del día va pegado al Día y ANTES del desglose por zona —
     // primero el número que se mira, después de qué se compone.
     // v15.57 (dueño): en esta tabla la fecha va "dd/mm", sin el año, pegada al día.
-    rows += '<tr><td class="f">' + escapeHtml(String(d.fecha).replace(/\/\d{4}$/, "")) + '</td><td class="d">' + dia + '</td>' +
+    rows += '<tr><td class="f">' + escapeHtml(dt ? gvDiaTxt(dt) : String(d.fecha).replace(/\/\d{4}$/, "")) + '</td>' +
       '<td class="num tot zc" onclick="pppResTgl(\'' + dk + '\',\'__tot__\')" title="Ver todas las NPs del día">' + f2(total) + '</td>' +
       Zc.map(function (z) {
         const m = Z[z[0]];
@@ -40265,7 +40264,7 @@ function pppResumenHtml(prog) {
       '<td class="num zc dem' + (demP != null && demP >= PPP_DEM_ALERTA ? ' hot' : '') + '" onclick="pppResCamTgl(\'' + dk + '\')" title="La demora del pedido que más esperó. Tocá para ver la de cada camión.">' + (demP != null ? demP : "·") + _ancIco + '</td></tr>';
   }
   const demT = TdemMax;   // v21.72: la PEOR de todas, no el promedio de promedios
-  const totRow = '<tr class="totrow"><td class="f">TOTAL</td><td></td>' +
+  const totRow = '<tr class="totrow"><td class="f">TOTAL</td>' +
     '<td class="num tot">' + f2(Ttot) + '</td>' + Zc.map(function (z) { return tcell(T[z[0]]); }).join("") +
     '<td class="num">' + Tcam + '</td><td class="num' + (demT != null && demT >= PPP_DEM_ALERTA ? ' hot' : '') + '">' + (demT != null ? demT : "·") + '</td></tr>';
   return head +
@@ -40273,7 +40272,7 @@ function pppResumenHtml(prog) {
       '<b>1 camión = 1 grupo de zonas</b>: Z1 · Z2 · Z3 (Z2+Z3 juntas si cada una &lt; 1 m³) · Z4 · Z5 · Z6+Z7 · Súper 1 x cliente · Retira sin camión. Sin partir hasta <b>' + CAMM3 + ' m³</b>. ' +
       '<b>Demora</b> = la del pedido que más esperó — tocala.<br>📦 / 📅 = no es demora: importado que todavía no llegó, o retiro / turno que eligió el cliente. Se cuenta desde esa fecha.</div>' + PPP_ARMADO_ORDEN_HTML +
     '<div class="ppp-restbl-wrap"><table class="ppp-restbl"><thead><tr>' +
-      '<th>Fecha</th><th>Día</th><th class="tot">Total<br>m³</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Cam.</th><th>Mayor<br>demora</th>' +
+      '<th>Día</th><th class="tot">Total<br>m³</th><th>Z1<br>Sur</th><th>Z2<br>Centro</th><th>Z3<br>Oeste</th><th>Z4<br>GBA<br>Sur</th><th>Z5<br>GBA<br>Oeste</th><th>Z6<br>GBA<br>Norte</th><th>Z7<br>GBA<br>Lejos</th><th>Retira</th><th>Súper</th><th>Cam.</th><th>Mayor<br>demora</th>' +
     '</tr></thead><tbody>' + rows + totRow + '</tbody></table></div>';
 }
 
@@ -41194,6 +41193,21 @@ function _pppFmtPesosCorto(n) { n = Number(n) || 0; if (Math.abs(n) >= 1e6) retu
 function _npSrcChip(np) { return /^(LK|CH)\s/i.test(String(np || "").trim()) ? '<span class="np-src web" title="Pedido de la página (web): se factura bajando el Excel ISIS">WEB</span>' : '<span class="np-src isis" title="Pedido cargado en ISIS: se factura con el tilde">ISIS</span>'; }
 function _pppFmtM3(n) { n = Number(n) || 0; return (n && Math.abs(n) < 0.1 ? n.toFixed(2) : n.toFixed(1)).replace(".", ","); }
 const _PN_DOW = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+/* v28.34 (Luis, 07/10: "formato de fecha es DDD DD/MM (Mie 07/10) en toda la PPP"): UNA sola forma de
+   escribir un día en la PPP. Acepta ISO (2026-10-07…), clave AAAAMMDD, dd/mm/aaaa o Date. */
+const GV_DOW3 = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+function gvDiaDate(x) {
+  if (x instanceof Date) return isNaN(x) ? null : x;
+  const t = String(x || ""); let m;
+  if ((m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t))) return new Date(+m[1], +m[2] - 1, +m[3]);
+  if ((m = /^(\d{4})(\d{2})(\d{2})$/.exec(t))) return new Date(+m[1], +m[2] - 1, +m[3]);
+  if ((m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(t))) return new Date(+m[3], +m[2] - 1, +m[1]);
+  return null;
+}
+function gvDiaTxt(x) {
+  const d = gvDiaDate(x); if (!d) return String(x || "");
+  return GV_DOW3[d.getDay()] + " " + String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
+}
 const _PN_MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const _PN_MESL = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 function _pppHoyKey() { return String(getTodayKey() || "").replace(/-/g, ""); }
@@ -42521,8 +42535,7 @@ function _pgaZonaTanda(t) {
 }
 function _pgaDiaTxt(k) {
   if (String(k) === PGA_ESPERA_KEY) return PGA_ESPERA_TXT;   // v19.29: no es una fecha, es el estacionamiento
-  const d = _pppKeyDate(k);
-  return _PN_DOW[d.getDay()] + " " + d.getDate() + "/" + String(d.getMonth() + 1).padStart(2, "0");
+  return gvDiaTxt(_pppKeyDate(k));
 }
 /* v20.01 (Thomas, 2026-09-18) — EN EL CELULAR, EL DÍA ES SÓLO LA FECHA: "18/9".
    La columna del día es la 1ª, es `sticky` y se lleva todo el ancho sobrante (`width:100%`), así que
@@ -42536,9 +42549,10 @@ function _pgaDiaTxt(k) {
    cambia. En el escritorio no se toca nada. */
 function _pgaDiaHtml(k) {
   if (String(k) === PGA_ESPERA_KEY) return escapeHtml(PGA_ESPERA_TXT);
-  const d = _pppKeyDate(k), m = d.getMonth() + 1;
-  return '<span class="pga-sem">' + _PN_DOW[d.getDay()] + ' </span>' + d.getDate() + '/' +
-    (m < 10 ? '<span class="pga-m0">0</span>' : "") + m;
+  // v28.34 (Luis): «Mié 07/10». En el celular sigue la regla v20.01 de Thomas (sólo «7/10»): el día de la
+  // semana y los ceros van en spans que el CSS del celular esconde.
+  const d = _pppKeyDate(k), dd = d.getDate(), m = d.getMonth() + 1, z = '<span class="pga-m0">0</span>';
+  return '<span class="pga-sem">' + GV_DOW3[d.getDay()] + ' </span>' + (dd < 10 ? z : "") + dd + '/' + (m < 10 ? z : "") + m;
 }
 /* El contenido de UNA NP: la misma tabla Código/Cajas/Unidades de A Programar (v17.57). */
 function _pgaItemsHtml(np) {
@@ -43520,7 +43534,7 @@ function _pppPlanGridHtml(programados) {
   // v13.17: las fechas de hojas anteriores no se listan (ya se vieron en su hoja)
   const otras = [...g.byDay.keys()].filter(function (k) { return !enGrilla.has(k) && !enHojasAnt.has(k); }).sort();
   if (otras.length) {
-    h += '<div class="pn-otras"><span class="t">Más adelante:</span>' + otras.map(function (k) { const dd = g.byDay.get(k), dt = _pppKeyDate(k); return '<button class="pn-chip" onclick="pppPlanAbrir(\'' + k + '\')">' + _PN_DOW[dt.getDay()].slice(0, 3) + ' ' + dt.getDate() + '/' + (dt.getMonth() + 1) + ' · ' + dd.ped.length + ' ped · ' + _pppFmtM3(_pppM3Sum(dd.ped)) + ' m³</button>'; }).join("") + '</div>';
+    h += '<div class="pn-otras"><span class="t">Más adelante:</span>' + otras.map(function (k) { const dd = g.byDay.get(k), dt = _pppKeyDate(k); return '<button class="pn-chip" onclick="pppPlanAbrir(\'' + k + '\')">' + gvDiaTxt(dt) + ' · ' + dd.ped.length + ' ped · ' + _pppFmtM3(_pppM3Sum(dd.ped)) + ' m³</button>'; }).join("") + '</div>';
   }
   // v13.17: "Ver hoja 2" (dueño) — los 6 hábiles siguientes; y volver.
   const sig = _pppDiasHabiles(6, (hoja + 1) * 6);
@@ -44645,7 +44659,7 @@ function _pmodFecha(iso, conDia) {
   if (String(iso || "").slice(0, 10) === PGA_ESPERA_ISO) return "⏸ En espera";   // v19.29
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || "")); if (!m) return String(iso || "");
   const d = new Date(+m[1], +m[2] - 1, +m[3]);
-  return (conDia ? _PN_DOW[d.getDay()] + " " : "") + (+m[3]) + "/" + m[2];
+  return conDia ? gvDiaTxt(d) : (m[3] + "/" + m[2]);
 }
 function pppTabsHtml(cProg, cPlan, cViaje, cEnt) {
   const n = function (v) { return (v == null ? "…" : v); };
@@ -49196,7 +49210,7 @@ function aprSalidaChip(p) {
     // programado; el chip dice qué va a pasar. v13.47 (dueño: "mandá directo a Programación si ya
     // está, no más en A Programar"): todo lo que tiene día lo programa el automático en la próxima
     // corrida (cada 15 min), también las zonas manuales con camión. El chip ya no pide "programalo".
-    const f = DOW[d.getDay()] + " " + d.getDate() + "/" + (d.getMonth() + 1);
+    const f = gvDiaTxt(d);
     /* v19.13 — `super_auto`: el súper con la excepción del dueño (GV_Clientes_Reglas) se arma
        solo, y el día es el turno de su OC. Se distingue del resto porque para un súper "se
        arma solo" es la excepción, no la regla: el de al lado sigue siendo "a mano". */
@@ -49276,7 +49290,7 @@ function aprLogHtml() {
   const l = _apr.log; if (!l) return "";
   const dt = l.corrida_en ? new Date(l.corrida_en) : null;
   const DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
-  const cuando = dt ? DOW[dt.getDay()] + " " + dt.getDate() + "/" + (dt.getMonth() + 1) + " " + String(dt.getHours()).padStart(2, "0") + ":" + String(dt.getMinutes()).padStart(2, "0") : "—";
+  const cuando = dt ? gvDiaTxt(dt) + " " + String(dt.getHours()).padStart(2, "0") + ":" + String(dt.getMinutes()).padStart(2, "0") : "—";
   const horas = dt ? (Date.now() - dt.getTime()) / 36e5 : 0;
   const fo = l.fecha_objetivo ? (function () { const q = String(l.fecha_objetivo).slice(0, 10).split("-"); return q[2] + "/" + q[1]; })() : "";
   const est = String(l.estado || "");
@@ -49519,9 +49533,7 @@ function aprItemsDe(peds) {
 }
 function aprDiaCorto(iso) {
   if (!iso) return "";
-  const d = new Date(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
-  const DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
-  return DOW[d.getDay()] + " " + d.getDate() + "/" + (d.getMonth() + 1);
+  return gvDiaTxt(iso);
 }
 
 /* v13.61/v13.65 (dueño: "no puede haber tanda armada sin fecha" · "no quiero tener que poner el nombre
@@ -53066,7 +53078,7 @@ function cuarYaProgHtml() {
       + '<td>' + (gvFechaPedChip(r.np, r.fecha_pedido, r.fecha_entrega, "cuar-yaprog-fped") || '<span class="cuar-yp-sin">—</span>') + '</td>'
       + '<td><span class="cuar-yaprog-tanda">' + escapeHtml(String(r.tanda || "sin tanda")) + '</span>'
         + (r.picking_empezado ? ' <span class="cuar-yaprog-pick" title="Ya hay eventos de operarios sobre esa tanda">pickeando</span>' : '') + '</td>'
-      + '<td><span class="cuar-yaprog-fecha">' + escapeHtml(String(r.fecha_entrega || "")) + '</span></td>'
+      + '<td><span class="cuar-yaprog-fecha">' + escapeHtml(gvDiaTxt(r.fecha_entrega)) + '</span></td>'
       + '<td class="cuar-yp-cli">'
         + (cod ? '<span class="cuar-yaprog-cod" title="Número de cliente en ' + (cuarEmpCod(r.empresa) === "CH" ? "Chef" : "Loekemeyer") + '">' + cuarEmpCod(r.empresa) + " " + escapeHtml(cod) + '</span> ' : '')
         + escapeHtml(String(r.razon_social || cod || "")) + '</td>'
@@ -54457,8 +54469,8 @@ function aprColDias() {
            (_apr.paso === 2 ? ' onclick="aprElegirDia(\'' + iso + '\')" role="button"' : '')) +   // v13.81: tocar = elegir
          ' title="' + escapeHtml(motivo) + '">' +
       '<div class="apr-dia-fecha">' +
-        '<span class="apr-dia-dow">' + DOW[fecha.getDay()] + '</span>' +
-        '<span class="apr-dia-num">' + fecha.getDate() + '<small>' + MES[fecha.getMonth()] + '</small></span>' +
+        '<span class="apr-dia-dow">' + GV_DOW3[fecha.getDay()] + '</span>' +
+        '<span class="apr-dia-num">' + String(fecha.getDate()).padStart(2, "0") + '/' + String(fecha.getMonth() + 1).padStart(2, "0") + '</span>' +
       '</div>' +
       '<div class="apr-dia-cuerpo">' +
         // v13.54: renglón 1 = m³ / cupo + chip de estado (hoy · completo · muy pronto · quedan N m³)
@@ -61376,7 +61388,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.33"></script>
+<script src="importacion.js?v=28.34"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64225,10 +64237,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.33"></script>
-<script src="hotsale.js?v=28.33"></script>
-<script src="estadisticas.js?v=28.33"></script>
-<script src="ads.js?v=28.33"></script>
+<script src="cobranzas.js?v=28.34"></script>
+<script src="hotsale.js?v=28.34"></script>
+<script src="estadisticas.js?v=28.34"></script>
+<script src="ads.js?v=28.34"></script>
 
 </body>
 </html>

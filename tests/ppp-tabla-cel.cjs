@@ -97,16 +97,16 @@ const pintar = async (p) => p.evaluate(async () => {
   const t = (c, m) => { console.log((c ? "  ✅ " : "  ❌ ") + m); if (!c) ok = false; };
   t(/(^|\s)18\/9(\s|$)/.test(cel.visible.replace("▸", "")),
     "(1) en el celular el día dice sólo la fecha «18/9» — «" + cel.visible + "»");
-  t(!/Viernes/.test(cel.visible), "(1) sin el nombre del día");
+  t(!/Vie /.test(cel.visible), "(1) sin el nombre del día");
   t(!/18\/09/.test(cel.visible), "(1) y sin el cero del mes");
-  t(/Viernes 18\/09/.test(cel.texto), "(2) el texto completo sigue en el HTML (se esconde, no se recorta)");
+  t(/Vie 18\/09/.test(cel.texto), "(2) el texto completo sigue en el HTML (se esconde, no se recorta)");
   t(cel.cols === 9, "(3) las 9 columnas siguen estando (Salió incluida, v20.10) — " + cel.cols);
   t(cel.sobra >= 0, "(3) y entran en el ancho visible: la última termina dentro del marco (sobran " +
     cel.sobra + " px; tabla " + cel.tabla + " de " + cel.wrap + ")");
   t(cel.abierto.pcts === 5, "(5) con el día abierto, la fila de la tanda trae los 5 porcentajes — " + cel.abierto.pcts);
   t(cel.abierto.sobra >= 0, "(5) y las 9 columnas siguen entrando (sobran " + cel.abierto.sobra +
     " px; tabla " + cel.abierto.tabla + ")");
-  t(/Viernes 18\/09/.test(esc.visible), "(6) en el escritorio el día se lee entero — «" + esc.visible + "»");
+  t(/Vie 18\/09/.test(esc.visible), "(6) en el escritorio el día se lee entero — «" + esc.visible + "»");
   t(errs.length === 0, "sin errores de JS" + (errs.length ? ": " + errs[0] : ""));
   console.log(ok ? "\nOK ppp-tabla-cel" : "\nFALLÓ ppp-tabla-cel");
   process.exit(ok ? 0 : 1);

@@ -122,7 +122,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     if (!/E48H.*mismo código/.test(r.ops[2])) fallas.push("(b) opción 3 no dice que la armada va con su mismo código");
     if (!/Pasan a vencer[\s\S]*E48G/.test(r.ops[2])) fallas.push("(b) opción 3 no avisa que E48G pasa a vencer");
     if (!/Reprogramar el resto/.test(r.ops[1])) fallas.push("(b) opción 2 no es Reprogramar el resto");
-    if (!/E48G[^→]*30\/9 → [^0-9]*1\/10/.test(r.ops[1])) fallas.push("(g) opción 2 no muestra E48G al 01/10: " + r.ops[1]);
+    if (!/E48G[^→]*30\/09 → [^0-9]*01\/10/.test(r.ops[1])) fallas.push("(g) opción 2 no muestra E48G al 01/10: " + r.ops[1]);
     if (!/1\/10: 4,50 m³/.test(r.ops[1])) fallas.push("(g) opción 2 no cuenta lo que ya tiene el 01/10 (E70A 2 + E48G 2,5): " + r.ops[1]);
   }
   const iRep = r.c.findIndex(function (x) { return x === "gv_ppp_dia_reprogramar:correr:false"; });

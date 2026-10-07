@@ -124,7 +124,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(r.med.includes("Riesgo Marcelo Fabian"),  "el nombre del cliente entra entero en la tanda");
   chk(r.med.includes("apr-titem-txt"),          "el item va en dos renglones (el nombre no compite con el detalle)");
   chk(r.med.includes("Arrastrá un pedido acá"),"la tanda vacía (vieja) lo dice");
-  chk(r.der.includes("Miércoles") && /9<small>sep<\/small>/.test(r.der), "la lista dice el día con nombre y fecha (v13.54: número grande + mes chico)");
+  chk(r.der.includes("Mié") && /09\/09/.test(r.der), "la lista dice el día con nombre y fecha (v13.54: número grande + mes chico)");
   chk(r.der.includes("0,50</b> / 5,00 m³"),    "muestra los m³ programados contra el cupo");
   // v13.84 (dueño: "dejame programar si quiero para antes"): "completo" y "muy pronto" SE PUEDEN elegir —
   // el backend avisa y el front pregunta. Sólo el no hábil queda cerrado.
@@ -141,7 +141,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   chk(/apr-dia-sub"><span><b>1<\/b> tanda\(s\) · <b>2<\/b> NP/.test(r.der), "v13.64: renglón 'tanda(s) · NP' del día");
   // v13.21: el chip dice qué día sale, no cuándo llegó (eso queda en el title)
   // v13.47 (dueño: "mandá directo a Programación si ya está"): zona manual con camión → la programa el automático
-  chk(/apr-chip-sal" title="Llegó el 2026-08-20\. Ya hay camión a la zona 3: D60A Lo programa el automático[^"]*">🚚 va al camión del mar 8\/9 · en minutos</.test(r.izq), "v13.47: chip .va al camión del mar 8/9 · en minutos. con el motivo en el title");
+  chk(/apr-chip-sal" title="Llegó el 2026-08-20\. Ya hay camión a la zona 3: D60A Lo programa el automático[^"]*">🚚 va al camión del Mar 08\/09 · en minutos</.test(r.izq), "v13.47: chip .va al camión del mar 8/9 · en minutos. con el motivo en el title");
   chk(!/programalo/.test(r.izq), "v13.47: el chip ya no pide 'programalo'");
   chk(/apr-porque">Ninguno tiene tanda todavía · <b>1<\/b> los programa solo el automático en minutos</.test(r.izq), "v13.47: la línea dice que el automático lo programa");
   chk(!/<span class="apr-chip">2026-08-20<\/span>/.test(r.izq), "v13.21: la fecha de recepción ya no es un chip");

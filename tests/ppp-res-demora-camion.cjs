@@ -62,7 +62,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const filas = [...host.querySelectorAll(".ppp-restbl tbody tr")].filter(function (tr) { return !tr.classList.contains("totrow"); });
     const dias = {};
     filas.forEach(function (tr) {
-      const f = tr.children[0].textContent.trim();
+      const f = tr.children[0].textContent.trim().slice(-5);   // v28.34: «Mié 23/09»
       dias[f] = { cam: tr.children[iCam].textContent.trim(), dem: tr.children[iDem].textContent.trim(),
                   camClick: !!tr.children[iCam].getAttribute("onclick"), demClick: !!tr.children[iDem].getAttribute("onclick") };
     });
@@ -72,7 +72,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
     // clickear la celda de demora del 23/09 y leer el pop-up
     let camsPop = null, demPop = null, headPop = "";
-    const fila2309 = filas.find(function (tr) { return tr.children[0].textContent.trim() === "23/09"; });
+    const fila2309 = filas.find(function (tr) { return tr.children[0].textContent.trim().endsWith("23/09"); });
     if (fila2309) {
       fila2309.children[iDem].click();
       const ov = document.getElementById("pppResPopOv");
@@ -90,7 +90,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     }
     // y la del 28/10, que es el caso que se reportó
     let pop2810 = null;
-    const fila2810 = filas.find(function (tr) { return tr.children[0].textContent.trim() === "28/10"; });
+    const fila2810 = filas.find(function (tr) { return tr.children[0].textContent.trim().endsWith("28/10"); });
     if (fila2810) {
       fila2810.children[iCam].click();
       const ov = document.getElementById("pppResPopOv");

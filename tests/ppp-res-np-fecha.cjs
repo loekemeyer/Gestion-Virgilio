@@ -51,11 +51,11 @@ catch (_e) {
     const host = document.createElement("div"); host.innerHTML = html; document.body.appendChild(host);
     const tdF = Array.prototype.slice.call(host.querySelectorAll(".ppp-restbl td.f")).map(function (td) { return td.textContent; });
     out.fechas = tdF.slice(0, 2);
-    out.sinAnio = tdF.filter(function (t) { return t !== "TOTAL"; }).every(function (t) { return /^\d{2}\/\d{2}$/.test(t); });
+    out.sinAnio = tdF.filter(function (t) { return t !== "TOTAL"; }).every(function (t) { return /^(Dom|Lun|Mar|Mié|Jue|Vie|Sáb) \d{2}\/\d{2}$/.test(t); });   // v28.34: «Mié 09/09» en una celda
     const tbl = host.querySelector(".ppp-restbl");
-    const cs = getComputedStyle(tbl), csF = getComputedStyle(host.querySelector(".ppp-restbl td.f")), csD = getComputedStyle(host.querySelector(".ppp-restbl td.d"));
+    const cs = getComputedStyle(tbl), csF = getComputedStyle(host.querySelector(".ppp-restbl td.f"));
     out.widthAuto = cs.width !== "" && tbl.offsetWidth < host.offsetWidth;          // no se estira al ancho del contenedor
-    out.pegados = parseFloat(csF.paddingRight) <= 4 && parseFloat(csD.paddingLeft) <= 4;
+    out.pegados = !host.querySelector(".ppp-restbl td.d");   // v28.34: día y fecha van en la MISMA celda
 
     // --- (b) el detalle de la celda: NP clickeable ---
     const dk = Object.keys(_pppResDet)[0];

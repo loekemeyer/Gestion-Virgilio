@@ -209,7 +209,7 @@ catch (_e) {
   chk(/2 pedidos · 0,70 m³ · LK/.test(r.p1sel.txt) && !r.p1sel.btnOff && r.p1sel.marcadas === 2, "con 2 tildados: '2 pedidos · 0,70 m³ · LK' y botón habilitado");
   chk(r.mixta.paso === 1 && /una sola empresa/.test(r.mixta.msg), "LK + Chef juntos no pasan al paso 2");
   chk(r.p2.paso === 2 && r.p2.dias === 2 && r.p2.chips === 2 && r.p2.btnOff && r.p2.tocable, "paso 2: días tocables, resumen de los pedidos, Programar deshabilitado hasta tocar un día");
-  chk(r.p2dia.sel === 1 && !r.p2dia.btnOff && /→ mar 15\/9/.test(r.p2dia.txt), "tocar el día lo marca y habilita Programar");
+  chk(r.p2dia.sel === 1 && !r.p2dia.btnOff && /→ Mar 15\/09/.test(r.p2dia.txt), "tocar el día lo marca y habilita Programar");
   chk(/ya está completo/.test(r.pregLleno.txt) && r.pregLleno.rpc === 0, "un día COMPLETO pregunta y, si se dice que no, no llama a nada");
   chk(/antes de la anticipación mínima/.test(r.pregPronto.txt) && r.pregPronto.rpc === 0, "un día MUY PRONTO pregunta (v13.84: ya no lo bloquea)");
   chk(r.sinPreg.preg === 0 && /gv_ppp_web_tanda_programar/.test(r.sinPreg.fns), "un día libre con 0,70 m³ no pregunta nada");
@@ -220,7 +220,7 @@ catch (_e) {
   chk(!/segundo camión/.test(r.camSuper), "el súper no pregunta por el camión (" + r.camSuper.slice(0, 40) + ")");
   chk(!/segundo camión/.test(r.camPrimero), "el primer camión del día tampoco pregunta");
   chk(r.falla.fns === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar>gv_ppp_web_tanda_descartar" && r.falla.paso === 2 && r.falla.err && r.falla.sel === 2, "si programar falla: descarta la tanda y se queda en el paso 2 con la selección");
-  chk(r.okk.fns === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar" && r.okk.fecha === "2026-09-15" && r.okk.paso === 1 && r.okk.sel === 0 && /✅ E09A programada para el mar 15\/9/.test(r.okk.msg) && !r.okk.err, "Programar ✓ = nueva → agregar ×2 → programar, y vuelve al paso 1 vacío");
+  chk(r.okk.fns === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar" && r.okk.fecha === "2026-09-15" && r.okk.paso === 1 && r.okk.sel === 0 && /✅ E09A programada para el Mar 15\/09/.test(r.okk.msg) && !r.okk.err, "Programar ✓ = nueva → agregar ×2 → programar, y vuelve al paso 1 vacío");
   // v13.88
   chk(r.paso2Vacio.paso === 1, "el paso 2 sin pedidos tildados vuelve solo al paso 1 (quedaba con '0 pedidos' y Programar en verde)");
   chk(r.listo.cartel && /Listo: no queda nada por programar/.test(r.listo.txt), "sin pedidos: cartel 'Listo' (" + r.listo.txt.slice(0, 40) + ")");

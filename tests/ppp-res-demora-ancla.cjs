@@ -26,7 +26,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     const leer = function (prog) {
       const host = document.createElement("div");
       host.innerHTML = pppResumenHtml(prog);
-      const fila = [...host.querySelectorAll(".ppp-restbl tbody tr")].find(function (tr) { return tr.children[0].textContent.trim() === "09/12"; });
+      const fila = [...host.querySelectorAll(".ppp-restbl tbody tr")].find(function (tr) { return tr.children[0].textContent.trim().endsWith("09/12"); });
       const td = fila ? fila.children[fila.children.length - 1] : null;
       return { txt: td ? td.textContent.replace(/[📦📅]/gu, "").trim() : null, ico: td ? td.textContent : "", title: td && td.querySelector(".dem-anc") ? td.querySelector(".dem-anc").title : "" };
     };

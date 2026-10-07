@@ -109,7 +109,7 @@ catch (_e) {
   chk(r.drop.fns.join(">") === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar", "pedido soltado en un día = nueva → agregar → programar (" + r.drop.fns.join(">") + ")");
   chk(r.drop.fecha === "2026-09-15" && r.drop.cod === "E09A" && r.drop.emp === "lk", "con el día del drop, el código que dio la base y la empresa del pedido");
   chk(/"art":"027"/.test(r.drop.items), "los artículos viajan al programar");
-  chk(/✅ E09A programada para el mar 15\/9: 1 NP · 0,400 m³/.test(r.drop.msg) && r.drop.err === false, "mensaje verde");
+  chk(/✅ E09A programada para el Mar 15\/09: 1 NP · 0,400 m³/.test(r.drop.msg) && r.drop.err === false, "mensaje verde");
   chk(r.falla.fns.join(">") === "gv_ppp_web_tanda_nueva>gv_ppp_web_tanda_agregar>gv_ppp_web_tanda_programar>gv_ppp_web_tanda_descartar" && /se descartó/.test(r.falla.msg) && r.falla.err === true && r.falla.emp === "chef",
       "si programar falla, la tanda se descarta (ninguna sin fecha) y la empresa es la del pedido (chef)");
   chk(r.over.prevented && r.over.on, "aprOver acepta un pedido sobre un día");
