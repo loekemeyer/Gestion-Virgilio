@@ -263,7 +263,7 @@ function _adsHtmlStock() {
     '<th rowspan="2">Saldo<br>' + H + ' d</th>' +
     '<th colspan="6" class="ug" title="Pedido y recibido de las últimas ' + _ads.n + ' OC (el rango de Entregas talleristas), sumando todos los talleristas · recibido = lo que recibió Virgilio, hasta lo pedido">Período (' + _ads.n + ' OC)</th></tr>' +
     '<tr><th class="u1">Fecha<br>últ. OC</th><th class="u2">Pedido<br>período</th><th class="u2">Recibido<br>período</th><th class="u2">%</th>' +
-    '<th class="u2" title="Lo que se estima que entreguen en ' + H + ' días: por tallerista, su ritmo del período (recibido ÷ días desde su 1.ª OC del rango) × ' + H + ', hasta lo que le falta entregar">Entrega<br>est. ' + H + ' d</th>' +
+    '<th class="u2" title="Lo que falta que entreguen de la OC vigente: lo declarado en la OC si está; si no, la OC × el % que viene entregando cada tallerista, menos lo ya recibido de esa OC">Entrega<br>est. OC</th>' +
     '<th class="u3" title="Tallerista al que le corresponde; si son varios, la parte de cada uno en lo pedido del período">Proporción</th></tr></thead><tbody>';
   if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
@@ -299,22 +299,22 @@ function _adsStockCalc(r, H) {
   var fechaUlt = r.oc_fecha || pc.reduce(function (m, x) { return x.ult_fecha && (!m || x.ult_fecha > m) ? x.ult_fecha : m; }, null) || null;
   // v27.81 (Luis): entrega estimada a H días, proporcional a cómo viene entregando cada tallerista:
   // ritmo = recibido ÷ días desde su 1.ª OC del período; estimado = ritmo × H, topado en lo que le falta.
-  var hoy = Date.now(), estH = 0, estDet = [], estArr = [];
+  var estH = 0, estDet = [], estArr = [];
   // v27.97 (Luis, 07/10, caso 609): la OC de la semana REEMPLAZA a la anterior, así que sólo se estima entrega
   // de los talleristas que están en la OC ACTUAL del código (la de fecha más nueva). El que salió de la OC no entrega más.
   var ultOc = pc.reduce(function (m, x) { var f = x.ult_fecha ? String(x.ult_fecha).slice(0, 10) : ""; return f > m ? f : m; }, "");
+  // v28.47 (Luis, 07/10): la OC completa ya ES la cobertura (30 días × índice): la entrega estimada es CUÁNTO DE LA OC
+  // VIGENTE va a entregar cada tallerista, sin escalar al plazo. Declarado en la OC (gv_entrega_proy) si está; si no,
+  // cantidad de la OC vigente × el % que viene entregando en el período. Menos lo que ya recibió de esa OC (ya es stock).
   pc.forEach(function (x) {
     if (ultOc && String(x.ult_fecha || "").slice(0, 10) !== ultOc) return;
-    var ped = Number(x.pedido) || 0, ent = Number(x.entregado) || 0, falta = Math.max(0, ped - ent);
-    var t0 = x.desde ? Date.parse(String(x.desde).slice(0, 10) + "T12:00:00-03:00") : NaN;
-    var dias = isFinite(t0) ? Math.max(1, (hoy - t0) / 864e5) : null;
-    var e = dias ? Math.min(falta, Math.round(ent / dias * H)) : 0;
-    // v28.44 (Luis): si en la OC vigente se cargó la entrega proyectada (consultada al tallerista), manda ESE dato
+    var ped = Number(x.pedido) || 0, ent = Number(x.entregado) || 0, pct = ped > 0 ? Math.min(1, ent / ped) : 0;
+    var cant = Number(x.ult_cant) || 0, rec = Number(x.ult_rec) || 0;
     var ep = (typeof _ads !== "undefined" && _ads.epOc && typeof _adsEpKey === "function") ? _ads.epOc[_adsEpKey(x.proveedor, r.cod, ultOc)] : null;
-    if (ep != null && isFinite(ep)) {   // v28.45 (Luis, D2): lo declarado es por SEMANA (la OC es semanal): pesa igual que el ritmo → × H/7, topado en lo que falta
-      e = Math.min(falta, Math.max(0, Math.round(ep * H / 7))); estDet.push(x.proveedor + ": " + e + " (cargado en la OC: " + Math.round(ep) + "/semana · faltan " + falta + ")"); }
-    else estDet.push(x.proveedor + ": " + e + " (por ritmo · faltan " + falta + ")");
-    estH += e; estArr.push({ p: x.proveedor, e: e, oc: ep != null && isFinite(ep) });
+    var oc = ep != null && isFinite(ep), e;
+    if (oc) { e = Math.max(0, Math.round(ep) - rec); estDet.push(x.proveedor + ": " + e + " (declarado en la OC: " + Math.round(ep) + ", ya recibió " + rec + ")"); }
+    else { e = Math.max(0, Math.round(cant * pct) - rec); estDet.push(x.proveedor + ": " + e + " (OC " + cant + " × " + Math.round(pct * 100) + " % que viene entregando, ya recibió " + rec + ")"); }
+    estH += e; estArr.push({ p: x.proveedor, e: e, oc: oc });
   });
   // v27.82 (Luis): la entrega estimada discriminada por tallerista, con su parte de lo estimado
   var _epTxt = function (y) { return y.oc ? " · cargado en la OC" : ""; };
@@ -428,7 +428,7 @@ function adsExcelStock(H) {
   // (salto de línea dentro de la celda), descripción sin ajuste, rótulo con borde de abajo, escala 75 (v27.99: «_5», G 8 · L 19,14).
   // v28.01 (Luis): el Saldo es lo más importante — primera columna de datos (C) y en negrita.
   var aoa = [["Cód", "Descripción", "Saldo " + H + " d", "Stk", "Comprom " + H + " d", "E M " + H + " d",
-              "Fecha últ. OC", "Ped período", "Rec período", "% período", "Entr est " + H + " d", "Entr. est. x tall.", "Proporción"]];
+              "Fecha últ. OC", "Ped período", "Rec período", "% período", "Entr est OC", "Entr. est. x tall.", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", _adsNum(c.saldo), c.disp, c.comp, Math.round(c.em),

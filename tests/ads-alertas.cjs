@@ -124,7 +124,7 @@ const STOCK = [
   if (JSON.stringify(r.chips) !== JSON.stringify(["10 días · 1", "20 días · 1", "30 días · 2", "todos · 3"])) fallas.push("(c) chips " + JSON.stringify(r.chips));
   if (JSON.stringify(r.stockCods) !== JSON.stringify(["505"])) fallas.push("(c) quiebre 10 d: " + JSON.stringify(r.stockCods));
   if (String(r.pctTall).trim() !== "Lucho (350)") fallas.push("(c) Dist un solo tallerista, sin % y con cajas: " + r.pctTall);
-  const C10 = ["Cód.","Descripción","Stk","Comprom.10 d","Est. Madre10 d","Saldo10 d","Período (4 OC)","Fechaúlt. OC","Pedidoperíodo","Recibidoperíodo","%","Entregaest. 10 d","Proporción"];
+  const C10 = ["Cód.","Descripción","Stk","Comprom.10 d","Est. Madre10 d","Saldo10 d","Período (4 OC)","Fechaúlt. OC","Pedidoperíodo","Recibidoperíodo","%","Entregaest. OC","Proporción"];
   if (JSON.stringify(r.cols10) !== JSON.stringify(C10)) fallas.push("(c) columnas stock: " + JSON.stringify(r.cols10));
   if (JSON.stringify(r.fila10) !== JSON.stringify(["50","20","100","-70","30/09","350","250","71 %"])) fallas.push("(c) fila a 10 d: " + JSON.stringify(r.fila10));
   if (JSON.stringify(r.fila30) !== JSON.stringify(["50","60","300","-310","30/09"])) fallas.push("(c) fila a 30 d: " + JSON.stringify(r.fila30));
@@ -160,7 +160,7 @@ const STOCK = [
     const _hoy = new Date(Date.now() - 3 * 36e5).toISOString().slice(0, 10), _T = Date.parse(_hoy + "T12:00:00-03:00");
     vm.runInContext("Date.now = function () { return " + _T + "; };", ctx);
     const d10 = new Date(_T - 10 * 864e5 - 3 * 36e5).toISOString().slice(0, 10);
-    ctx._adsPctCod = () => [{ proveedor: "A", pedido: 200, entregado: 50, desde: d10 }, { proveedor: "B", pedido: 30, entregado: 20, desde: d10 }];
+    ctx._adsPctCod = () => [{ proveedor: "A", pedido: 200, entregado: 50, desde: d10, ult_cant: 200, ult_rec: 0 }, { proveedor: "B", pedido: 30, entregado: 20, desde: d10, ult_cant: 15, ult_rec: 0 }];
     const cEst = ctx._adsStockCalc({ disponible: 5, proy_mes: 0, comp10: 0, saldo10: 5 }, 10), est = cEst.estH;
     // v27.91 (Luis): cada tallerista en su sub-fila del Excel, descripción sin ajuste, borde del rótulo, escala 74
   { const _s = require("fs").readFileSync(__dirname + "/../ads.js", "utf8");
@@ -177,7 +177,7 @@ const STOCK = [
   { const _s2 = require("fs").readFileSync(path.join(__dirname, "..", "ads.js"), "utf8");
     if ((_s2.match(/vertical="center"/g) || []).length < 4) fallas.push("(p) Excel: el texto a la izquierda va centrado en vertical (v28.00)"); }
   if (JSON.stringify(cEst.estDist) !== JSON.stringify(["A 83 % (50)", "B 17 % (10)"])) fallas.push("(k) entrega estimada por tallerista: " + JSON.stringify(cEst.estDist));
-    if (est < 57 || est > 61) fallas.push("(j) entrega estimada (A 50 + B topado en 10 = 60): " + est);
+    if (est < 57 || est > 61) fallas.push("(j) entrega estimada (A 200×25 % = 50 + B 15×67 % = 10): " + est);
     ctx._adsPctCod = () => [{ proveedor: "Garcia", pedido: 140 }, { proveedor: "Poly", pedido: 107 }];
     if (JSON.stringify(dist) !== JSON.stringify(["Garcia 57 % (140)", "Poly 43 % (107)"])) fallas.push("(i) proporción con cajas: " + JSON.stringify(dist));
     if (corto.pedP !== null || vende.pctP !== null) fallas.push("(h) sin OC en el período: " + JSON.stringify([corto, vende]));
