@@ -8107,7 +8107,7 @@ abre un **hilo** de comentarios sobre el estado de esa recepción. Badge azul co
 - **Sólo pantalla**: no va a impresos, WhatsApp ni Excel (Luis: *"de momento que se vea ahí el dato"*).
 - El «Pedido» editable de esa pantalla es a propósito (v11.82: ajustar la cantidad de ESTA OC o «⛽ llenar góndola»; se guarda
   con «💾 Guardar cantidades»).
-- `sql/gv_oc_entrega_proy_log_v2802.sql` (v28.03), `tests/oc-entrega-proy.cjs`.
+- `sql/gv_oc_entrega_proy_log_v2802.sql` (v28.21; salió como v28.03, número que quedaba por debajo del 28.2 de otra sesión), `tests/oc-entrega-proy.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-06, v27.21): ADS — ALERTAS DAMIÁN STOCK (`ads.js`)
 
