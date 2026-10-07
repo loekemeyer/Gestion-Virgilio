@@ -314,16 +314,18 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
   // v27.90 (Luis): la fuente 0 (estilo Normal) queda en Arial 10 — de ella sale la UNIDAD del ancho de columna;
   // si se le cambia el tamaño, los mismos anchos se ven distintos que en su Excel. El tamaño grande va en la fuente 1.
   var F = cfg.fuente ? 1 : 0, W = cfg.wrap ? ' wrapText="1"' : '';
-  st = st.replace(/<fonts[\s\S]*?<\/fonts>/, '<fonts count="2"><font><sz val="10"/><name val="Arial"/><family val="2"/></font><font><sz val="' + (cfg.fuente || 10) + '"/><name val="Arial"/><family val="2"/></font></fonts>')
-         .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+  st = st.replace(/<fonts[\s\S]*?<\/fonts>/, '<fonts count="3"><font><sz val="10"/><name val="Arial"/><family val="2"/></font><font><sz val="' + (cfg.fuente || 10) + '"/><name val="Arial"/><family val="2"/></font><font><b/><sz val="' + (cfg.fuente || 10) + '"/><name val="Arial"/><family val="2"/></font></fonts>')
+         .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
            + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="' + (cfg.bordeRot ? 1 : 0) + '" xfId="0" applyFont="1"' + (cfg.bordeRot ? ' applyBorder="1"' : '') + ' applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
            + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"' + W + '/></xf>'
            + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1"' + ' applyAlignment="1"><alignment vertical="center"' + W + '/></xf>'   // v28.00 (Luis): TODO centrado en vertical, como su Excel
-           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf></cellXfs>');
+           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+           // v28.01 (Luis): columna en NEGRITA (el Saldo del Excel de stock), centrada como los datos
+           + '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"' + W + '/></xf></cellXfs>');
   // v27.91 (Luis): el rótulo lleva el borde de abajo grueso de su Excel
   if (cfg.bordeRot) st = st.replace(/<borders[\s\S]*?<\/borders>/, '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="medium"><color indexed="64"/></bottom><diagonal/></border></borders>');
   cfb.FileIndex[iSt].content = enc.encode(st);
-  var izq = {}; (cfg.izq || []).forEach(function (i) { izq[i] = 3; }); (cfg.izqSin || []).forEach(function (i) { izq[i] = 4; });
+  var izq = {}; (cfg.izq || []).forEach(function (i) { izq[i] = 3; }); (cfg.izqSin || []).forEach(function (i) { izq[i] = 4; }); (cfg.negrita || []).forEach(function (i) { izq[i] = 5; });
   var colN = function (L) { var n = 0; for (var k = 0; k < L.length; k++) n = n * 26 + (L.charCodeAt(k) - 64); return n - 1; };
   var cols = '<cols>' + cfg.anchos.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + '</cols>';
   cfb.FullPaths.forEach(function (p, i) {
@@ -394,17 +396,18 @@ function adsExcelStock(H) {
   // todo con ajuste de texto, sus anchos y sus rótulos; el alto de cada fila según el texto más largo.
   // v27.91 (Luis, 07/10, «ADS_stock_10d_20261007_3»): optimización horizontal — cada tallerista en su sub-fila
   // (salto de línea dentro de la celda), descripción sin ajuste, rótulo con borde de abajo, escala 75 (v27.99: «_5», G 8 · L 19,14).
-  var aoa = [["Cód", "Descripción", "Stk", "Comprom " + H + " d", "E M " + H + " d", "Saldo " + H + " d",
+  // v28.01 (Luis): el Saldo es lo más importante — primera columna de datos (C) y en negrita.
+  var aoa = [["Cód", "Descripción", "Saldo " + H + " d", "Stk", "Comprom " + H + " d", "E M " + H + " d",
               "Fecha últ. OC", "Ped período", "Rec período", "% período", "Entr est " + H + " d", "Entr. est. x tall.", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
-    aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo),
+    aoa.push([String(r.cod), r.descripcion || "", _adsNum(c.saldo), c.disp, c.comp, Math.round(c.em),
       c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estCaj.join("\n"), c.dist.join("\n")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
-    { anchos: ADS_XLS_STOCK_ANCHOS, izq: [11, 12], izqSin: [1], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 75, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [11, 12]) });
+    { anchos: ADS_XLS_STOCK_ANCHOS, izq: [11, 12], izqSin: [1], negrita: [2], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 75, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [11, 12]) });
 }
-var ADS_XLS_STOCK_ANCHOS = [7.7109375, 14.85546875, 6, 7.140625, 6.28515625, 6, 8, 8.7109375, 6.28515625, 5.28515625, 6.28515625, 19.140625, 27.42578125];   // los de su Excel, exactos
+var ADS_XLS_STOCK_ANCHOS = [7.7109375, 14.85546875, 6, 6, 7.140625, 6.28515625, 8, 8.7109375, 6.28515625, 5.28515625, 6.28515625, 19.140625, 27.42578125];   // los de su Excel, exactos
 /* alto de cada fila (Arial 14 con ajuste): renglones del texto más largo × 18 pt; ~1,35 de ancho por carácter */
 function _adsAltos(aoa, anchos, cols) {
   return aoa.map(function (f, i) {
