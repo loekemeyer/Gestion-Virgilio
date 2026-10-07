@@ -139,8 +139,26 @@ function _adsCargarTall() {
     _adsRender();
   });
 }
+/* v28.43 (Luis): la ENTREGA PROY. que se carga a mano en la OC vigente (consultándole al tallerista,
+   Ordenes_Compra.gv_entrega_proy) manda sobre la estimación por ritmo. Clave proveedor|código|fecha de la OC.
+   Si la lectura falla, queda la estimación por ritmo (no se inventa un 0). */
+function _adsCargarEntregaProy() {
+  var sb = window.sb; _ads.epOc = {};
+  if (!sb || typeof sb.from !== "function") return;
+  try {
+    var d = new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10);
+    Promise.resolve(sb.from("Ordenes_Compra").select("fecha,proveedor,codigo,gv_entrega_proy").not("gv_entrega_proy", "is", null).gte("fecha", d))
+      .then(function (r) {
+        if (!r || r.error || !Array.isArray(r.data)) return;
+        var m = {};
+        r.data.forEach(function (x) { m[_adsEpKey(x.proveedor, x.codigo, x.fecha)] = Number(x.gv_entrega_proy); });
+        _ads.epOc = m; if (_ads.stock) _adsRender();
+      }).catch(function () {});
+  } catch (e) {}
+}
+function _adsEpKey(prov, cod, fecha) { return String(prov || "").trim().toUpperCase() + "|" + String(cod || "").trim().toUpperCase() + "|" + String(fecha || "").slice(0, 10); }
 function _adsCargarStock() {
-  _ads.stock = null; _ads.stockErr = "";
+  _ads.stock = null; _ads.stockErr = ""; _adsCargarEntregaProy();
   _adsRpc("gv_ads_stock3").then(function (r) {
     if (r.error || !Array.isArray(r.data)) _ads.stockErr = "No se pudo leer el stock: " + ((r.error && r.error.message) || "sin respuesta");
     else if (!r.data.length) _ads.stockErr = "La lectura del stock volvió vacía (no se dibuja como «sin quiebres»).";
@@ -260,7 +278,7 @@ function _adsHtmlStock() {
     if (c.pedP == null) h += '<td class="u1">' + fUlt + '</td><td colspan="4" class="u2">' + (_ads.tall ? "sin OC en el período" : "…") + "</td>";
     else h += '<td class="u1">' + fUlt + '</td><td class="u2">' + _adsN(c.pedP) + '</td><td class="u2">' + _adsN(c.recP) +
       '</td><td class="u2' + (c.pctP != null && c.pctP < _ads.umbral ? " neg" : "") + '">' + _adsPct(c.pctP) +
-      '</td><td class="u2" title="' + _adsEsc((c.estDist.length ? c.estDist : c.estDet).join("\n")) + '"><b>' + _adsN(c.estH) + "</b></td>";   // v27.85 (Luis): el reparto por tallerista va en el tooltip
+      '</td><td class="u2" title="' + _adsEsc((c.estDist.length ? c.estDist : c.estDet).join("\n")) + '"><b' + (c.estOc ? ' style="text-decoration:underline dotted"' : "") + '>' + _adsN(c.estH) + "</b></td>";   // v27.85 (Luis): el reparto por tallerista va en el tooltip
     h += '<td class="u3">' + dist + "</td></tr>";
   });
   return h + "</tbody></table></div>";
@@ -291,12 +309,17 @@ function _adsStockCalc(r, H) {
     var t0 = x.desde ? Date.parse(String(x.desde).slice(0, 10) + "T12:00:00-03:00") : NaN;
     var dias = isFinite(t0) ? Math.max(1, (hoy - t0) / 864e5) : null;
     var e = dias ? Math.min(falta, Math.round(ent / dias * H)) : 0;
-    estH += e; estDet.push(x.proveedor + ": " + e + " (faltan " + falta + ")"); estArr.push({ p: x.proveedor, e: e });
+    // v28.43 (Luis): si en la OC vigente se cargó la entrega proyectada (consultada al tallerista), manda ESE dato
+    var ep = (typeof _ads !== "undefined" && _ads.epOc && typeof _adsEpKey === "function") ? _ads.epOc[_adsEpKey(x.proveedor, r.cod, ultOc)] : null;
+    if (ep != null && isFinite(ep)) { e = Math.max(0, Math.round(ep)); estDet.push(x.proveedor + ": " + e + " (cargado en la OC · faltan " + falta + ")"); }
+    else estDet.push(x.proveedor + ": " + e + " (por ritmo · faltan " + falta + ")");
+    estH += e; estArr.push({ p: x.proveedor, e: e, oc: ep != null && isFinite(ep) });
   });
   // v27.82 (Luis): la entrega estimada discriminada por tallerista, con su parte de lo estimado
-  var estDist = estArr.length > 1 ? estArr.map(function (y) { return y.p + " " + (estH > 0 ? _adsPct(y.e / estH) : "—") + " (" + _adsN(y.e) + ")"; })
-              : estArr.length ? [estArr[0].p + " (" + _adsN(estArr[0].e) + ")"] : [];
-  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estDet: estDet, estDist: estDist, estCaj: estArr.map(function (y) { return y.p + ": " + _adsN(y.e); }),
+  var _epTxt = function (y) { return y.oc ? " · cargado en la OC" : ""; };
+  var estDist = estArr.length > 1 ? estArr.map(function (y) { return y.p + " " + (estH > 0 ? _adsPct(y.e / estH) : "—") + " (" + _adsN(y.e) + ")" + _epTxt(y); })
+              : estArr.length ? [estArr[0].p + " (" + _adsN(estArr[0].e) + ")" + _epTxt(estArr[0])] : [];
+  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estOc: estArr.some(function (y) { return y.oc; }), estDet: estDet, estDist: estDist, estCaj: estArr.map(function (y) { return y.p + ": " + _adsN(y.e); }),
            pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
            fechaUlt: fechaUlt, dist: dist };
 }
