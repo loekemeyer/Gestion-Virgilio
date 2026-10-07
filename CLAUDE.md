@@ -8246,3 +8246,13 @@ salido por CCN/CRN; `security_invoker`, centinela 356). Front: cartel naranja ar
 Resumen (`_pppMismoLugarNota`) y chip **📍 mismo lugar otro día** en la NP (`_pppMismoLugarChip`). Es AVISO:
 no mueve nada. Lectura rota → lo dice. Al 07/10: 0 casos (Matiz es súper). `sql/gv_ppp_mismo_lugar_dos_dias_v2834.sql`,
 `tests/ppp-mismo-lugar.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-07, v28.38, D9): LA ZONA DE UN RETIRA ES SIEMPRE «Retira»
+
+*"No le mandamos un Retira a una dirección a un cliente sino que lo vienen a buscar"*. Trigger
+**`gv_ppp_web_zona_retira`** (BEFORE INSERT/UPDATE en `PPP_Web_Programacion`): si el pedido dice Retira
+(`gv_es_retira_fila`: dirección/barrio exacto «Retira», Virgilio 2788, «Exp. Retira») la zona queda `Retira`,
+aunque el feed traiga la de otra dirección de la ficha (la fila «Retira» de la ficha no tiene zona). Caso: pedido
+1448 (Silvano) con zona «Zona 6» en E92A, que salió el 25/09 como «Retira cliente». **D8 (Luis): LK 0252 (970E +
+971E, importados que llegaron después) queda en E92A, que es su tanda de Retira** — no se le arma tanda nueva.
+Centinela 359. `sql/gv_ppp_web_zona_retira_v2838.sql`.
