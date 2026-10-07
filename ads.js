@@ -370,7 +370,8 @@ function adsExcelTall() {
     });
   });
   return _adsXlsx(aoa, "Talleristas", "ADS_talleristas_" + _ads.n + "OC",
-    { anchos: [Math.max(11.14, _adsAnchoTexto(aoa, 0, 6, 16)), 6.57, 23, 5.14, 5.29, 5.86, 4, 6.57, 5.86, 6], izq: [0, 2] });
+    // v27.88 (Luis, 07/10): formato de su Excel «ADS_talleristas_4OC_20261007»: Arial 14, rótulo alto 72, filas de 18, sus anchos
+    { anchos: [12.71, 12.43, 23, 7.43, 7.57, 7.57, 8.43, 8.29, 7.57, 8.29], izq: [0, 2], fuente: 14, altoRot: 72, altos: aoa.map(function (_f, i) { return i ? 18 : null; }) });
 }
 function adsExcelStock(H) {
   if (!_ads.stock) { alert("Todavía se está leyendo el stock."); return; }
