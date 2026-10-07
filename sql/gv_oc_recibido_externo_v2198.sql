@@ -1,3 +1,4 @@
+-- ⚠⚠ OBSOLETO (v28.37): NO CORRER. Esta copia NO tiene la regla dual v22.37 y al correrla se la borró a la función viva el 07/10. Ver sql/gv_oc_recompute_dual_repuesta_v2837.sql.
 -- v21.98 — OC: la mercadería que entrega un EXTERNO (proveedor sin OC de ese código
 -- en esa ventana) descuenta de la OC del/los ASIGNADO(S) — los que tienen la OC vigente.
 -- Si hay varios asignados, se reparte en cajas ENTERAS, proporcional al SPLIT asignado a cada

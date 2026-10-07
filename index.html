@@ -6335,7 +6335,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.37"></script>
+<script type="module" src="recepcion.js?v=28.38"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10614,7 +10614,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.37";
+const APP_VERSION = "v28.38";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -34727,9 +34727,16 @@ async function pwebResync(nps, empresa) {
    Los PENDIENTES no salen por acá: ésos son de la solapa A Programar, que es la
    única que necesita LK porque todavía no existen de este lado. */
 async function pppTraerWebProgramados() {
-  const rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion",
+  let rows = await supaFetchAll(SUPABASE_URL + "/rest/v1/PPP_Web_Programacion",
     "select=empresa,order_id,np_idx,np,cod_cliente,razon_social,direccion,barrio,zona," +
     "tanda,fecha_entrega,fecha_recep,m3,m3_parcial,lineas,cajas,observaciones&tanda=not.is.null");
+  // v28.37 (Luis, 07/10: "si se canceló se canceló y no debería estar"): una NP cancelada no se
+  // dibuja en Programación ni en Resumen aunque haya quedado con tanda. Si la lista no se puede leer,
+  // no se esconde nada (no pude leer no es "está cancelada").
+  let canc = null;
+  try { canc = await supaFetchAll(SUPABASE_URL + "/rest/v1/GV_PPP_Web_NP_Cancelada", "select=empresa,order_id,np_idx"); } catch (_e) { canc = null; }
+  const _cSet = new Set((canc || []).map(function (c) { return c.empresa + "|" + c.order_id + "|" + c.np_idx; }));
+  rows = (rows || []).filter(function (r) { return !_cSet.has(r.empresa + "|" + r.order_id + "|" + r.np_idx); });
   return (rows || []).map(function (r) {
     return {
       // v12.92 — la NP es el número de pedido de la página: si `np` viniera vacío se
@@ -61454,7 +61461,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.37"></script>
+<script src="importacion.js?v=28.38"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64303,10 +64310,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.37"></script>
-<script src="hotsale.js?v=28.37"></script>
-<script src="estadisticas.js?v=28.37"></script>
-<script src="ads.js?v=28.37"></script>
+<script src="cobranzas.js?v=28.38"></script>
+<script src="hotsale.js?v=28.38"></script>
+<script src="estadisticas.js?v=28.38"></script>
+<script src="ads.js?v=28.38"></script>
 
 </body>
 </html>

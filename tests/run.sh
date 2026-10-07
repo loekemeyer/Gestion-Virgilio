@@ -613,6 +613,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 echo "== rest-tope-1000 (guard: el corte de 1.000 filas de PostgREST no avisa) =="
 node tests/rest-tope-1000.cjs
 node tests/apr-no-cancelada.cjs
+node tests/ppp-sin-cancelada.cjs
 
 echo "== ppp-misiones (regresión: destino del expreso y el aviso de Misiones en la Programación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-misiones.cjs
