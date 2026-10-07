@@ -239,21 +239,23 @@ function _adsHtmlStock() {
   var f = adsFiltrarStock(rows, ver, _ads.q);
   h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · en cajas</div>';
   h += '<table><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Stk</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × ' + H + '/30">Est. Madre<br>' + H + ' d</th>' +
-    '<th rowspan="2">Saldo<br>' + H + ' d</th><th rowspan="2" title="Días que cubre lo disponible menos lo comprometido a ' + H + ' días, al ritmo de la Est. Madre">Días<br>cobertura</th>' +
-    '<th colspan="4" class="ug" title="Última OC del artículo · recibido = lo que recibió Virgilio de ese proveedor desde la fecha de la OC">Última OC</th>' +
+    '<th rowspan="2">Saldo<br>' + H + ' d</th>' +
+    '<th colspan="4" class="ug" title="Pedido y recibido de las últimas ' + _ads.n + ' OC (el rango de Entregas talleristas), sumando todos los talleristas · recibido = lo que recibió Virgilio, hasta lo pedido">Período (' + _ads.n + ' OC)</th>' +
     '<th rowspan="2" title="Tallerista al que le corresponde; si son varios, la parte de cada uno en lo pedido del rango">Proporción</th></tr>' +
-    '<tr><th class="u1">Fecha</th><th class="u2">Pedido</th><th class="u2">Recibido</th><th class="u3">%</th></tr></thead><tbody>';
-  if (!f.length) h += '<tr><td colspan="12" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
+    '<tr><th class="u1">Fecha<br>últ. OC</th><th class="u2">Pedido<br>período</th><th class="u2">Recibido<br>período</th><th class="u3">%</th></tr></thead><tbody>';
+  if (!f.length) h += '<tr><td colspan="11" class="msg">Ningún código en quiebre a ' + H + " días.</td></tr>";
   f.forEach(function (r) {
-    var c = _adsStockCalc(r, H), disp = c.disp, proy = c.proy, comp = c.comp, em = c.em, saldo = c.saldo, cob = c.cob, rec = c.rec, ocPct = c.ocPct;
+    var c = _adsStockCalc(r, H), disp = c.disp, proy = c.proy, comp = c.comp, em = c.em, saldo = c.saldo;
     var dist = c.dist.length ? c.dist.map(_adsEsc).join("<br>") : "—";
     h += "<tr><td><b>" + _adsEsc(r.cod) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
       '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + " · excedente " + _adsN(r.excedente) + '">' + _adsN(disp) +
       "</td><td>" + _adsN(comp) + '</td><td title="' + _adsN(proy) + ' por mes">' + _adsN(Math.round(em)) +
-      '</td><td class="' + (saldo < 0 ? "neg" : "pos") + '">' + _adsN(saldo) + "</td><td>" + (typeof cob === "string" ? cob : _adsN(Math.round(cob))) + "</td>";
-    if (r.oc_fecha) h += '<td class="u1">' + _adsFecha(r.oc_fecha) + '</td><td class="u2">' + _adsN(r.oc_cant) + '</td><td class="u2">' + _adsN(rec) +
-      '</td><td class="u3' + (ocPct != null && ocPct < _ads.umbral ? " neg" : "") + '">' + _adsPct(ocPct) + "</td>";
-    else h += '<td colspan="4" class="u1 u3"><span class="neg">sin OC</span></td>';
+      '</td><td class="' + (saldo < 0 ? "neg" : "pos") + '">' + _adsN(saldo) + "</td>";
+    // v27.78 (Luis): el recuadro es del PERÍODO (las N OC del rango), no de la última OC; la fecha sí es la de la última OC
+    var fUlt = c.fechaUlt ? _adsFecha(c.fechaUlt) : '<span class="neg">sin OC</span>';
+    if (c.pedP == null) h += '<td class="u1">' + fUlt + '</td><td colspan="3" class="u3">' + (_ads.tall ? "sin OC en el período" : "…") + "</td>";
+    else h += '<td class="u1">' + fUlt + '</td><td class="u2">' + _adsN(c.pedP) + '</td><td class="u2">' + _adsN(c.recP) +
+      '</td><td class="u3' + (c.pctP != null && c.pctP < _ads.umbral ? " neg" : "") + '">' + _adsPct(c.pctP) + "</td>";
     h += "<td>" + dist + "</td></tr>";
   });
   return h + "</tbody></table></div>";
@@ -269,10 +271,12 @@ function _adsStockCalc(r, H) {
   var dist = pc.length > 1 ? pc.map(function (x) { return x.proveedor + " " + (totPed > 0 ? _adsPct((Number(x.pedido) || 0) / totPed) : "—") + " (" + _adsN(x.pedido) + ")"; })   // v27.75: con las cajas
            : pc.length ? [pc[0].proveedor + " (" + _adsN(pc[0].pedido) + ")"] :   // v27.76 D1: uno solo, también con las cajas
            (r.oc_prov ? [r.oc_prov] : []);
-  var rec = r.oc_rec_v != null ? r.oc_rec_v : r.oc_rec;
+  // v27.78: pedido y recibido del período = suma de todos los talleristas del código en las N OC del rango
+  var recP = pc.reduce(function (s, x) { return s + (Number(x.entregado) || 0); }, 0);
+  var fechaUlt = r.oc_fecha || pc.reduce(function (m, x) { return x.ult_fecha && (!m || x.ult_fecha > m) ? x.ult_fecha : m; }, null) || null;
   return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]),
-           cob: disp - comp <= 0 ? 0 : (proy > 0 ? (disp - comp) / (proy / 30) : "sin venta"),   // D16 v27.59
-           rec: rec, ocPct: r.oc_cant ? Number(rec) / Number(r.oc_cant) : null, dist: dist };
+           pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
+           fechaUlt: fechaUlt, dist: dist };
 }
 
 /* v27.34 (Luis): Excel de cada pestaña — talleristas, y stock uno por rango (10/20/30).
@@ -351,15 +355,15 @@ function adsExcelStock(H) {
   if (!_ads.stock) { alert("Todavía se está leyendo el stock."); return; }
   var f = adsFiltrarStock(_ads.stock, H, "");
   // v27.42 (Luis): rótulos abreviados para que ninguna palabra se parta en el medio con los anchos chicos
-  var aoa = [["Cód.", "Descripción", "Stk", "Comp. " + H + " d", "Est. Madre " + H + " d", "Saldo " + H + " d", "Días cob.",
-              "Fecha últ. OC", "Ped. últ. OC", "Rec. últ. OC", "% últ. OC", "Proporción"]];
+  var aoa = [["Cód.", "Descripción", "Stk", "Comp. " + H + " d", "Est. Madre " + H + " d", "Saldo " + H + " d",
+              "Fecha últ. OC", "Ped. período", "Rec. período", "% período", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
-    aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo), typeof c.cob === "string" ? c.cob : Math.round(c.cob),
-      r.oc_fecha ? _adsFecha(r.oc_fecha) : "sin OC", _adsNum(r.oc_cant), r.oc_fecha ? _adsNum(c.rec) : "", _adsPctNum(c.ocPct), c.dist.join(" - ")]);
+    aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo),
+      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), c.dist.join(" - ")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
-    { anchos: [6.57, 23, 5.14, 6, 6.29, 6, 5.43, 6.29, 5.86, 5.86, 5.29, _adsAnchoTexto(aoa, 11, 10.5, 24)], izq: [1, 11] });
+    { anchos: [6.57, 23, 5.14, 6, 6.29, 6, 6.29, 6.29, 6.29, 5.29, _adsAnchoTexto(aoa, 10, 10.5, 24)], izq: [1, 10] });
 }
 
 function _adsRender() {
