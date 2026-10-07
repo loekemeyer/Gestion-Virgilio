@@ -7585,7 +7585,8 @@ negativo para usos prácticos de importación"*.
 | importado | componente GP2 | factor |
 |---|---|---|
 | 587C · 505C · 1546903 · 523C · 1000900 | Z23B · Z23A · C13 · E13 · D1 | 1 |
-| 323E / 838E | **GRJ31 + 323E + 838E** (pool compartido, totalidad) | 1 c/u (v26.99, Thomas 06/10) |
+| 838E | **GRJ31 + 838E** (+ parte 323ES) — GRJ31 va 100 % al 838E | 1 (v28.43, Luis 07/10) |
+| 323E | **323E** (su terminado de GP2) | 1 (v28.43) |
 | 942E · 943E · 944E · 945E · 948E | Z47 + Z47-M505D + 942E · Z44 + Z44-M505C + 943E · Z48 + Z48-M505 + 944E · Z49 + Z49-M505F + 945E · Z45 + Z45-M505B + 948E | 1 c/u, se suman (v26.00) |
 | 522ES | GRJ33 | 1 |
 | 702E · 106E | 702 + 702E + 102E · 723 + 106E | 1 c/u (v26.03) |
@@ -7605,7 +7606,7 @@ negativo para usos prácticos de importación"*.
   + GP2). `stock_total` / `stock_actual` / `stock_cajas` **no se tocaron** (los leen otros). El módulo de importación
   lee el neto: la cuenta de «a pedir», los meses y la pantalla muestran el negativo; la celda Stock lleva **🏭+N**.
 - Al 01/10: 22 códigos en negativo (583E −210, 969E −204…); 505C +21.605, 587C +20.377, 323E +600 (444 neto).
-- ⚠⚠ **v26.99 (Thomas, 06/10): GRJ31 es un POOL COMPARTIDO.** Tanto 323E como 838E cuentan **GRJ31 (totalidad) + 323E terminado (totalidad) + 838E terminado (totalidad)**, los tres a factor 1 — así los dos ven el pool neteado por lo ya despachado como cualquiera de los dos (3000 − 600 − 396 = 2.004 para ambos). La leyenda del pop-up los lista a los tres (se arma sola de `GV_Importados_Equiv_GP2`). **El 323ES ya NO ve GRJ31** (*"no va más"*): se borró su fila `(323ES, GRJ31)`. Esto **RETIRA** la regla D13 (Luis, 01/10, 20/80 + 323ES 100%): Thomas la dio vuelta — no volver al 20/80. Que GRJ31 figure entero en 323E y en 838E a la vez es a propósito (cada ítem ve el pool compartido; no se suman entre sí para comprar). Backup de las 3 filas viejas en el chat de la sesión 01RNVK8H (323E/GRJ31/0,2 · 838E/GRJ31/0,8 · 323ES/GRJ31/1).
+- ~~**v26.99 (Thomas, 06/10): GRJ31 es un POOL COMPARTIDO.**~~ **RETIRADO en la v28.43 (Luis, 07/10: *"habíamos determinado que 100 % iba para el 838E"*)**: ver la regla «PIEZAS E INSUMOS COMPARTIDOS» más abajo. Texto viejo: Tanto 323E como 838E cuentan **GRJ31 (totalidad) + 323E terminado (totalidad) + 838E terminado (totalidad)**, los tres a factor 1 — así los dos ven el pool neteado por lo ya despachado como cualquiera de los dos (3000 − 600 − 396 = 2.004 para ambos). La leyenda del pop-up los lista a los tres (se arma sola de `GV_Importados_Equiv_GP2`). **El 323ES ya NO ve GRJ31** (*"no va más"*): se borró su fila `(323ES, GRJ31)`. Esto **RETIRA** la regla D13 (Luis, 01/10, 20/80 + 323ES 100%): Thomas la dio vuelta — no volver al 20/80. Que GRJ31 figure entero en 323E y en 838E a la vez es a propósito (cada ítem ve el pool compartido; no se suman entre sí para comprar). Backup de las 3 filas viejas en el chat de la sesión 01RNVK8H (323E/GRJ31/0,2 · 838E/GRJ31/0,8 · 323ES/GRJ31/1).
 - **v26.00 (Luis, D19):** un importado puede tener VARIOS componentes y se suman; los que GP2 todavía no tiene (Z47, Z44-M505C, GRJ33…) cuentan solos cuando se creen (cruce por `upper`). El pop-up los lista todos. ⚠ Si el terminado de GP2 (942E…) se manda a Virgilio, tiene que salir del inventario de GP2 o cuenta dos veces.
 - **v26.86 (Luis, 05/10): suma TAMBIÉN el componente de GP2 con el MISMO código** (323E en GP2 = el artículo terminado), factor 1, salvo que ya esté en `GV_Importados_Equiv_GP2` o el código sea dual. Bodegas = todo GP2 menos Virgilio (talleristas incluidos). Lateral `e_mismo`, centinela 323. `sql/gv_importados_gp2_mismo_codigo_v2686.sql`.
 - **v26.03 (Luis, 01/10, D23): también suma STOCK DE VIRGILIO de otro código que se convierte en el importado**
@@ -7615,6 +7616,36 @@ negativo para usos prácticos de importación"*.
   702 LK; 106E ← 723 CH. Celda **🔁+N** y fila «🔁 Se convierte» en el pop-up. Puede contar también en la fila propia del
   origen (102E), a propósito. Y el insumo 522ES cuenta para el importado 522ES (además del 522E). `sql/gv_importados_equiv_virgilio_v2603.sql`.
 - Centinelas 269 y 270. `sql/gv_importados_equiv_gp2_v2561.sql`, `tests/pedimp-equiv-gp2.cjs`.
+
+## ⚠⚠ REGLA (Luis, 2026-10-07, v28.43): PIEZAS E INSUMOS COMPARTIDOS — cada artículo toma su % por E.M. del mes
+
+**Luis:** *"633E→942E, 630E→943E, 637E→944E, 636E→945E, 631E→948E tienen que contemplar las mismas piezas … pero
+proporcionalmente. Lo que determina la proporcionalidad es la estadística madre del mes (dinámica) · 323E/838E: 100 % para el
+838E · 438E y 439E que contemplen los insumos que tenemos en Virgilio, de la misma forma · para determinar si le compramos a los
+chinos y para avisar en la página que no tenemos stock"*.
+
+| grupo (dueño de las piezas) | lo comparten | qué se reparte |
+|---|---|---|
+| 942E · 943E · 944E · 945E · 948E (LK) | 633E · 630E · 637E · 636E · 631E (CH) | piezas GP2 (`GV_Importados_Equiv_GP2` + mismo código) y la parte 94xP de Virgilio |
+| 438E · 439E | el mismo código en LK y en CH | el insumo de Virgilio (`gv_importados_stock_insumos`) |
+| 323E / 838E | — | **no es reparto**: GRJ31 y la parte 323ES son del **838E** al 100 %; el 323E cuenta sólo su terminado de GP2 |
+
+- Quién comparte vive en **`GV_Piezas_Reparto`** (grupo, cod_art, empresa, `peso_fijo`); agregar uno = un `insert`.
+- El % lo calcula **`gv_piezas_reparto_share`**: E.M. de `gv_proyeccion_articulo` (proy_lk / proy_ch según la empresa) × UxB
+  de esa empresa (sin UxB, la del dueño del grupo: 633E y 637E) = unidades/mes; % = las suyas ÷ las del grupo. `peso_fijo`
+  pisa la E.M. Sin E.M. en todo el grupo → partes iguales. Es dinámico: cambia solo con la Est. Madre.
+- **Importación** (`gv_importados_ordenes`): `stock_gp2`, `stock_insumos`, `stock_total` y `stock_total_neto` ya vienen × su %;
+  columnas nuevas `piezas_share`, `piezas_reparto`. `vista_importados_stock_parte` también. El pop-up de stock lo dice
+  (fila «🔀 Piezas e insumos compartidos: le toca el N %»).
+- **Cartel de la página** (`gv_reingresos_feed`): ahora cuenta como stock las **piezas de Cervantes** y los **insumos de
+  Virgilio** de TODO importado (antes sólo la parte de `Importados_Stock_Parte`), cada uno con su %; y el que comparte sin ser
+  importado (633E…) **lleva cartel** en la página de su empresa, con la fecha de reingreso del dueño.
+- ⚠ **438E, 439E y 944E están en `GV_Reingreso_Excluido`**: no llevan cartel (regla de Luis del 23/09). El 637E (del grupo
+  944E) sí lo lleva.
+- Al 07/10: 942E 87 % / 633E 13 % · 943E 94 / 630E 6 · 944E 80 / 637E 20 · 945E 65 / 636E 35 · 948E 82 / 631E 18 ·
+  438E LK 52 / CH 48 · 439E LK 32 / CH 68. Medido: el cartel LK bajó de 1,2 s a 0,7 s, CH subió de 0,3 s a 0,5 s.
+- Centinelas 362-366. Backups `zz_backups."GV_Backup_Equiv323_838_20261007"` y `"GV_Backup_ReingresosFeed_def_20261007"`.
+  `sql/gv_piezas_reparto_em_v2843.sql`, `tests/pedimp-piezas-reparto.cjs`.
 - **v25.71 (Luis, 01/10):** el pop-up «📦 Stock — <cód>» es más grande y dice el **código del componente** de Cervantes
   (fila «🏭 Cervantes (GP2) · GRJ31» y chip en el encabezado; con factor ≠ 1, «le toca el 20 % de 4.000 u»). Lee
   `GV_Importados_Equiv_GP2`; si falla, se ve como antes. `tests/pedimp-stock-desg-gp2.cjs`.
@@ -8194,7 +8225,7 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
 - **v28.00 (Luis, 07/10): TODAS las celdas del Excel van centradas en VERTICAL** (B, L y M incluidas; antes el texto a la izquierda quedaba abajo). Lo horizontal sigue como su archivo.
 - **v27.99 (Luis, 07/10, «ADS_stock_10d_20261007_5», *"así tal cual"*)**: col G (Fecha últ. OC) 8 · L (Entr. est. x tall.) 19,14 · escala de impresión 75; el resto como la v27.91.
 - **v27.98 (Luis, 07/10): en el Excel de stock «Entr. est. x tall.» va «Nombre: cajas»** (`Pettofrezza: 0`, un renglón por tallerista de la OC actual, sin %; `estCaj` de `_adsStockCalc`). Retira el «sólo el número» de la v27.94. La pantalla (tooltip) sigue con % y cajas.
-- **v28.42 (Luis, 07/10): la pestaña Stock se ORDENA por el saldo del lapso elegido** (10/20/30), de mayor déficit a menor (antes siempre por el de 10 d). **El semáforo del botón muestra ACUMULADOS**: 10d = quiebran a 10 · 20d = quiebran a 20 (incluye los de 10) · 30d = quiebran a 30. Retira el «recién quiebra» de la v27.22.
+- **v28.43 (Luis, 07/10): la pestaña Stock se ORDENA por el saldo del lapso elegido** (10/20/30), de mayor déficit a menor (antes siempre por el de 10 d). **El semáforo del botón muestra ACUMULADOS**: 10d = quiebran a 10 · 20d = quiebran a 20 (incluye los de 10) · 30d = quiebran a 30. Retira el «recién quiebra» de la v27.22.
 - **v27.92 (Luis, D3, 07/10): saldo = disponible − el MAYOR entre comprometido H d y Est. Madre H d, NO la suma** (lo comprometido ya es parte de la venta que mide la Est. Madre; sumarlos contaba dos veces). Quiebres 39/61/88 → 32/46/67. `gv_ads_stock2` (marcador `v27.92-max`), centinela, `sql/gv_ads_saldo_max_v2792.sql`.
 - **Saldos en cajas ENTERAS (v27.32, Luis D11)**: quiebre sólo si falta media caja o más (antes −0,3 de una Est. Madre de 1 caja/mes contaba). Rojo 45 → 40. `sql/gv_ads_saldo_cajas_enteras_v2732.sql`.
 - Rango y umbral se guardan en `Stock_Config` **sólo con «Guardar para el badge»**: cambiarlos sin guardar vale para esa

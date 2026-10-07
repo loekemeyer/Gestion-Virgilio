@@ -897,6 +897,11 @@ async function pedImpStockDesglose(keyEnc, foco) {
           'stock disponible en Virgilio de ' + (cc ? '<b>' + cc + '</b>' : 'otro código') + ', que se puede convertir en este');
       }
       if (it.stockParteU > 0) h += tr('🔧 Parte ' + escapeHtml(it.stockParteCods || ''), f(it.stockParteU), 'el stock de la parte cuenta como stock de este artículo');
+      /* v28.43 (Luis, 07/10): las piezas (GP2) y los insumos de este artículo los COMPARTE con otros
+         (GV_Piezas_Reparto: 942E con 633E, 438E LK con CH…). Las filas de arriba ya traen sólo su parte. */
+      if (it.piezasShare != null && it.piezasShare !== 1)
+        h += '<tr class="imp-piezas-share"><td colspan="3" style="text-align:left;padding:8px 10px;font-size:14px;color:#7c2d12;background:#fff7ed">🔀 Piezas e insumos <b>compartidos</b>: a este artículo le toca el <b>' +
+          Math.round(it.piezasShare * 100) + ' %</b>, según la Estadística Madre del mes' + (it.piezasReparto ? ' (' + escapeHtml(it.piezasReparto) + ')' : '') + '.</td></tr>';
       h += '</tbody><tfoot><tr><th style="text-align:left;padding:8px 10px;font-size:16px">Total</th><th class="num" style="padding:8px 10px;font-size:18px">' + f(it.stockUni) + '</th><th></th></tr></tfoot></table>';
     }
     const det = it.parteDet || [];

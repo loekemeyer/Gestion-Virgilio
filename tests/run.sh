@@ -714,6 +714,7 @@ echo "== pedimp-moq-proy (v23.90: código → proyección · MOQ con margen hast
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pedimp-moq-proy.cjs
 node tests/pedimp-insumo-12m.cjs
 node tests/pedimp-equiv-gp2.cjs
+node tests/pedimp-piezas-reparto.cjs
 node tests/pedimp-stock-desg-gp2.cjs
 node tests/imp-recibir-cervantes.cjs
 node tests/imp-cervantes-denegado.cjs

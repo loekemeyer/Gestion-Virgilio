@@ -24,7 +24,7 @@ const CHICAS = {
   Camioneros: 13, GV_Rack_CxM: 45, gv_insumo_ubicacion: 149, vista_insumos: 142, Conteo_Stock: 2, Equivalencias_Codigos: 4, Equivalencias_Familia: 18,
   GV_Krikos_OC: 0, GV_Tandas_Auto_Log: 1, Insumos_Factores: 45, PPP_Web_Config: 62,
   gv_np_prog_sin_base: 0, gv_pedido_mod_np: 8, gv_ppp_cliente_dos_dias: 0,
-  gv_ppp_super_mezclado: 0, gv_ppp_mismo_lugar_dos_dias: 0, GV_PPP_Web_NP_Cancelada: 5, gv_vista_cola_impresion: 0, gv_vista_control_remitos: 29,
+  gv_ppp_super_mezclado: 0, gv_ppp_mismo_lugar_dos_dias: 0, gv_ppp_tanda_zona_fuera_regla: 0, GV_PPP_Web_NP_Cancelada: 5, gv_vista_cola_impresion: 0, gv_vista_control_remitos: 29,
   reporte_agentes: 165, vista_cola_impresion: 0, vista_correcciones_pedido_rich: 0,
   vista_np_faltantes_secuencia: 0, vista_np_sin_programar: 0, vista_pedidos_equivalencia: 2,
   vista_prov_importacion: 153, vista_recepcion_mensual: 469,
