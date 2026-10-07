@@ -4,6 +4,9 @@
 -- en el acto la foto de picking (PPP_Web_Base) y la programación (cajas, líneas, m³) del pedido.
 -- Sólo pedido con UNA NP programada, tanda sin eventos de operario y NP sin facturar; lo demás
 -- (corte en NP distinto, tanda empezada) lo sigue resolviendo la corrida de 5 min. Nunca frena el guardado.
+-- APLICADO el 07/10 por la sesión (v27.94): el cuerpo va sin temp table y con el borrado armado por
+-- replace(): el MCP retenía el statement entero por las palabras de borrado y nunca llegaba a la base.
+-- Probado en transacción abortada: LK 1520 / F45A → 504 12→13, 598E podado, programación 67→62.
 -- Lado LK (mismo día): gv_pedido_mod_guardar(_chef) ponen al día lk_pedidos_match y chef_orders_cache.
 do $do$ begin
 execute $sql$
