@@ -5798,6 +5798,11 @@ Va igual en Registro Producción 3.0 (v30.09). `tests/legajo1-confirma.cjs`.
   dispara la alarma ni marca «entró · sin arrancar». Caso 277 el 07/10 (08:27, sin tareas) y 237 el 06/10.
 - La única forma de ingresar es el código de la TV desde la v27.56; los celulares viejos se actualizan solos.
 - Huella del monitor re-congelada (`74a2aeae…`), 4 centinelas v27.68. `sql/gv_llegada_clave_tv_sueldos_v2768.sql`.
+- ⚠ **v27.69 (Thomas, 07/10): la app es UNA para las dos plantas y el ingreso no dice a cuál fue.** Caso 277: ingresó
+  08:27, registró en **Cervantes** 08:28 y el monitor de Virgilio lo marcó «sin arrancar» + alarma 08:33. Hoy: si
+  después del ingreso hay un registro en `Registros Produccion Cervantes`, la alarma dice `en Cervantes` (no avisa),
+  la TV no lo muestra como «entró» y el ingreso no adelanta la jornada de Virgilio (marcador `v27.69-cerv`, 3
+  centinelas). `sql/gv_llegada_cervantes_v2769.sql`.
 
 ## ⚠ REGLA (06/10/2026, v27.46): el DESHACER (60 s) del operario va por RPC — nunca DELETE
 
