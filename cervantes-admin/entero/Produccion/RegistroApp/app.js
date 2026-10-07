@@ -1034,8 +1034,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       if (item.id) {
-        await sb.from(TABLA_REGISTROS).delete().eq("id", item.id);
-        await sb.from("db_n8n_espejo").delete().eq("ID_Ejecucion", hashId(item.id));
+        const { error: eDel } = await sb.rpc("gv_cerv_eliminar_registro", { p_id: String(item.id), p_legajo: String(leg), p_id_ejec: hashId(item.id) });   // problema 596: sin DELETE con la clave pública
+        if (eDel) throw eDel;
       }
     } catch (err) { console.error("Error eliminando de Supabase:", err); }
 
@@ -1265,7 +1265,7 @@ document.addEventListener("DOMContentLoaded", () => {
               });
             }
           } else if (filaExiste) {
-            await sb.from("db_n8n_espejo").delete().eq("ID_Ejecucion", idEjec);
+            await sb.rpc("gv_cerv_espejo_borrar", { p_id_ejec: idEjec, p_legajo: String(item.legajo || "") });   // problema 596
           }
         }
       }

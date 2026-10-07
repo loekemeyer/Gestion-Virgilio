@@ -288,7 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ================= VERSION (unica fuente de verdad) ================= */
-  const LOCAL_VERSION = "v1.9.3";
+  const LOCAL_VERSION = "v1.9.4";
 
   /* ================= KEYS STORAGE ================= */
   const APP_TAG = "_Cervantes";
@@ -1179,8 +1179,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       if (item.id) {
-        await sb.from(TABLA_REGISTROS).delete().eq("id", item.id);
-        await sb.from("db_n8n_espejo").delete().eq("ID_Ejecucion", hashId(item.id));
+        // v1.9.4 (problema 596): la clave pública ya no borra; se borra por RPC (sólo lo del legajo, 15 días)
+        const { error: eDel } = await sb.rpc("gv_cerv_eliminar_registro", { p_id: String(item.id), p_legajo: String(leg), p_id_ejec: hashId(item.id) });
+        if (eDel) throw eDel;
       }
     } catch (err) { console.error("Error eliminando de Supabase:", err); }
 
@@ -1410,7 +1411,7 @@ document.addEventListener("DOMContentLoaded", () => {
               });
             }
           } else if (filaExiste) {
-            await sb.from("db_n8n_espejo").delete().eq("ID_Ejecucion", idEjec);
+            await sb.rpc("gv_cerv_espejo_borrar", { p_id_ejec: idEjec, p_legajo: String(item.legajo || "") });   // v1.9.4: sin DELETE con la clave pública
           }
         }
       }

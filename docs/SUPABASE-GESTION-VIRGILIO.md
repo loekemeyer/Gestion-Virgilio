@@ -31778,3 +31778,18 @@ igual) es decisión de la persona y no cambia; «movido a mano» cuenta como man
 - Rollback: correr `sql/gv_ppp_dia_ajustar_fijos_v2688.sql`, devolverle al 321 `v_dest := v_dest \|\| jsonb_build_object\(r\.grp`
   y borrar el 325.
 `sql/gv_ppp_dia_ajustar_sin_vencer_v2693.sql`, `tests/apr-dia-ocupado.cjs` (k).
+
+## §3.v2850 — la clave pública ya no BORRA en public (Thomas, 07/10, D3 · problema 596)
+
+- Medido: 12 tablas tenían grant DELETE a anon **y** la policy `delete_all` con anon (Articulos Virgilio X Tallerista,
+  Despiece x Articulo, Entregas PS, Envios a Talleristas, Matrices, Partes x Tallerista, Pendientes,
+  Proporcion_Articulo_Tallerista, Registros Produccion Cervantes, Rutas_Confirmadas, Rutas_Problemas, db_n8n_espejo).
+  Las otras ~70 con policy anon no tienen el grant: no borran.
+- Únicos DELETE anon en 24 h: el «eliminar» de la app de operarios de Cervantes. Ahora va por
+  `gv_cerv_eliminar_registro(id, legajo, id_ejec)` y `gv_cerv_espejo_borrar(id_ejec, legajo)` (SECURITY DEFINER,
+  sólo lo del legajo y de 15 días). Cervantes v1.9.4 + la copia `cervantes-admin/entero/Produccion/RegistroApp`.
+- Las 12 policies pasaron a `authenticated` (el admin «entero» corre con sesión).
+- Verificado como anon: borra 0 filas de Matrices; la RPC contesta.
+- Chequeo (vacío = bien): ver el final de `sql/gv_anon_sin_delete_v2850.sql`. Rollback por tabla:
+  `alter policy delete_all on public."<tabla>" to anon, authenticated;`
+- Queda del problema 596: los INSERT de anon y las RPC que escriben sin chequeo.
