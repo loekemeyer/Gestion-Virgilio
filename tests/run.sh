@@ -618,6 +618,7 @@ node tests/ppp-sin-cancelada.cjs
 echo "== ppp-misiones (regresión: destino del expreso y el aviso de Misiones en la Programación) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-misiones.cjs
 node tests/ppp-mismo-lugar.cjs
+node tests/ppp-zona-fuera-regla.cjs
 echo "== ppp-dir-real-expreso (v24.76: direccion real de la sucursal en pedidos por expreso + sucursal del Excel ISIS por order_id) =="
 node tests/ppp-dir-real-expreso.cjs
 
