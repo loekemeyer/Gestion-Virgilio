@@ -1,7 +1,7 @@
 /* v25.79 (Luis) — ALARMA de operario inactivo 5 min + Bajar de racks como tarea abierta.
    v25.90: la alarma es SÓLO de la TV del depósito (tv.html, no Mon. Admin) y sólo la dispara un operario real
    (ni el legajo de prueba ni el supervisor en la vista de operario).
-   A) monitor/tv.html: una alerta viva → cartel centrado ~70 % con el nombre; se va si se cierra y a los 15 s.
+   A) monitor/tv.html: una alerta viva → cartel centrado ~70 % con el nombre; se va si se cierra; suena 15 s y queda 60 s (v27.67).
    B) botonera: a los 5 min de tiempo muerto llama gv_alerta_inactivo_abrir; al registrar algo, _cerrar.
    C) Bajar de racks: abierto = tarea abierta (BR en rojo, tiempo muerto 0); al cerrar va al Historial.
    Sale 1 si falla. */
@@ -48,14 +48,19 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   await tv.evaluate(() => gvAlertaInactivo.leer());
   await tv.waitForTimeout(400);
   r.tvSeVaAlCerrar = await tv.evaluate(() => !document.getElementById("aiOv").classList.contains("on"));
-  // a los 15 s se va solo (corremos el reloj de la alerta)
+  // v27.67 (Thomas): a los 15 s deja de sonar pero el cartel sigue; a los 60 s se va solo
   cerrada = false;
-  r.tvSeVaA15s = await tv.evaluate(async () => {
-    const A = gvAlertaInactivo; A._abiertas["9"] = { id: 9, nombre: "Otro", cerrada: false }; A._vistas["9"] = Date.now();
-    A.pintar(); const on1 = document.getElementById("aiOv").classList.contains("on");
-    A._vistas["9"] = Date.now() - 16000; A.pintar();
-    return on1 && !document.getElementById("aiOv").classList.contains("on");
+  const t60 = await tv.evaluate(async () => {
+    const A = gvAlertaInactivo, on = () => document.getElementById("aiOv").classList.contains("on");
+    A._abiertas["9"] = { id: 9, nombre: "Otro", cerrada: false }; A._vistas["9"] = Date.now();
+    A.pintar(); const on1 = on();
+    A._vistas["9"] = Date.now() - 16000; A.pintar(); const on16 = on(), sir16 = A._sirena();
+    A._vistas["9"] = Date.now() - 59000; A.pintar(); const on59 = on();
+    A._vistas["9"] = Date.now() - 61000; A.pintar(); const on61 = on();
+    return { on1, on16, sir16, on59, on61 };
   });
+  r.tvSigue16s = t60.on1 && t60.on16 && !t60.sir16 && t60.on59;
+  r.tvSeVaA60s = !t60.on61;
   // ── B y C: el celular ──
   const p = await b.newPage({ viewport: { width: 390, height: 800 } });
   p.on("pageerror", (e) => errs.push("cel: " + e.message));

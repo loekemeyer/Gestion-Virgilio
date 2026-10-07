@@ -462,8 +462,8 @@ function build(src) {
   // v25.90 (Luis): la alarma de operario inactivo es SÓLO de la TV del depósito: Mon. Admin no la carga.
   // v26.02 PRUEBA TEMPORAL (01/10, vence 18:40 ART): Mon. Admin la carga en modo "prueba" — sólo muestra
   // al legajo 1 en el baño (gv_alertas_prueba_vivas), nunca la alarma real. Pasada la hora no hace nada.
-  out = rep(out, '<script src="alerta-inactivo.js?v=4"></script>\n',
-    '<script>window.GV_ALERTA_MODO = "prueba";</script>\n<script src="alerta-inactivo.js?v=4"></script>\n');
+  out = rep(out, '<script src="alerta-inactivo.js?v=5"></script>\n',
+    '<script>window.GV_ALERTA_MODO = "prueba";</script>\n<script src="alerta-inactivo.js?v=5"></script>\n');
   // 4) en pintar(): stash de `d` para que la capa admin lo lea
   out = rep(out,
     "function pintar(d) {\n  var nombres = d.empleados.nombres, horarios = d.empleados.horarios;",

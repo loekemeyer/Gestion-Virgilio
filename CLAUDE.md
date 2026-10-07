@@ -6002,7 +6002,8 @@ puedan salir anulando la tarea completamente · que se registre que apretaron pa
   `admin.html` lo hereda del build. El legajo de prueba (0/1) también avisa (sale «PRUEBA (legajo 1)»).
 - **El monitor** (`monitor/alerta-inactivo.js`)
   leen `gv_alertas_inactivo_vivas()` cada 4 s: cartel centrado del **70 %**, rojo titilando, *«[Nombre] lleva más de 5 minutos
-  inactivo»*, con **sirena** Web Audio. Se va a los **15 s** o apenas la alerta se cierra. Un iframe escondido no suena.
+  inactivo»*, con **sirena** Web Audio. **Suena 15 s y el cartel queda 60 s** (v27.67, Thomas 07/10; antes se iba a los 15 s), o se va
+  apenas la alerta se cierra. Un iframe escondido no suena.
 - ⚠ **El navegador no deja sonar sin un toque previo**: si el kiosko no arranca con `--autoplay-policy=no-user-gesture-required`,
   el cartel dice «🔇 tocá la pantalla una vez» y desde ese toque suena.
 - ⚠ **Sólo avisa con la botonera ABIERTA** en el celular: si el operario cerró la app, el contador no corre y no hay aviso. El

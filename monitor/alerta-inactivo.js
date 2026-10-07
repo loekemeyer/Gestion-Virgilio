@@ -6,7 +6,8 @@
  *                         al registrar la próxima tarea → rpc gv_alerta_inactivo_cerrar
  *   este archivo:          lee gv_alertas_inactivo_vivas() cada 4 s y, por cada alerta nueva,
  *                          muestra un cartel centrado del 70 % de la pantalla con alarma sonora.
- *                          Se va a los 15 s o apenas el operario registra algo (cerrada = true).
+ *                          Suena 15 s y queda en pantalla 60 s (v27.67, Thomas), o se va apenas el
+ *                          operario registra algo (cerrada = true).
  *
  * Vive APARTE de tv.html a propósito: tv.html tiene techo de 100 KB (tests/mon-tv.cjs) y
  * admin.html se genera desde tv.html, así que con un <script> los dos lo cargan.
@@ -28,7 +29,7 @@
   if (PRUEBA && Date.now() >= PRUEBA_HASTA) return;
   /* v25.90 (Luis, 01/10): sólo en el monitor del DEPÓSITO. Dentro de un iframe (📺 Vista TV del admin) no corre. */
   try { if (!PRUEBA && window.self !== window.top) return; } catch (_e) { return; }
-  var DURA_MS = PRUEBA ? Infinity : 15000, CADA_MS = PRUEBA ? 3000 : 4000;
+  var DURA_MS = PRUEBA ? Infinity : 60000, SUENA_MS = 15000, CADA_MS = PRUEBA ? 3000 : 4000;
   var RPC = PRUEBA ? "gv_alertas_prueba_vivas" : "gv_alertas_inactivo_vivas";
   var vistas = {};          // id → ms en que se mostró por primera vez
   var abiertas = {};        // id → alerta viva en pantalla
@@ -111,7 +112,9 @@
       (vivas.length > 1 ? "llevan" : "lleva") + " más de 5 minutos inactivo" + (vivas.length > 1 ? "s" : "") + "</div>" +
       (suena() ? "" : '<div class="ai-mudo">🔇 Sin sonido: tocá la pantalla una vez para habilitar la alarma</div>');
     ov.classList.add("on");
-    sonar();
+    /* v27.67 (Thomas, 07/10): suena los primeros 15 s de cada alerta; el cartel queda 60 s */
+    var conSonido = PRUEBA || Object.keys(abiertas).some(function (id) { return ahora - vistas[id] < SUENA_MS; });
+    if (conSonido) sonar(); else callar();
   }
 
   function leer() {
@@ -131,13 +134,14 @@
       rows.forEach(function (a) {
         var id = String(a.id);
         if (a.cerrada) { delete abiertas[id]; return; }            // registró una tarea → se va solo
-        if (!vistas[id]) { vistas[id] = ahora; abiertas[id] = a; }  // nueva: 15 s desde que se ve
+        if (!vistas[id]) { vistas[id] = ahora; abiertas[id] = a; }  // nueva: 60 s en pantalla (15 s con sirena)
       });
       pintar();
     }).catch(function () {});
   }
 
-  window.gvAlertaInactivo = { leer: leer, pintar: pintar, _abiertas: abiertas, _vistas: vistas };
+  window.gvAlertaInactivo = { leer: leer, pintar: pintar, _abiertas: abiertas, _vistas: vistas,
+    _sirena: function () { return !!sirena; } };
   function arrancar() { leer(); setInterval(leer, CADA_MS); setInterval(pintar, 1000); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", arrancar); else arrancar();
 })();
