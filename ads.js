@@ -294,7 +294,7 @@ function _adsStockCalc(r, H) {
   // v27.82 (Luis): la entrega estimada discriminada por tallerista, con su parte de lo estimado
   var estDist = estArr.length > 1 ? estArr.map(function (y) { return y.p + " " + (estH > 0 ? _adsPct(y.e / estH) : "—") + " (" + _adsN(y.e) + ")"; })
               : estArr.length ? [estArr[0].p + " (" + _adsN(estArr[0].e) + ")"] : [];
-  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estDet: estDet, estDist: estDist,
+  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estDet: estDet, estDist: estDist, estCaj: estArr.map(function (y) { return y.p + ": " + _adsN(y.e); }),
            pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
            fechaUlt: fechaUlt, dist: dist };
 }
@@ -383,7 +383,7 @@ function adsExcelTall() {
     // v27.88 (Luis, 07/10): formato de su Excel «ADS_talleristas_4OC_20261007»: Arial 14, rótulo alto 72, filas de 18, sus anchos
     { anchos: [12.7109375, 12.42578125, 23, 7.42578125, 7.5703125, 7.5703125, 8.42578125, 8.28515625, 7.5703125, 8.28515625], izq: [0, 2], fuente: 14, altoRot: 72, altos: aoa.map(function (_f, i) { return i ? 18 : null; }) });
 }
-// v27.94 (Luis, 07/10): en el Excel la entrega estimada por tallerista va SÓLO el número de cajas (un renglón por tallerista, en el orden de Proporción).
+// v27.94: sin llamador desde la v27.98 (Luis: en el Excel va «Pettofrezza: 0», nombre + cajas, ver estCaj).
 function _adsEstSinPct(arr) {
   return (arr || []).map(function (s) { var m = String(s).match(/\((\d+)\)\s*$/); return m ? m[1] : String(s); });
 }
@@ -399,7 +399,7 @@ function adsExcelStock(H) {
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo),
-      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), _adsEstSinPct(c.estDist).join("\n"), c.dist.join("\n")]);
+      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estCaj.join("\n"), c.dist.join("\n")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
     { anchos: ADS_XLS_STOCK_ANCHOS, izq: [11, 12], izqSin: [1], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 74, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [11, 12]) });
