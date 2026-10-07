@@ -6335,7 +6335,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.34"></script>
+<script type="module" src="recepcion.js?v=28.35"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10614,7 +10614,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.34";
+const APP_VERSION = "v28.35";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -49418,10 +49418,13 @@ async function aprCargar() {
     _apr.dobles = [];
     const pChef = aprTraerPedidos("chef");
     pChef.catch(function () {});
-    const [pedsLk, prog, items, tandas, isis] = await Promise.all([
+    const [pedsLk, prog, items, canc, tandas, isis] = await Promise.all([
       aprTraerPedidos("lk"),
       aprGet('PPP_Web_Programacion?select=empresa,order_id&tanda=not.is.null&limit=20000'),
       aprGet('PPP_Web_Tanda_Items?select=*&limit=20000'),
+      // v28.35 (caso LK 0066): un pedido CANCELADO desde la PPP no vuelve a la izquierda. El
+      // backend (gv_ppp_web_tanda_agregar) igual lo frena; esto es para que no se ofrezca.
+      aprGet('GV_PPP_Web_NP_Cancelada?select=empresa,order_id&limit=20000').catch(function () { return []; }),
       aprGet('gv_ppp_web_tandas_abiertas?select=*&order=codigo.asc'),
       aprTraerIsis(),         // v14.35: NP de ISIS sin tanda (no tienen pedido de la página)
       aprCargarCalendario(),  // v13.11: en paralelo (estaba en serie, una vuelta de red más)
@@ -49433,6 +49436,7 @@ async function aprCargar() {
     const fuera = new Set();
     for (const x of prog)  fuera.add(aprKey(x.empresa, x.order_id));
     for (const x of items) fuera.add(aprKey(x.empresa, x.order_id));
+    for (const x of (canc || [])) fuera.add(aprKey(x.empresa, x.order_id));
     const ordenar = function (arr) { return arr.sort(function (a, b) { return String(a.fecha_recep).localeCompare(String(b.fecha_recep)) || (a.order_id - b.order_id); }); };
     // `pedidosTodos` guarda TODOS, incluidos los que ya están en un borrador: al
     // programar hacen falta sus artículos, y ésos ya no están en la lista de la
@@ -61450,7 +61454,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.34"></script>
+<script src="importacion.js?v=28.35"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64299,10 +64303,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.34"></script>
-<script src="hotsale.js?v=28.34"></script>
-<script src="estadisticas.js?v=28.34"></script>
-<script src="ads.js?v=28.34"></script>
+<script src="cobranzas.js?v=28.35"></script>
+<script src="hotsale.js?v=28.35"></script>
+<script src="estadisticas.js?v=28.35"></script>
+<script src="ads.js?v=28.35"></script>
 
 </body>
 </html>
