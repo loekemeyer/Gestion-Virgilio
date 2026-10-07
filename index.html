@@ -6331,7 +6331,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.26"></script>
+<script type="module" src="recepcion.js?v=28.27"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10610,7 +10610,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.26";
+const APP_VERSION = "v28.27";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17407,7 +17407,7 @@ async function ocEnsureProyHoy() {
   _oc._proyLoading = false;
   if (_oc && _oc.view === "detail") ocRender();
 }
-function ocBack() { if (!_oc) return; if (_oc.view === "detail") { _oc.view = _oc.openFecha ? "fecha" : "list"; _oc.openKey = null; } else { _oc.view = "list"; _oc.openKey = null; _oc.openFecha = null; } ocRender(); }
+function ocBack() { if (!_oc) return; if (_oc.view === "detail") { if (_ocEpPendN() && !confirm("Hay " + _ocEpPendN() + " entrega(s) proyectada(s) sin guardar. ¿Salir igual y perderlas?")) return; _oc.epEdit = {}; _oc.view = _oc.openFecha ? "fecha" : "list"; _oc.openKey = null; } else { _oc.view = "list"; _oc.openKey = null; _oc.openFecha = null; } ocRender(); }
 function ocBodyDetail() {
   const g = ocGroups(), x = g[_oc.openKey];
   if (!x) { _oc.view = "list"; return ocBodyList(); }
@@ -17419,6 +17419,7 @@ function ocBodyDetail() {
   h += '<button class="oc-btn" onclick="ocPrintDetalle(false)" title="Para enviarle al tallerista (sin Cajas Recibidas)">🖨 Tallerista</button>';
   h += '<button class="oc-btn" onclick="ocWhatsappTallerista()" title="Copia la OC como imagen y abre WhatsApp del tallerista">📲 WhatsApp</button>';
   h += '<button class="oc-btn" onclick="ocDescargarExcelOC(_oc.openKey)" title="Excel de este tallerista: por código, pedido, entregado (cajas y %) y falta">⬇ Excel</button>';
+  h += _ocEpBtnHtml();
   h += '</div>';
   // v28.22 (Luis): sin la barra «Llenar góndola», sin la línea de totales y sin la nota de Recibido.
   // v11.52 — 3 columnas SOLO-PANTALLA (no van a los impresos): Stock · Máximo · Proyección
@@ -17504,10 +17505,11 @@ function ocDetEditCant(id, v) {
    WhatsApp ni Excel. Vive en Ordenes_Compra.gv_entrega_proy (+ _por/_at) y GV_OC_Log (append-only),
    escritos por RPC de supervisor (gv_oc_entrega_proy_guardar / gv_oc_log_agregar). */
 function _ocEntProyCell(r) {
-  const v = (r.gv_entrega_proy == null) ? "" : r.gv_entrega_proy;
+  const pend = _oc && _oc.epEdit && Object.prototype.hasOwnProperty.call(_oc.epEdit, r.id);
+  const v = pend ? _oc.epEdit[r.id] : ((r.gv_entrega_proy == null) ? "" : r.gv_entrega_proy);
   const tt = r.gv_entrega_proy_at ? ("Cargado por " + (r.gv_entrega_proy_por || "?") + " el " + new Date(r.gv_entrega_proy_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })) : "Sin dato";
   const nl = (_oc && _oc.logN && _oc.logN[r.id]) || 0;
-  return '<td class="num oc-entp" style="white-space:nowrap"><input class="oc-rinp" type="number" min="0" inputmode="numeric" title="' + escapeHtml(tt) + '" value="' + v + '" onchange="ocEntProyGuardar(' + r.id + ',this)">' +
+  return '<td class="num oc-entp" style="white-space:nowrap"><input class="oc-rinp" type="number" min="0" inputmode="numeric" title="' + escapeHtml(tt) + '" value="' + v + '"' + (pend ? ' style="background:#fef3c7"' : '') + ' oninput="ocEntProyEdit(' + r.id + ',this)">' +
     '<button class="oc-fillbtn oc-logbtn" title="Log de esta línea" onclick="ocLogAbrir(' + r.id + ')" style="margin:0 0 0 3px;position:relative">📓' +
     (nl ? '<span style="position:absolute;top:-6px;right:-6px;background:#2563eb;color:#fff;border-radius:9px;font-size:10px;padding:0 4px;line-height:15px">' + nl + '</span>' : '') + '</button></td>';
 }
@@ -17519,16 +17521,39 @@ async function _ocRpc(fn, args) {
   if (!resp.ok) { let m = txt; try { m = JSON.parse(txt).message || txt; } catch (_e) {} throw new Error(m); }
   try { return JSON.parse(txt); } catch (_e) { return null; }
 }
-async function ocEntProyGuardar(id, el) {
-  if (!_oc) return;
+/* v28.27 (Luis): Entrega proy. se guarda con el BOTÓN, no al cambiar la casilla. Cada guardado queda
+   en GV_OC_Entrega_Proy_Hist (valor, anterior, quién, cuándo) — aunque después se borre. */
+function _ocEpPendN() { return (_oc && _oc.epEdit) ? Object.keys(_oc.epEdit).length : 0; }
+function _ocEpBtnHtml() {
+  const n = _ocEpPendN();
+  return '<button id="ocEpSaveBtn" class="oc-btn' + (n ? ' ok' : '') + '" onclick="ocEntProyGuardar()"' + (n ? '' : ' disabled style="opacity:.5;cursor:default"') +
+    '>💾 Guardar entrega proy.' + (n ? ' (' + n + ')' : '') + '</button>';
+}
+function _ocEpSync() { const b = document.getElementById("ocEpSaveBtn"); if (b) b.outerHTML = _ocEpBtnHtml(); }
+function ocEntProyEdit(id, el) {
+  if (!_oc) return; if (!_oc.epEdit) _oc.epEdit = {};
+  const r = (_oc.rows || []).find(function (a) { return a.id === id; });
+  const actual = (r && r.gv_entrega_proy != null) ? String(r.gv_entrega_proy) : "";
   const raw = String(el.value || "").trim();
-  const cant = raw === "" ? null : Math.max(0, Math.round(parseFloat(raw) || 0));
-  try {
-    const res = await _ocRpc("gv_oc_entrega_proy_guardar", { p_oc_id: id, p_cant: cant });
-    const r = (_oc.rows || []).find(function (a) { return a.id === id; });
-    if (r && res) { r.gv_entrega_proy = cant; r.gv_entrega_proy_por = res.por; r.gv_entrega_proy_at = res.at; }
-    el.style.background = "#dcfce7";
-  } catch (e) { el.style.background = "#fee2e2"; alert("No se guardó la entrega proyectada: " + (e.message || e)); }
+  if (raw === actual) { delete _oc.epEdit[id]; el.style.background = ""; }
+  else { _oc.epEdit[id] = raw; el.style.background = "#fef3c7"; }
+  _ocEpSync();
+}
+async function ocEntProyGuardar() {
+  if (!_oc || !_ocEpPendN()) return;
+  const ids = Object.keys(_oc.epEdit), errores = [];
+  for (const k of ids) {
+    const id = Number(k), raw = String(_oc.epEdit[k] || "").trim();
+    const cant = raw === "" ? null : Math.max(0, Math.round(parseFloat(raw) || 0));
+    try {
+      const res = await _ocRpc("gv_oc_entrega_proy_guardar", { p_oc_id: id, p_cant: cant });
+      const r = (_oc.rows || []).find(function (a) { return a.id === id; });
+      if (r && res) { r.gv_entrega_proy = cant; r.gv_entrega_proy_por = res.por; r.gv_entrega_proy_at = res.at; }
+      delete _oc.epEdit[k];
+    } catch (e) { errores.push((e && e.message) || String(e)); }
+  }
+  if (_oc.view === "detail") ocRender();
+  if (errores.length) alert("No se guardaron " + errores.length + " casilla(s): " + errores[0]);
 }
 async function ocLogConteosCargar(x) {
   if (!_oc || !x || _oc._logKey === _oc.openKey) return;
@@ -61329,7 +61354,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.26"></script>
+<script src="importacion.js?v=28.27"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64178,10 +64203,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.26"></script>
-<script src="hotsale.js?v=28.26"></script>
-<script src="estadisticas.js?v=28.26"></script>
-<script src="ads.js?v=28.26"></script>
+<script src="cobranzas.js?v=28.27"></script>
+<script src="hotsale.js?v=28.27"></script>
+<script src="estadisticas.js?v=28.27"></script>
+<script src="ads.js?v=28.27"></script>
 
 </body>
 </html>
