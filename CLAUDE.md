@@ -4417,6 +4417,12 @@ md5 del `system_identifier` del cluster (no hay secreto en el repo, que es públ
 retira el «legajo sin clave» de la v23.83. Se entra con la clave de la TV → nombre de la lista; quien no está toca
 «＋ No estoy en la lista» → tipea su nombre y entra con el legajo 600 (v27.37), y un admin lo valida en ⚙️ →
 «Validar Operarios». `loginWithLegajo` quedó como alias que abre ese paso. Lo mismo en `Registro-Produccion-3.0` (v30.07).
+⚠ **v27.71 (Thomas, 07/10): EXCEPCIÓN CERVANTES hasta que tenga su TV** (*"vamos a implementar una tv en cervantes también …
+hasta entonces, habilitá la entrada con legajo en cervantes"*). En la pantalla de la clave hay **«Trabajo en Cervantes · entrar
+con legajo»**: valida el legajo contra `Empleados`, guarda la sesión con `soloCervantes`, registra el ingreso como
+**`legajo_cervantes`** y va derecho a `./cervantes/`. Con esa sesión **Virgilio no entra** (`chooseVirgilio` pide el código de la
+TV y borra la sesión). El monitor y la alarma de Virgilio no cuentan ese ingreso (sólo `clave_tv` / `nombre`, v27.68). Al poner
+la TV en Cervantes, sacar este botón. `tests/cervantes-legajo.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-09-28, v23.56): si la base de Gestión NO CONTESTA, avisa Telegram — y el vigilante vive en LK
 

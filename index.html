@@ -6331,7 +6331,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.70"></script>
+<script type="module" src="recepcion.js?v=27.71"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -6388,6 +6388,14 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
         <div class="tvclave-lbl">🔑 Código de ingreso (en la TV)</div>
         <input id="tvClaveInput" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4 números" onkeydown="if(event.key==='Enter')loginConClaveTv()">
         <button class="primary-btn" onclick="loginConClaveTv()">Entrar</button>
+        <!-- v27.71 (Thomas, 07/10): Cervantes todavía no tiene TV → ahí se entra con legajo, SÓLO para Cervantes. -->
+        <button class="tvnom-mas" style="margin-top:12px" onclick="tvMostrarCervantes()">Trabajo en Cervantes · entrar con legajo</button>
+      </div>
+      <div id="tvCervStep" class="hidden">
+        <div class="tvclave-lbl">Cervantes · tu legajo</div>
+        <input id="cervLegajoInput" type="number" inputmode="numeric" autocomplete="off" placeholder="Legajo" onkeydown="if(event.key==='Enter')loginCervantesLegajo()">
+        <button class="primary-btn" onclick="loginCervantesLegajo()">Entrar a Cervantes</button>
+        <div class="small" style="margin-top:6px;color:#64748b">Para Virgilio se entra con el código de la TV.</div>
       </div>
       <div id="tvNombreStep" class="hidden">
         <div class="tvclave-lbl">¿Quién sos?</div>
@@ -10602,7 +10610,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.70";
+const APP_VERSION = "v27.71";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10646,7 +10654,7 @@ function gvRegistrarIngreso(ident, metodo) {
     if (!ident) return;
     var quien = ident.type === "operario" ? ("L" + ((ident.emp && ident.emp.legajo) || "")) : (ident.email || "");
     var dia = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
-    var clave = "gv_disp_ing::" + dia + "::" + ident.type + "::" + quien;
+    var clave = "gv_disp_ing::" + dia + "::" + ident.type + "::" + quien + (metodo === "legajo_cervantes" ? "::cerv" : "");   // v27.71: el de Cervantes no tapa el ingreso a Virgilio
     try { if (localStorage.getItem(clave)) return; } catch (_e) {}
     fetch(SUPABASE_URL + "/rest/v1/GV_Dispositivo_Login", {
       method: "POST",
@@ -61257,7 +61265,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.70"></script>
+<script src="importacion.js?v=27.71"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -61564,6 +61572,7 @@ function _plantaDiaHoy() {
 }
 function _routeAfterAuth() {
   try { gvRegistrarIngreso(__identity, window.__gvLoginMetodo || "sesion_guardada"); window.__gvLoginMetodo = null; } catch (_e) {}
+  if (__identity && __identity.soloCervantes) { window.location.href = "./cervantes/"; return; }   // v27.71
   if (window.__pendingMonitorParam || __plantChosen) { _renderIdentity(); return; }
   if (__identity && __identity.type === "operario" && _plantaDiaHoy() === "virgilio") {
     __plantChosen = true;
@@ -61624,6 +61633,12 @@ async function showLoggedIn(user) {
 
 /* Acciones del selector de planta. */
 window.chooseVirgilio = function () {
+  // v27.71: quien entró con legajo (Cervantes) no entra a Virgilio: ahí va el código de la TV.
+  if (__identity && __identity.soloCervantes) {
+    alert("Para trabajar en Virgilio entrá con el código de la TV.");
+    try { clearLegajoSession(); } catch (_e) {}
+    __identity = null; showLoggedOut(); return;
+  }
   __plantChosen = true;
   _renderIdentity();
   // v23.87: el operario entra directo a su botonera y no vuelve a ver esta pantalla en el día.
@@ -61740,7 +61755,8 @@ function loadLegajoSession() {
 function saveLegajoSession(emp, day) {
   try {
     localStorage.setItem(LEGAJO_AUTH_KEY, JSON.stringify({
-      legajo: emp.legajo, nombre: emp.nombre || "", day: day || ""
+      legajo: emp.legajo, nombre: emp.nombre || "", day: day || "",
+      soloCervantes: !!emp.soloCervantes   // v27.71: entró con legajo → sólo Cervantes
     }));
   } catch (_e) {}
 }
@@ -61789,6 +61805,7 @@ async function applyAuthState() {
   const legSess = loadLegajoSession();
   if (legSess && today && legSess.day === today) {
     __identity = { type: "operario", emp: { legajo: legSess.legajo, nombre: legSess.nombre || "" }, nombre: legSess.nombre || ("Legajo " + legSess.legajo) };
+    if (legSess.soloCervantes) { __identity.soloCervantes = true; __identity.emp.soloCervantes = true; }
     _routeAfterAuth();
     return;
   }
@@ -61894,7 +61911,7 @@ let __tvClaveOkAt = 0;
 const TV_CLAVE_VALIDA_MS = 10 * 60 * 1000;   // una vez validada, 10 min para elegir nombre/legajo
 function _tvClaveVigente() { return __tvClaveOkAt && (Date.now() - __tvClaveOkAt) < TV_CLAVE_VALIDA_MS; }
 function _tvPaso(cual) {
-  ["tvClaveStep", "tvNombreStep", "tvLegajoStep"].forEach(function (id) { const e = $(id); if (e) e.classList.toggle("hidden", id !== cual); });
+  ["tvClaveStep", "tvNombreStep", "tvLegajoStep", "tvCervStep"].forEach(function (id) { const e = $(id); if (e) e.classList.toggle("hidden", id !== cual); });
 }
 window.loginConClaveTv = async function () {
   const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
@@ -61937,6 +61954,26 @@ function tvElegirOperario(o) {
   _routeAfterAuth();
 }
 window.tvElegirOperario = tvElegirOperario;
+
+/* v27.71 (Thomas, 07/10): «hasta que Cervantes tenga TV, habilitá la entrada con legajo en Cervantes».
+   Sólo lleva a Cervantes (./cervantes/): para Virgilio sigue siendo el código de la TV. El ingreso queda como
+   metodo 'legajo_cervantes', que el monitor y la alarma de Virgilio no cuentan como llegada. */
+window.tvMostrarCervantes = function () {
+  _tvPaso("tvCervStep");
+  setTimeout(function () { try { $("cervLegajoInput").focus(); } catch (_e) {} }, 40);
+};
+window.loginCervantesLegajo = async function () {
+  const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
+  const leg = String(($("cervLegajoInput") || {}).value || "").trim();
+  if (!/^\d+$/.test(leg)) { if (errEl) errEl.textContent = "Poné tu número de legajo."; return; }
+  const emp = await resolveEmpleadoByLegajo(leg);
+  if (!emp) { if (errEl) errEl.textContent = "No encuentro ese legajo (o no hay conexión). Probá de nuevo."; return; }
+  emp.soloCervantes = true;
+  saveLegajoSession(emp, todayKeyBsAs() || "");
+  __identity = { type: "operario", emp: emp, nombre: emp.nombre || ("Legajo " + emp.legajo), soloCervantes: true };
+  try { gvRegistrarIngreso(__identity, "legajo_cervantes"); } catch (_e) {}
+  setTimeout(function () { window.location.href = "./cervantes/"; }, 400);
+};
 
 /* v27.56 (Thomas, 06/10): «sacá todo el módulo de registro con legajo». No se entra tipeando el legajo:
    clave de la TV → nombre de la lista, o «No estoy en la lista» → nombre (v27.37). */
@@ -64077,10 +64114,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.70"></script>
-<script src="hotsale.js?v=27.70"></script>
-<script src="estadisticas.js?v=27.70"></script>
-<script src="ads.js?v=27.70"></script>
+<script src="cobranzas.js?v=27.71"></script>
+<script src="hotsale.js?v=27.71"></script>
+<script src="estadisticas.js?v=27.71"></script>
+<script src="ads.js?v=27.71"></script>
 
 </body>
 </html>
