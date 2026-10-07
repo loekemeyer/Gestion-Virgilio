@@ -6331,7 +6331,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.2"></script>
+<script type="module" src="recepcion.js?v=28.03"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10610,7 +10610,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.2";
+const APP_VERSION = "v28.03";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16875,7 +16875,7 @@ function _ocGroupKey(r) { return [r.proveedor || "", r.fecha || "", r.rubro || "
 async function ocFetchRows() {
   // v11.20 — paginado con supaFetchAll: PostgREST corta en 1000 filas por request
   // (el limit=20000 de antes era ilusorio; el histórico de OCs va a pasar las 1000).
-  return supaFetchAllSafe(SUPABASE_OC_ENDPOINT, "select=id,fecha,rubro,proveedor,proveedor_telefono,codigo,descripcion,cantidad,cantidad_recibida,unidad,estado,oc_max,oc_pedidos,oc_stock,oc_proy,oc_uni_caja,oc_ncaja&order=fecha.desc,proveedor.asc,codigo.asc");
+  return supaFetchAllSafe(SUPABASE_OC_ENDPOINT, "select=id,fecha,rubro,proveedor,proveedor_telefono,codigo,descripcion,cantidad,cantidad_recibida,unidad,estado,oc_max,oc_pedidos,oc_stock,oc_proy,oc_uni_caja,oc_ncaja,gv_entrega_proy,gv_entrega_proy_por,gv_entrega_proy_at&order=fecha.desc,proveedor.asc,codigo.asc");
 }
 /* ===== RECEPCIÓN → OC (v7.49, pedido del usuario / backlog v4.11 punto b) =====
    El visualizador se ALIMENTA de lo realmente recibido en Recepción de Mercadería
@@ -17423,6 +17423,7 @@ function ocBodyDetail() {
   // v11.82 — ajuste "llenar góndola a N meses" para ESTA OC (no toca la config permanente).
   // objetivo = MENOR(capacidad de góndola, proyección × meses); cantidad = max(0, objetivo + pedidos − stock).
   const _detCh = _ocDetChangedN();
+  ocLogConteosCargar(x);
   h += '<div class="oc-tools" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:8px 10px">' +
     '<span style="font-size:13px;font-weight:700;color:#065f46">⛽ Llenar góndola:</span>' +
     '<span style="font-size:13px">hasta</span> <input id="ocDetMeses" class="oc-inp" style="width:64px" type="number" min="0.5" step="0.5" value="' + (Number(_oc.detMeses) || 6) + '" oninput="ocDetMeses(this.value)"> <span style="font-size:13px">meses de Estadística Madre</span>' +
@@ -17450,7 +17451,7 @@ function ocBodyDetail() {
     if (_pm) { const v = _pm[_ocgNorm(r.codigo)]; if (v != null && v > 0) return '<td class="num oc-xtra" style="opacity:.72;font-style:italic;" title="Estadística Madre de HOY (esta OC es previa a guardar la Estadística Madre al generarla)">~' + Math.round(v) + '</td>'; }
     return '<td class="num oc-xtra">' + (_pm ? '—' : '…') + '</td>';
   };
-  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th></th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Stock al generar la OC">Stock</th><th class="num oc-xtra" title="Máximo al generar la OC">Máximo</th><th class="num oc-xtra" title="Capacidad de góndola (Capacidad_Sector, hoy)">Cap gónd.</th><th class="num oc-xtra" title="Pedidos pendientes (demanda) al generar la OC">Pedidos</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = Estadística Madre de hoy)">Estadística Madre</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th></th><th class="num oc-entp" title="Lo que el tallerista confirma o se estima que va a entregar en la vigencia de esta OC (1 semana). Sólo pantalla: no va a impresos ni Excel.">Entrega<br>proy.</th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Stock al generar la OC">Stock</th><th class="num oc-xtra" title="Máximo al generar la OC">Máximo</th><th class="num oc-xtra" title="Capacidad de góndola (Capacidad_Sector, hoy)">Cap gónd.</th><th class="num oc-xtra" title="Pedidos pendientes (demanda) al generar la OC">Pedidos</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = Estadística Madre de hoy)">Estadística Madre</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
     const ped = _ocDetCantEff(r), rec = ocRecEff(r), falt = ped - rec;
     const ch = (_oc.detEdit && _oc.detEdit[r.id] != null && Number(_oc.detEdit[r.id]) !== (Number(r.cantidad) || 0));
@@ -17462,6 +17463,7 @@ function ocBodyDetail() {
     h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td class="oc-desc">' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td>' +
       '<td class="num"><input class="oc-rinp" style="width:64px' + (ch ? ';background:#fef3c7' : '') + '" type="number" min="0" inputmode="numeric" value="' + ped + '" oninput="ocDetEditCant(' + r.id + ',this.value)"></td>' +
       '<td style="text-align:center;padding:0 2px">' + fillBtn + '</td>' +
+      _ocEntProyCell(r) +
       '<td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td>' +
       _gv(r, "oc_stock", " oc-xtra-first") + _gv(r, "oc_max", "") +
       '<td class="num oc-xtra">' + (cap == null ? "…" : (cap || "—")) + '</td>' +
@@ -17510,6 +17512,81 @@ function ocDetEditCant(id, v) {
   if (!_oc) return; if (!_oc.detEdit) _oc.detEdit = {};
   _oc.detEdit[id] = Math.max(0, Math.round(parseFloat(v) || 0));
   _ocDetSyncSave();
+}
+/* v28.02 (Luis, 07/10) — ENTREGA PROY. + 📓 log por línea de OC. Sólo PANTALLA: no va a impresos,
+   WhatsApp ni Excel. Vive en Ordenes_Compra.gv_entrega_proy (+ _por/_at) y GV_OC_Log (append-only),
+   escritos por RPC de supervisor (gv_oc_entrega_proy_guardar / gv_oc_log_agregar). */
+function _ocEntProyCell(r) {
+  const v = (r.gv_entrega_proy == null) ? "" : r.gv_entrega_proy;
+  const tt = r.gv_entrega_proy_at ? ("Cargado por " + (r.gv_entrega_proy_por || "?") + " el " + new Date(r.gv_entrega_proy_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })) : "Sin dato";
+  const nl = (_oc && _oc.logN && _oc.logN[r.id]) || 0;
+  return '<td class="num oc-entp" style="white-space:nowrap"><input class="oc-rinp" style="width:58px" type="number" min="0" inputmode="numeric" title="' + escapeHtml(tt) + '" value="' + v + '" onchange="ocEntProyGuardar(' + r.id + ',this)">' +
+    '<button class="oc-logbtn" title="Log de esta línea" onclick="ocLogAbrir(' + r.id + ')" style="margin-left:3px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:1px 4px;font-size:13px;cursor:pointer;position:relative">📓' +
+    (nl ? '<span style="position:absolute;top:-6px;right:-6px;background:#2563eb;color:#fff;border-radius:9px;font-size:10px;padding:0 4px;line-height:15px">' + nl + '</span>' : '') + '</button></td>';
+}
+async function _ocRpc(fn, args) {
+  const headers = await facAuthWriteHeaders();
+  if (!headers) throw new Error(authNoSesionMsg("Hace falta iniciar sesión con Google (supervisor)."));
+  const resp = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, { method: "POST", headers: headers, body: JSON.stringify(args) });
+  const txt = await resp.text();
+  if (!resp.ok) { let m = txt; try { m = JSON.parse(txt).message || txt; } catch (_e) {} throw new Error(m); }
+  try { return JSON.parse(txt); } catch (_e) { return null; }
+}
+async function ocEntProyGuardar(id, el) {
+  if (!_oc) return;
+  const raw = String(el.value || "").trim();
+  const cant = raw === "" ? null : Math.max(0, Math.round(parseFloat(raw) || 0));
+  try {
+    const res = await _ocRpc("gv_oc_entrega_proy_guardar", { p_oc_id: id, p_cant: cant });
+    const r = (_oc.rows || []).find(function (a) { return a.id === id; });
+    if (r && res) { r.gv_entrega_proy = cant; r.gv_entrega_proy_por = res.por; r.gv_entrega_proy_at = res.at; }
+    el.style.background = "#dcfce7";
+  } catch (e) { el.style.background = "#fee2e2"; alert("No se guardó la entrega proyectada: " + (e.message || e)); }
+}
+async function ocLogConteosCargar(x) {
+  if (!_oc || !x || _oc._logKey === _oc.openKey) return;
+  _oc._logKey = _oc.openKey;
+  try {
+    const rs = await _ocRpc("gv_oc_log_conteos", { p_ids: x.rows.map(function (r) { return r.id; }) });
+    _oc.logN = {}; (rs || []).forEach(function (a) { _oc.logN[a.oc_id] = a.n; });
+    if (_oc.view === "detail") ocRender();
+  } catch (_e) { /* sin conteo: el 📓 igual abre */ }
+}
+async function ocLogAbrir(id) {
+  if (!_oc) return;
+  const r = (_oc.rows || []).find(function (a) { return a.id === id; }); if (!r) return;
+  let ov = document.getElementById("ocLogOv");
+  if (!ov) { ov = document.createElement("div"); ov.id = "ocLogOv"; ov.setAttribute("style", "position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px"); ov.onclick = function (e) { if (e.target === ov) ov.remove(); }; document.body.appendChild(ov); }
+  ov.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:520px;width:100%;max-height:85vh;display:flex;flex-direction:column;padding:14px;box-sizing:border-box">' +
+    '<div style="display:flex;align-items:center;gap:8px"><b style="font-size:16px;flex:1">📓 ' + escapeHtml(codCanon(r.codigo) || "") + ' · ' + escapeHtml(r.proveedor || "") + ' · OC ' + escapeHtml(r.fecha || "") + '</b>' +
+    '<button onclick="document.getElementById(\'ocLogOv\').remove()" style="width:auto;margin:0;padding:2px 10px;font-size:16px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer">✕</button></div>' +
+    '<div id="ocLogLista" style="overflow:auto;flex:1;margin:10px 0;font-size:14px;min-height:60px">Cargando…</div>' +
+    '<textarea id="ocLogTxt" rows="3" placeholder="Ej.: el tallerista me dijo que le faltaban tuercas y arandelas" style="width:100%;box-sizing:border-box;font-size:14px;padding:6px;border:1px solid #cbd5e1;border-radius:8px"></textarea>' +
+    '<button onclick="ocLogAgregar(' + id + ')" style="width:auto;margin:8px 0 0;align-self:flex-end;padding:6px 14px;font-size:14px;border:0;background:#2563eb;color:#fff;border-radius:8px;cursor:pointer">Agregar</button></div>';
+  ocLogPintar(id);
+}
+async function ocLogPintar(id) {
+  const box = document.getElementById("ocLogLista"); if (!box) return;
+  try {
+    const rs = await _ocRpc("gv_oc_log_leer", { p_oc_id: id });
+    if (!rs || !rs.length) { box.innerHTML = '<span style="color:#64748b">Sin comentarios todavía.</span>'; return; }
+    box.innerHTML = rs.map(function (c) {
+      const f = new Date(c.created_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+      return '<div style="border-bottom:1px solid #e2e8f0;padding:6px 0"><div style="font-size:12px;color:#64748b">' + escapeHtml(f) + ' · ' + escapeHtml(c.autor || "?") + '</div><div style="white-space:pre-wrap">' + escapeHtml(c.texto || "") + '</div></div>';
+    }).join("");
+    box.scrollTop = box.scrollHeight;
+  } catch (e) { box.innerHTML = '<span style="color:#b91c1c">No se pudo leer el log: ' + escapeHtml(e.message || String(e)) + '</span>'; }
+}
+async function ocLogAgregar(id) {
+  const t = document.getElementById("ocLogTxt"); if (!t) return;
+  const txt = String(t.value || "").trim(); if (!txt) return;
+  try {
+    await _ocRpc("gv_oc_log_agregar", { p_oc_id: id, p_texto: txt });
+    t.value = "";
+    if (_oc) { if (!_oc.logN) _oc.logN = {}; _oc.logN[id] = (_oc.logN[id] || 0) + 1; }
+    await ocLogPintar(id);
+    if (_oc && _oc.view === "detail") ocRender();
+  } catch (e) { alert("No se guardó el comentario: " + (e.message || e)); }
 }
 function ocDetMeses(v) { if (!_oc) return; _oc.detMeses = Math.max(0.5, parseFloat(v) || 6); }
 function ocDetFill(id) {
@@ -61265,7 +61342,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.2"></script>
+<script src="importacion.js?v=28.03"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64114,10 +64191,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.2"></script>
-<script src="hotsale.js?v=28.2"></script>
-<script src="estadisticas.js?v=28.2"></script>
-<script src="ads.js?v=28.2"></script>
+<script src="cobranzas.js?v=28.03"></script>
+<script src="hotsale.js?v=28.03"></script>
+<script src="estadisticas.js?v=28.03"></script>
+<script src="ads.js?v=28.03"></script>
 
 </body>
 </html>

@@ -8098,6 +8098,17 @@ abre un **hilo** de comentarios sobre el estado de esa recepción. Badge azul co
 - **Chequeo:** `node tests/rcp-comentarios.cjs` (candado estático: las funciones de `recepcion.js` son de módulo, no
   viven en `window`).
 
+## ⚠ REGLA (Luis, 2026-10-07, v28.02): en el detalle de una OC — ENTREGA PROY. y 📓 log por línea
+
+- Al lado de «Pedido» (Compras → OC de un tallerista) va **Entrega proy.**: lo que el tallerista confirma o se estima que entrega
+  en la vigencia de la OC (1 semana). Lo carga un supervisor; queda en `Ordenes_Compra.gv_entrega_proy` (+ `_por` / `_at`) por
+  `gv_oc_entrega_proy_guardar`. El **📓** abre el log de esa línea (`GV_OC_Log`, append-only, fecha/hora y autor; RPC
+  `gv_oc_log_agregar` / `_leer` / `_conteos`).
+- **Sólo pantalla**: no va a impresos, WhatsApp ni Excel (Luis: *"de momento que se vea ahí el dato"*).
+- El «Pedido» editable de esa pantalla es a propósito (v11.82: ajustar la cantidad de ESTA OC o «⛽ llenar góndola»; se guarda
+  con «💾 Guardar cantidades»).
+- `sql/gv_oc_entrega_proy_log_v2802.sql` (v28.03), `tests/oc-entrega-proy.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-06, v27.21): ADS — ALERTAS DAMIÁN STOCK (`ads.js`)
 
 Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **violeta** (`#adsBadge`, `gv_ads_badge()`).
