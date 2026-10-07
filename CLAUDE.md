@@ -8105,8 +8105,7 @@ abre un **hilo** de comentarios sobre el estado de esa recepción. Badge azul co
   `gv_oc_entrega_proy_guardar`. El **📓** abre el log de esa línea (`GV_OC_Log`, append-only, fecha/hora y autor; RPC
   `gv_oc_log_agregar` / `_leer` / `_conteos`).
 - **Sólo pantalla**: no va a impresos, WhatsApp ni Excel (Luis: *"de momento que se vea ahí el dato"*).
-- El «Pedido» editable de esa pantalla es a propósito (v11.82: ajustar la cantidad de ESTA OC o «⛽ llenar góndola»; se guarda
-  con «💾 Guardar cantidades»).
+- **v28.22 (Luis): el detalle de la OC ya NO edita.** Pedido es texto, se fueron el ⛽ de cada línea, la barra verde «Llenar góndola» (con «Guardar cantidades»), la línea de totales y la nota de Recibido; el 📓 va al tamaño del ⛽ (`oc-fillbtn`). Las funciones `ocDet*` quedan sin puerta.
 - `sql/gv_oc_entrega_proy_log_v2802.sql` (v28.21; salió como v28.03, número que quedaba por debajo del 28.2 de otra sesión), `tests/oc-entrega-proy.cjs`.
 
 ## ⚠ REGLA (Luis, 2026-10-06, v27.21): ADS — ALERTAS DAMIÁN STOCK (`ads.js`)

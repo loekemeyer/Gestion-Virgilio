@@ -12,4 +12,8 @@ const xl = s.slice(s.indexOf("function ocDescargarExcelOC"), s.indexOf("function
 ok(!/gv_entrega_proy|_ocEntProyCell/.test(xl), "no va al Excel");
 ["gv_oc_entrega_proy_guardar", "gv_oc_log_agregar", "gv_oc_log_leer", "gv_oc_log_conteos"].forEach(f => ok(s.includes('"' + f + '"'), "RPC " + f));
 ok(/catch \(e\) \{ box\.innerHTML = '<span style="color:#b91c1c">No se pudo leer el log/.test(s), "lectura rota lo dice");
+ok(!det.includes("ocDetEditCant(") && !det.includes("ocDetSaveBtn") && !det.includes("Llenar góndola:"), "v28.22: Pedido no editable y sin la barra Llenar góndola");
+ok(!det.includes("fillBtn + '</td>'") && !det.includes('<th class="num">Pedido</th><th></th>'), "v28.22: sin el botón ⛽ al lado de Pedido");
+ok(!det.includes('class="oc-meta"') && !det.includes('class="oc-note" style="margin-top:0'), "v28.22: sin la línea de totales ni la nota de Recibido");
+ok(/class="oc-fillbtn oc-logbtn"/.test(s), "v28.22: el 📓 tiene el tamaño del ⛽ (oc-fillbtn)");
 process.exit(bad ? 1 : 0);

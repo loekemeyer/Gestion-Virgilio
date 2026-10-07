@@ -6331,7 +6331,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.21"></script>
+<script type="module" src="recepcion.js?v=28.22"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10610,7 +10610,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.21";
+const APP_VERSION = "v28.22";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17420,19 +17420,7 @@ function ocBodyDetail() {
   h += '<button class="oc-btn" onclick="ocWhatsappTallerista()" title="Copia la OC como imagen y abre WhatsApp del tallerista">📲 WhatsApp</button>';
   h += '<button class="oc-btn" onclick="ocDescargarExcelOC(_oc.openKey)" title="Excel de este tallerista: por código, pedido, entregado (cajas y %) y falta">⬇ Excel</button>';
   h += '</div>';
-  // v11.82 — ajuste "llenar góndola a N meses" para ESTA OC (no toca la config permanente).
-  // objetivo = MENOR(capacidad de góndola, proyección × meses); cantidad = max(0, objetivo + pedidos − stock).
-  const _detCh = _ocDetChangedN();
-  ocLogConteosCargar(x);
-  h += '<div class="oc-tools" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:8px 10px">' +
-    '<span style="font-size:13px;font-weight:700;color:#065f46">⛽ Llenar góndola:</span>' +
-    '<span style="font-size:13px">hasta</span> <input id="ocDetMeses" class="oc-inp" style="width:64px" type="number" min="0.5" step="0.5" value="' + (Number(_oc.detMeses) || 6) + '" oninput="ocDetMeses(this.value)"> <span style="font-size:13px">meses de Estadística Madre</span>' +
-    '<button class="oc-btn" onclick="ocDetFillAll()" title="Recalcula la cantidad de TODAS las líneas con góndola a MENOR(capacidad, proy×meses) − stock">⛽ Aplicar a todas</button>' +
-    '<button id="ocDetSaveBtn" class="oc-btn ok" onclick="ocDetSave()"' + (_detCh ? '' : ' style="display:none"') + '>💾 Guardar cantidades' + (_detCh ? ' (' + _detCh + ')' : '') + '</button>' +
-    '<span style="flex-basis:100%;font-size:11.5px;color:#475569">Cambia solo esta OC. Objetivo = MENOR(capacidad de góndola, Estadística Madre × meses). Editá la cantidad a mano o usá ⛽ por línea.</span>' +
-    '</div>';
-  h += '<div class="oc-meta">Proveedor <b>' + escapeHtml(x.proveedor || "—") + '</b> · Fecha <b>' + escapeHtml(x.fecha || "—") + '</b> · Rubro <b>' + escapeHtml(x.rubro || "—") + '</b> · Pedido <b>' + st.ped + '</b> · Recibido <b class="oc-ok">' + st.rec + '</b> · Falta <b class="' + (st.falta > 0 ? "oc-falt" : "oc-ok") + '">' + (st.falta > 0 ? st.falta : 0) + '</b> · Recepción <b style="color:' + _ocPctCol(_ocPct(st.rec, st.ped)) + '">' + _ocPct(st.rec, st.ped) + '%</b></div>';
-  h += '<div class="oc-note" style="margin-top:0;margin-bottom:8px"><b>Recibido</b> = lo que registró la Recepción de Mercadería para este tallerista y código, <b>dentro del período de esta OC</b> (no acumula entregas anteriores ni de otra OC). Se alimenta solo.</div>';
+  // v28.22 (Luis): sin la barra «Llenar góndola», sin la línea de totales y sin la nota de Recibido.
   // v11.52 — 3 columnas SOLO-PANTALLA (no van a los impresos): Stock · Máximo · Proyección
   // AL MOMENTO DE GENERAR LA OC (snapshots oc_stock/oc_max/oc_proy guardados en la fila,
   // igual criterio que el impreso). Así el "Pedido" y el contexto son de la MISMA foto.
@@ -17451,7 +17439,7 @@ function ocBodyDetail() {
     if (_pm) { const v = _pm[_ocgNorm(r.codigo)]; if (v != null && v > 0) return '<td class="num oc-xtra" style="opacity:.72;font-style:italic;" title="Estadística Madre de HOY (esta OC es previa a guardar la Estadística Madre al generarla)">~' + Math.round(v) + '</td>'; }
     return '<td class="num oc-xtra">' + (_pm ? '—' : '…') + '</td>';
   };
-  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th></th><th class="num oc-entp" title="Lo que el tallerista confirma o se estima que va a entregar en la vigencia de esta OC (1 semana). Sólo pantalla: no va a impresos ni Excel.">Entrega<br>proy.</th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Stock al generar la OC">Stock</th><th class="num oc-xtra" title="Máximo al generar la OC">Máximo</th><th class="num oc-xtra" title="Capacidad de góndola (Capacidad_Sector, hoy)">Cap gónd.</th><th class="num oc-xtra" title="Pedidos pendientes (demanda) al generar la OC">Pedidos</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = Estadística Madre de hoy)">Estadística Madre</th></tr></thead><tbody>';
+  h += '<div class="oc-tblwrap"><table class="oc-tbl oc-tbl-det"><thead><tr><th>Código</th><th class="oc-desc">Descripción</th><th class="num">Pedido</th><th class="num oc-entp" title="Lo que el tallerista confirma o se estima que va a entregar en la vigencia de esta OC (1 semana). Sólo pantalla: no va a impresos ni Excel.">Entrega<br>proy.</th><th class="num">Recibido</th><th class="num">Falta</th><th class="num oc-xtra oc-xtra-first" title="Stock al generar la OC">Stock</th><th class="num oc-xtra" title="Máximo al generar la OC">Máximo</th><th class="num oc-xtra" title="Capacidad de góndola (Capacidad_Sector, hoy)">Cap gónd.</th><th class="num oc-xtra" title="Pedidos pendientes (demanda) al generar la OC">Pedidos</th><th class="num oc-xtra" title="Al generar la OC (viejas: ~ = Estadística Madre de hoy)">Estadística Madre</th></tr></thead><tbody>';
   x.rows.forEach(function (r) {
     const ped = _ocDetCantEff(r), rec = ocRecEff(r), falt = ped - rec;
     const ch = (_oc.detEdit && _oc.detEdit[r.id] != null && Number(_oc.detEdit[r.id]) !== (Number(r.cantidad) || 0));
@@ -17461,8 +17449,7 @@ function ocBodyDetail() {
     const fillBtn = (sug == null) ? '<span title="No aplica: sin capacidad de góndola cargada o sin Estadística Madre" style="opacity:.4">⛽</span>'
       : '<button class="oc-fillbtn" title="Llenar a ' + (Number(_oc.detMeses) || 6) + ' meses: cantidad = MENOR(cap ' + cap + ', proy×meses) − stock = ' + sug + '" onclick="ocDetFill(' + r.id + ')">⛽</button>';
     h += '<tr><td class="oc-cod">' + escapeHtml(codCanon(r.codigo) || "—") + '</td><td class="oc-desc">' + escapeHtml(artNombre(r.codigo, r.descripcion) || "") + '</td>' +
-      '<td class="num"><input class="oc-rinp" style="width:64px' + (ch ? ';background:#fef3c7' : '') + '" type="number" min="0" inputmode="numeric" value="' + ped + '" oninput="ocDetEditCant(' + r.id + ',this.value)"></td>' +
-      '<td style="text-align:center;padding:0 2px">' + fillBtn + '</td>' +
+      '<td class="num" style="font-weight:700">' + ped + '</td>' +
       _ocEntProyCell(r) +
       '<td class="num ' + (rec > 0 ? "oc-ok" : "") + '">' + rec + '</td><td class="num ' + (falt > 0 ? "oc-falt" : "oc-ok") + '">' + (falt !== 0 ? falt : "0") + '</td>' +
       _gv(r, "oc_stock", " oc-xtra-first") + _gv(r, "oc_max", "") +
@@ -17521,7 +17508,7 @@ function _ocEntProyCell(r) {
   const tt = r.gv_entrega_proy_at ? ("Cargado por " + (r.gv_entrega_proy_por || "?") + " el " + new Date(r.gv_entrega_proy_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })) : "Sin dato";
   const nl = (_oc && _oc.logN && _oc.logN[r.id]) || 0;
   return '<td class="num oc-entp" style="white-space:nowrap"><input class="oc-rinp" style="width:58px" type="number" min="0" inputmode="numeric" title="' + escapeHtml(tt) + '" value="' + v + '" onchange="ocEntProyGuardar(' + r.id + ',this)">' +
-    '<button class="oc-logbtn" title="Log de esta línea" onclick="ocLogAbrir(' + r.id + ')" style="margin-left:3px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:1px 4px;font-size:13px;cursor:pointer;position:relative">📓' +
+    '<button class="oc-fillbtn oc-logbtn" title="Log de esta línea" onclick="ocLogAbrir(' + r.id + ')" style="margin:0 0 0 3px;position:relative">📓' +
     (nl ? '<span style="position:absolute;top:-6px;right:-6px;background:#2563eb;color:#fff;border-radius:9px;font-size:10px;padding:0 4px;line-height:15px">' + nl + '</span>' : '') + '</button></td>';
 }
 async function _ocRpc(fn, args) {
@@ -61342,7 +61329,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.21"></script>
+<script src="importacion.js?v=28.22"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64191,10 +64178,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.21"></script>
-<script src="hotsale.js?v=28.21"></script>
-<script src="estadisticas.js?v=28.21"></script>
-<script src="ads.js?v=28.21"></script>
+<script src="cobranzas.js?v=28.22"></script>
+<script src="hotsale.js?v=28.22"></script>
+<script src="estadisticas.js?v=28.22"></script>
+<script src="ads.js?v=28.22"></script>
 
 </body>
 </html>
