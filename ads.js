@@ -318,8 +318,8 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
          .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
            + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="' + (cfg.bordeRot ? 1 : 0) + '" xfId="0" applyFont="1"' + (cfg.bordeRot ? ' applyBorder="1"' : '') + ' applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
            + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"' + W + '/></xf>'
-           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1"' + (W ? ' applyAlignment="1"><alignment' + W + '/></xf>' : '/>')
-           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>');
+           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1"' + ' applyAlignment="1"><alignment vertical="center"' + W + '/></xf>'   // v28.00 (Luis): TODO centrado en vertical, como su Excel
+           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf></cellXfs>');
   // v27.91 (Luis): el rótulo lleva el borde de abajo grueso de su Excel
   if (cfg.bordeRot) st = st.replace(/<borders[\s\S]*?<\/borders>/, '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="medium"><color indexed="64"/></bottom><diagonal/></border></borders>');
   cfb.FileIndex[iSt].content = enc.encode(st);

@@ -167,6 +167,8 @@ const STOCK = [
     ctx._adsPctCod = _sv;
     if (c609.estCaj.length !== 1 || !/^Pettofrezza: \d+$/.test(c609.estCaj[0])) fallas.push("(o) 609 Excel: " + JSON.stringify(c609.estCaj));
     if (c609.estDist.length !== 1 || !/^Pettofrezza/.test(c609.estDist[0])) fallas.push("(n) 609: sólo estima el tallerista de la OC actual: " + JSON.stringify(c609.estDist)); }
+  { const _s2 = require("fs").readFileSync(path.join(__dirname, "..", "ads.js"), "utf8");
+    if ((_s2.match(/vertical="center"/g) || []).length < 4) fallas.push("(p) Excel: el texto a la izquierda va centrado en vertical (v28.00)"); }
   if (JSON.stringify(cEst.estDist) !== JSON.stringify(["A 83 % (50)", "B 17 % (10)"])) fallas.push("(k) entrega estimada por tallerista: " + JSON.stringify(cEst.estDist));
     if (est < 57 || est > 61) fallas.push("(j) entrega estimada (A 50 + B topado en 10 = 60): " + est);
     ctx._adsPctCod = () => [{ proveedor: "Garcia", pedido: 140 }, { proveedor: "Poly", pedido: 107 }];
