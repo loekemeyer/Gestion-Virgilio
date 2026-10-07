@@ -5539,6 +5539,7 @@ table.fac-np-tbl.nc-tbl th{ overflow: hidden; text-overflow: ellipsis; }
    v19.20 — se fue `.fac-tick-web`, la etiqueta «⬇ Excel» de la columna Acción: era un cartel que
    no hacía nada y repetía lo que dice la casilla de la izquierda. */
 .fac-xls-no{ color:#94a3b8; font-weight:700; }
+.fac-xls-lock{ font-size:16px; cursor:not-allowed; opacity:.75; }
 .fac-btn-tick{
   background: #16a34a; color: #fff; border: none; border-radius: 4px;
   padding: 1px 10px; font-size: 13px; font-weight: bold; cursor: pointer;
@@ -6331,7 +6332,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.30"></script>
+<script type="module" src="recepcion.js?v=28.31"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10610,7 +10611,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.30";
+const APP_VERSION = "v28.31";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -58932,6 +58933,12 @@ async function facSinTandaCargar() {
   })();
   return _facSinTandaInflight;
 }
+/* v28.31 (07/10) — NP armada que va en 0 cajas (todo faltó): no se puede tildar para el Excel.
+   Sólo con el dato de Entregas leído y la NP ahí (una lectura rota no la bloquea). */
+function facNpEnCero(np){
+  const k = String(np || "").trim().replace(/\.0+$/, "");
+  return !!(_facCajasTs && _facCajas && _facCajas.has(k) && !(Number(_facCajas.get(k)) > 0));
+}
 function facEstaArmada(npNorm){
   return (_facCajas && _facCajas.has(npNorm)) || (_facArmEv && _facArmEv.has(npNorm));
 }
@@ -59958,7 +59965,9 @@ function facRender(tandas){
     const _npTip = 'Tanda ' + String(f.tanda || '—') + ' · Salida ' + String(f.fechaSalida || '—');
     return _cab + `
       <tr data-fac-np="${escapeHtml(f.np)}" data-fac-dia-np="${escapeHtml(_dk)}"${_facDiaColap.has(_dk) ? ' style="display:none"' : ''} class="${altFlag ? 'fac-tanda-alt' : ''}${_ft ? ' fac-en-progreso' : (_ff ? ' fac-has-falta' : '')}">
-        <td class="center fac-xls-cell">${facNpEsWeb(f.np)
+        <td class="center fac-xls-cell">${(facNpEsWeb(f.np) && facNpEnCero(f.np))
+          ? (_facXlsSel.delete(String(f.np)), `<span class="fac-xls-lock" title="Va en 0 cajas (todo faltó): no entra al Excel ni se factura. Se cancela con ✕ Cancelar.">🔒</span>`)
+          : facNpEsWeb(f.np)
           ? `<input type="checkbox" class="fac-xls-chk" data-np="${escapeHtml(f.np)}" data-dia="${escapeHtml(_dk)}"${_facXlsSel.has(String(f.np)) ? ' checked' : ''} onchange="facXlsToggle(this.getAttribute('data-np'))" title="NP de la página: marcá y bajá el Excel ISIS para facturarla">`
           : `<span class="fac-xls-no" title="NP de ISIS: se factura con el tilde ✓, no va al Excel">—</span>`}</td>
         <td class="fac-np-cell" title="${escapeHtml(_npTip)}">${escapeHtml(f.np)}${_npSrcChip(f.np)}${facModChip(f.np)}${f._sinTanda ? `<span class="fac-sintanda" title="${escapeHtml(f._sinTanda)} — se armó igual (tanda ${escapeHtml(String(f.tanda))}), por eso aparece acá">sin tanda</span>` : ""}</td>
@@ -61345,7 +61354,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.30"></script>
+<script src="importacion.js?v=28.31"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64194,10 +64203,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.30"></script>
-<script src="hotsale.js?v=28.30"></script>
-<script src="estadisticas.js?v=28.30"></script>
-<script src="ads.js?v=28.30"></script>
+<script src="cobranzas.js?v=28.31"></script>
+<script src="hotsale.js?v=28.31"></script>
+<script src="estadisticas.js?v=28.31"></script>
+<script src="ads.js?v=28.31"></script>
 
 </body>
 </html>
