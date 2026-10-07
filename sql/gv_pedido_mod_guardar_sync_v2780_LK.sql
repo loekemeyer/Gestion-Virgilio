@@ -1,0 +1,11 @@
+-- v27.80 (Luis 07/10) — proyecto LK (kwkclwhmoygunqmlegrg). APLICADO (parche sobre pg_get_functiondef,
+-- idempotente por el marcador v27.80). Al guardar en Modificar Pedidos:
+--  * gv_pedido_mod_guardar: pone al día virgilio.lk_pedidos_match del pedido en el acto (el cron 24
+--    no ve cambios de ítems —su huella mira count/max/status— y el 70 de pedidos viejos corre 1 vez por hora).
+--  * gv_pedido_mod_guardar_chef: además actualiza chef_orders_cache (el feed del armado lee la copia
+--    local; sin esto el cambio esperaba hasta 10 min al cron 48).
+-- Bloques insertados (en try/catch: nunca frenan el guardado):
+--   update virgilio.lk_pedidos_match m set items_string = v.items_string, match_string = v.match_string
+--     from public.v_pedidos_match[_chef] v where v.order_id = p_order_id and m.empresa = '<emp>' and m.order_id = p_order_id ...;
+--   (chef) update public.chef_orders_cache set sheets_payload = v_pay where id = p_order_id;
+-- Rollback: quitar esos bloques del cuerpo vivo (buscar 'v27.80').
