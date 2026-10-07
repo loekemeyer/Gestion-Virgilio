@@ -3393,7 +3393,11 @@ function pendFmtDemora(tsMs) {
   let hh = Math.round((Date.now() - tsMs) / 1800000);   // medias horas
   if (hh < 0) hh = 0;
   const h = hh / 2;
-  return (Number.isInteger(h) ? String(h) : (Math.floor(h) + ",5")) + "hs";
+  if (h < 24) return (Number.isInteger(h) ? String(h) : (Math.floor(h) + ",5")) + "hs";
+  // Thomas, 07/10/2026: desde 1 día va en días y horas ("6d 22hs"), no en "165,5hs".
+  let d = Math.floor(h / 24), r = Math.round(h - d * 24);
+  if (r === 24) { d++; r = 0; }
+  return d + "d" + (r ? " " + r + "hs" : "");
 }
 function pendTickElapsed() {
   if (opState.step !== "pend") { if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; } return; }

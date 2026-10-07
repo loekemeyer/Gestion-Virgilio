@@ -1185,4 +1185,6 @@ echo "== rcp-comentarios (v27.12: botón de comentarios por recepción, hilo app
 node tests/rcp-comentarios.cjs
 echo "== cc-sombra-no-mostrar (v27.89: la cuenta corriente se valida en modo sombra y no se muestra al cliente) =="
 node tests/cc-sombra-no-mostrar.cjs
+echo "== pend-demora-dias (Thomas, 07/10: la demora de Pendientes pasa a '6d 22hs' desde las 24 hs, no '165,5hs') =="
+node tests/pend-demora-dias.cjs
 _resumen
