@@ -91,7 +91,7 @@ const STOCK = [
     await window.adsExcelStock(10); await window.adsExcelStock(30); await window.adsExcelTall();
     out.xl = bajados.map((x) => ({ n: x.nombre.replace(/_\d{8}\.xlsx$/, ""), cab: x.filas[0], f1: x.filas[1], len: x.filas.length,
       anchos: [...x.xml.matchAll(/<col [^>]*width="([\d.]+)"/g)].map((m) => Number(m[1])),
-      alto1: /<row r="1"[^>]* ht="45"/.test(x.xml), congela: /state="frozen"/.test(x.xml), ajusta: /fitToWidth="1"/.test(x.xml),
+      alto1: /<row r="1"[^>]* ht="72"/.test(x.xml), congela: /state="frozen"/.test(x.xml), ajusta: /fitToWidth="1"/.test(x.xml),
       a2: (x.xml.match(/<c r="A2"( s="\d+")?/) || [])[1] || "", b2: (x.xml.match(/<c r="B2"( s="\d+")?/) || [])[1] || "" }));
     window.adsHoriz(30); await espera(30);
     out.stock30 = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")].map((f) => f.cells[0].textContent);
@@ -134,7 +134,7 @@ const STOCK = [
   if (!xt || !/^ADS_talleristas_/.test(xt.n) || xt.len !== 4 ||
       JSON.stringify(xt.cab) !== JSON.stringify(["Tallerista","Cód.","Descripción","OC evaluadas","Pedido","Recibio Virgilio","%","Fecha última OC","Pedido última OC","Recibido última OC"])) fallas.push("(f) Excel talleristas: " + JSON.stringify(xt && xt.cab));
   // v27.40: el formato de Luis (anchos chicos, rótulo de 45, congelado, entra a lo ancho; texto a la izq., números centrados)
-  if (!xt || JSON.stringify(xt.anchos.slice(1)) !== JSON.stringify([6.57, 23, 5.14, 5.29, 5.86, 4, 6.57, 5.86, 6]) || xt.anchos[0] < 11.14 || xt.anchos[0] > 16 ||
+  if (!xt || JSON.stringify(xt.anchos) !== JSON.stringify([12.71, 12.43, 23, 7.43, 7.57, 7.57, 8.43, 8.29, 7.57, 8.29]) ||
       !xt.alto1 || !xt.congela || !xt.ajusta || xt.a2 !== "" || xt.b2 !== ' s="2"') fallas.push("(g) formato Excel talleristas: " + JSON.stringify(xt && [xt.anchos, xt.alto1, xt.congela, xt.ajusta, xt.a2, xt.b2]));
   // v27.87 (Luis): los anchos y rótulos son los de su Excel «ADS_stock_10d_20261007_1»
   if (!x10 || JSON.stringify(x10.anchos) !== JSON.stringify([5.86, 14.86, 6, 7.14, 6.29, 6, 5.57, 8.71, 6.29, 5.29, 6.29, 21, 18.86]) || x10.cab[3] !== "Comprom 10 d" || x10.cab[4] !== "E M 10 d" || x10.cab[12] !== "Proporción") fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
