@@ -8234,3 +8234,13 @@ puerta). Arriba del iframe de la Est. Madre (Stock y Compras) va la barra `#emBa
   (026 sep/26 = 165 cajas − 3 u de la NC a Coto + 36 u de 026L de Chef = 5.973 u; sale del parser de ISIS), y un código
   vendido que no tiene fila en la planilla (599E / 599EZ en Costos LK) va **al fondo en naranja**, como está.
 - Una RPC vacía o con error no baja nada. `sql/gv_est_plantilla_v2736.sql`, `tests/est-madre-mes.cjs`.
+
+## ⚠ REGLA (Luis, 2026-10-07, v28.34, D6): AVISO «MISMO CLIENTE, MISMO LUGAR, DÍAS DISTINTOS» en Programación y Resumen
+
+No revive la regla derogada «mismo cliente, mismo día» (v21.87): la clave es **(empresa, cod, dirección)**
+(`gv_dir_key`), no el cliente — un cliente con sucursales en dos zonas son dos viajes y no avisa.
+Vista **`gv_ppp_mismo_lugar_dos_dias`** (web + ISIS, de hoy en adelante; sin súper, retira/expo ni lo
+salido por CCN/CRN; `security_invoker`, centinela 356). Front: cartel naranja arriba de Programación y del
+Resumen (`_pppMismoLugarNota`) y chip **📍 mismo lugar otro día** en la NP (`_pppMismoLugarChip`). Es AVISO:
+no mueve nada. Lectura rota → lo dice. Al 07/10: 0 casos (Matiz es súper). `sql/gv_ppp_mismo_lugar_dos_dias_v2834.sql`,
+`tests/ppp-mismo-lugar.cjs`.
