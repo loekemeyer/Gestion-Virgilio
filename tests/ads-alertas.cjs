@@ -160,6 +160,12 @@ const STOCK = [
     if (!/_adsEstSinPct\(c\.estDist\)\.join\("\\n"\), c\.dist\.join\("\\n"\)/.test(_s) || !/izqSin: \[1\]/.test(_s) || !/bordeRot: true, escala: 74/.test(_s)) fallas.push("(l) formato stock v27.91"); }
   { const _m = src.match(/function _adsEstSinPct[\s\S]*?\n\}/); const _f = _m && new Function(_m[0] + "; return _adsEstSinPct;")();
     if (!_f || JSON.stringify(_f(["A 83 % (50)", "Lucho (350)"])) !== JSON.stringify(["50", "350"])) fallas.push("(m) Excel: entrega estimada sólo cajas"); }
+  { const _sv = ctx._adsPctCod; ctx._adsPctCod = function () { return [
+      { proveedor: "German", pedido: 20, entregado: 10, desde: "2026-09-23", ult_fecha: "2026-09-23" },
+      { proveedor: "Pettofrezza", pedido: 66, entregado: 10, desde: "2026-09-23", ult_fecha: "2026-10-07" }]; };
+    const c609 = ctx._adsStockCalc({ cod: "609", disponible: 0, proy_mes: 30, comp10: 5, saldo10: -10 }, 10);
+    ctx._adsPctCod = _sv;
+    if (c609.estDist.length !== 1 || !/^Pettofrezza/.test(c609.estDist[0])) fallas.push("(n) 609: sólo estima el tallerista de la OC actual: " + JSON.stringify(c609.estDist)); }
   if (JSON.stringify(cEst.estDist) !== JSON.stringify(["A 83 % (50)", "B 17 % (10)"])) fallas.push("(k) entrega estimada por tallerista: " + JSON.stringify(cEst.estDist));
     if (est < 57 || est > 61) fallas.push("(j) entrega estimada (A 50 + B topado en 10 = 60): " + est);
     ctx._adsPctCod = () => [{ proveedor: "Garcia", pedido: 140 }, { proveedor: "Poly", pedido: 107 }];

@@ -280,7 +280,11 @@ function _adsStockCalc(r, H) {
   // v27.81 (Luis): entrega estimada a H días, proporcional a cómo viene entregando cada tallerista:
   // ritmo = recibido ÷ días desde su 1.ª OC del período; estimado = ritmo × H, topado en lo que le falta.
   var hoy = Date.now(), estH = 0, estDet = [], estArr = [];
+  // v27.95 (Luis, 07/10, caso 609): la OC de la semana REEMPLAZA a la anterior, así que sólo se estima entrega
+  // de los talleristas que están en la OC ACTUAL del código (la de fecha más nueva). El que salió de la OC no entrega más.
+  var ultOc = pc.reduce(function (m, x) { var f = x.ult_fecha ? String(x.ult_fecha).slice(0, 10) : ""; return f > m ? f : m; }, "");
   pc.forEach(function (x) {
+    if (ultOc && String(x.ult_fecha || "").slice(0, 10) !== ultOc) return;
     var ped = Number(x.pedido) || 0, ent = Number(x.entregado) || 0, falta = Math.max(0, ped - ent);
     var t0 = x.desde ? Date.parse(String(x.desde).slice(0, 10) + "T12:00:00-03:00") : NaN;
     var dias = isFinite(t0) ? Math.max(1, (hoy - t0) / 864e5) : null;
