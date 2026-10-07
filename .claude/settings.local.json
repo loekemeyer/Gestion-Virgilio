@@ -139,7 +139,8 @@
       "Bash(sed -i 's/\\\\*\\\\*v27.35: el formato es el del Excel de Luis\\\\*\\\\*/**v27.40: el formato es el del Excel de Luis**/' CLAUDE.md)",
       "Bash(sed -i 's/   v27.35 \\(Luis\\): el formato lo dio Luis/   v27.40 \\(Luis\\): el formato lo dio Luis/; s/  \\\\/\\\\/ v27.35: el formato de Luis/  \\\\/\\\\/ v27.40: el formato de Luis/' ads.js tests/ads-alertas.cjs)",
       "Bash(sed -i *)",
-      "Bash(cp ads.js *)"
+      "Bash(cp ads.js *)",
+      "Read(//home/user/**)"
     ]
   }
 }
