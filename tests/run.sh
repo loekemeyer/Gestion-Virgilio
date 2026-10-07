@@ -670,6 +670,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== apr-cuarentena (v14.81: submódulo Cuarentena — pedidos retenidos por deuda/suspendido/crédito, con badge, fuera del auto) =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/apr-cuarentena.cjs
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/cuar-sacar-armado.cjs
 node tests/cuar-yaprog-fecha-pedido.cjs
 
 echo "== apr-contenido-np (v17.57: el contenido de la NP —códigos, cajas y unidades— con la flechita, en Pedidos a programar y en Cuarentena) =="

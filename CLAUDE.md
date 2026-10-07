@@ -8301,6 +8301,26 @@ picking, motivo con monto) y **sólo 3 botones: ✅ Aprobar · 🐊 Sacarlo a cu
 pantano (`.apr-col-pantano`, la tabla sobre fondo claro) y Clientes nuevos rosa bebé con textura (`.apr-col-clin`). Sólo visual.
 `tests/apr-cuarentena.cjs`, `tests/cuar-yaprog-fecha-pedido.cjs`, `tests/pipe-clientes-nuevos.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-07, v28.48): «🐊 SACARLO A CUARENTENA» mira la TANDA ENTERA — armado viaja sin día, en proceso no se puede
+
+**Luis:** *"Esperemos a que la tanda entera esté armada. Absolutamente nada en proceso"* · *"que no se imprima papel de
+cuarentena ni nada"* · *"si no tenía nada armado que se programe automáticamente … si estaba armado, que se quede y salte un
+cartel que diga que se tiene que revisar y asignar manualmente"*.
+
+| la tanda (entera, `gv_ppp_estado_grupo`) | qué hace `gv_cuarentena_devolver` (NP web) |
+|---|---|
+| **en proceso** (pickeo o armado empezado sin TAP) | **no se puede**: `EN_PROCESO:` y el botón queda deshabilitado |
+| **sin empezar** | como antes: `gv_ppp_web_desprogramar` (pierde tanda y día) |
+| **armada o facturada** | todas las NP del pedido salen solas a una **tanda nueva SIN DÍA** con su registro (TP/TAP, Entregas, porción de a_facturar), por `gv_ppp_pedido_mover(…, gv_ppp_espera_fecha())`; queda una fila en **`GV_Cuarentena_Armado`** |
+
+- **No se imprime ningún papel.** El aviso dice que hay que separar sus cajas del pallet.
+- Armado sacado → chip ámbar **«📦 armado · <tanda> sin día»** en A Programar y en Cuarentena (`gv_cuarentena_armado_lista`).
+- **Aprobado sin nada armado** → lo programa el armador como siempre. **Aprobado y armado** → NO se programa solo: cartel
+  *«ESTABA ARMADO… asignale el día A MANO»* y se programa soltándolo en un día (`gv_cuarentena_armado_asignar_dia`, conserva
+  el código; sin aprobación frena con `CUARENTENA:`).
+- ⚠ Sacar un armado exige `gv_es_supervisor_o_servicio()` (lo pide `gv_ppp_pedido_mover`).
+- Centinelas 367-369. `sql/gv_cuarentena_sacar_armado_v2845.sql`, `tests/cuar-sacar-armado.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-07, v28.40, D10): cambia la DIRECCIÓN de una NP programada → la ZONA se RECALCULA — y tanda fuera de regla = CARTEL
 
 - Trigger **`gv_ppp_web_zona_recalc`** (BEFORE UPDATE OF direccion, barrio en `PPP_Web_Programacion`): si la NP

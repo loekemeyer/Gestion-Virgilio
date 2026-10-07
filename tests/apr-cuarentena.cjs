@@ -413,7 +413,7 @@ catch (_e) {
 
     cuarYpCuarentena(0); await new Promise((res) => setTimeout(res, 120));
     const dh = (document.getElementById("cuarComModal") || {}).innerHTML || "";
-    out.devModal = /Volver a Cuarentena/.test(dh) && /saca de la programación/.test(dh) && /D71A/.test(dh);
+    out.devModal = /Volver a Cuarentena/.test(dh) && /(tanda|programación)/i.test(dh) && /D71A/.test(dh);   // v28.45: el aviso depende del estado de la tanda
     out.devPideQuien = /¿Quién lo devuelve\?/.test(dh);
     document.getElementById("cuarComTexto").value = "No lo autorizó cobranzas";
     await cuarDevolverConfirmar(); await new Promise((res) => setTimeout(res, 120));
@@ -722,7 +722,7 @@ catch (_e) {
   chk(r.marcarSinAprobar, "sin aprobar: ofrece Aprobar y Cuarentena");
   chk(r.marcarAprobada, "todas las filas ofrecen Aprobar y Cuarentena");
   chk(r.marcarFilas, "las dos filas ofrecen volver a cuarentena");
-  chk(r.devModal, "volver a cuarentena avisa que lo saca de la programación y de qué tanda");
+  chk(r.devModal, "volver a cuarentena avisa de qué tanda sale");
   chk(r.devPideQuien, "volver a cuarentena pide quién");
   chk(r.devSinQuien, "sin elegir quién NO devuelve");
   chk(r.devRpc, "al confirmar llama gv_cuarentena_devolver con NP, clave, comentario y persona");

@@ -1550,6 +1550,8 @@ body:has(#optionsScreen:not(.hidden)) #btnHistDias{ display:none !important; }
 /* v16.03 — el pedido ya se pickeó y se armó en una tanda anterior: rojo, para que nadie lo mande
    a pickear de nuevo. Al programarlo vuelve a ESA tanda, no a una nueva. */
 .apr-chip-hecho{ background:#fee2e2; color:#991b1b; font-weight:800; border:1px solid #fca5a5; }
+.apr-chip-cuararm{ background:#fef3c7; color:#92400e; font-weight:800; border:1px solid #f59e0b; }
+.cuar-m-warn.cuar-m-stop{ background:#fee2e2; border-color:#fca5a5; color:#991b1b; }
 /* v20.56 — salió de una tanda que TODAVÍA no se empezó: al programarlo vuelve ahí. Verde,
    porque no hay nada que mirar; el rojo queda para el que ya no puede volver. */
 .apr-chip-vuelve{ background:#dcfce7; color:#14532d; font-weight:800; border:1px solid #bbf7d0; }
@@ -49508,6 +49510,9 @@ async function aprCargar() {
     _apr.dobles = [];
     const pChef = aprTraerPedidos("chef");
     pChef.catch(function () {});
+    // v28.45 (Luis, 07/10): el pedido que se sacó a cuarentena CON SU ARMADO sigue en su tanda nueva
+    // SIN DÍA. Tiene tanda, pero no está programado: tiene que figurar acá (retenido y con badge).
+    const pArm = aprRpc("gv_cuarentena_armado_lista", {}).catch(function () { return null; });
     const [pedsLk, prog, items, canc, tandas, isis] = await Promise.all([
       aprTraerPedidos("lk"),
       aprGet('PPP_Web_Programacion?select=empresa,order_id&tanda=not.is.null&limit=20000'),
@@ -49524,7 +49529,10 @@ async function aprCargar() {
 
     // Un pedido ya programado, o que ya está en un borrador, no vuelve a la izquierda.
     const fuera = new Set();
-    for (const x of prog)  fuera.add(aprKey(x.empresa, x.order_id));
+    const _cArm = (await pArm) || [];
+    _apr.cuarArm = {};
+    for (const a of _cArm) _apr.cuarArm[aprKey(a.empresa, a.order_id)] = a;
+    for (const x of prog)  if (!_apr.cuarArm[aprKey(x.empresa, x.order_id)]) fuera.add(aprKey(x.empresa, x.order_id));
     for (const x of items) fuera.add(aprKey(x.empresa, x.order_id));
     for (const x of (canc || [])) fuera.add(aprKey(x.empresa, x.order_id));
     const ordenar = function (arr) { return arr.sort(function (a, b) { return String(a.fecha_recep).localeCompare(String(b.fecha_recep)) || (a.order_id - b.order_id); }); };
@@ -49532,6 +49540,7 @@ async function aprCargar() {
     // programar hacen falta sus artículos, y ésos ya no están en la lista de la
     // izquierda.
     _apr.pedidosTodos = aprHeredarCuar(ordenar(pedsLk.concat(isis || [])), _apr.pedidosTodos);   // v14.35: web + NP de ISIS sin tanda
+    aprMarcarCuarArm(_apr.pedidosTodos);
     _apr.pedidos = _apr.pedidosTodos.filter(function (p) { return !fuera.has(aprKey(p.empresa, p.order_id)); });
 
     _apr.tandas = tandas;
@@ -49547,6 +49556,7 @@ async function aprCargar() {
     try {
       const pedsChef = await pChef;
       _apr.pedidosTodos = ordenar(_apr.pedidosTodos.concat(aprHeredarCuar(pedsChef, _apr._cuarPrevChef)));
+      aprMarcarCuarArm(_apr.pedidosTodos);
       _apr.pedidos = _apr.pedidosTodos.filter(function (p) { return !fuera.has(aprKey(p.empresa, p.order_id)); });
       /* ⚠ v20.98 (Thomas, 2026-09-22: *"Ierakuin sigue saliendo en la vista de «A programar» y no
          en la sección de Cuarentena"*) — LOS PEDIDOS DE CHEF LLEGAN TARDE Y NADIE LOS VOLVÍA A
@@ -49696,6 +49706,36 @@ function aprDiaCorto(iso) {
    de tanda yo"): soltar un PEDIDO en un DÍA arma la tanda y la programa en UN paso — código automático
    (gv_ppp_web_tanda_nueva) + pedido (gv_ppp_web_tanda_agregar) + día (gv_ppp_web_tanda_programar).
    Si algo falla después de crearla, se descarta: nunca queda una tanda sin fecha. */
+/* v28.45 (Luis, 07/10) — PEDIDO SACADO A CUARENTENA CON SU ARMADO. Sus NP salieron solas de la tanda
+   armada a una tanda NUEVA SIN DÍA (gv_cuarentena_devolver), con su picking y su armado. Mientras esa
+   tanda no tenga día, el pedido figura en A Programar / Cuarentena con este badge. Aprobado, NO se
+   programa solo: soltarlo en un día lo manda por gv_cuarentena_armado_asignar_dia, que mueve esa tanda
+   entera con su mismo código (no se vuelve a pickear ni armar). Sin papel: no se imprime nada. */
+function aprMarcarCuarArm(lista) {
+  const m = _apr.cuarArm || {};
+  (lista || []).forEach(function (p) { const a = m[aprKey(p.empresa, p.order_id)]; if (a) p._cuarArm = a; else delete p._cuarArm; });
+}
+function aprCuarArmChip(p) {
+  const a = p && p._cuarArm; if (!a) return "";
+  const ret = aprEnCuarentena(p);
+  return '<span class="apr-chip apr-chip-cuararm" title="Se sacó a cuarentena con la tanda ' + escapeHtml(String(a.tanda_origen || "")) +
+    ' ya armada: salió SOLO, con su picking y su armado, a la tanda ' + escapeHtml(String(a.tanda_nueva || "")) + ', SIN DÍA. ' +
+    (ret ? 'Aprobado no se programa solo: hay que asignarle el día a mano.' : 'Soltalo en un día: sale con su mismo armado, no se vuelve a pickear.') + '">📦 armado · ' +
+    escapeHtml(String(a.tanda_nueva || "")) + ' sin día' + (ret ? '' : ' · asignale día') + '</span>';
+}
+async function aprCuarArmAsignar(p, fecha) {
+  const a = p._cuarArm;
+  _apr.msg = "Asignando el día a " + aprPedLabel(p) + "…"; _apr.msgErr = false; aprRender();
+  try {
+    const r = await aprRpc("gv_cuarentena_armado_asignar_dia", { p_empresa: p.empresa || "lk",
+      p_order_id: String(p.order_id), p_fecha: fecha, p_por: await aprQuien() });
+    const x = (Array.isArray(r) ? r[0] : r) || {};
+    _apr.msg = aprPedLabel(p) + " sale el " + (gvDiaTxt(x.fecha || fecha) || fecha) + " en su tanda " + (x.tanda || a.tanda_nueva) +
+      ", con su armado: no se vuelve a pickear ni armar.";
+    _apr.msgErr = false;
+  } catch (e) { _apr.msg = "⚠ " + String((e && e.message) || e); _apr.msgErr = true; }
+  aprRender(); aprCargar();
+}
 async function aprGenerarTanda(fecha, keys, opts) {
   const sel = keys || [];
   const peds = sel.map(function (k) { return (_apr.pedidos || []).find(function (p) { return aprKey(p.empresa, p.order_id) === k; }); }).filter(Boolean);
@@ -49711,6 +49751,15 @@ async function aprGenerarTanda(fecha, keys, opts) {
   if (_cuarRet.length) {
     _apr.msg = "⚠ " + _cuarRet.map(aprPedLabel).join(", ") + " está en cuarentena y nadie lo aprobó: liberalo desde Cuarentena antes de programarlo.";
     _apr.msgErr = true; aprRender(); return;
+  }
+  // v28.45: el pedido que volvió de cuarentena con su armado no arma tanda nueva: su tanda (sin día) recibe el día
+  const _cArmSel = peds.filter(function (p) { return p._cuarArm; });
+  if (_cArmSel.length) {
+    if (peds.length > 1) {
+      _apr.msg = "⚠ " + _cArmSel.map(aprPedLabel).join(", ") + " ya está armado en su tanda " + _cArmSel[0]._cuarArm.tanda_nueva +
+        ": se programa solo, no se junta con otros pedidos."; _apr.msgErr = true; aprRender(); return;
+    }
+    if (!_cuarNoVerif.length) return aprCuarArmAsignar(_cArmSel[0], fecha);
   }
   if (_cuarNoVerif.length) {
     _apr.msg = "⚠ Todavía no se pudo verificar la cuarentena de " + _cuarNoVerif.map(aprPedLabel).join(", ") +
@@ -50733,7 +50782,7 @@ function aprColPedidos() {
         aprDiferidoChip(p) + // v15.67: espera un reingreso
         '<span class="apr-chip apr-chip-z">' + escapeHtml(p.zona || "sin zona") + '</span>' + aprSucBadge(p) +
         // v20.51 (Luis): el destino del expreso, y el badge si la provincia está marcada.
-        aprDestinoChip(p) + aprDirRealChip(p) + aprMisBadge(p) +
+        aprDestinoChip(p) + aprDirRealChip(p) + aprMisBadge(p) + aprCuarArmChip(p) +
         // v16.03 — el pedido estuvo en una tanda y esa tanda YA se pickeó y se armó (la mercadería
         // está en un pallet). Va acá en rojo para que nadie lo mande a pickear de nuevo: al
         // programarlo vuelve a ESA tanda (gv_ppp_isis_programar reusa tanda_previa), no a una nueva.
@@ -51070,7 +51119,7 @@ function aprColCuarentena() {
       // v23.14 (Luis, 28/09: "monto y motivos son redundantes? aparece vacío monto"): la columna
       // Monto quedaba vacía en todo retenido que no es cliente nuevo (regla v22.40). Ahora el monto
       // va DEBAJO de los motivos, y sólo cuando aplica.
-      '<td>' + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') +
+      '<td>' + aprCuarArmChip(p) + (aprCuarBadgesHtml(p) || '<span class="cuar-yp-sin">—</span>') +
       // v22.40 (Thomas): el monto del pedido ACTUAL (lo que se cobra por adelantado) SÓLO corre
       // para CLIENTES NUEVOS. Para el activo retenido por deuda / límite / mal pago no aplica: lo
       // que importa es la DEUDA (badge de Motivos), no el valor de este pedido. Deroga la v19.94,
@@ -51527,6 +51576,15 @@ async function cuarLiberarConfirmar() {
     s.saving = false; cuarComCerrar(); cuarYaProgRecargar();
     _apr.msg = "Pedido enviado a Pedidos a programar (aprobado por " + quien + ")" + (txt ? ", con tu comentario." : "."); _apr.msgErr = false;
     if (p) { p._cuarLiberado = true; }   // pinta al toque; aprCargar lo confirma
+    // v28.45 (Luis, 07/10): "Si estaba armado, que se quede y salte un cartel que diga que se tiene que
+    // revisar y asignar manualmente". No se programa solo: queda en su tanda sin día.
+    if (p && p._cuarArm) {
+      const _cm = "⚠ " + aprPedLabel(p) + " ESTABA ARMADO: no se programa solo.\n\nSigue en la tanda " + p._cuarArm.tanda_nueva +
+        " SIN DÍA, con su picking y su armado. Revisalo y asignale el día A MANO: soltalo en un día en A Programar" +
+        " (sale con su mismo armado, no se vuelve a pickear).";
+      _apr.msg = _cm.replace(/\n+/g, " "); _apr.msgErr = true;
+      try { window.alert(_cm); } catch (_e) {}
+    }
     aprRender();
     aprCargar();
   } catch (e) {
@@ -53260,7 +53318,7 @@ function cuarYaProgHtml() {
       + '</div>'
       + '<div class="cuar-al-acc">'
         + '<button class="cuar-al-ok" onclick="cuarYpAprobar(' + i + ')" title="Aprobarlo: sigue en su tanda, SALE de esta lista y queda en el log de Config. Cuarentena con quién lo aprobó">✅ Aprobar</button>'
-        + '<button class="cuar-al-no" onclick="cuarYpCuarentena(' + i + ')" title="Sacarlo a cuarentena: lo saca de la programación (pierde tanda y fecha) y vuelve a A Programar retenido">🐊 Sacarlo a cuarentena</button>'
+        + '<button class="cuar-al-no" onclick="cuarYpCuarentena(' + i + ')" title="Sacarlo a cuarentena: con la tanda sin empezar pierde tanda y día; con la tanda armada sale solo, con su armado, a una tanda nueva sin día; con la tanda en proceso no se puede. Vuelve a A Programar retenido">🐊 Sacarlo a cuarentena</button>'
         + '<button class="cuar-al-com" onclick="cuarComAbrirIdx(' + i + ')" title="' + (nCom ? nCom + ' comentario' + (nCom === 1 ? "" : "s") : "Sin comentarios") + ' — abrir el log">📖 Comentarios' + (nCom ? ' <b>' + nCom + '</b>' : '') + '</button>'
       + '</div></div>';
   });
@@ -53305,6 +53363,16 @@ function cuarYpCuarentena(i) {
 async function cuarComAbrir(o) {
   _apr.cuarCom = Object.assign({ lista: [], cargando: true, err: "", saving: false, texto: "" }, o);
   cuarComEl().hidden = false; cuarComRender();
+  // v28.45 (Luis, 07/10): al SACAR a cuarentena se mira la tanda ENTERA antes de dejar el botón:
+  // en proceso no se puede; armada, el pedido sale solo con su armado a una tanda nueva sin día.
+  if (_apr.cuarCom.modo === "cuarentena" && _apr.cuarCom.np) {
+    _apr.cuarCom.chkCargando = true;
+    try {
+      const rc = await aprRpc("gv_cuarentena_sacar_chequeo", { p_np: _apr.cuarCom.np });
+      if (_apr.cuarCom) _apr.cuarCom.chk = (Array.isArray(rc) ? rc[0] : rc) || null;
+    } catch (_e) { if (_apr.cuarCom) _apr.cuarCom.chk = null; }
+    if (_apr.cuarCom) _apr.cuarCom.chkCargando = false;
+  }
   try {
     _apr.cuarCom.lista = (await aprRpc("gv_cuarentena_comentarios",
       { p_empresa: _apr.cuarCom.empresa, p_order_id: _apr.cuarCom.clave })) || [];
@@ -53379,15 +53447,13 @@ function cuarComRender() {
           (s.cli ? ' · ' + escapeHtml(String(s.cli)) : '') +
           (aprobar && s.clinEnviar ? '<br><b>Cliente nuevo:</b> sale <b>sólo este pedido</b> de la retención; el cliente sigue siendo nuevo y su próximo pedido vuelve a pasar por el pipeline. <b>El mensaje es obligatorio</b> y queda en el log del cliente.'
                    : aprobar ? '<br>Dejá un comentario de por qué se aprueba (cobranzas lo autorizó, ya pagó, lo pidió el dueño…). Queda en el log con tu usuario, la fecha y la hora.'
-                   : devolver ? '<br>Vuelve a Cuarentena: se lo <b>saca de la programación</b> (pierde tanda y fecha) y reaparece en <b>A Programar</b>, retenido. Contá por qué, queda en el log.'
+                   : devolver ? '<br>Vuelve a Cuarentena y reaparece en <b>A Programar</b>, retenido. Contá por qué, queda en el log.'
                    : anular ? ('<br>Sale de <b>A Programar</b> y el armado automático <b>no lo toma más</b>. Es para un pedido que entró <b>mal</b>. El pedido de la página <b>no se borra</b>, y esto <b>no se deshace</b> desde la pantalla.'
                        + (s.m3 != null ? ' Son <b>' + aprNum(s.m3) + ' m³</b>.' : ''))
                    : ver ? '<br>Solo lectura: por qué se liberó y quién lo hizo. Para escribir un comentario está el 📖 de Cuarentena.'
                    : '') + '</p>' +
         (ver ? cuarLibInfoHtml(s) : cuarQuienHtml(s, s.modo)) +
-        (devolver && s.tanda ? '<div class="cuar-m-warn">Sale de la tanda <b>' + escapeHtml(String(s.tanda)) + '</b>.' +
-          (s.picking ? ' ⚠ Esa tanda <b>ya se empezó a trabajar</b>: lo más probable es que el servidor no deje sacarlo — primero hay que resolverlo con el depósito.' : '') +
-          '</div>' : '') +
+        (devolver ? cuarSacarAvisoHtml(s) : '') +
         log +
         (ver ? '' : '<textarea id="cuarComTexto" class="cuar-com-ta" placeholder="' + (aprobar && s.clinEnviar ? 'Por qué se manda a programar — OBLIGATORIO (ej: pagó por transferencia, lo autorizó Luis…)' : aprobar ? 'Comentario de la aprobación (opcional)' : devolver ? 'Por qué vuelve a Cuarentena (opcional)' : anular ? 'Por qué se anula — OBLIGATORIO (ej: lo cargó mal el cliente, pedido duplicado…)' : 'Escribí un comentario…') + '">' + escapeHtml(String(s.texto || "")) + '</textarea>') +
         (s.err ? '<div class="cuar-m-err">⚠ ' + escapeHtml(s.err) + '</div>' : '') +
@@ -53396,7 +53462,7 @@ function cuarComRender() {
         (aprobar
           ? '<button class="cuar-save" ' + (s.saving ? "disabled" : "") + ' onclick="cuarLiberarConfirmar()">' + (s.saving ? "Enviando…" : "✅ Aprobar y enviar") + '</button>'
           : devolver
-          ? '<button class="cuar-danger" ' + (s.saving ? "disabled" : "") + ' onclick="cuarDevolverConfirmar()">' + (s.saving ? "Sacando…" : "🚧 Volver a Cuarentena") + '</button>'
+          ? '<button class="cuar-danger" ' + ((s.saving || s.chkCargando || (s.chk && s.chk.estado === "proceso")) ? "disabled" : "") + ' onclick="cuarDevolverConfirmar()">' + (s.saving ? "Sacando…" : s.chkCargando ? "Mirando la tanda…" : (s.chk && s.chk.estado === "proceso") ? "⛔ No se puede: tanda en proceso" : "🚧 Volver a Cuarentena") + '</button>'
           : anular
           ? '<button class="cuar-danger" ' + (s.saving ? "disabled" : "") + ' onclick="aprAnularConfirmar()">' + (s.saving ? "Anulando…" : "✕ Anular pedido") + '</button>'
           : ver
@@ -53406,6 +53472,21 @@ function cuarComRender() {
     '</div>';
   const t2 = document.getElementById("cuarComTexto");
   if (t2 && !s.saving) { t2.focus(); t2.selectionStart = t2.value.length; }
+}
+/* v28.45 (Luis, 07/10) — qué pasa al sacarlo, según la tanda ENTERA (gv_cuarentena_sacar_chequeo):
+   pendiente = pierde tanda y día · proceso = no se puede · armada = sale solo con su armado a una
+   tanda nueva sin día. No se imprime ningún papel. */
+function cuarSacarAvisoHtml(s) {
+  if (s.chkCargando) return '<div class="cuar-m-warn">Mirando en qué está la tanda…</div>';
+  const c = s.chk;
+  if (!c) return s.tanda ? '<div class="cuar-m-warn">Sale de la tanda <b>' + escapeHtml(String(s.tanda)) + '</b>. No se pudo ver en qué está: si ya se empezó, el servidor lo frena.</div>' : '';
+  const tx = escapeHtml(String(c.texto || ""));
+  if (c.estado === "proceso") return '<div class="cuar-m-warn cuar-m-stop">⛔ ' + tx + '</div>';
+  if (c.estado === "armado" || c.estado === "facturado")
+    return '<div class="cuar-m-warn">📦 ' + tx + ' La tanda ' + escapeHtml((c.tandas || []).join(", ")) +
+      ' sale sin él: <b>separá sus cajas del pallet</b>. No se imprime ningún papel.' +
+      ' Aprobado, <b>no se programa solo</b>: se le asigna el día a mano.</div>';
+  return '<div class="cuar-m-warn">' + tx + '</div>';
 }
 /* v17.23 (Luis, 2026-09-14) — "que solicite que la persona que lo apretó indique quién es".
    Vivi / Marian / Otro (con texto). En el chat quedó claro que es una AUTORIZACIÓN, así que en
@@ -53482,10 +53563,13 @@ async function cuarDevolverConfirmar() {
   if (!quien) { s.err = "Decinos quién lo devuelve a Cuarentena (Vivi, Marian u Otro)."; cuarComRender(); return; }
   s.saving = true; s.err = ""; cuarComRender();
   try {
-    await aprRpc("gv_cuarentena_devolver", { p_empresa: s.empresa, p_np: s.np, p_clave: s.clave,
+    const rd = await aprRpc("gv_cuarentena_devolver", { p_empresa: s.empresa, p_np: s.np, p_clave: s.clave,
       p_comentario: txt || null, p_por: await aprQuien(), p_persona: quien });
+    const _arm = s.chk && (s.chk.estado === "armado" || s.chk.estado === "facturado");
+    const _d = (Array.isArray(rd) ? rd[0] : rd) || {};
     s.saving = false; cuarComCerrar(); cuarYaProgRecargar();
-    _apr.msg = s.np + " volvió a Cuarentena: salió de la programación y está en A Programar, retenido.";
+    _apr.msg = _arm ? ("📦 " + (_d.detalle || s.np + " volvió a Cuarentena con su armado, en una tanda nueva sin día."))
+                    : s.np + " volvió a Cuarentena: salió de la programación y está en A Programar, retenido.";
     _apr.msgErr = false;
     aprRender();
     aprCargar();
