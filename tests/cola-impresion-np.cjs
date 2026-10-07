@@ -76,7 +76,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
   // ---- A. la vista
   out.A = await p.evaluate(async () => {
-    await openColaImpresion();
+    await openColaImpHistorial();
     const body = document.getElementById("colaImpBody");
     const dias = body.querySelectorAll(".ci-dia").length;
     const tablas = body.querySelectorAll("table.ci-t");
@@ -103,9 +103,9 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   out.C = await p.evaluate(async () => {
     let bd = document.getElementById("colaImpBadge");
     if (!bd) { bd = document.createElement("span"); bd.id = "colaImpBadge"; document.body.appendChild(bd); }
-    await colaImpLoadBadge();
+    await colaImpHistBadge();
     const okBadge = bd.textContent === "⚠ 3" && bd.style.display !== "none" && /185, 28, 28|b91c1c/.test(bd.style.background);
-    window.__S.rpcOk = false; await colaImpLoadBadge(); window.__S.rpcOk = true;
+    window.__S.rpcOk = false; await colaImpHistBadge(); window.__S.rpcOk = true;
     return okBadge && bd.textContent === "⚠ 3" && bd.style.display !== "none";   // lectura rota: no se apaga
   });
 
@@ -126,7 +126,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
   // ---- E. imprimir pendientes: del día más viejo, picking de la tanda primero, después la NP
   out.E = await p.evaluate(async () => {
-    await openColaImpresion(true);   // vuelve a leer: LK 0302 vuelve a figurar pendiente en el fixture
+    await openColaImpHistorial(true);   // vuelve a leer: LK 0302 vuelve a figurar pendiente en el fixture
     window.__S.prints.length = 0; window.__S.marcas.length = 0;
     await colaImprimirPendientes();
     const pend = document.querySelectorAll("#colaImpBody .ci-b.pend").length;
@@ -137,7 +137,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
 
   // ---- F. sólo pendientes y búsqueda
   out.F = await p.evaluate(async () => {
-    await openColaImpresion(true);
+    await openColaImpHistorial(true);
     const sp = document.getElementById("colaImpSoloPend"); sp.checked = true; colaImpRender();
     const nps = Array.from(document.querySelectorAll("#colaImpBody td.ci-np")).map(function (x) { return x.textContent; }).sort().join();
     sp.checked = false;
@@ -150,10 +150,38 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
   // ---- G. lectura rota
   out.G = await p.evaluate(async () => {
     window.__S.rpcOk = false; _colaImp = null;
-    await openColaImpresion();
+    await openColaImpHistorial();
     const txt = document.getElementById("colaImpBody").textContent + " " + document.getElementById("colaImpStatus").textContent;
     window.__S.rpcOk = true;
     return /No se pudo leer/.test(txt) && !/No hay NP/.test(txt);
+  });
+
+  // ---- H. v27.61: la cola principal vuelve a la de antes (NP armadas sin imprimir + picking) y abre el submódulo
+  out.H = await p.evaluate(async () => {
+    const f0 = window.fetch;
+    window.fetch = function (url, opts) {
+      const u = String(url);
+      const ok = function (j) { return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(j); } }); };
+      if (u.indexOf("gv_vista_cola_impresion") >= 0) return ok([{ np: "LK 0400", tanda: "F10A", razon_social: "Bazar Tres", armado_ts: new Date(Date.now() - 30 * 3600000).toISOString(), vencido: true, resumen: "A=501X1", armador_leg: "94", arts_fallback: [], faltantes_fallback: [] }]);
+      if (u.indexOf("vista_cola_impresion") >= 0) return ok([{ np: "LK 0400", vencido: true }]);
+      return f0(url, opts);
+    };
+    window.pkHojaPendientes = async function () { return [{ tanda: "F11B", legajo: "104", ts: new Date().toISOString() }]; };
+    window.pkHojaImprimir = async function (ts) { window.__S.prints.push("picking:" + ts.join()); };
+    colaImpClose();
+    await openColaImpresion();
+    const vb = document.getElementById("colaImpVBody").textContent;
+    const vista = /LK 0400/.test(vb) && /F11B/.test(vb) && /Imprimir todas \(2\)/.test(vb) && /Por día/.test(vb);
+    window.__S.prints.length = 0; window.__S.marcas.length = 0;
+    await colaImprimirTodas();
+    const imp = window.__S.prints.join() === "picking:F11B,armado:ARMADO-LK 0400" && window.__S.marcas.join() === "LK 0400|cola";
+    const bd = document.getElementById("colaImpBadge"); await colaImpLoadBadge();
+    const badge = bd.textContent === "⚠ 1";
+    Array.from(document.querySelectorAll("#colaImpVBody button")).find(function (x) { return /Por día/.test(x.textContent); }).click();
+    await new Promise(function (ok) { setTimeout(ok, 100); });
+    const sub = document.getElementById("colaImpOv").style.display !== "none" && document.getElementById("colaImpVOv").style.display === "none";
+    window.fetch = f0;
+    return vista && imp && badge && sub;
   });
 
   await b.close();
