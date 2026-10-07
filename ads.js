@@ -379,6 +379,10 @@ function adsExcelTall() {
     // v27.88 (Luis, 07/10): formato de su Excel «ADS_talleristas_4OC_20261007»: Arial 14, rótulo alto 72, filas de 18, sus anchos
     { anchos: [12.7109375, 12.42578125, 23, 7.42578125, 7.5703125, 7.5703125, 8.42578125, 8.28515625, 7.5703125, 8.28515625], izq: [0, 2], fuente: 14, altoRot: 72, altos: aoa.map(function (_f, i) { return i ? 18 : null; }) });
 }
+// v27.93 (Luis, 07/10): en el Excel la entrega estimada por tallerista va sólo con el número, sin el %.
+function _adsEstSinPct(arr) {
+  return (arr || []).map(function (s) { return String(s).replace(/\s+\d+\s*%\s*\((\d+)\)$/, " $1").replace(/\s*\((\d+)\)$/, " $1"); });
+}
 function adsExcelStock(H) {
   if (!_ads.stock) { alert("Todavía se está leyendo el stock."); return; }
   var f = adsFiltrarStock(_ads.stock, H, "");
@@ -391,7 +395,7 @@ function adsExcelStock(H) {
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo),
-      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estDist.join("\n"), c.dist.join("\n")]);
+      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), _adsEstSinPct(c.estDist).join("\n"), c.dist.join("\n")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
     { anchos: ADS_XLS_STOCK_ANCHOS, izq: [11, 12], izqSin: [1], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 74, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [11, 12]) });

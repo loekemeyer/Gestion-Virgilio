@@ -157,7 +157,9 @@ const STOCK = [
     const cEst = ctx._adsStockCalc({ disponible: 5, proy_mes: 0, comp10: 0, saldo10: 5 }, 10), est = cEst.estH;
     // v27.91 (Luis): cada tallerista en su sub-fila del Excel, descripción sin ajuste, borde del rótulo, escala 74
   { const _s = require("fs").readFileSync(__dirname + "/../ads.js", "utf8");
-    if (!/estDist\.join\("\\n"\), c\.dist\.join\("\\n"\)/.test(_s) || !/izqSin: \[1\]/.test(_s) || !/bordeRot: true, escala: 74/.test(_s)) fallas.push("(l) formato stock v27.91"); }
+    if (!/_adsEstSinPct\(c\.estDist\)\.join\("\\n"\), c\.dist\.join\("\\n"\)/.test(_s) || !/izqSin: \[1\]/.test(_s) || !/bordeRot: true, escala: 74/.test(_s)) fallas.push("(l) formato stock v27.91"); }
+  { const _m = src.match(/function _adsEstSinPct[\s\S]*?\n\}/); const _f = _m && new Function(_m[0] + "; return _adsEstSinPct;")();
+    if (!_f || JSON.stringify(_f(["A 83 % (50)", "Lucho (350)"])) !== JSON.stringify(["A 50", "Lucho 350"])) fallas.push("(m) Excel: entrega estimada sin %"); }
   if (JSON.stringify(cEst.estDist) !== JSON.stringify(["A 83 % (50)", "B 17 % (10)"])) fallas.push("(k) entrega estimada por tallerista: " + JSON.stringify(cEst.estDist));
     if (est < 57 || est > 61) fallas.push("(j) entrega estimada (A 50 + B topado en 10 = 60): " + est);
     ctx._adsPctCod = () => [{ proveedor: "Garcia", pedido: 140 }, { proveedor: "Poly", pedido: 107 }];
