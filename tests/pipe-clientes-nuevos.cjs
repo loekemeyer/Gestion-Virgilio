@@ -63,7 +63,7 @@ if (!/'pipeline_' \|\| v_ev/.test(sql))
 /* ── 4. v20.86: el pipeline REEMPLAZA al submodulo viejo DENTRO de «A Programar» ───────── */
 // Luis, 21/09: "implementalo... remplazando la vieja". El mismo modulo en dos lugares es
 // justo el problema de convivencia que se queria evitar, asi que la pestaña propia se fue.
-if (!/aprColPedidos\(\) \+ aprColCuarentena\(\) \+ pipeHtml\(\)/.test(html))
+if (!/aprColPedidos\(\) \+ aprColCuarYaProg\(\) \+ aprColCuarentena\(\) \+ pipeHtml\(\)/.test(html))
   fallos.push("el pipeline no ocupa el lugar del submodulo viejo en A Programar");
 if (/aprColCuarentena\(\) \+ clinNuevosHtml\(\)/.test(html))
   fallos.push("volvio el submodulo viejo a A Programar: los dos modulos no pueden convivir ahi");

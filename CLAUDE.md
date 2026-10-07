@@ -8256,3 +8256,13 @@ aunque el feed traiga la de otra dirección de la ficha (la fila «Retira» de l
 1448 (Silvano) con zona «Zona 6» en E92A, que salió el 25/09 como «Retira cliente». **D8 (Luis): LK 0252 (970E +
 971E, importados que llegaron después) queda en E92A, que es su tanda de Retira** — no se le arma tanda nueva.
 Centinela 359. `sql/gv_ppp_web_zona_retira_v2838.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-07, v28.40): A PROGRAMAR — el aviso de «programados que deberían estar en cuarentena» es un bloque PROPIO
+
+Orden: **Pedidos a programar → 🚨 CLIENTES PROGRAMADOS QUE DEBERÍAN ESTAR EN CUARENTENA → 🐊 Cuarentena → Clientes nuevos**,
+los cuatro colapsables. El aviso (`aprColCuarYaProg` / `cuarYaProgHtml`, clave `vir_cuaryp_colapsado`) salió de adentro de
+Cuarentena: borde de peligro negro/amarillo, una tarjeta por pedido (cliente, NP, sale día + tanda, «SALE EN N DÍAS», pidió,
+picking, motivo con monto) y **sólo 3 botones: ✅ Aprobar · 🐊 Sacarlo a cuarentena · 📖 Comentarios** (los mismos
+`cuarYpAprobar` / `cuarYpCuarentena` / `cuarComAbrirIdx`). Sin casos, no se dibuja. Cuarentena va con color y textura de
+pantano (`.apr-col-pantano`, la tabla sobre fondo claro) y Clientes nuevos rosa bebé con textura (`.apr-col-clin`). Sólo visual.
+`tests/apr-cuarentena.cjs`, `tests/cuar-yaprog-fecha-pedido.cjs`, `tests/pipe-clientes-nuevos.cjs`.

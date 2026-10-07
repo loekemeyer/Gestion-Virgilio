@@ -1275,6 +1275,52 @@ body:has(#optionsScreen:not(.hidden)) #btnHistDias{ display:none !important; }
 .cuar-com-sub{ font-size:12.5px; color:#475569; margin:0 0 8px; line-height:1.45; }
 .apr-col-cuar .apr-col-t{ color:#9a3412; }
 .apr-cuar-help{ font-weight:800; color:#c2410c; cursor:help; margin-left:5px; }
+/* v28.40 (Luis): A Programar — alerta de ya programados, Cuarentena pantano, Clientes nuevos rosa bebé */
+.cuar-alerta{ border-radius:10px; overflow:hidden; color:#111; border:5px solid transparent;
+  background-image:linear-gradient(#fff,#fff), repeating-linear-gradient(-45deg,#111 0 10px,#facc15 10px 20px);
+  background-origin:border-box; background-clip:padding-box,border-box; box-shadow:0 4px 14px rgba(0,0,0,.35); }
+.cuar-al-h{ background:#b91c1c; color:#fff; padding:8px 10px; font-weight:900; font-size:14.5px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.cuar-al-n{ background:#fff; color:#b91c1c; border-radius:999px; padding:0 9px; font-size:13px; }
+.cuar-al-sub{ background:#fef3c7; color:#713f12; font-size:12.5px; padding:6px 10px; border-bottom:1px solid #fde68a; }
+.cuar-al-card{ padding:9px 10px; border-top:1px solid #e5e7eb; display:grid; grid-template-columns:1fr auto; gap:6px 12px; align-items:center; }
+.cuar-al-sub + .cuar-al-card{ border-top:0; }
+.cuar-al-que{ font-size:13.5px; } .cuar-al-que b{ font-size:14.5px; }
+.cuar-al-dl{ display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12.5px; color:#374151; margin-top:3px; }
+.cuar-al-dl b{ color:#111; }
+.cuar-al-mot{ margin-top:4px; } .cuar-al-mot .cuar-badges{ margin-top:0; gap:4px; }
+.cuar-al-urg{ background:#111; color:#facc15; border-radius:4px; padding:0 6px; font-weight:900; font-size:11px; white-space:nowrap; }
+.cuar-al-acc{ display:flex; flex-direction:column; gap:5px; }
+.apr-wrap .cuar-al-acc button{ border:0; border-radius:7px; padding:6px 11px; font-weight:800; font-size:12.5px; cursor:pointer; white-space:nowrap; }
+.apr-wrap .cuar-al-acc .cuar-al-ok{ background:#16a34a; color:#fff; }
+.apr-wrap .cuar-al-acc .cuar-al-no{ background:#3f4b26; color:#e7f0d3; }
+.apr-wrap .cuar-al-acc .cuar-al-com{ background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; }
+@media (max-width:560px){ .cuar-al-card{ grid-template-columns:1fr; } .cuar-al-acc{ flex-direction:row; flex-wrap:wrap; } }
+.apr-col.apr-col-pantano{ color:#e7f0d3; border:2px solid #3b4a22; background-color:#3f4b26;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(140,160,70,.35) 0 6px, transparent 7px),
+    radial-gradient(circle at 78% 30%, rgba(160,175,90,.28) 0 4px, transparent 5px),
+    radial-gradient(circle at 40% 72%, rgba(120,140,60,.30) 0 8px, transparent 9px),
+    radial-gradient(circle at 88% 82%, rgba(170,185,95,.25) 0 5px, transparent 6px),
+    radial-gradient(ellipse at 30% 0%, rgba(90,110,40,.55), transparent 60%),
+    radial-gradient(ellipse at 100% 100%, rgba(40,52,20,.7), transparent 55%),
+    repeating-linear-gradient(170deg, rgba(255,255,255,.035) 0 2px, transparent 2px 9px);
+  box-shadow:inset 0 0 40px rgba(20,28,8,.65); }
+.apr-col.apr-col-pantano .apr-col-t{ color:#d9e8a4; }
+.apr-col.apr-col-pantano .apr-cuar-help{ color:#c9da8f; }
+.apr-col.apr-col-pantano .apr-vacio, .apr-col.apr-col-pantano .apr-vacio b, .apr-col.apr-col-pantano .apr-cargando{ color:#e7f0d3; }
+.apr-col.apr-col-pantano .cuar-demo-hint, .apr-col.apr-col-pantano .cuar-demo-hint b{ color:#d9e8a4; }
+.apr-col.apr-col-pantano .cuar-demo-btn{ background:#2a3412; color:#e7f0d3; border-color:#6f8a3a; }
+.apr-col.apr-col-pantano .apr-vacio.apr-cuar-err{ background:#7f1d1d; color:#fff; border-radius:8px; padding:8px; }
+.apr-col.apr-col-pantano .cuar-tbl, .apr-col.apr-col-pantano .cuar-yaprog-wrap{ background:rgba(247,250,238,.96); border-radius:8px; }
+.apr-col.apr-col-clin{ border:1px solid #f9c4dc; background-color:#fdf2f8;
+  background-image:
+    radial-gradient(circle at 10px 10px, rgba(244,167,203,.22) 0 2px, transparent 3px),
+    radial-gradient(circle at 25px 25px, rgba(255,255,255,.7) 0 2px, transparent 3px),
+    repeating-linear-gradient(135deg, rgba(249,196,220,.18) 0 6px, transparent 6px 14px);
+  background-size:30px 30px, 30px 30px, auto; }
+.apr-col.apr-col-clin .apr-col-t{ color:#9d174d; }
+.apr-col.apr-col-clin .apr-cuar-help{ color:#be185d; }
+.apr-col.apr-col-clin .cuar-tbl{ background:#fff; border-radius:8px; }
 .apr-col-cuar .apr-vacio{ color:#b45309; }
 /* v20.96 — el control de cuarentena se cayo (timeout): se avisa en vez de decir "no hay". */
 .apr-cuar-err{ color:#7f1d1d !important; background:#fef2f2; border-left:4px solid #b91c1c;
@@ -6335,7 +6381,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.39"></script>
+<script type="module" src="recepcion.js?v=28.40"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10614,7 +10660,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.39";
+const APP_VERSION = "v28.40";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -50095,7 +50141,7 @@ function aprRender() {
   // existe mientras haya pedidos tildados. Al programar se vacía la selección, así que vuelve solo al paso 1.
   if (_apr.paso === 2 && !aprSelKeys().length) { _apr.paso = 1; _apr.diaSel = null; }
   if (_apr.paso === 2) h += '<div class="apr-wrap apr-2col">' + aprPaso2Html() + '</div>';
-  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + aprColCuarentena() + pipeHtml() + aprColAvisosVend() + (conTandas ? aprColTandas() : '') + '</div>';
+  else h += '<div class="apr-wrap' + (conTandas ? '' : ' apr-2col') + '">' + aprColPedidos() + aprColCuarYaProg() + aprColCuarentena() + pipeHtml() + aprColAvisosVend() + (conTandas ? aprColTandas() : '') + '</div>';
   h += aprFootHtml();
 
   // Cada acción re-dibuja las tres columnas. Sin esto, sacar un pedido de una
@@ -50933,14 +50979,14 @@ function aprColCuarentena() {
   const _cuarCargando = !_apr.listo || aprCargandoAlgo();   // v15.54: mismo criterio que la columna de pedidos
   const _cuarCol = aprColapsado("vir_cuar_colapsado");   // v18.100 (Luis): submódulo colapsable
   const _cuarGrupos = cuarAgrupar(lista);   // v22.47: un pedido partido cuenta como UNO
-  let h = '<div class="apr-col apr-col-cuar' + (_cuarCargando ? ' apr-col-cargando' : '') + (_cuarCol ? ' apr-col-colapsado' : '') + '">' +
+  let h = '<div class="apr-col apr-col-cuar apr-col-pantano' + (_cuarCargando ? ' apr-col-cargando' : '') + (_cuarCol ? ' apr-col-colapsado' : '') + '">' +
     '<div class="apr-col-t apr-col-t-clic" onclick="aprCuarColapsar()" title="' + (_cuarCol ? "Mostrar" : "Ocultar") + ' Cuarentena">' +
-      '<span class="apr-col-caret">' + (_cuarCol ? "▸" : "▾") + '</span> 🚧 Cuarentena <b>(' + (_cuarCargando ? '…' : _cuarGrupos.length) + ')</b>' +
+      '<span class="apr-col-caret">' + (_cuarCol ? "▸" : "▾") + '</span> 🐊 Cuarentena <b>(' + (_cuarCargando ? '…' : _cuarGrupos.length) + ')</b>' +
       '<span class="apr-cuar-help" title="Pedidos de clientes con deuda, suspendidos, que superan su límite de crédito. No se programan (ni a mano ni por el automático): hay que liberarlos primero.">ⓘ</span>' +
     '</div>';
   if (_cuarCol) return h + '</div>';   // colapsado: sólo el título con el contador
   h += cuarDemoRowHtml();   // v14.88: los 4 botones de importación se movieron a "Config. Cuarentena"
-  h += cuarYaProgHtml();   // v16.57 — aviso de los que YA tienen tanda (problema 14)
+  // v28.40 (Luis): el aviso de los que YA tienen tanda salió a su propio bloque (aprColCuarYaProg)
   // v20.96 — el control se cayó: el sector NO puede decir "sin pedidos retenidos".
   if (_apr.cuarErr) {
     h += '<div class="apr-vacio apr-cuar-err">⚠ <b>No se pudo controlar la cuarentena</b> (' +
@@ -52989,7 +53035,7 @@ function pipeHtml() {
   // v20.86: el submodulo es COLAPSABLE y guarda la preferencia por navegador, igual que el
   // viejo — y con la MISMA clave, para que el operario no pierda como lo habia dejado.
   const _cliCol = aprColapsado("vir_cli_colapsado");
-  let h = '<div class="apr-col apr-col-cuar pipe-col' + (cargando ? ' apr-col-cargando' : '') +
+  let h = '<div class="apr-col apr-col-cuar apr-col-clin pipe-col' + (cargando ? ' apr-col-cargando' : '') +
     (_cliCol ? ' apr-col-colapsado' : '') + '">' +
     '<div class="apr-col-t apr-col-t-clic" onclick="aprCliColapsar()" title="' +
       (_cliCol ? "Mostrar" : "Ocultar") + ' el pipeline de clientes nuevos">' +
@@ -53130,15 +53176,28 @@ function cuarFechaHora(ts) {
     return p2(d.getDate()) + "/" + p2(d.getMonth() + 1) + " " + p2(d.getHours()) + ":" + p2(d.getMinutes());
   }
 }
+/* v28.40 (Luis, 07/10): «mucha más claridad» — bloque PROPIO entre los pedidos a programar y
+   Cuarentena, colapsable (vir_cuaryp_colapsado), con borde de peligro y una tarjeta por pedido.
+   Sólo 3 acciones: ✅ Aprobar · 🐊 Sacarlo a cuarentena · 📖 comentarios. Sin casos, no se dibuja. */
+function aprCuarYpColapsar() { aprSetColapsado("vir_cuaryp_colapsado", !aprColapsado("vir_cuaryp_colapsado")); aprRender(); }
+function aprColCuarYaProg() { return cuarYaProgHtml(); }
+function _cuarYpDias(f) {
+  const d = String(f || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
+  const n = Math.round((Date.parse(d + "T12:00:00") - Date.parse(hoy + "T12:00:00")) / 86400000);
+  return isFinite(n) ? n : null;
+}
 function cuarYaProgHtml() {
   if (_apr.cuarYaProg === undefined && !_apr.cuarYaProgLoading) { cuarYaProgCargar(); return ""; }
   const l = _apr.cuarYaProg || [];
   if (!l.length) return "";
-  let h = '<div class="cuar-yaprog"><div class="cuar-yaprog-t">⚠ Ya programados y el cliente está en cuarentena <b>(' + l.length + ')</b>'
-    + '<span class="apr-cuar-help" title="Estos pedidos YA tienen tanda: la cuarentena no los alcanzó porque el reporte de deuda entró después del armado. No se retiran solos — mirarlos con cobranzas y decidir. Al aprobar uno, sale de esta lista y queda en el log de 🚧 Config. Cuarentena. El 📖 abre sus comentarios.">ⓘ</span></div>'
-    + '<div class="cuar-yaprog-wrap"><table class="cuar-yaprog-tbl"><thead><tr>'
-    + '<th>NP</th><th>Pedido</th><th>Tanda</th><th>Entrega</th><th>Cliente</th><th>Motivos</th><th>Enviar a</th><th>Coment.</th>'
-    + '</tr></thead><tbody>';
+  const col = aprColapsado("vir_cuaryp_colapsado");
+  let h = '<div class="cuar-alerta' + (col ? ' apr-col-colapsado' : '') + '">'
+    + '<div class="cuar-al-h apr-col-t-clic" onclick="aprCuarYpColapsar()" title="' + (col ? "Mostrar" : "Ocultar") + ' el aviso">'
+    + '<span class="apr-col-caret">' + (col ? "▸" : "▾") + '</span> 🚨 CLIENTES PROGRAMADOS QUE DEBERÍAN ESTAR EN CUARENTENA <span class="cuar-al-n">' + l.length + '</span></div>';
+  if (col) return h + '</div>';
+  h += '<div class="cuar-al-sub">Ya tienen tanda y día, pero el cliente hoy no está habilitado: la cuarentena no los alcanzó al programarse. <b>Si nadie decide, salen igual en el camión.</b></div>';
   l.forEach(function (r, i) {
     const cod = String(r.cod || "").trim();
     const badges = aprCuarBadgesHtml({
@@ -53146,24 +53205,29 @@ function cuarYaProgHtml() {
       cuarentena_detalle: { deuda: r.deuda, estado: r.estado, nuevo_pedidos: r.nuevo_pedidos }
     });
     const nCom = Number(r.comentarios || 0);
-    h += '<tr>'
-      + '<td><span class="cuar-yaprog-np">' + escapeHtml(String(r.np || "")) + '</span></td>'
-      + '<td>' + (gvFechaPedChip(r.np, r.fecha_pedido, r.fecha_entrega, "cuar-yaprog-fped") || '<span class="cuar-yp-sin">—</span>') + '</td>'
-      + '<td><span class="cuar-yaprog-tanda">' + escapeHtml(String(r.tanda || "sin tanda")) + '</span>'
-        + (r.picking_empezado ? ' <span class="cuar-yaprog-pick" title="Ya hay eventos de operarios sobre esa tanda">pickeando</span>' : '') + '</td>'
-      + '<td><span class="cuar-yaprog-fecha">' + escapeHtml(gvDiaTxt(r.fecha_entrega)) + '</span></td>'
-      + '<td class="cuar-yp-cli">'
-        + (cod ? '<span class="cuar-yaprog-cod" title="Número de cliente en ' + (cuarEmpCod(r.empresa) === "CH" ? "Chef" : "Loekemeyer") + '">' + cuarEmpCod(r.empresa) + " " + escapeHtml(cod) + '</span> ' : '')
-        + escapeHtml(String(r.razon_social || cod || "")) + '</td>'
-      + '<td>' + (badges || '<span class="cuar-yp-sin">—</span>') + '</td>'
-      + '<td><div class="cuar-yp-marcar">'
-        + '<button class="cuar-yp-act cuar-yp-act-ok" onclick="cuarYpAprobar(' + i + ')" title="Aprobarlo: sigue en su tanda, SALE de esta lista y queda en el log de Config. Cuarentena con quién lo aprobó">✅ Aprobar</button>'
-        + '<button class="cuar-yp-act cuar-yp-act-cuar" onclick="cuarYpCuarentena(' + i + ')" title="Devolverlo a Cuarentena: lo saca de la programación (pierde tanda y fecha) y vuelve a A Programar retenido">🚧 Cuarentena</button>'
-        + '</div></td>'
-      + '<td><button class="cuar-yp-lib" onclick="cuarComAbrirIdx(' + i + ')" title="' + (nCom ? nCom + ' comentario' + (nCom === 1 ? "" : "s") : "Sin comentarios") + ' — abrir el log">📖' + (nCom ? '<b>' + nCom + '</b>' : '') + '</button></td>'
-      + '</tr>';
+    const dias = _cuarYpDias(r.fecha_entrega);
+    const urg = dias === null ? "" : (dias < 0 ? "SALIÓ HACE " + (-dias) + " DÍA" + (dias === -1 ? "" : "S") : dias === 0 ? "SALE HOY" : "SALE EN " + dias + " DÍA" + (dias === 1 ? "" : "S"));
+    const fped = gvFechaPedChip(r.np, r.fecha_pedido, r.fecha_entrega, "cuar-yaprog-fped");
+    h += '<div class="cuar-al-card">'
+      + '<div class="cuar-al-info">'
+        + '<div class="cuar-al-que"><b>' + escapeHtml(String(r.razon_social || cod || "")) + '</b>'
+          + (cod ? ' <span class="cuar-yaprog-cod" title="Número de cliente en ' + (cuarEmpCod(r.empresa) === "CH" ? "Chef" : "Loekemeyer") + '">' + cuarEmpCod(r.empresa) + " " + escapeHtml(cod) + '</span>' : '')
+          + ' · NP <span class="cuar-yaprog-np">' + escapeHtml(String(r.np || "")) + '</span>'
+          + (urg ? ' <span class="cuar-al-urg">' + urg + '</span>' : '') + '</div>'
+        + '<div class="cuar-al-dl">'
+          + '<span>Sale: <b>' + escapeHtml(gvDiaTxt(r.fecha_entrega) || "—") + '</b> · tanda <span class="cuar-yaprog-tanda">' + escapeHtml(String(r.tanda || "sin tanda")) + '</span></span>'
+          + '<span>Pidió: ' + (fped || '<b>—</b>') + '</span>'
+          + '<span>Picking: <b>' + (r.picking_empezado ? '<span class="cuar-yaprog-pick" title="Ya hay eventos de operarios sobre esa tanda">empezado</span>' : 'sin empezar') + '</b></span>'
+        + '</div>'
+        + '<div class="cuar-al-mot">' + (badges || '<span class="cuar-yp-sin">sin motivo informado</span>') + '</div>'
+      + '</div>'
+      + '<div class="cuar-al-acc">'
+        + '<button class="cuar-al-ok" onclick="cuarYpAprobar(' + i + ')" title="Aprobarlo: sigue en su tanda, SALE de esta lista y queda en el log de Config. Cuarentena con quién lo aprobó">✅ Aprobar</button>'
+        + '<button class="cuar-al-no" onclick="cuarYpCuarentena(' + i + ')" title="Sacarlo a cuarentena: lo saca de la programación (pierde tanda y fecha) y vuelve a A Programar retenido">🐊 Sacarlo a cuarentena</button>'
+        + '<button class="cuar-al-com" onclick="cuarComAbrirIdx(' + i + ')" title="' + (nCom ? nCom + ' comentario' + (nCom === 1 ? "" : "s") : "Sin comentarios") + ' — abrir el log">📖 Comentarios' + (nCom ? ' <b>' + nCom + '</b>' : '') + '</button>'
+      + '</div></div>';
   });
-  return h + '</tbody></table></div></div>';
+  return h + '</div>';
 }
 
 /* ── v17.15 — LOG DE COMENTARIOS (pedido de Luis) ───────────────────────────────────────────
@@ -61461,7 +61525,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.39"></script>
+<script src="importacion.js?v=28.40"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64310,10 +64374,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.39"></script>
-<script src="hotsale.js?v=28.39"></script>
-<script src="estadisticas.js?v=28.39"></script>
-<script src="ads.js?v=28.39"></script>
+<script src="cobranzas.js?v=28.40"></script>
+<script src="hotsale.js?v=28.40"></script>
+<script src="estadisticas.js?v=28.40"></script>
+<script src="ads.js?v=28.40"></script>
 
 </body>
 </html>

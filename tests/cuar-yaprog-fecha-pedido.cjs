@@ -20,7 +20,7 @@ h = ctx.gvFechaPedChip("LK 0298", "", "2026-10-15");
 if (!/a las 09:50/.test(h) || !/📥 Mié 30\/09/.test(h)) fail("cae al mapa GV_NP_Fecha_Pedido con hora: " + h);
 if (ctx.gvFechaPedChip("98000", "", "") !== "") fail("sin dato no inventa");
 const yp = fn("cuarYaProgHtml");
-if (!/<th>Pedido<\/th>/.test(yp) || !/gvFechaPedChip\(r\.np/.test(yp)) fail("Cuarentena ya programados sin columna Pedido");
+if (!/Pidi/.test(yp) || !/gvFechaPedChip\(r\.np/.test(yp)) fail("Cuarentena ya programados sin columna Pedido");
 if (!/gvFechaPedChip\(r\.np, r\.fecha_pedido, r\.fecha, "pga-ped"\)/.test(src)) fail("Programación sin el chip");
 if (ctx.gvDiaTxt("2026-10-07") !== "Mié 07/10") fail("gvDiaTxt: " + ctx.gvDiaTxt("2026-10-07"));
 console.log(ok ? "✓ fecha del pedido en Cuarentena y Programación" : "FALLÓ");

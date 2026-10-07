@@ -31,8 +31,8 @@ catch (_e) {
     _apr.pedidos = [mk({ order_id: 100 }), mk({ order_id: 101, razon_social: "Cliente Dos" })];
     aprRender(); await new Promise((res) => setTimeout(res, 200));
     let html = document.getElementById("pppPreview").innerHTML;
-    out.sectorSiempre = /apr-col-cuar/.test(html) && /🚧 Cuarentena/.test(html);
-    out.vacioCuenta = /🚧 Cuarentena <b>\(0\)<\/b>/.test(html);
+    out.sectorSiempre = /apr-col-cuar/.test(html) && /🐊 Cuarentena/.test(html);
+    out.vacioCuenta = /🐊 Cuarentena <b>\(0\)<\/b>/.test(html);
     out.listaNormal2 = /📋 Pedidos a programar <b>\(2\)<\/b>/.test(html);
     out.textoVacio = /Sin pedidos retenidos/.test(html);
     // v14.88: los 4 botones de importación se movieron a la pestaña "Config. Cuarentena";
@@ -98,7 +98,7 @@ catch (_e) {
     out.demoCli = /CLIENTE DE EJEMPLO S\.A\./.test(html);
     // v14.88: la ficha muestra 3 badges separados, no el texto unido
     out.demoMotivo = /cuar-badge b-deuda/.test(html) && /cuar-badge b-limite/.test(html);
-    out.demoCuenta = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);
+    out.demoCuenta = /🐊 Cuarentena <b>\(1\)<\/b>/.test(html);
     // v20.53 (Luis): el boton "Ver ejemplo" se cambio por "Imprimir". El pedido de ejemplo
     // sigue existiendo (se prende desde la consola), pero ya no tiene boton propio.
     out.demoBtnImprimir = /cuarExportarExcel\(\)/.test(html) && /Imprimir/.test(html);
@@ -121,7 +121,7 @@ catch (_e) {
     html = document.getElementById("pppPreview").innerHTML;
     out.cuarActivoSinMonto = !/\$55\.000/.test(html) && !/\$66\.550/.test(html) && !/c\/IVA/.test(html);
     _apr.cliValor = {};
-    out.cuentaCuar1 = /🚧 Cuarentena <b>\(1\)<\/b>/.test(html);
+    out.cuentaCuar1 = /🐊 Cuarentena <b>\(1\)<\/b>/.test(html);
     out.listaNormal1 = /📋 Pedidos a programar <b>\(1\)<\/b>/.test(html);
     // v14.88: badges separados (b-deuda + b-limite) + botón "Enviar a Pedidos a programar"
     out.badge = /cuar-badge b-deuda/.test(html) && /cuar-badge b-limite/.test(html);
@@ -155,10 +155,10 @@ catch (_e) {
     _pppTab = "prog"; aprRender(); await new Promise((res) => setTimeout(res, 50));
     html = document.getElementById("pppPreview").innerHTML;
     // Los dos submódulos conviven en el mismo render; se parte el HTML por sus títulos.
-    const iCuar = html.indexOf("🚧 Cuarentena"), iCli = html.indexOf("🧭 Clientes nuevos");
+    const iCuar = html.indexOf("🐊 Cuarentena"), iCli = html.indexOf("🧭 Clientes nuevos");
     const cuarSec = html.slice(iCuar, iCli), cliSec = html.slice(iCli);
     // (3a) Cuarentena: sólo el mixto (deuda+nuevo), con badge; el puro NO.
-    out.nuevoFueraDeCuar = /🚧 Cuarentena <b>\(1\)<\/b>/.test(cuarSec);
+    out.nuevoFueraDeCuar = /🐊 Cuarentena <b>\(1\)<\/b>/.test(cuarSec);
     out.nuevoBadge = /cuar-badge b-nuevo[^>]*>🆕 Cliente nuevo</.test(cuarSec);
     out.nuevoMotivo = /Cliente nuevo \(1 pedido facturado en toda su historia\)\./.test(cuarSec);
     // (3b) Clientes nuevos: el puro está (chip CH 2533); el mixto NO.
@@ -185,7 +185,7 @@ catch (_e) {
     aprRender(); await new Promise((res) => setTimeout(res, 50));
     const htmlIva = document.getElementById("pppPreview").innerHTML;
     const cliSecIva = htmlIva.slice(htmlIva.indexOf("🧭 Clientes nuevos"));
-    const cuarSecIva = htmlIva.slice(htmlIva.indexOf("🚧 Cuarentena"), htmlIva.indexOf("🧭 Clientes nuevos"));
+    const cuarSecIva = htmlIva.slice(htmlIva.indexOf("🐊 Cuarentena"), htmlIva.indexOf("🧭 Clientes nuevos"));
     out.cliMontoIva = /clin-iva[^>]*>c\/IVA \$121\.000/.test(cliSecIva);
     // v22.40 (Thomas): la fila nuevo-CON-deuda (motivo cliente_nuevo entre los suyos) SÍ muestra su
     // monto — es cliente nuevo. El activo puro no (se chequea en el bloque 2, cuarActivoSinMonto).
@@ -229,13 +229,15 @@ catch (_e) {
     _apr.pedidos = [mk({ order_id: 101, razon_social: "Cliente Dos" })];
     aprRender(); await new Promise((res) => setTimeout(res, 200));
     html = document.getElementById("pppPreview").innerHTML;
-    out.ypTabla = /cuar-yaprog-tbl/.test(html) && /<th>NP<\/th>/.test(html) && /<th>Enviar a<\/th>/.test(html);
+    // v28.40 (Luis): bloque propio con tarjetas, sólo Aprobar / Sacarlo a cuarentena / Comentarios
+    out.ypTabla = /cuar-alerta/.test(html) && (html.match(/cuar-al-card/g) || []).length === 2 && /cuarYpAprobar\(1\)/.test(html) && /cuarYpCuarentena\(1\)/.test(html);
     // v17.23: el aprobado sale de la lista (lo filtra el backend), así que la columna no va más
     out.ypSinColAprob = !/<th>Aprobación<\/th>/.test(html) && !/sin aprobar/.test(html);
-    out.ypCuenta = /Ya programados y el cliente está en cuarentena <b>\(2\)<\/b>/.test(html);
+    out.ypCuenta = /CLIENTES PROGRAMADOS QUE DEBERÍAN ESTAR EN CUARENTENA <span class="cuar-al-n">2<\/span>/.test(html)
+      && html.indexOf("cuar-alerta") < html.indexOf("🐊 Cuarentena");
     out.ypCod = /cuar-yaprog-cod[^>]*>LK 4263</.test(html) && /cuar-yaprog-cod[^>]*>CH 2715</.test(html);
     out.ypBadges = /cuar-badge b-deuda/.test(html) && /cuar-badge b-nuevo/.test(html);
-    out.ypLibrito = /cuarComAbrirIdx\(0\)/.test(html) && /cuarComAbrirIdx\(1\)/.test(html) && /📖<b>2<\/b>/.test(html);
+    out.ypLibrito = /cuarComAbrirIdx\(0\)/.test(html) && /cuarComAbrirIdx\(1\)/.test(html) && /📖 Comentarios <b>2<\/b>/.test(html);
 
     // el librito abre el modal con el log (RPC stubeada)
     const llamadas = [];
@@ -290,7 +292,7 @@ catch (_e) {
     const libHtml = document.getElementById("pppPreview").innerHTML;
     out.libBadgeBtn = /cuar-lib-btn[^>]*onclick="cuarLibVer\('lk','np98587'\)"/.test(libHtml) &&
                       /Liberado de cuarentena/.test(libHtml);
-    out.libFueraDeCuar = /🚧 Cuarentena <b>\(0\)<\/b>/.test(libHtml);   // liberado = NO retenido
+    out.libFueraDeCuar = /🐊 Cuarentena <b>\(0\)<\/b>/.test(libHtml);   // liberado = NO retenido
     cuarLibVer("lk", "np98587"); await new Promise((res) => setTimeout(res, 150));
     const lvh = (document.getElementById("cuarComModal") || {}).innerHTML || "";
     out.libAbre = /🚧 Liberado de cuarentena<\/b>/.test(lvh);
@@ -343,7 +345,7 @@ catch (_e) {
     out.repoChip = /apr-chip-repo[^>]*>🔁 Reposición · 1 código · facturado el mismo día/.test(rph);
     out.repoSoloElExento = (rph.match(/apr-chip-repo/g) || []).length === 1;
     out.repoTitle = /No cae en Cuarentena: es una reposición chica/.test(rph);
-    out.repoOtroRetenido = /🚧 Cuarentena <b>\(1\)<\/b>/.test(rph);   // el de 15 códigos sigue adentro
+    out.repoOtroRetenido = /🐊 Cuarentena <b>\(1\)<\/b>/.test(rph);   // el de 15 códigos sigue adentro
 
     // ⚠ EL TEST QUE FALTÓ EN LA v19.41: la RPC del chip EXPLOTA (como lo hacía con una NP de
     // ISIS) y la marcación tiene que seguir viva. Si esto falla, la Cuarentena se ve en 0.
@@ -361,7 +363,7 @@ catch (_e) {
     await cuarMarcarPedidos(); await new Promise((res) => setTimeout(res, 200));
     aprRender(); await new Promise((res) => setTimeout(res, 150));
     const rpk = document.getElementById("pppPreview").innerHTML;
-    out.repoFalloSigueMarcando = /🚧 Cuarentena <b>\(2\)<\/b>/.test(rpk);   // los DOS retenidos
+    out.repoFalloSigueMarcando = /🐊 Cuarentena <b>\(2\)<\/b>/.test(rpk);   // los DOS retenidos
     out.repoFalloSinChip = !/apr-chip-repo/.test(rpk);                        // sólo se pierde el chip
     out.repoFalloMarco = llamadas.some(function (c) { return c.fn === "gv_cuarentena_marcar"; });
     _apr.cuarRepo = null;
@@ -404,7 +406,7 @@ catch (_e) {
     aprRender(); await new Promise((res) => setTimeout(res, 150));
     html = document.getElementById("pppPreview").innerHTML;
     out.marcarCol = /<th>Enviar a<\/th>/.test(html);
-    const filas = html.split("<tr").filter(function (t) { return /cuarYpCuarentena/.test(t); });
+    const filas = html.split("cuar-al-card").filter(function (t) { return /cuarYpCuarentena/.test(t); });
     out.marcarSinAprobar = /cuarYpAprobar\(0\)/.test(html) && /cuarYpCuarentena\(0\)/.test(html);
     out.marcarAprobada = /cuarYpAprobar\(1\)/.test(html) && /cuarYpCuarentena\(1\)/.test(html);
     out.marcarFilas = filas.length === 2;   // las dos filas ofrecen volver a cuarentena
@@ -680,7 +682,7 @@ catch (_e) {
   chk(r.cliColapsaTitulo, "colapsar Clientes nuevos: el título con el contador (1) queda");
   chk(r.cliColapsaSinTabla, "colapsar Clientes nuevos: la tabla se esconde");
   chk(r.nuevoEtq === "Cliente nuevo", "etiqueta de cliente_nuevo = 'Cliente nuevo'");
-  chk(r.ypTabla, "ya programados: es una tabla con columnas NP / … / Enviar a");
+  chk(r.ypTabla, "ya programados: bloque de alerta con una tarjeta por pedido y sus 2 botones");
   chk(r.ypSinColAprob, "ya programados: sin columna Aprobación (el aprobado sale de la lista)");
   chk(r.ypCuenta, "ya programados: el contador cuenta las 2 filas");
   chk(r.ypCod, "ya programados: el número de cliente por empresa (LK 4263 / CH 2715)");

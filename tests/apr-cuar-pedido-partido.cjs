@@ -44,7 +44,7 @@ catch (_e) {
     aprRender(); await new Promise((res) => setTimeout(res, 150));
     html = document.getElementById("pppPreview").innerHTML;
     out.filas2 = (html.match(/class="cuar-tr/g) || []).length === 2;
-    out.contador2 = /🚧 Cuarentena <b>\(2\)<\/b>/.test(html);
+    out.contador2 = /🐊 Cuarentena <b>\(2\)<\/b>/.test(html);
     out.chip = /cuar-chip-partido/.test(html) && /2 pedidos \(1 partido\)/.test(html);
     out.labelsJuntos = /1545[^<]*\+[^<]*1546/.test(html);   // encabeza el ORIGINAL
     out.m3Sumado = /0,52[01] m³/.test(html) || /0\.52[01] m³/.test(html);
