@@ -118,7 +118,8 @@ function openAds() {
   ov.style.display = "flex";
   _adsRpc("gv_ads_config").then(function (r) {
     var c = r && r.data;
-    if (c) { _ads.cfg = c; _ads.n = Number(c.n_ocs) || 4; _ads.inc = c.incluir_actual == null ? true : !!c.incluir_actual; _ads.umbral = Number(c.umbral) || 0.5; }
+    if (c) { _ads.cfg = c; _ads.n = 4;   // v27.75 (Luis): el rango abre siempre en 4
+      _ads.inc = c.incluir_actual == null ? true : !!c.incluir_actual; _ads.umbral = Number(c.umbral) || 0.5; }
     _ads.inc = true;
     _adsRender(); _adsCargarTall(); _adsCargarStock();
   });
@@ -265,7 +266,7 @@ function _adsStockCalc(r, H) {
   // v27.33 (Luis): Dist = a qué tallerista le corresponde; con varios, la parte de cada uno en lo pedido del período.
   // Lo que entregó cada uno está en la pestaña Entregas talleristas.
   var totPed = pc.reduce(function (s, x) { return s + (Number(x.pedido) || 0); }, 0);
-  var dist = pc.length > 1 ? pc.map(function (x) { return x.proveedor + " " + (totPed > 0 ? _adsPct((Number(x.pedido) || 0) / totPed) : "—"); })
+  var dist = pc.length > 1 ? pc.map(function (x) { return x.proveedor + " " + (totPed > 0 ? _adsPct((Number(x.pedido) || 0) / totPed) : "—") + " (" + _adsN(x.pedido) + ")"; })   // v27.75: con las cajas
            : pc.length ? [pc[0].proveedor] : (r.oc_prov ? [r.oc_prov] : []);
   var rec = r.oc_rec_v != null ? r.oc_rec_v : r.oc_rec;
   return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]),
@@ -354,7 +355,7 @@ function adsExcelStock(H) {
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo), typeof c.cob === "string" ? c.cob : Math.round(c.cob),
-      r.oc_fecha ? _adsFecha(r.oc_fecha) : "sin OC", _adsNum(r.oc_cant), r.oc_fecha ? _adsNum(c.rec) : "", _adsPctNum(c.ocPct), c.dist.join(" · ")]);
+      r.oc_fecha ? _adsFecha(r.oc_fecha) : "sin OC", _adsNum(r.oc_cant), r.oc_fecha ? _adsNum(c.rec) : "", _adsPctNum(c.ocPct), c.dist.join(" - ")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
     { anchos: [6.57, 23, 5.14, 6, 6.29, 6, 5.43, 6.29, 5.86, 5.86, 5.29, _adsAnchoTexto(aoa, 11, 10.5, 24)], izq: [1, 11] });

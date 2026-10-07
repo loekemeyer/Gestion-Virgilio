@@ -36,7 +36,7 @@ const STOCK = [
     let modo = "ok";
     window.sb = { rpc: async (n, a) => {
       if (modo === "vacio") return { data: [], error: null };
-      if (n === "gv_ads_config") return { data: { n_ocs: 4, umbral: 0.5, incluir_actual: false }, error: null };
+      if (n === "gv_ads_config") return { data: { n_ocs: 7, umbral: 0.5, incluir_actual: false }, error: null };
       if (n === "gv_ads_talleristas") { window.__incArg = a && a.p_incluir_actual; return { data: TALL, error: null }; }
       if (n === "gv_ads_oc_fechas") return { data: [{ n: 1, fecha: "2026-10-07" }, { n: 2, fecha: "2026-09-30" }], error: null };
       if (n === "gv_ads_stock3") return { data: STOCK, error: null };
@@ -55,6 +55,7 @@ const STOCK = [
     out.semaf = sem && sem.style.display !== "none" ? [...sem.querySelectorAll(".ads-sem")].map((x) => x.textContent + "|" + x.style.background) : [];
     window.openAds(); await espera(150);
     out.rango = [...document.querySelectorAll("#adsOv .ads-bar select option")].map((o) => o.textContent);
+    out.rangoSel = (document.querySelector("#adsOv .ads-bar select") || {}).value;
     out.sinInc = !document.querySelector("#adsOv .ads-bar input[type=checkbox]") && window.__incArg === true;
     const filas = [...document.querySelectorAll("#adsOv tr.t")];
     out.orden = filas.map((f) => f.cells[0].textContent.replace(/[▸▾ ]/g, ""));
@@ -103,6 +104,7 @@ const STOCK = [
   await b.close();
   const fallas = [];
   if (r.rango.length !== 12 || r.rango[0] !== "1 - 07.10.26" || r.rango[1] !== "2 - 30.09.26" || r.rango[2] !== "3 - sin OC") fallas.push("(g) selector de rango 1..12 con fecha: " + JSON.stringify(r.rango));
+  if (r.rangoSel !== "4") fallas.push("(g) el rango abre en 4: " + r.rangoSel);
   if (!r.sinInc) fallas.push("(g) la OC en curso tiene que entrar siempre, sin casilla");
   if (!r.boton) fallas.push("(a) falta el botón ADS con su badge");
   if (r.badge !== "1") fallas.push("(a) badge no pinta: " + r.badge);
@@ -144,6 +146,10 @@ const STOCK = [
     const corto = ctx._adsStockCalc({ disponible: 5, proy_mes: 0, comp10: 8, saldo10: -3 }, 10).cob;
     const sobra = ctx._adsStockCalc({ disponible: 5, proy_mes: 0, comp10: 2, saldo10: 3 }, 10).cob;
     const vende = ctx._adsStockCalc({ disponible: 50, proy_mes: 30, comp10: 20, saldo10: 20 }, 10).cob;
+    ctx._adsN = (v) => Number(v).toLocaleString("es-AR");
+    ctx._adsPctCod = () => [{ proveedor: "Garcia", pedido: 140 }, { proveedor: "Poly", pedido: 107 }];
+    const dist = ctx._adsStockCalc({ disponible: 5, proy_mes: 0, comp10: 0, saldo10: 5 }, 10).dist;
+    if (JSON.stringify(dist) !== JSON.stringify(["Garcia 57 % (140)", "Poly 43 % (107)"])) fallas.push("(i) proporción con cajas: " + JSON.stringify(dist));
     if (corto !== 0 || sobra !== "sin venta" || vende !== 30) fallas.push("(h) D16 días cobertura: " + JSON.stringify([corto, sobra, vende]));
   }
   if (!/vac/i.test(r.vacio)) fallas.push("(d) lectura vacía no se dice: " + r.vacio);
