@@ -1,0 +1,8 @@
+-- v27.80 (Luis, 07/10/2026: "que no figure como un operario mas"): el supervisor firma desde el panel con
+-- legajo 'sup:<mail>' (v21.42) y gv_monitor_horas_operario_dia lo contaba como operario («Leg S.»).
+-- Aplicado sobre pg_get_functiondef (idempotente, marcador v27.80-sup, falla si no matchea 2 veces):
+--   and coalesce(r.legajo::text,'') !~* '^sup:'   (eventos)
+--   and coalesce(m.legajo::text,'') !~* '^sup:'   (movimientos de stock)
+-- Huella GV_Huella_Objeto re-congelada (6ba82d81…); el 15/09 no cambia. Centinela 348 (patron \^sup:).
+-- gv_horas_operario_detalle_v2 (sueldos) ya filtraba legajo ~ '^[0-9]+$': no se tocó.
+-- Rollback: quitar las dos líneas con 'v27.80-sup' del cuerpo vivo y re-congelar la huella.

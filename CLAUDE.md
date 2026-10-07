@@ -8026,6 +8026,14 @@ public.gv_alerta_gondola_llena_telegram(true);`. Centinela 322. `sql/gv_alerta_g
   no siguió · la tanda). Al agregar o reordenar un pase del armador, sumar su `set_config` y su fila al catálogo.
 - `sql/gv_ppp_np_pauta_v2705.sql`, centinela 336, `tests/ppp-res-origen.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-07, v27.80): el SUPERVISOR (`sup:<mail>`) no es operario en ningún monitor
+
+Caso: «Leg S. · libre 1:17» en el Mon. Admin = `loekemeyer.n8n@` marcando 6 «↩ s/salida» desde el panel (firma
+`sup:<mail>`, v21.42). Hoy lo sacan la vista `gv_monitor_horas_operario_dia` (marcador `v27.80-sup`, centinela 348),
+tv.html / admin.html (`actividadActual`, fichadas, `popFaseCiclos` en `build-admin.cjs`) y el monitor del index
+(`fetchMonitorDayStats`, `showDayBreakdown`, `_monActividadActual`, `_monEnSilencio`, `fetchMonitorEvents`). Todo
+filtro de «legajo de prueba» en un monitor lleva también `/^sup:/`. `tests/mon-sup-no-operario.cjs`.
+
 ## ⚠ REGLA (Luis, 2026-10-07, v27.74): 865ED NO EXISTE MÁS — es el 865E de 12 u
 
 El 865E (antes caja de 24 u) pasó a ser el Rallador Plano A/I 3 Usos **de 12 u**, y el 865ED se unificó ahí: UxB,

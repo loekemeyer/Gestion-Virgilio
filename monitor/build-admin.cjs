@@ -282,7 +282,7 @@ function popFaseCiclos(evs, code, abre, cierra) {
   (evs || []).forEach(function (e) {
     if (String(e.texto || "").trim().toUpperCase() !== code) return;
     var leg = String(e.legajo == null ? "" : e.legajo).trim();
-    if (!leg || leg === "0") return;
+    if (!leg || leg === "0" || /^sup:/i.test(leg)) return;
     if (e.opcion === abre) abiertos[leg] = { ini: e.ts_cliente, fin: null };
     else if (e.opcion === cierra) {
       var a = abiertos[leg];

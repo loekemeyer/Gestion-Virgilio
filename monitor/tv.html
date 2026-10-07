@@ -1123,7 +1123,7 @@ function actividadActual(eventos, hoy, fjHoy, fichados) {
   var porLeg = {}, i;
   for (i = 0; i < eventos.length; i++) {
     var ev = eventos[i], leg = String(ev.legajo == null ? "" : ev.legajo).trim();
-    if (!leg || leg === "0") continue;      // legajos de prueba/basura
+    if (!leg || leg === "0" || /^sup:/i.test(leg)) continue;      // legajos de prueba/basura
     if (dayKey(ev.ts_cliente) !== hoy) continue;
     (porLeg[leg] || (porLeg[leg] = [])).push({
       op: ev.opcion, tx: String(ev.texto || "").trim().toUpperCase(),
@@ -1766,7 +1766,7 @@ function ciclo() {
       });
       (fichadas || []).forEach(function (f) {
         var leg = f.legajo ? String(f.legajo) : null;
-        if (!leg || leg === "0") return;
+        if (!leg || leg === "0" || /^sup:/i.test(leg)) return;
         var ts = new Date(f.ts_cliente).getTime();
         if (!fichados.has(leg) || ts < fichados.get(leg)) fichados.set(leg, ts);
       });
