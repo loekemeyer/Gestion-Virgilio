@@ -210,14 +210,16 @@ function _adsPctCod(cod) {
   return _ads.tall.filter(function (r) { return String(r.codigo).toUpperCase() === String(cod).toUpperCase(); });
 }
 /* Filas de la pestaña Stock en quiebre al horizonte elegido. Puro: lo prueba el test. */
-function adsFiltrarStock(rows, horiz, q) {
+function adsFiltrarStock(rows, horiz, q, hOrden) {
   var campo = "saldo" + horiz;
+  // v28.42 (Luis): se ordena por el saldo del lapso ELEGIDO, de mayor déficit a menor (antes siempre por el de 10 d)
+  var ko = "saldo" + (hOrden || horiz || 10);
   return (rows || []).filter(function (r) {
     if (horiz && !(Number(r[campo]) < 0)) return false;
     if (q && (String(r.cod) + " " + String(r.descripcion || "")).toUpperCase().indexOf(q) < 0) return false;
     return true;
   }).sort(function (a, b) {
-    return (Number(a.saldo10) - Number(b.saldo10)) || (Number(a.saldo20) - Number(b.saldo20)) || (Number(a.saldo30) - Number(b.saldo30));
+    return (Number(a[ko]) - Number(b[ko])) || (Number(a.saldo10) - Number(b.saldo10)) || (Number(a.saldo20) - Number(b.saldo20)) || (Number(a.saldo30) - Number(b.saldo30));
   });
 }
 
@@ -237,7 +239,7 @@ function _adsHtmlStock() {
   h += '<div class="ads-body">';
   if (_ads.stockErr) return h + '<div class="err">' + _adsEsc(_ads.stockErr) + "</div></div>";
   if (!_ads.stock) return h + '<div class="msg">Leyendo stock…</div></div>';
-  var f = adsFiltrarStock(rows, ver, _ads.q);
+  var f = adsFiltrarStock(rows, ver, _ads.q, H);
   h += '<div class="res">Todo a ' + H + ' días · sólo artículos con tallerista · disponible = góndola + racks + a guardar + excedente · comprometido = NP programadas sin pickear con entrega hasta ese día · en cajas</div>';
   h += '<table><thead><tr><th rowspan="2">Cód.</th><th rowspan="2">Descripción</th><th rowspan="2">Stk</th><th rowspan="2">Comprom.<br>' + H + ' d</th><th rowspan="2" title="Est. Madre del mes × ' + H + '/30">Est. Madre<br>' + H + ' d</th>' +
     '<th rowspan="2">Saldo<br>' + H + ' d</th>' +
@@ -443,7 +445,8 @@ function _adsRender() {
    lo que ya se mostraba: no pinta nada. */
 function adsSemaforoCuentas(q) {
   var q10 = Number(q && q.q10) || 0, q20 = Number(q && q.q20) || 0, q30 = Number(q && q.q30) || 0;
-  return { rojo: q10, naranja: Math.max(0, q20 - q10), amarillo: Math.max(0, q30 - q20) };
+  // v28.42 (Luis): ACUMULADOS — cada pastilla dice cuántos quiebran a ese plazo (10 ⊂ 20 ⊂ 30), no los que recién quiebran
+  return { rojo: q10, naranja: q20, amarillo: q30 };
 }
 function adsLoadBadge() {
   var b = document.getElementById("adsBadge");
@@ -459,8 +462,8 @@ function adsLoadBadge() {
     if (!r || r.error || !r.data) return;
     var c = adsSemaforoCuentas(r.data), h = "";
     /* v27.25 (Luis): cada pastilla dice su plazo (10d / 20d / 30d) al lado del número */
-    [["rojo", "#dc2626", "#fff", "10d", "a 10 días"], ["naranja", "#ea580c", "#fff", "20d", "recién a 20 días"], ["amarillo", "#facc15", "#422006", "30d", "recién a 30 días"]].forEach(function (x) {
-      if (c[x[0]] > 0) h += '<span class="ads-sem" data-n="' + c[x[0]] + '" style="height:18px;line-height:18px;padding:0 5px;border-radius:9px;background:' + x[1] + ';color:' + x[2] + ';font-size:12px;font-weight:800;text-align:center;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3);" title="' + c[x[0]] + ' artículo(s) quiebran ' + x[4] + ' (cada artículo cuenta una vez, en su color más urgente)">' + c[x[0]] + '<span style="font-size:9px;font-weight:700;margin-left:3px;opacity:.85;">' + x[3] + "</span></span>";
+    [["rojo", "#dc2626", "#fff", "10d", "a 10 días"], ["naranja", "#ea580c", "#fff", "20d", "a 20 días"], ["amarillo", "#facc15", "#422006", "30d", "a 30 días"]].forEach(function (x) {
+      if (c[x[0]] > 0) h += '<span class="ads-sem" data-n="' + c[x[0]] + '" style="height:18px;line-height:18px;padding:0 5px;border-radius:9px;background:' + x[1] + ';color:' + x[2] + ';font-size:12px;font-weight:800;text-align:center;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3);" title="' + c[x[0]] + ' artículo(s) quiebran ' + x[4] + ' (acumulado: incluye los que ya quiebran antes)">' + c[x[0]] + '<span style="font-size:9px;font-weight:700;margin-left:3px;opacity:.85;">' + x[3] + "</span></span>";
     });
     s.innerHTML = h; s.style.display = h ? "flex" : "none";
   });
