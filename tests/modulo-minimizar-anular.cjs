@@ -24,7 +24,13 @@ catch (_e) {
   const errs = [];
   p.on("pageerror", (e) => errs.push(e.message));
   await p.route("**/*.supabase.co/**", (r) => r.abort());
-  await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "domcontentloaded" });
+  await p.goto("file://" + path.join(root, "index.html"), { waitUntil: "load" });
+  // Bajo carga paralela el index puede no haber terminado de definir sus funciones cuando
+  // arranca el evaluate (era la carrera que ponía este test en rojo 1 de N). Esperamos a que
+  // las funciones que maneja el test existan antes de empezar.
+  await p.waitForFunction(() => ["showRacksBajarModal", "showIngresoRacksModal", "showMGModal",
+    "selectOption", "updateCoreButtonsState", "getLegajoState"].every((f) => typeof window[f] === "function"),
+    { timeout: 25000 });
 
   const r = await p.evaluate(async () => {
     const out = {};
