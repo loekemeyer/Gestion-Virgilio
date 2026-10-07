@@ -130,6 +130,17 @@ const STOCK = [
   if (!xt || JSON.stringify(xt.anchos.slice(1)) !== JSON.stringify([6.57, 23, 5.14, 5.29, 5.86, 4, 6.57, 5.86, 6]) || xt.anchos[0] < 11.14 || xt.anchos[0] > 16 ||
       !xt.alto1 || !xt.congela || !xt.ajusta || xt.a2 !== "" || xt.b2 !== ' s="2"') fallas.push("(g) formato Excel talleristas: " + JSON.stringify(xt && [xt.anchos, xt.alto1, xt.congela, xt.ajusta, xt.a2, xt.b2]));
   if (!x10 || x10.anchos.length !== 12 || Math.max(...x10.anchos) > 24 || x10.cab[11] !== "Proporción" || x10.cab.slice(3).some((h) => String(h).split(/\s+/).some((w) => w.length > 6 && w !== "Proporción")) || x10.anchos.reduce((a, b) => a + b, 0) > 110) fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
+  // v27.59 D16 (Luis): sin stock que cubra lo comprometido = 0 días aunque no tenga Est. Madre; con sobrante y sin Est. Madre = «sin venta»
+  {
+    const src = require("fs").readFileSync(path.join(__dirname, "..", "ads.js"), "utf8");
+    const ctx = { _adsPctCod: () => [], _adsPct: (x) => Math.round(x * 100) + " %" };
+    const vm = require("vm"); vm.createContext(ctx);
+    vm.runInContext(src.slice(src.indexOf("function _adsStockCalc"), src.indexOf("/* v27.34")), ctx);
+    const corto = ctx._adsStockCalc({ disponible: 5, proy_mes: 0, comp10: 8, saldo10: -3 }, 10).cob;
+    const sobra = ctx._adsStockCalc({ disponible: 5, proy_mes: 0, comp10: 2, saldo10: 3 }, 10).cob;
+    const vende = ctx._adsStockCalc({ disponible: 50, proy_mes: 30, comp10: 20, saldo10: 20 }, 10).cob;
+    if (corto !== 0 || sobra !== "sin venta" || vende !== 30) fallas.push("(h) D16 días cobertura: " + JSON.stringify([corto, sobra, vende]));
+  }
   if (!/vac/i.test(r.vacio)) fallas.push("(d) lectura vacía no se dice: " + r.vacio);
   if (errs.length) fallas.push("errores de página: " + errs.slice(0, 3).join(" | "));
   if (fallas.length) { console.error("✗ ADS:\n  " + fallas.join("\n  ")); process.exit(1); }

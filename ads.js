@@ -241,7 +241,7 @@ function _adsHtmlStock() {
     h += "<tr><td><b>" + _adsEsc(r.cod) + '</b></td><td class="desc" title="' + _adsEsc(r.descripcion) + '">' + _adsEsc(r.descripcion) +
       '</td><td title="Góndola ' + _adsN(r.terminado) + " · racks " + _adsN(r.racks) + " · a guardar " + _adsN(r.a_guardar) + " · excedente " + _adsN(r.excedente) + '">' + _adsN(disp) +
       "</td><td>" + _adsN(comp) + '</td><td title="' + _adsN(proy) + ' por mes">' + _adsN(Math.round(em)) +
-      '</td><td class="' + (saldo < 0 ? "neg" : "pos") + '">' + _adsN(saldo) + "</td><td>" + (cob == null ? "—" : _adsN(Math.round(cob))) + "</td>";
+      '</td><td class="' + (saldo < 0 ? "neg" : "pos") + '">' + _adsN(saldo) + "</td><td>" + (typeof cob === "string" ? cob : _adsN(Math.round(cob))) + "</td>";
     if (r.oc_fecha) h += '<td class="u1">' + _adsFecha(r.oc_fecha) + '</td><td class="u2">' + _adsN(r.oc_cant) + '</td><td class="u2">' + _adsN(rec) +
       '</td><td class="u3' + (ocPct != null && ocPct < _ads.umbral ? " neg" : "") + '">' + _adsPct(ocPct) + "</td>";
     else h += '<td colspan="4" class="u1 u3"><span class="neg">sin OC</span></td>';
@@ -261,7 +261,7 @@ function _adsStockCalc(r, H) {
            : pc.length ? [pc[0].proveedor] : (r.oc_prov ? [r.oc_prov] : []);
   var rec = r.oc_rec_v != null ? r.oc_rec_v : r.oc_rec;
   return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]),
-           cob: proy > 0 ? Math.max(0, disp - comp) / (proy / 30) : null,
+           cob: disp - comp <= 0 ? 0 : (proy > 0 ? (disp - comp) / (proy / 30) : "sin venta"),   // D16 v27.59
            rec: rec, ocPct: r.oc_cant ? Number(rec) / Number(r.oc_cant) : null, dist: dist };
 }
 
@@ -345,7 +345,7 @@ function adsExcelStock(H) {
               "Fecha últ. OC", "Ped. últ. OC", "Rec. últ. OC", "% últ. OC", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
-    aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo), c.cob == null ? "" : Math.round(c.cob),
+    aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo), typeof c.cob === "string" ? c.cob : Math.round(c.cob),
       r.oc_fecha ? _adsFecha(r.oc_fecha) : "sin OC", _adsNum(r.oc_cant), r.oc_fecha ? _adsNum(c.rec) : "", _adsPctNum(c.ocPct), c.dist.join(" · ")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
