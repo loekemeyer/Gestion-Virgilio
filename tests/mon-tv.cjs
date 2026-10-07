@@ -48,7 +48,7 @@ if (/sb_publishable_|eyJhbGciOiJIUzI1NiIs/.test(src)) {
 /* ── 2) mismas fuentes que el monitor grande ──────────────────────────────── */
 for (const fuente of ["gv_ppp_programacion_diaria", "PPP_Web_Programacion", "gv_tanda_status",
                       "gv_tandas_deshechas", "Facturacion_NP", "Registros_Produccion_Virgilio",
-                      "Fichadas_Virgilio", "Empleados"]) {
+                      "rpc/gv_monitor_ingresos", "Empleados"]) {
   if (!src.includes(fuente)) fallas.push("no lee " + fuente);
 }
 for (const col of ["pick_abandonado", "arm_abandonado", "pick_fj_ts", "arm_fj_ts"]) {
@@ -208,7 +208,7 @@ function responder(url) {
   if (q.includes("/rpc/gv_tanda_m3_pickeado"))   return [{ tanda: "E31A", fraccion: 0.8, tp: iso(T0 - 2.5 * H), calc_at: iso(T0) }];
   if (q.includes("/gv_monitor_horas_operario"))  return DATOS.horas;
   if (q.includes("/Facturacion_NP"))             return DATOS.facturadas;
-  if (q.includes("/Fichadas_Virgilio"))          return DATOS.fichadas;
+  if (q.includes("/rpc/gv_monitor_ingresos"))          return DATOS.fichadas;
   if (q.includes("/Empleados"))                  return DATOS.empleados;
   if (q.includes("/Registros_Produccion_Virgilio")) {
     return q.includes("opcion=in.(CCN,FSS)") ? DATOS.ccn : DATOS.eventos;

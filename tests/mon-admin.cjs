@@ -158,7 +158,7 @@ function responder(url) {
   if (q.includes("/rpc/gv_ppp_prog_arbol"))      return DATOS.arbol;
   if (q.includes("/gv_monitor_horas_operario"))  return DATOS.horas;
   if (q.includes("/Facturacion_NP"))             return DATOS.facturadas;
-  if (q.includes("/Fichadas_Virgilio"))          return DATOS.fichadas;
+  if (q.includes("/rpc/gv_monitor_ingresos"))          return DATOS.fichadas;
   if (q.includes("/Empleados"))                  return DATOS.empleados;
   if (q.includes("/rpc/gv_tv_clave_actual"))     return { clave: "1234", cambia_en_s: 60 };
   /* v26.55 (Luis, 04/10): E31A se pickeó al 80 % → vale 1,2 m³ en todo el tablero (picking y armado) */

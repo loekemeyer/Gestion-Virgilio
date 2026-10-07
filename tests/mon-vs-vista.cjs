@@ -69,7 +69,7 @@ const TOL = 0.011;
   await p.route("**/rest/v1/**", (route) => {
     const u = route.request().url();
     let body = "[]";
-    if (u.indexOf("Fichadas_Virgilio") >= 0) body = JSON.stringify(FICH);
+    if (u.indexOf("gv_monitor_ingresos") >= 0) body = JSON.stringify(FICH);
     else if (u.indexOf("Empleados") >= 0) body = JSON.stringify(EMP);
     else if (u.indexOf("Movimientos_Stock") >= 0) body = JSON.stringify(RK);
     else if (u.indexOf("Registros_Produccion_Virgilio") >= 0) {

@@ -5783,6 +5783,8 @@ Para probar el programa de punta a punta. Con el legajo **1**, cada «Enviar» d
 Deshacer dura **10 min** (`_undoWindowMs`, ≡ el tope de `gv_deshacer_evento`); el resto de los legajos sigue en 60 s.
 Lo que pasa adentro de un módulo abierto con «sí» (cada código del picking, el armado, el guardado) no vuelve a preguntar.
 ⚠ **v27.63 (Thomas, D13): el legajo 1 CUENTA en el MONITOR** (vista `gv_monitor_horas_operario_dia`, marcador `v27.59-leg1`, TV, Mon. Admin, monitor del index) y Bajar/Ingreso a racks ya manda su tramo. Sigue excluido en la alarma de inactividad, la planilla de horas (`gv_horas_operario_detalle_v2`), productividad y reportes. `sql/gv_monitor_legajo1_v2763.sql`.
+
+⚠ **v27.65 (Thomas, D16: *"si entro por tv pero no marco nada, es tiempo muerto"*): los monitores leen el INGRESO de verdad.** TV, Mon. Admin y el monitor del index leían `Fichadas_Virgilio` (muerta desde el 27/05); hoy leen **`gv_monitor_ingresos(desde, hasta)`** (SECURITY DEFINER, anon; primer ingreso del día por legajo en `GV_Dispositivo_Login`, tipo operario, tope 8 días). El que entró con la clave y no registró nada sale **«entró · sin arrancar (tiempo muerto)»** desde su hora de ingreso. `sql/gv_monitor_ingresos_v2765.sql`.
 Va igual en Registro Producción 3.0 (v30.09). `tests/legajo1-confirma.cjs`.
 
 ## ⚠ REGLA (06/10/2026, v27.46): el DESHACER (60 s) del operario va por RPC — nunca DELETE

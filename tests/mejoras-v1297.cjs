@@ -50,7 +50,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     window.fetch = (url) => {
       const u = String(url);
       if (u.indexOf("opcion=eq.FJ") >= 0) return J([]);
-      if (u.indexOf(SUPABASE_FICHADAS_ENDPOINT) >= 0) return J([]);
+      if (u.indexOf(SUPABASE_FICHADAS_ENDPOINT) >= 0 || u.indexOf("gv_monitor_ingresos") >= 0) return J([]);
       if (u.indexOf(SUPABASE_TABLE_ENDPOINT) >= 0) return J(evs);
       return J([]);
     };

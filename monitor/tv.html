@@ -927,10 +927,11 @@ var cargarFeriados = cache(EMPLEADOS_TTL, function () {
 function cargarFichadasHoy() {
   var desde = hoyKey() + "T00:00:00-03:00";
   var hasta = dayKey(Date.now() + 86400000) + "T00:00:00-03:00";
-  return get("Fichadas_Virgilio",
-    "ts_cliente=gte." + encodeURIComponent(desde) +
-    "&ts_cliente=lt." + encodeURIComponent(hasta) +
-    "&tipo=eq.ingreso&select=legajo,ts_cliente&limit=2000").catch(function () { return []; });
+  /* v27.64 (Thomas, D16): el ingreso real es el de la app (código de la TV), no Fichadas_Virgilio (muerta desde
+     el 27/05). El que entró y no marcó nada es tiempo muerto desde que entró. ≡ index.html Query D. */
+  return get("rpc/gv_monitor_ingresos",
+    "p_desde=" + encodeURIComponent(desde) +
+    "&p_hasta=" + encodeURIComponent(hasta)).catch(function () { return []; });
 }
 
 var cargarEmpleados = cache(EMPLEADOS_TTL, function () {
@@ -1628,7 +1629,7 @@ function pintarHoras(filas, d) {
     var min = Math.round((Date.now() - r.desde) / 60000);
     var col = min >= 120 ? "#f87171" : (min >= 60 ? "#fbbf24" : "#64748b");
     var q;
-    if (r.idle) q = (r.arranco === false) ? "🕐 sin arrancar" : "💤 libre";
+    if (r.idle) q = (r.arranco === false) ? "🕐 entró · sin arrancar (tiempo muerto)" : "💤 libre";
     else { var info = ACT_INFO[r.kind] || { ic: "•", tx: r.kind }; q = (info.ic || "•") + " " + (info.vb ? (info.vb + " " + esc(r.tanda)) : info.tx); }
     return '<td class="op-ah' + (r.idle ? " act-idle" : "") + '">' + q + ' <b style="color:' + col + '">' + esc(fmtMin(min)) + '</b></td>';
   };
