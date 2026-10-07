@@ -1034,7 +1034,8 @@ var cargarCamiones = cache(PROG_TTL, function () {
    que es el criterio v20.12 de la PPP ("sólo salió si se cargó a camión"). */
 var cargarArbol = cache(PROG_TTL, function () {
   var hoy = hoyKey();
-  var hasta = new Date(new Date(hoy + "T12:00:00-03:00").getTime() + 30 * 86400000).toISOString().slice(0, 10);
+  /* v27.81 (Luis, D10): 10 días alcanzan (la pantalla usa 4 con reparto); 30 costaban ~40 % más en la base */
+  var hasta = new Date(new Date(hoy + "T12:00:00-03:00").getTime() + 10 * 86400000).toISOString().slice(0, 10);
   var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
   return conTimeout(fetch(SB_URL + "/rest/v1/rpc/gv_ppp_prog_arbol", {
     method: "POST", cache: "no-store", signal: ctrl ? ctrl.signal : undefined,
