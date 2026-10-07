@@ -119,8 +119,10 @@ function openAds() {
   _adsRpc("gv_ads_config").then(function (r) {
     var c = r && r.data;
     if (c) { _ads.cfg = c; _ads.n = Number(c.n_ocs) || 4; _ads.inc = c.incluir_actual == null ? true : !!c.incluir_actual; _ads.umbral = Number(c.umbral) || 0.5; }
+    _ads.inc = true;
     _adsRender(); _adsCargarTall(); _adsCargarStock();
   });
+  _adsRpc("gv_ads_oc_fechas", { p_n: 12 }).then(function (r) { if (r && Array.isArray(r.data)) { _ads.fechas = r.data; _adsRender(); } });
   _adsRender();
 }
 function adsClose() { var ov = document.getElementById("adsOv"); if (ov) ov.style.display = "none"; try { adsLoadBadge(); } catch (_e) {} }
@@ -128,7 +130,7 @@ function adsTab(t) { _ads.tab = t; _adsRender(); }
 
 function _adsCargarTall() {
   _ads.tall = null; _ads.tallErr = ""; _adsRender();
-  _adsRpc("gv_ads_talleristas", { p_n: _ads.n, p_incluir_actual: _ads.inc }).then(function (r) {
+  _adsRpc("gv_ads_talleristas", { p_n: _ads.n, p_incluir_actual: true }).then(function (r) {
     if (r.error || !Array.isArray(r.data)) _ads.tallErr = "No se pudieron leer las OC: " + ((r.error && r.error.message) || "sin respuesta");
     else if (!r.data.length) _ads.tallErr = "La lectura volvió vacía: no hay OC en el rango (o no hay sesión).";
     else _ads.tall = r.data;
@@ -145,11 +147,10 @@ function _adsCargarStock() {
   });
 }
 
-function adsSetN(v) { _ads.n = Math.max(1, Math.min(52, parseInt(v, 10) || 4)); _adsCargarTall(); }
-function adsSetInc(v) { _ads.inc = !!v; _adsCargarTall(); }
+function adsSetN(v) { _ads.n = Math.max(1, Math.min(12, parseInt(v, 10) || 4)); _adsCargarTall(); }
 function adsSetUmbral(v) { var n = parseFloat(String(v).replace(",", ".")); if (n > 0 && n <= 100) { _ads.umbral = n / 100; _adsRender(); } }
 function adsGuardarCfg() {
-  _adsRpc("gv_ads_config_guardar", { p_umbral: _ads.umbral, p_n: _ads.n, p_incluir: _ads.inc }).then(function (r) {
+  _adsRpc("gv_ads_config_guardar", { p_umbral: _ads.umbral, p_n: _ads.n, p_incluir: true }).then(function (r) {
     if (r.error) { alert("No se guardó: " + (r.error.message || r.error)); return; }
     _ads.cfg = r.data; alert("Guardado: el badge usa las últimas " + _ads.n + " OC y " + Math.round(_ads.umbral * 100) + " %.");
     try { adsLoadBadge(); } catch (_e) {}
@@ -159,12 +160,19 @@ function adsToggle(k) { _ads.abiertos[k] = !_ads.abiertos[k]; _adsRender(); }
 function adsHoriz(h) { if (h) { _ads.horiz = h; _ads.todos = false; } else _ads.todos = true; _adsRender(); }
 function adsBuscar(v) { _ads.q = String(v || "").trim().toUpperCase(); _adsRender(); var i = document.getElementById("adsQ"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }
 
+// v27.73 (Luis): el rango va de 1 a 12 y cada opción dice la fecha de la OC más vieja que entra ("1 - 07.10.26").
+function _adsOpcRango(n) {
+  var f = (_ads.fechas || []).filter(function (x) { return Number(x.n) === n; })[0];
+  if (!f || !f.fecha) return String(n) + (_ads.fechas ? " - sin OC" : "");
+  var p = String(f.fecha).slice(0, 10).split("-");
+  return n + " - " + p[2] + "." + p[1] + "." + p[0].slice(2);
+}
 function _adsBar(p, al) { var w = Math.max(0, Math.min(1, p || 0)) * 100; return '<span class="bar"><i class="' + (al ? "r" : "") + '" style="width:' + w.toFixed(0) + '%"></i></span>'; }
 
 function _adsHtmlTall() {
   var h = '<div class="ads-bar">Rango: últimas <select onchange="adsSetN(this.value)">';
-  [2, 3, 4, 5, 6, 8, 10, 12].forEach(function (n) { h += '<option' + (n === _ads.n ? " selected" : "") + ">" + n + "</option>"; });
-  h += '</select> OC · <label><input type="checkbox"' + (_ads.inc ? " checked" : "") + ' onchange="adsSetInc(this.checked)"> incluir la OC en curso</label>' +
+  for (var n = 1; n <= 12; n++) h += '<option value="' + n + '"' + (n === _ads.n ? " selected" : "") + ">" + _adsOpcRango(n) + "</option>";
+  h += '</select> OC' +
     ' · Alerta debajo de <input type="number" min="1" max="100" style="width:60px" value="' + Math.round(_ads.umbral * 100) + '" onchange="adsSetUmbral(this.value)"> %' +
     ' <button onclick="adsGuardarCfg()" title="Guarda rango y umbral para el badge del panel (vale para todos)">Guardar para el badge</button>' +
     ' <button class="xl" onclick="adsExcelTall()">Descargar Excel</button></div>';

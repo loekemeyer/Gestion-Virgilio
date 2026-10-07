@@ -8057,6 +8057,7 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
   a otro). Las dos tablas de entregas quedan separadas (D8, Luis: *"dejalo"*). La OC más nueva
   no entra por defecto (su semana corre). Tallerista con % < umbral → cuenta en el badge. Medido 06/10: badge 13 → 10
   (Lucho 40 → 51 %, Poly 36 → 60 %, Pedernera 22 → 76 %). **v27.31**: lo recibido cuenta desde la 1.ª OC de ESE artículo en el rango, no desde la 1.ª OC del rango (599E: 34 cajas del 28/09 se contaban contra una OC del 30/09 → «100 %»). `sql/gv_ads_recibido_virgilio_v2731.sql`.
+- **v27.73 (Luis, 07/10): rango 1 a 12, cada opción con la fecha de la OC más vieja que entra (`1 - 07.10.26`, `gv_ads_oc_fechas`); la OC en curso entra SIEMPRE (se fue la casilla).**
 - Rango, umbral (50 %) e «incluir la OC en curso» viven en `Stock_Config` (`ads_n_ocs`, `ads_umbral`,
   `ads_incluir_actual`); los guarda `gv_ads_config_guardar` (supervisor). Cambiarlos es un `update`.
 - **Stock** (`gv_ads_stock2()`, v27.22; `gv_ads_stock` queda sin llamador, de rollback): saldo a 10/20/30 días =
