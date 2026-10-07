@@ -180,7 +180,7 @@ catch (_e) {
     const fila58 = [...prev.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("LK 0058") >= 0);
     out.npCod    = !!fila58 && (fila58.querySelector(".pga-cod") || {}).textContent === "LK 1000";
     out.npZonaBarrio = !!fila58 && (fila58.querySelector(".pga-loc") || {}).textContent === "Zona 2 - CABA Centro · Villa Crespo";
-    out.npFechaPed   = !!fila58 && (fila58.querySelector(".pga-ped") || {}).textContent === "ped. 11/09";
+    out.npFechaPed   = !!fila58 && (fila58.querySelector(".pga-ped") || {}).textContent === "📥 11/09";
     const filaCh = [...prev.querySelectorAll("tr.pga-n")].find((x) => x.textContent.indexOf("CH 0019") >= 0);
     out.npCodCh = !!filaCh && (filaCh.querySelector(".pga-cod") || {}).textContent === "CH 1000";
 

@@ -1117,6 +1117,7 @@ body:has(#optionsScreen:not(.hidden)) #btnHistDias{ display:none !important; }
 .cuar-yaprog-np{ font-weight:900; }
 .cuar-yaprog-tanda{ background:#fee2e2; border-radius:4px; padding:0 5px; font-weight:700; }
 .cuar-yaprog-fecha{ opacity:.8; }
+.cuar-yaprog-fped{ font-weight:600; white-space:nowrap; }
 .cuar-yaprog-cli{ flex:1 1 120px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cuar-yaprog-motivo{ font-weight:700; }
 .cuar-yaprog-pick{ background:#991b1b; color:#fff; border-radius:4px; padding:0 5px; font-size:10px; font-weight:800; }
@@ -3870,7 +3871,7 @@ tr.ppp-err-zona > td{ background:#fffbeb !important; }
 .pga-ret{ display:inline-block; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1;
   border-radius:6px; padding:0 7px; font-size:12.5px; font-weight:800; margin-left:8px;
   vertical-align:1px; white-space:nowrap; }
-.pga-ped{ color:#94a3b8; font-size:13px; margin-left:8px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.pga-ped{ color:#334155; font-weight:600; font-size:13px; margin-left:8px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .pga-monto{ color:#047857; font-weight:600; font-size:13px; margin-left:8px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 /* v17.85 (Luis): las acciones de la fila de la NP.
    v17.94: van ANCLADAS A LA DERECHA de la columna, no colgando detrás del texto. Quedan siempre en
@@ -6332,7 +6333,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.31"></script>
+<script type="module" src="recepcion.js?v=28.32"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10611,7 +10612,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.31";
+const APP_VERSION = "v28.32";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -35720,7 +35721,7 @@ function _pppSearchStr(p) { return [p.np, p.cod, p.razon_social, p.tanda, p.loca
 function pppSetSearch(v) { _pppSearch = String(v == null ? "" : v).trim(); pppRenderProg(); }
 function pppLoadEntregados() { if (_pppEntregados) return _pppEntregados; let a = []; try { a = JSON.parse(localStorage.getItem(PPP_ENT_KEY) || "[]"); } catch (_e) {} _pppEntregados = new Set(Array.isArray(a) ? a.map(String) : []); return _pppEntregados; }
 function pppSaveEntregados() { try { localStorage.setItem(PPP_ENT_KEY, JSON.stringify(Array.from(pppLoadEntregados()))); } catch (_e) {} }
-function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "plan" || t === "ent" || t === "enviaje" || t === "resumen") pppRefreshEnSalida(); if (t === "plan") { pppRefreshValor(); pppRefreshGeo(); } if (t === "ent" || t === "enviaje") { pppRefreshDelivered(); pppRefreshMetaEntSet(); } if (t === "ent") { pppRefreshFechaPedido().then(function () { if (_pppTab === "ent") pppRenderProg(); }).catch(function () {}); } if (t === "ocup") pppRefreshOcupacion(); }
+function pppTab(t) { _pppTab = t; pppRenderProg(); if (t === "plan" || t === "ent" || t === "resumen") { pppRefreshArmado(); pppRefreshEntregado(); pppRefreshControlado(); } if (t === "plan" || t === "ent" || t === "enviaje" || t === "resumen") pppRefreshEnSalida(); if (t === "plan") { pppRefreshValor(); pppRefreshGeo(); pppRefreshFechaPedido().then(function () { if (_pppTab === "plan") pppRenderProg(); }).catch(function () {}); } if (t === "ent" || t === "enviaje") { pppRefreshDelivered(); pppRefreshMetaEntSet(); } if (t === "ent") { pppRefreshFechaPedido().then(function () { if (_pppTab === "ent") pppRenderProg(); }).catch(function () {}); } if (t === "ocup") pppRefreshOcupacion(); }
 /* "Controlado" (manual, lo marca la operadora) → recién ahí el pedido pasa a Pedidos
    Entregados. _pppEntregados = NPs controlados (persistido en vir_ppp_entregados). */
 function pppControlar(np) { pppLoadEntregados().add(String(np)); pppSaveEntregados(); pppRenderProg(); }
@@ -36183,6 +36184,24 @@ async function pppRefreshFechaPedido(force) {
   }
   _pppFechaPed = m; _pppFechaPedTs = Date.now();
   return m;
+}
+/* v28.32 (Luis, 07/10): «que figure la fecha en la que el cliente mandó el pedido» — en
+   Cuarentena (ya programados) y en la Programación. Chip común: «📥 dd/mm» y, en el title, la
+   fecha entera, la hora (si se sabe) y cuántos días corridos van hasta `hasta` (la entrega).
+   La fecha sale de la fila; si no trae, de GV_NP_Fecha_Pedido (_pppFechaPedOf). Sin dato, "". */
+function gvFechaPedChip(np, fIso, hasta, cls) {
+  let f = String(fIso || "").slice(0, 10), h = "";
+  const fp = _pppFechaPedOf(np);
+  if (fp && (!f || fp.f === f)) { f = f || fp.f; h = fp.h || ""; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return "";
+  const dd = f.slice(8, 10) + "/" + f.slice(5, 7);
+  let tit = "El cliente mandó el pedido el " + dd + "/" + f.slice(0, 4) + (h ? " a las " + h : "");
+  const ha = String(hasta || "").slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ha)) {
+    const n = Math.round((Date.parse(ha + "T12:00:00") - Date.parse(f + "T12:00:00")) / 86400000);
+    if (isFinite(n) && n >= 0) tit += " · " + n + " día" + (n === 1 ? "" : "s") + " corrido" + (n === 1 ? "" : "s") + " hasta la entrega";
+  }
+  return '<span class="' + (cls || "gv-fped") + '" title="' + escapeHtml(tit) + '">📥 ' + escapeHtml(dd) + '</span>';
 }
 /* El chip de la fila: «📥 12/09» y, en el title, la fecha entera, la hora y cuántos días pasaron
    hasta la salida. Sin dato no se dibuja nada (las NP de ISIS anteriores al 23/06 no lo tienen). */
@@ -42356,8 +42375,7 @@ function _pgaCuerpoHtml(dias, opts) {
                 escapeHtml(gvDirRealTxt(_dst.sucursal, _dst.localidad_destino, _dst.provincia)) + '</span>' : '') +
             (_mis ? '<span class="pga-mis" title="Pedido a una provincia marcada (PPP_Web_Config.provincias_alerta).">' +
                 escapeHtml(String(_dst.provincia || "").toUpperCase()) + '</span>' : '') +
-            (r.fecha_pedido ? '<span class="pga-ped" title="Fecha en que entró el pedido">ped. ' +
-              escapeHtml(String(r.fecha_pedido).slice(8, 10) + "/" + String(r.fecha_pedido).slice(5, 7)) + '</span>' : '') +
+            gvFechaPedChip(r.np, r.fecha_pedido, r.fecha, "pga-ped") +   // v28.32 (Luis): 📥 día que mandó el pedido
             // v23.27/28 (Luis, 28/09): el MONTO (gv_ppp_np_valor, a lista sin IVA) en NP, tanda y día.
             _pgaMontoChip(_pgaValorNp(r.np)) +
             '</span>' +
@@ -52997,6 +53015,9 @@ async function cuarYaProgCargar() {
   } catch (_e) { /* el log es registro, no bloquea la pantalla */ }
   _apr.cuarYaProgLoading = false;
   if (_pppTab === "prog") aprRender();
+  // v28.32 — la fecha en que el cliente mandó el pedido (GV_NP_Fecha_Pedido): llega aparte y redibuja.
+  if ((_apr.cuarYaProg || []).length)
+    pppRefreshFechaPedido().then(function () { if (_pppTab === "prog") aprRender(); }).catch(function () {});
 }
 /* v17.15 (Luis, 2026-09-14) — la lista es una TABLA: NP · tanda · entrega · cliente (con su
    número) · motivos como badges · aprobación (quién y cuándo) · comentarios (el librito).
@@ -53031,7 +53052,7 @@ function cuarYaProgHtml() {
   let h = '<div class="cuar-yaprog"><div class="cuar-yaprog-t">⚠ Ya programados y el cliente está en cuarentena <b>(' + l.length + ')</b>'
     + '<span class="apr-cuar-help" title="Estos pedidos YA tienen tanda: la cuarentena no los alcanzó porque el reporte de deuda entró después del armado. No se retiran solos — mirarlos con cobranzas y decidir. Al aprobar uno, sale de esta lista y queda en el log de 🚧 Config. Cuarentena. El 📖 abre sus comentarios.">ⓘ</span></div>'
     + '<div class="cuar-yaprog-wrap"><table class="cuar-yaprog-tbl"><thead><tr>'
-    + '<th>NP</th><th>Tanda</th><th>Entrega</th><th>Cliente</th><th>Motivos</th><th>Enviar a</th><th>Coment.</th>'
+    + '<th>NP</th><th>Pedido</th><th>Tanda</th><th>Entrega</th><th>Cliente</th><th>Motivos</th><th>Enviar a</th><th>Coment.</th>'
     + '</tr></thead><tbody>';
   l.forEach(function (r, i) {
     const cod = String(r.cod || "").trim();
@@ -53042,6 +53063,7 @@ function cuarYaProgHtml() {
     const nCom = Number(r.comentarios || 0);
     h += '<tr>'
       + '<td><span class="cuar-yaprog-np">' + escapeHtml(String(r.np || "")) + '</span></td>'
+      + '<td>' + (gvFechaPedChip(r.np, r.fecha_pedido, r.fecha_entrega, "cuar-yaprog-fped") || '<span class="cuar-yp-sin">—</span>') + '</td>'
       + '<td><span class="cuar-yaprog-tanda">' + escapeHtml(String(r.tanda || "sin tanda")) + '</span>'
         + (r.picking_empezado ? ' <span class="cuar-yaprog-pick" title="Ya hay eventos de operarios sobre esa tanda">pickeando</span>' : '') + '</td>'
       + '<td><span class="cuar-yaprog-fecha">' + escapeHtml(String(r.fecha_entrega || "")) + '</span></td>'
@@ -61354,7 +61376,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.31"></script>
+<script src="importacion.js?v=28.32"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64203,10 +64225,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.31"></script>
-<script src="hotsale.js?v=28.31"></script>
-<script src="estadisticas.js?v=28.31"></script>
-<script src="ads.js?v=28.31"></script>
+<script src="cobranzas.js?v=28.32"></script>
+<script src="hotsale.js?v=28.32"></script>
+<script src="estadisticas.js?v=28.32"></script>
+<script src="ads.js?v=28.32"></script>
 
 </body>
 </html>
