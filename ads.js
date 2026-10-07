@@ -311,7 +311,8 @@ function _adsStockCalc(r, H) {
     var e = dias ? Math.min(falta, Math.round(ent / dias * H)) : 0;
     // v28.44 (Luis): si en la OC vigente se cargó la entrega proyectada (consultada al tallerista), manda ESE dato
     var ep = (typeof _ads !== "undefined" && _ads.epOc && typeof _adsEpKey === "function") ? _ads.epOc[_adsEpKey(x.proveedor, r.cod, ultOc)] : null;
-    if (ep != null && isFinite(ep)) { e = Math.max(0, Math.round(ep)); estDet.push(x.proveedor + ": " + e + " (cargado en la OC · faltan " + falta + ")"); }
+    if (ep != null && isFinite(ep)) {   // v28.45 (Luis, D2): lo declarado es por SEMANA (la OC es semanal): pesa igual que el ritmo → × H/7, topado en lo que falta
+      e = Math.min(falta, Math.max(0, Math.round(ep * H / 7))); estDet.push(x.proveedor + ": " + e + " (cargado en la OC: " + Math.round(ep) + "/semana · faltan " + falta + ")"); }
     else estDet.push(x.proveedor + ": " + e + " (por ritmo · faltan " + falta + ")");
     estH += e; estArr.push({ p: x.proveedor, e: e, oc: ep != null && isFinite(ep) });
   });
