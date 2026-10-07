@@ -139,7 +139,7 @@ const STOCK = [
   if (!xt || JSON.stringify(xt.anchos) !== JSON.stringify([12.7109375, 12.42578125, 23, 7.42578125, 7.5703125, 7.5703125, 8.42578125, 8.28515625, 7.5703125, 8.28515625]) ||
       !xt.alto1 || !xt.congela || !xt.ajusta || xt.a2 !== ' s="3"' || xt.b2 !== ' s="2"') fallas.push("(g) formato Excel talleristas: " + JSON.stringify(xt && [xt.anchos, xt.alto1, xt.congela, xt.ajusta, xt.a2, xt.b2]));
   // v27.87 (Luis): los anchos y rótulos son los de su Excel «ADS_stock_10d_20261007_1»
-  if (!x10 || JSON.stringify(x10.anchos) !== JSON.stringify([7.7109375, 14.85546875, 6, 7.140625, 6.28515625, 6, 5.5703125, 8.7109375, 6.28515625, 5.28515625, 6.28515625, 23.28515625, 27.42578125]) || x10.cab[3] !== "Comprom 10 d" || x10.cab[4] !== "E M 10 d" || x10.cab[12] !== "Proporción") fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
+  if (!x10 || JSON.stringify(x10.anchos) !== JSON.stringify([7.7109375, 14.85546875, 6, 7.140625, 6.28515625, 6, 8, 8.7109375, 6.28515625, 5.28515625, 6.28515625, 19.140625, 27.42578125]) || x10.cab[3] !== "Comprom 10 d" || x10.cab[4] !== "E M 10 d" || x10.cab[12] !== "Proporción") fallas.push("(g) anchos Excel stock: " + JSON.stringify(x10 && x10.anchos));
   // v27.59 D16 (Luis): sin stock que cubra lo comprometido = 0 días aunque no tenga Est. Madre; con sobrante y sin Est. Madre = «sin venta»
   {
     const src = require("fs").readFileSync(path.join(__dirname, "..", "ads.js"), "utf8");
@@ -157,7 +157,7 @@ const STOCK = [
     const cEst = ctx._adsStockCalc({ disponible: 5, proy_mes: 0, comp10: 0, saldo10: 5 }, 10), est = cEst.estH;
     // v27.91 (Luis): cada tallerista en su sub-fila del Excel, descripción sin ajuste, borde del rótulo, escala 74
   { const _s = require("fs").readFileSync(__dirname + "/../ads.js", "utf8");
-    if (!/c\.estCaj\.join\("\\n"\), c\.dist\.join\("\\n"\)/.test(_s) || !/izqSin: \[1\]/.test(_s) || !/bordeRot: true, escala: 74/.test(_s)) fallas.push("(l) formato stock v27.91"); }
+    if (!/c\.estCaj\.join\("\\n"\), c\.dist\.join\("\\n"\)/.test(_s) || !/izqSin: \[1\]/.test(_s) || !/bordeRot: true, escala: 75/.test(_s)) fallas.push("(l) formato stock v27.91"); }
   { const _m = src.match(/function _adsEstSinPct[\s\S]*?\n\}/); const _f = _m && new Function(_m[0] + "; return _adsEstSinPct;")();
     if (!_f || JSON.stringify(_f(["A 83 % (50)", "Lucho (350)"])) !== JSON.stringify(["50", "350"])) fallas.push("(m) Excel: entrega estimada sólo cajas"); }
   { const _sv = ctx._adsPctCod; ctx._adsPctCod = function () { return [

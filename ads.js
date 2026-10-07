@@ -393,7 +393,7 @@ function adsExcelStock(H) {
   // v27.87 (Luis, 07/10): el formato es el de su Excel «ADS_stock_10d_20261007_1»: Arial 14, rótulo de alto 72,
   // todo con ajuste de texto, sus anchos y sus rótulos; el alto de cada fila según el texto más largo.
   // v27.91 (Luis, 07/10, «ADS_stock_10d_20261007_3»): optimización horizontal — cada tallerista en su sub-fila
-  // (salto de línea dentro de la celda), descripción sin ajuste, rótulo con borde de abajo, escala 74.
+  // (salto de línea dentro de la celda), descripción sin ajuste, rótulo con borde de abajo, escala 75 (v27.99: «_5», G 8 · L 19,14).
   var aoa = [["Cód", "Descripción", "Stk", "Comprom " + H + " d", "E M " + H + " d", "Saldo " + H + " d",
               "Fecha últ. OC", "Ped período", "Rec período", "% período", "Entr est " + H + " d", "Entr. est. x tall.", "Proporción"]];
   f.forEach(function (r) {
@@ -402,9 +402,9 @@ function adsExcelStock(H) {
       c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estCaj.join("\n"), c.dist.join("\n")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
-    { anchos: ADS_XLS_STOCK_ANCHOS, izq: [11, 12], izqSin: [1], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 74, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [11, 12]) });
+    { anchos: ADS_XLS_STOCK_ANCHOS, izq: [11, 12], izqSin: [1], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 75, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [11, 12]) });
 }
-var ADS_XLS_STOCK_ANCHOS = [7.7109375, 14.85546875, 6, 7.140625, 6.28515625, 6, 5.5703125, 8.7109375, 6.28515625, 5.28515625, 6.28515625, 23.28515625, 27.42578125];   // los de su Excel, exactos
+var ADS_XLS_STOCK_ANCHOS = [7.7109375, 14.85546875, 6, 7.140625, 6.28515625, 6, 8, 8.7109375, 6.28515625, 5.28515625, 6.28515625, 19.140625, 27.42578125];   // los de su Excel, exactos
 /* alto de cada fila (Arial 14 con ajuste): renglones del texto más largo × 18 pt; ~1,35 de ancho por carácter */
 function _adsAltos(aoa, anchos, cols) {
   return aoa.map(function (f, i) {
