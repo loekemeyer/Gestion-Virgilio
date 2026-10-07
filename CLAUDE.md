@@ -4935,6 +4935,35 @@ teléfono) · 👤 confirmado · ⚪ no identificado. **📋 Copiar para la plan
 `sql/gv_cobranza_resumen_conc_v2441.sql`, §3.v2441 · `tests/cbz-ficha-cliente.cjs` (h, i) ·
 `tests/cbz-conciliacion.cjs` · `tests/cbz-conc-extracto.cjs`.
 
+## 🟥 REGLA (Luis, 2026-10-07, v27.89): la CUENTA CORRIENTE NO se le muestra al cliente — se valida en MODO SOMBRA
+
+> ## **No se le muestra NADA de deuda ni de cuenta corriente al cliente, bajo ninguna circunstancia, hasta un pedido EXPLÍCITO de Thomas o Luis.**
+> Comunicarle a un cliente un dato de esa magnitud mal es inaceptable (Luis).
+
+| pieza | estado |
+|---|---|
+| página LK | `MOSTRAR_DEUDA_CLIENTE = false` (25/09) y **`get_mi_deuda()` de LK sin `EXECUTE` para `authenticated`/`anon`** (07/10). Rollback sólo con el pedido: `grant execute on function public.get_mi_deuda() to authenticated;` |
+| página Chef | ⚠ **su `get_mi_deuda()` sigue ejecutable** por el cliente logueado (la página no la llama). Hay que revocarla en el proyecto Chef: la sesión no tiene acceso |
+| validación | **modo sombra** en Gestión: mide, no muestra |
+
+**Modo sombra** (`sql/gv_cc_sombra_v2789.sql`; el marcador interno dice `v27.88-cc-sombra`: llave, no cambiar; cron **143 `gv-cc-sombra`**, `9-59/10`, anti-solape): cada Excel de deuda nuevo
+(Cuarentena) se copia a `GV_CC_Ancla` (el detalle se reemplaza en cada subida) y se compara, cliente por cliente, contra lo que
+el sistema habría estimado desde el Excel anterior: `excel+isis` (ancla + facturas/NC/ND de ISIS posteriores) y
+`excel+isis-banco` (− recibos de la conciliación, misma lógica que `gv_cobranza_deuda_viva_refrescar`). Un cruce está OK si
+ningún cliente difiere en $1 o más (`GV_CC_Sombra_Config.tolerancia`).
+
+- **Racha** (`gv_cc_sombra_racha`): días hábiles SEGUIDOS con cruce y todos OK. **Un día hábil sin subida del Excel corta.**
+- Con **20** (`racha_objetivo`) `gv_cc_sombra_tick` abre **UNA tarea por empresa** en el Planify de **Luis (52)**: «Implementar
+  cuenta corriente en página LK/CHEF» (`GV_CC_Sombra_Aviso`). **La tarea no prende nada**: implementar sigue pidiendo el pedido explícito.
+- Lectura: `select * from public.gv_cc_sombra_estado;` y el detalle por cliente en `GV_CC_Cruce_Detalle` (sólo service/MCP).
+- Primeras anclas: LK y Chef del 07/10 11:11/11:13. Los Excel anteriores se perdieron (sólo quedan los `.xls` del bucket `cuarentena`).
+- **Causas ya vistas en la prueba del 07/10** (son las que hay que cerrar para llegar a 0): (1) el Excel de las 11:11 NO trae la
+  factura de Matiz emitida esa mañana (FC 0004-36161, $8.179.600) — el corte del Excel no es la hora de la subida; (2) una FC +
+  su NC de anulación del mismo día cuentan la FC y no la NC (regla de `deuda_viva`: la NC del día del ancla se saltea) →
+  Cencosud $21.190 y Garbarino $20.778 de más.
+
+Centinelas 349 y 350. `tests/cc-sombra-no-mostrar.cjs`.
+
 ## ⚠ REGLA (Thomas, 2026-10-01, v25.91 · v25.93 · v25.98): HOT SALE — la rentabilidad ponderada vive en `hotsale.js`
 
 Los súper piden un **aporte de hot sale** (un % sobre el precio) dos o tres veces al año. El módulo

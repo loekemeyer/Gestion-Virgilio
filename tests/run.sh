@@ -1183,4 +1183,6 @@ echo "== ppp-ent-fecha-pedido (v26.69: Pedidos Entregados muestra la fecha en qu
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/ppp-ent-fecha-pedido.cjs
 echo "== rcp-comentarios (v27.12: botón de comentarios por recepción, hilo append-only, mismo 'quién' que Recibido) =="
 node tests/rcp-comentarios.cjs
+echo "== cc-sombra-no-mostrar (v27.89: la cuenta corriente se valida en modo sombra y no se muestra al cliente) =="
+node tests/cc-sombra-no-mostrar.cjs
 _resumen
