@@ -1112,6 +1112,7 @@ PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node te
 
 echo "== pipe-vinculados (v21.59 (Luis, 23/09) — 'que se vea para el chequeo de clientes nuevos en la PPP') =="
 PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}" node tests/pipe-vinculados.cjs
+node tests/pipe-vincular-todas-etapas.cjs
 
 
 # ── v21.80 — los 3 que la v21.77 dejó afuera por fallar. Ninguno era un bug de la app:

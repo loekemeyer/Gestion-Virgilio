@@ -2758,6 +2758,10 @@ Si el pedido no tiene decisión propia ni heredada y `GV_Clientes_Nuevos.pedidos
 da prioridad sobre los speech). No se escribe ninguna fila: se deriva al leer.
 `sql/gv_clin_recurrente_v2148.sql`, `tests/pipe-recurrente.cjs`.
 
+⚠ **«🔗 Vincular» a una razón social que ya es cliente va en TODA etapa abierta** (Luis, 07/10, v27.62): ingresado,
+análisis, referenciado, no referenciado, speech 1, speech 2 y pagado (`_vinc` en `pipeAccionesBtns`). Faltaba en análisis,
+speech 1/2 y pagado. `tests/pipe-vincular-todas-etapas.cjs`.
+
 ### ⚠ El cliente nuevo APROBADO sale en 48 h (Luis, 23/09, v21.67)
 
 Aprobado (fila en `GV_Cuarentena_Liberados` con `cliente_nuevo`) → el pase **(a0e)** del armador lo
@@ -8049,7 +8053,7 @@ Panel supervisor → **ADS — Alertas Damián Stock** (`openAds`), con badge **
   ((disp − comprom. H) ÷ Est. Madre diaria) · recuadro «Última OC» (Fecha · Pedido · **Recibido** · %) · Proporción (v27.42, antes «Dist.»: tallerista
   ; v27.33: sólo a quién le corresponde, y con varios la parte de cada uno en lo pedido del rango — lo entregado está en la otra pestaña). **Recibido = lo que recibió Virgilio de ese proveedor desde la fecha de la OC** (D10), no lo imputado:
   `gv_ads_stock3` (= stock2 + `oc_rec_v`). `sql/gv_ads_stock3_v2730.sql`.
-- **Días cobertura (v27.59, Luis D16)**: (Stk − Comp. H) ÷ (Est. Madre mes ÷ 30). Si Stk no cubre lo comprometido → **0** aunque no tenga Est. Madre; si sobra y no hay Est. Madre → **«sin venta»** (antes quedaba vacío: 231, 233, 567).
+- **Días cobertura (v27.62, Luis D16)**: (Stk − Comp. H) ÷ (Est. Madre mes ÷ 30). Si Stk no cubre lo comprometido → **0** aunque no tenga Est. Madre; si sobra y no hay Est. Madre → **«sin venta»** (antes quedaba vacío: 231, 233, 567).
 - **Saldos en cajas ENTERAS (v27.32, Luis D11)**: quiebre sólo si falta media caja o más (antes −0,3 de una Est. Madre de 1 caja/mes contaba). Rojo 45 → 40. `sql/gv_ads_saldo_cajas_enteras_v2732.sql`.
 - Rango y umbral se guardan en `Stock_Config` **sólo con «Guardar para el badge»**: cambiarlos sin guardar vale para esa
   pantalla y se pierde al cerrar.

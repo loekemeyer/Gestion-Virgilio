@@ -6323,7 +6323,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.61"></script>
+<script type="module" src="recepcion.js?v=27.62"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10594,7 +10594,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.61";
+const APP_VERSION = "v27.62";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -52709,13 +52709,17 @@ function pipeAccionesBtns(p) {
              "no solo a este pedido (Thomas, 21/09), y el pedido se programa con prioridad.',true)",
              "🤝 Referenciado", "Cuenta como habitual: no paga por adelantado, ni este pedido ni los próximos");
 
+  // v27.62 (Luis, 07/10): «🔗 Vincular» a una razón social que ya es cliente, en CUALQUIER etapa abierta
+  // (estaba en ingresado / referenciado / no referenciado y faltaba en análisis, speech 1, speech 2 y pagado).
+  const _vinc = B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
+             "Vincularlo a una razón social que ya es cliente: toma su antigüedad y sus próximos pedidos dejan de entrar acá");
+
   // v20.86: el 🗑 esta desde el minuto cero — un pedido que entro MAL no hay que analizarlo
   // para poder sacarlo, y desde que "No valido" no existe es la unica via de descarte.
   if (et === "ingresado")
     return B("pipe-b-eq", "pipeAnalisis('" + emp + "','" + oid + "')", "🔎 Análisis Cred.",
              "Abre Equifax y arranca el reloj del análisis") +
-           B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
-             "Vincularlo a una razón social que ya es cliente") +
+           _vinc +
            _enviarBtn() +
            B("pipe-b-no", _eliminar, "🗑 Eliminar pedido",
              "Lo saca de la PPP y queda en el log de anulados");
@@ -52733,15 +52737,14 @@ function pipeAccionesBtns(p) {
              "'Paga por adelantado sus 3 primeros pedidos. Se lo contacta por Speech 1; el pedido no se " +
              "programa hasta que pague. Vale para el CLIENTE: sus proximos pedidos arrancan en el Speech.',true)",
              "💳 No referenciado", "Paga por adelantado sus primeros 3 pedidos") +
-           _enviarBtn() +
+           _vinc + _enviarBtn() +
            B("pipe-b-no", _eliminar, "🗑 Eliminar pedido",
              "No se le vende: se saca de la PPP y queda en el log de anulados");
 
   if (et === "referenciado")
     return B("pipe-b-ok2", _aprobar, "✅ Aprobar y programar",
              "Lo manda a «Pedidos a programar». Tiene que salir dentro de los 2 días hábiles.") +
-           B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
-             "Vincularlo a una razón social que ya es cliente");
+           _vinc;
 
   if (et === "no_referenciado")
     // v22.04 (Luis, 23/09): sin telefono el Speech queda BLOQUEADO con "SIN TELEFONO".
@@ -52752,8 +52755,7 @@ function pipeAccionesBtns(p) {
              sinTel ? "No hay teléfono del cliente en ninguna tabla: cargarlo para poder mandar el Speech 1"
                     : "Le pide el pago por adelantado del total", sinTel) +
            _ref + _enviarBtn() +
-           B("pipe-b-lnk", "pipeVincAbrir('" + emp + "','" + oid + "')", "🔗 Vincular",
-             "Vincularlo a una razón social que ya es cliente");
+           _vinc;
 
   if (et === "speech1")
     return B("pipe-b-ok2", "pipeFirmaAbrir('" + emp + "','" + oid + "','pagado','Confirmar el PAGO'," +
@@ -52762,7 +52764,7 @@ function pipeAccionesBtns(p) {
            B("pipe-b-wa", "pipeSpeech('" + emp + "','" + oid + "',2)", sinTel ? "📵 SIN TELÉFONO" : "💬 Contacto Speech 2",
              sinTel ? "No hay teléfono del cliente en ninguna tabla: no se puede mandar el Speech 2"
                     : "Le pregunta si paga en 24 h; si no, se da de baja", sinTel) +
-           _ref + _enviarBtn();
+           _ref + _vinc + _enviarBtn();
 
   if (et === "speech2")
     return B("pipe-b-ok2", "pipeFirmaAbrir('" + emp + "','" + oid + "','pagado','Confirmar el PAGO'," +
@@ -52771,11 +52773,11 @@ function pipeAccionesBtns(p) {
            B("pipe-b-no", "pipeFirmaAbrir('" + emp + "','" + oid + "','cancelado','CANCELAR el pedido'," +
              "'No pagó en las 24 h. El pedido queda cancelado en el pipeline y hay que eliminarlo de la PPP.')",
              "🗑 Cancelar pedido", "No pagó: se da de baja") +
-           _ref + _enviarBtn();
+           _ref + _vinc + _enviarBtn();
 
   if (et === "pagado")
     return B("pipe-b-ok2", _aprobar, "✅ Aprobar y programar",
-             "Ya pagó. Lo manda a «Pedidos a programar»; tiene que salir dentro de los 2 días hábiles.");
+             "Ya pagó. Lo manda a «Pedidos a programar»; tiene que salir dentro de los 2 días hábiles.") + _vinc;
 
   return "";
 }
@@ -61252,7 +61254,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.61"></script>
+<script src="importacion.js?v=27.62"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64072,10 +64074,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.61"></script>
-<script src="hotsale.js?v=27.61"></script>
-<script src="estadisticas.js?v=27.61"></script>
-<script src="ads.js?v=27.61"></script>
+<script src="cobranzas.js?v=27.62"></script>
+<script src="hotsale.js?v=27.62"></script>
+<script src="estadisticas.js?v=27.62"></script>
+<script src="ads.js?v=27.62"></script>
 
 </body>
 </html>
