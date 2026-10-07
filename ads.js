@@ -310,12 +310,15 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
   // si se le cambia el tamaño, los mismos anchos se ven distintos que en su Excel. El tamaño grande va en la fuente 1.
   var F = cfg.fuente ? 1 : 0, W = cfg.wrap ? ' wrapText="1"' : '';
   st = st.replace(/<fonts[\s\S]*?<\/fonts>/, '<fonts count="2"><font><sz val="10"/><name val="Arial"/><family val="2"/></font><font><sz val="' + (cfg.fuente || 10) + '"/><name val="Arial"/><family val="2"/></font></fonts>')
-         .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
-           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+         .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="' + (cfg.bordeRot ? 1 : 0) + '" xfId="0" applyFont="1"' + (cfg.bordeRot ? ' applyBorder="1"' : '') + ' applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
            + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"' + W + '/></xf>'
-           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1"' + (W ? ' applyAlignment="1"><alignment' + W + '/></xf>' : '/>') + '</cellXfs>');
+           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1"' + (W ? ' applyAlignment="1"><alignment' + W + '/></xf>' : '/>')
+           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>');
+  // v27.91 (Luis): el rótulo lleva el borde de abajo grueso de su Excel
+  if (cfg.bordeRot) st = st.replace(/<borders[\s\S]*?<\/borders>/, '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="medium"><color indexed="64"/></bottom><diagonal/></border></borders>');
   cfb.FileIndex[iSt].content = enc.encode(st);
-  var izq = {}; (cfg.izq || []).forEach(function (i) { izq[i] = 1; });
+  var izq = {}; (cfg.izq || []).forEach(function (i) { izq[i] = 3; }); (cfg.izqSin || []).forEach(function (i) { izq[i] = 4; });
   var colN = function (L) { var n = 0; for (var k = 0; k < L.length; k++) n = n * 26 + (L.charCodeAt(k) - 64); return n - 1; };
   var cols = '<cols>' + cfg.anchos.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + '</cols>';
   cfb.FullPaths.forEach(function (p, i) {
@@ -325,19 +328,19 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
     x = x.replace(/<sheetData/, cols + "<sheetData");
     x = x.replace(/<c r="([A-Z]+)(\d+)"( s="\d+")?/g, function (_m, L, r) {
       if (r === "1") return '<c r="' + L + r + '" s="1"';
-      return '<c r="' + L + r + '" s="' + (izq[colN(L)] ? 3 : 2) + '"';
+      return '<c r="' + L + r + '" s="' + (izq[colN(L)] || 2) + '"';
     });
     if (cfg.altos) x = x.replace(/<row r="(\d+)"([^>]*)>/g, function (m, r, at) {
       var h = cfg.altos[Number(r) - 1]; if (!h || r === "1") return m;
       return '<row r="' + r + '"' + at.replace(/ ht="[^"]*"| customHeight="[^"]*"/g, "") + ' ht="' + h + '" customHeight="1">';
     });
-    x = x.replace(/<row r="1"([^>]*)>/, function (_m, at) { return '<row r="1"' + at.replace(/ ht="[^"]*"| customHeight="[^"]*"/g, "") + ' ht="' + (cfg.altoRot || 45) + '" customHeight="1">'; });
+    x = x.replace(/<row r="1"([^>]*)>/, function (_m, at) { return '<row r="1"' + at.replace(/ ht="[^"]*"| customHeight="[^"]*"/g, "") + ' ht="' + (cfg.altoRot || 45) + '" customHeight="1"' + (cfg.bordeRot ? ' thickBot="1"' : '') + '>'; });
     x = x.replace(/<sheetViews>[\s\S]*?<\/sheetViews>/, "")
          .replace(/<dimension[^>]*\/>/, function (d) { return d + '<sheetViews><sheetView zoomScale="130" zoomScaleNormal="130" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr baseColWidth="10" defaultRowHeight="12.75"/>'; });
     x = x.replace(/<sheetFormatPr[^>]*\/>(?=[\s\S]*<sheetFormatPr)/, "");
     if (!/<sheetPr/.test(x)) x = x.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
     x = x.replace(/<pageMargins[^>]*\/>/, "");
-    x = x.replace(/<\/sheetData>/, '</sheetData><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>');
+    x = x.replace(/<\/sheetData>/, '</sheetData><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9"' + (cfg.escala ? ' scale="' + cfg.escala + '"' : '') + ' orientation="portrait" fitToWidth="1" fitToHeight="0"/>');
     cfb.FileIndex[i].content = enc.encode(x);
   });
   return XLSX.CFB.write(cfb, { fileType: "zip", type: "array" });
@@ -380,22 +383,28 @@ function adsExcelStock(H) {
   var f = adsFiltrarStock(_ads.stock, H, "");
   // v27.87 (Luis, 07/10): el formato es el de su Excel «ADS_stock_10d_20261007_1»: Arial 14, rótulo de alto 72,
   // todo con ajuste de texto, sus anchos y sus rótulos; el alto de cada fila según el texto más largo.
-  var aoa = [["Cód.", "Descripción", "Stk", "Comprom " + H + " d", "E M " + H + " d", "Saldo " + H + " d",
+  // v27.91 (Luis, 07/10, «ADS_stock_10d_20261007_3»): optimización horizontal — cada tallerista en su sub-fila
+  // (salto de línea dentro de la celda), descripción sin ajuste, rótulo con borde de abajo, escala 74.
+  var aoa = [["Cód", "Descripción", "Stk", "Comprom " + H + " d", "E M " + H + " d", "Saldo " + H + " d",
               "Fecha últ. OC", "Ped período", "Rec período", "% período", "Entr est " + H + " d", "Entr. est. x tall.", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo),
-      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estDist.join(" - "), c.dist.join(" - ")]);
+      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estDist.join("\n"), c.dist.join("\n")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
-    { anchos: ADS_XLS_STOCK_ANCHOS, izq: [1, 11, 12], fuente: 14, altoRot: 72, wrap: true, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [1, 11, 12]) });
+    { anchos: ADS_XLS_STOCK_ANCHOS, izq: [11, 12], izqSin: [1], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 74, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [11, 12]) });
 }
-var ADS_XLS_STOCK_ANCHOS = [5.85546875, 14.85546875, 6, 7.140625, 6.28515625, 6, 5.5703125, 8.7109375, 6.28515625, 5.28515625, 6.28515625, 21, 18.85546875];   // los de su Excel, exactos
+var ADS_XLS_STOCK_ANCHOS = [7.7109375, 14.85546875, 6, 7.140625, 6.28515625, 6, 5.5703125, 8.7109375, 6.28515625, 5.28515625, 6.28515625, 23.28515625, 27.42578125];   // los de su Excel, exactos
 /* alto de cada fila (Arial 14 con ajuste): renglones del texto más largo × 18 pt; ~1,35 de ancho por carácter */
 function _adsAltos(aoa, anchos, cols) {
   return aoa.map(function (f, i) {
     if (!i) return null;
-    var n = 1; cols.forEach(function (c) { var t = String(f[c] == null ? "" : f[c]); if (t) n = Math.max(n, Math.ceil(t.length / Math.max(1, Math.floor(anchos[c] / 1.35)))); });
+    var n = 1; cols.forEach(function (c) {
+      var cpl = Math.max(1, Math.floor(anchos[c] / 1.35)), k = 0;   // cada sub-fila (\n) cuenta sus renglones
+      String(f[c] == null ? "" : f[c]).split("\n").forEach(function (t) { if (t) k += Math.ceil(t.length / cpl); });
+      n = Math.max(n, k);
+    });
     return n * 18;
   });
 }
