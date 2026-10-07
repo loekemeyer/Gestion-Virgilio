@@ -100,7 +100,6 @@ function _adsCss() {
     "#adsOv tr.sub th{position:static;}",
     "#adsOv .ads-body > table > thead{position:sticky;top:0;z-index:2;} #adsOv .ads-body > table > thead th{position:static;}",
     "#adsOv .ads-body > table .ug,#adsOv .ads-body > table .u1,#adsOv .ads-body > table .u2,#adsOv .ads-body > table .u3{background:#f5f3ff;}",
-    "#adsOv .estd{font-size:11px;color:#555;font-weight:400;line-height:1.25;white-space:nowrap;}",
     "#adsOv .ads-body > table .ug{border:2px solid #7c3aed;border-bottom:0;} #adsOv .ads-body > table .u1{border-left:2px solid #7c3aed;} #adsOv .ads-body > table .u3{border-right:2px solid #7c3aed;}",
     "#adsOv .ads-body > table tbody tr:last-child .u1,#adsOv .ads-body > table tbody tr:last-child .u2,#adsOv .ads-body > table tbody tr:last-child .u3{border-bottom:2px solid #7c3aed;}",
     "#adsOv tr.sub .ug,#adsOv tr.sub .u1,#adsOv tr.sub .u2,#adsOv tr.sub .u3{background:#f5f3ff;}",
@@ -258,8 +257,7 @@ function _adsHtmlStock() {
     if (c.pedP == null) h += '<td class="u1">' + fUlt + '</td><td colspan="4" class="u2">' + (_ads.tall ? "sin OC en el período" : "…") + "</td>";
     else h += '<td class="u1">' + fUlt + '</td><td class="u2">' + _adsN(c.pedP) + '</td><td class="u2">' + _adsN(c.recP) +
       '</td><td class="u2' + (c.pctP != null && c.pctP < _ads.umbral ? " neg" : "") + '">' + _adsPct(c.pctP) +
-      '</td><td class="u2" title="' + _adsEsc(c.estDet.join(" · ")) + '"><b>' + _adsN(c.estH) + "</b>" +
-      (c.estDist.length > 1 ? '<div class="estd">' + c.estDist.map(_adsEsc).join("<br>") + "</div>" : "") + "</td>";
+      '</td><td class="u2" title="' + _adsEsc((c.estDist.length ? c.estDist : c.estDet).join("\n")) + '"><b>' + _adsN(c.estH) + "</b></td>";   // v27.85 (Luis): el reparto por tallerista va en el tooltip
     h += '<td class="u3">' + dist + "</td></tr>";
   });
   return h + "</tbody></table></div>";
