@@ -969,6 +969,14 @@ body:has(#optionsScreen:not(.hidden)) #btnHistDias{ display:none !important; }
 .pipe-b-lnk{ background:#e0f2fe; color:#075985; border-color:#bae6fd; }
 .pipe-b-sec2{ background:#f1f5f9; color:#334155; border-color:#cbd5e1; }
 .pipe-b-off{ opacity:.45; cursor:not-allowed; }
+/* v27.63 (Luis, 07/10): «más prolija, consistencia de tamaño» — grilla de 2 columnas iguales, mismo alto,
+   texto centrado; «Vincular» con color sólido como el resto. */
+.pipe-btns{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:5px; width:100%; max-width:330px; }
+.pipe-btns .pipe-b, .cuar-tbl .pipe-btns .pipe-b{ width:100%; height:32px; margin:0; padding:0 8px; display:flex;
+  align-items:center; justify-content:center; box-sizing:border-box; overflow:hidden; text-overflow:ellipsis;
+  font-size:12.5px; line-height:1; }
+.pipe-btns .pipe-b-lnk{ background:#0e7490; color:#fff; border-color:#0e7490; }
+.pipe-btns .pipe-cerrado{ grid-column:1 / -1; }
 
 /* pop-ups (firma y vínculo) */
 .pipe-modal-off{ display:none; }
@@ -1317,7 +1325,7 @@ body:has(#optionsScreen:not(.hidden)) #btnHistDias{ display:none !important; }
 .cuar-tbl .cuar-td-zona{ min-width:0; margin-top:4px; font-weight:600; color:#7c2d12; }
 .cuar-tbl .cuar-td-cli{ min-width:0; }
 .cuar-tbl .pipe-b{ font-size:13px; padding:5px 9px; }
-.cuar-tbl .pipe-td-acc{ max-width:300px; }
+.cuar-tbl .pipe-td-acc{ max-width:340px; min-width:300px; }
 .cuar-tbl .clin-cuit{ font-size:12.5px; }
 .cuar-tbl .apr-anular-chico{ font-size:12px; }
 .cuar-tbl .cuar-yp-lib{ border-color:#f0d2bb; }
@@ -6323,7 +6331,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=27.62"></script>
+<script type="module" src="recepcion.js?v=27.63"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10594,7 +10602,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v27.62";
+const APP_VERSION = "v27.63";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -52668,7 +52676,8 @@ function pipeAccionesHtml(p) {
   // dato suelto: lo que decide si hay que apurarse es cuánto hace que está esperando.
   const _reloj = pipeRelojHtml(p);
   const _esp = /cuar-yp-sin/.test(_reloj) ? "" : '<div class="pipe-esp-linea">' + _reloj + '</div>';
-  return _esp + pipeAccionesBtns(p);
+  // v27.63 (Luis, 07/10): grilla pareja — dos columnas, todos los botones del mismo ancho y alto
+  return _esp + '<div class="pipe-btns">' + pipeAccionesBtns(p) + '</div>';
 }
 function pipeAccionesBtns(p) {
   const emp = (p.empresa || "lk"), oid = escapeHtml(String(p.order_id));
@@ -61254,7 +61263,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=27.62"></script>
+<script src="importacion.js?v=27.63"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64074,10 +64083,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=27.62"></script>
-<script src="hotsale.js?v=27.62"></script>
-<script src="estadisticas.js?v=27.62"></script>
-<script src="ads.js?v=27.62"></script>
+<script src="cobranzas.js?v=27.63"></script>
+<script src="hotsale.js?v=27.63"></script>
+<script src="estadisticas.js?v=27.63"></script>
+<script src="ads.js?v=27.63"></script>
 
 </body>
 </html>
