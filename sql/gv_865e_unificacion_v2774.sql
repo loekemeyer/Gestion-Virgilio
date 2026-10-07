@@ -1,0 +1,17 @@
+-- v27.74 (Luis, 07/10/2026): 865ED se UNIFICA en 865E, que pasa a ser el producto de 12 u.
+-- Aplicado el 07/10 en Gestión (hrxfctzncixxqmpfhskv) y LK (kwkclwhmoygunqmlegrg).
+-- Backup: zz_backups."GV_Backup_865E_unif_20261007" (GV_UxB, OC_Maximos, Importados, GV_Lugar_Item, en jsonb).
+--
+-- Gestión:
+--   GV_UxB 865E LK/CH: 24 -> 12, curado (el sync de LK no lo pisa: gv_uxb_protege_curado).
+--   OC_Maximos: 865E activo, 12 u · 865ED inactivo.
+--   Importados: id 106 (865E) 12 u · id 109 (865ED) inactivo, no principal. Alias 865ED -> 865E sigue.
+--   GV_Lugar_Item L57: 865E activo, 56 cajas · 865ED inactivo.
+--   Stock: la caja de 865ED LK terminado pasó a 865E (ref 'UNIF 865ED>865E').
+--     ⚠ zz_normalizar_empresa re-etiquetó el -1 como CH (artículo de Chef): se corrigió a LK por UPDATE.
+-- LK:
+--   sales_item_remap 865ED -> 865E: proyección, Est. Madre y desglose cuentan el 865ED como 865E.
+--   Ventas viejas de 865E (24 u): 17 cajas, todas de 2025, fuera de la ventana de 6 meses. NO se tocaron.
+--
+-- Rollback (Gestión): restaurar desde el backup + delete from public."Movimientos_Stock" where ref='UNIF 865ED>865E';
+-- Rollback (LK):      delete from public.sales_item_remap where from_code='865ED';

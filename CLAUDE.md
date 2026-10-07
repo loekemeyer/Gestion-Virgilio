@@ -8026,6 +8026,14 @@ public.gv_alerta_gondola_llena_telegram(true);`. Centinela 322. `sql/gv_alerta_g
   no siguió · la tanda). Al agregar o reordenar un pase del armador, sumar su `set_config` y su fila al catálogo.
 - `sql/gv_ppp_np_pauta_v2705.sql`, centinela 336, `tests/ppp-res-origen.cjs`.
 
+## ⚠ REGLA (Luis, 2026-10-07, v27.74): 865ED NO EXISTE MÁS — es el 865E de 12 u
+
+El 865E (antes caja de 24 u) pasó a ser el Rallador Plano A/I 3 Usos **de 12 u**, y el 865ED se unificó ahí: UxB,
+OC, Importados, góndola L57 (56 cajas) y stock van por 865E; el 865ED queda inactivo y LK lo remapea a 865E
+(`sales_item_remap`) para proyección y Est. Madre. Las 17 cajas viejas de 865E (24 u, 2025) no se tocaron. Las 47
+cajas que fueron a etiquetar a Cervantes el 30/09 vuelven como 865E (se resuelve al recibirlas).
+`sql/gv_865e_unificacion_v2774.sql`.
+
 ## ⚠ REGLA (Luis, 2026-10-06, v27.12): COMENTARIOS por recepción en Pendientes (Recepción de Mercadería)
 
 Botón redondo 📓 en el encabezado de cada tarjeta de Pendientes (`recepcion.js`, `pendCard` → `pendComentBtn`):
