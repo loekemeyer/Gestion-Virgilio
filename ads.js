@@ -351,7 +351,7 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
     x = x.replace(/<sheetFormatPr[^>]*\/>(?=[\s\S]*<sheetFormatPr)/, "");
     if (!/<sheetPr/.test(x)) x = x.replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>');
     x = x.replace(/<pageMargins[^>]*\/>/, "");
-    x = x.replace(/<\/sheetData>/, '</sheetData><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9"' + (cfg.escala ? ' scale="' + cfg.escala + '"' : '') + ' orientation="portrait" fitToWidth="1" fitToHeight="0"/>');
+    x = x.replace(/<\/sheetData>/, '</sheetData>' + (cfg.margenStd ? '<pageMargins left="0.70866141732283461" right="0.70866141732283461" top="0.74803149606299213" bottom="0.74803149606299213" header="0.31496062992125984" footer="0.31496062992125984"/>' : '<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>') + '<pageSetup paperSize="9"' + (cfg.escala ? ' scale="' + cfg.escala + '"' : '') + ' orientation="portrait" fitToWidth="1" fitToHeight="0"/>');
     cfb.FileIndex[i].content = enc.encode(x);
   });
   return XLSX.CFB.write(cfb, { fileType: "zip", type: "array" });
@@ -409,15 +409,16 @@ function adsExcelStock(H) {
       c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estCaj.join("\n"), c.dist.join("\n")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
-    { anchos: ADS_XLS_STOCK_ANCHOS, izq: [11, 12], izqSin: [1], negrita: [2], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 75, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [11, 12]) });
+    { anchos: ADS_XLS_STOCK_ANCHOS, izq: [11, 12], izqSin: [1], negrita: [2], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 68, margenStd: true, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [11, 12], 2, 1.4) });
 }
-var ADS_XLS_STOCK_ANCHOS = [7.7109375, 14.85546875, 6, 6, 7.140625, 6.28515625, 8, 8.7109375, 6.28515625, 5.28515625, 6.28515625, 19.140625, 27.42578125];   // los de su Excel, exactos
+// v28.30 (Luis, «ADS_stock_10d_20261007_8_1», *"ese es el formato que quiero"*): sus anchos exactos, filas de 2 renglones mínimo, escala 68
+var ADS_XLS_STOCK_ANCHOS = [11.28515625, 14.85546875, 5.28515625, 5.140625, 7.140625, 6, 7.7109375, 8.7109375, 6.28515625, 5.28515625, 6.140625, 19.140625, 27.42578125];   // los de su Excel, exactos
 /* alto de cada fila (Arial 14 con ajuste): renglones del texto más largo × 18 pt; ~1,35 de ancho por carácter */
-function _adsAltos(aoa, anchos, cols) {
+function _adsAltos(aoa, anchos, cols, minRen, porCar) {
   return aoa.map(function (f, i) {
     if (!i) return null;
-    var n = 1; cols.forEach(function (c) {
-      var cpl = Math.max(1, Math.floor(anchos[c] / 1.35)), k = 0;   // cada sub-fila (\n) cuenta sus renglones
+    var n = minRen || 1; cols.forEach(function (c) {
+      var cpl = Math.max(1, Math.floor(anchos[c] / (porCar || 1.35))), k = 0;   // cada sub-fila (\n) cuenta sus renglones
       String(f[c] == null ? "" : f[c]).split("\n").forEach(function (t) { if (t) k += Math.ceil(t.length / cpl); });
       n = Math.max(n, k);
     });
