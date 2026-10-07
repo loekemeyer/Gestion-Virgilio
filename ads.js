@@ -267,7 +267,8 @@ function _adsStockCalc(r, H) {
   // Lo que entregó cada uno está en la pestaña Entregas talleristas.
   var totPed = pc.reduce(function (s, x) { return s + (Number(x.pedido) || 0); }, 0);
   var dist = pc.length > 1 ? pc.map(function (x) { return x.proveedor + " " + (totPed > 0 ? _adsPct((Number(x.pedido) || 0) / totPed) : "—") + " (" + _adsN(x.pedido) + ")"; })   // v27.75: con las cajas
-           : pc.length ? [pc[0].proveedor] : (r.oc_prov ? [r.oc_prov] : []);
+           : pc.length ? [pc[0].proveedor + " (" + _adsN(pc[0].pedido) + ")"] :   // v27.76 D1: uno solo, también con las cajas
+           (r.oc_prov ? [r.oc_prov] : []);
   var rec = r.oc_rec_v != null ? r.oc_rec_v : r.oc_rec;
   return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]),
            cob: disp - comp <= 0 ? 0 : (proy > 0 ? (disp - comp) / (proy / 30) : "sin venta"),   // D16 v27.59
