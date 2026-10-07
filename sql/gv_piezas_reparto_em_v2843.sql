@@ -408,3 +408,23 @@ $function$;
 -- Rollback del cartel: select def from zz_backups."GV_Backup_ReingresosFeed_def_20261007"; → execute.
 -- Chequeo: select * from public.gv_piezas_reparto_share order by grupo, empresa desc;
 --          select * from public.gv_reglas_perdidas;   -- vacía
+
+-- =====================================================================================================
+-- v28.44 (Luis, 07/10): 323E / 838E "los dos lo ven, pero el split es 0-100 — y es así para todas las
+-- partes; se netea con Art Term en Cervantes, así que contempla de la misma forma 0-100 esos".
+--   · un pozo único, dueño 838E: GRJ31 + 838E y 323E terminados de GP2 + parte 323ES
+--   · GV_Piezas_Reparto con peso_fijo: 838E CH 1 · 323E LK 0
+insert into public."GV_Piezas_Reparto"(grupo,cod_art,empresa,peso_fijo,nota) values
+  ('838E','838E','CH',1,'v28.44 Luis 07/10: pozo GRJ31 + 323E/838E terminados GP2 + parte 323ES; 0-100 fijo'),
+  ('838E','323E','LK',0,'v28.44 Luis 07/10: lo ve pero le toca 0 %')
+on conflict do nothing;
+insert into public."GV_Importados_Equiv_GP2"(importado_cod, componente_codigo, factor, nota, creado_por)
+  values ('838E','323E',1,'v28.44 Luis 07/10: el terminado 323E de Cervantes netea en el pozo del 838E','Luis (claude)')
+on conflict do nothing;
+--   · gv_piezas_reparto_share: reparto dice "323E LK 0 % (fijo) · 838E CH 100 % (fijo)" (m4 + share en texto)
+--   · gv_importados_ordenes: el miembro usa las piezas del DUEÑO de su pozo (lateral g2 con
+--     COALESCE((select upper(r.grupo) from "GV_Piezas_Reparto" r where cod_art = i.cod_art and empresa), cod_art)),
+--     el join a la vista es por cod_art + empresa (sin sh.grupo = cod_art) y columna nueva piezas_grupo.
+--   · gv_reingresos_feed: SE SACA el cartel automático del que comparte sin ser importado (633E…):
+--     "yo controlo los carteles en la página con los botones" (Luis, D4/D5). El cartel es sólo de importados.
+-- Se aplicó como parche sobre la definición viva (idempotente); las definiciones vivas mandan.

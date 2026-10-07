@@ -5,7 +5,7 @@ const fs = require("fs"), path = require("path");
 const R = p => fs.readFileSync(path.join(__dirname, "..", p), "latin1");
 const idx = R("index.html"), imp = fs.readFileSync(path.join(__dirname, "..", "importacion.js"), "utf8");
 let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log("  ✗", m); } else console.log("  ✓", m); };
-ok(/stock_total,stock_gp2,stock_conv,stock_total_neto,(piezas_share,piezas_reparto,)?pedido_curso/.test(idx), "a) el fetch de importados pide stock_gp2, stock_conv y stock_total_neto");
+ok(/stock_total,stock_gp2,stock_conv,stock_total_neto,(piezas_share,piezas_reparto,(piezas_grupo,)?)?pedido_curso/.test(idx), "a) el fetch de importados pide stock_gp2, stock_conv y stock_total_neto");
 ok(/o\.stockUni - o\.stockIns - o\.stockGp2 - \(o\.stockConv \|\| 0\)/.test(idx), "a) el stock propio no cuenta dos veces lo convertible (v26.03)");
 ok(/o\.stockUni \+= \(r\.stock_total_neto != null\)/.test(idx), "a) el stock usa stock_total_neto (sin piso, con GP2)");
 ok(/stockGp2U: Math\.round\(o\.stockGp2\)/.test(idx), "a) el ítem lleva stockGp2U");

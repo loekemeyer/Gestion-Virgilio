@@ -2,6 +2,7 @@
    A. ocgFetchImportados pide piezas_share y piezas_reparto a gv_importados_ordenes y los pasa al ítem;
    B. el pop-up de stock del 942E dice que le toca el 87 % y el reparto (942E LK · 633E CH);
    C. sin reparto (share 1) no aparece la fila;
+   E. el 323E ve el pozo del 838E (GRJ31) con 0 % (v28.44);
    D. el SQL del repo tiene las tres piezas (vista de %, ordenes, cartel) y el 323E sin GRJ31.
    Sale 1 si falla. */
 const fs = require("fs");
@@ -49,6 +50,12 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     out.b = !!fila && /87 %/.test(fila.textContent) && /633E CH 24 u · 942E LK 156 u/.test(fila.textContent) && /Estadística Madre/.test(fila.textContent);
     ov = await abrir("702E");
     out.c = !!ov && !ov.querySelector(".imp-piezas-share");
+    // v28.44: 323E ve el pozo del 838E (GRJ31) con 0 %
+    let qEq = "";
+    supaFetchAllSafe = async function (url, q) { if (/GV_Importados_Equiv_GP2/.test(url)) { qEq = q; return [{ componente_codigo: "GRJ31", factor: 1 }, { componente_codigo: "838E", factor: 1 }, { componente_codigo: "323E", factor: 1 }]; } return []; };
+    items["323E"] = { cod: "323E", stockPropioModulo: 96, stockInsU: 0, stockGp2U: 0, stockUni: 96, piezasShare: 0, piezasReparto: "323E LK 0 % (fijo) · 838E CH 100 % (fijo)", piezasGrupo: "838E" };
+    ov = await abrir("323E");
+    out.e = /importado_cod=eq\.838E/.test(qEq) && /GRJ31/.test(ov.innerHTML) && /0 %<\/b>/.test(ov.querySelector(".imp-piezas-share").innerHTML);
     return out;
   });
   await b.close();

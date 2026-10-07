@@ -7585,8 +7585,7 @@ negativo para usos prácticos de importación"*.
 | importado | componente GP2 | factor |
 |---|---|---|
 | 587C · 505C · 1546903 · 523C · 1000900 | Z23B · Z23A · C13 · E13 · D1 | 1 |
-| 838E | **GRJ31 + 838E** (+ parte 323ES) — GRJ31 va 100 % al 838E | 1 (v28.43, Luis 07/10) |
-| 323E | **323E** (su terminado de GP2) | 1 (v28.43) |
+| 323E / 838E | **un pozo, dueño 838E**: GRJ31 + 323E y 838E terminados de GP2 + parte 323ES — los dos lo ven, **0 % 323E / 100 % 838E** | `GV_Piezas_Reparto.peso_fijo` (v28.44, Luis 07/10) |
 | 942E · 943E · 944E · 945E · 948E | Z47 + Z47-M505D + 942E · Z44 + Z44-M505C + 943E · Z48 + Z48-M505 + 944E · Z49 + Z49-M505F + 945E · Z45 + Z45-M505B + 948E | 1 c/u, se suman (v26.00) |
 | 522ES | GRJ33 | 1 |
 | 702E · 106E | 702 + 702E + 102E · 723 + 106E | 1 c/u (v26.03) |
@@ -7628,8 +7627,9 @@ chinos y para avisar en la página que no tenemos stock"*.
 |---|---|---|
 | 942E · 943E · 944E · 945E · 948E (LK) | 633E · 630E · 637E · 636E · 631E (CH) | piezas GP2 (`GV_Importados_Equiv_GP2` + mismo código) y la parte 94xP de Virgilio |
 | 438E · 439E | el mismo código en LK y en CH | el insumo de Virgilio (`gv_importados_stock_insumos`) |
-| 323E / 838E | — | **no es reparto**: GRJ31 y la parte 323ES son del **838E** al 100 %; el 323E cuenta sólo su terminado de GP2 |
+| 838E (dueño) | 323E LK | **peso fijo 0-100** (v28.44): GRJ31 + 323E y 838E terminados de GP2 (netea con el Art Term de Cervantes) + parte 323ES; los dos lo ven, el 838E se lleva el 100 % |
 
+- El miembro usa las piezas del **dueño** de su pozo (`gv_importados_ordenes.piezas_grupo`; el pop-up del 323E lista GRJ31 con 0 %).
 - Quién comparte vive en **`GV_Piezas_Reparto`** (grupo, cod_art, empresa, `peso_fijo`); agregar uno = un `insert`.
 - El % lo calcula **`gv_piezas_reparto_share`**: E.M. de `gv_proyeccion_articulo` (proy_lk / proy_ch según la empresa) × UxB
   de esa empresa (sin UxB, la del dueño del grupo: 633E y 637E) = unidades/mes; % = las suyas ÷ las del grupo. `peso_fijo`
@@ -7638,10 +7638,10 @@ chinos y para avisar en la página que no tenemos stock"*.
   columnas nuevas `piezas_share`, `piezas_reparto`. `vista_importados_stock_parte` también. El pop-up de stock lo dice
   (fila «🔀 Piezas e insumos compartidos: le toca el N %»).
 - **Cartel de la página** (`gv_reingresos_feed`): ahora cuenta como stock las **piezas de Cervantes** y los **insumos de
-  Virgilio** de TODO importado (antes sólo la parte de `Importados_Stock_Parte`), cada uno con su %; y el que comparte sin ser
-  importado (633E…) **lleva cartel** en la página de su empresa, con la fecha de reingreso del dueño.
-- ⚠ **438E, 439E y 944E están en `GV_Reingreso_Excluido`**: no llevan cartel (regla de Luis del 23/09). El 637E (del grupo
-  944E) sí lo lleva.
+  Virgilio** de TODO importado (antes sólo la parte de `Importados_Stock_Parte`), cada uno con su %. **El cartel es sólo de
+  importados y lo controla Luis con los botones** (v28.44, D4/D5): el que comparte sin ser importado (633E…) NO lleva cartel
+  automático, y `GV_Reingreso_Excluido` no se toca.
+- **438E, 439E y 944E están en `GV_Reingreso_Excluido`** a propósito (Luis, D4: los carteles los maneja él). No proponer sacarlos.
 - Al 07/10: 942E 87 % / 633E 13 % · 943E 94 / 630E 6 · 944E 80 / 637E 20 · 945E 65 / 636E 35 · 948E 82 / 631E 18 ·
   438E LK 52 / CH 48 · 439E LK 32 / CH 68. Medido: el cartel LK bajó de 1,2 s a 0,7 s, CH subió de 0,3 s a 0,5 s.
 - Centinelas 362-366. Backups `zz_backups."GV_Backup_Equiv323_838_20261007"` y `"GV_Backup_ReingresosFeed_def_20261007"`.
