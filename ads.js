@@ -100,6 +100,7 @@ function _adsCss() {
     "#adsOv tr.sub th{position:static;}",
     "#adsOv .ads-body > table > thead{position:sticky;top:0;z-index:2;} #adsOv .ads-body > table > thead th{position:static;}",
     "#adsOv .ads-body > table .ug,#adsOv .ads-body > table .u1,#adsOv .ads-body > table .u2,#adsOv .ads-body > table .u3{background:#f5f3ff;}",
+    "#adsOv .estd{font-size:11px;color:#555;font-weight:400;line-height:1.25;white-space:nowrap;}",
     "#adsOv .ads-body > table .ug{border:2px solid #7c3aed;border-bottom:0;} #adsOv .ads-body > table .u1{border-left:2px solid #7c3aed;} #adsOv .ads-body > table .u3{border-right:2px solid #7c3aed;}",
     "#adsOv .ads-body > table tbody tr:last-child .u1,#adsOv .ads-body > table tbody tr:last-child .u2,#adsOv .ads-body > table tbody tr:last-child .u3{border-bottom:2px solid #7c3aed;}",
     "#adsOv tr.sub .ug,#adsOv tr.sub .u1,#adsOv tr.sub .u2,#adsOv tr.sub .u3{background:#f5f3ff;}",
@@ -257,7 +258,8 @@ function _adsHtmlStock() {
     if (c.pedP == null) h += '<td class="u1">' + fUlt + '</td><td colspan="4" class="u2">' + (_ads.tall ? "sin OC en el período" : "…") + "</td>";
     else h += '<td class="u1">' + fUlt + '</td><td class="u2">' + _adsN(c.pedP) + '</td><td class="u2">' + _adsN(c.recP) +
       '</td><td class="u2' + (c.pctP != null && c.pctP < _ads.umbral ? " neg" : "") + '">' + _adsPct(c.pctP) +
-      '</td><td class="u2" title="' + _adsEsc(c.estDet.join(" · ")) + '"><b>' + _adsN(c.estH) + "</b></td>";
+      '</td><td class="u2" title="' + _adsEsc(c.estDet.join(" · ")) + '"><b>' + _adsN(c.estH) + "</b>" +
+      (c.estDist.length > 1 ? '<div class="estd">' + c.estDist.map(_adsEsc).join("<br>") + "</div>" : "") + "</td>";
     h += '<td class="u3">' + dist + "</td></tr>";
   });
   return h + "</tbody></table></div>";
@@ -278,15 +280,18 @@ function _adsStockCalc(r, H) {
   var fechaUlt = r.oc_fecha || pc.reduce(function (m, x) { return x.ult_fecha && (!m || x.ult_fecha > m) ? x.ult_fecha : m; }, null) || null;
   // v27.81 (Luis): entrega estimada a H días, proporcional a cómo viene entregando cada tallerista:
   // ritmo = recibido ÷ días desde su 1.ª OC del período; estimado = ritmo × H, topado en lo que le falta.
-  var hoy = Date.now(), estH = 0, estDet = [];
+  var hoy = Date.now(), estH = 0, estDet = [], estArr = [];
   pc.forEach(function (x) {
     var ped = Number(x.pedido) || 0, ent = Number(x.entregado) || 0, falta = Math.max(0, ped - ent);
     var t0 = x.desde ? Date.parse(String(x.desde).slice(0, 10) + "T12:00:00-03:00") : NaN;
     var dias = isFinite(t0) ? Math.max(1, (hoy - t0) / 864e5) : null;
     var e = dias ? Math.min(falta, Math.round(ent / dias * H)) : 0;
-    estH += e; estDet.push(x.proveedor + ": " + e + " (faltan " + falta + ")");
+    estH += e; estDet.push(x.proveedor + ": " + e + " (faltan " + falta + ")"); estArr.push({ p: x.proveedor, e: e });
   });
-  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estDet: estDet,
+  // v27.82 (Luis): la entrega estimada discriminada por tallerista, con su parte de lo estimado
+  var estDist = estArr.length > 1 ? estArr.map(function (y) { return y.p + " " + (estH > 0 ? _adsPct(y.e / estH) : "—") + " (" + _adsN(y.e) + ")"; })
+              : estArr.length ? [estArr[0].p + " (" + _adsN(estArr[0].e) + ")"] : [];
+  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estDet: estDet, estDist: estDist,
            pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
            fechaUlt: fechaUlt, dist: dist };
 }
@@ -368,14 +373,14 @@ function adsExcelStock(H) {
   var f = adsFiltrarStock(_ads.stock, H, "");
   // v27.42 (Luis): rótulos abreviados para que ninguna palabra se parta en el medio con los anchos chicos
   var aoa = [["Cód.", "Descripción", "Stk", "Comp. " + H + " d", "Est. Madre " + H + " d", "Saldo " + H + " d",
-              "Fecha últ. OC", "Ped. período", "Rec. período", "% período", "Entr. est. " + H + " d", "Proporción"]];
+              "Fecha últ. OC", "Ped. período", "Rec. período", "% período", "Entr. est. " + H + " d", "Entr. est. x tall.", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", c.disp, c.comp, Math.round(c.em), _adsNum(c.saldo),
-      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.dist.join(" - ")]);
+      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estDist.length > 1 ? c.estDist.join(" - ") : "", c.dist.join(" - ")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
-    { anchos: [6.57, 23, 5.14, 6, 6.29, 6, 6.29, 6.29, 6.29, 5.29, 6.29, _adsAnchoTexto(aoa, 11, 10.5, 24)], izq: [1, 11] });
+    { anchos: [6.57, 23, 5.14, 6, 6.29, 6, 6.29, 6.29, 6.29, 5.29, 6.29, _adsAnchoTexto(aoa, 11, 10.5, 24), _adsAnchoTexto(aoa, 12, 10.5, 24)], izq: [1, 11, 12] });
 }
 
 function _adsRender() {
