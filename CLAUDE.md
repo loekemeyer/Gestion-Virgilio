@@ -4954,7 +4954,13 @@ el sistema habría estimado desde el Excel anterior: `excel+isis` (ancla + factu
 `excel+isis-banco` (− recibos de la conciliación, misma lógica que `gv_cobranza_deuda_viva_refrescar`). Un cruce está OK si
 ningún cliente difiere en $1 o más (`GV_CC_Sombra_Config.tolerancia`).
 
-- **Racha** (`gv_cc_sombra_racha`): días hábiles SEGUIDOS con cruce y todos OK. **Un día hábil sin subida del Excel corta.**
+- **Racha** (`gv_cc_sombra_racha`, v27.93): suma los días hábiles **cubiertos** por cruces OK seguidos — cada cruce cubre
+  (corte anterior, corte nuevo]. **Un día sin Excel NO corta** (Luis: *"va a haber días donde no se sube el excel"*): lo valida
+  el Excel siguiente junto con los otros días. Sólo un cruce con diferencia corta.
+- **CORTE del Excel** (v27.93, `gv_cc_sombra_corte`): el Excel es la deuda al CIERRE de un día, no a la hora de la subida.
+  Corte = fecha ISIS más nueva de los comprobantes que trae. Todo lo de fecha <= corte YA está adentro (renglón, imputado o
+  anulado: FC + NC del mismo día que se cancelan no aparecen); se suma sólo lo de fecha > corte, FC/ND/NC por igual
+  (`gv_cc_sombra_estimar(text,text,date)`; la de `timestamptz` quedó sin llamador). Corrige las dos causas de la prueba del 07/10.
 - Con **20** (`racha_objetivo`) `gv_cc_sombra_tick` abre **UNA tarea por empresa** en el Planify de **Luis (52)**: «Implementar
   cuenta corriente en página LK/CHEF» (`GV_CC_Sombra_Aviso`). **La tarea no prende nada**: implementar sigue pidiendo el pedido explícito.
 - Lectura: `select * from public.gv_cc_sombra_estado;` y el detalle por cliente en `GV_CC_Cruce_Detalle` (sólo service/MCP).
