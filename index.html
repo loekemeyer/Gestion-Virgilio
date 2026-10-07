@@ -6335,7 +6335,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.39"></script>
+<script type="module" src="recepcion.js?v=28.40"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10614,7 +10614,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.39";
+const APP_VERSION = "v28.40";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -40194,16 +40194,49 @@ function _pppMismoLugarChip(np) {
     escapeHtml(otros.map(function (r) { return r.np + " " + _pppMLugFecha(r.dia) + " " + (r.tanda || ""); }).join(" · ")) +
     '. Podrían ir en un solo viaje.">📍 mismo lugar otro día</span>';
 }
+/* v28.40 (Luis, 07/10): CARTEL de tanda con pedidos de zonas que no van en el mismo camion
+   (reglas de grupo de zonas: gv_ppp_web_camion; Retira aparte), o NP de una tanda ya empezada
+   cuya direccion cambio de zona (la zona no se toco). Fuente: gv_ppp_tanda_zona_fuera_regla. Aviso. */
+let _pppZFR = null, _pppZFRTs = 0, _pppZFRBusy = false, _pppZFRErr = false;
+function pppZonaFueraNeed() {
+  if (_pppZFRBusy) return;
+  if (_pppZFR && (Date.now() - _pppZFRTs) < PPP_MLUG_TTL_MS) return;
+  _pppZFRBusy = true;
+  fetch(SUPABASE_URL + "/rest/v1/gv_ppp_tanda_zona_fuera_regla?select=fecha,tanda,motivo,camiones,zonas,detalle",
+    { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } })
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (rows) {
+      _pppZFR = rows || []; _pppZFRErr = false; _pppZFRTs = Date.now(); _pppZFRBusy = false;
+      if (typeof _pppTab !== "undefined" && (_pppTab === "resumen" || _pppTab === "plan")) pppRenderProg();
+    })
+    .catch(function () {
+      _pppZFRBusy = false; _pppZFRTs = Date.now(); _pppZFRErr = true;
+      if (typeof _pppTab !== "undefined" && (_pppTab === "resumen" || _pppTab === "plan")) pppRenderProg();
+    });
+}
+function _pppZonaFueraNota() {
+  if (_pppZFRErr && !_pppZFR) return '<div class="ppp-res-note">No se pudo leer el aviso de tandas con zonas fuera de regla.</div>';
+  const rs = _pppZFR || [];
+  if (!rs.length) return '';
+  return '<div class="ppp-res-note rep ppp-zfr"><b>' + rs.length + '</b> tanda(s) con pedidos de <b>zonas que no van en el mismo camión</b>:' +
+    rs.map(function (r) {
+      return '<div class="ppp-mlug-it"><b>' + escapeHtml(r.tanda || "—") + '</b> ' + escapeHtml(gvDiaTxt(r.fecha)) + ' · ' +
+        escapeHtml(r.motivo || "") + ' · ' + escapeHtml(r.camiones || r.zonas || "") +
+        (r.detalle ? ' <span style="opacity:.75">(' + escapeHtml(r.detalle) + ')</span>' : '') + '</div>';
+    }).join('') + '</div>';
+}
 function pppResumenHtml(prog) {
   pppDemAnclaNeed();
   pppNpOrigNeed();
   pppMismoLugarNeed();   // v28.34 (Luis, D6)
+  pppZonaFueraNeed();    // v28.40 (Luis): tanda con zonas de camiones distintos
   const conF = prog.filter(function (p) { return (p.fecha_entrega || "").trim(); });
   // v9.80 — Retira NO lleva fecha de entrega (el cliente retira del depósito, sin camión):
   // no es un error, así que NO cuenta como "sin Fecha de Entrega" (antes inflaba el aviso).
   const _esRetira = function (p) { const z = String(p.zona || "").trim() || pppZonaDeBarrio(p.localidad || ""); return String(z).toLowerCase() === "retira"; };
   const sinF = prog.filter(function (p) { return !(p.fecha_entrega || "").trim() && !_esRetira(p); }).length;
   let head = '';
+  head += _pppZonaFueraNota();   // v28.40
   head += _pppMismoLugarNota();   // v28.34 (Luis, D6): mismo cliente + lugar en días distintos
   // v13.33 (dueño: "los atrasados son un dato para que lo revise alguien de gerencia"): salieron de la
   // solapa Programación y viven acá, en Resumen, que es la solapa de mirar el conjunto.
@@ -44928,6 +44961,7 @@ function pppRenderProg() {
       // ya venía por defecto desde la v17.66. `_pppPlanGridHtml` y `pppPlanTabla` siguen en el
       // archivo (mismo criterio que `gv_ppp_np_desarmar` en la v18.77): lo que no puede volver
       // es la PUERTA.
+      pppZonaFueraNeed(); html += _pppZonaFueraNota();   // v28.40 (Luis)
       pppMismoLugarNeed(); html += _pppMismoLugarNota();   // v28.34 (Luis, D6)
       html += '<div class="pn-wrap">' + (_pppPlanDay ? _pppPlanDiaHtml(programados, _pppPlanDay)
               : _pppArbolHtml(programados)) + '</div>';
@@ -61461,7 +61495,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.39"></script>
+<script src="importacion.js?v=28.40"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64310,10 +64344,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.39"></script>
-<script src="hotsale.js?v=28.39"></script>
-<script src="estadisticas.js?v=28.39"></script>
-<script src="ads.js?v=28.39"></script>
+<script src="cobranzas.js?v=28.40"></script>
+<script src="hotsale.js?v=28.40"></script>
+<script src="estadisticas.js?v=28.40"></script>
+<script src="ads.js?v=28.40"></script>
 
 </body>
 </html>

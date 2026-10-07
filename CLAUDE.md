@@ -8256,3 +8256,17 @@ aunque el feed traiga la de otra dirección de la ficha (la fila «Retira» de l
 1448 (Silvano) con zona «Zona 6» en E92A, que salió el 25/09 como «Retira cliente». **D8 (Luis): LK 0252 (970E +
 971E, importados que llegaron después) queda en E92A, que es su tanda de Retira** — no se le arma tanda nueva.
 Centinela 359. `sql/gv_ppp_web_zona_retira_v2838.sql`.
+
+## ⚠ REGLA (Luis, 2026-10-07, v28.40, D10): cambia la DIRECCIÓN de una NP programada → la ZONA se RECALCULA — y tanda fuera de regla = CARTEL
+
+- Trigger **`gv_ppp_web_zona_recalc`** (BEFORE UPDATE OF direccion, barrio en `PPP_Web_Programacion`): si la NP
+  tiene tanda y su dirección cambia, la zona se recalcula con `gv_ppp_web_zona(barrio, null, direccion)` (la misma
+  cuenta del armado). **Tanda sin empezar** (sin EP/TP/AP/TAP): se aplica. **Empezada**: la zona NO se toca. Todo queda
+  en **`GV_PPP_Zona_Recalc`**. Corre antes que `gv_ppp_web_zona_retira` (el Retira pisa después).
+- **No mueve la NP de tanda**: si la zona nueva va en otro camión, la tanda queda mezclada y lo dice el cartel.
+- **Cartel** en Programación y Resumen (`_pppZonaFueraNota`): vista **`gv_ppp_tanda_zona_fuera_regla`** = tanda (web,
+  sin salir) con pedidos de camiones distintos según `gv_ppp_web_camion` (Retira y sin zona cuentan como camión
+  propio) + NP de tanda empezada cuya dirección cambió de zona. Es AVISO. Al 07/10: 0 filas.
+- ⚠ Medido: `gv_zona_de_barrio('Balvanera')` da **Zona 1** (8 NP de F18B/E97A están en Zona 2 movidas a mano). Si
+  cambia su dirección, pasan a Zona 1 y salen en el cartel.
+- `sql/gv_ppp_web_zona_recalc_v2840.sql`, `tests/ppp-zona-fuera-regla.cjs`, centinelas v28.40.
