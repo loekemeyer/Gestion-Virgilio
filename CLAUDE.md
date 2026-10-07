@@ -8257,7 +8257,7 @@ aunque el feed traiga la de otra dirección de la ficha (la fila «Retira» de l
 971E, importados que llegaron después) queda en E92A, que es su tanda de Retira** — no se le arma tanda nueva.
 Centinela 359. `sql/gv_ppp_web_zona_retira_v2838.sql`.
 
-## ⚠ REGLA (Luis, 2026-10-07, v28.40): A PROGRAMAR — el aviso de «programados que deberían estar en cuarentena» es un bloque PROPIO
+## ⚠ REGLA (Luis, 2026-10-07, v28.41): A PROGRAMAR — el aviso de «programados que deberían estar en cuarentena» es un bloque PROPIO
 
 Orden: **Pedidos a programar → 🚨 CLIENTES PROGRAMADOS QUE DEBERÍAN ESTAR EN CUARENTENA → 🐊 Cuarentena → Clientes nuevos**,
 los cuatro colapsables. El aviso (`aprColCuarYaProg` / `cuarYaProgHtml`, clave `vir_cuaryp_colapsado`) salió de adentro de
