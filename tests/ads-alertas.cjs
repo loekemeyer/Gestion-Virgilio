@@ -94,7 +94,7 @@ const STOCK = [
     out.xl = bajados.map((x) => ({ n: x.nombre.replace(/_\d{8}\.xlsx$/, ""), cab: x.filas[0], f1: x.filas[1], len: x.filas.length,
       anchos: [...x.xml.matchAll(/<col [^>]*width="([\d.]+)"/g)].map((m) => Number(m[1])),
       alto1: /<row r="1"[^>]* ht="72"/.test(x.xml), congela: /state="frozen"/.test(x.xml), ajusta: /fitToWidth="1"/.test(x.xml),
-      a2: (x.xml.match(/<c r="A2"( s="\d+")?/) || [])[1] || "", b2: (x.xml.match(/<c r="B2"( s="\d+")?/) || [])[1] || "", c2: (x.xml.match(/<c r="C2"( s="\d+")?/) || [])[1] || "", negr: /<font><b\/>/.test(x.sty || "") }));
+      a2: (x.xml.match(/<c r="A2"( s="\d+")?/) || [])[1] || "", b2: (x.xml.match(/<c r="B2"( s="\d+")?/) || [])[1] || "", c2: (x.xml.match(/<c r="C2"( s="\d+")?/) || [])[1] || "", negr: /<font><b\/>/.test(x.sty || ""), grilla: /<border><left style="thin">/.test(x.sty || "") && !/<xf numFmtId="0" fontId="\d" fillId="0" borderId="0" xfId="0" applyFont/.test(x.sty || "") }));
     window.adsHoriz(30); await espera(30);
     out.stock30 = [...document.querySelectorAll("#adsOv .ads-body table tbody tr")].map((f) => f.cells[0].textContent);
     const f30 = document.querySelector("#adsOv .ads-body > table tbody tr");
@@ -132,6 +132,7 @@ const STOCK = [
   if (JSON.stringify(r.btnXl) !== JSON.stringify(["10 días", "20 días", "30 días"])) fallas.push("(f) botones Excel por rango: " + JSON.stringify(r.btnXl));
   const x10 = r.xl && r.xl[0], x30 = r.xl && r.xl[1], xt = r.xl && r.xl[2];
   if (!x10 || x10.n !== "ADS_stock_10d" || x10.len !== 2 || x10.cab[2] !== "Saldo 10 d" || x10.cab[3] !== "Stk" || JSON.stringify(x10.f1.slice(0, 10)) !== JSON.stringify(["505", "Cuchillo", -70, 50, 20, 100, "30/09", 350, 250, 71])) fallas.push("(f) Excel stock 10 d: " + JSON.stringify(x10));
+  if (!x10 || !xt || !x10.grilla || !xt.grilla) fallas.push("(r) Excel ADS: todas las celdas con borde (cuadrícula al imprimir)");
   if (!x10 || x10.c2 !== ' s="5"' || !x10.negr) fallas.push("(q) Excel stock: el Saldo (C) en negrita: " + JSON.stringify(x10 && [x10.c2, x10.negr]));
   if (!x30 || x30.n !== "ADS_stock_30d" || x30.len !== 3) fallas.push("(f) Excel stock 30 d: " + JSON.stringify(x30));
   if (!xt || !/^ADS_talleristas_/.test(xt.n) || xt.len !== 4 ||

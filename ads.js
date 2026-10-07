@@ -316,14 +316,18 @@ function _adsXlsxFormato(XLSX, wb, cfg) {
   var F = cfg.fuente ? 1 : 0, W = cfg.wrap ? ' wrapText="1"' : '';
   st = st.replace(/<fonts[\s\S]*?<\/fonts>/, '<fonts count="3"><font><sz val="10"/><name val="Arial"/><family val="2"/></font><font><sz val="' + (cfg.fuente || 10) + '"/><name val="Arial"/><family val="2"/></font><font><b/><sz val="' + (cfg.fuente || 10) + '"/><name val="Arial"/><family val="2"/></font></fonts>')
          .replace(/<cellXfs[\s\S]*?<\/cellXfs>/, '<cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
-           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="' + (cfg.bordeRot ? 1 : 0) + '" xfId="0" applyFont="1"' + (cfg.bordeRot ? ' applyBorder="1"' : '') + ' applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
-           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"' + W + '/></xf>'
-           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1"' + ' applyAlignment="1"><alignment vertical="center"' + W + '/></xf>'   // v28.00 (Luis): TODO centrado en vertical, como su Excel
-           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="' + (cfg.bordeRot ? 2 : 1) + '" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"' + W + '/></xf>'
+           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"' + ' applyAlignment="1"><alignment vertical="center"' + W + '/></xf>'   // v28.00 (Luis): TODO centrado en vertical, como su Excel
+           + '<xf numFmtId="0" fontId="' + F + '" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
            // v28.01 (Luis): columna en NEGRITA (el Saldo del Excel de stock), centrada como los datos
-           + '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"' + W + '/></xf></cellXfs>');
+           + '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"' + W + '/></xf></cellXfs>');
   // v27.91 (Luis): el rótulo lleva el borde de abajo grueso de su Excel
-  if (cfg.bordeRot) st = st.replace(/<borders[\s\S]*?<\/borders>/, '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="medium"><color indexed="64"/></bottom><diagonal/></border></borders>');
+  // v28.28 (Luis): TODOS los bordes marcados (cuadrícula al imprimir): 1 = fino en las 4 caras; 2 = el rótulo con el de abajo grueso.
+  var _T = '<color indexed="64"/>';
+  st = st.replace(/<borders[\s\S]*?<\/borders>/, '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>'
+    + '<border><left style="thin">' + _T + '</left><right style="thin">' + _T + '</right><top style="thin">' + _T + '</top><bottom style="thin">' + _T + '</bottom><diagonal/></border>'
+    + '<border><left style="thin">' + _T + '</left><right style="thin">' + _T + '</right><top style="thin">' + _T + '</top><bottom style="medium">' + _T + '</bottom><diagonal/></border></borders>');
   cfb.FileIndex[iSt].content = enc.encode(st);
   var izq = {}; (cfg.izq || []).forEach(function (i) { izq[i] = 3; }); (cfg.izqSin || []).forEach(function (i) { izq[i] = 4; }); (cfg.negrita || []).forEach(function (i) { izq[i] = 5; });
   var colN = function (L) { var n = 0; for (var k = 0; k < L.length; k++) n = n * 26 + (L.charCodeAt(k) - 64); return n - 1; };
