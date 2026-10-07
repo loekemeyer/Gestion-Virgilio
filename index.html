@@ -6381,7 +6381,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.47"></script>
+<script type="module" src="recepcion.js?v=28.48"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10660,7 +10660,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.47";
+const APP_VERSION = "v28.48";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -29020,7 +29020,7 @@ async function showRacksBajarModal(legajo, _resume) {
      entrada mandaba un RKI nuevo y el tiempo anterior caía a tiempo muerto (94, 05/10: 0:32 en 11:18–11:50). */
   if (!_resume && _rkb && !_rkb._cerrado && String(_rkb.legajo) === String(legajo || "")) { rkbRender(); return; }
   const _rkIni = _gvTramoVivo(legajo, "racks");
-  if (_resume) { _rkb = _resume; _rkb._cerrado = false; _rkb.tsInicio = _rkIni || Date.now(); if (!_rkIni) { try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {} } rkbRender(); return; }   // v23.66: tramo nuevo · v26.83: o el que sigue abierto
+  if (_resume) { _rkb = _resume; _rkb._cerrado = false; _rkb.tsInicio = _rkIni || Date.now(); if (!_rkIni) { try { gvRacksTramo("RKI", _rkb.legajo, _rkb.tsInicio); } catch (_e) {} } rkbRender(); return; }   // v23.66: tramo nuevo · v26.83: o el que sigue abierto
   try {
     const res = await Promise.all([stockFetchSaldos(), loadArtNombres(), rkbFetchCxM(), stockFetchArtFactors(), ocgFetchCapacidad().catch(function () { return {}; }),
       (async function () { try { return await ocgDemanda(true); } catch (_e) { return {}; } })()]);   // v25.89: demanda, para la prioridad
@@ -29048,7 +29048,7 @@ async function showRacksBajarModal(legajo, _resume) {
         return (parseInt(x.cod, 10) || 0) - (parseInt(y.cod, 10) || 0);
       });
     _rkb = { legajo: String(legajo || ""), items: items, saldosN: sN, cxmMap: cxmMap, locsMap: locsMap, capMap: capMap, filtro: "", tsInicio: _rkIni || Date.now() };
-    if (!_rkIni) { try { gvRacksTramo("RKI", _rkb.legajo); } catch (_e) {} }   // v23.66 · v26.83: sin RKI nuevo si la bajada sigue abierta
+    if (!_rkIni) { try { gvRacksTramo("RKI", _rkb.legajo, _rkb.tsInicio); } catch (_e) {} }   // v23.66 · v26.83: sin RKI nuevo si la bajada sigue abierta
     rkbRender();
   } catch (e) { const b = document.getElementById("rkbBody"); if (b) b.innerHTML = '<div class="rkb-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -29291,7 +29291,7 @@ function gvRacksTramo(op, legajo, iniMs, texto) {
      Historial con su duración. Vale también para el Ingreso a racks (IRI/IRT). */
   try {
     const st = getLegajoState(leg) || {}; const k = (op === "RKI" || op === "RKB") ? "racks" : "ir";
-    if (op === "RKI" || op === "IRI") st[k] = { active: true, ts: nowMs };
+    if (op === "RKI" || op === "IRI") st[k] = { active: true, ts: iniMs || nowMs };   // v28.48: la MISMA hora que el tramo del módulo (antes 2 Date.now() distintos)
     else {
       const ini = (st[k] && st[k].ts) || iniMs || nowMs; st[k] = { active: false };
       pushHistoryForLegajo(leg, { ts: nowMs, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""),
@@ -29655,7 +29655,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
      «Cerrar» minimiza y volver a entrar sigue el MISMO tramo (aunque la app se haya reiniciado). */
   if (!_resume && _ir && !_ir._cerrado && String(_ir.legajo) === String(legajo || "")) { irRender(); return; }
   const _irIni = _gvTramoVivo(legajo, "ir");
-  if (_resume) { _ir = _resume; _ir._cerrado = false; _ir.tsInicio = _irIni || Date.now(); if (!_irIni) { try { gvRacksTramo("IRI", _ir.legajo); } catch (_e) {} } irRender(); return; }   // v23.66: tramo nuevo
+  if (_resume) { _ir = _resume; _ir._cerrado = false; _ir.tsInicio = _irIni || Date.now(); if (!_irIni) { try { gvRacksTramo("IRI", _ir.legajo, _ir.tsInicio); } catch (_e) {} } irRender(); return; }   // v23.66: tramo nuevo
   try {
     const plani = await racksFetchPlani();
     await loadArtNombres();
@@ -29671,7 +29671,7 @@ async function showIngresoRacksModal(legajo, _resume, _modoInit) {
     });
     libres.sort(function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); });
     _ir = { legajo: String(legajo || ""), cxm: cxm, saldos: saldos, libres: libres, ocupados: ocupados, modo: (_modoInit === "nacional" ? "nacional" : "import"), origen: "a_guardar", codPick: "", cod: "", masters: 0, inner: 0, sector: (libres[0] || ""), emp: "LK", done: [], confirming: false };
-    _ir.tsInicio = _irIni || Date.now(); if (!_irIni) { try { gvRacksTramo("IRI", _ir.legajo); } catch (_e) {} }   // v23.66: el tramo de racks arranca al abrir · v26.83: o sigue el abierto
+    _ir.tsInicio = _irIni || Date.now(); if (!_irIni) { try { gvRacksTramo("IRI", _ir.legajo, _ir.tsInicio); } catch (_e) {} }   // v23.66: el tramo de racks arranca al abrir · v26.83: o sigue el abierto
     irRender();
   } catch (e) { const b = document.getElementById("irBody"); if (b) b.innerHTML = '<div class="ir-empty">Error: ' + escapeHtml(e.message || String(e)) + '</div>'; }
 }
@@ -61562,7 +61562,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.47"></script>
+<script src="importacion.js?v=28.48"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64411,10 +64411,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.47"></script>
-<script src="hotsale.js?v=28.47"></script>
-<script src="estadisticas.js?v=28.47"></script>
-<script src="ads.js?v=28.47"></script>
+<script src="cobranzas.js?v=28.48"></script>
+<script src="hotsale.js?v=28.48"></script>
+<script src="estadisticas.js?v=28.48"></script>
+<script src="ads.js?v=28.48"></script>
 
 </body>
 </html>
