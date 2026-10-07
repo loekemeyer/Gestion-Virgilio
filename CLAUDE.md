@@ -6440,6 +6440,11 @@ dictó Luis. Al 22/09 **el dato y el centinela están aplicados; las dos mitades
    entregas de los dos por separado desde el 01/06 — 506 (Log/ Fabr 3.439 vs Blistpack 203), 659
    (42 vs 8) y 764 (49 vs 8). ⚠ Y recalcula `cantidad_recibida` y `estado`: va con backup.
 
+⚠ **v28.33 (Luis, 07/10): el cron de las 07:00 (`generar_ocs_automaticas`) también pasa por `gv_oc_emite_a`.**
+Insertaba con el proveedor crudo: la OC de los fabricantes salía a su nombre y la regeneración manual de las 11:03 (a
+Log/ Fabr) dejó 10 códigos con dos OC. Se anularon las 11 duplicadas (backup `zz_backups."GV_Backup_OC_dup_20261007"`).
+Centinela `gv_oc_emite_a\(prov\)`. `sql/gv_oc_auto_emite_a_v2833.sql`.
+
 ### ✅ v21.23: `OC_Maximos` de 544 y 560 → Pedernera (Luis: *"si, corregí 544 y 560 a Pedernera"*)
 
 Hasta la v21.22 convivían **las dos configuraciones para el mismo fabricante**: de los 7 códigos
