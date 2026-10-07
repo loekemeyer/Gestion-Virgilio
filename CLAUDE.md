@@ -5787,6 +5787,18 @@ Lo que pasa adentro de un módulo abierto con «sí» (cada código del picking,
 ⚠ **v27.65 (Thomas, D16: *"si entro por tv pero no marco nada, es tiempo muerto"*): los monitores leen el INGRESO de verdad.** TV, Mon. Admin y el monitor del index leían `Fichadas_Virgilio` (muerta desde el 27/05); hoy leen **`gv_monitor_ingresos(desde, hasta)`** (SECURITY DEFINER, anon; primer ingreso del día por legajo en `GV_Dispositivo_Login`, tipo operario, tope 8 días). El que entró con la clave y no registró nada sale **«entró · sin arrancar (tiempo muerto)»** desde su hora de ingreso. `sql/gv_monitor_ingresos_v2765.sql`.
 Va igual en Registro Producción 3.0 (v30.09). `tests/legajo1-confirma.cjs`.
 
+## ⚠ REGLA (Thomas, 2026-10-07, v27.68): DOS RELOJES — la LLEGADA es con el código de la TV; el SUELDO arranca en la 1.ª tarea
+
+| para qué | desde cuándo cuenta la jornada | dónde |
+|---|---|---|
+| **monitor, TV, Mon. Admin y alarma de inactivo** | el primer ingreso **con el código de la TV** (`GV_Dispositivo_Login.metodo in ('clave_tv','nombre')`; `nombre` = «No estoy en la lista», que también pasa por el código) | `gv_monitor_horas_operario_dia`, `gv_monitor_ingresos`, `gv_alerta_inactivo_servidor` (marcador `v27.68-clavetv`) |
+| **liquidación de sueldos** (xlsx de horas) | el **primer registro productivo** (primer evento que no es automático, anulado `X` ni Terminar Día) — **no** la llegada | `gv_horas_operario_detalle_v2` (marcador `v27.68-sueldo1er`) |
+
+- Un **legajo tipeado** (celulares con versión vieja, previa a la v27.56) o una sesión guardada **no es llegada**: no
+  dispara la alarma ni marca «entró · sin arrancar». Caso 277 el 07/10 (08:27, sin tareas) y 237 el 06/10.
+- La única forma de ingresar es el código de la TV desde la v27.56; los celulares viejos se actualizan solos.
+- Huella del monitor re-congelada (`74a2aeae…`), 4 centinelas v27.68. `sql/gv_llegada_clave_tv_sueldos_v2768.sql`.
+
 ## ⚠ REGLA (06/10/2026, v27.46): el DESHACER (60 s) del operario va por RPC — nunca DELETE
 
 Caso **F46A** (legajo 191, 17:39): el operario tocó «↩ Deshacer» sobre su EP, el celular mandó
