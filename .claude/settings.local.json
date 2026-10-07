@@ -143,7 +143,9 @@
       "Read(//home/user/**)",
       "Bash(BUMP_FORZAR=1 node scripts/bump-version.cjs 28.21)",
       "Bash(BUMP_FORZAR=1 node scripts/bump-version.cjs 28.22)",
-      "Bash(BUMP_FORZAR=1 node scripts/bump-version.cjs 28.23)"
+      "Bash(BUMP_FORZAR=1 node scripts/bump-version.cjs 28.23)",
+      "Bash(BUMP_FORZAR=1 node scripts/bump-version.cjs 28.24)",
+      "Bash(BUMP_FORZAR=1 node scripts/bump-version.cjs 28.25)"
     ]
   }
 }
