@@ -118,7 +118,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     pppPlanAbrir(_pppDateKey(hab[0]));
     html = document.getElementById("pppPreview").innerHTML;
     out.volver = /Volver a los 6 días/.test(html);
-    out.head = /class="d2">\d+ de [a-z]+</.test(html) && /VALOR ESTIMADO|Valor estimado/i.test(html) && /\$ 7\.000\.000/.test(html);
+    out.head = /class="d2">(Dom|Lun|Mar|Mié|Jue|Vie|Sáb) \d{2}\/\d{2}</.test(html) && /VALOR ESTIMADO|Valor estimado/i.test(html) && /\$ 7\.000\.000/.test(html);
     // v13.36: el chip lleva el CÓD del cliente (1008 = Astorga, Barracas; 1007 = Cuyana, Mataderos);
     // el cliente y la localidad quedan en el title y ya no hay línea "Recorrido: …".
     out.orden = /title="Astorga Ng S\.A\. · Barracas · NP 98702">1º cód 1008</.test(html) && /4º cód 1007</.test(html) &&

@@ -6335,7 +6335,7 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=28.36"></script>
+<script type="module" src="recepcion.js?v=28.37"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -10614,7 +10614,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v28.36";
+const APP_VERSION = "v28.37";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -36512,7 +36512,7 @@ function _ocupWeekSvg(wd, cap, showSin, todayKey) {
       if (pct < 100) s += '<text x="' + (x + barW / 2) + '" y="' + (y(b.total) - 13).toFixed(1) + '" text-anchor="middle" font-size="8" fill="#16a34a">✓' + pct + '%</text>';
     }
     if (b.sin) { s += '<text x="' + (x + barW / 2) + '" y="' + (baseY + 13) + '" text-anchor="middle" font-size="8.5" fill="' + OCUP_SINFECHA_COL + '" font-weight="700">A prog.</text><text x="' + (x + barW / 2) + '" y="' + (baseY + 24) + '" text-anchor="middle" font-size="7.5" fill="#94a3b8">sin fecha</text>'; }
-    else { const lc = b.isToday ? "#7c3aed" : ((b.dow === 0 || b.dow === 6) ? "#cbd5e1" : "#64748b"); s += '<text x="' + (x + barW / 2) + '" y="' + (baseY + 13) + '" text-anchor="middle" font-size="9" fill="' + lc + '"' + (b.isToday ? ' font-weight="700"' : '') + '>' + _OCUP_DOW[b.dow] + '</text><text x="' + (x + barW / 2) + '" y="' + (baseY + 24) + '" text-anchor="middle" font-size="8.5" fill="' + lc + '">' + b.dom + '/' + b.mon + '</text>'; if (b.isToday) s += '<text x="' + (x + barW / 2) + '" y="' + (padT - 6) + '" text-anchor="middle" font-size="8.5" fill="#7c3aed" font-weight="700">HOY</text>'; s += '<rect x="' + (x - 4) + '" y="' + (baseY + 2) + '" width="' + (barW + 8) + '" height="' + (padB - 4) + '" fill="transparent" ondragover="event.preventDefault()" ondrop="pppOcupDrop(event,\'' + b.key + '\')" onclick="pppOcupDay(\'' + b.key + '\')"></rect>'; }
+    else { const lc = b.isToday ? "#7c3aed" : ((b.dow === 0 || b.dow === 6) ? "#cbd5e1" : "#64748b"); s += '<text x="' + (x + barW / 2) + '" y="' + (baseY + 13) + '" text-anchor="middle" font-size="9" fill="' + lc + '"' + (b.isToday ? ' font-weight="700"' : '') + '>' + _OCUP_DOW[b.dow] + '</text><text x="' + (x + barW / 2) + '" y="' + (baseY + 24) + '" text-anchor="middle" font-size="8.5" fill="' + lc + '">' + String(b.dom).padStart(2, "0") + '/' + String(b.mon).padStart(2, "0") + '</text>'; if (b.isToday) s += '<text x="' + (x + barW / 2) + '" y="' + (padT - 6) + '" text-anchor="middle" font-size="8.5" fill="#7c3aed" font-weight="700">HOY</text>'; s += '<rect x="' + (x - 4) + '" y="' + (baseY + 2) + '" width="' + (barW + 8) + '" height="' + (padB - 4) + '" fill="transparent" ondragover="event.preventDefault()" ondrop="pppOcupDrop(event,\'' + b.key + '\')" onclick="pppOcupDay(\'' + b.key + '\')"></rect>'; }
   }
   s += '<line x1="' + padL + '" y1="' + baseY + '" x2="' + (W - padR) + '" y2="' + baseY + '" stroke="#cbd5e1"/></svg>';
   return s;
@@ -36530,7 +36530,7 @@ function _ocupWeekDetailHtml(wd) {
     return h + '</div></div>';
   }
   let peds = null, ttl = "", tot = 0, armM3 = 0;
-  if (_ocupSelKey) { const d = wd.days.filter(function (x) { return x.key === _ocupSelKey; })[0]; if (d) { peds = d.pedidos.slice(); tot = d.total; armM3 = d.armM3; ttl = "🗓️ " + DOWL[d.dow] + " " + d.dom + "/" + d.mon + " · " + tot.toFixed(2) + " m³ · " + peds.length + " pedido(s)"; } }
+  if (_ocupSelKey) { const d = wd.days.filter(function (x) { return x.key === _ocupSelKey; })[0]; if (d) { peds = d.pedidos.slice(); tot = d.total; armM3 = d.armM3; ttl = "🗓️ " + GV_DOW3[d.dow] + " " + String(d.dom).padStart(2, "0") + "/" + String(d.mon).padStart(2, "0") + " · " + tot.toFixed(2) + " m³ · " + peds.length + " pedido(s)"; } }
   if (!peds) return '<div class="ppp-ocup-empty" style="margin-top:8px">Tocá una barra para ver los pedidos de ese día (o "A prog." para asignar los sin fecha).</div>';
   if (!peds.length) return '<div class="ppp-ocup-detail"><h4>' + escapeHtml(ttl) + '</h4><div class="ppp-ocup-empty">Sin pedidos.</div></div>';
   const pct = tot > 0 ? Math.round(armM3 / tot * 100) : 0;
@@ -41282,7 +41282,7 @@ function _pppDiasHabiles(n, skip) {
     const dow = d.getDay();
     if (dow !== 0 && dow !== 6 && !(_pppNoHabiles && _pppNoHabiles.has(_pppDateKey(d)))) {   // v13.25: ni feriados de la empresa
       if (salt > 0) salt--;
-      else out.push({ key: _pppDateKey(d), date: new Date(d.getTime()), dow: _PN_DOW[dow], dnum: d.getDate(), mon: _PN_MES[d.getMonth()] });
+      else out.push({ key: _pppDateKey(d), date: new Date(d.getTime()), dow: GV_DOW3[dow], dnum: String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0"), mon: "" });   // v28.36: «Mié 07/10»
     }
     d.setDate(d.getDate() + 1);
   }
@@ -43519,7 +43519,7 @@ function _pppPlanGridHtml(programados) {
   const enGrilla = new Set(dias.map(function (d) { return d.key; }));
   const enHojasAnt = new Set(_pppDiasHabiles(hoja * 6).map(function (d) { return d.key; }));
   const hoy = _pppHoyKey();
-  const rangoTxt = dias.length ? (dias[0].dnum + ' ' + dias[0].mon + ' → ' + dias[dias.length - 1].dnum + ' ' + dias[dias.length - 1].mon) : '';
+  const rangoTxt = dias.length ? (dias[0].dow + ' ' + dias[0].dnum + ' → ' + dias[dias.length - 1].dow + ' ' + dias[dias.length - 1].dnum) : '';
   const cap = pppGetCfg().dayCap > 0 ? pppGetCfg().dayCap : 6;
   // v16.97 — % listo / % armado de cada día de la grilla (backend, una sola llamada).
   if (dias.length) pppAvanceNeed(dias[0].key, dias[dias.length - 1].key);
@@ -43599,7 +43599,7 @@ function _pppPlanGridHtml(programados) {
   }
   // v13.17: "Ver hoja 2" (dueño) — los 6 hábiles siguientes; y volver.
   const sig = _pppDiasHabiles(6, (hoja + 1) * 6);
-  const sigTxt = sig.length ? sig[0].dnum + ' ' + sig[0].mon + ' → ' + sig[sig.length - 1].dnum + ' ' + sig[sig.length - 1].mon : '';
+  const sigTxt = sig.length ? sig[0].dow + ' ' + sig[0].dnum + ' → ' + sig[sig.length - 1].dow + ' ' + sig[sig.length - 1].dnum : '';
   h += '<div class="pn-hojas">' +
     (hoja ? '<button class="pn-hoja" onclick="pppPlanHoja(' + (hoja - 1) + ')">← Hoja ' + hoja + '</button>' : '<span></span>') +
     '<button class="pn-hoja" onclick="pppPlanHoja(' + (hoja + 1) + ')">Ver hoja ' + (hoja + 2) + ' →<small>' + escapeHtml(sigTxt) + '</small></button></div>';
@@ -43616,8 +43616,8 @@ function _pppPlanDiaHtml(programados, key, opts) {
   const ped = esVenc ? g.atr : ((g.byDay.get(key) || {}).ped || []);   // v21.37
   const hoy = _pppHoyKey();
   const dt = esVenc ? null : _pppKeyDate(key);
-  const titulo = esVenc ? "Atrasados — la fecha de entrega ya pasó" : (dt.getDate() + " de " + _PN_MESL[dt.getMonth()]);
-  const sub = esVenc ? (ped.length + " pedido" + (ped.length === 1 ? "" : "s") + " que no " + (ped.length === 1 ? "salió" : "salieron") + " · reprogramar o cargar") : (_PN_DOW[dt.getDay()] + (key === hoy ? " · hoy" : ""));
+  const titulo = esVenc ? "Atrasados — la fecha de entrega ya pasó" : gvDiaTxt(dt);
+  const sub = esVenc ? (ped.length + " pedido" + (ped.length === 1 ? "" : "s") + " que no " + (ped.length === 1 ? "salió" : "salieron") + " · reprogramar o cargar") : (key === hoy ? "hoy" : "");
   const cams = _pppCamiones(ped), est = _pppPlanEstDia(ped), val = _pppPlanValor(ped);
   const nCam = cams.filter(function (c) { return c.ruta !== "ret"; }).length;
   let h = inline
@@ -61454,7 +61454,7 @@ async function refreshProductivityCharts(){
   }
 }
 </script>
-<script src="importacion.js?v=28.36"></script>
+<script src="importacion.js?v=28.37"></script>
 
 <!-- =========================================================
      LOGIN GOOGLE (Supabase Auth) — obligatorio.
@@ -64303,10 +64303,10 @@ window.cobrosRenderTab = cobrosRenderTab;
 <script src="modulo_talleristas_edit.js"></script>
 
 <!-- Submodulo Cobranzas (v23.98, Luis 29/09): pantalla propia con pestanas + ficha de cliente -->
-<script src="cobranzas.js?v=28.36"></script>
-<script src="hotsale.js?v=28.36"></script>
-<script src="estadisticas.js?v=28.36"></script>
-<script src="ads.js?v=28.36"></script>
+<script src="cobranzas.js?v=28.37"></script>
+<script src="hotsale.js?v=28.37"></script>
+<script src="estadisticas.js?v=28.37"></script>
+<script src="ads.js?v=28.37"></script>
 
 </body>
 </html>

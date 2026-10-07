@@ -8109,7 +8109,7 @@ cajas que fueron a etiquetar a Cervantes el 30/09 vuelven como 865E (se resuelve
 
 Una sola función, **`gvDiaTxt(x)`** (ISO, AAAAMMDD, dd/mm/aaaa o Date → `Mié 07/10`; `GV_DOW3`). La usan Programación,
 Resumen (día y fecha en UNA columna), A Programar (lista, chips, avisos, columna de días), Cambiar de día, Entregados,
-Cuarentena (entrega y 📥 pedido) y el planificador. **En el celular la Programación sigue la regla v20.01 de Thomas**
+Cuarentena (entrega y 📥 pedido), el planificador (tarjetas, cabecera y rango de hojas, v28.37) y Ocupación. **En el celular la Programación sigue la regla v20.01 de Thomas**
 (sólo «7/10»: el día y los ceros van en `.pga-sem` / `.pga-m0`, que el CSS esconde). Al agregar una fecha a la PPP, va por `gvDiaTxt`.
 
 ## ⚠ REGLA (Luis, 2026-10-06, v27.12): COMENTARIOS por recepción en Pendientes (Recepción de Mercadería)
