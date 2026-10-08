@@ -1,0 +1,13 @@
+-- v28.66 (Luis, 08/10/2026) · PROYECTO LK (kwkclwhmoygunqmlegrg) · YA APLICADO 08/10 13:39 UTC
+-- proyeccion_madre viaja con el cero adelante (058, no 58) desde la sync de LK.
+-- Cambio en public.sync_proyeccion_madre_virgilio() (marcador v28.62-cod3), sólo el insert:
+--   select case when upper(btrim(cod)) ~ '^[0-9]{1,2}([^0-9]|$)'
+--               then lpad(substring(upper(btrim(cod)) from '^[0-9]+'), 3, '0')
+--                    || substring(upper(btrim(cod)) from '^[0-9]+(.*)$')
+--               else upper(btrim(cod)) end, proy_cajas_mes, proy_uni_mes, now(),
+--          gv_descripcion, proy_cajas_lk, proy_cajas_chef from _proy_tmp;
+-- Medido después: proyeccion_madre 323 filas, 0 sin el cero; GP2.est_madre OK;
+-- gv_proyeccion_articulo sin cambios (todos sus lectores comparan sin ceros).
+-- ROLLBACK: volver el insert a `select upper(btrim(cod)), ...` (traer la definición viva antes).
+-- NO aplicado (no es 100 % seguro): rellenar stocks_carga_rapida.cod (PK, la escriben el trigger
+-- y refresh_stocks_carga_rapida con la clave pelada) ni los códigos de insumos (1, 10, 57 son legítimos).
