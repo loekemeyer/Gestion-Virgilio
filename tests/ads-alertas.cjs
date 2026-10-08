@@ -172,7 +172,7 @@ const STOCK = [
       { proveedor: "Pettofrezza", pedido: 66, entregado: 10, desde: "2026-09-23", ult_fecha: "2026-10-07" }]; };
     const c609 = ctx._adsStockCalc({ cod: "609", disponible: 0, proy_mes: 30, comp10: 5, saldo10: -10 }, 10);
     ctx._adsPctCod = _sv;
-    if (c609.estCaj.length !== 1 || !/^Pettofrezza: \d+$/.test(c609.estCaj[0])) fallas.push("(o) 609 Excel: " + JSON.stringify(c609.estCaj));
+    if (c609.estCaj.length !== 1 || !/^Pettofrezza: \d+\*$/.test(c609.estCaj[0])) fallas.push("(o) 609 Excel: " + JSON.stringify(c609.estCaj));
     if (c609.estDist.length !== 1 || !/^Pettofrezza/.test(c609.estDist[0])) fallas.push("(n) 609: sólo estima el tallerista de la OC actual: " + JSON.stringify(c609.estDist)); }
   { const _s2 = require("fs").readFileSync(path.join(__dirname, "..", "ads.js"), "utf8");
     if ((_s2.match(/vertical="center"/g) || []).length < 4) fallas.push("(p) Excel: el texto a la izquierda va centrado en vertical (v28.00)"); }

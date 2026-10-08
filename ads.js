@@ -320,7 +320,8 @@ function _adsStockCalc(r, H) {
   var _epTxt = function (y) { return y.oc ? " · cargado en la OC" : ""; };
   var estDist = estArr.length > 1 ? estArr.map(function (y) { return y.p + " " + (estH > 0 ? _adsPct(y.e / estH) : "—") + " (" + _adsN(y.e) + ")" + _epTxt(y); })
               : estArr.length ? [estArr[0].p + " (" + _adsN(estArr[0].e) + ")" + _epTxt(estArr[0])] : [];
-  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estOc: estArr.some(function (y) { return y.oc; }), estDet: estDet, estDist: estDist, estCaj: estArr.map(function (y) { return y.p + ": " + _adsN(y.e); }),
+  return { disp: disp, proy: proy, comp: comp, em: proy * H / 30, saldo: Number(r["saldo" + H]), estH: pc.length ? estH : null, estOc: estArr.some(function (y) { return y.oc; }), estDet: estDet, estDist: estDist, estCaj: estArr.map(function (y) { return y.p + ": " + _adsN(y.e) + (y.oc ? "" : "*"); }),
+           estCalc: estArr.some(function (y) { return !y.oc; }),
            pedP: pc.length ? totPed : null, recP: pc.length ? recP : null, pctP: pc.length && totPed > 0 ? recP / totPed : null,
            fechaUlt: fechaUlt, dist: dist };
 }
@@ -426,13 +427,14 @@ function adsExcelStock(H) {
   // todo con ajuste de texto, sus anchos y sus rótulos; el alto de cada fila según el texto más largo.
   // v27.91 (Luis, 07/10, «ADS_stock_10d_20261007_3»): optimización horizontal — cada tallerista en su sub-fila
   // (salto de línea dentro de la celda), descripción sin ajuste, rótulo con borde de abajo, escala 75 (v27.99: «_5», G 8 · L 19,14).
+  // v (Luis, 08/10): «*» en Entr est OC y en Entr. est. x tall. = CALCULADO (OC × % que viene entregando), no cargado a mano en la OC.
   // v28.01 (Luis): el Saldo es lo más importante — primera columna de datos (C) y en negrita.
   var aoa = [["Cód", "Descripción", "Saldo " + H + " d", "Stk", "Comprom " + H + " d", "E M " + H + " d",
               "Fecha últ. OC", "Ped período", "Rec período", "% período", "Entr est OC", "Entr. est. x tall.", "Proporción"]];
   f.forEach(function (r) {
     var c = _adsStockCalc(r, H);
     aoa.push([String(r.cod), r.descripcion || "", _adsNum(c.saldo), c.disp, c.comp, Math.round(c.em),
-      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), _adsNum(c.estH), c.estCaj.join("\n"), c.dist.join("\n")]);
+      c.fechaUlt ? _adsFecha(c.fechaUlt) : "sin OC", _adsNum(c.pedP), _adsNum(c.recP), _adsPctNum(c.pctP), (c.estH != null && c.estCalc ? _adsNum(c.estH) + "*" : _adsNum(c.estH)), c.estCaj.join("\n"), c.dist.join("\n")]);
   });
   return _adsXlsx(aoa, "Quiebre " + H + " d", "ADS_stock_" + H + "d",
     { anchos: ADS_XLS_STOCK_ANCHOS, izq: [11, 12], izqSin: [1], negrita: [2], fuente: 14, altoRot: 72, wrap: true, bordeRot: true, escala: 68, margenStd: true, altos: _adsAltos(aoa, ADS_XLS_STOCK_ANCHOS, [11, 12], 2, 1.4) });

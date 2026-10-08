@@ -13,6 +13,7 @@ const fallas = [];
 let c = vm.runInContext(`_ads.epOc = {}; _adsStockCalc({ cod: "550", saldo10: -5 }, 10)`, ctx);
 if (c.estH !== 5 + 20 || c.estOc) fallas.push("sin dato: OC × % − recibido (Garcia 50×20 %−5 = 5 + Poly 40×50 % = 20): " + c.estH);
 c = vm.runInContext(`_ads.epOc = {}; _ads.epOc[_adsEpKey("Garcia", "550", "2026-10-07")] = 60; _adsStockCalc({ cod: "550", saldo10: -5 }, 10)`, ctx);
+if (!c.estCaj.some(t => /^Garcia: 55$/.test(t)) || !c.estCaj.some(t => /^Poly: 20\*$/.test(t)) || !c.estCalc) fallas.push("v28.53 asterisco = calculado: " + JSON.stringify(c.estCaj));
 if (c.estH !== 55 + 20 || !c.estOc) fallas.push("Garcia declaró 60 en la OC − 5 recibidas = 55: " + c.estH);
 const c30 = vm.runInContext(`_adsStockCalc({ cod: "550", saldo30: -5 }, 30)`, ctx);
 if (c30.estH !== c.estH) fallas.push("no escala con el plazo (a 30 d igual que a 10): " + c30.estH);
